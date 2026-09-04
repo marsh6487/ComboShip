@@ -226,10 +226,19 @@ constexpr int kMaxPrereqTries = 4; // Tier-1 repicks of just the portal prerequi
 // out of the cross pool, owned-from-start for logic, and appended to the OOT placements.
 // startingGame (#135): GAME_MM roots MM from the start instead of behind the portal; the portal
 // prerequisites are still derived, as the re-entry guarantee for a player who strays into OOT.
-inline CombinedFillResult CrossWorldCombinedFill(
-    const std::string& sohDumpJson, const std::string& mmDumpJson, uint32_t masterSeed, const OracleFns& ootOracle,
-    const OracleFns& mmOracle, ComboRando::ComboGenProgress* progress = nullptr, const std::string& forcedOotJson = "",
-    OotAccess ootAccess = OotAccess::ALL_REACHABLE, CwGoal goal = {}, GameId startingGame = GAME_OOT) {
+// A shared item exists once across both games: obtaining either half grants the other at runtime
+// (NEI's FleetSharedItems), so the fill keeps one copy and credits both logics when it is reached.
+struct CwSharedPair {
+    std::string ootName;
+    std::string mmName;
+};
+
+inline CombinedFillResult
+CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDumpJson, uint32_t masterSeed,
+                       const OracleFns& ootOracle, const OracleFns& mmOracle,
+                       ComboRando::ComboGenProgress* progress = nullptr, const std::string& forcedOotJson = "",
+                       OotAccess ootAccess = OotAccess::ALL_REACHABLE, CwGoal goal = {}, GameId startingGame = GAME_OOT,
+                       const std::string& sharedPairsJson = "") {
     CombinedFillResult result;
     result.success = false;
 
@@ -319,6 +328,70 @@ inline CombinedFillResult CrossWorldCombinedFill(
         std::cerr << "[ComboShip] CrossWorldCombinedFill: " << result.error << "\n";
         return result;
     }
+    // --- Shared items: one copy per pair ---
+    // The OOT copy stays (MM's logic is credited through the pair below); MM's copies leave the pool
+    // and the MM balance pass pads the gap with MM junk. Pairs are only ever a subset, so a game with
+    // no shuffle of that item simply contributes no copies.
+    std::vector<CwSharedPair> sharedPairs;
+    if (!sharedPairsJson.empty()) {
+        try {
+            for (const auto& p : nlohmann::json::parse(sharedPairsJson)) {
+                std::string oot = p.value("oot", "");
+                std::string mm = p.value("mm", "");
+                if (!oot.empty() && !mm.empty())
+                    sharedPairs.push_back({ oot, mm });
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[ComboShip] CrossWorldCombinedFill: shared-pairs parse error, sharing off: " << e.what()
+                      << "\n";
+            sharedPairs.clear();
+        }
+        size_t dedupedCopies = 0;
+        auto countNamed = [](const std::vector<CwItem>& v, Game g, const std::string& name) {
+            return std::count_if(v.begin(), v.end(), [&](const CwItem& i) { return i.game == g && i.name == name; });
+        };
+        auto dropNamed = [&](std::vector<CwItem>& v, Game g, const std::string& name) {
+            const size_t before = v.size();
+            v.erase(std::remove_if(v.begin(), v.end(), [&](const CwItem& i) { return i.game == g && i.name == name; }),
+                    v.end());
+            dedupedCopies += before - v.size();
+        };
+        for (const auto& pair : sharedPairs) {
+            const bool ootHasCopies =
+                countNamed(advItems, GAME_OOT, pair.ootName) + countNamed(junkItems, GAME_OOT, pair.ootName) > 0;
+            const bool mmHasCopies =
+                countNamed(advItems, GAME_MM, pair.mmName) + countNamed(junkItems, GAME_MM, pair.mmName) > 0;
+            if (ootHasCopies && mmHasCopies) {
+                dropNamed(advItems, GAME_MM, pair.mmName);
+                dropNamed(junkItems, GAME_MM, pair.mmName);
+            }
+        }
+        std::cout << "[ComboShip] CrossWorldCombinedFill: shared items — " << sharedPairs.size() << " pairs, "
+                  << dedupedCopies << " MM copies removed\n";
+    }
+
+    // Logic credit for shared items: a game owns the other half of every shared item its peer owns.
+    // Applied to the sets the oracles see, never to the sets the fill credits, so bookkeeping stays
+    // one-item-one-pickup.
+    auto withSharedHalves = [&](const std::vector<std::string>& ootOwned, const std::vector<std::string>& mmOwned,
+                                std::vector<std::string>& ootOut, std::vector<std::string>& mmOut) {
+        ootOut = ootOwned;
+        mmOut = mmOwned;
+        if (sharedPairs.empty())
+            return;
+        std::unordered_map<std::string, int> ootCount, mmCount;
+        for (const auto& n : ootOwned)
+            ++ootCount[n];
+        for (const auto& n : mmOwned)
+            ++mmCount[n];
+        for (const auto& pair : sharedPairs) {
+            for (int k = 0; k < ootCount[pair.ootName]; ++k)
+                mmOut.push_back(pair.mmName);
+            for (int k = 0; k < mmCount[pair.mmName]; ++k)
+                ootOut.push_back(pair.ootName);
+        }
+    };
+
     // #135: under an MM start the Mask Shop Key is forced start-with, so a confined placement of it in
     // fixed[] means the force never reached OOT's settings. Warn only — A0 keeps the portal re-openable.
     if (mmStart) {
@@ -664,13 +737,15 @@ inline CombinedFillResult CrossWorldCombinedFill(
         std::unordered_set<std::string> ootReachable, mmReachable;
         // Latched: once OOT can reach the portal it stays open. An MM start roots MM immediately (#135).
         bool portalOpen = !portalGated || mmStart;
+        std::vector<std::string> ootSeen, mmSeen;
         for (;;) {
-            ootReachable = queryReachable(ootOracle, ootOwned);
+            withSharedHalves(ootOwned, mmOwned, ootSeen, mmSeen);
+            ootReachable = queryReachable(ootOracle, ootSeen);
             // Read the portal off THIS OOT query, before any MM check is credited below — that ordering
             // is what stops the fill proving the portal with an item that lives behind it.
             if (!portalOpen)
                 portalOpen = ootOracle.GetPortalOpen() != 0;
-            mmReachable = portalOpen ? queryReachable(mmOracle, mmOwned) : std::unordered_set<std::string>{};
+            mmReachable = portalOpen ? queryReachable(mmOracle, mmSeen) : std::unordered_set<std::string>{};
             bool changed = false;
             for (size_t i = 0; i < placements.size(); ++i) {
                 if (credited[i])

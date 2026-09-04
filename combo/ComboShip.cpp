@@ -214,10 +214,11 @@ static FnVoidArgless MM_PrepareForTransition = nullptr;
 typedef const char* (*FnDumpData)(void);
 static FnDumpData SOH_DumpRandoStaticData = nullptr;
 static FnDumpData MM_DumpRandoStaticData = nullptr;
-static FnDumpData SOH_DumpRandoSettings = nullptr; // {cvar:value} OOT rando settings snapshot
-static FnDumpData SOH_DumpEnabledTricks = nullptr; // [NameTag,...] the player's enabled OOT tricks
-static FnDumpData MM_DumpRandoSettings = nullptr;  // {cvar:value} MM rando settings snapshot
-static FnDumpData SOH_DumpRandoHintData = nullptr; // OOT hint text/options schema (cross-hint Phase 2)
+static FnDumpData SOH_DumpRandoSettings = nullptr;   // {cvar:value} OOT rando settings snapshot
+static FnDumpData SOH_DumpSharedItemPairs = nullptr; // NEI shared items: one copy per pair, cross-credited logic
+static FnDumpData SOH_DumpEnabledTricks = nullptr;   // [NameTag,...] the player's enabled OOT tricks
+static FnDumpData MM_DumpRandoSettings = nullptr;    // {cvar:value} MM rando settings snapshot
+static FnDumpData SOH_DumpRandoHintData = nullptr;   // OOT hint text/options schema (cross-hint Phase 2)
 // ComboShip: cross-hint Phase 3 — apply combo-generated hints + tell OOT whether this seed has any.
 typedef void (*FnApplyHints)(const char*);
 typedef void (*FnSetHintsPresent)(int);
@@ -1631,7 +1632,8 @@ static void RunComboFill(std::string inputSeed, ComboRando::ComboGenProgress* pr
         ComboRando::OotAccess ootAccess = ComboRando::OotAccessFromDump(sohDump);
         auto result =
             ComboRando::CrossWorldCombinedFill(sohDump, mmDump, masterSeed, ootOracle, mmOracle, progress, forcedOot,
-                                               ootAccess, goal, mmStart ? ComboRando::GAME_MM : ComboRando::GAME_OOT);
+                                               ootAccess, goal, mmStart ? ComboRando::GAME_MM : ComboRando::GAME_OOT,
+                                               SOH_DumpSharedItemPairs ? SOH_DumpSharedItemPairs() : "");
 
         if (result.success) {
             spoiler = result.spoilerJson;
@@ -1968,7 +1970,8 @@ static int RunComboGenTest(int numSeeds, uint32_t seedBase) {
             }
             result = ComboRando::CrossWorldCombinedFill(sohDump, mmDump, seed, ootOracle, mmOracle, nullptr, forcedOot,
                                                         ComboRando::OotAccessFromDump(sohDump), {},
-                                                        mmStart ? ComboRando::GAME_MM : ComboRando::GAME_OOT);
+                                                        mmStart ? ComboRando::GAME_MM : ComboRando::GAME_OOT,
+                                                        SOH_DumpSharedItemPairs ? SOH_DumpSharedItemPairs() : "");
             if (!result.success && mmStart && startCfg == 2)
                 pinStartOot = true;
             Combo_MM_Rando_Restore(); // reset the MM oracle's snapshot guard for the next fill
@@ -2064,7 +2067,8 @@ static void RunComboPlaythrough(const std::string& inputSeed) {
         }
         fill = ComboRando::CrossWorldCombinedFill(sohDump, mmDump, masterSeed, ootOracle, mmOracle, nullptr, forcedOot,
                                                   ComboRando::OotAccessFromDump(sohDump), {},
-                                                  mmStart ? ComboRando::GAME_MM : ComboRando::GAME_OOT);
+                                                  mmStart ? ComboRando::GAME_MM : ComboRando::GAME_OOT,
+                                                  SOH_DumpSharedItemPairs ? SOH_DumpSharedItemPairs() : "");
         if (!fill.success) {
             if (mmStart && startCfg == 2)
                 pinStartOot = true;
@@ -2771,6 +2775,7 @@ int main(int argc, char** argv) {
     SOH_DumpRandoStaticData = (FnDumpData)GetSym(sohModule, "SOH_DumpRandoStaticData");
     MM_DumpRandoStaticData = (FnDumpData)GetSym(mmModule, "MM_DumpRandoStaticData");
     SOH_DumpRandoSettings = (FnDumpData)GetSym(sohModule, "SOH_DumpRandoSettings");
+    SOH_DumpSharedItemPairs = (FnDumpData)GetSym(sohModule, "SOH_DumpSharedItemPairs");
     SOH_DumpEnabledTricks = (FnDumpData)GetSym(sohModule, "SOH_DumpEnabledTricks");
     MM_DumpRandoSettings = (FnDumpData)GetSym(mmModule, "MM_DumpRandoSettings");
     SOH_DumpRandoHintData = (FnDumpData)GetSym(sohModule, "SOH_DumpRandoHintData");

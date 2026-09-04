@@ -73,6 +73,12 @@ set(COMBO_SOURCES
     ComboShip.cpp
 )
 
+# Fleet.rc carries the application icon (FLEET.ico, 16-256px). Windows-only: MSVC compiles .rc, other
+# toolchains would choke on it.
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    list(APPEND COMBO_SOURCES Fleet.rc)
+endif()
+
 # Create executable
 add_executable(ComboShip ${COMBO_SOURCES})
 
@@ -132,7 +138,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     # SINGLE deploy location — the exe and every DLL already land here, so there is no second copy in
     # the per-target build tree (build/x64/combo/<config>) to go stale and cause a stale-DLL launch.
     set_target_properties(ComboShip PROPERTIES
-        OUTPUT_NAME "ComboShip"
+        OUTPUT_NAME "Fleet"
         RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_SOURCE_DIR}/x64/Debug"
         RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/x64/Release"
     )
