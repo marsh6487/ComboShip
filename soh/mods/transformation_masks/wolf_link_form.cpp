@@ -39,6 +39,10 @@
 #include "mods/transformation_masks/wolf_link_form.h"
 #include "soh/frame_interpolation.h"
 
+// Defined in OTRGlobals.cpp. Declared here rather than including that header, which drags the whole
+// OTRGlobals class into this TU for one accessor.
+extern "C" const char* Nei_AssetDir(void);
+
 #include <libultraship/bridge.h>
 #include <libultraship/libultraship.h>
 
@@ -334,9 +338,10 @@ static bool RangeOk(u32 offset, u32 size) {
 }
 
 static std::string FindAssetPath() {
-    std::string path = Ship::Context::LocateFileAcrossAppDirs("nei/wolf_link.bin");
+    const std::string rel = std::string(Nei_AssetDir()) + "/wolf_link.bin";
+    std::string path = Ship::Context::LocateFileAcrossAppDirs(rel);
     if (path.empty()) {
-        path = "nei/wolf_link.bin";
+        path = rel;
     }
     return path;
 }

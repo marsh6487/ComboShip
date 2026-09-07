@@ -238,6 +238,10 @@ __declspec(dllexport)
     void MM_ResumeGame(int fileNum);
 #endif
 void CrashHandler_PrintExt(char* buffer, size_t* pos);
+
+// The NEI asset folder for THIS game ("nei", or "nei/2ship" in ComboShip, where both games share one
+// Ship directory and their packs collide by name). Build every nei/ path from this, never a literal.
+const char* Nei_AssetDir(void);
 #ifdef __cplusplus
 };
 #endif
