@@ -915,8 +915,8 @@ void OTRGlobals::Initialize() {
     // icons, icon_item_24_static medallions) resolve to the companion. This is the EXACT pattern
     // SoH uses to mount MM's mm.o2r alongside OoT (mm_asset_loader.cpp LoadMmO2r).
     {
-        const std::string companionCandidates[] = { "oot.o2r", std::string(Nei_AssetDir()) + "/oot.o2r",
-                                                    "mods/oot.o2r", "../oot.o2r" };
+        const std::string companionCandidates[] = { "oot.o2r", std::string(Nei_AssetDir()) + "/oot.o2r", "mods/oot.o2r",
+                                                    "../oot.o2r" };
         std::string ootPath;
         for (const std::string& candidate : companionCandidates) {
             std::string p = Ship::Context::LocateFileAcrossAppDirs(candidate, appShortName);
