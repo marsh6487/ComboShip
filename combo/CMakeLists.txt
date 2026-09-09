@@ -41,6 +41,7 @@ set(COMBOUI_SOURCES
     gui/ComboHintTracker.cpp
     gui/ComboTimersWindow.cpp
     gui/ComboCosmeticsSync.cpp
+    gui/ComboSettingsSync.cpp
 )
 add_library(comboui SHARED ${COMBOUI_SOURCES})
 set_target_properties(comboui PROPERTIES PREFIX "")

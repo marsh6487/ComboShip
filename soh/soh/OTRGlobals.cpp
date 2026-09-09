@@ -5223,6 +5223,8 @@ extern "C" __declspec(dllexport) void SOH_ApplyComboHints(const char* json) {
     try {
         auto ctx = OTRGlobals::Instance->gRandoContext;
         nlohmann::json hints = nlohmann::json::parse(json);
+        // Before CreateStaticHints: the NPC hints it builds search only OOT's own locations.
+        Combo_SetHintItemAreas(hints.value("ootItemAreas", nlohmann::json::object()).dump());
         int applied = 0, skipped = 0;
         std::unordered_map<int, std::string> built;
         Combo_WalkComboHints(

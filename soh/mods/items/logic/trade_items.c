@@ -192,9 +192,10 @@ u8 TradeAdult_IsMmTradeUseItem(s32 item) {
 }
 
 extern void* MmAssets_LoadResource(const char* path); // MM GI models (object_gi_*) from mm.o2r
+extern void MmGi_SetupObjectSegments(PlayState* play); // shared with the rando GI draws (draw.cpp)
 
 // Presented item -> its MM GI display list(s) from mm.o2r. NULL = nothing in that render bucket. (Room
-// Key / letters are XLU; deeds are OPA; Moon's Tear uses a segmented tex-anim, so it may render rough.)
+// Key / letters are XLU; deeds are OPA.)
 typedef struct {
     u8 item;
     const char* opaPath;
@@ -304,6 +305,9 @@ void TradeAdult_PresentDraw(PlayState* play) {
     }
     Player* player = GET_PLAYER(play);
     Vec3f* hand = &player->leftHandPos;
+
+    // We draw right after Link's limbs, so segment 0x09 still holds his mouth texture path here.
+    MmGi_SetupObjectSegments(play);
 
     OPEN_DISPS(play->state.gfxCtx);
     Matrix_Translate(hand->x + (3.3f * Math_SinS(player->actor.shape.rot.y)), hand->y + 6.0f,

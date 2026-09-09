@@ -3905,6 +3905,26 @@ static MmTradeDrawEntry sMmTradeDrawTable[] = {
     { RG_MM_TINGLE_MAP_STONE_TOWER, gGiTingleMapDL, gGiTingleMapEmptyDL, MM_TRADE_DRAW_OPA01 },
 };
 
+// MM GI DLs branch raw to the object segments that AnimatedMat_Draw fills; OoT leaves 0x08/0x09
+// holding Link's eye/mouth texture PATH strings, so an unguarded branch runs ASCII as F3DEX2 and
+// dies in the vtx handler. Only the Moon's Tear branches (item -> 0x09 opa, glow -> 0x0A xlu).
+// Call before any MM GI DL.
+extern "C" void MmGi_SetupObjectSegments(PlayState* play) {
+    OPEN_DISPS(play->state.gfxCtx);
+
+    Gfx* emptyDL = MmSoul_EmptyDL(play->state.gfxCtx);
+    for (u32 seg = 0x08; seg <= 0x0C; seg++) {
+        gSPSegment(POLY_OPA_DISP++, seg, (uintptr_t)emptyDL);
+        gSPSegment(POLY_XLU_DISP++, seg, (uintptr_t)emptyDL);
+    }
+    gSPSegment(POLY_OPA_DISP++, 0x09,
+               (uintptr_t)Gfx_TexScroll(play->state.gfxCtx, 0, play->state.frames & 0x7F, 32, 32));
+    gSPSegment(POLY_XLU_DISP++, 0x0A,
+               (uintptr_t)Gfx_TexScroll(play->state.gfxCtx, 0, (play->state.frames * 2) & 0x7F, 32, 32));
+
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 void Randomizer_DrawMmTradeQuest(PlayState* play, GetItemEntry* getItemEntry) {
     if (!MmAssets_IsAvailable())
         return;
@@ -3919,29 +3939,12 @@ void Randomizer_DrawMmTradeQuest(PlayState* play, GetItemEntry* getItemEntry) {
     if (entry == NULL)
         return;
 
-    OPEN_DISPS(play->state.gfxCtx);
+    MmGi_SetupObjectSegments(play);
 
-    // Same guard as Randomizer_DrawMmSoul: pre-set segments 0x08-0x0C on both buffers so any
-    // raw segment branch inside an MM GI DL lands on a valid empty DL instead of garbage.
-    {
-        Gfx* emptyDL = MmSoul_EmptyDL(play->state.gfxCtx);
-        for (u32 seg = 0x08; seg <= 0x0C; seg++) {
-            gSPSegment(POLY_OPA_DISP++, seg, (uintptr_t)emptyDL);
-            gSPSegment(POLY_XLU_DISP++, seg, (uintptr_t)emptyDL);
-        }
-    }
+    OPEN_DISPS(play->state.gfxCtx);
 
     // DL0: opaque (shared across all three modes)
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    if (entry->mode == MM_TRADE_DRAW_MOONS_TEAR) {
-        // CRASH FIX (verified by walking the DL bytes in mm.o2r): gGiMoonsTearItemDL contains a
-        // raw gsSPDisplayList branch to SEGMENT 0x09 and gGiMoonsTearGlowDL one to SEGMENT 0x0A —
-        // MM's AnimatedMat_Draw(gGiMoonsTearTexAnim) populates those segments with per-frame
-        // texture-scroll DLs. With the segments unset, the interpreter jumps into garbage and dies
-        // in the vtx handler. Feed both segments a valid 32x32 tex-scroll like MM does.
-        gSPSegment(POLY_OPA_DISP++, 0x09,
-                   (uintptr_t)Gfx_TexScroll(play->state.gfxCtx, 0, play->state.frames & 0x7F, 32, 32));
-    }
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_MODELVIEW | G_MTX_LOAD);
     GSP_MM_DL(POLY_OPA_DISP++, entry->dl1);
@@ -3953,9 +3956,6 @@ void Randomizer_DrawMmTradeQuest(PlayState* play, GetItemEntry* getItemEntry) {
         // Second DL translucent.
         Gfx_SetupDL_25Xlu(play->state.gfxCtx);
         if (entry->mode == MM_TRADE_DRAW_MOONS_TEAR) {
-            // Glow branches to segment 0x0A (see crash-fix note above).
-            gSPSegment(POLY_XLU_DISP++, 0x0A,
-                       (uintptr_t)Gfx_TexScroll(play->state.gfxCtx, 0, (play->state.frames * 2) & 0x7F, 32, 32));
             // Moon's Tear glow is a billboarded sprite (mm GetItem_DrawMoonsTear).
             Matrix_ReplaceRotation(&play->billboardMtxF);
         }

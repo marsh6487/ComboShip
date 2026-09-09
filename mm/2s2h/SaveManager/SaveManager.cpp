@@ -198,9 +198,9 @@ int SaveManager_ReadSaveFile(const std::filesystem::path& fileName, nlohmann::js
 extern "C" int gComboOwlBlobSlot = -1;
 #endif
 
-void SaveManager_InitNewSaveForSlot(int mmFileNum, const unsigned char* ootName8) {
-    Sram_InitNewSave();
 #ifdef COMBO_BUILD
+void SaveManager_BuildComboBaseline(const unsigned char* ootName8) {
+    Sram_InitNewSave();
     // ComboShip: carry the OOT-entered file name over (same font codes in both games; anything
     // outside the shared 0x00-0x3F range, e.g. JP glyphs, becomes a space).
     if (ootName8 != nullptr) {
@@ -228,9 +228,17 @@ void SaveManager_InitNewSaveForSlot(int mmFileNum, const unsigned char* ootName8
     SET_WEEKEVENTREG(WEEKEVENTREG_ENTERED_WEST_CLOCK_TOWN);
     SET_WEEKEVENTREG(WEEKEVENTREG_ENTERED_NORTH_CLOCK_TOWN);
     // ComboShip: stamp RANDO before the write, not after. Every caller re-stamps it moments later, but
-    // this function PERSISTS, so leaving it VANILLA opened a window where the container briefly held a
-    // vanilla MM save, which silently disables every IS_RANDO hook. Combo has no vanilla mode.
+    // the caller below PERSISTS, so leaving it VANILLA opened a window where the container briefly held
+    // a vanilla MM save, which silently disables every IS_RANDO hook. Combo has no vanilla mode.
     gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+}
+#endif
+
+void SaveManager_InitNewSaveForSlot(int mmFileNum, const unsigned char* ootName8) {
+#ifdef COMBO_BUILD
+    SaveManager_BuildComboBaseline(ootName8);
+#else
+    Sram_InitNewSave();
 #endif
     nlohmann::json j;
     // Fresh json with no owlSave, and Combo_WriteGameSave replaces the whole mm section — that is what

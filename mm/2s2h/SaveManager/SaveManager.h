@@ -24,6 +24,11 @@ void SaveManager_DeleteSaveFile(const std::filesystem::path& fileName);
 int SaveManager_ReadSaveFile(const std::filesystem::path& fileName, nlohmann::json& j);
 void SaveManager_PersistSariaHintsAvailable();
 // ComboShip: cross-game save activation/persistence entry points
+#ifdef COMBO_BUILD
+// Playable combo MM save in gSaveContext, nothing written: post-first-cycle Human Link with the
+// mid-playthrough kit. ootName8 (optional) is the OOT-entered file name.
+void SaveManager_BuildComboBaseline(const unsigned char* ootName8);
+#endif
 void SaveManager_InitNewSaveForSlot(int mmFileNum, const unsigned char* ootName8 = nullptr);
 // 0 = loaded; negative = nothing usable was loaded (codes at the definition). Never creates or persists:
 // a failure is logged and leaves the fail-closed sentinel behind, and play still proceeds.

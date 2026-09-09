@@ -228,10 +228,7 @@ constexpr int kMaxPrereqTries = 4; // Tier-1 repicks of just the portal prerequi
 // prerequisites are still derived, as the re-entry guarantee for a player who strays into OOT.
 // A shared item exists once across both games: obtaining either half grants the other at runtime
 // (NEI's FleetSharedItems), so the fill keeps one copy and credits both logics when it is reached.
-struct CwSharedPair {
-    std::string ootName;
-    std::string mmName;
-};
+// CwSharedPair / ResolveSharedPairs live in CrossForeign.h — the display layer needs the same pairs.
 
 inline CombinedFillResult
 CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDumpJson, uint32_t masterSeed,
@@ -328,46 +325,49 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         std::cerr << "[ComboShip] CrossWorldCombinedFill: " << result.error << "\n";
         return result;
     }
-    // --- Shared items: one copy per pair ---
-    // The OOT copy stays (MM's logic is credited through the pair below); MM's copies leave the pool
-    // and the MM balance pass pads the gap with MM junk. Pairs are only ever a subset, so a game with
-    // no shuffle of that item simply contributes no copies.
-    std::vector<CwSharedPair> sharedPairs;
-    if (!sharedPairsJson.empty()) {
-        try {
-            for (const auto& p : nlohmann::json::parse(sharedPairsJson)) {
-                std::string oot = p.value("oot", "");
-                std::string mm = p.value("mm", "");
-                if (!oot.empty() && !mm.empty())
-                    sharedPairs.push_back({ oot, mm });
-            }
-        } catch (const std::exception& e) {
-            std::cerr << "[ComboShip] CrossWorldCombinedFill: shared-pairs parse error, sharing off: " << e.what()
-                      << "\n";
-            sharedPairs.clear();
-        }
-        size_t dedupedCopies = 0;
+    // --- Shared items: the union holds max(oot, mm) copies, not oot + mm ---
+    // OOT's copies stay (MM's logic is credited through the pair below) and the overlapping MM copies
+    // leave the pool; the MM balance pass pads that gap with MM junk. A game that does not shuffle the
+    // item contributes no copies, so the pair simply does not fire.
+    std::vector<CwSharedPair> sharedPairs = ResolveSharedPairs(sharedPairsJson, mmDumpJson);
+    if (!sharedPairs.empty()) {
         auto countNamed = [](const std::vector<CwItem>& v, Game g, const std::string& name) {
-            return std::count_if(v.begin(), v.end(), [&](const CwItem& i) { return i.game == g && i.name == name; });
+            return static_cast<size_t>(
+                std::count_if(v.begin(), v.end(), [&](const CwItem& i) { return i.game == g && i.name == name; }));
         };
-        auto dropNamed = [&](std::vector<CwItem>& v, Game g, const std::string& name) {
-            const size_t before = v.size();
-            v.erase(std::remove_if(v.begin(), v.end(), [&](const CwItem& i) { return i.game == g && i.name == name; }),
+        // remove_if applies the predicate exactly once per element, so `removed` is an exact count.
+        auto dropNamed = [](std::vector<CwItem>& v, Game g, const std::string& name, size_t budget) {
+            size_t removed = 0;
+            v.erase(std::remove_if(v.begin(), v.end(),
+                                   [&](const CwItem& i) {
+                                       if (removed == budget || i.game != g || i.name != name) {
+                                           return false;
+                                       }
+                                       ++removed;
+                                       return true;
+                                   }),
                     v.end());
-            dedupedCopies += before - v.size();
+            return removed;
         };
+        size_t dedupedCopies = 0, firedPairs = 0;
         for (const auto& pair : sharedPairs) {
-            const bool ootHasCopies =
-                countNamed(advItems, GAME_OOT, pair.ootName) + countNamed(junkItems, GAME_OOT, pair.ootName) > 0;
-            const bool mmHasCopies =
-                countNamed(advItems, GAME_MM, pair.mmName) + countNamed(junkItems, GAME_MM, pair.mmName) > 0;
-            if (ootHasCopies && mmHasCopies) {
-                dropNamed(advItems, GAME_MM, pair.mmName);
-                dropNamed(junkItems, GAME_MM, pair.mmName);
+            const size_t ootCopies =
+                countNamed(advItems, GAME_OOT, pair.ootName) + countNamed(junkItems, GAME_OOT, pair.ootName);
+            const size_t mmCopies =
+                countNamed(advItems, GAME_MM, pair.mmName) + countNamed(junkItems, GAME_MM, pair.mmName);
+            // One copy serves both worlds, so the union holds max(oot, mm) — dropping EVERY MM copy
+            // would strip the surplus of an item MM pools more of (52 Pieces of Heart against OOT's 39)
+            // and leave that many MM checks to be padded with cloned junk.
+            const size_t budget = std::min(ootCopies, mmCopies);
+            if (budget == 0) {
+                continue;
             }
+            const size_t fromAdv = dropNamed(advItems, GAME_MM, pair.mmName, budget);
+            dedupedCopies += fromAdv + dropNamed(junkItems, GAME_MM, pair.mmName, budget - fromAdv);
+            ++firedPairs;
         }
         std::cout << "[ComboShip] CrossWorldCombinedFill: shared items — " << sharedPairs.size() << " pairs, "
-                  << dedupedCopies << " MM copies removed\n";
+                  << firedPairs << " with copies on both sides, " << dedupedCopies << " MM copies removed\n";
     }
 
     // Logic credit for shared items: a game owns the other half of every shared item its peer owns.

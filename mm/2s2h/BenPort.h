@@ -204,6 +204,9 @@ void Combo_RequestOwlSaveQuit(void);
 // Load an existing MM save from disk into gSaveContext (C-callable wrapper). 0 = ok; negative = nothing
 // usable was loaded (logged; the load leaves the fail-closed sentinel behind and play still proceeds).
 int Combo_LoadMMSaveFile(int mmFileNum);
+// Recover from that failure: rebuild the slot's MM half from its baked seed, else leave a throwaway
+// baseline that cannot persist. Never let Play start on the zeroed SaveContext.
+void Combo_RepairMMSaveForSlot(int fileNum);
 // ComboShip (#182): 1-based MM file whose owlSave blob is what gSaveContext descends from (-1 = none).
 extern int gComboOwlBlobSlot;
 // ComboShip (#182): mirrors Sram_OpenSave's owl branch; resolveEntrance = 0 keeps combo's arrival point.

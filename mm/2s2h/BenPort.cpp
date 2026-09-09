@@ -782,6 +782,9 @@ void OTRGlobals::Initialize() {
     auto logLevel = static_cast<spdlog::level::level_enum>(CVarGetInteger("gDeveloperTools.LogLevel", defaultLogLevel));
     context->InitLogging(logLevel, logLevel);
     Ship::Context::GetRawInstance()->GetLogger()->set_pattern("[%H:%M:%S.%e] [%s:%#] [%^%l%$] %v");
+    // spdlog's default-logger registry is per MODULE: without adopting the file-backed logger that
+    // InitLogging built inside libultraship, every SPDLOG_ line this binary emits is dropped.
+    spdlog::set_default_logger(Ship::Context::GetRawInstance()->GetLogger());
 
     InitGfxDebugger();
     context->InitFileDropMgr();
@@ -3127,7 +3130,7 @@ extern "C" void Combo_AdoptOOTGlobalOptions(void) {
 
 // C-callable wrapper used by title_setup.c (which is a C file) to load a MM save from disk.
 // 0 = loaded a usable rando save; negative = nothing usable (SaveManager codes, plus -6 = loaded but not
-// a rando save). The caller REBUILDS on a negative code — it never refuses entry.
+// a rando save). A negative code sends the caller to Combo_RepairMMSaveForSlot — entry is never refused.
 extern "C" int Combo_LoadMMSaveFile(int mmFileNum) {
     int result = SaveManager_LoadSaveFile(mmFileNum);
     if (result != 0) {
@@ -3140,6 +3143,42 @@ extern "C" int Combo_LoadMMSaveFile(int mmFileNum) {
         return -6;
     }
     return 0;
+}
+
+// ComboShip: the launcher rebuilds a slot's MM half from the seed baked into its own container.
+extern "C" void (*gComboRebuildMMSave)(int fileNum) = nullptr;
+extern "C" __declspec(dllexport) void MM_SetRebuildSaveCallback(void (*cb)(int)) {
+    gComboRebuildMMSave = cb;
+}
+
+// ComboShip: entry found no usable MM half for this slot. Play must NOT start on the SaveContext_Init
+// zeros: playerForm 0 is Fierce Deity and item id 0 is the Ocarina of Time, so that reads in-game as
+// Fierce Deity holding an inventory of ocarinas. The container is self-contained, so the launcher can
+// rebuild the half from the slot's own seed — the same save file creation would have written.
+extern "C" void Combo_RepairMMSaveForSlot(int fileNum) try {
+    if (gComboRebuildMMSave != nullptr) {
+        gComboRebuildMMSave(fileNum);
+        if (Combo_LoadMMSaveFile(fileNum + 1) == 0) {
+            SPDLOG_WARN("[ComboShip] MM save for slot {} was rebuilt from the slot's baked seed", fileNum);
+            return;
+        }
+    }
+    // No seed bound to the slot (creation already refused that loudly) or the rebuild failed. Enter on a
+    // throwaway baseline and keep the fail-closed sentinel: fileNum 0xFF drops every save write, and
+    // VANILLA keeps IS_RANDO false so no tracker draws this as if it were the slot's real save.
+    SaveManager_BuildComboBaseline(nullptr);
+    gSaveContext.fileNum = 0xFF;
+    gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_VANILLA;
+    SPDLOG_ERROR("[ComboShip] MM save for slot {} is unusable and could not be rebuilt — nothing will be "
+                 "saved; re-create the file",
+                 fileNum);
+    Notification::Emit({
+        .prefix = "ComboShip:",
+        .message = "this file's MM save could not be loaded — progress will NOT be saved, re-create it",
+        .remainingTime = 20.0f,
+    });
+} catch (...) { // reached from C (title_setup) — never unwind past this frame
+    SPDLOG_ERROR("[ComboShip] Combo_RepairMMSaveForSlot threw for slot {}", fileNum);
 }
 
 extern "C" void MM_RunMain(void);
@@ -3887,7 +3926,10 @@ extern "C" __declspec(dllexport) const char* MM_DumpRandoStaticData(void) {
         // ComboShip: "trap" lets the cross-world layer disguise a foreign trap in the other game.
         // ComboShip: "trickNames" are MM's curated fake names, so a foreign trap disguised as this
         // item can lie with a real near-miss name instead of a letter-doubled one.
+        // ComboShip: "token" is the RI_* enum name — SOH_DumpSharedItemPairs still speaks tokens while
+        // this dump emits friendly names, and the launcher needs both to join them.
         nlohmann::json entry = { { "name", Rando::StaticData::GetItemDisplayName(id) },
+                                 { "token", item.spoilerName },
                                  { "advancement", isAdvancement(item) },
                                  { "trap", id == RI_TRAP },
                                  { "trickNames", Rando::StaticData::GetTrickNames(id) } };
@@ -4412,6 +4454,9 @@ extern "C" __declspec(dllexport) void Combo_MM_Rando_Reset(void) {
 // single-threaded, so build-once function-local statics are safe.
 // ComboShip: keyed on the FRIENDLY combo-spoiler names (GetItemDisplayName / GetCheckDisplayName), so
 // the oracle, cross-item grant and price/apply paths all resolve the same normalized names the dump emits.
+// The RI_* token is also accepted: soh's shared-item fan-out (FleetShared_OnNativeObtained) sends the
+// FC table's peer token, which stopped being what this game emits when the dump moved to friendly
+// names. emplace keeps the friendly key when an item's token collides with another item's name.
 static const std::unordered_map<std::string, RandoItemId>& Combo_MM_SpoilerNameToItemId() {
     static const std::unordered_map<std::string, RandoItemId> map = [] {
         std::unordered_map<std::string, RandoItemId> m;
@@ -4419,6 +4464,10 @@ static const std::unordered_map<std::string, RandoItemId>& Combo_MM_SpoilerNameT
             const std::string& n = Rando::StaticData::GetItemDisplayName(id);
             if (!n.empty())
                 m.emplace(n, id);
+        }
+        for (auto& [id, item] : Rando::StaticData::Items) {
+            if (item.spoilerName && item.spoilerName[0] != '\0')
+                m.emplace(item.spoilerName, id);
         }
         return m;
     }();
