@@ -274,10 +274,12 @@ void EnMa1_UpdateSinging(EnMa1* this) {
 
 void EnMa1_Init(Actor* thisx, PlayState* play) {
     EnMa1* this = (EnMa1*)thisx;
+    bool enteredCastleBefore = Flags_GetInfTable(INFTABLE_ENTERED_HYRULE_CASTLE);
     bool malonReturnedFromCastle = GameInteractor_Should(VB_MALON_RETURN_FROM_CASTLE,
                                                          Flags_GetEventChkInf(EVENTCHKINF_TALON_RETURNED_FROM_CASTLE));
     bool malonTaughtEponasSong =
         GameInteractor_Should(VB_MALON_ALREADY_TAUGHT_EPONAS_SONG, CHECK_QUEST_ITEM(QUEST_SONG_EPONA));
+    s32 shouldSpawn;
     s32 pad;
 
     ActorShape_Init(&this->actor.shape, 0.0f, ActorShadow_DrawCircle, 18.0f);
@@ -286,7 +288,22 @@ void EnMa1_Init(Actor* thisx, PlayState* play) {
     Collider_SetCylinder(play, &this->collider, &this->actor, &sCylinderInit);
     CollisionCheck_SetInfo2(&this->actor.colChkInfo, DamageTable_Get(22), &sColChkInfoInit);
 
-    if (!EnMa1_ShouldSpawn(this, play)) {
+    shouldSpawn = EnMa1_ShouldSpawn(this, play);
+    osSyncPrintf(
+        "[MalonSpawnProbe] stage=init scene=%d params=0x%04X placement=%d layer=%d child=%d day=%d rando=%d "
+        "talonReturned=%d enteredCastleBefore=%d enteredCastleAfter=%d eponasSong=%d taughtHook=%d shouldSpawn=%d\n",
+        play->sceneNum, (u16)this->actor.params, this->actor.shape.rot.z, gSaveContext.sceneLayer, LINK_IS_CHILD,
+        IS_DAY, IS_RANDO, Flags_GetEventChkInf(EVENTCHKINF_TALON_RETURNED_FROM_CASTLE), enteredCastleBefore,
+        Flags_GetInfTable(INFTABLE_ENTERED_HYRULE_CASTLE), CHECK_QUEST_ITEM(QUEST_SONG_EPONA), malonTaughtEponasSong,
+        shouldSpawn);
+
+    if (!shouldSpawn) {
+        osSyncPrintf(
+            "[MalonSpawnProbe] stage=kill reason=eligibility-zero scene=%d params=0x%04X placement=%d child=%d "
+            "day=%d talonReturned=%d enteredCastleBefore=%d enteredCastleAfter=%d\n",
+            play->sceneNum, (u16)this->actor.params, this->actor.shape.rot.z, LINK_IS_CHILD, IS_DAY,
+            Flags_GetEventChkInf(EVENTCHKINF_TALON_RETURNED_FROM_CASTLE), enteredCastleBefore,
+            Flags_GetInfTable(INFTABLE_ENTERED_HYRULE_CASTLE));
         Actor_Kill(&this->actor);
         return;
     }
@@ -330,6 +347,12 @@ void EnMa1_Idle(EnMa1* this, PlayState* play) {
 
     if ((play->sceneNum == SCENE_HYRULE_CASTLE) && malonReturnedFromCastle) {
         if (GameInteractor_Should(VB_SEND_MALON_HOME, true)) {
+            osSyncPrintf(
+                "[MalonSpawnProbe] stage=kill reason=send-home scene=%d params=0x%04X talonReturned=%d "
+                "eponasSong=%d taughtHook=%d\n",
+                play->sceneNum, (u16)this->actor.params,
+                Flags_GetEventChkInf(EVENTCHKINF_TALON_RETURNED_FROM_CASTLE), CHECK_QUEST_ITEM(QUEST_SONG_EPONA),
+                malonTaughtEponasSong);
             Actor_Kill(&this->actor);
         }
     } else if (!malonReturnedFromCastle || malonTaughtEponasSong) {

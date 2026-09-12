@@ -3652,11 +3652,39 @@ void Actor_SpawnTransitionActors(PlayState* play, ActorContext* actorCtx) {
 
 Actor* Actor_SpawnEntry(ActorContext* actorCtx, ActorEntry* actorEntry, PlayState* play) {
     gMapLoading = 1;
-    Actor* ret;
+    Actor* ret = NULL;
+    s32 shouldSpawn;
+    const char* progressionActorName = NULL;
 
-    if (GameInteractor_Should(VB_SPAWN_ACTOR_ENTRY, true, actorCtx, actorEntry, play, &ret)) {
+    if (actorEntry->id == ACTOR_EN_SA) {
+        progressionActorName = "Saria";
+    } else if (actorEntry->id == ACTOR_EN_MA1) {
+        progressionActorName = "ChildMalon";
+    }
+
+    if (progressionActorName != NULL) {
+        osSyncPrintf(
+            "[ProgressionActorProbe] actor=%s stage=scene-entry scene=%d params=0x%04X pos=(%d,%d,%d) "
+            "rot=(%d,%d,%d)\n",
+            progressionActorName, play->sceneNum, (u16)actorEntry->params, actorEntry->pos.x, actorEntry->pos.y,
+            actorEntry->pos.z, actorEntry->rot.x, actorEntry->rot.y, actorEntry->rot.z);
+    }
+
+    shouldSpawn = GameInteractor_Should(VB_SPAWN_ACTOR_ENTRY, true, actorCtx, actorEntry, play, &ret);
+    if (progressionActorName != NULL) {
+        osSyncPrintf(
+            "[ProgressionActorProbe] actor=%s stage=spawn-hook scene=%d params=0x%04X allowed=%d override=%p\n",
+            progressionActorName, play->sceneNum, (u16)actorEntry->params, shouldSpawn, (void*)ret);
+    }
+
+    if (shouldSpawn) {
         ret = Actor_Spawn(actorCtx, play, actorEntry->id, actorEntry->pos.x, actorEntry->pos.y, actorEntry->pos.z,
                           actorEntry->rot.x, actorEntry->rot.y, actorEntry->rot.z, actorEntry->params);
+    }
+
+    if (progressionActorName != NULL) {
+        osSyncPrintf("[ProgressionActorProbe] actor=%s stage=spawn-result scene=%d params=0x%04X actor=%p\n",
+                     progressionActorName, play->sceneNum, (u16)actorEntry->params, (void*)ret);
     }
 
     gMapLoading = 0;

@@ -57,6 +57,7 @@ for test_binary in "$stabilization_build/"*_test; do
     printf 'PASS %s\n' "$(basename "$test_binary")"
 done
 python3 -B -m unittest discover -s scripts/diagnostics -p 'test_audit_skull_kid.py' -v
+python3 -B -m unittest scripts.diagnostics.test_saria_spawn_diagnostics -v
 python3 -B scripts/diagnostics/run_audio_runtime_test.py "$stabilization_build" "$cc"
 python3 -B scripts/diagnostics/run_night_combat_test.py "$stabilization_build" "$cc" "$cxx"
 
