@@ -3663,11 +3663,10 @@ Actor* Actor_SpawnEntry(ActorContext* actorCtx, ActorEntry* actorEntry, PlayStat
     }
 
     if (progressionActorName != NULL) {
-        osSyncPrintf(
-            "[ProgressionActorProbe] actor=%s stage=scene-entry scene=%d params=0x%04X pos=(%d,%d,%d) "
-            "rot=(%d,%d,%d)\n",
-            progressionActorName, play->sceneNum, (u16)actorEntry->params, actorEntry->pos.x, actorEntry->pos.y,
-            actorEntry->pos.z, actorEntry->rot.x, actorEntry->rot.y, actorEntry->rot.z);
+        osSyncPrintf("[ProgressionActorProbe] actor=%s stage=scene-entry scene=%d params=0x%04X pos=(%d,%d,%d) "
+                     "rot=(%d,%d,%d)\n",
+                     progressionActorName, play->sceneNum, (u16)actorEntry->params, actorEntry->pos.x,
+                     actorEntry->pos.y, actorEntry->pos.z, actorEntry->rot.x, actorEntry->rot.y, actorEntry->rot.z);
     }
 
     shouldSpawn = GameInteractor_Should(VB_SPAWN_ACTOR_ENTRY, true, actorCtx, actorEntry, play, &ret);

@@ -493,11 +493,11 @@ void EnSa_Init(Actor* thisx, PlayState* play) {
     CollisionCheck_SetInfo2(&this->actor.colChkInfo, NULL, &sColChkInfoInit);
 
     initMode = func_80AF5DFC(this, play);
-    osSyncPrintf(
-        "[SariaSpawnProbe] stage=init scene=%d params=0x%04X cutscene=0x%04X adult=%d rando=%d zeldaLetter=%d "
-        "sariasSong=%d initMode=%d\n",
-        play->sceneNum, (u16)this->actor.params, (u16)gSaveContext.cutsceneIndex, LINK_IS_ADULT, IS_RANDO,
-        Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_ZELDAS_LETTER), CHECK_QUEST_ITEM(QUEST_SONG_SARIA), initMode);
+    osSyncPrintf("[SariaSpawnProbe] stage=init scene=%d params=0x%04X cutscene=0x%04X adult=%d rando=%d zeldaLetter=%d "
+                 "sariasSong=%d initMode=%d\n",
+                 play->sceneNum, (u16)this->actor.params, (u16)gSaveContext.cutsceneIndex, LINK_IS_ADULT, IS_RANDO,
+                 Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_ZELDAS_LETTER), CHECK_QUEST_ITEM(QUEST_SONG_SARIA),
+                 initMode);
 
     switch (initMode) {
         case 2:

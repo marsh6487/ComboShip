@@ -347,12 +347,11 @@ void EnMa1_Idle(EnMa1* this, PlayState* play) {
 
     if ((play->sceneNum == SCENE_HYRULE_CASTLE) && malonReturnedFromCastle) {
         if (GameInteractor_Should(VB_SEND_MALON_HOME, true)) {
-            osSyncPrintf(
-                "[MalonSpawnProbe] stage=kill reason=send-home scene=%d params=0x%04X talonReturned=%d "
-                "eponasSong=%d taughtHook=%d\n",
-                play->sceneNum, (u16)this->actor.params,
-                Flags_GetEventChkInf(EVENTCHKINF_TALON_RETURNED_FROM_CASTLE), CHECK_QUEST_ITEM(QUEST_SONG_EPONA),
-                malonTaughtEponasSong);
+            osSyncPrintf("[MalonSpawnProbe] stage=kill reason=send-home scene=%d params=0x%04X talonReturned=%d "
+                         "eponasSong=%d taughtHook=%d\n",
+                         play->sceneNum, (u16)this->actor.params,
+                         Flags_GetEventChkInf(EVENTCHKINF_TALON_RETURNED_FROM_CASTLE),
+                         CHECK_QUEST_ITEM(QUEST_SONG_EPONA), malonTaughtEponasSong);
             Actor_Kill(&this->actor);
         }
     } else if (!malonReturnedFromCastle || malonTaughtEponasSong) {
