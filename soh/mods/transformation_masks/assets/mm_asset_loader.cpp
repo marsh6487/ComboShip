@@ -16,6 +16,7 @@
  */
 
 #include "mm_asset_loader.h"
+#include "mm_display_list_patch.h"
 #include "mods/sound_translator/mm_audio_sfx.h" // MM SFX engine (Tier C vanilla port)
 #include <filesystem>
 #include <cstring>
@@ -24,14 +25,19 @@
 #include <exception>
 #include <unordered_map>
 #include <vector> // was transitively via OTRGlobals.h before upstream #6636 cleanup
+#include <fast/resource/type/DisplayList.h>
+#include <fast/resource/type/Texture.h>
+#include <fast/resource/type/Vertex.h>
 #include <libultraship/libultraship.h>
 #include <libultraship/log/luslog.h>
 #include <SDL2/SDL.h>
 #include "soh/OTRGlobals.h"
 #include "soh/GameVersions.h"
 #include "soh/ResourceManagerHelpers.h"
+#include "soh/resource/type/Array.h"
 #include "soh/resource/type/Text.h"
 #include "functions.h"           // For Audio_SetFontInstrument, AudioLoad_IsFontLoadComplete
+#include "variables.h"           // Native cull display lists; never assume adjacent arrays.
 #include "message_data_static.h" // MessageTableEntry struct
 
 // SoH globals that hold pointers into Text-resource std::string buffers. After
@@ -561,6 +567,157 @@ void* MmAssets_LoadResourceStrict(const char* path) {
     return nullptr;
 }
 
+static void* MmAssets_LoadFromMmArchive(const char* path, size_t* outSize);
+static std::shared_ptr<Ship::IResource> MmAssets_LoadResourceObjectFromMmArchive(const char* path);
+static const char* MmAssets_StripOtrPrefix(const char* path);
+
+namespace {
+
+struct MmDisplayListGraphContext {
+    const std::unordered_map<uint64_t, std::string>* pathsByHash;
+    std::unordered_map<std::string, Gfx*> inProgress;
+};
+
+struct MmDisplayListResolveContext {
+    MmDisplayListGraphContext* graph;
+    int depth;
+};
+
+static std::unordered_map<std::string, Gfx*> sStrictDisplayListGraphCache;
+static std::vector<std::shared_ptr<std::vector<Gfx>>> sStrictDisplayListGraphStorage;
+static std::vector<std::shared_ptr<Ship::IResource>> sStrictDisplayListTextureStorage;
+
+static Gfx* MmAssets_PatchDisplayListGraph(const std::string& path, MmDisplayListGraphContext& graph, int depth);
+
+static uintptr_t MmAssets_ResolveDisplayListReference(void* context, MmDisplayListReferenceKind kind, uint64_t hash,
+                                                      size_t* resourceSize) {
+    auto* resolve = static_cast<MmDisplayListResolveContext*>(context);
+    *resourceSize = 0;
+    if (kind == MM_DISPLAY_LIST_REFERENCE_CULL) {
+        return hash == 0   ? reinterpret_cast<uintptr_t>(gCullBackDList)
+               : hash == 2 ? reinterpret_cast<uintptr_t>(gCullFrontDList)
+                           : 0;
+    }
+    auto pathIt = resolve->graph->pathsByHash->find(hash);
+    if (pathIt == resolve->graph->pathsByHash->end()) {
+        MMASSETS_LOG("[MM Assets] STRICT graph hash miss: 0x%016llx", static_cast<unsigned long long>(hash));
+        return 0;
+    }
+
+    if (kind == MM_DISPLAY_LIST_REFERENCE_NESTED) {
+        return reinterpret_cast<uintptr_t>(
+            MmAssets_PatchDisplayListGraph(pathIt->second, *resolve->graph, resolve->depth + 1));
+    }
+
+    if (kind == MM_DISPLAY_LIST_REFERENCE_TEXTURE) {
+        auto textureResource = MmAssets_LoadResourceObjectFromMmArchive(pathIt->second.c_str());
+        auto texture = std::dynamic_pointer_cast<Fast::Texture>(textureResource);
+        if (texture == nullptr || texture->ImageData == nullptr) {
+            return 0;
+        }
+        // Keep the private-archive resource alive and bind its pixels directly.
+        // Returning a canonical __OTR__ filepath here would hand resolution back
+        // to the global mod stack, which cannot preserve the mm.o2r archive that
+        // this strict graph just selected and validated.
+        sStrictDisplayListTextureStorage.push_back(std::move(textureResource));
+        return reinterpret_cast<uintptr_t>(texture->ImageData);
+    }
+
+    auto vertexResource = MmAssets_LoadResourceObjectFromMmArchive(pathIt->second.c_str());
+    auto vertex = std::dynamic_pointer_cast<Fast::Vertex>(vertexResource);
+    auto vertexArray = std::dynamic_pointer_cast<SOH::Array>(vertexResource);
+    MmDisplayListVertexResourceView vertexView = {};
+    if (!MmDisplayList_SelectVertexResource(
+            vertex != nullptr ? vertex->GetRawPointer() : nullptr, vertex != nullptr ? vertex->GetPointerSize() : 0,
+            vertexArray != nullptr ? vertexArray->GetRawPointer() : nullptr,
+            vertexArray != nullptr ? vertexArray->GetPointerSize() : 0,
+            vertexArray != nullptr && vertexArray->ArrayType == SOH::ArrayResourceType::Vertex, &vertexView)) {
+        MMASSETS_LOG("[MM Assets] STRICT graph vertex type/miss: %s", pathIt->second.c_str());
+        return 0;
+    }
+    *resourceSize = vertexView.size;
+    return vertexView.pointer;
+}
+
+static Gfx* MmAssets_PatchDisplayListGraph(const std::string& path, MmDisplayListGraphContext& graph, int depth) {
+    if (depth > 8) {
+        MMASSETS_LOG("[MM Assets] STRICT graph depth exceeded: %s", path.c_str());
+        return nullptr;
+    }
+    auto cached = sStrictDisplayListGraphCache.find(path);
+    if (cached != sStrictDisplayListGraphCache.end()) {
+        return cached->second;
+    }
+    auto active = graph.inProgress.find(path);
+    if (active != graph.inProgress.end()) {
+        MMASSETS_LOG("[MM Assets] STRICT graph cycle rejected: %s", path.c_str());
+        return nullptr;
+    }
+
+    auto displayListResource = MmAssets_LoadResourceObjectFromMmArchive(path.c_str());
+    auto displayList = std::dynamic_pointer_cast<Fast::DisplayList>(displayListResource);
+    size_t resourceSize = displayList != nullptr ? displayList->GetPointerSize() : 0;
+    Gfx* source = displayList != nullptr ? static_cast<Gfx*>(displayList->GetRawPointer()) : nullptr;
+    const size_t commandCapacity = resourceSize / sizeof(Gfx);
+    if (source == nullptr || resourceSize % sizeof(Gfx) != 0 || commandCapacity == 0 || commandCapacity > 4096) {
+        MMASSETS_LOG("[MM Assets] STRICT graph invalid DL type/data: %s (%zu bytes)", path.c_str(), resourceSize);
+        return nullptr;
+    }
+
+    auto output = std::make_shared<std::vector<Gfx>>(source, source + commandCapacity);
+    graph.inProgress[path] = output->data();
+
+    std::vector<MmDisplayListCommand> commands(commandCapacity);
+    for (size_t i = 0; i < commandCapacity; ++i) {
+        commands[i].w0 = static_cast<uint32_t>((*output)[i].words.w0);
+        commands[i].w1 = static_cast<uintptr_t>((*output)[i].words.w1);
+    }
+
+    MmDisplayListResolveContext resolve = { &graph, depth };
+    MmDisplayListPatchStats stats = {};
+    const bool valid = MmDisplayList_PatchCommands(commands.data(), commands.size(),
+                                                   MmAssets_ResolveDisplayListReference, &resolve, &stats);
+    if (!valid || stats.unresolved != 0) {
+        MMASSETS_LOG("[MM Assets] STRICT graph rejected: %s (nested=%zu vertices=%zu unresolved=%zu malformed=%zu)",
+                     path.c_str(), stats.nestedPatched, stats.verticesPatched, stats.unresolved, stats.malformed);
+        graph.inProgress.erase(path);
+        return nullptr;
+    }
+
+    for (size_t i = 0; i < commandCapacity; ++i) {
+        (*output)[i].words.w0 = commands[i].w0;
+        (*output)[i].words.w1 = commands[i].w1;
+    }
+    Gfx* result = output->data();
+    sStrictDisplayListGraphStorage.push_back(std::move(output));
+    sStrictDisplayListGraphCache[path] = result;
+    graph.inProgress.erase(path);
+    MMASSETS_LOG("[MM Assets] STRICT graph ready: %s (nested=%zu vertices=%zu textures=%zu cull=%zu)", path.c_str(),
+                 stats.nestedPatched, stats.verticesPatched, stats.texturesPatched, stats.cullPatched);
+    return result;
+}
+
+} // namespace
+
+Gfx* MmAssets_LoadDisplayListGraphStrict(const char* displayListPath) {
+    if (displayListPath == nullptr || !sMmArchive) {
+        return nullptr;
+    }
+
+    static std::unordered_map<uint64_t, std::string> sPathsByHash;
+    if (sPathsByHash.empty()) {
+        auto files = sMmArchive->ListFiles();
+        if (!files) {
+            return nullptr;
+        }
+        for (const auto& [hash, path] : *files) {
+            sPathsByHash[hash] = path;
+        }
+    }
+    MmDisplayListGraphContext graph = { &sPathsByHash, {} };
+    return MmAssets_PatchDisplayListGraph(MmAssets_StripOtrPrefix(displayListPath), graph, 0);
+}
+
 /**
  * Load a resource from mm.o2r and get its size, with mod override support.
  * @param path Resource path
@@ -632,10 +789,7 @@ void* MmAssets_LoadResourceWithSize(const char* path, size_t* outSize) {
  * @param outSize Output: size in bytes (optional, can be NULL)
  * @return Pointer to loaded resource data, or NULL if not found
  */
-static void* MmAssets_LoadFromMmArchive(const char* path, size_t* outSize) {
-    if (outSize)
-        *outSize = 0;
-
+static std::shared_ptr<Ship::IResource> MmAssets_LoadResourceObjectFromMmArchive(const char* path) {
     if (!sMmArchive || !path) {
         MMASSETS_LOG("[MM Assets] LoadFromMmArchive FAIL: archive=%p, path=%s", (void*)sMmArchive.get(),
                      path ? path : "NULL");
@@ -647,11 +801,7 @@ static void* MmAssets_LoadFromMmArchive(const char* path, size_t* outSize) {
         std::string pathStr(path);
         auto cacheIt = sMmResourceCache.find(pathStr);
         if (cacheIt != sMmResourceCache.end() && cacheIt->second) {
-            void* ptr = cacheIt->second->GetRawPointer();
-            size_t size = cacheIt->second->GetPointerSize();
-            if (outSize)
-                *outSize = size;
-            return ptr;
+            return cacheIt->second;
         }
 
         auto resourceManager = OTRGlobals::Instance->context->GetResourceManager();
@@ -673,14 +823,11 @@ static void* MmAssets_LoadFromMmArchive(const char* path, size_t* outSize) {
 
         auto resource = resourceManager->GetResourceLoader()->LoadResource(pathStr, file);
         if (resource) {
-            void* ptr = resource->GetRawPointer();
-            size_t size = resource->GetPointerSize();
-            if (outSize)
-                *outSize = size;
             // Keep resource alive in our cache
             sMmResourceCache[pathStr] = resource;
-            MMASSETS_LOG("[MM Assets] LoadFromMmArchive OK: %s -> %p (%zu bytes)", path, ptr, size);
-            return ptr;
+            MMASSETS_LOG("[MM Assets] LoadFromMmArchive OK: %s -> %p (%zu bytes)", path, resource->GetRawPointer(),
+                         resource->GetPointerSize());
+            return resource;
         }
 
         MMASSETS_LOG("[MM Assets] LoadFromMmArchive FAIL: %s could not be parsed", path);
@@ -688,6 +835,20 @@ static void* MmAssets_LoadFromMmArchive(const char* path, size_t* outSize) {
         MMASSETS_LOG("[MM Assets] Exception in LoadFromMmArchive '%s': %s", path, e.what());
     } catch (...) { MMASSETS_LOG("[MM Assets] Unknown exception in LoadFromMmArchive '%s'", path); }
     return nullptr;
+}
+
+static void* MmAssets_LoadFromMmArchive(const char* path, size_t* outSize) {
+    if (outSize) {
+        *outSize = 0;
+    }
+    auto resource = MmAssets_LoadResourceObjectFromMmArchive(path);
+    if (!resource) {
+        return nullptr;
+    }
+    if (outSize) {
+        *outSize = resource->GetPointerSize();
+    }
+    return resource->GetRawPointer();
 }
 
 /**
