@@ -79,6 +79,13 @@ void* MmAssets_LoadResource(const char* path);
 void* MmAssets_LoadResourceStrict(const char* path);
 
 /**
+ * Load a complete MM display-list graph strictly from mm.o2r. Nested display
+ * lists are recursively converted to direct calls and vertex hashes are
+ * converted to pointers into resources from that same archive.
+ */
+Gfx* MmAssets_LoadDisplayListGraphStrict(const char* displayListPath);
+
+/**
  * Load a resource from mm.o2r and get its size
  * @param path Resource path (e.g., "objects/gameplay_keep/gPlayerAnim_...")
  * @param outSize Output: size in bytes of the resource data
