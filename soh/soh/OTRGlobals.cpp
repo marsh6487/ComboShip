@@ -2444,6 +2444,7 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
 
     auto intp = wnd->GetInterpreterWeak().lock().get();
     intp->mInterpolationIndex = 0;
+    intp->mGameTick = gPlayState != nullptr ? gPlayState->gameplayFrames : 0;
 
     UIWidgets::Colors themeColor =
         static_cast<UIWidgets::Colors>(CVarGetInteger(CVAR_SETTING("Menu.Theme"), UIWidgets::Colors::LightBlue));

@@ -569,6 +569,9 @@ class Interpreter {
     // 0 = previous tick, 1 = current tick. Set by the port before each
     // DrawAndRunGraphicsCommands call, like mInterpolationIndex.
     float mInterpolationT = 1.0f;
+    // Port-owned gameplay clock, sampled once before interpolated redraws.
+    // Instance-local: OoT and MM must never share a scrolling clock.
+    uint32_t mGameTick = 0;
 };
 
 void gfx_set_target_ucode(UcodeHandlers ucode);

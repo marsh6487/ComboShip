@@ -44,14 +44,6 @@ diff --git a/include/libultraship/libultra/gbi.h b/include/libultraship/libultra
 diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
 --- a/src/fast/interpreter.cpp
 +++ b/src/fast/interpreter.cpp
-@@ -126,6 +126,7 @@ Interpreter::~Interpreter() {
- }
- 
- static std::weak_ptr<Interpreter> mInstance;
-+extern "C" int32_t GfxGetCurrentGameTick();
- // Set a cached pointer to the instance so we don't need to go through the window every time
- void GfxSetInstance(std::shared_ptr<Interpreter> gfx) {
-     mInstance = gfx;
 @@ -588,6 +589,48 @@ static uint32_t GetTileSizeFromCoordinates(float low, float high) {
      return static_cast<uint32_t>(lroundf((high - low + 4.0f) / 4.0f));
  }
@@ -85,7 +77,7 @@ diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
 +    return shiftedPeriod;
 +}
 +
-+static float WrapScrollCoordinate(int32_t value, int32_t period) {
++static float WrapScrollCoordinate(int64_t value, int32_t period) {
 +    if (period <= 0) {
 +        return 0.0f;
 +    }
@@ -121,7 +113,7 @@ diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
 +
 +    const int32_t periodX = GetRepeatPeriodFromTile(gfx->mRdp, tile, true, tileWidth);
 +    const int32_t periodY = GetRepeatPeriodFromTile(gfx->mRdp, tile, false, tileHeight);
-+    const int32_t tick = GfxGetCurrentGameTick();
++    const int64_t tick = gfx->mGameTick;
 +
 +    const float uls0 = WrapScrollCoordinate(static_cast<int32_t>(lroundf(textureTile.uls)) + tick * speedX, periodX);
 +    const float ult0 = WrapScrollCoordinate(static_cast<int32_t>(lroundf(textureTile.ult)) + tick * speedY, periodY);
