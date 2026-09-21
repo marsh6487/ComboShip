@@ -895,14 +895,16 @@ void* AudioLoad_SyncLoad(s32 tableType, u32 id, s32* didAllocate) {
                 size -= 0x10;
             }
 
-            memcpy(ramAddr, romAddr, size);
+            memcpy(ramAddr, (const void*)romAddr, size);
         } else if (medium2 == mediumUnk) {
+            table = AudioLoad_GetLoadTable(tableType);
+            if (table == NULL) {
+                return NULL;
+            }
             AudioLoad_SyncDmaUnkMedium(romAddr, ramAddr, size, (s16)table->unkMediumParam);
         } else {
             if (tableType == SEQUENCE_TABLE && seqData != NULL) {
-                AudioLoad_SyncDma(seqData, ramAddr, size, medium);
-            } else if (tableType == FONT_TABLE) {
-                AudioLoad_SyncDma(fnt, ramAddr, size, medium);
+                AudioLoad_SyncDma((uintptr_t)seqData, ramAddr, size, medium);
             } else {
                 // AudioLoad_SyncDma(romAddr, ret, size, medium);
             }

@@ -10,7 +10,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 FUNCTIONS = {
     "load.c": ["AudioLoad_IsFontLoadComplete", "AudioLoad_IsSeqLoadComplete",
                "AudioLoad_SetFontLoadStatus", "AudioLoad_SetSeqLoadStatus",
-               "AudioLoad_GetFontsForSequence", "AudioLoad_SyncInitSeqPlayerInternal"],
+               "AudioLoad_GetFontsForSequence", "AudioLoad_SyncInitSeqPlayerInternal",
+               "AudioLoad_SyncLoad"],
     "heap.c": ["AudioHeap_ReleaseNotesForFont", "AudioHeap_Alloc",
                "AudioHeap_SearchPermanentCache", "AudioHeap_AllocPermanent"],
     "playback.c": ["AudioPlayback_GetInstrumentInner"],

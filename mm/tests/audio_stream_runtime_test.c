@@ -56,8 +56,17 @@ static u8 sequenceStatus[513 + 0xF];
 static u8 fontStatus[513];
 static u8 script[] = { 0xFF };
 static u16 queuedSeqId;
+static u8 cachedSequence[16];
+static u32 cacheLookups;
 
 typedef void SoundFontData;
+typedef struct {
+    u16 numInstruments;
+    u16 numDrums;
+    u16 numSfx;
+} UnloadedFonts;
+
+void* AudioLoad_SyncLoad(s32 tableType, u32 id, s32* didAllocate);
 
 SequenceData ResourceMgr_LoadSeqByName(const char* path) {
     return sequences[strtoul(path, NULL, 10)];
@@ -74,6 +83,28 @@ u32 AudioLoad_GetRealTableIndex(s32 tableType, u32 id) {
 void* AudioHeap_SearchCaches(s32 tableType, s32 cache, s32 id) {
     return id >= 0 && (size_t)id < gFontMapSize && fontStatus[id] >= LOAD_STATUS_COMPLETE ? &fonts[id] : NULL;
 }
+void* AudioLoad_SearchCaches(s32 tableType, s32 id) {
+    REQUIRE(tableType == SEQUENCE_TABLE);
+    ++cacheLookups;
+    return NULL;
+}
+AudioTable* AudioLoad_GetLoadTable(s32 tableType) {
+    return NULL;
+}
+void* AudioHeap_AllocCached(s32 tableType, size_t size, s32 cache, s32 id) {
+    REQUIRE(tableType == SEQUENCE_TABLE);
+    REQUIRE(size <= sizeof(cachedSequence));
+    return cachedSequence;
+}
+void AudioLoad_SyncDma(uintptr_t devAddr, u8* ramAddr, size_t size, s32 medium) {
+    memcpy(ramAddr, (const void*)devAddr, size);
+}
+void AudioLoad_SyncDmaUnkMedium(uintptr_t devAddr, u8* ramAddr, size_t size, s32 unkMediumParam) {
+    REQUIRE(false);
+}
+void AudioLoad_SetSampleFontLoadStatusAndApplyCaches(s32 sampleBankId, s32 loadStatus) {
+    REQUIRE(false);
+}
 void AudioScript_SequencePlayerDisable(SequencePlayer* player) {
     player->enabled = false;
 }
@@ -81,10 +112,8 @@ void AudioScript_ResetSequencePlayer(SequencePlayer* player) {
     player->enabled = false;
 }
 SoundFontData* AudioLoad_SyncLoadFont(u32 id) {
-    if (id >= gFontMapSize || gFontMap[id] == NULL)
-        return NULL;
-    fontStatus[id] = LOAD_STATUS_PERMANENT;
-    return (SoundFontData*)&fonts[id];
+    s32 didAllocate;
+    return AudioLoad_SyncLoad(FONT_TABLE, id, &didAllocate);
 }
 u8* AudioLoad_SyncLoadSeq(s32 id) {
     return id >= 0 && (size_t)id < gSequenceMapSize ? script : NULL;
@@ -132,6 +161,10 @@ int main(void) {
     const int ids[] = { 254, 255, 256, 257, 511, 512 };
     for (size_t i = 0; i < ARRAY_COUNT(ids); ++i) {
         int id = ids[i];
+        s32 didAllocate = true;
+        REQUIRE(AudioLoad_SyncLoad(FONT_TABLE, id, &didAllocate) == &fonts[id]);
+        REQUIRE(!didAllocate);
+        REQUIRE(fontStatus[id] == LOAD_STATUS_PERMANENT);
         REQUIRE(AudioLoad_SyncInitSeqPlayerInternal(0, id, 0));
         REQUIRE(player->seqId == id);
         REQUIRE(player->defaultFont == id);
@@ -140,6 +173,24 @@ int main(void) {
         REQUIRE(channel.fontId == id);
         REQUIRE(AudioPlayback_GetInstrumentInner(channel.fontId, 0) == &instruments[id]);
     }
+    REQUIRE(cacheLookups == 0);
+    s32 didAllocate = true;
+    REQUIRE(AudioLoad_SyncLoad(FONT_TABLE, gFontMapSize, &didAllocate) == NULL);
+    REQUIRE(!didAllocate);
+    fontNames[512] = NULL;
+    REQUIRE(AudioLoad_SyncLoad(FONT_TABLE, 512, &didAllocate) == NULL);
+    fontNames[512] = names[512];
+
+    sequences[256].cachePolicy = CACHE_LOAD_TEMPORARY;
+    sequences[256].medium = MEDIUM_CART;
+    REQUIRE(AudioLoad_SyncLoad(SEQUENCE_TABLE, 256, &didAllocate) == cachedSequence);
+    REQUIRE(didAllocate);
+    REQUIRE(cacheLookups == 1);
+    REQUIRE(cachedSequence[0] == script[0]);
+    REQUIRE(sequenceStatus[256] == LOAD_STATUS_COMPLETE);
+    sequences[256].medium = MEDIUM_UNK;
+    REQUIRE(AudioLoad_SyncLoad(SEQUENCE_TABLE, 256, &didAllocate) == NULL);
+    sequences[256].medium = MEDIUM_CART;
 
     sequences[512].resolvedFont = -1;
     sequences[512].numFonts = 2;
