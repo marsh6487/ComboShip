@@ -98,6 +98,11 @@ jobs:
           python3 scripts/diagnostics/run_mm_weather_tests.py
           python3 scripts/diagnostics/run_mm_custom_item_color_tests.py
 
+      - name: OoT transformation cosmetics and Zora barrier regressions
+        run: |
+          python3 scripts/diagnostics/run_oot_custom_cosmetics_tests.py
+          python3 scripts/diagnostics/run_zora_barrier_cosmetics_tests.py
+
       - name: Filter changed paths
         id: filter
         if: github.event_name == 'pull_request'
