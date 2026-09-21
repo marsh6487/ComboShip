@@ -26,10 +26,13 @@ def main():
     bodies.append(source[start:end])
     cppflags = os.environ.get("MM_AUDIO_DECODER_CPPFLAGS")
     libs = os.environ.get("MM_AUDIO_DECODER_LIBS")
+    # The fixture calls libvorbis directly. Shared vorbisfile/vorbisenc pkg-config
+    # flags do not include their private libvorbis dependency on Ubuntu.
+    packages = ["vorbisfile", "vorbisenc", "vorbis", "ogg"]
     if cppflags is None:
-        cppflags = subprocess.check_output(["pkg-config", "--cflags", "ogg", "vorbisfile", "vorbisenc"], text=True)
+        cppflags = subprocess.check_output(["pkg-config", "--cflags", *packages], text=True)
     if libs is None:
-        libs = subprocess.check_output(["pkg-config", "--libs", "ogg", "vorbisfile", "vorbisenc"], text=True)
+        libs = subprocess.check_output(["pkg-config", "--libs", *packages], text=True)
     with tempfile.TemporaryDirectory(prefix="mm-audio-decoder-") as temporary:
         build = Path(temporary)
         (build / "audio_decoder_production.inc").write_text("\n".join(bodies))
