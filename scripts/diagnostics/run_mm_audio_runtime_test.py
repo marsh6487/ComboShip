@@ -1,4 +1,4 @@
-"""Compile selected MM production function bodies against focused fixtures."""
+"""Check real MM audio translation units, then run focused function fixtures."""
 import pathlib
 import re
 import os
@@ -35,9 +35,34 @@ def function_body(source, name):
     raise RuntimeError(f"unterminated production function {name}")
 
 
+def check_translation_units(build, compiler):
+    # Fixtures define globals themselves and can hide missing declarations.
+    # Compile the complete sources with game headers before using those fixtures.
+    args = [compiler, "-std=gnu11", "-fsyntax-only", "-DNDEBUG",
+            "-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DMM_BUILD_DLL",
+            "-DCONTROLLERBUTTONS_T=uint32_t", "-DNON_EQUIVALENT", "-DNON_MATCHING",
+            "-Wno-error", "-Wno-int-conversion", "-Wno-incompatible-pointer-types"]
+    args += ["-I" + str(ROOT / path) for path in
+             ("mm/include", "mm/include/PR", "mm/src", "mm", "mm/2s2h", "mm/assets",
+              "libultraship/include", "libultraship/src", "combo")]
+    failed = False
+    for filename in FUNCTIONS:
+        path = (ROOT / "mm/src/audio/lib" / filename).resolve()
+        result = subprocess.run([*args, str(path)], capture_output=True, text=True)
+        (build / (path.stem + "_syntax.log")).write_text(result.stdout + result.stderr)
+        if result.returncode:
+            failed = True
+            sys.stderr.write(result.stdout + result.stderr)
+        else:
+            print("PASS real-header audio syntax:", path.relative_to(ROOT), flush=True)
+    if failed:
+        raise SystemExit(1)
+
+
 def main(build, compiler="cc"):
     build = pathlib.Path(build).resolve()
     build.mkdir(parents=True, exist_ok=True)
+    check_translation_units(build, compiler)
     bodies = []
     for filename, names in FUNCTIONS.items():
         path = (ROOT / "mm/src/audio/lib" / filename).resolve()

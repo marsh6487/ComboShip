@@ -33,6 +33,8 @@ u8 AudioScript_GetInstrument(SequenceChannel* channel, u8 instId, Instrument** i
 
 SequenceData ResourceMgr_LoadSeqByName(const char* path);
 extern char** gSequenceMap;
+extern size_t gSequenceMapSize;
+extern size_t gFontMapSize;
 
 /**
  * sSeqInstructionArgsTable is a table for each sequence instruction
