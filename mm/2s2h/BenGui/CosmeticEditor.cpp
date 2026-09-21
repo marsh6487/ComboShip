@@ -1015,6 +1015,10 @@ void CosmeticEditorWindow::InitElement() {
         return;
     }
 
+    // Native fixed-index callbacks must know which player models are replaced
+    // before their first invocation, including saved Changed/Rainbow settings.
+    RefreshDynamicCosmeticsStateIfNeeded();
+
     for (auto& [id, option] : cosmeticOptions) {
         Color_RGBA8 cvarColor = CVarGetColor(option.valuesCvar, option.defaultColor);
         option.currentColor =
@@ -1023,7 +1027,6 @@ void CosmeticEditorWindow::InitElement() {
     }
     CosmeticEditorSave();
 
-    RefreshDynamicCosmeticsStateIfNeeded();
     ApplyDynamicCosmetics();
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s8 sceneId, s8 spawnNum) {

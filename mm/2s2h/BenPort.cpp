@@ -2245,113 +2245,118 @@ extern "C" Gfx* ResourceMgr_LoadGfxByName(const char* path) {
 typedef struct {
     int index;
     Gfx instruction;
+    std::weak_ptr<Fast::DisplayList> resource;
 } GfxPatch;
 
 std::unordered_map<std::string, std::unordered_map<std::string, GfxPatch>> originalGfx;
 
-// Attention! This is primarily for cosmetics & bug fixes. For things like mods and model replacement you should be
-// using OTRs instead (When that is available). Index can be found using the commented out section below.
-extern "C" void ResourceMgr_PatchGfxByName(const char* path, const char* patchName, int index, Gfx instruction) {
-    auto res = std::static_pointer_cast<Fast::DisplayList>(
-        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path));
-
-    // Leaving this here for people attempting to find the correct Dlist index to patch
-    /*if (strcmp("__OTR__objects/object_gi_longsword/gGiBiggoronSwordDL", path) == 0) {
-        for (int i = 0; i < res->instructions.size(); i++) {
-            Gfx* gfx = (Gfx*)&res->instructions[i];
-            // Log all commands
-            // SPDLOG_INFO("index:{} command:{}", i, gfx->words.w0 >> 24);
-            // Log only SetPrimColors
-            if (gfx->words.w0 >> 24 == 250) {
-                SPDLOG_INFO("index:{} r:{} g:{} b:{} a:{}", i, _SHIFTR(gfx->words.w1, 24, 8), _SHIFTR(gfx->words.w1, 16,
-    8), _SHIFTR(gfx->words.w1, 8, 8), _SHIFTR(gfx->words.w1, 0, 8));
-            }
+static bool CanPatchGfx(const std::shared_ptr<Fast::DisplayList>& res, const char* path, const char* patchName,
+                        int index) {
+    // IsCustom alone is insufficient: binary replacement models can retain
+    // native metadata while containing fewer commands than the original list.
+    if (res != nullptr && res->GetInitData() != nullptr) {
+        if (res->GetInitData()->IsCustom) {
+            return false;
         }
-    }*/
+        if (index >= 0 && static_cast<size_t>(index) < res->Instructions.size()) {
+            return true;
+        }
+    }
 
-    // Index refers to individual gfx words, which are half the size on 32-bit
-    // if (sizeof(uintptr_t) < 8) {
-    // index /= 2;
-    // }
+    // Some cosmetic patches are requested every frame; report each rejected
+    // path/patch once without filling the log on every draw.
+    static std::unordered_map<std::string, std::unordered_map<std::string, bool>> reported;
+    if (reported[path].emplace(patchName, true).second) {
+        SPDLOG_WARN("[ResourceMgr] Skipping Gfx patch '{}' for '{}': unavailable display list or index {} outside {} "
+                    "instructions",
+                    patchName, path, index, res != nullptr ? res->Instructions.size() : 0);
+    }
+    return false;
+}
 
-    // Do not patch custom assets as they most likely do not have the same instructions as authentic assets
-    if (res->GetInitData()->IsCustom) {
+static void RestoreGfxPatch(const char* path, const char* patchName, const GfxPatch& patch) {
+    // A reload or alt-asset switch can resolve the same path to a different
+    // list. Restore only the instance that supplied the saved instruction.
+    auto res = patch.resource.lock();
+    if (res != nullptr && CanPatchGfx(res, path, patchName, patch.index)) {
+        res->Instructions[patch.index] = patch.instruction;
+    }
+}
+
+static void PatchGfxInstruction(const std::shared_ptr<Fast::DisplayList>& res, const char* path, const char* patchName,
+                                int index, Gfx instruction) {
+    auto& patches = originalGfx[path];
+    auto found = patches.find(patchName);
+    if (found == patches.end()) {
+        patches.emplace(patchName, GfxPatch{ index, res->Instructions[index], res });
+    } else if (found->second.resource.lock() != res || found->second.index != index) {
+        RestoreGfxPatch(path, patchName, found->second);
+        found->second = { index, res->Instructions[index], res };
+    }
+    res->Instructions[index] = instruction;
+}
+
+// Fixed indices are only appropriate for native-layout display lists.
+extern "C" void ResourceMgr_PatchGfxByName(const char* path, const char* patchName, int index, Gfx instruction) {
+    if (path == nullptr || patchName == nullptr) {
         return;
     }
-
-    Gfx* gfx = (Gfx*)&res->Instructions[index];
-
-    if (!originalGfx.contains(path) || !originalGfx[path].contains(patchName)) {
-        originalGfx[path][patchName] = { index, *gfx };
+    auto res = std::dynamic_pointer_cast<Fast::DisplayList>(
+        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path));
+    if (CanPatchGfx(res, path, patchName, index)) {
+        PatchGfxInstruction(res, path, patchName, index, instruction);
     }
-
-    *gfx = instruction;
 }
 
 extern "C" void ResourceMgr_PatchGfxCopyCommandByName(const char* path, const char* patchName, int destinationIndex,
                                                       int sourceIndex) {
-    auto res = std::static_pointer_cast<Fast::DisplayList>(
-        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path));
-
-    // Do not patch custom assets as they most likely do not have the same instructions as authentic assets
-    if (res->GetInitData()->IsCustom) {
+    if (path == nullptr || patchName == nullptr) {
         return;
     }
-
-    Gfx* destinationGfx = (Gfx*)&res->Instructions[destinationIndex];
-    Gfx sourceGfx = *(Gfx*)&res->Instructions[sourceIndex];
-
-    if (!originalGfx.contains(path) || !originalGfx[path].contains(patchName)) {
-        originalGfx[path][patchName] = { destinationIndex, *destinationGfx };
+    auto res = std::dynamic_pointer_cast<Fast::DisplayList>(
+        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path));
+    if (CanPatchGfx(res, path, patchName, destinationIndex) && CanPatchGfx(res, path, patchName, sourceIndex)) {
+        PatchGfxInstruction(res, path, patchName, destinationIndex, res->Instructions[sourceIndex]);
     }
-
-    *destinationGfx = sourceGfx;
 }
 
 extern "C" void ResourceMgr_UnpatchGfxByName(const char* path, const char* patchName) {
-    if (originalGfx.contains(path) && originalGfx[path].contains(patchName)) {
-        auto res = std::static_pointer_cast<Fast::DisplayList>(
-            Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path));
-
-        if (res->GetInitData()->IsCustom) {
-            return;
-        }
-
-        Gfx* gfx = (Gfx*)&res->Instructions[originalGfx[path][patchName].index];
-        *gfx = originalGfx[path][patchName].instruction;
-
-        originalGfx[path].erase(patchName);
+    if (path == nullptr || patchName == nullptr) {
+        return;
+    }
+    auto entry = originalGfx.find(path);
+    if (entry == originalGfx.end()) {
+        return;
+    }
+    auto patch = entry->second.find(patchName);
+    if (patch != entry->second.end()) {
+        RestoreGfxPatch(path, patchName, patch->second);
+        entry->second.erase(patch);
+    }
+    if (entry->second.empty()) {
+        originalGfx.erase(entry);
     }
 }
 
 extern "C" size_t ResourceMgr_GetPatchCountForDL(const char* path) {
-    if (originalGfx.contains(path)) {
+    if (path != nullptr && originalGfx.contains(path)) {
         return originalGfx[path].size();
     }
     return 0;
 }
 
 extern "C" void ResourceMgr_ResetAllPatchesForDL(const char* path) {
-    if (!originalGfx.contains(path)) {
+    if (path == nullptr) {
         return;
     }
-
-    auto res = std::static_pointer_cast<Fast::DisplayList>(
-        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path));
-
-    // Iterate through all patches and restore original instructions
-    auto& patches = originalGfx[path];
-    for (auto it = patches.begin(); it != patches.end();) {
-        Gfx* gfx = (Gfx*)&res->Instructions[it->second.index];
-        *gfx = it->second.instruction;
-        // erase() returns the next iterator, allowing safe iteration during removal
-        it = patches.erase(it);
+    auto entry = originalGfx.find(path);
+    if (entry == originalGfx.end()) {
+        return;
     }
-
-    // Clean up empty map entry
-    if (patches.empty()) {
-        originalGfx.erase(path);
+    for (const auto& [patchName, patch] : entry->second) {
+        RestoreGfxPatch(path, patchName.c_str(), patch);
     }
+    originalGfx.erase(entry);
 }
 
 extern "C" char* ResourceMgr_LoadVtxArrayByName(const char* path) {
