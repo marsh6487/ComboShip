@@ -1312,6 +1312,7 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     AudioCollection::Instance = new AudioCollection();
     LoadGuiTextures();
     ModMenu_LoadArchives();
+    OTRGlobals::Instance->LoadModGuiFonts();
     BenGui::SetupGuiElements();
     ShipInit::InitAll();
 #ifdef COMBO_BUILD
@@ -2617,6 +2618,41 @@ extern "C" void ResourceMgr_ClearSkeletons() {
 
 extern "C" s32* ResourceMgr_LoadCSByName(const char* path) {
     return (s32*)ResourceGetDataByName(path);
+}
+
+// GUI fonts are initially built before the per-game mod archives are mounted.
+// These optional paths let an enabled font pack replace the desktop/overlay
+// fonts after mounting. Removing the pack and restarting restores the defaults.
+void OTRGlobals::LoadModGuiFonts() {
+    const std::string standardPath = "fonts/mods/standard.ttf";
+    const std::string monoPath = "fonts/mods/mono.ttf";
+    auto archives = context->GetResourceManager()->GetArchiveManager();
+    bool hasStandard = archives->HasFile(standardPath);
+    bool hasMono = archives->HasFile(monoPath);
+    if (!hasStandard && !hasMono) {
+        return;
+    }
+
+    if (hasStandard) {
+        fontStandard = CreateFontWithSize(16.0f, standardPath);
+        fontStandardLarger = CreateFontWithSize(20.0f, standardPath);
+        fontStandardLargest = CreateFontWithSize(24.0f, standardPath);
+        ImGui::GetIO().FontDefault = fontStandardLarger;
+    }
+    if (hasMono) {
+        fontMono = CreateFontWithSize(16.0f, monoPath);
+        fontMonoLarger = CreateFontWithSize(20.0f, monoPath);
+        fontMonoLargest = CreateFontWithSize(24.0f, monoPath);
+    }
+
+    auto gui = context->GetWindow()->GetGui();
+    auto overlay = gui->GetGameOverlay();
+    const std::string& overlayPath = hasMono ? monoPath : standardPath;
+    // Retain the existing overlay choices so removing a pack cannot leave a
+    // saved font name that no longer exists. No user settings are rewritten.
+    overlay->LoadFont("Press Start 2P", 12.0f, overlayPath);
+    overlay->LoadFont("Fipps", 32.0f, overlayPath);
+    gui->RebuildFontTexture();
 }
 
 ImFont* OTRGlobals::CreateFontWithSize(float size, std::string fontPath) {
