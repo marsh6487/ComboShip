@@ -81,7 +81,7 @@ jobs:
 
       - name: clang-format (clang-format-14)
         run: |
-          sudo apt-get update && sudo apt-get install -y clang-format-14 nlohmann-json3-dev
+          sudo apt-get update && sudo apt-get install -y clang-format-14 nlohmann-json3-dev libogg-dev libvorbis-dev pkg-config
           ./run-clang-format.sh
           git diff --exit-code
 
@@ -94,6 +94,7 @@ jobs:
         run: |
           python3 scripts/diagnostics/run_mm_scene_randomization_tests.py
           python3 scripts/diagnostics/run_mm_audio_runtime_test.py "$RUNNER_TEMP/mm-audio-runtime"
+          python3 scripts/diagnostics/run_mm_audio_decoder_tests.py
           python3 scripts/diagnostics/run_mm_weather_tests.py
           python3 scripts/diagnostics/run_mm_custom_item_color_tests.py
 
