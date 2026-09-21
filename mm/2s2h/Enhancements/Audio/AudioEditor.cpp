@@ -646,9 +646,10 @@ void DrawTypeChip(SeqType type) {
     ImGui::EndDisabled();
 }
 
-void AudioEditorRegisterRandomizeAllOnNewScene() {
-    COND_VB_SHOULD(VB_PLAY_TRANSITION_CS, CVarGetInteger(CVAR_AUDIO("RandomizeAllOnNewScene"), 0),
-                   { AudioEditor_RandomizeAll(); });
+extern "C" void AudioEditor_RandomizeOnSceneLoad() {
+    if (gSaveContext.gameMode == GAMEMODE_NORMAL && CVarGetInteger(CVAR_AUDIO("RandomizeAllOnNewScene"), 0)) {
+        AudioEditor_RandomizeAll();
+    }
 }
 
 void AudioEditor::InitElement() {
@@ -1015,12 +1016,13 @@ void RegisterAudioWidgets() {
                               "your custom music for each scene more often."));
     AddAudioSearchWidget(enemyProx);
 
-    randoMusicOnSceneChange = { .name = "Randomize All Music and Sound Effects on New Scene",
+    randoMusicOnSceneChange = { .name = "Randomize All Music and Sound Effects on Scene Reload",
                                 .type = WidgetType::WIDGET_CVAR_CHECKBOX };
     randoMusicOnSceneChange.CVar(CVAR_AUDIO("RandomizeAllOnNewScene"))
         .Options(CheckboxOptions()
                      .Color(THEME_COLOR)
-                     .Tooltip("Enables randomizing all unlocked music and sound effects when you enter a new scene."));
+                     .Tooltip("Randomizes unlocked music and sound effects whenever you enter or reload a scene. "
+                              "Disabled by default; respects locks, the shuffle pool, and song categories."));
     AddAudioSearchWidget(randoMusicOnSceneChange);
 
     randomAudioOnSeedGen = { .name = "Randomize All Music and Sound Effects on Randomizer Generation",
@@ -1078,6 +1080,3 @@ void RegisterAudioWidgets() {
 }
 
 static RegisterMenuInitFunc initAudioWidgets(RegisterAudioWidgets);
-
-static RegisterShipInitFunc initFuncRandomizeAllOnNewScene(AudioEditorRegisterRandomizeAllOnNewScene,
-                                                           { CVAR_AUDIO("RandomizeAllOnNewScene") });

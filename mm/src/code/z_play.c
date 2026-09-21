@@ -43,6 +43,7 @@ u8 sMotionBlurStatus;
 #include "debug.h"
 #include "BenPort.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/Enhancements/Audio/AudioEditor.h"
 #include "2s2h/FleetShipCombo/FleetShipCombo.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/Enhancements/Graphics/Graphics.h"
@@ -2535,6 +2536,8 @@ void Play_Init(GameState* thisx) {
 
     CutsceneManager_StoreCamera(&this->mainCamera);
     Interface_SetSceneRestrictions(this);
+    // Shuffle before the destination scene requests its music, including same-scene loads.
+    AudioEditor_RandomizeOnSceneLoad();
     Environment_PlaySceneSequence(this);
     gSaveContext.seqId = this->sceneSequences.seqId;
     gSaveContext.ambienceId = this->sceneSequences.ambienceId;

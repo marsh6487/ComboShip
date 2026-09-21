@@ -3004,7 +3004,6 @@ void AudioOcarina_SetInstrument(u8 ocarinaInstrumentId) {
         u16 sfxEditorId = ocarinaInstrumentId + 0x81;
         u16 neSeq = AudioEditor_GetReplacementSeq(sfxEditorId);
         if (neSeq != sfxEditorId) {
-            gAudioCtx.seqReplaced[SEQ_PLAYER_SFX] = 1;
             ocarinaInstrumentId = neSeq - 0x81;
         }
         // #end region
@@ -6043,18 +6042,15 @@ void Audio_MuteBgmPlayersForFanfare(void) {
  * Sets up seqId to play on seqPlayerIndex 1
  */
 void Audio_PlayFanfare(u16 seqId) {
-    u8 prevFontBuff[16];
-    u8 fontBuff[16];
     u16 prevSeqId = AudioSeq_GetActiveSeqId(SEQ_PLAYER_FANFARE);
     u32 outNumFonts;
-    // 2S2H [Custom Audio] `prevSeqId` and `seqId` had a `& 0xFF`. This was likely OK because we always load soundFonts
-    // but it was removed anyway just in case.
-    u8* prevFontId = AudioThread_GetFontsForSequence(prevSeqId, &outNumFonts, prevFontBuff);
-    u8* fontId = AudioThread_GetFontsForSequence(seqId, &outNumFonts, fontBuff);
+    s32 prevFontId = gAudioCtx.seqPlayers[SEQ_PLAYER_FANFARE].defaultFont;
+    u16 requestedSeqId = AudioEditor_GetReplacementSeq(seqId);
+    s32* fontId = AudioThread_GetFontsForSequence(requestedSeqId, &outNumFonts);
     // BENTODO
     // #region 2S2H [Audio] TODO: Fixes fanfare crash, should/can be removed after audio is done
     // if ((prevSeqId == NA_BGM_DISABLED) || (*prevFontId == *fontId)) {
-    if ((prevSeqId == NA_BGM_DISABLED) || (prevFontId != NULL && fontId != NULL && *prevFontId == *fontId)) {
+    if ((prevSeqId == NA_BGM_DISABLED) || (fontId != NULL && outNumFonts == 1 && prevFontId == *fontId)) {
         // #endregion
         sFanfareState = 1;
     } else {

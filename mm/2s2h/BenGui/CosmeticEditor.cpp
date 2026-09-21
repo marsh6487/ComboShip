@@ -633,6 +633,7 @@ extern "C" Gfx* Gfx_DrawTexRectIA8_DropShadowOffsetOverride(Gfx* pkt, TexturePtr
 const char* kCosmeticRainbowSyncCvar = "gCosmetics.RainbowSync";
 const char* kCosmeticRainbowSpeedCvar = "gCosmetics.RainbowSpeed";
 const char* kCosmeticRandomizeOnSeedGenCvar = "gCosmetics.RandomizeOnSeedGen";
+const char* kCosmeticRandomizeOnSceneLoadCvar = "gCosmetics.RandomizeOnSceneLoad";
 int sCosmeticRainbowHue = 0;
 
 void CosmeticEditorSave() {
@@ -932,6 +933,12 @@ void CosmeticEditorWindow::DrawElement() {
                                    .Size(ImVec2(300.0f, 0.0f))
                                    .Color(THEME_COLOR));
     UIWidgets::CVarCheckbox(
+        "Randomize All Cosmetics on Scene Reload", kCosmeticRandomizeOnSceneLoadCvar,
+        UIWidgets::CheckboxOptions()
+            .Color(THEME_COLOR)
+            .Tooltip("Randomizes unlocked cosmetics, including mod cosmetics, whenever you enter or reload a scene. "
+                     "Disabled by default; locked colors are preserved."));
+    UIWidgets::CVarCheckbox(
         "Randomize all Cosmetics on Randomizer Generation", kCosmeticRandomizeOnSeedGenCvar,
         UIWidgets::CheckboxOptions()
             .Color(THEME_COLOR)
@@ -1019,6 +1026,11 @@ void CosmeticEditorWindow::InitElement() {
     RefreshDynamicCosmeticsStateIfNeeded();
     ApplyDynamicCosmetics();
 
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s8 sceneId, s8 spawnNum) {
+        if (gSaveContext.gameMode == GAMEMODE_NORMAL && CVarGetInteger(kCosmeticRandomizeOnSceneLoadCvar, 0)) {
+            CosmeticEditorRandomizeAllElements();
+        }
+    });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnRandoSeedGeneration>([]() {
         if (CVarGetInteger(kCosmeticRandomizeOnSeedGenCvar, 0)) {
             CosmeticEditorRandomizeAllElements();

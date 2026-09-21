@@ -368,7 +368,7 @@ TunedSample* AudioPlayback_GetInstrumentTunedSample(Instrument* instrument, s32 
 Instrument* AudioPlayback_GetInstrumentInner(s32 fontId, s32 instId) {
     Instrument* inst;
 
-    if (fontId == 0xFF) {
+    if (fontId < 0 || (size_t)fontId >= gFontMapSize || gFontMap[fontId] == NULL) {
         return NULL;
     }
 
@@ -377,9 +377,11 @@ Instrument* AudioPlayback_GetInstrumentInner(s32 fontId, s32 instId) {
         return NULL;
     }
 
-    int instCnt = 0;
     // 2S2H [Port] Audio assets in the archive
     SoundFont* sf = ResourceMgr_LoadAudioSoundFontByName(gFontMap[fontId]);
+    if (sf == NULL) {
+        return NULL;
+    }
 
     if (instId >= sf->numInstruments)
         return NULL;
@@ -397,7 +399,7 @@ Instrument* AudioPlayback_GetInstrumentInner(s32 fontId, s32 instId) {
 Drum* AudioPlayback_GetDrum(s32 fontId, s32 drumId) {
     Drum* drum = NULL;
 
-    if (fontId == 0xFF) {
+    if (fontId < 0 || (size_t)fontId >= gFontMapSize || gFontMap[fontId] == NULL) {
         return NULL;
     }
 
@@ -407,6 +409,9 @@ Drum* AudioPlayback_GetDrum(s32 fontId, s32 drumId) {
     }
     // 2S2H [Port] Audio assets in the archive
     SoundFont* sf = ResourceMgr_LoadAudioSoundFontByName(gFontMap[fontId]);
+    if (sf == NULL) {
+        return NULL;
+    }
     if (drumId < sf->numDrums) {
         drum = sf->drums[drumId];
     }
@@ -419,9 +424,9 @@ Drum* AudioPlayback_GetDrum(s32 fontId, s32 drumId) {
 }
 
 SoundEffect* AudioPlayback_GetSoundEffect(s32 fontId, s32 sfxId) {
-    SoundEffect* soundEffect;
+    SoundEffect* soundEffect = NULL;
 
-    if (fontId == 0xFF) {
+    if (fontId < 0 || (size_t)fontId >= gFontMapSize || gFontMap[fontId] == NULL) {
         return NULL;
     }
 
@@ -431,6 +436,9 @@ SoundEffect* AudioPlayback_GetSoundEffect(s32 fontId, s32 sfxId) {
     }
     // 2S2H [Port] Audio assets in the archive
     SoundFont* sf = ResourceMgr_LoadAudioSoundFontByName(gFontMap[fontId]);
+    if (sf == NULL) {
+        return NULL;
+    }
     if (sfxId < sf->numSfx) {
         soundEffect = &sf->soundEffects[sfxId];
     }
@@ -447,7 +455,7 @@ SoundEffect* AudioPlayback_GetSoundEffect(s32 fontId, s32 sfxId) {
 }
 
 s32 AudioPlayback_SetFontInstrument(s32 instrumentType, s32 fontId, s32 index, void* value) {
-    if (fontId == 0xFF) {
+    if (fontId < 0 || (size_t)fontId >= gFontMapSize) {
         return -1;
     }
 
