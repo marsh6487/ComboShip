@@ -110,6 +110,8 @@ CrowdControl* CrowdControl::Instance;
 #include "2s2h/resource/type/AudioSample.h"
 #include "2s2h/resource/type/AudioSequence.h"
 #include "2s2h/resource/type/AudioSoundFont.h"
+#include "2s2h/Enhancements/Audio/MMWeather.h"
+#include "2s2h/Enhancements/Audio/MMWeatherAudio.h"
 #include "2s2h/resource/type/CollisionHeader.h"
 #include "2s2h/resource/type/Cutscene.h"
 #include "2s2h/resource/type/Path.h"
@@ -1126,6 +1128,8 @@ void OTRAudio_Thread() {
                                            num_audio_samples);
         }
 
+        MMWeatherAudio_Mix(audio_buffer, num_audio_samples * AUDIO_FRAMES_PER_UPDATE);
+
         // Fleet Ship Combo: silence this game's output while it's the inactive one. The buffer
         // already holds the FULL mix (BGM + fanfare + ambience + SFX + SM64), so zeroing the used
         // span here mutes everything without stopping any sequence (positions keep advancing).
@@ -1147,6 +1151,7 @@ extern "C" void OTRAudio_Init() {
     ResourceMgr_LoadDirectory("audio");
 
     if (!audio.running) {
+        MMWeather_Reset();
         audio.running = true;
         audio.thread = std::thread(OTRAudio_Thread);
     }
@@ -1173,6 +1178,8 @@ extern "C" void OTRAudio_Exit() {
     if (audio.thread.joinable()) {
         audio.thread.join();
     }
+    MMWeather_Reset();
+    MMWeatherAudio_Shutdown();
 #ifndef COMBO_BUILD
     // In a combo build OTRAudio_Exit runs on every OOT<->MM transition, not just at shutdown. These
     // maps (gFontMap/gSequenceMap) + load-status arrays are populated once by AudioLoad_Init at boot

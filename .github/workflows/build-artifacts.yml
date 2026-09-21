@@ -90,10 +90,12 @@ jobs:
           python3 scripts/diagnostics/run_combo_shared_test.py --json-include /usr/include
           python3 scripts/diagnostics/run_combo_grant_tests.py --json-include /usr/include
 
-      - name: 2Ship scene randomization and streamed-audio regressions
+      - name: 2Ship weather, item-color, scene-randomization and streamed-audio regressions
         run: |
           python3 scripts/diagnostics/run_mm_scene_randomization_tests.py
           python3 scripts/diagnostics/run_mm_audio_runtime_test.py "$RUNNER_TEMP/mm-audio-runtime"
+          python3 scripts/diagnostics/run_mm_weather_tests.py
+          python3 scripts/diagnostics/run_mm_custom_item_color_tests.py
 
       - name: Filter changed paths
         id: filter

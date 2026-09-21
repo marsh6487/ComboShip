@@ -1,4 +1,5 @@
 #include "AudioEditor.h"
+#include "MMWeather.h"
 
 #include <map>
 #include <set>
@@ -36,6 +37,7 @@ static WidgetInfo voicePitchEnable;
 static WidgetInfo randoMusicOnSceneChange;
 static WidgetInfo randomAudioOnSeedGen;
 static WidgetInfo useSongCategories;
+static std::array<WidgetInfo, 8> weatherWidgets;
 
 namespace AudioPreview {
 
@@ -714,6 +716,12 @@ void AudioEditor::DrawElement() {
                 BenGui::mBenMenu->MenuDrawItem(ovlDuration, ImGui::GetContentRegionAvail().x, THEME_COLOR);
                 BenGui::mBenMenu->MenuDrawItem(voicePitchEnable, ImGui::GetContentRegionAvail().x, THEME_COLOR);
                 BenGui::mBenMenu->MenuDrawItem(voicePitch, ImGui::GetContentRegionAvail().x, THEME_COLOR);
+                ImGui::Separator();
+                ImGui::TextUnformatted("MM Outdoor Weather");
+                for (auto& widget : weatherWidgets) {
+                    BenGui::mBenMenu->MenuDrawItem(widget, ImGui::GetContentRegionAvail().x, THEME_COLOR);
+                }
+                ImGui::TextWrapped("Native rain, snow and scripted weather take priority.");
             }
             ImGui::EndChild();
             ImGui::EndTable();
@@ -982,6 +990,74 @@ void AddAudioSearchWidget(WidgetInfo& widgetInfo) {
 }
 
 void RegisterAudioWidgets() {
+
+    weatherWidgets[0] = { .name = "Enable Outdoor Rain", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    weatherWidgets[0]
+        .CVar(MM_WEATHER_CVAR("Enabled"))
+        .Options(CheckboxOptions()
+                     .DefaultValue(false)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Adds rain in compatible outdoor areas while playing MM. Independent of OoT weather; "
+                              "native weather keeps priority. No placed actor is required."));
+    static const std::unordered_map<int32_t, const char*> rainModes = { { 0, "Persistent" }, { 1, "Intermittent" } };
+    weatherWidgets[1] = { .name = "Outdoor Rain Mode", .type = WidgetType::WIDGET_CVAR_COMBOBOX };
+    weatherWidgets[1]
+        .CVar(MM_WEATHER_CVAR("Mode"))
+        .Options(
+            ComboboxOptions()
+                .ComboMap(&rainModes)
+                .DefaultIndex(0)
+                .Color(THEME_COLOR)
+                .Tooltip("Persistent rain continues outdoors. Intermittent rain alternates showers and dry periods."));
+    weatherWidgets[2] = { .name = "Outdoor Rain Color", .type = WidgetType::WIDGET_CUSTOM };
+    weatherWidgets[2].CustomFunction([](WidgetInfo&) {
+        UIWidgets::CVarColorPicker("Outdoor Rain Color", MM_WEATHER_CVAR("RainColor"),
+                                   Color_RGBA8{ 150, 255, 255, 255 }, false, nullptr, THEME_COLOR);
+    });
+    weatherWidgets[3] = { .name = "Overcast During Outdoor Rain", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    weatherWidgets[3]
+        .CVar(MM_WEATHER_CVAR("Overcast"))
+        .Options(CheckboxOptions()
+                     .DefaultValue(true)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Blends in cloudy skies and dims outdoor lighting during added rain."));
+    weatherWidgets[4] = { .name = "Thunder During Outdoor Rain", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    weatherWidgets[4]
+        .CVar(MM_WEATHER_CVAR("Thunder"))
+        .Options(CheckboxOptions()
+                     .DefaultValue(true)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Adds lightning and thunder during added rain. An active flash finishes when disabled."));
+    weatherWidgets[5] = { .name = "Outdoor Rain Volume: %d%%", .type = WidgetType::WIDGET_CVAR_SLIDER_INT };
+    weatherWidgets[5]
+        .CVar(MM_WEATHER_CVAR("RainVolume"))
+        .Options(IntSliderOptions()
+                     .Min(0)
+                     .Max(100)
+                     .DefaultValue(100)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Volume of added rain, also controlled by Master and Sound Effects volume."));
+    weatherWidgets[6] = { .name = "Outdoor Thunder Volume: %d%%", .type = WidgetType::WIDGET_CVAR_SLIDER_INT };
+    weatherWidgets[6]
+        .CVar(MM_WEATHER_CVAR("ThunderVolume"))
+        .Options(IntSliderOptions()
+                     .Min(0)
+                     .Max(100)
+                     .DefaultValue(100)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Volume of added thunder. Changes also apply to thunder that is already playing."));
+    weatherWidgets[7] = { .name = "Outdoor Thunder Frequency: %d%%", .type = WidgetType::WIDGET_CVAR_SLIDER_INT };
+    weatherWidgets[7]
+        .CVar(MM_WEATHER_CVAR("ThunderFrequency"))
+        .Options(IntSliderOptions()
+                     .Min(25)
+                     .Max(200)
+                     .DefaultValue(100)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Higher values produce thunder more often during added rain."));
+    for (auto& widget : weatherWidgets) {
+        AddAudioSearchWidget(widget);
+    }
 
     lowHpAlarm = { .name = "Mute Low HP Alarm", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
     lowHpAlarm.CVar(CVAR_AUDIO("LowHpAlarm"))

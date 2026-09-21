@@ -1,6 +1,7 @@
 #include "ultra64.h"
 #include "z64light.h"
 #include "z64math.h"
+#include "2s2h/Enhancements/Audio/MMWeather.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 typedef enum {
@@ -45,6 +46,7 @@ f32 D_801F4E74;
 u16 D_801F4E78;
 u16 gSkyboxNumStars;
 LightningBolt sLightningBolts[3];
+static LightningBolt sMMWeatherLightningBolt = { .state = LIGHTNING_BOLT_INACTIVE };
 LightNode* sNGameOverLightNode;
 LightInfo sNGameOverLightInfo;
 LightNode* sSGameOverLightNode;
@@ -571,6 +573,7 @@ void Environment_Init(PlayState* play2, EnvironmentContext* envCtx, s32 arg2) {
     u8 dayOffset;
     s16 i;
 
+    MMWeather_Reset();
     CREG(1) = 0;
 
     gSaveContext.sunsSongState = SUNSSONG_INACTIVE;
@@ -1084,6 +1087,8 @@ void Environment_UpdateSkybox(u8 skyboxId, EnvironmentContext* envCtx, SkyboxCon
             }
         }
 
+        MMWeather_ApplySky(&skybox1Index, &skybox2Index, &skyboxBlend);
+
         if ((envCtx->skybox1Index != skybox1Index) && (envCtx->skyboxDmaState == SKYBOX_DMA_INACTIVE)) {
             envCtx->skyboxDmaState = SKYBOX_DMA_TEXTURE1_START;
             // size = sNormalSkyFiles[skybox1Index].file.vromEnd - sNormalSkyFiles[skybox1Index].file.vromStart;
@@ -1128,13 +1133,18 @@ void Environment_UpdateSkybox(u8 skyboxId, EnvironmentContext* envCtx, SkyboxCon
         }
 
         envCtx->skyboxBlend = skyboxBlend;
-        Skybox_SetColors(skyboxCtx,
-                         LERPIMP_ALT(sSkyboxPrimColors[color1Index].r, sSkyboxPrimColors[color2Index].r, colorWeight),
-                         LERPIMP_ALT(sSkyboxPrimColors[color1Index].g, sSkyboxPrimColors[color2Index].g, colorWeight),
-                         LERPIMP_ALT(sSkyboxPrimColors[color1Index].b, sSkyboxPrimColors[color2Index].b, colorWeight),
-                         LERPIMP_ALT(sSkyboxEnvColors[color1Index].r, sSkyboxEnvColors[color2Index].r, colorWeight),
-                         LERPIMP_ALT(sSkyboxEnvColors[color1Index].g, sSkyboxEnvColors[color2Index].g, colorWeight),
-                         LERPIMP_ALT(sSkyboxEnvColors[color1Index].b, sSkyboxEnvColors[color2Index].b, colorWeight));
+        Skybox_SetColors(
+            skyboxCtx,
+            MMWeather_Shade(
+                LERPIMP_ALT(sSkyboxPrimColors[color1Index].r, sSkyboxPrimColors[color2Index].r, colorWeight)),
+            MMWeather_Shade(
+                LERPIMP_ALT(sSkyboxPrimColors[color1Index].g, sSkyboxPrimColors[color2Index].g, colorWeight)),
+            MMWeather_Shade(
+                LERPIMP_ALT(sSkyboxPrimColors[color1Index].b, sSkyboxPrimColors[color2Index].b, colorWeight)),
+            MMWeather_Shade(LERPIMP_ALT(sSkyboxEnvColors[color1Index].r, sSkyboxEnvColors[color2Index].r, colorWeight)),
+            MMWeather_Shade(LERPIMP_ALT(sSkyboxEnvColors[color1Index].g, sSkyboxEnvColors[color2Index].g, colorWeight)),
+            MMWeather_Shade(
+                LERPIMP_ALT(sSkyboxEnvColors[color1Index].b, sSkyboxEnvColors[color2Index].b, colorWeight)));
     }
 }
 
@@ -1584,6 +1594,13 @@ void Environment_UpdateLights(PlayState* play, EnvironmentContext* envCtx, Light
         }
     }
 
+    for (i = 0; i < 3; i++) {
+        lightCtx->ambientColor[i] = MMWeather_Shade(lightCtx->ambientColor[i]);
+        lightCtx->fogColor[i] = MMWeather_Shade(lightCtx->fogColor[i]);
+        envCtx->dirLight1.params.dir.color[i] = MMWeather_Shade(envCtx->dirLight1.params.dir.color[i]);
+        envCtx->dirLight2.params.dir.color[i] = MMWeather_Shade(envCtx->dirLight2.params.dir.color[i]);
+    }
+
     // Set both directional light directions
     envCtx->dirLight1.params.dir.x = envCtx->lightSettings.light1Dir[0];
     envCtx->dirLight1.params.dir.y = envCtx->lightSettings.light1Dir[1];
@@ -1626,7 +1643,7 @@ void Environment_UpdateSun(PlayState* play) {
     u16 phi_v0;
 
     if (!play->envCtx.sunDisabled) {
-        if (play->envCtx.precipitation[PRECIP_RAIN_CUR] != 0) {
+        if ((play->envCtx.precipitation[PRECIP_RAIN_CUR] != 0) || (MMWeather_Overcast() > 0.0f)) {
             Math_SmoothStepToF(&sSunPrimAlpha, 0.0f, 0.5f, 4.0f, 0.01f);
         } else {
             Math_SmoothStepToF(&sSunPrimAlpha, 255.0f, 0.5f, 4.0f, 0.01f);
@@ -1787,6 +1804,7 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
 
     Environment_WipeRumbleRequests();
 
+    MMWeather_Update(play);
     if (pauseCtx->state == PAUSE_STATE_OFF) {
         Environment_UpdateSkyboxRotY(play);
         Environment_UpdateRain(play);
@@ -1849,7 +1867,7 @@ void Environment_DrawSun(PlayState* play) {
 
 void Environment_DrawSunLensFlare(PlayState* play, EnvironmentContext* envCtx, View* view, GraphicsContext* gfxCtx,
                                   Vec3f vec) {
-    if ((play->envCtx.precipitation[PRECIP_RAIN_CUR] == 0) &&
+    if ((play->envCtx.precipitation[PRECIP_RAIN_CUR] == 0) && (MMWeather_Overcast() == 0.0f) &&
         !(GET_ACTIVE_CAM(play)->stateFlags & CAM_STATE_UNDERWATER) && (play->skyboxId == SKYBOX_NORMAL_SKY)) {
         f32 v0 = Math_CosS(CURRENT_TIME - CLOCK_TIME(12, 0));
 
@@ -2109,8 +2127,14 @@ void Environment_DrawRainImpl(PlayState* play, View* view, GraphicsContext* gfxC
     s16 pitch;
     s16 yaw;
     f32 scale;
+    f32 (*randomFloat)(void) = MMWeather_RainDensity() > 0 ? MMWeather_RandomFloat : Rand_ZeroOne;
+    u8 rainRed = 150;
+    u8 rainGreen = 255;
+    u8 rainBlue = 255;
 
-    if (play->envCtx.precipitation[PRECIP_SOS_MAX] != 0) {
+    if (MMWeather_RainDensity() > 0) {
+        precip = MMWeather_RainDensity();
+    } else if (play->envCtx.precipitation[PRECIP_SOS_MAX] != 0) {
         precip = play->envCtx.precipitation[PRECIP_RAIN_CUR];
     } else {
         precipScale = func_80173B48(&play->state) / 3e7f;
@@ -2140,7 +2164,8 @@ void Environment_DrawRainImpl(PlayState* play, View* view, GraphicsContext* gfxC
 
     if ((u32)precip != 0) {
         gDPPipeSync(POLY_XLU_DISP++);
-        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 150, 255, 255, 25);
+        MMWeather_RainColor(&rainRed, &rainGreen, &rainBlue);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, rainRed, rainGreen, rainBlue, 25);
         POLY_XLU_DISP = Gfx_SetupDL(POLY_XLU_DISP, SETUPDL_20);
     }
 
@@ -2155,8 +2180,8 @@ void Environment_DrawRainImpl(PlayState* play, View* view, GraphicsContext* gfxC
     yaw = Math_Vec3f_Yaw(&gZeroVec3f, &spD4) + 0x8000;
 
     for (i = 0; i < precip; i++) {
-        Matrix_Translate(((Rand_ZeroOne() - 0.7f) * 100.0f) + spF0, ((Rand_ZeroOne() - 0.7f) * 100.0f) + spEC,
-                         ((Rand_ZeroOne() - 0.7f) * 100.0f) + spE8, MTXMODE_NEW);
+        Matrix_Translate(((randomFloat() - 0.7f) * 100.0f) + spF0, ((randomFloat() - 0.7f) * 100.0f) + spEC,
+                         ((randomFloat() - 0.7f) * 100.0f) + spE8, MTXMODE_NEW);
         gSPMatrix(POLY_XLU_DISP++, D_01000000_TO_SEGMENTED, G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
         Matrix_RotateYS(yaw + (s16)(i << 5), MTXMODE_APPLY);
         Matrix_RotateXS(pitch + (s16)(i << 5), MTXMODE_APPLY);
@@ -2174,9 +2199,9 @@ void Environment_DrawRainImpl(PlayState* play, View* view, GraphicsContext* gfxC
                 gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 100);
                 materialApplied++;
             }
-            Matrix_Translate((Environment_RandCentered() * 220.0f) + spE4, player->actor.floorHeight + 2.0f,
-                             (Environment_RandCentered() * 220.0f) + spE0, MTXMODE_NEW);
-            scale = (Rand_ZeroOne() * 0.05f) + 0.05f;
+            Matrix_Translate(((randomFloat() - 0.5f) * 220.0f) + spE4, player->actor.floorHeight + 2.0f,
+                             ((randomFloat() - 0.5f) * 220.0f) + spE0, MTXMODE_NEW);
+            scale = (randomFloat() * 0.05f) + 0.05f;
             Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
             MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
             gSPDisplayList(POLY_XLU_DISP++, gEffShockwaveDL);
@@ -2187,6 +2212,10 @@ void Environment_DrawRainImpl(PlayState* play, View* view, GraphicsContext* gfxC
 }
 
 void Environment_DrawRain(PlayState* play, View* view, GraphicsContext* gfxCtx) {
+    if (MMWeather_RainDensity() > 0) {
+        Environment_DrawRainImpl(play, view, gfxCtx);
+        return;
+    }
     if (!(GET_ACTIVE_CAM(play)->stateFlags & CAM_STATE_UNDERWATER) &&
         (play->envCtx.precipitation[PRECIP_SNOW_CUR] == 0)) {
         if (play->envCtx.precipitation[PRECIP_SOS_MAX] != 0) {
@@ -2379,6 +2408,14 @@ void Environment_AddLightningBolts(PlayState* play, u8 num) {
     }
 }
 
+void MMWeather_StartBolt(void) {
+    sMMWeatherLightningBolt.state = LIGHTNING_BOLT_START;
+}
+
+void MMWeather_ClearBolts(void) {
+    sMMWeatherLightningBolt.state = LIGHTNING_BOLT_INACTIVE;
+}
+
 static TexturePtr sLightningTextures[] = {
     gEffLightning1Tex, gEffLightning2Tex, gEffLightning3Tex, gEffLightning4Tex,
     gEffLightning5Tex, gEffLightning6Tex, gEffLightning7Tex, gEffLightning8Tex,
@@ -2387,7 +2424,8 @@ static TexturePtr sLightningTextures[] = {
 /**
  * Draw any active lightning bolt entries contained in `sLightningBolts`
  */
-void Environment_DrawLightning(PlayState* play, s32 unused) {
+static void Environment_DrawLightningImpl(PlayState* play, LightningBolt* bolts, size_t count,
+                                          f32 (*randomFloat)(void)) {
     s16 i;
     f32 dx;
     f32 dz;
@@ -2397,8 +2435,8 @@ void Environment_DrawLightning(PlayState* play, s32 unused) {
 
     OPEN_DISPS(play->state.gfxCtx);
 
-    for (i = 0; i < ARRAY_COUNT(sLightningBolts); i++) {
-        switch (sLightningBolts[i].state) {
+    for (i = 0; i < count; i++) {
+        switch (bolts[i].state) {
             case LIGHTNING_BOLT_START:
                 dx = play->view.at.x - play->view.eye.x;
                 dz = play->view.at.z - play->view.eye.z;
@@ -2406,34 +2444,34 @@ void Environment_DrawLightning(PlayState* play, s32 unused) {
                 x = dx / sqrtf(SQ(dx) + SQ(dz));
                 z = dz / sqrtf(SQ(dx) + SQ(dz));
 
-                sLightningBolts[i].pos.x = play->view.eye.x + x * 9500.0f;
-                sLightningBolts[i].pos.y = Rand_ZeroOne() * 1000.0f + 4000.0f;
-                sLightningBolts[i].pos.z = play->view.eye.z + z * 9500.0f;
+                bolts[i].pos.x = play->view.eye.x + x * 9500.0f;
+                bolts[i].pos.y = randomFloat() * 1000.0f + 4000.0f;
+                bolts[i].pos.z = play->view.eye.z + z * 9500.0f;
 
-                sLightningBolts[i].offset.x = (Rand_ZeroOne() - 0.5f) * 5000.0f;
-                sLightningBolts[i].offset.y = 0.0f;
-                sLightningBolts[i].offset.z = (Rand_ZeroOne() - 0.5f) * 5000.0f;
+                bolts[i].offset.x = (randomFloat() - 0.5f) * 5000.0f;
+                bolts[i].offset.y = 0.0f;
+                bolts[i].offset.z = (randomFloat() - 0.5f) * 5000.0f;
 
-                sLightningBolts[i].textureIndex = 0;
-                sLightningBolts[i].pitch = (Rand_ZeroOne() - 0.5f) * 40.0f;
-                sLightningBolts[i].roll = (Rand_ZeroOne() - 0.5f) * 40.0f;
-                sLightningBolts[i].delayTimer = 3 * (i + 1);
-                sLightningBolts[i].state++;
+                bolts[i].textureIndex = 0;
+                bolts[i].pitch = (randomFloat() - 0.5f) * 40.0f;
+                bolts[i].roll = (randomFloat() - 0.5f) * 40.0f;
+                bolts[i].delayTimer = 3 * (i + 1);
+                bolts[i].state++;
                 break;
 
             case LIGHTNING_BOLT_WAIT:
-                sLightningBolts[i].delayTimer--;
+                bolts[i].delayTimer--;
 
-                if (sLightningBolts[i].delayTimer <= 0) {
-                    sLightningBolts[i].state++;
+                if (bolts[i].delayTimer <= 0) {
+                    bolts[i].state++;
                 }
                 break;
 
             case LIGHTNING_BOLT_DRAW:
-                if (sLightningBolts[i].textureIndex < 7) {
-                    sLightningBolts[i].textureIndex++;
+                if (bolts[i].textureIndex < 7) {
+                    bolts[i].textureIndex++;
                 } else {
-                    sLightningBolts[i].state = LIGHTNING_BOLT_INACTIVE;
+                    bolts[i].state = LIGHTNING_BOLT_INACTIVE;
                 }
                 break;
 
@@ -2441,18 +2479,16 @@ void Environment_DrawLightning(PlayState* play, s32 unused) {
                 break;
         }
 
-        if (sLightningBolts[i].state == LIGHTNING_BOLT_DRAW) {
-            Matrix_Translate(sLightningBolts[i].pos.x + sLightningBolts[i].offset.x,
-                             sLightningBolts[i].pos.y + sLightningBolts[i].offset.y,
-                             sLightningBolts[i].pos.z + sLightningBolts[i].offset.z, MTXMODE_NEW);
-            Matrix_RotateXFApply(DEG_TO_RAD(sLightningBolts[i].pitch));
-            Matrix_RotateZF(DEG_TO_RAD(sLightningBolts[i].roll), MTXMODE_APPLY);
+        if (bolts[i].state == LIGHTNING_BOLT_DRAW) {
+            Matrix_Translate(bolts[i].pos.x + bolts[i].offset.x, bolts[i].pos.y + bolts[i].offset.y,
+                             bolts[i].pos.z + bolts[i].offset.z, MTXMODE_NEW);
+            Matrix_RotateXFApply(DEG_TO_RAD(bolts[i].pitch));
+            Matrix_RotateZF(DEG_TO_RAD(bolts[i].roll), MTXMODE_APPLY);
             Matrix_Scale(22.0f, 100.0f, 22.0f, MTXMODE_APPLY);
             gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 128);
             gDPSetEnvColor(POLY_XLU_DISP++, 0, 255, 255, 128);
             MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-            gSPSegment(POLY_XLU_DISP++, 0x08,
-                       Lib_SegmentedToVirtual(sLightningTextures[sLightningBolts[i].textureIndex]));
+            gSPSegment(POLY_XLU_DISP++, 0x08, Lib_SegmentedToVirtual(sLightningTextures[bolts[i].textureIndex]));
             Gfx_SetupDL61_Xlu(play->state.gfxCtx);
             gSPMatrix(POLY_XLU_DISP++, D_01000000_TO_SEGMENTED, G_MTX_NOPUSH | G_MTX_MUL | G_MTX_MODELVIEW);
             gSPDisplayList(POLY_XLU_DISP++, gEffLightningDL);
@@ -2460,6 +2496,11 @@ void Environment_DrawLightning(PlayState* play, s32 unused) {
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
+}
+
+void Environment_DrawLightning(PlayState* play, s32 unused) {
+    Environment_DrawLightningImpl(play, sLightningBolts, ARRAY_COUNT(sLightningBolts), Rand_ZeroOne);
+    Environment_DrawLightningImpl(play, &sMMWeatherLightningBolt, 1, MMWeather_RandomFloat);
 }
 
 void Environment_PlaySceneSequence(PlayState* play) {
@@ -3447,6 +3488,7 @@ void Environment_Draw(PlayState* play) {
     Environment_SetupSkyboxStars(play);
     Environment_DrawSun(play);
     Environment_UpdateLightningStrike(play);
+    MMWeather_DrawLightning(play);
     Environment_DrawLightning(play, 0);
     Environment_DrawSkyboxFilters(play);
 }

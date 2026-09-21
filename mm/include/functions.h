@@ -111,6 +111,7 @@ s32 Actor_OfferTalkExchange(Actor* actor, struct PlayState* play, f32 xzRange, f
 s32 Actor_OfferTalkExchangeEquiCylinder(Actor* actor, struct PlayState* play, f32 radius, PlayerItemAction exchangeItemAction);
 
 void GetItem_Draw(PlayState* play, s16 drawId);
+Gfx* GetItem_DrawDListWithCosmetics(Gfx* gfx, const char* dlist, s16 drawId);
 
 u16 QuestHint_GetTatlTextId(PlayState* play);
 
