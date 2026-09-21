@@ -3,6 +3,9 @@
  * @brief Draw get-item models
  */
 #include "global.h"
+#include "2s2h/BenGui/CosmeticEditor.h"
+#include <libultraship/bridge/consolevariablebridge.h>
+#include <libultraship/bridge/resourcebridge.h>
 #include "assets/objects/object_gi_arrow/object_gi_arrow.h"
 #include "assets/objects/object_gi_arrowcase/object_gi_arrowcase.h"
 #include "assets/objects/object_gi_bean/object_gi_bean.h"
@@ -776,6 +779,37 @@ void GetItem_DrawDekuNuts(PlayState* play, s16 drawId) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+// Custom models do not share the native command offsets used by Cosmetic Editor.
+// Resolve through the display-list bridge first so the first Alt draw is classified
+// correctly, then scope the live MM cosmetic tint to this body draw only.
+Gfx* GetItem_DrawDListWithCosmetics(Gfx* gfx, const char* dlist, s16 drawId) {
+    Gfx drawCommand;
+    const char* cosmeticId = NULL;
+    Color_RGBA8 color;
+
+    gSPDisplayList(&drawCommand, (Gfx*)dlist);
+
+    if ((drawId == GID_MAGIC_JAR_SMALL || drawId == GID_MAGIC_JAR_BIG) &&
+        CVarGetInteger(CVAR_COSMETIC_CHANGED("HUD.Magic"), 0) && ResourceGetIsCustomByName(dlist)) {
+        cosmeticId = "HUD.Magic";
+        color = CosmeticEditor_GetChangedColor(0, 200, 0, 255, cosmeticId);
+    } else if ((drawId == GID_HEART_PIECE || drawId == GID_HEART_CONTAINER || drawId == GID_RECOVERY_HEART) &&
+               CVarGetInteger(CVAR_COSMETIC_CHANGED("HUD.Hearts"), 0) && ResourceGetIsCustomByName(dlist)) {
+        cosmeticId = "HUD.Hearts";
+        color = CosmeticEditor_GetChangedColor(255, 70, 50, 255, cosmeticId);
+    }
+
+    if (cosmeticId != NULL) {
+        gDPSetGrayscaleColor(gfx++, color.r, color.g, color.b, 255);
+        gSPGrayscale(gfx++, true);
+    }
+    *gfx++ = drawCommand;
+    if (cosmeticId != NULL) {
+        gSPGrayscale(gfx++, false);
+    }
+    return gfx;
+}
+
 void GetItem_DrawRecoveryHeart(PlayState* play, s16 drawId) {
     s32 pad;
 
@@ -788,7 +822,8 @@ void GetItem_DrawRecoveryHeart(PlayState* play, s16 drawId) {
                                   -(play->state.frames * 3), 32, 32, 1, play->state.frames * 0,
                                   -(play->state.frames * 2), 32, 32, 0, -3, 0, -2));
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[0]);
+    POLY_XLU_DISP =
+        GetItem_DrawDListWithCosmetics(POLY_XLU_DISP, (const char*)sDrawItemTable[drawId].drawResources[0], drawId);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -820,7 +855,8 @@ void GetItem_DrawOpa0(PlayState* play, s16 drawId) {
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
+    POLY_OPA_DISP =
+        GetItem_DrawDListWithCosmetics(POLY_OPA_DISP, (const char*)sDrawItemTable[drawId].drawResources[0], drawId);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -875,7 +911,8 @@ void GetItem_DrawXlu01(PlayState* play, s16 drawId) {
 
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[0]);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[1]);
+    POLY_XLU_DISP =
+        GetItem_DrawDListWithCosmetics(POLY_XLU_DISP, (const char*)sDrawItemTable[drawId].drawResources[1], drawId);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }

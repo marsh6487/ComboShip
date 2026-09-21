@@ -211,7 +211,7 @@ void DrawDoubleDefense() {
     gSPGrayscale(POLY_XLU_DISP++, true);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)&gGiHeartBorderDL);
     gDPSetGrayscaleColor(POLY_XLU_DISP++, 255, 0, 0, 100);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)&gGiHeartContainerDL);
+    POLY_XLU_DISP = GetItem_DrawDListWithCosmetics(POLY_XLU_DISP, gGiHeartContainerDL, GID_HEART_CONTAINER);
     gSPGrayscale(POLY_XLU_DISP++, false);
 
     CLOSE_DISPS(gPlayState->state.gfxCtx);
