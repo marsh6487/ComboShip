@@ -13,6 +13,9 @@
 // preserved from the previous shared block instead of regenerated.
 
 #include "FleetSync.h"
+#ifdef COMBO_BUILD
+#include "ComboExport.h"
+#endif
 #include "FleetShipCombo.h"
 #include "FleetOracleClient.h" // pairing MM's derived save files with OoT's (delete/ensure)
 #include "FleetComboIds.h"
@@ -1906,7 +1909,7 @@ static RegisterShipInitFunc initFleetSync(RegisterFleetSync, {});
 // ComboShip: the file-mirror pumps above stay off, but the two games still reconcile at every
 // switch — the peer pulls this snapshot (FleetSharedItems::PullFromPeer) and applies it max-merge.
 // Save-only: valid while this game is dormant.
-extern "C" __declspec(dllexport) const char* SOH_ExtractSharedState(void) {
+extern "C" COMBO_EXPORT const char* SOH_ExtractSharedState(void) {
     static std::string cached;
     nlohmann::json sh;
     ExtractShared(sh);

@@ -758,9 +758,9 @@ because the new templates have no clarity variants and so draw nothing from the 
 
 **Known limitations (unchanged):** composed area names are English in all three languages, including
 for OOT areas that do have translations (`areaText` wraps them in `EnglishOnly`); warp-song hints still
-use native's OOT-only area resolution; the 12 area-type NPC static hints (Sheik, boss keys, Dampé,
-Greg, Saria, Mido, Fishing Pole) still say "an Isolated Place" for a cross-placed target — that is the
-follow-up branch.
+use native's OOT-only area resolution; ~~the 12 area-type NPC static hints (Sheik, boss keys, Dampé,
+Greg, Saria, Mido, Fishing Pole) still say "an Isolated Place" for a cross-placed target~~ — fixed
+2026-09-02, see "NPC item hints resolve cross-placed items" below.
 
 **Settings-persistence fix (2026-07-16):** the silent file-select auto-reload
 (`Combo_OnReloadRequest(NULL)`) was writing the pending seed's `gRando.*` CVars over the user's
@@ -1812,3 +1812,321 @@ Ganondorf hint was being dropped WHOLE (not just its sword clause) because the e
 **On future merges:** if upstream reshapes `FindItemsAndMarkHinted` or `StaticHintInfo`, re-check
 `FindItemsForHint`; if `GetItemDisplayName`/`RetrieveItem().GetName()` change, the `ootItemAreas` keys
 are the join and must move with them.
+
+## NPC item hints resolve cross-placed items (2026-09-02)
+
+**Why:** a player's Greg hint (Treasure Chest Shop owner) said the rupee was "somewhere in an Isolated
+Place"; Greg was in a Snowhead Temple pot. Native `CreateStaticHintFromData` (hints.cpp) resolves each
+static hint's target item through `FindItemsAndMarkHinted`, which searches only `ctx->allLocations`
+(OOT's own checks). An item cross-placed into MM comes back `RC_UNKNOWN_CHECK`, whose empty area set
+is stored as `RA_NONE`, and `StaticData::areaNames[RA_NONE]` is `RHT_ISOLATED_PLACE`. The same path
+covered every area-type NPC hint with a target item: Sheik's Light Arrows, the six boss-door hints,
+Dampé's diary (hookshot), Greg, Saria (magic meter), Mido (Kokiri Sword) and the fishing pond owner.
+
+- `combo/rando/CrossHints.h` — new block after the Ganondorf hint composes those 12 hints from the
+  two-game placement list via the existing `itemAreaText` (Link's Pocket -> `RHT_YOUR_POCKET` for the
+  rows native flags `yourPocket`). Each is emitted as `"__STATIC__<RandomizerHint>"` with `type:
+  "static"`, one message per native `hintKeys` entry (Saria gets talk + song). The hinted check is
+  reserved in `usedCheckKeys`, mirroring native's `SetHintAccesible` (static hints are created before
+  stone/always hints natively, so stones never re-target them). An item in no check at all (starting
+  item, category not shuffled) is skipped and native fills the slot as before. These templates have no
+  clarity variants, so the block draws nothing from the RNG — existing seeds regenerate with identical
+  stone picks.
+- `soh/soh/OTRGlobals.cpp` — `SOH_DumpRandoHintData` exports the seven NPC hint options
+  (`sheikLaHint`, `bossKeyHint`, `dampesDiaryHint`, `gregHint`, `sariaHint`, `midoHint`,
+  `fishingPoleHint`); `Combo_IsUsedHintTemplate` allows the eight templates; `Combo_WalkComboHints`
+  maps the sentinel back to its `RandomizerHint` (checked BEFORE the generic `__` branch, which would
+  otherwise burn a gossip-stone slot on it). Native `CreateStaticHints()` then self-skips the enabled
+  key.
+- `soh/soh/Enhancements/randomizer/hint.cpp` — `GetHintMessage` re-stamps a MESSAGE-type Saria hint's
+  slot 1 as `TEXTBOX_TYPE_BLUE` (native's `RHT_SARIA_SONG_HINT` box type; the payload and the save
+  carry text only). Placed in the reader, not the apply walk, for the same reason as the last-message
+  fallback above it: `LoadRandomizer` rebuilds hints from the save arrays after the walk.
+- `combo/gui/ComboHintTracker.cpp` — new "NPC Item Hints" group, labelled by speaker.
+
+**Behavior change for OOT-placed targets too:** these hints are now composed by combo for every seed
+with the option on, not only cross-placed ones, so their area names follow the composer's conventions
+(English in all three languages, clear area name regardless of the obscure/ambiguous area-name pool
+native's `NamesChosen` draws from). Progressive items (hookshot, magic) hint the first copy in
+placement order, as native hinted the first copy in `allLocations` order — either copy is a valid
+target for both.
+
+## Foreign progressive models froze one tier too late (2026-09-04)
+
+`24d328af3` (#88) made a foreign progressive item draw the tier it actually grants instead of its
+static tier-1 model, by resolving through `Rando::ConvertItem` / `Item::GetGIEntry` and marking the
+recipe `stateDependent` — which makes both draw caches re-resolve it **every frame**.
+
+That is right while the item is only being *previewed* (lying in the world, on a shop shelf), but the
+cross-grant fires **mid-presentation**: `OOT_DeliverForeign` runs from `Randomizer_Item_Give` while
+the item is still held up, and MM's foreign branch cross-delivers from inside the `giveItem` lambda.
+The grant moves the other game's dormant save, so the next frame resolves one tier higher — picking
+up MM's Progressive Bow in OOT drew a Bow for one frame, then a Large Quiver. Every progressive, both
+directions, plus the MM foreign shop shelf (which keeps drawing until `boughtFunc` blanks it).
+
+MM's own **native** items never had this: `CheckQueue` converts once before the give and latches the
+concrete id into `CUSTOM_ITEM_PARAM`. The foreign path had no equivalent because its recipe is keyed
+by *check*, not by a stored resolved item.
+
+**Fix — a grant-time latch.** Both foreign caches gained a second entry point
+(`ComboLatchForeignDraw` / `ComboLatchForeignDrawOOT`) that resolves the recipe once, immediately
+before the grant, and stores it with `stateDependent = false`. The three function-local statics moved
+into a `ComboForeignDrawCache{,OOT}` struct + accessor so the resolver and the latch share one
+slot/generation sweep. The OOT latch re-adopts the generation after a successful fill, because
+`OOT_LookupForeign` can bump it from inside that fill (`OOT_GetForeignCategory` does the same);
+MM needs no equivalent — `ComboRandoGen()` is only ever bumped by `MM_LoadComboRando`. Vendored seams are thin wrappers: `Randomizer_LatchComboForeign` (draw.cpp,
+`int32_t` because `RandomizerCheck` isn't in `draw.h`'s scope) and `Rando::LatchComboForeign`
+(DrawItem.cpp). Call sites: `OOT_DeliverForeign`, `CheckQueue`'s foreign branch, `EnGirlA_RandoBuyFunc`.
+
+**Why clearing the flag beats a separate `latched` field:** the resolver returns at the cache-hit gate
+*before* reaching the fill, so a mid-presentation `NotReady` can no longer `erase` the latch and an
+`Unknown` can no longer overwrite it with `ok=false`. Both hazards become structurally unreachable.
+
+**Placement traps.**
+- OOT: the latch goes *after* the `fi` lookup, not at the top of `OOT_DeliverForeign` —
+  `OOT_LookupForeign` can lazily build the map and bump `OOT_ForeignMapGen()`, which would sweep the
+  latch straight back out. (`OOT_GetForeignCategory` documents the same hazard.)
+- MM: gated on `!wasObtained`, so a Song-of-Time re-presentation — which grants nothing — keeps
+  showing the tier the check actually gave instead of live-resolving one it will never grant. That
+  guarantee is session-scoped: any cache sweep (below) drops it and the re-presentation goes live again.
+- Neither trap branch latches: a foreign trap fires on the finder and touches only that game's save.
+- `info.animOk` recipes are skipped. No item in either anim class is progressive, so the skip is a
+  no-op on the OOT host (MM's stray fairies / souls / minifrogs never set `stateDependent` at all),
+  and on the MM host it preserves the one real anim state-dependence: the `SimplerBossSoulModels` CVar,
+  which a grant never moves and which must keep tracking a mid-session toggle.
+
+**Failure-path invariant:** any non-`Ok` resolution at latch time writes nothing and erases nothing.
+The entry keeps `stateDependent == true`, the draw resumes live per-frame re-resolution, and the worst
+case is exactly the pre-fix behaviour. The latch never sentinels a check and never negative-caches —
+the resolver's `erase`/`ok=false` are correct *for a draw* (something must be on screen this frame),
+but the latch isn't drawing, so it has no licence to poison a check for the rest of the slot.
+
+**Latch lifetime:** cleared by save-slot change, foreign-map generation change, save reload/seed
+rebake (both go through the first two), and re-latching on a later grant. Deliberately *not* cleared
+when the presentation ends — a frame-gap heuristic would reintroduce the bug on any frame the held-up
+item isn't submitted (fade, pause, textbox-only phase).
+
+**Residual:** the *name* alongside is static (`fi->displayName` both directions) and never re-resolved,
+so an OOT player now sees the correct Bow model under "You found Progressive Bow!". Resolving the text
+to the granted tier needs a new cross-game name ABI, and every other `displayName` consumer (check
+tracker, hints, merchant text, MM shop descriptions) must keep the generic name or it leaks
+progression. Separate follow-up.
+## Cross-placed MM junk is baked at generation (2026-09-07)
+
+A foreign MM junk check used to give three different answers. The grant forced a Red Rupee
+(`mm/2s2h/BenPort.cpp`, `MM_GrantCrossItem`); the model called `Rando::CurrentJunkItem()` with no
+check id (`combo/menu/ComboItemDrawMM.h`), so every foreign junk check in a seed drew the same item;
+and the text read "Junk (MM)".
+
+It can't be fixed by passing a check id through. `CurrentJunkItem(checkId)` seeds on
+`MM_finalSeed + randoCheckId` (`mm/2s2h/Rando/ConvertItem.cpp`), and a cross-placed item has no MM
+check id — the check lives in OOT, and `DeliverCrossItem` carries the OOT check *name*. The default
+mode also mixes in `gameplayFrames / 30`, and `gPlayState` is null while MM is dormant (combo pins
+`frames = 0`), so cross junk could never rotate visually either.
+
+**Fix:** resolve it once at generation. `CrossWorldCombinedFill` rewrites `p.item.name` for any MM
+junk placeholder landing in an OOT check, before the spoiler, the placements and the oracle commit
+all read it — so those three can't disagree. Downstream everything then sees an ordinary named item.
+
+**Details that matter:**
+- Candidates come from MM's **own** rotation set, exposed as `junkPool` in `MM_Dump` via
+  `Rando::ComboJunkPool()` — not derived from the dump's `pool[]`. Deriving it looked cheaper but let
+  three unsafe items through: `RI_NONE` ("literally nothing", `RITYPE_JUNK`, the vanilla item of 179
+  pot/crate checks) would have granted nothing at all and slipped past the Red Rupee fallback because
+  `ConvertItem` passes it through; and the singular `RI_DEKU_STICK`/`RI_DEKU_NUT` are item ids 0x08 and
+  0x09, i.e. real inventory slots that MM's logic gates on all over `Logic.h`. MM's own list carries
+  the inert `*_5` variants (0x8B/0x8D) instead, drops `RI_NONE`, and omits Huge/Silver Rupee.
+- MM picks uniformly from that list too (`obtainableJunkItems[Ship_Random(0, size)]`), so sampling it
+  uniformly matches MM's distribution rather than the pool's frequencies.
+- An older 2ship.dll emits no `junkPool`, so the bake no-ops and logs how many placements it skipped.
+  Those seeds keep the old placeholder behaviour.
+- Candidates are sorted and de-duplicated, and the pick uses its own RNG stream seeded per check
+  (`masterSeed << 32 ^ CwHashName(checkName) ^ 0x4A554E4B`). It never draws from the fill's `rng`, so
+  same-seed output stays byte-identical, and per-check seeding makes it independent of placement
+  order. Same rule the trap disguises and cross-hints already follow.
+- MM-only and one-directional: OOT pads with concrete items (`GetJunkItem`), so it has no junk
+  placeholder. MM junk in MM checks is untouched and still rotates at pickup.
+- Junk display names keep the `" (MM)"`/`" (OOT)"` suffix. Dropping it for junk was tried and reverted:
+  a bare "10 Arrows" in OOT that is really MM's grants no OOT ammo, and the suffix is the only thing
+  that tells the player why. It matters most for the ammo and refill entries, which look native.
+- The `RI_JUNK -> RI_RUPEE_RED` line in `MM_GrantCrossItem` stays as a fallback: an older seed or a
+  hand-written plando row can still name the placeholder, and the plando writer round-trips
+  `itemName` verbatim.
+
+**Accepted behaviour change:** `Rando::CurrentJunkItem` additionally filters by MM's live
+obtainability (don't hand out arrows with no bow). Generation can't do that, so the pick is unfiltered
+and may be an item the player can't use yet — low-value but harmless, and the same class of item MM
+would have offered. Seeds generated before this change keep their old behaviour.
+
+**Two consequences worth knowing:**
+- The playthrough pare-down, the sphere log and cross-hint requiredness all replay the *baked* spoiler,
+  so they now credit a real junk item where the fill validated a no-op placeholder. Every candidate is
+  non-advancement and inert in the oracle, so the fill's beatability guarantee holds — but this is why
+  the candidate set has to stay free of anything that lands in an inventory slot.
+- The oracle commit now skips foreign placements entirely. It previously fed the *other* game's item
+  name to a game's `PlaceItem`, which harmlessly missed the name lookup for "Junk" — but a baked name
+  like "Blue Rupee" exists in OOT too, so it would have placed the wrong native item at that check.
+
+**Follow-up — resolved tier name.** `CwItemDrawInfo` gained an appended `resolvedName` field, set by a
+producer only when a progressive placeholder actually converted to a tier (MM after the junk/trap
+indirection, so a maxed progressive that fell to junk names the junk item; OOT via a defaulted
+out-param on `Item::GetGIEntry`, see below). Each consumer cache copies it alongside the model and
+exposes two accessors: `ComboForeignLatchedName{,OOT}` (frozen — NULL unless the entry is latched
+with a non-empty name, so a pickup can never show the next tier) and `ComboForeignLiveName{,OOT}` (runs
+the per-frame resolver, for previews). `ShownForeignName` in `CrossForeign.h` tags the resolved name
+with the same `(MM)`/`(OOT)` suffix as `displayName`, or falls back to `displayName` when there is no
+name. Pickup text (OOT textbox/toast, MM textbox/toast) uses the latched accessor; shop/merchant/scrub
+previews use the live one. Everything else (trackers, hints, MM's other ~15 `GetItemName` callers)
+stays generic by construction: MM's `GetItemName` gained a defaulted `livePreview` parameter, opted
+into only at the purchase-preview call sites, so a hint feeder that reuses the same function can never
+leak a live tier into persisted hint text.
+
+**`Item::GetGIEntry` out-param (COMBO_BUILD-guarded deviation):** the vanilla signature returns
+`std::shared_ptr<GetItemEntry>`; the resolved `RandomizerGet` it computes for a progressive tier is a
+local (`actual`) never exposed. Combo appends a defaulted `RandomizerGet* actualOut = nullptr` and
+writes it once, right before the final `return`, only when the progressive branch actually resolved
+(the two earlier returns — non-progressive `giEntry`, and `actual == RG_NONE` falling back to
+`giEntry` — leave `*actualOut` untouched at the caller's default). All 17 existing callers are
+unaffected. Rejected: a combo-owned reverse `(modIndex, getItemId) -> RandomizerGet` map — real
+collisions exist (`GI_BRACELET` is both `RG_GORONS_BRACELET` and `RG_POWER_BRACELET`; `GI_SCALE_SILVER`
+is shared by four different RGs; the stick/nut capacity GIs are shared with the bag items).
+
+## Shared Items (OoTMM-style) — combo-owned feature (2026-09-10)
+
+A new Combo menu section ("Shared Items", 17 toggles: Bows, Bomb Bags, Bombchu Bags, Magic, Wallets,
+Hookshot, Fire/Ice/Light Arrows, Lens of Truth, Epona's Song, Song of Storms, Goron/Zora/Keaton/Bunny/
+Truth masks). Design: OOT keeps the family's pool copies, MM's are trimmed at generation, and a
+runtime ABI reconciles tiers in both directions — a shared item found in MM is simply a foreign OOT
+item, reusing every existing piece (foreign sentinels, #201 model latch, #202 resolved name, cross-grant
+exports, Anchor packets) unchanged. Table + mask helpers: `combo/rando/SharedItems.h` (new, header-only,
+`namespace ComboRando`, compiled into soh.dll/2ship.dll/comborando/exe like `CrossWorldRando.h`).
+
+**CVars:** `gCombo.Rando.Shared.<Family>` (menu-authored, one per family — see the table's `cvar` field).
+**Spoiler key:** top-level `sharedItems: ["bows", ...]` (effective mask — a family with zero OOT copies
+in the pool is left alone and not listed, even if requested). Absent key = mask 0 = feature off (old
+seeds unaffected; no save-format change, no `COMBO_RELEASE_VERSION` bump, spoiler `version` stays 1).
+
+**Skip rule:** a mask family whose OOT pool holds none of `ootName` is skipped with a log line — sound,
+MM keeps its native copies. Masks additionally require OOT's Mask Quest = Shuffle (checked via a new
+`accessibility.maskQuestShuffle` dump field, `OTRGlobals.cpp`); otherwise skipped with a log line + a
+menu footer note. A family whose OOT copies exist but whose MM name doesn't match anything in MM's
+pool (a future name drift) also logs and is left out of the effective mask, rather than failing
+generation — this exact bug shipped twice during implementation (Magic, Hookshot) and was caught by
+the headless smoke test, not by inspection.
+
+**Known gap:** the trim only counts `advItems`/`lockedPlacements`; it does not scan MM's own
+confined/fixed pre-placements for `mmName`. None of the 16 first-cut families are ever
+confined-placed in practice (masks route through trade slots, not confinement), so this is inert
+today — flagged here so a future family addition checks it.
+
+**Wallet special case:** OOT's optional Child Wallet tier has no MM equivalent, so a shared wallet pool
+would be ambiguous (3 copies = child+adult+giant, or adult+giant+tycoon?). When Shared Wallets is on,
+`Context::FinalizeSettings` (`soh/soh/Enhancements/randomizer/settings.cpp`, same `#ifdef COMBO_BUILD`
+seam as the #135 forces) forces `RSK_SHUFFLE_CHILD_WALLET` off, reading `gComboSharedMask` — pushed by
+`SOH_SetComboSharedItems(mask)` before every dump and on reload, mirroring `SOH_SetComboStartingGame`.
+
+**Runtime ABI (C-ABI, canonical `extern "C" __declspec(dllexport)`, try/catch inside):**
+`SOH_/MM_GetSharedTier(family)`, `SOH_/MM_RaiseSharedTier(family, tier)`, `SOH_/MM_SetSharedChangedCb`,
+`SOH_/MM_SetSharedTickCb`, `SOH_SetComboSharedItems`/`SOH_ReadComboSharedCVars` (OOT-only — MM has no
+gen-time setting keyed on the mask). `SOH_GetSharedTier`'s magic case reads `isMagicAcquired +
+isDoubleMagicAcquired`, **never `magicLevel`** (a HUD-tick value, reset to 0 on load, never advanced
+while dormant — the exact trap the side-fix below closes). `SOH_RaiseSharedTier` resolves a **concrete**
+RG per tier (`RG_FAIRY_BOW`/`RG_BIG_QUIVER`/..., `RG_MAGIC_SINGLE`/`RG_MAGIC_DOUBLE`, etc.) and grants via
+the existing `Combo_GrantResolvedOOT` — never the progressive resolver (`Combo_SOH_Rando_Reset` rebinds
+`Logic::mSaveContext` to a scratch save, so that resolver's magic branch reads a frozen `magicLevel`).
+`MM_RaiseSharedTier` uses `Rando::ConvertItem(RI_PROGRESSIVE_*)` (default `RC_UNKNOWN` check id is safe —
+none of these families gate on `hasObtainedCheck`) and clamps to the family's `mmTierCap`; `RI_JUNK`
+means "stop", never "substitute".
+
+**Pokes (vendored, guarded, one-to-three lines each — the five deviations this feature adds):**
+- `soh/soh/Enhancements/randomizer/settings.cpp` — the wallet force above.
+- `soh/soh/Network/Anchor/Packets/GiveItem.cpp` — `gComboSuppressAnchorSend` check at the top of
+  `SendPacket_GiveItem`, so a local `SOH_RaiseSharedTier` grant doesn't broadcast a teammate toast for
+  the player's own reconcile (set/cleared by `SOH_RaiseSharedTier` around the grant).
+- `mm/2s2h/Rando/GiveItem.cpp` — one poke after the switch (single exit), mirroring the #136 poke.
+- `soh/soh/Network/Anchor/Packets/UpdateTeamState.cpp` and `mm/2s2h/Network/Anchor/MMAnchor.cpp` — one
+  poke each beside the existing #136 Triforce poke (the inventory-union merge bypasses grants).
+
+OOT's own poke is an always-on `OnItemReceive` + `OnGameFrameUpdate` hook registered in `InitOTR`'s
+existing combo-owned block (no vendored edit needed there); MM's per-frame tick is `OnGameStateUpdate`,
+also always-on — **`PumpDormant` is Anchor-gated** (OOT under `isConnected`, MM under `isActive`) and
+cannot be reused as the drain path.
+
+**Launcher (`combo/ComboShip.cpp`):** `Combo_OnSharedChanged(game, fileNum)` rejects `fileNum == 0xFF`
+(file-select) and only ever sets `g_sharedReconcilePending = true` — **deferred, never inline** (a raise
+into the *active* game from inside its own give lambda would be re-entrant). `Combo_SharedTick()` (the
+tick-cb target) drains it when pending **and** both saves are resident
+(`g_MmSaveInMemorySlot == g_comboCompletionSlot`): clears pending first, then `Combo_SharedReconcileNow()`
+raises the lower side of every effective family to `max(oot, mm)`. Raises re-fire the poke and re-arm
+pending; the next tick finds equality and no-ops — convergence takes two frames, expected. Full
+reconcile also runs at OOT slot bind (`Combo_OnOOTSaveLoad`, both branches) and right after
+`MM_InitRandoSaveFile` in `Combo_OnOOTSaveInit` (closes the accepted under-approximation: OOT's
+*starting* copies aren't mirrored into the MM oracle's base state at gen time, so the runtime reconcile
+grants them for real at save creation).
+
+**Failure-path invariant:** for every effective family, after any drained reconcile,
+`ootTier == mmTier == max(before)` unless a side is capped (MM Tycoon Wallet not shuffled, OOT child
+trade slot occupied — the RandoInf flag still counts). A lost pending flag, a crash before persist, or a
+capped raise leaves `min(o,m) < max(o,m)`; the next pickup, slot bind, or Anchor merge re-runs the same
+idempotent reconcile and closes the gap. No junk is ever substituted, no seed state is mutated, no
+refusal/repair on old saves.
+
+**Naming (decision: no game suffix on shared families):** `combo/rando/CrossForeign.h` is the single
+suffix source. `SuffixCrossGameItems` gained an `untagged` set parameter (built by
+`SharedUntaggedNames(mask)` — both games' pool name for every effective family) erased from the
+collision set before tagging. `BuildForeignArray` gained a `sharedMask` parameter: an OOT foreign marker
+whose `itemName` is an effective family's `ootName` gets `"shared": true` and skips the suffix on
+`displayName`/`fakeDisplayName`/`fakeTrickName` alike (a disguise *as* a shared item is also untagged).
+`ForeignItem::shared` (parsed from the spoiler, absent = false) makes `ShownForeignName` return the bare
+resolved name instead of appending `GameSuffix`. Old seeds: `shared` absent everywhere → tagged exactly
+as before.
+
+**Bombchu Bag family (2026-09-13, split out of Bomb Bag):** MM's own Bomb Bag semantics grant Bombchu
+access (`INV_CONTENT(ITEM_BOMBCHU)`), leaking chus into MM whenever *any* Bomb Bag family is shared. New
+`SharedFamilyDef` fields `mmHasItem` (false = no MM pool copy, no trim, no oracle mirror — the family's
+`mmName` is `""`) and `ootToMmOnly` (true = one-way; MM's only tier signal, `INV_CONTENT(ITEM_BOMBCHU)`,
+is also set by vanilla ammo, so a two-way reconcile would hand OOT a free bag off a junk chest) model
+this: `SF_BOMBCHU_BAG` mirrors OOT's `RSK_BOMBCHU_BAG` option (Single/Progressive), key `bombchuBags`.
+MM gets the loaded slot's effective mask via a new `MM_SetComboSharedItems(mask)` export (mirrors
+`SOH_SetComboSharedItems`, bound/pushed alongside it in `combo/ComboShip.cpp`) and a helper,
+`Combo_MM_BombchuBagShared()`, so the vendored pokes below never include the family header. While the
+family is effective: `mm/2s2h/Rando/GiveItem.cpp` `RI_BOMB_BAG_*` grants bombs only (chus untouched
+unless already owned); `mm/2s2h/Rando/ConvertItem.cpp` `IsItemObtainable` blocks chu-ammo pickups
+(`RI_BOMBCHU*`) until a bag is owned, substituting instead. `GiveItemForOracle` (`BenPort.cpp`) is left
+unchanged — it runs at gen time against the loaded slot's mask, not the seed being generated, and MM
+logic never gates on chus alone. Standalone MM (mask off/missing) keeps 2ship's default bag-grants-chus
+behavior — the export is fail-open, never fail-into-suppression.
+
+**Side fix (separate commit, not folded into Shared Items):** `SOH_GrantCrossItem`
+(`soh/soh/OTRGlobals.cpp`) resolved a dormant "Progressive Magic Meter" through `Item::GetGIEntry()`'s
+progressive resolver, which switches on `logic->GetSaveContext()->magicLevel` — stale/frozen once
+`Combo_SOH_Rando_Reset` has ever rebound `Logic::mSaveContext` to a scratch save (true after any
+generation). A second cross-granted magic upgrade re-resolved to single magic and was lost. Fixed the
+same way as the Shared Items reader: resolve by `isMagicAcquired`/`isDoubleMagicAcquired` to a concrete
+`RG_MAGIC_SINGLE`/`RG_MAGIC_DOUBLE` before the generic `itemNameToEnum` lookup.
+
+
+## Shared Items with NEI and the current SoH port (2026-09-21)
+
+NEI's Fleet shared pairs remain active. The seed's Shared Items switches add Varuuna's native
+families; turning a switch off does not disable an existing NEI pair. Overlapping pairs and enabled
+families form one component in the generator and oracle. A real acquisition is counted once,
+then credited to the corresponding inventory names. Pool trimming preserves the existing NEI
+maximum-copy rule and extended chains. Native-mask families connect OoT's child-trade mask,
+NEI's imported OoT mask, and MM's mask when the upstream mask-shuffle gate is satisfied.
+
+Runtime tier convergence is a receive, so it cannot send another progressive Fleet grant back
+into the source game. A successful boolean MM mask raise still grants NEI's imported OoT alias.
+Receive guards restore their depth on exceptions, and Anchor suppression restores its prior state.
+Both cross-world and Fleet grants into inactive OoT resolve magic from the actual save flags.
+NEI's exported functions use the host's Windows/Linux symbol helpers. The launcher only reconciles
+resident saves belonging to the same valid slot, and does not mark a failed MM save creation resident.
+
+This integration targets newly generated seeds; it adds no existing-save migration. The candidate
+port and its runtime acceptance requirements are recorded in
+`docs/superpowers/specs/2026-09-21-shared-items-soh-integration.md`.
+
+Cross-item delivery and dormant Anchor pumps also schedule the native-family reconciliation
+using the launcher's bound slot. OoT's ordinary Anchor item receiver notifies after its
+save-direct grant. Both foreground pump callers require a loaded gameplay save, preventing
+title-screen or post-quit memory from being reconciled under a remembered slot.

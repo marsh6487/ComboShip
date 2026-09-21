@@ -5,6 +5,7 @@
  */
 
 #include "z_en_viewer.h"
+#include "overlays/actors/ovl_Bg_Toki_Swd/z_bg_toki_swd.h"
 #include "overlays/actors/ovl_En_Ganon_Mant/z_en_ganon_mant.h"
 #include "objects/object_zl4/object_zl4.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
@@ -30,6 +31,7 @@
 #include "objects/object_dy_obj/object_dy_obj.h"
 #include "objects/object_os_anime/object_os_anime.h"
 #include "static_story_actor.h"
+#include "static_story_talk.h"
 #include "static_story_kokiri.h"
 #include "static_story_mm_actor.h"
 #include "static_story_ganon.h"
@@ -37,6 +39,7 @@
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/frame_interpolation.h"
 #include <assert.h>
+#include <string.h>
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_ATTENTION_ENABLED)
 
@@ -176,6 +179,12 @@ void EnViewer_Destroy(Actor* thisx, PlayState* play) {
                 SkelAnime_Free(&this->skin.skelAnime, play);
             }
             Collider_DestroyCylinder(play, &this->staticState.collider);
+            this->staticState.initialized = false;
+        }
+        if (this->staticState.mmResourceOwner != NULL) {
+            MmAssets_ReleaseNormalActor(this->staticState.mmResourceOwner);
+            this->staticState.mmResourceOwner = NULL;
+            this->staticState.mmPlayerFrames = NULL;
         }
         return;
     }
@@ -384,6 +393,10 @@ void EnViewerStatic_Init(EnViewer* this, PlayState* play) {
     StaticStoryActorType type = StaticStoryActor_GetType(this->actor.params);
     StaticStoryObjectRequirements objects = StaticStoryActor_GetObjectRequirements(type);
 
+    /* Scene-editor placements should remain visible across open areas. Keep
+     * the existing frustum padding; the draw-distance setting can extend this. */
+    this->actor.uncullZoneForward = 6000.0f;
+
     StaticStoryActor_NormalizePlacementRotation(&this->actor.world.rot.x, &this->actor.world.rot.y,
                                                 &this->actor.world.rot.z);
     this->actor.shape.rot.x = this->actor.world.rot.x;
@@ -515,6 +528,17 @@ static bool EnViewerStatic_UpdateRutoWater(EnViewer* this, PlayState* play, bool
     return false;
 }
 
+static bool EnViewer_StaticSelectSkullKidModel(EnViewer* this) {
+    const MmSkullKidDisplayLists* model = MmAssets_GetSkullKidDisplayLists();
+    if (model == NULL)
+        return false;
+    memcpy(this->staticState.skullKidLimbDLs, model->limbs, sizeof(model->limbs));
+    this->staticState.skullKidHeadDL = model->head;
+    this->staticState.skullKidEyesDL = model->eyes;
+    this->staticState.skullKidMaskDL = model->mask;
+    return true;
+}
+
 void EnViewerStatic_WaitForObjects(EnViewer* this, PlayState* play) {
     const StaticStoryActorDefinition* definition =
         StaticStoryActor_GetDefinition((StaticStoryActorType)this->staticState.type);
@@ -530,7 +554,9 @@ void EnViewerStatic_WaitForObjects(EnViewer* this, PlayState* play) {
         Actor_Kill(&this->actor);
         return;
     }
-    if (usesMmAssets && !this->staticState.initialized) {
+    if (this->staticState.initialized)
+        return;
+    if (usesMmAssets) {
         const StaticStoryMmPresentation* presentation =
             StaticStoryMm_GetPresentation((StaticStoryActorType)this->staticState.type, this->staticState.pose);
         FlexSkeletonHeader* skeleton;
@@ -541,29 +567,60 @@ void EnViewerStatic_WaitForObjects(EnViewer* this, PlayState* play) {
         bool eyeTexturesComplete = true;
 
         MmAssets_Init();
-        skeleton = (FlexSkeletonHeader*)MmAssets_LoadSkeleton(presentation != NULL ? presentation->skeletonPath : "");
-        animation = (AnimationHeader*)MmAssets_LoadAnimation(presentation != NULL ? presentation->animationPath : "");
+        if (presentation != NULL && presentation->frameCount != 0) {
+            MmNormalActorResources resources;
+            if (!(presentation->kind == STATIC_STORY_MM_SCOPED_PLAYER_LOD
+                      ? MmAssets_LoadKafei(this->staticState.pose, &resources)
+                      : MmAssets_LoadNormalActor(this->staticState.type, this->staticState.pose, &resources))) {
+                Actor_Kill(&this->actor);
+                return;
+            }
+            this->staticState.mmResourceOwner = resources.owner;
+            skeleton = resources.skeleton;
+            animation = resources.animation;
+            this->staticState.mmPlayerFrames = resources.playerFrames;
+            this->staticState.mmPlayerFrameCount = presentation->frameCount;
+            memcpy(this->staticState.mmEyeTextures, resources.eyes, sizeof(resources.eyes));
+            memcpy(this->staticState.mmMouthTextures, resources.mouths, sizeof(resources.mouths));
+        } else {
+            /* Preserve the legacy MM actors' established resource contract. */
+            skeleton =
+                (FlexSkeletonHeader*)MmAssets_LoadSkeleton(presentation != NULL ? presentation->skeletonPath : "");
+            animation =
+                (AnimationHeader*)MmAssets_LoadAnimation(presentation != NULL ? presentation->animationPath : "");
+        }
         if (this->staticState.type == STATIC_STORY_ACTOR_TREASURE_CHEST_SHOP_GAL) {
-            for (int eye = 0; eye < 3; ++eye) {
+            /* The MMD replacement needs foot tracks fitted to its shoes.
+             * Keep MM's archive-scoped clip as the fallback for all other assets. */
+            if (ResourceMgr_IsAltAssetsEnabled()) {
+                const char* path = this->staticState.pose == 1 ? "alt/objects/object_bg/ShopGalMMDLevelSwayAnim"
+                                                               : "alt/objects/object_bg/ShopGalMMDLevelIdleAnim";
+                if (ResourceMgr_FileExists(path)) {
+                    AnimationHeader* fitted = (AnimationHeader*)ResourceMgr_GetResourceDataByNameHandlingMQ(path);
+                    if (fitted != NULL && animation != NULL &&
+                        fitted->common.frameCount == animation->common.frameCount) {
+                        animation = fitted;
+                    }
+                }
+            }
+            for (int eye = 0; eye < 4; ++eye) {
                 this->staticState.mmEyeTextures[eye] = MmAssets_LoadResource(
                     StaticStoryMm_GetEyeTexturePath(STATIC_STORY_ACTOR_TREASURE_CHEST_SHOP_GAL, eye));
                 eyeTexturesComplete = eyeTexturesComplete && this->staticState.mmEyeTextures[eye] != NULL;
             }
         }
-        if (presentation != NULL && presentation->requiresSecondarySkeleton) {
-            this->staticState.skullKidMaskDL = MmAssets_LoadDisplayListGraphStrict(presentation->maskDisplayListPath);
-            this->staticState.skullKidHeadDL = MmAssets_LoadDisplayListGraphStrict(presentation->headDisplayListPath);
-            this->staticState.skullKidEyesDL = MmAssets_LoadDisplayListGraphStrict(presentation->eyesDisplayListPath);
-            secondaryComplete = this->staticState.skullKidMaskDL != NULL && this->staticState.skullKidHeadDL != NULL &&
-                                this->staticState.skullKidEyesDL != NULL;
-            for (int limb = 0; limb < 22 && secondaryComplete; ++limb) {
-                const char* displayListPath = StaticStoryMm_GetSkullKidLimbDisplayListPath(limb);
-
-                if (displayListPath != NULL) {
-                    this->staticState.skullKidLimbDLs[limb] = MmAssets_LoadDisplayListGraphStrict(displayListPath);
-                    secondaryComplete = this->staticState.skullKidLimbDLs[limb] != NULL;
-                }
+        if (this->staticState.type == STATIC_STORY_ACTOR_ANJU) {
+            /* The strict graph owns its lists, vertices and texture aliases
+             * across scene/cache eviction, just like Skull Kid's graph. */
+            this->staticState.anjuModel = MmAssets_GetAnjuDisplayLists(this->staticState.pose);
+            if (this->staticState.anjuModel == NULL) {
+                Actor_Kill(&this->actor);
+                return;
             }
+            this->staticState.anjuUmbrellaDL = this->staticState.anjuModel->umbrella;
+        }
+        if (presentation != NULL && presentation->requiresSecondarySkeleton) {
+            secondaryComplete = EnViewer_StaticSelectSkullKidModel(this);
             if (!StaticStoryMm_UsesNativeFairyCompanion((StaticStoryActorType)this->staticState.type)) {
                 secondarySkeleton = (FlexSkeletonHeader*)MmAssets_LoadSkeleton(presentation->secondarySkeletonPath);
                 secondaryAnimation = (AnimationHeader*)MmAssets_LoadAnimation(presentation->secondaryAnimationPath);
@@ -582,7 +639,9 @@ void EnViewerStatic_WaitForObjects(EnViewer* this, PlayState* play) {
                 }
             }
         }
-        if (!StaticStoryMm_ResourcesComplete(presentation, skeleton != NULL, animation != NULL, secondaryComplete) ||
+        if (!StaticStoryMm_ResourcesComplete(presentation, skeleton != NULL,
+                                             animation != NULL || this->staticState.mmPlayerFrames != NULL,
+                                             secondaryComplete) ||
             !eyeTexturesComplete) {
             osSyncPrintf("Static story actor: MM resources unavailable for type %d pose %d\n", this->staticState.type,
                          this->staticState.pose);
@@ -590,7 +649,34 @@ void EnViewerStatic_WaitForObjects(EnViewer* this, PlayState* play) {
             return;
         }
         SkelAnime_InitFlex(play, &this->skin.skelAnime, skeleton, NULL, NULL, NULL, 0);
-        Animation_PlayLoopSetSpeed(&this->skin.skelAnime, animation, poseDescriptor->playbackSpeed);
+        if (this->skin.skelAnime.jointTable == NULL || this->skin.skelAnime.morphTable == NULL) {
+            SkelAnime_Free(&this->skin.skelAnime, play);
+            this->skin.skelAnime.jointTable = NULL;
+            this->skin.skelAnime.morphTable = NULL;
+            MmAssets_ReleaseNormalActor(this->staticState.mmResourceOwner);
+            this->staticState.mmResourceOwner = NULL;
+            this->staticState.mmPlayerFrames = NULL;
+            Actor_Kill(&this->actor);
+            return;
+        }
+        if (presentation->kind == STATIC_STORY_MM_SCOPED_PLAYER_LOD) {
+            if (this->skin.skelAnime.limbCount != 22 || this->skin.skelAnime.dListCount != 18) {
+                SkelAnime_Free(&this->skin.skelAnime, play);
+                this->skin.skelAnime.jointTable = this->skin.skelAnime.morphTable = NULL;
+                MmAssets_ReleaseNormalActor(this->staticState.mmResourceOwner);
+                this->staticState.mmResourceOwner = NULL;
+                this->staticState.mmPlayerFrames = NULL;
+                Actor_Kill(&this->actor);
+                return;
+            }
+            this->skin.skelAnime.curFrame = 0;
+            this->skin.skelAnime.playSpeed = poseDescriptor->playbackSpeed;
+            StaticStoryMm_SampleKafei(this->staticState.mmPlayerFrames, this->staticState.mmPlayerFrameCount,
+                                      &this->skin.skelAnime.curFrame, 0, this->skin.skelAnime.jointTable,
+                                      &this->staticState.mmAppearance);
+        } else {
+            Animation_PlayLoopSetSpeed(&this->skin.skelAnime, animation, poseDescriptor->playbackSpeed);
+        }
         if (presentation->requiresSecondarySkeleton) {
             if (StaticStoryMm_UsesNativeFairyCompanion((StaticStoryActorType)this->staticState.type)) {
                 /* Use SoH's retained fairy resources for the Tatl-colored companion. The custom MM
@@ -669,8 +755,14 @@ void EnViewerStatic_WaitForObjects(EnViewer* this, PlayState* play) {
     Actor_SetScale(&this->actor, definition->scale);
     const StaticStoryGanonPresentation* ganonPresentation =
         StaticStoryGanon_GetPresentation((StaticStoryActorType)this->staticState.type);
-    ActorShape_Init(&this->actor.shape, ganonPresentation != NULL ? ganonPresentation->shapeYOffset : 0.0f,
-                    ActorShadow_DrawCircle, definition->colliderRadius);
+    // Saria's narrower interaction collider should not shrink her visual shadow.
+    ActorShape_Init(
+        &this->actor.shape,
+        ganonPresentation != NULL
+            ? ganonPresentation->shapeYOffset
+            : StaticStoryMm_GetShapeYOffset((StaticStoryActorType)this->staticState.type, this->staticState.pose),
+        ActorShadow_DrawCircle,
+        this->staticState.type == STATIC_STORY_ACTOR_SARIA ? 20.0f : definition->colliderRadius);
     if (!usesMmAssets) {
         gSegments[6] = VIRTUAL_TO_PHYSICAL(play->objectCtx.status[this->animObjBankIndex].segment);
     }
@@ -695,6 +787,10 @@ void EnViewerStatic_WaitForObjects(EnViewer* this, PlayState* play) {
     this->staticState.collider.dim.yShift = definition->colliderYShift;
     this->actor.colChkInfo.mass = MASS_IMMOVABLE;
     this->staticState.blinkTimer = Rand_S16Offset(definition->blinkMin, definition->blinkRange);
+    this->staticState.luluHdBlinkPhase = 0;
+    this->staticState.luluHdBlinkTimer = this->staticState.blinkTimer;
+    this->staticState.anjuBlinkPhase = 0;
+    this->staticState.anjuBlinkTimer = this->staticState.blinkTimer;
     int8_t fixedEyeIndex =
         StaticStoryActor_GetFixedEyeIndex((StaticStoryActorType)this->staticState.type, this->staticState.pose);
     this->staticState.eyeIndex = fixedEyeIndex >= 0 ? fixedEyeIndex : 0;
@@ -721,7 +817,7 @@ void EnViewerStatic_Update(EnViewer* this, PlayState* play) {
     const StaticStoryPoseDescriptor* poseDescriptor =
         StaticStoryActor_ResolvePose((StaticStoryActorType)this->staticState.type, this->staticState.pose);
 
-    if (definition == NULL || poseDescriptor == NULL) {
+    if (definition == NULL || poseDescriptor == NULL || !this->staticState.initialized) {
         return;
     }
     bool animationEnded = false;
@@ -729,13 +825,23 @@ void EnViewerStatic_Update(EnViewer* this, PlayState* play) {
 
     if (poseDescriptor->skeletonFamily != STATIC_SKELETON_NONE &&
         poseDescriptor->animation != STATIC_ANIM_ADULT_ZELDA_NEUTRAL) {
-        animationEnded = SkelAnime_Update(&this->skin.skelAnime);
+        if (this->staticState.type == STATIC_STORY_ACTOR_CHILD_KAFEI) {
+            StaticStoryMm_SampleKafei(this->staticState.mmPlayerFrames, this->staticState.mmPlayerFrameCount,
+                                      &this->skin.skelAnime.curFrame,
+                                      this->skin.skelAnime.playSpeed * (R_UPDATE_RATE * 0.5f),
+                                      this->skin.skelAnime.jointTable, &this->staticState.mmAppearance);
+        } else {
+            animationEnded = SkelAnime_Update(&this->skin.skelAnime);
+        }
         if (StaticStoryActor_LocksRootTranslation((StaticStoryActorType)this->staticState.type,
                                                   this->staticState.pose)) {
             this->skin.skelAnime.jointTable[0].x = 0;
             this->skin.skelAnime.jointTable[0].y = 0;
             this->skin.skelAnime.jointTable[0].z = 0;
         }
+    }
+    if (this->staticState.type == STATIC_STORY_ACTOR_KOKIRI_GIRL || this->staticState.type == STATIC_STORY_ACTOR_FADO) {
+        StaticStoryKokiri_UpdatePose(this, R_UPDATE_RATE * (1.0f / 3.0f));
     }
     if (this->staticState.type == STATIC_STORY_ACTOR_ADULT_RUTO_WATER) {
         canInteract = EnViewerStatic_UpdateRutoWater(this, play, animationEnded);
@@ -759,13 +865,40 @@ void EnViewerStatic_Update(EnViewer* this, PlayState* play) {
     }
     int8_t fixedEyeIndex =
         StaticStoryActor_GetFixedEyeIndex((StaticStoryActorType)this->staticState.type, this->staticState.pose);
+    /* Great Fairy holds the fully closed head for two 20 Hz updates. */
+    u8 blinkFrameCount = this->staticState.type == STATIC_STORY_ACTOR_GREAT_FAIRY               ? 5
+                         : this->staticState.type == STATIC_STORY_ACTOR_TREASURE_CHEST_SHOP_GAL ? 4
+                                                                                                : 3;
     if (fixedEyeIndex >= 0) {
         this->staticState.eyeIndex = fixedEyeIndex;
     } else if (this->staticState.blinkTimer > 0) {
         this->staticState.blinkTimer--;
-    } else if (++this->staticState.eyeIndex >= 3) {
+    } else if (++this->staticState.eyeIndex >= blinkFrameCount) {
         this->staticState.eyeIndex = 0;
         this->staticState.blinkTimer = Rand_S16Offset(definition->blinkMin, definition->blinkRange);
+    }
+    /* The optional 3DS head has four eye images, independent of MM's three-eye
+     * expression logic (which holds Lulu's eyes open throughout singing).
+     * Five non-open updates give a 250 ms blink at the normal 20 Hz tick rate. */
+    if (this->staticState.type == STATIC_STORY_ACTOR_LULU && ResourceMgr_IsAltAssetsEnabled() &&
+        ResourceMgr_FileExists("alt/objects/object_zov/Lulu3DSHDBlinkHead0DL")) {
+        if (this->staticState.luluHdBlinkTimer > 0) {
+            this->staticState.luluHdBlinkTimer--;
+        } else if (++this->staticState.luluHdBlinkPhase >= 6) {
+            this->staticState.luluHdBlinkPhase = 0;
+            this->staticState.luluHdBlinkTimer = Rand_S16Offset(definition->blinkMin, definition->blinkRange);
+        }
+    }
+    if (this->staticState.type == STATIC_STORY_ACTOR_ANJU) {
+        /* The custom eyelids close for two updates (100 ms at 20 Hz).
+         * Keep time per instance and outside draw/interpolation callbacks;
+         * the native crying face continues to use its fixed sad eye. */
+        if (this->staticState.anjuBlinkTimer > 0) {
+            this->staticState.anjuBlinkTimer--;
+        } else if (++this->staticState.anjuBlinkPhase >= 5) {
+            this->staticState.anjuBlinkPhase = 0;
+            this->staticState.anjuBlinkTimer = Rand_S16Offset(definition->blinkMin, definition->blinkRange);
+        }
     }
     if (canInteract) {
         Collider_UpdateCylinder(&this->actor, &this->staticState.collider);
@@ -827,6 +960,17 @@ static void EnViewerStatic_UpdateTracking(EnViewer* this, PlayState* play) {
         StaticStoryActor_GetDefinition((StaticStoryActorType)this->staticState.type);
     NpcInteractInfo* interactInfo = &this->staticState.interactInfo;
 
+    if (StaticStoryActor_GetTrackingMode((StaticStoryActorType)this->staticState.type, this->staticState.pose) ==
+        STATIC_TRACKING_MODE_BODY_YAW) {
+        /* These hovering clips have no safe additive neck/torso tracking pose.
+         * Turn about the authored placement's up axis, then ease back home. */
+        s16 targetYaw = this->staticState.tracking ? this->actor.yawTowardsPlayer : this->actor.home.rot.y;
+        Math_SmoothStepToS(&this->actor.shape.rot.y, targetYaw, 4, 0x400, 1);
+        this->actor.world.rot.y = this->actor.shape.rot.y;
+        interactInfo->headRot = (Vec3s){ 0, 0, 0 };
+        interactInfo->torsoRot = (Vec3s){ 0, 0, 0 };
+        return;
+    }
     if (definition != NULL &&
         StaticStoryActor_CanTrack((StaticStoryActorType)this->staticState.type, this->staticState.pose) &&
         this->staticState.tracking) {
@@ -847,35 +991,84 @@ static void EnViewerStatic_RestorePlacementPose(EnViewer* this) {
     this->staticState.interactInfo.talkState = NPC_TALK_STATE_IDLE;
 }
 
-void EnViewerStatic_OfferTalk(EnViewer* this, PlayState* play) {
-    const StaticStoryActorDefinition* definition =
-        StaticStoryActor_GetDefinition((StaticStoryActorType)this->staticState.type);
-    StaticStoryProgression progression;
+typedef struct {
+    EnViewer* viewer;
+    PlayState* play;
+} EnViewerStaticTalkContext;
 
-    if (this->staticState.talking) {
-        this->staticState.tracking = true;
-        if (Message_GetState(&play->msgCtx) == TEXT_STATE_EVENT &&
-            StaticStoryActor_ShouldCloseEventMessage(true, Message_ShouldAdvance(play))) {
-            Message_CloseTextbox(play);
-            EnViewerStatic_RestorePlacementPose(this);
-        } else if (Message_GetState(&play->msgCtx) == TEXT_STATE_CLOSING) {
-            EnViewerStatic_RestorePlacementPose(this);
-        }
+static StaticStoryTalkMessageState EnViewerStatic_GetTalkMessageState(void* context) {
+    EnViewerStaticTalkContext* talkContext = context;
+    TextState state = Message_GetState(&talkContext->play->msgCtx);
+
+    if (state == TEXT_STATE_EVENT) {
+        return STATIC_STORY_TALK_MESSAGE_EVENT;
+    }
+    if (state == TEXT_STATE_CLOSING) {
+        return STATIC_STORY_TALK_MESSAGE_CLOSING;
+    }
+    return STATIC_STORY_TALK_MESSAGE_OTHER;
+}
+
+static bool EnViewerStatic_ShouldAdvanceTalk(void* context) {
+    return Message_ShouldAdvance(((EnViewerStaticTalkContext*)context)->play);
+}
+
+static void EnViewerStatic_CloseTalk(void* context) {
+    Message_CloseTextbox(((EnViewerStaticTalkContext*)context)->play);
+}
+
+static bool EnViewerStatic_ProcessTalkRequest(void* context) {
+    EnViewerStaticTalkContext* talkContext = context;
+    return Actor_ProcessTalkRequest(&talkContext->viewer->actor, talkContext->play);
+}
+
+static bool EnViewerStatic_OfferTalkAtDistance(float distance, void* context) {
+    EnViewerStaticTalkContext* talkContext = context;
+    return Actor_OfferTalk(&talkContext->viewer->actor, talkContext->play, distance);
+}
+
+void EnViewerStatic_OfferTalk(EnViewer* this, PlayState* play) {
+    StaticStoryActorType type = (StaticStoryActorType)this->staticState.type;
+    const StaticStoryActorDefinition* definition;
+    Player* player;
+    Actor* interaction;
+    bool timePedestalOffered;
+    StaticStoryProgression progression;
+    StaticStoryTalkSession session;
+    EnViewerStaticTalkContext context;
+
+    /* Model-only catalogue entries remain visible, collidable, and targetable without entering talk state. */
+    if (!StaticStoryActor_CanTalk(type)) {
+        this->actor.textId = 0;
+        EnViewerStatic_RestorePlacementPose(this);
         return;
     }
 
-    progression = EnViewerStatic_ReadProgression();
-    this->actor.textId = StaticStoryActor_SelectTextId((StaticStoryActorType)this->staticState.type, &progression);
+    definition = StaticStoryActor_GetDefinition(type);
     if (definition == NULL) {
         return;
     }
-    if (Actor_ProcessTalkRequest(&this->actor, play)) {
-        this->staticState.talking = true;
-        this->staticState.tracking = true;
-        this->staticState.interactInfo.talkState = NPC_TALK_STATE_TALKING;
-    } else {
-        this->staticState.tracking = Actor_OfferTalk(&this->actor, play, definition->talkDistance);
-    }
+    progression = EnViewerStatic_ReadProgression();
+    player = GET_PLAYER(play);
+    interaction = player != NULL ? player->interactRangeActor : NULL;
+    timePedestalOffered =
+        interaction != NULL && interaction->id == ACTOR_BG_TOKI_SWD && interaction->params == BG_TOKI_SWD_TIME_PEDESTAL;
+    session = (StaticStoryTalkSession){
+        .talking = this->staticState.talking,
+        .tracking = this->staticState.tracking,
+        .textId = this->actor.textId,
+    };
+    context = (EnViewerStaticTalkContext){ this, play };
+    static const StaticStoryTalkOperations operations = {
+        EnViewerStatic_GetTalkMessageState, EnViewerStatic_ShouldAdvanceTalk,   EnViewerStatic_CloseTalk,
+        EnViewerStatic_ProcessTalkRequest,  EnViewerStatic_OfferTalkAtDistance,
+    };
+    StaticStoryTalk_Update(type, &progression, definition->talkDistance, timePedestalOffered, &session, &operations,
+                           &context);
+    this->actor.textId = session.textId;
+    this->staticState.talking = session.talking;
+    this->staticState.tracking = session.tracking;
+    this->staticState.interactInfo.talkState = session.talking ? NPC_TALK_STATE_TALKING : NPC_TALK_STATE_IDLE;
 }
 
 void EnViewer_UpdateImpl(EnViewer* this, PlayState* play) {
@@ -1173,7 +1366,9 @@ void EnViewer_Update(Actor* thisx, PlayState* play) {
     EnViewer* this = (EnViewer*)thisx;
 
     if (this->staticState.staticMode) {
-        if (this->staticState.initialized) {
+        if (this->staticState.initialized &&
+            StaticStoryActor_GetResourceSource((StaticStoryActorType)this->staticState.type) ==
+                STATIC_STORY_RESOURCE_OOT_OBJECT) {
             gSegments[6] = VIRTUAL_TO_PHYSICAL(play->objectCtx.status[this->animObjBankIndex].segment);
         }
         this->actionFunc(this, play);
@@ -1594,8 +1789,8 @@ void EnViewer_DrawStaticChildRuto(EnViewer* this, PlayState* play) {
 
     OPEN_DISPS(play->state.gfxCtx);
     gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sEyes[this->staticState.eyeIndex]));
-    gSPSegment(POLY_OPA_DISP++, 0x09, SEGMENTED_TO_VIRTUAL(sEyes[this->staticState.eyeIndex]));
-    gSPSegment(POLY_OPA_DISP++, 0x0A, SEGMENTED_TO_VIRTUAL(gRutoChildMouthClosedTex));
+    /* object_ru1 uses 0x09 for the mouth, unlike adult Ruto's 0x0A contract. */
+    gSPSegment(POLY_OPA_DISP++, 0x09, SEGMENTED_TO_VIRTUAL(gRutoChildMouthClosedTex));
     gDPSetEnvColor(POLY_OPA_DISP++, 0, 0, 0, 255);
     gSPSegment(POLY_OPA_DISP++, 0x0C, &D_80116280[2]);
     SkelAnime_DrawSkeletonOpa(play, &this->skin.skelAnime, EnViewer_StaticChildRutoOverrideLimbDraw, NULL, this);
@@ -1784,6 +1979,11 @@ void EnViewer_DrawStaticNabooru(EnViewer* this, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+static u8 EnViewer_StaticGreatFairyEyeIndex(u8 phase) {
+    static const u8 eyes[] = { 0, 1, 2, 2, 1 };
+    return eyes[phase < ARRAY_COUNT(eyes) ? phase : 0];
+}
+
 static s32 EnViewer_StaticGreatFairyOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos,
                                                      Vec3s* rot, void* thisx) {
     EnViewer* this = (EnViewer*)thisx;
@@ -1791,6 +1991,21 @@ static s32 EnViewer_StaticGreatFairyOverrideLimbDraw(PlayState* play, s32 limbIn
         StaticStoryActor_GetTrackingMode(STATIC_STORY_ACTOR_GREAT_FAIRY, this->staticState.pose);
     StaticStoryGreatFairyTrackingLimb trackingLimb = StaticStoryActor_GetGreatFairyTrackingLimb(limbIndex);
 
+    if (trackingLimb == STATIC_GREAT_FAIRY_TRACKING_LIMB_HEAD && ResourceMgr_IsAltAssetsEnabled()) {
+        /* Optional HW replacement: the eye artwork is part of its mesh, so
+         * blink by selecting baked eyelid geometry instead of a texture. */
+        static const char* const heads[] = {
+            "alt/objects/object_dy_obj/HWGreatFairyCharcoalBlinkHead0DL",
+            "alt/objects/object_dy_obj/HWGreatFairyCharcoalBlinkHead1DL",
+            "alt/objects/object_dy_obj/HWGreatFairyCharcoalBlinkHead2DL",
+        };
+        const char* path = heads[EnViewer_StaticGreatFairyEyeIndex(this->staticState.eyeIndex)];
+        if (ResourceMgr_FileExists(path)) {
+            Gfx* head = (Gfx*)ResourceMgr_GetResourceDataByNameHandlingMQ(path);
+            if (head != NULL)
+                *dList = head;
+        }
+    }
     if (trackingMode == STATIC_TRACKING_MODE_FULL && trackingLimb == STATIC_GREAT_FAIRY_TRACKING_LIMB_TORSO) {
         rot->x += this->staticState.interactInfo.torsoRot.y;
     } else if (trackingMode != STATIC_TRACKING_MODE_NONE && trackingLimb == STATIC_GREAT_FAIRY_TRACKING_LIMB_HEAD) {
@@ -1809,11 +2024,12 @@ static s32 EnViewer_StaticGreatFairyOverrideLimbDraw(PlayState* play, s32 limbIn
 
 void EnViewer_DrawStaticGreatFairy(EnViewer* this, PlayState* play) {
     static void* sEyes[] = { gGreatFairyEyeOpenTex, gGreatFairyEyeHalfTex, gGreatFairyEyeClosedTex };
+    u8 eye = EnViewer_StaticGreatFairyEyeIndex(this->staticState.eyeIndex);
 
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sEyes[this->staticState.eyeIndex]));
-    gSPSegment(POLY_OPA_DISP++, 0x09, SEGMENTED_TO_VIRTUAL(sEyes[this->staticState.eyeIndex]));
+    gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sEyes[eye]));
+    gSPSegment(POLY_OPA_DISP++, 0x09, SEGMENTED_TO_VIRTUAL(sEyes[eye]));
     gSPSegment(POLY_OPA_DISP++, 0x0A, SEGMENTED_TO_VIRTUAL(gGreatFairyMouthClosedTex));
     SkelAnime_DrawSkeletonOpa(play, &this->skin.skelAnime, EnViewer_StaticGreatFairyOverrideLimbDraw, NULL, this);
     CLOSE_DISPS(play->state.gfxCtx);
@@ -1823,6 +2039,22 @@ static s32 EnViewer_StaticTreasureChestShopGalOverrideLimbDraw(PlayState* play, 
                                                                Vec3s* rot, void* thisx) {
     EnViewer* this = (EnViewer*)thisx;
 
+    if (limbIndex == 5 && ResourceMgr_IsAltAssetsEnabled()) {
+        /* Optional MMD replacement: its authored blink moves eyelid geometry.
+         * The three baked heads retain the model's own eyes and textures. */
+        static const char* const heads[] = {
+            "alt/objects/object_bg/ShopGalMMDBlinkHead0DL",
+            "alt/objects/object_bg/ShopGalMMDBlinkHead1DL",
+            "alt/objects/object_bg/ShopGalMMDBlinkHead2DL",
+            "alt/objects/object_bg/ShopGalMMDBlinkHead1DL",
+        };
+        uint8_t eye = this->staticState.eyeIndex < 4 ? this->staticState.eyeIndex : 0;
+        if (ResourceMgr_FileExists(heads[eye])) {
+            Gfx* head = (Gfx*)ResourceMgr_GetResourceDataByNameHandlingMQ(heads[eye]);
+            if (head != NULL)
+                *dList = head;
+        }
+    }
     if (StaticStoryActor_CanTrack(STATIC_STORY_ACTOR_TREASURE_CHEST_SHOP_GAL, this->staticState.pose)) {
         /* object_bg Treasure Chest Shop Gal enum order: head 5. */
         if (limbIndex == 5) {
@@ -1833,18 +2065,162 @@ static s32 EnViewer_StaticTreasureChestShopGalOverrideLimbDraw(PlayState* play, 
     return false;
 }
 
+static s32 EnViewer_StaticOrdinaryMmOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos,
+                                                     Vec3s* rot, void* thisx) {
+    EnViewer* this = (EnViewer*)thisx;
+    StaticStoryActorType type = (StaticStoryActorType)this->staticState.type;
+    if (type == STATIC_STORY_ACTOR_ANJU && this->staticState.anjuModel != NULL) {
+        const MmAnjuDisplayLists* model = this->staticState.anjuModel;
+        if (limbIndex > 1 && limbIndex <= 20)
+            *dList = model->limbs[limbIndex];
+        if (limbIndex == 9) {
+            static const uint8_t sequence[] = { 0, 1, 2, 2, 1 };
+            uint8_t phase = this->staticState.anjuBlinkPhase;
+            *dList = model->heads[model->custom && phase < 5 ? sequence[phase] : 0];
+        }
+        /* The supplied rig has this local fit offset on the three root
+         * branches. It is draw-only: never change actor/home Y or collision. */
+        if (model->custom && (limbIndex == 2 || limbIndex == 10 || limbIndex == 17))
+            pos->y += 476.0f;
+        return false;
+    }
+    if (type == STATIC_STORY_ACTOR_LULU && limbIndex == 12 && ResourceMgr_IsAltAssetsEnabled()) {
+        static const uint8_t eyeSequence[] = { 0, 1, 2, 3, 2, 1 };
+        static const char* const heads[2][4] = {
+            {
+                "alt/objects/object_zov/Lulu3DSHDBlinkHead0MouthClosedDL",
+                "alt/objects/object_zov/Lulu3DSHDBlinkHead1MouthClosedDL",
+                "alt/objects/object_zov/Lulu3DSHDBlinkHead2MouthClosedDL",
+                "alt/objects/object_zov/Lulu3DSHDBlinkHead3MouthClosedDL",
+            },
+            {
+                "alt/objects/object_zov/Lulu3DSHDBlinkHead0DL",
+                "alt/objects/object_zov/Lulu3DSHDBlinkHead1DL",
+                "alt/objects/object_zov/Lulu3DSHDBlinkHead2DL",
+                "alt/objects/object_zov/Lulu3DSHDBlinkHead3DL",
+            },
+        };
+        uint8_t phase = this->staticState.luluHdBlinkPhase;
+        uint8_t eye = eyeSequence[phase < 6 ? phase : 0];
+        /* The HD singing mouth is expressive enough that it should only be
+         * used by the singing pose, including during a blink. */
+        const char* path = heads[this->staticState.pose == 2][eye];
+        if (ResourceMgr_FileExists(path)) {
+            /* Each R6 head binds its own HD eye/mouth textures. Loading the
+             * explicit alt path keeps it in the resource cache without the
+             * original/alt unload performed by LoadGfxByName; several Lulus
+             * can safely reference the same head in one graphics frame. */
+            Gfx* head = (Gfx*)ResourceMgr_GetResourceDataByNameHandlingMQ(path);
+            if (head != NULL)
+                *dList = head;
+        }
+    }
+    if (type == STATIC_STORY_ACTOR_CHILD_KAFEI) {
+        if (limbIndex == 1) {
+            pos->x *= 11.0f / 17.0f;
+            pos->y *= 11.0f / 17.0f;
+            pos->z *= 11.0f / 17.0f;
+        }
+        return false;
+    }
+    if (!StaticStoryActor_CanTrack(type, this->staticState.pose) || !this->staticState.tracking)
+        return false;
+    if (type == STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN && limbIndex == 11) {
+        /* MM En_Osn applies a matrix X rotation before the authored head rotation. */
+        Matrix_RotateX(this->staticState.interactInfo.headRot.y * (M_PI / 32768.0f), MTXMODE_APPLY);
+    } else if (type == STATIC_STORY_ACTOR_LULU) {
+        if (limbIndex == 11)
+            rot->x += this->staticState.interactInfo.torsoRot.y;
+        if (limbIndex == 12) {
+            rot->x += this->staticState.interactInfo.headRot.y;
+            rot->z += this->staticState.interactInfo.headRot.x;
+        }
+    }
+    return false;
+}
+
+static void EnViewer_StaticAnjuPostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx) {
+    EnViewer* this = (EnViewer*)thisx;
+    /* MM En_An draws the umbrella in right-hand limb 8, without an extra
+     * transform. Do not copy her schedule's position, yaw or floor handling. */
+    if (limbIndex == 8 && this->staticState.anjuUmbrellaDL != NULL) {
+        OPEN_DISPS(play->state.gfxCtx);
+        gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        gSPDisplayList(POLY_OPA_DISP++, this->staticState.anjuUmbrellaDL);
+        CLOSE_DISPS(play->state.gfxCtx);
+    }
+}
+
 static void EnViewer_DrawStaticMmActor(EnViewer* this, PlayState* play) {
-    OverrideLimbDraw overrideLimbDraw = NULL;
+    if (!this->staticState.initialized)
+        return;
+    if (this->staticState.type == STATIC_STORY_ACTOR_ANJU) {
+        this->staticState.anjuModel = MmAssets_GetAnjuDisplayLists(this->staticState.pose);
+        if (this->staticState.anjuModel == NULL)
+            return;
+        this->staticState.anjuUmbrellaDL = this->staticState.anjuModel->umbrella;
+    }
+    OverrideLimbDrawOpa overrideLimbDraw = NULL;
+    PostLimbDrawOpa postLimbDraw = NULL;
+    const StaticStoryMmPresentation* presentation =
+        StaticStoryMm_GetPresentation((StaticStoryActorType)this->staticState.type, this->staticState.pose);
+    s16 modelYaw =
+        StaticStoryMm_GetModelYawOffset((StaticStoryActorType)this->staticState.type, this->staticState.pose);
 
     if (this->staticState.type == STATIC_STORY_ACTOR_TREASURE_CHEST_SHOP_GAL) {
         overrideLimbDraw = EnViewer_StaticTreasureChestShopGalOverrideLimbDraw;
+    } else if (presentation != NULL && presentation->frameCount != 0) {
+        overrideLimbDraw = EnViewer_StaticOrdinaryMmOverrideLimbDraw;
     }
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    if (this->staticState.type == STATIC_STORY_ACTOR_TREASURE_CHEST_SHOP_GAL) {
-        gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)this->staticState.mmEyeTextures[this->staticState.eyeIndex]);
+    if (this->staticState.type == STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN) {
+        gSPSegment(POLY_OPA_DISP++, 0x0C, MmAssets_GetOpaqueRenderMode());
     }
-    SkelAnime_DrawSkeletonOpa(play, &this->skin.skelAnime, overrideLimbDraw, NULL, this);
+    if (this->staticState.type == STATIC_STORY_ACTOR_ANJU) {
+        MmAssets_EnsureStrictTextureBindings();
+        postLimbDraw = EnViewer_StaticAnjuPostLimbDraw;
+    }
+    if (this->staticState.type == STATIC_STORY_ACTOR_TREASURE_CHEST_SHOP_GAL) {
+        /* Retain the resource path through segment 8 so the renderer can read
+         * HD dimensions, format and scaling. Raw ImageData loses that metadata.
+         * Both the base address and row stride must be even: bit 0 is the
+         * interpreter's segmented-address tag. Reopen through the half eye. */
+        static const ALIGN_ASSET(2) char eyePaths[4][80] = {
+            "__OTR__objects/object_bg/gTreasureChestShopGalEyeOpenDownTex",
+            "__OTR__objects/object_bg/gTreasureChestShopGalEyeHalfDownTex",
+            "__OTR__objects/object_bg/gTreasureChestShopGalEyeClosedTex",
+            "__OTR__objects/object_bg/gTreasureChestShopGalEyeHalfDownTex",
+        };
+        uint8_t eye = this->staticState.eyeIndex < 4 ? this->staticState.eyeIndex : 0;
+        gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)eyePaths[eye]);
+    }
+    if (presentation != NULL && presentation->frameCount != 0) {
+        StaticStoryMmFace face = StaticStoryMm_ResolveFace((StaticStoryActorType)this->staticState.type,
+                                                           this->staticState.pose, this->skin.skelAnime.curFrame,
+                                                           this->staticState.eyeIndex, this->staticState.tracking);
+        if (presentation->kind == STATIC_STORY_MM_SCOPED_PLAYER_LOD)
+            face = StaticStoryMm_KafeiFace(this->staticState.mmAppearance);
+        if (presentation->eyeCount != 0)
+            gSPSegment(POLY_OPA_DISP++, presentation->eyeSegment, (uintptr_t)this->staticState.mmEyeTextures[face.eye]);
+        if (presentation->mouthCount != 0)
+            gSPSegment(POLY_OPA_DISP++, presentation->mouthSegment,
+                       (uintptr_t)this->staticState.mmMouthTextures[face.mouth]);
+        gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
+    }
+    if (modelYaw != 0) {
+        Matrix_Push();
+        Matrix_RotateY(BINANG_TO_RAD(modelYaw), MTXMODE_APPLY);
+    }
+    if (presentation != NULL && presentation->kind == STATIC_STORY_MM_SCOPED_PLAYER_LOD) {
+        SkelAnime_DrawFlexLod(play, this->skin.skelAnime.skeleton, this->skin.skelAnime.jointTable, 18,
+                              overrideLimbDraw, NULL, this, 0);
+    } else {
+        SkelAnime_DrawSkeletonOpa(play, &this->skin.skelAnime, overrideLimbDraw, postLimbDraw, this);
+    }
+    if (modelYaw != 0) {
+        Matrix_Pop();
+    }
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
@@ -1873,15 +2249,33 @@ static void EnViewer_StaticSkullKidPostLimbDraw(PlayState* play, s32 limbIndex, 
     }
 }
 
-/* Tatl's limbs branch through segment 0x08. This setup contains no per-frame
+/* Tael's limbs branch through segment 0x08. This setup contains no per-frame
  * values, so it must remain at a stable address: frame interpolation can replay
  * Skull Kid's command stream after the transient graphics pool is recycled. */
 static Gfx sStaticStoryTatlSetupDL[] = {
     gsDPPipeSync(),
-    gsDPSetPrimColor(0, 1, 255, 255, 230, 255),
+    gsDPSetPrimColor(0, 1, 0x3F, 0x12, 0x5D, 255),
     gsDPSetRenderMode(G_RM_PASS, G_RM_ZB_CLD_SURF2),
     gsSPEndDisplayList(),
 };
+
+/* Native fairy body reset: preserve its transformed origin, but remove the
+ * inherited limb rotation/scale before the glow DL applies its billboard. */
+static s32 EnViewer_StaticTatlOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
+                                               void* thisx, Gfx** gfx) {
+    EnViewer* this = (EnViewer*)thisx;
+    if (limbIndex == 8) {
+        Vec3f zero = { 0.0f, 0.0f, 0.0f };
+        Vec3f origin;
+        f32 bodyScale = 0.012f * (1.0f + 0.1f * Math_SinS(this->staticState.tatlPulsePhase)) *
+                        (this->actor.scale.x * 124.99999f) *
+                        StaticStoryMm_GetTatlScale(this->staticState.tatlPulsePhase);
+        Matrix_MultVec3f(&zero, &origin);
+        Matrix_Translate(origin.x, origin.y, origin.z, MTXMODE_NEW);
+        Matrix_Scale(bodyScale, bodyScale, bodyScale, MTXMODE_APPLY);
+    }
+    return false;
+}
 
 static void EnViewer_DrawStaticTatl(EnViewer* this, PlayState* play) {
     StaticStoryMmVec3f anchor = StaticStoryMm_GetTatlAnchor(this->staticState.pose);
@@ -1893,19 +2287,27 @@ static void EnViewer_DrawStaticTatl(EnViewer* this, PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_27Xlu(play->state.gfxCtx);
     gSPSegment(POLY_XLU_DISP++, 0x08, sStaticStoryTatlSetupDL);
-    gDPSetEnvColor(POLY_XLU_DISP++, 0x5F, 0x25, 0x75, outerAlpha);
+    gDPSetEnvColor(POLY_XLU_DISP++, 0xFA, 0x28, 0x0A, outerAlpha);
     Matrix_Push();
     Matrix_Translate((anchor.x + orbitX) * 100.0f, anchor.y * 100.0f, (anchor.z + orbitZ) * 100.0f, MTXMODE_APPLY);
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
-    POLY_XLU_DISP = SkelAnime_Draw(play, this->staticState.tatlSkelAnime.skeleton,
-                                   this->staticState.tatlSkelAnime.jointTable, NULL, NULL, this, POLY_XLU_DISP);
+    POLY_XLU_DISP =
+        SkelAnime_Draw(play, this->staticState.tatlSkelAnime.skeleton, this->staticState.tatlSkelAnime.jointTable,
+                       EnViewer_StaticTatlOverrideLimbDraw, NULL, this, POLY_XLU_DISP);
     Matrix_Pop();
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static void EnViewer_DrawStaticSkullKid(EnViewer* this, PlayState* play) {
+    // Model sets are retained and selected atomically. Recheck here so changing
+    // alternate assets also switches geometry for an actor already in the scene.
+    if (!EnViewer_StaticSelectSkullKidModel(this))
+        return;
+    MmAssets_EnsureStrictTextureBindings();
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gDPPipeSync(POLY_OPA_DISP++);
+    gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
     SkelAnime_DrawSkeletonOpa(play, &this->skin.skelAnime, EnViewer_StaticSkullKidOverrideLimbDraw,
                               EnViewer_StaticSkullKidPostLimbDraw, this);
     CLOSE_DISPS(play->state.gfxCtx);
@@ -1971,6 +2373,11 @@ void EnViewerStatic_Draw(EnViewer* this, PlayState* play) {
             EnViewer_DrawStaticGreatFairy(this, play);
             break;
         case STATIC_STORY_ACTOR_TREASURE_CHEST_SHOP_GAL:
+        case STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN:
+        case STATIC_STORY_ACTOR_KEATON:
+        case STATIC_STORY_ACTOR_CHILD_KAFEI:
+        case STATIC_STORY_ACTOR_LULU:
+        case STATIC_STORY_ACTOR_ANJU:
             EnViewer_DrawStaticMmActor(this, play);
             break;
         case STATIC_STORY_ACTOR_SKULL_KID:

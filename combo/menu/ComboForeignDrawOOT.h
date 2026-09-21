@@ -27,19 +27,11 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#ifdef _WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#endif
 
 #include "ComboItemDrawABI.h"
 #include "soh/Enhancements/randomizer/hook_handlers.h" // OOT_LookupForeign / OOT_GetQueuedDrawCheck
 #include "soh/Enhancements/randomizer/static_data.h"
+#include "ComboResolve.h" // Combo_ResolveSym (process-wide combo-ABI symbol resolution)
 
 namespace {
 struct ComboForeignDrawInfo {
@@ -68,6 +60,8 @@ struct ComboForeignDrawInfo {
     // Recipe chosen from live save state (progressive tier, Triforce shard, junk/trap) — re-resolve
     // every frame instead of caching, or the first model drawn sticks for the whole save slot.
     bool stateDependent = false;
+    // Resolved tier name (e.g. "Large Quiver") when a progressive placeholder converted, else empty.
+    std::string resolvedName;
 };
 
 // Routed path strings must outlive the frame (the GBI wrapper emits the raw pointer into the
@@ -88,11 +82,10 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
         return ComboForeignResolve::Unknown;
     }
 
-#ifdef _WIN32
     static Fn_GetItemDrawInfo sGetItemDrawInfo = nullptr;
     if (sGetItemDrawInfo == nullptr) {
-        HMODULE h = GetModuleHandleA("2ship.dll"); // already loaded by the exe (ComboMenuModel pattern)
-        sGetItemDrawInfo = h ? (Fn_GetItemDrawInfo)GetProcAddress(h, "MM_GetItemDrawInfo") : nullptr;
+        // 2ship already loaded by the exe (ComboMenuModel pattern); resolution is process-wide.
+        sGetItemDrawInfo = (Fn_GetItemDrawInfo)Combo_ResolveSym("2ship", "MM_GetItemDrawInfo");
     }
     if (sGetItemDrawInfo == nullptr) {
         return ComboForeignResolve::NotReady; // 2ship.dll may simply not be resident yet
@@ -110,8 +103,7 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
         // the item; ComboForeignAnim_Draw (combo/menu/ComboForeignAnim.h) loads + draws it.
         static Fn_GetItemAnimDrawInfo sGetItemAnimDrawInfo = nullptr;
         if (sGetItemAnimDrawInfo == nullptr) {
-            HMODULE h = GetModuleHandleA("2ship.dll");
-            sGetItemAnimDrawInfo = h ? (Fn_GetItemAnimDrawInfo)GetProcAddress(h, "MM_GetItemAnimDrawInfo") : nullptr;
+            sGetItemAnimDrawInfo = (Fn_GetItemAnimDrawInfo)Combo_ResolveSym("2ship", "MM_GetItemAnimDrawInfo");
         }
         if (sGetItemAnimDrawInfo == nullptr) {
             return ComboForeignResolve::NotReady;
@@ -152,6 +144,9 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     info.matAnimBindOpa = raw.matAnimBindOpa != 0;
     info.matAnimBillboard = raw.matAnimBillboard != 0;
     info.stateDependent = raw.stateDependent != 0;
+    if (raw.resolvedName != nullptr) {
+        info.resolvedName = raw.resolvedName;
+    }
     info.drawKind = raw.drawKind;
     info.opCount = raw.opCount < CW_DRAW_MAX_OPS ? raw.opCount : CW_DRAW_MAX_OPS;
     memcpy(info.ops, raw.ops, sizeof(info.ops));
@@ -161,39 +156,93 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     }
     info.ok = true;
     return ComboForeignResolve::Ok;
-#else
-    return ComboForeignResolve::Unknown; // GetProcAddress resolution is Windows-only (ComboMenuModel)
-#endif
+}
+
+// Recipe cache, swept per save slot and per foreign-map generation. Shared by the resolver and the
+// grant-time latch below so both observe the same sweep.
+struct ComboForeignDrawCache {
+    std::unordered_map<int32_t, ComboForeignDrawInfo> map;
+    int slot = -1;
+    uint64_t gen = (uint64_t)-1;
+};
+
+inline ComboForeignDrawCache& ComboForeignDrawCacheGet() {
+    static ComboForeignDrawCache c;
+    int slot = gSaveContext.fileNum;
+    uint64_t gen = OOT_ForeignMapGen();
+    if (slot != c.slot || gen != c.gen) {
+        c.map.clear();
+        c.slot = slot;
+        c.gen = gen;
+    }
+    return c;
 }
 
 // Full lookup chain (foreign map -> MM export -> routed strings), cached per check per slot per
 // foreign-map generation so it runs once per check instead of every frame.
 inline const ComboForeignDrawInfo* ComboResolveForeignDrawInfo(RandomizerCheck rc) {
-    static std::unordered_map<int32_t, ComboForeignDrawInfo> sCache;
-    static int sCacheSlot = -1;
-    static uint64_t sCacheGen = (uint64_t)-1;
-    int slot = gSaveContext.fileNum;
-    uint64_t gen = OOT_ForeignMapGen();
-    if (slot != sCacheSlot || gen != sCacheGen) {
-        sCache.clear();
-        sCacheSlot = slot;
-        sCacheGen = gen;
-    }
-    auto cached = sCache.find(rc);
-    if (cached != sCache.end() && !cached->second.stateDependent) {
+    ComboForeignDrawCache& c = ComboForeignDrawCacheGet();
+    auto cached = c.map.find(rc);
+    if (cached != c.map.end() && !cached->second.stateDependent) {
         return cached->second.ok ? &cached->second : nullptr;
     }
     // A state-dependent recipe (progressive tier, Triforce shard, junk/trap) is re-resolved every
     // frame; caching it would freeze whichever model happened to be correct on the first draw.
     ComboForeignDrawInfo info{}; // built locally: a failure must not clobber a live cached recipe
-    if (ComboFillForeignDrawInfo(rc, slot, info) == ComboForeignResolve::NotReady) {
-        sCache.erase(rc); // transient — retry next frame instead of freezing the sentinel in
+    if (ComboFillForeignDrawInfo(rc, c.slot, info) == ComboForeignResolve::NotReady) {
+        c.map.erase(rc); // transient — retry next frame instead of freezing the sentinel in
         return nullptr;
     }
-    ComboForeignDrawInfo& entry = sCache[rc]; // Unknown caches ok=false: one lookup, then sentinel
+    ComboForeignDrawInfo& entry = c.map[rc]; // Unknown caches ok=false: one lookup, then sentinel
     entry = info;
     return entry.ok ? &entry : nullptr;
 }
+
+// ComboShip: freeze this check's recipe at the tier it is ABOUT to grant. The cross-grant mutates
+// MM's dormant save mid-presentation, so a live re-resolve would flip the held-up model next frame.
+inline void ComboLatchForeignDraw(RandomizerCheck rc) {
+    if (rc == RC_UNKNOWN_CHECK) {
+        return;
+    }
+    ComboForeignDrawCache& c = ComboForeignDrawCacheGet();
+    ComboForeignDrawInfo info{};
+    if (ComboFillForeignDrawInfo(rc, c.slot, info) != ComboForeignResolve::Ok) {
+        return; // nothing written, nothing erased: the draw stays live, i.e. no worse than before
+    }
+    if (info.animOk) {
+        return; // MM's anim class (stray fairies, souls, minifrogs) is never state-dependent
+    }
+    // The fill's lookup may have built the foreign map, bumping the generation the cache keys on;
+    // adopt it (dropping entries resolved against the old map) so this latch survives.
+    uint64_t gen = OOT_ForeignMapGen();
+    if (gen != c.gen) {
+        c.map.clear();
+        c.gen = gen;
+    }
+    info.stateDependent = false; // frozen: the resolver's cache-hit path now serves it verbatim
+    c.map[rc] = info;
+}
+
+// Frozen tier name only: NULL unless latched (stateDependent == false) with a non-empty name. Never
+// serves a live entry, so a pickup can't show the tier the NEXT copy would give.
+inline const char* ComboForeignLatchedName(RandomizerCheck rc) {
+    ComboForeignDrawCache& c = ComboForeignDrawCacheGet();
+    auto it = c.map.find(rc);
+    if (it == c.map.end() || it->second.stateDependent || it->second.resolvedName.empty()) {
+        return nullptr;
+    }
+    return it->second.resolvedName.c_str();
+}
+
+// Live tier name for previews: runs the same per-frame resolver the shelf model uses.
+inline const char* ComboForeignLiveName(RandomizerCheck rc) {
+    const ComboForeignDrawInfo* info = ComboResolveForeignDrawInfo(rc);
+    if (info == nullptr || info->resolvedName.empty()) {
+        return nullptr;
+    }
+    return info->resolvedName.c_str();
+}
+
 } // namespace
 
 // ---- Non-portable MM draw funcs. Each handler is a 1:1 port of the MM get-item func

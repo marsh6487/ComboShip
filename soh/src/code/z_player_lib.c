@@ -4,12 +4,14 @@
 #include "objects/object_link_boy/object_link_boy.h"
 #include "objects/object_link_child/object_link_child.h"
 #include "overlays/actors/ovl_Demo_Effect/z_demo_effect.h"
+#include "overlays/actors/ovl_Bg_Toki_Swd/z_bg_toki_swd.h"
 
 #include <libultraship/bridge/resourcebridge.h>
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/randomizer/draw.h"
 #include "soh/ResourceManagerHelpers.h"
+#include "soh/Enhancements/customequipment.h"
 #include "mods/items/custom_items.h"
 #include "mods/items/custom_bottles.h" // Net catch-at-blade (Skijer's NEI)
 #include "mods/extended_player.h"
@@ -1725,6 +1727,54 @@ static Gfx* Player_ResolveLimbDLForDummyOrLocal(void* dlPathOrPtr) {
     return ResourceMgr_LoadGfxByName(dlPathOrPtr);
 }
 
+// Apply AFTER equipment and model overrides. The sheath limb carries the
+// stowed sword/shield and the empty scabbard; hand limbs are independent.
+// Only hide its display list: keep skeleton traversal and shield collision.
+static void Player_ApplyBackEquipmentVisibility(s32 limbIndex, Gfx** dList) {
+    if (limbIndex == PLAYER_LIMB_SHEATH && CVarGetInteger(CVAR_ENHANCEMENT("HideBackEquipment"), 0)) {
+        *dList = NULL;
+    }
+}
+
+static void Player_ReverseTimePedestalEquipmentSword(Vec3s* rot) {
+    // Ordinary held-sword DLs point the blade along local -X. SkelAnime
+    // applies Rz * Ry * Rx after this callback; (-x, -y, z + pi) is the
+    // exact ZYX decomposition of (Rz * Ry * Rx) * Rz(pi).
+    rot->x = -rot->x;
+    rot->y = -rot->y;
+    rot->z += 0x8000;
+}
+
+static void Player_ApplyTimePedestalSword(PlayState* play, Player* player, s32 limbIndex, Gfx** dList, Vec3s* rot) {
+    if (limbIndex != PLAYER_LIMB_L_HAND) {
+        return;
+    }
+    s32 handState = BgTokiSwd_GetTimePedestalHandState(play, player);
+    if (handState != BG_TOKI_SWD_HAND_UNCHANGED) {
+        s32 reverseEquipmentSword = !LINK_IS_ADULT && handState == BG_TOKI_SWD_HAND_MASTER_SWORD;
+        if (handState == BG_TOKI_SWD_HAND_CLOSED) {
+            Gfx* swordDL = PakLoader_GetEquipDL(player, limbIndex);
+            *dList = (swordDL != NULL && swordDL != PAK_DL_STUB)
+                         ? swordDL
+                         : Player_ResolveLimbDLForDummyOrLocal(player->leftHandDLists[sDListsLodOffset]);
+            return;
+        }
+        // Resolve the weapon independently of the current-age equipment cache,
+        // and compose it with this age's hand. The pedestal uses this source too.
+        if (CustomEquipment_OverrideMasterSwordHand(play, dList)) {
+            if (reverseEquipmentSword) {
+                Player_ReverseTimePedestalEquipmentSword(rot);
+            }
+            return;
+        }
+        // The native ceremonial resource already has the child animation's grip.
+        const char* nativeDL = !LINK_IS_ADULT            ? gLinkChildLeftHandHoldingMasterSwordDL
+                               : (sDListsLodOffset == 0) ? gLinkAdultLeftHandHoldingMasterSwordNearDL
+                                                         : gLinkAdultLeftHandHoldingMasterSwordFarDL;
+        *dList = Player_ResolveLimbDLForDummyOrLocal((void*)nativeDL);
+    }
+}
+
 s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
                                            void* thisx) {
     Player* this = (Player*)thisx;
@@ -1933,6 +1983,12 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
         }
     }
 
+    // The sword cue changes leftHandDLists without changing the child's open
+    // hand type. Preserve that handoff after ordinary hand/equipment overrides;
+    // resource resolution still honors alternate assets and the selected pak.
+    Player_ApplyTimePedestalSword(play, this, limbIndex, dList, rot);
+    Player_ApplyBackEquipmentVisibility(limbIndex, dList);
+
     if (GameInteractor_InvisibleLinkActive()) {
         this->actor.shape.shadowDraw = NULL;
         *dList = NULL;
@@ -2016,6 +2072,7 @@ s32 Player_OverrideLimbDrawGameplayFirstPerson(PlayState* play, s32 limbIndex, G
 
     GameInteractor_Should(VB_PLAYER_OVERRIDE_LIMB_DRAW, true, limbIndex, dList, thisx, play);
 
+    Player_ApplyBackEquipmentVisibility(limbIndex, dList);
     return false;
 }
 
@@ -2025,6 +2082,7 @@ s32 Player_OverrideLimbDrawGameplayCrawling(PlayState* play, s32 limbIndex, Gfx*
         *dList = NULL;
     }
 
+    Player_ApplyBackEquipmentVisibility(limbIndex, dList);
     return false;
 }
 
@@ -2471,7 +2529,8 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
         // closed fist in Player_OverrideLimbDrawGameplayDefault, so *dList != NULL means a hand DL
         // — where a sword would be — is drawing). Self-guards on Odolwa-worn + sword-in-hand; own
         // push/pop + transform. Mirrors the MM 2ship L_HAND post-limb hook.
-        if ((*dList != NULL) && (this->actor.scale.y >= 0.0f)) {
+        if ((*dList != NULL) && (this->actor.scale.y >= 0.0f) &&
+            BgTokiSwd_GetTimePedestalHandState(play, this) == BG_TOKI_SWD_HAND_UNCHANGED) {
             BossRemains_DrawOdolwaSword(play, this);
         }
 
@@ -2944,6 +3003,7 @@ s32 Player_OverrideLimbDrawPause(PlayState* play, s32 limbIndex, Gfx** dList, Ve
         // pakDL == NULL → keep the o2r/vanilla *dList from the hook above
     }
 
+    Player_ApplyBackEquipmentVisibility(limbIndex, dList);
     return 0;
 }
 

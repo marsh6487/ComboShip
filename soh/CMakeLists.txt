@@ -8,6 +8,10 @@ set(CMAKE_C_STANDARD 23 CACHE STRING "The C standard to use")
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(pak_selection_test tests/pak_selection_test.cpp)
+    target_include_directories(pak_selection_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME pak_selection_test COMMAND pak_selection_test)
+
     add_executable(static_story_actor_test
         tests/static_story_actor_test.c
         src/overlays/actors/ovl_En_Viewer/static_story_actor.c
@@ -16,6 +20,44 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     )
     add_test(NAME static_story_actor_test COMMAND static_story_actor_test)
+
+    add_executable(static_story_dialogue_test
+        tests/static_story_dialogue_test.c
+        src/overlays/actors/ovl_En_Viewer/static_story_dialogue.c
+    )
+    add_test(NAME static_story_dialogue_test COMMAND static_story_dialogue_test)
+
+    add_executable(static_story_talk_test
+        tests/static_story_talk_test.c
+        src/overlays/actors/ovl_En_Viewer/static_story_talk.c
+        src/overlays/actors/ovl_En_Viewer/static_story_actor.c
+        src/overlays/actors/ovl_En_Viewer/static_story_dialogue.c
+    )
+    target_include_directories(static_story_talk_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    add_test(NAME static_story_talk_test COMMAND static_story_talk_test)
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_executable(static_story_viewer_talk_test
+            tests/static_story_viewer_talk_test.c
+            src/overlays/actors/ovl_En_Viewer/z_en_viewer.c
+            src/overlays/actors/ovl_En_Viewer/static_story_actor.c
+            src/overlays/actors/ovl_En_Viewer/static_story_dialogue.c
+            src/overlays/actors/ovl_En_Viewer/static_story_talk.c
+        )
+        target_include_directories(static_story_viewer_talk_test PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/../libultraship/include
+        )
+        target_compile_definitions(static_story_viewer_talk_test PRIVATE LOG_LEVEL_GAME_PRINTS=0)
+        target_compile_options(static_story_viewer_talk_test PRIVATE -ffunction-sections -fdata-sections)
+        target_link_options(static_story_viewer_talk_test PRIVATE -Wl,--gc-sections)
+        add_test(NAME static_story_viewer_talk_test COMMAND static_story_viewer_talk_test)
+    endif()
 
     add_executable(static_story_ruto_water_test
         tests/static_story_ruto_water_test.c
@@ -137,6 +179,32 @@ if(BUILD_TESTING)
         CVAR_PREFIX_SETTING="gSettings" CVAR_PREFIX_AUDIO="gAudioEditor"
     )
     add_test(NAME global_outdoor_rain_audio_test COMMAND global_outdoor_rain_audio_test)
+
+    find_package(nlohmann_json REQUIRED)
+    add_executable(scene_rain_policy_test tests/scene_rain_policy_test.cpp
+        soh/Enhancements/audio/SceneRainPolicy.cpp)
+    target_include_directories(scene_rain_policy_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(scene_rain_policy_test PRIVATE SCENE_RAIN_POLICY_TEST)
+    target_link_libraries(scene_rain_policy_test PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME scene_rain_policy_test COMMAND scene_rain_policy_test)
+    add_executable(scene_rain_binding_test tests/scene_rain_binding_test.cpp
+        soh/Enhancements/audio/SceneRainPolicy.cpp)
+    target_include_directories(scene_rain_binding_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/scene_rain_stubs
+        ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/libultraship/include)
+    target_link_libraries(scene_rain_binding_test PRIVATE nlohmann_json::nlohmann_json)
+    add_test(NAME scene_rain_binding_test COMMAND scene_rain_binding_test)
+
+
+    # The standalone engine harness uses GNU-style section/linker flags.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        find_package(Python3 REQUIRED COMPONENTS Interpreter)
+        add_test(NAME rain_engine_runtime COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/scripts/diagnostics/run_rain_runtime_test.py
+            ${CMAKE_CURRENT_BINARY_DIR}/rain-runtime ${CMAKE_C_COMPILER} ${CMAKE_CXX_COMPILER})
+    endif()
+
 endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
@@ -405,9 +473,19 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         OUTPUT_NAME "soh-macos"
     )
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # ComboShip: the target is SHARED (upstream built an executable named soh.elf); the launcher
+    # dlopens libsoh.so, so keep the default lib prefix and a plain name.
     set_target_properties(${PROJECT_NAME} PROPERTIES
-    OUTPUT_NAME "soh.elf"
+    OUTPUT_NAME "soh"
     )
+endif()
+
+# ComboShip: on ELF platforms both game libraries define identical engine symbols; hidden default
+# visibility keeps them out of the global namespace (no cross-game interposition) — only the combo
+# ABI opts back in via COMBO_EXPORT (combo/ComboExport.h). PE gets this per-DLL binding for free.
+if (NOT MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_DL_LIBS}) # Combo_ResolveSym uses dlsym
 endif()
 ################################################################################
 # MSVC runtime library

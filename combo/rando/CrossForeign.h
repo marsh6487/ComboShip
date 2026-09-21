@@ -16,6 +16,8 @@
 // resolves itemName to grant it, so both must match that game's friendly name maps exactly.
 #pragma once
 
+#include <algorithm>
+#include <limits>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -27,6 +29,8 @@
 #include <cstring>
 #include <iterator>
 #include <nlohmann/json.hpp>
+
+#include "SharedItems.h"
 
 namespace ComboRando {
 
@@ -82,6 +86,9 @@ struct ForeignItem {
     std::string fakeItemName;
     std::string fakeDisplayName; // disguise human name (suffixed like displayName)
     std::string fakeTrickName;   // typo'd disguise name for shop/merchant/hint text
+    // Shared Items (OoTMM-style): itemName is an effective shared family's OOT name — no suffix, no
+    // "(OOT)"/"(MM)" tag on any surface. Absent (old seed) -> false -> tagged exactly as before.
+    bool shared = false;
     bool HasDisguise() const {
         return !fakeItemName.empty();
     }
@@ -253,10 +260,46 @@ inline void AssignTrapDisguises(nlohmann::json& foreignArr, const nlohmann::json
     }
 }
 
+// " (MM)" / " (OOT)" — the one source for the home-game tag foreign names carry.
+inline const char* GameSuffix(GameId g) {
+    return g == GAME_MM ? " (MM)" : " (OOT)";
+}
+
+// Text shown for a foreign check: the latched/live resolved tier (tagged), or the spoiler displayName.
+inline std::string ShownForeignName(const ForeignItem& fi, const char* resolved) {
+    if (resolved != nullptr && resolved[0] != '\0') {
+        // Shared Items: once shared, the home-game qualifier is meaningless (decision 3).
+        return fi.shared ? std::string(resolved) : std::string(resolved) + GameSuffix(fi.itemGame);
+    }
+    return fi.displayName;
+}
+
+// A shared item exists once across both games: obtaining either half grants the other at runtime
+// (NEI's FleetSharedItems), so the fill keeps one copy and credits both logics when it is reached.
+struct CwSharedPair {
+    std::string ootName;
+    std::string mmName;
+};
+
+// Both native families and NEI pairs identify grant keys, never merely a colliding display name.
+inline bool IsSharedItem(GameId game, const std::string& name, uint32_t mask, const std::vector<CwSharedPair>& pairs) {
+    for (const auto& p : pairs)
+        if (name == (game == GAME_OOT ? p.ootName : p.mmName))
+            return true;
+    for (int i = 0; i < SF_COUNT; ++i) {
+        const auto& def = SharedFamilyByIndex(i);
+        if ((mask & (1u << i)) &&
+            ((game == GAME_OOT && name == def.ootName) || (game == GAME_MM && def.mmHasItem && name == def.mmName)))
+            return true;
+    }
+    return false;
+}
+
 // Tag a spoiler "foreign" array's displayNames with their home-game suffix for the consolidated file.
 // Every display surface (shops, hints, trackers, toasts) reads displayName, so tag once here.
 // advancement/trap/category are emitted only when meaningful; every loader defaults them.
-inline nlohmann::json BuildForeignArray(const nlohmann::json& foreignArray) {
+inline nlohmann::json BuildForeignArray(const nlohmann::json& foreignArray, uint32_t sharedMask = 0,
+                                        const std::vector<CwSharedPair>& sharedPairs = {}) {
     nlohmann::json out = nlohmann::json::array();
     for (const auto& fm : foreignArray) {
         std::string checkGame = fm.value("checkGame", "");
@@ -265,8 +308,11 @@ inline nlohmann::json BuildForeignArray(const nlohmann::json& foreignArray) {
             continue;
         std::string itemGame = fm.value("itemGame", "");
         std::string itemName = fm.value("itemName", "");
-        const bool tagged = (itemGame == "mm" || itemGame == "oot");
-        const char* suffix = (itemGame == "mm") ? " (MM)" : " (OOT)";
+        // Junk keeps the tag too: "10 Arrows" that turn out to be MM's grant no OOT ammo, and the
+        // suffix is the only thing that tells the player why.
+        const bool shared = IsSharedItem(KeyToGameId(itemGame), itemName, sharedMask, sharedPairs);
+        const bool tagged = !shared && (itemGame == "mm" || itemGame == "oot");
+        const char* suffix = GameSuffix(KeyToGameId(itemGame));
         auto tag = [&](std::string s) {
             s = StripGameSuffix(std::move(s));
             if (!s.empty() && tagged)
@@ -279,6 +325,8 @@ inline nlohmann::json BuildForeignArray(const nlohmann::json& foreignArray) {
                                  { "itemGame", itemGame },
                                  { "itemName", itemName },
                                  { "displayName", displayName } };
+        if (shared)
+            entry["shared"] = true;
         if (fm.value("advancement", false))
             entry["advancement"] = true;
         if (fm.value("trap", false))
@@ -298,13 +346,6 @@ inline nlohmann::json BuildForeignArray(const nlohmann::json& foreignArray) {
     }
     return out;
 }
-
-// A shared item exists once across both games: obtaining either half grants the other at runtime
-// (NEI's FleetSharedItems), so the fill keeps one copy and credits both logics when it is reached.
-struct CwSharedPair {
-    std::string ootName;
-    std::string mmName;
-};
 
 // SOH_DumpSharedItemPairs speaks the FC table's RI_* tokens while MM's dump names its items with
 // GetItemDisplayName, so joining them needs the dump's own token->name map. Without it every pair
@@ -330,6 +371,7 @@ inline std::vector<CwSharedPair> ResolveSharedPairs(const std::string& sharedPai
                      "match - rebuild 2ship.dll\n";
     }
     try {
+        std::set<std::pair<std::string, std::string>> seen;
         for (const auto& p : nlohmann::json::parse(sharedPairsJson)) {
             std::string oot = p.value("oot", "");
             std::string mm = p.value("mm", "");
@@ -337,7 +379,14 @@ inline std::vector<CwSharedPair> ResolveSharedPairs(const std::string& sharedPai
                 continue;
             }
             auto named = tokenToName.find(mm);
-            pairs.push_back({ std::move(oot), named != tokenToName.end() ? named->second : std::move(mm) });
+            if (named != tokenToName.end())
+                mm = named->second;
+            else if (mm.rfind("RI_", 0) == 0) {
+                std::cerr << "[ComboShip] shared items: unresolved MM token '" << mm << "', pair skipped\n";
+                continue;
+            }
+            if (seen.emplace(oot, mm).second)
+                pairs.push_back({ std::move(oot), std::move(mm) });
         }
     } catch (const std::exception& e) {
         std::cerr << "[ComboShip] shared items: pairs parse error, sharing off: " << e.what() << "\n";
@@ -354,6 +403,107 @@ inline std::set<std::string> SharedPairNames(const std::vector<CwSharedPair>& pa
         names.insert(p.mmName);
     }
     return names;
+}
+
+// One exemption set for UI generation, headless output and plando serialization.
+inline std::set<std::string> SharedUntaggedNames(uint32_t mask, const std::vector<CwSharedPair>& pairs) {
+    auto names = SharedUntaggedNames(mask);
+    auto nei = SharedPairNames(pairs);
+    names.insert(nei.begin(), nei.end());
+    return names;
+}
+
+struct CwSharedName {
+    GameId game;
+    std::string name;
+};
+struct CwSharedGroup {
+    std::vector<CwSharedName> names;
+    bool nei = false; // NEI progressive chains can exceed the native families' tier caps.
+    size_t mmTierCap = std::numeric_limits<size_t>::max();
+    bool nativeFamily = false;
+};
+
+// A native mask and its NEI imported representation can meet at the SAME MM item. Join those
+// edges before trimming or crediting; walking edges separately would count that pickup twice.
+inline std::vector<CwSharedGroup> BuildSharedItemGroups(const std::vector<CwSharedPair>& pairs, uint32_t mask) {
+    std::vector<CwSharedGroup> groups;
+    auto connect = [&](const std::string& oot, const std::string& mm, bool nei, size_t cap) {
+        size_t oi = groups.size(), mi = groups.size();
+        for (size_t i = 0; i < groups.size(); ++i)
+            for (const auto& n : groups[i].names) {
+                if (n.game == GAME_OOT && n.name == oot)
+                    oi = i;
+                if (n.game == GAME_MM && n.name == mm)
+                    mi = i;
+            }
+        const size_t missing = groups.size();
+        if (oi == missing && mi == missing) {
+            groups.push_back({ { { GAME_OOT, oot }, { GAME_MM, mm } }, nei, cap, !nei });
+            return;
+        }
+        size_t at = oi != missing ? oi : mi;
+        if (oi == missing)
+            groups[at].names.push_back({ GAME_OOT, oot });
+        if (mi == missing)
+            groups[at].names.push_back({ GAME_MM, mm });
+        if (oi != missing && mi != missing && oi != mi) {
+            groups[oi].names.insert(groups[oi].names.end(), groups[mi].names.begin(), groups[mi].names.end());
+            groups[oi].nei = groups[oi].nei || groups[mi].nei;
+            groups[oi].nativeFamily = groups[oi].nativeFamily || groups[mi].nativeFamily;
+            groups[oi].mmTierCap = std::max(groups[oi].mmTierCap, groups[mi].mmTierCap);
+            groups.erase(groups.begin() + mi);
+            at = oi - (mi < oi ? 1 : 0);
+        }
+        groups[at].nei = groups[at].nei || nei;
+        groups[at].nativeFamily = groups[at].nativeFamily || !nei;
+        groups[at].mmTierCap = std::max(groups[at].mmTierCap, cap);
+    };
+    for (const auto& p : pairs)
+        connect(p.ootName, p.mmName, true, std::numeric_limits<size_t>::max());
+    for (int i = 0; i < SF_COUNT; ++i) {
+        const auto& def = SharedFamilyByIndex(i);
+        if (!(mask & (1u << i)) || !def.mmHasItem)
+            continue;
+        connect(def.ootName, def.mmName, false, static_cast<size_t>(def.mmTierCap));
+        // Prefer the native OOT representation for an enabled family when deduplicating aliases.
+        for (auto& group : groups) {
+            auto n = std::find_if(group.names.begin(), group.names.end(),
+                                  [&](const CwSharedName& n) { return n.game == GAME_OOT && n.name == def.ootName; });
+            if (n != group.names.end())
+                std::rotate(group.names.begin(), n, n + 1);
+        }
+    }
+    return groups;
+}
+
+// Inputs contain only actual pickups. Rebuild the oracle views on every query; mirrored aliases
+// must never flow back into the pickup vectors or progressive tiers inflate on the next sphere.
+inline void SharedOwnedViews(const std::vector<CwSharedGroup>& groups, const std::vector<std::string>& ootOwned,
+                             const std::vector<std::string>& mmOwned, std::vector<std::string>& ootSeen,
+                             std::vector<std::string>& mmSeen) {
+    ootSeen = ootOwned;
+    mmSeen = mmOwned;
+    if (groups.empty())
+        return;
+    std::unordered_map<std::string, size_t> counts[2];
+    for (const auto& n : ootOwned)
+        ++counts[GAME_OOT][n];
+    for (const auto& n : mmOwned)
+        ++counts[GAME_MM][n];
+    for (const auto& group : groups) {
+        size_t copies = 0;
+        for (const auto& n : group.names) {
+            copies += counts[n.game][n.name];
+        }
+        for (const auto& n : group.names) {
+            auto& seen = n.game == GAME_OOT ? ootSeen : mmSeen;
+            const size_t native = counts[n.game][n.name];
+            const size_t target = n.game == GAME_MM && !group.nei ? std::min(copies, group.mmTierCap) : copies;
+            if (target > native)
+                seen.insert(seen.end(), target - native, n.name);
+        }
+    }
 }
 
 // Suffix cross-game ITEM-name collisions in the consolidated placements so a name like "Mirror Shield"
@@ -429,6 +579,8 @@ inline std::unordered_map<std::string, ForeignItem> LoadForeignForGame(int slot,
             fi.advancement = fm.value("advancement", false);
             // Absent in pre-trap-flag saves -> false -> the item cross-delivers as before.
             fi.trap = fm.value("trap", false);
+            // Absent in pre-Shared-Items saves -> false -> tagged exactly as before.
+            fi.shared = fm.value("shared", false);
             // Absent in pre-category saves -> empty -> consumers fall back to advancement.
             fi.category = fm.value("category", "");
             // Absent in pre-disguise saves -> empty -> every consumer falls back to the true name.

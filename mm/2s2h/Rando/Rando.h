@@ -22,6 +22,16 @@ void DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN, A
 // randoCheckId is only for naming: junk, traps and (in combo) foreign items resolve their display
 // name from the CHECK, so a give that omits it toasts the sentinel's name instead of the real one.
 void GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN);
+#ifdef COMBO_BUILD
+// ComboShip: freeze a foreign check's model at the tier it grants, before the cross-grant that
+// follows mutates OOT's dormant save and a live re-resolve flips the held-up model next frame.
+void LatchComboForeign(RandoCheckId randoCheckId);
+// ComboShip: junk rotation pool minus RI_NONE, dumped for the combo generator's junk bake.
+std::vector<RandoItemId> ComboJunkPool();
+// ComboShip: resolved tier name for a latched (frozen) / live-previewed foreign check, or NULL.
+const char* ComboForeignLatchedName(RandoCheckId randoCheckId);
+const char* ComboForeignLiveName(RandoCheckId randoCheckId);
+#endif
 // ComboShip: a small key lives in TWO counters — inventory.dungeonKeys and the rando mirror that
 // logic's KEY_COUNT reads — and both are -1 when fresh. Normalize each sentinel independently before
 // bumping, so a pre-existing desync heals instead of leaving the mirror permanently one behind.

@@ -77,6 +77,8 @@ typedef struct {
     uint8_t talking;
     uint8_t tracking;
     int16_t blinkTimer;
+    uint8_t luluHdBlinkPhase;
+    int16_t luluHdBlinkTimer;
     int16_t objectSlots[4];
     NpcInteractInfo interactInfo;
     ColliderCylinder collider;
@@ -85,6 +87,7 @@ typedef struct {
     uint8_t danceStep;
     uint8_t diagnosticDrawLogged;
     uint16_t greatFairyHoverPhase;
+    f32 kokiriLegFrame;
     uint16_t mmHoverPhase;
     uint16_t tatlPulsePhase;
     uint8_t tatlInitialized;
@@ -96,7 +99,16 @@ typedef struct {
     Gfx* skullKidEyesDL;
     Gfx* skullKidMaskDL;
     Gfx* skullKidLimbDLs[22];
-    void* mmEyeTextures[3];
+    void* mmEyeTextures[8];
+    void* mmMouthTextures[4];
+    void* mmResourceOwner;
+    Gfx* anjuUmbrellaDL;
+    const struct MmAnjuDisplayLists* anjuModel;
+    uint8_t anjuBlinkPhase;
+    int16_t anjuBlinkTimer;
+    const int16_t* mmPlayerFrames;
+    uint16_t mmPlayerFrameCount;
+    uint16_t mmAppearance;
 } EnViewerStaticState;
 
 typedef struct EnViewer {

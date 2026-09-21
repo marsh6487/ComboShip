@@ -1,5 +1,6 @@
 // combo/gui/ComboMenu.cpp
 #include "ComboMenu.h"
+#include "ComboExport.h"
 #include "ComboMenuModel.h"
 #include "ComboWidgetRender.h"
 #include "ComboWidgetStyle.h"
@@ -23,9 +24,7 @@
 #include <cstring>
 #include <cstdio>
 #include <unordered_set>
-#ifdef _WIN32
-#include <windows.h>
-#endif
+#include "ComboResolve.h"
 
 namespace {
 // soh.dll exports: trigger combo generation (non-blocking; spawns the launcher worker), read the
@@ -40,19 +39,14 @@ FnGetProgress sGetProgress = nullptr;
 FnIsOnFileSelect sIsOnFileSelect = nullptr;
 FnRefreshStartingGameUI sRefreshStartingGameUI = nullptr;
 void ResolveComboGenSyms() {
-#ifdef _WIN32
-    HMODULE h = GetModuleHandleA("soh.dll");
-    if (!h)
-        return;
     if (!sTrigger)
-        sTrigger = (FnTriggerGenerate)GetProcAddress(h, "SOH_TriggerComboGenerate");
+        sTrigger = (FnTriggerGenerate)Combo_ResolveSym("soh", "SOH_TriggerComboGenerate");
     if (!sGetProgress)
-        sGetProgress = (FnGetProgress)GetProcAddress(h, "SOH_GetComboGenProgress");
+        sGetProgress = (FnGetProgress)Combo_ResolveSym("soh", "SOH_GetComboGenProgress");
     if (!sIsOnFileSelect)
-        sIsOnFileSelect = (FnIsOnFileSelect)GetProcAddress(h, "SOH_IsOnFileSelect");
+        sIsOnFileSelect = (FnIsOnFileSelect)Combo_ResolveSym("soh", "SOH_IsOnFileSelect");
     if (!sRefreshStartingGameUI)
-        sRefreshStartingGameUI = (FnRefreshStartingGameUI)GetProcAddress(h, "SOH_RefreshComboStartingGameUI");
-#endif
+        sRefreshStartingGameUI = (FnRefreshStartingGameUI)Combo_ResolveSym("soh", "SOH_RefreshComboStartingGameUI");
 }
 
 // Bug 2: Anchor resync exports, one per game DLL — resolved the same way as the combo-gen syms
@@ -74,26 +68,20 @@ FnGetOwnerInfo sSohAnchorGetOwnerInfo = nullptr;
 FnSendRoomState sSohAnchorSendRoomState = nullptr;
 FnClearTeamState sSohAnchorClearTeamState = nullptr;
 void ResolveAnchorResyncSyms() {
-#ifdef _WIN32
-    if (HMODULE h = GetModuleHandleA("soh.dll")) {
-        if (!sSohRequestResync)
-            sSohRequestResync = (FnRequestResync)GetProcAddress(h, "SOH_Anchor_RequestResync");
-        if (!sSohAnchorSetEnabled)
-            sSohAnchorSetEnabled = (FnSetEnabled)GetProcAddress(h, "SOH_Anchor_SetEnabled");
-        if (!sSohAnchorGetConnState)
-            sSohAnchorGetConnState = (FnGetConnState)GetProcAddress(h, "SOH_Anchor_GetConnectionState");
-        if (!sSohAnchorGetOwnerInfo)
-            sSohAnchorGetOwnerInfo = (FnGetOwnerInfo)GetProcAddress(h, "SOH_Anchor_GetOwnerInfo");
-        if (!sSohAnchorSendRoomState)
-            sSohAnchorSendRoomState = (FnSendRoomState)GetProcAddress(h, "SOH_Anchor_SendRoomState");
-        if (!sSohAnchorClearTeamState)
-            sSohAnchorClearTeamState = (FnClearTeamState)GetProcAddress(h, "SOH_Anchor_ClearTeamState");
-    }
-    if (!sMmRequestResync) {
-        if (HMODULE h = GetModuleHandleA("2ship.dll"))
-            sMmRequestResync = (FnRequestResync)GetProcAddress(h, "MM_Anchor_RequestResync");
-    }
-#endif
+    if (!sSohRequestResync)
+        sSohRequestResync = (FnRequestResync)Combo_ResolveSym("soh", "SOH_Anchor_RequestResync");
+    if (!sSohAnchorSetEnabled)
+        sSohAnchorSetEnabled = (FnSetEnabled)Combo_ResolveSym("soh", "SOH_Anchor_SetEnabled");
+    if (!sSohAnchorGetConnState)
+        sSohAnchorGetConnState = (FnGetConnState)Combo_ResolveSym("soh", "SOH_Anchor_GetConnectionState");
+    if (!sSohAnchorGetOwnerInfo)
+        sSohAnchorGetOwnerInfo = (FnGetOwnerInfo)Combo_ResolveSym("soh", "SOH_Anchor_GetOwnerInfo");
+    if (!sSohAnchorSendRoomState)
+        sSohAnchorSendRoomState = (FnSendRoomState)Combo_ResolveSym("soh", "SOH_Anchor_SendRoomState");
+    if (!sSohAnchorClearTeamState)
+        sSohAnchorClearTeamState = (FnClearTeamState)Combo_ResolveSym("soh", "SOH_Anchor_ClearTeamState");
+    if (!sMmRequestResync)
+        sMmRequestResync = (FnRequestResync)Combo_ResolveSym("2ship", "MM_Anchor_RequestResync");
 }
 
 // Shared Anchor config CVar keys (process-global libultraship store; both game DLLs read these — see
@@ -122,20 +110,14 @@ FnDump sMmDump = nullptr;
 FnDump sSharedPairs = nullptr;
 FnRequestReload sRequestReload = nullptr;
 void ResolvePlandoSyms() {
-#ifdef _WIN32
-    if (HMODULE h = GetModuleHandleA("soh.dll")) {
-        if (!sSohDump)
-            sSohDump = (FnDump)GetProcAddress(h, "SOH_DumpRandoStaticData");
-        if (!sSharedPairs)
-            sSharedPairs = (FnDump)GetProcAddress(h, "SOH_DumpSharedItemPairs");
-        if (!sRequestReload)
-            sRequestReload = (FnRequestReload)GetProcAddress(h, "SOH_RequestComboReload");
-    }
-    if (HMODULE h = GetModuleHandleA("2ship.dll")) {
-        if (!sMmDump)
-            sMmDump = (FnDump)GetProcAddress(h, "MM_DumpRandoStaticData");
-    }
-#endif
+    if (!sSohDump)
+        sSohDump = (FnDump)Combo_ResolveSym("soh", "SOH_DumpRandoStaticData");
+    if (!sSharedPairs)
+        sSharedPairs = (FnDump)Combo_ResolveSym("soh", "SOH_DumpSharedItemPairs");
+    if (!sRequestReload)
+        sRequestReload = (FnRequestReload)Combo_ResolveSym("soh", "SOH_RequestComboReload");
+    if (!sMmDump)
+        sMmDump = (FnDump)Combo_ResolveSym("2ship", "MM_DumpRandoStaticData");
 }
 
 // Combo plandomizer editable state (single ComboMenu instance -> file-static). rows is the edited
@@ -153,6 +135,8 @@ struct PlandoState {
     std::string status;
     std::string loadedJson; // original consolidated file text (write-back base)
     std::string sohDump, mmDump;
+    uint32_t sharedMask = 0;
+    std::vector<ComboRando::CwSharedPair> sharedPairs;
     std::vector<ComboRando::CwPlacedItem> rows;
     std::vector<PlandoPickItem> items;
     std::vector<std::string> spoilerNames; // selectable spoilers in the Randomizer folder (display stems)
@@ -970,9 +954,10 @@ void DrawNetworkSharedPanel() {
 // matching the untagged placements SuffixCrossGameItems now writes for it.
 void PlandoBuildItems() {
     sPlando.items.clear();
-    const std::set<std::string> sharedNames =
-        ComboRando::SharedPairNames(ComboRando::ResolveSharedPairs(sSharedPairs ? sSharedPairs() : "", sPlando.mmDump));
-    std::unordered_set<std::string> sharedListed;
+    sPlando.sharedPairs = ComboRando::ResolveSharedPairs(sSharedPairs ? sSharedPairs() : "", sPlando.mmDump);
+    sPlando.sharedMask = ComboRando::SharedMaskForSpoiler(sPlando.loadedJson, 0);
+    const auto groups = ComboRando::BuildSharedItemGroups(sPlando.sharedPairs, sPlando.sharedMask);
+    std::set<size_t> sharedListed;
     auto add = [&](const std::string& dump, ComboRando::GameId g, const char* suf) {
         try {
             auto d = nlohmann::json::parse(dump);
@@ -983,10 +968,21 @@ void PlandoBuildItems() {
                     continue;
                 if (g == ComboRando::GAME_OOT && n == "Triforce")
                     continue; // OOT's win item: placing it would roll credits outside the combo goal
-                const bool shared = sharedNames.count(n) != 0;
-                if (shared && !sharedListed.insert(n).second)
-                    continue;
-                sPlando.items.push_back({ n, g, it.value("advancement", true), shared ? n : n + suf });
+                size_t sharedGroup = groups.size();
+                for (size_t i = 0; i < groups.size(); ++i)
+                    for (const auto& member : groups[i].names)
+                        if (member.game == g && member.name == n)
+                            sharedGroup = i;
+                const bool shared = ComboRando::IsSharedItem(g, n, sPlando.sharedMask, sPlando.sharedPairs);
+                if (sharedGroup != groups.size()) {
+                    if (!sharedListed.insert(sharedGroup).second)
+                        continue;
+                    const auto& canonical = groups[sharedGroup].names.front();
+                    sPlando.items.push_back(
+                        { canonical.name, canonical.game, it.value("advancement", true), canonical.name });
+                } else {
+                    sPlando.items.push_back({ n, g, it.value("advancement", true), shared ? n : n + suf });
+                }
             }
         } catch (...) {}
     };
@@ -1119,12 +1115,15 @@ void PlandoSavePlay() {
             foreignRaw.push_back(std::move(marker));
         }
     }
+    // Shared Items: the loaded seed's own effective mask — plando doesn't change which families are
+    // shared, only where items land.
+    const uint32_t plandoSharedMask = ComboRando::SharedMaskFromKeys(j.value("sharedItems", nlohmann::json::array()));
     // Native cross-game name collisions get their own-game suffix; foreign checks are skipped (their
     // real item travels in foreign[]). Exactly the generator's write path.
+    const auto sharedPairs = ComboRando::ResolveSharedPairs(sSharedPairs ? sSharedPairs() : "", sPlando.mmDump);
     ComboRando::SuffixCrossGameItems(ootPl, mmPl, foreignRaw, sPlando.sohDump, sPlando.mmDump,
-                                     ComboRando::SharedPairNames(ComboRando::ResolveSharedPairs(
-                                         sSharedPairs ? sSharedPairs() : "", sPlando.mmDump)));
-    nlohmann::json foreign = ComboRando::BuildForeignArray(foreignRaw);
+                                     ComboRando::SharedUntaggedNames(plandoSharedMask, sharedPairs));
+    nlohmann::json foreign = ComboRando::BuildForeignArray(foreignRaw, plandoSharedMask, sharedPairs);
 
     j["oot"]["placements"] = ootPl;
     j["mm"]["placements"] = mmPl;
@@ -1252,7 +1251,9 @@ void DrawComboPlandoPanel() {
             ImGui::TextUnformatted(r.check.c_str());
             ImGui::TableSetColumnIndex(2);
             ImGui::PushID(i);
-            std::string label = r.item + itag;
+            std::string label = ComboRando::IsSharedItem(r.itemGame, r.item, sPlando.sharedMask, sPlando.sharedPairs)
+                                    ? r.item
+                                    : r.item + itag;
             if (cross) // highlight cross-game placements (the harness's whole point)
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.85f, 0.4f, 1.0f));
             ComboRando::ComboMenu_PushButton(theme);
@@ -1726,6 +1727,34 @@ void ComboMenu::DrawComboPanel() {
                         "and the Mask Shop key/entrance exclusions, so Ocarina of Time stays enterable from nothing.");
     ImGui::Separator();
 
+    // Shared Items (OoTMM-style): one item counts for both games, applied at generation. Deferred
+    // families (Ocarina, Song of Time, Shields, Bottles, Health) are not drawn — see the plan doc.
+    ImGui::SeparatorText("Shared Items");
+    ImGui::TextWrapped("NEI's existing shared items always remain shared. These options add native item-family "
+                       "sharing and are saved with the generated seed.");
+    {
+        const ImGuiTableFlags sharedTableFlags = ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_NoSavedSettings;
+        if (ImGui::BeginTable("##sharedcols", 2, sharedTableFlags)) {
+            for (int i = 0; i < ComboRando::SF_COUNT; ++i) {
+                const auto& def = ComboRando::SharedFamilyByIndex(i);
+                if (i % 2 == 0)
+                    ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(i % 2);
+                bool on = CVarGetInteger(def.cvar, 0) != 0;
+                ComboRando::ComboMenu_PushCheckbox(goalTheme);
+                if (ImGui::Checkbox(def.label, &on)) {
+                    CVarSetInteger(def.cvar, on ? 1 : 0);
+                }
+                ComboRando::ComboMenu_PopCheckbox();
+                ImGui::SetItemTooltip("%s", def.tooltip);
+            }
+            ImGui::EndTable();
+        }
+    }
+    ImGui::TextDisabled("One item counts for both games. Applied at generation. Masks need Ocarina of\n"
+                        "Time's Mask Quest set to Shuffle. Shared Wallets turns off Shuffle Child Wallet.");
+    ImGui::Separator();
+
     // Cosmetics (#169): each game randomizes on its own by default; sync makes MM take OOT's colors.
     ImGui::SeparatorText("Cosmetics");
     bool syncCosmetics = CVarGetInteger("gCombo.Rando.SyncCosmetics", 0) != 0;
@@ -1807,17 +1836,12 @@ void ComboMenu::DrawComboPanel() {
 } // namespace ComboRando
 
 // ComboShip: open the combo menu on the Randomizer tab (file-select "Open Randomizer Settings").
-extern "C" __declspec(dllexport) void ComboUI_OpenRandomizerSettings(void) {
+extern "C" COMBO_EXPORT void ComboUI_OpenRandomizerSettings(void) {
     if (ComboRando::sComboMenu)
         ComboRando::sComboMenu->OpenAtRandomizer();
 }
 
-#ifdef _WIN32
-extern "C" __declspec(dllexport) void ComboUI_Register(void)
-#else
-extern "C" void ComboUI_Register(void)
-#endif
-{
+extern "C" COMBO_EXPORT void ComboUI_Register(void) {
     auto ctx = Ship::Context::GetRawInstance();
     if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
         return; // GUI not ready

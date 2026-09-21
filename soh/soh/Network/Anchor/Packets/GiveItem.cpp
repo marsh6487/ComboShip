@@ -20,7 +20,19 @@ extern PlayState* gPlayState;
 
 uint8_t incomingIceTrapsFromAnchor = 0;
 
+#ifdef COMBO_BUILD
+// ComboShip: Shared Items — suppresses this send around a local shared-tier raise (SOH_RaiseSharedTier),
+// which would otherwise broadcast a teammate toast for the player's own reconcile.
+extern "C" int gComboSuppressAnchorSend;
+extern "C" void (*gComboSharedChanged)(int game, int fileNum);
+#endif
+
 void Anchor::SendPacket_GiveItem(u16 modId, s16 getItemId) {
+#ifdef COMBO_BUILD
+    if (gComboSuppressAnchorSend) {
+        return;
+    }
+#endif
     if (!IsSaveLoaded() || isProcessingIncomingPacket || !roomState.syncItemsAndFlags) {
 #ifdef COMBO_BUILD
         SPDLOG_INFO("[Anchor] GIVE_ITEM not sent: saveLoaded={} processingIncoming={} syncItems={}", IsSaveLoaded(),
@@ -119,6 +131,11 @@ void Anchor::HandlePacket_GiveItem(nlohmann::json payload) {
     // Skip-Planting-Beans pre-plant) that this save-direct grant bypasses. See OTRGlobals.cpp.
     extern void Combo_ApplyItemReceiveSideEffects(const GetItemEntry& gie);
     Combo_ApplyItemReceiveSideEffects(getItemEntry);
+    // This save-direct path bypasses OnItemReceive. Dormant sentinel slots are re-poked by the
+    // launcher's PumpDormant using its bound slot; live packet grants can notify directly here.
+    if (gComboSharedChanged) {
+        gComboSharedChanged(0, static_cast<int>(gSaveContext.fileNum));
+    }
 #endif
 
     // Full heal if getting a heart container or piece

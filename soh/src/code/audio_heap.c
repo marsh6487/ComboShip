@@ -1056,13 +1056,8 @@ void* AudioHeap_AllocPermanent(s32 tableType, s32 id, size_t size) {
     s32 index;
 
     index = gAudioContext.permanentPool.count;
+    // Bound the cache before allocation: large custom-music packs must not corrupt gAudioContext.
     if (index < 0 || (size_t)index >= ARRAY_COUNT(gAudioContext.permanentCache)) {
-        return NULL;
-    }
-
-    // SOH [Bugfix] Bound permanentCache: large custom-music packs overflowed it and corrupted
-    // gAudioContext (crashed the audio thread). Refuse rather than corrupt memory; callers handle NULL.
-    if (index >= ARRAY_COUNT(gAudioContext.permanentCache)) {
         return NULL;
     }
 

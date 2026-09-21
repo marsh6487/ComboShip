@@ -38,6 +38,18 @@ extern Gfx gIKAxeInlineDL[]; // equipment/objects/ikaxe_DL — axe with segments
 // after the engine headers above (outside the extern "C" block — it is C++). Mirror of soh's
 // Randomizer_DrawComboForeign.
 #include "ComboForeignDrawMM.h"
+
+void Rando::LatchComboForeign(RandoCheckId randoCheckId) {
+    ComboLatchForeignDrawOOT(randoCheckId);
+}
+
+const char* Rando::ComboForeignLatchedName(RandoCheckId randoCheckId) {
+    return ComboForeignLatchedNameOOT(randoCheckId);
+}
+
+const char* Rando::ComboForeignLiveName(RandoCheckId randoCheckId) {
+    return ComboForeignLiveNameOOT(randoCheckId);
+}
 #endif
 
 s32 StrayFairyOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, Actor* thisx,

@@ -1,4 +1,5 @@
 #include "static_story_actor.h"
+#include "static_story_dialogue.h"
 
 #include <stddef.h>
 
@@ -14,7 +15,7 @@ static const StaticStoryActorDefinition sDefinitions[STATIC_STORY_ACTOR_MAX] = {
                                   STATIC_TRACKING_IMPA, 12, 4.0f },
     [STATIC_STORY_ACTOR_CHILD_MALON] = { 2, 1, OBJECT_MA1, STATIC_ADAPTER_MALON, 0.01f, 42.0f, 18, 46, 0, 30, 30, 70.0f,
                                          STATIC_TRACKING_CHILD_MALON, 0, 0.0f, 10.0f },
-    [STATIC_STORY_ACTOR_SARIA] = { 3, 1, OBJECT_SA, STATIC_ADAPTER_SARIA, 0.01f, 40.0f, 20, 46, 0, 30, 30, 70.0f,
+    [STATIC_STORY_ACTOR_SARIA] = { 3, 1, OBJECT_SA, STATIC_ADAPTER_SARIA, 0.01f, 40.0f, 8, 46, 0, 30, 30, 70.0f,
                                    STATIC_TRACKING_SARIA, 2, 4.0f },
     [STATIC_STORY_ACTOR_ADULT_ZELDA] = { 1, 1, OBJECT_ZL2, STATIC_ADAPTER_ADULT_ZELDA, 0.01f, 60.0f, 25, 80, 0, 30, 30,
                                          90.0f, STATIC_TRACKING_ADULT_ZELDA, 12, -3.0f, 0.0f,
@@ -47,10 +48,18 @@ static const StaticStoryActorDefinition sDefinitions[STATIC_STORY_ACTOR_MAX] = {
     [STATIC_STORY_ACTOR_PHANTOM_GANON] = { 0, 1, OBJECT_GND, STATIC_ADAPTER_PHANTOM_GANON, 0.01f, 80.0f, 35, 100, 0, 30,
                                            30, 120.0f, STATIC_TRACKING_NONE, 0, 0.0f },
     [STATIC_STORY_ACTOR_SKULL_KID] = { 1, 1, OBJECT_INVALID, STATIC_ADAPTER_MM_SKULL_KID, 0.01f, 55.0f, 20, 60, 0, 30,
-                                       30, 90.0f, STATIC_TRACKING_NONE, 0, 0.0f },
-    [STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN] = { 2, 0, OBJECT_INVALID, STATIC_ADAPTER_MM_HAPPY_MASK_SALESMAN, 0.01f,
+                                       30, 90.0f, STATIC_TRACKING_SKULL_KID, 0, 0.0f },
+    [STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN] = { 2, 1, OBJECT_INVALID, STATIC_ADAPTER_MM_HAPPY_MASK_SALESMAN, 0.01f,
                                                  60.0f, 22, 70, 0, 30, 30, 100.0f, STATIC_TRACKING_HAPPY_MASK_SALESMAN,
                                                  12, 0.0f },
+    [STATIC_STORY_ACTOR_KEATON] = { 2, 1, OBJECT_INVALID, STATIC_ADAPTER_MM_KEATON, 0.01f, 35.0f, 18, 50, 0, 30, 30,
+                                    70.0f, STATIC_TRACKING_NONE, 0, 0.0f },
+    [STATIC_STORY_ACTOR_CHILD_KAFEI] = { 1, 1, OBJECT_INVALID, STATIC_ADAPTER_MM_KAFEI, 0.01f, 45.0f, 18, 60, 0, 30, 30,
+                                         80.0f, STATIC_TRACKING_NONE, 0, 0.0f },
+    [STATIC_STORY_ACTOR_LULU] = { 3, 1, OBJECT_INVALID, STATIC_ADAPTER_MM_LULU, 0.01f, 60.0f, 22, 70, 0, 30, 30, 100.0f,
+                                  STATIC_TRACKING_LULU, 12, 0.0f },
+    [STATIC_STORY_ACTOR_ANJU] = { 1, 1, OBJECT_INVALID, STATIC_ADAPTER_MM_ANJU, 0.01f, 40.0f, 20, 50, 0, 30, 30, 90.0f,
+                                  STATIC_TRACKING_NONE, 0, 0.0f },
 };
 
 static const StaticStoryPoseDescriptor sPoses[STATIC_STORY_ACTOR_MAX][STATIC_STORY_ACTOR_POSE_COUNT] = {
@@ -155,9 +164,9 @@ static const StaticStoryPoseDescriptor sPoses[STATIC_STORY_ACTOR_MAX][STATIC_STO
                     STATIC_SKELETON_PHANTOM_GANON),
     },
     [STATIC_STORY_ACTOR_SKULL_KID] = {
-        STATIC_POSE(STATIC_ANIM_SKULL_KID_RECLINING_FLOAT, STATIC_POSE_FLAG_NO_TRACKING,
+        STATIC_POSE(STATIC_ANIM_SKULL_KID_RECLINING_FLOAT, STATIC_POSE_FLAG_NONE,
                     STATIC_SKELETON_SKULL_KID),
-        STATIC_POSE(STATIC_ANIM_SKULL_KID_ARMS_CROSSED_FLOAT, STATIC_POSE_FLAG_NO_TRACKING,
+        STATIC_POSE(STATIC_ANIM_SKULL_KID_ARMS_CROSSED_FLOAT, STATIC_POSE_FLAG_NONE,
                     STATIC_SKELETON_SKULL_KID),
     },
     [STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN] = {
@@ -168,13 +177,33 @@ static const StaticStoryPoseDescriptor sPoses[STATIC_STORY_ACTOR_MAX][STATIC_STO
         STATIC_POSE(STATIC_ANIM_HAPPY_MASK_SALESMAN_ARMS_OUT, STATIC_POSE_FLAG_NO_TRACKING,
                     STATIC_SKELETON_HAPPY_MASK_SALESMAN),
     },
+    [STATIC_STORY_ACTOR_KEATON] = {
+        STATIC_POSE(STATIC_ANIM_KEATON_IDLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_KEATON),
+        STATIC_POSE(STATIC_ANIM_KEATON_CHUCKLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_KEATON),
+        STATIC_POSE(STATIC_ANIM_KEATON_CELEBRATE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_KEATON),
+    },
+    [STATIC_STORY_ACTOR_CHILD_KAFEI] = {
+        STATIC_POSE(STATIC_ANIM_KAFEI_IDLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_KAFEI),
+        STATIC_POSE(STATIC_ANIM_KAFEI_GESTURE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_KAFEI),
+    },
+    [STATIC_STORY_ACTOR_LULU] = {
+        STATIC_POSE(STATIC_ANIM_LULU_LOOK_DOWN, STATIC_POSE_FLAG_NONE, STATIC_SKELETON_LULU),
+        STATIC_POSE(STATIC_ANIM_LULU_LOOK_LEFT, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_LULU),
+        STATIC_POSE(STATIC_ANIM_LULU_SING, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_LULU),
+        STATIC_POSE(STATIC_ANIM_LULU_LOOK_AROUND, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_LULU),
+    },
+    [STATIC_STORY_ACTOR_ANJU] = {
+        /* Keep the native seated root motion; the placement itself never moves. */
+        STATIC_POSE(STATIC_ANIM_ANJU_UMBRELLA_CRY, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_ANJU),
+        STATIC_POSE(STATIC_ANIM_ANJU_UMBRELLA_IDLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_ANJU),
+    },
 };
 
 _Static_assert(sizeof(sDefinitions) / sizeof(sDefinitions[0]) == STATIC_STORY_ACTOR_MAX,
                "Every static story actor type needs a definition");
 _Static_assert(sizeof(sPoses) / sizeof(sPoses[0]) == STATIC_STORY_ACTOR_MAX,
                "Every static story actor type needs a pose row");
-enum { STATIC_STORY_DEFINITION_COUNT = 19, STATIC_STORY_POSE_ROW_COUNT = 19 };
+enum { STATIC_STORY_DEFINITION_COUNT = 23, STATIC_STORY_POSE_ROW_COUNT = 23 };
 _Static_assert(STATIC_STORY_DEFINITION_COUNT == STATIC_STORY_ACTOR_MAX - 1,
                "Definition count must change with the actor registry");
 _Static_assert(STATIC_STORY_POSE_ROW_COUNT == STATIC_STORY_ACTOR_MAX - 1,
@@ -211,6 +240,14 @@ StaticStoryActorType StaticStoryActor_GetType(int16_t params) {
                 return STATIC_STORY_ACTOR_SKULL_KID;
             case 9:
                 return STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN;
+            case 10:
+                return STATIC_STORY_ACTOR_KEATON;
+            case 11:
+                return STATIC_STORY_ACTOR_CHILD_KAFEI;
+            case 12:
+                return STATIC_STORY_ACTOR_LULU;
+            case 13:
+                return STATIC_STORY_ACTOR_ANJU;
             default:
                 return STATIC_STORY_ACTOR_NONE;
         }
@@ -294,13 +331,13 @@ uint16_t StaticStoryActor_SelectTextId(StaticStoryActorType type, const StaticSt
 
     switch (type) {
         case STATIC_STORY_ACTOR_IMPA:
-            return progression->metZelda ? 0x708E : 0x702A;
+            return progression->metZelda ? 0x708E : 0x708D;
         case STATIC_STORY_ACTOR_CHILD_MALON:
             return progression->eponaComplete ? 0x204A : 0x2041;
         case STATIC_STORY_ACTOR_SARIA:
             return progression->forestComplete ? 0x10AD : 0x1001;
         case STATIC_STORY_ACTOR_ADULT_ZELDA:
-            return progression->metZelda ? 0x703D : 0x703C;
+            return progression->metZelda ? 0x70FE : 0x70FF;
         case STATIC_STORY_ACTOR_SHEIK:
             return progression->waterComplete ? 0x7010 : 0x700F;
         case STATIC_STORY_ACTOR_ADULT_RUTO:
@@ -323,14 +360,30 @@ uint16_t StaticStoryActor_SelectTextId(StaticStoryActorType type, const StaticSt
         case STATIC_STORY_ACTOR_GREAT_FAIRY:
             return 0x00DB;
         case STATIC_STORY_ACTOR_TREASURE_CHEST_SHOP_GAL:
-        case STATIC_STORY_ACTOR_ADULT_GANONDORF:
-        case STATIC_STORY_ACTOR_PHANTOM_GANON:
+            return STATIC_STORY_TEXT_TREASURE_CHEST_SHOP_GAL;
         case STATIC_STORY_ACTOR_SKULL_KID:
+            return STATIC_STORY_TEXT_SKULL_KID;
+        case STATIC_STORY_ACTOR_KEATON:
+            return STATIC_STORY_TEXT_KEATON;
         case STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN:
+            return STATIC_STORY_TEXT_HAPPY_MASK_SALESMAN;
+        case STATIC_STORY_ACTOR_CHILD_KAFEI:
+            return STATIC_STORY_TEXT_CHILD_KAFEI;
+        case STATIC_STORY_ACTOR_LULU:
+            return STATIC_STORY_TEXT_LULU;
+        case STATIC_STORY_ACTOR_ANJU:
+            return STATIC_STORY_TEXT_ANJU;
+        case STATIC_STORY_ACTOR_ADULT_GANONDORF:
             return 0x00DB;
+        case STATIC_STORY_ACTOR_PHANTOM_GANON:
+            return 0;
         default:
             return 0;
     }
+}
+
+bool StaticStoryActor_CanTalk(StaticStoryActorType type) {
+    return StaticStoryActor_GetDefinition(type) != NULL && type != STATIC_STORY_ACTOR_PHANTOM_GANON;
 }
 
 void StaticStoryActor_NormalizePlacementRotation(int16_t* pitch, int16_t* yaw, int16_t* roll) {
@@ -362,6 +415,9 @@ StaticStoryTrackingMode StaticStoryActor_GetTrackingMode(StaticStoryActorType ty
     }
     if (definition->trackingAdapter == STATIC_TRACKING_NONE) {
         return STATIC_TRACKING_MODE_NONE;
+    }
+    if (definition->trackingAdapter == STATIC_TRACKING_SKULL_KID) {
+        return STATIC_TRACKING_MODE_BODY_YAW;
     }
     return poseDescriptor->flags & STATIC_POSE_FLAG_HEAD_ONLY_TRACKING ? STATIC_TRACKING_MODE_HEAD_ONLY
                                                                        : STATIC_TRACKING_MODE_FULL;
@@ -403,6 +459,8 @@ float StaticStoryActor_GetGreatFairyHoverAmplitude(uint8_t pose) {
 }
 
 int8_t StaticStoryActor_GetFixedEyeIndex(StaticStoryActorType type, uint8_t pose) {
+    if (type == STATIC_STORY_ACTOR_ANJU)
+        return 0; /* The sole loaded eye is the native crying expression. */
     const StaticStoryPoseDescriptor* descriptor = StaticStoryActor_ResolvePose(type, pose);
     return descriptor != NULL && (descriptor->flags & (STATIC_POSE_FLAG_OCARINA | STATIC_POSE_FLAG_CLOSED_EYES)) ? 2
                                                                                                                  : -1;
@@ -441,6 +499,10 @@ StaticStoryResourceSource StaticStoryActor_GetResourceSource(StaticStoryActorTyp
         case STATIC_STORY_ACTOR_TREASURE_CHEST_SHOP_GAL:
         case STATIC_STORY_ACTOR_SKULL_KID:
         case STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN:
+        case STATIC_STORY_ACTOR_KEATON:
+        case STATIC_STORY_ACTOR_LULU:
+        case STATIC_STORY_ACTOR_CHILD_KAFEI:
+        case STATIC_STORY_ACTOR_ANJU:
             return STATIC_STORY_RESOURCE_MM_ARCHIVE;
         default:
             return STATIC_STORY_RESOURCE_OOT_OBJECT;

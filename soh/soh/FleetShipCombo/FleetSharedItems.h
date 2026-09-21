@@ -24,4 +24,16 @@ void FleetShared_RequestPullFromPeer(void);
 
 #ifdef __cplusplus
 }
+
+class FleetSharedReceiveGuard {
+  public:
+    FleetSharedReceiveGuard() {
+        FleetShared_BeginReceive();
+    }
+    ~FleetSharedReceiveGuard() {
+        FleetShared_EndReceive();
+    }
+    FleetSharedReceiveGuard(const FleetSharedReceiveGuard&) = delete;
+    FleetSharedReceiveGuard& operator=(const FleetSharedReceiveGuard&) = delete;
+};
 #endif

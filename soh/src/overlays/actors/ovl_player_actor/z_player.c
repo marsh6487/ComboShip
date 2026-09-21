@@ -8,6 +8,7 @@
 #include "global.h"
 
 #include "overlays/actors/ovl_Bg_Heavy_Block/z_bg_heavy_block.h"
+#include "overlays/actors/ovl_Bg_Toki_Swd/z_bg_toki_swd.h"
 #include "overlays/actors/ovl_Door_Shutter/z_door_shutter.h"
 #include "overlays/actors/ovl_En_Boom/z_en_boom.h"
 #include "overlays/actors/ovl_En_Arrow/z_en_arrow.h"
@@ -4963,6 +4964,15 @@ s32 Player_TryActionHandlerList(PlayState* play, Player* this, s8* actionHandler
 
         if (!(this->stateFlags1 & PLAYER_STATE1_START_CHANGING_HELD_ITEM) &&
             (Player_UpperAction_ChangeHeldItem != this->upperActionFunc)) {
+            // Turning in place normally checks only item use, so A can be
+            // ignored while lining up at the stump. This ceremony aligns Link
+            // itself; allow its valid offer through the usual grab handler.
+            Actor* interaction = this->interactRangeActor;
+            if (actionHandlerList == sActionHandlerListTurnInPlace && interaction != NULL &&
+                interaction->id == ACTOR_BG_TOKI_SWD && interaction->params == BG_TOKI_SWD_TIME_PEDESTAL &&
+                this->getItemId == GI_NONE && Player_ActionHandler_2(this, play)) {
+                return true;
+            }
             // Process all entries in the Action Handler List with a positive index
             while (*actionHandlerList >= 0) {
                 if (sActionHandlerFuncs[*actionHandlerList](this, play)) {
@@ -6584,8 +6594,9 @@ void func_8083A0F4(PlayState* play, Player* this) {
             this->interactRangeActor->parent = &this->actor;
             Player_SetupAction(play, this, Player_Action_WaitForCutscene, 0);
             this->stateFlags1 |= PLAYER_STATE1_IN_CUTSCENE;
-            if (!CVarGetInteger(CVAR_ENHANCEMENT("PersistentMasks"), 0) ||
-                !CVarGetInteger(CVAR_ENHANCEMENT("AdultMasks"), 0)) {
+            if (interactRangeActor->params != BG_TOKI_SWD_TIME_PEDESTAL &&
+                (!CVarGetInteger(CVAR_ENHANCEMENT("PersistentMasks"), 0) ||
+                 !CVarGetInteger(CVAR_ENHANCEMENT("AdultMasks"), 0))) {
                 gSaveContext.ship.maskMemory = PLAYER_MASK_NONE;
             }
         } else {
@@ -8856,7 +8867,8 @@ s32 Player_ActionHandler_2(Player* this, PlayState* play) {
                     this->heldItemAction = this->itemAction;
                     Player_SetupWaitForPutAway(play, this, func_8083A0F4);
 
-                    if (sp24 == PLAYER_IA_SWORD_MASTER) {
+                    if (sp24 == PLAYER_IA_SWORD_MASTER || (interactedActor->id == ACTOR_BG_TOKI_SWD &&
+                                                           interactedActor->params == BG_TOKI_SWD_TIME_PEDESTAL)) {
                         this->nextModelGroup = Player_ActionToModelGroup(this, PLAYER_IA_SWORD_CS);
                         Player_InitItemAction(play, this, PLAYER_IA_SWORD_CS);
                     } else {
@@ -12200,17 +12212,36 @@ void func_80846720(PlayState* play, Player* this, s32 arg2) {
 static Vec3f D_808546F4 = { -1.0f, 69.0f, 20.0f };
 
 void Player_StartMode_TimeTravel(PlayState* play, Player* this) {
+    s32 isTimePedestalArrival;
+
     Player_SetupAction(play, this, Player_Action_8084E9AC, 0);
     this->stateFlags1 |= PLAYER_STATE1_IN_CUTSCENE;
-    Math_Vec3f_Copy(&this->actor.world.pos, &D_808546F4);
-    this->yaw = this->actor.shape.rot.y = -0x8000;
+    isTimePedestalArrival = BgTokiSwd_IsTimePedestalArrival(play, this);
+    if (!isTimePedestalArrival) {
+        Math_Vec3f_Copy(&this->actor.world.pos, &D_808546F4);
+        this->yaw = this->actor.shape.rot.y = -0x8000;
+    }
     LinkAnimation_Change(play, &this->skelAnime, this->ageProperties->unk_A0, 2.0f / 3.0f, 0.0f, 0.0f, ANIMMODE_ONCE,
                          0.0f);
     Player_StartAnimMovement(play, this, 0x28F);
     if (LINK_IS_ADULT) {
-        func_80846720(play, this, 0);
+        if (isTimePedestalArrival) {
+            this->heldItemId = ITEM_NONE;
+            this->nextModelGroup = Player_ActionToModelGroup(this, PLAYER_IA_SWORD_CS);
+            Player_InitItemAction(play, this, PLAYER_IA_SWORD_CS);
+        } else {
+            func_80846720(play, this, 0);
+        }
     }
-    this->av2.actionVar2 = 20;
+    if (isTimePedestalArrival) {
+        // The native hold synchronizes this animation with the Temple of Time
+        // cutscene. A local pedestal reload has no matching cue, so begin its
+        // exit movement immediately instead of lingering on the first pose.
+        this->av1.actionVar1 = 1;
+        this->skelAnime.endFrame = this->skelAnime.animLength - 1.0f;
+    } else {
+        this->av2.actionVar2 = 20;
+    }
 }
 
 void Player_StartMode_Door(PlayState* play, Player* this) {
@@ -12456,7 +12487,9 @@ void Player_Init(Actor* thisx, PlayState* play2) {
         }
     }
 
-    if (GameInteractor_Should(VB_EXECUTE_PLAYER_STARTMODE_FUNC, true, startMode)) {
+    if (BgTokiSwd_BeginTimePedestalArrival(play, this)) {
+        Player_StartMode_TimeTravel(play, this);
+    } else if (GameInteractor_Should(VB_EXECUTE_PLAYER_STARTMODE_FUNC, true, startMode)) {
         sStartModeFuncs[startMode](play, this);
     }
 
@@ -14670,6 +14703,8 @@ void Player_Draw(Actor* thisx, PlayState* play2) {
 void Player_Destroy(Actor* thisx, PlayState* play) {
     Player* this = (Player*)thisx;
 
+    BgTokiSwd_EndTimePedestalArrival(play, this);
+
     Effect_Delete(play, this->meleeWeaponEffectIndex);
 
     Collider_DestroyCylinder(play, &this->cylinder);
@@ -16530,13 +16565,30 @@ static AnimSfxEntry D_808549F4[] = {
     { 0, -ANIMSFX_DATA(ANIMSFX_TYPE_LANDING, 15) },
 };
 
+static void Player_FinishTimePedestalArrival(PlayState* play, Player* this) {
+    this->heldItemId = ITEM_NONE;
+    this->nextModelGroup = Player_ActionToModelGroup(this, PLAYER_IA_NONE);
+    Player_InitItemAction(play, this, PLAYER_IA_NONE);
+    Player_SetEquipmentData(play, this);
+    func_8083C0E8(this, play);
+    // Restore the floor-safe position after idle setup finishes native root movement.
+    BgTokiSwd_EndTimePedestalArrival(play, this);
+}
+
 void Player_Action_8084E9AC(Player* this, PlayState* play) {
+    if (BgTokiSwd_SkipTimePedestalArrival(play, this)) {
+        Player_FinishTimePedestalArrival(play, this);
+        return;
+    }
+    BgTokiSwd_UpdateTimePedestalArrivalCamera(play, this);
     if (LinkAnimation_Update(play, &this->skelAnime)) {
         if (this->av1.actionVar1 == 0) {
             if (DECR(this->av2.actionVar2) == 0) {
                 this->av1.actionVar1 = 1;
                 this->skelAnime.endFrame = this->skelAnime.animLength - 1.0f;
             }
+        } else if (BgTokiSwd_IsTimePedestalArrival(play, this)) {
+            Player_FinishTimePedestalArrival(play, this);
         } else {
             func_8083C0E8(this, play);
         }
@@ -18227,8 +18279,16 @@ static LinkAnimationHeader* D_80855190[] = {
 static Vec3f D_80855198 = { -1.0f, 70.0f, 20.0f };
 
 void func_808519EC(PlayState* play, Player* this, CsCmdActorCue* cue) {
-    Math_Vec3f_Copy(&this->actor.world.pos, &D_80855198);
-    this->actor.shape.rot.y = -0x8000;
+    if (!BgTokiSwd_RelocateTimePedestalPlayer(play, this)) {
+        Math_Vec3f_Copy(&this->actor.world.pos, &D_80855198);
+        this->actor.shape.rot.y = -0x8000;
+    } else if (LINK_IS_ADULT) {
+        // Display the ceremonial sword even when it is not owned. The cutscene
+        // item action changes only the live player model, never save equipment.
+        this->heldItemId = ITEM_NONE;
+        this->nextModelGroup = Player_ActionToModelGroup(this, PLAYER_IA_SWORD_CS);
+        Player_InitItemAction(play, this, PLAYER_IA_SWORD_CS);
+    }
     Player_AnimPlayOnceAdjusted(play, this, this->ageProperties->unk_9C);
     Player_StartAnimMovement(play, this, 0x28F);
 }
