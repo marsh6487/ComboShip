@@ -15,8 +15,8 @@ int State::Random(int minimum, int maximum) {
     return minimum + static_cast<int>(randomState % (maximum - minimum + 1));
 }
 
-bool State::Step(const Settings& settings, bool eligible, bool nativeWeather, int ticks) {
-    if (!eligible || nativeWeather) {
+bool State::Step(const Settings& settings, bool eligible, int ticks) {
+    if (!eligible) {
         Reset();
         return false;
     }

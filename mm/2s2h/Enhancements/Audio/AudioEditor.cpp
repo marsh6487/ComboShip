@@ -721,7 +721,7 @@ void AudioEditor::DrawElement() {
                 for (auto& widget : weatherWidgets) {
                     BenGui::mBenMenu->MenuDrawItem(widget, ImGui::GetContentRegionAvail().x, THEME_COLOR);
                 }
-                ImGui::TextWrapped("Native rain, snow and scripted weather take priority.");
+                ImGui::TextWrapped("Enabled rain overrides outdoor story and weather restrictions.");
             }
             ImGui::EndChild();
             ImGui::EndTable();
@@ -994,11 +994,12 @@ void RegisterAudioWidgets() {
     weatherWidgets[0] = { .name = "Enable Outdoor Rain", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
     weatherWidgets[0]
         .CVar(MM_WEATHER_CVAR("Enabled"))
-        .Options(CheckboxOptions()
-                     .DefaultValue(false)
-                     .Color(THEME_COLOR)
-                     .Tooltip("Adds rain in compatible outdoor areas while playing MM. Independent of OoT weather; "
-                              "native weather keeps priority. No placed actor is required."));
+        .Options(
+            CheckboxOptions()
+                .DefaultValue(false)
+                .Color(THEME_COLOR)
+                .Tooltip("Adds rain outdoors while playing MM, overriding story weather and lighting restrictions. "
+                         "Independent of OoT weather. Indoor and underwater views are excluded."));
     static const std::unordered_map<int32_t, const char*> rainModes = { { 0, "Persistent" }, { 1, "Intermittent" } };
     weatherWidgets[1] = { .name = "Outdoor Rain Mode", .type = WidgetType::WIDGET_CVAR_COMBOBOX };
     weatherWidgets[1]

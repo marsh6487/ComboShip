@@ -7,7 +7,7 @@ using namespace MMWeather;
 
 static void Advance(State& state, const Settings& settings, int ticks, int step = 3) {
     for (int i = 0; i < ticks; i += step) {
-        state.Step(settings, true, false, step);
+        state.Step(settings, true, step);
     }
 }
 
@@ -20,7 +20,7 @@ int main() {
     settings.enabled = true;
     State initialThunder;
     for (int i = 0; i < 599; ++i) {
-        assert(!initialThunder.Step(settings, true, false, 1));
+        assert(!initialThunder.Step(settings, true, 1));
     }
     State faster, slower;
     Settings fastSettings = settings;
@@ -29,10 +29,10 @@ int main() {
     slowSettings.thunderFrequency = 25;
     int fastStrike = 0, slowStrike = 0;
     for (int tick = 1; tick < 6000 && slowStrike == 0; ++tick) {
-        if (faster.Step(fastSettings, true, false, 1) && fastStrike == 0) {
+        if (faster.Step(fastSettings, true, 1) && fastStrike == 0) {
             fastStrike = tick;
         }
-        if (slower.Step(slowSettings, true, false, 1)) {
+        if (slower.Step(slowSettings, true, 1)) {
             slowStrike = tick;
         }
     }
@@ -46,12 +46,10 @@ int main() {
     settings.overcast = true;
     assert(state.Overcast(settings) == 1.0f);
 
-    for (bool native : { false, true }) {
-        state.Step(settings, native, native, 3);
-        assert(state.Density() == 0 && state.FlashAlpha() == 0);
-        Advance(state, settings, 60);
-        assert(state.Density() == 25);
-    }
+    state.Step(settings, false, 3);
+    assert(state.Density() == 0 && state.FlashAlpha() == 0);
+    Advance(state, settings, 60);
+    assert(state.Density() == 25);
 
     settings.enabled = false;
     Advance(state, settings, 30);
@@ -75,7 +73,7 @@ int main() {
     int density = oneTick.Density();
     int flash = oneTick.FlashAlpha();
     for (int i = 0; i < 1000; ++i) {
-        oneTick.Step(settings, true, false, 0);
+        oneTick.Step(settings, true, 0);
     }
     assert(oneTick.Density() == density && oneTick.FlashAlpha() == flash);
 
@@ -83,12 +81,12 @@ int main() {
     state.Reset();
     bool strike = false;
     for (int i = 0; i < 4000 && !strike; ++i) {
-        strike = state.Step(settings, true, false, 1);
+        strike = state.Step(settings, true, 1);
     }
     assert(strike && state.FlashAlpha() > 0);
     settings.thunder = false;
     settings.enabled = false;
-    assert(!state.Step(settings, true, false, 1));
+    assert(!state.Step(settings, true, 1));
     assert(state.FlashAlpha() > 0);
     Advance(state, settings, 120);
     assert(state.FlashAlpha() == 0 && state.Density() == 0);
@@ -99,9 +97,9 @@ int main() {
     settings.enabled = true;
     Advance(state, settings, 60);
     settings.intermittent = true;
-    state.Step(settings, true, false, 3);
+    state.Step(settings, true, 3);
     assert(state.Density() > 0);
     Advance(state, settings, 120);
     assert(state.Density() == 0);
-    std::puts("PASS MM weather state: defaults, native priority, fades, modes, timing, pause, flash release, reset");
+    std::puts("PASS MM weather state: defaults, view eligibility, fades, modes, timing, pause, flash release, reset");
 }

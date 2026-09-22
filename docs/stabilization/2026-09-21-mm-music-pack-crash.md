@@ -35,7 +35,7 @@ The follow-up repair:
 
 Archive locking and music-pack conversion are unchanged. The earlier mutex exceptions might be another effect of corruption, but that connection has not been demonstrated.
 
-The user reports the trigger was Prelude music packs made using `oot.o2r` and will rebuild the same tracks using `mm.o2r`. Keep that comparison on the same executable with other mods and settings unchanged, replacing the old packs rather than loading both sets. Retain the old packs for reproduction. A successful comparison would implicate pack contents or their interaction with this setup; it would not by itself prove which write caused the corruption.
+The user reports the trigger was Prelude music packs made using `oot.o2r`, and that removing those archives lets this setup boot. They will rebuild the same tracks using `mm.o2r`. This establishes a user-reported workaround, not acceptance of the decoder/cosmetic repairs or identification of the exact corrupting resource. Keep that comparison on the same executable with other mods and settings unchanged, replacing the old packs rather than loading both sets. Retain the old packs for reproduction. A successful comparison would implicate pack contents or their interaction with this setup; it would not by itself prove which write caused the corruption.
 
 ## Verification
 

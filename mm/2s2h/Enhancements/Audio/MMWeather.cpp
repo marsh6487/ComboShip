@@ -14,25 +14,6 @@ int sScene = -1;
 int sRoom = -1;
 uint32_t sPresentationRandom = 0x4D4D5646;
 
-bool NativeWeather(const PlayState* play) {
-    const auto& env = play->envCtx;
-    for (int i = 0; i < PRECIP_MAX; ++i) {
-        if (env.precipitation[i] != 0) {
-            return true;
-        }
-    }
-    for (int i = 0; i < 3; ++i) {
-        if (env.adjLightSettings.ambientColor[i] != 0 || env.adjLightSettings.light1Color[i] != 0 ||
-            env.adjLightSettings.light2Color[i] != 0 || env.adjLightSettings.fogColor[i] != 0) {
-            return true;
-        }
-    }
-    return gWeatherMode != WEATHER_MODE_CLEAR || env.lightningState != LIGHTNING_OFF ||
-           gLightningStrike.state != LIGHTNING_STRIKE_WAIT || env.stormRequest != STORM_REQUEST_NONE ||
-           env.changeSkyboxState != CHANGE_SKYBOX_INACTIVE || env.changeLightEnabled ||
-           env.lightSettingOverride != LIGHT_SETTING_OVERRIDE_NONE || env.adjLightSettings.fogNear != 0 ||
-           env.adjLightSettings.zFar != 0 || env.sandstormState != SANDSTORM_OFF || env.customSkyboxFilter;
-}
 } // namespace
 
 extern "C" void MMWeather_Reset() {
@@ -61,15 +42,16 @@ extern "C" void MMWeather_Update(PlayState* play) {
     sSettings.thunder = CVarGetInteger(MM_WEATHER_CVAR("Thunder"), 1) != 0;
     sSettings.thunderFrequency = CVarGetInteger(MM_WEATHER_CVAR("ThunderFrequency"), 100);
     const Camera* camera = GET_ACTIVE_CAM(play);
+    // Outdoor rain is an explicit presentation override. Room storm policy,
+    // story lighting and native weather cannot stop it. In particular, both
+    // held and quick spins adjust fog throughout the effect and its release.
+    const bool outdoorSky = play->skyboxId == SKYBOX_NORMAL_SKY || play->skyboxId == SKYBOX_3;
     const bool eligible = gSaveContext.gameMode == GAMEMODE_NORMAL && play->gameOverCtx.state == GAMEOVER_INACTIVE &&
-                          play->csCtx.state == CS_STATE_IDLE && play->skyboxId == SKYBOX_NORMAL_SKY &&
-                          !play->envCtx.skyboxDisabled && play->envCtx.lightMode == LIGHT_MODE_TIME &&
-                          Environment_GetStormState(play) != STORM_STATE_OFF && camera != nullptr &&
+                          outdoorSky && !play->envCtx.skyboxDisabled && camera != nullptr &&
                           !(camera->stateFlags & CAM_STATE_UNDERWATER);
-    const bool nativeWeather = NativeWeather(play);
     const int ticks = play->pauseCtx.state == PAUSE_STATE_OFF ? std::clamp<int>(R_UPDATE_RATE, 1, 3) : 0;
-    const bool strike = sState.Step(sSettings, eligible, nativeWeather, ticks);
-    if (!eligible || nativeWeather) {
+    const bool strike = sState.Step(sSettings, eligible, ticks);
+    if (!eligible) {
         MMWeather_ClearBolts();
         MMWeatherAudio_Reset();
         return;

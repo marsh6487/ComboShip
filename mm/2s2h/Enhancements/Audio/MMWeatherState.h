@@ -15,7 +15,7 @@ struct Settings {
 class State {
   public:
     void Reset();
-    bool Step(const Settings& settings, bool eligible, bool nativeWeather, int ticks);
+    bool Step(const Settings& settings, bool eligible, int ticks);
     int Density() const;
     float Intensity() const;
     float Overcast(const Settings& settings) const;

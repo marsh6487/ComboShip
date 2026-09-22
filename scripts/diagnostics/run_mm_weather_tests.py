@@ -13,6 +13,22 @@ from run_mm_audio_runtime_test import function_body
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
+def array_declaration(source, name):
+    match = re.search(r"^[^\n;]*\b" + name + r"\b[^\n;]*=\s*\{.*?^\};", source, re.M | re.S)
+    if match is None:
+        raise RuntimeError("Cannot find production array: " + name)
+    return match[0]
+
+
+def production_function(source, name):
+    # Decompiled sky code contains commented-out DMA blocks with unmatched
+    # braces. Mask comments for balancing while retaining original offsets.
+    masked = re.sub(r"//[^\n]*|/\*[\s\S]*?\*/",
+                    lambda match: re.sub(r"[^\n]", " ", match[0]), source)
+    start, end = function_body(masked, name)
+    return source[start:end]
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="mm-weather-") as temporary:
         build = pathlib.Path(temporary)
@@ -47,6 +63,32 @@ def main():
         executable = build / "weather_bridge_test"
         environment = (ROOT / "mm/src/code/z_kankyo.c").read_text()
         play = (ROOT / "mm/src/code/z_play.c").read_text()
+        spin = (ROOT / "mm/src/overlays/actors/ovl_En_M_Thunder/z_en_m_thunder.c").read_text()
+        environment_functions = []
+        for source, name in ((environment, "Environment_AdjustLights"),
+                             (environment, "Environment_GetStormState"),
+                             (environment, "Environment_DrawRain"),
+                             (spin, "EnMThunder_AdjustLights")):
+            environment_functions.append(production_function(source, name))
+        (build / "weather_environment.inc").write_text("\n".join(environment_functions))
+        skybox = (ROOT / "mm/src/code/z_vr_box.c").read_text()
+        skybox_draw = (ROOT / "mm/src/code/z_vr_box_draw.c").read_text()
+        entry_end = environment.index("} TimeBasedSkyboxEntry;") + len("} TimeBasedSkyboxEntry;")
+        entry_start = environment.rfind("typedef struct {", 0, entry_end)
+        sky = [environment[entry_start:entry_end]]
+        for name in ("sTimeBasedSkyboxConfigs", "sSkyboxPrimColors", "sSkyboxEnvColors"):
+            sky.append(array_declaration(environment, name))
+        # C permits these const resource-name arrays in TexturePtr (void*);
+        # spell out the conversion only in the C++ fixture.
+        sky.append(re.sub(r"\bgSkybox(?:Clear|Cloudy)\dTex\b", r"(TexturePtr)\g<0>",
+                          array_declaration(skybox, "sSkyboxTextures")))
+        for source, name in ((environment, "Environment_LerpWeight"),
+                             (skybox_draw, "Skybox_SetColors"),
+                             (environment, "Environment_UpdateSkybox"),
+                             (environment, "Environment_DrawSkyboxFilters"),
+                             (environment, "Environment_SetupSkyboxStars")):
+            sky.append(production_function(source, name))
+        (build / "weather_sky.inc").write_text("\n".join(sky))
         gate = re.search(r"if \([^;{}]*precipitation\[PRECIP_RAIN_CUR\][^;{}]*\)\s*\{\s*"
                          r"Environment_DrawRain\(this, &this->view, gfxCtx\);\s*\}", play)
         if gate is None:

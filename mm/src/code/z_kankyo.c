@@ -1004,7 +1004,7 @@ Color_RGBA8 sSkyboxEnvColors[] = {
 };
 
 void Environment_UpdateSkybox(u8 skyboxId, EnvironmentContext* envCtx, SkyboxContext* skyboxCtx) {
-    size_t size;
+    s32 texturesChanged = false;
     s32 i;
     u8 skybox1Index = 255;
     u8 skybox2Index = 255;
@@ -1017,7 +1017,10 @@ void Environment_UpdateSkybox(u8 skyboxId, EnvironmentContext* envCtx, SkyboxCon
         envCtx->skyboxConfig = SKYBOX_CONFIG_0;
     }
 
-    if ((skyboxId == SKYBOX_NORMAL_SKY) || ((skyboxId == SKYBOX_3) && (D_801F4E74 < 1.0f))) {
+    // Regional gloom normally hides the sky entirely. Keep the cloudy textures
+    // current when enhanced overcast fades that presentation filter away.
+    if ((skyboxId == SKYBOX_NORMAL_SKY) ||
+        ((skyboxId == SKYBOX_3) && ((D_801F4E74 < 1.0f) || (MMWeather_Overcast() > 0.0f)))) {
         if (envCtx->skyboxDisabled) {
             return;
         }
@@ -1089,47 +1092,26 @@ void Environment_UpdateSkybox(u8 skyboxId, EnvironmentContext* envCtx, SkyboxCon
 
         MMWeather_ApplySky(&skybox1Index, &skybox2Index, &skyboxBlend);
 
-        if ((envCtx->skybox1Index != skybox1Index) && (envCtx->skyboxDmaState == SKYBOX_DMA_INACTIVE)) {
-            envCtx->skyboxDmaState = SKYBOX_DMA_TEXTURE1_START;
-            // size = sNormalSkyFiles[skybox1Index].file.vromEnd - sNormalSkyFiles[skybox1Index].file.vromStart;
-            // osCreateMesgQueue(&envCtx->loadQueue, envCtx->loadMsg, ARRAY_COUNT(envCtx->loadMsg));
-            // DmaMgr_SendRequestImpl(&envCtx->dmaRequest, skyboxCtx->staticSegments[0],
-            //                        sNormalSkyFiles[skybox1Index].file.vromStart, size, 0, &envCtx->loadQueue,
-            //                        OS_MESG_PTR(NULL));
-
-            // 2S2h [Port] Bypass DMA request and assign each skybox texture directly to the static segment
+        // The port binds resource names synchronously. Update BOTH slots before
+        // publishing the blend, including the first draw after scene entry.
+        // Retaining the old DMA gate left one slot stale for a rendered frame.
+        if (envCtx->skybox1Index != skybox1Index) {
             for (size_t i = 0; i < ARRAY_COUNTU(skyboxCtx->staticSegments[0]); i++) {
                 skyboxCtx->staticSegments[0][i] = sSkyboxTextures[skybox1Index][i];
             }
-
             envCtx->skybox1Index = skybox1Index;
+            texturesChanged = true;
         }
-
-        if ((envCtx->skybox2Index != skybox2Index) && (envCtx->skyboxDmaState == SKYBOX_DMA_INACTIVE)) {
-            envCtx->skyboxDmaState = SKYBOX_DMA_TEXTURE2_START;
-            // size = sNormalSkyFiles[skybox2Index].file.vromEnd - sNormalSkyFiles[skybox2Index].file.vromStart;
-            // osCreateMesgQueue(&envCtx->loadQueue, envCtx->loadMsg, ARRAY_COUNT(envCtx->loadMsg));
-            // DmaMgr_SendRequestImpl(&envCtx->dmaRequest, skyboxCtx->staticSegments[1],
-            //                        sNormalSkyFiles[skybox2Index].file.vromStart, size, 0, &envCtx->loadQueue,
-            //                        OS_MESG_PTR(NULL));
-
+        if (envCtx->skybox2Index != skybox2Index) {
             for (size_t i = 0; i < ARRAY_COUNTU(skyboxCtx->staticSegments[1]); i++) {
                 skyboxCtx->staticSegments[1][i] = sSkyboxTextures[skybox2Index][i];
             }
-
             envCtx->skybox2Index = skybox2Index;
+            texturesChanged = true;
         }
-
-        if ((envCtx->skyboxDmaState == SKYBOX_DMA_TEXTURE1_START) ||
-            (envCtx->skyboxDmaState == SKYBOX_DMA_TEXTURE2_START)) {
-            // if (osRecvMesg(&envCtx->loadQueue, NULL, 0) == 0) {
-            if (true) {
-                envCtx->skyboxDmaState = SKYBOX_DMA_INACTIVE;
-                // 2S2H [Port] Since the skybox static segments point to OTR strings, we need to re-create the skybox
-                // display lists to have the new textures loaded
-                Skybox_Calculate128(skyboxCtx, 5);
-                // #endregion
-            }
+        if (texturesChanged) {
+            envCtx->skyboxDmaState = SKYBOX_DMA_INACTIVE;
+            Skybox_Calculate128(skyboxCtx, 5);
         }
 
         envCtx->skyboxBlend = skyboxBlend;
@@ -2261,6 +2243,8 @@ void Environment_ChangeLightSetting(PlayState* play, u8 lightSetting) {
 }
 
 void Environment_DrawSkyboxFilters(PlayState* play) {
+    // Compose only the rendered opacity; preserve native fog/story state.
+    f32 weatherAlpha = 1.0f - MMWeather_Overcast();
     if ((((play->skyboxId != SKYBOX_NONE) && (play->lightCtx.fogNear < 980)) || (play->skyboxId >= SKYBOX_2)) &&
         ((play->skyboxId != SKYBOX_3) || (D_801F4E74 != 0.0f))) {
         f32 alpha;
@@ -2281,10 +2265,10 @@ void Environment_DrawSkyboxFilters(PlayState* play) {
 
         if (play->skyboxId != SKYBOX_3) {
             gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, play->lightCtx.fogColor[0], play->lightCtx.fogColor[1],
-                            play->lightCtx.fogColor[2], 255.0f * alpha);
+                            play->lightCtx.fogColor[2], 255.0f * alpha * weatherAlpha);
         } else {
             gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, play->lightCtx.fogColor[0] + 16, play->lightCtx.fogColor[1] + 16,
-                            play->lightCtx.fogColor[2] + 16, 255.0f * D_801F4E74);
+                            play->lightCtx.fogColor[2] + 16, 255.0f * D_801F4E74 * weatherAlpha);
         }
         gSPDisplayList(POLY_OPA_DISP++, D_0E000000_TO_SEGMENTED(clearFillRect));
 
@@ -2296,7 +2280,7 @@ void Environment_DrawSkyboxFilters(PlayState* play) {
 
         Gfx_SetupDL57_Opa(play->state.gfxCtx);
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, play->envCtx.skyboxFilterColor[0], play->envCtx.skyboxFilterColor[1],
-                        play->envCtx.skyboxFilterColor[2], play->envCtx.skyboxFilterColor[3]);
+                        play->envCtx.skyboxFilterColor[2], play->envCtx.skyboxFilterColor[3] * weatherAlpha);
         gSPDisplayList(POLY_OPA_DISP++, D_0E000000_TO_SEGMENTED(clearFillRect));
 
         CLOSE_DISPS(play->state.gfxCtx);
@@ -3204,7 +3188,7 @@ void Environment_SetupSkyboxStars(PlayState* play) {
 
         phi_f0 = (play->envCtx.skyboxConfig == SKYBOX_CONFIG_24) ? 1.0f : phi_f0;
 
-        D_801F4F28 = phi_f0;
+        D_801F4F28 = phi_f0 * (1.0f - MMWeather_Overcast());
         sEnvSkyboxNumStars = gSkyboxNumStars;
     } else {
         D_801F4F28 = 0.0f;
