@@ -32,6 +32,10 @@ typedef enum {
     STATIC_STORY_ACTOR_PHANTOM_GANON,
     STATIC_STORY_ACTOR_SKULL_KID,
     STATIC_STORY_ACTOR_HAPPY_MASK_SALESMAN,
+    STATIC_STORY_ACTOR_KEATON,
+    STATIC_STORY_ACTOR_CHILD_KAFEI,
+    STATIC_STORY_ACTOR_LULU,
+    STATIC_STORY_ACTOR_ANJU,
     STATIC_STORY_ACTOR_MAX,
 } StaticStoryActorType;
 
@@ -55,6 +59,10 @@ typedef enum {
     STATIC_ADAPTER_PHANTOM_GANON,
     STATIC_ADAPTER_MM_SKULL_KID,
     STATIC_ADAPTER_MM_HAPPY_MASK_SALESMAN,
+    STATIC_ADAPTER_MM_KEATON,
+    STATIC_ADAPTER_MM_LULU,
+    STATIC_ADAPTER_MM_KAFEI,
+    STATIC_ADAPTER_MM_ANJU,
 } StaticStoryActorAdapter;
 
 typedef enum {
@@ -76,6 +84,10 @@ typedef enum {
     STATIC_SKELETON_PHANTOM_GANON,
     STATIC_SKELETON_SKULL_KID,
     STATIC_SKELETON_HAPPY_MASK_SALESMAN,
+    STATIC_SKELETON_KEATON,
+    STATIC_SKELETON_LULU,
+    STATIC_SKELETON_KAFEI,
+    STATIC_SKELETON_ANJU,
 } StaticStorySkeletonFamily;
 
 typedef enum {
@@ -94,6 +106,8 @@ typedef enum {
     STATIC_TRACKING_GREAT_FAIRY,
     STATIC_TRACKING_TREASURE_CHEST_SHOP_GAL,
     STATIC_TRACKING_HAPPY_MASK_SALESMAN,
+    STATIC_TRACKING_LULU,
+    STATIC_TRACKING_SKULL_KID,
 } StaticStoryTrackingAdapter;
 
 typedef enum {
@@ -105,6 +119,7 @@ typedef enum {
     STATIC_TRACKING_MODE_NONE,
     STATIC_TRACKING_MODE_FULL,
     STATIC_TRACKING_MODE_HEAD_ONLY,
+    STATIC_TRACKING_MODE_BODY_YAW,
 } StaticStoryTrackingMode;
 
 typedef enum {
@@ -185,6 +200,17 @@ typedef enum {
     STATIC_ANIM_HAPPY_MASK_SALESMAN_IDLE,
     STATIC_ANIM_HAPPY_MASK_SALESMAN_HANDS_CLASPED,
     STATIC_ANIM_HAPPY_MASK_SALESMAN_ARMS_OUT,
+    STATIC_ANIM_KEATON_IDLE,
+    STATIC_ANIM_KEATON_CHUCKLE,
+    STATIC_ANIM_KEATON_CELEBRATE,
+    STATIC_ANIM_LULU_LOOK_DOWN,
+    STATIC_ANIM_LULU_LOOK_LEFT,
+    STATIC_ANIM_LULU_SING,
+    STATIC_ANIM_LULU_LOOK_AROUND,
+    STATIC_ANIM_KAFEI_IDLE,
+    STATIC_ANIM_KAFEI_GESTURE,
+    STATIC_ANIM_ANJU_UMBRELLA_CRY,
+    STATIC_ANIM_ANJU_UMBRELLA_IDLE,
 } StaticStoryAnimation;
 
 enum {
@@ -251,6 +277,7 @@ int16_t StaticStoryActor_GetAnimationObjectId(StaticStoryActorType type);
 StaticStoryObjectRequirements StaticStoryActor_GetObjectRequirements(StaticStoryActorType type);
 const StaticStoryPoseDescriptor* StaticStoryActor_ResolvePose(StaticStoryActorType type, uint8_t pose);
 uint16_t StaticStoryActor_SelectTextId(StaticStoryActorType type, const StaticStoryProgression* progression);
+bool StaticStoryActor_CanTalk(StaticStoryActorType type);
 bool StaticStoryActor_ShouldCloseEventMessage(bool isEventState, bool shouldAdvance);
 int StaticStoryActor_CanTrack(StaticStoryActorType type, uint8_t pose);
 StaticStoryTrackingMode StaticStoryActor_GetTrackingMode(StaticStoryActorType type, uint8_t pose);
@@ -260,8 +287,7 @@ int16_t StaticStoryActor_ClampGreatFairyHeadRotation(int16_t rotation);
 float StaticStoryActor_GetGreatFairyHoverAmplitude(uint8_t pose);
 int8_t StaticStoryActor_GetFixedEyeIndex(StaticStoryActorType type, uint8_t pose);
 StaticStoryFaceProfile StaticStoryActor_GetFaceProfile(StaticStoryActorType type);
-uint8_t StaticStoryActor_ResolveEyeIndex(StaticStoryActorType type, uint8_t requestedEyeIndex,
-                                        bool hasAlternateHead);
+uint8_t StaticStoryActor_ResolveEyeIndex(StaticStoryActorType type, uint8_t requestedEyeIndex, bool hasAlternateHead);
 bool StaticStoryActor_ShouldOverrideImpaHead(bool hasAlternateSkeleton);
 StaticStoryResourceSource StaticStoryActor_GetResourceSource(StaticStoryActorType type);
 void StaticStoryActor_NormalizePlacementRotation(int16_t* pitch, int16_t* yaw, int16_t* roll);

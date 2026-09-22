@@ -8,6 +8,9 @@
 #include <ship/resource/CrossRMRegistry.h>
 #endif
 #include <tinyxml2.h>
+#include <algorithm>
+#include <limits>
+#include <memory>
 #include <thread>
 
 #define DR_WAV_IMPLEMENTATION
@@ -39,16 +42,16 @@ typedef enum class OggType {
 
 static size_t VorbisReadCallback(void* out, size_t size, size_t elems, void* src) {
     OggFileData* data = static_cast<OggFileData*>(src);
-    size_t toRead = size * elems;
-
-    if (toRead > data->size - data->pos) {
-        toRead = data->size - data->pos;
+    if (size == 0 || elems == 0 || data->pos >= data->size) {
+        return 0;
     }
+    size_t count = std::min(elems, (data->size - data->pos) / size);
+    size_t toRead = count * size;
 
     memcpy(out, static_cast<uint8_t*>(data->data) + data->pos, toRead);
     data->pos += toRead;
 
-    return toRead / size;
+    return count;
 }
 
 static int VorbisSeekCallback(void* src, ogg_int64_t pos, int whence) {
@@ -92,29 +95,33 @@ static const ov_callbacks vorbisCallbacks = {
 };
 
 static OggType GetOggType(OggFileData* data) {
-    ogg_sync_state oy;
-    ogg_stream_state os;
-    ogg_page og;
-    ogg_packet op;
-    OggType type;
-    // The first page as the header information, containing, among other things, what kind of data this ogg holds.
+    ogg_sync_state oy{};
+    ogg_stream_state os{};
+    ogg_page og{};
+    ogg_packet op{};
+    OggType type = OggType::None;
+    // The first page contains the codec identification packet. Do not inspect
+    // its header or packet until libogg confirms they are complete and valid.
     ogg_sync_init(&oy);
     char* buffer = ogg_sync_buffer(&oy, 4096);
-    VorbisReadCallback(buffer, 4096, 1, data);
-    ogg_sync_wrote(&oy, 4096);
+    if (buffer == nullptr) {
+        ogg_sync_clear(&oy);
+        return type;
+    }
+    size_t bytesRead = VorbisReadCallback(buffer, 1, 4096, data);
+    if (ogg_sync_wrote(&oy, bytesRead) != 0 || ogg_sync_pageout(&oy, &og) != 1) {
+        ogg_sync_clear(&oy);
+        return type;
+    }
 
-    ogg_sync_pageout(&oy, &og);
-    ogg_stream_init(&os, ogg_page_serialno(&og));
-    ogg_stream_pagein(&os, &og);
-    ogg_stream_packetout(&os, &op);
-
-    // Can't use strmp because op.packet isn't a null terminated string.
-    if (memcmp((char*)op.packet, "\x01vorbis", 7) == 0) {
-        type = OggType::Vorbis;
-    } else if (memcmp((char*)op.packet, "OpusHead", 8) == 0) {
-        type = OggType::Opus;
-    } else {
-        type = OggType::None;
+    if (ogg_stream_init(&os, ogg_page_serialno(&og)) == 0 && ogg_stream_pagein(&os, &og) == 0 &&
+        ogg_stream_packetout(&os, &op) == 1 && op.packet != nullptr) {
+        // Packets are binary and may be shorter than either signature.
+        if (op.bytes >= 7 && memcmp(op.packet, "\x01vorbis", 7) == 0) {
+            type = OggType::Vorbis;
+        } else if (op.bytes >= 8 && memcmp(op.packet, "OpusHead", 8) == 0) {
+            type = OggType::Opus;
+        }
     }
     ogg_stream_clear(&os);
     ogg_sync_clear(&oy);
@@ -144,52 +151,79 @@ static void FlacDecoderWorker(std::shared_ptr<SOH::AudioSample> audioSample, std
 
 static void OggDecoderWorker(std::shared_ptr<SOH::AudioSample> audioSample, std::shared_ptr<Ship::File> sampleFile,
                              std::shared_ptr<Ship::ResourceInitData> initData) {
-    OggVorbis_File vf;
-    char dataBuff[4096];
-    long read = 0;
-    size_t pos = 0;
-
-    OggFileData fileData = {
-        .data = sampleFile->Buffer.get()->data(),
-        .pos = 0,
-        .size = sampleFile->Buffer.get()->size(),
-    };
-    switch (GetOggType(&fileData)) {
-        case OggType::Vorbis: {
-            // Getting the type advanced the position. We are going to use a different library to decode the file which
-            // assumes the file starts at 0
-            fileData.pos = 0;
-            int ret = ov_open_callbacks(&fileData, &vf, nullptr, 0, vorbisCallbacks);
-
-            vorbis_info* vi = ov_info(&vf, -1);
-
-            uint64_t numFrames = ov_pcm_total(&vf, -1);
-            uint64_t sampleRate = vi->rate;
-            uint64_t numChannels = vi->channels;
-            int bitStream = 0;
-            size_t toRead = numFrames * numChannels * 2;
-            audioSample->sample.sampleAddr = new uint8_t[toRead];
-            do {
-                read = ov_read(&vf, dataBuff, 4096, 0, 2, 1, &bitStream);
-                memcpy(audioSample->sample.sampleAddr + pos, dataBuff, read);
-                pos += read;
-            } while (read != 0);
-            ov_clear(&vf);
-            break;
+    // This runs on a detached thread: failures must name the resource and return,
+    // rather than letting an exception terminate the game.
+    try {
+        if (sampleFile == nullptr || sampleFile->Buffer == nullptr) {
+            SPDLOG_ERROR("Audio sample '{}' has no Ogg data; skipping.", initData->Path);
+            return;
         }
-        case OggType::Opus: {
-            // OPUS encoded data is decoded by the audio driver.
-            audioSample->sample.codec = CODEC_OPUS;
-            audioSample->sample.sampleAddr = new uint8_t[sampleFile->Buffer.get()->size()];
-            memcpy(audioSample->sample.sampleAddr, sampleFile->Buffer.get()->data(), sampleFile->Buffer.get()->size());
-            break;
+
+        OggFileData fileData = {
+            .data = sampleFile->Buffer->data(),
+            .pos = 0,
+            .size = sampleFile->Buffer->size(),
+        };
+        switch (GetOggType(&fileData)) {
+            case OggType::Vorbis: {
+                // Classification consumed the header; libvorbis starts at byte zero.
+                fileData.pos = 0;
+                OggVorbis_File vf{};
+                int ret = ov_open_callbacks(&fileData, &vf, nullptr, 0, vorbisCallbacks);
+                if (ret != 0) {
+                    SPDLOG_ERROR("Audio sample '{}' failed to open as Vorbis ({}); skipping.", initData->Path, ret);
+                    return;
+                }
+                std::unique_ptr<OggVorbis_File, decltype(&ov_clear)> vorbisFile(&vf, ov_clear);
+                vorbis_info* vi = ov_info(&vf, -1);
+                ogg_int64_t numFrames = ov_pcm_total(&vf, -1);
+                if (vi == nullptr || vi->channels <= 0 || numFrames <= 0 ||
+                    static_cast<uint64_t>(numFrames) >
+                        std::numeric_limits<size_t>::max() / (static_cast<size_t>(vi->channels) * 2)) {
+                    SPDLOG_ERROR("Audio sample '{}' has invalid Vorbis dimensions; skipping.", initData->Path);
+                    return;
+                }
+
+                size_t toRead = static_cast<size_t>(numFrames) * vi->channels * 2;
+                std::unique_ptr<uint8_t[]> decoded(new uint8_t[toRead]);
+                char dataBuff[4096];
+                size_t pos = 0;
+                int bitStream = 0;
+                for (;;) {
+                    long read = ov_read(&vf, dataBuff, sizeof(dataBuff), 0, 2, 1, &bitStream);
+                    if (read == 0) {
+                        break;
+                    }
+                    if (read < 0 || static_cast<size_t>(read) > toRead - pos) {
+                        SPDLOG_ERROR("Audio sample '{}' failed Vorbis decoding ({}); skipping.", initData->Path, read);
+                        return;
+                    }
+                    memcpy(decoded.get() + pos, dataBuff, read);
+                    pos += read;
+                }
+                if (pos != toRead) {
+                    SPDLOG_ERROR("Audio sample '{}' ended before its declared Vorbis length; skipping.",
+                                 initData->Path);
+                    return;
+                }
+                // Publish only complete data; failed or pending samples stay silent.
+                audioSample->sample.sampleAddr = decoded.release();
+                break;
+            }
+            case OggType::Opus: {
+                // OPUS encoded data is decoded by the audio driver.
+                std::unique_ptr<uint8_t[]> encoded(new uint8_t[fileData.size]);
+                memcpy(encoded.get(), fileData.data, fileData.size);
+                audioSample->sample.codec = CODEC_OPUS;
+                audioSample->sample.sampleAddr = encoded.release();
+                break;
+            }
+            case OggType::None:
+                SPDLOG_ERROR("Audio sample '{}' has an invalid or unsupported Ogg header; skipping.", initData->Path);
+                break;
         }
-        case OggType::None: {
-            char buff[2048];
-            snprintf(buff, 2048, "Ogg file %s is not Vorbis or OPUS", initData->Path.c_str());
-            throw std::runtime_error(buff);
-            break;
-        }
+    } catch (const std::exception& error) {
+        SPDLOG_ERROR("Audio sample '{}' failed Ogg decoding: {}; skipping.", initData->Path, error.what());
     }
 }
 

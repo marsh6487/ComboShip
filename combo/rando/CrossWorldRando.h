@@ -20,6 +20,7 @@
 #include <nlohmann/json.hpp>
 #include "gui/ComboGenProgress.h"
 #include "CrossForeign.h" // for ComboRando::GameId
+#include "SharedItems.h"
 
 namespace ComboRando {
 
@@ -37,6 +38,19 @@ struct CwRng {
         return n ? next() % n : 0;
     }
 };
+
+// MM's junk placeholder as the dump names it. Cross-placed junk is baked into a real item below, so
+// this only reaches a consumer from an older seed or a hand-written plando row.
+inline constexpr const char* kMmJunkName = "Junk";
+
+// FNV-1a over a name, so a per-entry RNG stream can be seeded without touching the fill's own.
+inline uint32_t CwHashName(const std::string& s) {
+    uint32_t h = 2166136261u;
+    for (unsigned char c : s) {
+        h = (h ^ c) * 16777619u;
+    }
+    return h;
+}
 
 template <class T> inline void cwShuffle(std::vector<T>& v, CwRng& rng) {
     for (size_t i = v.size(); i > 1; --i) {
@@ -235,7 +249,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
                        const OracleFns& ootOracle, const OracleFns& mmOracle,
                        ComboRando::ComboGenProgress* progress = nullptr, const std::string& forcedOotJson = "",
                        OotAccess ootAccess = OotAccess::ALL_REACHABLE, CwGoal goal = {}, GameId startingGame = GAME_OOT,
-                       const std::string& sharedPairsJson = "") {
+                       const std::string& sharedPairsJson = "", uint32_t sharedMask = 0) {
     CombinedFillResult result;
     result.success = false;
 
@@ -256,6 +270,8 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
     // Checks from "checks", items from the real "pool" (split by advancement), confined
     // pre-placements from "fixed". Falls back to per-check vanillaItem if an old DLL omits "pool".
     std::vector<CwItem> advItems, junkItems;
+    // MM's own pickup-rotation names, for the cross-placed junk bake below.
+    std::vector<std::string> mmJunkNames;
     std::vector<CwCheck> allChecks;
     std::vector<CwPlacement> lockedPlacements; // confined pre-placements (own-dungeon keys, etc.)
 
@@ -300,6 +316,14 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             }
         }
 
+        // MM's junk rotation set, for the bake below. Absent on an older 2ship.dll -> no bake.
+        if (game == GAME_MM) {
+            for (auto& j : d.value("junkPool", nlohmann::json::array())) {
+                if (j.is_string() && !j.get<std::string>().empty())
+                    mmJunkNames.push_back(j.get<std::string>());
+            }
+        }
+
         // Confined pre-placements: locked to their check, credited to logic when reached. No category —
         // locked items never enter junkItems, so they are never trim candidates.
         for (auto& f : d.value("fixed", nlohmann::json::array())) {
@@ -325,73 +349,6 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         std::cerr << "[ComboShip] CrossWorldCombinedFill: " << result.error << "\n";
         return result;
     }
-    // --- Shared items: the union holds max(oot, mm) copies, not oot + mm ---
-    // OOT's copies stay (MM's logic is credited through the pair below) and the overlapping MM copies
-    // leave the pool; the MM balance pass pads that gap with MM junk. A game that does not shuffle the
-    // item contributes no copies, so the pair simply does not fire.
-    std::vector<CwSharedPair> sharedPairs = ResolveSharedPairs(sharedPairsJson, mmDumpJson);
-    if (!sharedPairs.empty()) {
-        auto countNamed = [](const std::vector<CwItem>& v, Game g, const std::string& name) {
-            return static_cast<size_t>(
-                std::count_if(v.begin(), v.end(), [&](const CwItem& i) { return i.game == g && i.name == name; }));
-        };
-        // remove_if applies the predicate exactly once per element, so `removed` is an exact count.
-        auto dropNamed = [](std::vector<CwItem>& v, Game g, const std::string& name, size_t budget) {
-            size_t removed = 0;
-            v.erase(std::remove_if(v.begin(), v.end(),
-                                   [&](const CwItem& i) {
-                                       if (removed == budget || i.game != g || i.name != name) {
-                                           return false;
-                                       }
-                                       ++removed;
-                                       return true;
-                                   }),
-                    v.end());
-            return removed;
-        };
-        size_t dedupedCopies = 0, firedPairs = 0;
-        for (const auto& pair : sharedPairs) {
-            const size_t ootCopies =
-                countNamed(advItems, GAME_OOT, pair.ootName) + countNamed(junkItems, GAME_OOT, pair.ootName);
-            const size_t mmCopies =
-                countNamed(advItems, GAME_MM, pair.mmName) + countNamed(junkItems, GAME_MM, pair.mmName);
-            // One copy serves both worlds, so the union holds max(oot, mm) — dropping EVERY MM copy
-            // would strip the surplus of an item MM pools more of (52 Pieces of Heart against OOT's 39)
-            // and leave that many MM checks to be padded with cloned junk.
-            const size_t budget = std::min(ootCopies, mmCopies);
-            if (budget == 0) {
-                continue;
-            }
-            const size_t fromAdv = dropNamed(advItems, GAME_MM, pair.mmName, budget);
-            dedupedCopies += fromAdv + dropNamed(junkItems, GAME_MM, pair.mmName, budget - fromAdv);
-            ++firedPairs;
-        }
-        std::cout << "[ComboShip] CrossWorldCombinedFill: shared items — " << sharedPairs.size() << " pairs, "
-                  << firedPairs << " with copies on both sides, " << dedupedCopies << " MM copies removed\n";
-    }
-
-    // Logic credit for shared items: a game owns the other half of every shared item its peer owns.
-    // Applied to the sets the oracles see, never to the sets the fill credits, so bookkeeping stays
-    // one-item-one-pickup.
-    auto withSharedHalves = [&](const std::vector<std::string>& ootOwned, const std::vector<std::string>& mmOwned,
-                                std::vector<std::string>& ootOut, std::vector<std::string>& mmOut) {
-        ootOut = ootOwned;
-        mmOut = mmOwned;
-        if (sharedPairs.empty())
-            return;
-        std::unordered_map<std::string, int> ootCount, mmCount;
-        for (const auto& n : ootOwned)
-            ++ootCount[n];
-        for (const auto& n : mmOwned)
-            ++mmCount[n];
-        for (const auto& pair : sharedPairs) {
-            for (int k = 0; k < ootCount[pair.ootName]; ++k)
-                mmOut.push_back(pair.mmName);
-            for (int k = 0; k < mmCount[pair.mmName]; ++k)
-                ootOut.push_back(pair.ootName);
-        }
-    };
-
     // #135: under an MM start the Mask Shop Key is forced start-with, so a confined placement of it in
     // fixed[] means the force never reached OOT's settings. Warn only — A0 keeps the portal re-openable.
     if (mmStart) {
@@ -476,6 +433,75 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             }
         } catch (...) {}
     }
+
+    // Determine effective native families BEFORE NEI removes any overlapping MM copies. Forced
+    // starts and fixed OOT placements are sources too; a missing source never trims an MM item.
+    auto countNamed = [&](Game game, const std::string& name, bool includeLocked = true) {
+        size_t count = 0;
+        for (const auto* pool : { &advItems, &junkItems })
+            for (const auto& item : *pool)
+                count += item.game == game && item.name == name;
+        for (const auto* fixed : { &lockedPlacements, &forcedPlacements }) {
+            if (fixed == &lockedPlacements && !includeLocked)
+                continue;
+            for (const auto& p : *fixed)
+                count += p.item.game == game && p.item.name == name;
+        }
+        return count;
+    };
+    uint32_t effectiveSharedMask = 0;
+    const bool maskQuestShuffle = nlohmann::json::parse(sohDumpJson)
+                                      .value("accessibility", nlohmann::json::object())
+                                      .value("maskQuestShuffle", false);
+    for (int i = 0; i < SF_COUNT; ++i) {
+        const auto& def = SharedFamilyByIndex(i);
+        if (!(sharedMask & (1u << i)) || (def.isMask && !maskQuestShuffle))
+            continue;
+        if (countNamed(GAME_OOT, def.ootName) == 0)
+            continue;
+        if (def.mmHasItem && countNamed(GAME_MM, def.mmName) == 0)
+            continue;
+        effectiveSharedMask |= (1u << i);
+    }
+    const auto sharedPairs = ResolveSharedPairs(sharedPairsJson, mmDumpJson);
+    const auto sharedGroups = BuildSharedItemGroups(sharedPairs, effectiveSharedMask);
+    size_t dedupedCopies = 0;
+    for (const auto& group : sharedGroups) {
+        size_t target = 0, fixedCopies = 0;
+        for (const auto& n : group.names) {
+            // NEI keeps max(aliases), including its extended tiers. Family-only sharing retains
+            // the native OOT source count (upstream's MM trim policy).
+            if (group.nei || n.game == GAME_OOT)
+                target = std::max(target, countNamed(n.game, n.name, group.nativeFamily));
+            for (const auto* fixed : { &lockedPlacements, &forcedPlacements }) {
+                // NEI alone preserves its pool-only rule. Only an enabled native family may use
+                // nonshuffled fixed sources to remove copies from the peer's shuffled pool.
+                if (fixed == &lockedPlacements && !group.nativeFamily)
+                    continue;
+                for (const auto& p : *fixed)
+                    fixedCopies += p.item.game == n.game && p.item.name == n.name;
+            }
+        }
+        size_t remaining = target > fixedCopies ? target - fixedCopies : 0;
+        for (const auto& n : group.names) {
+            for (auto* pool : { &advItems, &junkItems }) {
+                pool->erase(std::remove_if(pool->begin(), pool->end(),
+                                           [&](const CwItem& item) {
+                                               if (item.game != n.game || item.name != n.name)
+                                                   return false;
+                                               if (remaining > 0) {
+                                                   --remaining;
+                                                   return false;
+                                               }
+                                               ++dedupedCopies;
+                                               return true;
+                                           }),
+                            pool->end());
+            }
+        }
+    }
+    std::cout << "[ComboShip] shared items: " << sharedGroups.size() << " groups, " << dedupedCopies
+              << " duplicate pool copies removed\n";
 
     // --- Balance each game's pool against its checks: P_g == C_g ---
     // Both generators over-supply on purpose and the over-supply is PROGRESSION, so only junk may be
@@ -739,7 +765,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         bool portalOpen = !portalGated || mmStart;
         std::vector<std::string> ootSeen, mmSeen;
         for (;;) {
-            withSharedHalves(ootOwned, mmOwned, ootSeen, mmSeen);
+            SharedOwnedViews(sharedGroups, ootOwned, mmOwned, ootSeen, mmSeen);
             ootReachable = queryReachable(ootOracle, ootSeen);
             // Read the portal off THIS OOT query, before any MM check is credited below — that ordering
             // is what stops the fill proving the portal with an item that lives behind it.
@@ -1176,6 +1202,29 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         progress->total.store(0);
     }
 
+    // --- Bake cross-placed MM junk into a real item ---
+    // MM resolves its junk placeholder at pickup from finalSeed + the MM check id, and a check in OOT
+    // has none — so pick from MM's own rotation set here and every surface agrees (see the deviations
+    // doc). Own RNG stream, seeded per check: never draws from the fill's, never depends on order.
+    {
+        std::sort(mmJunkNames.begin(), mmJunkNames.end());
+        mmJunkNames.erase(std::unique(mmJunkNames.begin(), mmJunkNames.end()), mmJunkNames.end());
+        size_t unbaked = 0;
+        for (auto& p : placements) {
+            if (p.check.game != GAME_OOT || p.item.game != GAME_MM || p.item.name != kMmJunkName)
+                continue;
+            if (mmJunkNames.empty()) {
+                ++unbaked;
+                continue;
+            }
+            CwRng jr((static_cast<uint64_t>(masterSeed) << 32) ^ CwHashName(p.check.name) ^ 0x4A554E4BULL);
+            p.item.name = mmJunkNames[jr.below(static_cast<uint32_t>(mmJunkNames.size()))];
+        }
+        if (unbaked > 0)
+            std::cout << "[ComboShip] junk bake skipped for " << unbaked
+                      << " cross placements: 2ship.dll reported no junkPool" << std::endl;
+    }
+
     // --- Build spoiler (same shape as the no-logic generator) ---
     nlohmann::json spoiler;
     spoiler["masterSeed"] = masterSeed;
@@ -1188,6 +1237,7 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
                              { "poolPadded", static_cast<uint32_t>(paddedTotal) },
                              { "checks", static_cast<uint32_t>(allChecks.size()) },
                              { "passes", passesUsed } };
+    spoiler["sharedItems"] = SharedKeysFromMask(effectiveSharedMask);
 
     nlohmann::json ootPlacements = nlohmann::json::object();
     nlohmann::json mmPlacements = nlohmann::json::object();
@@ -1230,6 +1280,11 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
 
     // --- Commit placements to oracles (for save consumption) ---
     for (const auto& p : placements) {
+        // ComboShip: a foreign item's name lives in the OTHER game's namespace. Baked junk names now
+        // collide with real OOT items ("Blue Rupee"), so committing one would place the wrong native
+        // item at the check instead of harmlessly missing the lookup.
+        if (p.check.game != p.item.game)
+            continue;
         if (p.check.game == GAME_OOT) {
             ootOracle.PlaceItem(p.check.name.c_str(), p.item.name.c_str());
         } else {

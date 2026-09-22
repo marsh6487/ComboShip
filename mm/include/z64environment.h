@@ -293,6 +293,7 @@ void Environment_DrawLensFlare(struct PlayState* play, EnvironmentContext* envCt
 void Environment_DrawRain(struct PlayState* play, struct View* view, struct GraphicsContext* gfxCtx);
 void Environment_ChangeLightSetting(struct PlayState* play, u8 lightSetting);
 void Environment_AddLightningBolts(struct PlayState* play, u8 num);
+void Environment_DrawLightningFlash(struct PlayState* play, u8 red, u8 green, u8 blue, u8 alpha);
 void Environment_PlaySceneSequence(struct PlayState* play);
 void Environment_DrawCustomLensFlare(struct PlayState* play);
 void Environment_InitGameOverLights(struct PlayState* play);

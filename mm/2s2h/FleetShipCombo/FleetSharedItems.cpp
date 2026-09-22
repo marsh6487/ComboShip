@@ -6,8 +6,8 @@
 #include "2s2h/ShipInit.hpp"
 
 #include <spdlog/spdlog.h>
-#ifdef _WIN32
-#include <windows.h>
+#ifdef COMBO_BUILD
+#include "ComboResolve.h"
 #endif
 
 extern "C" {
@@ -90,9 +90,7 @@ static FnGrantSharedItem ResolvePeerGrant() {
     static bool sTried = false;
     if (!sTried) {
         sTried = true;
-        if (HMODULE peer = GetModuleHandleA("soh.dll")) {
-            sGrant = (FnGrantSharedItem)GetProcAddress(peer, "SOH_GrantSharedItem");
-        }
+        sGrant = reinterpret_cast<FnGrantSharedItem>(Combo_ResolveSym("soh", "SOH_GrantSharedItem"));
     }
     return sGrant;
 }
@@ -133,17 +131,14 @@ static void PullFromPeerWhenReady() {
     static bool sTried = false;
     if (!sTried) {
         sTried = true;
-        if (HMODULE peer = GetModuleHandleA("soh.dll")) {
-            sExtract = (FnExtractSharedState)GetProcAddress(peer, "SOH_ExtractSharedState");
-        }
+        sExtract = reinterpret_cast<FnExtractSharedState>(Combo_ResolveSym("soh", "SOH_ExtractSharedState"));
     }
     if (sExtract == nullptr) {
         SPDLOG_WARN("[FleetShared] soh.dll has no SOH_ExtractSharedState; no reconciliation");
         return;
     }
-    FleetShared_BeginReceive();
+    FleetSharedReceiveGuard receiveGuard;
     FleetSync_ApplySharedState(sExtract());
-    FleetShared_EndReceive();
     SPDLOG_INFO("[FleetShared] pulled OoT's shared state into MM");
 }
 

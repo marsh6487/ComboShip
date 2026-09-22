@@ -9,6 +9,9 @@
 //   Play_UpdateMain even while the game is combo-frozen, so the queued write completes.
 
 #include "FleetSync.h"
+#ifdef COMBO_BUILD
+#include "ComboExport.h"
+#endif
 #include "FleetShipCombo.h"
 #include "FleetComboIds.h"
 #include "FleetComboItemsGlue.h" // FcCombo_NativeForItem (fcId -> native RI)
@@ -2230,7 +2233,7 @@ static RegisterShipInitFunc initFleetSync(RegisterFleetSync, {});
 // ComboShip: the file-mirror pumps above stay off, but the two games still reconcile at every
 // switch — the peer pulls this snapshot (FleetSharedItems::PullFromPeer) and applies it max-merge.
 // Save-only: valid while this game is dormant.
-extern "C" __declspec(dllexport) const char* MM_ExtractSharedState(void) {
+extern "C" COMBO_EXPORT const char* MM_ExtractSharedState(void) {
     static std::string cached;
     nlohmann::json sh;
     ExtractShared(sh);

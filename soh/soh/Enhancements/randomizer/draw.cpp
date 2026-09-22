@@ -397,7 +397,7 @@ extern "C" void Randomizer_DrawDoubleDefense(PlayState* play, GetItemEntry* getI
 
     gSPGrayscale(POLY_XLU_DISP++, false);
 
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gGiHeartContainerDL);
+    POLY_XLU_DISP = GetItem_DrawDListWithCosmetics(POLY_XLU_DISP, gGiHeartContainerDL, GID_HEART_CONTAINER);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -564,6 +564,18 @@ extern "C" void Randomizer_DrawRocsFeather(PlayState* play, GetItemEntry* getIte
 
 extern "C" void Randomizer_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
     OOT_DrawComboForeign(play, getItemEntry);
+}
+
+extern "C" void Randomizer_LatchComboForeign(int32_t rc) {
+    ComboLatchForeignDraw((RandomizerCheck)rc);
+}
+
+extern "C" const char* Randomizer_ComboForeignLatchedName(int32_t rc) {
+    return ComboForeignLatchedName((RandomizerCheck)rc);
+}
+
+extern "C" const char* Randomizer_ComboForeignLiveName(int32_t rc) {
+    return ComboForeignLiveName((RandomizerCheck)rc);
 }
 #endif
 

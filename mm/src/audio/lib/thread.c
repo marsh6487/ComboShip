@@ -99,21 +99,21 @@ void AudioThread_ProcessGlobalCmd(AudioCmd* cmd) {
         case AUDIOCMD_OP_GLOBAL_SYNC_LOAD_SEQ_PARTS:
             // 2S2H [Custom Audio] the second argument (seqId) was `cmd->arg1`changed to use the upper half of
             // `cmd->asInt so it can be 16 bit.
-            AudioLoad_SyncLoadSeqParts((cmd->asInt >> 16) & 0x7FF, cmd->arg2, cmd->asInt & 0xFFFF,
+            AudioLoad_SyncLoadSeqParts((cmd->asInt >> 16) & 0xFFFF, cmd->arg2, cmd->asInt & 0xFFFF,
                                        &gAudioCtx.externalLoadQueue);
             break;
 
         case AUDIOCMD_OP_GLOBAL_INIT_SEQPLAYER:
             // 2S2H [Custom Audio] the second argument (seqId) was `cmd->arg1`changed to use the upper half of
             // `cmd->asInt so it can be 16 bit.
-            AudioLoad_SyncInitSeqPlayer(cmd->arg0, (cmd->asInt >> 16) & 0x7FF, cmd->arg2);
+            AudioLoad_SyncInitSeqPlayer(cmd->arg0, (cmd->asInt >> 16) & 0xFFFF, cmd->arg2);
             AudioThread_SetFadeInTimer(cmd->arg0, cmd->asInt & 0xFFFF);
             break;
 
         case AUDIOCMD_OP_GLOBAL_INIT_SEQPLAYER_SKIP_TICKS:
             // 2S2H [Custom Audio] the second argument (seqId) was `cmd->arg1`changed to use the upper half of
             // `cmd->asInt so it can be 16 bit.
-            AudioLoad_SyncInitSeqPlayerSkipTicks(cmd->arg0, (cmd->asInt >> 16) & 0x7FF, cmd->asInt & 0xFFFF);
+            AudioLoad_SyncInitSeqPlayerSkipTicks(cmd->arg0, (cmd->asInt >> 16) & 0xFFFF, cmd->asInt & 0xFFFF);
             AudioThread_SetFadeInTimer(cmd->arg0, 500);
             AudioScript_SkipForwardSequence(&gAudioCtx.seqPlayers[cmd->arg0]);
             break;
@@ -516,8 +516,8 @@ u32 AudioThread_GetExternalLoadQueueMsg(u32* retMsg) {
     return msg >> 0x18;
 }
 
-u8* AudioThread_GetFontsForSequence(s32 seqId, u32* outNumFonts, u8* buff) {
-    return AudioLoad_GetFontsForSequence(seqId, outNumFonts, buff);
+s32* AudioThread_GetFontsForSequence(s32 seqId, u32* outNumFonts) {
+    return AudioLoad_GetFontsForSequence(seqId, outNumFonts);
 }
 
 void AudioThread_GetSampleBankIdsOfFont(s32 fontId, u32* sampleBankId1, u32* sampleBankId2) {

@@ -871,6 +871,7 @@ void Cutscene_HandleEntranceTriggers(PlayState* play);
 void Cutscene_HandleConditionalTriggers(PlayState* play);
 void Cutscene_SetSegment(PlayState* play, void* segment);
 void GetItem_Draw(PlayState* play, s16 drawId);
+Gfx* GetItem_DrawDListWithCosmetics(Gfx* gfx, const char* dlist, s16 drawId);
 void GetItemEntry_Draw(PlayState* play, GetItemEntry getItemEntry);
 void SoundSource_InitAll(PlayState* play);
 void SoundSource_UpdateAll(PlayState* play);
@@ -1296,6 +1297,7 @@ Gfx* SkelAnime_Draw(PlayState* play, void** skeleton, Vec3s* jointTable, Overrid
 Gfx* SkelAnime_DrawFlex(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dListCount,
                         OverrideLimbDraw overrideLimbDraw, PostLimbDraw postLimbDraw, void* arg, Gfx* gfx);
 void SkelAnime_InterpFrameTable(s32 limbCount, Vec3s* dst, Vec3s* start, Vec3s* target, f32 weight);
+void SkelAnime_GetFrameData(AnimationHeader* animation, s32 frame, s32 limbCount, Vec3s* frameTable);
 void AnimationContext_Reset(AnimationContext* animationCtx);
 void AnimationContext_SetNextQueue(PlayState* play);
 void AnimationContext_DisableQueue(PlayState* play);
@@ -1567,6 +1569,7 @@ s16 Play_ChangeCameraStatus(PlayState* play, s16 camId, s16 status);
 void Play_ClearCamera(PlayState* play, s16 camId);
 void Play_ClearAllSubCameras(PlayState* play);
 Camera* Play_GetCamera(PlayState* play, s16 camId);
+s16 Play_CameraGetUID(PlayState* play, s16 camId);
 s32 Play_CameraSetAtEye(PlayState* play, s16 camId, Vec3f* at, Vec3f* eye);
 s32 Play_CameraSetAtEyeUp(PlayState* play, s16 camId, Vec3f* at, Vec3f* eye, Vec3f* up);
 s32 Play_CameraSetFov(PlayState* play, s16 camId, f32 fov);

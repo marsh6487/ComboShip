@@ -152,7 +152,11 @@ static bool ItemResolvesFromState(RandomizerGet rg) {
     }
 }
 
+#ifdef COMBO_BUILD
+std::shared_ptr<GetItemEntry> Item::GetGIEntry(RandomizerGet* actualOut) const { // NOLINT(*-no-recursion)
+#else
 std::shared_ptr<GetItemEntry> Item::GetGIEntry() const { // NOLINT(*-no-recursion)
+#endif
     if (giEntry != nullptr && !ItemResolvesFromState(randomizerGet)) {
         return giEntry;
     }
@@ -535,6 +539,11 @@ std::shared_ptr<GetItemEntry> Item::GetGIEntry() const { // NOLINT(*-no-recursio
     if (giEntry != nullptr && (actual == RG_NONE || actual == randomizerGet)) {
         return giEntry;
     }
+#ifdef COMBO_BUILD
+    if (actualOut != nullptr) {
+        *actualOut = actual;
+    }
+#endif
     return StaticData::RetrieveItem(actual).GetGIEntry();
 }
 

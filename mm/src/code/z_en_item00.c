@@ -875,7 +875,7 @@ void EnItem00_DrawHeartContainer(EnItem00* this, PlayState* play) {
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
 
         gSPDisplayList(POLY_XLU_DISP++, gGiHeartBorderDL);
-        gSPDisplayList(POLY_XLU_DISP++, gGiHeartContainerDL);
+        POLY_XLU_DISP = GetItem_DrawDListWithCosmetics(POLY_XLU_DISP, gGiHeartContainerDL, GID_HEART_CONTAINER);
 
         CLOSE_DISPS(play->state.gfxCtx);
     }
@@ -891,7 +891,7 @@ void EnItem00_DrawHeartPiece(EnItem00* this, PlayState* play) {
 
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
 
-    gSPDisplayList(POLY_XLU_DISP++, gHeartPieceInteriorDL);
+    POLY_XLU_DISP = GetItem_DrawDListWithCosmetics(POLY_XLU_DISP, gHeartPieceInteriorDL, GID_HEART_PIECE);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }

@@ -5,6 +5,9 @@
 // y no hace falta que existan (los argumentos de macro no emitidos son solo tokens).
 
 #include "FleetComboItemsGlue.h"
+#ifdef COMBO_BUILD
+#include "ComboExport.h"
+#endif
 #include "FleetComboItems.h"
 #include "FleetComboIds.h" // FC_COMBO_OBTAINED_FC_SIZE
 #include "soh/Enhancements/randomizer/static_data.h"
@@ -116,10 +119,11 @@ static void RegisterFcComboItems() {
 
 static RegisterShipInitFunc initFcComboItems(RegisterFcComboItems, {});
 
+#ifdef COMBO_BUILD
 // ComboShip: the shared-item pairs for the launcher's cross-world fill, as
 // [{"oot": <soh itemTable English name>, "mm": <2ship spoiler name>, "chain": <n>}]. Only rows with
 // an item on BOTH sides are pairs; the names are exactly what each game's static-data dump emits.
-extern "C" __declspec(dllexport) const char* SOH_DumpSharedItemPairs(void) {
+extern "C" COMBO_EXPORT const char* SOH_DumpSharedItemPairs(void) {
     static std::string cached;
     nlohmann::json pairs = nlohmann::json::array();
     for (int fcId = 0; fcId < FCI_MAX; fcId++) {
@@ -133,3 +137,4 @@ extern "C" __declspec(dllexport) const char* SOH_DumpSharedItemPairs(void) {
     cached = pairs.dump();
     return cached.c_str();
 }
+#endif
