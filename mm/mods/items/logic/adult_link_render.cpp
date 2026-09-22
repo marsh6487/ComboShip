@@ -70,6 +70,11 @@ s32 CustomItems_OverrideDraw(Player* player, PlayState* play);
 // the back while we suppress the duplicate MM-CHILD shield the adult sheath DL already bakes in.
 const char* ExtEquip_GetShieldDLOverride(void);
 
+// z_player_lib.c: shared late-stage policy for native, adult, and custom-form
+// equipment limbs. Calling it after this renderer's sheath replacement keeps
+// held hand equipment intact while also covering alternate adult models.
+void Player_ApplyBackEquipmentVisibility(s32 limbIndex, Gfx** dList);
+
 // Custom forms (Kafei/Keaton/Gerudo/Garo): each is an adult-rigged mirror of object_link_boy under
 // objects/forms/<name>/, so this renderer draws them by swapping its model source to the form's base path.
 #include "mods/forms/custom_forms.h"
@@ -631,6 +636,7 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
             }
             break;
     }
+    Player_ApplyBackEquipmentVisibility(limbIndex, dList);
     return ret;
 }
 

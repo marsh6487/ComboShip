@@ -102,6 +102,11 @@ jobs:
       - name: 2Ship mod GUI fonts
         run: python3 scripts/diagnostics/run_mm_mod_font_tests.py
 
+      - name: 2Ship back equipment and OoT sky compatibility
+        run: |
+          python3 scripts/diagnostics/run_mm_back_equipment_tests.py
+          python3 scripts/diagnostics/run_mm_oot_sky_tests.py
+
       - name: Filter changed paths
         id: filter
         if: github.event_name == 'pull_request'

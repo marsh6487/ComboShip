@@ -1428,6 +1428,17 @@ void BenMenu::AddEnhancements() {
         .Options(CheckboxOptions().Tooltip(
             "Toggle between standard assets and alternate assets. Usually mods will indicate if "
             "this setting has to be used or not."));
+    AddWidget(path, "Use OoT Sky Textures", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.Graphics.UseOotSkyTextures")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Use the dawn, day, sunset, night, and overcast skies from an OoT sky texture pack. "
+            "Place the pack in mods/2ship and enable Alternate Assets. Requires a complete set of clear and "
+            "overcast sky faces; takes effect after changing scenes. MM moon is unchanged."));
+    AddWidget(path, "Hide Back Equipment and Scabbard", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.HideBackEquipment")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Hides stowed swords, shields, and the scabbard, even while a weapon is drawn.\n"
+            "Equipment held in the hands stays visible. Also applies to the pause-menu preview."));
     AddWidget(path, "Disable Bomb Billboarding", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Mods.DisableBombBillboarding")
         .Options(CheckboxOptions().Tooltip(
