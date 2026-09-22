@@ -34,6 +34,7 @@ extern void TradeAdult_GiveIndex(s32 index);
 extern SaveContext gSaveContext;
 extern s32 CVarGetInteger(const char* name, s32 defaultValue);
 extern f32 CVarGetFloat(const char* name, f32 defaultValue);
+extern u8 Player_ShouldHideBackEquipment(s32 limbIndex);
 
 // Cane of Byrna 3D model: blue-tinted variant of the Somaria cane, loaded from
 // soh.o2r (objects/object_somaria/g_byrna_cane_dl — shares the Somaria tri
@@ -1376,6 +1377,8 @@ void ExtEquip_DrawShieldDL(void* playVoid) {
 
 // Draw the ext shield on Link's back (sheath position)
 void ExtEquip_DrawShieldBackDL(void* playVoid) {
+    if (Player_ShouldHideBackEquipment(PLAYER_LIMB_SHEATH))
+        return;
     ExtEquip_DrawShieldCommon(playVoid, 1);
 }
 

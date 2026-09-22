@@ -4188,6 +4188,12 @@ bool gfx_set_timg_handler_rdp(F3DGfx** cmd0) {
     F3DGfx* cmd = *cmd0;
     uintptr_t i = (uintptr_t)gfx->SegAddr(cmd->words.w1);
 
+    // Validate before the OTR signature probe reads this address as a string.
+    // An unresolved, untagged segment (e.g. 0x08000000) is even but not readable.
+    if (!IsValidResolvedAddress(i)) {
+        return false;
+    }
+
     char* imgData = (char*)i;
     uint32_t texFlags = 0;
     RawTexMetadata rawTexMetdata = {};

@@ -36,12 +36,18 @@ Color_RGBA8 ColorRGBA8(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 }
 
 static const std::map<CosmeticGroup, const char*> sCosmeticGroupLabels = {
-    { COSMETICS_GROUP_PLAYER, "Player" }, { COSMETICS_GROUP_EFFECTS, "Effects" }, { COSMETICS_GROUP_TRAILS, "Trails" },
-    { COSMETICS_GROUP_HUD, "HUD" },       { COSMETICS_GROUP_BUTTONS, "Buttons" }, { COSMETICS_GROUP_MENUS, "Menus" },
+    { COSMETICS_GROUP_PLAYER, "Player" },       { COSMETICS_GROUP_EFFECTS, "Effects" },
+    { COSMETICS_GROUP_TRAILS, "Trails" },       { COSMETICS_GROUP_HUD, "HUD" },
+    { COSMETICS_GROUP_BUTTONS, "Buttons" },     { COSMETICS_GROUP_MENUS, "Menus" },
+    { COSMETICS_GROUP_ITEMS, "Dungeon Items" },
 };
 
 // clang-format off
 std::map<std::string, CosmeticOption> cosmeticOptions = {
+    COSMETIC_OPTION("Items.Woodfall",               "Woodfall",                 COSMETICS_GROUP_ITEMS,        ColorRGBA8(236, 120, 186, 255), false, true, false),
+    COSMETIC_OPTION("Items.Snowhead",               "Snowhead",                 COSMETICS_GROUP_ITEMS,        ColorRGBA8(129, 173,  70, 255), false, true, false),
+    COSMETIC_OPTION("Items.GreatBay",               "Great Bay",                COSMETICS_GROUP_ITEMS,        ColorRGBA8( 99,  90, 183, 255), false, true, false),
+    COSMETIC_OPTION("Items.StoneTower",             "Stone Tower",              COSMETICS_GROUP_ITEMS,        ColorRGBA8(177, 165,  83, 255), false, true, false),
     COSMETIC_OPTION("HUD.Hearts",                   "Hearts",                   COSMETICS_GROUP_HUD,          ColorRGBA8(255,  70,  50, 255), false, true, false),
     COSMETIC_OPTION("HUD.Magic",                    "Magic",                    COSMETICS_GROUP_HUD,          ColorRGBA8(  0, 200,   0, 255), false, true, false),
     COSMETIC_OPTION("HUD.SmallKey",                 "Small Key",                COSMETICS_GROUP_HUD,          ColorRGBA8(  0, 200, 230, 255), false, true, false),
@@ -975,6 +981,18 @@ void CosmeticEditorWindow::DrawElement() {
         if (ImGui::BeginTabItem("Link & Items")) {
             UIWidgets::Separator(true, true, 2.0f, 2.0f);
             CosmeticEditorDrawGroup(COSMETICS_GROUP_PLAYER, "Link");
+            UIWidgets::CVarCheckbox(
+                "Dungeon item colours", "gEnhancements.DungeonItemColors",
+                UIWidgets::CheckboxOptions()
+                    .Color(THEME_COLOR)
+                    .Tooltip("Use each dungeon's colour on its small keys, boss keys, maps and compass bodies. "
+                             "Shuffled items keep their owning dungeon's colour. Glass and gems stay clear."));
+            CosmeticEditorDrawGroup(COSMETICS_GROUP_ITEMS);
+            UIWidgets::CVarCheckbox(
+                "Bottle shimmer", "gEnhancements.BottleShimmer",
+                UIWidgets::CheckboxOptions()
+                    .Color(THEME_COLOR)
+                    .Tooltip("Add three subtle drifting motes around potions, bottled fairies and Poes."));
             ImGui::EndTabItem();
         }
 

@@ -91,6 +91,19 @@ extern u8 ExtEquip_IsOotMirrorSkinActive(void);
 extern u8 WeaponUpgrade_HasHammerAxe(void);
 extern u8 WeaponUpgrade_HasGreatFairy(void);
 
+// Apply after equipment/model overrides. The sheath limb carries the stowed sword,
+// shield, and empty scabbard; hand limbs are independent. Keep skeleton traversal
+// and collision setup intact by suppressing only the selected display list.
+u8 Player_ShouldHideBackEquipment(s32 limbIndex) {
+    return limbIndex == PLAYER_LIMB_SHEATH && CVarGetInteger("gEnhancements.HideBackEquipment", 0);
+}
+
+void Player_ApplyBackEquipmentVisibility(s32 limbIndex, Gfx** dList) {
+    if (Player_ShouldHideBackEquipment(limbIndex)) {
+        *dList = NULL;
+    }
+}
+
 typedef struct {
     /* 0x00 */ Vec3f unk_00;
     /* 0x0C */ Vec3f unk_0C;
@@ -3298,6 +3311,7 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
         }
     }
 
+    Player_ApplyBackEquipmentVisibility(limbIndex, dList);
     return false;
 }
 

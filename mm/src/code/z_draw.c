@@ -4,8 +4,10 @@
  */
 #include "global.h"
 #include "2s2h/BenGui/CosmeticEditor.h"
+#include "2s2h/Enhancements/ItemVisuals.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <libultraship/bridge/resourcebridge.h>
+#include "assets/objects/gameplay_keep/gameplay_keep.h"
 #include "assets/objects/object_gi_arrow/object_gi_arrow.h"
 #include "assets/objects/object_gi_arrowcase/object_gi_arrowcase.h"
 #include "assets/objects/object_gi_bean/object_gi_bean.h"
@@ -386,7 +388,122 @@ static DrawItemTableEntry sDrawItemTable[] = {
 // model actually loaded before we feed it to the interpreter.
 extern Gfx* ResourceMgr_LoadGfxByName(const char* path);
 
+s32 GetItem_DrawDungeonItem(PlayState* play, s16 drawId, s32 owner) {
+    static const Color_RGBA8 defaults[] = {
+        { 236, 120, 186, 255 },
+        { 129, 173, 70, 255 },
+        { 99, 90, 183, 255 },
+        { 177, 165, 83, 255 },
+    };
+    static const char* ids[] = { "Items.Woodfall", "Items.Snowhead", "Items.GreatBay", "Items.StoneTower" };
+    Color_RGBA8 color;
+    u8 strength;
+
+    if (!CVarGetInteger("gEnhancements.DungeonItemColors", 0) || owner < 0 || owner >= ARRAY_COUNT(defaults)) {
+        return false;
+    }
+    switch (drawId) {
+        case GID_KEY_SMALL:
+        case GID_KEY_BOSS:
+            strength = 192; // Retain some neutral metal highlights.
+            break;
+        case GID_DUNGEON_MAP:
+            strength = 96; // Keep parchment and markings readable.
+            break;
+        case GID_COMPASS:
+            strength = 176;
+            break;
+        default:
+            return false;
+    }
+    if (ResourceMgr_LoadGfxByName((const char*)sDrawItemTable[drawId].drawResources[0]) == NULL) {
+        return false;
+    }
+    color = defaults[owner];
+    color = CosmeticEditor_GetChangedColor(color.r, color.g, color.b, 255, ids[owner]);
+    OPEN_DISPS(play->state.gfxCtx);
+    gDPSetGrayscaleColor(POLY_OPA_DISP++, color.r, color.g, color.b, strength);
+    gSPGrayscale(POLY_OPA_DISP++, true);
+    CLOSE_DISPS(play->state.gfxCtx);
+
+    // Use the selected model's real draw, including its lighting/materials. No fixed-length
+    // copy or command-offset patch: short replacement display lists remain valid.
+    sDrawItemTable[drawId].drawFunc(play, drawId);
+
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    CLOSE_DISPS(play->state.gfxCtx);
+    // XLU is deliberately untouched: compass glass and the boss-key gem retain their material.
+    return true;
+}
+
+static s32 GetItem_BottleShimmerColor(s16 drawId, Color_RGBA8* color) {
+    switch (drawId) {
+        case GID_POTION_RED:
+            *color = CosmeticEditor_GetChangedColor(255, 70, 50, 255, "HUD.Hearts");
+            return true;
+        case GID_POTION_GREEN:
+            *color = CosmeticEditor_GetChangedColor(0, 200, 0, 255, "HUD.Magic");
+            return true;
+        case GID_POTION_BLUE:
+            *color = (Color_RGBA8){ 100, 160, 255, 255 };
+            return true;
+        case GID_FAIRY:
+        case GID_FAIRY_2:
+            *color = (Color_RGBA8){ 255, 160, 235, 255 };
+            return true;
+        case GID_POE:
+            *color = (Color_RGBA8){ 100, 0, 200, 255 };
+            return true;
+        case GID_BIG_POE:
+            *color = (Color_RGBA8){ 150, 200, 0, 255 };
+            return true;
+        default:
+            return false;
+    }
+}
+
+static void GetItem_DrawBottleShimmer(PlayState* play, s16 drawId) {
+    Color_RGBA8 color;
+    s32 i;
+
+    if (!CVarGetInteger("gEnhancements.BottleShimmer", 0) || !GetItem_BottleShimmerColor(drawId, &color) ||
+        ResourceMgr_LoadGfxByName(gEffSparklesDL) == NULL) {
+        return;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    gSPClearGeometryMode(POLY_XLU_DISP++, G_FOG | G_LIGHTING);
+
+    // Three local-space motes, evaluated from game time. Draw frequency and number of
+    // visible bottles cannot advance an effect pool, consume RNG, or accelerate the shimmer.
+    for (i = 0; i < 3; i++) {
+        u32 phase = (play->gameplayFrames + i * 43) & 127;
+        s16 angle = (s16)(play->gameplayFrames * 384 + i * 21845);
+        f32 fade = (phase < 64 ? phase : 128 - phase) / 64.0f;
+        f32 radius = (drawId == GID_FAIRY || drawId == GID_FAIRY_2) ? 23.0f : 29.0f;
+        f32 scale = 0.055f + 0.04f * fade;
+
+        Matrix_Push();
+        Matrix_Translate(Math_SinS(angle) * radius, -28.0f + phase * 0.5f, Math_CosS(angle) * radius, MTXMODE_APPLY);
+        Matrix_ReplaceRotation(&play->billboardMtxF);
+        Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0x80, 0x80, (color.r + 765) / 4, (color.g + 765) / 4, (color.b + 765) / 4,
+                        (u8)(112.0f * fade));
+        gDPSetEnvColor(POLY_XLU_DISP++, color.r, color.g, color.b, 0);
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_XLU_DISP++, gEffSparklesDL);
+        Matrix_Pop();
+    }
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 void GetItem_Draw(PlayState* play, s16 drawId) {
+    s32 owner = -1;
+    Color_RGBA8 shimmerColor;
+    s32 shimmer;
     // Guard against an out-of-range drawId and a get-item whose model resource does NOT resolve (a
     // missing/incompatible o2r, a missing asset, a rando/combo item without a resident object). Feeding
     // gSPDisplayList a display list the Fast3D interpreter can't resolve dereferences a bad address and
@@ -400,7 +517,40 @@ void GetItem_Draw(PlayState* play, s16 drawId) {
     if (primaryDL != NULL && ResourceMgr_LoadGfxByName((const char*)primaryDL) == NULL) {
         return; // primary model didn't load -> don't hand the interpreter a bad DL
     }
+    // Randomizer draws supply the true owner before this entry point. This fallback
+    // covers ordinary dungeon rewards; an overworld minimap index is never an owner.
+    switch (Play_GetOriginalSceneId(play->sceneId)) {
+        case SCENE_MITURIN:
+        case SCENE_MITURIN_BS:
+            owner = 0;
+            break;
+        case SCENE_HAKUGIN:
+        case SCENE_HAKUGIN_BS:
+            owner = 1;
+            break;
+        case SCENE_SEA:
+        case SCENE_SEA_BS:
+            owner = 2;
+            break;
+        case SCENE_INISIE_N:
+        case SCENE_INISIE_BS:
+            owner = 3;
+            break;
+    }
+    if (GetItem_DrawDungeonItem(play, drawId, owner)) {
+        return;
+    }
+    shimmer = CVarGetInteger("gEnhancements.BottleShimmer", 0) && GetItem_BottleShimmerColor(drawId, &shimmerColor);
+    if (shimmer) {
+        Matrix_Push();
+    }
     sDrawItemTable[drawId].drawFunc(play, drawId);
+    if (shimmer) {
+        // Some fairy draws leave a billboard transform behind. Motes use the incoming
+        // bottle transform, not the contents' billboard matrix.
+        Matrix_Pop();
+        GetItem_DrawBottleShimmer(play, drawId);
+    }
 }
 
 #ifdef COMBO_BUILD
