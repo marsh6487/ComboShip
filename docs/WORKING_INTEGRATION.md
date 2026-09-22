@@ -60,3 +60,17 @@ font appearance, pack removal/restart, OoT/MM transitions, and the combined
 Alt-assets/weather/audio configuration were not exercised here. Existing
 pack-specific runtime limitations remain as recorded in the stabilization notes;
 this integration does not claim general pause-crash or archive-mutex resolution.
+
+## Dungeon items and bottles candidate
+
+`poc/mm-dungeon-bottles-20260922` starts from the complete cumulative integration
+at `639b526150898cee98ffdd09ccfa6ccd6a40f8ba`. Every retained feature above remains
+in its base. It adds only scoped dungeon-item colours, optional bottle shimmer,
+the corresponding Cosmetic Editor controls, a model-pack builder and regression
+coverage. The generated Djipi hearts, HD fire, TP torches and TP dungeon/bottle
+O2R packs remain separate mod inputs.
+
+The dungeon/bottle candidate is tracked in draft PR #8. Production draw-command
+tests and independent review passed locally; full builds and configuration-specific
+runtime acceptance must be recorded separately. Its two new options start off
+under Cosmetic Editor > Link & Items.

@@ -97,6 +97,7 @@ jobs:
           python3 scripts/diagnostics/run_mm_audio_decoder_tests.py
           python3 scripts/diagnostics/run_mm_weather_tests.py
           python3 scripts/diagnostics/run_mm_custom_item_color_tests.py
+          python3 scripts/diagnostics/run_mm_item_visuals_tests.py
           python3 scripts/diagnostics/run_mm_gfx_patch_tests.py
 
       - name: 2Ship mod GUI fonts
