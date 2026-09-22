@@ -6,6 +6,13 @@ Cumulative working ref: `integration/shared-items-soh-20260921`
 
 Integration audit: 2026-09-22
 
+Follow-up candidate `poc/mm-back-equipment-reloaded-sky-20260922` starts at
+`639b526150898cee98ffdd09ccfa6ccd6a40f8ba` and adds the native MM hide-equipment
+option and opt-in OoT sky texture support. It retains the complete cumulative
+tree below. See `docs/stabilization/2026-09-22-mm-equipment-oot-sky.md` for
+installation, test evidence, and pending runtime acceptance. This candidate
+does not promote or replace the accepted baseline by implication.
+
 The working integration carries compatible features forward together. Start new
 integration work from the latest cumulative tree, preserve the accepted source
 branches, and record any feature deliberately left out. A branch being pushed or
