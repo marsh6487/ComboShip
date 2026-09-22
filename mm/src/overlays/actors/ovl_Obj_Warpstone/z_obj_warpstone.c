@@ -181,8 +181,9 @@ void ObjWarpstone_Draw(Actor* thisx, PlayState* play2) {
                      MTXMODE_APPLY);
         Matrix_Push();
         gDPPipeSync(POLY_XLU_DISP++);
-        gDPSetPrimColor(POLY_XLU_DISP++, 128, 128, 255, 255, 200, this->dyna.actor.home.rot.x);
-        gDPSetEnvColor(POLY_XLU_DISP++, 100, 200, 0, 255);
+        // Match the reconstructed 3DS-style owl: pale cyan #B8F8F8 over reference blue #72B0FA.
+        gDPSetPrimColor(POLY_XLU_DISP++, 128, 128, 184, 248, 248, this->dyna.actor.home.rot.x);
+        gDPSetEnvColor(POLY_XLU_DISP++, 114, 176, 250, 255);
         Matrix_RotateZF(BINANG_TO_RAD_ALT2((play->gameplayFrames * 1500) & 0xFFFF), MTXMODE_APPLY);
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
         gSPDisplayList(POLY_XLU_DISP++, gEffFlash1DL);
