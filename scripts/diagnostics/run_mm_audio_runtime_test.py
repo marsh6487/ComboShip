@@ -16,6 +16,7 @@ FUNCTIONS = {
                "AudioHeap_SearchPermanentCache", "AudioHeap_AllocPermanent"],
     "playback.c": ["AudioPlayback_GetInstrumentInner"],
     "seqplayer.c": ["AudioScript_SequencePlayerSetupChannels", "AudioScript_SelectChannelFont"],
+    "synthesis.c": [],  # Full translation-unit check; decoder tests exercise the streamed-sample branch.
     "../sequence.c": ["AudioSeq_ResolveSequence", "AudioSeq_StartSequence", "AudioSeq_QueueSeqCmd"],
 }
 

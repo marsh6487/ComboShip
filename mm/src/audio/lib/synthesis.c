@@ -1157,6 +1157,12 @@ Acmd* AudioSynth_ProcessSample(s32 noteIndex, NoteSampleState* sampleState, Note
                         numSamplesProcessed += numSamplesToLoadAdj;
                         dmemUncompressedAddrOffset1 = numSamplesToLoadAdj;
 
+                        // Custom samples decode asynchronously. Keep the cleared
+                        // buffer silent while pending, or if decoding failed.
+                        if (sampleAddr == NULL) {
+                            goto skip;
+                        }
+
                         if (((synthState->samplePosInt * 2) + (numSamplesToLoadAdj)*SAMPLE_SIZE) < sample->size) {
                             bytesToRead = (numSamplesToLoadAdj)*SAMPLE_SIZE;
                         } else {

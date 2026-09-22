@@ -110,6 +110,8 @@ CrowdControl* CrowdControl::Instance;
 #include "2s2h/resource/type/AudioSample.h"
 #include "2s2h/resource/type/AudioSequence.h"
 #include "2s2h/resource/type/AudioSoundFont.h"
+#include "2s2h/Enhancements/Audio/MMWeather.h"
+#include "2s2h/Enhancements/Audio/MMWeatherAudio.h"
 #include "2s2h/resource/type/CollisionHeader.h"
 #include "2s2h/resource/type/Cutscene.h"
 #include "2s2h/resource/type/Path.h"
@@ -1126,6 +1128,8 @@ void OTRAudio_Thread() {
                                            num_audio_samples);
         }
 
+        MMWeatherAudio_Mix(audio_buffer, num_audio_samples * AUDIO_FRAMES_PER_UPDATE);
+
         // Fleet Ship Combo: silence this game's output while it's the inactive one. The buffer
         // already holds the FULL mix (BGM + fanfare + ambience + SFX + SM64), so zeroing the used
         // span here mutes everything without stopping any sequence (positions keep advancing).
@@ -1147,6 +1151,7 @@ extern "C" void OTRAudio_Init() {
     ResourceMgr_LoadDirectory("audio");
 
     if (!audio.running) {
+        MMWeather_Reset();
         audio.running = true;
         audio.thread = std::thread(OTRAudio_Thread);
     }
@@ -1173,6 +1178,8 @@ extern "C" void OTRAudio_Exit() {
     if (audio.thread.joinable()) {
         audio.thread.join();
     }
+    MMWeather_Reset();
+    MMWeatherAudio_Shutdown();
 #ifndef COMBO_BUILD
     // In a combo build OTRAudio_Exit runs on every OOT<->MM transition, not just at shutdown. These
     // maps (gFontMap/gSequenceMap) + load-status arrays are populated once by AudioLoad_Init at boot
@@ -1312,6 +1319,7 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     AudioCollection::Instance = new AudioCollection();
     LoadGuiTextures();
     ModMenu_LoadArchives();
+    OTRGlobals::Instance->LoadModGuiFonts();
     BenGui::SetupGuiElements();
     ShipInit::InitAll();
 #ifdef COMBO_BUILD
@@ -2238,113 +2246,118 @@ extern "C" Gfx* ResourceMgr_LoadGfxByName(const char* path) {
 typedef struct {
     int index;
     Gfx instruction;
+    std::weak_ptr<Fast::DisplayList> resource;
 } GfxPatch;
 
 std::unordered_map<std::string, std::unordered_map<std::string, GfxPatch>> originalGfx;
 
-// Attention! This is primarily for cosmetics & bug fixes. For things like mods and model replacement you should be
-// using OTRs instead (When that is available). Index can be found using the commented out section below.
-extern "C" void ResourceMgr_PatchGfxByName(const char* path, const char* patchName, int index, Gfx instruction) {
-    auto res = std::static_pointer_cast<Fast::DisplayList>(
-        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path));
-
-    // Leaving this here for people attempting to find the correct Dlist index to patch
-    /*if (strcmp("__OTR__objects/object_gi_longsword/gGiBiggoronSwordDL", path) == 0) {
-        for (int i = 0; i < res->instructions.size(); i++) {
-            Gfx* gfx = (Gfx*)&res->instructions[i];
-            // Log all commands
-            // SPDLOG_INFO("index:{} command:{}", i, gfx->words.w0 >> 24);
-            // Log only SetPrimColors
-            if (gfx->words.w0 >> 24 == 250) {
-                SPDLOG_INFO("index:{} r:{} g:{} b:{} a:{}", i, _SHIFTR(gfx->words.w1, 24, 8), _SHIFTR(gfx->words.w1, 16,
-    8), _SHIFTR(gfx->words.w1, 8, 8), _SHIFTR(gfx->words.w1, 0, 8));
-            }
+static bool CanPatchGfx(const std::shared_ptr<Fast::DisplayList>& res, const char* path, const char* patchName,
+                        int index) {
+    // IsCustom alone is insufficient: binary replacement models can retain
+    // native metadata while containing fewer commands than the original list.
+    if (res != nullptr && res->GetInitData() != nullptr) {
+        if (res->GetInitData()->IsCustom) {
+            return false;
         }
-    }*/
+        if (index >= 0 && static_cast<size_t>(index) < res->Instructions.size()) {
+            return true;
+        }
+    }
 
-    // Index refers to individual gfx words, which are half the size on 32-bit
-    // if (sizeof(uintptr_t) < 8) {
-    // index /= 2;
-    // }
+    // Some cosmetic patches are requested every frame; report each rejected
+    // path/patch once without filling the log on every draw.
+    static std::unordered_map<std::string, std::unordered_map<std::string, bool>> reported;
+    if (reported[path].emplace(patchName, true).second) {
+        SPDLOG_WARN("[ResourceMgr] Skipping Gfx patch '{}' for '{}': unavailable display list or index {} outside {} "
+                    "instructions",
+                    patchName, path, index, res != nullptr ? res->Instructions.size() : 0);
+    }
+    return false;
+}
 
-    // Do not patch custom assets as they most likely do not have the same instructions as authentic assets
-    if (res->GetInitData()->IsCustom) {
+static void RestoreGfxPatch(const char* path, const char* patchName, const GfxPatch& patch) {
+    // A reload or alt-asset switch can resolve the same path to a different
+    // list. Restore only the instance that supplied the saved instruction.
+    auto res = patch.resource.lock();
+    if (res != nullptr && CanPatchGfx(res, path, patchName, patch.index)) {
+        res->Instructions[patch.index] = patch.instruction;
+    }
+}
+
+static void PatchGfxInstruction(const std::shared_ptr<Fast::DisplayList>& res, const char* path, const char* patchName,
+                                int index, Gfx instruction) {
+    auto& patches = originalGfx[path];
+    auto found = patches.find(patchName);
+    if (found == patches.end()) {
+        patches.emplace(patchName, GfxPatch{ index, res->Instructions[index], res });
+    } else if (found->second.resource.lock() != res || found->second.index != index) {
+        RestoreGfxPatch(path, patchName, found->second);
+        found->second = { index, res->Instructions[index], res };
+    }
+    res->Instructions[index] = instruction;
+}
+
+// Fixed indices are only appropriate for native-layout display lists.
+extern "C" void ResourceMgr_PatchGfxByName(const char* path, const char* patchName, int index, Gfx instruction) {
+    if (path == nullptr || patchName == nullptr) {
         return;
     }
-
-    Gfx* gfx = (Gfx*)&res->Instructions[index];
-
-    if (!originalGfx.contains(path) || !originalGfx[path].contains(patchName)) {
-        originalGfx[path][patchName] = { index, *gfx };
+    auto res = std::dynamic_pointer_cast<Fast::DisplayList>(
+        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path));
+    if (CanPatchGfx(res, path, patchName, index)) {
+        PatchGfxInstruction(res, path, patchName, index, instruction);
     }
-
-    *gfx = instruction;
 }
 
 extern "C" void ResourceMgr_PatchGfxCopyCommandByName(const char* path, const char* patchName, int destinationIndex,
                                                       int sourceIndex) {
-    auto res = std::static_pointer_cast<Fast::DisplayList>(
-        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path));
-
-    // Do not patch custom assets as they most likely do not have the same instructions as authentic assets
-    if (res->GetInitData()->IsCustom) {
+    if (path == nullptr || patchName == nullptr) {
         return;
     }
-
-    Gfx* destinationGfx = (Gfx*)&res->Instructions[destinationIndex];
-    Gfx sourceGfx = *(Gfx*)&res->Instructions[sourceIndex];
-
-    if (!originalGfx.contains(path) || !originalGfx[path].contains(patchName)) {
-        originalGfx[path][patchName] = { destinationIndex, *destinationGfx };
+    auto res = std::dynamic_pointer_cast<Fast::DisplayList>(
+        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path));
+    if (CanPatchGfx(res, path, patchName, destinationIndex) && CanPatchGfx(res, path, patchName, sourceIndex)) {
+        PatchGfxInstruction(res, path, patchName, destinationIndex, res->Instructions[sourceIndex]);
     }
-
-    *destinationGfx = sourceGfx;
 }
 
 extern "C" void ResourceMgr_UnpatchGfxByName(const char* path, const char* patchName) {
-    if (originalGfx.contains(path) && originalGfx[path].contains(patchName)) {
-        auto res = std::static_pointer_cast<Fast::DisplayList>(
-            Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path));
-
-        if (res->GetInitData()->IsCustom) {
-            return;
-        }
-
-        Gfx* gfx = (Gfx*)&res->Instructions[originalGfx[path][patchName].index];
-        *gfx = originalGfx[path][patchName].instruction;
-
-        originalGfx[path].erase(patchName);
+    if (path == nullptr || patchName == nullptr) {
+        return;
+    }
+    auto entry = originalGfx.find(path);
+    if (entry == originalGfx.end()) {
+        return;
+    }
+    auto patch = entry->second.find(patchName);
+    if (patch != entry->second.end()) {
+        RestoreGfxPatch(path, patchName, patch->second);
+        entry->second.erase(patch);
+    }
+    if (entry->second.empty()) {
+        originalGfx.erase(entry);
     }
 }
 
 extern "C" size_t ResourceMgr_GetPatchCountForDL(const char* path) {
-    if (originalGfx.contains(path)) {
+    if (path != nullptr && originalGfx.contains(path)) {
         return originalGfx[path].size();
     }
     return 0;
 }
 
 extern "C" void ResourceMgr_ResetAllPatchesForDL(const char* path) {
-    if (!originalGfx.contains(path)) {
+    if (path == nullptr) {
         return;
     }
-
-    auto res = std::static_pointer_cast<Fast::DisplayList>(
-        Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path));
-
-    // Iterate through all patches and restore original instructions
-    auto& patches = originalGfx[path];
-    for (auto it = patches.begin(); it != patches.end();) {
-        Gfx* gfx = (Gfx*)&res->Instructions[it->second.index];
-        *gfx = it->second.instruction;
-        // erase() returns the next iterator, allowing safe iteration during removal
-        it = patches.erase(it);
+    auto entry = originalGfx.find(path);
+    if (entry == originalGfx.end()) {
+        return;
     }
-
-    // Clean up empty map entry
-    if (patches.empty()) {
-        originalGfx.erase(path);
+    for (const auto& [patchName, patch] : entry->second) {
+        RestoreGfxPatch(path, patchName.c_str(), patch);
     }
+    originalGfx.erase(entry);
 }
 
 extern "C" char* ResourceMgr_LoadVtxArrayByName(const char* path) {
@@ -2617,6 +2630,41 @@ extern "C" void ResourceMgr_ClearSkeletons() {
 
 extern "C" s32* ResourceMgr_LoadCSByName(const char* path) {
     return (s32*)ResourceGetDataByName(path);
+}
+
+// GUI fonts are initially built before the per-game mod archives are mounted.
+// These optional paths let an enabled font pack replace the desktop/overlay
+// fonts after mounting. Removing the pack and restarting restores the defaults.
+void OTRGlobals::LoadModGuiFonts() {
+    const std::string standardPath = "fonts/mods/standard.ttf";
+    const std::string monoPath = "fonts/mods/mono.ttf";
+    auto archives = context->GetResourceManager()->GetArchiveManager();
+    bool hasStandard = archives->HasFile(standardPath);
+    bool hasMono = archives->HasFile(monoPath);
+    if (!hasStandard && !hasMono) {
+        return;
+    }
+
+    if (hasStandard) {
+        fontStandard = CreateFontWithSize(16.0f, standardPath);
+        fontStandardLarger = CreateFontWithSize(20.0f, standardPath);
+        fontStandardLargest = CreateFontWithSize(24.0f, standardPath);
+        ImGui::GetIO().FontDefault = fontStandardLarger;
+    }
+    if (hasMono) {
+        fontMono = CreateFontWithSize(16.0f, monoPath);
+        fontMonoLarger = CreateFontWithSize(20.0f, monoPath);
+        fontMonoLargest = CreateFontWithSize(24.0f, monoPath);
+    }
+
+    auto gui = context->GetWindow()->GetGui();
+    auto overlay = gui->GetGameOverlay();
+    const std::string& overlayPath = hasMono ? monoPath : standardPath;
+    // Retain the existing overlay choices so removing a pack cannot leave a
+    // saved font name that no longer exists. No user settings are rewritten.
+    overlay->LoadFont("Press Start 2P", 12.0f, overlayPath);
+    overlay->LoadFont("Fipps", 32.0f, overlayPath);
+    gui->RebuildFontTexture();
 }
 
 ImFont* OTRGlobals::CreateFontWithSize(float size, std::string fontPath) {

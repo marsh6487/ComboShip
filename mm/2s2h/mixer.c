@@ -113,17 +113,18 @@ void aOPUSdecImpl(void* source_addr, uint16_t dest_addr, uint16_t nbytes, struct
     int readSamples = 0;
     if (*decState == NULL) {
         *decState = op_open_memory(source_addr, size, NULL);
+        if (*decState == NULL) {
+            return;
+        }
     }
-    op_pcm_seek(*decState, pos);
-    int ret = op_read(*decState, BUF_S16(dest_addr), nbytes / 2, NULL);
-    if (ret < 0) {
+    if (op_pcm_seek(*decState, pos) < 0) {
         return;
     }
-    readSamples += ret;
     while (readSamples < nbytes / 2) {
-        ret = op_read(*decState, BUF_S16(dest_addr + readSamples * 2), (nbytes - readSamples * 2) / 2, NULL);
-        if (ret == 0)
+        int ret = op_read(*decState, BUF_S16(dest_addr + readSamples * 2), (nbytes - readSamples * 2) / 2, NULL);
+        if (ret <= 0) {
             break;
+        }
         readSamples += ret;
     }
 }

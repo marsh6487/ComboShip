@@ -81,7 +81,7 @@ jobs:
 
       - name: clang-format (clang-format-14)
         run: |
-          sudo apt-get update && sudo apt-get install -y clang-format-14 nlohmann-json3-dev
+          sudo apt-get update && sudo apt-get install -y clang-format-14 nlohmann-json3-dev libogg-dev libvorbis-dev pkg-config
           ./run-clang-format.sh
           git diff --exit-code
 
@@ -90,10 +90,17 @@ jobs:
           python3 scripts/diagnostics/run_combo_shared_test.py --json-include /usr/include
           python3 scripts/diagnostics/run_combo_grant_tests.py --json-include /usr/include
 
-      - name: 2Ship scene randomization and streamed-audio regressions
+      - name: 2Ship weather, item-color, scene-randomization and streamed-audio regressions
         run: |
           python3 scripts/diagnostics/run_mm_scene_randomization_tests.py
           python3 scripts/diagnostics/run_mm_audio_runtime_test.py "$RUNNER_TEMP/mm-audio-runtime"
+          python3 scripts/diagnostics/run_mm_audio_decoder_tests.py
+          python3 scripts/diagnostics/run_mm_weather_tests.py
+          python3 scripts/diagnostics/run_mm_custom_item_color_tests.py
+          python3 scripts/diagnostics/run_mm_gfx_patch_tests.py
+
+      - name: 2Ship mod GUI fonts
+        run: python3 scripts/diagnostics/run_mm_mod_font_tests.py
 
       - name: Filter changed paths
         id: filter

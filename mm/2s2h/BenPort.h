@@ -70,6 +70,7 @@ class OTRGlobals {
     void RunExtract(int argc, char* argv[]);
     void Initialize();
     void ScaleImGui();
+    void LoadModGuiFonts();
 
   private:
     ImFont* CreateFontWithSize(float size, std::string fontPath = "");

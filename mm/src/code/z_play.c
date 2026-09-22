@@ -1,4 +1,5 @@
 #include "z64.h"
+#include "2s2h/Enhancements/Audio/MMWeather.h"
 #include <libultraship/log/luslog.h> // 2S2H [Port] LUSLOG_ERROR (transition guard)
 #include "regs.h"
 #include "functions.h"
@@ -478,6 +479,7 @@ void Play_Destroy(GameState* thisx) {
     KaleidoManager_Destroy();
     ZeldaArena_Cleanup();
 
+    MMWeather_Reset();
     GameInteractor_ExecuteOnPlayDestroy();
 
     // #region 2S2H [General] Making gPlayState available
@@ -1470,7 +1472,7 @@ void Play_DrawMain(PlayState* this) {
                     }
                 }
 
-                if (this->envCtx.precipitation[PRECIP_RAIN_CUR] != 0) {
+                if ((this->envCtx.precipitation[PRECIP_RAIN_CUR] != 0) || (MMWeather_RainDensity() > 0)) {
                     Environment_DrawRain(this, &this->view, gfxCtx);
                 }
             }

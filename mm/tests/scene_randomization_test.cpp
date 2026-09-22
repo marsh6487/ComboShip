@@ -68,11 +68,18 @@ static std::map<std::string, CosmeticOption> cosmeticOptions;
 Color_RGBA8 CVarGetColor(const char*, Color_RGBA8 color) {
     return color;
 }
+static bool modelOwnershipReady = false;
+static int cosmeticRefreshes = 0;
 void CosmeticEditorRefreshElement(const CosmeticOption&) {
+    // Native fixed-index callbacks must see custom-model ownership on their
+    // first invocation, before any replacement display list can be patched.
+    CHECK(modelOwnershipReady);
+    ++cosmeticRefreshes;
 }
 void CosmeticEditorSave() {
 }
 void RefreshDynamicCosmeticsStateIfNeeded() {
+    modelOwnershipReady = true;
 }
 void ApplyDynamicCosmetics() {
 }
@@ -111,9 +118,11 @@ static void ReloadScene() {
 }
 
 int main() {
+    cosmeticOptions.emplace("Player.GoronTunic", CosmeticOption{ "gCosmetic.Player.GoronTunic.Color", {}, {} });
     CosmeticEditorWindow window;
     window.InitElement();
     window.InitElement(); // GUI initialization must not duplicate the reload hook.
+    CHECK(cosmeticRefreshes == 1);
 
     ReloadScene();
     CHECK(cosmeticRandomizations == 0);
