@@ -99,6 +99,9 @@ jobs:
           python3 scripts/diagnostics/run_mm_custom_item_color_tests.py
           python3 scripts/diagnostics/run_mm_gfx_patch_tests.py
 
+      - name: 2Ship mod GUI fonts
+        run: python3 scripts/diagnostics/run_mm_mod_font_tests.py
+
       - name: Filter changed paths
         id: filter
         if: github.event_name == 'pull_request'
