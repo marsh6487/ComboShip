@@ -8,6 +8,7 @@
 #include "objects/object_sek/object_sek.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "BenPort.h"
 
 #define FLAGS (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY)
 
@@ -169,6 +170,22 @@ void ObjWarpstone_Draw(Actor* thisx, PlayState* play2) {
     ObjWarpstone* this = (ObjWarpstone*)thisx;
 
     Gfx_DrawDListOpa(play, sOwlStatueDLs[this->modelIndex]);
+    // POC3 supplies a separate glow list so soft eye/page halos blend after opaque geometry.
+    // Without that optional asset, the native owl rendering path is unchanged.
+    if ((this->modelIndex == SEK_MODEL_OPENED) &&
+        ResourceMgr_FileExists("objects/owl_reconstruction_poc3/gOwlStatueGlowDL")) {
+        Gfx* glowDL = ResourceMgr_LoadGfxByName("objects/owl_reconstruction_poc3/gOwlStatueGlowDL");
+
+        if (glowDL != NULL) {
+            OPEN_DISPS(play->state.gfxCtx);
+
+            Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+            MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+            gSPDisplayList(POLY_XLU_DISP++, glowDL);
+
+            CLOSE_DISPS(play->state.gfxCtx);
+        }
+    }
     if (this->dyna.actor.home.rot.x != 0) {
         OPEN_DISPS(play->state.gfxCtx);
 
