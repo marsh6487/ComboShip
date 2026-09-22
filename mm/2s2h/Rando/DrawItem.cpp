@@ -1,4 +1,6 @@
 #include "Rando/Rando.h"
+#include "Rando/DungeonItemVisuals.h"
+#include "2s2h/Enhancements/ItemVisuals.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/ShipInit.hpp"
 #include "2s2h/Rando/DrawFuncs.h"
@@ -2969,6 +2971,12 @@ void Rando::DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* 
     if (actor != NULL) {
         func_800B8118(actor, gPlayState, 0);
         func_800B8050(actor, gPlayState, 0);
+    }
+
+    const int dungeonOwner = DungeonItem_GetOwner(randoItemId);
+    if (dungeonOwner >= 0 &&
+        GetItem_DrawDungeonItem(gPlayState, Rando::StaticData::Items[randoItemId].drawId, dungeonOwner)) {
+        return;
     }
 
     switch (randoItemId) {
