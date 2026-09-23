@@ -10,7 +10,8 @@
 | New controls | Cosmetic Editor > HUD: `Double Defense Hearts` (`HUD.DDHearts`) and `Infinite Magic / Chateau Romani` (`HUD.InfiniteMagic`), each with exact hex, rainbow, random, lock and reset via the normal editor row. |
 | SoH drop port | Enhancements > Graphics > Other: `Drops Don't Despawn`, beside `3D Item Drops`. Uses SoH's existing `gCheats.DropsDontDie` setting (default off), preserving the collection popup while stopping uncollected-drop timeouts. Applies to 2D/3D and Twinmold arrow/magic drops. |
 | Indoor rain correction | Exclude the Mayor's Residence (`SCENE_SONCHONOIE`, classified indoors in `scene_table.h`) from enhanced outdoor weather even when its room exposes an outdoor skybox. All four rooms suppress enhanced rain, overcast, lightning and owned weather audio; Clock Town rain resumes on exit. |
-| Already included | MM already has `Unrestricted Items` under Enhancements > Cheats and `Enemy Health Bars` under Enhancements > Graphics. Verified menu CVars, registered hooks and inclusion in the MM CMake source glob; retained from the baseline. |
+| Unrestricted Items port | The existing MM checkbox under **2 Ship 2 Harkinian > Enhancements > Cheats** previously removed form restrictions only. It now also removes ordinary scene item restrictions, matching the requested SoH location behavior for B/C/D-pad. Time-song, minigame and special-mask rules remain native. |
+| Enemy Health Bars | MM already has its own implementation and checkbox under **2 Ship 2 Harkinian > Enhancements > Graphics > Other**. Verified its MM actor-health and interface-draw hooks, inclusion in the 2ship build, and export into the MM tab; retained from the baseline. |
 | Compatibility | Before editing the new controls, DD retains the old Hearts-minus-55 color and Chateau retains the old Magic hue rotation. Edited colors apply directly. Reset returns to that fallback. DD white borders and HUD fade alpha stay native. Chateau styling applies only while the drank-Chateau flag is active; this does not grant infinite magic. |
 | Preservation | Base Hearts/Magic still drive native/custom 3D ground drops, ChuChu contents and red/green ChuChu colors. New upgrade rows affect the HUD separately. Custom texture pixels remain untouched; draw-color commands continue updating. No archive, geometry, collision, progression, engine-switching, or SoH source changes. Existing renderer invalidation APIs retain their behavior. Midna and chest size/contents work is inherited unchanged; native weather state is preserved. |
 | Status | Implemented; focused regression tests, source compile checks and independent review passed. Game FPS, GPU rendering and vanilla/Alt parity remain untested. Not accepted or promoted. |
@@ -108,6 +109,36 @@ clang-format 14.0.6 to changed MM source/test files, including the three files
 reported by CI, and reran the cosmetic, custom-item, drop-lifetime and weather
 regressions. This remains separate from full Windows/Linux build verification.
 
+## MM Unrestricted Items parity follow-up
+
+The user's clarification prompted a check of the actual SoH donor behavior,
+not just the matching checkbox names. SoH's `UnrestrictedItems.cpp` removes
+scene restrictions; MM's existing hook only overrides its form-item table.
+The MM checkbox now additionally bypasses the scene checks for the B button,
+trade items/bottles/ocarina, ordinary masks, pictograph box and other items in
+`Interface_UpdateButtonsPart2`, for both C-buttons and D-pad equips.
+
+The override reads the checkbox when computing button availability. It leaves
+the stored restriction fields intact, so disabling it restores restrictions on
+the next button update without re-entering the scene. Existing form/Deku-hookshot
+handling remains registered. Time-song rules, minigame and first-person locks,
+underwater rules and special-mask checks retain their existing paths. The
+checkbox stays in MM's Cheats menu and its tooltip describes this behavior.
+
+`run_mm_unrestricted_items_tests.py` compiles and runs the production button
+update, scene table and form table against real MM headers. Before the change,
+its Mayor's Residence bow check failed with the cheat on and the button still
+disabled. It now verifies B/C/D-pad availability, same-scene on/off, all ordinary
+item restriction groups over 120 updates, unchanged restriction bytes (including
+song flags), and preserved special-state locks. The full changed C translation
+unit passes a real-header syntax check. The runner is included in the CI gate.
+
+The ComboShip menu exports the actual MM BenMenu tree and calls
+`MM_MenuApplyCVarChange` on edits. Its MM Enhancements sections are not filtered
+out or substituted with SoH's controls. Enemy Health Bars uses MM's own actor
+extensions and interface draw hook, including Twinmold and Majora handling.
+This is source verification, not a live gameplay observation.
+
 ## Decisive runtime check
 
 Use the same save, scene/camera, texture packs and graphics settings for a short
@@ -123,8 +154,10 @@ accepting visual parity.
 Enable `Drops Don't Despawn`, wait beyond the normal expiry, collect the drops,
 then switch the checkbox off and check expiry resumes. Include Twinmold's drops.
 For the rain fix, walk from rainy Clock Town into the Mayor's Residence, visit
-its rooms, then leave and verify outdoor rain resumes. Unrestricted Items and
-Enemy Health Bars can be enabled through their existing MM menu entries.
+its rooms, then leave and verify outdoor rain resumes. In the MM Cheats menu,
+toggle Unrestricted Items inside a building and verify ordinary weapons become
+usable, then become restricted again when unchecked. Enable Enemy Health Bars
+from the MM Graphics menu and target an enemy.
 
 Keep the `fcdf04b` build and existing packs as rollback. This candidate requires
 a new executable; it is not an asset-mod archive.

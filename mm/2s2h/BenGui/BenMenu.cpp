@@ -1079,7 +1079,8 @@ void BenMenu::AddEnhancements() {
         .Options(CheckboxOptions().Tooltip("Allows to Razor Sword to be used indefinitely without dulling its blade."));
     AddWidget(path, "Unrestricted Items", WIDGET_CVAR_CHECKBOX)
         .CVar("gCheats.UnrestrictedItems")
-        .Options(CheckboxOptions().Tooltip("Allows all Forms to use all Items."));
+        .Options(CheckboxOptions().Tooltip("Allows all Forms to use Items in normally restricted locations.\n"
+                                           "Time-song, minigame and special mask restrictions still apply."));
     AddWidget(path, "Hookshot Anywhere", WIDGET_CVAR_CHECKBOX)
         .CVar("gCheats.HookshotAnywhere")
         .Options(CheckboxOptions().Tooltip("Allows most surfaces to be hookshot-able."));
