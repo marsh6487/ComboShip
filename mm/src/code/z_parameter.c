@@ -5807,6 +5807,12 @@ void Magic_Update(PlayState* play) {
 void Magic_DrawMeter(PlayState* play) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
     s16 magicBarY;
+    // Chateau has its own exact hex/rainbow color. Unedited/reset preserves the
+    // existing blue (or hue-rotated Magic color) behavior.
+    s32 infiniteColorChanged = CVarGetInteger(CVAR_COSMETIC_CHANGED("HUD.InfiniteMagic"), 0);
+    const char* infiniteColorId =
+        infiniteColorChanged ? COSMETIC_ID("HUD.InfiniteMagic") : COSMETIC_ID("HUD.Magic");
+    u8 infiniteColorMode = infiniteColorChanged ? COSMETIC_COLOR_MODE_DEFAULT : COSMETIC_COLOR_MODE_ROTATE;
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -5882,7 +5888,7 @@ void Magic_DrawMeter(PlayState* play) {
             if (CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
                 // Blue magic
                 gDPSetPrimColorOverrideEx(OVERLAY_DISP++, 0, 0, 0, 0, 200, interfaceCtx->magicAlpha,
-                                          COSMETIC_ID("HUD.Magic"), COSMETIC_COLOR_MODE_ROTATE, 120.0f);
+                                          infiniteColorId, infiniteColorMode, 120.0f);
             } else {
                 // Green magic (default)
                 gDPSetPrimColorOverride(OVERLAY_DISP++, 0, 0, 0, 200, 0, interfaceCtx->magicAlpha,
@@ -5924,7 +5930,7 @@ void Magic_DrawMeter(PlayState* play) {
             if (CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
                 // Blue magic
                 gDPSetPrimColorOverrideEx(OVERLAY_DISP++, 0, 0, 0, 0, 200, interfaceCtx->magicAlpha,
-                                          COSMETIC_ID("HUD.Magic"), COSMETIC_COLOR_MODE_ROTATE, 120.0f);
+                                          infiniteColorId, infiniteColorMode, 120.0f);
             } else {
                 // Green magic (default)
                 gDPSetPrimColorOverride(OVERLAY_DISP++, 0, 0, 0, 200, 0, interfaceCtx->magicAlpha,

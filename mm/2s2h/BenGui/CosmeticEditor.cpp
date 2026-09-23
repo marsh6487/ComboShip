@@ -2,6 +2,7 @@
 #include "2s2h/BenGui/BenGui.hpp"
 #include "CosmeticEditor.h"
 #include "2s2h/ShipInit.hpp"
+#include <fast/Fast3dWindow.h>
 #ifdef COMBO_BUILD
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
@@ -27,7 +28,6 @@ Gfx* Gfx_DrawTexRectIA16_DropShadow(Gfx* gfx, TexturePtr texture, s16 textureWid
 Gfx* Gfx_DrawTexRectIA8_DropShadowOffset(Gfx* gfx, TexturePtr texture, s16 textureWidth, s16 textureHeight,
                                          s16 rectLeft, s16 rectTop, s16 rectWidth, s16 rectHeight, u16 dsdx, u16 dtdy,
                                          s16 r, s16 g, s16 b, s16 a, s32 masks, s32 rects);
-void gfx_texture_cache_clear();
 }
 
 Color_RGBA8 ColorRGBA8(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
@@ -49,7 +49,9 @@ std::map<std::string, CosmeticOption> cosmeticOptions = {
     COSMETIC_OPTION("Items.GreatBay",               "Great Bay",                COSMETICS_GROUP_ITEMS,        ColorRGBA8( 99,  90, 183, 255), false, true, false),
     COSMETIC_OPTION("Items.StoneTower",             "Stone Tower",              COSMETICS_GROUP_ITEMS,        ColorRGBA8(177, 165,  83, 255), false, true, false),
     COSMETIC_OPTION("HUD.Hearts",                   "Hearts",                   COSMETICS_GROUP_HUD,          ColorRGBA8(255,  70,  50, 255), false, true, false),
+    COSMETIC_OPTION("HUD.DDHearts",                 "Double Defense Hearts",    COSMETICS_GROUP_HUD,          ColorRGBA8(200,   0,   0, 255), false, true, false),
     COSMETIC_OPTION("HUD.Magic",                    "Magic",                    COSMETICS_GROUP_HUD,          ColorRGBA8(  0, 200,   0, 255), false, true, false),
+    COSMETIC_OPTION("HUD.InfiniteMagic",            "Infinite Magic / Chateau Romani", COSMETICS_GROUP_HUD,   ColorRGBA8(  0,   0, 200, 255), false, true, false),
     COSMETIC_OPTION("HUD.SmallKey",                 "Small Key",                COSMETICS_GROUP_HUD,          ColorRGBA8(  0, 200, 230, 255), false, true, false),
     COSMETIC_OPTION("HUD.RupeeIcon",                "Rupee Icon",               COSMETICS_GROUP_HUD,          ColorRGBA8(200, 255, 100, 255), false, true, false),
     COSMETIC_OPTION("HUD.Minimap",                  "Minimap",                  COSMETICS_GROUP_HUD,          ColorRGBA8(  0, 255, 255, 160), false, true, false),
@@ -226,6 +228,16 @@ Gfx disableGrayscale[] = {
 // and shades it lighter or darker based on the difference between the average color and the target color.
 void ShadePaletteNewBase(const PaletteTarget& target, uint32_t begin, uint32_t end, Color_RGBA8 newBase,
                          SHADE_MODE mode) {
+    // These resources include both raw RGBA16 textures and CI palettes. Expire
+    // only their GPU copies/dependents; rainbow must retain the scene cache.
+    auto window = std::dynamic_pointer_cast<Fast::Fast3dWindow>(Ship::Context::GetRawInstance()->GetWindow());
+    if (window != nullptr) {
+        if (auto interpreter = window->GetInterpreterWeak().lock()) {
+            interpreter->TextureCacheDelete(target.data);
+            interpreter->TextureCacheDeleteByPalette(target.data, (static_cast<size_t>(end) + 1) * sizeof(uint16_t));
+        }
+    }
+
     uint8_t* data = target.data;
 
     uint32_t maxR = 0;
@@ -389,6 +401,16 @@ void ShadeRGBA16NewBase(const char* path, uint32_t begin, uint32_t end, Color_RG
     PaletteTarget target = ResolvePaletteTarget(path);
     if (target.data == nullptr || target.original == nullptr) {
         return;
+    }
+
+    // Rainbow updates change these pickup pixels every tick. Expire only their
+    // GPU copies, including on reset; a full clear also evicts every scene/HD
+    // texture and the resolved-resource cache. Custom textures return above.
+    auto window = std::dynamic_pointer_cast<Fast::Fast3dWindow>(Ship::Context::GetRawInstance()->GetWindow());
+    if (window != nullptr) {
+        if (auto interpreter = window->GetInterpreterWeak().lock()) {
+            interpreter->TextureCacheDelete(target.data);
+        }
     }
 
     uint8_t* data = target.data;
@@ -1221,7 +1243,6 @@ static RegisterShipInitFunc humanHairPatch(
 
             ShadePaletteRevert("objects/object_link_child/object_link_child_Tex_005400", 0, 127);
         }
-        gfx_texture_cache_clear();
     },
     { kHumanHairOption.colorChangedCvar });
 
@@ -1261,7 +1282,6 @@ static void ApplyDekuTunicPatch() {
         UnpatchTunicSites(kDekuTunicSites, ARRAY_COUNT(kDekuTunicSites));
         ShadePaletteRevert(kDekuTunicPalette, 243, 254);
     }
-    gfx_texture_cache_clear();
 }
 
 static RegisterShipInitFunc dekuTunicPatch([]() { ApplyDekuTunicPatch(); }, { kDekuTunicOption.colorChangedCvar });
@@ -1301,7 +1321,6 @@ static RegisterShipInitFunc dekuHairPatch(
             ShadePaletteRevert("objects/object_link_nuts/object_link_nuts_TLUT_003EB0", 109, 122);
             ShadePaletteRevert("objects/object_link_nuts/object_link_nuts_TLUT_003EB0", 124, 242);
         }
-        gfx_texture_cache_clear();
     },
     { kDekuHairOption.colorChangedCvar });
 
@@ -1343,7 +1362,6 @@ static RegisterShipInitFunc kafeiHairPatch(
             ShadePaletteRevert("objects/object_test3/gKafeiBody2TLUT", 1, 3);
             ShadePaletteRevert("objects/object_test3/gKafeiBody2TLUT", 8, 255);
         }
-        gfx_texture_cache_clear();
     },
     { kKafeiHairOption.colorChangedCvar });
 
@@ -1384,7 +1402,6 @@ static void ApplyGoronTunicPatch() {
         ShadePaletteRevert(kGoronTunicPalette, 0, 127);
         ShadePaletteRevert(kGoronTunicBasePalette, 0, 127);
     }
-    gfx_texture_cache_clear();
 }
 
 static RegisterShipInitFunc goronTunicPatch([]() { ApplyGoronTunicPatch(); }, { kGoronTunicOption.colorChangedCvar });
@@ -1399,7 +1416,6 @@ static RegisterShipInitFunc goronTunicColor(
         }
 
         ShadePaletteNewBase(kGoronTunicBasePalette, 0, 127, changedColor, MODE_MAX);
-        gfx_texture_cache_clear();
     },
     { kGoronTunicOption.colorCvar });
 
@@ -1447,7 +1463,6 @@ void PlayerTunic_SetPerPlayerTint(bool enabled) {
     if (!IsCustomGoronModelActive()) {
         ShadePaletteWhite(kGoronTunicPalette, 0, 127, MODE_MAX);
     }
-    gfx_texture_cache_clear();
 }
 
 Color_RGBA8 PlayerTunic_ResolveLocalColor() {
@@ -1499,8 +1514,6 @@ static RegisterShipInitFunc zoraTunicColor(
         // Boomerangs
         ShadePaletteGradient("objects/gameplay_keep/gameplay_keep_Tex_0700B0", 80, 511, zoraTunicBaseColor,
                              changedColor, zoraSkinColor);
-
-        gfx_texture_cache_clear();
     },
     { kZoraTunicOption.colorCvar });
 
@@ -1520,8 +1533,6 @@ static RegisterShipInitFunc zoraTunicPatch(
 
         ShadePaletteRevert("objects/object_link_zora/object_link_zora_Tex_010228", 80, 511);
         ShadePaletteRevert("objects/gameplay_keep/gameplay_keep_Tex_0700B0", 80, 511);
-
-        gfx_texture_cache_clear();
     },
     { kZoraTunicOption.colorChangedCvar });
 
@@ -1587,7 +1598,6 @@ static RegisterShipInitFunc heartsColorDLPatch(
 
             ShadeRGBA16Revert("objects/gameplay_keep/gDropRecoveryHeartTex", 0, 1023);
         }
-        gfx_texture_cache_clear();
     },
     { kHeartsOption.colorChangedCvar });
 
@@ -1607,7 +1617,6 @@ static RegisterShipInitFunc heartsColorDLUpdate(
 
         Color_RGBA8 changedColor = CVarGetColor(kHeartsOption.colorCvar, {});
         ShadeRGBA16NewBase("objects/gameplay_keep/gDropRecoveryHeartTex", 0, 1023, changedColor, MODE_AVG);
-        gfx_texture_cache_clear();
     },
     { kHeartsOption.colorCvar });
 
@@ -1656,7 +1665,6 @@ static RegisterShipInitFunc magicColorDLPatch(
             ShadeRGBA16Revert("objects/gameplay_keep/gDropMagicSmallTex", 0, 1023);
             ShadeRGBA16Revert("objects/gameplay_keep/gDropMagicLargeTex", 0, 1023);
         }
-        gfx_texture_cache_clear();
     },
     { kMagicOption.colorChangedCvar });
 
@@ -1677,6 +1685,5 @@ static RegisterShipInitFunc magicColorDLUpdate(
         Color_RGBA8 changedColor = CVarGetColor(kMagicOption.colorCvar, {});
         ShadeRGBA16NewBase("objects/gameplay_keep/gDropMagicSmallTex", 0, 1023, changedColor, MODE_AVG);
         ShadeRGBA16NewBase("objects/gameplay_keep/gDropMagicLargeTex", 0, 1023, changedColor, MODE_AVG);
-        gfx_texture_cache_clear();
     },
     { kMagicOption.colorCvar });

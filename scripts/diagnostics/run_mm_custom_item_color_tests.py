@@ -22,6 +22,7 @@ def main():
                                 "GetItem_DrawOpa0", "GetItem_DrawXlu01"],
         "mm/src/code/z_en_item00.c": ["EnItem00_DrawHeartContainer", "EnItem00_DrawHeartPiece"],
         "mm/src/overlays/actors/ovl_Item_B_Heart/z_item_b_heart.c": ["ItemBHeart_Draw"],
+        "mm/2s2h/Enhancements/Graphics/3DItemDrops.cpp": ["EnItem00_3DItemsDraw", "DrawSlime3DItem"],
         "mm/2s2h/Rando/DrawItem.cpp": ["DrawDoubleDefense"],
     }
     for path, names in paths.items():
