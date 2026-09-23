@@ -95,6 +95,8 @@ jobs:
           python3 scripts/diagnostics/run_mm_scene_randomization_tests.py
           python3 scripts/diagnostics/run_mm_audio_runtime_test.py "$RUNNER_TEMP/mm-audio-runtime"
           python3 scripts/diagnostics/run_mm_audio_decoder_tests.py
+          python3 scripts/diagnostics/run_mm_audio_pcm_tests.py
+          MM_AUDIO_PCM_CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie" python3 scripts/diagnostics/run_mm_audio_pcm_tests.py
           python3 scripts/diagnostics/run_mm_weather_tests.py
           python3 scripts/diagnostics/run_mm_custom_item_color_tests.py
           python3 scripts/diagnostics/run_mm_item_visuals_tests.py

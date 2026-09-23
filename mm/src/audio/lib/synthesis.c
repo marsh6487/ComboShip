@@ -1173,8 +1173,8 @@ Acmd* AudioSynth_ProcessSample(s32 noteIndex, NoteSampleState* sampleState, Note
                             aOPUSdecImpl(sampleAddr, DMEM_UNCOMPRESSED_NOTE, bytesToRead, &synthState->opusFile,
                                          synthState->samplePosInt, sample->fileSize);
                         } else {
-                            aLoadBuffer(cmd++, sampleAddr + (synthState->samplePosInt * 2), DMEM_UNCOMPRESSED_NOTE,
-                                        bytesToRead);
+                            aLoadBufferExactImpl(sampleAddr + (synthState->samplePosInt * 2), DMEM_UNCOMPRESSED_NOTE,
+                                                 bytesToRead);
                         }
 
                         goto skip;
