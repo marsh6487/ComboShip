@@ -131,6 +131,17 @@ jobs:
           python3 scripts/diagnostics/run_oot_custom_cosmetics_tests.py
           python3 scripts/diagnostics/run_zora_barrier_cosmetics_tests.py
 
+      - name: Young Epona riding and independent Epona cosmetics
+        run: |
+          python3 scripts/diagnostics/run_young_epona_tests.py
+          python3 scripts/diagnostics/run_young_epona_actor_tests.py
+          python3 scripts/diagnostics/run_young_epona_player_tests.py
+          python3 scripts/diagnostics/run_young_epona_save_tests.py
+          python3 scripts/diagnostics/test_young_epona_assets.py
+          python3 scripts/diagnostics/run_epona_mask_tests.py
+          python3 scripts/diagnostics/run_epona_cosmetics_tests.py
+          python3 scripts/diagnostics/run_mm_epona_cosmetics_tests.py
+
       - name: Filter changed paths
         id: filter
         if: github.event_name == 'pull_request'

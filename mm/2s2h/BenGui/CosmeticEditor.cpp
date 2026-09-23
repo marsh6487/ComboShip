@@ -39,7 +39,7 @@ static const std::map<CosmeticGroup, const char*> sCosmeticGroupLabels = {
     { COSMETICS_GROUP_PLAYER, "Player" },       { COSMETICS_GROUP_EFFECTS, "Effects" },
     { COSMETICS_GROUP_TRAILS, "Trails" },       { COSMETICS_GROUP_HUD, "HUD" },
     { COSMETICS_GROUP_BUTTONS, "Buttons" },     { COSMETICS_GROUP_MENUS, "Menus" },
-    { COSMETICS_GROUP_ITEMS, "Dungeon Items" },
+    { COSMETICS_GROUP_ITEMS, "Dungeon Items" }, { COSMETICS_GROUP_EPONA, "Epona" },
 };
 
 // clang-format off
@@ -91,6 +91,9 @@ std::map<std::string, CosmeticOption> cosmeticOptions = {
     COSMETIC_OPTION("Player.GoronTunic",            "Goron Tunic",              COSMETICS_GROUP_PLAYER,       ColorRGBA8( 30, 105,  27, 255), false, true, false),
     COSMETIC_OPTION("Player.ZoraTunic",             "Zora Tunic",               COSMETICS_GROUP_PLAYER,       ColorRGBA8( 30, 105,  27, 255), false, true, false),
     COSMETIC_OPTION("Player.KafeiHair",             "Kafei Hair",               COSMETICS_GROUP_PLAYER,       ColorRGBA8( 64,   0, 163, 255), false, true, false),
+    COSMETIC_OPTION("Epona.Coat",                   "Coat",                     COSMETICS_GROUP_EPONA,        ColorRGBA8(173,  57,   0, 255), false, true, false),
+    COSMETIC_OPTION("Epona.Eyes",                   "Eyes",                     COSMETICS_GROUP_EPONA,        ColorRGBA8( 24,  24,  24, 255), false, true, false),
+    COSMETIC_OPTION("Epona.WhiteHair",              "White Hair (Mane / Forelock / Hooves)", COSMETICS_GROUP_EPONA, ColorRGBA8(255, 255, 255, 255), false, true, false),
 };
 // clang-format on
 
@@ -1015,6 +1018,12 @@ void CosmeticEditorWindow::DrawElement() {
                 UIWidgets::CheckboxOptions()
                     .Color(THEME_COLOR)
                     .Tooltip("Add three subtle drifting motes around potions, bottled fairies and Poes."));
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Epona")) {
+            UIWidgets::Separator(true, true, 2.0f, 2.0f);
+            CosmeticEditorDrawGroup(COSMETICS_GROUP_EPONA);
             ImGui::EndTabItem();
         }
 
