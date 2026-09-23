@@ -6,7 +6,13 @@ Cumulative working ref: `integration/shared-items-soh-20260921`
 
 Integration audit: 2026-09-22
 
-Current cumulative testing candidate: `poc/mm-dungeon-bottles-20260922`, draft
+Newest cumulative testing candidate: `poc/comboship-chests-midna-20260923`, based on
+the complete MM streamed-audio candidate `39b63af0`. It adds optional contents-based
+chests and independent default-off Midna companions in both engines. See
+[the candidate record](poc/2026-09-23-combo-chests-midna.md) for sources, packs,
+verification and runtime limits. This remains a testing candidate.
+
+The September 22 cumulative candidate was `poc/mm-dungeon-bottles-20260922`, draft
 [PR #8](https://github.com/marsh6487/ComboShip/pull/8). The September 22 correction
 combines the complete working integration with the dungeon/bottle changes,
 MM back-equipment and OoT-sky controls, and the separately published OoT

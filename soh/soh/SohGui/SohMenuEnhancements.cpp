@@ -7,6 +7,7 @@
 #include <soh/Enhancements/TimeDisplay/TimeDisplay.h>
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/Restorations/GetItemManipulation.h"
+#include "soh/Enhancements/audio/MidnaAudio.h"
 #include <ship/Context.h>
 
 extern "C" {
@@ -193,6 +194,11 @@ void SohMenu::AddMenuEnhancements() {
             "then asks if you want to Continue, Reset, or Reset to Spawn."));
 
     AddWidget(path, "Containers Match Contents", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Chest Size Matches Contents", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("ChestSizeMatchesContents"))
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Use large chests for major items, lesser items, health upgrades and boss keys, and small chests "
+            "for junk, small keys and Skulltula Tokens. Works independently of container textures."));
     AddWidget(path, "Containers Match Contents", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("ChestSizeAndTextureMatchContents"))
         .Callback([](WidgetInfo& info) {
@@ -639,6 +645,14 @@ void SohMenu::AddMenuEnhancements() {
         .Options(IntSliderOptions().Min(4).Max(6).DefaultValue(6).Tooltip(
             "Space between text characters (useful for HD font textures)."));
     AddWidget(path, "Models & Textures", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Midna Companion (Navi)", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("MidnaCompanion"))
+        .RaceDisable(false)
+        .Callback([](WidgetInfo&) { MidnaAudio_Reset(); })
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Replace Navi with Midna's model, animation and companion sounds. "
+            "Requires the Midna companion pack in mods/soh. Missing assets use Navi's normal appearance or sounds. "
+            "Turn off to restore Navi. Tatl has a separate checkbox in the MM menu."));
     AddWidget(path, "Disable LOD", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("DisableLOD"))
         .RaceDisable(false)

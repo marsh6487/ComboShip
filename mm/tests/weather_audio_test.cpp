@@ -36,6 +36,21 @@ extern "C" SoundFont* ResourceMgr_LoadAudioSoundFontByName(const char* path) {
 }
 
 static std::atomic<bool> gFscAudioMuted{ false };
+static bool midnaVoicePending = true;
+static int midnaMixCalls;
+static int midnaResetCalls;
+static void MMMidnaAudio_Mix(int16_t* buffer, size_t frames) {
+    ++midnaMixCalls;
+    if (midnaVoicePending) {
+        for (size_t i = 0; i < frames * 2; ++i) {
+            buffer[i] += 100;
+        }
+    }
+}
+static void MMMidnaAudio_Reset() {
+    ++midnaResetCalls;
+    midnaVoicePending = false;
+}
 static int16_t played[2];
 static void AudioPlayer_Play(uint8_t* buffer, size_t size) {
     assert(size == sizeof(played));
@@ -76,6 +91,7 @@ int main() {
     int16_t inactive[] = { 123, -123 };
     SubmitWeatherAudio(inactive, 1);
     assert(played[0] == 0 && played[1] == 0);
+    assert(midnaMixCalls == 1 && midnaResetCalls == 1 && !midnaVoicePending);
     gFscAudioMuted = false;
     for (int channel = 0; channel < 2; ++channel) {
         master = channel == 0 ? 0.0f : 1.0f;

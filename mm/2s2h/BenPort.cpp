@@ -34,6 +34,7 @@
 #include <time.h>
 #endif
 #include <ship/audio/AudioPlayer.h>
+#include "2s2h/Enhancements/Companion/MidnaAudio.h"
 #include "variables.h"
 #include "z64.h"
 #include "macros.h"
@@ -1129,11 +1130,13 @@ void OTRAudio_Thread() {
         }
 
         MMWeatherAudio_Mix(audio_buffer, num_audio_samples * AUDIO_FRAMES_PER_UPDATE);
+        MMMidnaAudio_Mix(audio_buffer, num_audio_samples * AUDIO_FRAMES_PER_UPDATE);
 
         // Fleet Ship Combo: silence this game's output while it's the inactive one. The buffer
         // already holds the FULL mix (BGM + fanfare + ambience + SFX + SM64), so zeroing the used
         // span here mutes everything without stopping any sequence (positions keep advancing).
         if (gFscAudioMuted.load(std::memory_order_relaxed)) {
+            MMMidnaAudio_Reset();
             memset(audio_buffer, 0, num_audio_samples * NUM_AUDIO_CHANNELS * AUDIO_FRAMES_PER_UPDATE * sizeof(int16_t));
         }
 
@@ -1152,6 +1155,7 @@ extern "C" void OTRAudio_Init() {
 
     if (!audio.running) {
         MMWeather_Reset();
+        MMMidnaAudio_Init();
         audio.running = true;
         audio.thread = std::thread(OTRAudio_Thread);
     }
@@ -1178,6 +1182,7 @@ extern "C" void OTRAudio_Exit() {
     if (audio.thread.joinable()) {
         audio.thread.join();
     }
+    MMMidnaAudio_Reset();
     MMWeather_Reset();
     MMWeatherAudio_Shutdown();
 #ifndef COMBO_BUILD

@@ -5,6 +5,10 @@
  */
 
 #include "z_en_elf.h"
+#include "2s2h/Enhancements/Companion/MidnaAudio.h"
+#include "2s2h/Enhancements/Companion/MidnaAudioResources.h"
+#include <libultraship/bridge/consolevariablebridge.h>
+#include <stdio.h>
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_UPDATE_DURING_OCARINA)
 
@@ -312,6 +316,45 @@ f32 func_8088CD3C(s32 colorFlag) {
     return 0.0f;
 }
 
+static void EnElf_UpdateMidnaIdleAudio(EnElf* this, PlayState* play) {
+    Player* player = GET_PLAYER(play);
+
+    if (this->actor.params != FAIRY_TYPE_0) {
+        return;
+    }
+    MMMidnaAudio_UpdateIdle(this->unk_244 == 0 && !(this->fairyFlags & 8) && this->actor.scale.x >= 0.0078f &&
+                            this->innerColor.a > 0.0f && this->unk_269 == 0 && fabsf(player->actor.speed) < 0.1f &&
+                            fabsf(player->speedXZ) < 0.1f && (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) &&
+                            !(player->stateFlags1 & (PLAYER_STATE1_TALKING | PLAYER_STATE1_PARALLEL |
+                                                     PLAYER_STATE1_100000 | PLAYER_STATE1_400)) &&
+                            player->focusActor == NULL && player->rideActor == NULL &&
+                            player->currentMask != PLAYER_MASK_GIANT && play->pauseCtx.state == 0 &&
+                            Message_GetState(&play->msgCtx) == TEXT_STATE_NONE && !Play_InCsMode(play) &&
+                            play->transitionTrigger == TRANS_TRIGGER_OFF && play->transitionMode == TRANS_MODE_OFF &&
+                            play->gameOverCtx.state == GAMEOVER_INACTIVE);
+}
+
+static void EnElf_UpdateMidnaBlink(EnElf* this, PlayState* play) {
+    Player* player = GET_PLAYER(play);
+
+    /* Only visible companion time advances the blink clock. Native draw gates
+     * still decide whether the model is drawn, including Giant's Mask/cues. */
+    if (this->actor.params == FAIRY_TYPE_0 && CVarGetInteger("gEnhancements.MidnaCompanionMM", 0) &&
+        this->unk_244 != 6 && !(this->fairyFlags & 8) && this->actor.scale.x >= 0.004f && this->innerColor.a > 0.0f &&
+        player->currentMask != PLAYER_MASK_GIANT &&
+        (!(player->stateFlags1 & PLAYER_STATE1_100000) || kREG(90) < this->actor.projectedPos.z) &&
+        (!Cutscene_IsCueInChannel(play, CS_CMD_ACTOR_CUE_201) ||
+         play->csCtx.actorCues[Cutscene_GetCueChannel(play, CS_CMD_ACTOR_CUE_201)]->id != 6)) {
+        this->midnaBlinkTimer = (this->midnaBlinkTimer + 1) % 200;
+    }
+}
+
+static void EnElf_PlayTatlSound(EnElf* this, MMMidnaAudioEvent event, u16 nativeSfx) {
+    if (this->actor.params != FAIRY_TYPE_0 || !MMMidnaAudio_TryPlay(event)) {
+        Actor_PlaySfx(&this->actor, nativeSfx);
+    }
+}
+
 void EnElf_Init(Actor* thisx, PlayState* play2) {
     PlayState* play = play2;
     EnElf* this = (EnElf*)thisx;
@@ -333,6 +376,7 @@ void EnElf_Init(Actor* thisx, PlayState* play2) {
     this->lightNodeNoGlow = LightContext_InsertLight(play, &play->lightCtx, &this->lightInfoNoGlow);
 
     this->fairyFlags = 0;
+    this->midnaBlinkTimer = 0;
     this->disappearTimer = 600;
     this->unk_240 = 0.0f;
     colorConfig = 0;
@@ -463,6 +507,10 @@ void EnElf_Init(Actor* thisx, PlayState* play2) {
 void EnElf_Destroy(Actor* thisx, PlayState* play) {
     s32 pad;
     EnElf* this = (EnElf*)thisx;
+
+    if (this->actor.params == FAIRY_TYPE_0) {
+        MMMidnaAudio_Reset();
+    }
 
     LightContext_RemoveLight(play, &play->lightCtx, this->lightNodeGlow);
     LightContext_RemoveLight(play, &play->lightCtx, this->lightNodeNoGlow);
@@ -875,6 +923,11 @@ void func_8088E60C(EnElf* this, PlayState* play) {
 
     Lights_PointGlowSetInfo(&this->lightInfoGlow, this->actor.world.pos.x, this->actor.world.pos.y,
                             this->actor.world.pos.z, 255, 255, 255, glowLightRadius);
+    /* Preserve local illumination; a usable companion mesh replaces the halo. */
+    if (this->actor.params == FAIRY_TYPE_0 && CVarGetInteger("gEnhancements.MidnaCompanionMM", 0) &&
+        MMMidnaResources_Load("objects/midna_navi/poc1/MidnaFloatDL") != NULL) {
+        this->lightInfoGlow.type = LIGHT_POINT_NOGLOW;
+    }
     this->unk_258 = Math_Atan2S_XY(this->actor.velocity.z, this->actor.velocity.x);
     Actor_SetScale(&this->actor, this->actor.scale.x);
 }
@@ -908,12 +961,12 @@ void func_8088E850(EnElf* this, PlayState* play) {
 
         if ((play->sceneId == SCENE_CLOCKTOWER) && (gSaveContext.sceneLayer == 0) && (play->csCtx.scriptIndex == 0) &&
             ((play->csCtx.curFrame == 149) || (play->csCtx.curFrame == 381) || (play->csCtx.curFrame == 591))) {
-            Actor_PlaySfx(&this->actor, NA_SE_EV_WHITE_FAIRY_DASH);
+            EnElf_PlayTatlSound(this, MM_MIDNA_AUDIO_DASH, NA_SE_EV_WHITE_FAIRY_DASH);
         }
 
         if ((play->sceneId == SCENE_SECOM) && (gSaveContext.sceneLayer == 0) && (play->csCtx.scriptIndex == 4) &&
             (play->csCtx.curFrame == 95)) {
-            Actor_PlaySfx(&this->actor, NA_SE_EV_WHITE_FAIRY_DASH);
+            EnElf_PlayTatlSound(this, MM_MIDNA_AUDIO_DASH, NA_SE_EV_WHITE_FAIRY_DASH);
         }
     } else {
         this->actor.shape.rot.x = 0;
@@ -996,7 +1049,7 @@ void func_8088E850(EnElf* this, PlayState* play) {
                         if (distFromLinksHead > 100.0f) {
                             this->fairyFlags |= 2;
                             if (this->unk_269 == 0) {
-                                Actor_PlaySfx(&this->actor, NA_SE_EV_BELL_DASH_NORMAL);
+                                EnElf_PlayTatlSound(this, MM_MIDNA_AUDIO_DASH, NA_SE_EV_BELL_DASH_NORMAL);
                             }
                             this->unk_25C = 100;
                         }
@@ -1066,7 +1119,7 @@ void func_8088EFA4(EnElf* this, PlayState* play) {
         this->unk_268 = 0;
         this->unk_238 = 1.0f;
         if (!this->unk_269) {
-            Actor_PlaySfx(&this->actor, NA_SE_EV_BELL_DASH_NORMAL);
+            EnElf_PlayTatlSound(this, MM_MIDNA_AUDIO_DASH, NA_SE_EV_BELL_DASH_NORMAL);
         }
     } else if (this->unk_268 == 0) {
         if ((tatlHoverActor == NULL) ||
@@ -1095,7 +1148,10 @@ void func_8088EFA4(EnElf* this, PlayState* play) {
         u16 targetSfxId = (this->unk_269 == 0) ? NA_SE_NONE : NA_SE_NONE;
 
         if (!temp) {
-            Actor_PlaySfx(&this->actor, targetSfxId);
+            MMMidnaAudioEvent event = tatlHoverActor->category == ACTORCAT_NPC     ? MM_MIDNA_AUDIO_TARGET_NPC
+                                      : tatlHoverActor->category == ACTORCAT_ENEMY ? MM_MIDNA_AUDIO_TARGET_ENEMY
+                                                                                   : MM_MIDNA_AUDIO_TARGET_OTHER;
+            EnElf_PlayTatlSound(this, event, targetSfxId);
         }
         this->fairyFlags |= 1;
     }
@@ -1151,7 +1207,7 @@ void func_8088F214(EnElf* this, PlayState* play) {
                             sp34 = 0;
                         } else if (!(player->stateFlags1 & PLAYER_STATE1_TALKING)) {
                             if (this->unk_269 == 0) {
-                                Actor_PlaySfx(&this->actor, NA_SE_EV_NAVY_VANISH);
+                                EnElf_PlayTatlSound(this, MM_MIDNA_AUDIO_VANISH, NA_SE_EV_NAVY_VANISH);
                             }
                             sp34 = 5;
                         } else {
@@ -1200,7 +1256,7 @@ void func_8088F214(EnElf* this, PlayState* play) {
                 if (!(player->stateFlags2 & PLAYER_STATE2_100000)) {
                     sp34 = 5;
                     if (this->unk_269 == 0) {
-                        Actor_PlaySfx(&this->actor, NA_SE_EV_NAVY_VANISH);
+                        EnElf_PlayTatlSound(this, MM_MIDNA_AUDIO_VANISH, NA_SE_EV_NAVY_VANISH);
                     }
                 }
                 break;
@@ -1210,7 +1266,7 @@ void func_8088F214(EnElf* this, PlayState* play) {
                     sp34 = 9;
                     this->unk_25C = 0x2A;
                     if (this->unk_269 == 0) {
-                        Actor_PlaySfx(&this->actor, NA_SE_EV_BELL_DASH_NORMAL);
+                        EnElf_PlayTatlSound(this, MM_MIDNA_AUDIO_APPEAR, NA_SE_EV_BELL_DASH_NORMAL);
                     }
                 } else if (player->stateFlags1 & PLAYER_STATE1_TALKING) {
                     player->stateFlags2 |= PLAYER_STATE2_100000;
@@ -1314,6 +1370,8 @@ void func_8088FC34(EnElf* this, PlayState* play) {
 
     Math_SmoothStepToS(&this->actor.shape.rot.y, this->unk_258, 5, 0x1000, 0x400);
     this->timer++;
+    EnElf_UpdateMidnaBlink(this, play);
+    EnElf_UpdateMidnaIdleAudio(this, play);
 
     if (this->unk_234 == NULL) {
         if (this->unk_264 & 0x20) {
@@ -1472,7 +1530,9 @@ void func_8089010C(Actor* thisx, PlayState* play) {
     }
 
     if (Actor_TalkOfferAccepted(thisx, &play->state)) {
-        Audio_PlaySfx_AtPosWithReverb(&gSfxDefaultPos, NA_SE_VO_NA_LISTEN, 0x20);
+        if (this->actor.params != FAIRY_TYPE_0 || !MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_TALK)) {
+            Audio_PlaySfx_AtPosWithReverb(&gSfxDefaultPos, NA_SE_VO_NA_LISTEN, 0x20);
+        }
         thisx->focus.pos = thisx->world.pos;
 
         if (thisx->textId == QuestHint_GetTatlTextId(play)) {
@@ -1518,6 +1578,8 @@ void func_8089010C(Actor* thisx, PlayState* play) {
 
     this->elfMsg = NULL;
     this->timer++;
+    EnElf_UpdateMidnaBlink(this, play);
+    EnElf_UpdateMidnaIdleAudio(this, play);
 
     if ((this->unk_240 >= 0.0f) && Environment_AdjustLights(play, SQ(this->unk_240) * this->unk_240,
                                                             player->actor.projectedPos.z + 780.0f, 0.2f, 0.5f)) {
@@ -1540,6 +1602,7 @@ void EnElf_Update(Actor* thisx, PlayState* play) {
 
     thisx->shape.rot.y = this->unk_258;
     this->timer++;
+    EnElf_UpdateMidnaBlink(this, play);
 
     if (this->fairyFlags & 0x200) {
         func_8088F9E4(thisx, play);
@@ -1576,6 +1639,154 @@ s32 EnElf_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* p
     return false;
 }
 
+static void EnElf_DrawMidnaShimmer(EnElf* this, PlayState* play, Gfx* shimmer, u8 alpha) {
+    s32 i;
+
+    OPEN_DISPS(play->state.gfxCtx);
+    gDPPipeSync(POLY_XLU_DISP++);
+    /* Vertex alpha shapes each mote. The fog blender would consume that
+     * channel as fog distance and flatten the mote's transparent edges. */
+    gDPSetRenderMode(POLY_XLU_DISP++, G_RM_PASS, G_RM_AA_ZB_XLU_SURF2);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, (u8)this->outerColor.r, (u8)this->outerColor.g, (u8)this->outerColor.b, 255);
+    for (i = 0; i < 6; ++i) {
+        s16 orbit = this->timer * 0x100 + i * 0x2AAA;
+        f32 pulse = 0.5f + 0.5f * Math_SinS(this->timer * 0x500 + i * 0x2AAA);
+        u8 moteAlpha = (u8)(alpha * 0.35f * pulse);
+
+        Matrix_Push();
+        /* The torso/legs carry the motes; the face and helmet stay clear.
+         * ReplaceRotation preserves the current emergence/cosmetic scale. */
+        Matrix_Translate(Math_CosS(orbit) * 1050.0f, -1650.0f + i * 255.0f + pulse * 70.0f, Math_SinS(orbit) * 650.0f,
+                         MTXMODE_APPLY);
+        Matrix_ReplaceRotation(&play->billboardMtxF);
+        gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, moteAlpha);
+        gSPMatrix(POLY_XLU_DISP++, Matrix_Finalize(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        gSPDisplayList(POLY_XLU_DISP++, shimmer);
+        Matrix_Pop();
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static Gfx* EnElf_GetMidnaBlinkModel(u16 timer, Gfx* openModel, s32* blinkState) {
+    /* First blink after 1.2 seconds out, then alternating 4.6/5.4 seconds
+     * out. Six update frames give a readable 300 ms close/reopen. */
+    s32 phase = timer % 200;
+    s32 blinkFrame = phase >= 116 ? phase - 116 : phase - 24;
+    *blinkState = 0;
+    if (blinkFrame < 0 || blinkFrame > 5) {
+        return openModel;
+    }
+    /* Blink atlases are optional POC2 additions. A partial or failed load
+     * retains the original open eye and all existing POC2 presentation. */
+    if (MMMidnaResources_Exists("objects/midna_navi/poc2/BlinkHalfDL") &&
+        MMMidnaResources_Exists("objects/midna_navi/poc2/BlinkClosedDL") &&
+        MMMidnaResources_Exists("objects/midna_navi/poc2/DiffuseHalf") &&
+        MMMidnaResources_Exists("objects/midna_navi/poc2/DiffuseClosed")) {
+        Gfx* half = MMMidnaResources_Load("objects/midna_navi/poc2/BlinkHalfDL");
+        Gfx* closed = MMMidnaResources_Load("objects/midna_navi/poc2/BlinkClosedDL");
+        char* halfTexture = MMMidnaResources_Load("objects/midna_navi/poc2/DiffuseHalf");
+        char* closedTexture = MMMidnaResources_Load("objects/midna_navi/poc2/DiffuseClosed");
+        if (half != NULL && closed != NULL && halfTexture != NULL && closedTexture != NULL) {
+            *blinkState = blinkFrame == 2 || blinkFrame == 3 ? 2 : 1;
+            return *blinkState == 1 ? half : closed;
+        }
+    }
+    *blinkState = -1;
+    return openModel;
+}
+
+/* Private assets replace only the player companion. The shared fairy skeleton
+ * and every story, healing and collectible fairy retain their native paths. */
+static s32 EnElf_TryDrawMidna(EnElf* this, PlayState* play) {
+    static const char path[] = "objects/midna_navi/poc1/MidnaFloatDL";
+    Gfx* model;
+    Gfx* markings = NULL;
+    Gfx* shimmer = NULL;
+    Vtx* pose = NULL;
+    char posePath[64];
+    f32 alphaScale;
+    f32 cosmeticScale;
+    u8 alpha;
+    s32 blinkState = 0;
+
+    if (this->actor.params != FAIRY_TYPE_0 || !CVarGetInteger("gEnhancements.MidnaCompanionMM", 0) ||
+        !MMMidnaResources_Exists(path)) {
+        return false;
+    }
+    /* Resolve through the resource manager each draw; retaining a raw pointer
+     * here would outlive cache invalidation when assets are toggled/reloaded. */
+    model = MMMidnaResources_Load(path);
+    if (model == NULL) {
+        return false;
+    }
+
+    alphaScale = this->disappearTimer < 0 ? (this->disappearTimer * (7.0f / 6000.0f)) + 1.0f : 1.0f;
+    alphaScale = CLAMP(alphaScale, 0.0f, 1.0f);
+    alpha = (u8)(this->innerColor.a * alphaScale);
+    if (alpha == 0) {
+        return true;
+    }
+    /* Versioned POC2 additions are optional. Resolve every pointer through the
+     * resource manager on each draw so Alt/cache reloads cannot leave stale
+     * geometry. Partial packs fall back to the preserved POC1 mesh. */
+    snprintf(posePath, sizeof(posePath), "objects/midna_navi/poc2/Pose%02u", (u16)this->timer & 63);
+    if (MMMidnaResources_Exists("objects/midna_navi/poc2/BodyDL") &&
+        MMMidnaResources_Exists("objects/midna_navi/poc2/MarkingsDL") &&
+        MMMidnaResources_Exists("objects/midna_navi/poc2/ShimmerDL") &&
+        MMMidnaResources_Exists("objects/midna_navi/poc2/ShimmerVertices") &&
+        MMMidnaResources_Exists("objects/midna_navi/poc2/DiffuseNeutral") &&
+        MMMidnaResources_Exists("objects/midna_navi/poc2/MarkingsMask") && MMMidnaResources_Exists(posePath)) {
+        Gfx* animatedModel = MMMidnaResources_Load("objects/midna_navi/poc2/BodyDL");
+        Gfx* animatedMarkings = MMMidnaResources_Load("objects/midna_navi/poc2/MarkingsDL");
+        Gfx* animatedShimmer = MMMidnaResources_Load("objects/midna_navi/poc2/ShimmerDL");
+        Vtx* animatedPose = MMMidnaResources_Load(posePath);
+        Vtx* shimmerVertices = MMMidnaResources_Load("objects/midna_navi/poc2/ShimmerVertices");
+        char* diffuse = MMMidnaResources_Load("objects/midna_navi/poc2/DiffuseNeutral");
+        char* mask = MMMidnaResources_Load("objects/midna_navi/poc2/MarkingsMask");
+        if (animatedModel != NULL && animatedMarkings != NULL && animatedShimmer != NULL && animatedPose != NULL &&
+            shimmerVertices != NULL && diffuse != NULL && mask != NULL) {
+            model = animatedModel;
+            markings = animatedMarkings;
+            shimmer = animatedShimmer;
+            pose = animatedPose;
+        }
+    }
+    /* Same size for every player form: 60% of the original export, about 21.46
+     * world units including the helmet. Scale at draw time to preserve every
+     * packed vertex and avoid quantizing away tiny details. */
+    cosmeticScale = 0.6f;
+
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    /* The actor matrix already contains Tatl's emergence/vanish scale and
+     * movement. Add presentation-only sway without changing any actor state. */
+    Matrix_Push();
+    Matrix_Scale(cosmeticScale, cosmeticScale, cosmeticScale, MTXMODE_APPLY);
+    Matrix_RotateZF(Math_SinS(this->timer * 0x300) * 0.035f, MTXMODE_APPLY);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, alpha);
+    /* A partially faded mesh must not write depth over later translucent draws. */
+    gDPSetRenderMode(POLY_XLU_DISP++, G_RM_FOG_SHADE_A, alpha == 255 ? G_RM_AA_ZB_OPA_SURF2 : G_RM_AA_ZB_XLU_SURF2);
+    gSPMatrix(POLY_XLU_DISP++, Matrix_Finalize(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+    if (pose != NULL) {
+        gSPSegment(POLY_XLU_DISP++, 0x08, pose);
+        model = EnElf_GetMidnaBlinkModel(this->midnaBlinkTimer, model, &blinkState);
+    }
+    gSPDisplayList(POLY_XLU_DISP++, model);
+    if (markings != NULL) {
+        gDPPipeSync(POLY_XLU_DISP++);
+        /* Identical animated vertices and decal depth avoid detached markings
+         * or z fighting. Only the source's cyan circuitry is in this mask. */
+        gDPSetRenderMode(POLY_XLU_DISP++, G_RM_FOG_SHADE_A, G_RM_AA_ZB_XLU_DECAL2);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, (u8)this->innerColor.r, (u8)this->innerColor.g, (u8)this->innerColor.b,
+                        255);
+        gSPDisplayList(POLY_XLU_DISP++, markings);
+        EnElf_DrawMidnaShimmer(this, play, shimmer, alpha);
+    }
+    Matrix_Pop();
+    CLOSE_DISPS(play->state.gfxCtx);
+    return true;
+}
+
 void EnElf_Draw(Actor* thisx, PlayState* play) {
     EnElf* this = (EnElf*)thisx;
     Player* player = GET_PLAYER(play);
@@ -1587,6 +1798,9 @@ void EnElf_Draw(Actor* thisx, PlayState* play) {
             (!Cutscene_IsCueInChannel(play, CS_CMD_ACTOR_CUE_201) ||
              (play->csCtx.actorCues[Cutscene_GetCueChannel(play, CS_CMD_ACTOR_CUE_201)]->id != 6)) &&
             (!(player->stateFlags1 & PLAYER_STATE1_100000) || (kREG(90) < this->actor.projectedPos.z))) {
+            if (EnElf_TryDrawMidna(this, play)) {
+                return;
+            }
             Gfx* gfx = GRAPH_ALLOC(play->state.gfxCtx, 4 * sizeof(Gfx));
             f32 alphaScale;
             s32 envAlpha;
