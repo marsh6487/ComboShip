@@ -5810,8 +5810,7 @@ void Magic_DrawMeter(PlayState* play) {
     // Chateau has its own exact hex/rainbow color. Unedited/reset preserves the
     // existing blue (or hue-rotated Magic color) behavior.
     s32 infiniteColorChanged = CVarGetInteger(CVAR_COSMETIC_CHANGED("HUD.InfiniteMagic"), 0);
-    const char* infiniteColorId =
-        infiniteColorChanged ? COSMETIC_ID("HUD.InfiniteMagic") : COSMETIC_ID("HUD.Magic");
+    const char* infiniteColorId = infiniteColorChanged ? COSMETIC_ID("HUD.InfiniteMagic") : COSMETIC_ID("HUD.Magic");
     u8 infiniteColorMode = infiniteColorChanged ? COSMETIC_COLOR_MODE_DEFAULT : COSMETIC_COLOR_MODE_ROTATE;
 
     OPEN_DISPS(play->state.gfxCtx);
@@ -5887,8 +5886,8 @@ void Magic_DrawMeter(PlayState* play) {
             gDPPipeSync(OVERLAY_DISP++);
             if (CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
                 // Blue magic
-                gDPSetPrimColorOverrideEx(OVERLAY_DISP++, 0, 0, 0, 0, 200, interfaceCtx->magicAlpha,
-                                          infiniteColorId, infiniteColorMode, 120.0f);
+                gDPSetPrimColorOverrideEx(OVERLAY_DISP++, 0, 0, 0, 0, 200, interfaceCtx->magicAlpha, infiniteColorId,
+                                          infiniteColorMode, 120.0f);
             } else {
                 // Green magic (default)
                 gDPSetPrimColorOverride(OVERLAY_DISP++, 0, 0, 0, 200, 0, interfaceCtx->magicAlpha,
@@ -5929,8 +5928,8 @@ void Magic_DrawMeter(PlayState* play) {
             // Fill the whole meter with the normal magic color
             if (CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
                 // Blue magic
-                gDPSetPrimColorOverrideEx(OVERLAY_DISP++, 0, 0, 0, 0, 200, interfaceCtx->magicAlpha,
-                                          infiniteColorId, infiniteColorMode, 120.0f);
+                gDPSetPrimColorOverrideEx(OVERLAY_DISP++, 0, 0, 0, 0, 200, interfaceCtx->magicAlpha, infiniteColorId,
+                                          infiniteColorMode, 120.0f);
             } else {
                 // Green magic (default)
                 gDPSetPrimColorOverride(OVERLAY_DISP++, 0, 0, 0, 200, 0, interfaceCtx->magicAlpha,

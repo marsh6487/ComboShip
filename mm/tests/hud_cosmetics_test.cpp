@@ -22,55 +22,84 @@
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 using u8 = uint8_t;
 using f32 = float;
-struct Color_RGBA8 { uint8_t r, g, b, a; };
+struct Color_RGBA8 {
+    uint8_t r, g, b, a;
+};
 struct ImVec4 {
     float x, y, z, w;
-    ImVec4() : x(0), y(0), z(0), w(0) {}
-    ImVec4(float r, float g, float b, float a) : x(r), y(g), z(b), w(a) {}
+    ImVec4() : x(0), y(0), z(0), w(0) {
+    }
+    ImVec4(float r, float g, float b, float a) : x(r), y(g), z(b), w(a) {
+    }
 };
 
 namespace Fast {
-struct DisplayList { std::vector<Gfx> Instructions; };
+struct DisplayList {
+    std::vector<Gfx> Instructions;
+};
 #include "cache_types.inc"
 struct Interpreter {
     GfxTextureCache mTextureCache;
     std::unordered_map<const char*, int> mResolvedResourceCache;
-    struct { TextureCacheNode* mTextures[SHADER_MAX_TEXTURES]{}; } mRenderingState;
+    struct {
+        TextureCacheNode* mTextures[SHADER_MAX_TEXTURES]{};
+    } mRenderingState;
     void TextureCacheClear();
     void TextureCacheDelete(const uint8_t*);
     void TextureCacheDeleteByPalette(const uint8_t*, size_t);
 };
 #include "cache_production.inc"
-}
+} // namespace Fast
 static auto interpreter = std::make_shared<Fast::Interpreter>();
 
 // Resource/window services are the boundary. Cache eviction itself is production code.
 namespace Ship {
-struct Window { virtual ~Window() = default; };
+struct Window {
+    virtual ~Window() = default;
+};
 struct Resource {
-    struct { bool IsCustom = false; } init;
+    struct {
+        bool IsCustom = false;
+    } init;
     std::array<uint8_t, 2048> bytes{};
-    auto* GetInitData() { return &init; }
-    void* GetRawPointer() { return bytes.data(); }
+    auto* GetInitData() {
+        return &init;
+    }
+    void* GetRawPointer() {
+        return bytes.data();
+    }
 };
 struct ResourceManager {
     std::map<std::string, std::shared_ptr<Resource>> resources;
-    std::shared_ptr<Resource> LoadResource(const char* path) { return resources[path]; }
+    std::shared_ptr<Resource> LoadResource(const char* path) {
+        return resources[path];
+    }
 };
 struct Context {
     ResourceManager resources;
     std::shared_ptr<Window> window;
-    static Context* GetRawInstance() { static Context context; return &context; }
-    ResourceManager* GetResourceManager() { return &resources; }
-    std::shared_ptr<Window> GetWindow() { return window; }
+    static Context* GetRawInstance() {
+        static Context context;
+        return &context;
+    }
+    ResourceManager* GetResourceManager() {
+        return &resources;
+    }
+    std::shared_ptr<Window> GetWindow() {
+        return window;
+    }
 };
-}
+} // namespace Ship
 namespace Fast {
 struct Fast3dWindow : Ship::Window {
-    std::weak_ptr<Interpreter> GetInterpreterWeak() { return interpreter; }
+    std::weak_ptr<Interpreter> GetInterpreterWeak() {
+        return interpreter;
+    }
 };
+} // namespace Fast
+void gfx_texture_cache_clear() {
+    interpreter->TextureCacheClear();
 }
-void gfx_texture_cache_clear() { interpreter->TextureCacheClear(); }
 
 #include "hud_declarations.inc"
 static std::map<std::string, int> ints;
@@ -79,25 +108,50 @@ extern "C" int32_t CVarGetInteger(const char* key, int32_t fallback) {
     auto it = ints.find(key);
     return it == ints.end() ? fallback : it->second;
 }
-void CVarSetInteger(const char* key, int32_t value) { ints[key] = value; }
-float CVarGetFloat(const char*, float fallback) { return fallback; }
+void CVarSetInteger(const char* key, int32_t value) {
+    ints[key] = value;
+}
+float CVarGetFloat(const char*, float fallback) {
+    return fallback;
+}
 Color_RGBA8 CVarGetColor(const char* key, Color_RGBA8 fallback) {
     auto it = colors.find(key);
     return it == colors.end() ? fallback : it->second;
 }
-void CVarSetColor(const char* key, Color_RGBA8 color) { colors[key] = color; }
-static CosmeticOption& CosmeticEditor_GetOptionMutable(const char* id) { return cosmeticOptions.at(id); }
-static bool CosmeticEditorIsSuppressed(const char*) { return false; }
-static bool CosmeticEditorIsSuppressed(const CosmeticOption&) { return false; }
-void RefreshDynamicCosmeticsStateIfNeeded() {}
+void CVarSetColor(const char* key, Color_RGBA8 color) {
+    colors[key] = color;
+}
+static CosmeticOption& CosmeticEditor_GetOptionMutable(const char* id) {
+    return cosmeticOptions.at(id);
+}
+static bool CosmeticEditorIsSuppressed(const char*) {
+    return false;
+}
+static bool CosmeticEditorIsSuppressed(const CosmeticOption&) {
+    return false;
+}
+void RefreshDynamicCosmeticsStateIfNeeded() {
+}
 static bool customPlayer = false;
-bool IsCustomHumanModelActive() { return customPlayer; }
-bool IsCustomDekuModelActive() { return customPlayer; }
-bool IsCustomGoronModelActive() { return customPlayer; }
-bool IsCustomZoraModelActive() { return customPlayer; }
-bool IsCustomKafeiModelActive() { return customPlayer; }
-void ResourceMgr_PatchGfxByName(const char*, const char*, int, Gfx) {}
-void ResourceMgr_UnpatchGfxByName(const char*, const char*) {}
+bool IsCustomHumanModelActive() {
+    return customPlayer;
+}
+bool IsCustomDekuModelActive() {
+    return customPlayer;
+}
+bool IsCustomGoronModelActive() {
+    return customPlayer;
+}
+bool IsCustomZoraModelActive() {
+    return customPlayer;
+}
+bool IsCustomKafeiModelActive() {
+    return customPlayer;
+}
+void ResourceMgr_PatchGfxByName(const char*, const char*, int, Gfx) {
+}
+void ResourceMgr_UnpatchGfxByName(const char*, const char*) {
+}
 const char* kCosmeticRainbowSpeedCvar = "gCosmetics.RainbowSpeed";
 const char* kCosmeticRainbowSyncCvar = "gCosmetics.RainbowSync";
 int sCosmeticRainbowHue = 0;
@@ -120,8 +174,9 @@ static std::shared_ptr<Ship::Resource> resource(const char* path, bool custom = 
 }
 static void cache(const uint8_t* address, uint32_t size = 2048, const uint8_t* palette0 = nullptr,
                   const uint8_t* palette1 = nullptr) {
-    Fast::TextureCacheKey key{ address, { palette0, palette1 }, uint8_t(palette0 || palette1 ? G_IM_FMT_CI : G_IM_FMT_RGBA),
-                              2, 0, size };
+    Fast::TextureCacheKey key{
+        address, { palette0, palette1 }, uint8_t(palette0 || palette1 ? G_IM_FMT_CI : G_IM_FMT_RGBA), 2, 0, size
+    };
     auto& cache = interpreter->mTextureCache;
     auto [entry, added] = cache.map.emplace(key, Fast::TextureCacheValue{});
     if (added) {
@@ -143,7 +198,10 @@ static void selectColor(const char* id, Color_RGBA8 color, bool changed = true) 
 extern "C" void TestSetHudColor(const char* id, uint8_t r, uint8_t g, uint8_t b, int changed) {
     selectColor(id, { r, g, b, 255 }, changed);
 }
-extern "C" void TestResetHudColors() { ints.clear(); colors.clear(); }
+extern "C" void TestResetHudColors() {
+    ints.clear();
+    colors.clear();
+}
 extern "C" void TestHudDrawColors();
 
 static void TestAllRainbowCosmetics() {
@@ -189,7 +247,7 @@ static void TestAllRainbowCosmetics() {
         cache(shield->bytes.data());
         cache(boomerang->bytes.data());
         cache(&arm, 32, arms->bytes.data(), arms->bytes.data() + 256); // CI8, both halves
-        cache(&head, 32, nullptr, hat->bytes.data() + 256); // CI4 using the upper palette half
+        cache(&head, 32, nullptr, hat->bytes.data() + 256);            // CI4 using the upper palette half
         CosmeticEditorUpdateTick();
         REQUIRE(cached(&scene) && cached(&unrelatedCi) && cached(customTexture->bytes.data()));
         REQUIRE(interpreter->mResolvedResourceCache.size() == 1);

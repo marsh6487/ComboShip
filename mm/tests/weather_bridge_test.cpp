@@ -233,6 +233,50 @@ static void OutdoorOverrideRegression() {
     std::puts("PASS Termina Field, Woodfall and Clock Town outdoor overrides; view/lifecycle boundaries");
 }
 
+static void MayorsResidenceRegression() {
+    static PlayState play{};
+    Camera camera{};
+    play.cameraPtrs[0] = &camera;
+    play.skyboxId = SKYBOX_NORMAL_SKY;
+    play.envCtx.stormState = STORM_STATE_OFF;
+    gSaveContext.gameMode = GAMEMODE_NORMAL;
+    settings[MM_WEATHER_CVAR("Enabled")] = 1;
+    settings[MM_WEATHER_CVAR("Mode")] = 0;
+    settings[MM_WEATHER_CVAR("RainVolume")] = 100;
+    settings[MM_WEATHER_CVAR("Overcast")] = 1;
+    settings[MM_WEATHER_CVAR("Thunder")] = 1;
+    for (int mode = 0; mode < 2; ++mode) {
+        settings[MM_WEATHER_CVAR("Mode")] = mode;
+        play.sceneId = SCENE_TOWN;
+        for (int i = 0; i < 1200; ++i) {
+            MMWeather_Update(&play);
+        }
+        play.sceneId = SCENE_SONCHONOIE;
+        for (int room = 0; room < 4; ++room) {
+            play.roomCtx.curRoom.num = room;
+            for (auto sky : { SKYBOX_NORMAL_SKY, SKYBOX_3 }) {
+                play.skyboxId = sky;
+                const auto native = play.envCtx;
+                const int beforeDraws = rainDraws;
+                for (int i = 0; i < 1200; ++i) {
+                    MMWeather_Update(&play);
+                    DrawWeatherFromPlay(&play);
+                    assert(MMWeather_RainDensity() == 0 && rainGain == 0 && MMWeather_Overcast() == 0);
+                    assert(sMMWeatherLightningBolt.state == LIGHTNING_BOLT_INACTIVE);
+                }
+                assert(rainDraws == beforeDraws);
+                assert(std::memcmp(&native, &play.envCtx, sizeof(native)) == 0);
+            }
+        }
+    }
+    play.sceneId = SCENE_TOWN;
+    settings[MM_WEATHER_CVAR("Mode")] = 0;
+    AdvanceRain(&play);
+    assert(MMWeather_RainDensity() == 25 && rainGain > 0);
+    MMWeather_Reset();
+    std::puts("PASS Mayor's Residence rooms suppress enhanced rain/audio/overcast/lightning; Clock Town resumes");
+}
+
 static void SkyOverrideRegression() {
     static PlayState play{};
     Camera camera{};
@@ -410,4 +454,5 @@ int main() {
     SpinAttackRainRegression();
     OutdoorOverrideRegression();
     SkyOverrideRegression();
+    MayorsResidenceRegression();
 }

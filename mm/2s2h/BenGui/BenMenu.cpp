@@ -1509,6 +1509,11 @@ void BenMenu::AddEnhancements() {
     AddWidget(path, "3D Item Drops", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Graphics.3DItemDrops")
         .Options(CheckboxOptions().Tooltip("Makes item drops 3D"));
+    AddWidget(path, "Drops Don't Despawn", WIDGET_CVAR_CHECKBOX)
+        .CVar("gCheats.DropsDontDie")
+        .Options(CheckboxOptions().Tooltip("Keeps enemy, grass, pot and boss-arena drops from timing out.\n"
+                                           "Works with 2D and 3D drops. Items can still be collected normally, "
+                                           "and disappear when you leave the scene."));
     AddWidget(path, "Authentic Logo", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Graphics.AuthenticLogo")
         .Options(CheckboxOptions().Tooltip("Hide the game version and build details and display the authentic "

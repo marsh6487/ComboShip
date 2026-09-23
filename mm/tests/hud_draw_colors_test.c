@@ -15,23 +15,44 @@ static PlayState play;
 static s16 sMagicMeterOutlinePrimRed = 255, sMagicMeterOutlinePrimGreen = 255, sMagicMeterOutlinePrimBlue = 255;
 void TestSetHudColor(const char* id, u8 r, u8 g, u8 b, int changed);
 void TestResetHudColors(void);
-void FrameInterpolation_RecordOpenChild(const void* source, int line) {}
-void FrameInterpolation_RecordCloseChild(void) {}
-void Graph_OpenDisps(Gfx** refs, Gfx* vals, GraphicsContext* ctx, const char* file, s32 line) {}
-void Graph_CloseDisps(Gfx** refs, Gfx* vals, GraphicsContext* ctx, const char* file, s32 line) {}
-void gSPVertex(Gfx* command, uintptr_t vertices, int count, int first) { __gSPVertex(command, vertices, count, first); }
-void Gfx_SetupDL39_Overlay(GraphicsContext* ctx) {}
-void Gfx_SetupDL42_Overlay(GraphicsContext* ctx) {}
-void Mtx_SetTranslateScaleMtx(Mtx* mtx, f32 sx, f32 sy, f32 sz, f32 x, f32 y, f32 z) {}
-void HudEditor_SetActiveElement(HudEditorElementID id) { hudEditorActiveElement = id; }
-bool HudEditor_ShouldOverrideDraw(void) { return false; }
-f32 HudEditor_GetActiveElementScale(void) { return 1.0f; }
-void HudEditor_ModifyMatrixValues(f32* x, f32* y) {}
-void HudEditor_ModifyDrawValues(s16* x, s16* y, s16* w, s16* h, s16* dx, s16* dy) {}
-Gfx* Gfx_DrawTexRectIA8_DropShadow(Gfx* dl, TexturePtr tex, s16 tw, s16 th, s16 x, s16 y, s16 w, s16 h,
-                                 u16 dx, u16 dy, s16 r, s16 g, s16 b, s16 a) { return dl; }
-Gfx* Gfx_DrawTexRectIA8_DropShadowOffset(Gfx* dl, TexturePtr tex, s16 tw, s16 th, s16 x, s16 y, s16 w, s16 h,
-                                       u16 dx, u16 dy, s16 r, s16 g, s16 b, s16 a, s32 masks, s32 rects) { return dl; }
+void FrameInterpolation_RecordOpenChild(const void* source, int line) {
+}
+void FrameInterpolation_RecordCloseChild(void) {
+}
+void Graph_OpenDisps(Gfx** refs, Gfx* vals, GraphicsContext* ctx, const char* file, s32 line) {
+}
+void Graph_CloseDisps(Gfx** refs, Gfx* vals, GraphicsContext* ctx, const char* file, s32 line) {
+}
+void gSPVertex(Gfx* command, uintptr_t vertices, int count, int first) {
+    __gSPVertex(command, vertices, count, first);
+}
+void Gfx_SetupDL39_Overlay(GraphicsContext* ctx) {
+}
+void Gfx_SetupDL42_Overlay(GraphicsContext* ctx) {
+}
+void Mtx_SetTranslateScaleMtx(Mtx* mtx, f32 sx, f32 sy, f32 sz, f32 x, f32 y, f32 z) {
+}
+void HudEditor_SetActiveElement(HudEditorElementID id) {
+    hudEditorActiveElement = id;
+}
+bool HudEditor_ShouldOverrideDraw(void) {
+    return false;
+}
+f32 HudEditor_GetActiveElementScale(void) {
+    return 1.0f;
+}
+void HudEditor_ModifyMatrixValues(f32* x, f32* y) {
+}
+void HudEditor_ModifyDrawValues(s16* x, s16* y, s16* w, s16* h, s16* dx, s16* dy) {
+}
+Gfx* Gfx_DrawTexRectIA8_DropShadow(Gfx* dl, TexturePtr tex, s16 tw, s16 th, s16 x, s16 y, s16 w, s16 h, u16 dx, u16 dy,
+                                   s16 r, s16 g, s16 b, s16 a) {
+    return dl;
+}
+Gfx* Gfx_DrawTexRectIA8_DropShadowOffset(Gfx* dl, TexturePtr tex, s16 tw, s16 th, s16 x, s16 y, s16 w, s16 h, u16 dx,
+                                         u16 dy, s16 r, s16 g, s16 b, s16 a, s32 masks, s32 rects) {
+    return dl;
+}
 
 #include "hud_draw_production.inc"
 
@@ -50,8 +71,14 @@ static int hasColor(unsigned op, uint32_t rgba) {
     }
     return matches;
 }
-static void drawHearts(void) { beginDraw(); LifeMeter_Draw(&play); }
-static void drawMagic(void) { beginDraw(); Magic_DrawMeter(&play); }
+static void drawHearts(void) {
+    beginDraw();
+    LifeMeter_Draw(&play);
+}
+static void drawMagic(void) {
+    beginDraw();
+    Magic_DrawMeter(&play);
+}
 
 void TestHudDrawColors(void) {
     TestResetHudColors();
@@ -71,7 +98,7 @@ void TestHudDrawColors(void) {
     REQUIRE(hasColor(G_SETENVCOLOR, 0x2D5F91FF) == 3); // legacy subtract-55 fallback
     TestSetHudColor("HUD.DDHearts", 17, 34, 51, 1);
     drawHearts();
-    REQUIRE(hasColor(G_SETENVCOLOR, 0x112233FF) == 3); // full, beating and empty DD hearts
+    REQUIRE(hasColor(G_SETENVCOLOR, 0x112233FF) == 3);  // full, beating and empty DD hearts
     REQUIRE(hasColor(G_SETPRIMCOLOR, 0xFFFFFF4D) == 3); // white borders + native HUD fade
     gSaveContext.save.saveInfo.inventory.defenseHearts = 0;
     play.interfaceCtx.beatingHeartPrim[0] = 255;

@@ -1,4 +1,4 @@
-# MM rainbow HUD cache and separate upgrade colors
+# MM cosmetics, persistent drops and Mayor's Residence rain candidate
 
 | Field | Record |
 | --- | --- |
@@ -8,8 +8,11 @@
 | Source finding | `CosmeticEditorUpdateTick` invokes color callbacks each game update. Hearts/Magic recolor pickup textures, then clear the renderer's entire texture cache and resolved-resource cache, even when custom textures make recoloring return early. The expanded audit found the same per-tick clear in Goron and Zora tunic colors. |
 | Change | Invalidate only recolored raw texture addresses and cached textures that depend on modified palettes. Remove blanket cache clears from the cosmetic editor; shared recolor/reset helpers perform selective invalidation. Add a renderer palette-range eviction method for CI4/CI8 source pointers, including the upper palette half. |
 | New controls | Cosmetic Editor > HUD: `Double Defense Hearts` (`HUD.DDHearts`) and `Infinite Magic / Chateau Romani` (`HUD.InfiniteMagic`), each with exact hex, rainbow, random, lock and reset via the normal editor row. |
+| SoH drop port | Enhancements > Graphics > Other: `Drops Don't Despawn`, beside `3D Item Drops`. Uses SoH's existing `gCheats.DropsDontDie` setting (default off), preserving the collection popup while stopping uncollected-drop timeouts. Applies to 2D/3D and Twinmold arrow/magic drops. |
+| Indoor rain correction | Exclude the Mayor's Residence (`SCENE_SONCHONOIE`, classified indoors in `scene_table.h`) from enhanced outdoor weather even when its room exposes an outdoor skybox. All four rooms suppress enhanced rain, overcast, lightning and owned weather audio; Clock Town rain resumes on exit. |
+| Already included | MM already has `Unrestricted Items` under Enhancements > Cheats and `Enemy Health Bars` under Enhancements > Graphics. Verified menu CVars, registered hooks and inclusion in the MM CMake source glob; retained from the baseline. |
 | Compatibility | Before editing the new controls, DD retains the old Hearts-minus-55 color and Chateau retains the old Magic hue rotation. Edited colors apply directly. Reset returns to that fallback. DD white borders and HUD fade alpha stay native. Chateau styling applies only while the drank-Chateau flag is active; this does not grant infinite magic. |
-| Preservation | Base Hearts/Magic still drive native/custom 3D ground drops, ChuChu contents and red/green ChuChu colors. New upgrade rows affect the HUD separately. Custom texture pixels remain untouched; draw-color commands continue updating. No archive, geometry, collision, scene, actor, progression, audio, weather, engine-switching, or SoH source changes. Existing renderer invalidation APIs retain their behavior. |
+| Preservation | Base Hearts/Magic still drive native/custom 3D ground drops, ChuChu contents and red/green ChuChu colors. New upgrade rows affect the HUD separately. Custom texture pixels remain untouched; draw-color commands continue updating. No archive, geometry, collision, progression, engine-switching, or SoH source changes. Existing renderer invalidation APIs retain their behavior. Midna and chest size/contents work is inherited unchanged; native weather state is preserved. |
 | Status | Implemented; focused regression tests, source compile checks and independent review passed. Game FPS, GPU rendering and vanilla/Alt parity remain untested. Not accepted or promoted. |
 
 ## Evidence
@@ -75,6 +78,36 @@ regression runner is included in the CI gate.
 Archive/Alt-Assets reloads still use their existing cache reset outside the
 cosmetic editor. This fix does not change resource replacement behavior.
 
+## Persistent drops and indoor weather follow-up
+
+The SoH donor is `soh/soh/Enhancements/Cheats/DropsDontDie.cpp` and the
+`VB_ITEM00_TIMER_TICK` call in `soh/src/code/z_en_item00.c`. Its ground-drop
+guard maps from OoT `unk_154 <= 0` to MM `unk14C <= 0`; the lifetime timer maps
+from `unk_15A` to `unk152`. The separate 15-frame collection animation still
+finishes. Enabling the checkbox during a drop's blinking phase clears that mask.
+Turning it off resumes the timer. Placed-heart sentinels, out-of-world cleanup
+and normal collection remain unchanged. Twinmold's separate drop actor gets the
+same lifetime protection while ruin debris and sinking fragments still expire.
+
+`run_mm_drop_lifetime_tests.py` failed against the original update code, then
+passed the actual MM actor update functions with 1,000 updates for multiple
+ground-drop types in both 2D/3D settings, live on/off, blinking, collection,
+placed hearts, out-of-world cleanup, Twinmold drops and debris. Both changed
+C translation units also pass real-header syntax checks. Added to the CI gate.
+
+The weather controller previously inferred outdoor eligibility solely from the
+skybox/view state. A new production bridge test reproduced enhanced rain in
+`SCENE_SONCHONOIE` when an outdoor skybox is present, before adding the scene
+guard. It now covers all four rooms, both accepted outdoor skybox IDs, persistent
+and intermittent modes, rain draw calls, owned rain audio, overcast/lightning,
+native environment preservation and outdoor resumption. The full existing
+weather state, audio, sky, spin-attack and outdoor-override regressions pass.
+
+The first PR CI attempt stopped at clang-format. Applied the required
+clang-format 14.0.6 to changed MM source/test files, including the three files
+reported by CI, and reran the cosmetic, custom-item, drop-lifetime and weather
+regressions. This remains separate from full Windows/Linux build verification.
+
 ## Decisive runtime check
 
 Use the same save, scene/camera, texture packs and graphics settings for a short
@@ -86,6 +119,12 @@ ChuChu bodies and their 3D contents, then their dropped hearts/magic jars, follo
 the base Hearts/Magic hex/rainbow while DD/Chateau use their independent HUD rows.
 Repeat with the currently used Alt Assets setting and its control before
 accepting visual parity.
+
+Enable `Drops Don't Despawn`, wait beyond the normal expiry, collect the drops,
+then switch the checkbox off and check expiry resumes. Include Twinmold's drops.
+For the rain fix, walk from rainy Clock Town into the Mayor's Residence, visit
+its rooms, then leave and verify outdoor rain resumes. Unrestricted Items and
+Enemy Health Bars can be enabled through their existing MM menu entries.
 
 Keep the `fcdf04b` build and existing packs as rollback. This candidate requires
 a new executable; it is not an asset-mod archive.
