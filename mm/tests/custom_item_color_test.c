@@ -5,6 +5,7 @@
 #include "assets/objects/object_gi_heart/object_gi_heart.h"
 #include "assets/objects/gameplay_keep/gameplay_keep.h"
 #include "overlays/actors/ovl_Item_B_Heart/z_item_b_heart.h"
+#include "overlays/actors/ovl_En_Slime/z_en_slime.h"
 #include <stdio.h>
 #include <string.h>
 #include "2s2h/BenGui/CosmeticEditor.h"
@@ -32,6 +33,8 @@ static Mtx sMatrix;
 static EnItem00 sPickup;
 static ItemBHeart sBossHeart;
 static Actor sWarp;
+static Player sPlayer;
+static EnSlime sSlime;
 
 int32_t CVarGetInteger(const char* name, int32_t fallback) {
     if (!strcmp(name, "gCosmetic.HUD.Hearts.Changed"))
@@ -70,6 +73,22 @@ Mtx* Matrix_Finalize(GraphicsContext* gfx) {
 }
 void Matrix_Scale(f32 x, f32 y, f32 z, MatrixMode mode) {
 }
+void Matrix_RotateYS(s16 angle, MatrixMode mode) {
+}
+void FrameInterpolation_IgnoreActorMtx(void) {
+}
+void GetItem_Draw(PlayState* play, s16 drawId) {
+    // Dispatch boundary for the three production 3D drop entry points below.
+    // Their draw bodies and custom/native classification remain production code.
+    if (drawId == GID_RECOVERY_HEART) {
+        GetItem_DrawRecoveryHeart(play, drawId);
+    } else if (drawId == GID_MAGIC_JAR_SMALL || drawId == GID_MAGIC_JAR_BIG) {
+        GetItem_DrawOpa0(play, drawId);
+    } else {
+        fprintf(stderr, "Unexpected drop draw id %d\n", drawId);
+        ++sFailures;
+    }
+}
 s32 Object_GetSlot(ObjectContext* objectCtx, s16 objectId) {
     return 0;
 }
@@ -96,6 +115,7 @@ static void Reset(void) {
     sGfx.polyOpa.p = sOpa;
     sGfx.polyXlu.p = sXlu;
     sPlay.state.gfxCtx = &sGfx;
+    sPlay.actorCtx.actorLists[ACTORCAT_PLAYER].first = &sPlayer.actor;
 }
 static void CheckStreamWithBorder(const char* label, Gfx* begin, Gfx* end, const char* body, int tint, Color_RGB8 color,
                                   int whiteBorder) {
@@ -171,6 +191,31 @@ static void DrawCases(int tintHearts, int tintMagic) {
     DrawDoubleDefense();
     CheckStreamWithBorder("Double Defense white border and body", sXlu, sGfx.polyXlu.p, gGiHeartContainerDL, 1,
                           tintHearts ? sHeartsColor : (Color_RGB8){ 255, 0, 0 }, 1);
+
+    Reset();
+    sPickup.actor.params = ITEM00_RECOVERY_HEART;
+    EnItem00_3DItemsDraw(&sPickup.actor, &sPlay);
+    CheckStream("3D ground heart", sXlu, sGfx.polyXlu.p, gGiRecoveryHeartDL, tintHearts, sHeartsColor);
+    Reset();
+    sPickup.actor.params = ITEM00_MAGIC_JAR_SMALL;
+    EnItem00_3DItemsDraw(&sPickup.actor, &sPlay);
+    CheckStream("3D ground small magic", sOpa, sGfx.polyOpa.p, gGiMagicJarSmallDL, tintMagic, sMagicColor);
+    Reset();
+    sPickup.actor.params = ITEM00_MAGIC_JAR_BIG;
+    EnItem00_3DItemsDraw(&sPickup.actor, &sPlay);
+    CheckStream("3D ground large magic", sOpa, sGfx.polyOpa.p, gGiMagicJarLargeDL, tintMagic, sMagicColor);
+    Reset();
+    bool should = true;
+    sSlime.actor.params = EN_SLIME_TYPE_RED;
+    DrawSlime3DItem(&sSlime.actor, &should);
+    sFailures += should; // The 3D hook must replace the sprite draw.
+    CheckStream("red ChuChu 3D heart", sXlu, sGfx.polyXlu.p, gGiRecoveryHeartDL, tintHearts, sHeartsColor);
+    Reset();
+    should = true;
+    sSlime.actor.params = EN_SLIME_TYPE_GREEN;
+    DrawSlime3DItem(&sSlime.actor, &should);
+    sFailures += should;
+    CheckStream("green ChuChu 3D magic", sOpa, sGfx.polyOpa.p, gGiMagicJarSmallDL, tintMagic, sMagicColor);
 }
 int main(void) {
     sCustom = 1;

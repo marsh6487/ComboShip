@@ -5,6 +5,7 @@
 #include "overlays/actors/ovl_En_Elf/z_en_elf.h"
 #include "overlays/actors/ovl_En_Elforg/z_en_elforg.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 
@@ -495,12 +496,16 @@ void EnItem00_Update(Actor* thisx, PlayState* play) {
     s32 sp38 = player->stateFlags3 & PLAYER_STATE3_1000;
     s32 getItemId = GI_NONE;
     s32 params;
+    // Match SoH's ground-drop timer guard; the pickup popup must still expire.
+    bool preventDespawn = CVarGetInteger("gCheats.DropsDontDie", 0) && (this->unk14C <= 0);
 
-    if (this->unk152 > 0) {
+    if ((this->unk152 > 0) && !preventDespawn) {
         this->unk152--;
     }
 
-    if ((this->unk152 > 0) && (this->unk152 <= 40) && (this->unk14C <= 0)) {
+    if (preventDespawn) {
+        this->unk14E = 0; // Enabling during the blink phase must leave the drop visible.
+    } else if ((this->unk152 > 0) && (this->unk152 <= 40) && (this->unk14C <= 0)) {
         this->unk14E = this->unk152;
     }
 

@@ -608,6 +608,34 @@ void Interpreter::TextureCacheDelete(const uint8_t* origAddr) {
     }
 }
 
+void Interpreter::TextureCacheDeleteByPalette(const uint8_t* paletteAddr, size_t paletteSize) {
+    if (paletteAddr == nullptr || paletteSize == 0) {
+        return;
+    }
+
+    // CI8 cache keys can reference the second half of the source TLUT. Match
+    // the whole source range, rather than just the palette's base pointer.
+    const uintptr_t begin = reinterpret_cast<uintptr_t>(paletteAddr);
+    const auto usesPalette = [begin, paletteSize](const uint8_t* address) {
+        const uintptr_t value = reinterpret_cast<uintptr_t>(address);
+        return address != nullptr && value >= begin && value - begin < paletteSize;
+    };
+    for (auto it = mTextureCache.map.begin(); it != mTextureCache.map.end();) {
+        if (!usesPalette(it->first.palette_addrs[0]) && !usesPalette(it->first.palette_addrs[1])) {
+            ++it;
+            continue;
+        }
+        for (int j = 0; j < SHADER_MAX_TEXTURES; j++) {
+            if (mRenderingState.mTextures[j] == &*it) {
+                mRenderingState.mTextures[j] = nullptr;
+            }
+        }
+        mTextureCache.lru.erase(it->second.lru_location);
+        mTextureCache.free_texture_ids.push_back(it->second.texture_id);
+        it = mTextureCache.map.erase(it);
+    }
+}
+
 // Pick the per-line byte width for texture decode. Prefer the DRAM stride from
 // loaded_texture when it looks like real per-line info (differs from total size).
 // Fall back to the TMEM tile stride when loaded sizes match total (LoadBlock with

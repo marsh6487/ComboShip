@@ -45,7 +45,10 @@ extern "C" void MMWeather_Update(PlayState* play) {
     // Outdoor rain is an explicit presentation override. Room storm policy,
     // story lighting and native weather cannot stop it. In particular, both
     // held and quick spins adjust fog throughout the effect and its release.
-    const bool outdoorSky = play->skyboxId == SKYBOX_NORMAL_SKY || play->skyboxId == SKYBOX_3;
+    // The Mayor's Residence is an interior (scene_table.h), even when its
+    // room exposes an outdoor skybox. Keep all of its rooms out of global rain.
+    const bool outdoorSky =
+        play->sceneId != SCENE_SONCHONOIE && (play->skyboxId == SKYBOX_NORMAL_SKY || play->skyboxId == SKYBOX_3);
     const bool eligible = gSaveContext.gameMode == GAMEMODE_NORMAL && play->gameOverCtx.state == GAMEOVER_INACTIVE &&
                           outdoorSky && !play->envCtx.skyboxDisabled && camera != nullptr &&
                           !(camera->stateFlags & CAM_STATE_UNDERWATER);

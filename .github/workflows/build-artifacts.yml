@@ -107,6 +107,9 @@ jobs:
           MM_AUDIO_PCM_CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie" python3 scripts/diagnostics/run_mm_audio_pcm_tests.py
           python3 scripts/diagnostics/run_mm_weather_tests.py
           python3 scripts/diagnostics/run_mm_custom_item_color_tests.py
+          python3 scripts/diagnostics/run_mm_hud_cosmetics_tests.py
+          python3 scripts/diagnostics/run_mm_drop_lifetime_tests.py
+          python3 scripts/diagnostics/run_mm_unrestricted_items_tests.py
           python3 scripts/diagnostics/run_mm_item_visuals_tests.py
           python3 scripts/diagnostics/run_mm_gfx_patch_tests.py
 

@@ -2933,6 +2933,8 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
     Player* player = GET_PLAYER(play);
     s16 i;
     s16 restoreHudVisibility = false;
+    // Apply the location cheat at read sites so scene/song rules survive live toggles.
+    bool unrestrictedItems = CVarGetInteger("gCheats.UnrestrictedItems", 0);
 
     if (CHECK_EVENTINF(EVENTINF_41)) {
         // Related to swamp boat (non-minigame)?
@@ -3323,7 +3325,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
             }
 
             // Apply B button restriction
-            if (interfaceCtx->restrictions.bButton == 0) {
+            if (unrestrictedItems || interfaceCtx->restrictions.bButton == 0) {
                 if ((BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) == ITEM_BOW) ||
                     (BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) == ITEM_BOMB) ||
                     (BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) == ITEM_BOMBCHU)) {
@@ -3365,7 +3367,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                         gSaveContext.buttonStatus[EQUIP_SLOT_B] = BTN_ENABLED;
                     }
                 }
-            } else if (interfaceCtx->restrictions.bButton != 0) {
+            } else if (!unrestrictedItems && interfaceCtx->restrictions.bButton != 0) {
                 if ((BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) == ITEM_BOW) ||
                     (BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) == ITEM_BOMB) ||
                     (BUTTON_ITEM_EQUIP(CUR_FORM, EQUIP_SLOT_B) == ITEM_BOMBCHU)) {
@@ -3458,7 +3460,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                     }
                 } else {
                     // End of special item cases. Apply restrictions to buttons
-                    if (interfaceCtx->restrictions.tradeItems != 0) {
+                    if (!unrestrictedItems && interfaceCtx->restrictions.tradeItems != 0) {
                         if (((GET_CUR_FORM_BTN_ITEM(i) >= ITEM_MOONS_TEAR) &&
                              (GET_CUR_FORM_BTN_ITEM(i) <= ITEM_PENDANT_OF_MEMORIES)) ||
                             ((GET_CUR_FORM_BTN_ITEM(i) >= ITEM_BOTTLE) &&
@@ -3469,7 +3471,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                             }
                             gSaveContext.buttonStatus[i] = BTN_DISABLED;
                         }
-                    } else if (interfaceCtx->restrictions.tradeItems == 0) {
+                    } else if (unrestrictedItems || interfaceCtx->restrictions.tradeItems == 0) {
                         if (((GET_CUR_FORM_BTN_ITEM(i) >= ITEM_MOONS_TEAR) &&
                              (GET_CUR_FORM_BTN_ITEM(i) <= ITEM_PENDANT_OF_MEMORIES)) ||
                             ((GET_CUR_FORM_BTN_ITEM(i) >= ITEM_BOTTLE) &&
@@ -3482,7 +3484,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                         }
                     }
 
-                    if (interfaceCtx->restrictions.masks != 0) {
+                    if (!unrestrictedItems && interfaceCtx->restrictions.masks != 0) {
                         if ((GET_CUR_FORM_BTN_ITEM(i) >= ITEM_MASK_DEKU) &&
                             (GET_CUR_FORM_BTN_ITEM(i) <= ITEM_MASK_GIANT)) {
                             if (!gSaveContext.buttonStatus[i]) { // == BTN_ENABLED
@@ -3490,7 +3492,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                             }
                             gSaveContext.buttonStatus[i] = BTN_DISABLED;
                         }
-                    } else if (interfaceCtx->restrictions.masks == 0) {
+                    } else if (unrestrictedItems || interfaceCtx->restrictions.masks == 0) {
                         if ((GET_CUR_FORM_BTN_ITEM(i) >= ITEM_MASK_DEKU) &&
                             (GET_CUR_FORM_BTN_ITEM(i) <= ITEM_MASK_GIANT)) {
                             if (gSaveContext.buttonStatus[i] == BTN_DISABLED) {
@@ -3500,14 +3502,14 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                         }
                     }
 
-                    if (interfaceCtx->restrictions.pictoBox != 0) {
+                    if (!unrestrictedItems && interfaceCtx->restrictions.pictoBox != 0) {
                         if (GET_CUR_FORM_BTN_ITEM(i) == ITEM_PICTOGRAPH_BOX) {
                             if (!gSaveContext.buttonStatus[i]) { // == BTN_ENABLED
                                 restoreHudVisibility = true;
                             }
                             gSaveContext.buttonStatus[i] = BTN_DISABLED;
                         }
-                    } else if (interfaceCtx->restrictions.pictoBox == 0) {
+                    } else if (unrestrictedItems || interfaceCtx->restrictions.pictoBox == 0) {
                         if (GET_CUR_FORM_BTN_ITEM(i) == ITEM_PICTOGRAPH_BOX) {
                             if (gSaveContext.buttonStatus[i] == BTN_DISABLED) {
                                 restoreHudVisibility = true;
@@ -3516,7 +3518,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                         }
                     }
 
-                    if (interfaceCtx->restrictions.all != 0) {
+                    if (!unrestrictedItems && interfaceCtx->restrictions.all != 0) {
                         if (!((GET_CUR_FORM_BTN_ITEM(i) >= ITEM_MOONS_TEAR) &&
                               (GET_CUR_FORM_BTN_ITEM(i) <= ITEM_PENDANT_OF_MEMORIES)) &&
                             !((GET_CUR_FORM_BTN_ITEM(i) >= ITEM_BOTTLE) &&
@@ -3531,7 +3533,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                                 gSaveContext.buttonStatus[i] = BTN_DISABLED;
                             }
                         }
-                    } else if (interfaceCtx->restrictions.all == 0) {
+                    } else if (unrestrictedItems || interfaceCtx->restrictions.all == 0) {
                         if (!((GET_CUR_FORM_BTN_ITEM(i) >= ITEM_MOONS_TEAR) &&
                               (GET_CUR_FORM_BTN_ITEM(i) <= ITEM_PENDANT_OF_MEMORIES)) &&
                             !((GET_CUR_FORM_BTN_ITEM(i) >= ITEM_BOTTLE) &&
@@ -3613,7 +3615,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                     }
                 } else {
                     // End of special item cases. Apply restrictions to buttons
-                    if (interfaceCtx->restrictions.tradeItems != 0) {
+                    if (!unrestrictedItems && interfaceCtx->restrictions.tradeItems != 0) {
                         if (((DPAD_GET_CUR_FORM_BTN_ITEM(j) >= ITEM_MOONS_TEAR) &&
                              (DPAD_GET_CUR_FORM_BTN_ITEM(j) <= ITEM_PENDANT_OF_MEMORIES)) ||
                             ((DPAD_GET_CUR_FORM_BTN_ITEM(j) >= ITEM_BOTTLE) &&
@@ -3624,7 +3626,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                             }
                             gSaveContext.shipSaveContext.dpad.status[j] = BTN_DISABLED;
                         }
-                    } else if (interfaceCtx->restrictions.tradeItems == 0) {
+                    } else if (unrestrictedItems || interfaceCtx->restrictions.tradeItems == 0) {
                         if (((DPAD_GET_CUR_FORM_BTN_ITEM(j) >= ITEM_MOONS_TEAR) &&
                              (DPAD_GET_CUR_FORM_BTN_ITEM(j) <= ITEM_PENDANT_OF_MEMORIES)) ||
                             ((DPAD_GET_CUR_FORM_BTN_ITEM(j) >= ITEM_BOTTLE) &&
@@ -3637,7 +3639,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                         }
                     }
 
-                    if (interfaceCtx->restrictions.masks != 0) {
+                    if (!unrestrictedItems && interfaceCtx->restrictions.masks != 0) {
                         if ((DPAD_GET_CUR_FORM_BTN_ITEM(j) >= ITEM_MASK_DEKU) &&
                             (DPAD_GET_CUR_FORM_BTN_ITEM(j) <= ITEM_MASK_GIANT)) {
                             if (!gSaveContext.shipSaveContext.dpad.status[j]) { // == BTN_ENABLED
@@ -3645,7 +3647,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                             }
                             gSaveContext.shipSaveContext.dpad.status[j] = BTN_DISABLED;
                         }
-                    } else if (interfaceCtx->restrictions.masks == 0) {
+                    } else if (unrestrictedItems || interfaceCtx->restrictions.masks == 0) {
                         if ((DPAD_GET_CUR_FORM_BTN_ITEM(j) >= ITEM_MASK_DEKU) &&
                             (DPAD_GET_CUR_FORM_BTN_ITEM(j) <= ITEM_MASK_GIANT)) {
                             if (gSaveContext.shipSaveContext.dpad.status[j] == BTN_DISABLED) {
@@ -3655,14 +3657,14 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                         }
                     }
 
-                    if (interfaceCtx->restrictions.pictoBox != 0) {
+                    if (!unrestrictedItems && interfaceCtx->restrictions.pictoBox != 0) {
                         if (DPAD_GET_CUR_FORM_BTN_ITEM(j) == ITEM_PICTOGRAPH_BOX) {
                             if (!gSaveContext.shipSaveContext.dpad.status[j]) { // == BTN_ENABLED
                                 restoreHudVisibility = true;
                             }
                             gSaveContext.shipSaveContext.dpad.status[j] = BTN_DISABLED;
                         }
-                    } else if (interfaceCtx->restrictions.pictoBox == 0) {
+                    } else if (unrestrictedItems || interfaceCtx->restrictions.pictoBox == 0) {
                         if (DPAD_GET_CUR_FORM_BTN_ITEM(j) == ITEM_PICTOGRAPH_BOX) {
                             if (gSaveContext.shipSaveContext.dpad.status[j] == BTN_DISABLED) {
                                 restoreHudVisibility = true;
@@ -3671,7 +3673,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                         }
                     }
 
-                    if (interfaceCtx->restrictions.all != 0) {
+                    if (!unrestrictedItems && interfaceCtx->restrictions.all != 0) {
                         if (!((DPAD_GET_CUR_FORM_BTN_ITEM(j) >= ITEM_MOONS_TEAR) &&
                               (DPAD_GET_CUR_FORM_BTN_ITEM(j) <= ITEM_PENDANT_OF_MEMORIES)) &&
                             !((DPAD_GET_CUR_FORM_BTN_ITEM(j) >= ITEM_BOTTLE) &&
@@ -3686,7 +3688,7 @@ void Interface_UpdateButtonsPart2(PlayState* play) {
                                 gSaveContext.shipSaveContext.dpad.status[j] = BTN_DISABLED;
                             }
                         }
-                    } else if (interfaceCtx->restrictions.all == 0) {
+                    } else if (unrestrictedItems || interfaceCtx->restrictions.all == 0) {
                         if (!((DPAD_GET_CUR_FORM_BTN_ITEM(j) >= ITEM_MOONS_TEAR) &&
                               (DPAD_GET_CUR_FORM_BTN_ITEM(j) <= ITEM_PENDANT_OF_MEMORIES)) &&
                             !((DPAD_GET_CUR_FORM_BTN_ITEM(j) >= ITEM_BOTTLE) &&
@@ -5807,6 +5809,11 @@ void Magic_Update(PlayState* play) {
 void Magic_DrawMeter(PlayState* play) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
     s16 magicBarY;
+    // Chateau has its own exact hex/rainbow color. Unedited/reset preserves the
+    // existing blue (or hue-rotated Magic color) behavior.
+    s32 infiniteColorChanged = CVarGetInteger(CVAR_COSMETIC_CHANGED("HUD.InfiniteMagic"), 0);
+    const char* infiniteColorId = infiniteColorChanged ? COSMETIC_ID("HUD.InfiniteMagic") : COSMETIC_ID("HUD.Magic");
+    u8 infiniteColorMode = infiniteColorChanged ? COSMETIC_COLOR_MODE_DEFAULT : COSMETIC_COLOR_MODE_ROTATE;
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -5881,8 +5888,8 @@ void Magic_DrawMeter(PlayState* play) {
             gDPPipeSync(OVERLAY_DISP++);
             if (CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
                 // Blue magic
-                gDPSetPrimColorOverrideEx(OVERLAY_DISP++, 0, 0, 0, 0, 200, interfaceCtx->magicAlpha,
-                                          COSMETIC_ID("HUD.Magic"), COSMETIC_COLOR_MODE_ROTATE, 120.0f);
+                gDPSetPrimColorOverrideEx(OVERLAY_DISP++, 0, 0, 0, 0, 200, interfaceCtx->magicAlpha, infiniteColorId,
+                                          infiniteColorMode, 120.0f);
             } else {
                 // Green magic (default)
                 gDPSetPrimColorOverride(OVERLAY_DISP++, 0, 0, 0, 200, 0, interfaceCtx->magicAlpha,
@@ -5923,8 +5930,8 @@ void Magic_DrawMeter(PlayState* play) {
             // Fill the whole meter with the normal magic color
             if (CHECK_WEEKEVENTREG(WEEKEVENTREG_DRANK_CHATEAU_ROMANI)) {
                 // Blue magic
-                gDPSetPrimColorOverrideEx(OVERLAY_DISP++, 0, 0, 0, 0, 200, interfaceCtx->magicAlpha,
-                                          COSMETIC_ID("HUD.Magic"), COSMETIC_COLOR_MODE_ROTATE, 120.0f);
+                gDPSetPrimColorOverrideEx(OVERLAY_DISP++, 0, 0, 0, 0, 200, interfaceCtx->magicAlpha, infiniteColorId,
+                                          infiniteColorMode, 120.0f);
             } else {
                 // Green magic (default)
                 gDPSetPrimColorOverride(OVERLAY_DISP++, 0, 0, 0, 200, 0, interfaceCtx->magicAlpha,
