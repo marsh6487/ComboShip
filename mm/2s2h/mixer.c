@@ -105,6 +105,18 @@ void aLoadBufferImpl(const void* source_addr, uint16_t dest_addr, uint16_t nbyte
 #endif
 }
 
+// Host-decoded PCM is not a native DMA transfer. Preserve partial 16-byte
+// chunks, as SoH does, so fractional-rate streams do not lose sample tails.
+void aLoadBufferExactImpl(const void* source_addr, uint16_t dest_addr, uint16_t nbytes) {
+#if __SANITIZE_ADDRESS__
+    for (size_t i = 0; i < nbytes; i++) {
+        BUF_U8(dest_addr)[i] = ((const unsigned char*)source_addr)[i];
+    }
+#else
+    memcpy(BUF_U8(dest_addr), source_addr, nbytes);
+#endif
+}
+
 #include <opus/opus.h>
 #include <opusfile.h>
 

@@ -67,7 +67,7 @@ static void CheckOpusLoad(const uint8_t* source, int position, size_t size) {
     ++opusLoads;
 }
 #define AudioSynth_ClearBuffer(cmd, dest, size) (cleared = true)
-#define aLoadBuffer(cmd, source, dest, size) CheckPcmLoad(source, size)
+#define aLoadBufferExactImpl(source, dest, size) CheckPcmLoad(source, size)
 #define aOPUSdecImpl(source, dest, count, state, pos, size) CheckOpusLoad(source, pos, size)
 static void PlayStreamedSample(Sample* sample, int position) {
     struct {
@@ -92,7 +92,7 @@ skip:
     assert(numSamplesProcessed == 16 && dmemUncompressedAddrOffset1 == 16);
 }
 #undef AudioSynth_ClearBuffer
-#undef aLoadBuffer
+#undef aLoadBufferExactImpl
 #undef aOPUSdecImpl
 
 // Inject documented libopusfile failures at the driver boundary, including an
