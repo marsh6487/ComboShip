@@ -90,6 +90,14 @@ jobs:
           python3 scripts/diagnostics/run_combo_shared_test.py --json-include /usr/include
           python3 scripts/diagnostics/run_combo_grant_tests.py --json-include /usr/include
 
+      - name: Contents-based chests and opt-in Midna
+        run: |
+          python3 scripts/diagnostics/run_chest_size_tests.py
+          python3 scripts/diagnostics/run_mm_chest_contents_tests.py
+          python3 scripts/diagnostics/run_midna_navi_draw_test.py
+          python3 scripts/diagnostics/run_midna_audio_test.py
+          python3 scripts/diagnostics/run_mm_midna_test.py
+
       - name: 2Ship weather, item-color, scene-randomization and streamed-audio regressions
         run: |
           python3 scripts/diagnostics/run_mm_scene_randomization_tests.py

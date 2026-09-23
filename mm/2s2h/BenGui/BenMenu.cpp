@@ -9,6 +9,7 @@
 #include "DeveloperTools/SaveEditor.h"
 #include "DeveloperTools/CollisionViewer.h"
 #include "2s2h/Enhancements/Enhancements.h"
+#include "2s2h/Enhancements/Companion/MidnaAudio.h"
 #include "2s2h/Enhancements/GfxPatcher/AuthenticGfxPatches.h"
 #include "2s2h/PresetManager/PresetManager.h"
 #include "2s2h/Network/Harpoon/Harpoon.h"
@@ -1423,6 +1424,23 @@ void BenMenu::AddEnhancements() {
         .CVar("gEnhancements.Graphics.24HoursClock")
         .Options(CheckboxOptions().Tooltip("Changes from a 12 Hour to a 24 Hour Clock."));
     AddWidget(path, "Mods", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Midna Companion (Tatl)", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.MidnaCompanionMM")
+        .Callback([](WidgetInfo&) { MMMidnaAudio_Reset(); })
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Replace Tatl with Midna's model, animation and companion sounds. "
+            "Requires the Midna companion pack in mods/2ship. Missing assets use Tatl's normal appearance or sounds. "
+            "Turn off to restore Tatl. Navi has a separate checkbox in the OoT menu."));
+    AddWidget(path, "Chest Style Matches Contents", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.ChestStyleMatchesContentsMM")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Use the installed 3DS chest models to show the type of item inside. "
+            "Requires the MM chest pack in mods/2ship. Boss-key chests keep the active pack's model."));
+    AddWidget(path, "Chest Size Matches Contents", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.ChestSizeMatchesContentsMM")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Display larger chests for important items and smaller chests for minor pickups. "
+            "Works independently of chest style."));
     AddWidget(path, "Use Alternate Assets", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Mods.AlternateAssets")
         .Options(CheckboxOptions().Tooltip(

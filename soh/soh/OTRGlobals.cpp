@@ -37,6 +37,7 @@
 #include <time.h>
 #endif
 #include <ship/audio/AudioPlayer.h>
+#include "Enhancements/audio/MidnaAudio.h"
 #include <ship/resource/archive/O2rArchive.h>
 #include <ship/utils/binarytools/MemoryStream.h>
 #include "Enhancements/speechsynthesizer/SpeechSynthesizer.h"
@@ -1350,11 +1351,13 @@ void OTRAudio_Thread() {
         }
 
         WeatherSamplePlayer_Mix(audio_buffer, total_frames);
+        MidnaAudio_Mix(audio_buffer, total_frames);
 
         // Fleet Ship Combo: silence OoT's output while it's the inactive game. audio_buffer holds
         // the COMPLETE post-mix output (synth + all mix-ins), so zeroing it mutes everything
         // without stopping any sequence (positions keep advancing -> bit-exact resume).
         if (gFscAudioMuted.load(std::memory_order_relaxed)) {
+            MidnaAudio_Reset();
             memset(audio_buffer, 0, total_samples * sizeof(int16_t));
         }
 
@@ -1431,6 +1434,7 @@ void OTRAudio_Init() {
     WeatherSamplePlayer_Init();
 
     if (!audio.running) {
+        MidnaAudio_Init();
         audio.running = true;
         audio.thread = std::thread(OTRAudio_Thread);
     }
@@ -1472,6 +1476,7 @@ extern "C" void OTRAudio_Exit() {
     if (audio.thread.joinable()) {
         audio.thread.join();
     }
+    MidnaAudio_Reset();
 #if 0
     for (size_t i = 0; i < sequenceMapSize; i++) {
         free(sequenceMap[i]);
