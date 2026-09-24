@@ -120,6 +120,8 @@ jobs:
         run: |
           GFX_TEXTURE_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_texture_address_tests.py
           python3 scripts/diagnostics/run_gfx_texture_address_tests.py --low-module
+          GFX_DL_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_display_list_address_tests.py
+          python3 scripts/diagnostics/run_alt_segment_binding_tests.py
 
       - name: 2Ship back equipment and OoT sky compatibility
         run: |
@@ -130,6 +132,17 @@ jobs:
         run: |
           python3 scripts/diagnostics/run_oot_custom_cosmetics_tests.py
           python3 scripts/diagnostics/run_zora_barrier_cosmetics_tests.py
+
+      - name: Young Epona riding and independent Epona cosmetics
+        run: |
+          python3 scripts/diagnostics/run_young_epona_tests.py
+          python3 scripts/diagnostics/run_young_epona_actor_tests.py
+          python3 scripts/diagnostics/run_young_epona_player_tests.py
+          python3 scripts/diagnostics/run_young_epona_save_tests.py
+          python3 scripts/diagnostics/test_young_epona_assets.py
+          python3 scripts/diagnostics/run_epona_mask_tests.py
+          python3 scripts/diagnostics/run_epona_cosmetics_tests.py
+          python3 scripts/diagnostics/run_mm_epona_cosmetics_tests.py
 
       - name: Filter changed paths
         id: filter

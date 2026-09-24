@@ -20,6 +20,7 @@
 #include <list>
 #include <stack>
 #include "fast/resource/type/Light.h"
+#include "fast/resource/type/DisplayList.h"
 
 #ifndef _LANGUAGE_C
 #define _LANGUAGE_C
@@ -3862,6 +3863,27 @@ static bool ComboIsUnresolvedSegmentTarget(const void* p) {
     return true;
 #endif
 }
+
+static F3DGfx* ComboResolveDisplayListTarget(uintptr_t address, F3DGfx* target) {
+    const uintptr_t offset = (address & 1) ? (address & 0x00FFFFFE) : 0;
+    const char* path = reinterpret_cast<const char*>(reinterpret_cast<uintptr_t>(target) - offset);
+    if (!gfx_check_image_signature(path)) {
+        return target;
+    }
+
+    // Player eye/mouth segments may carry OTR names. An Alt model can call
+    // these as display lists even when the host's cached lookup saw the vanilla
+    // texture. Resolve the current asset before dispatch, never execute its name
+    // (or a texture's pixels) as GBI. LoadResourceProcess checks Alt before cache.
+    auto resource = std::dynamic_pointer_cast<Fast::DisplayList>(ActiveResMgr()->LoadResourceProcess(path));
+    // Resolve the segment base first: applying an index to the OTR name would
+    // hide its signature and execute a suffix of the string as commands.
+    if (resource == nullptr || offset % sizeof(F3DGfx) != 0 ||
+        offset / sizeof(F3DGfx) >= resource->Instructions.size()) {
+        return nullptr;
+    }
+    return reinterpret_cast<F3DGfx*>(resource->Instructions.data()) + offset / sizeof(F3DGfx);
+}
 #endif
 
 // F3D, F3DEX, and F3DEX2 do the same thing but F3DEX2 has its own opcode number
@@ -3876,6 +3898,10 @@ bool gfx_dl_handler_common(F3DGfx** cmd0) {
             SPDLOG_ERROR("gfx_dl_handler_common: unresolved segment DL target {}; skipping", (void*)subGFX);
         }
         return false; // skip this DL; the main loop advances to the next command (see OTR-filepath skip)
+    }
+    subGFX = ComboResolveDisplayListTarget(cmd->words.w1, subGFX);
+    if (subGFX == nullptr) {
+        return false;
     }
 #endif
     if (C0(16, 1) == 0) {
@@ -3929,6 +3955,10 @@ bool gfx_dl_index_handler(F3DGfx** cmd0) {
         if (sReported.insert((uintptr_t)subGFX).second) {
             SPDLOG_ERROR("gfx_dl_index_handler: unresolved segment DL target {}; skipping", (void*)subGFX);
         }
+        return false;
+    }
+    subGFX = ComboResolveDisplayListTarget(segAddr, subGFX);
+    if (subGFX == nullptr) {
         return false;
     }
 #endif
