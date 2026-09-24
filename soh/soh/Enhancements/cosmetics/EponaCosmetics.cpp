@@ -5,6 +5,7 @@
 
 #include "global.h"
 #include "soh/cvar_prefixes.h"
+#include "soh/frame_interpolation.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <fast/resource/type/DisplayList.h>
 #include <ship/resource/ResourceManager.h>
@@ -166,7 +167,10 @@ std::vector<LimbSwap> DrawLimbs(Skin* skin) {
     return result;
 }
 
-void BindColors(PlayState* play, bool young, unsigned changed, bool tp) {
+} // namespace
+
+// OPEN_DISPS/CLOSE_DISPS redeclare C functions; keep their caller out of the anonymous namespace.
+static void BindColors(PlayState* play, bool young, unsigned changed, bool tp) {
     // Colors are the only rainbow data built each frame. Masks, texture data and limb lists are immutable.
     auto* lists = static_cast<Gfx*>(Graph_Alloc(play->state.gfxCtx, sizeof(Gfx) * 32));
     OPEN_DISPS(play->state.gfxCtx);
@@ -197,7 +201,6 @@ void BindColors(PlayState* play, bool young, unsigned changed, bool tp) {
     }
     CLOSE_DISPS(play->state.gfxCtx);
 }
-} // namespace
 
 extern "C" void EponaCosmetics_BeginDraw(PlayState* play, Skin* skin, s32 young) {
     // Each actor pairs this call with End, including unsupported/default paths.
