@@ -2044,18 +2044,17 @@ extern "C" char* ResourceMgr_LoadTexOrDListByName(const char* filePath) {
 }
 
 extern "C" char* ResourceMgr_LoadIfDListByName(const char* filePath) {
-    auto res = GetResourceByName(filePath);
-
-#ifdef COMBO_BUILD
-    // ComboShip: a miss returns null here; callers already treat a null return as "not a DList".
-    if (res == nullptr) {
+    if (filePath == nullptr) {
         return nullptr;
     }
-#endif
-    if (res->GetInitData()->Type == static_cast<uint32_t>(Fast::ResourceType::DisplayList))
-        return (char*)&((std::static_pointer_cast<Fast::DisplayList>(res))->Instructions[0]);
-
-    return nullptr;
+    // A cold Alt material DL can replace a cached native texture at this path.
+    // Resolve it before the regular lookup can return that texture from cache.
+    ResourceMgr_PreloadAltWhenItExists(filePath);
+    auto res = std::dynamic_pointer_cast<Fast::DisplayList>(GetResourceByName(filePath));
+    if (res == nullptr || res->Instructions.empty()) {
+        return nullptr;
+    }
+    return reinterpret_cast<char*>(res->Instructions.data());
 }
 
 // extern "C" Sprite* GetSeedTexture(uint8_t index) {

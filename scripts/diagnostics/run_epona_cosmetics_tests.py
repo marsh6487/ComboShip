@@ -188,6 +188,20 @@ def main():
         subprocess.run([os.environ.get("CXX", "c++"), *flags,
                         "soh/tests/epona_cosmetics_dl_test.cpp", "-o", str(binary)], cwd=ROOT, check=True)
         subprocess.run([str(binary)], check=True)
+        renderer = (ROOT / "libultraship/src/fast/interpreter.cpp").read_text()
+        renderer = re.sub(r"/\*.*?\*/", "", renderer, flags=re.S)
+        renderer_header = (ROOT / "libultraship/include/fast/interpreter.h").read_text()
+        types = renderer_header[renderer_header.index("enum {\n    SHADER_0"):
+                                renderer_header.index("#define SHADER_MAX_TEXTURES")]
+        types += re.search(r"struct ColorCombiner \{.*?\n};", renderer_header, re.S).group()
+        (Path(folder) / "epona_combiner_types.inc").write_text(types)
+        (Path(folder) / "epona_combiner_production.inc").write_text("\n".join(
+            function(renderer, name) for name in (
+                "Interpreter::GenerateCC", "Interpreter::GfxDpSetCombineMode", "color_comb", "alpha_comb",
+                "Interpreter::GfxDpSetPrimColor", "gfx_set_combine_handler_rdp", "gfx_set_prim_color_handler_rdp")))
+        subprocess.run([os.environ.get("CXX", "c++"), *flags, "-I" + folder,
+                        "soh/tests/epona_cosmetics_alpha_test.cpp", "-o", str(binary)], cwd=ROOT, check=True)
+        subprocess.run([str(binary)], check=True)
         production = (ROOT / "soh/soh/Enhancements/cosmetics/EponaCosmetics.cpp").read_text()
         draw = (ROOT / "soh/tests/epona_cosmetics_draw_test.cpp").read_text()
         constants = production[production.index("constexpr const char* kColorCVars"):production.index("struct CachedMasks")]

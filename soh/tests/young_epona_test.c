@@ -153,8 +153,35 @@ int main(void) {
     REQUIRE(spawnCount == 1);
     REQUIRE(spawnParams == (0x4000 | 2));
     REQUIRE(memcmp(&adult, &gSaveContext.horseData, sizeof(adult)) == 0);
-    int scenes[] = { SCENE_HYRULE_FIELD, SCENE_LAKE_HYLIA, SCENE_GERUDO_VALLEY, SCENE_GERUDOS_FORTRESS,
-                     SCENE_LON_LON_RANCH };
+    int scenes[] = { SCENE_HYRULE_FIELD,
+                     SCENE_LAKE_HYLIA,
+                     SCENE_GERUDO_VALLEY,
+                     SCENE_GERUDOS_FORTRESS,
+                     SCENE_LON_LON_RANCH,
+                     SCENE_KAKARIKO_VILLAGE,
+                     SCENE_GRAVEYARD,
+                     SCENE_ZORAS_RIVER,
+                     SCENE_KOKIRI_FOREST,
+                     SCENE_SACRED_FOREST_MEADOW,
+                     SCENE_ZORAS_FOUNTAIN,
+                     SCENE_LOST_WOODS,
+                     SCENE_DESERT_COLOSSUS,
+                     SCENE_HAUNTED_WASTELAND,
+                     SCENE_HYRULE_CASTLE,
+                     SCENE_DEATH_MOUNTAIN_TRAIL,
+                     SCENE_DEATH_MOUNTAIN_CRATER,
+                     SCENE_OUTSIDE_GANONS_CASTLE,
+                     SCENE_MARKET_ENTRANCE_DAY,
+                     SCENE_MARKET_ENTRANCE_NIGHT,
+                     SCENE_MARKET_ENTRANCE_RUINS,
+                     SCENE_MARKET_DAY,
+                     SCENE_MARKET_NIGHT,
+                     SCENE_MARKET_RUINS,
+                     SCENE_BACK_ALLEY_DAY,
+                     SCENE_BACK_ALLEY_NIGHT,
+                     SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY,
+                     SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT,
+                     SCENE_TEMPLE_OF_TIME_EXTERIOR_RUINS };
     for (int i = 0; i < ARRAY_COUNT(scenes); i++) {
         Reset();
         play.sceneNum = scenes[i];
@@ -162,6 +189,27 @@ int main(void) {
         Horse_InitPlayerHorse(&play, &player);
         REQUIRE(spawnCount == 1 && mounted == 1 && camera == 1);
         REQUIRE(spawnParams == (0x4000 | 9));
+        REQUIRE(gSaveContext.ship.youngHorseDataValid);
+        REQUIRE(gSaveContext.ship.youngHorseData.scene == scenes[i]);
+        REQUIRE(memcmp(&adult, &gSaveContext.horseData, sizeof(adult)) == 0);
+        // Re-entry and song recall use the same outdoor scene gate.
+        horse.actor.world.pos = (Vec3f){ 12, 34, 56 };
+        Horse_SaveYoungEpona(&play, &horse.actor);
+        play.actorCtx.actorLists[ACTORCAT_BG].head = NULL;
+        player.rideActor = NULL;
+        Horse_InitPlayerHorse(&play, &player);
+        REQUIRE(spawnCount == 2 && spawnParams == (0x4000 | 1));
+        REQUIRE(horse.actor.world.pos.x == 12 && horse.actor.world.pos.z == 56);
+        Reset();
+        play.sceneNum = scenes[i];
+        REQUIRE(Horse_TrySummonYoungEpona(&play));
+        REQUIRE(spawnCount == 1 && DREG(53) == 1);
+        Reset();
+        play.sceneNum = scenes[i];
+        gSaveContext.linkAge = LINK_AGE_ADULT;
+        Horse_InitPlayerHorse(&play, &player);
+        REQUIRE(spawnCount == 0);
+        REQUIRE(adultSetup == (i < 5 ? 1 : 0));
     }
     Reset();
     play.sceneNum = SCENE_DEKU_TREE;
@@ -248,6 +296,7 @@ int main(void) {
     EnHorseLinkChild_Update(&npc.actor, &play);
     REQUIRE(npc.actor.update == NULL && nativeNpcUpdates == 1);
 #endif
-    puts("PASS: child gates, native five areas, mounted transitions, adult isolation, failed allocation");
+    puts("PASS: child gates, 29 outdoor areas, mounted transitions, re-entry, song recall, adult isolation, failed "
+         "allocation");
     return 0;
 }

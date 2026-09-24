@@ -120,6 +120,8 @@ jobs:
         run: |
           GFX_TEXTURE_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_texture_address_tests.py
           python3 scripts/diagnostics/run_gfx_texture_address_tests.py --low-module
+          GFX_DL_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_display_list_address_tests.py
+          python3 scripts/diagnostics/run_alt_segment_binding_tests.py
 
       - name: 2Ship back equipment and OoT sky compatibility
         run: |

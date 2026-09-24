@@ -172,8 +172,10 @@ inline std::vector<Gfx> BuildNativeDisplayList(const std::vector<Gfx>& source, u
                 result.insert(result.end(), textureSetup.begin(), textureSetup.end());
                 append(gsDPSetRenderMode(G_RM_FOG_SHADE_A, G_RM_AA_ZB_XLU_DECAL2));
                 // Native horse lists ignore texture alpha. The overlay must use it to cut out the mask.
-                append(gsDPSetCombineLERP(TEXEL0, 0, SHADE, 0, TEXEL0, 0, PRIMITIVE, 0, COMBINED, 0, PRIMITIVE, 0,
-                                          COMBINED, 0, 1, 0));
+                // Alpha C cannot select constant 1: mux 6 there is PRIM_LOD_FRAC (zero here).
+                // Pass first-cycle alpha through D so selected coat/hair/eye pixels remain visible.
+                append(gsDPSetCombineLERP(TEXEL0, 0, SHADE, 0, TEXEL0, 0, PRIMITIVE, 0, COMBINED, 0, PRIMITIVE, 0, 0, 0,
+                                          0, COMBINED));
                 append(gsDPSetPrimColor(0, 0, 255, 255, 255, 255));
                 segment(9 + part);
                 // Duplicate only triangles: never reload or transform the shared Skin vertex cache.
