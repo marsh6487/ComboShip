@@ -90,6 +90,9 @@ jobs:
           python3 scripts/diagnostics/run_combo_shared_test.py --json-include /usr/include
           python3 scripts/diagnostics/run_combo_grant_tests.py --json-include /usr/include
 
+      - name: OoT diagnostic frame timing accounting
+        run: python3 scripts/diagnostics/run_frame_timing_probe_tests.py
+
       - name: Contents-based chests and opt-in Midna
         run: |
           python3 scripts/diagnostics/run_chest_size_tests.py

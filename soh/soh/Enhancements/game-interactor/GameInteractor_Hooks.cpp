@@ -1,4 +1,5 @@
 #include "GameInteractor_Hooks.h"
+#include "soh/Enhancements/debugger/FrameTimingProbe.h"
 
 // MARK: - Gameplay
 
@@ -26,6 +27,7 @@ void GameInteractor_ExecuteOnGameStateMainStart() {
 }
 
 void GameInteractor_ExecuteOnGameFrameUpdate() {
+    FrameTiming::Scope timing(FRAME_TIMING_FRAME_HOOKS);
     GameInteractor::Instance->ExecuteHooks<GameInteractor::OnGameFrameUpdate>();
 }
 

@@ -1,6 +1,7 @@
 ﻿#include "OTRGlobals.h"
 #include "OTRAudio.h"
 #include "Enhancements/Graphics/PreludeLoadProbe.h"
+#include "Enhancements/debugger/FrameTimingProbe.h"
 #include "ComboExport.h"
 #include "ComboResolve.h"
 #include <algorithm>
@@ -2373,7 +2374,20 @@ extern "C" void PreludeLoadProbe_EndStateReload() {
     }
 }
 
+static FrameTimingContext CurrentFrameTimingContext() {
+    return {
+        gPlayState ? gPlayState->sceneNum : -1,
+        gPlayState ? gPlayState->roomCtx.curRoom.num : -1,
+        gSaveContext.linkAge,
+        CVarGetInteger(CVAR_SETTING("AltAssets"), 0),
+        gPlayState ? gPlayState->pauseCtx.state != 0 : 0,
+        static_cast<int>(OTRGlobals::Instance->GetInterpolationFPS()),
+    };
+}
+
 extern "C" void Graph_StartFrame() {
+    // Enabled by default only for this isolated diagnostic candidate.
+    FrameTiming_BeginFrame(CurrentFrameTimingContext(), CVarGetInteger(CVAR_DEVELOPER_TOOLS("FrameTimingProbe"), 1));
     Prelude::LoadProbe::BeginFrame(
         gPlayState ? gPlayState->sceneNum : -1, gPlayState ? gPlayState->roomCtx.curRoom.num : -1,
         gPlayState ? gPlayState->roomCtx.prevRoom.num : -1, gPlayState ? gPlayState->gameplayFrames : 0,
@@ -2494,7 +2508,10 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
     }
 
     // Process window events for resize, mouse, keyboard events
-    wnd->HandleEvents();
+    {
+        FrameTiming::Scope timing(FRAME_TIMING_WINDOW_EVENTS);
+        wnd->HandleEvents();
+    }
 
     // Render-gating (Fleet Ship Combo, host side): when OoT is the INACTIVE game (MM active),
     // OoT's 3D scene is fully hidden behind the composited MM image, so rendering it is wasted
@@ -2530,14 +2547,33 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
     UIWidgets::Colors themeColor =
         static_cast<UIWidgets::Colors>(CVarGetInteger(CVAR_SETTING("Menu.Theme"), UIWidgets::Colors::LightBlue));
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, UIWidgets::ColorValues.at(themeColor));
+    const bool collectRenderTimings = FrameTiming_IsActive() != 0;
+    wnd->SetCollectFrameTimings(collectRenderTimings);
     for (int i = 0; i < count; i++) {
         time += step;
+        const auto interpolationTiming = FrameTiming_BeginSpan();
         std::unordered_map<Mtx*, MtxF> mtx_replacements =
             (time == denom) ? std::unordered_map<Mtx*, MtxF>() : FrameInterpolation_Interpolate((float)time / denom);
+        FrameTiming_EndSpan(FRAME_TIMING_INTERPOLATION, interpolationTiming);
         intp->mInterpolationT = (float)time / denom;
-        wnd->DrawAndRunGraphicsCommands(Commands, mtx_replacements);
+        bool presented;
+        {
+            FrameTiming::Scope timing(FRAME_TIMING_DRAW_PRESENT);
+            presented = wnd->DrawAndRunGraphicsCommands(Commands, mtx_replacements);
+        }
+        if (collectRenderTimings) {
+            const auto& timings = wnd->GetLastFrameTimings();
+            FrameTiming_AddDuration(FRAME_TIMING_FRAME_READY, timings.ready);
+            if (presented) {
+                FrameTiming_AddDuration(FRAME_TIMING_RENDER_SETUP, timings.setup);
+                FrameTiming_AddDuration(FRAME_TIMING_GRAPHICS_COMMANDS, timings.commands);
+                FrameTiming_AddDuration(FRAME_TIMING_GUI_FINISH, timings.gui);
+                FrameTiming_AddDuration(FRAME_TIMING_PRESENT, timings.present);
+            }
+        }
         intp->mInterpolationIndex++;
     }
+    wnd->SetCollectFrameTimings(false);
     ImGui::PopStyleColor();
 }
 
@@ -2546,7 +2582,9 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
     Prelude::LoadProbe::BeginRender(gPlayState ? gPlayState->roomCtx.curRoom.num : -1,
                                     gPlayState ? gPlayState->roomCtx.prevRoom.num : -1);
     {
+        const auto audioWaitTiming = FrameTiming_BeginSpan();
         std::unique_lock<std::mutex> Lock(audio.mutex);
+        FrameTiming_EndSpan(FRAME_TIMING_AUDIO_WAIT, audioWaitTiming);
         audio.processing = true;
         // Set the combo audio-mute flag BEFORE waking the worker so this frame's buffer is
         // (un)muted correctly; storing it after the notify would race the worker by a frame.
@@ -2628,6 +2666,7 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
         GameInteractor::Instance->ExecuteHooks<GameInteractor::OnAssetAltChange>();
     }
 
+    FrameTiming_EndFrame(CurrentFrameTimingContext(), CVarGetInteger(CVAR_DEVELOPER_TOOLS("FrameTimingProbe"), 1));
     if (auto report = Prelude::LoadProbe::EndFrame()) {
         bool actorSnapshotTruncated = false;
         (*report)["actors"] = PreludeLoadProbe_ActorSnapshot(gPlayState, actorSnapshotTruncated);

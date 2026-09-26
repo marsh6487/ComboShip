@@ -16,6 +16,7 @@
  */
 
 #include "mm_asset_loader.h"
+#include "soh/Enhancements/debugger/FrameTimingProbe.h"
 #include "mm_display_list_patch.h"
 #include "mm_normal_actor_resource.h"
 #include "mm_kafei_resource.h"
@@ -455,6 +456,7 @@ static std::shared_ptr<Ship::Archive> MmAssets_FindModOverride(const char* path)
  * @return Pointer to loaded resource, or NULL if not found/not loaded
  */
 void* MmAssets_LoadResource(const char* path) {
+    FrameTiming::Scope timing(FRAME_TIMING_MM_ASSETS);
     if (!sMmO2rLoaded) {
         MMASSETS_LOG("[MM Assets] Cannot load resource - mm.o2r not loaded");
         return nullptr;

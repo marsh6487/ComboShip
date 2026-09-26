@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "soh/Enhancements/gameconsole.h"
+#include "soh/Enhancements/debugger/FrameTimingProbe.h"
 #include "soh/FleetShipCombo/FleetShipCombo.h"
 #include "soh/frame_interpolation.h"
 #include <overlays/actors/ovl_En_Niw/z_en_niw.h>
@@ -1783,14 +1784,18 @@ void Play_Main(GameState* thisx) {
     }
 
     if ((HREG(80) != 10) || (HREG(81) != 0)) {
+        FrameTimingSpan updateTiming = FrameTiming_BeginSpan();
         Play_Update(play);
+        FrameTiming_EndSpan(FRAME_TIMING_PLAY_UPDATE, updateTiming);
     }
 
     PLAY_LOG(4583);
 
+    FrameTimingSpan drawTiming = FrameTiming_BeginSpan();
     FrameInterpolation_StartRecord();
     Play_Draw(play);
     FrameInterpolation_StopRecord();
+    FrameTiming_EndSpan(FRAME_TIMING_PLAY_DRAW, drawTiming);
 
     PLAY_LOG(4587);
 

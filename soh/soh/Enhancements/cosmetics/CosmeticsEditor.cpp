@@ -1,4 +1,5 @@
 #include "CosmeticsEditor.h"
+#include "soh/Enhancements/debugger/FrameTimingProbe.h"
 #include "cosmeticsTypes.h"
 #include "authenticGfxPatches.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -543,6 +544,7 @@ int hue = 0;
 // Runs every frame to update rainbow hue, a potential future optimization is to only run this once or twice a second
 // and increase the speed of the rainbow hue rotation.
 void CosmeticsUpdateTick() {
+    FrameTiming::Scope timing(FRAME_TIMING_COSMETICS);
     int index = 0;
     float rainbowSpeed = CVarGetFloat(CVAR_COSMETIC("RainbowSpeed"), 0.6f);
     for (auto& [id, cosmeticOption] : cosmeticOptions) {
