@@ -3,6 +3,7 @@
 #include <chrono>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <ship/Context.h>
 #include <spdlog/spdlog.h>
 
 namespace {
@@ -27,7 +28,9 @@ const std::shared_ptr<spdlog::logger>& DiagnosticLogger() {
     // this diagnostic its own level. A saved Warn/Off setting must not hide the
     // capture, and normal resource logging must retain the user's preference.
     if (!diagnosticLogger) {
-        diagnosticLogger = spdlog::default_logger()->clone("OoTFrameTimingProbe");
+        // Windows statically links spdlog into each game/engine DLL. The game
+        // DLL's default logger is not the engine Context's file logger.
+        diagnosticLogger = Ship::Context::GetRawInstance()->GetLogger()->clone("OoTFrameTimingProbe");
         diagnosticLogger->set_level(spdlog::level::info);
         diagnosticLogger->flush_on(spdlog::level::info);
     }

@@ -31,7 +31,9 @@ with tempfile.TemporaryDirectory(prefix="oot-frame-timing-") as temporary:
         os.environ.get("CXX", "g++"), "-std=c++20", "-Wall", "-Wextra", "-Werror", "-pedantic",
         *shlex.split(os.environ.get("FRAME_TIMING_CXXFLAGS", "")),
         "-I", str(ROOT / "soh"), str(ROOT / "soh/tests/frame_timing_output_test.cpp"),
+        "-I", str(ROOT / "libultraship/include"),
+        str(ROOT / "soh/tests/frame_timing_context_fixture.cpp"),
         str(ROOT / "soh/soh/Enhancements/debugger/FrameTimingProbe.cpp"),
         *shlex.split(spdlog_flags), "-pthread", "-o", str(output_test),
     ], check=True)
-    subprocess.run([str(output_test), str(temporary / "timing.log")], check=True)
+    subprocess.run([str(output_test), str(temporary / "output")], check=True)

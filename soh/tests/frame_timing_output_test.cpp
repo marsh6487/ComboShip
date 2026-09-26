@@ -2,22 +2,30 @@
 
 #include <cassert>
 #include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <ship/Context.h>
 #include <spdlog/async_logger.h>
 #include <spdlog/details/thread_pool.h>
+#include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/spdlog.h>
 #include <thread>
 
 int main(int argc, char** argv) {
     assert(argc == 2);
-    auto sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(argv[1], 1024 * 1024, 1);
-    sink->set_pattern("%v");
-    auto pool = std::make_shared<spdlog::details::thread_pool>(8192, 1);
-    auto gameLogger = std::make_shared<spdlog::async_logger>("game", sink, pool, spdlog::async_overflow_policy::block);
-    spdlog::set_default_logger(gameLogger);
+    std::filesystem::create_directories(argv[1]);
+    std::filesystem::current_path(argv[1]);
+    auto* context = Ship::Context::CreateUninitializedInstance("FrameTimingOutputTest", "test", "unused.json");
+    assert(context->InitLogging(spdlog::level::off, spdlog::level::off));
+    auto gameLogger = context->GetLogger();
+    const auto logPath = Ship::Context::GetPathRelativeToAppDirectory("logs/FrameTimingOutputTest.log");
+    auto sink = gameLogger->sinks().back();
+    auto decoy = std::make_shared<spdlog::logger>("module-local", std::make_shared<spdlog::sinks::null_sink_mt>());
+    spdlog::set_default_logger(decoy);
+    assert(spdlog::default_logger() != gameLogger);
     gameLogger->set_level(spdlog::level::off);
 
     // Exercise the production adapter and the same asynchronous rotating-file
@@ -35,20 +43,22 @@ int main(int argc, char** argv) {
         FrameTiming_AddDuration(FRAME_TIMING_PRESENT, 500000);
         std::this_thread::sleep_for(std::chrono::milliseconds(1050));
         FrameTiming_EndFrame(play, 1);
-        assert(gameLogger->level() == level); // Preserve the user's normal logging preference.
+        assert(gameLogger->level() == level);      // Preserve the user's normal logging preference.
+        assert(spdlog::default_logger() == decoy); // Never repair output by replacing a module's default logger.
     }
     FrameTiming_BeginFrame(play, 0);
     FrameTiming_EndFrame(play, 0);
     FrameTiming_Shutdown();
-    // Thread-pool destruction drains queued log records and joins the writer.
-    pool.reset();
-    std::weak_ptr<spdlog::sinks::rotating_file_sink_mt> sinkLifetime = sink;
+    // The real Windows integration target destroys the shared engine Context,
+    // draining its async writer before either the probe DLL or engine unloads.
+    std::weak_ptr<spdlog::sinks::sink> sinkLifetime = sink;
+    Ship::Context::DestroyInstance();
     spdlog::drop_all();
     gameLogger.reset();
     sink.reset();
     assert(sinkLifetime.expired()); // No probe-owned formatter may survive game DLL teardown.
 
-    std::ifstream log(argv[1]);
+    std::ifstream log(logPath);
     std::string line;
     int samples = 0;
     bool armed = false;
@@ -86,17 +96,17 @@ int main(int argc, char** argv) {
 
     // A fresh Context in the same process must announce itself and bind to its
     // new sink instead of retaining the old file, pool, or enabled state.
-    const std::string nextPath = std::string(argv[1]) + ".next";
-    sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(nextPath, 1024 * 1024, 1);
-    sink->set_pattern("%v");
-    pool = std::make_shared<spdlog::details::thread_pool>(8192, 1);
-    gameLogger = std::make_shared<spdlog::async_logger>("new-game", sink, pool, spdlog::async_overflow_policy::block);
+    context = Ship::Context::CreateUninitializedInstance("FrameTimingOutputRestart", "test", "unused.json");
+    assert(context->InitLogging(spdlog::level::off, spdlog::level::off));
+    const auto nextPath = Ship::Context::GetPathRelativeToAppDirectory("logs/FrameTimingOutputRestart.log");
+    gameLogger = context->GetLogger();
+    sink = gameLogger->sinks().back();
     gameLogger->set_level(spdlog::level::off);
-    spdlog::set_default_logger(gameLogger);
+    spdlog::set_default_logger(decoy);
     FrameTiming_BeginFrame(title, 1);
     FrameTiming_EndFrame(title, 1);
     FrameTiming_Shutdown();
-    pool.reset();
+    Ship::Context::DestroyInstance();
     spdlog::drop_all();
     sinkLifetime = sink;
     gameLogger.reset();
@@ -107,5 +117,6 @@ int main(int argc, char** argv) {
     const auto restarted = nlohmann::json::parse(line.substr(line.find("[FrameTimingProbe] ") + 19));
     assert(restarted.at("event") == "startup");
     assert(restarted.at("enabled").get<bool>());
-    std::cout << "Production timing output: startup, all phases, Warn/Off immunity, teardown and restart passed\n";
+    std::cout << "Production timing output: Context file logger, separate default, all phases, Warn/Off, teardown and "
+                 "restart passed\n";
 }

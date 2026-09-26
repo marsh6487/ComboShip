@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD 20 CACHE STRING "The C++ standard to use")
 set(CMAKE_C_STANDARD 23 CACHE STRING "The C standard to use")
 
 include(CTest)
+include(tests/frame_timing_output.cmake)
 if(BUILD_TESTING)
     add_executable(pak_selection_test tests/pak_selection_test.cpp)
     target_include_directories(pak_selection_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
