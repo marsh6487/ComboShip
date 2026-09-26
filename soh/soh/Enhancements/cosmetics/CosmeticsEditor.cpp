@@ -194,6 +194,10 @@ std::map<std::string, CosmeticOption> cosmeticOptions = {
     COSMETIC_OPTION("Custom.ZoraMagicShield",          "Zora Magic Shield",        COSMETICS_GROUP_MAGIC,        ColorRGBA8(  0, 150, 255, 255), false, true, false),
     COSMETIC_OPTION("Custom.ZoraMagicShieldGlow",             "Zora Shield Glow",         COSMETICS_GROUP_MAGIC,        ColorRGBA8(  0,   0, 100, 255), false, true, false),
     COSMETIC_OPTION("Custom.ZoraMagicShieldHighlights",       "Zora Shield Highlights",   COSMETICS_GROUP_MAGIC,        ColorRGBA8(170, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Custom.DinFireShieldCore",        "Din Fire Shield Core",     COSMETICS_GROUP_MAGIC,        ColorRGBA8(255, 225, 122, 255), false, true, false),
+    COSMETIC_OPTION("Custom.DinFireShieldOuter",       "Din Fire Shield Outer",    COSMETICS_GROUP_MAGIC,        ColorRGBA8(255,  43,   3, 255), false, true, false),
+    COSMETIC_OPTION("Custom.DinFireSwordCore",         "Din Fire Sword Core",      COSMETICS_GROUP_MAGIC,        ColorRGBA8(255, 225, 122, 255), false, true, false),
+    COSMETIC_OPTION("Custom.DinFireSwordOuter",        "Din Fire Sword Outer",     COSMETICS_GROUP_MAGIC,        ColorRGBA8(255,  43,   3, 255), false, true, false),
     COSMETIC_OPTION("Link.KokiriTunic",             "Kokiri Tunic",             COSMETICS_GROUP_LINK,         ColorRGBA8( 30, 105,  27, 255), false, true, false),
     COSMETIC_OPTION("Link.GoronTunic",              "Goron Tunic",              COSMETICS_GROUP_LINK,         ColorRGBA8(100,  20,   0, 255), false, true, false),
     COSMETIC_OPTION("Link.ZoraTunic",               "Zora Tunic",               COSMETICS_GROUP_LINK,         ColorRGBA8(  0,  60, 100, 255), false, true, false),
@@ -389,12 +393,32 @@ std::map<std::string, CosmeticOption> cosmeticOptions = {
     COSMETIC_OPTION("Arrows.LightPrimary",          "Light Primary",            COSMETICS_GROUP_ARROWS,       ColorRGBA8(255, 255,   0, 255), false, true, false),
     COSMETIC_OPTION("Arrows.LightSecondary",        "Light Secondary",          COSMETICS_GROUP_ARROWS,       ColorRGBA8(255, 255, 170,   0), false, true, true),
 
+    COSMETIC_OPTION("Arrows.MedallionFirePrimary", "Fire Medallion Arrow Primary", COSMETICS_GROUP_ARROWS, ColorRGBA8(255, 200, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionFireSecondary", "Fire Medallion Arrow Secondary", COSMETICS_GROUP_ARROWS, ColorRGBA8(255, 0, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionWaterPrimary", "Water Medallion Arrow Primary", COSMETICS_GROUP_ARROWS, ColorRGBA8(170, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionWaterSecondary", "Water Medallion Arrow Secondary", COSMETICS_GROUP_ARROWS, ColorRGBA8(0, 0, 255, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionForestPrimary", "Forest Medallion Arrow Primary", COSMETICS_GROUP_ARROWS, ColorRGBA8(170, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionForestSecondary", "Forest Medallion Arrow Secondary", COSMETICS_GROUP_ARROWS, ColorRGBA8(0, 255, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionShadowPrimary", "Shadow Medallion Arrow Primary", COSMETICS_GROUP_ARROWS, ColorRGBA8(0, 0, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionShadowSecondary", "Shadow Medallion Arrow Secondary", COSMETICS_GROUP_ARROWS, ColorRGBA8(0, 0, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionLightPrimary", "Light Medallion Arrow Primary", COSMETICS_GROUP_ARROWS, ColorRGBA8(255, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionLightSecondary", "Light Medallion Arrow Secondary", COSMETICS_GROUP_ARROWS, ColorRGBA8(170, 170, 170, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionSpiritPrimary", "Spirit Medallion Arrow Primary", COSMETICS_GROUP_ARROWS, ColorRGBA8(255, 255, 170, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionSpiritSecondary", "Spirit Medallion Arrow Secondary", COSMETICS_GROUP_ARROWS, ColorRGBA8(255, 255, 0, 255), false, true, false),
+
     COSMETIC_OPTION("Magic.DinsPrimary",            "Din's Primary",            COSMETICS_GROUP_MAGIC,        ColorRGBA8(255, 200,   0, 255), false, true, false),
     COSMETIC_OPTION("Magic.DinsSecondary",          "Din's Secondary",          COSMETICS_GROUP_MAGIC,        ColorRGBA8(255,   0,   0, 255), false, true, true),
     COSMETIC_OPTION("Magic.FaroresPrimary",         "Farore's Primary",         COSMETICS_GROUP_MAGIC,        ColorRGBA8(255, 255,   0, 255), false, true, false),
     COSMETIC_OPTION("Magic.FaroresSecondary",       "Farore's Secondary",       COSMETICS_GROUP_MAGIC,        ColorRGBA8(100, 200,   0, 255), false, true, true),
     COSMETIC_OPTION("Magic.NayrusPrimary",          "Nayru's Primary",          COSMETICS_GROUP_MAGIC,        ColorRGBA8(170, 255, 255, 255), false, true, false),
     COSMETIC_OPTION("Magic.NayrusSecondary",        "Nayru's Secondary",        COSMETICS_GROUP_MAGIC,        ColorRGBA8(  0, 100, 255, 255), false, true, true),
+
+    COSMETIC_OPTION("Magic.MedallionFirePrimary",   "Fire Medallion Primary",   COSMETICS_GROUP_MAGIC,        ColorRGBA8(255, 200,   0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionFireSecondary", "Fire Medallion Secondary", COSMETICS_GROUP_MAGIC,        ColorRGBA8(255,   0,   0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionWaterPrimary",  "Water Medallion Primary",  COSMETICS_GROUP_MAGIC,        ColorRGBA8(150, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionWaterSecondary","Water Medallion Secondary",COSMETICS_GROUP_MAGIC,        ColorRGBA8(  0, 100, 255, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionForestPrimary", "Forest Medallion Primary", COSMETICS_GROUP_MAGIC,        ColorRGBA8(255, 255, 170, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionForestSecondary","Forest Medallion Secondary",COSMETICS_GROUP_MAGIC,       ColorRGBA8(150, 255,   0, 255), false, true, false),
 
     COSMETIC_OPTION("SpinAttack.Level1Primary",     "Level 1 Primary",          COSMETICS_GROUP_SPIN_ATTACK,  ColorRGBA8(170, 255, 255, 255), false, true, true),
     COSMETIC_OPTION("SpinAttack.Level1Secondary",   "Level 1 Secondary",        COSMETICS_GROUP_SPIN_ATTACK,  ColorRGBA8(  0, 100, 255, 255), false, true, false),
@@ -2485,6 +2509,14 @@ void CosmeticsEditorWindow::DrawElement() {
 
             DrawCosmeticGroup(COSMETICS_GROUP_MAGIC);
             DrawCosmeticGroup(COSMETICS_GROUP_ARROWS);
+            UIWidgets::CVarCheckbox(
+                "Elemental impact sounds", CVAR_COSMETIC("Arrows.ElementalImpactSounds"),
+                UIWidgets::CheckboxOptions()
+                    .Color(THEME_COLOR)
+                    .Tooltip(
+                        "Use flame ignition, ice breaking, and a light-arrow hit sound for elemental arrow impacts. "
+                        "Turn off to use the original impact sounds."));
+            UIWidgets::Spacer();
             DrawCosmeticGroup(COSMETICS_GROUP_SPIN_ATTACK);
             DrawCosmeticGroup(COSMETICS_GROUP_TRAILS);
             if (UIWidgets::CVarSliderInt("Trails Duration: %d", CVAR_COSMETIC("Trails.Duration.Value"),

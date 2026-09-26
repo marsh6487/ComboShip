@@ -51,6 +51,8 @@ def main() -> None:
         "BossRemains_IsGohtWorn",
         "BossRemains_IsOdolwaWorn",
         "CVarGetInteger",
+        "DinFireShield_HandDL",
+        "DinFireSword_HandDL",
         "ExtEquip_GetShieldDLOverride",
         "ExtEquip_IsDekuSkinActive",
         "ExtEquip_IsOotMirrorSkinActive",

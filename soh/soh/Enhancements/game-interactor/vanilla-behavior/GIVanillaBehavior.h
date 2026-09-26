@@ -1429,6 +1429,14 @@ typedef enum {
     // true
     // ```
     // #### `args`
+    // - `*s16`
+    VB_HEART_DISPLAY_TOTAL_COUNT,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
     // - None
     VB_HEARTS_INCREASE_WITH_CONTAINERS,
 
@@ -1599,6 +1607,22 @@ typedef enum {
     // #### `args`
     // - `*EnMs`
     VB_MAGIC_BEAN_SALESMAN_TAKE_MONEY,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*s16` (magicFillTarget)
+    VB_MAGIC_FILL_TARGET,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*s16`
+    VB_MAGIC_STEP_CAPACITY_TARGET,
 
     // #### `result`
     // ```c
@@ -2262,6 +2286,34 @@ typedef enum {
     // - `*Player`
     // - `*PlayState`
     VB_PLAYER_UPDATE_BOTTLE_HELD,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*PlayState`
+    // - `*u8`
+    // - `*Actor`
+    VB_PLAYER_ATTACK_DAMAGE_MULTIPLIER,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*PlayState`
+    // - `*s16`
+    VB_PLAYER_INCOMING_DAMAGE,
+
+    // #### `result`
+    // ```c
+    // true
+    // ```
+    // #### `args`
+    // - `*Player`
+    // - `*f32`
+    VB_PLAYER_SPEED_MULTIPLIER,
 
     // #### `result`
     // ```c

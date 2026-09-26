@@ -4,6 +4,7 @@
 #include "2s2h/Rando/Types.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
+#include "mods/combo_rpg.h"
 
 #include <spdlog/spdlog.h>
 #ifdef COMBO_BUILD
@@ -99,6 +100,12 @@ extern "C" void FleetShared_OnNativeObtained(int nativeId) {
     if (sReceiveDepth > 0) {
         return;
     }
+    // RPG magic owns a fractional bar. Native MM tiers cross as a monotonic
+    // capacity floor; giving a progressive item to OoT here would infer another
+    // tier from RPG-derived ownership flags and grant it twice.
+    if (ComboRpg_IsEnabled(COMBO_RPG_MAGIC) &&
+        (nativeId == RI_SINGLE_MAGIC || nativeId == RI_DOUBLE_MAGIC || nativeId == RI_PROGRESSIVE_MAGIC))
+        return;
     int chain = ChainAliasFor(nativeId);
     int fcId = FcCombo_ItemForNative(chain != 0 ? chain : nativeId);
     if (fcId == FCI_NO_ITEM || fcId < 0 || fcId >= FC_COMBO_ITEM_COUNT) {

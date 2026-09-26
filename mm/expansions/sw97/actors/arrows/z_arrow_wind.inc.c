@@ -5,6 +5,8 @@
 
 #include "expansions/sw97/sw97_compat.h"
 #include "expansions/sw97/sw97_config.h"
+#include "sw97_arrow_textures.h"
+#include "overlays/ovl_Arrow_Ice/ovl_Arrow_Ice.h"
 
 #include "z64.h"
 #include "global.h"
@@ -216,6 +218,8 @@ static Gfx sArrowWindVertexDL[] = {
 
 // Vanilla OTR cone geometry (correct wide cone, replaces narrow SW97 inline vertices)
 static const ALIGN_ASSET(2) char sSw97WindMatDL[] = "__OTR__overlays/ovl_Arrow_Ice/sMaterialDL";
+static const ALIGN_ASSET(2) char sSw97WindTex1[] = "__OTR__custom/medallion_magic/arrows/forest/s1Tex";
+static const ALIGN_ASSET(2) char sSw97WindTex2[] = "__OTR__custom/medallion_magic/arrows/forest/s2Tex";
 static const ALIGN_ASSET(2) char sSw97WindMdlDL[] = "__OTR__overlays/ovl_Arrow_Ice/sModelDL";
 
 // ============================================================================
@@ -515,11 +519,17 @@ void ArrowWind_Draw(Actor* thisx, PlayState* play) {
     EnArrow* arrow;
     Actor* tranform;
 
+    Color_RGBA8 primaryColor =
+        CosmeticEditor_GetChangedColor(170, 255, 255, 255, COSMETIC_ID("Arrows.MedallionForestPrimary"));
+    Color_RGBA8 secondaryColor =
+        CosmeticEditor_GetChangedColor(0, 255, 0, 128, COSMETIC_ID("Arrows.MedallionForestSecondary"));
+
     stateFrames = play->state.frames;
     arrow = (EnArrow*)this->actor.parent;
 
     if ((arrow != NULL) && (arrow->actor.update != NULL) && (this->timer < 255)) {
 
+        s32 useCompanion = Sw97_ArrowHasCompanionGeometry(sSw97WindMatDL, sSw97WindMdlDL);
         tranform = (arrow->unk_261 & 2) ? &this->actor : &arrow->actor;
 
         OPEN_DISPS(play->state.gfxCtx);
@@ -540,8 +550,8 @@ void ArrowWind_Draw(Actor* thisx, PlayState* play) {
         }
 
         Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-        gDPSetPrimColor(POLY_XLU_DISP++, 0x80, 0x80, 170, 255, 255, this->alpha);
-        gDPSetEnvColor(POLY_XLU_DISP++, 0, 255, 0, 128);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0x80, 0x80, primaryColor.r, primaryColor.g, primaryColor.b, this->alpha);
+        gDPSetEnvColor(POLY_XLU_DISP++, secondaryColor.r, secondaryColor.g, secondaryColor.b, 128);
         Matrix_RotateRPY(0x4000, 0x0, 0x0, MTXMODE_APPLY);
         if (this->timer != 0) {
             Matrix_Translate(0.0f, 0.0f, 0.0f, MTXMODE_APPLY);
@@ -552,11 +562,12 @@ void ArrowWind_Draw(Actor* thisx, PlayState* play) {
         Matrix_Translate(0.0f, -700.0f, 0.0f, MTXMODE_APPLY);
         gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, "../z_arrow_wind.c", 660),
                   G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-        gSPDisplayList(POLY_XLU_DISP++, sSw97WindMatDL);
+        gSPDisplayList(POLY_XLU_DISP++, useCompanion ? sSw97WindMatDL : gIceArrowMaterialDL);
+        POLY_XLU_DISP = Sw97_ArrowLoadMedallionTextures(POLY_XLU_DISP, sSw97WindTex1, sSw97WindTex2);
         gSPDisplayList(POLY_XLU_DISP++,
                        Gfx_TwoTexScroll(play->state.gfxCtx, 0, 511 - (stateFrames * 3) % 512, 0, 64, 32, 1,
                                         511 - (stateFrames * 15) % 512, 511 - (stateFrames * 5) % 512, 8, 16));
-        gSPDisplayList(POLY_XLU_DISP++, sSw97WindMdlDL);
+        gSPDisplayList(POLY_XLU_DISP++, useCompanion ? sSw97WindMdlDL : gIceArrowModelDL);
 
         CLOSE_DISPS(play->state.gfxCtx);
     }

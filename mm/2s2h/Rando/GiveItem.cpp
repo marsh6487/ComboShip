@@ -3,6 +3,7 @@
 #include "Rando/MiscBehavior/MiscBehavior.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "mods/nei_save.h" // NeiSaveData, Nei_Save, bullet-bag helpers (Skijer's NEI slingshot pass)
+#include "mods/combo_rpg.h"
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h" // FcCombo_ItemForNative (native RI -> fcId)
 #include "2s2h/FleetShipCombo/FleetComboItems.h"     // FCI_NO_ITEM, FCI_MAX
 #include "2s2h/FleetShipCombo/FleetComboIds.h"       // FC_OOT_* registry indices + FC_SHIELD_* bits
@@ -158,14 +159,19 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             gSaveContext.save.saveInfo.inventory.defenseHearts = 20;
             break;
         case RI_SINGLE_MAGIC:
+            ComboRpg_RecordNativeMagic(1);
             gSaveContext.save.saveInfo.playerData.isMagicAcquired = true;
-            gSaveContext.save.saveInfo.playerData.magic = gSaveContext.magicFillTarget = MAGIC_NORMAL_METER;
+            gSaveContext.save.saveInfo.playerData.magic = gSaveContext.magicFillTarget =
+                ComboRpg_MagicCapacity(MAGIC_NORMAL_METER);
+            gSaveContext.save.saveInfo.playerData.magicLevel = 0;
             SET_WEEKEVENTREG(WEEKEVENTREG_12_80);
             break;
         case RI_DOUBLE_MAGIC:
+            ComboRpg_RecordNativeMagic(2);
             gSaveContext.save.saveInfo.playerData.isMagicAcquired = true;
             gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired = true;
-            gSaveContext.save.saveInfo.playerData.magic = gSaveContext.magicFillTarget = MAGIC_DOUBLE_METER;
+            gSaveContext.save.saveInfo.playerData.magic = gSaveContext.magicFillTarget =
+                ComboRpg_MagicCapacity(MAGIC_DOUBLE_METER);
             gSaveContext.save.saveInfo.playerData.magicLevel = 0;
             SET_WEEKEVENTREG(WEEKEVENTREG_12_80);
             break;

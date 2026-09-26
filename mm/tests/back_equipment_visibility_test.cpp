@@ -4,6 +4,8 @@
 
 extern "C" {
 #include "global.h"
+#include "din_fire_shield.h"
+#include "din_fire_sword.h"
 
 SaveContext gSaveContext;
 u16 gEquipMasks[] = { 0xF, 0xF0, 0xF00, 0xF000 };
@@ -65,6 +67,15 @@ u8 Nei_HeldItemUsesOotHookshotModel(Player*) {
 }
 
 Gfx* FourSword_HeldSwordDL(void) {
+    return nullptr;
+}
+
+// Keep optional Din hand replacements disabled for native/adult visibility checks.
+void* DinFireSword_HandDL(PlayState*, Player*, void*) {
+    return nullptr;
+}
+
+void* DinFireShield_HandDL(PlayState*, Player*, void*) {
     return nullptr;
 }
 

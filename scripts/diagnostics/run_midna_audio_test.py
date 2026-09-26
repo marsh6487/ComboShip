@@ -59,7 +59,8 @@ with tempfile.TemporaryDirectory(prefix='midna-audio-test-') as folder:
     print(result.stdout.strip())
     resources = (ROOT / 'soh/soh/Enhancements/audio/MidnaAudioResources.cpp').read_text()
     adapter = ''.join(function(resources, name) for name in
-                      ('GetOwnResourceManager', 'Enabled', 'HasModel', 'ReadClip', 'Gain'))
+                      ('GetOwnResourceManager', 'ListClips', 'ReadAssignment', 'WriteAssignment',
+                       'Enabled', 'HasModel', 'ReadClip', 'Gain'))
     source = folder/'resources.cpp'
     source.write_text((ROOT / 'soh/tests/midna_audio_resources_test.cpp').read_text().replace(
         '/* PRODUCTION_MIDNA_AUDIO_RESOURCES */', adapter))

@@ -1,3 +1,6 @@
+#include "din_fire_sword.h"
+#include "mods/combo_rpg.h"
+#include "din_fire_shield.h"
 /*
  * File: z_player.c
  * Overlay: ovl_player_actor
@@ -6159,6 +6162,7 @@ PlayerMeleeWeaponAnimation func_808335F4(Player* this) {
 }
 
 void func_80833728(Player* this, s32 index, u32 dmgFlags, s32 damage) {
+    dmgFlags = DinFireSword_SetDamageFlags(gPlayState, this, index, dmgFlags);
     this->meleeWeaponQuads[index].elem.atDmgInfo.dmgFlags = dmgFlags;
     this->meleeWeaponQuads[index].elem.atDmgInfo.damage = damage;
 
@@ -14217,6 +14221,9 @@ void Player_Update(Actor* thisx, PlayState* play) {
     // Skijer's NEI: re-stamp custom-item hold poses that hand-write jointTable (ball & chain), now
     // that PlayerAnimation_Update inside Player_UpdateCommon has re-sampled the anim into jointTable.
     CustomItems_LatePose(this, play);
+    DinFireShield_Update(play, this);
+    DinFireSword_Update(play, this);
+    DinFireSword_RefreshDamage(play, this);
 skipUpdate:
     play->actorCtx.isOverrideInputOn = false;
     memset(&play->actorCtx.overrideInput, 0, sizeof(Input));
@@ -14378,10 +14385,14 @@ void Player_Draw(Actor* thisx, PlayState* play) {
         extern s32 AdultLink_ShouldHide(void);
         extern void AdultLink_Draw(PlayState * play, Player * player);
         if (AdultLink_ShouldHide()) {
+            DinFireSword_BeginPlayerDraw(play, this);
             AdultLink_Draw(play, this);
+            DinFireSword_DrawAfterPlayer(play, this);
             return;
         }
     }
+
+    DinFireSword_BeginPlayerDraw(play, this);
 
     Math_Vec3f_Copy(&this->unk_D6C, &this->bodyPartsPos[PLAYER_BODYPART_WAIST]);
     if (this->stateFlags3 & (PLAYER_STATE3_100 | PLAYER_STATE3_40000)) {
@@ -14677,11 +14688,17 @@ void Player_Draw(Actor* thisx, PlayState* play) {
         ExtEquip_DrawBehavior(this, play);
     }
 
+    DinFireSword_DrawAfterPlayer(play, this);
+
     play->actorCtx.flags &= ~ACTORCTX_FLAG_3;
 }
 
 void Player_Destroy(Actor* thisx, PlayState* play) {
     Player* this = (Player*)thisx;
+    if (this == GET_PLAYER(play)) {
+        DinFireSword_Reset();
+        DinFireShield_Reset();
+    }
 
     Effect_Destroy(play, this->meleeWeaponEffectIndex[0]);
     Effect_Destroy(play, this->meleeWeaponEffectIndex[1]);
@@ -16373,6 +16390,11 @@ void Player_Action_13(Player* this, PlayState* play) {
             speedTarget *= 1.5f;
         }
 
+        // Apply the OoT RPG speed stat at the same movement stage as Kokiri's
+        // Emerald. Multiplying preserves both bonuses across the whole walk,
+        // including the frame the stone activates or the save is restored.
+        speedTarget *= ComboRpg_SpeedMultiplier();
+
         // (Boss Remains Odolwa 2x-hold-A now multiplies centrally in Player_GetMovementSpeedAndYaw, so
         // it also boosts backward/sideways/targeting movement — not just this forward walk.)
 
@@ -18012,7 +18034,8 @@ void Player_Action_50(Player* this, PlayState* play) {
 
     if (GameInteractor_Should(VB_SET_CLIMB_SPEED, true, &var_fv1)) {
         // Spiritual Stone: Goron's Ruby — climb +2 (var_fv1 is the ±1 direction sign)
-        this->skelAnime.playSpeed = var_fv1 * var_fv0 + var_fv1 * (SpiritualStone_GoronClimbActive() ? 2 : 0);
+        this->skelAnime.playSpeed =
+            var_fv1 * (var_fv0 + (SpiritualStone_GoronClimbActive() ? 2 : 0) + ComboRpg_ClimbBonus());
     }
 
     if (this->av2.actionVar2 >= 0) {

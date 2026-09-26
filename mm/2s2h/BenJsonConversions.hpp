@@ -5,6 +5,7 @@
 #include <spdlog/spdlog.h>
 #include "build.h"
 #include <cstring> // memset for NEI save defaults (Skijer's NEI)
+#include "../../combo/rando/RpgStatsJson.h"
 
 extern "C" {
 #include "z64save.h"
@@ -140,6 +141,9 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "ootCanGrab", n.ootCanGrab },
         { "activeCustomForm", n.activeCustomForm },
         { "marioMaskOwned", n.marioMaskOwned },
+        { "comboSpeedUpgrades", n.comboSpeedUpgrades },
+        { "comboSpeedRequired", n.comboSpeedRequired },
+        { "comboRpg", ComboRpg::ToJson(n.comboRpg) },
     };
 }
 
@@ -267,6 +271,11 @@ inline void from_json(const json& j, NeiSaveData& n) {
     n.ootCanGrab = j.value("ootCanGrab", (uint8_t)0);
     n.activeCustomForm = j.value("activeCustomForm", (uint8_t)0);
     n.marioMaskOwned = j.value("marioMaskOwned", (uint8_t)0);
+    n.comboSpeedUpgrades = j.value("comboSpeedUpgrades", (uint8_t)0);
+    n.comboSpeedRequired = j.value("comboSpeedRequired", (uint8_t)0);
+    if (j.contains("comboRpg"))
+        ComboRpg::MergeJson(n.comboRpg, j["comboRpg"]);
+    ComboRpg::MigrateLegacySpeed(n.comboRpg, n.comboSpeedUpgrades, n.comboSpeedRequired);
 }
 
 // Spiritual Stones — per-save state (gSaveContext.save.shipSaveInfo.spiritualStones).
@@ -743,6 +752,16 @@ inline void from_json(const json& j, Save& save) {
     j.at("isOwlSave").get_to(save.isOwlSave);
     j.at("saveInfo").get_to(save.saveInfo);
     j.at("shipSaveInfo").get_to(save.shipSaveInfo);
+    // Older MM saves always used the native 48/96 meter. Preserve that earned
+    // capacity once; current snapshots explicitly store even a zero native tier
+    // so RPG-derived ownership flags can never become native pickups on reload.
+    const auto& ship = j.at("shipSaveInfo");
+    const bool hasNativeMagicTier = ship.contains("nei") && ship["nei"].contains("comboRpg") &&
+                                    ship["nei"]["comboRpg"].contains("nativeMagicLevel");
+    if (!hasNativeMagicTier) {
+        save.shipSaveInfo.nei.comboRpg.nativeMagicLevel =
+            save.saveInfo.playerData.isMagicAcquired ? (save.saveInfo.playerData.isDoubleMagicAcquired ? 2 : 1) : 0;
+    }
 }
 
 inline void to_json(json& j, const SaveContext& saveContext) {

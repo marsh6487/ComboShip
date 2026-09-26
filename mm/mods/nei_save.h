@@ -3,6 +3,7 @@
 #define NEI_SAVE_H
 
 #include <stdint.h>
+#include "../../combo/rando/RpgStats.h"
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_COMBO_OBTAINED_FC_SIZE
 
 #ifdef __cplusplus
@@ -311,6 +312,10 @@ typedef struct NeiSaveData {
     // pickup grants one season (slate idiom, no levels). APPENDED AT THE END.
     uint8_t season;       // SEASON_* — the season the cell shows
     uint8_t seasonsOwned; // SEASON_* bitmask (four bits) — 0 = rod not owned at all
+    // OoT RPG Speed Upgrades mirrored by FleetSync. Append to preserve older saves.
+    uint8_t comboSpeedUpgrades;
+    uint8_t comboSpeedRequired; // effective upgrade count from the saved OoT seed; 0 means default 5
+    ComboRpgState comboRpg;     // full OoT RPG seed rules and capped counters; legacy speed fields retained above
 } NeiSaveData;
 
 // Hookshot-cell variant ids (which item currently fires from SLOT_HOOKSHOT). Returned by

@@ -11,7 +11,7 @@
  * lists (overlays/ovl_Magic_Fire/{sMaterialDL,sModelDL,sSphereVtx,sTex}) from oot.o2r via the
  * OotAssets loader, so Din's Fire renders exactly like OoT. Shared by both Din's Fire
  * (ACTOR_OOT_DINS_FIRE, its own actor row) and the Fire Medallion (ACTOR_SW97_MAGIC_FIRE) — in
- * OoT/the fork they are the identical orange/red flame, so there is no params branch.
+ * both actors retain this sphere, with separate live colors and an optional Fire Medallion texture pair.
  *
  * MM adaptations vs OoT: damage bit DMG_MAGIC_FIRE (0x20000) → DMG_FIRE_ARROW (0x800); screen tint
  * via MM's master-DL fillRect idiom (Gfx_SetupDL57); Gfx_SetupDL25_Xlu / Matrix_NewMtx MM helpers.
@@ -19,15 +19,17 @@
 
 #include "expansions/sw97/sw97_compat.h"
 #include "expansions/sw97/sw97_config.h"
+#include "align_asset_macro.h"
+#include "2s2h/BenGui/CosmeticEditor.h"
+#include "soh/ResourceManagerHelpers.h"
+#include <libultraship/bridge/resourcebridge.h>
 
 // ============================================================
 // Struct (real OoT ovl_Magic_Fire layout)
 // ============================================================
 
-// One struct, two visual paths. Din's Fire (ACTOR_OOT_DINS_FIRE) uses the sphere fields
-// (screenTint*); the Fire Medallion (ACTOR_SW97_MAGIC_FIRE) uses skelCurve + colliderScale for the
-// SW97 baked SkelCurve dome. Both share action/actionTimer/alphaMultiplier/scalingSpeed. Only one
-// path ever runs per instance (selected by thisx->id), so the overlapping fields never conflict.
+// Both live actor ids use the sphere fields. Keep the retired SkelCurve fields
+// for the unused historical implementation below; the router never selects it.
 typedef struct MagicFire {
     /* 0x0000 */ Actor actor;
     /* 0x014C */ ColliderCylinder collider;
@@ -48,9 +50,8 @@ extern s16 gSw97ActorId_MagicFire;
 #define FLAGS 0x02000010
 #define THIS ((MagicFire*)thisx)
 
-// Public entry points (the router #defines these five to Sw97_MagicFire_*). Each branches on
-// thisx->id: ACTOR_OOT_DINS_FIRE -> the OoT sphere (MagicFireDins_*), else the Fire Medallion
-// SkelCurve dome (MagicFireMed_*).
+// Public entry points (the router #defines these five to Sw97_MagicFire_*).
+// Both actor ids use the accepted OoT sphere (MagicFireDins_*).
 void MagicFire_Init(Actor* thisx, PlayState* play);
 void MagicFire_Destroy(Actor* thisx, PlayState* play);
 void MagicFire_Update(Actor* thisx, PlayState* play);
@@ -123,41 +124,36 @@ static u8 sVertexIndices[] = {
 };
 
 // ============================================================
-// Companion (oot.o2r) real display lists — loaded once, retried while absent.
+// Companion sphere resources — validate afresh and submit named references for Alt/HD metadata.
 // ============================================================
 
 extern void* OotAssets_LoadGfx(const char* otrPath);
 extern void* OotAssets_LoadTexOrDList(const char* otrPath);
 extern Vtx* ResourceMgr_LoadVtxByName(char* path); // 2s2h BenPort (C-linkage); redundant if BenPort.h is in scope
 
+static const char ALIGN_ASSET(2) sMagicFireOotMaterialDL[] = "__OTR__overlays/ovl_Magic_Fire/sMaterialDL";
+static const char ALIGN_ASSET(2) sMagicFireOotModelDL[] = "__OTR__overlays/ovl_Magic_Fire/sModelDL";
+static const char ALIGN_ASSET(2) sMagicFireOotTex[] = "__OTR__overlays/ovl_Magic_Fire/sTex";
+static const char ALIGN_ASSET(2) sMagicFireOotSphereVtx[] = "__OTR__overlays/ovl_Magic_Fire/sSphereVtx";
+static const char ALIGN_ASSET(2) sMagicFireMedallion1Tex[] = "__OTR__custom/medallion_magic/spells/fire/s1Tex";
+static const char ALIGN_ASSET(2) sMagicFireMedallion2Tex[] = "__OTR__custom/medallion_magic/spells/fire/s2Tex";
+
 static Gfx* MagicFire_GetOotMaterialDL(void) {
-    static Gfx* sDL = NULL;
-    if (sDL == NULL) {
-        sDL = (Gfx*)OotAssets_LoadGfx("__OTR__overlays/ovl_Magic_Fire/sMaterialDL");
-    }
-    return sDL;
+    return (Gfx*)OotAssets_LoadGfx(sMagicFireOotMaterialDL);
 }
 
 static Gfx* MagicFire_GetOotModelDL(void) {
-    static Gfx* sDL = NULL;
-    if (sDL == NULL) {
-        sDL = (Gfx*)OotAssets_LoadGfx("__OTR__overlays/ovl_Magic_Fire/sModelDL");
-    }
-    return sDL;
+    return (Gfx*)OotAssets_LoadGfx(sMagicFireOotModelDL);
 }
 
 static void* MagicFire_GetOotTex(void) {
-    static void* sTex = NULL;
-    if (sTex == NULL) {
-        sTex = OotAssets_LoadTexOrDList("__OTR__overlays/ovl_Magic_Fire/sTex");
-    }
-    return sTex;
+    return OotAssets_LoadTexOrDList(sMagicFireOotTex);
 }
 
 static Vtx* MagicFire_GetOotSphereVtx(void) {
-    // The companion sModelDL draws sSphereVtx; loading the same Vtx resource here returns the SAME
-    // cached array, so alpha edits below are what the model DL renders (real-OoT fade mechanism).
-    return ResourceMgr_LoadVtxByName((char*)"__OTR__overlays/ovl_Magic_Fire/sSphereVtx");
+    // The named model and this fade lookup must resolve the same current Alt/base
+    // resource. Retaining a raw pointer would keep the previous pack after a toggle.
+    return ResourceMgr_LoadVtxByName((char*)sMagicFireOotSphereVtx);
 }
 
 // ============================================================
@@ -306,6 +302,14 @@ static void MagicFireDins_Update(Actor* thisx, PlayState* play) {
 
 static void MagicFireDins_Draw(Actor* thisx, PlayState* play) {
     MagicFire* this = THIS;
+    // Both MM actor ids use the OoT sphere. Read the appropriate live colors on
+    // every frame so charge, expansion and fade all share one appearance.
+    const char* primaryId = thisx->id == ACTOR_SW97_MAGIC_FIRE ? COSMETIC_ID("Magic.MedallionFirePrimary")
+                                                               : COSMETIC_ID("Magic.DinsPrimary");
+    const char* secondaryId = thisx->id == ACTOR_SW97_MAGIC_FIRE ? COSMETIC_ID("Magic.MedallionFireSecondary")
+                                                                 : COSMETIC_ID("Magic.DinsSecondary");
+    Color_RGBA8 primary = CosmeticEditor_GetChangedColor(255, 200, 0, 255, primaryId);
+    Color_RGBA8 secondary = CosmeticEditor_GetChangedColor(255, 0, 0, 255, secondaryId);
     u32 gameplayFrames = play->gameplayFrames;
     s32 i;
     u8 alpha;
@@ -325,6 +329,11 @@ static void MagicFireDins_Draw(Actor* thisx, PlayState* play) {
     if ((materialDL == NULL) || (modelDL == NULL) || (tex == NULL)) {
         return;
     }
+    const u8 medallionTextures = thisx->id == ACTOR_SW97_MAGIC_FIRE && ResourceMgr_IsAltAssetsEnabled() &&
+                                 ResourceMgr_FileAltExists(sMagicFireMedallion1Tex) &&
+                                 ResourceMgr_FileAltExists(sMagicFireMedallion2Tex) &&
+                                 ResourceGetDataByName(sMagicFireMedallion1Tex) != NULL &&
+                                 ResourceGetDataByName(sMagicFireMedallion2Tex) != NULL;
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -340,25 +349,34 @@ static void MagicFireDins_Draw(Actor* thisx, PlayState* play) {
     // env { 255, 0, 0 } (red). The actor matrix (translate world.pos * scale actor.scale) is already
     // on the stack from Actor_Draw; the 0.15 factor matches OoT.
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, 255, 200, 0, (u8)(this->alphaMultiplier * 255));
-    gDPSetEnvColor(POLY_XLU_DISP++, 255, 0, 0, (u8)(this->alphaMultiplier * 255));
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, primary.r, primary.g, primary.b, (u8)(this->alphaMultiplier * 255));
+    gDPSetEnvColor(POLY_XLU_DISP++, secondary.r, secondary.g, secondary.b, (u8)(this->alphaMultiplier * 255));
     Matrix_Scale(0.15f, 0.15f, 0.15f, MTXMODE_APPLY);
     gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, "z_magic_fire.inc.c", 0),
               G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
     gDPPipeSync(POLY_XLU_DISP++);
     gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
     gDPSetTextureLUT(POLY_XLU_DISP++, G_TT_NONE);
-    gDPLoadTextureBlock(POLY_XLU_DISP++, tex, G_IM_FMT_I, G_IM_SIZ_8b, 64, 64, 0, G_TX_NOMIRROR | G_TX_WRAP,
-                        G_TX_NOMIRROR | G_TX_WRAP, 6, 6, 15, G_TX_NOLOD);
+    gDPLoadTextureBlock(POLY_XLU_DISP++, sMagicFireOotTex, G_IM_FMT_I, G_IM_SIZ_8b, 64, 64, 0,
+                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 6, 6, 15, G_TX_NOLOD);
     gDPSetTile(POLY_XLU_DISP++, G_IM_FMT_I, G_IM_SIZ_8b, 8, 0, 1, 0, G_TX_NOMIRROR | G_TX_WRAP, 6, 14,
                G_TX_NOMIRROR | G_TX_WRAP, 6, 14);
     gDPSetTileSize(POLY_XLU_DISP++, 1, 0, 0, 252, 252);
-    gSPDisplayList(POLY_XLU_DISP++, materialDL);
+    gSPDisplayList(POLY_XLU_DISP++, sMagicFireOotMaterialDL);
+    if (medallionTextures) {
+        // The optional donor pair is 64x64 I4, two 2048-byte sheets. Give each
+        // render tile its own TMEM slot while preserving the sphere's UV shifts,
+        // masks and scrolling below. Submit after the material's native setup.
+        gDPLoadMultiBlock_4b(POLY_XLU_DISP++, sMagicFireMedallion1Tex, 0, 0, G_IM_FMT_I, 64, 64, 0,
+                             G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 6, 6, 15, G_TX_NOLOD);
+        gDPLoadMultiBlock_4b(POLY_XLU_DISP++, sMagicFireMedallion2Tex, 0x100, 1, G_IM_FMT_I, 64, 64, 0,
+                             G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 6, 6, 14, 14);
+    }
     gSPDisplayList(POLY_XLU_DISP++,
                    Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, (gameplayFrames * 2) % 512,
                                       511 - ((gameplayFrames * 5) % 512), 64, 64, 1, (gameplayFrames * 2) % 256,
                                       255 - ((gameplayFrames * 20) % 256), 32, 32, 2, -5, 2, -20));
-    gSPDisplayList(POLY_XLU_DISP++, modelDL);
+    gSPDisplayList(POLY_XLU_DISP++, sMagicFireOotModelDL);
 
     CLOSE_DISPS(play->state.gfxCtx);
 
@@ -922,8 +940,8 @@ static void MagicFireMed_Draw(Actor* thisx, PlayState* play) {
 // AND ACTOR_SW97_MAGIC_FIRE (Fire Medallion) — now run the REAL OoT ovl_Magic_Fire path
 // (MagicFireDins_*): the expanding textured sphere drawn with the companion oot.o2r's
 // overlays/ovl_Magic_Fire/{sMaterialDL,sModelDL,sSphereVtx,sTex}, exactly like soh
-// z_magic_fire.c. In OoT/the fork the two casts are the identical orange/red flame, so there is
-// no visual branch to keep. The old SW97 baked SkelCurve dome (MagicFireMed_*, sMed* data above)
+// z_magic_fire.c. Live colors and the optional Fire Medallion pair are selected in this shared
+// sphere draw. The old SW97 baked SkelCurve dome (MagicFireMed_*, sMed* data above)
 // is retired but kept compiled for reference; the (void) refs below stop unused-function warnings.
 //
 // o2r shadowing note: overlays/ovl_Magic_Fire does NOT exist in MM's own assets (no folder

@@ -6,6 +6,8 @@
 
 #include <libultraship/libultra.h>
 #include "global.h"
+#include "din_fire_shield.h"
+#include "din_fire_sword.h"
 
 #include "overlays/actors/ovl_Bg_Heavy_Block/z_bg_heavy_block.h"
 #include "overlays/actors/ovl_Bg_Toki_Swd/z_bg_toki_swd.h"
@@ -32,6 +34,7 @@
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h"
 #include "soh/Enhancements/enhancementTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
+#include "soh/Enhancements/randomizer/randostatupgrade.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance.h"
 #include "soh/Enhancements/randomizer/randomizer_grotto.h"
@@ -4738,6 +4741,7 @@ s32 Player_CalcSpeedAndYawFromControlStick(PlayState* play, Player* this, f32* o
 
             *outSpeedTarget = (*outSpeedTarget * 0.14f) - (8.0f * floorPitchInfluence * floorPitchInfluence);
             *outSpeedTarget = CLAMP(*outSpeedTarget, 0.0f, speedCap);
+            GameInteractor_Should(VB_PLAYER_SPEED_MULTIPLIER, true, this, outSpeedTarget);
 
             return true;
         }
@@ -5175,12 +5179,13 @@ s32 func_80837818(Player* this) {
     return sp18;
 }
 
-void func_80837918(Player* this, s32 quadIndex, u32 dmgFlags) {
+void func_80837918(PlayState* play, Player* this, s32 quadIndex, u32 dmgFlags) {
     // Giant's Mask: Link's strikes land as hammer blows (MM behavior). Skijer's NEI
     extern s32 MmMaskWear_IsGiantMaskActive(void);
     if (MmMaskWear_IsGiantMaskActive()) {
         dmgFlags = DMG_HAMMER_SWING;
     }
+    dmgFlags = DinFireSword_SetDamageFlags(play, this, quadIndex, dmgFlags);
     this->meleeWeaponQuads[quadIndex].info.toucher.dmgFlags = dmgFlags;
 
     if (dmgFlags == 2) {
@@ -5295,8 +5300,8 @@ void func_80837948(PlayState* play, Player* this, s32 arg2) {
                                                                                                    : D_80854488[0][0];
     }
 
-    func_80837918(this, 0, dmgFlags);
-    func_80837918(this, 1, dmgFlags);
+    func_80837918(play, this, 0, dmgFlags);
+    func_80837918(play, this, 1, dmgFlags);
 
     // Boss Remains (Odolwa): every melee swing with magic fires a moth projectile forward, like the
     // FD sword beam below. Self-guards on Odolwa-worn + magic. Mirrors the MM 2ship melee-setup hook.
@@ -10520,6 +10525,8 @@ s32 func_808428D8(Player* this, PlayState* play) {
     this->meleeWeaponAnimation = PLAYER_MWA_STAB_1H;
     this->yaw = this->actor.shape.rot.y + this->upperLimbRot.y;
 
+    DinFireSword_RefreshDamage(play, this);
+
     if (!CVarGetInteger(CVAR_ENHANCEMENT("CrouchStabHammerFix"), 0)) {
         return 1;
     }
@@ -10536,8 +10543,8 @@ s32 func_808428D8(Player* this, PlayState* play) {
     }
 
     u32 flags = D_80854488[swordId][0];
-    func_80837918(this, 0, flags);
-    func_80837918(this, 1, flags);
+    func_80837918(play, this, 0, flags);
+    func_80837918(play, this, 1, flags);
 
     return 1;
 }
@@ -12381,6 +12388,8 @@ void Player_Init(Actor* thisx, PlayState* play2) {
     s32 respawnFlag;
     s32 respawnMode;
 
+    DinFireShield_Reset();
+    DinFireSword_Reset();
     play->shootingGalleryStatus = play->bombchuBowlingStatus = 0;
 
     play->playerInit = Player_InitCommon;
@@ -13499,6 +13508,7 @@ static f32 sFloorConveyorSpeeds[] = { 0.5f, 1.0f, 3.0f };
 void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
     s32 pad;
 
+    BgTokiSwd_UpdateTimePedestalFill(play, this);
     sControlInput = input;
 
     if (this->unk_A86 < 0) {
@@ -13858,8 +13868,18 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
         Player_UpdateCamAndSeqModes(play, this);
 
         if (this->skelAnime.movementFlags & 8) {
-            AnimationContext_SetMoveActor(play, &this->actor, &this->skelAnime,
-                                          (this->skelAnime.movementFlags & 4) ? 1.0f : this->ageProperties->unk_08);
+            f32 movementYScale = (this->skelAnime.movementFlags & 4) ? 1.0f : this->ageProperties->unk_08;
+            f32 swordPullFloor;
+            if (BgTokiSwd_GetChildSwordPullFloor(play, this, &swordPullFloor)) {
+                // Keep the original reach and frame-87 sword transfer. The
+                // child's later animation root lift is ceremonial. With that
+                // lift disabled, the native and Young Din foot soles sit about
+                // 2-4 world units above the actor origin during the hold.
+                // Anchor close to the stump cap; the planted sword is unaffected.
+                Math_ApproachF(&this->actor.world.pos.y, swordPullFloor - 3.0f, 1.0f, 4.0f);
+                movementYScale = 0.0f;
+            }
+            AnimationContext_SetMoveActor(play, &this->actor, &this->skelAnime, movementYScale);
         }
 
         Player_UpdateShapeYaw(this, play);
@@ -14317,6 +14337,8 @@ void Player_Update(Actor* thisx, PlayState* play) {
     }
 
     GameInteractor_ExecuteOnPlayerUpdate();
+    DinFireShield_Update(play, this);
+    DinFireSword_Update(play, this);
 
     // SW97 Shadow Medallion heart→magic exchange — must run before the spell
     // cast pipeline aborts on zero magic, so it lives outside that gate.
@@ -14390,6 +14412,8 @@ void Player_DrawGameplay(PlayState* play, Player* this, s32 lod, Gfx* cullDList,
     static s32 D_8085486C = 255;
 
     OPEN_DISPS(play->state.gfxCtx);
+
+    DinFireSword_BeginPlayerDraw(play, this);
 
     gSPSegment(POLY_OPA_DISP++, 0x0C, cullDList);
     gSPSegment(POLY_XLU_DISP++, 0x0C, cullDList);
@@ -14494,6 +14518,10 @@ void Player_DrawGameplay(PlayState* play, Player* this, s32 lod, Gfx* cullDList,
         if (CVarGetInteger(CVAR_GENERAL("FixIceTrapWithBunnyHood"), 1))
             Matrix_Pop();
     }
+
+    // Body, equipment and masks have consumed their inherited material colors.
+    // Draw the saved sword pose now, before effects change the actor matrix.
+    DinFireSword_DrawAfterPlayer(play, this);
 
     if (Player_IsHovering(this) && !(this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) &&
         !(this->stateFlags1 & PLAYER_STATE1_ON_HORSE) && (this->hoverBootsTimer != 0)) {
@@ -15435,8 +15463,10 @@ void Player_Action_8084BF1C(Player* this, PlayState* play) {
         phi_f2 = -1.0f;
     }
 
-    this->skelAnime.playSpeed = phi_f2 * phi_f0 + phi_f2 * CVarGetInteger(CVAR_ENHANCEMENT("ClimbSpeed"), 0) +
-                                phi_f2 * (SpiritualStone_GoronClimbActive() ? 2 : 0);
+    this->skelAnime.playSpeed =
+        phi_f2 * phi_f0 +
+        phi_f2 * (IsClimbStatActive() ? GetClimbStatValue() : CVarGetInteger(CVAR_ENHANCEMENT("ClimbSpeed"), 0)) +
+        phi_f2 * (SpiritualStone_GoronClimbActive() ? 2 : 0);
 
     if (this->av2.actionVar2 >= 0) {
         if ((this->actor.wallPoly != NULL) && (this->actor.wallBgId != BGCHECK_SCENE)) {
@@ -16617,11 +16647,15 @@ static void Player_FinishTimePedestalArrival(PlayState* play, Player* this) {
 }
 
 void Player_Action_8084E9AC(Player* this, PlayState* play) {
-    if (BgTokiSwd_SkipTimePedestalArrival(play, this)) {
+    BgTokiSwd_UpdateTimePedestalArrivalCamera(play, this);
+    s32 skipArrival = BgTokiSwd_SkipTimePedestalArrival(play, this);
+    if (skipArrival > 0) {
         Player_FinishTimePedestalArrival(play, this);
         return;
     }
-    BgTokiSwd_UpdateTimePedestalArrivalCamera(play, this);
+    if (skipArrival < 0) {
+        return;
+    }
     if (LinkAnimation_Update(play, &this->skelAnime)) {
         if (this->av1.actionVar1 == 0) {
             if (DECR(this->av2.actionVar2) == 0) {

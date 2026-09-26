@@ -57,7 +57,8 @@ def main():
         adapter = ''.join(function(resources, name) for name in ('OwnManager', 'MMMidnaResources_Exists',
                                                                 'MMMidnaResources_Load'))
         adapter += 'namespace MMMidnaAudioResources {\n'
-        adapter += ''.join(function(resources, name) for name in ('Enabled', 'HasModel', 'ReadClip', 'Gain'))
+        adapter += ''.join(function(resources, name) for name in ('ListClips', 'ReadAssignment', 'WriteAssignment',
+                                                                'Enabled', 'HasModel', 'ReadClip', 'Gain'))
         adapter += '}\n'
         cppfile = folder / 'resources.cpp'
         cppfile.write_text((ROOT / 'mm/tests/midna_audio_resources_test.cpp').read_text().replace(

@@ -1,4 +1,6 @@
 #include "global.h"
+#include "din_fire_shield.h"
+#include "din_fire_sword.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/gameplay_field_keep/gameplay_field_keep.h"
 #include "objects/object_link_boy/object_link_boy.h"
@@ -1736,22 +1738,15 @@ static void Player_ApplyBackEquipmentVisibility(s32 limbIndex, Gfx** dList) {
     }
 }
 
-static void Player_ReverseTimePedestalEquipmentSword(Vec3s* rot) {
-    // Ordinary held-sword DLs point the blade along local -X. SkelAnime
-    // applies Rz * Ry * Rx after this callback; (-x, -y, z + pi) is the
-    // exact ZYX decomposition of (Rz * Ry * Rx) * Rz(pi).
-    rot->x = -rot->x;
-    rot->y = -rot->y;
-    rot->z += 0x8000;
-}
-
 static void Player_ApplyTimePedestalSword(PlayState* play, Player* player, s32 limbIndex, Gfx** dList, Vec3s* rot) {
+    // Keep the animated wrist basis. CustomEquipment applies the native child
+    // ceremonial placement to the selected sword alone, inside its display list.
+    (void)rot;
     if (limbIndex != PLAYER_LIMB_L_HAND) {
         return;
     }
     s32 handState = BgTokiSwd_GetTimePedestalHandState(play, player);
     if (handState != BG_TOKI_SWD_HAND_UNCHANGED) {
-        s32 reverseEquipmentSword = !LINK_IS_ADULT && handState == BG_TOKI_SWD_HAND_MASTER_SWORD;
         if (handState == BG_TOKI_SWD_HAND_CLOSED) {
             Gfx* swordDL = PakLoader_GetEquipDL(player, limbIndex);
             *dList = (swordDL != NULL && swordDL != PAK_DL_STUB)
@@ -1762,9 +1757,6 @@ static void Player_ApplyTimePedestalSword(PlayState* play, Player* player, s32 l
         // Resolve the weapon independently of the current-age equipment cache,
         // and compose it with this age's hand. The pedestal uses this source too.
         if (CustomEquipment_OverrideMasterSwordHand(play, dList)) {
-            if (reverseEquipmentSword) {
-                Player_ReverseTimePedestalEquipmentSword(rot);
-            }
             return;
         }
         // The native ceremonial resource already has the child animation's grip.
@@ -2532,6 +2524,12 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
         if ((*dList != NULL) && (this->actor.scale.y >= 0.0f) &&
             BgTokiSwd_GetTimePedestalHandState(play, this) == BG_TOKI_SWD_HAND_UNCHANGED) {
             BossRemains_DrawOdolwaSword(play, this);
+            // Coat the selected ordinary sword without replacing its model.
+            // Other weapon owners change sLeftHandType; unrelated PAK slots
+            // must not suppress this overlay.
+            if (sLeftHandType == PLAYER_MODELTYPE_LH_SWORD || sLeftHandType == PLAYER_MODELTYPE_LH_BGS) {
+                DinFireSword_Draw(play, this);
+            }
         }
 
         if (this->itemAction == PLAYER_IA_DEKU_STICK || this->itemAction == PLAYER_IA_ROD_FIRE ||
@@ -2707,6 +2705,7 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
     } else if (limbIndex == PLAYER_LIMB_R_HAND) {
         Actor* heldActor = this->heldActor;
 
+        DinFireShield_Draw(play, this);
         ItemEquip_CaptureHandMatrix();
 
         if (this->rightHandType == PLAYER_MODELTYPE_RH_FF) {

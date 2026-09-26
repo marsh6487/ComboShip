@@ -31,6 +31,22 @@ void BuildTriforcePieceMessage(CustomMessage&) {
 }
 void BuildTriforceMessage(CustomMessage&) {
 }
+void BuildQuarterHeartMessage(CustomMessage&) {
+}
+void BuildDefenseUpgradeMessage(CustomMessage&) {
+}
+void BuildSpeedUpgradeMessage(CustomMessage&) {
+}
+void BuildPowerUpgradeMessage(CustomMessage&) {
+}
+void BuildMagicStatUpgradeMessage(CustomMessage&) {
+}
+void BuildCrawlSpeedUpgradeMessage(CustomMessage&) {
+}
+void BuildClimbSpeedUpgradeMessage(CustomMessage&) {
+}
+void BuildPushSpeedUpgradeMessage(CustomMessage&) {
+}
 namespace Rando::Traps {
 void BuildIceTrapMessage(CustomMessage&, GetItemEntry) {
 }
@@ -59,6 +75,17 @@ int main() {
         loadedMessages = 0;
         registeredMessage(&text, &fromTable);
         REQUIRE(!fromTable && loadedMessages == 1);
+        player->getItemEntry.getItemId = RG_PROGRESSIVE_ROCS;
+        fromTable = true;
+        loadedMessages = 0;
+        registeredMessage(&text, &fromTable);
+        REQUIRE(!fromTable && loadedMessages == 1);
+        player->getItemEntry.objectId = OBJECT_INVALID;
+        fromTable = true;
+        loadedMessages = 0;
+        registeredMessage(&text, &fromTable);
+        REQUIRE(fromTable == !randomizer && loadedMessages == randomizer);
+        player->getItemEntry.objectId = OBJECT_GI_MEDAL;
         player->getItemEntry.getItemId = RG_PROGRESSIVE_BOW;
         fromTable = true;
         loadedMessages = 0;
@@ -73,5 +100,5 @@ int main() {
     }
     delete player;
     delete play;
-    puts("PASS Time Gate message: registered before pickup, normal/rando receipt, unrelated messages preserved");
+    puts("PASS fixed reward messages: Time Gate/house feather in normal and rando saves; unrelated messages preserved");
 }

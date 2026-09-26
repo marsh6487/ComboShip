@@ -140,6 +140,7 @@ CrowdControl* CrowdControl::Instance;
 #include "2s2h/resource/importer/TextMMFactory.h"
 #include "2s2h/resource/importer/BackgroundFactory.h"
 #include "2s2h/resource/importer/TextureAnimationFactory.h"
+#include "2s2h/resource/importer/SpinEffectTextureFactory.h"
 #include "2s2h/resource/importer/KeyFrameFactory.h"
 #include <ship/window/gui/resource/Font.h>
 #include <ship/window/FileDropMgr.h>
@@ -811,9 +812,9 @@ void OTRGlobals::Initialize() {
                 (char*)gGitBranch, (char*)gGitCommitHash);
 
     auto loader = context->GetResourceManager()->GetResourceLoader();
-    loader->RegisterResourceFactory(std::make_shared<Fast::ResourceFactoryBinaryTextureV0>(), RESOURCE_FORMAT_BINARY,
+    loader->RegisterResourceFactory(std::make_shared<MM::SpinEffectTextureFactoryV0>(), RESOURCE_FORMAT_BINARY,
                                     "Texture", static_cast<uint32_t>(Fast::ResourceType::Texture), 0);
-    loader->RegisterResourceFactory(std::make_shared<Fast::ResourceFactoryBinaryTextureV1>(), RESOURCE_FORMAT_BINARY,
+    loader->RegisterResourceFactory(std::make_shared<MM::SpinEffectTextureFactoryV1>(), RESOURCE_FORMAT_BINARY,
                                     "Texture", static_cast<uint32_t>(Fast::ResourceType::Texture), 1);
     loader->RegisterResourceFactory(std::make_shared<Fast::ResourceFactoryBinaryVertexV0>(), RESOURCE_FORMAT_BINARY,
                                     "Vertex", static_cast<uint32_t>(Fast::ResourceType::Vertex), 0);
@@ -1953,6 +1954,17 @@ extern "C" uint8_t ResourceMgr_FileExists(const char* filePath) {
         path = path.substr(7);
     }
 
+    return ExtensionCache.contains(path);
+}
+
+extern "C" uint8_t ResourceMgr_FileAltExists(const char* filePath) {
+    std::string path = filePath;
+    if (path.substr(0, 7) == "__OTR__") {
+        path = path.substr(7);
+    }
+    if (path.substr(0, 4) != "alt/") {
+        path = "alt/" + path;
+    }
     return ExtensionCache.contains(path);
 }
 

@@ -2,6 +2,7 @@
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "mods/nei_save.h" // ootHookshotLevel (FC 3-level hookshot chain obtainability)
+#include "mods/combo_rpg.h"
 // Needed by the OoT progressive chains below: they resolve to their concrete tier and degrade to
 // junk at the top, reading the SAME state their gives write. Skijer's NEI
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_OOT_SWORD_MASTER / FC_OOT_SWORD_BIGGORON
@@ -389,15 +390,17 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
         case RI_PROGRESSIVE_MAGIC:
             if (hasObtainedCheck) {
                 return false;
-            } else if (gSaveContext.save.saveInfo.playerData.isMagicAcquired &&
-                       gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired) {
+            } else if (ComboRpg_NativeMagicTier(gSaveContext.save.saveInfo.playerData.isMagicAcquired +
+                                                gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired) >= 2) {
                 return false;
             }
             return true;
         case RI_DOUBLE_MAGIC:
-            return !gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired;
+            return ComboRpg_NativeMagicTier(gSaveContext.save.saveInfo.playerData.isMagicAcquired +
+                                            gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired) < 2;
         case RI_SINGLE_MAGIC:
-            return !gSaveContext.save.saveInfo.playerData.isMagicAcquired;
+            return ComboRpg_NativeMagicTier(gSaveContext.save.saveInfo.playerData.isMagicAcquired +
+                                            gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired) == 0;
         case RI_MAGIC_JAR_SMALL:
         case RI_MAGIC_JAR_BIG:
             return gSaveContext.save.saveInfo.playerData.isMagicAcquired;
@@ -842,9 +845,11 @@ RandoItemId Rando::ConvertItem(RandoItemId randoItemId, RandoCheckId randoCheckI
                 assert(false);
                 return RI_JUNK;
             case RI_PROGRESSIVE_MAGIC:
-                if (!gSaveContext.save.saveInfo.playerData.isMagicAcquired) {
+                if (ComboRpg_NativeMagicTier(gSaveContext.save.saveInfo.playerData.isMagicAcquired +
+                                             gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired) == 0) {
                     return RI_SINGLE_MAGIC;
-                } else if (!gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired) {
+                } else if (ComboRpg_NativeMagicTier(gSaveContext.save.saveInfo.playerData.isMagicAcquired +
+                                                    gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired) < 2) {
                     return RI_DOUBLE_MAGIC;
                 }
                 // Shouldn't happen, just in case

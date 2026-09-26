@@ -1,3 +1,4 @@
+#include "din_fire_shield.h"
 /**
  * extended_inventory.c - Extended inventory system implementation
  *
@@ -785,6 +786,9 @@ uint8_t Nei_CaneActiveSkill(void);
 u8 KafeiLandmine_Active(void);
 
 void* ExtInv_GetItemIcon(uint16_t itemId) {
+    void* fireShieldIcon = DinFireShield_ItemIcon(itemId);
+    if (fireShieldIcon != NULL)
+        return fireShieldIcon;
 
     // Kafei lays SW97 landmines rather than throwing homing mice, so the slot has to read as one
     // while he is transformed and go back to the mouse the moment he is not. Skijer's NEI

@@ -3,6 +3,7 @@
 #include "test_require.h"
 #include "soh/Enhancements/audio/MidnaAudioResources.h"
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <map>
 #include <memory>
@@ -12,6 +13,14 @@
 #define CVAR_ENHANCEMENT(name) "gEnhancements." name
 static int master = 40, sfx = 50, loads;
 static int enabled = -1;
+static std::map<std::string, std::string> savedAssignments;
+const char* CVarGetString(const char* key, const char* fallback) {
+    auto it = savedAssignments.find(key);
+    return it == savedAssignments.end() ? fallback : it->second.c_str();
+}
+void CVarSetString(const char* key, const char* value) {
+    savedAssignments[key] = value;
+}
 int CVarGetInteger(const char* key, int fallback) {
     if (std::strcmp(key, "gEnhancements.MidnaCompanion") == 0) {
         REQUIRE(fallback == 0);
@@ -40,6 +49,16 @@ struct ArchiveManager {
     std::shared_ptr<File> LoadFile(const std::string& key) {
         ++loads;
         return files.at(key);
+    }
+    std::shared_ptr<std::vector<std::string>> ListFiles(const std::string& pattern) {
+        REQUIRE(pattern == "objects/midna_navi/audio/*");
+        auto result = std::make_shared<std::vector<std::string>>();
+        for (const auto& [path, file] : files) {
+            if (path.rfind("objects/midna_navi/audio/", 0) == 0) {
+                result->push_back(path);
+            }
+        }
+        return result;
     }
 };
 struct ResourceManager {
@@ -91,6 +110,16 @@ int main() {
     Ship::activeManager = Ship::otherManager;
 #endif
     REQUIRE(MidnaAudioResources::HasModel());
+    Ship::manager->archive.files["objects/midna_navi/audio/extra.WAV"] = file;
+    Ship::manager->archive.files["objects/midna_navi/audio/notes.txt"] = file;
+    REQUIRE(
+        (MidnaAudioResources::ListClips() == std::vector<std::string>{ path, "objects/midna_navi/audio/extra.WAV" }));
+    REQUIRE(MidnaAudioResources::ReadAssignment("Emerge", path) == path);
+    MidnaAudioResources::WriteAssignment("Emerge", "objects/midna_navi/audio/extra.WAV");
+    REQUIRE(MidnaAudioResources::ReadAssignment("Emerge", path) == "objects/midna_navi/audio/extra.WAV");
+    REQUIRE(savedAssignments.at("gEnhancements.MidnaAudio.Emerge") == "objects/midna_navi/audio/extra.WAV");
+    MidnaAudioResources::WriteAssignment("Emerge", "");
+    REQUIRE(MidnaAudioResources::ReadAssignment("Emerge", path).empty());
     REQUIRE(MidnaAudioResources::ReadClip(path, bytes));
     REQUIRE(loads == 1 && bytes.size() == 5 && bytes[4] == 255);
     REQUIRE(!MidnaAudioResources::ReadClip("objects/midna_navi/audio/absent.wav", bytes));
@@ -107,6 +136,7 @@ int main() {
     Ship::ownManager.reset();
     REQUIRE(!MidnaAudioResources::HasModel());
     REQUIRE(!MidnaAudioResources::ReadClip(path, bytes));
+    REQUIRE(MidnaAudioResources::ListClips().empty());
     Ship::ownManager = Ship::manager;
     Ship::manager->archive.files.clear();
     REQUIRE(!MidnaAudioResources::HasModel());

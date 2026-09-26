@@ -227,6 +227,15 @@ typedef struct {
 typedef struct ShipRandomizerSaveContextData {
     u8 triforcePiecesCollected;
     u8 bombchuUpgradeLevel;
+    u8 quarterHearts;
+    u8 defenseUpgrades;
+    u8 speedUpgrades;
+    u8 powerUpgrades;
+    u8 magicStatUpgrades;
+    u8 crawlSpeedUpgrades;
+    u8 climbSpeedUpgrades;
+    u8 pushSpeedUpgrades;
+    u8 comboNativeMagicLevel; // MM native magic capacity floor in an RPG seed (0/1/2)
 } ShipRandomizerSaveContextData;
 
 typedef struct ShipBossRushSaveContextData {

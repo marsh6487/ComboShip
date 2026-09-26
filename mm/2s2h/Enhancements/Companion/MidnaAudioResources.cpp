@@ -1,6 +1,7 @@
 #include "MidnaAudioResources.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <ship/Context.h>
 #include <ship/resource/File.h>
@@ -38,6 +39,42 @@ extern "C" void* MMMidnaResources_Load(const char* path) {
 }
 
 namespace MMMidnaAudioResources {
+std::vector<std::string> ListClips() {
+    const auto manager = OwnManager();
+    const auto archives = manager != nullptr ? manager->GetArchiveManager() : nullptr;
+    if (archives == nullptr) {
+        return {};
+    }
+    const auto files = archives->ListFiles("objects/midna_navi/audio/*");
+    std::vector<std::string> result;
+    if (files != nullptr) {
+        for (const auto& path : *files) {
+            if (path.size() < 4) {
+                continue;
+            }
+            std::string extension = path.substr(path.size() - 4);
+            std::transform(extension.begin(), extension.end(), extension.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (extension == ".wav") {
+                result.push_back(path);
+            }
+        }
+    }
+    std::sort(result.begin(), result.end());
+    result.erase(std::unique(result.begin(), result.end()), result.end());
+    return result;
+}
+
+std::string ReadAssignment(const char* event, const char* fallback) {
+    const std::string key = std::string("gEnhancements.MidnaAudioMM.") + event;
+    return CVarGetString(key.c_str(), fallback);
+}
+
+void WriteAssignment(const char* event, const std::string& path) {
+    const std::string key = std::string("gEnhancements.MidnaAudioMM.") + event;
+    CVarSetString(key.c_str(), path.c_str());
+}
+
 bool Enabled() {
     return CVarGetInteger("gEnhancements.MidnaCompanionMM", 0) != 0;
 }
