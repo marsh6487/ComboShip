@@ -44,6 +44,7 @@ FrameTimingSpan FrameTiming_BeginSpan(void);
 void FrameTiming_EndSpan(FrameTimingPhase phase, FrameTimingSpan span);
 void FrameTiming_AddDuration(FrameTimingPhase phase, uint64_t nanos);
 void FrameTiming_EndFrame(FrameTimingContext context, int enabled);
+void FrameTiming_Shutdown(void);
 #ifdef __cplusplus
 }
 

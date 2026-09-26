@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test the real timing accumulator and compile its C bridge header; no ROM needed."""
+"""Test timing accounting, C bridge, and actual asynchronous log output; no ROM needed."""
 import os
 from pathlib import Path
 import shlex
@@ -23,3 +23,15 @@ with tempfile.TemporaryDirectory(prefix="oot-frame-timing-") as temporary:
     subprocess.run([os.environ.get("CC", "gcc"), "-std=c11", "-Wall", "-Werror", "-pedantic",
                     "-I", str(ROOT / "soh"), "-c", str(source), "-o", str(temporary / "bridge.o")], check=True)
     print("C bridge header compiled")
+    output_test = temporary / "frame_timing_output_test"
+    spdlog_flags = os.environ.get("FRAME_TIMING_SPDLOG_FLAGS")
+    if spdlog_flags is None:
+        spdlog_flags = subprocess.check_output(["pkg-config", "--cflags", "--libs", "spdlog"], text=True)
+    subprocess.run([
+        os.environ.get("CXX", "g++"), "-std=c++20", "-Wall", "-Wextra", "-Werror", "-pedantic",
+        *shlex.split(os.environ.get("FRAME_TIMING_CXXFLAGS", "")),
+        "-I", str(ROOT / "soh"), str(ROOT / "soh/tests/frame_timing_output_test.cpp"),
+        str(ROOT / "soh/soh/Enhancements/debugger/FrameTimingProbe.cpp"),
+        *shlex.split(spdlog_flags), "-pthread", "-o", str(output_test),
+    ], check=True)
+    subprocess.run([str(output_test), str(temporary / "timing.log")], check=True)

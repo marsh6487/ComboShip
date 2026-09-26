@@ -2224,6 +2224,7 @@ extern "C" void DeinitOTR() {
     sOOTResourceManager = nullptr;
 #endif
 
+    FrameTiming_Shutdown();
     OTRGlobals::Instance->context = nullptr;
     // Destroys the Context (libultraship owns it since #1103). Was previously implicit: soh dropped
     // the last shared_ptr. Must stay here — MM_Deinit runs first and only clears its own pointer.

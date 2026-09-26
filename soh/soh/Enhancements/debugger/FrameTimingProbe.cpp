@@ -1,11 +1,14 @@
 #include "FrameTimingProbe.h"
 
 #include <chrono>
+#include <memory>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 namespace {
 thread_local FrameTiming::Recorder recorder;
+std::shared_ptr<spdlog::logger> diagnosticLogger;
+int previousEnabled = -1;
 
 uint64_t Now() {
     return static_cast<uint64_t>(
@@ -18,9 +21,50 @@ constexpr const char* names[] = { "tick_build",        "play_update",      "play
                                   "interpolation",     "draw_and_present", "frame_ready",      "render_setup",
                                   "graphics_commands", "gui_finish",       "present" };
 static_assert(sizeof(names) / sizeof(names[0]) == FRAME_TIMING_PHASE_COUNT);
+
+const std::shared_ptr<spdlog::logger>& DiagnosticLogger() {
+    // Reuse the application's existing sinks and asynchronous writer, but give
+    // this diagnostic its own level. A saved Warn/Off setting must not hide the
+    // capture, and normal resource logging must retain the user's preference.
+    if (!diagnosticLogger) {
+        diagnosticLogger = spdlog::default_logger()->clone("OoTFrameTimingProbe");
+        diagnosticLogger->set_level(spdlog::level::info);
+        diagnosticLogger->flush_on(spdlog::level::info);
+    }
+    return diagnosticLogger;
+}
+
+void ReportOutputState(bool enabled) {
+    if (previousEnabled == static_cast<int>(enabled)) {
+        return;
+    }
+    const nlohmann::json state = {
+        { "event", previousEnabled == -1 ? "startup" : "state" },
+        { "schema", 1 },
+        { "enabled", enabled },
+        { "phase_count", FRAME_TIMING_PHASE_COUNT },
+        { "interval_ms", 1000 },
+        { "normal_log_level_independent", true },
+        { "scope", "all OoT gameplay scenes; no slow-frame threshold" },
+    };
+    DiagnosticLogger()->info("[FrameTimingProbe] {}", state.dump());
+    previousEnabled = static_cast<int>(enabled);
+}
 } // namespace
 
+extern "C" void FrameTiming_Shutdown(void) {
+    // Release shared sinks while both game DLLs (which may own their formatter
+    // vtables) remain mapped. Context teardown drains the async queue afterward.
+    recorder = {};
+    if (diagnosticLogger) {
+        diagnosticLogger->flush();
+        diagnosticLogger.reset();
+    }
+    previousEnabled = -1;
+}
+
 extern "C" void FrameTiming_BeginFrame(FrameTimingContext context, int enabled) {
+    ReportOutputState(enabled != 0);
     recorder.BeginFrame(context, enabled != 0, enabled && context.scene >= 0 ? Now() : 0);
 }
 
@@ -61,6 +105,8 @@ extern "C" void FrameTiming_EndFrame(FrameTimingContext context, int enabled) {
         };
     }
     const nlohmann::json record = {
+        { "event", "sample" },
+        { "schema", 1 },
         { "scene", report->context.scene },
         { "room", report->context.room },
         { "age", report->context.age },
@@ -79,5 +125,5 @@ extern "C" void FrameTiming_EndFrame(FrameTimingContext context, int enabled) {
         { "semantics",
           "inclusive elapsed scopes; nested phases overlap; draw_and_present includes pacing and GPU waits" },
     };
-    SPDLOG_INFO("[FrameTimingProbe] {}", record.dump());
+    DiagnosticLogger()->info("[FrameTimingProbe] {}", record.dump());
 }

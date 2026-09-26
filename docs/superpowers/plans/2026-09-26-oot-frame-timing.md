@@ -20,6 +20,7 @@
 - Report actual scope semantics: nested measurements overlap; graphics/presentation includes pacing and GPU waits and is not a GPU timer. Logic ticks are distinct from rendered frames.
 - Reset aggregation across scene/room/age/Alt/pause/target changes. Disabled collection must discard partial data, avoid clock reads and ignore stale scopes.
 - Log at most one aggregate per second. Log formatting is outside the measured tick. Scene transitions discard incomplete windows instead of mixing configurations.
+- Clone the application's existing logger and asynchronous writer with an independent Info level, so saved Warn/Off levels cannot suppress diagnostics. Preserve normal game logging settings. Emit an explicit startup record and enable-state changes; samples include schema and event fields.
 - `gDeveloperTools.FrameTimingProbe` defaults to 1 only in this diagnostic candidate; setting it to 0 disables collection.
 - Runtime request: reproduce the slowdown for about 20 seconds in Kakariko or Graveyard, then provide the log. No performance improvement is claimed.
 
@@ -60,3 +61,5 @@
 - Generated Python bytecode was removed from the index after review; it is not part of the candidate.
 - The production logging adapter passes a C++20 syntax compile against real nlohmann JSON and spdlog headers. The existing custom-cosmetics regression suite passes. Full Windows build and in-game behavior remain unverified until CI and the user capture.
 - Review limitations: rendering call order was inspected, not run against a GPU; no runtime overhead or root-cause claim is made. This candidate must not be promoted as a performance fix.
+- User requires useful output without discovering missing logging parameters after a long build. An integration test using the production adapter and real asynchronous rotating-file sink reproduced the original missing-output failure with normal logging Off. After isolating the diagnostic logger, the test passes with both Off and Warn, verifies startup and disabled-state records, parses both complete samples with all 15 phases, and confirms normal logging settings remain unchanged. The CI gate now runs this output test before either full application build.
+- Follow-up review found that retaining the cloned sinks through static destruction could outlive game DLL formatter code. A sink-lifetime assertion reproduced that retention. `FrameTiming_Shutdown` now releases the logger immediately before Context destruction, with both DLLs still mapped. The output test passes again and additionally proves sink release plus a fresh startup record on a new logger after reinitialization. This does not substitute for Windows DLL-unload runtime testing.
