@@ -2550,6 +2550,7 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, UIWidgets::ColorValues.at(themeColor));
     const bool collectRenderTimings = FrameTiming_IsActive() != 0;
     wnd->SetCollectFrameTimings(collectRenderTimings);
+    intp->SetCollectRenderCosts(collectRenderTimings && CVarGetInteger(CVAR_DEVELOPER_TOOLS("RendererCostProbe"), 1));
     for (int i = 0; i < count; i++) {
         time += step;
         const auto interpolationTiming = FrameTiming_BeginSpan();
@@ -2570,11 +2571,13 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
                 FrameTiming_AddDuration(FRAME_TIMING_GRAPHICS_COMMANDS, timings.commands);
                 FrameTiming_AddDuration(FRAME_TIMING_GUI_FINISH, timings.gui);
                 FrameTiming_AddDuration(FRAME_TIMING_PRESENT, timings.present);
+                FrameTiming_LogRenderCost(intp->GetRenderCostReport(), CurrentFrameTimingContext());
             }
         }
         intp->mInterpolationIndex++;
     }
     wnd->SetCollectFrameTimings(false);
+    intp->SetCollectRenderCosts(false);
     ImGui::PopStyleColor();
 }
 

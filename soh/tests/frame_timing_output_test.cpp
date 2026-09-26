@@ -1,4 +1,5 @@
 #include "soh/Enhancements/debugger/FrameTimingProbe.h"
+#include "fast/RenderCostProbe.h"
 
 #include <cassert>
 #include <chrono>
@@ -43,8 +44,27 @@ int main(int argc, char** argv) {
         FrameTiming_AddDuration(FRAME_TIMING_PRESENT, 500000);
         std::this_thread::sleep_for(std::chrono::milliseconds(1050));
         FrameTiming_EndFrame(play, 1);
+        Fast::RenderCostProbe render;
+        FrameTiming_LogRenderCost(render.Report(), play); // Unsampled reports must not be emitted.
+        render.BeginFrame(true, 1000);
+        render.SyncDepth(1);
+        render.SetResource("objects/young_din/head");
+        render.AddCommand(4, 5, "G_TRI1", 2000000);
+        {
+            Fast::RenderTextureScope texture(&render, "textures/young_din/hair");
+            render.AddUpload(4096, 500000);
+        }
+        render.MutableReport().backend = "Direct3D 11";
+        render.MutableReport().gameTick = 42;
+        render.MutableReport().interpolationIndex = 1;
+        render.MutableReport().interpolationT = 0.5f;
+        render.MutableReport().renderWidth = 1280;
+        render.MutableReport().renderHeight = 720;
+        render.MutableReport().cacheMisses = 1;
+        render.EndFrame(3001000);
+        FrameTiming_LogRenderCost(render.Report(), play);
         assert(gameLogger->level() == level);      // Preserve the user's normal logging preference.
-        assert(spdlog::default_logger() == decoy); // Never repair output by replacing a module's default logger.
+        assert(spdlog::default_logger() == decoy); // Keep module-local logging unchanged.
     }
     FrameTiming_BeginFrame(play, 0);
     FrameTiming_EndFrame(play, 0);
@@ -61,9 +81,33 @@ int main(int argc, char** argv) {
     std::ifstream log(logPath);
     std::string line;
     int samples = 0;
+    int renderSamples = 0;
     bool armed = false;
     bool disabled = false;
     while (std::getline(log, line)) {
+        const std::string renderMarker = "[RenderCostProbe] ";
+        const auto renderStart = line.find(renderMarker);
+        if (renderStart != std::string::npos) {
+            ++renderSamples;
+            const auto cost = nlohmann::json::parse(line.substr(renderStart + renderMarker.size()));
+            assert(cost.at("scene") == play.scene);
+            assert(cost.at("sample_every") == 31);
+            assert(cost.at("game_tick") == 42);
+            assert(cost.at("interpolation_index") == 1);
+            assert(cost.at("interpolation_t") == 0.5);
+            assert(cost.at("backend") == "Direct3D 11");
+            assert(cost.at("render_width") == 1280);
+            assert(cost.at("total_ms") == 3.0);
+            assert(cost.at("command_sum_ms") == 2.0);
+            assert(cost.at("non_command_ms") == 1.0);
+            assert(cost.at("opcodes").at(0).at("name") == "G_TRI1");
+            assert(cost.at("top_resources").at(0).at("path") == "objects/young_din/head");
+            assert(cost.at("top_texture_uploads").at(0).at("path") == "textures/young_din/hair");
+            assert(cost.at("top_texture_uploads").at(0).at("bytes") == 4096);
+            assert(cost.at("cache").at("misses") == 1);
+            assert(cost.at("scopes").at("upload").at("ms") == 0.5);
+            continue;
+        }
         const auto marker = line.find("[FrameTimingProbe] ");
         if (marker == std::string::npos) {
             continue;
@@ -93,6 +137,7 @@ int main(int argc, char** argv) {
     assert(armed);
     assert(disabled);
     assert(samples == 2);
+    assert(renderSamples == 2);
 
     // A fresh Context in the same process must announce itself and bind to its
     // new sink instead of retaining the old file, pool, or enabled state.

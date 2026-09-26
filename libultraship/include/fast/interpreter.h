@@ -19,6 +19,7 @@
 #include "fast/debug/GfxDebugger.h"
 
 #include "fast/resource/type/Texture.h"
+#include "fast/RenderCostProbe.h"
 #include "ship/resource/Resource.h"
 
 // TODO figure out why changing these to 640x480 makes the game only render in a quarter of the window
@@ -425,6 +426,13 @@ class Interpreter {
 
     // private: TODO make these private
     void Flush();
+    void SetCollectRenderCosts(bool enabled) {
+        mCollectRenderCosts = enabled;
+    }
+    const RenderCostReport& GetRenderCostReport() const {
+        return mRenderCost.Report();
+    }
+    void UploadTextureMeasured(const uint8_t* rgba32, uint32_t width, uint32_t height);
     ShaderProgram* LookupOrCreateShaderProgram(uint64_t id0, uint64_t id1);
     ColorCombiner* LookupOrCreateColorCombiner(const ColorCombinerKey& key);
     void ShaderCacheClear();
@@ -517,6 +525,9 @@ class Interpreter {
     RenderingState mRenderingState{};
 
     GfxTextureCache mTextureCache{};
+    RenderCostProbe mRenderCost;
+    bool mCollectRenderCosts = false;
+    uint64_t mDiagnosticCacheClears = 0, mDiagnosticCacheDeletes = 0;
     std::unordered_map<const void*, std::shared_ptr<Ship::IResource>> mResolvedResourceCache;
     bool mResolvedResourceCacheEnabled = false;
     std::map<ColorCombinerKey, ColorCombiner> mColorCombinerPool; // color_combiner_pool;

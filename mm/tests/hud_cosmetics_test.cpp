@@ -40,6 +40,8 @@ struct DisplayList {
 #include "cache_types.inc"
 struct Interpreter {
     GfxTextureCache mTextureCache;
+    uint64_t mDiagnosticCacheClears = 0;
+    uint64_t mDiagnosticCacheDeletes = 0;
     std::unordered_map<const char*, int> mResolvedResourceCache;
     struct {
         TextureCacheNode* mTextures[SHADER_MAX_TEXTURES]{};

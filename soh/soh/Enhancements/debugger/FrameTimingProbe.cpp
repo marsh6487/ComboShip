@@ -1,4 +1,5 @@
 #include "FrameTimingProbe.h"
+#include "fast/RenderCostProbe.h"
 
 #include <chrono>
 #include <memory>
@@ -129,4 +130,110 @@ extern "C" void FrameTiming_EndFrame(FrameTimingContext context, int enabled) {
           "inclusive elapsed scopes; nested phases overlap; draw_and_present includes pacing and GPU waits" },
     };
     DiagnosticLogger()->info("[FrameTimingProbe] {}", record.dump());
+}
+
+extern "C" void FrameTiming_LogRenderCost(const Fast::RenderCostReport& report, FrameTimingContext context) {
+    if (!report.sampled) {
+        return;
+    }
+    auto counter = [](const Fast::RenderCostCounter& cost) {
+        return nlohmann::json{ { "calls", cost.calls }, { "ms", cost.nanos / 1000000.0 } };
+    };
+    uint64_t commandNanos = 0;
+    nlohmann::json opcodes = nlohmann::json::array();
+    for (size_t i = 0; i < report.opcodes.size(); ++i) {
+        const auto& cost = report.opcodes[i];
+        if (cost.calls == 0) {
+            continue;
+        }
+        commandNanos += cost.nanos;
+        auto entry = counter(cost);
+        entry["ucode"] = i / 256;
+        entry["opcode"] = i % 256;
+        entry["name"] = cost.name ? cost.name : "<unknown>";
+        opcodes.push_back(std::move(entry));
+    }
+    // Sort indices only. Reports keep no resource ownership and remain unchanged.
+    std::vector<size_t> order;
+    for (size_t i = 0; i < report.resources.size(); ++i) {
+        if (report.resources[i].commands.calls != 0) {
+            order.push_back(i);
+        }
+    }
+    std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+        return report.resources[a].commands.nanos > report.resources[b].commands.nanos;
+    });
+    nlohmann::json resources = nlohmann::json::array();
+    for (size_t i = 0; i < std::min<size_t>(12, order.size()); ++i) {
+        const auto& cost = report.resources[order[i]];
+        auto entry = counter(cost.commands);
+        entry["path"] = cost.path;
+        resources.push_back(std::move(entry));
+    }
+    order.clear();
+    for (size_t i = 0; i < report.textures.size(); ++i) {
+        if (report.textures[i].upload.calls != 0) {
+            order.push_back(i);
+        }
+    }
+    std::sort(order.begin(), order.end(),
+              [&](size_t a, size_t b) { return report.textures[a].upload.nanos > report.textures[b].upload.nanos; });
+    nlohmann::json textures = nlohmann::json::array();
+    for (size_t i = 0; i < std::min<size_t>(12, order.size()); ++i) {
+        const auto& cost = report.textures[order[i]];
+        auto entry = counter(cost.upload);
+        entry["path"] = cost.path;
+        entry["bytes"] = cost.bytes;
+        textures.push_back(std::move(entry));
+    }
+    const nlohmann::json record = {
+        { "event", "sample" },
+        { "schema", 1 },
+        { "scene", context.scene },
+        { "room", context.room },
+        { "age", context.age },
+        { "alt_assets", context.altAssets != 0 },
+        { "paused", context.paused != 0 },
+        { "target_fps", context.targetFps },
+        { "frame_index", report.frameIndex },
+        { "game_tick", report.gameTick },
+        { "interpolation_index", report.interpolationIndex },
+        { "interpolation_t", report.interpolationT },
+        { "sample_every", Fast::RenderCostProbe::SampleEvery },
+        { "backend", report.backend },
+        { "render_width", report.renderWidth },
+        { "render_height", report.renderHeight },
+        { "window_width", report.windowWidth },
+        { "window_height", report.windowHeight },
+        { "msaa", report.msaa },
+        { "total_ms", report.totalNanos / 1000000.0 },
+        { "command_sum_ms", commandNanos / 1000000.0 },
+        { "non_command_ms", (report.totalNanos >= commandNanos ? report.totalNanos - commandNanos : 0) / 1000000.0 },
+        { "opcodes", std::move(opcodes) },
+        { "top_resources", std::move(resources) },
+        { "top_texture_uploads", std::move(textures) },
+        { "resource_overflow", report.resourceOverflow },
+        { "scopes",
+          { { "texture_import", counter(report.textureImport) },
+            { "upload", counter(report.upload) },
+            { "driver_draw", counter(report.driverDraw) },
+            { "shader_create", counter(report.shaderCreate) },
+            { "framebuffer_setup", counter(report.framebufferSetup) },
+            { "framebuffer_finish", counter(report.framebufferFinish) } } },
+        { "cache",
+          { { "hits", report.cacheHits },
+            { "misses", report.cacheMisses },
+            { "evictions", report.cacheEvictions },
+            { "entries", report.cacheEntries },
+            { "clears_total", report.cacheClearsTotal },
+            { "deletes_total", report.cacheDeletesTotal } } },
+        { "upload_bytes", report.uploadBytes },
+        { "vertices", report.vertices },
+        { "triangles", report.triangles },
+        { "submitted_triangles", report.submittedTriangles },
+        { "semantics", "sampled CPU elapsed including driver waits, not GPU timestamps; nested scopes overlap; "
+                       "resource times are own commands, excluding child lists; total includes profiling overhead; "
+                       "cache clears/deletes are cumulative since interpreter initialization" },
+    };
+    DiagnosticLogger()->info("[RenderCostProbe] {}", record.dump());
 }
