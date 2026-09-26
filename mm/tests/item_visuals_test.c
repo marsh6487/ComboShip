@@ -1,4 +1,5 @@
 #include "global.h"
+#include "din_fire_shield.h"
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "2s2h/Enhancements/ItemVisuals.h"
 #include "2s2h/Rando/DungeonItemVisuals.h"
@@ -17,6 +18,11 @@ static float sTrace[128];
 static char sLastColorId[64];
 static const char* sBody = "fixture/body";
 static const char* sGlass = "fixture/glass";
+
+// Din rendering has its own production-module suite; exercise native item visuals here.
+int DinFireShield_DrawItem(PlayState* play, int16_t drawId) {
+    return 0;
+}
 
 static void FixtureDraw(PlayState* play, s16 id) {
     ++sDraws;

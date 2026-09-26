@@ -2,6 +2,7 @@
 #include "interface/parameter_static/parameter_static.h"
 #include "2s2h/BenGui/HudEditor.h"
 #include "2s2h/BenGui/CosmeticEditor.h"
+#include "mods/combo_rpg.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "tests/test_require.h"
 #include <string.h>
@@ -15,6 +16,9 @@ static PlayState play;
 static s16 sMagicMeterOutlinePrimRed = 255, sMagicMeterOutlinePrimGreen = 255, sMagicMeterOutlinePrimBlue = 255;
 void TestSetHudColor(const char* id, u8 r, u8 g, u8 b, int changed);
 void TestResetHudColors(void);
+NeiSaveData* Nei_Save(void) {
+    return &gSaveContext.save.shipSaveInfo.nei;
+}
 void FrameInterpolation_RecordOpenChild(const void* source, int line) {
 }
 void FrameInterpolation_RecordCloseChild(void) {
@@ -71,6 +75,13 @@ static int hasColor(unsigned op, uint32_t rgba) {
     }
     return matches;
 }
+static int countDrawCommands(unsigned op) {
+    int matches = 0;
+    for (Gfx* cmd = commands; cmd < gfx.overlay.p; ++cmd) {
+        matches += (cmd->words.w0 >> 24) == op;
+    }
+    return matches;
+}
 static void drawHearts(void) {
     beginDraw();
     LifeMeter_Draw(&play);
@@ -112,6 +123,16 @@ void TestHudDrawColors(void) {
     drawHearts();
     REQUIRE(hasColor(G_SETENVCOLOR, 0x2D5F91FF) == 3);
     puts("PASS: DD hex controls full/beating/empty fills; normal hearts, white border, fade and reset preserved");
+
+    gSaveContext.save.saveInfo.playerData.healthCapacity = 3 * 16 + 4;
+    gSaveContext.save.saveInfo.playerData.health = 16;
+    drawHearts();
+    REQUIRE(countDrawCommands(G_TEXRECT) == 2); // two static hearts plus one beating heart
+    Nei_Save()->comboRpg.quarterHeartsEnabled = 1;
+    drawHearts();
+    REQUIRE(countDrawCommands(G_TEXRECT) == 3); // the fractional capacity adds a fourth heart
+    Nei_Save()->comboRpg.quarterHeartsEnabled = 0;
+    puts("PASS: saved RPG quarter-heart rule draws fractional capacity through the real MM adapter");
 
     TestResetHudColors();
     gSaveContext.save.saveInfo.playerData.magicLevel = 1;

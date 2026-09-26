@@ -66,3 +66,11 @@ Recovery decisions: reuse the interrupted build and recompile/relink only the th
 ## Runtime acceptance still needed
 
 Use the intended child/adult models and Alt state in each game. Check Din guarding/idle/swing, grass and several enemy reactions, native and medallion arrows through release/impact, spell color changes during animation, Epona scene transitions, young pedestal arrival/exit in OoT, and a seed with RPG items through pickup, save/reload, game swap, and MM cycle reset. Include native magic before and after RPG magic. Record the exact build, save, active packs and configuration with any clip.
+
+## CI gate follow-up — 2026-09-26
+
+PR #15's first gate at `3bb84121f48ee551e24b29a939f49e025c77ee6d` failed while compiling the extracted MM HUD draw functions: the fixture lacked the new `ComboRpg_HeartCount` declaration and implementation. The HUD runner now links the real MM RPG adapter against fixture save state. A draw-command regression also checks that saved quarter-heart mode displays fractional capacity.
+
+Running the checks skipped after that failure exposed two more missing fixture dependencies: the item-visuals fixture lacked `DinFireShield_DrawItem`, and the adult back-equipment fixture lacked the Din hand adapters. Both fixtures now include the production headers and provide typed, disabled-feature boundaries. The separate production Din module suite still checks enabled rendering, hand composition, ownership and native item fallback. No production behavior or CI gate was changed.
+
+The HUD suite, all 21 commands after it, and the independent Din rendering suite passed locally, including the repaired item/back-equipment fixtures. The two renderer sanitizer commands required `ASAN_OPTIONS=detect_leaks=0` locally because LeakSanitizer cannot run under this container's tracing; address and undefined-behavior sanitizers remained active. CI retains its original sanitizer settings. Changed C/C++ fixtures satisfy clang-format-14; `git diff --check` passes. Hosted Windows/Linux build and package results must be read from the follow-up CI run; this fixture repair does not establish gameplay acceptance.

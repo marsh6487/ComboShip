@@ -78,7 +78,8 @@ def main():
             "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter", "-Wno-missing-field-initializers",
             "-DF3DEX_GBI_2", "-I" + str(build), "-I" + str(ROOT / "mm"),
             "-I" + str(ROOT / "libultraship/include"),
-            str(ROOT / "mm/tests/hud_cosmetics_test.cpp"), str(draw_object), "-o", str(binary),
+            str(ROOT / "mm/tests/hud_cosmetics_test.cpp"), str(ROOT / "mm/mods/combo_rpg.cpp"),
+            str(draw_object), "-o", str(binary),
         ], check=True)
         subprocess.run([str(binary)], check=True)
         for path in ["mm/src/code/z_lifemeter.c", "mm/src/code/z_parameter.c"]:
