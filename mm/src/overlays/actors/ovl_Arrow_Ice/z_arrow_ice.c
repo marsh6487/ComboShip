@@ -61,8 +61,8 @@ static void ArrowIce_DrawSnowflake(ArrowIce* this, PlayState* play, Vec3f* pos, 
         f32 charge = CLAMP(this->radius * 0.1f, 0.0f, 1.0f);
         // Gameplay time freezes on pause and stays stable across redraws.
         // At 20 Hz, turn once in twelve seconds with a gentle three-second pulse.
-        f32 pulse = sinf((play->gameplayFrames % 60) * (2.0f * M_PI / 60.0f));
-        rotation = (play->gameplayFrames % 240) * (2.0f * M_PI / 240.0f);
+        f32 pulse = sinf((play->gameplayFrames % 60) * (2.0f * M_PIf / 60.0f));
+        rotation = (play->gameplayFrames % 240) * (2.0f * M_PIf / 240.0f);
         halfSize = (5.0f + 7.0f * charge) * (1.0f + 0.04f * pulse);
         opacity = charge * (0.92f + 0.08f * pulse);
         if (this->actionFunc == ArrowIce_Fly) {
