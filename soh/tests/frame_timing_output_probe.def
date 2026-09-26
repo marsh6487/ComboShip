@@ -1,0 +1,8 @@
+EXPORTS
+    FrameTiming_BeginFrame
+    FrameTiming_IsActive
+    FrameTiming_BeginSpan
+    FrameTiming_AddDuration
+    FrameTiming_EndSpan
+    FrameTiming_EndFrame
+    FrameTiming_Shutdown

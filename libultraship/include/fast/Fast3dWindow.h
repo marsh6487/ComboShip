@@ -27,6 +27,22 @@ enum WindowBackend {
 
 class Fast3dWindow : public Ship::Window {
   public:
+    // Optional elapsed stage timings; command/present time can include driver
+    // and GPU waits. These are not GPU timestamp measurements.
+    struct FrameTimings {
+        uint64_t ready = 0;
+        uint64_t setup = 0;
+        uint64_t commands = 0;
+        uint64_t gui = 0;
+        uint64_t present = 0;
+    };
+    void SetCollectFrameTimings(bool enabled) {
+        mCollectFrameTimings = enabled;
+    }
+    const FrameTimings& GetLastFrameTimings() const {
+        return mLastFrameTimings;
+    }
+
     Fast3dWindow();
     Fast3dWindow(std::vector<std::shared_ptr<Ship::GuiWindow>> guiWindows);
     Fast3dWindow(std::shared_ptr<Ship::Gui> gui);
@@ -103,5 +119,7 @@ class Fast3dWindow : public Ship::Window {
     GfxWindowBackend* mWindowManagerApi;
     std::shared_ptr<Interpreter> mInterpreter = nullptr;
     std::shared_ptr<GfxDebugger> mGfxDebugger;
+    bool mCollectFrameTimings = false;
+    FrameTimings mLastFrameTimings;
 };
 } // namespace Fast

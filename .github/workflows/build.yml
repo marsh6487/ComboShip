@@ -56,6 +56,16 @@ jobs:
       # comboui + ComboShip pull the rest of the runtime in as dependencies.
       - name: Build libultraship
         run: cmake --build build/x64 --target libultraship --config Release
+      # Validate the actual Windows DLL logging boundary before spending time
+      # compiling both games. The check uses the real engine Context/file sink.
+      - name: Verify diagnostic output across Windows DLLs
+        shell: pwsh
+        run: |
+          cmake --build build/x64 --target frame_timing_output_check --config Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:PATH = "$PWD/x64/Release;$env:PATH"
+          & ./build/x64/frame-timing-check/Release/frame_timing_output_check.exe "$env:RUNNER_TEMP/frame-timing-output"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build soh
         run: cmake --build build/x64 --target soh --config Release
       - name: Build 2ship
