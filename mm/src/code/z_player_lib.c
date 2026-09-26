@@ -1,3 +1,6 @@
+#include "din_fire_sword.h"
+#include "din_fire_shield.h"
+#include "mods/items/logic/adult_link_render.h"
 /**
  * File: z_player_lib.c
  * Description: Set of library functions to interact with the Player system
@@ -3311,6 +3314,16 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
         }
     }
 
+    if (*dList != NULL && !AdultLink_IsActive()) {
+        Gfx* dinHand = NULL;
+        if (limbIndex == PLAYER_LIMB_LEFT_HAND)
+            dinHand = DinFireSword_HandDL(play, player, gPlayerLeftHandClosedDLs[D_801F59E0 + sPlayerLod]);
+        else if (limbIndex == PLAYER_LIMB_RIGHT_HAND)
+            dinHand = DinFireShield_HandDL(play, player, gPlayerRightHandClosedDLs[D_801F59E0 + sPlayerLod]);
+        if (dinHand != NULL)
+            *dList = dinHand;
+    }
+
     Player_ApplyBackEquipmentVisibility(limbIndex, dList);
     return false;
 }
@@ -4492,6 +4505,9 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList1, G
     // (Magic Cape shoulder capture removed — the cloth anchors on player->bodyPartsPos natively.)
 
     if (limbIndex == PLAYER_LIMB_LEFT_HAND) {
+        if (*dList1 != NULL) {
+            DinFireSword_Draw(play, player);
+        }
         Math_Vec3f_Copy(&player->leftHandWorld.pos, sPlayerCurBodyPartPos);
 
         // Skijer's NEI: OoT Boomerang in the left fist. OoT bakes it into the child hand DL
@@ -4747,6 +4763,9 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList1, G
 
                 Matrix_Get(&player->shieldMf);
                 Player_UpdateShieldCollider(play, player, &player->shieldQuad, sRightHandLimbModelShieldQuadVertices);
+                if (*dList1 != NULL) {
+                    DinFireShield_Draw(play, player);
+                }
                 // Skijer's NEI: draw the custom ext shield (Divine / Kite / Shield of Ikana) in the
                 // raised hand position (the native shield model was swapped to an open hand in the
                 // override above). ExtEquip_DrawShieldDL self-guards on the ext-equip state — no-op

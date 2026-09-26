@@ -37,4 +37,15 @@ void MMMidnaAudio_Reset(void);
 
 #ifdef __cplusplus
 }
+
+#include <string>
+#include <vector>
+
+// Menu operations use the decoded archive bank; no I/O is performed during playback.
+std::vector<std::string> MMMidnaAudio_GetAvailableClips();
+const char* MMMidnaAudio_GetEventLabel(MMMidnaAudioEvent event);
+std::string MMMidnaAudio_GetAssignment(MMMidnaAudioEvent event);
+// An empty path restores the native cue (silence for the optional idle yawn).
+bool MMMidnaAudio_Assign(MMMidnaAudioEvent event, const std::string& path);
+void MMMidnaAudio_ResetAssignments();
 #endif

@@ -65,6 +65,30 @@ std::map<std::string, CosmeticOption> cosmeticOptions = {
     COSMETIC_OPTION("Effects.IceArrowSec",          "Ice Arrow Secondary",      COSMETICS_GROUP_EFFECTS,      ColorRGBA8(  0,   0, 255, 128), false, true, false),
     COSMETIC_OPTION("Effects.LightArrowPrim",       "Light Arrow Primary",      COSMETICS_GROUP_EFFECTS,      ColorRGBA8(255, 255, 170, 255), false, true, false),
     COSMETIC_OPTION("Effects.LightArrowSec",        "Light Arrow Secondary",    COSMETICS_GROUP_EFFECTS,      ColorRGBA8(255, 255,   0, 128), false, true, false),
+    COSMETIC_OPTION("Custom.DinFireShieldCore", "Din Fire Shield Core", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 225, 122, 255), false, true, false),
+    COSMETIC_OPTION("Custom.DinFireShieldOuter", "Din Fire Shield Outer", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 43, 3, 255), false, true, false),
+    COSMETIC_OPTION("Custom.DinFireSwordCore", "Din Fire Sword Core", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 225, 122, 255), false, true, false),
+    COSMETIC_OPTION("Custom.DinFireSwordOuter", "Din Fire Sword Outer", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 43, 3, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionFirePrimary", "Fire Medallion Arrow Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 200, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionFireSecondary", "Fire Medallion Arrow Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 0, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionWaterPrimary", "Water Medallion Arrow Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(170, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionWaterSecondary", "Water Medallion Arrow Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(0, 0, 255, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionForestPrimary", "Forest Medallion Arrow Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(170, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionForestSecondary", "Forest Medallion Arrow Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(0, 255, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionShadowPrimary", "Shadow Medallion Arrow Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(0, 0, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionShadowSecondary", "Shadow Medallion Arrow Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(0, 0, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionLightPrimary", "Light Medallion Arrow Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionLightSecondary", "Light Medallion Arrow Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(170, 170, 170, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionSpiritPrimary", "Spirit Medallion Arrow Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 255, 170, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionSpiritSecondary", "Spirit Medallion Arrow Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 255, 0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionFirePrimary", "Fire Medallion Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 200, 0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionFireSecondary", "Fire Medallion Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 0, 0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionWaterPrimary", "Water Medallion Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(150, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionWaterSecondary", "Water Medallion Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(0, 100, 255, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionForestPrimary", "Forest Medallion Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 255, 170, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionForestSecondary", "Forest Medallion Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(150, 255, 0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.DinsPrimary", "Din's Fire Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 200, 0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.DinsSecondary", "Din's Fire Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 0, 0, 255), false, true, false),
     COSMETIC_OPTION("Trails.KokiriSwordTrail",      "Kokiri Sword Trail",       COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
     COSMETIC_OPTION("Trails.RazorSwordTrail",       "Razor Sword Trail",        COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
     COSMETIC_OPTION("Trails.GildedSwordTrail",      "Gilded Sword Trail",       COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
@@ -1036,6 +1060,14 @@ void CosmeticEditorWindow::DrawElement() {
         if (ImGui::BeginTabItem("Effects")) {
             UIWidgets::Separator(true, true, 2.0f, 2.0f);
             CosmeticEditorDrawGroup(COSMETICS_GROUP_EFFECTS);
+            UIWidgets::CVarCheckbox(
+                "Elemental impact sounds", CVAR_COSMETIC("Arrows.ElementalImpactSounds"),
+                UIWidgets::CheckboxOptions()
+                    .DefaultValue(false)
+                    .Color(THEME_COLOR)
+                    .Tooltip(
+                        "Use flame ignition, ice breaking, and a light-arrow hit sound for elemental arrow impacts. "
+                        "Turn off to use the original impact sounds."));
             CosmeticEditorDrawGroup(COSMETICS_GROUP_TRAILS);
             ImGui::EndTabItem();
         }

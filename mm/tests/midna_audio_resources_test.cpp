@@ -3,6 +3,7 @@
 #include "test_require.h"
 #include "2s2h/Enhancements/Companion/MidnaAudioResources.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <map>
 #include <memory>
@@ -11,6 +12,14 @@
 
 static std::map<std::string, int> settings;
 static std::map<std::string, float> volumes;
+static std::map<std::string, std::string> assignments;
+const char* CVarGetString(const char* key, const char* fallback) {
+    const auto found = assignments.find(key);
+    return found == assignments.end() ? fallback : found->second.c_str();
+}
+void CVarSetString(const char* key, const char* value) {
+    assignments[key] = value;
+}
 int CVarGetInteger(const char* key, int fallback) {
     return settings.count(key) ? settings.at(key) : fallback;
 }
@@ -30,6 +39,16 @@ struct ArchiveManager {
     std::shared_ptr<File> LoadFile(const std::string& path) {
         ++loads;
         return files.at(path);
+    }
+    std::shared_ptr<std::vector<std::string>> ListFiles(const std::string& pattern) {
+        REQUIRE(pattern == "objects/midna_navi/audio/*");
+        auto result = std::make_shared<std::vector<std::string>>();
+        for (const auto& [path, file] : files) {
+            if (path.rfind("objects/midna_navi/audio/", 0) == 0) {
+                result->push_back(path);
+            }
+        }
+        return result;
     }
 };
 struct Resource {
@@ -90,10 +109,24 @@ int main() {
     REQUIRE(MMMidnaAudioResources::Enabled());
     REQUIRE(!MMMidnaAudioResources::HasModel());
     REQUIRE(!MMMidnaAudioResources::ReadClip(path, bytes));
+    REQUIRE(MMMidnaAudioResources::ListClips().empty());
     REQUIRE(MMMidnaResources_Load(model) == nullptr);
     Ship::mm->archive->files[path] = file;
     Ship::mm->archive->files[model] = file;
     REQUIRE(MMMidnaAudioResources::HasModel());
+    const char* extra = "objects/midna_navi/audio/extra.WAV";
+    Ship::mm->archive->files[extra] = file;
+    Ship::mm->archive->files["objects/midna_navi/audio/notes.txt"] = file;
+    REQUIRE((MMMidnaAudioResources::ListClips() == std::vector<std::string>{ path, extra }));
+    REQUIRE(MMMidnaAudioResources::ReadAssignment("Emerge", path) == path);
+    assignments["gEnhancements.MidnaAudio.Emerge"] = "oot.wav";
+    REQUIRE(MMMidnaAudioResources::ReadAssignment("Emerge", path) == path);
+    MMMidnaAudioResources::WriteAssignment("Emerge", extra);
+    REQUIRE(MMMidnaAudioResources::ReadAssignment("Emerge", path) == extra);
+    REQUIRE(assignments.at("gEnhancements.MidnaAudioMM.Emerge") == extra);
+    REQUIRE(assignments.at("gEnhancements.MidnaAudio.Emerge") == "oot.wav");
+    MMMidnaAudioResources::WriteAssignment("Emerge", "");
+    REQUIRE(MMMidnaAudioResources::ReadAssignment("Emerge", path).empty());
     REQUIRE(MMMidnaAudioResources::ReadClip(path, bytes));
     REQUIRE(bytes.size() == 5 && bytes[4] == 255);
     REQUIRE(Ship::mm->archive->loads == 1 && Ship::oot->archive->loads == 0);
@@ -120,6 +153,7 @@ int main() {
     Ship::mm.reset();
     REQUIRE(!MMMidnaAudioResources::HasModel());
     REQUIRE(!MMMidnaAudioResources::ReadClip(path, bytes));
+    REQUIRE(MMMidnaAudioResources::ListClips().empty());
     REQUIRE(MMMidnaResources_Load(model) == nullptr); // absent MM never falls back to active OoT
     REQUIRE(MMMidnaAudioResources::Gain() == 0.4f);
     volumes["gSettings.Audio.SoundEffectsVolume"] = 0.5f;
@@ -131,5 +165,6 @@ int main() {
     REQUIRE(MMMidnaAudioResources::Gain() == 1.0f);
     volumes["gSettings.Audio.MasterVolume"] = std::numeric_limits<float>::quiet_NaN();
     REQUIRE(MMMidnaAudioResources::Gain() == 0.0f);
-    puts("PASS: MM manager isolation, exact WAV paths, independent opt-in, resource reloads and MM volumes");
+    puts("PASS: MM manager isolation, WAV discovery, independent sound assignments/opt-in, resource reloads and "
+         "volumes");
 }

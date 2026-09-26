@@ -1,3 +1,4 @@
+#include "din_fire_sword.h"
 /*
  * File: z_actor.c
  * Description:
@@ -5528,11 +5529,11 @@ void Actor_SetDropFlag(Actor* actor, ColliderElement* elem) {
 
     if (acHitElem == NULL) {
         actor->dropFlag = DROPFLAG_NONE;
-    } else if (acHitElem->atDmgInfo.dmgFlags & DMG_FIRE_ARROW) {
+    } else if (DinFireSword_OriginalDamageFlags(gPlayState, acHitElem) & DMG_FIRE_ARROW) {
         actor->dropFlag = DROPFLAG_1;
-    } else if (acHitElem->atDmgInfo.dmgFlags & DMG_ICE_ARROW) {
+    } else if (DinFireSword_OriginalDamageFlags(gPlayState, acHitElem) & DMG_ICE_ARROW) {
         actor->dropFlag = DROPFLAG_2;
-    } else if (acHitElem->atDmgInfo.dmgFlags & DMG_LIGHT_ARROW) {
+    } else if (DinFireSword_OriginalDamageFlags(gPlayState, acHitElem) & DMG_LIGHT_ARROW) {
         actor->dropFlag = DROPFLAG_20;
     } else {
         actor->dropFlag = DROPFLAG_NONE;
@@ -5554,7 +5555,7 @@ void Actor_SetDropFlagJntSph(Actor* actor, ColliderJntSph* jntSph) {
         if (acHitElem == NULL) {
             flag = DROPFLAG_NONE;
         } else {
-            s32 dmgFlags = acHitElem->atDmgInfo.dmgFlags;
+            s32 dmgFlags = DinFireSword_OriginalDamageFlags(gPlayState, acHitElem);
 
             if (dmgFlags & DMG_FIRE_ARROW) {
                 flag = DROPFLAG_1;

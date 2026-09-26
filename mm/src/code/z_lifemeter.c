@@ -1,4 +1,5 @@
 #include "global.h"
+#include "mods/combo_rpg.h"
 #include "interface/parameter_static/parameter_static.h"
 
 #include "BenPort.h"
@@ -226,7 +227,7 @@ void LifeMeter_Draw(PlayState* play) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
     Vtx* beatingHeartVtx = interfaceCtx->beatingHeartVtx;
     s32 fractionHeartCount = gSaveContext.save.saveInfo.playerData.health % 0x10;
-    s16 healthCapacity = gSaveContext.save.saveInfo.playerData.healthCapacity / 0x10;
+    s16 healthCapacity = ComboRpg_HeartCount(gSaveContext.save.saveInfo.playerData.healthCapacity);
     s16 fullHeartCount = gSaveContext.save.saveInfo.playerData.health / 0x10;
     s32 pad2;
     f32 lifesize = interfaceCtx->lifeSizeChange * 0.1f;

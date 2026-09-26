@@ -1,3 +1,5 @@
+#include "din_fire_sword.h"
+#include "din_fire_shield.h"
 /*
  * adult_link_render.cpp - render OoT adult Link over MM's human Link (Skijer's NEI).
  * See adult_link_render.h for the design.
@@ -635,6 +637,15 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
                 }
             }
             break;
+    }
+    if (*dList != NULL) {
+        Gfx* dinHand = NULL;
+        if (limbIndex == PLAYER_LIMB_LEFT_HAND)
+            dinHand = static_cast<Gfx*>(DinFireSword_HandDL(play, p, sIsMod ? skelDL : sDL_LHClosed));
+        else if (limbIndex == PLAYER_LIMB_RIGHT_HAND)
+            dinHand = static_cast<Gfx*>(DinFireShield_HandDL(play, p, sIsMod ? skelDL : sDL_RHClosed));
+        if (dinHand != NULL)
+            *dList = dinHand;
     }
     Player_ApplyBackEquipmentVisibility(limbIndex, dList);
     return ret;

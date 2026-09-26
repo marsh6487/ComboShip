@@ -678,6 +678,9 @@ void ExtractShared(nlohmann::json& sh) {
     sh["wandRodsOwned"] = (int)nei->wandRodsOwned;
     sh["slateRunesOwned"] = (int)nei->slateRunesOwned;
     sh["seasonsOwned"] = (int)nei->seasonsOwned;
+    sh["rpgStats"] = ComboRpg::ToJson(nei->comboRpg);
+    sh["speedUpgrades"] = nei->comboRpg.level[COMBO_RPG_SPEED];
+    sh["speedUpgradeRequired"] = ComboRpgState_Required(&nei->comboRpg, COMBO_RPG_SPEED);
     RepairFlagOwnedCells(nei);
     // Shared NEI options/flags (FleetComboOptions.h). Table-driven so a future
     // option is one row there, not new code here. MAX rows never lose a value;
@@ -995,6 +998,31 @@ void ApplyShared(const nlohmann::json& sh) {
     }
     FC_COMBO_OPTION_TABLE(FCO_APPLY)
 #undef FCO_APPLY
+    const uint8_t previousMagicStat = nei->comboRpg.level[COMBO_RPG_MAGIC];
+    const int16_t previousMagicCap = ComboRpgState_MagicCapacity(&nei->comboRpg, 0);
+    if (sh.contains("rpgStats")) {
+        ComboRpg::MergeJson(nei->comboRpg, sh["rpgStats"]);
+    } else if (!(nei->comboRpg.knownMask & (1 << COMBO_RPG_SPEED)) && sh.contains("speedUpgrades")) {
+        const uint8_t level = ComboRpg::ReadInteger(sh["speedUpgrades"], 0, 0, 100);
+        const uint8_t required =
+            sh.contains("speedUpgradeRequired") ? ComboRpg::ReadInteger(sh["speedUpgradeRequired"], 5, 1, 100) : 5;
+        ComboRpg::MigrateLegacySpeed(nei->comboRpg, level, required);
+    }
+    nei->comboSpeedUpgrades = nei->comboRpg.level[COMBO_RPG_SPEED];
+    nei->comboSpeedRequired = nei->comboRpg.required[COMBO_RPG_SPEED];
+    const int16_t magicCap = ComboRpgState_MagicCapacity(&nei->comboRpg, 0);
+    if (magicCap > 0) {
+        MM_PD.isMagicAcquired = true;
+        if (magicCap > MAGIC_NORMAL_METER)
+            MM_PD.isDoubleMagicAcquired = true;
+        if (magicCap != previousMagicCap || nei->comboRpg.level[COMBO_RPG_MAGIC] > previousMagicStat) {
+            // A new stat item earns its fill once. Repeated syncs preserve spent magic.
+            MM_PD.magic = magicCap;
+            MM_PD.magicLevel = 0;
+        } else if (MM_PD.magic > magicCap) {
+            MM_PD.magic = magicCap;
+        }
+    }
 
     // Wand rods / slate runes: OR the bits in, and hand the game every rod/rune it did not have yet
     // through its own grant function (which also places the cell item and picks the active mode).

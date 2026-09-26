@@ -5,6 +5,8 @@
 
 #include "expansions/sw97/sw97_compat.h"
 #include "expansions/sw97/sw97_config.h"
+#include "sw97_arrow_textures.h"
+#include "overlays/ovl_Arrow_Ice/ovl_Arrow_Ice.h"
 
 #include "z64.h"
 #include "global.h"
@@ -227,6 +229,8 @@ static Gfx sArrowIceVertexDL[] = {
 
 // Vanilla OTR cone geometry (correct wide cone, replaces narrow SW97 inline vertices)
 static const ALIGN_ASSET(2) char sSw97IceMatDL[] = "__OTR__overlays/ovl_Arrow_Ice/sMaterialDL";
+static const ALIGN_ASSET(2) char sSw97IceTex1[] = "__OTR__custom/medallion_magic/arrows/water/s1Tex";
+static const ALIGN_ASSET(2) char sSw97IceTex2[] = "__OTR__custom/medallion_magic/arrows/water/s2Tex";
 static const ALIGN_ASSET(2) char sSw97IceMdlDL[] = "__OTR__overlays/ovl_Arrow_Ice/sModelDL";
 
 // ============================================================================
@@ -287,7 +291,7 @@ void ArrowIce_Charge(ArrowIce* this, PlayState* play) {
     this->actor.world.pos = arrow->actor.world.pos;
     this->actor.shape.rot = arrow->actor.shape.rot;
 
-    Actor_PlaySfx_Flagged2(&this->actor, NA_SE_PL_ARROW_CHARGE_ICE - SFX_FLAG);
+    Actor_PlaySfx_Flagged2(&this->actor, NA_SE_EV_WATER_WALL - SFX_FLAG);
 
     if (arrow->actor.parent == NULL) {
         this->unkPos = this->actor.world.pos;
@@ -395,7 +399,7 @@ void ArrowIce_Fly(ArrowIce* this, PlayState* play) {
     ArrowIce_MeltIceShelters(play, &this->actor.world.pos, 50.0f);
 
     if (arrow->unk_261 & 1) {
-        Actor_PlaySfx(&this->actor, NA_SE_IT_EXPLOSION_ICE);
+        Actor_PlaySfx(&this->actor, NA_SE_EV_DIVE_INTO_WATER);
         ArrowIce_SetupAction(this, ArrowIce_Hit);
         this->timer = 32;
         this->alpha = 255;
@@ -428,11 +432,17 @@ void ArrowIce_Draw(Actor* thisx, PlayState* play) {
     u32 stateFrames;
     EnArrow* arrow;
 
+    Color_RGBA8 primaryColor =
+        CosmeticEditor_GetChangedColor(170, 255, 255, 255, COSMETIC_ID("Arrows.MedallionWaterPrimary"));
+    Color_RGBA8 secondaryColor =
+        CosmeticEditor_GetChangedColor(0, 0, 255, 128, COSMETIC_ID("Arrows.MedallionWaterSecondary"));
+
     stateFrames = play->state.frames;
     arrow = (EnArrow*)this->actor.parent;
 
     if ((arrow != NULL) && (arrow->actor.update != NULL) && (this->timer < 255)) {
 
+        s32 useCompanion = Sw97_ArrowHasCompanionGeometry(sSw97IceMatDL, sSw97IceMdlDL);
         tranform = (arrow->unk_261 & 2) ? &this->actor : &arrow->actor;
 
         OPEN_DISPS(play->state.gfxCtx);
@@ -453,8 +463,8 @@ void ArrowIce_Draw(Actor* thisx, PlayState* play) {
         }
 
         Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-        gDPSetPrimColor(POLY_XLU_DISP++, 0x80, 0x80, 170, 255, 255, this->alpha);
-        gDPSetEnvColor(POLY_XLU_DISP++, 0, 0, 255, 128);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0x80, 0x80, primaryColor.r, primaryColor.g, primaryColor.b, this->alpha);
+        gDPSetEnvColor(POLY_XLU_DISP++, secondaryColor.r, secondaryColor.g, secondaryColor.b, 128);
         Matrix_RotateRPY(0x4000, 0x0, 0x0, MTXMODE_APPLY);
         if (this->timer != 0) {
             Matrix_Translate(0.0f, 0.0f, 0.0f, MTXMODE_APPLY);
@@ -465,11 +475,12 @@ void ArrowIce_Draw(Actor* thisx, PlayState* play) {
         Matrix_Translate(0.0f, -700.0f, 0.0f, MTXMODE_APPLY);
         gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, "../z_arrow_ice.c", 660),
                   G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-        gSPDisplayList(POLY_XLU_DISP++, sSw97IceMatDL);
+        gSPDisplayList(POLY_XLU_DISP++, useCompanion ? sSw97IceMatDL : gIceArrowMaterialDL);
+        POLY_XLU_DISP = Sw97_ArrowLoadMedallionTextures(POLY_XLU_DISP, sSw97IceTex1, sSw97IceTex2);
         gSPDisplayList(POLY_XLU_DISP++,
                        Gfx_TwoTexScroll(play->state.gfxCtx, 0, 511 - (stateFrames * 5) % 512, 0, 128, 32, 1,
                                         511 - (stateFrames * 10) % 512, 511 - (stateFrames * 10) % 512, 4, 16));
-        gSPDisplayList(POLY_XLU_DISP++, sSw97IceMdlDL);
+        gSPDisplayList(POLY_XLU_DISP++, useCompanion ? sSw97IceMdlDL : gIceArrowModelDL);
 
         CLOSE_DISPS(play->state.gfxCtx);
     }

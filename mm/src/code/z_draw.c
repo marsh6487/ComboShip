@@ -1,3 +1,4 @@
+#include "din_fire_shield.h"
 /**
  * @file z_draw.c
  * @brief Draw get-item models
@@ -501,6 +502,8 @@ static void GetItem_DrawBottleShimmer(PlayState* play, s16 drawId) {
 }
 
 void GetItem_Draw(PlayState* play, s16 drawId) {
+    if (DinFireShield_DrawItem(play, drawId))
+        return;
     s32 owner = -1;
     Color_RGBA8 shimmerColor;
     s32 shimmer;

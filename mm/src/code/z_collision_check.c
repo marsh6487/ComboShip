@@ -1,3 +1,6 @@
+#include "din_fire_sword.h"
+#include "mods/combo_rpg.h"
+#include "variables.h"
 #include "z64collision_check.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -92,10 +95,12 @@ f32 CollisionCheck_GetDamageAndEffectOnElementAC(Collider* atCol, ColliderElemen
             dmgFlags >>= 1;
         }
 
+        const u8 entry = DinFireSword_DamageEntry(gPlayState, acCol->actor, atElem, acElem->acDmgInfo.dmgFlags,
+                                                  acCol->actor->colChkInfo.damageTable->attack[i]);
         // #region 2S2H - Enhancements - Damage Multiplier and Effect
         if ((GameInteractor_Should(VB_DAMAGE_MULTIPLIER, true, i, acCol->actor->colChkInfo.damageTable, &damage,
                                    sDamageMultipliers))) {
-            damage *= sDamageMultipliers[acCol->actor->colChkInfo.damageTable->attack[i] & 0xF];
+            damage *= sDamageMultipliers[entry & 0xF];
         }
 
         // SoH z_collision_check.c:3660-3675 — when an Ivan-style entity is
@@ -121,7 +126,7 @@ f32 CollisionCheck_GetDamageAndEffectOnElementAC(Collider* atCol, ColliderElemen
 
         if ((GameInteractor_Should(VB_DAMAGE_EFFECT, true, i, acCol->actor->colChkInfo.damageTable, effect,
                                    acCol->actor))) {
-            *effect = (acCol->actor->colChkInfo.damageTable->attack[i] >> 4) & 0xF;
+            *effect = (entry >> 4) & 0xF;
         }
         // #endregion
     }
@@ -3582,6 +3587,12 @@ void CollisionCheck_ApplyDamage(struct PlayState* play, CollisionCheckContext* c
             col->actor->colChkInfo.damageEffect = effect;
         }
         if (!(col->acFlags & AC_HARD) || ((col->acFlags & AC_HARD) && (atElem->atDmgInfo.dmgFlags == 0x20000000))) {
+            // Roll for this accepted outgoing hit, before the max-damage merge.
+            // Never reroll or multiply damage already accumulated by another element.
+            if (finalDamage > 0.0f && col->actor->category != ACTORCAT_PLAYER && (atCol->atFlags & AT_TYPE_PLAYER) &&
+                ComboRpg_IsEnabled(COMBO_RPG_POWER)) {
+                finalDamage = ComboRpg_ApplyPower((u8)CLAMP(finalDamage, 0.0f, 255.0f), Rand_ZeroOne());
+            }
             if (col->actor->colChkInfo.damage < finalDamage) {
                 col->actor->colChkInfo.damage = finalDamage;
             }

@@ -5,6 +5,9 @@
 
 #include "expansions/sw97/sw97_compat.h"
 #include "expansions/sw97/sw97_config.h"
+#include "sw97_arrow_textures.h"
+#include "2s2h/Enhancements/Graphics/ElementalArrowSfx.h"
+#include "overlays/ovl_Arrow_Light/ovl_Arrow_Light.h"
 
 #include "z64.h"
 #include "global.h"
@@ -372,7 +375,7 @@ void ArrowLight_Fly(ArrowLight* this, PlayState* play) {
     ArrowLight_LerpPos(&this->unkPos, &this->actor.world.pos, 0.05f);
 
     if (arrow->unk_261 & 1) {
-        Actor_PlaySfx(&this->actor, NA_SE_IT_EXPLOSION_LIGHT);
+        Actor_PlaySfx(&this->actor, ElementalArrow_GetImpactSfx(NA_SE_IT_EXPLOSION_LIGHT));
         ArrowLight_SetupAction(this, ArrowLight_Hit);
         this->timer = 32;
         this->alpha = 255;
@@ -402,11 +405,17 @@ void ArrowLight_Draw(Actor* thisx, PlayState* play) {
     EnArrow* arrow;
     Actor* tranform;
 
+    Color_RGBA8 primaryColor =
+        CosmeticEditor_GetChangedColor(255, 255, 255, 255, COSMETIC_ID("Arrows.MedallionLightPrimary"));
+    Color_RGBA8 secondaryColor =
+        CosmeticEditor_GetChangedColor(170, 170, 170, 128, COSMETIC_ID("Arrows.MedallionLightSecondary"));
+
     stateFrames = play->state.frames;
     arrow = (EnArrow*)this->actor.parent;
 
     if ((arrow != NULL) && (arrow->actor.update != NULL) && (this->timer < 255)) {
 
+        s32 useCompanion = Sw97_ArrowHasCompanionGeometry(sSw97LightMatDL, sSw97LightMdlDL);
         tranform = (arrow->unk_261 & 2) ? &this->actor : &arrow->actor;
 
         OPEN_DISPS(play->state.gfxCtx);
@@ -428,8 +437,8 @@ void ArrowLight_Draw(Actor* thisx, PlayState* play) {
         }
 
         Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-        gDPSetPrimColor(POLY_XLU_DISP++, 0x80, 0x80, 255, 255, 255, this->alpha);
-        gDPSetEnvColor(POLY_XLU_DISP++, 170, 170, 170, 128);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0x80, 0x80, primaryColor.r, primaryColor.g, primaryColor.b, this->alpha);
+        gDPSetEnvColor(POLY_XLU_DISP++, secondaryColor.r, secondaryColor.g, secondaryColor.b, 128);
         Matrix_RotateRPY(0x4000, 0x0, 0x0, MTXMODE_APPLY);
         if (this->timer != 0) {
             Matrix_Translate(0.0f, 0.0f, 0.0f, MTXMODE_APPLY);
@@ -440,11 +449,11 @@ void ArrowLight_Draw(Actor* thisx, PlayState* play) {
         Matrix_Translate(0.0f, -700.0f, 0.0f, MTXMODE_APPLY);
         gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, "../z_arrow_light.c", 648),
                   G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-        gSPDisplayList(POLY_XLU_DISP++, sSw97LightMatDL);
+        gSPDisplayList(POLY_XLU_DISP++, useCompanion ? sSw97LightMatDL : gLightArrowMaterialDL);
         gSPDisplayList(POLY_XLU_DISP++,
                        Gfx_TwoTexScroll(play->state.gfxCtx, 0, 511 - (stateFrames * 5) % 512, 0, 4, 32, 1,
                                         511 - (stateFrames * 10) % 512, 511 - (stateFrames * 30) % 512, 8, 16));
-        gSPDisplayList(POLY_XLU_DISP++, sSw97LightMdlDL);
+        gSPDisplayList(POLY_XLU_DISP++, useCompanion ? sSw97LightMdlDL : gLightArrowModelDL);
 
         CLOSE_DISPS(play->state.gfxCtx);
     }

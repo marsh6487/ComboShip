@@ -25,6 +25,7 @@
 #include "soh/SaveManager.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/randomizer/static_data.h" // Rando::StaticData::RetrieveItem + GetGIEntry_Copy
+#include "soh/Enhancements/randomizer/randostatupgrade.h"
 #include "soh/ShipInit.hpp"
 
 #include <libultraship/bridge/consolevariablebridge.h> // CVar: persist last-saved game/slot for boot
@@ -96,6 +97,8 @@ void Seasons_GrantSeason(unsigned char season);
 // Cross-game restart: the raw reset of THIS game (defined in debugconsole.cpp), called by the
 // responder pump below WITHOUT signaling so a paired reset never ping-pongs.
 extern "C" void FleetCombo_DoLocalReset(void);
+
+#include "FleetRpgStats.h"
 
 namespace {
 
@@ -536,6 +539,7 @@ void ExtractShared(nlohmann::json& sh) {
     sh["wandRodsOwned"] = (int)nei->wandRodsOwned;
     sh["slateRunesOwned"] = (int)nei->slateRunesOwned;
     sh["seasonsOwned"] = (int)nei->seasonsOwned;
+    FleetRpg::Extract(sh);
     RepairFlagOwnedCells(nei);
     // Shared NEI options/flags (FleetComboOptions.h). Table-driven so a future
     // option is one row there, not new code here. MAX rows never lose a value;
@@ -796,6 +800,7 @@ void ApplyShared(const nlohmann::json& sh) {
     }
     FC_COMBO_OPTION_TABLE(FCO_APPLY)
 #undef FCO_APPLY
+    FleetRpg::Apply(sh);
 
     // Wand rods / slate runes: OR the bits in, and hand the game every rod/rune it did not have yet
     // through its own grant function (which also places the cell item and picks the active mode).

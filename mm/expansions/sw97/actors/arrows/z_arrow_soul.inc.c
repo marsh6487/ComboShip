@@ -5,6 +5,8 @@
 
 #include "expansions/sw97/sw97_compat.h"
 #include "expansions/sw97/sw97_config.h"
+#include "sw97_arrow_textures.h"
+#include "overlays/ovl_Arrow_Light/ovl_Arrow_Light.h"
 
 #include "z64.h"
 #include "global.h"
@@ -216,6 +218,8 @@ static Gfx sArrowSoulVertexDL[] = {
 
 // Vanilla OTR cone geometry (correct wide cone, replaces narrow SW97 inline vertices)
 static const ALIGN_ASSET(2) char sSw97SoulMatDL[] = "__OTR__overlays/ovl_Arrow_Light/sMaterialDL";
+static const ALIGN_ASSET(2) char sSw97SoulTex1[] = "__OTR__custom/medallion_magic/arrows/spirit/s1Tex";
+static const ALIGN_ASSET(2) char sSw97SoulTex2[] = "__OTR__custom/medallion_magic/arrows/spirit/s2Tex";
 static const ALIGN_ASSET(2) char sSw97SoulMdlDL[] = "__OTR__overlays/ovl_Arrow_Light/sModelDL";
 
 // ============================================================================
@@ -453,11 +457,17 @@ void ArrowSoul_Draw(Actor* thisx, PlayState* play) {
     EnArrow* arrow;
     Actor* tranform;
 
+    Color_RGBA8 primaryColor =
+        CosmeticEditor_GetChangedColor(255, 255, 170, 255, COSMETIC_ID("Arrows.MedallionSpiritPrimary"));
+    Color_RGBA8 secondaryColor =
+        CosmeticEditor_GetChangedColor(255, 255, 0, 128, COSMETIC_ID("Arrows.MedallionSpiritSecondary"));
+
     stateFrames = play->state.frames;
     arrow = (EnArrow*)this->actor.parent;
 
     if ((arrow != NULL) && (arrow->actor.update != NULL) && (this->timer < 255)) {
 
+        s32 useCompanion = Sw97_ArrowHasCompanionGeometry(sSw97SoulMatDL, sSw97SoulMdlDL);
         tranform = (arrow->unk_261 & 2) ? &this->actor : &arrow->actor;
 
         OPEN_DISPS(play->state.gfxCtx);
@@ -478,8 +488,8 @@ void ArrowSoul_Draw(Actor* thisx, PlayState* play) {
         }
 
         Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-        gDPSetPrimColor(POLY_XLU_DISP++, 0x80, 0x80, 255, 255, 170, this->alpha);
-        gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 0, 128);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0x80, 0x80, primaryColor.r, primaryColor.g, primaryColor.b, this->alpha);
+        gDPSetEnvColor(POLY_XLU_DISP++, secondaryColor.r, secondaryColor.g, secondaryColor.b, 128);
         Matrix_RotateRPY(0x4000, 0x0, 0x0, MTXMODE_APPLY);
         if (this->timer != 0) {
             Matrix_Translate(0.0f, 0.0f, 0.0f, MTXMODE_APPLY);
@@ -490,11 +500,12 @@ void ArrowSoul_Draw(Actor* thisx, PlayState* play) {
         Matrix_Translate(0.0f, -700.0f, 0.0f, MTXMODE_APPLY);
         gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, "../z_arrow_soul.c", 660),
                   G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-        gSPDisplayList(POLY_XLU_DISP++, sSw97SoulMatDL);
+        gSPDisplayList(POLY_XLU_DISP++, useCompanion ? sSw97SoulMatDL : gLightArrowMaterialDL);
+        POLY_XLU_DISP = Sw97_ArrowLoadMedallionTextures(POLY_XLU_DISP, sSw97SoulTex1, sSw97SoulTex2);
         gSPDisplayList(POLY_XLU_DISP++,
                        Gfx_TwoTexScroll(play->state.gfxCtx, 0, 511 - (stateFrames * 5) % 512, 0, 64, 32, 1,
                                         511 - (stateFrames * 15) % 512, 511 - (stateFrames * 15) % 512, 8, 16));
-        gSPDisplayList(POLY_XLU_DISP++, sSw97SoulMdlDL);
+        gSPDisplayList(POLY_XLU_DISP++, useCompanion ? sSw97SoulMdlDL : gLightArrowModelDL);
 
         CLOSE_DISPS(play->state.gfxCtx);
     }

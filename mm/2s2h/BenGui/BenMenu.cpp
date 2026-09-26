@@ -19,6 +19,8 @@
 #include "Notification.h"
 #include "2s2h/Enhancements/Trackers/DisplayOverlay.h"
 #include <algorithm>
+#include <cfloat>
+#include <cstring>
 #include <string>
 #include <variant>
 #include <vector>
@@ -267,6 +269,73 @@ static const std::unordered_map<int32_t, const char*> damageMultiplierOptions = 
 };
 
 namespace BenGui {
+
+static std::string MMMidnaClipLabel(const std::string& path) {
+    constexpr const char* prefix = "objects/midna_navi/audio/";
+    std::string label = path.rfind(prefix, 0) == 0 ? path.substr(std::strlen(prefix)) : path;
+    if (label.size() >= 4) {
+        label.resize(label.size() - 4);
+    }
+    std::replace(label.begin(), label.end(), '_', ' ');
+    return label;
+}
+
+static void DrawMMMidnaSoundAssignments(WidgetInfo& info) {
+    if (!ImGui::CollapsingHeader("Midna Sound Effects")) {
+        return;
+    }
+    const auto clips = MMMidnaAudio_GetAvailableClips();
+    if (clips.empty()) {
+        ImGui::TextWrapped("No playable Midna sounds found. Install the Midna companion archive and restart the game.");
+        return;
+    }
+    bool changed = false;
+    if (ImGui::BeginTable("MidnaSoundAssignmentsMM", 2, ImGuiTableFlags_SizingStretchProp)) {
+        ImGui::TableSetupColumn("Event", ImGuiTableColumnFlags_WidthStretch, 0.45f);
+        ImGui::TableSetupColumn("Sound", ImGuiTableColumnFlags_WidthStretch, 0.55f);
+        for (int i = 0; i < MM_MIDNA_AUDIO_EVENT_COUNT; ++i) {
+            const auto event = static_cast<MMMidnaAudioEvent>(i);
+            const auto selected = MMMidnaAudio_GetAssignment(event);
+            const char* native = event == MM_MIDNA_AUDIO_YAWN ? "Silent" : "Original game sound";
+            std::string preview = selected.empty() ? native : MMMidnaClipLabel(selected);
+            if (!selected.empty() && std::find(clips.begin(), clips.end(), selected) == clips.end()) {
+                preview += " (unavailable)";
+            }
+            ImGui::PushID(i);
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextWrapped("%s", MMMidnaAudio_GetEventLabel(event));
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            if (ImGui::BeginCombo("##Sound", preview.c_str())) {
+                if (ImGui::Selectable(native, selected.empty())) {
+                    changed |= MMMidnaAudio_Assign(event, "");
+                }
+                for (const auto& clip : clips) {
+                    ImGui::PushID(clip.c_str());
+                    if (ImGui::Selectable(MMMidnaClipLabel(clip).c_str(), selected == clip)) {
+                        changed |= MMMidnaAudio_Assign(event, clip);
+                    }
+                    if (selected == clip) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
+    if (ImGui::Button("Reset Midna Sounds")) {
+        MMMidnaAudio_ResetAssignments();
+        changed = true;
+    }
+    if (changed) {
+        Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    }
+}
+
 extern std::shared_ptr<BenMenu> mBenMenu;
 void FreeLookPitchMinMax() {
     f32 maxY = CVarGetFloat("gEnhancements.Camera.FreeLook.MaxPitch", 72.0f);
@@ -1431,7 +1500,11 @@ void BenMenu::AddEnhancements() {
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
             "Replace Tatl with Midna's model, animation and companion sounds. "
             "Requires the Midna companion pack in mods/2ship. Missing assets use Tatl's normal appearance or sounds. "
-            "Turn off to restore Tatl. Navi has a separate checkbox in the OoT menu."));
+            "Turn off to restore Tatl. Navi has a separate checkbox in the OoT menu. "
+            "Enable to choose a sound for each event below."));
+    AddWidget(path, "Midna Sound Effects", WIDGET_CUSTOM)
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gEnhancements.MidnaCompanionMM", 0); })
+        .CustomFunction(DrawMMMidnaSoundAssignments);
     AddWidget(path, "Chest Style Matches Contents", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.ChestStyleMatchesContentsMM")
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
@@ -1447,6 +1520,30 @@ void BenMenu::AddEnhancements() {
         .Options(CheckboxOptions().Tooltip(
             "Toggle between standard assets and alternate assets. Usually mods will indicate if "
             "this setting has to be used or not."));
+    AddWidget(path, "Din Fire Shield (POC)", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.DinFireShield")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Forms an animated flame shield while guarding with Din's bracer. Requires the fire-weapons add-on, "
+            "matching Din equipment, and Alternate Assets. Supports the Hero's shield and its Deku skin. "
+            "Blocking follows the equipped shield's normal rules."));
+    AddWidget(path, "Shield SFX", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.DinFireShieldSfx")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gEnhancements.DinFireShield", 0); })
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Plays a flame sound while guarding with Din's Fire Shield."));
+    AddWidget(path, "Din Fire Sword (POC)", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.DinFireSword")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Surrounds Din's drawn sword with animated fire. Requires the fire-weapons add-on, matching Din equipment, "
+            "and Alternate Assets. Supports Kokiri, Master, and Biggoron swords. Normal sword damage and reach are "
+            "unchanged."));
+    AddWidget(path, "Fire Damage", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.DinFireSwordDamage")
+        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gEnhancements.DinFireSword", 0); })
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Adds fire interactions to direct sword hits while preserving normal cutting, sword damage, and enemy "
+            "reactions. "
+            "Charged spin waves keep their normal behavior."));
     AddWidget(path, "Use OoT Sky Textures", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Graphics.UseOotSkyTextures")
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(

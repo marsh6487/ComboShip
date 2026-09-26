@@ -93,6 +93,25 @@ static int32_t CwSimple(CwItemDrawInfo* out, const char* dl, bool xlu, float sca
 // model. Each branch is a 1:1 description of the func in soh/.../randomizer/draw.cpp. Returns 1 when
 // rg is handled; 0 means "fall through to the gid table".
 static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
+    // RPG stat models use custom OPA draws; their legacy spell GIDs are only
+    // placeholders and would otherwise show the wrong item at MM checks.
+    switch (rg) {
+        case RG_DEFENSE_UPGRADE:
+            return CwSimple(out, gStatDefenseDL, false, 1.0f);
+        case RG_SPEED_UPGRADE:
+            return CwSimple(out, gStatSpeedDL, false, 1.0f);
+        case RG_POWER_UPGRADE:
+            return CwSimple(out, gStatPowerDL, false, 1.0f);
+        case RG_CRAWL_SPEED_UPGRADE:
+            return CwSimple(out, gStatCrawlSpeedDL, false, 1.0f);
+        case RG_CLIMB_SPEED_UPGRADE:
+            return CwSimple(out, gStatClimbSpeedDL, false, 1.0f);
+        case RG_PUSH_SPEED_UPGRADE:
+            return CwSimple(out, gStatPushSpeedDL, false, 1.0f);
+        default:
+            break;
+    }
+
     // Boss souls: bespoke func the gid-keyed table can't express (vestigial skull-token gid).
     // Grayscale-colored flame dl0 + generic skull dl1 (Randomizer_DrawBossSoul).
     if (rg >= RG_GOHMA_SOUL && rg <= RG_GANON_SOUL) {

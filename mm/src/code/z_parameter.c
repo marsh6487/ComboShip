@@ -1,4 +1,5 @@
 #include "global.h"
+#include "mods/combo_rpg.h"
 #include "PR/gs2dex.h"
 #include "sys_cfb.h"
 #include "z64malloc.h"
@@ -5314,6 +5315,8 @@ s32 Health_ChangeBy(PlayState* play, s16 healthChange) {
         healthChange >>= 1;
     }
 
+    healthChange = ComboRpg_ApplyDefense(healthChange);
+
     gSaveContext.save.saveInfo.playerData.health += healthChange;
 
     if (((void)0, gSaveContext.save.saveInfo.playerData.health) >
@@ -5635,7 +5638,8 @@ void Magic_Update(PlayState* play) {
         case MAGIC_STATE_STEP_CAPACITY:
             // Step magicCapacity to the capacity determined by magicLevel
             // This changes the width of the magic meter drawn
-            magicCapacityTarget = gSaveContext.save.saveInfo.playerData.magicLevel * MAGIC_NORMAL_METER;
+            magicCapacityTarget =
+                ComboRpg_MagicCapacity(gSaveContext.save.saveInfo.playerData.magicLevel * MAGIC_NORMAL_METER);
             if (gSaveContext.magicCapacity != magicCapacityTarget) {
                 if (gSaveContext.magicCapacity < magicCapacityTarget) {
                     gSaveContext.magicCapacity += 0x10;
@@ -5657,6 +5661,9 @@ void Magic_Update(PlayState* play) {
 
         case MAGIC_STATE_FILL:
             // Add magic until magicFillTarget is reached
+            if (gSaveContext.magicFillTarget > ComboRpg_MagicCapacity(gSaveContext.magicFillTarget)) {
+                gSaveContext.magicFillTarget = ComboRpg_MagicCapacity(gSaveContext.magicFillTarget);
+            }
             gSaveContext.save.saveInfo.playerData.magic += 0x10;
 
             if ((gSaveContext.gameMode == GAMEMODE_NORMAL) && (gSaveContext.sceneLayer < 4)) {
@@ -10469,7 +10476,8 @@ void Interface_Update(PlayState* play) {
             // Prepare to step `magicCapacity` to full capacity
             gSaveContext.save.saveInfo.playerData.magicLevel =
                 gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired + 1;
-            gSaveContext.magicFillTarget = gSaveContext.save.saveInfo.playerData.magic;
+            gSaveContext.magicFillTarget = MIN(gSaveContext.save.saveInfo.playerData.magic,
+                                               ComboRpg_MagicCapacity(gSaveContext.save.saveInfo.playerData.magic));
             gSaveContext.save.saveInfo.playerData.magic = 0;
             gSaveContext.magicState = MAGIC_STATE_STEP_CAPACITY;
             BUTTON_ITEM_EQUIP(PLAYER_FORM_DEKU, EQUIP_SLOT_B) = ITEM_DEKU_NUT;

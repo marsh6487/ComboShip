@@ -16,8 +16,23 @@ static bool enabled = true;
 static float gain = 1.0f;
 static std::map<std::string, std::vector<uint8_t>> files;
 static int reads;
+static std::map<std::string, std::string> assignments;
 
 namespace MMMidnaAudioResources {
+std::vector<std::string> ListClips() {
+    std::vector<std::string> result;
+    for (const auto& [path, bytes] : files) {
+        result.push_back(path);
+    }
+    return result;
+}
+std::string ReadAssignment(const char* event, const char* fallback) {
+    const auto it = assignments.find(event);
+    return it == assignments.end() ? fallback : it->second;
+}
+void WriteAssignment(const char* event, const std::string& path) {
+    assignments[event] = path;
+}
 bool Enabled() {
     return enabled;
 }
@@ -191,10 +206,62 @@ static void optOut() {
     files["objects/midna_navi/audio/call.wav"] = wav({ 200, 300 });
 }
 
+static void reassignArchiveClips() {
+    const std::string extra = "objects/midna_navi/audio/extra_laugh.wav";
+    files[extra] = wav({ 1234, -2345, 3456 });
+    files["objects/midna_navi/audio/broken.wav"] = { 0, 1, 2 };
+    MMMidnaAudio_Init();
+    const auto choices = MMMidnaAudio_GetAvailableClips();
+    REQUIRE(std::find(choices.begin(), choices.end(), extra) != choices.end());
+    REQUIRE(std::find(choices.begin(), choices.end(), "objects/midna_navi/audio/broken.wav") == choices.end());
+    REQUIRE(std::strcmp(MMMidnaAudio_GetEventLabel(MM_MIDNA_AUDIO_APPEAR), "Midna Emerge") == 0);
+    const int archiveReads = reads;
+    REQUIRE(MMMidnaAudio_Assign(MM_MIDNA_AUDIO_APPEAR, extra));
+    REQUIRE(MMMidnaAudio_GetAssignment(MM_MIDNA_AUDIO_APPEAR) == extra);
+    REQUIRE(assignments.at("Emerge") == extra);
+    REQUIRE(MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_APPEAR));
+    std::array<int16_t, 2> out{};
+    MMMidnaAudio_Mix(out.data(), 1);
+    REQUIRE(out[0] == 1234 && out[1] == 1234);
+    REQUIRE(reads == archiveReads); // choosing/playing never opens the archive
+
+    // A remap stops the previous event's tail immediately and updates idle routing too.
+    REQUIRE(MMMidnaAudio_Assign(MM_MIDNA_AUDIO_APPEAR, ""));
+    out = {};
+    MMMidnaAudio_Mix(out.data(), 1);
+    REQUIRE(out[0] == 0);
+    REQUIRE(!MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_APPEAR));
+    REQUIRE(MMMidnaAudio_Assign(MM_MIDNA_AUDIO_YAWN, extra));
+    REQUIRE(MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_YAWN));
+    out = {};
+    MMMidnaAudio_Mix(out.data(), 1);
+    REQUIRE(out[0] == 1234);
+    REQUIRE(!MMMidnaAudio_Assign(MM_MIDNA_AUDIO_EVENT_COUNT, extra));
+    REQUIRE(!MMMidnaAudio_Assign(MM_MIDNA_AUDIO_CALL, "absent.wav"));
+
+    MMMidnaAudio_Init(); // restart uses saved assignments, including explicit native fallback
+    REQUIRE(!MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_APPEAR));
+    REQUIRE(MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_YAWN));
+    out = {};
+    MMMidnaAudio_Mix(out.data(), 1);
+    REQUIRE(out[0] == 1234);
+    files.erase(extra);
+    MMMidnaAudio_Init();
+    REQUIRE(MMMidnaAudio_GetAssignment(MM_MIDNA_AUDIO_YAWN) == extra);
+    REQUIRE(!MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_YAWN)); // removed pack keeps selection, falls back safely
+    MMMidnaAudio_ResetAssignments();
+    REQUIRE(MMMidnaAudio_GetAssignment(MM_MIDNA_AUDIO_CALL) == "objects/midna_navi/audio/call.wav");
+    REQUIRE(MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_CALL));
+    files.erase("objects/midna_navi/audio/broken.wav");
+    assignments.clear();
+}
+
 int main() {
     files["objects/midna_navi/audio/dash.wav"] = wav({ 1000, -2000, 3000, 4000 });
     files["objects/midna_navi/audio/vanish.wav"] = wav({ 500, 600 });
     files["objects/midna_navi/audio/call.wav"] = wav({ 200, 300 });
+    reassignArchiveClips();
+    reads = 0;
     model = false;
     MMMidnaAudio_Init();
     REQUIRE(!MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_DASH));
@@ -283,13 +350,18 @@ int main() {
         }
     });
     for (int i = 0; i < 1000; ++i) {
+        REQUIRE(MMMidnaAudio_Assign(MM_MIDNA_AUDIO_CALL, i % 2 ? "objects/midna_navi/audio/vanish.wav"
+                                                               : "objects/midna_navi/audio/call.wav"));
+        MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_CALL);
         MMMidnaAudio_TryPlay(MM_MIDNA_AUDIO_DASH);
         MMMidnaAudio_Reset();
     }
     mixer.join();
+    MMMidnaAudio_ResetAssignments();
     MMMidnaAudio_Reset();
     optOut();
     movementSpacing();
     idleYawn();
-    puts("PASS: Midna private clips, native fallback, PCM validation, mixing, volume and teardown");
+    puts(
+        "PASS: MM Midna archive choices, saved/live assignments, native fallback, PCM validation, mixing and teardown");
 }
