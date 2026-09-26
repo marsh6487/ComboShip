@@ -6,3 +6,4 @@ EXPORTS
     FrameTiming_EndSpan
     FrameTiming_EndFrame
     FrameTiming_Shutdown
+    FrameTiming_LogRenderCost

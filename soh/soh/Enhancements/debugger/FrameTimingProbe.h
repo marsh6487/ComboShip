@@ -52,6 +52,11 @@ void FrameTiming_Shutdown(void);
 #include <array>
 #include <optional>
 
+namespace Fast {
+struct RenderCostReport;
+}
+extern "C" void FrameTiming_LogRenderCost(const Fast::RenderCostReport& report, FrameTimingContext context);
+
 namespace FrameTiming {
 // Inclusive elapsed durations, not exclusive CPU or GPU utilization. Scope
 // totals overlap (for example Cosmetics inside FrameHooks inside TickBuild).

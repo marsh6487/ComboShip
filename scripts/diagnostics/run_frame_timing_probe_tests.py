@@ -16,6 +16,13 @@ with tempfile.TemporaryDirectory(prefix="oot-frame-timing-") as temporary:
         "-I", str(ROOT / "soh"), str(ROOT / "soh/tests/frame_timing_probe_test.cpp"), "-o", str(output),
     ], check=True)
     subprocess.run([str(output)], check=True)
+    render_test = temporary / "render_cost_test"
+    subprocess.run([
+        os.environ.get("CXX", "g++"), "-std=c++20", "-Wall", "-Wextra", "-Werror", "-pedantic",
+        "-I", str(ROOT / "libultraship/include"), str(ROOT / "soh/tests/render_cost_probe_test.cpp"),
+        "-o", str(render_test),
+    ], check=True)
+    subprocess.run([str(render_test)], check=True)
     source = temporary / "bridge.c"
     source.write_text('#include "soh/Enhancements/debugger/FrameTimingProbe.h"\n'
                       'void sample(void) { FrameTimingSpan span = FrameTiming_BeginSpan();\n'
