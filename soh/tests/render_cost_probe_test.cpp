@@ -96,5 +96,23 @@ int main() {
     assert(bounded.Report().sampled);
     assert(bounded.Report().resources.size() == 1);
     assert(bounded.Report().uploadBytes == 0 && bounded.Report().resourceOverflow == 0);
+    Fast::RenderCostProbe continuous;
+    assert(continuous.BeginFrame(true, 100, true));
+    continuous.EndFrame(200);
+    assert(continuous.BeginFrame(true, 300, true)); // second frame must not disappear
+    continuous.SyncDepth(1);
+    continuous.SetResource("parent");
+    int address = 0;
+    continuous.PrepareResource(&address, "child_filepath");
+    continuous.AddCommand(4, 39, "G_DL", 5); // caller owns the call itself
+    continuous.SyncDepth(2);
+    continuous.EnterCommand(&address);
+    continuous.AddCommand(4, 5, "G_TRI1", 7);
+    continuous.SyncDepth(1);
+    continuous.AddCommand(4, 5, "G_TRI1", 11);
+    continuous.EndFrame(500000300);
+    assert(continuous.Report().totalNanos == 500000000);
+    assert(continuous.Report().resources[1].commands.nanos == 16);
+    assert(continuous.Report().resources[2].commands.nanos == 7);
     std::cout << "Render cost probe: cadence, attribution, bounds, reset and accounting passed\n";
 }

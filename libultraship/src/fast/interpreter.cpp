@@ -3839,6 +3839,7 @@ bool gfx_dl_otr_filepath_handler_custom(F3DGfx** cmd0) {
                                       gfx->mAltRenderLookup,
                                       gfx->mRenderCost.Active() ? &gfx->mRenderCost.MutableReport().displayListLookups : nullptr);
     F3DGfx* nDL = resource != nullptr ? (F3DGfx*)resource->GetRawPointer() : nullptr;
+    if (gfx->mRenderCost.Active()) gfx->mRenderCost.PrepareResource(nDL, fileName);
 
     if (hasRouteMarker && nDL == nullptr) {
         // ComboShip: a bad route (unknown game or missing resource) must not crash the game —
@@ -5443,9 +5444,10 @@ void Interpreter::RunGuiOnly() {
 }
 
 void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_replacements) {
-    const bool sampled = mRenderCost.BeginFrame(mCollectRenderCosts, mCollectRenderCosts ? RenderCostNow() : 0);
+    const bool sampled = mRenderCost.BeginFrame(mCollectRenderCosts, mCollectRenderCosts ? RenderCostNow() : 0, mRenderCostEveryFrame);
     if (sampled) {
         auto& report = mRenderCost.MutableReport();
+        report.attemptId = mDiagnosticFrameId;
         report.altRenderLookup = mAltRenderLookup;
         report.backend = mRapi->GetName();
         report.gameTick = mGameTick;
@@ -5498,6 +5500,7 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
         }
         if (sampled) {
             mRenderCost.SyncDepth(g_exec_stack.cmd_stack.size());
+            mRenderCost.EnterCommand(cmd);
             const int8_t opcode = static_cast<int8_t>(cmd->words.w0 >> 24);
             const auto ucode = ucode_handler_index;
             if (opcode == OTR_G_MARKER) {

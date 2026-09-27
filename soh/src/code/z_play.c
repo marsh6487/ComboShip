@@ -1406,6 +1406,9 @@ void Play_DrawOverlayElements(PlayState* play) {
 }
 
 void Play_Draw(PlayState* play) {
+    // Sequential phases partition draw work; nested detail/actor/weather spans are inclusive.
+    // Each early goto closes its current phase before entering the shared tail.
+    FrameTimingSpan drawPhase = FrameTiming_BeginSpan();
     GraphicsContext* gfxCtx = play->state.gfxCtx;
     Lights* sp228;
     Vec3f sp21C;
@@ -1454,7 +1457,13 @@ void Play_Draw(PlayState* play) {
     Gfx_SetupFrame(gfxCtx, 0, 0, 0);
 
     if ((HREG(80) != 10) || (HREG(82) != 0)) {
+        FrameTiming_EndNamedSpan("play_draw", "setup", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
+
         GameInteractor_ExecuteOnPlayDrawBegin();
+
+        FrameTiming_EndNamedSpan("play_draw", "begin_hook", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
 
         POLY_OPA_DISP = Play_SetFog(play, POLY_OPA_DISP);
         POLY_XLU_DISP = Play_SetFog(play, POLY_XLU_DISP);
@@ -1488,6 +1497,9 @@ void Play_Draw(PlayState* play) {
             Matrix_MtxFToMtx(MATRIX_CHECKFLOATS(&play->billboardMtxF), Graph_Alloc(gfxCtx, sizeof(Mtx)));
 
         gSPSegment(POLY_OPA_DISP++, 0x01, play->billboardMtx);
+
+        FrameTiming_EndNamedSpan("play_draw", "camera_setup", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
 
         if ((HREG(80) != 10) || (HREG(92) != 0)) {
             Gfx* gfxP;
@@ -1528,8 +1540,12 @@ void Play_Draw(PlayState* play) {
 
             TransitionUnk_Draw(&sTrnsnUnk, &sp88);
             POLY_OPA_DISP = sp88;
+            FrameTiming_EndNamedSpan("play_draw", "transitions", drawPhase);
             goto Play_Draw_DrawOverlayElements;
         }
+
+        FrameTiming_EndNamedSpan("play_draw", "transitions", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
 
         PreRender_SetValues(&play->pauseBgPreRender, SCREEN_WIDTH, SCREEN_HEIGHT, gfxCtx->curFrameBuffer, gZBuffer);
 
@@ -1554,8 +1570,12 @@ void Play_Draw(PlayState* play) {
             FB_DrawFromFramebuffer(&gfxP, gPauseFrameBuffer, 255);
             POLY_OPA_DISP = gfxP;
 
+            FrameTiming_EndNamedSpan("play_draw", "pause_prepare", drawPhase);
             goto Play_Draw_DrawOverlayElements;
         }
+
+        FrameTiming_EndNamedSpan("play_draw", "pause_prepare", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
 
         if ((HREG(80) != 10) || (HREG(83) != 0)) {
             if (play->skyboxId && (play->skyboxId != SKYBOX_UNSET_1D) && !play->envCtx.skyboxDisabled) {
@@ -1570,26 +1590,43 @@ void Play_Draw(PlayState* play) {
             }
         }
 
+        FrameTiming_EndNamedSpan("play_draw", "skybox", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
+
         if ((HREG(80) != 10) || (HREG(90) & 2)) {
             if (!play->envCtx.sunMoonDisabled) {
                 Environment_DrawSunAndMoon(play);
             }
         }
 
+        FrameTiming_EndNamedSpan("play_draw", "sun_moon", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
+
         if ((HREG(80) != 10) || (HREG(90) & 1)) {
             Environment_DrawSkyboxFilters(play);
         }
 
+        FrameTiming_EndNamedSpan("play_draw", "skybox_filters", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
+
         if ((HREG(80) != 10) || (HREG(90) & 4)) {
+            FrameTimingSpan lightningUpdate = FrameTiming_BeginSpan();
             Environment_UpdateLightningStrike(play);
+            FrameTiming_EndNamedSpan("weather", "lightning_update", lightningUpdate);
             Environment_DrawLightning(play, 0);
         }
+
+        FrameTiming_EndNamedSpan("play_draw", "lightning", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
 
         if ((HREG(80) != 10) || (HREG(90) & 8)) {
             sp228 = LightContext_NewLights(&play->lightCtx, gfxCtx);
             Lights_BindAll(sp228, play->lightCtx.listHead, NULL);
             Lights_Draw(sp228, gfxCtx);
         }
+
+        FrameTiming_EndNamedSpan("play_draw", "lighting", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
 
         if ((HREG(80) != 10) || (HREG(84) != 0)) {
             if (VREG(94) == 0) {
@@ -1600,11 +1637,26 @@ void Play_Draw(PlayState* play) {
                 } else {
                     roomDrawFlags = HREG(84);
                 }
-                Scene_Draw(play);
-                Room_Draw(play, &play->roomCtx.curRoom, roomDrawFlags & 3);
-                Room_Draw(play, &play->roomCtx.prevRoom, roomDrawFlags & 3);
+                {
+                    FrameTimingSpan roomSpan = FrameTiming_BeginSpan();
+                    Scene_Draw(play);
+                    FrameTiming_EndNamedSpan("play_draw_detail", "scene", roomSpan);
+                }
+                {
+                    FrameTimingSpan roomSpan = FrameTiming_BeginSpan();
+                    Room_Draw(play, &play->roomCtx.curRoom, roomDrawFlags & 3);
+                    FrameTiming_EndNamedSpan("play_draw_detail", "room_current", roomSpan);
+                }
+                {
+                    FrameTimingSpan roomSpan = FrameTiming_BeginSpan();
+                    Room_Draw(play, &play->roomCtx.prevRoom, roomDrawFlags & 3);
+                    FrameTiming_EndNamedSpan("play_draw_detail", "room_previous", roomSpan);
+                }
             }
         }
+
+        FrameTiming_EndNamedSpan("play_draw", "scene_rooms", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
 
         if ((HREG(80) != 10) || (HREG(83) != 0)) {
             if ((play->skyboxCtx.unk_140 != 0) && (GET_ACTIVE_CAM(play)->setting != CAM_SET_PREREND_FIXED)) {
@@ -1616,17 +1668,29 @@ void Play_Draw(PlayState* play) {
             }
         }
 
+        FrameTiming_EndNamedSpan("play_draw", "skybox_offset", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
+
         if (play->envCtx.unk_EE[1] != 0) {
             Environment_DrawRain(play, &play->view, gfxCtx);
         }
+
+        FrameTiming_EndNamedSpan("play_draw", "rain", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
 
         if ((HREG(80) != 10) || (HREG(84) != 0)) {
             Environment_FillScreen(gfxCtx, 0, 0, 0, play->bgCoverAlpha, FILL_SCREEN_OPA);
         }
 
+        FrameTiming_EndNamedSpan("play_draw", "background_fill", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
+
         if ((HREG(80) != 10) || (HREG(85) != 0)) {
             Actor_DrawAll(play, &play->actorCtx);
         }
+
+        FrameTiming_EndNamedSpan("play_draw", "actors", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
 
         if ((HREG(80) != 10) || (HREG(86) != 0)) {
             if (!play->envCtx.sunMoonDisabled) {
@@ -1637,6 +1701,9 @@ void Play_Draw(PlayState* play) {
             }
             Environment_DrawCustomLensFlare(play);
         }
+
+        FrameTiming_EndNamedSpan("play_draw", "lens_flare", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
 
         if ((HREG(80) != 10) || (HREG(87) != 0)) {
             if (MREG(64) != 0) {
@@ -1655,15 +1722,24 @@ void Play_Draw(PlayState* play) {
             }
         }
 
+        FrameTiming_EndNamedSpan("play_draw", "screen_fill", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
+
         if ((HREG(80) != 10) || (HREG(88) != 0)) {
             if (play->envCtx.sandstormState != SANDSTORM_OFF) {
                 Environment_DrawSandstorm(play, play->envCtx.sandstormState);
             }
         }
 
+        FrameTiming_EndNamedSpan("play_draw", "sandstorm", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
+
         if ((HREG(80) != 10) || (HREG(93) != 0)) {
             DebugDisplay_DrawObjects(play);
         }
+
+        FrameTiming_EndNamedSpan("play_draw", "debug_objects", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
 
         if ((R_PAUSE_MENU_MODE == 1) || (gTrnsnUnkState == 1)) {
             Gfx* gfxP = OVERLAY_DISP;
@@ -1701,19 +1777,33 @@ void Play_Draw(PlayState* play) {
 
             // SOH [Port] Continue to render the post world for pausing to avoid flashing the HUD
             if (gTrnsnUnkState == 2) {
+                FrameTiming_EndNamedSpan("play_draw", "pause_capture", drawPhase);
+                drawPhase = FrameTiming_BeginSpan();
                 goto Play_Draw_skip;
             }
         }
 
         // Draw Enhancements that need to be placed in the world. This happens before the PostWorldDraw
         // so that they aren't drawn when the pause menu is up (e.g. collision viewer, actor name tags)
+        FrameTiming_EndNamedSpan("play_draw", "pause_capture", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
+
         GameInteractor_ExecuteOnPlayDrawEnd();
+        FrameTiming_EndNamedSpan("play_draw", "end_hook", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
+
         PreludeNativeMaterialScroll_Update(play->state.gfxCtx, play->state.frames, play->gameplayFrames);
 
+        FrameTiming_EndNamedSpan("play_draw", "material_scroll", drawPhase);
+
     Play_Draw_DrawOverlayElements:
+        drawPhase = FrameTiming_BeginSpan();
         if ((HREG(80) != 10) || (HREG(89) != 0)) {
             Play_DrawOverlayElements(play);
         }
+
+        FrameTiming_EndNamedSpan("play_draw", "overlay", drawPhase);
+        drawPhase = FrameTiming_BeginSpan();
 
         // Reset the inverted culling
         if (CVarGetInteger(CVAR_ENHANCEMENT("MirroredWorld"), 0)) {
@@ -1723,6 +1813,9 @@ void Play_Draw(PlayState* play) {
     }
 
 Play_Draw_skip:
+
+    FrameTiming_EndNamedSpan("play_draw", "finish_setup", drawPhase);
+    drawPhase = FrameTiming_BeginSpan();
 
     if (play->view.unk_124 != 0) {
         Camera_Update(GET_ACTIVE_CAM(play));
@@ -1737,7 +1830,11 @@ Play_Draw_skip:
 
     CLOSE_DISPS(gfxCtx);
 
+    FrameTiming_EndNamedSpan("play_draw", "camera_finish", drawPhase);
+    drawPhase = FrameTiming_BeginSpan();
+
     Interface_DrawTotalGameplayTimer(play);
+    FrameTiming_EndNamedSpan("play_draw", "gameplay_timer", drawPhase);
 }
 
 time_t Play_GetRealTime() {

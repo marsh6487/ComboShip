@@ -38,6 +38,16 @@ int main(int argc, char** argv) {
     for (auto level : { spdlog::level::off, spdlog::level::warn }) {
         gameLogger->set_level(level);
         FrameTiming_BeginFrame(play, 1);
+        FrameTiming_RecordConfiguration({ { "test_configuration", true } });
+        FrameTiming_RecordAttempt({ { "id", 1 },
+                                    { "presented", false },
+                                    { "fraction", .333 },
+                                    { "pacing", { { "reason", "scheduler_late" } } } });
+        FrameTiming_RecordAttempt(
+            { { "id", 2 }, { "presented", true }, { "fraction", .667 }, { "gpu", { { "status", "pending" } } } });
+        FrameTiming_Count("actors.drawn", 12);
+        auto named = FrameTiming_BeginSpan();
+        FrameTiming_EndNamedSpan("draw", "room", named);
         auto span = FrameTiming_BeginSpan();
         FrameTiming_EndSpan(FRAME_TIMING_PLAY_UPDATE, span);
         FrameTiming_AddDuration(FRAME_TIMING_DRAW_PRESENT, 1000000);
@@ -85,9 +95,24 @@ int main(int argc, char** argv) {
     std::string line;
     int samples = 0;
     int renderSamples = 0;
+    int flightSamples = 0;
     bool armed = false;
     bool disabled = false;
     while (std::getline(log, line)) {
+        const std::string flightMarker = "[FrameFlightRecorder] ";
+        if (const auto pos = line.find(flightMarker); pos != std::string::npos) {
+            ++flightSamples;
+            const auto capture = nlohmann::json::parse(line.substr(pos + flightMarker.size()));
+            assert(capture.at("attempts").size() == 2);
+            assert(capture.at("attempts")[0].at("presented") == false);
+            assert(capture.at("attempts")[1].at("gpu").at("status") == "pending");
+            assert(capture.at("attempts")[0].at("tick_id") == capture.at("ticks")[0].at("id"));
+            assert(capture.at("ticks")[0].at("trace").at("counts").at("actors.drawn") == 12);
+            assert(capture.at("ticks")[0].at("phases_ms").contains("play_update"));
+            assert(capture.at("ticks")[0].at("wall_ms").get<double>() >= 1000.0);
+            assert(capture.at("ticks")[0].contains("thread_cpu_ms"));
+            continue;
+        }
         const std::string renderMarker = "[RenderCostProbe] ";
         const auto renderStart = line.find(renderMarker);
         if (renderStart != std::string::npos) {
@@ -145,6 +170,7 @@ int main(int argc, char** argv) {
     assert(disabled);
     assert(samples == 2);
     assert(renderSamples == 2);
+    assert(flightSamples == 2);
 
     // A fresh Context in the same process must announce itself and bind to its
     // new sink instead of retaining the old file, pool, or enabled state.

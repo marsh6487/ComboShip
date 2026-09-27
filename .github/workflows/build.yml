@@ -61,6 +61,8 @@ jobs:
       - name: Verify diagnostic output across Windows DLLs
         shell: pwsh
         run: |
+          python scripts/diagnostics/run_build_metadata_test.py --msvc --compiler cl --json-include "$PWD/build/x64/vcpkg/installed/x64-windows-static-md/include"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build build/x64 --target frame_timing_output_check --config Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:PATH = "$PWD/x64/Release;$env:PATH"

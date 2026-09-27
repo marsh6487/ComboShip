@@ -1,4 +1,6 @@
 #include "global.h"
+#include "soh/Enhancements/debugger/FrameTimingProbe.h"
+#include <stdio.h>
 #include "din_fire_sword.h"
 #include "vt.h"
 
@@ -2686,6 +2688,9 @@ u32 D_80116068[ACTORCAT_MAX] = {
 };
 
 void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
+    FrameTimingSpan updateAllSpan = FrameTiming_BeginSpan();
+    uint64_t actorsVisited = 0;
+    uint64_t actorsUpdated = 0;
     Actor* refActor;
     Actor* actor;
     Player* player;
@@ -2740,6 +2745,7 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
 
         actor = actorCtx->actorLists[i].head;
         while (actor != NULL) {
+            actorsVisited++;
             if (actor->world.pos.y < -25000.0f) {
                 actor->world.pos.y = -25000.0f;
             }
@@ -2816,8 +2822,20 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                         actor->colorFilterTimer--;
                     }
                     if (GameInteractor_ShouldActorUpdate(actor)) {
+                        FrameTimingSpan actorSpan = FrameTiming_BeginSpan();
+                        char actorTimingName[48];
+                        if (actorSpan.epoch != 0) {
+                            snprintf(actorTimingName, sizeof(actorTimingName), "id=%04x params=%04x",
+                                     (unsigned)(u16)actor->id, (unsigned)(u16)actor->params);
+                        }
+                        actorsUpdated++;
                         actor->update(actor, play);
+                        if (actorSpan.epoch != 0) {
+                            FrameTiming_EndNamedSpan("actor_update", actorTimingName, actorSpan);
+                        }
+                        actorSpan = FrameTiming_BeginSpan();
                         GameInteractor_ExecuteOnActorUpdate(actor);
+                        FrameTiming_EndNamedSpan("actor_update_detail", "update_hook", actorSpan);
                         // Skijer's NEI partial slowdown: re-freeze for TimeCtl_GetStutterFrames()
                         // after each update, so the actor ticks 1 frame in N and its animations and
                         // AI timers slow with it. The interval is derived from the requested factor,
@@ -2860,6 +2878,11 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
     Attention_Update(&actorCtx->targetCtx, player, actor, play);
     TitleCard_Update(play, &actorCtx->titleCtx);
     DynaPoly_UpdateBgActorTransforms(play, &play->colCtx.dyna);
+    if (updateAllSpan.epoch != 0) {
+        FrameTiming_Count("actors_update_visited", actorsVisited);
+        FrameTiming_Count("actors_updated", actorsUpdated);
+    }
+    FrameTiming_EndNamedSpan("play_update", "actors", updateAllSpan);
 }
 
 void Actor_FaultPrint(Actor* actor, char* command) {
@@ -2884,8 +2907,17 @@ void Actor_FaultPrint(Actor* actor, char* command) {
 }
 
 void Actor_Draw(PlayState* play, Actor* actor) {
+    FrameTimingSpan actorSpan = FrameTiming_BeginSpan();
+    FrameTimingSpan detailSpan = actorSpan;
+    char actorTimingName[48];
     FaultClient faultClient;
     Lights* lights;
+
+    if (actorSpan.epoch != 0) {
+        snprintf(actorTimingName, sizeof(actorTimingName), "id=%04x params=%04x", (unsigned)(u16)actor->id,
+                 (unsigned)(u16)actor->params);
+        FrameTiming_Count("actors_drawn", 1);
+    }
 
     Fault_AddClient(&faultClient, Actor_FaultPrint, actor, "Actor_draw");
 
@@ -2898,6 +2930,8 @@ void Actor_Draw(PlayState* play, Actor* actor) {
                    (actor->flags & ACTOR_FLAG_IGNORE_POINTLIGHTS) ? NULL : &actor->world.pos);
     Lights_Draw(lights, play->state.gfxCtx);
 
+    FrameTiming_EndNamedSpan("actor_draw_detail", "lighting", detailSpan);
+    detailSpan = FrameTiming_BeginSpan();
     FrameInterpolation_RecordActorPosRotMatrix();
     if (actor->flags & ACTOR_FLAG_IGNORE_QUAKE) {
         Matrix_SetTranslateRotateYXZ(
@@ -2943,7 +2977,11 @@ void Actor_Draw(PlayState* play, Actor* actor) {
         if (recallGray) {
             Hourglass_PushGray(play);
         }
+        FrameTiming_EndNamedSpan("actor_draw_detail", "setup", detailSpan);
+        detailSpan = FrameTiming_BeginSpan();
         actor->draw(actor, play);
+        FrameTiming_EndNamedSpan("actor_draw_detail", "draw_callback", detailSpan);
+        detailSpan = FrameTiming_BeginSpan();
         if (recallGray) {
             Hourglass_PopGray(play);
         }
@@ -2957,6 +2995,8 @@ void Actor_Draw(PlayState* play, Actor* actor) {
         }
     }
 
+    FrameTiming_EndNamedSpan("actor_draw_detail", "restore", detailSpan);
+    detailSpan = FrameTiming_BeginSpan();
     if (actor->shape.shadowDraw != NULL) {
         actor->shape.shadowDraw(actor, lights, play);
     }
@@ -2964,12 +3004,18 @@ void Actor_Draw(PlayState* play, Actor* actor) {
     // VB_ACTOR_POST_DRAW: subscribers (e.g. Harpoon's Triforce Thief carrier
     // indicator) can draw extra geometry attached to this actor after its
     // own draw + shadow pass.
+    FrameTiming_EndNamedSpan("actor_draw_detail", "shadow", detailSpan);
+    detailSpan = FrameTiming_BeginSpan();
     GameInteractor_Should(VB_ACTOR_POST_DRAW, true, play, actor);
 
     CLOSE_DISPS(play->state.gfxCtx);
     FrameInterpolation_RecordCloseChild();
 
     Fault_RemoveClient(&faultClient);
+    FrameTiming_EndNamedSpan("actor_draw_detail", "post_draw_hook_cleanup", detailSpan);
+    if (actorSpan.epoch != 0) {
+        FrameTiming_EndNamedSpan("actor_draw", actorTimingName, actorSpan);
+    }
 }
 
 void Actor_UpdateFlaggedAudio(Actor* actor) {
@@ -3219,6 +3265,10 @@ s32 Ship_CalcShouldDrawAndUpdate(PlayState* play, Actor* actor, Vec3f* projected
 // #endregion
 
 void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
+    FrameTimingSpan listSpan = FrameTiming_BeginSpan();
+    FrameTimingSpan phaseSpan = listSpan;
+    uint64_t actorsVisited = 0;
+    uint64_t actorsCulled = 0;
     s32 invisibleActorCounter;
     Actor* invisibleActors[INVISIBLE_ACTOR_MAX];
     ActorListEntry* actorListEntry;
@@ -3235,6 +3285,7 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
         actor = actorListEntry->head;
 
         while (actor != NULL) {
+            actorsVisited++;
             char* actorName = ActorDB_Retrieve(actor->id)->name;
 
             gDPNoOpString(POLY_OPA_DISP++, actorName, i);
@@ -3281,6 +3332,12 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
                 }
             }
 
+            // Count geometric culling only; lens deferral and debug suppression are separate.
+            if (listSpan.epoch != 0 && actor->init == NULL && actor->draw != NULL &&
+                !(actor->flags & (ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_INSIDE_CULLING_VOLUME)) &&
+                !shipShouldDraw) {
+                actorsCulled++;
+            }
             actor->isDrawn = false;
 
             if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(71) == 0)) {
@@ -3307,13 +3364,22 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
         }
     }
 
+    FrameTiming_EndNamedSpan("actor_draw_all", "actor_traversal", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
+
     if ((HREG(64) != 1) || (HREG(73) != 0)) {
         Effect_DrawAll(play->state.gfxCtx);
     }
 
+    FrameTiming_EndNamedSpan("actor_draw_all", "effects", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
+
     if ((HREG(64) != 1) || (HREG(74) != 0)) {
         EffectSs_DrawAll(play);
     }
+
+    FrameTiming_EndNamedSpan("actor_draw_all", "effects_ss", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
 
     if ((HREG(64) != 1) || (HREG(72) != 0)) {
         // Skijer's NEI: lensFromLantern is the Poe-fire lantern's own lens; it is
@@ -3326,21 +3392,39 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
         }
     }
 
+    FrameTiming_EndNamedSpan("actor_draw_all", "lens_actors", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
+
     Actor_DrawFaroresWindPointer(play);
+
+    FrameTiming_EndNamedSpan("actor_draw_all", "farores_wind", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
 
     if (IREG(32) == 0) {
         Lights_DrawGlow(play);
     }
 
+    FrameTiming_EndNamedSpan("actor_draw_all", "light_glow", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
+
     if ((HREG(64) != 1) || (HREG(75) != 0)) {
         TitleCard_Draw(play, &actorCtx->titleCtx);
     }
+
+    FrameTiming_EndNamedSpan("actor_draw_all", "title_card", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
 
     if ((HREG(64) != 1) || (HREG(76) != 0)) {
         CollisionCheck_DrawCollision(play, &play->colChkCtx);
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
+    FrameTiming_EndNamedSpan("actor_draw_all", "collision_debug", phaseSpan);
+    if (listSpan.epoch != 0) {
+        FrameTiming_Count("actors_draw_visited", actorsVisited);
+        FrameTiming_Count("actors_draw_culled", actorsCulled);
+        FrameTiming_Count("actors_lens_queued", invisibleActorCounter);
+    }
 }
 
 void Actor_KillAllWithMissingObject(PlayState* play, ActorContext* actorCtx) {

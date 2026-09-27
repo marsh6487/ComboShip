@@ -2554,13 +2554,50 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, UIWidgets::ColorValues.at(themeColor));
     const bool collectRenderTimings = FrameTiming_IsActive() != 0;
     wnd->SetCollectFrameTimings(collectRenderTimings);
-    intp->SetCollectRenderCosts(collectRenderTimings && CVarGetInteger(CVAR_DEVELOPER_TOOLS("RendererCostProbe"), 1));
+    const int renderDetail = CVarGetInteger(CVAR_DEVELOPER_TOOLS("RenderFlightDetail"), 2);
+    intp->SetCollectRenderCosts(collectRenderTimings && renderDetail != 0 &&
+                                CVarGetInteger(CVAR_DEVELOPER_TOOLS("RendererCostProbe"), 1));
+    intp->mRenderCostEveryFrame = renderDetail >= 2;
+    if (collectRenderTimings && (FrameTiming_NeedsConfiguration() || FrameTiming_TickId() % 200 == 0)) {
+        nlohmann::json archives = nlohmann::json::array();
+        for (const auto& archive :
+             *Ship::Context::GetRawInstance()->GetResourceManager()->GetArchiveManager()->GetArchives()) {
+            archives.push_back(archive->GetPath());
+        }
+        FrameTiming_RecordConfiguration(
+            { { "build", std::string(gBuildVersion) },
+              { "commit", std::string(gGitCommitHash) },
+              { "archives_in_manager_order", std::move(archives) },
+              { "detail_mode", renderDetail },
+              { "render_cost_probe", CVarGetInteger(CVAR_DEVELOPER_TOOLS("RendererCostProbe"), 1) },
+              { "alt_lookup", CVarGetInteger(CVAR_DEVELOPER_TOOLS("AltRenderLookup"), 1) },
+              { "backend", intp->mRapi->GetName() },
+              { "internal_resolution", CVarGetFloat(CVAR_SETTING("InternalResolution"), 1.0f) },
+              { "msaa", CVarGetInteger(CVAR_SETTING("MSAAValue"), 1) },
+              { "vsync", CVarGetInteger(CVAR_SETTING("VsyncEnabled"), 1) } });
+    }
     for (int i = 0; i < count; i++) {
         time += step;
         const auto interpolationTiming = FrameTiming_BeginSpan();
+        const uint64_t interpolationStart = collectRenderTimings ? Fast::RenderCostNow() : 0;
         std::unordered_map<Mtx*, MtxF> mtx_replacements =
             (time == denom) ? std::unordered_map<Mtx*, MtxF>() : FrameInterpolation_Interpolate((float)time / denom);
         FrameTiming_EndSpan(FRAME_TIMING_INTERPOLATION, interpolationTiming);
+        const uint64_t interpolationNs = collectRenderTimings ? Fast::RenderCostNow() - interpolationStart : 0;
+        uint64_t poseDigest = 0;
+        const auto digestStart = collectRenderTimings ? Fast::RenderCostNow() : 0;
+        if (collectRenderTimings) {
+            // Order-independent matrix fingerprint, only comparable within the same
+            // game tick. It detects repeated matrix poses, not identical pixels.
+            for (const auto& [address, matrix] : mtx_replacements) {
+                uint64_t item = 1469598103934665603ULL ^ reinterpret_cast<uintptr_t>(address);
+                const auto* bytes = reinterpret_cast<const unsigned char*>(&matrix.mf);
+                for (size_t byte = 0; byte < sizeof(matrix.mf); ++byte)
+                    item = (item ^ bytes[byte]) * 1099511628211ULL;
+                poseDigest ^= item;
+            }
+        }
+        const auto digestNs = collectRenderTimings ? Fast::RenderCostNow() - digestStart : 0;
         intp->mInterpolationT = (float)time / denom;
         bool presented;
         {
@@ -2569,6 +2606,39 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
         }
         if (collectRenderTimings) {
             const auto& timings = wnd->GetLastFrameTimings();
+            FrameTiming_RecordAttempt(
+                { { "id", timings.attemptId },
+                  { "start_ns", timings.startNs },
+                  { "end_ns", timings.endNs },
+                  { "game_tick", intp->mGameTick },
+                  { "index", i },
+                  { "count", count },
+                  { "fraction", intp->mInterpolationT },
+                  { "original_pose", time == denom },
+                  { "matrix_count", mtx_replacements.size() },
+                  { "matrix_digest", time == denom ? nlohmann::json(nullptr) : nlohmann::json(poseDigest) },
+                  { "matrix_digest_ms", digestNs / 1000000.0 },
+                  { "interpolation_ms", interpolationNs / 1000000.0 },
+                  { "presented", presented },
+                  { "detail_mode", renderDetail },
+                  { "ready_ms", timings.ready / 1000000.0 },
+                  { "setup_ms", timings.setup / 1000000.0 },
+                  { "commands_ms", timings.commands / 1000000.0 },
+                  { "gui_ms", timings.gui / 1000000.0 },
+                  { "present_ms", timings.present / 1000000.0 },
+                  { "pacing", timings.pacing },
+                  { "gpu", timings.gpu },
+                  { "renderer_sampled", presented && intp->GetRenderCostReport().sampled },
+                  { "renderer", presented && intp->GetRenderCostReport().sampled
+                                    ? FrameTiming_RenderSummary(intp->GetRenderCostReport())
+                                    : nlohmann::json(nullptr) },
+                  { "alt_lookup", intp->mAltRenderLookup },
+                  { "triangles", presented && intp->GetRenderCostReport().sampled
+                                     ? nlohmann::json(intp->GetRenderCostReport().triangles)
+                                     : nlohmann::json(nullptr) },
+                  { "vertices", presented && intp->GetRenderCostReport().sampled
+                                    ? nlohmann::json(intp->GetRenderCostReport().vertices)
+                                    : nlohmann::json(nullptr) } });
             FrameTiming_AddDuration(FRAME_TIMING_FRAME_READY, timings.ready);
             if (presented) {
                 FrameTiming_AddDuration(FRAME_TIMING_RENDER_SETUP, timings.setup);
@@ -2582,6 +2652,7 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
     }
     wnd->SetCollectFrameTimings(false);
     intp->SetCollectRenderCosts(false);
+    intp->mRenderCostEveryFrame = false;
     intp->mAltRenderLookup = false;
     ImGui::PopStyleColor();
 }

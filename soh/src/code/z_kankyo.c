@@ -1,4 +1,5 @@
 #include "global.h"
+#include "soh/Enhancements/debugger/FrameTimingProbe.h"
 #include <libultraship/libultra.h>
 #include "vt.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
@@ -1635,6 +1636,10 @@ f32 func_800746DC(void) {
 }
 
 void Environment_DrawRain(PlayState* play, View* view, GraphicsContext* gfxCtx) {
+    FrameTimingSpan rainSpan = FrameTiming_BeginSpan();
+    FrameTimingSpan phaseSpan = rainSpan;
+    uint64_t dropsDrawn = 0;
+    uint64_t splashesDrawn = 0;
     s16 i;
     s32 pad;
     Vec3f vec;
@@ -1686,8 +1691,11 @@ void Environment_DrawRain(PlayState* play, View* view, GraphicsContext* gfxCtx) 
             POLY_XLU_DISP = Gfx_SetupDL(POLY_XLU_DISP, 20);
         }
 
+        FrameTiming_EndNamedSpan("weather", "rain_setup", phaseSpan);
+        phaseSpan = FrameTiming_BeginSpan();
         // draw rain drops
         for (i = 0; i < play->envCtx.unk_EE[1]; i++) {
+            dropsDrawn++;
             FrameInterpolation_RecordOpenChild("Rain Drop", i);
 
             temp2 = Rand_ZeroOne();
@@ -1718,11 +1726,14 @@ void Environment_DrawRain(PlayState* play, View* view, GraphicsContext* gfxCtx) 
             FrameInterpolation_RecordCloseChild();
         }
 
+        FrameTiming_EndNamedSpan("weather", "rain_drops", phaseSpan);
+        phaseSpan = FrameTiming_BeginSpan();
         // draw droplet rings on the ground
         if (player->actor.world.pos.y < view->eye.y) {
             u8 firstDone = false;
 
             for (i = 0; i < play->envCtx.unk_EE[1]; i++) {
+                splashesDrawn++;
                 FrameInterpolation_RecordOpenChild("Droplet Ring", i);
 
                 if (!firstDone) {
@@ -1750,7 +1761,13 @@ void Environment_DrawRain(PlayState* play, View* view, GraphicsContext* gfxCtx) 
         }
 
         CLOSE_DISPS(gfxCtx);
+        FrameTiming_EndNamedSpan("weather", "rain_splashes", phaseSpan);
     }
+    if (rainSpan.epoch != 0) {
+        FrameTiming_Count("rain_drops_drawn", dropsDrawn);
+        FrameTiming_Count("rain_splashes_drawn", splashesDrawn);
+    }
+    FrameTiming_EndNamedSpan("weather", "rain_total", rainSpan);
 }
 
 void func_80074CE8(PlayState* play, u32 arg1) {
@@ -1951,6 +1968,8 @@ void Environment_AddLightningBolts(PlayState* play, u8 num) {
  * Draw any active lightning bolt entries contained in `sLightningBolts`
  */
 void Environment_DrawLightning(PlayState* play, s32 unused) {
+    FrameTimingSpan lightningSpan = FrameTiming_BeginSpan();
+    uint64_t boltsDrawn = 0;
     static void* lightningTextures[] = {
         gEffLightning1Tex, gEffLightning2Tex, gEffLightning3Tex,
         gEffLightning4Tex, gEffLightning5Tex, gEffLightning6Tex,
@@ -2009,6 +2028,7 @@ void Environment_DrawLightning(PlayState* play, s32 unused) {
         }
 
         if (sLightningBolts[i].state == LIGHTNING_BOLT_DRAW) {
+            boltsDrawn++;
             Matrix_Translate(sLightningBolts[i].pos.x + sLightningBolts[i].offset.x,
                              sLightningBolts[i].pos.y + sLightningBolts[i].offset.y,
                              sLightningBolts[i].pos.z + sLightningBolts[i].offset.z, MTXMODE_NEW);
@@ -2028,6 +2048,10 @@ void Environment_DrawLightning(PlayState* play, s32 unused) {
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
+    if (lightningSpan.epoch != 0) {
+        FrameTiming_Count("lightning_bolts_drawn", boltsDrawn);
+    }
+    FrameTiming_EndNamedSpan("weather", "lightning_draw", lightningSpan);
 }
 
 void Environment_PlaySceneSequence(PlayState* play) {

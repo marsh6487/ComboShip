@@ -1,4 +1,14 @@
 #include "FrameTimingProbe.h"
+#include "FrameFlightRecorder.h"
+#include <ship/diagnostics/PerformanceTrace.h>
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <time.h>
+#endif
 #include "fast/RenderCostProbe.h"
 
 #include <chrono>
@@ -6,11 +16,41 @@
 #include <nlohmann/json.hpp>
 #include <ship/Context.h>
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
 
 namespace {
 thread_local FrameTiming::Recorder recorder;
 std::shared_ptr<spdlog::logger> diagnosticLogger;
 int previousEnabled = -1;
+FrameTiming::FlightRecorder flight;
+uint64_t tickId = 0, tickStart = 0, tickCpuStart = 0, flightStart = 0;
+uint64_t previousLogNanos = 0;
+FrameTimingContext tickContext{};
+std::string flightLogPath;
+bool configurationLogged = false;
+uint64_t flightErrors = 0;
+uint64_t captureStart = 0, captureBytes = 0;
+bool captureLimit = false;
+uint64_t contextId = 0;
+constexpr uint64_t MaxCaptureBytes = 256ULL * 1024 * 1024;
+constexpr uint64_t MaxCaptureNanos = 15ULL * 60 * 1000000000;
+
+uint64_t ThreadCpuNow() {
+#if defined(_WIN32)
+    FILETIME creation, exit, kernel, user;
+    if (!GetThreadTimes(GetCurrentThread(), &creation, &exit, &kernel, &user))
+        return 0;
+    auto value = [](FILETIME t) { return (uint64_t(t.dwHighDateTime) << 32) | t.dwLowDateTime; };
+    return (value(kernel) + value(user)) * 100;
+#elif defined(CLOCK_THREAD_CPUTIME_ID)
+    timespec value{};
+    if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &value) != 0)
+        return 0;
+    return uint64_t(value.tv_sec) * 1000000000ULL + value.tv_nsec;
+#else
+    return 0;
+#endif
+}
 
 uint64_t Now() {
     return static_cast<uint64_t>(
@@ -32,16 +72,67 @@ const std::shared_ptr<spdlog::logger>& DiagnosticLogger() {
         // Windows statically links spdlog into each game/engine DLL. The game
         // DLL's default logger is not the engine Context's file logger.
         diagnosticLogger = Ship::Context::GetRawInstance()->GetLogger()->clone("OoTFrameTimingProbe");
+        flightLogPath =
+            Ship::Context::GetPathRelativeToAppDirectory("logs/OoT-RenderFlight-" + std::to_string(Now()) + ".log");
+        auto captureSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(flightLogPath, false);
+        captureSink->set_pattern("%v");
+        diagnosticLogger->sinks().push_back(captureSink);
         diagnosticLogger->set_level(spdlog::level::info);
         diagnosticLogger->flush_on(spdlog::level::info);
     }
     return diagnosticLogger;
 }
 
+void Emit(const char* marker, const nlohmann::json& record) {
+    const auto serialized = record.dump();
+    if (captureBytes + serialized.size() > MaxCaptureBytes) {
+        if (!captureLimit)
+            DiagnosticLogger()->info(
+                "[RenderFlightState] "
+                "{{\"event\":\"capture_limit\",\"reason\":\"256_MiB\",\"discarded_record_bytes\":{}}}",
+                serialized.size());
+        captureLimit = true;
+        return;
+    }
+    captureBytes += serialized.size();
+    DiagnosticLogger()->info("[{}] {}", marker, serialized);
+}
+void DrainTrace(const char* reason) {
+    auto tail = Ship::PerformanceTrace::EndTick();
+    if (tail.is_null()) {
+        ++flightErrors;
+        return;
+    }
+    if (tail.value("aggregate_keys", 0ULL) || tail.value("phase_keys", 0ULL) || tail.value("actor_keys", 0ULL) ||
+        tail.value("outstanding_scopes", 0ULL) || !tail.value("counts", nlohmann::json::object()).empty()) {
+        Emit("RenderFlightTail",
+             { { "reason", reason },
+               { "trace", std::move(tail) },
+               { "incomplete_tail_possible", true },
+               { "note", "No wait for background workers; late or queued work may finish after capture closes" } });
+    }
+}
+
+void FlushFlight(const char* reason) {
+    if (flight.Empty())
+        return;
+    const uint64_t start = Now();
+    auto record = flight.Take(reason);
+    record["diagnostic_errors"] = flightErrors;
+    const auto pool = Ship::Context::GetRawInstance()->GetLogThreadPool();
+    record["logger_queue_depth_before_emit"] = pool ? nlohmann::json(pool->queue_size()) : nlohmann::json(nullptr);
+    record["logger_overruns_total"] = pool ? nlohmann::json(pool->overrun_counter()) : nlohmann::json(nullptr);
+    record["previous_log_emit_ms"] = previousLogNanos / 1000000.0;
+    Emit("FrameFlightRecorder", record);
+    previousLogNanos = Now() - start;
+    flightStart = Now();
+}
+
 void ReportOutputState(bool enabled) {
     if (previousEnabled == static_cast<int>(enabled)) {
         return;
     }
+    DiagnosticLogger(); // create the complete-session capture before announcing its path
     const nlohmann::json state = {
         { "event", previousEnabled == -1 ? "startup" : "state" },
         { "schema", 1 },
@@ -50,8 +141,18 @@ void ReportOutputState(bool enabled) {
         { "interval_ms", 1000 },
         { "normal_log_level_independent", true },
         { "scope", "all OoT gameplay scenes; no slow-frame threshold" },
+        { "flight_schema", 1 },
+        { "complete_capture_file", flightLogPath },
+        { "flight_capture", "all ticks and render attempts; transition and shutdown flush" },
+        { "gpu", "DX11 asynchronous timestamp queries; pending/disjoint/errors explicit" },
+        { "presentation", "CPU submission intervals and backend statistics; not physical display timestamps" },
+        { "bounds",
+          { { "attempts_per_batch", 1024 },
+            { "ticks_per_batch", 128 },
+            { "capture_bytes", MaxCaptureBytes },
+            { "capture_seconds", 900 } } },
     };
-    DiagnosticLogger()->info("[FrameTimingProbe] {}", state.dump());
+    Emit("FrameTimingProbe", state);
     previousEnabled = static_cast<int>(enabled);
 }
 } // namespace
@@ -59,7 +160,15 @@ void ReportOutputState(bool enabled) {
 extern "C" void FrameTiming_Shutdown(void) {
     // Release shared sinks while both game DLLs (which may own their formatter
     // vtables) remain mapped. Context teardown drains the async queue afterward.
+    try {
+        DrainTrace("shutdown");
+        FlushFlight("shutdown");
+    } catch (...) { ++flightErrors; }
     recorder = {};
+    tickStart = tickCpuStart = flightStart = previousLogNanos = 0;
+    configurationLogged = false;
+    captureStart = captureBytes = 0;
+    captureLimit = false;
     if (diagnosticLogger) {
         diagnosticLogger->flush();
         diagnosticLogger.reset();
@@ -68,8 +177,42 @@ extern "C" void FrameTiming_Shutdown(void) {
 }
 
 extern "C" void FrameTiming_BeginFrame(FrameTimingContext context, int enabled) {
-    ReportOutputState(enabled != 0);
-    recorder.BeginFrame(context, enabled != 0, enabled && context.scene >= 0 ? Now() : 0);
+    try {
+        if (enabled && context.scene >= 0 && !captureStart)
+            captureStart = Now();
+        if (enabled && captureStart && !captureLimit && Now() - captureStart >= MaxCaptureNanos) {
+            Emit("RenderFlightState", { { "event", "capture_limit" }, { "reason", "15_minutes" } });
+            captureLimit = true;
+        }
+        enabled = enabled && !captureLimit;
+        const bool wasActive = previousEnabled == 1;
+        ReportOutputState(enabled != 0);
+        const bool changed = context.scene != tickContext.scene || context.room != tickContext.room ||
+                             context.age != tickContext.age || context.altAssets != tickContext.altAssets ||
+                             context.paused != tickContext.paused || context.targetFps != tickContext.targetFps;
+        if (!enabled || changed) {
+            if (!enabled && wasActive)
+                DrainTrace("disabled");
+            FlushFlight(!enabled ? "disabled" : "context_change");
+        }
+        if (changed || contextId == 0)
+            ++contextId;
+        tickContext = context;
+        tickStart = enabled && context.scene >= 0 ? Now() : 0;
+        recorder.BeginFrame(context, enabled != 0, tickStart);
+        if (recorder.Active()) {
+            ++tickId;
+            if (!flightStart)
+                flightStart = tickStart;
+            tickCpuStart = ThreadCpuNow();
+            Ship::PerformanceTrace::BeginTick(tickId);
+        }
+
+    } catch (...) {
+        ++flightErrors;
+        recorder = {};
+        (void)Ship::PerformanceTrace::EndTick();
+    }
 }
 
 extern "C" FrameTimingSpan FrameTiming_BeginSpan(void) {
@@ -91,49 +234,88 @@ extern "C" void FrameTiming_EndSpan(FrameTimingPhase phase, FrameTimingSpan span
 }
 
 extern "C" void FrameTiming_EndFrame(FrameTimingContext context, int enabled) {
-    if (!recorder.Active()) {
-        return;
-    }
-    auto report = recorder.EndFrame(Now(), context, enabled != 0);
-    if (!report) {
-        return;
-    }
-    // Formatting and logging occur after the timed tick, once per second.
-    const double perTickMillis = 1.0 / (1000000.0 * report->gameTicks);
-    nlohmann::json phases = nlohmann::json::object();
-    for (size_t i = 0; i < FRAME_TIMING_PHASE_COUNT; ++i) {
-        phases[names[i]] = {
-            { "mean_ms_per_tick", report->phaseNanos[i] * perTickMillis },
-            { "max_ms_per_tick", report->phaseMaxNanos[i] / 1000000.0 },
-            { "calls", report->calls[i] },
+    try {
+        if (!recorder.Active()) {
+            return;
+        }
+        const auto end = Now();
+        const auto cpuEnd = ThreadCpuNow();
+        nlohmann::json tickPhases = nlohmann::json::object();
+        for (size_t i = 0; i < FRAME_TIMING_PHASE_COUNT; ++i)
+            tickPhases[names[i]] = recorder.CurrentPhases()[i] / 1000000.0;
+        const auto traceStart = Now();
+        auto trace = Ship::PerformanceTrace::EndTick();
+        const auto traceEnd = Now();
+        nlohmann::json tick = { { "id", tickId },
+                                { "start_ns", tickStart },
+                                { "end_ns", end },
+                                { "context_id", contextId },
+                                { "wall_ms", (end - tickStart) / 1000000.0 },
+                                { "thread_cpu_ms", tickCpuStart && cpuEnd >= tickCpuStart
+                                                       ? nlohmann::json((cpuEnd - tickCpuStart) / 1000000.0)
+                                                       : nlohmann::json(nullptr) },
+                                { "scene", tickContext.scene },
+                                { "room", tickContext.room },
+                                { "age", tickContext.age },
+                                { "alt_assets", tickContext.altAssets != 0 },
+                                { "paused", tickContext.paused != 0 },
+                                { "target_fps", tickContext.targetFps },
+                                { "end_scene", context.scene },
+                                { "end_room", context.room },
+                                { "phases_ms", std::move(tickPhases) },
+                                { "trace", std::move(trace) },
+                                { "trace_finalize_ms", (traceEnd - traceStart) / 1000000.0 } };
+        tick["post_tick_diagnostic_ms"] = (Now() - end) / 1000000.0;
+        flight.Tick(std::move(tick));
+        if (end - flightStart >= 1000000000ULL)
+            FlushFlight("interval");
+        auto report = recorder.EndFrame(end, context, enabled != 0);
+        if (!report) {
+            return;
+        }
+        // Formatting and logging occur after the timed tick, once per second.
+        const double perTickMillis = 1.0 / (1000000.0 * report->gameTicks);
+        nlohmann::json phases = nlohmann::json::object();
+        for (size_t i = 0; i < FRAME_TIMING_PHASE_COUNT; ++i) {
+            phases[names[i]] = {
+                { "mean_ms_per_tick", report->phaseNanos[i] * perTickMillis },
+                { "max_ms_per_tick", report->phaseMaxNanos[i] / 1000000.0 },
+                { "calls", report->calls[i] },
+            };
+        }
+        const nlohmann::json record = {
+            { "event", "sample" },
+            { "schema", 1 },
+            { "scene", report->context.scene },
+            { "room", report->context.room },
+            { "age", report->context.age },
+            { "alt_assets", report->context.altAssets != 0 },
+            { "paused", report->context.paused != 0 },
+            { "target_fps", report->context.targetFps },
+            { "capture_ms", report->captureNanos / 1000000.0 },
+            { "game_ticks", report->gameTicks },
+            { "graphics_calls", report->calls[FRAME_TIMING_DRAW_PRESENT] },
+            { "presented_frames", report->calls[FRAME_TIMING_PRESENT] },
+            { "present_rate", report->calls[FRAME_TIMING_PRESENT] * (1000000000.0 / report->captureNanos) },
+            { "mean_tick_ms", report->tickNanos * perTickMillis },
+            { "max_tick_ms", report->tickMaxNanos / 1000000.0 },
+            { "between_ticks_ms", (report->captureNanos - report->tickNanos) / 1000000.0 },
+            { "phases", std::move(phases) },
+            { "semantics",
+              "inclusive elapsed scopes; nested phases overlap; draw_and_present includes pacing and GPU waits" },
         };
+        Emit("FrameTimingProbe", record);
+
+    } catch (...) {
+        ++flightErrors;
+        recorder = {};
+        (void)Ship::PerformanceTrace::EndTick();
     }
-    const nlohmann::json record = {
-        { "event", "sample" },
-        { "schema", 1 },
-        { "scene", report->context.scene },
-        { "room", report->context.room },
-        { "age", report->context.age },
-        { "alt_assets", report->context.altAssets != 0 },
-        { "paused", report->context.paused != 0 },
-        { "target_fps", report->context.targetFps },
-        { "capture_ms", report->captureNanos / 1000000.0 },
-        { "game_ticks", report->gameTicks },
-        { "graphics_calls", report->calls[FRAME_TIMING_DRAW_PRESENT] },
-        { "presented_frames", report->calls[FRAME_TIMING_PRESENT] },
-        { "present_rate", report->calls[FRAME_TIMING_PRESENT] * (1000000000.0 / report->captureNanos) },
-        { "mean_tick_ms", report->tickNanos * perTickMillis },
-        { "max_tick_ms", report->tickMaxNanos / 1000000.0 },
-        { "between_ticks_ms", (report->captureNanos - report->tickNanos) / 1000000.0 },
-        { "phases", std::move(phases) },
-        { "semantics",
-          "inclusive elapsed scopes; nested phases overlap; draw_and_present includes pacing and GPU waits" },
-    };
-    DiagnosticLogger()->info("[FrameTimingProbe] {}", record.dump());
 }
 
 extern "C" void FrameTiming_LogRenderCost(const Fast::RenderCostReport& report, FrameTimingContext context) {
-    if (!report.sampled) {
+    if (!report.sampled || (report.totalNanos < 1000000000ULL / std::max(1, context.targetFps) &&
+                            (report.frameIndex - 1) % Fast::RenderCostProbe::SampleEvery != 0)) {
         return;
     }
     auto counter = [](const Fast::RenderCostCounter& cost) {
@@ -197,6 +379,8 @@ extern "C" void FrameTiming_LogRenderCost(const Fast::RenderCostReport& report, 
         { "target_fps", context.targetFps },
         { "frame_index", report.frameIndex },
         { "game_tick", report.gameTick },
+        { "attempt_id", report.attemptId },
+        { "tick_id", tickId },
         { "interpolation_index", report.interpolationIndex },
         { "interpolation_t", report.interpolationT },
         { "sample_every", Fast::RenderCostProbe::SampleEvery },
@@ -241,5 +425,79 @@ extern "C" void FrameTiming_LogRenderCost(const Fast::RenderCostReport& report, 
                        "resource times are own commands, excluding child lists; total includes profiling overhead; "
                        "cache clears/deletes are cumulative since interpreter initialization" },
     };
-    DiagnosticLogger()->info("[RenderCostProbe] {}", record.dump());
+    Emit("RenderCostProbe", record);
+}
+
+extern "C" uint64_t FrameTiming_TickId() {
+    return tickId;
+}
+extern "C" void FrameTiming_RecordAttempt(const nlohmann::json& value) {
+    try {
+        if (!recorder.Active())
+            return;
+        auto attempt = value;
+        attempt["tick_id"] = tickId;
+        attempt["context_id"] = contextId;
+        attempt["scene"] = tickContext.scene;
+        attempt["room"] = tickContext.room;
+        attempt["age"] = tickContext.age;
+        attempt["alt_assets"] = tickContext.altAssets != 0;
+        attempt["paused"] = tickContext.paused != 0;
+        attempt["target_fps"] = tickContext.targetFps;
+        flight.Attempt(std::move(attempt));
+
+    } catch (...) { ++flightErrors; }
+}
+extern "C" void FrameTiming_EndNamedSpan(const char* category, const char* name, FrameTimingSpan span) {
+    if (recorder.Active() && span.epoch != 0 && span.epoch == recorder.BeginSpan(0).epoch) {
+        Ship::PerformanceTrace::Record(category, name, span.start, Now());
+    }
+}
+extern "C" void FrameTiming_Count(const char* name, uint64_t amount) {
+    if (recorder.Active())
+        Ship::PerformanceTrace::Count(name, amount);
+}
+
+extern "C" void FrameTiming_RecordConfiguration(const nlohmann::json& value) {
+    try {
+        if (!recorder.Active())
+            return;
+        auto configuration = value;
+        configurationLogged = true;
+        configuration["tick_id"] = tickId;
+        Emit("RenderFlightConfiguration", configuration);
+
+    } catch (...) { ++flightErrors; }
+}
+
+extern "C" int FrameTiming_NeedsConfiguration() {
+    return recorder.Active() && !configurationLogged;
+}
+
+nlohmann::json FrameTiming_RenderSummary(const Fast::RenderCostReport& r) {
+    nlohmann::json scopes = nlohmann::json::object();
+    auto add = [&](const char* name, const Fast::RenderCostCounter& value) {
+        scopes[name] = { { "calls", value.calls }, { "ms", value.nanos / 1000000.0 } };
+    };
+    add("driver_draw", r.driverDraw);
+    add("texture_import", r.textureImport);
+    add("upload", r.upload);
+    add("shader_create", r.shaderCreate);
+    add("framebuffer_setup", r.framebufferSetup);
+    add("framebuffer_finish", r.framebufferFinish);
+    return { { "scopes", std::move(scopes) },
+             { "upload_bytes", r.uploadBytes },
+             { "triangles", r.triangles },
+             { "submitted_triangles", r.submittedTriangles },
+             { "vertices", r.vertices },
+             { "cache_hits", r.cacheHits },
+             { "cache_misses", r.cacheMisses },
+             { "cache_evictions", r.cacheEvictions },
+             { "cache_entries", r.cacheEntries },
+             { "cache_clears_total", r.cacheClearsTotal },
+             { "cache_deletes_total", r.cacheDeletesTotal },
+             { "resource_overflow", r.resourceOverflow },
+             { "render_width", r.renderWidth },
+             { "render_height", r.renderHeight },
+             { "msaa", r.msaa } };
 }

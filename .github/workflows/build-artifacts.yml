@@ -91,7 +91,9 @@ jobs:
           python3 scripts/diagnostics/run_combo_grant_tests.py --json-include /usr/include
 
       - name: OoT diagnostic frame timing accounting
-        run: python3 scripts/diagnostics/run_frame_timing_probe_tests.py
+        run: |
+          python3 scripts/diagnostics/run_build_metadata_test.py
+          python3 scripts/diagnostics/run_frame_timing_probe_tests.py
 
       - name: Contents-based chests and opt-in Midna
         run: |
@@ -118,6 +120,14 @@ jobs:
 
       - name: 2Ship mod GUI fonts
         run: python3 scripts/diagnostics/run_mm_mod_font_tests.py
+
+      - name: Complete render flight recorder coverage
+        run: |
+          python3 scripts/diagnostics/run_performance_trace_tests.py
+          python3 scripts/diagnostics/run_draw_attribution_tests.py "$RUNNER_TEMP/draw-attribution"
+          python3 libultraship/tests/gpu_timing_query_test.py /usr/include
+          python3 libultraship/tests/dxgi_pacing_test.py /usr/include
+          python3 scripts/diagnostics/test_analyze_render_flight.py
 
       - name: Shared renderer texture-address regressions
         run: |
