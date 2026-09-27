@@ -66,7 +66,7 @@ static void Submit(uintptr_t address) {
     commands[0].words.w0 = 0xFD10001F; // RGBA16 texture, width 32
     commands[0].words.w1 = address;
     F3DGfx* command = commands;
-    assert(!gfx_set_timg_handler_rdp(&command));
+    assert(!gfx_set_timg_handler_rdp(sInterpreter.get(), &command));
     assert(command == commands); // Rejection must not skip the following GBI command.
 }
 

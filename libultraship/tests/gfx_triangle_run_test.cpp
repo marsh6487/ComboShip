@@ -146,6 +146,70 @@ static void reuseTest() {
     std::cout << "PASS unchanged triangle run prepares shader layout once\n";
 }
 
+static void configure(Fixture& f, unsigned variant);
+
+template<class T> uint64_t packedMask(const T& gfx) {
+    if constexpr (requires { gfx.mTriangleState.packedVertexMask; }) return gfx.mTriangleState.packedVertexMask;
+    return 0;
+}
+
+static void packedVertexReuseTest() {
+    Fixture f;
+    configure(f, 3);
+    beginRun(f.gfx, true);
+    f.gfx.GfxSpTri1(0, 1, 2, false);
+    require(packedMask(f.gfx) == 7, "an unchanged triangle run must retain packed attributes for its three indices");
+    f.gfx.GfxSpTri1(1, 2, 0, false);
+    f.gfx.Flush();
+    const auto& output = f.backend.output;
+    const size_t stride = output.size() / 6;
+    require(memcmp(output.data() + stride, output.data() + stride * 3, stride * sizeof(uint32_t)) == 0,
+            "shared vertex must emit the same attributes when it changes position in a triangle");
+    // New vertex/material commands reset prepared state. Reusing a stale packed
+    // vertex here would corrupt animation or scrolling even when the index matches.
+    beginRun(f.gfx, true);
+    f.gfx.mRsp->loaded_vertices[0].u += 64;
+    f.gfx.mRsp->loaded_vertices[0].color.r = 255;
+    f.gfx.GfxSpTri1(0, 1, 2, false);
+    f.gfx.Flush();
+    Fixture expected;
+    configure(expected, 3);
+    *expected.gfx.mRsp = *f.gfx.mRsp;
+    beginRun(expected.gfx, false);
+    expected.gfx.GfxSpTri1(0, 1, 2, false);
+    expected.gfx.Flush();
+    require(memcmp(f.backend.output.data() + 6 * stride, expected.backend.output.data(),
+                   expected.backend.output.size() * sizeof(uint32_t)) == 0,
+            "new triangle run must repack a changed vertex");
+    std::cout << "PASS shared packed vertices preserve output and reset between runs\n";
+}
+
+static void packedFlushAndBoundaryTest() {
+    Fixture baseline, optimized;
+    for (auto* f : {&baseline, &optimized}) {
+        configure(*f, 3);
+        beginRun(f->gfx, f == &optimized);
+        f->gfx.GfxSpTri1(63, 0, 63, false);
+        if (f == &optimized) require(packedMask(f->gfx) == ((uint64_t{1} << 63) | 1),
+                                     "index 63 and repeated indices must fit the validity mask");
+        f->gfx.Flush();
+        require(packedMask(f->gfx) == 0, "explicit flush must invalidate submission-buffer offsets");
+        // Preserve prepared material state across this flush, then overwrite the
+        // buffer in a new index order. Stale offsets would alias the new output.
+        f->gfx.GfxSpTri1(0, 1, 63, false);
+        f->gfx.GfxSpTri1(1, 63, 0, false);
+        f->gfx.Flush();
+        for (unsigned i = 64; i < 68; ++i) f->gfx.mRsp->loaded_vertices[i] = f->gfx.mRsp->loaded_vertices[i-64];
+        f->gfx.GfxSpTri1(64, 65, 67, true);
+        f->gfx.GfxSpTri1(65, 66, 67, true);
+        require(packedMask(f->gfx) == 0, "temporary rectangle vertices must bypass packed reuse");
+        f->gfx.Flush();
+    }
+    require(baseline.backend.output == optimized.backend.output && baseline.backend.events == optimized.backend.events,
+            "flush, index-63 repeats and rectangle vertices must preserve exact output");
+    std::cout << "PASS packed offsets reset on flush and preserve index/rectangle boundaries\n";
+}
+
 
 static uint64_t combine(unsigned a, unsigned b, unsigned c, unsigned d, unsigned aa, unsigned ab, unsigned ac, unsigned ad) {
     return (a & 15) | ((b & 15) << 4) | ((c & 31) << 8) | ((d & 7) << 13) |
@@ -250,17 +314,50 @@ template<class Table> bool dispatch(const Table& table, int8_t opcode, F3DGfx** 
 template<class T> void enable(T& gfx, bool enabled) {
     if constexpr (requires { gfx.mTriangleStateReuseEnabled; }) gfx.mTriangleStateReuseEnabled = enabled;
 }
-static bool changeColor(F3DGfx**) {
-    mInstance.lock()->mRdp->prim_color.r += 21;
+#ifdef GFX_EXPLICIT_DISPATCH
+#define HANDLER_CONTEXT Interpreter* gfx,
+#define HANDLER_INSTANCE
+#else
+#define HANDLER_CONTEXT
+#define HANDLER_INSTANCE auto gfx = mInstance.lock();
+#endif
+static bool changeColor(HANDLER_CONTEXT F3DGfx**) {
+    HANDLER_INSTANCE
+    gfx->mRdp->prim_color.r += 21;
     return false;
 }
-static bool temporaryDraw(F3DGfx**) {
-    auto gfx = mInstance.lock();
+static bool temporaryDraw(HANDLER_CONTEXT F3DGfx**) {
+    HANDLER_INSTANCE
     auto saved = gfx->mRdp->other_mode_l;
     gfx->mRdp->other_mode_l ^= G_ZS_PRIM | ZMODE_DEC;
     gfx->GfxSpTri1(1, 3, 2, true);
     gfx->mRdp->other_mode_l = saved;
     return false;
+}
+
+// Commands must operate on the interpreter executing this stream, even if the
+// externally selected interpreter changes. Reacquiring the global weak pointer
+// both violates that contract and adds atomic ownership work to every command.
+static void dispatchContextTest() {
+    constexpr UcodeHandler table = {{1, {"tri", gfx_tri2_handler_f3dex}},
+                                   {2, {"depth", gfx_set_prim_depth_handler_rdp}}};
+    Fixture selected, executing;
+    auto selectedOwner = std::shared_ptr<Interpreter>(&selected.gfx, [](Interpreter*) {});
+    mInstance = selectedOwner;
+    F3DGfx cmd{};
+    auto ptr = &cmd;
+    cmd.words.w1 = 0x12340000;
+    dispatch(table, 2, &ptr, &executing.gfx);
+    require(executing.gfx.mRdp->prim_depth == 0x1234,
+            "command must update the executing interpreter, not the selected global interpreter");
+    require(selected.gfx.mRdp->prim_depth == 0, "dispatch must leave the other interpreter untouched");
+    cmd.words.w0 = (1 << 9) | (2 << 1);
+    cmd.words.w1 = (1 << 17) | (3 << 9) | (2 << 1);
+    dispatch(table, 1, &ptr, &executing.gfx);
+    executing.gfx.Flush();
+    require(executing.backend.triangles == 2 && selected.backend.triangles == 0,
+            "triangle dispatch must use the executing backend");
+    std::cout << "PASS command dispatch stays with its executing interpreter\n";
 }
 static void dispatchTest() {
     const UcodeHandler table = {{1, {"tri", gfx_tri2_handler_f3dex}},
@@ -402,13 +499,62 @@ static void benchmark() {
     }
 }
 
+static void commandBenchmark() {
+    const UcodeHandler table = {{1, {"tri", gfx_tri2_handler_f3dex}},
+                               {2, {"depth", gfx_set_prim_depth_handler_rdp}},
+                               {3, {"key-r", gfx_set_key_r_handler_rdp}},
+                               {4, {"key-gb", gfx_set_key_gb_handler_rdp}}};
+    // Synthetic mixes approximate command/triangle counts, not scene replays.
+    for (auto shape : {std::array<unsigned, 3>{7680, 8, 10}, {6250, 6, 25}}) {
+      for (bool shared : {false, true}) {
+        std::vector<double> times;
+        for (unsigned repeat = 0; repeat < 16; ++repeat) {
+            Fixture f;
+            configure(f, 3);
+            enable(f.gfx, true);
+            f.backend.recording = false;
+            auto owner = std::shared_ptr<Interpreter>(&f.gfx, [](Interpreter*) {});
+            mInstance = owner;
+            F3DGfx triangle{}, state{};
+            triangle.words.w0 = (1 << 9) | (2 << 1);
+            triangle.words.w1 = (1 << 17) | (3 << 9) | (2 << 1);
+            state.words.w1 = 0x12345678;
+            auto start = std::chrono::steady_clock::now();
+            for (unsigned batch = 0; batch < shape[0]; ++batch) {
+                for (unsigned s = 0; s < shape[2]; ++s) {
+                    auto ptr = &state;
+                    dispatch(table, 2 + s % 3, &ptr, &f.gfx);
+                }
+                for (unsigned t = 0; t < shape[1]; ++t) {
+                    const unsigned first = shared ? 0 : t * 6;
+                    triangle.words.w0 = (first << 17) | ((first + 1) << 9) | ((first + 2) << 1);
+                    triangle.words.w1 = ((first + 1) << 17) | ((first + 3) << 9) | ((first + 2) << 1);
+                    if (!shared) triangle.words.w1 = ((first + 3) << 17) | ((first + 4) << 9) | ((first + 5) << 1);
+                    auto ptr = &triangle;
+                    dispatch(table, 1, &ptr, &f.gfx);
+                }
+            }
+            f.gfx.Flush();
+            auto end = std::chrono::steady_clock::now();
+            require(f.backend.triangles == shape[0] * shape[1] * 2, "command workload must draw every triangle");
+            if (repeat) times.push_back(std::chrono::duration<double, std::milli>(end - start).count());
+        }
+        std::sort(times.begin(), times.end());
+        std::cout << "COMMAND_BENCH commands=" << shape[0] * (shape[1] + shape[2])
+                  << " triangles=" << shape[0] * shape[1] * 2 << " shared=" << shared
+                  << " median_ms=" << times[times.size()/2] << '\n';
+      }
+    }
+}
+
 int main(int argc, char** argv) {
     bool reference = false, bench = false;
     for (int i = 1; i < argc; ++i) {
         reference |= std::string(argv[i]) == "--reference";
         bench |= std::string(argv[i]) == "--benchmark";
     }
-    if (bench) { benchmark(); return 0; }
+    if (bench) { benchmark(); commandBenchmark(); return 0; }
+    if (!reference) { dispatchContextTest(); packedVertexReuseTest(); packedFlushAndBoundaryTest(); }
     if (!reference) reuseTest();
     equivalenceTest();
     literalVertexTest();

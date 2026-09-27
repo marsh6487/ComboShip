@@ -64,7 +64,7 @@ static void Submit(uintptr_t address, F3DGfx* expected, bool indexed, bool branc
     packet.words.w1 = address;
     auto* command = &packet;
     g_exec_stack = {};
-    bool jumped = indexed ? gfx_dl_index_handler(&command) : gfx_dl_handler_common(&command);
+    bool jumped = indexed ? gfx_dl_index_handler(sInterpreter.get(), &command) : gfx_dl_handler_common(sInterpreter.get(), &command);
     if (expected == nullptr) {
         assert(!jumped && command == &packet);
         assert(g_exec_stack.calls == 0 && g_exec_stack.branches == 0);

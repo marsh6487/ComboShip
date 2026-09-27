@@ -369,6 +369,15 @@ struct TriangleRenderState {
     uint8_t numInputs = 0;
     bool usedTextures[2]{};
     GfxClipParameters clip_parameters{};
+    bool reusePackedVertices = false;
+    uint64_t packedVertexMask = 0;
+};
+
+// Reuse attributes already emitted into the current submission buffer. Entries
+// cannot survive a flush, command barrier or frame boundary.
+struct PackedTriangleVertex {
+    size_t offset;
+    uint8_t count;
 };
 
 struct RenderingState {
@@ -480,7 +489,7 @@ class Interpreter {
     void GfxSpPopMatrix(uint32_t count);
     void GfxSpVertex(size_t numVertices, size_t destIndex, const F3DVtx* vertices);
     void GfxSpModifyVertex(uint16_t vtxIdx, uint8_t where, uint32_t val);
-    template <bool ReuseState>
+    template <bool ReuseState, bool PackVertices>
     void GfxSpTri1Impl(uint8_t vtx1Idx, uint8_t vtx2Idx, uint8_t vtx3Idx, bool isRect);
     void GfxSpTri1(uint8_t vtx1Idx, uint8_t vtx2Idx, uint8_t vtx3Idx, bool isRect);
     void GfxSpGeometryMode(uint32_t clear, uint32_t set);
@@ -542,6 +551,7 @@ class Interpreter {
     RDP* mRdp;
     RenderingState mRenderingState{};
     TriangleRenderState mTriangleState{};
+    PackedTriangleVertex mPackedTriangleVertices[MAX_VERTICES]{};
     bool mTriangleStateReuseEnabled = false; // Port opt-in; MM retains the original path.
     bool mTriangleStateReuseAllowed = false; // Only set while dispatching pure triangle commands.
 

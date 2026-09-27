@@ -18,7 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def function(source, name):
-    match = re.search(r"^(?:[\w:*<>]+\s+)*" + re.escape(name) + r"\([^;{}]*\)\s*(?:const\s*)?\{", source, re.M)
+    match = re.search(r"^(?:template\s*<[^>]+>\s*)?(?:[\w:*<>]+\s+)*" + re.escape(name) +
+                      r"\([^;{}]*\)\s*(?:const\s*)?\{", source, re.M)
     if not match:
         raise RuntimeError(f"Missing production function: {name}")
     # Ignore braces in comments and literals while retaining source offsets.
@@ -71,14 +72,19 @@ def main():
                  "Interpreter::GfxSpTri1", "gfx_tri1_otr_handler_f3dex2", "gfx_tri1_handler_f3dex2",
                  "gfx_tri1_handler_f3dex", "gfx_tri1_handler_f3d", "gfx_tri2_handler_f3dex",
                  "gfx_quad_handler_f3dex2", "gfx_quad_handler_f3dex", "Interpreter::SpReset",
-                 "Interpreter::NormalizeVector", "Interpreter::TransposedMatrixMul", "Interpreter::CalculateNormalDir"]
+                 "Interpreter::NormalizeVector", "Interpreter::TransposedMatrixMul", "Interpreter::CalculateNormalDir",
+                 "gfx_set_prim_depth_handler_rdp", "gfx_set_key_r_handler_rdp", "gfx_set_key_gb_handler_rdp"]
         if "Interpreter::PrepareTriangleState(" in source:
             names.insert(names.index("Interpreter::GfxSpTri1"), "Interpreter::PrepareTriangleState")
         if "Interpreter::GfxSpTri1Impl(" in source:
             names.insert(names.index("Interpreter::GfxSpTri1"), "Interpreter::GfxSpTri1Impl")
         # Destructor name needs the same parser, with its tilde included.
         generated = "namespace Fast {\nconstexpr size_t MAX_TRI_BUFFER = 256;\nstatic constexpr float N64_PRIM_DEPTH_MAX = 32767.0f;\n" + helpers
-        generated += "static std::weak_ptr<Interpreter> mInstance;\nusing GfxOpcodeHandlerFunc = bool (*)(F3DGfx**);\n"
+        explicit_dispatch = "(*GfxOpcodeHandlerFunc)(Interpreter*" in source
+        generated += "static std::weak_ptr<Interpreter> mInstance;\n"
+        generated += re.search(r"typedef bool \(\*GfxOpcodeHandlerFunc\).*?;", source).group(0) + "\n"
+        if explicit_dispatch:
+            generated += "#define GFX_EXPLICIT_DISPATCH 1\n"
         generated += "\n".join(re.findall(r"^#define C[01].*$", source, re.M)) + "\n"
         generated += "\n".join(function(source, name) for name in names)
         generated += source[source.index("class UcodeHandler {"):source.index("static constexpr UcodeHandler rdpHandlers")]

@@ -93,13 +93,12 @@ diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
  void Interpreter::ImportTextureRgba16(int tile, bool importReplacement) {
      const RawTexMetadata* metadata = &mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].raw_tex_metadata;
      const uint8_t* addr =
-@@ -4348,6 +4391,45 @@ bool gfx_set_tile_size_lerp_handler_rdp(F3DGfx** cmd0) {
+@@ -4348,5 +4391,43 @@ bool gfx_set_tile_size_lerp_handler_rdp(Interpreter* gfx, F3DGfx** cmd0) {
      return false;
  }
  
-+bool gfx_scroll_texture_handler_custom(F3DGfx** cmd0) {
++bool gfx_scroll_texture_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
 +    F3DGfx* cmd = *cmd0;
-+    Interpreter* gfx = mInstance.lock().get();
 +
 +    const uint8_t tile = cmd->words.w0 & 0x7;
 +    const int16_t speedX = static_cast<int16_t>(cmd->words.w1 >> 16);
@@ -136,9 +135,8 @@ diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
 +    return false;
 +}
 +
- bool gfx_set_interpolation_index_target(F3DGfx** cmd0) {
+ bool gfx_set_interpolation_index_target(Interpreter* gfx, F3DGfx** cmd0) {
      F3DGfx* cmd = *cmd0;
-     Interpreter* gfx = mInstance.lock().get();
 @@ -4732,6 +4814,7 @@ static constexpr UcodeHandler otrHandlers = {
      { OTR_G_MOVEMEM_HASH, { "OTR_G_MOVEMEM_HASH", gfx_movemem_handler_otr } },      // OTR_G_MOVEMEM_HASH
      { OTR_G_PUSH_SHADER, { "G_PUSH_SHADER", gfx_push_shader } },
