@@ -119,6 +119,14 @@ jobs:
       - name: 2Ship mod GUI fonts
         run: python3 scripts/diagnostics/run_mm_mod_font_tests.py
 
+      - name: Complete render flight recorder coverage
+        run: |
+          python3 scripts/diagnostics/run_performance_trace_tests.py
+          python3 scripts/diagnostics/run_draw_attribution_tests.py "$RUNNER_TEMP/draw-attribution"
+          python3 libultraship/tests/gpu_timing_query_test.py /usr/include
+          python3 libultraship/tests/dxgi_pacing_test.py /usr/include
+          python3 scripts/diagnostics/test_analyze_render_flight.py
+
       - name: Shared renderer texture-address regressions
         run: |
           GFX_TEXTURE_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_texture_address_tests.py

@@ -40,6 +40,7 @@ struct RenderCostReport {
     bool altRenderLookup = false;
     RenderResourceLookupStats vertexLookups, displayListLookups;
     uint64_t frameIndex = 0;
+    uint64_t attemptId = 0;
     uint32_t gameTick = 0;
     int interpolationIndex = 0;
     float interpolationT = 1.0f;
@@ -68,8 +69,8 @@ class RenderCostProbe {
     static constexpr unsigned SampleEvery = 31;
     static constexpr unsigned MaxResources = 512;
 
-    bool BeginFrame(bool enabled, uint64_t now) {
-        active = enabled && (++requestedFrames - 1) % SampleEvery == 0;
+    bool BeginFrame(bool enabled, uint64_t now, bool everyFrame = false) {
+        active = enabled && ((++requestedFrames - 1) % SampleEvery == 0 || everyFrame);
         report.sampled = active;
         if (!active) {
             return false;
@@ -83,6 +84,8 @@ class RenderCostProbe {
         textureIndex.clear();
         ownerStack.clear();
         currentOwner = 0;
+        pendingAddress = nullptr;
+        pendingResource.clear();
         currentTexture = 0;
         frameStart = now;
         return true;
@@ -99,6 +102,13 @@ class RenderCostProbe {
         return active;
     }
 
+    void PrepareResource(const void* address, const std::string& path) {
+        if (active && address) { pendingAddress = address; pendingResource = path; }
+    }
+    void EnterCommand(const void* address) {
+        if (pendingAddress == address && pendingAddress != nullptr) SetResource(pendingResource);
+        pendingAddress = nullptr;
+    }
     void SyncDepth(size_t depth) {
         if (!active) {
             return;
@@ -175,6 +185,8 @@ class RenderCostProbe {
     }
 
   private:
+    const void* pendingAddress = nullptr;
+    std::string pendingResource;
     bool active = false;
     uint64_t requestedFrames = 0, frameStart = 0;
     size_t currentOwner = 0, currentTexture = 0;

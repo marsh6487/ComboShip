@@ -426,6 +426,8 @@ class Interpreter {
 
     // private: TODO make these private
     void Flush();
+    bool mRenderCostEveryFrame = false;
+    uint64_t mDiagnosticFrameId = 0;
     bool mAltRenderLookup = false; // scoped by OoT RunCommands; never enabled by MM
     void SetCollectRenderCosts(bool enabled) {
         mCollectRenderCosts = enabled;

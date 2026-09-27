@@ -44,6 +44,8 @@ FrameTimingSpan FrameTiming_BeginSpan(void);
 void FrameTiming_EndSpan(FrameTimingPhase phase, FrameTimingSpan span);
 void FrameTiming_AddDuration(FrameTimingPhase phase, uint64_t nanos);
 void FrameTiming_EndFrame(FrameTimingContext context, int enabled);
+void FrameTiming_EndNamedSpan(const char* category, const char* name, FrameTimingSpan span);
+void FrameTiming_Count(const char* name, uint64_t amount);
 void FrameTiming_Shutdown(void);
 #ifdef __cplusplus
 }
@@ -51,10 +53,16 @@ void FrameTiming_Shutdown(void);
 #include <algorithm>
 #include <array>
 #include <optional>
+#include <nlohmann/json_fwd.hpp>
+extern "C" void FrameTiming_RecordAttempt(const nlohmann::json& attempt);
+extern "C" uint64_t FrameTiming_TickId();
+extern "C" int FrameTiming_NeedsConfiguration();
+extern "C" void FrameTiming_RecordConfiguration(const nlohmann::json& configuration);
 
 namespace Fast {
 struct RenderCostReport;
 }
+nlohmann::json FrameTiming_RenderSummary(const Fast::RenderCostReport& report);
 extern "C" void FrameTiming_LogRenderCost(const Fast::RenderCostReport& report, FrameTimingContext context);
 
 namespace FrameTiming {
@@ -75,6 +83,9 @@ struct Report {
 // supplies steady_clock timestamps; no allocation or locking occurs here.
 class Recorder {
   public:
+    const auto& CurrentPhases() const {
+        return frameNanos;
+    }
     bool Active() const {
         return active;
     }
