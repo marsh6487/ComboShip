@@ -44,13 +44,16 @@ for name in ('GetRepeatPeriodFromTile(', 'WrapScrollCoordinate(', 'gfx_scroll_te
     source += '\n' + function(name)
 source += r'''
 int main() {
+    using Handler = bool (*)(Interpreter*, F3DGfx**);
+    constexpr Handler scrollHandler = gfx_scroll_texture_handler_custom;
     auto oot=std::make_shared<Interpreter>();
     auto mm=std::make_shared<Interpreter>();
     F3DGfx command{{0, (uint32_t(4)<<16)|uint16_t(-4)}};
     F3DGfx* ptr=&command;
     auto run=[&](std::shared_ptr<Interpreter> game, uint32_t tick, float t) {
         game->storage=RDP{}; game->mGameTick=tick; game->mInterpolationT=t;
-        mInstance=game; assert(!gfx_scroll_texture_handler_custom(&ptr));
+        mInstance=(game==oot?mm:oot);
+        assert(!scrollHandler(game.get(), &ptr));
         assert(game->storage.textures_changed[0] && game->storage.textures_changed[1]);
     };
     run(oot, 3, 0); assert(oot->storage.texture_tile[0].uls==12);

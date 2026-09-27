@@ -31,6 +31,8 @@ The fixture passes with ASan and UBSan. Local LeakSanitizer is disabled because 
 
 Independent read-only review identified a missed external shader helper during the mechanical dispatch conversion; its original lookup was restored. Review also prompted the index-63 and explicit-flush tests.
 
+CI exposed remaining Epona fixture calls and the configure-time custom texture-scroll patch that still used the old handler signature. The Epona and standalone strict-texture fixtures now pass the executing interpreter explicitly. The scroll patch and its typed runtime fixture use the same interface; clean patch application, independent clocks, interpolation, signed wrapping and long-running clock checks pass. Patch applicability and the scroll runtime fixture now run in the shared-renderer CI gate. The Epona cosmetics suite also passes locally.
+
 ## Synthetic CPU measurements
 
 GCC 13.3, `-O3`, diagnostics off, recording backend with output recording off. Compare against the untouched PR #20 source using `--baseline-ref d9cdb052c1e6d4692ef40aadf3f6c8947c802e96`; run parent and candidate sequentially. These are production-function fixtures, not captured scene replays, driver/GPU timings or predictions of game FPS.
