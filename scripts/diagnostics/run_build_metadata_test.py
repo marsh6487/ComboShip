@@ -12,8 +12,8 @@ parser.add_argument("--json-include", default="/usr/include")
 parser.add_argument("--compiler", default="c++")
 parser.add_argument("--msvc", action="store_true")
 args = parser.parse_args()
-variables = (root / "soh/include/variables.h").read_text()
-production = (root / "soh/soh/OTRGlobals.cpp").read_text()
+variables = (root / "soh/include/variables.h").read_text(encoding="utf-8")
+production = (root / "soh/soh/OTRGlobals.cpp").read_text(encoding="utf-8")
 declarations = []
 fields = []
 for key, symbol in [("build", "gBuildVersion"), ("commit", "gGitCommitHash")]:
@@ -30,7 +30,8 @@ with tempfile.TemporaryDirectory(prefix="build-metadata-") as directory:
         + 'const char gBuildVersion[] = "version-test";\n'
         + 'const char gGitCommitHash[] = "commit-test";\n'
         + 'int main() { auto j = Metadata(); return '
-          'j.at("build") == "version-test" && j.at("commit") == "commit-test" ? EXIT_SUCCESS : EXIT_FAILURE; }\n'
+          'j.at("build") == "version-test" && j.at("commit") == "commit-test" ? EXIT_SUCCESS : EXIT_FAILURE; }\n',
+        encoding="utf-8",
     )
     command = ([args.compiler, "/nologo", "/std:c++20", "/EHsc", "/W4", "/WX",
                 "/I" + args.json_include, str(source), "/Fe:" + str(binary)] if args.msvc else
