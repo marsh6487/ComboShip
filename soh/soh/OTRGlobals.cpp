@@ -2542,6 +2542,10 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
 #endif
 
     auto intp = wnd->GetInterpreterWeak().lock().get();
+    // POC: bypass ready-future allocation in every OoT scene with Alt rendering enabled.
+    intp->mAltRenderLookup = gPlayState != nullptr && gPlayState->pauseCtx.state == 0 &&
+                             Ship::Context::GetRawInstance()->GetResourceManager()->IsAltAssetsEnabled() &&
+                             CVarGetInteger(CVAR_DEVELOPER_TOOLS("AltRenderLookup"), 1) != 0;
     intp->mInterpolationIndex = 0;
     intp->mGameTick = gPlayState != nullptr ? gPlayState->gameplayFrames : 0;
 
@@ -2578,6 +2582,7 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
     }
     wnd->SetCollectFrameTimings(false);
     intp->SetCollectRenderCosts(false);
+    intp->mAltRenderLookup = false;
     ImGui::PopStyleColor();
 }
 

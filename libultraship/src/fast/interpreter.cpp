@@ -3795,8 +3795,9 @@ bool gfx_vtx_otr_filepath_handler_custom(F3DGfx** cmd0) {
     size_t vtxCnt = cmd->words.w0;
     size_t vtxIdxOff = cmd->words.w1 >> 16;
     size_t vtxDataOff = cmd->words.w1 & 0xFFFF;
-    F3DVtx* vtx =
-        (F3DVtx*)ActiveResMgr()->GetResourceRawPointer((const char*)fileName);
+    auto resource = LoadRenderResource(*ActiveResMgr(), fileName, gfx->mAltRenderLookup,
+                                      gfx->mRenderCost.Active() ? &gfx->mRenderCost.MutableReport().vertexLookups : nullptr);
+    F3DVtx* vtx = resource != nullptr ? (F3DVtx*)resource->GetRawPointer() : nullptr;
     vtx += vtxDataOff;
 
     gfx->GfxSpVertex(vtxCnt, vtxIdxOff, vtx);
@@ -3804,6 +3805,7 @@ bool gfx_vtx_otr_filepath_handler_custom(F3DGfx** cmd0) {
 }
 
 bool gfx_dl_otr_filepath_handler_custom(F3DGfx** cmd0) {
+    Interpreter* gfx = mInstance.lock().get();
     F3DGfx* cmd = *cmd0;
     char* fileName = (char*)cmd->words.w1;
 
@@ -3833,8 +3835,10 @@ bool gfx_dl_otr_filepath_handler_custom(F3DGfx** cmd0) {
         }
     }
 
-    F3DGfx* nDL = (F3DGfx*)(routedRM != nullptr ? routedRM->GetResourceRawPointer((const char*)fileName)
-                                                : ActiveResMgr()->GetResourceRawPointer((const char*)fileName));
+    auto resource = LoadRenderResource(*(routedRM != nullptr ? routedRM : ActiveResMgr()), fileName,
+                                      gfx->mAltRenderLookup,
+                                      gfx->mRenderCost.Active() ? &gfx->mRenderCost.MutableReport().displayListLookups : nullptr);
+    F3DGfx* nDL = resource != nullptr ? (F3DGfx*)resource->GetRawPointer() : nullptr;
 
     if (hasRouteMarker && nDL == nullptr) {
         // ComboShip: a bad route (unknown game or missing resource) must not crash the game —
@@ -5442,6 +5446,7 @@ void Interpreter::Run(Gfx* commands, const std::unordered_map<Mtx*, MtxF>& mtx_r
     const bool sampled = mRenderCost.BeginFrame(mCollectRenderCosts, mCollectRenderCosts ? RenderCostNow() : 0);
     if (sampled) {
         auto& report = mRenderCost.MutableReport();
+        report.altRenderLookup = mAltRenderLookup;
         report.backend = mRapi->GetName();
         report.gameTick = mGameTick;
         report.interpolationIndex = mInterpolationIndex;
