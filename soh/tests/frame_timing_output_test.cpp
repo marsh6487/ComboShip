@@ -61,6 +61,9 @@ int main(int argc, char** argv) {
         render.MutableReport().renderWidth = 1280;
         render.MutableReport().renderHeight = 720;
         render.MutableReport().cacheMisses = 1;
+        render.MutableReport().altRenderLookup = true;
+        render.MutableReport().vertexLookups = { 500, 2 };
+        render.MutableReport().displayListLookups = { 30, 1 };
         render.EndFrame(3001000);
         FrameTiming_LogRenderCost(render.Report(), play);
         assert(gameLogger->level() == level);      // Preserve the user's normal logging preference.
@@ -105,6 +108,10 @@ int main(int argc, char** argv) {
             assert(cost.at("top_texture_uploads").at(0).at("path") == "textures/young_din/hair");
             assert(cost.at("top_texture_uploads").at(0).at("bytes") == 4096);
             assert(cost.at("cache").at("misses") == 1);
+            const auto& lookup = cost.at("alt_render_lookup");
+            assert(lookup.at("enabled") == true);
+            assert(lookup.at("vertex_hits") == 500 && lookup.at("vertex_fallbacks") == 2);
+            assert(lookup.at("display_list_hits") == 30 && lookup.at("display_list_fallbacks") == 1);
             assert(cost.at("scopes").at("upload").at("ms") == 0.5);
             continue;
         }

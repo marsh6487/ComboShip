@@ -113,6 +113,7 @@ static int ResourceMgr_OTRSigCheck(char* path) {
     return Ship::Context::GetRawInstance()->manager->OtrSignatureCheck(path);
 }
 #include "alt_segment_helpers.inc"
+#include <fast/RenderResourceLookup.h>
 
 static unsigned failures = 0;
 #define REQUIRE(condition)                                                    \
@@ -190,10 +191,41 @@ int main(int argc, char** argv) {
     // A misleading metadata tag must not permit a Texture-to-DisplayList cast.
     checkOther("WrongType", Resource<Fast::Texture>("alt/wrong", Fast::ResourceType::DisplayList), true, true);
     REQUIRE(ResourceMgr_LoadIfDListByName("__OTR__objects/not_present") == nullptr);
+    // Exercise the render shortcut against the production cache/load methods.
+    Fast::RenderResourceLookupStats stats{};
+    REQUIRE(Fast::LoadRenderResource(*rm, path.c_str(), true, &stats) == material);
+    REQUIRE(stats.hits == 1 && stats.fallbacks == 0);
+    REQUIRE(Fast::LoadRenderResource(*rm, path.c_str(), false, &stats) == material);
+    REQUIRE(stats.hits == 1 && stats.fallbacks == 0); // disabled uses the original loader
+    rm->mAltAssetsEnabled = false;
+    REQUIRE(Fast::LoadRenderResource(*rm, path.c_str(), true, nullptr) == native);
+    rm->mAltAssetsEnabled = true;
+    auto replacement = Resource<Fast::DisplayList>(alt, Fast::ResourceType::DisplayList);
+    rm->loader->resources[alt] = replacement;
+    material->Dirty();
+    REQUIRE(Fast::LoadRenderResource(*rm, path.c_str(), true, &stats) == replacement);
+    REQUIRE(stats.fallbacks == 1); // dirty entries must reload, never return stale data
+    rm->mResourceCache.erase({ alt, 0, nullptr });
+    rm->mResourceCache.erase({ name, 0, nullptr });
+    REQUIRE(Fast::LoadRenderResource(*rm, path.c_str(), true, &stats) == replacement);
+    REQUIRE(stats.fallbacks == 2);
+    REQUIRE(Fast::LoadRenderResource(*rm, "__OTR____OTR__objects/not_present", true, &stats) == nullptr);
+    REQUIRE(stats.fallbacks == 3);
+    auto foreign = std::make_shared<Ship::ResourceManager>();
+    foreign->loader->resources[name] = native;
+    foreign->mArchiveManager->files.insert(name);
+    REQUIRE(Fast::LoadRenderResource(*foreign, path.c_str(), true, nullptr) == native);
+    // Scope changes and externally replaced cache entries are visible on the very next lookup.
+    rm->mDefaultCacheOwner = 7;
+    rm->mResourceCache[{ alt, 7, nullptr }] = material;
+    rm->mResourceCache[{ alt, 7, nullptr }] = native;
+    REQUIRE(Fast::LoadRenderResource(*rm, path.c_str(), true, nullptr) == native);
+    rm->mDefaultCacheOwner = 0;
+    REQUIRE(Fast::LoadRenderResource(*rm, path.c_str(), true, nullptr) == replacement);
     if (failures)
         return 1;
     std::printf(
         "PASS %s Alt segment binding: cold direct/.meta DL over warm texture, on/off, retained caches, HD texture, "
-        "missing/empty/wrong type\n",
+        "missing/empty/wrong type; render lookup shortcut, dirty reload, manager and owner switching\n",
         argc > 1 ? argv[1] : "game");
 }

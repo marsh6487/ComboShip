@@ -1,5 +1,7 @@
 #pragma once
 
+#include "fast/RenderResourceLookup.h"
+
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -35,6 +37,8 @@ struct RenderTextureCost {
 
 struct RenderCostReport {
     bool sampled = false;
+    bool altRenderLookup = false;
+    RenderResourceLookupStats vertexLookups, displayListLookups;
     uint64_t frameIndex = 0;
     uint32_t gameTick = 0;
     int interpolationIndex = 0;
