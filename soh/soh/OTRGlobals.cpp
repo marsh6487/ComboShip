@@ -2388,7 +2388,7 @@ static FrameTimingContext CurrentFrameTimingContext() {
 
 extern "C" void Graph_StartFrame() {
     // Enabled by default only for this isolated diagnostic candidate.
-    FrameTiming_BeginFrame(CurrentFrameTimingContext(), CVarGetInteger(CVAR_DEVELOPER_TOOLS("FrameTimingProbe"), 1));
+    FrameTiming_BeginFrame(CurrentFrameTimingContext(), CVarGetInteger(CVAR_DEVELOPER_TOOLS("FrameTimingProbe"), 0));
     Prelude::LoadProbe::BeginFrame(
         gPlayState ? gPlayState->sceneNum : -1, gPlayState ? gPlayState->roomCtx.curRoom.num : -1,
         gPlayState ? gPlayState->roomCtx.prevRoom.num : -1, gPlayState ? gPlayState->gameplayFrames : 0,
@@ -2546,6 +2546,8 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
     intp->mAltRenderLookup = gPlayState != nullptr && gPlayState->pauseCtx.state == 0 &&
                              Ship::Context::GetRawInstance()->GetResourceManager()->IsAltAssetsEnabled() &&
                              CVarGetInteger(CVAR_DEVELOPER_TOOLS("AltRenderLookup"), 1) != 0;
+    // Reuse triangle preparation within unchanged runs in every OoT scene.
+    intp->mTriangleStateReuseEnabled = CVarGetInteger(CVAR_DEVELOPER_TOOLS("TriangleStateReuse"), 1) != 0;
     intp->mInterpolationIndex = 0;
     intp->mGameTick = gPlayState != nullptr ? gPlayState->gameplayFrames : 0;
 
@@ -2654,6 +2656,7 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
     intp->SetCollectRenderCosts(false);
     intp->mRenderCostEveryFrame = false;
     intp->mAltRenderLookup = false;
+    intp->mTriangleStateReuseEnabled = false;
     ImGui::PopStyleColor();
 }
 
@@ -2746,7 +2749,7 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
         GameInteractor::Instance->ExecuteHooks<GameInteractor::OnAssetAltChange>();
     }
 
-    FrameTiming_EndFrame(CurrentFrameTimingContext(), CVarGetInteger(CVAR_DEVELOPER_TOOLS("FrameTimingProbe"), 1));
+    FrameTiming_EndFrame(CurrentFrameTimingContext(), CVarGetInteger(CVAR_DEVELOPER_TOOLS("FrameTimingProbe"), 0));
     if (auto report = Prelude::LoadProbe::EndFrame()) {
         bool actorSnapshotTruncated = false;
         (*report)["actors"] = PreludeLoadProbe_ActorSnapshot(gPlayState, actorSnapshotTruncated);

@@ -358,6 +358,19 @@ struct ColorCombiner {
     uint8_t shader_input_mapping[2][7];
 };
 
+// Prepared state is valid only within consecutive pure triangle commands.
+// No resource ownership or vertex transforms survive a command boundary.
+struct TriangleRenderState {
+    bool valid = false;
+    ColorCombiner* comb = nullptr;
+    bool use_alpha = false, use_fog = false, use_blend_color = false, use_grayscale = false;
+    uint32_t tm = 0;
+    uint32_t tex_width[2]{}, tex_height[2]{}, tex_width2[2]{}, tex_height2[2]{}, effective_tile[2]{};
+    uint8_t numInputs = 0;
+    bool usedTextures[2]{};
+    GfxClipParameters clip_parameters{};
+};
+
 struct RenderingState {
     uint8_t depth_test_and_mask; // 1: depth test, 2: depth mask
     bool decal_mode;
@@ -467,6 +480,8 @@ class Interpreter {
     void GfxSpPopMatrix(uint32_t count);
     void GfxSpVertex(size_t numVertices, size_t destIndex, const F3DVtx* vertices);
     void GfxSpModifyVertex(uint16_t vtxIdx, uint8_t where, uint32_t val);
+    template <bool ReuseState>
+    void GfxSpTri1Impl(uint8_t vtx1Idx, uint8_t vtx2Idx, uint8_t vtx3Idx, bool isRect);
     void GfxSpTri1(uint8_t vtx1Idx, uint8_t vtx2Idx, uint8_t vtx3Idx, bool isRect);
     void GfxSpGeometryMode(uint32_t clear, uint32_t set);
     void GfxSpExtraGeometryMode(uint32_t clear, uint32_t set);
@@ -526,6 +541,9 @@ class Interpreter {
     RSP* mRsp;
     RDP* mRdp;
     RenderingState mRenderingState{};
+    TriangleRenderState mTriangleState{};
+    bool mTriangleStateReuseEnabled = false; // Port opt-in; MM retains the original path.
+    bool mTriangleStateReuseAllowed = false; // Only set while dispatching pure triangle commands.
 
     GfxTextureCache mTextureCache{};
     RenderCostProbe mRenderCost;

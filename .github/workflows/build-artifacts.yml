@@ -129,6 +129,11 @@ jobs:
           python3 libultraship/tests/dxgi_pacing_test.py /usr/include
           python3 scripts/diagnostics/test_analyze_render_flight.py
 
+      - name: OoT triangle submission equivalence
+        run: |
+          python3 scripts/diagnostics/run_gfx_triangle_run_tests.py
+          GFX_TRIANGLE_TEST_CXXFLAGS='-O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_triangle_run_tests.py
+
       - name: Shared renderer texture-address regressions
         run: |
           GFX_TEXTURE_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_texture_address_tests.py

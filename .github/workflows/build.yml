@@ -50,7 +50,20 @@ jobs:
         # breaks automate-vcpkg.cmake's git pull. Point it at the build-dir vcpkg it clones+caches.
         env:
           VCPKG_ROOT: ${{ github.workspace }}/build/x64/vcpkg
-        run: cmake -B build/x64 -S . -G "Visual Studio 17 2022" -A x64
+        shell: pwsh
+        run: |
+          # vcpkg can exhaust its short download retries during a GitHub 503.
+          # A new configure resumes the existing dependency installation.
+          $PSNativeCommandUseErrorActionPreference = $false
+          for ($configureAttempt = 1; $configureAttempt -le 3; $configureAttempt++) {
+            cmake -B build/x64 -S . -G "Visual Studio 17 2022" -A x64
+            $configureExitCode = $LASTEXITCODE
+            if ($configureExitCode -eq 0) { exit 0 }
+            if ($configureAttempt -eq 3) { exit $configureExitCode }
+            $configureDelaySeconds = 10 * $configureAttempt
+            Write-Warning "Configure failed (exit $configureExitCode); retrying in $configureDelaySeconds seconds."
+            Start-Sleep -Seconds $configureDelaySeconds
+          }
 
       # Order matters: libultraship -> soh -> 2ship (soh before 2ship; they share OTRExporter/ZAPD).
       # comboui + ComboShip pull the rest of the runtime in as dependencies.
