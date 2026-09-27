@@ -2565,8 +2565,8 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
             archives.push_back(archive->GetPath());
         }
         FrameTiming_RecordConfiguration(
-            { { "build", gBuildVersion },
-              { "commit", gGitCommitHash },
+            { { "build", std::string(gBuildVersion) },
+              { "commit", std::string(gGitCommitHash) },
               { "archives_in_manager_order", std::move(archives) },
               { "detail_mode", renderDetail },
               { "render_cost_probe", CVarGetInteger(CVAR_DEVELOPER_TOOLS("RendererCostProbe"), 1) },
