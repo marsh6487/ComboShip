@@ -127,7 +127,7 @@ std::shared_ptr<IResource> ResourceManager::LoadResourceProcess(const ResourceId
     // While waiting in the queue, another thread could have loaded the resource.
     // In a last attempt to avoid doing work that will be discarded, let's check if the cached version exists.
     auto cacheLine = CheckCache(identifier, loadExact);
-    auto cachedResource = GetCachedResource(cacheLine);
+    auto cachedResource = GetCachedResource(std::move(cacheLine));
     if (cachedResource != nullptr) {
         return cachedResource;
     }
@@ -259,6 +259,14 @@ ResourceManager::LoadResourceAsync(const std::string& filePath, bool loadExact, 
 
 std::shared_ptr<IResource> ResourceManager::LoadResource(const ResourceIdentifier& identifier, bool loadExact,
                                                          std::shared_ptr<ResourceInitData> initData) {
+    // Match LoadResourceAsync's signature handling before consulting the same cache.
+    if (OtrSignatureCheck(identifier.Path.c_str())) {
+        return LoadResource({ identifier.Path.substr(7), identifier.Owner, identifier.Parent }, loadExact);
+    }
+    // A synchronous cache hit does not need an allocated promise/future pair.
+    if (auto cachedResource = GetCachedResource(identifier, loadExact)) {
+        return cachedResource;
+    }
     PerformanceTrace::Scope waitTrace("resource.wait", identifier.Path,
                                       reinterpret_cast<uintptr_t>(this), identifier.Owner, 2000000);
     waitTrace.Detail("exception_or_incomplete");
@@ -329,7 +337,7 @@ ResourceManager::GetCachedResource(std::variant<ResourceLoadError, std::shared_p
     // Gets the cached resource based on a cache line std::variant from the cache map.
     if (std::holds_alternative<std::shared_ptr<IResource>>(cacheLine)) {
         try {
-            auto resource = std::get<std::shared_ptr<IResource>>(cacheLine);
+            auto& resource = std::get<std::shared_ptr<IResource>>(cacheLine);
 
             if (resource.use_count() <= 0) {
                 return nullptr;
@@ -343,7 +351,8 @@ ResourceManager::GetCachedResource(std::variant<ResourceLoadError, std::shared_p
             }
 
             PerformanceTrace::Count("resource.cache_hits");
-            return resource;
+            // cacheLine owns this reference; transfer it without another atomic retain/release.
+            return std::move(resource);
         } catch (std::bad_variant_access const& e) {
             // This should never happen. The holds_alternative check above should prevent it.
             SPDLOG_ERROR("Unexpected bad_variant_access in GetCachedResource: {}", e.what());
