@@ -85,6 +85,11 @@ jobs:
           ./run-clang-format.sh
           git diff --exit-code
 
+      - name: PAK menu visibility and voice discovery
+        run: |
+          python3 scripts/diagnostics/run_combo_pak_visibility_tests.py
+          python3 scripts/diagnostics/run_voice_pack_discovery_tests.py
+
       - name: Shared-item integration regressions
         run: |
           python3 scripts/diagnostics/run_combo_shared_test.py --json-include /usr/include

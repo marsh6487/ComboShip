@@ -423,9 +423,11 @@ int32_t SohMenu::DrawWidgetByIndex(int32_t i, int32_t width) {
     // SoH's Combobox does comboMap.at(value), which THROWS (and would unwind across the C-ABI
     // boundary and crash) if the CVar value isn't a current option key. comboui's search/flat render
     // skips the section update funcs that normally keep it in range — skip drawing when out of range.
+    // Use the same default as CVarCombobox: equipment slots default to -1 (inherit),
+    // and treating an unset slot as pack 0 hides it when that pack lacks the item.
     if (w->type == WIDGET_CVAR_COMBOBOX && w->cVar && w->cVar[0]) {
         auto opts = std::static_pointer_cast<UIWidgets::ComboboxOptions>(w->options);
-        if (!opts || opts->comboMap.find(CVarGetInteger(w->cVar, 0)) == opts->comboMap.end()) {
+        if (!opts || opts->comboMap.find(CVarGetInteger(w->cVar, opts->defaultIndex)) == opts->comboMap.end()) {
             return 0;
         }
     }
