@@ -143,6 +143,12 @@ jobs:
           GFX_DL_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_display_list_address_tests.py
           python3 scripts/diagnostics/run_alt_segment_binding_tests.py
 
+      - name: Vertex lighting and texture generation equivalence
+        run: |
+          git fetch --no-tags --depth=1 origin 9c084d74a7f7d0ae8cf88b18c0ed74abde03a950
+          python3 scripts/diagnostics/run_gfx_vertex_batch_tests.py
+          GFX_VERTEX_TEST_CXXFLAGS='-O1 -g -fsanitize=address,undefined,float-cast-overflow -fno-sanitize-recover=all -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_vertex_batch_tests.py --skip-null-test
+
       - name: 2Ship back equipment and OoT sky compatibility
         run: |
           python3 scripts/diagnostics/run_mm_back_equipment_tests.py

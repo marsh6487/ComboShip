@@ -1700,6 +1700,11 @@ void Interpreter::GfxSpVertex(size_t n_vertices, size_t dest_index, const F3DVtx
     if (mRenderCost.Active()) {
         mRenderCost.MutableReport().vertices += n_vertices;
     }
+    // Lighting and generated UVs depend only on the normal within a directional
+    // batch. Retain one result for adjacent shared normals; positional lights
+    // still evaluate every position. Nothing survives this vertex command.
+    const bool reuseNormal = (mRsp->geometry_mode & (G_LIGHTING | G_LIGHTING_POSITIONAL)) == G_LIGHTING &&
+                             (mRsp->current_num_lights > 1 || (mRsp->geometry_mode & G_TEXTURE_GEN));
     for (size_t i = 0; i < n_vertices; i++, dest_index++) {
         const F3DVtx_t* v = &vertices[i].v;
         const F3DVtx_tn* vn = &vertices[i].n;
@@ -1743,96 +1748,107 @@ void Interpreter::GfxSpVertex(size_t n_vertices, size_t dest_index, const F3DVtx
                 mRsp->lights_changed = false;
             }
 
-            int r = mRsp->current_lights[mRsp->current_num_lights - 1].l.col[0];
-            int g = mRsp->current_lights[mRsp->current_num_lights - 1].l.col[1];
-            int b = mRsp->current_lights[mRsp->current_num_lights - 1].l.col[2];
+            if (reuseNormal && i != 0 && vn->n[0] == vertices[i - 1].n.n[0] &&
+                vn->n[1] == vertices[i - 1].n.n[1] && vn->n[2] == vertices[i - 1].n.n[2]) {
+                d->color.r = d[-1].color.r;
+                d->color.g = d[-1].color.g;
+                d->color.b = d[-1].color.b;
+                if (mRsp->geometry_mode & G_TEXTURE_GEN) {
+                    U = d[-1].u;
+                    V = d[-1].v;
+                }
+            } else {
+                int r = mRsp->current_lights[mRsp->current_num_lights - 1].l.col[0];
+                int g = mRsp->current_lights[mRsp->current_num_lights - 1].l.col[1];
+                int b = mRsp->current_lights[mRsp->current_num_lights - 1].l.col[2];
 
-            for (int i = 0; i < mRsp->current_num_lights - 1; i++) {
-                float intensity = 0;
-                if ((mRsp->geometry_mode & G_LIGHTING_POSITIONAL) && (mRsp->current_lights[i].p.unk3 != 0)) {
-                    // Calculate distance from the light to the vertex
-                    float dist_vec[3] = { mRsp->current_lights[i].p.pos[0] - world_pos[0],
-                                          mRsp->current_lights[i].p.pos[1] - world_pos[1],
-                                          mRsp->current_lights[i].p.pos[2] - world_pos[2] };
-                    float dist_sq =
-                        dist_vec[0] * dist_vec[0] + dist_vec[1] * dist_vec[1] +
-                        dist_vec[2] * dist_vec[2] * 2; // The *2 comes from GLideN64, unsure of why it does it
-                    float dist = sqrt(dist_sq);
+                for (int i = 0; i < mRsp->current_num_lights - 1; i++) {
+                    float intensity = 0;
+                    if ((mRsp->geometry_mode & G_LIGHTING_POSITIONAL) && (mRsp->current_lights[i].p.unk3 != 0)) {
+                        // Calculate distance from the light to the vertex
+                        float dist_vec[3] = { mRsp->current_lights[i].p.pos[0] - world_pos[0],
+                                              mRsp->current_lights[i].p.pos[1] - world_pos[1],
+                                              mRsp->current_lights[i].p.pos[2] - world_pos[2] };
+                        float dist_sq =
+                            dist_vec[0] * dist_vec[0] + dist_vec[1] * dist_vec[1] +
+                            dist_vec[2] * dist_vec[2] * 2; // The *2 comes from GLideN64, unsure of why it does it
+                        float dist = sqrt(dist_sq);
 
-                    // Transform distance vector (which acts as a direction light vector) into model's space
-                    float light_model[3];
-                    TransposedMatrixMul(light_model, dist_vec,
-                                        mRsp->modelview_matrix_stack[mRsp->modelview_matrix_stack_size - 1]);
+                        // Transform distance vector (which acts as a direction light vector) into model's space
+                        float light_model[3];
+                        TransposedMatrixMul(light_model, dist_vec,
+                                            mRsp->modelview_matrix_stack[mRsp->modelview_matrix_stack_size - 1]);
 
-                    // Calculate intensity for each axis using standard formula for intensity
-                    float light_intensity[3];
-                    for (int light_i = 0; light_i < 3; light_i++) {
-                        light_intensity[light_i] = 4.0f * light_model[light_i] / dist_sq;
-                        light_intensity[light_i] = std::clamp(light_intensity[light_i], -1.0f, 1.0f);
+                        // Calculate intensity for each axis using standard formula for intensity
+                        float light_intensity[3];
+                        for (int light_i = 0; light_i < 3; light_i++) {
+                            light_intensity[light_i] = 4.0f * light_model[light_i] / dist_sq;
+                            light_intensity[light_i] = std::clamp(light_intensity[light_i], -1.0f, 1.0f);
+                        }
+
+                        // Adjust intensity based on surface normal and sum up total
+                        float total_intensity =
+                            light_intensity[0] * vn->n[0] + light_intensity[1] * vn->n[1] + light_intensity[2] * vn->n[2];
+                        total_intensity = std::clamp(total_intensity, -1.0f, 1.0f);
+
+                        // Attenuate intensity based on attenuation values.
+                        // Example formula found at https://ogldev.org/www/tutorial20/tutorial20.html
+                        // Specific coefficients for MM's microcode sourced from GLideN64
+                        // https://github.com/gonetz/GLideN64/blob/3b43a13a80dfc2eb6357673440b335e54eaa3896/src/gSP.cpp#L636
+                        float distf = floorf(dist);
+                        float attenuation = (distf * mRsp->current_lights[i].p.unk7 * 2.0f +
+                                             distf * distf * mRsp->current_lights[i].p.unkE / 8.0f) /
+                                                (float)0xFFFF +
+                                            1.0f;
+                        intensity = total_intensity / attenuation;
+                    } else {
+                        intensity += vn->n[0] * mRsp->current_lights_coeffs[i][0];
+                        intensity += vn->n[1] * mRsp->current_lights_coeffs[i][1];
+                        intensity += vn->n[2] * mRsp->current_lights_coeffs[i][2];
+                        intensity /= 127.0f;
+                    }
+                    if (intensity > 0.0f) {
+                        r += intensity * mRsp->current_lights[i].l.col[0];
+                        g += intensity * mRsp->current_lights[i].l.col[1];
+                        b += intensity * mRsp->current_lights[i].l.col[2];
+                    }
+                }
+
+                d->color.r = r > 255 ? 255 : r;
+                d->color.g = g > 255 ? 255 : g;
+                d->color.b = b > 255 ? 255 : b;
+
+                if (mRsp->geometry_mode & G_TEXTURE_GEN) {
+                    float dotx = 0, doty = 0;
+                    dotx += vn->n[0] * mRsp->current_lookat_coeffs[0][0];
+                    dotx += vn->n[1] * mRsp->current_lookat_coeffs[0][1];
+                    dotx += vn->n[2] * mRsp->current_lookat_coeffs[0][2];
+                    doty += vn->n[0] * mRsp->current_lookat_coeffs[1][0];
+                    doty += vn->n[1] * mRsp->current_lookat_coeffs[1][1];
+                    doty += vn->n[2] * mRsp->current_lookat_coeffs[1][2];
+
+                    dotx /= 127.0f;
+                    doty /= 127.0f;
+
+                    dotx = Ship::Math::clamp(dotx, -1.0f, 1.0f);
+                    doty = Ship::Math::clamp(doty, -1.0f, 1.0f);
+
+                    if (mRsp->geometry_mode & G_TEXTURE_GEN_LINEAR) {
+                        // Not sure exactly what formula we should use to get accurate values
+                        /*dotx = (2.906921f * dotx * dotx + 1.36114f) * dotx;
+                        doty = (2.906921f * doty * doty + 1.36114f) * doty;
+                        dotx = (dotx + 1.0f) / 4.0f;
+                        doty = (doty + 1.0f) / 4.0f;*/
+                        dotx = acosf(-dotx) /* M_PI */ * 0.159155f;
+                        doty = acosf(-doty) /* M_PI */ * 0.159155f;
+                    } else {
+                        dotx = (dotx + 1.0f) / 4.0f;
+                        doty = (doty + 1.0f) / 4.0f;
                     }
 
-                    // Adjust intensity based on surface normal and sum up total
-                    float total_intensity =
-                        light_intensity[0] * vn->n[0] + light_intensity[1] * vn->n[1] + light_intensity[2] * vn->n[2];
-                    total_intensity = std::clamp(total_intensity, -1.0f, 1.0f);
-
-                    // Attenuate intensity based on attenuation values.
-                    // Example formula found at https://ogldev.org/www/tutorial20/tutorial20.html
-                    // Specific coefficients for MM's microcode sourced from GLideN64
-                    // https://github.com/gonetz/GLideN64/blob/3b43a13a80dfc2eb6357673440b335e54eaa3896/src/gSP.cpp#L636
-                    float distf = floorf(dist);
-                    float attenuation = (distf * mRsp->current_lights[i].p.unk7 * 2.0f +
-                                         distf * distf * mRsp->current_lights[i].p.unkE / 8.0f) /
-                                            (float)0xFFFF +
-                                        1.0f;
-                    intensity = total_intensity / attenuation;
-                } else {
-                    intensity += vn->n[0] * mRsp->current_lights_coeffs[i][0];
-                    intensity += vn->n[1] * mRsp->current_lights_coeffs[i][1];
-                    intensity += vn->n[2] * mRsp->current_lights_coeffs[i][2];
-                    intensity /= 127.0f;
+                    U = (int32_t)(dotx * mRsp->texture_scaling_factor.s);
+                    V = (int32_t)(doty * mRsp->texture_scaling_factor.t);
                 }
-                if (intensity > 0.0f) {
-                    r += intensity * mRsp->current_lights[i].l.col[0];
-                    g += intensity * mRsp->current_lights[i].l.col[1];
-                    b += intensity * mRsp->current_lights[i].l.col[2];
-                }
-            }
-
-            d->color.r = r > 255 ? 255 : r;
-            d->color.g = g > 255 ? 255 : g;
-            d->color.b = b > 255 ? 255 : b;
-
-            if (mRsp->geometry_mode & G_TEXTURE_GEN) {
-                float dotx = 0, doty = 0;
-                dotx += vn->n[0] * mRsp->current_lookat_coeffs[0][0];
-                dotx += vn->n[1] * mRsp->current_lookat_coeffs[0][1];
-                dotx += vn->n[2] * mRsp->current_lookat_coeffs[0][2];
-                doty += vn->n[0] * mRsp->current_lookat_coeffs[1][0];
-                doty += vn->n[1] * mRsp->current_lookat_coeffs[1][1];
-                doty += vn->n[2] * mRsp->current_lookat_coeffs[1][2];
-
-                dotx /= 127.0f;
-                doty /= 127.0f;
-
-                dotx = Ship::Math::clamp(dotx, -1.0f, 1.0f);
-                doty = Ship::Math::clamp(doty, -1.0f, 1.0f);
-
-                if (mRsp->geometry_mode & G_TEXTURE_GEN_LINEAR) {
-                    // Not sure exactly what formula we should use to get accurate values
-                    /*dotx = (2.906921f * dotx * dotx + 1.36114f) * dotx;
-                    doty = (2.906921f * doty * doty + 1.36114f) * doty;
-                    dotx = (dotx + 1.0f) / 4.0f;
-                    doty = (doty + 1.0f) / 4.0f;*/
-                    dotx = acosf(-dotx) /* M_PI */ * 0.159155f;
-                    doty = acosf(-doty) /* M_PI */ * 0.159155f;
-                } else {
-                    dotx = (dotx + 1.0f) / 4.0f;
-                    doty = (doty + 1.0f) / 4.0f;
-                }
-
-                U = (int32_t)(dotx * mRsp->texture_scaling_factor.s);
-                V = (int32_t)(doty * mRsp->texture_scaling_factor.t);
             }
         } else {
             d->color.r = v->cn[0];

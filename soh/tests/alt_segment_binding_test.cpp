@@ -4,6 +4,8 @@
 #include <fast/resource/type/DisplayList.h>
 #include <fast/resource/type/Texture.h>
 #include <cstdio>
+#include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <future>
 #include <map>
@@ -12,9 +14,26 @@
 #include <set>
 #include <string>
 #include <variant>
+#include <thread>
 
 #define SPDLOG_ERROR(...) ((void)0)
 #define SPDLOG_TRACE(...) ((void)0)
+
+static size_t trackedAllocations = 0;
+static bool trackAllocations = false;
+[[gnu::noinline]] void* operator new(std::size_t size) {
+    if (trackAllocations)
+        ++trackedAllocations;
+    if (void* value = std::malloc(size))
+        return value;
+    throw std::bad_alloc();
+}
+[[gnu::noinline]] void operator delete(void* value) noexcept {
+    std::free(value);
+}
+[[gnu::noinline]] void operator delete(void* value, std::size_t) noexcept {
+    std::free(value);
+}
 
 namespace BS {
 using priority_t = int;
@@ -42,9 +61,11 @@ struct FixtureArchive {
     }
 };
 struct FixtureLoader {
+    std::shared_ptr<ResourceInitData> lastInitData;
     std::map<std::string, std::shared_ptr<IResource>> resources;
     std::shared_ptr<IResource> LoadResource(const std::string& path, std::shared_ptr<File>,
-                                            std::shared_ptr<ResourceInitData>) {
+                                            std::shared_ptr<ResourceInitData> initData) {
+        lastInitData = initData;
         const auto found = resources.find(path);
         return found == resources.end() ? nullptr : found->second;
     }
@@ -139,6 +160,8 @@ static uintptr_t Bind(const std::string& path, int segment = 8) {
 }
 
 int main(int argc, char** argv) {
+    // Match the runtime's shared_ptr atomic reference counting, not libc's single-thread shortcut.
+    std::thread([] {}).join();
     auto rm = Ship::Context::GetRawInstance()->manager;
     const std::string name = "objects/object_link_child/gLinkChildEyesOpenTex";
     const std::string path = "__OTR__" + name;
@@ -222,6 +245,83 @@ int main(int argc, char** argv) {
     REQUIRE(Fast::LoadRenderResource(*rm, path.c_str(), true, nullptr) == native);
     rm->mDefaultCacheOwner = 0;
     REQUIRE(Fast::LoadRenderResource(*rm, path.c_str(), true, nullptr) == replacement);
+    rm->mAltAssetsEnabled = false;
+    rm->mResourceCache[{ name, 0, nullptr }] = native;
+    Ship::ResourceIdentifier warmIdentifier{ name, 0, nullptr };
+    trackedAllocations = 0;
+    trackAllocations = true;
+    auto warmResult = rm->LoadResource(warmIdentifier);
+    trackAllocations = false;
+    REQUIRE(warmResult == native);
+    if (!std::getenv("RESOURCE_BASELINE"))
+        REQUIRE(trackedAllocations == 0); // Synchronous cache hits need no promise/future allocation.
+    // Preserve signature/init-data behavior and archive-parent isolation.
+    auto scoped = std::make_shared<Ship::ResourceManager>();
+    scoped->loader->resources[name] = native;
+    scoped->mArchiveManager->files.insert(name);
+    auto initData = std::make_shared<Ship::ResourceInitData>();
+    REQUIRE(scoped->LoadResource(name, true, initData) == native);
+    REQUIRE(scoped->loader->lastInitData == initData);
+    scoped->mResourceCache.clear();
+    REQUIRE(scoped->LoadResource(path, true, initData) == native);
+    REQUIRE(scoped->loader->lastInitData == nullptr); // Existing Async prefix contract.
+    auto parent = std::shared_ptr<Ship::Archive>(native, reinterpret_cast<Ship::Archive*>(native.get()));
+    scoped->mDefaultCacheArchive = parent;
+    scoped->mResourceCache[{ name, 0, parent }] = replacement;
+    REQUIRE(scoped->LoadResource(path) == replacement);
+    scoped->mDefaultCacheArchive.reset();
+    REQUIRE(scoped->LoadResource(path) == native);
+    scoped->mResourceCache[{ name, 0, nullptr }] = std::shared_ptr<Ship::IResource>{};
+    REQUIRE(scoped->LoadResource(name) == native);
+    scoped->mResourceCache[{ name, 0, nullptr }] = Ship::ResourceManager::ResourceLoadError::NotFound;
+    REQUIRE(scoped->LoadResource(name) == native);
+    if (std::getenv("RESOURCE_BENCHMARK")) {
+        constexpr unsigned count = 500000;
+        for (int mode : { 0, 1, 2 }) {
+            const bool enabled = mode == 1;
+            for (bool alternate : { false, true }) {
+                rm->mAltAssetsEnabled = alternate;
+                const auto begin = std::chrono::steady_clock::now();
+                uintptr_t sum = 0;
+                for (unsigned i = 0; i < count; ++i)
+                    sum += reinterpret_cast<uintptr_t>(
+                        (mode == 2 ? rm->LoadResourceProcess(name)
+                                   : Fast::LoadRenderResource(*rm, path.c_str(), enabled, nullptr))
+                            .get());
+                const auto ns =
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - begin)
+                        .count();
+                std::printf("BENCH mode=%d alt=%d ns/call=%.2f checksum=%zu\n", mode, alternate, double(ns) / count,
+                            size_t(sum));
+            }
+        }
+    }
+    if (std::getenv("RESOURCE_BENCHMARK")) {
+        for (bool alternate : { false, true }) {
+            auto mixed = std::make_shared<Ship::ResourceManager>();
+            mixed->mAltAssetsEnabled = alternate;
+            mixed->loader->resources[name] = native;
+            mixed->loader->resources[alt] = replacement;
+            mixed->mArchiveManager->files = { name, alt };
+            auto dirty = Resource<Fast::Texture>(name, Fast::ResourceType::Texture);
+            dirty->Dirty();
+            const auto begin = std::chrono::steady_clock::now();
+            uintptr_t sum = 0;
+            constexpr unsigned count = 100000;
+            for (unsigned i = 0; i < count; ++i) {
+                mixed->mDefaultCacheOwner = i % 2; // Scope switches on every lookup.
+                if (i % 64 == 0)
+                    mixed->mResourceCache.clear(); // Unload/reload.
+                if (i % 64 == 16)
+                    mixed->mResourceCache[{ alternate ? alt : name, i % 2, nullptr }] = dirty;
+                const char* selected = i % 64 == 32 ? "objects/not_present" : path.c_str();
+                sum += reinterpret_cast<uintptr_t>(mixed->LoadResource(selected).get());
+            }
+            const auto ns =
+                std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - begin).count();
+            std::printf("BENCH mixed alt=%d ns/call=%.2f checksum=%zu\n", alternate, double(ns) / count, size_t(sum));
+        }
+    }
     if (failures)
         return 1;
     std::printf(

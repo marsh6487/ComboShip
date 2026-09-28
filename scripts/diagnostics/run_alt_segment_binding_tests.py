@@ -27,9 +27,15 @@ def helper_function(source, name):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--build-dir", type=Path)
+    parser.add_argument("--benchmark", action="store_true", help="Build optimized fixture; set RESOURCE_BENCHMARK=1 to time it")
+    parser.add_argument("--expect-allocation-regression", action="store_true", help="Keep the zero-allocation gate on a baseline revision")
+    parser.add_argument("--baseline", help="Git revision to use for ResourceManager bodies")
     parser.add_argument("--game", choices=("oot", "mm", "all"), default="all")
     args = parser.parse_args()
     manager = (ROOT / "libultraship/src/ship/resource/ResourceManager.cpp").read_text()
+    if args.baseline:
+        manager = subprocess.check_output(["git", "show", args.baseline + ":libultraship/src/ship/resource/ResourceManager.cpp"], cwd=ROOT, text=True)
     load_start = manager.index("std::shared_ptr<IResource> ResourceManager::LoadResourceProcess(const ResourceIdentifier&")
     load_end = manager.index("std::shared_ptr<IResource> ResourceManager::LoadResource(uint64_t", load_start)
     cache_start = manager.index("std::variant<ResourceManager::ResourceLoadError, std::shared_ptr<IResource>>\n"
@@ -38,9 +44,10 @@ def main():
     cache = manager[load_start:load_end] + manager[cache_start:cache_end]
     failed = False
     with tempfile.TemporaryDirectory(prefix="alt-segment-binding-") as temporary:
-        build = Path(temporary)
+        build = args.build_dir or Path(temporary)
+        build.mkdir(parents=True, exist_ok=True)
         (build / "alt_segment_cache.inc").write_text(cache)
-        (build / "spdlog").mkdir()
+        (build / "spdlog").mkdir(exist_ok=True)
         (build / "spdlog/spdlog.h").write_text("#pragma once\n#define SPDLOG_TRACE(...) ((void)0)\n")
         for game in ("oot", "mm"):
             if args.game not in (game, "all"):
@@ -63,7 +70,7 @@ def main():
             subprocess.run([
                 *shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", "-Wall", "-Wextra", "-Werror",
                 "-Wno-unused-parameter", "-Wno-unused-function", "-Wno-pointer-arith", "-DF3DEX_GBI_2", "-DCOMBO_BUILD",
-                "-fsanitize=undefined", "-fno-sanitize-recover=all", "-I" + str(build),
+                *(["-O3", "-DNDEBUG"] if args.benchmark else ["-fsanitize=undefined", "-fno-sanitize-recover=all"]), "-I" + str(build),
                 "-I" + str(ROOT / "libultraship/include"),
                 *shlex.split(os.environ.get("PERFORMANCE_TRACE_CXXFLAGS", "")),
                 "-include", str(ROOT / "libultraship/include/ship/diagnostics/PerformanceTrace.h"),
@@ -73,7 +80,8 @@ def main():
                 str(ROOT / "libultraship/src/fast/resource/type/DisplayList.cpp"),
                 str(ROOT / "libultraship/src/fast/resource/type/Texture.cpp"), "-o", str(binary),
             ], check=True)
-            result = subprocess.run([str(binary), game])
+            result = subprocess.run([str(binary), game], env={**os.environ,
+                **({"RESOURCE_BASELINE": "1"} if args.baseline and not args.expect_allocation_regression else {})})
             failed |= result.returncode != 0
     return int(failed)
 
