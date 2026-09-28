@@ -102,6 +102,7 @@ jobs:
 
       - name: Contents-based chests and opt-in Midna
         run: |
+          python3 scripts/diagnostics/run_hint_item_name_tests.py
           python3 scripts/diagnostics/run_chest_size_tests.py
           python3 scripts/diagnostics/run_mm_chest_contents_tests.py
           python3 scripts/diagnostics/run_midna_navi_draw_test.py
