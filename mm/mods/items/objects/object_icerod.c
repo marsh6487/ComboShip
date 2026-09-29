@@ -67,49 +67,52 @@ void CustomItems_DrawIceRod(Player* player, PlayState* play) {
 
     OPEN_DISPS(play->state.gfxCtx);
 
-    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    // Keep only the local aiming view clear; projectile rendering continues below.
+    if (player != GET_PLAYER(play) || !iceRodFirstPerson) {
+        Gfx_SetupDL_25Opa(play->state.gfxCtx);
 
-    // Get forearm and hand positions to calculate hand direction
-    Vec3f forearmPos = player->bodyPartsPos[PLAYER_BODYPART_L_FOREARM];
-    Vec3f handPos = player->bodyPartsPos[PLAYER_BODYPART_L_HAND];
+        // Get forearm and hand positions to calculate hand direction
+        Vec3f forearmPos = player->bodyPartsPos[PLAYER_BODYPART_L_FOREARM];
+        Vec3f handPos = player->bodyPartsPos[PLAYER_BODYPART_L_HAND];
 
-    // Calculate direction vector from forearm to hand
-    f32 dx = handPos.x - forearmPos.x;
-    f32 dy = handPos.y - forearmPos.y;
-    f32 dz = handPos.z - forearmPos.z;
+        // Calculate direction vector from forearm to hand
+        f32 dx = handPos.x - forearmPos.x;
+        f32 dy = handPos.y - forearmPos.y;
+        f32 dz = handPos.z - forearmPos.z;
 
-    // Calculate yaw and pitch from direction
-    f32 handYaw = atan2f(dx, dz);
-    f32 horizDist = sqrtf(dx * dx + dz * dz);
-    f32 handPitch = atan2f(dy, horizDist);
+        // Calculate yaw and pitch from direction
+        f32 handYaw = atan2f(dx, dz);
+        f32 horizDist = sqrtf(dx * dx + dz * dz);
+        f32 handPitch = atan2f(dy, horizDist);
 
-    // Position at hand
-    Matrix_Translate(handPos.x, handPos.y, handPos.z, MTXMODE_NEW);
+        // Position at hand
+        Matrix_Translate(handPos.x, handPos.y, handPos.z, MTXMODE_NEW);
 
-    // Apply hand rotation
-    Matrix_RotateY(handYaw, MTXMODE_APPLY);
-    Matrix_RotateX(-handPitch, MTXMODE_APPLY);
-    Matrix_RotateY(BINANG_TO_RAD(0x4000), MTXMODE_APPLY);
+        // Apply hand rotation
+        Matrix_RotateY(handYaw, MTXMODE_APPLY);
+        Matrix_RotateX(-handPitch, MTXMODE_APPLY);
+        Matrix_RotateY(BINANG_TO_RAD(0x4000), MTXMODE_APPLY);
 
-    // Slight offset in local X and Z
-    Matrix_Translate(-0.5f, 0.0f, 0.5f, MTXMODE_APPLY);
+        // Slight offset in local X and Z
+        Matrix_Translate(-0.5f, 0.0f, 0.5f, MTXMODE_APPLY);
 
-    Matrix_Scale(0.05f, 0.05f, 0.05f, MTXMODE_APPLY);
+        Matrix_Scale(0.05f, 0.05f, 0.05f, MTXMODE_APPLY);
 
-    {
-        Gfx* opaDL = IceRod_GetOpaDL();
-        Gfx* xluDL = IceRod_GetXluDL();
-        if (opaDL != NULL) {
-            gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, __FILE__, __LINE__),
-                      G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-            gSPDisplayList(POLY_OPA_DISP++, opaDL);
-        }
-        if (xluDL != NULL) {
-            // Draw transparent parts (ice crystal) with same matrix
-            Gfx_SetupDL_25Xlu(play->state.gfxCtx);
-            gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, __FILE__, __LINE__),
-                      G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-            gSPDisplayList(POLY_XLU_DISP++, xluDL);
+        {
+            Gfx* opaDL = IceRod_GetOpaDL();
+            Gfx* xluDL = IceRod_GetXluDL();
+            if (opaDL != NULL) {
+                gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, __FILE__, __LINE__),
+                          G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+                gSPDisplayList(POLY_OPA_DISP++, opaDL);
+            }
+            if (xluDL != NULL) {
+                // Draw transparent parts (ice crystal) with same matrix
+                Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+                gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, __FILE__, __LINE__),
+                          G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+                gSPDisplayList(POLY_XLU_DISP++, xluDL);
+            }
         }
     }
 

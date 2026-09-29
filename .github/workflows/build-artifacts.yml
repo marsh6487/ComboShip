@@ -95,6 +95,12 @@ jobs:
           python3 scripts/diagnostics/run_combo_shared_test.py --json-include /usr/include
           python3 scripts/diagnostics/run_combo_grant_tests.py --json-include /usr/include
 
+      - name: Accepted NEI presentation and MM pickup regressions
+        run: |
+          # Fixed source fixtures from the accepted SoH history; never substitute current output.
+          git fetch --no-tags --depth=1 https://github.com/marsh6487/Shipwright.git cec63fce86b1f582f6e61ad6a98eca6c3cca784b c77c18587a976f6d6cb5c8f91f27593286469218
+          bash scripts/diagnostics/run_combo_nei_regressions.sh
+
       - name: OoT diagnostic frame timing accounting
         run: |
           python3 scripts/diagnostics/run_build_metadata_test.py

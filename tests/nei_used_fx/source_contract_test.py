@@ -62,7 +62,7 @@ path='soh/mods/items/objects/object_lightrod.c'
 assert (ROOT/path).read_text().count('Rand_ZeroOne()')==baseline(path).count('Rand_ZeroOne()')==1
 path='soh/soh/Enhancements/randomizer/NeiGiPresentation.cpp'
 old=functions(baseline(path))['NeiGi_DrawMesh']
-new=functions((ROOT/path).read_text())['NeiGi_DrawMeshMaterial']
+new=functions((ROOT/'soh/soh/Enhancements/randomizer/NeiGiMeshRenderer.inc').read_text())['NeiGi_DrawMeshMaterial']
 new=re.sub(r'static void NeiGi_DrawMeshMaterial\(.*?\) \{',
            'void NeiGi_DrawMesh(PlayState* play, const NeiGi::Mesh& mesh, Kind orb) {',new,count=1,flags=re.S)
 new=new.replace('(material ? 32 : 63)','63')

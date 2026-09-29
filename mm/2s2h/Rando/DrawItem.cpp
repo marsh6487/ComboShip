@@ -29,8 +29,7 @@ void* OotAssets_LoadGfx(const char* otrPath);        // Skijer's NEI — resolve
 void* OotAssets_LoadGfxDirect(const char* otrPath);  // Skijer's NEI — archive-scoped load (defeats MM shadowing)
 void* OotAssets_LoadTexOrDList(const char* otrPath); // Skijer's NEI — texture/DL resource (Climb ladder seg-8 tex)
 uint16_t Nei_GetOwnedItem(uint8_t slot);             // mods/nei_save.cpp — Roc chain level for its draw (u16 store)
-u8 Cane_HasSkill(u8 skill);  // items/logic/item_cane_of_somaria.h — which cane skill this copy is
-extern Gfx gIKAxeInlineDL[]; // equipment/objects/ikaxe_DL — axe with segments pre-resolved
+extern Gfx gIKAxeInlineDL[];                         // equipment/objects/ikaxe_DL — axe with segments pre-resolved
 }
 
 #ifdef COMBO_BUILD
@@ -39,7 +38,30 @@ extern Gfx gIKAxeInlineDL[]; // equipment/objects/ikaxe_DL — axe with segments
 // blue rupee when it can't be resolved). Bodies live in the combo-owned TU-glue header, included
 // after the engine headers above (outside the extern "C" block — it is C++). Mirror of soh's
 // Randomizer_DrawComboForeign.
+void DrawOotNeiCaneOfSomaria(RandoItemId skill);
+void DrawOotNeiUltrahand();
 #include "ComboForeignDrawMM.h"
+
+extern "C" void Message_StageCustomItemIconEx(void* tex, s16 width, s16 height, u8 isIA8);
+
+uint8_t Rando::ComboForeignMessageIcon(RandoCheckId check) {
+    const auto* item = Rando::MiscBehavior::MM_LookupForeign(check);
+    if (!item || item->itemGame != ComboRando::GAME_OOT || item->trap)
+        return 0xFE;
+    static Fn_GetItemIconInfo getIcon = nullptr;
+    if (!getIcon)
+        getIcon = (Fn_GetItemIconInfo)Combo_ResolveSym("soh", "OOT_GetItemIconInfo");
+    if (!getIcon)
+        return 0xFE;
+    CwItemIconInfo icon{};
+    if (getIcon(item->itemName.c_str(), &icon) != 1 || !icon.path || std::strncmp(icon.path, "__OTR__", 7) != 0 ||
+        (icon.width < 1 || icon.width > 64 || icon.height < 1 || icon.height > 64 ||
+         (icon.isIA8 != 0 && icon.isIA8 != 1)))
+        return 0xFE;
+    const char* routed = ComboInternRoutedPathOOT(std::string("__OTR__@oot:") + (icon.path + 7));
+    Message_StageCustomItemIconEx((void*)routed, (s16)icon.width, (s16)icon.height, (u8)icon.isIA8);
+    return 0xF5;
+}
 
 void Rando::LatchComboForeign(RandoCheckId randoCheckId) {
     ComboLatchForeignDrawOOT(randoCheckId);
@@ -1868,7 +1890,7 @@ void DrawOotWaterDragonScale() {
 // Progressive Master Sword — SoH parity (Randomizer_DrawMasterSword): the Temple of Time pedestal Master
 // Boss-soul flame overlay (defined with the slate runes below). Shared tier signal: SoH marks the
 // True Master Sword and the Ultrashot with it, so MM matches. Skijer's NEI
-static void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b);
+void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b);
 
 // Sword mesh from vanilla OoT object_toki_objects (OoT-unique folder), scaled/rotated to fit the get-item
 // cylinder, with its scrolling shine on segment 8.
@@ -2041,24 +2063,14 @@ void DrawOotNeiLightRod() { // REAL mesh: converted from light_rodDL/Cylinder_00
     static Gfx* c = NULL;
     DrawOotRodStandIn(&c, 255, 255, 130);
 }
-// Dual Cane — the six skills share ONE slot, so the floating model has to say WHICH skill this
-// pickup is. Mirrors SoH (Randomizer_DrawCaneOfSomaria and friends): the give order is fixed
-// (Statue, Flip, Block, Stone, Platform, Ultrahand — kCaneOrder), so the number of skills already
-// owned identifies this copy. Somaria stays its red mesh, Pacci is the same mesh tinted gold, and
-// the upgrade skills add the boss-soul flame in their cane's colour. Skijer's NEI
-void DrawOotNeiCaneOfSomaria() { // REAL mesh (object_somaria give DL, SoH scale 0.25) — fallback: LTTP-red stick
-    static u32 sCaneFrame = 0;
-    static int sCaneOwned = 0;
-    if (TierLatch_NewPickup(&sCaneFrame)) {
-        sCaneOwned = 0;
-        for (u8 s = 0; s < 6; s++) {
-            sCaneOwned += Cane_HasSkill(s) ? 1 : 0;
-        }
-    }
-    int owned = sCaneOwned;
-    // 0 -> Statue (Somaria base), 1 -> Flip (Pacci base), 2/4 -> Somaria upgrades, 3/5 -> Pacci.
-    u8 isPacci = (owned == 1) || (owned == 3) || (owned == 5);
-    u8 isUpgrade = (owned >= 2);
+// Concrete skill ids are frozen by ConvertItem before the grant. Never infer this pickup's
+// appearance from current MM inventory: that inventory already includes the newly granted skill.
+// Pacci uses the golden cane; upgrades retain their matching red/gold flame.
+void DrawOotNeiCaneOfSomaria(RandoItemId skill) {
+    const bool isPacci = skill == RI_OOT_NEI_CANE_PACCI_FLIP || skill == RI_OOT_NEI_CANE_PACCI_STONE ||
+                         skill == RI_OOT_NEI_CANE_PACCI_ULTRAHAND;
+    const bool isUpgrade = skill == RI_OOT_NEI_CANE_SOMARIA_BLOCK || skill == RI_OOT_NEI_CANE_SOMARIA_PLATFORM ||
+                           skill == RI_OOT_NEI_CANE_PACCI_STONE || skill == RI_OOT_NEI_CANE_PACCI_ULTRAHAND;
     if (isUpgrade) {
         if (isPacci) {
             DrawOotSlateRuneFlame(255, 215, 70); // Pacci gold
@@ -2105,7 +2117,7 @@ void DrawOotNeiUltrahand() {
                           "__OTR__objects/object_nei_ultrahand/gUltrahandGiveXluDL", &xlu, &xluTried, 0.17f)) {
         return;
     }
-    DrawOotNeiCaneOfSomaria();
+    DrawOotNeiCaneOfSomaria(RI_OOT_NEI_CANE_PACCI_ULTRAHAND);
 }
 void DrawOotExtCaneOfByrna() { // REAL mesh (object_somaria blue Byrna give DL) — fallback: LTTP-blue stick
     static Gfx* real = NULL;
@@ -2878,7 +2890,7 @@ void DrawOotNeiSheikahSlate() {
 
 // Slate runes: the same slate model wrapped in a per-rune tinted flame (the boss-soul flame idiom —
 // the flame color IS the rune's identity, matching its badge/glyph icons and SoH's draw.cpp).
-static void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b) {
+void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b) {
     static Gfx* sFlame = NULL;
     if (sFlame == NULL) {
         sFlame = (Gfx*)OotAssets_LoadGfxDirect("__OTR__objects/object_gi_fire/gGiBlueFireFlameDL");
@@ -2967,12 +2979,24 @@ void DrawOotNeiRodOfSeasons() {
 }
 
 void Rando::DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* actor) {
+    // Raw world previews need the next tier. Concrete awards bypass this wrapper.
+    if (randoItemId == RI_OOT_NEI_CANE_OF_SOMARIA || randoItemId == RI_OOT_PROGRESSIVE_ROC) {
+        randoItemId = Rando::ConvertItem(randoItemId, randoCheckId);
+    }
+    Rando::DrawResolvedItem(randoItemId, randoCheckId, actor);
+}
+
+void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* actor) {
     // Apply hilites with actor world pos before drawing
     if (actor != NULL) {
         func_800B8118(actor, gPlayState, 0);
         func_800B8050(actor, gPlayState, 0);
     }
 
+#ifdef COMBO_BUILD
+    if (MM_TryDrawNeiGi(randoItemId))
+        return;
+#endif
     const int dungeonOwner = DungeonItem_GetOwner(randoItemId);
     if (dungeonOwner >= 0 &&
         GetItem_DrawDungeonItem(gPlayState, Rando::StaticData::Items[randoItemId].drawId, dungeonOwner)) {
@@ -3545,7 +3569,7 @@ void Rando::DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* 
         case RI_OOT_NEI_CANE_SOMARIA_PLATFORM:
         case RI_OOT_NEI_CANE_PACCI_FLIP:
         case RI_OOT_NEI_CANE_PACCI_STONE:
-            DrawOotNeiCaneOfSomaria();
+            DrawOotNeiCaneOfSomaria(randoItemId);
             break;
         case RI_OOT_NEI_CANE_PACCI_ULTRAHAND: // has its own mesh, unlike the other five skills
             DrawOotNeiUltrahand();

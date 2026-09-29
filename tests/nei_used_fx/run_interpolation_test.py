@@ -14,6 +14,12 @@ with tempfile.TemporaryDirectory(prefix="nei-rod-interpolation-") as temporary:
                "soh/soh/Enhancements/randomizer/NeiUsedMagicPresentation.cpp",
                "soh/soh/Enhancements/randomizer/NeiGiPresentation.cpp",
                "soh/soh/frame_interpolation.cpp", "tests/nei_used_fx/interpolation_test.cpp"]
+    # ComboShip adds optional timing counters around the same interpolator. Keep its source
+    # intact while this render fixture runs with instrumentation disabled.
+    timing = Path(temporary) / "timing.cpp"
+    timing.write_text('#include <stdint.h>\nextern "C" int FrameTiming_IsActive(void) { return 0; }\n'
+                      'extern "C" void FrameTiming_Count(const char*, uint64_t) {}\n')
+    sources.append(str(timing))
     objects = []
     # Compile the published baseline under distinct names, avoiding inline ODR
     # collisions. Compare its complete real-renderer output with the candidate.

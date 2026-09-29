@@ -22,7 +22,8 @@
 #include "libultraship/color.h"  // Color_RGB8
 #include "soh/cvar_prefixes.h"
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h" // COLORSCHEME_*
-#include "soh/OTRGlobals.h"                            // rando-context null guards (MM calls us while OOT is dormant)
+#include "variables.h"
+#include "soh/OTRGlobals.h" // rando-context null guards (MM calls us while OOT is dormant)
 #include <string>
 #include "soh/Enhancements/randomizer/dungeon.h"   // Rando::DungeonKey / GetDungeon()->IsMQ() (key-ring MQ variants)
 #include "objects/object_gi_fire/object_gi_fire.h" // gGiBlueFireFlameDL (boss-soul flame)
@@ -422,6 +423,13 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
 // instead of caching the first model it saw (Item::GetGIEntry progressive tiers + Triforce shards).
 static bool OOT_IsStateDependentDraw(RandomizerGet rg) {
     switch (rg) {
+        case RG_PROGRESSIVE_ROCS:
+        case RG_CANE_OF_SOMARIA:
+        case RG_PROGRESSIVE_KOKIRI_SWORD:
+        case RG_PROGRESSIVE_MASTER_SWORD:
+        case RG_PROGRESSIVE_BGS:
+        case RG_PROGRESSIVE_HAMMER:
+        case RG_STONE_OF_AGONY:
         case RG_PROGRESSIVE_HOOKSHOT:
         case RG_PROGRESSIVE_STRENGTH:
         case RG_PROGRESSIVE_BOMB_BAG:
@@ -442,6 +450,8 @@ static bool OOT_IsStateDependentDraw(RandomizerGet rg) {
     }
 }
 
+extern "C" int32_t NeiGi_DescribeEntry(const GetItemEntry* entry, CwItemDrawInfo* out);
+
 static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     RandomizerGet actual = RG_NONE;
     GetItemEntry gi = *Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual);
@@ -451,8 +461,26 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     // Progressive items resolve to the tier actually owed; classify THAT item's draw func, not the
     // placeholder's (drawItemId carries the resolved RandomizerGet for rando-table entries).
     RandomizerGet effRg = (gi.tableId == TABLE_RANDOMIZER) ? (RandomizerGet)gi.drawItemId : rg;
-    if (OOT_DescribeCustomDraw(effRg, out)) {
+    if (NeiGi_DescribeEntry(&gi, out) || OOT_DescribeCustomDraw(effRg, out)) {
         return 1;
+    }
+    // Concrete skills must retain their own tint/flame even when they use the legacy cane.
+    if (gi.drawFunc == Randomizer_DrawCaneOfSomaria)
+        out->neiLegacyCane = 1;
+    else if (gi.drawFunc == Randomizer_DrawCanePacci)
+        out->neiLegacyCane = 2;
+    else if (gi.drawFunc == Randomizer_DrawCaneSomariaUpgrade)
+        out->neiLegacyCane = 3;
+    else if (gi.drawFunc == Randomizer_DrawCanePacciUpgrade)
+        out->neiLegacyCane = 4;
+    else if (gi.drawFunc == Randomizer_DrawCanePacciUltrahand)
+        out->neiLegacyCane = 6;
+    if (out->neiLegacyCane) {
+        out->drawKind = CW_DRAW_KIND_NEI_CANE;
+        return 1;
+    }
+    if (gi.drawFunc != nullptr) {
+        return 0; // A custom callback has no native gid row; gid 0 would masquerade as a bottle.
     }
     void* dls[CW_DRAW_MAX_DLISTS] = {};
     int32_t xluStart = -1;
@@ -525,6 +553,49 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemDrawInfo(const char* itemName, CwItem
         }
         out->stateDependent = OOT_IsStateDependentDraw(rg) ? 1 : 0;
         return 1;
+    } catch (...) { return 0; }
+}
+
+static int32_t OOT_FillItemIconInfo(RandomizerGet rg, CwItemIconInfo* out) {
+    RandomizerGet actual = RG_NONE;
+    auto gi = Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual);
+    auto item = Rando::StaticData::RetrieveItem(actual != RG_NONE ? actual : rg);
+    if (item.HasCustomIcon()) {
+        out->path = item.GetCustomIcon();
+        out->width = out->height = item.GetCustomIconSize() == ICON_SIZE_24 ? 24 : 32;
+    } else if (gi && gi->itemId >= 0 && gi->itemId < ITEM_ROCS_FEATHER_SKIJER) {
+        out->path = static_cast<const char*>(gItemIcons[gi->itemId]);
+        out->width = out->height = gi->itemId >= ITEM_MEDALLION_FOREST && gi->itemId <= ITEM_HEART_PIECE_2 ? 24 : 32;
+    }
+    if (!out->path || std::strncmp(out->path, "__OTR__", 7) != 0)
+        return 0;
+    // These native icon families are IA8, unlike the square RGBA32 item/quest icons.
+    if (std::strstr(out->path, "/gSongNoteTex")) {
+        out->width = 16;
+        out->height = 24;
+        out->isIA8 = 1;
+    } else if (std::strstr(out->path, "/gOcarinaBtnIcon")) {
+        out->width = out->height = 16;
+        out->isIA8 = 1;
+    } else if (std::strstr(out->path, "/gHeartPieceIcon")) {
+        out->width = out->height = 48;
+        out->isIA8 = 1;
+    }
+    return 1;
+}
+
+extern "C" COMBO_EXPORT int32_t OOT_GetItemIconInfo(const char* itemName, CwItemIconInfo* out) {
+    try {
+        if (!itemName || !out)
+            return 0;
+        *out = CwItemIconInfo{};
+        const auto it = Rando::StaticData::itemNameToEnum.find(itemName);
+        if (it == Rando::StaticData::itemNameToEnum.end() || it->second == RG_NONE || it->second == RG_COMBO_FOREIGN ||
+            it->second == RG_SOLD_OUT || it->second == RG_HINT)
+            return 0;
+        if (!OTRGlobals::Instance || !OTRGlobals::Instance->gRandomizer || !OTRGlobals::Instance->gRandoContext)
+            return CW_DRAW_NOT_READY;
+        return OOT_FillItemIconInfo(it->second, out);
     } catch (...) { return 0; }
 }
 

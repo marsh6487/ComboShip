@@ -59,7 +59,24 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
     for name in names:
         source = ROOT / "tests" / (name + "_test.cpp")
         out = str(Path(tmp) / name.replace("/", "_"))
-        subprocess.run([cc, *flags, "-I" + tmp, str(source), "-o", out], check=True)
+        extra_flags = []
+        if name == "nei_gi/presentation" and "--combo" in sys.argv:
+            renderer = functions((ROOT / "mm/2s2h/Rando/NeiGiPresentation.cpp").read_text())["MM_DrawNeiGi"]
+            shim = """
+extern "C" { PlayState* gPlayState = &Fixture::play; }
+void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b) { Fixture::flameColors.push_back({r,g,b}); }
+#define Gfx_SetupDL25_Opa Gfx_SetupDL_25Opa
+#define Gfx_SetupDL25_Xlu Gfx_SetupDL_25Xlu
+#define Matrix_RotateYF Matrix_RotateY
+#define MATRIX_FINALIZE_AND_LOAD(pkt, gfx) gSPMatrix(pkt, Matrix_NewMtx(gfx, (char*)__FILE__, __LINE__), G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH)
+"""
+            candidate = source.read_text().replace("int main() {", shim + renderer + "\nint main() {", 1)
+            checks = (ROOT / "tests/mm_presentation/gi_bridge_checks.inc").read_text()
+            candidate = candidate.replace("  using namespace Fixture;\n", "  using namespace Fixture;\n" + checks, 1)
+            source = Path(tmp) / "combo_gi_presentation.cpp"
+            source.write_text("#define COMBO_BUILD 1\n" + candidate)
+            extra_flags = ["-I" + str(ROOT / "combo"), "-I" + str(ROOT / "combo/menu")]
+        subprocess.run([cc, *flags, *extra_flags, "-I" + tmp, str(source), "-o", out], check=True)
         subprocess.run([out], check=True)
 
 # Check the actual C dispatch boundary, using the same CVar definitions as CMake.
