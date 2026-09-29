@@ -1,6 +1,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include "2s2h/Rando/NeiArticulatedPresentation.h"
+#include "2s2h/Rando/NeiLanternPresentation.h"
 
 extern "C" {
 #include "global.h"
@@ -81,6 +83,24 @@ void* DinFireShield_HandDL(PlayState*, Player*, void*) {
 
 u8 ResourceMgr_FileExists(const char*) {
     return 0;
+}
+
+static bool sHookHandEnabled = false;
+static bool sLanternGripEnabled = false;
+static Gfx* sResolvedHookHand = nullptr;
+static Gfx sHookReplacement;
+
+bool NeiArticulated_ApplySwitchHookHand(PlayState*, Player*, Gfx** dList, Gfx* resolvedHand) {
+    if (!sHookHandEnabled || resolvedHand == nullptr) {
+        return false;
+    }
+    sResolvedHookHand = resolvedHand;
+    *dList = &sHookReplacement;
+    return true;
+}
+
+bool NeiLantern_UsesGrip(const Player*) {
+    return sLanternGripEnabled;
 }
 
 f32 CustomForms_RootScale(void) {
@@ -242,6 +262,8 @@ static void AdultSheathAndHandsFollowPolicy(void) {
     static Gfx adultEmpty;
     static Gfx adultLeft;
     static Gfx adultRight;
+    static Gfx adultClosedLeft;
+    static Gfx adultClosedRight;
     static Gfx skeleton;
     Player player = MakePlayer();
 
@@ -249,6 +271,8 @@ static void AdultSheathAndHandsFollowPolicy(void) {
     sDL_SheathEmpty = &adultEmpty;
     sDL_LHSword = &adultLeft;
     sDL_RHShield = &adultRight;
+    sDL_LHClosed = &adultClosedLeft;
+    sDL_RHClosed = &adultClosedRight;
     gSaveContext.save.saveInfo.equips.equipment = EQUIP_VALUE_SWORD_KOKIRI;
 
     player.sheathType = PLAYER_MODELTYPE_SHEATH_14;
@@ -270,6 +294,18 @@ static void AdultSheathAndHandsFollowPolicy(void) {
     player.rightHandType = PLAYER_MODELTYPE_RH_SHIELD;
     player.currentShield = PLAYER_SHIELD_HEROS_SHIELD;
     CHECK(DrawAdult(&player, PLAYER_LIMB_RIGHT_HAND, &skeleton) == &adultRight);
+
+    // The production callback applies its final NEI hand selector after resolving adult equipment.
+    sHookHandEnabled = true;
+    sResolvedHookHand = nullptr;
+    CHECK(DrawAdult(&player, PLAYER_LIMB_RIGHT_HAND, &skeleton) == &sHookReplacement);
+    CHECK(sResolvedHookHand == &adultClosedRight);
+    sHookHandEnabled = false;
+
+    player.leftHandType = PLAYER_MODELTYPE_LH_ONE_HAND_SWORD;
+    sLanternGripEnabled = true;
+    CHECK(DrawAdult(&player, PLAYER_LIMB_LEFT_HAND, &skeleton) == &adultClosedLeft);
+    sLanternGripEnabled = false;
 }
 
 static void ExtendedBackShieldFollowsPolicy(void) {

@@ -177,7 +177,7 @@ void Rando::MiscBehavior::CheckQueue() {
                             }
                             CustomMessage::Entry entry = {
                                 .textboxType = 2,
-                                .icon = Rando::StaticData::GetIconForZMessage(RI_COMBO_FOREIGN),
+                                .icon = Rando::ComboForeignMessageIcon(cid),
                                 .msg = foreignTrap ? GetTrapMessage() : ("You found " + foreignName + "!"),
                             };
                             if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
@@ -311,7 +311,7 @@ void Rando::MiscBehavior::CheckQueue() {
                         }
 
                         Matrix_Scale(30.0f, 30.0f, 30.0f, MTXMODE_APPLY);
-                        Rando::DrawItem(randoItemId, randoCheckId, actor);
+                        Rando::DrawResolvedItem(randoItemId, randoCheckId, actor);
                     } });
             return;
         }

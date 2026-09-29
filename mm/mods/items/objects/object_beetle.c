@@ -1,3 +1,4 @@
+#include "2s2h/Rando/NeiHeldPresentation.h"
 /**
  * object_beetle.c - Beetle 3D model and draw functions
  */
@@ -46,7 +47,10 @@ static void Beetle_DrawBody(PlayState* play, Vec3f* pos, Vec3s* rot, f32 scale) 
     Matrix_RotateY(M_PI / 2.0f, MTXMODE_APPLY);
     Matrix_Scale(scale * 3.0f, scale * 3.0f, scale * 3.0f, MTXMODE_APPLY);
 
-    {
+    if (NeiHeld_HasResources(NEI_HELD_PATH("beetle_body"), NULL) &&
+        NeiHeld_HasResources(NEI_HELD_PATH("beetle_wings"), NULL)) {
+        NeiHeld_DrawModel(play, NEI_HELD_PATH("beetle_body"), NULL);
+    } else {
         Gfx* bodyDL = Beetle_GetBodyDL();
         if (bodyDL != NULL) {
             gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
@@ -62,7 +66,10 @@ static void Beetle_DrawWings(PlayState* play, f32 wingScale) {
 
     Matrix_Push();
     Matrix_Scale(1.0f, wingScale, 1.0f, MTXMODE_APPLY);
-    {
+    if (NeiHeld_HasResources(NEI_HELD_PATH("beetle_body"), NULL) &&
+        NeiHeld_HasResources(NEI_HELD_PATH("beetle_wings"), NULL)) {
+        NeiHeld_DrawModel(play, NEI_HELD_PATH("beetle_wings"), NULL);
+    } else {
         Gfx* wingsDL = Beetle_GetWingsDL();
         if (wingsDL != NULL) {
             gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);

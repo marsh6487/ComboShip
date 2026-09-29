@@ -384,7 +384,7 @@ static void BallChain_Stop(Player* p, PlayState* play) {
     // Link's animation would stay stuck. Hand it back so he can move again. Skijer's NEI
     p->skelAnime.playSpeed = 1.0f;
     // (All sfx are one-shots now — no flagged/looping sounds to stop. Skijer's NEI)
-    ItemEquip_PlayUnequipSFX(play, p);
+    ItemEquip_PlayUnequipSFXForAction(play, p, PLAYER_IA_BALL_AND_CHAIN);
 }
 
 static void BallChain_Start(Player* p, PlayState* play) {
@@ -395,7 +395,7 @@ static void BallChain_Start(Player* p, PlayState* play) {
     bcSpinAngle = 0;
     bcFirstPerson = 0;
     bcState = BALLCHAIN_STATE_EQUIP;
-    ItemEquip_PlayEquipSFX(play, p);
+    ItemEquip_PlayEquipSFXForAction(play, p, PLAYER_IA_BALL_AND_CHAIN);
 }
 
 // =============================================================================
@@ -807,7 +807,8 @@ void Handle_BallAndChain(Player* p, PlayState* play) {
         return;
     }
     if (in.otherButtonPressed) {
-        BallChain_Stop(p, play);
+        if (bcActive)
+            BallChain_Stop(p, play);
         return;
     }
 

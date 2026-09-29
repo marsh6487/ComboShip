@@ -1,3 +1,4 @@
+#include "2s2h/Rando/NeiUsedMagicPresentation.h"
 /**
  * item_rod_ice.c - Ice Rod from A Link Between Worlds
  *
@@ -39,6 +40,7 @@ static u8 sIceWaveCollidersInited = 0;
 
 // Multi-set projectile system (5 concurrent sets)
 static RodProjSet sIceProjSets[ROD_MAX_PROJ_SETS];
+static u32 sIceDrawEpoch;
 
 static RodColor sIceRodColor = { ICE_ROD_PRIM_R, ICE_ROD_PRIM_G, ICE_ROD_PRIM_B, ICE_ROD_PRIM_A,
                                  ICE_ROD_ENV_R,  ICE_ROD_ENV_G,  ICE_ROD_ENV_B,  ICE_ROD_ENV_A };
@@ -146,6 +148,7 @@ static void IceRod_CalcVelocity(Vec3f* outVel, s16 yaw, s16 pitch) {
 static void IceRod_InitSingleProjectile(Player* p, PlayState* play, Vec3f* startPos, s16 yaw, s16 pitch, f32 maxRange) {
     RodProjSet* set = IceRod_FindFreeSet(play);
     IceRod_InitSetColliders(set, p, play);
+    set->drawEpoch = ++sIceDrawEpoch;
 
     set->targetScale = 2.0f;
     set->active = 1;
@@ -171,6 +174,7 @@ static void IceRod_InitSingleProjectile(Player* p, PlayState* play, Vec3f* start
 static void IceRod_InitTripleProjectile(Player* p, PlayState* play, Vec3f* startPos, s16 baseYaw, s16 pitch) {
     RodProjSet* set = IceRod_FindFreeSet(play);
     IceRod_InitSetColliders(set, p, play);
+    set->drawEpoch = ++sIceDrawEpoch;
 
     set->targetScale = 2.0f;
     set->active = 1;
@@ -252,7 +256,9 @@ static void IceRod_SpawnIceSparks(PlayState* play, Vec3f* pos, f32 scale) {
         vel.x = (Rand_ZeroOne() - 0.5f) * 3.0f;
         vel.y = Rand_ZeroOne() * 2.0f;
         vel.z = (Rand_ZeroOne() - 0.5f) * 3.0f;
-        EffectSsEnIce_Spawn(play, &sparkPos, scale * 0.3f, &vel, &accel, &primColor, &envColor, 15);
+        // The private frost wake replaces these six opaque flight clumps.
+        // Keep allocation, lifespan and RNG cadence; only collapse their visual size.
+        EffectSsEnIce_Spawn(play, &sparkPos, 0.0f, &vel, &accel, &primColor, &envColor, 15);
     }
 }
 
@@ -717,7 +723,7 @@ static void IceRod_UpdateCharge(Player* p, PlayState* play) {
 
     if ((play->gameplayFrames % 3) == 0) {
         Vec3f* tipPos = &p->meleeWeaponInfo[0].tip;
-        FX_SpawnRodSwingParticles(play, tipPos, &sIceRodColor);
+        RodCommon_PreserveChargeSparkCadence(play, tipPos, &sIceRodColor);
     }
 
     if ((play->gameplayFrames % 12) == 0) {
@@ -843,7 +849,7 @@ static void IceRod_OnEquip(PlayState* play, Player* p) {
     sIceChargeHoldCounter = 0;
 
     iceRodBlureIdx = FX_InitSwordTrail(play, &sIceRodColor);
-    ItemEquip_PlayEquipSFX(play, p);
+    ItemEquip_PlayEquipSFXForAction(play, p, PLAYER_IA_ROD_ICE);
 }
 
 static void IceRod_OnUnequip(PlayState* play, Player* p) {
@@ -876,7 +882,7 @@ static void IceRod_OnUnequip(PlayState* play, Player* p) {
 
     if (iceRodSpinActive)
         IceRod_StopSpinIce();
-    ItemEquip_PlayUnequipSFX(play, p);
+    ItemEquip_PlayUnequipSFXForAction(play, p, PLAYER_IA_ROD_ICE);
 }
 
 // =============================================================================
@@ -1031,10 +1037,17 @@ void CustomItems_DrawIceRodReticle(Player* p, PlayState* play) {
 
 // Charge aura + spin cylinder — drawn here (draw phase), state set in update. Skijer's NEI
 void CustomItems_DrawIceRodEffects(Player* p, PlayState* play) {
-    if (iceRodSpinActive) {
-        FX_DrawSpinFireCylinder(play, p, iceRodSpinRadius, iceRodSpinIsBig, &sIceRodColor);
-    }
-    if (iceRodCharging) {
-        FX_DrawChargeAura(play, p, iceRodChargeLevel, &sIceRodColor);
-    }
+    if (iceRodSpinActive)
+        NeiUsedMagic_DrawSpin(play, p, 1, iceRodSpinRadius, iceRodSpinIsBig);
+    if (iceRodCharging)
+        NeiUsedMagic_DrawCharge(play, p, 1, iceRodChargeLevel);
+    if (iceRodWaveActive)
+        for (s32 i = 0; i < ICE_ROD_WAVE_COUNT; ++i)
+            NeiUsedMagic_DrawBurst(play, 1, &iceRodWavePos[i], .8f + .1f * i, iceRodWaveTimer / 30.0f);
+}
+
+void IceRod_PutAway(Player* p, PlayState* play) {
+    if (iceRodActive || iceRodFirstPerson)
+        IceRod_OnUnequip(play, p);
+    sIceEquipState.isEquipped = 0;
 }

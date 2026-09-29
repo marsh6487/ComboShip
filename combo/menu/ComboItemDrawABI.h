@@ -59,6 +59,8 @@ typedef enum {
     CW_DRAW_KIND_MM_FAIRY_BOTTLE, /* OPA dl0; XLU dl1; seg8 scroll (32x320 layer 2); billboard dl2 */
     CW_DRAW_KIND_MM_SOUL_FLAME,   /* MM enemy soul: billboard seg8 flame (primColorXlu), dl0 */
     CW_DRAW_KIND_OPS,             /* ops[] bytecode below (transforms/colors/DLs); see CwDrawOpCode */
+    CW_DRAW_KIND_NEI_CANE,        /* concrete legacy cane skill rendered by the MM host */
+    CW_DRAW_KIND_NEI_GI,          /* replacement mesh plus host-rendered elemental energy */
 } CwDrawKind;
 
 #define CW_DRAW_MAX_OPS 20
@@ -139,7 +141,24 @@ typedef struct {
 
     /* Resolved tier name when a progressive placeholder converted (e.g. "Large Quiver"), or NULL. */
     const char* resolvedName;
+
+    /* NEI presentation metadata; no owning-game pointers to gameplay state. */
+    int32_t neiEffect;
+    float neiEffectCenter[3];
+    int32_t neiSomariaUpgrade;
+    int32_t neiLegacyCane; /* 1=Statue, 2=Flip, 3=Block, 4=Stone, 5=Platform, 6=Ultrahand */
 } CwItemDrawInfo;
+
+typedef struct {
+    const char* path;      /* owning archive's process-lifetime texture path */
+    int32_t width, height; /* logical pixels, independent of high-resolution replacements */
+    int32_t isIA8;         /* zero = RGBA32 */
+} CwItemIconInfo;
+typedef int32_t (*Fn_GetItemIconInfo)(const char* itemName, CwItemIconInfo* out);
+// Uses the registered asset owner and its Alt mode; no engine state crosses.
+typedef int32_t (*Fn_NeiResourceExists)(const char* path);
+int32_t OOT_NeiResourceExists(const char* path);
+typedef int32_t (*Fn_GetNeiGiDrawInfo)(const char* slug, CwItemDrawInfo* out);
 
 /* Returns 1 and fills out on success; 0 if the item is unknown/undrawable; CW_DRAW_NOT_READY if the
  * producer's state isn't up yet. itemName is in the owning game's namespace (MM: RI_* spoilerName). */
@@ -167,6 +186,7 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
         case CW_DRAW_KIND_BRONZE_SCALE:
             return 2;
         case CW_DRAW_KIND_OPS:
+        case CW_DRAW_KIND_NEI_CANE:
             return 0; /* the interpreter bounds-checks every CW_OP_DLIST index itself */
         default:
             return 1;

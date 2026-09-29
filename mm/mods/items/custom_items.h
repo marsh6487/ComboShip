@@ -387,6 +387,7 @@ typedef struct {
     // ── Lantern ──────────────────────────────────────────────────────────
     u8 lanternFireType;    // LanternFireType enum (0-4)
     u8 lanternSwinging;    // 1 = in swing animation
+    u8 lanternStowed;      // Explicitly pocketed until next use (local lifecycle only)
     u8 lanternEquipped;    // 1 = lantern is on a C-button (draw in hand always)
     s16 lanternSwingFrame; // Current swing anim frame
     u8 lanternCatchWindow; // 1 = catch frames active this frame
@@ -719,6 +720,12 @@ void Player_InitTimeGateIA(PlayState* play, Player* player);
 void Player_InitWhipIA(PlayState* play, Player* player);
 void Player_InitSwitchHookIA(PlayState* play, Player* player);
 void Player_InitMinishCapIA(PlayState* play, Player* player);
+
+s32 CustomItems_HasStowableHeldItem(Player* p);
+s32 CustomItems_BlocksMovement(Player* p);
+void CustomItems_CleanupTransientTools(Player* p, PlayState* play);
+void CustomItems_ResetTransientTools(Player* p, PlayState* play);
+void CustomItems_PutAwayHeldItems(Player* p, PlayState* play);
 
 #ifdef __cplusplus
 }

@@ -31,6 +31,9 @@ void AdultLink_Toggle(void);
 // 1 if adult mode is currently ON (reads Nei_Save()->timeGateAdultMode).
 s32 AdultLink_IsActive(void);
 
+// Read-only fit query for the local overlay's ready human rig; peers use their native rig.
+s32 AdultLink_UsesAdultPresentation(const Player* player);
+
 // 1 if we should DRAW adult Link and HIDE vanilla Link this frame (active AND the OoT model is
 // loaded/ready). Returns 0 when oot.o2r isn't available so the game falls back to vanilla Link.
 s32 AdultLink_ShouldHide(void);

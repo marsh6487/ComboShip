@@ -145,7 +145,7 @@ static void Beetle_Stop(Player* p, PlayState* play) {
     p->focusActor = NULL;
     // Stop looping fly sound
     Audio_StopSfxById(BEETLE_SFX_FLY);
-    ItemEquip_PlayUnequipSFX(play, p);
+    ItemEquip_PlayUnequipSFXForAction(play, p, PLAYER_IA_BEETLE);
 }
 
 static void Beetle_Start(Player* p, PlayState* play) {
@@ -164,7 +164,7 @@ static void Beetle_Start(Player* p, PlayState* play) {
     p->stateFlags1 |= PLAYER_STATE1_8; // ITEM_IN_HAND + unk_ACC → real aim cam on entry (see StateAiming)
     p->unk_ACC = 0xA;
     func_80831010(p, play);
-    ItemEquip_PlayEquipSFX(play, p);
+    ItemEquip_PlayEquipSFXForAction(play, p, PLAYER_IA_BEETLE);
 }
 
 static void Beetle_Launch(Player* p, PlayState* play) {
@@ -353,7 +353,7 @@ static void Beetle_StateAiming(Player* p, PlayState* play, ItemInputState* in) {
             func_80831010(p, play); // enter/hold MM's real aim camera (was FirstPerson_Init, which never aimed)
             beetleFirstPerson = 1;
         }
-        ItemEquip_PlayEquipSFX(play, p);
+        ItemEquip_PlayEquipSFXForAction(play, p, PLAYER_IA_BEETLE);
         return;
     }
 

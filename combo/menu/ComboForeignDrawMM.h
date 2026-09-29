@@ -35,6 +35,7 @@
 #include <unordered_set>
 
 #include "ComboItemDrawABI.h"
+#include "Rando/NeiGiPresentation.h"
 // ComboShip: the animated class, with 2ship.dll as the host (see the shim in ComboForeignAnim.h).
 #define COMBO_FOREIGN_ANIM_HOST_MM 1
 #include "ComboForeignAnim.h"
@@ -74,6 +75,10 @@ struct ComboForeignDrawInfoOOT {
     bool stateDependent = false;
     // Resolved tier name (e.g. "Longshot") when a progressive placeholder converted, else empty.
     std::string resolvedName;
+    int32_t neiEffect = 0;
+    float neiEffectCenter[3] = {};
+    int32_t neiSomariaUpgrade = 0;
+    int32_t neiLegacyCane = 0;
 };
 
 // Routed path strings must outlive the frame (the GBI wrapper emits the raw pointer into the display
@@ -109,7 +114,7 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     if (rcStatic == CW_DRAW_NOT_READY) {
         return ComboForeignResolveOOT::NotReady; // OOT dormant / rando context null — retry next frame
     }
-    if (rcStatic == 0 || raw.dlistCount <= 0) {
+    if (rcStatic == 0 || (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_NEI_CANE)) {
         // ComboShip: no static DL row — try the animated ABI (OOT boss souls' real skeletons). OOT
         // only describes the item; ComboForeignAnim_Draw loads + draws it (mirror of the OOT side).
         static Fn_GetItemAnimDrawInfo sGetItemAnimDrawInfo = nullptr;
@@ -151,6 +156,10 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     info.setupDlXlu = raw.setupDlXlu;
     info.hasEnvColor = raw.hasEnvColor != 0;
     info.drawKind = raw.drawKind;
+    info.neiEffect = raw.neiEffect;
+    memcpy(info.neiEffectCenter, raw.neiEffectCenter, sizeof(info.neiEffectCenter));
+    info.neiSomariaUpgrade = raw.neiSomariaUpgrade;
+    info.neiLegacyCane = raw.neiLegacyCane;
     info.stateDependent = raw.stateDependent != 0;
     if (raw.resolvedName != nullptr) {
         info.resolvedName = raw.resolvedName;
@@ -806,6 +815,35 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
         return;
     }
 
+    if (info->drawKind == CW_DRAW_KIND_NEI_CANE) {
+        static constexpr RandoItemId skills[] = { RI_NONE,
+                                                  RI_OOT_NEI_CANE_OF_SOMARIA,
+                                                  RI_OOT_NEI_CANE_PACCI_FLIP,
+                                                  RI_OOT_NEI_CANE_SOMARIA_BLOCK,
+                                                  RI_OOT_NEI_CANE_PACCI_STONE,
+                                                  RI_OOT_NEI_CANE_SOMARIA_PLATFORM,
+                                                  RI_OOT_NEI_CANE_PACCI_ULTRAHAND };
+        if (info->neiLegacyCane == 6)
+            DrawOotNeiUltrahand();
+        else if (info->neiLegacyCane > 0 && info->neiLegacyCane < 6)
+            DrawOotNeiCaneOfSomaria(skills[info->neiLegacyCane]);
+        else
+            GetItem_Draw(gPlayState, GID_RUPEE_BLUE);
+        return;
+    }
+    if (info->drawKind == CW_DRAW_KIND_NEI_GI) {
+        CwItemDrawInfo recipe{};
+        for (int i = 0; i < info->count; ++i)
+            recipe.dlists[i] = info->dls[i];
+        recipe.dlistCount = info->count;
+        recipe.xluStartIndex = info->xluStart;
+        recipe.scale = info->scale;
+        recipe.neiEffect = info->neiEffect;
+        memcpy(recipe.neiEffectCenter, info->neiEffectCenter, sizeof(recipe.neiEffectCenter));
+        recipe.neiSomariaUpgrade = info->neiSomariaUpgrade;
+        MM_DrawNeiGi(recipe);
+        return;
+    }
     switch (info->drawKind) {
         case CW_DRAW_KIND_GORON_SWORD:
             MM_DrawForeignGoronSword(info);

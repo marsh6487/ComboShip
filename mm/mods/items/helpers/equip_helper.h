@@ -44,6 +44,26 @@ typedef struct {
     s8 prevInvincibility; // For damage detection
 } ItemEquipState;
 
+// A model posed off a captured wrist. Existing right-hand poses were dialled
+// with live sliders; each object's values remain its own calibration.
+typedef struct {
+    f32 offsetX;
+    f32 offsetY;
+    f32 offsetZ;
+    f32 rotX;
+    f32 rotY;
+    f32 rotZ;
+    f32 scale;
+} ItemHandPose;
+
+void ItemEquip_CaptureHandMatrix(void);     // z_player_lib.c, at PLAYER_LIMB_R_HAND
+void ItemEquip_CaptureLeftHandMatrix(void); // before the native stick/sword transforms at PLAYER_LIMB_L_HAND
+void ItemEquip_ReleaseHandMatrix(void);     // once per draw pass, AFTER every in-hand drawer
+// Pose only: no resource lookup or graphics submission. Returns 0 if this
+// player's draw has no captured wrist. Caller owns push/pop of the CPU matrix.
+u8 ItemEquip_ApplyHandPose(Player* player, const ItemHandPose* pose);
+u8 ItemEquip_ApplyLeftHandPose(Player* player, const ItemHandPose* pose);
+
 typedef void (*EquipCallback)(PlayState* play, Player* player);
 typedef void (*UnequipCallback)(PlayState* play, Player* player);
 
@@ -225,6 +245,13 @@ u8 ItemHeld_IsButtonHeld(u8 itemId, Player* player, PlayState* play);
  * @return 1 if pressed
  */
 u8 ItemHeld_IsButtonPressed(u8 itemId, Player* player, PlayState* play);
+
+void ItemInput_SuppressUntilRelease(u8 itemId, PlayState* play);
+void ItemEquip_ResetUnequipSound(PlayState* play, Player* player, s32 itemAction);
+void ItemEquip_BeginItemChangeSound(PlayState* play, Player* player, s32 itemAction);
+u8 ItemEquip_ClaimUnequipSound(PlayState* play, Player* player, s32 itemAction);
+void ItemEquip_PlayEquipSFXForAction(PlayState* play, Player* player, s32 itemAction);
+void ItemEquip_PlayUnequipSFXForAction(PlayState* play, Player* player, s32 itemAction);
 
 #ifdef __cplusplus
 }

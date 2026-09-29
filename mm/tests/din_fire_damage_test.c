@@ -2,6 +2,7 @@
 // drops and ice gates. din_fire_native.inc contains unchanged native functions
 // extracted at build time; enemy tables come from their actor translation units.
 #include "din_fire_fixture.h"
+#include <stdarg.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "mods/combo_rpg.h"
 #include "mods/extended_player.h"
@@ -10,9 +11,28 @@
 #include "overlays/actors/ovl_Obj_Aqua/z_obj_aqua.h"
 #include "overlays/actors/ovl_Obj_Mine/z_obj_mine.h"
 
+extern void Test_SetSoulState(int enabled, int owned);
+extern int Test_SoulGate(Collider* at, Collider* ac);
+
 bool GameInteractor_Should(GIVanillaBehavior behavior, uint32_t result, ...) {
-    (void)behavior;
+    if (behavior == VB_PERFORM_AC_COLLISION) {
+        va_list args;
+        va_start(args, result);
+        Collider* at = va_arg(args, Collider*);
+        Collider* ac = va_arg(args, Collider*);
+        result = Test_SoulGate(at, ac);
+        va_end(args);
+    }
     return result;
+}
+void CollisionCheck_HitEffects(PlayState* state, Collider* at, ColliderElement* atElem, Collider* ac,
+                               ColliderElement* acElem, Vec3f* hitPos) {
+    (void)state;
+    (void)at;
+    (void)atElem;
+    (void)ac;
+    (void)acElem;
+    (void)hitPos;
 }
 u8 TridentChargeBall_GetFierceDamage(Actor* actor) {
     (void)actor;
@@ -93,6 +113,7 @@ void EffectSsKirakira_SpawnDispersed(PlayState* state, Vec3f* position, Vec3f* v
 
 #include "din_fire_native.inc"
 
+extern DamageTable* Test_ChuchuTable(void);
 extern DamageTable* Test_DekuBabaTable(void);
 extern DamageTable* Test_WolfosTable(void);
 extern DamageTable* Test_WhiteWolfosTable(void);
@@ -445,7 +466,58 @@ static void MineReactions(void) {
     REQUIRE(fallback.x == 0.0f && fallback.y == 1.0f && fallback.z == 0.0f);
 }
 
+// This reaches the production AC admission hook before damage resolution. Unlike
+// RequireHit, it never fabricates AC_HIT/acHitElem, so soul immunity is observable.
+static void NativeSoulAdmission(void) {
+    for (int visual = 0; visual < 2; ++visual) {
+        for (int fire = 0; fire < 2; ++fire) {
+            for (int enabled = 0; enabled < 2; ++enabled) {
+                for (int owned = 0; owned < 2; ++owned) {
+                    for (int kind = 0; kind < 4; ++kind) {
+                        SetupDamage();
+                        swordOption = visual;
+                        damageOption = fire;
+                        adult = 1;
+                        Test_SetSoulState(enabled, owned);
+                        Strike(0, 0); // Runtime log: Kokiri item 0x4D, action 0x03, human form.
+                        DinFireSword_Update(&play, &player);
+                        DinFireSword_RefreshDamage(&play, &player);
+                        Actor target = { 0 };
+                        Collider receiver = { 0 };
+                        ColliderElement element = { 0 };
+                        Vec3f contact = { 0 };
+                        const s16 ids[] = { ACTOR_EN_SLIME, ACTOR_EN_DEKUBABA, ACTOR_EN_KUSA, ACTOR_OBJ_GRASS };
+                        target.id = ids[kind];
+                        target.category = kind < 2 ? ACTORCAT_ENEMY : ACTORCAT_PROP;
+                        target.colChkInfo.damageTable = kind == 0   ? Test_ChuchuTable()
+                                                        : kind == 1 ? Test_DekuBabaTable()
+                                                                    : NULL;
+                        receiver.actor = &target;
+                        receiver.acFlags = AC_ON | AC_TYPE_PLAYER;
+                        element.acElemFlags = ACELEM_ON;
+                        element.acDmgInfo.dmgFlags = kind == 0   ? 0xF7CFFFFF
+                                                     : kind == 2 ? Test_KusaMask()
+                                                     : kind == 3 ? Test_GrassMask()
+                                                                 : DMG_DEFAULT;
+                        ColliderQuad* attack = &player.meleeWeaponQuads[0];
+                        REQUIRE(!CollisionCheck_NoSharedFlags(&attack->elem, &element));
+                        const int allowed = kind >= 2 || !enabled || owned;
+                        REQUIRE(CollisionCheck_SetATvsAC(&play, &attack->base, &attack->elem, &contact, &receiver,
+                                                         &element, &contact, &contact) == allowed);
+                        REQUIRE(!!(receiver.acFlags & AC_HIT) == allowed);
+                        CollisionCheck_ApplyDamage(&play, &play.colChkCtx, &receiver, &element);
+                        REQUIRE(target.colChkInfo.damage == allowed);
+                    }
+                }
+            }
+        }
+    }
+    Test_SetSoulState(0, 0);
+}
+
 int main(void) {
+    NativeSoulAdmission();
+    puts("PASS MM Din: native soul hook gates Chuchu/Deku Baba, permits Kusa/Grass, both fire checkboxes off/on");
     NativeDamageAndReactions();
     puts("PASS MM Din: native 1/3/4 and 2/6/8 sword damage, 13 real enemy tables, native reactions and fire-only "
          "receivers");

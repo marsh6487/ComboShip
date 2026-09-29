@@ -19,6 +19,8 @@ namespace Rando {
 
 void Init();
 void DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN, Actor* actor = nullptr);
+// CheckQueue has already resolved/frozen this award; do not consult changed inventory again.
+void DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* actor);
 // randoCheckId is only for naming: junk, traps and (in combo) foreign items resolve their display
 // name from the CHECK, so a give that omits it toasts the sentinel's name instead of the real one.
 void GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN);
@@ -26,6 +28,7 @@ void GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId = RC_UNKNOWN);
 // ComboShip: freeze a foreign check's model at the tier it grants, before the cross-grant that
 // follows mutates OOT's dormant save and a live re-resolve flips the held-up model next frame.
 void LatchComboForeign(RandoCheckId randoCheckId);
+uint8_t ComboForeignMessageIcon(RandoCheckId randoCheckId);
 // ComboShip: junk rotation pool minus RI_NONE, dumped for the combo generator's junk bake.
 std::vector<RandoItemId> ComboJunkPool();
 // ComboShip: resolved tier name for a latched (frozen) / live-previewed foreign check, or NULL.

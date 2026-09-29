@@ -1082,15 +1082,27 @@ static Color_RGB8 sStrayFairyIconEnvColors[] = {
 //               textbox icon when a fairy is obtained outside a dungeon: the vanilla draw indexes
 //               sStrayFairyIconTextures[gSaveContext.dungeonSceneSharedIndex], which is only valid
 //               inside the four dungeons.
-//   0xF5      = staged custom texture (rgba32, square; size staged alongside the pointer).
+//   0xF5      = staged custom texture with explicit dimensions and RGBA32/IA8 format.
 #define MESSAGE_CUSTOM_ICON_ITEM 0xFD
 static TexturePtr sMsgCustomIconTex = NULL;
-static s16 sMsgCustomIconSize = 32;
+static s16 sMsgCustomIconWidth = 32;
+static s16 sMsgCustomIconHeight = 32;
+static u8 sMsgCustomIconIA8 = false;
 static s16 sMsgStrayFairyIndex = -1;
 
-void Message_StageCustomItemIcon(void* tex, s16 size) {
+void Message_StageCustomItemIconEx(void* tex, s16 width, s16 height, u8 isIA8) {
+    if (width < 1 || width > 64 || height < 1 || height > 64 || isIA8 > 1) {
+        sMsgCustomIconTex = NULL;
+        return;
+    }
     sMsgCustomIconTex = tex;
-    sMsgCustomIconSize = size;
+    sMsgCustomIconWidth = width;
+    sMsgCustomIconHeight = height;
+    sMsgCustomIconIA8 = isIA8;
+}
+
+void Message_StageCustomItemIcon(void* tex, s16 size) {
+    Message_StageCustomItemIconEx(tex, size, size, false);
 }
 // #endregion
 
@@ -1098,6 +1110,7 @@ void Message_DrawItemIcon(PlayState* play, Gfx** gfxP) {
     MessageContext* msgCtx = &play->msgCtx;
     Gfx* gfx = *gfxP;
     s32 index;
+    s32 textureStep = D_801F6B08;
 
     msgCtx->unk12016 = msgCtx->unk12014;
 
@@ -1146,10 +1159,17 @@ void Message_DrawItemIcon(PlayState* play, Gfx** gfxP) {
                             G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD,
                             G_TX_NOLOD);
     } else if ((msgCtx->itemId == MESSAGE_CUSTOM_ICON_ITEM) && (sMsgCustomIconTex != NULL)) {
-        // 2S2H [Rando] Staged custom icon: rgba32 square texture (32x32 item icons or 24x24 quest icons)
-        gDPLoadTextureBlock(gfx++, msgCtx->textboxSegment[TEXTBOX_SEG_ICON], G_IM_FMT_RGBA, G_IM_SIZ_32b,
-                            sMsgCustomIconSize, sMsgCustomIconSize, 0, G_TX_NOMIRROR | G_TX_WRAP,
-                            G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+        msgCtx->unk12016 = (msgCtx->unk12014 * sMsgCustomIconHeight) / sMsgCustomIconWidth;
+        textureStep = (sMsgCustomIconWidth << 10) / msgCtx->unk12014;
+        if (sMsgCustomIconIA8) {
+            gDPLoadTextureBlock(gfx++, msgCtx->textboxSegment[TEXTBOX_SEG_ICON], G_IM_FMT_IA, G_IM_SIZ_8b,
+                                sMsgCustomIconWidth, sMsgCustomIconHeight, 0, G_TX_NOMIRROR | G_TX_WRAP,
+                                G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+        } else {
+            gDPLoadTextureBlock(gfx++, msgCtx->textboxSegment[TEXTBOX_SEG_ICON], G_IM_FMT_RGBA, G_IM_SIZ_32b,
+                                sMsgCustomIconWidth, sMsgCustomIconHeight, 0, G_TX_NOMIRROR | G_TX_WRAP,
+                                G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+        }
     } else if ((msgCtx->itemId >= ITEM_SONG_SONATA) && (msgCtx->itemId <= ITEM_SONG_SUN)) {
         index = msgCtx->itemId - ITEM_SONG_SONATA;
         gDPSetPrimColor(gfx++, 0, 0, D_801CFE04[index], D_801CFE1C[index], D_801CFE34[index], msgCtx->textColorAlpha);
@@ -1189,7 +1209,7 @@ void Message_DrawItemIcon(PlayState* play, Gfx** gfxP) {
     }
 
     gSPTextureRectangle(gfx++, msgCtx->unk12010 << 2, msgCtx->unk12012 << 2, (msgCtx->unk12010 + msgCtx->unk12014) << 2,
-                        (msgCtx->unk12012 + msgCtx->unk12016) << 2, G_TX_RENDERTILE, 0, 0, D_801F6B08, D_801F6B08);
+                        (msgCtx->unk12012 + msgCtx->unk12016) << 2, G_TX_RENDERTILE, 0, 0, textureStep, textureStep);
     gDPPipeSync(gfx++);
     gDPSetCombineLERP(gfx++, 0, 0, 0, PRIMITIVE, TEXEL0, 0, PRIMITIVE, 0, 0, 0, 0, PRIMITIVE, TEXEL0, 0, PRIMITIVE, 0);
 
@@ -2057,7 +2077,7 @@ void Message_LoadItemIcon(PlayState* play, u16 itemId, s16 arg2) {
     // 2S2H [Rando] Staged custom icon — must be handled before the vanilla >= ITEM_B8 /
     // <= ITEM_REMAINS_TWINMOLD range checks, which would index native icon tables OOB with 0xFD.
     if ((itemId == MESSAGE_CUSTOM_ICON_ITEM) && (sMsgCustomIconTex != NULL)) {
-        if (sMsgCustomIconSize == 24) {
+        if (sMsgCustomIconWidth == 24) {
             // 24x24 quest-icon metrics (same as the ITEM_SKULL_TOKEN branch)
             msgCtx->unk12010 = (msgCtx->unk11FF8 - D_801CFF7C[gSaveContext.options.language]);
             msgCtx->unk12012 = (arg2 + 0xA);
@@ -2068,6 +2088,7 @@ void Message_LoadItemIcon(PlayState* play, u16 itemId, s16 arg2) {
             msgCtx->unk12012 = (arg2 + 6);
             msgCtx->unk12014 = 0x20;
         }
+        msgCtx->unk12014 = sMsgCustomIconWidth > 32 ? 32 : sMsgCustomIconWidth;
         msgCtx->textboxSegment[TEXTBOX_SEG_ICON] = sMsgCustomIconTex;
 
         if (play->pauseCtx.bombersNotebookOpen) {

@@ -25,6 +25,11 @@ class ResourceManager {
     std::shared_ptr<Fast::Texture> texture;
     int loads = 0;
 };
+struct CrossRMRegistry {
+    static std::shared_ptr<ResourceManager> Get(const std::string&) {
+        return nullptr;
+    }
+};
 #include "texture_signature.inc"
 } // namespace Ship
 

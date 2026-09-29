@@ -29,7 +29,8 @@ def native_functions():
         'overlays/actors/ovl_player_actor/z_player.c': ['func_80833728', 'func_8083375C'],
         'code/z_collision_check.c': ['CollisionCheck_GetElementATDamage',
             'CollisionCheck_GetDamageAndEffectOnElementAC', 'CollisionCheck_ApplyElementATDefense',
-            'CollisionCheck_NoSharedFlags', 'CollisionCheck_ApplyDamage'],
+            'CollisionCheck_NoSharedFlags', 'CollisionCheck_ApplyDamage',
+            'CollisionCheck_SetBounce', 'CollisionCheck_SetATvsAC'],
         'code/z_actor.c': ['Actor_SetDropFlag', 'Actor_SetDropFlagJntSph', 'Actor_WorldYawTowardActor'],
         'overlays/actors/ovl_Boss_Hakugin/z_boss_hakugin.c': ['BossHakugin_FrozenBeforeFight'],
         'overlays/actors/ovl_Obj_Ice_Poly/z_obj_ice_poly.c': ['func_80931A38'],
@@ -44,6 +45,7 @@ def native_functions():
 
 def main():
     actors = {
+        'En_Slime': [('Chuchu', 'sDamageTable')],
         'En_Dekubaba': [('DekuBaba', 'sDamageTable')],
         'En_Wf': [('Wolfos', 'sDamageTable1'), ('WhiteWolfos', 'sDamageTable2')],
         'En_Am': [('Armos', 'sDamageTable')],
@@ -75,12 +77,31 @@ def main():
             path.write_text(f'#include "overlays/actors/ovl_{actor}/z_{actor.lower()}.c"\n'
                             f'u32 Test_{name}Mask(void) {{ return sCylinderInit.elem.acDmgInfo.dmgFlags; }}\n')
             wrappers.append(str(path))
+        # Execute the native enemy-soul hook instead of assuming every AC collision is allowed.
+        souls = (ROOT / 'mm/2s2h/Rando/ActorBehavior/Souls.cpp').read_text()
+        rando = (ROOT / 'mm/2s2h/Rando/Rando.h').read_text()
+        soul_header = (ROOT / 'mm/2s2h/Rando/ActorBehavior/Souls.h').read_text()
+        soul_code = '\n'.join(re.search(r'^#define ' + name + r'[^\n]*', text, re.M)[0]
+                              for name, text in [('IS_RANDO', rando), ('RANDO_SAVE_OPTIONS', rando),
+                                                 ('SOUL_RI_TO_RANDO_INF', soul_header)])
+        soul_code += '\n' + re.search(r'std::unordered_map<int16_t, RandoItemId> enemySoulMap = \{.*?^\};',
+                                       souls, re.M | re.S)[0]
+        soul_code += '\n' + functions(souls, ['HaveEnemySoul'])['HaveEnemySoul']
+        gate = re.search(r'    bool shouldEnemyInjure = .*?\n    \}\);', souls, re.S)[0]
+        soul_code += '\nvoid Test_RegisterSoulGate(void) {\n' + gate + '\n}\n'
+        (build / 'din_soul_native.inc').write_text(soul_code)
+        soul_object = str(build / 'souls.o')
+        cxx_flags = [flag for flag in FLAGS if not flag.startswith('-std=') and
+                     flag not in ('-Wno-incompatible-pointer-types', '-Wno-discarded-qualifiers',
+                                  '-Werror=implicit-function-declaration')]
+        run(os.environ.get('CXX', 'c++'), '-std=c++20', *cxx_flags, '-I' + directory,
+            '-c', 'mm/tests/din_fire_soul_gate.cpp', '-o', soul_object)
         binary = str(build / 'damage')
         run(os.environ.get('CC', 'cc'), *FLAGS, '-I' + directory,
             '-ffunction-sections', '-fdata-sections', 'mm/tests/din_fire_damage_test.c',
             'mm/src/code/din_fire_sword.c', 'mm/src/code/sys_math_atan.c',
             'mm/src/libultra/gu/coss.c',
-            *wrappers, '-Wl,--gc-sections', '-lm', '-o', binary)
+            *wrappers, soul_object, '-Wl,--gc-sections', '-lstdc++', '-lm', '-o', binary)
         run(binary)
 
 

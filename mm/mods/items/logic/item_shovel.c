@@ -219,8 +219,7 @@ static void Shovel_Stop(Player* p, PlayState* play) {
     shActive = 0;
     shAnimating = 0;
     shAnimTimer = 0;
-    p->stateFlags1 &= ~PLAYER_STATE1_INPUT_DISABLED;
-    ItemEquip_PlayUnequipSFX(play, p);
+    ItemEquip_PlayUnequipSFXForAction(play, p, PLAYER_IA_SHOVEL);
 }
 
 static void Shovel_Start(Player* p, PlayState* play) {
@@ -239,13 +238,12 @@ static void Shovel_Start(Player* p, PlayState* play) {
     shActive = 1;
     shAnimating = 1;
     shAnimTimer = 0;
-    LinkAnimation_PlayOnce(play, &p->skelAnimeUpper, anim);
-    ItemEquip_PlayEquipSFX(play, p);
+    // The native equip transition owns skelAnimeUpper until the shovel callback runs.
+    ItemEquip_PlayEquipSFXForAction(play, p, PLAYER_IA_SHOVEL);
 }
 
 static void Shovel_UpdateAnimation(Player* p, PlayState* play) {
     // Stop movement during animation
-    p->stateFlags1 |= PLAYER_STATE1_INPUT_DISABLED;
     p->actor.speed = 0.0f;
     p->linearVelocity = 0.0f;
 }
@@ -299,6 +297,15 @@ s32 Player_UpperAction_Shovel(Player* p, PlayState* play) {
     if (!shAnimating)
         return 0;
 
+    if (shAnimTimer == 0) {
+        LinkAnimationHeader* anim = NeiAnim_Load(NEI_ANIM_DAMPE_DIG);
+        if (anim == NULL) {
+            Shovel_Stop(p, play);
+            return 0;
+        }
+        LinkAnimation_PlayOnce(play, &p->skelAnimeUpper, anim);
+    }
+
     // Update the skeletal animation
     if (LinkAnimation_Update(play, &p->skelAnimeUpper)) {
         // Animation finished
@@ -310,7 +317,6 @@ s32 Player_UpperAction_Shovel(Player* p, PlayState* play) {
     shAnimTimer++;
 
     // Stop movement during dig animation
-    p->stateFlags1 |= PLAYER_STATE1_INPUT_DISABLED;
     p->actor.speed = 0.0f;
     p->linearVelocity = 0.0f;
 

@@ -1,3 +1,4 @@
+#include "2s2h/Rando/NeiUsedMagicPresentation.h"
 /**
  * item_rod_light.c - Light Rod (custom item)
  *
@@ -787,7 +788,7 @@ static void LightRod_UpdateCharge(Player* p, PlayState* play) {
 
     if ((play->gameplayFrames % 3) == 0) {
         Vec3f* tipPos = &p->meleeWeaponInfo[0].tip;
-        FX_SpawnRodSwingParticles(play, tipPos, &sLightRodColor);
+        RodCommon_PreserveChargeSparkCadence(play, tipPos, &sLightRodColor);
     }
 
     if ((play->gameplayFrames % 12) == 0) {
@@ -910,7 +911,7 @@ static void LightRod_OnEquip(PlayState* play, Player* p) {
     sLightChargeHoldCounter = 0;
 
     lightRodBlureIdx = FX_InitSwordTrail(play, &sLightRodColor);
-    ItemEquip_PlayEquipSFX(play, p);
+    ItemEquip_PlayEquipSFXForAction(play, p, PLAYER_IA_ROD_LIGHT);
 }
 
 static void LightRod_OnUnequip(PlayState* play, Player* p) {
@@ -945,7 +946,7 @@ static void LightRod_OnUnequip(PlayState* play, Player* p) {
 
     if (lightRodSpinActive)
         LightRod_StopSpinLight();
-    ItemEquip_PlayUnequipSFX(play, p);
+    ItemEquip_PlayUnequipSFXForAction(play, p, PLAYER_IA_ROD_LIGHT);
 }
 
 // =============================================================================
@@ -1101,24 +1102,17 @@ void CustomItems_DrawLightRodReticle(Player* p, PlayState* play) {
 // Charge aura + spin cylinder — drawn here (draw phase), state set in update. The charge aura turns
 // bright yellow at max charge (intense light magic). Skijer's NEI
 void CustomItems_DrawLightRodEffects(Player* p, PlayState* play) {
-    if (lightRodSpinActive) {
-        FX_DrawSpinFireCylinder(play, p, lightRodSpinRadius, lightRodSpinIsBig, &sLightRodColor);
-    }
-    if (lightRodCharging) {
-        RodColor chargeColor;
-        if (lightRodChargeLevel >= LIGHT_ROD_CHARGE_BIG) {
-            // Bright yellow for max charge
-            chargeColor.primR = 255;
-            chargeColor.primG = 255;
-            chargeColor.primB = 0;
-            chargeColor.primA = 255;
-            chargeColor.envR = 255;
-            chargeColor.envG = 255;
-            chargeColor.envB = 100;
-            chargeColor.envA = 255;
-        } else {
-            chargeColor = sLightRodColor;
-        }
-        FX_DrawChargeAura(play, p, lightRodChargeLevel, &chargeColor);
-    }
+    if (lightRodSpinActive)
+        NeiUsedMagic_DrawSpin(play, p, 2, lightRodSpinRadius, lightRodSpinIsBig);
+    if (lightRodCharging)
+        NeiUsedMagic_DrawCharge(play, p, 2, lightRodChargeLevel);
+    if (lightRodBeamActive)
+        for (s32 i = 0; i < LIGHT_ROD_BEAM_COUNT; ++i)
+            NeiUsedMagic_DrawBurst(play, 2, &lightRodBeamPos[i], .6f + .18f * i, lightRodBeamTimer / 30.0f);
+}
+
+void LightRod_PutAway(Player* p, PlayState* play) {
+    if (lightRodActive || lightRodFirstPerson)
+        LightRod_OnUnequip(play, p);
+    sLightEquipState.isEquipped = 0;
 }

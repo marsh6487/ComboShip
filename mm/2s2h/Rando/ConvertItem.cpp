@@ -3,6 +3,9 @@
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "mods/nei_save.h" // ootHookshotLevel (FC 3-level hookshot chain obtainability)
 #include "mods/combo_rpg.h"
+extern "C" {
+#include "mods/items/logic/item_cane_of_somaria.h"
+}
 // Needed by the OoT progressive chains below: they resolve to their concrete tier and degrade to
 // junk at the top, reading the SAME state their gives write. Skijer's NEI
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_OOT_SWORD_MASTER / FC_OOT_SWORD_BIGGORON
@@ -759,6 +762,21 @@ bool Rando::IsItemObtainable(RandoItemId randoItemId, RandoCheckId randoCheckId)
     return true;
 }
 
+static RandoItemId ResolveCanePresentation() {
+    static constexpr u8 skills[] = {
+        CANE_SKILL_SOMARIA_STATUE, CANE_SKILL_PACCI_FLIP,       CANE_SKILL_SOMARIA_BLOCK,
+        CANE_SKILL_PACCI_STONE,    CANE_SKILL_SOMARIA_PLATFORM, CANE_SKILL_PACCI_ULTRAHAND
+    };
+    static constexpr RandoItemId items[] = { RI_OOT_NEI_CANE_OF_SOMARIA,       RI_OOT_NEI_CANE_PACCI_FLIP,
+                                             RI_OOT_NEI_CANE_SOMARIA_BLOCK,    RI_OOT_NEI_CANE_PACCI_STONE,
+                                             RI_OOT_NEI_CANE_SOMARIA_PLATFORM, RI_OOT_NEI_CANE_PACCI_ULTRAHAND };
+    for (int i = 0; i < 6; ++i)
+        if (!Cane_HasSkill(skills[i]))
+            return items[i];
+    // All-owned copies preserve the existing no-op grant.
+    return RI_OOT_NEI_CANE_OF_SOMARIA;
+}
+
 RandoItemId Rando::ConvertItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
     if (IsItemObtainable(randoItemId, randoCheckId)) {
         switch (randoItemId) {
@@ -811,6 +829,8 @@ RandoItemId Rando::ConvertItem(RandoItemId randoItemId, RandoCheckId randoCheckI
                                                                                : RI_OOT_BIGGORON_SWORD;
             case RI_OOT_STONE_OF_AGONY:
                 return Nei_Save()->quartzOwned ? RI_OOT_QUARTZ_OF_MOTION : RI_OOT_STONE_OF_AGONY;
+            case RI_OOT_NEI_CANE_OF_SOMARIA:
+                return ResolveCanePresentation();
             case RI_OOT_PROGRESSIVE_ROC:
                 return (Nei_GetOwnedItem(SLOT_ROCS) == ITEM_NONE) ? RI_OOT_NEI_ROCS_FEATHER : RI_OOT_NEI_ROCS_CAPE;
             case RI_OOT_PROGRESSIVE_STRENGTH: {

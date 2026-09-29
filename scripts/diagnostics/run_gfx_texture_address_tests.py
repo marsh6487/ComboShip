@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def function(source, name):
-    match = re.search(r"^(?:static )?(?:void\*|bool|int32_t)\s+" + re.escape(name) +
+    match = re.search(r"^(?:static )?(?:void\*|bool|int32_t|std::shared_ptr<Fast::Texture>)\s+" + re.escape(name) +
                       r"\([^;{}]*\)\s*\{", source, re.M)
     if not match:
         raise RuntimeError(f"Missing production function: {name}")
@@ -44,7 +44,7 @@ def main():
         (build / "texture_signature.inc").write_text(function(manager, "ResourceManager::OtrSignatureCheck"))
         (build / "texture_address_production.inc").write_text("\n".join(
             function(interpreter, name) for name in [
-                "Interpreter::SegAddr", "IsValidResolvedAddress", "gfx_check_image_signature",
+                "Interpreter::SegAddr", "IsValidResolvedAddress", "gfx_check_image_signature", "ComboLoadTextureResource",
                 "gfx_set_timg_handler_rdp",
             ]))
         # Resource destruction's trace logger is outside the texture address contract.

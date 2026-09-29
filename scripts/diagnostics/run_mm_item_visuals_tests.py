@@ -32,8 +32,12 @@ def main():
         if result.returncode:
             raise RuntimeError(result.stdout + result.stderr)
         print("PASS real-header z_draw.c syntax")
-        # Check the owner hook lives before dispatch (including the old per-key copies).
-        draw = function((ROOT / "mm/2s2h/Rando/DrawItem.cpp").read_text(), "Rando::DrawItem")
+        # Raw previews delegate to the concrete-award drawer. Both routes must
+        # retain the owner hook before dispatch (including the old per-key copies).
+        source = (ROOT / "mm/2s2h/Rando/DrawItem.cpp").read_text()
+        preview = function(source, "Rando::DrawItem")
+        assert "Rando::DrawResolvedItem(randoItemId, randoCheckId, actor);" in preview
+        draw = function(source, "Rando::DrawResolvedItem")
         assert draw.index("DungeonItem_GetOwner") < draw.index("switch (randoItemId)")
         assert "GetItem_DrawDungeonItem" in draw
         print("PASS randomizer owner hook precedes dispatch")

@@ -119,10 +119,8 @@
 // other action buttons — so pressing B (or reaching for anything else) simply never
 // reached the net and it stayed glued to Link's hands.
 //
-// Unequipping goes through ItemInput_RequestItemChange, which is what actually
-// sheathes: it clears heldItemId and raises PLAYER_STATE1_START_CHANGING_HELD_ITEM,
-// so Link plays the putaway instead of the item blinking out. Same call the rods
-// rely on.
+// Explicit stow goes through native Player_UseItem. Replacement item buttons must remain
+// available to Player_UpdateItems, which runs after this custom-item handler.
 static ItemEquipState sNetEquipState = { 0 };
 static u8 sNetActive = 0;
 
@@ -131,8 +129,17 @@ static void Net_OnEquip(PlayState* play, Player* p) {
 }
 
 static void Net_OnUnequip(PlayState* play, Player* p) {
+    u16 replacementButtons = BTN_B | BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT;
     sNetActive = 0;
-    ItemInput_RequestItemChange(p, play); // sheathe, do not just vanish
+    if (CVarGetInteger("gEnhancements.Dpad.DpadEquips", 0)) {
+        replacementButtons |= BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT;
+    }
+    // Native processing still owns replacement selection and all of its acceptance gates.
+    // Queuing NONE here would make Player_UpdateItems skip that pending button press.
+    replacementButtons &= ~ItemInput_GetEquippedButton(ITEM_NET, play);
+    if (!(play->state.input[0].press.button & replacementButtons)) {
+        ItemInput_RequestItemChange(p, play);
+    }
 }
 
 void Handle_Net(Player* p, PlayState* play) {
@@ -169,3 +176,5 @@ s32 Player_UpperAction_Net(Player* player, PlayState* play) {
 
     return result;
 }
+
+#include "../custom_items_stow.c"
