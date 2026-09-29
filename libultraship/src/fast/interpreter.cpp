@@ -4327,6 +4327,26 @@ static bool IsValidResolvedAddress(uintptr_t addr) {
 #endif
 }
 
+// A directly submitted foreign texture has no routed parent DL to establish an RM override.
+// Resolve the same owner marker as the DL handler, scoped to this lookup so later host icons
+// keep using their own RM. A missing/invalid owner must never borrow a same-named host texture.
+static std::shared_ptr<Fast::Texture> ComboLoadTextureResource(const char* fileName) {
+    auto rm = ActiveResMgr();
+    static constexpr char kOtrPrefix[] = "__OTR__";
+    if (strncmp(fileName, kOtrPrefix, sizeof(kOtrPrefix) - 1) == 0 && fileName[sizeof(kOtrPrefix) - 1] == '@') {
+        const char* gameStart = fileName + sizeof(kOtrPrefix);
+        const char* colon = strchr(gameStart, ':');
+        if (colon == nullptr || colon == gameStart)
+            return nullptr;
+        rm = Ship::CrossRMRegistry::Get(std::string(gameStart, colon - gameStart));
+        if (rm == nullptr)
+            return nullptr;
+        const std::string path = std::string(kOtrPrefix) + (colon + 1);
+        return std::static_pointer_cast<Fast::Texture>(rm->LoadResourceProcess(path.c_str()));
+    }
+    return std::static_pointer_cast<Fast::Texture>(rm->LoadResourceProcess(fileName));
+}
+
 bool gfx_set_timg_handler_rdp(Interpreter* gfx, F3DGfx** cmd0) {
     F3DGfx* cmd = *cmd0;
     uintptr_t i = (uintptr_t)gfx->SegAddr(cmd->words.w1);
@@ -4347,8 +4367,7 @@ bool gfx_set_timg_handler_rdp(Interpreter* gfx, F3DGfx** cmd0) {
 
     if ((i & 1) != 1) {
         if (gfx_check_image_signature(imgData) == 1) {
-            std::shared_ptr<Fast::Texture> tex = std::static_pointer_cast<Fast::Texture>(
-                ActiveResMgr()->LoadResourceProcess(imgData));
+            std::shared_ptr<Fast::Texture> tex = ComboLoadTextureResource(imgData);
 
             if (tex == nullptr) {
                 (*cmd0)++;
@@ -4448,8 +4467,7 @@ bool gfx_set_timg_otr_filepath_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
     uint32_t texFlags = 0;
     RawTexMetadata rawTexMetadata = {};
 
-    std::shared_ptr<Fast::Texture> texture = std::static_pointer_cast<Fast::Texture>(
-        ActiveResMgr()->LoadResourceProcess(fileName));
+    std::shared_ptr<Fast::Texture> texture = ComboLoadTextureResource(fileName);
     if (texture != nullptr) {
 
         texFlags = texture->Flags;

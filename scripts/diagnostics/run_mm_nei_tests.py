@@ -42,3 +42,5 @@ if __name__=='__main__':
     subprocess.run([sys.executable,'-B',str(ROOT/'tests/mm_nei/run_hand_selector_tests.py')],check=True)
 
     subprocess.run([sys.executable,'-B',str(ROOT/'tests/mm_nei/run_use_tests.py')],check=True)
+    subprocess.run([sys.executable,'-B',str(ROOT/'tests/mm_nei/run_ice_projectile_tests.py')],check=True)
+    subprocess.run([sys.executable,'-B',str(ROOT/'tests/mm_nei/run_action_tests.py')],check=True)

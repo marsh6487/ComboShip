@@ -242,13 +242,13 @@ void ItemEquip_PlayEquipSFXForAction(PlayState*,Player*,s32){++sounds;}
 void Player_PlaySfx(Player*,u16){}
 void DekuLeaf_SpawnWindParticles(Player*,PlayState*){++wind;}
 void DekuLeaf_BlowEffect(Player*,PlayState*){dlCollider.base.atFlags|=AT_ON;}
-''',[body(leaf,n) for n in ['DekuLeaf_Stop','DekuLeaf_StartGlide','DekuLeaf_StartBlow','Player_UpperAction_DekuLeaf']],r'''
+''',[body('mm/mods/items/custom_items_common.c','CustomItems_BlocksMovement')]+[body(leaf,n) for n in ['DekuLeaf_Stop','DekuLeaf_StartGlide','DekuLeaf_StartBlow','Player_UpperAction_DekuLeaf']],r'''
 Player p{};PlayState play{};magic=false;DekuLeaf_StartBlow(&p,&play);assert(!dlActive&&!sounds&&!plays);
 magic=true;asset=false;DekuLeaf_StartBlow(&p,&play);assert(!dlActive&&!sounds&&!plays);
 asset=true;DekuLeaf_StartBlow(&p,&play);assert(dlActive&&dlBlowing&&plays==1&&p.skelAnimeUpper.playSpeed==2);
 p.skelAnimeUpper.curFrame=DEKULEAF_BLOW_EFFECT_FRAME;Player_UpperAction_DekuLeaf(&p,&play);Player_UpperAction_DekuLeaf(&p,&play);
-assert(consumes==1&&(p.stateFlags1&PLAYER_STATE1_INPUT_DISABLED)&&(dlCollider.base.atFlags&AT_ON));
-done=true;assert(!Player_UpperAction_DekuLeaf(&p,&play));assert(!dlActive&&!dlBlowing&&!(dlCollider.base.atFlags&(AT_ON|AT_HIT))&&!(p.stateFlags1&PLAYER_STATE1_INPUT_DISABLED)&&closes==0);
+assert(consumes==1&&CustomItems_BlocksMovement(&p)&&!(p.stateFlags1&PLAYER_STATE1_INPUT_DISABLED)&&(dlCollider.base.atFlags&AT_ON));
+done=true;assert(!Player_UpperAction_DekuLeaf(&p,&play));assert(!dlActive&&!dlBlowing&&!(dlCollider.base.atFlags&(AT_ON|AT_HIT))&&!CustomItems_BlocksMovement(&p)&&closes==0);
 int prior=sounds;DekuLeaf_Stop(&p,&play);assert(sounds==prior);
 done=false;DekuLeaf_StartBlow(&p,&play);DekuLeaf_Stop(&p,&play);assert(!dlActive);DekuLeaf_StartGlide(&p,&play);DekuLeaf_Stop(&p,&play);assert(closes==1);
 ''')

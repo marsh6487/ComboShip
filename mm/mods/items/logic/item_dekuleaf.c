@@ -99,7 +99,6 @@ static void DekuLeaf_Stop(Player* p, PlayState* play) {
         DekuLeaf_PlayMmSfx(MM_NA_SE_IT_DEKUNUTS_FLOWER_CLOSE, &p->actor.projectedPos);
     }
 
-    p->stateFlags1 &= ~PLAYER_STATE1_INPUT_DISABLED;
     ItemEquip_PlayUnequipSFXForAction(play, p, PLAYER_IA_DEKU_LEAF);
 }
 
@@ -316,7 +315,6 @@ s32 Player_UpperAction_DekuLeaf(Player* player, PlayState* play) {
     dlAnimTimer++;
 
     // Stop movement during the blow
-    player->stateFlags1 |= PLAYER_STATE1_INPUT_DISABLED;
     player->actor.speed = 0.0f;
     player->linearVelocity = 0.0f;
 

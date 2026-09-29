@@ -722,6 +722,7 @@ void Player_InitSwitchHookIA(PlayState* play, Player* player);
 void Player_InitMinishCapIA(PlayState* play, Player* player);
 
 s32 CustomItems_HasStowableHeldItem(Player* p);
+s32 CustomItems_BlocksMovement(Player* p);
 void CustomItems_PutAwayHeldItems(Player* p, PlayState* play);
 
 #ifdef __cplusplus

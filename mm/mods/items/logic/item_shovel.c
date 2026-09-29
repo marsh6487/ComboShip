@@ -219,7 +219,6 @@ static void Shovel_Stop(Player* p, PlayState* play) {
     shActive = 0;
     shAnimating = 0;
     shAnimTimer = 0;
-    p->stateFlags1 &= ~PLAYER_STATE1_INPUT_DISABLED;
     ItemEquip_PlayUnequipSFXForAction(play, p, PLAYER_IA_SHOVEL);
 }
 
@@ -245,7 +244,6 @@ static void Shovel_Start(Player* p, PlayState* play) {
 
 static void Shovel_UpdateAnimation(Player* p, PlayState* play) {
     // Stop movement during animation
-    p->stateFlags1 |= PLAYER_STATE1_INPUT_DISABLED;
     p->actor.speed = 0.0f;
     p->linearVelocity = 0.0f;
 }
@@ -310,7 +308,6 @@ s32 Player_UpperAction_Shovel(Player* p, PlayState* play) {
     shAnimTimer++;
 
     // Stop movement during dig animation
-    p->stateFlags1 |= PLAYER_STATE1_INPUT_DISABLED;
     p->actor.speed = 0.0f;
     p->linearVelocity = 0.0f;
 

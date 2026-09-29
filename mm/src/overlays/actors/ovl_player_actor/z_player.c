@@ -73,6 +73,7 @@
 // (sm64 is intentionally NOT re-listed — it's the 2ship-native block above.)
 #include "mods/nei_oot_compat.h" // OoT->MM compat (PLAYER_STATE/PLAYER_IA/ITEM/M_PI) for the item files
 s32 Player_PutAwayHeldItem(PlayState* play, Player* this); // defined below, called from power_keg.c
+void func_80837C20(PlayState* play, Player* this);         // native wall-climb continuation
 #include "mods/items/custom_items.h"
 #include "mods/items/custom_bottles.h"
 #include "mods/extended_player.h"
@@ -5295,6 +5296,13 @@ s32 Player_SetupWaitForPutAwayWithCs(PlayState* play, Player* this, AfterPutAway
     Player_SetAction(play, this, Player_Action_WaitForPutAway, 0);
     func_8083249C(this);
     this->stateFlags2 |= PLAYER_STATE2_40;
+
+    // Mitts are the climbing equipment, so this native climb entry must retain them.
+    // Other interactions and explicit put-away still use the normal cleanup path.
+    if ((csId == CS_ID_NONE) && (afterPutAwayFunc == func_80837C20) && gMogmaMittsClimbActive &&
+        (this->heldItemAction == PLAYER_IA_MOGMA_MITTS)) {
+        return false;
+    }
 
     return Player_PutAwayHeldItem(play, this);
 }
@@ -14150,7 +14158,7 @@ void Player_Update(Actor* thisx, PlayState* play) {
 
     if (play->actorCtx.isOverrideInputOn && (this == GET_PLAYER(play))) {
         input = play->actorCtx.overrideInput;
-    } else if ((this->csAction == PLAYER_CSACTION_5) ||
+    } else if ((this->csAction == PLAYER_CSACTION_5) || CustomItems_BlocksMovement(this) ||
                (this->stateFlags1 & (PLAYER_STATE1_20 | PLAYER_STATE1_20000000)) || (this != GET_PLAYER(play)) ||
                func_8082DA90(play) || (gSaveContext.save.saveInfo.playerData.health == 0)) {
         memset(&input, 0, sizeof(Input));

@@ -217,6 +217,12 @@ s32 CustomItems_IsBlocked(Player* p, PlayState* play) {
     return false;
 }
 
+// Ordinary tool animations lock movement without borrowing MM's cutscene/HUD suppression bit.
+s32 CustomItems_BlocksMovement(Player* p) {
+    return p != NULL && ((gCustomItemState.dekuLeafActive && gCustomItemState.dekuLeafBlowing) ||
+                         (gCustomItemState.shovelActive && gCustomItemState.shovelAnimating));
+}
+
 // Quick check if item is on any item button (B, the three C buttons, or a D-pad slot).
 // Must go through ItemEquip_GetItemOnSlot: MM's equips.buttonItems row is only 4 wide and the
 // D-pad lives in its own save array, so the old 1..8 walk missed B, missed the D-pad entirely,
