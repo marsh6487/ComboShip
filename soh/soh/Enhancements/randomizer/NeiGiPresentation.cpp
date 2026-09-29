@@ -228,7 +228,7 @@ extern "C" bool NeiGi_DrawShop(PlayState* play, GetItemEntry* entry) {
 #include "ComboExport.h"
 
 static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* out) {
-    if (!out || !HasResource(item.opaque) || (item.translucent && !HasResource(item.translucent))) {
+    if (!out || !OOT_NeiResourceExists(item.opaque) || (item.translucent && !OOT_NeiResourceExists(item.translucent))) {
         return false;
     }
     out->dlists[0] = item.opaque;

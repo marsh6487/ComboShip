@@ -1,3 +1,6 @@
+#include "2s2h/Rando/NeiArticulatedPresentation.h"
+#include "2s2h/Rando/NeiLanternPresentation.h"
+#include "mods/items/helpers/equip_helper.h"
 #include "din_fire_sword.h"
 #include "din_fire_shield.h"
 #include "mods/items/logic/adult_link_render.h"
@@ -2805,6 +2808,31 @@ void func_80125CE0(Player* player, struct_80124618* arg1, Vec3f* pos, Vec3s* rot
     Matrix_Scale(player->unk_AF0[0].x, player->unk_AF0[0].y, player->unk_AF0[0].z, MTXMODE_APPLY);
 }
 
+// Called after native equipment selection. Resolve the native form's resource
+// before building the per-draw compound: __gSPDisplayList requires real Gfx.
+static void Player_ApplyNeiHeldHand(PlayState* play, Player* player, s32 limbIndex, Gfx** dList) {
+    if (*dList == NULL || AdultLink_UsesAdultPresentation(player) || player->actor.scale.y < 0.0f ||
+        player->transformation != PLAYER_FORM_HUMAN) {
+        return;
+    }
+    Gfx* path = NULL;
+    if (limbIndex == PLAYER_LIMB_RIGHT_HAND && NeiArticulated_UsesSwitchHook(player)) {
+        path = gPlayerRightHandClosedDLs[player->transformation * 2 + sPlayerLod];
+    } else if (limbIndex == PLAYER_LIMB_LEFT_HAND && NeiLantern_UsesGrip(player)) {
+        path = gPlayerLeftHandClosedDLs[player->transformation * 2 + sPlayerLod];
+    }
+    if (path == NULL || !ResourceMgr_FileExists((const char*)path)) {
+        return;
+    }
+    Gfx* hand = ResourceMgr_LoadGfxByName((const char*)path);
+    if (limbIndex == PLAYER_LIMB_RIGHT_HAND) {
+        NeiArticulated_ApplySwitchHookHand(play, player, dList, hand);
+    } else if (hand != NULL) {
+        *dList = hand;
+        sPlayerLeftHandType = PLAYER_MODELTYPE_LH_CLOSED;
+    }
+}
+
 s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
                                            Actor* actor) {
     Player* player = (Player*)actor;
@@ -3325,6 +3353,7 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
     }
 
     Player_ApplyBackEquipmentVisibility(limbIndex, dList);
+    Player_ApplyNeiHeldHand(play, player, limbIndex, dList);
     return false;
 }
 
@@ -3374,6 +3403,7 @@ s32 Player_OverrideLimbDrawGameplayFirstPerson(PlayState* play, s32 limbIndex, G
         }
     }
 
+    Player_ApplyNeiHeldHand(play, player, limbIndex, dList);
     return false;
 }
 
@@ -4476,6 +4506,7 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList1, G
     // him when a spin attack turns the whole skeleton. Self-guards on the surf being active, and
     // hides the hand/back shield for as long as it draws. Skijer's NEI
     if (limbIndex == PLAYER_LIMB_ROOT) {
+        ItemEquip_ReleaseHandMatrix();
         ExtEquip_DrawKiteSurfBoard(play);
     }
 
@@ -4505,6 +4536,9 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList1, G
     // (Magic Cape shoulder capture removed — the cloth anchors on player->bodyPartsPos natively.)
 
     if (limbIndex == PLAYER_LIMB_LEFT_HAND) {
+        if (*dList1 != NULL && player->transformation == PLAYER_FORM_HUMAN) {
+            ItemEquip_CaptureLeftHandMatrix();
+        }
         if (*dList1 != NULL) {
             DinFireSword_Draw(play, player);
         }
@@ -4666,6 +4700,9 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList1, G
             }
         }
     } else if (limbIndex == PLAYER_LIMB_RIGHT_HAND) {
+        if (*dList1 != NULL && player->transformation == PLAYER_FORM_HUMAN) {
+            ItemEquip_CaptureHandMatrix();
+        }
         Actor* heldActor = player->heldActor;
         s32 pad;
 

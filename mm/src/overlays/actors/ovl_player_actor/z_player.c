@@ -677,7 +677,7 @@ void func_8082DD2C(PlayState* play, Player* this) {
  * @return  true if an item needs to be put away, false if not.
  */
 s32 Player_PutAwayHeldItem(PlayState* play, Player* this) {
-    if (this->heldItemAction > PLAYER_IA_LAST_USED) {
+    if (this->heldItemAction > PLAYER_IA_LAST_USED || CustomItems_HasStowableHeldItem(this)) {
         Player_UseItem(play, this, ITEM_NONE);
         return true;
     } else {
@@ -3578,6 +3578,10 @@ void Player_InitZoraBoomerangIA(PlayState* play, Player* this) {
 }
 
 void Player_InitItemAction(PlayState* play, Player* this, PlayerItemAction itemAction) {
+    if (itemAction == PLAYER_IA_NONE) {
+        CustomItems_PutAwayHeldItems(this, play);
+    }
+    ItemEquip_ResetUnequipSound(play, this, itemAction);
     this->itemAction = this->heldItemAction = itemAction;
     this->modelGroup = this->nextModelGroup;
 
@@ -4478,7 +4482,8 @@ s32 func_808306F8(Player* this, PlayState* play) {
 void Player_FinishItemChange(PlayState* play, Player* this) {
     s32 isGoronOrDeku = (this->transformation == PLAYER_FORM_GORON) || (this->transformation == PLAYER_FORM_DEKU);
 
-    if ((this->heldItemAction != PLAYER_IA_NONE) && !isGoronOrDeku) {
+    if ((this->heldItemAction != PLAYER_IA_NONE) && !isGoronOrDeku &&
+        ItemEquip_ClaimUnequipSound(play, this, this->heldItemAction)) {
         if (Player_SwordFromIA(this, this->heldItemAction) > PLAYER_SWORD_NONE) {
             func_8082E1F0(this, NA_SE_IT_SWORD_PUTAWAY);
         } else {
@@ -4984,6 +4989,9 @@ void Player_UseItem(PlayState* play, Player* this, ItemId item) {
     }
 
     PlayerItemAction itemAction = Player_ItemToItemAction(this, item);
+    // Net borrows the Kokiri Sword action, but its model/capture identity is heldItemId.
+    // An accepted Net <-> sword change must still initialize the requested identity.
+    bool netItemChanged = (item != this->heldItemId) && ((item == ITEM_NET) || (this->heldItemId == ITEM_NET));
 
     // NEI-DBG: mask-wear tracing (remove after diagnosis)
     if (item != ITEM_NONE && item != ITEM_FD) {
@@ -4999,6 +5007,9 @@ void Player_UseItem(PlayState* play, Player* this, ItemId item) {
         ((itemAction == PLAYER_IA_NONE) || !(this->stateFlags1 & PLAYER_STATE1_8000000) ||
          (GameInteractor_Should(VB_USE_ITEM_CONSIDER_ITEM_ACTION, itemAction == PLAYER_IA_MASK_ZORA, &itemAction)) ||
          ((this->currentBoots >= PLAYER_BOOTS_ZORA_UNDERWATER) && (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND)))) {
+        if (itemAction == PLAYER_IA_NONE) {
+            CustomItems_PutAwayHeldItems(this, play);
+        }
         s32 var_v1 = ((itemAction >= PLAYER_IA_MASK_MIN) && (itemAction <= PLAYER_IA_MASK_MAX) &&
                       (!GameInteractor_Should(VB_USE_ITEM_CONSIDER_LINK_HUMAN,
                                               this->transformation == PLAYER_FORM_HUMAN, &itemAction) ||
@@ -5086,11 +5097,12 @@ void Player_UseItem(PlayState* play, Player* this, ItemId item) {
                 }
                 gSaveContext.save.equippedMask = this->currentMask;
             }
-        } else if ((itemAction != this->heldItemAction) ||
+        } else if ((itemAction != this->heldItemAction) || netItemChanged ||
                    ((this->heldActor == NULL) && (Player_ExplosiveFromIA(this, itemAction) > PLAYER_EXPLOSIVE_NONE))) {
             u8 nextAnimType;
 
             // Handle using a new held item
+            ItemEquip_BeginItemChangeSound(play, this, this->heldItemAction);
             this->nextModelGroup = Player_ActionToModelGroup(this, itemAction);
             nextAnimType = gPlayerModelTypes[this->nextModelGroup].modelAnimType;
             var_v1 = ((this->transformation != PLAYER_FORM_GORON) || (itemAction == PLAYER_IA_POWDER_KEG));
@@ -5103,6 +5115,9 @@ void Player_UseItem(PlayState* play, Player* this, ItemId item) {
                 this->stateFlags3 |= PLAYER_STATE3_START_CHANGING_HELD_ITEM;
             } else {
                 // Init new held item for use
+                if (netItemChanged) {
+                    this->heldItemId = item;
+                }
                 Player_DestroyHookshot(this);
                 Player_DetachHeldActor(play, this);
                 Player_InitItemActionWithAnim(play, this, itemAction);
@@ -12535,7 +12550,7 @@ void Player_UpdateInterface(PlayState* play, Player* this) {
                     doActionA = DO_ACTION_ATTACK;
                 } else if (GameInteractor_Should(VB_SHOULD_PUTAWAY, ((this->transformation == PLAYER_FORM_HUMAN) ||
                                                                      (this->transformation == PLAYER_FORM_ZORA))) &&
-                           ((this->heldItemAction >= PLAYER_IA_SWORD_KOKIRI) ||
+                           ((this->heldItemAction >= PLAYER_IA_SWORD_KOKIRI) || CustomItems_HasStowableHeldItem(this) ||
                             ((this->stateFlags2 & PLAYER_STATE2_100000) &&
                              (play->actorCtx.attention.tatlHoverActor == NULL)))) {
                     doActionA = DO_ACTION_PUTAWAY;

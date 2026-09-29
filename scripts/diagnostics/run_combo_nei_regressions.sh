@@ -4,6 +4,7 @@ cd "$(dirname "$0")/../.."
 python3 -B scripts/diagnostics/run_hint_item_name_tests.py
 python3 -B scripts/diagnostics/run_nei_gi_tests.py --held --combo
 python3 -B scripts/diagnostics/run_mm_item_presentation_tests.py
+python3 -B scripts/diagnostics/run_mm_nei_tests.py
 python3 -B tests/nei_held/run_hand_fit_tests.py
 python3 -B tests/nei_held/run_articulated_tests.py
 python3 -B tests/nei_used_fx/run_tests.py

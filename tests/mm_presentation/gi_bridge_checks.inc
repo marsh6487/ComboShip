@@ -2,6 +2,15 @@
 CwItemDrawInfo exported{};
 assert(OOT_GetNeiGiDrawInfo(nullptr, &exported) == 0);
 assert(OOT_GetNeiGiDrawInfo("unknown", &exported) == 0);
+// Inactive OoT owns its own Alt mode, independently of the active MM context.
+Reset();
+files.insert("alt/__OTR__objects/nei_gi_redesign/fire_rod/gi_dl");
+ownerAlt = true;
+alt = false;
+assert(OOT_GetNeiGiDrawInfo("fire_rod", &exported) == 1);
+ownerAlt = false;
+alt = true;
+assert(OOT_GetNeiGiDrawInfo("fire_rod", &exported) == 0);
 int authored = 0;
 for (const auto& item : kPresentations) {
     if (!item.opaque) continue;

@@ -1,3 +1,4 @@
+#include "2s2h/Rando/NeiHeldPresentation.h"
 /**
  * object_ballchain.c - Ball and Chain 3D model and draw functions
  *
@@ -54,7 +55,7 @@ static void BallChain_DrawBall(PlayState* play, Vec3f* pos, f32 scale, u8 should
 
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
 
-    {
+    if (!NeiHeld_DrawModel(play, NEI_HELD_PATH("ball"), NULL)) {
         Gfx* ballDL = BallChain_GetBallDL();
         if (ballDL != NULL) {
             gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, __FILE__, __LINE__),

@@ -1,19 +1,15 @@
 #include "NeiGiPresentation.h"
+#include "NeiResourceRouting.h"
 #include "variables.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "ComboResolve.h"
 #include <algorithm>
 #include <cstring>
-#include <string>
-#include <unordered_set>
 #include <libultraship/bridge/consolevariablebridge.h>
 extern "C" {
 #include "functions.h"
 #include "macros.h"
 #include "mods/nei_oot_compat.h"
-uint8_t ResourceMgr_FileExists(const char*);
-uint8_t ResourceMgr_FileAltExists(const char*);
-bool ResourceMgr_IsAltAssetsEnabled();
 }
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiEnergyTexture.h"
@@ -21,18 +17,11 @@ bool ResourceMgr_IsAltAssetsEnabled();
 using NeiGi::Kind;
 namespace {
 bool HasResource(const char* path) {
-    return path &&
-           (ResourceMgr_FileExists(path) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path)));
+    return NeiResource_Available(path);
 }
 float Spin(PlayState* play) {
     const uint32_t bits = (static_cast<uint32_t>(play->gameplayFrames) * 2u) & 0xFFFFu;
     return (bits >= 0x8000u ? static_cast<int32_t>(bits) - 0x10000 : static_cast<int32_t>(bits)) * .01f;
-}
-const char* Route(const char* path) {
-    if (!path || std::strncmp(path, "__OTR__", 7) != 0)
-        return nullptr;
-    static std::unordered_set<std::string> paths;
-    return paths.insert(std::string("__OTR__@oot:") + (path + 7)).first->c_str();
 }
 struct Binding {
     RandoItemId id;
@@ -68,8 +57,27 @@ const Binding kBindings[] = {
 
 extern "C" {
 #define Graph_Alloc(gfx, bytes) GRAPH_ALLOC(gfx, bytes)
+#define NeiGi_DrawTexturedMesh NeiGi_DrawTexturedMeshNative
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiMeshRenderer.inc"
+#undef NeiGi_DrawTexturedMesh
 #undef Graph_Alloc
+}
+
+// Texture commands resolve through the interpreter's active resource manager,
+// unlike G_DL_OTR_FILEPATH which parses @oot:. Keep the raw texture path and
+// bracket exactly the native mesh submission in its asset owner's namespace.
+extern "C" bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh,
+                                       const NeiGi::TextureMaterial& material) {
+    if (!play || !mesh.count || !HasResource(material.path))
+        return false;
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPComboRMPush(POLY_XLU_DISP++, "oot");
+    CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material);
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPComboRMPop(POLY_XLU_DISP++);
+    CLOSE_DISPS(play->state.gfxCtx);
+    return true;
 }
 
 void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b);
@@ -139,7 +147,7 @@ bool MM_TryDrawNeiGi(RandoItemId item) {
     if (describe(binding->slug, &info) != 1)
         return false;
     for (int i = 0; i < info.dlistCount; ++i) {
-        info.dlists[i] = Route(info.dlists[i]);
+        info.dlists[i] = NeiResource_Route(info.dlists[i]);
         if (!info.dlists[i])
             return false;
     }

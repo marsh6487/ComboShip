@@ -1,3 +1,5 @@
+#include "2s2h/Rando/NeiArticulatedPresentation.h"
+#include "2s2h/Rando/NeiLanternPresentation.h"
 #include "din_fire_sword.h"
 #include "din_fire_shield.h"
 /*
@@ -514,6 +516,17 @@ static s32 AdultLink_Setup(void) {
 // Custom limb-draw override: run the vanilla logic (matrices, body-part tracking, hand-type caching,
 // leg adjust, upper-limb rot) then re-point the four equipment limbs to adult DLs. Everything the
 // PostLimb pass keys off (player->*Type) is untouched, so trails/colliders/reticle still work.
+static void AdultLink_ApplyNeiHeldHand(PlayState* play, Player* player, s32 limbIndex, Gfx** dList, Gfx* resolvedFist) {
+    if (*dList == NULL || resolvedFist == NULL || player->actor.scale.y < 0.0f) {
+        return;
+    }
+    if (limbIndex == PLAYER_LIMB_RIGHT_HAND) {
+        NeiArticulated_ApplySwitchHookHand(play, player, dList, resolvedFist);
+    } else if (limbIndex == PLAYER_LIMB_LEFT_HAND && NeiLantern_UsesGrip(player)) {
+        *dList = resolvedFist;
+    }
+}
+
 static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, Actor* actor) {
     // Snapshot the skeleton's OWN limb DL BEFORE the vanilla override runs. For a mod skeleton these are
     // the mod's meshes (waist / hands / sword+sheath); for the base they're the deep-patched adult DLs.
@@ -541,6 +554,7 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
         Gfx* formDL = CustomForms_HandDL(p, limbIndex, &claimed);
         if (claimed) {
             *dList = formDL;
+            AdultLink_ApplyNeiHeldHand(play, p, limbIndex, dList, formDL);
             return ret;
         }
     }
@@ -647,6 +661,9 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
         if (dinHand != NULL)
             *dList = dinHand;
     }
+    AdultLink_ApplyNeiHeldHand(
+        play, p, limbIndex, dList,
+        (sIsMod || sIsChildRig) ? skelDL : (limbIndex == PLAYER_LIMB_LEFT_HAND ? sDL_LHClosed : sDL_RHClosed));
     Player_ApplyBackEquipmentVisibility(limbIndex, dList);
     return ret;
 }
@@ -721,6 +738,13 @@ static void AdultLink_DrawGaro(PlayState* play, Player* player) {
 extern "C" s32 AdultLink_IsActive(void) {
     // gAdultLink.ForceOn (console) forces adult mode ON regardless of the Time Gate, for isolated tests.
     return Nei_Save()->timeGateAdultMode != 0 || CVarGetInteger("gAdultLink.ForceOn", 0) != 0;
+}
+
+extern "C" s32 AdultLink_UsesAdultPresentation(const Player* player) {
+    // sSkel belongs to the local overlay; peers keep their own native skelAnime skeleton.
+    return player != nullptr && gPlayState != nullptr && player == GET_PLAYER(gPlayState) &&
+           player->transformation == PLAYER_FORM_HUMAN && sReady && sSkel != nullptr && !sIsChildRig &&
+           (AdultLink_IsActive() || CustomForms_ActiveForm() != CUSTOM_FORM_NONE);
 }
 
 extern "C" void AdultLink_Toggle(void) {

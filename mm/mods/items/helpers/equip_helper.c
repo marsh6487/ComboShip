@@ -3,6 +3,7 @@
  */
 
 #include "equip_helper.h"
+#include <string.h>
 #include "../custom_items.h"
 #include "../../extended_equipment.h" // MAGIC_REQ — Magic Cape halves all magic costs
 #include "macros.h"
@@ -19,6 +20,9 @@ typedef struct {
 } EquipCache;
 
 static EquipCache sEquipCache = { 0 };
+static u16 sStowedItemButtons[256];
+static u32 sStowedItemFrames[256];
+static PlayState* sEquipCachePlay;
 
 u8 ItemEquip_GetItemOnSlot(u8 slot) {
     // sButtonMasks[4..7] is D-Up, D-Down, D-Left, D-Right — keep this table in that same order.
@@ -47,12 +51,23 @@ u8 ItemEquip_GetItemOnSlot(u8 slot) {
 }
 
 static void EquipCache_Update(PlayState* play) {
-    if (sEquipCache.frameCount == play->gameplayFrames)
+    // A new native play lifetime must not inherit held-button suppression or a same-frame cache.
+    if (sEquipCachePlay != play || play->gameplayFrames < sEquipCache.frameCount) {
+        memset(sStowedItemButtons, 0, sizeof(sStowedItemButtons));
+        memset(sStowedItemFrames, 0, sizeof(sStowedItemFrames));
+        sEquipCachePlay = play;
+    } else if (sEquipCache.frameCount == play->gameplayFrames) {
         return;
+    }
     sEquipCache.frameCount = play->gameplayFrames;
 
-    for (int i = 0; i < 256; i++)
+    for (int i = 0; i < 256; i++) {
         sEquipCache.cachedButtons[i] = 0;
+        sStowedItemButtons[i] &= play->state.input[0].cur.button | play->state.input[0].press.button;
+        if (sStowedItemFrames[i] != play->gameplayFrames) {
+            sStowedItemButtons[i] &= ~play->state.input[0].press.button;
+        }
+    }
 
     // Slot 0 = B button (sButtonMasks[0] = BTN_B). Start at 0 so custom
     // items equipped to B (e.g. Roc's Feather, transformation masks) get
@@ -80,6 +95,12 @@ static void EquipCache_Update(PlayState* play) {
 u16 ItemInput_GetEquippedButton(u8 itemId, PlayState* play) {
     EquipCache_Update(play);
     return sEquipCache.cachedButtons[itemId];
+}
+
+void ItemInput_SuppressUntilRelease(u8 itemId, PlayState* play) {
+    sStowedItemButtons[itemId] |= ItemInput_GetEquippedButton(itemId, play) &
+                                  (play->state.input[0].cur.button | play->state.input[0].press.button);
+    sStowedItemFrames[itemId] = play->gameplayFrames;
 }
 
 // mods/actors/cane_pacci.c — while Ultrahand mode is up the D-pad rotates and moves
@@ -114,6 +135,9 @@ void ItemInput_Update(ItemInputState* out, u8 itemId, Player* player, PlayState*
     out->isReleased = !out->isHeld && !out->isPressed;
     out->otherButtonPressed = ItemInput_CheckOtherButtons(out->equippedButton, &play->state.input[0]);
     out->damageTaken = 0;
+    if (sStowedItemButtons[itemId] & out->equippedButton) {
+        out->isPressed = out->isHeld = out->isReleased = 0;
+    }
 }
 
 u8 ItemInput_CheckDamage(Player* player, s8* prevInvincibility) {
@@ -135,7 +159,7 @@ u8 ItemInput_IsBlockedEx(Player* player, PlayState* play, u8 skipOptionalBlocker
 
     if (player->stateFlags1 & ITEM_BLOCK_STATE1)
         return 1;
-    if (player->stateFlags1 & PLAYER_STATE1_START_CHANGING_HELD_ITEM)
+    if (player->stateFlags3 & PLAYER_STATE3_START_CHANGING_HELD_ITEM)
         return 1;
     // (MM has no PlayState.shootingGalleryStatus — OoT shooting-gallery item-block guard dropped)
 
@@ -157,8 +181,10 @@ u8 ItemInput_IsBlocked(Player* player, PlayState* play) {
 
 void ItemInput_RequestItemChange(Player* player, PlayState* play) {
     if (player->heldItemAction >= 0 && player->heldItemAction != PLAYER_IA_NONE) {
-        player->heldItemId = ITEM_NONE;
-        player->stateFlags1 |= PLAYER_STATE1_START_CHANGING_HELD_ITEM;
+        // Native use prepares nextModelGroup, sound ownership and the transition animation,
+        // while retaining MM's action/form acceptance gates.
+        extern void Player_UseItem(PlayState * play, Player * player, ItemId item);
+        Player_UseItem(play, player, ITEM_NONE);
     }
 }
 
@@ -169,6 +195,77 @@ u8 ItemInput_CanInterrupt(Player* player) {
                                PLAYER_STATE1_READY_TO_FIRE | PLAYER_STATE1_BOOMERANG_THROWN))
         return 0;
     return 1;
+}
+
+// Custom tools can also play a completion sound (digging, landing, empty aim).
+// Deduplicate only an actual native item change, not the whole held lifetime.
+// Keep the outgoing action as the key so late cleanup cannot claim the new item.
+typedef struct {
+    u8 changing;
+    u8 played;
+    u8 hasCustomSound;
+    u32 customSoundFrame;
+} ItemUnequipSoundState;
+
+static ItemUnequipSoundState* ItemEquip_UnequipSoundState(PlayState* play, Player* player) {
+    static PlayState* ownerPlay;
+    static Player* ownerPlayer;
+    static u32 lastFrame;
+    static ItemUnequipSoundState states[128];
+    if (ownerPlay != play || ownerPlayer != player || play->gameplayFrames < lastFrame) {
+        memset(states, 0, sizeof(states));
+        ownerPlay = play;
+        ownerPlayer = player;
+    }
+    lastFrame = play->gameplayFrames;
+    return states;
+}
+
+void ItemEquip_ResetUnequipSound(PlayState* play, Player* player, s32 itemAction) {
+    if (itemAction >= 0 && itemAction < 128) {
+        memset(&ItemEquip_UnequipSoundState(play, player)[itemAction], 0, sizeof(ItemUnequipSoundState));
+    }
+}
+
+void ItemEquip_BeginItemChangeSound(PlayState* play, Player* player, s32 itemAction) {
+    if (itemAction >= 0 && itemAction < 128) {
+        ItemUnequipSoundState* state = &ItemEquip_UnequipSoundState(play, player)[itemAction];
+        if (!state->changing) {
+            state->changing = 1;
+            // Input cleanup may precede native dispatch in this same update.
+            state->played = state->hasCustomSound && state->customSoundFrame == play->gameplayFrames;
+        }
+    }
+}
+
+u8 ItemEquip_ClaimUnequipSound(PlayState* play, Player* player, s32 itemAction) {
+    if (itemAction < 0 || itemAction >= 128) {
+        return 1;
+    }
+    ItemEquip_BeginItemChangeSound(play, player, itemAction);
+    ItemUnequipSoundState* state = &ItemEquip_UnequipSoundState(play, player)[itemAction];
+    if (state->played) {
+        return 0;
+    }
+    state->played = 1;
+    return 1;
+}
+
+void ItemEquip_PlayEquipSFXForAction(PlayState* play, Player* player, s32 itemAction) {
+    ItemEquip_ResetUnequipSound(play, player, itemAction);
+    ItemEquip_PlayEquipSFX(play, player);
+}
+
+void ItemEquip_PlayUnequipSFXForAction(PlayState* play, Player* player, s32 itemAction) {
+    if (itemAction >= 0 && itemAction < 128) {
+        ItemUnequipSoundState* state = &ItemEquip_UnequipSoundState(play, player)[itemAction];
+        if (state->changing && !ItemEquip_ClaimUnequipSound(play, player, itemAction)) {
+            return;
+        }
+        state->hasCustomSound = 1;
+        state->customSoundFrame = play->gameplayFrames;
+    }
+    ItemEquip_PlayUnequipSFX(play, player);
 }
 
 void ItemEquip_PlayEquipSFX(PlayState* play, Player* player) {
@@ -293,4 +390,49 @@ u8 Pacci_IsHoldingUltrahand(void);
 // type it does not match resolves a NULL display list.
 u8 ItemEquip_HoldsEmptyHand(void) {
     return Hourglass_WantsEmptyHand() || Pacci_IsHoldingUltrahand();
+}
+
+static MtxF sHandMtx;
+static u8 sHandMtxValid = 0;
+static MtxF sLeftHandMtx;
+static u8 sLeftHandMtxValid = 0;
+
+void ItemEquip_CaptureHandMatrix(void) {
+    Matrix_Get(&sHandMtx);
+    sHandMtxValid = 1;
+}
+
+void ItemEquip_CaptureLeftHandMatrix(void) {
+    Matrix_Get(&sLeftHandMtx);
+    sLeftHandMtxValid = 1;
+}
+
+void ItemEquip_ReleaseHandMatrix(void) {
+    sHandMtxValid = 0;
+    sLeftHandMtxValid = 0;
+}
+
+static u8 ItemEquip_ApplyCapturedHandPose(Player* player, const ItemHandPose* pose, MtxF* matrix, u8 valid) {
+    f32 unscale;
+    if (!valid || player == NULL || pose == NULL || player->transformation != PLAYER_FORM_HUMAN) {
+        return 0;
+    }
+    Matrix_Put(matrix);
+    unscale = (player->actor.scale.x != 0.0f) ? (1.0f / player->actor.scale.x) : 1.0f;
+    Matrix_Scale(unscale, unscale, unscale, MTXMODE_APPLY);
+    Matrix_RotateY(DEG_TO_RAD(pose->rotY), MTXMODE_APPLY);
+    Matrix_RotateX(DEG_TO_RAD(pose->rotX), MTXMODE_APPLY);
+    Matrix_RotateZ(DEG_TO_RAD(pose->rotZ), MTXMODE_APPLY);
+    // Keep the established handheld convention: offsets follow model rotation.
+    Matrix_Translate(pose->offsetX, pose->offsetY, pose->offsetZ, MTXMODE_APPLY);
+    Matrix_Scale(pose->scale, pose->scale, pose->scale, MTXMODE_APPLY);
+    return 1;
+}
+
+u8 ItemEquip_ApplyHandPose(Player* player, const ItemHandPose* pose) {
+    return ItemEquip_ApplyCapturedHandPose(player, pose, &sHandMtx, sHandMtxValid);
+}
+
+u8 ItemEquip_ApplyLeftHandPose(Player* player, const ItemHandPose* pose) {
+    return ItemEquip_ApplyCapturedHandPose(player, pose, &sLeftHandMtx, sLeftHandMtxValid);
 }

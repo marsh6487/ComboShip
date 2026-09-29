@@ -1,3 +1,4 @@
+#include "2s2h/Rando/NeiLanternPresentation.h"
 /**
  * item_lantern.c - Poe Lantern: catch fire, illuminate, apply elemental effects
  *
@@ -749,7 +750,18 @@ void Lantern_SetFireType(u8 type) {
 }
 
 void Player_InitLanternIA(PlayState* play, Player* this) {
+    gCustomItemState.lanternStowed = 0;
     // Nothing special needed on equip
+}
+
+void Lantern_PutAway(Player* p, PlayState* play) {
+    if (!gCustomItemState.lanternEquipped && !gCustomItemState.lanternSwinging)
+        return;
+
+    // Holding is separate from the captured fire: pocket light, healing and spawned flames persist.
+    gCustomItemState.lanternEquipped = 0;
+    gCustomItemState.lanternSwinging = 0;
+    gCustomItemState.lanternStowed = 1;
 }
 
 void Handle_Lantern(Player* p, PlayState* play) {
@@ -770,7 +782,7 @@ void Handle_Lantern(Player* p, PlayState* play) {
     // Handle_Lantern only runs while the lantern IS on a button, so no extra check here.
     if (p->heldItemAction != PLAYER_IA_LANTERN && p->heldItemAction != PLAYER_IA_NONE) {
         gCustomItemState.lanternEquipped = 0;
-    } else if (gCustomItemState.lanternFireType != LANTERN_FIRE_NONE) {
+    } else if (gCustomItemState.lanternFireType != LANTERN_FIRE_NONE && !gCustomItemState.lanternStowed) {
         gCustomItemState.lanternEquipped = 1;
     }
 
@@ -788,6 +800,7 @@ void Handle_Lantern(Player* p, PlayState* play) {
     // ── Start swing on C-button press ───────────────────────────────────
     // Entire swing/catch/message flow handled by Player_Action_SwingLantern below.
     if (input.isPressed) {
+        gCustomItemState.lanternStowed = 0;
         Player_StartLanternSwing(p, play);
     }
 }
@@ -883,6 +896,9 @@ void Player_StartLanternSwing(Player* this, PlayState* play) {
 // ── Draw ────────────────────────────────────────────────────────────────────
 
 void CustomItems_DrawLantern(Player* p, PlayState* play) {
+    if (NeiLantern_DrawHeld(p, play, gCustomItemState.lanternFireType)) {
+        return;
+    }
     Vec3f handPos = p->bodyPartsPos[PLAYER_BODYPART_L_HAND];
     s16 handYaw = p->actor.shape.rot.y;
     u8 fireType = gCustomItemState.lanternFireType;

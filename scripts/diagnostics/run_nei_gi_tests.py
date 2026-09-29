@@ -64,6 +64,10 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
             renderer = functions((ROOT / "mm/2s2h/Rando/NeiGiPresentation.cpp").read_text())["MM_DrawNeiGi"]
             shim = """
 extern "C" { PlayState* gPlayState = &Fixture::play; }
+bool ownerAlt = false;
+extern "C" int32_t OOT_NeiResourceExists(const char* path) {
+    return path && (ResourceMgr_FileExists(path) || (ownerAlt && ResourceMgr_FileAltExists(path)));
+}
 void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b) { Fixture::flameColors.push_back({r,g,b}); }
 #define Gfx_SetupDL25_Opa Gfx_SetupDL_25Opa
 #define Gfx_SetupDL25_Xlu Gfx_SetupDL_25Xlu

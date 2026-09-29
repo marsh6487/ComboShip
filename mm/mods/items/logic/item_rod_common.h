@@ -56,6 +56,7 @@ typedef struct {
     s16 pitch;
     ColliderCylinder colliders[3];
     u8 collidersInited;
+    u32 drawEpoch; // New presentation identity on launch/reuse.
 } RodProjSet;
 #endif // ROD_PROJ_SET_DEFINED
 
@@ -129,5 +130,7 @@ typedef struct {
 // `yaw` (around Y) then `pitch` (around X). Verbatim port of the per-rod
 // *Rod_CalcVelocity helpers, parameterized by speed.
 void RodCommon_CalcVelocity(const RodConfig* cfg, Vec3f* outVel, s16 yaw, s16 pitch);
+
+void RodCommon_PreserveChargeSparkCadence(PlayState* play, Vec3f* tipPos, RodColor* color);
 
 #endif // ITEM_ROD_COMMON_H

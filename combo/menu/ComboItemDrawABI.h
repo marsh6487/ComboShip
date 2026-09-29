@@ -155,6 +155,9 @@ typedef struct {
     int32_t isIA8;         /* zero = RGBA32 */
 } CwItemIconInfo;
 typedef int32_t (*Fn_GetItemIconInfo)(const char* itemName, CwItemIconInfo* out);
+// Uses the registered asset owner and its Alt mode; no engine state crosses.
+typedef int32_t (*Fn_NeiResourceExists)(const char* path);
+int32_t OOT_NeiResourceExists(const char* path);
 typedef int32_t (*Fn_GetNeiGiDrawInfo)(const char* slug, CwItemDrawInfo* out);
 
 /* Returns 1 and fills out on success; 0 if the item is unknown/undrawable; CW_DRAW_NOT_READY if the

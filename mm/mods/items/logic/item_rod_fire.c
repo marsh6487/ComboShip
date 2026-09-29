@@ -1,3 +1,4 @@
+#include "2s2h/Rando/NeiUsedMagicPresentation.h"
 /**
  * item_rod_fire.c - Fire Rod from A Link Between Worlds
  *
@@ -34,6 +35,7 @@ static u8 sFlameCollidersInited = 0;
 
 // Multi-set projectile system (5 concurrent sets)
 static RodProjSet sFireProjSets[ROD_MAX_PROJ_SETS];
+static u32 sFireDrawEpoch;
 
 static RodColor sFireRodColor = { FIRE_ROD_PRIM_R, FIRE_ROD_PRIM_G, FIRE_ROD_PRIM_B, FIRE_ROD_PRIM_A,
                                   FIRE_ROD_ENV_R,  FIRE_ROD_ENV_G,  FIRE_ROD_ENV_B,  FIRE_ROD_ENV_A };
@@ -186,6 +188,7 @@ static void FireRod_InitSingleProjectile(Player* p, PlayState* play, Vec3f* star
                                          f32 maxRange) {
     RodProjSet* set = FireRod_FindFreeSet(play);
     FireRod_InitSetColliders(set, p, play);
+    set->drawEpoch = ++sFireDrawEpoch;
 
     set->targetScale = 2.0f;
     set->active = 1;
@@ -211,6 +214,7 @@ static void FireRod_InitSingleProjectile(Player* p, PlayState* play, Vec3f* star
 static void FireRod_InitTripleProjectile(Player* p, PlayState* play, Vec3f* startPos, s16 baseYaw, s16 pitch) {
     RodProjSet* set = FireRod_FindFreeSet(play);
     FireRod_InitSetColliders(set, p, play);
+    set->drawEpoch = ++sFireDrawEpoch;
 
     set->targetScale = 2.0f;
     set->active = 1;
@@ -275,7 +279,7 @@ static void FireRod_SpawnFireSparks(PlayState* play, Vec3f* pos, f32 scale) {
         sparkPos.x = pos->x + (Rand_ZeroOne() - 0.5f) * (scale * 20.0f);
         sparkPos.y = pos->y + (Rand_ZeroOne() - 0.5f) * (scale * 20.0f);
         sparkPos.z = pos->z;
-        EffectSsKiraKira_SpawnDispersed(play, &sparkPos, &vel, &accel, &primColor, &envColor, 1000, 10);
+        EffectSsKiraKira_SpawnDispersed(play, &sparkPos, &vel, &accel, &primColor, &envColor, 0, 10);
     }
 }
 
@@ -716,7 +720,7 @@ static void FireRod_UpdateCharge(Player* p, PlayState* play) {
 
     if ((play->gameplayFrames % 3) == 0) {
         Vec3f* tipPos = &p->meleeWeaponInfo[0].tip;
-        FX_SpawnRodSwingParticles(play, tipPos, &sFireRodColor);
+        RodCommon_PreserveChargeSparkCadence(play, tipPos, &sFireRodColor);
     }
 
     Audio_PlayActorSound2(&p->actor, FIRE_ROD_SFX_FIRE_IGNITE - SFX_FLAG);
@@ -844,7 +848,7 @@ static void FireRod_OnEquip(PlayState* play, Player* p) {
     sChargeHoldCounter = 0;
 
     fireRodBlureIdx = FX_InitSwordTrail(play, &sFireRodColor);
-    ItemEquip_PlayEquipSFX(play, p);
+    ItemEquip_PlayEquipSFXForAction(play, p, PLAYER_IA_ROD_FIRE);
 }
 
 static void FireRod_OnUnequip(PlayState* play, Player* p) {
@@ -878,7 +882,7 @@ static void FireRod_OnUnequip(PlayState* play, Player* p) {
 
     if (fireRodSpinActive)
         FireRod_StopSpinFire();
-    ItemEquip_PlayUnequipSFX(play, p);
+    ItemEquip_PlayUnequipSFXForAction(play, p, PLAYER_IA_ROD_FIRE);
 }
 
 // =============================================================================
@@ -1037,10 +1041,14 @@ void CustomItems_DrawFireRodReticle(Player* p, PlayState* play) {
 // state, and this runs from CustomItems_OverrideDraw. (Emitting them from update crashed in 2ship;
 // MM's own fire actors draw gEffFire1DL the same way but from their Draw callbacks.) Skijer's NEI
 void CustomItems_DrawFireRodEffects(Player* p, PlayState* play) {
-    if (fireRodSpinActive) {
-        FX_DrawSpinFireCylinder(play, p, fireRodSpinRadius, fireRodSpinIsBig, &sFireRodColor);
-    }
-    if (fireRodCharging) {
-        FX_DrawChargeAura(play, p, fireRodChargeLevel, &sFireRodColor);
-    }
+    if (fireRodSpinActive)
+        NeiUsedMagic_DrawSpin(play, p, 0, fireRodSpinRadius, fireRodSpinIsBig);
+    if (fireRodCharging)
+        NeiUsedMagic_DrawCharge(play, p, 0, fireRodChargeLevel);
+}
+
+void FireRod_PutAway(Player* p, PlayState* play) {
+    if (fireRodActive || fireRodFirstPerson)
+        FireRod_OnUnequip(play, p);
+    sEquipState.isEquipped = 0;
 }

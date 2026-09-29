@@ -968,6 +968,9 @@ s32 CustomItems_OverrideDraw(Player* p, PlayState* play) {
         }
     }
 
+    // Captures belong only to this player; clones draw after this pass.
+    ItemEquip_ReleaseHandMatrix();
+
     // Draw reticle for items using first-person aiming mode
     // Color scheme: RED = expel/attack, BLUE = pull/suck, GREEN = control
 

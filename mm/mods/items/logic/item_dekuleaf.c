@@ -100,7 +100,7 @@ static void DekuLeaf_Stop(Player* p, PlayState* play) {
     }
 
     p->stateFlags1 &= ~PLAYER_STATE1_INPUT_DISABLED;
-    ItemEquip_PlayUnequipSFX(play, p);
+    ItemEquip_PlayUnequipSFXForAction(play, p, PLAYER_IA_DEKU_LEAF);
 }
 
 static void DekuLeaf_StartGlide(Player* p, PlayState* play) {
@@ -113,7 +113,7 @@ static void DekuLeaf_StartGlide(Player* p, PlayState* play) {
     // MM's FLOWER_OPEN fires during the Deku flower LAUNCH sequence (Link
     // pops out of the ground bud). For the Deku Leaf glide context Link
     // isn't launching from a flower — the equip SFX alone covers the entry.
-    ItemEquip_PlayEquipSFX(play, p);
+    ItemEquip_PlayEquipSFXForAction(play, p, PLAYER_IA_DEKU_LEAF);
 }
 
 static void DekuLeaf_StartBlow(Player* p, PlayState* play) {
@@ -147,7 +147,7 @@ static void DekuLeaf_StartBlow(Player* p, PlayState* play) {
         p->skelAnimeUpper.playSpeed = DEKULEAF_BLOW_SPEED;
     }
 
-    ItemEquip_PlayEquipSFX(play, p);
+    ItemEquip_PlayEquipSFXForAction(play, p, PLAYER_IA_DEKU_LEAF);
 }
 
 u8 RocBoots_IsWorn(void); // equip_roc_boots.c (later in this TU)

@@ -23,6 +23,7 @@
 #include <stb_image.h>
 
 #ifdef COMBO_BUILD
+#include "ComboExport.h"
 // ComboShip: audio loads pinned to OOT's own RM — the audio thread races active-RM swaps
 // (ResourceManagerScope) made on other threads.
 #include <ship/resource/CrossRMRegistry.h>
@@ -903,3 +904,15 @@ extern "C" void ResourceMgr_ClearSkeletons() {
 extern "C" s32* ResourceMgr_LoadCSByName(const char* path) {
     return (s32*)ResourceMgr_GetResourceDataByNameHandlingMQ(path);
 }
+
+#ifdef COMBO_BUILD
+// Typed resource-only query for native MM. The owner may be inactive; never
+// consult OoT save/player state. Match deferred rendering using the registered
+// owner's Alt mode, which can differ from the currently active MM mode.
+extern "C" COMBO_EXPORT int32_t OOT_NeiResourceExists(const char* path) {
+    const auto owner = Ship::CrossRMRegistry::Get("oot");
+    return path && owner &&
+           (ResourceMgr_FileExists(path) || (owner->IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path)));
+}
+
+#endif
