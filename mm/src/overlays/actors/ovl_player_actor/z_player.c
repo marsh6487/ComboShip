@@ -12024,6 +12024,9 @@ void Player_Init(Actor* thisx, PlayState* play) {
     s32 var_a1;
     PlayerStartMode startMode;
 
+    // Combo resume can replace the game heap without destroying the previous Player.
+    CustomItems_ResetTransientTools(this, play);
+
     play->playerInit = Player_InitCommon;
     play->playerUpdate = Player_UpdateCommon;
     play->unk_18770 = func_8085B170;
@@ -14719,6 +14722,7 @@ void Player_Draw(Actor* thisx, PlayState* play) {
 void Player_Destroy(Actor* thisx, PlayState* play) {
     Player* this = (Player*)thisx;
     if (this == GET_PLAYER(play)) {
+        CustomItems_ResetTransientTools(this, play);
         DinFireSword_Reset();
         DinFireShield_Reset();
     }

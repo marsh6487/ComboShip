@@ -130,20 +130,13 @@ static void DekuLeaf_StartBlow(Player* p, PlayState* play) {
     dlBlowTimer = 0;
     sDekuLeafBlowEffectFired = 0;
 
-    // Play the custom blow animation on skelAnimeUpper (loaded from 2ship.o2r), then override
-    // playSpeed so the whole 39-frame swing runs 2x fast. Skijer's NEI
-    {
-        LinkAnimationHeader* anim = NeiAnim_Load(NEI_ANIM_DEKULEAF_BLOW);
-
-        if (anim == NULL) {
-            // Resource missing (o2r not regenerated) — don't start a blow we can't animate.
-            dlActive = 0;
-            dlMode = DEKULEAF_MODE_INACTIVE;
-            dlBlowing = 0;
-            return;
-        }
-        LinkAnimation_PlayOnce(play, &p->skelAnimeUpper, anim);
-        p->skelAnimeUpper.playSpeed = DEKULEAF_BLOW_SPEED;
+    // Native item equip may still need skelAnimeUpper. Start the authored swing only when
+    // its upper action receives control, after MM has finished changing held items.
+    if (NeiAnim_Load(NEI_ANIM_DEKULEAF_BLOW) == NULL) {
+        dlActive = 0;
+        dlMode = DEKULEAF_MODE_INACTIVE;
+        dlBlowing = 0;
+        return;
     }
 
     ItemEquip_PlayEquipSFXForAction(play, p, PLAYER_IA_DEKU_LEAF);
@@ -303,6 +296,16 @@ s32 Player_UpperAction_DekuLeaf(Player* player, PlayState* play) {
         return 0;
     if (!dlBlowing)
         return 0;
+
+    if (dlAnimTimer == 0) {
+        LinkAnimationHeader* anim = NeiAnim_Load(NEI_ANIM_DEKULEAF_BLOW);
+        if (anim == NULL) {
+            DekuLeaf_Stop(player, play);
+            return 0;
+        }
+        LinkAnimation_PlayOnce(play, &player->skelAnimeUpper, anim);
+        player->skelAnimeUpper.playSpeed = DEKULEAF_BLOW_SPEED;
+    }
 
     // Advance the blow animation. It runs at DEKULEAF_BLOW_SPEED (2x), so it finishes in about half
     // the frames — the animation itself decides when the blow ends. Skijer's NEI

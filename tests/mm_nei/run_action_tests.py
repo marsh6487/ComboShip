@@ -93,7 +93,7 @@ run('ordinary_tool_camera', r'''
 #include "mods/transformation_masks/transformation_masks.h"
 #define linearVelocity speedXZ
 CustomItemState gCustomItemState{};u8 sDekuLeafBlowEffectFired=0,sDekuLeafColInitialized=1;
-bool done=false,magic=true,asset=true,blocked=false;ItemInputState next{};
+bool done=false,magic=true,asset=true,blocked=false,autoAnimate=false;ItemInputState next{};
 s8 sDekuLeafPrevInvinc=0,sShovelPrevInvinc=0;
 PlayerAnimationHeader anim{};int digs=0,spent=0;
 #define NEI_ANIM_DEKULEAF_BLOW "leaf"
@@ -102,8 +102,13 @@ s32 ItemMagic_HasEnough(PlayState*,s16){return magic;}
 void ItemMagic_Consume(PlayState*,s16){++spent;}
 LinkAnimationHeader* NeiAnim_Load(const char*){return asset?&anim:nullptr;}
 void DekuLeaf_InitCollider(PlayState*,Player*){}
-void PlayerAnimation_PlayOnce(PlayState*,SkelAnime* s,PlayerAnimationHeader*){s->curFrame=0;}
-s32 PlayerAnimation_Update(PlayState*,SkelAnime*){return done;}
+s32 PlayerAnimation_Once(PlayState*,SkelAnime*);
+s32 StubAnimation(PlayState*,SkelAnime*){return done;}
+void PlayerAnimation_AnimateFrame(PlayState*,SkelAnime*){}
+void PlayerAnimation_PlayOnce(PlayState*,SkelAnime* s,PlayerAnimationHeader* anim){
+ s->animation=anim;s->curFrame=0;s->endFrame=39;s->animLength=40;s->playSpeed=1;
+ s->update.player=autoAnimate?PlayerAnimation_Once:StubAnimation;
+}
 void AudioSfx_StopById(u32){}
 void MmSfx_Stop(u16){}
 void DekuLeaf_PlayMmSfx(u16,Vec3f*){}
@@ -121,21 +126,42 @@ u8 TransformMasks_IsTransformed(void){return false;}
 MmPlayerTransformation MmPlayer_GetForm(void){return MM_PLAYER_FORM_HUMAN;}
 bool func_8082DA90(PlayState*){return false;}
 SaveContext gSaveContext{};
+bool leafSlot=true,shovelSlot=true;
+u8 ItemEquip_GetItemOnSlot(u8 slot){return slot==1&&leafSlot?ITEM_DEKU_LEAF:slot==2&&shovelSlot?ITEM_SHOVEL:ITEM_NONE;}
+void DinFireSword_Reset(){}
+void DinFireShield_Reset(){}
+void Effect_Destroy(PlayState*,s32){}
+void LightContext_RemoveLight(PlayState*,LightContext*,LightNode*){}
+s32 Collider_DestroyCylinder(PlayState*,ColliderCylinder*){return 1;}
+s32 Collider_DestroyQuad(PlayState*,ColliderQuad*){return 1;}
+void ZeldaArena_Free(void*){}
+void Magic_Reset(PlayState*){}
+void func_80831454(Player*){}
 ''', ([body(common, 'CustomItems_BlocksMovement')] if 'CustomItems_BlocksMovement' in (ROOT / common).read_text() else []) +
+    [body('mm/src/code/z_skelanime.c', n) for n in ['PlayerAnimation_Once', 'PlayerAnimation_Update']] +
     [body(equip, 'ItemInput_CheckDamage')] +
     [body(leaf, n) for n in ['DekuLeaf_Stop', 'DekuLeaf_StartGlide', 'DekuLeaf_StartBlow', 'Player_UpperAction_DekuLeaf', 'Handle_DekuLeaf']] +
     [body(shovel, n) for n in ['Shovel_Stop', 'Shovel_Start', 'Shovel_UpdateAnimation', 'Player_UpperAction_Shovel', 'Handle_Shovel']] +
-    [body('mm/src/code/z_camera.c', 'func_800CB854'),
+    [body(common, n) for n in ['CustomItems_IsBlocked', 'IsItemEquipped']] +
+    [body('mm/mods/items/custom_items_stow.c', n) for n in ['CustomItems_CleanupTransientTools', 'CustomItems_ResetTransientTools']] +
+    ['void InitToolLifetime(Actor* thisx,PlayState* play){' + body(player, 'Player_Init').split('{',1)[1].split('    play->playerInit =')[0] + '}'] +
+    [body(player, 'Player_Destroy'), body('mm/src/code/z_camera.c', 'func_800CB854'),
      'Input SelectInput(Player* self,PlayState* play){Input input{};' + input_selection + 'return input;}'], r'''
 Player p{};PlayState play{};play.actorCtx.actorLists[ACTORCAT_PLAYER].first=&p.actor;
 Camera camera{};camera.play=&play;camera.focalActor=&p.actor;gSaveContext.save.saveInfo.playerData.health=16;
 next.wasEquipped=1;p.actor.bgCheckFlags=BGCHECKFLAG_GROUND;
-play.state.input[0].cur.button=BTN_A;play.state.input[0].cur.stick_x=40;
+play.state.input[0].cur.button=BTN_CLEFT;play.state.input[0].press.button=BTN_CLEFT;play.state.input[0].cur.stick_x=40;
 assert(SelectInput(&p,&play).cur.stick_x==40);
 magic=false;DekuLeaf_StartBlow(&p,&play);assert(!dlActive);magic=true;asset=false;Shovel_Start(&p,&play);assert(!shActive);asset=true;
 for(int tool=0;tool<2;tool++){
- done=false;
- if(tool==0){DekuLeaf_StartBlow(&p,&play);p.skelAnimeUpper.curFrame=DEKULEAF_BLOW_EFFECT_FRAME;Player_UpperAction_DekuLeaf(&p,&play);}
+ done=false;p.heldItemAction=PLAYER_IA_NONE;p.upperActionFunc=nullptr;
+ // CustomItems_Update starts tools BEFORE native item dispatch selects/installs the upper action.
+ if(tool==0)DekuLeaf_StartBlow(&p,&play);else Shovel_Start(&p,&play);
+ assert(SelectInput(&p,&play).press.button==BTN_CLEFT); // activation press must reach native equip
+ p.heldItemAction=(PlayerItemAction)(tool==0?PLAYER_IA_DEKU_LEAF:PLAYER_IA_SHOVEL);
+ p.upperActionFunc=tool==0?Player_UpperAction_DekuLeaf:Player_UpperAction_Shovel;
+
+ if(tool==0){DekuLeaf_StartBlow(&p,&play);Player_UpperAction_DekuLeaf(&p,&play);p.skelAnimeUpper.curFrame=DEKULEAF_BLOW_EFFECT_FRAME;Player_UpperAction_DekuLeaf(&p,&play);}
  else{Shovel_Start(&p,&play);Shovel_UpdateAnimation(&p,&play);shAnimTimer=SHOVEL_DIG_FRAME-1;Player_UpperAction_Shovel(&p,&play);assert(digs==1);}
  assert(!func_800CB854(&camera)); // ordinary item use cannot request cutscene letterboxing
  assert(!SelectInput(&p,&play).cur.button&&!SelectInput(&p,&play).cur.stick_x);
@@ -158,6 +184,7 @@ for(int tool=0;tool<2;tool++){
   if(tool==0)Handle_DekuLeaf(&p,&play);else Handle_Shovel(&p,&play);
   next.isPressed=1;
   if(tool==0)Handle_DekuLeaf(&p,&play);else Handle_Shovel(&p,&play);
+  if(tool==0)Player_UpperAction_DekuLeaf(&p,&play);else Player_UpperAction_Shovel(&p,&play);
   assert(!SelectInput(&p,&play).cur.stick_x);next.isPressed=0;
   if(interruption==0)p.invincibilityTimer=1;else next.wasEquipped=0;
   if(tool==0)Handle_DekuLeaf(&p,&play);else Handle_Shovel(&p,&play);
@@ -165,4 +192,54 @@ for(int tool=0;tool<2;tool++){
  }
 }
 assert(spent==1);
+// The reset path destroys the old Player while the process-global tool state remains allocated.
+for(int tool=0;tool<2;tool++){
+ done=false;
+ if(tool==0)DekuLeaf_StartBlow(&p,&play);else Shovel_Start(&p,&play);
+ Player_Destroy(&p.actor,&play);
+ assert(!dlActive&&!dlBlowing&&!dlGliding&&!shActive&&!shAnimating);
+ p=Player{}; // same address reused for the new Clock Tower entrance Player
+ assert(SelectInput(&p,&play).cur.stick_x==40);
+}
+// Combo resume may skip destroy; execute the production prefix of Player_Init too.
+DekuLeaf_StartGlide(&p,&play);Shovel_Start(&p,&play);
+p=Player{};InitToolLifetime(&p.actor,&play);
+assert(!dlActive&&!dlGliding&&!shActive&&!sDekuLeafColInitialized);
+// Advance real PlayerAnimation_Once at the native 20 Hz rate, without manually forcing completion.
+autoAnimate=true;play.state.framerateDivisor=2;
+for(int tool=0;tool<2;tool++){
+ int oldSpent=spent,oldDigs=digs;
+ p.heldItemAction=(PlayerItemAction)(tool==0?PLAYER_IA_DEKU_LEAF:PLAYER_IA_SHOVEL);
+ p.upperActionFunc=tool==0?Player_UpperAction_DekuLeaf:Player_UpperAction_Shovel;
+ if(tool==0)DekuLeaf_StartBlow(&p,&play);else Shovel_Start(&p,&play);
+ // Native Player_StartChangingHeldItem replaces the pending animation. The tool must
+ // start its own animation at callback handoff, even when that equip Once has finished.
+ PlayerAnimationHeader equipAnim{};p.skelAnimeUpper.animation=&equipAnim;
+ p.skelAnimeUpper.curFrame=p.skelAnimeUpper.endFrame;
+ for(int frame=0;frame<50&&(dlActive||shActive);frame++){
+  play.gameplayFrames++;
+  CustomItems_CleanupTransientTools(&p,&play);
+  p.upperActionFunc(&p,&play);
+  assert(!func_800CB854(&camera));
+ }
+ assert(!dlActive&&!shActive&&SelectInput(&p,&play).cur.stick_x==40);
+ assert(spent-oldSpent==(tool==0)&&digs-oldDigs==(tool==1));
+ // Scene/cutscene interruption, losing animation ownership, and slot removal clear busy state.
+ for(int interruption=0;interruption<3;interruption++){
+  p.heldItemAction=(PlayerItemAction)(tool==0?PLAYER_IA_DEKU_LEAF:PLAYER_IA_SHOVEL);
+  p.upperActionFunc=tool==0?Player_UpperAction_DekuLeaf:Player_UpperAction_Shovel;
+  if(tool==0)DekuLeaf_StartBlow(&p,&play);else Shovel_Start(&p,&play);
+  p.upperActionFunc(&p,&play);assert(CustomItems_BlocksMovement(&p));
+  Player remote{};CustomItems_ResetTransientTools(&remote,&play);
+  assert(CustomItems_BlocksMovement(&p));
+  if(interruption==0){p.csAction=PLAYER_CSACTION_5;p.stateFlags1|=PLAYER_STATE1_20;}
+  else if(interruption==1){p.heldItemAction=PLAYER_IA_NONE;p.upperActionFunc=nullptr;}
+  else{leafSlot=shovelSlot=false;}
+  CustomItems_CleanupTransientTools(&p,&play);
+  assert(!dlActive&&!shActive&&!CustomItems_BlocksMovement(&p));
+  if(interruption==0)assert(p.stateFlags1&PLAYER_STATE1_20);
+  p.csAction=PLAYER_CSACTION_NONE;p.stateFlags1=0;leafSlot=shovelSlot=true;
+ }
+}
+
 ''')

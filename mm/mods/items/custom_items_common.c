@@ -17,6 +17,8 @@
 #include "helpers/camera_helper.h"
 #include "helpers/equip_helper.h" // ItemEquip_GetItemOnSlot — MM keeps D-pad equips in their own array
 #include "logic/item_postman_hat.h"
+#include "logic/item_dekuleaf.h"
+#include "logic/item_shovel.h"
 #include "../extended_inventory.h" // ExtInv_GetItemSlot — custom items must NOT use vanilla SLOT()/INV_CONTENT()
 #include "overlays/actors/ovl_En_Boom/z_en_boom.h" // EnBoom struct for Gale Boomerang multi-target override
 #include "soh/FleetShipCombo/FleetShipCombo.h"     // cross-game world-connector (loading zone)
@@ -217,10 +219,14 @@ s32 CustomItems_IsBlocked(Player* p, PlayState* play) {
     return false;
 }
 
-// Ordinary tool animations lock movement without borrowing MM's cutscene/HUD suppression bit.
+// Lock only after the native upper action has actually advanced the tool animation.
+// CustomItems_Update runs BEFORE native item-button dispatch: locking at StartBlow/Start
+// swallows the press needed to install that upper action and leaves the tool stuck forever.
 s32 CustomItems_BlocksMovement(Player* p) {
-    return p != NULL && ((gCustomItemState.dekuLeafActive && gCustomItemState.dekuLeafBlowing) ||
-                         (gCustomItemState.shovelActive && gCustomItemState.shovelAnimating));
+    return p != NULL && ((dlActive && dlBlowing && dlAnimTimer > 0 && p->heldItemAction == PLAYER_IA_DEKU_LEAF &&
+                          p->upperActionFunc == Player_UpperAction_DekuLeaf) ||
+                         (shActive && shAnimating && shAnimTimer > 0 && p->heldItemAction == PLAYER_IA_SHOVEL &&
+                          p->upperActionFunc == Player_UpperAction_Shovel));
 }
 
 // Quick check if item is on any item button (B, the three C buttons, or a D-pad slot).
@@ -247,7 +253,7 @@ static void CustomItems_CleanupUnequipped(Player* p, PlayState* play) {
         Handle_Shovel(p, play);
     if (gCustomItemState.demiseDestructionActive && !IsItemEquipped(ITEM_DEMISE_DESTRUCTION))
         Handle_DemiseDestruction(p, play);
-    if (gCustomItemState.dekuLeafGliding && !IsItemEquipped(ITEM_DEKU_LEAF))
+    if (gCustomItemState.dekuLeafActive && !IsItemEquipped(ITEM_DEKU_LEAF))
         Handle_DekuLeaf(p, play);
     if (gCustomItemState.beetleActive && !IsItemEquipped(ITEM_BEETLE))
         Handle_Beetle(p, play);
@@ -382,6 +388,9 @@ static void FleetWarp_Tick(Player* p, PlayState* play) {
 }
 
 void CustomItems_Update(Player* p, PlayState* play) {
+    // Run cancellation before any cutscene/transition or exclusive-item early return.
+    CustomItems_CleanupTransientTools(p, play);
+
     // FLEET SHIP COMBO (MM): FleetWarp_Tick below is the OoT sending/arrival logic that rode in with
     // the NEI port — it is WRONG for MM (OoT entrances/scenes) and, worse, its ConsumePendingWarp
     // ran here inside Player_Update (BEFORE FleetWarp_FileSelectTick in the frame) and ATE every

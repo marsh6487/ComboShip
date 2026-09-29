@@ -223,6 +223,8 @@ assert(!ArmsHook_IsLiveSwapTarget(&play,&front));assert(!ArmsHook_SelectManualSw
 leaf='mm/mods/items/logic/item_dekuleaf.c'
 run('native_leaf_lifecycle',r'''
 #include "mods/items/logic/item_dekuleaf.h"
+#include "mods/items/logic/item_shovel.h"
+s32 Player_UpperAction_Shovel(Player*,PlayState*){return 0;}
 #include "mods/sound_translator/mm_sfx_ids.h"
 #define linearVelocity speedXZ
 CustomItemState gCustomItemState{};u8 sDekuLeafBlowEffectFired=0;bool magic=true,asset=true,done=false;
@@ -243,9 +245,10 @@ void Player_PlaySfx(Player*,u16){}
 void DekuLeaf_SpawnWindParticles(Player*,PlayState*){++wind;}
 void DekuLeaf_BlowEffect(Player*,PlayState*){dlCollider.base.atFlags|=AT_ON;}
 ''',[body('mm/mods/items/custom_items_common.c','CustomItems_BlocksMovement')]+[body(leaf,n) for n in ['DekuLeaf_Stop','DekuLeaf_StartGlide','DekuLeaf_StartBlow','Player_UpperAction_DekuLeaf']],r'''
-Player p{};PlayState play{};magic=false;DekuLeaf_StartBlow(&p,&play);assert(!dlActive&&!sounds&&!plays);
+Player p{};PlayState play{};p.heldItemAction=(PlayerItemAction)PLAYER_IA_DEKU_LEAF;p.upperActionFunc=Player_UpperAction_DekuLeaf;magic=false;DekuLeaf_StartBlow(&p,&play);assert(!dlActive&&!sounds&&!plays);
 magic=true;asset=false;DekuLeaf_StartBlow(&p,&play);assert(!dlActive&&!sounds&&!plays);
-asset=true;DekuLeaf_StartBlow(&p,&play);assert(dlActive&&dlBlowing&&plays==1&&p.skelAnimeUpper.playSpeed==2);
+asset=true;DekuLeaf_StartBlow(&p,&play);assert(dlActive&&dlBlowing&&plays==0);
+Player_UpperAction_DekuLeaf(&p,&play);assert(plays==1&&p.skelAnimeUpper.playSpeed==2);
 p.skelAnimeUpper.curFrame=DEKULEAF_BLOW_EFFECT_FRAME;Player_UpperAction_DekuLeaf(&p,&play);Player_UpperAction_DekuLeaf(&p,&play);
 assert(consumes==1&&CustomItems_BlocksMovement(&p)&&!(p.stateFlags1&PLAYER_STATE1_INPUT_DISABLED)&&(dlCollider.base.atFlags&AT_ON));
 done=true;assert(!Player_UpperAction_DekuLeaf(&p,&play));assert(!dlActive&&!dlBlowing&&!(dlCollider.base.atFlags&(AT_ON|AT_HIT))&&!CustomItems_BlocksMovement(&p)&&closes==0);
@@ -288,7 +291,9 @@ void Mitts_OnUnequip(PlayState*,Player*){gCustomItemState.mogmaMittsActive=0;}
 void BallChain_Stop(Player*,PlayState*){++stops;gCustomItemState.ballAndChainThrown=0;}
 void Whip_Stop(Player*,PlayState*){++stops;whipActive=0;}
 void ItemInput_SuppressUntilRelease(u8,PlayState*){++suppress;}
-''',[source('mm/mods/items/custom_items_stow.c')],r'''
+void DekuLeaf_Stop(Player*,PlayState*){gCustomItemState.dekuLeafActive=0;}
+void Shovel_Stop(Player*,PlayState*){gCustomItemState.shovelActive=0;}
+''',[body('mm/mods/items/custom_items_stow.c',n) for n in ['CustomItems_CanStowWhip','CustomItems_HasStowableHeldItem','CustomItems_PutAwayHeldItems']],r'''
 Player p{},remote{};PlayState play{};play.actorCtx.actorLists[ACTORCAT_PLAYER].first=&p.actor;
 gCustomItemState.lanternEquipped=fireRodActive=iceRodFirstPerson=lightRodActive=1;
 CustomItems_PutAwayHeldItems(&remote,&play);assert(gCustomItemState.lanternEquipped&&fireRodActive);
@@ -477,4 +482,55 @@ run_caller('spinner_native_stow',r'''
  Spinner_Start(&p,&play);
  assert(p.heldItemAction==PLAYER_IA_NONE&&p.nextModelGroup==PLAYER_MODELGROUP_DEFAULT&&initializations==1);
  assert(!(p.stateFlags3&PLAYER_STATE3_START_CHANGING_HELD_ITEM));
+''')
+
+# Regression: the tool handler starts before Player_Update selects input. Execute that
+# selection and the real native button/use pipeline; the transition-animation boundary
+# remains the same recorder used by the Net tests above.
+caller_prefix = caller_prefix.replace('static int transitions,initializations;', 'static u8 requestedTool;static int transitions,initializations;')
+caller_prefix = caller_prefix.replace('if(slot==EQUIP_SLOT_C_LEFT)return ITEM_NET;', 'if(slot==EQUIP_SLOT_C_LEFT)return requestedTool;')
+caller_prefix = caller_prefix.replace('return slot==EQUIP_SLOT_D_DOWN?ITEM_BOW:ITEM_NONE;', 'return slot==EQUIP_SLOT_D_DOWN?requestedTool:ITEM_NONE;')
+caller_prefix = caller_prefix.replace('if(item==ITEM_NET||item==ITEM_SWORD_KOKIRI)', 'if(item==ITEM_DEKU_LEAF)return PLAYER_IA_DEKU_LEAF;\n if(item==ITEM_SHOVEL)return PLAYER_IA_SHOVEL;\n if(item==ITEM_NET||item==ITEM_SWORD_KOKIRI)')
+caller_prefix += r'''
+#include "mods/items/logic/item_dekuleaf.h"
+#include "mods/items/logic/item_shovel.h"
+static u8 sDekuLeafBlowEffectFired;
+static PlayerAnimationHeader toolAnim;
+#define NEI_ANIM_DEKULEAF_BLOW "leaf"
+#define NEI_ANIM_DAMPE_DIG "dig"
+s32 ItemMagic_HasEnough(PlayState* play,s16 amount){return 1;}
+LinkAnimationHeader* NeiAnim_Load(const char* key){return &toolAnim;}
+void DekuLeaf_InitCollider(PlayState* play,Player* p){}
+void PlayerAnimation_PlayOnce(PlayState* play,SkelAnime* skel,PlayerAnimationHeader* anim){skel->curFrame=0;}
+void ItemEquip_PlayEquipSFXForAction(PlayState* play,Player* p,s32 action){}
+s32 Player_UpperAction_DekuLeaf(Player* p,PlayState* play){return 1;}
+s32 Player_UpperAction_Shovel(Player* p,PlayState* play){return 1;}
+'''
+update = body(player, 'Player_Update')
+selection = update[update.index('if (play->actorCtx.isOverrideInputOn'):update.index('    GameInteractor_ExecuteOnPassPlayerInputs')]
+caller_parts += [body(leaf,'DekuLeaf_StartBlow'),body('mm/mods/items/logic/item_shovel.c','Shovel_Start'),body('mm/mods/items/custom_items_common.c','CustomItems_BlocksMovement')]
+caller_parts += ['Input SelectToolInput(Player* this,PlayState* play){Input input={0};'+selection+'return input;}']
+run_caller('tool_native_activation',r'''
+ Player p;PlayState play;
+ for(int tool=0;tool<2;tool++)for(int dpad=0;dpad<2;dpad++){
+  u16 button=dpad?BTN_DDOWN:BTN_CLEFT;
+  requestedTool=tool==0?ITEM_DEKU_LEAF:ITEM_SHOVEL;
+  ResetCaller(&p,&play,ITEM_SWORD_KOKIRI,button);dpadEnabled=dpad;
+  play.actorCtx.actorLists[ACTORCAT_PLAYER].first=&p.actor;
+  play.state.input[0].cur.button=button;play.state.input[0].cur.stick_x=40;
+  memset(&gCustomItemState,0,sizeof(gCustomItemState));
+  if(tool==0)DekuLeaf_StartBlow(&p,&play);else Shovel_Start(&p,&play);
+  Input input=SelectToolInput(&p,&play);sPlayerControlInput=&input;
+  Player_UpdateItems(&p,&play);
+  assert(input.press.button==button&&transitions==1&&p.heldItemId==requestedTool);
+  assert(animationDestination==PLAYER_MODELGROUP_DEFAULT);
+  // The movement lock belongs only to an installed and advancing tool upper action.
+  p.heldItemAction=tool==0?PLAYER_IA_DEKU_LEAF:PLAYER_IA_SHOVEL;
+  p.upperActionFunc=tool==0?Player_UpperAction_DekuLeaf:Player_UpperAction_Shovel;
+  assert(SelectToolInput(&p,&play).press.button==button);
+  if(tool==0)dlAnimTimer=1;else shAnimTimer=1;
+  assert(!SelectToolInput(&p,&play).cur.stick_x);
+  p.upperActionFunc=NULL;
+  assert(SelectToolInput(&p,&play).cur.stick_x==40);
+ }
 ''')
