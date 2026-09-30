@@ -50,9 +50,18 @@ static void TGate_ComputePhaseEnd(s32 baseTimer, f32 lastFrame) {
 // Stop / Start
 // =============================================================================
 
+static void TimeGate_StopSounds(Player* p) {
+    // MM swaps the model live, so there is no scene reload to stop these loops.
+    // Match the source used at playback to preserve other actors' warp sounds.
+    AudioSfx_StopByPosAndId(&p->actor.world.pos, NA_SE_EV_WARP_HOLE);
+    AudioSfx_StopByPosAndId(&p->actor.world.pos, NA_SE_PL_MAGIC_WIND_WARP);
+}
+
 static void TimeGate_Stop(Player* p, PlayState* play) {
     if (!tgActive)
         return;
+
+    TimeGate_StopSounds(p);
 
     // Close any open textbox
     if (tgPromptShown) {
@@ -306,6 +315,8 @@ static void TimeGate_StateHovering(Player* p, PlayState* play) {
 // =============================================================================
 
 static void TimeGate_StateSwitching(Player* p, PlayState* play) {
+    TimeGate_StopSounds(p);
+
     // Consume magic now that user confirmed
     ItemMagic_Consume(play, TGATE_MAGIC_COST);
 
@@ -374,6 +385,8 @@ static void TimeGate_StateCancel(Player* p, PlayState* play) {
 
     // End after cancel duration
     if (tgTimer >= TGATE_CANCEL_DURATION) {
+        TimeGate_StopSounds(p);
+
         p->stateFlags1 &= ~(PLAYER_STATE1_IN_ITEM_CS | PLAYER_STATE1_INPUT_DISABLED | PLAYER_STATE1_IN_CUTSCENE);
         Camera_ChangeSetting(Play_GetCamera(play, 0),
                              CAM_SET_NORMAL0); // real MM camera reset (func_8005B1A4 is a no-op stub)
