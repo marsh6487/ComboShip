@@ -13,7 +13,10 @@ tail=f['Player_OverrideLimbDrawGameplayDefault']
 tail=tail[tail.index('    GameInteractor_Should(VB_PLAYER_OVERRIDE_LIMB_DRAW'):]
 helpers=f.get('Player_ApplyLanternGrip','')
 with tempfile.TemporaryDirectory(prefix='lantern-grip-') as td:
-    Path(td,'grip_tail.inc').write_text(helpers+'\nstatic s32 Fixture_Apply(PlayState* play, Player* this, s32 limbIndex, Gfx** dList) {\nvoid* thisx=this; Vec3s r={0}; Vec3s* rot=&r;\n'+tail)
+    # Earlier limb selection permits the final fire stage on the left hand.
+    # This fixture has no progressive fire resources; its renderer boundary
+    # returns NULL, exercising the ordinary equipment fallback in the real tail.
+    Path(td,'grip_tail.inc').write_text(helpers+'\nstatic s32 Fixture_Apply(PlayState* play, Player* this, s32 limbIndex, Gfx** dList) {\nvoid* thisx=this; Vec3s r={0}; Vec3s* rot=&r;\nu8 mayDrawProgressiveFire = limbIndex == PLAYER_LIMB_L_HAND;\n'+tail)
     binary=str(Path(td,'grip'))
     subprocess.run(['cc',*flags(),'-I'+td,str(ROOT/'tests/nei_lantern_grip/grip_test.c'),'-lm','-o',binary],check=True)
     subprocess.run([binary],check=True)

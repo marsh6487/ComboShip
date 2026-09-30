@@ -64,6 +64,14 @@ void DinFireSword_Draw(PlayState*, Player*) {
     ++fireSwordDrawCalls;
 }
 
+void* DinFireSword_HandDL(PlayState*, Player*, void*, u8, u8, u8) {
+    return nullptr; // This fixture uses the ordinary ceremonial sword assets.
+}
+
+void Player_ApplyLanternGrip(Player*, s32, Gfx**) {
+    // No lantern in these cases; its grip is covered by tests/nei_lantern_grip.
+}
+
 void BossRemains_DrawOdolwaSword(PlayState*, Player*) {
     postSwordDrawCalls++;
 }
