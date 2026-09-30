@@ -37,10 +37,27 @@ new=functions((ROOT/'soh/mods/items/logic/item_rod_common.c').read_text())['RodC
 old=old.replace('FX_SpawnRodSwingParticles','RodCommon_PreserveChargeSparkCadence').replace('&env, 100, 10','&env, 0, 0')
 assert tokens(old)==tokens(new)
 for path in ('soh/src/overlays/effects/ovl_Effect_Ss_G_Spk/z_eff_ss_g_spk.c',
-             'soh/mods/items/logic/item_time_gate.c',
              'soh/src/overlays/effects/ovl_Effect_Ss_En_Ice/z_eff_ss_en_ice.c',
              'soh/src/overlays/effects/ovl_Effect_Ss_KiraKira/z_eff_ss_kirakira.c'):
  assert (ROOT/path).read_text()==baseline(path),path
+# The native-bank regression in tests/oot_timegate covers this audio-only
+# lifetime fix. Permit only its two source-owned stops and one cleanup call in
+# each exit handler; the rest of Time Gate must still match the accepted source
+# byte for byte, including controls, magic cost, animations and state changes.
+path='soh/mods/items/logic/item_time_gate.c'
+current=(ROOT/path).read_text()
+helper=functions(current)['TimeGate_StopSounds']
+assert tokens(helper)==tokens('''static void TimeGate_StopSounds(Player* p) {
+    Audio_StopSfxByPosAndId(&p->actor.world.pos, NA_SE_EV_WARP_HOLE);
+    Audio_StopSfxByPosAndId(&p->actor.world.pos, NA_SE_PL_MAGIC_WIND_WARP);
+}'''), 'Time Gate cleanup must stop only its own two sounds'
+current=current.replace(helper+'\n\n','',1)
+for name,indent in (('TimeGate_Stop',4),('TimeGate_StateSwitching',4),('TimeGate_StateCancel',8)):
+ body=functions(current)[name]
+ cleanup=' '*indent+'TimeGate_StopSounds(p);\n\n'
+ assert body.count(cleanup)==1,(name,'expected one audio cleanup')
+ current=current.replace(body,body.replace(cleanup,'',1),1)
+assert current==baseline(path),(path,'changes beyond the tested audio cleanup')
 # Accepted Fire dispatch retains the GI17 center-history path. Ice now has
 # independently tested per-head reconstructed trails, without gameplay edits.
 fire=(ROOT/'soh/mods/items/objects/object_firerod.c').read_text()
