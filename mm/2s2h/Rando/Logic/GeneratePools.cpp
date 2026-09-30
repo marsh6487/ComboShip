@@ -340,6 +340,12 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             itemPool.push_back(RI_OOT_PROGRESSIVE_ROC); // L2 Cape
         }
         if (saveInfo.randoSaveOptions[RO_SHUFFLE_OOT_QUEST] == RO_GENERIC_YES) {
+#ifndef COMBO_BUILD
+            // ComboShip gets OoT's rewards from the OoT dump, after its native
+            // reward-placement rules run. Adding MM copies here bypasses those
+            // restrictions (and duplicates rewards already fixed to bosses).
+            // UnifiedPoolActive is intentionally false in the launcher build;
+            // keep these extra rewards exclusive to standalone MM.
             itemPool.push_back(RI_OOT_MEDALLION_FOREST);
             itemPool.push_back(RI_OOT_MEDALLION_FIRE);
             itemPool.push_back(RI_OOT_MEDALLION_WATER);
@@ -349,6 +355,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             itemPool.push_back(RI_OOT_STONE_KOKIRI_EMERALD);
             itemPool.push_back(RI_OOT_STONE_GORON_RUBY);
             itemPool.push_back(RI_OOT_STONE_ZORA_SAPPHIRE);
+#endif
             itemPool.push_back(RI_OOT_STONE_OF_AGONY);
             itemPool.push_back(RI_OOT_SONG_ZELDAS_LULLABY);
             itemPool.push_back(RI_OOT_SONG_MINUET_OF_FOREST);
