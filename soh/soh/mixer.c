@@ -659,10 +659,13 @@ static void aMixImplSSE2(uint16_t count, int16_t gain, uint16_t in_addr, uint16_
 
             // Interleave the lo and hi bits into one 32 bit value for each vector element.
             // So now we have 4 full elements in each vector instead of 8 half elements.
+            // Both halves must read the original product words before either is replaced.
+            __m128i outProductHiVec = _mm_unpackhi_epi16(outx7fffLoVec, outx7fffHiVec);
+            __m128i inProductHiVec = _mm_unpackhi_epi16(inxGainLoVec, inxGainHiVec);
             outx7fffLoVec = _mm_unpacklo_epi16(outx7fffLoVec, outx7fffHiVec);
-            outx7fffHiVec = _mm_unpackhi_epi16(outx7fffLoVec, outx7fffHiVec);
+            outx7fffHiVec = outProductHiVec;
             inxGainLoVec = _mm_unpacklo_epi16(inxGainLoVec, inxGainHiVec);
-            inxGainHiVec = _mm_unpackhi_epi16(inxGainLoVec, inxGainHiVec);
+            inxGainHiVec = inProductHiVec;
 
             // Now we have 4 32 bit elements.  Continue the calculaton per the reference implementation.
             // We already did out + 0x7fff and in * gain.

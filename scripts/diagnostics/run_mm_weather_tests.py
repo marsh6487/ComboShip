@@ -116,11 +116,12 @@ def main():
         subprocess.run([str(executable)], check=True)
         executable = build / "weather_audio_test"
         port = (ROOT / "mm/2s2h/BenPort.cpp").read_text()
-        start = port.index("        MMWeatherAudio_Mix(audio_buffer,")
-        end = port.index("        audio.processing = false;", start)
+        start = port.index("            MMWeatherAudio_Mix(audio_buffer,")
+        end = port.index(";", port.index("AudioPlayer_Play(", start)) + 1
         (build / "weather_output.inc").write_text(
             "void SubmitWeatherAudio(int16_t* audio_buffer, unsigned int num_audio_samples) {\n" +
-            port[start:end] + "}\n")
+            "const unsigned int totalFrames = num_audio_samples; constexpr int kChannels = 2;\n" +
+            port[start:end] + "\n}\n")
         result = subprocess.run([*compiler, *flags, *game_flags, "-Wno-error", "-pthread",
                                 "-I" + str(build),
                                 str(ROOT / "mm/tests/weather_audio_test.cpp"),
