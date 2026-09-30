@@ -1,5 +1,6 @@
 // Execute the real final player hand-override order with resource/PAK boundaries.
 #include "global.h"
+#include "din_fire_sword.h"
 #include "mods/items/custom_items.h"
 #include "mods/pak_loader/pak_loader.h"
 #include "objects/object_link_boy/object_link_boy.h"
@@ -16,6 +17,10 @@ Gfx* gPlayerLeftHandClosedDLs[] = {(Gfx*)gLinkAdultLeftHandClosedNearDL, (Gfx*)g
                                         (Gfx*)gLinkAdultLeftHandClosedFarDL, (Gfx*)gLinkChildLeftFistFarDL};
 static Gfx* sPlayerRightHandClosedDLs[] = {nativeHand,nativeHand,nativeHand,nativeHand};
 static int sDListsLodOffset, sLeftHandType, sRightHandType, pak, alt, requested;
+static Color_RGB8 sPlayerBodyEnvColor;
+void* DinFireSword_HandDL(PlayState* play, Player* player, void* hand, u8 r, u8 g, u8 b) {
+    return NULL; // No progressive fire resources in this lantern fixture.
+}
 #define VB_PLAYER_OVERRIDE_LIMB_DRAW 0
 static s32 GameInteractor_Should(int flag,int value,...) { return value; }
 static s32 GameInteractor_InvisibleLinkActive(void) { return 0; }

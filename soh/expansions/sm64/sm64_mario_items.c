@@ -498,6 +498,9 @@ typedef struct {
 static Sm64CapState sCapStates[SM64_CAP_SLOT_COUNT];
 static s32 sActiveCap = -1; // index of the ACTIVE cap, or -1
 static u8 sCapStatesInited = 0;
+// A private source lets every exit stop cap cues, including looping Metal audio,
+// without touching a spell or actor that happens to use the same sound ID.
+static Vec3f sSm64CapSfxPos = { 0.0f, 0.0f, 0.0f };
 
 static void Sm64Caps_EnsureInit(void) {
     if (sCapStatesInited)
@@ -532,6 +535,8 @@ static void Sm64Caps_DeactivateActive(u8 clearLib) {
     s32 idx = sActiveCap;
     Sm64CapState* s = &sCapStates[idx];
     const Sm64CapDef* d = &kCapDefs[idx];
+
+    Audio_StopSfxByPos(&sSm64CapSfxPos);
 
     s32 used = s->elapsed;
     if (used > d->activeDur)
@@ -598,7 +603,8 @@ static void Sm64Caps_Activate(s32 idx) {
             p_sm64_set_mario_action(sSm64MarioId, SM64_ACT_PUTTING_ON_CAP);
         }
     }
-    Sfx_PlaySfxCentered(d->sfx);
+    Audio_PlaySoundGeneral(d->sfx, &sSm64CapSfxPos, 4, &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
+                           &gSfxDefaultReverb);
     lusprintf(__FILE__, __LINE__, 2, "[SM64Caps] activate %s (flag 0x%X)", d->name, d->capFlag);
 }
 

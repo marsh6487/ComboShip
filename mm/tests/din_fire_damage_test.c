@@ -277,6 +277,7 @@ static void GrassAndOwnership(void) {
                 break;
             case 8:
                 kokiriUpgrade = 1;
+                missing = "/progressive/";
                 break;
             case 9:
                 bossOwner = 1;
@@ -294,13 +295,18 @@ static void GrassAndOwnership(void) {
     func_8083375C(&remote, PLAYER_MWA_JUMPSLASH_START);
     REQUIRE(remote.meleeWeaponQuads[0].elem.atDmgInfo.dmgFlags == DMG_SWORD);
     REQUIRE(remote.meleeWeaponQuads[0].elem.atDmgInfo.damage == 2);
-    // Native Razor/Gilded meshes have no verified Din profile in this pack.
+    // Fire augments recognition while native Razor/Gilded jump damage stays 4/6.
     for (int gilded = 0; gilded < 2; ++gilded) {
         player.heldItemId = gilded ? ITEM_SWORD_GILDED : ITEM_SWORD_RAZOR;
         player.heldItemAction = gilded ? PLAYER_IA_SWORD_GILDED : PLAYER_IA_SWORD_RAZOR;
         func_8083375C(&player, PLAYER_MWA_JUMPSLASH_START);
+        REQUIRE(player.meleeWeaponQuads[0].elem.atDmgInfo.dmgFlags == (DMG_SWORD | DMG_FIRE_ARROW));
+        REQUIRE(player.meleeWeaponQuads[0].elem.atDmgInfo.damage == (gilded ? 6 : 4));
+        missing = "/progressive/";
+        func_8083375C(&player, PLAYER_MWA_JUMPSLASH_START);
         REQUIRE(player.meleeWeaponQuads[0].elem.atDmgInfo.dmgFlags == DMG_SWORD);
         REQUIRE(player.meleeWeaponQuads[0].elem.atDmgInfo.damage == (gilded ? 6 : 4));
+        missing = NULL;
     }
     SetupDamage();
     REQUIRE(DinFireSword_DamageFlags(&play, &player, DMG_SPIN_ATTACK) == DMG_SPIN_ATTACK);

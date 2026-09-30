@@ -457,6 +457,8 @@ void Fixture_ApplyLateHandOverrides(PlayState*, Player*, s32, Gfx**);
 void Fixture_ApplyLateHandOverridesWithRot(PlayState*, Player*, s32, Gfx**, Vec3s*);
 void Fixture_DrawPostHand(PlayState*, Player*, Gfx**);
 void DinFireSword_Draw(PlayState*, Player*);
+void* DinFireSword_HandDL(PlayState*, Player*, void*, u8, u8, u8);
+void Player_ApplyLanternGrip(Player*, s32, Gfx**);
 void BossRemains_DrawOdolwaSword(PlayState*, Player*);
 Gfx* Player_ResolveLimbDLForDummyOrLocal(void*);
 bool NeiArticulated_UsesSwitchHook(const Player*);

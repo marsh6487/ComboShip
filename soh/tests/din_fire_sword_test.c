@@ -15,6 +15,8 @@ static Mtx matrix;
 static MtxF currentMatrix, matrixStack[8], submittedMatrices[8];
 static int enabled, alt, assets, loadFailure, transformed, invisible, customColors;
 static int depth, matrices, fireDamage, otherOwner, pakActive, bossOwner;
+static int renderKokiriUpgrade, renderFairyUpgrade, fourSwordOwner;
+static Gfx handDL[6], swordBlade[1], hand[1];
 static const char* missing;
 static const char* lastCorePath;
 SaveContext gSaveContext;
@@ -55,7 +57,13 @@ Gfx* ResourceMgr_LoadGfxByName(const char* path) {
         lastCorePath = path;
         return core;
     }
+    if (strstr(path, "/progressive/"))
+        return swordBlade;
     return flame;
+}
+void* Graph_Alloc(GraphicsContext* context, size_t size) {
+    REQUIRE(size <= sizeof(handDL));
+    return handDL;
 }
 void* ResourceGetDataByName(const char* path) {
     return loadFailure || (missing && strstr(path, missing)) ? NULL : pixels;
@@ -66,6 +74,9 @@ u8 PakLoader_HasActiveModel(void) {
 u8 ExtEquip_ShouldHideSwordDL(void) {
     return otherOwner;
 }
+u8 FourSword_IsEquipped(void) {
+    return fourSwordOwner;
+}
 s32 BossRemains_IsOdolwaWorn(void) {
     return bossOwner == 1;
 }
@@ -73,10 +84,10 @@ s32 BossRemains_IsGohtWorn(void) {
     return bossOwner == 2;
 }
 u8 WeaponUpgrade_KokiriLevel(void) {
-    return otherOwner;
+    return renderKokiriUpgrade;
 }
 u8 WeaponUpgrade_HasGreatFairy(void) {
-    return otherOwner;
+    return renderFairyUpgrade;
 }
 u8 TransformMasks_IsTransformedAny(void) {
     return transformed;
@@ -136,6 +147,7 @@ static void setup(void) {
     loadFailure = transformed = invisible = customColors = depth = matrices = 0;
     missing = lastCorePath = NULL;
     fireDamage = otherOwner = pakActive = bossOwner = 0;
+    renderKokiriUpgrade = renderFairyUpgrade = fourSwordOwner = 0;
     DinFireSword_Reset();
 }
 static void tick(void) {
@@ -273,7 +285,44 @@ static void requireDrawLifetime(void) {
     puts("PASS deferred fire draw: no stale/duplicate pose, disable recovery and reflection-to-player rendering");
 }
 
+static void requireProgressiveSwords(void) {
+    for (int variant = 0; variant < 3; ++variant) {
+        setup();
+        if (variant < 2) {
+            gSaveContext.linkAge = LINK_AGE_CHILD;
+            player.itemAction = player.heldItemAction = PLAYER_IA_SWORD_KOKIRI;
+            renderKokiriUpgrade = variant + 1;
+        } else {
+            player.itemAction = player.heldItemAction = PLAYER_IA_SWORD_BIGGORON;
+            player.leftHandType = PLAYER_MODELTYPE_LH_BGS;
+            renderFairyUpgrade = 1;
+            gSaveContext.swordHealth = 0; // GFS must never select the broken blade.
+        }
+        tick();
+        REQUIRE(draw() > 0);
+        REQUIRE(strstr(lastCorePath, variant < 2 ? "/child/" : "/bgs/"));
+        Gfx* dl = DinFireSword_HandDL(&play, &player, hand, 12, 34, 56);
+        REQUIRE(dl && containsLayer(dl, dl + 6, swordBlade) && containsLayer(dl, dl + 6, hand));
+        REQUIRE(color(dl, dl + 6, G_SETENVCOLOR, 0x0C2238));
+        fireDamage = 1;
+        REQUIRE(DinFireSword_DamageFlags(&play, &player, DMG_SLASH_KOKIRI) == (DMG_SLASH_KOKIRI | DMG_ARROW_FIRE));
+        enabled = 0;
+        REQUIRE(draw() == 0 && DinFireSword_HandDL(&play, &player, hand, 0, 0, 0) == NULL);
+        enabled = 1;
+        alt = 0;
+        REQUIRE(draw() == 0 && DinFireSword_HandDL(&play, &player, hand, 0, 0, 0) == NULL);
+        alt = 1;
+        fourSwordOwner = 1;
+        REQUIRE(draw() == 0);
+        fourSwordOwner = 0;
+        missing = "/progressive/";
+        REQUIRE(draw() == 0 && DinFireSword_HandDL(&play, &player, hand, 0, 0, 0) == NULL);
+    }
+    puts("PASS OoT progressive swords: Razor/Gilded/GFS mesh, full GFS profile, body state and fallbacks");
+}
+
 int main(void) {
+    requireProgressiveSwords();
     requireBodyColorsPreserved();
     requireDrawLifetime();
     setup();

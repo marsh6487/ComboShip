@@ -87,6 +87,7 @@ static void TestOwnership(void) {
     REQUIRE(DrawSword() == 0 && DrawShield() == 0);
     SetupEnabled();
     kokiriUpgrade = 1;
+    missing = "/progressive/"; // old archive retains native upgrade rendering
     Tick();
     REQUIRE(DrawSword() == 0);
     SetupEnabled();
@@ -244,7 +245,45 @@ static void TestPauseResourcesAndShield(void) {
     REQUIRE(gfx.polyOpa.p == opa && gfx.polyXlu.p == xlu);
     puts("PASS MM Din: pause clock, live colors, missing dependencies, shield fade/SFX, icon and native item fallback");
 }
+static void TestProgressiveSwords(void) {
+    // The real module must keep fire and the fitted blade after NEI grants an upgrade.
+    const u8 ids[] = { ITEM_SWORD_KOKIRI, ITEM_SWORD_KOKIRI, ITEM_SWORD_RAZOR,
+                       ITEM_SWORD_GILDED, ITEM_SWORD_BGS,    ITEM_SWORD_GREAT_FAIRY };
+    const s32 actions[] = { PLAYER_IA_SWORD_KOKIRI, PLAYER_IA_SWORD_KOKIRI,     PLAYER_IA_SWORD_RAZOR,
+                            PLAYER_IA_SWORD_GILDED, PLAYER_IA_SWORD_TWO_HANDED, PLAYER_IA_SWORD_TWO_HANDED };
+    for (int age = 0; age < 2; ++age) {
+        for (size_t i = 0; i < ARRAY_COUNT(ids); ++i) {
+            SetupEnabled();
+            adult = age;
+            player.heldItemId = ids[i];
+            player.itemAction = player.heldItemAction = actions[i];
+            player.leftHandType = i < 4 ? PLAYER_MODELTYPE_LH_ONE_HAND_SWORD : PLAYER_MODELTYPE_LH_TWO_HAND_SWORD;
+            kokiriUpgrade = i < 2 ? i + 1 : 0;
+            fairyUpgrade = i == 4;
+            Tick();
+            REQUIRE(DrawSword() > 0);
+            REQUIRE(DinFireSword_HandDL(&play, &player, hand) != NULL);
+            REQUIRE(strstr(lastCorePath, i < 4 ? (age ? "/adult/" : "/child/") : "/bgs/"));
+            REQUIRE(DinFireSword_DamageFlags(&play, &player, DMG_SWORD) == (DMG_SWORD | DMG_FIRE_ARROW));
+            damageOption = 0;
+            REQUIRE(DinFireSword_DamageFlags(&play, &player, DMG_SWORD) == DMG_SWORD);
+            swordOption = 0;
+            REQUIRE(DrawSword() == 0 && DinFireSword_HandDL(&play, &player, hand) == NULL);
+            swordOption = 1;
+            alt = 0;
+            REQUIRE(DrawSword() == 0 && DinFireSword_HandDL(&play, &player, hand) == NULL);
+            alt = 1;
+            fourSwordOwner = 1;
+            REQUIRE(DrawSword() == 0 && DinFireSword_HandDL(&play, &player, hand) == NULL);
+            fourSwordOwner = 0;
+            missing = "/progressive/";
+            REQUIRE(DrawSword() == 0 && DinFireSword_HandDL(&play, &player, hand) == NULL);
+        }
+    }
+    puts("PASS MM progressive swords: both ages, NEI/native upgrades, fitted blade, toggle and old-pack fallbacks");
+}
 int main(void) {
+    TestProgressiveSwords();
     TestOwnership();
     TestProfilesAndHandCapture();
     TestPauseResourcesAndShield();

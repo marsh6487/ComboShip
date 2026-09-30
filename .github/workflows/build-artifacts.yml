@@ -106,6 +106,16 @@ jobs:
           python3 scripts/diagnostics/run_build_metadata_test.py
           python3 scripts/diagnostics/run_frame_timing_probe_tests.py
 
+      - name: Progressive Din swords and Mario cap sound lifetimes
+        run: |
+          python3 -B scripts/diagnostics/run_din_fire_sword_tests.py
+          python3 -B scripts/diagnostics/run_din_progressive_hand_tests.py
+          python3 -B scripts/diagnostics/run_din_fire_sword_damage_tests.py
+          python3 -B scripts/diagnostics/run_mm_din_fire_tests.py
+          python3 -B scripts/diagnostics/run_mm_din_fire_damage_tests.py
+          python3 -B tests/sm64_caps/run_audio_tests.py
+          python3 -B tests/oot_timegate/run_audio_tests.py
+
       - name: Contents-based chests and opt-in Midna
         run: |
           python3 scripts/diagnostics/run_chest_size_tests.py

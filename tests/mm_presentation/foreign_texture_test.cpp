@@ -1,5 +1,5 @@
 // Execute production SETTIMG handlers; resource lookup and GPU state are the
-// only doubles.
+// only doubles, with logger output captured for the missing-texture contract.
 #include "fast/lus_gbi.h"
 #include "fast/resource/type/Texture.h"
 #include <cassert>
@@ -8,14 +8,31 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
-#define SPDLOG_ERROR(...) ((void)0)
+struct CapturedError {
+  std::string format;
+  std::vector<std::string> fields;
+};
+static std::vector<CapturedError> errors;
+template <typename T> static std::string LogField(const T &value) {
+  std::ostringstream field;
+  field << value;
+  return field.str();
+}
+template <typename... Args>
+static void CaptureError(const char *format, const Args &...args) {
+  errors.push_back({format, {LogField(args)...}});
+}
+#define SPDLOG_ERROR(...) CaptureError(__VA_ARGS__)
 namespace Ship {
 class ResourceManager {
 public:
   bool OtrSignatureCheck(const char *);
+  bool IsAltAssetsEnabled() { return altAssets; }
   std::shared_ptr<IResource> LoadResourceProcess(const char *path) {
     ++loads;
     lastPath = path;
@@ -25,6 +42,7 @@ public:
   std::map<std::string, std::shared_ptr<Fast::Texture>> textures;
   std::string lastPath;
   int loads = 0;
+  bool altAssets = false;
 };
 class CrossRMRegistry {
 public:
@@ -75,8 +93,14 @@ static void Submit(Handler handler, const char *path, uint32_t format = 0,
   F3DGfx commands[2]{};
   commands[0].words.w0 = (format << 21) | (size << 19) | 31;
   commands[0].words.w1 = reinterpret_cast<uintptr_t>(path);
+  const auto submitted = commands[0];
   auto *cursor = commands;
   assert(!handler(instance.get(), &cursor));
+  if (handler == gfx_set_timg_otr_filepath_handler_custom) {
+    assert(cursor == commands);
+    assert(commands[0].words.w0 == submitted.words.w0 &&
+           commands[0].words.w1 == submitted.words.w1);
+  }
 }
 static auto MakeTexture(unsigned char value) {
   auto texture = std::make_shared<Fast::Texture>();
@@ -87,6 +111,71 @@ static auto MakeTexture(unsigned char value) {
   texture->HByteScale = texture->VPixelScale = 1;
   return texture;
 }
+
+static void TestMissingTextureDiagnostics(
+    const std::shared_ptr<Ship::ResourceManager> &otherManager,
+    const char *validPath) {
+  const auto handler = gfx_set_timg_otr_filepath_handler_custom;
+  const char *missing = "__OTR__objects/missing/texture";
+  Submit(handler, validPath);
+  auto sets = instance->sets;
+  const auto pixels = instance->lastPixels;
+  const int initialLoads = host->loads;
+  for (int frame = 0; frame < 1985; ++frame)
+    Submit(handler, missing);
+  assert(errors.size() == 1); // A visible missing texture must not log every frame.
+  assert(errors[0].fields.size() == 3 && errors[0].fields[0] == missing);
+  assert(errors[0].format.find("activeRM") != std::string::npos &&
+         errors[0].fields[1] == LogField(static_cast<const void *>(host.get())));
+  assert(errors[0].format.find("alt") != std::string::npos &&
+         errors[0].fields[2] == "0");
+  assert(host->loads == initialLoads + 1985); // Suppression never suppresses lookups.
+  assert(instance->sets == sets && instance->lastPixels == pixels);
+
+  host->altAssets = true;
+  Submit(handler, missing);
+  Submit(handler, missing);
+  assert(errors.size() == 2 && errors.back().fields[2] == "1");
+  host->altAssets = false;
+  auto originalHost = host;
+  host = otherManager;
+  Submit(handler, missing);
+  Submit(handler, missing);
+  assert(errors.size() == 3 && errors.back().fields[1] ==
+                                   LogField(static_cast<const void *>(host.get())));
+  host = originalHost;
+  Submit(handler, missing); // Returning to a reported context stays quiet.
+  assert(errors.size() == 3);
+
+  Submit(handler, "__OTR__objects/another/missing");
+  const char *badRoute = "__OTR__@missing:objects/missing/texture";
+  Submit(handler, badRoute);
+  assert(errors.size() == 5 && errors.back().fields[0] == badRoute);
+  for (int path = 0; path < 123; ++path) {
+    std::string name = "__OTR__objects/missing/" + std::to_string(path);
+    Submit(handler, name.c_str());
+  }
+  assert(errors.size() == 128);
+  Submit(handler, missing);
+  assert(errors.size() == 128); // A duplicate at the limit is not an overflow.
+  for (int path = 123; path < 300; ++path) {
+    std::string name = "__OTR__objects/missing/" + std::to_string(path);
+    Submit(handler, name.c_str());
+  }
+  assert(errors.size() == 129);
+  assert(errors.back().format.find("suppress") != std::string::npos);
+  assert(instance->sets == sets && instance->lastPixels == pixels);
+
+  // Recovery and successful rendering remain available after log suppression.
+  host->textures[missing] = host->textures.at(validPath);
+  Submit(handler, missing);
+  assert(instance->sets == sets + 1 && instance->lastPixels == pixels);
+  assert(errors.size() == 129);
+  host->textures.erase(missing);
+  std::cout << "PASS missing texture diagnostics: requested path, active RM/Alt "
+               "contexts, repeated-frame suppression, 128-entry cap and recovery\n";
+}
+
 int main() {
   auto owner = std::make_shared<Ship::ResourceManager>();
   Ship::CrossRMRegistry::managers["oot"] = owner;
@@ -103,6 +192,7 @@ int main() {
   owner->textures[scale] = silver;
   host->textures[scale] = hostShadow;
   owner->textures[cane] = custom;
+  TestMissingTextureDiagnostics(owner, scale);
   for (auto handler :
        {gfx_set_timg_handler_rdp, gfx_set_timg_otr_filepath_handler_custom}) {
     auto sets = instance->sets, hostLoads = host->loads;

@@ -14,6 +14,7 @@
 #include "mods/items/logic/weapon_upgrades.h"
 extern s32 BossRemains_IsOdolwaWorn(void);
 extern s32 BossRemains_IsGohtWorn(void);
+extern u8 FourSword_IsEquipped(void);
 
 #define SWORD_ROOT "objects/din_fire_sword/poc1/"
 static const ALIGN_ASSET(2) char sCoreTexture[] = "__OTR__" SWORD_ROOT "CoreTex";
@@ -30,6 +31,18 @@ static const char* sEquipment[] = {
     "objects/object_link_boy/DinSleekEquipmentPOC1_OOT_Adult/SwordDL",
     "objects/object_link_child/DinSleekEquipmentPOC1_OOT_Child/SwordDL",
 };
+static const char* sProgressiveEquipment[] = {
+    "objects/din_fire_sword/progressive/adult/SwordDL",
+    "objects/din_fire_sword/progressive/child/SwordDL",
+    "objects/din_fire_sword/progressive/bgs/SwordDL",
+};
+
+static s32 DinFireSword_IsUpgrade(Player* player) {
+    return player->heldItemId == ITEM_SWORD_RAZOR || player->heldItemId == ITEM_SWORD_GILDED ||
+           player->heldItemId == ITEM_SWORD_GREAT_FAIRY ||
+           (player->heldItemAction == PLAYER_IA_SWORD_KOKIRI && WeaponUpgrade_KokiriLevel()) ||
+           (player->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED && WeaponUpgrade_HasGreatFairy());
+}
 
 static struct {
     PlayState* play;
@@ -56,13 +69,16 @@ static s32 DinFireSword_Profile(Player* player) {
     // Custom items reuse sword actions (notably the net and Four Sword).
     // They retain ownership of their hand geometry and attack flags.
     if (player->heldItemId != ITEM_SWORD_KOKIRI && player->heldItemId != ITEM_SWORD_MASTER &&
-        player->heldItemId != ITEM_SWORD_BGS && player->heldItemId != ITEM_SWORD_KNIFE)
+        player->heldItemId != ITEM_SWORD_BGS && player->heldItemId != ITEM_SWORD_KNIFE &&
+        player->heldItemId != ITEM_SWORD_RAZOR && player->heldItemId != ITEM_SWORD_GILDED &&
+        player->heldItemId != ITEM_SWORD_GREAT_FAIRY)
         return -1;
     if (player->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED &&
         player->leftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD)
         return 2;
     if (player->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD &&
-        (player->heldItemAction == PLAYER_IA_SWORD_MASTER || player->heldItemAction == PLAYER_IA_SWORD_KOKIRI))
+        (player->heldItemAction == PLAYER_IA_SWORD_MASTER || player->heldItemAction == PLAYER_IA_SWORD_KOKIRI ||
+         player->heldItemAction == PLAYER_IA_SWORD_RAZOR || player->heldItemAction == PLAYER_IA_SWORD_GILDED))
         return AdultLink_IsActive() ? 0 : 1;
     return -1;
 }
@@ -74,11 +90,13 @@ static s32 DinFireSword_Eligible(PlayState* play, Player* player) {
         BossRemains_IsOdolwaWorn() || BossRemains_IsGohtWorn() || player->actor.scale.y <= 0.0f ||
         player->csAction != 0 || (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_8000000)) ||
         (player->stateFlags2 & PLAYER_STATE2_20000000) || play->transitionTrigger != TRANS_TRIGGER_OFF ||
-        ExtEquip_ShouldHideSwordDL() ||
-        (player->heldItemAction == PLAYER_IA_SWORD_KOKIRI && WeaponUpgrade_KokiriLevel()) ||
-        (player->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED && WeaponUpgrade_HasGreatFairy()) ||
-        DinFireSword_Profile(player) < 0) {
+        ExtEquip_ShouldHideSwordDL() || FourSword_IsEquipped() || DinFireSword_Profile(player) < 0) {
         return false;
+    }
+    if (DinFireSword_IsUpgrade(player)) {
+        const char* path = sProgressiveEquipment[DinFireSword_Profile(player)];
+        if (!ResourceMgr_FileExists(path) || ResourceMgr_LoadGfxByName(path) == NULL)
+            return false;
     }
     return ResourceMgr_FileExists(sEquipment[(AdultLink_IsActive() ? 0 : 1)]);
 }
@@ -135,10 +153,11 @@ void* DinFireSword_HandDL(PlayState* play, Player* player, void* closedHand) {
     if (closedHand == NULL || !DinFireSword_Eligible(play, player))
         return NULL;
     s32 profile = DinFireSword_Profile(player);
-    if (profile > 1)
+    s32 upgraded = DinFireSword_IsUpgrade(player);
+    if (profile > 1 && !upgraded)
         return NULL; // Biggoron keeps its matching native full-length mesh.
     Gfx *core, *flame;
-    Gfx* blade = ResourceMgr_LoadGfxByName(sEquipment[profile]);
+    Gfx* blade = ResourceMgr_LoadGfxByName(upgraded ? sProgressiveEquipment[profile] : sEquipment[profile]);
     if (blade == NULL || !DinFireSword_Load(profile, &core, &flame))
         return NULL;
     Gfx* dl = GRAPH_ALLOC(play->state.gfxCtx, 5 * sizeof(Gfx));
@@ -157,9 +176,7 @@ void* DinFireSword_HandDL(PlayState* play, Player* player, void* closedHand) {
 
 uint32_t DinFireSword_DamageFlags(PlayState* play, Player* player, uint32_t original) {
     if (!CVarGetInteger(CVAR_ENHANCEMENT("DinFireSwordDamage"), 0) || !(original & DMG_SWORD) ||
-        (original & ~((u32)DMG_SWORD)) || !DinFireSword_Eligible(play, player) || ExtEquip_ShouldHideSwordDL() ||
-        (player->heldItemAction == PLAYER_IA_SWORD_KOKIRI && WeaponUpgrade_KokiriLevel()) ||
-        (player->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED && WeaponUpgrade_HasGreatFairy()))
+        (original & ~((u32)DMG_SWORD)) || !DinFireSword_Eligible(play, player))
         return original;
     Gfx *core, *flame;
     if (!DinFireSword_Load(DinFireSword_Profile(player), &core, &flame))
