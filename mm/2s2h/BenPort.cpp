@@ -806,7 +806,8 @@ void OTRGlobals::Initialize() {
                                               CVarGetInteger("gSettings.AutoCaptureMouse", 1));
     context->GetWindow()->SetForceCursorVisibility(CVarGetInteger("gSettings.CursorVisibility", 0));
 
-    context->InitAudio({ .SampleRate = 32000, .SampleLength = 1024, .DesiredBuffered = 1680 });
+    // Match OoT's reservoir so short rendering stalls cannot drain native BGM/SFX.
+    context->InitAudio({ .SampleRate = 32000, .SampleLength = 1024, .DesiredBuffered = 4096 });
 
     SPDLOG_INFO("Starting 2 Ship 2 Harkinian version {} (Branch: {} | Commit: {})", (char*)gBuildVersion,
                 (char*)gGitBranch, (char*)gGitCommitHash);
@@ -1089,6 +1090,7 @@ static struct {
     std::mutex mutex;
     bool running;
     bool processing;
+    int framesPerUpdate = 1; // Published by the gfx thread under audio.mutex.
 } audio;
 
 // Fleet Ship Combo: when this game is the INACTIVE one in the combo, silence ALL of its audio
@@ -1099,54 +1101,62 @@ static struct {
 static std::atomic<bool> gFscAudioMuted{ false };
 
 void OTRAudio_Thread() {
+    constexpr int kSamplesLow = 528;
+    constexpr int kSamplesHigh = 544;
+    constexpr int kChannels = 2;
+    constexpr int kMaxRefillBatches = 8;
+    constexpr auto kRefillInterval = std::chrono::milliseconds(5);
+    int sampleDebtThirds = 0;
+    bool primed = false;
+    s16 audio_buffer[kSamplesHigh * kChannels * 3];
+
+    std::unique_lock<std::mutex> lock(audio.mutex);
     while (audio.running) {
-        {
-            std::unique_lock<std::mutex> Lock(audio.mutex);
-            while (!audio.processing && audio.running) {
-                audio.cv_to_thread.wait(Lock);
+        if (!primed) {
+            // Never synthesize before the first ready game frame, including after a game switch.
+            audio.cv_to_thread.wait(lock, [] { return audio.processing || !audio.running; });
+            primed = audio.processing;
+        } else {
+            // Native music and SFX must continue even when rendering a shop frame takes longer.
+            audio.cv_to_thread.wait_for(lock, kRefillInterval, [] { return audio.processing || !audio.running; });
+        }
+        if (!audio.running) {
+            break;
+        }
+
+        const int framesPerUpdate = audio.framesPerUpdate;
+        // Do not advance the sequencer for PCM that the backend would have to drop.
+        // Bound each refill so shutdown and game-thread signals can acquire the mutex.
+        for (int batch = 0; batch < kMaxRefillBatches &&
+                            AudioPlayer_Buffered() + kSamplesHigh * framesPerUpdate <= AudioPlayer_GetDesiredBuffered();
+             ++batch) {
+            // MM, like OoT, advances musical time at 60 audio updates/sec. Average
+            // exactly 32000/60 samples rather than speeding music up while refilling.
+            const u32 num_audio_samples = sampleDebtThirds > 0 ? kSamplesHigh : kSamplesLow;
+            sampleDebtThirds += (1600 - 3 * static_cast<int>(num_audio_samples)) * framesPerUpdate;
+            const u32 totalFrames = num_audio_samples * framesPerUpdate;
+            for (int i = 0; i < framesPerUpdate; ++i) {
+                AudioMgr_CreateNextAudioBuffer(audio_buffer + i * num_audio_samples * kChannels, num_audio_samples);
             }
 
-            if (!audio.running) {
-                break;
+            MMWeatherAudio_Mix(audio_buffer, totalFrames);
+            MMMidnaAudio_Mix(audio_buffer, totalFrames);
+
+            // Preserve final-output ownership: every native and private voice is muted
+            // together while MM is inactive; no sequence or user volume is changed.
+            if (gFscAudioMuted.load(std::memory_order_relaxed)) {
+                MMMidnaAudio_Reset();
+                memset(audio_buffer, 0, totalFrames * kChannels * sizeof(int16_t));
             }
-        }
-        std::unique_lock<std::mutex> Lock(audio.mutex);
-// AudioMgr_ThreadEntry(&gAudioMgr);
-//  528 and 544 relate to 60 fps at 32 kHz 32000/60 = 533.333..
-//  in an ideal world, one third of the calls should use num_samples=544 and two thirds num_samples=528
-#define SAMPLES_HIGH 560
-#define SAMPLES_LOW 528
-
-#define AUDIO_FRAMES_PER_UPDATE (R_UPDATE_RATE > 0 ? R_UPDATE_RATE : 1)
-#define NUM_AUDIO_CHANNELS 2
-
-        int samples_left = AudioPlayer_Buffered();
-        u32 num_audio_samples = samples_left < AudioPlayer_GetDesiredBuffered() ? SAMPLES_HIGH : SAMPLES_LOW;
-
-        // 3 is the maximum authentic frame divisor.
-        s16 audio_buffer[SAMPLES_HIGH * NUM_AUDIO_CHANNELS * 3];
-        for (int i = 0; i < AUDIO_FRAMES_PER_UPDATE; i++) {
-            AudioMgr_CreateNextAudioBuffer(audio_buffer + i * (num_audio_samples * NUM_AUDIO_CHANNELS),
-                                           num_audio_samples);
+            AudioPlayer_Play(reinterpret_cast<u8*>(audio_buffer), totalFrames * kChannels * sizeof(int16_t));
         }
 
-        MMWeatherAudio_Mix(audio_buffer, num_audio_samples * AUDIO_FRAMES_PER_UPDATE);
-        MMMidnaAudio_Mix(audio_buffer, num_audio_samples * AUDIO_FRAMES_PER_UPDATE);
-
-        // Fleet Ship Combo: silence this game's output while it's the inactive one. The buffer
-        // already holds the FULL mix (BGM + fanfare + ambience + SFX + SM64), so zeroing the used
-        // span here mutes everything without stopping any sequence (positions keep advancing).
-        if (gFscAudioMuted.load(std::memory_order_relaxed)) {
-            MMMidnaAudio_Reset();
-            memset(audio_buffer, 0, num_audio_samples * NUM_AUDIO_CHANNELS * AUDIO_FRAMES_PER_UPDATE * sizeof(int16_t));
-        }
-
-        AudioPlayer_Play((u8*)audio_buffer,
-                         num_audio_samples * (sizeof(int16_t) * NUM_AUDIO_CHANNELS * AUDIO_FRAMES_PER_UPDATE));
-
+        // The render thread must also be released when the reservoir is already full.
         audio.processing = false;
         audio.cv_from_thread.notify_one();
     }
+    audio.processing = false;
+    audio.cv_from_thread.notify_all();
 }
 
 // C->C++ Bridge
@@ -1157,6 +1167,8 @@ extern "C" void OTRAudio_Init() {
     if (!audio.running) {
         MMWeather_Reset();
         MMMidnaAudio_Init();
+        audio.processing = false;
+        audio.framesPerUpdate = 1;
         audio.running = true;
         audio.thread = std::thread(OTRAudio_Thread);
     }
@@ -1708,6 +1720,7 @@ void RunCommands(Gfx* Commands, int time, int step, int denom, int count) {
 extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
     {
         std::unique_lock<std::mutex> Lock(audio.mutex);
+        audio.framesPerUpdate = std::clamp<int>(R_UPDATE_RATE, 1, 3);
         audio.processing = true;
         // Set the combo audio-mute flag BEFORE waking the worker so THIS frame's buffer is
         // (un)muted correctly; storing it after the notify would race the worker by a frame.

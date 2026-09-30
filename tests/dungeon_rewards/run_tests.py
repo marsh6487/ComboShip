@@ -24,7 +24,10 @@ def main():
         for path in ('mm/include', 'mm/include/PR', 'mm/2s2h', 'mm', 'mm/src', 'mm/assets',
                      'libultraship/include'):
             flags += ['-isystem', str(ROOT / path)]
-        flags += ['-isystem', str(args.json_include)]
+        # Re-adding the compiler's system root with -isystem moves it before
+        # libstdc++ and breaks its #include_next <stdlib.h> on Ubuntu CI.
+        if args.json_include.resolve() != Path('/usr/include'):
+            flags += ['-isystem', str(args.json_include)]
         failures = 0
         for mode in ('combo', 'standalone'):
             binary = build / mode
