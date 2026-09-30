@@ -1804,6 +1804,7 @@ static void Player_ApplyTimePedestalSword(PlayState* play, Player* player, s32 l
 s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
                                            void* thisx) {
     Player* this = (Player*)thisx;
+    u8 mayDrawProgressiveFire = false;
 
     if (!Player_OverrideLimbDrawGameplayCommon(play, limbIndex, dList, pos, rot, thisx)) {
         // Gerudo Form dual-wield (hand = scimitar DL, sheath hidden). Skijer's NEI
@@ -1961,6 +1962,7 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
                 *dList = Player_ResolveLimbDLForDummyOrLocal(openDLs[sDListsLodOffset]);
                 sLeftHandType = PLAYER_MODELTYPE_LH_OPEN;
             } else if (!extOwnsWeapon) {
+                mayDrawProgressiveFire = !hideLH;
                 // NEI progressive sword upgrades: keep an OOT open hand and draw the MM Razor /
                 // Gilded / Great Fairy's Sword pieces (loaded from o2r) on top — pak_loader-style
                 // (sword then hand), supporting mods. No-op unless the upgraded sword is wielded.
@@ -2006,6 +2008,21 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
             *dList = NULL;
         } else if (pakReDL != NULL) {
             *dList = pakReDL;
+        }
+    }
+
+    // CustomEquipment can select a broken-knife mesh from the old inventory
+    // bit even after a Great Fairy upgrade. Select the fitted progressive blade
+    // after equipment hooks while the explicit fire option owns this upgrade.
+    // Disabling fire/Alt or removing the new assets restores the normal choices.
+    if (mayDrawProgressiveFire && *dList != NULL) {
+        void* closedHand =
+            Player_ResolveLimbDLForDummyOrLocal(gPlayerLeftHandClosedDLs[gSaveContext.linkAge + sDListsLodOffset]);
+        Gfx* dinHand = DinFireSword_HandDL(play, this, closedHand, sPlayerBodyEnvColor.r, sPlayerBodyEnvColor.g,
+                                           sPlayerBodyEnvColor.b);
+        if (dinHand != NULL) {
+            *dList = dinHand;
+            sLeftHandType = this->leftHandType;
         }
     }
 

@@ -4485,7 +4485,34 @@ bool gfx_set_timg_otr_filepath_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
         gfx->GfxDpSetTextureImage(fmt, size, width, fileName, texFlags, rawTexMetadata,
                                   reinterpret_cast<char*>(texture->ImageData));
     } else {
-        SPDLOG_ERROR("G_SETTIMG_OTR_FILEPATH: Texture is null");
+        // Missing textures can be submitted every frame. Preserve each failed
+        // request's active context, without retaining managers or growing with
+        // every frame/new bad path. An explicit @owner remains in fileName;
+        // activeRM describes the surrounding draw, not that routed owner.
+        struct MissingTextureContext {
+            std::string path;
+            const Ship::ResourceManager* manager;
+            bool alt;
+        };
+        static std::vector<MissingTextureContext> sReported;
+        static bool sReportedOverflow = false;
+        constexpr size_t kMaxReported = 128;
+        auto manager = ActiveResMgr();
+        const bool alt = manager->IsAltAssetsEnabled();
+        for (const auto& reported : sReported) {
+            if (reported.manager == manager.get() && reported.alt == alt && reported.path == fileName) {
+                return false;
+            }
+        }
+        if (sReported.size() < kMaxReported) {
+            sReported.push_back({ fileName, manager.get(), alt });
+            SPDLOG_ERROR("G_SETTIMG_OTR_FILEPATH: Texture is null ('{}'; activeRM={}; alt={})", fileName,
+                         static_cast<const void*>(manager.get()), static_cast<int>(alt));
+        } else if (!sReportedOverflow) {
+            sReportedOverflow = true;
+            SPDLOG_ERROR("G_SETTIMG_OTR_FILEPATH: suppressing additional missing-texture diagnostics after 128 "
+                         "path/activeRM/Alt contexts");
+        }
     }
     return false;
 }

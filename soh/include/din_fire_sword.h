@@ -28,6 +28,9 @@ void DinFireSword_BeginPlayerDraw(struct PlayState* play, struct Player* player)
 void DinFireSword_Draw(struct PlayState* play, struct Player* player);
 // Submit the captured hand effect after body meshes and accessories, before XLU.
 void DinFireSword_DrawAfterPlayer(struct PlayState* play, struct Player* player);
+// Fit progressive swords to the existing fire layers without changing upgrade state.
+void* DinFireSword_HandDL(struct PlayState* play, struct Player* player, void* closedHand,
+                        uint8_t r, uint8_t g, uint8_t b);
 // Call only alongside the custom pedestal sword, in its current model matrix.
 void DinFireSword_DrawPedestal(struct PlayState* play);
 

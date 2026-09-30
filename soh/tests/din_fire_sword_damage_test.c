@@ -257,8 +257,9 @@ static void testIsolation(void) {
               DinFireSword_DamageFlags(&play, &player, swordFlags[sword][0]) == swordFlags[sword][0]);
         otherOwner = 0;
         kokiriUpgrade = greatFairyUpgrade = 1;
+        missing = "/progressive/";
         if (sword != 1) {
-            CHECK("Kokiri and Great Fairy upgrades retain their own damage",
+            CHECK("old archive retains native upgrade damage",
                   DinFireSword_DamageFlags(&play, &player, swordFlags[sword][0]) == swordFlags[sword][0]);
         }
         kokiriUpgrade = greatFairyUpgrade = 0;

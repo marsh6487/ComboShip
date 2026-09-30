@@ -26,6 +26,7 @@ static u8 pixels[4];
 static int swordOption, damageOption, shieldOption, soundOption;
 static int alt, assets, loadFailure, adult, customForm, hideSword, hideShield, bossOwner, kokiriUpgrade, fairyUpgrade;
 static int customColors, audioRequests;
+static int fourSwordOwner;
 static u16 lastSound;
 static const char* missing;
 static const char* lastCorePath;
@@ -94,6 +95,9 @@ s32 AdultLink_IsActive(void) {
 }
 u8 ExtEquip_ShouldHideSwordDL(void) {
     return hideSword;
+}
+u8 FourSword_IsEquipped(void) {
+    return fourSwordOwner;
 }
 const char* ExtEquip_GetShieldDLOverride(void) {
     return hideShield ? "HIDE" : NULL;
@@ -206,6 +210,7 @@ static void Setup(void) {
     swordOption = damageOption = shieldOption = soundOption = -1;
     alt = assets = 1;
     loadFailure = adult = hideSword = hideShield = bossOwner = kokiriUpgrade = fairyUpgrade = 0;
+    fourSwordOwner = 0;
     customForm = CUSTOM_FORM_NONE;
     customColors = audioRequests = 0;
     soundActor = NULL;

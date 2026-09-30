@@ -10,6 +10,7 @@
 #include "mods/items/logic/weapon_upgrades.h"
 extern s32 BossRemains_IsOdolwaWorn(void);
 extern s32 BossRemains_IsGohtWorn(void);
+extern u8 FourSword_IsEquipped(void);
 
 #define SWORD_ROOT "objects/din_fire_sword/poc1/"
 static const ALIGN_ASSET(2) char sCoreTexture[] = "__OTR__" SWORD_ROOT "CoreTex";
@@ -26,6 +27,16 @@ static const char* sEquipment[] = {
     "objects/object_link_boy/DinSleekEquipmentPOC1_OOT_Adult/SwordDL",
     "objects/object_link_child/DinSleekEquipmentPOC1_OOT_Child/SwordDL",
 };
+static const char* sProgressiveEquipment[] = {
+    "objects/din_fire_sword/progressive/adult/SwordDL",
+    "objects/din_fire_sword/progressive/child/SwordDL",
+    "objects/din_fire_sword/progressive/bgs/SwordDL",
+};
+
+static s32 DinFireSword_IsUpgrade(Player* player) {
+    return (player->heldItemAction == PLAYER_IA_SWORD_KOKIRI && WeaponUpgrade_KokiriLevel()) ||
+           (player->heldItemAction == PLAYER_IA_SWORD_BIGGORON && WeaponUpgrade_HasGreatFairy());
+}
 
 static struct {
     PlayState* play;
@@ -50,7 +61,7 @@ void DinFireSword_BeginPlayerDraw(PlayState* play, Player* player) {
 
 static s32 DinFireSword_Profile(Player* player) {
     if (player->heldItemAction == PLAYER_IA_SWORD_BIGGORON && player->leftHandType == PLAYER_MODELTYPE_LH_BGS)
-        return gSaveContext.swordHealth <= 0.0f ? 3 : 2;
+        return !WeaponUpgrade_HasGreatFairy() && gSaveContext.swordHealth <= 0.0f ? 3 : 2;
     if (player->leftHandType == PLAYER_MODELTYPE_LH_SWORD &&
         player->heldItemAction == (LINK_IS_ADULT ? PLAYER_IA_SWORD_MASTER : PLAYER_IA_SWORD_KOKIRI))
         return gSaveContext.linkAge;
@@ -61,11 +72,17 @@ static s32 DinFireSword_Eligible(PlayState* play, Player* player) {
     if (play == NULL || player == NULL || player != GET_PLAYER(play) ||
         !CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0) || !CVarGetInteger(CVAR_SETTING("AltAssets"), 1) ||
         TransformMasks_IsTransformedAny() || BossRemains_IsOdolwaWorn() || BossRemains_IsGohtWorn() ||
-        GameInteractor_InvisibleLinkActive() || player->actor.scale.y <= 0.0f || player->csAction != 0 ||
+        ExtEquip_ShouldHideSwordDL() || FourSword_IsEquipped() || GameInteractor_InvisibleLinkActive() ||
+        player->actor.scale.y <= 0.0f || player->csAction != 0 ||
         (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_IN_WATER)) ||
         (player->stateFlags2 & PLAYER_STATE2_DISABLE_DRAW) || play->transitionTrigger != TRANS_TRIGGER_OFF ||
         DinFireSword_Profile(player) < 0) {
         return false;
+    }
+    if (DinFireSword_IsUpgrade(player)) {
+        const char* path = sProgressiveEquipment[DinFireSword_Profile(player)];
+        if (!ResourceMgr_FileExists(path) || ResourceMgr_LoadGfxByName(path) == NULL)
+            return false;
     }
     return ResourceMgr_FileExists(sEquipment[gSaveContext.linkAge]);
 }
@@ -120,9 +137,7 @@ static s32 DinFireSword_Load(s32 age, Gfx** core, Gfx** flame) {
 
 uint32_t DinFireSword_DamageFlags(PlayState* play, Player* player, uint32_t original) {
     if (!CVarGetInteger(CVAR_ENHANCEMENT("DinFireSwordDamage"), 0) || !(original & DMG_SWORD) ||
-        (original & ~((u32)DMG_SWORD)) || !DinFireSword_Eligible(play, player) || ExtEquip_ShouldHideSwordDL() ||
-        (player->heldItemAction == PLAYER_IA_SWORD_KOKIRI && WeaponUpgrade_KokiriLevel()) ||
-        (player->heldItemAction == PLAYER_IA_SWORD_BIGGORON && WeaponUpgrade_HasGreatFairy()))
+        (original & ~((u32)DMG_SWORD)) || !DinFireSword_Eligible(play, player))
         return original;
     Gfx *core, *flame;
     if (!DinFireSword_Load(DinFireSword_Profile(player), &core, &flame))
@@ -130,6 +145,25 @@ uint32_t DinFireSword_DamageFlags(PlayState* play, Player* player, uint32_t orig
     // Keep sword-only collision masks and sword recognition intact. The owned
     // hit's table lookup below resolves fire without replacing sword power.
     return original | DMG_ARROW_FIRE;
+}
+
+void* DinFireSword_HandDL(PlayState* play, Player* player, void* closedHand, u8 r, u8 g, u8 b) {
+    if (closedHand == NULL || !DinFireSword_Eligible(play, player) || !DinFireSword_IsUpgrade(player))
+        return NULL;
+    s32 profile = DinFireSword_Profile(player);
+    Gfx *core, *flame;
+    Gfx* blade = ResourceMgr_LoadGfxByName(sProgressiveEquipment[profile]);
+    if (blade == NULL || !DinFireSword_Load(profile, &core, &flame))
+        return NULL;
+    Gfx* dl = Graph_Alloc(play->state.gfxCtx, 6 * sizeof(Gfx));
+    Gfx* p = dl;
+    gSPDisplayList(p++, blade);
+    gSPDisplayList(p++, closedHand);
+    gDPPipeSync(p++);
+    gDPSetEnvColor(p++, r, g, b, 0);
+    gSPLoadGeometryMode(p++, G_ZBUFFER | G_SHADE | G_CULL_BACK | G_LIGHTING | G_SHADING_SMOOTH);
+    gSPEndDisplayList(p);
+    return dl;
 }
 
 // Crouch stabs intentionally reuse the previous strike's damage in vanilla.
