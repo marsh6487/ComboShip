@@ -61,6 +61,8 @@ typedef enum {
     CW_DRAW_KIND_OPS,             /* ops[] bytecode below (transforms/colors/DLs); see CwDrawOpCode */
     CW_DRAW_KIND_NEI_CANE,        /* concrete legacy cane skill rendered by the MM host */
     CW_DRAW_KIND_NEI_GI,          /* replacement mesh plus host-rendered elemental energy */
+    CW_DRAW_KIND_MM_MASK,         /* imported MM mask: native MM resources and palette-free split passes */
+    CW_DRAW_KIND_MM_REMAINS,      /* imported boss remains: native MM OPA resource, scale 0.02 */
 } CwDrawKind;
 
 #define CW_DRAW_MAX_OPS 20
@@ -184,6 +186,7 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
         case CW_DRAW_KIND_BOSS_SOUL:
         case CW_DRAW_KIND_DOUBLE_DEFENSE:
         case CW_DRAW_KIND_BRONZE_SCALE:
+        case CW_DRAW_KIND_MM_MASK:
             return 2;
         case CW_DRAW_KIND_OPS:
         case CW_DRAW_KIND_NEI_CANE:

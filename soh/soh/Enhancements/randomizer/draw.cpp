@@ -1,4 +1,7 @@
 #include "draw.h"
+#ifdef COMBO_BUILD
+#include "ComboItemDrawABI.h"
+#endif
 #include "soh/OTRGlobals.h"
 #include <vector>
 #include <spdlog/spdlog.h> // SPDLOG_INFO (MmSoul debug instrumentation)
@@ -2617,6 +2620,23 @@ static MmMaskDrawEntry sMmMaskDrawTable[] = {
     /* FIERCE_DEITY  */ { gGiFierceDeityMaskFaceDL, gGiFierceDeityMaskHairAndHatDL, MM_MASK_DRAW_OPA01 },
 };
 
+#ifdef COMBO_BUILD
+// Describe the existing native-MM table, so the cross-game recipe cannot drift
+// from OoT's imported-mask renderer. The MM host must resolve these in its own RM.
+extern "C" int32_t OOT_DescribeMmMaskDraw(int32_t itemId, CwItemDrawInfo* out) {
+    if (out == nullptr || itemId < ITEM_MM_MASK_POSTMAN || itemId > ITEM_MM_MASK_FIERCE_DEITY) {
+        return 0;
+    }
+    const auto& entry = sMmMaskDrawTable[itemId - ITEM_MM_MASK_POSTMAN];
+    out->drawKind = CW_DRAW_KIND_MM_MASK;
+    out->dlistCount = 2;
+    out->xluStartIndex = entry.mode == MM_MASK_DRAW_OPA0_XLU1 ? 1 : -1;
+    out->dlists[0] = entry.dl1;
+    out->dlists[1] = entry.dl2;
+    return 1;
+}
+#endif
+
 // Raw OTR-path-as-pointer draw, the same mechanism the 24 MM masks have always used: the gfx
 // interpreter resolves "__OTR__..." string pointers at execution time against the mounted archives.
 // VERIFIED (2026-07-20, listing the user's mm.o2r): every path in the mm_sources headers exists in
@@ -2801,26 +2821,43 @@ void Randomizer_DrawBottleWithMagicMushroom(PlayState* play, GetItemEntry* getIt
 // Single OPA display list per remains, scaled 0.02 (mirrors mm GetItem_DrawRemains).
 // The RG is carried in getItemEntry->getItemId (GetGIEntry stores randomizerGet there).
 // =============================================================================
+static const char* MmRemainsGetDrawDL(RandomizerGet rg) {
+    switch (rg) {
+        case RG_MM_REMAINS_ODOLWA:
+            return gMmRemainsOdolwaDL;
+        case RG_MM_REMAINS_GOHT:
+            return gMmRemainsGohtDL;
+        case RG_MM_REMAINS_GYORG:
+            return gMmRemainsGyorgDL;
+        case RG_MM_REMAINS_TWINMOLD:
+            return gMmRemainsTwinmoldDL;
+        default:
+            return nullptr;
+    }
+}
+
+#ifdef COMBO_BUILD
+extern "C" int32_t OOT_DescribeMmRemainsDraw(int32_t rg, CwItemDrawInfo* out) {
+    const char* dl = MmRemainsGetDrawDL((RandomizerGet)rg);
+    if (out == nullptr || dl == nullptr) {
+        return 0;
+    }
+    out->drawKind = CW_DRAW_KIND_MM_REMAINS;
+    out->dlistCount = 1;
+    out->xluStartIndex = -1;
+    out->scale = 0.02f;
+    out->dlists[0] = dl;
+    return 1;
+}
+#endif
+
 void Randomizer_DrawMmRemains(PlayState* play, GetItemEntry* getItemEntry) {
     if (!MmAssets_IsAvailable())
         return;
 
-    const char* dl;
-    switch ((RandomizerGet)getItemEntry->getItemId) {
-        case RG_MM_REMAINS_ODOLWA:
-            dl = gMmRemainsOdolwaDL;
-            break;
-        case RG_MM_REMAINS_GOHT:
-            dl = gMmRemainsGohtDL;
-            break;
-        case RG_MM_REMAINS_GYORG:
-            dl = gMmRemainsGyorgDL;
-            break;
-        case RG_MM_REMAINS_TWINMOLD:
-            dl = gMmRemainsTwinmoldDL;
-            break;
-        default:
-            return;
+    const char* dl = MmRemainsGetDrawDL((RandomizerGet)getItemEntry->getItemId);
+    if (dl == nullptr) {
+        return;
     }
 
     OPEN_DISPS(play->state.gfxCtx);
