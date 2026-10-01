@@ -1,3 +1,4 @@
+#include "../../combo/menu/ItemGrantAuditBridge.h"
 /**
  * extended_inventory.h - Extended inventory system for custom items
  *
@@ -224,6 +225,7 @@ static inline uint16_t ExtInv_GetSlotItem(int slot) {
 // only be put in a page-2 slot; writing one to a vanilla slot truncates, which is why the casts
 // below are explicit rather than implicit. Skijer's NEI
 static inline void ExtInv_SetSlotItem(int slot, uint16_t itemId) {
+    ItemGrantAudit_Begin("MM extended-slot-write", itemId, slot, 1);
     extern SaveContext gSaveContext;
     if (slot >= 0 && slot < 24) {
         gSaveContext.save.saveInfo.inventory.items[slot] = (uint8_t)itemId; // 2ship: nested inventory
@@ -234,6 +236,7 @@ static inline void ExtInv_SetSlotItem(int slot, uint16_t itemId) {
     } else {
         Nei_SetOwnedItem((uint8_t)slot, itemId);
     }
+    ItemGrantAudit_End();
 }
 
 // Skijer's NEI — item-action func ptr types (shared with extended_player.h via

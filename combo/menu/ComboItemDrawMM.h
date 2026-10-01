@@ -1,3 +1,4 @@
+#include "ItemGrantAuditBridge.h"
 /* combo/menu/ComboItemDrawMM.h — ComboShip: MM-side bodies of the cross-game item-draw exports
  * (combo/menu/ComboItemDrawABI.h). Combo-OWNED source compiled INTO 2ship.dll (the menu-extraction
  * pattern) so the vendored BenPort.cpp keeps only a single include — the data here mirrors MM's
@@ -926,6 +927,7 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
 // Whole body inside the try: we run on OOT's graph thread while MM is dormant, and an unwind across
 // the C ABI into soh.dll is unrecoverable.
 extern "C" COMBO_EXPORT int32_t MM_GetItemDrawInfo(const char* itemName, CwItemDrawInfo* out) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM preview-DrawInfo", -1, -1, true);
     try {
         if (itemName == nullptr || out == nullptr) {
             return 0;
@@ -953,6 +955,7 @@ extern "C" COMBO_EXPORT int32_t MM_GetItemDrawInfo(const char* itemName, CwItemD
 // Returns 0 for items outside the animated class.
 // Whole body inside the try: an unwind across the C ABI into soh.dll is unrecoverable.
 extern "C" COMBO_EXPORT int32_t MM_GetItemAnimDrawInfo(const char* itemName, CwItemAnimDrawInfo* out) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM preview-AnimDrawInfo", -1, -1, true);
     try {
         if (itemName == nullptr || out == nullptr) {
             return 0;

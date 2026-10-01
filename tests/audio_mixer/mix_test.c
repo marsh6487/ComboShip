@@ -10,6 +10,24 @@
 #error This regression must exercise the x86 SSE2 mixer.
 #endif
 
+#ifdef TEST_MM_HILOGAIN
+#include <assert.h>
+static int hiLoGainFix;
+static unsigned hiLoGainModeReports;
+void MM_LogAudioGainMode(int enabled, int gain, int requestedBytes,
+                         int processedBytes) {
+  assert(enabled == hiLoGainFix);
+  assert(gain >= 0 && gain <= 255);
+  assert(processedBytes == requestedBytes * (enabled ? 1 : 2));
+  ++hiLoGainModeReports;
+}
+int32_t CVarGetInteger(const char *name, int32_t defaultValue) {
+  assert(strcmp(name, "gEnhancements.Fixes.MMAudioGainBuffer") == 0);
+  assert(defaultValue == 0);
+  return hiLoGainFix;
+}
+#endif
+
 static unsigned failures;
 static unsigned cases;
 static uint32_t randomState = 0x5EED1234;
@@ -137,6 +155,42 @@ static void checkReverb(void) {
   }
 }
 
+#ifdef TEST_MM_HILOGAIN
+/* Preserve every byte outside the command's rounded byte span, including the
+ * adjacent synthesis workspace. Compare UQ4.4 gain using wide independent
+ * arithmetic. */
+static void checkHiLoGain(void) {
+  const uint16_t lengths[] = {1, 16, 31, 32, 33, 64, 352, 384, 416};
+  int16_t original[DMEM_BUF_SIZE / sizeof(int16_t)];
+  int16_t expected[DMEM_BUF_SIZE / sizeof(int16_t)];
+  for (int enabled = 0; enabled <= 1; ++enabled) {
+    hiLoGainFix = enabled;
+    for (unsigned gain = 0; gain <= 255; ++gain) {
+      for (size_t n = 0; n < sizeof(lengths) / sizeof(lengths[0]); ++n) {
+        const size_t span =
+            ((lengths[n] + 31) & ~31) / sizeof(int16_t) * (enabled ? 1 : 2);
+        const size_t offset = (0x3B0 - 0x330) / sizeof(int16_t);
+        for (size_t i = 0; i < sizeof(original) / sizeof(original[0]); ++i)
+          original[i] = nextSample();
+        memcpy(expected, original, sizeof(expected));
+        for (size_t i = offset; i < offset + span; ++i) {
+          int64_t v = ((int64_t)original[i] * gain) >> 4;
+          expected[i] = v < INT16_MIN   ? INT16_MIN
+                        : v > INT16_MAX ? INT16_MAX
+                                        : (int16_t)v;
+        }
+        memcpy(rspa.buf.as_s16, original, sizeof(original));
+        aHiLoGainImpl((uint8_t)gain, lengths[n], 0x3B0);
+        compare("MM HiLoGain span and adjacent workspace", rspa.buf.as_s16,
+                expected, sizeof(expected) / sizeof(expected[0]));
+        ++cases;
+      }
+    }
+  }
+  assert(hiLoGainModeReports == 2);
+}
+#endif
+
 int main(void) {
   /* Gain zero must preserve every lane of a smooth existing signal. */
   checkMix(26, 0, 0, 0, 1);
@@ -157,6 +211,9 @@ int main(void) {
     }
   }
   checkReverb();
+#ifdef TEST_MM_HILOGAIN
+  checkHiLoGain();
+#endif
   printf("%s native SSE2 mixer: %u cases, %u mismatched samples\n", GAME_NAME,
          cases, failures);
   return failures ? EXIT_FAILURE : EXIT_SUCCESS;

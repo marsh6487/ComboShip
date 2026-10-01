@@ -1953,6 +1953,12 @@ void BenMenu::AddEnhancements() {
                      .Tooltip("Fixes textures that normally overflow to be patched with the correct size or format.")
                      .DefaultValue(true))
         .Callback([](WidgetInfo& info) { GfxPatcher_ApplyOverflowTexturePatches(); });
+    AddWidget(path, "Fix MM Audio Gain Buffer", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.Fixes.MMAudioGainBuffer")
+        .Options(CheckboxOptions()
+                     .Tooltip("Corrects an MM audio gain buffer overrun that can distort music or sound effects. "
+                              "Applies immediately. Turn off to compare with the existing audio behavior.")
+                     .DefaultValue(false));
     AddWidget(path, "Fix Completed Heart Container Audio", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Fixes.CompletedHeartContainerAudio")
         .Options(CheckboxOptions().Tooltip(

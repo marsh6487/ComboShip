@@ -95,6 +95,7 @@ jobs:
           python3 scripts/diagnostics/run_combo_shared_test.py --json-include /usr/include
           python3 scripts/diagnostics/run_combo_grant_tests.py --json-include /usr/include
           python3 tests/dungeon_rewards/run_tests.py --json-include /usr/include
+          python3 tests/item_grant_audit/run_tests.py
 
       - name: Accepted NEI presentation and MM pickup regressions
         run: |

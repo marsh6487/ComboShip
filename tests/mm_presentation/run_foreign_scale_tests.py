@@ -67,7 +67,7 @@ def run_lifecycle():
     with tempfile.TemporaryDirectory(prefix='scale-lifecycle-') as temporary:
         build=Path(temporary);test=build/'lifecycle.cpp';test.write_text(fixture)
         binary=build/'lifecycle'
-        flags=['-std=c++20','-Wall','-Wextra','-I'+str(json_include)]
+        flags=['-std=c++20','-Wall','-Wextra','-I'+str(json_include),'-I'+str(ROOT)]
         if '--sanitize' in sys.argv:
             flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g']
         subprocess.run([os.environ.get('CXX','c++'),*flags,str(test),'-o',str(binary)],check=True)

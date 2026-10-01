@@ -1,3 +1,4 @@
+#include "ItemGrantAuditBridge.h"
 /* combo/menu/ComboItemDrawOOT.h — ComboShip: OOT-side bodies of the cross-game item-draw exports
  * (combo/menu/ComboItemDrawABI.h). The exact mirror of combo/menu/ComboItemDrawMM.h, in the opposite
  * direction: MM (2ship.dll) asks soh.dll which display lists render a foreign OOT item, then submits
@@ -521,6 +522,7 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
 static bool OOT_BossSoulUsesSkeleton(RandomizerGet rg); // defined with the animated ABI below
 
 extern "C" COMBO_EXPORT int32_t OOT_GetItemDrawInfo(const char* itemName, CwItemDrawInfo* out) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT preview-DrawInfo", -1, -1, true);
     try {
         if (itemName == nullptr || out == nullptr) {
             return 0;
@@ -585,6 +587,7 @@ static int32_t OOT_FillItemIconInfo(RandomizerGet rg, CwItemIconInfo* out) {
 }
 
 extern "C" COMBO_EXPORT int32_t OOT_GetItemIconInfo(const char* itemName, CwItemIconInfo* out) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT preview-IconInfo", -1, -1, true);
     try {
         if (!itemName || !out)
             return 0;
@@ -787,6 +790,7 @@ static int32_t OOT_FillBossSoulAnim(int slot, CwItemAnimDrawInfo* out) {
 // sentinel. Mirror of MM_GetItemAnimDrawInfo.
 // Whole body inside the try: an unwind across the C ABI into 2ship.dll is unrecoverable.
 extern "C" COMBO_EXPORT int32_t OOT_GetItemAnimDrawInfo(const char* itemName, CwItemAnimDrawInfo* out) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT preview-AnimDrawInfo", -1, -1, true);
     try {
         if (itemName == nullptr || out == nullptr) {
             return 0;

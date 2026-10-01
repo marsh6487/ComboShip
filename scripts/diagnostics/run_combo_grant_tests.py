@@ -41,6 +41,7 @@ production = oot_helper + mm_helper + oot_raise + mm_raise
 rg_names = sorted(set(re.findall(r'\bRG_[A-Z_0-9]+', production)) | {'RG_PROGRESSIVE_MAGIC_METER', 'RG_NONE'})
 ri_names = sorted(set(re.findall(r'\bRI_[A-Z_0-9]+', production)) | {'RI_NONE'})
 preamble = r'''
+#include "ItemGrantAuditBridge.h"
 #include <algorithm>
 #include <iostream>
 #include <map>
@@ -159,6 +160,6 @@ with tempfile.TemporaryDirectory(prefix='combo_grants_') as temp:
     fixture.write_text(preamble + production + checks)
     binary = temp / 'grants'
     subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++17', '-Wall', '-Wextra', '-O0',
-        '-I', str(ROOT / 'combo'), '-I', str(ROOT / 'soh/soh/FleetShipCombo'),
+        '-I', str(ROOT / 'combo'), '-I', str(ROOT / 'combo/menu'), '-I', str(ROOT / 'soh/soh/FleetShipCombo'),
         '-I', str(args.json_include), str(fixture), '-o', str(binary)], check=True)
     raise SystemExit(subprocess.run([str(binary)]).returncode)

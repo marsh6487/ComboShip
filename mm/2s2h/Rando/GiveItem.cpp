@@ -1,3 +1,4 @@
+#include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/MiscBehavior.h"
@@ -74,6 +75,7 @@ extern "C" int Combo_MM_BombchuBagShared(void);
 #endif
 
 void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM randomizer-grant", (int)randoItemId, (int)randoCheckId);
     // FleetShipCombo cross-item record: on obtaining ANY FC-shared item, bump its fcId-indexed count
     // (comboObtainedFc, synced to OoT) and the local shadow (comboAppliedFc, since it's granted here).
     // Re-entrancy guard: GiveItem recurses for progressives/ConvertItem and RI_TRIFORCE_PIECE ->
@@ -93,9 +95,8 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
 #ifdef COMBO_BUILD
     if (sGiveDepth == 1) {
         SPDLOG_INFO("[ItemGrantAudit] MM native grant: file={} seed={} item={} check={} dormant={} suppressed={}",
-                    (int)gSaveContext.fileNum, gSaveContext.save.shipSaveInfo.rando.finalSeed,
-                    (int)randoItemId, (int)randoCheckId, (int)Rando::gComboDormantGive,
-                    (int)gFcCombo_SuppressRecord);
+                    (int)gSaveContext.fileNum, gSaveContext.save.shipSaveInfo.rando.finalSeed, (int)randoItemId,
+                    (int)randoCheckId, (int)Rando::gComboDormantGive, (int)gFcCombo_SuppressRecord);
     }
 #endif
     if (sGiveDepth == 1 && gFcCombo_SuppressRecord == 0) {

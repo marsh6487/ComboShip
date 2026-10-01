@@ -1,3 +1,6 @@
+// Diagnostic bridge is a no-op in this host-service fixture (included before
+// COMBO_BUILD).
+#include "combo/menu/ItemGrantAuditBridge.h"
 // Production scale resolver + foreign queue + MM save writer/loader.
 // Save schema, host engine services and target persistence are narrowed test
 // boundaries.
@@ -109,7 +112,8 @@ struct Logic {
 RandomizerGet ResolveScale() {
   auto *logic = &logicState;
   RandomizerGet actual = RG_NONE;
-  switch (static_cast<int>(RG_PROGRESSIVE_SCALE)) { /* SCALE_CASE */ }
+  switch (static_cast<int>(RG_PROGRESSIVE_SCALE)) { /* SCALE_CASE */
+  }
   return actual;
 }
 void GrantScale() {

@@ -208,14 +208,14 @@ def main():
         repair_end = sram.index("if (GameInteractor_Should(VB_REVERT_SPOILING_ITEMS", repair_start)
         (build / "reload.c").write_text('#include "time_pedestal_fixture.h"\n' +
             "void Fixture_AdultLoadRepair(void) {\n" + sram[repair_start:repair_end] + "\n}\n")
-        give = parameter["Item_Give"]
+        give = parameter.get("ItemGrantAudit_ItemGive", parameter["Item_Give"])
         sword_start = give.index("if ((item >= ITEM_SWORD_KOKIRI) && (item <= ITEM_SWORD_BGS))")
         (build / "ownership.c").write_text('#include "time_pedestal_fixture.h"\n' +
             "u8 Fixture_GiveSword(PlayState* play, u8 item) {\n" + block_from(give, sword_start) +
             "\nreturn ITEM_NONE;\n}\n" +
             functions((ROOT / "soh/src/code/z_inventory.c").read_text())["Inventory_DeleteEquipment"])
         metadata = functions((ROOT / "soh/mods/nei_save.cpp").read_text())
-        (build / "metadata.cpp").write_text('#include "time_pedestal_fixture.h"\n' +
+        (build / "metadata.cpp").write_text('#include "time_pedestal_fixture.h"\n#include "combo/menu/ItemGrantAuditBridge.h"\n' +
             "static NeiSaveData& gNeiSave = *Nei_Save();\n" + metadata["NeiSave_Save"] + "\n" + metadata["NeiSave_Load"])
         (build / "music.c").write_text('#include "time_pedestal_fixture.h"\n' +
             functions((ROOT / "soh/src/code/z_kankyo.c").read_text())["Environment_PlaySceneSequence"])
@@ -237,7 +237,7 @@ def main():
         for number in (1, 2, 3):
             arrays += without_includes((ACTOR / f"z_bg_toki_swd_cutscene_data_{number}.c").read_text())
         (build / "scripts.c").write_text(arrays)
-        includes = ["-I" + str(p) for p in (build, ROOT / "soh/tests", ROOT / "soh/include", ROOT / "soh", ACTOR)]
+        includes = ["-I" + str(p) for p in (ROOT, build, ROOT / "soh/tests", ROOT / "soh/include", ROOT / "soh", ACTOR)]
         sources = [build / name for name in
                    ("actor.c", "collision.c", "offers.c", "interaction.c", "parameter.c", "player.c", "render.c", "scripts.c", "handoff.c", "extended.c", "hud.c", "save.c", "music.c", "reload.c", "ownership.c")]
         helper = ACTOR / "time_pedestal_cutscene.c"

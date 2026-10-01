@@ -38,6 +38,8 @@ static inline void op_free(OggOpusFile* f) { abort(); }
                        "-I" + str(build), "-I" + str(ROOT / game / "include"),
                        "-I" + str(ROOT / "libultraship/include"),
                        str(ROOT / "tests/audio_mixer/mix_test.c"), "-lm", "-o", str(binary)]
+            if game == "mm":
+                command.insert(1, "-DTEST_MM_HILOGAIN")
             subprocess.run(command, check=True)
             failures += subprocess.run([str(binary)], timeout=30).returncode != 0
     raise SystemExit(bool(failures))

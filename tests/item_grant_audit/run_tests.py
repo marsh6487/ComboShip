@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+"""Headless provenance checks; no game boot, seed build, or user-save mutation.
+
+Compile actual capture functions against extracted production ownership structures.
+Other SaveContext members are modeled: this is not a complete game build.
+"""
+import os
+import hashlib
+from pathlib import Path
+import re
+import subprocess
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[2]
+CXX = os.environ.get('CXX', 'c++')
+CC = os.environ.get('CC', 'cc')
+
+
+def read(path):
+    return (ROOT / path).read_text(encoding='utf-8-sig')
+
+
+def comments(text):
+    return re.sub(r'/\*.*?\*/|//[^\n]*', '', text, flags=re.S)
+
+
+def declaration(text, name):
+    clean = comments(text)
+    pattern = r'typedef (?:struct|union|enum)(?:\s+\w+)?\s*\{[^{}]*\}\s*' + name + r'\s*;'
+    matches = re.findall(pattern, clean, re.S)
+    assert len(matches) == 1, name
+    return matches[0]
+
+
+def function(text, signature):
+    start = text.index(signature)
+    brace = text.index('{', start)
+    # Captures below contain no braces in string literals/comments.
+    depth = 1
+    end = brace + 1
+    while depth:
+        depth += (text[end] == '{') - (text[end] == '}')
+        end += 1
+    return text[start:end]
+
+
+with tempfile.TemporaryDirectory(prefix='item_grant_audit_') as td:
+    td = Path(td)
+    flags = ['-std=c++17', '-Wall', '-Wextra', '-Werror', '-O1', '-I', str(ROOT / 'combo/menu')]
+    sanitizer = ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-no-pie']
+    env = {**os.environ, 'ASAN_OPTIONS': 'detect_leaks=0'}
+
+    def run_cpp(name, text):
+        path = td / (name + '.cpp')
+        path.write_text(text)
+        binary = td / name
+        subprocess.run([CXX, *flags, *sanitizer, str(path), '-o', str(binary)], check=True)
+        subprocess.run([str(binary)], check=True, env=env)
+
+    run_cpp('tracker', read('tests/item_grant_audit/tracker_test.cpp'))
+    for game in ['soh', 'mm']:
+        zsave = read(f'{game}/include/z64save.h')
+        nei = declaration(read(f'{game}/mods/nei_save.h'), 'NeiSaveData')
+        inv = declaration(zsave, 'Inventory')
+        src = read('soh/soh/FleetShipCombo/FleetSync.cpp' if game == 'soh'
+                   else 'mm/2s2h/FleetShipCombo/FleetSync.cpp')
+        capture = function(src, 'static ItemGrantAudit::Snapshot CaptureItemGrantAudit()')
+        preamble = '''
+#include "ItemGrantAudit.h"
+#include <cassert>
+#include <cstring>
+#include <iostream>
+#include <algorithm>
+#include "combo/rando/RpgStats.h"
+using u8=uint8_t; using u16=uint16_t; using u32=uint32_t;
+using s8=int8_t; using s16=int16_t;
+#define FC_COMBO_OBTAINED_FC_SIZE 512
+'''
+        if game == 'soh':
+            inf = read('soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerInf.h')
+            preamble += '#define RANDO_ENUM_BEGIN(n) typedef enum {\n#define RANDO_ENUM_ITEM(n, ...) n,\n#define RANDO_ENUM_END(n) } n;\n'
+            preamble += '#include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerInf.h"\n'
+            preamble += declaration(zsave, 'ShipRandomizerSaveContextData') + '\n'
+        else:
+            types = read('mm/2s2h/Rando/Types.h')
+            preamble += declaration(types, 'RandoCheckId') + '\n'
+            preamble += declaration(types, 'RandoInf') + '\n'
+            preamble += declaration(zsave, 'SavePlayerData') + '\n'
+            # The check shape is production; item identity isn't read by the observer.
+            preamble += 'using RandoItemId=int;\n' + declaration(zsave, 'RandoSaveCheck') + '\n'
+        preamble += nei + '\n' + inv + '\n'
+        if game == 'soh':
+            preamble += '''
+struct {
+    int fileNum=0, gameMode=0, healthCapacity=48;
+    u8 isMagicAcquired=0, isDoubleMagicAcquired=0, isDoubleDefenseAcquired=0, bgsFlag=0;
+    Inventory inventory{};
+    struct {
+        struct { int id=4; struct { ShipRandomizerSaveContextData randomizer{}; } data; } quest;
+        u16 randomizerInf[(RAND_INF_MAX+15)/16]{};
+    } ship;
+} gSaveContext;
+#define IS_RANDO (gSaveContext.ship.quest.id == 4)
+NeiSaveData custom{};
+NeiSaveData* Nei_Save() { return &custom; }
+'''
+        else:
+            preamble += '''
+struct {
+    int fileNum=0, gameMode=0;
+    struct {
+        struct {
+            Inventory inventory{}; SavePlayerData playerData{};
+            struct { u16 equipment=0; } equips;
+            u32 skullTokenCount=0;
+        } saveInfo;
+        struct {
+            int saveType=1;
+            struct {
+                u32 finalSeed=123;
+                s8 foundDungeonKeys[9]{};
+                u16 randoInf[(RANDO_INF_MAX+15)/16]{};
+                u16 foundTriforcePieces=0;
+                RandoSaveCheck randoSaveChecks[RC_MAX]{};
+            } rando;
+            NeiSaveData nei{};
+        } shipSaveInfo;
+    } save;
+} gSaveContext;
+NeiSaveData* Nei_Save() { return &gSaveContext.save.shipSaveInfo.nei; }
+'''
+        test = '''
+int main() {
+    auto* custom = Nei_Save();
+    std::fill(std::begin(custom->ownedItems), std::end(custom->ownedItems), 0xFF);
+    custom->caneSkills=3; custom->capeOwned=1; custom->comboObtainedFc[511]=1;
+    auto saveBefore = gSaveContext;
+    auto neiBefore = *custom;
+    auto s = CaptureItemGrantAudit();
+    assert(!s.overflow && s.size > 1200 && s.size <= 2048);
+    assert(std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)) == 0);
+    assert(std::memcmp(&neiBefore, custom, sizeof(neiBefore)) == 0);
+    bool cape=false, cane=false, lastFc=false;
+    for(size_t i=0;i<s.size;++i) {
+        auto& f=s.fields[i];
+        if(std::string(f.name)=="nei.capeOwned") cape=f.value==1;
+        if(std::string(f.name)=="nei.caneSkills") cane=f.value==3;
+        if(std::string(f.name)=="nei.comboObtainedFc" && f.index==511) lastFc=f.value==1;
+    }
+    assert(cape && cane && lastFc);
+    std::cout << "production capture: fields=" << s.size << " passive/complete registry PASS\\n";
+}
+'''
+        path = td / (game + '.cpp')
+        path.write_text(preamble + capture + test)
+        binary = td / game
+        subprocess.run([CXX, *flags, *sanitizer, '-I', str(ROOT), str(path), '-o', str(binary)], check=True)
+        subprocess.run([str(binary)], check=True, env=env)
+
+    # Verify C ABI and stock builds: stock bridge needs no linked observer.
+    bridge = '''
+#include "ItemGrantAuditBridge.h"
+int main(void) {
+    ItemGrantAudit_Begin("stock", 1, 2, 0);
+    ItemGrantAudit_Checkpoint("stock");
+    ItemGrantAudit_End();
+    return 0;
+}
+'''
+    path = td / 'stock.c'
+    path.write_text(bridge)
+    subprocess.run([CC, '-std=c11', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT / 'combo/menu'),
+                    str(path), '-o', str(td / 'stock')], check=True)
+    run_cpp('stock_cpp', '#include "ItemGrantAuditBridge.h"\nint main(){ ItemGrantAudit::Scope s("stock"); }')
+    # Original native give bodies remain byte-for-byte identical after renaming the wrapper.
+    for game in ['soh', 'mm']:
+        path = f'{game}/src/code/z_parameter.c'
+        candidate = function(read(path), 'static u8 ItemGrantAudit_ItemGive(PlayState* play, u8 item) {')
+        preserved_hash = {'soh': 'ccf744c9d538e4fbe619b1479369dbd6a158578944f35123f2c5ed19d697541f', 'mm': '6e67d423b5c2a26b4614dbd68081d51ef2a9fd44dc28cbf1ce895209c230d437'}
+        assert hashlib.sha256(candidate[candidate.index('{'):].encode()).hexdigest() == preserved_hash[game], path
+        wrapper = function(read(path), 'u8 Item_Give(PlayState* play, u8 item) {')
+        assert 'ItemGrantAudit_Begin' in wrapper and 'ItemGrantAudit_End' in wrapper and 'return result;' in wrapper
+        fixture = '''
+#define COMBO_BUILD
+#include "ItemGrantAuditBridge.h"
+#include <assert.h>
+typedef unsigned char u8;
+typedef struct { int unused; } PlayState;
+static int active, calls;
+void ItemGrantAudit_Begin(const char* s, int item, int check, int quiet) {
+    (void)s; (void)item; (void)check; (void)quiet; ++active;
+}
+void ItemGrantAudit_End(void) { --active; }
+static u8 ItemGrantAudit_ItemGive(PlayState* play, u8 item) {
+    (void)play; ++calls; return item;
+}
+'''
+        fixture += wrapper + '''
+int main(void) {
+    for (int i=0; i<256; ++i) assert(Item_Give(0, (u8)i) == (u8)i);
+    assert(active == 0 && calls == 256);
+}
+'''
+        cpath = td / (game + '_bridge.c')
+        cpath.write_text(fixture)
+        subprocess.run([CC, '-std=c11', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT / 'combo/menu'),
+                        str(cpath), '-o', str(td / (game + '_bridge'))], check=True)
+        subprocess.run([str(td / (game + '_bridge'))], check=True)
+    print('C bridge, stock C/C++ and native grant preservation PASS')

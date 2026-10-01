@@ -1,3 +1,4 @@
+#include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "global.h"
 #include "vt.h"
 #include "textures/parameter_static/parameter_static.h"
@@ -1943,7 +1944,14 @@ u8 Return_Item(u8 itemID, ModIndex modId, ItemID returnItem) {
  * @param item
  * @return u8
  */
+static u8 ItemGrantAudit_ItemGive(PlayState* play, u8 item);
 u8 Item_Give(PlayState* play, u8 item) {
+    ItemGrantAudit_Begin("OOT Item_Give", item, -1, 0);
+    u8 result = ItemGrantAudit_ItemGive(play, item);
+    ItemGrantAudit_End();
+    return result;
+}
+static u8 ItemGrantAudit_ItemGive(PlayState* play, u8 item) {
     // prevents getting sticks without the bag in case something got missed
     if (IS_RANDO && (item == ITEM_STICK || item == ITEM_STICKS_5 || item == ITEM_STICKS_10) &&
         Randomizer_GetSettingValue(RSK_SHUFFLE_DEKU_STICK_BAG) && CUR_UPG_VALUE(UPG_STICKS) == 0) {

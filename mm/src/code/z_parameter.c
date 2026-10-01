@@ -1,3 +1,4 @@
+#include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "global.h"
 #include "mods/combo_rpg.h"
 #include "PR/gs2dex.h"
@@ -4747,7 +4748,14 @@ u8 Item_GiveImpl(PlayState* play, u8 item) {
 }
 
 // #region 2S2H [Enhancements] This is our wrapper around the original Item_Give function for hooking purposes
+static u8 ItemGrantAudit_ItemGive(PlayState* play, u8 item);
 u8 Item_Give(PlayState* play, u8 item) {
+    ItemGrantAudit_Begin("MM Item_Give", item, -1, 0);
+    u8 result = ItemGrantAudit_ItemGive(play, item);
+    ItemGrantAudit_End();
+    return result;
+}
+static u8 ItemGrantAudit_ItemGive(PlayState* play, u8 item) {
     if (!GameInteractor_ShouldItemGive(item) || item == ITEM_SHIP) {
         return ITEM_NONE;
     }

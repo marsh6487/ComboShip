@@ -1,3 +1,4 @@
+#include "../../combo/menu/ItemGrantAuditBridge.h"
 #include "BenPort.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
@@ -158,6 +159,7 @@ AudioCollection* AudioCollection::Instance;
 static bool sComboTransitionActive = false;
 
 extern "C" COMBO_EXPORT void MM_NotifyComboTransition(void) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM_NotifyComboTransition");
     sComboTransitionActive = true;
     FleetShared_RequestPullFromPeer(); // OoT is still resident: reconcile shared state on the next live tick
 }
@@ -1099,6 +1101,12 @@ static struct {
 // before it sends the buffer out — lock-free, no torn reads, changes no volume CVar, and fully
 // reversible (sequence/note state keeps advancing, so audio resumes bit-exactly on switch-back).
 static std::atomic<bool> gFscAudioMuted{ false };
+
+// Called by the native mixer on first gain use and opt-in changes.
+extern "C" void MM_LogAudioGainMode(int enabled, int gain, int requestedBytes, int processedBytes) {
+    SPDLOG_INFO("[MMAudioGain] enabled={} gain={} requestedBytes={} processedBytes={}", enabled, gain, requestedBytes,
+                processedBytes);
+}
 
 void OTRAudio_Thread() {
     constexpr int kSamplesLow = 528;
@@ -3326,6 +3334,7 @@ extern "C" void OTRMessage_ResetForResume(void);
 // ComboShip: OOT->MM forward transition. Stop MM audio without destroying the shared
 // context/window/resource-manager (OOT reuses them). Mirrors SOH_PrepareForTransition.
 extern "C" COMBO_EXPORT void MM_PrepareForTransition(void) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM_PrepareForTransition");
     SaveManager_ThreadPoolWait();
     OTRAudio_Exit();
     // NOTE: do NOT BenGui::Destroy() here. The Gui is a single shared libultraship instance; tearing
@@ -3338,6 +3347,7 @@ extern "C" COMBO_EXPORT void MM_PrepareForTransition(void) {
 // ComboShip: OOT->MM return. Re-enter MM's game loop on the same shared context/window and jump
 // straight to Play in South Clock Town for the given slot. Counterpart to OOT's SOH_ResumeGame.
 extern "C" COMBO_EXPORT void MM_ResumeGame(int fileNum) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM_ResumeGame");
     auto ctx = Ship::Context::GetRawInstance();
     ctx->GetLogger()->flush_on(spdlog::level::trace);
     SPDLOG_INFO("[ComboShip] MM_ResumeGame: begin (fileNum={})", fileNum);
@@ -3390,6 +3400,7 @@ extern "C" COMBO_EXPORT void MM_ResumeGame(int fileNum) {
 // the tracker peek shows real items before MM is visited this session. Same headless load path
 // title_setup.c runs on resume (no gPlayState needed). Nonzero = nothing usable was loaded.
 extern "C" COMBO_EXPORT int MM_LoadSaveForCombo(int fileNum) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM_LoadSaveForCombo");
     return Combo_LoadMMSaveFile(fileNum + 1); // shares the saveType tripwire
 }
 
@@ -3419,6 +3430,7 @@ extern "C" COMBO_EXPORT void MM_SetComboRandoSeed(uint64_t seed) {
 // SAVETYPE_RANDO either way, since a vanilla one disables every IS_RANDO hook.
 extern "C" COMBO_EXPORT int MM_InitRandoSaveFile(int fileNum, const char* placementJson,
                                                  const unsigned char* ootName8) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM_InitRandoSaveFile");
     // Playable combo baseline first (Human Link, South Clock Town, ocarina/songs, etc.).
     SaveManager_InitNewSaveForSlot(fileNum + 1, ootName8);
     // Sram_InitNewSave (inside the call above) resets fileNum; restore it so SaveManager_SaveCurrentForCombo
@@ -4479,6 +4491,7 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_Reset(void) {
     // ComboShip: MM's region graph + static data are built by the eager boot
     // (MM_BootForCombo -> ShipInit::InitAll), so the oracle needs no lazy init here.
     if (!sMM_OracleActive) { // snapshot the REAL live context only on the first Reset of a fill
+        ItemGrantAudit_Suspend();
         memcpy(&sMM_OracleSavedContext, &gSaveContext, sizeof(SaveContext));
         sMM_OracleSavedRegionTime = gCurrentRegionTime;
         sMM_OracleActive = true;
@@ -4635,6 +4648,7 @@ static bool Combo_IsBottleRefill(RandoItemId rid) {
 }
 
 void Combo_MM_GiveDormantResolved(RandoItemId rid) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM dormant-resolved");
     // ComboShip (#84): drop a bottle refill when no bottle is free. Callers convert first, so this is
     // a backstop — Item_Give's bottle-contents branch overwrites bottle #1. Keep it either way.
     if (Combo_IsBottleRefill(rid) && !Inventory_HasEmptyBottle()) {
@@ -4703,6 +4717,7 @@ static bool GrantMmItemByName(const char* itemName, RandoItemId* granted) {
 
 // A foreign check's item landing in its home game is a real acquisition: share it like a pickup.
 extern "C" COMBO_EXPORT void MM_GrantCrossItem(const char* itemName) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM_GrantCrossItem");
     RandoItemId granted = RI_NONE;
     if (GrantMmItemByName(itemName, &granted)) {
         FleetShared_OnNativeObtained((int)granted);
@@ -4834,6 +4849,7 @@ extern "C" COMBO_EXPORT int MM_GetSharedTier(int family) try {
 }
 
 extern "C" COMBO_EXPORT void MM_RaiseSharedTier(int family, int tier) try {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM_RaiseSharedTier");
     if (family < 0 || family >= ComboRando::SF_COUNT)
         return;
     const auto& def = ComboRando::SharedFamilyByIndex(family);
@@ -5057,6 +5073,7 @@ extern "C" COMBO_EXPORT void Combo_MM_Rando_Restore(void) {
     memcpy(&gSaveContext, &sMM_OracleSavedContext, sizeof(SaveContext));
     gCurrentRegionTime = sMM_OracleSavedRegionTime;
     sMM_OracleActive = false;
+    ItemGrantAudit_Resume();
 }
 #endif // COMBO_BUILD — combo-only region opened above MM_LoadSaveForCombo
 
