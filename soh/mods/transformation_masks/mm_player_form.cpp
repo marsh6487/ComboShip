@@ -3269,6 +3269,22 @@ static void MmForm_StopGoronRollSfx(void);
 // Declared here, above MmForm_RestoreOotState, because that is the first user.
 static u8 sRollOwnsPause = 0;
 
+// Form combat temporarily disables OOT's persistent sword colliders. Human
+// swings update damage and vertices, but do not re-enable AT_ON themselves.
+static void MmForm_RestoreMeleeColliders(Player* player) {
+    for (s32 i = 0; i < 2; i++) {
+        ColliderQuad* quad = &player->meleeWeaponQuads[i];
+        if (gPlayState != NULL) {
+            Collider_ResetQuadAT(gPlayState, &quad->base);
+        }
+        quad->base.atFlags = AT_ON | AT_TYPE_PLAYER;
+        quad->info.toucher.damage = 1; // OOT's normal collider initializer
+        player->meleeWeaponInfo[i + 1].active = 0;
+    }
+    player->meleeWeaponInfo[0].active = 0;
+    player->meleeWeaponState = 0;
+}
+
 static void MmForm_RestoreOotState(Player* player) {
     // Clear Gerudo combat state on every full form-exit so re-equipping the mask
     // starts clean. This is the FULL reset (rage meter included); the yield path
@@ -3470,6 +3486,7 @@ static void MmForm_RestoreOotState(Player* player) {
     gFormState.dekuFlightLaunchType = 0;
     gFormState.dekuSparkleAcc = 0;
     gFormState.dekuSavedShadowScale = 0.0f;
+    MmForm_RestoreMeleeColliders(player);
 }
 
 // =============================================================================
@@ -17823,6 +17840,7 @@ void MmForm_Update(PlayState* play, Player* player) {
             } else {
                 // Skeleton load failed: fallback to human
                 MMFORM_LOG("[MmForm] Soft-reload failed for form %d, reverting to human", form);
+                MmForm_RestoreMeleeColliders(player);
                 memset(&gFormState, 0, sizeof(gFormState));
                 gFormState.state = MMFORM_STATE_INACTIVE;
                 gFormState.currentForm = MM_PLAYER_FORM_HUMAN;
