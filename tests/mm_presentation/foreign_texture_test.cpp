@@ -96,8 +96,8 @@ static void Submit(Handler handler, const char *path, uint32_t format = 0,
   const auto submitted = commands[0];
   auto *cursor = commands;
   assert(!handler(instance.get(), &cursor));
+  assert(cursor == commands); // Both one-word forms preserve the following command.
   if (handler == gfx_set_timg_otr_filepath_handler_custom) {
-    assert(cursor == commands);
     assert(commands[0].words.w0 == submitted.words.w0 &&
            commands[0].words.w1 == submitted.words.w1);
   }

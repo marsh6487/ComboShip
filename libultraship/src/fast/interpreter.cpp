@@ -4347,6 +4347,44 @@ static std::shared_ptr<Fast::Texture> ComboLoadTextureResource(const char* fileN
     return std::static_pointer_cast<Fast::Texture>(rm->LoadResourceProcess(fileName));
 }
 
+// Raw/segmented and hash texture commands can fail before reaching the named
+// FILEPATH diagnostic. Keep these failures observable without per-frame spam.
+// This bounds reporting only: every request still performs its normal lookup.
+static void ReportTextureLoadFailure(const char* command, const char* reason, const char* path,
+                                     uint64_t source, uintptr_t resolved) {
+    struct Context {
+        std::string command;
+        std::string reason;
+        std::string path;
+        uint64_t source;
+        const Ship::ResourceManager* manager;
+        bool alt;
+    };
+    static std::vector<Context> reported;
+    static bool overflowReported = false;
+    constexpr size_t kMaxReported = 128;
+    const auto manager = ActiveResMgr();
+    const bool alt = manager->IsAltAssetsEnabled();
+    // A named path is stable even if a caller reallocates the OTR string.
+    // Unnamed requests need their address/hash to distinguish failure sites.
+    const uint64_t identity = path[0] != '\0' ? 0 : source;
+    for (const auto& context : reported) {
+        if (context.manager == manager.get() && context.alt == alt && context.source == identity &&
+            context.command == command && context.reason == reason && context.path == path) {
+            return;
+        }
+    }
+    if (reported.size() < kMaxReported) {
+        reported.push_back({ command, reason, path, identity, manager.get(), alt });
+        SPDLOG_ERROR("TextureTrace: command={} reason={} path='{}' source=0x{:x} resolved=0x{:x} activeRM={} alt={}",
+                     command, reason, path, source, resolved, static_cast<const void*>(manager.get()),
+                     static_cast<int>(alt));
+    } else if (!overflowReported) {
+        overflowReported = true;
+        SPDLOG_ERROR("TextureTrace: suppressing additional raw/hash texture diagnostics after 128 contexts");
+    }
+}
+
 bool gfx_set_timg_handler_rdp(Interpreter* gfx, F3DGfx** cmd0) {
     F3DGfx* cmd = *cmd0;
     uintptr_t i = (uintptr_t)gfx->SegAddr(cmd->words.w1);
@@ -4354,6 +4392,7 @@ bool gfx_set_timg_handler_rdp(Interpreter* gfx, F3DGfx** cmd0) {
     // Validate before the OTR signature probe reads this address as a string.
     // An unresolved, untagged segment (e.g. 0x08000000) is even but not readable.
     if (!IsValidResolvedAddress(i)) {
+        ReportTextureLoadFailure("G_SETTIMG", "unresolved-address", "", cmd->words.w1, i);
         return false;
     }
 
@@ -4370,7 +4409,9 @@ bool gfx_set_timg_handler_rdp(Interpreter* gfx, F3DGfx** cmd0) {
             std::shared_ptr<Fast::Texture> tex = ComboLoadTextureResource(imgData);
 
             if (tex == nullptr) {
-                (*cmd0)++;
+                ReportTextureLoadFailure("G_SETTIMG", "missing-resource", imgData, cmd->words.w1, i);
+                // gfx_step advances this one-word command. Advancing here too
+                // discards the next command, which may load vertices or state.
                 return false;
             }
 
@@ -4386,6 +4427,7 @@ bool gfx_set_timg_handler_rdp(Interpreter* gfx, F3DGfx** cmd0) {
     }
 
     if (!IsValidResolvedAddress(i)) {
+        ReportTextureLoadFailure("G_SETTIMG", "invalid-image-data", imgData, cmd->words.w1, i);
         return false;
     }
 
@@ -4404,7 +4446,9 @@ bool gfx_set_timg_otr_hash_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
     RawTexMetadata rawTexMetadata = {};
 
     if (fileName == nullptr) {
-        (*cmd0)++;
+        ReportTextureLoadFailure("G_SETTIMG_OTR_HASH", "unknown-hash", "", hash, 0);
+        // cmd0 already points at the hash payload. The dispatcher's increment
+        // must land on the next command, not skip over it.
         return false;
     }
 
@@ -4447,13 +4491,14 @@ bool gfx_set_timg_otr_hash_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
         if (tex != NULL) {
 
             gfx->GfxDpSetTextureImage(fmt, size, width, fileName, texFlags, rawTexMetadata, tex);
+        } else {
+            ReportTextureLoadFailure("G_SETTIMG_OTR_HASH", "invalid-image-data", fileName, hash, 0);
         }
     } else {
-        // ComboShip: name it and log once per path — this fires every frame the model is on screen.
-        static std::unordered_set<std::string> sReportedNullTextures;
-        if (sReportedNullTextures.insert(fileName).second) {
-            SPDLOG_ERROR("G_SETTIMG_OTR_HASH: Texture is null ({})", fileName);
-        }
+        ReportTextureLoadFailure("G_SETTIMG_OTR_HASH", "missing-resource", fileName, hash, 0);
+        // The successful branch moves back to the first command word. This
+        // failure branch is still on the payload and needs no extra increment.
+        return false;
     }
 
     (*cmd0)++;
