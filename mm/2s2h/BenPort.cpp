@@ -1108,6 +1108,10 @@ extern "C" void MM_LogAudioGainMode(int enabled, int gain, int requestedBytes, i
                 processedBytes);
 }
 
+#ifdef COMBO_BUILD
+#include "../../combo/audio/MMAudioTraceHost.h"
+#endif
+
 void OTRAudio_Thread() {
     constexpr int kSamplesLow = 528;
     constexpr int kSamplesHigh = 544;
@@ -1116,6 +1120,9 @@ void OTRAudio_Thread() {
     constexpr auto kRefillInterval = std::chrono::milliseconds(5);
     int sampleDebtThirds = 0;
     bool primed = false;
+#ifdef COMBO_BUILD
+    auto previousWake = std::chrono::steady_clock::now();
+#endif
     s16 audio_buffer[kSamplesHigh * kChannels * 3];
 
     std::unique_lock<std::mutex> lock(audio.mutex);
@@ -1131,6 +1138,14 @@ void OTRAudio_Thread() {
         if (!audio.running) {
             break;
         }
+#ifdef COMBO_BUILD
+        MMAudioTrace::Poll();
+        const auto wake = std::chrono::steady_clock::now();
+        MMAudioTrace::Queue(
+            AudioPlayer_Buffered(),
+            static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(wake - previousWake).count()));
+        previousWake = wake;
+#endif
 
         const int framesPerUpdate = audio.framesPerUpdate;
         // Do not advance the sequencer for PCM that the backend would have to drop.
@@ -1147,6 +1162,9 @@ void OTRAudio_Thread() {
                 AudioMgr_CreateNextAudioBuffer(audio_buffer + i * num_audio_samples * kChannels, num_audio_samples);
             }
 
+#ifdef COMBO_BUILD
+            MMAudioTrace::Native(audio_buffer, totalFrames);
+#endif
             MMWeatherAudio_Mix(audio_buffer, totalFrames);
             MMMidnaAudio_Mix(audio_buffer, totalFrames);
 
@@ -1156,6 +1174,9 @@ void OTRAudio_Thread() {
                 MMMidnaAudio_Reset();
                 memset(audio_buffer, 0, totalFrames * kChannels * sizeof(int16_t));
             }
+#ifdef COMBO_BUILD
+            MMAudioTrace::Final(audio_buffer, totalFrames, gFscAudioMuted.load(std::memory_order_relaxed));
+#endif
             AudioPlayer_Play(reinterpret_cast<u8*>(audio_buffer), totalFrames * kChannels * sizeof(int16_t));
         }
 
@@ -1165,6 +1186,9 @@ void OTRAudio_Thread() {
     }
     audio.processing = false;
     audio.cv_from_thread.notify_all();
+#ifdef COMBO_BUILD
+    MMAudioTrace::Stopped();
+#endif
 }
 
 // C->C++ Bridge
@@ -1203,6 +1227,11 @@ extern "C" void OTRAudio_Exit() {
     if (audio.thread.joinable()) {
         audio.thread.join();
     }
+#ifdef COMBO_BUILD
+    try {
+        MMAudioTrace::SaveCapture(Ship::Context::GetPathRelativeToAppDirectory("audio-diagnostics", appShortName));
+    } catch (const std::exception& e) { SPDLOG_ERROR("[MMAudioPCM] capture save failed: {}", e.what()); }
+#endif
     MMMidnaAudio_Reset();
     MMWeather_Reset();
     MMWeatherAudio_Shutdown();
@@ -1392,6 +1421,9 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     });
     // Shared Items: per-frame drain seam. Always-on (not Anchor-gated) so it also runs solo.
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateUpdate>([]() {
+        MMAudioTrace::scene.store(gPlayState ? gPlayState->sceneId : -1);
+        MMAudioTrace::room.store(gPlayState ? gPlayState->roomCtx.curRoom.num : -1);
+        MMAudioTrace::mode.store(gSaveContext.gameMode);
         if (gMMComboSharedTick) {
             gMMComboSharedTick();
         }

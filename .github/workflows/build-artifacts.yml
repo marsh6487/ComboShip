@@ -134,6 +134,7 @@ jobs:
           python3 scripts/diagnostics/run_mm_audio_pcm_tests.py
           MM_AUDIO_PCM_CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie" python3 scripts/diagnostics/run_mm_audio_pcm_tests.py
           python3 scripts/diagnostics/run_native_audio_mixer_tests.py
+          python3 tests/audio_mixer/run_pcm_diagnostics_tests.py
           NATIVE_AUDIO_CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie" python3 scripts/diagnostics/run_native_audio_mixer_tests.py
           python3 scripts/diagnostics/run_mm_audio_worker_tests.py
           MM_AUDIO_WORKER_CXXFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie" python3 scripts/diagnostics/run_mm_audio_worker_tests.py

@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include "mixer.h"
+#include "../../combo/audio/MMAudioTraceBridge.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #ifndef __clang__
 #pragma GCC optimize("unroll-loops")
@@ -116,6 +117,8 @@ void aLoadBufferExactImpl(const void* source_addr, uint16_t dest_addr, uint16_t 
 #else
     memcpy(BUF_U8(dest_addr), source_addr, nbytes);
 #endif
+    if (MM_AudioTraceEnabled())
+        MM_AudioTracePCM(MM_TRACE_DECODED, BUF_S16(dest_addr), nbytes / 2, 0);
 }
 
 #include <opus/opus.h>
@@ -127,19 +130,31 @@ void aOPUSdecImpl(void* source_addr, uint16_t dest_addr, uint16_t nbytes, struct
     if (*decState == NULL) {
         *decState = op_open_memory(source_addr, size, NULL);
         if (*decState == NULL) {
+            MM_AudioTraceEvent("opus-open-failed", nbytes / 2, 0);
             return;
         }
     }
     if (op_pcm_seek(*decState, pos) < 0) {
+        MM_AudioTraceEvent("opus-seek-failed", nbytes / 2, 0);
         return;
     }
     while (readSamples < nbytes / 2) {
         int ret = op_read(*decState, BUF_S16(dest_addr + readSamples * 2), (nbytes - readSamples * 2) / 2, NULL);
         if (ret <= 0) {
+            MM_AudioTraceEvent(ret < 0 ? "opus-read-failed" : "opus-eof", nbytes / 2, readSamples);
             break;
         }
         readSamples += ret;
     }
+    if (MM_AudioTraceEnabled())
+        MM_AudioTracePCM(MM_TRACE_DECODED, BUF_S16(dest_addr), readSamples, 0);
+}
+
+void aAudioTraceDMemImpl(int stage, uint16_t addr, unsigned samples) {
+    if (!MM_AudioTraceEnabled() || addr < 0x330 || (unsigned)(addr - 0x330) > DMEM_BUF_SIZE ||
+        samples > (DMEM_BUF_SIZE - (unsigned)(addr - 0x330)) / sizeof(int16_t))
+        return;
+    MM_AudioTracePCM(stage, BUF_S16(addr), samples, 0);
 }
 
 void aOPUSFree(struct OggOpusFile* opusFile) {
@@ -244,6 +259,8 @@ void aADPCMdecImpl(uint8_t flags, ADPCM_STATE state) {
         nbytes -= 16 * sizeof(int16_t);
     }
     memcpy(state, out - 16, 16 * sizeof(int16_t));
+    if (MM_AudioTraceEnabled())
+        MM_AudioTracePCM(MM_TRACE_DECODED, BUF_S16(rspa.out) + 16, ROUND_UP_32(rspa.nbytes) / 2, 0);
 }
 
 void aResampleImpl(uint8_t flags, uint16_t pitch, RESAMPLE_STATE state) {
@@ -293,6 +310,9 @@ void aResampleImpl(uint8_t flags, uint16_t pitch, RESAMPLE_STATE state) {
     }
     state[5] = i;
     memcpy(state + 8, in, 8 * sizeof(int16_t));
+    if (MM_AudioTraceEnabled())
+        MM_AudioTracePCM(MM_TRACE_RESAMPLED, BUF_S16(rspa.out), MM_AudioTraceNoteSamples(ROUND_UP_16(rspa.nbytes) / 2),
+                         0);
 }
 
 void aEnvSetup1Impl(uint8_t initial_vol_wet, uint16_t rate_wet, uint16_t rate_left, uint16_t rate_right) {
@@ -565,6 +585,8 @@ void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t* state_or_filter)
 
         memcpy(state_or_filter, tmp, 8 * sizeof(int16_t));
         memcpy(state_or_filter + 8, rspa.filter, 8 * sizeof(int16_t));
+        if (MM_AudioTraceEnabled())
+            MM_AudioTracePCM(MM_TRACE_FILTER, BUF_S16(count_or_buf), rspa.filter_count / 2, 0);
     }
 }
 
@@ -576,6 +598,16 @@ void aHiLoGainImpl(uint8_t g, uint16_t count, uint16_t addr) {
     int nbytes = ROUND_UP_32(count);
     const int enabled = CVarGetInteger("gEnhancements.Fixes.MMAudioGainBuffer", 0) != 0;
     const int consumedBytes = enabled ? 8 * sizeof(int16_t) : 8;
+    unsigned traceClips = 0;
+    const int tracing = MM_AudioTraceEnabled();
+    const unsigned traceSamples = tracing ? MM_AudioTraceNoteSamples(nbytes / 2) : 0;
+    if (tracing) {
+        // Count attempted saturation within the requested span, not the legacy spill.
+        for (unsigned i = 0; i < traceSamples; ++i) {
+            const int32_t amplified = ((int32_t)samples[i] * g) >> 4;
+            traceClips += amplified < INT16_MIN || amplified > INT16_MAX;
+        }
+    }
     static int observedMode = -1;
     if (observedMode != enabled) {
         observedMode = enabled;
@@ -603,6 +635,8 @@ void aHiLoGainImpl(uint8_t g, uint16_t count, uint16_t addr) {
         // The opt-in fix counts eight s16 samples as bytes; off retains the baseline.
         nbytes -= consumedBytes;
     } while (nbytes > 0);
+    if (tracing)
+        MM_AudioTracePCM(MM_TRACE_GAIN, BUF_S16(addr), traceSamples, traceClips);
 }
 
 void aUnkCmd3Impl(uint16_t a, uint16_t b, uint16_t c) {

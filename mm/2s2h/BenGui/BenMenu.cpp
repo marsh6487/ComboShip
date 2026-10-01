@@ -1959,6 +1959,17 @@ void BenMenu::AddEnhancements() {
                      .Tooltip("Corrects an MM audio gain buffer overrun that can distort music or sound effects. "
                               "Applies immediately. Turn off to compare with the existing audio behavior.")
                      .DefaultValue(false));
+#ifdef COMBO_BUILD
+    AddWidget(path, "Trace MM Shop Audio", WIDGET_CVAR_CHECKBOX)
+        .CVar("gDeveloperTools.MMAudioPCMTrace")
+        .Options(
+            CheckboxOptions()
+                .Tooltip(
+                    "Logs loaded music resources, PCM processing and audio queue health without changing playback. "
+                    "Enable inside the affected shop. Captures up to 20 seconds of output; saves the WAV in "
+                    "audio-diagnostics when MM audio stops (quit or switch games). Off by default.")
+                .DefaultValue(false));
+#endif
     AddWidget(path, "Fix Completed Heart Container Audio", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Fixes.CompletedHeartContainerAudio")
         .Options(CheckboxOptions().Tooltip(

@@ -11,6 +11,7 @@
  */
 
 #include "global.h"
+#include "../../../../combo/audio/MMAudioTraceBridge.h"
 #include "buffers.h"
 #include <stdio.h>
 #include <string.h>
@@ -676,6 +677,10 @@ s32 AudioLoad_SyncInitSeqPlayerInternal(s32 playerIndex, s32 seqId, s32 arg2) {
     seqPlayer->defaultFont = fontId;
 
     seqPlayer->seqData = seqData;
+#ifdef COMBO_BUILD
+    // Synthesis sees the heap/cache copy, not the factory's original sequence buffer.
+    MM_AudioTraceAlias(1, (uintptr_t)seqData, (uintptr_t)seqData2.seqData);
+#endif
     seqPlayer->enabled = true;
     seqPlayer->scriptState.pc = seqData;
     seqPlayer->scriptState.depth = 0;

@@ -35,6 +35,16 @@ extern "C" SoundFont* ResourceMgr_LoadAudioSoundFontByName(const char* path) {
     return &font;
 }
 
+#ifdef COMBO_BUILD
+// The extracted production submission block now observes final PCM. Retain
+// that real observer while replacing only its log sink in this adapter test.
+template <class... T> static void TestTraceLog(const T&...) {
+}
+#define SPDLOG_INFO(...) TestTraceLog(__VA_ARGS__)
+#define SPDLOG_ERROR(...) TestTraceLog(__VA_ARGS__)
+#include "../../combo/audio/MMAudioTraceHost.h"
+#endif
+
 static std::atomic<bool> gFscAudioMuted{ false };
 static bool midnaVoicePending = true;
 static int midnaMixCalls;
@@ -88,9 +98,16 @@ int main() {
     MMWeatherAudio_Mix(output, 2);
     assert(output[0] == 1024 && output[1] == 1024 && loads == 1);
     gFscAudioMuted = true;
+#ifdef COMBO_BUILD
+    MMAudioTrace::WorkerTrace().SetEnabled(true);
+#endif
     int16_t inactive[] = { 123, -123 };
     SubmitWeatherAudio(inactive, 1);
     assert(played[0] == 0 && played[1] == 0);
+#ifdef COMBO_BUILD
+    const auto& captured = MMAudioTrace::WorkerTrace().capture;
+    assert(captured.size() == 2 && captured[0] == 0 && captured[1] == 0);
+#endif
     assert(midnaMixCalls == 1 && midnaResetCalls == 1 && !midnaVoicePending);
     gFscAudioMuted = false;
     for (int channel = 0; channel < 2; ++channel) {

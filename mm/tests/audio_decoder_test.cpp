@@ -1,4 +1,5 @@
 #include "audio/soundfont.h"
+#include "../../combo/audio/MMAudioTraceBridge.h"
 #include <ogg/ogg.h>
 #include <vorbis/vorbisenc.h>
 #include <vorbis/vorbisfile.h>

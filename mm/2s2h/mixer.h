@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+void aAudioTraceDMemImpl(int stage, uint16_t addr, unsigned samples);
 #include "libultraship/libultra/abi.h"
 
 #undef aSegment

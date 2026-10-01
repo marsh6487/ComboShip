@@ -5,6 +5,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <mutex>
 #include <thread>
@@ -61,6 +62,16 @@ static void AudioPlayer_Play(const u8 *buffer, size_t bytes) {
   ++batches;
 }
 
+static int diagnosticsMode = 0;
+static int CVarGetInteger(const char *key, int fallback) {
+  return std::strcmp(key, "gDeveloperTools.MMAudioPCMTrace") == 0
+             ? diagnosticsMode
+             : fallback;
+}
+template <class... T> static void TestAudioLog(const T &...) {}
+#define SPDLOG_INFO(...) TestAudioLog(__VA_ARGS__)
+#define SPDLOG_ERROR(...) TestAudioLog(__VA_ARGS__)
+#include "../../combo/audio/MMAudioTraceHost.h"
 #include "mm_audio_worker.inc"
 
 static void start() {
@@ -101,7 +112,8 @@ static bool awaitRefill() {
   return false;
 }
 
-int main() {
+int main(int argc, char **argv) {
+  diagnosticsMode = argc > 1 ? std::atoi(argv[1]) : 0;
   start();
   std::this_thread::sleep_for(std::chrono::milliseconds(20));
   {

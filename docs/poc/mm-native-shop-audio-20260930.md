@@ -65,6 +65,99 @@ it is not asserted to explain the user's severe crackling by itself.
 
 ## Runtime check and recovery
 
+### October 1 audible follow-up: unresolved
+
+Cor reports no perceptible shop improvement with the gain-buffer checkbox on.
+The runtime log records both gain modes executing: 384 requested bytes process
+384 bytes on and 768 off. This rules out a checkbox that never reaches the mixer.
+For identical input, both modes perform the same arithmetic on the requested
+span; the correction only prevents processing the additional adjacent span.
+Its audible effect depends on whether subsequent synthesis uses that memory.
+This buffer defect must not be presented as the shop-crunch diagnosis.
+
+The recorded gain is 127 (UQ4.4 = 7.9375). Production synthesis applies this to
+the resampled mono note before the filter and envelope. The gain mixer saturates
+to signed 16-bit, so input magnitudes above approximately 4128 can clip before
+later volume attenuation. The log does not record note amplitudes or clipping;
+high gain alone does not prove distortion, since a quiet sample can require it.
+
+The Google explanation does not establish the affected samples' actual rate or
+codec. Sample rate and encoding bitrate describe different limits. The engine
+supports both 4-bit and 2-bit ADPCM, but that does not identify which instruments
+are audible in this shop configuration. Original sample texture, premature
+clipping, decoder/filter behavior and device underruns remain distinguishable
+hypotheses. This log contains no PCM capture or underrun measurements. The
+previous archive arithmetic probe did not render the complete shop sequence.
+
+Review verification: complete production MM/OoT mixer suite passes 137,137 /
+132,529 cases with zero mismatches. This verifies tested arithmetic and buffer
+spans, not shop sound quality. Next evidence should correlate the active shop
+sequence/font/sample codec and tuning with pre/post-gain saturation, final PCM,
+and device queue minima; compare the same instruments with reference playback.
+Any corrective audio behavior remains opt-in under Fixes. Cor subsequently
+authorized publishing the narrow item repairs alongside the PCM diagnostics
+below. No additional corrective audio behavior is claimed.
+
+### October 1 PCM diagnostic follow-up
+
+Recovered baseline: PR #31 at `19b5b4c6b1381b187caf3b09854330c7ad9cd738`.
+The interrupted local work was copied to an isolated checkout before review;
+the published baseline and original checkout were preserved. Build #72 on that
+baseline completed successfully. This follow-up retains its renderer,
+transformation, audio-worker and gain-toggle candidates.
+
+The new **MM Enhancements -> Fixes -> Trace MM Shop Audio** checkbox is off by
+default. Enable it inside the affected shop. `[MMAudioPCM]` logs identify the
+actual sequence and sample resource paths, whether they are streamed, player
+ownership (main BGM/fanfare/SFX/sub BGM/ambience), codec, gain, resampling pitch,
+tuning, filters and comb-filter gain. WAV/MP3/FLAC/Vorbis decoder metadata also
+reports the PCM rate, source channels and frame count when available. Sequence
+heap copies are aliased to their factory resource identity. Ownership is
+captured for each prepared synthesis sub-update, before later updates can reuse
+the same note for a different player. Released notes with no owner remain
+explicitly unattributed.
+
+PCM summaries cover decoded/loaded samples, resampling, gain, filtering,
+processed mono notes, native stereo output and final stereo submitted to the
+backend. They include sample counts, peak/RMS, rail and zero counts, maximum
+adjacent-sample steps and hashes. Gain tracing additionally counts values that
+would saturate within the audible requested span, excluding padding and the
+legacy spill. Pitch/tuning changes close the old interval. These measurements
+are diagnostic signals, not by themselves proof of audible distortion; decoder
+windows can contain lookahead or overlapping samples. No sample, gain, filter,
+volume, tempo, reverb or audio routing is changed by tracing.
+
+Queue summaries report minimum buffered frames, empty-queue observations after
+initial submission and maximum worker wake gap. Empty observations are not a
+backend underrun counter. Final PCM is captured before backend/device processing;
+a clean capture cannot rule out distortion introduced by the device afterward.
+Both output channels are measured separately. Detail logging is limited to 128
+records per summary window; four output summaries and coverage records remain
+available even if note/event activity exhausts that budget.
+
+The first 20 seconds of traced final output are retained in memory. Turning the
+checkbox off/on retains unsaved PCM, concatenating the enabled intervals within
+that limit. Quit normally or switch games to stop/join the MM worker and write
+`audio-diagnostics/mm-audio-pcm-*.wav` below the MM app directory. The log prints
+the exact path. WAV output is signed 16-bit, stereo, 32000 Hz. There are no disk
+writes on the audio worker. Resource registration is synchronized separately
+from worker-owned statistics/capture; maps and capture are bounded. A process
+crash before normal worker shutdown cannot save the in-memory capture.
+
+Focused observer checks use the actual host, gain and DMEM-probe functions under
+ASan/UBSan: tracing on/off preserves PCM and adjacent workspace in both gain
+modes, BGM/SFX note reuse and sub-update ownership remain separate, pitch changes
+close the right interval, invalid DMEM ranges are rejected, metadata and queue
+observations are recorded, output survives detail-budget exhaustion, A/B toggles
+retain the bounded capture and WAV header/payload are correct. The production
+worker passes with tracing off/on, including stalled rendering, tempo,
+backpressure, mute/mix-ins, restart and shutdown. Complete native mixers pass
+137137 MM / 132529 OoT cases with zero mismatches, and 32/44.1/48 kHz PCM parity
+and full MM audio C translation-unit syntax checks pass. Decoder/platform CI and
+actual shop diagnostic output require their own evidence. This is an implemented,
+focused-regression-verified diagnostic candidate, not an audible shop repair or
+master promotion.
+
 Use the same build configuration, packs, Alt setting and shop that exhibited
 the problem. Listen while idle, browse and buy an item, hear the fanfare, exit
 and re-enter, pause/unpause, and switch OoT -> MM -> OoT -> MM. Check steady

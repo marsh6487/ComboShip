@@ -1,4 +1,5 @@
 #include "2s2h/resource/importer/AudioSequenceFactory.h"
+#include "../../../../combo/audio/MMAudioTraceBridge.h"
 #include "2s2h/resource/type/AudioSequence.h"
 #include "2s2h/resource/importer/AudioSoundFontFactory.h"
 #include <ship/Context.h>
@@ -46,6 +47,8 @@ ResourceFactoryBinaryAudioSequenceV2::ReadResource(std::shared_ptr<Ship::File> f
         audioSequence->sequence.fonts[i] = reader->ReadUByte();
     }
 
+    MM_AudioTraceResource(1, reinterpret_cast<uintptr_t>(audioSequence->sequence.seqData), initData->Path.c_str(),
+                          nullptr, 0);
     return audioSequence;
 }
 
@@ -407,6 +410,8 @@ ResourceFactoryXMLAudioSequenceV0::ReadResource(std::shared_ptr<Ship::File> file
         }
     }
 
+    MM_AudioTraceResource(1, reinterpret_cast<uintptr_t>(sequence->sequence.seqData), initData->Path.c_str(), path,
+                          streamed);
     return sequence;
 }
 } // namespace SOH
