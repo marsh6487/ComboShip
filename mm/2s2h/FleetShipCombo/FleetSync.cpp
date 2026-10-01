@@ -293,6 +293,8 @@ void ApplyInvItem(const nlohmann::json& inv, const char* key, int slot, uint8_t 
     }
     if (inv[key].get<bool>()) {
         if (MM_INV.items[slot] == 0xFF) {
+            SPDLOG_INFO("[ItemGrantAudit] MM shared-state grant: file={} key={} inventorySlot={} item={}",
+                        (int)gSaveContext.fileNum, key, slot, (int)itemId);
             MM_INV.items[slot] = itemId;
         }
     }
@@ -888,8 +890,13 @@ void ApplyShared(const nlohmann::json& sh) {
             nei->ootBoomerangOwned = 1;
         if (inv.value("hammer", false))
             nei->ootHammerOwned = 1;
-        if (inv.value("dins", false))
+        if (inv.value("dins", false)) {
+            if (!(nei->ootSpellsOwned & (1 << 0))) {
+                SPDLOG_INFO("[ItemGrantAudit] MM shared-state grant: file={} key=dins spellsBefore={}",
+                            (int)gSaveContext.fileNum, (int)nei->ootSpellsOwned);
+            }
             nei->ootSpellsOwned |= (1 << 0);
+        }
         if (inv.value("farores", false))
             nei->ootSpellsOwned |= (1 << 1);
         if (inv.value("nayrus", false))

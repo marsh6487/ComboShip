@@ -90,6 +90,14 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             sGiveDepth--;
         }
     } _dg;
+#ifdef COMBO_BUILD
+    if (sGiveDepth == 1) {
+        SPDLOG_INFO("[ItemGrantAudit] MM native grant: file={} seed={} item={} check={} dormant={} suppressed={}",
+                    (int)gSaveContext.fileNum, gSaveContext.save.shipSaveInfo.rando.finalSeed,
+                    (int)randoItemId, (int)randoCheckId, (int)Rando::gComboDormantGive,
+                    (int)gFcCombo_SuppressRecord);
+    }
+#endif
     if (sGiveDepth == 1 && gFcCombo_SuppressRecord == 0) {
         // Dual Cane skills: MM's pool places SIX DISTINCT skill RIs, but the FC table pairs one RG
         // with one RI — soh's side is six copies of the single RG_CANE_OF_SOMARIA, all counting into

@@ -247,6 +247,8 @@ void ApplyInvItem(const nlohmann::json& inv, const char* key, int slot, uint8_t 
     }
     if (inv[key].get<bool>()) {
         if (gSaveContext.inventory.items[slot] == 0xFF) {
+            SPDLOG_INFO("[ItemGrantAudit] OOT shared-state grant: file={} key={} inventorySlot={} item={}",
+                        (int)gSaveContext.fileNum, key, slot, (int)itemId);
             gSaveContext.inventory.items[slot] = itemId;
         }
     }

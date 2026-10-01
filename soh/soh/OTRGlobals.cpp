@@ -4104,6 +4104,8 @@ extern "C" COMBO_EXPORT void SOH_RaiseSharedTier(int family, int tier) try {
                 }
             } flagGuard;
             gComboSuppressAnchorSend = 1;
+            SPDLOG_INFO("[ItemGrantAudit] OOT shared-tier grant: file={} family={} current={} target={} rg={}",
+                        (int)gSaveContext.fileNum, family, cur, tier, (int)rg);
             GetItemEntry gie = Rando::StaticData::RetrieveItem(rg).GetGIEntry_Copy();
             Combo_GrantResolvedOOT(gie);
         }

@@ -52,6 +52,9 @@ static uint16_t rupeeCounts[] = {
 
 void StartingItemGive(GetItemEntry getItemEntry, RandomizerCheck randomizerCheck) {
 #ifdef COMBO_BUILD
+    SPDLOG_INFO("[ItemGrantAudit] OOT starting reward: slot={} check={} mod={} item={} getItem={}",
+                (int)gSaveContext.fileNum, (int)randomizerCheck, (int)getItemEntry.modIndex,
+                (int)getItemEntry.itemId, (int)getItemEntry.getItemId);
     // ComboShip: an unplaced save-creation check yields ITEM_NONE/MOD_NONE; Item_Give(0xFF) would
     // assert. Skip it loudly instead of crashing file creation (belt-and-suspenders behind the fix).
     if (getItemEntry.modIndex == MOD_NONE && getItemEntry.itemId == ITEM_NONE) {
