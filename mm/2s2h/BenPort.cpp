@@ -4799,7 +4799,9 @@ extern "C" int Combo_MM_BombchuBagShared(void) {
 }
 
 extern "C" COMBO_EXPORT int MM_GetSharedTier(int family) try {
-    if (family < 0 || family >= ComboRando::SF_COUNT)
+    // Owl-save quit clears this save before the launcher invalidates its resident-slot cache.
+    // Zero-filled item slots are not ownership; only a loaded randomizer save is a tier source.
+    if (!IS_RANDO || family < 0 || family >= ComboRando::SF_COUNT)
         return 0;
     switch (static_cast<ComboRando::SharedFamily>(family)) {
         case ComboRando::SF_BOW:
@@ -4816,11 +4818,11 @@ extern "C" COMBO_EXPORT int MM_GetSharedTier(int family) try {
         case ComboRando::SF_HOOKSHOT:
             return INV_CONTENT(ITEM_HOOKSHOT) != ITEM_NONE ? 1 : 0;
         case ComboRando::SF_FIRE_ARROWS:
-            return INV_CONTENT(ITEM_ARROW_FIRE) != ITEM_NONE ? 1 : 0;
+            return INV_CONTENT(ITEM_ARROW_FIRE) == ITEM_ARROW_FIRE ? 1 : 0;
         case ComboRando::SF_ICE_ARROWS:
-            return INV_CONTENT(ITEM_ARROW_ICE) != ITEM_NONE ? 1 : 0;
+            return INV_CONTENT(ITEM_ARROW_ICE) == ITEM_ARROW_ICE ? 1 : 0;
         case ComboRando::SF_LIGHT_ARROWS:
-            return INV_CONTENT(ITEM_ARROW_LIGHT) != ITEM_NONE ? 1 : 0;
+            return INV_CONTENT(ITEM_ARROW_LIGHT) == ITEM_ARROW_LIGHT ? 1 : 0;
         case ComboRando::SF_LENS:
             return INV_CONTENT(ITEM_LENS_OF_TRUTH) != ITEM_NONE ? 1 : 0;
         case ComboRando::SF_EPONAS_SONG:
@@ -4850,7 +4852,8 @@ extern "C" COMBO_EXPORT int MM_GetSharedTier(int family) try {
 
 extern "C" COMBO_EXPORT void MM_RaiseSharedTier(int family, int tier) try {
     ItemGrantAudit::Scope itemGrantAuditScope("MM_RaiseSharedTier");
-    if (family < 0 || family >= ComboRando::SF_COUNT)
+    // The cleared quit/title save is neither a source nor a destination for shared grants.
+    if (!IS_RANDO || family < 0 || family >= ComboRando::SF_COUNT)
         return;
     const auto& def = ComboRando::SharedFamilyByIndex(family);
     tier = std::min(tier, def.mmTierCap);

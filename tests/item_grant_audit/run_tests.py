@@ -157,6 +157,123 @@ int main() {
         subprocess.run([CXX, *flags, *sanitizer, '-I', str(ROOT), str(path), '-o', str(binary)], check=True)
         subprocess.run([str(binary)], check=True, env=env)
 
+    # Execute the production dungeon/spell cases. These are local MM effects;
+    # cross-game identity recording happens before the switch and is untouched.
+    grant_src = read('mm/2s2h/Rando/GiveItem.cpp')
+    dungeon_start = grant_src.index('        case RI_OOT_BOSS_KEY_FIRE_TEMPLE:')
+    spell_start = grant_src.index('        case RI_OOT_DINS_FIRE:', dungeon_start)
+    gear_start = grant_src.index('        case RI_OOT_BOOMERANG:', spell_start)
+    local_cases = grant_src[dungeon_start:gear_start]
+    dungeon_ids = re.findall(r'case (RI_\w+):', grant_src[dungeon_start:spell_start])
+    assert len(dungeon_ids) == 46, 'Update coverage for added dungeon items'
+    moon_start = grant_src.index('        case RI_MOONS_TEAR:')
+    moon_end = grant_src.index('        case RI_DEED_LAND:', moon_start)
+    moon_case = grant_src[moon_start:moon_end]
+    types = read('mm/2s2h/Rando/Types.h')
+    fixture = '#include <cassert>\n#include <iostream>\n'
+    fixture += declaration(types, 'RandoItemId') + '\n'
+    fixture += declaration(types, 'RandoInf') + '\n'
+    fixture += '''
+struct { unsigned ootSpellsOwned; } nei;
+auto* Nei_Save() { return &nei; }
+bool moonOwned=false;
+unsigned nativeGives=0;
+void Flags_SetRandoInf(RandoInf flag) {
+    assert(flag == RANDO_INF_OBTAINED_MOONS_TEAR);
+    moonOwned=true;
+}
+void* gPlayState=nullptr;
+void Item_Give(void*, int item) { assert(item == 0x28); ++nativeGives; }
+namespace Rando::StaticData { struct Entry { int itemId; }; Entry Items[RI_MAX]{}; }
+void Grant(RandoItemId randoItemId) {
+    switch(randoItemId) {
+'''
+    fixture += local_cases + moon_case + 'default: assert(false);\n}\n}\n'
+    fixture += 'int main() {\nconst RandoItemId dungeonItems[] = {' + ','.join(dungeon_ids) + '};\n'
+    fixture += '''
+    Rando::StaticData::Items[RI_MOONS_TEAR].itemId=0x28;
+    for (unsigned spells=0; spells<8; ++spells) {
+        for (bool moon : {false, true}) {
+            for (auto item : dungeonItems) {
+                nei.ootSpellsOwned=spells; moonOwned=moon; nativeGives=0;
+                Grant(item);
+                assert(nei.ootSpellsOwned == spells);
+                assert(moonOwned == moon && nativeGives == 0);
+            }
+            nei.ootSpellsOwned=spells; moonOwned=moon; nativeGives=0;
+            Grant(RI_MOONS_TEAR);
+            assert(nei.ootSpellsOwned == spells && moonOwned && nativeGives == 1);
+            const RandoItemId spellsToGive[] = {RI_OOT_DINS_FIRE, RI_OOT_FARORES_WIND, RI_OOT_NAYRUS_LOVE};
+            for (unsigned i=0; i<3; ++i) {
+                nei.ootSpellsOwned=spells; moonOwned=moon; nativeGives=0;
+                Grant(spellsToGive[i]);
+                assert(nei.ootSpellsOwned == (spells | (1u << i)));
+                assert(moonOwned == moon && nativeGives == 0);
+            }
+        }
+    }
+    std::cout << "MM production grant cases: 46 dungeon items, Moon's Tear and all spells PASS\\n";
+}
+'''
+    run_cpp('mm_dungeon_spell_grants', fixture)
+
+    # The launcher can still consider the MM slot resident during owl-save quit.
+    # Exercise the actual tier reader with the reset (zero-filled) save, as well
+    # as valid dormant/file-select saves; gameMode alone cannot validate a save.
+    port = read('mm/2s2h/BenPort.cpp')
+    tiers = function(port, 'extern "C" COMBO_EXPORT int MM_GetSharedTier(int family) try {')
+    raise_start = port.index('extern "C" COMBO_EXPORT void MM_RaiseSharedTier(int family, int tier) try {')
+    raise_prefix = port[raise_start:port.index('    const auto& def', raise_start)]
+    fixture = '''
+#include <cassert>
+#include <iostream>
+#include "ItemGrantAuditBridge.h"
+namespace ComboRando {
+'''
+    shared = comments(read('combo/rando/SharedItems.h'))
+    fixture += re.search(r'enum SharedFamily[^}]+};', shared, re.S)[0] + '\n}\n'
+    fixture += declaration(read('mm/include/z64item.h'), 'ItemId') + '\n'
+    fixture += '''
+#define COMBO_EXPORT
+#define IS_RANDO (gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO)
+constexpr int SAVETYPE_RANDO=1;
+int inventory[256]{};
+#define INV_CONTENT(item) inventory[item]
+#define CUR_UPG_VALUE(upg) 0
+#define CHECK_QUEST_ITEM(quest) 0
+struct { struct {
+    struct { struct { int isMagicAcquired=0, isDoubleMagicAcquired=0; } playerData; } saveInfo;
+    struct { int saveType=0; } shipSaveInfo;
+} save; } gSaveContext;
+'''
+    fixture += tiers + ' catch (...) { assert(false); return 0; }\n'
+    # Model downstream grant services, after the actual production entry guard.
+    fixture += 'int downstreamGrants=0;\n' + raise_prefix
+    fixture += '(void)tier; ++downstreamGrants; } catch (...) { assert(false); }\n'
+    fixture += '''
+int main() {
+    for(int family=0; family<ComboRando::SF_COUNT; ++family) {
+        assert(MM_GetSharedTier(family) == 0);
+        MM_RaiseSharedTier(family, 1);
+    }
+    assert(downstreamGrants == 0);
+    // A loaded dormant save is valid even when no PlayState exists.
+    gSaveContext.save.shipSaveInfo.saveType=SAVETYPE_RANDO;
+    MM_RaiseSharedTier(ComboRando::SF_LIGHT_ARROWS, 1);
+    assert(downstreamGrants == 1);
+    const int families[] = {ComboRando::SF_FIRE_ARROWS, ComboRando::SF_ICE_ARROWS, ComboRando::SF_LIGHT_ARROWS};
+    const int items[] = {ITEM_ARROW_FIRE, ITEM_ARROW_ICE, ITEM_ARROW_LIGHT};
+    for(unsigned i=0; i<3; ++i) {
+        for(int value : {0, static_cast<int>(ITEM_NONE), items[i]}) {
+            inventory[items[i]]=value;
+            assert(MM_GetSharedTier(families[i]) == (value == items[i]));
+        }
+    }
+    std::cout << "MM shared tiers: cleared save rejected, dormant arrow ownership exact PASS\\n";
+}
+'''
+    run_cpp('mm_shared_tiers', fixture)
+
     # Verify C ABI and stock builds: stock bridge needs no linked observer.
     bridge = '''
 #include "ItemGrantAuditBridge.h"

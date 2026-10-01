@@ -7,11 +7,11 @@ returning to OoT, with no remembered get-item notification. Absence of a
 notification does not identify the writer: dormant delivery and reconciliation
 can legitimately bypass the visible pickup animation.
 
-This is a passive diagnostic candidate. Parent: the published initial probe
+This candidate includes passive diagnostics and the narrow item repairs described below. Parent: the published initial probe
 `e5d16f21d31ff396b9658fa099bb2852aedebbf1`, stacked on the transformation-collision
 candidate `6ba22e0d1a079464220837111ac487dc06be24e8` (PR #30). The parents' runtime
-limitations remain unresolved. No item gameplay repair, save rewrite, reseed, change
-to progression, merge or promotion is part of this PR. The accompanying audio
+limitations remain unresolved. No existing-save rewrite, reseed, merge or promotion
+is part of this PR. The accompanying audio
 correction is opt-in and recorded below. Existing renderer, audio,
 reward-pool and transformation work is retained.
 
@@ -23,6 +23,42 @@ ownership. Exceptions at the diagnostic boundary are swallowed. No PlayState
 pointer is dereferenced by the capture functions. Non-Combo builds use a no-op
 bridge; observer symbols remain internal to each game DLL under the existing
 hidden-visibility build configuration.
+
+## Runtime evidence and item repairs (October 1 follow-up)
+
+The latest session in `Fleet of Harkinian(20261001-154019).log` reports seed
+668268527. At 10:32:03.292, the Water Temple small key grant changes
+`nei.ootSpellsOwned` from 0 to 1. Delivery identifies the Bank Adult's Wallet
+check. The Forest Temple key from Astral Observatory Passage Pot 03 follows at
+10:32:05.978. All 46 OoT dungeon-item cases in MM's `Rando::GiveItem` fell through
+to Din's Fire because their no-effect branch lacked a break. The repair ends that
+branch; FC identity recording before the switch is preserved. Moon's Tear instead
+sets `RANDO_INF_OBTAINED_MOONS_TEAR` and gives native item 0x28, with its own break.
+It does not use `ootSpellsOwned`. Existing accidental ownership is not removed.
+
+At 10:37:24.747, MM's save reset leaves zero-filled item slots and saveType 0;
+the same timestamp reports an OoT Item_Give of 0x12 (Light Arrows). At
+10:39:54.244, after the matching MM save reload, `MM_RaiseSharedTier` gives Light
+Arrows to MM. The launcher invalidates its MM resident-slot cache only after the
+MM loop returns, while the shared tick can still run during reset. Previously
+`MM_GetSharedTier` considered any value other than 0xFF owned, including reset
+zeros. The repair rejects non-randomizer save state in both MM tier reading and
+raising, and requires the actual arrow item ID for each elemental arrow tier.
+Valid dormant saves remain eligible; this is not a gameplay-only gate. This path
+matches the reported quit/reload behavior, but the log contains no OoT audit
+records to attribute its initial grant beyond the native Item_Give line.
+
+The new extracted-production regression reproduces the dungeon fallthrough and
+reset-save tier failure before correction. After correction, ASan/UBSan checks
+cover all 46 dungeon IDs with all spell combinations and Moon's Tear states,
+legitimate spell/Moon grants, reset-save source/destination rejection, valid
+dormant eligibility, and exact arrow ownership. These narrow fixtures model host
+services and do not replace platform builds or runtime acceptance.
+
+The audio log confirms both checkbox states executed the gain path (384 requested
+bytes: 384 processed on, 768 off). The user's audible A/B test reports continued
+shop crunch in both modes. The gain span defect remains corrected behind the
+opt-in setting; it has not resolved the reported shop audio problem.
 
 ## Writer coverage and criteria
 

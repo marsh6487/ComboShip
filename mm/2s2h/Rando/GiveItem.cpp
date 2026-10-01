@@ -909,6 +909,8 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         case RI_OOT_SMALL_KEY_SPIRIT_TEMPLE:
         case RI_OOT_SMALL_KEY_TREASURE_GAME:
         case RI_OOT_SMALL_KEY_WATER_TEMPLE:
+            // Their FC identity was recorded above; do not fall through into Din's Fire.
+            break;
         // Skijer's NEI — OoT page-0 gear/spells: real grants into the NeiSaveData fields that back the
         // OoT-layout kaleido page 0 (extended_inventory.c VSLOT_* cells) and that FleetSync ships to
         // OoT (inv.dins/farores/nayrus/boomerang/hammer). Obtaining in MM == obtaining in OoT.

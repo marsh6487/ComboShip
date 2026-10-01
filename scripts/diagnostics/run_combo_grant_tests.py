@@ -58,6 +58,8 @@ preamble += 'enum RandoItemId {' + ','.join(ri_names) + '};\n'
 preamble += r'''
 int depth = 0, echoes = 0, ootTier = 0, mmTier = 0, persisted = 0;
 bool throwGrant = false;
+bool mmSaveLoaded = true;
+#define IS_RANDO mmSaveLoaded
 extern "C" void FleetShared_BeginReceive() { ++depth; }
 extern "C" void FleetShared_EndReceive() { --depth; }
 extern "C" int FleetShared_IsReceiving() { return depth > 0; }
@@ -115,8 +117,13 @@ void check(bool condition, const char* label) {
     if (!condition) { std::cerr << "FAIL: " << label << '\n'; ++failures; }
 }
 void reset() { depth = echoes = ootTier = mmTier = persisted = 0; throwGrant = false; gPlayState = nullptr;
+    mmSaveLoaded = true;
     gSaveContext.isMagicAcquired = gSaveContext.isDoubleMagicAcquired = false; gComboSuppressAnchorSend = 0; }
 int main() {
+    reset(); mmSaveLoaded = false;
+    MM_RaiseSharedTier(ComboRando::SF_LIGHT_ARROWS, 1);
+    check(mmTier == 0 && persisted == 0 && depth == 0 && echoes == 0,
+          "cleared MM quit save rejects shared grants without persistence");
     reset();
     SOH_RaiseSharedTier(ComboRando::SF_BOW, 1);
     check(ootTier == 1 && echoes == 0 && depth == 0, "OoT convergence raises once without NEI echo");
