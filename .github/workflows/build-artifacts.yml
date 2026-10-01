@@ -147,6 +147,11 @@ jobs:
           python3 scripts/diagnostics/run_mm_item_visuals_tests.py
           python3 scripts/diagnostics/run_mm_gfx_patch_tests.py
 
+      - name: Foreign soul replacement skeletons and limb matrices
+        run: |
+          python3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py
+          python3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py --sanitize
+
       - name: 2Ship mod GUI fonts
         run: python3 scripts/diagnostics/run_mm_mod_font_tests.py
 

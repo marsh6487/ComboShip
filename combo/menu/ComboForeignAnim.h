@@ -281,12 +281,31 @@ inline bool CfaValidateTexAnim(const CfaMatEntry* mat) {
     return seg < 0; // must have hit the negative-segment terminator
 }
 
+// Both resource factories expose the loaded skeleton kind in this header byte. MM's public
+// SkeletonHeader omits it, so use the factory layout rather than reading host-struct padding.
+// A replacement may turn a vanilla rigid skeleton into a flex skeleton; its shared limb
+// matrices must be generated even when the foreign recipe describes the vanilla rigid model.
+struct CfaLoadedSkeletonHeader {
+    void** segment;
+    uint8_t limbCount;
+    uint8_t skeletonType;
+};
+struct CfaLoadedFlexSkeletonHeader {
+    CfaLoadedSkeletonHeader sh;
+    uint8_t dListCount;
+};
+static_assert(sizeof(CfaLoadedSkeletonHeader) == sizeof(SkeletonHeader));
+static_assert(sizeof(CfaLoadedFlexSkeletonHeader) == sizeof(FlexSkeletonHeader));
+constexpr uint8_t kCfaSkeletonNormal = 0;
+constexpr uint8_t kCfaSkeletonFlex = 1;
+
 // ---- Per-item caches. Resources are held as shared_ptr so they stay alive in the owning RM's
 // cache; SkelAnime/jointTable storage is node-stable (unordered_map). Negative results are cached
 // (ok=false) so a broken item costs one attempt, then falls back to the sentinel forever.
 
 struct CfaSkelEntry {
     bool ok = false;
+    bool nonFlexSkeleton = false; // selected from the loaded asset, not the vanilla recipe
     std::shared_ptr<Ship::IResource> skelRes;
     std::shared_ptr<Ship::IResource> animRes;
     SkelAnime skelAnime{};
@@ -679,7 +698,8 @@ inline int32_t ComboForeignAnim_Draw(const CwItemAnimDrawInfo* info, const char*
     if (info->opa && !CfaValidateOpaInfo(info)) {
         return 0; // unexpressible recipe — sentinel beats an unbound-segment draw
     }
-    if (Ship::CrossRMRegistry::Get(game) == nullptr) {
+    auto owningRm = Ship::CrossRMRegistry::Get(game);
+    if (owningRm == nullptr) {
         return 0; // owning game not resident: bail before any Gfx is emitted
     }
 
@@ -687,7 +707,10 @@ inline int32_t ComboForeignAnim_Draw(const CwItemAnimDrawInfo* info, const char*
 
     // -- skeleton + animation (keyed by skel+anim; all variants sharing a pair share one instance,
     //    so like MM's single-instance approach all on-screen copies animate in unison) --
-    std::string skelKey = std::string(info->skelPath) + "|" + info->animPath;
+    // Keep the owner and its live Alt selection in the key. Otherwise toggling assets leaves
+    // cached limb pointers/type from the first draw paired with the other selection's DLs.
+    std::string skelKey = std::string(game) + "|" + (owningRm->IsAltAssetsEnabled() ? "alt|" : "vanilla|") +
+                          info->skelPath + "|" + info->animPath;
     auto skelIt = sCfaSkelCache.find(skelKey);
     if (skelIt == sCfaSkelCache.end()) {
         skelIt = sCfaSkelCache.emplace(skelKey, CfaSkelEntry{}).first;
@@ -704,26 +727,29 @@ inline int32_t ComboForeignAnim_Draw(const CwItemAnimDrawInfo* info, const char*
                 e.animRes = rm->LoadResource(info->animPath);
             }
 
-            FlexSkeletonHeader* skel = e.skelRes ? (FlexSkeletonHeader*)e.skelRes->GetRawPointer() : NULL;
+            auto* skel = e.skelRes ? (CfaLoadedSkeletonHeader*)e.skelRes->GetRawPointer() : nullptr;
             AnimationHeader* anim = e.animRes ? (AnimationHeader*)e.animRes->GetRawPointer() : NULL;
             // soh's SkelAnime_Init/InitFlex assert limbCount == sh.limbCount + 1 — pre-validate instead.
-            if (skel != NULL && anim != NULL && info->limbCount > 0 && (s32)skel->sh.limbCount + 1 == info->limbCount) {
+            if (skel != NULL && anim != NULL && info->limbCount > 0 && (s32)skel->limbCount + 1 == info->limbCount &&
+                (skel->skeletonType == kCfaSkeletonNormal || skel->skeletonType == kCfaSkeletonFlex) &&
+                (info->opa || skel->skeletonType == kCfaSkeletonFlex)) {
+                e.nonFlexSkeleton = skel->skeletonType == kCfaSkeletonNormal;
                 e.jointTable.resize(info->limbCount);
                 if (info->opa) {
                     e.morphTable.resize(info->limbCount);
-                    if (info->nonFlexSkeleton) {
+                    if (e.nonFlexSkeleton) {
                         SkelAnime_Init(play, &e.skelAnime, (SkeletonHeader*)skel, anim, e.jointTable.data(),
                                        e.morphTable.data(), info->limbCount);
                     } else {
-                        SkelAnime_InitFlex(play, &e.skelAnime, skel, anim, e.jointTable.data(), e.morphTable.data(),
-                                           info->limbCount);
+                        SkelAnime_InitFlex(play, &e.skelAnime, (FlexSkeletonHeader*)skel, anim, e.jointTable.data(),
+                                           e.morphTable.data(), info->limbCount);
                     }
                     if (info->playSpeed != 0.0f) {
                         e.skelAnime.playSpeed = info->playSpeed;
                     }
                 } else {
-                    SkelAnime_InitFlex(play, &e.skelAnime, skel, anim, e.jointTable.data(), e.jointTable.data(),
-                                       info->limbCount);
+                    SkelAnime_InitFlex(play, &e.skelAnime, (FlexSkeletonHeader*)skel, anim, e.jointTable.data(),
+                                       e.jointTable.data(), info->limbCount);
                 }
                 e.ok = true;
             }
@@ -817,7 +843,7 @@ inline int32_t ComboForeignAnim_Draw(const CwItemAnimDrawInfo* info, const char*
         gSPComboRMPush(POLY_XLU_DISP++, game);
         CLOSE_DISPS(play->state.gfxCtx);
 
-        if (info->nonFlexSkeleton) {
+        if (skelEntry.nonFlexSkeleton) {
             SkelAnime_DrawOpa(play, skelEntry.skelAnime.skeleton, skelEntry.skelAnime.jointTable,
                               CfaOverrideLimbDrawOpa, CfaPostLimbDrawOpa, NULL);
         } else {
@@ -829,6 +855,10 @@ inline int32_t ComboForeignAnim_Draw(const CwItemAnimDrawInfo* info, const char*
         gSPComboRMPop(POLY_OPA_DISP++);
         gSPComboRMPop(POLY_XLU_DISP++);
         CLOSE_DISPS(play->state.gfxCtx);
+        if (!skelEntry.nonFlexSkeleton) {
+            const int32_t matrixSegment = 13;
+            CfaRestoreSegs(play, &matrixSegment, 1);
+        }
 
         if (info->flameDlPath != NULL && info->flameAfter) {
             CfaDrawFlame(play, info, game, segs, &segCount); // MM: flame inherits the model transform
