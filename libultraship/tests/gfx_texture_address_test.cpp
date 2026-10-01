@@ -8,6 +8,10 @@
 #include <dlfcn.h>
 #include <memory>
 #include <string>
+#include <vector>
+
+template <typename... Args> static void IgnoreDiagnostic(const Args&...) {}
+#define SPDLOG_ERROR(...) IgnoreDiagnostic(__VA_ARGS__)
 
 // External linkage lets dladdr recognize these low mapped addresses in non-PIE tests.
 alignas(8) unsigned char gTestRawTexture[128] = { 0x12, 0x34, 0x56, 0x78 };
@@ -17,6 +21,7 @@ namespace Ship {
 class ResourceManager {
   public:
     bool OtrSignatureCheck(const char* fileName);
+    bool IsAltAssetsEnabled() { return false; }
     std::shared_ptr<IResource> LoadResourceProcess(const char* path) {
         assert(std::strcmp(path, gTestTexturePath) == 0);
         ++loads;

@@ -26,7 +26,7 @@ def run_texture():
     names=['Interpreter::SegAddr','IsValidResolvedAddress','gfx_check_image_signature']
     if 'ComboLoadTextureResource(' in source:
         names.append('ComboLoadTextureResource')
-    names+=['gfx_set_timg_handler_rdp','gfx_set_timg_otr_filepath_handler_custom']
+    names+=['ReportTextureLoadFailure','gfx_set_timg_handler_rdp','gfx_set_timg_otr_filepath_handler_custom']
     with tempfile.TemporaryDirectory(prefix='foreign-texture-') as temporary:
         build=Path(temporary)
         (build/'texture_signature.inc').write_text(function(manager,'ResourceManager::OtrSignatureCheck'))
