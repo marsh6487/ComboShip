@@ -1,5 +1,6 @@
 #include "global.h"
 #include "audio/effects.h"
+#include "audio/streamed_positional.h"
 #include "BenPort.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
@@ -117,6 +118,7 @@ void AudioPlayback_InitSampleState(Note* note, NoteSampleState* sampleState, Not
 
     sampleState->gain = subAttrs->gain;
     sampleState->filter = subAttrs->filter;
+    Audio_ApplyStreamedPositionalPolicy(sampleState, &sampleState->gain, &sampleState->filter);
     sampleState->combFilterSize = subAttrs->combFilterSize;
     sampleState->combFilterGain = subAttrs->combFilterGain;
     sampleState->targetReverbVol = targetReverbVol;
@@ -549,6 +551,8 @@ void AudioPlayback_SeqLayerDecayRelease(SequenceLayer* layer, s32 target) {
             }
 
             attrs->filter = channel->filter;
+            // Freeze the effective policy before copying the filter for a released note.
+            Audio_ApplyStreamedPositionalPolicy(&note->sampleState, &attrs->gain, &attrs->filter);
 
             if (attrs->filter != NULL) {
                 for (i = 0; i < 8; i++) {

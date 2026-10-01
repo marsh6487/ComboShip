@@ -26,10 +26,10 @@ template<class... T> void Log(const T&... args) {
 }
 #define SPDLOG_INFO(...) Log(__VA_ARGS__)
 #define SPDLOG_ERROR(...) Log(__VA_ARGS__)
-int traceCvar=0, gainFix=0;
+int traceCvar=0, cleanPositional=0;
 int CVarGetInteger(const char* name, int value) {
     if (!std::strcmp(name, "gDeveloperTools.MMAudioPCMTrace")) return traceCvar;
-    if (!std::strcmp(name, "gEnhancements.Fixes.MMAudioGainBuffer")) return gainFix;
+    if (!std::strcmp(name, "gEnhancements.Fixes.MMStreamedPositionalAudio")) return cleanPositional;
     return value;
 }
 #include "combo/audio/MMAudioTraceHost.h"
@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
     note.tuning=1.378125f;
     int16_t baseline[1024];
     for (int mode=0; mode<2; ++mode) {
-        gainFix=mode; trace.SetEnabled(false);
+        cleanPositional=mode; trace.SetEnabled(false);
         std::fill_n(buffer, 1024, 10000);
         aHiLoGainImpl(127, 64, 0x3B0);
         std::memcpy(baseline, buffer, sizeof(buffer));

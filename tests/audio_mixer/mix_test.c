@@ -12,20 +12,15 @@
 
 #ifdef TEST_MM_HILOGAIN
 #include <assert.h>
-static int hiLoGainFix;
 static unsigned hiLoGainModeReports;
 void MM_LogAudioGainMode(int enabled, int gain, int requestedBytes,
                          int processedBytes) {
-  assert(enabled == hiLoGainFix);
+  assert(enabled == 1);
   assert(gain >= 0 && gain <= 255);
-  assert(processedBytes == requestedBytes * (enabled ? 1 : 2));
+  assert(processedBytes == requestedBytes);
   ++hiLoGainModeReports;
 }
-int32_t CVarGetInteger(const char *name, int32_t defaultValue) {
-  assert(strcmp(name, "gEnhancements.Fixes.MMAudioGainBuffer") == 0);
-  assert(defaultValue == 0);
-  return hiLoGainFix;
-}
+
 #endif
 
 static unsigned failures;
@@ -163,12 +158,11 @@ static void checkHiLoGain(void) {
   const uint16_t lengths[] = {1, 16, 31, 32, 33, 64, 352, 384, 416};
   int16_t original[DMEM_BUF_SIZE / sizeof(int16_t)];
   int16_t expected[DMEM_BUF_SIZE / sizeof(int16_t)];
-  for (int enabled = 0; enabled <= 1; ++enabled) {
-    hiLoGainFix = enabled;
+  {
     for (unsigned gain = 0; gain <= 255; ++gain) {
       for (size_t n = 0; n < sizeof(lengths) / sizeof(lengths[0]); ++n) {
         const size_t span =
-            ((lengths[n] + 31) & ~31) / sizeof(int16_t) * (enabled ? 1 : 2);
+            ((lengths[n] + 31) & ~31) / sizeof(int16_t);
         const size_t offset = (0x3B0 - 0x330) / sizeof(int16_t);
         for (size_t i = 0; i < sizeof(original) / sizeof(original[0]); ++i)
           original[i] = nextSample();
@@ -187,7 +181,7 @@ static void checkHiLoGain(void) {
       }
     }
   }
-  assert(hiLoGainModeReports == 2);
+  assert(hiLoGainModeReports == 1);
 }
 #endif
 

@@ -590,14 +590,13 @@ void aFilterImpl(uint8_t flags, uint16_t count_or_buf, int16_t* state_or_filter)
     }
 }
 
-// Report first gain use and live opt-in changes through the MM host.
+// Report first corrected gain use through the MM host.
 extern void MM_LogAudioGainMode(int enabled, int gain, int requestedBytes, int processedBytes);
 
 void aHiLoGainImpl(uint8_t g, uint16_t count, uint16_t addr) {
     int16_t* samples = BUF_S16(addr);
     int nbytes = ROUND_UP_32(count);
-    const int enabled = CVarGetInteger("gEnhancements.Fixes.MMAudioGainBuffer", 0) != 0;
-    const int consumedBytes = enabled ? 8 * sizeof(int16_t) : 8;
+    const int consumedBytes = 8 * sizeof(int16_t);
     unsigned traceClips = 0;
     const int tracing = MM_AudioTraceEnabled();
     const unsigned traceSamples = tracing ? MM_AudioTraceNoteSamples(nbytes / 2) : 0;
@@ -608,10 +607,10 @@ void aHiLoGainImpl(uint8_t g, uint16_t count, uint16_t addr) {
             traceClips += amplified < INT16_MIN || amplified > INT16_MAX;
         }
     }
-    static int observedMode = -1;
-    if (observedMode != enabled) {
-        observedMode = enabled;
-        MM_LogAudioGainMode(enabled, g, nbytes, enabled ? nbytes : nbytes * 2);
+    static int reported = 0;
+    if (!reported) {
+        reported = 1;
+        MM_LogAudioGainMode(1, g, nbytes, nbytes);
     }
 
     do {
@@ -632,7 +631,7 @@ void aHiLoGainImpl(uint8_t g, uint16_t count, uint16_t addr) {
         *samples = clamp16((*samples * g) >> 4);
         samples++;
 
-        // The opt-in fix counts eight s16 samples as bytes; off retains the baseline.
+        // Eight s16 samples consume sixteen bytes, including the final rounded block.
         nbytes -= consumedBytes;
     } while (nbytes > 0);
     if (tracing)

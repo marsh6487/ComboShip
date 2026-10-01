@@ -1953,23 +1953,13 @@ void BenMenu::AddEnhancements() {
                      .Tooltip("Fixes textures that normally overflow to be patched with the correct size or format.")
                      .DefaultValue(true))
         .Callback([](WidgetInfo& info) { GfxPatcher_ApplyOverflowTexturePatches(); });
-    AddWidget(path, "Fix MM Audio Gain Buffer", WIDGET_CVAR_CHECKBOX)
-        .CVar("gEnhancements.Fixes.MMAudioGainBuffer")
+    AddWidget(path, "Clean Streamed Positional Music", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.Fixes.MMStreamedPositionalAudio")
         .Options(CheckboxOptions()
-                     .Tooltip("Corrects an MM audio gain buffer overrun that can distort music or sound effects. "
-                              "Applies immediately. Turn off to compare with the existing audio behavior.")
+                     .Tooltip("Removes native point-source band-pass filtering and high gain from streamed music "
+                              "in shops and other scenes. Preserves distance volume, pan, reverb and native "
+                              "instrument music. Applies immediately; off by default.")
                      .DefaultValue(false));
-#ifdef COMBO_BUILD
-    AddWidget(path, "Trace MM Shop Audio", WIDGET_CVAR_CHECKBOX)
-        .CVar("gDeveloperTools.MMAudioPCMTrace")
-        .Options(
-            CheckboxOptions()
-                .Tooltip(
-                    "Logs loaded music resources, PCM processing and audio queue health without changing playback. "
-                    "Enable inside the affected shop. Captures up to 20 seconds of output; saves the WAV in "
-                    "audio-diagnostics when MM audio stops (quit or switch games). Off by default.")
-                .DefaultValue(false));
-#endif
     AddWidget(path, "Fix Completed Heart Container Audio", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Fixes.CompletedHeartContainerAudio")
         .Options(CheckboxOptions().Tooltip(

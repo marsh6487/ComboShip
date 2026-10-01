@@ -36,18 +36,19 @@ inline void Poll() try {
     trace.SetEnabled(CVarGetInteger("gDeveloperTools.MMAudioPCMTrace", 0) != 0);
     if (!trace.enabled)
         return;
-    static int previousScene = -2, previousRoom = -2, previousMode = -2, previousGain = -1, previousAlt = -1;
+    static int previousScene = -2, previousRoom = -2, previousMode = -2, previousClean = -1, previousAlt = -1;
     const int s = scene.load(), r = room.load(), m = mode.load();
-    const int gain = CVarGetInteger("gEnhancements.Fixes.MMAudioGainBuffer", 0);
+    const int clean = CVarGetInteger("gEnhancements.Fixes.MMStreamedPositionalAudio", 0);
     const int alt = CVarGetInteger("gEnhancements.Mods.AlternateAssets", 0);
-    if (!wasEnabled || s != previousScene || r != previousRoom || m != previousMode || gain != previousGain ||
+    if (!wasEnabled || s != previousScene || r != previousRoom || m != previousMode || clean != previousClean ||
         alt != previousAlt) {
         trace.Flush();
-        SPDLOG_INFO("[MMAudioPCM] context scene={} room={} mode={} alt={} gainBufferFix={}", s, r, m, alt, gain);
+        SPDLOG_INFO("[MMAudioPCM] context scene={} room={} mode={} alt={} gainBufferFix=1 cleanStreamedPositional={}",
+                    s, r, m, alt, clean);
         previousScene = s;
         previousRoom = r;
         previousMode = m;
-        previousGain = gain;
+        previousClean = clean;
         previousAlt = alt;
     }
 } catch (...) {}
