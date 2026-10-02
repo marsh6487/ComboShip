@@ -61,7 +61,10 @@ Local production-body fixtures pass:
   bindings against a colliding native icon number, MM blue-potion message owner
   routing, resolved-tier freezing, pointer lifetime, native icons, dimensions and
   formats, and all 64 cane ownership masks.
-- Existing cross-grant and shared-item integration checks; RPG math, wire merge,
+- Existing cross-grant and shared-item integration checks; complete provenance
+  capture/tracker, C ABI/stock-build and preserved native-grant checks. The MM
+  shared-tier audit fixture compiles the production RPG native-tier helper and
+  distinguishes fractional HUD flags from native pickups. RPG math, wire merge,
   MM save migration, OoT pool/pickup and idempotent return checks.
 - Both complete native item-color draw translation-unit syntax checks and their
   draw-command fixtures; native MM item visuals.
