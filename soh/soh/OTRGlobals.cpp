@@ -128,6 +128,7 @@
 #include "soh/Network/Harpoon/Harpoon.h"
 #include "soh/Network/Harpoon/HarpoonSkinSync.h"
 #include "soh/FleetShipCombo/FleetSharedItems.h"
+#include "soh/FleetShipCombo/FleetRpgStats.h"
 #include "Enhancements/game-interactor/GameInteractor.h"
 #include "Enhancements/randomizer/draw.h"
 #include "mods/broken_items/broken_items.h"
@@ -3820,14 +3821,18 @@ static bool GrantOotItemByName(const char* itemName, RandomizerGet* granted) {
     if (!itemName)
         return false;
     RandomizerGet rg;
-    // ComboShip: resolve magic concretely — Item::GetGIEntry()'s progressive resolver reads a
-    // stale/frozen Logic magicLevel, losing a second dormant magic upgrade. See deviations/rando.md.
+    // Resolve native magic from the resident save rather than the frozen oracle.
+    // In RPG mode the HUD flags describe fractional capacity, not native pickups.
     if (std::string(itemName) == "Progressive Magic Meter") {
-        if (gSaveContext.isMagicAcquired && gSaveContext.isDoubleMagicAcquired) {
+        const auto state = FleetRpg::Read();
+        const int nativeTier = ComboRpgState_Enabled(&state, COMBO_RPG_MAGIC)
+                                   ? state.nativeMagicLevel
+                                   : gSaveContext.isMagicAcquired + gSaveContext.isDoubleMagicAcquired;
+        if (nativeTier >= 2) {
             SPDLOG_INFO("[ComboShip] SOH_GrantCrossItem: '{}' already at double magic, nothing to grant", itemName);
             return false;
         }
-        rg = gSaveContext.isMagicAcquired ? RG_MAGIC_DOUBLE : RG_MAGIC_SINGLE;
+        rg = nativeTier > 0 ? RG_MAGIC_DOUBLE : RG_MAGIC_SINGLE;
     } else {
         auto it = Rando::StaticData::itemNameToEnum.find(itemName);
         if (it == Rando::StaticData::itemNameToEnum.end()) {
@@ -3857,6 +3862,28 @@ extern "C" COMBO_EXPORT void SOH_GrantCrossItem(const char* itemName) {
 // The peer's half of a shared item (MM obtained it): grant only, never share back.
 extern "C" COMBO_EXPORT void SOH_GrantSharedItem(const char* itemName) {
     GrantOotItemByName(itemName, nullptr);
+}
+
+// Mirror native magic without resolving a second progressive pickup. This is
+// save-only, so it is safe for both a live OoT check and a dormant OoT save.
+extern "C" COMBO_EXPORT void SOH_ApplySharedMagicFloor(int tier) {
+    if (!IS_RANDO || gSaveContext.fileNum > 2 || tier < 1 || tier > 2)
+        return;
+    auto& nativeTier = gSaveContext.ship.quest.data.randomizer.comboNativeMagicLevel;
+    if (nativeTier >= tier)
+        return;
+    ItemGrantAudit::Scope itemGrantAuditScope("SOH_ApplySharedMagicFloor", -1, tier);
+    FleetSharedReceiveGuard receiveGuard;
+    nativeTier = static_cast<uint8_t>(tier);
+    const auto state = FleetRpg::Read();
+    const int16_t capacity = ComboRpgState_MagicCapacity(&state, tier * MAGIC_NORMAL_METER);
+    gSaveContext.isMagicAcquired = true;
+    if (capacity > MAGIC_NORMAL_METER)
+        gSaveContext.isDoubleMagicAcquired = true;
+    gSaveContext.magic = gSaveContext.magicFillTarget = capacity;
+    gSaveContext.magicLevel = 0; // let the native HUD build its meter on the next tick
+    if (SaveManager::Instance)
+        SaveManager::Instance->SaveFile(gSaveContext.fileNum);
 }
 
 // ComboShip: mark a foreign OOT check obtained without re-delivering — used on the NETWORK receive
@@ -3990,9 +4017,13 @@ extern "C" COMBO_EXPORT int SOH_GetSharedTier(int family) try {
             return CUR_UPG_VALUE(UPG_BOMB_BAG);
         case ComboRando::SF_BOMBCHU_BAG:
             return INV_CONTENT(ITEM_BOMBCHU) != ITEM_NONE ? 1 : 0;
-        case ComboRando::SF_MAGIC:
+        case ComboRando::SF_MAGIC: {
             // Never magicLevel: it's a HUD-tick value, reset to 0 on load and never advanced dormant.
+            const auto state = FleetRpg::Read();
+            if (ComboRpgState_Enabled(&state, COMBO_RPG_MAGIC))
+                return state.nativeMagicLevel;
             return gSaveContext.isMagicAcquired + gSaveContext.isDoubleMagicAcquired;
+        }
         case ComboRando::SF_WALLET:
             return CUR_UPG_VALUE(UPG_WALLET);
         case ComboRando::SF_HOOKSHOT:

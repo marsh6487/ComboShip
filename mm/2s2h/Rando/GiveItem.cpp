@@ -137,7 +137,13 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         // (soh hook_handlers.cpp ~1330). Outermost call only = one toast per pickup (recursion for
         // progressives/ConvertItem stays silent), and cross-sync deficit grants (SuppressRecord) stay
         // silent too, matching OoT where FC arrivals don't toast.
-        if (Rando::StaticData::Items.contains(randoItemId)) {
+        // A dormant cross-grant is presented and notified by the finder. Queuing its
+        // toast here would replay it only when the player switches back to MM.
+        if (
+#ifdef COMBO_BUILD
+            !Rando::gComboDormantGive &&
+#endif
+            Rando::StaticData::Items.contains(randoItemId)) {
             Notification::Emit({
                 .message = "You found",
                 .suffix = Rando::StaticData::GetItemName(randoItemId, true, randoCheckId) +

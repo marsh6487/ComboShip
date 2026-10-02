@@ -4,6 +4,7 @@
 #include "Rando/Rando.h"
 
 void DrawEnLight(Color_RGB8 flameColor, Vec3f flameSize);
+void DrawOotSoulFlame(PlayState* play, const uint8_t color[3], const float translate[3], const float scale[3]);
 
 // Boss Functions
 void DrawGoht();

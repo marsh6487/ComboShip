@@ -15,7 +15,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 
 def function(source, name):
-    start = re.search(r'^void ' + re.escape(name) + r'\(', source, re.M).start()
+    start = re.search(r'^(?:static |extern )?void ' + re.escape(name) + r'\(', source, re.M).start()
     token = source.index(name + '(', start)
     brace = source.index('{', token)
     depth, end = 1, brace + 1
@@ -46,6 +46,8 @@ with tempfile.TemporaryDirectory(prefix='foreign-soul-') as td:
         production = production.replace('Mtx* mtx = GRAPH_ALLOC(', 'Mtx* mtx = (Mtx*)GRAPH_ALLOC(')
         production = production.replace('Mtx* mtx = Graph_Alloc(', 'Mtx* mtx = (Mtx*)Graph_Alloc(')
         (build / 'native_draw.inc').write_text(production)
+        soul = (ROOT / 'mm/2s2h/Rando/DrawFuncs.cpp').read_text()
+        (build / 'native_soul.inc').write_text('\n'.join(function(soul, n) for n in ['DrawSoulFlame', 'DrawOotSoulFlame']))
         binary = build / host
         flags = ['-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-Wno-unused-variable', '-Wno-unused-but-set-variable']
         if host == 'mm': flags += ['-DHOST_MM']

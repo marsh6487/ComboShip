@@ -1,4 +1,5 @@
 #include "draw.h"
+#include "soh/frame_interpolation.h"
 #ifdef COMBO_BUILD
 #include "ComboItemDrawABI.h"
 #endif
@@ -18,6 +19,7 @@ extern "C" {
 #include "macros.h"
 #include "functions.h"
 #include "variables.h"
+#include "objects/gameplay_keep/gameplay_keep.h"
 #include "dungeon.h"
 #include "objects/object_gi_key/object_gi_key.h"
 #include "objects/object_gi_bosskey/object_gi_bosskey.h"
@@ -86,6 +88,8 @@ extern "C" {
 extern PlayState* gPlayState;
 extern SaveContext gSaveContext;
 }
+
+#include "ComboMaskShimmer.h"
 
 #ifdef COMBO_BUILD
 // ComboShip: combo-owned animated cross-game item rendering (MM stray fairies). TU-glue: needs the
@@ -1742,6 +1746,7 @@ void Randomizer_DrawMinishCap(PlayState* play, GetItemEntry* getItemEntry) {
 // facing up off the backpack), so tilt it upright to face the camera; and it is a
 // single-sided plate, so culling is disabled or it vanishes for half of the spin.
 void Randomizer_DrawMarioMask(PlayState* play, GetItemEntry* getItemEntry) {
+    Matrix_Push();
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
@@ -1756,6 +1761,12 @@ void Randomizer_DrawMarioMask(PlayState* play, GetItemEntry* getItemEntry) {
     gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
 
     CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Pop();
+    uint8_t shimmerColor[4];
+    ComboMaskShimmerColor(0, shimmerColor);
+    if (ResourceMgr_LoadGfxByName(gEffSparklesDL) != nullptr) {
+        ComboDrawMaskShimmer(play, gEffSparklesDL, shimmerColor, nullptr);
+    }
 }
 
 // =============================================================================
@@ -2633,6 +2644,7 @@ extern "C" int32_t OOT_DescribeMmMaskDraw(int32_t itemId, CwItemDrawInfo* out) {
     out->xluStartIndex = entry.mode == MM_MASK_DRAW_OPA0_XLU1 ? 1 : -1;
     out->dlists[0] = entry.dl1;
     out->dlists[1] = entry.dl2;
+    out->itemShimmer = ComboMmMaskShimmerColor(itemId - ITEM_MM_MASK_POSTMAN, out->itemShimmerColor);
     return 1;
 }
 
@@ -2746,6 +2758,7 @@ void Randomizer_DrawMmMask(PlayState* play, GetItemEntry* getItemEntry) {
         }
     }
 
+    Matrix_Push();
     OPEN_DISPS(play->state.gfxCtx);
 
     // Palette mode OFF before every MM mask.
@@ -2782,6 +2795,12 @@ void Randomizer_DrawMmMask(PlayState* play, GetItemEntry* getItemEntry) {
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Pop();
+    uint8_t shimmerColor[4];
+    Gfx* shimmer = MmMaskResolveDL("__OTR__objects/gameplay_keep/gEffSparklesDL");
+    if (shimmer != nullptr && ComboMmMaskShimmerColor(index, shimmerColor)) {
+        ComboDrawMaskShimmer(play, (const char*)shimmer, shimmerColor, nullptr);
+    }
 }
 
 // =============================================================================
@@ -2889,6 +2908,7 @@ extern "C" int32_t OOT_DescribeMmRemainsDraw(int32_t rg, CwItemDrawInfo* out) {
     out->xluStartIndex = -1;
     out->scale = 0.02f;
     out->dlists[0] = dl;
+    out->itemShimmer = ComboMmRemainsShimmerColor(rg - (int32_t)RG_MM_REMAINS_ODOLWA, out->itemShimmerColor);
     return 1;
 }
 #endif
@@ -2902,6 +2922,7 @@ void Randomizer_DrawMmRemains(PlayState* play, GetItemEntry* getItemEntry) {
         return;
     }
 
+    Matrix_Push();
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
@@ -2911,6 +2932,13 @@ void Randomizer_DrawMmRemains(PlayState* play, GetItemEntry* getItemEntry) {
     GSP_MM_DL(POLY_OPA_DISP++, dl);
 
     CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Pop();
+    uint8_t shimmerColor[4];
+    Gfx* shimmer = MmMaskResolveDL("__OTR__objects/gameplay_keep/gEffSparklesDL");
+    if (shimmer != nullptr &&
+        ComboMmRemainsShimmerColor(getItemEntry->getItemId - (int32_t)RG_MM_REMAINS_ODOLWA, shimmerColor)) {
+        ComboDrawMaskShimmer(play, (const char*)shimmer, shimmerColor, nullptr);
+    }
 }
 
 // =============================================================================

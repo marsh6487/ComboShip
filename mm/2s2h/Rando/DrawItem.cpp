@@ -37,6 +37,10 @@ extern Gfx gIKAxeInlineDL[];                         // equipment/objects/ikaxe_
 #include "ComboSpinAttackGi.h"
 #undef COMBO_SPIN_GI_HOST_MM
 
+#define COMBO_MASK_SHIMMER_HOST_MM
+#include "ComboMaskShimmer.h"
+#undef COMBO_MASK_SHIMMER_HOST_MM
+
 #ifdef COMBO_BUILD
 // ComboShip: cross-game foreign-item rendering. A check holding RI_COMBO_FOREIGN actually holds an
 // OOT item; MM_DrawComboForeign renders the real OOT model via "@oot:" cross-RM routing (sentinel
@@ -653,30 +657,12 @@ void DrawOotBeanSoul() {
     DrawOotGetItemOpa("__OTR__objects/object_gi_bean/gGiBeanDL", &sCache);
 }
 
-// All 9 boss souls draw OoT's blue-fire flame (grayscale-tinted per boss) PLUS the generic soul
-// skull, mirroring SoH's Randomizer_DrawBossSoul (draw.cpp:1000) in its "simpler models" form.
-// Before this only the flame was drawn, so all nine souls looked like the same little flame in a
-// different colour. Skijer's NEI
-//
-// Two loaders on purpose:
-//   - The flame is an OoT game asset, so it comes from oot.o2r — and with the ARCHIVE-SCOPED loader.
-//     The plain OotAssets_LoadGfx mounts oot.o2r at the LOWEST priority, so an MM folder with the
-//     same name and without that symbol makes the path resolve to nothing and the item renders
-//     invisible. That is exactly what bit the bean souls above.
-//   - The skull is object_boss_soul, a NEI custom asset that ships inside 2ship.o2r. It is NOT an
-//     OoT game asset, so it does not go through the oot.o2r path.
-// Each half draws independently: if one archive is not ready, the other still shows something.
+// Native MM soul flame, tinted per OoT boss, plus the NEI skull from 2ship.o2r.
+// The effect can draw independently while the custom skull archive becomes ready.
 void DrawOotBossSoul(RandoItemId randoItemId) {
-    static Gfx* sFlame = NULL;
     static Gfx* sSkull = NULL;
-    if (sFlame == NULL) {
-        sFlame = (Gfx*)OotAssets_LoadGfxDirect("__OTR__objects/object_gi_fire/gGiBlueFireFlameDL");
-    }
     if (sSkull == NULL) {
         sSkull = ResourceMgr_LoadGfxByName("__OTR__objects/object_boss_soul/gGIBossSoulSkullDL");
-    }
-    if (sFlame == NULL && sSkull == NULL) {
-        return; // neither archive ready yet — try again next frame
     }
 
     u8 r = 150, g = 150, b = 150; // default: Ganon/grey
@@ -730,26 +716,13 @@ void DrawOotBossSoul(RandoItemId randoItemId) {
             break;
     }
 
+    const uint8_t color[3] = { r, g, b };
+    const float translate[3] = { 0.0f, -70.0f, 0.0f };
+    const float scale[3] = { 5.0f, 5.0f, 5.0f };
+    DrawOotSoulFlame(gPlayState, color, translate, scale);
+
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
-
-    // Flame: billboarded, pushed down and scaled up. Wrapped in Push/Pop so the skull below still
-    // gets the untouched get-item matrix, same as SoH does.
-    if (sFlame != NULL) {
-        Matrix_Push();
-        gSPSegment(POLY_XLU_DISP++, 8,
-                   (uintptr_t)Gfx_TwoTexScrollEx(gPlayState->state.gfxCtx, 0, 0, 0, 16, 32, 1, gPlayState->state.frames,
-                                                 -(gPlayState->state.frames * 8), 16, 32, 0, 0, 1, -8));
-        Matrix_Translate(0.0f, -70.0f, 0.0f, MTXMODE_APPLY);
-        Matrix_Scale(5.0f, 5.0f, 5.0f, MTXMODE_APPLY);
-        Matrix_ReplaceRotation(&gPlayState->billboardMtxF);
-        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gPlayState->state.gfxCtx);
-        gDPSetGrayscaleColor(POLY_XLU_DISP++, r, g, b, 255);
-        gSPGrayscale(POLY_XLU_DISP++, true);
-        gSPDisplayList(POLY_XLU_DISP++, sFlame);
-        gSPGrayscale(POLY_XLU_DISP++, false);
-        Matrix_Pop();
-    }
 
     // Skull: Ganon's is black, the rest white — the one distinction SoH keeps in this mode.
     if (sSkull != NULL) {
@@ -1531,9 +1504,18 @@ void DrawOotQuartzOfMotion() {
     static Gfx* sCache = NULL;
     DrawOotGetItemOpa("__OTR__objects/object_gi_map/gGiStoneOfAgonyDL", &sCache);
 }
+static void DrawOotMaskShimmer() {
+    uint8_t color[4];
+    ComboMaskShimmerColor(0, color);
+    if (ResourceMgr_LoadGfxByName(gEffSparklesDL) != NULL) {
+        ComboDrawMaskShimmer(gPlayState, gEffSparklesDL, color, nullptr);
+    }
+}
+
 void DrawOotSkullMask() { // object_gi_skj_mask (OoT-unique)
     static Gfx* sCache = NULL;
     DrawOotGetItemOpa("__OTR__objects/object_gi_skj_mask/gGiSkullMaskDL", &sCache);
+    DrawOotMaskShimmer();
 }
 void DrawOotSpookyMask() { // object_gi_redead_mask (OoT-unique)
     // DIRECT loader: the plain one leaves the DL's texture/vertex hash refs to be resolved in MM's
@@ -1542,10 +1524,12 @@ void DrawOotSpookyMask() { // object_gi_redead_mask (OoT-unique)
     // reason the adult-Link limbs and the OoT hookshot chain use it. Skijer's NEI
     static Gfx* sDirect = NULL;
     if (DrawOotDirectOpa("__OTR__objects/object_gi_redead_mask/gGiSpookyMaskDL", &sDirect)) {
+        DrawOotMaskShimmer();
         return;
     }
     static Gfx* sCache = NULL;
     DrawOotGetItemOpa("__OTR__objects/object_gi_redead_mask/gGiSpookyMaskDL", &sCache);
+    DrawOotMaskShimmer();
 }
 void DrawOotGerudoMask() { // object_gi_gerudomask (OoT-unique)
     // Same as the Spooky Mask above — and this one is CI (it ships a TLUT,
@@ -1553,10 +1537,12 @@ void DrawOotGerudoMask() { // object_gi_gerudomask (OoT-unique)
     // colours" symptom. Direct load inlines them. Skijer's NEI
     static Gfx* sDirect = NULL;
     if (DrawOotDirectOpa("__OTR__objects/object_gi_gerudomask/gGiGerudoMaskDL", &sDirect)) {
+        DrawOotMaskShimmer();
         return;
     }
     static Gfx* sCache = NULL;
     DrawOotGetItemOpa("__OTR__objects/object_gi_gerudomask/gGiGerudoMaskDL", &sCache);
+    DrawOotMaskShimmer();
 }
 
 // Iron Boots — object_gi_boots_2 (OoT-unique), boots Opa + rivets Xlu (OoT GetItem_DrawOpa0Xlu1).
@@ -2209,6 +2195,7 @@ void DrawOotNeiMarioMask() {
         return;
     }
 
+    Matrix_Push();
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
     Matrix_Scale(0.038f, 0.038f, 0.038f, MTXMODE_APPLY);
@@ -2218,6 +2205,8 @@ void DrawOotNeiMarioMask() {
     gSPDisplayList(POLY_OPA_DISP++, dl);
     gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
+    Matrix_Pop();
+    DrawOotMaskShimmer();
 }
 
 void DrawOotNeiBallAndChain() { // REAL mesh (object_nei_ball_and_chain, SoH scale 0.25) — fallback: steel bomb

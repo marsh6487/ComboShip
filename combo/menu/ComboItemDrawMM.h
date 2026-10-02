@@ -1008,6 +1008,7 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     GetItem_GetDrawSetupDLs((s32)it->second.drawId, &setupOpa, &setupXlu);
     out->setupDlOpa = setupOpa;
     out->setupDlXlu = setupXlu;
+    out->itemShimmer = GetItem_GetShimmerColor((s16)it->second.drawId, out->itemShimmerColor);
     // ComboShip: some MM item bodies sample an animated segment-8 material their draw func binds via
     // AnimatedMat_Draw (Moon's Tear, fairy bottle). z_draw.c can't carry that across, so report the
     // texanim resource for the consumer to replicate (ComboForeignTexAnim_Run). Matched by DL string

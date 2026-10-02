@@ -14,7 +14,7 @@ static const MmBottleUseBehavior sMmBottleUse[MM_BOTTLE_COUNT] = {
     /* MM_BOTTLE_SEAHORSE         */ MM_BOTTLE_USE_CANT_USE,
     /* MM_BOTTLE_ZORA_EGG         */ MM_BOTTLE_USE_CANT_USE,
     /* MM_BOTTLE_GOLD_DUST        */ MM_BOTTLE_USE_CANT_USE,
-    /* MM_BOTTLE_CHATEAU_ROMANI   */ MM_BOTTLE_USE_CANT_USE, // FUTURE idea: refill magic
+    /* MM_BOTTLE_CHATEAU_ROMANI   */ MM_BOTTLE_USE_NATIVE, // blue-potion drink + existing infinite-magic consume hook
     /* MM_BOTTLE_SPRING_WATER     */ MM_BOTTLE_USE_CANT_USE,
     /* MM_BOTTLE_HOT_SPRING_WATER */ MM_BOTTLE_USE_BLUE_FIRE, // user: acts as Blue Fire in OoT
     /* MM_BOTTLE_MAGIC_MUSHROOM   */ MM_BOTTLE_USE_NATIVE,    // OoT already has ITEM_MAGIC_MUSHROOM

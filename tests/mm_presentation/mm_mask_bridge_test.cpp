@@ -15,7 +15,7 @@
 #define RANDO_ENUM_ITEM(x) x,
 #define RANDO_ENUM_END(x) };
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"
-using s32=int32_t;using f32=float;
+using s16=int16_t;using s32=int32_t;using f32=float;
 #define ARRAY_COUNT(a) (sizeof(a)/sizeof((a)[0]))
 void* Combo_ResolveSym(const char*,const char*);
 /* MASK_TABLE */
@@ -46,6 +46,7 @@ int nativeRows=0;
 int NeiGi_DescribeEntry(const GetItemEntry*,CwItemDrawInfo*) {return 0;}
 int GetItem_GetDrawTableEntry(int,void**,int,int*,float*,int*,uint8_t*) {++nativeRows;return 0;}
 void GetItem_GetDrawSetupDLs(int,void**,void**) {}
+int GetItem_GetShimmerColor(s16,uint8_t*) {return 0;}
 /* OWNER_DESCRIPTOR */
 /* HOST_INFO */
 RandomizerGet selected=RG_MM_MASK_POSTMAN;
@@ -102,6 +103,29 @@ std::vector<int> luts;
 #define MATRIX_FINALIZE_AND_LOAD(p,g) ((void)(p))
 #define MTXMODE_APPLY 1
 float scale=0;
+int matrixDepth=0,shimmerDraws=0;
+bool missingShimmer=false;
+uint8_t shimmerColor[4]{};
+void Matrix_Push() {++matrixDepth;}
+void Matrix_Pop() {assert(matrixDepth>0);--matrixDepth;}
+namespace Ship {
+struct ResourceManager {
+ std::shared_ptr<int> LoadResource(const char* path) {
+  assert(!strcmp(path,"__OTR__objects/gameplay_keep/gEffSparklesDL"));
+  return missingShimmer?nullptr:std::make_shared<int>(1);
+ }
+};
+struct CrossRMRegistry {
+ static std::shared_ptr<ResourceManager> Get(const char* owner) {
+  assert(!strcmp(owner,"mm"));return std::make_shared<ResourceManager>();
+ }
+};
+struct ResourceManagerScope {ResourceManagerScope(std::shared_ptr<ResourceManager>) {}};
+}
+void ComboDrawMaskShimmer(PlayState*,const char* root,const uint8_t color[4],const char* owner) {
+ assert(!strcmp(root,"__OTR__@mm:objects/gameplay_keep/gEffSparklesDL") && !strcmp(owner,"mm"));
+ assert(matrixDepth==0);memcpy(shimmerColor,color,4);++shimmerDraws;
+}
 void Matrix_Scale(float x,float y,float z,int) {assert(x==y && y==z);scale=x;}
 void Gfx_SetupDL25_Opa(GraphicsContext*) {}
 void Gfx_SetupDL25_Xlu(GraphicsContext*) {}
@@ -141,9 +165,13 @@ int main() {
   const auto& expected=sMmMaskDrawTable[i];
   assert(!strcmp(out.dlists[0],expected.dl1) && !strcmp(out.dlists[1],expected.dl2));
   assert(out.xluStartIndex==(expected.mode==MM_MASK_DRAW_OPA0_XLU1?1:-1));
+  uint8_t expectedColor[4];ComboMmMaskShimmerColor(i,expectedColor);
+  assert(out.itemShimmer && !memcmp(out.itemShimmerColor,expectedColor,4));
+  shimmerDraws=0;
   gfx.o=opa;gfx.x=xlu;submitted.clear();luts.clear();current={};
   MM_DrawComboForeign(1);
   assert(sentinels==0 && current.ok && submitted.size()==2);
+  assert(shimmerDraws==1 && matrixDepth==0 && !memcmp(shimmerColor,expectedColor,4));
   for(int layer=0;layer<2;++layer) {
    assert(submitted[layer].second==std::string("__OTR__@mm:")+(out.dlists[layer]+7));
    assert(submitted[layer].first==(layer==1 && out.xluStartIndex==1?1:0));
@@ -158,12 +186,18 @@ int main() {
   assert(OOT_FillItemDrawInfo(selected,&out)==1 && out.drawKind==CW_DRAW_KIND_MM_REMAINS);
   assert(out.dlistCount==1 && out.xluStartIndex==-1 && out.scale==0.02f && nativeRows==0);
   assert(!strcmp(out.dlists[0],remains[i]));
+  uint8_t expectedColor[4];ComboMmRemainsShimmerColor(i,expectedColor);
+  assert(out.itemShimmer && !memcmp(out.itemShimmerColor,expectedColor,4));
+  shimmerDraws=0;
   gfx.o=opa;gfx.x=xlu;submitted.clear();luts.clear();current={};scale=0;
   MM_DrawComboForeign(1);
   assert(sentinels==0 && current.ok && submitted.size()==1 && submitted[0].first==0);
   assert(submitted[0].second==std::string("__OTR__@mm:")+(remains[i]+7));
   assert(luts==std::vector<int>{0} && scale==0.02f);
+  assert(shimmerDraws==1 && matrixDepth==0 && !memcmp(shimmerColor,expectedColor,4));
  }
+ missingShimmer=true;shimmerDraws=0;gfx.o=opa;gfx.x=xlu;submitted.clear();
+ MM_DrawComboForeign(1);assert(submitted.size()==1 && shimmerDraws==0 && matrixDepth==0);missingShimmer=false;
  selected=RG_MM_MASK_ROMANI;CwItemDrawInfo romani{};assert(OOT_FillItemDrawInfo(selected,&romani));
  assert(!strcmp(romani.dlists[0],gGiRomaniMaskCapDL) && !strcmp(romani.dlists[1],gGiRomaniMaskNoseEyeDL));
  const char* retained=current.dls[0];for(int i=0;i<1000;++i)ComboInternRoutedPathOOT(std::to_string(i));

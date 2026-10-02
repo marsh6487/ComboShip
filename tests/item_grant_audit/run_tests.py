@@ -246,6 +246,14 @@ struct { struct {
     struct { int saveType=0; } shipSaveInfo;
 } save; } gSaveContext;
 '''
+    fixture += '''
+constexpr int COMBO_RPG_MAGIC=3;
+bool rpgMagicEnabled=false;
+struct { struct { int nativeMagicLevel=0; } comboRpg; } nei;
+auto Nei_Save() { return &nei; }
+int ComboRpg_IsEnabled(int) { return rpgMagicEnabled; }
+'''
+    fixture += function(read('mm/mods/combo_rpg.cpp'), 'extern "C" int ComboRpg_NativeMagicTier(int nativeTier) {') + '\n'
     fixture += tiers + ' catch (...) { assert(false); return 0; }\n'
     # Model downstream grant services, after the actual production entry guard.
     fixture += 'int downstreamGrants=0;\n' + raise_prefix
@@ -269,7 +277,16 @@ int main() {
             assert(MM_GetSharedTier(families[i]) == (value == items[i]));
         }
     }
-    std::cout << "MM shared tiers: cleared save rejected, dormant arrow ownership exact PASS\\n";
+    auto& player = gSaveContext.save.saveInfo.playerData;
+    player.isMagicAcquired = player.isDoubleMagicAcquired = 1;
+    assert(MM_GetSharedTier(ComboRando::SF_MAGIC) == 2);
+    rpgMagicEnabled = true;
+    assert(MM_GetSharedTier(ComboRando::SF_MAGIC) == 0);
+    nei.comboRpg.nativeMagicLevel = 1;
+    assert(MM_GetSharedTier(ComboRando::SF_MAGIC) == 1);
+    nei.comboRpg.nativeMagicLevel = 2;
+    assert(MM_GetSharedTier(ComboRando::SF_MAGIC) == 2);
+    std::cout << "MM shared tiers: cleared save rejected, dormant arrow ownership and native RPG magic exact PASS\\n";
 }
 '''
     run_cpp('mm_shared_tiers', fixture)

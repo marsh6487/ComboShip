@@ -2,6 +2,7 @@
 """Execute the production cross-game GI selection boundary without either game runtime."""
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 
@@ -26,7 +27,7 @@ preamble = r'''
 #include <string>
 #include <iostream>
 #include "combo/menu/ComboItemDrawABI.h"
-using s32=int32_t; using f32=float;
+using s16=int16_t; using s32=int32_t; using f32=float;
 enum RandomizerGet { RG_NONE, RG_TEST_CUSTOM, RG_TEST_NATIVE, RG_TEST_PROGRESSIVE, RG_TEST_TIER };
 constexpr int TABLE_RANDOMIZER=1;
 struct GetItemEntry { int tableId, drawItemId, gid; void (*drawFunc)(); int itemId=0; };
@@ -62,6 +63,7 @@ int GetItem_GetDrawTableEntry(int,void** out,int,int*,float*,int*,uint8_t*) {
  ++tableCalls;out[0]=(void*)"__OTR__native";return 1;
 }
 void GetItem_GetDrawSetupDLs(int,void**,void**) {}
+int GetItem_GetShimmerColor(s16,uint8_t*) { return 0; }
 '''
 checks = r'''
 int main() {
@@ -99,13 +101,16 @@ with tempfile.TemporaryDirectory(prefix='mm-presentation-') as td:
 message = (ROOT / 'mm/src/code/z_message.c').read_text()
 consumer = (ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text()
 fixture = (ROOT / 'tests/mm_presentation/icon_bridge_test.cpp').read_text()
+bindings = re.findall(r'itemTable\[RG_BOTTLE_WITH_[A-Z_]+\]\.CustomIcon\([^;]+;',
+                      (ROOT / 'soh/soh/Enhancements/randomizer/item_list.cpp').read_text())
+fixture = fixture.replace('/* BOTTLE_ICON_BINDINGS */', '\n'.join(bindings))
 fixture = fixture.replace('/* OWNER_ICON */', function(src, 'OOT_FillItemIconInfo'))
 fixture = fixture.replace('/* STAGE_ICON */', function(message, 'Message_StageCustomItemIconEx') + '\n' + function(message, 'Message_StageCustomItemIcon'))
 fixture = fixture.replace('/* CONSUMER_ICON */', function(consumer, 'Rando::ComboForeignMessageIcon'))
 with tempfile.TemporaryDirectory(prefix='mm-icon-') as td:
     test=Path(td)/'test.cpp';test.write_text(fixture)
     binary=Path(td)/'test'
-    subprocess.run([os.environ.get('CXX','c++'),*flags,str(test),'-o',str(binary)],check=True)
+    subprocess.run([os.environ.get('CXX','c++'),*flags,'-I'+str(ROOT / 'soh/include'),str(test),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True)
 
 conversion = (ROOT / 'mm/2s2h/Rando/ConvertItem.cpp').read_text()

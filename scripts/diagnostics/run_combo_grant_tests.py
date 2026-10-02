@@ -47,6 +47,7 @@ preamble = r'''
 #include <map>
 #include <stdexcept>
 #include "rando/SharedItems.h"
+#include "rando/RpgStats.h"
 #include "FleetSharedItems.h"
 #define COMBO_EXPORT
 #define SPDLOG_INFO(...) ((void)0)
@@ -65,6 +66,8 @@ extern "C" void FleetShared_EndReceive() { --depth; }
 extern "C" int FleetShared_IsReceiving() { return depth > 0; }
 extern "C" void FleetShared_OnNativeObtained(int) { if (!depth) ++echoes; }
 struct { bool isMagicAcquired = false, isDoubleMagicAcquired = false; int fileNum = 0; } gSaveContext;
+ComboRpgState ootRpg{};
+namespace FleetRpg { ComboRpgState Read() { return ootRpg; } }
 int gComboSuppressAnchorSend = 0;
 void* gPlayState = nullptr;
 int bombchu = -1, ammo = 0;
@@ -90,8 +93,8 @@ Item RetrieveItem(RandomizerGet id) { return {id}; }
 void Combo_GrantResolvedOOT(const GetItemEntry& item) {
     if (throwGrant) throw std::runtime_error("injected save failure");
     ++ootTier;
-    if (item.id == RG_MAGIC_SINGLE) gSaveContext.isMagicAcquired = true;
-    if (item.id == RG_MAGIC_DOUBLE) gSaveContext.isDoubleMagicAcquired = true;
+    if (item.id == RG_MAGIC_SINGLE) { gSaveContext.isMagicAcquired = true; ootRpg.nativeMagicLevel = 1; }
+    if (item.id == RG_MAGIC_DOUBLE) { gSaveContext.isDoubleMagicAcquired = true; ootRpg.nativeMagicLevel = 2; }
     FleetShared_OnNativeObtained(item.id);
 }
 const std::map<std::string, RandoItemId>& Combo_MM_SpoilerNameToItemId() {
@@ -117,6 +120,7 @@ void check(bool condition, const char* label) {
     if (!condition) { std::cerr << "FAIL: " << label << '\n'; ++failures; }
 }
 void reset() { depth = echoes = ootTier = mmTier = persisted = 0; throwGrant = false; gPlayState = nullptr;
+    ootRpg = {};
     mmSaveLoaded = true;
     gSaveContext.isMagicAcquired = gSaveContext.isDoubleMagicAcquired = false; gComboSuppressAnchorSend = 0; }
 int main() {
@@ -148,6 +152,15 @@ int main() {
     check(gSaveContext.isDoubleMagicAcquired, "second dormant magic resolves from save flags");
     check(!GrantOotItemByName("Progressive Magic Meter", &granted), "maxed dormant magic is not regranted");
     check(!GrantOotItemByName("unknown item", nullptr) && !GrantOotItemByName(nullptr, nullptr), "invalid grants are ignored");
+    reset();
+    ootRpg.knownMask = ootRpg.enabledMask = 1 << COMBO_RPG_MAGIC;
+    ootRpg.level[COMBO_RPG_MAGIC] = 6;
+    gSaveContext.isMagicAcquired = gSaveContext.isDoubleMagicAcquired = true;
+    check(GrantOotItemByName("Progressive Magic Meter", &granted) && granted == RG_MAGIC_SINGLE,
+          "fractional RPG meter does not skip the first native magic pickup");
+    check(GrantOotItemByName("Progressive Magic Meter", &granted) && granted == RG_MAGIC_DOUBLE,
+          "second RPG native magic resolves from saved native tier");
+    check(!GrantOotItemByName("Progressive Magic Meter", &granted), "RPG double magic stays maxed");
     reset(); throwGrant = true;
     try { GrantOotItemByName("Progressive Magic Meter", nullptr); } catch (const std::exception&) {}
     check(depth == 0, "OoT failed grant unwinds receive guard");

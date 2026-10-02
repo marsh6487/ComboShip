@@ -19,6 +19,7 @@
 #define COMBO_FOREIGN_DRAW_OOT_H
 
 #include "ComboSpinAttackGi.h"
+#include "ComboMaskShimmer.h"
 
 #ifndef OPEN_DISPS
 #error "ComboForeignDrawOOT.h is TU-glue: include the host engine headers before it"
@@ -42,7 +43,9 @@ struct ComboForeignDrawInfo {
     int32_t xluStart = -1;            // first XLU entry in dls[] order; -1 = all OPA
     float scale = 0.0f;               // extra model scale; 0 = none (MM remains: 0.02)
     bool appearanceDependent = false; // Palette and Alt state remain live after a dungeon-item grant.
-    bool hasEnvColor = false;         // emit env color before the DLs (MM song notes)
+    bool itemShimmer = false;
+    uint8_t itemShimmerColor[4] = {};
+    bool hasEnvColor = false; // emit env color before the DLs (MM song notes)
     uint8_t envColor[4] = { 0, 0, 0, 0 };
     bool xluSeg8TexScroll = false;          // bind segment 8 to the flame texscroll before the XLU layer (skull token)
     const char* matAnimPath = nullptr;      // MM TextureAnimation resource to replicate before the DLs (Moon's Tear)
@@ -148,6 +151,8 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     info.matAnimBillboard = raw.matAnimBillboard != 0;
     info.stateDependent = raw.stateDependent != 0;
     info.appearanceDependent = raw.stateDependent == 2;
+    info.itemShimmer = raw.itemShimmer != 0;
+    memcpy(info.itemShimmerColor, raw.itemShimmerColor, sizeof(info.itemShimmerColor));
     if (raw.resolvedName != nullptr) {
         info.resolvedName = raw.resolvedName;
     }
@@ -669,6 +674,9 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
         return;
     }
 
+    if (info->itemShimmer) {
+        Matrix_Push();
+    }
     switch (info->drawKind) {
         case CW_DRAW_KIND_MM_SPIN_ATTACK:
             ComboDrawSpinAttackGi(play, info->dls[0], info->dls[1], info->scale, info->primColorXlu, "mm");
@@ -704,6 +712,17 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
         default:
             OOT_DrawForeignSimple(play, info);
             break;
+    }
+    if (info->itemShimmer) {
+        Matrix_Pop();
+        auto rm = Ship::CrossRMRegistry::Get("mm");
+        if (rm != nullptr) {
+            Ship::ResourceManagerScope scope(rm);
+            if (rm->LoadResource("__OTR__objects/gameplay_keep/gEffSparklesDL") != nullptr) {
+                ComboDrawMaskShimmer(play, "__OTR__@mm:objects/gameplay_keep/gEffSparklesDL", info->itemShimmerColor,
+                                     "mm");
+            }
+        }
     }
 }
 

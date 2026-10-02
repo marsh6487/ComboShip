@@ -151,6 +151,9 @@ typedef struct {
     float neiEffectCenter[3];
     int32_t neiSomariaUpgrade;
     int32_t neiLegacyCane; /* 1=Statue, 2=Flip, 3=Block, 4=Stone, 5=Platform, 6=Ultrahand */
+    /* Independent effect pass; never tint the mask model or change its material routing. */
+    int32_t itemShimmer;
+    uint8_t itemShimmerColor[4];
 } CwItemDrawInfo;
 
 typedef struct {

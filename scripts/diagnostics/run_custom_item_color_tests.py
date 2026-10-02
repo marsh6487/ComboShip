@@ -33,7 +33,7 @@ def main():
         binary = out / "custom_item_color_test"
         cmd = ["cc", "-std=gnu11", "-O1", "-g", "-DNDEBUG", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0",
                '-DCVAR_PREFIX_COSMETIC="gCosmetics"', "-Isoh/include", "-Isoh/src",
-               "-Isoh/assets", "-Isoh", "-Ilibultraship/include", "-I" + str(out),
+               "-Isoh/assets", "-Isoh", "-Ilibultraship/include", "-Icombo/menu", "-I" + str(out),
                "-Wno-incompatible-pointer-types", "soh/tests/custom_item_color_test.c",
                "-o", str(binary)]
         subprocess.run(cmd, cwd=ROOT, check=True)

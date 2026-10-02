@@ -96,6 +96,8 @@ jobs:
           python3 scripts/diagnostics/run_combo_grant_tests.py --json-include /usr/include
           python3 tests/dungeon_rewards/run_tests.py --json-include /usr/include
           python3 tests/item_grant_audit/run_tests.py
+          python3 scripts/diagnostics/run_combo_reward_delivery_tests.py
+          python3 scripts/diagnostics/run_combo_reward_delivery_tests.py --sanitize
 
       - name: Accepted NEI presentation and MM pickup regressions
         run: |
@@ -158,6 +160,11 @@ jobs:
         run: |
           python3 -B scripts/diagnostics/run_spin_gi_tests.py
           python3 -B scripts/diagnostics/run_spin_gi_tests.py --sanitize
+
+      - name: Mask and remains shimmer in both engines
+        run: |
+          python3 -B scripts/diagnostics/run_mask_shimmer_tests.py
+          python3 -B scripts/diagnostics/run_mask_shimmer_tests.py --sanitize
 
       - name: 2Ship mod GUI fonts
         run: python3 scripts/diagnostics/run_mm_mod_font_tests.py

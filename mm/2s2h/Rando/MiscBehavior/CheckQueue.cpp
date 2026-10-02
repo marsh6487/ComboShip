@@ -78,7 +78,7 @@ void Rando::MiscBehavior::SendForeignCheck(RandoCheckId rc) {
         // A trap latches under its disguise's tier, not its own; never name a trap's toast with it.
         const char* resolved = it->second.trap ? nullptr : Rando::ComboForeignLatchedName(rc);
         Notification::Emit(
-            { .message = "Sent to Hyrule:",
+            { .message = "You found",
               .suffix = ComboRando::ShownForeignName(it->second, resolved) + BankRewardSourceSuffix(rc) });
         SPDLOG_INFO("[ComboShip] MM delivered foreign item '{}' to OOT (from check '{}')", it->second.itemName,
                     checkName);
