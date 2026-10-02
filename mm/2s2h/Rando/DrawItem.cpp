@@ -5,6 +5,7 @@
 #include "2s2h/ShipInit.hpp"
 #include "2s2h/Rando/DrawFuncs.h"
 #include "2s2h_assets.h"
+#include "Rando/SpinAttackGi.h"
 #include "mods/nei_save.h"                     // NeiSaveData chain tiers for progressive get-item draws
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_OOT_SWORD_* registry indices (chain tiers)
 
@@ -31,6 +32,10 @@ void* OotAssets_LoadTexOrDList(const char* otrPath); // Skijer's NEI — texture
 uint16_t Nei_GetOwnedItem(uint8_t slot);             // mods/nei_save.cpp — Roc chain level for its draw (u16 store)
 extern Gfx gIKAxeInlineDL[];                         // equipment/objects/ikaxe_DL — axe with segments pre-resolved
 }
+
+#define COMBO_SPIN_GI_HOST_MM
+#include "ComboSpinAttackGi.h"
+#undef COMBO_SPIN_GI_HOST_MM
 
 #ifdef COMBO_BUILD
 // ComboShip: cross-game foreign-item rendering. A check holding RI_COMBO_FOREIGN actually holds an
@@ -3004,6 +3009,12 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
     }
 
     switch (randoItemId) {
+        case RI_GREAT_SPIN_ATTACK: {
+            CwItemDrawInfo info{};
+            MM_FillSpinAttackGi(&info);
+            ComboDrawSpinAttackGi(gPlayState, info.dlists[0], info.dlists[1], info.scale, info.primColorXlu, nullptr);
+            break;
+        }
         case RI_JUNK:
             Rando::DrawItem(Rando::CurrentJunkItem(randoCheckId), randoCheckId, actor);
             break;

@@ -73,6 +73,7 @@ struct ComboForeignDrawInfoOOT {
     // Recipe chosen from live save state (progressive tier, Triforce shard, junk/trap) — re-resolve
     // every frame instead of caching, or the first model drawn sticks for the whole save slot.
     bool stateDependent = false;
+    bool appearanceDependent = false; // Keep cosmetic palettes live after grant latching.
     // Resolved tier name (e.g. "Longshot") when a progressive placeholder converted, else empty.
     std::string resolvedName;
     int32_t neiEffect = 0;
@@ -147,7 +148,8 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
         if (p == nullptr || strncmp(p, kOtrPrefix, sizeof(kOtrPrefix) - 1) != 0) {
             return ComboForeignResolveOOT::Unknown; // not an OTR path literal — can't route it
         }
-        const char* ownerPrefix = (raw.drawKind == CW_DRAW_KIND_MM_MASK || raw.drawKind == CW_DRAW_KIND_MM_REMAINS)
+        const char* ownerPrefix = (raw.drawKind == CW_DRAW_KIND_MM_MASK || raw.drawKind == CW_DRAW_KIND_MM_REMAINS ||
+                                   raw.drawKind == CW_DRAW_KIND_MM_SPIN_ATTACK)
                                       ? "__OTR__@mm:"
                                       : "__OTR__@oot:";
         info.dls[i] = ComboInternRoutedPathOOT(std::string(ownerPrefix) + (p + sizeof(kOtrPrefix) - 1));
@@ -164,6 +166,7 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     info.neiSomariaUpgrade = raw.neiSomariaUpgrade;
     info.neiLegacyCane = raw.neiLegacyCane;
     info.stateDependent = raw.stateDependent != 0;
+    info.appearanceDependent = raw.stateDependent == 2;
     if (raw.resolvedName != nullptr) {
         info.resolvedName = raw.resolvedName;
     }
@@ -236,7 +239,7 @@ inline void ComboLatchForeignDrawOOT(RandoCheckId rc) {
     if (info.animOk) {
         return; // that class's state-dependence is a CVar (SimplerBossSoulModels), not save state
     }
-    info.stateDependent = false; // frozen: the resolver's cache-hit path now serves it verbatim
+    info.stateDependent = info.appearanceDependent; // Freeze tiers while keeping appearance live.
     c.map[rc] = info;
 }
 
@@ -296,6 +299,10 @@ inline void MM_RestoreForeignSegs(const int32_t* segs, int32_t count) {
         gSPSegment(POLY_XLU_DISP++, segs[i], (uintptr_t)empty);
     }
     CLOSE_DISPS(gfxCtx);
+}
+
+inline void MM_DrawForeignSpinAttack(const ComboForeignDrawInfoOOT* info) {
+    ComboDrawSpinAttackGi(gPlayState, info->dls[0], info->dls[1], info->scale, info->primColorXlu, "mm");
 }
 
 // Simple path: OPA layers then XLU layers (self-contained funcs, rupees, wallets, Triforce/rod scale).
@@ -911,6 +918,9 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
             break;
         case CW_DRAW_KIND_BRONZE_SCALE:
             MM_DrawForeignBronzeScale(info);
+            break;
+        case CW_DRAW_KIND_MM_SPIN_ATTACK:
+            MM_DrawForeignSpinAttack(info);
             break;
         case CW_DRAW_KIND_MM_MASK:
         case CW_DRAW_KIND_MM_REMAINS:

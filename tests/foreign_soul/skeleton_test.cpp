@@ -94,13 +94,19 @@ struct SkelAnime {
 #define GBL_c1(...) 0
 #define G_RM_AA_ZB_XLU_SURF2 0
 #define gDPPipeSync(p) ((p)->kind = 0)
-#define gDPSetPrimColor(p, ...) ((p)->kind = 0)
-#define gDPSetEnvColor(p, ...) ((p)->kind = 0)
+void gDPSetPrimColor(Gfx* p, int, int, int r, int g, int b, int a) {
+  *p = {4, 0, (uintptr_t)(((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8) | (uint32_t)a)};
+}
+void gDPSetEnvColor(Gfx* p, int r, int g, int b, int a) {
+  *p = {5, 0, (uintptr_t)(((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8) | (uint32_t)a)};
+}
 #define gDPSetRenderMode(p, ...) ((p)->kind = 0)
-#define gDPSetGrayscaleColor(p, ...) ((p)->kind = 0)
-#define gSPGrayscale(p, ...) ((p)->kind = 0)
-#define gSPComboRMPush(p, ...) ((p)->kind = 0)
-#define gSPComboRMPop(p, ...) ((p)->kind = 0)
+void gDPSetGrayscaleColor(Gfx* p, int r, int g, int b, int a) {
+  *p = {6, 0, (uintptr_t)(((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8) | (uint32_t)a)};
+}
+void gSPGrayscale(Gfx* p, bool enable) { *p = {7, 0, (uintptr_t)enable}; }
+void gSPComboRMPush(Gfx* p, const char* game) { *p = {8, 0, (uintptr_t)game}; }
+void gSPComboRMPop(Gfx* p) { *p = {9, 0, 0}; }
 #define gSPEndDisplayList(p) ((p)->kind = 0)
 void gSPSegment(Gfx *p, int seg, uintptr_t target) { *p = {1, seg, target}; }
 void gSPSegment(Gfx *p, int seg, void *target) {
@@ -289,6 +295,31 @@ void checkDraw(GraphicsContext &c, bool flex, const char *game) {
   assert(bindings == (flex ? 2 : 0));
   assert(matrices.empty());
 }
+// Replay with deliberately transparent inherited shelf state. A replacement flame
+// that omits local prim/env commands must still receive an opaque neutral base,
+// its boss tint, the owner RM and a valid scroll without perturbing the jaw.
+void checkFlame(GraphicsContext& c, const char* game) {
+  uintptr_t prim = 0, env = 0, tint = 0, segment8 = 0;
+  bool grayscale = false, saw = false;
+  std::vector<std::string> owners;
+  for (Gfx* p = c.xlu; p < c.xp; ++p) {
+    if (p->kind == 1 && p->seg == 8) segment8 = p->target;
+    if (p->kind == 4) prim = p->target;
+    if (p->kind == 5) env = p->target;
+    if (p->kind == 6) tint = p->target;
+    if (p->kind == 7) grayscale = p->target;
+    if (p->kind == 8) owners.emplace_back((const char*)p->target);
+    if (p->kind == 9) { assert(!owners.empty()); owners.pop_back(); }
+    if (p->kind == 3) {
+      assert(std::string((const char*)p->target) == std::string("__OTR__@") + game + ":flame");
+      assert(prim == 0xffffffff && env == 0xffffffff);
+      assert(grayscale && tint == 0xed5f5fff && segment8);
+      assert(!owners.empty() && owners.back() == game);
+      saw = true;
+    }
+  }
+  assert(saw && !grayscale && owners.empty());
+}
 int main() {
   auto oot = std::make_shared<Ship::ResourceManager>(),
        mm = std::make_shared<Ship::ResourceManager>();
@@ -333,6 +364,29 @@ int main() {
     }
   assert(normalInits == 2 && flexInits == 2 &&
          updates == 4); // owners and selections cache independently
+  // Full composite path with the flame present, before the model, in both
+  // directions and repeatedly toggled between rigid vanilla and flex Alt.
+  info.flameDlPath = "__OTR__flame";
+  info.flameGrayscale = 1;
+  info.flameColor[0] = 237; info.flameColor[1] = 95; info.flameColor[2] = 95;
+  info.flameHasSeg = 1;
+  info.flameSeg.kind = CW_ANIM_SEG_TEXSCROLL;
+  info.flameSeg.segment = 8; info.flameSeg.onXlu = 1;
+  info.flameSeg.width1 = info.flameSeg.width2 = 16;
+  info.flameSeg.height1 = info.flameSeg.height2 = 32;
+  info.flameSeg.xStep2 = 1; info.flameSeg.yStep2 = -8;
+  for (const char* game : {"oot", "mm"}) {
+    for (bool alt : {false, true, false}) {
+      Ship::CrossRMRegistry::Get(game)->alt = alt;
+      GraphicsContext c;
+      PlayState p{{&c, 7}, 7, {}};
+      current = {};
+      assert(ComboForeignAnim_Draw(&info, game, &p));
+      checkDraw(c, alt, game);
+      checkFlame(c, game);
+    }
+  }
+  info.flameDlPath = nullptr;
   // Recipe flag intentionally disagrees in the other direction too: loaded
   // normal wins.
   CfaClearCaches();

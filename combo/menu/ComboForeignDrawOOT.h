@@ -18,6 +18,8 @@
 #ifndef COMBO_FOREIGN_DRAW_OOT_H
 #define COMBO_FOREIGN_DRAW_OOT_H
 
+#include "ComboSpinAttackGi.h"
+
 #ifndef OPEN_DISPS
 #error "ComboForeignDrawOOT.h is TU-glue: include the host engine headers before it"
 #endif
@@ -668,6 +670,9 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
     }
 
     switch (info->drawKind) {
+        case CW_DRAW_KIND_MM_SPIN_ATTACK:
+            ComboDrawSpinAttackGi(play, info->dls[0], info->dls[1], info->scale, info->primColorXlu, "mm");
+            break;
         case CW_DRAW_KIND_GORON_SWORD:
             OOT_DrawForeignGoronSword(play, info);
             break;

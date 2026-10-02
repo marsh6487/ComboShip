@@ -32,6 +32,7 @@ oot = (ROOT / 'combo/menu/ComboForeignDrawOOT.h').read_text()
 owner = (ROOT / 'mm/2s2h/Rando/DungeonItemVisuals.h').read_text()
 owner = owner[owner.index('static inline int'):owner.rindex('#endif')]
 parts = {
+    'SPIN': function((ROOT / 'mm/2s2h/Rando/SpinAttackGi.h').read_text(), 'MM_FillSpinAttackGi'),
     'OWNER': owner,
     'OPS': '\n'.join(function(mm, n) for n in ['MM_Op', 'MM_OpV', 'MM_OpColor', 'MM_OpDL']),
     'CROSS': '\n'.join(function(mm, n) for n in ['MM_FillDungeonKeyModelInfo', 'MM_FillDungeonTintInfo']),

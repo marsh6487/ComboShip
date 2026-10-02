@@ -15,6 +15,7 @@
 #include "ComboItemDrawABI.h"
 #include "2s2h/Enhancements/ItemVisuals.h"
 #include "2s2h/Rando/DungeonItemVisuals.h"
+#include "2s2h/Rando/SpinAttackGi.h"
 #include "2s2h_assets.h"                                     // custom rando models (triforce, ocarina buttons, ...)
 #include "objects/gameplay_keep/gameplay_keep.h"             // stray-fairy skel/anim + soul flame DL
 #include "objects/object_gi_melody/object_gi_melody.h"       // gGiSongNoteDL
@@ -913,6 +914,9 @@ static bool MM_IsStateDependentDraw(RandoItemId id) {
     if (DungeonItem_GetOwner(id) >= 0) {
         return true; // Picker/Tab changes remain live through the fallback too.
     }
+    if (id == RI_GREAT_SPIN_ATTACK) {
+        return true;
+    }
     switch (id) {
         case RI_JUNK:
         case RI_TRAP:
@@ -959,6 +963,9 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     if (MM_FillDungeonKeyModelInfo(id, (s16)it->second.drawId, out) ||
         MM_FillDungeonTintInfo(id, (s16)it->second.drawId, out)) {
         return 1;
+    }
+    if (id == RI_GREAT_SPIN_ATTACK) {
+        return MM_FillSpinAttackGi(out);
     }
     if (MM_FillSongDrawInfo(id, out)) {
         return 1; // songs: tinted note, no table row
@@ -1035,7 +1042,7 @@ extern "C" COMBO_EXPORT int32_t MM_GetItemDrawInfo(const char* itemName, CwItemD
         if (!MM_FillItemDrawInfo(id, out)) {
             return 0;
         }
-        if (DungeonItem_GetOwner(id) >= 0) {
+        if (DungeonItem_GetOwner(id) >= 0 || id == RI_GREAT_SPIN_ATTACK) {
             out->stateDependent = 2;
         } else {
             out->stateDependent = (MM_IsProgressiveItem(id) || MM_IsStateDependentDraw(id)) ? 1 : 0;

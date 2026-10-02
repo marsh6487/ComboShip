@@ -366,10 +366,13 @@ inline Gfx* CfaRouteLimbDList(Gfx* dList) {
     if (sCfaCurrentGame == nullptr) {
         return NULL; // no direction set: drop the limb rather than submit an unrouted foreign DL
     }
-    static std::unordered_map<const void*, std::string> sRouted; // node-based: values pointer-stable
-    auto it = sRouted.find(s);
-    if (it == sRouted.end()) {
-        it = sRouted.emplace(s, std::string("__OTR__@") + sCfaCurrentGame + ":" + (s + 7)).first;
+    // A shared path literal can describe effects owned by either game. Keep the
+    // owner in the routing cache too, rather than freezing the first direction.
+    static std::unordered_map<std::string, std::unordered_map<const void*, std::string>> sRouted;
+    auto& paths = sRouted[sCfaCurrentGame]; // node-based: returned strings remain pointer-stable
+    auto it = paths.find(s);
+    if (it == paths.end()) {
+        it = paths.emplace(s, std::string("__OTR__@") + sCfaCurrentGame + ":" + (s + 7)).first;
     }
     return (Gfx*)it->second.c_str();
 }
@@ -619,6 +622,11 @@ inline void CfaDrawFlame(PlayState* play, const CwItemAnimDrawInfo* info, const 
     OPEN_DISPS(play->state.gfxCtx);
     CFA_LOAD_MTX(POLY_XLU_DISP++, play->state.gfxCtx);
     if (info->flameGrayscale) {
+        // The animated path bypasses the static foreign drawer's color pin. A shelf's
+        // preceding material can leave PRIMITIVE alpha at zero; replacement flame DLs
+        // that inherit that state then disappear even though the skeleton still draws.
+        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+        gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
         gDPSetGrayscaleColor(POLY_XLU_DISP++, info->flameColor[0], info->flameColor[1], info->flameColor[2], 255);
         gSPGrayscale(POLY_XLU_DISP++, true);
     } else {

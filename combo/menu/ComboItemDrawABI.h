@@ -63,6 +63,7 @@ typedef enum {
     CW_DRAW_KIND_NEI_GI,          /* replacement mesh plus host-rendered elemental energy */
     CW_DRAW_KIND_MM_MASK,         /* imported MM mask: native MM resources and palette-free split passes */
     CW_DRAW_KIND_MM_REMAINS,      /* imported boss remains: native MM OPA resource, scale 0.02 */
+    CW_DRAW_KIND_MM_SPIN_ATTACK,  /* MM Great Spin: native disk/cylinder, seg8 scroll, live burst color */
 } CwDrawKind;
 
 #define CW_DRAW_MAX_OPS 20
@@ -188,6 +189,7 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
         case CW_DRAW_KIND_DOUBLE_DEFENSE:
         case CW_DRAW_KIND_BRONZE_SCALE:
         case CW_DRAW_KIND_MM_MASK:
+        case CW_DRAW_KIND_MM_SPIN_ATTACK:
             return 2;
         case CW_DRAW_KIND_OPS:
         case CW_DRAW_KIND_NEI_CANE:
