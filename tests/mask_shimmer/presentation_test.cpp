@@ -15,6 +15,7 @@ extern "C" {
 #endif
 #include "objects/gameplay_keep/gameplay_keep.h"
 }
+/* PRODUCTION_DRAW_PRELUDE */
 
 static Gfx opa[512], xlu[512], resource;
 static GraphicsContext gfx;
@@ -60,8 +61,6 @@ void Graph_OpenDisps(Gfx**, GraphicsContext*, const char*, s32) {}
 void Graph_CloseDisps(Gfx**, GraphicsContext*, const char*, s32) {}
 #endif
 void Matrix_ReplaceRotation(MtxF*) {}
-void FrameInterpolation_RecordOpenChild(const void*, int) {}
-void FrameInterpolation_RecordCloseChild() {}
 f32 Math_SinS(s16 a) { return sinf(a * 3.14159265358979323846f / 32768); }
 f32 Math_CosS(s16 a) { return cosf(a * 3.14159265358979323846f / 32768); }
 int DinFireShield_DrawItem(PlayState*, int16_t) { return 0; }
@@ -78,6 +77,7 @@ static void GetItem_DrawBottleShimmer(PlayState*, s16) { assert(false); }
 #define COMBO_MASK_SHIMMER_HOST_MM
 #endif
 #include "ComboMaskShimmer.h"
+/* PRODUCTION_FOREIGN_LINKAGE */
 
 static void ModelDraw(PlayState*, s16 id) {
     gSPDisplayList(gfx.polyOpa.p++, (Gfx*)"__OTR__fixture/mask");

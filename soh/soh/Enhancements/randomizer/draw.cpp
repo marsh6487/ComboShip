@@ -1,4 +1,5 @@
 #include "draw.h"
+#include "soh/frame_interpolation.h"
 #ifdef COMBO_BUILD
 #include "ComboItemDrawABI.h"
 #endif
