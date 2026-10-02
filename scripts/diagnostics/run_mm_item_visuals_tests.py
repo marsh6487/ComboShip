@@ -14,13 +14,13 @@ def main():
     source = (ROOT / "mm/src/code/z_draw.c").read_text()
     names = ["GetItem_GetDungeonItemTint", "GetItem_GetDungeonKeyEmblemTint", "GetItem_GetDungeonKeyModel",
              "GetItem_TryDrawDungeonKey", "GetItem_DrawDungeonItem", "GetItem_BottleShimmerColor",
-             "GetItem_DrawBottleShimmer", "GetItem_Draw"]
+             "GetItem_DrawBottleShimmer", "GetItem_GetShimmerColor", "GetItem_DrawShimmer", "GetItem_Draw"]
     bodies = [function(source, name) for name in names]
     flags = ["-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
              "-DNON_EQUIVALENT", "-DNON_MATCHING", "-Wno-int-conversion", "-Wno-incompatible-pointer-types"]
     flags += ["-I" + str(ROOT / p) for p in
               ("mm/include", "mm/include/PR", "mm/src", "mm", "mm/2s2h", "mm/assets",
-               "libultraship/include", "libultraship/src", "combo")]
+               "libultraship/include", "libultraship/src", "combo", "combo/menu")]
     cc = shlex.split(os.environ.get("CC", "cc"))
     with tempfile.TemporaryDirectory(prefix="mm-item-visuals-") as temporary:
         build = Path(temporary)

@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -9,6 +10,9 @@
 #include <vector>
 using s32 = int32_t;
 using u8 = uint8_t;
+using s8 = int8_t;
+using u32 = uint32_t;
+struct Color_RGB8 { uint8_t r, g, b; };
 struct Vec3s {
   int16_t x = 0, y = 0, z = 0;
 };
@@ -17,6 +21,7 @@ struct Vec3f {
 };
 struct Mtx {
   float x = 0, y = 0, z = 0;
+  float sx = 1, sy = 1, sz = 1;
 };
 struct Gfx {
   int kind = 0, seg = 0;
@@ -133,7 +138,9 @@ void Matrix_Translate(float x, float y, float z, int) {
   current.y += y;
   current.z += z;
 }
-void Matrix_Scale(float, float, float, int) {}
+void Matrix_Scale(float x, float y, float z, int) {
+  current.sx *= x; current.sy *= y; current.sz *= z;
+}
 void Matrix_ReplaceRotation(Mtx *) {}
 void Matrix_TranslateRotateZYX(Vec3f *p, Vec3s *) {
   Matrix_Translate(p->x, p->y, p->z, 0);
@@ -160,6 +167,9 @@ template <class... T> Gfx *Gfx_TexScrollEx(T...) {
   return &p;
 }
 #ifdef HOST_MM
+float Rand_ZeroOne() { return 0.0f; }
+static const char gameplay_keep_DL_01ACF0[] = "__OTR__objects/gameplay_keep/gameplay_keep_DL_01ACF0";
+#include "native_soul.inc"
 using LimbArg = Actor *;
 #define COMBO_FOREIGN_ANIM_HOST_MM 1
 #else
@@ -387,6 +397,48 @@ int main() {
     }
   }
   info.flameDlPath = nullptr;
+#ifdef HOST_MM
+  // The actual native MM soul renderer surrounds the owner-routed OoT model.
+  // Repeated OoT Alt switches must change the jaw dispatch, never effect ownership.
+  info.flameDlPath = "__OTR__objects/object_gi_fire/gGiBlueFireFlameDL";
+  info.flameTranslate[1] = -70.0f;
+  info.flameScale[0] = info.flameScale[1] = info.flameScale[2] = 5.0f;
+  for (bool alt : {false, true, false}) {
+    oot->alt = alt;
+    GraphicsContext c;
+    PlayState p{{&c, 8}, 8, {}};
+    current = {};
+    assert(ComboForeignAnim_Draw(&info, "oot", &p));
+    checkDraw(c, alt, "oot");
+    std::vector<std::string> owners;
+    uintptr_t prim = 0, env = 0, seg8 = 0;
+    bool grayscale = true, sawNative = false;
+    Mtx* flameMatrix = nullptr;
+    for (Gfx* cmd = c.xlu; cmd < c.xp; ++cmd) {
+      if (cmd->kind == 8) owners.emplace_back((const char*)cmd->target);
+      if (cmd->kind == 9) { assert(!owners.empty()); owners.pop_back(); }
+      if (cmd->kind == 4) prim = cmd->target;
+      if (cmd->kind == 5) env = cmd->target;
+      if (cmd->kind == 7) grayscale = cmd->target;
+      if (cmd->kind == 1 && cmd->seg == 8) seg8 = cmd->target;
+      if (cmd->kind == 2) flameMatrix = (Mtx*)cmd->target;
+      if (cmd->kind == 3) {
+        assert(std::string((const char*)cmd->target) == gameplay_keep_DL_01ACF0);
+        assert(owners.back() == "mm" && seg8 && !grayscale);
+        assert(prim == 0xed5f5f00 && env == 0xed5f5f00);
+        assert(flameMatrix && fabs(flameMatrix->sx * 400 - 60) < .001f);
+        assert(fabs(flameMatrix->y - flameMatrix->sy * 480 + 60) < .001f);
+        assert(fabs(flameMatrix->y + flameMatrix->sy * 1440 - 140) < .001f);
+        assert(fabs(flameMatrix->sz - .15f) < .001f);
+        sawNative = true;
+      }
+    }
+    assert(sawNative && owners.empty() && !grayscale);
+    assert(prim == 0xffffffff && env == 0xffffffff);
+    assert(((Gfx*)seg8)[0].kind == 0 && matrices.empty());
+  }
+  info.flameDlPath = nullptr;
+#endif
   // Recipe flag intentionally disagrees in the other direction too: loaded
   // normal wins.
   CfaClearCaches();

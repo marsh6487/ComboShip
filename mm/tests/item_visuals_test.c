@@ -8,6 +8,9 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#define COMBO_MASK_SHIMMER_HOST_MM
+#include "ComboMaskShimmer.h"
+#undef COMBO_MASK_SHIMMER_HOST_MM
 
 static Gfx sOpa[256], sXlu[256], sResource;
 static GraphicsContext sGfx;

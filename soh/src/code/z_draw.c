@@ -1,6 +1,8 @@
 #include "global.h"
+#include "objects/gameplay_keep/gameplay_keep.h"
 #include "din_fire_shield.h"
 #include <libultraship/bridge/resourcebridge.h>
+#include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/randomizer/NeiGiPresentation.h"
 #include "objects/object_gi_key/object_gi_key.h"
 #include "objects/object_gi_jewel/object_gi_jewel.h"
@@ -401,10 +403,40 @@ DrawItemTableEntry sDrawItemTable[] = {
  * Draw "Get Item" Model
  * Calls the corresponding draw function for the given draw ID
  */
+#include "ComboMaskShimmer.h"
+
+s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]) {
+    switch (drawId) {
+        case GID_MASK_KEATON:
+        case GID_MASK_SPOOKY:
+        case GID_MASK_SKULL:
+        case GID_MASK_BUNNY:
+        case GID_MASK_TRUTH:
+        case GID_MASK_GORON:
+        case GID_MASK_ZORA:
+        case GID_MASK_GERUDO:
+            ComboMaskShimmerColor(0, color);
+            return true;
+        default:
+            return false;
+    }
+}
+
 void GetItem_Draw(PlayState* play, s16 drawId) {
     if (DinFireShield_DrawItem(play, drawId))
         return;
+    uint8_t maskColor[4];
+    s32 itemShimmer = GetItem_GetShimmerColor(drawId, maskColor);
+    if (itemShimmer) {
+        Matrix_Push();
+    }
     sDrawItemTable[drawId].drawFunc(play, drawId);
+    if (itemShimmer) {
+        Matrix_Pop();
+        if (ResourceMgr_LoadGfxByName(gEffSparklesDL) != NULL) {
+            ComboDrawMaskShimmer(play, gEffSparklesDL, maskColor, NULL);
+        }
+    }
 }
 
 #ifdef COMBO_BUILD

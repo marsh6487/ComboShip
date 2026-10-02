@@ -26,7 +26,7 @@ preamble = r'''
 #include <string>
 #include <iostream>
 #include "combo/menu/ComboItemDrawABI.h"
-using s32=int32_t; using f32=float;
+using s16=int16_t; using s32=int32_t; using f32=float;
 enum RandomizerGet { RG_NONE, RG_TEST_CUSTOM, RG_TEST_NATIVE, RG_TEST_PROGRESSIVE, RG_TEST_TIER };
 constexpr int TABLE_RANDOMIZER=1;
 struct GetItemEntry { int tableId, drawItemId, gid; void (*drawFunc)(); int itemId=0; };
@@ -62,6 +62,7 @@ int GetItem_GetDrawTableEntry(int,void** out,int,int*,float*,int*,uint8_t*) {
  ++tableCalls;out[0]=(void*)"__OTR__native";return 1;
 }
 void GetItem_GetDrawSetupDLs(int,void**,void**) {}
+int GetItem_GetShimmerColor(s16,uint8_t*) { return 0; }
 '''
 checks = r'''
 int main() {

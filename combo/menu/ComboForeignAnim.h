@@ -598,6 +598,15 @@ inline void CfaPostLimbDrawOpa(PlayState* play, s32 limbIndex, Gfx** dList, Vec3
 // perturb the model transform.
 inline void CfaDrawFlame(PlayState* play, const CwItemAnimDrawInfo* info, const char* game, int32_t* segs,
                          int32_t* segCount) {
+#ifdef COMBO_FOREIGN_ANIM_HOST_MM
+    // OoT boss models retain their owning RM and replacement skeleton. Only their
+    // blue-fire composite pass uses MM's native soul renderer in the MM host.
+    if (info->flameDlPath != nullptr && strcmp(game, "oot") == 0 && info->flameGrayscale &&
+        strcmp(info->flameDlPath, "__OTR__objects/object_gi_fire/gGiBlueFireFlameDL") == 0) {
+        DrawOotSoulFlame(play, info->flameColor, info->flameTranslate, info->flameScale);
+        return;
+    }
+#endif
     Gfx* dl = CfaRouteLimbDList((Gfx*)info->flameDlPath);
     if (dl == NULL) {
         return;

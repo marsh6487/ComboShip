@@ -39,6 +39,9 @@
 // ComboShip: the animated class, with 2ship.dll as the host (see the shim in ComboForeignAnim.h).
 #define COMBO_FOREIGN_ANIM_HOST_MM 1
 #include "ComboForeignAnim.h"
+#define COMBO_MASK_SHIMMER_HOST_MM
+#include "ComboMaskShimmer.h"
+#undef COMBO_MASK_SHIMMER_HOST_MM
 #include "2s2h/Rando/MiscBehavior/MiscBehavior.h" // Rando::MiscBehavior::MM_LookupForeign
 #include "rando/CrossForeign.h"                   // ComboRando::ForeignItem / GAME_OOT
 #include "ComboResolve.h"                         // Combo_ResolveSym (process-wide combo-ABI resolution)
@@ -50,6 +53,8 @@ struct ComboForeignDrawInfoOOT {
     int32_t count = 0;
     int32_t xluStart = -1; // first XLU entry in dls[] order; -1 = all OPA
     float scale = 0.0f;    // extra uniform model scale; 0 = none (OOT rupees: 0.7)
+    bool itemShimmer = false;
+    uint8_t itemShimmerColor[4] = {};
     bool hasEnvColor = false;
     uint8_t envColor[4] = { 0, 0, 0, 0 };
     int32_t drawKind = CW_DRAW_KIND_SIMPLE;   // non-SIMPLE = replicate a specific OOT draw func
@@ -167,6 +172,8 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     info.neiLegacyCane = raw.neiLegacyCane;
     info.stateDependent = raw.stateDependent != 0;
     info.appearanceDependent = raw.stateDependent == 2;
+    info.itemShimmer = raw.itemShimmer != 0;
+    memcpy(info.itemShimmerColor, raw.itemShimmerColor, sizeof(info.itemShimmerColor));
     if (raw.resolvedName != nullptr) {
         info.resolvedName = raw.resolvedName;
     }
@@ -657,33 +664,20 @@ inline void MM_DrawForeignMusicNote(const ComboForeignDrawInfoOOT* info) {
     CLOSE_DISPS(gfxCtx);
 }
 
-// OOT boss soul: seg8 flame scroll + billboard, grayscale-colored flame dl0, then generic skull dl1
-// with env color (Randomizer_DrawBossSoul, SimplerBossSoulModels path — no boss skeleton cross-game).
+// OoT's simpler boss souls use MM's native flame plus the owner-routed generic skull.
 inline void MM_DrawForeignBossSoul(const ComboForeignDrawInfoOOT* info) {
     PlayState* play = gPlayState;
     GraphicsContext* gfxCtx = play->state.gfxCtx;
+    const float translate[3] = { 0.0f, -70.0f, 0.0f };
+    const float scale[3] = { 5.0f, 5.0f, 5.0f };
+    DrawOotSoulFlame(play, info->primColorXlu, translate, scale);
     OPEN_DISPS(gfxCtx);
     Gfx_SetupDL25_Xlu(gfxCtx);
     MM_FOREIGN_PIN_XLU();
-    gSPSegment(POLY_XLU_DISP++, 0x08,
-               (uintptr_t)Gfx_TwoTexScrollEx(gfxCtx, G_TX_RENDERTILE, 0, 0, 16, 32, 1, play->state.frames * 1,
-                                             -(play->state.frames * 8), 16, 32, 0, 0, 1, -8));
-    Matrix_Push();
-    Matrix_Translate(0.0f, -70.0f, 0.0f, MTXMODE_APPLY);
-    Matrix_Scale(5.0f, 5.0f, 5.0f, MTXMODE_APPLY);
-    Matrix_ReplaceRotation(&play->billboardMtxF);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
-    gDPSetGrayscaleColor(POLY_XLU_DISP++, info->primColorXlu[0], info->primColorXlu[1], info->primColorXlu[2], 255);
-    gSPGrayscale(POLY_XLU_DISP++, true);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[0]); // flame
-    gSPGrayscale(POLY_XLU_DISP++, false);
-    Matrix_Pop();
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
     gDPSetEnvColor(POLY_XLU_DISP++, info->envColorXlu[0], info->envColorXlu[1], info->envColorXlu[2], 255);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[1]); // generic soul skull
     CLOSE_DISPS(gfxCtx);
-    int32_t segs[] = { 0x08 };
-    MM_RestoreForeignSegs(segs, 1);
 }
 
 // Per-DL prim/env colored layers: the rando map/compass/small-key/boss-key/key-ring/jabber-nut/
@@ -858,6 +852,9 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
         MM_DrawNeiGi(recipe);
         return;
     }
+    if (info->itemShimmer) {
+        Matrix_Push();
+    }
     switch (info->drawKind) {
         case CW_DRAW_KIND_GORON_SWORD:
             MM_DrawForeignGoronSword(info);
@@ -928,6 +925,21 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
         default:
             MM_DrawForeignSimple(info);
             break;
+    }
+    if (info->itemShimmer) {
+        Matrix_Pop();
+        const bool mmOwner = info->drawKind == CW_DRAW_KIND_MM_MASK || info->drawKind == CW_DRAW_KIND_MM_REMAINS;
+        const char* owner = mmOwner ? "mm" : "oot";
+        auto rm = Ship::CrossRMRegistry::Get(owner);
+        if (rm != nullptr) {
+            Ship::ResourceManagerScope scope(rm);
+            if (rm->LoadResource("__OTR__objects/gameplay_keep/gEffSparklesDL") != nullptr) {
+                ComboDrawMaskShimmer(gPlayState,
+                                     mmOwner ? "__OTR__@mm:objects/gameplay_keep/gEffSparklesDL"
+                                             : "__OTR__@oot:objects/gameplay_keep/gEffSparklesDL",
+                                     info->itemShimmerColor, owner);
+            }
+        }
     }
 }
 

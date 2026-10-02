@@ -63,6 +63,7 @@ extern "C" s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDl
 // Which setup DL the row's func emits (NULL = plain 25). The consumer must submit the same one.
 extern "C" void GetItem_GetDrawSetupDLs(s32 drawId, void** outOpa, void** outXlu);
 extern "C" void* GetItem_GetSetupDL(s32 index); // by index, for the bespoke Randomizer_Draw* funcs
+extern "C" s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]);
 
 // --- CW_DRAW_KIND_COLOR_LAYERS helpers: attach a prim/env color to one display list slot.
 static void CwLayerPrim(CwItemDrawInfo* out, int32_t i, Color_RGB8 c) {
@@ -536,6 +537,7 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     GetItem_GetDrawSetupDLs((s32)gi.gid, &setupOpa, &setupXlu);
     out->setupDlOpa = setupOpa;
     out->setupDlXlu = setupXlu;
+    out->itemShimmer = GetItem_GetShimmerColor((s16)gi.gid, out->itemShimmerColor);
     return 1;
 }
 

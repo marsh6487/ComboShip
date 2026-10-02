@@ -86,6 +86,7 @@ void Matrix_Scale(f32 x, f32 y, f32 z, s32 mode) {
 void Matrix_Translate(f32 x, f32 y, f32 z, s32 m) {}
 void Matrix_RotateZYX(s16 x, s16 y, s16 z, s32 m) {}
 void Matrix_ReplaceRotation(void *p) {}
+s32 GetItem_GetShimmerColor(s16 id, uint8_t *color) { return false; }
 Gfx *Gfx_SetupDL(Gfx *p, int id) {
   assert(id == 5);
   testSetup5++;

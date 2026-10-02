@@ -62,6 +62,7 @@ s32 GetItem_GetDungeonItemTint(s16, s32, Color_RGBA8 *, u8 *);
 s32 GetItem_GetDungeonKeyEmblemTint(s32, Color_RGBA8 *);
 s32 GetItem_GetDrawTableEntry(s32, void **, s32, s32 *, f32 *, s32 *, s32 *);
 void GetItem_GetDrawSetupDLs(s32, void **, void **);
+s32 GetItem_GetShimmerColor(s16, uint8_t *);
 #define ARRAY_COUNT(a) ((int)(sizeof(a) / sizeof((a)[0])))
 #define POLY_OPA_DISP testOpa
 #define POLY_XLU_DISP testXlu

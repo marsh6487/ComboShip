@@ -15,6 +15,7 @@ s32 GetItem_GetDungeonKeyModel(s16 drawId, s32 owner, const char** metalPath, co
 // Palette-only helpers: work without replacement models and with Alt Assets disabled.
 s32 GetItem_GetDungeonItemTint(s16 drawId, s32 owner, Color_RGBA8* color, u8* strength);
 s32 GetItem_GetDungeonKeyEmblemTint(s32 owner, Color_RGBA8* color);
+s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]);
 
 #ifdef __cplusplus
 }

@@ -574,6 +574,72 @@ s32 GetItem_DrawDungeonItem(PlayState* play, s16 drawId, s32 owner) {
     return true;
 }
 
+#define COMBO_MASK_SHIMMER_HOST_MM
+#include "ComboMaskShimmer.h"
+#undef COMBO_MASK_SHIMMER_HOST_MM
+
+s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]) {
+    int profile = 0;
+    switch (drawId) {
+        case GID_MASK_DEKU:
+            profile = 1;
+            break;
+        case GID_MASK_GORON:
+            profile = 2;
+            break;
+        case GID_MASK_ZORA:
+            profile = 3;
+            break;
+        case GID_MASK_FIERCE_DEITY:
+            profile = 4;
+            break;
+        case GID_REMAINS_ODOLWA:
+            profile = 5;
+            break;
+        case GID_REMAINS_GOHT:
+            profile = 6;
+            break;
+        case GID_REMAINS_GYORG:
+            profile = 7;
+            break;
+        case GID_REMAINS_TWINMOLD:
+            profile = 8;
+            break;
+        case GID_MASK_KAMARO:
+        case GID_MASK_COUPLE:
+        case GID_MASK_STONE:
+        case GID_MASK_KAFEIS_MASK:
+        case GID_MASK_CIRCUS_LEADER:
+        case GID_MASK_BREMEN:
+        case GID_MASK_ALL_NIGHT:
+        case GID_MASK_DON_GERO:
+        case GID_MASK_KEATON:
+        case GID_MASK_SUN:
+        case GID_MASK_BLAST:
+        case GID_MASK_SCENTS:
+        case GID_MASK_CAPTAIN:
+        case GID_MASK_BUNNY:
+        case GID_MASK_TRUTH:
+        case GID_MASK_GARO:
+        case GID_MASK_GREAT_FAIRY:
+        case GID_MASK_GIBDO:
+        case GID_MASK_ROMANI:
+        case GID_MASK_POSTMAN:
+        case GID_MASK_GIANT:
+            break;
+        default:
+            return false;
+    }
+    ComboMaskShimmerColor(profile, color);
+    return true;
+}
+
+static void GetItem_DrawShimmer(PlayState* play, const uint8_t color[4]) {
+    if (ResourceMgr_LoadGfxByName(gEffSparklesDL) != NULL) {
+        ComboDrawMaskShimmer(play, gEffSparklesDL, color, NULL);
+    }
+}
+
 static s32 GetItem_BottleShimmerColor(s16 drawId, Color_RGBA8* color) {
     switch (drawId) {
         case GID_POTION_RED:
@@ -643,6 +709,8 @@ void GetItem_Draw(PlayState* play, s16 drawId) {
     s32 owner = -1;
     Color_RGBA8 shimmerColor;
     s32 shimmer;
+    uint8_t maskColor[4];
+    s32 itemShimmer;
     // Guard against an out-of-range drawId and a get-item whose model resource does NOT resolve (a
     // missing/incompatible o2r, a missing asset, a rando/combo item without a resident object). Feeding
     // gSPDisplayList a display list the Fast3D interpreter can't resolve dereferences a bad address and
@@ -681,15 +749,21 @@ void GetItem_Draw(PlayState* play, s16 drawId) {
         return;
     }
     shimmer = CVarGetInteger("gEnhancements.BottleShimmer", 0) && GetItem_BottleShimmerColor(drawId, &shimmerColor);
-    if (shimmer) {
+    itemShimmer = GetItem_GetShimmerColor(drawId, maskColor);
+    if (shimmer || itemShimmer) {
         Matrix_Push();
     }
     sDrawItemTable[drawId].drawFunc(play, drawId);
-    if (shimmer) {
+    if (shimmer || itemShimmer) {
         // Some fairy draws leave a billboard transform behind. Motes use the incoming
         // bottle transform, not the contents' billboard matrix.
         Matrix_Pop();
-        GetItem_DrawBottleShimmer(play, drawId);
+        if (shimmer) {
+            GetItem_DrawBottleShimmer(play, drawId);
+        }
+        if (itemShimmer) {
+            GetItem_DrawShimmer(play, maskColor);
+        }
     }
 }
 
