@@ -134,6 +134,7 @@ void Randomizer_DrawExtWaterDragonScale(PlayState* play, GetItemEntry* getItemEn
 
 // MM Mask Get-Item 3D Models (all 24, from mm.o2r)
 void Randomizer_DrawMmMask(PlayState* play, GetItemEntry* getItemEntry);
+void Randomizer_DrawMmGreatSpinAttack(PlayState* play, GetItemEntry* getItemEntry);
 
 // Chateau Romani bottle (from mm.o2r)
 void Randomizer_DrawChateauRomani(PlayState* play, GetItemEntry* getItemEntry);

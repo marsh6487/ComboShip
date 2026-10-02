@@ -27,6 +27,7 @@ enum {
   SETUPDL_5 = 5
 };
 extern bool testAlt;
+extern int testSpinRed;
 extern int testColors, testChanged, testEmblemChanged, testMissing,
     testLoadFail;
 extern int testCount, testDepth, testScales, testSetup5;

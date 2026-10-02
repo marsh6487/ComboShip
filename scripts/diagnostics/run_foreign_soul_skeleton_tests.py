@@ -25,6 +25,8 @@ def function(source, name):
     return source[start:end]
 
 header = (ROOT / 'combo/menu/ComboForeignAnim.h').read_text()
+if '--baseline-aura' in sys.argv:
+    header = subprocess.check_output(['git', 'show', '9e3a2a6006c8d77f6e733da1987dd44681566ba7:combo/menu/ComboForeignAnim.h'], cwd=ROOT, text=True)
 if '--baseline' in sys.argv:
     header = subprocess.check_output(['git', 'show', 'd1965180:combo/menu/ComboForeignAnim.h'], cwd=ROOT, text=True)
     # Fixture's factory-layout mirror was introduced with the correction.

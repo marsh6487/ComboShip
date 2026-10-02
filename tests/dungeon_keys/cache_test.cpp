@@ -38,7 +38,8 @@ enum RandoItemId {
   RI_TRIFORCE_PIECE,
   RI_TRIFORCE_PIECE_PREVIOUS,
   RI_TEST_SWORD,
-  RI_TEST_COMPASS
+  RI_TEST_COMPASS,
+  RI_GREAT_SPIN_ATTACK
 };
 /* PRODUCTION_OWNER */
 RandoItemId progression = RI_TEST_SWORD;
@@ -82,6 +83,9 @@ int32_t MM_FillOpsDrawInfo(RandoItemId, CwItemDrawInfo *) { return 0; }
 int32_t MM_FillSimpleDrawInfo(RandoItemId, CwItemDrawInfo *) { return 0; }
 int32_t MM_FillEnemySoulDrawInfo(RandoItemId, CwItemDrawInfo *) { return 0; }
 int32_t MM_FillGidAliasDrawInfo(RandoItemId, CwItemDrawInfo *) { return 0; }
+static const char *gGreatSpinAttackDiskDL = "__OTR__objects/gameplay_keep/gGreatSpinAttackDiskDL";
+static const char *gGreatSpinAttackCylinderDL = "__OTR__objects/gameplay_keep/gGreatSpinAttackCylinderDL";
+/* PRODUCTION_SPIN */
 bool MM_HasAnimDraw(RandoItemId) { return false; }
 const char *gGiMoonsTearItemDL = "__OTR__unrelated/tear";
 const char *gGiMoonsTearTexAnim = "__OTR__unrelated/tearTex";
@@ -217,6 +221,21 @@ int main() {
         CheckRendered(ComboResolveForeignDrawInfo(rc), d, k, false);
       }
     }
+  Rando::StaticData::Items[RI_GREAT_SPIN_ATTACK] = {0, "Great Spin Attack"};
+  foreign.itemName = "Great Spin Attack";
+  generation++;
+  CwItemDrawInfo spin{};
+  assert(MM_GetItemDrawInfo(foreign.itemName.c_str(), &spin) == 1);
+  assert(spin.stateDependent == 2 && spin.drawKind == CW_DRAW_KIND_MM_SPIN_ATTACK);
+  const auto *burst = ComboResolveForeignDrawInfo(98);
+  assert(burst && burst->appearanceDependent && burst->stateDependent);
+  assert(strstr(burst->dls[0], "__OTR__@mm:objects/gameplay_keep/gGreatSpinAttackDiskDL"));
+  assert(burst->primColorXlu[0] == 17);
+  ComboLatchForeignDraw(98);
+  testSpinRed = 211;
+  assert(ComboResolveForeignDrawInfo(98)->primColorXlu[0] == 211);
+  assert(ComboForeignLatchedName(98) == nullptr);
+
   // The original progressive latch must remain frozen across grant-state
   // changes.
   Rando::StaticData::Items[RI_PROGRESSIVE_SWORD] = {0, "Progressive sword"};

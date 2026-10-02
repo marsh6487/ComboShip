@@ -1,4 +1,5 @@
 #include "fixture_api.h"
+int testSpinRed = 17;
 bool testAlt = true;
 int testColors = 1, testChanged = 0, testEmblemChanged = 0, testMissing = 0,
     testLoadFail = 0;
@@ -54,6 +55,8 @@ int CVarGetInteger(const char *p, int fallback) {
 }
 Color_RGBA8 CosmeticEditor_GetChangedColor(u8 r, u8 g, u8 b, u8 a,
                                            const char *id) {
+  if (strcmp(id, "Effects.GreatSpinBurst") == 0)
+    return (Color_RGBA8){testSpinRed, 123, 241, 255};
   const char *emblemIds[] = {"Items.WoodfallEmblem", "Items.SnowheadEmblem",
                              "Items.GreatBayEmblem", "Items.StoneTowerEmblem"};
   for (int i = 0; i < 4; i++)

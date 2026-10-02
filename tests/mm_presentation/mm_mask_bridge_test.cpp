@@ -6,6 +6,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include "combo/menu/ComboItemDrawABI.h"
 #include "soh/mods/mm_sources/objects/object_gi_masks_all.h"
 #include "soh/mods/mm_sources/objects/object_mm_rando_items.h"
@@ -16,6 +17,7 @@
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"
 using s32=int32_t;using f32=float;
 #define ARRAY_COUNT(a) (sizeof(a)/sizeof((a)[0]))
+void* Combo_ResolveSym(const char*,const char*);
 /* MASK_TABLE */
 constexpr int TABLE_RANDOMIZER=1;
 void Randomizer_DrawMmMask() {}
@@ -59,10 +61,27 @@ struct ForeignItem {int itemGame=GAME_OOT;std::string itemName="mask",fakeItemNa
 using RandoCheckId=int;
 ComboRando::ForeignItem foreign;
 namespace Rando::MiscBehavior {const ComboRando::ForeignItem* MM_LookupForeign(int) {return &foreign;}}
-void* Combo_ResolveSym(const char*,const char* name) {return !strcmp(name,"OOT_GetItemDrawInfo")?(void*)Describe:nullptr;}
+int spinResult=1, spinRed=17;
+int32_t SpinDonor(const char* name,CwItemDrawInfo* out) {
+ assert(!strcmp(name,"Great Spin Attack"));
+ if(spinResult!=1)return spinResult;
+ out->drawKind=CW_DRAW_KIND_MM_SPIN_ATTACK;out->dlistCount=2;
+ out->dlists[0]="__OTR__objects/gameplay_keep/gGreatSpinAttackDiskDL";
+ out->dlists[1]="__OTR__objects/gameplay_keep/gGreatSpinAttackCylinderDL";
+ out->scale=0.012f;out->stateDependent=2;out->primColorXlu[0]=spinRed;
+ return 1;
+}
+void* Combo_ResolveSym(const char*,const char* name) {
+ if(!strcmp(name,"OOT_GetItemDrawInfo"))return (void*)Describe;
+ return !strcmp(name,"MM_GetItemDrawInfo")?(void*)SpinDonor:nullptr;
+}
 const char* ComboInternRoutedPathOOT(const std::string& path) {static std::set<std::string> paths;return paths.insert(path).first->c_str();}
 enum class ComboForeignResolveOOT {Ok,Unknown,NotReady};
 /* HOST_RESOLVER */
+constexpr int RC_UNKNOWN=-1;
+struct {int fileNum=0;} gSaveContext;
+namespace Rando::MiscBehavior {uint64_t ComboRandoGen() {return 1;}}
+/* HOST_CACHE */
 struct Gfx {int stream;};
 Gfx opa[64],xlu[64];
 struct GraphicsContext {Gfx* o=opa;Gfx* x=xlu;};
@@ -88,8 +107,14 @@ void Gfx_SetupDL25_Opa(GraphicsContext*) {}
 void Gfx_SetupDL25_Xlu(GraphicsContext*) {}
 #define gDPSetEnvColor(p,...) ((void)(p))
 /* HOST_SIMPLE_DRAW */
+int spinDraws=0;
+void ComboDrawSpinAttackGi(PlayState*,const char* disk,const char* cylinder,float size,const uint8_t*,const char* owner) {
+ assert(strstr(disk,"__OTR__@mm:objects/gameplay_keep/gGreatSpinAttackDiskDL"));
+ assert(strstr(cylinder,"__OTR__@mm:objects/gameplay_keep/gGreatSpinAttackCylinderDL"));
+ assert(size==0.012f && !strcmp(owner,"mm"));spinDraws++;
+}
+/* HOST_SPIN_DRAW */
 int sentinels=0;
-constexpr int RC_UNKNOWN=-1;
 ComboForeignDrawInfoOOT current;
 const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(int rc) {return ComboFillForeignDrawInfoOOT(rc,current)==ComboForeignResolveOOT::Ok?&current:nullptr;}
 void GetItem_Draw(PlayState*,int gid) {assert(gid==GID_RUPEE_BLUE);++sentinels;}
@@ -144,6 +169,18 @@ int main() {
  const char* retained=current.dls[0];for(int i=0;i<1000;++i)ComboInternRoutedPathOOT(std::to_string(i));
  assert(!strncmp(retained,"__OTR__@mm:",11));
  producerResult=CW_DRAW_NOT_READY;current={};assert(ComboFillForeignDrawInfoOOT(1,current)==ComboForeignResolveOOT::NotReady);
+ producerResult=1;selected=RG_MM_GREAT_SPIN_ATTACK;
+ assert(OOT_DescribeMmSpinAttackDraw(nullptr)==0);
+ CwItemDrawInfo spin{};assert(OOT_FillItemDrawInfo(selected,&spin)==1 && spin.stateDependent==2);
+ auto* live=TestResolveForeignDrawInfoOOT(2);
+ assert(live && live->appearanceDependent && live->primColorXlu[0]==17);
+ ComboLatchForeignDrawOOT(2);spinRed=211;
+ assert(TestResolveForeignDrawInfoOOT(2)->primColorXlu[0]==211);
+ MM_DrawComboForeign(2);assert(spinDraws==1);
+ spinResult=CW_DRAW_NOT_READY;
+ assert(OOT_FillItemDrawInfo(selected,&spin)==CW_DRAW_NOT_READY);
+ assert(TestResolveForeignDrawInfoOOT(2)==nullptr);
+ spinResult=1;assert(TestResolveForeignDrawInfoOOT(2)!=nullptr);
  MM_DrawComboForeign(RC_UNKNOWN);assert(sentinels==1);
  std::cout<<"PASS all 24 mask and four boss-remains production recipes and MM draw dispatch: no blue sentinel, correct native MM routing, opaque/translucent passes, LUT reset, Romani layers and retained paths\n";
 }

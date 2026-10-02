@@ -620,8 +620,8 @@ void Rando::StaticData::InitItemTable() {
     // GSP_MM_DL; MM-unique folder). Give fills an OoT bottle slot with ITEM_GOLD_DUST (0xEC) — the
     // exact content mm_bottles_behavior.cpp maps to MM_BOTTLE_GOLD_DUST (same store the debug editor uses).
     itemTable[RG_MM_BOTTLE_GOLD_DUST] =       Item(RG_MM_BOTTLE_GOLD_DUST,      Text{ "Bottle With Gold Dust", "Bouteille de Poudre d'Or", "Flasche mit Goldstaub" },                  ITEMTYPE_ITEM, 0x18D, true, LOGIC_BOTTLES, RHT_NONE, RG_MM_BOTTLE_GOLD_DUST,     OBJECT_GI_JEWEL, 0, TEXT_RANDOMIZER_CUSTOM_ITEM, 0x80, CHEST_ANIM_LONG, ITEM_CATEGORY_MAJOR, MOD_RANDOMIZER).CustomIcon("__OTR__icon_item_static_yar/gItemIconBottledGoldDustTex");
-    // MM Great Spin Attack — OoT has no great-spin store (WEEKEVENTREG is MM-side): DEFAULT draw path
-    // with OoT's Kokiri Sword model (same GID stand-in 2ship's RI row uses); give is a no-op.
+    // MM Great Spin Attack — custom burst GI attached below; sword GID is the standalone fallback.
+    // OoT has no great-spin store (WEEKEVENTREG is MM-side); give remains a no-op.
     itemTable[RG_MM_GREAT_SPIN_ATTACK] =      Item(RG_MM_GREAT_SPIN_ATTACK,     Text{ "Great Spin Attack", "Super Attaque Tornade", "Große Wirbelattacke" },                            ITEMTYPE_ITEM, 0x18E, true, LOGIC_NONE, RHT_NONE, RG_MM_GREAT_SPIN_ATTACK,     OBJECT_GI_SWORD_1, GID_SWORD_KOKIRI, TEXT_RANDOMIZER_CUSTOM_ITEM, 0x80, CHEST_ANIM_LONG, ITEM_CATEGORY_MAJOR, MOD_RANDOMIZER).CustomIcon("__OTR__icon_item_static_yar/gItemIconKokiriSwordTex");
     // MM clock-shuffle half-days — REAL static MM clock model (Randomizer_DrawMmClock, mm.o2r
     // object_obj_tokeidai, mirrors 2ship DrawClock frozen: day = clock face at 0xC000, night =
@@ -943,9 +943,8 @@ void Rando::StaticData::InitItemTable() {
     setNeiDraw(RG_MM_COMPASS_SNOWHEAD);
     setNeiDraw(RG_MM_COMPASS_GREAT_BAY);
     setNeiDraw(RG_MM_COMPASS_STONE_TOWER);
-    // Final MM cross items (third wave). Great Spin uses the DEFAULT native draw path (Kokiri
-    // Sword GID above) — no setNeiDraw for it. The 6 clock halves are not in the NEI registry,
-    // so they take a literal SetCustomDrawFunc (static MM clock-tower face, mm.o2r).
+    // Great Spin and the clock halves use native MM effects/resources outside the NEI registry.
+    itemTable[RG_MM_GREAT_SPIN_ATTACK].SetCustomDrawFunc(Randomizer_DrawMmGreatSpinAttack);
     itemTable[RG_MM_TIME_DAY_1].SetCustomDrawFunc(Randomizer_DrawMmClock);
     itemTable[RG_MM_TIME_DAY_2].SetCustomDrawFunc(Randomizer_DrawMmClock);
     itemTable[RG_MM_TIME_DAY_3].SetCustomDrawFunc(Randomizer_DrawMmClock);

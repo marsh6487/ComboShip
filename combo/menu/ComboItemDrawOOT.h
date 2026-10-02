@@ -92,6 +92,7 @@ static int32_t CwSimple(CwItemDrawInfo* out, const char* dl, bool xlu, float sca
 
 extern "C" int32_t OOT_DescribeMmMaskDraw(int32_t itemId, CwItemDrawInfo* out);
 extern "C" int32_t OOT_DescribeMmRemainsDraw(int32_t rg, CwItemDrawInfo* out);
+extern "C" int32_t OOT_DescribeMmSpinAttackDraw(CwItemDrawInfo* out);
 
 // ComboShip: describe the bespoke Randomizer_Draw* funcs (Item::SetCustomDrawFunc), which the
 // gid-keyed sDrawItemTable is blind to — without this those items draw a plausible-but-wrong vanilla
@@ -108,6 +109,10 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
 
     if (rg >= RG_MM_REMAINS_ODOLWA && rg <= RG_MM_REMAINS_TWINMOLD) {
         return OOT_DescribeMmRemainsDraw((int32_t)rg, out);
+    }
+
+    if (rg == RG_MM_GREAT_SPIN_ATTACK) {
+        return OOT_DescribeMmSpinAttackDraw(out);
     }
 
     // RPG stat models use custom OPA draws; their legacy spell GIDs are only
@@ -477,8 +482,12 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     // Progressive items resolve to the tier actually owed; classify THAT item's draw func, not the
     // placeholder's (drawItemId carries the resolved RandomizerGet for rando-table entries).
     RandomizerGet effRg = (gi.tableId == TABLE_RANDOMIZER) ? (RandomizerGet)gi.drawItemId : rg;
-    if (NeiGi_DescribeEntry(&gi, out) || OOT_DescribeCustomDraw(effRg, out)) {
+    if (NeiGi_DescribeEntry(&gi, out)) {
         return 1;
+    }
+    const int32_t customResult = OOT_DescribeCustomDraw(effRg, out);
+    if (customResult != 0) {
+        return customResult; // Preserve a donor's transient CW_DRAW_NOT_READY.
     }
     // Concrete skills must retain their own tint/flame even when they use the legacy cane.
     if (gi.drawFunc == Randomizer_DrawCaneOfSomaria)
@@ -565,10 +574,11 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemDrawInfo(const char* itemName, CwItem
             return CW_DRAW_NOT_READY;
         }
         *out = CwItemDrawInfo{};
-        if (!OOT_FillItemDrawInfo(rg, out)) {
-            return 0;
+        const int32_t result = OOT_FillItemDrawInfo(rg, out);
+        if (result != 1) {
+            return result;
         }
-        out->stateDependent = OOT_IsStateDependentDraw(rg) ? 1 : 0;
+        out->stateDependent = rg == RG_MM_GREAT_SPIN_ATTACK ? 2 : OOT_IsStateDependentDraw(rg) ? 1 : 0;
         return 1;
     } catch (...) { return 0; }
 }

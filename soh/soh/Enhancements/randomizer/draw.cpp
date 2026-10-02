@@ -2635,7 +2635,49 @@ extern "C" int32_t OOT_DescribeMmMaskDraw(int32_t itemId, CwItemDrawInfo* out) {
     out->dlists[1] = entry.dl2;
     return 1;
 }
+
+// The imported alias must query MM's palette as well as use MM's resources.
+extern "C" int32_t OOT_DescribeMmSpinAttackDraw(CwItemDrawInfo* out) {
+    if (out == nullptr) {
+        return 0;
+    }
+    static Fn_GetItemDrawInfo getDrawInfo = nullptr;
+    if (getDrawInfo == nullptr) {
+        getDrawInfo = (Fn_GetItemDrawInfo)Combo_ResolveSym("2ship", "MM_GetItemDrawInfo");
+    }
+    if (getDrawInfo == nullptr) {
+        return CW_DRAW_NOT_READY;
+    }
+    CwItemDrawInfo recipe{};
+    const int32_t result = getDrawInfo("Great Spin Attack", &recipe);
+    if (result != 1) {
+        return result;
+    }
+    if (recipe.drawKind != CW_DRAW_KIND_MM_SPIN_ATTACK || recipe.dlistCount != 2) {
+        return 0;
+    }
+    for (int i = 0; i < 2; i++) {
+        if (recipe.dlists[i] == nullptr || strncmp(recipe.dlists[i], "__OTR__", 7) != 0) {
+            return 0;
+        }
+    }
+    *out = recipe;
+    return 1;
+}
 #endif
+
+extern "C" void Randomizer_DrawMmGreatSpinAttack(PlayState* play, GetItemEntry* getItemEntry) {
+#ifdef COMBO_BUILD
+    CwItemDrawInfo recipe{};
+    if (OOT_DescribeMmSpinAttackDraw(&recipe) == 1) {
+        const char* disk = ComboInternRoutedPath(std::string("__OTR__@mm:") + (recipe.dlists[0] + 7));
+        const char* cylinder = ComboInternRoutedPath(std::string("__OTR__@mm:") + (recipe.dlists[1] + 7));
+        ComboDrawSpinAttackGi(play, disk, cylinder, recipe.scale, recipe.primColorXlu, "mm");
+        return;
+    }
+#endif
+    GetItem_Draw(play, GID_SWORD_KOKIRI);
+}
 
 // Raw OTR-path-as-pointer draw, the same mechanism the 24 MM masks have always used: the gfx
 // interpreter resolves "__OTR__..." string pointers at execution time against the mounted archives.
