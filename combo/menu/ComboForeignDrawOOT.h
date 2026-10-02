@@ -37,10 +37,10 @@ namespace {
 struct ComboForeignDrawInfo {
     bool ok = false;
     int32_t count = 0;
-    int32_t xluStart = -1;    // first XLU entry in dls[] order; -1 = all OPA
-    float scale = 0.0f;       // extra model scale; 0 = none (MM remains: 0.02)
+    int32_t xluStart = -1;            // first XLU entry in dls[] order; -1 = all OPA
+    float scale = 0.0f;               // extra model scale; 0 = none (MM remains: 0.02)
     bool appearanceDependent = false; // Palette and Alt state remain live after a dungeon-item grant.
-    bool hasEnvColor = false; // emit env color before the DLs (MM song notes)
+    bool hasEnvColor = false;         // emit env color before the DLs (MM song notes)
     uint8_t envColor[4] = { 0, 0, 0, 0 };
     bool xluSeg8TexScroll = false;          // bind segment 8 to the flame texscroll before the XLU layer (skull token)
     const char* matAnimPath = nullptr;      // MM TextureAnimation resource to replicate before the DLs (Moon's Tear)
