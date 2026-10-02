@@ -10,7 +10,7 @@ import sys
 ROOT=Path(__file__).resolve().parents[2]
 
 def function(source,name):
-    match=re.search(r'^(?:extern "C" )?(?:static )?(?:void\*|bool|int32_t|int|void|std::shared_ptr<Fast::Texture>)\s+'+re.escape(name)+r'\([^;{}]*\)\s*\{',source,re.M)
+    match=re.search(r'^(?:extern "C" )?(?:(?:static|inline) )?(?:void\*|bool|int32_t|int|void|std::string|std::shared_ptr<Fast::Texture>)\s+'+re.escape(name)+r'\([^;{}]*\)\s*\{',source,re.M)
     if not match:
         raise RuntimeError('Missing production function: '+name)
     index,depth=match.end(),1
@@ -58,6 +58,8 @@ def run_lifecycle():
     fixture=fixture.replace('/* MM_SAVE */',function(saves,'SaveManager_SaveCurrentForCombo')+function(saves,'SaveManager_LoadSaveFile'))
     fixture=fixture.replace('/* SCALE_CASE */',scale).replace('/* FOREIGN_QUEUE */',queue[start:end])
     fixture=fixture.replace('/* SEND_FOREIGN */',function(queue,'Rando::MiscBehavior::SendForeignCheck'))
+    check_source=(ROOT/'mm/2s2h/Rando/MiscBehavior/MiscBehavior.h').read_text()
+    fixture=fixture.replace('/* BANK_SOURCE */',function(check_source,'BankRewardSourceSuffix'))
     sharing=(ROOT/'mm/2s2h/FleetShipCombo/FleetSharedItems.cpp').read_text()
     shared=function(sharing,'FleetShared_OnNativeObtained')
     fixture=fixture.replace('/* SHARE_SWIM */',shared)

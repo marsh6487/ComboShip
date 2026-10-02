@@ -78,7 +78,8 @@ void Rando::MiscBehavior::SendForeignCheck(RandoCheckId rc) {
         // A trap latches under its disguise's tier, not its own; never name a trap's toast with it.
         const char* resolved = it->second.trap ? nullptr : Rando::ComboForeignLatchedName(rc);
         Notification::Emit(
-            { .message = "Sent to Hyrule:", .suffix = ComboRando::ShownForeignName(it->second, resolved) });
+            { .message = "Sent to Hyrule:",
+              .suffix = ComboRando::ShownForeignName(it->second, resolved) + BankRewardSourceSuffix(rc) });
         SPDLOG_INFO("[ComboShip] MM delivered foreign item '{}' to OOT (from check '{}')", it->second.itemName,
                     checkName);
     } else {
@@ -178,7 +179,8 @@ void Rando::MiscBehavior::CheckQueue() {
                             CustomMessage::Entry entry = {
                                 .textboxType = 2,
                                 .icon = Rando::ComboForeignMessageIcon(cid),
-                                .msg = foreignTrap ? GetTrapMessage() : ("You found " + foreignName + "!"),
+                                .msg = (foreignTrap ? GetTrapMessage() : ("You found " + foreignName + "!")) +
+                                       BankRewardSourceSuffix(cid),
                             };
                             if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
                                 CustomMessage::SetActiveCustomMessage(entry.msg, entry);
@@ -249,7 +251,8 @@ void Rando::MiscBehavior::CheckQueue() {
                         CustomMessage::Entry entry = {
                             .textboxType = 2,
                             .icon = Rando::StaticData::GetIconForZMessage(randoItemId),
-                            .msg = (prefix == "" ? "" : prefix + " ") + message + (randoItemId == RI_TRAP ? "" : "!"),
+                            .msg = (prefix == "" ? "" : prefix + " ") + message + (randoItemId == RI_TRAP ? "" : "!") +
+                                   BankRewardSourceSuffix((RandoCheckId)CUSTOM_ITEM_PARAM),
                         };
 
                         if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
@@ -261,7 +264,7 @@ void Rando::MiscBehavior::CheckQueue() {
                                 Notification::Emit({
                                     .itemIcon = Rando::StaticData::GetIconTexturePath(randoItemId),
                                     .message = prefix,
-                                    .suffix = message,
+                                    .suffix = message + BankRewardSourceSuffix((RandoCheckId)CUSTOM_ITEM_PARAM),
                                 });
                             }
                         }

@@ -140,7 +140,8 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         if (Rando::StaticData::Items.contains(randoItemId)) {
             Notification::Emit({
                 .message = "You found",
-                .suffix = Rando::StaticData::GetItemName(randoItemId, true, randoCheckId),
+                .suffix = Rando::StaticData::GetItemName(randoItemId, true, randoCheckId) +
+                          Rando::MiscBehavior::BankRewardSourceSuffix(randoCheckId),
             });
         }
     }
