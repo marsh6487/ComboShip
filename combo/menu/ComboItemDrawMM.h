@@ -13,6 +13,8 @@
 #include <cstring>
 #include "ComboExport.h"
 #include "ComboItemDrawABI.h"
+#include "2s2h/Enhancements/ItemVisuals.h"
+#include "2s2h/Rando/DungeonItemVisuals.h"
 #include "2s2h_assets.h"                                     // custom rando models (triforce, ocarina buttons, ...)
 #include "objects/gameplay_keep/gameplay_keep.h"             // stray-fairy skel/anim + soul flame DL
 #include "objects/object_gi_melody/object_gi_melody.h"       // gGiSongNoteDL
@@ -110,6 +112,89 @@ static void MM_OpDL(CwItemDrawInfo* out, const char* dl) {
     int32_t i = out->dlistCount++;
     out->dlists[i] = dl;
     MM_OpV(out, CW_OP_DLIST, (float)i, 0.0f, 0.0f);
+}
+
+// Same two color channels in both hosts. The crest's metal is inside MetalDL,
+// so Stone Tower's gold/silver ornament and key body cannot diverge.
+static int32_t MM_FillDungeonKeyModelInfo(RandoItemId id, s16 drawId, CwItemDrawInfo* out) {
+    const char *metalPath, *emblemPath;
+    Color_RGBA8 metal, emblem;
+    if (!GetItem_GetDungeonKeyModel(drawId, DungeonItem_GetOwner(id), &metalPath, &emblemPath, &metal, &emblem)) {
+        return 0;
+    }
+    out->drawKind = CW_DRAW_KIND_OPS;
+    out->xluStartIndex = -1;
+    out->scale = 0.0f;       // OPS carries its transform explicitly; SIMPLE's scale field is not replayed here.
+    out->stateDependent = 2; // Live appearance, distinct from a grant-latched progressive tier.
+    MM_Op(out, CW_OP_SETUP_OPA);
+    MM_Op(out, CW_OP_GRAYSCALE_OFF);
+    MM_OpColor(out, CW_OP_PRIM_COLOR, 255, 255, 255, 255, 128.0f);
+    MM_Op(out, CW_OP_PUSH);
+    MM_OpV(out, CW_OP_SCALE, 0.25f, 0.25f, 0.25f);
+    MM_Op(out, CW_OP_LOAD_MATRIX);
+    MM_OpColor(out, CW_OP_ENV_COLOR, metal.r, metal.g, metal.b, 255, 0.0f);
+    MM_OpDL(out, metalPath);
+    MM_OpColor(out, CW_OP_ENV_COLOR, emblem.r, emblem.g, emblem.b, 255, 0.0f);
+    MM_OpDL(out, emblemPath);
+    MM_OpColor(out, CW_OP_ENV_COLOR, 255, 255, 255, 255, 0.0f);
+    MM_Op(out, CW_OP_POP);
+    return 1;
+}
+
+// All four vanilla GI families and retained replacements use the same palette-only
+// helpers as native MM. Compass glass remains untinted; an edited boss gem is separate.
+static int32_t MM_FillDungeonTintInfo(RandoItemId id, s16 drawId, CwItemDrawInfo* out) {
+    const int owner = DungeonItem_GetOwner(id);
+    Color_RGBA8 c, emblem;
+    u8 strength = 0;
+    const bool tintBody = GetItem_GetDungeonItemTint(drawId, owner, &c, &strength);
+    const bool tintGem = drawId == GID_KEY_BOSS && GetItem_GetDungeonKeyEmblemTint(owner, &emblem);
+    if (!tintBody && !tintGem) {
+        return 0;
+    }
+    void* dls[CW_DRAW_MAX_DLISTS] = {};
+    s32 xluStart = -1, scroll = 0, drawKind = CW_DRAW_KIND_SIMPLE;
+    f32 scale = 0.0f;
+    const int n = GetItem_GetDrawTableEntry(drawId, dls, CW_DRAW_MAX_DLISTS, &xluStart, &scale, &scroll, &drawKind);
+    const int opaEnd = xluStart >= 0 ? xluStart : n;
+    if (n <= 0 || opaEnd <= 0 || n > CW_DRAW_MAX_DLISTS || xluStart >= n) {
+        return 0;
+    }
+    out->drawKind = CW_DRAW_KIND_OPS;
+    out->xluStartIndex = -1;
+    out->scale = scale;
+    out->stateDependent = 2;
+    void *setupOpa = nullptr, *setupXlu = nullptr;
+    GetItem_GetDrawSetupDLs(drawId, &setupOpa, &setupXlu);
+    out->setupDlOpa = setupOpa;
+    out->setupDlXlu = setupXlu;
+    MM_Op(out, CW_OP_SETUP_OPA);
+    if (tintBody) {
+        MM_OpColor(out, CW_OP_GRAYSCALE_COLOR, c.r, c.g, c.b, strength, 0.0f);
+        MM_Op(out, CW_OP_GRAYSCALE_ON);
+    } else {
+        MM_Op(out, CW_OP_GRAYSCALE_OFF);
+    }
+    MM_Op(out, CW_OP_LOAD_MATRIX);
+    for (int i = 0; i < opaEnd; i++) {
+        MM_OpDL(out, (const char*)dls[i]);
+    }
+    MM_Op(out, CW_OP_GRAYSCALE_OFF);
+    if (xluStart >= 0) {
+        MM_Op(out, CW_OP_SETUP_XLU);
+        if (tintGem) {
+            MM_OpColor(out, CW_OP_GRAYSCALE_COLOR, emblem.r, emblem.g, emblem.b, 192, 0.0f);
+            MM_Op(out, CW_OP_GRAYSCALE_ON);
+        } else {
+            MM_Op(out, CW_OP_GRAYSCALE_OFF);
+        }
+        MM_Op(out, CW_OP_LOAD_MATRIX);
+        for (int i = xluStart; i < n; i++) {
+            MM_OpDL(out, (const char*)dls[i]);
+        }
+        MM_Op(out, CW_OP_GRAYSCALE_OFF);
+    }
+    return 1;
 }
 
 // Songs have no sDrawItemTable row — MM draws them as one tinted note DL (Rando/DrawItem.cpp
@@ -825,6 +910,9 @@ static bool MM_IsProgressiveItem(RandoItemId id) {
 // re-resolve them every frame: junk/trap indirection and the Triforce shard cycle (progressive
 // tiers are flagged separately below).
 static bool MM_IsStateDependentDraw(RandoItemId id) {
+    if (DungeonItem_GetOwner(id) >= 0) {
+        return true; // Picker/Tab changes remain live through the fallback too.
+    }
     switch (id) {
         case RI_JUNK:
         case RI_TRAP:
@@ -867,6 +955,10 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     auto it = Rando::StaticData::Items.find(id);
     if (it == Rando::StaticData::Items.end()) {
         return 0;
+    }
+    if (MM_FillDungeonKeyModelInfo(id, (s16)it->second.drawId, out) ||
+        MM_FillDungeonTintInfo(id, (s16)it->second.drawId, out)) {
+        return 1;
     }
     if (MM_FillSongDrawInfo(id, out)) {
         return 1; // songs: tinted note, no table row
@@ -943,7 +1035,11 @@ extern "C" COMBO_EXPORT int32_t MM_GetItemDrawInfo(const char* itemName, CwItemD
         if (!MM_FillItemDrawInfo(id, out)) {
             return 0;
         }
-        out->stateDependent = (MM_IsProgressiveItem(id) || MM_IsStateDependentDraw(id)) ? 1 : 0;
+        if (DungeonItem_GetOwner(id) >= 0) {
+            out->stateDependent = 2;
+        } else {
+            out->stateDependent = (MM_IsProgressiveItem(id) || MM_IsStateDependentDraw(id)) ? 1 : 0;
+        }
         return 1;
     } catch (...) { return 0; }
 }

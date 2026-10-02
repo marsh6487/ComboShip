@@ -119,8 +119,9 @@ typedef struct {
     uint8_t primColorOpa[4]; /* JEWEL setting (OPA) prim */
     uint8_t envColorOpa[4];  /* JEWEL setting (OPA) env */
 
-    /* 1 = model is chosen from live save state (progressive tier, Triforce shard, junk/trap), so the
-     * consumer must re-query every frame instead of caching. */
+    /* 1 = live save-state model (progressive tier, Triforce shard, junk/trap); freezes on grant.
+     * 2 = live appearance (dungeon palette/Alt selection); remains live after grant.
+     * Both values require re-querying instead of caching. No struct layout change. */
     int32_t stateDependent;
 
     /* ComboShip: CW_DRAW_KIND_COLOR_LAYERS payload — the per-DL prim/env colors the rando key/map/

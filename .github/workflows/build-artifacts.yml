@@ -145,6 +145,8 @@ jobs:
           python3 scripts/diagnostics/run_mm_drop_lifetime_tests.py
           python3 scripts/diagnostics/run_mm_unrestricted_items_tests.py
           python3 scripts/diagnostics/run_mm_item_visuals_tests.py
+          python3 scripts/diagnostics/run_mm_dungeon_key_tests.py
+          python3 scripts/diagnostics/run_mm_dungeon_key_tests.py --sanitize
           python3 scripts/diagnostics/run_mm_gfx_patch_tests.py
 
       - name: Foreign soul replacement skeletons and limb matrices

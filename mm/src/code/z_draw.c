@@ -389,52 +389,188 @@ static DrawItemTableEntry sDrawItemTable[] = {
 // model actually loaded before we feed it to the interpreter.
 extern Gfx* ResourceMgr_LoadGfxByName(const char* path);
 
-s32 GetItem_DrawDungeonItem(PlayState* play, s16 drawId, s32 owner) {
-    static const Color_RGBA8 defaults[] = {
+// Palette resolution is independent of replacement assets. Both hosts use these helpers
+// for the vanilla GI lists as well as the existing TP map/compass replacements.
+s32 GetItem_GetDungeonItemTint(s16 drawId, s32 owner, Color_RGBA8* color, u8* strength) {
+    static const Color_RGBA8 defaults[4] = {
         { 236, 120, 186, 255 },
         { 129, 173, 70, 255 },
         { 99, 90, 183, 255 },
         { 177, 165, 83, 255 },
     };
-    static const char* ids[] = { "Items.Woodfall", "Items.Snowhead", "Items.GreatBay", "Items.StoneTower" };
-    Color_RGBA8 color;
-    u8 strength;
-
-    if (!CVarGetInteger("gEnhancements.DungeonItemColors", 0) || owner < 0 || owner >= ARRAY_COUNT(defaults)) {
+    static const char* ids[4] = { "Items.Woodfall", "Items.Snowhead", "Items.GreatBay", "Items.StoneTower" };
+    if (owner < 0 || owner >= 4 || color == NULL || strength == NULL ||
+        !CVarGetInteger("gEnhancements.DungeonItemColors", 0)) {
         return false;
     }
     switch (drawId) {
         case GID_KEY_SMALL:
         case GID_KEY_BOSS:
-            strength = 192; // Retain some neutral metal highlights.
+            *strength = 192; // Preserve the established neutral highlights.
             break;
         case GID_DUNGEON_MAP:
-            strength = 96; // Keep parchment and markings readable.
+            *strength = 96; // Retain the parchment markings.
             break;
         case GID_COMPASS:
-            strength = 176;
+            *strength = 176;
             break;
         default:
             return false;
     }
-    if (ResourceMgr_LoadGfxByName((const char*)sDrawItemTable[drawId].drawResources[0]) == NULL) {
+    *color = CosmeticEditor_GetChangedColor(defaults[owner].r, defaults[owner].g, defaults[owner].b, 255, ids[owner]);
+    return true;
+}
+
+// A vanilla boss key has a separate gem layer. An edited emblem row colors that
+// layer too; untouched rows preserve the original native gem, even with no key pack.
+s32 GetItem_GetDungeonKeyEmblemTint(s32 owner, Color_RGBA8* color) {
+    static const Color_RGBA8 defaults[4] = {
+        { 236, 120, 186, 255 },
+        { 129, 173, 70, 255 },
+        { 99, 90, 183, 255 },
+        { 201, 38, 41, 255 },
+    };
+    static const char* ids[4] = { "Items.WoodfallEmblem", "Items.SnowheadEmblem", "Items.GreatBayEmblem",
+                                  "Items.StoneTowerEmblem" };
+    static const char* changed[4] = {
+        "gCosmetic.Items.WoodfallEmblem.Changed",
+        "gCosmetic.Items.SnowheadEmblem.Changed",
+        "gCosmetic.Items.GreatBayEmblem.Changed",
+        "gCosmetic.Items.StoneTowerEmblem.Changed",
+    };
+    if (owner < 0 || owner >= 4 || color == NULL || !CVarGetInteger(changed[owner], 0)) {
         return false;
     }
-    color = defaults[owner];
-    color = CosmeticEditor_GetChangedColor(color.r, color.g, color.b, 255, ids[owner]);
+    *color = CosmeticEditor_GetChangedColor(defaults[owner].r, defaults[owner].g, defaults[owner].b, 255, ids[owner]);
+    return true;
+}
+
+// Replacement-model selection is a separate, optional path.
+extern bool ResourceMgr_IsAltAssetsEnabled(void);
+extern u8 ResourceMgr_FileAltExists(const char* path);
+
+s32 GetItem_GetDungeonKeyModel(s16 drawId, s32 owner, const char** metalPath, const char** emblemPath,
+                               Color_RGBA8* metalColor, Color_RGBA8* emblemColor) {
+    static const Color_RGBA8 metalDefaults[2] = { { 213, 224, 236, 255 }, { 233, 191, 66, 255 } };
+    static const Color_RGBA8 emblemDefaults[4] = {
+        { 236, 120, 186, 255 },
+        { 129, 173, 70, 255 },
+        { 99, 90, 183, 255 },
+        { 201, 38, 41, 255 },
+    };
+    static const char* ids[4] = { "Items.Woodfall", "Items.Snowhead", "Items.GreatBay", "Items.StoneTower" };
+    static const char* emblemIds[4] = { "Items.WoodfallEmblem", "Items.SnowheadEmblem", "Items.GreatBayEmblem",
+                                        "Items.StoneTowerEmblem" };
+    static const char* paths[4][2][2] = {
+        { { "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallSmallKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallSmallKeyEmblemDL" },
+          { "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallBossKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallBossKeyEmblemDL" } },
+        { { "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadSmallKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadSmallKeyEmblemDL" },
+          { "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadBossKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadBossKeyEmblemDL" } },
+        { { "__OTR__alt/objects/cor_mm_keys_poc2/GreatBaySmallKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/GreatBaySmallKeyEmblemDL" },
+          { "__OTR__alt/objects/cor_mm_keys_poc2/GreatBayBossKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/GreatBayBossKeyEmblemDL" } },
+        { { "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerSmallKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerSmallKeyEmblemDL" },
+          { "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerBossKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerBossKeyEmblemDL" } },
+    };
+    s32 kind;
+    if (owner < 0 || owner >= 4 || metalPath == NULL || emblemPath == NULL || metalColor == NULL ||
+        emblemColor == NULL || !ResourceMgr_IsAltAssetsEnabled()) {
+        return false;
+    }
+    if (drawId == GID_KEY_SMALL) {
+        kind = 0;
+    } else if (drawId == GID_KEY_BOSS) {
+        kind = 1;
+    } else {
+        return false;
+    }
+    *metalPath = paths[owner][kind][0];
+    *emblemPath = paths[owner][kind][1];
+    if (!ResourceMgr_FileAltExists(*metalPath) || !ResourceMgr_FileAltExists(*emblemPath)) {
+        return false;
+    }
+    *metalColor = metalDefaults[kind];
+    *emblemColor = emblemDefaults[owner];
+    if (CVarGetInteger("gEnhancements.DungeonItemColors", 0)) {
+        // Unchanged rows keep neutral steel/gold; a selected dungeon hex colors the metal.
+        *metalColor = CosmeticEditor_GetChangedColor(metalColor->r, metalColor->g, metalColor->b, 255, ids[owner]);
+    }
+    // Emblems have their own picker, independent of key metal and the general checkbox.
+    *emblemColor =
+        CosmeticEditor_GetChangedColor(emblemColor->r, emblemColor->g, emblemColor->b, 255, emblemIds[owner]);
+    return true;
+}
+
+static s32 GetItem_TryDrawDungeonKey(PlayState* play, s16 drawId, s32 owner) {
+    const char *metalPath, *emblemPath;
+    Color_RGBA8 metalColor, emblemColor;
+    Gfx *metal, *emblem;
+    if (!GetItem_GetDungeonKeyModel(drawId, owner, &metalPath, &emblemPath, &metalColor, &emblemColor)) {
+        return false;
+    }
+    metal = ResourceMgr_LoadGfxByName(metalPath);
+    emblem = ResourceMgr_LoadGfxByName(emblemPath);
+    if (metal == NULL || emblem == NULL) {
+        return false;
+    }
+    Matrix_Push();
+    // Quarter-unit detail is stored as integer vertices at 4x scale in the O2R.
+    Matrix_Scale(0.25f, 0.25f, 0.25f, MTXMODE_APPLY);
     OPEN_DISPS(play->state.gfxCtx);
-    gDPSetGrayscaleColor(POLY_OPA_DISP++, color.r, color.g, color.b, strength);
-    gSPGrayscale(POLY_OPA_DISP++, true);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_OPA_DISP++, metalColor.r, metalColor.g, metalColor.b, 255);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, metal);
+    gDPPipeSync(POLY_OPA_DISP++);
+    gDPSetEnvColor(POLY_OPA_DISP++, emblemColor.r, emblemColor.g, emblemColor.b, 255);
+    gSPDisplayList(POLY_OPA_DISP++, emblem);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
     CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Pop();
+    return true;
+}
 
-    // Use the selected model's real draw, including its lighting/materials. No fixed-length
-    // copy or command-offset patch: short replacement display lists remain valid.
+s32 GetItem_DrawDungeonItem(PlayState* play, s16 drawId, s32 owner) {
+    Color_RGBA8 color, emblem;
+    u8 strength = 0;
+    s32 tintBody, tintGem;
+    if (GetItem_TryDrawDungeonKey(play, drawId, owner)) {
+        return true;
+    }
+    tintBody = GetItem_GetDungeonItemTint(drawId, owner, &color, &strength);
+    tintGem = drawId == GID_KEY_BOSS && GetItem_GetDungeonKeyEmblemTint(owner, &emblem);
+    if ((!tintBody && !tintGem) ||
+        ResourceMgr_LoadGfxByName((const char*)sDrawItemTable[drawId].drawResources[0]) == NULL) {
+        return false;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    if (tintBody) {
+        gDPSetGrayscaleColor(POLY_OPA_DISP++, color.r, color.g, color.b, strength);
+        gSPGrayscale(POLY_OPA_DISP++, true);
+    }
+    if (tintGem) {
+        gDPSetGrayscaleColor(POLY_XLU_DISP++, emblem.r, emblem.g, emblem.b, 192);
+        gSPGrayscale(POLY_XLU_DISP++, true);
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+    // The real table draw preserves selected GI geometry, materials and pass routing.
     sDrawItemTable[drawId].drawFunc(play, drawId);
-
     OPEN_DISPS(play->state.gfxCtx);
     gSPGrayscale(POLY_OPA_DISP++, false);
+    if (tintGem) {
+        gSPGrayscale(POLY_XLU_DISP++, false);
+    }
     CLOSE_DISPS(play->state.gfxCtx);
-    // XLU is deliberately untouched: compass glass and the boss-key gem retain their material.
     return true;
 }
 
@@ -536,6 +672,7 @@ void GetItem_Draw(PlayState* play, s16 drawId) {
             owner = 2;
             break;
         case SCENE_INISIE_N:
+        case SCENE_INISIE_R:
         case SCENE_INISIE_BS:
             owner = 3;
             break;
