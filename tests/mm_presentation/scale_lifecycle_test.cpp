@@ -146,6 +146,16 @@ using FnGrantSharedItem = void (*)(const char *);
 FnGrantSharedItem ResolvePeerGrant() {
   return [](const char *) { GrantScale(); };
 }
+int nativeMagicFloor = 0;
+void ApplyNativeMagicFloor(int tier) {
+  if (tier > nativeMagicFloor)
+    nativeMagicFloor = tier;
+}
+void* Combo_ResolveSym(const char* module, const char* symbol) {
+  assert(std::strcmp(module, "soh") == 0);
+  assert(std::strcmp(symbol, "SOH_ApplySharedMagicFloor") == 0);
+  return reinterpret_cast<void*>(ApplyNativeMagicFloor);
+}
 /* SHARE_SWIM */
 namespace ComboRando {
 constexpr int GAME_MM = 1, GAME_OOT = 0;
@@ -266,6 +276,11 @@ int main() {
   FleetShared_OnNativeObtained(RI_ABILITY_SWIM);
   assert(targetGrants == priorGrants);
   sReceiveDepth = 0;
+  nativeMagicFloor = 0;
+  int priorMagicGrants = targetGrants;
+  FleetShared_OnNativeObtained(RI_SINGLE_MAGIC);
+  FleetShared_OnNativeObtained(RI_DOUBLE_MAGIC);
+  assert(nativeMagicFloor == 2 && targetGrants == priorMagicGrants);
   targetScale = 0;
   canSwim = false;
   assert(ResolveScale() == RG_BRONZE_SCALE);

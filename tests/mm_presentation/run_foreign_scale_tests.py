@@ -61,7 +61,7 @@ def run_lifecycle():
     check_source=(ROOT/'mm/2s2h/Rando/MiscBehavior/MiscBehavior.h').read_text()
     fixture=fixture.replace('/* BANK_SOURCE */',function(check_source,'BankRewardSourceSuffix'))
     sharing=(ROOT/'mm/2s2h/FleetShipCombo/FleetSharedItems.cpp').read_text()
-    shared=function(sharing,'FleetShared_OnNativeObtained')
+    shared=function(sharing,'ShareNativeMagicFloor')+function(sharing,'FleetShared_OnNativeObtained')
     fixture=fixture.replace('/* SHARE_SWIM */',shared)
     json_include=Path('/usr/include')
     if '--json-include' in sys.argv:
