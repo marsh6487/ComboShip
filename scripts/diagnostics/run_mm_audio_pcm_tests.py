@@ -21,6 +21,7 @@ def mixer_fixture(game, build):
         names.append("aLoadBufferExactImpl")
     # Separate translation units retain each game's real DMEM layout/table.
     bodies = ["#include <assert.h>\n#include <stddef.h>\n#include <string.h>",
+              '#include "combo/audio/MMAudioTraceBridge.h"',
               '#include "audio/soundfont.h"']
     bodies += [f"#define {name} {game}_{name}" for name in names if name != "clamp16"]
     bodies += ['#define aOPUSdecImpl mm_test_opus', '#include "mixer.h"',
@@ -96,7 +97,7 @@ def main():
         command = [*shlex.split(os.environ.get("CC", "cc")), "-std=gnu11", "-g", "-Wall", "-Wextra",
                    "-Werror", "-Wno-unused-parameter", "-Wno-sign-compare",
                    *shlex.split(os.environ.get("MM_AUDIO_PCM_CFLAGS", "")),
-                   "-I" + str(ROOT / "mm/include"), "-I" + str(ROOT / "mm/2s2h"),
+                   "-I" + str(ROOT), "-I" + str(ROOT / "mm/include"), "-I" + str(ROOT / "mm/2s2h"),
                    "-I" + str(ROOT / "libultraship/include"), *map(str, sources),
                    str(ROOT / "mm/tests/audio_pcm_test.c"), "-lm", "-o", str(binary)]
         subprocess.run(command, check=True)

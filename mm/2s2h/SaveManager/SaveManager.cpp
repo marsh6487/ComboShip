@@ -1,3 +1,4 @@
+#include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "SaveManager.h"
 
 #include <fstream>
@@ -236,6 +237,7 @@ void SaveManager_BuildComboBaseline(const unsigned char* ootName8) {
 #endif
 
 void SaveManager_InitNewSaveForSlot(int mmFileNum, const unsigned char* ootName8) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM save-init");
 #ifdef COMBO_BUILD
     SaveManager_BuildComboBaseline(ootName8);
 #else
@@ -254,6 +256,7 @@ void SaveManager_InitNewSaveForSlot(int mmFileNum, const unsigned char* ootName8
 }
 
 void SaveManager_SaveCurrentForCombo() {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM save-write");
 #ifdef COMBO_BUILD
     // Guard the write itself, not each caller's own gate. 0xFF (no save) reaches here on real,
     // non-buggy paths (play proceeding after a failed load), so refuse and return — don't assert.
@@ -355,6 +358,7 @@ static int SaveManager_LoadFailedForCombo(int code) {
 // loudly. Nothing repairs the slot — re-create the file. 0 ok, -1 missing, -2 unreadable, -3 migrate,
 // -4 no usable save page (neither key, or owlSave unparseable with no newCycleSave), -5 parse.
 int SaveManager_LoadSaveFile(int mmFileNum) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM save-load");
     std::string fileName = SaveManager_GetFileName(mmFileNum);
     nlohmann::json j;
     int result = SaveManager_ReadSaveFile(fileName, j);

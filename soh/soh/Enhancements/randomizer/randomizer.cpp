@@ -1,3 +1,4 @@
+#include "../../../../combo/menu/ItemGrantAuditBridge.h"
 #include "randomizer.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
@@ -1715,6 +1716,7 @@ static bool ChildTradeSlotOccupied() {
 }
 
 extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT randomizer-grant", (int)giEntry.getItemId);
     if (giEntry.modIndex != MOD_RANDOMIZER) {
         LUSLOG_WARN(
             "Randomizer_Item_Give was called with a GetItemEntry with a mod index different from MOD_RANDOMIZER (%d)",

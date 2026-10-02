@@ -37,9 +37,10 @@ namespace {
 struct ComboForeignDrawInfo {
     bool ok = false;
     int32_t count = 0;
-    int32_t xluStart = -1;    // first XLU entry in dls[] order; -1 = all OPA
-    float scale = 0.0f;       // extra model scale; 0 = none (MM remains: 0.02)
-    bool hasEnvColor = false; // emit env color before the DLs (MM song notes)
+    int32_t xluStart = -1;            // first XLU entry in dls[] order; -1 = all OPA
+    float scale = 0.0f;               // extra model scale; 0 = none (MM remains: 0.02)
+    bool appearanceDependent = false; // Palette and Alt state remain live after a dungeon-item grant.
+    bool hasEnvColor = false;         // emit env color before the DLs (MM song notes)
     uint8_t envColor[4] = { 0, 0, 0, 0 };
     bool xluSeg8TexScroll = false;          // bind segment 8 to the flame texscroll before the XLU layer (skull token)
     const char* matAnimPath = nullptr;      // MM TextureAnimation resource to replicate before the DLs (Moon's Tear)
@@ -144,6 +145,7 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     info.matAnimBindOpa = raw.matAnimBindOpa != 0;
     info.matAnimBillboard = raw.matAnimBillboard != 0;
     info.stateDependent = raw.stateDependent != 0;
+    info.appearanceDependent = raw.stateDependent == 2;
     if (raw.resolvedName != nullptr) {
         info.resolvedName = raw.resolvedName;
     }
@@ -219,7 +221,7 @@ inline void ComboLatchForeignDraw(RandomizerCheck rc) {
         c.map.clear();
         c.gen = gen;
     }
-    info.stateDependent = false; // frozen: the resolver's cache-hit path now serves it verbatim
+    info.stateDependent = info.appearanceDependent; // Freeze progressive tiers, retain live cosmetics.
     c.map[rc] = info;
 }
 
@@ -463,11 +465,17 @@ inline void OOT_DrawForeignOps(PlayState* play, const ComboForeignDrawInfo* info
         switch (o->op) {
             case CW_OP_SETUP_OPA:
                 Gfx_SetupDL_25Opa(play->state.gfxCtx);
+                if (info->setupDlOpa != nullptr) {
+                    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)info->setupDlOpa);
+                }
                 OOT_FOREIGN_PIN_OPA();
                 xlu = false;
                 break;
             case CW_OP_SETUP_XLU:
                 Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+                if (info->setupDlXlu != nullptr) {
+                    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->setupDlXlu);
+                }
                 OOT_FOREIGN_PIN_XLU();
                 xlu = true;
                 break;

@@ -14,6 +14,7 @@ static GraphicsContext sGfx;
 static PlayState sPlay;
 static Mtx sMatrix;
 static int sTint, sShimmer, sMissing, sEdited, sDepth, sDraws, sTransforms;
+static int sEmblemEdited;
 static float sTrace[128];
 static char sLastColorId[64];
 static const char* sBody = "fixture/body";
@@ -39,11 +40,20 @@ int32_t CVarGetInteger(const char* name, int32_t fallback) {
         return sTint;
     if (!strcmp(name, "gEnhancements.BottleShimmer"))
         return sShimmer;
+    if (strstr(name, "gCosmetic.Items.") == name && strstr(name, "Emblem.Changed"))
+        return sEmblemEdited;
     return fallback;
 }
 Color_RGBA8 CosmeticEditor_GetChangedColor(u8 r, u8 g, u8 b, u8 a, const char* id) {
     strcpy(sLastColorId, id);
-    return sEdited ? (Color_RGBA8){ 17, 123, 241, a } : (Color_RGBA8){ r, g, b, a };
+    int edited = strstr(id, "Emblem") ? sEmblemEdited : sEdited;
+    return edited ? (Color_RGBA8){ 17, 123, 241, a } : (Color_RGBA8){ r, g, b, a };
+}
+bool ResourceMgr_IsAltAssetsEnabled(void) {
+    return false; // This suite deliberately uses vanilla GI resources.
+}
+u8 ResourceMgr_FileAltExists(const char* p) {
+    return false; // No custom key archive is available.
 }
 Gfx* ResourceMgr_LoadGfxByName(const char* p) {
     return sMissing ? NULL : &sResource;
@@ -56,6 +66,8 @@ void Graph_OpenDisps(Gfx** r, Gfx* v, GraphicsContext* g, const char* f, s32 l) 
 void Graph_CloseDisps(Gfx** r, Gfx* v, GraphicsContext* g, const char* f, s32 l) {
 }
 void Gfx_SetupDL25_Xlu(GraphicsContext* gfx) {
+}
+void Gfx_SetupDL25_Opa(GraphicsContext* gfx) {
 }
 Mtx* Matrix_Finalize(GraphicsContext* gfx) {
     return &sMatrix;
@@ -170,6 +182,29 @@ int main(void) {
     assert(!GetItem_DrawDungeonItem(&sPlay, GID_COMPASS, 0));
     assert(sGfx.polyOpa.p == sOpa && sGfx.polyXlu.p == sXlu && sDraws == 0);
     sMissing = 0;
+    // Emblem edits also reach the vanilla boss gem without the body-color checkbox.
+    sTint = 0;
+    sEmblemEdited = 1;
+    for (int d = 0; d < 4; ++d) {
+        Reset();
+        assert(GetItem_DrawDungeonItem(&sPlay, GID_KEY_BOSS, d));
+        assert(strstr(sLastColorId, "Emblem"));
+        int gemTint = 0, gems = 0;
+        for (Gfx* g = sXlu; g < sGfx.polyXlu.p; ++g) {
+            unsigned op = g->words.w0 >> 24;
+            if (op == G_SETGRAYSCALE)
+                gemTint = g->words.w1;
+            if (op == G_DL) {
+                assert(gemTint);
+                ++gems;
+            }
+        }
+        assert(gems == 1 && !gemTint);
+        for (Gfx* g = sOpa; g < sGfx.polyOpa.p; ++g)
+            assert((g->words.w0 >> 24) != G_SETGRAYSCALE || g->words.w1 == 0);
+    }
+    sEmblemEdited = 0;
+    sTint = 1;
     const s16 scenes[] = { SCENE_MITURIN, SCENE_HAKUGIN_BS, SCENE_SEA, SCENE_INISIE_R };
     const char* ids[] = { "Items.Woodfall", "Items.Snowhead", "Items.GreatBay", "Items.StoneTower" };
     for (int d = 0; d < 4; ++d) {

@@ -1,3 +1,4 @@
+#include "../../combo/menu/ItemGrantAuditBridge.h"
 // Skijer's NEI — per-save custom state.
 //
 // 2ship port: this state now lives INSIDE 2ship's per-save struct at
@@ -31,6 +32,7 @@ extern "C" uint16_t Nei_GetOwnedItem(uint8_t slot) {
 }
 
 extern "C" void Nei_SetOwnedItem(uint8_t slot, uint16_t v) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM custom-slot-write", (int)v, (int)slot);
     if (slot >= 24 && slot < 72) {
         gSaveContext.save.shipSaveInfo.nei.ownedItems[slot - 24] = v;
     }
@@ -40,6 +42,7 @@ extern "C" void Nei_SetOwnedItem(uint8_t slot, uint16_t v) {
 // zeroed save needs this normalization. TODO(port): call from 2ship's new-file
 // init path; from_json also applies these defaults when the "nei" key is absent.
 extern "C" void Nei_InitNewSave(void) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM custom-init");
     NeiSaveData* n = &gSaveContext.save.shipSaveInfo.nei;
     memset(n, 0, sizeof(*n));
     // ownedItems is u16 now, so memset(0xFF) would write 0xFFFF per entry — and the empty marker is
@@ -57,6 +60,7 @@ extern "C" void Nei_InitNewSave(void) {
 extern "C" void WeaponUpgrade_SetHammerAxe(uint8_t on);
 
 extern "C" void Nei_GiveAllOotItems(void) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM give-all");
     NeiSaveData* nei = Nei_Save();
     nei->ootSpellsOwned = 0x7; // Din's + Farore's + Nayru's
     nei->slingshotOwned = 1;

@@ -1,3 +1,4 @@
+#include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "SaveEditor.h"
 #include <fast/Fast3dGui.h>
 #include "2s2h/BenGui/UIWidgets.hpp"
@@ -2988,6 +2989,7 @@ static void DrawNeiTab() {
 }
 
 void SaveEditorWindow::DrawElement() {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM save-editor", -1, -1, true);
     UIWidgets::PushStyleTabs(UIWidgets::Colors(CVarGetInteger("gSettings.Menu.Theme", 5)));
     if (ImGui::BeginTabBar("SaveContextTabBar", ImGuiTabBarFlags_NoCloseWithMiddleMouseButton)) {
         if (ImGui::BeginTabItem("General")) {

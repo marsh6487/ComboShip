@@ -18,6 +18,7 @@
 #include "macros.h"
 #include "soh/util.h"
 #include "soh/ResourceManagerHelpers.h"
+#include "../../combo/menu/ItemGrantAuditBridge.h"
 
 // Expose fixture setup and direct section entry points without adding test-only
 // methods to the production class. Standard library headers are already loaded.
@@ -54,6 +55,13 @@ extern "C" void Flags_SetInfTable(s32) {
 extern "C" void Flags_SetEventChkInf(s32) {
 }
 extern "C" void Flags_SetRandomizerInf(RandomizerInf) {
+}
+// The production InitFile scope is retained. This horse-persistence fixture
+// models the unrelated observer host service; its behavior is covered by the
+// dedicated item_grant_audit suite.
+extern "C" void ItemGrantAudit_Begin(const char*, int, int, int) {
+}
+extern "C" void ItemGrantAudit_End(void) {
 }
 #define SPDLOG_WARN(...) ((void)0)
 #define SPDLOG_ERROR(...) ((void)0)

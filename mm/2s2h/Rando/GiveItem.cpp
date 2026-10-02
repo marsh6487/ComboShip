@@ -1,3 +1,4 @@
+#include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "Rando/Rando.h"
 #include "Rando/ActorBehavior/Souls.h"
 #include "Rando/MiscBehavior/MiscBehavior.h"
@@ -74,6 +75,7 @@ extern "C" int Combo_MM_BombchuBagShared(void);
 #endif
 
 void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM randomizer-grant", (int)randoItemId, (int)randoCheckId);
     // FleetShipCombo cross-item record: on obtaining ANY FC-shared item, bump its fcId-indexed count
     // (comboObtainedFc, synced to OoT) and the local shadow (comboAppliedFc, since it's granted here).
     // Re-entrancy guard: GiveItem recurses for progressives/ConvertItem and RI_TRIFORCE_PIECE ->
@@ -90,6 +92,13 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             sGiveDepth--;
         }
     } _dg;
+#ifdef COMBO_BUILD
+    if (sGiveDepth == 1) {
+        SPDLOG_INFO("[ItemGrantAudit] MM native grant: file={} seed={} item={} check={} dormant={} suppressed={}",
+                    (int)gSaveContext.fileNum, gSaveContext.save.shipSaveInfo.rando.finalSeed, (int)randoItemId,
+                    (int)randoCheckId, (int)Rando::gComboDormantGive, (int)gFcCombo_SuppressRecord);
+    }
+#endif
     if (sGiveDepth == 1 && gFcCombo_SuppressRecord == 0) {
         // Dual Cane skills: MM's pool places SIX DISTINCT skill RIs, but the FC table pairs one RG
         // with one RI — soh's side is six copies of the single RG_CANE_OF_SOMARIA, all counting into
@@ -131,7 +140,8 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         if (Rando::StaticData::Items.contains(randoItemId)) {
             Notification::Emit({
                 .message = "You found",
-                .suffix = Rando::StaticData::GetItemName(randoItemId, true, randoCheckId),
+                .suffix = Rando::StaticData::GetItemName(randoItemId, true, randoCheckId) +
+                          Rando::MiscBehavior::BankRewardSourceSuffix(randoCheckId),
             });
         }
     }
@@ -900,6 +910,8 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
         case RI_OOT_SMALL_KEY_SPIRIT_TEMPLE:
         case RI_OOT_SMALL_KEY_TREASURE_GAME:
         case RI_OOT_SMALL_KEY_WATER_TEMPLE:
+            // Their FC identity was recorded above; do not fall through into Din's Fire.
+            break;
         // Skijer's NEI — OoT page-0 gear/spells: real grants into the NeiSaveData fields that back the
         // OoT-layout kaleido page 0 (extended_inventory.c VSLOT_* cells) and that FleetSync ships to
         // OoT (inv.dins/farores/nayrus/boomerang/hammer). Obtaining in MM == obtaining in OoT.

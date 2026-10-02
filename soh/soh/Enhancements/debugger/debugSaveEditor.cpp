@@ -1,3 +1,4 @@
+#include "../../../../combo/menu/ItemGrantAuditBridge.h"
 #include "debugSaveEditor.h"
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
@@ -3176,6 +3177,7 @@ void ResetBaseOptions() {
 }
 
 void SaveEditorWindow::DrawElement() {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT save-editor", -1, -1, true);
     PushStyleTabs(THEME_COLOR);
     ImGui::PushFont(OTRGlobals::Instance->fontMonoLarger);
     ImGui::BeginDisabled(CVarGetInteger(CVAR_SETTING("DisableChanges"), 0));

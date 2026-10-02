@@ -1,4 +1,5 @@
-﻿#include "OTRGlobals.h"
+﻿#include "../../combo/menu/ItemGrantAuditBridge.h"
+#include "OTRGlobals.h"
 #include "OTRAudio.h"
 #include "Enhancements/Graphics/PreludeLoadProbe.h"
 #include "Enhancements/debugger/FrameTimingProbe.h"
@@ -2244,6 +2245,7 @@ extern "C" void DeinitOTR() {
 // own line BEFORE `extern "C"`) is silently ignored by MSVC (C4091), so this function would not be
 // exported and the MM boot gate would fail.
 extern "C" COMBO_EXPORT void SOH_PrepareForTransition(void) {
+    ItemGrantAudit::Scope itemGrantAuditScope("SOH_PrepareForTransition");
     SaveManager_ThreadPoolWait();
     OTRAudio_Exit();
     // ComboShip: do NOT SohGui::Destroy() here. The Gui is a single shared libultraship instance that
@@ -3771,6 +3773,7 @@ void Combo_ApplyItemReceiveSideEffects(const GetItemEntry& gie) {
 // ComboShip: save-direct grant of a resolved OOT item. Shared by SOH_GrantCrossItem and Anchor's
 // team-state backfill so both apply identical dispatch + side effects + persist.
 void Combo_GrantResolvedOOT(const GetItemEntry& gie) {
+    ItemGrantAudit::Scope itemGrantAuditScope("Combo_GrantResolvedOOT", (int)gie.getItemId);
     // ComboShip (#84): drop bottle CONTENTS when no bottle is free. Milk Bottle and Ruto's Letter are
     // excluded exactly as Item_Give excludes them — they create a new bottle, so gating them here
     // would permanently lose Ruto's Letter and softlock the seed.
@@ -3844,6 +3847,7 @@ static bool GrantOotItemByName(const char* itemName, RandomizerGet* granted) {
 
 // A foreign check's item landing in its home game is a real acquisition: share it like a pickup.
 extern "C" COMBO_EXPORT void SOH_GrantCrossItem(const char* itemName) {
+    ItemGrantAudit::Scope itemGrantAuditScope("SOH_GrantCrossItem");
     RandomizerGet granted = RG_NONE;
     if (GrantOotItemByName(itemName, &granted)) {
         FleetShared_OnNativeObtained((int)granted);
@@ -4031,6 +4035,7 @@ extern "C" COMBO_EXPORT int SOH_GetSharedTier(int family) try {
 extern "C" int gComboSuppressAnchorSend = 0;
 
 extern "C" COMBO_EXPORT void SOH_RaiseSharedTier(int family, int tier) try {
+    ItemGrantAudit::Scope itemGrantAuditScope("SOH_RaiseSharedTier");
     if (family < 0 || family >= ComboRando::SF_COUNT)
         return;
     const auto fam = static_cast<ComboRando::SharedFamily>(family);
@@ -4104,6 +4109,8 @@ extern "C" COMBO_EXPORT void SOH_RaiseSharedTier(int family, int tier) try {
                 }
             } flagGuard;
             gComboSuppressAnchorSend = 1;
+            SPDLOG_INFO("[ItemGrantAudit] OOT shared-tier grant: file={} family={} current={} target={} rg={}",
+                        (int)gSaveContext.fileNum, family, cur, tier, (int)rg);
             GetItemEntry gie = Rando::StaticData::RetrieveItem(rg).GetGIEntry_Copy();
             Combo_GrantResolvedOOT(gie);
         }
@@ -4193,6 +4200,7 @@ static void SOH_ReinitForResume() {
 
 // ComboShip: symmetric marker mirroring MM_NotifyComboTransition; called before SOH_ResumeGame.
 extern "C" COMBO_EXPORT void SOH_NotifyComboReturn(void) {
+    ItemGrantAudit::Scope itemGrantAuditScope("SOH_NotifyComboReturn");
     FleetShared_RequestPullFromPeer(); // MM is still resident: reconcile shared state on the next live tick
 }
 
@@ -4370,6 +4378,7 @@ extern "C" COMBO_EXPORT int32_t SOH_MenuDrawWidget(int32_t i, int32_t width) {
 extern "C" bool WindowIsRunning(void);
 
 extern "C" COMBO_EXPORT void SOH_ResumeGame(void) {
+    ItemGrantAudit::Scope itemGrantAuditScope("SOH_ResumeGame");
     auto ctx = Ship::Context::GetRawInstance();
     // Flush every log line immediately so the resume diagnostics survive a hard crash (the console
     // window closes on crash; the log file is what we read afterward).

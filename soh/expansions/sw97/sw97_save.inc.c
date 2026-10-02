@@ -1,3 +1,4 @@
+#include "../../../combo/menu/ItemGrantAuditBridge.h"
 /**
  * sw97_save.c - Save presets for SW97 tour system
  *
@@ -303,6 +304,7 @@ void Sw97_InitSave(s32 preset) {
  * Sets double magic and fills health/magic/ammo.
  */
 void Sw97_GiveFullInventory(void) {
+    ItemGrantAudit_Begin("OOT SW97 give-full-inventory", -1, -1, 0);
     // Spells
     gSaveContext.inventory.items[SLOT_DINS_FIRE] = ITEM_DINS_FIRE;
     gSaveContext.inventory.items[SLOT_FARORES_WIND] = ITEM_FARORES_WIND;
@@ -352,4 +354,5 @@ void Sw97_GiveFullInventory(void) {
 
     // Sword health
     gSaveContext.swordHealth = 8;
+    ItemGrantAudit_End();
 }

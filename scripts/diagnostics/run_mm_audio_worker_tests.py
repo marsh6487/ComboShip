@@ -20,12 +20,13 @@ def main():
         build = Path(directory)
         (build / "mm_audio_worker.inc").write_text(source[start:end])
         binary = build / "worker_test"
-        subprocess.run([*shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", "-O2", "-g",
+        subprocess.run([*shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", "-O2", "-g", "-DCOMBO_BUILD",
                         "-pthread", "-Wall", "-Wextra", "-Werror", "-Wno-unused-variable",
                         *shlex.split(os.environ.get("MM_AUDIO_WORKER_CXXFLAGS", "")),
                         "-I" + str(build), str(ROOT / "tests/audio_mixer/mm_worker_test.cpp"),
                         "-o", str(binary)], check=True)
-        subprocess.run([str(binary)], check=True, timeout=10)
+        for enabled in ['0', '1']:
+            subprocess.run([str(binary), enabled], check=True, timeout=10)
 
 
 if __name__ == "__main__":

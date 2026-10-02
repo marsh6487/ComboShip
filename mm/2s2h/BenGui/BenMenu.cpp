@@ -1953,6 +1953,13 @@ void BenMenu::AddEnhancements() {
                      .Tooltip("Fixes textures that normally overflow to be patched with the correct size or format.")
                      .DefaultValue(true))
         .Callback([](WidgetInfo& info) { GfxPatcher_ApplyOverflowTexturePatches(); });
+    AddWidget(path, "Clean Streamed Positional Music", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.Fixes.MMStreamedPositionalAudio")
+        .Options(CheckboxOptions()
+                     .Tooltip("Removes native point-source band-pass filtering and high gain from streamed music "
+                              "in shops and other scenes. Preserves distance volume, pan, reverb and native "
+                              "instrument music. Applies immediately; off by default.")
+                     .DefaultValue(false));
     AddWidget(path, "Fix Completed Heart Container Audio", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Fixes.CompletedHeartContainerAudio")
         .Options(CheckboxOptions().Tooltip(

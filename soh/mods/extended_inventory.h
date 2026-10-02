@@ -1,3 +1,4 @@
+#include "../../combo/menu/ItemGrantAuditBridge.h"
 /**
  * extended_inventory.h - Extended inventory system for custom items
  *
@@ -67,12 +68,14 @@ static inline uint16_t ExtInv_GetSlotItem(int slot) {
 }
 // An EXT id (>0xFF) only fits in a page-2 slot; the vanilla range truncates, hence the explicit cast.
 static inline void ExtInv_SetSlotItem(int slot, uint16_t itemId) {
+    ItemGrantAudit_Begin("OOT extended-slot-write", itemId, slot, 1);
     extern SaveContext gSaveContext;
     if (slot >= 0 && slot < 24) {
         gSaveContext.inventory.items[slot] = (uint8_t)itemId;
     } else {
         Nei_SetOwnedItem((uint8_t)slot, itemId);
     }
+    ItemGrantAudit_End();
 }
 
 // Skijer's NEI — item-action func ptr types (shared with extended_player.h via

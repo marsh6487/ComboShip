@@ -221,6 +221,7 @@ uint8_t NayrusWheel_HasNayrus(void) {
 // or spinning the wheel becomes an item generator. Granting also selects what you just received,
 // which is what the player expects to see in the cell. Skijer's NEI
 void NayrusWheel_Grant(uint8_t itemId) {
+    ItemGrantAudit_Begin("MM nayru-wheel-grant", itemId, -1, 1);
     NeiSaveData* nei = Nei_Save();
     if (itemId == ITEM_NAYRUS_LOVE) {
         nei->ootSpellsOwned |= 0x4;
@@ -229,6 +230,7 @@ void NayrusWheel_Grant(uint8_t itemId) {
         nei->ootSpellsOwned |= 0x8;
         nei->nayruRocsMode = 1;
     }
+    ItemGrantAudit_End();
 }
 
 // --- OoT virtual slots (72+): backed by dedicated NeiSaveData fields ---
@@ -400,6 +402,7 @@ const char* OotMask_IconPath(int index) {
 }
 
 void ExtInv_SetOotSlotItem(int slot, uint8_t itemId) {
+    ItemGrantAudit_Begin("MM virtual-OOT-slot-write", itemId, slot, 1);
     NeiSaveData* nei = Nei_Save();
     switch (slot) {
         case VSLOT_DINS:
@@ -431,6 +434,7 @@ void ExtInv_SetOotSlotItem(int slot, uint8_t itemId) {
         default:
             break;
     }
+    ItemGrantAudit_End();
 }
 
 // Page-0 ammo digits are item-based (the layout is remapped, so slot-indexed tables don't apply)

@@ -10,7 +10,7 @@ import sys
 ROOT=Path(__file__).resolve().parents[2]
 
 def function(source,name):
-    match=re.search(r'^(?:extern "C" )?(?:static )?(?:void\*|bool|int32_t|int|void|std::shared_ptr<Fast::Texture>)\s+'+re.escape(name)+r'\([^;{}]*\)\s*\{',source,re.M)
+    match=re.search(r'^(?:extern "C" )?(?:(?:static|inline) )?(?:void\*|bool|int32_t|int|void|std::string|std::shared_ptr<Fast::Texture>)\s+'+re.escape(name)+r'\([^;{}]*\)\s*\{',source,re.M)
     if not match:
         raise RuntimeError('Missing production function: '+name)
     index,depth=match.end(),1
@@ -58,6 +58,8 @@ def run_lifecycle():
     fixture=fixture.replace('/* MM_SAVE */',function(saves,'SaveManager_SaveCurrentForCombo')+function(saves,'SaveManager_LoadSaveFile'))
     fixture=fixture.replace('/* SCALE_CASE */',scale).replace('/* FOREIGN_QUEUE */',queue[start:end])
     fixture=fixture.replace('/* SEND_FOREIGN */',function(queue,'Rando::MiscBehavior::SendForeignCheck'))
+    check_source=(ROOT/'mm/2s2h/Rando/MiscBehavior/MiscBehavior.h').read_text()
+    fixture=fixture.replace('/* BANK_SOURCE */',function(check_source,'BankRewardSourceSuffix'))
     sharing=(ROOT/'mm/2s2h/FleetShipCombo/FleetSharedItems.cpp').read_text()
     shared=function(sharing,'FleetShared_OnNativeObtained')
     fixture=fixture.replace('/* SHARE_SWIM */',shared)
@@ -67,7 +69,7 @@ def run_lifecycle():
     with tempfile.TemporaryDirectory(prefix='scale-lifecycle-') as temporary:
         build=Path(temporary);test=build/'lifecycle.cpp';test.write_text(fixture)
         binary=build/'lifecycle'
-        flags=['-std=c++20','-Wall','-Wextra','-I'+str(json_include)]
+        flags=['-std=c++20','-Wall','-Wextra','-I'+str(json_include),'-I'+str(ROOT)]
         if '--sanitize' in sys.argv:
             flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g']
         subprocess.run([os.environ.get('CXX','c++'),*flags,str(test),'-o',str(binary)],check=True)

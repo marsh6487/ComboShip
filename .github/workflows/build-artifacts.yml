@@ -95,6 +95,7 @@ jobs:
           python3 scripts/diagnostics/run_combo_shared_test.py --json-include /usr/include
           python3 scripts/diagnostics/run_combo_grant_tests.py --json-include /usr/include
           python3 tests/dungeon_rewards/run_tests.py --json-include /usr/include
+          python3 tests/item_grant_audit/run_tests.py
 
       - name: Accepted NEI presentation and MM pickup regressions
         run: |
@@ -130,9 +131,11 @@ jobs:
           python3 scripts/diagnostics/run_mm_scene_randomization_tests.py
           python3 scripts/diagnostics/run_mm_audio_runtime_test.py "$RUNNER_TEMP/mm-audio-runtime"
           python3 scripts/diagnostics/run_mm_audio_decoder_tests.py
+          python3 scripts/diagnostics/run_mm_streamed_positional_tests.py --sanitize
           python3 scripts/diagnostics/run_mm_audio_pcm_tests.py
           MM_AUDIO_PCM_CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie" python3 scripts/diagnostics/run_mm_audio_pcm_tests.py
           python3 scripts/diagnostics/run_native_audio_mixer_tests.py
+          python3 tests/audio_mixer/run_pcm_diagnostics_tests.py
           NATIVE_AUDIO_CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie" python3 scripts/diagnostics/run_native_audio_mixer_tests.py
           python3 scripts/diagnostics/run_mm_audio_worker_tests.py
           MM_AUDIO_WORKER_CXXFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie" python3 scripts/diagnostics/run_mm_audio_worker_tests.py
@@ -142,7 +145,14 @@ jobs:
           python3 scripts/diagnostics/run_mm_drop_lifetime_tests.py
           python3 scripts/diagnostics/run_mm_unrestricted_items_tests.py
           python3 scripts/diagnostics/run_mm_item_visuals_tests.py
+          python3 scripts/diagnostics/run_mm_dungeon_key_tests.py
+          python3 scripts/diagnostics/run_mm_dungeon_key_tests.py --sanitize
           python3 scripts/diagnostics/run_mm_gfx_patch_tests.py
+
+      - name: Foreign soul replacement skeletons and limb matrices
+        run: |
+          python3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py
+          python3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py --sanitize
 
       - name: 2Ship mod GUI fonts
         run: python3 scripts/diagnostics/run_mm_mod_font_tests.py

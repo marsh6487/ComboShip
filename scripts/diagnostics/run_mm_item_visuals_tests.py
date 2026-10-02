@@ -12,7 +12,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def main():
     source = (ROOT / "mm/src/code/z_draw.c").read_text()
-    names = ["GetItem_DrawDungeonItem", "GetItem_BottleShimmerColor", "GetItem_DrawBottleShimmer", "GetItem_Draw"]
+    names = ["GetItem_GetDungeonItemTint", "GetItem_GetDungeonKeyEmblemTint", "GetItem_GetDungeonKeyModel",
+             "GetItem_TryDrawDungeonKey", "GetItem_DrawDungeonItem", "GetItem_BottleShimmerColor",
+             "GetItem_DrawBottleShimmer", "GetItem_Draw"]
     bodies = [function(source, name) for name in names]
     flags = ["-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
              "-DNON_EQUIVALENT", "-DNON_MATCHING", "-Wno-int-conversion", "-Wno-incompatible-pointer-types"]

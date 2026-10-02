@@ -1,3 +1,4 @@
+#include "../../combo/menu/ItemGrantAuditBridge.h"
 // Skijer's NEI — per-save state moved out of the (now 100% vanilla) SaveContext
 // into a dedicated "nei" SaveManager section. Old saves lose this state (accepted).
 #include <string.h>
@@ -35,6 +36,7 @@ extern "C" uint16_t Nei_GetOwnedItem(uint8_t slot) {
 }
 
 extern "C" void Nei_SetOwnedItem(uint8_t slot, uint16_t v) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT custom-slot-write", (int)v, (int)slot);
     if (slot >= 24 && slot < 72) {
         gNeiSave.ownedItems[slot - 24] = v;
     }
@@ -240,6 +242,7 @@ namespace {
 constexpr const char* kSaveSectionName = "nei";
 
 void NeiSave_Init(bool isDebug) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT custom-init");
     memset(&gNeiSave, 0, sizeof(gNeiSave));
     // Empty custom slots = ITEM_NONE (0xFF), not 0 (=ITEM_STICK). Skijer's NEI
     // ownedItems is u16 now, so memset(0xFF) would write 0xFFFF per entry — and the empty marker
@@ -351,6 +354,7 @@ void NeiSave_Save(SaveContext* saveContext, int sectionID, bool fullSave) {
 }
 
 void NeiSave_Load() {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT custom-load");
     // memset first so a save lacking this section loads as a clean new game.
     memset(&gNeiSave, 0, sizeof(gNeiSave));
     SaveManager::Instance->LoadData("timePedestalNoMasterSwordRepair", gNeiSave.timePedestalNoMasterSwordRepair,

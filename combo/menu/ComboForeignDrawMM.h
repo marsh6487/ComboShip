@@ -147,7 +147,10 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
         if (p == nullptr || strncmp(p, kOtrPrefix, sizeof(kOtrPrefix) - 1) != 0) {
             return ComboForeignResolveOOT::Unknown; // not an OTR path literal — can't route it
         }
-        info.dls[i] = ComboInternRoutedPathOOT(std::string("__OTR__@oot:") + (p + sizeof(kOtrPrefix) - 1));
+        const char* ownerPrefix = (raw.drawKind == CW_DRAW_KIND_MM_MASK || raw.drawKind == CW_DRAW_KIND_MM_REMAINS)
+                                      ? "__OTR__@mm:"
+                                      : "__OTR__@oot:";
+        info.dls[i] = ComboInternRoutedPathOOT(std::string(ownerPrefix) + (p + sizeof(kOtrPrefix) - 1));
     }
     info.count = n;
     info.xluStart = raw.xluStartIndex;
@@ -314,6 +317,8 @@ inline void MM_DrawForeignSimple(const ComboForeignDrawInfoOOT* info) {
             Gfx_SetupDL25_Opa(gfxCtx);
         }
         MM_FOREIGN_PIN_OPA();
+        if (info->drawKind == CW_DRAW_KIND_MM_MASK || info->drawKind == CW_DRAW_KIND_MM_REMAINS)
+            gDPSetTextureLUT(POLY_OPA_DISP++, G_TT_NONE);
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
         if (info->hasEnvColor) {
             gDPSetEnvColor(POLY_OPA_DISP++, info->envColor[0], info->envColor[1], info->envColor[2], info->envColor[3]);
@@ -329,6 +334,8 @@ inline void MM_DrawForeignSimple(const ComboForeignDrawInfoOOT* info) {
             Gfx_SetupDL25_Xlu(gfxCtx);
         }
         MM_FOREIGN_PIN_XLU();
+        if (info->drawKind == CW_DRAW_KIND_MM_MASK || info->drawKind == CW_DRAW_KIND_MM_REMAINS)
+            gDPSetTextureLUT(POLY_XLU_DISP++, G_TT_NONE);
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
         if (info->hasEnvColor) {
             gDPSetEnvColor(POLY_XLU_DISP++, info->envColor[0], info->envColor[1], info->envColor[2], info->envColor[3]);
@@ -905,6 +912,8 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
         case CW_DRAW_KIND_BRONZE_SCALE:
             MM_DrawForeignBronzeScale(info);
             break;
+        case CW_DRAW_KIND_MM_MASK:
+        case CW_DRAW_KIND_MM_REMAINS:
         case CW_DRAW_KIND_SIMPLE:
         default:
             MM_DrawForeignSimple(info);

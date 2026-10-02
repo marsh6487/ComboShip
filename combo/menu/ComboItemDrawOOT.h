@@ -1,3 +1,4 @@
+#include "ItemGrantAuditBridge.h"
 /* combo/menu/ComboItemDrawOOT.h — ComboShip: OOT-side bodies of the cross-game item-draw exports
  * (combo/menu/ComboItemDrawABI.h). The exact mirror of combo/menu/ComboItemDrawMM.h, in the opposite
  * direction: MM (2ship.dll) asks soh.dll which display lists render a foreign OOT item, then submits
@@ -89,11 +90,26 @@ static int32_t CwSimple(CwItemDrawInfo* out, const char* dl, bool xlu, float sca
     return 1;
 }
 
+extern "C" int32_t OOT_DescribeMmMaskDraw(int32_t itemId, CwItemDrawInfo* out);
+extern "C" int32_t OOT_DescribeMmRemainsDraw(int32_t rg, CwItemDrawInfo* out);
+
 // ComboShip: describe the bespoke Randomizer_Draw* funcs (Item::SetCustomDrawFunc), which the
 // gid-keyed sDrawItemTable is blind to — without this those items draw a plausible-but-wrong vanilla
 // model. Each branch is a 1:1 description of the func in soh/.../randomizer/draw.cpp. Returns 1 when
 // rg is handled; 0 means "fall through to the gid table".
 static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
+    // Include all 24 imported masks, including the five whose legacy native GIDs
+    // would otherwise select OoT's child-trade model instead of MM's mask.
+    static_assert(RG_MM_MASK_FIERCE_DEITY - RG_MM_MASK_POSTMAN == 23);
+    static_assert(ITEM_MM_MASK_FIERCE_DEITY - ITEM_MM_MASK_POSTMAN == 23);
+    if (rg >= RG_MM_MASK_POSTMAN && rg <= RG_MM_MASK_FIERCE_DEITY) {
+        return OOT_DescribeMmMaskDraw(ITEM_MM_MASK_POSTMAN + (int32_t)rg - (int32_t)RG_MM_MASK_POSTMAN, out);
+    }
+
+    if (rg >= RG_MM_REMAINS_ODOLWA && rg <= RG_MM_REMAINS_TWINMOLD) {
+        return OOT_DescribeMmRemainsDraw((int32_t)rg, out);
+    }
+
     // RPG stat models use custom OPA draws; their legacy spell GIDs are only
     // placeholders and would otherwise show the wrong item at MM checks.
     switch (rg) {
@@ -521,6 +537,7 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
 static bool OOT_BossSoulUsesSkeleton(RandomizerGet rg); // defined with the animated ABI below
 
 extern "C" COMBO_EXPORT int32_t OOT_GetItemDrawInfo(const char* itemName, CwItemDrawInfo* out) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT preview-DrawInfo", -1, -1, true);
     try {
         if (itemName == nullptr || out == nullptr) {
             return 0;
@@ -585,6 +602,7 @@ static int32_t OOT_FillItemIconInfo(RandomizerGet rg, CwItemIconInfo* out) {
 }
 
 extern "C" COMBO_EXPORT int32_t OOT_GetItemIconInfo(const char* itemName, CwItemIconInfo* out) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT preview-IconInfo", -1, -1, true);
     try {
         if (!itemName || !out)
             return 0;
@@ -787,6 +805,7 @@ static int32_t OOT_FillBossSoulAnim(int slot, CwItemAnimDrawInfo* out) {
 // sentinel. Mirror of MM_GetItemAnimDrawInfo.
 // Whole body inside the try: an unwind across the C ABI into 2ship.dll is unrecoverable.
 extern "C" COMBO_EXPORT int32_t OOT_GetItemAnimDrawInfo(const char* itemName, CwItemAnimDrawInfo* out) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT preview-AnimDrawInfo", -1, -1, true);
     try {
         if (itemName == nullptr || out == nullptr) {
             return 0;

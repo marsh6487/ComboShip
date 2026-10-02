@@ -45,9 +45,13 @@ static const std::map<CosmeticGroup, const char*> sCosmeticGroupLabels = {
 // clang-format off
 std::map<std::string, CosmeticOption> cosmeticOptions = {
     COSMETIC_OPTION("Items.Woodfall",               "Woodfall",                 COSMETICS_GROUP_ITEMS,        ColorRGBA8(236, 120, 186, 255), false, true, false),
+    COSMETIC_OPTION("Items.WoodfallEmblem", "Woodfall emblem", COSMETICS_GROUP_ITEMS, ColorRGBA8(236, 120, 186, 255), false, true, false),
     COSMETIC_OPTION("Items.Snowhead",               "Snowhead",                 COSMETICS_GROUP_ITEMS,        ColorRGBA8(129, 173,  70, 255), false, true, false),
+    COSMETIC_OPTION("Items.SnowheadEmblem", "Snowhead emblem", COSMETICS_GROUP_ITEMS, ColorRGBA8(129, 173, 70, 255), false, true, false),
     COSMETIC_OPTION("Items.GreatBay",               "Great Bay",                COSMETICS_GROUP_ITEMS,        ColorRGBA8( 99,  90, 183, 255), false, true, false),
+    COSMETIC_OPTION("Items.GreatBayEmblem", "Great Bay emblem", COSMETICS_GROUP_ITEMS, ColorRGBA8(99, 90, 183, 255), false, true, false),
     COSMETIC_OPTION("Items.StoneTower",             "Stone Tower",              COSMETICS_GROUP_ITEMS,        ColorRGBA8(177, 165,  83, 255), false, true, false),
+    COSMETIC_OPTION("Items.StoneTowerEmblem", "Stone Tower emblem", COSMETICS_GROUP_ITEMS, ColorRGBA8(201, 38, 41, 255), false, true, false),
     COSMETIC_OPTION("HUD.Hearts",                   "Hearts",                   COSMETICS_GROUP_HUD,          ColorRGBA8(255,  70,  50, 255), false, true, false),
     COSMETIC_OPTION("HUD.DDHearts",                 "Double Defense Hearts",    COSMETICS_GROUP_HUD,          ColorRGBA8(200,   0,   0, 255), false, true, false),
     COSMETIC_OPTION("HUD.Magic",                    "Magic",                    COSMETICS_GROUP_HUD,          ColorRGBA8(  0, 200,   0, 255), false, true, false),
@@ -1035,7 +1039,9 @@ void CosmeticEditorWindow::DrawElement() {
                 UIWidgets::CheckboxOptions()
                     .Color(THEME_COLOR)
                     .Tooltip("Use each dungeon's colour on its small keys, boss keys, maps and compass bodies. "
-                             "Shuffled items keep their owning dungeon's colour. Glass and gems stay clear."));
+                             "Colours apply to vanilla and replacement dungeon items in either game. "
+                             "Shuffled items keep their owning dungeon's colour; compass glass stays clear. "
+                             "Independent emblem colours also apply to an edited boss-key gem."));
             CosmeticEditorDrawGroup(COSMETICS_GROUP_ITEMS);
             UIWidgets::CVarCheckbox(
                 "Bottle shimmer", "gEnhancements.BottleShimmer",

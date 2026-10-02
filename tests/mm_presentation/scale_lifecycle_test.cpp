@@ -1,3 +1,6 @@
+// Diagnostic bridge is a no-op in this host-service fixture (included before
+// COMBO_BUILD).
+#include "combo/menu/ItemGrantAuditBridge.h"
 // Production scale resolver + foreign queue + MM save writer/loader.
 // Save schema, host engine services and target persistence are narrowed test
 // boundaries.
@@ -23,6 +26,9 @@ enum RandomizerGet {
 };
 constexpr int RAND_INF_CAN_SWIM = 0, UPG_SCALE = 0, RI_COMBO_FOREIGN = 1;
 using RandoCheckId = int;
+constexpr RandoCheckId RC_CLOCK_TOWN_WEST_BANK_ADULTS_WALLET = 100,
+                       RC_CLOCK_TOWN_WEST_BANK_INTEREST = 101,
+                       RC_CLOCK_TOWN_WEST_BANK_PIECE_OF_HEART = 102;
 struct Check {
   int randoItemId;
   bool obtained, cycleObtained, eligible;
@@ -109,7 +115,8 @@ struct Logic {
 RandomizerGet ResolveScale() {
   auto *logic = &logicState;
   RandomizerGet actual = RG_NONE;
-  switch (static_cast<int>(RG_PROGRESSIVE_SCALE)) { /* SCALE_CASE */ }
+  switch (static_cast<int>(RG_PROGRESSIVE_SCALE)) { /* SCALE_CASE */
+  }
   return actual;
 }
 void GrantScale() {
@@ -188,6 +195,7 @@ std::string GetCheckDisplayName(int) { return "chest"; }
 std::string GetItemName(int, bool, int) { return "Progressive Scale"; }
 } // namespace StaticData
 namespace MiscBehavior {
+/* BANK_SOURCE */
 const ComboRando::ForeignItem *MM_LookupForeign(int) {
   return &g_mmForeignMap.begin()->second;
 }
@@ -209,6 +217,7 @@ bool queued = false;
 std::string GetTrapMessage() { return "trap"; }
 #define RANDO_SAVE_CHECKS gSaveContext.save.shipSaveInfo.rando.checks
 void CollectForeign(int check) {
+  using Rando::MiscBehavior::BankRewardSourceSuffix;
   CUSTOM_ITEM_PARAM = check;
   auto &randoSaveCheck = RANDO_SAVE_CHECKS[check];
   /* FOREIGN_QUEUE */

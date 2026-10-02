@@ -1,4 +1,5 @@
 #include "2s2h/resource/importer/AudioSampleFactory.h"
+#include "../../../../combo/audio/MMAudioTraceBridge.h"
 #include "2s2h/resource/type/AudioSample.h"
 #include "2s2h/resource/importer/AudioSoundFontFactory.h"
 #include "audio/soundfont.h"
@@ -139,6 +140,7 @@ static void Mp3DecoderWorker(std::shared_ptr<SOH::AudioSample> audioSample, std:
 
     audioSample->sample.sampleAddr = new uint8_t[numFrames * channels * 2];
     drmp3_read_pcm_frames_s16(&mp3, numFrames, (int16_t*)audioSample->sample.sampleAddr);
+    MM_AudioTraceFormat(reinterpret_cast<uintptr_t>(&audioSample->sample), sampleRate, channels, numFrames);
 }
 
 static void FlacDecoderWorker(std::shared_ptr<SOH::AudioSample> audioSample, std::shared_ptr<Ship::File> sampleFile) {
@@ -146,6 +148,7 @@ static void FlacDecoderWorker(std::shared_ptr<SOH::AudioSample> audioSample, std
     drflac_uint64 numFrames = flac->totalPCMFrameCount;
     audioSample->sample.sampleAddr = new uint8_t[numFrames * flac->channels * 2];
     drflac_read_pcm_frames_s16(flac, numFrames, (int16_t*)audioSample->sample.sampleAddr);
+    MM_AudioTraceFormat(reinterpret_cast<uintptr_t>(&audioSample->sample), flac->sampleRate, flac->channels, numFrames);
     drflac_close(flac);
 }
 
@@ -208,6 +211,8 @@ static void OggDecoderWorker(std::shared_ptr<SOH::AudioSample> audioSample, std:
                 }
                 // Publish only complete data; failed or pending samples stay silent.
                 audioSample->sample.sampleAddr = decoded.release();
+                MM_AudioTraceFormat(reinterpret_cast<uintptr_t>(&audioSample->sample), vi->rate, vi->channels,
+                                    numFrames);
                 break;
             }
             case OggType::Opus: {
@@ -274,6 +279,7 @@ ResourceFactoryBinaryAudioSampleV2::ReadResource(std::shared_ptr<Ship::File> fil
     }
     audioSample->sample.book = &audioSample->book;
 
+    MM_AudioTraceResource(0, reinterpret_cast<uintptr_t>(&audioSample->sample), initData->Path.c_str(), nullptr, 0);
     return audioSample;
 }
 
@@ -327,6 +333,9 @@ ResourceFactoryXMLAudioSampleV0::ReadResource(std::shared_ptr<Ship::File> file,
     audioSample->sample.size = size;
 
     const char* path = child->Attribute("Path");
+    MM_AudioTraceResource(0, reinterpret_cast<uintptr_t>(&audioSample->sample), initData->Path.c_str(), path,
+                          customFormatStr != nullptr || audioSample->sample.codec == CODEC_S16 ||
+                              audioSample->sample.codec == CODEC_OPUS);
 
 #ifdef COMBO_BUILD
     // ComboShip: pin MM's own RM — audio factories race active-RM swaps on other threads.
@@ -351,6 +360,8 @@ ResourceFactoryXMLAudioSampleV0::ReadResource(std::shared_ptr<Ship::File> file,
             audioSample->sample.sampleAddr = new uint8_t[numFrames * wav.channels * 2];
 
             drwav_read_pcm_frames_s16(&wav, numFrames, (int16_t*)audioSample->sample.sampleAddr);
+            MM_AudioTraceFormat(reinterpret_cast<uintptr_t>(&audioSample->sample), wav.sampleRate, wav.channels,
+                                numFrames);
             return audioSample;
         } else if (strcmp(customFormatStr, "mp3") == 0) {
             std::thread fileDecoderThread = std::thread(Mp3DecoderWorker, audioSample, sampleFile);

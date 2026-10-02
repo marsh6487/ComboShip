@@ -1,3 +1,5 @@
+#include <thread>
+#include "../../../combo/menu/ItemGrantAuditBridge.h"
 // FleetSync.cpp (MM side) — cross-game save cache + shared player-state overlay.
 //
 // Mirror of the OoT implementation (soh/soh/FleetShipCombo/FleetSync.cpp) with MM accessors:
@@ -293,6 +295,8 @@ void ApplyInvItem(const nlohmann::json& inv, const char* key, int slot, uint8_t 
     }
     if (inv[key].get<bool>()) {
         if (MM_INV.items[slot] == 0xFF) {
+            SPDLOG_INFO("[ItemGrantAudit] MM shared-state grant: file={} key={} inventorySlot={} item={}",
+                        (int)gSaveContext.fileNum, key, slot, (int)itemId);
             MM_INV.items[slot] = itemId;
         }
     }
@@ -522,6 +526,7 @@ static void RepairFlagOwnedCells(NeiSaveData* nei) {
 }
 
 void ExtractShared(nlohmann::json& sh) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM ExtractShared", -1, -1, true);
     NeiSaveData* nei = Nei_Save();
     HealLeakedOwnedItems();
     FoldNativesIntoRegistry();
@@ -720,6 +725,7 @@ void ExtractShared(nlohmann::json& sh) {
 }
 
 void ApplyShared(const nlohmann::json& sh) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM ApplyShared", -1, -1, true);
     NeiSaveData* nei = Nei_Save();
     HealLeakedOwnedItems();
 
@@ -888,8 +894,13 @@ void ApplyShared(const nlohmann::json& sh) {
             nei->ootBoomerangOwned = 1;
         if (inv.value("hammer", false))
             nei->ootHammerOwned = 1;
-        if (inv.value("dins", false))
+        if (inv.value("dins", false)) {
+            if (!(nei->ootSpellsOwned & (1 << 0))) {
+                SPDLOG_INFO("[ItemGrantAudit] MM shared-state grant: file={} key=dins spellsBefore={}",
+                            (int)gSaveContext.fileNum, (int)nei->ootSpellsOwned);
+            }
             nei->ootSpellsOwned |= (1 << 0);
+        }
         if (inv.value("farores", false))
             nei->ootSpellsOwned |= (1 << 1);
         if (inv.value("nayrus", false))
@@ -1988,6 +1999,10 @@ void ProcessSignals() {
 
 void RegisterFleetSync() {
 #ifdef COMBO_BUILD
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>(
+        []() { ItemGrantAudit_Checkpoint("frame-start"); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldEnd>(
+        []() { ItemGrantAudit_Checkpoint("draw-end"); });
     // Shared state travels through ComboShip's merged save container (Combo_ReadGameSave /
     // WriteGameSave). Installing the file-mirror pumps too would give the same state two owners —
     // and the title-screen save wipe they carry is fatal here.
@@ -2276,5 +2291,120 @@ extern "C" void FleetSync_ApplySharedState(const char* json) {
     try {
         ApplyShared(nlohmann::json::parse(json));
     } catch (const std::exception& e) { SPDLOG_ERROR("[FleetSync] ApplySharedState failed: {}", e.what()); }
+}
+#endif
+
+#ifdef COMBO_BUILD
+#include "../../../combo/menu/ItemGrantAudit.h"
+namespace {
+thread_local ItemGrantAudit::Tracker sItemGrantAudit;
+static ItemGrantAudit::Snapshot CaptureItemGrantAudit() {
+    ItemGrantAudit::Snapshot snapshot;
+    snapshot.file = gSaveContext.fileNum;
+    snapshot.mode = gSaveContext.gameMode;
+    snapshot.saveType = gSaveContext.save.shipSaveInfo.saveType;
+    snapshot.seed = gSaveContext.save.shipSaveInfo.rando.finalSeed;
+    auto& inv = gSaveContext.save.saveInfo.inventory;
+    snapshot.Array("inventory.items", inv.items, 0xFF);
+    snapshot.Add("inventory.upgrades", inv.upgrades);
+    snapshot.Add("inventory.questItems", inv.questItems);
+    snapshot.Array("inventory.dungeonItems", inv.dungeonItems);
+    snapshot.Array("inventory.dungeonKeys", inv.dungeonKeys, 0xFF);
+    const auto& pd = gSaveContext.save.saveInfo.playerData;
+    snapshot.Add("healthCapacity", pd.healthCapacity);
+    snapshot.Add("isMagicAcquired", pd.isMagicAcquired);
+    snapshot.Add("isDoubleMagicAcquired", pd.isDoubleMagicAcquired);
+    snapshot.Add("doubleDefense", pd.doubleDefense);
+    snapshot.Add("equips.equipment", gSaveContext.save.saveInfo.equips.equipment);
+    snapshot.Add("skullTokenCount", gSaveContext.save.saveInfo.skullTokenCount);
+    snapshot.Add("inventory.defenseHearts", inv.defenseHearts);
+    snapshot.Array("inventory.strayFairies", inv.strayFairies);
+    const auto& r = gSaveContext.save.shipSaveInfo.rando;
+    snapshot.Array("rando.foundDungeonKeys", r.foundDungeonKeys, 0xFF);
+    snapshot.Array("rando.inf", r.randoInf);
+    snapshot.Add("rando.foundTriforcePieces", r.foundTriforcePieces);
+    for (size_t start = 0; start < sizeof(r.randoSaveChecks) / sizeof(r.randoSaveChecks[0]); start += 16) {
+        uint64_t flags = 0;
+        for (size_t j = 0; j < 16 && start + j < sizeof(r.randoSaveChecks) / sizeof(r.randoSaveChecks[0]); ++j) {
+            const auto& c = r.randoSaveChecks[start + j];
+            const uint64_t bits = c.obtained | (uint64_t(c.cycleObtained) << 1) | (uint64_t(c.eligible) << 2) |
+                                  (uint64_t(c.shuffled) << 3);
+            flags |= bits << (j * 4);
+        }
+        snapshot.Add("rando.checkFlags", flags, start);
+    }
+
+    auto* nei = Nei_Save();
+    snapshot.Array("nei.ownedItems", nei->ownedItems, 0xFF);
+    snapshot.Array("nei.bottleSlots", nei->bottleSlots, 0xFF);
+    snapshot.Array("nei.comboObtained", nei->comboObtained);
+    snapshot.Array("nei.comboObtainedFc", nei->comboObtainedFc);
+    snapshot.Array("nei.comboAppliedFc", nei->comboAppliedFc);
+    snapshot.Add("nei.extEquipOwnedBits", nei->extEquipOwnedBits);
+    snapshot.Add("nei.weaponUpgrades", nei->weaponUpgrades);
+    snapshot.Add("nei.tradeAdultOwned", nei->tradeAdultOwned);
+    snapshot.Add("nei.ootMasksOwned", nei->ootMasksOwned);
+    snapshot.Add("nei.wandRodsOwned", nei->wandRodsOwned);
+    snapshot.Add("nei.slateRunesOwned", nei->slateRunesOwned);
+    snapshot.Add("nei.seasonsOwned", nei->seasonsOwned);
+    snapshot.Add("nei.shovelOwned", nei->shovelOwned);
+    snapshot.Add("nei.dominionOwned", nei->dominionOwned);
+    snapshot.Add("nei.pokeballOwned", nei->pokeballOwned);
+    snapshot.Add("nei.twilightUpgrade", nei->twilightUpgrade);
+    snapshot.Add("nei.powerKegOwned", nei->powerKegOwned);
+    snapshot.Add("nei.ootSpellsOwned", nei->ootSpellsOwned);
+    snapshot.Add("nei.ootUpgrades", nei->ootUpgrades);
+    snapshot.Add("nei.ootQuestItems", nei->ootQuestItems);
+    snapshot.Add("nei.slingshotOwned", nei->slingshotOwned);
+    snapshot.Add("nei.ootBoomerangOwned", nei->ootBoomerangOwned);
+    snapshot.Add("nei.ootHammerOwned", nei->ootHammerOwned);
+    snapshot.Add("nei.ootHookshotLevel", nei->ootHookshotLevel);
+    snapshot.Add("nei.shieldOwned", nei->shieldOwned);
+    snapshot.Add("nei.comboTriforce", nei->comboTriforce);
+    snapshot.Add("nei.lanternCapturedTypes", nei->lanternCapturedTypes);
+    snapshot.Add("nei.bottomlessBottleMode", nei->bottomlessBottleMode);
+    snapshot.Add("nei.netEquipped", nei->netEquipped);
+    snapshot.Add("nei.capeOwned", nei->capeOwned);
+    snapshot.Add("nei.pendantOwned", nei->pendantOwned);
+    snapshot.Add("nei.caneSkills", nei->caneSkills);
+    snapshot.Add("nei.quartzOwned", nei->quartzOwned);
+    snapshot.Add("nei.bombArrowsOwned", nei->bombArrowsOwned);
+    snapshot.Add("nei.clawshotOwned", nei->clawshotOwned);
+    snapshot.Add("nei.marioMaskOwned", nei->marioMaskOwned);
+    snapshot.Add("nei.ootGsCount", nei->ootGsCount);
+    snapshot.Add("nei.comboSpeedUpgrades", nei->comboSpeedUpgrades);
+    snapshot.Array("nei.rpg.level", nei->comboRpg.level);
+    snapshot.Add("nei.rpg.nativeMagicLevel", nei->comboRpg.nativeMagicLevel);
+    return snapshot;
+}
+static void ItemGrantAuditLog(const std::string& record) {
+    SPDLOG_INFO("[ItemGrantAudit] MM thread={} {}", std::hash<std::thread::id>{}(std::this_thread::get_id()), record);
+}
+} // namespace
+// Diagnostics must not throw into gameplay; no PlayState pointers are dereferenced here.
+extern "C" void ItemGrantAudit_Begin(const char* source, int item, int check, int quiet) {
+    try {
+        sItemGrantAudit.Begin(CaptureItemGrantAudit(), source, item, check, quiet != 0, ItemGrantAuditLog);
+    } catch (...) {}
+}
+extern "C" void ItemGrantAudit_End(void) {
+    try {
+        sItemGrantAudit.End(CaptureItemGrantAudit(), ItemGrantAuditLog);
+    } catch (...) {}
+}
+extern "C" void ItemGrantAudit_Checkpoint(const char* phase) {
+    try {
+        sItemGrantAudit.Checkpoint(CaptureItemGrantAudit(), phase, ItemGrantAuditLog);
+    } catch (...) {}
+}
+extern "C" void ItemGrantAudit_Suspend(void) {
+    try {
+        sItemGrantAudit.Suspend(CaptureItemGrantAudit(), ItemGrantAuditLog);
+    } catch (...) {}
+}
+extern "C" void ItemGrantAudit_Resume(void) {
+    try {
+        sItemGrantAudit.Resume(CaptureItemGrantAudit(), ItemGrantAuditLog);
+    } catch (...) {}
 }
 #endif

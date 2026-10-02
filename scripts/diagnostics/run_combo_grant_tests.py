@@ -41,6 +41,7 @@ production = oot_helper + mm_helper + oot_raise + mm_raise
 rg_names = sorted(set(re.findall(r'\bRG_[A-Z_0-9]+', production)) | {'RG_PROGRESSIVE_MAGIC_METER', 'RG_NONE'})
 ri_names = sorted(set(re.findall(r'\bRI_[A-Z_0-9]+', production)) | {'RI_NONE'})
 preamble = r'''
+#include "ItemGrantAuditBridge.h"
 #include <algorithm>
 #include <iostream>
 #include <map>
@@ -57,6 +58,8 @@ preamble += 'enum RandoItemId {' + ','.join(ri_names) + '};\n'
 preamble += r'''
 int depth = 0, echoes = 0, ootTier = 0, mmTier = 0, persisted = 0;
 bool throwGrant = false;
+bool mmSaveLoaded = true;
+#define IS_RANDO mmSaveLoaded
 extern "C" void FleetShared_BeginReceive() { ++depth; }
 extern "C" void FleetShared_EndReceive() { --depth; }
 extern "C" int FleetShared_IsReceiving() { return depth > 0; }
@@ -114,8 +117,13 @@ void check(bool condition, const char* label) {
     if (!condition) { std::cerr << "FAIL: " << label << '\n'; ++failures; }
 }
 void reset() { depth = echoes = ootTier = mmTier = persisted = 0; throwGrant = false; gPlayState = nullptr;
+    mmSaveLoaded = true;
     gSaveContext.isMagicAcquired = gSaveContext.isDoubleMagicAcquired = false; gComboSuppressAnchorSend = 0; }
 int main() {
+    reset(); mmSaveLoaded = false;
+    MM_RaiseSharedTier(ComboRando::SF_LIGHT_ARROWS, 1);
+    check(mmTier == 0 && persisted == 0 && depth == 0 && echoes == 0,
+          "cleared MM quit save rejects shared grants without persistence");
     reset();
     SOH_RaiseSharedTier(ComboRando::SF_BOW, 1);
     check(ootTier == 1 && echoes == 0 && depth == 0, "OoT convergence raises once without NEI echo");
@@ -159,6 +167,6 @@ with tempfile.TemporaryDirectory(prefix='combo_grants_') as temp:
     fixture.write_text(preamble + production + checks)
     binary = temp / 'grants'
     subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++17', '-Wall', '-Wextra', '-O0',
-        '-I', str(ROOT / 'combo'), '-I', str(ROOT / 'soh/soh/FleetShipCombo'),
+        '-I', str(ROOT / 'combo'), '-I', str(ROOT / 'combo/menu'), '-I', str(ROOT / 'soh/soh/FleetShipCombo'),
         '-I', str(args.json_include), str(fixture), '-o', str(binary)], check=True)
     raise SystemExit(subprocess.run([str(binary)]).returncode)

@@ -1,3 +1,4 @@
+#include "../../combo/menu/ItemGrantAuditBridge.h"
 #include "SaveManager.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
@@ -797,6 +798,7 @@ void SaveManager::InitMeta(int fileNum) {
 }
 
 void SaveManager::InitFile(bool isDebug) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT save-init");
     for (InitFunc& func : initFuncs) {
         func(isDebug);
     }
@@ -1437,6 +1439,7 @@ void SaveManager::SaveSection(int fileNum, int sectionID, bool threaded) {
 }
 
 void SaveManager::SaveFile(int fileNum) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT save-write");
     SaveSection(fileNum, SECTION_ID_BASE, true);
 }
 
@@ -1523,6 +1526,7 @@ void SaveManager::SaveGlobal() {
 }
 
 void SaveManager::LoadFile(int fileNum) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT save-load");
     saveMtx.lock();
     SPDLOG_INFO("Load File - fileNum: {}", fileNum);
     std::filesystem::path fileName = GetFileName(fileNum);
