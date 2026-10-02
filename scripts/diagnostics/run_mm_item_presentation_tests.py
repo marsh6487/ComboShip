@@ -2,6 +2,7 @@
 """Execute the production cross-game GI selection boundary without either game runtime."""
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 
@@ -100,13 +101,16 @@ with tempfile.TemporaryDirectory(prefix='mm-presentation-') as td:
 message = (ROOT / 'mm/src/code/z_message.c').read_text()
 consumer = (ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text()
 fixture = (ROOT / 'tests/mm_presentation/icon_bridge_test.cpp').read_text()
+bindings = re.findall(r'itemTable\[RG_BOTTLE_WITH_[A-Z_]+\]\.CustomIcon\([^;]+;',
+                      (ROOT / 'soh/soh/Enhancements/randomizer/item_list.cpp').read_text())
+fixture = fixture.replace('/* BOTTLE_ICON_BINDINGS */', '\n'.join(bindings))
 fixture = fixture.replace('/* OWNER_ICON */', function(src, 'OOT_FillItemIconInfo'))
 fixture = fixture.replace('/* STAGE_ICON */', function(message, 'Message_StageCustomItemIconEx') + '\n' + function(message, 'Message_StageCustomItemIcon'))
 fixture = fixture.replace('/* CONSUMER_ICON */', function(consumer, 'Rando::ComboForeignMessageIcon'))
 with tempfile.TemporaryDirectory(prefix='mm-icon-') as td:
     test=Path(td)/'test.cpp';test.write_text(fixture)
     binary=Path(td)/'test'
-    subprocess.run([os.environ.get('CXX','c++'),*flags,str(test),'-o',str(binary)],check=True)
+    subprocess.run([os.environ.get('CXX','c++'),*flags,'-I'+str(ROOT / 'soh/include'),str(test),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True)
 
 conversion = (ROOT / 'mm/2s2h/Rando/ConvertItem.cpp').read_text()

@@ -84,6 +84,15 @@ static int ChainAliasFor(int nativeId) {
 
 typedef void (*FnGrantSharedItem)(const char*);
 
+static void ShareNativeMagicFloor(int tier) {
+    typedef void (*FnMagicFloor)(int);
+    static FnMagicFloor apply = nullptr;
+    if (apply == nullptr)
+        apply = reinterpret_cast<FnMagicFloor>(Combo_ResolveSym("soh", "SOH_ApplySharedMagicFloor"));
+    if (apply != nullptr)
+        apply(tier);
+}
+
 // soh.dll is loaded in this process by the launcher before either game boots; resolve its export
 // lazily so this module never depends on link order.
 static FnGrantSharedItem ResolvePeerGrant() {
@@ -100,11 +109,13 @@ extern "C" void FleetShared_OnNativeObtained(int nativeId) {
     if (sReceiveDepth > 0) {
         return;
     }
-    // RPG magic owns a fractional bar. Native MM tiers cross as a monotonic
-    // capacity floor; giving a progressive item to OoT here would infer another
-    // tier from RPG-derived ownership flags and grant it twice.
-    if (ComboRpg_IsEnabled(COMBO_RPG_MAGIC) &&
-        (nativeId == RI_SINGLE_MAGIC || nativeId == RI_DOUBLE_MAGIC || nativeId == RI_PROGRESSIVE_MAGIC))
+    // Share the concrete native tier even in RPG mode. Returning without a
+    // floor update left a foreign magic pickup dormant until the next switch.
+    if (nativeId == RI_SINGLE_MAGIC || nativeId == RI_DOUBLE_MAGIC) {
+        ShareNativeMagicFloor(nativeId == RI_DOUBLE_MAGIC ? 2 : 1);
+        return;
+    }
+    if (ComboRpg_IsEnabled(COMBO_RPG_MAGIC) && nativeId == RI_PROGRESSIVE_MAGIC)
         return;
     int chain = ChainAliasFor(nativeId);
     int fcId = FcCombo_ItemForNative(chain != 0 ? chain : nativeId);

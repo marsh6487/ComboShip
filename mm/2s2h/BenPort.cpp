@@ -14,6 +14,7 @@
 #include <thread>
 #include <unordered_map> // ComboShip: oracle name->id lookup maps
 #include "2s2h/FleetShipCombo/FleetSharedItems.h"
+#include "mods/combo_rpg.h"
 
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
@@ -4761,6 +4762,24 @@ extern "C" COMBO_EXPORT void MM_GrantSharedItem(const char* itemName) {
     GrantMmItemByName(itemName, nullptr);
 }
 
+extern "C" COMBO_EXPORT void MM_ApplySharedMagicFloor(int tier) {
+    if (!IS_RANDO || gSaveContext.fileNum > 2 || tier < 1 || tier > 2)
+        return;
+    if (Nei_Save()->comboRpg.nativeMagicLevel >= tier)
+        return;
+    ItemGrantAudit::Scope itemGrantAuditScope("MM_ApplySharedMagicFloor", -1, tier);
+    FleetSharedReceiveGuard receiveGuard;
+    ComboRpg_RecordNativeMagic(static_cast<uint8_t>(tier));
+    const int16_t capacity = ComboRpg_MagicCapacity(tier * MAGIC_NORMAL_METER);
+    auto& data = gSaveContext.save.saveInfo.playerData;
+    data.isMagicAcquired = true;
+    if (capacity > MAGIC_NORMAL_METER)
+        data.isDoubleMagicAcquired = true;
+    data.magic = gSaveContext.magicFillTarget = capacity;
+    data.magicLevel = 0;
+    SaveManager_SaveCurrentForCombo();
+}
+
 // ComboShip: mark a foreign MM check obtained without re-delivering — used on the NETWORK receive
 // path so a client that gets a teammate's broadcast won't later physically collect the same check
 // and double-deliver. Save-only (no grant), persisted immediately.
@@ -4843,8 +4862,8 @@ extern "C" COMBO_EXPORT int MM_GetSharedTier(int family) try {
         case ComboRando::SF_BOMBCHU_BAG:
             return INV_CONTENT(ITEM_BOMBCHU) != ITEM_NONE ? 1 : 0;
         case ComboRando::SF_MAGIC:
-            return gSaveContext.save.saveInfo.playerData.isMagicAcquired +
-                   gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired;
+            return ComboRpg_NativeMagicTier(gSaveContext.save.saveInfo.playerData.isMagicAcquired +
+                                            gSaveContext.save.saveInfo.playerData.isDoubleMagicAcquired);
         case ComboRando::SF_WALLET:
             return CUR_UPG_VALUE(UPG_WALLET);
         case ComboRando::SF_HOOKSHOT:

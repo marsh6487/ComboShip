@@ -42,6 +42,15 @@ extern "C" int FleetShared_IsReceiving(void) {
 #ifdef COMBO_BUILD
 typedef void (*FnGrantSharedItem)(const char*);
 
+static void ShareNativeMagicFloor(int tier) {
+    typedef void (*FnMagicFloor)(int);
+    static FnMagicFloor apply = nullptr;
+    if (apply == nullptr)
+        apply = reinterpret_cast<FnMagicFloor>(Combo_ResolveSym("2ship", "MM_ApplySharedMagicFloor"));
+    if (apply != nullptr)
+        apply(tier);
+}
+
 // 2ship.dll is loaded in this process by the launcher before either game boots; resolve its export
 // lazily so this module never depends on link order.
 static FnGrantSharedItem ResolvePeerGrant() {
@@ -56,6 +65,12 @@ static FnGrantSharedItem ResolvePeerGrant() {
 
 extern "C" void FleetShared_OnNativeObtained(int nativeId) {
     if (sReceiveDepth > 0) {
+        return;
+    }
+    // Native magic is an absolute capacity floor. A progressive peer grant can
+    // infer another tier from RPG-derived flags or a repeated delivery.
+    if (nativeId == RG_MAGIC_SINGLE || nativeId == RG_MAGIC_DOUBLE) {
+        ShareNativeMagicFloor(nativeId == RG_MAGIC_DOUBLE ? 2 : 1);
         return;
     }
     int chain = FleetCombo_ChainAliasFor(nativeId);
