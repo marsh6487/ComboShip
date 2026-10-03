@@ -28,7 +28,15 @@ preamble = r'''
 #include <iostream>
 #include "combo/menu/ComboItemDrawABI.h"
 using s16=int16_t; using s32=int32_t; using f32=float;
-enum RandomizerGet { RG_NONE, RG_TEST_CUSTOM, RG_TEST_NATIVE, RG_TEST_PROGRESSIVE, RG_TEST_TIER };
+#include <cstring>
+#define RANDO_ENUM_BEGIN(x) enum x {
+#define RANDO_ENUM_ITEM(x) x,
+#define RANDO_ENUM_END(x) };
+#include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"
+constexpr RandomizerGet RG_TEST_CUSTOM=static_cast<RandomizerGet>(RG_MAX+1),
+ RG_TEST_NATIVE=static_cast<RandomizerGet>(RG_MAX+2),
+ RG_TEST_PROGRESSIVE=static_cast<RandomizerGet>(RG_MAX+3),
+ RG_TEST_TIER=static_cast<RandomizerGet>(RG_MAX+4);
 constexpr int TABLE_RANDOMIZER=1;
 struct GetItemEntry { int tableId, drawItemId, gid; void (*drawFunc)(); int itemId=0; };
 void customDraw() {}
@@ -64,6 +72,9 @@ int GetItem_GetDrawTableEntry(int,void** out,int,int*,float*,int*,uint8_t*) {
 }
 void GetItem_GetDrawSetupDLs(int,void**,void**) {}
 int GetItem_GetShimmerColor(s16,uint8_t*) { return 0; }
+void OOT_DescribeMagicJar(s16,CwItemDrawInfo*) {}
+int CwAltSwordGi(RandomizerGet,CwItemDrawInfo*) {return 0;}
+void ComboMaskShimmerColor(int,uint8_t*) {}
 '''
 checks = r'''
 int main() {
@@ -101,7 +112,7 @@ with tempfile.TemporaryDirectory(prefix='mm-presentation-') as td:
 message = (ROOT / 'mm/src/code/z_message.c').read_text()
 consumer = (ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text()
 fixture = (ROOT / 'tests/mm_presentation/icon_bridge_test.cpp').read_text()
-bindings = re.findall(r'itemTable\[RG_BOTTLE_WITH_[A-Z_]+\]\.CustomIcon\([^;]+;',
+bindings = re.findall(r'itemTable\[(?:RG_BOTTLE_WITH_[A-Z_]+|RG_MAGIC_BEAN_PACK)\]\.CustomIcon\([^;]+;',
                       (ROOT / 'soh/soh/Enhancements/randomizer/item_list.cpp').read_text())
 fixture = fixture.replace('/* BOTTLE_ICON_BINDINGS */', '\n'.join(bindings))
 fixture = fixture.replace('/* OWNER_ICON */', function(src, 'OOT_FillItemIconInfo'))

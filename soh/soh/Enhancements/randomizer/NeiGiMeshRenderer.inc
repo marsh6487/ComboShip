@@ -134,3 +134,36 @@ bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiG
     NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material);
     return true;
 }
+
+// Shared by native and foreign mask/remains and progressive sword overlays.
+// Reuse the exact optional NEI shimmer sampler and renderer; only the requested
+// transformation/remains palette changes. Ordinary items retain NEI's palette.
+void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner) {
+    if (!play || !color)
+        return;
+    const bool ordinary = color[0] == 220 && color[1] == 225 && color[2] == 240;
+    const bool dark = color[0] == 0 && color[1] == 0 && color[2] == 0;
+    auto mesh = NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play));
+    if (!ordinary) {
+        const uint32_t rgb = uint32_t(color[0]) << 16 | uint32_t(color[1]) << 8 | color[2];
+        for (size_t i = 0; i < mesh.count; ++i) {
+            auto& vertex = mesh.vertices[i];
+            vertex.rgb = vertex.rgb == 0xFFFFFF ? (dark ? 0x505060 : 0xFFFFFF) : rgb;
+        }
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    if (owner)
+        gSPComboRMPush(POLY_XLU_DISP++, owner);
+    CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawMesh(play, mesh, Kind::Neutral);
+    OPEN_DISPS(play->state.gfxCtx);
+    if (owner)
+        gSPComboRMPop(POLY_XLU_DISP++);
+    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+    gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    CLOSE_DISPS(play->state.gfxCtx);
+}

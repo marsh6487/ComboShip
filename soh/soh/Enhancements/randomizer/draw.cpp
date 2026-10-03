@@ -1764,9 +1764,7 @@ void Randomizer_DrawMarioMask(PlayState* play, GetItemEntry* getItemEntry) {
     Matrix_Pop();
     uint8_t shimmerColor[4];
     ComboMaskShimmerColor(0, shimmerColor);
-    if (ResourceMgr_LoadGfxByName(gEffSparklesDL) != nullptr) {
-        ComboDrawMaskShimmer(play, gEffSparklesDL, shimmerColor, nullptr);
-    }
+    ComboDrawMaskShimmer(play, nullptr, shimmerColor, nullptr);
 }
 
 // =============================================================================
@@ -2797,9 +2795,8 @@ void Randomizer_DrawMmMask(PlayState* play, GetItemEntry* getItemEntry) {
     CLOSE_DISPS(play->state.gfxCtx);
     Matrix_Pop();
     uint8_t shimmerColor[4];
-    Gfx* shimmer = MmMaskResolveDL("__OTR__objects/gameplay_keep/gEffSparklesDL");
-    if (shimmer != nullptr && ComboMmMaskShimmerColor(index, shimmerColor)) {
-        ComboDrawMaskShimmer(play, (const char*)shimmer, shimmerColor, nullptr);
+    if (ComboMmMaskShimmerColor(index, shimmerColor)) {
+        ComboDrawMaskShimmer(play, nullptr, shimmerColor, nullptr);
     }
 }
 
@@ -2934,10 +2931,8 @@ void Randomizer_DrawMmRemains(PlayState* play, GetItemEntry* getItemEntry) {
     CLOSE_DISPS(play->state.gfxCtx);
     Matrix_Pop();
     uint8_t shimmerColor[4];
-    Gfx* shimmer = MmMaskResolveDL("__OTR__objects/gameplay_keep/gEffSparklesDL");
-    if (shimmer != nullptr &&
-        ComboMmRemainsShimmerColor(getItemEntry->getItemId - (int32_t)RG_MM_REMAINS_ODOLWA, shimmerColor)) {
-        ComboDrawMaskShimmer(play, (const char*)shimmer, shimmerColor, nullptr);
+    if (ComboMmRemainsShimmerColor(getItemEntry->getItemId - (int32_t)RG_MM_REMAINS_ODOLWA, shimmerColor)) {
+        ComboDrawMaskShimmer(play, nullptr, shimmerColor, nullptr);
     }
 }
 

@@ -64,6 +64,11 @@ typedef enum {
     CW_DRAW_KIND_MM_MASK,         /* imported MM mask: native MM resources and palette-free split passes */
     CW_DRAW_KIND_MM_REMAINS,      /* imported boss remains: native MM OPA resource, scale 0.02 */
     CW_DRAW_KIND_MM_SPIN_ATTACK,  /* MM Great Spin: native disk/cylinder, seg8 scroll, live burst color */
+    CW_DRAW_KIND_OOT_MORPHA_SOUL = 32, /* native MM flame dl0 + OoT Morpha membrane/nucleus dl1/2 */
+    CW_DRAW_KIND_MAGIC_JAR = 33, /* OoT magic jar: custom Alt grayscale tint carried in primColorOpa */
+    CW_DRAW_KIND_CUSTOM_GI = 31, /* OoT custom: spin, ops transforms, scale, OPA/XLU; primColorOpa grayscale,
+                              primColorXlu weapon flame; alpha zero disables each independent tint/effect. */
+    CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT = 34, /* concrete static award; ops[0] native equipment selector */
 } CwDrawKind;
 
 #define CW_DRAW_MAX_OPS 20
@@ -89,7 +94,22 @@ typedef enum {
     CW_OP_GRAYSCALE_ON,
     CW_OP_GRAYSCALE_OFF,
     CW_OP_DLIST, /* a = index into dlists[] */
+    CW_OP_FRAME_PAIR, /* only CUSTOM_GI: choose one of two OPA DLs; a = frame bit (0..30) */
+    CW_OP_NATIVE_EQUIPMENT, /* only OOT_NATIVE_EQUIPMENT: a = CwOotNativeEquipment */
 } CwDrawOpCode;
+
+// Existing MM-native renderers for inline/palette-remapped OoT equipment. These concrete
+// selectors carry no progression logic, item grants or gameplay pointers across the ABI.
+typedef enum {
+    CW_OOT_EQUIP_AXE = 1,
+    CW_OOT_EQUIP_SPIRIT_TUNIC,
+    CW_OOT_EQUIP_CHAMPIONS_TUNIC,
+    CW_OOT_EQUIP_SAGES_TUNIC,
+    CW_OOT_EQUIP_PEGASUS_BOOTS,
+    CW_OOT_EQUIP_TRIDENT,
+    CW_OOT_EQUIP_CLIMB_BOOTS,
+    CW_OOT_EQUIP_ROC_BOOTS,
+} CwOotNativeEquipment;
 
 typedef struct {
     int32_t op; /* CwDrawOpCode */
@@ -183,6 +203,7 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
         case CW_DRAW_KIND_FAIRY:
         case CW_DRAW_KIND_MAGIC_SPELL:
         case CW_DRAW_KIND_MM_FAIRY_BOTTLE:
+        case CW_DRAW_KIND_OOT_MORPHA_SOUL:
             return 3;
         case CW_DRAW_KIND_MIRROR_SHIELD:
         case CW_DRAW_KIND_BLUE_FIRE:
@@ -196,7 +217,8 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
             return 2;
         case CW_DRAW_KIND_OPS:
         case CW_DRAW_KIND_NEI_CANE:
-            return 0; /* the interpreter bounds-checks every CW_OP_DLIST index itself */
+        case CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT:
+            return 0; /* native kinds carry no resource lists; OPS bounds-checks every DL index */
         default:
             return 1;
     }

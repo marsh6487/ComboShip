@@ -47,12 +47,16 @@ int NeiGi_DescribeEntry(const GetItemEntry*,CwItemDrawInfo*) {return 0;}
 int GetItem_GetDrawTableEntry(int,void**,int,int*,float*,int*,uint8_t*) {++nativeRows;return 0;}
 void GetItem_GetDrawSetupDLs(int,void**,void**) {}
 int GetItem_GetShimmerColor(s16,uint8_t*) {return 0;}
+void OOT_DescribeMagicJar(s16,CwItemDrawInfo*) {}
+int CwAltSwordGi(RandomizerGet,CwItemDrawInfo*) {return 0;} // Static weapon policy is exercised separately.
 /* OWNER_DESCRIPTOR */
 /* HOST_INFO */
 RandomizerGet selected=RG_MM_MASK_POSTMAN;
 int producerResult=1;
+bool magicSelected=false; uint8_t magicRed=53;
 int32_t Describe(const char*,CwItemDrawInfo* out) {
  if(producerResult!=1) return producerResult;
+ if(magicSelected) {out->drawKind=CW_DRAW_KIND_MAGIC_JAR;out->dlistCount=1;out->xluStartIndex=-1;out->dlists[0]="__OTR__magic";out->stateDependent=2;out->primColorOpa[0]=magicRed;out->primColorOpa[3]=255;return 1;}
  return OOT_FillItemDrawInfo(selected,out);
 }
 namespace ComboRando {
@@ -104,32 +108,22 @@ std::vector<int> luts;
 #define MTXMODE_APPLY 1
 float scale=0;
 int matrixDepth=0,shimmerDraws=0;
-bool missingShimmer=false;
 uint8_t shimmerColor[4]{};
 void Matrix_Push() {++matrixDepth;}
 void Matrix_Pop() {assert(matrixDepth>0);--matrixDepth;}
-namespace Ship {
-struct ResourceManager {
- std::shared_ptr<int> LoadResource(const char* path) {
-  assert(!strcmp(path,"__OTR__objects/gameplay_keep/gEffSparklesDL"));
-  return missingShimmer?nullptr:std::make_shared<int>(1);
- }
-};
-struct CrossRMRegistry {
- static std::shared_ptr<ResourceManager> Get(const char* owner) {
-  assert(!strcmp(owner,"mm"));return std::make_shared<ResourceManager>();
- }
-};
-struct ResourceManagerScope {ResourceManagerScope(std::shared_ptr<ResourceManager>) {}};
-}
 void ComboDrawMaskShimmer(PlayState*,const char* root,const uint8_t color[4],const char* owner) {
- assert(!strcmp(root,"__OTR__@mm:objects/gameplay_keep/gEffSparklesDL") && !strcmp(owner,"mm"));
+ assert(root == nullptr && !strcmp(owner,"mm"));
  assert(matrixDepth==0);memcpy(shimmerColor,color,4);++shimmerDraws;
 }
 void Matrix_Scale(float x,float y,float z,int) {assert(x==y && y==z);scale=x;}
 void Gfx_SetupDL25_Opa(GraphicsContext*) {}
 void Gfx_SetupDL25_Xlu(GraphicsContext*) {}
 #define gDPSetEnvColor(p,...) ((void)(p))
+std::vector<int> grayEvents;
+uint8_t submittedMagicRed=0;
+#define gDPSetGrayscaleColor(p,r,g,b,a) ((void)(p), submittedMagicRed=(r))
+#define gSPGrayscale(p,on) ((void)(p), grayEvents.push_back(on))
+/* HOST_MAGIC_DRAW */
 /* HOST_SIMPLE_DRAW */
 int spinDraws=0;
 void ComboDrawSpinAttackGi(PlayState*,const char* disk,const char* cylinder,float size,const uint8_t*,const char* owner) {
@@ -196,8 +190,6 @@ int main() {
   assert(luts==std::vector<int>{0} && scale==0.02f);
   assert(shimmerDraws==1 && matrixDepth==0 && !memcmp(shimmerColor,expectedColor,4));
  }
- missingShimmer=true;shimmerDraws=0;gfx.o=opa;gfx.x=xlu;submitted.clear();
- MM_DrawComboForeign(1);assert(submitted.size()==1 && shimmerDraws==0 && matrixDepth==0);missingShimmer=false;
  selected=RG_MM_MASK_ROMANI;CwItemDrawInfo romani{};assert(OOT_FillItemDrawInfo(selected,&romani));
  assert(!strcmp(romani.dlists[0],gGiRomaniMaskCapDL) && !strcmp(romani.dlists[1],gGiRomaniMaskNoseEyeDL));
  const char* retained=current.dls[0];for(int i=0;i<1000;++i)ComboInternRoutedPathOOT(std::to_string(i));
@@ -216,5 +208,13 @@ int main() {
  assert(TestResolveForeignDrawInfoOOT(2)==nullptr);
  spinResult=1;assert(TestResolveForeignDrawInfoOOT(2)!=nullptr);
  MM_DrawComboForeign(RC_UNKNOWN);assert(sentinels==1);
+ magicSelected=true;assert(CwMinDlistsForKind(CW_DRAW_KIND_MAGIC_JAR)==1);
+ auto* magic=TestResolveForeignDrawInfoOOT(4);assert(magic && magic->appearanceDependent);
+ ComboLatchForeignDrawOOT(4);magicRed=211;
+ magic=TestResolveForeignDrawInfoOOT(4);assert(magic && magic->primColorOpa[0]==211);
+ gfx.o=opa;gfx.x=xlu;submitted.clear();grayEvents.clear();
+ MM_DrawComboForeign(4);
+ assert(submitted.size()==1 && submitted[0].second=="__OTR__@oot:magic");
+ assert(submittedMagicRed==211 && grayEvents==std::vector<int>({1,0}));
  std::cout<<"PASS all 24 mask and four boss-remains production recipes and MM draw dispatch: no blue sentinel, correct native MM routing, opaque/translucent passes, LUT reset, Romani layers and retained paths\n";
 }

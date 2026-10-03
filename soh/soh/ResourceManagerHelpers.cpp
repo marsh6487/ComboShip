@@ -906,6 +906,33 @@ extern "C" s32* ResourceMgr_LoadCSByName(const char* path) {
 }
 
 #ifdef COMBO_BUILD
+// Dormant-owner queries: host MM's Alt toggle and resource cache never select OoT equipment.
+extern "C" COMBO_EXPORT int32_t OOT_NeiAltAssetsEnabled(void) {
+    const auto owner = Ship::CrossRMRegistry::Get("oot");
+    return owner && owner->IsAltAssetsEnabled();
+}
+
+extern "C" COMBO_EXPORT int32_t OOT_MagicJarUsesCustomAsset(const char* path) {
+    const auto owner = Ship::CrossRMRegistry::Get("oot");
+    if (!path || !owner)
+        return 0;
+    std::string base = path;
+    if (base.compare(0, 7, "__OTR__") == 0)
+        base.erase(0, 7);
+    std::string selected = base;
+    if (owner->IsAltAssetsEnabled() && base.compare(0, 4, "alt/") != 0 &&
+        (owner->GetArchiveManager()->HasFile("alt/" + base) ||
+         owner->GetArchiveManager()->HasFile("alt/" + base + ".meta"))) {
+        selected = "alt/" + base;
+    }
+    // Exact registered-owner loads avoid dormant save/MQ helpers and native cache eviction.
+    // Match deferred resource fallback if a present Alt entry cannot actually be loaded.
+    auto resource = owner->LoadResource(selected, true);
+    if (!resource && selected != base)
+        resource = owner->LoadResource(base, true);
+    return resource && resource->GetInitData() && resource->GetInitData()->IsCustom;
+}
+
 // Typed resource-only query for native MM. The owner may be inactive; never
 // consult OoT save/player state. Match deferred rendering using the registered
 // owner's Alt mode, which can differ from the currently active MM mode.

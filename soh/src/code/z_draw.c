@@ -433,9 +433,7 @@ void GetItem_Draw(PlayState* play, s16 drawId) {
     sDrawItemTable[drawId].drawFunc(play, drawId);
     if (itemShimmer) {
         Matrix_Pop();
-        if (ResourceMgr_LoadGfxByName(gEffSparklesDL) != NULL) {
-            ComboDrawMaskShimmer(play, gEffSparklesDL, maskColor, NULL);
-        }
+        ComboDrawMaskShimmer(play, NULL, maskColor, NULL);
     }
 }
 

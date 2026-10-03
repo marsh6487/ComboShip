@@ -48,15 +48,23 @@ with tempfile.TemporaryDirectory(prefix='mask-shimmer-') as temporary:
         source = build / 'test.cpp'
         source.write_text(fixture)
         includes = [game, game+'/include', game+'/include/PR', game+'/src', game+'/assets', game+'/2s2h',
-                    game+'/soh', game+'/mods', 'libultraship/include', 'libultraship/src', 'combo/menu']
+                    game+'/soh', game+'/mods', 'libultraship/include', 'libultraship/src', 'combo/menu', 'soh']
         bridge = build / 'interpolation.cpp'
         native_header = ('2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h'
                          if host == 'mm' else 'soh/frame_interpolation.h')
         bridge.write_text('#include "z64.h"\n#include "' + native_header + '"\n'
                           'void FrameInterpolation_RecordOpenChild(const void*, int) {}\n'
                           'void FrameInterpolation_RecordCloseChild() {}\n')
+        c_glue = build / 'c_boundary.c'
+        c_glue.write_text('#include "' + ('global.h' if host == 'mm' else 'z64.h') + '"\n'
+                          '#include "ComboMaskShimmer.h"\n'
+                          'void Fixture_DrawCShimmer(PlayState* play, const uint8_t color[4]) {\n'
+                          '    ComboDrawMaskShimmer(play, 0, color, 0);\n}\n')
+        c_object = build / 'c_boundary.o'
+        subprocess.run([os.environ.get('CC', 'cc'), '-std=gnu2x', *flags,
+                        *['-I'+str(ROOT/p) for p in includes], '-c', str(c_glue), '-o', str(c_object)], check=True)
         binary = build / host
         subprocess.run([os.environ.get('CXX', 'c++'), '-std=gnu++20', *flags,
                         *(['-DHOST_MM'] if host == 'mm' else []), *['-I'+str(ROOT/p) for p in includes],
-                        str(source), str(bridge), '-o', str(binary)], check=True)
+                        str(source), str(bridge), str(c_object), '-o', str(binary)], check=True)
         subprocess.run([str(binary)], check=True, env={**os.environ, 'ASAN_OPTIONS': 'detect_leaks=0'})

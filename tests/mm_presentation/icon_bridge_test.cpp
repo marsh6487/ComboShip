@@ -26,6 +26,7 @@ enum RandomizerGet {
   RG_BOTTLE_WITH_BUGS,
   RG_BOTTLE_WITH_POE,
   RG_BOTTLE_WITH_BIG_POE,
+  RG_MAGIC_BEAN_PACK,
   RG_COUNT
 };
 constexpr int ICON_SIZE_24 = 24, ICON_SIZE_32 = 32, ITEM_MEDALLION_FOREST = 102,
@@ -127,6 +128,11 @@ int main() {
            std::string(info.path) == path);
     assert(info.width == 32 && info.height == 32 && !info.isIA8);
   }
+  nativeId = 12;
+  gItemIcons[nativeId] = (void *)gItemIconBottleFairyTex;
+  assert(OOT_FillItemIconInfo(RG_MAGIC_BEAN_PACK, &info) == 1 &&
+         std::string(info.path) == gItemIconMagicBeanTex);
+  assert(info.width == 32 && info.height == 32 && !info.isIA8);
   provider = false;
   assert(Rando::ComboForeignMessageIcon(1) == 0xFE);
   provider = true;

@@ -1,0 +1,39 @@
+"""Execute OoT static custom recipes, concrete award resolution and MM host submission."""
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+from run_mm_scene_randomization_tests import function
+
+ROOT = Path(__file__).resolve().parents[2]
+owner = (ROOT/'combo/menu/ComboItemDrawOOT.h').read_text()
+host = (ROOT/'combo/menu/ComboForeignDrawMM.h').read_text()
+# Keep the actual static callback switch; unrelated soul/key branches have independent fixtures.
+a = owner.index('    switch (rg) {\n        case RG_EXT_CANE_OF_BYRNA:')
+b = owner.index('\n// Items whose model', a)
+body = 'static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {\n' + owner[a:b]
+helpers = function(owner, 'CwSimple') + '\n' + function(owner, 'CwLayerEnv')
+if '// Static custom GI bridge recipes.' in owner:
+    a = owner.index('// Static custom GI bridge recipes.')
+    b = owner.index('extern "C" int32_t OOT_DescribeMmMaskDraw', a)
+    helpers += '\n' + owner[a:b]
+fixture = (ROOT/'tests/mm_presentation/static_gi_bridge_test.cpp').read_text()
+fixture = fixture.replace('/* OWNER_HELPERS */', helpers)
+fixture = fixture.replace('/* OWNER_ALT_QUERY */', function((ROOT/'soh/soh/ResourceManagerHelpers.cpp').read_text(), 'OOT_NeiAltAssetsEnabled'))
+fixture = fixture.replace('/* OWNER_DESCRIPTOR */', body + '\n' + function(owner, 'OOT_FillItemDrawInfo'))
+fixture = fixture.replace('/* OWNER_MAGIC_QUERY */', function((ROOT/'soh/soh/ResourceManagerHelpers.cpp').read_text(), 'OOT_MagicJarUsesCustomAsset'))
+fixture = fixture.replace('/* HOST_INFO */', host[host.index('struct ComboForeignDrawInfoOOT {'):host.index('\n};', host.index('struct ComboForeignDrawInfoOOT {'))+3])
+fixture = fixture.replace('/* HOST_RESOLVER */', function(host, 'ComboFillForeignDrawInfoOOT'))
+fixture = fixture.replace('/* HOST_NATIVE_DRAW */', function(host, 'MM_DrawForeignNativeEquipment'))
+fixture = fixture.replace('/* HOST_AXE_DRAW */', function((ROOT/'mm/2s2h/Rando/DrawItem.cpp').read_text(), 'DrawOotIronKnuckleAxe'))
+if 'inline void MM_DrawForeignCustomGi(' in host:
+    fixture = fixture.replace('/* HOST_CUSTOM_DRAW */', function(host, 'MM_DrawForeignCustomGi'))
+else:
+    fixture = fixture.replace('/* HOST_CUSTOM_DRAW */', 'void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*) {}')
+with tempfile.TemporaryDirectory(prefix='mm-static-gi-') as td:
+    path=Path(td)/'test.cpp';path.write_text(fixture);binary=Path(td)/'test'
+    flags=['-std=c++20','-Wall','-Wextra','-Wno-unused-parameter']
+    if '--sanitize' in sys.argv: flags+=['-g','-fsanitize=address,undefined','-fno-omit-frame-pointer','-fno-pie','-no-pie']
+    subprocess.run([os.environ.get('CXX','c++'),*flags,'-I'+str(ROOT),'-I'+str(ROOT/'soh/include'),str(path),'-o',str(binary)],check=True)
+    subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})

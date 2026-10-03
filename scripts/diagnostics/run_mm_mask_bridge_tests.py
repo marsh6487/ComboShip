@@ -19,7 +19,7 @@ draw=(ROOT/'soh/soh/Enhancements/randomizer/draw.cpp').read_text()
 host=(ROOT/'combo/menu/ComboForeignDrawMM.h').read_text()
 fixture=(ROOT/'tests/mm_presentation/mm_mask_bridge_test.cpp').read_text()
 shimmer=(ROOT/'combo/menu/ComboMaskShimmer.h').read_text()
-palette=shimmer[shimmer.index('// 0 = ordinary mask;'):shimmer.index('#ifdef COMBO_MASK_SHIMMER_HOST_MM')]
+palette=shimmer[shimmer.index('// 0 = ordinary mask;'):shimmer.index('// The shared NEI mesh renderer')]
 a=draw.index('typedef enum {\n    MM_MASK_DRAW_OPA0_XLU1');b=draw.index('\n#ifdef COMBO_BUILD',a)
 fixture=fixture.replace('/* MASK_TABLE */',palette+draw[a:b]+'\n'+function(draw,'OOT_DescribeMmMaskDraw')+'\n'+function(draw,'MmRemainsGetDrawDL')+'\n'+function(draw,'OOT_DescribeMmRemainsDraw')+'\n'+function(draw,'OOT_DescribeMmSpinAttackDraw'))
 a=owner.index('static int32_t OOT_DescribeCustomDraw(');b=owner.index('    // RPG stat models',a)
@@ -29,6 +29,7 @@ fixture=fixture.replace('/* HOST_INFO */',host[a:b])
 fixture=fixture.replace('/* HOST_RESOLVER */',function(host,'ComboFillForeignDrawInfoOOT'))
 cache=host[host.index('struct ComboForeignDrawCacheOOT {'):host.index('} // namespace')]
 fixture=fixture.replace('/* HOST_CACHE */',cache.replace('ComboResolveForeignDrawInfoOOT','TestResolveForeignDrawInfoOOT'))
+fixture=fixture.replace('/* HOST_MAGIC_DRAW */',function(host,'MM_DrawForeignMagicJarDList'))
 fixture=fixture.replace('/* HOST_SIMPLE_DRAW */',function(host,'MM_DrawForeignSimple'))
 fixture=fixture.replace('/* HOST_SPIN_DRAW */',function(host,'MM_DrawForeignSpinAttack'))
 foreign=function(host,'MM_DrawComboForeign')

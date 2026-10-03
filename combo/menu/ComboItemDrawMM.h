@@ -67,6 +67,9 @@
 #include "assets/objects/object_wiz/object_wiz.h"                 // Wizrobe
 #include "assets/objects/object_wf/object_wf.h"                   // Wolfos
 #include "objects/object_fr/object_fr.h"                          // Minifrog
+#include "objects/object_boss_hakugin/object_boss_hakugin.h" // Goht soul
+#include "objects/object_boss03/object_boss03.h"             // Gyorg soul
+#include "objects/object_boss01/object_boss01.h"             // Odolwa soul
 
 // Portable slice of one sDrawItemTable row (defined in mm/src/code/z_draw.c). outDrawKind is a
 // CwDrawKind: 0 = plain OPA/XLU submission, else a non-portable func the consumer replicates.
@@ -712,6 +715,54 @@ static void MM_AnimSoulFlame(CwItemAnimDrawInfo* out, const uint8_t rgb[3], floa
     out->flameSeg.yMask2 = 0x7F;
 }
 
+// Native MM boss models whose draw routines fit the existing skeletal ABI. Canonical
+// paths are loaded through MM's RM, including its own Alt selection and vanilla fallback.
+// Twinmold's separate segment-13 matrix array is not described by this ABI; retain its alias.
+static int32_t MM_FillBossSoulAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
+    uint8_t flame[3];
+    float flameSize;
+    switch (id) {
+        case RI_SOUL_BOSS_GOHT:
+            out->skelPath = gGohtSkel;
+            out->animPath = gGohtRunAnim;
+            out->limbCount = GOHT_LIMB_MAX;
+            out->scale = 0.005f;
+            flame[0] = 10;
+            flame[1] = 138;
+            flame[2] = 46;
+            flameSize = 30.0f;
+            MM_AnimTexSeg(out, 8, gGohtMetalPlateWithCirclePatternTex);
+            break;
+        case RI_SOUL_BOSS_GYORG:
+            out->skelPath = gGyorgSkel;
+            out->animPath = gGyorgGentleSwimmingAnim;
+            out->limbCount = GYORG_LIMB_MAX;
+            out->scale = 0.05f;
+            flame[0] = 19;
+            flame[1] = 99;
+            flame[2] = 165;
+            flameSize = 3.0f;
+            break;
+        case RI_SOUL_BOSS_ODOLWA:
+            out->skelPath = gOdolwaSkel;
+            out->animPath = gOdolwaReadyAnim;
+            out->limbCount = ODOLWA_LIMB_MAX;
+            out->scale = 0.005f;
+            flame[0] = 145;
+            flame[1] = 20;
+            flame[2] = 133;
+            flameSize = 25.0f;
+            break;
+        default:
+            return 0;
+    }
+    out->opa = 1;
+    out->hiddenLimb = -1;
+    out->translatePre[1] = -20.0f;
+    MM_AnimSoulFlame(out, flame, flameSize, flameSize, flameSize);
+    return 1;
+}
+
 // The 8 enemy souls with no entry in the table above keep the flame-only stand-in: Bad Bat (9 wing
 // frame DLs, no skeleton), Boe / Chuchu / Freezard / Like Like (non-skeletal or matrix-array driven),
 // Dexihand (hand-built arm segment chain), Gomess (two texanims, one stepped) and Iron Knuckle
@@ -872,7 +923,7 @@ static int32_t MM_FillMinifrogAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
 }
 
 static int32_t MM_FillAnimDrawInfo(RandoItemId id, CwItemAnimDrawInfo* out) {
-    if (MM_FillEnemySoulAnim(id, out) || MM_FillMinifrogAnim(id, out)) {
+    if (MM_FillBossSoulAnim(id, out) || MM_FillEnemySoulAnim(id, out) || MM_FillMinifrogAnim(id, out)) {
         return 1;
     }
     return 0;

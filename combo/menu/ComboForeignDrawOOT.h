@@ -715,14 +715,7 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
     }
     if (info->itemShimmer) {
         Matrix_Pop();
-        auto rm = Ship::CrossRMRegistry::Get("mm");
-        if (rm != nullptr) {
-            Ship::ResourceManagerScope scope(rm);
-            if (rm->LoadResource("__OTR__objects/gameplay_keep/gEffSparklesDL") != nullptr) {
-                ComboDrawMaskShimmer(play, "__OTR__@mm:objects/gameplay_keep/gEffSparklesDL", info->itemShimmerColor,
-                                     "mm");
-            }
-        }
+        ComboDrawMaskShimmer(play, nullptr, info->itemShimmerColor, "mm");
     }
 }
 

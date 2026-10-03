@@ -1507,9 +1507,7 @@ void DrawOotQuartzOfMotion() {
 static void DrawOotMaskShimmer() {
     uint8_t color[4];
     ComboMaskShimmerColor(0, color);
-    if (ResourceMgr_LoadGfxByName(gEffSparklesDL) != NULL) {
-        ComboDrawMaskShimmer(gPlayState, gEffSparklesDL, color, nullptr);
-    }
+    ComboDrawMaskShimmer(gPlayState, nullptr, color, nullptr);
 }
 
 void DrawOotSkullMask() { // object_gi_skj_mask (OoT-unique)
