@@ -18,6 +18,7 @@
 #define COMBO_ITEM_DRAW_OOT_H
 
 #include "ComboItemDrawABI.h"
+#include "ComboLiveCosmetics.h"
 #include "ComboExport.h"
 #include "ComboMaskShimmer.h"
 #include "libultraship/bridge.h" // CVarGetInteger / CVarGetColor24 (cosmetic key/nut colors)
@@ -46,6 +47,7 @@
 #include "objects/object_sst/object_sst.h"
 #include "objects/object_tw/object_tw.h"
 #include "objects/object_ganon2/object_ganon2.h"
+#include "objects/object_bv/object_bv.h"               // Barinade's procedural skeletal model
 #include "objects/object_mo/object_mo.h"               // non-skeletal Morpha core model
 #include "overlays/actors/ovl_Boss_Goma/z_boss_goma.h" // BOSSGOMA_LIMB_EYE / BOSSGOMA_LIMB_IRIS
 
@@ -300,19 +302,26 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             "gCosmetics.Key.SpiritBoss", "gCosmetics.Key.ShadowBoss", "gCosmetics.Key.GanonsBoss",
         };
         int slot = rg - RG_FOREST_TEMPLE_BOSS_KEY;
+        out->stateDependent = 2;
         out->dlistCount = 2;
         out->xluStartIndex = 1;
-        if (!customKeys) { // vanilla models; the func's optional grayscale recolor is dropped
-            out->drawKind = CW_DRAW_KIND_SIMPLE;
+        if (!customKeys) {
+            out->drawKind = CW_DRAW_KIND_GRAYSCALE_LAYERS;
             out->dlists[0] = gGiBossKeyDL;
             out->dlists[1] = gGiBossKeyGemDL;
+            if (CVarGetInteger((std::string(cvars[slot]) + "Body.Changed").c_str(), 0))
+                CwLayerPrim(out, 0,
+                            CwLiveCosmeticColor((std::string(cvars[slot]) + "Body.Value").c_str(), { 255, 255, 0 }));
+            if (CVarGetInteger((std::string(cvars[slot]) + "Gem.Changed").c_str(), 0))
+                CwLayerPrim(out, 1,
+                            CwLiveCosmeticColor((std::string(cvars[slot]) + "Gem.Value").c_str(), { 255, 0, 0 }));
             return 1;
         }
         out->drawKind = CW_DRAW_KIND_COLOR_LAYERS;
         out->dlists[0] = gBossKeyCustomDL;
         out->dlists[1] = icons[slot];
-        CwLayerEnv(out, 0, CVarGetColor24((std::string(cvars[slot]) + "Body.Value").c_str(), { 255, 255, 0 }));
-        CwLayerEnv(out, 1, CVarGetColor24((std::string(cvars[slot]) + "Gem.Value").c_str(), { 255, 0, 0 }));
+        CwLayerEnv(out, 0, CwLiveCosmeticColor((std::string(cvars[slot]) + "Body.Value").c_str(), { 255, 255, 0 }));
+        CwLayerEnv(out, 1, CwLiveCosmeticColor((std::string(cvars[slot]) + "Gem.Value").c_str(), { 255, 0, 0 }));
         return 1;
     }
 
@@ -325,16 +334,20 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             gSmallKeyIconTreasureChestGameDL,
         };
         int slot = rg - RG_FOREST_TEMPLE_SMALL_KEY;
-        if (!customKeys) { // vanilla key; the func's grayscale recolor is dropped
-            return CwSimple(out, gGiSmallKeyDL, false, 0.0f);
+        out->stateDependent = 2;
+        if (!customKeys) {
+            CwSimple(out, gGiSmallKeyDL, false, 0.0f);
+            out->drawKind = CW_DRAW_KIND_GRAYSCALE_LAYERS;
+            CwLayerPrim(out, 0, CwLiveCosmeticColor(SmallBodyCvarValue[slot], { 255, 255, 255 }));
+            return 1;
         }
         out->drawKind = CW_DRAW_KIND_COLOR_LAYERS;
         out->dlistCount = 2;
         out->xluStartIndex = 1;
         out->dlists[0] = gSmallKeyCustomDL;
         out->dlists[1] = icons[slot];
-        CwLayerEnv(out, 0, CVarGetColor24(SmallBodyCvarValue[slot], { 255, 255, 255 }));
-        CwLayerEnv(out, 1, CVarGetColor24(SmallEmblemCvarValue[slot], SmallEmblemDefaultValue[slot]));
+        CwLayerEnv(out, 0, CwLiveCosmeticColor(SmallBodyCvarValue[slot], { 255, 255, 255 }));
+        CwLayerEnv(out, 1, CwLiveCosmeticColor(SmallEmblemCvarValue[slot], SmallEmblemDefaultValue[slot]));
         return 1;
     }
 
@@ -365,8 +378,12 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             Rando::GANONS_CASTLE, (Rando::DungeonKey)0,
         };
         int slot = rg - RG_FOREST_TEMPLE_KEY_RING;
+        out->stateDependent = 2;
         if (!customKeys) { // the vanilla path stacks five keys via matrix chaining — not portable
-            return CwSimple(out, gGiSmallKeyDL, false, 0.0f);
+            CwSimple(out, gGiSmallKeyDL, false, 0.0f);
+            out->drawKind = CW_DRAW_KIND_GRAYSCALE_LAYERS;
+            CwLayerPrim(out, 0, CwLiveCosmeticColor(SmallBodyCvarValue[slot], { 255, 255, 255 }));
+            return 1;
         }
         bool mq = slotDungeon[slot] != 0 && Rando::Context::GetInstance()->GetDungeon(slotDungeon[slot])->IsMQ();
         out->drawKind = CW_DRAW_KIND_COLOR_LAYERS;
@@ -375,9 +392,9 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
         out->dlists[0] = mq ? keysMQ[slot] : keys[slot];
         out->dlists[1] = gKeyringRingDL;
         out->dlists[2] = icons[slot];
-        CwLayerEnv(out, 0, CVarGetColor24(SmallBodyCvarValue[slot], { 255, 255, 255 }));
-        CwLayerEnv(out, 1, CVarGetColor24(CVAR_COSMETIC("Key.KeyringRing.Value"), { 255, 255, 255 }));
-        CwLayerEnv(out, 2, CVarGetColor24(SmallEmblemCvarValue[slot], SmallEmblemDefaultValue[slot]));
+        CwLayerEnv(out, 0, CwLiveCosmeticColor(SmallBodyCvarValue[slot], { 255, 255, 255 }));
+        CwLayerEnv(out, 1, CwLiveCosmeticColor(CVAR_COSMETIC("Key.KeyringRing.Value"), { 255, 255, 255 }));
+        CwLayerEnv(out, 2, CwLiveCosmeticColor(SmallEmblemCvarValue[slot], SmallEmblemDefaultValue[slot]));
         return 1;
     }
 
@@ -703,6 +720,8 @@ static bool OOT_IsStateDependentDraw(RandomizerGet rg) {
 extern "C" int32_t NeiGi_DescribeEntry(const GetItemEntry* entry, CwItemDrawInfo* out);
 
 extern "C" int32_t OOT_MagicJarUsesCustomAsset(const char* path);
+extern "C" int32_t OOT_ApplyGiHeartCosmetics(const char* path, int32_t piece, uint8_t r, uint8_t g, uint8_t b,
+                                             int32_t changed);
 
 // Match native GetItem_DrawDListWithCosmetics for custom magic jars. The donor
 // owns both the Alt classification and cosmetic value; the host only submits it.
@@ -712,11 +731,29 @@ static void OOT_DescribeMagicJar(s16 drawId, CwItemDrawInfo* out) {
     out->drawKind = CW_DRAW_KIND_MAGIC_JAR;
     out->stateDependent = 2; // live cosmetic edits and Alt toggles must re-resolve
     if (CVarGetInteger(CVAR_COSMETIC("Consumable.Magic.Changed"), 0) && OOT_MagicJarUsesCustomAsset(out->dlists[0])) {
-        const Color_RGB8 color = CVarGetColor24(CVAR_COSMETIC("Consumable.Magic.Value"), { 0, 200, 0 });
+        const Color_RGB8 color = CwLiveCosmeticColor(CVAR_COSMETIC("Consumable.Magic.Value"), { 0, 200, 0 });
         out->primColorOpa[0] = color.r;
         out->primColorOpa[1] = color.g;
         out->primColorOpa[2] = color.b;
         out->primColorOpa[3] = 255;
+    }
+}
+
+// Keep the border pass independent. The native body uses the editor's own
+// prim/env patch IDs; selected custom bodies use the accepted grayscale scope.
+static void OOT_DescribeHeartCosmetics(s16 drawId, CwItemDrawInfo* out) {
+    if (drawId != GID_HEART_PIECE && drawId != GID_HEART_CONTAINER)
+        return;
+    out->stateDependent = 2;
+    if (out->dlistCount < 2)
+        return;
+    const Color_RGB8 color = CwLiveCosmeticColor(CVAR_COSMETIC("Consumable.Hearts.Value"), { 255, 70, 50 });
+    const int32_t changed = CVarGetInteger(CVAR_COSMETIC("Consumable.Hearts.Changed"), 0);
+    const int32_t custom =
+        OOT_ApplyGiHeartCosmetics(out->dlists[1], drawId == GID_HEART_PIECE, color.r, color.g, color.b, changed);
+    if (custom && changed) {
+        out->drawKind = CW_DRAW_KIND_GRAYSCALE_LAYERS;
+        CwLayerPrim(out, 1, color);
     }
 }
 
@@ -802,6 +839,7 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     out->setupDlOpa = setupOpa;
     out->setupDlXlu = setupXlu;
     OOT_DescribeMagicJar((s16)gi.gid, out);
+    OOT_DescribeHeartCosmetics((s16)gi.gid, out);
     uint8_t nativeShimmerColor[4] = {};
     if (GetItem_GetShimmerColor((s16)gi.gid, nativeShimmerColor)) {
         out->itemShimmer = 1;
@@ -960,7 +998,7 @@ static void OOT_AnimLimbEnv(CwItemAnimDrawInfo* out, int32_t from, int32_t to, u
 
 // ComboShip (issue #86): the boss souls' REAL boss skeletons, described for MM to render through
 // combo/menu/ComboForeignAnim.h. 1:1 with DrawGohma/DrawKingDodongo/... in soh/.../randomizer/
-// draw.cpp. Barinade's per-limb rotation/scale surgery and XLU post pass exceed the skeletal ABI.
+// draw.cpp. Barinade carries its native procedural profile and frozen clip pose.
 // Morpha has no skeleton and is served by its native core display lists through the static ABI.
 static bool OOT_BossSoulUsesSkeleton(RandomizerGet rg) {
     if (rg < RG_GOHMA_SOUL || rg > RG_GANON_SOUL ||
@@ -968,7 +1006,7 @@ static bool OOT_BossSoulUsesSkeleton(RandomizerGet rg) {
         return false;
     }
     int slot = (int)rg - (int)RG_GOHMA_SOUL;
-    return slot != 2 && slot != 5; // Barinade / Morpha
+    return slot != 5; // Morpha uses the static core route.
 }
 
 static int32_t OOT_FillBossSoulAnim(int slot, CwItemAnimDrawInfo* out) {
@@ -996,6 +1034,18 @@ static int32_t OOT_FillBossSoulAnim(int slot, CwItemAnimDrawInfo* out) {
             out->nonFlexSkeleton = 1;
             out->translatePre[1] = -20.0f;
             out->scale = 0.003f;
+            return 1;
+        case 2: // Barinade
+            out->skelPath = gBarinadeBodySkel;
+            out->animPath = gBarinadeBodyAnim;
+            out->limbCount = 64;
+            out->nonFlexSkeleton = 1;
+            out->translatePre[1] = -25.0f;
+            out->scale = 0.03f;
+            out->proceduralProfile = CW_ANIM_PROFILE_OOT_BARINADE;
+            out->proceduralDlPaths[0] = gBarinadeDL_008D70;
+            out->proceduralDlPaths[1] = gBarinadeDL_008BB8;
+            out->freezeLastFrame = 1;
             return 1;
         case 3: // Phantom Ganon
             out->skelPath = gPhantomGanonSkel;
@@ -1063,9 +1113,12 @@ static int32_t OOT_FillBossSoulAnim(int slot, CwItemAnimDrawInfo* out) {
             s9->height1 = 64;
             s9->yStep1 = 1;
             s9->yMask1 = 0xFF;
-            CwAnimLimbDL* l = &out->limbDLs[out->limbDLCount++]; // head swap + XLU ice hair (slot 0)
+            // A custom skeleton keeps its authored head. The native ice-hair
+            // post-pass remains active, with its owning Alt model/materials.
+            CwAnimLimbDL* l = &out->limbDLs[out->limbDLCount++];
             l->limbIndex = 21;
-            l->dlPath = gTwinrovaKotakeHeadDL;
+            if (!OOT_MagicJarUsesCustomAsset(gTwinrovaKotakeSkel))
+                l->dlPath = gTwinrovaKotakeHeadDL;
             l->postDlPath = gTwinrovaKotakeIceHairDL;
             l->postXlu = 1;
             return 1;

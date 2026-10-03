@@ -17,9 +17,14 @@ baseline. New candidate tests are command tests, not new game acceptance.
 | Slate and runes | Authored slate mesh and native rune flame colors |
 | Scepters, hourglass, shadow crystal | Authored static/split recipes rather than unsupported-callback sentinel |
 | Actions | Existing crawl/climb/open-chest/grab GI recipes retained; no standalone `RG_SWIM` exists, swimming uses scale ownership |
+| Barinade | Native frozen skeletal pose, procedural tentacle rotations/scales, electric/ring/translucent passes and MM-owned soul flame, including selected compatible Alt models |
+| Twinrova | Selected model and native flying clip; custom head geometry preserved with native ice-hair/scroll post-pass |
+| Native MM imported OoT souls | All nine imports query the same donor model recipes by exact item name instead of always drawing a skull; unavailable owner/module retains retry/fallback |
 | Morpha foreign OoT GI | Actual membrane/nucleus, native rotation/scroll/color, MM native flame; selected owner Alt paths |
-| MM souls rendered in OoT | Goht, Gyorg, Odolwa actual skeleton/clip exports; native MM behavior retained |
+| MM souls rendered in OoT | All four native boss GI models/clips/flames, including Twinmold head/skin and normal/flex matrix support |
 | Bean pack icon | Explicit magic-bean texture binding, avoiding randomizer/native itemId collision |
+| Keys | Live OoT key body/emblem hex and rainbow sampling from MM frames; Well/Shadow settings remain separate; native grayscale scopes and acquisition latch refresh |
+| Heart pieces/containers | Native OoT editor material patches; custom body-only grayscale with untinted border, including both-XLU models; live colors after acquisition |
 | RPG magic jar | OoT cosmetic color carried with custom selected-asset classification; MM submits native-equivalent grayscale scope, refreshes after acquisition latch |
 
 See `boss-soul-model-routes-20261003.md` for all nine OoT/four MM boss routes
@@ -31,7 +36,13 @@ uses procedural rotations/scrolling, not a skeletal clip or native bobbing.
 Production-body tests cover the draw descriptor, actual award resolution,
 owner Alt selection, routing validation, custom submission, inline axe draw,
 mask/remains dispatch, exact shimmer mesh, C/C++ linkage, Morpha/MM soul recipes,
-native MM flame, icon staging, and magic cosmetic/latch behavior. Focused suites
+native MM flame, icon staging, and magic/key/heart cosmetic and latch behavior. Boss checks cover native Barinade
+callbacks, electric/ring/translucent effects, matching native headers, custom
+Twinrova head plus ice hair, all nine imported routes and matrix restoration.
+Resource reload tests reproduce and fix pointer-address aliasing in limb paths.
+Key tests compare the actual native rainbow tick against the bridge sampler,
+including phase wrap and synchronization; heart tests check donor patch IDs,
+reset and both-XLU consumer border/body grayscale separation. Focused suites
 pass normally and under ASan/UBSan with leak detection disabled because the
 container cannot inspect `/proc` for LeakSanitizer.
 
@@ -46,13 +57,6 @@ a C return-type mismatch, and metadata-only Alt magic aliases. No grant/action g
 - TP boss archive retrieval returned HTTP 502 twice; exact installed custom
   model/skeleton mappings remain unverified. Owner canonical Alt routes are
   preserved rather than inventing resource names.
-- Barinade foreign animated geometry requires per-limb scale/rotation and
-  post-XLU handling beyond the current descriptor. Its skull fallback remains.
-- Twinmold foreign animation needs its separate 23-matrix segment-13 binding;
-  its existing remains alias remains. Native MM Twinmold behavior is unchanged.
-- Native MM imported `RI_SOUL_OOT_BOSS_*` rows retain their existing generic
-  skull path; this change targets the foreign OoT GI route used for custom
-  boss/equipment checks.
 - Frozen sword award recipes retain the selected Alt appearance until cache
   reset. Live Alt toggles during a latched progressive award are not proven.
 - The requested death-skull texture swap is not implemented. The supplied
@@ -64,7 +68,22 @@ a C return-type mismatch, and metadata-only Alt magic aliases. No grant/action g
   run separately; this is not a full-suite pass claim.
 
 Runtime acceptance should compare Alt off/on with the same pack/load order:
-Morpha vs accepted Volvagia; each progressive sword family; Seasons/runes;
+Barinade/electric effects and Twinrova/ice hair, Morpha vs accepted Volvagia; each progressive sword family; Seasons/runes;
 scepters/hourglass/crystal/equipment; mask transformation hex and shimmer;
-bean icon; RPG magic color; blue potion and blue fire regression checks.
-No master promotion is part of this candidate.
+bean icon; RPG magic color; Well/Shadow key hex/rainbow; heart piece/container
+body and border colors; blue potion and blue fire regression checks.
+Native Twinmold also uses the shared selected-asset route in MM, retaining its
+native flame phase. The intended presentations match the native GIs (Twinmold
+head, Morpha core, Volvagia head), with their special effects. Rebuild both
+modules together for the appended skeletal ABI. No master promotion is part of
+this candidate.
+
+## Bridge review on October 3
+
+Final review found and corrected two integration issues in the dormant-owner
+asset classifier: its translation unit now includes ResourceManagerScope, and
+exact root loads run inside the owner scope so skeleton factories load nested
+limbs through OoT rather than the active MM resource manager. The focused static
+GI regression failed on that ownership boundary before the fix and passes
+normally and with ASan/UBSan afterward. Magic, sisters and heart checks pass.
+Full application build remains pending; no runtime acceptance is inferred.

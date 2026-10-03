@@ -51,6 +51,25 @@ void DrawOotNeiCaneOfSomaria(RandoItemId skill);
 void DrawOotNeiUltrahand();
 #include "ComboForeignDrawMM.h"
 
+extern "C" int32_t MM_GetItemAnimDrawInfo(const char* itemName, CwItemAnimDrawInfo* out);
+
+// Native MM and the foreign bridge use one selected-asset route for Twinmold's
+// head GI, including flex replacement matrices, blue skin and native soul flame.
+extern "C" int32_t ComboDrawNativeTwinmoldSoul() {
+    if (gPlayState == nullptr) {
+        return 0;
+    }
+    CwItemAnimDrawInfo info{};
+    const std::string& name = Rando::StaticData::GetItemDisplayName(RI_SOUL_BOSS_TWINMOLD);
+    if (MM_GetItemAnimDrawInfo(name.c_str(), &info) != 1) {
+        return 0;
+    }
+    Matrix_Push();
+    const int32_t drawn = ComboForeignAnim_Draw(&info, "mm", gPlayState);
+    Matrix_Pop();
+    return drawn;
+}
+
 extern "C" void Message_StageCustomItemIconEx(void* tex, s16 width, s16 height, u8 isIA8);
 
 uint8_t Rando::ComboForeignMessageIcon(RandoCheckId check) {
@@ -657,9 +676,13 @@ void DrawOotBeanSoul() {
     DrawOotGetItemOpa("__OTR__objects/object_gi_bean/gGiBeanDL", &sCache);
 }
 
-// Native MM soul flame, tinted per OoT boss, plus the NEI skull from 2ship.o2r.
-// The effect can draw independently while the custom skull archive becomes ready.
+// Prefer the owning OoT model/animation recipe for imported boss souls. The
+// standalone fallback can draw its flame/skull while the OoT module is unavailable.
 void DrawOotBossSoul(RandoItemId randoItemId) {
+#ifdef COMBO_BUILD
+    if (MM_TryDrawOotBossSoul(randoItemId))
+        return;
+#endif
     static Gfx* sSkull = NULL;
     if (sSkull == NULL) {
         sSkull = ResourceMgr_LoadGfxByName("__OTR__objects/object_boss_soul/gGIBossSoulSkullDL");

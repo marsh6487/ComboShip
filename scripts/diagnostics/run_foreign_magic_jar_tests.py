@@ -26,6 +26,7 @@ constexpr int GID_MAGIC_SMALL=1, GID_MAGIC_LARGE=2;
 bool changed=false, custom=false, loaded=false;
 int CVarGetInteger(const char*,int) {return changed;}
 Color_RGB8 CVarGetColor24(const char*,Color_RGB8) {return {230,93,171};}
+Color_RGB8 CwLiveCosmeticColor(const char*,Color_RGB8) {return {230,93,171};}
 int32_t OOT_MagicJarUsesCustomAsset(const char*) {loaded=true;return custom;}
 void grayColor(Gfx*p,uint8_t r,uint8_t g,uint8_t b) {*p={1,r,g,b};}
 #define gDPSetGrayscaleColor(p,r,g,b,a) grayColor(p,r,g,b)

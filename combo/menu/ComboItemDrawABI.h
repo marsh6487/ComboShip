@@ -68,6 +68,7 @@ typedef enum {
     CW_DRAW_KIND_MAGIC_JAR = 33,            /* OoT magic jar: custom Alt grayscale tint carried in primColorOpa */
     CW_DRAW_KIND_CUSTOM_GI = 31,            /* OoT custom: spin, ops transforms, scale, OPA/XLU; primColorOpa grayscale,
                                          primColorXlu weapon flame; alpha zero disables each independent tint/effect. */
+    CW_DRAW_KIND_GRAYSCALE_LAYERS = 35,     /* per-DL grayscale layerPrimMask/colors; OPA/XLU split */
     CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT = 34, /* concrete static award; ops[0] native equipment selector */
 } CwDrawKind;
 
@@ -181,6 +182,13 @@ typedef struct {
     int32_t width, height; /* logical pixels, independent of high-resolution replacements */
     int32_t isIA8;         /* zero = RGBA32 */
 } CwItemIconInfo;
+// Resource-only editor sampling for foreign GI presentation. Host frames advance only
+// the sampling clock; no dormant native frame, game state or cosmetic patch loop runs.
+void OOT_SetGiCosmeticFrame(uint32_t hostFrame);
+void OOT_SampleGiCosmeticColor(const char* valueCvar, uint8_t fallbackR, uint8_t fallbackG, uint8_t fallbackB,
+                               uint8_t* outRGB);
+typedef void (*Fn_SetGiCosmeticFrame)(uint32_t hostFrame);
+
 typedef int32_t (*Fn_GetItemIconInfo)(const char* itemName, CwItemIconInfo* out);
 // Uses the registered asset owner and its Alt mode; no engine state crosses.
 typedef int32_t (*Fn_NeiResourceExists)(const char* path);
@@ -270,6 +278,12 @@ typedef struct {
 #define CW_ANIM_MAX_LIMB_COLORS 6
 #define CW_ANIM_MAX_LIMB_DLS 4
 
+typedef enum {
+    CW_ANIM_PROFILE_NONE = 0,
+    CW_ANIM_PROFILE_OOT_BARINADE,
+    CW_ANIM_PROFILE_MM_TWINMOLD,
+} CwAnimProceduralProfile;
+
 /* ComboShip: animated variant — the owner describes a skeletal item and ComboForeignAnim.h loads it
  * via the owner's RM and drives the host's SkelAnime. APPEND-ONLY (POD C ABI, two DLLs). */
 typedef struct {
@@ -313,6 +327,10 @@ typedef struct {
     CwAnimSegBind flameSeg;
     /* 1 = recipe depends on live state (e.g. OOT's SimplerBossSoulModels CVar) — do not cache. */
     int32_t stateDependent;
+    /* Native procedural limb surgery; appended without changing existing record offsets. */
+    int32_t proceduralProfile;        /* CwAnimProceduralProfile */
+    const char* proceduralDlPaths[2]; /* Barinade: limb-25 ring and limbs-10..19 electric XLU DLs */
+    int32_t freezeLastFrame;          /* 1 = initialize the selected animation at its last frame, once mode */
 } CwItemAnimDrawInfo;
 typedef int32_t (*Fn_GetItemAnimDrawInfo)(const char* itemName, CwItemAnimDrawInfo* out);
 

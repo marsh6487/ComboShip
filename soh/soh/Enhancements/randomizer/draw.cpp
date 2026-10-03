@@ -2,6 +2,7 @@
 #include "soh/frame_interpolation.h"
 #ifdef COMBO_BUILD
 #include "ComboItemDrawABI.h"
+extern "C" int32_t OOT_MagicJarUsesCustomAsset(const char* path);
 #endif
 #include "soh/OTRGlobals.h"
 #include <vector>
@@ -922,9 +923,13 @@ extern "C" void DrawBongoBongo(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+// Native head surgery applies only to the native rig; replacement skeletons
+// provide their own sisters geometry. Updated before this GI skeleton draw.
+static bool sKotakeGiCustomSkeleton = false;
+
 extern "C" s32 OverrideLimbDrawKotake(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
                                       void* thisx) {
-    if (limbIndex == 21) { // Head
+    if (limbIndex == 21 && !sKotakeGiCustomSkeleton) { // Head
         *dList = (Gfx*)gTwinrovaKotakeHeadDL;
     }
 
@@ -945,6 +950,9 @@ extern "C" void PostLimbDrawKotake(PlayState* play, s32 limbIndex, Gfx** dList, 
 
 #define LIMB_COUNT_KOTAKE 27
 extern "C" void DrawKotake(PlayState* play) {
+    const auto selectedSkeleton = ResourceMgr_GetResourceByNameHandlingMQ(gTwinrovaKotakeSkel);
+    sKotakeGiCustomSkeleton =
+        selectedSkeleton && selectedSkeleton->GetInitData() && selectedSkeleton->GetInitData()->IsCustom;
     static bool initialized = false;
     static SkelAnime skelAnime;
     static Vec3s jointTable[LIMB_COUNT_KOTAKE];

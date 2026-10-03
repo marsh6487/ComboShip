@@ -102,9 +102,10 @@ inline const char* ComboInternRoutedPathOOT(const std::string& s) {
 // not resident, OOT's rando context null while dormant), which must NEVER be negative-cached.
 enum class ComboForeignResolveOOT { Ok, Unknown, NotReady };
 
-inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, ComboForeignDrawInfoOOT& info) {
-    const ComboRando::ForeignItem* fi = Rando::MiscBehavior::MM_LookupForeign(rc);
-    if (fi == nullptr || fi->itemGame != ComboRando::GAME_OOT) {
+inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, ComboForeignDrawInfoOOT& info,
+                                                          const char* namedItem = nullptr) {
+    const ComboRando::ForeignItem* fi = namedItem ? nullptr : Rando::MiscBehavior::MM_LookupForeign(rc);
+    if (!namedItem && (fi == nullptr || fi->itemGame != ComboRando::GAME_OOT)) {
         return ComboForeignResolveOOT::Unknown;
     }
 
@@ -116,9 +117,15 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     if (sGetItemDrawInfo == nullptr) {
         return ComboForeignResolveOOT::NotReady; // soh.dll may simply not be resident yet
     }
+    static Fn_SetGiCosmeticFrame sSetGiCosmeticFrame = nullptr;
+    if (!sSetGiCosmeticFrame)
+        sSetGiCosmeticFrame = (Fn_SetGiCosmeticFrame)Combo_ResolveSym("soh", "OOT_SetGiCosmeticFrame");
+    if (sSetGiCosmeticFrame && gPlayState)
+        sSetGiCosmeticFrame(static_cast<uint32_t>(gPlayState->gameplayFrames));
     // A disguised trap must draw the item it pretends to be. Same namespace, so the itemGame dispatch
     // above is unaffected. Not state-dependent: like OOT, the disguise holds until the get-item cutscene.
-    const char* drawName = fi->HasDisguise() ? fi->fakeItemName.c_str() : fi->itemName.c_str();
+    const char* drawName =
+        namedItem ? namedItem : (fi->HasDisguise() ? fi->fakeItemName.c_str() : fi->itemName.c_str());
     CwItemDrawInfo raw{};
     int32_t rcStatic = sGetItemDrawInfo(drawName, &raw);
     if (rcStatic == CW_DRAW_NOT_READY) {
@@ -743,8 +750,8 @@ inline void MM_DrawForeignMorphaSoul(const ComboForeignDrawInfoOOT* info) {
     DrawOotSoulFlame(play, info->primColorXlu, translate, scale);
     Matrix_Push();
     Matrix_Scale(0.015f, 0.015f, 0.015f, MTXMODE_APPLY);
-    Matrix_RotateX(play->state.frames * 0.1f, MTXMODE_APPLY);
-    Matrix_RotateZ(play->state.frames * 0.16f, MTXMODE_APPLY);
+    Matrix_RotateXF(play->state.frames * 0.1f, MTXMODE_APPLY);
+    Matrix_RotateZF(play->state.frames * 0.16f, MTXMODE_APPLY);
     OPEN_DISPS(gfxCtx);
     Gfx_SetupDL25_Xlu(gfxCtx);
     MM_FOREIGN_PIN_XLU();
@@ -765,6 +772,62 @@ inline void MM_DrawForeignMorphaSoul(const ComboForeignDrawInfoOOT* info) {
     Matrix_Pop();
     const int32_t segs[] = { 8, 9 };
     MM_RestoreForeignSegs(segs, 2);
+}
+
+// Native MM imported boss souls have no foreign check-map entry. Resolve the
+// same OoT model recipe by name so both pickup routes honor OoT's Alt selection,
+// native animation and simplified-model setting.
+inline bool MM_TryDrawOotBossSoul(RandoItemId item) {
+    if (!gPlayState || !Ship::CrossRMRegistry::Get("oot"))
+        return false;
+    const char* name = nullptr;
+    switch (item) {
+        case RI_SOUL_OOT_BOSS_GOHMA:
+            name = "Gohma's Soul";
+            break;
+        case RI_SOUL_OOT_BOSS_KING_DODONGO:
+            name = "King Dodongo's Soul";
+            break;
+        case RI_SOUL_OOT_BOSS_BARINADE:
+            name = "Barinade's Soul";
+            break;
+        case RI_SOUL_OOT_BOSS_PHANTOM_GANON:
+            name = "Phantom Ganon's Soul";
+            break;
+        case RI_SOUL_OOT_BOSS_VOLVAGIA:
+            name = "Volvagia's Soul";
+            break;
+        case RI_SOUL_OOT_BOSS_MORPHA:
+            name = "Morpha's Soul";
+            break;
+        case RI_SOUL_OOT_BOSS_BONGO_BONGO:
+            name = "Bongo Bongo's Soul";
+            break;
+        case RI_SOUL_OOT_BOSS_TWINROVA:
+            name = "Twinrova's Soul";
+            break;
+        case RI_SOUL_OOT_BOSS_GANON:
+            name = "Ganon's Soul";
+            break;
+        default:
+            return false;
+    }
+    ComboForeignDrawInfoOOT info{};
+    if (ComboFillForeignDrawInfoOOT(RC_UNKNOWN, info, name) != ComboForeignResolveOOT::Ok)
+        return false;
+    bool drawn = false;
+    Matrix_Push();
+    if (info.animOk) {
+        drawn = ComboForeignAnim_Draw(&info.anim, "oot", gPlayState) != 0;
+    } else if (info.drawKind == CW_DRAW_KIND_OOT_MORPHA_SOUL) {
+        MM_DrawForeignMorphaSoul(&info);
+        drawn = true;
+    } else if (info.drawKind == CW_DRAW_KIND_BOSS_SOUL) {
+        MM_DrawForeignBossSoul(&info);
+        drawn = true;
+    }
+    Matrix_Pop();
+    return drawn;
 }
 
 // Per-DL prim/env colored layers: the rando map/compass/small-key/boss-key/key-ring/jabber-nut/
@@ -813,6 +876,55 @@ inline void MM_DrawForeignColorLayers(const ComboForeignDrawInfoOOT* info) {
                                info->layerEnvColor[i][2], info->layerEnvColor[i][3]);
             }
             gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[i]);
+        }
+    }
+    CLOSE_DISPS(gfxCtx);
+}
+
+// Per-layer grayscale matches native editor tint scopes without tinting neighboring DLs.
+inline void MM_DrawForeignGrayscaleLayers(const ComboForeignDrawInfoOOT* info) {
+    GraphicsContext* gfxCtx = gPlayState->state.gfxCtx;
+    if (info->scale > 0.0f)
+        Matrix_Scale(info->scale, info->scale, info->scale, MTXMODE_APPLY);
+    const int split = info->xluStart < 0 || info->xluStart > info->count ? info->count : info->xluStart;
+    OPEN_DISPS(gfxCtx);
+    for (int stream = 0; stream < 2; ++stream) {
+        const int begin = stream ? split : 0;
+        const int end = stream ? info->count : split;
+        if (begin >= end)
+            continue;
+        if (stream) {
+            if (info->setupDlXlu)
+                gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->setupDlXlu);
+            else
+                Gfx_SetupDL25_Xlu(gfxCtx);
+            MM_FOREIGN_PIN_XLU();
+            MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
+            for (int i = begin; i < end; ++i) {
+                const bool tint = (info->layerPrimMask & (1 << i)) != 0;
+                if (tint)
+                    gDPSetGrayscaleColor(POLY_XLU_DISP++, info->layerPrimColor[i][0], info->layerPrimColor[i][1],
+                                         info->layerPrimColor[i][2], info->layerPrimColor[i][3]);
+                gSPGrayscale(POLY_XLU_DISP++, tint);
+                gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[i]);
+                gSPGrayscale(POLY_XLU_DISP++, false);
+            }
+        } else {
+            if (info->setupDlOpa)
+                gSPDisplayList(POLY_OPA_DISP++, (Gfx*)info->setupDlOpa);
+            else
+                Gfx_SetupDL25_Opa(gfxCtx);
+            MM_FOREIGN_PIN_OPA();
+            MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
+            for (int i = begin; i < end; ++i) {
+                const bool tint = (info->layerPrimMask & (1 << i)) != 0;
+                if (tint)
+                    gDPSetGrayscaleColor(POLY_OPA_DISP++, info->layerPrimColor[i][0], info->layerPrimColor[i][1],
+                                         info->layerPrimColor[i][2], info->layerPrimColor[i][3]);
+                gSPGrayscale(POLY_OPA_DISP++, tint);
+                gSPDisplayList(POLY_OPA_DISP++, (Gfx*)info->dls[i]);
+                gSPGrayscale(POLY_OPA_DISP++, false);
+            }
         }
     }
     CLOSE_DISPS(gfxCtx);
@@ -1101,6 +1213,9 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
             break;
         case CW_DRAW_KIND_OOT_MORPHA_SOUL:
             MM_DrawForeignMorphaSoul(info);
+            break;
+        case CW_DRAW_KIND_GRAYSCALE_LAYERS:
+            MM_DrawForeignGrayscaleLayers(info);
             break;
         case CW_DRAW_KIND_COLOR_LAYERS:
             MM_DrawForeignColorLayers(info);

@@ -50,6 +50,8 @@ bool ownerPresent=true, hostAlt=false, magicResourcePresent=true, magicLoaded=fa
 bool magicAltPresent=true, magicAltLoads=true, magicAltMetaPresent=false;
 std::vector<std::string> loadedPaths;
 namespace Ship {
+ struct ResourceManager;
+ extern std::shared_ptr<ResourceManager> activeRm;
  struct InitData {bool IsCustom;};
  struct Resource {std::shared_ptr<InitData> init;std::shared_ptr<InitData> GetInitData(){return init;}};
  struct Archive {bool HasFile(const std::string& path) {if(path=="alt/magic")return magicAltPresent;assert(path=="alt/magic.meta");return magicAltMetaPresent;}};
@@ -57,6 +59,9 @@ namespace Ship {
   bool owner;bool IsAltAssetsEnabled() {return owner?ownerAlt:hostAlt;}
   std::shared_ptr<Archive> GetArchiveManager() {assert(owner);return std::make_shared<Archive>();}
   std::shared_ptr<Resource> LoadResource(const std::string& path,bool exact) {
+   // Skeleton factories resolve nested limbs through the active context RM,
+   // even when the root is loaded directly from the registered owner.
+   assert(activeRm.get()==this && "nested factory loads must use the root resource owner");
    assert(owner && exact);magicLoaded=true;loadedPaths.push_back(path);
    if(!magicResourcePresent || (path=="alt/magic" && !magicAltLoads))return nullptr;
    return std::make_shared<Resource>(Resource{std::make_shared<InitData>(InitData{path=="alt/magic"})});
@@ -80,6 +85,7 @@ void Seasons_SeasonColor(uint8_t season,uint8_t* r,uint8_t* g,uint8_t* b) {
  *r=colors[season][0];*g=colors[season][1];*b=colors[season][2];
 }
 /* OWNER_HELPERS */
+void OOT_DescribeHeartCosmetics(s16,CwItemDrawInfo*) {}
 void OOT_DescribeMagicJar(s16,CwItemDrawInfo*) {} // Magic policy is exercised by its own fixture.
 /* OWNER_DESCRIPTOR */
 /* HOST_INFO */
@@ -104,11 +110,11 @@ int32_t Describe(const char*,CwItemDrawInfo* out) {
 void* Combo_ResolveSym(const char*,const char* name) {return !strcmp(name,"OOT_GetItemDrawInfo")?(void*)Describe:nullptr;}
 const char* ComboInternRoutedPathOOT(const std::string& path) {static std::set<std::string> pool;return pool.insert(path).first->c_str();}
 enum class ComboForeignResolveOOT {Ok,Unknown,NotReady};
-/* HOST_RESOLVER */
 struct Gfx {int stream;};Gfx opa[64],xlu[64];
 struct GraphicsContext {Gfx* o=opa;Gfx* x=xlu;} gfx;
 struct PlayState {struct {GraphicsContext* gfxCtx=&gfx;int frames=0;} state;int gameplayFrames=9;} play;
 PlayState* gPlayState=&play;
+/* HOST_RESOLVER */
 std::vector<std::pair<int,std::string>> submitted;
 std::vector<std::string> transforms;
 std::vector<std::vector<int>> flames;

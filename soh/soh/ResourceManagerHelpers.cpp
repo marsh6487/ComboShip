@@ -27,6 +27,7 @@
 // ComboShip: audio loads pinned to OOT's own RM — the audio thread races active-RM swaps
 // (ResourceManagerScope) made on other threads.
 #include <ship/resource/CrossRMRegistry.h>
+#include <ship/resource/ResourceManagerScope.h>
 #define COMBO_OWN_RM() (Ship::CrossRMRegistry::GetOrActive("oot"))
 #else
 #define COMBO_OWN_RM() (Ship::Context::GetRawInstance()->GetResourceManager())
@@ -916,6 +917,9 @@ extern "C" COMBO_EXPORT int32_t OOT_MagicJarUsesCustomAsset(const char* path) {
     const auto owner = Ship::CrossRMRegistry::Get("oot");
     if (!path || !owner)
         return 0;
+    // Factories may load dependencies through Context's active resource manager.
+    // Keep those nested loads with the root owner, including Alt fallback.
+    Ship::ResourceManagerScope scope(owner);
     std::string base = path;
     if (base.compare(0, 7, "__OTR__") == 0)
         base.erase(0, 7);
@@ -931,6 +935,28 @@ extern "C" COMBO_EXPORT int32_t OOT_MagicJarUsesCustomAsset(const char* path) {
     if (!resource && selected != base)
         resource = owner->LoadResource(base, true);
     return resource && resource->GetInitData() && resource->GetInitData()->IsCustom;
+}
+
+// Native heart material offsets are owned by the Cosmetic Editor. Custom
+// geometry receives a draw tint instead, so those offsets never touch an Alt DL.
+extern "C" COMBO_EXPORT int32_t OOT_ApplyGiHeartCosmetics(const char* path, int32_t piece, uint8_t r, uint8_t g,
+                                                          uint8_t b, int32_t changed) {
+    const auto owner = Ship::CrossRMRegistry::Get("oot");
+    if (!path || !owner)
+        return 0;
+    if (OOT_MagicJarUsesCustomAsset(path))
+        return 1;
+    Ship::ResourceManagerScope scope(owner);
+    const char* primPatch = piece ? "Consumable_Hearts5" : "Consumable_Hearts7";
+    const char* envPatch = piece ? "Consumable_Hearts6" : "Consumable_Hearts8";
+    if (changed) {
+        ResourceMgr_PatchGfxByName(path, primPatch, 2, gsDPSetPrimColor(0, 0, r, g, b, 255));
+        ResourceMgr_PatchGfxByName(path, envPatch, 6, gsDPSetEnvColor(r / 2, g / 2, b / 2, 255));
+    } else {
+        ResourceMgr_UnpatchGfxByName(path, primPatch);
+        ResourceMgr_UnpatchGfxByName(path, envPatch);
+    }
+    return 0;
 }
 
 // Typed resource-only query for native MM. The owner may be inactive; never

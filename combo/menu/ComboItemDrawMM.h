@@ -69,6 +69,7 @@
 #include "objects/object_fr/object_fr.h"                          // Minifrog
 #include "objects/object_boss_hakugin/object_boss_hakugin.h"      // Goht soul
 #include "objects/object_boss03/object_boss03.h"                  // Gyorg soul
+#include "objects/object_boss02/object_boss02.h"                  // Twinmold soul
 #include "objects/object_boss01/object_boss01.h"                  // Odolwa soul
 
 // Portable slice of one sDrawItemTable row (defined in mm/src/code/z_draw.c). outDrawKind is a
@@ -542,8 +543,8 @@ static int32_t MM_FillEnemySoulDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
 
 // GID aliasing: items with no table row of their own (GID_NONE) whose real draw func is a bespoke
 // SkelAnime routine, mapped to a stand-in table row so they get a recognizable model instead of the
-// sentinel. Boss souls -> the matching boss remains (Majora has none -> Twinmold's); the four
-// minifrogs -> Don Gero's frog mask (their per-frog env color is not carried).
+// sentinel. Animated boss souls and minifrogs are intercepted before this legacy fallback;
+// Majora still aliases Twinmold's remains because its distinct material route is not described.
 static int32_t MM_FillGidAliasDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     s32 gid;
     switch (id) {
@@ -717,7 +718,7 @@ static void MM_AnimSoulFlame(CwItemAnimDrawInfo* out, const uint8_t rgb[3], floa
 
 // Native MM boss models whose draw routines fit the existing skeletal ABI. Canonical
 // paths are loaded through MM's RM, including its own Alt selection and vanilla fallback.
-// Twinmold's separate segment-13 matrix array is not described by this ABI; retain its alias.
+// Twinmold uses its native head rig/clip and a dedicated initialized matrix-13 profile.
 static int32_t MM_FillBossSoulAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
     uint8_t flame[3];
     float flameSize;
@@ -753,12 +754,25 @@ static int32_t MM_FillBossSoulAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
             flame[2] = 133;
             flameSize = 25.0f;
             break;
+        case RI_SOUL_BOSS_TWINMOLD:
+            out->skelPath = gTwinmoldHeadSkel;
+            out->animPath = gTwinmoldHeadFlyAnim;
+            out->limbCount = TWINMOLD_HEAD_LIMB_MAX;
+            out->nonFlexSkeleton = 1;
+            out->scale = 0.06f;
+            out->proceduralProfile = CW_ANIM_PROFILE_MM_TWINMOLD;
+            flame[0] = 168;
+            flame[1] = 180;
+            flame[2] = 20;
+            flameSize = 3.0f;
+            MM_AnimTexSeg(out, 8, gTwinmoldBlueSkinTex);
+            break;
         default:
             return 0;
     }
     out->opa = 1;
     out->hiddenLimb = -1;
-    out->translatePre[1] = -20.0f;
+    out->translatePre[1] = id == RI_SOUL_BOSS_TWINMOLD ? 0.0f : -20.0f;
     MM_AnimSoulFlame(out, flame, flameSize, flameSize, flameSize);
     return 1;
 }

@@ -47,6 +47,7 @@ int NeiGi_DescribeEntry(const GetItemEntry*,CwItemDrawInfo*) {return 0;}
 int GetItem_GetDrawTableEntry(int,void**,int,int*,float*,int*,uint8_t*) {++nativeRows;return 0;}
 void GetItem_GetDrawSetupDLs(int,void**,void**) {}
 int GetItem_GetShimmerColor(s16,uint8_t*) {return 0;}
+void OOT_DescribeHeartCosmetics(s16,CwItemDrawInfo*) {}
 void OOT_DescribeMagicJar(s16,CwItemDrawInfo*) {}
 int CwAltSwordGi(RandomizerGet,CwItemDrawInfo*) {return 0;} // Static weapon policy is exercised separately.
 /* OWNER_DESCRIPTOR */
@@ -82,17 +83,17 @@ void* Combo_ResolveSym(const char*,const char* name) {
 }
 const char* ComboInternRoutedPathOOT(const std::string& path) {static std::set<std::string> paths;return paths.insert(path).first->c_str();}
 enum class ComboForeignResolveOOT {Ok,Unknown,NotReady};
-/* HOST_RESOLVER */
 constexpr int RC_UNKNOWN=-1;
 struct {int fileNum=0;} gSaveContext;
 namespace Rando::MiscBehavior {uint64_t ComboRandoGen() {return 1;}}
-/* HOST_CACHE */
 struct Gfx {int stream;};
 Gfx opa[64],xlu[64];
 struct GraphicsContext {Gfx* o=opa;Gfx* x=xlu;};
 GraphicsContext gfx;
-struct PlayState {struct {GraphicsContext* gfxCtx=&gfx;} state;};
+struct PlayState {struct {GraphicsContext* gfxCtx=&gfx;} state; int gameplayFrames=0;};
 PlayState play;PlayState* gPlayState=&play;
+/* HOST_RESOLVER */
+/* HOST_CACHE */
 std::vector<std::pair<int,std::string>> submitted;
 std::vector<int> luts;
 #define OPEN_DISPS(g) ((void)(g))

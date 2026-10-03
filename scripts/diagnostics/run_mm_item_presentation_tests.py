@@ -72,6 +72,7 @@ int GetItem_GetDrawTableEntry(int,void** out,int,int*,float*,int*,uint8_t*) {
 }
 void GetItem_GetDrawSetupDLs(int,void**,void**) {}
 int GetItem_GetShimmerColor(s16,uint8_t*) { return 0; }
+void OOT_DescribeHeartCosmetics(s16,CwItemDrawInfo*) {}
 void OOT_DescribeMagicJar(s16,CwItemDrawInfo*) {}
 int CwAltSwordGi(RandomizerGet,CwItemDrawInfo*) {return 0;}
 void ComboMaskShimmerColor(int,uint8_t*) {}

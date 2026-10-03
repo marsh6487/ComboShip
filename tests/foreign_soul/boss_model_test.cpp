@@ -56,8 +56,8 @@ void Matrix_Push() { depth++; }
 void Matrix_Pop() { assert(depth > 0); depth--; }
 void Matrix_Translate(f32, f32, f32, MatrixMode) {}
 void Matrix_Scale(f32, f32, f32, MatrixMode) {}
-void Matrix_RotateX(f32 a, MatrixMode) { rotations.push_back(a); }
-void Matrix_RotateZ(f32 a, MatrixMode) { rotations.push_back(a); }
+void Matrix_RotateXF(f32 a, MatrixMode) { rotations.push_back(a); }
+void Matrix_RotateZF(f32 a, MatrixMode) { rotations.push_back(a); }
 void Matrix_ReplaceRotation(MtxF*) {}
 Mtx* Matrix_Finalize(GraphicsContext*) { return &matrix; }
 void Gfx_SetupDL25_Xlu(GraphicsContext*) {}
@@ -140,15 +140,15 @@ int main() {
     }
     simpler = false;
     for (int slot = 0; slot < 9; ++slot) {
-        assert(OOT_BossSoulUsesSkeleton((RandomizerGet)(RG_GOHMA_SOUL + slot)) == (slot != 2 && slot != 5));
+        assert(OOT_BossSoulUsesSkeleton((RandomizerGet)(RG_GOHMA_SOUL + slot)) == (slot != 5));
     }
-    for (auto id : {RI_SOUL_BOSS_GOHT, RI_SOUL_BOSS_GYORG, RI_SOUL_BOSS_ODOLWA}) {
+    for (auto id : {RI_SOUL_BOSS_GOHT, RI_SOUL_BOSS_GYORG, RI_SOUL_BOSS_ODOLWA, RI_SOUL_BOSS_TWINMOLD}) {
         CwItemAnimDrawInfo anim{};
         assert(MM_FillAnimDrawInfo(id, &anim) == 1);
         assert(MM_HasAnimDraw(id));
         assert(anim.opa && anim.skelPath && anim.animPath && anim.flameAfter && anim.flameBillboardFirst);
         assert(!strcmp(anim.flameDlPath, gameplay_keep_DL_01ACF0));
-        assert(anim.translatePre[1] == -20.0f && anim.hiddenLimb == -1);
+        assert(anim.translatePre[1] == (id == RI_SOUL_BOSS_TWINMOLD ? 0.0f : -20.0f) && anim.hiddenLimb == -1);
         if (id == RI_SOUL_BOSS_GOHT) {
             assert(!strcmp(anim.skelPath, gGohtSkel) && !strcmp(anim.animPath, gGohtRunAnim));
             assert(anim.limbCount == GOHT_LIMB_MAX && anim.scale == .005f);
@@ -161,13 +161,19 @@ int main() {
             assert(anim.limbCount == GYORG_LIMB_MAX && anim.scale == .05f && anim.segCount == 0);
             assert(anim.flameColor[0] == 19 && anim.flameColor[1] == 99 && anim.flameColor[2] == 165);
             assert(anim.flameScale[0] == 3);
-        } else {
+        } else if (id == RI_SOUL_BOSS_ODOLWA) {
             assert(!strcmp(anim.skelPath, gOdolwaSkel) && !strcmp(anim.animPath, gOdolwaReadyAnim));
             assert(anim.limbCount == ODOLWA_LIMB_MAX && anim.scale == .005f && anim.segCount == 0);
             assert(anim.flameColor[0] == 145 && anim.flameColor[1] == 20 && anim.flameColor[2] == 133);
             assert(anim.flameScale[0] == 25);
+        } else {
+            assert(!strcmp(anim.skelPath, gTwinmoldHeadSkel) && !strcmp(anim.animPath, gTwinmoldHeadFlyAnim));
+            assert(anim.limbCount == TWINMOLD_HEAD_LIMB_MAX && anim.scale == .06f);
+            assert(anim.segCount == 1 && !strcmp(anim.segs[0].path, gTwinmoldBlueSkinTex));
+            assert(anim.flameColor[0] == 168 && anim.flameColor[1] == 180 && anim.flameColor[2] == 20);
+            assert(anim.flameScale[0] == 3);
         }
     }
-    assert(!MM_HasAnimDraw(RI_SOUL_BOSS_TWINMOLD));
+    assert(MM_HasAnimDraw(RI_SOUL_BOSS_TWINMOLD));
     puts("PASS production Morpha recipe/consumer: owner paths, native MM flame, model scroll/rotations/colors and segment cleanup; native MM boss skeleton exports");
 }

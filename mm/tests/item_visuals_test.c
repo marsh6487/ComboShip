@@ -17,7 +17,17 @@ static GraphicsContext sGfx;
 static PlayState sPlay;
 static Mtx sMatrix;
 static int sTint, sShimmer, sMissing, sEdited, sDepth, sDraws, sTransforms;
-static int sEmblemEdited;
+static int sEmblemEdited, sOverlayDraws;
+static uint8_t sOverlayColor[4];
+static unsigned sOverlayFrame;
+// The shared renderer's geometry is tested by run_mask_shimmer_tests.py.
+// This native dispatch fixture checks the C boundary, palette and frame.
+void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner) {
+    assert(owner == NULL);
+    ++sOverlayDraws;
+    memcpy(sOverlayColor, color, 4);
+    sOverlayFrame = play->gameplayFrames;
+}
 static float sTrace[128];
 static char sLastColorId[64];
 static const char* sBody = "fixture/body";
