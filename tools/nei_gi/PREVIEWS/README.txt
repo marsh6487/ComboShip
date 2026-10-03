@@ -6,3 +6,11 @@ slate-element-preview.png: previous Slate, new upright Slate front/back, five ru
 elemental-rods-spells.png: existing and updated rod/spell materials with designated shimmer hex values.
 
 The optional animated shimmer is not shown in these static sheets. In-game appearance and performance have not been tested. This preview-only branch contains no implementation changes.
+
+Slate designs approved by the user.
+
+slate_rotation_comparison.gif: exact before/after rotation with production halo triangles.
+slate_rotation_comparison.png: front/back comparison showing the ring-clearance correction.
+slate-halo-clearance.md: diagnosis, fix and verification details.
+
+The animation is an offline depth-tested render, not captured gameplay. Shimmer is off to show halo clearance.
