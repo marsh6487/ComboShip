@@ -1,5 +1,7 @@
 # Slate ring clearance review
 
+Historical camera-facing clearance experiment. The current effect behavior is described in [Slate rings that turn with the model](slate-rings-attached.md).
+
 The user raised a concern about a half-circle visible during an earlier rotating preview. The original animation was unavailable, but a new depth-tested render reproduced partial and disappearing rings in the current GI implementation.
 
 The two effect circles are complete meshes. Their camera-facing plane was anchored at a fixed model-local depth of 4 native units. The raised eye extends to approximately 5.04, and rotation moves the casing through that plane. Opaque depth therefore hid parts of the circles.
