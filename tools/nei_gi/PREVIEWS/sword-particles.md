@@ -1,5 +1,9 @@
 # Sword GI particle preview
 
+The initial geometry preview below is superseded by the
+[proportion correction](sword-proportions.md). The palette and particle themes
+remain current.
+
 The approved particle pass uses the seven exact models supplied in
 `NEI_Sword_GI_Latest_20261003.zip`, plus the existing Razor and Biggoron models.
 The two Kokiri variants retain their own appearance and effect color in either
