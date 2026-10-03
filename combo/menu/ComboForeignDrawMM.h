@@ -125,7 +125,7 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
         return ComboForeignResolveOOT::NotReady; // OOT dormant / rando context null — retry next frame
     }
     if (rcStatic == 0 || (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_NEI_CANE &&
-                                              raw.drawKind != CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT)) {
+                          raw.drawKind != CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT)) {
         // ComboShip: no static DL row — try the animated ABI (OOT boss souls' real skeletons). OOT
         // only describes the item; ComboForeignAnim_Draw loads + draws it (mirror of the OOT side).
         static Fn_GetItemAnimDrawInfo sGetItemAnimDrawInfo = nullptr;
@@ -168,8 +168,8 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
         const bool routedOot = strncmp(p, "__OTR__@oot:", 12) == 0;
         if (p[7] == '@' && !routedMm && !routedOot)
             return ComboForeignResolveOOT::Unknown;
-        info.dls[i] = ComboInternRoutedPathOOT(routedMm || routedOot ? std::string(p)
-            : std::string(ownerPrefix) + (p + sizeof(kOtrPrefix) - 1));
+        info.dls[i] = ComboInternRoutedPathOOT(
+            routedMm || routedOot ? std::string(p) : std::string(ownerPrefix) + (p + sizeof(kOtrPrefix) - 1));
     }
     info.count = n;
     info.xluStart = raw.xluStartIndex;
@@ -189,11 +189,12 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
             return ComboForeignResolveOOT::Unknown;
         for (int i = 0; i < raw.opCount; ++i) {
             const int op = raw.ops[i].op;
-            if (op != CW_OP_ROTATE_X && op != CW_OP_ROTATE_Z && op != CW_OP_SCALE &&
-                op != CW_OP_TRANSLATE && op != CW_OP_FRAME_PAIR)
+            if (op != CW_OP_ROTATE_X && op != CW_OP_ROTATE_Z && op != CW_OP_SCALE && op != CW_OP_TRANSLATE &&
+                op != CW_OP_FRAME_PAIR)
                 return ComboForeignResolveOOT::Unknown;
-            if (op == CW_OP_FRAME_PAIR && (n != 2 || raw.xluStartIndex != -1 ||
-                !(raw.ops[i].a >= 0 && raw.ops[i].a <= 30) || raw.ops[i].a != static_cast<int>(raw.ops[i].a)))
+            if (op == CW_OP_FRAME_PAIR &&
+                (n != 2 || raw.xluStartIndex != -1 || !(raw.ops[i].a >= 0 && raw.ops[i].a <= 30) ||
+                 raw.ops[i].a != static_cast<int>(raw.ops[i].a)))
                 return ComboForeignResolveOOT::Unknown;
         }
     }
@@ -748,12 +749,11 @@ inline void MM_DrawForeignMorphaSoul(const ComboForeignDrawInfoOOT* info) {
     Gfx_SetupDL25_Xlu(gfxCtx);
     MM_FOREIGN_PIN_XLU();
     gSPSegment(POLY_XLU_DISP++, 0x08,
-               (uintptr_t)Gfx_TwoTexScrollEx(gfxCtx, 0, play->state.frames * 3, play->state.frames * 3, 32, 32,
-                                             1, play->state.frames * -3, play->state.frames * -3, 32, 32,
-                                             3, 3, -3, -3));
+               (uintptr_t)Gfx_TwoTexScrollEx(gfxCtx, 0, play->state.frames * 3, play->state.frames * 3, 32, 32, 1,
+                                             play->state.frames * -3, play->state.frames * -3, 32, 32, 3, 3, -3, -3));
     gSPSegment(POLY_XLU_DISP++, 0x09,
-               (uintptr_t)Gfx_TwoTexScrollEx(gfxCtx, 0, play->state.frames * 3, 0, 32, 32,
-                                             1, 0, play->state.frames * -5, 32, 32, 3, 0, 0, -5));
+               (uintptr_t)Gfx_TwoTexScrollEx(gfxCtx, 0, play->state.frames * 3, 0, 32, 32, 1, 0,
+                                             play->state.frames * -5, 32, 32, 3, 0, 0, -5));
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
     gDPSetPrimColor(POLY_XLU_DISP++, 0x80, 0x80, 255, 255, 255, 255);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[1]);
@@ -906,14 +906,23 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info) {
     for (int i = 0; i < info->opCount; ++i) {
         const auto& op = info->ops[i];
         switch (op.op) {
-            case CW_OP_ROTATE_X: Matrix_RotateXF(op.a * (3.14159265358979323846f / 32768.0f), MTXMODE_APPLY); break;
-            case CW_OP_ROTATE_Z: Matrix_RotateZF(op.a * (3.14159265358979323846f / 32768.0f), MTXMODE_APPLY); break;
-            case CW_OP_SCALE: Matrix_Scale(op.a, op.b, op.c, MTXMODE_APPLY); break;
-            case CW_OP_TRANSLATE: Matrix_Translate(op.a, op.b, op.c, MTXMODE_APPLY); break;
+            case CW_OP_ROTATE_X:
+                Matrix_RotateXF(op.a * (3.14159265358979323846f / 32768.0f), MTXMODE_APPLY);
+                break;
+            case CW_OP_ROTATE_Z:
+                Matrix_RotateZF(op.a * (3.14159265358979323846f / 32768.0f), MTXMODE_APPLY);
+                break;
+            case CW_OP_SCALE:
+                Matrix_Scale(op.a, op.b, op.c, MTXMODE_APPLY);
+                break;
+            case CW_OP_TRANSLATE:
+                Matrix_Translate(op.a, op.b, op.c, MTXMODE_APPLY);
+                break;
             case CW_OP_FRAME_PAIR:
                 selectedOpaque = (static_cast<uint32_t>(gPlayState->gameplayFrames) >> static_cast<int>(op.a)) & 1u;
                 break;
-            default: break;
+            default:
+                break;
         }
     }
     if (info->scale > 0)
@@ -924,7 +933,8 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info) {
     for (int stream = 0; stream < 2; ++stream) {
         const int begin = stream ? split : 0;
         const int end = stream ? info->count : split;
-        if (begin >= end) continue;
+        if (begin >= end)
+            continue;
         if (stream) {
             Gfx_SetupDL25_Xlu(gfxCtx);
             MM_FOREIGN_PIN_XLU();
@@ -964,14 +974,30 @@ void DrawOotExtRocBoots();
 inline void MM_DrawForeignNativeEquipment(const ComboForeignDrawInfoOOT* info) {
     Matrix_Push();
     switch (static_cast<int32_t>(info->ops[0].a)) {
-        case CW_OOT_EQUIP_AXE: DrawOotIronKnuckleAxe(); break;
-        case CW_OOT_EQUIP_SPIRIT_TUNIC: DrawOotExtSpiritBreastplate(); break;
-        case CW_OOT_EQUIP_CHAMPIONS_TUNIC: DrawOotExtChampionsTunic(); break;
-        case CW_OOT_EQUIP_SAGES_TUNIC: DrawOotExtSagesTunic(); break;
-        case CW_OOT_EQUIP_PEGASUS_BOOTS: DrawOotExtPegasusAnklet(); break;
-        case CW_OOT_EQUIP_TRIDENT: DrawOotExtTrident(); break;
-        case CW_OOT_EQUIP_CLIMB_BOOTS: DrawOotExtClimbBoots(); break;
-        case CW_OOT_EQUIP_ROC_BOOTS: DrawOotExtRocBoots(); break;
+        case CW_OOT_EQUIP_AXE:
+            DrawOotIronKnuckleAxe();
+            break;
+        case CW_OOT_EQUIP_SPIRIT_TUNIC:
+            DrawOotExtSpiritBreastplate();
+            break;
+        case CW_OOT_EQUIP_CHAMPIONS_TUNIC:
+            DrawOotExtChampionsTunic();
+            break;
+        case CW_OOT_EQUIP_SAGES_TUNIC:
+            DrawOotExtSagesTunic();
+            break;
+        case CW_OOT_EQUIP_PEGASUS_BOOTS:
+            DrawOotExtPegasusAnklet();
+            break;
+        case CW_OOT_EQUIP_TRIDENT:
+            DrawOotExtTrident();
+            break;
+        case CW_OOT_EQUIP_CLIMB_BOOTS:
+            DrawOotExtClimbBoots();
+            break;
+        case CW_OOT_EQUIP_ROC_BOOTS:
+            DrawOotExtRocBoots();
+            break;
     }
     Matrix_Pop();
 }

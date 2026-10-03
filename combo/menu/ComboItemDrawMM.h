@@ -67,9 +67,9 @@
 #include "assets/objects/object_wiz/object_wiz.h"                 // Wizrobe
 #include "assets/objects/object_wf/object_wf.h"                   // Wolfos
 #include "objects/object_fr/object_fr.h"                          // Minifrog
-#include "objects/object_boss_hakugin/object_boss_hakugin.h" // Goht soul
-#include "objects/object_boss03/object_boss03.h"             // Gyorg soul
-#include "objects/object_boss01/object_boss01.h"             // Odolwa soul
+#include "objects/object_boss_hakugin/object_boss_hakugin.h"      // Goht soul
+#include "objects/object_boss03/object_boss03.h"                  // Gyorg soul
+#include "objects/object_boss01/object_boss01.h"                  // Odolwa soul
 
 // Portable slice of one sDrawItemTable row (defined in mm/src/code/z_draw.c). outDrawKind is a
 // CwDrawKind: 0 = plain OPA/XLU submission, else a non-portable func the consumer replicates.

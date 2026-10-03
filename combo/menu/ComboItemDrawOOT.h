@@ -46,7 +46,7 @@
 #include "objects/object_sst/object_sst.h"
 #include "objects/object_tw/object_tw.h"
 #include "objects/object_ganon2/object_ganon2.h"
-#include "objects/object_mo/object_mo.h" // non-skeletal Morpha core model
+#include "objects/object_mo/object_mo.h"               // non-skeletal Morpha core model
 #include "overlays/actors/ovl_Boss_Goma/z_boss_goma.h" // BOSSGOMA_LIMB_EYE / BOSSGOMA_LIMB_IRIS
 
 // Cosmetic tables owned by soh/.../draw.cpp; reused so the recipes can't drift from the real funcs.
@@ -244,9 +244,9 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
         int slot = (int)rg - (int)RG_GOHMA_SOUL;
         out->dlistCount = 2;
         out->drawKind = CW_DRAW_KIND_BOSS_SOUL;
-        out->xluStartIndex = 0;                   // both layers XLU
-        out->dlists[0] = gGiBlueFireFlameDL;      // flame (grayscale-tinted)
-        out->dlists[1] = gBossSoulSkullDL;        // generic soul skull
+        out->xluStartIndex = 0;              // both layers XLU
+        out->dlists[0] = gGiBlueFireFlameDL; // flame (grayscale-tinted)
+        out->dlists[1] = gBossSoulSkullDL;   // generic soul skull
         if (slot == 5 && !CVarGetInteger(CVAR_RANDOMIZER_ENHANCEMENT("SimplerBossSoulModels"), 0)) {
             out->drawKind = CW_DRAW_KIND_OOT_MORPHA_SOUL;
             out->dlistCount = 3;
@@ -492,13 +492,15 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             return CwCustomGi(out, "__OTR__objects/object_nei_net/g_net_dl", .55f,
                               "__OTR__objects/object_nei_net/g_net_xlu_dl");
         case RG_ULTRASHOT:
-            return CwFlameGi(out, "__OTR__objects/object_gi_hookshot/gGiLongshotDL", .5f, {255, 240, 130});
+            return CwFlameGi(out, "__OTR__objects/object_gi_hookshot/gGiLongshotDL", .5f, { 255, 240, 130 });
         case RG_BOTTOMLESS_BOTTLE:
             if (!CwCustomGi(out, "__OTR__objects/object_gi_bottle/gGiBottleStopperDL", 0.0f,
                             "__OTR__objects/object_gi_bottle/gGiBottleDL"))
                 return 0;
-            out->primColorXlu[0] = 190; out->primColorXlu[1] = 60;
-            out->primColorXlu[2] = 230; out->primColorXlu[3] = 255;
+            out->primColorXlu[0] = 190;
+            out->primColorXlu[1] = 60;
+            out->primColorXlu[2] = 230;
+            out->primColorXlu[3] = 255;
             return 1;
         case RG_EXT_FOUR_SWORD:
             if (!CwCustomGi(out, "__OTR__objects/object_nei_four_sword/gNeiFourSwordBladeDL", .04f,
@@ -575,15 +577,18 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
         case RG_SHEIKAH_SLATE:
             return CwCustomGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f);
         case RG_SLATE_RUNE_BOMB:
-            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f, {95, 220, 235});
+            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f, { 95, 220, 235 });
         case RG_SLATE_RUNE_MASTER_CYCLE:
-            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f, {100, 230, 190});
+            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f,
+                             { 100, 230, 190 });
         case RG_SLATE_RUNE_STASIS:
-            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f, {250, 200, 70});
+            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f, { 250, 200, 70 });
         case RG_SLATE_RUNE_CRYONIS:
-            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f, {150, 215, 255});
+            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f,
+                             { 150, 215, 255 });
         case RG_DESIRE_SENSOR:
-            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f, {200, 130, 255});
+            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f,
+                             { 200, 130, 255 });
         case RG_PHANTOM_HOURGLASS:
             return CwCustomGi(out, "__OTR__objects/object_nei_phantom_hourglass/gNeiPhantomHourglassDL", .35f);
         case RG_SHADOW_CRYSTAL:
@@ -706,8 +711,7 @@ static void OOT_DescribeMagicJar(s16 drawId, CwItemDrawInfo* out) {
         return;
     out->drawKind = CW_DRAW_KIND_MAGIC_JAR;
     out->stateDependent = 2; // live cosmetic edits and Alt toggles must re-resolve
-    if (CVarGetInteger(CVAR_COSMETIC("Consumable.Magic.Changed"), 0) &&
-        OOT_MagicJarUsesCustomAsset(out->dlists[0])) {
+    if (CVarGetInteger(CVAR_COSMETIC("Consumable.Magic.Changed"), 0) && OOT_MagicJarUsesCustomAsset(out->dlists[0])) {
         const Color_RGB8 color = CVarGetColor24(CVAR_COSMETIC("Consumable.Magic.Value"), { 0, 200, 0 });
         out->primColorOpa[0] = color.r;
         out->primColorOpa[1] = color.g;
@@ -724,8 +728,9 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     }
     // Progressive items resolve to the tier actually owed; classify THAT item's draw func, not the
     // placeholder's (drawItemId carries the resolved RandomizerGet for rando-table entries).
-    RandomizerGet effRg = actual != RG_NONE ? actual
-        : (gi.tableId == TABLE_RANDOMIZER) ? (RandomizerGet)gi.drawItemId : rg;
+    RandomizerGet effRg = actual != RG_NONE                  ? actual
+                          : (gi.tableId == TABLE_RANDOMIZER) ? (RandomizerGet)gi.drawItemId
+                                                             : rg;
     switch (effRg) {
         case RG_KOKIRI_SWORD:
         case RG_MASTER_SWORD:

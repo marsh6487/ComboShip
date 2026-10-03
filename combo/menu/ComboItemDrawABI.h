@@ -56,18 +56,18 @@ typedef enum {
     /* ComboShip: MM->OOT additions. The kinds above are OOT funcs replicated by MM; these are MM
      * funcs replicated by OOT. Where an MM func is byte-for-byte the same as its OOT twin
      * (DekuNuts/RecoveryHeart/Fish/Potion/Poes/GoronSword) the kind above is reused instead. */
-    CW_DRAW_KIND_MM_FAIRY_BOTTLE, /* OPA dl0; XLU dl1; seg8 scroll (32x320 layer 2); billboard dl2 */
-    CW_DRAW_KIND_MM_SOUL_FLAME,   /* MM enemy soul: billboard seg8 flame (primColorXlu), dl0 */
-    CW_DRAW_KIND_OPS,             /* ops[] bytecode below (transforms/colors/DLs); see CwDrawOpCode */
-    CW_DRAW_KIND_NEI_CANE,        /* concrete legacy cane skill rendered by the MM host */
-    CW_DRAW_KIND_NEI_GI,          /* replacement mesh plus host-rendered elemental energy */
-    CW_DRAW_KIND_MM_MASK,         /* imported MM mask: native MM resources and palette-free split passes */
-    CW_DRAW_KIND_MM_REMAINS,      /* imported boss remains: native MM OPA resource, scale 0.02 */
-    CW_DRAW_KIND_MM_SPIN_ATTACK,  /* MM Great Spin: native disk/cylinder, seg8 scroll, live burst color */
-    CW_DRAW_KIND_OOT_MORPHA_SOUL = 32, /* native MM flame dl0 + OoT Morpha membrane/nucleus dl1/2 */
-    CW_DRAW_KIND_MAGIC_JAR = 33, /* OoT magic jar: custom Alt grayscale tint carried in primColorOpa */
-    CW_DRAW_KIND_CUSTOM_GI = 31, /* OoT custom: spin, ops transforms, scale, OPA/XLU; primColorOpa grayscale,
-                              primColorXlu weapon flame; alpha zero disables each independent tint/effect. */
+    CW_DRAW_KIND_MM_FAIRY_BOTTLE,           /* OPA dl0; XLU dl1; seg8 scroll (32x320 layer 2); billboard dl2 */
+    CW_DRAW_KIND_MM_SOUL_FLAME,             /* MM enemy soul: billboard seg8 flame (primColorXlu), dl0 */
+    CW_DRAW_KIND_OPS,                       /* ops[] bytecode below (transforms/colors/DLs); see CwDrawOpCode */
+    CW_DRAW_KIND_NEI_CANE,                  /* concrete legacy cane skill rendered by the MM host */
+    CW_DRAW_KIND_NEI_GI,                    /* replacement mesh plus host-rendered elemental energy */
+    CW_DRAW_KIND_MM_MASK,                   /* imported MM mask: native MM resources and palette-free split passes */
+    CW_DRAW_KIND_MM_REMAINS,                /* imported boss remains: native MM OPA resource, scale 0.02 */
+    CW_DRAW_KIND_MM_SPIN_ATTACK,            /* MM Great Spin: native disk/cylinder, seg8 scroll, live burst color */
+    CW_DRAW_KIND_OOT_MORPHA_SOUL = 32,      /* native MM flame dl0 + OoT Morpha membrane/nucleus dl1/2 */
+    CW_DRAW_KIND_MAGIC_JAR = 33,            /* OoT magic jar: custom Alt grayscale tint carried in primColorOpa */
+    CW_DRAW_KIND_CUSTOM_GI = 31,            /* OoT custom: spin, ops transforms, scale, OPA/XLU; primColorOpa grayscale,
+                                         primColorXlu weapon flame; alpha zero disables each independent tint/effect. */
     CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT = 34, /* concrete static award; ops[0] native equipment selector */
 } CwDrawKind;
 
@@ -93,8 +93,8 @@ typedef enum {
     CW_OP_GRAYSCALE_COLOR, /* rgba */
     CW_OP_GRAYSCALE_ON,
     CW_OP_GRAYSCALE_OFF,
-    CW_OP_DLIST, /* a = index into dlists[] */
-    CW_OP_FRAME_PAIR, /* only CUSTOM_GI: choose one of two OPA DLs; a = frame bit (0..30) */
+    CW_OP_DLIST,            /* a = index into dlists[] */
+    CW_OP_FRAME_PAIR,       /* only CUSTOM_GI: choose one of two OPA DLs; a = frame bit (0..30) */
     CW_OP_NATIVE_EQUIPMENT, /* only OOT_NATIVE_EQUIPMENT: a = CwOotNativeEquipment */
 } CwDrawOpCode;
 
