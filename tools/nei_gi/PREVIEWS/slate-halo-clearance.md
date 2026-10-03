@@ -4,7 +4,7 @@ The user raised a concern about a half-circle visible during an earlier rotating
 
 The two effect circles are complete meshes. Their camera-facing plane was anchored at a fixed model-local depth of 4 native units. The raised eye extends to approximately 5.04, and rotation moves the casing through that plane. Opaque depth therefore hid parts of the circles.
 
-The fix places the ring plane ahead of the projected bounds of the approved Slate, with a 0.75 native-unit clearance. Its screen center, two radii, colors, and animation are retained. Depth testing remains enabled.
+The fix places the ring plane ahead of the projected bounds of the approved Slate, with a 0.75 native-unit clearance. Its position in the camera plane, two native-unit radii, colors, and animation are retained. Depth testing remains enabled. Perspective can change apparent size when depth changes; final appearance still needs an in-game check.
 
 [Before and after rotation](slate_rotation_comparison.gif)
 
