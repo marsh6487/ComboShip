@@ -12,7 +12,8 @@ host = (ROOT/'combo/menu/ComboForeignDrawMM.h').read_text()
 # Keep the actual static callback switch; unrelated soul/key branches have independent fixtures.
 a = owner.index('    switch (rg) {\n        case RG_EXT_CANE_OF_BYRNA:')
 b = owner.index('\n// Items whose model', a)
-body = 'static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {\n' + owner[a:b]
+stats=owner[owner.index('    // RPG stat models'):owner.index('    // Boss souls: bespoke')]
+body = 'static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {\n' + stats + owner[a:b]
 helpers = function(owner, 'CwSimple') + '\n' + function(owner, 'CwLayerEnv')
 if '// Static custom GI bridge recipes.' in owner:
     a = owner.index('// Static custom GI bridge recipes.')
@@ -21,7 +22,9 @@ if '// Static custom GI bridge recipes.' in owner:
 fixture = (ROOT/'tests/mm_presentation/static_gi_bridge_test.cpp').read_text()
 fixture = fixture.replace('/* OWNER_HELPERS */', helpers)
 fixture = fixture.replace('/* OWNER_ALT_QUERY */', function((ROOT/'soh/soh/ResourceManagerHelpers.cpp').read_text(), 'OOT_NeiAltAssetsEnabled'))
-fixture = fixture.replace('/* OWNER_DESCRIPTOR */', body + '\n' + function(owner, 'OOT_FillItemDrawInfo'))
+fixture = fixture.replace('/* OWNER_MAGIC_DESCRIPTOR */', function(owner, 'OOT_DescribeMagicJar'))
+fixture = fixture.replace('/* OWNER_DESCRIPTOR */', body + '\n' + function(owner, 'OOT_FillItemDrawInfo') + '\n' +
+                          function(owner, 'OOT_IsStateDependentDraw') + '\n' + function(owner, 'OOT_DrawDependency'))
 fixture = fixture.replace('/* OWNER_MAGIC_QUERY */', function((ROOT/'soh/soh/ResourceManagerHelpers.cpp').read_text(), 'OOT_MagicJarUsesCustomAsset'))
 fixture = fixture.replace('/* HOST_INFO */', host[host.index('struct ComboForeignDrawInfoOOT {'):host.index('\n};', host.index('struct ComboForeignDrawInfoOOT {'))+3])
 fixture = fixture.replace('/* HOST_RESOLVER */', function(host, 'ComboFillForeignDrawInfoOOT'))

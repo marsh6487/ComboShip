@@ -1,0 +1,26 @@
+{
+  "resource_count": 6,
+  "vertex_records": 300,
+  "vertex_loads": 12,
+  "xlu_entry": "objects/nei_gi_redesign/shadow_crystal/gi_xlu_dl",
+  "slug": "shadow_crystal",
+  "name": "Shadow Crystal",
+  "entry": "objects/nei_gi_redesign/shadow_crystal/gi_dl",
+  "draw_scale": 1.0,
+  "matrix_scale": 0.040618896484375,
+  "triangles": 288,
+  "bounds_author": [
+    [
+      -21.0,
+      -39.0,
+      -18.1875
+    ],
+    [
+      21.0,
+      39.0,
+      18.1875
+    ]
+  ],
+  "markers": {},
+  "runtime_tested": false
+}

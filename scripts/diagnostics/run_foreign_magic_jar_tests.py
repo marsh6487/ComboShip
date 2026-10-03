@@ -24,9 +24,10 @@ struct Gfx {int op=0; uint8_t r=0,g=0,b=0;};
 constexpr int GID_MAGIC_SMALL=1, GID_MAGIC_LARGE=2;
 #define CVAR_COSMETIC(x) x
 bool changed=false, custom=false, loaded=false;
+Color_RGB8 liveColor{230,93,171};
 int CVarGetInteger(const char*,int) {return changed;}
 Color_RGB8 CVarGetColor24(const char*,Color_RGB8) {return {230,93,171};}
-Color_RGB8 CwLiveCosmeticColor(const char*,Color_RGB8) {return {230,93,171};}
+Color_RGB8 CwLiveCosmeticColor(const char*,Color_RGB8) {return liveColor;}
 int32_t OOT_MagicJarUsesCustomAsset(const char*) {loaded=true;return custom;}
 void grayColor(Gfx*p,uint8_t r,uint8_t g,uint8_t b) {*p={1,r,g,b};}
 #define gDPSetGrayscaleColor(p,r,g,b,a) grayColor(p,r,g,b)
@@ -41,13 +42,20 @@ int main() {
   OOT_DescribeMagicJar(id,&info);
   bool tint=change&&alt&&id!=9;
   assert((info.primColorOpa[3]!=0)==tint);
-  if(id!=9) assert(info.drawKind==CW_DRAW_KIND_MAGIC_JAR&&info.stateDependent==2);
+  if(id!=9) {
+   assert(info.drawKind==CW_DRAW_KIND_MAGIC_JAR&&info.stateDependent==2 && info.itemShimmer);
+   assert(info.itemShimmerColor[0]==(change?230:0) && info.itemShimmerColor[1]==(change?93:200));
+  }
   else assert(info.drawKind==CW_DRAW_KIND_SIMPLE);
   Gfx commands[8];Gfx*end=MM_DrawForeignMagicJarDList(commands,"__OTR__@oot:magic",info.primColorOpa);
   if(tint) {assert(end==commands+4);assert(commands[0].op==1&&commands[0].r==230&&commands[0].g==93&&commands[0].b==171);
    assert(commands[1].op==2&&commands[2].op==3&&commands[3].op==4);}
   else {assert(end==commands+1&&commands[0].op==3);}
  }
+ changed=true; custom=true; CwItemDrawInfo animated{}; animated.dlists[0]="__OTR__magic";
+ liveColor={12,210,250}; OOT_DescribeMagicJar(GID_MAGIC_LARGE,&animated);
+ assert(animated.itemShimmerColor[0]==12 && animated.itemShimmerColor[1]==210 && animated.itemShimmerColor[2]==250);
+ assert(animated.primColorOpa[0]==animated.itemShimmerColor[0]);
 }
 '''
 with tempfile.TemporaryDirectory(prefix='foreign-magic-') as td:

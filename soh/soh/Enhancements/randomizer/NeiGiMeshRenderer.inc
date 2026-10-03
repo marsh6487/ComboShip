@@ -13,7 +13,7 @@ NeiGi::Basis NeiGi_CameraBasis(PlayState* play) {
 }
 
 static void NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kind orb,
-                                   const NeiGi::TextureMaterial* material) {
+                                   const NeiGi::TextureMaterial* material, bool seasonSunRays = false) {
     if (mesh.count == 0)
         return;
     // Reuse shared vertices within each 32-entry RSP cache load. A full potion
@@ -43,8 +43,12 @@ static void NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kin
                                 static_cast<int16_t>(std::lround(v.p.y * 16)),
                                 static_cast<int16_t>(std::lround(v.p.z * 16)) },
                               0,
-                              { static_cast<int16_t>(std::lround(v.u * (material ? 32 : 63) * 32)),
-                                static_cast<int16_t>(std::lround(v.v * (material ? 32 : 63) * 32)) },
+                              { static_cast<int16_t>(std::lround(v.u * (material || seasonSunRays ? 32 : 63) * 32)),
+                                static_cast<int16_t>(std::lround(v.v *
+                                                                 (seasonSunRays ? 31
+                                                                  : material    ? 32
+                                                                                : 63) *
+                                                                 32)) },
                               { static_cast<uint8_t>(v.rgb >> 16), static_cast<uint8_t>(v.rgb >> 8),
                                 static_cast<uint8_t>(v.rgb), v.alpha } } };
         }
@@ -78,7 +82,16 @@ static void NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kin
     gDPSetCycleType(POLY_XLU_DISP++, G_CYC_2CYCLE);
     gDPSetAlphaCompare(POLY_XLU_DISP++, G_AC_NONE);
     gDPSetRenderMode(POLY_XLU_DISP++, G_RM_PASS, G_RM_AA_ZB_XLU_SURF2);
-    if (material) {
+    if (seasonSunRays) {
+        gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
+        gDPSetTextureLUT(POLY_XLU_DISP++, G_TT_NONE);
+        gDPSetTextureFilter(POLY_XLU_DISP++, G_TF_BILERP);
+        gDPLoadTextureBlock(POLY_XLU_DISP++, NeiGi::SeasonSunRayTexture().data(), G_IM_FMT_I, G_IM_SIZ_8b, 32, 32, 0,
+                            G_TX_WRAP, G_TX_CLAMP, 5, 5, G_TX_NOLOD, G_TX_NOLOD);
+        const uint32_t scroll = (play->gameplayFrames / 4u) % 32u;
+        gDPSetTileSize(POLY_XLU_DISP++, G_TX_RENDERTILE, scroll * 4, 0, (scroll + 31) * 4, 31 * 4);
+        gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA, G_CC_PASS2);
+    } else if (material) {
         gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
         gDPSetTextureLUT(POLY_XLU_DISP++, G_TT_NONE);
         gDPSetTextureFilter(POLY_XLU_DISP++, G_TF_BILERP);
@@ -133,6 +146,114 @@ bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiG
         return false;
     NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material);
     return true;
+}
+
+void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
+                            const float center[3], bool shimmer, const char* owner) {
+    if (!play || !opa || !center || scale <= 0 || effect < 0 || effect > int(Kind::SeasonCycle))
+        return;
+    const Kind kind = static_cast<Kind>(effect);
+    const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
+    const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
+    Matrix_Push();
+    OPEN_DISPS(play->state.gfxCtx);
+    if (owner) {
+        gSPComboRMPush(POLY_OPA_DISP++, owner);
+        gSPComboRMPush(POLY_XLU_DISP++, owner);
+    }
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    Matrix_Push();
+    Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+#ifdef NEI_GI_ROTATE_Y
+    NEI_GI_ROTATE_Y(spin, MTXMODE_APPLY);
+#else
+    Matrix_RotateY(spin, MTXMODE_APPLY);
+#endif
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
+    gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD);
+    gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, opa, 0, G_DL_PUSH);
+    // Child mesh renderers advance the same streams. Publish these cursors
+    // before invoking them, then reopen after all procedural submissions.
+    CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Pop();
+    Matrix_Push();
+#ifdef NEI_GI_ROTATE_Y
+    NEI_GI_ROTATE_Y(spin, MTXMODE_APPLY);
+#else
+    Matrix_RotateY(spin, MTXMODE_APPLY);
+#endif
+    const auto camera = NeiGi_CameraBasis(play);
+    Matrix_Push();
+    Matrix_Translate(center[0], center[1], center[2], MTXMODE_APPLY);
+    if (NeiGi::IsRod(kind) || NeiGi::IsSpell(kind)) {
+        NeiGi_DrawMesh(play, NeiGi::SampleOrb(kind, camera), kind);
+        NeiGi_DrawMesh(play, NeiGi::SampleEnergy(kind, play->gameplayFrames, camera));
+    }
+    if (NeiGi::IsSpecial(kind))
+        NeiGi_DrawMesh(play, NeiGi::SampleSpecial(kind, play->gameplayFrames, camera));
+    Matrix_Pop();
+    if (shimmer)
+        NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, camera, kind));
+    Matrix_Pop();
+    if (kind == Kind::SeasonCycle)
+        NeiGi_DrawSeasonOverlay(play, 5, nullptr);
+    OPEN_DISPS(play->state.gfxCtx);
+    if (xlu) {
+        Matrix_Push();
+        Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+#ifdef NEI_GI_ROTATE_Y
+        NEI_GI_ROTATE_Y(spin, MTXMODE_APPLY);
+#else
+        Matrix_RotateY(spin, MTXMODE_APPLY);
+#endif
+        Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+        gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+        gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+                  G_MTX_MODELVIEW | G_MTX_LOAD);
+        gDma1p(POLY_XLU_DISP++, G_DL_OTR_FILEPATH, xlu, 0, G_DL_PUSH);
+        Matrix_Pop();
+    }
+    if (owner) {
+        gSPComboRMPop(POLY_OPA_DISP++);
+        gSPComboRMPop(POLY_XLU_DISP++);
+    }
+    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+    gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD);
+    CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Pop();
+}
+
+void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner) {
+    if (!play || profile < 1 || profile > 5)
+        return;
+    auto mesh = NeiGi::SampleSeason(play->gameplayFrames, profile, NeiGi_CameraBasis(play));
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    if (owner)
+        gSPComboRMPush(POLY_XLU_DISP++, owner);
+    CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawMesh(play, mesh, Kind::Neutral);
+    if (NeiGi::SeasonProfile(play->gameplayFrames, profile) == 2) {
+        const auto rays = NeiGi::SampleSeasonSunRays(play->gameplayFrames, profile, NeiGi_CameraBasis(play));
+        NeiGi_DrawMeshMaterial(play, rays, Kind::Neutral, nullptr, true);
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    if (owner)
+        gSPComboRMPop(POLY_XLU_DISP++);
+    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+    gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 // Shared by native and foreign mask/remains and progressive sword overlays.

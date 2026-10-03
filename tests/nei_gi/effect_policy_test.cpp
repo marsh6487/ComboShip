@@ -44,11 +44,57 @@ int main() {
     }
     assert(moves);
   }
+  for(Kind k : {Kind::Sand,Kind::Tornado,Kind::Water,Kind::Meteor,Kind::Storm,Kind::Shadow,
+                 Kind::Slate,Kind::Hourglass,Kind::DarkCrystal,Kind::SwordAura,Kind::CaneBlue}) {
+    assert(IsSpecial(k));
+    for(uint32_t frame : {0u,19u,47u,179u,180u,65535u}) {
+      auto a=SampleSpecial(k,frame), b=SampleSpecial(k,frame);
+      assert(a.count>0 && a.count<=a.vertices.size() && a.count%3==0);
+      for(size_t i=0;i<a.count;++i) {
+        const auto& v=a.vertices[i];
+        assert(std::isfinite(v.p.x) && std::isfinite(v.p.y) && std::isfinite(v.p.z));
+        assert(std::abs(v.p.x)<48 && std::abs(v.p.y)<48 && std::abs(v.p.z)<48);
+        assert(v.p.x==b.vertices[i].p.x && v.rgb==b.vertices[i].rgb && v.alpha==b.vertices[i].alpha);
+      }
+    }
+  }
+  assert(!IsSpecial(Kind::Neutral) && SampleSpecial(Kind::Neutral,0).count==0);
   assert(SampleEnergy(Kind::Neutral, 0).count == 0);
   assert(SampleShimmer(0, false).count == 0);
   const auto glints = SampleShimmer(45, true);
   assert(glints.count > 0 && glints.count <= glints.vertices.size());
   assert(ColorHex(Kind::Demise) == 0x000000);
+  // Summer must remain a recognizable, steady sun rather than rising motes.
+  // Removing the disk or reintroducing embers breaks this silhouette contract.
+  for (uint32_t frame : {0u, 47u, 179u, 180u, 719u,
+                         std::numeric_limits<uint32_t>::max()}) {
+    const auto sun = SampleSeason(frame, 2);
+    size_t diskVertices = 0;
+    for (size_t i = 0; i < sun.count; ++i) {
+      const auto &v = sun.vertices[i];
+      if (v.alpha >= 230 && std::hypot(v.p.x, v.p.y) <= 11.6f)
+        ++diskVertices;
+    }
+    assert(diskVertices >= 48);
+  }
+  // Spring's only particles are rain; petals can resemble a second item effect.
+  const auto rain = SampleSeason(47, 1);
+  for (size_t i = 0; i < rain.count; ++i)
+    assert((rain.vertices[i].rgb & 255) >= (rain.vertices[i].rgb >> 16));
+  const auto &sunRays = SeasonSunRayTexture();
+  assert(sunRays.size() == 1024 && &sunRays == &SeasonSunRayTexture());
+  assert(sunRays[0] == 255 && sunRays[16] == 0);
+  for (size_t i = 992; i < 1024; ++i) assert(sunRays[i] == 0);
+  for (int profile : {1, 3, 4}) {
+    // A native frame boundary must not snap visible flakes/leaves around.
+    const auto a = SampleSeason(179, profile), b = SampleSeason(180, profile);
+    assert(a.count == b.count);
+    for (size_t i = 0; i < a.count; ++i) {
+      if (a.vertices[i].alpha < 40 || b.vertices[i].alpha < 40) continue;
+      assert(std::abs(a.vertices[i].p.y - b.vertices[i].p.y) < 2);
+      assert(std::abs(a.vertices[i].p.x - b.vertices[i].p.x) < 1);
+    }
+  }
   // Native orb texels must be stable for deferred GPU interpretation, animated,
   // bounded to one TMEM load, and empty at their border (no square billboard).
   for (Kind kind :

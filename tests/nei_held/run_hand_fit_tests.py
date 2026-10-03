@@ -12,7 +12,8 @@ if __name__ == "__main__":
         objects = []
         sources = ["helpers/equip_helper.c", "objects/object_whip.c", "objects/object_firerod.c",
                    "objects/object_icerod.c", "objects/object_lightrod.c", "objects/object_shovel.c",
-                   "objects/object_spinner.c", "objects/object_cane_of_somaria.c"]
+                   "objects/object_spinner.c", "objects/object_cane_of_somaria.c",
+                   "objects/object_rod_of_seasons.c"]
         for source in sources:
             output = str(Path(temporary) / (Path(source).stem + ".o"))
             # Somaria normally enters the item unity after these real headers.

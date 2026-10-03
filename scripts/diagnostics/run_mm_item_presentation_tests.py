@@ -27,6 +27,7 @@ preamble = r'''
 #include <string>
 #include <iostream>
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboItemEffectColors.h"
 using s16=int16_t; using s32=int32_t; using f32=float;
 #include <cstring>
 #define RANDO_ENUM_BEGIN(x) enum x {

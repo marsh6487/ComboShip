@@ -36,6 +36,10 @@
 
 #include "ComboItemDrawABI.h"
 #include "Rando/NeiGiPresentation.h"
+#include "Rando/NeiResourceRouting.h"
+#define COMBO_MORPHA_GI_HOST_MM
+#include "ComboMorphaGi.h"
+#undef COMBO_MORPHA_GI_HOST_MM
 // ComboShip: the animated class, with 2ship.dll as the host (see the shim in ComboForeignAnim.h).
 #define COMBO_FOREIGN_ANIM_HOST_MM 1
 #include "ComboForeignAnim.h"
@@ -132,7 +136,7 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
         return ComboForeignResolveOOT::NotReady; // OOT dormant / rando context null — retry next frame
     }
     if (rcStatic == 0 || (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_NEI_CANE &&
-                          raw.drawKind != CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT)) {
+                          raw.drawKind != CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT && raw.drawKind != CW_DRAW_KIND_SEASON_GI)) {
         // ComboShip: no static DL row — try the animated ABI (OOT boss souls' real skeletons). OOT
         // only describes the item; ComboForeignAnim_Draw loads + draws it (mirror of the OOT side).
         static Fn_GetItemAnimDrawInfo sGetItemAnimDrawInfo = nullptr;
@@ -191,7 +195,10 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     info.neiLegacyCane = raw.neiLegacyCane;
     if (raw.opCount < 0 || raw.opCount > CW_DRAW_MAX_OPS)
         return ComboForeignResolveOOT::Unknown;
-    if (raw.drawKind == CW_DRAW_KIND_CUSTOM_GI) {
+    if (raw.drawKind == CW_DRAW_KIND_SEASON_GI &&
+        (raw.neiEffect < 1 || raw.neiEffect > 5 || (raw.neiEffect < 5 ? n != 0 || raw.opCount != 0 : n < 1)))
+        return ComboForeignResolveOOT::Unknown;
+    if (raw.drawKind == CW_DRAW_KIND_CUSTOM_GI || raw.drawKind == CW_DRAW_KIND_SEASON_GI) {
         if (raw.xluStartIndex < -1 || raw.xluStartIndex > n)
             return ComboForeignResolveOOT::Unknown;
         for (int i = 0; i < raw.opCount; ++i) {
@@ -748,6 +755,8 @@ inline void MM_DrawForeignMorphaSoul(const ComboForeignDrawInfoOOT* info) {
     const float translate[3] = { 0.0f, -70.0f, 0.0f };
     const float scale[3] = { 5.0f, 5.0f, 5.0f };
     DrawOotSoulFlame(play, info->primColorXlu, translate, scale);
+    ComboDrawMorphaTentacleGi(play, "oot",
+                              [](const char* path, const char*) { return NeiResource_Available(path) != 0; });
     Matrix_Push();
     Matrix_Scale(0.015f, 0.015f, 0.015f, MTXMODE_APPLY);
     Matrix_RotateXF(play->state.frames * 0.1f, MTXMODE_APPLY);
@@ -1159,6 +1168,7 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
         recipe.neiEffect = info->neiEffect;
         memcpy(recipe.neiEffectCenter, info->neiEffectCenter, sizeof(recipe.neiEffectCenter));
         recipe.neiSomariaUpgrade = info->neiSomariaUpgrade;
+        recipe.itemShimmer = info->itemShimmer;
         MM_DrawNeiGi(recipe);
         return;
     }
@@ -1228,6 +1238,11 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
             break;
         case CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT:
             MM_DrawForeignNativeEquipment(info);
+            break;
+        case CW_DRAW_KIND_SEASON_GI:
+            if (info->neiEffect == 5)
+                MM_DrawForeignCustomGi(info);
+            NeiGi_DrawSeasonOverlay(gPlayState, info->neiEffect, "oot");
             break;
         case CW_DRAW_KIND_CUSTOM_GI:
             MM_DrawForeignCustomGi(info);

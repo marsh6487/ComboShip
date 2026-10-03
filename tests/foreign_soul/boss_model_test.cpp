@@ -93,6 +93,22 @@ struct ComboForeignDrawInfoOOT {
 static void MM_RestoreForeignSegs(const int32_t* segs, int count) {
     for (int i = 0; i < count; ++i) gSPSegment(gfx.polyXlu.p++, segs[i], (uintptr_t)empty);
 }
+// This adjacent core/flame regression deliberately takes the helper's
+// unavailable-resource fallback. The dedicated Morpha fixture executes the
+// real helper together with both actual integration bodies.
+static int tentacleRequests, tentacleAvailabilityRequests;
+static int NeiResource_Available(const char* path) {
+    assert(!strcmp(path, gMorphaTentacleBaseDL));
+    ++tentacleAvailabilityRequests;
+    return 0;
+}
+static bool ComboDrawMorphaTentacleGi(PlayState* host, const char* owner,
+                                     bool (*available)(const char*, const char*)) {
+    assert(host == &play && !strcmp(owner, "oot"));
+    ++tentacleRequests;
+    assert(!available(gMorphaTentacleBaseDL, owner));
+    return false;
+}
 /* PRODUCTION_DRAW */
 static int32_t MM_FillEnemySoulAnim(RandoItemId, CwItemAnimDrawInfo*) { return 0; }
 static int32_t MM_FillMinifrogAnim(RandoItemId, CwItemAnimDrawInfo*) { return 0; }
@@ -111,12 +127,14 @@ int main() {
         gfx.polyOpa.p = opa; gfx.polyOpa.d = empty + 8; gfx.polyXlu.p = xlu;
         play.state.gfxCtx = &gfx; play.state.frames = frame;
         draws.clear(); rotations.clear(); scrollCount = depth = 0;
+        tentacleRequests = tentacleAvailabilityRequests = 0;
         std::string membrane = "__OTR__@oot:" + std::string(recipe.dlists[1] + 7);
         std::string nucleus = "__OTR__@oot:" + std::string(recipe.dlists[2] + 7);
         ComboForeignDrawInfoOOT info{};
         info.count = 3; info.dls[1] = membrane.c_str(); info.dls[2] = nucleus.c_str();
         memcpy(info.primColorXlu, recipe.primColorXlu, 4);
         MM_DrawForeignMorphaSoul(&info);
+        assert(tentacleRequests == 1 && tentacleAvailabilityRequests == 1);
         assert(draws.size() == 3 && draws[0] == gameplay_keep_DL_01ACF0);
         assert(draws[1] == membrane && draws[2] == nucleus);
         assert(scrollCount == 3 && depth == 0 && gfx.polyOpa.p == opa);

@@ -6,7 +6,28 @@
 #include <cstdint>
 
 namespace NeiGi {
-enum class Kind { Neutral, Fire, Ice, Light, Hylia, Zonai, Demise, Leaf };
+enum class Kind {
+    Neutral,
+    Fire,
+    Ice,
+    Light,
+    Hylia,
+    Zonai,
+    Demise,
+    Leaf,
+    Sand,
+    Tornado,
+    Water,
+    Meteor,
+    Storm,
+    Shadow,
+    Slate,
+    Hourglass,
+    DarkCrystal,
+    SwordAura,
+    CaneBlue,
+    SeasonCycle
+};
 constexpr float Tau = 6.28318530718f;
 constexpr uint32_t ColorHex(Kind kind) {
     switch (kind) {
@@ -24,6 +45,27 @@ constexpr uint32_t ColorHex(Kind kind) {
             return 0x000000;
         case Kind::Leaf:
             return 0x5AC85A;
+        case Kind::Sand:
+            return 0xE8AC48;
+        case Kind::Tornado:
+            return 0x91EFBC;
+        case Kind::Water:
+            return 0x38A6FF;
+        case Kind::Meteor:
+            return 0xFF4818;
+        case Kind::Storm:
+            return 0xB5A8FF;
+        case Kind::Shadow:
+        case Kind::DarkCrystal:
+            return 0x9E38DA;
+        case Kind::Slate:
+            return 0x30CAFA;
+        case Kind::Hourglass:
+            return 0xF0C864;
+        case Kind::SwordAura:
+            return 0x78B4FF;
+        case Kind::CaneBlue:
+            return 0x5A90FF;
         default:
             return 0xE6E6EB;
     }
@@ -33,6 +75,9 @@ inline bool IsRod(Kind k) {
 }
 inline bool IsSpell(Kind k) {
     return k == Kind::Hylia || k == Kind::Zonai || k == Kind::Demise;
+}
+inline bool IsSpecial(Kind k) {
+    return k >= Kind::Sand && k <= Kind::CaneBlue;
 }
 struct Point {
     float x = 0, y = 0, z = 0;
@@ -141,6 +186,65 @@ inline void IceCrystal(Mesh& m, Point center, Point direction, float length, flo
         face(hi, nextHi, tip);
         face(nextLo, lo, base);
     }
+}
+inline Mesh SampleSpecial(Kind kind, uint32_t frame, const Basis& camera = {}) {
+    Mesh m;
+    const float t = Time(frame);
+    const uint32_t color = ColorHex(kind);
+    if (kind == Kind::Sand || kind == Kind::Water || kind == Kind::Meteor || kind == Kind::Hourglass) {
+        for (int i = 0; i < 10; ++i) {
+            const float f = float((frame + i * 11u) % 120u) / 120.f;
+            const float a = i * 2.4f + t;
+            Point p{ std::cos(a) * 8, 12 - 24 * f, std::sin(a) * 8 };
+            if (kind == Kind::Meteor)
+                p = { std::cos(a) * 7, -8 + 27 * f, std::sin(a) * 7 };
+            if (kind == Kind::Hourglass)
+                p = { std::sin(a) * .8f, 9 - 18 * f, std::cos(a) * .8f };
+            const uint8_t alpha = uint8_t(210 * std::sin(f * Tau * .5f));
+            if (kind == Kind::Water)
+                Band(m, p, p + Point{ -.5f, -4, 0 }, .4f, color, 0xE4F8FF, camera, alpha);
+            else
+                Glow(m, p, kind == Kind::Hourglass ? .4f : .75f, color, alpha, camera);
+        }
+    } else if (kind == Kind::Tornado || kind == Kind::Shadow || kind == Kind::DarkCrystal || kind == Kind::CaneBlue) {
+        for (int ring = 0; ring < 2; ++ring) {
+            auto p = [&](int j) {
+                const float f = j / 24.f, a = f * Tau * 1.6f + t * (ring ? -.9f : 1.4f) + ring * Tau * .5f;
+                const float r = kind == Kind::Tornado ? 3 + 10 * f : 13;
+                return Point{ r * std::cos(a), -13 + 26 * f, r * std::sin(a) };
+            };
+            for (int j = 0; j < 24; ++j)
+                Band(m, p(j), p(j + 1), .45f, color, kind == Kind::Tornado ? 0xF0FFF7 : 0xD5B6FF, camera, 150);
+        }
+    } else if (kind == Kind::Storm) {
+        for (int bolt = 0; bolt < 3; ++bolt) {
+            auto p = [&](int j) {
+                const float a = bolt * Tau / 3;
+                return Point{ 9 * std::cos(a) + 2 * std::sin(j * 2.6f + t * 8), -14 + j * 4.f, 9 * std::sin(a) };
+            };
+            for (int j = 0; j < 7; ++j)
+                Band(m, p(j), p(j + 1), .7f, color, 0xF5F3FF, camera, 200);
+        }
+    } else if (kind == Kind::Slate) {
+        for (int ring = 0; ring < 2; ++ring)
+            for (int j = 0; j < 24; ++j) {
+                auto p = [&](int k) {
+                    float a = k * Tau / 24 + t * (ring ? -1 : 1), r = 9 + ring * 5;
+                    return Plane(camera, r * std::cos(a), r * std::sin(a), 0);
+                };
+                Band(m, p(j), p(j + 1), .22f, color, 0xD1F8FF, camera, 120);
+            }
+    } else if (kind == Kind::SwordAura) {
+        for (int strand = 0; strand < 3; ++strand) {
+            auto p = [&](int j) {
+                float y = -24 + j * 5.f, a = t * 3 + j * .55f + strand * Tau / 3;
+                return Point{ 5 * std::sin(a), y, 5 * std::cos(a) };
+            };
+            for (int j = 0; j < 10; ++j)
+                Band(m, p(j), p(j + 1), 1.3f, color, 0xE5F1FF, camera, 180);
+        }
+    }
+    return m;
 }
 inline Mesh SampleShimmer(uint32_t frame, bool enabled, const Basis& camera = {}, Kind kind = Kind::Neutral) {
     Mesh m;
@@ -259,6 +363,86 @@ inline Mesh SampleEnergy(Kind kind, uint32_t frame, const Basis& camera = {}) {
             if (extent > .97f)
                 p = p * (.97f / extent);
         }
+    }
+    return m;
+}
+// 1 spring, 2 summer, 3 autumn, 4 winter; 5 cycles all four for the Rod.
+// Coordinates are in the incoming GI pose before its mesh-specific scaling.
+inline int SeasonProfile(uint32_t frame, int profile) {
+    return profile == 5 ? 1 + (frame / 180u) % 4 : profile;
+}
+inline Point SeasonSunCenter(const Basis& camera, bool rod) {
+    return rod ? Plane(camera, 16, 24) : Point{};
+}
+inline Mesh SampleSeason(uint32_t frame, int profile, const Basis& camera = {}) {
+    Mesh m;
+    const bool rod = profile == 5;
+    profile = SeasonProfile(frame, profile);
+    if (profile < 1 || profile > 4)
+        return m;
+    if (profile == 2) {
+        // A steady round sun with a soft halo. The separate
+        // textured corona scrolls slowly; no rising sparks or spell glints.
+        const Point center = SeasonSunCenter(camera, rod);
+        const float radius = rod ? 6.5f : 11.5f;
+        Glow(m, center, rod ? 14.f : 26.f, 0xFFD16A, 95, camera);
+        for (int j = 0; j < 24; ++j) {
+            const float a = Tau * j / 24, b = Tau * (j + 1) / 24;
+            m.Tri({ center, 0xFFF4B0, 245 },
+                  { center + Plane(camera, radius * std::cos(a), radius * std::sin(a)), 0xFFC83E, 235 },
+                  { center + Plane(camera, radius * std::cos(b), radius * std::sin(b)), 0xFFC83E, 235 });
+        }
+        return m;
+    }
+    const uint32_t lifetime = profile == 1 ? 80u : profile == 3 ? 210u : 240u;
+    const float drift = (frame % 360u) * (Tau / 360.f);
+    const float roll = (frame % (profile == 3 ? 240u : 1800u)) * (Tau / (profile == 3 ? 240.f : 1800.f));
+    for (int i = 0; i < 12; ++i) {
+        const float phase = float((frame % lifetime + i * 19u) % lifetime) / lifetime;
+        const float angle = i * 2.399963f;
+        const float x = (18 + i % 3 * 5) * std::cos(angle);
+        const float z = (18 + i % 3 * 5) * std::sin(angle);
+        const float fade = std::fmin(1.f, std::fmin(phase, 1 - phase) * 8.f);
+        const uint8_t alpha = uint8_t(210 * fade);
+        if (profile == 1) {
+            Point p{ x, 32 - 64 * phase, z };
+            Band(m, p, p + Point{ -1.2f, -6, 0 }, .55f, 0x5ABEFF, 0xDCF5FF, camera, alpha);
+        } else if (profile == 3) {
+            Point p{ x + 6 * std::sin(drift + i), 30 - 60 * phase, z };
+            Point along = Plane(camera, std::cos(roll + i) * 3.2f, std::sin(roll + i) * 3.2f);
+            Point across = Plane(camera, -std::sin(roll + i) * 1.6f, std::cos(roll + i) * 1.6f);
+            uint32_t color = i % 2 ? 0xF0A02C : 0xC85022;
+            m.Tri({ p + along, color, alpha }, { p + across, color, alpha }, { p - along, 0xFFD279, alpha });
+            m.Tri({ p + along, color, alpha }, { p - along, 0xFFD279, alpha }, { p - across, color, alpha });
+        } else {
+            Point p{ x + 4 * std::sin(drift + i), 32 - 64 * phase, z };
+            // Three thin crossing arms make a readable snowflake silhouette.
+            for (int arm = 0; arm < 3; ++arm) {
+                const float a = roll + i + arm * Tau / 6;
+                const Point d = Plane(camera, std::cos(a) * 1.8f, std::sin(a) * 1.8f);
+                Band(m, p - d, p + d, .24f, 0x8CCEFF, 0xF0FAFF, camera, alpha);
+            }
+        }
+    }
+    return m;
+}
+// Polar UVs put twelve soft rays around a circular sun. Scrolling the S tile
+// moves those rays around its rim without moving or distorting the sun disk.
+inline Mesh SampleSeasonSunRays(uint32_t frame, int profile, const Basis& camera = {}) {
+    Mesh m;
+    if (SeasonProfile(frame, profile) != 2)
+        return m;
+    const bool rod = profile == 5;
+    const Point center = SeasonSunCenter(camera, rod);
+    auto vertex = [&](int j, bool outer) {
+        const float angle = Tau * (j % 48) / 48;
+        const float radius = outer ? (rod ? 14.f : 24.f) : (rod ? 6.25f : 11.2f);
+        return EffectVertex{ center + Plane(camera, radius * std::cos(angle), radius * std::sin(angle)), 0xFFD16A, 210,
+                             j * (12.f / 48), outer ? 1.f : 0.f };
+    };
+    for (int j = 0; j < 48; ++j) {
+        m.Tri(vertex(j, false), vertex(j, true), vertex(j + 1, true));
+        m.Tri(vertex(j, false), vertex(j + 1, true), vertex(j + 1, false));
     }
     return m;
 }

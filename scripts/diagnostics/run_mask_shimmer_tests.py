@@ -19,7 +19,7 @@ foreign = (ROOT / 'combo/menu/ComboForeignAnim.h').read_text()
 foreign_linkage = re.search(r'extern "C" \{\nvoid FrameInterpolation_RecordOpenChild[^}]+\}', foreign).group(0)
 
 def function(source, name):
-    match = re.search(r'^(?:static )?(?:void|s32) ' + re.escape(name) + r'\([^;{}]*\)\s*\{', source, re.M)
+    match = re.search(r'^(?:(?:static|inline) )?(?:void|s32|bool) ' + re.escape(name) + r'\([^;{}]*\)\s*\{', source, re.M)
     if not match:
         raise ValueError(name)
     pos, depth = match.end(), 1
@@ -45,6 +45,41 @@ with tempfile.TemporaryDirectory(prefix='mask-shimmer-') as temporary:
         fixture = fixture.replace('/* PRODUCTION_DRAW_PRELUDE */', interpolation)
         fixture = fixture.replace('/* PRODUCTION_FOREIGN_LINKAGE */', foreign_linkage)
         fixture = fixture.replace('/* PRODUCTION_NATIVE */', 'extern "C" {\n' + '\n'.join(function(native, n) for n in names) + '\n}')
+        callbacks = ''
+        if host == 'mm':
+            callbacks = '\n'.join(function((ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text(), name)
+                                  for name in ['DrawOotRutosLetter', 'DrawOotBottleWithShimmer'])
+        if host == 'oot':
+            draw = oot_draw.replace('extern "C" void Randomizer_Draw', 'void Randomizer_Draw')
+            callbacks = '\n'.join(function(draw, 'Randomizer_Draw'+name+'Upgrade') for name in
+                                  ['Defense','Speed','Power','CrawlSpeed','ClimbSpeed','PushSpeed'])
+        fixture = fixture.replace('/* PRODUCTION_RPG_DRAWS */', callbacks)
+        seasonal = ('\n'.join(function(oot_draw, n) for n in
+                               ['Randomizer_DrawNeiRodOfSeasons', 'DrawSeasonCommon'])
+                    if host == 'oot' else
+                    function((ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text(), 'DrawOotNeiSeason'))
+        fixture = fixture.replace('/* PRODUCTION_SEASON_DRAWS */', seasonal)
+        native_dispatch = ''
+        if host == 'mm':
+            nei = (ROOT / 'mm/2s2h/Rando/NeiGiPresentation.cpp').read_text()
+            bindings = nei[nei.index('struct Binding {'):nei.index('} // namespace')]
+            native_dispatch = '''
+#include "Rando/Types.h"
+#include "ComboItemDrawABI.h"
+''' + bindings + '''
+static int ownerLookups;
+void* Combo_ResolveSym(const char*, const char*) { ++ownerLookups; return nullptr; }
+extern "C" const char* NeiResource_Route(const char*) { assert(false); return nullptr; }
+void DrawOotSlateRuneFlame(u8, u8, u8) { assert(false); }
+''' + function(nei, 'MM_DescribeNeiGi') + '\n' + function(nei, 'MM_DrawNeiGi') + '\n' + function(nei, 'MM_TryDrawNeiGi')
+        fixture = fixture.replace('/* PRODUCTION_NEI_NATIVE_DISPATCH */', native_dispatch)
+        blue = ''
+        if host == 'oot':
+            foreign_oot = (ROOT / 'combo/menu/ComboForeignDrawOOT.h').read_text()
+            macros = foreign_oot[foreign_oot.index('#define COMBO_FOREIGN_MTX'):foreign_oot.index('// Biggoron')]
+            blue = macros + function(foreign_oot, 'OOT_DrawForeignBlueFire')
+        fixture = fixture.replace('/* PRODUCTION_BLUE_FIRE */', blue)
+
         source = build / 'test.cpp'
         source.write_text(fixture)
         includes = [game, game+'/include', game+'/include/PR', game+'/src', game+'/assets', game+'/2s2h',

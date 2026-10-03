@@ -91,6 +91,8 @@ extern SaveContext gSaveContext;
 }
 
 #include "ComboMaskShimmer.h"
+#include "ComboMorphaGi.h"
+#include "ComboItemEffectColors.h"
 
 #ifdef COMBO_BUILD
 // ComboShip: combo-owned animated cross-game item rendering (MM stray fairies). TU-glue: needs the
@@ -855,6 +857,9 @@ extern "C" void DrawVolvagia(PlayState* play) {
 }
 
 extern "C" void DrawMorpha(PlayState* play) {
+    ComboDrawMorphaTentacleGi(play, "oot", [](const char* path, const char*) {
+        return ResourceMgr_FileExists(path) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path));
+    });
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
@@ -2523,23 +2528,15 @@ void Randomizer_DrawNeiShadowCrystal(PlayState* play, GetItemEntry* getItemEntry
 }
 
 void Randomizer_DrawNeiRodOfSeasons(PlayState* play, GetItemEntry* getItemEntry) {
+    NeiGi_DrawSeasonOverlay(play, 5, nullptr);
     static Gfx* c = NULL;
     static u8 t = 0;
     DrawCustomItemDiamondByPath(play, "__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL", &c, &t, 0.35f);
 }
 
-// Seasons: the same rod model wrapped in its season's flame — the flame colour IS the season's
-// identity, matching its wheel glyph.
+// Individual season GIs contain weather only; the actual rod has a separate callback.
 static void DrawSeasonCommon(PlayState* play, u8 season) {
-    static Gfx* c = NULL;
-    static u8 t = 0;
-    u8 r;
-    u8 g;
-    u8 b;
-
-    Seasons_SeasonColor(season, &r, &g, &b);
-    DrawWeaponFlameOverlay(play, r, g, b);
-    DrawCustomItemDiamondByPath(play, "__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL", &c, &t, 0.35f);
+    NeiGi_DrawSeasonOverlay(play, 1 + season, nullptr);
 }
 
 void Randomizer_DrawSeasonSpring(PlayState* play, GetItemEntry* getItemEntry) {
@@ -4361,6 +4358,9 @@ extern "C" void Randomizer_DrawDefenseUpgrade(PlayState* play, GetItemEntry* get
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gStatDefenseDL);
     CLOSE_DISPS(play->state.gfxCtx);
+    uint8_t color[4];
+    ComboRpgShimmerColor(0, color);
+    ComboDrawMaskShimmer(play, nullptr, color, nullptr);
 }
 
 extern "C" void Randomizer_DrawSpeedUpgrade(PlayState* play, GetItemEntry* getItemEntry) {
@@ -4370,6 +4370,9 @@ extern "C" void Randomizer_DrawSpeedUpgrade(PlayState* play, GetItemEntry* getIt
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gStatSpeedDL);
     CLOSE_DISPS(play->state.gfxCtx);
+    uint8_t color[4];
+    ComboRpgShimmerColor(1, color);
+    ComboDrawMaskShimmer(play, nullptr, color, nullptr);
 }
 
 extern "C" void Randomizer_DrawPowerUpgrade(PlayState* play, GetItemEntry* getItemEntry) {
@@ -4379,6 +4382,9 @@ extern "C" void Randomizer_DrawPowerUpgrade(PlayState* play, GetItemEntry* getIt
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gStatPowerDL);
     CLOSE_DISPS(play->state.gfxCtx);
+    uint8_t color[4];
+    ComboRpgShimmerColor(2, color);
+    ComboDrawMaskShimmer(play, nullptr, color, nullptr);
 }
 
 extern "C" void Randomizer_DrawCrawlSpeedUpgrade(PlayState* play, GetItemEntry* getItemEntry) {
@@ -4388,6 +4394,9 @@ extern "C" void Randomizer_DrawCrawlSpeedUpgrade(PlayState* play, GetItemEntry* 
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gStatCrawlSpeedDL);
     CLOSE_DISPS(play->state.gfxCtx);
+    uint8_t color[4];
+    ComboRpgShimmerColor(4, color);
+    ComboDrawMaskShimmer(play, nullptr, color, nullptr);
 }
 
 extern "C" void Randomizer_DrawClimbSpeedUpgrade(PlayState* play, GetItemEntry* getItemEntry) {
@@ -4397,6 +4406,9 @@ extern "C" void Randomizer_DrawClimbSpeedUpgrade(PlayState* play, GetItemEntry* 
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gStatClimbSpeedDL);
     CLOSE_DISPS(play->state.gfxCtx);
+    uint8_t color[4];
+    ComboRpgShimmerColor(5, color);
+    ComboDrawMaskShimmer(play, nullptr, color, nullptr);
 }
 
 extern "C" void Randomizer_DrawPushSpeedUpgrade(PlayState* play, GetItemEntry* getItemEntry) {
@@ -4406,4 +4418,7 @@ extern "C" void Randomizer_DrawPushSpeedUpgrade(PlayState* play, GetItemEntry* g
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gStatPushSpeedDL);
     CLOSE_DISPS(play->state.gfxCtx);
+    uint8_t color[4];
+    ComboRpgShimmerColor(6, color);
+    ComboDrawMaskShimmer(play, nullptr, color, nullptr);
 }

@@ -12,6 +12,7 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/randomizer/draw.h"
+#include "soh/Enhancements/randomizer/NeiGiPresentation.h"
 #include "soh/Enhancements/randomizer/NeiArticulatedPresentation.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/customequipment.h"
@@ -2430,7 +2431,13 @@ void Player_DrawGetItemImpl(PlayState* play, Player* this, Vec3f* refPos, s32 dr
     } else if (this->getItemEntry.drawFunc != NULL) {
         GetItemEntry_Draw(play, this->getItemEntry);
     } else {
-        GetItem_Draw(play, drawIdPlusOne - 1);
+        // Native rows also have authored GI/shimmer presentations. Use the
+        // actual acquisition draw ID without changing the stored award entry.
+        GetItemEntry drawEntry = this->getItemEntry;
+        drawEntry.gid = drawIdPlusOne - 1;
+        if (!NeiGi_Draw(play, &drawEntry)) {
+            GetItem_Draw(play, drawIdPlusOne - 1);
+        }
     }
 
     CLOSE_DISPS(play->state.gfxCtx);

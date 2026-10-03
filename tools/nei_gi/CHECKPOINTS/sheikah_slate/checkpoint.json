@@ -1,0 +1,25 @@
+{
+  "resource_count": 8,
+  "vertex_records": 1381,
+  "vertex_loads": 48,
+  "slug": "sheikah_slate",
+  "name": "Sheikah Slate",
+  "entry": "objects/nei_gi_redesign/sheikah_slate/gi_dl",
+  "draw_scale": 1.0,
+  "matrix_scale": 0.040618896484375,
+  "triangles": 1404,
+  "bounds_author": [
+    [
+      -29.0,
+      -33.0,
+      -4.875
+    ],
+    [
+      29.0,
+      47.1875,
+      4.875
+    ]
+  ],
+  "markers": {},
+  "runtime_tested": false
+}

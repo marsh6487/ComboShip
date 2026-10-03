@@ -33,6 +33,7 @@ mmrecipe += '\n' + function(mm, 'MM_FillAnimDrawInfo')
 mmrecipe += '\n' + function(mm, 'MM_HasAnimDraw')
 recipe += '\n' + function(oot, 'OOT_BossSoulUsesSkeleton')
 recipe += '\n' + function(oot, 'OOT_IsStateDependentDraw')
+recipe += '\n' + function(oot, 'OOT_DrawDependency')
 export = function(oot, 'OOT_GetItemDrawInfo')
 # Extract the complete dependency decision, including its surrounding guards.
 result_guard = export.index('if (result != 1)')

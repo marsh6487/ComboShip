@@ -32,7 +32,7 @@ if __name__=='__main__':
             subprocess.run([os.environ.get('CXX','c++'),'-std=c++20',*flags(),'-ffunction-sections','-fdata-sections','-c',str(ROOT/'mm/2s2h/Rando'/source),'-o',obj],check=True)
             native.append(obj)
         binary=str(Path(td)/'renderer-runtime')
-        subprocess.run([os.environ.get('CXX','c++'),'-std=c++20',*flags(),'-ffunction-sections','-fdata-sections',str(ROOT/'tests/mm_nei/renderer_runtime_test.cpp'),str(query),*native,'-Wl,--gc-sections','-Wl,--export-dynamic-symbol=OOT_NeiResourceExists','-o',binary],check=True)
+        subprocess.run([os.environ.get('CXX','c++'),'-std=c++20',*flags(),'-ffunction-sections','-fdata-sections',str(ROOT/'tests/mm_nei/renderer_runtime_test.cpp'),str(query),*native,'-Wl,--gc-sections','-Wl,--export-dynamic-symbol=OOT_NeiResourceExists','-Wl,--export-dynamic-symbol=OOT_GetNeiGiDrawInfo','-o',binary],check=True)
         subprocess.run([binary],check=True)
 
     subprocess.run([sys.executable,'-B',str(ROOT/'tests/mm_nei/run_dispatch_tests.py')],check=True)

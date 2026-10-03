@@ -21,6 +21,7 @@
 #include "ComboLiveCosmetics.h"
 #include "ComboExport.h"
 #include "ComboMaskShimmer.h"
+#include "ComboItemEffectColors.h"
 #include "libultraship/bridge.h" // CVarGetInteger / CVarGetColor24 (cosmetic key/nut colors)
 #include "libultraship/color.h"  // Color_RGB8
 #include "soh/cvar_prefixes.h"
@@ -586,11 +587,12 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
         case RG_SEASON_SPRING:
         case RG_SEASON_SUMMER:
         case RG_SEASON_AUTUMN:
-        case RG_SEASON_WINTER: {
-            Color_RGB8 flame{};
-            Seasons_SeasonColor(static_cast<uint8_t>(rg - RG_SEASON_SPRING), &flame.r, &flame.g, &flame.b);
-            return CwFlameGi(out, "__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL", .35f, flame);
-        }
+        case RG_SEASON_WINTER:
+            out->drawKind = CW_DRAW_KIND_SEASON_GI;
+            out->neiEffect = 1 + rg - RG_SEASON_SPRING;
+            out->dlistCount = 0;
+            out->xluStartIndex = -1;
+            return 1;
         case RG_SHEIKAH_SLATE:
             return CwCustomGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f);
         case RG_SLATE_RUNE_BOMB:
@@ -611,7 +613,11 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
         case RG_SHADOW_CRYSTAL:
             return CwCustomGi(out, "__OTR__objects/object_nei_shadow_crystal/gNeiShadowCrystalDL", .35f);
         case RG_ROD_OF_SEASONS:
-            return CwCustomGi(out, "__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL", .35f);
+            if (!CwCustomGi(out, "__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL", .35f))
+                return 0;
+            out->drawKind = CW_DRAW_KIND_SEASON_GI;
+            out->neiEffect = 5;
+            return 1;
         case RG_QUARTZ_OF_MOTION:
             return CwCustomGi(out, "__OTR__objects/object_nei_quartz_of_motion/gNeiQuartzOfMotionDL", .25f);
         case RG_EXT_DIVINE_SHIELD:
@@ -717,6 +723,31 @@ static bool OOT_IsStateDependentDraw(RandomizerGet rg) {
     }
 }
 
+static int32_t OOT_DrawDependency(RandomizerGet rg, const CwItemDrawInfo& info) {
+    if (rg == RG_MM_GREAT_SPIN_ATTACK || (rg >= RG_GOHMA_SOUL && rg <= RG_GANON_SOUL))
+        return 2;
+    if (OOT_IsStateDependentDraw(rg))
+        return 1;
+    if (info.stateDependent)
+        return info.stateDependent;
+    if (info.drawKind == CW_DRAW_KIND_NEI_GI)
+        return 2;
+    // Concrete swords can switch between the redesign and selected weapon pack.
+    // Refresh both recipes; progressive requests still freeze at grant time above.
+    switch (rg) {
+        case RG_KOKIRI_SWORD:
+        case RG_RAZOR_SWORD:
+        case RG_GILDED_SWORD:
+        case RG_MASTER_SWORD:
+        case RG_TRUE_MASTER_SWORD:
+        case RG_BIGGORON_SWORD:
+        case RG_GREAT_FAIRY_SWORD:
+            return 2;
+        default:
+            return 0;
+    }
+}
+
 extern "C" int32_t NeiGi_DescribeEntry(const GetItemEntry* entry, CwItemDrawInfo* out);
 
 extern "C" int32_t OOT_MagicJarUsesCustomAsset(const char* path);
@@ -730,8 +761,15 @@ static void OOT_DescribeMagicJar(s16 drawId, CwItemDrawInfo* out) {
         return;
     out->drawKind = CW_DRAW_KIND_MAGIC_JAR;
     out->stateDependent = 2; // live cosmetic edits and Alt toggles must re-resolve
-    if (CVarGetInteger(CVAR_COSMETIC("Consumable.Magic.Changed"), 0) && OOT_MagicJarUsesCustomAsset(out->dlists[0])) {
-        const Color_RGB8 color = CwLiveCosmeticColor(CVAR_COSMETIC("Consumable.Magic.Value"), { 0, 200, 0 });
+    const bool changed = CVarGetInteger(CVAR_COSMETIC("Consumable.Magic.Changed"), 0);
+    const Color_RGB8 color =
+        changed ? CwLiveCosmeticColor(CVAR_COSMETIC("Consumable.Magic.Value"), { 0, 200, 0 }) : Color_RGB8{ 0, 200, 0 };
+    out->itemShimmer = 1;
+    out->itemShimmerColor[0] = color.r;
+    out->itemShimmerColor[1] = color.g;
+    out->itemShimmerColor[2] = color.b;
+    out->itemShimmerColor[3] = 255;
+    if (changed && OOT_MagicJarUsesCustomAsset(out->dlists[0])) {
         out->primColorOpa[0] = color.r;
         out->primColorOpa[1] = color.g;
         out->primColorOpa[2] = color.b;
@@ -782,6 +820,34 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
         default:
             break;
     }
+    int statProfile = -1;
+    switch (effRg) {
+        case RG_DEFENSE_UPGRADE:
+            statProfile = 0;
+            break;
+        case RG_SPEED_UPGRADE:
+            statProfile = 1;
+            break;
+        case RG_POWER_UPGRADE:
+            statProfile = 2;
+            break;
+        case RG_MAGIC_STAT_UPGRADE:
+            statProfile = 3;
+            break;
+        case RG_CRAWL_SPEED_UPGRADE:
+            statProfile = 4;
+            break;
+        case RG_CLIMB_SPEED_UPGRADE:
+            statProfile = 5;
+            break;
+        case RG_PUSH_SPEED_UPGRADE:
+            statProfile = 6;
+            break;
+        default:
+            break;
+    }
+    if (ComboRpgShimmerColor(statProfile, out->itemShimmerColor))
+        out->itemShimmer = 1;
     if (CwAltSwordGi(effRg, out))
         return 1;
     if (NeiGi_DescribeEntry(&gi, out)) {
@@ -838,13 +904,15 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     GetItem_GetDrawSetupDLs((s32)gi.gid, &setupOpa, &setupXlu);
     out->setupDlOpa = setupOpa;
     out->setupDlXlu = setupXlu;
-    OOT_DescribeMagicJar((s16)gi.gid, out);
-    OOT_DescribeHeartCosmetics((s16)gi.gid, out);
     uint8_t nativeShimmerColor[4] = {};
     if (GetItem_GetShimmerColor((s16)gi.gid, nativeShimmerColor)) {
         out->itemShimmer = 1;
         std::memcpy(out->itemShimmerColor, nativeShimmerColor, sizeof(nativeShimmerColor));
     }
+    // Apply after native eligibility so dormant-owner rainbow sampling drives
+    // the foreign jar body and its shimmer from the same host-frame hue.
+    OOT_DescribeMagicJar((s16)gi.gid, out);
+    OOT_DescribeHeartCosmetics((s16)gi.gid, out);
     return 1;
 }
 
@@ -888,10 +956,7 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemDrawInfo(const char* itemName, CwItem
             return result;
         }
         // Keep appearance-only refreshes live after acquisition freezes progressive tiers.
-        if (rg == RG_MM_GREAT_SPIN_ATTACK || (rg >= RG_GOHMA_SOUL && rg <= RG_GANON_SOUL))
-            out->stateDependent = 2;
-        else if (!out->stateDependent)
-            out->stateDependent = OOT_IsStateDependentDraw(rg) ? 1 : 0;
+        out->stateDependent = OOT_DrawDependency(rg, *out);
         return 1;
     } catch (...) { return 0; }
 }

@@ -12,7 +12,11 @@
 
 #include <cstring>
 #include "ComboExport.h"
+#include "ComboResolve.h"
 #include "ComboItemDrawABI.h"
+#include "ComboOotBottleShimmerMM.h"
+#include "2s2h/Rando/NeiGiPresentation.h"
+#include "2s2h/Rando/NeiResourceRouting.h"
 #include "2s2h/Enhancements/ItemVisuals.h"
 #include "2s2h/Rando/DungeonItemVisuals.h"
 #include "2s2h/Rando/SpinAttackGi.h"
@@ -960,6 +964,9 @@ static bool MM_HasAnimDraw(RandoItemId id) {
 static bool MM_IsProgressiveItem(RandoItemId id) {
     switch (id) {
         case RI_PROGRESSIVE_SWORD:
+        case RI_OOT_PROGRESSIVE_HAMMER:
+        case RI_OOT_PROGRESSIVE_MASTER_SWORD:
+        case RI_OOT_PROGRESSIVE_BGS:
         case RI_PROGRESSIVE_BOW:
         case RI_PROGRESSIVE_BOMB_BAG:
         case RI_PROGRESSIVE_WALLET:
@@ -987,6 +994,75 @@ static bool MM_IsStateDependentDraw(RandoItemId id) {
         case RI_TRAP:
         case RI_TRIFORCE_PIECE:
         case RI_TRIFORCE_PIECE_PREVIOUS:
+            return true;
+        default:
+            return false;
+    }
+}
+
+// These concrete aliases have GID_NONE in MM. The owner already describes its
+// selected standalone/Din weapon and native scroll fallback; do not fall through
+// to the empty MM row when the authored NEI mesh is unavailable or declined.
+// This is export-only: MM's native NEI hook still returns false for legacy draws.
+static int32_t MM_FillImportedSwordFallback(RandoItemId id, CwItemDrawInfo* out) {
+    const char* name;
+    switch (id) {
+        case RI_OOT_MASTER_SWORD:
+            name = "Master Sword";
+            break;
+        case RI_OOT_TRUE_MASTER_SWORD:
+            name = "True Master Sword";
+            break;
+        case RI_OOT_BIGGORON_SWORD:
+            name = "Biggoron's Sword";
+            break;
+        default:
+            return 0;
+    }
+    static Fn_GetItemDrawInfo describe = nullptr;
+    if (!describe)
+        describe = reinterpret_cast<Fn_GetItemDrawInfo>(Combo_ResolveSym("soh", "OOT_GetItemDrawInfo"));
+    if (!describe)
+        return CW_DRAW_NOT_READY;
+    CwItemDrawInfo info{};
+    const int32_t result = describe(name, &info);
+    if (result != 1)
+        return result == CW_DRAW_NOT_READY ? result : 0;
+    if (info.dlistCount < 1 || info.dlistCount > CW_DRAW_MAX_DLISTS || info.opCount < 0 ||
+        info.opCount > CW_DRAW_MAX_OPS)
+        return 0;
+    for (int i = 0; i < info.dlistCount; ++i) {
+        const char* path = info.dlists[i];
+        if (!path || std::strncmp(path, "__OTR__", 7))
+            return 0;
+        if (path[7] != '@')
+            info.dlists[i] = NeiResource_Route(path);
+        else if (std::strncmp(path, "__OTR__@oot:", 12) && std::strncmp(path, "__OTR__@mm:", 11))
+            return 0;
+        if (!info.dlists[i])
+            return 0;
+    }
+    // The native MM true-tier drawer retains its gold blade independently of
+    // the sacred-blue flame. A selected CUSTOM_GI carries its own palette.
+    if (id == RI_OOT_TRUE_MASTER_SWORD && info.drawKind == CW_DRAW_KIND_MASTER_SWORD) {
+        const uint8_t gold[4] = { 255, 215, 110, 255 };
+        std::memcpy(info.primColorOpa, gold, 4);
+    }
+    const char* resolvedName = out->resolvedName;
+    *out = info;
+    out->resolvedName = resolvedName;
+    return 1;
+}
+
+static bool MM_IsSwordAppearanceDependent(RandoItemId id) {
+    switch (id) {
+        case RI_SWORD_KOKIRI:
+        case RI_SWORD_RAZOR:
+        case RI_SWORD_GILDED:
+        case RI_GREAT_FAIRY_SWORD:
+        case RI_OOT_MASTER_SWORD:
+        case RI_OOT_TRUE_MASTER_SWORD:
+        case RI_OOT_BIGGORON_SWORD:
             return true;
         default:
             return false;
@@ -1025,8 +1101,48 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     if (it == Rando::StaticData::Items.end()) {
         return 0;
     }
+    CwItemDrawInfo nei{};
+    if (MM_DescribeNeiGi(id, &nei)) {
+        const char* resolvedName = out->resolvedName;
+        *out = nei;
+        out->resolvedName = resolvedName;
+        return 1;
+    }
+    const int32_t swordFallback = MM_FillImportedSwordFallback(id, out);
+    if (swordFallback != 0)
+        return swordFallback;
+    // These two imported bottles have GID_NONE in MM: describe their OoT
+    // resources before consulting MM's native draw table.
+    if (id == RI_OOT_BOTTLE_BLUE_FIRE || id == RI_OOT_RUTOS_LETTER) {
+        out->dlistCount = 2;
+        out->xluStartIndex = 1;
+        if (id == RI_OOT_BOTTLE_BLUE_FIRE) {
+            out->drawKind = CW_DRAW_KIND_BLUE_FIRE;
+            out->dlists[0] = "__OTR__@oot:objects/object_gi_fire/gGiBlueFireChamberstickDL";
+            out->dlists[1] = "__OTR__@oot:objects/object_gi_fire/gGiBlueFireFlameDL";
+        } else {
+            out->drawKind = CW_DRAW_KIND_SIMPLE;
+            out->dlists[0] = "__OTR__@oot:objects/object_gi_bottle_letter/gGiLetterBottleContentsDL";
+            out->dlists[1] = "__OTR__@oot:objects/object_gi_bottle_letter/gGiLetterBottleDL";
+        }
+        out->itemShimmer = MM_OotBottleShimmerColor(id, out->itemShimmerColor);
+        return 1;
+    }
     if (MM_FillDungeonKeyModelInfo(id, (s16)it->second.drawId, out) ||
         MM_FillDungeonTintInfo(id, (s16)it->second.drawId, out)) {
+        return 1;
+    }
+    if (id == RI_OOT_NEI_ROD_OF_SEASONS || (id >= RI_OOT_NEI_SEASON_SPRING && id <= RI_OOT_NEI_SEASON_WINTER)) {
+        out->drawKind = CW_DRAW_KIND_SEASON_GI;
+        out->xluStartIndex = -1;
+        out->neiEffect = id == RI_OOT_NEI_ROD_OF_SEASONS ? 5 : 1 + id - RI_OOT_NEI_SEASON_SPRING;
+        if (id == RI_OOT_NEI_ROD_OF_SEASONS) {
+            out->dlistCount = 1;
+            out->scale = .35f;
+            out->dlists[0] = "__OTR__@oot:objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL";
+        } else {
+            out->dlistCount = 0;
+        }
         return 1;
     }
     if (id == RI_GREAT_SPIN_ATTACK) {
@@ -1074,6 +1190,9 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     out->setupDlOpa = setupOpa;
     out->setupDlXlu = setupXlu;
     out->itemShimmer = GetItem_GetShimmerColor((s16)it->second.drawId, out->itemShimmerColor);
+    if (MM_OotBottleShimmerColor(id, out->itemShimmerColor)) {
+        out->itemShimmer = 1;
+    }
     // ComboShip: some MM item bodies sample an animated segment-8 material their draw func binds via
     // AnimatedMat_Draw (Moon's Tear, fairy bottle). z_draw.c can't carry that across, so report the
     // texanim resource for the consumer to replicate (ComboForeignTexAnim_Run). Matched by DL string
@@ -1105,10 +1224,10 @@ extern "C" COMBO_EXPORT int32_t MM_GetItemDrawInfo(const char* itemName, CwItemD
             return 0; // the animated ABI serves the skeletal class (enemy souls, minifrogs)
         }
         *out = CwItemDrawInfo{};
-        if (!MM_FillItemDrawInfo(id, out)) {
-            return 0;
-        }
-        if (DungeonItem_GetOwner(id) >= 0 || id == RI_GREAT_SPIN_ATTACK) {
+        const int32_t result = MM_FillItemDrawInfo(id, out);
+        if (result != 1)
+            return result;
+        if (DungeonItem_GetOwner(id) >= 0 || id == RI_GREAT_SPIN_ATTACK || MM_IsSwordAppearanceDependent(id)) {
             out->stateDependent = 2;
         } else {
             out->stateDependent = (MM_IsProgressiveItem(id) || MM_IsStateDependentDraw(id)) ? 1 : 0;

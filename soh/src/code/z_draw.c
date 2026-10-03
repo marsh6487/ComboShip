@@ -1,4 +1,5 @@
 #include "global.h"
+#include <string.h>
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "din_fire_shield.h"
 #include <libultraship/bridge/resourcebridge.h>
@@ -407,6 +408,49 @@ DrawItemTableEntry sDrawItemTable[] = {
 
 s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]) {
     switch (drawId) {
+        case GID_POTION_RED: {
+            const uint8_t c[4] = { 255, 70, 50, 255 };
+            memcpy(color, c, 4);
+            return true;
+        }
+        case GID_POTION_GREEN:
+        case GID_MAGIC_SMALL:
+        case GID_MAGIC_LARGE: {
+            Color_RGB8 c = { 0, 200, 0 };
+            if (CVarGetInteger(CVAR_COSMETIC("Consumable.Magic.Changed"), 0))
+                c = CVarGetColor24(CVAR_COSMETIC("Consumable.Magic.Value"), c);
+            color[0] = c.r;
+            color[1] = c.g;
+            color[2] = c.b;
+            color[3] = 255;
+            return true;
+        }
+        case GID_POTION_BLUE:
+        case GID_BLUE_FIRE: {
+            const uint8_t c[4] = { 100, 160, 255, 255 };
+            memcpy(color, c, 4);
+            return true;
+        }
+        case GID_FAIRY: {
+            const uint8_t c[4] = { 255, 160, 235, 255 };
+            memcpy(color, c, 4);
+            return true;
+        }
+        case GID_POE: {
+            const uint8_t c[4] = { 100, 0, 200, 255 };
+            memcpy(color, c, 4);
+            return true;
+        }
+        case GID_BIG_POE: {
+            const uint8_t c[4] = { 150, 200, 0, 255 };
+            memcpy(color, c, 4);
+            return true;
+        }
+        case GID_BOTTLE:
+        case GID_MILK:
+        case GID_LETTER_RUTO:
+        case GID_FISH:
+        case GID_BUG:
         case GID_MASK_KEATON:
         case GID_MASK_SPOOKY:
         case GID_MASK_SKULL:

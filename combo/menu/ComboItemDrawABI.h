@@ -68,6 +68,7 @@ typedef enum {
     CW_DRAW_KIND_MAGIC_JAR = 33,            /* OoT magic jar: custom Alt grayscale tint carried in primColorOpa */
     CW_DRAW_KIND_CUSTOM_GI = 31,            /* OoT custom: spin, ops transforms, scale, OPA/XLU; primColorOpa grayscale,
                                          primColorXlu weapon flame; alpha zero disables each independent tint/effect. */
+    CW_DRAW_KIND_SEASON_GI = 36, /* neiEffect 1..4: weather-only (zero DLs); 5: legacy rod + cycling weather */
     CW_DRAW_KIND_GRAYSCALE_LAYERS = 35,     /* per-DL grayscale layerPrimMask/colors; OPA/XLU split */
     CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT = 34, /* concrete static award; ops[0] native equipment selector */
 } CwDrawKind;
@@ -193,6 +194,7 @@ typedef int32_t (*Fn_GetItemIconInfo)(const char* itemName, CwItemIconInfo* out)
 // Uses the registered asset owner and its Alt mode; no engine state crosses.
 typedef int32_t (*Fn_NeiResourceExists)(const char* path);
 int32_t OOT_NeiResourceExists(const char* path);
+int32_t OOT_NeiAltAssetsEnabled(void);
 typedef int32_t (*Fn_GetNeiGiDrawInfo)(const char* slug, CwItemDrawInfo* out);
 
 /* Returns 1 and fills out on success; 0 if the item is unknown/undrawable; CW_DRAW_NOT_READY if the
@@ -227,6 +229,8 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
         case CW_DRAW_KIND_NEI_CANE:
         case CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT:
             return 0; /* native kinds carry no resource lists; OPS bounds-checks every DL index */
+        case CW_DRAW_KIND_SEASON_GI:
+            return 0; /* weather-only profiles; resolvers separately require a model for profile 5 */
         default:
             return 1;
     }

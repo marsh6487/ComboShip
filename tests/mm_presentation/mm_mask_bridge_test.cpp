@@ -8,6 +8,7 @@
 #include <vector>
 #include <unordered_map>
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboItemEffectColors.h"
 #include "soh/mods/mm_sources/objects/object_gi_masks_all.h"
 #include "soh/mods/mm_sources/objects/object_mm_rando_items.h"
 #include "z64item.h"
@@ -143,6 +144,7 @@ enum {RI_NONE,RI_OOT_NEI_CANE_OF_SOMARIA,RI_OOT_NEI_CANE_PACCI_FLIP,RI_OOT_NEI_C
 void DrawOotNeiUltrahand() {assert(0);}
 void DrawOotNeiCaneOfSomaria(int) {assert(0);}
 void MM_DrawNeiGi(const CwItemDrawInfo&) {assert(0);}
+void NeiGi_DrawSeasonOverlay(PlayState*,int,const char*) {assert(0 && "mask fixture must not select weather");}
 /* OTHER_DRAW_HANDLERS */
 /* HOST_DISPATCH */
 int main() {

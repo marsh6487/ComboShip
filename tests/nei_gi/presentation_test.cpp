@@ -14,7 +14,7 @@
 #include <vector>
 
 namespace Fixture {
-int enabled, alt, loads, allocations, fallback, interpolation, vanilla, trap,
+int enabled, alt, dinSword, loads, allocations, fallback, interpolation, vanilla, trap,
     triforce;
 float matrix = 1;
 float matrixY = 0;
@@ -30,7 +30,7 @@ GraphicsContext gfx{};
 PlayState play{};
 GetItemEntry shopEntry{};
 void Reset() {
-  enabled = alt = loads = allocations = fallback = interpolation = 0;
+  enabled = alt = dinSword = loads = allocations = fallback = interpolation = 0;
   vanilla = trap = triforce = 0;
   matrix = 1;
   matrixY = 0;
@@ -82,7 +82,9 @@ f32 Math_SinS(s16) { return 0; }
 f32 Math_CosS(s16) { return 1; }
 void Matrix_RotateZYX(s16, s16, s16, u8) {}
 int32_t CVarGetInteger(const char *name, int32_t) {
-  return std::strcmp(name, CVAR_NEI_GI_EFFECTS) == 0 ? Fixture::enabled : 0;
+  if (std::strcmp(name, CVAR_NEI_GI_EFFECTS) == 0) return Fixture::enabled;
+  if (std::strcmp(name, CVAR_ENHANCEMENT("DinFireSword")) == 0) return Fixture::dinSword;
+  return 0;
 }
 ShopItemIdentity Randomizer_IdentifyShopItem(s32, u8) { return {}; }
 GetItemEntry
@@ -192,6 +194,42 @@ ORIGINAL(Randomizer_DrawMagnesis)
 ORIGINAL(Randomizer_DrawStasis)
 ORIGINAL(Randomizer_DrawLantern)
 ORIGINAL(Randomizer_DrawCryonis)
+ORIGINAL(Randomizer_DrawElementalWand)
+ORIGINAL(Randomizer_DrawExtFourSword)
+ORIGINAL(Randomizer_DrawExtDivineShield)
+ORIGINAL(Randomizer_DrawExtSheikahShield)
+ORIGINAL(Randomizer_DrawExtShieldOfIkana)
+ORIGINAL(Randomizer_DrawExtMagicCape)
+ORIGINAL(Randomizer_DrawExtSpiritBreastplate)
+ORIGINAL(Randomizer_DrawExtSagesTunic)
+ORIGINAL(Randomizer_DrawExtChampionsTunic)
+ORIGINAL(Randomizer_DrawExtPegasusAnklet)
+ORIGINAL(Randomizer_DrawExtTrident)
+ORIGINAL(Randomizer_DrawExtClimbBoots)
+ORIGINAL(Randomizer_DrawExtRocBoots)
+ORIGINAL(Randomizer_DrawExtPendantOfMemories)
+ORIGINAL(Randomizer_DrawNeiSheikahSlate)
+ORIGINAL(Randomizer_DrawSlateRuneBomb)
+ORIGINAL(Randomizer_DrawSlateRuneMasterCycle)
+ORIGINAL(Randomizer_DrawSlateRuneStasis)
+ORIGINAL(Randomizer_DrawSlateRuneCryonis)
+ORIGINAL(Randomizer_DrawSlateRuneSensor)
+ORIGINAL(Randomizer_DrawNeiPhantomHourglass)
+ORIGINAL(Randomizer_DrawNeiShadowCrystal)
+ORIGINAL(Randomizer_DrawNeiRodOfSeasons)
+ORIGINAL(Randomizer_DrawSeasonSpring)
+ORIGINAL(Randomizer_DrawSeasonSummer)
+ORIGINAL(Randomizer_DrawSeasonAutumn)
+ORIGINAL(Randomizer_DrawSeasonWinter)
+ORIGINAL(Randomizer_DrawProgressiveKokiriSword)
+ORIGINAL(Randomizer_DrawProgressiveMasterSword)
+ORIGINAL(Randomizer_DrawProgressiveBGS)
+ORIGINAL(Randomizer_DrawMasterSword)
+ORIGINAL(Randomizer_DrawRazorSword)
+ORIGINAL(Randomizer_DrawGildedSword)
+ORIGINAL(Randomizer_DrawTrueMasterSword)
+ORIGINAL(Randomizer_DrawGreatFairySword)
+ORIGINAL(Randomizer_DrawIronKnuckleAxe)
 ORIGINAL(UnrelatedDraw)
 #undef ORIGINAL
 static void DrawWeaponFlameOverlay(PlayState *, u8 r, u8 g, u8 b) {
@@ -212,6 +250,49 @@ int main() {
   entry.drawFunc = UnrelatedDraw;
   assert(!NeiGi_Draw(&play, &entry));
   assert(allocations == 0 && fallback == 0);
+
+  // Seasons are intrinsic weather in the common, shop and overhead routes,
+  // even with optional effects disabled and authored season/rod assets present.
+  const std::array<CustomDrawFunc, 4> seasons = {
+      Randomizer_DrawSeasonSpring, Randomizer_DrawSeasonSummer,
+      Randomizer_DrawSeasonAutumn, Randomizer_DrawSeasonWinter};
+  const char *seasonSlugs[] = {"season_spring", "season_summer", "season_autumn",
+                              "season_winter"};
+  for (size_t season = 0; season < seasons.size(); ++season) {
+    for (int assets = 0; assets < 3; ++assets) {
+      for (int route = 0; route < 3; ++route) {
+        Reset();
+        entry = {};
+        entry.drawFunc = seasons[season];
+        alt = assets == 2;
+        if (assets) {
+          const std::string prefix = assets == 2 ? "alt/" : "";
+          files.insert(prefix + "__OTR__objects/nei_gi_redesign/" +
+                       seasonSlugs[season] + "/gi_dl");
+          files.insert(prefix +
+                       "__OTR__objects/nei_gi_redesign/rod_of_seasons/gi_dl");
+        }
+        if (route == 0) {
+          GetItemEntry_Draw(&play, entry);
+        } else if (route == 1) {
+          EnGirlA shop{};
+          shop.actor.params = SI_RANDOMIZED_ITEM;
+          shopEntry = entry;
+          EnGirlA_Draw(&shop.actor, &play);
+        } else {
+          Player seasonalPlayer{};
+          Vec3f reference{};
+          seasonalPlayer.getItemEntry = entry;
+          Player_DrawGetItemImpl(&play, &seasonalPlayer, &reference, 1);
+        }
+        assert(!arena.empty() && gfx.polyXlu.p > xlu);
+        assert(Drawn().empty() && fallback == 0);
+        assert(stack.empty() && interpolation == 0 && loads == 0);
+      }
+    }
+  }
+  Reset();
+  entry = {};
 
   // A missing model retains the original draw and restores its matrix edits.
   entry.drawFunc = Randomizer_DrawWhip;
@@ -405,7 +486,7 @@ int main() {
     assert(fallback == 1 && Drawn().empty() && matrix == 1 && matrixY == 0);
   }
   for (auto draw : {Randomizer_DrawCanePacci, Randomizer_DrawCanePacciUpgrade,
-                   Randomizer_DrawCanePacciUltrahand, Randomizer_DrawExtCaneOfByrna}) {
+                   Randomizer_DrawCanePacciUltrahand}) {
     Reset();
     entry.drawFunc = draw;
     files.insert("__OTR__objects/nei_gi_redesign/cane_of_somaria/gi_dl");
@@ -415,6 +496,108 @@ int main() {
     assert(fallback == 1 && Drawn().empty());
   }
 
+  // Every authored equipment/item uses the original NEI shimmer sampler.
+  // Verify actual packed submissions through common, shop and acquisition
+  // entry points; intrinsic energy and both mesh passes must survive toggling.
+  size_t covered = 0;
+  for (const auto &item : kPresentations) {
+    if (!item.opaque) continue;
+    for (bool altOnly : {false, true}) {
+      for (int route = 0; route < 3; ++route) {
+        std::vector<std::vector<Vtx>> offMeshes;
+        std::vector<std::string> offPaths;
+        for (bool effects : {false, true}) {
+          Reset();
+          enabled = effects;
+          alt = altOnly;
+          entry = {};
+          entry.drawFunc = item.draw;
+          entry.drawItemId = item.identity;
+          entry.gid = item.nativeGid;
+          const std::string prefix = altOnly ? "alt/" : "";
+          files.insert(prefix + item.opaque);
+          if (item.translucent) files.insert(prefix + item.translucent);
+          if (route == 0) GetItemEntry_Draw(&play, entry);
+          else if (route == 1) {
+            EnGirlA shop{};
+            shop.actor.params = SI_RANDOMIZED_ITEM;
+            shopEntry = entry;
+            EnGirlA_Draw(&shop.actor, &play);
+          } else {
+            player = {};
+            player.getItemEntry = entry;
+            Player_DrawGetItemImpl(&play, &player, &ref, item.draw ? 1 : item.nativeGid + 1);
+          }
+          if (fallback || vanilla) std::cerr << "coverage " << item.opaque << " route=" << route << " alt=" << altOnly << " effects=" << effects << " fallback=" << fallback << " vanilla=" << vanilla << "\n";
+          assert(fallback == 0 && vanilla == 0);
+          assert(stack.empty() && interpolation == 0 && loads == 0);
+          if (!effects) {
+            offMeshes = arena;
+            offPaths = Drawn();
+          } else {
+            assert(Drawn() == offPaths);
+            assert(arena.size() == offMeshes.size() + (item.alwaysShimmer ? 0 : 1));
+            auto drawnMeshes = arena;
+            // Render the shared sampler alone to compare its packed vertices,
+            // including alpha/UV/color. Camera and frame are the same.
+            arena.clear();
+            NeiGi_DrawMesh(&play, NeiGi::SampleShimmer(play.gameplayFrames, true,
+                               NeiGi_CameraBasis(&play), item.effect));
+            assert(arena.size() == 1);
+            const auto &want = arena.front();
+            size_t matching = 0;
+            for (const auto &got : drawnMeshes)
+              if (got.size() == want.size() &&
+                  !std::memcmp(got.data(), want.data(), want.size() * sizeof(Vtx))) ++matching;
+            assert(matching == 1); // Exactly one shared shimmer, never a duplicate.
+          }
+        }
+      }
+    }
+    ++covered;
+  }
+  std::cout << "PASS all " << covered
+            << " authored bindings: shared shimmer, base/Alt, common/shop/acquisition, toggle and no duplicates\n";
+
+  // Selected swords keep their original drawer AND the shared shimmer. The
+  // callback deliberately changes the model matrix to catch a misplaced overlay.
+  Reset();
+  alt = 1;
+  entry = {};
+  entry.drawFunc = Randomizer_DrawMasterSword;
+  files.insert("__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL");
+  assert(NeiGi_Draw(&play, &entry));
+  assert(fallback == 1 && Drawn().empty() && arena.size() == 1);
+  assert(matrix == 1 && stack.empty() && interpolation == 0);
+
+  // Plain native swords and each concrete callback use their own GI. Selected
+  // standalone sword packs and the protected Din GI retain the existing route.
+  for (const auto test : {std::pair{GID_SWORD_KOKIRI,"kokiri_sword"},
+                         std::pair{GID_SWORD_BGS,"biggoron_sword"}}) {
+    Reset(); entry={}; entry.gid=test.first;
+    assert(NeiGi_Draw(&play,&entry));
+    assert(vanilla == 1 && arena.size() == 1);
+    Reset(); entry={}; entry.gid=test.first;
+    const std::string path=std::string("__OTR__objects/nei_gi_redesign/")+test.second+"/gi_dl";
+    files.insert(path); assert(NeiGi_Draw(&play,&entry));
+    assert(Drawn()==std::vector<std::string>{path} && !arena.empty() && stack.empty());
+    const char* selected=test.first==GID_SWORD_KOKIRI ?
+      "__OTR__alt/objects/object_custom_equip/gCustomKokiriSwordDL" :
+      "__OTR__alt/objects/object_custom_equip/gCustomLongswordDL";
+    files.insert(selected); alt=1;
+    const int nativeBefore = vanilla;
+    const size_t shimmerBefore = arena.size();
+    assert(NeiGi_Draw(&play,&entry));
+    assert(vanilla == nativeBefore + 1 && arena.size() == shimmerBefore + 1);
+    files.erase(selected);
+    const char* fire=test.first==GID_SWORD_KOKIRI ?
+      "__OTR__objects/din_fire_sword/progressive/child/SwordDL" :
+      "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
+    files.insert(fire); dinSword=1;
+    assert(NeiGi_Draw(&play,&entry));
+    assert(vanilla == nativeBefore + 2 && arena.size() == shimmerBefore + 2);
+    dinSword=0; assert(NeiGi_Draw(&play,&entry));
+  }
   // Serialized model vertices and resource matrices must clear the shelf by 0.5
   // world units under EnGirlA's real .25 actor scale / 24 local-unit Y offset.
   struct Bounds {
@@ -425,6 +608,8 @@ int main() {
     std::array<float, 3> minimum, maximum;
     float spinningWidth, drawScale;
     bool translucent;
+    int identity = 0;
+    int gid = -1;
   };
   const Bounds bounds[] = {
 #include "nei_gi_bounds.inc"
@@ -455,7 +640,10 @@ int main() {
   };
   for (const auto &b : bounds) {
     Reset();
+    entry = {};
     entry.drawFunc = b.draw;
+    entry.drawItemId = b.identity;
+    entry.gid = b.gid;
     const auto path = std::string("__OTR__objects/nei_gi_redesign/") + b.slug;
     files.insert(path + "/gi_dl");
     if (b.translucent)
@@ -489,12 +677,18 @@ int main() {
       if (!firstPreview)
         preview << ',';
       firstPreview = false;
+      const auto* authored = FindPresentation(&entry);
+      assert(authored);
       preview << "{\"slug\":\"" << b.slug << "\",\"name\":\"" << b.name
               << "\",\"callback\":\"Randomizer_Draw" << b.callback
               << "\",\"draw_scale\":" << b.drawScale << ",\"shop_matrix\":";
       writeMatrix(scale, y);
       preview << ",\"nonshop_matrix\":";
       writeMatrix(submitted.front().first, submitted.front().second);
+      preview << ",\"nei_effect\":" << int(authored->effect)
+              << ",\"effect_center\":[" << authored->effectCenter.x << ',' << authored->effectCenter.y
+              << ',' << authored->effectCenter.z << ']' << ",\"always_shimmer\":"
+              << (authored->alwaysShimmer ? "true" : "false");
       preview << ",\"bounds\":{\"resource\":";
       writeBounds(b, 1, 0);
       preview << ",\"nonshop\":";

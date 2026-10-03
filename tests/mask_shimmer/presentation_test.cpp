@@ -14,8 +14,10 @@ extern "C" {
 #include "z64.h"
 #include "macros.h"
 #include "functions.h"
+#include "soh_assets.h"
 #endif
 #include "objects/gameplay_keep/gameplay_keep.h"
+#define CVAR_COSMETIC(x) "gCosmetics." x
 }
 /* PRODUCTION_DRAW_PRELUDE */
 #include "soh/Enhancements/randomizer/NeiGiRender.h"
@@ -36,6 +38,7 @@ static std::vector<Transform> stack, sparkleTransforms;
 static std::vector<std::string> paths;
 
 extern "C" {
+void gSPSegment(void* p, int segment, uintptr_t base) { __gSPSegment((Gfx*)p,segment,base); }
 void gSPDisplayList(Gfx* p, Gfx* dl) {
     paths.emplace_back((const char*)dl);
     if (paths.back().find("gEffSparklesDL") != std::string::npos) {
@@ -56,6 +59,7 @@ void Matrix_Translate(f32 x, f32 y, f32 z, MatrixMode) {
 }
 Mtx* Matrix_Finalize(GraphicsContext*) { return &matrix; }
 void Gfx_SetupDL25_Xlu(GraphicsContext*) {}
+void Gfx_SetupDL25_Opa(GraphicsContext*) {}
 void Graph_OpenDisps(Gfx**, Gfx*, GraphicsContext*, const char*, s32) {}
 void Graph_CloseDisps(Gfx**, Gfx*, GraphicsContext*, const char*, s32) {}
 #else
@@ -65,8 +69,14 @@ void Matrix_Translate(f32 x, f32 y, f32 z, u8) {
 }
 Mtx* Matrix_NewMtx(GraphicsContext*, char*, s32) { return &matrix; }
 void Gfx_SetupDL_25Xlu(GraphicsContext*) {}
+void Gfx_SetupDL_25Opa(GraphicsContext*) {}
 void Graph_OpenDisps(Gfx**, GraphicsContext*, const char*, s32) {}
 void Graph_CloseDisps(Gfx**, GraphicsContext*, const char*, s32) {}
+#endif
+#ifdef HOST_MM
+void Matrix_RotateYF(f32, MatrixMode) {}
+#else
+void Matrix_RotateY(f32, u8) {}
 #endif
 void Matrix_ReplaceRotation(MtxF*) {}
 void Matrix_Get(MtxF* m) {
@@ -86,6 +96,10 @@ void gSPVertex(Gfx* cmd, uintptr_t data, int n, int v0) {
 }
 f32 Math_SinS(s16 a) { return sinf(a * 3.14159265358979323846f / 32768); }
 f32 Math_CosS(s16 a) { return cosf(a * 3.14159265358979323846f / 32768); }
+Color_RGB8 CVarGetColor24(const char*, Color_RGB8 color) { return color; }
+#ifndef HOST_MM
+int32_t CVarGetInteger(const char*, int32_t value) { return value; }
+#endif
 int DinFireShield_DrawItem(PlayState*, int16_t) { return 0; }
 #ifdef HOST_MM
 s16 Play_GetOriginalSceneId(s16 id) { return id; }
@@ -100,6 +114,7 @@ static void GetItem_DrawBottleShimmer(PlayState*, s16) { assert(false); }
 #define COMBO_MASK_SHIMMER_HOST_MM
 #endif
 #include "ComboMaskShimmer.h"
+#include "ComboItemEffectColors.h"
 /* PRODUCTION_FOREIGN_LINKAGE */
 using NeiGi::Kind;
 static bool HasResource(const char*) { return false; }
@@ -107,13 +122,46 @@ extern "C" {
 #ifdef HOST_MM
 #define Gfx_SetupDL_25Xlu Gfx_SetupDL25_Xlu
 #define Matrix_NewMtx(ctx, file, line) Matrix_Finalize(ctx)
+#define Gfx_SetupDL_25Opa Gfx_SetupDL25_Opa
+#define NEI_GI_ROTATE_Y Matrix_RotateYF
 #endif
 #include "soh/Enhancements/randomizer/NeiGiMeshRenderer.inc"
 #ifdef HOST_MM
 #undef Gfx_SetupDL_25Xlu
 #undef Matrix_NewMtx
+#undef Gfx_SetupDL_25Opa
+#undef NEI_GI_ROTATE_Y
 #endif
 }
+
+#ifdef HOST_MM
+extern "C" { PlayState* gPlayState = &play; }
+void DrawOotGetItemOpaXlu(const char* a, Gfx**, const char* b, Gfx**) { paths.emplace_back(a); paths.emplace_back(b); }
+#endif
+/* PRODUCTION_RPG_DRAWS */
+#ifdef HOST_MM
+bool DrawNeiRealOpa(const char* path, Gfx**, u8*, float, bool) { paths.emplace_back(path); return true; }
+void DrawOotRodStandIn(Gfx**, u8, u8, u8) { assert(false); }
+#else
+void DrawCustomItemDiamondByPath(PlayState*, const char* path, Gfx**, u8*, float) { paths.emplace_back(path); }
+#endif
+/* PRODUCTION_SEASON_DRAWS */
+/* PRODUCTION_NEI_NATIVE_DISPATCH */
+#ifndef HOST_MM
+struct ComboForeignDrawInfo { const char* dls[2]; };
+static int restoredBlueSegments, blueScrollCalls;
+void OOT_RestoreForeignSegs(PlayState*, const int32_t* segs, int32_t count) {
+    assert(count==1 && segs[0]==8); ++restoredBlueSegments;
+}
+extern "C" Gfx* Gfx_TwoTexScrollEx(GraphicsContext*, s32 tile1, u32 x1, u32 y1,
+    s32 w1, s32 h1, s32 tile2, u32 x2, u32 y2, s32 w2, s32 h2,
+    s32 dx1, s32 dy1, s32 dx2, s32 dy2) {
+    assert(tile1==0 && x1==0 && y1==0 && w1==16 && h1==32);
+    assert(tile2==1 && x2==47 && y2==uint32_t(-47*8) && w2==16 && h2==32);
+    assert(dx1==0 && dy1==0 && dx2==1 && dy2==-8); ++blueScrollCalls; return &resource;
+}
+#endif
+/* PRODUCTION_BLUE_FIRE */
 
 static void ModelDraw(PlayState*, s16 id) {
     gSPDisplayList(gfx.polyOpa.p++, (Gfx*)"__OTR__fixture/mask");
@@ -186,6 +234,34 @@ static std::vector<Vtx> Check(const uint8_t color[4], bool foreign, const char* 
     return actual;
 }
 int main() {
+    for (int season = 1; season <= 4; ++season) {
+        Reset(47);
+#ifdef HOST_MM
+        DrawOotNeiSeason(season);
+#else
+        DrawSeasonCommon(&play, season - 1);
+#endif
+        assert(paths.empty() && !vertexLoads.empty() && depth == 0);
+#ifdef HOST_MM
+        Reset(47);
+        assert(MM_TryDrawNeiGi(static_cast<RandoItemId>(RI_OOT_NEI_SEASON_SPRING + season - 1)));
+        assert(paths.empty() && !vertexLoads.empty() && depth == 0 && ownerLookups == 0);
+#endif
+    }
+#ifdef HOST_MM
+    gPlayState = nullptr;
+    assert(!MM_TryDrawNeiGi(RI_OOT_NEI_SEASON_SUMMER));
+    gPlayState = &play;
+    assert(!MM_TryDrawNeiGi(RI_OOT_NEI_WHIP)); // Fixture has no dormant OoT module.
+    assert(ownerLookups == 1);
+#endif
+    Reset(47);
+#ifdef HOST_MM
+    DrawOotNeiSeason(5);
+#else
+    Randomizer_DrawNeiRodOfSeasons(&play, nullptr);
+#endif
+    assert(paths.size() == 1 && paths[0].find("rod_of_seasons") != std::string::npos);
     for (auto& row : sDrawItemTable) { row.drawFunc = ModelDraw; row.drawResources[0] = (void*)"__OTR__fixture/mask"; }
     int eligible = 0;
     for (int id = 0; id < 256; ++id) {
@@ -211,11 +287,162 @@ int main() {
     const uint8_t expected[4][3] = { {50,220,90}, {240,64,64}, {64,144,255}, {0,0,0} };
     for (int i = 0; i < 4; ++i) { uint8_t color[4]; assert(GetItem_GetShimmerColor(special[i], color)); assert(!memcmp(color, expected[i], 3)); }
 #else
-    assert(eligible == 8);
+    uint8_t blueBottle[4]{};
+    assert(GetItem_GetShimmerColor(GID_POTION_BLUE, blueBottle));
+    assert(blueBottle[0]==100 && blueBottle[1]==160 && blueBottle[2]==255);
+    assert(eligible > 8);
 #endif
     for (int profile = 0; profile < 9; ++profile) {
         uint8_t color[4]; ComboMaskShimmerColor(profile, color);
         Reset(47); ComboDrawMaskShimmer(&play, "__OTR__@mm:objects/gameplay_keep/gEffSparklesDL", color, "mm"); Check(color, true);
+    }
+#ifndef HOST_MM
+    Reset(47); play.state.frames=47;
+    ComboForeignDrawInfo blueRecipe{{"__OTR__@oot:stick","__OTR__@oot:flame"}};
+    OOT_DrawForeignBlueFire(&play,&blueRecipe);
+    assert(paths.size()==2 && paths[0]==blueRecipe.dls[0] && paths[1]==blueRecipe.dls[1]);
+    assert(restoredBlueSegments==1 && blueScrollCalls==1 && depth==0 && stack.empty());
+    assert(transform.x==0 && transform.y==0 && transform.scale==1);
+    const auto statDraws = {Randomizer_DrawDefenseUpgrade, Randomizer_DrawSpeedUpgrade,
+        Randomizer_DrawPowerUpgrade, Randomizer_DrawCrawlSpeedUpgrade,
+        Randomizer_DrawClimbSpeedUpgrade, Randomizer_DrawPushSpeedUpgrade};
+    const int statProfiles[] = {0,1,2,4,5,6};
+    int statIndex=0;
+    for (auto draw: statDraws) {
+        uint8_t color[4]; ComboRpgShimmerColor(statProfiles[statIndex++], color);
+        Reset(47); draw(&play, nullptr); Check(color, false); assert(paths.size()==1);
+    }
+#endif
+#ifdef HOST_MM
+    Reset(47); DrawOotRutosLetter();
+    uint8_t letterColor[4]; ComboMaskShimmerColor(0,letterColor); Check(letterColor, true, "oot");
+    assert(paths.size()==2);
+    const uint8_t aliasColor[4]={100,160,255,255};
+    Reset(47); DrawOotBottleWithShimmer(GID_POTION_BLUE,aliasColor);
+    Check(aliasColor,true,"mm"); assert(paths.size()==1);
+#endif
+    for (int profile=0; profile<7; ++profile) {
+        uint8_t color[4]; assert(ComboRpgShimmerColor(profile, color));
+        Reset(47); ComboDrawMaskShimmer(&play, nullptr, color, nullptr); Check(color, false);
+    }
+    // Execute the shared GI body with both engines' real GBI. Its model and
+    // optional crystal pass must enclose every child effect in one owner scope.
+    for (Kind kind : {Kind::Neutral, Kind::Sand, Kind::Tornado, Kind::Water, Kind::Meteor,
+         Kind::Storm, Kind::Shadow, Kind::Slate, Kind::Hourglass, Kind::DarkCrystal,
+         Kind::SwordAura, Kind::CaneBlue}) for (bool shimmer : {false, true}) {
+        Reset(47);
+        constexpr float center[3] = {0,0,0};
+        constexpr const char* body = "__OTR__@oot:fixture/gi_dl";
+        constexpr const char* skin = "__OTR__@oot:fixture/gi_xlu_dl";
+        NeiGi_DrawPresentation(&play,body,skin,1,int(kind),center,shimmer,"oot");
+        const auto actual=ExpandedVertices(true,"oot");
+        auto expected=NeiGi::SampleSpecial(kind,47,NeiGi_CameraBasis(&play));
+        auto glitter=NeiGi::SampleShimmer(47,shimmer,NeiGi_CameraBasis(&play),kind);
+        assert(actual.size()==expected.count+glitter.count);
+        for(size_t i=0;i<actual.size();++i) {
+            const auto& v=i<expected.count ? expected.vertices[i] : glitter.vertices[i-expected.count];
+            assert(actual[i].v.ob[0]==std::lround(v.p.x*16));
+            assert(actual[i].v.ob[1]==std::lround(v.p.y*16));
+            assert(actual[i].v.ob[2]==std::lround(v.p.z*16));
+            assert(actual[i].v.cn[3]==v.alpha);
+        }
+        int scopes[2]={}, models[2]={};
+        int stream=0;
+        for(auto range : {std::pair(opa,gfx.polyOpa.p),std::pair(xlu,gfx.polyXlu.p)}) {
+            for(Gfx* cmd=range.first;cmd<range.second;++cmd) {
+                const unsigned op=cmd->words.w0>>24;
+                if(op==G_COMBO_RM_PUSH) {assert(!strcmp((const char*)cmd->words.w1,"oot"));++scopes[stream];}
+                if(op==G_COMBO_RM_POP) --scopes[stream];
+                if(op==G_DL_OTR_FILEPATH) {
+                    assert(scopes[stream]==1);
+                    assert(!strcmp((const char*)cmd->words.w1,stream ? skin : body));
+                    ++models[stream];
+                }
+            }
+            assert(scopes[stream]==0 && models[stream]==1); ++stream;
+        }
+        assert(depth==0 && stack.empty() && transform.scale==1 && resourceLoads==0);
+    }
+    for (int season=1; season<=5; ++season) for (int frame: {0,47,119,179,180,359,719,65535}) {
+        Reset(frame); NeiGi_DrawSeasonOverlay(&play, season, "oot");
+        const auto actual=ExpandedVertices(true, "oot");
+        auto expected=NeiGi::SampleSeason(frame, season, NeiGi_CameraBasis(&play));
+        const auto rays=NeiGi::SampleSeasonSunRays(frame, season, NeiGi_CameraBasis(&play));
+        for(size_t i=0;i<rays.count;++i) expected.vertices[expected.count++]=rays.vertices[i];
+        assert(!actual.empty() && actual.size()==expected.count && actual.size()<=720);
+        assert(depth==0 && stack.empty() && resourceLoads==0);
+        for(size_t i=0;i<actual.size();++i) {
+            const auto& v=expected.vertices[i];
+            assert(std::isfinite(v.p.x) && std::isfinite(v.p.y) && std::isfinite(v.p.z));
+            assert(actual[i].v.ob[0]==std::lround(v.p.x*16));
+            assert(actual[i].v.ob[1]==std::lround(v.p.y*16));
+            assert(actual[i].v.ob[2]==std::lround(v.p.z*16));
+            assert(actual[i].v.cn[3]==v.alpha);
+        }
+        Reset(frame); NeiGi_DrawSeasonOverlay(&play, season, "oot");
+        const auto repeat=ExpandedVertices(true, "oot");
+        assert(repeat.size()==actual.size());
+        for(size_t i=0;i<repeat.size();++i) assert(!memcmp(&repeat[i], &actual[i], sizeof(Vtx)));
+    }
+    Reset(47); NeiGi_DrawSeasonOverlay(&play, 0, nullptr); assert(vertexLoads.empty());
+    // The summer corona has one bounded, stable I8 tile. Its scroll is emitted
+    // by the real host renderer, independently of archive/resource selection.
+    uintptr_t sunImage = 0;
+    uint32_t scrollAt47 = 0, scrollAt51 = 0;
+    for (int frame : {47, 51}) {
+        Reset(frame); NeiGi_DrawSeasonOverlay(&play, 2, "oot");
+        int images = 0, scrolls = 0;
+        for (Gfx* cmd = xlu; cmd < gfx.polyXlu.p; ++cmd) {
+            const unsigned op = cmd->words.w0 >> 24;
+            if (op == G_SETTIMG) {
+                ++images;
+                assert(((cmd->words.w0 >> 21) & 7) == G_IM_FMT_I);
+                if (sunImage) assert(sunImage == cmd->words.w1);
+                sunImage = cmd->words.w1;
+            }
+            if (op == G_SETTILESIZE && (cmd->words.w0 & 0x00ffffff)) {
+                ++scrolls;
+                (frame == 47 ? scrollAt47 : scrollAt51) = cmd->words.w0 & 0x00ffffff;
+            }
+        }
+        assert(images == 1 && scrolls == 1 && sunImage);
+        assert(resourceLoads == 0 && depth == 0 && stack.empty());
+        ExpandedVertices(true, "oot");
+    }
+    assert(scrollAt47 != scrollAt51);
+    for (int season = 1; season <= 5; ++season) {
+        Reset(227); // The rod is in its summer phase.
+        for (int slot = 0; slot < 8; ++slot) NeiGi_DrawSeasonOverlay(&play, season, "oot");
+        size_t vertexBytes = 0;
+        for (const auto& allocation : arena) vertexBytes += allocation.size() * sizeof(Vtx);
+        assert(vertexBytes < 65536 && gfx.polyXlu.p - xlu < 2048);
+        assert(depth == 0 && stack.empty() && transform.scale == 1 && paths.empty());
+        ExpandedVertices(true, "oot");
+        printf("Season %d: eight items use %zu vertex bytes and %td XLU commands\n",
+               season, vertexBytes, gfx.polyXlu.p - xlu);
+    }
+    Reset(47); allocationFailure=true; NeiGi_DrawSeasonOverlay(&play, 4, "oot");
+    assert(ExpandedVertices(true,"oot").empty() && depth==0); allocationFailure=false;
+    // The authored Rod composes one model with cycling weather through the
+    // shared renderer. This must survive the art/season boundary in both hosts.
+    for (int frame : {0, 227, 407, 587}) {
+        Reset(frame);
+        constexpr float center[3] = {0, 0, 0};
+        constexpr const char* rod = "__OTR__@oot:objects/nei_gi_redesign/rod_of_seasons/gi_dl";
+        NeiGi_DrawPresentation(&play, rod, nullptr, 1, int(Kind::SeasonCycle), center, false, "oot");
+        auto expected = NeiGi::SampleSeason(frame, 5, NeiGi_CameraBasis(&play));
+        auto rays = NeiGi::SampleSeasonSunRays(frame, 5, NeiGi_CameraBasis(&play));
+        auto actual = ExpandedVertices(true, "oot");
+        assert(actual.size() == expected.count + rays.count && !actual.empty());
+        int models = 0;
+        for (Gfx* cmd = opa; cmd < gfx.polyOpa.p; ++cmd) {
+            if ((cmd->words.w0 >> 24) == G_DL_OTR_FILEPATH) {
+                assert(!strcmp((const char*)cmd->words.w1, rod));
+                ++models;
+            }
+        }
+        assert(models == 1 && resourceLoads == 0);
+        assert(depth == 0 && stack.empty() && transform.scale == 1);
     }
     uint8_t ordinary[4]; ComboMaskShimmerColor(0, ordinary);
     Reset(47); ComboDrawMaskShimmer(&play, nullptr, ordinary, "oot"); Check(ordinary, true, "oot");
@@ -228,5 +455,5 @@ int main() {
         Fixture_DrawCShimmer(&play, ordinary); Check(ordinary, false);
     }
     Reset(47); GetItem_Draw(&play, GID_BOMB); assert(paths.size() == 1 && sparkleTransforms.empty());
-    puts("PASS real-header mask/remains shimmer: eligibility, transformation hex, black highlights, exact NEI shimmer geometry, deterministic sampling, texture independence, allocation fallback and matrix/color/RM cleanup");
+    puts("PASS both-host weather-only native seasons, rod isolation, sun I8 scroll, bounded shop submission and retained mask/remains shimmer");
 }

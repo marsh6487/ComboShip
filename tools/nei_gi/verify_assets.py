@@ -15,7 +15,17 @@ PREFIX = "objects/nei_gi_redesign/"
 ITEMS = ("fire_rod", "ice_rod", "light_rod", "rocs_feather", "time_gate", "whip", "shovel",
          "gust_jar", "hylia_grace", "zonai_permafrost", "demise_destruction", "ball_and_chain",
          "deku_leaf", "mogma_mitts", "switch_hook", "beetle", "lantern",
-         "spinner", "cane_of_somaria", "minish_cap", "rocs_cape")
+         "spinner", "cane_of_somaria", "minish_cap", "rocs_cape",
+         "divine_shield", "sheikah_shield", "shield_of_ikana", "magic_cape",
+         "spirit_breastplate", "sages_tunic", "champions_tunic", "pegasus_anklet",
+         "trident", "climb_boots", "roc_boots", "cane_of_byrna", "four_sword",
+         "pendant_of_memories", "elemental_wand", "sand_rod", "tornado_rod", "water_rod",
+         "meteor_rod", "storm_rod", "shadow_scepter", "sheikah_slate", "slate_bomb",
+         "slate_master_cycle", "slate_stasis", "slate_cryonis", "slate_sensor",
+         "phantom_hourglass", "shadow_crystal",
+         "rod_of_seasons", "kokiri_sword", "razor_sword",
+         "gilded_sword", "master_sword", "true_master_sword", "biggoron_sword",
+         "great_fairy_sword", "iron_knuckle_axe")
 
 
 def face_key(points):
