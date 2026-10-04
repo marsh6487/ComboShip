@@ -798,9 +798,9 @@ static void OOT_DescribeHeartCosmetics(s16 drawId, CwItemDrawInfo* out) {
 static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     RandomizerGet actual = RG_NONE;
     GetItemEntry gi = *Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual);
-    if (actual != RG_NONE) {
-        out->resolvedName = Rando::StaticData::RetrieveItem(actual).GetName().english.c_str();
-    }
+    // Self/base tiers also need a frozen name (Cane, Roc, Stone of Agony).
+    // Otherwise a repeat receipt could ask the donor to describe its next tier.
+    out->resolvedName = Rando::StaticData::RetrieveItem(actual != RG_NONE ? actual : rg).GetName().english.c_str();
     // Progressive items resolve to the tier actually owed; classify THAT item's draw func, not the
     // placeholder's (drawItemId carries the resolved RandomizerGet for rando-table entries).
     RandomizerGet effRg = actual != RG_NONE                  ? actual

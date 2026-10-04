@@ -82,6 +82,7 @@ checks = r'''
 int main() {
  CwItemDrawInfo info{};
  assert(OOT_FillItemDrawInfo(RG_TEST_CUSTOM,&info)==0);
+ assert(info.resolvedName && std::string(info.resolvedName)=="Awarded tier"); // self/base tiers also latch names
  assert(tableCalls==0); // custom callback must never consult bottle row zero
  redesigned=true;
  assert(OOT_FillItemDrawInfo(RG_TEST_CUSTOM,&info)==1);

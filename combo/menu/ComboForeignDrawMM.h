@@ -85,7 +85,7 @@ struct ComboForeignDrawInfoOOT {
     // every frame instead of caching, or the first model drawn sticks for the whole save slot.
     bool stateDependent = false;
     bool appearanceDependent = false; // Keep cosmetic palettes live after grant latching.
-    // Resolved tier name (e.g. "Longshot") when a progressive placeholder converted, else empty.
+    // Resolved receipt identity: the actual progressive tier or the base item name.
     std::string resolvedName;
     int32_t neiEffect = 0;
     float neiEffectCenter[3] = {};
@@ -248,6 +248,7 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
 // grant-time latch below so both observe the same sweep.
 struct ComboForeignDrawCacheOOT {
     std::unordered_map<int32_t, ComboForeignDrawInfoOOT> map;
+    std::unordered_map<int32_t, std::string> receiptNames;
     int slot = -1;
     uint64_t gen = (uint64_t)-1;
 };
@@ -258,6 +259,7 @@ inline ComboForeignDrawCacheOOT& ComboForeignDrawCacheOOTGet() {
     uint64_t gen = Rando::MiscBehavior::ComboRandoGen();
     if (slot != c.slot || gen != c.gen) {
         c.map.clear();
+        c.receiptNames.clear();
         c.slot = slot;
         c.gen = gen;
     }
@@ -295,6 +297,8 @@ inline void ComboLatchForeignDrawOOT(RandoCheckId rc) {
     if (ComboFillForeignDrawInfoOOT(rc, info) != ComboForeignResolveOOT::Ok) {
         return; // nothing written, nothing erased: the draw stays live, i.e. no worse than before
     }
+    if (!info.resolvedName.empty())
+        c.receiptNames[rc] = info.resolvedName;
     if (info.animOk) {
         return; // that class's state-dependence is a CVar (SimplerBossSoulModels), not save state
     }
@@ -302,15 +306,15 @@ inline void ComboLatchForeignDrawOOT(RandoCheckId rc) {
     c.map[rc] = info;
 }
 
-// Frozen tier name only: NULL unless latched (stateDependent == false) with a non-empty name. Never
-// serves a live entry, so a pickup can't show the tier the NEXT copy would give.
+// The receipt identity remains frozen even when the model's cosmetic recipe is
+// live. Both caches reset together when the save slot or foreign map changes.
 inline const char* ComboForeignLatchedNameOOT(RandoCheckId rc) {
     ComboForeignDrawCacheOOT& c = ComboForeignDrawCacheOOTGet();
-    auto it = c.map.find(rc);
-    if (it == c.map.end() || it->second.stateDependent || it->second.resolvedName.empty()) {
+    auto it = c.receiptNames.find(rc);
+    if (it == c.receiptNames.end() || it->second.empty()) {
         return nullptr;
     }
-    return it->second.resolvedName.c_str();
+    return it->second.c_str();
 }
 
 // Live tier name for previews: runs the same per-frame resolver the shelf model uses.

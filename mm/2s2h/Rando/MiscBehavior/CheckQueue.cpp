@@ -5,6 +5,7 @@
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/BenGui/Notification.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
+#include "2s2h/Rando/ItemReceiptText.h"
 #include "2s2h/ShipUtils.h"
 #include "Traps.h"
 #ifdef COMBO_BUILD
@@ -179,13 +180,20 @@ void Rando::MiscBehavior::CheckQueue() {
                             CustomMessage::Entry entry = {
                                 .textboxType = 2,
                                 .icon = Rando::ComboForeignMessageIcon(cid),
-                                .msg = (foreignTrap ? GetTrapMessage() : ("You found " + foreignName + "!")) +
-                                       BankRewardSourceSuffix(cid),
+                                .msg = foreignTrap ? GetTrapMessage() : ("You found " + foreignName + "!"),
                             };
+                            if (!foreignTrap && fi != nullptr) {
+                                // Resolve before SendForeignCheck changes the donor's progressive tier.
+                                const char* resolved = Rando::ComboForeignLatchedName(cid);
+                                Rando::ApplyForeignItemReceiptText(resolved ? resolved : fi->itemName.c_str(), entry,
+                                                                   cid);
+                            }
+                            Rando::AppendReceiptSource(entry, BankRewardSourceSuffix(cid));
                             if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
                                 CustomMessage::SetActiveCustomMessage(entry.msg, entry);
                             } else if (Rando::MiscBehavior::ShouldShowForeignCutscene(cid)) {
-                                CustomMessage::StartTextbox(entry.msg + "\x1C\x02\x10", entry);
+                                CustomMessage::StartTextbox(entry.autoFormat ? entry.msg + "\x1C\x02\x10" : entry.msg,
+                                                            entry);
                             }
                             randoSaveCheck.cycleObtained = true;
                             randoSaveCheck.obtained = true;
@@ -251,14 +259,16 @@ void Rando::MiscBehavior::CheckQueue() {
                         CustomMessage::Entry entry = {
                             .textboxType = 2,
                             .icon = Rando::StaticData::GetIconForZMessage(randoItemId),
-                            .msg = (prefix == "" ? "" : prefix + " ") + message + (randoItemId == RI_TRAP ? "" : "!") +
-                                   BankRewardSourceSuffix((RandoCheckId)CUSTOM_ITEM_PARAM),
+                            .msg = (prefix == "" ? "" : prefix + " ") + message + (randoItemId == RI_TRAP ? "" : "!"),
                         };
+                        Rando::ApplyItemReceiptText(randoItemId, entry);
+                        Rando::AppendReceiptSource(entry, BankRewardSourceSuffix((RandoCheckId)CUSTOM_ITEM_PARAM));
 
                         if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
                             CustomMessage::SetActiveCustomMessage(entry.msg, entry);
                         } else if (Rando::StaticData::ShouldShowGetItemCutscene(randoItemId)) {
-                            CustomMessage::StartTextbox(entry.msg + "\x1C\x02\x10", entry);
+                            CustomMessage::StartTextbox(entry.autoFormat ? entry.msg + "\x1C\x02\x10" : entry.msg,
+                                                        entry);
                         } else {
                             if (Rando::StaticData::Items[randoItemId].randoItemType != RITYPE_JUNK) {
                                 Notification::Emit({

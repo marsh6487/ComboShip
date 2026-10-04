@@ -15,6 +15,9 @@
 #include "soh/ShipInit.hpp"
 #include <soh/ResourceManagerHelpers.h>
 #ifdef COMBO_BUILD
+#include "ComboExport.h"
+#include "ComboItemReceiptText.h"
+#include "message_data_static.h"
 #include "rando/CrossForeign.h"
 #include "soh/Enhancements/randomizer/hook_handlers.h"
 #include "soh/Enhancements/randomizer/draw.h"
@@ -24,6 +27,7 @@ extern "C" int (*gComboOtherTriforceCount)(void);
 
 #include <cstdarg>
 #include <algorithm>
+#include <cstring>
 
 extern "C" {
 #include "variables.h"
@@ -43,6 +47,98 @@ struct CustomItemMessageEntry {
     const char* french;
 };
 extern const CustomItemMessageEntry* GetCustomItemMessage(s16 rgId);
+
+#ifdef COMBO_BUILD
+extern "C" MessageTableEntry* sNesMessageEntryTablePtr;
+void BuildQuarterHeartMessage(CustomMessage& msg);
+void BuildDefenseUpgradeMessage(CustomMessage& msg);
+void BuildSpeedUpgradeMessage(CustomMessage& msg);
+void BuildPowerUpgradeMessage(CustomMessage& msg);
+void BuildMagicStatUpgradeMessage(CustomMessage& msg);
+void BuildCrawlSpeedUpgradeMessage(CustomMessage& msg);
+void BuildClimbSpeedUpgradeMessage(CustomMessage& msg);
+void BuildPushSpeedUpgradeMessage(CustomMessage& msg);
+
+// Read-only counterpart to OOT_GetItemDrawInfo. The caller supplies its own
+// buffer; no C++ object, donor pointer, icon ID or story state crosses the ABI.
+extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName, char* buffer, uint32_t capacity) {
+    try {
+        if (!itemName || !buffer || !capacity || !OTRGlobals::Instance || !OTRGlobals::Instance->gRandoContext ||
+            !OTRGlobals::Instance->gRandomizer)
+            return 0;
+        const auto found = Rando::StaticData::itemNameToEnum.find(itemName);
+        if (found == Rando::StaticData::itemNameToEnum.end() || found->second == RG_NONE ||
+            found->second == RG_COMBO_FOREIGN || found->second == RG_ICE_TRAP)
+            return 0;
+        const RandomizerGet rg = found->second;
+        auto item = Rando::StaticData::RetrieveItem(rg);
+        // Consumables/traps retain their normal brief receipts.
+        if (item.GetCategory() == ITEM_CATEGORY_JUNK)
+            return 0;
+        std::string body;
+        void (*builder)(CustomMessage&) = nullptr;
+        switch (rg) {
+            case RG_QUARTER_HEART:
+                builder = BuildQuarterHeartMessage;
+                break;
+            case RG_DEFENSE_UPGRADE:
+                builder = BuildDefenseUpgradeMessage;
+                break;
+            case RG_SPEED_UPGRADE:
+                builder = BuildSpeedUpgradeMessage;
+                break;
+            case RG_POWER_UPGRADE:
+                builder = BuildPowerUpgradeMessage;
+                break;
+            case RG_MAGIC_STAT_UPGRADE:
+                builder = BuildMagicStatUpgradeMessage;
+                break;
+            case RG_CRAWL_SPEED_UPGRADE:
+                builder = BuildCrawlSpeedUpgradeMessage;
+                break;
+            case RG_CLIMB_SPEED_UPGRADE:
+                builder = BuildClimbSpeedUpgradeMessage;
+                break;
+            case RG_PUSH_SPEED_UPGRADE:
+                builder = BuildPushSpeedUpgradeMessage;
+                break;
+            default:
+                break;
+        }
+        if (builder) {
+            CustomMessage message;
+            builder(message); // same read-only description builder as OoT's own receipt
+            if (!ComboItemReceiptText::FromOotMessage(message.GetEnglish(MF_RAW), body))
+                return 0;
+        } else {
+            const auto* custom = GetCustomItemMessage(rg);
+            if (custom && custom->english && *custom->english) {
+                body = ComboItemReceiptText::FromNeiMarkup(custom->english);
+            } else {
+                const auto gi = item.GetGIEntryUnresolved();
+                if (!gi)
+                    return 0;
+                if (gi->textId != TEXT_RANDOMIZER_CUSTOM_ITEM && sNesMessageEntryTablePtr) {
+                    for (const auto* text = sNesMessageEntryTablePtr; text->textId != 0xFFFF; ++text) {
+                        if (text->textId != gi->textId)
+                            continue;
+                        if (!text->segment ||
+                            !ComboItemReceiptText::FromOotMessage(std::string_view(text->segment, text->msgSize), body))
+                            return 0;
+                        break;
+                    }
+                }
+            }
+        }
+        if (body.empty() || body.size() > capacity)
+            return 0;
+        std::memcpy(buffer, body.data(), body.size());
+        return static_cast<int32_t>(body.size());
+    } catch (...) {
+        return 0; // exceptions must not unwind into the other game module
+    }
+}
+#endif
 
 void BuildTriforcePieceMessage(CustomMessage& msg) {
     auto rando = OTRGlobals::Instance->gRandomizer;
