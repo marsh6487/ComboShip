@@ -20,16 +20,16 @@ struct CustomMessage {
 };
 /* MAGIC_BUILDER */
 int main() {
-    for (int owned : {0, 7, 8}) {
+    for (int owned : {0, 2, 7, 8, 254, 255}) {
         gSaveContext.ship.quest.data.randomizer.magicStatUpgrades = owned;
         CustomMessage message;
         BuildMagicStatUpgradeMessage(message);
-        assert(message.english.find("%gMagic Meter%w") != std::string::npos);
-        assert(message.english.find("%yMagic Meter") == std::string::npos);
-        if (owned == 0) assert(message.english.find("7") != std::string::npos);
+        assert(message.english.find("%yMagic Meter%w") != std::string::npos);
+        if (owned == 0) assert(message.english.find("%c7%w more") != std::string::npos);
+        if (owned == 2) assert(message.english.find("%c5%w more") != std::string::npos);
         if (owned == 7) assert(message.english.find("Max magic reached") != std::string::npos);
-        if (owned == 8) assert(message.english.find("Already at max magic") != std::string::npos);
+        if (owned >= 8) assert(message.english.find("Already at max magic") != std::string::npos);
         assert(gSaveContext.ship.quest.data.randomizer.magicStatUpgrades == owned);
     }
-    std::cout << "Magic receipt keeps green identity at partial, complete and overflow tiers\n";
+    std::cout << "Yellow magic receipt keeps RPG remaining counts and handles saturated tiers\n";
 }

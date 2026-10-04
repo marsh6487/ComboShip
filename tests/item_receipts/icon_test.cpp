@@ -9,14 +9,12 @@
 #define RANDO_ENUM_ITEM(x) x,
 #define RANDO_ENUM_END(x) };
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"
+#include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboSongDrawOOT.h"
 constexpr int ITEM_FISH = 0x19, ITEM_HEART_CONTAINER = 0x72;
 constexpr int ITEM_MEDALLION_FOREST = 0x66, ITEM_HEART_PIECE_2 = 0x7A;
 constexpr int ITEM_ROCS_FEATHER_SKIJER = 0xA0, ICON_SIZE_24 = 0;
 struct GetItemEntry { int itemId; };
-struct CwItemIconInfo {
-    const char* path = nullptr;
-    int width = 0, height = 0, isIA8 = 0;
-};
 void* gItemIcons[256]{};
 namespace Rando::StaticData {
 struct Item {

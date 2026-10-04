@@ -195,8 +195,9 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info) {
 }
 
 bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
-    if (!out || HasMmLegacyGiMod(item))
+    if (!out)
         return false;
+    *out = CwItemDrawInfo{};
     if (item >= RI_OOT_NEI_SEASON_SPRING && item <= RI_OOT_NEI_SEASON_WINTER) {
         *out = CwItemDrawInfo{};
         out->drawKind = CW_DRAW_KIND_SEASON_GI;
@@ -210,16 +211,36 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
             binding = &candidate;
             break;
         }
-    if (!binding)
+    if (!binding) {
+        Kind kind;
+        if (item == RI_OOT_NEI_POKE_BALL)
+            kind = Kind::Pokeball;
+        else if (item == RI_OOT_NEI_CANE_PACCI_FLIP || item == RI_OOT_NEI_CANE_PACCI_STONE ||
+                 item == RI_OOT_NEI_CANE_PACCI_ULTRAHAND)
+            kind = Kind::Pacci;
+        else
+            return false;
+        out->neiShimmer = static_cast<int>(kind) + 1;
+        out->itemShimmer = CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0) != 0;
+        out->stateDependent = 2;
         return false;
+    }
     static Fn_GetNeiGiDrawInfo describe = nullptr;
     if (!describe)
         describe = (Fn_GetNeiGiDrawInfo)Combo_ResolveSym("soh", "OOT_GetNeiGiDrawInfo");
     if (!describe)
         return false;
     CwItemDrawInfo info{};
-    if (describe(binding->slug, &info) != 1)
+    const bool authored = describe(binding->slug, &info) == 1;
+    out->neiShimmer = info.neiShimmer;
+    const bool mandatory = info.neiShimmer > 0 &&
+                           (NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1)) ||
+                            item == RI_OOT_IRON_KNUCKLE_AXE || item == RI_OOT_NEI_MARIO_MASK);
+    out->itemShimmer = mandatory || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0);
+    out->stateDependent = 2;
+    if (!authored || HasMmLegacyGiMod(item))
         return false;
+    info.itemShimmer = out->itemShimmer;
     for (int i = 0; i < info.dlistCount; ++i) {
         info.dlists[i] = NeiResource_Route(info.dlists[i]);
         if (!info.dlists[i])
@@ -241,23 +262,17 @@ bool MM_TryDrawNeiGi(RandoItemId item) {
     return true;
 }
 
-MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer(RandoItemId item) : mItem(item), mEnabled(false) {
+MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer(RandoItemId item) : mKind(Kind::Neutral), mEnabled(false) {
     if (!gPlayState)
         return;
     // Its legacy drawer already has an unconditional mask shimmer.
     if (item == RI_OOT_NEI_MARIO_MASK)
         return;
-    const bool sword = item == RI_SWORD_KOKIRI || item == RI_SWORD_RAZOR || item == RI_SWORD_GILDED ||
-                       item == RI_GREAT_FAIRY_SWORD || item == RI_OOT_MASTER_SWORD ||
-                       item == RI_OOT_TRUE_MASTER_SWORD || item == RI_OOT_BIGGORON_SWORD ||
-                       item == RI_OOT_IRON_KNUCKLE_AXE;
-    if (!sword && !CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0))
-        return;
-    // The four seasons are deliberately absent: their weather is the GI.
-    mEnabled = item == RI_OOT_NEI_POKE_BALL || item == RI_OOT_NEI_CANE_PACCI_FLIP ||
-               item == RI_OOT_NEI_CANE_PACCI_STONE || item == RI_OOT_NEI_CANE_PACCI_ULTRAHAND ||
-               std::any_of(std::begin(kBindings), std::end(kBindings),
-                           [item](const Binding& binding) { return binding.id == item; });
+    CwItemDrawInfo info{};
+    MM_DescribeNeiGi(item, &info);
+    mEnabled = info.itemShimmer && info.neiShimmer > 0 && info.neiShimmer <= static_cast<int>(Kind::MarioMask) + 1;
+    if (mEnabled)
+        mKind = static_cast<Kind>(info.neiShimmer - 1);
     if (mEnabled)
         Matrix_Push();
 }
@@ -266,51 +281,6 @@ MM_NeiGiFallbackShimmer::~MM_NeiGiFallbackShimmer() {
     if (!mEnabled)
         return;
     Matrix_Pop();
-    Kind kind = Kind::Neutral;
-    switch (mItem) {
-        case RI_OOT_NEI_CANE_OF_SOMARIA:
-        case RI_OOT_NEI_CANE_SOMARIA_BLOCK:
-        case RI_OOT_NEI_CANE_SOMARIA_PLATFORM:
-            kind = Kind::Somaria;
-            break;
-        case RI_OOT_NEI_CANE_PACCI_FLIP:
-        case RI_OOT_NEI_CANE_PACCI_STONE:
-        case RI_OOT_NEI_CANE_PACCI_ULTRAHAND:
-            kind = Kind::Pacci;
-            break;
-        case RI_OOT_NEI_POKE_BALL:
-            kind = Kind::Pokeball;
-            break;
-        case RI_OOT_NEI_DEKU_LEAF:
-            kind = Kind::Leaf;
-            break;
-        case RI_SWORD_KOKIRI:
-            kind = Kind::MmKokiriSword;
-            break;
-        case RI_SWORD_RAZOR:
-            kind = Kind::RazorSword;
-            break;
-        case RI_SWORD_GILDED:
-            kind = Kind::GildedSword;
-            break;
-        case RI_OOT_MASTER_SWORD:
-            kind = Kind::MasterSword;
-            break;
-        case RI_OOT_TRUE_MASTER_SWORD:
-            kind = Kind::SwordAura;
-            break;
-        case RI_OOT_BIGGORON_SWORD:
-            kind = Kind::BiggoronSword;
-            break;
-        case RI_GREAT_FAIRY_SWORD:
-            kind = Kind::GreatFairySword;
-            break;
-        case RI_OOT_EXT_FOUR_SWORD:
-            kind = Kind::FourSword;
-            break;
-        default:
-            break;
-    }
     NeiGi_DrawMesh(gPlayState,
-                   NeiGi::SampleShimmer(gPlayState->gameplayFrames, true, NeiGi_CameraBasis(gPlayState), kind));
+                   NeiGi::SampleShimmer(gPlayState->gameplayFrames, true, NeiGi_CameraBasis(gPlayState), mKind));
 }

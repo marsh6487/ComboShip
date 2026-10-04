@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+"""Run the production descriptor when replacement geometry is unavailable.
+
+Only archive selection and CVar reads are controlled: the ABI fields returned
+by the real producer must still drive the host's independent effect pass.
+"""
+import os
+import re
+from pathlib import Path
+import subprocess
+import tempfile
+
+from run_mm_scene_randomization_tests import function
+
+ROOT = Path(__file__).resolve().parents[2]
+body = function((ROOT / 'soh/soh/Enhancements/randomizer/NeiGiPresentation.cpp').read_text(),
+                'NeiGi_FillCrossGameInfo')
+source = r'''
+#include <cassert>
+#include <cstring>
+#include "combo/menu/ComboItemDrawABI.h"
+#include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
+using NeiGi::Kind;
+struct Vec3f {float x,y,z;};
+struct Presentation {
+    void (*draw)(); const char* opaque; const char* translucent; float scale;
+    Kind effect; Vec3f effectCenter; bool alwaysShimmer;
+};
+void Randomizer_DrawCaneSomariaUpgrade() {}
+bool mod, selectedSword, resources; int enabled;
+#define CVAR_NEI_GI_EFFECTS "gEnhancements.SkijerNEI.ItemEffects"
+int CVarGetInteger(const char*,int) {return enabled;}
+bool HasLegacyGiMod(const Presentation&,bool) {return mod;}
+bool HasSelectedSword(const Presentation&,bool,bool (*)(const char*)) {return selectedSword;}
+int OOT_NeiAltAssetsEnabled() {return true;}
+int OOT_NeiResourceExists(const char*) {return resources;}
+''' + body + r'''
+int main() {
+    for(Kind kind : {Kind::Fire,Kind::Ice,Kind::Light,Kind::Hylia,Kind::Zonai,Kind::Demise,
+                    Kind::Leaf,Kind::SlateBomb,Kind::SlateCycle,Kind::SlateStasis,
+                    Kind::SlateCryonis,Kind::SlateSensor,Kind::Somaria,Kind::Pacci,
+                    Kind::Pokeball,Kind::FourSword,Kind::MasterSword}) {
+        const bool mandatory=NeiGi::IsSword(kind);
+        Presentation p{nullptr,"__OTR__objects/nei_gi_redesign/test/gi_dl",nullptr,1,kind,{},mandatory};
+        for(int effects : {0,1}) for(int selection : {0,1,2,3}) {
+            enabled=effects; mod=selection==1; selectedSword=selection==2; resources=selection!=3;
+            CwItemDrawInfo out{};
+            const bool authored=NeiGi_FillCrossGameInfo(p,&out);
+            assert(authored==(selection==0));
+            assert(out.neiShimmer==int(kind)+1 && "declining the model discarded the item identity");
+            assert(out.itemShimmer==(mandatory||effects));
+            assert(out.stateDependent==2 && "live model selection cannot freeze after a grant");
+            if(!authored) {
+                assert(out.dlistCount==0 && out.neiEffect==0 && "mod mesh inherited authored energy");
+            } else {
+                assert(out.dlistCount==1 && out.neiEffect==int(kind));
+            }
+        }
+    }
+}
+'''
+with tempfile.TemporaryDirectory(prefix='nei-identity-') as temporary:
+    path=Path(temporary)
+    (path/'fixture.cpp').write_text(source)
+    subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),str(path/'fixture.cpp'),
+                    '-o',str(path/'fixture')],check=True)
+    subprocess.run([str(path/'fixture')],check=True)
+print('PASS production NEI identity descriptors: 17 themes, authored/mod/custom/missing selection, effects off/on')
+
+mm = (ROOT/'mm/2s2h/Rando/NeiGiPresentation.cpp').read_text()
+bindings = re.search(r'struct Binding \{.*?const Binding kBindings\[\] = \{.*?\n\};', mm, re.S)[0]
+header = (ROOT/'mm/2s2h/Rando/NeiGiPresentation.h').read_text()
+fallback = mm[mm.index('MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer'):]
+source = source[:source.index('int main() {')] + r'''
+#include <algorithm>
+#include "mm/2s2h/Rando/Types.h"
+struct PlayState {uint32_t gameplayFrames=47;};
+PlayState play; PlayState* gPlayState=&play;
+Kind awardKind=Kind::Fire; bool mmMod; int pushes, draws;
+NeiGi::Mesh captured;
+void Matrix_Push() {++pushes;} void Matrix_Pop() {assert(pushes>0);--pushes;}
+NeiGi::Basis NeiGi_CameraBasis(PlayState*) {return {};}
+void NeiGi_DrawMesh(PlayState*,const NeiGi::Mesh& mesh) {captured=mesh;++draws;}
+int Describe(const char*,CwItemDrawInfo* out) {
+    Presentation p{nullptr,"__OTR__objects/nei_gi_redesign/test/gi_dl",nullptr,1,awardKind,{},NeiGi::IsSword(awardKind)};
+    return NeiGi_FillCrossGameInfo(p,out);
+}
+void* Combo_ResolveSym(const char*,const char*) {return reinterpret_cast<void*>(Describe);}
+const char* NeiResource_Route(const char* path) {return path;}
+int ResourceMgr_IsModAssetForGame(const char*,const char*) {return mmMod;}
+''' + bindings + '\n' + header[header.index('class MM_NeiGiFallbackShimmer'):] + '\n'
+source += function(mm,'HasMmLegacyGiMod')+'\n'+function(mm,'MM_DescribeNeiGi')+'\n'+fallback
+source += r'''
+int main() {
+    const std::pair<RandoItemId,Kind> awards[]={
+        {RI_OOT_NEI_FIRE_ROD,Kind::Fire},{RI_OOT_NEI_ICE_ROD,Kind::Ice},
+        {RI_OOT_NEI_LIGHT_ROD,Kind::Light},{RI_OOT_NEI_HYLIAS_GRACE,Kind::Hylia},
+        {RI_OOT_NEI_ZONAI_PERMAFROST,Kind::Zonai},{RI_OOT_NEI_DEMISE_DESTRUCTION,Kind::Demise},
+        {RI_OOT_NEI_SLATE_RUNE_BOMB,Kind::SlateBomb},{RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE,Kind::SlateCycle},
+        {RI_OOT_NEI_SLATE_RUNE_STASIS,Kind::SlateStasis},{RI_OOT_NEI_SLATE_RUNE_CRYONIS,Kind::SlateCryonis},
+        {RI_OOT_NEI_DESIRE_SENSOR,Kind::SlateSensor},{RI_OOT_EXT_CANE_OF_BYRNA,Kind::CaneBlue},
+        {RI_OOT_EXT_FOUR_SWORD,Kind::FourSword},{RI_SWORD_KOKIRI,Kind::MmKokiriSword},
+        {RI_SWORD_RAZOR,Kind::RazorSword},{RI_OOT_MASTER_SWORD,Kind::MasterSword},
+        {RI_OOT_NEI_CANE_OF_SOMARIA,Kind::Somaria},{RI_OOT_NEI_CANE_PACCI_FLIP,Kind::Pacci},
+        {RI_OOT_NEI_POKE_BALL,Kind::Pokeball}};
+    for(const auto& award:awards) for(int effects:{0,1}) for(int selection:{1,2,3,4}) {
+        awardKind=award.second; enabled=effects; resources=selection!=3;
+        mod=selection==1; selectedSword=selection==2; mmMod=selection==4;
+        CwItemDrawInfo info{};
+        const bool authored=MM_DescribeNeiGi(award.first,&info);
+        if(selection!=4 || award.first==RI_OOT_NEI_FIRE_ROD || award.first==RI_SWORD_KOKIRI ||
+           award.first==RI_OOT_EXT_FOUR_SWORD) assert(!authored);
+        assert(info.neiShimmer==int(award.second)+1);
+        assert(info.itemShimmer==(NeiGi::IsSword(award.second)||effects));
+        draws=0;
+        {MM_NeiGiFallbackShimmer fallback(award.first);}
+        assert(draws==(NeiGi::IsSword(award.second)||effects));
+        assert(pushes==0);
+        if(draws) {
+            const auto expected=NeiGi::SampleShimmer(play.gameplayFrames,true,{},award.second);
+            assert(captured.count==expected.count);
+            for(size_t i=0;i<captured.count;++i)
+                assert(captured.vertices[i].rgb==expected.vertices[i].rgb &&
+                       captured.vertices[i].p.x==expected.vertices[i].p.x);
+        }
+    }
+}
+'''
+with tempfile.TemporaryDirectory(prefix='mm-nei-identity-') as temporary:
+    path=Path(temporary)
+    (path/'fixture.cpp').write_text(source)
+    subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),str(path/'fixture.cpp'),
+                    '-o',str(path/'fixture')],check=True)
+    subprocess.run([str(path/'fixture')],check=True)
+print('PASS native MM fallback: 19 themes retain exact sampler through owner and native mod selection, no attached energy')

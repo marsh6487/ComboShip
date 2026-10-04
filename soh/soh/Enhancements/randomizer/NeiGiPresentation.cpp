@@ -910,7 +910,15 @@ static bool NeiGi_FillSeasonInfo(int season, CwItemDrawInfo* out) {
 }
 
 static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* out) {
-    if (!out || HasLegacyGiMod(item, true) ||
+    if (!out)
+        return false;
+    // Identity belongs to the award, independently of the mesh selected by
+    // either archive manager. A declined replacement still supplies shimmer
+    // metadata, while leaving authored mesh-local energy unset.
+    out->neiShimmer = static_cast<int32_t>(item.effect) + 1;
+    out->itemShimmer = item.alwaysShimmer || CVarGetInteger(CVAR_NEI_GI_EFFECTS, 0);
+    out->stateDependent = 2;
+    if (!item.opaque || HasLegacyGiMod(item, true) ||
         HasSelectedSword(item, OOT_NeiAltAssetsEnabled(),
                          [](const char* path) { return OOT_NeiResourceExists(path) != 0; }) ||
         !OOT_NeiResourceExists(item.opaque) || (item.translucent && !OOT_NeiResourceExists(item.translucent))) {
@@ -931,12 +939,6 @@ static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* ou
     out->neiEffectCenter[1] = item.effectCenter.y;
     out->neiEffectCenter[2] = item.effectCenter.z;
     out->neiSomariaUpgrade = item.draw == Randomizer_DrawCaneSomariaUpgrade;
-    if (item.alwaysShimmer)
-        out->itemShimmer = 1;
-    if (item.alwaysShimmer) {
-        const uint8_t ordinary[4] = { 220, 225, 240, 255 };
-        std::memcpy(out->itemShimmerColor, ordinary, 4);
-    }
     return true;
 }
 

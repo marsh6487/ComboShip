@@ -621,23 +621,23 @@ void BuildPowerUpgradeMessage(CustomMessage& msg) {
 }
 
 void BuildMagicStatUpgradeMessage(CustomMessage& msg) {
-    uint8_t level = gSaveContext.ship.quest.data.randomizer.magicStatUpgrades + 1;
+    const unsigned level = static_cast<unsigned>(gSaveContext.ship.quest.data.randomizer.magicStatUpgrades) + 1;
     uint8_t required = StatUpgradeRequired(8, RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE, RSK_MAGIC_STAT_UPGRADE_TOTAL,
                                            RSK_MAGIC_STAT_UPGRADE_REQUIRED);
     if (level < required) {
         uint8_t remaining = required - level;
-        msg = { "You found a %gMagic Meter%w!&%c[[remaining]]%w more to reach max stat.",
-                "Du erhältst ein %gMagisches Maß%w!&Noch %c[[remaining]]%w bis zum Maximum.",
-                "Vous trouvez une %gJauge de Magie%w!&Encore %c[[remaining]]%w pour atteindre le maximum." };
+        msg = { "You found a %yMagic Meter%w!&%c[[remaining]]%w more to reach max stat.",
+                "Du erhältst ein %yMagisches Maß%w!&Noch %c[[remaining]]%w bis zum Maximum.",
+                "Vous trouvez une %yJauge de Magie%w!&Encore %c[[remaining]]%w pour atteindre le maximum." };
         msg.Replace("[[remaining]]", std::to_string(remaining));
     } else if (level == required) {
-        msg = { "You found a %gMagic Meter%w!&%gMax magic reached!%w",
-                "Du erhältst ein %gMagisches Maß%w!&%gMaximale Magie erreicht!%w",
-                "Vous trouvez une %gJauge de Magie%w!&%gMagie maximale atteinte!%w" };
+        msg = { "You found a %yMagic Meter%w!&%gMax magic reached!%w",
+                "Du erhältst ein %yMagisches Maß%w!&%gMaximale Magie erreicht!%w",
+                "Vous trouvez une %yJauge de Magie%w!&%gMagie maximale atteinte!%w" };
     } else {
-        msg = { "You found a %gMagic Meter%w!&%rAlready at max magic!%w",
-                "Du erhältst ein %gMagisches Maß%w!&%rBereits bei maximaler Magie!%w",
-                "Vous trouvez une %gJauge de Magie%w!&%rMagie déjà au maximum!%w" };
+        msg = { "You found a %yMagic Meter%w!&%rAlready at max magic!%w",
+                "Du erhältst ein %yMagisches Maß%w!&%rBereits bei maximaler Magie!%w",
+                "Vous trouvez une %yJauge de Magie%w!&%rMagie déjà au maximum!%w" };
     }
     msg.AutoFormat(ITEM_CUSTOM);
 }
