@@ -89,8 +89,9 @@
 #include "item_rocs_feather_vanilla.c"
 #include "item_dominionrod.c"
 #include "item_cane_of_somaria.c"
-#include "../helpers/box_menu.c"    // Skijer's NEI: generic hold-button box selector (slate runes, ...)
-#include "item_elemental_wand.c"    // Skijer's NEI: six rods behind one item action (wandMode dispatch)
+#include "../helpers/box_menu.c" // Skijer's NEI: generic hold-button box selector (slate runes, ...)
+#include "item_elemental_wand.c" // Skijer's NEI: six rods behind one item action (wandMode dispatch)
+#include "item_rod_of_seasons.c"
 #include "item_sheikah_slate.c"     // Skijer's NEI: four runes behind one page-2 cell (slateMode dispatch)
 #include "item_phantom_hourglass.c" // Skijer's NEI: ToTK Recall on one actor, over rewind_helper
 #include "item_time_gate.c"

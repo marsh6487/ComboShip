@@ -5,6 +5,7 @@
  */
 
 #include "z_object_kankyo.h"
+#include "2s2h/Enhancements/Audio/MMWeather.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "BenPort.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
@@ -324,15 +325,42 @@ void func_808DC454(ObjectKankyo* this, PlayState* play) {
     }
 }
 
+static s32 ObjectKankyo_IsSeasonSnowOwner(ObjectKankyo* this, PlayState* play) {
+    Actor* first = NULL;
+    for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].first; actor != NULL; actor = actor->next) {
+        if (actor->id != ACTOR_OBJECT_KANKYO || actor->params < 1 || actor->params > 3 || actor->update == NULL) {
+            continue;
+        }
+        if (first == NULL) {
+            first = actor;
+        }
+        if (actor->params == 2 && ((ObjectKankyo*)actor)->unk_114C == 0) {
+            return actor == &this->actor; // retain the native first blizzard updater when present
+        }
+    }
+    // The native instance counter is not reset on scene re-entry. Select one live
+    // actor even when no index-zero instance remains, including mixed snow variants.
+    return first == &this->actor;
+}
+
+static void ObjectKankyo_UpdateSnowTarget(PlayState* play) {
+    if ((play->state.frames % 16) != 0) {
+        return;
+    }
+    u8* count = &play->envCtx.precipitation[PRECIP_SNOW_CUR];
+    u8 target = play->envCtx.precipitation[PRECIP_SNOW_MAX];
+    // A partially drained blizzard can leave an odd count. Clamp the final step
+    // so switching to a season reaches its target instead of oscillating around it.
+    if (*count < target) {
+        *count += MIN(2, target - *count);
+    } else if (*count > target) {
+        *count -= MIN(2, *count - target);
+    }
+}
+
 void func_808DCB7C(ObjectKankyo* this, PlayState* play) {
-    if (play->envCtx.precipitation[PRECIP_SNOW_CUR] < play->envCtx.precipitation[PRECIP_SNOW_MAX]) {
-        if ((play->state.frames % 16) == 0) {
-            play->envCtx.precipitation[PRECIP_SNOW_CUR] += 2;
-        }
-    } else if (play->envCtx.precipitation[PRECIP_SNOW_MAX] < play->envCtx.precipitation[PRECIP_SNOW_CUR]) {
-        if ((play->state.frames % 16) == 0) {
-            play->envCtx.precipitation[PRECIP_SNOW_CUR] -= 2;
-        }
+    if (MMWeather_Season() < 0 || ObjectKankyo_IsSeasonSnowOwner(this, play)) {
+        ObjectKankyo_UpdateSnowTarget(play);
     }
     func_808DC454(this, play);
 }
@@ -340,7 +368,13 @@ void func_808DCB7C(ObjectKankyo* this, PlayState* play) {
 void func_808DCBF8(ObjectKankyo* this, PlayState* play) {
     f32 temp_f0;
 
-    if ((play->envCtx.precipitation[PRECIP_SNOW_CUR] > 0) && (this->unk_114C == 0)) {
+    if (MMWeather_Season() >= 0) {
+        // Reuse the existing first blizzard updater. Off/story/ineligible weather
+        // immediately resumes the native drain below; no second actor is needed.
+        if (ObjectKankyo_IsSeasonSnowOwner(this, play)) {
+            ObjectKankyo_UpdateSnowTarget(play);
+        }
+    } else if ((play->envCtx.precipitation[PRECIP_SNOW_CUR] > 0) && (this->unk_114C == 0)) {
         if ((play->state.frames % 16) == 0) {
             play->envCtx.precipitation[PRECIP_SNOW_CUR] -= 9;
             if ((s8)play->envCtx.precipitation[PRECIP_SNOW_CUR] < 0) {
@@ -528,7 +562,8 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
     f32 tempf;
 
     if ((play->cameraPtrs[CAM_ID_MAIN]->stateFlags & CAM_STATE_UNDERWATER) ||
-        ((u8)play->envCtx.stormState == STORM_STATE_OFF)) {
+        ((u8)play->envCtx.stormState == STORM_STATE_OFF && MMWeather_Season() != SEASON_SPRING &&
+         MMWeather_Season() != SEASON_WINTER)) {
         return;
     }
 
@@ -590,7 +625,9 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
             temp_f2 = ((1.0f < temp_f2) ? 0.0f : (((1.0f - temp_f2) > 1.0f) ? 1.0f : 1.0f - temp_f2));
 
             gDPPipeSync(POLY_XLU_DISP++);
-            gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, (u8)(160.0f * temp_f2));
+            const u8 spring = MMWeather_Season() == SEASON_SPRING;
+            gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, spring ? 190 : 255, spring ? 245 : 255, spring ? 200 : 255,
+                            (u8)(160.0f * temp_f2));
 
             Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
 

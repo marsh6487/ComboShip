@@ -571,7 +571,8 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
     // dungeon reward cross-placed into MM comes back RC_UNKNOWN_CHECK and gets skipped, leaving a
     // literal "[[N]]" in the displayed hint. Resolving each reward via `candidates` (which spans both
     // games) fills every slot regardless of which game holds it.
-    if (options.value("totAltarHint", 0) != 0) {
+    const bool compassInformation = options.value("mapsCompassesGiveInformation", 0) != 0;
+    if (options.value("totAltarHint", 0) != 0 || compassInformation) {
         // An unresolvable reward reads as "an unknown place" (pre-existing fill gap, not an
         // altar-composition bug — see UPSTREAM_MERGES.md); the altar text always fills every slot.
         auto rewardArea = [&](const char* itemName) -> Tri {
@@ -616,9 +617,12 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
         };
 
         static const char* kChildRewards[3] = { "Kokiri's Emerald", "Goron's Ruby", "Zora's Sapphire" };
-        Tri childMsg = PickTemplate(tmpl("RHT_CHILD_ALTAR_STONES"), hintClarity, rng);
-        for (int i = 0; i < 3; ++i)
-            ReplacePlaceholder(childMsg, i + 1, rewardArea(kChildRewards[i]));
+        Tri childMsg;
+        if (!compassInformation) {
+            childMsg = PickTemplate(tmpl("RHT_CHILD_ALTAR_STONES"), hintClarity, rng);
+            for (int i = 0; i < 3; ++i)
+                ReplacePlaceholder(childMsg, i + 1, rewardArea(kChildRewards[i]));
+        }
         childMsg += endClause("doorOfTimeTemplate");
         ootHints.push_back(
             { { "checkName", "__ALTAR_CHILD__" },
@@ -627,9 +631,12 @@ inline nlohmann::json Generate(uint32_t masterSeed, const std::string& sohDumpJs
 
         static const char* kAdultRewards[6] = { "Light Medallion", "Forest Medallion", "Fire Medallion",
                                                 "Water Medallion", "Spirit Medallion", "Shadow Medallion" };
-        Tri adultMsg = PickTemplate(tmpl("RHT_ADULT_ALTAR_MEDALLIONS"), hintClarity, rng);
-        for (int i = 0; i < 6; ++i)
-            ReplacePlaceholder(adultMsg, i + 1, rewardArea(kAdultRewards[i]));
+        Tri adultMsg;
+        if (!compassInformation) {
+            adultMsg = PickTemplate(tmpl("RHT_ADULT_ALTAR_MEDALLIONS"), hintClarity, rng);
+            for (int i = 0; i < 6; ++i)
+                ReplacePlaceholder(adultMsg, i + 1, rewardArea(kAdultRewards[i]));
+        }
         adultMsg += withCount("bridgeTemplate", "bridgeCount");
         adultMsg += withCount("gbkTemplate", "gbkCount");
         adultMsg += withCount("soulTemplate", "soulCount");

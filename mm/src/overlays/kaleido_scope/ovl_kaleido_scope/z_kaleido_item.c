@@ -2365,6 +2365,10 @@ void KaleidoScope_SwapDpadItemToCItem(PlayState* play, EquipSlot cEquipSlot) {
 
 void KaleidoScope_UpdateDpadItemEquip(PlayState* play) {
     PauseContext* pauseCtx = &play->pauseCtx;
+    extern s32 ExtButton_EquipItem(PlayState*, s32, u16, u8);
+    if (ExtButton_EquipItem(play, pauseCtx->equipTargetCBtn, pauseCtx->equipTargetItem, pauseCtx->equipTargetSlot)) {
+        return;
+    }
 
     if (pauseCtx->equipTargetCBtn == PAUSE_EQUIP_D_RIGHT) {
         // Swap if item is already equipped on other Item Buttons.
@@ -3100,8 +3104,12 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
                 return;
             }
 
-            // Equip item onto c buttons
-            if (pauseCtx->equipTargetCBtn == PAUSE_EQUIP_C_LEFT) {
+            // Keep the marker and u16 payload together when moving between C and D-pad.
+            extern s32 ExtButton_EquipItem(PlayState*, s32, u16, u8);
+            if (ExtButton_EquipItem(play, pauseCtx->equipTargetCBtn, pauseCtx->equipTargetItem,
+                                    pauseCtx->equipTargetSlot)) {
+                // Completed by the extended-button store.
+            } else if (pauseCtx->equipTargetCBtn == PAUSE_EQUIP_C_LEFT) {
                 // Swap if item is already equipped on CDown or CRight.
                 if (pauseCtx->equipTargetSlot == C_SLOT_EQUIP(0, EQUIP_SLOT_C_DOWN)) {
                     if ((BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_C_LEFT) & 0xFF) != ITEM_NONE) {

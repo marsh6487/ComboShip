@@ -65,7 +65,10 @@ enum RandoItemId {
   RI_OOT_BOTTLE_GREEN_POTION,
   RI_OOT_BOTTLE_MAGIC_MUSHROOM,
   RI_OOT_BOTTLE_POE,
-  RI_OOT_RUTOS_LETTER
+  RI_OOT_RUTOS_LETTER,
+  RI_OOT_NEI_LANTERN,
+  RI_OOT_NEI_POKE_BALL,
+  RI_OOT_NEI_MARIO_MASK
 };
 #include "ComboOotBottleShimmerMM.h"
 /* PRODUCTION_OWNER */
@@ -120,6 +123,7 @@ bool MM_DescribeNeiGi(RandoItemId id, CwItemDrawInfo *out) {
   out->scale = 1;
   out->dlists[0] = "__OTR__@oot:objects/nei_gi_redesign/master_sword/gi_dl";
   out->itemShimmer = 1;
+  out->stateDependent = 2;
   return true;
 }
 static const char *gGreatSpinAttackDiskDL =
@@ -147,6 +151,7 @@ enum RandomizerGet {
   RG_GREAT_FAIRY_SWORD
 };
 static bool ownerAltEnabled, ownerDin, ownerNotReady, ownerModuleReady;
+static const char* expectedDirectName = nullptr;
 static std::unordered_set<std::string> ownerResources;
 extern "C" int32_t OOT_NeiAltAssetsEnabled() { return ownerAltEnabled; }
 extern "C" int32_t OOT_NeiResourceExists(const char *path) {
@@ -162,6 +167,11 @@ static const char *object_toki_objects_DL_001BD0 =
 static int32_t OwnerSword(const char *name, CwItemDrawInfo *out) {
   if (ownerNotReady)
     return CW_DRAW_NOT_READY;
+  if (expectedDirectName) {
+    assert(!strcmp(name, expectedDirectName));
+    out->stateDependent = 2;
+    return CwCustomGi(out, "__OTR__direct_legacy_recipe", 1.f);
+  }
   const RandomizerGet rg = !strcmp(name, "Master Sword") ? RG_MASTER_SWORD
                            : !strcmp(name, "True Master Sword")
                                ? RG_TRUE_MASTER_SWORD
@@ -209,7 +219,7 @@ int malformedSeason = 0;
 int32_t DescribeForeign(const char* name, CwItemDrawInfo* out) {
   int32_t result = MM_GetItemDrawInfo(name, out);
   if (malformedSeason == 1) out->neiEffect = 0;
-  if (malformedSeason == 2) out->neiEffect = 6;
+  if (malformedSeason == 2) out->neiEffect = 7;
   if (malformedSeason == 3) {
     out->dlistCount = 1;
     out->dlists[0] = "__OTR__@oot:objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL";
@@ -539,6 +549,18 @@ int main() {
   puts("PASS imported sword export/cache: real GID_NONE aliases, native fallback, "
        "selected standalone/Din recipes, owner/module retry, concrete appearance "
        "refresh and progressive grant freeze.");
+  for (auto [id, name] : { std::pair{ RI_OOT_NEI_LANTERN, "Lantern" },
+                          std::pair{ RI_OOT_NEI_POKE_BALL, "Poké Ball" },
+                          std::pair{ RI_OOT_NEI_MARIO_MASK, "Mario Mask" } }) {
+    Rando::StaticData::Items[id] = { -1, name };
+    ownerResources.insert("__OTR__direct_legacy_recipe");
+    expectedDirectName = name;
+    CwItemDrawInfo descriptor{};
+    assert(MM_GetItemDrawInfo(name, &descriptor) == 1);
+    assert(descriptor.drawKind == CW_DRAW_KIND_CUSTOM_GI && descriptor.stateDependent == 2);
+    assert(!strcmp(descriptor.dlists[0], "__OTR__@oot:direct_legacy_recipe"));
+  }
+  expectedDirectName = nullptr;
   // The original progressive latch must remain frozen across grant-state
   // changes.
   Rando::StaticData::Items[RI_PROGRESSIVE_SWORD] = {0, "Progressive sword"};

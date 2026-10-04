@@ -134,7 +134,7 @@ int main() {
         info.count = 3; info.dls[1] = membrane.c_str(); info.dls[2] = nucleus.c_str();
         memcpy(info.primColorXlu, recipe.primColorXlu, 4);
         MM_DrawForeignMorphaSoul(&info);
-        assert(tentacleRequests == 1 && tentacleAvailabilityRequests == 1);
+        assert(tentacleRequests == 0 && tentacleAvailabilityRequests == 0);
         assert(draws.size() == 3 && draws[0] == gameplay_keep_DL_01ACF0);
         assert(draws[1] == membrane && draws[2] == nucleus);
         assert(scrollCount == 3 && depth == 0 && gfx.polyOpa.p == opa);

@@ -2198,6 +2198,9 @@ void Environment_DrawRain(PlayState* play, View* view, GraphicsContext* gfxCtx) 
         Environment_DrawRainImpl(play, view, gfxCtx);
         return;
     }
+    if (MMWeather_Season() >= 0) {
+        return; // owned clear/snow seasons suppress native rain; Off restores it unchanged
+    }
     if (!(GET_ACTIVE_CAM(play)->stateFlags & CAM_STATE_UNDERWATER) &&
         (play->envCtx.precipitation[PRECIP_SNOW_CUR] == 0)) {
         if (play->envCtx.precipitation[PRECIP_SOS_MAX] != 0) {

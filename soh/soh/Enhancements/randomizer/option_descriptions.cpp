@@ -766,7 +766,16 @@ void Settings::CreateOptionDescriptions() {
     mOptionDescriptions[RSK_TOT_ALTAR_HINT] =
         "Reading the Temple of Time altar as child will tell you the locations of the Spiritual Stones.\n"
         "Reading the Temple of Time altar as adult will tell you the locations of the medallions, as well as the "
-        "conditions for building the Rainbow Bridge and getting the Boss Key for Ganon's Castle.";
+        "conditions for building the Rainbow Bridge and getting the Boss Key for Ganon's Castle. "
+        "Maps and Compasses Give Information replaces only the reward-location hints.";
+    mOptionDescriptions[RSK_MAPS_COMPASSES_GIVE_INFORMATION] =
+        "Compasses reveal the actual reward at the dungeon's boss, including shuffled items. "
+        "Boss entrance shuffle also names the boss reached from that dungeon. "
+        "Maps reveal the physical entrance location when dungeon entrances are shuffled. "
+        "Collecting the item shows its information; press C-Up on an owned Map or Compass on the dungeon map "
+        "page to read it again, including with Start With Maps/Compasses. "
+        "The Temple of Time altar stops revealing reward locations; progression requirements remain. "
+        "Bottom of the Well and Ice Cavern have no boss reward hints. Ordinary/masterful hints are unchanged.";
     mOptionDescriptions[RSK_GANONDORF_HINT] =
         "Talking to Ganondorf in his boss room will tell you the location of the Light Arrows and Master Sword. "
         "If this option is enabled and Ganondorf is reachable without these items, Gossip Stones will never hint the "

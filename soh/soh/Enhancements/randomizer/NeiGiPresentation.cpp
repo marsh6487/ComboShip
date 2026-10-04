@@ -3,6 +3,8 @@
 #include "NeiGiEnergyTexture.h"
 #include "NeiGiRender.h"
 #include "NeiGiShopFit.h"
+#include "ComboSongDraw.h"
+#include "objects/object_gi_melody/object_gi_melody.h"
 #include <algorithm>
 #include <cstring>
 #include <iterator>
@@ -102,16 +104,22 @@ const Presentation kPresentations[] = {
       GI_PATH("cane_of_somaria"),
       nullptr,
       .25f,
-      Kind::Neutral,
+      Kind::Somaria,
       {},
       NeiGi::kSomariaShopFit },
     { Randomizer_DrawCaneSomariaUpgrade,
       GI_PATH("cane_of_somaria"),
       nullptr,
       .25f,
-      Kind::Neutral,
+      Kind::Somaria,
       {},
       NeiGi::kSomariaShopFit },
+    { Randomizer_DrawCanePacci, nullptr, nullptr, 1.f, Kind::Pacci, {} },
+    { Randomizer_DrawCanePacciUpgrade, nullptr, nullptr, 1.f, Kind::Pacci, {} },
+    { Randomizer_DrawCanePacciUltrahand, nullptr, nullptr, 1.f, Kind::Pacci, {} },
+    { Randomizer_DrawPokeball, nullptr, nullptr, 1.f, Kind::Pokeball, {} },
+    { Randomizer_DrawMarioMask, GI_PATH("mario_mask"), nullptr, 1.f, Kind::MarioMask, {}, {}, 0, true, -1 },
+    { nullptr, GI_PATH("cojiro"), nullptr, 1.f, Kind::Neutral, {}, {}, 0, false, GID_COJIRO },
     { Randomizer_DrawMinishCap, GI_PATH("minish_cap"), nullptr, .5f, Kind::Neutral, {} },
     { Randomizer_DrawDominionRod, nullptr, nullptr, 1.f, Kind::Neutral, {} },
     { Randomizer_DrawMagnesis, nullptr, nullptr, 1.f, Kind::Neutral, {} },
@@ -553,6 +561,50 @@ const Presentation* FindPresentation(const GetItemEntry* entry) {
     return fallback;
 }
 
+int SongForEntry(const GetItemEntry* entry) {
+    if (!entry)
+        return -1;
+    if (entry->gid == GID_SONG_STORM)
+        return CW_SONG_STORMS;
+    if (entry->tableId != TABLE_RANDOMIZER)
+        return -1;
+    switch (entry->drawItemId) {
+        case RG_MM_SONG_DOUBLE_TIME:
+            return CW_SONG_DOUBLE_TIME;
+        case RG_MM_SONG_ELEGY:
+            return CW_SONG_ELEGY;
+        case RG_MM_SONG_EPONA:
+            return CW_SONG_EPONA;
+        case RG_MM_SONG_HEALING:
+            return CW_SONG_HEALING;
+        case RG_MM_SONG_INVERTED_TIME:
+            return CW_SONG_INVERTED_TIME;
+        case RG_MM_SONG_LULLABY_PROGRESSIVE:
+        case RG_MM_SONG_LULLABY_INTRO:
+            return CW_SONG_LULLABY_INTRO;
+        case RG_MM_SONG_LULLABY:
+            return CW_SONG_LULLABY;
+        case RG_MM_SONG_NOVA:
+            return CW_SONG_NOVA;
+        case RG_MM_SONG_OATH:
+            return CW_SONG_OATH;
+        case RG_MM_SONG_SARIA:
+            return CW_SONG_SARIA;
+        case RG_MM_SONG_SOARING:
+            return CW_SONG_SOARING;
+        case RG_MM_SONG_SONATA:
+            return CW_SONG_SONATA;
+        case RG_MM_SONG_STORMS:
+            return CW_SONG_STORMS;
+        case RG_MM_SONG_SUN:
+            return CW_SONG_SUN;
+        case RG_MM_SONG_TIME:
+            return CW_SONG_TIME;
+        default:
+            return -1;
+    }
+}
+
 struct SeasonPresentation {
     CustomDrawFunc draw;
     const char* slug;
@@ -598,6 +650,7 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
         const char* owner;
         const char* opaque;
         const char* second = nullptr;
+        const char* third = nullptr;
     };
     static constexpr Legacy models[] = {
         { "rocs_feather", "oot", "objects/object_nei_rocs_feather/rocs_feather_dl",
@@ -612,6 +665,9 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
         { "time_gate", "oot", "objects/object_nei_time_gate/g_timegate_dl" },
         { "minish_cap", "oot", "objects/object_nei_minish_cap/Cylinder_opaque_dl" },
         { "lantern", "oot", "objects/object_poh/gPoeLanternDL" },
+        { "mario_mask", "oot", "objects/object_nei_mario_mask/g_mario_mask_dl" },
+        { "cojiro", "oot", "objects/object_gi_niwatori/gGiChickenDL", "objects/object_gi_niwatori/gGiCojiroColorDL",
+          "objects/object_gi_niwatori/gGiChickenEyesDL" },
         { "divine_shield", "oot", "objects/object_nei_divine_shield/g_divine_shield_dl" },
         { "sheikah_shield", "oot", "objects/object_nei_kite_shield/g_kite_shield_dl" },
         { "shield_of_ikana", "mm", "objects/object_link_child/gLinkHumanMirrorShieldDL" },
@@ -671,7 +727,7 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
                        ((sharedMmPath || std::strcmp(model.owner, "oot") != 0) &&
                         ResourceMgr_IsModAssetForGame("mm", path));
             };
-            return selectedMod(model.opaque) || selectedMod(model.second);
+            return selectedMod(model.opaque) || selectedMod(model.second) || selectedMod(model.third);
         }
     }
     return false;
@@ -703,7 +759,29 @@ bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available
 extern "C" {
 #include "NeiGiMeshRenderer.inc"
 
+static void NeiGi_DrawSong(PlayState* play, int song) {
+    if (song == CW_SONG_STORMS) {
+        NeiGi_DrawSeasonOverlay(play, 6, nullptr);
+        return;
+    }
+    uint8_t color[4];
+    if (!ComboSongShimmerColor(song, color))
+        return;
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    gDPSetGrayscaleColor(POLY_XLU_DISP++, color[0], color[1], color[2], color[3]);
+    gSPGrayscale(POLY_XLU_DISP++, true);
+    gDma1p(POLY_XLU_DISP++, G_DL_OTR_FILEPATH, gGiSongNoteDL, 0, G_DL_PUSH);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawShimmerOverlay(play, color, nullptr);
+}
+
 static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool upgraded) {
+    if (!upgraded && item.draw == Randomizer_DrawMarioMask)
+        return; // The legacy callback already draws its mask overlay.
     if (upgraded && item.effect == Kind::SeasonCycle)
         NeiGi_DrawSeasonOverlay(play, 5, nullptr);
     const bool shimmer = CVarGetInteger(CVAR_NEI_GI_EFFECTS, 0) != 0;
@@ -732,6 +810,10 @@ static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool up
 static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     if (play == nullptr || entry == nullptr)
         return false;
+    if (const int song = SongForEntry(entry); song >= 0) {
+        NeiGi_DrawSong(play, song);
+        return true;
+    }
     // Intrinsic season weather precedes archive/model selection and optional effects.
     if (const int season = SeasonForDraw(entry->drawFunc)) {
         NeiGi_DrawSeasonOverlay(play, season, nullptr);
@@ -755,6 +837,8 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         Matrix_Translate(0, item->shop.lift, 0, MTXMODE_APPLY);
         Matrix_Scale(item->shop.scale, item->shop.scale, item->shop.scale, MTXMODE_APPLY);
     }
+    if (upgraded && !shop)
+        Matrix_Translate(0.f, NeiGi::PresentationOffsetY(item->effect), 0.f, MTXMODE_APPLY);
     if (upgraded && item->draw == Randomizer_DrawCaneSomariaUpgrade) {
         // Retain the original red skill-upgrade flame with the authored cane.
         Randomizer_DrawCaneSomariaUpgradeFlame(play);
@@ -857,6 +941,19 @@ static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* ou
 }
 
 extern "C" int32_t NeiGi_DescribeEntry(const GetItemEntry* entry, CwItemDrawInfo* out) {
+    if (const int song = SongForEntry(entry); song >= 0) {
+        if (!out)
+            return 0;
+        if (song == CW_SONG_STORMS)
+            return NeiGi_FillSeasonInfo(6, out);
+        out->drawKind = CW_DRAW_KIND_MUSIC_NOTE;
+        out->dlists[0] = gGiSongNoteDL;
+        out->dlistCount = 1;
+        out->xluStartIndex = 0;
+        out->itemShimmer = ComboSongShimmerColor(song, out->itemShimmerColor);
+        std::memcpy(out->primColorXlu, out->itemShimmerColor, 4);
+        return 1;
+    }
     if (entry)
         if (const int season = SeasonForDraw(entry->drawFunc))
             return NeiGi_FillSeasonInfo(season, out);

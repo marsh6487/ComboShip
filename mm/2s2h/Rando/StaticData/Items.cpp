@@ -629,6 +629,35 @@ RandoItemId GetItemIdFromVanillaItemId(u32 itemId) {
 // This exists because of nintendo being nintendo
 u8 GetIconForZMessage(RandoItemId randoItemId) {
     switch (randoItemId) {
+        // Song rows have GI_NONE, but the message table already has native
+        // 16x24 IA8 clef entries. Do not send these through square RGBA staging.
+        case RI_SONG_SONATA:
+            return 0xCA;
+        case RI_SONG_LULLABY_INTRO:
+        case RI_SONG_LULLABY:
+            return 0xCB;
+        case RI_SONG_NOVA:
+            return 0xCC;
+        case RI_SONG_ELEGY:
+            return 0xCD;
+        case RI_SONG_OATH:
+            return 0xCE;
+        case RI_SONG_SARIA:
+            return 0xCF;
+        case RI_SONG_DOUBLE_TIME:
+        case RI_SONG_INVERTED_TIME:
+        case RI_SONG_TIME:
+            return 0xD0;
+        case RI_SONG_HEALING:
+            return 0xD1;
+        case RI_SONG_EPONA:
+            return 0xD2;
+        case RI_SONG_SOARING:
+            return 0xD3;
+        case RI_SONG_STORMS:
+            return 0xD4;
+        case RI_SONG_SUN:
+            return 0xD5;
         case RI_MASK_CAPTAIN:
             return GI_MASK_TRUTH;
         case RI_MASK_TRUTH:
@@ -1136,16 +1165,21 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
             return "__OTR__textures/icon_item_custom/gItemIconSheikahSlateSensorTex";
         case RI_OOT_NEI_DOMINION_ROD:
             return "__OTR__textures/icon_item_custom/gItemIconDominionRodTex";
-        // Elemental Wand: the six rods ARE one wand, so they share its icon. The check name and the
-        // textbox already say which rod it is.
+        // Receipt and tracker icons match each rod's GI; all modes still share one inventory slot.
         case RI_OOT_NEI_ELEMENTAL_WAND:
-        case RI_OOT_NEI_WAND_SAND_ROD:
-        case RI_OOT_NEI_WAND_TORNADO_ROD:
-        case RI_OOT_NEI_WAND_WATER_ROD:
-        case RI_OOT_NEI_WAND_METEOR_ROD:
-        case RI_OOT_NEI_WAND_STORM_ROD:
-        case RI_OOT_NEI_WAND_SHADOW_SCEPTER:
             return "__OTR__textures/icon_item_custom/gItemIconElementalWandTex";
+        case RI_OOT_NEI_WAND_SAND_ROD:
+            return "__OTR__textures/icon_item_custom/gItemIconSandRodTex";
+        case RI_OOT_NEI_WAND_TORNADO_ROD:
+            return "__OTR__textures/icon_item_custom/gItemIconTornadoRodTex";
+        case RI_OOT_NEI_WAND_WATER_ROD:
+            return "__OTR__textures/icon_item_custom/gItemIconWaterRodTex";
+        case RI_OOT_NEI_WAND_METEOR_ROD:
+            return "__OTR__textures/icon_item_custom/gItemIconMeteorRodTex";
+        case RI_OOT_NEI_WAND_STORM_ROD:
+            return "__OTR__textures/icon_item_custom/gItemIconStormRodTex";
+        case RI_OOT_NEI_WAND_SHADOW_SCEPTER:
+            return "__OTR__textures/icon_item_custom/gItemIconShadowScepterTex";
         case RI_OOT_NEI_FIRE_ROD:
             return "__OTR__textures/icon_item_custom/gItemIconFireRodTex";
         case RI_OOT_NEI_GUST_JAR:

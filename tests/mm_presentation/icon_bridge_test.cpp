@@ -27,9 +27,11 @@ enum RandomizerGet {
   RG_BOTTLE_WITH_POE,
   RG_BOTTLE_WITH_BIG_POE,
   RG_MAGIC_BEAN_PACK,
+  RG_DOUBLE_DEFENSE = 0x19,
   RG_COUNT
 };
 constexpr int ICON_SIZE_24 = 24, ICON_SIZE_32 = 32, ITEM_MEDALLION_FOREST = 102,
+              ITEM_HEART_CONTAINER = 0x72, ITEM_FISH = 0x19,
               ITEM_HEART_PIECE_2 = 122, ITEM_ROCS_FEATHER_SKIJER = 158;
 void *gItemIcons[158] = {};
 const char *customPath = "__OTR__textures/icon_item_custom/fire";
@@ -91,6 +93,7 @@ int32_t DescribeIcon(const char *name, CwItemIconInfo *out) {
   return OOT_FillItemIconInfo(
       std::string(name) == "progressive"   ? RG_PROGRESSIVE
       : std::string(name) == "blue-potion" ? RG_BOTTLE_WITH_BLUE_POTION
+      : std::string(name) == "double-defense" ? RG_DOUBLE_DEFENSE
                                            : RG_CUSTOM,
       out);
 }
@@ -133,9 +136,22 @@ int main() {
   assert(OOT_FillItemIconInfo(RG_MAGIC_BEAN_PACK, &info) == 1 &&
          std::string(info.path) == gItemIconMagicBeanTex);
   assert(info.width == 32 && info.height == 32 && !info.isIA8);
+  static_assert(RG_DOUBLE_DEFENSE == ITEM_FISH);
+  nativeId = RG_DOUBLE_DEFENSE;
+  gItemIcons[ITEM_FISH] = (void *)gItemIconBottleFishTex;
+  gItemIcons[ITEM_HEART_CONTAINER] =
+      (void *)"__OTR__textures/icon_item_24_static/gQuestIconHeartContainerTex";
+  assert(OOT_FillItemIconInfo(RG_DOUBLE_DEFENSE, &info) == 1 &&
+         std::string(info.path).find("HeartContainer") != std::string::npos);
+  assert(info.width == 24 && info.height == 24 && !info.isIA8);
   provider = false;
   assert(Rando::ComboForeignMessageIcon(1) == 0xFE);
   provider = true;
+  foreign.itemName = "double-defense";
+  assert(Rando::ComboForeignMessageIcon(1) == 0xF5 &&
+         sMsgCustomIconWidth == 24 && sMsgCustomIconHeight == 24);
+  assert(std::string((char *)sMsgCustomIconTex) ==
+         "__OTR__@oot:textures/icon_item_24_static/gQuestIconHeartContainerTex");
   foreign.itemName = "blue-potion";
   assert(Rando::ComboForeignMessageIcon(1) == 0xF5);
   assert(std::string((char *)sMsgCustomIconTex) ==

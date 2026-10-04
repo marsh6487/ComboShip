@@ -112,7 +112,7 @@ class Model:
         if axis=='y':path=path[:,[0,2,1]]
         if axis=='x':path=path[:,[2,0,1]]
         self.tube(name,mat,path+center,thickness,sides,cap=False)
-    def polygon(self,name,mat,xy,depth=2,z=0,bevel=.8):
+    def polygon(self,name,mat,xy,depth=2,z=0,bevel=.8,closed_sides=False):
         """Bevelled extrusion with flat normals; ear-clips concave face outlines."""
         xy=np.asarray(xy,float);center=xy.mean(axis=0);ln=len(xy)
         shrunk=center+(xy-center)*(1-bevel/max(np.ptp(xy,axis=0).max(),1)*2)
@@ -120,9 +120,14 @@ class Model:
         tri=[];n=[]
         faces=earclip(xy)
         tri.extend(faces);tri.extend([[i+3*ln for i in f[::-1]] for f in faces])
+        # Existing accepted assets keep their exact serialized triangles by default.
+        # Opt-in extrusions close the front/back perimeter with outward side walls.
+        ccw=sum(xy[i,0]*xy[(i+1)%ln,1]-xy[i,1]*xy[(i+1)%ln,0] for i in range(ln))>0
         for k in range(3):
             for j in range(ln):
-                a=k*ln+j;b=k*ln+(j+1)%ln;tri.extend([[a,b,b+ln],[a,b+ln,a+ln]])
+                a=k*ln+j;b=k*ln+(j+1)%ln
+                side=[[a,b,b+ln],[a,b+ln,a+ln]]
+                tri.extend([face[::-1] for face in side] if closed_sides and ccw else side)
         # Exact per-face normal, retaining the specified outline order.
         tr=np.array(tri);pp=p[tr].reshape(-1,3)
         nn=np.repeat(unit(np.cross(p[tr[:,1]]-p[tr[:,0]],p[tr[:,2]]-p[tr[:,0]])),3,axis=0)

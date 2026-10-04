@@ -85,6 +85,7 @@ extern u8 Trident_GoldenArmor(void);
 extern s32 BossRemains_IsOdolwaWorn(void);
 // Recall aim / Ultrahand carry: reaching out with nothing in the hand. Skijer's NEI
 extern u8 ItemEquip_HoldsEmptyHand(void);
+extern u8 Seasons_IsDrawn(void);
 extern s32 BossRemains_IsGohtWorn(void);
 extern void BossRemains_DrawOdolwaSword(PlayState* play, Player* player);
 extern void BossRemains_DrawOdolwaShield(PlayState* play, Player* player);
@@ -3103,7 +3104,10 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
                     rot->z -= player->unk_B8C;
                 }
 
-                if (sPlayerRightHandType == PLAYER_MODELTYPE_RH_SHIELD) {
+                if (Seasons_IsDrawn() && player == GET_PLAYER(play) && player->transformation == PLAYER_FORM_HUMAN) {
+                    rightHandDLists = &gPlayerRightHandClosedDLs[D_801F59E0];
+                    sPlayerRightHandType = PLAYER_MODELTYPE_RH_CLOSED;
+                } else if (sPlayerRightHandType == PLAYER_MODELTYPE_RH_SHIELD) {
                     if (player->transformation == PLAYER_FORM_HUMAN) {
                         if (player->currentShield != PLAYER_SHIELD_NONE) {
                             // Skijer's NEI: an ext shield (Divine/Kite/Shield of Ikana) — OR Odolwa's

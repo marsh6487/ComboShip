@@ -209,6 +209,8 @@ ORIGINAL(Randomizer_DrawDominionRod)
 ORIGINAL(Randomizer_DrawMagnesis)
 ORIGINAL(Randomizer_DrawStasis)
 ORIGINAL(Randomizer_DrawLantern)
+ORIGINAL(Randomizer_DrawMarioMask)
+ORIGINAL(Randomizer_DrawPokeball)
 ORIGINAL(Randomizer_DrawCryonis)
 ORIGINAL(Randomizer_DrawElementalWand)
 ORIGINAL(Randomizer_DrawExtFourSword)
@@ -258,6 +260,48 @@ static void DrawWeaponFlameOverlay(PlayState *, u8 r, u8 g, u8 b) {
 
 int main() {
   using namespace Fixture;
+  Reset();
+  GetItemEntry fourSwordEntry{};
+  fourSwordEntry.drawFunc = Randomizer_DrawExtFourSword;
+  files.insert("__OTR__objects/nei_gi_redesign/four_sword/gi_dl");
+  assert(NeiGi_Draw(&play, &fourSwordEntry));
+  assert(!submitted.empty() && submitted[0].second == -18.f);
+  Reset();
+  files.insert("__OTR__objects/nei_gi_redesign/four_sword/gi_dl");
+  assert(NeiGi_DrawShop(&play, &fourSwordEntry));
+  assert(!submitted.empty() && submitted[0].second == 14.f);
+  for (auto song : { std::pair{ RG_MM_SONG_SONATA, CW_SONG_SONATA },
+                     std::pair{ RG_MM_SONG_LULLABY, CW_SONG_LULLABY },
+                     std::pair{ RG_MM_SONG_NOVA, CW_SONG_NOVA },
+                     std::pair{ RG_MM_SONG_HEALING, CW_SONG_HEALING },
+                     std::pair{ RG_MM_SONG_SOARING, CW_SONG_SOARING },
+                     std::pair{ RG_MM_SONG_ELEGY, CW_SONG_ELEGY },
+                     std::pair{ RG_MM_SONG_OATH, CW_SONG_OATH },
+                     std::pair{ RG_MM_SONG_DOUBLE_TIME, CW_SONG_DOUBLE_TIME } }) {
+    Reset();
+    GetItemEntry songEntry{};
+    songEntry.tableId = TABLE_RANDOMIZER;
+    songEntry.drawItemId = song.first;
+    uint8_t color[4];
+    assert(ComboSongShimmerColor(song.second, color));
+    assert(NeiGi_Draw(&play, &songEntry));
+    assert(Drawn() == std::vector<std::string>{ gGiSongNoteDL });
+    assert(!arena.empty() && stack.empty());
+    const auto& vertex = arena.front().front();
+    assert(vertex.v.cn[0] == color[0] && vertex.v.cn[1] == color[1] && vertex.v.cn[2] == color[2]);
+#ifdef COMBO_BUILD
+    CwItemDrawInfo songInfo{};
+    assert(NeiGi_DescribeEntry(&songEntry, &songInfo));
+    assert(songInfo.drawKind == CW_DRAW_KIND_MUSIC_NOTE && songInfo.itemShimmer);
+    assert(std::memcmp(color, songInfo.itemShimmerColor, 4) == 0);
+#endif
+  }
+  Reset();
+  GetItemEntry stormEntry{};
+  stormEntry.gid = GID_SONG_STORM;
+  assert(NeiGi_Draw(&play, &stormEntry));
+  assert(Drawn().empty() && arena.size() == 2 && stack.empty()); // Rain and lightning, no note mesh.
+  std::cout << "PASS song presentations: native MM aliases keep palette and shimmer; Storms uses local rain/lightning\n";
   Reset();
   GetItemEntry entry{};
   assert(!NeiGi_Draw(nullptr, &entry));
@@ -563,8 +607,13 @@ int main() {
     Reset();
     entry.drawFunc = draw;
     files.insert("__OTR__objects/nei_gi_redesign/cane_of_somaria/gi_dl");
-    assert(!NeiGi_Draw(&play, &entry));
-    assert(!NeiGi_DrawShop(&play, &entry));
+    enabled = true;
+    assert(NeiGi_Draw(&play, &entry));
+    assert(arena.size() == 1 && fallback == 1);
+    Reset(); enabled = true;
+    assert(NeiGi_DrawShop(&play, &entry));
+    assert(arena.size() == 1 && fallback == 1);
+    Reset(); enabled = true;
     GetItemEntry_Draw(&play, entry);
     assert(fallback == 1 && Drawn().empty());
   }
@@ -687,6 +736,7 @@ int main() {
     {Randomizer_DrawTimeGate,"time_gate","oot","__OTR__objects/object_nei_time_gate/g_timegate_dl"},
     {Randomizer_DrawMinishCap,"minish_cap","oot","__OTR__objects/object_nei_minish_cap/Cylinder_opaque_dl"},
     {Randomizer_DrawLantern,"lantern","oot","__OTR__objects/object_poh/gPoeLanternDL"},
+    {Randomizer_DrawMarioMask,"mario_mask","oot","__OTR__objects/object_nei_mario_mask/g_mario_mask_dl"},
     {Randomizer_DrawExtDivineShield,"divine_shield","oot","__OTR__objects/object_nei_divine_shield/g_divine_shield_dl"},
     {Randomizer_DrawExtSheikahShield,"sheikah_shield","oot","__OTR__objects/object_nei_kite_shield/g_kite_shield_dl"},
     {Randomizer_DrawExtShieldOfIkana,"shield_of_ikana","mm","__OTR__objects/object_link_child/gLinkHumanMirrorShieldDL"},
@@ -763,6 +813,19 @@ int main() {
 #endif
   }
 #ifdef COMBO_BUILD
+  for (const char* part : {"gGiChickenDL", "gGiCojiroColorDL", "gGiChickenEyesDL"}) {
+    for (const char* owner : {"oot", "mm"}) for (int selectedAlt : {0, 1}) {
+      Reset(); alt = selectedAlt; ownerAlt = selectedAlt;
+      const std::string legacy = std::string("__OTR__objects/object_gi_niwatori/") + part;
+      files.insert("__OTR__objects/nei_gi_redesign/cojiro/gi_dl");
+      files.insert(legacy);
+      if (selectedAlt) files.insert("alt/" + legacy);
+      CwItemDrawInfo info{};
+      assert(OOT_GetNeiGiDrawInfo("cojiro", &info));
+      modFiles.insert({owner, selectedAlt ? "alt/" + legacy : legacy});
+      assert(!OOT_GetNeiGiDrawInfo("cojiro", &info));
+    }
+  }
   for(const char* owner:{"oot","mm"})for(int selectedAlt:{0,1}){
     Reset();alt=selectedAlt;ownerAlt=selectedAlt;
     const char* legacy="__OTR__objects/object_gi_sword_1/gGiKokiriSwordDL";
@@ -923,7 +986,8 @@ int main() {
     matrix = 1;
     matrixY = 0;
     GetItemEntry_Draw(&play, entry);
-    assert(submitted.front().first == b.drawScale && submitted.front().second == 0);
+    assert(submitted.front().first == b.drawScale);
+    assert(submitted.front().second == NeiGi::PresentationOffsetY(FindPresentation(&entry)->effect));
     if (preview.is_open()) {
       if (!firstPreview)
         preview << ',';
@@ -954,7 +1018,8 @@ int main() {
     ref = {};
     Player_DrawGetItemImpl(&play, &player, &ref, 1);
     assert(std::abs(submitted.front().first - .2f * b.drawScale) < .000001f);
-    assert(submitted.front().second == 14.f);
+    assert(std::abs(submitted.front().second -
+                    (14.f + .2f * NeiGi::PresentationOffsetY(FindPresentation(&entry)->effect))) < .000001f);
     Reset();
     matrix = .25f;
     matrixY = 6;

@@ -78,6 +78,31 @@ for (const auto& sword : {
     }
 }
 Reset();
+for (const auto& item : {
+    std::pair{ RI_OOT_NEI_CANE_OF_SOMARIA, Kind::Somaria },
+    std::pair{ RI_OOT_NEI_CANE_SOMARIA_PLATFORM, Kind::Somaria },
+    std::pair{ RI_OOT_NEI_CANE_PACCI_FLIP, Kind::Pacci },
+    std::pair{ RI_OOT_NEI_CANE_PACCI_STONE, Kind::Pacci },
+    std::pair{ RI_OOT_NEI_CANE_PACCI_ULTRAHAND, Kind::Pacci },
+    std::pair{ RI_OOT_NEI_POKE_BALL, Kind::Pokeball } }) {
+    for (int optionalEffects : {0, 1}) {
+        Reset(); enabled = optionalEffects;
+        { MM_NeiGiFallbackShimmer shimmer(item.first); }
+        assert(arena.size() == size_t(optionalEffects));
+        if (optionalEffects) {
+            const auto got = arena.front();
+            arena.clear();
+            NeiGi_DrawMesh(&play, NeiGi::SampleShimmer(play.gameplayFrames, true, NeiGi_CameraBasis(&play), item.second));
+            assert(got.size() == arena.front().size());
+            assert(!std::memcmp(got.data(), arena.front().data(), got.size() * sizeof(Vtx)));
+        }
+        assert(stack.empty());
+    }
+}
+Reset(); enabled = 1;
+{ MM_NeiGiFallbackShimmer shimmer(RI_OOT_NEI_MARIO_MASK); }
+assert(arena.empty() && stack.empty()); // Legacy mask drawer supplies its one intrinsic overlay.
+Reset();
 // Season descriptors never require a rod or authored season mesh, and MM's
 // generic native bridge must accept their zero-display-list weather recipes.
 const CustomDrawFunc seasonCallbacks[] = {Randomizer_DrawSeasonSpring, Randomizer_DrawSeasonSummer,
@@ -169,7 +194,7 @@ for (const auto& item : kPresentations) {
     }
     ++authored;
 }
-assert(authored == 64);
+assert(authored == 66);
 std::cout << "PASS real owner descriptors and MM host draw: all authored bindings, effects, split passes, concrete Somaria flame, missing-resource fallback\n";
 Reset();
 

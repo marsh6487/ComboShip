@@ -35,6 +35,10 @@
 #include <unordered_set>
 
 #include "ComboItemDrawABI.h"
+#include "ComboFairyBottle.h"
+#define COMBO_FAIRY_HOST_MM
+#include "ComboFairyBottleDraw.h"
+#undef COMBO_FAIRY_HOST_MM
 #include "Rando/NeiGiPresentation.h"
 #include "Rando/NeiResourceRouting.h"
 #define COMBO_MORPHA_GI_HOST_MM
@@ -197,7 +201,7 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     if (raw.opCount < 0 || raw.opCount > CW_DRAW_MAX_OPS)
         return ComboForeignResolveOOT::Unknown;
     if (raw.drawKind == CW_DRAW_KIND_SEASON_GI &&
-        (raw.neiEffect < 1 || raw.neiEffect > 5 || (raw.neiEffect < 5 ? n != 0 || raw.opCount != 0 : n < 1)))
+        (raw.neiEffect < 1 || raw.neiEffect > 6 || (raw.neiEffect != 5 ? n != 0 || raw.opCount != 0 : n < 1)))
         return ComboForeignResolveOOT::Unknown;
     if (raw.drawKind == CW_DRAW_KIND_CUSTOM_GI || raw.drawKind == CW_DRAW_KIND_SEASON_GI) {
         if (raw.xluStartIndex < -1 || raw.xluStartIndex > n)
@@ -205,7 +209,7 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
         for (int i = 0; i < raw.opCount; ++i) {
             const int op = raw.ops[i].op;
             if (op != CW_OP_ROTATE_X && op != CW_OP_ROTATE_Z && op != CW_OP_SCALE && op != CW_OP_TRANSLATE &&
-                op != CW_OP_FRAME_PAIR)
+                op != CW_OP_FRAME_PAIR && op != CW_OP_NO_CULL)
                 return ComboForeignResolveOOT::Unknown;
             if (op == CW_OP_FRAME_PAIR &&
                 (n != 2 || raw.xluStartIndex != -1 || !(raw.ops[i].a >= 0 && raw.ops[i].a <= 30) ||
@@ -607,6 +611,7 @@ inline void MM_DrawForeignPoes(const ComboForeignDrawInfoOOT* info) {
 inline void MM_DrawForeignFairy(const ComboForeignDrawInfoOOT* info) {
     PlayState* play = gPlayState;
     GraphicsContext* gfxCtx = play->state.gfxCtx;
+    const ComboFairyBottleMotion motion = ComboFairyBottle_Sample(play->gameplayFrames);
     OPEN_DISPS(gfxCtx);
     Gfx_SetupDL25_Opa(gfxCtx);
     MM_FOREIGN_PIN_OPA();
@@ -615,14 +620,23 @@ inline void MM_DrawForeignFairy(const ComboForeignDrawInfoOOT* info) {
     Gfx_SetupDL25_Xlu(gfxCtx);
     MM_FOREIGN_PIN_XLU();
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[1]);
+    if (strcmp(info->dls[0], info->dls[1]) != 0) {
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[1]);
+    }
     gSPSegment(POLY_XLU_DISP++, 0x08,
                (uintptr_t)Gfx_TwoTexScrollEx(gfxCtx, G_TX_RENDERTILE, 0, 0, 32, 32, 1, play->state.frames * 1,
                                              -(play->state.frames * 6), 32, 32, 0, 0, 1, -6));
     Matrix_Push();
+    if (ComboFairyBottle_IsBlueFireShell(info->dls[0])) {
+        Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
+    }
+    Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
     Matrix_ReplaceRotation(&play->billboardMtxF);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[2]);
+    Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
+    if (!ComboFairyBottle_DrawVfx(play)) {
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[2]);
+    }
     Matrix_Pop();
     CLOSE_DISPS(gfxCtx);
     int32_t segs[] = { 0x08 };
@@ -760,8 +774,6 @@ inline void MM_DrawForeignMorphaSoul(const ComboForeignDrawInfoOOT* info) {
     const float translate[3] = { 0.0f, -70.0f, 0.0f };
     const float scale[3] = { 5.0f, 5.0f, 5.0f };
     DrawOotSoulFlame(play, info->primColorXlu, translate, scale);
-    ComboDrawMorphaTentacleGi(play, "oot",
-                              [](const char* path, const char*) { return NeiResource_Available(path) != 0; });
     Matrix_Push();
     Matrix_Scale(0.015f, 0.015f, 0.015f, MTXMODE_APPLY);
     Matrix_RotateXF(play->state.frames * 0.1f, MTXMODE_APPLY);
@@ -1029,6 +1041,7 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info) {
     const int32_t rotation = bits >= 0x8000u ? static_cast<int32_t>(bits) - 0x10000 : bits;
     Matrix_RotateYF(rotation * .01f, MTXMODE_APPLY);
     int selectedOpaque = -1;
+    bool noCull = false;
     for (int i = 0; i < info->opCount; ++i) {
         const auto& op = info->ops[i];
         switch (op.op) {
@@ -1046,6 +1059,9 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info) {
                 break;
             case CW_OP_FRAME_PAIR:
                 selectedOpaque = (static_cast<uint32_t>(gPlayState->gameplayFrames) >> static_cast<int>(op.a)) & 1u;
+                break;
+            case CW_OP_NO_CULL:
+                noCull = true;
                 break;
             default:
                 break;
@@ -1071,6 +1087,8 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info) {
             Gfx_SetupDL25_Opa(gfxCtx);
             MM_FOREIGN_PIN_OPA();
             MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gfxCtx);
+            if (noCull)
+                gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BOTH);
             if (info->primColorOpa[3]) {
                 gDPSetGrayscaleColor(POLY_OPA_DISP++, info->primColorOpa[0], info->primColorOpa[1],
                                      info->primColorOpa[2], info->primColorOpa[3]);
@@ -1082,6 +1100,8 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info) {
             }
             if (info->primColorOpa[3])
                 gSPGrayscale(POLY_OPA_DISP++, false);
+            if (noCull)
+                gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
         }
     }
     CLOSE_DISPS(gfxCtx);
@@ -1148,6 +1168,7 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
     }
 
     if (info->drawKind == CW_DRAW_KIND_NEI_CANE) {
+        Matrix_Push();
         static constexpr RandoItemId skills[] = { RI_NONE,
                                                   RI_OOT_NEI_CANE_OF_SOMARIA,
                                                   RI_OOT_NEI_CANE_PACCI_FLIP,
@@ -1161,6 +1182,9 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
             DrawOotNeiCaneOfSomaria(skills[info->neiLegacyCane]);
         else
             GetItem_Draw(gPlayState, GID_RUPEE_BLUE);
+        Matrix_Pop();
+        if (info->itemShimmer)
+            ComboDrawMaskShimmer(gPlayState, nullptr, info->itemShimmerColor, "oot");
         return;
     }
     if (info->drawKind == CW_DRAW_KIND_NEI_GI) {
@@ -1272,7 +1296,11 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
     if (info->itemShimmer) {
         Matrix_Pop();
         const bool mmOwner = info->drawKind == CW_DRAW_KIND_MM_MASK || info->drawKind == CW_DRAW_KIND_MM_REMAINS;
-        ComboDrawMaskShimmer(gPlayState, nullptr, info->itemShimmerColor, mmOwner ? "mm" : "oot");
+        if (info->neiEffect == static_cast<int32_t>(NeiGi::Kind::Pokeball))
+            NeiGi_DrawMesh(gPlayState, NeiGi::SampleShimmer(gPlayState->gameplayFrames, true,
+                                                            NeiGi_CameraBasis(gPlayState), NeiGi::Kind::Pokeball));
+        else
+            ComboDrawMaskShimmer(gPlayState, nullptr, info->itemShimmerColor, mmOwner ? "mm" : "oot");
     }
 }
 

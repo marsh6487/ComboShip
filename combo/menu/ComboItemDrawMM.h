@@ -14,6 +14,7 @@
 #include "ComboExport.h"
 #include "ComboResolve.h"
 #include "ComboItemDrawABI.h"
+#include "ComboSongDraw.h"
 #include "ComboOotBottleShimmerMM.h"
 #include "2s2h/Rando/NeiGiPresentation.h"
 #include "2s2h/Rando/NeiResourceRouting.h"
@@ -210,74 +211,17 @@ static int32_t MM_FillDungeonTintInfo(RandoItemId id, s16 drawId, CwItemDrawInfo
 // DrawSong: 25Xlu + per-song gDPSetEnvColor + gGiSongNoteDL). Fully portable as a static
 // description. Returns 1 and fills env color if the item is a song. Color table mirrors DrawSong.
 static int32_t MM_FillSongDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
-    uint8_t rgb[3];
-    switch (id) {
-        case RI_SONG_SUN:
-            rgb[0] = 237;
-            rgb[1] = 231;
-            rgb[2] = 62;
-            break;
-        case RI_SONG_DOUBLE_TIME:
-        case RI_SONG_INVERTED_TIME:
-        case RI_SONG_TIME:
-            rgb[0] = 98;
-            rgb[1] = 177;
-            rgb[2] = 211;
-            break;
-        case RI_SONG_HEALING:
-            rgb[0] = 255;
-            rgb[1] = 150;
-            rgb[2] = 230;
-            break;
-        case RI_SONG_STORMS:
-            rgb[0] = 146;
-            rgb[1] = 146;
-            rgb[2] = 146;
-            break;
-        case RI_SONG_SARIA:
-        case RI_SONG_SONATA:
-            rgb[0] = 98;
-            rgb[1] = 255;
-            rgb[2] = 98;
-            break;
-        case RI_SONG_SOARING:
-            rgb[0] = 200;
-            rgb[1] = 160;
-            rgb[2] = 255;
-            break;
-        case RI_SONG_ELEGY:
-            rgb[0] = 255;
-            rgb[1] = 98;
-            rgb[2] = 0;
-            break;
-        case RI_SONG_LULLABY_INTRO:
-            rgb[0] = 255;
-            rgb[1] = 100;
-            rgb[2] = 100;
-            break;
-        case RI_SONG_LULLABY:
-            rgb[0] = 255;
-            rgb[1] = 20;
-            rgb[2] = 20;
-            break;
-        case RI_SONG_OATH:
-            rgb[0] = 98;
-            rgb[1] = 0;
-            rgb[2] = 98;
-            break;
-        case RI_SONG_EPONA:
-            rgb[0] = 146;
-            rgb[1] = 87;
-            rgb[2] = 49;
-            break;
-        case RI_SONG_NOVA:
-            rgb[0] = 20;
-            rgb[1] = 20;
-            rgb[2] = 255;
-            break;
-        default:
-            return 0;
+    if (id == RI_SONG_STORMS) {
+        out->drawKind = CW_DRAW_KIND_SEASON_GI;
+        out->neiEffect = 6;
+        out->xluStartIndex = -1;
+        return 1;
     }
+    uint8_t rgb[4];
+    if (!ComboSongShimmerColor(id - RI_SONG_DOUBLE_TIME, rgb))
+        return 0;
+    out->itemShimmer = 1;
+    std::memcpy(out->itemShimmerColor, rgb, 4);
     out->dlists[0] = gGiSongNoteDL;
     out->dlistCount = 1;
     out->xluStartIndex = 0; // XLU layer, like MM's DrawSong
@@ -1001,7 +945,7 @@ static bool MM_IsStateDependentDraw(RandoItemId id) {
 }
 
 // These concrete aliases have GID_NONE in MM. The owner already describes its
-// selected standalone/Din weapon and native scroll fallback; do not fall through
+// selected standalone/Din weapon and native fallback; do not fall through
 // to the empty MM row when the authored NEI mesh is unavailable or declined.
 // This is export-only: MM's native NEI hook still returns false for legacy draws.
 static int32_t MM_FillImportedSwordFallback(RandoItemId id, CwItemDrawInfo* out) {
@@ -1015,6 +959,15 @@ static int32_t MM_FillImportedSwordFallback(RandoItemId id, CwItemDrawInfo* out)
             break;
         case RI_OOT_BIGGORON_SWORD:
             name = "Biggoron's Sword";
+            break;
+        case RI_OOT_NEI_LANTERN:
+            name = "Lantern";
+            break;
+        case RI_OOT_NEI_POKE_BALL:
+            name = "Poké Ball";
+            break;
+        case RI_OOT_NEI_MARIO_MASK:
+            name = "Mario Mask";
             break;
         default:
             return 0;
@@ -1179,6 +1132,8 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     out->hasEnvColor = 0;
     out->xluSeg8TexScroll = xluSeg8TexScroll;
     out->drawKind = drawKind;
+    if (drawKind == CW_DRAW_KIND_MM_FAIRY_BOTTLE || drawKind == CW_DRAW_KIND_MM_FAIRY_CONTAINER)
+        out->stateDependent = 2; // selected shell follows live MM owner Alt/mod state
     for (int32_t i = 0; i < n; i++) {
         out->dlists[i] = (const char*)dls[i];
     }
@@ -1195,13 +1150,13 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     }
     // ComboShip: some MM item bodies sample an animated segment-8 material their draw func binds via
     // AnimatedMat_Draw (Moon's Tear, fairy bottle). z_draw.c can't carry that across, so report the
-    // texanim resource for the consumer to replicate (ComboForeignTexAnim_Run). Matched by DL string
-    // (separate TUs hold distinct `static` copies of the path literal).
+    // texanim resource for the consumer to replicate (ComboForeignTexAnim_Run). The fairy kind is
+    // stable even when its shell is supplied by the selected generic-bottle mod.
     if (n >= 1 && dls[0] != NULL && strcmp((const char*)dls[0], gGiMoonsTearItemDL) == 0) {
         out->matAnimPath = gGiMoonsTearTexAnim; // MM's own path; consumer loads via CrossRMRegistry("mm")
         out->matAnimBindOpa = 1;                // the tear body (OPA) samples the animated segment
         out->matAnimBillboard = 1;              // the glow (XLU) billboards toward the camera
-    } else if (n >= 1 && dls[0] != NULL && strcmp((const char*)dls[0], gGiFairyBottleEmptyDL) == 0) {
+    } else if (drawKind == CW_DRAW_KIND_MM_FAIRY_CONTAINER) {
         out->matAnimPath = gGiFairyBottleTexAnim; // GetItem_DrawFairyContainer's AnimatedMat_Draw
         out->matAnimBindOpa = 1;
     }
@@ -1227,10 +1182,13 @@ extern "C" COMBO_EXPORT int32_t MM_GetItemDrawInfo(const char* itemName, CwItemD
         const int32_t result = MM_FillItemDrawInfo(id, out);
         if (result != 1)
             return result;
-        if (DungeonItem_GetOwner(id) >= 0 || id == RI_GREAT_SPIN_ATTACK || MM_IsSwordAppearanceDependent(id)) {
+        if (MM_IsProgressiveItem(id)) {
+            out->stateDependent = 1; // Freeze the awarded tier before its concrete appearance refreshes.
+        } else if (out->stateDependent == 2 || DungeonItem_GetOwner(id) >= 0 || id == RI_GREAT_SPIN_ATTACK ||
+                   MM_IsSwordAppearanceDependent(id)) {
             out->stateDependent = 2;
         } else {
-            out->stateDependent = (MM_IsProgressiveItem(id) || MM_IsStateDependentDraw(id)) ? 1 : 0;
+            out->stateDependent = MM_IsStateDependentDraw(id) ? 1 : 0;
         }
         return 1;
     } catch (...) { return 0; }

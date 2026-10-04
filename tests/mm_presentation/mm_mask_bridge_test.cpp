@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include "combo/menu/ComboItemDrawABI.h"
 #include "combo/menu/ComboItemEffectColors.h"
+#include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include "soh/mods/mm_sources/objects/object_gi_masks_all.h"
 #include "soh/mods/mm_sources/objects/object_mm_rando_items.h"
 #include "z64item.h"
@@ -19,6 +20,7 @@
 using s16=int16_t;using s32=int32_t;using f32=float;
 #define ARRAY_COUNT(a) (sizeof(a)/sizeof((a)[0]))
 void* Combo_ResolveSym(const char*,const char*);
+int CVarGetInteger(const char*, int fallback) { return fallback; }
 /* MASK_TABLE */
 constexpr int TABLE_RANDOMIZER=1;
 void Randomizer_DrawMmMask() {}
@@ -93,6 +95,8 @@ struct GraphicsContext {Gfx* o=opa;Gfx* x=xlu;};
 GraphicsContext gfx;
 struct PlayState {struct {GraphicsContext* gfxCtx=&gfx;} state; int gameplayFrames=0;};
 PlayState play;PlayState* gPlayState=&play;
+NeiGi::Basis NeiGi_CameraBasis(PlayState*) { return {}; }
+void NeiGi_DrawMesh(PlayState*, const NeiGi::Mesh&) { assert(0 && "mask dispatch must use its own palette overlay"); }
 /* HOST_RESOLVER */
 /* HOST_CACHE */
 std::vector<std::pair<int,std::string>> submitted;

@@ -370,6 +370,57 @@ static void SkyOverrideRegression() {
     std::puts("PASS production sky: all day/time palettes, gloom, slot bindings, filters, stars and restoration");
 }
 
+static void SeasonWeatherRegression() {
+    static PlayState play{};
+    Camera camera{};
+    play.sceneId = SCENE_TOWN;
+    play.skyboxId = SKYBOX_NORMAL_SKY;
+    play.cameraPtrs[0] = &camera;
+    play.envCtx.stormState = STORM_STATE_OFF;
+    play.envCtx.lightSettingOverride = LIGHT_SETTING_OVERRIDE_NONE;
+    settings.clear();
+    MMWeather_Reset();
+    auto& nei = gSaveContext.save.shipSaveInfo.nei;
+    nei.seasonsOwned = 0x0F;
+    nei.season = SEASON_AUTUMN;
+    const auto native = play.envCtx;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 30 && rainGain > 0 && MMWeather_Overcast() > 0);
+    assert(std::memcmp(&native, &play.envCtx, sizeof(native)) == 0);
+    int draws = rainDraws;
+    DrawWeatherFromPlay(&play);
+    assert(rainDraws == draws + 1);
+    nei.season = SEASON_WINTER;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0 && rainGain == 0 && MMWeather_Overcast() > 0);
+    nei.season = SEASON_SUMMER;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0 && MMWeather_Overcast() == 0);
+    nei.season = SEASON_OFF;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0 && MMWeather_Overcast() == 0);
+    nei.season = SEASON_AUTUMN;
+    play.skyboxId = SKYBOX_NONE;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0 && rainGain == 0);
+    play.skyboxId = SKYBOX_NORMAL_SKY;
+    play.csCtx.state = 1;
+    MMWeather_Update(&play);
+    assert(MMWeather_Season() < 0 && MMWeather_RainDensity() == 0);
+    play.csCtx.state = CS_STATE_IDLE;
+    play.envCtx.lightSettingOverride = 1;
+    MMWeather_Update(&play);
+    assert(MMWeather_Season() < 0 && MMWeather_Overcast() == 0);
+    // Explicit enhancement settings retain priority even during a story light override.
+    settings[MM_WEATHER_CVAR("Enabled")] = 1;
+    for (int i = 0; i < 25; ++i)
+        MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 25 && rainGain > 0);
+    nei.seasonsOwned = 0;
+    MMWeather_Reset();
+    std::puts("PASS seasonal rain, snow sky, clear weather, Off, interior/story restore and user override");
+}
+
 int main() {
     static PlayState play{};
     Camera camera{};
@@ -455,4 +506,5 @@ int main() {
     OutdoorOverrideRegression();
     SkyOverrideRegression();
     MayorsResidenceRegression();
+    SeasonWeatherRegression();
 }

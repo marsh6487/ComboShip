@@ -298,7 +298,18 @@ int main() {
         allocationFailure = false;
     }
 #ifdef HOST_MM
-    assert(eligible == 29); // 24 inventory masks, Sun Mask GI and four remains.
+    assert(eligible == 31); // 24 inventory masks, Sun Mask GI, four remains and two bottled-fairy rows.
+    for (int id : {GID_FAIRY,GID_FAIRY_2}) {
+        uint8_t pink[4]{};
+        const uint8_t expectedPink[4]={255,160,235,255};
+        assert(GetItem_GetShimmerColor(id,pink) && !memcmp(pink,expectedPink,4));
+    }
+    uint8_t goht[4], keaton[4], bremen[4];
+    assert(GetItem_GetShimmerColor(GID_REMAINS_GOHT, goht));
+    assert(goht[0] > goht[1] && goht[0] > goht[2]);
+    assert(GetItem_GetShimmerColor(GID_MASK_KEATON, keaton));
+    assert(GetItem_GetShimmerColor(GID_MASK_BREMEN, bremen));
+    assert(memcmp(keaton, bremen, 3) != 0);
     const int special[] = { GID_MASK_DEKU, GID_MASK_GORON, GID_MASK_ZORA, GID_MASK_FIERCE_DEITY };
     const uint8_t expected[4][3] = { {50,220,90}, {240,64,64}, {64,144,255}, {0,0,0} };
     for (int i = 0; i < 4; ++i) { uint8_t color[4]; assert(GetItem_GetShimmerColor(special[i], color)); assert(!memcmp(color, expected[i], 3)); }
@@ -336,6 +347,11 @@ int main() {
     const uint8_t aliasColor[4]={100,160,255,255};
     Reset(47); DrawOotBottleWithShimmer(GID_POTION_BLUE,aliasColor);
     Check(aliasColor,true,"mm"); assert(paths.size()==1);
+    const uint8_t fairyColor[4]={255,160,235,255};
+    for (int id : {GID_FAIRY,GID_FAIRY_2}) {
+        Reset(47); DrawOotBottleWithShimmer(id,fairyColor);
+        Check(fairyColor,false,"mm"); assert(paths.size()==1); // Exactly one 360-vertex hex overlay.
+    }
 #endif
     for (int profile=0; profile<7; ++profile) {
         uint8_t color[4]; assert(ComboRpgShimmerColor(profile, color));

@@ -604,7 +604,6 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             RI_OOT_NEI_ZONAI_PERMAFROST,
             RI_OOT_NEI_PHANTOM_HOURGLASS,
             RI_OOT_NEI_SHADOW_CRYSTAL,
-            RI_OOT_NEI_ROD_OF_SEASONS,
             RI_OOT_NEI_SEASON_SPRING,
             RI_OOT_NEI_SEASON_SUMMER,
             RI_OOT_NEI_SEASON_AUTUMN,

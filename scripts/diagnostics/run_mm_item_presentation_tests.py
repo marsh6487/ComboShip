@@ -47,7 +47,8 @@ void Randomizer_DrawCaneSomariaUpgrade() {}
 void Randomizer_DrawCanePacciUpgrade() {}
 void Randomizer_DrawCanePacciUltrahand() {}
 void (*awardDraw)()=customDraw;
-int tableCalls=0; bool redesigned=false;
+int tableCalls=0; bool redesigned=false, effects=false;
+int CVarGetInteger(const char*, int) { return effects; }
 RandomizerGet described=RG_NONE;
 namespace Rando::StaticData {
 struct Name { std::string english="Awarded tier"; };
@@ -98,6 +99,12 @@ int main() {
    awardDraw=skills[i]; info={};
    assert(OOT_FillItemDrawInfo(RG_TEST_CUSTOM,&info)==1);
    assert(info.drawKind==CW_DRAW_KIND_NEI_CANE && info.neiLegacyCane==expected[i]);
+   assert(!info.itemShimmer);
+   effects=true; info={};
+   assert(OOT_FillItemDrawInfo(RG_TEST_CUSTOM,&info)==1 && info.itemShimmer);
+   assert(info.itemShimmerColor[0]==255);
+   assert(info.itemShimmerColor[1]==((i==0 || i==2) ? 60 : 215));
+   effects=false;
    assert(tableCalls==1);
  }
 

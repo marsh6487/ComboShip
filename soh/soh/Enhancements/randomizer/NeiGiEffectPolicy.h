@@ -39,12 +39,29 @@ enum class Kind {
     MasterSword,
     BiggoronSword,
     GreatFairySword,
-    FourSword
+    FourSword,
+    Somaria,
+    Pacci,
+    Pokeball,
+    MarioMask
 };
 constexpr float Tau = 6.28318530718f;
+// The authored Four Sword's high center is lowered in GI space only. Its
+// held model and source vertices keep their accepted placement.
+constexpr float PresentationOffsetY(Kind kind) {
+    return kind == Kind::FourSword ? -18.f : 0.f;
+}
 constexpr std::array<uint32_t, 4> FourSwordColors{ 0x315B2F, 0xD8232D, 0x2289CF, 0x6D3593 };
 constexpr uint32_t ColorHex(Kind kind) {
     switch (kind) {
+        case Kind::Somaria:
+            return 0xFF3C3C;
+        case Kind::Pacci:
+            return 0xFFD746;
+        case Kind::Pokeball:
+            return 0xE73842;
+        case Kind::MarioMask:
+            return 0xE63C3C;
         case Kind::Fire:
             return 0xFA8B20;
         case Kind::Ice:
@@ -414,7 +431,8 @@ inline Mesh SampleShimmer(uint32_t frame, bool enabled, const Basis& camera = {}
         float pulse = .25f + .75f * std::pow(.5f + .5f * std::sin(t * 4 + i * 2.f), 2.f);
         // Wonder-item silhouette; Deku Leaf keeps green halos AND green glints.
         const bool leaf = kind == Kind::Leaf;
-        const uint32_t hue = kind == Kind::FourSword         ? FourSwordColors[i % FourSwordColors.size()]
+        const uint32_t hue = kind == Kind::Pokeball          ? (i % 2 ? 0xFFFFFF : 0xE73842)
+                             : kind == Kind::FourSword       ? FourSwordColors[i % FourSwordColors.size()]
                              : kind == Kind::GreatFairySword ? fairyHue
                              : kind == Kind::Neutral         ? 0xA8E9FF
                                                              : ColorHex(kind);

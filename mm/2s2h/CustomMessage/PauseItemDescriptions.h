@@ -11,6 +11,8 @@ extern "C" {
  * (vanilla MM items keep their own 0x17xx message).
  */
 const char* PauseItemDesc_Get(u16 itemId, s32 pageIndex);
+// Current dungeon's owned map/compass information, including Start With items.
+const char* PauseItemDesc_GetMapInfo(s32 dungeon, u16 itemId);
 
 // C-Up on the equipment page's upgrade column: row 0 = Magic Cape, row 1 = Pendant of Memories.
 const char* PauseItemDesc_GetEquipUpgrade(s16 row);

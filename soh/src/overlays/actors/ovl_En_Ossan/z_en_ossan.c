@@ -425,6 +425,7 @@ s16 ShopItemDisp_GerudoMask(s16 v) {
 void EnOssan_SpawnItemsOnShelves(EnOssan* this, PlayState* play, ShopItem* shopItems) {
     EnTana* shelves;
     s16 itemParams;
+    s16 originalItemParams;
     s32 i;
 
     for (i = 0; i < 8; i++, shopItems++) {
@@ -432,14 +433,13 @@ void EnOssan_SpawnItemsOnShelves(EnOssan* this, PlayState* play, ShopItem* shopI
             this->shelfSlots[i] = NULL;
         } else {
             itemParams = sShopItemReplaceFunc[shopItems->shopItemIndex](shopItems->shopItemIndex);
+            originalItemParams = itemParams;
             if (IS_RANDO && Randomizer_GetSettingValue(RSK_SHOPSANITY) != RO_SHOPSANITY_OFF) {
                 ShopItemIdentity shopItemIdentity = Randomizer_IdentifyShopItem(play->sceneNum, i + 1);
                 if (shopItemIdentity.identity.randomizerCheck != RC_UNKNOWN_CHECK) {
-                    itemParams = shopItemIdentity.enGirlAShopItem;
-
-                    if (Flags_GetRandomizerInf(shopItemIdentity.identity.randomizerInf)) {
-                        itemParams = SI_SOLD_OUT;
-                    }
+                    if (!Flags_GetRandomizerInf(shopItemIdentity.identity.randomizerInf)) {
+                        itemParams = shopItemIdentity.enGirlAShopItem;
+                    } // Otherwise retain the original native shelf stock selected above.
                 }
             }
 
@@ -452,8 +452,10 @@ void EnOssan_SpawnItemsOnShelves(EnOssan* this, PlayState* play, ShopItem* shopI
                     shelves->actor.world.pos.y + shopItems->yOffset, shelves->actor.world.pos.z + shopItems->zOffset,
                     shelves->actor.shape.rot.x, shelves->actor.shape.rot.y + sItemShelfRot[i],
                     shelves->actor.shape.rot.z, itemParams);
-                if (IS_RANDO && Randomizer_GetSettingValue(RSK_SHOPSANITY) != RO_SHOPSANITY_OFF) {
+                if (this->shelfSlots[i] != NULL && IS_RANDO &&
+                    Randomizer_GetSettingValue(RSK_SHOPSANITY) != RO_SHOPSANITY_OFF) {
                     this->shelfSlots[i]->randoSlotIndex = i + 1;
+                    this->shelfSlots[i]->randoOriginalShopItem = originalItemParams;
                 }
             }
         }

@@ -120,7 +120,7 @@ def slate(slug):
     m.material('pupil',rgb(0x081019),rough=.3)
     m.material('wrap',rgb(0xA38150),'braid',rough=.85)
     outline=[(-23,-32),(23,-32),(28,-27),(28,26),(22,34),(-22,34),(-28,26),(-28,-27)]
-    m.polygon('Thick chamfered ancient casing','casing',outline,depth=9,bevel=2.5)
+    m.polygon('Thick chamfered ancient casing','casing',outline,depth=9,bevel=2.5,closed_sides=True)
     # Localized fittings leave the charcoal silhouette visible like the reference.
     for side in (-1,1):
         m.tube('Bronze casing side rail','bronze',[[side*24,-28,4.6],[side*26,-24,4.6],
@@ -135,11 +135,11 @@ def slate(slug):
     m.sphere('Raised bronze iris bezel','bronze',[0,5,5.1],[7.1,9,1.7],8,20)
     m.sphere('Luminous rune iris','glyph',[0,5,6.5],[5.25,7,1],8,20)
     m.sphere('Inset dark pupil','pupil',[0,5,7.35],[2.1,3.35,.4],6,16)
-    m.polygon('Bronze eye tear','bronze',[(-3,-6),(3,-6),(0,-13)],depth=1.5,z=5.2,bevel=.4)
+    m.polygon('Bronze eye tear','bronze',[(-3,-6),(3,-6),(0,-13)],depth=1.5,z=5.2,bevel=.4,closed_sides=True)
     # Three amber forehead triangles and fine bronze circuit traces.
     for x,y in [(-11,22),(0,26),(11,22)]:
-        m.polygon('Bronze triangle setting','bronze',[(x-3,y+3),(x+3,y+3),(x,y-3)],depth=1.3,z=5,bevel=.35)
-        m.polygon('Amber triangular inlay','amber',[(x-1.5,y+1.5),(x+1.5,y+1.5),(x,y-1.5)],depth=.4,z=5.9,bevel=.15)
+        m.polygon('Bronze triangle setting','bronze',[(x-3,y+3),(x+3,y+3),(x,y-3)],depth=1.3,z=5,bevel=.35,closed_sides=True)
+        m.polygon('Amber triangular inlay','amber',[(x-1.5,y+1.5),(x+1.5,y+1.5),(x,y-1.5)],depth=.4,z=5.9,bevel=.15,closed_sides=True)
     for sign in (-1,1):
         for y in (-24,-9,18):
             m.tube('Branching bronze circuitry','bronze',[[sign*15,y+4,5],[sign*21,y+4,5],
@@ -154,7 +154,7 @@ def slate(slug):
     m.tube('Spiral grip binding','edge',np.c_[-9+18*t,44+2.6*np.cos(t*TAU*7),2.6*np.sin(t*TAU*7)],.45,5)
     for sign in (-1,1):
         m.polygon('Handle mounting bracket','bronze',[(sign*10,29),(sign*17,29),
-                  (sign*17,34),(sign*10,34)],depth=10,bevel=.8)
+                  (sign*17,34),(sign*10,34)],depth=10,bevel=.8,closed_sides=True)
     # Rear seams and inset eye make a rotating pickup readable from both sides.
     for sign in (-1,1):
         t=np.linspace(0,math.pi,18)
@@ -171,9 +171,9 @@ def slate(slug):
         for x in (-8,8):m.ring('Cycle wheel','glyph',[x,-20,5.2],3.5,.65,segments=16,sides=5)
         m.tube('Cycle chassis','glyph',[[-8,-20,5.2],[-2,-15,5.2],[5,-16,5.2],[8,-20,5.2]],.7,5)
     elif slug=='slate_stasis':
-        for x in (-3.5,3.5):m.polygon('Stasis pause bar','glyph',[(x-1,-24),(x+1,-24),(x+1,-16),(x-1,-16)],depth=.6,z=5.2,bevel=.2)
+        for x in (-3.5,3.5):m.polygon('Stasis pause bar','glyph',[(x-1,-24),(x+1,-24),(x+1,-16),(x-1,-16)],depth=.6,z=5.2,bevel=.2,closed_sides=True)
     elif slug=='slate_cryonis':
-        for x,h in [(-7,5),(0,9),(7,6)]:m.polygon('Cryonis pillar','glyph',[(x-2,-24),(x+2,-24),(x+2,-24+h),(x-2,-24+h)],depth=.7,z=5.2,bevel=.2)
+        for x,h in [(-7,5),(0,9),(7,6)]:m.polygon('Cryonis pillar','glyph',[(x-2,-24),(x+2,-24),(x+2,-24+h),(x-2,-24+h)],depth=.7,z=5.2,bevel=.2,closed_sides=True)
     elif slug=='slate_sensor':
         for r in (3,6,9):
             t=np.linspace(-.8,.8,16)

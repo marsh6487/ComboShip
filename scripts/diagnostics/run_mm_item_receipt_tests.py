@@ -125,6 +125,58 @@ int main() {
 '''
 with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     tmp = Path(tmp)
+    compiler = os.environ.get('CXX', 'c++')
+    extra = ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-g'] if '--sanitizers' in sys.argv else []
+    icon = (ROOT / 'tests/item_receipts/icon_test.cpp').read_text()
+    icon_source = (ROOT / 'combo/menu/ComboItemDrawOOT.h').read_text()
+    icon = icon.replace('/* ICON_SELECTOR */',
+        'static int32_t OOT_FillItemIconInfo(RandomizerGet rg,CwItemIconInfo* out) ' +
+        block(icon_source, 'static int32_t OOT_FillItemIconInfo'))
+    tu = tmp / 'icon.cpp'
+    tu.write_text(icon)
+    exe = tmp / 'icon'
+    subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', *extra,
+                    '-I', str(ROOT), str(tu), '-o', str(exe)], check=True)
+    subprocess.run([str(exe)], check=True)
+    song = (ROOT / 'tests/item_receipts/song_icons_test.cpp').read_text()
+    messages = (ROOT / 'soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp').read_text()
+    song = song.replace('/* CUSTOM_ICON_FUNCTIONS */',
+        'void LoadCustomItemIcon(bool displayAsEnglish) ' + block(messages, 'void LoadCustomItemIcon') + '\n' +
+        'void DrawCustomItemIcon(Gfx** p) ' + block(messages, 'void DrawCustomItemIcon'))
+    engine = (ROOT / 'soh/src/code/z_message_PAL.c').read_text()
+    song = song.replace('/* ENGINE_ICON_DRAW */',
+        'u16 Message_DrawItemIcon(PlayState* play,u16 itemId,Gfx** p,u16 i) ' +
+        block(engine, 'u16 Message_DrawItemIcon'))
+    mm_message = (ROOT / 'mm/src/code/z_message.c').read_text()
+    song_palette = ''
+    for channel in ('D_801CFE04', 'D_801CFE1C', 'D_801CFE34'):
+        song_palette += 's16 ' + channel + '[] = ' + block(mm_message, 's16 ' + channel + '[]') + ';\n'
+    song = song.replace('/* MM_SONG_PALETTE */', song_palette)
+    native_load = block(mm_message, 'void Message_LoadItemIcon')
+    song = song.replace('/* MM_SONG_LOAD */',
+        block(native_load, '} else if ((itemId >= ITEM_SONG_SONATA)'))
+    native_draw = block(mm_message, 'void Message_DrawItemIcon')
+    song = song.replace('/* MM_SONG_DRAW */',
+        block(native_draw, '} else if ((msgCtx->itemId >= ITEM_SONG_SONATA)'))
+    rect = native_draw.rindex('gSPTextureRectangle(')
+    song = song.replace('/* MM_ICON_RECTANGLE */', native_draw[rect:native_draw.index(';', rect) + 1])
+    tu = tmp / 'song.cpp'
+    tu.write_text(song)
+    exe = tmp / 'song'
+    subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', *extra,
+                    '-I', str(ROOT), str(tu), '-o', str(exe)], check=True)
+    subprocess.run([str(exe)], check=True)
+    magic = (ROOT / 'tests/item_receipts/magic_test.cpp').read_text()
+    item_messages = (ROOT / 'soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp').read_text()
+    magic = magic.replace('/* MAGIC_BUILDER */',
+        'void BuildMagicStatUpgradeMessage(CustomMessage& msg) ' +
+        block(item_messages, 'void BuildMagicStatUpgradeMessage(CustomMessage& msg) {'))
+    tu = tmp / 'magic.cpp'
+    tu.write_text(magic)
+    exe = tmp / 'magic'
+    subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', *extra,
+                    '-I', str(ROOT), str(tu), '-o', str(exe)], check=True)
+    subprocess.run([str(exe)], check=True)
     tu = tmp / 'queue.cpp'
     helpers = (ROOT / 'mm/2s2h/Rando/ItemReceiptText.cpp').read_text()
     append = block(helpers, 'void Rando::AppendReceiptSource')
@@ -132,8 +184,6 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                   '\nnamespace Rando::MiscBehavior { void Apply(Actor* actor,PlayState* play) ' + give +
                   '\n}\nusing Rando::MiscBehavior::Apply;\n' + checks_source)
     exe = tmp / 'queue'
-    compiler = os.environ.get('CXX', 'c++')
-    extra = ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-g'] if '--sanitizers' in sys.argv else []
     subprocess.run([compiler, '-std=c++20', '-DCOMBO_BUILD', '-I', str(ROOT), *extra, str(tu), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)
     codec = tmp / 'codec'
@@ -156,6 +206,13 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     macro = items[items.index('#define RI('):items.index('// clang-format off')]
     catalog = macro + '\nnamespace Rando::StaticData { std::map<RandoItemId,RandoStaticItem> Items = ' + \
         block(items, 'std::map<RandoItemId, RandoStaticItem> Items') + ';\n}\n#undef RI\n'
+    message = (ROOT / 'mm/src/code/z_message.c').read_text()
+    catalog += '#define MESSAGE_ITEM_NONE 9999\ns16 D_801CFF94[] = ' + block(message, 's16 D_801CFF94[]') + ';\n'
+    for channel in ('D_801CFE04', 'D_801CFE1C', 'D_801CFE34'):
+        catalog += 's16 ' + channel + '[] = ' + block(message, 's16 ' + channel + '[]') + ';\n'
+    catalog += 'extern "C" void Message_StageCustomItemIcon(void*,s16);\n'
+    catalog += 'u8 Rando::StaticData::GetIconForZMessage(RandoItemId randoItemId) ' + \
+        block(items, 'u8 GetIconForZMessage') + '\n'
     native = (ROOT / 'mm/src/overlays/actors/ovl_player_actor/z_player.c').read_text()
     catalog += 'struct NativeGetItemEntry { u8 itemId,field; s8 gid; u8 textId; u16 objectId; };\n'
     catalog += native[native.index('#define GIFIELD_'):native.index('GetItemEntry sGetItemTable')]
@@ -183,6 +240,9 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     for declaration in ('u32 gUpgradeMasks', 'u8 gUpgradeShifts'):
         catalog += 'extern "C" ' + declaration + '[8] = ' + block(inventory, declaration) + ';\n'
     (tmp / 'receipt_catalogs.inc').write_text(catalog)
+    pause_desc = (ROOT / 'mm/2s2h/CustomMessage/PauseItemDescriptions.cpp').read_text()
+    (tmp / 'receipt_map_pause.inc').write_text('extern "C" const char* PauseItemDesc_GetMapInfo(s32 dungeon,u16 itemId) ' +
+                                             block(pause_desc, 'const char* PauseItemDesc_GetMapInfo'))
     mmflags = ['-DCOMBO_BUILD', '-DMM_BUILD_DLL', '-DF3DEX_GBI_2', '-DCONTROLLERBUTTONS_T=uint32_t',
                '-DNON_EQUIVALENT', '-DNON_MATCHING']
     mmflags += ['-I' + str(ROOT / p) for p in ('mm/include', 'mm/include/PR', 'mm/src', 'mm', 'mm/2s2h',
@@ -200,7 +260,9 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     donor = (ROOT / 'tests/item_receipts/donor_test.cpp').read_text()
     descriptions = 'const CustomItemMessageEntry receiptMessages[] = {\n'
     for rg in ('RG_CANE_OF_SOMARIA', 'RG_PROGRESSIVE_ROCS', 'RG_CANE_PACCI_FLIP',
-               'RG_ROCS_CAPE', 'RG_QUARTZ_OF_MOTION', 'RG_DEKU_LEAF'):
+               'RG_ROCS_CAPE', 'RG_QUARTZ_OF_MOTION', 'RG_DEKU_LEAF',
+               'RG_MM_REMAINS_GOHT', 'RG_MM_SONG_LULLABY', 'RG_MM_SONG_LULLABY_INTRO', 'RG_MM_SONG_NOVA',
+               'RG_MM_SONG_HEALING', 'RG_MM_SONG_STORMS'):
         text = re.search(r'\{\s*' + rg + r',.*?,\s*((?:"(?:[^"\\]|\\.)*"\s*)+)',
                          (ROOT / 'soh/soh/Enhancements/randomizer/randomizer.cpp').read_text(), re.S)
         if not text:
@@ -209,12 +271,66 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     descriptions += '};\n'
     donor = donor.replace('/* DONOR_MESSAGES */', descriptions)
     exported = (ROOT / 'soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp').read_text()
+    context_builders = 'bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received = true);\n'
+    for signature in ('static bool DungeonInformationEnabled()',
+                      'extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled(void)',
+                      'static CustomMessage DungeonRewardName(RandomizerCheck check)',
+                      'static int16_t DungeonEntranceDestination(int16_t entrance)',
+                      'static std::string DungeonEntranceSource(int16_t dungeonEntrance)',
+                      'bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received)',
+                      'bool BuildTokenReceiptMessage(RandomizerGet rg, CustomMessage& msg)',
+                      'extern "C" uint16_t Randomizer_GetDungeonItemInfoTextId(uint16_t cursorItem)',
+                      'void BuildDungeonPauseInfoMessage(uint16_t* textId, bool* loadFromMessageTable)',
+                      'void BuildMapMessage(uint16_t* textId, bool* loadFromMessageTable)'):
+        context_builders += signature + ' ' + block(exported, signature + ' {') + '\n'
+    donor = donor.replace('/* CONTEXT_BUILDERS */', context_builders)
+    donor = donor.replace('/* FOREIGN_BUILDER */',
+        'void BuildComboForeignMessage(Player* player,CustomMessage& msg) ' +
+        block(exported, 'void BuildComboForeignMessage'))
     donor = donor.replace('/* DONOR_EXPORT */',
         'extern "C" int32_t OOT_GetItemReceiptText(const char* itemName,char* buffer,uint32_t capacity) ' +
         block(exported, 'int32_t OOT_GetItemReceiptText'))
     tu = tmp / 'donor.cpp'
     tu.write_text(donor)
     exe = tmp / 'donor'
-    subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT), *extra,
+    subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-I', str(ROOT), *extra,
                     str(tu), '-o', str(exe)], check=True)
+    subprocess.run([str(exe)], check=True)
+
+    information = (ROOT / 'tests/item_receipts/information_test.cpp').read_text()
+    hint = (ROOT / 'soh/soh/Enhancements/randomizer/hint.cpp').read_text()
+    save = (ROOT / 'soh/soh/SaveManager.cpp').read_text()
+    save_header = (ROOT / 'soh/soh/SaveManager.h').read_text()
+    otr = (ROOT / 'soh/soh/OTRGlobals.cpp').read_text()
+    information = information.replace('/* ALTAR_BUILDER */',
+        'const CustomMessage Hint::GetHintMessage(MessageFormat format,size_t id) const ' + block(hint, 'const CustomMessage Hint::GetHintMessage'))
+    information = information.replace('/* SETTINGS_RESTORE */',
+        'extern "C" void SOH_RestoreRandoSettings(const char* json) ' + block(otr, 'void SOH_RestoreRandoSettings'))
+    information = information.replace('/* ALTAR_EXPORT */',
+        'extern "C" const char* SOH_DumpAltarHintMessages(void) ' + block(otr, 'const char* SOH_DumpAltarHintMessages'))
+    information = information.replace('/* LOAD_DATA */', block(
+        save_header[save_header.index('template <typename T> void LoadData'):], ') {\n        if (name == "")'))
+    information = information.replace('/* LOAD_ARRAY */',
+        'void SaveManager::LoadArray(const std::string& name,const size_t size,LoadArrayFunc func) ' + block(save, 'void SaveManager::LoadArray'))
+    information = information.replace('/* LOAD_SETTINGS */',
+        'SaveManager::Instance->LoadArray("randoSettings",RSK_MAX,[&](size_t i) ' + block(save, 'SaveManager::Instance->LoadArray("randoSettings"') + ');')
+    settings = (ROOT / 'soh/soh/Enhancements/randomizer/settings.cpp').read_text()
+    information = information.replace('/* SPOILER_SETTINGS */',
+        block(settings, 'void Settings::ParseJson')[1:].split('    nlohmann::json jsonExcludedLocations')[0])
+    tu = tmp / 'information.cpp'
+    tu.write_text(information)
+    exe = tmp / 'information'
+    subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', *extra,
+                    '-I', str(ROOT), str(tu), '-o', str(exe)], check=True)
+    subprocess.run([str(exe)], check=True)
+
+    tracker = (ROOT / 'tests/item_receipts/tracker_test.cpp').read_text()
+    launcher = (ROOT / 'combo/ComboShip.cpp').read_text()
+    tracker = tracker.replace('/* TRACKER_PUSH */', 'static void Combo_PushHintTrackerData(int slot) ' +
+                              block(launcher, 'static void Combo_PushHintTrackerData'))
+    tu = tmp / 'tracker.cpp'
+    tu.write_text(tracker)
+    exe = tmp / 'tracker'
+    subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', *extra,
+                    '-I', str(ROOT), '-I', str(ROOT / 'combo'), str(tu), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)

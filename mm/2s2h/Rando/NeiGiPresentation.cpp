@@ -49,6 +49,8 @@ const Binding kBindings[] = {
     { RI_OOT_NEI_CANE_SOMARIA_PLATFORM, "cane_of_somaria" },
     { RI_OOT_NEI_MINISH_CAP, "minish_cap" },
     { RI_OOT_NEI_LANTERN, "lantern" },
+    { RI_OOT_NEI_MARIO_MASK, "mario_mask" },
+    { RI_OOT_TRADE_COJIRO, "cojiro" },
     { RI_OOT_NEI_ELEMENTAL_WAND, "elemental_wand" },
     { RI_OOT_NEI_WAND_SAND_ROD, "sand_rod" },
     { RI_OOT_NEI_WAND_TORNADO_ROD, "tornado_rod" },
@@ -224,6 +226,7 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
             return false;
     }
     info.neiSomariaUpgrade = item == RI_OOT_NEI_CANE_SOMARIA_BLOCK || item == RI_OOT_NEI_CANE_SOMARIA_PLATFORM;
+    info.stateDependent = 2; // Model-pack selection remains live for concrete aliases.
     *out = info;
     return true;
 }
@@ -241,6 +244,9 @@ bool MM_TryDrawNeiGi(RandoItemId item) {
 MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer(RandoItemId item) : mItem(item), mEnabled(false) {
     if (!gPlayState)
         return;
+    // Its legacy drawer already has an unconditional mask shimmer.
+    if (item == RI_OOT_NEI_MARIO_MASK)
+        return;
     const bool sword = item == RI_SWORD_KOKIRI || item == RI_SWORD_RAZOR || item == RI_SWORD_GILDED ||
                        item == RI_GREAT_FAIRY_SWORD || item == RI_OOT_MASTER_SWORD ||
                        item == RI_OOT_TRUE_MASTER_SWORD || item == RI_OOT_BIGGORON_SWORD ||
@@ -248,7 +254,9 @@ MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer(RandoItemId item) : mItem(item)
     if (!sword && !CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0))
         return;
     // The four seasons are deliberately absent: their weather is the GI.
-    mEnabled = std::any_of(std::begin(kBindings), std::end(kBindings),
+    mEnabled = item == RI_OOT_NEI_POKE_BALL || item == RI_OOT_NEI_CANE_PACCI_FLIP ||
+               item == RI_OOT_NEI_CANE_PACCI_STONE || item == RI_OOT_NEI_CANE_PACCI_ULTRAHAND ||
+               std::any_of(std::begin(kBindings), std::end(kBindings),
                            [item](const Binding& binding) { return binding.id == item; });
     if (mEnabled)
         Matrix_Push();
@@ -260,6 +268,19 @@ MM_NeiGiFallbackShimmer::~MM_NeiGiFallbackShimmer() {
     Matrix_Pop();
     Kind kind = Kind::Neutral;
     switch (mItem) {
+        case RI_OOT_NEI_CANE_OF_SOMARIA:
+        case RI_OOT_NEI_CANE_SOMARIA_BLOCK:
+        case RI_OOT_NEI_CANE_SOMARIA_PLATFORM:
+            kind = Kind::Somaria;
+            break;
+        case RI_OOT_NEI_CANE_PACCI_FLIP:
+        case RI_OOT_NEI_CANE_PACCI_STONE:
+        case RI_OOT_NEI_CANE_PACCI_ULTRAHAND:
+            kind = Kind::Pacci;
+            break;
+        case RI_OOT_NEI_POKE_BALL:
+            kind = Kind::Pokeball;
+            break;
         case RI_OOT_NEI_DEKU_LEAF:
             kind = Kind::Leaf;
             break;

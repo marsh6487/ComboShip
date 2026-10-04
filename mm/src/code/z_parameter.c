@@ -4134,7 +4134,8 @@ void Interface_Dpad_LoadItemIconImpl(PlayState* play, u8 btn) {
     // at DPAD_BUTTON(btn) + EQUIP_SLOT_MAX; the D-pad HUD draw already sizes 24x24 quest icons at 24).
     {
         extern void* ExtInv_GetItemIcon(unsigned short itemId);
-        u8 it = DPAD_GET_CUR_FORM_BTN_ITEM(btn);
+        extern u16 ExtButton_GetDpadItem(s32 form, s32 btn);
+        u16 it = ExtButton_GetDpadItem(0, btn);
         void* neiIcon = ExtInv_GetItemIcon(it);
         interfaceCtx->iconItemSegment[DPAD_BUTTON(btn) + EQUIP_SLOT_MAX] = neiIcon ? (TexturePtr)neiIcon
                                                                            : (it < ARRAY_COUNT(gItemIcons))
@@ -6306,7 +6307,8 @@ void Interface_Dpad_DrawItemIconTexture(PlayState* play, TexturePtr texture, s16
     // Interface_DrawItemIconTexture; loading them as 32x32 shows garbage.
     extern uint8_t ExtInv_GetItemIconSize(unsigned short itemId);
     extern void* ExtInv_GetItemIcon(unsigned short itemId);
-    u8 dpadBtnItem = DPAD_GET_CUR_FORM_BTN_ITEM(button);
+    extern u16 ExtButton_GetDpadItem(s32 form, s32 btn);
+    u16 dpadBtnItem = ExtButton_GetDpadItem(0, button);
     s16 texSize = 32;
     s16 texScale = sDpadItemIconDD[button];
 

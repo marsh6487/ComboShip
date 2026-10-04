@@ -4,6 +4,7 @@
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h"
 #include "2s2h/Rando/ItemReceiptText.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
+#include "rando/CrossForeign.h"
 #include "ComboExport.h"
 #include "ComboItemReceiptText.h"
 extern "C" {
@@ -35,17 +36,41 @@ const NeiItem *Nei_FindByRg(int16_t id) {
 static NeiSaveData neiSave{};
 NeiSaveData *Nei_Save() { return &neiSave; }
 SaveContext gSaveContext{};
+TexturePtr gItemIcons[131]{};
+void Message_StageCustomItemIcon(void*, s16) {}
 u8 gItemSlots[77]{};
+u32 gBitFlags[32] = {1, 2, 4};
 u8 Nei_BulletBagLevel() { return std::min<int>(3, neiSave.ootUpgrades & 7); }
+}
+
+namespace Rando::StaticData {
+const char* GetIconTexturePath(RandoItemId) { return nullptr; }
+const std::string& GetCheckDisplayName(RandoCheckId id) {
+  static const std::map<RandoCheckId, std::string> names = {
+    {RC_WOODFALL_TEMPLE_BOSS_WARP, "Woodfall Temple Boss Warp"},
+    {RC_SNOWHEAD_TEMPLE_BOSS_WARP, "Snowhead Temple Boss Warp"},
+    {RC_GREAT_BAY_TEMPLE_BOSS_WARP, "Great Bay Temple Boss Warp"},
+    {RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_WARP, "Stone Tower Temple Inverted Boss Warp"}
+  };
+  return names.at(id);
+}
 }
 
 static std::string requested;
 static bool donorReady = true;
 static int donorReads = 0;
 static uint64_t generation = 0;
+static bool mapCompassInfo = false;
+static RandoCheckId foreignRewardCheck = RC_UNKNOWN;
+static ComboRando::ForeignItem foreignReward;
 namespace Rando::MiscBehavior {
 uint64_t ComboRandoGen() { return generation; }
+const ComboRando::ForeignItem* MM_LookupForeign(RandoCheckId check) {
+  return check == foreignRewardCheck ? &foreignReward : nullptr;
+}
 } // namespace Rando::MiscBehavior
+extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled() { return mapCompassInfo; }
+#include "receipt_map_pause.inc"
 extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char *name,
                                                        char *buffer,
                                                        uint32_t capacity) {
@@ -61,6 +86,101 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char *name,
   assert(body.size() <= capacity);
   std::memcpy(buffer, body.data(), body.size());
   return body.size();
+}
+
+static void CheckMapCompassInformation() {
+  const auto saved = gSaveContext;
+  gSaveContext.fileNum = 0;
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+  mapCompassInfo = true;
+  const RandoCheckId checks[] = { RC_WOODFALL_TEMPLE_BOSS_WARP, RC_SNOWHEAD_TEMPLE_BOSS_WARP,
+      RC_GREAT_BAY_TEMPLE_BOSS_WARP, RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_WARP };
+  const RandoItemId rewards[] = { RI_PROGRESSIVE_SWORD, RI_SONG_NOVA, RI_COMBO_FOREIGN, RI_PROGRESSIVE_MAGIC };
+  const RandoItemId compasses[] = { RI_WOODFALL_COMPASS, RI_SNOWHEAD_COMPASS, RI_GREAT_BAY_COMPASS, RI_STONE_TOWER_COMPASS };
+  const RandoItemId maps[] = { RI_WOODFALL_MAP, RI_SNOWHEAD_MAP, RI_GREAT_BAY_MAP, RI_STONE_TOWER_MAP };
+  const char* bosses[] = { "Odolwa", "Goht", "Gyorg", "Twinmold" };
+  const char* entrances[] = { "Woodfall", "Snowhead", "Zora Cape's turtle", "Stone Tower" };
+  foreignRewardCheck = checks[2];
+  foreignReward.itemGame = ComboRando::GAME_OOT;
+  foreignReward.itemName = "Progressive Hookshot";
+  foreignReward.fakeItemName = "Light Arrows";
+  for (int d = 0; d < 4; ++d) {
+    auto& check = gSaveContext.save.shipSaveInfo.rando.randoSaveChecks[checks[d]];
+    check = {};
+    check.randoItemId = rewards[d];
+    gSaveContext.save.saveInfo.inventory.dungeonItems[d] = 0;
+    assert(!PauseItemDesc_GetMapInfo(d, ITEM_COMPASS));
+    assert(!PauseItemDesc_GetMapInfo(d, ITEM_DUNGEON_MAP));
+    // Start With ownership: no obtain history, visited flags, or receipt latch.
+    gSaveContext.save.saveInfo.inventory.dungeonItems[d] = (1 << DUNGEON_COMPASS) | (1 << DUNGEON_MAP);
+    const std::string expected = d == 2 ? "Progressive Hookshot (OOT)" : Rando::StaticData::Items.at(rewards[d]).name;
+    const auto before = gSaveContext;
+    const int reads = donorReads;
+    char name[128];
+    assert(MM_GetDungeonRewardName(d, name, sizeof(name)) == static_cast<int>(expected.size()));
+    assert(name == expected);
+    const auto info = Rando::GetDungeonMapCompassInfo(d, true);
+    assert(info.find(bosses[d]) != std::string::npos && info.find(expected) != std::string::npos);
+    assert(info.find("Light Arrows") == std::string::npos);
+    assert(PauseItemDesc_GetMapInfo(d, ITEM_COMPASS) == info);
+    const auto map = Rando::GetDungeonMapCompassInfo(d, false);
+    assert(map.find(entrances[d]) != std::string::npos && map.find("entrance") != std::string::npos);
+    assert(PauseItemDesc_GetMapInfo(d, ITEM_DUNGEON_MAP) == map);
+    CustomMessage::Entry receipt;
+    assert(Rando::ApplyItemReceiptText(compasses[d], receipt));
+    assert(receipt.msg.find(bosses[d]) != std::string::npos && !receipt.autoFormat);
+    assert(Rando::ApplyItemReceiptText(maps[d], receipt));
+    assert(receipt.msg.find("entrance") != std::string::npos);
+    assert(donorReads == reads && !std::memcmp(&before, &gSaveContext, sizeof(before)));
+  }
+  // Raw placed names remain stable across live equipment tiers and acquired checks.
+  gSaveContext.save.saveInfo.equips.equipment = 0xFFFF;
+  gSaveContext.save.shipSaveInfo.rando.randoSaveChecks[checks[0]].obtained = true;
+  assert(Rando::GetDungeonMapCompassInfo(0, true).find("Progressive Sword") != std::string::npos);
+  char shortName[2] = {'x', 'x'};
+  assert(MM_GetDungeonRewardName(0, shortName, sizeof(shortName)) == 0 && !shortName[0]);
+  assert(MM_GetDungeonRewardName(-1, shortName, sizeof(shortName)) == 0);
+  assert(MM_GetDungeonRewardName(4, shortName, sizeof(shortName)) == 0);
+  assert(MM_GetDungeonRewardName(0, nullptr, 0) == 0);
+  assert(!PauseItemDesc_GetMapInfo(4, ITEM_COMPASS));
+  assert(!PauseItemDesc_GetMapInfo(0, ITEM_KEY_BOSS));
+  foreignRewardCheck = RC_UNKNOWN;
+  assert(Rando::GetDungeonMapCompassInfo(2, true).empty()); // Missing foreign data never names the sentinel.
+  mapCompassInfo = false;
+  for (int d = 0; d < 4; ++d) {
+    assert(Rando::GetDungeonMapCompassInfo(d, true).empty());
+    assert(Rando::GetDungeonMapCompassInfo(d, false).empty());
+    assert(!PauseItemDesc_GetMapInfo(d, ITEM_COMPASS));
+  }
+  mapCompassInfo = true;
+  gSaveContext.fileNum = 0xFF;
+  assert(!Rando::MapCompassInfoEnabled() && MM_GetDungeonRewardName(0, shortName, sizeof(shortName)) == 0);
+  nlohmann::json seed = {
+    {"mm", {{"placements", {{"Woodfall Temple Boss Warp", "Deku Leaf"}}}}},
+    {"foreign", nlohmann::json::array({{{"checkGame", "mm"}, {"checkName", "Woodfall Temple Boss Warp"},
+                                      {"itemGame", "oot"}, {"itemName", "Deku Leaf"}}})}
+  };
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());
+  ++generation;
+  char dormantName[128];
+  assert(MM_GetDungeonRewardName(0, dormantName, sizeof(dormantName)) > 0);
+  assert(!strcmp(dormantName, "Deku Leaf (OOT)"));
+  seed["foreign"][0]["itemName"] = "Poké Ball";
+  seed["foreign"][0]["shared"] = true;
+  seed["foreign"][0]["fakeItemName"] = "Light Arrows";
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());
+  ++generation;
+  assert(MM_GetDungeonRewardName(0, dormantName, sizeof(dormantName)) == std::strlen("Poké Ball"));
+  assert(!strcmp(dormantName, "Poké Ball")); // UTF-8 bytes, actual name and shared ownership survive cache refresh.
+  assert(MM_GetDungeonRewardName(1, dormantName, sizeof(dormantName)) == 0 && !dormantName[0]);
+  ComboRando::Combo_SetForeignJson("{malformed");
+  ++generation;
+  assert(MM_GetDungeonRewardName(0, dormantName, sizeof(dormantName)) == 0 && !dormantName[0]);
+  ComboRando::Combo_SetForeignJson(nullptr);
+  ++generation;
+  gSaveContext = saved;
+  mapCompassInfo = false;
+  std::cout << "MM map/compass information: four placed rewards, foreign owner names, native entrances, owned pause/Start With, gates and no save writes passed\n";
 }
 
 int main() {
@@ -85,6 +205,42 @@ int main() {
   play.msgCtx.messageTableNES = table;
   CustomMessage::Entry entry;
   entry.icon = 0xF5;
+  CheckMapCompassInformation();
+  // GI_NONE song rows must still take the engine's 16x24 IA8 note branch.
+  const std::pair<RandoItemId, int> songIcons[] = {
+      { RI_SONG_SONATA, ITEM_SONG_SONATA }, { RI_SONG_LULLABY, ITEM_SONG_LULLABY },
+      { RI_SONG_LULLABY_INTRO, ITEM_SONG_LULLABY }, { RI_SONG_NOVA, ITEM_SONG_NOVA },
+      { RI_SONG_ELEGY, ITEM_SONG_ELEGY }, { RI_SONG_OATH, ITEM_SONG_OATH },
+      { RI_SONG_SARIA, ITEM_SONG_SARIA }, { RI_SONG_TIME, ITEM_SONG_TIME },
+      { RI_SONG_DOUBLE_TIME, ITEM_SONG_TIME }, { RI_SONG_INVERTED_TIME, ITEM_SONG_TIME },
+      { RI_SONG_HEALING, ITEM_SONG_HEALING }, { RI_SONG_EPONA, ITEM_SONG_EPONA },
+      { RI_SONG_SOARING, ITEM_SONG_SOARING }, { RI_SONG_STORMS, ITEM_SONG_STORMS },
+      { RI_SONG_SUN, ITEM_SONG_SUN },
+  };
+  for (auto [song, icon] : songIcons) {
+    auto byte = Rando::StaticData::GetIconForZMessage(song);
+    assert(byte < 0xF1 && D_801CFF94[byte] == icon);
+  }
+  const int healing = ITEM_SONG_HEALING - ITEM_SONG_SONATA;
+  assert(D_801CFE04[healing] == 255 && D_801CFE1C[healing] == 150 && D_801CFE34[healing] == 230);
+  const int time = ITEM_SONG_TIME - ITEM_SONG_SONATA;
+  assert(D_801CFE04[time] == 98 && D_801CFE1C[time] == 177 && D_801CFE34[time] == 211);
+  // Receipt is composed before GiveItem. The token's identity, never the
+  // current scene, chooses the spider-house counter.
+  play.sceneId = SCENE_CLOCKTOWER;
+  gSaveContext.save.saveInfo.skullTokenCount = (7u << 16) | 19u;
+  assert(Rando::ApplyItemReceiptText(RI_GS_TOKEN_SWAMP, entry));
+  assert(entry.msg.find("Swamp") != std::string::npos &&
+         entry.msg.find("8") != std::string::npos &&
+         entry.msg.find("20") == std::string::npos);
+  assert(Rando::ApplyItemReceiptText(RI_GS_TOKEN_OCEAN, entry));
+  assert(entry.msg.find("Ocean") != std::string::npos &&
+         entry.msg.find("20") != std::string::npos);
+  neiSave.ootGsCount = 42;
+  assert(Rando::ApplyItemReceiptText(RI_OOT_GS_TOKEN, entry));
+  assert(entry.msg.find("43") != std::string::npos);
+  assert(gSaveContext.save.saveInfo.skullTokenCount == ((7u << 16) | 19u));
+  assert(neiSave.ootGsCount == 42); // descriptions cannot grant items
   assert(Rando::ApplyItemReceiptText(RI_BOW, entry));
   assert(entry.msg.find("aim") != std::string::npos);
   assert(entry.msg.find('\x19') == std::string::npos &&
@@ -149,6 +305,24 @@ int main() {
                                      entry)); // no negative cache
   const std::pair<RandoItemId, const char *> concrete[] = {
       {RI_SINGLE_MAGIC, "Magic Meter"},
+      {RI_SONG_SONATA, "Sonata of Awakening"},
+      {RI_SONG_LULLABY, "Goron Lullaby"},
+      {RI_SONG_LULLABY_INTRO, "Goron Lullaby Intro"},
+      {RI_SONG_NOVA, "New Wave Bossa Nova"},
+      {RI_SONG_ELEGY, "Elegy of Emptiness"},
+      {RI_SONG_OATH, "Oath to Order"},
+      {RI_SONG_HEALING, "Song of Healing"},
+      {RI_SONG_SOARING, "Song of Soaring"},
+      {RI_SONG_TIME, "Song of Time (MM)"},
+      {RI_SONG_STORMS, "Song of Storms (MM)"},
+      {RI_SONG_SUN, "Sun's Song (MM)"},
+      {RI_SONG_EPONA, "Epona's Song (MM)"},
+      {RI_SONG_SARIA, "Saria's Song (MM)"},
+      {RI_SONG_DOUBLE_TIME, "Song of Double Time"},
+      {RI_SONG_INVERTED_TIME, "Inverted Song of Time"},
+      {RI_OOT_COMPASS_DEKU_TREE, "Great Deku Tree Compass"},
+      {RI_OOT_MAP_DEKU_TREE, "Great Deku Tree Map"},
+      {RI_SNOWHEAD_COMPASS, "Snowhead Compass"},
       {RI_DOUBLE_MAGIC, "Enhanced Magic Meter"},
       {RI_CLAWSHOT, "Clawshot"},
       {RI_OOT_MASTER_SWORD, "Master Sword"},

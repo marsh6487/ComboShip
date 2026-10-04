@@ -20,6 +20,8 @@
 
 #include "ComboSpinAttackGi.h"
 #include "ComboMaskShimmer.h"
+#include "ComboFairyBottle.h"
+#include "ComboFairyBottleDraw.h"
 #include "soh/Enhancements/randomizer/NeiGiRender.h"
 #include "soh/Enhancements/randomizer/NeiGiShopFit.h"
 
@@ -170,7 +172,7 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     if (raw.opCount < 0 || raw.opCount > CW_DRAW_MAX_OPS)
         return ComboForeignResolve::Unknown;
     if (raw.drawKind == CW_DRAW_KIND_SEASON_GI &&
-        (raw.neiEffect < 1 || raw.neiEffect > 5 || (raw.neiEffect < 5 ? n != 0 || raw.opCount != 0 : n < 1)))
+        (raw.neiEffect < 1 || raw.neiEffect > 6 || (raw.neiEffect != 5 ? n != 0 || raw.opCount != 0 : n < 1)))
         return ComboForeignResolve::Unknown;
     info.neiEffect = raw.neiEffect;
     std::memcpy(info.neiEffectCenter, raw.neiEffectCenter, sizeof(info.neiEffectCenter));
@@ -451,6 +453,7 @@ inline void OOT_DrawForeignPoes(PlayState* play, const ComboForeignDrawInfo* inf
 
 // Bottled fairy: OPA dl0; XLU dl1; seg8 scroll; billboard dl2 (GetItem_DrawFairyBottle).
 inline void OOT_DrawForeignFairyBottle(PlayState* play, const ComboForeignDrawInfo* info) {
+    const ComboFairyBottleMotion motion = ComboFairyBottle_Sample(play->gameplayFrames);
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     OOT_FOREIGN_PIN_OPA();
@@ -459,19 +462,84 @@ inline void OOT_DrawForeignFairyBottle(PlayState* play, const ComboForeignDrawIn
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     OOT_FOREIGN_PIN_XLU();
     COMBO_FOREIGN_MTX(POLY_XLU_DISP++);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[1]);
+    if (strcmp(info->dls[0], info->dls[1]) != 0) {
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[1]);
+    }
     gSPSegment(POLY_XLU_DISP++, 0x08,
                (uintptr_t)Gfx_TwoTexScrollEx(play->state.gfxCtx, G_TX_RENDERTILE, play->state.frames * 0,
                                              play->state.frames * 0, 32, 32, 1, play->state.frames,
                                              -(int32_t)(play->state.frames * 6), 32, 320, 0, 0, 1, -6));
     Matrix_Push();
+    if (ComboFairyBottle_IsBlueFireShell(info->dls[0])) {
+        Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
+    }
+    Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
     Matrix_ReplaceRotation(&play->billboardMtxF);
-    COMBO_FOREIGN_MTX(POLY_XLU_DISP++);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[2]);
+    Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
+    if (!ComboFairyBottle_DrawVfx(play)) {
+        COMBO_FOREIGN_MTX(POLY_XLU_DISP++);
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[2]);
+    }
     Matrix_Pop();
     CLOSE_DISPS(play->state.gfxCtx);
     int32_t segs[] = { 0x08 };
     OOT_RestoreForeignSegs(play, segs, 1);
+}
+
+// MM's native bottle keeps its contents-placement Mtx and animated materials.
+// Slot 3 is a resource path, never a display list. Load it from the asset owner,
+// then leave that scope before submitting commands or using the host fallback.
+// False means the complete native fallback already rendered its own shimmer.
+inline bool OOT_DrawForeignFairyContainer(PlayState* play, const ComboForeignDrawInfo* info) {
+    MtxF contentsMtx;
+    bool hasMatrix = false;
+    if (info->count >= 4 && info->dls[3] != nullptr && strncmp(info->dls[3], "__OTR__@mm:", 11) == 0) {
+        if (auto owner = Ship::CrossRMRegistry::Get("mm")) {
+            Ship::ResourceManagerScope ownerScope(owner);
+            if (auto matrix = owner->LoadResource(info->dls[3] + 11)) {
+                if (matrix->GetRawPointer() != nullptr) {
+                    Matrix_MtxToMtxF((Mtx*)matrix->GetRawPointer(), &contentsMtx);
+                    hasMatrix = true;
+                }
+            }
+        }
+    }
+    int32_t matSegs[kMaxMatEntries] = {};
+    int32_t matSegCount = 0;
+    if (!hasMatrix || !ComboForeignTexAnim_Run(play, "mm", info->matAnimPath, true, matSegs, &matSegCount)) {
+        GetItem_Draw(play, GID_FAIRY);
+        return false;
+    }
+
+    const ComboFairyBottleMotion motion = ComboFairyBottle_Sample(play->gameplayFrames);
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    OOT_FOREIGN_PIN_OPA();
+    COMBO_FOREIGN_MTX(POLY_OPA_DISP++);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)info->dls[0]);
+    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    OOT_FOREIGN_PIN_XLU();
+    COMBO_FOREIGN_MTX(POLY_XLU_DISP++);
+    if (strcmp(info->dls[0], info->dls[1]) != 0) {
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[1]);
+    }
+    Matrix_Push();
+    Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
+    if (ComboFairyBottle_IsBlueFireShell(info->dls[0])) {
+        Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
+    } else {
+        Matrix_Mult(&contentsMtx, MTXMODE_APPLY);
+    }
+    Matrix_ReplaceRotation(&play->billboardMtxF);
+    Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
+    if (!ComboFairyBottle_DrawVfx(play)) {
+        COMBO_FOREIGN_MTX(POLY_XLU_DISP++);
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[2]);
+    }
+    Matrix_Pop();
+    CLOSE_DISPS(play->state.gfxCtx);
+    ComboForeignTexAnim_Restore(play, matSegs, matSegCount, true);
+    return true;
 }
 
 // MM enemy soul: the billboarded soul flame in the soul's own color (DrawFuncs.cpp DrawEnLight).
@@ -570,6 +638,7 @@ inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo*
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     Matrix_RotateY((bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f, MTXMODE_APPLY);
     int selectedOpaque = -1;
+    bool noCull = false;
     for (int i = 0; i < info->opCount; ++i) {
         const auto& op = info->ops[i];
         switch (op.op) {
@@ -588,6 +657,9 @@ inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo*
             case CW_OP_FRAME_PAIR:
                 if (op.a >= 0 && op.a <= 30)
                     selectedOpaque = (uint32_t(play->gameplayFrames) >> int(op.a)) & 1u;
+                break;
+            case CW_OP_NO_CULL:
+                noCull = true;
                 break;
             default:
                 break;
@@ -615,6 +687,8 @@ inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo*
             OOT_FOREIGN_PIN_OPA();
             gSPGrayscale(POLY_OPA_DISP++, false);
             COMBO_FOREIGN_MTX(POLY_OPA_DISP++);
+            if (noCull)
+                gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BOTH);
             if (info->primColorOpa[3]) {
                 gDPSetGrayscaleColor(POLY_OPA_DISP++, info->primColorOpa[0], info->primColorOpa[1],
                                      info->primColorOpa[2], info->primColorOpa[3]);
@@ -624,6 +698,8 @@ inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo*
                 if (selectedOpaque < 0 || i == selectedOpaque)
                     gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, info->dls[i], 0, G_DL_PUSH);
             gSPGrayscale(POLY_OPA_DISP++, false);
+            if (noCull)
+                gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
         }
     }
     Matrix_Pop();
@@ -902,6 +978,14 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
         case CW_DRAW_KIND_MM_FAIRY_BOTTLE:
             OOT_DrawForeignFairyBottle(play, info);
             break;
+        case CW_DRAW_KIND_MM_FAIRY_CONTAINER:
+            if (!OOT_DrawForeignFairyContainer(play, info)) {
+                if (overlayShimmer) {
+                    Matrix_Pop();
+                }
+                return; // the native fallback includes its pink hex overlay
+            }
+            break;
         case CW_DRAW_KIND_MM_SOUL_FLAME:
             OOT_DrawForeignSoulFlame(play, info);
             break;
@@ -923,7 +1007,11 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
     }
     if (overlayShimmer) {
         Matrix_Pop();
-        ComboDrawMaskShimmer(play, nullptr, info->itemShimmerColor, "mm");
+        if (info->neiEffect == static_cast<int32_t>(NeiGi::Kind::Pokeball))
+            NeiGi_DrawMesh(
+                play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play), NeiGi::Kind::Pokeball));
+        else
+            ComboDrawMaskShimmer(play, nullptr, info->itemShimmerColor, "mm");
     }
 }
 

@@ -462,12 +462,11 @@ static void TestIntegration() {
     }
     assert(ownerDepth == 0 && coreScrollCount == 3);
     assert(flameDraws == 1 && membraneDraws == 1 && nucleusDraws == 1);
-    assert(tentacleDraws == (mode == 0 ? 41 : 0));
-    assert(checked.size() >
-           0); // Actual integration calls the availability bridge.
+    assert(tentacleDraws == 0);
+    assert(checked.empty()); // Retired tentacle cannot load or replace the selected core.
   }
   std::cout << "PASS actual Morpha native OoT/MM integration: core and flame "
-               "survive tentacle success/resource/arena failure\n";
+               "remain without tentacle submissions or resource requests\n";
 }
 int main() {
   TestTentacle();

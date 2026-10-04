@@ -18,6 +18,7 @@ inline void to_json(json& j, const DpadSaveInfo& dpadEquips) {
     j = json{
         { "dpadItems", dpadEquips.dpadItems },
         { "dpadSlots", dpadEquips.dpadSlots },
+        { "extItems", dpadEquips.extItems },
     };
 }
 
@@ -25,6 +26,11 @@ inline void from_json(const json& j, DpadSaveInfo& dpadEquips) {
     for (int i = 0; i < ARRAY_COUNT(dpadEquips.dpadItems); i++) {
         j.at("dpadItems").at(i).get_to(dpadEquips.dpadItems[i]);
         j.at("dpadSlots").at(i).get_to(dpadEquips.dpadSlots[i]);
+        if (j.contains("extItems")) {
+            j.at("extItems").at(i).get_to(dpadEquips.extItems[i]);
+        } else {
+            memset(dpadEquips.extItems[i], 0, sizeof(dpadEquips.extItems[i]));
+        }
     }
 }
 
@@ -138,6 +144,8 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "sw97LayoutVersion", n.sw97LayoutVersion },
         { "slateMode", n.slateMode },
         { "slateRunesOwned", n.slateRunesOwned },
+        { "season", n.season },
+        { "seasonsOwned", n.seasonsOwned },
         { "ootCanGrab", n.ootCanGrab },
         { "activeCustomForm", n.activeCustomForm },
         { "marioMaskOwned", n.marioMaskOwned },
@@ -268,6 +276,8 @@ inline void from_json(const json& j, NeiSaveData& n) {
     n.sw97LayoutVersion = j.value("sw97LayoutVersion", (uint8_t)0);
     n.slateMode = j.value("slateMode", (uint8_t)0);
     n.slateRunesOwned = j.value("slateRunesOwned", (uint8_t)0);
+    n.season = j.value("season", (uint8_t)0);
+    n.seasonsOwned = j.value("seasonsOwned", (uint8_t)0);
     n.ootCanGrab = j.value("ootCanGrab", (uint8_t)0);
     n.activeCustomForm = j.value("activeCustomForm", (uint8_t)0);
     n.marioMaskOwned = j.value("marioMaskOwned", (uint8_t)0);

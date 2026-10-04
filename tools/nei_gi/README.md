@@ -1,6 +1,6 @@
 # NEI GI upgrade candidate
 
-The current asset set contains **60 serialized GI models**, with authored get-item
+The current asset set contains **62 serialized GI models**, with authored get-item
 resources under `soh/assets/custom/objects/nei_gi_redesign/`. The latest pass adds
 element colors for rods, spells and Slate variants, rings that turn with the
 Slate, and sword-specific particle themes. It also includes distinct OoT/MM
@@ -13,6 +13,13 @@ See [Slate model/color review](PREVIEWS/slate-element-preview.md) and
 [attached Slate rings](PREVIEWS/slate-rings-attached.md) for the latest Slate work.
 These are offline previews; visual approval does not establish in-game appearance
 or a successful full game build.
+
+The October 4 candidate adds a rounded blue Cojiro and a volumetric Mario Mask,
+and closes the inward-wound side faces on all six Slate models. Existing Slate
+positions, materials, front/back faces and attached rings are preserved. The
+remaining accepted GI resources and all 39 held components are byte-identical
+to PR34 `122dd5f`. New previews are in
+[`PREVIEWS/20261004/`](PREVIEWS/20261004/); in-game appearance is untested.
 
 The [integration verification record](PUBLICATION.md) documents the final
 19-suite regression run and the resolved historical MM fixture failure.
@@ -27,6 +34,7 @@ dependencies are in the forged toolkit. From the repository root:
 ```sh
 python3 -m pip install -r tools/nei_gi/SOURCE/forged_swords/requirements.txt
 python3 tools/nei_gi/check_forged_proportions.py
+python3 tools/nei_gi/check_slate_solidity.py
 python3 tools/nei_gi/verify_assets.py
 python3 scripts/diagnostics/run_nei_gi_tests.py --combo
 python3 tools/nei_gi/package_archive.py /tmp/NEI_GI_Current.o2r
@@ -43,6 +51,8 @@ toolkit. To rebuild selected Slate variants and install their resources:
 
 ```sh
 python3 tools/nei_gi/SOURCE/quest_revamp.py sheikah_slate slate_bomb slate_master_cycle slate_stasis slate_cryonis slate_sensor --install
+python3 tools/nei_gi/SOURCE/requested_revamp.py cojiro mario_mask --install
+python3 tools/nei_gi/runtime_preview/render_requested.py tools/nei_gi/PREVIEWS/20261004 --frames 36
 ```
 
 Generated intermediate `RESOURCES/` and Python caches are ignored; installed

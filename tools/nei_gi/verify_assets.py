@@ -25,7 +25,7 @@ ITEMS = ("fire_rod", "ice_rod", "light_rod", "rocs_feather", "time_gate", "whip"
          "phantom_hourglass", "shadow_crystal",
          "rod_of_seasons", "kokiri_sword", "mm_kokiri_sword", "razor_sword",
          "gilded_sword", "master_sword", "true_master_sword", "biggoron_sword",
-         "great_fairy_sword", "iron_knuckle_axe")
+         "great_fairy_sword", "iron_knuckle_axe", "cojiro", "mario_mask")
 
 
 def face_key(points):

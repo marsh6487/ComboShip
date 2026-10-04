@@ -66,17 +66,19 @@ static const s16 sWandMagicCost[WAND_MODE_COUNT] = {
 
 static void Wand_OnWheelConfirm(s32 index) {
     Wand_SetMode(Wand_ModeAt((u8)index));
+    if (gPlayState != NULL) {
+        // The shared item id stays the same while the active rod's icon changes.
+        ExtInv_RefreshButtonIconsForItem(gPlayState, ITEM_ELEMENTAL_WAND);
+    }
 }
 
-// Owned rods only, in the order the kaleido wheel cycles them, so every entry is selectable. The
-// icon is the MEDALLION: the six rods share one staff sprite, so the element is the only thing that
-// tells them apart anywhere else either.
+// Owned rods only, in the existing mode order, with the same model-matched icons as inventory.
 static s32 Wand_BuildWheel(BoxMenuEntry* out) {
     s32 count = Wand_ModeCount();
 
     for (s32 i = 0; i < count; i++) {
-        out[i].iconPath = (const char*)ExtInv_GetItemIcon(Wand_ModeMedallion(Wand_ModeAt((u8)i)));
-        out[i].iconSize = 24; // quest icons, unlike the slate's 32x32 runes
+        out[i].iconPath = (const char*)Wand_ModeIcon(Wand_ModeAt((u8)i));
+        out[i].iconSize = 32; // logical slot size; HD raw texture scales supply the full pixels
         out[i].enabled = 1;
     }
     return count;

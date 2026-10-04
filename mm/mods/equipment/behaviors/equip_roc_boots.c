@@ -35,11 +35,14 @@ void RocBoots_MoveWithGravity(Player* p, void (*integrate)(Actor*)) {
 
 static u8 sRocOnWater = 0;
 
+// Winter uses the same surface collision gate as Roc Boots, leaving swimming below intact.
+u8 Seasons_WalksOnWater(void);
+
 // 0 = not on water; 1 = pinned to the surface; 2 = pinned, first frame (the landing).
 u8 RocBoots_WalksOnWater(Player* p) {
     u8 wasOnWater = sRocOnWater;
 
-    sRocOnWater = RocBoots_IsWorn() && (p->transformation == PLAYER_FORM_HUMAN) &&
+    sRocOnWater = (RocBoots_IsWorn() || Seasons_WalksOnWater()) && (p->transformation == PLAYER_FORM_HUMAN) &&
                   !(p->stateFlags1 & PLAYER_STATE1_8000000) && (p->actor.depthInWater >= 0.0f) &&
                   (p->actor.velocity.y <= 0.0f);
     if (!sRocOnWater) {

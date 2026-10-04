@@ -149,6 +149,7 @@ FOREIGN_DRAW_STUB(OOT_DrawForeignPotion)
 FOREIGN_DRAW_STUB(OOT_DrawForeignBlueFire)
 FOREIGN_DRAW_STUB(OOT_DrawForeignPoes)
 FOREIGN_DRAW_STUB(OOT_DrawForeignFairyBottle)
+bool OOT_DrawForeignFairyContainer(PlayState*, const ComboForeignDrawInfo*) { ++foreignFallbackCalls; return true; }
 FOREIGN_DRAW_STUB(OOT_DrawForeignSoulFlame)
 FOREIGN_DRAW_STUB(OOT_DrawForeignOps)
 FOREIGN_DRAW_STUB(OOT_DrawForeignSimple)

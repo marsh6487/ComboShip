@@ -168,6 +168,11 @@ void DrawStrayFairy(RandoItemId randoItemId) {
 }
 
 void DrawSong(RandoItemId randoItemId) {
+    if (randoItemId == RI_SONG_STORMS) {
+        NeiGi_DrawSeasonOverlay(gPlayState, 6, "oot");
+        return;
+    }
+    std::array<uint8_t, 4> color{ 220, 225, 240, 255 };
     OPEN_DISPS(gPlayState->state.gfxCtx);
 
     Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
@@ -176,86 +181,88 @@ void DrawSong(RandoItemId randoItemId) {
 
     switch (randoItemId) {
         case RI_SONG_SUN:
-            gDPSetEnvColor(POLY_XLU_DISP++, 237, 231, 62, 255);
+            color = { 237, 231, 62, 255 };
             break;
         case RI_SONG_DOUBLE_TIME:
         case RI_SONG_INVERTED_TIME:
         case RI_SONG_TIME:
-            gDPSetEnvColor(POLY_XLU_DISP++, 98, 177, 211, 255);
+            color = { 98, 177, 211, 255 };
             break;
         case RI_SONG_HEALING:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 150, 230, 255);
+            color = { 255, 150, 230, 255 };
             break;
         case RI_SONG_STORMS:
-            gDPSetEnvColor(POLY_XLU_DISP++, 146, 146, 146, 255);
+            color = { 146, 146, 146, 255 };
             break;
         case RI_SONG_SARIA:
         case RI_SONG_SONATA:
-            gDPSetEnvColor(POLY_XLU_DISP++, 98, 255, 98, 255);
+            color = { 98, 255, 98, 255 };
             break;
         case RI_SONG_SOARING:
-            gDPSetEnvColor(POLY_XLU_DISP++, 200, 160, 255, 255);
+            color = { 200, 160, 255, 255 };
             break;
         case RI_SONG_ELEGY:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 98, 0, 255);
+            color = { 255, 98, 0, 255 };
             break;
         case RI_SONG_LULLABY_INTRO:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 100, 100, 255);
+            color = { 255, 100, 100, 255 };
             break;
         case RI_SONG_LULLABY:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 20, 20, 255);
+            color = { 255, 20, 20, 255 };
             break;
         case RI_SONG_OATH:
-            gDPSetEnvColor(POLY_XLU_DISP++, 98, 0, 98, 255);
+            color = { 98, 0, 98, 255 };
             break;
         case RI_SONG_EPONA:
-            gDPSetEnvColor(POLY_XLU_DISP++, 146, 87, 49, 255);
+            color = { 146, 87, 49, 255 };
             break;
         case RI_SONG_NOVA:
-            gDPSetEnvColor(POLY_XLU_DISP++, 20, 20, 255, 255);
+            color = { 20, 20, 255, 255 };
             break;
         // Skijer's NEI — OoT (SoH) warp songs. MM renders every song as one note (gGiSongNoteDL) tinted by
         // env color, so the OoT warp songs reuse that exact note model, tinted to each sage's color.
         case RI_OOT_SONG_MINUET_OF_FOREST:
-            gDPSetEnvColor(POLY_XLU_DISP++, 98, 255, 98, 255);
+            color = { 98, 255, 98, 255 };
             break;
         case RI_OOT_SONG_BOLERO_OF_FIRE:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 60, 0, 255);
+            color = { 255, 60, 0, 255 };
             break;
         case RI_OOT_SONG_SERENADE_OF_WATER:
-            gDPSetEnvColor(POLY_XLU_DISP++, 85, 180, 223, 255);
+            color = { 85, 180, 223, 255 };
             break;
         // Zelda's Lullaby is not a warp song, but it renders the same way; pink, as in OoT's own UI.
         case RI_OOT_SONG_ZELDAS_LULLABY:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 120, 200, 255);
+            color = { 255, 120, 200, 255 };
             break;
         case RI_OOT_SONG_REQUIEM_OF_SPIRIT:
-            gDPSetEnvColor(POLY_XLU_DISP++, 222, 158, 47, 255);
+            color = { 222, 158, 47, 255 };
             break;
         case RI_OOT_SONG_NOCTURNE_OF_SHADOW:
-            gDPSetEnvColor(POLY_XLU_DISP++, 160, 40, 210, 255);
+            color = { 160, 40, 210, 255 };
             break;
         case RI_OOT_SONG_PRELUDE_OF_LIGHT:
-            gDPSetEnvColor(POLY_XLU_DISP++, 237, 231, 62, 255);
+            color = { 237, 231, 62, 255 };
             break;
         // Skijer's NEI — the 3 NEI custom songs (no get-item model on the OoT side either); note tinted to
         // each song's SoH quest-page ring color (soh z_kaleido_collect.c sMmPageSongs ring colors).
         case RI_OOT_SONG_FUGUE_OF_HOME:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 170, 50, 255); // amber
+            color = { 255, 170, 50, 255 }; // amber
             break;
         case RI_OOT_SONG_COMMAND_MELODY:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 120, 255, 255); // magenta
+            color = { 255, 120, 255, 255 }; // magenta
             break;
         case RI_OOT_SONG_BALLAD_OF_THE_HERO:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 230, 120, 255); // gold
+            color = { 255, 230, 120, 255 }; // gold
             break;
         default:
             break;
     }
 
+    gDPSetEnvColor(POLY_XLU_DISP++, color[0], color[1], color[2], color[3]);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)&gGiSongNoteDL);
 
     CLOSE_DISPS(gPlayState->state.gfxCtx);
+    ComboDrawMaskShimmer(gPlayState, nullptr, color.data(), "mm");
 }
 
 void DrawDoubleDefense() {
@@ -1528,16 +1535,16 @@ void DrawOotQuartzOfMotion() {
     static Gfx* sCache = NULL;
     DrawOotGetItemOpa("__OTR__objects/object_gi_map/gGiStoneOfAgonyDL", &sCache);
 }
-static void DrawOotMaskShimmer() {
+static void DrawOotMaskShimmer(int mask = 8) {
     uint8_t color[4];
-    ComboMaskShimmerColor(0, color);
+    ComboOotMaskShimmerColor(mask, color);
     ComboDrawMaskShimmer(gPlayState, nullptr, color, nullptr);
 }
 
 void DrawOotSkullMask() { // object_gi_skj_mask (OoT-unique)
     static Gfx* sCache = NULL;
     DrawOotGetItemOpa("__OTR__objects/object_gi_skj_mask/gGiSkullMaskDL", &sCache);
-    DrawOotMaskShimmer();
+    DrawOotMaskShimmer(1);
 }
 void DrawOotSpookyMask() { // object_gi_redead_mask (OoT-unique)
     // DIRECT loader: the plain one leaves the DL's texture/vertex hash refs to be resolved in MM's
@@ -1546,12 +1553,12 @@ void DrawOotSpookyMask() { // object_gi_redead_mask (OoT-unique)
     // reason the adult-Link limbs and the OoT hookshot chain use it. Skijer's NEI
     static Gfx* sDirect = NULL;
     if (DrawOotDirectOpa("__OTR__objects/object_gi_redead_mask/gGiSpookyMaskDL", &sDirect)) {
-        DrawOotMaskShimmer();
+        DrawOotMaskShimmer(2);
         return;
     }
     static Gfx* sCache = NULL;
     DrawOotGetItemOpa("__OTR__objects/object_gi_redead_mask/gGiSpookyMaskDL", &sCache);
-    DrawOotMaskShimmer();
+    DrawOotMaskShimmer(2);
 }
 void DrawOotGerudoMask() { // object_gi_gerudomask (OoT-unique)
     // Same as the Spooky Mask above — and this one is CI (it ships a TLUT,
@@ -1559,12 +1566,12 @@ void DrawOotGerudoMask() { // object_gi_gerudomask (OoT-unique)
     // colours" symptom. Direct load inlines them. Skijer's NEI
     static Gfx* sDirect = NULL;
     if (DrawOotDirectOpa("__OTR__objects/object_gi_gerudomask/gGiGerudoMaskDL", &sDirect)) {
-        DrawOotMaskShimmer();
+        DrawOotMaskShimmer(6);
         return;
     }
     static Gfx* sCache = NULL;
     DrawOotGetItemOpa("__OTR__objects/object_gi_gerudomask/gGiGerudoMaskDL", &sCache);
-    DrawOotMaskShimmer();
+    DrawOotMaskShimmer(6);
 }
 
 // Iron Boots — object_gi_boots_2 (OoT-unique), boots Opa + rivets Xlu (OoT GetItem_DrawOpa0Xlu1).
@@ -2550,7 +2557,9 @@ void DrawOotBottleWithShimmer(s16 drawId, const uint8_t color[4]) {
     Matrix_Push();
     GetItem_Draw(gPlayState, drawId);
     Matrix_Pop();
-    ComboDrawMaskShimmer(gPlayState, nullptr, color, "mm");
+    if (drawId != GID_FAIRY && drawId != GID_FAIRY_2) {
+        ComboDrawMaskShimmer(gPlayState, nullptr, color, "mm");
+    } // native fairy draw already owns its matching pink hex shimmer
 }
 
 // Ruto's Letter — OoT bottle-with-letter (object_gi_bottle_letter, OoT-unique folder): contents Opa +

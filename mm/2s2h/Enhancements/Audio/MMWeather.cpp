@@ -12,6 +12,7 @@ MMWeather::Settings sSettings;
 PlayState* sPlay = nullptr;
 int sScene = -1;
 int sRoom = -1;
+int sSeason = -1;
 uint32_t sPresentationRandom = 0x4D4D5646;
 
 } // namespace
@@ -20,6 +21,7 @@ extern "C" void MMWeather_Reset() {
     sState.Reset();
     sPlay = nullptr;
     sScene = sRoom = -1;
+    sSeason = -1;
     sPresentationRandom = 0x4D4D5646;
     MMWeather_ClearBolts();
     MMWeatherAudio_Reset();
@@ -52,6 +54,25 @@ extern "C" void MMWeather_Update(PlayState* play) {
     const bool eligible = gSaveContext.gameMode == GAMEMODE_NORMAL && play->gameOverCtx.state == GAMEOVER_INACTIVE &&
                           outdoorSky && !play->envCtx.skyboxDisabled && camera != nullptr &&
                           !(camera->stateFlags & CAM_STATE_UNDERWATER);
+    const auto& nei = gSaveContext.save.shipSaveInfo.nei;
+    sSeason = -1;
+    // The rod defers to story presentation; the user's explicit weather override
+    // continues to follow its existing independent eligibility/settings above.
+    const bool seasonEligible = eligible && play->csCtx.state == CS_STATE_IDLE &&
+                                play->envCtx.lightSettingOverride == LIGHT_SETTING_OVERRIDE_NONE &&
+                                !play->envCtx.customSkyboxFilter;
+    if (seasonEligible && nei.seasonsOwned && nei.season != SEASON_OFF) {
+        if (nei.season < SEASON_COUNT && (nei.seasonsOwned & (1 << nei.season))) {
+            sSeason = nei.season;
+        } else {
+            for (int season = 0; season < SEASON_COUNT; ++season) {
+                if (nei.seasonsOwned & (1 << season)) {
+                    sSeason = season;
+                    break;
+                }
+            }
+        }
+    }
     const int ticks = play->pauseCtx.state == PAUSE_STATE_OFF ? std::clamp<int>(R_UPDATE_RATE, 1, 3) : 0;
     const bool strike = sState.Step(sSettings, eligible, ticks);
     if (!eligible) {
@@ -59,20 +80,26 @@ extern "C" void MMWeather_Update(PlayState* play) {
         MMWeatherAudio_Reset();
         return;
     }
-    MMWeatherAudio_SetRain(sState.Intensity() * std::clamp(CVarGetInteger(MM_WEATHER_CVAR("RainVolume"), 100), 0, 100) /
-                           100.0f);
+    const float seasonRain = sSeason == SEASON_AUTUMN ? 1.0f : 0.0f;
+    MMWeatherAudio_SetRain(std::max(sState.Intensity(), seasonRain) *
+                           std::clamp(CVarGetInteger(MM_WEATHER_CVAR("RainVolume"), 100), 0, 100) / 100.0f);
     if (strike) {
         MMWeather_StartBolt();
         MMWeatherAudio_Thunder(1.0f);
     }
 }
 
+extern "C" int MMWeather_Season() {
+    return sSeason;
+}
+
 extern "C" int MMWeather_RainDensity() {
-    return sState.Density();
+    return std::max(sState.Density(), sSeason == SEASON_AUTUMN ? 30 : 0);
 }
 
 extern "C" float MMWeather_Overcast() {
-    return sState.Overcast(sSettings);
+    const float seasonal = sSeason == SEASON_AUTUMN ? 0.75f : sSeason == SEASON_WINTER ? 0.65f : 0.0f;
+    return std::max(sState.Overcast(sSettings), seasonal);
 }
 
 extern "C" uint8_t MMWeather_Shade(uint8_t value) {

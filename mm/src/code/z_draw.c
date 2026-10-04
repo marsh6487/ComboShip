@@ -8,6 +8,7 @@
 #include "2s2h/Enhancements/ItemVisuals.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <libultraship/bridge/resourcebridge.h>
+#include "ComboFairyBottle.h"
 #include "assets/objects/gameplay_keep/gameplay_keep.h"
 #include "assets/objects/object_gi_arrow/object_gi_arrow.h"
 #include "assets/objects/object_gi_arrowcase/object_gi_arrowcase.h"
@@ -381,6 +382,20 @@ static DrawItemTableEntry sDrawItemTable[] = {
     { GetItem_DrawOpa01, { gGiFierceDeityMaskFaceDL, gGiFierceDeityMaskHairAndHatDL } },
 };
 
+extern int ResourceMgr_IsModAsset(const char* path);
+extern int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
+static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
+    return ComboFairyBottle_SelectShell(
+        (const char*)sDrawItemTable[drawId].drawResources[0], (const char*)sDrawItemTable[drawId].drawResources[1],
+        gGiEmptyBottleCorkDL, gGiEmptyBottleGlassDL, ResourceMgr_IsModAsset,
+        "__OTR__@oot:objects/object_gi_fire/gGiBlueFireChamberstickDL",
+        ResourceMgr_IsModAssetForGame("oot", "objects/object_gi_fire/gGiBlueFireChamberstickDL"));
+}
+
+#define COMBO_FAIRY_HOST_MM
+#include "ComboFairyBottleDraw.h"
+#undef COMBO_FAIRY_HOST_MM
+
 /**
  * Draw "Get Item" Model
  * Calls the corresponding draw function for the given draw ID
@@ -579,59 +594,78 @@ s32 GetItem_DrawDungeonItem(PlayState* play, s16 drawId, s32 owner) {
 #undef COMBO_MASK_SHIMMER_HOST_MM
 
 s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]) {
-    int profile = 0;
     switch (drawId) {
-        case GID_MASK_DEKU:
-            profile = 1;
-            break;
-        case GID_MASK_GORON:
-            profile = 2;
-            break;
-        case GID_MASK_ZORA:
-            profile = 3;
-            break;
-        case GID_MASK_FIERCE_DEITY:
-            profile = 4;
-            break;
-        case GID_REMAINS_ODOLWA:
-            profile = 5;
-            break;
-        case GID_REMAINS_GOHT:
-            profile = 6;
-            break;
-        case GID_REMAINS_GYORG:
-            profile = 7;
-            break;
-        case GID_REMAINS_TWINMOLD:
-            profile = 8;
-            break;
-        case GID_MASK_KAMARO:
-        case GID_MASK_COUPLE:
-        case GID_MASK_STONE:
-        case GID_MASK_KAFEIS_MASK:
-        case GID_MASK_CIRCUS_LEADER:
-        case GID_MASK_BREMEN:
-        case GID_MASK_ALL_NIGHT:
-        case GID_MASK_DON_GERO:
-        case GID_MASK_KEATON:
-        case GID_MASK_SUN:
-        case GID_MASK_BLAST:
-        case GID_MASK_SCENTS:
-        case GID_MASK_CAPTAIN:
-        case GID_MASK_BUNNY:
-        case GID_MASK_TRUTH:
-        case GID_MASK_GARO:
-        case GID_MASK_GREAT_FAIRY:
-        case GID_MASK_GIBDO:
-        case GID_MASK_ROMANI:
+        case GID_FAIRY:
+        case GID_FAIRY_2: {
+            const uint8_t pink[4] = { 255, 160, 235, 255 };
+            memcpy(color, pink, sizeof(pink));
+            return true;
+        }
         case GID_MASK_POSTMAN:
+            return ComboMmMaskShimmerColor(0, color);
+        case GID_MASK_ALL_NIGHT:
+            return ComboMmMaskShimmerColor(1, color);
+        case GID_MASK_BLAST:
+            return ComboMmMaskShimmerColor(2, color);
+        case GID_MASK_STONE:
+            return ComboMmMaskShimmerColor(3, color);
+        case GID_MASK_GREAT_FAIRY:
+            return ComboMmMaskShimmerColor(4, color);
+        case GID_MASK_DEKU:
+            return ComboMmMaskShimmerColor(5, color);
+        case GID_MASK_KEATON:
+            return ComboMmMaskShimmerColor(6, color);
+        case GID_MASK_BREMEN:
+            return ComboMmMaskShimmerColor(7, color);
+        case GID_MASK_BUNNY:
+            return ComboMmMaskShimmerColor(8, color);
+        case GID_MASK_DON_GERO:
+            return ComboMmMaskShimmerColor(9, color);
+        case GID_MASK_SCENTS:
+            return ComboMmMaskShimmerColor(10, color);
+        case GID_MASK_GORON:
+            return ComboMmMaskShimmerColor(11, color);
+        case GID_MASK_ROMANI:
+            return ComboMmMaskShimmerColor(12, color);
+        case GID_MASK_CIRCUS_LEADER:
+            return ComboMmMaskShimmerColor(13, color);
+        case GID_MASK_KAFEIS_MASK:
+            return ComboMmMaskShimmerColor(14, color);
+        case GID_MASK_COUPLE:
+            return ComboMmMaskShimmerColor(15, color);
+        case GID_MASK_TRUTH:
+            return ComboMmMaskShimmerColor(16, color);
+        case GID_MASK_ZORA:
+            return ComboMmMaskShimmerColor(17, color);
+        case GID_MASK_KAMARO:
+            return ComboMmMaskShimmerColor(18, color);
+        case GID_MASK_GIBDO:
+            return ComboMmMaskShimmerColor(19, color);
+        case GID_MASK_GARO:
+            return ComboMmMaskShimmerColor(20, color);
+        case GID_MASK_CAPTAIN:
+            return ComboMmMaskShimmerColor(21, color);
         case GID_MASK_GIANT:
-            break;
+            return ComboMmMaskShimmerColor(22, color);
+        case GID_MASK_FIERCE_DEITY:
+            return ComboMmMaskShimmerColor(23, color);
+        case GID_REMAINS_ODOLWA:
+            return ComboMmRemainsShimmerColor(0, color);
+        case GID_REMAINS_GOHT:
+            return ComboMmRemainsShimmerColor(1, color);
+        case GID_REMAINS_GYORG:
+            return ComboMmRemainsShimmerColor(2, color);
+        case GID_REMAINS_TWINMOLD:
+            return ComboMmRemainsShimmerColor(3, color);
+        case GID_MASK_SUN:
+            color[0] = 255;
+            color[1] = 205;
+            color[2] = 70;
+            color[3] = 255;
+            return true;
         default:
             return false;
     }
-    ComboMaskShimmerColor(profile, color);
-    return true;
 }
 
 static void GetItem_DrawShimmer(PlayState* play, const uint8_t color[4]) {
@@ -782,6 +816,7 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         KIND_POTION = 5,
         KIND_POES = 8,
         KIND_MM_FAIRY_BOTTLE = 21,
+        KIND_MM_FAIRY_CONTAINER = 37,
     };
     static const s8 sOrder0[] = { 0 };
     static const s8 sOrder01[] = { 0, 1 };
@@ -877,10 +912,11 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         count = 1;
         xluStart = -1;
     } else if (drawFunc == GetItem_DrawFairyContainer) {
-        // Bottle (OPA) + glass (XLU); the AnimatedMat scroll is replicated by the consumer
-        // (matAnimPath). The billboarded contents DL needs a Mtx resource and is dropped.
-        order = sOrder01;
-        count = 2;
+        // Keep the native contents and its placement matrix; the consumer loads
+        // the matrix through the owning MM resource manager before billboarding.
+        kind = KIND_MM_FAIRY_CONTAINER;
+        order = sOrderRaw;
+        count = 4;
         xluStart = 1;
     } else if (drawFunc == GetItem_DrawGoronSword) {
         kind = KIND_GORON_SWORD;
@@ -932,6 +968,11 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
             return 0; // padded/unused rows (e.g. GID_37) are not drawable
         }
         outDlists[i] = res[order[i]];
+    }
+    if (kind == KIND_MM_FAIRY_BOTTLE || kind == KIND_MM_FAIRY_CONTAINER) {
+        const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
+        outDlists[0] = (void*)shell.opaque;
+        outDlists[1] = (void*)shell.glass;
     }
     *outXluStart = (xluStart > count) ? count : xluStart;
     if (outDrawKind != NULL) {
@@ -1017,27 +1058,38 @@ void GetItem_DrawPoes(PlayState* play, s16 drawId) {
 
 void GetItem_DrawFairyBottle(PlayState* play, s16 drawId) {
     s32 pad;
+    const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
+    const ComboFairyBottleMotion motion = ComboFairyBottle_Sample(play->gameplayFrames);
 
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)shell.opaque);
 
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[1]);
+    if (strcmp(shell.opaque, shell.glass) != 0) {
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)shell.glass);
+    }
     gSPSegment(POLY_XLU_DISP++, 0x08,
                Gfx_TwoTexScrollEx(play->state.gfxCtx, G_TX_RENDERTILE, play->state.frames * 0, play->state.frames * 0,
                                   32, 32, 1, play->state.frames, -(play->state.frames * 6), 32, 320, 0, 0, 1, -6));
 
     Matrix_Push();
+    if (ComboFairyBottle_IsBlueFireShell(shell.opaque)) {
+        Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
+    }
+    Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
     Matrix_ReplaceRotation(&play->billboardMtxF);
+    Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
 
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[2]);
+    if (!ComboFairyBottle_DrawVfx(play)) {
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[2]);
+    }
 
     Matrix_Pop();
 
@@ -1308,6 +1360,8 @@ void GetItem_DrawSeahorse(PlayState* play, s16 drawId) {
 void GetItem_DrawFairyContainer(PlayState* play, s16 drawId) {
     s32 pad;
     MtxF mtx;
+    const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
+    const ComboFairyBottleMotion motion = ComboFairyBottle_Sample(play->gameplayFrames);
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -1316,17 +1370,29 @@ void GetItem_DrawFairyContainer(PlayState* play, s16 drawId) {
     AnimatedMat_Draw(play, Lib_SegmentedToVirtual(gGiFairyBottleTexAnim));
 
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)shell.opaque);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[1]);
+    if (strcmp(shell.opaque, shell.glass) != 0) {
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)shell.glass);
+    }
 
     Matrix_MtxToMtxF(ResourceMgr_LoadMtxByName(Lib_SegmentedToVirtual(sDrawItemTable[drawId].drawResources[3])), &mtx);
-    Matrix_Mult(&mtx, MTXMODE_APPLY);
+    Matrix_Push();
+    Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
+    if (ComboFairyBottle_IsBlueFireShell(shell.opaque)) {
+        Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
+    } else {
+        Matrix_Mult(&mtx, MTXMODE_APPLY);
+    }
     Matrix_ReplaceRotation(&play->billboardMtxF);
+    Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
 
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[2]);
+    if (!ComboFairyBottle_DrawVfx(play)) {
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[2]);
+    }
+    Matrix_Pop();
 
     CLOSE_DISPS(play->state.gfxCtx);
 }

@@ -1103,11 +1103,14 @@ static void* const sWandNameTex[WAND_MODE_COUNT] = {
     (void*)gMeteorRodNameTex, (void*)gStormRodNameTex,   (void*)gShadowScepterNameTex,
 };
 
-// One icon for all six rods, Gust Jar idiom: the ELEMENT is the medallion the kaleido draws behind
-// it, not a different staff sprite. Keeps the six modes reading as one item you retune.
+static void* const sWandIconTex[WAND_MODE_COUNT] = {
+    (void*)gItemIconSandRodTex,   (void*)gItemIconTornadoRodTex, (void*)gItemIconWaterRodTex,
+    (void*)gItemIconMeteorRodTex, (void*)gItemIconStormRodTex,   (void*)gItemIconShadowScepterTex,
+};
+
+// The active rod's icon matches its GI and held model; the inventory slot stays shared.
 void* Wand_ModeIcon(uint8_t mode) {
-    (void)mode;
-    return (void*)gItemIconElementalWandTex;
+    return (mode < WAND_MODE_COUNT) ? sWandIconTex[mode] : (void*)gItemIconElementalWandTex;
 }
 void* Wand_ModeNameTex(uint8_t mode) {
     return (mode < WAND_MODE_COUNT) ? sWandNameTex[mode] : sWandNameTex[0];

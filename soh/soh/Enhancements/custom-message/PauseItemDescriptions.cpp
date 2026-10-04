@@ -241,7 +241,11 @@ static const ItemDescEntry sVanillaItemDescs[] = {
 // Lookup: item ID + page -> text ID (or 0)
 // ---------------------------------------------------------------------------
 
+extern "C" uint16_t Randomizer_GetDungeonItemInfoTextId(uint16_t cursorItem);
+
 extern "C" u16 PauseItemDesc_GetTextId(u16 cursorItem, s32 pageIndex) {
+    if (pageIndex == PAUSE_MAP)
+        return Randomizer_GetDungeonItemInfoTextId(cursorItem);
     // Custom items + masks + SW97 arrows on ITEM pages
     if (pageIndex == PAUSE_ITEM) {
         for (size_t i = 0; i < ARRAY_COUNT(sCustomItemDescs); i++) {

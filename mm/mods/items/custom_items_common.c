@@ -938,12 +938,14 @@ s32 CustomItems_OverrideDraw(Player* p, PlayState* play) {
     // so the draw gates itself on Slate_IsDrawn(). Skijer's NEI
     {
         extern void CustomItems_DrawSheikahSlate(Player * player, PlayState * play);
+        extern void CustomItems_DrawRodOfSeasons(Player * player, PlayState * play);
         extern void Stasis_Draw(PlayState * play);
         extern void Hourglass_Draw(PlayState * play);
         extern void Wand_Draw(Player * player, PlayState * play);
         extern void Cryonis_DrawGhost(PlayState * play);
 
         CustomItems_DrawSheikahSlate(p, play);
+        CustomItems_DrawRodOfSeasons(p, play);
         Stasis_Draw(play);       // chains + launch arrow on whatever the Stasis rune is holding
         Hourglass_Draw(play);    // the path the recall target is about to retrace
         Cryonis_DrawGhost(play); // where the ice would land while the aiming mode is up

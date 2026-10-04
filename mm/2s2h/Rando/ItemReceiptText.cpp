@@ -3,12 +3,18 @@
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h"
 #include "2s2h/FleetShipCombo/FleetComboItems.h"
 #include "ComboItemReceiptText.h"
+#include <algorithm>
+#include <array>
+#include <cstring>
 #ifdef COMBO_BUILD
+#include "ComboExport.h"
 #include "ComboResolve.h"
+#include "rando/CrossForeign.h"
 #include <unordered_map>
 namespace Rando::MiscBehavior {
 uint64_t ComboRandoGen();
-}
+const ComboRando::ForeignItem* MM_LookupForeign(RandoCheckId check);
+} // namespace Rando::MiscBehavior
 #endif
 
 extern "C" {
@@ -19,6 +25,115 @@ u16 Player_GetItemReceiptTextId(s16 getItemId, s16 itemId);
 }
 
 namespace {
+struct DungeonInformation {
+    const char* temple;
+    const char* boss;
+    const char* entrance;
+    RandoCheckId reward;
+};
+
+// MM currently keeps these physical entrances and bosses native. The reward
+// belongs to the saved check placement, independently of ownership or discovery.
+constexpr DungeonInformation kDungeonInformation[] = {
+    { "Woodfall Temple", "Odolwa", "Woodfall", RC_WOODFALL_TEMPLE_BOSS_WARP },
+    { "Snowhead Temple", "Goht", "Snowhead", RC_SNOWHEAD_TEMPLE_BOSS_WARP },
+    { "Great Bay Temple", "Gyorg", "Zora Cape's turtle", RC_GREAT_BAY_TEMPLE_BOSS_WARP },
+    { "Stone Tower Temple", "Twinmold", "Stone Tower", RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_WARP },
+};
+
+#ifdef COMBO_BUILD
+std::string ForeignRewardName(const ComboRando::ForeignItem& item) {
+    return ComboRando::StripGameSuffix(item.itemName) + (item.shared                             ? ""
+                                                         : item.itemGame == ComboRando::GAME_OOT ? " (OOT)"
+                                                                                                 : " (MM)");
+}
+
+std::string LoadedSeedDungeonRewardName(int32_t dungeon) {
+    static uint64_t generation = static_cast<uint64_t>(-1);
+    static std::array<std::string, 4> names;
+    const uint64_t current = Rando::MiscBehavior::ComboRandoGen();
+    if (generation != current) {
+        generation = current;
+        names = {};
+        try {
+            const auto seed = nlohmann::json::parse(ComboRando::g_comboForeignJson);
+            const auto placements =
+                seed.value("mm", nlohmann::json::object()).value("placements", nlohmann::json::object());
+            const auto foreign = ComboRando::LoadForeignForGame(0, ComboRando::GAME_MM);
+            for (int i = 0; i < 4; ++i) {
+                const auto& checkName = Rando::StaticData::GetCheckDisplayName(kDungeonInformation[i].reward);
+                const auto placement = placements.find(checkName);
+                if (placement == placements.end() || !placement->is_string())
+                    continue;
+                const auto imported = foreign.find(checkName);
+                names[i] =
+                    imported != foreign.end()
+                        ? (imported->second.itemName.empty() ? std::string{} : ForeignRewardName(imported->second))
+                        : placement->get<std::string>();
+                if (names[i] == ComboRando::kForeignSentinelNameMM)
+                    names[i].clear();
+            }
+        } catch (...) { names = {}; }
+    }
+    return names[dungeon];
+}
+#endif
+
+std::string DungeonRewardName(int32_t dungeon) {
+    if (dungeon < 0 || dungeon >= 4)
+        return {};
+#ifdef COMBO_BUILD
+    // The launcher pushes the selected seed before MM gameplay/save hydration.
+    // Prefer it over dormant save data, which may still belong to a prior slot.
+    if (!ComboRando::g_comboForeignJson.empty())
+        return LoadedSeedDungeonRewardName(dungeon);
+#endif
+    if (gSaveContext.fileNum == 0xFF || gSaveContext.save.shipSaveInfo.saveType != SAVETYPE_RANDO)
+        return {};
+    const auto check = kDungeonInformation[dungeon].reward;
+    const auto id = gSaveContext.save.shipSaveInfo.rando.randoSaveChecks[check].randoItemId;
+#ifdef COMBO_BUILD
+    if (id == RI_COMBO_FOREIGN) {
+        const auto* foreign = Rando::MiscBehavior::MM_LookupForeign(check);
+        if (!foreign || foreign->itemName.empty())
+            return {};
+        return ForeignRewardName(*foreign);
+    }
+#endif
+    const auto item = Rando::StaticData::Items.find(id);
+    return id != RI_UNKNOWN && item != Rando::StaticData::Items.end() && item->second.name ? item->second.name
+                                                                                           : std::string{};
+}
+
+int MapCompassDungeon(RandoItemId id, bool& compass) {
+    compass = true;
+    switch (id) {
+        case RI_WOODFALL_COMPASS:
+            return 0;
+        case RI_SNOWHEAD_COMPASS:
+            return 1;
+        case RI_GREAT_BAY_COMPASS:
+            return 2;
+        case RI_STONE_TOWER_COMPASS:
+            return 3;
+        default:
+            break;
+    }
+    compass = false;
+    switch (id) {
+        case RI_WOODFALL_MAP:
+            return 0;
+        case RI_SNOWHEAD_MAP:
+            return 1;
+        case RI_GREAT_BAY_MAP:
+            return 2;
+        case RI_STONE_TOWER_MAP:
+            return 3;
+        default:
+            return -1;
+    }
+}
+
 // ConvertItem already resolved these identities using MM's save. Never ask the
 // donor to choose a tier again: its state may differ or already include this grant.
 const char* ConcreteReceiptName(RandoItemId id) {
@@ -27,6 +142,38 @@ const char* ConcreteReceiptName(RandoItemId id) {
             return "Magic Meter";
         case RI_DOUBLE_MAGIC:
             return "Enhanced Magic Meter";
+        // Shared songs still need MM's description of their use in Termina.
+        // These are concrete identities, including each Goron Lullaby tier.
+        case RI_SONG_SONATA:
+            return "Sonata of Awakening";
+        case RI_SONG_LULLABY:
+            return "Goron Lullaby";
+        case RI_SONG_LULLABY_INTRO:
+            return "Goron Lullaby Intro";
+        case RI_SONG_NOVA:
+            return "New Wave Bossa Nova";
+        case RI_SONG_ELEGY:
+            return "Elegy of Emptiness";
+        case RI_SONG_OATH:
+            return "Oath to Order";
+        case RI_SONG_HEALING:
+            return "Song of Healing";
+        case RI_SONG_SOARING:
+            return "Song of Soaring";
+        case RI_SONG_TIME:
+            return "Song of Time (MM)";
+        case RI_SONG_STORMS:
+            return "Song of Storms (MM)";
+        case RI_SONG_SUN:
+            return "Sun's Song (MM)";
+        case RI_SONG_EPONA:
+            return "Epona's Song (MM)";
+        case RI_SONG_SARIA:
+            return "Saria's Song (MM)";
+        case RI_SONG_DOUBLE_TIME:
+            return "Song of Double Time";
+        case RI_SONG_INVERTED_TIME:
+            return "Inverted Song of Time";
         case RI_CLAWSHOT:
             return "Clawshot";
         case RI_HOOKSHOT: {
@@ -115,7 +262,46 @@ bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry) {
 }
 } // namespace
 
+bool Rando::MapCompassInfoEnabled() {
 #ifdef COMBO_BUILD
+    using GetEnabled = int32_t (*)();
+    static GetEnabled getEnabled = nullptr;
+    if (!getEnabled)
+        getEnabled = reinterpret_cast<GetEnabled>(Combo_ResolveSym("soh", "OOT_MapCompassInfoEnabled"));
+    return gSaveContext.fileNum != 0xFF && gSaveContext.save.shipSaveInfo.saveType == SAVETYPE_RANDO && getEnabled &&
+           getEnabled() != 0;
+#else
+    return false;
+#endif
+}
+
+std::string Rando::GetDungeonMapCompassInfo(int32_t dungeon, bool compass) {
+    if (dungeon < 0 || dungeon >= 4 || !MapCompassInfoEnabled())
+        return {};
+    const auto& info = kDungeonInformation[dungeon];
+    if (!compass)
+        return std::string("The entrance to ") + info.temple + " is at " + info.entrance + ".";
+    const std::string reward = DungeonRewardName(dungeon);
+    if (reward.empty())
+        return {};
+    return std::string("The boss of ") + info.temple + " is " + info.boss + ". Defeat " + info.boss + " for " + reward +
+           ".";
+}
+
+#ifdef COMBO_BUILD
+extern "C" COMBO_EXPORT int32_t MM_GetDungeonRewardName(int32_t dungeon, char* buffer, uint32_t capacity) {
+    if (!buffer || !capacity)
+        return 0;
+    buffer[0] = '\0';
+    try {
+        const std::string name = DungeonRewardName(dungeon);
+        if (name.empty() || name.size() >= capacity)
+            return 0;
+        std::memcpy(buffer, name.c_str(), name.size() + 1);
+        return static_cast<int32_t>(name.size());
+    } catch (...) { return 0; }
+}
+
 bool Rando::ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Entry& entry, RandoCheckId check) {
     // Capture dynamic descriptions before the cross grant. Cycle recollection
     // must keep that receipt's counters as well as its resolved item identity.
@@ -159,6 +345,46 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     if (it == StaticData::Items.end())
         return false;
     const auto& item = it->second;
+    bool compass;
+    const int dungeon = MapCompassDungeon(id, compass);
+    if (dungeon >= 0) {
+        const std::string info = GetDungeonMapCompassInfo(dungeon, compass);
+        if (!info.empty()) {
+            SetReceiptBody(entry,
+                           ComboItemReceiptText::FromNeiMarkup("You got the " + std::string(item.name) + "!^" + info));
+            return true;
+        }
+    }
+    if (item.randoItemType == RITYPE_SKULLTULA_TOKEN) {
+        // CheckQueue composes this before GiveItem. Native MESSAGE_TOKENS
+        // instead reads the current scene, which is wrong for shuffled tokens.
+        unsigned count;
+        std::string place;
+        switch (id) {
+            case RI_GS_TOKEN_SWAMP:
+                count = (gSaveContext.save.saveInfo.skullTokenCount >> 16) + 1;
+                place = " in the Swamp Spider House";
+                break;
+            case RI_GS_TOKEN_OCEAN:
+                count = (gSaveContext.save.saveInfo.skullTokenCount & 0xFFFF) + 1;
+                place = " in the Ocean Spider House";
+                break;
+            case RI_OOT_GS_TOKEN:
+                // The FC total includes newly found tokens pending the next
+                // shared-state projection into MM's OoT quest-page counter.
+                count = std::max<unsigned>(Nei_Save()->ootGsCount, Nei_Save()->comboObtainedFc[FCI_OOT_GS_TOKEN]) + 1;
+                place = " in Hyrule";
+                break;
+            default:
+                return false;
+        }
+        const std::string article = item.article && *item.article ? std::string(item.article) + " " : "";
+        const std::string color = id == RI_OOT_GS_TOKEN ? "%r" : "%c";
+        SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(
+                                  "You got " + article + color + item.name + "%w!^You've collected " + color +
+                                  std::to_string(count) + "%w " + (count == 1 ? "token" : "tokens") + place + "."));
+        return true;
+    }
     if (item.randoItemType != RITYPE_MAJOR && item.randoItemType != RITYPE_MASK &&
         item.randoItemType != RITYPE_LESSER && item.randoItemType != RITYPE_HEALTH)
         return false;

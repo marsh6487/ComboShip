@@ -1427,6 +1427,7 @@ void Sw97_RefreshButtonIcons(PlayState* play) {
 void ExtInv_RefreshButtonIconsForItem(PlayState* play, uint16_t itemId) {
     void Interface_LoadItemIconImpl(PlayState * play, u8 btn);
     void Interface_Dpad_LoadItemIconImpl(PlayState * play, u8 btn);
+    u16 ExtButton_GetDpadItem(s32 form, s32 btn);
     for (int32_t i = EQUIP_SLOT_C_LEFT; i <= EQUIP_SLOT_C_RIGHT; i++) {
         uint8_t it = GET_CUR_FORM_BTN_ITEM(i);
         uint16_t eff = (it == ITEM_EXT_BUTTON) ? EXT_BUTTON_ITEM(0, i) : it; // u16 items park a marker
@@ -1435,7 +1436,7 @@ void ExtInv_RefreshButtonIconsForItem(PlayState* play, uint16_t itemId) {
         }
     }
     for (int32_t i = EQUIP_SLOT_D_RIGHT; i <= EQUIP_SLOT_D_UP; i++) {
-        if (DPAD_GET_CUR_FORM_BTN_ITEM(i) == itemId) { // D-pad has no EXT-marker slots
+        if (ExtButton_GetDpadItem(0, i) == itemId) {
             Interface_Dpad_LoadItemIconImpl(play, (u8)i);
         }
     }
@@ -1538,11 +1539,14 @@ static void* const sWandNameTex[WAND_MODE_COUNT] = {
     (void*)gMeteorRodNameTex, (void*)gStormRodNameTex,   (void*)gShadowScepterNameTex,
 };
 
-// One icon for all six rods: the ELEMENT is the medallion the kaleido cell draws with it, not a
-// different staff sprite. Keeps the six modes reading as one item you retune.
+static void* const sWandIconTex[WAND_MODE_COUNT] = {
+    (void*)gItemIconSandRodTex,   (void*)gItemIconTornadoRodTex, (void*)gItemIconWaterRodTex,
+    (void*)gItemIconMeteorRodTex, (void*)gItemIconStormRodTex,   (void*)gItemIconShadowScepterTex,
+};
+
+// The active rod's icon matches its GI and held model; the inventory slot stays shared.
 void* Wand_ModeIcon(uint8_t mode) {
-    (void)mode;
-    return (void*)gItemIconElementalWandTex;
+    return (mode < WAND_MODE_COUNT) ? sWandIconTex[mode] : (void*)gItemIconElementalWandTex;
 }
 void* Wand_ModeNameTex(uint8_t mode) {
     return (mode < WAND_MODE_COUNT) ? sWandNameTex[mode] : sWandNameTex[0];
@@ -1764,8 +1768,7 @@ uint8_t Slate_RuneNeighbor(uint8_t rune, int32_t dir) {
     return Slate_RuneAt(0);
 }
 
-// ── Rod of Seasons — four seasons in one page-2 cell (slate idiom). The rod is model-only here; the
-// state exists so a season found in MM reaches OoT, and OoT's seasons show up owned on this side. ──
+// Rod of Seasons: four sibling pickups share one rod; ownership crosses hosts unchanged.
 uint8_t Seasons_SeasonOwned(uint8_t season) {
     if (season == SEASON_OFF) {
         return 1; // the blank coin comes with the rod

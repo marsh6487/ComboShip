@@ -5,6 +5,7 @@
 #include <libultraship/bridge/resourcebridge.h>
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/randomizer/NeiGiPresentation.h"
+#include "ComboFairyBottle.h"
 #include "objects/object_gi_key/object_gi_key.h"
 #include "objects/object_gi_jewel/object_gi_jewel.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
@@ -400,6 +401,15 @@ DrawItemTableEntry sDrawItemTable[] = {
     { GetItem_DrawFishingPole, { gGiFishingPoleDL } },    // Fishing Pole
 };
 
+static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
+    return ComboFairyBottle_SelectShell((const char*)sDrawItemTable[drawId].dlists[0],
+                                        (const char*)sDrawItemTable[drawId].dlists[1], gGiBottleStopperDL, gGiBottleDL,
+                                        ResourceMgr_IsModAsset, gGiBlueFireChamberstickDL,
+                                        ResourceMgr_IsModAsset(gGiBlueFireChamberstickDL));
+}
+
+#include "ComboFairyBottleDraw.h"
+
 /**
  * Draw "Get Item" Model
  * Calls the corresponding draw function for the given draw ID
@@ -451,16 +461,24 @@ s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]) {
         case GID_LETTER_RUTO:
         case GID_FISH:
         case GID_BUG:
-        case GID_MASK_KEATON:
-        case GID_MASK_SPOOKY:
-        case GID_MASK_SKULL:
-        case GID_MASK_BUNNY:
-        case GID_MASK_TRUTH:
-        case GID_MASK_GORON:
-        case GID_MASK_ZORA:
-        case GID_MASK_GERUDO:
             ComboMaskShimmerColor(0, color);
             return true;
+        case GID_MASK_KEATON:
+            return ComboOotMaskShimmerColor(0, color);
+        case GID_MASK_SKULL:
+            return ComboOotMaskShimmerColor(1, color);
+        case GID_MASK_SPOOKY:
+            return ComboOotMaskShimmerColor(2, color);
+        case GID_MASK_BUNNY:
+            return ComboOotMaskShimmerColor(3, color);
+        case GID_MASK_GORON:
+            return ComboOotMaskShimmerColor(4, color);
+        case GID_MASK_ZORA:
+            return ComboOotMaskShimmerColor(5, color);
+        case GID_MASK_GERUDO:
+            return ComboOotMaskShimmerColor(6, color);
+        case GID_MASK_TRUTH:
+            return ComboOotMaskShimmerColor(7, color);
         default:
             return false;
     }
@@ -645,11 +663,11 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         xluStart = 0;
         kind = KIND_MUSIC_NOTE;
         if (outColors != NULL) {
-            // Grayscale tint by note slot (drawId - 120), mirroring DrawGenericMusicNote's table.
+            // Use enum-relative indexing; the note block moves when GIDs are added.
             static const u8 kNoteColors[7][3] = { { 255, 255, 255 }, { 109, 73, 143 }, { 217, 110, 48 },
                                                   { 62, 109, 23 },   { 237, 231, 62 }, { 98, 177, 211 },
                                                   { 146, 146, 146 } };
-            s32 slot = drawId - 120;
+            s32 slot = drawId - GID_SONG_GENERIC;
             if (slot < 0 || slot > 6) {
                 slot = 0;
             }
@@ -737,6 +755,9 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         return 0;
     }
 
+    if (kind == KIND_FAIRY && count > maxDlists) {
+        return 0; // shell and contents form one recipe; never publish a truncated fairy
+    }
     if (count > maxDlists) {
         count = maxDlists;
     }
@@ -745,6 +766,11 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
             return 0; // padded/unused rows are not drawable
         }
         outDlists[i] = (void*)res[order[i]];
+    }
+    if (kind == KIND_FAIRY) {
+        const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
+        outDlists[0] = (void*)shell.opaque;
+        outDlists[1] = (void*)shell.glass;
     }
     *outXluStart = (xluStart > count) ? count : xluStart;
     *outDrawKind = kind;
@@ -977,24 +1003,35 @@ void GetItem_DrawPoes(PlayState* play, s16 drawId) {
 
 void GetItem_DrawFairy(PlayState* play, s16 drawId) {
     s32 pad;
+    const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
+    const ComboFairyBottleMotion motion = ComboFairyBottle_Sample(play->gameplayFrames);
 
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[0]);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)shell.opaque);
 
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[1]);
+    if (strcmp(shell.opaque, shell.glass) != 0) {
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)shell.glass);
+    }
     gSPSegment(POLY_XLU_DISP++, 0x08,
                Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, 0 * (play->state.frames * 0), 0 * (play->state.frames * 0), 32,
                                   32, 1, 1 * (play->state.frames * 1), 1 * -(play->state.frames * 6), 32, 32, 0, 0, 1,
                                   -6));
     Matrix_Push();
+    if (ComboFairyBottle_IsBlueFireShell(shell.opaque)) {
+        Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
+    }
+    Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
     Matrix_ReplaceRotation(&play->billboardMtxF);
-    gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[2]);
+    Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
+    if (!ComboFairyBottle_DrawVfx(play)) {
+        gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[2]);
+    }
     Matrix_Pop();
 
     CLOSE_DISPS(play->state.gfxCtx);
@@ -1227,9 +1264,15 @@ void GetItem_DrawOpa0Xlu1(PlayState* play, s16 drawId) {
 }
 
 void GetItem_DrawGenericMusicNote(PlayState* play, s16 drawId) {
+    if (drawId == GID_SONG_STORM) {
+        NeiGi_DrawSeasonOverlay(play, 6, NULL);
+        return;
+    }
     s32 pad;
-    s16 color_slot = drawId - 120; // 0 = generic
-    s16* colors[7][3] = {
+    s16 color_slot = drawId - GID_SONG_GENERIC;
+    if (color_slot < 0 || color_slot >= 7)
+        color_slot = 0;
+    static const u8 colors[7][3] = {
         { 255, 255, 255 }, // Generic Song (full white)
         { 109, 73, 143 },  // Lullaby
         { 217, 110, 48 },  // Epona

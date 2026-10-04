@@ -4,9 +4,16 @@
 
 namespace Rando {
 bool ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry);
+// Read-only seed information; returns no text while the shared setting is disabled.
+bool MapCompassInfoEnabled();
+std::string GetDungeonMapCompassInfo(int32_t dungeon, bool compass);
 #ifdef COMBO_BUILD
 bool ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Entry& entry, RandoCheckId check = RC_UNKNOWN);
 #endif
 // Append attribution after the description while retaining its encoding.
 void AppendReceiptSource(CustomMessage::Entry& entry, const std::string& source);
 } // namespace Rando
+
+#ifdef COMBO_BUILD
+extern "C" int32_t MM_GetDungeonRewardName(int32_t dungeon, char* buffer, uint32_t capacity);
+#endif

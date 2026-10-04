@@ -150,12 +150,13 @@ bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiG
 
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
                             const float center[3], bool shimmer, const char* owner) {
-    if (!play || !opa || !center || scale <= 0 || effect < 0 || effect > int(Kind::FourSword))
+    if (!play || !opa || !center || scale <= 0 || effect < 0 || effect > int(Kind::MarioMask))
         return;
     const Kind kind = static_cast<Kind>(effect);
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
     Matrix_Push();
+    Matrix_Translate(0.f, NeiGi::PresentationOffsetY(kind), 0.f, MTXMODE_APPLY);
     OPEN_DISPS(play->state.gfxCtx);
     if (owner) {
         gSPComboRMPush(POLY_OPA_DISP++, owner);
@@ -232,15 +233,18 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
 }
 
 void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner) {
-    if (!play || profile < 1 || profile > 5)
+    if (!play || profile < 1 || profile > 6)
         return;
-    auto mesh = NeiGi::SampleSeason(play->gameplayFrames, profile, NeiGi_CameraBasis(play));
+    const bool stormSong = profile == 6;
+    auto mesh = NeiGi::SampleSeason(play->gameplayFrames, stormSong ? 1 : profile, NeiGi_CameraBasis(play));
     OPEN_DISPS(play->state.gfxCtx);
     gSPGrayscale(POLY_XLU_DISP++, false);
     if (owner)
         gSPComboRMPush(POLY_XLU_DISP++, owner);
     CLOSE_DISPS(play->state.gfxCtx);
     NeiGi_DrawMesh(play, mesh, Kind::Neutral);
+    if (stormSong)
+        NeiGi_DrawMesh(play, NeiGi::SampleSpecial(Kind::Storm, play->gameplayFrames, NeiGi_CameraBasis(play)));
     if (NeiGi::SeasonProfile(play->gameplayFrames, profile) == 2) {
         const auto rays = NeiGi::SampleSeasonSunRays(play->gameplayFrames, profile, NeiGi_CameraBasis(play));
         NeiGi_DrawMeshMaterial(play, rays, Kind::Neutral, nullptr, true);

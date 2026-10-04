@@ -27,6 +27,12 @@ u16 ExtButton_GetItem(s32 form, s32 btn);
 // the real id in extButtons. Does NOT touch cButtonSlots — callers set that as needed.
 void ExtButton_SetItem(s32 form, s32 btn, u16 extId);
 
+// D-pad slots use the same marker with their own persistent u16 store.
+u16 ExtButton_GetDpadItem(s32 form, s32 btn);
+void ExtButton_SetDpadItem(s32 form, s32 btn, u16 item);
+// Handles C/D-pad moves involving an extended item. Native-only equips stay with kaleido.
+s32 ExtButton_EquipItem(PlayState* play, s32 pauseButton, u16 item, u8 slot);
+
 // Clear a button slot: buttonItems -> ITEM_NONE, extButtons -> 0.
 void ExtButton_ClearItem(s32 form, s32 btn);
 

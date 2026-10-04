@@ -9,6 +9,12 @@
 
 int main() {
   using namespace NeiGi;
+  // Concrete cane hues and a two-tone Pokeball never inherit neutral blue.
+  assert(ColorHex(static_cast<Kind>(33)) == 0xFF3C3C);
+  assert(ColorHex(static_cast<Kind>(34)) == 0xFFD746);
+  const auto pokeball = SampleShimmer(47, true, {}, static_cast<Kind>(35));
+  for (int cluster = 0; cluster < 5; ++cluster)
+    assert(pokeball.vertices[cluster * 72].rgb == (cluster % 2 ? 0xFFFFFFu : 0xE73842u));
   // Each blade has its own intrinsic effect even when the optional shimmer is
   // disabled. These numeric identities append to the existing native contract.
   const Kind swords[] = {Kind::KokiriSword, Kind::MmKokiriSword,

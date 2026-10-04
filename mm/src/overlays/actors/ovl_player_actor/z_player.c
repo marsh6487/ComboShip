@@ -13486,6 +13486,8 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
     // wearing it as a mask on Link's face. Gated internally by gMods.BossRemains.Enabled.
     BossRemains_TickInput(play, this);
 
+    Seasons_TickInput(play, this);
+
     // Sheikah Slate: C casts the active rune, hold L opens the rune row. Skijer's NEI
     {
         extern void Slate_TickInput(PlayState * play, Player * player);

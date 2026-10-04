@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -9,6 +10,7 @@
 #include <unordered_map>
 #include "combo/menu/ComboItemDrawABI.h"
 #include "combo/menu/ComboItemEffectColors.h"
+#include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #define RANDO_ENUM_BEGIN(x) enum x {
 #define RANDO_ENUM_ITEM(x) x,
 #define RANDO_ENUM_END(x) };
@@ -86,6 +88,7 @@ uint8_t ResourceGetIsCustomByName(const char*) {assert(magicLoaded && Ship::acti
 /* OWNER_MAGIC_QUERY */
 int OOT_NeiResourceExists(const char* path) {return resources.count(path);}
 void ComboMaskShimmerColor(int,uint8_t* color) {color[0]=255;color[1]=255;color[2]=255;color[3]=255;}
+void ComboOotMaskShimmerColor(int i,uint8_t* color) {ComboMaskShimmerColor(i,color);}
 void Seasons_SeasonColor(uint8_t season,uint8_t* r,uint8_t* g,uint8_t* b) {
  static const uint8_t colors[][3]={{6,235,64},{235,5,7},{235,166,6},{4,105,235}};
  *r=colors[season][0];*g=colors[season][1];*b=colors[season][2];
@@ -112,7 +115,7 @@ int32_t Describe(const char*,CwItemDrawInfo* out) {
  if(malformed==7)out->opCount=0;
  if(malformed==8)out->ops[0].op=CW_OP_DLIST;
  if(malformed==9)out->neiEffect=0;
- if(malformed==10)out->neiEffect=6;
+ if(malformed==10)out->neiEffect=7;
  if(malformed==11) {out->dlistCount=1;out->dlists[0]="__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL";}
  if(malformed==12)out->dlistCount=0;
  if(malformed==13) {out->opCount=1;out->ops[0].op=CW_OP_SCALE;}
@@ -129,7 +132,7 @@ PlayState* gPlayState=&play;
 std::vector<std::pair<int,std::string>> submitted;
 std::vector<std::string> transforms;
 std::vector<std::vector<int>> flames;
-int matrixDepth=0;
+int matrixDepth=0, cullDisable=0, cullRestore=0;
 #define OPEN_DISPS(g) ((void)(g))
 #define CLOSE_DISPS(g) ((void)(g))
 #define POLY_OPA_DISP gfx.o
@@ -141,6 +144,8 @@ int matrixDepth=0;
 #define gSPDisplayList(p,dl) submitted.emplace_back((p)->stream,(const char*)(dl))
 #define gDPSetGrayscaleColor(p,...) ((void)(p))
 #define gSPGrayscale(p,...) ((void)(p))
+#define gSPClearGeometryMode(p,...) ((void)(p), ++cullDisable)
+#define gSPSetGeometryMode(p,...) ((void)(p), ++cullRestore)
 void Matrix_Push() {++matrixDepth;} void Matrix_Pop() {assert(matrixDepth>0);--matrixDepth;}
 void Matrix_Scale(float,float,float,int) {transforms.push_back("scale");}
 void Matrix_RotateYF(float,int) {transforms.push_back("spin");}
@@ -149,7 +154,9 @@ void Matrix_RotateZF(float,int) {transforms.push_back("z");}
 void Matrix_Translate(float,float,float,int) {transforms.push_back("translate");}
 void Gfx_SetupDL25_Opa(GraphicsContext*) {} void Gfx_SetupDL25_Xlu(GraphicsContext*) {}
 void DrawOotSlateRuneFlame(uint8_t r,uint8_t g,uint8_t b) {assert(matrixDepth==0);flames.push_back({r,g,b});}
+#ifndef M_PIf
 constexpr float M_PIf=3.14159265358979323846f;
+#endif
 const char* gIKAxeInlineDL="__native_inline_axe";
 /* HOST_AXE_DRAW */
 int nativeCalled=0;
@@ -277,6 +284,9 @@ int main() {
  assert(info.drawKind==CW_DRAW_KIND_MASTER_SWORD && info.primColorXlu[0]==120);
  concrete=RG_NONE;ownerAlt=false;
  const std::pair<RandomizerGet,const char*> direct[] = {
+  {RG_LANTERN,"__OTR__objects/object_poh/gPoeLanternDL"},
+  {RG_POKEBALL,"__OTR__objects/object_nei_pokeball/ItmPokeBall_opaque_dl"},
+  {RG_MARIO_MASK,"__OTR__objects/object_nei_mario_mask/g_mario_mask_dl"},
   {RG_EXT_CANE_OF_BYRNA,"__OTR__objects/object_somaria/g_byrna_cane_give_dl"},
   {RG_EXT_MAGIC_CAPE,"__OTR__objects/object_nei_magic_cape/gNeiMagicCapeDL"},
   {RG_ULTRASHOT,"__OTR__objects/object_gi_hookshot/gGiLongshotDL"},
@@ -287,6 +297,20 @@ int main() {
  for(auto [rg,path]:direct) {
   resources.insert(path);selected=rg;info={};
   assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+  if(rg==RG_LANTERN || rg==RG_POKEBALL || rg==RG_MARIO_MASK) {
+   assert(info.appearanceDependent);
+   gfx.o=opa;gfx.x=xlu;submitted.clear();transforms.clear();cullDisable=cullRestore=0;
+   MM_DrawForeignCustomGi(&info);
+   assert(submitted.size()==1 && submitted[0].second==std::string("__OTR__@oot:")+(path+7));
+   assert(matrixDepth==0);
+   if(rg==RG_MARIO_MASK) {
+    assert(info.scale==.038f && info.opCount==2 && info.itemShimmer);
+    assert(cullDisable==1 && cullRestore==1);
+    assert(std::find(transforms.begin(),transforms.end(),"x")!=transforms.end());
+   } else {
+    assert(info.scale==(rg==RG_LANTERN?.025f:.18f) && cullDisable==0 && cullRestore==0);
+   }
+  }
  }
  selected=RG_EXT_MAGIC_CAPE;info={};
  assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);

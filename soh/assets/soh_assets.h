@@ -641,6 +641,9 @@ static const ALIGN_ASSET(2) char gStatSpeedTex[] = dgStatSpeedTex;
 #define dgStatPowerTex "__OTR__textures/icon_item_static/gStatPowerTex"
 static const ALIGN_ASSET(2) char gStatPowerTex[] = dgStatPowerTex;
 
+#define dgStatMagicTex "__OTR__textures/icon_item_static/gStatMagicTex"
+static const ALIGN_ASSET(2) char gStatMagicTex[] = dgStatMagicTex;
+
 #define dgCrawlSpeedTex "__OTR__textures/icon_item_static/gCrawlSpeedTex"
 static const ALIGN_ASSET(2) char gCrawlSpeedTex[] = dgCrawlSpeedTex;
 

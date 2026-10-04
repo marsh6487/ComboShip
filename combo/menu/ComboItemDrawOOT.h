@@ -22,6 +22,7 @@
 #include "ComboExport.h"
 #include "ComboMaskShimmer.h"
 #include "ComboItemEffectColors.h"
+#include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include "libultraship/bridge.h" // CVarGetInteger / CVarGetColor24 (cosmetic key/nut colors)
 #include "libultraship/color.h"  // Color_RGB8
 #include "soh/cvar_prefixes.h"
@@ -506,6 +507,24 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
     switch (rg) {
         case RG_EXT_CANE_OF_BYRNA:
             return CwCustomGi(out, "__OTR__objects/object_somaria/g_byrna_cane_give_dl", .25f);
+        case RG_LANTERN:
+            out->stateDependent = 2;
+            return CwCustomGi(out, "__OTR__objects/object_poh/gPoeLanternDL", .025f);
+        case RG_POKEBALL:
+            out->neiEffect = static_cast<int32_t>(NeiGi::Kind::Pokeball);
+            out->itemShimmer = CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0) != 0;
+            out->stateDependent = 2;
+            return CwCustomGi(out, "__OTR__objects/object_nei_pokeball/ItmPokeBall_opaque_dl", .18f);
+        case RG_MARIO_MASK:
+            out->stateDependent = 2;
+            if (!CwCustomGi(out, "__OTR__objects/object_nei_mario_mask/g_mario_mask_dl", .038f))
+                return 0;
+            out->opCount = 2;
+            out->ops[0] = { CW_OP_ROTATE_X, -16384.0f, 0, 0, {} };
+            out->ops[1] = { CW_OP_NO_CULL, 0, 0, 0, {} };
+            out->itemShimmer = 1;
+            ComboOotMaskShimmerColor(8, out->itemShimmerColor);
+            return 1;
         case RG_NET:
             return CwCustomGi(out, "__OTR__objects/object_nei_net/g_net_dl", .55f,
                               "__OTR__objects/object_nei_net/g_net_xlu_dl");
@@ -870,6 +889,12 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
         out->neiLegacyCane = 6;
     if (out->neiLegacyCane) {
         out->drawKind = CW_DRAW_KIND_NEI_CANE;
+        out->stateDependent = 2;
+        out->itemShimmer = CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0) != 0;
+        const bool pacci = out->neiLegacyCane == 2 || out->neiLegacyCane == 4 || out->neiLegacyCane == 6;
+        const uint8_t color[4] = { 255, static_cast<uint8_t>(pacci ? 215 : 60), static_cast<uint8_t>(pacci ? 70 : 60),
+                                   255 };
+        std::memcpy(out->itemShimmerColor, color, 4);
         return 1;
     }
     if (gi.drawFunc != nullptr) {
@@ -888,6 +913,8 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     out->xluStartIndex = xluStart;
     out->scale = scale;
     out->drawKind = drawKind;
+    if (drawKind == CW_DRAW_KIND_FAIRY)
+        out->stateDependent = 2; // selected generic/fairy-specific shell follows live owner Alt/mod state
     for (int32_t i = 0; i < 4; i++) {
         out->primColorXlu[i] = colors[i];
         out->envColorXlu[i] = colors[4 + i];
@@ -965,7 +992,12 @@ static int32_t OOT_FillItemIconInfo(RandomizerGet rg, CwItemIconInfo* out) {
     RandomizerGet actual = RG_NONE;
     auto gi = Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual);
     auto item = Rando::StaticData::RetrieveItem(actual != RG_NONE ? actual : rg);
-    if (item.HasCustomIcon()) {
+    if ((actual != RG_NONE ? actual : rg) == RG_DOUBLE_DEFENSE) {
+        // Its grant row deliberately stores RG_DOUBLE_DEFENSE in itemId. That
+        // number is also ITEM_FISH; it is not an inventory-icon index.
+        out->path = static_cast<const char*>(gItemIcons[ITEM_HEART_CONTAINER]);
+        out->width = out->height = 24;
+    } else if (item.HasCustomIcon()) {
         out->path = item.GetCustomIcon();
         out->width = out->height = item.GetCustomIconSize() == ICON_SIZE_24 ? 24 : 32;
     } else if (gi && gi->itemId >= 0 && gi->itemId < ITEM_ROCS_FEATHER_SKIJER) {

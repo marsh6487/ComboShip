@@ -56,21 +56,22 @@ typedef enum {
     /* ComboShip: MM->OOT additions. The kinds above are OOT funcs replicated by MM; these are MM
      * funcs replicated by OOT. Where an MM func is byte-for-byte the same as its OOT twin
      * (DekuNuts/RecoveryHeart/Fish/Potion/Poes/GoronSword) the kind above is reused instead. */
-    CW_DRAW_KIND_MM_FAIRY_BOTTLE,       /* OPA dl0; XLU dl1; seg8 scroll (32x320 layer 2); billboard dl2 */
-    CW_DRAW_KIND_MM_SOUL_FLAME,         /* MM enemy soul: billboard seg8 flame (primColorXlu), dl0 */
-    CW_DRAW_KIND_OPS,                   /* ops[] bytecode below (transforms/colors/DLs); see CwDrawOpCode */
-    CW_DRAW_KIND_NEI_CANE,              /* concrete legacy cane skill rendered by the MM host */
-    CW_DRAW_KIND_NEI_GI,                /* replacement mesh plus host-rendered elemental energy */
-    CW_DRAW_KIND_MM_MASK,               /* imported MM mask: native MM resources and palette-free split passes */
-    CW_DRAW_KIND_MM_REMAINS,            /* imported boss remains: native MM OPA resource, scale 0.02 */
-    CW_DRAW_KIND_MM_SPIN_ATTACK,        /* MM Great Spin: native disk/cylinder, seg8 scroll, live burst color */
-    CW_DRAW_KIND_OOT_MORPHA_SOUL = 32,  /* native MM flame dl0 + OoT Morpha membrane/nucleus dl1/2 */
-    CW_DRAW_KIND_MAGIC_JAR = 33,        /* OoT magic jar: custom Alt grayscale tint carried in primColorOpa */
-    CW_DRAW_KIND_CUSTOM_GI = 31,        /* OoT custom: spin, ops transforms, scale, OPA/XLU; primColorOpa grayscale,
-                                     primColorXlu weapon flame; alpha zero disables each independent tint/effect. */
-    CW_DRAW_KIND_SEASON_GI = 36,        /* neiEffect 1..4: weather-only (zero DLs); 5: legacy rod + cycling weather */
-    CW_DRAW_KIND_GRAYSCALE_LAYERS = 35, /* per-DL grayscale layerPrimMask/colors; OPA/XLU split */
+    CW_DRAW_KIND_MM_FAIRY_BOTTLE,           /* OPA dl0; XLU dl1; seg8 scroll (32x320 layer 2); billboard dl2 */
+    CW_DRAW_KIND_MM_SOUL_FLAME,             /* MM enemy soul: billboard seg8 flame (primColorXlu), dl0 */
+    CW_DRAW_KIND_OPS,                       /* ops[] bytecode below (transforms/colors/DLs); see CwDrawOpCode */
+    CW_DRAW_KIND_NEI_CANE,                  /* concrete legacy cane skill rendered by the MM host */
+    CW_DRAW_KIND_NEI_GI,                    /* replacement mesh plus host-rendered elemental energy */
+    CW_DRAW_KIND_MM_MASK,                   /* imported MM mask: native MM resources and palette-free split passes */
+    CW_DRAW_KIND_MM_REMAINS,                /* imported boss remains: native MM OPA resource, scale 0.02 */
+    CW_DRAW_KIND_MM_SPIN_ATTACK,            /* MM Great Spin: native disk/cylinder, seg8 scroll, live burst color */
+    CW_DRAW_KIND_OOT_MORPHA_SOUL = 32,      /* native MM flame dl0 + OoT Morpha membrane/nucleus dl1/2 */
+    CW_DRAW_KIND_MAGIC_JAR = 33,            /* OoT magic jar: custom Alt grayscale tint carried in primColorOpa */
+    CW_DRAW_KIND_CUSTOM_GI = 31,            /* OoT custom: spin, ops transforms, scale, OPA/XLU; primColorOpa grayscale,
+                                         primColorXlu weapon flame; alpha zero disables each independent tint/effect. */
+    CW_DRAW_KIND_SEASON_GI = 36,            /* 1..4: seasons; 5: rod + cycling weather; 6: rain/lightning song */
+    CW_DRAW_KIND_GRAYSCALE_LAYERS = 35,     /* per-DL grayscale layerPrimMask/colors; OPA/XLU split */
     CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT = 34, /* concrete static award; ops[0] native equipment selector */
+    CW_DRAW_KIND_MM_FAIRY_CONTAINER = 37,   /* OPA shell0, XLU glass1/contents2; dl3 is its native Mtx path */
 } CwDrawKind;
 
 #define CW_DRAW_MAX_OPS 20
@@ -98,6 +99,7 @@ typedef enum {
     CW_OP_DLIST,            /* a = index into dlists[] */
     CW_OP_FRAME_PAIR,       /* only CUSTOM_GI: choose one of two OPA DLs; a = frame bit (0..30) */
     CW_OP_NATIVE_EQUIPMENT, /* only OOT_NATIVE_EQUIPMENT: a = CwOotNativeEquipment */
+    CW_OP_NO_CULL,          /* only CUSTOM_GI: draw a legacy single-sided plate from either side */
 } CwDrawOpCode;
 
 // Existing MM-native renderers for inline/palette-remapped OoT equipment. These concrete
@@ -209,6 +211,7 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
             return 6;
         case CW_DRAW_KIND_POES:
         case CW_DRAW_KIND_SCALE:
+        case CW_DRAW_KIND_MM_FAIRY_CONTAINER:
             return 4;
         case CW_DRAW_KIND_FAIRY:
         case CW_DRAW_KIND_MAGIC_SPELL:

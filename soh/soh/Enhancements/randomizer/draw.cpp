@@ -860,9 +860,6 @@ extern "C" void DrawVolvagia(PlayState* play) {
 }
 
 extern "C" void DrawMorpha(PlayState* play) {
-    ComboDrawMorphaTentacleGi(play, "oot", [](const char* path, const char*) {
-        return ResourceMgr_FileExists(path) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path));
-    });
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
@@ -1779,7 +1776,7 @@ void Randomizer_DrawMarioMask(PlayState* play, GetItemEntry* getItemEntry) {
     CLOSE_DISPS(play->state.gfxCtx);
     Matrix_Pop();
     uint8_t shimmerColor[4];
-    ComboMaskShimmerColor(0, shimmerColor);
+    ComboOotMaskShimmerColor(8, shimmerColor);
     ComboDrawMaskShimmer(play, nullptr, shimmerColor, nullptr);
 }
 

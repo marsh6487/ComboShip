@@ -12,7 +12,7 @@ from run_time_pedestal_tests import functions
 def flags():
     result = ["-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0"]
     result += ["-I" + str(ROOT / p) for p in
-               ("soh", "soh/include", "soh/src", "soh/assets", "soh/mods", "libultraship/include")]
+               ("soh", "soh/include", "soh/src", "soh/assets", "soh/mods", "combo/menu", "libultraship/include")]
     for config in ("CMake/soh-cvars.cmake", "CMake/lus-cvars.cmake"):
         for key, value in re.findall(r'set\((CVAR_PREFIX_\w+)\s+"?([^\s"\)]+)', (ROOT / config).read_text()):
             result.append(f'-D{key}="{value}"')

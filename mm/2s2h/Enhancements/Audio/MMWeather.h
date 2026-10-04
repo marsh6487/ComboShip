@@ -10,6 +10,8 @@ extern "C" {
 struct PlayState;
 void MMWeather_Update(struct PlayState* play);
 void MMWeather_Reset(void);
+// Eligible owned season, or -1 for Off/unowned/interior. Does not change native weather flags.
+int MMWeather_Season(void);
 int MMWeather_RainDensity(void);
 float MMWeather_Overcast(void);
 uint8_t MMWeather_Shade(uint8_t value);

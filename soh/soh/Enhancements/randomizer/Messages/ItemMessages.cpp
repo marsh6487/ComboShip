@@ -10,12 +10,18 @@
 #include "soh/Enhancements/custom-message/CustomMessageTypes.h"
 #include "soh/Enhancements/randomizer/Traps.h"
 #include "soh/Enhancements/randomizer/item.h"
+#include "soh/Enhancements/randomizer/dungeon.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/randostatupgrade.h"
+#include "soh/Enhancements/randomizer/randomizer_entrance.h"
+#include "soh/Enhancements/randomizer/entrance.h"
+#include "soh/Enhancements/randomizer/randomizer_entrance_tracker.h"
+#include "soh/FleetShipCombo/FleetComboIds.h"
 #include "soh/ShipInit.hpp"
 #include <soh/ResourceManagerHelpers.h>
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
+#include "ComboResolve.h"
 #include "ComboItemReceiptText.h"
 #include "message_data_static.h"
 #include "rando/CrossForeign.h"
@@ -34,6 +40,7 @@ extern "C" {
 #include "macros.h"
 #include "functions.h"
 #include "z64item.h"
+#include "mods/extended_inventory.h"
 extern PlayState* gPlayState;
 extern u8 gLanternCatchPending; // item_lantern.c — fire type pending message display
 }
@@ -48,7 +55,24 @@ struct CustomItemMessageEntry {
 };
 extern const CustomItemMessageEntry* GetCustomItemMessage(s16 rgId);
 
+bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received = true);
+bool BuildTokenReceiptMessage(RandomizerGet rg, CustomMessage& msg);
+
+static bool DungeonInformationEnabled() {
+    if (!OTRGlobals::Instance || !OTRGlobals::Instance->gRandoContext || !OTRGlobals::Instance->gRandomizer)
+        return false;
+    const auto ctx = OTRGlobals::Instance->gRandoContext;
+    // A Combo seed can start in MM before OoT creates a PlayState or hydrates
+    // its save. The generated/loaded seed context is already authoritative.
+    return (IS_RANDO || ctx->IsSeedGenerated() || ctx->IsSpoilerLoaded()) &&
+           ctx->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Is(RO_GENERIC_ON);
+}
+
 #ifdef COMBO_BUILD
+extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled(void) {
+    return DungeonInformationEnabled();
+}
+
 extern "C" MessageTableEntry* sNesMessageEntryTablePtr;
 void BuildQuarterHeartMessage(CustomMessage& msg);
 void BuildDefenseUpgradeMessage(CustomMessage& msg);
@@ -105,7 +129,11 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName, cha
             default:
                 break;
         }
-        if (builder) {
+        CustomMessage contextual;
+        if (BuildDungeonItemReceiptMessage(rg, contextual) || BuildTokenReceiptMessage(rg, contextual)) {
+            if (!ComboItemReceiptText::FromOotMessage(contextual.GetEnglish(MF_RAW), body))
+                return 0;
+        } else if (builder) {
             CustomMessage message;
             builder(message); // same read-only description builder as OoT's own receipt
             if (!ComboItemReceiptText::FromOotMessage(message.GetEnglish(MF_RAW), body))
@@ -274,6 +302,11 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
         rgid = player->getItemId;
     }
 
+    if (BuildDungeonItemReceiptMessage(static_cast<RandomizerGet>(rgid), msg) ||
+        BuildTokenReceiptMessage(static_cast<RandomizerGet>(rgid), msg)) {
+        return;
+    }
+
     // Check if this is a custom item with a detailed message
     const CustomItemMessageEntry* customMsg = GetCustomItemMessage(rgid);
     if (customMsg != nullptr) {
@@ -354,7 +387,11 @@ void LoadCustomItemIcon(bool displayAsEnglish) {
         static int16_t sIconItem24XOffsets[] = { 72, 72, 72, 50 };
         MessageContext* msgCtx = &gPlayState->msgCtx;
         uint8_t language = displayAsEnglish ? LANGUAGE_ENG : (Language)gSaveContext.language;
-        if (iconSize == ICON_SIZE_32) {
+        if (std::strstr(customIcon, "/gSongNoteTex")) {
+            R_TEXTBOX_ICON_XPOS = R_TEXT_INIT_XPOS - sIconItem24XOffsets[language];
+            R_TEXTBOX_ICON_YPOS = (R_TEXTBOX_Y + 10) + 10;
+            R_TEXTBOX_ICON_SIZE = 16;
+        } else if (iconSize == ICON_SIZE_32) {
             R_TEXTBOX_ICON_XPOS = R_TEXT_INIT_XPOS - sIconItem32XOffsets[language];
             R_TEXTBOX_ICON_YPOS = (R_TEXTBOX_Y + 10) + 6;
             R_TEXTBOX_ICON_SIZE = 32;
@@ -374,11 +411,64 @@ void DrawCustomItemIcon(Gfx** p) {
     MessageContext* msgCtx = &gPlayState->msgCtx;
     Player* player = GET_PLAYER(gPlayState);
     CustomIconSize iconSize = ICON_SIZE_32;
+    const char* customIcon = nullptr;
+    RandomizerGet rgid = RG_NONE;
     if (player->getItemEntry.objectId != OBJECT_INVALID && player->getItemEntry.modIndex == MOD_RANDOMIZER) {
-        RandomizerGet rgid = static_cast<RandomizerGet>(player->getItemEntry.getItemId);
+        rgid = static_cast<RandomizerGet>(player->getItemEntry.getItemId);
+        customIcon = Rando::StaticData::RetrieveItem(rgid).GetCustomIcon();
         iconSize = Rando::StaticData::RetrieveItem(rgid).GetCustomIconSize();
     }
-    if (iconSize == ICON_SIZE_24) {
+    if (customIcon && std::strstr(customIcon, "/gSongNoteTex")) {
+        Color_RGB8 color = { 255, 255, 255 };
+        // Match the MM song's existing get-item theme without replacing its clef.
+        switch (rgid) {
+            case RG_MM_SONG_SARIA:
+            case RG_MM_SONG_SONATA:
+                color = { 98, 255, 98 };
+                break;
+            case RG_MM_SONG_LULLABY_INTRO:
+                color = { 255, 100, 100 };
+                break;
+            case RG_MM_SONG_LULLABY:
+                color = { 255, 20, 20 };
+                break;
+            case RG_MM_SONG_NOVA:
+                color = { 20, 20, 255 };
+                break;
+            case RG_MM_SONG_ELEGY:
+                color = { 255, 98, 0 };
+                break;
+            case RG_MM_SONG_OATH:
+                color = { 98, 0, 98 };
+                break;
+            case RG_MM_SONG_HEALING:
+                color = { 255, 150, 230 };
+                break;
+            case RG_MM_SONG_SOARING:
+                color = { 200, 160, 255 };
+                break;
+            case RG_MM_SONG_TIME:
+            case RG_MM_SONG_DOUBLE_TIME:
+            case RG_MM_SONG_INVERTED_TIME:
+                color = { 98, 177, 211 };
+                break;
+            case RG_MM_SONG_SUN:
+                color = { 237, 231, 62 };
+                break;
+            case RG_MM_SONG_EPONA:
+                color = { 146, 87, 49 };
+                break;
+            case RG_MM_SONG_STORMS:
+                color = { 146, 146, 146 };
+                break;
+            default:
+                break;
+        }
+        gDPSetPrimColor(gfx++, 0, 0, color.r, color.g, color.b, msgCtx->textColorAlpha);
+        gDPLoadTextureBlock(gfx++, (uintptr_t)msgCtx->textboxSegment + MESSAGE_STATIC_TEX_SIZE, G_IM_FMT_IA,
+                            G_IM_SIZ_8b, 16, 24, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK,
+                            G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+    } else if (iconSize == ICON_SIZE_24) {
         gDPLoadTextureBlock(gfx++, (uintptr_t)msgCtx->textboxSegment + MESSAGE_STATIC_TEX_SIZE, G_IM_FMT_RGBA,
                             G_IM_SIZ_32b, 24, 24, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK,
                             G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
@@ -417,6 +507,32 @@ void BuildComboForeignMessage(Player* player, CustomMessage& msg) {
             const char* resolved = Randomizer_ComboForeignLatchedName((int32_t)rc);
             if (resolved != nullptr) {
                 name = ComboRando::ShownForeignName(*fi, resolved);
+            }
+            if (fi->itemGame == ComboRando::GAME_MM) {
+                // Use the name frozen by the model latch, never resolve a
+                // progressive against the now-changing MM save a second time.
+                std::string receiptName = resolved ? resolved : fi->itemName;
+                if (receiptName == "Saria's Song" || receiptName == "Epona's Song" || receiptName == "Song of Time" ||
+                    receiptName == "Song of Storms" || receiptName == "Sun's Song") {
+                    receiptName += " (MM)";
+                }
+                const auto found = Rando::StaticData::itemNameToEnum.find(receiptName);
+                if (found != Rando::StaticData::itemNameToEnum.end()) {
+                    if (BuildDungeonItemReceiptMessage(found->second, msg) ||
+                        BuildTokenReceiptMessage(found->second, msg)) {
+                        // The foreign sentinel has no local custom icon. Keep
+                        // the existing iconless path, including on later pages.
+                        for (const auto icon : { ITEM_CUSTOM, ITEM_SKULL_TOKEN, ITEM_DUNGEON_MAP, ITEM_COMPASS })
+                            msg.Replace(CustomMessage::ITEM_OBTAINED(icon), "");
+                        return;
+                    }
+                    const auto* custom = GetCustomItemMessage(found->second);
+                    if (custom) {
+                        msg = CustomMessage(custom->english, custom->german, custom->french, TEXTBOX_TYPE_BLUE);
+                        msg.AutoFormat();
+                        return;
+                    }
+                }
             }
         }
     }
@@ -510,18 +626,18 @@ void BuildMagicStatUpgradeMessage(CustomMessage& msg) {
                                            RSK_MAGIC_STAT_UPGRADE_REQUIRED);
     if (level < required) {
         uint8_t remaining = required - level;
-        msg = { "You found a %yMagic Meter%w!&%c[[remaining]]%w more to reach max stat.",
-                "Du erhältst ein %yMagisches Maß%w!&Noch %c[[remaining]]%w bis zum Maximum.",
-                "Vous trouvez une %yJauge de Magie%w!&Encore %c[[remaining]]%w pour atteindre le maximum." };
+        msg = { "You found a %gMagic Meter%w!&%c[[remaining]]%w more to reach max stat.",
+                "Du erhältst ein %gMagisches Maß%w!&Noch %c[[remaining]]%w bis zum Maximum.",
+                "Vous trouvez une %gJauge de Magie%w!&Encore %c[[remaining]]%w pour atteindre le maximum." };
         msg.Replace("[[remaining]]", std::to_string(remaining));
     } else if (level == required) {
-        msg = { "You found a %yMagic Meter%w!&%gMax magic reached!%w",
-                "Du erhältst ein %yMagisches Maß%w!&%gMaximale Magie erreicht!%w",
-                "Vous trouvez une %yJauge de Magie%w!&%gMagie maximale atteinte!%w" };
+        msg = { "You found a %gMagic Meter%w!&%gMax magic reached!%w",
+                "Du erhältst ein %gMagisches Maß%w!&%gMaximale Magie erreicht!%w",
+                "Vous trouvez une %gJauge de Magie%w!&%gMagie maximale atteinte!%w" };
     } else {
-        msg = { "You found a %yMagic Meter%w!&%rAlready at max magic!%w",
-                "Du erhältst ein %yMagisches Maß%w!&%rBereits bei maximaler Magie!%w",
-                "Vous trouvez une %yJauge de Magie%w!&%rMagie déjà au maximum!%w" };
+        msg = { "You found a %gMagic Meter%w!&%rAlready at max magic!%w",
+                "Du erhältst ein %gMagisches Maß%w!&%rBereits bei maximaler Magie!%w",
+                "Vous trouvez une %gJauge de Magie%w!&%rMagie déjà au maximum!%w" };
     }
     msg.AutoFormat(ITEM_CUSTOM);
 }
@@ -643,59 +759,263 @@ void BuildItemMessage(u16* textId, bool* loadFromMessageTable) {
     msg.LoadIntoFont();
 }
 
-void BuildMapMessage(uint16_t* textId, bool* loadFromMessageTable) {
-    GetItemEntry itemEntry = GET_PLAYER(gPlayState)->getItemEntry;
+// The custom get-item textbox and MM donor export run before the grant, with
+// an already selected identity. En_Si's post-grant native GS textbox does not
+// call this builder; its existing native count message remains separate.
+bool BuildTokenReceiptMessage(RandomizerGet rg, CustomMessage& msg) {
+    unsigned count;
+    CustomMessage place;
+    switch (rg) {
+        case RG_GOLD_SKULLTULA_TOKEN:
+            count = gSaveContext.inventory.gsTokens + 1;
+            place = CustomMessage(" in Hyrule", " in Hyrule", " en Hyrule");
+            break;
+        case RG_MM_GS_TOKEN_SWAMP:
+            count = Nei_Save()->comboObtained[FC_MM_SKULLS_SWAMP] + 1;
+            place = CustomMessage(" in the Swamp Spider House", " im Sumpf-Spinnenhaus",
+                                  " dans la maison des araignées du marais");
+            break;
+        case RG_MM_GS_TOKEN_OCEAN:
+            count = Nei_Save()->comboObtained[FC_MM_SKULLS_OCEAN] + 1;
+            place = CustomMessage(" in the Ocean Spider House", " im Ozean-Spinnenhaus",
+                                  " dans la maison des araignées de l'océan");
+            break;
+        default:
+            return false;
+    }
+    msg = CustomMessage(
+        "You found [[article]][[color]][[name]]%w!^You've collected [[color]][[count]]%w in total[[place]].",
+        "Du hast ein [[color]][[name]]%w gefunden!^Insgesamt [[color]][[count]]%w gesammelt[[place]].",
+        "Vous obtenez un [[color]][[name]]%w!^Vous en avez collecté [[color]][[count]]%w au total[[place]].",
+        TEXTBOX_TYPE_BLUE);
+    msg.Replace("[[color]]", rg == RG_GOLD_SKULLTULA_TOKEN ? "%r" : "%c");
+    msg.Replace("[[article]]", rg == RG_MM_GS_TOKEN_OCEAN ? "an " : "a ");
+    msg.Replace("[[name]]", CustomMessage(Rando::StaticData::RetrieveItem(rg).GetName()));
+    msg.Replace("[[count]]", std::to_string(count));
+    msg.Replace("[[place]]", place);
+    msg.AutoFormat(rg == RG_GOLD_SKULLTULA_TOKEN ? ITEM_SKULL_TOKEN : ITEM_CUSTOM);
+    return true;
+}
+
+static CustomMessage DungeonRewardName(RandomizerCheck check) {
+    const auto* location = OTRGlobals::Instance->gRandoContext->GetItemLocation(check);
+    const auto item = location->GetPlacedRandomizerGet();
+#ifdef COMBO_BUILD
+    if (item == RG_COMBO_FOREIGN) {
+        const auto* foreign = OOT_LookupForeignByCheck(check);
+        if (foreign && !foreign->itemName.empty())
+            return CustomMessage(foreign->displayName.empty() ? foreign->itemName : foreign->displayName);
+        return CustomMessage("an unknown reward", "eine unbekannte Belohnung", "une récompense inconnue");
+    }
+#endif
+    if (item == RG_NONE || item == RG_HINT || item == RG_SOLD_OUT)
+        return CustomMessage("an unknown reward", "eine unbekannte Belohnung", "une récompense inconnue");
+    // Seed identity only: a preview must not resolve a progressive against the
+    // current inventory or reveal a reward belonging to the dungeon's old boss.
+    return CustomMessage(location->GetPlacedItemName());
+}
+
+static int16_t DungeonEntranceDestination(int16_t entrance) {
+    auto* overrides = Randomizer_GetEntranceOverrides();
+    for (size_t i = 0; i < ENTRANCE_OVERRIDES_MAX_COUNT; ++i) {
+        if (Entrance_EntranceIsNull(&overrides[i]))
+            break;
+        if (overrides[i].index == entrance)
+            return overrides[i].override;
+    }
+    return entrance;
+}
+
+static std::string DungeonEntranceSource(int16_t dungeonEntrance) {
+    auto* overrides = Randomizer_GetEntranceOverrides();
+    std::vector<std::string> sources;
+    for (size_t i = 0; i < ENTRANCE_OVERRIDES_MAX_COUNT; ++i) {
+        if (Entrance_EntranceIsNull(&overrides[i]))
+            break;
+        if (overrides[i].override != dungeonEntrance)
+            continue;
+        const auto* entrance = EntranceTracker::GetEntranceData(overrides[i].index);
+        if (entrance && std::find(sources.begin(), sources.end(), entrance->source) == sources.end())
+            sources.push_back(entrance->source);
+    }
+    if (sources.empty() && DungeonEntranceDestination(dungeonEntrance) == dungeonEntrance) {
+        // An excluded/unshuffled entrance still has its physical vanilla source.
+        const auto* entrance = EntranceTracker::GetEntranceData(dungeonEntrance);
+        if (entrance)
+            sources.push_back(entrance->source);
+    }
+    std::string source;
+    for (const auto& name : sources) {
+        if (!source.empty())
+            source += ", ";
+        source += name;
+    }
+    return source;
+}
+
+bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received) {
+    const bool ootMap = rg >= RG_DEKU_TREE_MAP && rg <= RG_ICE_CAVERN_MAP;
+    const bool ootCompass = rg >= RG_DEKU_TREE_COMPASS && rg <= RG_ICE_CAVERN_COMPASS;
+    const bool mmMap = rg >= RG_MM_MAP_WOODFALL && rg <= RG_MM_MAP_STONE_TOWER;
+    const bool mmCompass = rg >= RG_MM_COMPASS_WOODFALL && rg <= RG_MM_COMPASS_STONE_TOWER;
+    if (!ootMap && !ootCompass && !mmMap && !mmCompass)
+        return false;
+
     auto ctx = OTRGlobals::Instance->gRandoContext;
-    CustomMessage msg =
-        CustomMessage("You found the %g[[name]]%w! [[typeHint]]", "Du erhältst das %g[[name]]%w! [[typeHint]]",
-                      "Vous obtenez %g[[name]]%w! [[typeHint]]", TEXTBOX_TYPE_BLUE);
-    int sceneNum;
-    switch (itemEntry.getItemId) {
-        case RG_DEKU_TREE_MAP:
-            sceneNum = SCENE_DEKU_TREE;
-            break;
-        case RG_DODONGOS_CAVERN_MAP:
-            sceneNum = SCENE_DODONGOS_CAVERN;
-            break;
-        case RG_JABU_JABUS_BELLY_MAP:
-            sceneNum = SCENE_JABU_JABU;
-            break;
-        case RG_FOREST_TEMPLE_MAP:
-            sceneNum = SCENE_FOREST_TEMPLE;
-            break;
-        case RG_FIRE_TEMPLE_MAP:
-            sceneNum = SCENE_FIRE_TEMPLE;
-            break;
-        case RG_WATER_TEMPLE_MAP:
-            sceneNum = SCENE_WATER_TEMPLE;
-            break;
-        case RG_SPIRIT_TEMPLE_MAP:
-            sceneNum = SCENE_SPIRIT_TEMPLE;
-            break;
-        case RG_SHADOW_TEMPLE_MAP:
-            sceneNum = SCENE_SHADOW_TEMPLE;
-            break;
-        case RG_BOTTOM_OF_THE_WELL_MAP:
-            sceneNum = SCENE_BOTTOM_OF_THE_WELL;
-            break;
-        case RG_ICE_CAVERN_MAP:
-            sceneNum = SCENE_ICE_CAVERN;
-            break;
+    const auto item = Rando::StaticData::RetrieveItem(rg);
+    msg = received ? CustomMessage(
+                         "You found the [[color]][[name]]%w![[typeHint]][[bossHint]][[rewardHint]][[entranceHint]]",
+                         "Du erhältst das [[color]][[name]]%w![[typeHint]][[bossHint]][[rewardHint]][[entranceHint]]",
+                         "Vous obtenez [[color]][[name]]%w![[typeHint]][[bossHint]][[rewardHint]][[entranceHint]]",
+                         TEXTBOX_TYPE_BLUE)
+                   : CustomMessage("[[color]][[name]]%w[[typeHint]][[bossHint]][[rewardHint]][[entranceHint]]",
+                                   TEXTBOX_TYPE_BLUE);
+    msg.Replace("[[name]]", CustomMessage(item.GetName()));
+    msg.Replace("[[color]]", item.GetColor());
+
+    CustomMessage typeHint;
+    CustomMessage bossHint;
+    CustomMessage rewardHint;
+    CustomMessage entranceHint;
+    CustomMessage rewardName;
+    bool hasReward = false;
+    const bool information = DungeonInformationEnabled();
+    const char* boss = nullptr;
+    if (ootMap || ootCompass) {
+        const int dungeon = rg - (ootMap ? RG_DEKU_TREE_MAP : RG_DEKU_TREE_COMPASS);
+        constexpr int scenes[] = { SCENE_DEKU_TREE,     SCENE_DODONGOS_CAVERN, SCENE_JABU_JABU,
+                                   SCENE_FOREST_TEMPLE, SCENE_FIRE_TEMPLE,     SCENE_WATER_TEMPLE,
+                                   SCENE_SPIRIT_TEMPLE, SCENE_SHADOW_TEMPLE,   SCENE_BOTTOM_OF_THE_WELL,
+                                   SCENE_ICE_CAVERN };
+        if (!ctx->GetOption(RSK_MQ_DUNGEON_RANDOM).Is(RO_MQ_DUNGEONS_NONE) &&
+            !(ctx->GetOption(RSK_MQ_DUNGEON_RANDOM).Is(RO_MQ_DUNGEONS_SET_NUMBER) &&
+              ctx->GetOption(RSK_MQ_DUNGEON_COUNT).Is(MAX_MQ_DUNGEON_COUNT))) {
+            // The resource helper follows the active OoT quest. In an MM-first
+            // seed the donor is dormant, so read its loaded seed dungeon mode.
+            const auto* seedDungeon = ctx->GetDungeons()->GetDungeonFromScene(scenes[dungeon]);
+            const bool masterQuest =
+                IS_RANDO ? ResourceMgr_IsSceneMasterQuest(scenes[dungeon]) : seedDungeon && seedDungeon->IsMQ();
+            typeHint = Rando::StaticData::hintTextTable[masterQuest ? RHT_DUNGEON_MASTERFUL : RHT_DUNGEON_ORDINARY]
+                           .GetHintMessage();
+        }
+        if (information && ootMap && !ctx->GetOption(RSK_SHUFFLE_DUNGEON_ENTRANCES).Is(0)) {
+            constexpr int entrances[] = { ENTR_DEKU_TREE_ENTRANCE,          ENTR_DODONGOS_CAVERN_ENTRANCE,
+                                          ENTR_JABU_JABU_ENTRANCE,          ENTR_FOREST_TEMPLE_ENTRANCE,
+                                          ENTR_FIRE_TEMPLE_ENTRANCE,        ENTR_WATER_TEMPLE_ENTRANCE,
+                                          ENTR_SPIRIT_TEMPLE_ENTRANCE,      ENTR_SHADOW_TEMPLE_ENTRANCE,
+                                          ENTR_BOTTOM_OF_THE_WELL_ENTRANCE, ENTR_ICE_CAVERN_ENTRANCE };
+            const auto source = DungeonEntranceSource(entrances[dungeon]);
+            if (!source.empty()) {
+                entranceHint =
+                    CustomMessage("^Its entrance is at %c[[source]]%w.", "^Der Eingang liegt bei %c[[source]]%w.",
+                                  "^Son entrée se trouve à %c[[source]]%w.");
+                entranceHint.Replace("[[source]]", source);
+            }
+        }
+        if (information && ootCompass && dungeon < 8) {
+            constexpr int doors[] = { ENTR_DEKU_TREE_BOSS_ENTRANCE,     ENTR_DODONGOS_CAVERN_BOSS_ENTRANCE,
+                                      ENTR_JABU_JABU_BOSS_ENTRANCE,     ENTR_FOREST_TEMPLE_BOSS_ENTRANCE,
+                                      ENTR_FIRE_TEMPLE_BOSS_ENTRANCE,   ENTR_WATER_TEMPLE_BOSS_ENTRANCE,
+                                      ENTR_SPIRIT_TEMPLE_BOSS_ENTRANCE, ENTR_SHADOW_TEMPLE_BOSS_ENTRANCE };
+            constexpr const char* bosses[] = { "Queen Gohma", "King Dodongo", "Barinade", "Phantom Ganon",
+                                               "Volvagia",    "Morpha",       "Twinrova", "Bongo Bongo" };
+            constexpr RandomizerCheck rewards[] = { RC_QUEEN_GOHMA, RC_KING_DODONGO, RC_BARINADE, RC_PHANTOM_GANON,
+                                                    RC_VOLVAGIA,    RC_MORPHA,       RC_TWINROVA, RC_BONGO_BONGO };
+            const int destination = ctx->GetOption(RSK_SHUFFLE_BOSS_ENTRANCES).Is(RO_BOSS_ROOM_ENTRANCE_SHUFFLE_OFF)
+                                        ? doors[dungeon]
+                                        : DungeonEntranceDestination(doors[dungeon]);
+            for (size_t i = 0; i < 8; ++i) {
+                if (destination == doors[i]) {
+                    boss = bosses[i];
+                    rewardName = DungeonRewardName(rewards[i]);
+                    hasReward = true;
+                    break;
+                }
+            }
+            // Mixed entrance pools can lead somewhere other than a boss room.
+            // Never substitute the vanilla boss for an unknown destination.
+        }
+    } else if (information && mmMap) {
+        // Match MM's known native entrances; this port has no MM entrance graph.
+        constexpr const char* entrances[] = { "Woodfall", "Snowhead", "Zora Cape's turtle", "Stone Tower" };
+        entranceHint = CustomMessage("^Its entrance is at %c[[source]]%w.", "^Der Eingang liegt bei %c[[source]]%w.",
+                                     "^Son entrée se trouve à %c[[source]]%w.");
+        entranceHint.Replace("[[source]]", entrances[rg - RG_MM_MAP_WOODFALL]);
+    } else if (information && mmCompass) {
+        // This port has no MM boss-entrance shuffle; Combo seeds currently
+        // serialize only the OoT entrance graph.
+        constexpr const char* bosses[] = { "Odolwa", "Goht", "Gyorg", "Twinmold" };
+        boss = bosses[rg - RG_MM_COMPASS_WOODFALL];
+#ifdef COMBO_BUILD
+        using RewardNameFn = int32_t (*)(int32_t, char*, uint32_t);
+        auto getRewardName = reinterpret_cast<RewardNameFn>(Combo_ResolveSym("2ship", "MM_GetDungeonRewardName"));
+        char name[512];
+        if (getRewardName) {
+            const int32_t size = getRewardName(rg - RG_MM_COMPASS_WOODFALL, name, sizeof(name));
+            if (size > 0 && static_cast<size_t>(size) < sizeof(name)) {
+                rewardName = CustomMessage(std::string(name, size));
+                hasReward = true;
+            }
+        }
+#endif
     }
-    CustomMessage name =
-        CustomMessage(Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(itemEntry.getItemId)).GetName());
-    msg.Replace("[[name]]", name);
-    if (ctx->GetOption(RSK_MQ_DUNGEON_RANDOM).Is(RO_MQ_DUNGEONS_NONE) ||
-        (ctx->GetOption(RSK_MQ_DUNGEON_RANDOM).Is(RO_MQ_DUNGEONS_SET_NUMBER) &&
-         ctx->GetOption(RSK_MQ_DUNGEON_COUNT).Is(MAX_MQ_DUNGEON_COUNT))) {
-        msg.Replace("[[typeHint]]", "");
-    } else if (ResourceMgr_IsSceneMasterQuest(sceneNum)) {
-        msg.Replace("[[typeHint]]", Rando::StaticData::hintTextTable[RHT_DUNGEON_MASTERFUL].GetHintMessage());
-    } else {
-        msg.Replace("[[typeHint]]", Rando::StaticData::hintTextTable[RHT_DUNGEON_ORDINARY].GetHintMessage());
+    if (hasReward) {
+        rewardHint = CustomMessage("^The reward is %g[[reward]]%w.", "^Die Belohnung ist %g[[reward]]%w.",
+                                   "^La récompense est %g[[reward]]%w.");
+        rewardHint.Replace("[[reward]]", rewardName);
     }
+    if (boss) {
+        bossHint = CustomMessage("^It points to %r[[boss]]%w!", "^Er zeigt zu %r[[boss]]%w!",
+                                 "^Elle pointe vers %r[[boss]]%w!");
+        bossHint.Replace("[[boss]]", boss);
+    }
+    msg.Replace("[[typeHint]]", typeHint);
+    msg.Replace("[[bossHint]]", bossHint);
+    msg.Replace("[[rewardHint]]", rewardHint);
+    msg.Replace("[[entranceHint]]", entranceHint);
+    msg.AutoFormat(ootCompass || mmCompass ? ITEM_COMPASS : ITEM_DUNGEON_MAP);
+    return true;
+}
+
+extern "C" uint16_t Randomizer_GetDungeonItemInfoTextId(uint16_t cursorItem) {
+    if (!DungeonInformationEnabled() || !gPlayState || gSaveContext.mapIndex < 0 || gSaveContext.mapIndex >= 10 ||
+        !((gPlayState->sceneNum >= SCENE_DEKU_TREE && gPlayState->sceneNum <= SCENE_ICE_CAVERN) ||
+          (gPlayState->sceneNum >= SCENE_DEKU_TREE_BOSS && gPlayState->sceneNum <= SCENE_SHADOW_TEMPLE_BOSS)))
+        return 0;
+    if (cursorItem == ITEM_COMPASS && CHECK_DUNGEON_ITEM(DUNGEON_COMPASS, gSaveContext.mapIndex))
+        return TEXT_DESC_DUNGEON_COMPASS_INFO;
+    if (cursorItem == ITEM_DUNGEON_MAP && CHECK_DUNGEON_ITEM(DUNGEON_MAP, gSaveContext.mapIndex))
+        return TEXT_DESC_DUNGEON_MAP_INFO;
+    return 0;
+}
+
+void BuildDungeonPauseInfoMessage(uint16_t* textId, bool* loadFromMessageTable) {
+    const bool compass = *textId == TEXT_DESC_DUNGEON_COMPASS_INFO;
+    if (Randomizer_GetDungeonItemInfoTextId(compass ? ITEM_COMPASS : ITEM_DUNGEON_MAP) != *textId)
+        return;
+    CustomMessage msg;
+    const auto rg =
+        static_cast<RandomizerGet>((compass ? RG_DEKU_TREE_COMPASS : RG_DEKU_TREE_MAP) + gSaveContext.mapIndex);
+    if (BuildDungeonItemReceiptMessage(rg, msg, false)) {
+        msg.LoadIntoFont();
+        *loadFromMessageTable = false;
+    }
+}
+
+void BuildMapMessage(uint16_t* textId, bool* loadFromMessageTable) {
+    CustomMessage msg;
+    const auto entry = GET_PLAYER(gPlayState)->getItemEntry;
+    auto rg = static_cast<RandomizerGet>(entry.getItemId);
+    // Native entries have no dungeon-specific RG. The pickup scene identifies
+    // their dungeon even when its entrances alone are shuffled.
+    if (entry.modIndex != MOD_RANDOMIZER && (entry.itemId == ITEM_COMPASS || entry.itemId == ITEM_DUNGEON_MAP) &&
+        gPlayState->sceneNum >= SCENE_DEKU_TREE && gPlayState->sceneNum <= SCENE_ICE_CAVERN) {
+        rg = static_cast<RandomizerGet>((entry.itemId == ITEM_COMPASS ? RG_DEKU_TREE_COMPASS : RG_DEKU_TREE_MAP) +
+                                        gPlayState->sceneNum - SCENE_DEKU_TREE);
+    }
+    if (!BuildDungeonItemReceiptMessage(rg, msg))
+        return;
     *loadFromMessageTable = false;
-    msg.AutoFormat(ITEM_DUNGEON_MAP);
     msg.LoadIntoFont();
 }
 
@@ -742,10 +1062,14 @@ void BuildTimeGateMessage(uint16_t* textId, bool* loadFromMessageTable) {
 
 void RegisterItemMessages() {
     COND_ID_HOOK(OnOpenText, TEXT_RANDOMIZER_CUSTOM_ITEM, true, BuildItemMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_ITEM_DUNGEON_MAP, DUNGEON_ITEMS_CAN_BE_OUTSIDE_DUNGEON(RSK_SHUFFLE_MAPANDCOMPASS),
+    COND_ID_HOOK(OnOpenText, TEXT_DESC_DUNGEON_MAP_INFO, true, BuildDungeonPauseInfoMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_DESC_DUNGEON_COMPASS_INFO, true, BuildDungeonPauseInfoMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_ITEM_DUNGEON_MAP,
+                 DUNGEON_ITEMS_CAN_BE_OUTSIDE_DUNGEON(RSK_SHUFFLE_MAPANDCOMPASS) || DungeonInformationEnabled(),
                  BuildMapMessage);
-    COND_ID_HOOK(OnOpenText, TEXT_ITEM_COMPASS, DUNGEON_ITEMS_CAN_BE_OUTSIDE_DUNGEON(RSK_SHUFFLE_MAPANDCOMPASS),
-                 BuildItemMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_ITEM_COMPASS,
+                 DUNGEON_ITEMS_CAN_BE_OUTSIDE_DUNGEON(RSK_SHUFFLE_MAPANDCOMPASS) || DungeonInformationEnabled(),
+                 BuildMapMessage);
     COND_ID_HOOK(OnOpenText, TEXT_ITEM_KEY_BOSS,
                  (DUNGEON_ITEMS_CAN_BE_OUTSIDE_DUNGEON(RSK_BOSS_KEYSANITY) ||
                   DUNGEON_ITEMS_CAN_BE_OUTSIDE_DUNGEON(RSK_GANONS_BOSS_KEY)),
