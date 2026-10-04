@@ -1,7 +1,7 @@
 # Sword GI particle preview
 
 The initial geometry preview below is superseded by the
-[proportion correction](sword-proportions.md). The palette and particle themes
+[user reference image pass](sword-reference-pass.md). The palette and particle themes
 remain current.
 
 The approved particle pass uses the seven exact models supplied in
