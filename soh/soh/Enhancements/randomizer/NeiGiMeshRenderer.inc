@@ -302,3 +302,28 @@ void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const cha
               G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
     CLOSE_DISPS(play->state.gfxCtx);
 }
+
+void NeiGi_DrawSongOverlay(PlayState* play, int song, const char* owner) {
+    if (!play || song < 0 || song >= CW_SONG_COUNT)
+        return;
+    if (song == CW_SONG_STORMS) {
+        NeiGi_DrawSeasonOverlay(play, 6, owner);
+        return;
+    }
+    const auto mesh = NeiGi::SampleSong(song, play->gameplayFrames, NeiGi_CameraBasis(play));
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    if (owner)
+        gSPComboRMPush(POLY_XLU_DISP++, owner);
+    CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawMesh(play, mesh);
+    OPEN_DISPS(play->state.gfxCtx);
+    if (owner)
+        gSPComboRMPop(POLY_XLU_DISP++);
+    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+    gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    CLOSE_DISPS(play->state.gfxCtx);
+}

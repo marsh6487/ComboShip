@@ -6,6 +6,7 @@
 #include "2s2h/Rando/DrawFuncs.h"
 #include "2s2h_assets.h"
 #include "Rando/SpinAttackGi.h"
+#include "ComboSongDrawMM.h"
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "mods/nei_save.h"                     // NeiSaveData chain tiers for progressive get-item draws
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_OOT_SWORD_* registry indices (chain tiers)
@@ -168,101 +169,41 @@ void DrawStrayFairy(RandoItemId randoItemId) {
 }
 
 void DrawSong(RandoItemId randoItemId) {
-    if (randoItemId == RI_SONG_STORMS) {
+    if (!gPlayState)
+        return;
+    const int song = ComboSongForMmItem(randoItemId);
+    if (song == CW_SONG_STORMS) {
         NeiGi_DrawSeasonOverlay(gPlayState, 6, "oot");
         return;
     }
     std::array<uint8_t, 4> color{ 220, 225, 240, 255 };
-    OPEN_DISPS(gPlayState->state.gfxCtx);
-
-    Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
-
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gPlayState->state.gfxCtx);
-
-    switch (randoItemId) {
-        case RI_SONG_SUN:
-            color = { 237, 231, 62, 255 };
-            break;
-        case RI_SONG_DOUBLE_TIME:
-        case RI_SONG_INVERTED_TIME:
-        case RI_SONG_TIME:
-            color = { 98, 177, 211, 255 };
-            break;
-        case RI_SONG_HEALING:
-            color = { 255, 150, 230, 255 };
-            break;
-        case RI_SONG_STORMS:
-            color = { 146, 146, 146, 255 };
-            break;
-        case RI_SONG_SARIA:
-        case RI_SONG_SONATA:
-            color = { 98, 255, 98, 255 };
-            break;
-        case RI_SONG_SOARING:
-            color = { 200, 160, 255, 255 };
-            break;
-        case RI_SONG_ELEGY:
-            color = { 255, 98, 0, 255 };
-            break;
-        case RI_SONG_LULLABY_INTRO:
-            color = { 255, 100, 100, 255 };
-            break;
-        case RI_SONG_LULLABY:
-            color = { 255, 20, 20, 255 };
-            break;
-        case RI_SONG_OATH:
-            color = { 98, 0, 98, 255 };
-            break;
-        case RI_SONG_EPONA:
-            color = { 146, 87, 49, 255 };
-            break;
-        case RI_SONG_NOVA:
-            color = { 20, 20, 255, 255 };
-            break;
-        // Skijer's NEI — OoT (SoH) warp songs. MM renders every song as one note (gGiSongNoteDL) tinted by
-        // env color, so the OoT warp songs reuse that exact note model, tinted to each sage's color.
-        case RI_OOT_SONG_MINUET_OF_FOREST:
-            color = { 98, 255, 98, 255 };
-            break;
-        case RI_OOT_SONG_BOLERO_OF_FIRE:
-            color = { 255, 60, 0, 255 };
-            break;
-        case RI_OOT_SONG_SERENADE_OF_WATER:
-            color = { 85, 180, 223, 255 };
-            break;
-        // Zelda's Lullaby is not a warp song, but it renders the same way; pink, as in OoT's own UI.
-        case RI_OOT_SONG_ZELDAS_LULLABY:
-            color = { 255, 120, 200, 255 };
-            break;
-        case RI_OOT_SONG_REQUIEM_OF_SPIRIT:
-            color = { 222, 158, 47, 255 };
-            break;
-        case RI_OOT_SONG_NOCTURNE_OF_SHADOW:
-            color = { 160, 40, 210, 255 };
-            break;
-        case RI_OOT_SONG_PRELUDE_OF_LIGHT:
-            color = { 237, 231, 62, 255 };
-            break;
-        // Skijer's NEI — the 3 NEI custom songs (no get-item model on the OoT side either); note tinted to
-        // each song's SoH quest-page ring color (soh z_kaleido_collect.c sMmPageSongs ring colors).
-        case RI_OOT_SONG_FUGUE_OF_HOME:
-            color = { 255, 170, 50, 255 }; // amber
-            break;
-        case RI_OOT_SONG_COMMAND_MELODY:
-            color = { 255, 120, 255, 255 }; // magenta
-            break;
-        case RI_OOT_SONG_BALLAD_OF_THE_HERO:
-            color = { 255, 230, 120, 255 }; // gold
-            break;
-        default:
-            break;
+    if (!ComboSongShimmerColor(song, color.data())) {
+        // These NEI songs have separate quest-page colors and no recovered
+        // themed profile. Preserve their established note presentation.
+        switch (randoItemId) {
+            case RI_OOT_SONG_FUGUE_OF_HOME:
+                color = { 255, 170, 50, 255 };
+                break;
+            case RI_OOT_SONG_COMMAND_MELODY:
+                color = { 255, 120, 255, 255 };
+                break;
+            case RI_OOT_SONG_BALLAD_OF_THE_HERO:
+                color = { 255, 230, 120, 255 };
+                break;
+            default:
+                break;
+        }
     }
-
+    OPEN_DISPS(gPlayState->state.gfxCtx);
+    Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gPlayState->state.gfxCtx);
     gDPSetEnvColor(POLY_XLU_DISP++, color[0], color[1], color[2], color[3]);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)&gGiSongNoteDL);
-
     CLOSE_DISPS(gPlayState->state.gfxCtx);
-    ComboDrawMaskShimmer(gPlayState, nullptr, color.data(), "mm");
+    if (song >= 0)
+        NeiGi_DrawSongOverlay(gPlayState, song, nullptr);
+    else
+        ComboDrawMaskShimmer(gPlayState, nullptr, color.data(), "mm");
 }
 
 void DrawDoubleDefense() {

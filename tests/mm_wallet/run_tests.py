@@ -53,6 +53,12 @@ def main():
                         "-Wno-int-conversion", "-Wno-incompatible-pointer-types", "-fsyntax-only",
                         str(ROOT / "mm/src/code/z_parameter.c")], check=True)
         print("PASS real-header syntax: mm/src/code/z_parameter.c")
+        cxx = shlex.split(os.environ.get("CXX", "c++"))
+        subprocess.run([*cxx, "-std=c++20", "-fpermissive", *flags,
+                        "-I" + str(ROOT / "libultraship/src"), "-I" + str(ROOT / "combo/menu"),
+                        "-include", "nlohmann/json.hpp", "-include", str(ROOT / "mm/include/global.h"),
+                        "-fsyntax-only", str(ROOT / "mm/2s2h/Rando/MiscBehavior/TycoonWallet.cpp")], check=True)
+        print("PASS real-header syntax: mm/2s2h/Rando/MiscBehavior/TycoonWallet.cpp")
 
 
 if __name__ == "__main__":

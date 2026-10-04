@@ -33,7 +33,18 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-core-') as td:
         source=Path(td)/'donor-loader.cpp'; source.write_text(donor)
     for name,mode in [('sanitized',['-O1','-g','-fsanitize=undefined','-fno-sanitize-recover=all']),('fast-math',['-O2','-ffast-math'])]:
         binary=str(Path(td)/name)
-        run([os.environ.get('CXX','c++'),'-std=c++20',*flags(), '-include',str(ROOT/'mm/include/z64malloc.h'),
+        objects=[]
+        for i,path in enumerate(['mm/expansions/ssbb/ssbb_character.c','mm/expansions/ssbb/ssbb_skin.c',
+                                 'mm/src/code/z_skin_matrix.c','mm/src/code/z_lib.c']):
+            obj=str(Path(td)/f'{name}-{i}.o')
+            run([os.environ.get('CC','cc'),'-std=gnu11',*flags(),'-include',str(ROOT/'mm/include/z64malloc.h'),
+                 '-include',str(ROOT/'mm/expansions/ssbb/ssbb_anim.h'),
+                 '-include',str(ROOT/'mm/include/functions.h'),'-include',str(ROOT/'mm/include/variables.h'),
+                 '-include',str(ROOT/'libultraship/include/libultraship/bridge/consolevariablebridge.h'),
+                 '-ffunction-sections','-fdata-sections',*mode,'-c',str(ROOT/path),'-o',obj])
+            objects.append(obj)
+        options=['-DMM_WOLF_NATIVE_HANDOFF'] if 'nativeOwnsAction' in source.read_text() else []
+        run([os.environ.get('CXX','c++'),'-std=c++20',*flags(),*options,
              '-DWOLF_IMPLEMENTATION="'+str(source)+'"','-ffunction-sections','-fdata-sections',*mode,
-             str(ROOT/'tests/mm_wolf/core_runtime_test.cpp'),'-Wl,--gc-sections','-o',binary])
+             str(ROOT/'tests/mm_wolf/core_runtime_test.cpp'),*objects,'-Wl,--gc-sections','-o',binary])
         run([binary,td])

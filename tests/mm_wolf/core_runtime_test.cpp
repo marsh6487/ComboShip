@@ -7,13 +7,45 @@
 #include <limits>
 
 static std::string assetDirectory;
-static int registrations;
+static int colliderInitializations, colliderDestructions, attackRegistrations;
+static Collider* lastAttack;
 namespace Ship { std::string Context::LocateFileAcrossAppDirs(const std::string& p, const std::string&) { return p; } }
 extern "C" {
 const char* Nei_AssetDir(void) { return assetDirectory.c_str(); }
 int32_t CVarGetInteger(const char*, int32_t v) { return v; }
 float CVarGetFloat(const char*, float v) { return v; }
-s32 SSBBChar_Register(SSBBCharacterDef*) { return registrations++; }
+SaveContext gSaveContext{};
+static RegEditor registers{};
+RegEditor* gRegEditor = &registers;
+PlayState* gPlayState;
+void* ZeldaArena_Malloc(size_t size) { return std::calloc(1,size); }
+void ZeldaArena_Free(void* p) { std::free(p); }
+s16 sins(u16 a) { return (s16)(std::sin(a * (3.14159265358979323846f / 32768)) * 32767); }
+s16 coss(u16 a) { return (s16)(std::cos(a * (3.14159265358979323846f / 32768)) * 32767); }
+int GameInteractor_InvertControl(int) { return 1; }
+s16 Math_Atan2S_XY(f32 x,f32 y) { return (s16)(std::atan2(y,x) * 32768 / 3.14159265358979323846f); }
+s16 Camera_GetInputDirYaw(Camera*) { return 0; }
+void Player_PlaySfx(Player*,u16) {}
+s32 Collider_InitCylinder(PlayState*,ColliderCylinder* c) { ++colliderInitializations; std::memset(c,0,sizeof(*c)); return 1; }
+s32 Collider_SetCylinder(PlayState*,ColliderCylinder* c,Actor* a,ColliderCylinderInit* i) {
+    c->base.actor=a; c->base.atFlags=i->base.atFlags; c->elem.atDmgInfo.damage=i->elem.atDmgInfo.damage;
+    c->elem.atDmgInfo.dmgFlags=i->elem.atDmgInfo.dmgFlags; c->dim=i->dim; return 1;
+}
+s32 Collider_DestroyCylinder(PlayState*,ColliderCylinder*) { ++colliderDestructions; return 1; }
+s32 CollisionCheck_SetAT(PlayState*,CollisionCheckContext*,Collider* c) { ++attackRegistrations; lastAttack=c; return 1; }
+void ActorShadow_DrawFeet(Actor*,Lights*,PlayState*) {}
+void* Graph_Alloc(GraphicsContext*,size_t) { static Mtx m; return &m; }
+void Graph_OpenDisps(Gfx**,Gfx*,GraphicsContext*,const char*,s32) {}
+void Graph_CloseDisps(Gfx**,Gfx*,GraphicsContext*,const char*,s32) {}
+void Gfx_SetupDL25_Opa(GraphicsContext*) {}
+void Matrix_SetTranslateRotateYXZ(f32,f32,f32,Vec3s*) {}
+void Matrix_Scale(f32,f32,f32,MatrixMode) {}
+Mtx* Matrix_ToMtx(Mtx* m) { return m; }
+void gSPSegment(void*,int,uintptr_t) {}
+void gSPDisplayList(Gfx*,Gfx*) {}
+void FrameInterpolation_RecordOpenChild(const void*,int) {}
+void FrameInterpolation_RecordCloseChild(void) {}
+Gfx gCullBackDList[1];
 }
 static void write32(std::vector<u8>& b, size_t off, u32 v) { std::memcpy(b.data()+off,&v,4); }
 static void write16(std::vector<u8>& b, size_t off, u16 v) { std::memcpy(b.data()+off,&v,2); }
@@ -47,9 +79,9 @@ static bool load(const std::vector<u8>& b) {
     return LoadAssets();
 }
 static void rejected(const char* label, const std::vector<u8>& b) {
-    int before=registrations;
+    int before=sDefIndex;
     if(load(b)) { std::fprintf(stderr,"FAIL malformed Wolf accepted: %s\n",label); std::exit(1); }
-    assert(registrations==before);
+    assert(sDefIndex==before);
 }
 int main(int argc,char** argv) {
     assert(argc==2); assetDirectory=argv[1];
@@ -78,4 +110,68 @@ int main(int argc,char** argv) {
     b=good; write32(b,12+15*4,0xffffffffu); rejected("frame chunk overflow",b);
     b=good; b.pop_back(); rejected("truncated file",b);
     std::puts("PASS production Wolf malformed-bin validation and valid format fixture");
+
+    assert(load(good));
+    PlayState play{}; Player player{}; Camera camera{};
+    gPlayState=&play; play.cameraPtrs[0]=&camera;
+    R_UPDATE_RATE=3;
+    player.actor.bgCheckFlags=BGCHECKFLAG_GROUND;
+    player.actor.world.pos={100,20,300};
+    player.actor.shape.shadowDraw=ActorShadow_DrawFeet;
+    player.cylinder.dim.radius=12; player.cylinder.dim.height=50; player.cylinder.dim.yShift=2;
+    assert(WolfLinkForm_LoadSkeleton(&play));
+    assert(sWolf.initialized && sSkin.vtxBuf[0] && sSkin.vtxBuf[1]);
+    bool nativeOwnsAction=false;
+    auto tick=[&] {
+#ifdef MM_WOLF_NATIVE_HANDOFF
+        WolfLinkForm_Update(&player,&play,&play.state.input[0],nativeOwnsAction);
+#else
+        WolfLinkForm_Update(&player,&play);
+#endif
+        ++play.gameplayFrames;
+    };
+    play.state.input[0].press.button=BTN_B;
+    tick(); assert(sWolf.proc==PROC_WOLF_WAIT_ATTACK && sWolf.procOwnsPlayer);
+    play.state.input[0].press.button=0;
+    const int beforeAttacks=attackRegistrations;
+    for(int i=0;i<7;++i) tick();
+    assert(attackRegistrations>beforeAttacks && lastAttack==&sWolf.atCyl.base);
+    assert(sWolf.atCyl.elem.atDmgInfo.damage==2 && sWolf.atCyl.elem.atDmgInfo.dmgFlags==DMG_SLASH);
+    sWolf.atCyl.base.atFlags|=AT_BOUNCED;
+    tick(); assert(sWolf.proc==PROC_WOLF_ATTACK_REVERSE && player.actor.velocity.y>0);
+    ProcMoveInit(&player); ResetCombo(); player.actor.bgCheckFlags=BGCHECKFLAG_GROUND;
+    player.actor.velocity.y=0; player.speedXZ=6; sWolf.wasOnGround=1;
+    play.state.input[0].rel.stick_y=60; play.state.input[0].press.button=BTN_A;
+    tick(); assert(sWolf.proc==PROC_WOLF_DASH && player.speedXZ>6 && sWolf.dashModeTimer>0);
+    play.state.input[0].press.button=0;
+    sWolf.character.curFrame=4; player.actor.bgCheckFlags|=BGCHECKFLAG_WALL;
+    tick(); assert(sWolf.proc==PROC_WOLF_DASH_REVERSE && player.speedXZ<0);
+    ProcMoveInit(&player); ResetCombo(); sWolf.dashModeTimer=0;
+    player.actor.bgCheckFlags=BGCHECKFLAG_GROUND; play.state.input[0].rel.stick_y=0;
+    // Native MM freeze/thaw can own the action even after invincibility expires.
+    player.stateFlags1=PLAYER_STATE1_4000000; player.invincibilityTimer=0;
+    player.speedXZ=-4; player.actor.velocity.y=2; player.actor.colChkInfo.damage=6;
+    play.state.input[0].press.button=BTN_B;
+    tick();
+    if(sWolf.procOwnsPlayer || sWolf.atActive || (player.stateFlags3 & PLAYER_STATE3_4)) {
+        std::fputs("FAIL Wolf stole native MM damage/freeze action after invincibility expired\n",stderr); return 1;
+    }
+    assert(player.speedXZ==-4 && player.actor.velocity.y==2 && player.actor.colChkInfo.damage==6);
+    player.stateFlags1=0; nativeOwnsAction=true;
+    tick(); assert(!sWolf.procOwnsPlayer && !sWolf.atActive && player.speedXZ==-4);
+    // Host can hand freeze/thaw action ownership to MM even with the generic damaged flag cleared.
+    nativeOwnsAction=false; ProcMoveInit(&player); player.speedXZ=0;
+    tick(); assert(sWolf.procOwnsPlayer);
+    const int beforeDestroy=colliderDestructions;
+#ifdef MM_WOLF_NATIVE_HANDOFF
+    WolfLinkForm_Cleanup(&player,&play);
+#else
+    WolfLinkForm_Cleanup();
+#endif
+    if((player.stateFlags3&PLAYER_STATE3_4) || colliderDestructions!=beforeDestroy+1) {
+        std::fputs("FAIL Wolf cleanup retained action ownership or attack collider\n",stderr); return 1;
+    }
+    assert(player.cylinder.dim.radius==12 && player.cylinder.dim.height==50 && player.cylinder.dim.yShift==2);
+    assert(player.actor.shape.shadowDraw==ActorShadow_DrawFeet && !sWolf.initialized);
+    std::puts("PASS production Wolf bite/attack window/MM damage flags/bounce/dash/wall rebound/native damage ownership");
 }

@@ -107,7 +107,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
         if name == "nei_gi/presentation" and "--combo" in sys.argv:
             mm_source = (ROOT / "mm/2s2h/Rando/NeiGiPresentation.cpp").read_text()
             mm_functions = functions(mm_source)
-            renderer = mm_functions["HasMmLegacyGiMod"] + "\n" + mm_functions["MM_DrawNeiGi"] + "\n" + mm_functions["MM_DescribeNeiGi"] + "\n" + mm_functions["MM_TryDrawNeiGi"]
+            renderer = functions((ROOT / "mm/2s2h/Rando/DrawItem.cpp").read_text())["DrawSong"] + "\n" + mm_functions["HasMmLegacyGiMod"] + "\n" + mm_functions["MM_DrawNeiGi"] + "\n" + mm_functions["MM_DescribeNeiGi"] + "\n" + mm_functions["MM_TryDrawNeiGi"]
             # MM's item enum and binding table are copied verbatim so origin
             # selection is exercised without importing the unrelated MM engine.
             mm_types = (ROOT / "mm/2s2h/Rando/Types.h").read_text()
@@ -177,7 +177,7 @@ void ComboDrawSpinAttackGi(PlayState*, const char*, const char*, float, const ui
     ++foreignFallbackCalls;
 }
 """
-            tested_bridge = (shim + route + "\n" + item_enum + "\n" + bindings + "\n" + fallback_class + "\n" +
+            tested_bridge = (shim + route + "\n" + item_enum + "\n#include \"ComboSongDrawMM.h\"\n" + bindings + "\n" + fallback_class + "\n" +
                              renderer + "\n" + fallback + "\n" + foreign_info + "\n" +
                              foreign_shim + foreign_draw + "\n" + foreign_wrapper + "\n" + foreign_shop)
             candidate = source.read_text().replace("int main() {", tested_bridge + "\nint main() {", 1)

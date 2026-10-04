@@ -36,7 +36,9 @@
 #include "macros.h"
 #include "functions.h"
 #include "variables.h"
+extern "C" {
 #include "z64malloc.h"
+}
 #include "mods/nei_oot_compat.h"
 #include "mods/transformation_masks/wolf_link_form.h"
 #include "soh/frame_interpolation.h"
@@ -274,6 +276,9 @@ struct WolfRuntime {
     u8 wasOnGround = 1;
     u8 prevInvincible = 0;
 
+    Player* owner = nullptr;
+    ActorShadowFunc savedShadow = nullptr;
+    Cylinder16 savedCylinder{};
     ColliderCylinder atCyl;
     u8 atCylInit = 0;
     u8 atActive = 0;
@@ -797,9 +802,10 @@ struct WolfInput {
     u8 blocked = 0;
 };
 
-static WolfInput ReadInput(Player* player, PlayState* play) {
+static WolfInput ReadInput(Player* player, PlayState* play, const Input* source) {
     WolfInput in;
-    Input* input = &play->state.input[0];
+    Input inputCopy = source ? *source : Input{};
+    Input* input = &inputCopy;
     Lib_GetControlStickData(&in.stickMag, &in.stickWorldYaw, input);
     in.stickWorldYaw = (s16)(Camera_GetInputDirYaw(GET_ACTIVE_CAM(play)) + in.stickWorldYaw);
     in.aPress = CHECK_BTN_ALL(input->press.button, BTN_A) != 0;
@@ -1524,7 +1530,10 @@ extern "C" f32 WolfLinkForm_SpeedMultiplier(void) {
 }
 
 extern "C" u8 WolfLinkForm_LoadSkeleton(PlayState* play) {
-    std::memset(&sWolf, 0, sizeof(sWolf));
+    if (sWolf.initialized) {
+        return 1;
+    }
+    sWolf = WolfRuntime{};
     for (s32& index : sWolf.animIndex) {
         index = -1;
     }
@@ -1536,10 +1545,14 @@ extern "C" u8 WolfLinkForm_LoadSkeleton(PlayState* play) {
     sSkin.materialDL = sMaterialDl.data();
 
     SSBBChar_Init(&sWolf.character, sDefIndex, play);
+    if (!sWolf.character.initialized || !sWolf.character.jointTable || !sSkin.vtxBuf[0] || !sSkin.vtxBuf[1]) {
+        WolfLinkForm_Cleanup(nullptr, play);
+        return 0;
+    }
     for (s32 i = 0; i < WANM_COUNT; ++i) {
         sWolf.animIndex[i] = FindAnim(kAnimNames[i]);
         if (sWolf.animIndex[i] < 0) {
-            WolfLinkForm_Cleanup();
+            WolfLinkForm_Cleanup(nullptr, play);
             return 0;
         }
     }
@@ -1550,28 +1563,75 @@ extern "C" u8 WolfLinkForm_LoadSkeleton(PlayState* play) {
     return 1;
 }
 
-extern "C" void WolfLinkForm_Cleanup(void) {
-    if (sWolf.character.def && sWolf.character.def->skinMesh) {
-        SSBBSkin_Destroy(sWolf.character.def->skinMesh);
-    }
-    if (sWolf.character.jointTable) {
-        ZELDA_ARENA_FREE_DEBUG(sWolf.character.jointTable);
-        sWolf.character.jointTable = nullptr;
-    }
-    sWolf.initialized = 0;
-    sWolf.procOwnsPlayer = 0;
-    sWolf.atActive = 0;
-    // Hand the shadow back to OoT (MmForm_UpdateActive re-asserts DrawFeet for
-    // other forms; vanilla Link needs it restored here).
-    if (gPlayState != NULL && GET_PLAYER(gPlayState) != NULL) {
-        GET_PLAYER(gPlayState)->actor.shape.shadowDraw = ActorShadow_DrawFeet;
+extern "C" u8 WolfLinkForm_IsReady(void) {
+    return sWolf.initialized;
+}
+
+extern "C" u8 WolfLinkForm_OwnsPlayerAction(void) {
+    return sWolf.initialized && sWolf.procOwnsPlayer;
+}
+
+extern "C" void WolfLinkForm_ReleaseAction(Player* player) {
+    if (sWolf.initialized && player == sWolf.owner) {
+        ProcMoveInit(player);
+        ResetCombo();
+        sWolf.dashModeTimer = 0;
+        if (sWolf.atCylInit)
+            sWolf.atCyl.base.atFlags = AT_NONE;
     }
 }
 
-extern "C" void WolfLinkForm_Update(Player* player, PlayState* play) {
+extern "C" void WolfLinkForm_ApplyCollisionShape(Player* player) {
+    if (!sWolf.initialized || player != sWolf.owner)
+        return;
+    f32 scale = RenderScale();
+    player->cylinder.dim.radius = (s16)std::max(12.0f, 40.0f * scale);
+    player->cylinder.dim.height = (s16)std::max(20.0f, 100.0f * scale);
+    player->cylinder.dim.yShift = 0;
+}
+
+extern "C" void WolfLinkForm_Cleanup(Player* player, PlayState* play) {
+    if (player && player == sWolf.owner) {
+        Release(player);
+        player->actor.shape.shadowDraw = sWolf.savedShadow;
+        player->cylinder.dim = sWolf.savedCylinder;
+    }
+    if (sWolf.atCylInit) {
+        sWolf.atCyl.base.atFlags = AT_NONE;
+        // A mask/teardown can occur after this frame's AT submission. Remove the owned
+        // cylinder without disturbing native or other custom-form colliders.
+        if (play) {
+            for (s32 i = 0; i < play->colChkCtx.colATCount;) {
+                if (play->colChkCtx.colAT[i] == &sWolf.atCyl.base) {
+                    --play->colChkCtx.colATCount;
+                    for (s32 j = i; j < play->colChkCtx.colATCount; ++j)
+                        play->colChkCtx.colAT[j] = play->colChkCtx.colAT[j + 1];
+                } else {
+                    ++i;
+                }
+            }
+        }
+        Collider_DestroyCylinder(play, &sWolf.atCyl);
+    }
+    if (sWolf.character.def && sWolf.character.def->skinMesh)
+        SSBBSkin_Destroy(sWolf.character.def->skinMesh);
+    if (sWolf.character.jointTable)
+        ZELDA_ARENA_FREE_DEBUG(sWolf.character.jointTable);
+    sWolf = WolfRuntime{};
+    sSelected = 0;
+}
+
+extern "C" void WolfLinkForm_Update(Player* player, PlayState* play, const Input* input, u8 nativeOwnsAction) {
     if (!sWolf.initialized || !sWolf.character.ssbbAnim) {
         return;
     }
+    if (!sWolf.owner) {
+        sWolf.owner = player;
+        sWolf.savedCylinder = player->cylinder.dim;
+        sWolf.savedShadow = player->actor.shape.shadowDraw;
+    }
+    if (player != sWolf.owner)
+        return;
     // ── body / collider shape (wolf is long and low) ──
     f32 s = RenderScale();
     for (s32 i = 0; i < PLAYER_BODYPART_MAX; ++i) {
@@ -1581,7 +1641,9 @@ extern "C" void WolfLinkForm_Update(Player* player, PlayState* play) {
     player->bodyPartsPos[PLAYER_BODYPART_L_FOOT].y = player->actor.world.pos.y;
     player->bodyPartsPos[PLAYER_BODYPART_R_FOOT].y = player->actor.world.pos.y;
     player->bodyPartsPos[PLAYER_BODYPART_HEAD].y = player->actor.world.pos.y + 110.0f * s;
-    // feet = front paws (last draw); the hind pair is handled by DrawShadow
+    SSBBSkin_ComputePose(&sWolf.character);
+    player->actor.focus.pos = player->bodyPartsPos[PLAYER_BODYPART_HEAD];
+    // feet = front paws of this instance; the hind pair is handled by DrawShadow
     if (!PawWorldPos(player, 0, &player->actor.shape.feetPos[0]) ||
         !PawWorldPos(player, 1, &player->actor.shape.feetPos[1])) {
         player->actor.shape.feetPos[0] = player->actor.world.pos;
@@ -1592,7 +1654,7 @@ extern "C" void WolfLinkForm_Update(Player* player, PlayState* play) {
     player->cylinder.dim.height = (s16)std::max(20.0f, 100.0f * s);
     player->cylinder.dim.yShift = 0;
 
-    WolfInput in = ReadInput(player, play);
+    WolfInput in = ReadInput(player, play, input);
 
     // timers
     if (sWolf.dashModeTimer > 0) {
@@ -1611,16 +1673,26 @@ extern "C" void WolfLinkForm_Update(Player* player, PlayState* play) {
         }
     }
 
-    // OoT's damage action fired (knockback / invincibility started): show the hurt pose
-    u8 invincible = player->invincibilityTimer > 0;
-    if (invincible && !sWolf.prevInvincible && sWolf.proc != PROC_WOLF_DAMAGE) {
-        ProcDamageInit(player);
+    // Native MM owns the full damage/freeze/thaw sequence. Invincibility alone is
+    // not an ownership signal: thaw may outlast it, and item invulnerability is not damage.
+    if (nativeOwnsAction || (player->stateFlags1 & PLAYER_STATE1_4000000)) {
+        if (sWolf.proc != PROC_WOLF_DAMAGE)
+            ProcDamageInit(player);
+        Release(player);
+        if (sWolf.atCylInit)
+            sWolf.atCyl.base.atFlags = AT_NONE;
+        AdvanceAnim();
+        return;
     }
-    sWolf.prevInvincible = invincible;
-
-    if (in.blocked && sWolf.procOwnsPlayer) {
-        // a cutscene / dialogue / water took the player: drop the owned proc
+    // Show a hurt pose when MM has already installed a new damage action.
+    if (sWolf.proc == PROC_WOLF_DAMAGE)
         ProcMoveInit(player);
+
+    if (in.blocked) {
+        WolfLinkForm_ReleaseAction(player);
+        SetLoopAnim(WANM_WAIT, kNopIdleAnmSpeed);
+        AdvanceAnim();
+        return;
     }
 
     switch (sWolf.proc) {

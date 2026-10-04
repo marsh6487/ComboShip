@@ -9,6 +9,7 @@ The historical final candidate disappeared from the transient workspace. The sup
 | `c54ca14d3555324731412c35a0242e5dd334afcc` | Exact recovered headers and accepted reconstruction plan | Remote tree `34ea8dc7c7a5c4ccd49ce13c42fc4622eb58004d` equals the local tree; fetched branch verified | Reconstruct gameplay implementations and fresh tests |
 | `3f6ed4d42d7cb759ee1bb5f06cd97d3af4388fdf` | Tested skin, yellow magic and independent shimmer sections; checkpoint instructions | Remote tree `7068c516dd6b5488407ce7b91f25d86cc97cf1ab` equals the local tested tree; fetched branch verified | Wallet/editor, Wolf core/host, GI fitting/song effects, remaining receipts/icons and combined review/builds |
 | `6d5902fb8ada8dd8b5ce9fedec4a1fa6e93a07c9` | Safe wallet digits and descriptive localized MM songs | Remote tree `e4f335a0d6e1b3288b904ec6f058e621274083d3` equals the local tested tree; fetched branch verified | Editor, Wolf core/host, remaining GI/text presentation and combined review/builds |
+| `9d4886c54847b0eb267a8985d99bd55140011170` | Wolf loader, GI fit, traditional/exact-color receipts, Pikachu compatibility and WIP editor fixture | Remote tree `9e03696c4aa44929e0516d04360a4fa4f72a2b8c` equals local tree; fetched branch verified | Host/editor implementation, final presentation, review and builds |
 
 ## MM skin section
 
@@ -26,11 +27,14 @@ Local worker commit `12d055506bbdb49280cd30e8502672b9a10e91e7` adds opt-in root 
 - Exact boss-soul name RGB is applied by both Latin text renderers only in recognized localized Soul-name spans. `python3 -B scripts/diagnostics/run_receipt_soul_color_tests.py` passed five souls across EN/DE/FR, wrapped/malformed/page/unknown cases, ordinary palette and red Goht Remains, plus both real textbox translation-unit syntax checks.
 - Independent review found an existing Pikachu metadata layout with 48 skeleton nodes and 47 weighted bones. The strict equality guard was corrected. A fixture now links the actual generated Pikachu mesh/skeleton/registration and passes production draw submission, legacy shared scale and bounded pose queries. `run_skin_tests.py` passed again after the fix; review follow-up is in progress.
 
-## Editor fixture in progress
+## Newly verified sections
 
-The production grant fixture in `tests/mm_editor` is checkpointed as work in progress. The editor implementation is still being reconstructed; this fixture is not yet included in the combined passing gate. It exercises real catalog/FC/grant/flag handlers through headless engine boundaries so the missing Slate/Hourglass/Crystal/Seasons grants can be reproduced before changes.
+- MM editor grants now enumerate the live NEI/EXT item table and use production grants for all four canonical slots, powers, seasons and cane/wand variants. `python3 -B tests/mm_editor/run_tests.py` passed actual catalog/FC/grant/flag behavior, ordinary inventory byte preservation, three wand rules, repeat safety, partial cane and Roc Cape cases, plus real SaveEditor/GiveItem translation-unit syntax. The previously WIP fixture is now green.
+- Wolf combat keeps native MM damage and freeze actions authoritative and releases attack ownership. `run_core_tests.py` passed native damage flags, freeze with zero invincibility, bounce, dash/wall rebound and cleanup in UBSan and fast-math modes. Host activation is still being integrated.
+- Themed song geometry includes actual Soaring feather vanes/rachises. `run_song_gi_tests.py` passed all 24 profiles, native/imported mappings, early MM dispatcher and wraparound frame cases.
+- The skin fixture's actual graphics arena now initializes both head and tail pointers. The null-tail regression reproduced under UBSan and was corrected. `run_skin_tests.py` now passes ASan/UBSan/bounds for synthetic and actual Pikachu data; leak detection alone is disabled for the runner's process-inspection restriction.
 
-This is a partial reconstruction checkpoint. Wolf host/combat integration, editor grants, song effects/standalone sword orientation, clef and Ikana icon handling, combined review and complete Windows/Linux builds remain in progress. In-game acceptance is not claimed.
+This is a partial reconstruction checkpoint. Wolf host integration, standalone sword/mod presentation, clef and Ikana icon handling, final editor binding/pool checks, combined review and complete Windows/Linux builds remain in progress. In-game acceptance is not claimed.
 
 ## Resume
 

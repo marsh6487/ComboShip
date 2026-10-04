@@ -87,7 +87,7 @@ def main():
         (build / "editor_production.inc").write_text(production)
         binary = build / "editor_grant_test"
         cxx = shlex.split(os.environ.get("CXX", "c++"))
-        subprocess.run([*cxx, "-std=c++20", "-fpermissive", "-O1", "-g",
+        subprocess.run([*cxx, "-std=c++20", "-fpermissive", "-O0", "-g",
                         "-fsanitize=address,undefined,bounds", "-fno-sanitize-recover=all",
                         *flags(), "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
                         "-I" + str(build), "-include", "nlohmann/json.hpp",
@@ -95,6 +95,17 @@ def main():
                         str(ROOT / "tests/mm_editor/grant_test.cpp"), "-o", str(binary)], check=True)
         environment = {**os.environ, "ASAN_OPTIONS": os.environ.get("ASAN_OPTIONS", "") + ":detect_leaks=0"}
         subprocess.run([str(binary)], check=True, env=environment)
+        native_flags = ["-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
+                        "-DNON_EQUIVALENT", "-DNON_MATCHING"]
+        native_flags += ["-I" + str(ROOT / p) for p in
+                         ("mm/include", "mm/include/PR", "mm/src", "mm", "mm/2s2h", "mm/assets",
+                          "libultraship/include", "libultraship/src", "combo", "combo/menu")]
+        for path in ["mm/2s2h/DeveloperTools/SaveEditor.cpp", "mm/2s2h/Rando/GiveItem.cpp"]:
+            subprocess.run([*cxx, "-std=c++20", "-fpermissive", *native_flags,
+                            "-include", "nlohmann/json.hpp", "-include", str(ROOT / "mm/include/global.h"),
+                            "-include", "spdlog/spdlog.h", "-include", "ship/Context.h", "-fsyntax-only",
+                            str(ROOT / path)], check=True)
+            print("PASS real-header syntax: " + path)
 
 
 if __name__ == "__main__":

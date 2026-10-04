@@ -44,8 +44,8 @@ for (const auto& origin : {std::pair{mmKokiri, 0xA46CFFu}, std::pair{ootKokiri, 
 Reset();
 
 // Legacy fallback keeps each sword's shimmer palette when authored resources
-// are missing. Standard swords retain their mandatory shimmer; Four Sword
-// follows the optional toggle and has no intrinsic particles in this route.
+// are missing. Every sword, including Four Sword, retains its mandatory
+// identity shimmer and has no authored intrinsic particles in this route.
 for (const auto& sword : {
     std::pair{RI_SWORD_KOKIRI, Kind::MmKokiriSword},
     std::pair{RI_SWORD_RAZOR, Kind::RazorSword},
@@ -62,7 +62,7 @@ for (const auto& sword : {
             MM_NeiGiFallbackShimmer fallbackShimmer(sword.first);
             Matrix_Scale(7, 7, 7, MTXMODE_APPLY); // Original model mutates its own pose.
         }
-        const bool active = sword.first != RI_OOT_EXT_FOUR_SWORD || optionalEffects;
+        const bool active = true;
         assert(arena.size() == (active ? 1 : 0));
         assert(stack.empty() && interpolation == 0 && loads == 0);
         if (active) {

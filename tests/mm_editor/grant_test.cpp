@@ -1,6 +1,8 @@
 #include "2s2h/Rando/Rando.h"
+extern "C" {
 #include "mods/extended_inventory.h"
 #include "mods/extended_equipment.h"
+}
 #include "mods/extended_player.h"
 #include "mods/items/logic/item_cane_of_somaria.h"
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h"
@@ -23,22 +25,40 @@ int wandRule = WAND_RANDO_MEDALLIONS;
 int notifications = 0;
 int sharedObtained = 0;
 bool Rando::gComboDormantGive = false;
+extern "C" void ItemGrantAudit_Begin(const char*, int, int, int) {}
+extern "C" void ItemGrantAudit_End(void) {}
+void ExtInv_SetOotSlotItem(int, u8) { REQUIRE(false); }
+u8 ExtInv_GetOotSlotItem(int) {
+    REQUIRE(false);
+    return ITEM_NONE;
+}
+extern "C" s32 TradeAdult_OwnedCount(void) {
+    REQUIRE(false);
+    return 0;
+}
+extern "C" u8 TradeAdult_CellItem(void) {
+    REQUIRE(false);
+    return ITEM_NONE;
+}
 
 extern "C" void FleetShared_OnNativeObtained(int) { ++sharedObtained; }
 int32_t CVarGetInteger(const char* name, int32_t defaultValue) {
-    if (strcmp(name, "gRando.Options.RO_ELEMENTAL_WAND_SHUFFLE") == 0) return wandRule;
+    if (strcmp(name, "gRando.Options.RO_ELEMENTAL_WAND_SHUFFLE") == 0)
+        return wandRule;
     return defaultValue;
 }
 namespace Notification {
-struct Options { std::string prefix, message, suffix; };
+struct Options {
+    std::string prefix, message, suffix;
+};
 void Emit(Options) { ++notifications; }
-}
+} // namespace Notification
 namespace Rando::MiscBehavior {
 std::string BankRewardSourceSuffix(RandoCheckId) { return ""; }
-}
+} // namespace Rando::MiscBehavior
 namespace Rando::StaticData {
 std::string GetItemName(RandoItemId item, bool, RandoCheckId, bool) { return Items.at(item).name; }
-}
+} // namespace Rando::StaticData
 
 #include "editor_production.inc"
 
@@ -49,7 +69,8 @@ static void reset() {
     gRandoPickupSerial = 0;
     // Ordinary inventory, bottles, masks, currency and upgrades must survive grants.
     auto& native = gSaveContext.save.saveInfo;
-    for (int i = 0; i < 48; ++i) native.inventory.items[i] = (u8)(i + 1);
+    for (int i = 0; i < 48; ++i)
+        native.inventory.items[i] = (u8)(i + 1);
     native.inventory.items[SLOT_BOTTLE_1] = ITEM_MUSHROOM;
     native.inventory.items[SLOT_BOTTLE_2] = ITEM_FISH;
     native.inventory.upgrades = 0x123456;
@@ -71,10 +92,13 @@ int main() {
         REQUIRE(nei->seasonsOwned == 0x0F);
         REQUIRE(nei->caneSkills == 0x3F);
         REQUIRE(nei->wandRodsOwned == 0x3F);
-        for (u8 mode = 0; mode < 6; ++mode) REQUIRE(Wand_ModeOwned(mode));
+        for (u8 mode = 0; mode < 6; ++mode)
+            REQUIRE(Wand_ModeOwned(mode));
         REQUIRE(nei->shovelOwned && nei->dominionOwned && nei->bombArrowsOwned);
         REQUIRE(nei->pokeballOwned && nei->marioMaskOwned && nei->capeOwned);
         REQUIRE(Nei_GetOwnedItem(SLOT_ROCS) == ITEM_ROCS_CAPE);
+        for (const auto id : NeiEditor::Catalog())
+            REQUIRE(NeiEditor::IsOwned(id));
         REQUIRE(memcmp(&nativeBefore, &gSaveContext.save.saveInfo, sizeof(nativeBefore)) == 0);
 
         // An already-complete grant must not recount FC items, send new notifications,
@@ -89,13 +113,18 @@ int main() {
         REQUIRE(sharedObtained == countBefore && gRandoPickupSerial == serialBefore);
         REQUIRE(memcmp(&nativeBefore, &gSaveContext.save.saveInfo, sizeof(nativeBefore)) == 0);
     }
-    puts("PASS grant-all: current NEI handlers, four canonical slots, all powers/seasons/cane/wand rules, ordinary inventory and repeat safety");
+    puts("PASS grant-all: current NEI handlers, four canonical slots, all powers/seasons/cane/wand rules, ordinary "
+         "inventory and repeat safety");
 #if __has_include("2s2h/DeveloperTools/NeiEditorItems.h")
-    const struct { RandoItemId id; u8 slot; u16 item; } individual[] = {
-        { RI_OOT_NEI_SHEIKAH_SLATE, 39, EXT_ITEM_SHEIKAH_SLATE },
-        { RI_OOT_NEI_PHANTOM_HOURGLASS, 41, EXT_ITEM_PHANTOM_HOURGLASS },
-        { RI_OOT_NEI_SHADOW_CRYSTAL, 44, EXT_ITEM_SHADOW_CRYSTAL },
-        { RI_OOT_NEI_ROD_OF_SEASONS, 47, EXT_ITEM_ROD_OF_SEASONS },
+    const struct {
+        RandoItemId id;
+        u8 slot;
+        u16 item;
+    } individual[] = {
+        {RI_OOT_NEI_SHEIKAH_SLATE, 39, EXT_ITEM_SHEIKAH_SLATE},
+        {RI_OOT_NEI_PHANTOM_HOURGLASS, 41, EXT_ITEM_PHANTOM_HOURGLASS},
+        {RI_OOT_NEI_SHADOW_CRYSTAL, 44, EXT_ITEM_SHADOW_CRYSTAL},
+        {RI_OOT_NEI_ROD_OF_SEASONS, 47, EXT_ITEM_ROD_OF_SEASONS},
     };
     for (const auto& item : individual) {
         reset();
@@ -119,19 +148,25 @@ int main() {
     REQUIRE(Nei_GetOwnedItem(SLOT_FIRE_ROD) == ITEM_ROD_FIRE);
     REQUIRE(Nei_GetOwnedItem(41) == ITEM_NONE);
     REQUIRE(RI_OOT_NEI_HYLIAS_GRACE == 194 && RI_OOT_NEI_FIRE_ROD == 192);
-    puts("PASS individual canonical grants route through real randomizer recording; duplicates, ordinary/retired identities are ignored");
+    puts("PASS individual canonical grants route through real randomizer recording; duplicates, ordinary/retired "
+         "identities are ignored");
 
     // Any power can be the first grant and must also provide its usable host item.
-    const RandoItemId runes[] = { RI_OOT_NEI_DESIRE_SENSOR, RI_OOT_NEI_SLATE_RUNE_BOMB,
-        RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE, RI_OOT_NEI_SLATE_RUNE_STASIS, RI_OOT_NEI_SLATE_RUNE_CRYONIS };
-    for (u8 rune = 0; rune < 5; ++rune) {
+    const struct {
+        RandoItemId id;
+        u8 mask;
+    } runes[] = {
+        {RI_OOT_NEI_DESIRE_SENSOR, 16},    {RI_OOT_NEI_SLATE_RUNE_BOMB, 1},    {RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE, 8},
+        {RI_OOT_NEI_SLATE_RUNE_STASIS, 2}, {RI_OOT_NEI_SLATE_RUNE_CRYONIS, 4},
+    };
+    for (const auto& rune : runes) {
         reset();
-        REQUIRE(NeiEditor::Grant(runes[rune]));
+        REQUIRE(NeiEditor::Grant(rune.id));
         REQUIRE(Nei_GetOwnedItem(39) == EXT_ITEM_SHEIKAH_SLATE);
-        REQUIRE(Nei_Save()->slateRunesOwned == (1u << rune));
+        REQUIRE(Nei_Save()->slateRunesOwned == rune.mask);
     }
-    const RandoItemId seasons[] = { RI_OOT_NEI_SEASON_SPRING, RI_OOT_NEI_SEASON_SUMMER,
-        RI_OOT_NEI_SEASON_AUTUMN, RI_OOT_NEI_SEASON_WINTER };
+    const RandoItemId seasons[] = {RI_OOT_NEI_SEASON_SPRING, RI_OOT_NEI_SEASON_SUMMER, RI_OOT_NEI_SEASON_AUTUMN,
+                                   RI_OOT_NEI_SEASON_WINTER};
     for (u8 season = 0; season < 4; ++season) {
         reset();
         REQUIRE(NeiEditor::Grant(seasons[season]));

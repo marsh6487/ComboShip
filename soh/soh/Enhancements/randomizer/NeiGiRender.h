@@ -2,6 +2,7 @@
 
 #include "NeiGiEffectPolicy.h"
 #include "NeiGiFrameFit.h"
+#include "NeiGiSongEffectPolicy.h"
 #include "z64.h"
 namespace NeiGi {
 // Private RGBA32 resources use a 32x32 logical tile; resource metadata owns

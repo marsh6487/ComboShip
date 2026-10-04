@@ -3,6 +3,7 @@
 #include "variables.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "ComboResolve.h"
+#include "ComboSongDrawMM.h"
 #include <algorithm>
 #include <cstring>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -252,9 +253,17 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
     return true;
 }
 
+void DrawSong(RandoItemId item);
+
 bool MM_TryDrawNeiGi(RandoItemId item) {
     if (!gPlayState)
         return false;
+    // Resolve song identity before the shared draw table, whose aliases can
+    // otherwise route imported/native songs through an unrelated note drawer.
+    if (ComboSongForMmItem(item) >= 0) {
+        DrawSong(item);
+        return true;
+    }
     CwItemDrawInfo info{};
     if (!MM_DescribeNeiGi(item, &info))
         return false;

@@ -3,7 +3,7 @@
 #include "NeiGiEnergyTexture.h"
 #include "NeiGiRender.h"
 #include "NeiGiShopFit.h"
-#include "ComboSongDraw.h"
+#include "ComboSongDrawOOT.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
 #include <algorithm>
 #include <cstring>
@@ -564,42 +564,40 @@ const Presentation* FindPresentation(const GetItemEntry* entry) {
 int SongForEntry(const GetItemEntry* entry) {
     if (!entry)
         return -1;
-    if (entry->gid == GID_SONG_STORM)
-        return CW_SONG_STORMS;
-    if (entry->tableId != TABLE_RANDOMIZER)
-        return -1;
-    switch (entry->drawItemId) {
-        case RG_MM_SONG_DOUBLE_TIME:
-            return CW_SONG_DOUBLE_TIME;
-        case RG_MM_SONG_ELEGY:
-            return CW_SONG_ELEGY;
-        case RG_MM_SONG_EPONA:
-            return CW_SONG_EPONA;
-        case RG_MM_SONG_HEALING:
-            return CW_SONG_HEALING;
-        case RG_MM_SONG_INVERTED_TIME:
-            return CW_SONG_INVERTED_TIME;
-        case RG_MM_SONG_LULLABY_PROGRESSIVE:
-        case RG_MM_SONG_LULLABY_INTRO:
+    if (entry->tableId == TABLE_RANDOMIZER) {
+        if (entry->drawItemId == RG_MM_SONG_LULLABY_PROGRESSIVE)
             return CW_SONG_LULLABY_INTRO;
-        case RG_MM_SONG_LULLABY:
-            return CW_SONG_LULLABY;
-        case RG_MM_SONG_NOVA:
-            return CW_SONG_NOVA;
-        case RG_MM_SONG_OATH:
-            return CW_SONG_OATH;
-        case RG_MM_SONG_SARIA:
-            return CW_SONG_SARIA;
-        case RG_MM_SONG_SOARING:
-            return CW_SONG_SOARING;
-        case RG_MM_SONG_SONATA:
-            return CW_SONG_SONATA;
-        case RG_MM_SONG_STORMS:
-            return CW_SONG_STORMS;
-        case RG_MM_SONG_SUN:
+        const int song = ComboSongForOotItem(entry->drawItemId);
+        if (song >= 0)
+            return song;
+    }
+    // Native table calls retain unambiguous note identities. Imported aliases
+    // above take priority over their deliberately shared native GIDs.
+    switch (entry->gid) {
+        case GID_SONG_MINUET:
+            return CW_SONG_OOT_MINUET;
+        case GID_SONG_BOLERO:
+            return CW_SONG_OOT_BOLERO;
+        case GID_SONG_SERENADE:
+            return CW_SONG_OOT_SERENADE;
+        case GID_SONG_REQUIEM:
+            return CW_SONG_OOT_REQUIEM;
+        case GID_SONG_NOCTURNE:
+            return CW_SONG_OOT_NOCTURNE;
+        case GID_SONG_PRELUDE:
+            return CW_SONG_OOT_PRELUDE;
+        case GID_SONG_ZELDA:
+            return CW_SONG_OOT_ZELDA;
+        case GID_SONG_EPONA:
+            return CW_SONG_OOT_EPONA;
+        case GID_SONG_SARIA:
+            return CW_SONG_OOT_SARIA;
+        case GID_SONG_SUN:
             return CW_SONG_SUN;
-        case RG_MM_SONG_TIME:
+        case GID_SONG_TIME:
             return CW_SONG_TIME;
+        case GID_SONG_STORM:
+            return CW_SONG_STORMS;
         default:
             return -1;
     }
@@ -776,7 +774,7 @@ static void NeiGi_DrawSong(PlayState* play, int song) {
     gDma1p(POLY_XLU_DISP++, G_DL_OTR_FILEPATH, gGiSongNoteDL, 0, G_DL_PUSH);
     gSPGrayscale(POLY_XLU_DISP++, false);
     CLOSE_DISPS(play->state.gfxCtx);
-    NeiGi_DrawShimmerOverlay(play, color, nullptr);
+    NeiGi_DrawSongOverlay(play, song, nullptr);
 }
 
 static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool upgraded) {
@@ -947,7 +945,8 @@ extern "C" int32_t NeiGi_DescribeEntry(const GetItemEntry* entry, CwItemDrawInfo
             return 0;
         if (song == CW_SONG_STORMS)
             return NeiGi_FillSeasonInfo(6, out);
-        out->drawKind = CW_DRAW_KIND_MUSIC_NOTE;
+        out->drawKind = CW_DRAW_KIND_SONG_GI;
+        out->neiEffect = song;
         out->dlists[0] = gGiSongNoteDL;
         out->dlistCount = 1;
         out->xluStartIndex = 0;

@@ -20,7 +20,6 @@ float CVarGetFloat(const char* name, float value) {
 }
 void* ZeldaArena_Malloc(size_t size) { return std::calloc(1, size); }
 void ZeldaArena_Free(void* p) { std::free(p); }
-void* Graph_Alloc(GraphicsContext*, size_t size) { static Mtx m; assert(size == sizeof(m)); return &m; }
 void Graph_OpenDisps(Gfx**, Gfx*, GraphicsContext*, const char*, s32) {}
 void Graph_CloseDisps(Gfx**, Gfx*, GraphicsContext*, const char*, s32) {}
 void Gfx_SetupDL25_Opa(GraphicsContext*) {}
@@ -60,7 +59,10 @@ int main() {
     inst.ssbbAnim=&anim; inst.curFrame=.5f;
     GraphicsContext gfx{}; Gfx commands[128]{}; PlayState play{}; play.state.gfxCtx=&gfx;
     Vec3f position{}; Vec3s rotation{};
-    auto draw=[&] { gfx.polyOpa.p=commands; SSBBSkin_Draw(&inst,&play,&position,&rotation); };
+    auto draw=[&] {
+        gfx.polyOpa.p=commands; gfx.polyOpa.d=commands+128;
+        SSBBSkin_Draw(&inst,&play,&position,&rotation);
+    };
     SSBBSkin_Init(&skin);
     // Existing Pikachu defaults: snap fractional frames, strip TopN/EyeYellowM motion,
     // and retain the shared scale override.
@@ -102,7 +104,7 @@ int main() {
     pika.def=&pikachu_ssbb_def; pika.skeleton=(void**)pikachu_ssbb_skeleton.sh.segment;
     pika.initialized=1; pika.ssbbAnim=&pikaAnim;
     assert(pika.def->numLimbs==48 && pika.def->skinMesh->boneCount==47);
-    SSBBSkin_Init(pika.def->skinMesh); gfx.polyOpa.p=commands;
+    SSBBSkin_Init(pika.def->skinMesh); gfx.polyOpa.p=commands; gfx.polyOpa.d=commands+128;
     int before=displayLists;
     SSBBSkin_Draw(&pika,&play,&position,&rotation);
     if (displayLists == before) { std::fputs("FAIL actual Pikachu 48-node/47-bone metadata stopped rendering\n",stderr); return 1; }

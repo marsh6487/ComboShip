@@ -8,6 +8,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/diagnostics'))
 from run_mm_nei_tests import flags
+SANITIZERS = ['-fsanitize=address,undefined,bounds', '-fno-sanitize-recover=all']
 
 def run(command):
     result = subprocess.run(command, capture_output=True, text=True)
@@ -25,9 +26,12 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-skin-') as td:
         run([os.environ.get('CC','cc'), '-std=gnu11', *flags(), '-include', str(ROOT/'mm/include/variables.h'),
                         '-include', str(ROOT/'mm/include/functions.h'), '-include', str(ROOT/'mm/include/z64malloc.h'),
                         '-include', str(ROOT/'libultraship/include/libultraship/bridge/consolevariablebridge.h'),
-                        '-O1', '-g', '-ffunction-sections', '-fdata-sections', '-c', str(ROOT/source), '-o', obj])
+                        '-O1', '-g', *SANITIZERS, '-ffunction-sections', '-fdata-sections', '-c', str(ROOT/source), '-o', obj])
         objects.append(obj)
     binary = str(Path(td)/'skin')
-    run([os.environ.get('CXX','c++'), '-std=c++20', *flags(), *options,
+    run([os.environ.get('CXX','c++'), '-std=c++20', *flags(), *options, *SANITIZERS,
          str(ROOT/'tests/mm_wolf/skin_runtime_test.cpp'), *objects, '-Wl,--gc-sections', '-o', binary])
-    subprocess.run([binary], check=True)
+    # LeakSanitizer cannot inspect /proc tasks in the managed executor; memory/bounds/UB checks remain enabled.
+    env = dict(os.environ)
+    env['ASAN_OPTIONS'] = env.get('ASAN_OPTIONS', '') + ':detect_leaks=0'
+    subprocess.run([binary], check=True, env=env)

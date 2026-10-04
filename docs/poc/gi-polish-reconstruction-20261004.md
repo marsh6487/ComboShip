@@ -51,3 +51,23 @@ use 72,784 vertex bytes and 2,075 XLU commands in the capture fixture.
 
 Still outstanding: themed songs, selected standalone sword orientation and full
 foreign dispatch/sanitizer verification. No in-game acceptance is claimed.
+
+
+Themed song checkpoint restores `NeiGi_DrawSongOverlay` for all 24 recovered
+profiles. Soaring uses six curved triangulated feathers with vane, barb and
+rachis geometry (1296 vertices), rather than recolored generic shimmer. Healing
+uses hearts; Time/Double/Inverted use clocks; Epona uses horseshoes; Sonata/Saria
+and Minuet leaves, Nova/Serenade ripples, Sun/Prelude light, and the other songs
+retain their distinct recovered palette. Storms remains weather-only. The native
+MM early dispatcher resolves exact song identity before shared table aliases.
+OoT native IDs and imported/progressive aliases resolve the same profiles.
+
+RED: native Soaring renderer emitted the generic colored shimmer; MM early
+production dispatcher declined a native song. GREEN: `run_song_gi_tests.py`
+executes real MM DrawSong + early dispatch for every native/imported mapped song,
+checks all profile bounded/finite geometry at wraparound frames, exact recovered
+colors and actual feather geometry. `run_nei_gi_tests.py` and `--combo` pass the
+real renderer, all equipment fits, owner descriptors and both foreign dispatch
+paths. Real MM `NeiGiPresentation.cpp` and `DrawItem.cpp` syntax pass, with the
+latter using the production dependency headers `nlohmann/json.hpp` and
+`ship/window/gui/GuiWindow.h` forced in for the standalone compile.

@@ -1,5 +1,6 @@
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "SaveEditor.h"
+#include "NeiEditorItems.h"
 #include <fast/Fast3dGui.h>
 #include "2s2h/BenGui/UIWidgets.hpp"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -2480,7 +2481,6 @@ void DrawRandoTab() {
 #include "mods/nei_save.h"             // NeiSaveData, Nei_Save, bullet-bag helpers (Skijer's NEI slingshot pass)
 #include "mods/items/custom_bottles.h" // Bottle Randomizer editor (bottleSlots grid + Net/Bottomless)
 extern "C" {
-void ExtInv_DebugGiveAll(void);
 uint16_t Nei_GetOwnedItem(uint8_t slot);         // u16 store (NeiSaveData.ownedItems)
 void Nei_SetOwnedItem(uint8_t slot, uint16_t v); // u16 store (NeiSaveData.ownedItems)
 void ExtEquip_GiveItem(int16_t equipType, uint8_t index);
@@ -2642,7 +2642,7 @@ static void DrawNeiTab() {
 
     ImGui::SeparatorText("Custom Items (inventory slots 24-47)");
     if (ImGui::Button("Give All Custom Items")) {
-        ExtInv_DebugGiveAll();
+        NeiEditor::GrantAll();
     }
     ImGui::SameLine();
     if (ImGui::Button("Clear Custom Items")) {
@@ -2652,6 +2652,23 @@ static void DrawNeiTab() {
     }
     // NOTE: visual slots 48..71 now map to the REAL MM mask inventory (items[24..47]) — no
     // separate NEI mask storage to clear anymore; edit masks from the Items & Masks tab.
+
+    ImGui::SeparatorText("NEI Item Grants");
+    ImGui::TextDisabled("Includes all Slate powers, seasons, cane skills, wand modes and extended equipment.");
+    if (ImGui::BeginTable("neiItemGrants", 3, ImGuiTableFlags_SizingStretchSame)) {
+        for (const auto id : NeiEditor::Catalog()) {
+            const auto& item = Rando::StaticData::Items.at(id);
+            ImGui::TableNextColumn();
+            ImGui::PushID((int)id);
+            ImGui::BeginDisabled(NeiEditor::IsOwned(id));
+            if (ImGui::Button(item.name, ImVec2(-FLT_MIN, 0))) {
+                NeiEditor::Grant(id);
+            }
+            ImGui::EndDisabled();
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
 
     ImGui::SeparatorText("OoT Page-0 Items (Din's/Farore's/Nayru's, Slingshot, Boomerang, Hookshot chain)");
     if (ImGui::Button("Give All OoT Items")) {

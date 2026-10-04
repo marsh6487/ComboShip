@@ -306,12 +306,22 @@ int main() {
     assert(NeiGi_Draw(&play, &songEntry));
     assert(Drawn() == std::vector<std::string>{ gGiSongNoteDL });
     assert(!arena.empty() && stack.empty());
-    const auto& vertex = arena.front().front();
-    assert(vertex.v.cn[0] == color[0] && vertex.v.cn[1] == color[1] && vertex.v.cn[2] == color[2]);
+    if(song.second==CW_SONG_SOARING) {
+      const auto shown=arena;
+      arena.clear();
+      NeiGi_DrawShimmerOverlay(&play,color,nullptr);
+      assert(shown.front().size()!=arena.front().size() ||
+             std::memcmp(shown.front().data(),arena.front().data(),shown.front().size()*sizeof(Vtx)) &&
+             "Soaring needs actual feather geometry, not the generic colored star shimmer");
+      arena=shown;
+    }
+    assert(std::any_of(arena.front().begin(),arena.front().end(),[&](const Vtx& vertex) {
+      return vertex.v.cn[0] == color[0] && vertex.v.cn[1] == color[1] && vertex.v.cn[2] == color[2];
+    }));
 #ifdef COMBO_BUILD
     CwItemDrawInfo songInfo{};
     assert(NeiGi_DescribeEntry(&songEntry, &songInfo));
-    assert(songInfo.drawKind == CW_DRAW_KIND_MUSIC_NOTE && songInfo.itemShimmer);
+    assert(songInfo.drawKind == CW_DRAW_KIND_SONG_GI && songInfo.neiEffect == song.second && songInfo.itemShimmer);
     assert(std::memcmp(color, songInfo.itemShimmerColor, 4) == 0);
 #endif
   }
