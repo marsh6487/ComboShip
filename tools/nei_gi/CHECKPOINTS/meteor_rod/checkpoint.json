@@ -27,5 +27,9 @@
       0.0
     ]
   },
+  "notes": [
+    "New wand silhouette and material candidate, derived from each elemental theme.",
+    "No Dominion Rod stand-in; GI resources only, held/action behavior preserved."
+  ],
   "runtime_tested": false
 }

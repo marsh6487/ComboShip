@@ -12,153 +12,161 @@
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/blade_edge_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="0" Count="24"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="0" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
+<Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
 <PipeSync/>
 <SetRenderMode Mode1="G_RM_PASS" Mode2="G_RM_AA_ZB_OPA_SURF2"/>
 <SetCombineLERP A0="G_CCMUX_TEXEL0" B0="G_CCMUX_0" C0="G_CCMUX_SHADE" D0="G_CCMUX_0" Aa0="G_ACMUX_TEXEL0" Ab0="G_ACMUX_0" Ac0="G_ACMUX_PRIMITIVE" Ad0="G_ACMUX_0" A1="G_CCMUX_0" B1="G_CCMUX_0" C1="G_CCMUX_0" D1="G_CCMUX_COMBINED" Aa1="G_ACMUX_0" Ab1="G_ACMUX_0" Ac1="G_ACMUX_0" Ad1="G_ACMUX_COMBINED"/>
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/steel_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="24" Count="24"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="30" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="48" Count="24"/>
+<Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="60" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
+<Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
 <PipeSync/>
 <SetRenderMode Mode1="G_RM_PASS" Mode2="G_RM_AA_ZB_OPA_SURF2"/>
 <SetCombineLERP A0="G_CCMUX_TEXEL0" B0="G_CCMUX_0" C0="G_CCMUX_SHADE" D0="G_CCMUX_0" Aa0="G_ACMUX_TEXEL0" Ab0="G_ACMUX_0" Ac0="G_ACMUX_PRIMITIVE" Ad0="G_ACMUX_0" A1="G_CCMUX_0" B1="G_CCMUX_0" C1="G_CCMUX_0" D1="G_CCMUX_COMBINED" Aa1="G_ACMUX_0" Ab1="G_ACMUX_0" Ac1="G_ACMUX_0" Ad1="G_ACMUX_COMBINED"/>
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/blade_edge_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="72" Count="24"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="90" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="96" Count="24"/>
+<Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="120" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
+<Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
 <PipeSync/>
 <SetRenderMode Mode1="G_RM_PASS" Mode2="G_RM_AA_ZB_OPA_SURF2"/>
 <SetCombineLERP A0="G_CCMUX_TEXEL0" B0="G_CCMUX_0" C0="G_CCMUX_SHADE" D0="G_CCMUX_0" Aa0="G_ACMUX_TEXEL0" Ab0="G_ACMUX_0" Ac0="G_ACMUX_PRIMITIVE" Ad0="G_ACMUX_0" A1="G_CCMUX_0" B1="G_CCMUX_0" C1="G_CCMUX_0" D1="G_CCMUX_COMBINED" Aa1="G_ACMUX_0" Ab1="G_ACMUX_0" Ac1="G_ACMUX_0" Ad1="G_ACMUX_COMBINED"/>
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/steel_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="120" Count="24"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="150" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="144" Count="24"/>
+<Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="180" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
+<Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
 <PipeSync/>
 <SetRenderMode Mode1="G_RM_PASS" Mode2="G_RM_AA_ZB_OPA_SURF2"/>
 <SetCombineLERP A0="G_CCMUX_TEXEL0" B0="G_CCMUX_0" C0="G_CCMUX_SHADE" D0="G_CCMUX_0" Aa0="G_ACMUX_TEXEL0" Ab0="G_ACMUX_0" Ac0="G_ACMUX_PRIMITIVE" Ad0="G_ACMUX_0" A1="G_CCMUX_0" B1="G_CCMUX_0" C1="G_CCMUX_0" D1="G_CCMUX_COMBINED" Aa1="G_ACMUX_0" Ab1="G_ACMUX_0" Ac1="G_ACMUX_0" Ad1="G_ACMUX_COMBINED"/>
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/blade_edge_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="168" Count="24"/>
-<Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
-<Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
-<Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
-<Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
-<PipeSync/>
-<SetRenderMode Mode1="G_RM_PASS" Mode2="G_RM_AA_ZB_OPA_SURF2"/>
-<SetCombineLERP A0="G_CCMUX_TEXEL0" B0="G_CCMUX_0" C0="G_CCMUX_SHADE" D0="G_CCMUX_0" Aa0="G_ACMUX_TEXEL0" Ab0="G_ACMUX_0" Ac0="G_ACMUX_PRIMITIVE" Ad0="G_ACMUX_0" A1="G_CCMUX_0" B1="G_CCMUX_0" C1="G_CCMUX_0" D1="G_CCMUX_COMBINED" Aa1="G_ACMUX_0" Ab1="G_ACMUX_0" Ac1="G_ACMUX_0" Ad1="G_ACMUX_COMBINED"/>
-<SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
-<Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
-<LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/steel_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="192" Count="18"/>
-<Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
-<Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
-<Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
-<PipeSync/>
-<SetRenderMode Mode1="G_RM_PASS" Mode2="G_RM_AA_ZB_OPA_SURF2"/>
-<SetCombineLERP A0="G_CCMUX_TEXEL0" B0="G_CCMUX_0" C0="G_CCMUX_SHADE" D0="G_CCMUX_0" Aa0="G_ACMUX_TEXEL0" Ab0="G_ACMUX_0" Ac0="G_ACMUX_PRIMITIVE" Ad0="G_ACMUX_0" A1="G_CCMUX_0" B1="G_CCMUX_0" C1="G_CCMUX_0" D1="G_CCMUX_COMBINED" Aa1="G_ACMUX_0" Ab1="G_ACMUX_0" Ac1="G_ACMUX_0" Ad1="G_ACMUX_COMBINED"/>
-<SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
-<Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
-<LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/goron_bronze_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
 <LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="210" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="240" Count="30"/>
+<PipeSync/>
+<SetRenderMode Mode1="G_RM_PASS" Mode2="G_RM_AA_ZB_OPA_SURF2"/>
+<SetCombineLERP A0="G_CCMUX_TEXEL0" B0="G_CCMUX_0" C0="G_CCMUX_SHADE" D0="G_CCMUX_0" Aa0="G_ACMUX_TEXEL0" Ab0="G_ACMUX_0" Ac0="G_ACMUX_PRIMITIVE" Ad0="G_ACMUX_0" A1="G_CCMUX_0" B1="G_CCMUX_0" C1="G_CCMUX_0" D1="G_CCMUX_COMBINED" Aa1="G_ACMUX_0" Ab1="G_ACMUX_0" Ac1="G_ACMUX_0" Ad1="G_ACMUX_COMBINED"/>
+<SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
+<Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
+<LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/steel_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="240" Count="18"/>
+<Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
+<Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
+<Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
+<PipeSync/>
+<SetRenderMode Mode1="G_RM_PASS" Mode2="G_RM_AA_ZB_OPA_SURF2"/>
+<SetCombineLERP A0="G_CCMUX_TEXEL0" B0="G_CCMUX_0" C0="G_CCMUX_SHADE" D0="G_CCMUX_0" Aa0="G_ACMUX_TEXEL0" Ab0="G_ACMUX_0" Ac0="G_ACMUX_PRIMITIVE" Ad0="G_ACMUX_0" A1="G_CCMUX_0" B1="G_CCMUX_0" C1="G_CCMUX_0" D1="G_CCMUX_COMBINED" Aa1="G_ACMUX_0" Ab1="G_ACMUX_0" Ac1="G_ACMUX_0" Ad1="G_ACMUX_COMBINED"/>
+<SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
+<Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
+<LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/goron_bronze_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="258" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="270" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="288" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="300" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="318" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="330" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="348" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="360" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="378" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="390" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="408" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="420" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="438" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="450" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="468" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="480" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="498" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="510" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="528" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="540" Count="18"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="558" Count="30"/>
+<Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
+<Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
+<Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
+<Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
+<Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="588" Count="18"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
@@ -168,7 +176,7 @@
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/bronze_edge_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="558" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="606" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="1" V11="3" V12="2" Flag1="0"/>
 <Triangles2 V00="1" V01="4" V02="3" Flag0="0" V10="4" V11="5" V12="3" Flag1="0"/>
 <Triangles2 V00="4" V01="6" V02="5" Flag0="0" V10="6" V11="7" V12="5" Flag1="0"/>
@@ -191,7 +199,7 @@
 <Triangles2 V00="22" V01="23" V02="29" Flag0="0" V10="23" V11="30" V12="29" Flag1="0"/>
 <Triangles2 V00="23" V01="24" V02="30" Flag0="0" V10="24" V11="31" V12="30" Flag1="0"/>
 <Triangle1 V00="24" V01="25" V02="31" Flag0="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="590" Count="19"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="638" Count="19"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="3" V12="1" Flag1="0"/>
 <Triangles2 V00="3" V01="4" V02="1" Flag0="0" V10="3" V11="5" V12="4" Flag1="0"/>
 <Triangles2 V00="5" V01="6" V02="4" Flag0="0" V10="7" V11="8" V12="9" Flag1="0"/>
@@ -207,19 +215,19 @@
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/gold_edge_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="609" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="657" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="639" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="687" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="669" Count="24"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="717" Count="24"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
@@ -230,13 +238,13 @@
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/goron_bronze_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="693" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="741" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="723" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="771" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
@@ -248,7 +256,7 @@
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/bronze_edge_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="753" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="801" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="1" V11="3" V12="2" Flag1="0"/>
 <Triangles2 V00="1" V01="4" V02="3" Flag0="0" V10="4" V11="5" V12="3" Flag1="0"/>
 <Triangles2 V00="4" V01="6" V02="5" Flag0="0" V10="6" V11="7" V12="5" Flag1="0"/>
@@ -271,7 +279,7 @@
 <Triangles2 V00="22" V01="23" V02="29" Flag0="0" V10="23" V11="30" V12="29" Flag1="0"/>
 <Triangles2 V00="23" V01="24" V02="30" Flag0="0" V10="24" V11="31" V12="30" Flag1="0"/>
 <Triangle1 V00="24" V01="25" V02="31" Flag0="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="785" Count="19"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="833" Count="19"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="3" V12="1" Flag1="0"/>
 <Triangles2 V00="3" V01="4" V02="1" Flag0="0" V10="3" V11="5" V12="4" Flag1="0"/>
 <Triangles2 V00="5" V01="6" V02="4" Flag0="0" V10="7" V11="8" V12="9" Flag1="0"/>
@@ -287,19 +295,19 @@
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/gold_edge_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="804" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="852" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="834" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="882" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="864" Count="24"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="912" Count="24"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
@@ -310,13 +318,13 @@
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/goron_bronze_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="888" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="936" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
 <Triangles2 V00="18" V01="19" V02="20" Flag0="0" V10="21" V11="22" V12="23" Flag1="0"/>
 <Triangles2 V00="24" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="918" Count="30"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="966" Count="30"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="6" V01="7" V02="8" Flag0="0" V10="9" V11="10" V12="11" Flag1="0"/>
 <Triangles2 V00="12" V01="13" V02="14" Flag0="0" V10="15" V11="16" V12="17" Flag1="0"/>
@@ -328,7 +336,7 @@
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/grip_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="948" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="996" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="2" V11="1" V12="3" Flag1="0"/>
 <Triangles2 V00="2" V01="3" V02="4" Flag0="0" V10="4" V11="3" V12="5" Flag1="0"/>
 <Triangles2 V00="4" V01="5" V02="6" Flag0="0" V10="6" V11="5" V12="7" Flag1="0"/>
@@ -347,7 +355,7 @@
 <Triangles2 V00="7" V01="29" V02="9" Flag0="0" V10="9" V11="29" V12="30" Flag1="0"/>
 <Triangles2 V00="9" V01="30" V02="11" Flag0="0" V10="11" V11="30" V12="31" Flag1="0"/>
 <Triangle1 V00="11" V01="31" V02="13" Flag0="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="980" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1028" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="2" V12="3" Flag1="0"/>
 <Triangles2 V00="3" V01="2" V02="4" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="5" V01="4" V02="6" Flag0="0" V10="5" V11="6" V12="7" Flag1="0"/>
@@ -366,7 +374,7 @@
 <Triangles2 V00="8" V01="28" V02="29" Flag0="0" V10="8" V11="29" V12="10" Flag1="0"/>
 <Triangles2 V00="10" V01="29" V02="30" Flag0="0" V10="10" V11="30" V12="12" Flag1="0"/>
 <Triangles2 V00="12" V01="30" V02="31" Flag0="0" V10="12" V11="31" V12="14" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1012" Count="29"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1060" Count="29"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="3" V01="5" V02="6" Flag0="0" V10="3" V11="6" V12="7" Flag1="0"/>
 <Triangles2 V00="3" V01="7" V02="8" Flag0="0" V10="3" V11="8" V12="9" Flag1="0"/>
@@ -386,7 +394,7 @@
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/goron_bronze_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1041" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1089" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="2" V11="1" V12="3" Flag1="0"/>
 <Triangles2 V00="2" V01="3" V02="4" Flag0="0" V10="4" V11="3" V12="5" Flag1="0"/>
 <Triangles2 V00="4" V01="5" V02="6" Flag0="0" V10="6" V11="5" V12="7" Flag1="0"/>
@@ -405,7 +413,7 @@
 <Triangles2 V00="7" V01="29" V02="9" Flag0="0" V10="9" V11="29" V12="30" Flag1="0"/>
 <Triangles2 V00="9" V01="30" V02="11" Flag0="0" V10="11" V11="30" V12="31" Flag1="0"/>
 <Triangle1 V00="11" V01="31" V02="13" Flag0="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1073" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1121" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="2" V12="3" Flag1="0"/>
 <Triangles2 V00="3" V01="2" V02="4" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="5" V01="4" V02="6" Flag0="0" V10="5" V11="6" V12="7" Flag1="0"/>
@@ -424,7 +432,7 @@
 <Triangles2 V00="8" V01="28" V02="29" Flag0="0" V10="8" V11="29" V12="10" Flag1="0"/>
 <Triangles2 V00="10" V01="29" V02="30" Flag0="0" V10="10" V11="30" V12="12" Flag1="0"/>
 <Triangles2 V00="12" V01="30" V02="31" Flag0="0" V10="12" V11="31" V12="14" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1105" Count="29"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1153" Count="29"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="3" V01="5" V02="6" Flag0="0" V10="3" V11="6" V12="7" Flag1="0"/>
 <Triangles2 V00="3" V01="7" V02="8" Flag0="0" V10="3" V11="8" V12="9" Flag1="0"/>
@@ -438,7 +446,7 @@
 <Triangles2 V00="17" V01="26" V02="25" Flag0="0" V10="17" V11="27" V12="26" Flag1="0"/>
 <Triangles2 V00="17" V01="28" V02="27" Flag0="0" V10="17" V11="1" V12="28" Flag1="0"/>
 <Triangle1 V00="17" V01="2" V02="1" Flag0="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1134" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1182" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="2" V11="1" V12="3" Flag1="0"/>
 <Triangles2 V00="2" V01="3" V02="4" Flag0="0" V10="4" V11="3" V12="5" Flag1="0"/>
 <Triangles2 V00="4" V01="5" V02="6" Flag0="0" V10="6" V11="5" V12="7" Flag1="0"/>
@@ -457,7 +465,7 @@
 <Triangles2 V00="7" V01="29" V02="9" Flag0="0" V10="9" V11="29" V12="30" Flag1="0"/>
 <Triangles2 V00="9" V01="30" V02="11" Flag0="0" V10="11" V11="30" V12="31" Flag1="0"/>
 <Triangle1 V00="11" V01="31" V02="13" Flag0="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1166" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1214" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="2" V12="3" Flag1="0"/>
 <Triangles2 V00="3" V01="2" V02="4" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="5" V01="4" V02="6" Flag0="0" V10="5" V11="6" V12="7" Flag1="0"/>
@@ -476,7 +484,7 @@
 <Triangles2 V00="8" V01="28" V02="29" Flag0="0" V10="8" V11="29" V12="10" Flag1="0"/>
 <Triangles2 V00="10" V01="29" V02="30" Flag0="0" V10="10" V11="30" V12="12" Flag1="0"/>
 <Triangles2 V00="12" V01="30" V02="31" Flag0="0" V10="12" V11="31" V12="14" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1198" Count="29"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1246" Count="29"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="3" V01="5" V02="6" Flag0="0" V10="3" V11="6" V12="7" Flag1="0"/>
 <Triangles2 V00="3" V01="7" V02="8" Flag0="0" V10="3" V11="8" V12="9" Flag1="0"/>
@@ -496,7 +504,7 @@
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/grip_seam_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1227" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1275" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="1" V11="3" V12="2" Flag1="0"/>
 <Triangles2 V00="1" V01="4" V02="3" Flag0="0" V10="4" V11="5" V12="3" Flag1="0"/>
 <Triangles2 V00="4" V01="6" V02="5" Flag0="0" V10="6" V11="7" V12="5" Flag1="0"/>
@@ -519,7 +527,7 @@
 <Triangles2 V00="23" V01="24" V02="28" Flag0="0" V10="24" V11="29" V12="28" Flag1="0"/>
 <Triangles2 V00="25" V01="26" V02="30" Flag0="0" V10="26" V11="31" V12="30" Flag1="0"/>
 <Triangle1 V00="26" V01="27" V02="31" Flag0="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1259" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1307" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="3" V12="1" Flag1="0"/>
 <Triangles2 V00="3" V01="4" V02="1" Flag0="0" V10="3" V11="5" V12="4" Flag1="0"/>
 <Triangles2 V00="5" V01="6" V02="4" Flag0="0" V10="7" V11="2" V12="8" Flag1="0"/>
@@ -542,7 +550,7 @@
 <Triangles2 V00="24" V01="29" V02="28" Flag0="0" V10="24" V11="25" V12="29" Flag1="0"/>
 <Triangles2 V00="25" V01="30" V02="29" Flag0="0" V10="25" V11="26" V12="30" Flag1="0"/>
 <Triangles2 V00="26" V01="31" V02="30" Flag0="0" V10="26" V11="27" V12="31" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1291" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1339" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="4" V01="6" V02="5" Flag0="0" V10="4" V11="7" V12="6" Flag1="0"/>
 <Triangles2 V00="7" V01="8" V02="6" Flag0="0" V10="7" V11="2" V12="8" Flag1="0"/>
@@ -564,7 +572,7 @@
 <Triangles2 V00="23" V01="28" V02="27" Flag0="0" V10="23" V11="24" V12="28" Flag1="0"/>
 <Triangles2 V00="24" V01="29" V02="28" Flag0="0" V10="24" V11="25" V12="29" Flag1="0"/>
 <Triangles2 V00="25" V01="30" V02="29" Flag0="0" V10="26" V11="27" V12="31" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1323" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1371" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="3" V12="1" Flag1="0"/>
 <Triangles2 V00="3" V01="4" V02="1" Flag0="0" V10="3" V11="5" V12="4" Flag1="0"/>
 <Triangles2 V00="5" V01="6" V02="4" Flag0="0" V10="5" V11="7" V12="6" Flag1="0"/>
@@ -587,7 +595,7 @@
 <Triangles2 V00="23" V01="28" V02="27" Flag0="0" V10="24" V11="25" V12="29" Flag1="0"/>
 <Triangles2 V00="25" V01="30" V02="29" Flag0="0" V10="25" V11="26" V12="30" Flag1="0"/>
 <Triangles2 V00="26" V01="31" V02="30" Flag0="0" V10="26" V11="27" V12="31" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1355" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1403" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="3" V12="1" Flag1="0"/>
 <Triangles2 V00="3" V01="4" V02="1" Flag0="0" V10="5" V11="6" V12="7" Flag1="0"/>
 <Triangles2 V00="6" V01="8" V02="7" Flag0="0" V10="6" V11="2" V12="8" Flag1="0"/>
@@ -610,7 +618,7 @@
 <Triangles2 V00="24" V01="29" V02="28" Flag0="0" V10="24" V11="25" V12="29" Flag1="0"/>
 <Triangles2 V00="25" V01="30" V02="29" Flag0="0" V10="25" V11="26" V12="30" Flag1="0"/>
 <Triangle1 V00="26" V01="31" V02="30" Flag0="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1387" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1435" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="1" V11="3" V12="2" Flag1="0"/>
 <Triangles2 V00="1" V01="4" V02="3" Flag0="0" V10="4" V11="5" V12="3" Flag1="0"/>
 <Triangles2 V00="4" V01="6" V02="5" Flag0="0" V10="6" V11="7" V12="5" Flag1="0"/>
@@ -633,7 +641,7 @@
 <Triangles2 V00="23" V01="24" V02="28" Flag0="0" V10="24" V11="29" V12="28" Flag1="0"/>
 <Triangles2 V00="25" V01="26" V02="30" Flag0="0" V10="26" V11="31" V12="30" Flag1="0"/>
 <Triangle1 V00="26" V01="27" V02="31" Flag0="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1419" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1467" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="3" V12="1" Flag1="0"/>
 <Triangles2 V00="3" V01="4" V02="1" Flag0="0" V10="3" V11="5" V12="4" Flag1="0"/>
 <Triangles2 V00="5" V01="6" V02="4" Flag0="0" V10="7" V11="2" V12="8" Flag1="0"/>
@@ -656,7 +664,7 @@
 <Triangles2 V00="24" V01="29" V02="28" Flag0="0" V10="24" V11="25" V12="29" Flag1="0"/>
 <Triangles2 V00="25" V01="30" V02="29" Flag0="0" V10="25" V11="26" V12="30" Flag1="0"/>
 <Triangles2 V00="26" V01="31" V02="30" Flag0="0" V10="26" V11="27" V12="31" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1451" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1499" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="4" V01="6" V02="5" Flag0="0" V10="4" V11="7" V12="6" Flag1="0"/>
 <Triangles2 V00="7" V01="8" V02="6" Flag0="0" V10="7" V11="2" V12="8" Flag1="0"/>
@@ -678,7 +686,7 @@
 <Triangles2 V00="23" V01="28" V02="27" Flag0="0" V10="23" V11="24" V12="28" Flag1="0"/>
 <Triangles2 V00="24" V01="29" V02="28" Flag0="0" V10="24" V11="25" V12="29" Flag1="0"/>
 <Triangles2 V00="25" V01="30" V02="29" Flag0="0" V10="26" V11="27" V12="31" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1483" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1531" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="3" V12="1" Flag1="0"/>
 <Triangles2 V00="3" V01="4" V02="1" Flag0="0" V10="3" V11="5" V12="4" Flag1="0"/>
 <Triangles2 V00="5" V01="6" V02="4" Flag0="0" V10="5" V11="7" V12="6" Flag1="0"/>
@@ -701,7 +709,7 @@
 <Triangles2 V00="23" V01="28" V02="27" Flag0="0" V10="24" V11="25" V12="29" Flag1="0"/>
 <Triangles2 V00="25" V01="30" V02="29" Flag0="0" V10="25" V11="26" V12="30" Flag1="0"/>
 <Triangles2 V00="26" V01="31" V02="30" Flag0="0" V10="26" V11="27" V12="31" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1515" Count="14"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1563" Count="14"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="3" V12="1" Flag1="0"/>
 <Triangles2 V00="3" V01="4" V02="1" Flag0="0" V10="5" V11="6" V12="7" Flag1="0"/>
 <Triangles2 V00="5" V01="8" V02="6" Flag0="0" V10="5" V11="9" V12="8" Flag1="0"/>
@@ -714,7 +722,7 @@
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/goron_bronze_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1529" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1577" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="2" V11="1" V12="3" Flag1="0"/>
 <Triangles2 V00="2" V01="3" V02="4" Flag0="0" V10="4" V11="3" V12="5" Flag1="0"/>
 <Triangles2 V00="4" V01="5" V02="6" Flag0="0" V10="6" V11="5" V12="7" Flag1="0"/>
@@ -733,7 +741,7 @@
 <Triangles2 V00="7" V01="29" V02="9" Flag0="0" V10="9" V11="29" V12="30" Flag1="0"/>
 <Triangles2 V00="9" V01="30" V02="11" Flag0="0" V10="11" V11="30" V12="31" Flag1="0"/>
 <Triangle1 V00="11" V01="31" V02="13" Flag0="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1561" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1609" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="2" V12="3" Flag1="0"/>
 <Triangles2 V00="3" V01="2" V02="4" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="5" V01="4" V02="6" Flag0="0" V10="5" V11="6" V12="7" Flag1="0"/>
@@ -752,7 +760,7 @@
 <Triangles2 V00="8" V01="28" V02="29" Flag0="0" V10="8" V11="29" V12="10" Flag1="0"/>
 <Triangles2 V00="10" V01="29" V02="30" Flag0="0" V10="10" V11="30" V12="12" Flag1="0"/>
 <Triangles2 V00="12" V01="30" V02="31" Flag0="0" V10="12" V11="31" V12="14" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1593" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1641" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="5" V01="4" V02="6" Flag0="0" V10="5" V11="6" V12="7" Flag1="0"/>
 <Triangles2 V00="7" V01="6" V02="8" Flag0="0" V10="7" V11="8" V12="9" Flag1="0"/>
@@ -767,7 +775,7 @@
 <Triangles2 V00="1" V01="24" V02="25" Flag0="0" V10="1" V11="25" V12="2" Flag1="0"/>
 <Triangles2 V00="2" V01="25" V02="26" Flag0="0" V10="27" V11="28" V12="29" Flag1="0"/>
 <Triangles2 V00="27" V01="29" V02="30" Flag0="0" V10="27" V11="30" V12="31" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1625" Count="25"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1673" Count="25"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="2" V12="3" Flag1="0"/>
 <Triangles2 V00="0" V01="3" V02="4" Flag0="0" V10="0" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="0" V01="5" V02="6" Flag0="0" V10="0" V11="6" V12="7" Flag1="0"/>
@@ -785,7 +793,7 @@
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/bronze_edge_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1650" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1698" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="2" V11="1" V12="3" Flag1="0"/>
 <Triangles2 V00="2" V01="3" V02="4" Flag0="0" V10="4" V11="3" V12="5" Flag1="0"/>
 <Triangles2 V00="4" V01="5" V02="6" Flag0="0" V10="6" V11="5" V12="7" Flag1="0"/>
@@ -804,7 +812,7 @@
 <Triangles2 V00="7" V01="29" V02="9" Flag0="0" V10="9" V11="29" V12="30" Flag1="0"/>
 <Triangles2 V00="9" V01="30" V02="11" Flag0="0" V10="11" V11="30" V12="31" Flag1="0"/>
 <Triangle1 V00="11" V01="31" V02="13" Flag0="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1682" Count="32"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1730" Count="32"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="0" V11="2" V12="3" Flag1="0"/>
 <Triangles2 V00="3" V01="2" V02="4" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="5" V01="4" V02="6" Flag0="0" V10="5" V11="6" V12="7" Flag1="0"/>
@@ -823,7 +831,7 @@
 <Triangles2 V00="8" V01="28" V02="29" Flag0="0" V10="8" V11="29" V12="10" Flag1="0"/>
 <Triangles2 V00="10" V01="29" V02="30" Flag0="0" V10="10" V11="30" V12="12" Flag1="0"/>
 <Triangles2 V00="12" V01="30" V02="31" Flag0="0" V10="12" V11="31" V12="14" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1714" Count="29"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1762" Count="29"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="3" V11="4" V12="5" Flag1="0"/>
 <Triangles2 V00="3" V01="5" V02="6" Flag0="0" V10="3" V11="6" V12="7" Flag1="0"/>
 <Triangles2 V00="3" V01="7" V02="8" Flag0="0" V10="3" V11="8" V12="9" Flag1="0"/>
@@ -843,7 +851,7 @@
 <SetPrimColor M="0" L="0" R="255" G="255" B="255" A="255"/>
 <Texture S="65535" T="65535" Level="0" Tile="0" On="1"/>
 <LoadTextureBlock Path="objects/nei_gi_redesign/biggoron_sword/steel_shadow_tex" Format="0" Size="3" Width="32" Height="32" MaskS="5" MaskT="5" ShiftS="0" ShiftT="0" CMS_TXNoMirror="1" CMS_TXWrap="1" CMT_TXNoMirror="1" CMT_TXWrap="1"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1743" Count="20"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1791" Count="20"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="1" V11="3" V12="2" Flag1="0"/>
 <Triangles2 V00="1" V01="4" V02="3" Flag0="0" V10="4" V11="5" V12="3" Flag1="0"/>
 <Triangles2 V00="4" V01="6" V02="5" Flag0="0" V10="6" V11="7" V12="5" Flag1="0"/>
@@ -859,7 +867,7 @@
 <Triangles2 V00="18" V01="10" V02="8" Flag0="0" V10="19" V11="12" V12="13" Flag1="0"/>
 <Triangles2 V00="19" V01="13" V02="14" Flag0="0" V10="19" V11="14" V12="15" Flag1="0"/>
 <Triangles2 V00="19" V01="15" V02="16" Flag0="0" V10="19" V11="16" V12="17" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1763" Count="20"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1811" Count="20"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="1" V11="3" V12="2" Flag1="0"/>
 <Triangles2 V00="1" V01="4" V02="3" Flag0="0" V10="4" V11="5" V12="3" Flag1="0"/>
 <Triangles2 V00="4" V01="6" V02="5" Flag0="0" V10="6" V11="7" V12="5" Flag1="0"/>
@@ -875,7 +883,7 @@
 <Triangles2 V00="18" V01="10" V02="8" Flag0="0" V10="19" V11="12" V12="13" Flag1="0"/>
 <Triangles2 V00="19" V01="13" V02="14" Flag0="0" V10="19" V11="14" V12="15" Flag1="0"/>
 <Triangles2 V00="19" V01="15" V02="16" Flag0="0" V10="19" V11="16" V12="17" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1783" Count="20"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1831" Count="20"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="1" V11="3" V12="2" Flag1="0"/>
 <Triangles2 V00="1" V01="4" V02="3" Flag0="0" V10="4" V11="5" V12="3" Flag1="0"/>
 <Triangles2 V00="4" V01="6" V02="5" Flag0="0" V10="6" V11="7" V12="5" Flag1="0"/>
@@ -891,7 +899,7 @@
 <Triangles2 V00="18" V01="10" V02="8" Flag0="0" V10="19" V11="12" V12="13" Flag1="0"/>
 <Triangles2 V00="19" V01="13" V02="14" Flag0="0" V10="19" V11="14" V12="15" Flag1="0"/>
 <Triangles2 V00="19" V01="15" V02="16" Flag0="0" V10="19" V11="16" V12="17" Flag1="0"/>
-<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1803" Count="20"/>
+<LoadVertices Path="objects/nei_gi_redesign/biggoron_sword/mesh_opa_vtx" VertexBufferIndex="0" VertexOffset="1851" Count="20"/>
 <Triangles2 V00="0" V01="1" V02="2" Flag0="0" V10="1" V11="3" V12="2" Flag1="0"/>
 <Triangles2 V00="1" V01="4" V02="3" Flag0="0" V10="4" V11="5" V12="3" Flag1="0"/>
 <Triangles2 V00="4" V01="6" V02="5" Flag0="0" V10="6" V11="7" V12="5" Flag1="0"/>

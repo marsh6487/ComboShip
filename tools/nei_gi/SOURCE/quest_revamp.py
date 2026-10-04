@@ -19,14 +19,18 @@ def model(slug, name):
     return m
 
 
+def rgb(hex_value):
+    return [((hex_value >> shift) & 255) / 255 for shift in (16, 8, 0)]
+
+
 WANDS = {
     'elemental_wand': ('Elemental Wand', [.53,.86,1.]),
-    'sand_rod': ('Sand Rod', [.91,.64,.25]),
-    'tornado_rod': ('Tornado Rod', [.56,.94,.69]),
-    'water_rod': ('Water Rod', [.22,.65,1.]),
-    'meteor_rod': ('Meteor Rod', [1.,.22,.075]),
-    'storm_rod': ('Storm Rod', [.71,.66,1.]),
-    'shadow_scepter': ('Shadow Scepter', [.57,.15,.80]),
+    'sand_rod': ('Sand Rod', rgb(0xE8AC48)),
+    'tornado_rod': ('Tornado Rod', rgb(0x91EFBC)),
+    'water_rod': ('Water Rod', rgb(0x38A6FF)),
+    'meteor_rod': ('Meteor Rod', rgb(0xFF4818)),
+    'storm_rod': ('Storm Rod', rgb(0xB5A8FF)),
+    'shadow_scepter': ('Shadow Scepter', rgb(0x9E38DA)),
 }
 
 
@@ -98,47 +102,84 @@ def wand(slug):
 
 
 RUNES = {
-    'sheikah_slate': ('Sheikah Slate', [.19,.79,.98]),
-    'slate_bomb': ('Remote Bomb Rune', [.37,.86,.92]),
-    'slate_master_cycle': ('Master Cycle Rune', [.39,.90,.75]),
-    'slate_stasis': ('Stasis Rune', [.98,.78,.27]),
-    'slate_cryonis': ('Cryonis Rune', [.59,.84,1.]),
-    'slate_sensor': ('Sheikah Sensor Rune', [.78,.51,1.]),
+    'sheikah_slate': ('Sheikah Slate', rgb(0x30CAFA)),
+    'slate_bomb': ('Remote Bomb Rune', rgb(0x5FDCEB)),
+    'slate_master_cycle': ('Master Cycle Rune', rgb(0x64E6BE)),
+    'slate_stasis': ('Stasis Rune', rgb(0xFAC846)),
+    'slate_cryonis': ('Cryonis Rune', rgb(0x96D7FF)),
+    'slate_sensor': ('Sheikah Sensor Rune', rgb(0xC882FF)),
 }
 
 
 def slate(slug):
     name,color=RUNES[slug];m=model(slug,name)
     m.material('glyph',color,'energy',emission=.65)
-    outline=[(-23,-32),(23,-32),(28,-27),(28,27),(21,34),(-21,34),(-28,27),(-28,-27)]
-    m.polygon('Carved basalt tablet','stone',outline,depth=7,bevel=2)
-    for z in (-3.7,3.7):
-        m.tube('Bronze tablet rim','gold',[[x,y,z] for x,y in outline+[outline[0]]],1.15,6)
-    m.polygon('Inset dark display','dark',[(-19,-24),(19,-24),(19,25),(-19,25)],depth=.5,z=3.7,bevel=1)
-    m.ring('Carrying handle','gold',[0,38,0],[10,8],1.4,segments=24,sides=6)
-    m.ring('Eye iris','glyph',[0,4,4.2],[4.2,5.7],.65,segments=24,sides=5)
+    m.material('casing',rgb(0x292B30),'stone',rough=.75)
+    m.material('bronze',rgb(0xB08A50),'metal',metal=.65,rough=.42)
+    m.material('amber',rgb(0xFFAF32),'energy',emission=.7)
+    m.material('pupil',rgb(0x081019),rough=.3)
+    m.material('wrap',rgb(0xA38150),'braid',rough=.85)
+    outline=[(-23,-32),(23,-32),(28,-27),(28,26),(22,34),(-22,34),(-28,26),(-28,-27)]
+    m.polygon('Thick chamfered ancient casing','casing',outline,depth=9,bevel=2.5)
+    # Localized fittings leave the charcoal silhouette visible like the reference.
+    for side in (-1,1):
+        m.tube('Bronze casing side rail','bronze',[[side*24,-28,4.6],[side*26,-24,4.6],
+               [side*26,23,4.6],[side*21,30,4.6]],.75,6)
+        m.tube('Rear casing rail','bronze',[[side*24,-28,-4.6],[side*26,-24,-4.6],
+               [side*26,23,-4.6],[side*21,30,-4.6]],.6,6)
+    # Broad raised lids and central iris form a sculpted emblem, rather than a screen.
+    for sign in (-1,1):
+        t=np.linspace(0,math.pi,22)
+        m.tube('Raised bronze Sheikah eyelid','bronze',
+               np.c_[17*np.cos(t),5+sign*9*np.sin(t),np.full(len(t),5.2)],1.65,7)
+    m.sphere('Raised bronze iris bezel','bronze',[0,5,5.1],[7.1,9,1.7],8,20)
+    m.sphere('Luminous rune iris','glyph',[0,5,6.5],[5.25,7,1],8,20)
+    m.sphere('Inset dark pupil','pupil',[0,5,7.35],[2.1,3.35,.4],6,16)
+    m.polygon('Bronze eye tear','bronze',[(-3,-6),(3,-6),(0,-13)],depth=1.5,z=5.2,bevel=.4)
+    # Three amber forehead triangles and fine bronze circuit traces.
+    for x,y in [(-11,22),(0,26),(11,22)]:
+        m.polygon('Bronze triangle setting','bronze',[(x-3,y+3),(x+3,y+3),(x,y-3)],depth=1.3,z=5,bevel=.35)
+        m.polygon('Amber triangular inlay','amber',[(x-1.5,y+1.5),(x+1.5,y+1.5),(x,y-1.5)],depth=.4,z=5.9,bevel=.15)
+    for sign in (-1,1):
+        for y in (-24,-9,18):
+            m.tube('Branching bronze circuitry','bronze',[[sign*15,y+4,5],[sign*21,y+4,5],
+                   [sign*21,y,5],[sign*23,y-1,5]],.75,6)
+            m.sphere('Circuit terminal bronze socket','bronze',[sign*23,y-1,5],[1.65,1.65,.8],5,10)
+            m.sphere('Amber circuit terminal','amber',[sign*23,y-1,5.75],[.7,.7,.25],4,8)
+    # Squared handle with a wrapped central grip; opening remains visible.
+    handle=[[-14,32,0],[-14,39,0],[-10,44,0],[10,44,0],[14,39,0],[14,32,0]]
+    m.tube('Heavy bronze carrying handle','bronze',handle,2.2,8)
+    m.tube('Wrapped handle grip','wrap',[[-9,44,0],[9,44,0]],2.5,10)
+    t=np.linspace(0,1,80)
+    m.tube('Spiral grip binding','edge',np.c_[-9+18*t,44+2.6*np.cos(t*TAU*7),2.6*np.sin(t*TAU*7)],.45,5)
+    for sign in (-1,1):
+        m.polygon('Handle mounting bracket','bronze',[(sign*10,29),(sign*17,29),
+                  (sign*17,34),(sign*10,34)],depth=10,bevel=.8)
+    # Rear seams and inset eye make a rotating pickup readable from both sides.
     for sign in (-1,1):
         t=np.linspace(0,math.pi,18)
-        m.tube('Sheikah eye lid','glyph',np.c_[13*np.cos(t),4+sign*6*np.sin(t),np.full(len(t),4.2)],.65,5)
-    m.polygon('Sheikah tear','glyph',[(-2,-5),(2,-5),(0,-13)],depth=.7,z=4.2,bevel=.2)
-    for x in (-23,23):
-        for y in (-23,23):m.sphere('Frame bronze rivet','edge',[x,y,4],[1.2,1.2,.6],4,8)
+        m.tube('Rear bronze eye relief','bronze',np.c_[11*np.cos(t),4+sign*5*np.sin(t),
+               np.full(len(t),-4.8)],.65,5)
+    m.sphere('Rear rune seal','glyph',[0,4,-5],[2.2,3,.5],6,12)
+    for y in (-22,23):
+        m.tube('Rear engraved casing seam','bronze',[[-18,y,-4.8],[0,y-2,-4.8],[18,y,-4.8]],.45,5)
     # A real raised rune badge below the eye, readable while the item rotates.
     if slug=='slate_bomb':
-        m.sphere('Remote bomb badge','glyph',[0,-20,4.5],[4,4,1],6,12)
-        m.tube('Bomb fuse','edge',[[0,-16,4.8],[1,-13,4.8],[3,-12,4.8]],.5,5)
+        m.sphere('Remote bomb badge','glyph',[0,-20,5.2],[4,4,1],6,12)
+        m.tube('Bomb fuse','edge',[[0,-16,5.6],[1,-13,5.6],[3,-12,5.6]],.5,5)
     elif slug=='slate_master_cycle':
-        for x in (-8,8):m.ring('Cycle wheel','glyph',[x,-20,4.4],3.5,.65,segments=16,sides=5)
-        m.tube('Cycle chassis','glyph',[[-8,-20,4.4],[-2,-15,4.4],[5,-16,4.4],[8,-20,4.4]],.7,5)
+        for x in (-8,8):m.ring('Cycle wheel','glyph',[x,-20,5.2],3.5,.65,segments=16,sides=5)
+        m.tube('Cycle chassis','glyph',[[-8,-20,5.2],[-2,-15,5.2],[5,-16,5.2],[8,-20,5.2]],.7,5)
     elif slug=='slate_stasis':
-        for x in (-3.5,3.5):m.polygon('Stasis pause bar','glyph',[(x-1,-24),(x+1,-24),(x+1,-16),(x-1,-16)],depth=.6,z=4.4,bevel=.2)
+        for x in (-3.5,3.5):m.polygon('Stasis pause bar','glyph',[(x-1,-24),(x+1,-24),(x+1,-16),(x-1,-16)],depth=.6,z=5.2,bevel=.2)
     elif slug=='slate_cryonis':
-        for x,h in [(-7,5),(0,9),(7,6)]:m.polygon('Cryonis pillar','glyph',[(x-2,-24),(x+2,-24),(x+2,-24+h),(x-2,-24+h)],depth=.7,z=4.4,bevel=.2)
+        for x,h in [(-7,5),(0,9),(7,6)]:m.polygon('Cryonis pillar','glyph',[(x-2,-24),(x+2,-24),(x+2,-24+h),(x-2,-24+h)],depth=.7,z=5.2,bevel=.2)
     elif slug=='slate_sensor':
         for r in (3,6,9):
             t=np.linspace(-.8,.8,16)
-            m.tube('Sensor signal arc','glyph',np.c_[r*np.sin(t),-23+r*np.cos(t),np.full(len(t),4.4)],.5,5)
-    m.notes=['Basalt tablet, bronze trim, carrying loop and raised Sheikah eye/rune badge.',
+            m.tube('Sensor signal arc','glyph',np.c_[r*np.sin(t),-23+r*np.cos(t),np.full(len(t),5.2)],.5,5)
+    m.notes=['Upright BotW-inspired charcoal casing, sculpted bronze eye, amber circuitry and wrapped handle.',
+             'Rune iris and badge use the same hex palette as the shared GI effect policy.',
              'New three-dimensional GI; original gameplay slate resource remains separate.']
     return m
 
@@ -169,7 +210,7 @@ def hourglass():
 def shadow_crystal():
     m=model('shadow_crystal','Shadow Crystal')
     m.material('obsidian',[.025,.018,.042],metal=.4,rough=.21)
-    m.material('violet',[.42,.12,.65],'energy',emission=.5)
+    m.material('violet',rgb(0x9E38DA),'energy',emission=.5)
     m.material('crystal_skin',[.62,.38,.80],alpha=.24,rough=.12)
     m.crystal('Black shadow core','obsidian',[0,0,0],19,72,6)
     m.crystal('Violet translucent facets','crystal_skin',[0,0,0],21,78,6)

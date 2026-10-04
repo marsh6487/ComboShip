@@ -135,8 +135,9 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     if (rcStatic == CW_DRAW_NOT_READY) {
         return ComboForeignResolveOOT::NotReady; // OOT dormant / rando context null — retry next frame
     }
-    if (rcStatic == 0 || (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_NEI_CANE &&
-                          raw.drawKind != CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT && raw.drawKind != CW_DRAW_KIND_SEASON_GI)) {
+    if (rcStatic == 0 ||
+        (raw.dlistCount <= 0 && raw.drawKind != CW_DRAW_KIND_NEI_CANE &&
+         raw.drawKind != CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT && raw.drawKind != CW_DRAW_KIND_SEASON_GI)) {
         // ComboShip: no static DL row — try the animated ABI (OOT boss souls' real skeletons). OOT
         // only describes the item; ComboForeignAnim_Draw loads + draws it (mirror of the OOT side).
         static Fn_GetItemAnimDrawInfo sGetItemAnimDrawInfo = nullptr;

@@ -150,7 +150,7 @@ bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiG
 
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
                             const float center[3], bool shimmer, const char* owner) {
-    if (!play || !opa || !center || scale <= 0 || effect < 0 || effect > int(Kind::SeasonCycle))
+    if (!play || !opa || !center || scale <= 0 || effect < 0 || effect > int(Kind::FourSword))
         return;
     const Kind kind = static_cast<Kind>(effect);
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;

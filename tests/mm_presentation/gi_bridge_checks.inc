@@ -2,6 +2,82 @@
 CwItemDrawInfo exported{};
 assert(OOT_GetNeiGiDrawInfo(nullptr, &exported) == 0);
 assert(OOT_GetNeiGiDrawInfo("unknown", &exported) == 0);
+// The native MM item must request its purple Kokiri recipe from the owner.
+// Its bridge identity cannot share OoT's green progressive Kokiri recipe.
+Reset();
+files.insert("__OTR__objects/nei_gi_redesign/mm_kokiri_sword/gi_dl");
+CwItemDrawInfo mmKokiri{};
+assert(MM_DescribeNeiGi(RI_SWORD_KOKIRI, &mmKokiri));
+assert(std::strcmp(mmKokiri.dlists[0], "__OTR__@oot:objects/nei_gi_redesign/mm_kokiri_sword/gi_dl") == 0);
+assert(NeiGi::ColorHex(static_cast<Kind>(mmKokiri.neiEffect)) == 0xA46CFF);
+files.insert("__OTR__objects/nei_gi_redesign/kokiri_sword/gi_dl");
+CwItemDrawInfo ootKokiri{};
+assert(OOT_GetNeiGiDrawInfo("kokiri_sword", &ootKokiri) == 1);
+assert(std::strcmp(ootKokiri.dlists[0], "__OTR__objects/nei_gi_redesign/kokiri_sword/gi_dl") == 0);
+assert(NeiGi::ColorHex(static_cast<Kind>(ootKokiri.neiEffect)) == 0x78C850);
+assert(mmKokiri.neiEffect != ootKokiri.neiEffect);
+for (const auto& origin : {std::pair{mmKokiri, 0xA46CFFu}, std::pair{ootKokiri, 0x78C850u}}) {
+    Reset();
+    MM_DrawNeiGi(origin.first);
+    assert(Drawn() == std::vector<std::string>{origin.first.dlists[0]});
+    assert(!arena.empty()); // Intrinsic particles are carried without the optional toggle.
+    bool carriesColor = false;
+    for (const auto& mesh : arena)
+        for (const auto& v : mesh)
+            carriesColor |= ((uint32_t(v.v.cn[0]) << 16) | (uint32_t(v.v.cn[1]) << 8) | v.v.cn[2]) == origin.second;
+    assert(carriesColor);
+    const auto intrinsicCount = arena.size();
+    Reset(); enabled = 1;
+    MM_DrawNeiGi(origin.first);
+    assert(arena.size() == intrinsicCount + (origin.first.itemShimmer ? 0 : 1));
+    const auto shown = arena;
+    arena.clear();
+    NeiGi_DrawMesh(&play, NeiGi::SampleShimmer(play.gameplayFrames, true,
+        NeiGi_CameraBasis(&play), static_cast<Kind>(origin.first.neiEffect)));
+    assert(arena.size() == 1);
+    const auto& want = arena.front();
+    assert(std::count_if(shown.begin(), shown.end(), [&](const auto& got) {
+        return got.size() == want.size() && !std::memcmp(got.data(), want.data(), want.size() * sizeof(Vtx));
+    }) == 1);
+    assert(stack.empty() && interpolation == 0 && matrix == 1);
+}
+Reset();
+
+// Legacy fallback keeps each sword's shimmer palette when authored resources
+// are missing. Standard swords retain their mandatory shimmer; Four Sword
+// follows the optional toggle and has no intrinsic particles in this route.
+for (const auto& sword : {
+    std::pair{RI_SWORD_KOKIRI, Kind::MmKokiriSword},
+    std::pair{RI_SWORD_RAZOR, Kind::RazorSword},
+    std::pair{RI_SWORD_GILDED, Kind::GildedSword},
+    std::pair{RI_OOT_MASTER_SWORD, Kind::MasterSword},
+    std::pair{RI_OOT_TRUE_MASTER_SWORD, Kind::SwordAura},
+    std::pair{RI_OOT_BIGGORON_SWORD, Kind::BiggoronSword},
+    std::pair{RI_GREAT_FAIRY_SWORD, Kind::GreatFairySword},
+    std::pair{RI_OOT_EXT_FOUR_SWORD, Kind::FourSword},
+    std::pair{RI_OOT_IRON_KNUCKLE_AXE, Kind::Neutral}}) {
+    for (int optionalEffects : {0, 1}) {
+        Reset(); enabled = optionalEffects;
+        {
+            MM_NeiGiFallbackShimmer fallbackShimmer(sword.first);
+            Matrix_Scale(7, 7, 7, MTXMODE_APPLY); // Original model mutates its own pose.
+        }
+        const bool active = sword.first != RI_OOT_EXT_FOUR_SWORD || optionalEffects;
+        assert(arena.size() == (active ? 1 : 0));
+        assert(stack.empty() && interpolation == 0 && loads == 0);
+        if (active) {
+            assert(matrix == 1 && matrixY == 0);
+            const auto got = arena.front();
+            arena.clear();
+            NeiGi_DrawMesh(&play, NeiGi::SampleShimmer(play.gameplayFrames, true,
+                NeiGi_CameraBasis(&play), sword.second));
+            assert(arena.size() == 1);
+            const auto& want = arena.front();
+            assert(got.size() == want.size() && !std::memcmp(got.data(), want.data(), want.size() * sizeof(Vtx)));
+        }
+    }
+}
+Reset();
 // Season descriptors never require a rod or authored season mesh, and MM's
 // generic native bridge must accept their zero-display-list weather recipes.
 const CustomDrawFunc seasonCallbacks[] = {Randomizer_DrawSeasonSpring, Randomizer_DrawSeasonSummer,

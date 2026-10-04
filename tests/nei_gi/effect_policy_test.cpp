@@ -5,9 +5,161 @@
 #include <iostream>
 #include <limits>
 #include <set>
+#include <utility>
 
 int main() {
   using namespace NeiGi;
+  // Each blade has its own intrinsic effect even when the optional shimmer is
+  // disabled. These numeric identities append to the existing native contract.
+  const Kind swords[] = {Kind::KokiriSword, Kind::MmKokiriSword,
+                         Kind::RazorSword, Kind::GildedSword,
+                         Kind::MasterSword, Kind::BiggoronSword,
+                         Kind::GreatFairySword, Kind::FourSword,
+                         Kind::SwordAura};
+  static_assert(int(Kind::SwordAura) == 17 && int(Kind::SlateSensor) == 24 &&
+                int(Kind::KokiriSword) == 25 && int(Kind::FourSword) == 32);
+  const uint32_t swordHues[] = {0x78C850, 0xA46CFF, 0xBDD6EA, 0xFFD45A,
+                                0x6F8FFF, 0xFF9A42, 0x79BE84, 0x315B2F,
+                                0xFFF4D6};
+  const Basis sideCamera{{0, 0, 1}, {0, 1, 0}, {-1, 0, 0}};
+  auto near = [](Point a, Point b) {
+    return std::abs(a.x - b.x) < .0001f &&
+           std::abs(a.y - b.y) < .0001f &&
+           std::abs(a.z - b.z) < .0001f;
+  };
+  for (size_t sword = 0; sword < std::size(swords); ++sword) {
+    const Kind kind = swords[sword];
+    assert(IsSword(kind));
+    assert(IsSpecial(kind));
+    assert(ColorHex(kind) == swordHues[sword]);
+    float highestBladeEffect = -1000.f;
+    for (uint32_t frame : {0u, 19u, 47u, 179u, 180u, 65535u,
+                           std::numeric_limits<uint32_t>::max()}) {
+      const auto mesh = SampleSpecial(kind, frame);
+      const auto again = SampleSpecial(kind, frame);
+      const auto side = SampleSpecial(kind, frame, sideCamera);
+      assert(mesh.count > 0 && mesh.count < mesh.vertices.size() &&
+             mesh.count % 3 == 0 && mesh.count == side.count);
+      size_t anchors = 0;
+      for (size_t i = 0; i < mesh.count; ++i) {
+        const auto &v = mesh.vertices[i];
+        highestBladeEffect = std::max(highestBladeEffect, v.p.y);
+        assert(std::isfinite(v.p.x) && std::isfinite(v.p.y) &&
+               std::isfinite(v.p.z));
+        assert(std::abs(v.p.x) < 25 && v.p.y > -23 && v.p.y < 103 &&
+               std::abs(v.p.z) < 15);
+        assert(near(v.p, again.vertices[i].p) &&
+               v.rgb == again.vertices[i].rgb &&
+               v.alpha == again.vertices[i].alpha);
+        // Transparent skirts may face the camera; lit blade centers and local
+        // flecks must stay attached as the camera moves around the item.
+        if (v.rgb == swordHues[sword] && v.alpha >= 80) {
+          assert(near(v.p, side.vertices[i].p));
+          if (kind == Kind::RazorSword || kind == Kind::BiggoronSword) {
+            // The corrected meshes stand upright. Their lit particle centers
+            // must stay around the blade axis without the former baked lean.
+            assert(std::abs(v.p.x) < 6.8f);
+          }
+          ++anchors;
+        }
+      }
+      assert(anchors >= 6);
+      assert(SampleShimmer(frame, false, {}, kind).count == 0);
+    }
+    // Energy must reach each blade's upper section. Gilded's shortened model
+    // ends at native Y=65.99, so its motes must not trail far beyond that tip.
+    if (kind == Kind::MasterSword) assert(highestBladeEffect > 70.f);
+    if (kind == Kind::SwordAura) assert(highestBladeEffect > 65.f);
+    if (kind == Kind::GildedSword) {
+      assert(highestBladeEffect > 63.f);
+      assert(highestBladeEffect < 66.5f);
+    }
+    const auto a = SampleSpecial(kind, 19), b = SampleSpecial(kind, 47);
+    bool moves = a.count != b.count;
+    for (size_t i = 0; i < a.count && i < b.count; ++i)
+      moves |= !near(a.vertices[i].p, b.vertices[i].p);
+    assert(moves);
+    // The native animation phase may wrap, but visible energy must not snap.
+    const auto last = SampleSpecial(kind, 179), first = SampleSpecial(kind, 180);
+    assert(last.count == first.count);
+    for (size_t i = 0; i < last.count; ++i) {
+      if (last.vertices[i].alpha < 40 || first.vertices[i].alpha < 40)
+        continue;
+      const auto delta = last.vertices[i].p - first.vertices[i].p;
+      assert(std::hypot(delta.x, std::hypot(delta.y, delta.z)) < 2);
+    }
+  }
+  // Four Sword always carries all four exact blade colors, and the five
+  // optional shimmer clusters are green, red, blue, violet, green.
+  const Kind fourSword = Kind::FourSword;
+  const uint32_t fourHues[] = {0x315B2F, 0xD8232D, 0x2289CF, 0x6D3593};
+  for (uint32_t frame : {0u, 47u, 179u, 180u}) {
+    const auto trails = SampleSpecial(fourSword, frame);
+    for (uint32_t hue : fourHues) {
+      bool visible = false;
+      for (size_t i = 0; i < trails.count; ++i)
+        visible |= trails.vertices[i].rgb == hue &&
+                   trails.vertices[i].alpha >= 80;
+      assert(visible);
+    }
+    const auto shimmer = SampleShimmer(frame, true, {}, fourSword);
+    // Each independent cluster has a soft 16-triangle halo and 8-triangle star.
+    assert(shimmer.count == 5 * (16 + 8) * 3);
+    const uint32_t clusterHues[] = {fourHues[0], fourHues[1], fourHues[2],
+                                    fourHues[3], fourHues[0]};
+    for (size_t cluster = 0; cluster < 5; ++cluster)
+      assert(shimmer.vertices[cluster * 72].rgb == clusterHues[cluster]);
+  }
+  // Fairy petals progress through the two approved hues across the animation.
+  const Kind fairySword = Kind::GreatFairySword;
+  bool green = false, violet = false, hueChanges = false;
+  const auto fairyStart = SampleSpecial(fairySword, 0);
+  for (uint32_t frame : {0u, 47u, 90u, 137u}) {
+    const auto petals = SampleSpecial(fairySword, frame);
+    for (size_t i = 0; i < petals.count; ++i) {
+      const auto &v = petals.vertices[i];
+      assert(v.rgb == 0x79BE84 || v.rgb == 0x9382C4);
+      green |= v.rgb == 0x79BE84 && v.alpha >= 80;
+      violet |= v.rgb == 0x9382C4 && v.alpha >= 80;
+      hueChanges |= i < fairyStart.count && v.rgb != fairyStart.vertices[i].rgb;
+    }
+  }
+  assert(green && violet && hueChanges);
+  // Fairy shimmer follows a smooth shared green/violet cycle while its bright
+  // star centers stay white. A native 180-frame boundary cannot reset the hue.
+  for (const auto &[frame, expected] :
+       {std::pair{0u, 0x79BE84u}, std::pair{90u, 0x86A0A4u},
+        std::pair{180u, 0x9382C4u}, std::pair{360u, 0x79BE84u}}) {
+    const auto shimmer = SampleShimmer(frame, true, {}, fairySword);
+    bool whiteCore = false;
+    for (size_t i = 0; i < shimmer.count; ++i) {
+      const auto &v = shimmer.vertices[i];
+      assert(v.rgb == expected || v.rgb == 0xFFFFFF);
+      whiteCore |= v.rgb == 0xFFFFFF && v.alpha == 255;
+    }
+    assert(shimmer.vertices[0].rgb == expected && whiteCore);
+  }
+  for (uint32_t frame = 0; frame < 720; ++frame) {
+    const uint32_t a = SampleShimmer(frame, true, {}, fairySword).vertices[0].rgb;
+    const uint32_t b = SampleShimmer(frame + 1, true, {}, fairySword).vertices[0].rgb;
+    for (int shift : {0, 8, 16})
+      assert(std::abs(int((a >> shift) & 255) - int((b >> shift) & 255)) <= 2);
+  }
+  assert(!IsSword(Kind::Neutral) && !IsSword(Kind::SlateSensor));
+  // True Master is an ivory blessing with gold motes. Any blue energy would
+  // obscure its identity and make it resemble the ordinary Master Sword.
+  assert(ColorHex(Kind::SwordAura) == 0xFFF4D6);
+  for (uint32_t frame : {0u, 19u, 47u, 179u, 180u}) {
+    const auto blessing = SampleSpecial(Kind::SwordAura, frame);
+    bool ivory = false, gold = false;
+    for (size_t i = 0; i < blessing.count; ++i) {
+      const auto &v = blessing.vertices[i];
+      assert(v.rgb == 0xFFF4D6 || v.rgb == 0xF4C95D);
+      ivory |= v.rgb == 0xFFF4D6 && v.alpha > 0;
+      gold |= v.rgb == 0xF4C95D && v.alpha > 0;
+    }
+    assert(ivory && gold);
+  }
   const Kind kinds[] = {Kind::Fire,  Kind::Ice,   Kind::Light,
                         Kind::Hylia, Kind::Zonai, Kind::Demise};
   for (Kind kind : kinds) {
@@ -53,7 +205,8 @@ int main() {
       for(size_t i=0;i<a.count;++i) {
         const auto& v=a.vertices[i];
         assert(std::isfinite(v.p.x) && std::isfinite(v.p.y) && std::isfinite(v.p.z));
-        assert(std::abs(v.p.x)<48 && std::abs(v.p.y)<48 && std::abs(v.p.z)<48);
+        const float heightBound = k == Kind::SwordAura ? 68.f : 48.f;
+        assert(std::abs(v.p.x)<48 && std::abs(v.p.y)<heightBound && std::abs(v.p.z)<48);
         assert(v.p.x==b.vertices[i].p.x && v.rgb==b.vertices[i].rgb && v.alpha==b.vertices[i].alpha);
       }
     }
@@ -64,6 +217,16 @@ int main() {
   const auto glints = SampleShimmer(45, true);
   assert(glints.count > 0 && glints.count <= glints.vertices.size());
   assert(ColorHex(Kind::Demise) == 0x000000);
+  // Elemental shimmer must carry the item's hue, rather than a universal cyan.
+  for (Kind kind : {Kind::Fire, Kind::Ice, Kind::Light, Kind::Hylia,
+                    Kind::Zonai, Kind::Demise, Kind::Shadow, Kind::DarkCrystal}) {
+    const auto shimmer = SampleShimmer(45, true, {}, kind);
+    bool carriesHue = false;
+    for (size_t i = 0; i < shimmer.count; ++i)
+      carriesHue |= shimmer.vertices[i].rgb == ColorHex(kind);
+    assert(carriesHue);
+    assert(SampleShimmer(45, false, {}, kind).count == 0);
+  }
   // Summer must remain a recognizable, steady sun rather than rising motes.
   // Removing the disk or reintroducing embers breaks this silhouette contract.
   for (uint32_t frame : {0u, 47u, 179u, 180u, 719u,

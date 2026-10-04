@@ -1,31 +1,53 @@
 {
   "resource_count": 10,
-  "vertex_records": 1769,
-  "vertex_loads": 62,
+  "vertex_records": 2069,
+  "vertex_loads": 85,
   "slug": "kokiri_sword",
-  "name": "Kokiri Sword",
+  "name": "Kokiri Sword (OoT)",
   "entry": "objects/nei_gi_redesign/kokiri_sword/gi_dl",
   "draw_scale": 1.0,
-  "matrix_scale": 0.040618896484375,
-  "triangles": 1410,
+  "matrix_scale": 0.0412445068359375,
+  "triangles": 1538,
   "bounds_author": [
     [
-      -22.5,
-      -46.1875,
-      -5.125
+      -13.0,
+      -32.0,
+      -3.5
     ],
     [
-      16.5625,
-      45.625,
-      5.125
+      13.0,
+      61.0,
+      3.5
     ]
   ],
   "markers": {
-    "presentation_only": true,
-    "draw_scale": 1.0,
-    "effective_author_scale": 0.65,
-    "authored_lean_degrees": -18,
-    "reconstruction": true
+    "visual_review_candidate": true,
+    "runtime_tested": false,
+    "preview_front_angle": 16,
+    "preview_back_angle": 164,
+    "imported_approved_model": true
   },
-  "runtime_tested": false
+  "notes": [
+    "OoT Kokiri identity: short steel blade, solid brown guard, red jewel, leather grip and flared wooden pommel.",
+    "Clean walnut guard without added wire ornament; mirrored bevel faces point outward and the blade tang extends through its central mount."
+  ],
+  "runtime_tested": false,
+  "source_provenance": {
+    "bundle": "NEI_Sword_GI_Latest_20261003",
+    "art_checkpoint": "dd66ee65",
+    "authoring_recipe": "../../SOURCE/forged_swords/SOURCE/sword_forged.py",
+    "glb_sha256": "a86974807df75b3f35c0eb83d88b3fae95bc50086d0ba3e7da6fe32cdec5e7be",
+    "resource_sha256": {
+      "bronze_tex": "d655803bd62e4ef449a2728d2dbaa454028f915249b07d709100b15e5165ad75",
+      "brown_leather_tex": "0139c1798707054172e3aa16e06790b383dde997a74d7634118ab825abe476a1",
+      "brown_wrap_tex": "2ea68ef40a720bff017ddad602e703a57dd9ad04de7f3e90fc8fd93c0b1eacc1",
+      "edge_tex": "8c9b5b1548288588aece01a8e76afda8722485d75ab049ebe9f59b0978dc55a7",
+      "gi_dl": "33bc634ba47fe9ba3702b1c108282149038565dfff80b7527842b3a7b5e64c70",
+      "mesh_opa_vtx": "1ee30b7241fbc451d66b32f18657e7d37d0f141a5c479daee90ec1dba4f98720",
+      "ruby_tex": "977178ae17f8942bb63ac277bfe9c09c4990cbd8458f8e76fad18e9a601d35f7",
+      "scale_mtx": "bba652b1cf8f43eb8f04a6fdc3fa639db60eab659614e7fcbef2bbac0943a4ad",
+      "steel_tex": "5ba49cfb20429ebcf49f5b76c0f464e1e83db89fc23e245062e96c9c5d1bd45f",
+      "walnut_tex": "43886406c78bbbe561170d3e6e5825ece427c1a8a471c25003c39a05e01e26fd"
+    }
+  }
 }

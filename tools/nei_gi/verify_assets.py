@@ -23,7 +23,7 @@ ITEMS = ("fire_rod", "ice_rod", "light_rod", "rocs_feather", "time_gate", "whip"
          "meteor_rod", "storm_rod", "shadow_scepter", "sheikah_slate", "slate_bomb",
          "slate_master_cycle", "slate_stasis", "slate_cryonis", "slate_sensor",
          "phantom_hourglass", "shadow_crystal",
-         "rod_of_seasons", "kokiri_sword", "razor_sword",
+         "rod_of_seasons", "kokiri_sword", "mm_kokiri_sword", "razor_sword",
          "gilded_sword", "master_sword", "true_master_sword", "biggoron_sword",
          "great_fairy_sword", "iron_knuckle_axe")
 

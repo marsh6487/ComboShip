@@ -1,8 +1,61 @@
 # NEI GI upgrade candidate
 
-The final presentation candidate extends this original batch to **21 GI models**:
+The current asset set contains **60 serialized GI models**, with authored get-item
+resources under `soh/assets/custom/objects/nei_gi_redesign/`. The latest pass adds
+element colors for rods, spells and Slate variants, rings that turn with the
+Slate, and sword-specific particle themes. It also includes distinct OoT/MM
+Kokiri swords and the reviewed sword proportion corrections.
+
+The approved Master, Gilded and True Master visual baseline is recorded in
+[`SOURCE/sword_visual_approval.json`](SOURCE/sword_visual_approval.json), with
+current previews in the [two-sword adjustment](PREVIEWS/sword-tuned-pass.md).
+See [Slate model/color review](PREVIEWS/slate-element-preview.md) and
+[attached Slate rings](PREVIEWS/slate-rings-attached.md) for the latest Slate work.
+These are offline previews; visual approval does not establish in-game appearance
+or a successful full game build.
+
+The [integration verification record](PUBLICATION.md) documents the final
+19-suite regression run and the resolved historical MM fixture failure.
+
+## Reproduce the current assets and previews
+
+`CHECKPOINTS/` retains the exact exported GLBs, metadata and front/back views.
+`SOURCE/` contains the authoring recipes, and `REFERENCES/` preserves earlier
+reference inputs. Use Python 3.11 or newer with NumPy/Pillow; the recorded Python
+dependencies are in the forged toolkit. From the repository root:
+
+```sh
+python3 -m pip install -r tools/nei_gi/SOURCE/forged_swords/requirements.txt
+python3 tools/nei_gi/check_forged_proportions.py
+python3 tools/nei_gi/verify_assets.py
+python3 scripts/diagnostics/run_nei_gi_tests.py --combo
+python3 tools/nei_gi/package_archive.py /tmp/NEI_GI_Current.o2r
+```
+
+The focused diagnostics compile against the checkout's actual libultraship and
+SoH headers and require a C++20 compiler and nlohmann-json headers. Packaging
+uses the installed resources and creates identical base/Alt entries.
+
+For selected sword rebuilds, use the
+[forged toolkit instructions](SOURCE/forged_swords/README.md). The legacy
+`SOURCE/sword_revamp.py` entry point also dispatches imported sword slugs to that
+toolkit. To rebuild selected Slate variants and install their resources:
+
+```sh
+python3 tools/nei_gi/SOURCE/quest_revamp.py sheikah_slate slate_bomb slate_master_cycle slate_stasis slate_cryonis slate_sensor --install
+```
+
+Generated intermediate `RESOURCES/` and Python caches are ignored; installed
+custom assets and checkpoint files are the published outputs. Current sword and
+Slate rotating previews use production C++ effects with Mesa EGL/OpenGL and a
+common sword camera scale. Portable commands and system dependencies are in
+[`runtime_preview/README.md`](runtime_preview/README.md).
+
+## Historical original batch
+
+The earlier presentation candidate extended the original batch to **21 GI models**:
 the lantern, Spinner, Cane of Somaria, Minish Cap and Roc's Cape are included.
-Both native SoH and NEI feather callbacks use the approved feather. Current
+Both native SoH and NEI feather callbacks use the approved feather. That batch's
 scope, references and evidence are recorded in
 [`../nei_final_preview/VERIFICATION.md`](../nei_final_preview/VERIFICATION.md).
 The original batch history below remains the record of its earlier review.
@@ -21,7 +74,7 @@ The user approved the offline designs on September 27, 2026, after reviewing all
 
 These are renders of the exported model geometry, without game particle effects. The spell cores are the actual assets; the pale crystal edges are modeled strips, not preview wireframes. Runtime effects surround the models without replacing their surfaces.
 
-## Reproduce and check
+## Historical batch reproduction
 
 `CHECKPOINTS/` retains each exact GLB and its metadata/front/back views. `SOURCE/` contains the Python mesh authoring and software preview renderer (numpy and Pillow required); `REFERENCES/` contains the preserved inputs.
 
@@ -33,8 +86,8 @@ python3 tools/nei_gi/package_archive.py /tmp/NEI_GI_Upgrade_Approved_POC3.o2r
 
 The renderer tests compile against the checkout's actual libultraship and SoH headers; a C++20 compiler and nlohmann-json headers are required. The archive contains only these GI-specific resources with identical base/Alt copies. It is one combined pack.
 
-To regenerate authoring checkpoints, run `python3 tools/nei_gi/SOURCE/build_batch.py`; copy the resulting `tools/nei_gi/RESOURCES/objects/nei_gi_redesign/` into the corresponding custom-assets directory before validating and packaging. Regeneration does not silently replace shipped assets.
+To regenerate the original batch's authoring checkpoints, run `python3 tools/nei_gi/SOURCE/build_batch.py`; copy the resulting `tools/nei_gi/RESOURCES/objects/nei_gi_redesign/` into the corresponding custom-assets directory before validating and packaging. This entry point rebuilds the historical batch, not all 60 current models. Regeneration does not silently replace shipped assets.
 
 ## Acceptance still required
 
-Compiled tests and offline previews do not prove game appearance. Check one shop and shuffled freestanding pickup with effects off/on, inspect rod-tip placement, rotate the three transparent spells, and repeat with Alt Assets toggled. Check pickup scale, scene re-entry and pause/unpause. This remains a POC until those configurations are accepted.
+Compiled tests and offline previews do not prove game appearance. Check one shop and shuffled freestanding pickup with effects off/on, inspect rod-tip placement, rotate the three transparent spells, and repeat with Alt Assets toggled. Check the current swords and attached Slate rings in native and foreign host draws, including pickup scale, scene re-entry and pause/unpause. In-game verification of these configurations remains required.

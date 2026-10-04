@@ -251,6 +251,63 @@ int main() {
   assert(!NeiGi_Draw(&play, &entry));
   assert(allocations == 0 && fallback == 0);
 
+  // The concrete sword binding must select its approved palette and emit
+  // intrinsic particles through both native and shared host draw boundaries.
+  // A neutral binding or a stale enum gate silently loses this presentation.
+  for (const auto& sword : {
+      std::pair{&Randomizer_DrawProgressiveKokiriSword, 0x78C850u},
+      std::pair{&Randomizer_DrawRazorSword, 0xBDD6EAu},
+      std::pair{&Randomizer_DrawGildedSword, 0xFFD45Au},
+      std::pair{&Randomizer_DrawMasterSword, 0x6F8FFFu},
+      std::pair{&Randomizer_DrawTrueMasterSword, 0xFFF4D6u},
+      std::pair{&Randomizer_DrawProgressiveBGS, 0xFF9A42u},
+      std::pair{&Randomizer_DrawGreatFairySword, 0x79BE84u},
+      std::pair{&Randomizer_DrawExtFourSword, 0x315B2Fu}}) {
+    Reset();
+    entry = {};
+    entry.drawFunc = sword.first;
+    const auto* binding = FindPresentation(&entry);
+    assert(binding && NeiGi::ColorHex(binding->effect) == sword.second);
+    files.insert(binding->opaque);
+    assert(NeiGi_Draw(&play, &entry));
+    assert(Drawn() == std::vector<std::string>{binding->opaque});
+    assert(!arena.empty()); // Intrinsic particles, even with optional shimmer off.
+    Reset();
+    const float center[] = {0, 0, 0};
+    NeiGi_DrawPresentation(&play, binding->opaque, nullptr, binding->scale,
+                          int(binding->effect), center, false, nullptr);
+    assert(Drawn() == std::vector<std::string>{binding->opaque});
+    assert(!arena.empty() && stack.empty());
+  }
+  std::cout << "PASS sword native/shared bindings: approved palettes and intrinsic particles\n";
+
+  // Rune identification survives the shared Slate silhouette and animation.
+  std::set<uint32_t> runeHues;
+  for (CustomDrawFunc draw : {Randomizer_DrawSlateRuneBomb,
+                             Randomizer_DrawSlateRuneMasterCycle,
+                             Randomizer_DrawSlateRuneStasis,
+                             Randomizer_DrawSlateRuneCryonis,
+                             Randomizer_DrawSlateRuneSensor}) {
+    entry.drawFunc = draw;
+    const auto* rune = FindPresentation(&entry);
+    assert(rune != nullptr);
+    const auto hue = NeiGi::ColorHex(rune->effect);
+    assert(runeHues.insert(hue).second);
+    const auto shimmer = NeiGi::SampleShimmer(45, true, {}, rune->effect);
+    bool carriesHue = false;
+    for (size_t i = 0; i < shimmer.count; ++i)
+      carriesHue |= shimmer.vertices[i].rgb == hue;
+    assert(carriesHue);
+    assert(NeiGi::SampleSpecial(rune->effect, 45).count > 0);
+    // MM consumes the shared integer effect through this renderer boundary.
+    Reset();
+    const float center[] = {0, 0, 4};
+    NeiGi_DrawPresentation(&play, rune->opaque, nullptr, 1.f,
+                           static_cast<int>(rune->effect), center, true, nullptr);
+    assert(gfx.polyOpa.p > opa && !arena.empty());
+    assert(stack.empty());
+  }
+
   // Seasons are intrinsic weather in the common, shop and overhead routes,
   // even with optional effects disabled and authored season/rod assets present.
   const std::array<CustomDrawFunc, 4> seasons = {
@@ -614,6 +671,49 @@ int main() {
   const Bounds bounds[] = {
 #include "nei_gi_bounds.inc"
   };
+  // Front-mounted Slate sigils share the GI's rotation. Camera changes may
+  // alter ribbon width, but cannot billboard their ring centerlines. Compare
+  // packed effects with the actual serialized model's frontmost relief.
+  size_t slateVariants = 0;
+  for (const auto& b : bounds) {
+    GetItemEntry slateEntry{};
+    slateEntry.drawFunc = b.draw;
+    const auto* slate = FindPresentation(&slateEntry);
+    if (!slate || !NeiGi::IsSlate(slate->effect))
+      continue;
+    ++slateVariants;
+    for (int pitch : {-60, -30, 0, 30, 60}) {
+      const float x = pitch * NeiGi::Tau / 360.f;
+      for (int yaw = 0; yaw < 360; yaw += 15) {
+        const float y = yaw * NeiGi::Tau / 360.f;
+        const float sx = std::sin(x), cx = std::cos(x);
+        const float sy = std::sin(y), cy = std::cos(y);
+        const NeiGi::Basis camera{{cy, 0, sy}, {sx * sy, cx, -sx * cy},
+                                  {-cx * sy, sx, cx * cy}};
+        for (uint32_t frame : {0u, 45u, 89u}) {
+          const auto halo = NeiGi::SampleSpecial(slate->effect, frame, camera);
+          const auto faceOn = NeiGi::SampleSpecial(slate->effect, frame);
+          assert(halo.count > 0);
+          // Vertex zero is the first ribbon's centerline anchor. Its model-local
+          // position must not move when only the camera orientation changes.
+          assert(halo.vertices[0].p.x == faceOn.vertices[0].p.x);
+          assert(halo.vertices[0].p.y == faceOn.vertices[0].p.y);
+          assert(halo.vertices[0].p.z == faceOn.vertices[0].p.z);
+          for (size_t i = 0; i < halo.count; ++i) {
+            const auto& sampled = halo.vertices[i].p;
+            const NeiGi::Point p{std::round(sampled.x * 16) / 16,
+                                 std::round(sampled.y * 16) / 16,
+                                 std::round(sampled.z * 16) / 16};
+            assert(p.z + slate->effectCenter.z > b.maximum[2] * b.drawScale + .25f);
+            const float radius = std::hypot(p.x, p.y);
+            assert(radius > 8.5f && radius < 14.5f);
+          }
+        }
+      }
+    }
+  }
+  assert(slateVariants == 6);
+  std::cout << "PASS six Slate sigils: model-attached centerlines and packed vertices clear raised relief across camera poses\n";
   std::ofstream preview;
   if (const auto *path = std::getenv("NEI_SHOP_PREVIEW_EXPORT")) {
     preview.open(path);

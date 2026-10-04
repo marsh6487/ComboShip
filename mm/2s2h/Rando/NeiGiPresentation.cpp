@@ -78,7 +78,7 @@ const Binding kBindings[] = {
     { RI_OOT_NEI_PHANTOM_HOURGLASS, "phantom_hourglass" },
     { RI_OOT_NEI_SHADOW_CRYSTAL, "shadow_crystal" },
     { RI_OOT_NEI_ROD_OF_SEASONS, "rod_of_seasons" },
-    { RI_SWORD_KOKIRI, "kokiri_sword" },
+    { RI_SWORD_KOKIRI, "mm_kokiri_sword" },
     { RI_SWORD_RAZOR, "razor_sword" },
     { RI_SWORD_GILDED, "gilded_sword" },
     { RI_OOT_MASTER_SWORD, "master_sword" },
@@ -203,7 +203,38 @@ MM_NeiGiFallbackShimmer::~MM_NeiGiFallbackShimmer() {
     if (!mEnabled)
         return;
     Matrix_Pop();
-    const Kind kind = mItem == RI_OOT_NEI_DEKU_LEAF ? Kind::Leaf : Kind::Neutral;
-    NeiGi_DrawMesh(gPlayState, NeiGi::SampleShimmer(gPlayState->gameplayFrames, true,
-                                                  NeiGi_CameraBasis(gPlayState), kind));
+    Kind kind = Kind::Neutral;
+    switch (mItem) {
+        case RI_OOT_NEI_DEKU_LEAF:
+            kind = Kind::Leaf;
+            break;
+        case RI_SWORD_KOKIRI:
+            kind = Kind::MmKokiriSword;
+            break;
+        case RI_SWORD_RAZOR:
+            kind = Kind::RazorSword;
+            break;
+        case RI_SWORD_GILDED:
+            kind = Kind::GildedSword;
+            break;
+        case RI_OOT_MASTER_SWORD:
+            kind = Kind::MasterSword;
+            break;
+        case RI_OOT_TRUE_MASTER_SWORD:
+            kind = Kind::SwordAura;
+            break;
+        case RI_OOT_BIGGORON_SWORD:
+            kind = Kind::BiggoronSword;
+            break;
+        case RI_GREAT_FAIRY_SWORD:
+            kind = Kind::GreatFairySword;
+            break;
+        case RI_OOT_EXT_FOUR_SWORD:
+            kind = Kind::FourSword;
+            break;
+        default:
+            break;
+    }
+    NeiGi_DrawMesh(gPlayState,
+                   NeiGi::SampleShimmer(gPlayState->gameplayFrames, true, NeiGi_CameraBasis(gPlayState), kind));
 }

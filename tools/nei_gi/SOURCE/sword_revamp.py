@@ -185,12 +185,31 @@ def kokiri_sword():
 
 def razor_sword():
     m = _model('razor_sword', 'Razor Sword')
-    # The original Razor is a double blade. Its upper fork is real open space.
-    _blade(m, 'Shared steel fork root', [(-12, 7.9), (-6, 9.5), (7, 8.8)], 4.)
-    for side in (-1, 1):
-        profile = [(6, 4.5, side*4.4), (25, 4.2, side*5.8),
-                   (46, 3.6, side*6.6), (62, 0, side*7.7)]
-        _blade(m, 'Razor split prong %d' % side, profile, 3.2)
+    # The decoded public held model is a secondary silhouette reference, not
+    # original GI vertex data. Its asymmetric hooked edge, shorter lower spur
+    # and three connecting bridges are one blade assembly, not two free tines.
+    # Preserve this GI reconstruction's 74-unit exposed blade height while
+    # transferring the reference XY silhouette into the upright blade plane.
+    held_scale = 74 / 1576
+    def held_outline(points, ccw=True):
+        outline = [((y-231.5)*held_scale, (x-326)*held_scale-12)
+                   for x, y in points]
+        # Swapping the held axes reverses winding. _beveled_plate requires CCW
+        # contours, while Model.polygon's side facets require CW contours.
+        area = sum(a[0]*b[1]-b[0]*a[1]
+                   for a, b in zip(outline, outline[1:]+outline[:1]))
+        return outline if (area > 0) == ccw else outline[::-1]
+    upper = held_outline([(326, 266), (1514, 267), (1660, 111),
+                          (1902, 122), (1771, 298), (1496, 431), (326, 432)])
+    lower = held_outline([(326, 31), (1330, 37), (1452, 183), (326, 182)])
+    _beveled_plate(m, 'Razor hooked broad cutting edge', upper, depth=3.2)
+    _beveled_plate(m, 'Razor shorter clipped cutting spur', lower, depth=3.2)
+    for i, (start, end) in enumerate(((326, 414), (790, 878), (1244, 1333))):
+        bridge = held_outline([(start, 178), (end, 178), (end, 271), (start, 271)],
+                              ccw=False)
+        m.polygon('Razor integral steel bridge %d' % (i+1), 'steel',
+                  bridge, 1.5, 0, .18)
+    _blade(m, 'Razor seated blade tang', [(-17, 3.1), (-12, 7.)], 3.2)
     m.material('plum_enamel', [.24, .12, .31], 'ceramic', .5, .31)
     guard = [(-20, -17), (-23, -11), (-19, -4), (-17, -10), (-8, -12),
              (-5, -9.5), (0, -12), (5, -9.5), (8, -12), (17, -10),
@@ -210,9 +229,15 @@ def razor_sword():
                   .5, sign*2.8, .15)
         m.polygon('Razor central silver inset', 'blade_edge',
                   [(-1.7, -13), (1.7, -13), (0, -9.5)], .18, sign*3.2, .07)
-    m.notes = ['Distinct real double-pronged steel blade, upswept silver guard, plum/red leather grip.',
-               'Open fork and independent blade ridges distinguish Razor from both adjacent tiers.']
-    return _finish(m, -14)
+    m.notes = ['Connected asymmetric steel Razor blade with a hooked upper edge, shorter clipped spur and three bridges across its narrow slot; silver guard and plum/red leather grip retained.',
+               'Silhouette follows decoded public Z64Online held Razor geometry as a secondary identity reference; original Nintendo GI vertices and absolute GI dimensions were unavailable.',
+               'The secondary held blade was rescaled from 1576 long-axis units to the existing 74-unit GI blade span; upright centered presentation is a reviewable reconstruction.']
+    m = _finish(m, 0)
+    m.markers.update(guard_baseline_y=-17.5*m.native_scale*16,
+                     proportion_reference='secondary held Razor silhouette; GI reconstruction candidate',
+                     secondary_reference='https://github.com/hylian-modding/Z64Online/blob/d1c59355532d7fd81209a40e73dbf586a4738aa9/src/Z64Online/mm/models/zobjs/gear.ts',
+                     original_gi_vertex_data_available=False)
+    return m
 
 
 def gilded_sword():
@@ -332,38 +357,48 @@ def true_master_sword():
 
 def biggoron_sword():
     m = _model('biggoron_sword', "Biggoron's Sword")
-    _blade(m, 'Heavy broad Biggoron blade', [(-10, 8.5), (-6, 10.),
-           (41, 9.4), (55, 8.7), (69, 0)], 4.8, ridge='steel')
+    # A greatsword reconstruction candidate: the 161-unit overall span
+    # is longer than the Master Sword, and the 18-unit cutting width no longer
+    # makes the blade read as a short cleaver. The short tang seats in the guard.
+    # These are authored proportions, not recovered Nintendo GI coordinates.
+    _blade(m, 'Long Biggoron steel blade and seated tang', [(-14, 3.1),
+           (-10, 7.), (-6, 9.), (78, 8.4), (94, 7.2), (106, 0)], 3.6,
+           ridge='steel')
     m.material('goron_bronze', [.68, .32, .07], 'metal', .8, .39)
     m.material('bronze_edge', [.95, .57, .20], 'metal', .82, .27)
     m.material('blue_grip', [.12, .17, .35], 'leather', 0, .76)
-    guard = [(-23, -15), (-24, -8), (-19, -5), (-12, -7), (-7, -8.2),
-             (0, -6.8), (7, -8.2), (12, -7), (19, -5), (24, -8),
-             (23, -15), (15, -16), (7, -13.5), (-7, -13.5), (-15, -16)]
-    m.polygon('Wide orange-bronze Biggoron guard', 'goron_bronze', guard, 6.8, 0, .9)
+    guard = [(-19.2, -15), (-20, -8), (-15.8, -5), (-10, -7), (-5.8, -8.2),
+             (0, -6.8), (5.8, -8.2), (10, -7), (15.8, -5), (20, -8),
+             (19.2, -15), (12.5, -16), (5.8, -13.5), (-5.8, -13.5), (-12.5, -16)]
+    m.polygon('Orange-bronze Biggoron crossguard', 'goron_bronze', guard, 5.2, 0, .75)
     for sign in (1, -1):
         m.tube('Biggoron solid guard rim', 'bronze_edge',
-               [[-22, -11, sign*3.45], [-15, -9.9, sign*3.45], [0, -10, sign*3.45],
-                [15, -9.9, sign*3.45], [22, -11, sign*3.45]], .43, 6)
+               [[-18.4, -11, sign*2.65], [-12.5, -9.9, sign*2.65], [0, -10, sign*2.65],
+                [12.5, -9.9, sign*2.65], [18.4, -11, sign*2.65]], .36, 6)
         m.polygon('Goron guard stamped diamond', 'gold_edge',
-                  [(0, -15), (4.8, -10.4), (0, -6), (-4.8, -10.4)], .23, sign*3.56, .15)
+                  [(0, -15), (4., -10.4), (0, -6), (-4., -10.4)], .23, sign*2.76, .15)
         m.polygon('Goron guard dark central mark', 'goron_bronze',
-                  [(0, -12.9), (2.6, -10.4), (0, -7.9), (-2.6, -10.4)], .13, sign*3.74, .1)
-    _grip(m, -40.5, -17, 3.3, [.115, .16, .31], 'goron_bronze')
+                  [(0, -12.9), (2.2, -10.4), (0, -7.9), (-2.2, -10.4)], .13, sign*2.94, .1)
+    _grip(m, -48, -14, 3.2, [.115, .16, .31], 'goron_bronze')
     # A long two-hand grip and heavy disc pommel carry the weight of the blade.
     m.lathe('Biggoron heavy bronze pommel', 'goron_bronze',
-            [(-50.5, 2.6), (-49, 4.6), (-46, 5.5), (-42.2, 4.6), (-40.5, 3.7)], 12)
-    _band(m, 'Biggoron pommel thick raised rim', 'bronze_edge', -46, 5.45, .8)
+            [(-55, 2.2), (-53.6, 4.), (-51.2, 4.7), (-48.8, 3.8), (-48, 3.4)], 12)
+    _band(m, 'Biggoron pommel thick raised rim', 'bronze_edge', -51.2, 4.65, .65)
     for sign in (1, -1):
         m.tube('Biggoron ricasso reinforced ridge', 'steel_shadow',
-               [[-5.8, -8, sign*1.57], [-5.5, 4, sign*1.7],
-                [-2.8, 11, sign*2.08]], .25, 5)
+               [[-5.1, -8, sign*1.20], [-4.9, 4, sign*1.28],
+                [-2.5, 11, sign*1.56]], .23, 5)
         m.tube('Biggoron ricasso reinforced ridge', 'steel_shadow',
-               [[5.8, -8, sign*1.57], [5.5, 4, sign*1.7],
-                [2.8, 11, sign*2.08]], .25, 5)
-    m.notes = ['Long heavy steel blade, broad orange-bronze guard, indigo two-hand grip and bronze disc pommel.',
-               'Biggoron > Great Fairy remains a separate chain with a visibly heavier base sword.']
-    return _finish(m, -14)
+               [[5.1, -8, sign*1.20], [4.9, 4, sign*1.28],
+                [2.5, 11, sign*1.56]], .23, 5)
+    m.notes = ['Visual reconstruction candidate with a long steel blade, orange-bronze guard, 34-unit indigo two-hand grip and bronze pommel.',
+               '161-unit full span, 18-unit blade width and 40-unit guard follow the proportion review; they are not recovered original Nintendo GI measurements.',
+               'Upright centered GI presentation retains the bronze/indigo/steel material palette.']
+    m = _finish(m, 0)
+    m.markers.update(guard_baseline_y=-35.875*m.native_scale*16,
+                     proportion_reference='proportion correction candidate from user feedback',
+                     original_gi_vertex_data_available=False)
+    return m
 
 
 def _leaf(m, name, xy, z, sign=1, color='leaf_green', depth=.9):
@@ -501,11 +536,29 @@ BUILDERS = {
 
 def main():
     from build_completion import build, ROOT
+    from pathlib import Path
+    import subprocess
+    import sys
+    # The supplied forged recipes own these GI resources. Keep the remaining
+    # legacy weapon builders for Razor, Biggoron and the Iron Knuckle axe.
+    forged = {'kokiri_sword', 'mm_kokiri_sword', 'gilded_sword',
+              'master_sword', 'true_master_sword', 'great_fairy_sword', 'four_sword'}
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('items', nargs='*', choices=list(BUILDERS))
+    p.add_argument('items', nargs='*')
     p.add_argument('--install', action='store_true')
     args = p.parse_args()
-    build({n: BUILDERS[n] for n in (args.items or BUILDERS)}, ROOT, args.install)
+    names = args.items or list(BUILDERS) + ['mm_kokiri_sword', 'four_sword']
+    unknown = set(names) - set(BUILDERS) - forged
+    if unknown:
+        p.error('Unknown sword candidate: ' + ', '.join(sorted(unknown)))
+    chosen = [n for n in names if n in forged]
+    if chosen:
+        helper = Path(__file__).with_name('forged_swords') / 'rebuild.py'
+        command = [sys.executable, str(helper), *chosen, '--output', str(ROOT)]
+        if args.install:
+            command.append('--install')
+        subprocess.run(command, check=True)
+    build({n: BUILDERS[n] for n in names if n not in forged}, ROOT, args.install)
 
 
 if __name__ == '__main__':

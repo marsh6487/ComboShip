@@ -26,9 +26,23 @@ enum class Kind {
     DarkCrystal,
     SwordAura,
     CaneBlue,
-    SeasonCycle
+    SeasonCycle,
+    SlateBomb,
+    SlateCycle,
+    SlateStasis,
+    SlateCryonis,
+    SlateSensor,
+    KokiriSword,
+    MmKokiriSword,
+    RazorSword,
+    GildedSword,
+    MasterSword,
+    BiggoronSword,
+    GreatFairySword,
+    FourSword
 };
 constexpr float Tau = 6.28318530718f;
+constexpr std::array<uint32_t, 4> FourSwordColors{ 0x315B2F, 0xD8232D, 0x2289CF, 0x6D3593 };
 constexpr uint32_t ColorHex(Kind kind) {
     switch (kind) {
         case Kind::Fire:
@@ -60,10 +74,36 @@ constexpr uint32_t ColorHex(Kind kind) {
             return 0x9E38DA;
         case Kind::Slate:
             return 0x30CAFA;
+        case Kind::SlateBomb:
+            return 0x5FDCEB;
+        case Kind::SlateCycle:
+            return 0x64E6BE;
+        case Kind::SlateStasis:
+            return 0xFAC846;
+        case Kind::SlateCryonis:
+            return 0x96D7FF;
+        case Kind::SlateSensor:
+            return 0xC882FF;
         case Kind::Hourglass:
             return 0xF0C864;
         case Kind::SwordAura:
-            return 0x78B4FF;
+            return 0xFFF4D6;
+        case Kind::KokiriSword:
+            return 0x78C850;
+        case Kind::MmKokiriSword:
+            return 0xA46CFF;
+        case Kind::RazorSword:
+            return 0xBDD6EA;
+        case Kind::GildedSword:
+            return 0xFFD45A;
+        case Kind::MasterSword:
+            return 0x6F8FFF;
+        case Kind::BiggoronSword:
+            return 0xFF9A42;
+        case Kind::GreatFairySword:
+            return 0x79BE84;
+        case Kind::FourSword:
+            return FourSwordColors[0];
         case Kind::CaneBlue:
             return 0x5A90FF;
         default:
@@ -76,8 +116,14 @@ inline bool IsRod(Kind k) {
 inline bool IsSpell(Kind k) {
     return k == Kind::Hylia || k == Kind::Zonai || k == Kind::Demise;
 }
+inline bool IsSlate(Kind k) {
+    return k == Kind::Slate || (k >= Kind::SlateBomb && k <= Kind::SlateSensor);
+}
+inline bool IsSword(Kind k) {
+    return k == Kind::SwordAura || (k >= Kind::KokiriSword && k <= Kind::FourSword);
+}
 inline bool IsSpecial(Kind k) {
-    return k >= Kind::Sand && k <= Kind::CaneBlue;
+    return (k >= Kind::Sand && k <= Kind::CaneBlue) || IsSlate(k) || IsSword(k);
 }
 struct Point {
     float x = 0, y = 0, z = 0;
@@ -187,6 +233,107 @@ inline void IceCrystal(Mesh& m, Point center, Point direction, float length, flo
         face(nextLo, lo, base);
     }
 }
+// All swords point up +Y. Camera axes only shape the soft skirts; emission
+// paths remain in the corrected model's own coordinates.
+inline float SwordBladeTip(Kind kind) {
+    switch (kind) {
+        case Kind::KokiriSword:
+            return 38.f;
+        case Kind::MmKokiriSword:
+            return 40.f;
+        case Kind::RazorSword:
+            return 35.f;
+        case Kind::BiggoronSword:
+            return 51.f;
+        case Kind::GildedSword:
+            return 64.5f;
+        case Kind::MasterSword:
+            return 71.f;
+        case Kind::SwordAura:
+            return 66.f;
+        case Kind::GreatFairySword:
+            return 100.f;
+        case Kind::FourSword:
+            return 49.f;
+        default:
+            return 47.f;
+    }
+}
+inline float SwordEmissionBase(Kind kind) {
+    // Centered legacy meshes put their guards below the origin. These starts
+    // lie just above the measured, exported blade seats, rather than halfway
+    // up the longer blades. Forged meshes keep their guard at Y=0.
+    return kind == Kind::RazorSword ? -9.f : kind == Kind::BiggoronSword ? -20.f : 8.f;
+}
+inline Mesh SampleSword(Kind kind, uint32_t frame, const Basis& camera) {
+    Mesh m;
+    const float t = Time(frame), top = SwordBladeTip(kind), bottom = SwordEmissionBase(kind);
+    const uint32_t color = ColorHex(kind);
+    if (kind == Kind::KokiriSword || kind == Kind::GreatFairySword) {
+        const bool fairy = kind == Kind::GreatFairySword;
+        for (int i = 0; i < 10; ++i) {
+            const uint32_t age = frame % 360u + i * 31u;
+            const float f = float(age % 180u) / 180.f;
+            const float a = i * 2.399963f + f * Tau * (fairy ? 1.5f : .5f);
+            const float radius = fairy ? 10.f : 4.8f;
+            const Point p{ radius * std::cos(a), bottom + (top - bottom) * f, radius * std::sin(a) };
+            const Point along{ std::sin(a) * .5f, fairy ? 1.3f : .9f, std::cos(a) * .5f };
+            const Point across{ std::cos(a) * (fairy ? .65f : .45f), .1f, -std::sin(a) * (fairy ? .65f : .45f) };
+            const uint32_t hue = fairy && (age / 180u) % 2 ? 0x9382C4 : color;
+            const uint8_t alpha = uint8_t((fairy ? 165 : 145) * std::sin(f * Tau * .5f));
+            // Pointed local flecks/petals retain their shape while the GI spins.
+            m.Tri({ p + along, hue, alpha }, { p + across, hue, alpha }, { p - along, hue, alpha });
+            m.Tri({ p + along, hue, alpha }, { p - along, hue, alpha }, { p - across, hue, alpha });
+        }
+    } else if (kind == Kind::MmKokiriSword || kind == Kind::MasterSword || kind == Kind::SwordAura ||
+               kind == Kind::FourSword) {
+        const bool blessing = kind == Kind::SwordAura, four = kind == Kind::FourSword;
+        const int strands = four ? 4 : 2;
+        for (int strand = 0; strand < strands; ++strand) {
+            const uint32_t hue = four ? FourSwordColors[strand] : color;
+            auto p = [&](int j) {
+                const float f = j / 14.f;
+                const float a = t + f * Tau * .55f + strand * Tau / strands;
+                const float radius = (four ? 5.4f : 4.8f) + .45f * std::sin(f * Tau + t);
+                return Point{ radius * std::sin(a), bottom + (top - bottom) * f, radius * std::cos(a) };
+            };
+            for (int j = 0; j < 14; ++j)
+                Band(m, p(j), p(j + 1), blessing ? .45f : .32f, hue, blessing ? 0xF4C95D : 0xFFFFFF, camera,
+                     blessing ? 145 : 115);
+        }
+        if (blessing) {
+            for (int i = 0; i < 6; ++i) {
+                const float f = float((frame % 360u + i * 59u) % 360u) / 360.f;
+                const float a = i * 2.399963f + t;
+                Glow(m, { 5.5f * std::cos(a), bottom + (top - bottom) * f, 5.5f * std::sin(a) }, .55f, 0xF4C95D,
+                     uint8_t(165 * std::sin(f * Tau * .5f)), camera);
+            }
+        }
+    } else if (kind == Kind::RazorSword) {
+        for (int i = 0; i < 8; ++i) {
+            const float f = float((frame % 180u + i * 23u) % 180u) / 180.f;
+            const float y = bottom + (top - bottom) * f;
+            const float edge = (i % 2 ? -1.f : 1.f) * (5.8f - 1.7f * f);
+            const Point p{ edge, y, 1.5f * std::sin(t + i) };
+            const uint8_t alpha = uint8_t(170 * std::sin(f * Tau * .5f));
+            Band(m, p, p + Point{ .25f, .9f, 0 }, .18f, color, 0xFFFFFF, camera, alpha);
+            Glow(m, p, .45f, color, alpha, camera);
+        }
+    } else if (kind == Kind::GildedSword || kind == Kind::BiggoronSword) {
+        const bool forge = kind == Kind::BiggoronSword;
+        const uint32_t lifetime = forge ? 90u : 360u;
+        for (int i = 0; i < 8; ++i) {
+            const float f = float((frame % lifetime + i * (forge ? 11u : 43u)) % lifetime) / lifetime;
+            const float a = i * 2.399963f + (forge ? f * 1.6f : (frame % 360u) * (Tau / 360.f));
+            const Point p{ 5.2f * std::cos(a), bottom + (top - bottom) * f, 5.2f * std::sin(a) };
+            const uint8_t alpha = uint8_t((forge ? 175 : 150) * std::sin(f * Tau * .5f));
+            Glow(m, p, forge ? .55f : .7f, color, alpha, camera);
+            if (forge)
+                Band(m, p, p - Point{ .2f, 1.5f, 0 }, .16f, color, 0xFFE6BA, camera, alpha);
+        }
+    }
+    return m;
+}
 inline Mesh SampleSpecial(Kind kind, uint32_t frame, const Basis& camera = {}) {
     Mesh m;
     const float t = Time(frame);
@@ -225,24 +372,22 @@ inline Mesh SampleSpecial(Kind kind, uint32_t frame, const Basis& camera = {}) {
             for (int j = 0; j < 7; ++j)
                 Band(m, p(j), p(j + 1), .7f, color, 0xF5F3FF, camera, 200);
         }
-    } else if (kind == Kind::Slate) {
+    } else if (IsSlate(kind)) {
+        // Front-mounted sigils rotate in the Slate's own frame. Its raised
+        // eye reaches Z=5.04; with the (0,0,4) effect center, this local offset
+        // leaves a .75 gap for the .22-wide camera-facing ribbon skirts.
+        // The casing naturally hides these front-face rings from rear views.
+        constexpr float depth = 1.79f;
         for (int ring = 0; ring < 2; ++ring)
             for (int j = 0; j < 24; ++j) {
                 auto p = [&](int k) {
                     float a = k * Tau / 24 + t * (ring ? -1 : 1), r = 9 + ring * 5;
-                    return Plane(camera, r * std::cos(a), r * std::sin(a), 0);
+                    return Point{ r * std::cos(a), r * std::sin(a), depth };
                 };
                 Band(m, p(j), p(j + 1), .22f, color, 0xD1F8FF, camera, 120);
             }
-    } else if (kind == Kind::SwordAura) {
-        for (int strand = 0; strand < 3; ++strand) {
-            auto p = [&](int j) {
-                float y = -24 + j * 5.f, a = t * 3 + j * .55f + strand * Tau / 3;
-                return Point{ 5 * std::sin(a), y, 5 * std::cos(a) };
-            };
-            for (int j = 0; j < 10; ++j)
-                Band(m, p(j), p(j + 1), 1.3f, color, 0xE5F1FF, camera, 180);
-        }
+    } else if (IsSword(kind)) {
+        return SampleSword(kind, frame, camera);
     }
     return m;
 }
@@ -251,14 +396,30 @@ inline Mesh SampleShimmer(uint32_t frame, bool enabled, const Basis& camera = {}
     if (!enabled)
         return m;
     float t = Time(frame);
+    uint32_t fairyHue = ColorHex(Kind::GreatFairySword);
+    if (kind == Kind::GreatFairySword) {
+        // One shared 360-frame hue cycle keeps all five shimmer clusters green
+        // at phase zero and violet halfway through, without a native-frame snap.
+        const float blend = .5f - .5f * std::cos((frame % 360u) * (Tau / 360.f));
+        fairyHue = 0;
+        for (int shift : { 0, 8, 16 }) {
+            const float green = float((0x79BE84u >> shift) & 255u);
+            const float violet = float((0x9382C4u >> shift) & 255u);
+            fairyHue |= uint32_t(green + (violet - green) * blend + .5f) << shift;
+        }
+    }
     for (int i = 0; i < 5; ++i) {
         float phase = t + i * Tau / 5;
         Point p = { 24 * std::cos(i * 2.4f + t), 24 * std::sin(phase), 24 * std::sin(i * 2.4f + t) };
         float pulse = .25f + .75f * std::pow(.5f + .5f * std::sin(t * 4 + i * 2.f), 2.f);
         // Wonder-item silhouette; Deku Leaf keeps green halos AND green glints.
         const bool leaf = kind == Kind::Leaf;
-        Glow(m, p, 7 * pulse, leaf ? ColorHex(Kind::Leaf) : 0xA8E9FF, 140, camera);
-        Star(m, p, 6 * pulse, t * .5f, leaf ? 0x5AC85A : 0xE6F8FF, camera, leaf ? 0xB0FFB0 : 0xFFFFFF);
+        const uint32_t hue = kind == Kind::FourSword         ? FourSwordColors[i % FourSwordColors.size()]
+                             : kind == Kind::GreatFairySword ? fairyHue
+                             : kind == Kind::Neutral         ? 0xA8E9FF
+                                                             : ColorHex(kind);
+        Glow(m, p, 7 * pulse, hue, 140, camera);
+        Star(m, p, 6 * pulse, t * .5f, kind == Kind::Neutral ? 0xE6F8FF : hue, camera, leaf ? 0xB0FFB0 : 0xFFFFFF);
     }
     return m;
 }

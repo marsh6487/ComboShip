@@ -861,6 +861,14 @@ def main():
     repo=root.parents[1]
     for slug in args.items or BUILDERS:
         if slug not in BUILDERS:parser.error('Unknown equipment candidate: '+slug)
+        if slug == 'four_sword':
+            import subprocess
+            import sys
+            helper=Path(__file__).with_name('forged_swords')/'rebuild.py'
+            command=[sys.executable,str(helper),slug,'--output',str(root)]
+            if args.install:command.append('--install')
+            subprocess.run(command,check=True)
+            continue
         m=BUILDERS[slug]();stats=meshkit.export_resources(m);preview.checkpoint(m,stats)
         if args.install:
             shutil.copytree(root/'RESOURCES'/m.prefix,repo/'soh/assets/custom'/m.prefix,dirs_exist_ok=True)

@@ -312,7 +312,7 @@ const Presentation kPresentations[] = {
       GI_PATH("four_sword"),
       nullptr,
       1.f,
-      Kind::Neutral,
+      Kind::FourSword,
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
@@ -342,7 +342,7 @@ const Presentation kPresentations[] = {
       GI_PATH("slate_bomb"),
       nullptr,
       1.f,
-      Kind::Slate,
+      Kind::SlateBomb,
       { 0.0000f, 0.0000f, 4.0000f },
       { .85f, 14.f },
       0,
@@ -352,7 +352,7 @@ const Presentation kPresentations[] = {
       GI_PATH("slate_master_cycle"),
       nullptr,
       1.f,
-      Kind::Slate,
+      Kind::SlateCycle,
       { 0.0000f, 0.0000f, 4.0000f },
       { .85f, 14.f },
       0,
@@ -362,7 +362,7 @@ const Presentation kPresentations[] = {
       GI_PATH("slate_stasis"),
       nullptr,
       1.f,
-      Kind::Slate,
+      Kind::SlateStasis,
       { 0.0000f, 0.0000f, 4.0000f },
       { .85f, 14.f },
       0,
@@ -372,7 +372,7 @@ const Presentation kPresentations[] = {
       GI_PATH("slate_cryonis"),
       nullptr,
       1.f,
-      Kind::Slate,
+      Kind::SlateCryonis,
       { 0.0000f, 0.0000f, 4.0000f },
       { .85f, 14.f },
       0,
@@ -382,7 +382,7 @@ const Presentation kPresentations[] = {
       GI_PATH("slate_sensor"),
       nullptr,
       1.f,
-      Kind::Slate,
+      Kind::SlateSensor,
       { 0.0000f, 0.0000f, 4.0000f },
       { .85f, 14.f },
       0,
@@ -422,7 +422,7 @@ const Presentation kPresentations[] = {
       GI_PATH("kokiri_sword"),
       nullptr,
       1.f,
-      Kind::Neutral,
+      Kind::KokiriSword,
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
@@ -432,9 +432,9 @@ const Presentation kPresentations[] = {
       GI_PATH("master_sword"),
       nullptr,
       1.f,
-      Kind::Neutral,
+      Kind::MasterSword,
       { 0.0000f, 0.0000f, 0.0000f },
-      { .85f, 14.f },
+      NeiGi::kMasterSwordShopFit,
       0,
       true,
       -1 },
@@ -442,9 +442,9 @@ const Presentation kPresentations[] = {
       GI_PATH("master_sword"),
       nullptr,
       1.f,
-      Kind::Neutral,
+      Kind::MasterSword,
       { 0.0000f, 0.0000f, 0.0000f },
-      { .85f, 14.f },
+      NeiGi::kMasterSwordShopFit,
       0,
       true,
       -1 },
@@ -452,9 +452,9 @@ const Presentation kPresentations[] = {
       GI_PATH("biggoron_sword"),
       nullptr,
       1.f,
-      Kind::Neutral,
+      Kind::BiggoronSword,
       { 0.0000f, 0.0000f, 0.0000f },
-      { .85f, 14.f },
+      NeiGi::kBiggoronSwordShopFit,
       0,
       true,
       -1 },
@@ -462,7 +462,7 @@ const Presentation kPresentations[] = {
       GI_PATH("razor_sword"),
       nullptr,
       1.f,
-      Kind::Neutral,
+      Kind::RazorSword,
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
@@ -472,9 +472,9 @@ const Presentation kPresentations[] = {
       GI_PATH("gilded_sword"),
       nullptr,
       1.f,
-      Kind::Neutral,
+      Kind::GildedSword,
       { 0.0000f, 0.0000f, 0.0000f },
-      { .85f, 14.f },
+      NeiGi::kGildedSwordShopFit,
       0,
       true,
       -1 },
@@ -484,7 +484,7 @@ const Presentation kPresentations[] = {
       1.f,
       Kind::SwordAura,
       { 0.0000f, 0.0000f, 0.0000f },
-      { .85f, 14.f },
+      NeiGi::kMasterSwordShopFit,
       0,
       true,
       -1 },
@@ -492,9 +492,9 @@ const Presentation kPresentations[] = {
       GI_PATH("great_fairy_sword"),
       nullptr,
       1.f,
-      Kind::Neutral,
+      Kind::GreatFairySword,
       { 0.0000f, 0.0000f, 0.0000f },
-      { .85f, 14.f },
+      NeiGi::kGreatFairySwordShopFit,
       0,
       true,
       -1 },
@@ -512,7 +512,7 @@ const Presentation kPresentations[] = {
       GI_PATH("kokiri_sword"),
       nullptr,
       1.f,
-      Kind::Neutral,
+      Kind::KokiriSword,
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
@@ -522,12 +522,16 @@ const Presentation kPresentations[] = {
       GI_PATH("biggoron_sword"),
       nullptr,
       1.f,
-      Kind::Neutral,
+      Kind::BiggoronSword,
       { 0.0000f, 0.0000f, 0.0000f },
-      { .85f, 14.f },
+      NeiGi::kBiggoronSwordShopFit,
       0,
       true,
       GID_SWORD_BGS },
+};
+// MM owns a distinct Kokiri item even when OoT renders its exported recipe.
+const Presentation kMmKokiriPresentation{
+    nullptr, GI_PATH("mm_kokiri_sword"), nullptr, 1.f, Kind::MmKokiriSword, {}, { .85f, 14.f }, 0, true, -1
 };
 #undef GI_PATH
 #undef GI_XLU
@@ -584,8 +588,8 @@ bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available
         return false;
     const char* selected = nullptr;
     const char* fire = nullptr;
-    if (std::strstr(item.opaque, "/kokiri_sword/") || std::strstr(item.opaque, "/razor_sword/") ||
-        std::strstr(item.opaque, "/gilded_sword/")) {
+    if (std::strstr(item.opaque, "/kokiri_sword/") || std::strstr(item.opaque, "/mm_kokiri_sword/") ||
+        std::strstr(item.opaque, "/razor_sword/") || std::strstr(item.opaque, "/gilded_sword/")) {
         selected = "__OTR__alt/objects/object_custom_equip/gCustomKokiriSwordDL";
         fire = "__OTR__objects/din_fire_sword/progressive/child/SwordDL";
     } else if (std::strstr(item.opaque, "/master_sword/") || std::strstr(item.opaque, "/true_master_sword/")) {
@@ -646,8 +650,8 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     // Queue stable paths for the interpreter. Loading through the legacy GBI wrapper
     // here would evict/reload base resources on each draw when Alt Assets is enabled.
     // Archive presence checks preserve the original model if a required pass is absent.
-    const bool upgraded = !selectedSword && HasResource(item->opaque) &&
-                          (!item->translucent || HasResource(item->translucent));
+    const bool upgraded =
+        !selectedSword && HasResource(item->opaque) && (!item->translucent || HasResource(item->translucent));
     if (!upgraded && !entry->drawFunc && !item->alwaysShimmer)
         return false;
     Matrix_Push();
@@ -699,8 +703,18 @@ extern "C" bool NeiGi_Draw(PlayState* play, GetItemEntry* entry) {
     return NeiGi_DrawImpl(play, entry, false);
 }
 
+#ifdef COMBO_BUILD
+extern "C" bool OOT_DrawComboForeignShop(PlayState* play, GetItemEntry* entry);
+#endif
+
 extern "C" bool NeiGi_DrawShop(PlayState* play, GetItemEntry* entry) {
-    return NeiGi_DrawImpl(play, entry, true);
+    if (NeiGi_DrawImpl(play, entry, true))
+        return true;
+#ifdef COMBO_BUILD
+    return OOT_DrawComboForeignShop(play, entry);
+#else
+    return false;
+#endif
 }
 
 #ifdef COMBO_BUILD
@@ -760,6 +774,10 @@ extern "C" int32_t NeiGi_DescribeEntry(const GetItemEntry* entry, CwItemDrawInfo
 extern "C" COMBO_EXPORT int32_t OOT_GetNeiGiDrawInfo(const char* slug, CwItemDrawInfo* out) {
     if (!slug || !out)
         return 0;
+    if (std::strcmp(slug, "mm_kokiri_sword") == 0) {
+        *out = CwItemDrawInfo{};
+        return NeiGi_FillCrossGameInfo(kMmKokiriPresentation, out);
+    }
     for (size_t i = 0; i < std::size(kSeasons); ++i) {
         if (std::strcmp(slug, kSeasons[i].slug) == 0) {
             *out = CwItemDrawInfo{};

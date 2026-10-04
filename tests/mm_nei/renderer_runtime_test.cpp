@@ -73,7 +73,7 @@ int main() {
     {RI_OOT_NEI_SLATE_RUNE_STASIS,"slate_stasis"}, {RI_OOT_NEI_SLATE_RUNE_CRYONIS,"slate_cryonis"},
     {RI_OOT_NEI_DESIRE_SENSOR,"slate_sensor"}, {RI_OOT_NEI_PHANTOM_HOURGLASS,"phantom_hourglass"},
     {RI_OOT_NEI_SHADOW_CRYSTAL,"shadow_crystal"}, {RI_OOT_NEI_ROD_OF_SEASONS,"rod_of_seasons"},
-    {RI_SWORD_KOKIRI,"kokiri_sword"}, {RI_SWORD_RAZOR,"razor_sword"}, {RI_SWORD_GILDED,"gilded_sword"},
+    {RI_SWORD_KOKIRI,"mm_kokiri_sword"}, {RI_SWORD_RAZOR,"razor_sword"}, {RI_SWORD_GILDED,"gilded_sword"},
     {RI_OOT_MASTER_SWORD,"master_sword"}, {RI_OOT_TRUE_MASTER_SWORD,"true_master_sword"},
     {RI_OOT_BIGGORON_SWORD,"biggoron_sword"}, {RI_GREAT_FAIRY_SWORD,"great_fairy_sword"},
     {RI_OOT_IRON_KNUCKLE_AXE,"iron_knuckle_axe"}

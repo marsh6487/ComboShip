@@ -1,5 +1,39 @@
 # NEI GI runtime revision preview
 
+The current asset set contains **60 serialized GI models**. The sword and Slate
+preview tools load the current exported GLB checkpoints and sample the production
+C++ effect policy. See the [approved sword adjustment](../PREVIEWS/sword-tuned-pass.md)
+and [Slate rings attached to the model](../PREVIEWS/slate-rings-attached.md).
+Approved sword hashes are recorded in
+[`../SOURCE/sword_visual_approval.json`](../SOURCE/sword_visual_approval.json).
+
+Use Python 3.11 or newer with NumPy/Pillow, a C++20 compiler, Mesa EGL/OpenGL
+libraries (`libEGL.so.1` and `libGL.so.1`), and the DejaVu Sans font. On Linux the
+renderer expects the font at `/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf`.
+The two GIF tools compile their C++ exporters automatically. From the repository
+root, using a Python environment with the recorded dependencies:
+
+```sh
+python3 -m pip install -r tools/nei_gi/SOURCE/forged_swords/requirements.txt
+python3 tools/nei_gi/runtime_preview/render_swords.py /tmp/nei-gi-previews --stem swords_current --groups
+python3 tools/nei_gi/runtime_preview/render_slate.py /tmp/nei-gi-previews --slug sheikah_slate --stem slate_current
+```
+
+The sword output includes all nine swords at a common camera scale, three larger
+group GIFs, effects-off views, a guard-aligned scale sheet, and camera metadata.
+Use `--before-root` with an earlier checkpoint directory to add comparison pairs.
+The Slate tool accepts each of the six slate slugs through `--slug`. These tools
+preserve model materials and depth testing and use quantized production effect
+triangles. Lighting and reflections remain offline approximations; the previews
+do not verify gameplay appearance or a full game build. The older video renderer
+below additionally requires ffmpeg.
+
+## Historical POC5–POC7 revisions
+
+The descriptions, budgets and verification results below record the earlier
+rod/spell preview work. They are not fresh measurements of the current sword
+and Slate changes.
+
 POC7 removes all nine stationary decorative ice crystals from `a4e7705e6`:
 six formations in the effect code and three `Small ice splinter` parts baked
 into the ice-rod mesh. The eight collapsing/tumbling fragments and the entire

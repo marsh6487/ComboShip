@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def flags():
-    result = ["-std=gnu2x", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0"]
+    # Match the production GNU C option for asset-name resource pointers.
+    result = ["-std=gnu2x", "-Wno-incompatible-pointer-types", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0"]
     result += ["-I" + str(ROOT / path) for path in
                ("soh", "soh/include", "soh/src", "soh/assets", "soh/mods", "libultraship/include")]
     for config in ("CMake/soh-cvars.cmake", "CMake/lus-cvars.cmake"):

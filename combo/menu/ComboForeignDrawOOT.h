@@ -21,6 +21,7 @@
 #include "ComboSpinAttackGi.h"
 #include "ComboMaskShimmer.h"
 #include "soh/Enhancements/randomizer/NeiGiRender.h"
+#include "soh/Enhancements/randomizer/NeiGiShopFit.h"
 
 #ifndef OPEN_DISPS
 #error "ComboForeignDrawOOT.h is TU-glue: include the host engine headers before it"
@@ -48,13 +49,13 @@ struct ComboForeignDrawInfo {
     uint8_t itemShimmerColor[4] = {};
     bool hasEnvColor = false; // emit env color before the DLs (MM song notes)
     uint8_t envColor[4] = { 0, 0, 0, 0 };
-    bool xluSeg8TexScroll = false;          // bind segment 8 to the flame texscroll before the XLU layer (skull token)
-    const char* matAnimPath = nullptr;      // MM TextureAnimation resource to replicate before the DLs (Moon's Tear)
-    bool matAnimBindOpa = false;            // also bind the animated segment on the OPA layer (item body samples it)
-    bool matAnimBillboard = false;          // Matrix_ReplaceRotation(billboardMtxF) before the XLU layer (glow)
+    bool xluSeg8TexScroll = false;     // bind segment 8 to the flame texscroll before the XLU layer (skull token)
+    const char* matAnimPath = nullptr; // MM TextureAnimation resource to replicate before the DLs (Moon's Tear)
+    bool matAnimBindOpa = false;       // also bind the animated segment on the OPA layer (item body samples it)
+    bool matAnimBillboard = false;     // Matrix_ReplaceRotation(billboardMtxF) before the XLU layer (glow)
     int32_t neiEffect = 0;
     float neiEffectCenter[3] = {};
-    int32_t drawKind = CW_DRAW_KIND_SIMPLE; // non-SIMPLE = replicate a specific MM draw func
+    int32_t drawKind = CW_DRAW_KIND_SIMPLE;   // non-SIMPLE = replicate a specific MM draw func
     uint8_t primColorXlu[4] = { 0, 0, 0, 0 }; // MM_SOUL_FLAME color
     uint8_t primColorOpa[4] = {};             // independent custom/True Master blade tint
     int32_t opCount = 0;                      // CW_DRAW_KIND_OPS payload
@@ -855,14 +856,17 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
         return;
     }
 
-    if (info->itemShimmer) {
+    // Authored NEI recipes carry their palette in neiEffect and render their
+    // shimmer inside the shared presentation. Other recipes use the overlay.
+    const bool overlayShimmer = info->itemShimmer && info->drawKind != CW_DRAW_KIND_NEI_GI;
+    if (overlayShimmer) {
         Matrix_Push();
     }
     switch (info->drawKind) {
         case CW_DRAW_KIND_NEI_GI:
             NeiGi_DrawPresentation(play, info->dls[0], info->xluStart == 1 && info->count > 1 ? info->dls[1] : nullptr,
                                    info->scale, info->neiEffect, info->neiEffectCenter,
-                                   !info->itemShimmer && CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0),
+                                   info->itemShimmer || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0),
                                    "oot");
             break;
         case CW_DRAW_KIND_MM_SPIN_ATTACK:
@@ -917,10 +921,49 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
             OOT_DrawForeignSimple(play, info);
             break;
     }
-    if (info->itemShimmer) {
+    if (overlayShimmer) {
         Matrix_Pop();
         ComboDrawMaskShimmer(play, nullptr, info->itemShimmerColor, "mm");
     }
+}
+
+// EnGirlA's sentinel callback has no local Presentation binding. Fit only
+// complete authored recipes for the five resized swords, then reuse the foreign renderer
+// so the model and every effect inherit the same shelf pose.
+extern "C" bool OOT_DrawComboForeignShop(PlayState* play, GetItemEntry* entry) {
+    if (!play || !entry || entry->drawFunc != Randomizer_DrawComboForeign)
+        return false;
+    RandomizerCheck rc = static_cast<RandomizerCheck>(entry->comboForeignCheck);
+    if (rc == RC_UNKNOWN_CHECK)
+        rc = OOT_GetQueuedDrawCheck();
+    const auto* info = rc != RC_UNKNOWN_CHECK ? ComboResolveForeignDrawInfo(rc) : nullptr;
+    if (!info || !info->ok || info->animOk || info->drawKind != CW_DRAW_KIND_NEI_GI || info->count < 1 ||
+        !info->dls[0] || !(info->scale > 0.f) || (info->xluStart == 1 && (info->count < 2 || !info->dls[1])))
+        return false;
+    const NeiGi::ShopFit* fit = nullptr;
+    switch (static_cast<NeiGi::Kind>(info->neiEffect)) {
+        case NeiGi::Kind::MasterSword:
+        case NeiGi::Kind::SwordAura:
+            fit = &NeiGi::kMasterSwordShopFit;
+            break;
+        case NeiGi::Kind::GildedSword:
+            fit = &NeiGi::kGildedSwordShopFit;
+            break;
+        case NeiGi::Kind::BiggoronSword:
+            fit = &NeiGi::kBiggoronSwordShopFit;
+            break;
+        case NeiGi::Kind::GreatFairySword:
+            fit = &NeiGi::kGreatFairySwordShopFit;
+            break;
+        default:
+            return false;
+    }
+    Matrix_Push();
+    Matrix_Translate(0.f, fit->lift, 0.f, MTXMODE_APPLY);
+    Matrix_Scale(fit->scale, fit->scale, fit->scale, MTXMODE_APPLY);
+    OOT_DrawComboForeign(play, entry);
+    Matrix_Pop();
+    return true;
 }
 
 #undef COMBO_FOREIGN_MTX

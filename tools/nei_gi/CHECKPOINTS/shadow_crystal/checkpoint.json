@@ -22,5 +22,9 @@
     ]
   ],
   "markers": {},
+  "notes": [
+    "Black crystalline body, restrained violet fractures and transparent facets.",
+    "GI-only redesign preserves original item ownership and transformation behavior."
+  ],
   "runtime_tested": false
 }
