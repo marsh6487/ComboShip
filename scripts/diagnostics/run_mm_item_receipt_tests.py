@@ -10,6 +10,20 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def verify_windows_reward_export_contract():
+    """MSVC requires the declaration and definition to agree on DLL linkage."""
+    header = (ROOT / 'mm/2s2h/Rando/ItemReceiptText.h').read_text()
+    source = (ROOT / 'mm/2s2h/Rando/ItemReceiptText.cpp').read_text()
+    declaration = re.search(r'extern "C"[^;]*MM_GetDungeonRewardName\([^;]*;', header)
+    definition = re.search(r'extern "C"[^\{]*MM_GetDungeonRewardName\([^\{]*\{', source)
+    assert declaration and definition
+    assert 'COMBO_EXPORT' in declaration.group(0), 'MM reward declaration lacks Windows DLL export linkage'
+    assert 'COMBO_EXPORT' in definition.group(0), 'MM reward definition lacks Windows DLL export linkage'
+
+
+verify_windows_reward_export_contract()
+
+
 def block(source, start):
     begin = source.index('{', source.index(start))
     depth, end = 1, begin + 1
