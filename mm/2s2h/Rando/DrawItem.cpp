@@ -6,6 +6,7 @@
 #include "2s2h/Rando/DrawFuncs.h"
 #include "2s2h_assets.h"
 #include "Rando/SpinAttackGi.h"
+#include "../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "mods/nei_save.h"                     // NeiSaveData chain tiers for progressive get-item draws
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_OOT_SWORD_* registry indices (chain tiers)
 
