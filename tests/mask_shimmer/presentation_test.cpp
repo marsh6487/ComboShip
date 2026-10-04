@@ -36,8 +36,18 @@ struct Transform { float x = 0, y = 0, z = 0, scale = 1; };
 static Transform transform;
 static std::vector<Transform> stack, sparkleTransforms;
 static std::vector<std::string> paths;
+#ifdef HOST_MM
+// Archive ownership boundary for the extracted native MM GI dispatcher.
+static std::string legacyModPath;
+#endif
 
 extern "C" {
+#ifdef HOST_MM
+int ResourceMgr_IsModAssetForGame(const char* game, const char* path) {
+    assert(!strcmp(game, "mm"));
+    return legacyModPath == path;
+}
+#endif
 void gSPSegment(void* p, int segment, uintptr_t base) { __gSPSegment((Gfx*)p,segment,base); }
 void gSPDisplayList(Gfx* p, Gfx* dl) {
     paths.emplace_back((const char*)dl);
@@ -252,6 +262,12 @@ int main() {
     gPlayState = nullptr;
     assert(!MM_TryDrawNeiGi(RI_OOT_NEI_SEASON_SUMMER));
     gPlayState = &play;
+    Reset(47);
+    // A local replacement must return to the legacy draw without querying OoT.
+    legacyModPath = "objects/object_nei_fire_rod/Cylinder_001_opaque_dl";
+    assert(!MM_TryDrawNeiGi(RI_OOT_NEI_FIRE_ROD));
+    assert(ownerLookups == 0 && paths.empty() && vertexLoads.empty());
+    legacyModPath.clear();
     assert(!MM_TryDrawNeiGi(RI_OOT_NEI_WHIP)); // Fixture has no dormant OoT module.
     assert(ownerLookups == 1);
 #endif
