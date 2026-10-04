@@ -162,6 +162,9 @@ void Ctx_WriteSaveFile(uintptr_t addr, void* dramAddr, size_t size);
 
 uint64_t GetPerfCounter();
 bool ResourceMgr_IsAltAssetsEnabled();
+// Archive provenance, respecting the resource owner and its current Alt mode.
+int ResourceMgr_IsModAsset(const char* path);
+int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
 struct SkeletonHeader* ResourceMgr_LoadSkeletonByName(const char* path, SkelAnime* skelAnime);
 void ResourceMgr_UnregisterSkeleton(SkelAnime* skelAnime);
 void ResourceMgr_ClearSkeletons();

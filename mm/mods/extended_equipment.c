@@ -10,6 +10,7 @@
  */
 
 #include "extended_equipment.h"
+#include "equipment/nei_equipment_presentation.h"
 #include "nei_save.h" // Skijer's NEI
 #include "transformation_masks/transformation_masks.h"
 #include "transformation_masks/assets/mm_asset_loader.h"
@@ -43,6 +44,12 @@ extern u8 ResourceMgr_FileExists(const char* resName);
 extern Gfx* ResourceMgr_LoadGfxByName(const char* path);
 
 static Gfx* Byrna_GetCaneDL(void) {
+    Gfx* authored = NeiEquipment_ModelDL(NEI_EQUIPMENT_BYRNA, "__OTR__objects/object_somaria/g_byrna_cane_dl");
+    if (authored != NULL)
+        return authored;
+    Gfx* mod = NeiEquipment_LegacyDL(NEI_EQUIPMENT_BYRNA, "__OTR__objects/object_somaria/g_byrna_cane_dl");
+    if (mod != NULL)
+        return mod;
     static Gfx* sCached = NULL;
     static u8 sTried = 0;
     if (!sTried) {
@@ -969,6 +976,14 @@ void ExtEquip_DrawBehavior(void* playerVoid, void* playVoid) {
 // then an access violation. Skijer's NEI
 // ---------------------------------------------------------------------------
 static Gfx* Trident_GetLanceDL(void) {
+    Gfx* authored = NeiEquipment_ModelDL(NEI_EQUIPMENT_TRIDENT,
+                                         "__OTR__objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298");
+    if (authored != NULL)
+        return authored;
+    Gfx* mod = NeiEquipment_LegacyDL(NEI_EQUIPMENT_TRIDENT,
+                                     "__OTR__objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298");
+    if (mod != NULL)
+        return mod;
     static Gfx* sCached = NULL;
     static u8 sTried = 0;
 
@@ -1231,12 +1246,28 @@ static Gfx* ExtEquip_GetCachedDL(const char* otr, Gfx** cache, u8* tried) {
 }
 
 static Gfx* ExtEquip_GetKiteShieldDL(void) {
+    Gfx* authored =
+        NeiEquipment_ModelDL(NEI_EQUIPMENT_SHEIKAH_SHIELD, "__OTR__objects/object_nei_kite_shield/g_kite_shield_dl");
+    if (authored != NULL)
+        return authored;
+    Gfx* mod =
+        NeiEquipment_LegacyDL(NEI_EQUIPMENT_SHEIKAH_SHIELD, "__OTR__objects/object_nei_kite_shield/g_kite_shield_dl");
+    if (mod != NULL)
+        return mod;
     static Gfx* sCached = NULL;
     static u8 sTried = 0;
     return ExtEquip_GetCachedDL("__OTR__objects/object_nei_kite_shield/g_kite_shield_dl", &sCached, &sTried);
 }
 
 static Gfx* ExtEquip_GetDivineShieldDL(void) {
+    Gfx* authored =
+        NeiEquipment_ModelDL(NEI_EQUIPMENT_DIVINE_SHIELD, "__OTR__objects/object_nei_divine_shield/g_divine_shield_dl");
+    if (authored != NULL)
+        return authored;
+    Gfx* mod = NeiEquipment_LegacyDL(NEI_EQUIPMENT_DIVINE_SHIELD,
+                                     "__OTR__objects/object_nei_divine_shield/g_divine_shield_dl");
+    if (mod != NULL)
+        return mod;
     static Gfx* sCached = NULL;
     static u8 sTried = 0;
     return ExtEquip_GetCachedDL("__OTR__objects/object_nei_divine_shield/g_divine_shield_dl", &sCached, &sTried);
@@ -1362,6 +1393,19 @@ static void ExtEquip_DrawShieldCommon(void* playVoid, u8 onBack) {
             DrawCustomShieldDL(playVoid, ExtEquip_GetKiteShieldDL(), onBack);
             break;
         case 3: { // Shield of Ikana: MM Mirror Shield from mm.o2r
+            Gfx* authored = NeiEquipment_ModelDL(NEI_EQUIPMENT_IKANA_SHIELD,
+                                                 "__OTR__objects/object_link_child/gLinkHumanMirrorShieldDL");
+            if (authored != NULL) {
+                DrawCustomShieldDL(playVoid, authored, onBack);
+                break;
+            }
+            const char* legacy = onBack ? "__OTR__objects/object_link_child/gLinkHumanMirrorShieldDL"
+                                        : "__OTR__objects/object_link_child/gLinkHumanRightHandHoldingMirrorShieldDL";
+            Gfx* mod = NeiEquipment_LegacyDL(NEI_EQUIPMENT_IKANA_SHIELD, legacy);
+            if (mod != NULL) {
+                DrawCachedShieldDL(playVoid, mod);
+                break;
+            }
             ExtEquip_LoadMmShieldDLs();
             Gfx* mmDL = onBack ? sCachedMmShieldBackDL : sCachedMmShieldHandDL;
             if (mmDL != NULL)

@@ -89,7 +89,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
         if name == "nei_gi/presentation" and "--combo" in sys.argv:
             mm_source = (ROOT / "mm/2s2h/Rando/NeiGiPresentation.cpp").read_text()
             mm_functions = functions(mm_source)
-            renderer = mm_functions["MM_DrawNeiGi"] + "\n" + mm_functions["MM_DescribeNeiGi"]
+            renderer = mm_functions["HasMmLegacyGiMod"] + "\n" + mm_functions["MM_DrawNeiGi"] + "\n" + mm_functions["MM_DescribeNeiGi"] + "\n" + mm_functions["MM_TryDrawNeiGi"]
             # MM's item enum and binding table are copied verbatim so origin
             # selection is exercised without importing the unrelated MM engine.
             mm_types = (ROOT / "mm/2s2h/Rando/Types.h").read_text()
@@ -163,6 +163,7 @@ void ComboDrawSpinAttackGi(PlayState*, const char*, const char*, float, const ui
             candidate = source.read_text().replace("int main() {", tested_bridge + "\nint main() {", 1)
             checks = (ROOT / "tests/mm_presentation/gi_bridge_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/foreign_sword_checks.inc").read_text()
+            checks += (ROOT / "tests/mm_presentation/legacy_mod_checks.inc").read_text()
             candidate = candidate.replace("  using namespace Fixture;\n", "  using namespace Fixture;\n" + checks, 1)
             source = Path(tmp) / "combo_gi_presentation.cpp"
             source.write_text("#define COMBO_BUILD 1\n" + candidate)

@@ -11,6 +11,10 @@
 #include "extended_inventory.h" // Wand_GetMode / WAND_MODE_*
 #include "macros.h"
 #include "functions.h"
+#include "soh/Enhancements/randomizer/NeiHeldPresentation.h"
+#include "soh/ResourceManagerHelpers.h"
+#define QUEST_HELD_IS_MOD ResourceMgr_IsModAsset
+#include "quest_held_resources.inc"
 
 // Dialled in game and baked. The staff measures 350 units tall against the slate's 96, which is the
 // whole reason its scale is not the slate's. Order: offset XYZ, rotation XYZ, scale.
@@ -18,22 +22,11 @@ static const ItemHandPose sWandPose = {
     0.0f, 7.356f, -3.218f, 91.034f, 180.0f, 111.724f, 0.12f,
 };
 
-static const struct {
-    const char* opa;
-    const char* xlu; // the gem, which is translucent on every rod
-} sWandModel[WAND_MODE_COUNT] = {
-    { "__OTR__objects/object_nei_wand_sand_rod/gNeiSandRodDL",
-      "__OTR__objects/object_nei_wand_sand_rod/gNeiSandRodXluDL" },
-    { "__OTR__objects/object_nei_wand_tornado_rod/gNeiTornadoRodDL",
-      "__OTR__objects/object_nei_wand_tornado_rod/gNeiTornadoRodXluDL" },
-    { "__OTR__objects/object_nei_wand_water_rod/gNeiWaterRodDL",
-      "__OTR__objects/object_nei_wand_water_rod/gNeiWaterRodXluDL" },
-    { "__OTR__objects/object_nei_wand_meteor_rod/gNeiMeteorRodDL",
-      "__OTR__objects/object_nei_wand_meteor_rod/gNeiMeteorRodXluDL" },
-    { "__OTR__objects/object_nei_wand_storm_rod/gNeiStormRodDL",
-      "__OTR__objects/object_nei_wand_storm_rod/gNeiStormRodXluDL" },
-    { "__OTR__objects/object_nei_wand_shadow_scepter/gNeiShadowScepterDL",
-      "__OTR__objects/object_nei_wand_shadow_scepter/gNeiShadowScepterXluDL" },
+// The original paths remain the resource-pack override points. Built-in lists
+// delegate to the matching held meshes; incomplete bundles use retained geometry.
+static const QuestHeldModel* const sWandModel[WAND_MODE_COUNT] = {
+    &sQuest_sand_rod,   &sQuest_tornado_rod, &sQuest_water_rod,
+    &sQuest_meteor_rod, &sQuest_storm_rod,   &sQuest_shadow_scepter,
 };
 
 void CustomItems_DrawElementalWand(Player* player, PlayState* play) {
@@ -47,5 +40,19 @@ void CustomItems_DrawElementalWand(Player* player, PlayState* play) {
     if (!Wand_IsDrawn() || (mode >= WAND_MODE_COUNT)) {
         return;
     }
-    ItemEquip_DrawHeldModel(player, play, sWandModel[mode].opa, sWandModel[mode].xlu, &sWandPose);
+    const QuestHeldModel* model = sWandModel[mode];
+    const char* opa;
+    const char* xlu;
+    QuestHeld_Select(model, &opa, &xlu);
+    if (opa != NULL) {
+        ItemEquip_DrawHeldModel(player, play, opa, xlu, &sWandPose);
+    } else if (xlu != NULL && ItemEquip_ApplyHandPose(player, &sWandPose)) {
+        // An XLU-only resource-pack pass stays visible even when its pristine
+        // opaque counterpart is unavailable. Keep the same calibrated wrist pose.
+        OPEN_DISPS(play->state.gfxCtx);
+        Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+        gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        gSPDisplayList(POLY_XLU_DISP++, ResourceMgr_LoadGfxByName(xlu));
+        CLOSE_DISPS(play->state.gfxCtx);
+    }
 }

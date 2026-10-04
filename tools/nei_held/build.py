@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parents[1]
 sys.path.insert(0, str(ROOT / 'SOURCE'))
 from simple import BUILDERS
+from equipment import BUILDERS as EQUIPMENT_BUILDERS
+BUILDERS.update(EQUIPMENT_BUILDERS)
 import meshkit
 import preview
 
@@ -35,6 +37,9 @@ def build(names):
         source = ROOT / 'RESOURCES' / m.prefix
         dest = REPO / 'soh/assets/custom' / m.prefix
         shutil.copytree(source, dest, dirs_exist_ok=True)
+    if any(slug in EQUIPMENT_BUILDERS for slug in names):
+        from generate_equipment_manifest import generate
+        generate()
 
 
 if __name__ == '__main__':

@@ -193,6 +193,7 @@ struct Entry {
   int textboxType;
   uint8_t icon;
   std::string msg;
+  bool autoFormat = true;
 };
 std::string shown;
 void SetActiveCustomMessage(std::string msg, Entry) { shown = msg; }
@@ -200,6 +201,10 @@ void StartTextbox(std::string msg, Entry) { shown = msg; }
 } // namespace CustomMessage
 std::string frozen;
 namespace Rando {
+// This lifecycle probe exercises the generic fallback; detailed donor receipts
+// and their binary encoding are verified in tests/item_receipts.
+bool ApplyForeignItemReceiptText(const char *, CustomMessage::Entry &, int) { return false; }
+void AppendReceiptSource(CustomMessage::Entry &, const std::string &);
 namespace StaticData {
 std::string GetCheckDisplayName(int) { return "chest"; }
 std::string GetItemName(int, bool, int) { return "Progressive Scale"; }
@@ -222,6 +227,7 @@ const char *ComboForeignLatchedName(int) {
 }
 uint8_t ComboForeignMessageIcon(int) { return 0xF5; }
 } // namespace Rando
+/* RECEIPT_SOURCE */
 /* SEND_FOREIGN */
 bool queued = false;
 std::string GetTrapMessage() { return "trap"; }

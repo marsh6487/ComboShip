@@ -37,6 +37,7 @@ RodProjSet *FireRod_GetProjSets() { return sets[0]; }
 RodProjSet *IceRod_GetProjSets() { return sets[1]; }
 RodProjSet *LightRod_GetProjSets() { return sets[2]; }
 u8 ResourceMgr_FileExists(const char *) { return 1; }
+int ResourceMgr_IsModAssetForGame(const char*, const char*) { return 0; }
 Gfx *ResourceMgr_LoadGfxByName(const char *) {
   static Gfx dl[1];
   return dl;

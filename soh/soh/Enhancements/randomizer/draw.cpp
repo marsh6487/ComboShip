@@ -6,6 +6,9 @@ extern "C" int32_t OOT_MagicJarUsesCustomAsset(const char* path);
 #endif
 #include "soh/OTRGlobals.h"
 #include <vector>
+#include <array>
+#include <map>
+#include <cstring>
 #include <spdlog/spdlog.h> // SPDLOG_INFO (MmSoul debug instrumentation)
 #include "soh/cvar_prefixes.h"
 #include "randomizerTypes.h"
@@ -1865,7 +1868,26 @@ void Randomizer_DrawProgressiveBGS(PlayState* play, GetItemEntry* getItemEntry) 
 // before mm.o2r finished mounting cached NULL forever and the item silently fell back for the rest
 // of the run. When mm.o2r is genuinely absent MmAssets_IsAvailable() is false, so the retry costs
 // nothing. Skijer's NEI
+// Keep custom GI geometry and materials with their current owner. Deferred
+// paths remain valid across Alt toggles without retaining a loaded model pointer.
+static Gfx* NeiGi_ModOverrideDL(const char* path, bool importedMm) {
+    if (!path)
+        return nullptr;
+    const bool local = ResourceMgr_IsModAsset(path) != 0;
+    if (!local && (!importedMm || !ResourceMgr_IsModAssetForGame("mm", path)))
+        return nullptr;
+    const char* base = std::strncmp(path, "__OTR__", 7) == 0 ? path + 7 : path;
+    const std::string routed = std::string(local ? "__OTR__" : "__OTR__@mm:") + base;
+    static std::map<std::string, std::array<Gfx, 2>> wrappers;
+    auto& entry = *wrappers.try_emplace(routed).first;
+    gDma1p(&entry.second[0], G_DL_OTR_FILEPATH, entry.first.c_str(), 0, G_DL_PUSH);
+    gSPEndDisplayList(&entry.second[1]);
+    return entry.second.data();
+}
+
 static Gfx* LoadMmDLOnce(const char* path, Gfx** cache, u8* tried) {
+    if (Gfx* mod = NeiGi_ModOverrideDL(path, true))
+        return mod;
     if (!*tried && MmAssets_IsAvailable()) {
         *cache = (Gfx*)MmAssets_LoadResource(path);
         if (*cache != NULL) {
@@ -2052,13 +2074,15 @@ void Randomizer_DrawExtShieldOfIkana(PlayState* play, GetItemEntry* getItemEntry
     // ExtEquip_LoadMmShieldDLs in extended_equipment.c proves this path resolves cleanly in
     // mm.o2r — using object_gi_shield_3/gGiMirrorShieldDL crashed because its vertex hashes
     // didn't resolve in the OTR pack, and the unresolved bytes were executed as gsSPVertex.
+    Gfx* mod = NeiGi_ModOverrideDL("objects/object_link_child/gLinkHumanMirrorShieldDL", true);
     static Gfx* sCachedMmShieldDL = NULL;
     static u8 sLoadAttempted = 0;
-    if (!sLoadAttempted) {
+    if (!mod && !sLoadAttempted) {
         sLoadAttempted = 1;
         sCachedMmShieldDL = (Gfx*)TransformMasks_LoadMmDL("objects/object_link_child/gLinkHumanMirrorShieldDL");
     }
-    if (sCachedMmShieldDL == NULL) {
+    Gfx* selected = mod ? mod : sCachedMmShieldDL;
+    if (selected == NULL) {
         return; // mm.o2r not present — silent skip instead of crashing on a NULL DL
     }
 
@@ -2074,7 +2098,7 @@ void Randomizer_DrawExtShieldOfIkana(PlayState* play, GetItemEntry* getItemEntry
     Matrix_Scale(0.035f, 0.035f, 0.035f, MTXMODE_APPLY);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    gSPDisplayList(POLY_OPA_DISP++, sCachedMmShieldDL);
+    gSPDisplayList(POLY_OPA_DISP++, selected);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
@@ -2179,6 +2203,8 @@ static uint32_t Pegasus_CrimsonRamp(uint32_t rgba) {
 }
 
 static Gfx* Pegasus_GetRecoloredBootsDL() {
+    if (Gfx* mod = NeiGi_ModOverrideDL(gGiHoverBootsDL, false))
+        return mod;
     static std::vector<Gfx> sDL;
     if (!sDL.empty()) {
         return sDL.data();
@@ -2276,6 +2302,8 @@ void Randomizer_DrawExtTrident(PlayState* play, GetItemEntry* getItemEntry) {
 // G_SETPRIMCOLOR/G_SETENVCOLOR pushed through `remap`. Per-SECTION recolors (Climb: yellow leather
 // vs silver iron) are only possible this way — a grayscale tint is one color for the whole mesh.
 static Gfx* BuildRecoloredGiDL(const char* dlName, uint32_t (*remap)(uint32_t), std::vector<Gfx>& out) {
+    if (Gfx* mod = NeiGi_ModOverrideDL(dlName, false))
+        return mod;
     if (!out.empty()) {
         return out.data();
     }
@@ -2464,6 +2492,10 @@ void Randomizer_DrawBottomlessBottle(PlayState* play, GetItemEntry* getItemEntry
 // to a non-DisplayList yields a bogus pointer whose bytes get executed as GBI opcodes — the 0xC0000005
 // crash. Resolve first, skip the draw if it didn't, and say so once in the log. Skijer's NEI
 static void DrawCustomItemDiamondByPath(PlayState* play, const char* path, Gfx** cache, u8* tried, f32 scale) {
+    if (Gfx* mod = NeiGi_ModOverrideDL(path, false)) {
+        DrawCustomItemDiamond(play, mod, scale);
+        return;
+    }
     if (!*tried) {
         *tried = 1;
         if (ResourceMgr_FileExists(path)) {

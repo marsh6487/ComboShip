@@ -1,3 +1,4 @@
+#include "../../combo/NeiAssetPriorityResource.h"
 #include "ResourceManagerHelpers.h"
 #include "OTRGlobals.h"
 #include "variables.h"
@@ -968,4 +969,18 @@ extern "C" COMBO_EXPORT int32_t OOT_NeiResourceExists(const char* path) {
            (ResourceMgr_FileExists(path) || (owner->IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path)));
 }
 
+#endif
+
+extern "C" int ResourceMgr_IsModAsset(const char* path) {
+    return NeiAssetPriority::IsModAsset("oot", "oot", path);
+}
+
+extern "C" int ResourceMgr_IsModAssetForGame(const char* game, const char* path) {
+    return NeiAssetPriority::IsModAsset("oot", game, path);
+}
+
+#ifdef COMBO_BUILD
+extern "C" COMBO_EXPORT int OOT_NeiResourceIsMod(const char* path) {
+    return ResourceMgr_IsModAsset(path);
+}
 #endif

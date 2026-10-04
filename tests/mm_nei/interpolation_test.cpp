@@ -77,6 +77,7 @@ void lusprintf(const char *, int32_t, int32_t, const char *, ...) {
 void Graph_OpenDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
 void Graph_CloseDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
 u8 ResourceMgr_FileExists(const char *) { return 1; }
+int ResourceMgr_IsModAssetForGame(const char*, const char*) { return 0; }
 int NeiResource_Available(const char *) { return 1; }
 Gfx *ResourceMgr_LoadGfxByName(const char *) {
   static Gfx dl[1];

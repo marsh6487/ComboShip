@@ -7,6 +7,7 @@
 #include <cstring>
 #include <libultraship/bridge/consolevariablebridge.h>
 extern "C" {
+int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
 #include "functions.h"
 #include "macros.h"
 #include "mods/nei_oot_compat.h"
@@ -87,6 +88,60 @@ const Binding kBindings[] = {
     { RI_GREAT_FAIRY_SWORD, "great_fairy_sword" },
     { RI_OOT_IRON_KNUCKLE_AXE, "iron_knuckle_axe" },
 };
+// Only roots that differ from the OoT callback are listed here. Shared
+// legacy roots are checked against both hosts by the owner's GI descriptor.
+bool HasMmLegacyGiMod(RandoItemId item) {
+    const char* opaque = nullptr;
+    const char* second = nullptr;
+    switch (item) {
+        case RI_OOT_NEI_FIRE_ROD:
+            opaque = "objects/object_nei_fire_rod/Cylinder_001_opaque_dl";
+            break;
+        case RI_OOT_NEI_ICE_ROD:
+            opaque = "objects/object_nei_ice_rod/ice_rod_opaque_dl";
+            second = "objects/object_nei_ice_rod/ice_rod_transparent_dl";
+            break;
+        case RI_OOT_NEI_LIGHT_ROD:
+            opaque = "objects/object_nei_light_rod/Cylinder_002_opaque_dl";
+            second = "objects/object_nei_light_rod/Cylinder_002_transparent_dl";
+            break;
+        case RI_OOT_NEI_BALL_AND_CHAIN:
+            opaque = "objects/object_nei_ball_and_chain/g_ball_and_chain_dl";
+            break;
+        case RI_OOT_NEI_BEETLE:
+            opaque = "objects/object_nei_beetle/g_beetle_dl";
+            break;
+        case RI_OOT_NEI_SHOVEL:
+            opaque = "objects/object_nei_shovel/gShovelGiveDL_opaque_dl";
+            break;
+        case RI_OOT_NEI_HYLIAS_GRACE:
+            opaque = "objects/object_nei_magic_spell/gHyliaGraceGiveDL";
+            break;
+        case RI_OOT_NEI_ZONAI_PERMAFROST:
+            opaque = "objects/object_nei_magic_spell/gZonaiPermafrostGiveDL";
+            break;
+        case RI_OOT_NEI_DEMISE_DESTRUCTION:
+            opaque = "objects/object_nei_magic_spell/gDemiseDestructionGiveDL";
+            break;
+        case RI_SWORD_KOKIRI:
+        case RI_OOT_EXT_FOUR_SWORD:
+            opaque = "objects/object_gi_sword_1/gGiKokiriSwordGuardDL";
+            second = "objects/object_gi_sword_1/gGiKokiriSwordBladeHiltDL";
+            break;
+        case RI_SHIELD_MIRROR:
+            opaque = "objects/object_gi_shield_3/gGiMirrorShieldEmptyDL";
+            second = "objects/object_gi_shield_3/gGiMirrorShieldDL";
+            break;
+        case RI_OOT_EXT_MAGIC_CAPE:
+            opaque = "objects/object_gi_clothes/gGiTunicCollarDL";
+            second = "objects/object_gi_clothes/gGiTunicDL";
+            break;
+        default:
+            break;
+    }
+    return (opaque && ResourceMgr_IsModAssetForGame("mm", opaque)) ||
+           (second && ResourceMgr_IsModAssetForGame("mm", second));
+}
 } // namespace
 
 extern "C" {
@@ -138,7 +193,7 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info) {
 }
 
 bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
-    if (!out)
+    if (!out || HasMmLegacyGiMod(item))
         return false;
     if (item >= RI_OOT_NEI_SEASON_SPRING && item <= RI_OOT_NEI_SEASON_WINTER) {
         *out = CwItemDrawInfo{};

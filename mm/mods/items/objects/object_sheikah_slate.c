@@ -5,23 +5,20 @@
  * drawn every frame from the R-hand body part, oriented along the forearm→hand vector so it follows
  * whatever animation is playing. That is what makes it read as "held" rather than stuck to a bone.
  *
- * The whole placement (offset, rotation, scale) is live-tunable through gItemEditor.Slate.* CVars,
- * because getting a flat tablet to sit in a fist the way the Hookshot does is pure eyeballing — the
- * defaults here are a starting point, not a measurement. The CVar names are shared with 2ship so a
- * preset tuned in one game carries to the other.
+ * Its separately calibrated placement stays fixed. Resource-pack entrypoints remain
+ * authoritative; incomplete matching geometry falls back to retained native lists.
  */
 
 #include "z64.h"
 #include "../custom_items.h"
 #include "macros.h"
 #include "functions.h"
+#include "2s2h/Rando/NeiHeldPresentation.h"
+#include "2s2h/Rando/NeiResourceRouting.h"
+#define QUEST_HELD_IS_MOD NeiResource_IsMod
+#include "quest_held_resources.inc"
 #include <math.h>
 
-// The slate model ships in the custom archive (assets/custom/objects/object_nei_sheikah_slate).
-// ResourceMgr_LoadGfxByName crashes on a missing path, so gate on FileExists and simply draw
-// nothing while the archive has not been rebuilt.
-extern u8 ResourceMgr_FileExists(const char* resName);
-extern Gfx* ResourceMgr_LoadGfxByName(const char* path);
 extern u8 Slate_IsDrawn(void); // equip state, owned by item_sheikah_slate.c (same TU)
 
 // Placement, baked. These are the values tuned in-game with the Item Editor sliders — the tablet
@@ -39,22 +36,8 @@ extern u8 Slate_IsDrawn(void); // equip state, owned by item_sheikah_slate.c (sa
 #define SLATE_DEF_ROT_Z 13.664f
 #define SLATE_DEF_SCALE 0.146f
 
-static Gfx* Slate_GetHandDL(void) {
-    static Gfx* sCached = NULL;
-    static u8 sTried = 0;
-
-    if (!sTried) {
-        sTried = 1;
-        const char* otr = "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL";
-        if (ResourceMgr_FileExists(otr)) {
-            sCached = ResourceMgr_LoadGfxByName(otr);
-        }
-    }
-    return sCached;
-}
-
 void CustomItems_DrawSheikahSlate(Player* player, PlayState* play) {
-    Gfx* handDL;
+    const char* handPath;
     Vec3f forearmPos;
     Vec3f handPos;
     f32 dx;
@@ -69,14 +52,14 @@ void CustomItems_DrawSheikahSlate(Player* player, PlayState* play) {
         return;
     }
 
-    handDL = Slate_GetHandDL();
-    if (handDL == NULL) {
-        return; // archive not rebuilt yet — no crash, just no tablet
+    const QuestHeldModel* model = &sQuest_sheikah_slate;
+    if (QuestHeld_UseOriginal(model)) {
+        handPath = model->opa;
+    } else if (QuestHeld_Complete(model->fallbackRequired)) {
+        handPath = model->fallbackOpa;
+    } else {
+        return;
     }
-
-    OPEN_DISPS(play->state.gfxCtx);
-
-    Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
     // Orient along the forearm→hand vector so the tablet tracks every animation, including the
     // hookshot-style aim pose the cast plays.
@@ -109,8 +92,5 @@ void CustomItems_DrawSheikahSlate(Player* player, PlayState* play) {
     scale = SLATE_DEF_SCALE;
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
 
-    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, handDL);
-
-    CLOSE_DISPS(play->state.gfxCtx);
+    NeiHeld_DrawModel(play, handPath, NULL);
 }

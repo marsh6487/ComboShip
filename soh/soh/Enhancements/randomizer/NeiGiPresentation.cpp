@@ -583,6 +583,100 @@ bool HasResource(const char* path) {
            (ResourceMgr_FileExists(path) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path)));
 }
 
+// Only resource-backed legacy GI routes participate. In particular, the
+// wand's old GI is an inline stand-in: a held-only wand mod must retain the new
+// GI while its held wrapper independently preserves that mod's model.
+bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
+    // This progressive callback draws a Kokiri placeholder. The real Master
+    // callback and MM foreign recipe use Temple geometry instead.
+    if (!includeMmHost && item.draw == Randomizer_DrawProgressiveMasterSword)
+        return ResourceMgr_IsModAsset("objects/object_gi_sword_1/gGiKokiriSwordDL");
+    if (!item.opaque)
+        return false;
+    struct Legacy {
+        const char* slug;
+        const char* owner;
+        const char* opaque;
+        const char* second = nullptr;
+    };
+    static constexpr Legacy models[] = {
+        { "rocs_feather", "oot", "objects/object_nei_rocs_feather/rocs_feather_dl",
+          "objects/object_rocs_feather/gGiRocsFeatherDL" },
+        { "rocs_cape", "oot", "objects/object_nei_rocs_cape/rocs_cape_mesh_dl" },
+        { "whip", "oot", "objects/object_nei_whip/whip_give_opaque_dl" },
+        { "spinner", "oot", "objects/object_nei_spinner/n0b0_opaque_dl" },
+        { "deku_leaf", "oot", "objects/object_nei_deku_leaf/g_dekuleaf_dl" },
+        { "switch_hook", "oot", "objects/object_nei_switchhook/gSwitchHookGiveDL" },
+        { "mogma_mitts", "oot", "objects/object_nei_mogma_mitts/gMogmaMittsGiveDL" },
+        { "gust_jar", "oot", "objects/object_nei_gust_jar/jar_model_dl" },
+        { "time_gate", "oot", "objects/object_nei_time_gate/g_timegate_dl" },
+        { "minish_cap", "oot", "objects/object_nei_minish_cap/Cylinder_opaque_dl" },
+        { "lantern", "oot", "objects/object_poh/gPoeLanternDL" },
+        { "divine_shield", "oot", "objects/object_nei_divine_shield/g_divine_shield_dl" },
+        { "sheikah_shield", "oot", "objects/object_nei_kite_shield/g_kite_shield_dl" },
+        { "shield_of_ikana", "mm", "objects/object_link_child/gLinkHumanMirrorShieldDL" },
+        { "magic_cape", "oot", "objects/object_nei_magic_cape/gNeiMagicCapeDL",
+          "objects/object_nei_magic_cape/gNeiMagicCapeWaveDL" },
+        { "spirit_breastplate", "oot", "objects/object_gi_clothes/gGiTunicCollarDL",
+          "objects/object_gi_clothes/gGiTunicDL" },
+        { "sages_tunic", "oot", "objects/object_gi_clothes/gGiTunicCollarDL", "objects/object_gi_clothes/gGiTunicDL" },
+        { "champions_tunic", "oot", "objects/object_gi_clothes/gGiTunicCollarDL",
+          "objects/object_gi_clothes/gGiTunicDL" },
+        { "pegasus_anklet", "oot", "objects/object_gi_hoverboots/gGiHoverBootsDL" },
+        { "trident", "oot", "objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298" },
+        { "climb_boots", "oot", "objects/object_gi_boots_2/gGiIronBootsDL",
+          "objects/object_gi_boots_2/gGiIronBootsRivetsDL" },
+        { "roc_boots", "oot", "objects/object_gi_hoverboots/gGiHoverBootsDL" },
+        { "cane_of_byrna", "oot", "objects/object_somaria/g_byrna_cane_give_dl" },
+        { "cane_of_somaria", "oot", "objects/object_somaria/g_somaria_cane_give_dl" },
+        { "four_sword", "oot", "objects/object_nei_four_sword/gNeiFourSwordBladeDL",
+          "objects/object_nei_four_sword/gNeiFourSwordHiltDL" },
+        { "pendant_of_memories", "mm", "objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL" },
+        { "sheikah_slate", "oot", "objects/object_nei_sheikah_slate/gNeiSheikahSlateDL" },
+        { "slate_bomb", "oot", "objects/object_nei_sheikah_slate/gNeiSheikahSlateDL" },
+        { "slate_master_cycle", "oot", "objects/object_nei_sheikah_slate/gNeiSheikahSlateDL" },
+        { "slate_stasis", "oot", "objects/object_nei_sheikah_slate/gNeiSheikahSlateDL" },
+        { "slate_cryonis", "oot", "objects/object_nei_sheikah_slate/gNeiSheikahSlateDL" },
+        { "slate_sensor", "oot", "objects/object_nei_sheikah_slate/gNeiSheikahSlateDL" },
+        { "rod_of_seasons", "oot", "objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL" },
+        { "phantom_hourglass", "oot", "objects/object_nei_phantom_hourglass/gNeiPhantomHourglassDL" },
+        { "shadow_crystal", "oot", "objects/object_nei_shadow_crystal/gNeiShadowCrystalDL" },
+        { "kokiri_sword", "oot", "objects/object_gi_sword_1/gGiKokiriSwordDL" },
+        { "mm_kokiri_sword", "mm", "objects/object_gi_sword_1/gGiKokiriSwordDL" },
+        { "master_sword", "oot", "objects/object_toki_objects/object_toki_objects_DL_001BD0" },
+        { "true_master_sword", "oot", "objects/object_toki_objects/object_toki_objects_DL_001BD0" },
+        { "biggoron_sword", "oot", "objects/object_gi_longsword/gGiBiggoronSwordDL" },
+        { "razor_sword", "mm", "objects/object_gi_sword_2/gGiRazorSwordDL",
+          "objects/object_gi_sword_2/gGiRazorSwordEmptyDL" },
+        { "gilded_sword", "mm", "objects/object_gi_sword_3/gGiGildedSwordDL",
+          "objects/object_gi_sword_3/gGiGildedSwordEmptyDL" },
+        { "great_fairy_sword", "mm", "objects/object_gi_sword_4/gGiGreatFairysSwordBladeDL",
+          "objects/object_gi_sword_4/gGiGreatFairysSwordHiltEmblemDL" },
+    };
+    constexpr char prefix[] = "__OTR__objects/nei_gi_redesign/";
+    if (std::strncmp(item.opaque, prefix, sizeof(prefix) - 1) != 0)
+        return false;
+    const char* slug = item.opaque + sizeof(prefix) - 1;
+    for (const auto& model : models) {
+        const size_t length = std::strlen(model.slug);
+        if (std::strncmp(slug, model.slug, length) == 0 && std::strcmp(slug + length, "/gi_dl") == 0) {
+            const auto selectedMod = [&](const char* path) {
+                if (!path)
+                    return false;
+                // Imported MM files can be overridden in OoT's local archive
+                // manager before TransformMasks_LoadMmDL reaches the donor.
+                const bool sharedMmPath = includeMmHost && std::strcmp(model.slug, "magic_cape") != 0 &&
+                                          std::strcmp(model.slug, "four_sword") != 0;
+                return ResourceMgr_IsModAssetForGame("oot", path) ||
+                       ((sharedMmPath || std::strcmp(model.owner, "oot") != 0) &&
+                        ResourceMgr_IsModAssetForGame("mm", path));
+            };
+            return selectedMod(model.opaque) || selectedMod(model.second);
+        }
+    }
+    return false;
+}
+
 bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available)(const char*)) {
     if (!item.alwaysShimmer || !altAssets)
         return false;
@@ -650,8 +744,8 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     // Queue stable paths for the interpreter. Loading through the legacy GBI wrapper
     // here would evict/reload base resources on each draw when Alt Assets is enabled.
     // Archive presence checks preserve the original model if a required pass is absent.
-    const bool upgraded =
-        !selectedSword && HasResource(item->opaque) && (!item->translucent || HasResource(item->translucent));
+    const bool upgraded = !selectedSword && !HasLegacyGiMod(*item) && HasResource(item->opaque) &&
+                          (!item->translucent || HasResource(item->translucent));
     if (!upgraded && !entry->drawFunc && !item->alwaysShimmer)
         return false;
     Matrix_Push();
@@ -732,7 +826,7 @@ static bool NeiGi_FillSeasonInfo(int season, CwItemDrawInfo* out) {
 }
 
 static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* out) {
-    if (!out ||
+    if (!out || HasLegacyGiMod(item, true) ||
         HasSelectedSword(item, OOT_NeiAltAssetsEnabled(),
                          [](const char* path) { return OOT_NeiResourceExists(path) != 0; }) ||
         !OOT_NeiResourceExists(item.opaque) || (item.translucent && !OOT_NeiResourceExists(item.translucent))) {

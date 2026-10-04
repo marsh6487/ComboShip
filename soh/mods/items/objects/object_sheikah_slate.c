@@ -9,6 +9,10 @@
 #include "../helpers/equip_helper.h"
 #include "macros.h"
 #include "functions.h"
+#include "soh/Enhancements/randomizer/NeiHeldPresentation.h"
+#include "soh/ResourceManagerHelpers.h"
+#define QUEST_HELD_IS_MOD ResourceMgr_IsModAsset
+#include "quest_held_resources.inc"
 #include <math.h>
 
 extern u8 Slate_IsDrawn(void);     // equip state, owned by item_sheikah_slate.c (same TU)
@@ -31,6 +35,10 @@ void CustomItems_DrawSheikahSlate(Player* player, PlayState* play) {
     if (!Slate_IsDrawn() || RemoteBomb_IsHeld()) {
         return;
     }
-    ItemEquip_DrawHeldModel(player, play, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", NULL,
-                            &sSlatePose);
+    const QuestHeldModel* model = &sQuest_sheikah_slate;
+    if (QuestHeld_UseOriginal(model)) {
+        ItemEquip_DrawHeldModel(player, play, model->opa, model->xlu, &sSlatePose);
+    } else if (QuestHeld_Complete(model->fallbackRequired)) {
+        ItemEquip_DrawHeldModel(player, play, model->fallbackOpa, model->fallbackXlu, &sSlatePose);
+    }
 }

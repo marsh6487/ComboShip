@@ -13,6 +13,9 @@
 #include <string>
 #include <vector>
 
+#ifdef COMBO_BUILD
+extern bool ownerAlt;
+#endif
 namespace Fixture {
 int enabled, alt, dinSword, loads, allocations, fallback, interpolation, vanilla, trap,
     triforce;
@@ -24,6 +27,7 @@ std::vector<std::array<unsigned, 3>> flameColors;
 std::vector<std::vector<Vtx>> arena;
 std::map<Gfx *, std::vector<Vtx>> vertexLoads;
 std::set<std::string> files;
+std::set<std::pair<std::string,std::string>> modFiles;
 Gfx opa[4096], xlu[4096];
 Mtx matrices[128];
 GraphicsContext gfx{};
@@ -42,6 +46,7 @@ void Reset() {
   std::memset(xlu, 0, sizeof(xlu));
   stack.clear();
   files.clear();
+  modFiles.clear();
   gfx.polyOpa.p = opa;
   gfx.polyXlu.p = xlu;
   play.state.gfxCtx = &gfx;
@@ -102,6 +107,17 @@ uint8_t ResourceMgr_FileAltExists(const char *path) {
   return Fixture::files.contains(std::string("alt/") + path);
 }
 bool ResourceMgr_IsAltAssetsEnabled() { return Fixture::alt; }
+int ResourceMgr_IsModAssetForGame(const char* game,const char* path) {
+  bool alt=Fixture::alt;
+#ifdef COMBO_BUILD
+  if(std::strcmp(game,"oot")==0)alt=ownerAlt;
+#endif
+  const std::string canonical=std::strncmp(path,"__OTR__",7)==0?std::string(path):std::string("__OTR__")+path;
+  const std::string selected=alt&&Fixture::files.contains(std::string("alt/")+canonical)?std::string("alt/")+canonical:canonical;
+  return Fixture::modFiles.contains({game,selected});
+}
+int ResourceMgr_IsModAsset(const char* path) {return ResourceMgr_IsModAssetForGame("oot",path);}
+
 Gfx *ResourceMgr_LoadGfxByName(const char *path) {
   ++Fixture::loads;
   return Fixture::files.contains(path)
@@ -655,6 +671,141 @@ int main() {
     assert(vanilla == nativeBefore + 2 && arena.size() == shimmerBefore + 2);
     dinSword=0; assert(NeiGi_Draw(&play,&entry));
   }
+  // A mod at an established model resource outranks authored GI geometry in
+  // native common/shop selection and the owner-pinned foreign descriptor.
+  struct ModBinding {CustomDrawFunc draw;const char* slug;const char* game;const char* legacy;int identity=0;};
+  const ModBinding modBindings[]={
+    {Randomizer_DrawRocsFeatherSkijer,"rocs_feather","oot","__OTR__objects/object_nei_rocs_feather/rocs_feather_dl"},
+    {Randomizer_DrawRocsFeather,"rocs_feather","oot","__OTR__objects/object_rocs_feather/gGiRocsFeatherDL"},
+    {Randomizer_DrawRocsCape,"rocs_cape","oot","__OTR__objects/object_nei_rocs_cape/rocs_cape_mesh_dl"},
+    {Randomizer_DrawWhip,"whip","oot","__OTR__objects/object_nei_whip/whip_give_opaque_dl"},
+    {Randomizer_DrawSpinner,"spinner","oot","__OTR__objects/object_nei_spinner/n0b0_opaque_dl"},
+    {Randomizer_DrawDekuLeaf,"deku_leaf","oot","__OTR__objects/object_nei_deku_leaf/g_dekuleaf_dl"},
+    {Randomizer_DrawSwitchHook,"switch_hook","oot","__OTR__objects/object_nei_switchhook/gSwitchHookGiveDL"},
+    {Randomizer_DrawMogmaMitts,"mogma_mitts","oot","__OTR__objects/object_nei_mogma_mitts/gMogmaMittsGiveDL"},
+    {Randomizer_DrawGustJar,"gust_jar","oot","__OTR__objects/object_nei_gust_jar/jar_model_dl"},
+    {Randomizer_DrawTimeGate,"time_gate","oot","__OTR__objects/object_nei_time_gate/g_timegate_dl"},
+    {Randomizer_DrawMinishCap,"minish_cap","oot","__OTR__objects/object_nei_minish_cap/Cylinder_opaque_dl"},
+    {Randomizer_DrawLantern,"lantern","oot","__OTR__objects/object_poh/gPoeLanternDL"},
+    {Randomizer_DrawExtDivineShield,"divine_shield","oot","__OTR__objects/object_nei_divine_shield/g_divine_shield_dl"},
+    {Randomizer_DrawExtSheikahShield,"sheikah_shield","oot","__OTR__objects/object_nei_kite_shield/g_kite_shield_dl"},
+    {Randomizer_DrawExtShieldOfIkana,"shield_of_ikana","mm","__OTR__objects/object_link_child/gLinkHumanMirrorShieldDL"},
+    {Randomizer_DrawExtMagicCape,"magic_cape","oot","__OTR__objects/object_nei_magic_cape/gNeiMagicCapeWaveDL"},
+    {Randomizer_DrawExtSpiritBreastplate,"spirit_breastplate","oot","__OTR__objects/object_gi_clothes/gGiTunicCollarDL"},
+    {Randomizer_DrawExtSagesTunic,"sages_tunic","oot","__OTR__objects/object_gi_clothes/gGiTunicDL"},
+    {Randomizer_DrawExtChampionsTunic,"champions_tunic","oot","__OTR__objects/object_gi_clothes/gGiTunicDL"},
+    {Randomizer_DrawExtPegasusAnklet,"pegasus_anklet","oot","__OTR__objects/object_gi_hoverboots/gGiHoverBootsDL"},
+    {Randomizer_DrawExtTrident,"trident","oot","__OTR__objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298"},
+    {Randomizer_DrawExtClimbBoots,"climb_boots","oot","__OTR__objects/object_gi_boots_2/gGiIronBootsRivetsDL"},
+    {Randomizer_DrawExtRocBoots,"roc_boots","oot","__OTR__objects/object_gi_hoverboots/gGiHoverBootsDL"},
+    {Randomizer_DrawExtCaneOfByrna,"cane_of_byrna","oot","__OTR__objects/object_somaria/g_byrna_cane_give_dl"},
+    {Randomizer_DrawExtFourSword,"four_sword","oot","__OTR__objects/object_nei_four_sword/gNeiFourSwordHiltDL"},
+    {Randomizer_DrawCaneOfSomaria,"cane_of_somaria","oot","__OTR__objects/object_somaria/g_somaria_cane_give_dl"},
+    {Randomizer_DrawExtPendantOfMemories,"pendant_of_memories","mm","__OTR__objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL"},
+    {Randomizer_DrawProgressiveKokiriSword,"kokiri_sword","oot","__OTR__objects/object_gi_sword_1/gGiKokiriSwordDL"},
+    {Randomizer_DrawMasterSword,"master_sword","oot","__OTR__objects/object_toki_objects/object_toki_objects_DL_001BD0"},
+    {Randomizer_DrawTrueMasterSword,"true_master_sword","oot","__OTR__objects/object_toki_objects/object_toki_objects_DL_001BD0"},
+    {Randomizer_DrawProgressiveBGS,"biggoron_sword","oot","__OTR__objects/object_gi_longsword/gGiBiggoronSwordDL"},
+    {Randomizer_DrawRazorSword,"razor_sword","mm","__OTR__objects/object_gi_sword_2/gGiRazorSwordDL"},
+    {Randomizer_DrawGildedSword,"gilded_sword","mm","__OTR__objects/object_gi_sword_3/gGiGildedSwordEmptyDL"},
+    {Randomizer_DrawGreatFairySword,"great_fairy_sword","mm","__OTR__objects/object_gi_sword_4/gGiGreatFairysSwordHiltEmblemDL"},
+    {Randomizer_DrawNeiSheikahSlate,"sheikah_slate","oot","__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL"},
+    {Randomizer_DrawSlateRuneMasterCycle,"slate_master_cycle","oot","__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL"},
+    {Randomizer_DrawSlateRuneStasis,"slate_stasis","oot","__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL"},
+    {Randomizer_DrawSlateRuneCryonis,"slate_cryonis","oot","__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL"},
+    {Randomizer_DrawSlateRuneSensor,"slate_sensor","oot","__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL"},
+    {Randomizer_DrawSlateRuneBomb,"slate_bomb","oot","__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL"},
+    {Randomizer_DrawNeiRodOfSeasons,"rod_of_seasons","oot","__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL"},
+    {Randomizer_DrawNeiPhantomHourglass,"phantom_hourglass","oot","__OTR__objects/object_nei_phantom_hourglass/gNeiPhantomHourglassDL"},
+    {Randomizer_DrawNeiShadowCrystal,"shadow_crystal","oot","__OTR__objects/object_nei_shadow_crystal/gNeiShadowCrystalDL"},
+  };
+  for(const auto& test:modBindings)for(int selectedAlt:{0,1}){
+    Reset();alt=selectedAlt;
+#ifdef COMBO_BUILD
+    ownerAlt=selectedAlt;
+#endif
+    entry={};entry.drawFunc=test.draw;entry.drawItemId=test.identity;
+    const auto path=std::string("__OTR__objects/nei_gi_redesign/")+test.slug+"/gi_dl";
+    files.insert(path);files.insert(test.legacy);
+    const auto* selected=FindPresentation(&entry);assert(selected);
+    std::vector<std::string> authoredPaths{path};
+    if(selected->translucent){files.insert(selected->translucent);authoredPaths.push_back(selected->translucent);}
+    if(selectedAlt)files.insert(std::string("alt/")+test.legacy);
+    assert(NeiGi_Draw(&play,&entry)&&fallback==0&&Drawn()==authoredPaths);
+    modFiles.insert({test.game,selectedAlt?std::string("alt/")+test.legacy:std::string(test.legacy)});
+    gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
+    assert(NeiGi_Draw(&play,&entry)&&fallback==1&&Drawn().empty());
+    gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
+    assert(NeiGi_DrawShop(&play,&entry)&&fallback==1&&Drawn().empty());
+#ifdef COMBO_BUILD
+    CwItemDrawInfo info{};assert(!OOT_GetNeiGiDrawInfo(test.slug,&info));
+    modFiles.clear();assert(OOT_GetNeiGiDrawInfo(test.slug,&info));
+    if(std::strcmp(test.game,"mm")==0){
+      // Imported MM model files can also be replaced in OoT's local archive
+      // manager, which TransformMasks_LoadMmDL consults before the donor.
+      modFiles.insert({"oot",selectedAlt?std::string("alt/")+test.legacy:std::string(test.legacy)});
+      gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
+      assert(NeiGi_Draw(&play,&entry)&&fallback==1&&Drawn().empty());
+      assert(!OOT_GetNeiGiDrawInfo(test.slug,&info));
+      modFiles.clear();assert(OOT_GetNeiGiDrawInfo(test.slug,&info));
+    }
+    if(std::strcmp(test.game,"oot")==0 && std::strcmp(test.slug,"magic_cape") && std::strcmp(test.slug,"four_sword")){
+      // A native MM mod protects its exported descriptor, but does not affect
+      // the OoT host's own selected model or GI.
+      modFiles.insert({"mm",selectedAlt?std::string("alt/")+test.legacy:std::string(test.legacy)});
+      gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
+      assert(NeiGi_Draw(&play,&entry)&&fallback==0&&Drawn()==authoredPaths);
+      assert(!OOT_GetNeiGiDrawInfo(test.slug,&info));
+      modFiles.clear();assert(OOT_GetNeiGiDrawInfo(test.slug,&info));
+    }
+    assert(info.dlistCount==authoredPaths.size()&&std::strcmp(info.dlists[0],path.c_str())==0);
+    ownerAlt=false;
+#endif
+  }
+#ifdef COMBO_BUILD
+  for(const char* owner:{"oot","mm"})for(int selectedAlt:{0,1}){
+    Reset();alt=selectedAlt;ownerAlt=selectedAlt;
+    const char* legacy="__OTR__objects/object_gi_sword_1/gGiKokiriSwordDL";
+    files.insert("__OTR__objects/nei_gi_redesign/mm_kokiri_sword/gi_dl");files.insert(legacy);
+    if(selectedAlt)files.insert(std::string("alt/")+legacy);
+    CwItemDrawInfo info{};assert(OOT_GetNeiGiDrawInfo("mm_kokiri_sword",&info));
+    modFiles.insert({owner,selectedAlt?std::string("alt/")+legacy:std::string(legacy)});
+    assert(!OOT_GetNeiGiDrawInfo("mm_kokiri_sword",&info));
+  }
+  ownerAlt=false;
+#endif
+  // The progressive OoT Master callback actually draws a tinted Kokiri
+  // placeholder; the real Master callback and foreign recipe use Temple geometry.
+  for(int selectedAlt:{0,1}){
+    Reset();alt=selectedAlt;
+#ifdef COMBO_BUILD
+    ownerAlt=selectedAlt;
+#endif
+    const char* kokiri="__OTR__objects/object_gi_sword_1/gGiKokiriSwordDL";
+    const char* authored="__OTR__objects/nei_gi_redesign/master_sword/gi_dl";
+    files.insert(kokiri);files.insert(authored);
+    if(selectedAlt)files.insert(std::string("alt/")+kokiri);
+    modFiles.insert({"oot",selectedAlt?std::string("alt/")+kokiri:std::string(kokiri)});
+    entry={};entry.drawFunc=Randomizer_DrawProgressiveMasterSword;
+    assert(NeiGi_Draw(&play,&entry)&&fallback==1&&Drawn().empty());
+    gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
+    entry.drawFunc=Randomizer_DrawMasterSword;
+    assert(NeiGi_Draw(&play,&entry)&&fallback==0&&Drawn()==std::vector<std::string>{authored});
+#ifdef COMBO_BUILD
+    CwItemDrawInfo info{};assert(OOT_GetNeiGiDrawInfo("master_sword",&info));ownerAlt=false;
+#endif
+  }
+  // Wand mods only own held geometry: their legacy GI is an inline stand-in,
+  // so keeping a held mod must not turn the new GI back into that stand-in.
+  Reset();entry={};entry.drawFunc=Randomizer_DrawElementalWand;entry.drawItemId=RG_WAND_SHADOW_SCEPTER;
+  const char* shadowPath="__OTR__objects/nei_gi_redesign/shadow_scepter/gi_dl";
+  files.insert(shadowPath);files.insert("__OTR__objects/object_nei_wand_shadow_scepter/gNeiShadowScepterDL");
+  modFiles.insert({"oot","__OTR__objects/object_nei_wand_shadow_scepter/gNeiShadowScepterDL"});
+  assert(NeiGi_Draw(&play,&entry)&&fallback==0&&Drawn()==std::vector<std::string>{shadowPath});
+#ifdef COMBO_BUILD
+  CwItemDrawInfo heldOnlyInfo{};assert(OOT_GetNeiGiDrawInfo("shadow_scepter",&heldOnlyInfo));
+#endif
+  std::cout<<"PASS legacy mod model priority: "<<std::size(modBindings)<<" concrete GI callbacks, base/Alt, native/common/shop, foreign and both imported owners; held-only wand mods retain authored GI\n";
   // Serialized model vertices and resource matrices must clear the shelf by 0.5
   // world units under EnGirlA's real .25 actor scale / 24 local-unit Y offset.
   struct Bounds {

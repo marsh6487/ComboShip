@@ -21,3 +21,13 @@ extern "C" const char* NeiResource_Route(const char* path) {
     static std::unordered_set<std::string> paths;
     return paths.insert(std::string("__OTR__@oot:") + (path + 7)).first->c_str();
 }
+
+extern "C" int NeiResource_IsMod(const char* path) {
+    if (!path)
+        return 0;
+    using Query = int (*)(const char*);
+    static Query query = nullptr;
+    if (!query)
+        query = reinterpret_cast<Query>(Combo_ResolveSym("soh", "OOT_NeiResourceIsMod"));
+    return query && query(path);
+}

@@ -27,6 +27,9 @@ extern "C" {
 
 Gfx* ResourceMgr_LoadGfxByName(const char* path);
 u8 ResourceMgr_FileExists(const char* resName);
+u8 ResourceMgr_FileAltExists(const char* resName);
+bool ResourceMgr_IsAltAssetsEnabled();
+int ResourceMgr_IsModAsset(const char* path);
 void* OotAssets_LoadGfx(const char* otrPath);        // Skijer's NEI — resolve an OoT model DL from oot.o2r
 void* OotAssets_LoadGfxDirect(const char* otrPath);  // Skijer's NEI — archive-scoped load (defeats MM shadowing)
 void* OotAssets_LoadTexOrDList(const char* otrPath); // Skijer's NEI — texture/DL resource (Climb ladder seg-8 tex)
@@ -632,6 +635,14 @@ void DrawTycoonWallet() {
 // archives mount LOWEST. The parent then draws with whatever MM data answers those child paths — the
 // Gerudo Mask rendered as flat grey stone that way. The deep loader patches every child reference to
 // a raw pointer from the OoT archive, which is also what stops the child-miss crashes.
+// The resource manager owns caching and current base/Alt resolution. A
+// winning local mod must precede archive-scoped companion loads as well.
+static Gfx* LoadNeiLegacyGfx(const char* path, bool direct) {
+    if (ResourceMgr_IsModAsset(path))
+        return ResourceMgr_LoadGfxByName(path);
+    return (Gfx*)(direct ? OotAssets_LoadGfxDirect(path) : OotAssets_LoadGfx(path));
+}
+
 static void DrawOotGetItemOpa(const char* otrPath, Gfx** cache) {
     if (*cache == NULL) {
         *cache = (Gfx*)OotAssets_LoadGfxDirect(otrPath);
@@ -792,12 +803,8 @@ static void DrawOotGetItemOpaOpa(const char* pathA, Gfx** cacheA, const char* pa
 static void DrawOotGetItemOpaXlu(const char* opaPath, Gfx** opaCache, const char* xluPath, Gfx** xluCache) {
     // Deep loader — see the note on DrawOotGetItemOpa. This helper is the one that crashed in the
     // 2026-08-13 log (0xC0000005 inside ResourceMgr_LoadGfxByName on a null resource).
-    if (*opaCache == NULL) {
-        *opaCache = (Gfx*)OotAssets_LoadGfxDirect(opaPath);
-    }
-    if (*xluCache == NULL) {
-        *xluCache = (Gfx*)OotAssets_LoadGfxDirect(xluPath);
-    }
+    *opaCache = LoadNeiLegacyGfx(opaPath, true);
+    *xluCache = LoadNeiLegacyGfx(xluPath, true);
     if (*opaCache == NULL || *xluCache == NULL) {
         return; // oot.o2r not mounted yet — try again next frame
     }
@@ -1278,9 +1285,7 @@ void DrawOotCompass() { // object_gi_compass, body Opa + glass Xlu (OoT GetItem_
 
 // Single opaque DL, grayscale-tinted.
 static void DrawOotGetItemOpaTint(const char* otrPath, Gfx** cache, u8 r, u8 g, u8 b) {
-    if (*cache == NULL) {
-        *cache = (Gfx*)OotAssets_LoadGfx(otrPath);
-    }
+    *cache = LoadNeiLegacyGfx(otrPath, false);
     if (*cache == NULL) {
         return; // archive not mounted yet — try again next frame
     }
@@ -1297,12 +1302,8 @@ static void DrawOotGetItemOpaTint(const char* otrPath, Gfx** cache, u8 r, u8 g, 
 // Two opaque DLs drawn in sequence, grayscale-tinted (tinted tunics / paired meshes).
 static void DrawOotGetItemOpaOpaTint(const char* pathA, Gfx** cacheA, const char* pathB, Gfx** cacheB, u8 r, u8 g,
                                      u8 b) {
-    if (*cacheA == NULL) {
-        *cacheA = (Gfx*)OotAssets_LoadGfx(pathA);
-    }
-    if (*cacheB == NULL) {
-        *cacheB = (Gfx*)OotAssets_LoadGfx(pathB);
-    }
+    *cacheA = LoadNeiLegacyGfx(pathA, false);
+    *cacheB = LoadNeiLegacyGfx(pathB, false);
     if (*cacheA == NULL || *cacheB == NULL) {
         return; // archive not mounted yet — try again next frame
     }
@@ -1421,9 +1422,7 @@ static bool TierLatch_NewPickup(u32* seen) {
 
 static bool DrawOotBiggoronSwordReal(void) {
     static Gfx* sCache = NULL;
-    if (sCache == NULL) {
-        sCache = (Gfx*)OotAssets_LoadGfxDirect("__OTR__objects/object_gi_longsword/gGiBiggoronSwordDL");
-    }
+    sCache = LoadNeiLegacyGfx("__OTR__objects/object_gi_longsword/gGiBiggoronSwordDL", true);
     if (sCache == NULL) {
         return false;
     }
@@ -1910,9 +1909,7 @@ void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b);
 // cylinder, with its scrolling shine on segment 8.
 static void DrawOotMasterSwordTiered(u8 trueTier) {
     static Gfx* sCache = NULL;
-    if (sCache == NULL) {
-        sCache = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_toki_objects/object_toki_objects_DL_001BD0");
-    }
+    sCache = LoadNeiLegacyGfx("__OTR__objects/object_toki_objects/object_toki_objects_DL_001BD0", false);
     if (sCache == NULL) {
         return; // oot.o2r not mounted yet — try again next frame
     }
@@ -1955,9 +1952,7 @@ void DrawOotMasterSword() { // chain entry point — forwards to the tier Conver
 // Modeled at actor scale, so shrink to fit the get-item cylinder.
 void DrawOotNeiLantern() {
     static Gfx* sCache = NULL;
-    if (sCache == NULL) {
-        sCache = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_poh/gPoeLanternDL");
-    }
+    sCache = LoadNeiLegacyGfx("__OTR__objects/object_poh/gPoeLanternDL", false);
     if (sCache == NULL) {
         return; // oot.o2r not mounted yet — try again next frame
     }
@@ -1970,7 +1965,7 @@ void DrawOotNeiLantern() {
 }
 
 // --- REAL NEI meshes (2ship.o2r, packed from mm/assets/custom/objects/object_nei_* + object_somaria).
-// NULL-safe loader: existence-gated (ResourceMgr_FileExists) and cached, so an OLDER 2ship.o2r that
+// NULL-safe loader: existence-gated, with live base/Alt resolution, so an OLDER 2ship.o2r that
 // doesn't carry the object yet just returns NULL and the caller falls back to its documented
 // stand-in — o2r-version-proof, never a crash on unresolved symbols. Skijer's NEI ---
 extern "C" unsigned char OotAssets_PathAllowed(const char* p); // blocklist (oot_asset_loader.cpp):
@@ -1978,15 +1973,12 @@ extern "C" unsigned char OotAssets_PathAllowed(const char* p); // blocklist (oot
 // those load as NULL here so every call site draws its stand-in fallback instead.
 
 static Gfx* LoadNeiRealGfx(const char* otrPath, Gfx** cache, u8* tried) {
-    if (!OotAssets_PathAllowed(otrPath)) {
-        return NULL; // blocked family -> stand-in fallback (crash-proof)
-    }
-    if (!*tried) {
-        *tried = 1;
-        if (ResourceMgr_FileExists(otrPath)) {
-            *cache = ResourceMgr_LoadGfxByName(otrPath);
-        }
-    }
+    (void)tried; // retained call-site ABI; never negative-cache or pin an Alt mode
+    *cache = NULL;
+    if (!OotAssets_PathAllowed(otrPath))
+        return NULL;
+    if (ResourceMgr_FileExists(otrPath) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(otrPath)))
+        *cache = ResourceMgr_LoadGfxByName(otrPath);
     return *cache;
 }
 
@@ -2672,6 +2664,9 @@ static u32 Pegasus_CrimsonRamp(u32 rgba) {
 }
 
 static Gfx* Pegasus_GetRecoloredBootsDL() {
+    const char* path = "__OTR__objects/object_gi_hoverboots/gGiHoverBootsDL";
+    if (ResourceMgr_IsModAsset(path))
+        return ResourceMgr_LoadGfxByName(path);
     static Gfx sDL[512];
     static bool sBuilt = false;
     if (sBuilt) {
@@ -2754,10 +2749,7 @@ void DrawOotExtTrident() {
     // is a thin silhouette and read as a needle at the shared size (Skijer asked for 2.5x).
     // Skijer's NEI
     static Gfx* sTrident = NULL;
-    if (sTrident == NULL) {
-        sTrident =
-            (Gfx*)OotAssets_LoadGfxDirect("__OTR__objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298");
-    }
+    sTrident = LoadNeiLegacyGfx("__OTR__objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298", true);
     if (sTrident == NULL) {
         static Gfx* c = NULL; // oot.o2r not ready — keep the old tinted stand-in rather than nothing
         DrawOotGetItemOpaTint("__OTR__objects/object_gi_longsword/gGiBiggoronSwordDL", &c, 120, 190, 230);
@@ -2782,6 +2774,8 @@ void DrawOotExtTrident() {
 // G_SETPRIMCOLOR/G_SETENVCOLOR pushed through `remap`. Per-SECTION recolors (Climb: yellow leather
 // vs silver iron) are only possible this way — a grayscale tint is one color for the whole mesh.
 static Gfx* BuildRecoloredOotGiDL(const char* otrPath, u32 (*remap)(u32), Gfx* dst, bool* built) {
+    if (ResourceMgr_IsModAsset(otrPath))
+        return ResourceMgr_LoadGfxByName(otrPath);
     if (*built) {
         return dst;
     }

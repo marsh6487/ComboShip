@@ -215,12 +215,15 @@ void Wand_TickInput(PlayState* play, Player* player) {
     sWasDrawn = drawn;
 }
 
+#include "../objects/object_elemental_wand.c"
+
 // The world-space half of the rods, run from the player's draw pass: these emit into POLY_XLU and
 // the update pass has no display list open.
 void Wand_Draw(Player* player, PlayState* play) {
     WandShadow_Draw(play);
     WandStorm_Draw(play);
     WandWind_Draw(player, play);
+    CustomItems_DrawElementalWand(player, play);
 }
 
 /**
