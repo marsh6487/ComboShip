@@ -271,6 +271,35 @@ int main() {
   Rando::AppendReceiptSource(entry, "");
   assert(entry.msg.back() == '\xBF');
   donorReady = false;
+  // Missing donor access must not send songs to story/teaching text, or leave
+  // a one-line identity receipt. Both warm and cold runs use the MM meanings.
+  const std::pair<RandoItemId, const char *> descriptions[] = {
+    {RI_SONG_SONATA, "slumber"}, {RI_SONG_LULLABY, "sleep"},
+    {RI_SONG_LULLABY_INTRO, "opening bars"}, {RI_SONG_NOVA, "new life"},
+    {RI_SONG_ELEGY, "hollow"}, {RI_SONG_OATH, "giants"},
+    {RI_SONG_HEALING, "masks"}, {RI_SONG_SOARING, "statue"},
+    {RI_SONG_TIME, "Termina"}, {RI_SONG_STORMS, "thunder"},
+    {RI_SONG_SUN, "night"}, {RI_SONG_EPONA, "horse"},
+    {RI_SONG_SARIA, "forest"}, {RI_SONG_DOUBLE_TIME, "dusk"},
+    {RI_SONG_INVERTED_TIME, "slows"}
+  };
+  for (bool ready : {false, true}) {
+    donorReady = ready;
+    gSaveContext.options.language = LANGUAGE_ENG;
+    for (auto [id, description] : descriptions) {
+      entry = {};
+      assert(Rando::ApplyItemReceiptText(id, entry) && "MM song has no descriptive receipt");
+      assert(entry.msg.find(description) != std::string::npos && !entry.autoFormat);
+    }
+    gSaveContext.options.language = LANGUAGE_GER;
+    assert(Rando::ApplyItemReceiptText(RI_SONG_HEALING, entry));
+    assert(entry.msg.find("Masken") != std::string::npos);
+    gSaveContext.options.language = LANGUAGE_FRE;
+    assert(Rando::ApplyItemReceiptText(RI_SONG_HEALING, entry));
+    assert(entry.msg.find("masques") != std::string::npos);
+  }
+  gSaveContext.options.language = LANGUAGE_ENG;
+  donorReady = false;
   entry.msg = "fallback";
   assert(Rando::ApplyItemReceiptText(
       RI_OOT_NEI_DEKU_LEAF, entry)); // local registry works without donor
@@ -345,7 +374,7 @@ int main() {
   for (const auto &[id, name] : concrete) {
     requested.clear();
     assert(Rando::ApplyItemReceiptText(id, entry));
-    assert(requested == name &&
+    assert((id >= RI_SONG_DOUBLE_TIME && id <= RI_SONG_TIME) || requested == name &&
            "concrete receipt went back through progressive donor state");
   }
   for (int owned = 0; owned <= 3; ++owned) {

@@ -7,6 +7,7 @@ The historical final candidate disappeared from the transient workspace. The sup
 | Checkpoint | Content | Verification | Remaining work |
 |---|---|---|---|
 | `c54ca14d3555324731412c35a0242e5dd334afcc` | Exact recovered headers and accepted reconstruction plan | Remote tree `34ea8dc7c7a5c4ccd49ce13c42fc4622eb58004d` equals the local tree; fetched branch verified | Reconstruct gameplay implementations and fresh tests |
+| `3f6ed4d42d7cb759ee1bb5f06cd97d3af4388fdf` | Tested skin, yellow magic and independent shimmer sections; checkpoint instructions | Remote tree `7068c516dd6b5488407ce7b91f25d86cc97cf1ab` equals the local tested tree; fetched branch verified | Wallet/editor, Wolf core/host, GI fitting/song effects, remaining receipts/icons and combined review/builds |
 
 ## MM skin section
 
@@ -16,8 +17,10 @@ Local worker commit `12d055506bbdb49280cd30e8502672b9a10e91e7` adds opt-in root 
 
 - Yellow magic receipts retain localized yellow identity and RPG remaining-upgrade counts; saturated tiers no longer wrap. `python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py` passed on the combined checkpoint, including native/foreign receipt catalogs, grants, latch state, Skulltula totals and dungeon-information guards.
 - Custom/legacy GI selection retains independent shimmer identity without attaching authored mesh-local energy. `python3 -B scripts/diagnostics/run_nei_identity_tests.py` passed all 17 owner themes and 19 native MM themes through selection and toggle cases. `python3 -B scripts/diagnostics/run_nei_gi_tests.py` passed the native renderer and engine-header checks. Foreign-host shop fitting and song effects are still being reconstructed.
+- Native MM and Tycoon rupee digits safely display every nonnegative signed16 balance without changing saved currency, wallet capacity or accumulator state. `python3 -B tests/mm_wallet/run_tests.py` passed all 65,536 balances across five paths under ASan/UBSan/bounds and the real native HUD translation-unit syntax check. The regression reproduced the native index16 crash at 1667/wallet2 and Tycoon10000 masking to1296. Only leak detection is disabled because the fixture allocates no heap and this runner cannot perform LeakSanitizer's process inspection.
+- All 15 MM song variants retain descriptive localized receipt bodies with a cold donor. The combined `run_mm_item_receipt_tests.py` runner passed again after this section, including EN/DE/FR song cases and existing grant/dungeon-information guards.
 
-This is a partial reconstruction checkpoint. Wolf loader/core and MM host integration, editor and wallet fixes, GI fitting/song effects, remaining receipts/icon ownership, combined review and complete Windows/Linux builds remain in progress. In-game acceptance is not claimed.
+This is a partial reconstruction checkpoint. Wolf loader/core and MM host integration, editor grants, GI fitting/song effects, remaining receipts/icon ownership, combined review and complete Windows/Linux builds remain in progress. In-game acceptance is not claimed.
 
 ## Resume
 

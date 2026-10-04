@@ -13,6 +13,9 @@ python3 -B tests/seasons/run_oot_shop_tests.py
 python3 -B scripts/diagnostics/run_mm_mask_bridge_tests.py --sanitize
 python3 -B tests/mm_presentation/run_foreign_scale_tests.py
 python3 -B scripts/diagnostics/run_mm_nei_tests.py
+python3 -B tests/mm_wallet/run_tests.py
+python3 -B tests/mm_wolf/run_skin_tests.py
+python3 -B scripts/diagnostics/run_nei_identity_tests.py
 python3 -B tests/nei_held/run_hand_fit_tests.py
 python3 -B tests/nei_held/run_articulated_tests.py
 python3 -B tests/nei_asset_priority/run_tests.py
