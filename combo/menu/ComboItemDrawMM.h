@@ -14,7 +14,7 @@
 #include "ComboExport.h"
 #include "ComboResolve.h"
 #include "ComboItemDrawABI.h"
-#include "ComboSongDraw.h"
+#include "ComboSongDrawMM.h"
 #include "ComboOotBottleShimmerMM.h"
 #include "2s2h/Rando/NeiGiPresentation.h"
 #include "2s2h/Rando/NeiResourceRouting.h"
@@ -218,8 +218,10 @@ static int32_t MM_FillSongDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
         return 1;
     }
     uint8_t rgb[4];
-    if (!ComboSongShimmerColor(id - RI_SONG_DOUBLE_TIME, rgb))
+    if (!ComboSongShimmerColor(ComboSongForMmItem(id), rgb))
         return 0;
+    out->drawKind = CW_DRAW_KIND_SONG_GI;
+    out->neiEffect = ComboSongForMmItem(id);
     out->itemShimmer = 1;
     std::memcpy(out->itemShimmerColor, rgb, 4);
     out->dlists[0] = gGiSongNoteDL;
@@ -1061,6 +1063,10 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
         out->resolvedName = resolvedName;
         return 1;
     }
+    out->neiShimmer = nei.neiShimmer;
+    out->itemShimmer = nei.itemShimmer;
+    if (nei.neiShimmer)
+        out->stateDependent = 2;
     const int32_t swordFallback = MM_FillImportedSwordFallback(id, out);
     if (swordFallback != 0)
         return swordFallback;
@@ -1144,7 +1150,7 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     GetItem_GetDrawSetupDLs((s32)it->second.drawId, &setupOpa, &setupXlu);
     out->setupDlOpa = setupOpa;
     out->setupDlXlu = setupXlu;
-    out->itemShimmer = GetItem_GetShimmerColor((s16)it->second.drawId, out->itemShimmerColor);
+    out->itemShimmer = GetItem_GetShimmerColor((s16)it->second.drawId, out->itemShimmerColor) || out->itemShimmer;
     if (MM_OotBottleShimmerColor(id, out->itemShimmerColor)) {
         out->itemShimmer = 1;
     }

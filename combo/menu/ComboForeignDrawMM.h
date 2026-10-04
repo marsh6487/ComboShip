@@ -65,6 +65,7 @@ struct ComboForeignDrawInfoOOT {
     float scale = 0.0f;    // extra uniform model scale; 0 = none (OOT rupees: 0.7)
     bool itemShimmer = false;
     uint8_t itemShimmerColor[4] = {};
+    int32_t neiShimmer = 0;
     bool hasEnvColor = false;
     uint8_t envColor[4] = { 0, 0, 0, 0 };
     int32_t drawKind = CW_DRAW_KIND_SIMPLE;   // non-SIMPLE = replicate a specific OOT draw func
@@ -229,6 +230,7 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
     info.stateDependent = raw.stateDependent != 0;
     info.appearanceDependent = raw.stateDependent == 2;
     info.itemShimmer = raw.itemShimmer != 0;
+    info.neiShimmer = raw.neiShimmer;
     memcpy(info.itemShimmerColor, raw.itemShimmerColor, sizeof(info.itemShimmerColor));
     if (raw.resolvedName != nullptr) {
         info.resolvedName = raw.resolvedName;
@@ -1151,7 +1153,7 @@ inline void MM_DrawForeignNativeEquipment(const ComboForeignDrawInfoOOT* info) {
 // Draw a foreign (OOT-bound) item's real OOT model at the current model matrix. Any resolution
 // failure falls back to the sentinel blue rupee (the RI_COMBO_FOREIGN item's GID_RUPEE_BLUE), so we
 // never draw blank. Mirrors Randomizer_DrawComboForeign (soh/.../draw.cpp).
-inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
+inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false) {
     const ComboForeignDrawInfoOOT* info =
         (randoCheckId != RC_UNKNOWN) ? ComboResolveForeignDrawInfoOOT(randoCheckId) : nullptr;
     if (info == nullptr) {
@@ -1198,7 +1200,7 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
         memcpy(recipe.neiEffectCenter, info->neiEffectCenter, sizeof(recipe.neiEffectCenter));
         recipe.neiSomariaUpgrade = info->neiSomariaUpgrade;
         recipe.itemShimmer = info->itemShimmer;
-        MM_DrawNeiGi(recipe);
+        MM_DrawNeiGi(recipe, shop);
         return;
     }
     if (info->itemShimmer) {
@@ -1244,6 +1246,7 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
         case CW_DRAW_KIND_SKULL_TOKEN:
             MM_DrawForeignSkullToken(info);
             break;
+        case CW_DRAW_KIND_SONG_GI:
         case CW_DRAW_KIND_MUSIC_NOTE:
             MM_DrawForeignMusicNote(info);
             break;
@@ -1296,7 +1299,13 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId) {
     if (info->itemShimmer) {
         Matrix_Pop();
         const bool mmOwner = info->drawKind == CW_DRAW_KIND_MM_MASK || info->drawKind == CW_DRAW_KIND_MM_REMAINS;
-        if (info->neiEffect == static_cast<int32_t>(NeiGi::Kind::Pokeball))
+        if (info->drawKind == CW_DRAW_KIND_SONG_GI)
+            NeiGi_DrawSongOverlay(gPlayState, info->neiEffect, "oot");
+        else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1)
+            NeiGi_DrawMesh(gPlayState,
+                           NeiGi::SampleShimmer(gPlayState->gameplayFrames, true, NeiGi_CameraBasis(gPlayState),
+                                                static_cast<NeiGi::Kind>(info->neiShimmer - 1)));
+        else if (info->neiEffect == static_cast<int32_t>(NeiGi::Kind::Pokeball))
             NeiGi_DrawMesh(gPlayState, NeiGi::SampleShimmer(gPlayState->gameplayFrames, true,
                                                             NeiGi_CameraBasis(gPlayState), NeiGi::Kind::Pokeball));
         else

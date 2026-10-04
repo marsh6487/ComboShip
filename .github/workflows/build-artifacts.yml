@@ -105,7 +105,9 @@ jobs:
           git fetch --no-tags --depth=1 https://github.com/marsh6487/Shipwright.git cec63fce86b1f582f6e61ad6a98eca6c3cca784b c77c18587a976f6d6cb5c8f91f27593286469218
           # HD icon routes compare grant behavior with this fixed ComboShip baseline.
           git fetch --no-tags --depth=1 origin 122dd5f68cb37fcf515c3726f8a77043db5dcdf4
-          bash scripts/diagnostics/run_combo_nei_regressions.sh
+          # Match libultraship's ImGui dependency for the real save-editor draw fixture.
+          git clone --depth=1 --branch v1.91.9b-docking https://github.com/ocornut/imgui.git "$RUNNER_TEMP/combo-nei-imgui"
+          CPATH="$RUNNER_TEMP/combo-nei-imgui${CPATH:+:$CPATH}" bash scripts/diagnostics/run_combo_nei_regressions.sh
 
       - name: OoT diagnostic frame timing accounting
         run: |

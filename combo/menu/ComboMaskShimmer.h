@@ -3,6 +3,7 @@
 #define COMBO_MASK_SHIMMER_H
 
 #include <stdint.h>
+#include "ComboSongDraw.h"
 
 // 0 = ordinary mask; 1..4 = transformations; 5..8 = Odolwa, Goht, Gyorg, Twinmold.
 static inline void ComboMaskShimmerColor(int profile, uint8_t color[4]) {
@@ -64,6 +65,7 @@ static inline int ComboMmRemainsShimmerColor(int index, uint8_t color[4]) {
 extern "C" {
 #endif
 void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner);
+void NeiGi_DrawSongOverlay(PlayState* play, int song, const char* owner);
 #ifdef __cplusplus
 }
 #endif

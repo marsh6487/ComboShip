@@ -71,6 +71,7 @@ typedef enum {
     CW_DRAW_KIND_SEASON_GI = 36,            /* 1..4: seasons; 5: rod + cycling weather; 6: rain/lightning song */
     CW_DRAW_KIND_GRAYSCALE_LAYERS = 35,     /* per-DL grayscale layerPrimMask/colors; OPA/XLU split */
     CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT = 34, /* concrete static award; ops[0] native equipment selector */
+    CW_DRAW_KIND_SONG_GI = 38,              /* note plus song profile in neiEffect; native env or grayscale tint */
     CW_DRAW_KIND_MM_FAIRY_CONTAINER = 37,   /* OPA shell0, XLU glass1/contents2; dl3 is its native Mtx path */
 } CwDrawKind;
 
@@ -178,12 +179,17 @@ typedef struct {
     /* Independent effect pass; never tint the mask model or change its material routing. */
     int32_t itemShimmer;
     uint8_t itemShimmerColor[4];
+    /* Optional model-independent NEI sampler: Kind + 1, or zero for the color overlay.
+     * Carries shimmer only; never apply authored mesh-local energy to a mod model. */
+    int32_t neiShimmer;
 } CwItemDrawInfo;
 
 typedef struct {
     const char* path;      /* owning archive's process-lifetime texture path */
     int32_t width, height; /* logical pixels, independent of high-resolution replacements */
     int32_t isIA8;         /* zero = RGBA32 */
+    int32_t hasColor;      /* append-only; zero preserves the default white */
+    uint8_t color[4];
 } CwItemIconInfo;
 // Resource-only editor sampling for foreign GI presentation. Host frames advance only
 // the sampling clock; no dormant native frame, game state or cosmetic patch loop runs.
