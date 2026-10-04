@@ -1,5 +1,13 @@
 # Gilded length and Master blade-root adjustment
 
+The user approved the final Master and Gilded models shown in preview commit
+`48308c553619265a548ab7d2dfa142ef43232e83`. True Master was accepted before
+this adjustment. These versions are the approved visual baseline; approval
+does not replace in-game verification.
+
+The subsequent [Master hilt symmetry review](master-hilt-review.md) checks
+the perceived asymmetry without changing the approved model.
+
 This pass follows the latest feedback: Gilded was too long, Master's narrow
 blade section above the guard was too thin, and True Master was accepted.
 
