@@ -39,7 +39,8 @@ def verify_sources():
         path = "textures/icon_item_custom/gItemIcon" + name + "Tex"
         for host, header in (("soh", "soh_assets.h"), ("mm", "2s2h_assets.h")):
             assert '"__OTR__' + path + '"' in (ROOT / host / "assets" / header).read_text()
-            assert (ROOT / host / "assets/custom" / path).exists(), path
+            target = ROOT / host / "assets/custom" / path
+            assert target.with_name(target.name + ".rgba32.png").exists(), (path, "missing built-in fallback")
     item_header = (ROOT / "soh/soh/Enhancements/randomizer/item.h").read_text()
     assert "CustomIconSize iconSize_ = ICON_SIZE_32" in item_header
     foreign_oot = (ROOT / "combo/menu/ComboItemDrawOOT.h").read_text()

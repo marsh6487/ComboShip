@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Render, package and verify optional HD GI-matched icons.
+"""Render, integrate and verify the requested HD GI-matched icon batch.
 
-python tools/nei_icons/build.py --render --manifest --pack /tmp/nei-icons.o2r
+python tools/nei_icons/build.py --render --install --pack /tmp/nei-icons.o2r
 python tools/nei_icons/build.py --verify
 
 The native 32px logical slots remain unchanged. OTEX version 1 raw textures carry
 512px RGBA pixels and 16x horizontal/vertical scale, the same format used by the
-existing HD icon pack builder. Only the optional pack receives these pixels;
-the built-in game assets remain unchanged. Base/Alt entries follow mod priority.
+existing HD icon pack builder. Base archives load these normally, so external
+mod/Alt texture priority is unchanged; no C++ resource hook overrides a mod.
 """
 from __future__ import annotations
 
@@ -147,23 +147,30 @@ def contact_sheet():
     sheet.save(HERE / "contact_sheet.png")
 
 
-def write_manifest():
+def install():
     records = []
     sources = json.loads((HERE / "render_sources.json").read_text())
     for name, *_ in ICONS:
         image = Image.open(png_path(name)).convert("RGBA")
         data = texture_resource(image)
         arc = resource(name)
+        for host in ("soh", "mm"):
+            target = ROOT / host / "assets/custom" / arc
+            target.parent.mkdir(parents=True, exist_ok=True)
+            # ZAPD otherwise sees both PNG and serialized entries with one path.
+            legacy = target.with_name(target.name + ".rgba32.png")
+            if legacy.exists():
+                legacy.unlink()
+            target.write_bytes(data)
         records.append({"name": name, "resource": arc, "logical_size": [32, 32], "size": [SIZE, SIZE],
                         "raw_flags": 1, "scale": [16., 16.], "png": relative(png_path(name)),
                         "png_sha256": sha(png_path(name).read_bytes()), "resource_sha256": sha(data),
                         "source": sources[name]})
     manifest = {"version": 1, "baseline": "122dd5f68cb37fcf515c3726f8a77043db5dcdf4", "icons": records,
                 "hosts": ["soh", "mm"], "runtime_tested": False,
-                "delivery": "optional asset-only archive; not included in game asset trees",
-                "priority": "Identical base/Alt resources follow normal external mod load order."}
+                "priority": "Base resource trees only; ordinary external mods and Alt Assets keep their existing precedence."}
     (HERE / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    print(f"recorded {len(ICONS)} optional icons; no game assets written")
+    print(f"installed {len(ICONS)} scaled raw resources in both host trees")
 
 
 def verify_resource(data, image):
@@ -190,18 +197,18 @@ def verify(archive=None):
         assert max(np.ptp(xx), np.ptp(yy)) >= SIZE*.78, (path, "loose framing")
         for dependency, checksum in entry["source"]["dependencies"].items():
             assert sha((ROOT / dependency).read_bytes()) == checksum, (path, "stale source", dependency)
-        data = texture_resource(image)
-        assert sha(data) == entry["resource_sha256"], path
-        verify_resource(data, image)
+        for host in manifest["hosts"]:
+            target = ROOT / host / "assets/custom" / entry["resource"]
+            data = target.read_bytes()
+            assert sha(data) == entry["resource_sha256"], target
+            verify_resource(data, image)
+            assert not target.with_name(target.name + ".rgba32.png").exists(), (target, "duplicate pack source")
     if archive:
         with zipfile.ZipFile(archive) as packed:
-            base = {resource(x[0]) for x in ICONS}
-            assert len(packed.namelist()) == len(base) * 2
-            assert set(packed.namelist()) == base | {"alt/" + p for p in base}
+            assert set(packed.namelist()) == {resource(x[0]) for x in ICONS}
             for entry in manifest["icons"]:
                 verify_resource(packed.read(entry["resource"]), Image.open(ROOT / entry["png"]))
-                assert packed.read(entry["resource"]) == packed.read("alt/" + entry["resource"])
-    print(f"verified {len(ICONS)} PNGs, source hashes, transparent framing and OTEX1 raw flags/scales" + (" + optional base/Alt archive" if archive else ""))
+    print(f"verified {len(ICONS)} PNGs, source hashes, transparent framing, OTEX1 raw flags/scales, and byte-identical host resources" + (" + archive" if archive else ""))
 
 
 def package(path):
@@ -209,12 +216,10 @@ def package(path):
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for name, *_ in ICONS:
             arc = resource(name)
-            data = texture_resource(Image.open(png_path(name)).convert("RGBA"))
-            for entry in (arc, "alt/" + arc):
-                info = zipfile.ZipInfo(entry, (2026, 10, 4, 0, 0, 0))
-                info.compress_type = zipfile.ZIP_DEFLATED
-                info.external_attr = 0o644 << 16
-                archive.writestr(info, data, compresslevel=9)
+            info = zipfile.ZipInfo(arc, (2026, 10, 4, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            archive.writestr(info, (ROOT / "soh/assets/custom" / arc).read_bytes(), compresslevel=9)
     verify(path)
 
 
@@ -222,15 +227,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--render", action="store_true")
     parser.add_argument("--only", nargs="+", choices=[x[0] for x in ICONS])
-    parser.add_argument("--manifest", action="store_true", help="refresh the optional pack manifest without installing game assets")
+    parser.add_argument("--install", action="store_true")
     parser.add_argument("--pack", type=Path)
     parser.add_argument("--verify", action="store_true")
     args = parser.parse_args()
     if args.render:
         render_icons(args.only)
-    if args.manifest:
-        write_manifest()
-    if args.verify or args.manifest or args.pack or not args.render:
+    if args.install:
+        install()
+    if args.verify or args.install or args.pack or not args.render:
         verify()
     if args.pack:
         package(args.pack)

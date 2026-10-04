@@ -4,6 +4,7 @@
 #include "assets/soh_assets.h"
 #include "soh/Enhancements/randomizer/rando_hash.h"
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
+#include "soh/Enhancements/randomizer/OptionalNeiIcons.h"
 
 #include <libultraship/libultraship.h>
 #include <fast/Fast3dGui.h>
@@ -350,10 +351,11 @@ void RegisterImGuiItemIcons() {
     }
 
     for (const auto& entry : customItemsMapping) {
+        const char* texturePath = NeiOptionalIcons::Resolve(entry.second.texturePath);
         std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-            ->LoadGuiTexture(entry.second.name, entry.second.texturePath, "", ImVec4(1, 1, 1, 1));
+            ->LoadGuiTexture(entry.second.name, texturePath, "", ImVec4(1, 1, 1, 1));
         std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-            ->LoadGuiTexture(entry.second.nameFaded, entry.second.texturePath, "", ImVec4(1, 1, 1, 0.3f));
+            ->LoadGuiTexture(entry.second.nameFaded, texturePath, "", ImVec4(1, 1, 1, 0.3f));
     }
 
     for (const auto& entry : jabbernutMapping) {

@@ -812,6 +812,17 @@ int main() {
     ownerAlt=false;
 #endif
   }
+  {
+    Reset();
+    GetItemEntry optionalCojiro{};
+    optionalCojiro.tableId = TABLE_VANILLA;
+    optionalCojiro.gid = GID_COJIRO;
+    assert(!NeiGi_Draw(&play, &optionalCojiro));
+    files.insert("__OTR__objects/nei_gi_redesign/cojiro/gi_dl");
+    assert(NeiGi_Draw(&play, &optionalCojiro));
+    files.clear();
+    assert(!NeiGi_Draw(&play, &optionalCojiro));
+  }
 #ifdef COMBO_BUILD
   for (const char* part : {"gGiChickenDL", "gGiCojiroColorDL", "gGiChickenEyesDL"}) {
     for (const char* owner : {"oot", "mm"}) for (int selectedAlt : {0, 1}) {

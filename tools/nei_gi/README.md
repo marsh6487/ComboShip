@@ -1,7 +1,8 @@
 # NEI GI upgrade candidate
 
-The current asset set contains **62 serialized GI models**, with authored get-item
-resources under `soh/assets/custom/objects/nei_gi_redesign/`. The latest pass adds
+The current asset set contains **62 serialized GI models**: 61 bundled under
+`soh/assets/custom/objects/nei_gi_redesign/`, plus optional Cojiro resources under
+`tools/nei_gi/OPTIONAL_ASSETS/`. The latest pass adds
 element colors for rods, spells and Slate variants, rings that turn with the
 Slate, and sword-specific particle themes. It also includes distinct OoT/MM
 Kokiri swords and the reviewed sword proportion corrections.
@@ -14,12 +15,20 @@ See [Slate model/color review](PREVIEWS/slate-element-preview.md) and
 These are offline previews; visual approval does not establish in-game appearance
 or a successful full game build.
 
-The October 4 candidate adds a rounded blue Cojiro and a volumetric Mario Mask,
+The October 4 candidate adds an optional rounded blue Cojiro and a bundled
+volumetric Mario Mask,
 and closes the inward-wound side faces on all six Slate models. Existing Slate
 positions, materials, front/back faces and attached rings are preserved. The
 remaining accepted GI resources and all 39 held components are byte-identical
 to PR34 `122dd5f`. New previews are in
 [`PREVIEWS/20261004/`](PREVIEWS/20261004/); in-game appearance is untested.
+
+Cojiro is delivered separately as an asset-only `.o2r`; it is absent from the
+built-in game asset trees. The matching PR #34 renderer selects it when loaded
+and retains the normal Cojiro fallback when absent. Existing legacy-mod priority
+still applies. The archive contains three exact resources with identical base
+and Alt copies. The 23 HD icons are a separate optional pack documented in
+[`../nei_icons/README.md`](../nei_icons/README.md).
 
 The [integration verification record](PUBLICATION.md) documents the final
 19-suite regression run and the resolved historical MM fixture failure.
@@ -38,11 +47,13 @@ python3 tools/nei_gi/check_slate_solidity.py
 python3 tools/nei_gi/verify_assets.py
 python3 scripts/diagnostics/run_nei_gi_tests.py --combo
 python3 tools/nei_gi/package_archive.py /tmp/NEI_GI_Current.o2r
+python3 tools/nei_gi/package_cojiro.py /tmp/ComboShip_Cojiro_GI_Optional.o2r
 ```
 
 The focused diagnostics compile against the checkout's actual libultraship and
 SoH headers and require a C++20 compiler and nlohmann-json headers. Packaging
-uses the installed resources and creates identical base/Alt entries.
+uses the installed resources and creates identical base/Alt entries. The
+general GI pack contains the 61 bundled models; Cojiro remains a separate pack.
 
 For selected sword rebuilds, use the
 [forged toolkit instructions](SOURCE/forged_swords/README.md). The legacy
@@ -54,6 +65,9 @@ python3 tools/nei_gi/SOURCE/quest_revamp.py sheikah_slate slate_bomb slate_maste
 python3 tools/nei_gi/SOURCE/requested_revamp.py cojiro mario_mask --install
 python3 tools/nei_gi/runtime_preview/render_requested.py tools/nei_gi/PREVIEWS/20261004 --frames 36
 ```
+
+`requested_revamp.py --install` installs Mario Mask but always writes Cojiro to
+`OPTIONAL_ASSETS/`, never to a game asset tree.
 
 Generated intermediate `RESOURCES/` and Python caches are ignored; installed
 custom assets and checkpoint files are the published outputs. Current sword and

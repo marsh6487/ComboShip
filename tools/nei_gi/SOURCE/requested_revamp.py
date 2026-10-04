@@ -170,7 +170,13 @@ def main():
     for name in names:
         if name not in BUILDERS:
             parser.error('Unknown GI candidate: ' + name)
-    build({name: BUILDERS[name] for name in names}, Path(__file__).resolve().parents[1], args.install)
+    import shutil
+    root = Path(__file__).resolve().parents[1]
+    for name in names:
+        build({name: BUILDERS[name]}, root, args.install and name != 'cojiro')
+        if name == 'cojiro':
+            relative = Path('objects/nei_gi_redesign/cojiro')
+            shutil.copytree(root / 'RESOURCES' / relative, root / 'OPTIONAL_ASSETS' / relative, dirs_exist_ok=True)
 
 
 if __name__ == '__main__':

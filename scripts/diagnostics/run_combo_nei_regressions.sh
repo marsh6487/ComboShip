@@ -32,3 +32,4 @@ python3 -B tests/nei_item_stow/run_stow_tests.py
 python3 -B tools/nei_held/verify_assets.py
 python3 -B tools/nei_icons/build.py --verify
 python3 -B tools/nei_icons/verify_routes.py
+python3 -B tests/optional_assets/run_tests.py

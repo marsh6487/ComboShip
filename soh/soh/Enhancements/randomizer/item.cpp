@@ -1,5 +1,6 @@
 #include "item.h"
 #include "item_location.h"
+#include "OptionalNeiIcons.h"
 
 #include "SeedContext.h"
 #include "logic.h"
@@ -663,11 +664,11 @@ Item Item::CustomIcon(const char* customIcon_, CustomIconSize iconSize_) {
 }
 
 const char* Item::GetCustomIcon() {
-    return customIcon;
+    return NeiOptionalIcons::Resolve(customIcon);
 }
 
 CustomIconSize Item::GetCustomIconSize() {
-    return iconSize;
+    return NeiOptionalIcons::UsesNativeMagicFallback(customIcon) ? ICON_SIZE_24 : iconSize;
 }
 
 bool Item::HasCustomIcon() {
