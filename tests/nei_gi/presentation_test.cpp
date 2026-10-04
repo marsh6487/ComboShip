@@ -269,7 +269,26 @@ int main() {
   Reset();
   files.insert("__OTR__objects/nei_gi_redesign/four_sword/gi_dl");
   assert(NeiGi_DrawShop(&play, &fourSwordEntry));
-  assert(!submitted.empty() && submitted[0].second == 14.f);
+  const auto* fourFrame = NeiGi::FindFrameBounds("__OTR__objects/nei_gi_redesign/four_sword/gi_dl");
+  assert(fourFrame && !submitted.empty());
+  assert(submitted[0].second == NeiGi::FrameFit(*fourFrame,1,true).lift);
+  // The Four Sword's shelf height was small enough, but its high pivot still
+  // clipped the top. Check both ends of the real serialized envelope.
+  struct FourBounds {
+    CustomDrawFunc draw;
+    const char *slug, *name, *callback;
+    std::array<float,3> minimum,maximum;
+    float width, drawScale;
+    bool translucent;
+    int identity = 0, gid = -1;
+  };
+  const FourBounds fourBounds[] = {
+#include "nei_gi_bounds.inc"
+  };
+  const auto& four = *std::find_if(std::begin(fourBounds),std::end(fourBounds),
+      [](const auto& b) {return std::strcmp(b.slug,"four_sword")==0;});
+  assert(6.f + .25f * (submitted[0].second + submitted[0].first * four.maximum[1]) <= 19.f &&
+         "Four Sword clips the shelf's upper edge despite passing its height test");
   for (auto song : { std::pair{ RG_MM_SONG_SONATA, CW_SONG_SONATA },
                      std::pair{ RG_MM_SONG_LULLABY, CW_SONG_LULLABY },
                      std::pair{ RG_MM_SONG_NOVA, CW_SONG_NOVA },
@@ -997,8 +1016,11 @@ int main() {
     matrix = 1;
     matrixY = 0;
     GetItemEntry_Draw(&play, entry);
-    assert(submitted.front().first == b.drawScale);
-    assert(submitted.front().second == NeiGi::PresentationOffsetY(FindPresentation(&entry)->effect));
+    const auto* frameBounds = NeiGi::FindFrameBounds((path + "/gi_dl").c_str());
+    assert(frameBounds);
+    const auto commonFit = NeiGi::FrameFit(*frameBounds,b.drawScale,false);
+    assert(std::abs(submitted.front().first - b.drawScale * commonFit.scale) < .000001f);
+    assert(submitted.front().second == commonFit.lift);
     if (preview.is_open()) {
       if (!firstPreview)
         preview << ',';
@@ -1028,9 +1050,9 @@ int main() {
     player.getItemEntry = entry;
     ref = {};
     Player_DrawGetItemImpl(&play, &player, &ref, 1);
-    assert(std::abs(submitted.front().first - .2f * b.drawScale) < .000001f);
+    assert(std::abs(submitted.front().first - .2f * b.drawScale * commonFit.scale) < .000001f);
     assert(std::abs(submitted.front().second -
-                    (14.f + .2f * NeiGi::PresentationOffsetY(FindPresentation(&entry)->effect))) < .000001f);
+                    (14.f + .2f * commonFit.lift)) < .000001f);
     Reset();
     matrix = .25f;
     matrixY = 6;
@@ -1119,6 +1141,43 @@ int main() {
       triangle(cmd->words.w1);
   }
   assert(decoded == mesh.count && vertexLoads.size() > 1);
+  // Exercise the shared production draw for all 61 serialized models at the
+  // actual pickup/shop/freestanding caller scales and both owner routes.
+  struct FrameFixture {const char* slug;float low,high,width,drawScale;bool xlu;};
+  const FrameFixture frames[] = {
+#include "nei_all_frame_bounds.inc"
+  };
+  assert(std::size(frames)==61);
+  for(const auto& f:frames) for(const char* owner:{"","@oot:","@mm:"}) for(int route:{0,1,2}) {
+    Reset();
+    const std::string path=std::string("__OTR__")+owner+"objects/nei_gi_redesign/"+f.slug+"/gi_dl";
+    const std::string shell=std::string("__OTR__")+owner+"objects/nei_gi_redesign/"+f.slug+"/gi_xlu_dl";
+    const auto* b=NeiGi::FindFrameBounds(path.c_str());
+    assert(b && std::abs(b->minimum.y-f.low)<.0001f && std::abs(b->maximum.y-f.high)<.0001f &&
+           std::abs(b->spinningWidth-f.width)<.0001f);
+    matrix=route==1?.25f:route==2?.2f:1.f;
+    matrixY=route==1?6.f:route==2?14.f:0.f;
+    const auto incoming=std::pair(matrix,matrixY);
+    const float center[]={0,0,0};
+    NeiGi_DrawPresentation(&play,path.c_str(),f.xlu?shell.c_str():nullptr,f.drawScale,int(b->effect),center,
+                          false,nullptr,route==1);
+    assert(!submitted.empty());
+    const auto [s,y]=submitted.front();
+    const float bottom=y+s*f.low, top=y+s*f.high;
+    if(route==1) {
+      assert(bottom>=.49999f && top<=(std::strcmp(f.slug,"rocs_feather")?19.00001f:21.50001f));
+      assert(s*f.width<=19.00001f);
+    } else if(route==2) {
+      assert(bottom>=3.59999f && top<=23.60001f && s*f.width<=20.80001f);
+    } else {
+      assert(bottom>=-52.00001f && top<=48.00001f && s*f.width<=104.00001f);
+    }
+    if(f.xlu) assert(submitted[submitted.size()-2]==submitted.front()); // final command restores effect state
+    assert(stack.empty() && std::pair(matrix,matrixY)==incoming && interpolation==0);
+  }
+  assert(!NeiGi::FindFrameBounds("__OTR__@bad:objects/nei_gi_redesign/four_sword/gi_dl"));
+  assert(!NeiGi::FindFrameBounds("__OTR__objects/nei_gi_redesign/four_sword/held_dl"));
+  std::cout<<"PASS all 61 serialized GI frames: native/OoT/MM routes, pickup/shop/freestanding bounds and shared shell pose\n";
   // Optional private USED surfaces must not load global textures or retain an
   // Alt-owned resource pointer. Missing base/Alt materials queue nothing.
   Reset();

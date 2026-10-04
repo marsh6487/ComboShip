@@ -18,7 +18,9 @@ def run(command):
 with tempfile.TemporaryDirectory(prefix='mm-wolf-skin-') as td:
     options = ['-DMM_WOLF_SKIN_OPTIONS'] if 'preserveRootMotion' in (ROOT/'mm/expansions/ssbb/ssbb_skin.h').read_text() else []
     objects = []
-    for i, source in enumerate(['mm/expansions/ssbb/ssbb_skin.c', 'mm/src/code/z_skin_matrix.c']):
+    for i, source in enumerate(['mm/expansions/ssbb/ssbb_skin.c', 'mm/src/code/z_skin_matrix.c',
+                              'mm/expansions/ssbb/characters/pikachu_ssbb_skin.c',
+                              'mm/expansions/ssbb/characters/pikachu_ssbb_skel.c']):
         obj = str(Path(td)/f'{i}.o')
         run([os.environ.get('CC','cc'), '-std=gnu11', *flags(), '-include', str(ROOT/'mm/include/variables.h'),
                         '-include', str(ROOT/'mm/include/functions.h'), '-include', str(ROOT/'mm/include/z64malloc.h'),

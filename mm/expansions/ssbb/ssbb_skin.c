@@ -264,7 +264,7 @@ static void SSBBSkin_BlendVertices(SSBBSkinMesh* skin) {
 
 // Current pose is owned by one instance; another character cannot supply Wolf's paw positions.
 s32 SSBBSkin_GetBoneWorldPos(const SSBBCharacterInstance* inst, s32 boneIndex, Vec3f* out) {
-    if (!out || !inst || sPoseOwner != inst || boneIndex < 0 || boneIndex >= inst->def->numLimbs)
+    if (!out || !inst || sPoseOwner != inst || boneIndex < 0 || boneIndex >= inst->def->skinMesh->boneCount)
         return 0;
     out->x = sBoneWorldMatrices[boneIndex].xw;
     out->y = sBoneWorldMatrices[boneIndex].yw;
@@ -282,8 +282,11 @@ s32 SSBBSkin_ComputePose(SSBBCharacterInstance* inst) {
         !inst->ssbbAnim || !inst->ssbbAnim->numFrames || !inst->ssbbAnim->frames)
         return 0;
     skin = inst->def->skinMesh;
+    // Pikachu's existing 48-node skeleton has 47 weighted bones and one extra rigid
+    // limb. Keep that layout: only weighted bones need animation/inverse-bind data.
     if (skin->boneCount == 0 || skin->boneCount > SSBB_MAX_SKIN_BONES ||
-        inst->def->numLimbs != skin->boneCount || inst->ssbbAnim->numBones != skin->boneCount)
+        inst->def->numLimbs < skin->boneCount || inst->def->numLimbs > SSBB_MAX_SKIN_BONES ||
+        inst->ssbbAnim->numBones < skin->boneCount || inst->ssbbAnim->numBones > inst->def->numLimbs)
         return 0;
     frame = inst->curFrame < 0.0f ? 0 : inst->curFrame >= inst->ssbbAnim->numFrames ?
         inst->ssbbAnim->numFrames - 1 : (u16)inst->curFrame;

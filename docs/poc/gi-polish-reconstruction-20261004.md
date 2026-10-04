@@ -29,3 +29,25 @@ Verification:
 The recovered foreign recipe consumers still require the missing shop fitting
 and themed song implementation. Full candidate build, native/foreign in-game
 appearance, Alt parity and buffer headroom remain unproven.
+
+## Checkpoint 2: serialized catalog fitting
+
+`NeiGiFrameBounds.inc` derives all 61 bundled models plus optional Cojiro's
+metadata from actual opaque/translucent vertices and N64 scale matrices. The
+same host correction encloses body, energy and shell in native/foreign space.
+Accepted sizes stay when they fit; only overflow changes scale/pivot. Held
+geometry, authoring exports and materials remain untouched. The incoming caller
+still owns actor/pickup/world scale. Foreign shop recipes reject an identity
+that mismatches the catalog mesh.
+
+The new Four Sword upper-edge assertion failed before the fit: its old shelf
+pose reached world Y=20.43 despite passing a height-only check. The corrected
+pose reaches Y=19, clears the shelf by 3.11 and retains its .85 shelf scale.
+All 61 model bounds passed the real shared renderer under native/OoT/MM routes
+and pickup/shop/freestanding caller matrices. Transparent cores and shells share
+their fit and every draw restores its CPU matrix. The native suite and real MM
+presentation translation unit passed again. Eight occupied potion-shop slots
+use 72,784 vertex bytes and 2,075 XLU commands in the capture fixture.
+
+Still outstanding: themed songs, selected standalone sword orientation and full
+foreign dispatch/sanitizer verification. No in-game acceptance is claimed.

@@ -3,6 +3,7 @@
 extern "C" {
 #include "expansions/ssbb/ssbb_anim.h"
 #include "expansions/ssbb/ssbb_skin.h"
+#include "expansions/ssbb/characters/pikachu_ssbb_register.h"
 }
 #include <cassert>
 #include <cmath>
@@ -11,6 +12,7 @@ extern "C" {
 #include <cstring>
 
 static float scaleOverride, submittedScale;
+static int displayLists;
 extern "C" {
 int32_t CVarGetInteger(const char*, int32_t value) { return value; }
 float CVarGetFloat(const char* name, float value) {
@@ -25,11 +27,12 @@ void Gfx_SetupDL25_Opa(GraphicsContext*) {}
 void FrameInterpolation_RecordOpenChild(const void*, int) {}
 void FrameInterpolation_RecordCloseChild(void) {}
 void gSPSegment(void*, int, uintptr_t) {}
-void gSPDisplayList(Gfx*, Gfx*) {}
+void gSPDisplayList(Gfx*, Gfx*) { ++displayLists; }
 void Matrix_SetTranslateRotateYXZ(f32, f32, f32, Vec3s*) {}
 void Matrix_Scale(f32 x, f32 y, f32 z, MatrixMode) { assert(x == y && y == z); submittedScale = x; }
 Mtx* Matrix_ToMtx(Mtx* out) { return out; }
 Gfx gCullBackDList[1];
+AnimationHeader pikachu_ssbb_Wait1_anim{}, pikachu_ssbb_Wait3_anim{};
 }
 static void close(float a, float b) { if (std::fabs(a-b) > .002f) {
     std::fprintf(stderr, "FAIL skin pose: expected %.3f, got %.3f\n", b, a); std::exit(1);
@@ -90,5 +93,24 @@ int main() {
 #else
     SSBBSkin_Destroy(&skin);
 #endif
+    // Actual production Pikachu has 48 skeleton nodes but only 47 weighted bones.
+    // The trailing node is a rigid extra limb; it has no inverse bind or skin weights.
+    SSBBBoneFrame pikaFrames[47]{};
+    for (auto& f:pikaFrames) f.sx=f.sy=f.sz=1;
+    SSBBAnim pikaAnim{"pikachu-fixture",1,47,30,pikaFrames};
+    SSBBCharacterInstance pika{};
+    pika.def=&pikachu_ssbb_def; pika.skeleton=(void**)pikachu_ssbb_skeleton.sh.segment;
+    pika.initialized=1; pika.ssbbAnim=&pikaAnim;
+    assert(pika.def->numLimbs==48 && pika.def->skinMesh->boneCount==47);
+    SSBBSkin_Init(pika.def->skinMesh); gfx.polyOpa.p=commands;
+    int before=displayLists;
+    SSBBSkin_Draw(&pika,&play,&position,&rotation);
+    if (displayLists == before) { std::fputs("FAIL actual Pikachu 48-node/47-bone metadata stopped rendering\n",stderr); return 1; }
+    close(submittedScale,.7f);
+#ifdef MM_WOLF_SKIN_OPTIONS
+    assert(!SSBBSkin_GetBoneWorldPos(&pika,47,&position));
+    assert(!SSBBSkin_GetBoneWorldPos(&pika,48,&position));
+#endif
+    SSBBSkin_Destroy(pika.def->skinMesh);
     std::puts("PASS production MM skin: Pikachu defaults, Wolf root/TRS interpolation, scale and owner-scoped bone queries");
 }

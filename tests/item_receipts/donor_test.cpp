@@ -155,6 +155,10 @@ std::map<std::string, RandomizerGet> itemNameToEnum = {
     {"Song of Storms (MM)", RG_MM_SONG_STORMS},
     {"Great Deku Tree Compass", RG_DEKU_TREE_COMPASS},
     {"Great Deku Tree Map", RG_DEKU_TREE_MAP},
+    {"Forest Temple Small Key", RG_FOREST_TEMPLE_SMALL_KEY},
+    {"Forest Temple Boss Key", RG_FOREST_TEMPLE_BOSS_KEY},
+    {"Ganon's Castle Boss Key", RG_GANONS_CASTLE_BOSS_KEY},
+    {"Minuet of Forest", RG_MINUET_OF_FOREST},
     {"Snowhead Compass", RG_MM_COMPASS_SNOWHEAD},
     {"Woodfall Map", RG_MM_MAP_WOODFALL},
     {"Snowhead Map", RG_MM_MAP_SNOWHEAD},
@@ -187,6 +191,8 @@ struct Item {
                     : id == RG_MAGIC_SINGLE      ? 0xE4
                     : id == RG_MAGIC_DOUBLE      ? 0xE8
                     : id == RG_DEKU_TREE_COMPASS ? 0x67
+                    : id == RG_DEKU_TREE_MAP     ? 0x66
+                    : id == RG_MINUET_OF_FOREST  ? 0x73
                                                  : TEXT_RANDOMIZER_CUSTOM_ITEM;
     return std::make_shared<GetItemEntry>(GetItemEntry{text});
   }
@@ -236,11 +242,23 @@ static const char doubleMagic[] =
     "Your Magic Meter is enhanced!\x04You can use twice as much magic.\x02";
 static const char compass[] =
     "You got the Compass!\x01Now you can see hidden things.\x02";
+static const char dungeonMap[] =
+    "You got the Dungeon Map!\x01" "Blue rooms are places you have visited.\x02";
+static const char smallKey[] =
+    "You got a Small Key!\x01This key will open a locked door in this dungeon.\x02";
+static const char bossKey[] =
+    "You got the Boss Key!\x01Now you can get inside the chamber where the Boss lurks.\x02";
+static const char minuet[] =
+    "You have learned the Minuet of Forest!\x01" "A melody that will take you to the forest.\x02";
 MessageTableEntry nativeTable[] = {
     {0x68, 0, stone, sizeof(stone) - 1},
     {0xE4, 0, magic, sizeof(magic) - 1},
     {0xE8, 0, doubleMagic, sizeof(doubleMagic) - 1},
     {0x67, 0, compass, sizeof(compass) - 1},
+    {0x66, 0, dungeonMap, sizeof(dungeonMap) - 1},
+    {0x60, 0, smallKey, sizeof(smallKey) - 1},
+    {0xC7, 0, bossKey, sizeof(bossKey) - 1},
+    {0x73, 0, minuet, sizeof(minuet) - 1},
     {0xFFFF, 0, nullptr, 0}};
 MessageTableEntry *sNesMessageEntryTablePtr = nativeTable;
 constexpr int MF_RAW = 0;
@@ -399,6 +417,8 @@ int main() {
   char buffer[1269];
   auto read = [&](const char *name) {
     const int32_t size = OOT_GetItemReceiptText(name, buffer, sizeof(buffer));
+    if (size <= 0)
+      std::cerr << "Missing donor receipt: " << name << '\n';
     assert(size > 0);
     return std::string(buffer, size);
   };
@@ -428,6 +448,17 @@ int main() {
   assert(read("New Wave Bossa Nova").find("\x03New Wave") != std::string::npos);
   assert(read("Song of Healing").find("\x06Song") != std::string::npos);
   assert(read("Song of Storms (MM)").find("rain") != std::string::npos);
+  // Export keeps the native tutorial body even for randomizer keys whose GI
+  // entry points at the generic custom textbox. Extra seed info follows it.
+  assert(read("Forest Temple Small Key").find("locked door") != std::string::npos);
+  assert(read("Forest Temple Boss Key").find("Boss lurks") != std::string::npos);
+  assert(read("Ganon's Castle Boss Key").find("Boss lurks") != std::string::npos);
+  assert(read("Minuet of Forest").find("take you to the forest") != std::string::npos);
+  for (int enabled : {0, 1}) {
+    receiptContext.information = enabled;
+    assert(read("Great Deku Tree Compass").find("see hidden things") != std::string::npos);
+    assert(read("Great Deku Tree Map").find("Blue rooms") != std::string::npos);
+  }
   const std::array<std::pair<const char *, const char *>, 4> mmMaps{
       {{"Woodfall Map", "Woodfall"},
        {"Snowhead Map", "Snowhead"},

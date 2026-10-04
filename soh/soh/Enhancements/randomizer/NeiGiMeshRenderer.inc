@@ -149,14 +149,24 @@ bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiG
 }
 
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
-                            const float center[3], bool shimmer, const char* owner) {
+                            const float center[3], bool shimmer, const char* owner, bool shop) {
     if (!play || !opa || !center || scale <= 0 || effect < 0 || effect > int(Kind::MarioMask))
         return;
     const Kind kind = static_cast<Kind>(effect);
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
     Matrix_Push();
-    Matrix_Translate(0.f, NeiGi::PresentationOffsetY(kind), 0.f, MTXMODE_APPLY);
+    if (const auto* bounds = NeiGi::FindFrameBounds(opa)) {
+        if (bounds->effect != kind) {
+            Matrix_Pop();
+            return;
+        }
+        const auto fit = NeiGi::FrameFit(*bounds, scale, shop);
+        Matrix_Translate(0.f, fit.lift, 0.f, MTXMODE_APPLY);
+        Matrix_Scale(fit.scale, fit.scale, fit.scale, MTXMODE_APPLY);
+    } else {
+        Matrix_Translate(0.f, NeiGi::PresentationOffsetY(kind), 0.f, MTXMODE_APPLY);
+    }
     OPEN_DISPS(play->state.gfxCtx);
     if (owner) {
         gSPComboRMPush(POLY_OPA_DISP++, owner);

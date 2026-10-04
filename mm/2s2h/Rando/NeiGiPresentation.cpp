@@ -175,7 +175,7 @@ extern "C" bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh,
 
 void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b);
 
-void MM_DrawNeiGi(const CwItemDrawInfo& info) {
+void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop) {
     PlayState* play = gPlayState;
     if (play && info.drawKind == CW_DRAW_KIND_SEASON_GI) {
         if (info.neiEffect >= 1 && info.neiEffect <= 4 && info.dlistCount == 0 && info.opCount == 0)
@@ -190,7 +190,7 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info) {
     NeiGi_DrawPresentation(play, info.dlists[0],
                            info.xluStartIndex == 1 && info.dlistCount > 1 ? info.dlists[1] : nullptr, info.scale,
                            info.neiEffect, info.neiEffectCenter,
-                           info.itemShimmer || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0), "oot");
+                           info.itemShimmer || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0), "oot", shop);
     Matrix_Pop();
 }
 

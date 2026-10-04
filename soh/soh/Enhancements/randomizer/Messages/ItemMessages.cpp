@@ -100,6 +100,32 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName, cha
         if (item.GetCategory() == ITEM_CATEGORY_JUNK)
             return 0;
         std::string body;
+        // Randomizer dungeon keys point at a generic custom message, but MM
+        // still needs the full traditional OoT tutorial. Native song receipt
+        // IDs are safe here; teaching/cutscene text is never requested.
+        uint16_t traditionalText = 0;
+        if (rg >= RG_DEKU_TREE_MAP && rg <= RG_ICE_CAVERN_MAP)
+            traditionalText = 0x66;
+        else if (rg >= RG_DEKU_TREE_COMPASS && rg <= RG_ICE_CAVERN_COMPASS)
+            traditionalText = 0x67;
+        else if (rg >= RG_FOREST_TEMPLE_SMALL_KEY && rg <= RG_TREASURE_GAME_SMALL_KEY)
+            traditionalText = 0x60;
+        else if (rg >= RG_FOREST_TEMPLE_BOSS_KEY && rg <= RG_GANONS_CASTLE_BOSS_KEY)
+            traditionalText = 0xC7;
+        else if (rg >= RG_ZELDAS_LULLABY && rg <= RG_PRELUDE_OF_LIGHT) {
+            if (const auto gi = item.GetGIEntryUnresolved())
+                traditionalText = gi->textId;
+        }
+        if (traditionalText && sNesMessageEntryTablePtr) {
+            for (const auto* text = sNesMessageEntryTablePtr; text->textId != 0xFFFF; ++text) {
+                if (text->textId != traditionalText)
+                    continue;
+                if (!text->segment ||
+                    !ComboItemReceiptText::FromOotMessage(std::string_view(text->segment, text->msgSize), body))
+                    return 0;
+                break;
+            }
+        }
         void (*builder)(CustomMessage&) = nullptr;
         switch (rg) {
             case RG_QUARTER_HEART:
@@ -130,9 +156,15 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName, cha
                 break;
         }
         CustomMessage contextual;
-        if (BuildDungeonItemReceiptMessage(rg, contextual) || BuildTokenReceiptMessage(rg, contextual)) {
-            if (!ComboItemReceiptText::FromOotMessage(contextual.GetEnglish(MF_RAW), body))
+        if (BuildDungeonItemReceiptMessage(rg, contextual, body.empty()) || BuildTokenReceiptMessage(rg, contextual)) {
+            std::string information;
+            if (!ComboItemReceiptText::FromOotMessage(contextual.GetEnglish(MF_RAW), information))
                 return 0;
+            if (!body.empty() && !information.empty())
+                body += '\x10';
+            body += information;
+        } else if (!body.empty()) {
+            // Already selected the complete native body above.
         } else if (builder) {
             CustomMessage message;
             builder(message); // same read-only description builder as OoT's own receipt

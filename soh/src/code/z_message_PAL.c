@@ -1,6 +1,7 @@
 #include "global.h"
 #include "young_epona.h"
 #include "message_data_static.h"
+#include "ComboBossSoulColor.h"
 #include "vt.h"
 
 #include <string.h>
@@ -1347,6 +1348,15 @@ void Message_DrawText(PlayState* play, Gfx** gfxP) {
                 break;
             case MESSAGE_COLOR:
                 Message_SetTextColor(msgCtx, msgCtx->msgBufDecoded[++i] & 0xF);
+                if ((msgCtx->msgBufDecoded[i] & 0xF) == 2) {
+                    const uint32_t rgb = ComboBossSoulSpanColor((const uint8_t*)msgCtx->msgBufDecoded + i + 1,
+                                                               sizeof(msgCtx->msgBufDecoded) - i - 1, false);
+                    if (rgb) {
+                        msgCtx->textColorR = (rgb >> 16) & 0xFF;
+                        msgCtx->textColorG = (rgb >> 8) & 0xFF;
+                        msgCtx->textColorB = rgb & 0xFF;
+                    }
+                }
                 break;
             case ' ':
                 msgCtx->textPosX += CVarGetInteger(CVAR_ENHANCEMENT("TextSpacing"), 6);

@@ -2,7 +2,7 @@
 #include "ComboItemDrawABI.h"
 #include "Rando/Types.h"
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
-void MM_DrawNeiGi(const CwItemDrawInfo& info);
+void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop = false);
 bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out);
 bool MM_TryDrawNeiGi(RandoItemId item);
 

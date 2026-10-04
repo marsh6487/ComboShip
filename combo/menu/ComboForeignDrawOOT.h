@@ -1035,7 +1035,8 @@ extern "C" bool OOT_DrawComboForeignShop(PlayState* play, GetItemEntry* entry) {
     if (!info || !info->ok || info->animOk || info->drawKind != CW_DRAW_KIND_NEI_GI || info->count < 1 ||
         !info->dls[0] || !(info->scale > 0.f) || (info->xluStart == 1 && (info->count < 2 || !info->dls[1])))
         return false;
-    if (!NeiGi::FindFrameBounds(info->dls[0]))
+    const auto* bounds = NeiGi::FindFrameBounds(info->dls[0]);
+    if (!bounds || static_cast<int>(bounds->effect) != info->neiEffect)
         return false;
     OOT_DrawComboForeign(play, entry, true);
     return true;

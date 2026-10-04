@@ -1,6 +1,7 @@
 #pragma once
 
 #include "NeiGiEffectPolicy.h"
+#include "NeiGiFrameFit.h"
 #include "z64.h"
 namespace NeiGi {
 // Private RGBA32 resources use a 32x32 logical tile; resource metadata owns
@@ -21,7 +22,8 @@ void NeiGi_DrawMesh(PlayState* play, const NeiGi::Mesh& mesh, NeiGi::Kind orb = 
 bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiGi::TextureMaterial& material);
 // Intrinsic weather; profiles 1..4 are individual seasons, 5 cycles on the actual rod.
 void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner);
+void NeiGi_DrawSongOverlay(PlayState* play, int song, const char* owner);
 // Owner-aware mesh/effect composition used by both foreign GI directions.
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
-                            const float center[3], bool shimmer, const char* owner);
+                            const float center[3], bool shimmer, const char* owner, bool shop = false);
 }

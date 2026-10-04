@@ -831,14 +831,13 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     if (!upgraded && !entry->drawFunc && !item->alwaysShimmer)
         return false;
     Matrix_Push();
-    if (shop && upgraded) {
-        // The same shelf pose encloses the mesh, energy and crystal skin.
-        // World/overhead sizes and incomplete-resource fallbacks stay intact.
-        Matrix_Translate(0, item->shop.lift, 0, MTXMODE_APPLY);
-        Matrix_Scale(item->shop.scale, item->shop.scale, item->shop.scale, MTXMODE_APPLY);
+    if (upgraded) {
+        if (const auto* bounds = NeiGi::FindFrameBounds(item->opaque)) {
+            const auto fit = NeiGi::FrameFit(*bounds, item->scale, shop);
+            Matrix_Translate(0, fit.lift, 0, MTXMODE_APPLY);
+            Matrix_Scale(fit.scale, fit.scale, fit.scale, MTXMODE_APPLY);
+        }
     }
-    if (upgraded && !shop)
-        Matrix_Translate(0.f, NeiGi::PresentationOffsetY(item->effect), 0.f, MTXMODE_APPLY);
     if (upgraded && item->draw == Randomizer_DrawCaneSomariaUpgrade) {
         // Retain the original red skill-upgrade flame with the authored cane.
         Randomizer_DrawCaneSomariaUpgradeFlame(play);

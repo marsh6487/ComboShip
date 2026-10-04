@@ -78,6 +78,24 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
                         f'{{{low}}}, {{{high}}}, {2*radius}f, {float(meta["draw_scale"])}f, '
                         f'{str((root / "gi_xlu_dl").exists()).lower()}, {identity}}},')
     (Path(tmp) / "nei_gi_bounds.inc").write_text("\n".join(fixtures))
+    # Every bundled model is checked, including the eight formerly omitted
+    # catalog entries and both real-engine owners of the Kokiri GI.
+    all_frames = []
+    for asset in sorted((ROOT / "soh/assets/custom/objects/nei_gi_redesign").iterdir()):
+        if not asset.is_dir():
+            continue
+        vertices = [tuple(int(v.get(axis)) for axis in ("X", "Y", "Z"))
+                    for path in asset.glob("mesh_*_vtx") for v in ET.parse(path).getroot()]
+        words = struct.unpack_from("<16I", (asset / "scale_mtx").read_bytes(), 64)
+        scale = ((words[0] >> 16) * 65536 + (words[8] >> 16)) / 65536
+        meta = json.loads((ROOT / "tools/nei_gi/CHECKPOINTS" / asset.name / "checkpoint.json").read_text())
+        low = min(p[1] for p in vertices)*scale
+        high = max(p[1] for p in vertices)*scale
+        width = 2*max(math.hypot(p[0],p[2]) for p in vertices)*scale
+        all_frames.append(f'{{"{asset.name}",{low}f,{high}f,{width}f,{float(meta["draw_scale"])}f,'
+                          f'{str((asset/"gi_xlu_dl").exists()).lower()}}},')
+    assert len(all_frames) == 61
+    (Path(tmp) / "nei_all_frame_bounds.inc").write_text("\n".join(all_frames))
     names = ["nei_gi/effect_policy", "nei_gi/presentation"]
     if "--held" in sys.argv:
         names.append("nei_held/presentation")
@@ -126,6 +144,7 @@ void* Combo_ResolveSym(const char* owner, const char* name) {
     return nullptr;
 }
 void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b) { Fixture::flameColors.push_back({r,g,b}); }
+void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false);
 #define Gfx_SetupDL25_Opa Gfx_SetupDL_25Opa
 #define Gfx_SetupDL25_Xlu Gfx_SetupDL_25Xlu
 #define Matrix_RotateYF Matrix_RotateY

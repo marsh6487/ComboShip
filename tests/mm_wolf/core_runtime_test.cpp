@@ -1,0 +1,81 @@
+// The Wolf implementation is included so private loader/proc behavior is exercised directly.
+// No validation or combat implementation is copied into the fixture.
+#include WOLF_IMPLEMENTATION
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <limits>
+
+static std::string assetDirectory;
+static int registrations;
+namespace Ship { std::string Context::LocateFileAcrossAppDirs(const std::string& p, const std::string&) { return p; } }
+extern "C" {
+const char* Nei_AssetDir(void) { return assetDirectory.c_str(); }
+int32_t CVarGetInteger(const char*, int32_t v) { return v; }
+float CVarGetFloat(const char*, float v) { return v; }
+s32 SSBBChar_Register(SSBBCharacterDef*) { return registrations++; }
+}
+static void write32(std::vector<u8>& b, size_t off, u32 v) { std::memcpy(b.data()+off,&v,4); }
+static void write16(std::vector<u8>& b, size_t off, u16 v) { std::memcpy(b.data()+off,&v,2); }
+static void writeFloat(std::vector<u8>& b, size_t off, float f) { std::memcpy(b.data()+off,&f,4); }
+static u32 field(const std::vector<u8>& b, int i) { return ReadU32(b.data()+12+i*4); }
+static std::vector<u8> makeAsset() {
+    constexpr u32 bones=37, frames=60;
+    std::vector<u8> b(kHeaderSize,0);
+    std::memcpy(b.data(),kMagic,8); write32(b,8,kVersion);
+    auto chunk=[&](size_t size) { while(b.size()%4) b.push_back(0); u32 off=b.size(); b.resize(b.size()+size); return off; };
+    const u32 v=chunk(60),w=chunk(24),p=chunk(bones*2),m=chunk(bones*64),bp=chunk(bones*12),e=chunk(WANM_COUNT*16);
+    std::vector<u32> nameOffsets;
+    u32 names=chunk(0);
+    for (const char* name:kAnimNames) { nameOffsets.push_back(b.size()); b.insert(b.end(),name,name+std::strlen(name)+1); }
+    u32 namesSize=b.size()-names;
+    const u32 f=chunk(WANM_COUNT*frames*bones*36),fs=WANM_COUNT*frames*bones*36,t=chunk(128);
+    u32 header[]={3,1,bones,WANM_COUNT,8,8,v,w,p,m,bp,e,names,namesSize,f,fs,t,128,(u32)b.size()};
+    for(int i=0;i<19;++i) write32(b,12+i*4,header[i]);
+    for(int i=0;i<3;++i) { b[w+i*8+4]=255; b[v+i*20+12]=127; b[v+i*20+19]=255; writeFloat(b,v+i*20,float(i)); }
+    for(u32 i=0;i<bones;++i) { write16(b,p+i*2,i==0 ? 0xffff : i-1); for(int j=0;j<4;++j) writeFloat(b,m+i*64+j*20,1); }
+    for(int i=0;i<WANM_COUNT;++i) {
+        write32(b,e+i*16,nameOffsets[i]); write16(b,e+i*16+4,frames); write16(b,e+i*16+6,bones);
+        writeFloat(b,e+i*16+8,30); write32(b,e+i*16+12,f+i*frames*bones*36);
+    }
+    for(u32 i=0;i<WANM_COUNT*frames*bones;++i) for(int j=6;j<9;++j) writeFloat(b,f+i*36+j*4,1);
+    return b;
+}
+static bool load(const std::vector<u8>& b) {
+    sAssetsLoaded=0;
+    std::ofstream out(assetDirectory+"/wolf_link.bin",std::ios::binary); out.write((const char*)b.data(),b.size()); out.close();
+    return LoadAssets();
+}
+static void rejected(const char* label, const std::vector<u8>& b) {
+    int before=registrations;
+    if(load(b)) { std::fprintf(stderr,"FAIL malformed Wolf accepted: %s\n",label); std::exit(1); }
+    assert(registrations==before);
+}
+int main(int argc,char** argv) {
+    assert(argc==2); assetDirectory=argv[1];
+    const auto good=makeAsset();
+    assert(load(good)); assert(sSkin.vertexCount==3 && sSkin.boneCount==37);
+    auto b=good; write32(b,field(b,6),0x7fc00001); rejected("NaN vertex under fast-math",b);
+    for(u32 bits:{0x7f800000u,0xff800000u,0x7fc00001u,0xffc00001u,0x7f7fffffu}) {
+        b=good; write32(b,field(b,9),bits); rejected("invalid inverse bind",b);
+        b=good; write32(b,field(b,10),bits); rejected("invalid bone position",b);
+        b=good; write32(b,field(b,14),bits); rejected("invalid animation TRS",b);
+        b=good; write32(b,field(b,11)+8,bits); rejected("invalid frame rate",b);
+    }
+    b=good; write32(b,12+1*4,0x55555556); rejected("triangle multiplication overflow",b);
+    b=good; write32(b,12+3*4,0x10000001); rejected("animation entry multiplication overflow",b);
+    b=good; write32(b,12+6*4,4); rejected("chunk overlaps header",b);
+    b=good; write32(b,12+9*4,field(b,9)+1); rejected("unaligned inverse bind",b);
+    b=good; b[field(b,7)]=37; rejected("weight bone out of range",b);
+    b=good; b[field(b,7)+4]=0; rejected("zero-sum weights",b);
+    b=good; b[field(b,7)+5]=1; rejected("weights after zero influence",b);
+    b=good; write16(b,field(b,8)+2,1); rejected("self parent",b);
+    b=good; write16(b,field(b,8),1); rejected("cyclic root",b);
+    b=good; write16(b,field(b,8)+2,0xffff); rejected("disconnected root",b);
+    b=good; write32(b,field(b,11),field(b,12)+field(b,13)-1); b[field(b,12)+field(b,13)-1]='X'; rejected("unterminated name",b);
+    b=good; write16(b,field(b,11)+4,0); rejected("empty animation",b);
+    b=good; write32(b,field(b,11)+12,field(b,16)); rejected("frames outside frame chunk",b);
+    b=good; write32(b,12+15*4,0xffffffffu); rejected("frame chunk overflow",b);
+    b=good; b.pop_back(); rejected("truncated file",b);
+    std::puts("PASS production Wolf malformed-bin validation and valid format fixture");
+}
