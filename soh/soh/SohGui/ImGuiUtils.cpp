@@ -351,7 +351,7 @@ void RegisterImGuiItemIcons() {
     }
 
     for (const auto& entry : customItemsMapping) {
-        const char* texturePath = NeiOptionalIcons::Resolve(entry.second.texturePath);
+        const char* texturePath = NeiOptionalIcons::Resolve(entry.second.texturePath.c_str());
         std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
             ->LoadGuiTexture(entry.second.name, texturePath, "", ImVec4(1, 1, 1, 1));
         std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
