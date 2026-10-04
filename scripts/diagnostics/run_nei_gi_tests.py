@@ -28,7 +28,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
     (Path(tmp) / "nei_gi_dispatch.inc").write_text(draw["GetItemEntry_Draw"] + "\n" +
         re.sub(r"\bthis\b", "player", player["Player_DrawGetItemImpl"]) + "\n" +
         re.sub(r"\bthis\b", "shop", shop["EnGirlA_Draw"]) + "\n" +
-        custom["Randomizer_DrawCaneSomariaUpgradeFlame"])
+        custom["Randomizer_DrawCaneSomariaUpgradeFlame"] + "\n" + custom["Randomizer_DrawTrueMasterSwordFlame"])
     fixtures = []
     bindings = (("ball_and_chain", "BallAndChain"), ("shovel", "Shovel"),
                            ("fire_rod", "FireRod"), ("ice_rod", "IceRod"), ("light_rod", "LightRod"),

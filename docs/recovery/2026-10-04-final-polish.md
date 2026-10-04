@@ -10,6 +10,7 @@ The historical final candidate disappeared from the transient workspace. The sup
 | `3f6ed4d42d7cb759ee1bb5f06cd97d3af4388fdf` | Tested skin, yellow magic and independent shimmer sections; checkpoint instructions | Remote tree `7068c516dd6b5488407ce7b91f25d86cc97cf1ab` equals the local tested tree; fetched branch verified | Wallet/editor, Wolf core/host, GI fitting/song effects, remaining receipts/icons and combined review/builds |
 | `6d5902fb8ada8dd8b5ce9fedec4a1fa6e93a07c9` | Safe wallet digits and descriptive localized MM songs | Remote tree `e4f335a0d6e1b3288b904ec6f058e621274083d3` equals the local tested tree; fetched branch verified | Editor, Wolf core/host, remaining GI/text presentation and combined review/builds |
 | `9d4886c54847b0eb267a8985d99bd55140011170` | Wolf loader, GI fit, traditional/exact-color receipts, Pikachu compatibility and WIP editor fixture | Remote tree `9e03696c4aa44929e0516d04360a4fa4f72a2b8c` equals local tree; fetched branch verified | Host/editor implementation, final presentation, review and builds |
+| `a79093a7c4c6a601c334c44e7578cb6ca945f83b` | Live editor grants, Wolf combat, themed songs and sanitized skin fixtures | Remote tree `4832641839853c68f577c2108f48312c174db1c7` equals local tree; fetched branch verified | Host, sword/receipt integration, preservation review and builds |
 
 ## MM skin section
 
@@ -18,10 +19,10 @@ Local worker commit `12d055506bbdb49280cd30e8502672b9a10e91e7` adds opt-in root 
 ## Other completed sections
 
 - Yellow magic receipts retain localized yellow identity and RPG remaining-upgrade counts; saturated tiers no longer wrap. `python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py` passed on the combined checkpoint, including native/foreign receipt catalogs, grants, latch state, Skulltula totals and dungeon-information guards.
-- Custom/legacy GI selection retains independent shimmer identity without attaching authored mesh-local energy. `python3 -B scripts/diagnostics/run_nei_identity_tests.py` passed all 17 owner themes and 19 native MM themes through selection and toggle cases. `python3 -B scripts/diagnostics/run_nei_gi_tests.py` passed the native renderer and engine-header checks. Foreign-host shop fitting and song effects are still being reconstructed.
+- Custom/legacy GI selection retains independent shimmer identity without attaching authored mesh-local energy. `python3 -B scripts/diagnostics/run_nei_identity_tests.py` passed all 17 owner themes and 19 native MM themes through selection and toggle cases. `python3 -B scripts/diagnostics/run_nei_gi_tests.py --held --combo` passed the combined renderer and engine-header checks, including foreign-host shop fitting.
 - Native MM and Tycoon rupee digits safely display every nonnegative signed16 balance without changing saved currency, wallet capacity or accumulator state. `python3 -B tests/mm_wallet/run_tests.py` passed all 65,536 balances across five paths under ASan/UBSan/bounds and the real native HUD translation-unit syntax check. The regression reproduced the native index16 crash at 1667/wallet2 and Tycoon10000 masking to1296. Only leak detection is disabled because the fixture allocates no heap and this runner cannot perform LeakSanitizer's process inspection.
 - All 15 MM song variants retain descriptive localized receipt bodies with a cold donor. The combined `run_mm_item_receipt_tests.py` runner passed again after this section, including EN/DE/FR song cases and existing grant/dungeon-information guards.
-- Wolf's binary loader rejects malformed bounds, counts, trees, names and NaN/Inf using serialized float bits. `python3 -B tests/mm_wolf/run_core_tests.py` passed UBSan and optimized fast-math fixtures. The loader/core scaffold is not yet activated in the MM host.
+- Wolf's binary loader rejects malformed bounds, counts, trees, names and NaN/Inf using serialized float bits. `python3 -B tests/mm_wolf/run_core_tests.py` passed UBSan and optimized fast-math fixtures. Host activation was integrated after the scaffold checkpoint; see the next section.
 - Traditional OoT dungeon/song receipts survive the donor export; enabled map/compass and MQ information appends as a separate page. The combined receipt runner passed again with these changes.
 - Generated catalog bounds now fit all 61 authored GI models under native/OoT/MM routes and pickup/shop/freestanding matrices. The production GI runner passed; Four Sword's actual top edge now fits while retaining its shelf scale. Source/held asset bytes are unchanged.
 - Exact boss-soul name RGB is applied by both Latin text renderers only in recognized localized Soul-name spans. `python3 -B scripts/diagnostics/run_receipt_soul_color_tests.py` passed five souls across EN/DE/FR, wrapped/malformed/page/unknown cases, ordinary palette and red Goht Remains, plus both real textbox translation-unit syntax checks.
@@ -30,11 +31,19 @@ Local worker commit `12d055506bbdb49280cd30e8502672b9a10e91e7` adds opt-in root 
 ## Newly verified sections
 
 - MM editor grants now enumerate the live NEI/EXT item table and use production grants for all four canonical slots, powers, seasons and cane/wand variants. `python3 -B tests/mm_editor/run_tests.py` passed actual catalog/FC/grant/flag behavior, ordinary inventory byte preservation, three wand rules, repeat safety, partial cane and Roc Cape cases, plus real SaveEditor/GiveItem translation-unit syntax. The previously WIP fixture is now green.
-- Wolf combat keeps native MM damage and freeze actions authoritative and releases attack ownership. `run_core_tests.py` passed native damage flags, freeze with zero invincibility, bounce, dash/wall rebound and cleanup in UBSan and fast-math modes. Host activation is still being integrated.
+- Wolf combat keeps native MM damage and freeze actions authoritative and releases attack ownership. `run_core_tests.py` passed native damage flags, freeze with zero invincibility, bounce, dash/wall rebound and cleanup in UBSan and fast-math modes.
 - Themed song geometry includes actual Soaring feather vanes/rachises. `run_song_gi_tests.py` passed all 24 profiles, native/imported mappings, early MM dispatcher and wraparound frame cases.
 - The skin fixture's actual graphics arena now initializes both head and tail pointers. The null-tail regression reproduced under UBSan and was corrected. `run_skin_tests.py` now passes ASan/UBSan/bounds for synthetic and actual Pikachu data; leak detection alone is disabled for the runner's process-inspection restriction.
 
-This is a partial reconstruction checkpoint. Wolf host integration, standalone sword/mod presentation, clef and Ikana icon handling, final editor binding/pool checks, combined review and complete Windows/Linux builds remain in progress. In-game acceptance is not claimed.
+## Integrated host and presentation checks
+
+- `python3 -B tests/mm_wolf/run_host_tests.py` passed the production Wolf host/core and real full-width extended-button accessors. It links the unchanged native MM freeze and thaw bodies, exercises periodic damage once, A/B thaw input, native completion without reacquiring the Wolf action, C/D-pad toggles, tool/custom-form/PAK/O2R priority, masks, death/scene/destroy cleanup and asset fallback.
+- `python3 -B tests/mm_wolf/run_skin_tests.py` and `run_syntax_tests.py` passed again with the host integration; all four changed production translation units use real engine headers.
+- `python3 -B scripts/diagnostics/run_sword_pose_tests.py` passed actual standalone/native and producer sword bodies: +X blades become upright +Y through all spins. `run_nei_gi_tests.py --combo` passed again, including native selection priority, foreign shelves, custom models, all 61 serialized GI bounds and authored effects.
+- `python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py` passed on the integrated tree with colored native IA8 song clefs and MM-owned Ikana shield icons, including cold aliases, foreign ownership and aspect/reset behavior. `run_receipt_syntax_tests.py` passed all seven full production translation units, including the jointly edited MM DrawItem dispatcher.
+- The combined regression gate now includes these host, syntax and sword tests.
+
+This remains a partial reconstruction checkpoint. Final malformed-transform guards, arbitrary mod FX exclusion, clear/regrant and concrete receipt boundaries, independent combined review and complete Windows/Linux builds remain in progress. In-game acceptance is not claimed.
 
 ## Resume
 

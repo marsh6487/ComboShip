@@ -718,8 +718,15 @@ int main() {
   entry.drawFunc = Randomizer_DrawMasterSword;
   files.insert("__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL");
   assert(NeiGi_Draw(&play, &entry));
-  assert(fallback == 1 && Drawn().empty() && arena.size() == 1);
+  assert(fallback == 0 && Drawn() == std::vector<std::string>{"__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL"} && arena.size() == 1);
   assert(matrix == 1 && stack.empty() && interpolation == 0);
+
+  Reset(); alt=1; entry={}; entry.drawFunc=Randomizer_DrawTrueMasterSword;
+  files.insert("__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL");
+  assert(NeiGi_Draw(&play,&entry));
+  assert(Drawn()==std::vector<std::string>{"__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL"});
+  assert((flameColors==std::vector<std::array<unsigned,3>>{{120,180,255}}));
+  assert(arena.size()==1 && fallback==0 && stack.empty() && matrix==1);
 
   // Plain native swords and each concrete callback use their own GI. Selected
   // standalone sword packs and the protected Din GI retain the existing route.
@@ -739,14 +746,14 @@ int main() {
     const int nativeBefore = vanilla;
     const size_t shimmerBefore = arena.size();
     assert(NeiGi_Draw(&play,&entry));
-    assert(vanilla == nativeBefore + 1 && arena.size() == shimmerBefore + 1);
+    assert(vanilla == nativeBefore && Drawn().back() == selected && arena.size() == shimmerBefore + 1);
     files.erase(selected);
     const char* fire=test.first==GID_SWORD_KOKIRI ?
       "__OTR__objects/din_fire_sword/progressive/child/SwordDL" :
       "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
     files.insert(fire); dinSword=1;
     assert(NeiGi_Draw(&play,&entry));
-    assert(vanilla == nativeBefore + 2 && arena.size() == shimmerBefore + 2);
+    assert(vanilla == nativeBefore && Drawn().back() == fire && arena.size() == shimmerBefore + 2);
     dinSword=0; assert(NeiGi_Draw(&play,&entry));
   }
   // A mod at an established model resource outranks authored GI geometry in

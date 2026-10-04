@@ -731,9 +731,9 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
     return false;
 }
 
-bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available)(const char*)) {
-    if (!item.alwaysShimmer || !altAssets)
-        return false;
+const char* SelectedSwordPath(const Presentation& item, bool altAssets, bool (*available)(const char*)) {
+    if (!item.opaque || !item.alwaysShimmer || !altAssets)
+        return nullptr;
     const char* selected = nullptr;
     const char* fire = nullptr;
     if (std::strstr(item.opaque, "/kokiri_sword/") || std::strstr(item.opaque, "/mm_kokiri_sword/") ||
@@ -747,11 +747,37 @@ bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available
         selected = "__OTR__alt/objects/object_custom_equip/gCustomLongswordDL";
         fire = "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
     }
-    // Preserve the selected standalone weapon pack and the protected Din GI.
-    return selected &&
-           (available(selected) || (CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0) && available(fire)));
+    if (!selected)
+        return nullptr;
+    // Match the exported recipe's protected Din priority before the selected
+    // standalone weapon pack. Neither path uses the player fist/body DL.
+    if (CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0) && available(fire))
+        return fire;
+    return available(selected) ? selected : nullptr;
 }
+
+bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available)(const char*)) {
+    return SelectedSwordPath(item, altAssets, available) != nullptr;
+}
+
 } // namespace
+
+static void NeiGi_DrawSelectedSword(PlayState* play, const char* path) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Matrix_RotateY(Spin(play), MTXMODE_APPLY);
+    // Standalone donor blades point along +X. Z alone turns that axis into
+    // upright +Y; an extra X quarter turn would lay it flat in XZ.
+    Matrix_RotateZ(1.8f, MTXMODE_APPLY);
+    Matrix_Scale(.04f, .04f, .04f, MTXMODE_APPLY);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
+    gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, path, 0, G_DL_PUSH);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
 
 // OPEN_DISPS declares interpolation callbacks with the enclosing C linkage.
 extern "C" {
@@ -820,7 +846,7 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     const Presentation* item = FindPresentation(entry);
     if (item == nullptr)
         return false;
-    const bool selectedSword = HasSelectedSword(*item, ResourceMgr_IsAltAssetsEnabled(), HasResource);
+    const char* selectedSword = SelectedSwordPath(*item, ResourceMgr_IsAltAssetsEnabled(), HasResource);
     // Queue stable paths for the interpreter. Loading through the legacy GBI wrapper
     // here would evict/reload base resources on each draw when Alt Assets is enabled.
     // Archive presence checks preserve the original model if a required pass is absent.
@@ -841,7 +867,11 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         Randomizer_DrawCaneSomariaUpgradeFlame(play);
     }
     Matrix_Push();
-    if (upgraded) {
+    if (selectedSword) {
+        if (item->effect == Kind::SwordAura)
+            Randomizer_DrawTrueMasterSwordFlame(play);
+        NeiGi_DrawSelectedSword(play, selectedSword);
+    } else if (upgraded) {
         OPEN_DISPS(play->state.gfxCtx);
         Matrix_Scale(item->scale, item->scale, item->scale, MTXMODE_APPLY);
         Matrix_RotateY(Spin(play), MTXMODE_APPLY);

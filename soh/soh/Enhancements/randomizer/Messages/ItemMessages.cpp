@@ -17,6 +17,7 @@
 #include "soh/Enhancements/randomizer/entrance.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance_tracker.h"
 #include "soh/FleetShipCombo/FleetComboIds.h"
+#include "ComboSongDrawOOT.h"
 #include "soh/ShipInit.hpp"
 #include <soh/ResourceManagerHelpers.h>
 #ifdef COMBO_BUILD
@@ -452,50 +453,9 @@ void DrawCustomItemIcon(Gfx** p) {
     }
     if (customIcon && std::strstr(customIcon, "/gSongNoteTex")) {
         Color_RGB8 color = { 255, 255, 255 };
-        // Match the MM song's existing get-item theme without replacing its clef.
-        switch (rgid) {
-            case RG_MM_SONG_SARIA:
-            case RG_MM_SONG_SONATA:
-                color = { 98, 255, 98 };
-                break;
-            case RG_MM_SONG_LULLABY_INTRO:
-                color = { 255, 100, 100 };
-                break;
-            case RG_MM_SONG_LULLABY:
-                color = { 255, 20, 20 };
-                break;
-            case RG_MM_SONG_NOVA:
-                color = { 20, 20, 255 };
-                break;
-            case RG_MM_SONG_ELEGY:
-                color = { 255, 98, 0 };
-                break;
-            case RG_MM_SONG_OATH:
-                color = { 98, 0, 98 };
-                break;
-            case RG_MM_SONG_HEALING:
-                color = { 255, 150, 230 };
-                break;
-            case RG_MM_SONG_SOARING:
-                color = { 200, 160, 255 };
-                break;
-            case RG_MM_SONG_TIME:
-            case RG_MM_SONG_DOUBLE_TIME:
-            case RG_MM_SONG_INVERTED_TIME:
-                color = { 98, 177, 211 };
-                break;
-            case RG_MM_SONG_SUN:
-                color = { 237, 231, 62 };
-                break;
-            case RG_MM_SONG_EPONA:
-                color = { 146, 87, 49 };
-                break;
-            case RG_MM_SONG_STORMS:
-                color = { 146, 146, 146 };
-                break;
-            default:
-                break;
-        }
+        uint8_t rgba[4];
+        if (ComboSongShimmerColor(ComboSongForOotItem(rgid), rgba))
+            color = { rgba[0], rgba[1], rgba[2] };
         gDPSetPrimColor(gfx++, 0, 0, color.r, color.g, color.b, msgCtx->textColorAlpha);
         gDPLoadTextureBlock(gfx++, (uintptr_t)msgCtx->textboxSegment + MESSAGE_STATIC_TEX_SIZE, G_IM_FMT_IA,
                             G_IM_SIZ_8b, 16, 24, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK,

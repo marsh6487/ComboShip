@@ -11,6 +11,7 @@
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"
 #include "combo/menu/ComboItemDrawABI.h"
 #include "combo/menu/ComboSongDrawOOT.h"
+#include "combo/menu/ComboItemIconOwnership.h"
 constexpr int ITEM_FISH = 0x19, ITEM_HEART_CONTAINER = 0x72;
 constexpr int ITEM_MEDALLION_FOREST = 0x66, ITEM_HEART_PIECE_2 = 0x7A;
 constexpr int ITEM_ROCS_FEATHER_SKIJER = 0xA0, ICON_SIZE_24 = 0;
@@ -41,5 +42,9 @@ int main() {
     icon = {};
     assert(OOT_FillItemIconInfo(RG_FAIRY_BOW, &icon) == 1);
     assert(std::strstr(icon.path, "Bow") && icon.width == 32);
+    icon = {};
+    assert(OOT_FillItemIconInfo(RG_EXT_SHIELD_OF_IKANA, &icon) == 1);
+    assert(std::strcmp(icon.path, "__OTR__icon_item_static_yar/gItemIconMirrorShieldTex") == 0);
+    assert(icon.width == 32 && icon.height == 32 && !icon.isIA8);
     std::cout << "Double Defense icon uses the heart, not the colliding RG/item ID\n";
 }

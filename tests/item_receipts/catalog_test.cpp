@@ -7,6 +7,7 @@
 #include "rando/CrossForeign.h"
 #include "ComboExport.h"
 #include "ComboItemReceiptText.h"
+#include "ComboSongDrawMM.h"
 extern "C" {
 #include "message_data_static.h"
 #include "mods/extended_inventory.h"
@@ -38,6 +39,17 @@ NeiSaveData *Nei_Save() { return &neiSave; }
 SaveContext gSaveContext{};
 TexturePtr gItemIcons[131]{};
 void Message_StageCustomItemIcon(void*, s16) {}
+static u8 stagedColor[3];
+static s16 stagedWidth, stagedHeight;
+static u8 stagedIA8;
+void Message_StageCustomItemIconTint(void*, s16 width, s16 height, u8 ia8, u8 r, u8 g, u8 b) {
+    stagedWidth = width;
+    stagedHeight = height;
+    stagedIA8 = ia8;
+    stagedColor[0] = r;
+    stagedColor[1] = g;
+    stagedColor[2] = b;
+}
 u8 gItemSlots[77]{};
 u32 gBitFlags[32] = {1, 2, 4};
 u8 Nei_BulletBagLevel() { return std::min<int>(3, neiSave.ootUpgrades & 7); }
@@ -219,7 +231,24 @@ int main() {
   };
   for (auto [song, icon] : songIcons) {
     auto byte = Rando::StaticData::GetIconForZMessage(song);
-    assert(byte < 0xF1 && D_801CFF94[byte] == icon);
+    (void)icon;
+    assert(byte == 0xF5 && stagedWidth == 16 && stagedHeight == 24 && stagedIA8);
+  }
+  Rando::StaticData::GetIconForZMessage(RI_SONG_DOUBLE_TIME);
+  assert(stagedColor[0] == 128 && stagedColor[1] == 216 && stagedColor[2] == 240);
+  Rando::StaticData::GetIconForZMessage(RI_SONG_INVERTED_TIME);
+  assert(stagedColor[0] == 74 && stagedColor[1] == 112 && stagedColor[2] == 202);
+  Rando::StaticData::GetIconForZMessage(RI_SONG_LULLABY_INTRO);
+  assert(stagedColor[0] == 255 && stagedColor[1] == 100 && stagedColor[2] == 100);
+  const std::pair<RandoItemId, uint32_t> receiptColors[] = {
+      {RI_SONG_DOUBLE_TIME, 0x80D8F0}, {RI_SONG_ELEGY, 0xFF6200},         {RI_SONG_EPONA, 0x925731},
+      {RI_SONG_HEALING, 0xFF96E6},     {RI_SONG_INVERTED_TIME, 0x4A70CA}, {RI_SONG_LULLABY_INTRO, 0xFF6464},
+      {RI_SONG_LULLABY, 0xFF1414},     {RI_SONG_NOVA, 0x1414FF},          {RI_SONG_OATH, 0x620062},
+      {RI_SONG_SARIA, 0x6ACB62},       {RI_SONG_SOARING, 0xC8A0FF},       {RI_SONG_SONATA, 0x62FF62},
+      {RI_SONG_STORMS, 0x929292},      {RI_SONG_SUN, 0xEDE73E},           {RI_SONG_TIME, 0x62B1D3}};
+  for (auto [song, rgb] : receiptColors) {
+      assert(Rando::StaticData::GetIconForZMessage(song) == 0xF5);
+      assert((uint32_t(stagedColor[0]) << 16 | uint32_t(stagedColor[1]) << 8 | stagedColor[2]) == rgb);
   }
   const int healing = ITEM_SONG_HEALING - ITEM_SONG_SONATA;
   assert(D_801CFE04[healing] == 255 && D_801CFE1C[healing] == 150 && D_801CFE34[healing] == 230);

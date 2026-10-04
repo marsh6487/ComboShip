@@ -354,24 +354,27 @@ static bool FloatOk(const u8* p, f32 maxAbs) {
 }
 
 static bool ValidateBlob() {
-    if (sBlob.size() < kHeaderSize || sBlob.size() > kMaxBlobSize ||
-        std::memcmp(sBlob.data(), kMagic, 8) != 0 || ReadU32(sBlob.data() + 8) != kVersion)
+    if (sBlob.size() < kHeaderSize || sBlob.size() > kMaxBlobSize || std::memcmp(sBlob.data(), kMagic, 8) != 0 ||
+        ReadU32(sBlob.data() + 8) != kVersion)
         return false;
     const u8* h = sBlob.data() + 12;
     auto value = [h](u32 i) { return ReadU32(h + i * 4); };
     const u32 vertices = value(0), triangles = value(1), bones = value(2), anims = value(3);
     const u32 width = value(4), height = value(5);
-    if (!vertices || vertices > 65535 || vertices % 3 || triangles != vertices / 3 ||
-        !bones || bones > SSBB_MAX_SKIN_BONES || !anims || anims > 65535 || value(18) != sBlob.size() ||
-        width < 8 || width > 1024 || height < 8 || height > 1024 ||
-        (width & (width - 1)) || (height & (height - 1)) || value(17) != width * height * 2)
+    if (!vertices || vertices > 65535 || vertices % 3 || triangles != vertices / 3 || !bones ||
+        bones > SSBB_MAX_SKIN_BONES || !anims || anims > 65535 || value(18) != sBlob.size() || width < 8 ||
+        width > 1024 || height < 8 || height > 1024 || (width & (width - 1)) || (height & (height - 1)) ||
+        value(17) != width * height * 2)
         return false;
-    struct Chunk { u32 offset; u64 size; };
-    const Chunk chunks[] = {
-        {value(6), (u64)vertices * 20}, {value(7), (u64)vertices * 8}, {value(8), (u64)bones * 2},
-        {value(9), (u64)bones * 64}, {value(10), (u64)bones * 12}, {value(11), (u64)anims * 16},
-        {value(12), value(13)}, {value(14), value(15)}, {value(16), value(17)}
+    struct Chunk {
+        u32 offset;
+        u64 size;
     };
+    const Chunk chunks[] = { { value(6), (u64)vertices * 20 }, { value(7), (u64)vertices * 8 },
+                             { value(8), (u64)bones * 2 },     { value(9), (u64)bones * 64 },
+                             { value(10), (u64)bones * 12 },   { value(11), (u64)anims * 16 },
+                             { value(12), value(13) },         { value(14), value(15) },
+                             { value(16), value(17) } };
     for (size_t i = 0; i < sizeof(chunks) / sizeof(chunks[0]); ++i) {
         const Chunk& c = chunks[i];
         if (!c.size || c.offset < kHeaderSize || !RangeOk(c.offset, c.size))
@@ -417,9 +420,8 @@ static bool ValidateBlob() {
         u16 count = ReadU16(e + 4), animBones = ReadU16(e + 6);
         u64 size = (u64)count * animBones * sizeof(SSBBBoneFrame);
         if (!count || animBones != bones || name < value(12) || (u64)name >= (u64)value(12) + value(13) ||
-            !std::memchr(sBlob.data() + name, 0, value(12) + value(13) - name) ||
-            !FloatOk(e + 8, 240.0f) || ReadF32(e + 8) <= 0 || (start & 3u) ||
-            start < value(14) || (u64)start + size > (u64)value(14) + value(15))
+            !std::memchr(sBlob.data() + name, 0, value(12) + value(13) - name) || !FloatOk(e + 8, 240.0f) ||
+            ReadF32(e + 8) <= 0 || (start & 3u) || start < value(14) || (u64)start + size > (u64)value(14) + value(15))
             return false;
         for (u64 j = 0; j < (u64)count * bones; ++j) {
             const u8* f = sBlob.data() + start + j * 36;
@@ -812,9 +814,9 @@ static WolfInput ReadInput(Player* player, PlayState* play, const Input* source)
     in.bPress = CHECK_BTN_ALL(input->press.button, BTN_B) != 0;
     in.rHold = CHECK_BTN_ALL(input->cur.button, BTN_R) != 0;
     u32 blockMask = PLAYER_STATE1_200 | PLAYER_STATE1_TALKING | PLAYER_STATE1_DEAD | PLAYER_STATE1_400 |
-                    PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_4 | PLAYER_STATE1_2000 |
-                    PLAYER_STATE1_FIRST_PERSON | PLAYER_STATE1_CLIMBING_LADDER | PLAYER_STATE1_400 |
-                    PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_8000000 | PLAYER_STATE1_800000;
+                    PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_4 | PLAYER_STATE1_2000 | PLAYER_STATE1_FIRST_PERSON |
+                    PLAYER_STATE1_CLIMBING_LADDER | PLAYER_STATE1_400 | PLAYER_STATE1_IN_CUTSCENE |
+                    PLAYER_STATE1_8000000 | PLAYER_STATE1_800000;
     if (player->stateFlags1 & blockMask) {
         in.aPress = in.bPress = 0;
         in.blocked = 1;

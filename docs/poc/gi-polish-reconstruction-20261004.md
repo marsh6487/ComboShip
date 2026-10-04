@@ -71,3 +71,22 @@ real renderer, all equipment fits, owner descriptors and both foreign dispatch
 paths. Real MM `NeiGiPresentation.cpp` and `DrawItem.cpp` syntax pass, with the
 latter using the production dependency headers `nlohmann/json.hpp` and
 `ship/window/gui/GuiWindow.h` forced in for the standalone compile.
+
+
+Sword checkpoint removes the native Four Sword helper's extra X quarter turn,
+restores native selected standalone Kokiri/Master/longsword submission with one
+Z=1.8 rotation, and uses the same protected Din priority as the recovered
+exporter. True Master Sword's existing RGB(120,180,255) flame is retained as a
+separate helper, with no geometry tint or authored-mesh particles on the
+selected sword. `run_sword_pose_tests.py` transforms a +X donor blade through
+actual native and exporter bodies: RED on zero upward component, GREEN at
+>0.95 normalized Y across six spins. The native selected-path fixture also
+failed before direct selected submission was restored.
+
+`run_nei_gi_tests.py --combo`, `run_sword_fallback_tests.py --sanitize`, and
+`run_mm_static_gi_bridge_tests.py --sanitize` pass. Preservation fixtures
+`run_fairy_bottle_tests.py`, `run_boss_soul_model_tests.py` and
+`run_morpha_tentacle_tests.py` pass: partial shell priority, bouncing pink fairy,
+exactly one pink shimmer, native boss flame, and no live Morpha tentacle resource
+requests/submissions. Old isolated fixtures were brought up to the exact
+restored ABI/sword operation count; their production bodies remain unmodified.

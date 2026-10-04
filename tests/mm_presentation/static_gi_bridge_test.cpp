@@ -96,6 +96,7 @@ void Seasons_SeasonColor(uint8_t season,uint8_t* r,uint8_t* g,uint8_t* b) {
 /* OWNER_HELPERS */
 void OOT_DescribeHeartCosmetics(s16,CwItemDrawInfo*) {}
 /* OWNER_MAGIC_DESCRIPTOR */
+int32_t OOT_FillSongDrawInfo(RandomizerGet,CwItemDrawInfo*) {return 0;} // Songs have their own production fixture.
 /* OWNER_DESCRIPTOR */
 /* HOST_INFO */
 RandomizerGet selected=RG_SHEIKAH_SLATE;
@@ -278,7 +279,7 @@ int main() {
  ownerAlt=true;info={};
  assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
  assert(std::string(info.dls[0])=="__OTR__@oot:alt/objects/object_custom_equip/gCustomMasterSwordDL");
- assert(info.opCount==2 && info.ops[0].op==CW_OP_ROTATE_X && info.ops[1].op==CW_OP_ROTATE_Z);
+ assert(info.opCount==1 && info.ops[0].op==CW_OP_ROTATE_Z);
  ownerAlt=false;info={};
  assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
  assert(info.drawKind==CW_DRAW_KIND_MASTER_SWORD && info.primColorXlu[0]==120);

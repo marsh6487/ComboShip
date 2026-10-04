@@ -2,12 +2,14 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <utility>
 struct {
     struct { struct { struct { struct { uint8_t magicStatUpgrades; } randomizer; } data; } quest; } ship;
 } gSaveContext;
 constexpr int RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE = 0, RSK_MAGIC_STAT_UPGRADE_TOTAL = 1,
               RSK_MAGIC_STAT_UPGRADE_REQUIRED = 2, ITEM_CUSTOM = 0;
-uint8_t StatUpgradeRequired(int, int, int, int) { return 8; }
+static uint8_t required = 8;
+uint8_t StatUpgradeRequired(int, int, int, int) { return required; }
 struct CustomMessage {
     std::string english;
     CustomMessage() = default;
@@ -30,6 +32,16 @@ int main() {
         if (owned == 7) assert(message.english.find("Max magic reached") != std::string::npos);
         if (owned >= 8) assert(message.english.find("Already at max magic") != std::string::npos);
         assert(gSaveContext.ship.quest.data.randomizer.magicStatUpgrades == owned);
+    }
+    // RPG adjustable caps come from StatUpgradeRequired, rather than the
+    // default pool size. The message reports the count after this pickup.
+    for (auto sample : {std::pair{uint8_t(3), uint8_t(0)}, std::pair{uint8_t(100), uint8_t(97)}}) {
+        required = sample.first;
+        gSaveContext.ship.quest.data.randomizer.magicStatUpgrades = sample.second;
+        CustomMessage message;
+        BuildMagicStatUpgradeMessage(message);
+        assert(message.english.find("%c2%w more") != std::string::npos);
+        assert(gSaveContext.ship.quest.data.randomizer.magicStatUpgrades == sample.second);
     }
     std::cout << "Yellow magic receipt keeps RPG remaining counts and handles saturated tiers\n";
 }

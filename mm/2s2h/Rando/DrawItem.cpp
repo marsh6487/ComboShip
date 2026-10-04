@@ -7,6 +7,7 @@
 #include "2s2h_assets.h"
 #include "Rando/SpinAttackGi.h"
 #include "ComboSongDrawMM.h"
+#include "ComboItemIconOwnership.h"
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "mods/nei_save.h"                     // NeiSaveData chain tiers for progressive get-item draws
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_OOT_SWORD_* registry indices (chain tiers)
@@ -77,11 +78,16 @@ extern "C" int32_t ComboDrawNativeTwinmoldSoul() {
 }
 
 extern "C" void Message_StageCustomItemIconEx(void* tex, s16 width, s16 height, u8 isIA8);
+extern "C" void Message_StageCustomItemIconTint(void* tex, s16 width, s16 height, u8 isIA8, u8 r, u8 g, u8 b);
 
 uint8_t Rando::ComboForeignMessageIcon(RandoCheckId check) {
     const auto* item = Rando::MiscBehavior::MM_LookupForeign(check);
     if (!item || item->itemGame != ComboRando::GAME_OOT || item->trap)
         return 0xFE;
+    if (ComboIconIsIkanaShieldName(item->itemName.c_str())) {
+        Message_StageCustomItemIconEx((void*)COMBO_IKANA_SHIELD_ICON, 32, 32, false);
+        return 0xF5;
+    }
     static Fn_GetItemIconInfo getIcon = nullptr;
     if (!getIcon)
         getIcon = (Fn_GetItemIconInfo)Combo_ResolveSym("soh", "OOT_GetItemIconInfo");
@@ -90,10 +96,16 @@ uint8_t Rando::ComboForeignMessageIcon(RandoCheckId check) {
     CwItemIconInfo icon{};
     if (getIcon(item->itemName.c_str(), &icon) != 1 || !icon.path || std::strncmp(icon.path, "__OTR__", 7) != 0 ||
         (icon.width < 1 || icon.width > 64 || icon.height < 1 || icon.height > 64 ||
-         (icon.isIA8 != 0 && icon.isIA8 != 1)))
+         (icon.isIA8 != 0 && icon.isIA8 != 1) || (icon.hasColor != 0 && icon.hasColor != 1)))
         return 0xFE;
-    const char* routed = ComboInternRoutedPathOOT(std::string("__OTR__@oot:") + (icon.path + 7));
-    Message_StageCustomItemIconEx((void*)routed, (s16)icon.width, (s16)icon.height, (u8)icon.isIA8);
+    const char* routed = ComboIconUsesMmOwnership(icon.path)
+                             ? icon.path
+                             : ComboInternRoutedPathOOT(std::string("__OTR__@oot:") + (icon.path + 7));
+    if (icon.hasColor)
+        Message_StageCustomItemIconTint((void*)routed, (s16)icon.width, (s16)icon.height, (u8)icon.isIA8, icon.color[0],
+                                        icon.color[1], icon.color[2]);
+    else
+        Message_StageCustomItemIconEx((void*)routed, (s16)icon.width, (s16)icon.height, (u8)icon.isIA8);
     return 0xF5;
 }
 

@@ -22,6 +22,7 @@
 #include "ComboExport.h"
 #include "ComboMaskShimmer.h"
 #include "ComboSongDrawOOT.h"
+#include "ComboItemIconOwnership.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
 #include "ComboItemEffectColors.h"
 #include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
@@ -1016,7 +1017,10 @@ static int32_t OOT_FillItemIconInfo(RandomizerGet rg, CwItemIconInfo* out) {
     RandomizerGet actual = RG_NONE;
     auto gi = Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual);
     auto item = Rando::StaticData::RetrieveItem(actual != RG_NONE ? actual : rg);
-    if ((actual != RG_NONE ? actual : rg) == RG_DOUBLE_DEFENSE) {
+    if ((actual != RG_NONE ? actual : rg) == RG_EXT_SHIELD_OF_IKANA) {
+        out->path = COMBO_IKANA_SHIELD_ICON;
+        out->width = out->height = 32;
+    } else if ((actual != RG_NONE ? actual : rg) == RG_DOUBLE_DEFENSE) {
         // Its grant row deliberately stores RG_DOUBLE_DEFENSE in itemId. That
         // number is also ITEM_FISH; it is not an inventory-icon index.
         out->path = static_cast<const char*>(gItemIcons[ITEM_HEART_CONTAINER]);

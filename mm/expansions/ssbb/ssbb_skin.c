@@ -278,25 +278,26 @@ s32 SSBBSkin_ComputePose(SSBBCharacterInstance* inst) {
     f32 blend = 0.0f;
     s32 b;
     sPoseOwner = NULL;
-    if (!inst || !inst->initialized || !inst->def || !inst->def->skinMesh || !inst->skeleton ||
-        !inst->ssbbAnim || !inst->ssbbAnim->numFrames || !inst->ssbbAnim->frames)
+    if (!inst || !inst->initialized || !inst->def || !inst->def->skinMesh || !inst->skeleton || !inst->ssbbAnim ||
+        !inst->ssbbAnim->numFrames || !inst->ssbbAnim->frames)
         return 0;
     skin = inst->def->skinMesh;
     // Pikachu's existing 48-node skeleton has 47 weighted bones and one extra rigid
     // limb. Keep that layout: only weighted bones need animation/inverse-bind data.
-    if (skin->boneCount == 0 || skin->boneCount > SSBB_MAX_SKIN_BONES ||
-        inst->def->numLimbs < skin->boneCount || inst->def->numLimbs > SSBB_MAX_SKIN_BONES ||
-        inst->ssbbAnim->numBones < skin->boneCount || inst->ssbbAnim->numBones > inst->def->numLimbs)
+    if (skin->boneCount == 0 || skin->boneCount > SSBB_MAX_SKIN_BONES || inst->def->numLimbs < skin->boneCount ||
+        inst->def->numLimbs > SSBB_MAX_SKIN_BONES || inst->ssbbAnim->numBones < skin->boneCount ||
+        inst->ssbbAnim->numBones > inst->def->numLimbs)
         return 0;
-    frame = inst->curFrame < 0.0f ? 0 : inst->curFrame >= inst->ssbbAnim->numFrames ?
-        inst->ssbbAnim->numFrames - 1 : (u16)inst->curFrame;
+    frame = inst->curFrame < 0.0f                         ? 0
+            : inst->curFrame >= inst->ssbbAnim->numFrames ? inst->ssbbAnim->numFrames - 1
+                                                          : (u16)inst->curFrame;
     nextFrame = frame;
     if (skin->interpolateFrames && frame + 1 < inst->ssbbAnim->numFrames) {
         nextFrame = frame + 1;
         blend = CLAMP(inst->curFrame - (f32)frame, 0.0f, 1.0f);
     }
-    SSBBSkin_ComputeBoneMatricesFromAnim(inst->skeleton, inst->ssbbAnim, frame, nextFrame, blend,
-                                       &skin->daeToF64, 0, inst->def->numLimbs, !skin->preserveRootMotion);
+    SSBBSkin_ComputeBoneMatricesFromAnim(inst->skeleton, inst->ssbbAnim, frame, nextFrame, blend, &skin->daeToF64, 0,
+                                         inst->def->numLimbs, !skin->preserveRootMotion);
     for (b = 0; b < skin->boneCount; ++b)
         SkinMatrix_MtxFMtxFMult(&sBoneWorldMatrices[b], &skin->invBindMatrices[b], &sCombinedMatrices[b]);
     sPoseOwner = inst;
