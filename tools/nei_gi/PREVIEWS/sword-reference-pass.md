@@ -1,5 +1,9 @@
 # Sword reference image pass
 
+Gilded's length and Master's blade root from this preview are superseded by
+the [latest two-sword adjustment](sword-tuned-pass.md). True Master was accepted
+and is preserved in that pass.
+
 Master, True Master and Gilded now follow the three images supplied in chat.
 Their blades are longer than both the initial bundle and the preceding shortened
 pass. Shape matching uses each image's component ratios; the images have

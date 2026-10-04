@@ -1,8 +1,9 @@
 # Sword GI particle preview
 
 The initial geometry preview below is superseded by the
-[user reference image pass](sword-reference-pass.md). The palette and particle themes
-remain current.
+[user reference image pass](sword-reference-pass.md) and the
+[latest two-sword adjustment](sword-tuned-pass.md). The palette and particle
+themes remain current.
 
 The approved particle pass uses the seven exact models supplied in
 `NEI_Sword_GI_Latest_20261003.zip`, plus the existing Razor and Biggoron models.

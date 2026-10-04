@@ -1,7 +1,8 @@
 # Sword GI proportion correction
 
 Master, True Master and Gilded from this earlier pass are superseded by the
-[user reference image pass](sword-reference-pass.md).
+[user reference image pass](sword-reference-pass.md) and the
+[latest two-sword adjustment](sword-tuned-pass.md).
 
 This preview implements the requested correction to the six sword silhouettes.
 The original Nintendo GI vertex payloads are unavailable in this environment.
