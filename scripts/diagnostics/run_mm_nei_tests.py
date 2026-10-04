@@ -8,11 +8,13 @@ import tempfile
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT/'tests/mm_nei'))
 from rig_fit_query import write_query
+from check_mm_draw_item_compile import check_draw_item
 def flags():
     # z_player.c's unity build gets the audio aliases through extended_player.c's
     # SoH redirect headers before equip_helper.c. Standalone fixtures need them too.
     return ['-DPLAYER_STATE1_LOADING=PLAYER_STATE1_200','-DPLAYER_STATE1_IN_ITEM_CS=0u','-DPLAYER_STATE1_GETTING_ITEM=PLAYER_STATE1_400','-DPLAYER_STATE1_DAMAGED=PLAYER_STATE1_4000000','-DPLAYER_STATE1_HANGING_OFF_LEDGE=0u','-DPLAYER_STATE1_CLIMBING_LEDGE=PLAYER_STATE1_4','-DF3DEX_GBI_2','-DLOG_LEVEL_GAME_PRINTS=0',*[f'-I{ROOT/p}' for p in ('mm','mm/2s2h','mm/include','mm/include/PR','mm/src','mm/assets','mm/mods','libultraship/include','combo','combo/menu')],'-include',str(ROOT/'mm/include/z64.h'),'-include',str(ROOT/'mm/mods/nei_oot_compat.h'),'-include',str(ROOT/'mm/soh/_nei_compat_core.h')]
 if __name__=='__main__':
+    check_draw_item()
     with tempfile.TemporaryDirectory(prefix='mm-nei-') as td:
         query=Path(td)/'rig_fit_query.cpp'
         write_query(ROOT, query)

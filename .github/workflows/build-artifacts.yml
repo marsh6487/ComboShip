@@ -8,7 +8,7 @@ name: Build Artifacts
 on:
   pull_request:
   push:
-    branches: [develop]
+    branches: [develop, slate-element-preview]
     paths:
       - 'libultraship/**'
       - 'soh/**'
