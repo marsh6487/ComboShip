@@ -635,9 +635,7 @@ s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]) {
 }
 
 static void GetItem_DrawShimmer(PlayState* play, const uint8_t color[4]) {
-    if (ResourceMgr_LoadGfxByName(gEffSparklesDL) != NULL) {
-        ComboDrawMaskShimmer(play, gEffSparklesDL, color, NULL);
-    }
+    ComboDrawMaskShimmer(play, NULL, color, NULL);
 }
 
 static s32 GetItem_BottleShimmerColor(s16 drawId, Color_RGBA8* color) {

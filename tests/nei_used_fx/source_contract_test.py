@@ -82,8 +82,14 @@ old=functions(baseline(path))['NeiGi_DrawMesh']
 new=functions((ROOT/'soh/soh/Enhancements/randomizer/NeiGiMeshRenderer.inc').read_text())['NeiGi_DrawMeshMaterial']
 new=re.sub(r'static void NeiGi_DrawMeshMaterial\(.*?\) \{',
            'void NeiGi_DrawMesh(PlayState* play, const NeiGi::Mesh& mesh, Kind orb) {',new,count=1,flags=re.S)
-new=new.replace('(material ? 32 : 63)','63')
-a=new.index('    if (material) {');b=new.index('    } else if (orb != Kind::Neutral) {',a)
+# With both optional texture modes disabled, the retained GI batcher must
+# still match the approved untextured renderer. The seasonal ray lane is
+# independently exercised by the production weather renderer fixtures.
+assert new.count('(material || seasonSunRays ? 32 : 63)')==1
+new=new.replace('(material || seasonSunRays ? 32 : 63)','63')
+new,count=re.subn(r'\(seasonSunRays \? 31\s*: material\s*\? 32\s*: 63\)', '63',new)
+assert count==1,'expected the one seasonal/material V texture coordinate'
+a=new.index('    if (seasonSunRays) {');b=new.index('    } else if (orb != Kind::Neutral) {',a)
 new=new[:a]+'    if (orb != Kind::Neutral) {'+new[b+len('    } else if (orb != Kind::Neutral) {'):]
 assert tokens(old)==tokens(new),'Existing GI batcher command path changed'
 print('USED VFX source contract: rod gameplay, Time Gate state, local/remote shot dispatch, flight particle size alone suppressed; impact particles, gameplay and RNG cadence preserved')

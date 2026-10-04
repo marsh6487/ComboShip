@@ -1,0 +1,65 @@
+{
+  "resource_count": 12,
+  "vertex_records": 3569,
+  "vertex_loads": 136,
+  "slug": "master_sword",
+  "name": "Master Sword",
+  "entry": "objects/nei_gi_redesign/master_sword/gi_dl",
+  "draw_scale": 1.0,
+  "matrix_scale": 0.0412445068359375,
+  "triangles": 3014,
+  "bounds_author": [
+    [
+      -16.375,
+      -30.0,
+      -3.6875
+    ],
+    [
+      16.375,
+      110.0,
+      3.6875
+    ]
+  ],
+  "markers": {
+    "visual_review_candidate": true,
+    "runtime_tested": false,
+    "preview_front_angle": 16,
+    "preview_back_angle": 164,
+    "guard_baseline_y": 0,
+    "original_gi_vertex_data_available": false,
+    "proportion_reference": "User-provided steel/gold sword images; component ratios are visual targets, not original GI vertex measurements.",
+    "reference_blade_to_hilt_ratio": 3.6666666666666665,
+    "reference_blade_tip_y": 110,
+    "reference_hilt_rear_y": -30,
+    "imported_approved_model": false
+  },
+  "notes": [
+    "Steel reference with the latest reviewed blade-root width: long nearly parallel blade, broad connecting ricasso, stepped shoulders and violet winged guard.",
+    "Reflection bands use the game-supported G_TEXTURE_GEN material, not an image overlay.",
+    "Steel blade, blue-violet metal hilt and leather grip, golden central gem.",
+    "Reconstructed from the distinct user-provided steel/gold silhouettes; these models deliberately have different blade and hilt proportions.",
+    "Part dimensions are visual review targets, not measured Nintendo get-item coordinates."
+  ],
+  "runtime_tested": false,
+  "source_provenance": {
+    "bundle": "NEI_Sword_GI_Latest_20261003",
+    "art_checkpoint": "dd66ee65",
+    "authoring_recipe": "../../SOURCE/forged_swords/SOURCE/sword_forged.py",
+    "glb_sha256": "532728001c667ea3568c88ec27d2e1d1bfd25a1a34e7434556680d7f30d4a2e5",
+    "approved_glb_sha256": "7d20618f8415e483246da693ce58a579c1ad6653c99edf679ca58d3421172e9a",
+    "resource_sha256": {
+      "blue_leather_tex": "ff3a68b1e5fca15482f8b7ab5c0f6c4c0a17be90f7478cd9e519cc02ad735857",
+      "blue_wrap_tex": "5300d0d85d5d441e23430e5a2dc310cbd4d62bfba2bfde93b7da526d8680f7a7",
+      "edge_tex": "8c9b5b1548288588aece01a8e76afda8722485d75ab049ebe9f59b0978dc55a7",
+      "gi_dl": "941f36c148fc6eb5581651d44e57668e898919801e737b9fbbd9c619f46a7cdd",
+      "gold_edge_tex": "d499b1a4d2f97541a6805df075e60932c1a08eecee2110c1cf0a695830e8b406",
+      "gold_recess_tex": "803e040c5cea30f99fed2ad2b91db4c780c12afcc77ac7515009e06d3c1cca72",
+      "gold_tex": "4e5b29e2944e2fe09421c00f401fa6c938d6cec6f5a41d9071d1025c12ea9698",
+      "mesh_opa_vtx": "43f22e78e2a508c03dca094c2125aff1fb7db71aea871e38dcf6e49cdb9b465b",
+      "scale_mtx": "bba652b1cf8f43eb8f04a6fdc3fa639db60eab659614e7fcbef2bbac0943a4ad",
+      "steel_tex": "5ba49cfb20429ebcf49f5b76c0f464e1e83db89fc23e245062e96c9c5d1bd45f",
+      "violet_edge_tex": "c3a807d4ae7b3b3e471dae1ba2768dde0bb9331ba956ae21497d52317fa99866",
+      "violet_tex": "6c1d1fdf0353b6ba9379f79c511607e66c55955ec2f01649e7a43c3d36f88205"
+    }
+  }
+}

@@ -18,6 +18,9 @@ constexpr const char *kOriginalSpinner =
     "__OTR__objects/object_nei_spinner/n0b0_opaque_dl";
 constexpr const char *kOriginalCane =
     "__OTR__objects/object_somaria/g_somaria_cane_dl";
+constexpr const char *kOriginalSeasonsRod =
+    "__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL";
+u8 seasonsDrawn = 0;
 std::vector<std::string> resourceQueries, resourceLoads, caneEffects;
 u8 selectedCane = CANE_TYPE_SOMARIA;
 u8 aimingCane = 0, selectedCaneSkill = CANE_SKILL_SOMARIA_BLOCK;
@@ -65,6 +68,8 @@ void unchanged(const Player &player, const Player &before,
 } // namespace
 
 extern "C" {
+void CustomItems_DrawRodOfSeasons(Player *, PlayState *);
+u8 Seasons_IsDrawn(void) { return seasonsDrawn; }
 SaveContext gSaveContext{};
 Gfx Cylinder_001_opaque_dl[1];
 Gfx ice_rod_opaque_dl[1], ice_rod_transparent_dl[1];
@@ -165,8 +170,86 @@ void testMissingWrapperResources(Player &player, PlayState &play,
   assert(caneEffects ==
          std::vector<std::string>({"ultrahand", "fuse", "flip"}));
   assert(matrices.empty());
+  resetWrappers(graphics, opa, xlu);
+  seasonsDrawn = 1;
+  const MtxF rodCaller = current;
+  CustomItems_DrawRodOfSeasons(&player, &play);
+  assert(drawn.empty() && nativeDraws == 0 && resourceLoads.empty());
+  assert(resourceQueries == std::vector<std::string>{kOriginalSeasonsRod});
+  assert(std::memcmp(&current, &rodCaller, sizeof(current)) == 0);
+  assert(matrices.empty());
   std::cout << "PASS: real Spinner/Somaria wrappers safely decline absent "
                "replacement and legacy resources\n";
+}
+
+void testSeasonsRodWrapper(Player &player, PlayState &play,
+                           GraphicsContext &graphics, Gfx *opa, Gfx *xlu) {
+  const ItemHandPose originalPose =
+      {0, 5.977f, -3.218f, 109.655f, 72.414f, 0, .4f};
+  for (int age : {LINK_AGE_CHILD, LINK_AGE_ADULT}) {
+    gSaveContext.linkAge = age;
+    for (float bodyScale : {.01f, .001f}) {
+      player.actor.scale.x = player.actor.scale.y = player.actor.scale.z =
+          bodyScale;
+      for (int sample = 0; sample < 8; ++sample) {
+        Matrix_Translate(-400, -500, -600, MTXMODE_NEW);
+        Matrix_Scale(bodyScale, bodyScale, bodyScale, MTXMODE_APPLY);
+        ItemEquip_CaptureLeftHandMatrix();
+        Matrix_Translate(42 + sample, 60, 90, MTXMODE_NEW);
+        Matrix_RotateY(sample * .31f, MTXMODE_APPLY);
+        Matrix_RotateX(sample * -.47f, MTXMODE_APPLY);
+        Matrix_RotateZ(sample * .61f, MTXMODE_APPLY);
+        Matrix_Scale(bodyScale, bodyScale, bodyScale, MTXMODE_APPLY);
+        ItemEquip_CaptureHandMatrix();
+        assert(ItemEquip_ApplyHandPose(&player, &originalPose));
+        const MtxF expected = current;
+        for (bool replacement : {false, true}) {
+          for (bool drawnState : {false, true}) {
+            resetWrappers(graphics, opa, xlu);
+            available.insert(kOriginalSeasonsRod);
+            if (replacement)
+              available.insert(NEI_HELD_PATH("rod_of_seasons"));
+            seasonsDrawn = drawnState;
+            Matrix_Translate(-100, -200, -300, MTXMODE_NEW);
+            const MtxF caller = current;
+            const Player before = player;
+            const CustomItemState state = gCustomItemState;
+            CustomItems_DrawRodOfSeasons(&player, &play);
+            if (!drawnState) {
+              assert(drawn.empty() && nativeDraws == 0 && resourceQueries.empty());
+              assert(std::memcmp(&current, &caller, sizeof(current)) == 0);
+            } else if (replacement) {
+              assert(drawn == std::vector<std::string>{NEI_HELD_PATH("rod_of_seasons")});
+              assert(nativeDraws == 0 && resourceQueries.empty());
+              near(transform(poses.front(), {0, 0, 0}), transform(expected, {0, 0, 0}));
+              near(transform(poses.front(), {0, 48, 0}), transform(expected, {0, 48, 0}));
+              near(transform(poses.front(), {1, 0, 0}), transform(expected, {1, 0, 0}));
+              assert(std::memcmp(&current, &caller, sizeof(current)) == 0);
+            } else {
+              assert(drawn.empty() && nativeDraws == 1);
+              near(transform(current, {0, 0, 0}), transform(expected, {0, 0, 0}));
+              near(transform(current, {0, 48, 0}), transform(expected, {0, 48, 0}));
+            }
+            unchanged(player, before, state);
+            assert(seasonsDrawn == drawnState);
+          }
+        }
+      }
+    }
+  }
+  resetWrappers(graphics, opa, xlu);
+  available.insert(kOriginalSeasonsRod);
+  available.insert(NEI_HELD_PATH("rod_of_seasons"));
+  ItemEquip_ReleaseHandMatrix();
+  ItemEquip_CaptureLeftHandMatrix();
+  seasonsDrawn = 1;
+  const MtxF caller = current;
+  CustomItems_DrawRodOfSeasons(&player, &play);
+  assert(drawn.empty() && nativeDraws == 0);
+  assert(std::memcmp(&current, &caller, sizeof(current)) == 0);
+  assert(matrices.empty());
+  std::cout << "PASS: held Rod of Seasons retains the original right-wrist pose, "
+               "child/adult scale, draw-state gate and legacy fallback\n";
 }
 
 void testSpinnerWrapper(Player &player, PlayState &play,
@@ -662,6 +745,7 @@ int main(int argc, char **argv) {
                "poses; child/adult shovel scale\n";
   testSpinnerWrapper(player, play, graphics, opa, xlu);
   testSomariaWrapper(player, play, graphics, opa, xlu);
+  testSeasonsRodWrapper(player, play, graphics, opa, xlu);
   std::cout
       << "PASS: real Spinner rotation/height/fallback and Somaria right-wrist "
          "child/adult grip; Pacci/Ultrahand/Trirod colors and VFX preserved\n";

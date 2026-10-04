@@ -6,6 +6,7 @@
 #include "2s2h/Rando/DrawFuncs.h"
 #include "2s2h_assets.h"
 #include "Rando/SpinAttackGi.h"
+#include "../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "mods/nei_save.h"                     // NeiSaveData chain tiers for progressive get-item draws
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_OOT_SWORD_* registry indices (chain tiers)
 
@@ -39,6 +40,7 @@ extern Gfx gIKAxeInlineDL[];                         // equipment/objects/ikaxe_
 
 #define COMBO_MASK_SHIMMER_HOST_MM
 #include "ComboMaskShimmer.h"
+#include "ComboOotBottleShimmerMM.h"
 #undef COMBO_MASK_SHIMMER_HOST_MM
 
 #ifdef COMBO_BUILD
@@ -50,6 +52,25 @@ extern Gfx gIKAxeInlineDL[];                         // equipment/objects/ikaxe_
 void DrawOotNeiCaneOfSomaria(RandoItemId skill);
 void DrawOotNeiUltrahand();
 #include "ComboForeignDrawMM.h"
+
+extern "C" int32_t MM_GetItemAnimDrawInfo(const char* itemName, CwItemAnimDrawInfo* out);
+
+// Native MM and the foreign bridge use one selected-asset route for Twinmold's
+// head GI, including flex replacement matrices, blue skin and native soul flame.
+extern "C" int32_t ComboDrawNativeTwinmoldSoul() {
+    if (gPlayState == nullptr) {
+        return 0;
+    }
+    CwItemAnimDrawInfo info{};
+    const std::string& name = Rando::StaticData::GetItemDisplayName(RI_SOUL_BOSS_TWINMOLD);
+    if (MM_GetItemAnimDrawInfo(name.c_str(), &info) != 1) {
+        return 0;
+    }
+    Matrix_Push();
+    const int32_t drawn = ComboForeignAnim_Draw(&info, "mm", gPlayState);
+    Matrix_Pop();
+    return drawn;
+}
 
 extern "C" void Message_StageCustomItemIconEx(void* tex, s16 width, s16 height, u8 isIA8);
 
@@ -657,9 +678,13 @@ void DrawOotBeanSoul() {
     DrawOotGetItemOpa("__OTR__objects/object_gi_bean/gGiBeanDL", &sCache);
 }
 
-// Native MM soul flame, tinted per OoT boss, plus the NEI skull from 2ship.o2r.
-// The effect can draw independently while the custom skull archive becomes ready.
+// Prefer the owning OoT model/animation recipe for imported boss souls. The
+// standalone fallback can draw its flame/skull while the OoT module is unavailable.
 void DrawOotBossSoul(RandoItemId randoItemId) {
+#ifdef COMBO_BUILD
+    if (MM_TryDrawOotBossSoul(randoItemId))
+        return;
+#endif
     static Gfx* sSkull = NULL;
     if (sSkull == NULL) {
         sSkull = ResourceMgr_LoadGfxByName("__OTR__objects/object_boss_soul/gGIBossSoulSkullDL");
@@ -1507,9 +1532,7 @@ void DrawOotQuartzOfMotion() {
 static void DrawOotMaskShimmer() {
     uint8_t color[4];
     ComboMaskShimmerColor(0, color);
-    if (ResourceMgr_LoadGfxByName(gEffSparklesDL) != NULL) {
-        ComboDrawMaskShimmer(gPlayState, gEffSparklesDL, color, nullptr);
-    }
+    ComboDrawMaskShimmer(gPlayState, nullptr, color, nullptr);
 }
 
 void DrawOotSkullMask() { // object_gi_skj_mask (OoT-unique)
@@ -2529,6 +2552,15 @@ void DrawOotGsToken() {
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 
+// Keep MM's native contents/materials and optional bottle motes, then add the
+// imported OoT item's NEI shimmer in the incoming GI pose.
+void DrawOotBottleWithShimmer(s16 drawId, const uint8_t color[4]) {
+    Matrix_Push();
+    GetItem_Draw(gPlayState, drawId);
+    Matrix_Pop();
+    ComboDrawMaskShimmer(gPlayState, nullptr, color, "mm");
+}
+
 // Ruto's Letter — OoT bottle-with-letter (object_gi_bottle_letter, OoT-unique folder): contents Opa +
 // bottle glass Xlu, matching OoT z_draw { GetItem_DrawOpa0Xlu1, { gGiLetterBottleContentsDL, gGiLetterBottleDL } }.
 void DrawOotRutosLetter() {
@@ -2536,6 +2568,9 @@ void DrawOotRutosLetter() {
     static Gfx* xluCache = NULL;
     DrawOotGetItemOpaXlu("__OTR__objects/object_gi_bottle_letter/gGiLetterBottleContentsDL", &opaCache,
                          "__OTR__objects/object_gi_bottle_letter/gGiLetterBottleDL", &xluCache);
+    uint8_t color[4];
+    ComboMaskShimmerColor(0, color);
+    ComboDrawMaskShimmer(gPlayState, nullptr, color, "oot");
 }
 
 // Bottle with Blue Fire — no MM analog anywhere. Replica of OoT GetItem_DrawBlueFire (object_gi_fire,
@@ -2568,6 +2603,8 @@ void DrawOotBlueFireBottle() {
     gSPDisplayList(POLY_XLU_DISP++, sFlameCache);
     Matrix_Pop();
     CLOSE_DISPS(gPlayState->state.gfxCtx);
+    const uint8_t color[4] = { 100, 160, 255, 255 };
+    ComboDrawMaskShimmer(gPlayState, nullptr, color, "oot");
 }
 void DrawOotExtMagicCape() { // SoH parity: tunic tinted red/purple
     DrawOotTunicTint(180, 40, 120);
@@ -2962,7 +2999,11 @@ void DrawOotNeiShadowCrystal() {
     DrawOotRodStandIn(&c, 150, 60, 220); // twilight violet
 }
 
-void DrawOotNeiRodOfSeasons() {
+void DrawOotNeiSeason(int profile) {
+    NeiGi_DrawSeasonOverlay(gPlayState, profile, "oot");
+    if (profile != 5)
+        return; // Only the actual rod has a model.
+
     static Gfx* real = NULL;
     static u8 tried = 0;
     if (DrawNeiRealOpa("__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL", &real, &tried, 0.35f, false)) {
@@ -2972,9 +3013,15 @@ void DrawOotNeiRodOfSeasons() {
     DrawOotRodStandIn(&c, 230, 60, 60); // seasonal red
 }
 
+void DrawOotNeiRodOfSeasons() {
+    DrawOotNeiSeason(5);
+}
+
 void Rando::DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* actor) {
     // Raw world previews need the next tier. Concrete awards bypass this wrapper.
-    if (randoItemId == RI_OOT_NEI_CANE_OF_SOMARIA || randoItemId == RI_OOT_PROGRESSIVE_ROC) {
+    if (randoItemId == RI_OOT_NEI_CANE_OF_SOMARIA || randoItemId == RI_OOT_PROGRESSIVE_ROC ||
+        randoItemId == RI_OOT_PROGRESSIVE_HAMMER || randoItemId == RI_OOT_PROGRESSIVE_MASTER_SWORD ||
+        randoItemId == RI_OOT_PROGRESSIVE_BGS) {
         randoItemId = Rando::ConvertItem(randoItemId, randoCheckId);
     }
     Rando::DrawResolvedItem(randoItemId, randoCheckId, actor);
@@ -2990,6 +3037,7 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
 #ifdef COMBO_BUILD
     if (MM_TryDrawNeiGi(randoItemId))
         return;
+    MM_NeiGiFallbackShimmer fallbackShimmer(randoItemId);
 #endif
     const int dungeonOwner = DungeonItem_GetOwner(randoItemId);
     if (dungeonOwner >= 0 &&
@@ -3429,8 +3477,19 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
         case RI_OOT_DEKU_SHIELD: // real OoT object_gi_shield_1 mesh (direct load; Hero's Shield brown fallback)
             DrawOotDekuShield();
             break;
-        // Third wave (final cross items). The 8 MM-native bottled contents (big poe / potions / bugs /
-        // fairy / fish / mushroom / poe) draw through the DEFAULT GetItem_Draw path via their MM GIDs.
+        case RI_OOT_BOTTLE_BIG_POE:
+        case RI_OOT_BOTTLE_BLUE_POTION:
+        case RI_OOT_BOTTLE_BUGS:
+        case RI_OOT_BOTTLE_FAIRY:
+        case RI_OOT_BOTTLE_FISH:
+        case RI_OOT_BOTTLE_GREEN_POTION:
+        case RI_OOT_BOTTLE_MAGIC_MUSHROOM:
+        case RI_OOT_BOTTLE_POE: {
+            uint8_t color[4];
+            MM_OotBottleShimmerColor(randoItemId, color);
+            DrawOotBottleWithShimmer(Rando::StaticData::Items[randoItemId].drawId, color);
+            break;
+        }
         case RI_OOT_ABILITY_CLIMB: // SoH ladder draw replica (object_mori_objects)
             DrawOotClimbLadder();
             break;
@@ -3719,11 +3778,13 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
             DrawOotNeiShadowCrystal();
             break;
         case RI_OOT_NEI_ROD_OF_SEASONS:
+            DrawOotNeiRodOfSeasons();
+            break;
         case RI_OOT_NEI_SEASON_SPRING:
         case RI_OOT_NEI_SEASON_SUMMER:
         case RI_OOT_NEI_SEASON_AUTUMN:
         case RI_OOT_NEI_SEASON_WINTER:
-            DrawOotNeiRodOfSeasons();
+            DrawOotNeiSeason(1 + randoItemId - RI_OOT_NEI_SEASON_SPRING);
             break;
         case RI_OOT_EXT_SHEIKAH_SHIELD:
             DrawOotExtSheikahShield();

@@ -1,6 +1,7 @@
 """Exercise production dungeon tint and bottle shimmer command streams."""
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import tempfile
@@ -43,6 +44,18 @@ def main():
         assert draw.index("DungeonItem_GetOwner") < draw.index("switch (randoItemId)")
         assert "GetItem_DrawDungeonItem" in draw
         print("PASS randomizer owner hook precedes dispatch")
+        # Compile the native dispatcher labels with the real item enum. This
+        # catches duplicate imported-season cases without the app's UI SDK.
+        dispatch = '#include "Rando/Types.h"\n'
+        for index, section in enumerate(draw.split('switch (randoItemId)')[1:]):
+            labels = re.findall(r'^\s*case (RI_\w+):', section, re.M)
+            dispatch += f'void CheckDispatch{index}(RandoItemId id) {{ switch(id) {{\n'
+            dispatch += '\n'.join(f'case {label}: break;' for label in labels) + '\n} }\n'
+        path = build / 'dispatch.cpp'
+        path.write_text(dispatch)
+        subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-DCOMBO_BUILD',
+                        '-I' + str(ROOT / 'mm/2s2h'), '-fsyntax-only', str(path)], check=True)
+        print("PASS real-enum native MM dispatcher compiles without duplicate season cases")
 
 
 if __name__ == "__main__":

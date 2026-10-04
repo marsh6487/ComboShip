@@ -1,0 +1,331 @@
+#include <cassert>
+#include <cstdint>
+#include <cstring>
+#include <iostream>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboItemEffectColors.h"
+#define RANDO_ENUM_BEGIN(x) enum x {
+#define RANDO_ENUM_ITEM(x) x,
+#define RANDO_ENUM_END(x) };
+#include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"
+using s16=int16_t;using s32=int32_t;using f32=float;
+struct Color_RGB8 {uint8_t r,g,b;};
+#define CVAR_COSMETIC(x) x
+#define CVAR_ENHANCEMENT(x) x
+bool changedMagic=false;
+int CVarGetInteger(const char* name,int value) {return !strcmp(name,"Consumable.Magic.Changed") ? changedMagic : value;}
+constexpr int GID_MAGIC_SMALL=31, GID_MAGIC_LARGE=32;
+Color_RGB8 CVarGetColor24(const char*,Color_RGB8 c) {return c;}
+Color_RGB8 liveMagic{12,210,250};
+Color_RGB8 CwLiveCosmeticColor(const char*,Color_RGB8) {return liveMagic;}
+#define PATH(name) const char* name="__OTR__" #name;
+PATH(object_toki_objects_DL_001BD0) PATH(gGiHeartBorderDL) PATH(gGiHeartContainerDL)
+PATH(gGiScaleDL) PATH(gGiScaleWaterDL) PATH(gSkeletonKeyDL) PATH(gTriforcePiece1DL)
+PATH(gTriforcePiece2DL) PATH(gTriforcePiece0DL) PATH(gTriforcePieceCompletedDL)
+PATH(gGiRocsFeatherDL) PATH(gGiGrabDL) PATH(gGiClimbDL) PATH(gGiCrawlDL)
+PATH(gGiOpenChestsDL) PATH(gGiFishingPoleDL)
+PATH(gStatDefenseDL) PATH(gStatSpeedDL) PATH(gStatPowerDL) PATH(gStatCrawlSpeedDL) PATH(gStatClimbSpeedDL) PATH(gStatPushSpeedDL)
+struct {struct {struct {struct {struct {int triforcePiecesCollected=0;} randomizer;} data;} quest;} ship;} gSaveContext;
+constexpr int TABLE_RANDOMIZER=1;
+void Randomizer_DrawCaneOfSomaria() {} void Randomizer_DrawCanePacci() {}
+void Randomizer_DrawCaneSomariaUpgrade() {} void Randomizer_DrawCanePacciUpgrade() {}
+void Randomizer_DrawCanePacciUltrahand() {} void Custom() {}
+struct GetItemEntry {int tableId,drawItemId,gid,itemId;void (*drawFunc)();};
+RandomizerGet concrete=RG_NONE;
+namespace Rando::StaticData {
+struct Name {std::string english="concrete award";};
+struct Item {RandomizerGet rg;std::shared_ptr<GetItemEntry> GetGIEntry(RandomizerGet* actual) {
+ *actual=concrete;return std::make_shared<GetItemEntry>(GetItemEntry{TABLE_RANDOMIZER,rg,rg==RG_MAGIC_STAT_UPGRADE?GID_MAGIC_LARGE:0,0,(rg==RG_MAGIC_STAT_UPGRADE || concrete==RG_KOKIRI_SWORD || concrete==RG_BIGGORON_SWORD)?nullptr:Custom});
+ } const Name& GetName() {static Name name;return name;}};
+Item RetrieveItem(RandomizerGet rg) {return {rg};}
+}
+int NeiGi_DescribeEntry(const GetItemEntry*,CwItemDrawInfo*) {return 0;}
+int GetItem_GetDrawTableEntry(int,void** dls,int,int*,float*,int*,uint8_t*) {
+ if(concrete!=RG_MAGIC_STAT_UPGRADE && concrete!=RG_KOKIRI_SWORD && concrete!=RG_BIGGORON_SWORD)return 0;
+ dls[0]=(void*)"__OTR__native_sword_row";return 1;
+}
+void GetItem_GetDrawSetupDLs(int,void**,void**) {} int GetItem_GetShimmerColor(s16,uint8_t* color) {memset(color,1,4);return concrete==RG_MAGIC_STAT_UPGRADE;}
+std::set<std::string> resources;
+bool ownerAlt=false;
+bool ownerPresent=true, hostAlt=false, magicResourcePresent=true, magicLoaded=false;
+bool magicAltPresent=true, magicAltLoads=true, magicAltMetaPresent=false;
+std::vector<std::string> loadedPaths;
+namespace Ship {
+ struct ResourceManager;
+ extern std::shared_ptr<ResourceManager> activeRm;
+ struct InitData {bool IsCustom;};
+ struct Resource {std::shared_ptr<InitData> init;std::shared_ptr<InitData> GetInitData(){return init;}};
+ struct Archive {bool HasFile(const std::string& path) {if(path=="alt/magic")return magicAltPresent;assert(path=="alt/magic.meta");return magicAltMetaPresent;}};
+ struct ResourceManager {
+  bool owner;bool IsAltAssetsEnabled() {return owner?ownerAlt:hostAlt;}
+  std::shared_ptr<Archive> GetArchiveManager() {assert(owner);return std::make_shared<Archive>();}
+  std::shared_ptr<Resource> LoadResource(const std::string& path,bool exact) {
+   // Skeleton factories resolve nested limbs through the active context RM,
+   // even when the root is loaded directly from the registered owner.
+   assert(activeRm.get()==this && "nested factory loads must use the root resource owner");
+   assert(owner && exact);magicLoaded=true;loadedPaths.push_back(path);
+   if(!magicResourcePresent || (path=="alt/magic" && !magicAltLoads))return nullptr;
+   return std::make_shared<Resource>(Resource{std::make_shared<InitData>(InitData{path=="alt/magic"})});
+  }
+ };
+ std::shared_ptr<ResourceManager> ownerRm=std::make_shared<ResourceManager>(ResourceManager{true});
+ std::shared_ptr<ResourceManager> hostRm=std::make_shared<ResourceManager>(ResourceManager{false});
+ std::shared_ptr<ResourceManager> activeRm=hostRm;
+ struct CrossRMRegistry {static std::shared_ptr<ResourceManager> Get(const char* game) {assert(!strcmp(game,"oot"));return ownerPresent?ownerRm:nullptr;}};
+ struct ResourceManagerScope {std::shared_ptr<ResourceManager> old;ResourceManagerScope(std::shared_ptr<ResourceManager> rm):old(activeRm) {activeRm=rm;}~ResourceManagerScope(){activeRm=old;}};
+}
+void* ResourceMgr_LoadGfxByName(const char*) {assert(Ship::activeRm==Ship::ownerRm);magicLoaded=true;return magicResourcePresent?static_cast<void*>(&magicLoaded):nullptr;}
+uint8_t ResourceGetIsCustomByName(const char*) {assert(magicLoaded && Ship::activeRm==Ship::ownerRm);return Ship::activeRm->IsAltAssetsEnabled();}
+#define COMBO_EXPORT
+/* OWNER_ALT_QUERY */
+/* OWNER_MAGIC_QUERY */
+int OOT_NeiResourceExists(const char* path) {return resources.count(path);}
+void ComboMaskShimmerColor(int,uint8_t* color) {color[0]=255;color[1]=255;color[2]=255;color[3]=255;}
+void Seasons_SeasonColor(uint8_t season,uint8_t* r,uint8_t* g,uint8_t* b) {
+ static const uint8_t colors[][3]={{6,235,64},{235,5,7},{235,166,6},{4,105,235}};
+ *r=colors[season][0];*g=colors[season][1];*b=colors[season][2];
+}
+/* OWNER_HELPERS */
+void OOT_DescribeHeartCosmetics(s16,CwItemDrawInfo*) {}
+/* OWNER_MAGIC_DESCRIPTOR */
+/* OWNER_DESCRIPTOR */
+/* HOST_INFO */
+RandomizerGet selected=RG_SHEIKAH_SLATE;
+namespace ComboRando {constexpr int GAME_OOT=0;struct ForeignItem {int itemGame=GAME_OOT;std::string itemName="item",fakeItemName;bool HasDisguise()const{return false;}};}
+using RandoCheckId=int;
+namespace Rando::MiscBehavior {const ComboRando::ForeignItem* MM_LookupForeign(int) {static ComboRando::ForeignItem item;return &item;}}
+int malformed=0;
+int32_t Describe(const char*,CwItemDrawInfo* out) {
+ int result=OOT_FillItemDrawInfo(selected,out);
+ out->stateDependent=OOT_DrawDependency(selected,*out);
+ if(malformed==1)out->opCount=CW_DRAW_MAX_OPS+1;
+ if(malformed==2)out->xluStartIndex=out->dlistCount+1;
+ if(malformed==3) {out->opCount=1;out->ops[0].op=CW_OP_DLIST;}
+ if(malformed==4)out->dlists[0]="__OTR__@invalid:model";
+ if(malformed==5)out->ops[0].a=-1;
+ if(malformed==6)out->ops[0].a=1.5f;
+ if(malformed==7)out->opCount=0;
+ if(malformed==8)out->ops[0].op=CW_OP_DLIST;
+ if(malformed==9)out->neiEffect=0;
+ if(malformed==10)out->neiEffect=6;
+ if(malformed==11) {out->dlistCount=1;out->dlists[0]="__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL";}
+ if(malformed==12)out->dlistCount=0;
+ if(malformed==13) {out->opCount=1;out->ops[0].op=CW_OP_SCALE;}
+ return result;
+}
+void* Combo_ResolveSym(const char*,const char* name) {return !strcmp(name,"OOT_GetItemDrawInfo")?(void*)Describe:nullptr;}
+const char* ComboInternRoutedPathOOT(const std::string& path) {static std::set<std::string> pool;return pool.insert(path).first->c_str();}
+enum class ComboForeignResolveOOT {Ok,Unknown,NotReady};
+struct Gfx {int stream;};Gfx opa[64],xlu[64];
+struct GraphicsContext {Gfx* o=opa;Gfx* x=xlu;} gfx;
+struct PlayState {struct {GraphicsContext* gfxCtx=&gfx;int frames=0;} state;int gameplayFrames=9;} play;
+PlayState* gPlayState=&play;
+/* HOST_RESOLVER */
+std::vector<std::pair<int,std::string>> submitted;
+std::vector<std::string> transforms;
+std::vector<std::vector<int>> flames;
+int matrixDepth=0;
+#define OPEN_DISPS(g) ((void)(g))
+#define CLOSE_DISPS(g) ((void)(g))
+#define POLY_OPA_DISP gfx.o
+#define POLY_XLU_DISP gfx.x
+#define MM_FOREIGN_PIN_OPA() ((void)0)
+#define MM_FOREIGN_PIN_XLU() ((void)0)
+#define MATRIX_FINALIZE_AND_LOAD(p,g) ((void)(p))
+#define MTXMODE_APPLY 1
+#define gSPDisplayList(p,dl) submitted.emplace_back((p)->stream,(const char*)(dl))
+#define gDPSetGrayscaleColor(p,...) ((void)(p))
+#define gSPGrayscale(p,...) ((void)(p))
+void Matrix_Push() {++matrixDepth;} void Matrix_Pop() {assert(matrixDepth>0);--matrixDepth;}
+void Matrix_Scale(float,float,float,int) {transforms.push_back("scale");}
+void Matrix_RotateYF(float,int) {transforms.push_back("spin");}
+void Matrix_RotateXF(float,int) {transforms.push_back("x");}
+void Matrix_RotateZF(float,int) {transforms.push_back("z");}
+void Matrix_Translate(float,float,float,int) {transforms.push_back("translate");}
+void Gfx_SetupDL25_Opa(GraphicsContext*) {} void Gfx_SetupDL25_Xlu(GraphicsContext*) {}
+void DrawOotSlateRuneFlame(uint8_t r,uint8_t g,uint8_t b) {assert(matrixDepth==0);flames.push_back({r,g,b});}
+constexpr float M_PIf=3.14159265358979323846f;
+const char* gIKAxeInlineDL="__native_inline_axe";
+/* HOST_AXE_DRAW */
+int nativeCalled=0;
+void DrawOotExtSpiritBreastplate() {nativeCalled=CW_OOT_EQUIP_SPIRIT_TUNIC;}
+void DrawOotExtChampionsTunic() {nativeCalled=CW_OOT_EQUIP_CHAMPIONS_TUNIC;}
+void DrawOotExtSagesTunic() {nativeCalled=CW_OOT_EQUIP_SAGES_TUNIC;}
+void DrawOotExtPegasusAnklet() {nativeCalled=CW_OOT_EQUIP_PEGASUS_BOOTS;}
+void DrawOotExtTrident() {nativeCalled=CW_OOT_EQUIP_TRIDENT;}
+void DrawOotExtClimbBoots() {nativeCalled=CW_OOT_EQUIP_CLIMB_BOOTS;}
+void DrawOotExtRocBoots() {nativeCalled=CW_OOT_EQUIP_ROC_BOOTS;}
+/* HOST_NATIVE_DRAW */
+/* HOST_CUSTOM_DRAW */
+int main() {
+ CwItemDrawInfo dependency{};
+ for(auto sword:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,
+                 RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD}) {
+  dependency.drawKind=CW_DRAW_KIND_NEI_GI;
+  assert(OOT_DrawDependency(sword,dependency)==2);
+  dependency.drawKind=CW_DRAW_KIND_CUSTOM_GI;
+  assert(OOT_DrawDependency(sword,dependency)==2);
+ }
+ for(auto progressive:{RG_PROGRESSIVE_KOKIRI_SWORD,RG_PROGRESSIVE_MASTER_SWORD,
+                       RG_PROGRESSIVE_BGS,RG_PROGRESSIVE_HAMMER}) {
+  dependency.drawKind=CW_DRAW_KIND_NEI_GI;
+  assert(OOT_DrawDependency(progressive,dependency)==1);
+ }
+ dependency={};dependency.drawKind=CW_DRAW_KIND_NEI_GI;
+ assert(OOT_DrawDependency(RG_SHEIKAH_SLATE,dependency)==2);
+ for(auto& cmd:opa)cmd.stream=0;
+ for(auto& cmd:xlu)cmd.stream=1;
+ ownerAlt=true;hostAlt=false;magicLoaded=false;
+ assert(OOT_MagicJarUsesCustomAsset("__OTR__magic")==1 && magicLoaded && Ship::activeRm==Ship::hostRm);
+ assert(loadedPaths==std::vector<std::string>({"alt/magic"}));
+ loadedPaths.clear();
+ ownerAlt=false;hostAlt=true;magicLoaded=false;
+ assert(OOT_MagicJarUsesCustomAsset("magic")==0 && magicLoaded && Ship::activeRm==Ship::hostRm);
+ assert(loadedPaths==std::vector<std::string>({"magic"}));
+ loadedPaths.clear();ownerAlt=true;magicAltPresent=false;
+ assert(OOT_MagicJarUsesCustomAsset("magic")==0 && loadedPaths==std::vector<std::string>({"magic"}));
+ loadedPaths.clear();magicAltMetaPresent=true;
+ assert(OOT_MagicJarUsesCustomAsset("magic")==1 && loadedPaths==std::vector<std::string>({"alt/magic"}));
+ loadedPaths.clear();magicAltMetaPresent=false;magicAltPresent=true;magicAltLoads=false;
+ assert(OOT_MagicJarUsesCustomAsset("magic")==0 && loadedPaths==std::vector<std::string>({"alt/magic","magic"}));
+ loadedPaths.clear();magicAltLoads=true;
+ magicResourcePresent=false;magicLoaded=false;
+ assert(OOT_MagicJarUsesCustomAsset("magic")==0 && magicLoaded);
+ ownerPresent=false;magicLoaded=false;
+ assert(OOT_MagicJarUsesCustomAsset("magic")==0 && !magicLoaded);
+ assert(OOT_NeiAltAssetsEnabled()==0);
+ ownerPresent=true;magicResourcePresent=true;ownerAlt=false;hostAlt=false;
+ assert(OOT_MagicJarUsesCustomAsset(nullptr)==0);
+ resources.insert("__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL");
+ CwItemDrawInfo out{};
+ assert(OOT_FillItemDrawInfo(RG_SHEIKAH_SLATE,&out)==1);
+ assert(!strcmp(out.dlists[0],"__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL"));
+ assert(out.scale==.35f);
+ selected=RG_SLATE_RUNE_STASIS;
+ ComboForeignDrawInfoOOT info;
+ assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+ MM_DrawForeignCustomGi(&info);
+ assert(submitted.size()==1 && submitted[0].second=="__OTR__@oot:objects/object_nei_sheikah_slate/gNeiSheikahSlateDL");
+ assert(flames==std::vector<std::vector<int>>({{250,200,70}}) && matrixDepth==0);
+ out={}; assert(OOT_FillItemDrawInfo(RG_DEFENSE_UPGRADE,&out)==1);
+ assert(out.dlists[0]==gStatDefenseDL);
+ assert(out.itemShimmer && out.itemShimmerColor[2]==255 && out.itemShimmerColor[0]==64);
+ out={}; assert(OOT_FillItemDrawInfo(RG_POWER_UPGRADE,&out)==1);
+ assert(out.dlists[0]==gStatPowerDL);
+ assert(out.itemShimmer && out.itemShimmerColor[0]==255 && out.itemShimmerColor[2]==64);
+
+ // Individual seasons resolve without a rod resource, and carry no model DL.
+ for(auto season:{RG_SEASON_SPRING,RG_SEASON_SUMMER,RG_SEASON_AUTUMN,RG_SEASON_WINTER}) {
+  selected=season;info={};
+  assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+  assert(info.drawKind==36 && info.neiEffect==1+season-RG_SEASON_SPRING);
+  assert(info.count==0 && info.dls[0]==nullptr && info.opCount==0);
+  assert(info.primColorXlu[3]==0);
+ }
+ resources.insert("__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL");
+ selected=RG_ROD_OF_SEASONS;info={};
+ assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+ assert(info.neiEffect==5 && info.count==1 && info.dls[0] && info.scale==.35f);
+ for(malformed=9;malformed<=13;++malformed) {
+  selected=malformed==12 ? RG_ROD_OF_SEASONS : RG_SEASON_SPRING;info={};
+  assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Unknown);
+ }
+ malformed=0;
+ const char* wandPaths[][2]={
+  {"sand_rod","SandRod"},{"tornado_rod","TornadoRod"},{"water_rod","WaterRod"},
+  {"meteor_rod","MeteorRod"},{"storm_rod","StormRod"},{"shadow_scepter","ShadowScepter"}};
+ for(int i=0;i<6;++i) {
+  const std::string stem=std::string("__OTR__objects/object_nei_wand_")+wandPaths[i][0]+"/gNei"+wandPaths[i][1];
+  resources.insert(stem+"DL");resources.insert(stem+"XluDL");
+  selected=static_cast<RandomizerGet>(RG_WAND_SAND_ROD+i);info={};
+  assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+  assert(info.count==2 && info.xluStart==1);
+  gfx.o=opa;gfx.x=xlu;submitted.clear();transforms.clear();flames.clear();
+  MM_DrawForeignCustomGi(&info);
+  assert(submitted.size()==2 && submitted[0].first==0 && submitted[1].first==1);
+  assert(matrixDepth==0);
+  resources.erase(stem+"XluDL");out={};
+  assert(OOT_FillItemDrawInfo(selected,&out)==0);
+ }
+ const RandomizerGet tiers[]={RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_GREAT_FAIRY_SWORD};
+ for(auto tier:tiers) {
+  concrete=tier;selected=RG_PROGRESSIVE_KOKIRI_SWORD;info={};
+  assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+  assert(std::string(info.dls[0]).starts_with("__OTR__@mm:objects/object_gi_sword_"));
+  assert(info.count==2 && info.xluStart==(tier==RG_GREAT_FAIRY_SWORD?1:-1));
+  assert(info.resolvedName=="concrete award");
+ }
+ ownerAlt=false;
+ for(auto base:{RG_KOKIRI_SWORD,RG_BIGGORON_SWORD}) {
+  concrete=base;selected=RG_PROGRESSIVE_KOKIRI_SWORD;out={};
+  assert(OOT_FillItemDrawInfo(selected,&out)==1 && out.itemShimmer==1);
+  assert(out.itemShimmerColor[3]==255);
+ }
+ resources.insert("__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL");
+ concrete=RG_TRUE_MASTER_SWORD;selected=RG_PROGRESSIVE_MASTER_SWORD;
+ ownerAlt=true;info={};
+ assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+ assert(std::string(info.dls[0])=="__OTR__@oot:alt/objects/object_custom_equip/gCustomMasterSwordDL");
+ assert(info.opCount==2 && info.ops[0].op==CW_OP_ROTATE_X && info.ops[1].op==CW_OP_ROTATE_Z);
+ ownerAlt=false;info={};
+ assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+ assert(info.drawKind==CW_DRAW_KIND_MASTER_SWORD && info.primColorXlu[0]==120);
+ concrete=RG_NONE;ownerAlt=false;
+ const std::pair<RandomizerGet,const char*> direct[] = {
+  {RG_EXT_CANE_OF_BYRNA,"__OTR__objects/object_somaria/g_byrna_cane_give_dl"},
+  {RG_EXT_MAGIC_CAPE,"__OTR__objects/object_nei_magic_cape/gNeiMagicCapeDL"},
+  {RG_ULTRASHOT,"__OTR__objects/object_gi_hookshot/gGiLongshotDL"},
+  {RG_NET,"__OTR__objects/object_nei_net/g_net_dl"},
+ };
+ resources.insert("__OTR__objects/object_nei_net/g_net_xlu_dl");
+ resources.insert("__OTR__objects/object_nei_magic_cape/gNeiMagicCapeWaveDL");
+ for(auto [rg,path]:direct) {
+  resources.insert(path);selected=rg;info={};
+  assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+ }
+ selected=RG_EXT_MAGIC_CAPE;info={};
+ assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+ for(int frame:{0,8}) {
+  play.gameplayFrames=frame;gfx.o=opa;gfx.x=xlu;submitted.clear();
+  MM_DrawForeignCustomGi(&info);
+  assert(submitted.size()==1);
+  assert(submitted[0].second==std::string("__OTR__@oot:objects/object_nei_magic_cape/")+
+   (frame?"gNeiMagicCapeWaveDL":"gNeiMagicCapeDL"));
+ }
+ concrete=RG_NONE;
+ for(auto rg:{RG_IRON_KNUCKLE_AXE,RG_EXT_TRIDENT,RG_EXT_SPIRIT_BREASTPLATE,RG_EXT_CHAMPIONS_TUNIC,
+              RG_EXT_WATER_DRAGON_SCALE,RG_EXT_PEGASUS_ANKLET,RG_EXT_CLIMB_BOOTS,RG_EXT_ROC_BOOTS}) {
+  selected=rg;info={};assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+  nativeCalled=0;gfx.o=opa;gfx.x=xlu;submitted.clear();transforms.clear();
+  MM_DrawForeignNativeEquipment(&info);
+  if(rg==RG_IRON_KNUCKLE_AXE) {
+   assert(submitted.size()==1 && submitted[0].second=="__native_inline_axe");
+   assert(transforms==std::vector<std::string>({"x","scale","translate"}));
+  } else assert(nativeCalled==static_cast<int>(info.ops[0].a));
+  assert(matrixDepth==0);
+ }
+ selected=RG_IRON_KNUCKLE_AXE;concrete=RG_NONE;
+ for(malformed=5;malformed<=8;++malformed) {
+  info={};assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Unknown);
+ }
+ malformed=0;
+ ownerAlt=true;concrete=RG_TRUE_MASTER_SWORD;selected=RG_PROGRESSIVE_MASTER_SWORD;
+ for(malformed=1;malformed<=4;++malformed) {
+  info={};assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Unknown);
+ }
+ malformed=0;ownerAlt=false;
+ concrete=RG_NONE;resources.clear();out={};
+ assert(OOT_FillItemDrawInfo(RG_SHEIKAH_SLATE,&out)==0);
+ for(auto rg:{RG_OPEN_CHEST,RG_CRAWL,RG_CLIMB,RG_POWER_BRACELET}) {out={};assert(OOT_FillItemDrawInfo(rg,&out)==1);}
+ concrete=RG_MAGIC_STAT_UPGRADE; changedMagic=true; out={};
+ assert(OOT_FillItemDrawInfo(RG_MAGIC_STAT_UPGRADE,&out)==1 && out.itemShimmer && out.stateDependent==2);
+ assert(out.itemShimmerColor[0]==12 && out.itemShimmerColor[1]==210 && out.itemShimmerColor[2]==250);
+ liveMagic={240,40,190}; out={}; assert(OOT_FillItemDrawInfo(RG_MAGIC_STAT_UPGRADE,&out)==1);
+ assert(out.itemShimmerColor[0]==240 && out.itemShimmerColor[1]==40 && out.itemShimmerColor[2]==190);
+ std::cout<<"PASS production static custom GI recipes, rune flame, native MM tiers and resolved awards\n";
+}

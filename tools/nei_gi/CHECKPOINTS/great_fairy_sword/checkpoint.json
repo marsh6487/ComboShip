@@ -1,0 +1,60 @@
+{
+  "resource_count": 11,
+  "vertex_records": 5138,
+  "vertex_loads": 226,
+  "slug": "great_fairy_sword",
+  "name": "Great Fairy Sword",
+  "entry": "objects/nei_gi_redesign/great_fairy_sword/gi_dl",
+  "draw_scale": 1.0,
+  "matrix_scale": 0.0412445068359375,
+  "triangles": 4430,
+  "bounds_author": [
+    [
+      -22.0,
+      -42.3125,
+      -3.375
+    ],
+    [
+      22.0,
+      154.5,
+      3.375
+    ]
+  ],
+  "markers": {
+    "visual_review_candidate": true,
+    "runtime_tested": false,
+    "preview_front_angle": 16,
+    "preview_back_angle": 164,
+    "guard_baseline_y": 0,
+    "original_gi_vertex_data_available": false,
+    "proportion_reference": "Secondary stock held geometry; absolute get-item dimensions are approximate.",
+    "imported_approved_model": false
+  },
+  "notes": [
+    "Rebuilt rose-metal blade, lilac lily fittings, emerald field and sculpted leaves/floral ornament.",
+    "All blade, handle and ornament surfaces are opaque; no enlarged low-resolution black/green motif is used.",
+    "User-requested long two-handed get-item silhouette; botanical relief anchors and grip leaves follow the new part dimensions.",
+    "Blade, guard and grip ratios follow secondary stock held geometry; absolute get-item size is approximate, not measured from Nintendo GI vertices."
+  ],
+  "runtime_tested": false,
+  "source_provenance": {
+    "bundle": "NEI_Sword_GI_Latest_20261003",
+    "art_checkpoint": "dd66ee65",
+    "authoring_recipe": "../../SOURCE/forged_swords/SOURCE/sword_forged.py",
+    "glb_sha256": "50cab76ab68bd38161a97085b2b20c4d71390a502e75cb7700db3530a2037e7f",
+    "approved_glb_sha256": "de9f1d992bb5c453807241ec6593ad68a5c4cf21c3ac8195c55fcdd6472c997d",
+    "resource_sha256": {
+      "gi_dl": "cd3ca964688e60f2aaccd2d7f6bb2e712014204eacc8a9d81a9cb2540f5b46b4",
+      "gold_edge_tex": "d499b1a4d2f97541a6805df075e60932c1a08eecee2110c1cf0a695830e8b406",
+      "green_leather_tex": "538b5e1709ac4ebf1a06fd7f211fde057e775436b3c646a2339894229519a28b",
+      "jade_edge_tex": "0625fc019defd9fb62e45ea87044639a23483312761e17e4eddccdeb4923d838",
+      "jade_tex": "0c959cf2bde5589753cbf68f24fd1dd4c1816f28fce80fcd566eabd280493ac1",
+      "mesh_opa_vtx": "27bf4edf9a901eafdb07fc3bb60ece78243a7b1f44d87b820aff3de12e7015dd",
+      "rose_edge_tex": "02bb3e14419ad4cab65d6cb8ea88cd9348f321b2b78190ecd3b6caa879955fa7",
+      "rose_tex": "dd2dc652a89b76656e3e9b6b8ade4262e273fb265dfb1c474463516dcd11fda4",
+      "scale_mtx": "bba652b1cf8f43eb8f04a6fdc3fa639db60eab659614e7fcbef2bbac0943a4ad",
+      "violet_edge_tex": "c3a807d4ae7b3b3e471dae1ba2768dde0bb9331ba956ae21497d52317fa99866",
+      "violet_tex": "6c1d1fdf0353b6ba9379f79c511607e66c55955ec2f01649e7a43c3d36f88205"
+    }
+  }
+}

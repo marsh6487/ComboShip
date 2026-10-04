@@ -54,6 +54,11 @@ class Item {
 #ifdef COMBO_BUILD
     // actualOut: resolved RandomizerGet when a progressive placeholder converted, else untouched.
     std::shared_ptr<GetItemEntry> GetGIEntry(RandomizerGet* actualOut = nullptr) const;
+    // Read the exact table row after the finder has frozen its receipt identity.
+    // This never re-resolves a chain against the donor's current inventory.
+    std::shared_ptr<GetItemEntry> GetGIEntryUnresolved() const {
+        return giEntry;
+    }
 #else
     std::shared_ptr<GetItemEntry> GetGIEntry() const;
 #endif

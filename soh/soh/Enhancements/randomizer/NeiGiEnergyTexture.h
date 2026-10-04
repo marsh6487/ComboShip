@@ -4,6 +4,25 @@
 #include <algorithm>
 
 namespace NeiGi {
+using SeasonSunRayTexels = std::array<uint8_t, 32 * 32>;
+inline const SeasonSunRayTexels& SeasonSunRayTexture() {
+    // One immutable 1 KiB I8 tile; deferred display lists retain its address.
+    // S repeats one ray, T tapers its tip. Animation scrolls the native tile,
+    // never rewrites texture bytes or uses a scene-owned weather resource.
+    alignas(8) static const SeasonSunRayTexels texels = [] {
+        SeasonSunRayTexels result{};
+        for (int y = 0; y < 32; ++y) {
+            const float radius = y / 31.f;
+            for (int x = 0; x < 32; ++x) {
+                const float crest = .5f + .5f * std::cos(Tau * x / 32);
+                const float value = std::pow(crest, 2 + 5 * radius) * std::pow(1 - radius, 1.25f);
+                result[y * 32 + x] = uint8_t(std::lround(255 * value));
+            }
+        }
+        return result;
+    }();
+    return texels;
+}
 constexpr size_t OrbTextureSize = 64, OrbFrameCount = 48;
 using OrbTexels = std::array<uint8_t, OrbTextureSize * OrbTextureSize>;
 

@@ -2633,6 +2633,16 @@ GetItemEntry sGetItemTable[GI_MAX - 1] = {
     // #endregion
 };
 
+// Read the same native receipt ID used by Player_Action_GetItem, validating
+// both namespaces. Rando aliases sometimes reuse a GI only for its model.
+u16 Player_GetItemReceiptTextId(s16 getItemId, s16 itemId) {
+    if (getItemId <= GI_NONE || getItemId >= GI_MAX || getItemId == GI_SHIP || itemId == ITEM_NONE) {
+        return 0;
+    }
+    const GetItemEntry* entry = &sGetItemTable[getItemId - 1];
+    return entry->itemId == itemId ? entry->textId : 0;
+}
+
 // Player_UpdateCurrentGetItemDrawId?
 void func_8082ECE0(Player* this) {
     GetItemEntry* giEntry = &sGetItemTable[this->getItemId - 1];

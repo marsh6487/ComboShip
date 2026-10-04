@@ -6,10 +6,14 @@
 
 #include <ship/controller/controldeck/ControlDeck.h>
 #ifdef COMBO_BUILD
+#include "ComboExport.h"
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
 #endif
 #include <string>
+#include <cmath>
+#include <cstring>
+#include <cstdint>
 
 #include "soh/SohGui/UIWidgets.hpp"
 #include "soh/SohGui/SohMenu.h"
@@ -540,6 +544,73 @@ void ResetPositionAll() {
 }
 
 int hue = 0;
+
+// Resource-only foreign GI cosmetic sampler. Preserve the editor's own hue, ordering,
+// speed and sync semantics without running its dormant frame or applying unrelated patches.
+#ifdef COMBO_BUILD
+static bool sGiCosmeticFrameSet = false;
+static uint32_t sGiCosmeticFrame = 0;
+static uint64_t sGiCosmeticHue = 0;
+static int sGiNativeHueSnapshot = 0;
+
+extern "C" COMBO_EXPORT void OOT_SetGiCosmeticFrame(uint32_t hostFrame) {
+    if (!sGiCosmeticFrameSet || hue != sGiNativeHueSnapshot) {
+        sGiCosmeticFrameSet = true;
+        sGiCosmeticFrame = hostFrame;
+        sGiNativeHueSnapshot = hue;
+        sGiCosmeticHue = hue;
+        return;
+    }
+    if (hostFrame == sGiCosmeticFrame)
+        return;
+    uint64_t delta = hostFrame > sGiCosmeticFrame ? hostFrame - sGiCosmeticFrame : 1;
+    sGiCosmeticFrame = hostFrame;
+    const float speed = CVarGetFloat(CVAR_COSMETIC("RainbowSpeed"), 0.6f);
+    if (!(speed > 0.0f) || !std::isfinite(speed))
+        return;
+    const uint64_t period = static_cast<uint64_t>(std::ceil(360 * speed));
+    // The native tick resets an out-of-range hue after its next increment, including
+    // when the editor changes speed. Then each complete period wraps to zero.
+    if (sGiCosmeticHue >= period) {
+        sGiCosmeticHue = 0;
+        --delta;
+    }
+    sGiCosmeticHue = (sGiCosmeticHue + delta) % period;
+}
+
+extern "C" COMBO_EXPORT void OOT_SampleGiCosmeticColor(const char* valueCvar, uint8_t fallbackR, uint8_t fallbackG,
+                                                       uint8_t fallbackB, uint8_t* outRGB) {
+    if (!outRGB)
+        return;
+    Color_RGB8 color = { fallbackR, fallbackG, fallbackB };
+    if (valueCvar)
+        color = CVarGetColor24(valueCvar, color);
+    const float speed = CVarGetFloat(CVAR_COSMETIC("RainbowSpeed"), 0.6f);
+    if (valueCvar && speed > 0.0f && std::isfinite(speed)) {
+        int index = 0;
+        for (const auto& [id, option] : cosmeticOptions) {
+            if (std::strcmp(valueCvar, option.valuesCvar) == 0 && option.supportsRainbow &&
+                CVarGetInteger(option.rainbowCvar, 0)) {
+                const double frequency = 2 * M_PI / (360 * speed);
+                const uint64_t phase = sGiCosmeticFrameSet ? sGiCosmeticHue : hue;
+                // Equivalent to the native uint8 wrap, with a defined signed conversion
+                // before adding 128 (the final channel is always in the range 1..255).
+                color.r = static_cast<uint8_t>(static_cast<int>(sin(frequency * (phase + index)) * 127) + 128);
+                color.g =
+                    static_cast<uint8_t>(static_cast<int>(sin(frequency * (phase + index) + 2 * M_PI / 3) * 127) + 128);
+                color.b =
+                    static_cast<uint8_t>(static_cast<int>(sin(frequency * (phase + index) + 4 * M_PI / 3) * 127) + 128);
+                break;
+            }
+            if (!CVarGetInteger(CVAR_COSMETIC("RainbowSync"), 0))
+                index += static_cast<int>(60 * speed);
+        }
+    }
+    outRGB[0] = color.r;
+    outRGB[1] = color.g;
+    outRGB[2] = color.b;
+}
+#endif
 
 // Runs every frame to update rainbow hue, a potential future optimization is to only run this once or twice a second
 // and increase the speed of the rainbow hue rotation.

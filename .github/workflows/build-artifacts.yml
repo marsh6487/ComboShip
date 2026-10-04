@@ -155,6 +155,30 @@ jobs:
         run: |
           python3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py
           python3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py --sanitize
+          python3 -B scripts/diagnostics/run_boss_soul_model_tests.py
+          python3 -B scripts/diagnostics/run_boss_soul_model_tests.py --sanitize
+          python3 -B scripts/diagnostics/run_barinade_syntax_tests.py
+          python3 -B scripts/diagnostics/run_twinrova_gi_replacement_tests.py
+          python3 -B scripts/diagnostics/run_twinrova_gi_replacement_tests.py --sanitize
+          python3 -B scripts/diagnostics/run_mm_oot_boss_import_bridge_tests.py
+          python3 -B scripts/diagnostics/run_mm_oot_boss_import_bridge_tests.py --sanitize
+
+      - name: Static OoT equipment GI bridge
+        run: |
+          python3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py
+          python3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py --sanitize
+
+      - name: Foreign OoT magic jar cosmetic presentation
+        run: |
+          python3 -B scripts/diagnostics/run_foreign_magic_jar_tests.py
+          ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_foreign_magic_jar_tests.py --sanitize
+
+      - name: Foreign OoT key and heart cosmetics
+        run: |
+          python3 -B scripts/diagnostics/run_oot_key_cosmetic_bridge_tests.py
+          ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_oot_key_cosmetic_bridge_tests.py --sanitize
+          python3 -B scripts/diagnostics/run_foreign_heart_cosmetic_tests.py
+          ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_foreign_heart_cosmetic_tests.py --sanitize
 
       - name: Great Spin GI presentation in both engines
         run: |
