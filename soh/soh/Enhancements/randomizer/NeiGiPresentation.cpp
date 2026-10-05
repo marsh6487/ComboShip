@@ -3,6 +3,7 @@
 #include "NeiGiEnergyTexture.h"
 #include "NeiGiRender.h"
 #include "NeiGiShopFit.h"
+#include "ComboSwordGiFit.h"
 #include "ComboSongDrawOOT.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
 #include <algorithm>
@@ -767,8 +768,12 @@ bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available
 
 } // namespace
 
-static void NeiGi_DrawSelectedSword(PlayState* play, const char* path) {
+#include "ComboDinSwordGi.h"
+
+static void NeiGi_DrawSelectedSword(PlayState* play, const char* path, bool shop = false, bool fit = true) {
     OPEN_DISPS(play->state.gfxCtx);
+    if (fit)
+        ComboSwordGi_ApplyFit("oot", path, .04f, 1.8f, shop);
     Matrix_RotateY(Spin(play), MTXMODE_APPLY);
     // Standalone donor blades point along +X. Z alone turns that axis into
     // upright +Y; an extra X quarter turn would lay it flat in XZ.
@@ -782,6 +787,7 @@ static void NeiGi_DrawSelectedSword(PlayState* play, const char* path) {
               G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
     gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, path, 0, G_DL_PUSH);
     CLOSE_DISPS(play->state.gfxCtx);
+    ComboDinSwordGi_DrawLayers(play, "oot", path);
 }
 
 // OPEN_DISPS declares interpolation callbacks with the enclosing C linkage.
@@ -789,10 +795,6 @@ extern "C" {
 #include "NeiGiMeshRenderer.inc"
 
 static void NeiGi_DrawSong(PlayState* play, int song) {
-    if (song == CW_SONG_STORMS) {
-        NeiGi_DrawSeasonOverlay(play, 6, nullptr);
-        return;
-    }
     uint8_t color[4];
     if (!ComboSongShimmerColor(song, color))
         return;
@@ -803,12 +805,19 @@ static void NeiGi_DrawSong(PlayState* play, int song) {
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
-    gDPSetGrayscaleColor(POLY_XLU_DISP++, color[0], color[1], color[2], color[3]);
-    gSPGrayscale(POLY_XLU_DISP++, true);
+    const char* colorDl = ComboSongOotColorDlist(song);
+    if (colorDl) {
+        gSPGrayscale(POLY_XLU_DISP++, false);
+        gDma1p(POLY_XLU_DISP++, G_DL_OTR_FILEPATH, colorDl, 0, G_DL_PUSH);
+    } else {
+        gDPSetGrayscaleColor(POLY_XLU_DISP++, color[0], color[1], color[2], color[3]);
+        gSPGrayscale(POLY_XLU_DISP++, true);
+    }
     gDma1p(POLY_XLU_DISP++, G_DL_OTR_FILEPATH, gGiSongNoteDL, 0, G_DL_PUSH);
     gSPGrayscale(POLY_XLU_DISP++, false);
     CLOSE_DISPS(play->state.gfxCtx);
-    NeiGi_DrawSongOverlay(play, song, nullptr);
+    if (ComboSongHasOverlay(song))
+        NeiGi_DrawSongOverlay(play, song, nullptr);
 }
 
 static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool upgraded, bool legacy) {
@@ -818,7 +827,8 @@ static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool up
         NeiGi_DrawSeasonOverlay(play, 5, nullptr);
     const bool shimmer = CVarGetInteger(CVAR_NEI_GI_EFFECTS, 0) != 0;
     const bool energy =
-        upgraded && (NeiGi::IsRod(item.effect) || NeiGi::IsSpell(item.effect) || NeiGi::IsSpecial(item.effect));
+        (upgraded || NeiGi::IsSword(item.effect)) &&
+        (NeiGi::IsRod(item.effect) || NeiGi::IsSpell(item.effect) || NeiGi::IsSpecial(item.effect));
     if (!shimmer && !energy && !item.alwaysShimmer)
         return;
     Matrix_Push();
@@ -874,7 +884,11 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     if (!arena)
         return true;
     Matrix_Push();
-    if (authored) {
+    if (selectedSword) {
+        ComboSwordGi_ApplyFit("oot", selectedSword, .04f, 1.8f, shop);
+    } else if (upgraded && !authored && NeiGi::IsSword(item->effect)) {
+        ComboSwordGi_ApplyFit("oot", item->opaque, item->scale, 0.f, shop);
+    } else if (authored) {
         if (const auto* bounds = NeiGi::FindFrameBounds(item->opaque)) {
             const auto fit = NeiGi::FrameFit(*bounds, item->scale, shop);
             Matrix_Translate(0, fit.lift, 0, MTXMODE_APPLY);
@@ -889,7 +903,7 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     if (selectedSword) {
         if (item->effect == Kind::SwordAura)
             Randomizer_DrawTrueMasterSwordFlame(play);
-        NeiGi_DrawSelectedSword(play, selectedSword);
+        NeiGi_DrawSelectedSword(play, selectedSword, shop, false);
     } else if (upgraded) {
         OPEN_DISPS(play->state.gfxCtx);
         Matrix_Scale(item->scale, item->scale, item->scale, MTXMODE_APPLY);
@@ -1004,14 +1018,16 @@ extern "C" int32_t NeiGi_DescribeEntry(const GetItemEntry* entry, CwItemDrawInfo
     if (const int song = SongForEntry(entry); song >= 0) {
         if (!out)
             return 0;
-        if (song == CW_SONG_STORMS)
-            return NeiGi_FillSeasonInfo(6, out);
         out->drawKind = CW_DRAW_KIND_SONG_GI;
         out->neiEffect = song;
-        out->dlists[0] = gGiSongNoteDL;
-        out->dlistCount = 1;
+        const char* colorDl = ComboSongOotColorDlist(song);
+        out->dlistCount = 0;
+        if (colorDl)
+            out->dlists[out->dlistCount++] = colorDl;
+        out->dlists[out->dlistCount++] = gGiSongNoteDL;
         out->xluStartIndex = 0;
-        out->itemShimmer = ComboSongShimmerColor(song, out->itemShimmerColor);
+        out->itemShimmer = ComboSongHasOverlay(song);
+        ComboSongShimmerColor(song, out->itemShimmerColor);
         std::memcpy(out->primColorXlu, out->itemShimmerColor, 4);
         return 1;
     }

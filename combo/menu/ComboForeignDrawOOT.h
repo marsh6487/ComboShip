@@ -21,6 +21,8 @@
 #include "ComboSpinAttackGi.h"
 #include "ComboMaskShimmer.h"
 #include "ComboFairyBottle.h"
+#include "ComboSwordGiFit.h"
+#include "ComboDinSwordGi.h"
 #include "ComboFairyBottleDraw.h"
 #include "soh/Enhancements/randomizer/NeiGiRender.h"
 
@@ -529,11 +531,23 @@ inline bool OOT_DrawForeignFairyContainer(PlayState* play, const ComboForeignDra
     if (ComboFairyBottle_IsBlueFireShell(info->dls[0])) {
         Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
     } else {
-        Matrix_Mult(&contentsMtx, MTXMODE_APPLY);
+        // The native billboard matrix sizes a sprite, not an actor skeleton.
+        // Keep its anchor for the VFX; apply its full scale only to fallback contents.
+        Matrix_Translate(contentsMtx.xw, contentsMtx.yw, contentsMtx.zw, MTXMODE_APPLY);
     }
     Matrix_ReplaceRotation(&play->billboardMtxF);
     Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
     if (!ComboFairyBottle_DrawVfx(play)) {
+        Matrix_Pop();
+        Matrix_Push();
+        Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
+        if (ComboFairyBottle_IsBlueFireShell(info->dls[0])) {
+            Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
+        } else {
+            Matrix_Mult(&contentsMtx, MTXMODE_APPLY);
+        }
+        Matrix_ReplaceRotation(&play->billboardMtxF);
+        Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
         COMBO_FOREIGN_MTX(POLY_XLU_DISP++);
         gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[2]);
     }
@@ -633,7 +647,7 @@ inline void OOT_DrawForeignMasterSword(PlayState* play, const ComboForeignDrawIn
 
 // Selected standalone/Din GI recipe. Match MM_DrawForeignCustomGi's signed
 // spin, hand-local transforms, split passes and independent optional flame.
-inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo* info) {
+inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo* info, bool shop = false) {
     OOT_DrawForeignWeaponFlame(play, info->primColorXlu);
     Matrix_Push();
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
@@ -703,7 +717,11 @@ inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo*
                 gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
         }
     }
+    CLOSE_DISPS(play->state.gfxCtx);
+    if (info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z)
+        ComboDinSwordGi_DrawLayers(play, "oot", info->dls[0]);
     Matrix_Pop();
+    OPEN_DISPS(play->state.gfxCtx);
     gSPGrayscale(POLY_OPA_DISP++, false);
     gSPGrayscale(POLY_XLU_DISP++, false);
     OOT_FOREIGN_PIN_OPA();
@@ -839,6 +857,8 @@ inline void OOT_DrawForeignSimple(PlayState* play, const ComboForeignDrawInfo* i
     int32_t xs = (info->xluStart < 0 || info->xluStart > n) ? n : info->xluStart;
 
     OPEN_DISPS(play->state.gfxCtx);
+    if (info->drawKind == CW_DRAW_KIND_SONG_GI)
+        gSPGrayscale(POLY_XLU_DISP++, false);
 
     // ComboShip: replicate MM's AnimatedMat_Draw segment bind before the DLs (Moon's Tear).
     int32_t matSegs[kMaxMatEntries];
@@ -933,6 +953,15 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         return;
     }
 
+    const bool fitSword = info->drawKind == CW_DRAW_KIND_CUSTOM_GI && info->count > 0 &&
+                          info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
+                          NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
+    if (fitSword) {
+        Matrix_Push();
+        ComboSwordGi_ApplyFit("oot", info->dls[0], info->scale,
+                             info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z ?
+                                 info->ops[0].a * (3.14159265358979323846f / 32768.f) : 0.f, shop);
+    }
     // Authored NEI recipes carry their palette in neiEffect and render their
     // shimmer inside the shared presentation. Other recipes use the overlay.
     const bool overlayShimmer = info->itemShimmer && info->drawKind != CW_DRAW_KIND_NEI_GI;
@@ -956,7 +985,7 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
             OOT_DrawForeignMasterSword(play, info);
             break;
         case CW_DRAW_KIND_CUSTOM_GI:
-            OOT_DrawForeignCustomGi(play, info);
+            OOT_DrawForeignCustomGi(play, info, shop);
             break;
         case CW_DRAW_KIND_DEKU_NUTS:
             OOT_DrawForeignDekuNuts(play, info);
@@ -1009,6 +1038,10 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
     }
     if (overlayShimmer) {
         Matrix_Pop();
+        if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
+            NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
+            NeiGi_DrawMesh(play, NeiGi::SampleSpecial(static_cast<NeiGi::Kind>(info->neiShimmer - 1),
+                                                         play->gameplayFrames, NeiGi_CameraBasis(play)));
         if (info->drawKind == CW_DRAW_KIND_SONG_GI)
             NeiGi_DrawSongOverlay(play, info->neiEffect, "mm");
         else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1)
@@ -1020,6 +1053,8 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         else
             ComboDrawMaskShimmer(play, nullptr, info->itemShimmerColor, "mm");
     }
+    if (fitSword)
+        Matrix_Pop();
 }
 
 // EnGirlA's sentinel callback has no local Presentation binding. Fit only

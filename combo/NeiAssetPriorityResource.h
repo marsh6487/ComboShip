@@ -1,8 +1,11 @@
 #pragma once
 #include "NeiAssetPriority.h"
+#include "NeiGiModelBounds.h"
+#include "DinSwordGiResources.h"
 #include <ship/Context.h>
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManager.h>
+#include <ship/resource/ResourceManagerScope.h>
 #include <ship/resource/archive/Archive.h>
 #include <ship/resource/archive/ArchiveManager.h>
 
@@ -82,5 +85,104 @@ inline bool IsModAsset(const char* nativeGame, const char* game, const char* pat
                             const auto archive = archives->GetArchiveFromFile(key);
                             return archive ? archive->GetPath() : std::string{};
                         });
+}
+// XML model replacements remain custom after users consolidate them into a
+// companion/base O2R. Archive provenance alone cannot identify that geometry.
+inline bool IsCustomAsset(const char* nativeGame, const char* game, const char* path) {
+    if (!game || !path)
+        return false;
+    std::string resource = path;
+    if (resource.compare(0, 7, "__OTR__") == 0)
+        resource.erase(0, 7);
+    std::string ownerGame = game;
+    if (!resource.empty() && resource[0] == '@') {
+        const auto colon = resource.find(':');
+        if (colon == std::string::npos)
+            return false;
+        ownerGame = resource.substr(1, colon - 1);
+        resource.erase(0, colon + 1);
+    }
+    auto owner = Ship::CrossRMRegistry::Get(ownerGame);
+#ifndef COMBO_BUILD
+    if (!owner && ownerGame == nativeGame) {
+        const auto context = Ship::Context::GetRawInstance();
+        if (context)
+            owner = context->GetResourceManager();
+    }
+#else
+    (void)nativeGame;
+#endif
+    if (!owner)
+        return false;
+    Ship::ResourceManagerScope scope(owner);
+    const auto model = owner->LoadResource(resource);
+    return model && model->GetInitData() && model->GetInitData()->IsCustom;
+}
+inline bool GetGiModelFit(const char* nativeGame, const char* game, const char* path, float scale, float tilt,
+                          bool shop, float fit[2], int dinProfile = 0) {
+    if (!game || !path || !fit || !std::isfinite(scale) || scale <= 0.f || !std::isfinite(tilt))
+        return false;
+    std::string resource = path;
+    if (resource.compare(0, 7, "__OTR__") == 0)
+        resource.erase(0, 7);
+    std::string ownerGame = game;
+    if (!resource.empty() && resource[0] == '@') {
+        const auto colon = resource.find(':');
+        if (colon == std::string::npos)
+            return false;
+        ownerGame = resource.substr(1, colon - 1);
+        resource.erase(0, colon + 1);
+    }
+    auto owner = Ship::CrossRMRegistry::Get(ownerGame);
+#ifndef COMBO_BUILD
+    if (!owner && ownerGame == nativeGame) {
+        const auto context = Ship::Context::GetRawInstance();
+        if (context)
+            owner = context->GetResourceManager();
+    }
+#else
+    (void)nativeGame;
+#endif
+    if (!owner)
+        return false;
+    Ship::ResourceManagerScope scope(owner);
+    // Hash and filepath dependencies follow the same owner's live Alt selection.
+    const auto load = [&](auto key) { return owner->LoadResource(key); };
+    NeiGi::ShopFit correction{};
+    if (!NeiGi::SelectedModelFit(load, resource.c_str(), scale, tilt, shop, dinProfile, correction))
+        return false;
+    fit[0] = correction.scale;
+    fit[1] = correction.lift;
+    return true;
+}
+inline int GetDinSwordGiProfile(const char* nativeGame, const char* game, const char* path, bool enabled) {
+    if (!game || !path || !enabled)
+        return 0;
+    std::string resource = path;
+    if (resource.compare(0, 7, "__OTR__") == 0)
+        resource.erase(0, 7);
+    std::string ownerGame = game;
+    if (!resource.empty() && resource[0] == '@') {
+        const auto colon = resource.find(':');
+        if (colon == std::string::npos)
+            return 0;
+        ownerGame = resource.substr(1, colon - 1);
+        resource.erase(0, colon + 1);
+    }
+    auto owner = Ship::CrossRMRegistry::Get(ownerGame);
+#ifndef COMBO_BUILD
+    if (!owner && ownerGame == nativeGame) {
+        const auto context = Ship::Context::GetRawInstance();
+        if (context)
+            owner = context->GetResourceManager();
+    }
+#else
+    (void)nativeGame;
+#endif
+    if (!owner)
+        return 0;
+    Ship::ResourceManagerScope scope(owner);
+    return DinSwordGi::SelectedProfile(resource.c_str(), enabled, owner->IsAltAssetsEnabled(),
+                                       [&](const char* dependency) { return bool(owner->LoadResource(dependency)); });
 }
 } // namespace NeiAssetPriority

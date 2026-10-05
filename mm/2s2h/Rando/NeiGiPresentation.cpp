@@ -4,6 +4,7 @@
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "ComboResolve.h"
 #include "ComboSongDrawMM.h"
+#include "ComboSwordGiFit.h"
 #include <algorithm>
 #include <cstring>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -15,6 +16,9 @@ int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
 }
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiEnergyTexture.h"
+#define COMBO_DIN_SWORD_GI_HOST_MM
+#include "ComboDinSwordGi.h"
+#undef COMBO_DIN_SWORD_GI_HOST_MM
 
 using NeiGi::Kind;
 namespace {
@@ -131,6 +135,18 @@ bool HasMmLegacyGiMod(RandoItemId item) {
             opaque = "objects/object_gi_sword_1/gGiKokiriSwordGuardDL";
             second = "objects/object_gi_sword_1/gGiKokiriSwordBladeHiltDL";
             break;
+        case RI_SWORD_RAZOR:
+            opaque = "objects/object_gi_sword_2/gGiRazorSwordDL";
+            second = "objects/object_gi_sword_2/gGiRazorSwordEmptyDL";
+            break;
+        case RI_SWORD_GILDED:
+            opaque = "objects/object_gi_sword_3/gGiGildedSwordDL";
+            second = "objects/object_gi_sword_3/gGiGildedSwordEmptyDL";
+            break;
+        case RI_GREAT_FAIRY_SWORD:
+            opaque = "objects/object_gi_sword_4/gGiGreatFairysSwordBladeDL";
+            second = "objects/object_gi_sword_4/gGiGreatFairysSwordHiltEmblemDL";
+            break;
         case RI_SHIELD_MIRROR:
             opaque = "objects/object_gi_shield_3/gGiMirrorShieldEmptyDL";
             second = "objects/object_gi_shield_3/gGiMirrorShieldDL";
@@ -145,15 +161,41 @@ bool HasMmLegacyGiMod(RandoItemId item) {
     return (opaque && ResourceMgr_IsModAssetForGame("mm", opaque)) ||
            (second && ResourceMgr_IsModAssetForGame("mm", second));
 }
+
+bool GetSelectedOwnerSword(RandoItemId item, CwItemDrawInfo* out) {
+    const char* name = nullptr;
+    switch (item) {
+        case RI_SWORD_KOKIRI: name = "Kokiri Sword"; break;
+        case RI_SWORD_RAZOR: name = "Razor Sword"; break;
+        case RI_SWORD_GILDED: name = "Gilded Sword"; break;
+        case RI_OOT_MASTER_SWORD: name = "Master Sword"; break;
+        case RI_OOT_TRUE_MASTER_SWORD: name = "True Master Sword"; break;
+        case RI_OOT_BIGGORON_SWORD: name = "Biggoron's Sword"; break;
+        case RI_GREAT_FAIRY_SWORD: name = "Great Fairy's Sword"; break;
+        default: return false;
+    }
+    static Fn_GetItemDrawInfo describe = nullptr;
+    if (!describe)
+        describe = reinterpret_cast<Fn_GetItemDrawInfo>(Combo_ResolveSym("soh", "OOT_GetItemDrawInfo"));
+    CwItemDrawInfo selected{};
+    if (!describe || describe(name, &selected) != 1 || selected.drawKind != CW_DRAW_KIND_CUSTOM_GI ||
+        selected.dlistCount != 1 || selected.opCount != 1 || selected.ops[0].op != CW_OP_ROTATE_Z ||
+        selected.neiShimmer <= 0 || !NeiGi::IsSword(static_cast<Kind>(selected.neiShimmer - 1)))
+        return false;
+    *out = selected;
+    return true;
+}
 } // namespace
 
 extern "C" {
 #define Graph_Alloc(gfx, bytes) GRAPH_ALLOC(gfx, bytes)
 #define NeiGi_DrawTexturedMesh NeiGi_DrawTexturedMeshNative
 #define NEI_GI_ROTATE_Y Matrix_RotateYF
+#define NEI_GI_ROTATE_Z Matrix_RotateZF
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiMeshRenderer.inc"
 #undef NeiGi_DrawTexturedMesh
 #undef NEI_GI_ROTATE_Y
+#undef NEI_GI_ROTATE_Z
 #undef Graph_Alloc
 }
 
@@ -179,9 +221,25 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop) {
     if (!play || info.dlistCount < 1 || !info.dlists[0])
         return;
     if (info.drawKind == CW_DRAW_KIND_CUSTOM_GI) {
+        const float tilt = info.opCount == 1 && info.ops[0].op == CW_OP_ROTATE_Z ?
+            info.ops[0].a * (3.14159265358979323846f / 32768.f) : 0.f;
+        if (!NeiGi_ValidScale(info.scale) || !NeiGi_Finite(tilt) || info.neiShimmer < 1 ||
+            info.neiShimmer > int(Kind::MarioMask) + 1)
+            return;
+        const bool flame = tilt != 0.f && info.primColorXlu[3];
+        // The native scroll/flame allocates before the shared renderer. Check
+        // both passes together, and keep the flame in their selected GI fit.
+        if (flame && !NeiGi_ArenaHasRoom(play, 12 * sizeof(Gfx), 4, 20, 40))
+            return;
+        Matrix_Push();
+        if (info.neiShimmer > 0 && NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1)))
+            ComboSwordGi_ApplyFit("oot", info.dlists[0], info.scale, tilt, shop);
+        if (flame)
+            DrawOotSlateRuneFlame(info.primColorXlu[0], info.primColorXlu[1], info.primColorXlu[2]);
         NeiGi_DrawExternalPresentation(play, info.dlists[0],
                                        info.xluStartIndex == 1 && info.dlistCount > 1 ? info.dlists[1] : nullptr,
-                                       info.scale, info.neiShimmer - 1, info.itemShimmer, "oot");
+                                       info.scale, info.neiShimmer - 1, info.itemShimmer, "oot", shop, tilt, false);
+        Matrix_Pop();
         return;
     }
     // The native flame runs before the bounded presentation renderer. Check
@@ -235,13 +293,20 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
     if (!describe)
         return false;
     CwItemDrawInfo info{};
-    const bool authored = describe(binding->slug, &info) == 1;
+    bool authored = describe(binding->slug, &info) == 1;
     out->neiShimmer = info.neiShimmer;
     const bool mandatory = info.neiShimmer > 0 && (NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1)) ||
                                                    item == RI_OOT_IRON_KNUCKLE_AXE || item == RI_OOT_NEI_MARIO_MASK);
     out->itemShimmer = mandatory || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0);
     out->stateDependent = 2;
-    if (!authored || HasMmLegacyGiMod(item))
+    const bool legacyMod = HasMmLegacyGiMod(item);
+    if (!authored && !legacyMod && GetSelectedOwnerSword(item, &info)) {
+        // The owner declined authored GI geometry because its standalone
+        // sword is selected. Keep MM's concrete award identity on that mesh.
+        info.neiShimmer = out->neiShimmer;
+        authored = true;
+    }
+    if (!authored || legacyMod)
         return false;
     info.itemShimmer = out->itemShimmer;
     for (int i = 0; i < info.dlistCount; ++i) {
@@ -292,6 +357,9 @@ MM_NeiGiFallbackShimmer::~MM_NeiGiFallbackShimmer() {
     if (!mEnabled)
         return;
     Matrix_Pop();
+    if (NeiGi::IsSword(mKind))
+        NeiGi_DrawMesh(gPlayState, NeiGi::SampleSpecial(mKind, gPlayState->gameplayFrames,
+                                                       NeiGi_CameraBasis(gPlayState)));
     NeiGi_DrawMesh(gPlayState,
                    NeiGi::SampleShimmer(gPlayState->gameplayFrames, true, NeiGi_CameraBasis(gPlayState), mKind));
 }

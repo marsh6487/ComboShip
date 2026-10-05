@@ -9,6 +9,7 @@
 #include <vector>
 #include "combo/menu/ComboFairyBottle.h"
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboSongDraw.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 
 using s8 = int8_t;
@@ -35,7 +36,11 @@ char opaque[] = "opaque", glass[] = "glass", fairy[] = "fairy", matrixPath[] = "
 char genericOpaque[] = "genericOpaque", genericGlass[] = "genericGlass";
 char blueFire[] = "__OTR__objects/object_gi_fire/gGiBlueFireChamberstickDL";
 const char* gGiFairyBottleTexAnim = "texAnim";
-std::unordered_set<std::string> selectedMods;
+std::unordered_set<std::string> selectedMods, customModels;
+int ResourceMgr_IsCustomAssetForGame(const char* game,const char* path) {
+    assert(!strcmp(game,"oot"));
+    return customModels.count(path) || customModels.count(std::string("__OTR__") + path);
+}
 int ResourceMgr_IsModAsset(const char* path) { return selectedMods.count(path) != 0; }
 int ResourceMgr_IsModAssetForGame(const char* game, const char* path) {
     assert(!strcmp(game,"oot") && !strcmp(path,blueFire+7));
@@ -45,7 +50,7 @@ int ResourceMgr_IsModAssetForGame(const char* game, const char* path) {
 constexpr int MTXMODE_APPLY = 1, G_MTX_MODELVIEW = 2, G_MTX_LOAD = 4, G_TX_RENDERTILE = 0;
 constexpr int GID_FAIRY = 0, GID_SONG_GENERIC = 0x75, kMaxMatEntries = 8;
 MtxF current, initial, loaded[2];
-MtxF nativePlacement{0, 3, 0};
+MtxF nativePlacement{0, 3, 0, .01f, .01f, .01f};
 std::vector<MtxF> stack;
 struct Draw { int stream; std::string path; MtxF pose; };
 std::vector<Draw> draws;
@@ -65,7 +70,7 @@ void Matrix_Pop() { assert(!stack.empty()); current = stack.back(); stack.pop_ba
 void Matrix_Translate(float x, float y, float z, int) { current.x += x; current.y += y; current.z += z; }
 void Matrix_Scale(float x, float y, float z, int) { current.sx *= x; current.sy *= y; current.sz *= z; }
 void Matrix_ReplaceRotation(MtxF*) { current.billboard = true; }
-void Matrix_Mult(MtxF* mtx, int) { current.x += mtx->x; current.y += mtx->y; current.z += mtx->z; }
+void Matrix_Mult(MtxF* mtx, int) { current.x += mtx->x; current.y += mtx->y; current.z += mtx->z; current.sx *= mtx->sx; current.sy *= mtx->sy; current.sz *= mtx->sz; }
 void Matrix_MtxToMtxF(Mtx* input, MtxF* output) { *output = *input; }
 void LoadMatrix(Gfx* command, MtxF* pose) { loaded[command->stream] = *pose; }
 void DrawList(Gfx* command, const void* path) {
@@ -127,6 +132,8 @@ struct ComboForeignDrawInfo {
     const char* dls[4] = {opaque, glass, fairy, "__OTR__@mm:matrix"};
     const char* matAnimPath = "texAnim";
     int drawKind = CW_DRAW_KIND_MM_FAIRY_CONTAINER, xluStart = 1, neiEffect = 0, neiShimmer = 0;
+    int opCount = 0;
+    CwDrawOp ops[CW_DRAW_MAX_OPS] = {};
     float scale = 0, neiEffectCenter[3]{};
     bool animOk = false, itemShimmer = true;
     uint8_t itemShimmerColor[4] = {255,160,235,255}, primColorXlu[4]{};
@@ -145,6 +152,7 @@ template<class... T> void NeiGi_DrawPresentation(T...) { assert(false); }
 template<class... T> void NeiGi_DrawMesh(T...) { assert(false); }
 template<class... T> void NeiGi_DrawSeasonOverlay(T...) { assert(false); }
 template<class... T> void NeiGi_DrawSongOverlay(T...) { assert(false); }
+template<class... T> void ComboSwordGi_ApplyFit(T...) { assert(false); }
 template<class... T> void ComboDrawSpinAttackGi(T...) { assert(false); }
 #define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
 #define POLY_OPA_DISP opaPtr
@@ -226,7 +234,13 @@ constexpr int ANIMMODE_LOOP=0,G_RM_PASS=0,G_RM_ZB_CLD_SURF2=0;
 #define Gfx_SetupDL27_Xlu(...) events.push_back("fairy-setup")
 #define Gfx_SetupDL_27Xlu(...) events.push_back("fairy-setup")
 #include "combo/menu/ComboFairyBottleDraw.h"
+#define xw x
+#define yw y
+#define zw z
 #include "fairy_production.inc"
+#undef xw
+#undef yw
+#undef zw
 
 bool Near(float x, float y) { return std::abs(x - y) < .0001f; }
 bool Same(const MtxF& a, const MtxF& b) {
@@ -250,8 +264,8 @@ void CheckDraw(float contentsY, bool foreign) {
     const auto& content = draws[2].pose;
     assert(Near(content.x, initial.x + expected.x) && Near(content.y, initial.y + contentsY + expected.y));
     assert(Near(content.z, initial.z + expected.z) && content.billboard);
-    assert(Near(content.sx, 2 * expected.scaleX) && Near(content.sy, 2 * expected.scaleY));
-    assert(Near(content.sz, 2 * expected.scaleZ) && Same(current, initial) && stack.empty());
+    assert(Near(content.sx, 2 * (contentsY ? .01f : 1.f) * expected.scaleX) && Near(content.sy, 2 * (contentsY ? .01f : 1.f) * expected.scaleY));
+    assert(Near(content.sz, 2 * (contentsY ? .01f : 1.f) * expected.scaleZ) && Same(current, initial) && stack.empty());
     assert(foreignRestores == (foreign ? 1 : 0) && hostFallbacks == 0);
 }
 
@@ -268,6 +282,11 @@ int main() {
     auto shell = ComboFairyBottle_SelectShell(opaque,glass,genericOpaque,genericGlass,nullptr,blueFire,1);
     assert(shell.opaque == opaque && shell.glass == glass);
     selectedMods.clear();
+    customModels={blueFire};
+    assert(oot::GetItem_FairyBottleShell(0).opaque == blueFire &&
+           "XML TP shell imported in a built-in O2R was rejected as non-mod");
+    assert(ComboFairyBottle_IsBlueFireShell(mm::GetItem_FairyBottleShell(0).opaque));
+    customModels.clear();
     for (uint32_t frame = 0; frame < 360; ++frame) {
         auto motion = ComboFairyBottle_Sample(frame), repeat = ComboFairyBottle_Sample(frame + 360);
         assert(std::abs(motion.x) <= .65001f && std::abs(motion.y) <= 1.15001f && std::abs(motion.z) <= .35001f);
@@ -333,6 +352,17 @@ int main() {
         Reset(frame); MM_DrawForeignFairy(&info);
         assert(draws.size() == 2 && draws[0].path == blueFire && draws[1].path == "fairy-vfx" && foreignRestores == 1);
     }
+    // The native contents billboard can include its own tiny sprite scale.
+    // A real actor-derived fairy needs the bottle GI scale, not that scale twice.
+    selectedMods.clear();
+    Reset(27); mm::GetItem_DrawFairyContainer(&play,0);
+    assert(draws.back().path == "fairy-vfx");
+    assert(Near(draws.back().pose.sx,2*ComboFairyBottle_Sample(27).scaleX*.004f) &&
+           "actor fairy inherited native billboard sprite scale and vanished");
+    info.dls[0]=opaque;info.dls[1]=glass;
+    Reset(27); OOT_DrawForeignFairyContainer(&play,&info);
+    assert(Near(draws.back().pose.sx,2*ComboFairyBottle_Sample(27).scaleX*.004f));
+    selectedMods={blueFire};
     fairyResources = false; Reset(27); oot::GetItem_DrawFairy(&play,0);
     assert(draws.size() == 2 && draws[0].path == blueFire && draws[1].path == fairy && skeletonDraws == 0);
     selectedMods = {blueFire,glass};

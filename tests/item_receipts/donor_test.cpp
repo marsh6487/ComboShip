@@ -418,10 +418,60 @@ void BuildIceTrapMessageNamed(CustomMessage &msg, const std::string &) {
   msg.english = "Trap receipt";
 }
 } // namespace Rando::Traps
+#ifndef COMBO_EXPORT
 #define COMBO_EXPORT
+#endif
 /* CONTEXT_BUILDERS */
 /* FOREIGN_BUILDER */
 /* DONOR_EXPORT */
+
+// Test-only entry point for the receiver integration. OoT is dormant while MM
+// owns the active save; its generated seed still supplies this saved option.
+extern "C" COMBO_EXPORT void FixtureConfigureForestCompassReceipt(int information) {
+  for (const auto &fixture : traditionalReceipts)
+    Rando::StaticData::itemNameToEnum[fixture.name] = fixture.item;
+  receiptContext.information = information;
+  receiptContext.generated = true;
+  receiptContext.spoiler = false;
+  receiptContext.bossShuffle = RO_BOSS_ROOM_ENTRANCE_SHUFFLE_OFF;
+  receiptContext.mqMode = 2;
+  receiptContext.mqCount = 6;
+  receiptContext.dungeon.mq = true;
+  receiptContext.placements[RC_PHANTOM_GANON] = {RG_DEKU_LEAF, "Deku Leaf"};
+  randoActive = false;
+  gPlayState = nullptr;
+}
+
+static void CheckForestCompassReceiptInformation() {
+  const auto contextBefore = receiptContext;
+  auto *playBefore = gPlayState;
+  const bool activeBefore = randoActive;
+  const auto saveBefore = gSaveContext;
+  const int resolutionsBefore = liveResolutionCalls;
+  const int latchesBefore = foreignLatches;
+  for (int information : {0, 1}) {
+    FixtureConfigureForestCompassReceipt(information);
+    char buffer[1269];
+    const int32_t size = OOT_GetItemReceiptText("Forest Temple Compass", buffer, sizeof(buffer));
+    assert(size > 0);
+    const std::string text(buffer, size);
+    // Off reproduces the supplied clip's tutorial plus title. On appends the
+    // actual boss/reward while retaining every part of that native tutorial.
+    assert(text.find("You got the Compass!") != std::string::npos);
+    assert(text.find("Now you can see hidden things.") != std::string::npos);
+    assert(text.find("Forest Temple Compass") != std::string::npos);
+    assert(text.find("masterful") != std::string::npos);
+    assert((text.find("Phantom Ganon") != std::string::npos) == bool(information));
+    assert((text.find("The reward is") != std::string::npos) == bool(information));
+    assert((text.find("Deku Leaf") != std::string::npos) == bool(information));
+  }
+  assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+  assert(liveResolutionCalls == resolutionsBefore && foreignLatches == latchesBefore);
+  receiptContext = contextBefore;
+  gPlayState = playBefore;
+  randoActive = activeBefore;
+  std::cout << "Forest Temple Compass: saved Off reproduces tutorial/title; saved On appends actual reward with dormant OoT and preserves tutorial/MQ passed\n";
+}
 
 int main() {
   // Item names and unresolved native text IDs come from the real OoT catalog.
@@ -439,6 +489,7 @@ int main() {
   }
   nativeMessages.push_back({0xFFFF, 0, nullptr, 0});
   sNesMessageEntryTablePtr = nativeMessages.data();
+  CheckForestCompassReceiptInformation();
   entranceOverrides[0] = {ENTR_DEKU_TREE_BOSS_ENTRANCE, 1,
                           ENTR_FOREST_TEMPLE_BOSS_ENTRANCE, 1};
   char buffer[1269];
@@ -701,4 +752,5 @@ int main() {
   assert(OOT_GetItemReceiptText("Magic Meter", buffer, sizeof(buffer)) == 0);
   std::cout << "actual OoT export: full text, fixed tiers, binary lengths, "
                "guards and exceptions passed\n";
+  return 0;
 }

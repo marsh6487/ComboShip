@@ -90,7 +90,7 @@ void* Combo_ResolveSym(const char*,const char*) {return reinterpret_cast<void*>(
 const char* NeiResource_Route(const char* path) {return path;}
 int ResourceMgr_IsModAssetForGame(const char*,const char*) {return mmMod;}
 ''' + bindings + '\n' + header[header.index('class MM_NeiGiFallbackShimmer'):] + '\n'
-source += function(mm,'HasMmLegacyGiMod')+'\n'+function(mm,'MM_DescribeNeiGi')+'\n'+fallback
+source += function(mm,'HasMmLegacyGiMod')+'\n'+function(mm,'GetSelectedOwnerSword')+'\n'+function(mm,'MM_DescribeNeiGi')+'\n'+fallback
 source += r'''
 int main() {
     const std::pair<RandoItemId,Kind> awards[]={
@@ -115,7 +115,7 @@ int main() {
         assert(info.itemShimmer==(NeiGi::IsSword(award.second)||effects));
         draws=0;
         {MM_NeiGiFallbackShimmer fallback(award.first);}
-        assert(draws==(NeiGi::IsSword(award.second)||effects));
+        assert(draws==(NeiGi::IsSword(award.second) ? 2 : effects) && "selected sword mesh lost its intrinsic particles");
         assert(pushes==0);
         if(draws) {
             const auto expected=NeiGi::SampleShimmer(play.gameplayFrames,true,{},award.second);
@@ -133,4 +133,4 @@ with tempfile.TemporaryDirectory(prefix='mm-nei-identity-') as temporary:
     subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),str(path/'fixture.cpp'),
                     '-o',str(path/'fixture')],check=True)
     subprocess.run([str(path/'fixture')],check=True)
-print('PASS native MM fallback: 19 themes retain exact sampler through owner and native mod selection, no attached energy')
+print('PASS native MM fallback: 19 themes retain exact shimmer; swords also retain intrinsic particles through mod selection')

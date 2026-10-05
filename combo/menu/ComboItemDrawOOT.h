@@ -830,21 +830,18 @@ static void OOT_DescribeHeartCosmetics(s16 drawId, CwItemDrawInfo* out) {
 }
 
 static int32_t OOT_FillSongDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
-    const int song = rg >= RG_MM_SONG_SONATA ? ComboSongForOotItem(rg) : -1;
+    const int song = ComboSongForOotItem(rg);
     if (song < 0)
         return 0;
-    if (song == CW_SONG_STORMS) {
-        out->drawKind = CW_DRAW_KIND_SEASON_GI;
-        out->neiEffect = 6;
-        out->xluStartIndex = -1;
-        return 1;
-    }
     out->drawKind = CW_DRAW_KIND_SONG_GI;
     out->neiEffect = song;
-    out->dlists[0] = gGiSongNoteDL;
-    out->dlistCount = 1;
+    const char* colorDl = ComboSongOotColorDlist(song);
+    out->dlistCount = 0;
+    if (colorDl)
+        out->dlists[out->dlistCount++] = colorDl;
+    out->dlists[out->dlistCount++] = gGiSongNoteDL;
     out->xluStartIndex = 0;
-    out->itemShimmer = 1;
+    out->itemShimmer = ComboSongHasOverlay(song);
     ComboSongShimmerColor(song, out->primColorXlu);
     std::memcpy(out->itemShimmerColor, out->primColorXlu, 4);
     return 1;

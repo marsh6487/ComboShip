@@ -971,6 +971,21 @@ extern "C" COMBO_EXPORT int32_t OOT_NeiResourceExists(const char* path) {
 
 #endif
 
+extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* path, float scale, float tilt,
+                                                int shop, float fit[2]) {
+    const int din = NeiAssetPriority::GetDinSwordGiProfile("oot", game, path,
+        CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
+    return NeiAssetPriority::GetGiModelFit("oot", game, path, scale, tilt, shop != 0, fit, din);
+}
+extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* game, const char* path) {
+    return NeiAssetPriority::GetDinSwordGiProfile("oot", game, path,
+        CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
+}
+
+extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path) {
+    return NeiAssetPriority::IsCustomAsset("oot", game, path);
+}
+
 extern "C" int ResourceMgr_IsModAsset(const char* path) {
     return NeiAssetPriority::IsModAsset("oot", "oot", path);
 }

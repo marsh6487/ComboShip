@@ -9,6 +9,8 @@ python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py
 python3 -B scripts/diagnostics/run_receipt_syntax_tests.py
 python3 -B scripts/diagnostics/run_song_gi_tests.py
 python3 -B scripts/diagnostics/run_sword_pose_tests.py
+python3 -B scripts/diagnostics/run_sword_mod_gi_tests.py
+python3 -B scripts/diagnostics/run_sword_fallback_tests.py --sanitize
 python3 -B scripts/diagnostics/run_fairy_bottle_tests.py
 python3 -B tests/seasons/run_tests.py
 python3 -B tests/seasons/run_rod_lifecycle_tests.py
@@ -21,6 +23,7 @@ python3 -B tests/mm_editor/run_tests.py
 python3 -B tests/nei_shared_slot/run_tests.py
 python3 -B tests/nei_shared_slot/run_ui_tests.py
 python3 -B tests/nei_shared_slot/run_sync_tests.py
+python3 -B tests/nei_shared_slot/run_save_tests.py
 python3 -B tests/mm_wolf/run_skin_tests.py
 python3 -B tests/mm_wolf/run_core_tests.py
 python3 -B tests/mm_wolf/run_host_tests.py

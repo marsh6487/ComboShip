@@ -15,6 +15,8 @@ extern "C" {
 }
 #include "ComboItemDrawABI.h"
 #include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
+#include "combo/DinSwordGiResources.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 /* PRODUCTION_INFO */
 static Gfx opa[1024], xlu[1024];
 static GraphicsContext gfx;
@@ -26,12 +28,15 @@ struct Pose {
 };
 static Pose pose;
 static std::vector<Pose> stack;
+static int dinColorReads;
 static std::deque<Mtx> matrices;
 static std::map<Mtx *, Pose> captured;
 static std::vector<std::vector<Gfx>> arena;
 static Gfx scrolls[4][12];
 static std::vector<std::vector<int32_t>> scrollParams;
 static bool flameAvailable = true;
+static bool dinLayers;
+static bool fitModel;
 static int interpolation, shimmers, sentinels, identityDraws;
 static NeiGi::Mesh identityMesh;
 static ComboForeignDrawInfo recipe;
@@ -103,10 +108,35 @@ static bool ComboForeignAnim_Draw(const CwItemAnimDrawInfo *, const char *,
   assert(false);
   return false;
 }
-static int CVarGetInteger(const char *, int) { return 0; }
+extern "C" int32_t CVarGetInteger(const char *, int32_t) { return dinLayers; }
+extern "C" Color_RGB8 CVarGetColor24(const char* key,Color_RGB8) {
+#ifdef HOST_MM_ROUTE
+  assert(false && "MM Din GI must use its changed-color/suppression-aware cosmetics API");
+#endif
+  ++dinColorReads;
+  if(!strcmp(key,"gCosmetics.Custom.DinFireSwordCore.Value"))return {17,31,47};
+  assert(!strcmp(key,"gCosmetics.Custom.DinFireSwordOuter.Value"));return {53,67,79};
+}
+#ifdef HOST_MM_ROUTE
+extern "C" Color_RGBA8 CosmeticEditor_GetChangedColor(u8,u8,u8,u8,const char* id) {
+  ++dinColorReads;
+  if(!strcmp(id,"Custom.DinFireSwordCore"))return {17,31,47,255};
+  assert(!strcmp(id,"Custom.DinFireSwordOuter"));return {53,67,79,255};
+}
+#endif
+extern "C" bool NeiGi_CanDrawLayers(PlayState*,size_t,size_t,size_t) {return true;}
+extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* owner,const char* path) {
+  assert(!strcmp(owner,"oot"));
+  if(!strncmp(path,"__OTR__@oot:",12))path+=12;
+  else if(!strncmp(path,"__OTR__",7))path+=7;
+  return DinSwordGi::SelectedProfile(path,dinLayers,true,[](const char*){return true;});
+}
+static void ComboSwordGi_ApplyFit(const char*,const char*,float,float,bool) {
+  if(fitModel){Matrix_Translate(0,-20,0,MTXMODE_APPLY);Matrix_Scale(.5f,.5f,.5f,MTXMODE_APPLY);}
+}
 static void ComboDrawMaskShimmer(PlayState *, const char *,
                                  const uint8_t *color, const char *owner) {
-  assert(pose == Pose{} && !strcmp(owner, "mm"));
+  assert(pose == Pose{} && (!strcmp(owner, "mm") || !strcmp(owner,"oot")));
   assert(color[0] == 220 && color[1] == 225 && color[2] == 240);
   ++shimmers;
 }
@@ -134,7 +164,19 @@ static void NeiGi_DrawSeasonOverlay(PlayState*,int,const char*) {
 static bool OOT_DrawForeignFairyContainer(PlayState*,const ComboForeignDrawInfo*) {assert(false);return false;}
 static void NeiGi_DrawSongOverlay(PlayState*,int,const char*) {assert(false);}
 static NeiGi::Basis NeiGi_CameraBasis(PlayState*) {return {};}
-static void NeiGi_DrawMesh(PlayState*,const NeiGi::Mesh& mesh) {assert(pose==Pose{});identityMesh=mesh;++identityDraws;}
+static void NeiGi_DrawMesh(PlayState*,const NeiGi::Mesh& mesh) {
+  Pose expected{};if(fitModel){expected.scale*=.5f;expected.y-=20;}
+  assert(pose==expected && "sword model and particles do not share the fitted presentation");
+  identityMesh=mesh;++identityDraws;
+}
+#ifdef HOST_MM_ROUTE
+#define COMBO_DIN_SWORD_GI_HOST_MM
+#define Matrix_Finalize(gfx) Matrix_NewMtx(gfx,(char*)__FILE__,__LINE__)
+#define Gfx_SetupDL25_Opa Gfx_SetupDL_25Opa
+#define Gfx_SetupDL25_Xlu Gfx_SetupDL_25Xlu
+#endif
+#include "ComboDinSwordGi.h"
+#undef COMBO_DIN_SWORD_GI_HOST_MM
 /* PRODUCTION_HANDLERS */
 
 struct Draw {
@@ -143,12 +185,14 @@ struct Draw {
   bool gray;
   uint32_t color;
   int owner;
+  uint32_t prim, env;
 };
 static std::vector<Draw> CheckStream(Gfx *begin, Gfx *end, bool restore) {
   Pose gpu;
   int owner = 0;
   bool gray = false;
   uint32_t color = 0;
+  uint32_t prim = 0, env = 0;
   uintptr_t segment8 = 0;
   std::vector<Draw> draws;
   for (auto *cmd = begin; cmd < end; ++cmd) {
@@ -165,17 +209,23 @@ static std::vector<Draw> CheckStream(Gfx *begin, Gfx *end, bool restore) {
       gray = cmd->words.w1;
     if (op == G_SETINTENSITY)
       color = cmd->words.w1;
+    if (op == G_SETPRIMCOLOR)prim = cmd->words.w1;
+    if (op == G_SETENVCOLOR)env = cmd->words.w1;
     if (op == G_MTX)
       gpu = captured.at((Mtx *)cmd->words.w1);
     if (op == G_MOVEWORD && ((cmd->words.w0 >> 16) & 255) == G_MW_SEGMENT &&
         (cmd->words.w0 & 65535) == 8 * 4)
       segment8 = cmd->words.w1;
     if (op == G_DL || op == G_DL_OTR_FILEPATH)
-      draws.push_back({(const char *)cmd->words.w1, gpu, gray, color, owner});
+      draws.push_back({(const char *)cmd->words.w1, gpu, gray, color, owner, prim, env});
   }
   assert(owner == 0 && !gray);
-  if (!draws.empty())
-    assert(gpu == Pose{});
+  if (!draws.empty()) {
+#ifndef HOST_MM_ROUTE
+    Pose expected{};if(fitModel){expected.scale*=.5f;expected.y-=20;}
+    assert(gpu == expected);
+#endif
+  }
   if (restore && segment8)
     assert(((Gfx *)segment8)->words.w0 >> 24 == G_ENDDL);
   return draws;
@@ -198,6 +248,8 @@ static void Reset(int kind, bool trueTier, bool shimmer) {
   scrollParams.clear();
   interpolation = shimmers = sentinels = identityDraws = 0;
   flameAvailable = true;
+  dinLayers = false;
+  fitModel = false;
   recipe = {};
   recipe.count = 1;
   recipe.xluStart = -1;
@@ -238,8 +290,10 @@ int main() {
         Dispatch();
         auto body = CheckStream(opa, gfx.polyOpa.p, true),
              flame = CheckStream(xlu, gfx.polyXlu.p, true);
-        assert(body.size() == 1 && body[0].path == recipe.dls[0] &&
-               body[0].owner == 1);
+        assert(body.size() == 1 && body[0].path == recipe.dls[0]);
+#ifndef HOST_MM_ROUTE
+        assert(body[0].owner == 1);
+#endif
         assert(body[0].gray == (trueTier && kind == CW_DRAW_KIND_MASTER_SWORD));
         if (body[0].gray)
           assert(body[0].color == 0xFFD76EFFu);
@@ -270,13 +324,34 @@ int main() {
   for(auto kind:{NeiGi::Kind::KokiriSword,NeiGi::Kind::RazorSword,NeiGi::Kind::GildedSword,
                  NeiGi::Kind::MasterSword,NeiGi::Kind::SwordAura,NeiGi::Kind::BiggoronSword,NeiGi::Kind::GreatFairySword}) {
     Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);recipe.neiShimmer=int(kind)+1;
-    Dispatch();assert(identityDraws==1 && shimmers==0);
+    Dispatch();assert(identityDraws==2 && shimmers==0);
     const auto wanted=NeiGi::SampleShimmer(play.gameplayFrames,true,{},kind);
     assert(identityMesh.count==wanted.count);
     for(size_t i=0;i<wanted.count;++i)assert(identityMesh.vertices[i].rgb==wanted.vertices[i].rgb &&
         identityMesh.vertices[i].alpha==wanted.vertices[i].alpha && identityMesh.vertices[i].p.x==wanted.vertices[i].p.x);
     assert(CheckStream(opa,gfx.polyOpa.p,false).size()==1 && CheckStream(xlu,gfx.polyXlu.p,false).empty());
   }
+  Reset(CW_DRAW_KIND_CUSTOM_GI, false, true);
+  recipe.neiShimmer = int(NeiGi::Kind::MasterSword) + 1;
+  dinLayers = true;
+  dinColorReads = 0;
+  Dispatch();
+  const auto dinBody = CheckStream(opa,gfx.polyOpa.p,false);
+  const auto dinFlame = CheckStream(xlu,gfx.polyXlu.p,false);
+  assert(dinBody.size() == 2 && dinFlame.size() == 1 && "selected Din GI lost its core/flame layers");
+  assert(dinBody[1].path == DinSwordGi::profiles[0].core && dinFlame[0].path == DinSwordGi::profiles[0].flame);
+  assert(dinBody[0].pose == dinBody[1].pose && dinBody[0].pose == dinFlame[0].pose);
+  assert(dinColorReads == 2 && dinBody[1].prim == 0x111F2FFF && dinBody[1].env == 0x35434FFF);
+  assert((dinFlame[0].prim & 0xFFFFFF00u) == 0x111F2F00 && dinFlame[0].env == 0x35434FFF);
+  assert(identityDraws == 2 && "Din layers replaced the awarded sword particles/shimmer");
+  Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);
+  recipe.neiShimmer=int(NeiGi::Kind::MasterSword)+1;
+  fitModel=true;dinLayers=true;
+  Dispatch();
+  const auto fittedBody=CheckStream(opa,gfx.polyOpa.p,false);
+  const auto fittedFlame=CheckStream(xlu,gfx.polyXlu.p,false);
+  assert(fittedBody[0].pose==fittedBody[1].pose && fittedBody[0].pose==fittedFlame[0].pose);
+  assert(std::abs(fittedBody[0].pose.scale-.04f)<.00001f && fittedBody[0].pose.y==-3.f);
   Reset(CW_DRAW_KIND_CUSTOM_GI, true, true);
   flameAvailable = false;
   Dispatch();

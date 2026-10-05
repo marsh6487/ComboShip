@@ -45,7 +45,7 @@ Reset();
 
 // Legacy fallback keeps each sword's shimmer palette when authored resources
 // are missing. Every sword, including Four Sword, retains its mandatory
-// identity shimmer and has no authored intrinsic particles in this route.
+// identity shimmer and its own intrinsic particles in this route.
 for (const auto& sword : {
     std::pair{RI_SWORD_KOKIRI, Kind::MmKokiriSword},
     std::pair{RI_SWORD_RAZOR, Kind::RazorSword},
@@ -63,11 +63,11 @@ for (const auto& sword : {
             Matrix_Scale(7, 7, 7, MTXMODE_APPLY); // Original model mutates its own pose.
         }
         const bool active = true;
-        assert(arena.size() == (active ? 1 : 0));
+        assert(arena.size() == 1 + NeiGi::IsSword(sword.second));
         assert(stack.empty() && interpolation == 0 && loads == 0);
         if (active) {
             assert(matrix == 1 && matrixY == 0);
-            const auto got = arena.front();
+            const auto got = arena.back();
             arena.clear();
             NeiGi_DrawMesh(&play, NeiGi::SampleShimmer(play.gameplayFrames, true,
                 NeiGi_CameraBasis(&play), sword.second));
