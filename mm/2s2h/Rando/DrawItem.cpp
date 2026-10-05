@@ -184,10 +184,6 @@ void DrawSong(RandoItemId randoItemId) {
     if (!gPlayState)
         return;
     const int song = ComboSongForMmItem(randoItemId);
-    if (song == CW_SONG_STORMS) {
-        NeiGi_DrawSeasonOverlay(gPlayState, 6, "oot");
-        return;
-    }
     std::array<uint8_t, 4> color{ 220, 225, 240, 255 };
     if (!ComboSongShimmerColor(song, color.data())) {
         // These NEI songs have separate quest-page colors and no recovered
@@ -212,10 +208,8 @@ void DrawSong(RandoItemId randoItemId) {
     gDPSetEnvColor(POLY_XLU_DISP++, color[0], color[1], color[2], color[3]);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)&gGiSongNoteDL);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
-    if (song >= 0)
+    if (ComboSongHasOverlay(song))
         NeiGi_DrawSongOverlay(gPlayState, song, nullptr);
-    else
-        ComboDrawMaskShimmer(gPlayState, nullptr, color.data(), "mm");
 }
 
 void DrawDoubleDefense() {

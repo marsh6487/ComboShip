@@ -323,7 +323,7 @@ int main() {
   Rando::StaticData::GetIconForZMessage(RI_SONG_LULLABY_INTRO);
   assert(stagedColor[0] == 255 && stagedColor[1] == 100 && stagedColor[2] == 100);
   const std::pair<RandoItemId, uint32_t> receiptColors[] = {
-      {RI_SONG_DOUBLE_TIME, 0x80D8F0}, {RI_SONG_ELEGY, 0xFF6200},         {RI_SONG_EPONA, 0x925731},
+      {RI_SONG_DOUBLE_TIME, 0x80D8F0}, {RI_SONG_ELEGY, 0xFF6200},         {RI_SONG_EPONA, 0xD96E30},
       {RI_SONG_HEALING, 0xFF96E6},     {RI_SONG_INVERTED_TIME, 0x4A70CA}, {RI_SONG_LULLABY_INTRO, 0xFF6464},
       {RI_SONG_LULLABY, 0xFF1414},     {RI_SONG_NOVA, 0x1414FF},          {RI_SONG_OATH, 0x620062},
       {RI_SONG_SARIA, 0x6ACB62},       {RI_SONG_SOARING, 0xC8A0FF},       {RI_SONG_SONATA, 0x62FF62},

@@ -415,9 +415,21 @@ static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
  * Calls the corresponding draw function for the given draw ID
  */
 #include "ComboMaskShimmer.h"
+#include "ComboSongDraw.h"
 
 s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]) {
     switch (drawId) {
+        case GID_SONG_MINUET:
+        case GID_SONG_BOLERO:
+        case GID_SONG_SERENADE:
+        case GID_SONG_REQUIEM:
+        case GID_SONG_NOCTURNE:
+        case GID_SONG_PRELUDE:
+            return ComboSongShimmerColor(CW_SONG_OOT_MINUET + drawId - GID_SONG_MINUET, color);
+        case GID_SONG_EPONA:
+            return ComboSongShimmerColor(CW_SONG_OOT_EPONA, color);
+        case GID_SONG_SUN:
+            return ComboSongShimmerColor(CW_SONG_SUN, color);
         case GID_POTION_RED: {
             const uint8_t c[4] = { 255, 70, 50, 255 };
             memcpy(color, c, 4);
@@ -1264,10 +1276,6 @@ void GetItem_DrawOpa0Xlu1(PlayState* play, s16 drawId) {
 }
 
 void GetItem_DrawGenericMusicNote(PlayState* play, s16 drawId) {
-    if (drawId == GID_SONG_STORM) {
-        NeiGi_DrawSeasonOverlay(play, 6, NULL);
-        return;
-    }
     s32 pad;
     s16 color_slot = drawId - GID_SONG_GENERIC;
     if (color_slot < 0 || color_slot >= 7)
@@ -1292,6 +1300,8 @@ void GetItem_DrawGenericMusicNote(PlayState* play, s16 drawId) {
     gSPGrayscale(POLY_XLU_DISP++, false);
 
     CLOSE_DISPS(play->state.gfxCtx);
+    if (drawId == GID_SONG_STORM)
+        NeiGi_DrawSongOverlay(play, CW_SONG_STORMS, NULL);
 }
 
 void GetItem_DrawXlu01(PlayState* play, s16 drawId) {

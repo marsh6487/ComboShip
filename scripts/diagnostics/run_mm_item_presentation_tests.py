@@ -115,14 +115,28 @@ int main() {
  for(auto id : {RG_MM_SONG_SONATA,RG_MM_SONG_TIME}) {
    info={};
    assert(OOT_FillItemDrawInfo(id,&info)==1);
-   assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.dlistCount==1 && info.itemShimmer);
+   assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.dlistCount==1 && !info.itemShimmer);
    const uint8_t expected[4]={98,static_cast<uint8_t>(id==RG_MM_SONG_SONATA?255:177),
                              static_cast<uint8_t>(id==RG_MM_SONG_SONATA?98:211),255};
    assert(!std::memcmp(info.itemShimmerColor,expected,4));
  }
  info={};
  assert(OOT_FillItemDrawInfo(RG_MM_SONG_STORMS,&info)==1);
- assert(info.drawKind==CW_DRAW_KIND_SEASON_GI && info.neiEffect==6 && info.dlistCount==0);
+ assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.neiEffect==CW_SONG_STORMS && info.dlistCount==1 && info.itemShimmer);
+ assert(!strcmp(info.dlists[0],gGiSongNoteDL) && info.primColorXlu[0]==146 && info.primColorXlu[1]==146 && info.primColorXlu[2]==146);
+ const RandomizerGet warpIds[]={RG_MINUET_OF_FOREST,RG_BOLERO_OF_FIRE,RG_SERENADE_OF_WATER,
+                               RG_REQUIEM_OF_SPIRIT,RG_NOCTURNE_OF_SHADOW,RG_PRELUDE_OF_LIGHT};
+ const char* colorDls[]={"__OTR__objects/object_gi_melody/gGiMinuetColorDL","__OTR__objects/object_gi_melody/gGiBoleroColorDL",
+                        "__OTR__objects/object_gi_melody/gGiSerenadeColorDL","__OTR__objects/object_gi_melody/gGiRequiemColorDL",
+                        "__OTR__objects/object_gi_melody/gGiNocturneColorDL","__OTR__objects/object_gi_melody/gGiPreludeColorDL"};
+ const uint32_t hues[]={0x62FF62,0xFF3C00,0x55B4DF,0xDE9E2F,0xA028D2,0xEDE73E};
+ for(int i=0;i<6;++i) {
+   info={};assert(OOT_FillItemDrawInfo(warpIds[i],&info)==1);
+   assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.dlistCount==2 && info.xluStartIndex==0 && info.itemShimmer);
+   assert(!strcmp(info.dlists[0],colorDls[i]) && !strcmp(info.dlists[1],gGiSongNoteDL));
+   const uint8_t color[]={uint8_t(hues[i]>>16),uint8_t(hues[i]>>8),uint8_t(hues[i]),255};
+   assert(!memcmp(info.itemShimmerColor,color,4));
+ }
  assert(tableCalls==1);
  std::cout<<"PASS actual GI boundary: custom fallback cannot become bottle; resolved tier, native rows and imported song recipes preserved\n";
 }

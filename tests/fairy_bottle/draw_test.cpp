@@ -9,6 +9,7 @@
 #include <vector>
 #include "combo/menu/ComboFairyBottle.h"
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboSongDraw.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 
 using s8 = int8_t;

@@ -320,7 +320,7 @@ int main() {
         gfx.polyOpa.d = opa + 16;
       const auto opaHead = gfx.polyOpa.p, opaTail = gfx.polyOpa.d;
       const auto xluHead = gfx.polyXlu.p, xluTail = gfx.polyXlu.d;
-      const auto mesh = NeiGi::SampleSong(CW_SONG_SOARING, 42);
+      const auto mesh = NeiGi::SampleSong(CW_SONG_OOT_ZELDA, 42);
       const uint8_t color[4] = {80, 180, 240, 255};
       const float center[3] = {};
       if (draw == 0)
@@ -332,7 +332,7 @@ int main() {
       if (draw == 3)
         NeiGi_DrawShimmerOverlay(&play, color, "oot");
       if (draw == 4)
-        NeiGi_DrawSongOverlay(&play, CW_SONG_SOARING, "oot");
+        NeiGi_DrawSongOverlay(&play, CW_SONG_OOT_ZELDA, "oot");
       if (draw == 5)
         NeiGi_DrawPresentation(
             &play, "__OTR__objects/nei_gi_redesign/fire_rod/gi_dl", nullptr, 1,
@@ -405,18 +405,18 @@ int main() {
   gfx.polyOpa.d = opa + 4096;
   gfx.polyXlu.d = xlu + 512;
   for (int i = 0; i < 32; ++i) {
-    NeiGi_DrawSongOverlay(&play, CW_SONG_SOARING, "oot");
+    NeiGi_DrawSongOverlay(&play, CW_SONG_OOT_ZELDA, "oot");
     assert(gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d &&
            gfx.overlay.p == overlay && stack.empty());
   }
   assert(!arena.empty());
   Reset();
-  NeiGi_DrawSongOverlay(&play, CW_SONG_SOARING, "oot");
+  NeiGi_DrawSongOverlay(&play, CW_SONG_OOT_ZELDA, "oot");
   assert(arena.size() == 1 && !submitted.empty() && stack.empty());
   std::cout
       << "PASS real OPA-tail vertices/matrices, actual debug/setup commands: "
          "short/invalid/overlay/exact/misaligned budgets, caller shell/restore "
-         "reserves and repeated Soaring exhaustion\n";
+         "reserves and repeated approved-song exhaustion\n";
   const auto untouched = [] {
     assert(arena.empty() && submitted.empty() && gfx.polyOpa.p==opa && gfx.polyXlu.p==xlu);
     assert(stack.empty() && matrix==1 && matrixY==0 && interpolation==0);
@@ -502,23 +502,11 @@ int main() {
     assert(ComboSongShimmerColor(song.second, color));
     assert(NeiGi_Draw(&play, &songEntry));
     assert(Drawn() == std::vector<std::string>{ gGiSongNoteDL });
-    assert(!arena.empty() && stack.empty());
-    if(song.second==CW_SONG_SOARING) {
-      const auto shown=arena;
-      arena.clear();
-      NeiGi_DrawShimmerOverlay(&play,color,nullptr);
-      assert(shown.front().size()!=arena.front().size() ||
-             std::memcmp(shown.front().data(),arena.front().data(),shown.front().size()*sizeof(Vtx)) &&
-             "Soaring needs actual feather geometry, not the generic colored star shimmer");
-      arena=shown;
-    }
-    assert(std::any_of(arena.front().begin(),arena.front().end(),[&](const Vtx& vertex) {
-      return vertex.v.cn[0] == color[0] && vertex.v.cn[1] == color[1] && vertex.v.cn[2] == color[2];
-    }));
+    assert(arena.empty() && stack.empty() && "ordinary songs retain native note geometry without unapproved themed particles");
 #ifdef COMBO_BUILD
     CwItemDrawInfo songInfo{};
     assert(NeiGi_DescribeEntry(&songEntry, &songInfo));
-    assert(songInfo.drawKind == CW_DRAW_KIND_SONG_GI && songInfo.neiEffect == song.second && songInfo.itemShimmer);
+    assert(songInfo.drawKind == CW_DRAW_KIND_SONG_GI && songInfo.neiEffect == song.second && !songInfo.itemShimmer);
     assert(songInfo.dlistCount==1 && songInfo.xluStartIndex==0);
     assert(std::memcmp(color, songInfo.itemShimmerColor, 4) == 0);
 #endif
@@ -527,8 +515,56 @@ int main() {
   GetItemEntry stormEntry{};
   stormEntry.gid = GID_SONG_STORM;
   assert(NeiGi_Draw(&play, &stormEntry));
-  assert(Drawn().empty() && arena.size() == 2 && stack.empty()); // Rain and lightning, no note mesh.
-  std::cout << "PASS song presentations: native MM aliases keep palette and shimmer; Storms uses local rain/lightning\n";
+  assert(Drawn() == std::vector<std::string>{gGiSongNoteDL} && arena.size() == 1 && stack.empty());
+  const auto shownRain=arena.front();
+  arena.clear();
+  NeiGi_DrawMesh(&play,NeiGi::SampleSeason(42,1,NeiGi_CameraBasis(&play)));
+  assert(arena.front().size()==shownRain.size() && !std::memcmp(arena.front().data(),shownRain.data(),shownRain.size()*sizeof(Vtx)) &&
+         "Storms must render only the existing rain, without lightning geometry");
+  struct SongFixture {int rg,gid,song;const char* colorDl;uint32_t hue;};
+  const SongFixture shimmerSongs[]={
+    {RG_MINUET_OF_FOREST,GID_SONG_MINUET,CW_SONG_OOT_MINUET,gGiMinuetColorDL,0x62FF62},
+    {RG_BOLERO_OF_FIRE,GID_SONG_BOLERO,CW_SONG_OOT_BOLERO,gGiBoleroColorDL,0xFF3C00},
+    {RG_SERENADE_OF_WATER,GID_SONG_SERENADE,CW_SONG_OOT_SERENADE,gGiSerenadeColorDL,0x55B4DF},
+    {RG_REQUIEM_OF_SPIRIT,GID_SONG_REQUIEM,CW_SONG_OOT_REQUIEM,gGiRequiemColorDL,0xDE9E2F},
+    {RG_NOCTURNE_OF_SHADOW,GID_SONG_NOCTURNE,CW_SONG_OOT_NOCTURNE,gGiNocturneColorDL,0xA028D2},
+    {RG_PRELUDE_OF_LIGHT,GID_SONG_PRELUDE,CW_SONG_OOT_PRELUDE,gGiPreludeColorDL,0xEDE73E},
+    {RG_EPONAS_SONG,GID_SONG_EPONA,CW_SONG_OOT_EPONA,nullptr,0xD96E30},
+    {RG_SUNS_SONG,GID_SONG_SUN,CW_SONG_SUN,nullptr,0xEDE73E}};
+  for(const auto& song:shimmerSongs)for(int effects:{0,1})for(int selectedAlt:{0,1})for(int mod:{0,1}) {
+    Reset();enabled=effects;alt=selectedAlt;
+#ifdef COMBO_BUILD
+    ownerAlt=selectedAlt;
+#endif
+    const std::string selected=(selectedAlt?"alt/":"")+std::string(gGiSongNoteDL);
+    files.insert(gGiSongNoteDL);
+    if(selectedAlt)files.insert(selected);
+    if(mod)modFiles.insert({"oot",selected});
+    const uint8_t rgba[]={uint8_t(song.hue>>16),uint8_t(song.hue>>8),uint8_t(song.hue),255};
+    NeiGi_DrawShimmerOverlay(&play,rgba,nullptr);
+    const auto expected=arena.front();
+    Reset();enabled=effects;alt=selectedAlt;
+    files.insert(gGiSongNoteDL);if(selectedAlt)files.insert(selected);
+    if(mod)modFiles.insert({"oot",selected});
+    GetItemEntry songEntry{};songEntry.tableId=TABLE_RANDOMIZER;songEntry.drawItemId=song.rg;songEntry.gid=song.gid;
+    assert(NeiGi_Draw(&play,&songEntry));
+    const auto paths=Drawn();
+    const std::vector<std::string> wanted=song.colorDl?std::vector<std::string>{song.colorDl,gGiSongNoteDL}:
+                                                           std::vector<std::string>{gGiSongNoteDL};
+    assert(paths==wanted && "all warp songs preserve their native color display list and clef, including selected Alt/mod assets");
+    size_t copies=0;
+    for(const auto& submitted:arena)if(submitted.size()==expected.size() && !std::memcmp(submitted.data(),expected.data(),expected.size()*sizeof(Vtx)))++copies;
+    assert(copies==1 && stack.empty() && "one matching shared shimmer is mandatory even with ItemEffects off or no mod present");
+#ifdef COMBO_BUILD
+    CwItemDrawInfo info{};assert(NeiGi_DescribeEntry(&songEntry,&info));
+    assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.neiEffect==song.song && info.itemShimmer);
+    assert(info.dlistCount==(song.colorDl?2:1) && info.xluStartIndex==0);
+    assert(!std::memcmp(info.itemShimmerColor,rgba,4));
+    assert(std::strcmp(info.dlists[info.dlistCount-1],gGiSongNoteDL)==0);
+    if(song.colorDl)assert(std::strcmp(info.dlists[0],song.colorDl)==0);
+#endif
+  }
+  std::cout << "PASS song presentations: normal MM notes, Storms note/rain, native warp palettes and mandatory matching shimmer across toggle/Alt/mod paths\n";
   Reset();
   GetItemEntry entry{};
   assert(!NeiGi_Draw(nullptr, &entry));

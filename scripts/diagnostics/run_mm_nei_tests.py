@@ -21,6 +21,8 @@ if __name__=='__main__':
     with tempfile.TemporaryDirectory(prefix='mm-nei-') as td:
         sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
         write_graph_helpers(td)
+        from run_time_pedestal_tests import functions
+        (Path(td)/'mm_song_draw.inc').write_text(functions((ROOT/'mm/2s2h/Rando/DrawItem.cpp').read_text())['DrawSong'])
         query=Path(td)/'rig_fit_query.cpp'
         write_query(ROOT, query)
         objects=[]

@@ -789,10 +789,6 @@ extern "C" {
 #include "NeiGiMeshRenderer.inc"
 
 static void NeiGi_DrawSong(PlayState* play, int song) {
-    if (song == CW_SONG_STORMS) {
-        NeiGi_DrawSeasonOverlay(play, 6, nullptr);
-        return;
-    }
     uint8_t color[4];
     if (!ComboSongShimmerColor(song, color))
         return;
@@ -803,12 +799,19 @@ static void NeiGi_DrawSong(PlayState* play, int song) {
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
-    gDPSetGrayscaleColor(POLY_XLU_DISP++, color[0], color[1], color[2], color[3]);
-    gSPGrayscale(POLY_XLU_DISP++, true);
+    const char* colorDl = ComboSongOotColorDlist(song);
+    if (colorDl) {
+        gSPGrayscale(POLY_XLU_DISP++, false);
+        gDma1p(POLY_XLU_DISP++, G_DL_OTR_FILEPATH, colorDl, 0, G_DL_PUSH);
+    } else {
+        gDPSetGrayscaleColor(POLY_XLU_DISP++, color[0], color[1], color[2], color[3]);
+        gSPGrayscale(POLY_XLU_DISP++, true);
+    }
     gDma1p(POLY_XLU_DISP++, G_DL_OTR_FILEPATH, gGiSongNoteDL, 0, G_DL_PUSH);
     gSPGrayscale(POLY_XLU_DISP++, false);
     CLOSE_DISPS(play->state.gfxCtx);
-    NeiGi_DrawSongOverlay(play, song, nullptr);
+    if (ComboSongHasOverlay(song))
+        NeiGi_DrawSongOverlay(play, song, nullptr);
 }
 
 static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool upgraded, bool legacy) {
@@ -1004,14 +1007,16 @@ extern "C" int32_t NeiGi_DescribeEntry(const GetItemEntry* entry, CwItemDrawInfo
     if (const int song = SongForEntry(entry); song >= 0) {
         if (!out)
             return 0;
-        if (song == CW_SONG_STORMS)
-            return NeiGi_FillSeasonInfo(6, out);
         out->drawKind = CW_DRAW_KIND_SONG_GI;
         out->neiEffect = song;
-        out->dlists[0] = gGiSongNoteDL;
-        out->dlistCount = 1;
+        const char* colorDl = ComboSongOotColorDlist(song);
+        out->dlistCount = 0;
+        if (colorDl)
+            out->dlists[out->dlistCount++] = colorDl;
+        out->dlists[out->dlistCount++] = gGiSongNoteDL;
         out->xluStartIndex = 0;
-        out->itemShimmer = ComboSongShimmerColor(song, out->itemShimmerColor);
+        out->itemShimmer = ComboSongHasOverlay(song);
+        ComboSongShimmerColor(song, out->itemShimmerColor);
         std::memcpy(out->primColorXlu, out->itemShimmerColor, 4);
         return 1;
     }

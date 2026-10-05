@@ -411,8 +411,6 @@ void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner) {
         gSPComboRMPush(POLY_XLU_DISP++, owner);
     CLOSE_DISPS(play->state.gfxCtx);
     NeiGi_DrawMesh(play, mesh, Kind::Neutral);
-    if (stormSong)
-        NeiGi_DrawMesh(play, NeiGi::SampleSpecial(Kind::Storm, play->gameplayFrames, NeiGi_CameraBasis(play)));
     if (NeiGi::SeasonProfile(play->gameplayFrames, profile) == 2) {
         const auto rays = NeiGi::SampleSeasonSunRays(play->gameplayFrames, profile, NeiGi_CameraBasis(play));
         NeiGi_DrawMeshMaterial(play, rays, Kind::Neutral, nullptr, true);
@@ -467,14 +465,21 @@ void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const cha
 void NeiGi_DrawSongOverlay(PlayState* play, int song, const char* owner) {
     if (!play || !play->state.gfxCtx || song < 0 || song >= CW_SONG_COUNT)
         return;
-    NeiGi_ArenaScope arena(play, 1, 2, 16);
-    if (!arena)
-        return;
     if (song == CW_SONG_STORMS) {
         NeiGi_DrawSeasonOverlay(play, 6, owner);
         return;
     }
+    if (ComboSongAlwaysShimmers(song)) {
+        uint8_t color[4];
+        ComboSongShimmerColor(song, color);
+        NeiGi_DrawShimmerOverlay(play, color, owner);
+    }
     const auto mesh = NeiGi::SampleSong(song, play->gameplayFrames, NeiGi_CameraBasis(play));
+    if (!mesh.count)
+        return;
+    NeiGi_ArenaScope arena(play, 1, 2, 16);
+    if (!arena)
+        return;
     OPEN_DISPS(play->state.gfxCtx);
     gSPGrayscale(POLY_XLU_DISP++, false);
     if (owner)
