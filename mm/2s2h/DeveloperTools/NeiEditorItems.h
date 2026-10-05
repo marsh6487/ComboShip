@@ -38,26 +38,26 @@ struct SlotItem {
     uint16_t item;
 };
 inline constexpr SlotItem slotItems[] = {
-    {RI_OOT_NEI_BALL_AND_CHAIN, SLOT_BALL_AND_CHAIN, ITEM_BALL_AND_CHAIN},
-    {RI_OOT_NEI_BEETLE, SLOT_BEETLE, ITEM_BEETLE},
-    {RI_OOT_NEI_DEKU_LEAF, SLOT_DEKU_LEAF, ITEM_DEKU_LEAF},
-    {RI_OOT_NEI_DEMISE_DESTRUCTION, SLOT_DEMISE_DESTRUCTION, ITEM_DEMISE_DESTRUCTION},
-    {RI_OOT_NEI_FIRE_ROD, SLOT_FIRE_ROD, ITEM_ROD_FIRE},
-    {RI_OOT_NEI_GUST_JAR, SLOT_GUST_JAR, ITEM_GUST_JAR},
-    {RI_OOT_NEI_ICE_ROD, SLOT_ICE_ROD, ITEM_ROD_ICE},
-    {RI_OOT_NEI_LANTERN, SLOT_LANTERN, ITEM_LANTERN},
-    {RI_OOT_NEI_LIGHT_ROD, SLOT_LIGHT_ROD, ITEM_ROD_LIGHT},
-    {RI_OOT_NEI_MINISH_CAP, SLOT_MINISH_CAP, ITEM_MINISH_CAP},
-    {RI_OOT_NEI_MOGMA_MITTS, SLOT_MOGMA_MITTS, ITEM_MOGMA_MITTS},
-    {RI_OOT_NEI_SPINNER, SLOT_SPINNER, ITEM_SPINNER},
-    {RI_OOT_NEI_SWITCH_HOOK, SLOT_SWITCH_HOOK, ITEM_SWITCH_HOOK},
-    {RI_OOT_NEI_TIME_GATE, SLOT_TIME_GATE, ITEM_TIME_GATE},
-    {RI_OOT_NEI_WHIP, SLOT_WHIP, ITEM_WHIP},
-    {RI_OOT_NEI_ZONAI_PERMAFROST, SLOT_ZONAI_PERMAFROST, ITEM_ZONAI_PERMAFROST},
-    {RI_OOT_NEI_SHEIKAH_SLATE, SLOT_SHEIKAH_SLATE, EXT_ITEM_SHEIKAH_SLATE},
-    {RI_OOT_NEI_PHANTOM_HOURGLASS, SLOT_PHANTOM_HOURGLASS, EXT_ITEM_PHANTOM_HOURGLASS},
-    {RI_OOT_NEI_SHADOW_CRYSTAL, SLOT_SHADOW_CRYSTAL, EXT_ITEM_SHADOW_CRYSTAL},
-    {RI_OOT_NEI_ROD_OF_SEASONS, SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS},
+    { RI_OOT_NEI_BALL_AND_CHAIN, SLOT_BALL_AND_CHAIN, ITEM_BALL_AND_CHAIN },
+    { RI_OOT_NEI_BEETLE, SLOT_BEETLE, ITEM_BEETLE },
+    { RI_OOT_NEI_DEKU_LEAF, SLOT_DEKU_LEAF, ITEM_DEKU_LEAF },
+    { RI_OOT_NEI_DEMISE_DESTRUCTION, SLOT_DEMISE_DESTRUCTION, ITEM_DEMISE_DESTRUCTION },
+    { RI_OOT_NEI_FIRE_ROD, SLOT_FIRE_ROD, ITEM_ROD_FIRE },
+    { RI_OOT_NEI_GUST_JAR, SLOT_GUST_JAR, ITEM_GUST_JAR },
+    { RI_OOT_NEI_ICE_ROD, SLOT_ICE_ROD, ITEM_ROD_ICE },
+    { RI_OOT_NEI_LANTERN, SLOT_LANTERN, ITEM_LANTERN },
+    { RI_OOT_NEI_LIGHT_ROD, SLOT_LIGHT_ROD, ITEM_ROD_LIGHT },
+    { RI_OOT_NEI_MINISH_CAP, SLOT_MINISH_CAP, ITEM_MINISH_CAP },
+    { RI_OOT_NEI_MOGMA_MITTS, SLOT_MOGMA_MITTS, ITEM_MOGMA_MITTS },
+    { RI_OOT_NEI_SPINNER, SLOT_SPINNER, ITEM_SPINNER },
+    { RI_OOT_NEI_SWITCH_HOOK, SLOT_SWITCH_HOOK, ITEM_SWITCH_HOOK },
+    { RI_OOT_NEI_TIME_GATE, SLOT_TIME_GATE, ITEM_TIME_GATE },
+    { RI_OOT_NEI_WHIP, SLOT_WHIP, ITEM_WHIP },
+    { RI_OOT_NEI_ZONAI_PERMAFROST, SLOT_ZONAI_PERMAFROST, ITEM_ZONAI_PERMAFROST },
+    { RI_OOT_NEI_SHEIKAH_SLATE, SLOT_SHEIKAH_SLATE, EXT_ITEM_SHEIKAH_SLATE },
+    { RI_OOT_NEI_PHANTOM_HOURGLASS, SLOT_PHANTOM_HOURGLASS, EXT_ITEM_PHANTOM_HOURGLASS },
+    { RI_OOT_NEI_SHADOW_CRYSTAL, SLOT_SHADOW_CRYSTAL, EXT_ITEM_SHADOW_CRYSTAL },
+    { RI_OOT_NEI_ROD_OF_SEASONS, SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS },
 };
 
 inline constexpr RandoItemId runeItems[] = {
@@ -95,6 +95,14 @@ inline int WandMode(RandoItemId id) {
     return -1;
 }
 
+inline bool WandModeEarned(int mode) {
+    if (mode < 0 || mode >= WAND_MODE_COUNT) {
+        return false;
+    }
+    const auto earned = Nei_Save()->wandRodsOwned & ((1u << WAND_MODE_COUNT) - 1);
+    return Wand_RandoMode() == WAND_RANDO_SINGLE ? earned != 0 : (earned & (1u << mode)) != 0;
+}
+
 inline bool IsOwned(RandoItemId id) {
     const auto* nei = Nei_Save();
     for (const auto& item : slotItems) {
@@ -121,51 +129,53 @@ inline bool IsOwned(RandoItemId id) {
     }
     const int wand = WandMode(id);
     if (wand >= 0) {
-        return Wand_ModeOwned((uint8_t)wand) && Nei_GetOwnedItem(SLOT_ELEMENTAL_WAND) == ITEM_ELEMENTAL_WAND;
+        return WandModeEarned(wand) && Wand_ModeOwned((uint8_t)wand) &&
+               Nei_GetOwnedItem(SLOT_ELEMENTAL_WAND) == ITEM_ELEMENTAL_WAND;
     }
     switch (id) {
-    case RI_OOT_NEI_BOMB_ARROWS:
-        return nei->bombArrowsOwned != 0;
-    case RI_OOT_NEI_SHOVEL:
-        return nei->shovelOwned &&
-               (Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_SHOVEL || Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_DOMINION_ROD);
-    case RI_OOT_NEI_DOMINION_ROD:
-        return nei->dominionOwned &&
-               (Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_SHOVEL || Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_DOMINION_ROD);
-    case RI_OOT_NEI_POKE_BALL:
-        return nei->pokeballOwned != 0;
-    case RI_OOT_NEI_MARIO_MASK:
-        return nei->marioMaskOwned != 0;
-    case RI_OOT_NEI_ROCS_FEATHER:
-        return Nei_GetOwnedItem(SLOT_ROCS) == ITEM_ROCS_FEATHER_SKIJER || Nei_GetOwnedItem(SLOT_ROCS) == ITEM_ROCS_CAPE;
-    case RI_OOT_NEI_ROCS_CAPE:
-        return Nei_GetOwnedItem(SLOT_ROCS) == ITEM_ROCS_CAPE;
-    case RI_OOT_EXT_MAGIC_CAPE:
-        return ExtEquip_CapeOwned() != 0;
-    case RI_OOT_EXT_CANE_OF_BYRNA:
-        return ExtEquip_HasItem(EQUIP_TYPE_SWORD, 1);
-    case RI_OOT_EXT_FOUR_SWORD:
-        return ExtEquip_HasItem(EQUIP_TYPE_SWORD, 2);
-    case RI_OOT_EXT_TRIDENT:
-        return ExtEquip_HasItem(EQUIP_TYPE_SWORD, 3);
-    case RI_OOT_EXT_DIVINE_SHIELD:
-        return ExtEquip_HasItem(EQUIP_TYPE_SHIELD, 1);
-    case RI_OOT_EXT_SHEIKAH_SHIELD:
-        return ExtEquip_HasItem(EQUIP_TYPE_SHIELD, 2);
-    case RI_OOT_EXT_CHAMPIONS_TUNIC:
-        return ExtEquip_HasItem(EQUIP_TYPE_TUNIC, 1);
-    case RI_OOT_EXT_SPIRIT_BREASTPLATE:
-        return ExtEquip_HasItem(EQUIP_TYPE_TUNIC, 2);
-    case RI_OOT_EXT_WATER_DRAGON_SCALE:
-        return ExtEquip_HasItem(EQUIP_TYPE_TUNIC, 3);
-    case RI_OOT_EXT_PEGASUS_ANKLET:
-        return ExtEquip_HasItem(3, 1);
-    case RI_OOT_EXT_CLIMB_BOOTS:
-        return ExtEquip_HasItem(3, 2);
-    case RI_OOT_EXT_ROC_BOOTS:
-        return ExtEquip_HasItem(3, 3);
-    default:
-        return false;
+        case RI_OOT_NEI_BOMB_ARROWS:
+            return nei->bombArrowsOwned != 0;
+        case RI_OOT_NEI_SHOVEL:
+            return nei->shovelOwned &&
+                   (Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_SHOVEL || Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_DOMINION_ROD);
+        case RI_OOT_NEI_DOMINION_ROD:
+            return nei->dominionOwned &&
+                   (Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_SHOVEL || Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_DOMINION_ROD);
+        case RI_OOT_NEI_POKE_BALL:
+            return nei->pokeballOwned != 0;
+        case RI_OOT_NEI_MARIO_MASK:
+            return nei->marioMaskOwned != 0;
+        case RI_OOT_NEI_ROCS_FEATHER:
+            return Nei_GetOwnedItem(SLOT_ROCS) == ITEM_ROCS_FEATHER_SKIJER ||
+                   Nei_GetOwnedItem(SLOT_ROCS) == ITEM_ROCS_CAPE;
+        case RI_OOT_NEI_ROCS_CAPE:
+            return Nei_GetOwnedItem(SLOT_ROCS) == ITEM_ROCS_CAPE;
+        case RI_OOT_EXT_MAGIC_CAPE:
+            return ExtEquip_CapeOwned() != 0;
+        case RI_OOT_EXT_CANE_OF_BYRNA:
+            return ExtEquip_HasItem(EQUIP_TYPE_SWORD, 1);
+        case RI_OOT_EXT_FOUR_SWORD:
+            return ExtEquip_HasItem(EQUIP_TYPE_SWORD, 2);
+        case RI_OOT_EXT_TRIDENT:
+            return ExtEquip_HasItem(EQUIP_TYPE_SWORD, 3);
+        case RI_OOT_EXT_DIVINE_SHIELD:
+            return ExtEquip_HasItem(EQUIP_TYPE_SHIELD, 1);
+        case RI_OOT_EXT_SHEIKAH_SHIELD:
+            return ExtEquip_HasItem(EQUIP_TYPE_SHIELD, 2);
+        case RI_OOT_EXT_CHAMPIONS_TUNIC:
+            return ExtEquip_HasItem(EQUIP_TYPE_TUNIC, 1);
+        case RI_OOT_EXT_SPIRIT_BREASTPLATE:
+            return ExtEquip_HasItem(EQUIP_TYPE_TUNIC, 2);
+        case RI_OOT_EXT_WATER_DRAGON_SCALE:
+            return ExtEquip_HasItem(EQUIP_TYPE_TUNIC, 3);
+        case RI_OOT_EXT_PEGASUS_ANKLET:
+            return ExtEquip_HasItem(3, 1);
+        case RI_OOT_EXT_CLIMB_BOOTS:
+            return ExtEquip_HasItem(3, 2);
+        case RI_OOT_EXT_ROC_BOOTS:
+            return ExtEquip_HasItem(3, 3);
+        default:
+            return false;
     }
 }
 
@@ -200,14 +210,9 @@ inline bool RestoreOwnedHost(RandoItemId id) {
     } else if (id == RI_OOT_NEI_DOMINION_ROD && nei->dominionOwned) {
         slot = SLOT_SHOVEL;
         item = ITEM_DOMINION_ROD;
-    } else if (WandMode(id) >= 0) {
-        for (uint8_t mode = 0; mode < WAND_MODE_COUNT; ++mode) {
-            if (Wand_ModeOwned(mode)) {
-                slot = SLOT_ELEMENTAL_WAND;
-                item = ITEM_ELEMENTAL_WAND;
-                break;
-            }
-        }
+    } else if (WandMode(id) >= 0 && (nei->wandRodsOwned & ((1u << WAND_MODE_COUNT) - 1))) {
+        slot = SLOT_ELEMENTAL_WAND;
+        item = ITEM_ELEMENTAL_WAND;
     }
     if (slot != SLOT_NONE && Nei_GetOwnedItem(slot) == ITEM_NONE) {
         ExtInv_GiveItem(slot, item);
@@ -221,16 +226,25 @@ inline bool Grant(RandoItemId id) {
         return false;
     }
     const bool restored = RestoreOwnedHost(id);
+    const int wand = WandMode(id);
+    if (wand >= 0) {
+        bool changed = restored;
+        if (!WandModeEarned(wand)) {
+            Rando::GiveItem(id);
+            changed = true;
+        }
+        // Repair usability separately from earned ownership: a retained rod
+        // may be missing its medallion, and must not be awarded a second time.
+        if (Wand_RandoMode() == WAND_RANDO_MEDALLIONS && !Wand_ModeOwned((uint8_t)wand)) {
+            Rando::GiveItem(wandMedallions[wand]);
+            changed = true;
+        }
+        return changed;
+    }
     if (IsOwned(id)) {
         return restored;
     }
     Rando::GiveItem(id);
-    // The default wand rule reads the medallion quest bits, so obtaining a rod
-    // also needs its canonical medallion grant to make that variant usable.
-    const int wand = WandMode(id);
-    if (wand >= 0 && Wand_RandoMode() == WAND_RANDO_MEDALLIONS && !Wand_ModeOwned((uint8_t)wand)) {
-        Rando::GiveItem(wandMedallions[wand]);
-    }
     return true;
 }
 

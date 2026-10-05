@@ -16,7 +16,7 @@ extern "C" {
 #define SPDLOG_INFO(...) ((void)0)
 
 SaveContext gSaveContext{};
-PlayState* gPlayState = nullptr;
+PlayState *gPlayState = nullptr;
 int gFcCombo_SuppressRecord = 0;
 u32 gRandoPickupSerial = 0;
 u8 gItemSlots[77]{};
@@ -25,7 +25,7 @@ int wandRule = WAND_RANDO_MEDALLIONS;
 int notifications = 0;
 int sharedObtained = 0;
 bool Rando::gComboDormantGive = false;
-extern "C" void ItemGrantAudit_Begin(const char*, int, int, int) {}
+extern "C" void ItemGrantAudit_Begin(const char *, int, int, int) {}
 extern "C" void ItemGrantAudit_End(void) {}
 void ExtInv_SetOotSlotItem(int, u8) { REQUIRE(false); }
 u8 ExtInv_GetOotSlotItem(int) {
@@ -42,7 +42,7 @@ extern "C" u8 TradeAdult_CellItem(void) {
 }
 
 extern "C" void FleetShared_OnNativeObtained(int) { ++sharedObtained; }
-int32_t CVarGetInteger(const char* name, int32_t defaultValue) {
+int32_t CVarGetInteger(const char *name, int32_t defaultValue) {
     if (strcmp(name, "gRando.Options.RO_ELEMENTAL_WAND_SHUFFLE") == 0)
         return wandRule;
     return defaultValue;
@@ -68,7 +68,7 @@ static void reset() {
     notifications = sharedObtained = 0;
     gRandoPickupSerial = 0;
     // Ordinary inventory, bottles, masks, currency and upgrades must survive grants.
-    auto& native = gSaveContext.save.saveInfo;
+    auto &native = gSaveContext.save.saveInfo;
     for (int i = 0; i < 48; ++i)
         native.inventory.items[i] = (u8)(i + 1);
     native.inventory.items[SLOT_BOTTLE_1] = ITEM_MUSHROOM;
@@ -83,7 +83,7 @@ int main() {
         reset();
         const auto nativeBefore = gSaveContext.save.saveInfo;
         NeiEditor::GrantAll();
-        auto* nei = Nei_Save();
+        auto *nei = Nei_Save();
         REQUIRE(Nei_GetOwnedItem(39) == EXT_ITEM_SHEIKAH_SLATE);
         REQUIRE(Nei_GetOwnedItem(41) == EXT_ITEM_PHANTOM_HOURGLASS);
         REQUIRE(Nei_GetOwnedItem(44) == EXT_ITEM_SHADOW_CRYSTAL);
@@ -128,7 +128,7 @@ int main() {
         {RI_OOT_NEI_SHADOW_CRYSTAL, 44, EXT_ITEM_SHADOW_CRYSTAL},
         {RI_OOT_NEI_ROD_OF_SEASONS, 47, EXT_ITEM_ROD_OF_SEASONS},
     };
-    for (const auto& item : individual) {
+    for (const auto &item : individual) {
         reset();
         const auto nativeBefore = gSaveContext.save.saveInfo;
         REQUIRE(NeiEditor::Grant(item.id));
@@ -161,7 +161,7 @@ int main() {
         {RI_OOT_NEI_DESIRE_SENSOR, 16},    {RI_OOT_NEI_SLATE_RUNE_BOMB, 1},    {RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE, 8},
         {RI_OOT_NEI_SLATE_RUNE_STASIS, 2}, {RI_OOT_NEI_SLATE_RUNE_CRYONIS, 4},
     };
-    for (const auto& rune : runes) {
+    for (const auto &rune : runes) {
         reset();
         REQUIRE(NeiEditor::Grant(rune.id));
         REQUIRE(Nei_GetOwnedItem(39) == EXT_ITEM_SHEIKAH_SLATE);
@@ -211,6 +211,55 @@ int main() {
     REQUIRE(Nei_Save()->comboAppliedFc[caneFc] == powered.comboAppliedFc[caneFc]);
     puts("PASS clear/regrant: retained powers recover their host cells without recounting cane skills or changing "
          "rune/season selection");
+
+    // Medallions make a wand mode usable, but do not constitute an earned wand.
+    wandRule = WAND_RANDO_MEDALLIONS;
+    for (const auto id : {RI_OOT_NEI_ELEMENTAL_WAND, RI_OOT_NEI_WAND_SAND_ROD}) {
+        reset();
+        Rando::GiveItem(RI_OOT_MEDALLION_SPIRIT);
+        REQUIRE(Wand_ModeOwned(WAND_MODE_SAND));
+        REQUIRE(Nei_GetOwnedItem(SLOT_ELEMENTAL_WAND) == ITEM_NONE);
+        const int fc = FcCombo_ItemForNative(id);
+        REQUIRE(fc >= 0);
+        const auto obtained = Nei_Save()->comboObtainedFc[fc];
+        const auto applied = Nei_Save()->comboAppliedFc[fc];
+        REQUIRE(NeiEditor::Grant(id));
+        REQUIRE(Nei_Save()->wandRodsOwned & (1u << WAND_MODE_SAND));
+        REQUIRE(Nei_Save()->comboObtainedFc[fc] == obtained + 1);
+        REQUIRE(Nei_Save()->comboAppliedFc[fc] == applied + 1);
+    }
+    reset();
+    for (const auto id : NeiEditor::wandMedallions)
+        Rando::GiveItem(id);
+    NeiEditor::GrantAll();
+    REQUIRE(Nei_Save()->wandRodsOwned == 0x3F);
+    for (const auto id : NeiEditor::wandItems)
+        REQUIRE(NeiEditor::IsOwned(id));
+
+    // A bare earned wand needs only its missing prerequisite. Clearing its host
+    // must not cause the previously earned wand to be awarded or counted again.
+    for (bool clear : {false, true}) {
+        reset();
+        Rando::GiveItem(RI_OOT_NEI_ELEMENTAL_WAND);
+        REQUIRE(!Wand_ModeOwned(WAND_MODE_SAND));
+        REQUIRE(Nei_Save()->wandRodsOwned & (1u << WAND_MODE_SAND));
+        const int fc = FcCombo_ItemForNative(RI_OOT_NEI_ELEMENTAL_WAND);
+        REQUIRE(fc >= 0);
+        const auto obtained = Nei_Save()->comboObtainedFc[fc];
+        const auto applied = Nei_Save()->comboAppliedFc[fc];
+        if (clear)
+            Nei_SetOwnedItem(SLOT_ELEMENTAL_WAND, ITEM_NONE);
+        REQUIRE(NeiEditor::Grant(RI_OOT_NEI_ELEMENTAL_WAND));
+        REQUIRE(Wand_ModeOwned(WAND_MODE_SAND));
+        REQUIRE(Nei_GetOwnedItem(SLOT_ELEMENTAL_WAND) == ITEM_ELEMENTAL_WAND);
+        REQUIRE(Nei_Save()->comboObtainedFc[fc] == obtained);
+        REQUIRE(Nei_Save()->comboAppliedFc[fc] == applied);
+        const auto before = *Nei_Save();
+        REQUIRE(!NeiEditor::Grant(RI_OOT_NEI_ELEMENTAL_WAND));
+        REQUIRE(memcmp(&before, Nei_Save(), sizeof(before)) == 0);
+    }
+    puts("PASS wand earning versus usability: medallion-only canonical grants, complete siblings and bare/cleared "
+         "owned wand prerequisite repair without recounting");
 #endif
     return 0;
 }

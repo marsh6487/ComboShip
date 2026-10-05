@@ -1,6 +1,6 @@
 # Task 4 receipt reconstruction evidence
 
-Task started: 2026-10-04; report completed: 2026-10-05 UTC. Worktree: `/workspace/scratch/68d44ffc4c98/takeover-receipts`. Branch: `poc/reconstruct-receipts-20261004`. Final worker HEAD: `f15790182fdb653a7c79e5af58c5d6bea641c680`.
+Task started: 2026-10-04; report completed and amended after independent review: 2026-10-05 UTC. Worktree: `/workspace/scratch/68d44ffc4c98/takeover-receipts`. Branch: `poc/reconstruct-receipts-20261004`. Final worker HEAD: `a7ee19c58007bcca1a0378261198de7a01414c05`.
 
 This resumes the accepted Task 4 design in `docs/superpowers/plans/2026-10-04-final-polish-reconstruction.md`. The recovered song receipt, song palette and soul-color headers were preserved. Missing production implementations were reconstructed and newly verified; this report does not claim they are byte-for-byte historical recovery. The parent owns integration, GitHub checkpoint publication and draft PR #34 publication. This worker did not push, merge or edit the root gate.
 
@@ -14,8 +14,9 @@ This resumes the accepted Task 4 design in `docs/superpowers/plans/2026-10-04-fi
 | `956a62b1da4f21b3625e3d27a0e44395ee563d67` | Exact soul-name colors in the two Latin textboxes | Each engine's actual color-control arm failed exact RGB before the fix. Five bosses in EN/DE/FR, wrapped names, page/control rejection, unknown names and red Goht Remains pass afterward. |
 | `9d5b45ca63af089c6e2d41781d1f9d646c9465ac` | Colored MM clef staging, donor tint and MM Ikana ownership | Production fixtures caught the OoT icon selected for Ikana, missing cold alias icons and shared Time RGB for Double Time. Native and donor icon selectors, both clef renderers, white reset and geometry checks pass after the fixes. |
 | `f15790182fdb653a7c79e5af58c5d6bea641c680` | Concrete Chest Game key body and all traditional families | A real-catalog fixture reported `Replaced traditional receipt: Chest Game Small Key`. Its native text ID is 0xF3, while randomized dungeon small keys need 0x60. The correction passes all 48 traditional catalog rows. |
+| `a7ee19c58007bcca1a0378261198de7a01414c05` | Concrete local MM small-key consumer routing | Independent review found that all ten count-chain keys bypassed the donor. The actual MM builder fixture went RED with `Missing concrete MM key tutorial: Bottom of the Well Small Key`; all ten concrete and direct foreign consumer paths now preserve complete tutorials, including the Chest Game distinction. |
 
-All six SHAs and section evidence were sent to the parent as soon as the sections were committed.
+All seven SHAs and section evidence were sent to the parent as soon as the sections were committed.
 
 ## Resulting production behavior
 
@@ -24,6 +25,10 @@ All six SHAs and section evidence were sent to the parent as soon as the section
 `OOT_GetItemReceiptText` selects the original OoT message-table body before fallback/custom receipt handling. Maps use 0x66, compasses 0x67, randomized dungeon and fortress small keys 0x60, concrete Chest Game keys 0xF3 and boss keys 0xC7. Native OoT song receipt IDs come from the item's unresolved GI entry, so receipt composition does not advance the identity after a progressive grant. Enabled map/compass information is appended after the preserved body and a page control. The existing dungeon mode hint remains intact.
 
 The expanded fixture imports real item names and unresolved text IDs from `item_list.cpp` and executes the production exporter for 12 songs, 10 maps, 10 compasses, 10 small keys and 6 boss keys. It checks the complete normalized native body as a prefix, not just a short acquired-name string. Message-table bodies are controlled test seams with distinct IDs; this is a routing/body-preservation proof, not an archive extraction or in-game text screenshot.
+
+Independent final review identified a missing consumer route that the 48-row exporter fixture could not detect. The ten local MM `RI_OOT_SMALL_KEY_*` rows have `ITEM_NONE`/`GI_NONE`; their FC chain lengths (2..9) count identical keys. `ApplyItemReceiptText` allowed the generic direct donor fallback only for `chainLen == 1`, and these keys had no concrete name mapping. The reviewer's real-builder reproduction found `accepted=0`, no donor read and an unchanged generic receipt for all ten keys.
+
+The follow-up maps those ten concrete identities to their canonical donor names in `ConcreteReceiptName`. It does not relax the generic progressive-chain guard or change FC tables, counts, grants or saves. The amended catalog fixture links the actual MM `ItemReceiptText.cpp` and real static/FC catalogs. It exercises every key at count zero and full count, with information disabled and enabled in a valid Rando save, verifies the complete 0x60/0xF3 tutorial supplied by the donor seam, compares `ApplyForeignItemReceiptText` with the local consumer, checks source/page/end appending and asserts that both game and NEI save data stay unchanged. The existing 48-row real exporter fixture separately verifies the donor side of this contract.
 
 Existing production foreign-latch and queued receipt fixtures continue to cover frozen progressive identities, live appearance changes, slot/generation reset, source attribution, ordinary grants and trap suppression. The MM concrete receipt catalog and actual native/FC item catalog checks also remain green. Grant logic and save layout were not changed.
 
@@ -79,18 +84,20 @@ Checks source `/workspace/scratch/68d44ffc4c98/test-env.sh`, which supplies actu
 
 | Command | Result | Evidence |
 | --- | --- | --- |
-| `python3 scripts/diagnostics/run_mm_item_receipt_tests.py` | PASS after final Chest Game fix | `/tmp/receipt-traditional-all-green.log` |
-| `ASAN_OPTIONS=detect_leaks=0 python3 scripts/diagnostics/run_mm_item_receipt_tests.py --sanitizers` | PASS with AddressSanitizer and UndefinedBehaviorSanitizer | `/tmp/receipt-final-asan.log` |
+| `python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py` | PASS after concrete MM small-key consumer correction, including all 48 donor rows and ten concrete/direct foreign consumers | `/tmp/receipt-concrete-small-keys-green.log` |
+| `ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py --sanitizers` | PASS with AddressSanitizer and UndefinedBehaviorSanitizer after consumer correction | `/tmp/receipt-concrete-small-keys-asan.log` |
 | `python3 scripts/diagnostics/run_receipt_soul_color_tests.py` | PASS for MM and OoT behavioral fixtures plus both full textbox C source syntax checks | `/tmp/receipt-formatted-soul.log` |
 | `CC='cc -fsanitize=address,undefined -fno-omit-frame-pointer -g' ASAN_OPTIONS=detect_leaks=0 python3 scripts/diagnostics/run_receipt_soul_color_tests.py` | PASS for both engines with AddressSanitizer and UndefinedBehaviorSanitizer | `/tmp/receipt-soul-asan.log` |
 | `python3 scripts/diagnostics/run_combo_rpg_tests.py` | PASS caps, all stat formulas, partial sync, idempotency, MM save migration and real OoT RPG pool/export | `/tmp/receipt-rpg-regression.log` |
 | `python3 scripts/diagnostics/run_combo_reward_delivery_tests.py` | PASS immediate magic floors, capacity, duplicate/echo suppression, invalid saves, Chateau/native/infinite/ordinary milk behavior and active-only notifications | `/tmp/receipt-reward-regression.log` |
-| `python3 scripts/diagnostics/run_receipt_syntax_tests.py` | Six full receipt TUs PASS; isolated DrawItem TU has one GI signature dependency | `/tmp/receipt-final-source-syntax.log` |
+| `python3 -B scripts/diagnostics/run_receipt_syntax_tests.py` | Six full receipt TUs PASS after consumer correction; isolated DrawItem TU has one GI signature dependency | `/tmp/receipt-concrete-small-keys-syntax.log` |
 | `git diff --check` / staged whitespace checks | PASS before each section checkpoint | Commit preparation output |
 
 Full production translation units passing actual-header syntax: MM `z_message.c`, MM `z_message_nes.c`, OoT `z_message_PAL.c`, MM `ItemReceiptText.cpp`, MM `StaticData/Items.cpp` and OoT `Messages/ItemMessages.cpp`. Compiler warnings remain (34, 16, 5, 14, 15 and 1 respectively); the harness reports them rather than claiming warning-free compilation. MM C++ checks include the real CMake precompiled-header console-variable, Context and Window prerequisites.
 
-The seventh TU, MM `DrawItem.cpp`, fails in this isolated branch only because recovered `ComboForeignDrawMM.h` calls `MM_DrawNeiGi(recipe, shop)` while the old isolated `NeiGiPresentation.h` declares a single argument. The parent confirms the GI worker corrected this in `cfdbfbfa` and will run the full-TU check after integration. Per ownership instructions this worker did not copy/cherry-pick or duplicate GI implementation changes to silence that dependency.
+The seventh TU, MM `DrawItem.cpp`, fails in this isolated branch only because recovered `ComboForeignDrawMM.h` calls `MM_DrawNeiGi(recipe, shop)` while the old isolated `NeiGiPresentation.h` declares a single argument. The parent confirms the GI worker corrected this in `cfdbfbfa` and all seven receipt TUs passed in the integrated tree before this consumer follow-up. The parent will independently recheck the follow-up. Per ownership instructions this worker did not copy/cherry-pick or duplicate GI implementation changes to silence that dependency.
+
+Consumer follow-up RED evidence: `/tmp/receipt-concrete-small-keys-red.log`. The independent review's exhaustive ten-key reproduction and log are `/workspace/scratch/68d44ffc4c98/final-review-small-key-repro.cpp`, `/workspace/scratch/68d44ffc4c98/final-review-small-key-repro.py` and `/workspace/scratch/68d44ffc4c98/final-review-small-key-repro.log`. The initial source inspection of the existing generic guard was insufficient; the actual local-consumer fixture now prevents this specific omission from passing an exporter-only test.
 
 The first sanitizer attempt reached LeakSanitizer's sandbox limitation (`Can't open /proc/.../task`, `LeakSanitizer does not work under ptrace`). The successful reruns explicitly disabled leak detection. They prove ASan/UBSan checks, not leak analysis.
 

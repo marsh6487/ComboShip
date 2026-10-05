@@ -26,9 +26,11 @@ struct HostState {
     PlayState* play = nullptr;
     Player* player = nullptr;
     Input raw{};
+    Input effective{};
     u32 frame = 0;
     s16 scene = 0;
     u16 filter = 0;
+    u16 toggle = 0;
 };
 HostState sHost;
 
@@ -78,8 +80,9 @@ bool OtherOwner(Player* player) {
 bool MustRelease(PlayState* play, Player* player) {
     return player != GET_PLAYER(play) || player->transformation != PLAYER_FORM_HUMAN ||
            player->currentMask != PLAYER_MASK_NONE || OtherOwner(player) ||
-           !CVarGetInteger("gMods.WolfLink.Enabled", 1) || play->transitionTrigger == TRANS_TRIGGER_START ||
-           (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_200)) ||
+           !CVarGetInteger("gMods.WolfLink.Enabled", 1) || play->transitionTrigger != TRANS_TRIGGER_OFF ||
+           play->transitionMode != TRANS_MODE_OFF || play->actorCtx.isOverrideInputOn ||
+           (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_200 | PLAYER_STATE1_20)) ||
            gSaveContext.save.saveInfo.playerData.health <= 0 ||
            (player->stateFlags3 & PLAYER_STATE3_FLYING_WITH_HOOKSHOT);
 }
@@ -88,7 +91,7 @@ bool ContextAction(const Player* player) {
     return (player->stateFlags1 & kInteractionStates) ||
            ((player->stateFlags2 & PLAYER_STATE2_CAN_ACCEPT_TALK_OFFER) && player->talkActor) ||
            player->interactRangeActor || player->doorType != PLAYER_DOORTYPE_NONE ||
-           player->csAction != PLAYER_CSACTION_NONE;
+           player->csAction != PLAYER_CSACTION_NONE || player->textboxBtnCooldownTimer != 0;
 }
 
 bool CanActivate(PlayState* play, Player* player) {
@@ -128,25 +131,24 @@ extern "C" void WolfLinkHost_PreUpdate(PlayState* play, Player* player) {
     sHost.scene = play->sceneId;
     sHost.frame = play->gameplayFrames;
     sHost.raw = play->state.input[0];
+    sHost.effective = Input{};
     sHost.filter = 0;
+    sHost.toggle = 0;
 
-    if (Active(player) && MustRelease(play, player))
-        Stop(play, player);
+    if (MustRelease(play, player)) {
+        if (Active(player))
+            Stop(play, player);
+        return;
+    }
 
     if (sHost.raw.press.button & ItemButtons(0, true)) {
         if (Active(player))
             Stop(play, player);
         return;
     }
-    const u16 toggle = ItemButtons(EXT_ITEM_SHADOW_CRYSTAL, false);
-    if (sHost.raw.press.button & toggle) {
-        if (Active(player)) {
-            Stop(play, player);
-            sHost.filter = toggle;
-        } else if (CanActivate(play, player) && WolfLinkForm_LoadSkeleton(play)) {
-            WolfLinkForm_Select(1);
-            sHost.filter = toggle;
-        }
+    if (Active(player) || CanActivate(play, player)) {
+        sHost.toggle = ItemButtons(EXT_ITEM_SHADOW_CRYSTAL, false);
+        sHost.filter = sHost.toggle;
     }
     if (Active(player)) {
         sHost.filter |= kItemButtons;
@@ -160,9 +162,38 @@ extern "C" void WolfLinkHost_PreUpdate(PlayState* play, Player* player) {
     Filter(&play->state.input[0], sHost.filter);
 }
 
+extern "C" void WolfLinkHost_RestorePlayerInput(Player* player, Input* input) {
+    if (sHost.player != player)
+        return;
+    // Reconstitute only reservations made before raw listeners. MM selects/suppresses
+    // this physical pad afterward, and OnPassPlayerInputs still has final policy control.
+    const u16 reserved = (sHost.filter & kMashButtons) | sHost.toggle;
+    input->cur.button |= sHost.raw.cur.button & reserved;
+    input->press.button |= sHost.raw.press.button & reserved;
+    input->rel.button |= sHost.raw.rel.button & reserved;
+}
+
 extern "C" void WolfLinkHost_FilterInput(Player* player, Input* input) {
-    if (sHost.player == player)
-        Filter(input, sHost.filter);
+    if (sHost.player != player)
+        return;
+    sHost.effective = *input;
+    const u16 toggle = sHost.toggle;
+    if (input->press.button & toggle) {
+        if (Active(player))
+            Stop(sHost.play, player);
+        else if (CanActivate(sHost.play, player) && WolfLinkForm_LoadSkeleton(sHost.play))
+            WolfLinkForm_Select(1);
+    }
+    sHost.filter = toggle;
+    if (Active(player)) {
+        sHost.filter |= kItemButtons;
+        if (!NativeDamage(player)) {
+            sHost.filter |= BTN_B | BTN_R;
+            if (!ContextAction(player))
+                sHost.filter |= BTN_A;
+        }
+    }
+    Filter(input, sHost.filter);
 }
 
 extern "C" void WolfLinkHost_BeforeAction(PlayState* play, Player* player, Input* input) {
@@ -174,12 +205,12 @@ extern "C" void WolfLinkHost_BeforeAction(PlayState* play, Player* player, Input
         return;
     }
     const bool native = NativeDamage(player);
-    Input actionInput = sHost.raw;
+    Input actionInput = sHost.effective;
     if (native) {
         // Preserve freeze/thaw mash inputs even when MM installed the action this frame.
-        input->cur.button |= sHost.raw.cur.button & kMashButtons;
-        input->press.button |= sHost.raw.press.button & kMashButtons;
-        input->rel.button |= sHost.raw.rel.button & kMashButtons;
+        input->cur.button |= sHost.effective.cur.button & kMashButtons;
+        input->press.button |= sHost.effective.press.button & kMashButtons;
+        input->rel.button |= sHost.effective.rel.button & kMashButtons;
     } else if (ContextAction(player)) {
         WolfLinkForm_ReleaseAction(player);
         Filter(&actionInput, kMashButtons);

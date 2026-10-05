@@ -130,6 +130,8 @@ bool leafSlot=true,shovelSlot=true;
 u8 ItemEquip_GetItemOnSlot(u8 slot){return slot==1&&leafSlot?ITEM_DEKU_LEAF:slot==2&&shovelSlot?ITEM_SHOVEL:ITEM_NONE;}
 void DinFireSword_Reset(){}
 void DinFireShield_Reset(){}
+void WolfLinkHost_Destroy(PlayState*,Player*){}
+void WolfLinkHost_RestorePlayerInput(Player*,Input*){}
 void Effect_Destroy(PlayState*,s32){}
 void LightContext_RemoveLight(PlayState*,LightContext*,LightNode*){}
 s32 Collider_DestroyCylinder(PlayState*,ColliderCylinder*){return 1;}

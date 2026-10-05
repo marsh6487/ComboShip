@@ -16,6 +16,7 @@ source=r'''
 #include <cmath>
 #include <cstdint>
 #include "combo/menu/ComboItemDrawABI.h"
+#include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 using f32=float;using s16=int16_t;using Gfx=int;
 constexpr int MTXMODE_APPLY=1;
 struct PlayState{struct{void* gfxCtx;}state;uint32_t gameplayFrames=42;} play;

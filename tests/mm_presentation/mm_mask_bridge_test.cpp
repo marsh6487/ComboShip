@@ -53,6 +53,7 @@ int GetItem_GetShimmerColor(s16,uint8_t*) {return 0;}
 void OOT_DescribeHeartCosmetics(s16,CwItemDrawInfo*) {}
 void OOT_DescribeMagicJar(s16,CwItemDrawInfo*) {}
 int CwAltSwordGi(RandomizerGet,CwItemDrawInfo*) {return 0;} // Static weapon policy is exercised separately.
+int32_t OOT_FillSongDrawInfo(RandomizerGet,CwItemDrawInfo*) {return 0;} // Song producer tested separately.
 /* OWNER_DESCRIPTOR */
 /* HOST_INFO */
 RandomizerGet selected=RG_MM_MASK_POSTMAN;
@@ -147,8 +148,9 @@ using RandoItemId=int;
 enum {RI_NONE,RI_OOT_NEI_CANE_OF_SOMARIA,RI_OOT_NEI_CANE_PACCI_FLIP,RI_OOT_NEI_CANE_SOMARIA_BLOCK,RI_OOT_NEI_CANE_PACCI_STONE,RI_OOT_NEI_CANE_SOMARIA_PLATFORM,RI_OOT_NEI_CANE_PACCI_ULTRAHAND};
 void DrawOotNeiUltrahand() {assert(0);}
 void DrawOotNeiCaneOfSomaria(int) {assert(0);}
-void MM_DrawNeiGi(const CwItemDrawInfo&) {assert(0);}
+void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false) {assert(0);}
 void NeiGi_DrawSeasonOverlay(PlayState*,int,const char*) {assert(0 && "mask fixture must not select weather");}
+void NeiGi_DrawSongOverlay(PlayState*,int,const char*) {assert(false && "song dispatch has its own production fixture");}
 /* OTHER_DRAW_HANDLERS */
 /* HOST_DISPATCH */
 int main() {

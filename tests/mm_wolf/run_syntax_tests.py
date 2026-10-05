@@ -21,4 +21,4 @@ for path in ('mm/mods/transformation_masks/wolf_link_form.cpp',
         print(result.stdout + result.stderr)
         raise SystemExit(result.returncode)
     warnings = result.stderr.count('warning:')
-    print(f'PASS real-header syntax: {path} ({warnings} existing header/unity warnings)')
+    print(f'PASS real-header syntax: {path} ({warnings} header/unity warnings)')

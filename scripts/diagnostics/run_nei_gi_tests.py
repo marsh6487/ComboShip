@@ -20,6 +20,9 @@ for config in ("CMake/soh-cvars.cmake", "CMake/lus-cvars.cmake"):
     for key, value in re.findall(r'set\((CVAR_PREFIX_\w+)\s+"?([^\s"\)]+)', (ROOT / config).read_text()):
         flags.append(f'-D{key}="{value}"')
 cc = os.environ.get("CXX", "c++")
+sanitize = ["-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"] if "--sanitize" in sys.argv else []
+if "--fast-math" in sys.argv:
+    sanitize.append("-ffast-math")
 with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
     draw = functions((ROOT / "soh/src/code/z_draw.c").read_text())
     player = functions((ROOT / "soh/src/code/z_player_lib.c").read_text())
@@ -188,8 +191,8 @@ void ComboDrawSpinAttackGi(PlayState*, const char*, const char*, float, const ui
             source = Path(tmp) / "combo_gi_presentation.cpp"
             source.write_text("#define COMBO_BUILD 1\n" + candidate)
             extra_flags = ["-I" + str(ROOT), "-I" + str(ROOT / "combo"), "-I" + str(ROOT / "combo/menu")]
-        subprocess.run([cc, *flags, *extra_flags, "-I" + tmp, str(source), "-o", out], check=True)
-        subprocess.run([out], check=True)
+        subprocess.run([cc, *flags, *sanitize, *extra_flags, "-I" + tmp, str(source), "-o", out], check=True)
+        subprocess.run([out], check=True, env={**os.environ,"ASAN_OPTIONS":"detect_leaks=0"})
 
 # Check the actual C dispatch boundary, using the same CVar definitions as CMake.
 cflags = ["-std=gnu2x", "-fsyntax-only", "-Werror=implicit-function-declaration",

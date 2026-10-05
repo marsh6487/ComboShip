@@ -6,6 +6,7 @@
 #include "z64malloc.h"
 #include "mods/nei_oot_compat.h"
 #include <libultraship/bridge/consolevariablebridge.h>
+#include <string.h>
 
 // ── Bone matrix storage ─────────────────────────────────────────────────────
 static MtxF sBoneWorldMatrices[SSBB_MAX_SKIN_BONES];
@@ -110,7 +111,11 @@ static void SSBBSkin_BuildLocalMatrix(const SSBBBoneFrame* bf, MtxF* out) {
 
 // Shortest-path lerp for a rotation component in degrees.
 static f32 SSBBSkin_LerpAngle(f32 a, f32 b, f32 t) {
-    f32 d = fmodf(b - a + 540.0f, 360.0f) - 180.0f;
+    f32 d = fmodf(b - a, 360.0f);
+    if (d >= 180.0f)
+        d -= 360.0f;
+    else if (d < -180.0f)
+        d += 360.0f;
     return a + d * t;
 }
 
@@ -184,6 +189,32 @@ static void SSBBSkin_ComputeBoneMatricesFromAnim(void** skeleton, const struct S
 
 // ── Blend Vertices ──────────────────────────────────────────────────────────
 
+static s32 SSBBSkin_IsFinite(f32 value) {
+    u32 bits;
+    memcpy(&bits, &value, sizeof(bits));
+    return (bits & 0x7F800000u) != 0x7F800000u;
+}
+
+static s16 SSBBSkin_PackPosition(f32 value) {
+    if (!SSBBSkin_IsFinite(value))
+        return 0;
+    if (value >= 32767.0f)
+        return 32767;
+    if (value <= -32768.0f)
+        return -32768;
+    return (s16)value;
+}
+
+static s8 SSBBSkin_PackNormal(f32 value) {
+    if (!SSBBSkin_IsFinite(value))
+        return 0;
+    if (value >= 127.0f)
+        return 127;
+    if (value <= -127.0f)
+        return -127;
+    return (s8)value;
+}
+
 static void SSBBSkin_BlendVertices(SSBBSkinMesh* skin) {
     Vtx* vtxBuf;
     s32 v;
@@ -247,15 +278,15 @@ static void SSBBSkin_BlendVertices(SSBBSkinMesh* skin) {
             blendedNorm.z += transformedNorm.z * w;
         }
 
-        vtxBuf[v].n.ob[0] = (s16)blendedPos.x;
-        vtxBuf[v].n.ob[1] = (s16)blendedPos.y;
-        vtxBuf[v].n.ob[2] = (s16)blendedPos.z;
+        vtxBuf[v].n.ob[0] = SSBBSkin_PackPosition(blendedPos.x);
+        vtxBuf[v].n.ob[1] = SSBBSkin_PackPosition(blendedPos.y);
+        vtxBuf[v].n.ob[2] = SSBBSkin_PackPosition(blendedPos.z);
 
         len = sqrtf(blendedNorm.x * blendedNorm.x + blendedNorm.y * blendedNorm.y + blendedNorm.z * blendedNorm.z);
-        if (len > 0.001f) {
-            vtxBuf[v].n.n[0] = (s8)(blendedNorm.x / len * 127.0f);
-            vtxBuf[v].n.n[1] = (s8)(blendedNorm.y / len * 127.0f);
-            vtxBuf[v].n.n[2] = (s8)(blendedNorm.z / len * 127.0f);
+        if (SSBBSkin_IsFinite(len) && len > 0.001f) {
+            vtxBuf[v].n.n[0] = SSBBSkin_PackNormal(blendedNorm.x / len * 127.0f);
+            vtxBuf[v].n.n[1] = SSBBSkin_PackNormal(blendedNorm.y / len * 127.0f);
+            vtxBuf[v].n.n[2] = SSBBSkin_PackNormal(blendedNorm.z / len * 127.0f);
         }
     }
 
@@ -282,6 +313,8 @@ s32 SSBBSkin_ComputePose(SSBBCharacterInstance* inst) {
         !inst->ssbbAnim->numFrames || !inst->ssbbAnim->frames)
         return 0;
     skin = inst->def->skinMesh;
+    if (!skin->invBindMatrices || !SSBBSkin_IsFinite(inst->curFrame))
+        return 0;
     // Pikachu's existing 48-node skeleton has 47 weighted bones and one extra rigid
     // limb. Keep that layout: only weighted bones need animation/inverse-bind data.
     if (skin->boneCount == 0 || skin->boneCount > SSBB_MAX_SKIN_BONES || inst->def->numLimbs < skin->boneCount ||
@@ -298,8 +331,14 @@ s32 SSBBSkin_ComputePose(SSBBCharacterInstance* inst) {
     }
     SSBBSkin_ComputeBoneMatricesFromAnim(inst->skeleton, inst->ssbbAnim, frame, nextFrame, blend, &skin->daeToF64, 0,
                                          inst->def->numLimbs, !skin->preserveRootMotion);
-    for (b = 0; b < skin->boneCount; ++b)
+    for (b = 0; b < skin->boneCount; ++b) {
+        s32 component;
         SkinMatrix_MtxFMtxFMult(&sBoneWorldMatrices[b], &skin->invBindMatrices[b], &sCombinedMatrices[b]);
+        for (component = 0; component < 16; ++component)
+            if (!SSBBSkin_IsFinite(((f32*)&sBoneWorldMatrices[b])[component]) ||
+                !SSBBSkin_IsFinite(((f32*)&sCombinedMatrices[b])[component]))
+                return 0;
+    }
     sPoseOwner = inst;
     return 1;
 }

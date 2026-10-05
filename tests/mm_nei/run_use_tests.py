@@ -385,6 +385,8 @@ void func_80839978(PlayState* play,Player* p){}
 void func_80839A10(PlayState* play,Player* p){}
 s32 RocsFeatherVanilla_TryUse(PlayState* play,Player* p,s32 item){return 0;}
 u8 CustomForms_UseItem(Player* p,ItemId item){return 0;}
+void WolfLinkHost_OnUseItem(PlayState* play,Player* p,s32 item){}
+void WolfLinkHost_RestorePlayerInput(Player* p,Input* input){}
 void CustomItems_PutAwayHeldItems(Player* p,PlayState* play){}
 void ItemEquip_BeginItemChangeSound(PlayState* play,Player* p,s32 action){}
 s32 OotSpells_TryUseItem(PlayState* play,Player* p,PlayerItemAction a,ItemId item){return 0;}

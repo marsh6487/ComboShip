@@ -12,9 +12,45 @@ NeiGi::Basis NeiGi_CameraBasis(PlayState* play) {
     return { right, up, NeiGi::Unit(NeiGi::Cross(right, up)) };
 }
 
+// Bitwise finite checks remain effective under the engines' fast-math flags.
+// Reject a whole malformed mesh before any arena allocation or GPU submission.
+static bool NeiGi_Finite(float value) {
+    uint32_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));
+    return (bits & 0x7F800000u) != 0x7F800000u;
+}
+
+static bool NeiGi_ValidScale(float scale) {
+    return NeiGi_Finite(scale) && scale > 0.f && scale <= 2048.f;
+}
+
+static bool NeiGi_ValidMesh(const NeiGi::Mesh& mesh, const NeiGi::TextureMaterial* material = nullptr,
+                            bool seasonSunRays = false) {
+    if (!mesh.count || mesh.count > mesh.vertices.size() || mesh.count % 3)
+        return false;
+    const auto fits = [](float value, float scale) {
+        if (!NeiGi_Finite(value))
+            return false;
+        const float fixed = value * scale;
+        return NeiGi_Finite(fixed) && fixed >= -32768.f && fixed <= 32767.f;
+    };
+    for (size_t i = 0; i < mesh.count; ++i) {
+        const auto& v = mesh.vertices[i];
+        if (!fits(v.p.x, 16) || !fits(v.p.y, 16) || !fits(v.p.z, 16) ||
+            !fits(v.u, (material || seasonSunRays ? 32 : 63) * 32) ||
+            !fits(v.v, (seasonSunRays ? 31
+                        : material    ? 32
+                                      : 63) *
+                           32))
+            return false;
+    }
+    return true;
+}
+
 static void NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kind orb,
                                    const NeiGi::TextureMaterial* material, bool seasonSunRays = false) {
-    if (mesh.count == 0)
+    if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, material, seasonSunRays) || int(orb) < 0 ||
+        int(orb) > int(Kind::MarioMask))
         return;
     // Reuse shared vertices within each 32-entry RSP cache load. A full potion
     // shop must leave room in both the OPA arena and XLU command buffer.
@@ -142,7 +178,7 @@ void NeiGi_DrawMesh(PlayState* play, const NeiGi::Mesh& mesh, Kind orb) {
 }
 
 bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiGi::TextureMaterial& material) {
-    if (!play || !mesh.count || !HasResource(material.path))
+    if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, &material) || !HasResource(material.path))
         return false;
     NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material);
     return true;
@@ -150,23 +186,19 @@ bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiG
 
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
                             const float center[3], bool shimmer, const char* owner, bool shop) {
-    if (!play || !opa || !center || scale <= 0 || effect < 0 || effect > int(Kind::MarioMask))
+    if (!play || !play->state.gfxCtx || !opa || !center || !NeiGi_ValidScale(scale) || !NeiGi_Finite(center[0]) ||
+        !NeiGi_Finite(center[1]) || !NeiGi_Finite(center[2]) || effect < 0 || effect > int(Kind::MarioMask))
         return;
     const Kind kind = static_cast<Kind>(effect);
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
+    const auto* bounds = NeiGi::FindFrameBounds(opa);
+    if (!bounds || bounds->effect != kind)
+        return;
     Matrix_Push();
-    if (const auto* bounds = NeiGi::FindFrameBounds(opa)) {
-        if (bounds->effect != kind) {
-            Matrix_Pop();
-            return;
-        }
-        const auto fit = NeiGi::FrameFit(*bounds, scale, shop);
-        Matrix_Translate(0.f, fit.lift, 0.f, MTXMODE_APPLY);
-        Matrix_Scale(fit.scale, fit.scale, fit.scale, MTXMODE_APPLY);
-    } else {
-        Matrix_Translate(0.f, NeiGi::PresentationOffsetY(kind), 0.f, MTXMODE_APPLY);
-    }
+    const auto fit = NeiGi::FrameFit(*bounds, scale, shop);
+    Matrix_Translate(0.f, fit.lift, 0.f, MTXMODE_APPLY);
+    Matrix_Scale(fit.scale, fit.scale, fit.scale, MTXMODE_APPLY);
     OPEN_DISPS(play->state.gfxCtx);
     if (owner) {
         gSPComboRMPush(POLY_OPA_DISP++, owner);
@@ -242,9 +274,10 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
     Matrix_Pop();
 }
 
-void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char* xlu, float scale,
-                                   int shimmerKind, bool shimmer, const char* owner) {
-    if (!play || !opa || scale <= 0 || shimmerKind < 0 || shimmerKind > int(Kind::MarioMask))
+void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int shimmerKind,
+                                    bool shimmer, const char* owner) {
+    if (!play || !play->state.gfxCtx || !opa || !NeiGi_ValidScale(scale) || shimmerKind < 0 ||
+        shimmerKind > int(Kind::MarioMask))
         return;
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
@@ -284,11 +317,11 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
     Matrix_Pop();
     if (shimmer)
         NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play),
-                                                static_cast<Kind>(shimmerKind)));
+                                                  static_cast<Kind>(shimmerKind)));
 }
 
 void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner) {
-    if (!play || profile < 1 || profile > 6)
+    if (!play || !play->state.gfxCtx || profile < 1 || profile > 6)
         return;
     const bool stormSong = profile == 6;
     auto mesh = NeiGi::SampleSeason(play->gameplayFrames, stormSong ? 1 : profile, NeiGi_CameraBasis(play));
@@ -319,7 +352,7 @@ void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner) {
 // Reuse the exact optional NEI shimmer sampler and renderer; only the requested
 // transformation/remains palette changes. Ordinary items retain NEI's palette.
 void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner) {
-    if (!play || !color)
+    if (!play || !play->state.gfxCtx || !color)
         return;
     const bool ordinary = color[0] == 220 && color[1] == 225 && color[2] == 240;
     const bool dark = color[0] == 0 && color[1] == 0 && color[2] == 0;
@@ -349,7 +382,7 @@ void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const cha
 }
 
 void NeiGi_DrawSongOverlay(PlayState* play, int song, const char* owner) {
-    if (!play || song < 0 || song >= CW_SONG_COUNT)
+    if (!play || !play->state.gfxCtx || song < 0 || song >= CW_SONG_COUNT)
         return;
     if (song == CW_SONG_STORMS) {
         NeiGi_DrawSeasonOverlay(play, 6, owner);

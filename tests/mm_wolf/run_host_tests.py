@@ -25,7 +25,12 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-host-') as td:
             depth+=(player_source[end]=='{')-(player_source[end]=='}'); end+=1
         return player_source[start:end]
     native_actions=Path(td)/'native-freeze.c'
+    input_start=player_source.index('    if (play->actorCtx.isOverrideInputOn && (this == GET_PLAYER(play))) {')
+    input_end=player_source.index('\n    GameInteractor_ExecuteOnPassPlayerInputs(&input);',input_start)
+    input_body=player_source[input_start:input_end]
     native_actions.write_text('#include "global.h"\n'
+                              '#include "mods/forms/wolf_link_host.h"\n'
+                              'void GameInteractor_ExecuteOnPassPlayerInputs(Input*);\n'
                               'extern Input* sPlayerControlInput;\n'
                               'extern f32 sControlStickMagnitude;\n'
                               'extern s16 sControlStickAngle;\n'
@@ -34,7 +39,11 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-host-') as td:
                               'void func_808339B4(Player*, s32);\n'
                               'void func_80834104(PlayState*, Player*);\n'+
                               native_body('s32 func_8082DE88(Player* this, s32 arg1, s32 arg2) {')+'\n'+
-                              native_body('void Player_Action_82(Player* this, PlayState* play) {')+'\n')
+                              native_body('void Player_Action_82(Player* this, PlayState* play) {')+'\n'+
+                              native_body('bool func_8082DA90(PlayState* play) {')+'\n'+
+                              'void WolfFixture_SelectNativeInput(PlayState* play, Player* this, Input* out) {\n'
+                              'Input input;\n'+input_body+'\n'
+                              'GameInteractor_ExecuteOnPassPlayerInputs(&input);\n*out=input;\n}\n')
     objects=[]
     for i,path in enumerate(['mm/expansions/ssbb/ssbb_character.c','mm/expansions/ssbb/ssbb_skin.c',
                              'mm/src/code/z_skin_matrix.c','mm/src/code/z_lib.c','mm/mods/ext_buttons/ext_buttons.cpp',

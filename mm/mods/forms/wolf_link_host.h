@@ -9,6 +9,7 @@ extern "C" {
 
 // Capture before custom-item listeners; dispatch after MM has resolved native damage.
 void WolfLinkHost_PreUpdate(PlayState* play, Player* player);
+void WolfLinkHost_RestorePlayerInput(Player* player, Input* input);
 void WolfLinkHost_FilterInput(Player* player, Input* input);
 void WolfLinkHost_BeforeAction(PlayState* play, Player* player, Input* input);
 void WolfLinkHost_ApplyCollisionShape(Player* player);

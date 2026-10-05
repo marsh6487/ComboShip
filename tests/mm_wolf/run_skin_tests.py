@@ -8,7 +8,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/diagnostics'))
 from run_mm_nei_tests import flags
-SANITIZERS = ['-fsanitize=address,undefined,bounds', '-fno-sanitize-recover=all']
+SANITIZERS = ['-fsanitize=address,undefined,bounds,float-cast-overflow', '-fno-sanitize-recover=all']
+MODE = ['-O2', '-ffast-math'] if '--fast-math' in sys.argv else ['-O1', '-g']
 
 def run(command):
     result = subprocess.run(command, capture_output=True, text=True)
@@ -26,10 +27,10 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-skin-') as td:
         run([os.environ.get('CC','cc'), '-std=gnu11', *flags(), '-include', str(ROOT/'mm/include/variables.h'),
                         '-include', str(ROOT/'mm/include/functions.h'), '-include', str(ROOT/'mm/include/z64malloc.h'),
                         '-include', str(ROOT/'libultraship/include/libultraship/bridge/consolevariablebridge.h'),
-                        '-O1', '-g', *SANITIZERS, '-ffunction-sections', '-fdata-sections', '-c', str(ROOT/source), '-o', obj])
+                        *MODE, *SANITIZERS, '-ffunction-sections', '-fdata-sections', '-c', str(ROOT/source), '-o', obj])
         objects.append(obj)
     binary = str(Path(td)/'skin')
-    run([os.environ.get('CXX','c++'), '-std=c++20', *flags(), *options, *SANITIZERS,
+    run([os.environ.get('CXX','c++'), '-std=c++20', *flags(), *options, *MODE, *SANITIZERS,
          str(ROOT/'tests/mm_wolf/skin_runtime_test.cpp'), *objects, '-Wl,--gc-sections', '-o', binary])
     # LeakSanitizer cannot inspect /proc tasks in the managed executor; memory/bounds/UB checks remain enabled.
     env = dict(os.environ)

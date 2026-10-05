@@ -196,8 +196,25 @@ constexpr f32 kOotRunSpeed = 6.58f;
 constexpr f32 kOotGravity = -1.0f; // REG(68)/100 for the player
 constexpr f32 kTpToOotFrames = 20.0f / 30.0f;
 
+static f32 BoundedScale(const char* name, f32 fallback) {
+    f32 scale = CVarGetFloat(name, fallback);
+    u32 bits;
+    std::memcpy(&bits, &scale, sizeof(bits));
+    if ((bits & 0x7F800000u) == 0x7F800000u || scale < 0.05f || scale > 10.0f)
+        return fallback;
+    return scale;
+}
+
+static s16 ColliderCoordinate(f32 value) {
+    u32 bits;
+    std::memcpy(&bits, &value, sizeof(bits));
+    if ((bits & 0x7F800000u) == 0x7F800000u)
+        return 0;
+    return (s16)std::clamp(value, -32768.0f, 32767.0f);
+}
+
 static f32 SpeedScale() {
-    return CVarGetFloat("gMods.WolfLink.SpeedScale", 1.0f);
+    return BoundedScale("gMods.WolfLink.SpeedScale", 1.0f);
 }
 // TP per-30Hz-frame horizontal speed → OoT per-20Hz-frame, relative to Link's run.
 static f32 TpSpeed(f32 tp) {
@@ -423,11 +440,34 @@ static bool ValidateBlob() {
             !std::memchr(sBlob.data() + name, 0, value(12) + value(13) - name) || !FloatOk(e + 8, 240.0f) ||
             ReadF32(e + 8) <= 0 || (start & 3u) || start < value(14) || (u64)start + size > (u64)value(14) + value(15))
             return false;
+        double maxScale[SSBB_MAX_SKIN_BONES] = {};
+        double maxTranslation[SSBB_MAX_SKIN_BONES] = {};
         for (u64 j = 0; j < (u64)count * bones; ++j) {
             const u8* f = sBlob.data() + start + j * 36;
             for (u32 k = 0; k < 9; ++k)
                 if (!FloatOk(f + k * 4, k < 3 ? 32767.0f : k < 6 ? 100000.0f : 64.0f))
                     return false;
+            const u32 bone = j % bones;
+            double translationSquared = 0.0;
+            for (u32 k = 0; k < 3; ++k) {
+                const double translation = ReadF32(f + k * 4);
+                translationSquared += translation * translation;
+                maxScale[bone] = std::max(maxScale[bone], std::fabs((double)ReadF32(f + (6 + k) * 4)));
+            }
+            maxTranslation[bone] = std::max(maxTranslation[bone], std::sqrt(translationSquared));
+        }
+        // Operator-norm bounds include every frame and fractional TRS interpolation.
+        // Finite inputs alone do not prevent overflow through a chain of scaled parents.
+        double worldScale[SSBB_MAX_SKIN_BONES] = {};
+        double worldTranslation[SSBB_MAX_SKIN_BONES] = {};
+        for (u32 bone = 0; bone < bones; ++bone) {
+            const s16 parent = ReadS16(sBlob.data() + value(8) + bone * 2);
+            const double parentScale = parent < 0 ? 1.0 : worldScale[parent];
+            const double parentTranslation = parent < 0 ? 0.0 : worldTranslation[parent];
+            worldScale[bone] = parentScale * maxScale[bone];
+            worldTranslation[bone] = parentTranslation + parentScale * maxTranslation[bone];
+            if (worldScale[bone] > 100000.0 || worldTranslation[bone] > 32767.0)
+                return false;
         }
     }
     return true;
@@ -714,13 +754,9 @@ static bool LoadAssets() {
     return true;
 }
 
-// Wolf's own size knob (the shared SSBB skin path draws at def->scale and no
-// longer reads a CVar, so Pikachu is unaffected).  0.3 is the tuned value.
+// Wolf opts into its definition scale; Pikachu retains the shared SkinScale setting.
 static f32 RenderScale() {
-    f32 scale = CVarGetFloat("gMods.WolfLink.Scale", 0.3f);
-    if (scale < 0.05f) {
-        scale = 0.3f;
-    }
+    f32 scale = BoundedScale("gMods.WolfLink.Scale", 0.3f);
     sDefinition.scale = scale;
     return scale;
 }
@@ -813,10 +849,10 @@ static WolfInput ReadInput(Player* player, PlayState* play, const Input* source)
     in.aPress = CHECK_BTN_ALL(input->press.button, BTN_A) != 0;
     in.bPress = CHECK_BTN_ALL(input->press.button, BTN_B) != 0;
     in.rHold = CHECK_BTN_ALL(input->cur.button, BTN_R) != 0;
-    u32 blockMask = PLAYER_STATE1_200 | PLAYER_STATE1_TALKING | PLAYER_STATE1_DEAD | PLAYER_STATE1_400 |
-                    PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_4 | PLAYER_STATE1_2000 | PLAYER_STATE1_FIRST_PERSON |
-                    PLAYER_STATE1_CLIMBING_LADDER | PLAYER_STATE1_400 | PLAYER_STATE1_IN_CUTSCENE |
-                    PLAYER_STATE1_8000000 | PLAYER_STATE1_800000;
+    u32 blockMask = PLAYER_STATE1_200 | PLAYER_STATE1_20 | PLAYER_STATE1_TALKING | PLAYER_STATE1_DEAD |
+                    PLAYER_STATE1_400 | PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_4 | PLAYER_STATE1_2000 |
+                    PLAYER_STATE1_FIRST_PERSON | PLAYER_STATE1_CLIMBING_LADDER | PLAYER_STATE1_400 |
+                    PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_8000000 | PLAYER_STATE1_800000;
     if (player->stateFlags1 & blockMask) {
         in.aPress = in.bPress = 0;
         in.blocked = 1;
@@ -902,9 +938,9 @@ static void UpdateAttackCollider(Player* player, PlayState* play) {
     f32 off = TpLength(sWolf.radiusOffset, RenderScale());
     pos.x += Math_SinS(player->actor.shape.rot.y) * off;
     pos.z += Math_CosS(player->actor.shape.rot.y) * off;
-    sWolf.atCyl.dim.pos.x = (s16)pos.x;
-    sWolf.atCyl.dim.pos.y = (s16)pos.y;
-    sWolf.atCyl.dim.pos.z = (s16)pos.z;
+    sWolf.atCyl.dim.pos.x = ColliderCoordinate(pos.x);
+    sWolf.atCyl.dim.pos.y = ColliderCoordinate(pos.y);
+    sWolf.atCyl.dim.pos.z = ColliderCoordinate(pos.z);
     sWolf.atCyl.base.atFlags = AT_ON | AT_TYPE_PLAYER;
     CollisionCheck_SetAT(play, &play->colChkCtx, &sWolf.atCyl.base);
 }

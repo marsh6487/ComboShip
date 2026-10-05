@@ -11,6 +11,7 @@ static std::string assetDirectory;
 static int colliderInitializations, colliderDestructions, attackRegistrations;
 static Collider* lastAttack;
 static std::map<std::string, int32_t> integerCvars;
+static std::map<std::string, float> floatCvars;
 namespace Ship {
 std::string Context::LocateFileAcrossAppDirs(const std::string& p, const std::string&) {
     return p;
@@ -24,8 +25,9 @@ int32_t CVarGetInteger(const char* name, int32_t v) {
     const auto found = integerCvars.find(name);
     return found == integerCvars.end() ? v : found->second;
 }
-float CVarGetFloat(const char*, float v) {
-    return v;
+float CVarGetFloat(const char* name, float v) {
+    const auto found = floatCvars.find(name);
+    return found == floatCvars.end() ? v : found->second;
 }
 SaveContext gSaveContext{};
 static RegEditor registers{};
@@ -204,6 +206,22 @@ int main(int argc, char** argv) {
         rejected("invalid frame rate", b);
     }
     b = good;
+    for (int bone = 0; bone < 37; ++bone)
+        for (int scale = 6; scale < 9; ++scale)
+            writeFloat(b, field(b, 14) + bone * 36 + scale * 4, 64.0f);
+    rejected("finite bone scales overflow when composed", b);
+    b = good;
+    writeFloat(b, field(b, 14), 20000.0f);
+    writeFloat(b, field(b, 14) + 36, 20000.0f);
+    rejected("finite bone translations exceed composed bounds", b);
+    for (u32 bits : { 0x7f800000u, 0xff800000u, 0x7fc00001u, 0x7f7fffffu }) {
+        f32 badScale;
+        std::memcpy(&badScale, &bits, sizeof(bits));
+        floatCvars["gMods.WolfLink.Scale"] = floatCvars["gMods.WolfLink.SpeedScale"] = badScale;
+        assert(RenderScale() == .3f && SpeedScale() == 1.0f);
+    }
+    floatCvars.clear();
+    b = good;
     write32(b, 12 + 1 * 4, 0x55555556);
     rejected("triangle multiplication overflow", b);
     b = good;
@@ -278,6 +296,12 @@ int main(int argc, char** argv) {
     play.state.input[0].press.button = BTN_B;
     tick();
     assert(sWolf.proc == PROC_WOLF_WAIT_ATTACK && sWolf.procOwnsPlayer);
+    player.actor.world.pos = { 32760, -32760, 32760 };
+    SetAttackCollider(&player, &play, 70, 150, 100, 1);
+    UpdateAttackCollider(&player, &play);
+    assert(sWolf.atCyl.dim.pos.z == 32767 && sWolf.atCyl.elem.atDmgInfo.damage == 4);
+    player.actor.world.pos = {};
+    SetAttackCollider(&player, &play, kAtWaLr.radius, kAtWaLr.height, kAtWaLr.radiusOffset, 0);
     play.state.input[0].press.button = 0;
     const int beforeAttacks = attackRegistrations;
     for (int i = 0; i < 7; ++i)

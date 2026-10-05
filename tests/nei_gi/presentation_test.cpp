@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <limits>
 #include <set>
 #include <string>
 #include <vector>
@@ -260,6 +261,46 @@ static void DrawWeaponFlameOverlay(PlayState *, u8 r, u8 g, u8 b) {
 
 int main() {
   using namespace Fixture;
+  const auto untouched = [] {
+    assert(arena.empty() && submitted.empty() && gfx.polyOpa.p==opa && gfx.polyXlu.p==xlu);
+    assert(stack.empty() && matrix==1 && matrixY==0 && interpolation==0);
+  };
+  for(size_t count:{size_t(0),size_t(1),size_t(2),size_t(1537),std::numeric_limits<size_t>::max()}) {
+    Reset(); NeiGi::Mesh malformed;malformed.count=count;
+    NeiGi_DrawMesh(&play,malformed);untouched();
+  }
+  for(float value:{std::numeric_limits<float>::quiet_NaN(),std::numeric_limits<float>::infinity(),
+                   -std::numeric_limits<float>::infinity(),1e30f,-1e30f,2048.f,-2049.f}) {
+    for(int field=0;field<5;++field) {
+      Reset(); NeiGi::Mesh malformed;malformed.count=3;
+      if(field==0)malformed.vertices[0].p.x=value;
+      if(field==1)malformed.vertices[0].p.y=value;
+      if(field==2)malformed.vertices[0].p.z=value;
+      if(field==3)malformed.vertices[0].u=value;
+      if(field==4)malformed.vertices[0].v=value;
+      NeiGi_DrawMesh(&play,malformed);untouched();
+    }
+  }
+  Reset(); const auto validMesh=NeiGi::SampleShimmer(42,true);
+  NeiGi_DrawMesh(nullptr,validMesh);untouched();
+  play.state.gfxCtx=nullptr;NeiGi_DrawMesh(&play,validMesh);play.state.gfxCtx=&gfx;untouched();
+  const float origin[3]={};
+  const char* guarded="__OTR__objects/nei_gi_redesign/fire_rod/gi_dl";
+  for(float scale:{0.f,-1.f,std::numeric_limits<float>::quiet_NaN(),std::numeric_limits<float>::infinity(),1e30f}) {
+    Reset(); NeiGi_DrawPresentation(&play,guarded,nullptr,scale,int(Kind::Fire),origin,true,"oot");untouched();
+    NeiGi_DrawExternalPresentation(&play,guarded,nullptr,scale,int(Kind::Fire),true,"oot");untouched();
+  }
+  for(int axis=0;axis<3;++axis) {
+    Reset();float center[3]={};center[axis]=std::numeric_limits<float>::quiet_NaN();
+    NeiGi_DrawPresentation(&play,guarded,nullptr,1,int(Kind::Fire),center,true,"oot");untouched();
+  }
+  Reset(); NeiGi_DrawPresentation(&play,guarded,nullptr,1,int(Kind::Ice),origin,true,"oot");untouched();
+  NeiGi_DrawPresentation(&play,"__OTR__objects/arbitrary/gi_dl",nullptr,1,int(Kind::Fire),origin,true,"oot");untouched();
+  Reset(); NeiGi::Mesh maximum;
+  for(size_t i=0;i<maximum.vertices.size();++i)maximum.vertices[i]={{float(i%32),float(i/32),0},0xC8A0FF,255};
+  maximum.count=maximum.vertices.size();NeiGi_DrawMesh(&play,maximum);
+  assert(arena.size()==1 && arena.front().size()<=1536 && gfx.polyXlu.p<xlu+4096 && stack.empty());
+  std::cout<<"PASS real renderer malformed mesh/count/NaN/Inf/range/scale/center/path guards and maximum vertex batch\n";
   Reset();
   GetItemEntry fourSwordEntry{};
   fourSwordEntry.drawFunc = Randomizer_DrawExtFourSword;
@@ -427,7 +468,7 @@ int main() {
           shopEntry = entry;
           EnGirlA_Draw(&shop.actor, &play);
         } else {
-          Player seasonalPlayer{};
+          Player seasonalPlayer{}; seasonalPlayer.giObjectSegment=reinterpret_cast<void*>(uintptr_t(0x80000000));
           Vec3f reference{};
           seasonalPlayer.getItemEntry = entry;
           Player_DrawGetItemImpl(&play, &seasonalPlayer, &reference, 1);
@@ -536,7 +577,7 @@ int main() {
   // Exercise the actual overhead animation entry point, not a surrogate
   // dispatch.
   Reset();
-  Player player{};
+  Player player{}; player.giObjectSegment=reinterpret_cast<void*>(uintptr_t(0x80000000));
   Vec3f ref{};
   player.getItemEntry.drawFunc = Randomizer_DrawWhip;
   files.insert("__OTR__objects/nei_gi_redesign/whip/gi_dl");
@@ -574,7 +615,7 @@ int main() {
           shopEntry = entry;
           EnGirlA_Draw(&shop.actor, &play);
         } else {
-          player = {};
+          player = {}; player.giObjectSegment=reinterpret_cast<void*>(uintptr_t(0x80000000));
           player.getItemEntry = entry;
           Player_DrawGetItemImpl(&play, &player, &ref, 1);
         }
@@ -615,7 +656,7 @@ int main() {
           shopEntry = entry;
           EnGirlA_Draw(&shop.actor, &play);
         } else {
-          player = {};
+          player = {}; player.giObjectSegment=reinterpret_cast<void*>(uintptr_t(0x80000000));
           player.getItemEntry = entry;
           Player_DrawGetItemImpl(&play, &player, &ref, 1);
         }
@@ -676,7 +717,7 @@ int main() {
             shopEntry = entry;
             EnGirlA_Draw(&shop.actor, &play);
           } else {
-            player = {};
+            player = {}; player.giObjectSegment=reinterpret_cast<void*>(uintptr_t(0x80000000));
             player.getItemEntry = entry;
             Player_DrawGetItemImpl(&play, &player, &ref, item.draw ? 1 : item.nativeGid + 1);
           }
@@ -1103,7 +1144,7 @@ int main() {
       preview << "}}";
     }
     submitted.clear();
-    player = {};
+    player = {}; player.giObjectSegment=reinterpret_cast<void*>(uintptr_t(0x80000000));
     player.getItemEntry = entry;
     ref = {};
     Player_DrawGetItemImpl(&play, &player, &ref, 1);

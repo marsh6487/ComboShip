@@ -12,6 +12,7 @@ The historical final candidate disappeared from the transient workspace. The sup
 | `9d4886c54847b0eb267a8985d99bd55140011170` | Wolf loader, GI fit, traditional/exact-color receipts, Pikachu compatibility and WIP editor fixture | Remote tree `9e03696c4aa44929e0516d04360a4fa4f72a2b8c` equals local tree; fetched branch verified | Host/editor implementation, final presentation, review and builds |
 | `a79093a7c4c6a601c334c44e7578cb6ca945f83b` | Live editor grants, Wolf combat, themed songs and sanitized skin fixtures | Remote tree `4832641839853c68f577c2108f48312c174db1c7` equals local tree; fetched branch verified | Host, sword/receipt integration, preservation review and builds |
 | `167aa37c33c3f5be46de342287772100de5633fa` | Integrated Wolf host, upright swords, colored clefs and MM-owned Ikana icons | Remote tree `6942eb50ff1c26561b7624863a8d34abd1f16b62` equals local tree; fetched branch verified | Final edge cases, independent review and builds |
+| `d5b9a68d3065f40bd02b468dd5dd468220c781d2` | Final editor/catalog/mod integration and explicit open review findings | Remote tree `9069ac12a0bd2020815aa959195619c7669b1851` equals local tree; fetched branch verified | Independent corrections, real arena bounds, whole gate and builds |
 
 ## MM skin section
 
@@ -51,11 +52,16 @@ Local worker commit `12d055506bbdb49280cd30e8502672b9a10e91e7` adds opt-in root 
 - `run_nei_gi_tests.py --combo` and `run_nei_identity_tests.py` passed again with arbitrary external OPA/XLU mod replacements. Those selected meshes retain independent shimmer while excluding authored fit and model-local energy.
 - CI now provides BS thread-pool v4.1.0 and stb headers at the project's exact pins. Actual SaveEditor compiler dependency expansion proved they are required alongside the already-provided ImGui/JSON/spdlog/SDL headers. The accepted fixed historical source commits used by preservation tests have been fetched unchanged.
 
-## Open independent review findings
+## Independent review corrections
 
-The checkpoint is deliberately incomplete. Independent review reproduced Wolf responding to raw A/B when MM suppressed or overrode effective input; the Wolf worker is fixing effective input capture and remote-tool/textbox ownership with the actual native selection block. GI review found selected standalone/Din sword recipes return before assigning their per-item shimmer identity. Receipt review found local concrete MM OoT small keys skip the donor because their FC count-chain length exceeds one. These are assigned narrow implementation/production-fixture fixes; do not treat the passing older fixtures as proof of these omitted cases.
+- Wolf now captures effective input after MM's unchanged override/disabled/textbox selection and pass-input hook, restores only its reservation before that selection, and yields for remote tools. The native input and freeze fixture, sanitized core/skin and all four real translation units passed. Independent safety review verified the reported raw-input reproductions closed; its earlier Pikachu metadata and null-tail fixture findings are also closed. Source report: `docs/testing/MM_NEI_WOLF_RECONSTRUCTION.md`.
+- Selected standalone/Din sword recipes now assign the concrete sword's identity before returning. Independent real full-producer/resolver and combined renderer sanitizer/fast-math tests passed all seven themes, with mandatory exact identity and no generic overlay.
+- Concrete MM small-key names now route all ten count-chain identities to the OoT exporter. Actual `ApplyItemReceiptText` fixtures passed all keys at zero/full counts, complete tutorial bodies, Chest Game text distinction, source append and information toggles without save writes. Independent rerun passed after integration.
+- Review also reproduced a medallion-only editor save silently gaining a wand host without earning or recording the wand. Host restoration now requires actual retained rod bits; new rods and missing medallion prerequisites are granted separately, avoiding a second award of a bare earned wand. The expanded production fixture first failed the new earned-bit assertion, then passed all nine groups including medallion-only individual/all grants, retained/cleared bare rods, FC recording, repeat safety, all wand rules and real translation units. Independent review confirmed the exact committed header/test/runner blobs. The final editor/receipt review report is tracked alongside the section reports.
 
-Final malformed-transform/renderer guards, the above review corrections, the complete combined gate and Windows/Linux builds remain in progress. In-game acceptance is not claimed.
+## Remaining integration
+
+The actual MM shop callback previously did not forward shop context to the shared fit, despite renderer-level shop fixtures passing. The GI worker is correcting the native/foreign dispatch and adding a real shop callback fixture. Real engine graphics allocators subtract their tail without returning null; demand-only fixtures do not prove arena capacity. Shared GI mesh and MM skin draws are receiving narrow aligned-allocation/command head-tail preflights plus real finite-arena fixtures. Complete combined regressions, final review and Windows/Linux builds follow these corrections. This is still a partial checkpoint; in-game acceptance is not claimed.
 
 ## Resume
 

@@ -151,9 +151,24 @@ int main() {
     inst.curFrame = .5f;
     draw();
     close(skin.vtxBuf[skin.bufIndex ^ 1][0].n.ob[0], 17);
+    frames[0].rz = 720;
+    frames[3].rz = -270;
+    draw();
+    close(skin.vtxBuf[skin.bufIndex ^ 1][0].n.ob[0], 22);
     inst.curFrame = 1;
     draw();
     close(submittedScale, .3f);
+    frames[3].rz = 0;
+    vertex.posX = 30000;
+    draw();
+    assert(skin.vtxBuf[skin.bufIndex ^ 1][0].n.ob[0] == 32767);
+    vertex.posX = -30000;
+    draw();
+    assert(skin.vtxBuf[skin.bufIndex ^ 1][0].n.ob[0] == -32768);
+    const u32 invalidFrame = 0x7fc00001;
+    std::memcpy(&inst.curFrame, &invalidFrame, sizeof(invalidFrame));
+    assert(!SSBBSkin_ComputePose(&inst));
+    assert(!SSBBSkin_GetBoneWorldPos(&inst, 0, &bone));
     SSBBSkin_Destroy(&skin);
     assert(!SSBBSkin_GetBoneWorldPos(&inst, 0, &bone));
 #else

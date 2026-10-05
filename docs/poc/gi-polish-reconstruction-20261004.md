@@ -106,3 +106,21 @@ replacing a redesigned GI pass. GREEN: every bound model's OPA and available
 XLU overrides pass both base/Alt and effects off/on in native/owner/MM renderer
 fixtures; no generated fit or local effects, exact separate identity metadata.
 Native and `--combo` renderer suites, identity fixtures and real MM syntax pass.
+
+
+Renderer validation checkpoint rejects incomplete/oversized triangle counts,
+non-finite and unrepresentable position/UV values, absent graphics contexts,
+invalid scales/centers, and unknown/mismatched authored paths before allocation
+or GPU commands. IEEE-bit checks remain effective under fast-math. RED: one
+vertex was submitted as a full triangle. GREEN: the actual native/MM/foreign
+renderer fixture passes `--combo --sanitize` and `--combo --sanitize --fast-math`,
+including the maximum 1536-vertex mesh, all fits, paths, owner scopes and effects.
+Acquisition fixtures now initialize the simulated N64 object segment rather
+than passing null through the legacy VIRTUAL_TO_PHYSICAL macro.
+
+Independent review found the selected-sword producer returned before writing
+identity. `CwAltSwordGi` now emits mandatory per-award `neiShimmer` for all seven
+concrete sword themes, preserving selected/Din geometry, protected priority and
+True Master flame fields. Full producer+resolver tests reproduced the loss first,
+then passed for both selection modes; sanitized actual foreign renderer dispatch
+receives each exact identity sampler and no generic overlay.

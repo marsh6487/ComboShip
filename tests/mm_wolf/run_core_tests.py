@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-core-') as td:
             donor=donor.replace(old,new)
         donor=donor.replace('    sSkeleton.sh.skeletonType = SKELANIME_TYPE_FLEX;','')
         source=Path(td)/'donor-loader.cpp'; source.write_text(donor)
-    for name,mode in [('sanitized',['-O1','-g','-fsanitize=undefined','-fno-sanitize-recover=all']),('fast-math',['-O2','-ffast-math'])]:
+    for name,mode in [('sanitized',['-O1','-g','-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all']),('fast-math',['-O2','-ffast-math'])]:
         binary=str(Path(td)/name)
         objects=[]
         for i,path in enumerate(['mm/expansions/ssbb/ssbb_character.c','mm/expansions/ssbb/ssbb_skin.c',

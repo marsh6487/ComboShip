@@ -68,6 +68,14 @@ RED evidence also includes `editor-red.log` (original Slate missing), `editor-cl
 
 The new production fixtures use address, undefined-behavior and bounds sanitizers with no recovery. LeakSanitizer alone is disabled because this runner cannot inspect processes through `/proc`/ptrace. The wallet fixture uses no heap. Whole C++ translation units use the repository's `-fpermissive`, real build defines and forced PCH-equivalent includes; existing controller macro, const qualifier, UIWidgets name and deprecated comma-subscript warnings remain, with no compilation errors. These are source/header checks, not a full linked game or platform build.
 
+## Independent review correction: earned wand and usable mode
+
+The initial clear/regrant repair used `Wand_ModeOwned` as evidence of an earned host. Independent production reproduction showed that a separately earned medallion makes a mode usable even when no wand has been obtained. The initial helper could then insert an empty wand cell and skip the actual randomizer grant and FC recording. It could also skip unearned siblings during Grant All when their medallions already existed. This was an omitted partial-save case in the original passing fixture.
+
+Host restoration now requires valid retained `wandRodsOwned` bits. Editor ownership checks earned mode state as well as active-rule usability and the canonical host. The single-item treatment retains its native any-earned-rod semantics. Granting a new wand still uses `Rando::GiveItem`; repairing a bare previously earned wand grants only its missing medallion prerequisite and avoids awarding or counting the wand again.
+
+The expanded production fixture failed first at the medallion-only canonical grant's missing earned rod bit (`wand-review-red.log`). It then passed medallion-only Elemental Wand and Sand Rod grants with actual FC obtained/applied counts, Grant All after all medallions were earned separately, and both retained/cleared bare wand prerequisite repairs with unchanged wand counts and complete repeat safety (`wand-review-green.log`). Both real translation units and pool/GI characterization also passed: nine PASS groups in total. Independent review reran the expanded fixture and confirmed the same tested blobs.
+
 ## Remaining acceptance and handoff
 
 No game has been booted. Visual fit of the additional decimal digits, actual editor presentation, runtime item use and platform package acceptance remain for the parent/user candidate gates. No Wolf, GI/receipt source or root gate code is changed. The report's requested standalone copy is `/workspace/scratch/68d44ffc4c98/editor-wallet-rebuild-report.md`; the tracked copy provides durable recovery evidence when the parent publishes this section.

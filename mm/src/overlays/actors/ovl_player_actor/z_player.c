@@ -14190,6 +14190,7 @@ void Player_Update(Actor* thisx, PlayState* play) {
         this->fallStartHeight = this->actor.world.pos.y;
     } else {
         input = *CONTROLLER1(&play->state);
+        WolfLinkHost_RestorePlayerInput(this, &input);
         if (this->textboxBtnCooldownTimer != 0) {
             // Prevent the usage of A/B/C-up.
             // Helps avoid accidental inputs when mashing to close the final textbox.

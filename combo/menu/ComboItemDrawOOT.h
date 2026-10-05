@@ -150,22 +150,30 @@ static int32_t CwAltSwordGi(RandomizerGet rg, CwItemDrawInfo* out) {
     const char* selected = nullptr;
     const char* fire = nullptr;
     bool trueMaster = false;
+    NeiGi::Kind shimmer = NeiGi::Kind::Neutral;
     switch (rg) {
         case RG_KOKIRI_SWORD:
         case RG_RAZOR_SWORD:
         case RG_GILDED_SWORD:
+            shimmer = rg == RG_KOKIRI_SWORD  ? NeiGi::Kind::KokiriSword
+                      : rg == RG_RAZOR_SWORD ? NeiGi::Kind::RazorSword
+                                             : NeiGi::Kind::GildedSword;
             selected = "__OTR__alt/objects/object_custom_equip/gCustomKokiriSwordDL";
             fire = "__OTR__objects/din_fire_sword/progressive/child/SwordDL";
             break;
         case RG_TRUE_MASTER_SWORD:
             trueMaster = true;
+            shimmer = NeiGi::Kind::SwordAura;
             [[fallthrough]];
         case RG_MASTER_SWORD:
+            if (!trueMaster)
+                shimmer = NeiGi::Kind::MasterSword;
             selected = "__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL";
             fire = "__OTR__objects/din_fire_sword/progressive/adult/SwordDL";
             break;
         case RG_BIGGORON_SWORD:
         case RG_GREAT_FAIRY_SWORD:
+            shimmer = rg == RG_BIGGORON_SWORD ? NeiGi::Kind::BiggoronSword : NeiGi::Kind::GreatFairySword;
             selected = "__OTR__alt/objects/object_custom_equip/gCustomLongswordDL";
             fire = "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
             break;
@@ -176,6 +184,11 @@ static int32_t CwAltSwordGi(RandomizerGet rg, CwItemDrawInfo* out) {
         selected = fire;
     if (!CwCustomGi(out, selected, .04f))
         return 0;
+    // This route returns before the authored descriptor. Carry the concrete
+    // award's identity even when selected geometry owns the entire model.
+    out->neiShimmer = static_cast<int32_t>(shimmer) + 1;
+    out->itemShimmer = 1;
+    out->stateDependent = 2;
     // Standalone equipment follows the native hand-local +X blade axis.
     // Tilt it into +Y; an X quarter-turn after this would lay it flat in XZ.
     out->opCount = 1;

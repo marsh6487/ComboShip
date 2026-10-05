@@ -10,6 +10,7 @@ static s32 otherForm = CUSTOM_FORM_NONE;
 static u8 pendant, beetle, kite, trident, mario, customItemBlock, pakModel, o2rModel;
 static unsigned nativeActions, nativeDamageTicks, iceBursts, thawCompletions;
 static bool nativeAnimationDone;
+static u16 hookSuppressedButtons;
 extern "C" {
 Input* sPlayerControlInput;
 f32 sControlStickMagnitude;
@@ -78,6 +79,11 @@ void EffectSsIcePiece_SpawnBurst(PlayState*, Vec3f*, f32) {
     ++iceBursts;
 }
 void Player_Action_82(Player*, PlayState*);
+void WolfFixture_SelectNativeInput(PlayState*, Player*, Input*);
+void GameInteractor_ExecuteOnPassPlayerInputs(Input* input) {
+    input->cur.button &= ~hookSuppressedButtons;
+    input->press.button &= ~hookSuppressedButtons;
+}
 }
 #ifdef MM_WOLF_HOST
 #include "mods/forms/wolf_link_host.cpp"
@@ -121,6 +127,7 @@ int main(int argc, char** argv) {
     ExtButton_SetItem(0, EQUIP_SLOT_C_LEFT, EXT_ITEM_SHADOW_CRYSTAL);
     assert(load(makeAsset()));
     sAssetsLoaded = 0;
+    bool installFreezeBeforeAction = false;
     auto frame = [&](u16 buttons = 0, u16 held = 0, s8 stick = 0) {
         play.state.input[0] = {};
         play.state.input[0].press.button = buttons;
@@ -128,8 +135,15 @@ int main(int argc, char** argv) {
         play.state.input[0].rel.stick_y = stick;
         play.state.input[0].cur.stick_y = stick;
         WolfLinkHost_PreUpdate(&play, &player);
-        Input filtered = play.state.input[0];
+        Input filtered{};
+        WolfFixture_SelectNativeInput(&play, &player, &filtered);
         WolfLinkHost_FilterInput(&player, &filtered);
+        if (installFreezeBeforeAction) {
+            player.actionFunc = Player_Action_82;
+            player.av1.actionVar1 = 6;
+            player.av2.actionVar2 = 0;
+            installFreezeBeforeAction = false;
+        }
         sPlayerControlInput = &filtered;
         WolfLinkHost_BeforeAction(&play, &player, &filtered);
         if (!(player.stateFlags3 & PLAYER_STATE3_4) && player.actionFunc)
@@ -142,8 +156,55 @@ int main(int argc, char** argv) {
         std::fputs("FAIL full-width C-button Shadow Crystal did not activate the production MM Wolf runtime\n", stderr);
         return 1;
     }
+    player.stateFlags1 = PLAYER_STATE1_20;
+    auto blocked = frame(BTN_B, BTN_R);
+    if (sWolf.procOwnsPlayer || (player.stateFlags3 & PLAYER_STATE3_4)) {
+        std::fputs("FAIL Wolf ignored native disabled-input/remote-tool ownership\n", stderr);
+        return 1;
+    }
+    assert((play.state.input[0].press.button & BTN_B) && (play.state.input[0].cur.button & BTN_R));
+    WolfLinkHost_Destroy(&play, &player);
+    frame(BTN_CLEFT);
+    assert(!WolfLinkForm_IsReady());
+    player.stateFlags1 = 0;
+    frame(BTN_CLEFT);
+    assert(WolfLinkForm_IsReady());
+    play.actorCtx.isOverrideInputOn = true;
+    play.actorCtx.overrideInput = {};
+    frame(BTN_B);
+    assert(!sWolf.procOwnsPlayer && !(player.stateFlags3 & PLAYER_STATE3_4));
+    frame(BTN_CLEFT);
+    assert(!WolfLinkForm_IsReady());
+    play.actorCtx.isOverrideInputOn = false;
+    frame(BTN_CLEFT);
+    assert(WolfLinkForm_IsReady());
+    player.textboxBtnCooldownTimer = 3;
+    frame(BTN_B | BTN_A);
+    assert(!sWolf.procOwnsPlayer && !(player.stateFlags3 & PLAYER_STATE3_4));
+    player.textboxBtnCooldownTimer = 0;
+    hookSuppressedButtons = BTN_B | BTN_A;
+    frame(BTN_B | BTN_A);
+    assert(!sWolf.procOwnsPlayer && !(player.stateFlags3 & PLAYER_STATE3_4));
+    hookSuppressedButtons = BTN_CLEFT;
+    frame(BTN_CLEFT);
+    assert(WolfLinkForm_IsReady());
+    hookSuppressedButtons = 0;
     auto filtered = frame(BTN_B, BTN_R);
     assert(!(filtered.press.button & BTN_B) && !(filtered.cur.button & BTN_R));
+    assert(sWolf.procOwnsPlayer && sWolf.proc == PROC_WOLF_WAIT_ATTACK);
+    player.stateFlags1 = PLAYER_STATE1_20000000;
+    player.actionFunc = NativeIdle;
+    const auto blockedNativeActions = nativeActions;
+    frame(BTN_B);
+    assert(!sWolf.procOwnsPlayer && !(player.stateFlags3 & PLAYER_STATE3_4) &&
+           nativeActions == blockedNativeActions + 1);
+    WolfLinkHost_Destroy(&play, &player);
+    frame(BTN_CLEFT);
+    assert(!WolfLinkForm_IsReady());
+    player.stateFlags1 = 0;
+    player.actionFunc = nullptr;
+    frame(BTN_CLEFT);
+    frame(BTN_B, BTN_R);
     assert(sWolf.procOwnsPlayer && sWolf.proc == PROC_WOLF_WAIT_ATTACK);
     // Native collision-shape fitting cannot overwrite Wolf's low body.
 #ifdef MM_WOLF_HOST
@@ -163,6 +224,18 @@ int main(int argc, char** argv) {
         assert(!sWolf.procOwnsPlayer && !sWolf.atActive && !(player.stateFlags3 & PLAYER_STATE3_4));
         assert(gSaveContext.save.saveInfo.playerData.health == health);
     }
+    // A hit may install freeze after filtering this frame's pad. Only permitted mash
+    // buttons are recovered from Wolf's reservation; an input hook can still suppress them.
+    player.actionFunc = nullptr;
+    installFreezeBeforeAction = true;
+    frame(BTN_A | BTN_B);
+    assert(player.av2.actionVar2 == 6 && !sWolf.procOwnsPlayer && !(player.stateFlags3 & PLAYER_STATE3_4));
+    player.actionFunc = nullptr;
+    hookSuppressedButtons = BTN_A | BTN_B;
+    installFreezeBeforeAction = true;
+    frame(BTN_A | BTN_B);
+    assert(player.av2.actionVar2 == 1 && !sWolf.procOwnsPlayer && !(player.stateFlags3 & PLAYER_STATE3_4));
+    hookSuppressedButtons = 0;
     // Actual native freeze action + actual mash helper are extracted unchanged from z_player.c.
     // They must tick periodic native damage once, thaw on A/B mashing, and finish their animation.
     player.actionFunc = Player_Action_82;
@@ -212,6 +285,10 @@ int main(int argc, char** argv) {
     frame(BTN_DUP);
     assert(!WolfLinkForm_IsReady());
     integerCvars["gEnhancements.Dpad.DpadEquips"] = 1;
+    hookSuppressedButtons = BTN_DUP;
+    frame(BTN_DUP);
+    assert(!WolfLinkForm_IsReady());
+    hookSuppressedButtons = 0;
     frame(BTN_DUP);
     assert(WolfLinkForm_IsReady());
     frame(BTN_DUP);

@@ -162,7 +162,7 @@ extern "C" {
 // bracket exactly the native mesh submission in its asset owner's namespace.
 extern "C" bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh,
                                        const NeiGi::TextureMaterial& material) {
-    if (!play || !mesh.count || !HasResource(material.path))
+    if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, &material) || !HasResource(material.path))
         return false;
     OPEN_DISPS(play->state.gfxCtx);
     gSPComboRMPush(POLY_XLU_DISP++, "oot");
