@@ -392,6 +392,10 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
     }
     CLOSE_DISPS(play->state.gfxCtx);
     Matrix_Pop();
+    // Sword particles belong to the awarded sword, including mod geometry.
+    if (NeiGi::IsSword(static_cast<Kind>(shimmerKind)))
+        NeiGi_DrawMesh(play, NeiGi::SampleSpecial(static_cast<Kind>(shimmerKind), play->gameplayFrames,
+                                                 NeiGi_CameraBasis(play)));
     if (shimmer)
         NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play),
                                                   static_cast<Kind>(shimmerKind)));

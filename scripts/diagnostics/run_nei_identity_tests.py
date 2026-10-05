@@ -115,7 +115,7 @@ int main() {
         assert(info.itemShimmer==(NeiGi::IsSword(award.second)||effects));
         draws=0;
         {MM_NeiGiFallbackShimmer fallback(award.first);}
-        assert(draws==(NeiGi::IsSword(award.second)||effects));
+        assert(draws==(NeiGi::IsSword(award.second) ? 2 : effects) && "selected sword mesh lost its intrinsic particles");
         assert(pushes==0);
         if(draws) {
             const auto expected=NeiGi::SampleShimmer(play.gameplayFrames,true,{},award.second);

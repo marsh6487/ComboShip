@@ -22,3 +22,11 @@ Failing behavior regression reproduced: an actor fairy drawn after a scaled MM n
 Second failing behavior regression reproduced: a TP XML BlueFire shell in a built-in/companion O2R was rejected solely by non-mod archive provenance. New owner-aware query recognizes XML replacement geometry as well as selected mod archives. Vanilla binary chamberstick remains ineligible. Fairy-specific and generic mod priority remains intact.
 
 `python3 -B scripts/diagnostics/run_fairy_bottle_tests.py`: passes both host variants and both real C++ helper header gates with provided CPATH. Native/foreign transform and fallback checks passed. `run_mm_item_visuals_tests.py` is running; exact result will follow. No game runtime validation or exact TP stack proof.
+
+## Selected sword fitting and particles WIP
+
+New graph reader obtains bounds from the currently selected Fast display list and vertex resources, recursively following XML filepath and binary hash calls, then transforms +X equipment bounds by the retained Z=1.8 upright pose. Full-spin radius and vertical bounds feed the existing `FrameFit` envelope. Owner-aware lookup and live Alt selection remain; no player/held vertices change. Static unsupported/dynamic matrix paths leave their geometry draw intact.
+
+Focused red tests: `run_sword_pose_tests.py` failed on selected Din equipment top >48 GI units; `run_nei_identity_tests.py` failed when native MM selected sword fallback emitted shimmer without intrinsic particles. Both now pass their controlled execution checks. `run_sword_mod_gi_tests.py --archives /workspace/scratch/b1753232b6d5/upload` is executing actual supplied resource graphs and model routes. Native/foreign syntax/integration gates and intrinsic Din fire-layer restoration remain unfinished. This is a WIP checkpoint, not a build-accepted candidate.
+
+Fairy gate update: `run_mm_item_visuals_tests.py` completed successfully (native MM command checks, real z_draw C syntax, real item-enum dispatcher). Existing controller macro redefinition warnings remain unchanged.

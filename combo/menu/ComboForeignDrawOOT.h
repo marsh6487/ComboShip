@@ -21,6 +21,7 @@
 #include "ComboSpinAttackGi.h"
 #include "ComboMaskShimmer.h"
 #include "ComboFairyBottle.h"
+#include "ComboSwordGiFit.h"
 #include "ComboFairyBottleDraw.h"
 #include "soh/Enhancements/randomizer/NeiGiRender.h"
 
@@ -645,9 +646,13 @@ inline void OOT_DrawForeignMasterSword(PlayState* play, const ComboForeignDrawIn
 
 // Selected standalone/Din GI recipe. Match MM_DrawForeignCustomGi's signed
 // spin, hand-local transforms, split passes and independent optional flame.
-inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo* info) {
+inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo* info, bool shop = false) {
     OOT_DrawForeignWeaponFlame(play, info->primColorXlu);
     Matrix_Push();
+    if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
+        NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
+        ComboSwordGi_ApplyFit("oot", info->dls[0], info->scale,
+                             info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z ? 1.8f : 0.f, shop);
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     Matrix_RotateY((bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f, MTXMODE_APPLY);
     int selectedOpaque = -1;
@@ -968,7 +973,7 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
             OOT_DrawForeignMasterSword(play, info);
             break;
         case CW_DRAW_KIND_CUSTOM_GI:
-            OOT_DrawForeignCustomGi(play, info);
+            OOT_DrawForeignCustomGi(play, info, shop);
             break;
         case CW_DRAW_KIND_DEKU_NUTS:
             OOT_DrawForeignDekuNuts(play, info);
@@ -1021,6 +1026,10 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
     }
     if (overlayShimmer) {
         Matrix_Pop();
+        if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
+            NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
+            NeiGi_DrawMesh(play, NeiGi::SampleSpecial(static_cast<NeiGi::Kind>(info->neiShimmer - 1),
+                                                         play->gameplayFrames, NeiGi_CameraBasis(play)));
         if (info->drawKind == CW_DRAW_KIND_SONG_GI)
             NeiGi_DrawSongOverlay(play, info->neiEffect, "mm");
         else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1)

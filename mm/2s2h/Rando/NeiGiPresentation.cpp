@@ -292,6 +292,9 @@ MM_NeiGiFallbackShimmer::~MM_NeiGiFallbackShimmer() {
     if (!mEnabled)
         return;
     Matrix_Pop();
+    if (NeiGi::IsSword(mKind))
+        NeiGi_DrawMesh(gPlayState, NeiGi::SampleSpecial(mKind, gPlayState->gameplayFrames,
+                                                       NeiGi_CameraBasis(gPlayState)));
     NeiGi_DrawMesh(gPlayState,
                    NeiGi::SampleShimmer(gPlayState->gameplayFrames, true, NeiGi_CameraBasis(gPlayState), mKind));
 }

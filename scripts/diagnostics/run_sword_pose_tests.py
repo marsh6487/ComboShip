@@ -17,13 +17,23 @@ source=r'''
 #include <cstdint>
 #include "combo/menu/ComboItemDrawABI.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
+#include "soh/soh/Enhancements/randomizer/NeiGiFrameFit.h"
 using f32=float;using s16=int16_t;using Gfx=int;
 constexpr int MTXMODE_APPLY=1;
 struct PlayState{struct{void* gfxCtx;}state;uint32_t gameplayFrames=42;} play;
 using Matrix=std::array<std::array<float,3>,3>;
 Matrix m;
-void Reset(){m={{{1,0,0},{0,1,0},{0,0,1}}};}
+float lift;
+void Reset(){lift=0;m={{{1,0,0},{0,1,0},{0,0,1}}};}
 void Multiply(const Matrix& r){auto old=m;for(int i=0;i<3;++i)for(int j=0;j<3;++j){m[i][j]=0;for(int k=0;k<3;++k)m[i][j]+=old[i][k]*r[k][j];}}
+void Matrix_Translate(float,float y,float,int){lift+=y;}
+void ComboSwordGi_ApplyFit(const char*,const char*,float scale,float tilt,bool shop=false){
+    const float c=std::cos(tilt),s=std::sin(tilt);
+    NeiGi::FrameBounds bounds{"selected",{0,-670*s-268*c,0},{0,4122*s-268*c,0},2400,NeiGi::Kind::MasterSword,{}};
+    auto fit=NeiGi::FrameFit(bounds,scale,shop);Matrix_Translate(0,fit.lift,0,1);
+    // Apply the fit without depending on Matrix_Scale's later declaration.
+    Multiply({{{fit.scale,0,0},{0,fit.scale,0},{0,0,fit.scale}}});
+}
 void Matrix_RotateX(float a,int){Multiply({{{1,0,0},{0,std::cos(a),-std::sin(a)},{0,std::sin(a),std::cos(a)}}});}
 void Matrix_RotateY(float a,int){Multiply({{{std::cos(a),0,std::sin(a)},{0,1,0},{-std::sin(a),0,std::cos(a)}}});}
 void Matrix_RotateZ(float a,int){Multiply({{{std::cos(a),-std::sin(a),0},{std::sin(a),std::cos(a),0},{0,0,1}}});}
@@ -66,7 +76,7 @@ int main(){
         }
 '''
 if 'NeiGi_DrawSelectedSword' in native:
-    source+='Reset();NeiGi_DrawSelectedSword(&play,"selected");Check();\n'
+    source+='Reset();NeiGi_DrawSelectedSword(&play,"selected");Check();\nconst float high=m[1][0]*4122+m[1][1]*-268+m[1][2]*101+lift;\nassert(high<=48.001f && "actual selected Din equipment mesh exceeds the GI frame envelope");\n'
 source+='}\n}\n'
 with tempfile.TemporaryDirectory(prefix='sword-pose-') as temporary:
     path=Path(temporary); (path/'pose.cpp').write_text(source)

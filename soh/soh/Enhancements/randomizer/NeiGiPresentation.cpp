@@ -3,6 +3,7 @@
 #include "NeiGiEnergyTexture.h"
 #include "NeiGiRender.h"
 #include "NeiGiShopFit.h"
+#include "ComboSwordGiFit.h"
 #include "ComboSongDrawOOT.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
 #include <algorithm>
@@ -767,8 +768,9 @@ bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available
 
 } // namespace
 
-static void NeiGi_DrawSelectedSword(PlayState* play, const char* path) {
+static void NeiGi_DrawSelectedSword(PlayState* play, const char* path, bool shop = false) {
     OPEN_DISPS(play->state.gfxCtx);
+    ComboSwordGi_ApplyFit("oot", path, .04f, 1.8f, shop);
     Matrix_RotateY(Spin(play), MTXMODE_APPLY);
     // Standalone donor blades point along +X. Z alone turns that axis into
     // upright +Y; an extra X quarter turn would lay it flat in XZ.
@@ -818,7 +820,8 @@ static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool up
         NeiGi_DrawSeasonOverlay(play, 5, nullptr);
     const bool shimmer = CVarGetInteger(CVAR_NEI_GI_EFFECTS, 0) != 0;
     const bool energy =
-        upgraded && (NeiGi::IsRod(item.effect) || NeiGi::IsSpell(item.effect) || NeiGi::IsSpecial(item.effect));
+        (upgraded || NeiGi::IsSword(item.effect)) &&
+        (NeiGi::IsRod(item.effect) || NeiGi::IsSpell(item.effect) || NeiGi::IsSpecial(item.effect));
     if (!shimmer && !energy && !item.alwaysShimmer)
         return;
     Matrix_Push();
@@ -889,7 +892,7 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     if (selectedSword) {
         if (item->effect == Kind::SwordAura)
             Randomizer_DrawTrueMasterSwordFlame(play);
-        NeiGi_DrawSelectedSword(play, selectedSword);
+        NeiGi_DrawSelectedSword(play, selectedSword, shop);
     } else if (upgraded) {
         OPEN_DISPS(play->state.gfxCtx);
         Matrix_Scale(item->scale, item->scale, item->scale, MTXMODE_APPLY);

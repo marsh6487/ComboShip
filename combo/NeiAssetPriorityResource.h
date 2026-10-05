@@ -1,8 +1,10 @@
 #pragma once
 #include "NeiAssetPriority.h"
+#include "NeiGiModelBounds.h"
 #include <ship/Context.h>
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManager.h>
+#include <ship/resource/ResourceManagerScope.h>
 #include <ship/resource/archive/Archive.h>
 #include <ship/resource/archive/ArchiveManager.h>
 
@@ -114,5 +116,44 @@ inline bool IsCustomAsset(const char* nativeGame, const char* game, const char* 
     Ship::ResourceManagerScope scope(owner);
     const auto model = owner->LoadResource(resource);
     return model && model->GetInitData() && model->GetInitData()->IsCustom;
+}
+inline bool GetGiModelFit(const char* nativeGame, const char* game, const char* path, float scale, float tilt,
+                          bool shop, float fit[2]) {
+    if (!game || !path || !fit || !std::isfinite(scale) || scale <= 0.f || !std::isfinite(tilt))
+        return false;
+    std::string resource = path;
+    if (resource.compare(0, 7, "__OTR__") == 0)
+        resource.erase(0, 7);
+    std::string ownerGame = game;
+    if (!resource.empty() && resource[0] == '@') {
+        const auto colon = resource.find(':');
+        if (colon == std::string::npos)
+            return false;
+        ownerGame = resource.substr(1, colon - 1);
+        resource.erase(0, colon + 1);
+    }
+    auto owner = Ship::CrossRMRegistry::Get(ownerGame);
+#ifndef COMBO_BUILD
+    if (!owner && ownerGame == nativeGame) {
+        const auto context = Ship::Context::GetRawInstance();
+        if (context)
+            owner = context->GetResourceManager();
+    }
+#else
+    (void)nativeGame;
+#endif
+    if (!owner)
+        return false;
+    Ship::ResourceManagerScope scope(owner);
+    // Hash and filepath dependencies follow the same owner's live Alt selection.
+    const auto load = [&](auto key) { return owner->LoadResource(key); };
+    NeiGi::FrameBounds bounds{};
+    NeiGi::ModelBoundsReader<decltype(load)> reader(load, tilt);
+    if (!reader.Read(resource.c_str(), bounds))
+        return false;
+    const auto correction = NeiGi::FrameFit(bounds, scale, shop);
+    fit[0] = correction.scale;
+    fit[1] = correction.lift;
+    return true;
 }
 } // namespace NeiAssetPriority
