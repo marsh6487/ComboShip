@@ -3,6 +3,7 @@
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h"
 #include "2s2h/FleetShipCombo/FleetComboItems.h"
 #include "ComboItemReceiptText.h"
+#include "ComboSongReceiptText.h"
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -142,6 +143,28 @@ const char* ConcreteReceiptName(RandoItemId id) {
             return "Magic Meter";
         case RI_DOUBLE_MAGIC:
             return "Enhanced Magic Meter";
+        // These FC chains count identical keys, rather than equipment tiers.
+        // Each local key already has the concrete identity the donor needs.
+        case RI_OOT_SMALL_KEY_BOTTOM_OF_THE_WELL:
+            return "Bottom of the Well Small Key";
+        case RI_OOT_SMALL_KEY_FIRE_TEMPLE:
+            return "Fire Temple Small Key";
+        case RI_OOT_SMALL_KEY_FOREST_TEMPLE:
+            return "Forest Temple Small Key";
+        case RI_OOT_SMALL_KEY_GANONS_CASTLE:
+            return "Ganon's Castle Small Key";
+        case RI_OOT_SMALL_KEY_GERUDO_FORTRESS:
+            return "Gerudo Fortress Small Key";
+        case RI_OOT_SMALL_KEY_GERUDO_TRAINING_GROUND:
+            return "Training Ground Small Key";
+        case RI_OOT_SMALL_KEY_SHADOW_TEMPLE:
+            return "Shadow Temple Small Key";
+        case RI_OOT_SMALL_KEY_SPIRIT_TEMPLE:
+            return "Spirit Temple Small Key";
+        case RI_OOT_SMALL_KEY_TREASURE_GAME:
+            return "Chest Game Small Key";
+        case RI_OOT_SMALL_KEY_WATER_TEMPLE:
+            return "Water Temple Small Key";
         // Shared songs still need MM's description of their use in Termina.
         // These are concrete identities, including each Goron Lullaby tier.
         case RI_SONG_SONATA:
@@ -389,6 +412,17 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
         item.randoItemType != RITYPE_LESSER && item.randoItemType != RITYPE_HEALTH)
         return false;
     const char* concrete = ConcreteReceiptName(id);
+    // Cross-game text export carries English bytes only. MM owns the meaning
+    // and locale of its songs, including shared songs and both lullaby tiers.
+    if (concrete) {
+        if (const auto* song = ComboSongReceiptText::Find(concrete)) {
+            const char* text = gSaveContext.options.language == LANGUAGE_GER   ? song->german
+                               : gSaveContext.options.language == LANGUAGE_FRE ? song->french
+                                                                               : song->english;
+            SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(text));
+            return true;
+        }
+    }
 #ifdef COMBO_BUILD
     if (concrete && ApplyForeignItemReceiptText(concrete, entry))
         return true;

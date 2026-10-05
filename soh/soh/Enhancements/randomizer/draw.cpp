@@ -1813,13 +1813,13 @@ void Randomizer_DrawNet(PlayState* play, GetItemEntry* getItemEntry) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Defined with the per-level sword draws below (upright + 45° hand-local sword presentation).
+// Defined with the per-level sword draws below (upright hand-local sword presentation).
 static void DrawMmWeaponGi(PlayState* play, Gfx* dl1, Gfx* dl2, f32 scale);
 
 void Randomizer_DrawExtFourSword(PlayState* play, GetItemEntry* getItemEntry) {
     // The REAL Four Sword model (soh.o2r object_nei_four_sword, converted out of the old pak).
     // Blade + hilt are separate DLs, both authored in hand-local space like the MM swords, so they
-    // take the same upright + 45° presentation. Falls back to the tinted Kokiri sword if the
+    // take the same upright presentation. Falls back to the tinted Kokiri sword if the
     // archive is stale.
     Gfx* blade = ResourceMgr_LoadGfxByName(dgNeiFourSwordBladeDL);
     Gfx* hilt = ResourceMgr_LoadGfxByName(dgNeiFourSwordHiltDL);
@@ -1902,15 +1902,14 @@ static Gfx* LoadMmDLOnce(const char* path, Gfx** cache, u8* tried) {
 // DLs looked wrong here no matter the angle: they are arm-local meshes, not GI models.
 // For meshes authored in HAND-LOCAL space (they are held-weapon models, not GI models): stand them
 // up and tilt them into a get-item pose by hand. Only the Four Sword needs this now — the MM sword
-// levels moved to their real GI models above. Spin around world-up, then upright, then tilt, then
-// shrink; ~1.8 rad is what makes a hand-local blade read like the Master Sword GI (45° left it
-// nearly horizontal).
+// levels moved to their real GI models above. Spin around world-up, rotate the
+// donor's +X blade into +Y with Z, then shrink. An extra X quarter turn after the
+// tilt lays the blade flat, so it must not be applied here.
 static void DrawMmWeaponGi(PlayState* play, Gfx* dl1, Gfx* dl2, f32 scale) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     s16 rotation = play->gameplayFrames * 0x2;
     Matrix_RotateY(rotation * 0.01f, MTXMODE_APPLY);
-    Matrix_RotateX(-M_PI / 2.0f, MTXMODE_APPLY);
     Matrix_RotateZ(1.8f, MTXMODE_APPLY);
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
@@ -2005,9 +2004,13 @@ void Randomizer_DrawGreatFairySword(PlayState* play, GetItemEntry* getItemEntry)
     DrawMmGiModel(play, blade, emblem, true); // el emblema del pomo va en XLU (así lo dibuja MM)
 }
 
+void Randomizer_DrawTrueMasterSwordFlame(PlayState* play) {
+    DrawWeaponFlameOverlay(play, 120, 180, 255);
+}
+
 void Randomizer_DrawTrueMasterSword(PlayState* play, GetItemEntry* getItemEntry) {
     // Sacred-blue boss-soul flame + the real Master Sword mesh (pedestal object).
-    DrawWeaponFlameOverlay(play, 120, 180, 255);
+    Randomizer_DrawTrueMasterSwordFlame(play);
     Randomizer_DrawMasterSword(play, getItemEntry);
 }
 

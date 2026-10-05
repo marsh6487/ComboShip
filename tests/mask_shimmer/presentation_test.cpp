@@ -23,7 +23,7 @@ extern "C" {
 #include "soh/Enhancements/randomizer/NeiGiRender.h"
 #include "soh/Enhancements/randomizer/NeiGiEnergyTexture.h"
 
-static Gfx opa[2048], xlu[2048], resource;
+static Gfx opa[8192], xlu[2048], overlay[2048], resource;
 static GraphicsContext gfx;
 static PlayState play;
 static Mtx matrix;
@@ -189,6 +189,10 @@ static struct { void (*drawFunc)(PlayState*, s16); void* drawResources[1]; } sDr
 static void Reset(int frame) {
     memset(opa, 0, sizeof(opa)); memset(xlu, 0, sizeof(xlu));
     gfx.polyOpa.p = opa; gfx.polyXlu.p = xlu;
+    gfx.polyOpa.d = std::end(opa);
+    gfx.polyXlu.d = std::end(xlu);
+    gfx.overlay.p = overlay;
+    gfx.overlay.d = std::end(overlay);
     play.state.gfxCtx = &gfx; play.gameplayFrames = frame;
     paths.clear(); sparkleTransforms.clear(); stack.clear(); depth = 0; transform = {};
     arena.clear(); vertexLoads.clear(); resourceLoads = 0;
@@ -263,13 +267,14 @@ int main() {
     assert(!MM_TryDrawNeiGi(RI_OOT_NEI_SEASON_SUMMER));
     gPlayState = &play;
     Reset(47);
-    // A local replacement must return to the legacy draw without querying OoT.
+    // A local replacement keeps its legacy geometry while the owner lookup
+    // supplies independent identity when that module is available.
     legacyModPath = "objects/object_nei_fire_rod/Cylinder_001_opaque_dl";
     assert(!MM_TryDrawNeiGi(RI_OOT_NEI_FIRE_ROD));
-    assert(ownerLookups == 0 && paths.empty() && vertexLoads.empty());
+    assert(ownerLookups == 1 && paths.empty() && vertexLoads.empty());
     legacyModPath.clear();
     assert(!MM_TryDrawNeiGi(RI_OOT_NEI_WHIP)); // Fixture has no dormant OoT module.
-    assert(ownerLookups == 1);
+    assert(ownerLookups == 2);
 #endif
     Reset(47);
 #ifdef HOST_MM
@@ -359,13 +364,22 @@ int main() {
     }
     // Execute the shared GI body with both engines' real GBI. Its model and
     // optional crystal pass must enclose every child effect in one owner scope.
-    for (Kind kind : {Kind::Neutral, Kind::Sand, Kind::Tornado, Kind::Water, Kind::Meteor,
-         Kind::Storm, Kind::Shadow, Kind::Slate, Kind::Hourglass, Kind::DarkCrystal,
-         Kind::SwordAura, Kind::CaneBlue}) for (bool shimmer : {false, true}) {
+    for (Kind kind : {Kind::Sand, Kind::Tornado, Kind::Water, Kind::Meteor,
+                      Kind::Storm, Kind::Shadow, Kind::Slate, Kind::Hourglass,
+                      Kind::DarkCrystal, Kind::SwordAura, Kind::CaneBlue})
+      for (bool shimmer : {false, true}) {
         Reset(47);
         constexpr float center[3] = {0,0,0};
-        constexpr const char* body = "__OTR__@oot:fixture/gi_dl";
-        constexpr const char* skin = "__OTR__@oot:fixture/gi_xlu_dl";
+        const auto catalog = std::find_if(
+            std::begin(NeiGi::kFrameBounds), std::end(NeiGi::kFrameBounds),
+            [kind](const auto &frame) { return frame.effect == kind; });
+        assert(catalog != std::end(NeiGi::kFrameBounds));
+        const std::string root =
+            std::string("__OTR__@oot:objects/nei_gi_redesign/") + catalog->slug;
+        const std::string bodyPath = root + "/gi_dl",
+                          skinPath = root + "/gi_xlu_dl";
+        const char *body = bodyPath.c_str();
+        const char *skin = skinPath.c_str();
         NeiGi_DrawPresentation(&play,body,skin,1,int(kind),center,shimmer,"oot");
         const auto actual=ExpandedVertices(true,"oot");
         auto expected=NeiGi::SampleSpecial(kind,47,NeiGi_CameraBasis(&play));
@@ -394,7 +408,7 @@ int main() {
             assert(scopes[stream]==0 && models[stream]==1); ++stream;
         }
         assert(depth==0 && stack.empty() && transform.scale==1 && resourceLoads==0);
-    }
+      }
     for (int season=1; season<=5; ++season) for (int frame: {0,47,119,179,180,359,719,65535}) {
         Reset(frame); NeiGi_DrawSeasonOverlay(&play, season, "oot");
         const auto actual=ExpandedVertices(true, "oot");

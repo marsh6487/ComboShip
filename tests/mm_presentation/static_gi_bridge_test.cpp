@@ -19,8 +19,8 @@ using s16=int16_t;using s32=int32_t;using f32=float;
 struct Color_RGB8 {uint8_t r,g,b;};
 #define CVAR_COSMETIC(x) x
 #define CVAR_ENHANCEMENT(x) x
-bool changedMagic=false;
-int CVarGetInteger(const char* name,int value) {return !strcmp(name,"Consumable.Magic.Changed") ? changedMagic : value;}
+bool changedMagic=false, dinSelected=false;
+int CVarGetInteger(const char* name,int value) {return !strcmp(name,"Consumable.Magic.Changed") ? changedMagic : !strcmp(name,"DinFireSword") ? dinSelected : value;}
 constexpr int GID_MAGIC_SMALL=31, GID_MAGIC_LARGE=32;
 Color_RGB8 CVarGetColor24(const char*,Color_RGB8 c) {return c;}
 Color_RGB8 liveMagic{12,210,250};
@@ -96,6 +96,7 @@ void Seasons_SeasonColor(uint8_t season,uint8_t* r,uint8_t* g,uint8_t* b) {
 /* OWNER_HELPERS */
 void OOT_DescribeHeartCosmetics(s16,CwItemDrawInfo*) {}
 /* OWNER_MAGIC_DESCRIPTOR */
+int32_t OOT_FillSongDrawInfo(RandomizerGet,CwItemDrawInfo*) {return 0;} // Songs have their own production fixture.
 /* OWNER_DESCRIPTOR */
 /* HOST_INFO */
 RandomizerGet selected=RG_SHEIKAH_SLATE;
@@ -278,11 +279,35 @@ int main() {
  ownerAlt=true;info={};
  assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
  assert(std::string(info.dls[0])=="__OTR__@oot:alt/objects/object_custom_equip/gCustomMasterSwordDL");
- assert(info.opCount==2 && info.ops[0].op==CW_OP_ROTATE_X && info.ops[1].op==CW_OP_ROTATE_Z);
+ assert(info.opCount==1 && info.ops[0].op==CW_OP_ROTATE_Z);
  ownerAlt=false;info={};
  assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
  assert(info.drawKind==CW_DRAW_KIND_MASTER_SWORD && info.primColorXlu[0]==120);
  concrete=RG_NONE;ownerAlt=false;
+ struct SelectedSwordTheme {RandomizerGet rg;NeiGi::Kind kind;const char* equipment;const char* fire;};
+ const SelectedSwordTheme swordThemes[]={
+  {RG_KOKIRI_SWORD,NeiGi::Kind::KokiriSword,"KokiriSword","child"},
+  {RG_RAZOR_SWORD,NeiGi::Kind::RazorSword,"KokiriSword","child"},
+  {RG_GILDED_SWORD,NeiGi::Kind::GildedSword,"KokiriSword","child"},
+  {RG_MASTER_SWORD,NeiGi::Kind::MasterSword,"MasterSword","adult"},
+  {RG_TRUE_MASTER_SWORD,NeiGi::Kind::SwordAura,"MasterSword","adult"},
+  {RG_BIGGORON_SWORD,NeiGi::Kind::BiggoronSword,"Longsword","bgs"},
+  {RG_GREAT_FAIRY_SWORD,NeiGi::Kind::GreatFairySword,"Longsword","bgs"}};
+ for(const auto& theme:swordThemes)for(bool fire:{false,true}) {
+  ownerAlt=true;dinSelected=fire;concrete=theme.rg;selected=RG_PROGRESSIVE_MASTER_SWORD;
+  resources.insert(std::string("__OTR__alt/objects/object_custom_equip/gCustom")+theme.equipment+"DL");
+  const auto firePath=std::string("__OTR__objects/din_fire_sword/progressive/")+theme.fire+"/SwordDL";
+  if(fire)resources.insert(firePath);else resources.erase(firePath);
+  info={};assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+  assert(info.drawKind==CW_DRAW_KIND_CUSTOM_GI && info.itemShimmer);
+  assert(info.neiShimmer==int(theme.kind)+1 && "selected standalone/Din full producer lost its item-specific identity");
+  assert(info.neiEffect==0 && !info.primColorOpa[3]);
+  assert(info.primColorXlu[3]==(theme.rg==RG_TRUE_MASTER_SWORD?255:0));
+  assert(bool(std::strstr(info.dls[0],"din_fire_sword"))==fire);
+  assert(info.opCount==1 && info.ops[0].op==CW_OP_ROTATE_Z && info.scale==.04f);
+ }
+ ownerAlt=false;dinSelected=false;concrete=RG_NONE;
+ std::cout<<"PASS selected standalone/Din full producer+resolver: seven exact themes, independent shimmer and unchanged geometry/flame fields\n";
  const std::pair<RandomizerGet,const char*> direct[] = {
   {RG_LANTERN,"__OTR__objects/object_poh/gPoeLanternDL"},
   {RG_POKEBALL,"__OTR__objects/object_nei_pokeball/ItmPokeBall_opaque_dl"},

@@ -20,7 +20,12 @@ for config in ("CMake/soh-cvars.cmake", "CMake/lus-cvars.cmake"):
     for key, value in re.findall(r'set\((CVAR_PREFIX_\w+)\s+"?([^\s"\)]+)', (ROOT / config).read_text()):
         flags.append(f'-D{key}="{value}"')
 cc = os.environ.get("CXX", "c++")
+sanitize = ["-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"] if "--sanitize" in sys.argv else []
+if "--fast-math" in sys.argv:
+    sanitize.append("-ffast-math")
 with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
+    graph = functions((ROOT / "soh/src/code/graph.c").read_text())
+    (Path(tmp) / "nei_gi_graph.inc").write_text(graph["Graph_OpenDisps"] + "\n" + graph["Graph_CloseDisps"])
     draw = functions((ROOT / "soh/src/code/z_draw.c").read_text())
     player = functions((ROOT / "soh/src/code/z_player_lib.c").read_text())
     shop = functions((ROOT / "soh/src/overlays/actors/ovl_En_GirlA/z_en_girla.c").read_text())
@@ -28,7 +33,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
     (Path(tmp) / "nei_gi_dispatch.inc").write_text(draw["GetItemEntry_Draw"] + "\n" +
         re.sub(r"\bthis\b", "player", player["Player_DrawGetItemImpl"]) + "\n" +
         re.sub(r"\bthis\b", "shop", shop["EnGirlA_Draw"]) + "\n" +
-        custom["Randomizer_DrawCaneSomariaUpgradeFlame"])
+        custom["Randomizer_DrawCaneSomariaUpgradeFlame"] + "\n" + custom["Randomizer_DrawTrueMasterSwordFlame"])
     fixtures = []
     bindings = (("ball_and_chain", "BallAndChain"), ("shovel", "Shovel"),
                            ("fire_rod", "FireRod"), ("ice_rod", "IceRod"), ("light_rod", "LightRod"),
@@ -78,6 +83,24 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
                         f'{{{low}}}, {{{high}}}, {2*radius}f, {float(meta["draw_scale"])}f, '
                         f'{str((root / "gi_xlu_dl").exists()).lower()}, {identity}}},')
     (Path(tmp) / "nei_gi_bounds.inc").write_text("\n".join(fixtures))
+    # Every bundled model is checked, including the eight formerly omitted
+    # catalog entries and both real-engine owners of the Kokiri GI.
+    all_frames = []
+    for asset in sorted((ROOT / "soh/assets/custom/objects/nei_gi_redesign").iterdir()):
+        if not asset.is_dir():
+            continue
+        vertices = [tuple(int(v.get(axis)) for axis in ("X", "Y", "Z"))
+                    for path in asset.glob("mesh_*_vtx") for v in ET.parse(path).getroot()]
+        words = struct.unpack_from("<16I", (asset / "scale_mtx").read_bytes(), 64)
+        scale = ((words[0] >> 16) * 65536 + (words[8] >> 16)) / 65536
+        meta = json.loads((ROOT / "tools/nei_gi/CHECKPOINTS" / asset.name / "checkpoint.json").read_text())
+        low = min(p[1] for p in vertices)*scale
+        high = max(p[1] for p in vertices)*scale
+        width = 2*max(math.hypot(p[0],p[2]) for p in vertices)*scale
+        all_frames.append(f'{{"{asset.name}",{low}f,{high}f,{width}f,{float(meta["draw_scale"])}f,'
+                          f'{str((asset/"gi_xlu_dl").exists()).lower()}}},')
+    assert len(all_frames) == 61
+    (Path(tmp) / "nei_all_frame_bounds.inc").write_text("\n".join(all_frames))
     names = ["nei_gi/effect_policy", "nei_gi/presentation"]
     if "--held" in sys.argv:
         names.append("nei_held/presentation")
@@ -89,7 +112,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
         if name == "nei_gi/presentation" and "--combo" in sys.argv:
             mm_source = (ROOT / "mm/2s2h/Rando/NeiGiPresentation.cpp").read_text()
             mm_functions = functions(mm_source)
-            renderer = mm_functions["HasMmLegacyGiMod"] + "\n" + mm_functions["MM_DrawNeiGi"] + "\n" + mm_functions["MM_DescribeNeiGi"] + "\n" + mm_functions["MM_TryDrawNeiGi"]
+            renderer = functions((ROOT / "mm/2s2h/Rando/DrawItem.cpp").read_text())["DrawSong"] + "\n" + mm_functions["HasMmLegacyGiMod"] + "\n" + mm_functions["MM_DrawNeiGi"] + "\n" + mm_functions["MM_DescribeNeiGi"] + "\n" + mm_functions["MM_TryDrawNeiGi"]
             # MM's item enum and binding table are copied verbatim so origin
             # selection is exercised without importing the unrelated MM engine.
             mm_types = (ROOT / "mm/2s2h/Rando/Types.h").read_text()
@@ -126,6 +149,7 @@ void* Combo_ResolveSym(const char* owner, const char* name) {
     return nullptr;
 }
 void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b) { Fixture::flameColors.push_back({r,g,b}); }
+void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false);
 #define Gfx_SetupDL25_Opa Gfx_SetupDL_25Opa
 #define Gfx_SetupDL25_Xlu Gfx_SetupDL_25Xlu
 #define Matrix_RotateYF Matrix_RotateY
@@ -158,19 +182,59 @@ void ComboDrawSpinAttackGi(PlayState*, const char*, const char*, float, const ui
     ++foreignFallbackCalls;
 }
 """
-            tested_bridge = (shim + route + "\n" + item_enum + "\n" + bindings + "\n" + fallback_class + "\n" +
+            mm_foreign_source = (ROOT / "combo/menu/ComboForeignDrawMM.h").read_text()
+            mm_foreign_info = re.search(r"struct ComboForeignDrawInfoOOT \{.*?\n\};",mm_foreign_source,re.S)[0]
+            mm_foreign_draw = functions(mm_foreign_source)["MM_DrawComboForeign"]
+            mm_handlers = sorted(set(re.findall(r"\b(MM_DrawForeign\w+)\(info\)", mm_foreign_draw)))
+            mm_shop_support = """
+using RandoCheckId=int;
+constexpr RandoCheckId RC_UNKNOWN=0;
+struct MmShopEnGirlA { Actor actor; s16 rotY; };
+struct MmShopSaveCheck { RandoItemId randoItemId=RI_NONE; };
+MmShopSaveCheck mmShopChecks[8];
+#define RANDO_SAVE_CHECKS mmShopChecks
+void Matrix_RotateYS(s16, u8) {}
+void func_800B8118(Actor*,PlayState*,int) {}
+void func_800B8050(Actor*,PlayState*,int) {}
+int DungeonItem_GetOwner(RandoItemId) {return -1;}
+bool GetItem_DrawDungeonItem(PlayState*,s16,int) {assert(false);return false;}
+int mmShopLegacyDraws;
+namespace Rando {
+void DrawItem(RandoItemId,RandoCheckId,Actor*);
+void DrawResolvedItem(RandoItemId,RandoCheckId,Actor*);
+RandoItemId ConvertItem(RandoItemId item,RandoCheckId) {return item;}
+namespace StaticData {struct FixtureItem {s16 drawId;};FixtureItem Items[RI_MAX];}
+}
+void DrawOotNeiUltrahand() {assert(false);}
+void DrawOotNeiCaneOfSomaria(RandoItemId) {assert(false);}
+""" + mm_foreign_info + """
+const ComboForeignDrawInfoOOT* selectedForeignInfoMM=nullptr;
+const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckId) {return selectedForeignInfoMM;}
+""" + "\n".join("void "+name+"(const ComboForeignDrawInfoOOT*) {assert(false);}" for name in mm_handlers)
+            mm_draw_source=(ROOT/"mm/2s2h/Rando/DrawItem.cpp").read_text()
+            # Keep the exact outer item conversion/context/early dispatcher and
+            # actual foreign branch; unrelated switch bodies have own fixtures.
+            resolved = mm_draw_source[mm_draw_source.index("void Rando::DrawResolvedItem("):]
+            prefix = resolved[:resolved.index("    switch (randoItemId) {")]
+            foreign_case = re.search(r"        case RI_COMBO_FOREIGN:.*?            break;", resolved,re.S)[0]
+            resolved = prefix + "    switch(randoItemId) {\n" + foreign_case + "\n        default: ++mmShopLegacyDraws;break;\n    }\n}"
+            draw_item = mm_draw_source[mm_draw_source.index("void Rando::DrawItem("):mm_draw_source.index("void Rando::DrawResolvedItem(")]
+            callback = functions((ROOT/"mm/2s2h/Rando/ActorBehavior/EnGirlA.cpp").read_text())["EnGirlA_RandoDrawFunc"].replace("EnGirlA*","MmShopEnGirlA*")
+            mm_shop_support += "\n" + mm_foreign_draw + "\n" + resolved + "\n" + draw_item + "\n" + callback + "\n#undef RANDO_SAVE_CHECKS\n"
+            tested_bridge = (shim + route + "\n" + item_enum + "\nbool MM_TryDrawNeiGi(RandoItemId,bool shop=false);\n#include \"ComboSongDrawMM.h\"\n" + bindings + "\n" + fallback_class + "\n" +
                              renderer + "\n" + fallback + "\n" + foreign_info + "\n" +
-                             foreign_shim + foreign_draw + "\n" + foreign_wrapper + "\n" + foreign_shop)
+                             foreign_shim + foreign_draw + "\n" + foreign_wrapper + "\n" + foreign_shop + "\n" + mm_shop_support)
             candidate = source.read_text().replace("int main() {", tested_bridge + "\nint main() {", 1)
             checks = (ROOT / "tests/mm_presentation/gi_bridge_checks.inc").read_text()
+            checks += (ROOT / "tests/mm_presentation/shop_dispatch_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/foreign_sword_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/legacy_mod_checks.inc").read_text()
             candidate = candidate.replace("  using namespace Fixture;\n", "  using namespace Fixture;\n" + checks, 1)
             source = Path(tmp) / "combo_gi_presentation.cpp"
             source.write_text("#define COMBO_BUILD 1\n" + candidate)
             extra_flags = ["-I" + str(ROOT), "-I" + str(ROOT / "combo"), "-I" + str(ROOT / "combo/menu")]
-        subprocess.run([cc, *flags, *extra_flags, "-I" + tmp, str(source), "-o", out], check=True)
-        subprocess.run([out], check=True)
+        subprocess.run([cc, *flags, *sanitize, *extra_flags, "-I" + tmp, str(source), "-o", out], check=True)
+        subprocess.run([out], check=True, env={**os.environ,"ASAN_OPTIONS":"detect_leaks=0"})
 
 # Check the actual C dispatch boundary, using the same CVar definitions as CMake.
 cflags = ["-std=gnu2x", "-fsyntax-only", "-Werror=implicit-function-declaration",

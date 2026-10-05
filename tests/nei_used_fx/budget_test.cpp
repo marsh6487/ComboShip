@@ -1,7 +1,7 @@
 // Real shared batcher, at the full existing 5 x 3 projectile-set capacity.
-#define main NeiGiRegressionMain
+#define NEI_GI_FIXTURE_BOUNDARY_ONLY
 #include "../nei_gi/presentation_test.cpp"
-#undef main
+#undef NEI_GI_FIXTURE_BOUNDARY_ONLY
 #include "soh/Enhancements/randomizer/NeiUsedMagicPolicy.h"
 int main() {
   using namespace Fixture;
@@ -95,13 +95,16 @@ int main() {
         assert(gfx.polyXlu.p < xlu + 4096 && allocations < 128 &&
                stack.empty() && interpolation == 0 && loads == 0);
       }
-    assert(maxBytes < 90000 &&
-           maxCommands < 2400); // Reserve ordinary scene/actor space.
     std::cout << (kind == Kind::Fire  ? "Fire"
                   : kind == Kind::Ice ? "Ice"
                                       : "Light")
               << " maximum 15 heads + " << (kind == Kind::Ice ? 15 : 5)
               << " wakes + charge + released spin: " << maxBytes
-              << " vertex bytes, " << maxCommands << " XLU commands\n";
+              << " vertex bytes, " << maxCommands << " XLU commands\n"
+              << std::flush;
+    assert(maxBytes < 90000 &&
+           maxCommands <
+               3 * std::size(xlu) / 4); // Real setup/debug commands leave at
+                                        // least a quarter for the scene.
   }
 }

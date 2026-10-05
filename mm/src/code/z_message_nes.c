@@ -1,6 +1,7 @@
 #include "global.h"
 #include "message_data_fmt_nes.h"
 #include "message_data_static.h"
+#include "ComboBossSoulColor.h"
 #include "assets/interface/message_texture_static/message_texture_static.h"
 #include <stdio.h>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -541,6 +542,15 @@ void Message_DrawTextNES(PlayState* play, Gfx** gfxP, u16 textDrawPos) {
                     msgCtx->textColorR = sColorsNormalNES[(s16)((u8)character - 1)].r;
                     msgCtx->textColorG = sColorsNormalNES[(s16)((u8)character - 1)].g;
                     msgCtx->textColorB = sColorsNormalNES[(s16)((u8)character - 1)].b;
+                }
+                if ((u8)character == MESSAGE_COLOR_GREEN) {
+                    const uint32_t rgb = ComboBossSoulSpanColor((const uint8_t*)msgCtx->decodedBuffer.schar + i + 1,
+                                                                sizeof(msgCtx->decodedBuffer.schar) - i - 1, true);
+                    if (rgb) {
+                        msgCtx->textColorR = (rgb >> 16) & 0xFF;
+                        msgCtx->textColorG = (rgb >> 8) & 0xFF;
+                        msgCtx->textColorB = rgb & 0xFF;
+                    }
                 }
 
                 if ((i + 1) == msgCtx->textDrawPos ||

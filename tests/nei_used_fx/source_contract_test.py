@@ -80,8 +80,34 @@ assert (ROOT/path).read_text().count('Rand_ZeroOne()')==baseline(path).count('Ra
 path='soh/soh/Enhancements/randomizer/NeiGiPresentation.cpp'
 old=functions(baseline(path))['NeiGi_DrawMesh']
 new=functions((ROOT/'soh/soh/Enhancements/randomizer/NeiGiMeshRenderer.inc').read_text())['NeiGi_DrawMeshMaterial']
-new=re.sub(r'static void NeiGi_DrawMeshMaterial\(.*?\) \{',
+new=re.sub(r'static bool NeiGi_DrawMeshMaterial\(.*?\) \{',
            'void NeiGi_DrawMesh(PlayState* play, const NeiGi::Mesh& mesh, Kind orb) {',new,count=1,flags=re.S)
+# The renderer input/capacity guards have their own real-arena regressions.
+# Normalize only those exact additions; retain the fixed historical batcher
+# and untextured material/command behavior as the comparison baseline.
+start=new.index('{')+1;end=new.index('    // Reuse shared vertices')
+assert tokens(new[start:end])==tokens('''
+    if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, material, seasonSunRays) || int(orb) < 0 ||
+        int(orb) > int(Kind::MarioMask))
+        return false;
+''')
+new=new[:start]+'\n    if (mesh.count == 0)\n        return;\n'+new[end:]
+start=new.index('    size_t triangleCommands = 0;');end=new.index('    auto* vertices',start)
+assert tokens(new[start:end])==tokens('''
+    size_t triangleCommands = 0;
+    for (size_t b = 0; b < batchCount; ++b)
+        triangleCommands += (batches[b].indexCount + 5) / 6;
+    if (!NeiGi_ArenaHasRoom(play, vertexCount * sizeof(Vtx), 1, 2, 32 + batchCount + triangleCommands))
+        return false;
+''')
+new=new[:start]+new[end:]
+for op in ('Push','Pop'):
+    new,count=re.subn(r'    if \(owner\)\n        gSPComboRM'+op+r'\(POLY_XLU_DISP\+\+(?:, owner)?\);\n','',new)
+    assert count==1,'expected exactly the private-material owner '+op
+assert new.count('return false;')==1
+new=new.replace('return false;','return;')
+new,count=re.subn(r'    return true;\n}$','}',new)
+assert count==1,'expected only the renderer success result'
 # With both optional texture modes disabled, the retained GI batcher must
 # still match the approved untextured renderer. The seasonal ray lane is
 # independently exercised by the production weather renderer fixtures.

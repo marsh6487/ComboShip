@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <limits>
 #include <set>
 #include <string>
 #include <vector>
@@ -28,8 +29,10 @@ std::vector<std::vector<Vtx>> arena;
 std::map<Gfx *, std::vector<Vtx>> vertexLoads;
 std::set<std::string> files;
 std::set<std::pair<std::string,std::string>> modFiles;
-Gfx opa[4096], xlu[4096];
-Mtx matrices[128];
+alignas(16) Gfx opa[0x2FC0], xlu[0x1000], overlay[0x800];
+Gfx setupDl{};
+Vtx *pendingVertices;
+size_t pendingVertexCount;
 GraphicsContext gfx{};
 PlayState play{};
 GetItemEntry shopEntry{};
@@ -41,14 +44,20 @@ void Reset() {
   submitted.clear();
   flameColors.clear();
   arena.clear();
+  pendingVertices = nullptr;
   vertexLoads.clear();
   std::memset(opa, 0, sizeof(opa));
   std::memset(xlu, 0, sizeof(xlu));
+  std::memset(overlay, 0, sizeof(overlay));
   stack.clear();
   files.clear();
   modFiles.clear();
   gfx.polyOpa.p = opa;
+  gfx.polyOpa.d = std::end(opa);
   gfx.polyXlu.p = xlu;
+  gfx.polyXlu.d = std::end(xlu);
+  gfx.overlay.p = overlay;
+  gfx.overlay.d = std::end(overlay);
   play.state.gfxCtx = &gfx;
   play.gameplayFrames = 42;
   play.billboardMtxF = {};
@@ -149,19 +158,43 @@ void Matrix_Get(MtxF *m) {
   m->xx = m->yy = m->zz = Fixture::matrix;
   m->yw = Fixture::matrixY;
 }
-void *Graph_Alloc(GraphicsContext *, size_t size) {
+void *DebitTail(GraphicsContext *context, size_t size) {
+  const auto tail =
+      (reinterpret_cast<uintptr_t>(context->polyOpa.d) & ~uintptr_t(15)) -
+      ((size + 15) & ~size_t(15));
+  assert(tail >= reinterpret_cast<uintptr_t>(context->polyOpa.p) &&
+         "production renderer tried to cross the real OPA head/tail");
+  context->polyOpa.d = reinterpret_cast<Gfx *>(tail);
+  return reinterpret_cast<void *>(tail);
+}
+void *Graph_Alloc(GraphicsContext *context, size_t size) {
   assert(size <= 1536 * sizeof(Vtx) && size % sizeof(Vtx) == 0);
   Fixture::arena.emplace_back(size / sizeof(Vtx));
-  return Fixture::arena.back().data();
+  Fixture::pendingVertices = static_cast<Vtx *>(DebitTail(context, size));
+  Fixture::pendingVertexCount = size / sizeof(Vtx);
+  return Fixture::pendingVertices;
 }
-Mtx *Matrix_NewMtx(GraphicsContext *, char *, int32_t) {
+Mtx *Matrix_NewMtx(GraphicsContext *context, char *, int32_t) {
+  if (Fixture::pendingVertices) {
+    std::copy_n(Fixture::pendingVertices, Fixture::pendingVertexCount,
+                Fixture::arena.back().data());
+    Fixture::pendingVertices = nullptr;
+  }
   Fixture::submitted.emplace_back(Fixture::matrix, Fixture::matrixY);
-  return &Fixture::matrices[Fixture::allocations++];
+  ++Fixture::allocations;
+  return static_cast<Mtx *>(DebitTail(context, sizeof(Mtx)));
 }
-void Gfx_SetupDL_25Opa(GraphicsContext *) {}
-void Gfx_SetupDL_25Xlu(GraphicsContext *) {}
-void Graph_OpenDisps(Gfx **, GraphicsContext *, const char *, int32_t) {}
-void Graph_CloseDisps(Gfx **, GraphicsContext *, const char *, int32_t) {}
+#include "nei_gi_graph.inc"
+void Gfx_SetupDL_25Opa(GraphicsContext *context) {
+  OPEN_DISPS(context);
+  __gSPDisplayList(POLY_OPA_DISP++, &Fixture::setupDl);
+  CLOSE_DISPS(context);
+}
+void Gfx_SetupDL_25Xlu(GraphicsContext *context) {
+  OPEN_DISPS(context);
+  __gSPDisplayList(POLY_XLU_DISP++, &Fixture::setupDl);
+  CLOSE_DISPS(context);
+}
 void FrameInterpolation_RecordOpenChild(const void *, int) {
   ++Fixture::interpolation;
 }
@@ -258,8 +291,172 @@ static void DrawWeaponFlameOverlay(PlayState *, u8 r, u8 g, u8 b) {
 #undef gSPSegment
 }
 
+#ifndef NEI_GI_FIXTURE_BOUNDARY_ONLY
 int main() {
   using namespace Fixture;
+  // This allocator uses the actual OPA tail for vertices and matrices,
+  // including OoT's alignment loss; setup functions also emit their real one
+  // command.
+  const NeiGi::TextureMaterial arenaMaterial{
+      "__OTR__objects/private/arena-test", false, false};
+  for (int draw = 0; draw < 7; ++draw)
+    for (int shortArena = 0; shortArena < 6; ++shortArena) {
+      Reset();
+      files.insert(arenaMaterial.path);
+      gfx.polyOpa.p = opa + 17;
+      gfx.polyXlu.p = xlu + 23;
+      if (shortArena == 0)
+        gfx.polyOpa.d = opa + 18;
+      if (shortArena == 1)
+        gfx.polyXlu.d = xlu + 24;
+      if (shortArena == 2)
+        gfx.polyOpa.d =
+            reinterpret_cast<Gfx *>(reinterpret_cast<uintptr_t>(opa + 17) + 15);
+      if (shortArena == 3)
+        gfx.polyXlu.d = xlu + 22;
+      if (shortArena == 4)
+        gfx.overlay.d = overlay + 1;
+      if (shortArena == 5)
+        gfx.polyOpa.d = opa + 16;
+      const auto opaHead = gfx.polyOpa.p, opaTail = gfx.polyOpa.d;
+      const auto xluHead = gfx.polyXlu.p, xluTail = gfx.polyXlu.d;
+      const auto mesh = NeiGi::SampleSong(CW_SONG_SOARING, 42);
+      const uint8_t color[4] = {80, 180, 240, 255};
+      const float center[3] = {};
+      if (draw == 0)
+        NeiGi_DrawMesh(&play, mesh);
+      if (draw == 1)
+        assert(!NeiGi_DrawTexturedMesh(&play, mesh, arenaMaterial));
+      if (draw == 2)
+        NeiGi_DrawSeasonOverlay(&play, 6, "oot");
+      if (draw == 3)
+        NeiGi_DrawShimmerOverlay(&play, color, "oot");
+      if (draw == 4)
+        NeiGi_DrawSongOverlay(&play, CW_SONG_SOARING, "oot");
+      if (draw == 5)
+        NeiGi_DrawPresentation(
+            &play, "__OTR__objects/nei_gi_redesign/fire_rod/gi_dl", nullptr, 1,
+            int(Kind::Fire), center, true, "oot");
+      if (draw == 6)
+        NeiGi_DrawExternalPresentation(&play, "__OTR__objects/arbitrary/gi_dl",
+                                       nullptr, 1, int(Kind::Fire), true,
+                                       "oot");
+      assert(gfx.polyOpa.p == opaHead && gfx.polyOpa.d == opaTail &&
+             gfx.polyXlu.p == xluHead && gfx.polyXlu.d == xluTail);
+      assert(arena.empty() && submitted.empty() && stack.empty() &&
+             matrix == 1 && matrixY == 0);
+    }
+  // Exact conservative mesh budget: three packed vertices, one matrix, two
+  // transient OPA debug nodes, one load/triangle and 32 fixed XLU commands.
+  NeiGi::Mesh arenaTriangle;
+  arenaTriangle.count = 3;
+  arenaTriangle.vertices[0] = {{0, 0, 0}, 0xFFFFFF, 255};
+  arenaTriangle.vertices[1] = {{1, 0, 0}, 0xFFFFFF, 255};
+  arenaTriangle.vertices[2] = {{0, 1, 0}, 0xFFFFFF, 255};
+  for (int padding : {0, 15, -1}) {
+    Reset();
+    gfx.polyOpa.p = opa + 17;
+    gfx.polyXlu.p = xlu + 23;
+    const auto needed =
+        3 * sizeof(Vtx) + ((sizeof(Mtx) + 15) & ~size_t(15)) + 2 * sizeof(Gfx);
+    gfx.polyOpa.d = reinterpret_cast<Gfx *>(
+        reinterpret_cast<uintptr_t>(gfx.polyOpa.p) + needed + padding);
+    gfx.polyXlu.d = gfx.polyXlu.p + 34;
+    gfx.overlay.d = overlay + 2;
+    const auto head = gfx.polyOpa.p, tail = gfx.polyOpa.d;
+    NeiGi_DrawMesh(&play, arenaTriangle);
+    if (padding == -1)
+      assert(arena.empty() && submitted.empty() && gfx.polyOpa.p == head &&
+             gfx.polyOpa.d == tail && gfx.polyXlu.p == xlu + 23);
+    else
+      assert(arena.size() == 1 && submitted.size() == 1 &&
+             gfx.polyOpa.d == head + 2);
+    assert(gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d &&
+           gfx.overlay.p == overlay && stack.empty());
+  }
+  // Once geometry has been submitted, expensive effects may decline, while the
+  // actual caller still has room for the shell, owner pop and restore matrix.
+  Reset();
+  gfx.polyOpa.d = opa + 40;
+  gfx.polyXlu.d = xlu + 128;
+  const float reservedCenter[3] = {};
+  NeiGi_DrawPresentation(
+      &play, "__OTR__objects/nei_gi_redesign/zonai_permafrost/gi_dl",
+      "__OTR__objects/nei_gi_redesign/zonai_permafrost/gi_xlu_dl", 1,
+      int(Kind::Zonai), reservedCenter, true, "oot");
+  assert(arena.empty() && submitted.size() == 3 && Drawn().size() == 2 &&
+         gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d &&
+         stack.empty());
+  Reset();
+  enabled = 1;
+  gfx.polyOpa.d = opa + 40;
+  gfx.polyXlu.d = xlu + 128;
+  files.insert("__OTR__objects/nei_gi_redesign/zonai_permafrost/gi_dl");
+  files.insert("__OTR__objects/nei_gi_redesign/zonai_permafrost/gi_xlu_dl");
+  GetItemEntry arenaEntry{};
+  arenaEntry.drawFunc = Randomizer_DrawZonaiPermafrost;
+  assert(NeiGi_Draw(&play, &arenaEntry));
+  assert(arena.empty() && submitted.size() == 2 && Drawn().size() == 2 &&
+         gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d &&
+         stack.empty());
+  // Repeated high-vertex songs fill a real arena; subsequent calls skip before
+  // all commands/allocations once even the wrapper no longer fits.
+  Reset();
+  gfx.polyOpa.d = opa + 4096;
+  gfx.polyXlu.d = xlu + 512;
+  for (int i = 0; i < 32; ++i) {
+    NeiGi_DrawSongOverlay(&play, CW_SONG_SOARING, "oot");
+    assert(gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d &&
+           gfx.overlay.p == overlay && stack.empty());
+  }
+  assert(!arena.empty());
+  Reset();
+  NeiGi_DrawSongOverlay(&play, CW_SONG_SOARING, "oot");
+  assert(arena.size() == 1 && !submitted.empty() && stack.empty());
+  std::cout
+      << "PASS real OPA-tail vertices/matrices, actual debug/setup commands: "
+         "short/invalid/overlay/exact/misaligned budgets, caller shell/restore "
+         "reserves and repeated Soaring exhaustion\n";
+  const auto untouched = [] {
+    assert(arena.empty() && submitted.empty() && gfx.polyOpa.p==opa && gfx.polyXlu.p==xlu);
+    assert(stack.empty() && matrix==1 && matrixY==0 && interpolation==0);
+  };
+  for(size_t count:{size_t(0),size_t(1),size_t(2),size_t(1537),std::numeric_limits<size_t>::max()}) {
+    Reset(); NeiGi::Mesh malformed;malformed.count=count;
+    NeiGi_DrawMesh(&play,malformed);untouched();
+  }
+  for(float value:{std::numeric_limits<float>::quiet_NaN(),std::numeric_limits<float>::infinity(),
+                   -std::numeric_limits<float>::infinity(),1e30f,-1e30f,2048.f,-2049.f}) {
+    for(int field=0;field<5;++field) {
+      Reset(); NeiGi::Mesh malformed;malformed.count=3;
+      if(field==0)malformed.vertices[0].p.x=value;
+      if(field==1)malformed.vertices[0].p.y=value;
+      if(field==2)malformed.vertices[0].p.z=value;
+      if(field==3)malformed.vertices[0].u=value;
+      if(field==4)malformed.vertices[0].v=value;
+      NeiGi_DrawMesh(&play,malformed);untouched();
+    }
+  }
+  Reset(); const auto validMesh=NeiGi::SampleShimmer(42,true);
+  NeiGi_DrawMesh(nullptr,validMesh);untouched();
+  play.state.gfxCtx=nullptr;NeiGi_DrawMesh(&play,validMesh);play.state.gfxCtx=&gfx;untouched();
+  const float origin[3]={};
+  const char* guarded="__OTR__objects/nei_gi_redesign/fire_rod/gi_dl";
+  for(float scale:{0.f,-1.f,std::numeric_limits<float>::quiet_NaN(),std::numeric_limits<float>::infinity(),1e30f}) {
+    Reset(); NeiGi_DrawPresentation(&play,guarded,nullptr,scale,int(Kind::Fire),origin,true,"oot");untouched();
+    NeiGi_DrawExternalPresentation(&play,guarded,nullptr,scale,int(Kind::Fire),true,"oot");untouched();
+  }
+  for(int axis=0;axis<3;++axis) {
+    Reset();float center[3]={};center[axis]=std::numeric_limits<float>::quiet_NaN();
+    NeiGi_DrawPresentation(&play,guarded,nullptr,1,int(Kind::Fire),center,true,"oot");untouched();
+  }
+  Reset(); NeiGi_DrawPresentation(&play,guarded,nullptr,1,int(Kind::Ice),origin,true,"oot");untouched();
+  NeiGi_DrawPresentation(&play,"__OTR__objects/arbitrary/gi_dl",nullptr,1,int(Kind::Fire),origin,true,"oot");untouched();
+  Reset(); NeiGi::Mesh maximum;
+  for(size_t i=0;i<maximum.vertices.size();++i)maximum.vertices[i]={{float(i%32),float(i/32),0},0xC8A0FF,255};
+  maximum.count=maximum.vertices.size();NeiGi_DrawMesh(&play,maximum);
+  assert(arena.size()==1 && arena.front().size()<=1536 && gfx.polyXlu.p<xlu+4096 && stack.empty());
+  std::cout<<"PASS real renderer malformed mesh/count/NaN/Inf/range/scale/center/path guards and maximum vertex batch\n";
   Reset();
   GetItemEntry fourSwordEntry{};
   fourSwordEntry.drawFunc = Randomizer_DrawExtFourSword;
@@ -269,7 +466,26 @@ int main() {
   Reset();
   files.insert("__OTR__objects/nei_gi_redesign/four_sword/gi_dl");
   assert(NeiGi_DrawShop(&play, &fourSwordEntry));
-  assert(!submitted.empty() && submitted[0].second == 14.f);
+  const auto* fourFrame = NeiGi::FindFrameBounds("__OTR__objects/nei_gi_redesign/four_sword/gi_dl");
+  assert(fourFrame && !submitted.empty());
+  assert(submitted[0].second == NeiGi::FrameFit(*fourFrame,1,true).lift);
+  // The Four Sword's shelf height was small enough, but its high pivot still
+  // clipped the top. Check both ends of the real serialized envelope.
+  struct FourBounds {
+    CustomDrawFunc draw;
+    const char *slug, *name, *callback;
+    std::array<float,3> minimum,maximum;
+    float width, drawScale;
+    bool translucent;
+    int identity = 0, gid = -1;
+  };
+  const FourBounds fourBounds[] = {
+#include "nei_gi_bounds.inc"
+  };
+  const auto& four = *std::find_if(std::begin(fourBounds),std::end(fourBounds),
+      [](const auto& b) {return std::strcmp(b.slug,"four_sword")==0;});
+  assert(6.f + .25f * (submitted[0].second + submitted[0].first * four.maximum[1]) <= 19.f &&
+         "Four Sword clips the shelf's upper edge despite passing its height test");
   for (auto song : { std::pair{ RG_MM_SONG_SONATA, CW_SONG_SONATA },
                      std::pair{ RG_MM_SONG_LULLABY, CW_SONG_LULLABY },
                      std::pair{ RG_MM_SONG_NOVA, CW_SONG_NOVA },
@@ -287,12 +503,23 @@ int main() {
     assert(NeiGi_Draw(&play, &songEntry));
     assert(Drawn() == std::vector<std::string>{ gGiSongNoteDL });
     assert(!arena.empty() && stack.empty());
-    const auto& vertex = arena.front().front();
-    assert(vertex.v.cn[0] == color[0] && vertex.v.cn[1] == color[1] && vertex.v.cn[2] == color[2]);
+    if(song.second==CW_SONG_SOARING) {
+      const auto shown=arena;
+      arena.clear();
+      NeiGi_DrawShimmerOverlay(&play,color,nullptr);
+      assert(shown.front().size()!=arena.front().size() ||
+             std::memcmp(shown.front().data(),arena.front().data(),shown.front().size()*sizeof(Vtx)) &&
+             "Soaring needs actual feather geometry, not the generic colored star shimmer");
+      arena=shown;
+    }
+    assert(std::any_of(arena.front().begin(),arena.front().end(),[&](const Vtx& vertex) {
+      return vertex.v.cn[0] == color[0] && vertex.v.cn[1] == color[1] && vertex.v.cn[2] == color[2];
+    }));
 #ifdef COMBO_BUILD
     CwItemDrawInfo songInfo{};
     assert(NeiGi_DescribeEntry(&songEntry, &songInfo));
-    assert(songInfo.drawKind == CW_DRAW_KIND_MUSIC_NOTE && songInfo.itemShimmer);
+    assert(songInfo.drawKind == CW_DRAW_KIND_SONG_GI && songInfo.neiEffect == song.second && songInfo.itemShimmer);
+    assert(songInfo.dlistCount==1 && songInfo.xluStartIndex==0);
     assert(std::memcmp(color, songInfo.itemShimmerColor, 4) == 0);
 #endif
   }
@@ -397,7 +624,7 @@ int main() {
           shopEntry = entry;
           EnGirlA_Draw(&shop.actor, &play);
         } else {
-          Player seasonalPlayer{};
+          Player seasonalPlayer{}; seasonalPlayer.giObjectSegment=reinterpret_cast<void*>(uintptr_t(0x80000000));
           Vec3f reference{};
           seasonalPlayer.getItemEntry = entry;
           Player_DrawGetItemImpl(&play, &seasonalPlayer, &reference, 1);
@@ -506,7 +733,7 @@ int main() {
   // Exercise the actual overhead animation entry point, not a surrogate
   // dispatch.
   Reset();
-  Player player{};
+  Player player{}; player.giObjectSegment=reinterpret_cast<void*>(uintptr_t(0x80000000));
   Vec3f ref{};
   player.getItemEntry.drawFunc = Randomizer_DrawWhip;
   files.insert("__OTR__objects/nei_gi_redesign/whip/gi_dl");
@@ -544,7 +771,7 @@ int main() {
           shopEntry = entry;
           EnGirlA_Draw(&shop.actor, &play);
         } else {
-          player = {};
+          player = {}; player.giObjectSegment=reinterpret_cast<void*>(uintptr_t(0x80000000));
           player.getItemEntry = entry;
           Player_DrawGetItemImpl(&play, &player, &ref, 1);
         }
@@ -585,7 +812,7 @@ int main() {
           shopEntry = entry;
           EnGirlA_Draw(&shop.actor, &play);
         } else {
-          player = {};
+          player = {}; player.giObjectSegment=reinterpret_cast<void*>(uintptr_t(0x80000000));
           player.getItemEntry = entry;
           Player_DrawGetItemImpl(&play, &player, &ref, 1);
         }
@@ -646,7 +873,7 @@ int main() {
             shopEntry = entry;
             EnGirlA_Draw(&shop.actor, &play);
           } else {
-            player = {};
+            player = {}; player.giObjectSegment=reinterpret_cast<void*>(uintptr_t(0x80000000));
             player.getItemEntry = entry;
             Player_DrawGetItemImpl(&play, &player, &ref, item.draw ? 1 : item.nativeGid + 1);
           }
@@ -689,8 +916,15 @@ int main() {
   entry.drawFunc = Randomizer_DrawMasterSword;
   files.insert("__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL");
   assert(NeiGi_Draw(&play, &entry));
-  assert(fallback == 1 && Drawn().empty() && arena.size() == 1);
+  assert(fallback == 0 && Drawn() == std::vector<std::string>{"__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL"} && arena.size() == 1);
   assert(matrix == 1 && stack.empty() && interpolation == 0);
+
+  Reset(); alt=1; entry={}; entry.drawFunc=Randomizer_DrawTrueMasterSword;
+  files.insert("__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL");
+  assert(NeiGi_Draw(&play,&entry));
+  assert(Drawn()==std::vector<std::string>{"__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL"});
+  assert((flameColors==std::vector<std::array<unsigned,3>>{{120,180,255}}));
+  assert(arena.size()==1 && fallback==0 && stack.empty() && matrix==1);
 
   // Plain native swords and each concrete callback use their own GI. Selected
   // standalone sword packs and the protected Din GI retain the existing route.
@@ -710,16 +944,55 @@ int main() {
     const int nativeBefore = vanilla;
     const size_t shimmerBefore = arena.size();
     assert(NeiGi_Draw(&play,&entry));
-    assert(vanilla == nativeBefore + 1 && arena.size() == shimmerBefore + 1);
+    assert(vanilla == nativeBefore && Drawn().back() == selected && arena.size() == shimmerBefore + 1);
     files.erase(selected);
     const char* fire=test.first==GID_SWORD_KOKIRI ?
       "__OTR__objects/din_fire_sword/progressive/child/SwordDL" :
       "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
     files.insert(fire); dinSword=1;
     assert(NeiGi_Draw(&play,&entry));
-    assert(vanilla == nativeBefore + 2 && arena.size() == shimmerBefore + 2);
+    assert(vanilla == nativeBefore && Drawn().back() == fire && arena.size() == shimmerBefore + 2);
     dinSword=0; assert(NeiGi_Draw(&play,&entry));
   }
+  // A selected mod can also replace a redesigned GI pass itself. Exact path
+  // ownership does not make its arbitrary mesh inherit our authored fit/FX.
+  for(const auto& model:kPresentations) {
+    if(!model.opaque)continue;
+    for(bool useAlt:{false,true}) for(int effects:{0,1}) for(int pass:{0,1}) {
+      if(pass && !model.translucent)continue;
+      Reset(); alt=useAlt; enabled=effects;
+#ifdef COMBO_BUILD
+      ownerAlt=useAlt;
+#endif
+      files.insert(model.opaque); if(model.translucent)files.insert(model.translucent);
+      const char* overridden=pass?model.translucent:model.opaque;
+      if(useAlt)files.insert(std::string("alt/")+overridden);
+      modFiles.insert({"oot",(useAlt?"alt/":"")+std::string(overridden)});
+      GetItemEntry modEntry{}; modEntry.drawFunc=model.draw; modEntry.drawItemId=model.identity;modEntry.gid=model.nativeGid;
+      assert(NeiGi_Draw(&play,&modEntry));
+      assert(!submitted.empty() && submitted.front()==std::pair(model.scale,0.f));
+      assert(arena.size()==size_t(model.alwaysShimmer||effects) && "arbitrary redesigned-path mod inherited authored model-local energy");
+      assert(flameColors.empty() && fallback==0 && vanilla==0 && stack.empty() && matrix==1 && matrixY==0);
+#ifdef COMBO_BUILD
+      CwItemDrawInfo modInfo{}; assert(NeiGi_DescribeEntry(&modEntry,&modInfo));
+      assert(modInfo.drawKind==CW_DRAW_KIND_CUSTOM_GI && modInfo.neiEffect==0 && modInfo.neiShimmer==int(model.effect)+1);
+      assert(!modInfo.neiSomariaUpgrade && !modInfo.primColorOpa[3] && !modInfo.primColorXlu[3]);
+      const std::string slug=std::string(model.opaque).substr(std::strlen("__OTR__objects/nei_gi_redesign/"));
+      CwItemDrawInfo ownerInfo{}; assert(OOT_GetNeiGiDrawInfo(slug.substr(0,slug.find('/')).c_str(),&ownerInfo));
+      assert(ownerInfo.drawKind==CW_DRAW_KIND_CUSTOM_GI && ownerInfo.neiEffect==0);
+      submitted.clear();arena.clear();gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;
+      MM_DrawNeiGi(ownerInfo);
+      assert(submitted.front()==std::pair(model.scale,0.f));
+      assert(arena.size()==size_t(model.alwaysShimmer||effects));
+      assert(stack.empty() && matrix==1 && matrixY==0);
+#endif
+    }
+  }
+#ifdef COMBO_BUILD
+  ownerAlt=false;
+#endif
+  std::cout<<"PASS every redesigned GI override: both OPA/XLU selections, base/Alt, native/owner/MM, independent identity shimmer and no authored fit/energy\n";
+
   // A mod at an established model resource outranks authored GI geometry in
   // native common/shop selection and the owner-pinned foreign descriptor.
   struct ModBinding {CustomDrawFunc draw;const char* slug;const char* game;const char* legacy;int identity=0;};
@@ -997,8 +1270,11 @@ int main() {
     matrix = 1;
     matrixY = 0;
     GetItemEntry_Draw(&play, entry);
-    assert(submitted.front().first == b.drawScale);
-    assert(submitted.front().second == NeiGi::PresentationOffsetY(FindPresentation(&entry)->effect));
+    const auto* frameBounds = NeiGi::FindFrameBounds((path + "/gi_dl").c_str());
+    assert(frameBounds);
+    const auto commonFit = NeiGi::FrameFit(*frameBounds,b.drawScale,false);
+    assert(std::abs(submitted.front().first - b.drawScale * commonFit.scale) < .000001f);
+    assert(submitted.front().second == commonFit.lift);
     if (preview.is_open()) {
       if (!firstPreview)
         preview << ',';
@@ -1024,13 +1300,13 @@ int main() {
       preview << "}}";
     }
     submitted.clear();
-    player = {};
+    player = {}; player.giObjectSegment=reinterpret_cast<void*>(uintptr_t(0x80000000));
     player.getItemEntry = entry;
     ref = {};
     Player_DrawGetItemImpl(&play, &player, &ref, 1);
-    assert(std::abs(submitted.front().first - .2f * b.drawScale) < .000001f);
+    assert(std::abs(submitted.front().first - .2f * b.drawScale * commonFit.scale) < .000001f);
     assert(std::abs(submitted.front().second -
-                    (14.f + .2f * NeiGi::PresentationOffsetY(FindPresentation(&entry)->effect))) < .000001f);
+                    (14.f + .2f * commonFit.lift)) < .000001f);
     Reset();
     matrix = .25f;
     matrixY = 6;
@@ -1119,6 +1395,43 @@ int main() {
       triangle(cmd->words.w1);
   }
   assert(decoded == mesh.count && vertexLoads.size() > 1);
+  // Exercise the shared production draw for all 61 serialized models at the
+  // actual pickup/shop/freestanding caller scales and both owner routes.
+  struct FrameFixture {const char* slug;float low,high,width,drawScale;bool xlu;};
+  const FrameFixture frames[] = {
+#include "nei_all_frame_bounds.inc"
+  };
+  assert(std::size(frames)==61);
+  for(const auto& f:frames) for(const char* owner:{"","@oot:","@mm:"}) for(int route:{0,1,2}) {
+    Reset();
+    const std::string path=std::string("__OTR__")+owner+"objects/nei_gi_redesign/"+f.slug+"/gi_dl";
+    const std::string shell=std::string("__OTR__")+owner+"objects/nei_gi_redesign/"+f.slug+"/gi_xlu_dl";
+    const auto* b=NeiGi::FindFrameBounds(path.c_str());
+    assert(b && std::abs(b->minimum.y-f.low)<.0001f && std::abs(b->maximum.y-f.high)<.0001f &&
+           std::abs(b->spinningWidth-f.width)<.0001f);
+    matrix=route==1?.25f:route==2?.2f:1.f;
+    matrixY=route==1?6.f:route==2?14.f:0.f;
+    const auto incoming=std::pair(matrix,matrixY);
+    const float center[]={0,0,0};
+    NeiGi_DrawPresentation(&play,path.c_str(),f.xlu?shell.c_str():nullptr,f.drawScale,int(b->effect),center,
+                          false,nullptr,route==1);
+    assert(!submitted.empty());
+    const auto [s,y]=submitted.front();
+    const float bottom=y+s*f.low, top=y+s*f.high;
+    if(route==1) {
+      assert(bottom>=.49999f && top<=(std::strcmp(f.slug,"rocs_feather")?19.00001f:21.50001f));
+      assert(s*f.width<=19.00001f);
+    } else if(route==2) {
+      assert(bottom>=3.59999f && top<=23.60001f && s*f.width<=20.80001f);
+    } else {
+      assert(bottom>=-52.00001f && top<=48.00001f && s*f.width<=104.00001f);
+    }
+    if(f.xlu) assert(submitted[submitted.size()-2]==submitted.front()); // final command restores effect state
+    assert(stack.empty() && std::pair(matrix,matrixY)==incoming && interpolation==0);
+  }
+  assert(!NeiGi::FindFrameBounds("__OTR__@bad:objects/nei_gi_redesign/four_sword/gi_dl"));
+  assert(!NeiGi::FindFrameBounds("__OTR__objects/nei_gi_redesign/four_sword/held_dl"));
+  std::cout<<"PASS all 61 serialized GI frames: native/OoT/MM routes, pickup/shop/freestanding bounds and shared shell pose\n";
   // Optional private USED surfaces must not load global textures or retain an
   // Alt-owned resource pointer. Missing base/Alt materials queue nothing.
   Reset();
@@ -1141,3 +1454,4 @@ int main() {
                "Alt paths, and matrix balance passed\n";
   return 0;
 }
+#endif

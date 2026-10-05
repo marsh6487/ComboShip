@@ -21,6 +21,9 @@
 #include "ComboLiveCosmetics.h"
 #include "ComboExport.h"
 #include "ComboMaskShimmer.h"
+#include "ComboSongDrawOOT.h"
+#include "ComboItemIconOwnership.h"
+#include "objects/object_gi_melody/object_gi_melody.h"
 #include "ComboItemEffectColors.h"
 #include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include "libultraship/bridge.h" // CVarGetInteger / CVarGetColor24 (cosmetic key/nut colors)
@@ -147,22 +150,30 @@ static int32_t CwAltSwordGi(RandomizerGet rg, CwItemDrawInfo* out) {
     const char* selected = nullptr;
     const char* fire = nullptr;
     bool trueMaster = false;
+    NeiGi::Kind shimmer = NeiGi::Kind::Neutral;
     switch (rg) {
         case RG_KOKIRI_SWORD:
         case RG_RAZOR_SWORD:
         case RG_GILDED_SWORD:
+            shimmer = rg == RG_KOKIRI_SWORD  ? NeiGi::Kind::KokiriSword
+                      : rg == RG_RAZOR_SWORD ? NeiGi::Kind::RazorSword
+                                             : NeiGi::Kind::GildedSword;
             selected = "__OTR__alt/objects/object_custom_equip/gCustomKokiriSwordDL";
             fire = "__OTR__objects/din_fire_sword/progressive/child/SwordDL";
             break;
         case RG_TRUE_MASTER_SWORD:
             trueMaster = true;
+            shimmer = NeiGi::Kind::SwordAura;
             [[fallthrough]];
         case RG_MASTER_SWORD:
+            if (!trueMaster)
+                shimmer = NeiGi::Kind::MasterSword;
             selected = "__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL";
             fire = "__OTR__objects/din_fire_sword/progressive/adult/SwordDL";
             break;
         case RG_BIGGORON_SWORD:
         case RG_GREAT_FAIRY_SWORD:
+            shimmer = rg == RG_BIGGORON_SWORD ? NeiGi::Kind::BiggoronSword : NeiGi::Kind::GreatFairySword;
             selected = "__OTR__alt/objects/object_custom_equip/gCustomLongswordDL";
             fire = "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
             break;
@@ -173,10 +184,15 @@ static int32_t CwAltSwordGi(RandomizerGet rg, CwItemDrawInfo* out) {
         selected = fire;
     if (!CwCustomGi(out, selected, .04f))
         return 0;
-    // DrawMmWeaponGi's hand-local weapon presentation, expressed in the existing binang ABI.
-    out->opCount = 2;
-    out->ops[0] = { CW_OP_ROTATE_X, -16384.0f, 0, 0, {} };
-    out->ops[1] = { CW_OP_ROTATE_Z, 18774.682f, 0, 0, {} }; // 1.8 radians
+    // This route returns before the authored descriptor. Carry the concrete
+    // award's identity even when selected geometry owns the entire model.
+    out->neiShimmer = static_cast<int32_t>(shimmer) + 1;
+    out->itemShimmer = 1;
+    out->stateDependent = 2;
+    // Standalone equipment follows the native hand-local +X blade axis.
+    // Tilt it into +Y; an X quarter-turn after this would lay it flat in XZ.
+    out->opCount = 1;
+    out->ops[0] = { CW_OP_ROTATE_Z, 18774.682f, 0, 0, {} }; // 1.8 radians
     if (trueMaster) {
         out->primColorXlu[0] = 120;
         out->primColorXlu[1] = 180;
@@ -544,9 +560,8 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
                             "__OTR__objects/object_nei_four_sword/gNeiFourSwordHiltDL"))
                 return 0;
             out->xluStartIndex = -1; // Both blade and hilt are opaque in the native callback.
-            out->opCount = 2;
-            out->ops[0] = { CW_OP_ROTATE_X, -16384.0f, 0, 0, {} };
-            out->ops[1] = { CW_OP_ROTATE_Z, 18774.682f, 0, 0, {} };
+            out->opCount = 1;
+            out->ops[0] = { CW_OP_ROTATE_Z, 18774.682f, 0, 0, {} };
             return 1;
         case RG_EXT_SHIELD_OF_IKANA:
             CwSimple(out, "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL", false, .035f);
@@ -814,6 +829,27 @@ static void OOT_DescribeHeartCosmetics(s16 drawId, CwItemDrawInfo* out) {
     }
 }
 
+static int32_t OOT_FillSongDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
+    const int song = rg >= RG_MM_SONG_SONATA ? ComboSongForOotItem(rg) : -1;
+    if (song < 0)
+        return 0;
+    if (song == CW_SONG_STORMS) {
+        out->drawKind = CW_DRAW_KIND_SEASON_GI;
+        out->neiEffect = 6;
+        out->xluStartIndex = -1;
+        return 1;
+    }
+    out->drawKind = CW_DRAW_KIND_SONG_GI;
+    out->neiEffect = song;
+    out->dlists[0] = gGiSongNoteDL;
+    out->dlistCount = 1;
+    out->xluStartIndex = 0;
+    out->itemShimmer = 1;
+    ComboSongShimmerColor(song, out->primColorXlu);
+    std::memcpy(out->itemShimmerColor, out->primColorXlu, 4);
+    return 1;
+}
+
 static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     RandomizerGet actual = RG_NONE;
     GetItemEntry gi = *Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual);
@@ -897,6 +933,8 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
         std::memcpy(out->itemShimmerColor, color, 4);
         return 1;
     }
+    if (OOT_FillSongDrawInfo(effRg, out))
+        return 1;
     if (gi.drawFunc != nullptr) {
         return 0; // A custom callback has no native gid row; gid 0 would masquerade as a bottle.
     }
@@ -992,7 +1030,10 @@ static int32_t OOT_FillItemIconInfo(RandomizerGet rg, CwItemIconInfo* out) {
     RandomizerGet actual = RG_NONE;
     auto gi = Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual);
     auto item = Rando::StaticData::RetrieveItem(actual != RG_NONE ? actual : rg);
-    if ((actual != RG_NONE ? actual : rg) == RG_DOUBLE_DEFENSE) {
+    if ((actual != RG_NONE ? actual : rg) == RG_EXT_SHIELD_OF_IKANA) {
+        out->path = COMBO_IKANA_SHIELD_ICON;
+        out->width = out->height = 32;
+    } else if ((actual != RG_NONE ? actual : rg) == RG_DOUBLE_DEFENSE) {
         // Its grant row deliberately stores RG_DOUBLE_DEFENSE in itemId. That
         // number is also ITEM_FISH; it is not an inventory-icon index.
         out->path = static_cast<const char*>(gItemIcons[ITEM_HEART_CONTAINER]);
@@ -1011,6 +1052,7 @@ static int32_t OOT_FillItemIconInfo(RandomizerGet rg, CwItemIconInfo* out) {
         out->width = 16;
         out->height = 24;
         out->isIA8 = 1;
+        out->hasColor = ComboSongShimmerColor(ComboSongForOotItem(actual != RG_NONE ? actual : rg), out->color);
     } else if (std::strstr(out->path, "/gOcarinaBtnIcon")) {
         out->width = out->height = 16;
         out->isIA8 = 1;

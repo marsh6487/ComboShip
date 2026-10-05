@@ -3,7 +3,7 @@
 #include "NeiGiEnergyTexture.h"
 #include "NeiGiRender.h"
 #include "NeiGiShopFit.h"
-#include "ComboSongDraw.h"
+#include "ComboSongDrawOOT.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
 #include <algorithm>
 #include <cstring>
@@ -564,42 +564,40 @@ const Presentation* FindPresentation(const GetItemEntry* entry) {
 int SongForEntry(const GetItemEntry* entry) {
     if (!entry)
         return -1;
-    if (entry->gid == GID_SONG_STORM)
-        return CW_SONG_STORMS;
-    if (entry->tableId != TABLE_RANDOMIZER)
-        return -1;
-    switch (entry->drawItemId) {
-        case RG_MM_SONG_DOUBLE_TIME:
-            return CW_SONG_DOUBLE_TIME;
-        case RG_MM_SONG_ELEGY:
-            return CW_SONG_ELEGY;
-        case RG_MM_SONG_EPONA:
-            return CW_SONG_EPONA;
-        case RG_MM_SONG_HEALING:
-            return CW_SONG_HEALING;
-        case RG_MM_SONG_INVERTED_TIME:
-            return CW_SONG_INVERTED_TIME;
-        case RG_MM_SONG_LULLABY_PROGRESSIVE:
-        case RG_MM_SONG_LULLABY_INTRO:
+    if (entry->tableId == TABLE_RANDOMIZER) {
+        if (entry->drawItemId == RG_MM_SONG_LULLABY_PROGRESSIVE)
             return CW_SONG_LULLABY_INTRO;
-        case RG_MM_SONG_LULLABY:
-            return CW_SONG_LULLABY;
-        case RG_MM_SONG_NOVA:
-            return CW_SONG_NOVA;
-        case RG_MM_SONG_OATH:
-            return CW_SONG_OATH;
-        case RG_MM_SONG_SARIA:
-            return CW_SONG_SARIA;
-        case RG_MM_SONG_SOARING:
-            return CW_SONG_SOARING;
-        case RG_MM_SONG_SONATA:
-            return CW_SONG_SONATA;
-        case RG_MM_SONG_STORMS:
-            return CW_SONG_STORMS;
-        case RG_MM_SONG_SUN:
+        const int song = ComboSongForOotItem(entry->drawItemId);
+        if (song >= 0)
+            return song;
+    }
+    // Native table calls retain unambiguous note identities. Imported aliases
+    // above take priority over their deliberately shared native GIDs.
+    switch (entry->gid) {
+        case GID_SONG_MINUET:
+            return CW_SONG_OOT_MINUET;
+        case GID_SONG_BOLERO:
+            return CW_SONG_OOT_BOLERO;
+        case GID_SONG_SERENADE:
+            return CW_SONG_OOT_SERENADE;
+        case GID_SONG_REQUIEM:
+            return CW_SONG_OOT_REQUIEM;
+        case GID_SONG_NOCTURNE:
+            return CW_SONG_OOT_NOCTURNE;
+        case GID_SONG_PRELUDE:
+            return CW_SONG_OOT_PRELUDE;
+        case GID_SONG_ZELDA:
+            return CW_SONG_OOT_ZELDA;
+        case GID_SONG_EPONA:
+            return CW_SONG_OOT_EPONA;
+        case GID_SONG_SARIA:
+            return CW_SONG_OOT_SARIA;
+        case GID_SONG_SUN:
             return CW_SONG_SUN;
-        case RG_MM_SONG_TIME:
+        case GID_SONG_TIME:
             return CW_SONG_TIME;
+        case GID_SONG_STORM:
+            return CW_SONG_STORMS;
         default:
             return -1;
     }
@@ -733,9 +731,9 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
     return false;
 }
 
-bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available)(const char*)) {
-    if (!item.alwaysShimmer || !altAssets)
-        return false;
+const char* SelectedSwordPath(const Presentation& item, bool altAssets, bool (*available)(const char*)) {
+    if (!item.opaque || !item.alwaysShimmer || !altAssets)
+        return nullptr;
     const char* selected = nullptr;
     const char* fire = nullptr;
     if (std::strstr(item.opaque, "/kokiri_sword/") || std::strstr(item.opaque, "/mm_kokiri_sword/") ||
@@ -749,11 +747,42 @@ bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available
         selected = "__OTR__alt/objects/object_custom_equip/gCustomLongswordDL";
         fire = "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
     }
-    // Preserve the selected standalone weapon pack and the protected Din GI.
-    return selected &&
-           (available(selected) || (CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0) && available(fire)));
+    if (!selected)
+        return nullptr;
+    // Match the exported recipe's protected Din priority before the selected
+    // standalone weapon pack. Neither path uses the player fist/body DL.
+    if (CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0) && available(fire))
+        return fire;
+    return available(selected) ? selected : nullptr;
 }
+
+bool HasRedesignGiMod(const Presentation& item) {
+    return (item.opaque && ResourceMgr_IsModAssetForGame("oot", item.opaque)) ||
+           (item.translucent && ResourceMgr_IsModAssetForGame("oot", item.translucent));
+}
+
+bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available)(const char*)) {
+    return SelectedSwordPath(item, altAssets, available) != nullptr;
+}
+
 } // namespace
+
+static void NeiGi_DrawSelectedSword(PlayState* play, const char* path) {
+    OPEN_DISPS(play->state.gfxCtx);
+    Matrix_RotateY(Spin(play), MTXMODE_APPLY);
+    // Standalone donor blades point along +X. Z alone turns that axis into
+    // upright +Y; an extra X quarter turn would lay it flat in XZ.
+    Matrix_RotateZ(1.8f, MTXMODE_APPLY);
+    Matrix_Scale(.04f, .04f, .04f, MTXMODE_APPLY);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
+    gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, path, 0, G_DL_PUSH);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
 
 // OPEN_DISPS declares interpolation callbacks with the enclosing C linkage.
 extern "C" {
@@ -767,6 +796,9 @@ static void NeiGi_DrawSong(PlayState* play, int song) {
     uint8_t color[4];
     if (!ComboSongShimmerColor(song, color))
         return;
+    NeiGi_ArenaScope arena(play, 1, 2, 12);
+    if (!arena)
+        return;
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
@@ -776,11 +808,11 @@ static void NeiGi_DrawSong(PlayState* play, int song) {
     gDma1p(POLY_XLU_DISP++, G_DL_OTR_FILEPATH, gGiSongNoteDL, 0, G_DL_PUSH);
     gSPGrayscale(POLY_XLU_DISP++, false);
     CLOSE_DISPS(play->state.gfxCtx);
-    NeiGi_DrawShimmerOverlay(play, color, nullptr);
+    NeiGi_DrawSongOverlay(play, song, nullptr);
 }
 
-static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool upgraded) {
-    if (!upgraded && item.draw == Randomizer_DrawMarioMask)
+static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool upgraded, bool legacy) {
+    if (legacy && item.draw == Randomizer_DrawMarioMask)
         return; // The legacy callback already draws its mask overlay.
     if (upgraded && item.effect == Kind::SeasonCycle)
         NeiGi_DrawSeasonOverlay(play, 5, nullptr);
@@ -822,33 +854,50 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     const Presentation* item = FindPresentation(entry);
     if (item == nullptr)
         return false;
-    const bool selectedSword = HasSelectedSword(*item, ResourceMgr_IsAltAssetsEnabled(), HasResource);
+    const char* selectedSword = SelectedSwordPath(*item, ResourceMgr_IsAltAssetsEnabled(), HasResource);
     // Queue stable paths for the interpreter. Loading through the legacy GBI wrapper
     // here would evict/reload base resources on each draw when Alt Assets is enabled.
     // Archive presence checks preserve the original model if a required pass is absent.
     const bool upgraded = !selectedSword && !HasLegacyGiMod(*item) && HasResource(item->opaque) &&
                           (!item->translucent || HasResource(item->translucent));
+    const bool authored = upgraded && !HasRedesignGiMod(*item);
     if (!upgraded && !entry->drawFunc && !item->alwaysShimmer)
         return false;
+    // Procedural effects leave space for the later translucent model shell.
+    // Intrinsic flames allocate a twelve-packet scroll and a matrix before
+    // the model. Include their native setup/debug commands in the same scope.
+    const bool flame = (authored && item->draw == Randomizer_DrawCaneSomariaUpgrade) ||
+                       (selectedSword && item->effect == Kind::SwordAura);
+    const size_t modelMatrices = selectedSword ? 1 : upgraded ? (item->translucent ? 2 : 1) : 0;
+    NeiGi_ArenaScope arena(play, modelMatrices + (flame ? 1 : 0), flame ? 20 : 16, flame ? 32 : 16,
+                           flame ? 12 * sizeof(Gfx) : 0);
+    if (!arena)
+        return true;
     Matrix_Push();
-    if (shop && upgraded) {
-        // The same shelf pose encloses the mesh, energy and crystal skin.
-        // World/overhead sizes and incomplete-resource fallbacks stay intact.
-        Matrix_Translate(0, item->shop.lift, 0, MTXMODE_APPLY);
-        Matrix_Scale(item->shop.scale, item->shop.scale, item->shop.scale, MTXMODE_APPLY);
+    if (authored) {
+        if (const auto* bounds = NeiGi::FindFrameBounds(item->opaque)) {
+            const auto fit = NeiGi::FrameFit(*bounds, item->scale, shop);
+            Matrix_Translate(0, fit.lift, 0, MTXMODE_APPLY);
+            Matrix_Scale(fit.scale, fit.scale, fit.scale, MTXMODE_APPLY);
+        }
     }
-    if (upgraded && !shop)
-        Matrix_Translate(0.f, NeiGi::PresentationOffsetY(item->effect), 0.f, MTXMODE_APPLY);
-    if (upgraded && item->draw == Randomizer_DrawCaneSomariaUpgrade) {
+    if (authored && item->draw == Randomizer_DrawCaneSomariaUpgrade) {
         // Retain the original red skill-upgrade flame with the authored cane.
         Randomizer_DrawCaneSomariaUpgradeFlame(play);
     }
     Matrix_Push();
-    if (upgraded) {
+    if (selectedSword) {
+        if (item->effect == Kind::SwordAura)
+            Randomizer_DrawTrueMasterSwordFlame(play);
+        NeiGi_DrawSelectedSword(play, selectedSword);
+    } else if (upgraded) {
         OPEN_DISPS(play->state.gfxCtx);
         Matrix_Scale(item->scale, item->scale, item->scale, MTXMODE_APPLY);
         Matrix_RotateY(Spin(play), MTXMODE_APPLY);
         Gfx_SetupDL_25Opa(play->state.gfxCtx);
+        gSPGrayscale(POLY_OPA_DISP++, false);
+        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
+        gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
         gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
                   G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
         gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, item->opaque, 0, G_DL_PUSH);
@@ -859,7 +908,7 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         GetItem_Draw(play, entry->gid);
     }
     Matrix_Pop();
-    NeiGi_DrawEffects(play, *item, upgraded);
+    NeiGi_DrawEffects(play, *item, authored, !upgraded && !selectedSword);
     if (upgraded && item->translucent != nullptr) {
         // Composite the crystal skin over its contained energy, using the same pose.
         OPEN_DISPS(play->state.gfxCtx);
@@ -867,6 +916,9 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         Matrix_Scale(item->scale, item->scale, item->scale, MTXMODE_APPLY);
         Matrix_RotateY(Spin(play), MTXMODE_APPLY);
         Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+        gSPGrayscale(POLY_XLU_DISP++, false);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+        gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
         gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
                   G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
         gDma1p(POLY_XLU_DISP++, G_DL_OTR_FILEPATH, item->translucent, 0, G_DL_PUSH);
@@ -910,7 +962,15 @@ static bool NeiGi_FillSeasonInfo(int season, CwItemDrawInfo* out) {
 }
 
 static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* out) {
-    if (!out || HasLegacyGiMod(item, true) ||
+    if (!out)
+        return false;
+    // Identity belongs to the award, independently of the mesh selected by
+    // either archive manager. A declined replacement still supplies shimmer
+    // metadata, while leaving authored mesh-local energy unset.
+    out->neiShimmer = static_cast<int32_t>(item.effect) + 1;
+    out->itemShimmer = item.alwaysShimmer || CVarGetInteger(CVAR_NEI_GI_EFFECTS, 0);
+    out->stateDependent = 2;
+    if (!item.opaque || HasLegacyGiMod(item, true) ||
         HasSelectedSword(item, OOT_NeiAltAssetsEnabled(),
                          [](const char* path) { return OOT_NeiResourceExists(path) != 0; }) ||
         !OOT_NeiResourceExists(item.opaque) || (item.translucent && !OOT_NeiResourceExists(item.translucent))) {
@@ -925,18 +985,18 @@ static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* ou
         out->xluStartIndex = 1;
     }
     out->scale = item.scale;
+    // An override at either redesigned pass owns its geometry. Preserve its
+    // deferred selection and identity overlay without authored bounds/FX.
+    if (HasRedesignGiMod(item)) {
+        out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
+        return true;
+    }
     out->drawKind = CW_DRAW_KIND_NEI_GI;
     out->neiEffect = static_cast<int32_t>(item.effect);
     out->neiEffectCenter[0] = item.effectCenter.x;
     out->neiEffectCenter[1] = item.effectCenter.y;
     out->neiEffectCenter[2] = item.effectCenter.z;
     out->neiSomariaUpgrade = item.draw == Randomizer_DrawCaneSomariaUpgrade;
-    if (item.alwaysShimmer)
-        out->itemShimmer = 1;
-    if (item.alwaysShimmer) {
-        const uint8_t ordinary[4] = { 220, 225, 240, 255 };
-        std::memcpy(out->itemShimmerColor, ordinary, 4);
-    }
     return true;
 }
 
@@ -946,7 +1006,8 @@ extern "C" int32_t NeiGi_DescribeEntry(const GetItemEntry* entry, CwItemDrawInfo
             return 0;
         if (song == CW_SONG_STORMS)
             return NeiGi_FillSeasonInfo(6, out);
-        out->drawKind = CW_DRAW_KIND_MUSIC_NOTE;
+        out->drawKind = CW_DRAW_KIND_SONG_GI;
+        out->neiEffect = song;
         out->dlists[0] = gGiSongNoteDL;
         out->dlistCount = 1;
         out->xluStartIndex = 0;

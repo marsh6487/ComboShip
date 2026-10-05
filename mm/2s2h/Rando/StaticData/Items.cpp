@@ -1,4 +1,5 @@
 #include "StaticData.h"
+#include "ComboSongDrawMM.h"
 #include <unordered_map>
 #include <cstring>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -13,6 +14,7 @@ extern "C" {
 extern s16 D_801CFF94[250];
 // 2S2H [Rando] z_message.c — stages a custom rgba32 textbox icon consumed by sentinel icon byte 0xF5
 void Message_StageCustomItemIcon(void* tex, s16 size);
+void Message_StageCustomItemIconTint(void* tex, s16 width, s16 height, u8 isIA8, u8 r, u8 g, u8 b);
 #include "assets/interface/parameter_static/parameter_static.h"
 #include "assets/interface/icon_item_dungeon_static/icon_item_dungeon_static.h"
 #include "interface/icon_item_field_static/icon_item_field_static.h"
@@ -628,36 +630,14 @@ RandoItemId GetItemIdFromVanillaItemId(u32 itemId) {
 
 // This exists because of nintendo being nintendo
 u8 GetIconForZMessage(RandoItemId randoItemId) {
+    const int song = ComboSongForMmItem(randoItemId);
+    uint8_t color[4];
+    if (ComboSongShimmerColor(song, color)) {
+        Message_StageCustomItemIconTint((void*)gItemIcons[ITEM_SONG_SONATA], 16, 24, true, color[0], color[1],
+                                        color[2]);
+        return 0xF5;
+    }
     switch (randoItemId) {
-        // Song rows have GI_NONE, but the message table already has native
-        // 16x24 IA8 clef entries. Do not send these through square RGBA staging.
-        case RI_SONG_SONATA:
-            return 0xCA;
-        case RI_SONG_LULLABY_INTRO:
-        case RI_SONG_LULLABY:
-            return 0xCB;
-        case RI_SONG_NOVA:
-            return 0xCC;
-        case RI_SONG_ELEGY:
-            return 0xCD;
-        case RI_SONG_OATH:
-            return 0xCE;
-        case RI_SONG_SARIA:
-            return 0xCF;
-        case RI_SONG_DOUBLE_TIME:
-        case RI_SONG_INVERTED_TIME:
-        case RI_SONG_TIME:
-            return 0xD0;
-        case RI_SONG_HEALING:
-            return 0xD1;
-        case RI_SONG_EPONA:
-            return 0xD2;
-        case RI_SONG_SOARING:
-            return 0xD3;
-        case RI_SONG_STORMS:
-            return 0xD4;
-        case RI_SONG_SUN:
-            return 0xD5;
         case RI_MASK_CAPTAIN:
             return GI_MASK_TRUTH;
         case RI_MASK_TRUTH:

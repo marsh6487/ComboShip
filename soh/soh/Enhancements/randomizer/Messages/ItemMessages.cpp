@@ -17,6 +17,7 @@
 #include "soh/Enhancements/randomizer/entrance.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance_tracker.h"
 #include "soh/FleetShipCombo/FleetComboIds.h"
+#include "ComboSongDrawOOT.h"
 #include "soh/ShipInit.hpp"
 #include <soh/ResourceManagerHelpers.h>
 #ifdef COMBO_BUILD
@@ -100,6 +101,32 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName, cha
         if (item.GetCategory() == ITEM_CATEGORY_JUNK)
             return 0;
         std::string body;
+        // Randomizer dungeon keys point at a generic custom message, but MM
+        // still needs the full traditional OoT tutorial. Native song receipt
+        // IDs are safe here; teaching/cutscene text is never requested.
+        uint16_t traditionalText = 0;
+        if (rg >= RG_DEKU_TREE_MAP && rg <= RG_ICE_CAVERN_MAP)
+            traditionalText = 0x66;
+        else if (rg >= RG_DEKU_TREE_COMPASS && rg <= RG_ICE_CAVERN_COMPASS)
+            traditionalText = 0x67;
+        else if (rg >= RG_FOREST_TEMPLE_SMALL_KEY && rg <= RG_TREASURE_GAME_SMALL_KEY)
+            traditionalText = rg == RG_TREASURE_GAME_SMALL_KEY ? 0xF3 : 0x60;
+        else if (rg >= RG_FOREST_TEMPLE_BOSS_KEY && rg <= RG_GANONS_CASTLE_BOSS_KEY)
+            traditionalText = 0xC7;
+        else if (rg >= RG_ZELDAS_LULLABY && rg <= RG_PRELUDE_OF_LIGHT) {
+            if (const auto gi = item.GetGIEntryUnresolved())
+                traditionalText = gi->textId;
+        }
+        if (traditionalText && sNesMessageEntryTablePtr) {
+            for (const auto* text = sNesMessageEntryTablePtr; text->textId != 0xFFFF; ++text) {
+                if (text->textId != traditionalText)
+                    continue;
+                if (!text->segment ||
+                    !ComboItemReceiptText::FromOotMessage(std::string_view(text->segment, text->msgSize), body))
+                    return 0;
+                break;
+            }
+        }
         void (*builder)(CustomMessage&) = nullptr;
         switch (rg) {
             case RG_QUARTER_HEART:
@@ -130,9 +157,15 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName, cha
                 break;
         }
         CustomMessage contextual;
-        if (BuildDungeonItemReceiptMessage(rg, contextual) || BuildTokenReceiptMessage(rg, contextual)) {
-            if (!ComboItemReceiptText::FromOotMessage(contextual.GetEnglish(MF_RAW), body))
+        if (BuildDungeonItemReceiptMessage(rg, contextual, body.empty()) || BuildTokenReceiptMessage(rg, contextual)) {
+            std::string information;
+            if (!ComboItemReceiptText::FromOotMessage(contextual.GetEnglish(MF_RAW), information))
                 return 0;
+            if (!body.empty() && !information.empty())
+                body += '\x10';
+            body += information;
+        } else if (!body.empty()) {
+            // Already selected the complete native body above.
         } else if (builder) {
             CustomMessage message;
             builder(message); // same read-only description builder as OoT's own receipt
@@ -420,50 +453,9 @@ void DrawCustomItemIcon(Gfx** p) {
     }
     if (customIcon && std::strstr(customIcon, "/gSongNoteTex")) {
         Color_RGB8 color = { 255, 255, 255 };
-        // Match the MM song's existing get-item theme without replacing its clef.
-        switch (rgid) {
-            case RG_MM_SONG_SARIA:
-            case RG_MM_SONG_SONATA:
-                color = { 98, 255, 98 };
-                break;
-            case RG_MM_SONG_LULLABY_INTRO:
-                color = { 255, 100, 100 };
-                break;
-            case RG_MM_SONG_LULLABY:
-                color = { 255, 20, 20 };
-                break;
-            case RG_MM_SONG_NOVA:
-                color = { 20, 20, 255 };
-                break;
-            case RG_MM_SONG_ELEGY:
-                color = { 255, 98, 0 };
-                break;
-            case RG_MM_SONG_OATH:
-                color = { 98, 0, 98 };
-                break;
-            case RG_MM_SONG_HEALING:
-                color = { 255, 150, 230 };
-                break;
-            case RG_MM_SONG_SOARING:
-                color = { 200, 160, 255 };
-                break;
-            case RG_MM_SONG_TIME:
-            case RG_MM_SONG_DOUBLE_TIME:
-            case RG_MM_SONG_INVERTED_TIME:
-                color = { 98, 177, 211 };
-                break;
-            case RG_MM_SONG_SUN:
-                color = { 237, 231, 62 };
-                break;
-            case RG_MM_SONG_EPONA:
-                color = { 146, 87, 49 };
-                break;
-            case RG_MM_SONG_STORMS:
-                color = { 146, 146, 146 };
-                break;
-            default:
-                break;
-        }
+        uint8_t rgba[4];
+        if (ComboSongShimmerColor(ComboSongForOotItem(rgid), rgba))
+            color = { rgba[0], rgba[1], rgba[2] };
         gDPSetPrimColor(gfx++, 0, 0, color.r, color.g, color.b, msgCtx->textColorAlpha);
         gDPLoadTextureBlock(gfx++, (uintptr_t)msgCtx->textboxSegment + MESSAGE_STATIC_TEX_SIZE, G_IM_FMT_IA,
                             G_IM_SIZ_8b, 16, 24, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK,
@@ -621,23 +613,23 @@ void BuildPowerUpgradeMessage(CustomMessage& msg) {
 }
 
 void BuildMagicStatUpgradeMessage(CustomMessage& msg) {
-    uint8_t level = gSaveContext.ship.quest.data.randomizer.magicStatUpgrades + 1;
+    const unsigned level = static_cast<unsigned>(gSaveContext.ship.quest.data.randomizer.magicStatUpgrades) + 1;
     uint8_t required = StatUpgradeRequired(8, RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE, RSK_MAGIC_STAT_UPGRADE_TOTAL,
                                            RSK_MAGIC_STAT_UPGRADE_REQUIRED);
     if (level < required) {
         uint8_t remaining = required - level;
-        msg = { "You found a %gMagic Meter%w!&%c[[remaining]]%w more to reach max stat.",
-                "Du erhältst ein %gMagisches Maß%w!&Noch %c[[remaining]]%w bis zum Maximum.",
-                "Vous trouvez une %gJauge de Magie%w!&Encore %c[[remaining]]%w pour atteindre le maximum." };
+        msg = { "You found a %yMagic Meter%w!&%c[[remaining]]%w more to reach max stat.",
+                "Du erhältst ein %yMagisches Maß%w!&Noch %c[[remaining]]%w bis zum Maximum.",
+                "Vous trouvez une %yJauge de Magie%w!&Encore %c[[remaining]]%w pour atteindre le maximum." };
         msg.Replace("[[remaining]]", std::to_string(remaining));
     } else if (level == required) {
-        msg = { "You found a %gMagic Meter%w!&%gMax magic reached!%w",
-                "Du erhältst ein %gMagisches Maß%w!&%gMaximale Magie erreicht!%w",
-                "Vous trouvez une %gJauge de Magie%w!&%gMagie maximale atteinte!%w" };
+        msg = { "You found a %yMagic Meter%w!&%gMax magic reached!%w",
+                "Du erhältst ein %yMagisches Maß%w!&%gMaximale Magie erreicht!%w",
+                "Vous trouvez une %yJauge de Magie%w!&%gMagie maximale atteinte!%w" };
     } else {
-        msg = { "You found a %gMagic Meter%w!&%rAlready at max magic!%w",
-                "Du erhältst ein %gMagisches Maß%w!&%rBereits bei maximaler Magie!%w",
-                "Vous trouvez une %gJauge de Magie%w!&%rMagie déjà au maximum!%w" };
+        msg = { "You found a %yMagic Meter%w!&%rAlready at max magic!%w",
+                "Du erhältst ein %yMagisches Maß%w!&%rBereits bei maximaler Magie!%w",
+                "Vous trouvez une %yJauge de Magie%w!&%rMagie déjà au maximum!%w" };
     }
     msg.AutoFormat(ITEM_CUSTOM);
 }

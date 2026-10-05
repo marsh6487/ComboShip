@@ -19,18 +19,43 @@ enum {
     CW_SONG_SONATA,
     CW_SONG_STORMS,
     CW_SONG_SUN,
-    CW_SONG_TIME
+    CW_SONG_TIME,
+    CW_SONG_OOT_MINUET,
+    CW_SONG_OOT_BOLERO,
+    CW_SONG_OOT_SERENADE,
+    CW_SONG_OOT_REQUIEM,
+    CW_SONG_OOT_NOCTURNE,
+    CW_SONG_OOT_PRELUDE,
+    CW_SONG_OOT_ZELDA,
+    CW_SONG_OOT_EPONA,
+    CW_SONG_OOT_SARIA,
+    CW_SONG_COUNT
 };
+// OoT's native item song block is Minuet..Storms. Keep its established model
+// colors as the source for receipt tint, without importing either game's enums.
+static inline int ComboSongForOotSongIndex(int index) {
+    static const int songs[] = { CW_SONG_OOT_MINUET,   CW_SONG_OOT_BOLERO,  CW_SONG_OOT_SERENADE, CW_SONG_OOT_REQUIEM,
+                                 CW_SONG_OOT_NOCTURNE, CW_SONG_OOT_PRELUDE, CW_SONG_OOT_ZELDA,    CW_SONG_OOT_EPONA,
+                                 CW_SONG_OOT_SARIA,    CW_SONG_SUN,         CW_SONG_TIME,         CW_SONG_STORMS };
+    return index >= 0 && index < 12 ? songs[index] : -1;
+}
+// Hex themes are shared by native notes, exported recipes and their particles.
+// Related songs retain a family hue while each MM song has its own shade.
+static inline uint32_t ComboSongColorHex(int song) {
+    static const uint32_t colors[CW_SONG_COUNT] = { 0x80D8F0, 0xFF6200, 0x925731, 0xFF96E6, 0x4A70CA, 0xFF6464,
+                                                    0xFF1414, 0x1414FF, 0x620062, 0x6ACB62, 0xC8A0FF, 0x62FF62,
+                                                    0x929292, 0xEDE73E, 0x62B1D3, 0x62FF62, 0xFF3C00, 0x55B4DF,
+                                                    0xDE9E2F, 0xA028D2, 0xEDE73E, 0x6D498F, 0xD96E30, 0x3E6D17 };
+    return song >= 0 && song < CW_SONG_COUNT ? colors[song] : 0;
+}
 static inline int ComboSongShimmerColor(int song, uint8_t color[4]) {
-    static const uint8_t colors[15][4] = { { 98, 177, 211, 255 },  { 255, 98, 0, 255 },    { 146, 87, 49, 255 },
-                                           { 255, 150, 230, 255 }, { 98, 177, 211, 255 },  { 255, 100, 100, 255 },
-                                           { 255, 20, 20, 255 },   { 20, 20, 255, 255 },   { 98, 0, 98, 255 },
-                                           { 98, 255, 98, 255 },   { 200, 160, 255, 255 }, { 98, 255, 98, 255 },
-                                           { 146, 146, 146, 255 }, { 237, 231, 62, 255 },  { 98, 177, 211, 255 } };
-    if (song < 0 || song >= 15)
+    if (song < 0 || song >= CW_SONG_COUNT || !color)
         return 0;
-    for (int i = 0; i < 4; ++i)
-        color[i] = colors[song][i];
+    const uint32_t rgb = ComboSongColorHex(song);
+    color[0] = (uint8_t)(rgb >> 16);
+    color[1] = (uint8_t)(rgb >> 8);
+    color[2] = (uint8_t)rgb;
+    color[3] = 255;
     return 1;
 }
 #endif

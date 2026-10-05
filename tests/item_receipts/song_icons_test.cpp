@@ -8,10 +8,13 @@
 #define RANDO_ENUM_ITEM(x) x,
 #define RANDO_ENUM_END(x) };
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"
+#include "combo/menu/ComboSongDrawOOT.h"
 using u16 = uint16_t;
+using u8 = uint8_t;
 using s16 = int16_t;
 using s32 = int32_t;
 using Gfx = int;
+using TexturePtr = void*;
 struct Color_RGB8 { uint8_t r, g, b; };
 enum CustomIconSize { ICON_SIZE_32, ICON_SIZE_24 };
 enum Language { LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRA };
@@ -47,7 +50,7 @@ Color_RGB8 color{};
 #define gDPSetCombineMode(p, ...) ((void)(p))
 #define gDPSetCombineLERP(p, ...) ((void)(p))
 #define gSPInvalidateTexCache(p, ...) ((void)(p))
-#define gDPSetPrimColor(p, m, l, r, g, b, a) ((void)(p), ::color = Color_RGB8{r, g, b})
+#define gDPSetPrimColor(p, m, l, r, g, b, a) ((void)(p), ::color = Color_RGB8{uint8_t(r), uint8_t(g), uint8_t(b)})
 #define gDPLoadTextureBlock(p, tex, fmt, siz, w, h, ...) \
     ((void)(p), format = (fmt), bits = (siz), width = (w), height = (h))
 #define gSPTextureRectangle(p, x1, y1, x2, y2, ...) \
@@ -68,9 +71,26 @@ void* gStaticItemIcons[16]{};
 struct MmMessageContext {
     int itemId = ITEM_SONG_HEALING, textColorAlpha = 255;
     int unk11FF8 = 100, unk12010 = 0, unk12012 = 0, unk12014 = 0, unk12016 = 0;
+    int choiceNum = 0;
     void* textboxSegment[1]{};
 };
 /* MM_SONG_PALETTE */
+/* MM_CUSTOM_STAGE */
+int D_801CFF70[] = {18, 18, 18}, D_801CFF7C[] = {14, 14, 14};
+void MmCustomIcon(MmMessageContext* msgCtx, Gfx* gfx) {
+    struct {
+        struct {
+            bool bombersNotebookOpen = false;
+        } pauseCtx;
+    } mmPlay;
+    auto* play = &mmPlay;
+    const int itemId = MESSAGE_CUSTOM_ICON_ITEM;
+    int arg2 = 20, textureStep = 1 << 10;
+    (void)textureStep;
+    /* MM_CUSTOM_LOAD */
+    /* MM_CUSTOM_DRAW */
+    /* MM_ICON_RECTANGLE */
+}
 void MmSongIcon(MmMessageContext* msgCtx, Gfx* gfx) {
     int arg2 = 20, index;
     /* MM_SONG_LOAD */
@@ -91,6 +111,16 @@ int main() {
     LoadCustomItemIcon(false);
     Message_DrawItemIcon(&play, ITEM_CUSTOM, &p, 0);
     assert(color.r == 255 && color.g == 20 && color.b == 20);
+    testPlayer.getItemEntry.getItemId = RG_MM_SONG_DOUBLE_TIME;
+    p = commands;
+    LoadCustomItemIcon(false);
+    Message_DrawItemIcon(&play, ITEM_CUSTOM, &p, 0);
+    assert(color.r == 128 && color.g == 216 && color.b == 240);
+    testPlayer.getItemEntry.getItemId = RG_MM_SONG_INVERTED_TIME;
+    p = commands;
+    LoadCustomItemIcon(false);
+    Message_DrawItemIcon(&play, ITEM_CUSTOM, &p, 0);
+    assert(color.r == 74 && color.g == 112 && color.b == 202);
     iconPath = "__OTR__textures/icon_item_custom/square";
     for (CustomIconSize size : { ICON_SIZE_32, ICON_SIZE_24 }) {
         iconSize = size;
@@ -111,5 +141,15 @@ int main() {
     mm.itemId = ITEM_SONG_TIME;
     MmSongIcon(&mm, commands);
     assert(color.r == 98 && color.g == 177 && color.b == 211);
+    Message_StageCustomItemIconTint((void*)"clef", 16, 24, true, 128, 216, 240);
+    MmCustomIcon(&mm, commands);
+    assert(format == G_IM_FMT_IA && bits == G_IM_SIZ_8b && width == 16 && height == 24);
+    assert(rectangleWidth == 16 && rectangleHeight == 24 && mm.unk12012 == 30);
+    assert(color.r == 128 && color.g == 216 && color.b == 240);
+    Message_StageCustomItemIcon((void*)"square", 32);
+    MmCustomIcon(&mm, commands);
+    assert(format == G_IM_FMT_RGBA && width == 32 && height == 32);
+    assert(rectangleWidth == 32 && rectangleHeight == 32);
+    assert(color.r == 255 && color.g == 255 && color.b == 255);
     std::cout << "Both song receipt renderers retain native IA8 aspect and song colors; square icons preserved\n";
 }

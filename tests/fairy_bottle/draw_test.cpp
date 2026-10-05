@@ -9,6 +9,7 @@
 #include <vector>
 #include "combo/menu/ComboFairyBottle.h"
 #include "combo/menu/ComboItemDrawABI.h"
+#include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 
 using s8 = int8_t;
 using s16 = int16_t;
@@ -125,7 +126,7 @@ struct ComboForeignDrawInfo {
     int count = 4;
     const char* dls[4] = {opaque, glass, fairy, "__OTR__@mm:matrix"};
     const char* matAnimPath = "texAnim";
-    int drawKind = CW_DRAW_KIND_MM_FAIRY_CONTAINER, xluStart = 1, neiEffect = 0;
+    int drawKind = CW_DRAW_KIND_MM_FAIRY_CONTAINER, xluStart = 1, neiEffect = 0, neiShimmer = 0;
     float scale = 0, neiEffectCenter[3]{};
     bool animOk = false, itemShimmer = true;
     uint8_t itemShimmerColor[4] = {255,160,235,255}, primColorXlu[4]{};
@@ -139,14 +140,11 @@ const ComboForeignDrawInfo* selectedForeign = nullptr;
 RandomizerCheck OOT_GetQueuedDrawCheck() { return 1; }
 const ComboForeignDrawInfo* ComboResolveForeignDrawInfo(int) { return selectedForeign; }
 bool ComboForeignAnim_Draw(const CwItemAnimDrawInfo*,const char*,PlayState*) { return false; }
-namespace NeiGi {
-enum class Kind { Pokeball = 99 };
-template<class... T> int SampleShimmer(T...) { assert(false); return 0; }
-}
-int NeiGi_CameraBasis(PlayState*) { return 0; }
+NeiGi::Basis NeiGi_CameraBasis(PlayState*) { return {}; }
 template<class... T> void NeiGi_DrawPresentation(T...) { assert(false); }
 template<class... T> void NeiGi_DrawMesh(T...) { assert(false); }
 template<class... T> void NeiGi_DrawSeasonOverlay(T...) { assert(false); }
+template<class... T> void NeiGi_DrawSongOverlay(T...) { assert(false); }
 template<class... T> void ComboDrawSpinAttackGi(T...) { assert(false); }
 #define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
 #define POLY_OPA_DISP opaPtr

@@ -93,6 +93,8 @@ void func_80837C20(PlayState* play, Player* this);         // native wall-climb 
 #include "mods/spiritual_stones/spiritual_stones.h"
 #include "mods/boss_remains/boss_remains.h"
 #include "mods/forms/custom_forms.h"
+#include "mods/forms/wolf_link_host.h"
+#include "mods/transformation_masks/wolf_link_form.h"
 #include "expansions/ssbb/ssbb_anim.h"
 #include "expansions/ssbb/ssbb_character.h"
 #include "expansions/ssbb/ssbb_global.c"
@@ -4982,6 +4984,7 @@ void func_80831944(PlayState* play, Player* this) {
 }
 
 void Player_UseItem(PlayState* play, Player* this, ItemId item) {
+    WolfLinkHost_OnUseItem(play, this, item);
     // Skijer's NEI — SHIP-VANILLA Roc's Feather (the one sharing the Nayru's Love cell, NOT Skijer's
     // page-2 feather). SoH implements it by answering false to VB_CHANGE_HELD_ITEM_AND_USE_ITEM, so
     // the item never reaches its Player_UseItem at all. MM has no such hook — the C-button dispatch
@@ -5724,6 +5727,7 @@ s32 Player_GetMovementSpeedAndYaw(Player* this, f32* outSpeedTarget, s16* outYaw
     // forward, backward, sideways, targeting — because all locomotion actions pull speed from here.
     *outSpeedTarget *= BossRemains_RunSpeedMul();
     *outSpeedTarget *= CustomForms_RunSpeedMul();
+    *outSpeedTarget *= WolfLinkForm_SpeedMultiplier();
 
     return true;
 }
@@ -13828,6 +13832,8 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
                 this->stateFlags3 &= ~PLAYER_STATE3_PAUSE_ACTION_FUNC;
             }
         }
+        // Damage/freezing/thawing installed above remain native actions; Wolf releases before dispatch.
+        WolfLinkHost_BeforeAction(play, this, sPlayerControlInput);
         if (!(this->stateFlags3 & PLAYER_STATE3_4)) {
             this->actionFunc(this, play);
         }
@@ -13949,6 +13955,7 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
             }
         }
 
+        WolfLinkHost_ApplyCollisionShape(this);
         Collider_UpdateCylinder(&this->actor, &this->cylinder);
         if (!(this->stateFlags2 & PLAYER_STATE2_4000)) {
             if (!(this->stateFlags1 & (PLAYER_STATE1_4 | PLAYER_STATE1_DEAD | PLAYER_STATE1_2000 | PLAYER_STATE1_4000 |
@@ -14102,6 +14109,9 @@ void Player_Update(Actor* thisx, PlayState* play) {
     Input input;
     s32 pad2;
 
+    // Full-width Shadow Crystal input must be reserved before equipment/tool raw-pad listeners.
+    WolfLinkHost_PreUpdate(play, this);
+
     // SM64 Mario suspend cascade — edge-detects scene transitions /
     // cutscenes and pauses Mario for ~30 frames so libsm64 gets a clean
     // Reset → Init cycle through the new state. Runs every frame so
@@ -14180,6 +14190,7 @@ void Player_Update(Actor* thisx, PlayState* play) {
         this->fallStartHeight = this->actor.world.pos.y;
     } else {
         input = *CONTROLLER1(&play->state);
+        WolfLinkHost_RestorePlayerInput(this, &input);
         if (this->textboxBtnCooldownTimer != 0) {
             // Prevent the usage of A/B/C-up.
             // Helps avoid accidental inputs when mashing to close the final textbox.
@@ -14216,7 +14227,8 @@ void Player_Update(Actor* thisx, PlayState* play) {
         } else {
             this->stateFlags3 |= PLAYER_STATE3_PAUSE_ACTION_FUNC;
         }
-    } else if (!KiteSurf_IsActive() && !Trident_OwnsPlayerAction() && !CustomForms_OwnsPlayerAction()) {
+    } else if (!KiteSurf_IsActive() && !Trident_OwnsPlayerAction() && !CustomForms_OwnsPlayerAction() &&
+               !WolfLinkForm_OwnsPlayerAction()) {
         // Do not clear a flag another module owns. This else exists for SM64 Mario's exit path, but
         // it runs unconditionally whenever Mario mode is OFF — i.e. always — and it sits between the
         // ext-equipment hook and Player_UpdateCommon, so it was wiping the Kite Shield surf's pause
@@ -14234,6 +14246,7 @@ void Player_Update(Actor* thisx, PlayState* play) {
 
     // Custom forms strip the buttons they own before vanilla reads them, and keep the raw pad for
     // their own tick after Player_UpdateCommon (same late-call reason as the Kite Shield below).
+    WolfLinkHost_FilterInput(this, &input);
     CustomForms_FilterInput(this, &input);
 
     Player_UpdateCommon(this, play, &input);
@@ -14403,6 +14416,7 @@ void Player_Draw(Actor* thisx, PlayState* play) {
     Player* this = (Player*)thisx;
     f32 one = 1.0f;
     s32 spEC = false;
+    s32 wolfDrawn;
 
     // SM64 Mario draw — submit Mario's mesh into the OPA/XLU display lists
     // first, then ShouldHideLink short-circuits the entire vanilla Link
@@ -14413,6 +14427,35 @@ void Player_Draw(Actor* thisx, PlayState* play) {
         Sm64Mario_Draw(play, this);
     }
     if (Sm64Mario_ShouldHideLink()) {
+        return;
+    }
+
+    Matrix_Push();
+    wolfDrawn = WolfLinkHost_Draw(play, this);
+    Matrix_Pop();
+    if (wolfDrawn == 2) {
+        return;
+    }
+    if (wolfDrawn) {
+        // Keep MM's freeze shell and item/effect presentation while the Wolf mesh replaces Link.
+        OPEN_DISPS(play->state.gfxCtx);
+        if (this->stateFlags2 & PLAYER_STATE2_4000) {
+            f32 iceScale = this->unk_B48;
+            gSPSegment(POLY_XLU_DISP++, 0x08,
+                       Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, 0, -(s32)play->gameplayFrames & 0x7F, 0x20, 0x20, 1, 0,
+                                          ((s32)play->gameplayFrames * -2) & 0x7F, 0x20, 0x20, 0, -1, 0, -2));
+            Matrix_Scale(iceScale, iceScale, iceScale, MTXMODE_APPLY);
+            MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+            gDPSetEnvColor(POLY_XLU_DISP++, 0, 50, 100, 255);
+            gSPDisplayList(POLY_XLU_DISP++, gEffIceFragment3DL);
+        }
+        if (this->getItemDrawIdPlusOne > GID_NONE + 1)
+            Player_DrawGetItem(play, this);
+        func_80122D44(play, &this->unk_3D0);
+        CLOSE_DISPS(play->state.gfxCtx);
+        CustomItems_OverrideDraw(this, play);
+        ExtEquip_DrawBehavior(this, play);
+        play->actorCtx.flags &= ~ACTORCTX_FLAG_3;
         return;
     }
 
@@ -14734,6 +14777,7 @@ void Player_Draw(Actor* thisx, PlayState* play) {
 void Player_Destroy(Actor* thisx, PlayState* play) {
     Player* this = (Player*)thisx;
     if (this == GET_PLAYER(play)) {
+        WolfLinkHost_Destroy(play, this);
         CustomItems_ResetTransientTools(this, play);
         DinFireSword_Reset();
         DinFireShield_Reset();

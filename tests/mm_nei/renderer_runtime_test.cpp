@@ -23,8 +23,14 @@ OOT_GetNeiGiDrawInfo(const char* slug, CwItemDrawInfo* out) {
   const char* opa=descriptorPaths.insert(prefix+"/gi_dl").first->c_str();
   const bool split=!strcmp(slug,"phantom_hourglass") || !strcmp(slug,"shadow_crystal");
   const char* skin=split ? descriptorPaths.insert(prefix+"/gi_xlu_dl").first->c_str() : nullptr;
+  *out = {};
+  const auto *bounds = NeiGi::FindFrameBounds(opa);
+  assert(bounds);
+  out->neiEffect = static_cast<int>(bounds->effect);
+  out->neiShimmer = out->neiEffect + 1;
   if(!OOT_NeiResourceExists(opa) || (skin && !OOT_NeiResourceExists(skin))) return 0;
-  *out={}; out->drawKind=CW_DRAW_KIND_NEI_GI; out->dlistCount=split ? 2 : 1;
+  out->drawKind = CW_DRAW_KIND_NEI_GI;
+  out->dlistCount = split ? 2 : 1;
   out->dlists[0]=opa; out->dlists[1]=skin; out->xluStartIndex=split ? 1 : -1;
   out->scale=1; out->itemShimmer=1;
   return 1;
@@ -34,6 +40,9 @@ extern "C" int32_t CVarGetInteger(const char* name,int32_t value) {
   return !strcmp(name,"gEnhancements.SkijerNEI.ItemEffects") ? itemEffects : value;
 }
 void DrawOotSlateRuneFlame(u8,u8,u8) {assert(false && "concrete non-Somaria GI must not borrow a flame");}
+void DrawSong(RandoItemId) {
+  assert(false && "songs have their own production dispatcher fixture");
+}
 extern "C" void gSPVertex(Gfx *cmd, uintptr_t addr, int count, int v0) {
   cmd->words.w0 = (G_VTX << 24) | (count << 12) | ((v0 + count) << 1);
   cmd->words.w1 = addr;
@@ -44,16 +53,73 @@ int main() {
   PlayState play{};
   Player p{};
   GraphicsContext gfx{};
-  static Gfx opa[100000], xlu[100000];
+  alignas(16) static Gfx opa[0x6700], xlu[0x1000], overlay[0x800];
   play.state.gfxCtx = &gfx;
   gPlayState=&play;
   play.billboardMtxF.xx = play.billboardMtxF.yy = play.billboardMtxF.zz = 1;
   auto reset = [&]() {
     gfx.polyOpa.p = opa;
-    gfx.polyOpa.d = opa + 100000;
+    gfx.polyOpa.d = std::end(opa);
     gfx.polyXlu.p = xlu;
+    gfx.polyXlu.d = std::end(xlu);
+    gfx.overlay.p = overlay;
+    gfx.overlay.d = std::end(overlay);
     Matrix_Translate(0, 0, 0, MTXMODE_NEW);
   };
+  const auto firstOpaquePath = [&]() {
+    for (Gfx *cmd = opa; cmd < gfx.polyOpa.p; ++cmd)
+      if (cmd->words.w0 >> 24 == G_DL_OTR_FILEPATH)
+        return reinterpret_cast<const char *>(cmd->words.w1);
+    assert(false && "missing deferred opaque path");
+    return static_cast<const char *>(nullptr);
+  };
+  const NeiGi::TextureMaterial guardedMaterial{
+      "__OTR__objects/nei_used_magic/ice_fracture", true, true};
+  ownerBase.insert(guardedMaterial.path);
+  for (int draw = 0; draw < 3; ++draw)
+    for (int shortArena = 0; shortArena < 4; ++shortArena) {
+      reset();
+      if (shortArena == 0)
+        gfx.polyOpa.d = opa + 1;
+      if (shortArena == 1)
+        gfx.polyXlu.d = xlu + 1;
+      if (shortArena == 2)
+        gfx.overlay.d = overlay + 1;
+      if (shortArena == 3)
+        gfx.polyOpa.p = opa + 2, gfx.polyOpa.d = opa + 1;
+      const auto opaHead = gfx.polyOpa.p, xluHead = gfx.polyXlu.p;
+      const auto opaTail = gfx.polyOpa.d, xluTail = gfx.polyXlu.d;
+      const auto mesh = NeiGi::SampleSong(CW_SONG_SOARING, 42);
+      if (draw == 0)
+        NeiGi_DrawMesh(&play, mesh);
+      if (draw == 1)
+        assert(!NeiGi_DrawTexturedMesh(&play, mesh, guardedMaterial));
+      if (draw == 2)
+        NeiGi_DrawSongOverlay(&play, CW_SONG_SOARING, "oot");
+      assert(gfx.polyOpa.p == opaHead && gfx.polyOpa.d == opaTail &&
+             gfx.polyXlu.p == xluHead && gfx.polyXlu.d == xluTail &&
+             gfx.overlay.p == overlay && matrices.empty());
+    }
+  reset();
+  assert(NeiGi_DrawTexturedMesh(&play, NeiGi::SampleSong(CW_SONG_SOARING, 42),
+                                guardedMaterial));
+  int ownerDepth = 0;
+  bool texturedVertices = false;
+  for (Gfx *cmd = xlu; cmd < gfx.polyXlu.p; ++cmd) {
+    const unsigned op = cmd->words.w0 >> 24;
+    if (op == G_COMBO_RM_PUSH)
+      ++ownerDepth;
+    if (op == G_VTX)
+      assert(ownerDepth == 1), texturedVertices = true;
+    if (op == G_COMBO_RM_POP)
+      --ownerDepth;
+    assert(ownerDepth >= 0);
+  }
+  assert(texturedVertices && ownerDepth == 0 &&
+         gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d &&
+         matrices.empty());
+  std::cout << "PASS actual MM GRAPH_ALLOC/matrix/debug/setup arena guards, "
+               "native textured owner balance and no commands on decline\n";
   // Execute the real MM binding/description code and its owner-routed draw.
   // Unknown items and missing/incomplete resources retain the native fallback.
   const std::pair<RandoItemId,const char*> candidates[] = {
@@ -108,10 +174,12 @@ int main() {
   // Missing authored resources still use the shared shimmer around the
   // existing model, without inheriting a legacy drawer's scale/translation.
   for (auto [id,slug] : candidates) {
-    const bool sword = id == RI_SWORD_KOKIRI || id == RI_SWORD_RAZOR ||
-      id == RI_SWORD_GILDED || id == RI_GREAT_FAIRY_SWORD ||
-      id == RI_OOT_MASTER_SWORD || id == RI_OOT_TRUE_MASTER_SWORD ||
-      id == RI_OOT_BIGGORON_SWORD || id == RI_OOT_IRON_KNUCKLE_AXE;
+    const bool sword =
+        id == RI_SWORD_KOKIRI || id == RI_SWORD_RAZOR ||
+        id == RI_SWORD_GILDED || id == RI_GREAT_FAIRY_SWORD ||
+        id == RI_OOT_MASTER_SWORD || id == RI_OOT_TRUE_MASTER_SWORD ||
+        id == RI_OOT_BIGGORON_SWORD || id == RI_OOT_IRON_KNUCKLE_AXE ||
+        id == RI_OOT_EXT_FOUR_SWORD;
     for (bool enabled : {false,true}) {
       reset(); itemEffects = enabled;
       const auto before = current;
@@ -153,10 +221,9 @@ int main() {
   ownerAltEnabled = true;
   mmAltEnabled = false;
   assert(NeiHeld_DrawModel(&play, body, glass));
-  assert((opa[1].words.w0 >> 24) == G_DL_OTR_FILEPATH);
-  assert(std::string((const char *)opa[1].words.w1) ==
+  assert(std::string(firstOpaquePath()) ==
          "__OTR__@oot:objects/nei_held_redesign/fire_rod/gi_dl");
-  const char *retained = (const char *)opa[1].words.w1;
+  const char *retained = firstOpaquePath();
   for (int i = 0; i < 10000; i++) {
     std::string temp = "__OTR__objects/transient/" + std::to_string(i);
     NeiResource_Route(temp.c_str());
@@ -231,7 +298,7 @@ int main() {
   for (int fire = 0; fire <= 4; fire++) {
     reset();
     assert(NeiLantern_DrawHeld(&p, &play, fire));
-    assert(std::string((char *)opa[1].words.w1) ==
+    assert(std::string(firstOpaquePath()) ==
            "__OTR__@oot:objects/nei_gi_redesign/lantern/gi_dl");
     int verts = 0, glassDraws = 0;
     for (Gfx *c = xlu; c < gfx.polyXlu.p; c++) {

@@ -213,7 +213,10 @@
             continue;
         ++checked;
         const auto id = sword->id;
-        const auto fit = sword->fit;
+        const auto* frameBounds = NeiGi::FindFrameBounds((std::string("__OTR__objects/nei_gi_redesign/") + b.slug + "/gi_dl").c_str());
+        assert(frameBounds);
+        const auto worldFit = NeiGi::FrameFit(*frameBounds,b.drawScale,false);
+        const auto fit = NeiGi::FrameFit(*frameBounds,b.drawScale,true);
         const std::string path = std::string("__OTR__objects/nei_gi_redesign/") + b.slug + "/gi_dl";
         for (bool useAlt : {false, true}) {
             for (int optionalEffects : {0, 1}) {
@@ -243,7 +246,7 @@
                 entry.comboForeignCheck = RC_LINKS_POCKET;
                 GetItemEntry_Draw(&play, entry);
                 assert(Drawn() == std::vector<std::string>{native.dlists[0]});
-                assert(!submitted.empty() && submitted.front() == std::pair(1.f, 0.f));
+                assert(!submitted.empty() && submitted.front() == std::pair(worldFit.scale*b.drawScale, worldFit.lift));
                 const auto worldMatrices = submitted;
                 const auto worldMeshes = arena;
                 submitted.clear();
@@ -266,9 +269,9 @@
                 assert(scale * b.spinningWidth <= 19.f);
                 assert(submitted.size() == worldMatrices.size() && arena.size() == worldMeshes.size());
                 for (size_t i = 0; i < submitted.size(); ++i) {
-                    assert(std::abs(submitted[i].first - worldMatrices[i].first * .25f * fit.scale) < .000001f);
+                    assert(std::abs(submitted[i].first - worldMatrices[i].first * .25f * fit.scale/worldFit.scale) < .000001f);
                     assert(std::abs(submitted[i].second - (6.f + .25f * fit.lift +
-                        worldMatrices[i].second * .25f * fit.scale)) < .000001f);
+                        (worldMatrices[i].second-worldFit.lift) * .25f * fit.scale/worldFit.scale)) < .000001f);
                 }
                 for (size_t i = 0; i < arena.size(); ++i)
                     assert(arena[i].size() == worldMeshes[i].size() &&
@@ -282,7 +285,7 @@
     ownerAlt = false;
     selectedForeignInfo = nullptr;
     Reset();
-    std::cout << "PASS foreign shelves for five resized swords: actual sentinel callback, base/Alt bounds, shared mesh/effect pose and full-size world draw\n";
+    std::cout << "PASS foreign shelves for five resized swords: actual sentinel callback, base/Alt bounds, shared mesh/effect pose and bounded world draw\n";
 }
 
 // A shelf fit never turns an unrelated, unresolved or legacy recipe into an

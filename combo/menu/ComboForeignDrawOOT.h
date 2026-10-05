@@ -23,7 +23,6 @@
 #include "ComboFairyBottle.h"
 #include "ComboFairyBottleDraw.h"
 #include "soh/Enhancements/randomizer/NeiGiRender.h"
-#include "soh/Enhancements/randomizer/NeiGiShopFit.h"
 
 #ifndef OPEN_DISPS
 #error "ComboForeignDrawOOT.h is TU-glue: include the host engine headers before it"
@@ -49,6 +48,7 @@ struct ComboForeignDrawInfo {
     bool appearanceDependent = false; // Palette and Alt state remain live after a dungeon-item grant.
     bool itemShimmer = false;
     uint8_t itemShimmerColor[4] = {};
+    int32_t neiShimmer = 0;
     bool hasEnvColor = false; // emit env color before the DLs (MM song notes)
     uint8_t envColor[4] = { 0, 0, 0, 0 };
     bool xluSeg8TexScroll = false;     // bind segment 8 to the flame texscroll before the XLU layer (skull token)
@@ -164,6 +164,7 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     info.stateDependent = raw.stateDependent != 0;
     info.appearanceDependent = raw.stateDependent == 2;
     info.itemShimmer = raw.itemShimmer != 0;
+    info.neiShimmer = raw.neiShimmer;
     memcpy(info.itemShimmerColor, raw.itemShimmerColor, sizeof(info.itemShimmerColor));
     if (raw.resolvedName != nullptr) {
         info.resolvedName = raw.resolvedName;
@@ -910,7 +911,7 @@ inline void OOT_DrawForeignSimple(PlayState* play, const ComboForeignDrawInfo* i
 // Draw a foreign (MM-bound) item's real MM model at the current model matrix. Any resolution
 // failure falls back to the sentinel (the RG_COMBO_FOREIGN entry's blue rupee), so we never draw
 // blank. Mirror of MM_DrawComboForeign (combo/menu/ComboForeignDrawMM.h).
-inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
+inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bool shop = false) {
     RandomizerCheck rc = (RandomizerCheck)getItemEntry->comboForeignCheck;
     if (rc == RC_UNKNOWN_CHECK) {
         // Defensive: entries not built via GetFinalGIEntry carry no check; the queued get-item
@@ -942,8 +943,8 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
         case CW_DRAW_KIND_NEI_GI:
             NeiGi_DrawPresentation(play, info->dls[0], info->xluStart == 1 && info->count > 1 ? info->dls[1] : nullptr,
                                    info->scale, info->neiEffect, info->neiEffectCenter,
-                                   info->itemShimmer || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0),
-                                   "oot");
+                                   info->itemShimmer || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0), "oot",
+                                   shop);
             break;
         case CW_DRAW_KIND_MM_SPIN_ATTACK:
             ComboDrawSpinAttackGi(play, info->dls[0], info->dls[1], info->scale, info->primColorXlu, "mm");
@@ -1000,6 +1001,7 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
             }
             NeiGi_DrawSeasonOverlay(play, info->neiEffect, "oot");
             break;
+        case CW_DRAW_KIND_SONG_GI:
         case CW_DRAW_KIND_SIMPLE:
         default:
             OOT_DrawForeignSimple(play, info);
@@ -1007,7 +1009,12 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
     }
     if (overlayShimmer) {
         Matrix_Pop();
-        if (info->neiEffect == static_cast<int32_t>(NeiGi::Kind::Pokeball))
+        if (info->drawKind == CW_DRAW_KIND_SONG_GI)
+            NeiGi_DrawSongOverlay(play, info->neiEffect, "mm");
+        else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1)
+            NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play),
+                                                      static_cast<NeiGi::Kind>(info->neiShimmer - 1)));
+        else if (info->neiEffect == static_cast<int32_t>(NeiGi::Kind::Pokeball))
             NeiGi_DrawMesh(
                 play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play), NeiGi::Kind::Pokeball));
         else
@@ -1016,7 +1023,7 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry) {
 }
 
 // EnGirlA's sentinel callback has no local Presentation binding. Fit only
-// complete authored recipes for the five resized swords, then reuse the foreign renderer
+// complete authored catalog recipes, then reuse the foreign renderer
 // so the model and every effect inherit the same shelf pose.
 extern "C" bool OOT_DrawComboForeignShop(PlayState* play, GetItemEntry* entry) {
     if (!play || !entry || entry->drawFunc != Randomizer_DrawComboForeign)
@@ -1028,29 +1035,10 @@ extern "C" bool OOT_DrawComboForeignShop(PlayState* play, GetItemEntry* entry) {
     if (!info || !info->ok || info->animOk || info->drawKind != CW_DRAW_KIND_NEI_GI || info->count < 1 ||
         !info->dls[0] || !(info->scale > 0.f) || (info->xluStart == 1 && (info->count < 2 || !info->dls[1])))
         return false;
-    const NeiGi::ShopFit* fit = nullptr;
-    switch (static_cast<NeiGi::Kind>(info->neiEffect)) {
-        case NeiGi::Kind::MasterSword:
-        case NeiGi::Kind::SwordAura:
-            fit = &NeiGi::kMasterSwordShopFit;
-            break;
-        case NeiGi::Kind::GildedSword:
-            fit = &NeiGi::kGildedSwordShopFit;
-            break;
-        case NeiGi::Kind::BiggoronSword:
-            fit = &NeiGi::kBiggoronSwordShopFit;
-            break;
-        case NeiGi::Kind::GreatFairySword:
-            fit = &NeiGi::kGreatFairySwordShopFit;
-            break;
-        default:
-            return false;
-    }
-    Matrix_Push();
-    Matrix_Translate(0.f, fit->lift, 0.f, MTXMODE_APPLY);
-    Matrix_Scale(fit->scale, fit->scale, fit->scale, MTXMODE_APPLY);
-    OOT_DrawComboForeign(play, entry);
-    Matrix_Pop();
+    const auto* bounds = NeiGi::FindFrameBounds(info->dls[0]);
+    if (!bounds || static_cast<int>(bounds->effect) != info->neiEffect)
+        return false;
+    OOT_DrawComboForeign(play, entry, true);
     return true;
 }
 

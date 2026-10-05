@@ -27,7 +27,7 @@ std::vector<void*> allocations;
 std::map<Mtx*, MtxF> submitted;
 std::vector<Vec3f> visibleVertices;
 std::vector<Vtx> packedVertices;
-Gfx opa[8192], xlu[8192];
+Gfx opa[8192], xlu[8192], overlay[2048];
 GraphicsContext graphics{};
 PlayState play{};
 Player player{};
@@ -84,7 +84,11 @@ void draw(int element) {
     visibleVertices.clear();
     packedVertices.clear();
     graphics.polyOpa.p = opa;
+    graphics.polyOpa.d = std::end(opa);
     graphics.polyXlu.p = xlu;
+    graphics.polyXlu.d = std::end(xlu);
+    graphics.overlay.p = overlay;
+    graphics.overlay.d = std::end(overlay);
     FrameInterpolation_StartRecord();
     Matrix_Translate(0, 0, 0, MTXMODE_NEW);
     if (element == 0) CustomItems_DrawFireRod(&player, &play);
@@ -126,7 +130,11 @@ struct Snapshot {
 };
 Snapshot effectDraw(bool baseline, bool release, float value, bool big, int element = 2) {
     graphics.polyOpa.p = opa;
+    graphics.polyOpa.d = std::end(opa);
     graphics.polyXlu.p = xlu;
+    graphics.polyXlu.d = std::end(xlu);
+    graphics.overlay.p = overlay;
+    graphics.overlay.d = std::end(overlay);
     visibleVertices.clear();
     packedVertices.clear();
     Matrix_Translate(10, 40, 5, MTXMODE_NEW);

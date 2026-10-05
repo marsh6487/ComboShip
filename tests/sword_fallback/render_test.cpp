@@ -14,6 +14,7 @@ extern "C" {
 #include "z64.h"
 }
 #include "ComboItemDrawABI.h"
+#include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 /* PRODUCTION_INFO */
 static Gfx opa[1024], xlu[1024];
 static GraphicsContext gfx;
@@ -31,7 +32,8 @@ static std::vector<std::vector<Gfx>> arena;
 static Gfx scrolls[4][12];
 static std::vector<std::vector<int32_t>> scrollParams;
 static bool flameAvailable = true;
-static int interpolation, shimmers, sentinels;
+static int interpolation, shimmers, sentinels, identityDraws;
+static NeiGi::Mesh identityMesh;
 static ComboForeignDrawInfo recipe;
 void FrameInterpolation_RecordOpenChild(const void *, int) { ++interpolation; }
 void FrameInterpolation_RecordCloseChild() {
@@ -129,6 +131,10 @@ UNUSED_HANDLER(OOT_DrawForeignSimple)
 static void NeiGi_DrawSeasonOverlay(PlayState*,int,const char*) {
   assert(false && "sword fixture must not select weather");
 }
+static bool OOT_DrawForeignFairyContainer(PlayState*,const ComboForeignDrawInfo*) {assert(false);return false;}
+static void NeiGi_DrawSongOverlay(PlayState*,int,const char*) {assert(false);}
+static NeiGi::Basis NeiGi_CameraBasis(PlayState*) {return {};}
+static void NeiGi_DrawMesh(PlayState*,const NeiGi::Mesh& mesh) {assert(pose==Pose{});identityMesh=mesh;++identityDraws;}
 /* PRODUCTION_HANDLERS */
 
 struct Draw {
@@ -190,7 +196,7 @@ static void Reset(int kind, bool trueTier, bool shimmer) {
   matrices.clear();
   arena.clear();
   scrollParams.clear();
-  interpolation = shimmers = sentinels = 0;
+  interpolation = shimmers = sentinels = identityDraws = 0;
   flameAvailable = true;
   recipe = {};
   recipe.count = 1;
@@ -206,9 +212,8 @@ static void Reset(int kind, bool trueTier, bool shimmer) {
             "object_toki_objects_DL_001BD0";
   if (kind == CW_DRAW_KIND_CUSTOM_GI) {
     recipe.scale = .04f;
-    recipe.opCount = 2;
-    recipe.ops[0] = {CW_OP_ROTATE_X, -16384, 0, 0, {}};
-    recipe.ops[1] = {CW_OP_ROTATE_Z, 18774.682f, 0, 0, {}};
+    recipe.opCount = 1;
+    recipe.ops[0] = {CW_OP_ROTATE_Z, 18774.682f, 0, 0, {}};
   }
   if (trueTier) {
     const uint8_t flame[4] = {120, 180, 255, 255};
@@ -245,7 +250,7 @@ int main() {
                         (kind == CW_DRAW_KIND_MASTER_SWORD ? 2.1f : 1.8f)) <
                .0001f);
         if (kind == CW_DRAW_KIND_CUSTOM_GI)
-          assert(std::abs(body[0].pose.rx + 1.5707963f) < .00001f &&
+          assert(body[0].pose.rx == 0 &&
                  body[0].pose.ry == .94f);
         assert(flame.size() == size_t(trueTier) && shimmers == int(shimmer));
         if (trueTier) {
@@ -262,6 +267,16 @@ int main() {
               scrollParams.back() ==
               std::vector<int32_t>({47, 0, 32, 32, 0, 0, 32, 32, 1, 0, 0, 0}));
       }
+  for(auto kind:{NeiGi::Kind::KokiriSword,NeiGi::Kind::RazorSword,NeiGi::Kind::GildedSword,
+                 NeiGi::Kind::MasterSword,NeiGi::Kind::SwordAura,NeiGi::Kind::BiggoronSword,NeiGi::Kind::GreatFairySword}) {
+    Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);recipe.neiShimmer=int(kind)+1;
+    Dispatch();assert(identityDraws==1 && shimmers==0);
+    const auto wanted=NeiGi::SampleShimmer(play.gameplayFrames,true,{},kind);
+    assert(identityMesh.count==wanted.count);
+    for(size_t i=0;i<wanted.count;++i)assert(identityMesh.vertices[i].rgb==wanted.vertices[i].rgb &&
+        identityMesh.vertices[i].alpha==wanted.vertices[i].alpha && identityMesh.vertices[i].p.x==wanted.vertices[i].p.x);
+    assert(CheckStream(opa,gfx.polyOpa.p,false).size()==1 && CheckStream(xlu,gfx.polyXlu.p,false).empty());
+  }
   Reset(CW_DRAW_KIND_CUSTOM_GI, true, true);
   flameAvailable = false;
   Dispatch();

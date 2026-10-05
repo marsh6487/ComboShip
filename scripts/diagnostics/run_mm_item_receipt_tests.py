@@ -152,6 +152,19 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', *extra,
                     '-I', str(ROOT), str(tu), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)
+    foreign_icon = (ROOT / 'tests/item_receipts/foreign_icon_test.cpp').read_text()
+    owner_header = ROOT / 'combo/menu/ComboItemIconOwnership.h'
+    foreign_icon = foreign_icon.replace('/* ICON_OWNER_INCLUDE */',
+        '#include "combo/menu/ComboItemIconOwnership.h"' if owner_header.exists() else '')
+    foreign_icon = foreign_icon.replace('/* FOREIGN_ICON_SELECTOR */',
+        'uint8_t Rando::ComboForeignMessageIcon(RandoCheckId check) ' +
+        block((ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text(), 'uint8_t Rando::ComboForeignMessageIcon'))
+    tu = tmp / 'foreign_icon.cpp'
+    tu.write_text(foreign_icon)
+    exe = tmp / 'foreign_icon'
+    subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', *extra,
+                    '-I', str(ROOT), str(tu), '-o', str(exe)], check=True)
+    subprocess.run([str(exe)], check=True)
     song = (ROOT / 'tests/item_receipts/song_icons_test.cpp').read_text()
     messages = (ROOT / 'soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp').read_text()
     song = song.replace('/* CUSTOM_ICON_FUNCTIONS */',
@@ -167,9 +180,16 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
         song_palette += 's16 ' + channel + '[] = ' + block(mm_message, 's16 ' + channel + '[]') + ';\n'
     song = song.replace('/* MM_SONG_PALETTE */', song_palette)
     native_load = block(mm_message, 'void Message_LoadItemIcon')
+    stage_start = mm_message.index('#define MESSAGE_CUSTOM_ICON_ITEM')
+    song = song.replace('/* MM_CUSTOM_STAGE */',
+        mm_message[stage_start:mm_message.index('// #endregion', stage_start)])
+    song = song.replace('/* MM_CUSTOM_LOAD */',
+        block(native_load, 'if ((itemId == MESSAGE_CUSTOM_ICON_ITEM)').replace('return;', ''))
     song = song.replace('/* MM_SONG_LOAD */',
         block(native_load, '} else if ((itemId >= ITEM_SONG_SONATA)'))
     native_draw = block(mm_message, 'void Message_DrawItemIcon')
+    song = song.replace('/* MM_CUSTOM_DRAW */',
+        block(native_draw, '} else if ((msgCtx->itemId == MESSAGE_CUSTOM_ICON_ITEM)'))
     song = song.replace('/* MM_SONG_DRAW */',
         block(native_draw, '} else if ((msgCtx->itemId >= ITEM_SONG_SONATA)'))
     rect = native_draw.rindex('gSPTextureRectangle(')
@@ -225,6 +245,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     for channel in ('D_801CFE04', 'D_801CFE1C', 'D_801CFE34'):
         catalog += 's16 ' + channel + '[] = ' + block(message, 's16 ' + channel + '[]') + ';\n'
     catalog += 'extern "C" void Message_StageCustomItemIcon(void*,s16);\n'
+    catalog += 'extern "C" void Message_StageCustomItemIconTint(void*,s16,s16,u8,u8,u8,u8);\n'
     catalog += 'u8 Rando::StaticData::GetIconForZMessage(RandoItemId randoItemId) ' + \
         block(items, 'u8 GetIconForZMessage') + '\n'
     native = (ROOT / 'mm/src/overlays/actors/ovl_player_actor/z_player.c').read_text()
@@ -272,6 +293,27 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
 
     # Execute the actual exported donor builder, with the authored descriptions.
     donor = (ROOT / 'tests/item_receipts/donor_test.cpp').read_text()
+    enum_gets = re.findall(r'RANDO_ENUM_ITEM\((RG_\w+)\)',
+                          (ROOT / 'soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h').read_text())
+    groups = (('RG_ZELDAS_LULLABY', 'RG_PRELUDE_OF_LIGHT', None),
+              ('RG_DEKU_TREE_MAP', 'RG_ICE_CAVERN_MAP', 0x66),
+              ('RG_DEKU_TREE_COMPASS', 'RG_ICE_CAVERN_COMPASS', 0x67),
+              ('RG_FOREST_TEMPLE_SMALL_KEY', 'RG_TREASURE_GAME_SMALL_KEY', 0x60),
+              ('RG_FOREST_TEMPLE_BOSS_KEY', 'RG_GANONS_CASTLE_BOSS_KEY', 0xC7))
+    traditional = 'const TraditionalReceiptFixture traditionalReceipts[] = {\n'
+    for first, last, expected_text in groups:
+        for rg in enum_gets[enum_gets.index(first):enum_gets.index(last) + 1]:
+            row = re.search(r'itemTable\[' + rg + r'\]\s*=\s*Item\([^\n]+', donor_catalog).group(0)
+            name = re.search(r'Text\{\s*("(?:[^"\\]|\\.)*")', row).group(1)
+            native_text = re.search(r'GID_\w+,\s*(0x[0-9A-Fa-f]+|TEXT_\w+)', row).group(1)
+            if native_text == 'TEXT_ITEM_DUNGEON_MAP':
+                native_text = '0x66'
+            elif native_text == 'TEXT_ITEM_COMPASS':
+                native_text = '0x67'
+            expected = '0xF3' if rg == 'RG_TREASURE_GAME_SMALL_KEY' else native_text if expected_text is None else hex(expected_text)
+            traditional += f'{{{rg}, {name}, {native_text}, {expected}}},\n'
+    traditional += '};\n'
+    donor = donor.replace('/* TRADITIONAL_CATALOG */', traditional)
     descriptions = 'const CustomItemMessageEntry receiptMessages[] = {\n'
     for rg in ('RG_CANE_OF_SOMARIA', 'RG_PROGRESSIVE_ROCS', 'RG_CANE_PACCI_FLIP',
                'RG_ROCS_CAPE', 'RG_QUARTZ_OF_MOTION', 'RG_DEKU_LEAF',

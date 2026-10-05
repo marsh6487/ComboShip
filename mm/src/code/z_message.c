@@ -1089,9 +1089,11 @@ static TexturePtr sMsgCustomIconTex = NULL;
 static s16 sMsgCustomIconWidth = 32;
 static s16 sMsgCustomIconHeight = 32;
 static u8 sMsgCustomIconIA8 = false;
+static Color_RGB8 sMsgCustomIconColor = { 255, 255, 255 };
 static s16 sMsgStrayFairyIndex = -1;
 
 void Message_StageCustomItemIconEx(void* tex, s16 width, s16 height, u8 isIA8) {
+    sMsgCustomIconColor = (Color_RGB8){ 255, 255, 255 };
     if (width < 1 || width > 64 || height < 1 || height > 64 || isIA8 > 1) {
         sMsgCustomIconTex = NULL;
         return;
@@ -1104,6 +1106,11 @@ void Message_StageCustomItemIconEx(void* tex, s16 width, s16 height, u8 isIA8) {
 
 void Message_StageCustomItemIcon(void* tex, s16 size) {
     Message_StageCustomItemIconEx(tex, size, size, false);
+}
+
+void Message_StageCustomItemIconTint(void* tex, s16 width, s16 height, u8 isIA8, u8 r, u8 g, u8 b) {
+    Message_StageCustomItemIconEx(tex, width, height, isIA8);
+    sMsgCustomIconColor = (Color_RGB8){ r, g, b };
 }
 // #endregion
 
@@ -1162,6 +1169,8 @@ void Message_DrawItemIcon(PlayState* play, Gfx** gfxP) {
     } else if ((msgCtx->itemId == MESSAGE_CUSTOM_ICON_ITEM) && (sMsgCustomIconTex != NULL)) {
         msgCtx->unk12016 = (msgCtx->unk12014 * sMsgCustomIconHeight) / sMsgCustomIconWidth;
         textureStep = (sMsgCustomIconWidth << 10) / msgCtx->unk12014;
+        gDPSetPrimColor(gfx++, 0, 0, sMsgCustomIconColor.r, sMsgCustomIconColor.g, sMsgCustomIconColor.b,
+                        msgCtx->textColorAlpha);
         if (sMsgCustomIconIA8) {
             gDPLoadTextureBlock(gfx++, msgCtx->textboxSegment[TEXTBOX_SEG_ICON], G_IM_FMT_IA, G_IM_SIZ_8b,
                                 sMsgCustomIconWidth, sMsgCustomIconHeight, 0, G_TX_NOMIRROR | G_TX_WRAP,
@@ -2078,7 +2087,11 @@ void Message_LoadItemIcon(PlayState* play, u16 itemId, s16 arg2) {
     // 2S2H [Rando] Staged custom icon — must be handled before the vanilla >= ITEM_B8 /
     // <= ITEM_REMAINS_TWINMOLD range checks, which would index native icon tables OOB with 0xFD.
     if ((itemId == MESSAGE_CUSTOM_ICON_ITEM) && (sMsgCustomIconTex != NULL)) {
-        if (sMsgCustomIconWidth == 24) {
+        if (sMsgCustomIconWidth == 16 && sMsgCustomIconHeight == 24 && sMsgCustomIconIA8) {
+            msgCtx->unk12010 = (msgCtx->unk11FF8 - D_801CFF88[gSaveContext.options.language]);
+            msgCtx->unk12012 = (arg2 + 0xA);
+            msgCtx->unk12014 = 0x10;
+        } else if (sMsgCustomIconWidth == 24) {
             // 24x24 quest-icon metrics (same as the ITEM_SKULL_TOKEN branch)
             msgCtx->unk12010 = (msgCtx->unk11FF8 - D_801CFF7C[gSaveContext.options.language]);
             msgCtx->unk12012 = (arg2 + 0xA);

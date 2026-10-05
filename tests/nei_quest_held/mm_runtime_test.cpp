@@ -28,7 +28,10 @@ bool NeiHeld_DrawModel(PlayState*,const char* opa,const char* xlu){if(!NeiHeld_H
 }
 int main(int argc,char**argv){
   Player p{};p.transformation=PLAYER_FORM_HUMAN;PlayState play{};play.actorCtx.actorLists[ACTORCAT_PLAYER].first=&p.actor;gPlayState=&play;
-  GraphicsContext graphics{};Gfx opa[2048],xlu[2048];graphics.polyOpa.p=opa;graphics.polyXlu.p=xlu;play.state.gfxCtx=&graphics;
+  GraphicsContext graphics{};Gfx opa[8192]{},xlu[8192]{},overlay[8192]{};
+  graphics.polyOpa.p=opa;graphics.polyOpa.d=opa+8192;
+  graphics.polyXlu.p=xlu;graphics.polyXlu.d=xlu+8192;
+  graphics.overlay.p=overlay;graphics.overlay.d=overlay+8192;play.state.gfxCtx=&graphics;
   const QuestHeldModel* models[]={&sQuest_sand_rod,&sQuest_tornado_rod,&sQuest_water_rod,&sQuest_meteor_rod,&sQuest_storm_rod,&sQuest_shadow_scepter,&sQuest_sheikah_slate};
   mod=argc>1&&std::string(argv[1])=="--mod";
   bool fallback=argc>1&&std::string(argv[1])=="--fallback";bool empty=argc>1&&std::string(argv[1])=="--missing";
