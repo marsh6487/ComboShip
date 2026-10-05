@@ -37,6 +37,9 @@
 #include "ComboItemDrawABI.h"
 #include "ComboFairyBottle.h"
 #include "ComboSwordGiFit.h"
+#define COMBO_DIN_SWORD_GI_HOST_MM
+#include "ComboDinSwordGi.h"
+#undef COMBO_DIN_SWORD_GI_HOST_MM
 #define COMBO_FAIRY_HOST_MM
 #include "ComboFairyBottleDraw.h"
 #undef COMBO_FAIRY_HOST_MM
@@ -1112,6 +1115,8 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info, bool sho
         }
     }
     CLOSE_DISPS(gfxCtx);
+    if (info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z)
+        ComboDinSwordGi_DrawLayers(gPlayState, "oot", info->dls[0]);
     Matrix_Pop();
 }
 

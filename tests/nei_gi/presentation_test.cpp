@@ -100,6 +100,16 @@ int32_t CVarGetInteger(const char *name, int32_t) {
   if (std::strcmp(name, CVAR_ENHANCEMENT("DinFireSword")) == 0) return Fixture::dinSword;
   return 0;
 }
+Color_RGB8 CVarGetColor24(const char*,Color_RGB8 value) {return value;}
+int ResourceMgr_GetDinSwordGiProfileForGame(const char*,const char* path) {
+  if(!std::strncmp(path,"__OTR__@oot:",12))path+=12;
+  else if(!std::strncmp(path,"__OTR__",7))path+=7;
+  return DinSwordGi::SelectedProfile(path,Fixture::dinSword,Fixture::alt,
+    [](const char* dependency) {
+      const std::string key=!std::strncmp(dependency,"__OTR__",7)?dependency:std::string("__OTR__")+dependency;
+      return Fixture::files.contains(key);
+    });
+}
 ShopItemIdentity Randomizer_IdentifyShopItem(s32, u8) { return {}; }
 GetItemEntry
 Randomizer_GetItemFromKnownCheckWithoutObtainabilityCheck(RandomizerCheck,
@@ -126,6 +136,7 @@ int ResourceMgr_IsModAssetForGame(const char* game,const char* path) {
   return Fixture::modFiles.contains({game,selected});
 }
 int ResourceMgr_IsModAsset(const char* path) {return ResourceMgr_IsModAssetForGame("oot",path);}
+int ResourceMgr_GetGiModelFitForGame(const char*,const char*,float,float,int,float[2]) {return 0;}
 
 Gfx *ResourceMgr_LoadGfxByName(const char *path) {
   ++Fixture::loads;
@@ -916,7 +927,7 @@ int main() {
   entry.drawFunc = Randomizer_DrawMasterSword;
   files.insert("__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL");
   assert(NeiGi_Draw(&play, &entry));
-  assert(fallback == 0 && Drawn() == std::vector<std::string>{"__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL"} && arena.size() == 1);
+  assert(fallback == 0 && Drawn() == std::vector<std::string>{"__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL"} && arena.size() == 2);
   assert(matrix == 1 && stack.empty() && interpolation == 0);
 
   Reset(); alt=1; entry={}; entry.drawFunc=Randomizer_DrawTrueMasterSword;
@@ -924,7 +935,7 @@ int main() {
   assert(NeiGi_Draw(&play,&entry));
   assert(Drawn()==std::vector<std::string>{"__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL"});
   assert((flameColors==std::vector<std::array<unsigned,3>>{{120,180,255}}));
-  assert(arena.size()==1 && fallback==0 && stack.empty() && matrix==1);
+  assert(arena.size()==2 && fallback==0 && stack.empty() && matrix==1);
 
   // Plain native swords and each concrete callback use their own GI. Selected
   // standalone sword packs and the protected Din GI retain the existing route.
@@ -932,7 +943,7 @@ int main() {
                          std::pair{GID_SWORD_BGS,"biggoron_sword"}}) {
     Reset(); entry={}; entry.gid=test.first;
     assert(NeiGi_Draw(&play,&entry));
-    assert(vanilla == 1 && arena.size() == 1);
+    assert(vanilla == 1 && arena.size() == 2);
     Reset(); entry={}; entry.gid=test.first;
     const std::string path=std::string("__OTR__objects/nei_gi_redesign/")+test.second+"/gi_dl";
     files.insert(path); assert(NeiGi_Draw(&play,&entry));
@@ -944,14 +955,14 @@ int main() {
     const int nativeBefore = vanilla;
     const size_t shimmerBefore = arena.size();
     assert(NeiGi_Draw(&play,&entry));
-    assert(vanilla == nativeBefore && Drawn().back() == selected && arena.size() == shimmerBefore + 1);
+    assert(vanilla == nativeBefore && Drawn().back() == selected && arena.size() == shimmerBefore + 2);
     files.erase(selected);
     const char* fire=test.first==GID_SWORD_KOKIRI ?
       "__OTR__objects/din_fire_sword/progressive/child/SwordDL" :
       "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
     files.insert(fire); dinSword=1;
     assert(NeiGi_Draw(&play,&entry));
-    assert(vanilla == nativeBefore && Drawn().back() == fire && arena.size() == shimmerBefore + 2);
+    assert(vanilla == nativeBefore && Drawn().back() == fire && arena.size() == shimmerBefore + 4);
     dinSword=0; assert(NeiGi_Draw(&play,&entry));
   }
   // A selected mod can also replace a redesigned GI pass itself. Exact path
@@ -971,7 +982,7 @@ int main() {
       GetItemEntry modEntry{}; modEntry.drawFunc=model.draw; modEntry.drawItemId=model.identity;modEntry.gid=model.nativeGid;
       assert(NeiGi_Draw(&play,&modEntry));
       assert(!submitted.empty() && submitted.front()==std::pair(model.scale,0.f));
-      assert(arena.size()==size_t(model.alwaysShimmer||effects) && "arbitrary redesigned-path mod inherited authored model-local energy");
+      assert(arena.size()==size_t(model.alwaysShimmer||effects)+NeiGi::IsSword(model.effect) && "selected sword lost its intrinsic particles");
       assert(flameColors.empty() && fallback==0 && vanilla==0 && stack.empty() && matrix==1 && matrixY==0);
 #ifdef COMBO_BUILD
       CwItemDrawInfo modInfo{}; assert(NeiGi_DescribeEntry(&modEntry,&modInfo));
@@ -983,7 +994,7 @@ int main() {
       submitted.clear();arena.clear();gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;
       MM_DrawNeiGi(ownerInfo);
       assert(submitted.front()==std::pair(model.scale,0.f));
-      assert(arena.size()==size_t(model.alwaysShimmer||effects));
+      assert(arena.size()==size_t(model.alwaysShimmer||effects)+NeiGi::IsSword(model.effect));
       assert(stack.empty() && matrix==1 && matrixY==0);
 #endif
     }

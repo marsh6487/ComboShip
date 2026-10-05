@@ -768,6 +768,8 @@ bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available
 
 } // namespace
 
+#include "ComboDinSwordGi.h"
+
 static void NeiGi_DrawSelectedSword(PlayState* play, const char* path, bool shop = false) {
     OPEN_DISPS(play->state.gfxCtx);
     ComboSwordGi_ApplyFit("oot", path, .04f, 1.8f, shop);
@@ -784,6 +786,7 @@ static void NeiGi_DrawSelectedSword(PlayState* play, const char* path, bool shop
               G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
     gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, path, 0, G_DL_PUSH);
     CLOSE_DISPS(play->state.gfxCtx);
+    ComboDinSwordGi_DrawLayers(play, "oot", path);
 }
 
 // OPEN_DISPS declares interpolation callbacks with the enclosing C linkage.

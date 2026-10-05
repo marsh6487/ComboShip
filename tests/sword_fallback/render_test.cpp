@@ -15,6 +15,8 @@ extern "C" {
 }
 #include "ComboItemDrawABI.h"
 #include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
+#include "combo/DinSwordGiResources.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 /* PRODUCTION_INFO */
 static Gfx opa[1024], xlu[1024];
 static GraphicsContext gfx;
@@ -32,6 +34,7 @@ static std::vector<std::vector<Gfx>> arena;
 static Gfx scrolls[4][12];
 static std::vector<std::vector<int32_t>> scrollParams;
 static bool flameAvailable = true;
+static bool dinLayers;
 static int interpolation, shimmers, sentinels, identityDraws;
 static NeiGi::Mesh identityMesh;
 static ComboForeignDrawInfo recipe;
@@ -103,7 +106,16 @@ static bool ComboForeignAnim_Draw(const CwItemAnimDrawInfo *, const char *,
   assert(false);
   return false;
 }
-static int CVarGetInteger(const char *, int) { return 0; }
+extern "C" int32_t CVarGetInteger(const char *, int32_t) { return dinLayers; }
+extern "C" Color_RGB8 CVarGetColor24(const char*,Color_RGB8 value) {return value;}
+extern "C" bool NeiGi_CanDrawLayers(PlayState*,size_t,size_t,size_t) {return true;}
+extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* owner,const char* path) {
+  assert(!strcmp(owner,"oot"));
+  if(!strncmp(path,"__OTR__@oot:",12))path+=12;
+  else if(!strncmp(path,"__OTR__",7))path+=7;
+  return DinSwordGi::SelectedProfile(path,dinLayers,true,[](const char*){return true;});
+}
+static void ComboSwordGi_ApplyFit(const char*,const char*,float,float,bool) {}
 static void ComboDrawMaskShimmer(PlayState *, const char *,
                                  const uint8_t *color, const char *owner) {
   assert(pose == Pose{} && !strcmp(owner, "mm"));
@@ -135,6 +147,7 @@ static bool OOT_DrawForeignFairyContainer(PlayState*,const ComboForeignDrawInfo*
 static void NeiGi_DrawSongOverlay(PlayState*,int,const char*) {assert(false);}
 static NeiGi::Basis NeiGi_CameraBasis(PlayState*) {return {};}
 static void NeiGi_DrawMesh(PlayState*,const NeiGi::Mesh& mesh) {assert(pose==Pose{});identityMesh=mesh;++identityDraws;}
+#include "ComboDinSwordGi.h"
 /* PRODUCTION_HANDLERS */
 
 struct Draw {
@@ -198,6 +211,7 @@ static void Reset(int kind, bool trueTier, bool shimmer) {
   scrollParams.clear();
   interpolation = shimmers = sentinels = identityDraws = 0;
   flameAvailable = true;
+  dinLayers = false;
   recipe = {};
   recipe.count = 1;
   recipe.xluStart = -1;
@@ -270,13 +284,23 @@ int main() {
   for(auto kind:{NeiGi::Kind::KokiriSword,NeiGi::Kind::RazorSword,NeiGi::Kind::GildedSword,
                  NeiGi::Kind::MasterSword,NeiGi::Kind::SwordAura,NeiGi::Kind::BiggoronSword,NeiGi::Kind::GreatFairySword}) {
     Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);recipe.neiShimmer=int(kind)+1;
-    Dispatch();assert(identityDraws==1 && shimmers==0);
+    Dispatch();assert(identityDraws==2 && shimmers==0);
     const auto wanted=NeiGi::SampleShimmer(play.gameplayFrames,true,{},kind);
     assert(identityMesh.count==wanted.count);
     for(size_t i=0;i<wanted.count;++i)assert(identityMesh.vertices[i].rgb==wanted.vertices[i].rgb &&
         identityMesh.vertices[i].alpha==wanted.vertices[i].alpha && identityMesh.vertices[i].p.x==wanted.vertices[i].p.x);
     assert(CheckStream(opa,gfx.polyOpa.p,false).size()==1 && CheckStream(xlu,gfx.polyXlu.p,false).empty());
   }
+  Reset(CW_DRAW_KIND_CUSTOM_GI, false, true);
+  recipe.neiShimmer = int(NeiGi::Kind::MasterSword) + 1;
+  dinLayers = true;
+  Dispatch();
+  const auto dinBody = CheckStream(opa,gfx.polyOpa.p,false);
+  const auto dinFlame = CheckStream(xlu,gfx.polyXlu.p,false);
+  assert(dinBody.size() == 2 && dinFlame.size() == 1 && "selected Din GI lost its core/flame layers");
+  assert(dinBody[1].path == DinSwordGi::profiles[0].core && dinFlame[0].path == DinSwordGi::profiles[0].flame);
+  assert(dinBody[0].pose == dinBody[1].pose && dinBody[0].pose == dinFlame[0].pose);
+  assert(identityDraws == 2 && "Din layers replaced the awarded sword particles/shimmer");
   Reset(CW_DRAW_KIND_CUSTOM_GI, true, true);
   flameAvailable = false;
   Dispatch();

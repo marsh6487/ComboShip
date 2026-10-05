@@ -52,6 +52,7 @@ int32_t OOT_NeiAltAssetsEnabled(){return true;}
 int32_t OOT_NeiResourceExists(const char*){return true;}
 #define CVAR_ENHANCEMENT(x) x
 int CVarGetInteger(const char*,int){return 0;}
+void ComboDinSwordGi_DrawLayers(PlayState*,const char*,const char*) {}
 ''' + draw['DrawMmWeaponGi']+'\n'
 source+='\n'.join(owner[name] for name in ('CwSimple','CwCustomGi','CwAltSwordGi'))+'\n'
 if 'NeiGi_DrawSelectedSword' in native:

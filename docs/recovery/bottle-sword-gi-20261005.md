@@ -30,3 +30,21 @@ New graph reader obtains bounds from the currently selected Fast display list an
 Focused red tests: `run_sword_pose_tests.py` failed on selected Din equipment top >48 GI units; `run_nei_identity_tests.py` failed when native MM selected sword fallback emitted shimmer without intrinsic particles. Both now pass their controlled execution checks. `run_sword_mod_gi_tests.py --archives /workspace/scratch/b1753232b6d5/upload` is executing actual supplied resource graphs and model routes. Native/foreign syntax/integration gates and intrinsic Din fire-layer restoration remain unfinished. This is a WIP checkpoint, not a build-accepted candidate.
 
 Fairy gate update: `run_mm_item_visuals_tests.py` completed successfully (native MM command checks, real z_draw C syntax, real item-enum dispatcher). Existing controller macro redefinition warnings remain unchanged.
+
+## Sword execution integration checkpoint
+
+`run_nei_gi_tests.py --combo` now passes the actual native renderer and owner descriptor, native MM selector/fallback, both foreign dispatchers, common/acquisition/shop routes, mandatory sword intrinsic particles plus exactly one designated shimmer, base/Alt model priority and arena guards. Fixtures now distinguish sword particles from authored non-sword energy; custom sword meshes always keep their awarded identity. Actual supplied O2R graph test passed all 14 selected meshes across 360-frame pickup/shop rotations. `run_sword_fallback_tests.py` passes the actual OoT foreign custom sword stream and matrix execution fixture. Existing C qualifier/engine macro warnings remain.
+
+This checkpoint confirms host execution/build gates, not the user's runtime configuration. Intrinsic Din core/flame layers still need a GI hook, and native MM's selected equipment route still needs explicit handling. Both remain active work; no runtime acceptance is claimed.
+
+## Native MM selected-sword checkpoint
+
+Added a failing actual-MM selector test: seven concrete awards discarded the selected standalone owner sword when its authored GI descriptor declined. Native MM now resolves the owner's existing selected-sword producer, carries its upright Z-only pose, and retains the native award's intrinsic particle/shimmer identity. Shared external sword drawing now applies selected graph fit before both mesh and particle passes; optional True Master flame is preserved. Live owner Alt/resource selection remains in the existing producer.
+
+Fresh `run_nei_gi_tests.py --combo` and `run_nei_identity_tests.py` pass after this change, including native MM's seven selected-sword awards and existing custom/legacy priority fixtures. Resource-loader matrix fitting and exact user runtime still need final verification; Din physical layers remain active work.
+
+## Din layer integration checkpoint
+
+A failing actual foreign draw test reproduced the selected Din blade missing its CoreDL/FlameDL layers. The GI hook now queues those existing resources in the selected blade's fitted/upright matrix, with owner scopes around both geometry/hash references and textures. The existing hot core/flame combine modes, I8 tiles, scroll and alpha animation are retained. Complete private dependencies and Din feature/owner Alt eligibility are required; missing layers leave the selected blade and designated particles/shimmer intact. Selected fitting now also reads real core/flame bounds when active.
+
+Fresh `run_sword_fallback_tests.py` passes the actual OoT custom foreign stream and model/core/flame pose check. Fresh `run_nei_gi_tests.py --combo` passes native OoT and MM complete/missing Din dependencies plus all previous selected/mod/particle cases. The real resource-helper header syntax gate passes. Expanded actual-archive layer bounds and foreign MM execution checks remain to be completed; no full game runtime is available.

@@ -112,7 +112,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
         if name == "nei_gi/presentation" and "--combo" in sys.argv:
             mm_source = (ROOT / "mm/2s2h/Rando/NeiGiPresentation.cpp").read_text()
             mm_functions = functions(mm_source)
-            renderer = functions((ROOT / "mm/2s2h/Rando/DrawItem.cpp").read_text())["DrawSong"] + "\n" + mm_functions["HasMmLegacyGiMod"] + "\n" + mm_functions["MM_DrawNeiGi"] + "\n" + mm_functions["MM_DescribeNeiGi"] + "\n" + mm_functions["MM_TryDrawNeiGi"]
+            renderer = functions((ROOT / "mm/2s2h/Rando/DrawItem.cpp").read_text())["DrawSong"] + "\n" + mm_functions["HasMmLegacyGiMod"] + "\n" + mm_functions["GetSelectedOwnerSword"] + "\n" + mm_functions["MM_DrawNeiGi"] + "\n" + mm_functions["MM_DescribeNeiGi"] + "\n" + mm_functions["MM_TryDrawNeiGi"]
             # MM's item enum and binding table are copied verbatim so origin
             # selection is exercised without importing the unrelated MM engine.
             mm_types = (ROOT / "mm/2s2h/Rando/Types.h").read_text()
@@ -139,12 +139,24 @@ extern "C" int32_t OOT_NeiAltAssetsEnabled(void) { return ownerAlt; }
 extern "C" int32_t OOT_NeiResourceExists(const char* path) {
     return path && (ResourceMgr_FileExists(path) || (ownerAlt && ResourceMgr_FileAltExists(path)));
 }
+/* SELECTED_SWORD_PRODUCER */
+int32_t SelectedSwordFixture(const char* name,CwItemDrawInfo* out) {
+    const std::pair<const char*,RandomizerGet> names[] = {
+      {"Kokiri Sword",RG_KOKIRI_SWORD},{"Razor Sword",RG_RAZOR_SWORD},
+      {"Gilded Sword",RG_GILDED_SWORD},{"Master Sword",RG_MASTER_SWORD},
+      {"True Master Sword",RG_TRUE_MASTER_SWORD},{"Biggoron's Sword",RG_BIGGORON_SWORD},
+      {"Great Fairy's Sword",RG_GREAT_FAIRY_SWORD}};
+    for(auto [title,item]:names)if(!std::strcmp(title,name))return CwAltSwordGi(item,out);
+    return 0;
+}
 void* Combo_ResolveSym(const char* owner, const char* name) {
     assert(std::strcmp(owner, "soh") == 0);
     if (std::strcmp(name, "OOT_GetNeiGiDrawInfo") == 0)
         return reinterpret_cast<void*>(OOT_GetNeiGiDrawInfo);
     if (std::strcmp(name, "OOT_NeiResourceExists") == 0)
         return reinterpret_cast<void*>(OOT_NeiResourceExists);
+    if (std::strcmp(name, "OOT_GetItemDrawInfo") == 0)
+        return reinterpret_cast<void*>(SelectedSwordFixture);
     assert(false && "unexpected bridge symbol");
     return nullptr;
 }
@@ -153,8 +165,12 @@ void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false);
 #define Gfx_SetupDL25_Opa Gfx_SetupDL_25Opa
 #define Gfx_SetupDL25_Xlu Gfx_SetupDL_25Xlu
 #define Matrix_RotateYF Matrix_RotateY
+#define Matrix_RotateZF Matrix_RotateZ
 #define MATRIX_FINALIZE_AND_LOAD(pkt, gfx) gSPMatrix(pkt, Matrix_NewMtx(gfx, (char*)__FILE__, __LINE__), G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH)
 """
+            owner_functions = functions((ROOT / "combo/menu/ComboItemDrawOOT.h").read_text())
+            shim = shim.replace("/* SELECTED_SWORD_PRODUCER */", "\n".join(
+                owner_functions[name] for name in ("CwSimple", "CwCustomGi", "CwAltSwordGi")))
             foreign_shim = """
 const ComboForeignDrawInfo* selectedForeignInfo = nullptr;
 int foreignFallbackCalls = 0;
@@ -165,7 +181,7 @@ bool ComboForeignAnim_Draw(const CwItemAnimDrawInfo*, const char*, PlayState*) {
     void name(PlayState*, const ComboForeignDrawInfo*) { ++foreignFallbackCalls; Matrix_Scale(7,7,7,MTXMODE_APPLY); }
 FOREIGN_DRAW_STUB(OOT_DrawForeignGoronSword)
 FOREIGN_DRAW_STUB(OOT_DrawForeignMasterSword)
-FOREIGN_DRAW_STUB(OOT_DrawForeignCustomGi)
+void OOT_DrawForeignCustomGi(PlayState*, const ComboForeignDrawInfo*, bool) { ++foreignFallbackCalls; Matrix_Scale(7,7,7,MTXMODE_APPLY); }
 FOREIGN_DRAW_STUB(OOT_DrawForeignDekuNuts)
 FOREIGN_DRAW_STUB(OOT_DrawForeignRecoveryHeart)
 FOREIGN_DRAW_STUB(OOT_DrawForeignFish)
@@ -185,7 +201,7 @@ void ComboDrawSpinAttackGi(PlayState*, const char*, const char*, float, const ui
             mm_foreign_source = (ROOT / "combo/menu/ComboForeignDrawMM.h").read_text()
             mm_foreign_info = re.search(r"struct ComboForeignDrawInfoOOT \{.*?\n\};",mm_foreign_source,re.S)[0]
             mm_foreign_draw = functions(mm_foreign_source)["MM_DrawComboForeign"]
-            mm_handlers = sorted(set(re.findall(r"\b(MM_DrawForeign\w+)\(info\)", mm_foreign_draw)))
+            mm_handlers = sorted(set(re.findall(r"\b(MM_DrawForeign\w+)\(info(?:, shop)?\)", mm_foreign_draw)))
             mm_shop_support = """
 using RandoCheckId=int;
 constexpr RandoCheckId RC_UNKNOWN=0;
@@ -210,7 +226,9 @@ void DrawOotNeiCaneOfSomaria(RandoItemId) {assert(false);}
 """ + mm_foreign_info + """
 const ComboForeignDrawInfoOOT* selectedForeignInfoMM=nullptr;
 const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckId) {return selectedForeignInfoMM;}
-""" + "\n".join("void "+name+"(const ComboForeignDrawInfoOOT*) {assert(false);}" for name in mm_handlers)
+""" + "\n".join("void "+name+"(const ComboForeignDrawInfoOOT*" +
+                     (", bool" if name == "MM_DrawForeignCustomGi" else "") +
+                     ") {assert(false);}" for name in mm_handlers)
             mm_draw_source=(ROOT/"mm/2s2h/Rando/DrawItem.cpp").read_text()
             # Keep the exact outer item conversion/context/early dispatcher and
             # actual foreign branch; unrelated switch bodies have own fixtures.
@@ -229,6 +247,7 @@ const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckId) {ret
             checks += (ROOT / "tests/mm_presentation/shop_dispatch_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/foreign_sword_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/legacy_mod_checks.inc").read_text()
+            checks += (ROOT / "tests/mm_presentation/selected_sword_checks.inc").read_text()
             candidate = candidate.replace("  using namespace Fixture;\n", "  using namespace Fixture;\n" + checks, 1)
             source = Path(tmp) / "combo_gi_presentation.cpp"
             source.write_text("#define COMBO_BUILD 1\n" + candidate)

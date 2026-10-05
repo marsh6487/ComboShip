@@ -1,6 +1,7 @@
 #pragma once
 #include "NeiAssetPriority.h"
 #include "NeiGiModelBounds.h"
+#include "DinSwordGiResources.h"
 #include <ship/Context.h>
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManager.h>
@@ -118,7 +119,7 @@ inline bool IsCustomAsset(const char* nativeGame, const char* game, const char* 
     return model && model->GetInitData() && model->GetInitData()->IsCustom;
 }
 inline bool GetGiModelFit(const char* nativeGame, const char* game, const char* path, float scale, float tilt,
-                          bool shop, float fit[2]) {
+                          bool shop, float fit[2], int dinProfile = 0) {
     if (!game || !path || !fit || !std::isfinite(scale) || scale <= 0.f || !std::isfinite(tilt))
         return false;
     std::string resource = path;
@@ -151,9 +152,51 @@ inline bool GetGiModelFit(const char* nativeGame, const char* game, const char* 
     NeiGi::ModelBoundsReader<decltype(load)> reader(load, tilt);
     if (!reader.Read(resource.c_str(), bounds))
         return false;
+    if (dinProfile >= 1 && dinProfile <= 3) {
+        const auto& layers = DinSwordGi::profiles[dinProfile - 1];
+        for (const auto* layer : { layers.core, layers.flame }) {
+            NeiGi::FrameBounds layerBounds{};
+            NeiGi::ModelBoundsReader<decltype(load)> layerReader(load, tilt);
+            if (layerReader.Read(layer, layerBounds)) {
+                bounds.minimum.y = std::min(bounds.minimum.y, layerBounds.minimum.y);
+                bounds.maximum.y = std::max(bounds.maximum.y, layerBounds.maximum.y);
+                bounds.spinningWidth = std::max(bounds.spinningWidth, layerBounds.spinningWidth);
+            }
+        }
+    }
     const auto correction = NeiGi::FrameFit(bounds, scale, shop);
     fit[0] = correction.scale;
     fit[1] = correction.lift;
     return true;
+}
+inline int GetDinSwordGiProfile(const char* nativeGame, const char* game, const char* path, bool enabled) {
+    if (!game || !path || !enabled)
+        return 0;
+    std::string resource = path;
+    if (resource.compare(0, 7, "__OTR__") == 0)
+        resource.erase(0, 7);
+    std::string ownerGame = game;
+    if (!resource.empty() && resource[0] == '@') {
+        const auto colon = resource.find(':');
+        if (colon == std::string::npos)
+            return 0;
+        ownerGame = resource.substr(1, colon - 1);
+        resource.erase(0, colon + 1);
+    }
+    auto owner = Ship::CrossRMRegistry::Get(ownerGame);
+#ifndef COMBO_BUILD
+    if (!owner && ownerGame == nativeGame) {
+        const auto context = Ship::Context::GetRawInstance();
+        if (context)
+            owner = context->GetResourceManager();
+    }
+#else
+    (void)nativeGame;
+#endif
+    if (!owner)
+        return 0;
+    Ship::ResourceManagerScope scope(owner);
+    return DinSwordGi::SelectedProfile(resource.c_str(), enabled, owner->IsAltAssetsEnabled(),
+                                       [&](const char* dependency) { return bool(owner->LoadResource(dependency)); });
 }
 } // namespace NeiAssetPriority

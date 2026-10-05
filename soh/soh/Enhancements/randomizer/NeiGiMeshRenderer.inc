@@ -83,6 +83,10 @@ class NeiGi_ArenaScope {
     }
 };
 
+bool NeiGi_CanDrawLayers(PlayState* play, size_t matrices, size_t opa, size_t xlu) {
+    return NeiGi_ArenaHasRoom(play, 0, matrices, opa, xlu);
+}
+
 static bool NeiGi_ValidMesh(const NeiGi::Mesh& mesh, const NeiGi::TextureMaterial* material = nullptr,
                             bool seasonSunRays = false) {
     if (!mesh.count || mesh.count > mesh.vertices.size() || mesh.count % 3)
@@ -349,7 +353,7 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
 }
 
 void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int shimmerKind,
-                                    bool shimmer, const char* owner) {
+                                    bool shimmer, const char* owner, bool shop, float tilt) {
     if (!play || !play->state.gfxCtx || !opa || !NeiGi_ValidScale(scale) || shimmerKind < 0 ||
         shimmerKind > int(Kind::MarioMask))
         return;
@@ -359,12 +363,22 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
     Matrix_Push();
+    if (NeiGi::IsSword(static_cast<Kind>(shimmerKind)))
+        ComboSwordGi_ApplyFit(owner ? owner : "oot", opa, scale, tilt, shop);
+    Matrix_Push();
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
 #ifdef NEI_GI_ROTATE_Y
     NEI_GI_ROTATE_Y(spin, MTXMODE_APPLY);
 #else
     Matrix_RotateY(spin, MTXMODE_APPLY);
 #endif
+    if (tilt != 0.f) {
+#ifdef NEI_GI_ROTATE_Z
+        NEI_GI_ROTATE_Z(tilt, MTXMODE_APPLY);
+#else
+        Matrix_RotateZ(tilt, MTXMODE_APPLY);
+#endif
+    }
     OPEN_DISPS(play->state.gfxCtx);
     if (owner) {
         gSPComboRMPush(POLY_OPA_DISP++, owner);
@@ -391,6 +405,8 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
         gSPComboRMPop(POLY_XLU_DISP++);
     }
     CLOSE_DISPS(play->state.gfxCtx);
+    if (tilt != 0.f && NeiGi::IsSword(static_cast<Kind>(shimmerKind)))
+        ComboDinSwordGi_DrawLayers(play, owner ? owner : "oot", opa);
     Matrix_Pop();
     // Sword particles belong to the awarded sword, including mod geometry.
     if (NeiGi::IsSword(static_cast<Kind>(shimmerKind)))
@@ -399,6 +415,7 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
     if (shimmer)
         NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play),
                                                   static_cast<Kind>(shimmerKind)));
+    Matrix_Pop();
 }
 
 void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner) {

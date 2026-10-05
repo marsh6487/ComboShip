@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory(prefix='sword-fallback-') as temporary:
     source=Path(temporary)/'render.cpp'
     source.write_text((ROOT/'tests/sword_fallback/render_test.cpp').read_text().replace(
         '/* PRODUCTION_INFO */',info).replace('/* PRODUCTION_HANDLERS */',handlers))
-    includes=['soh','soh/include','soh/include/PR','soh/src','soh/assets','soh/soh',
+    includes=['.','soh','soh/include','soh/include/PR','soh/src','soh/assets','soh/soh',
               'combo/menu','libultraship/include','libultraship/src']
     binary=Path(temporary)/'render'
     subprocess.run([os.environ.get('CXX','c++'),*flags,*['-I'+str(ROOT/p) for p in includes],str(source),'-o',str(binary)],check=True)

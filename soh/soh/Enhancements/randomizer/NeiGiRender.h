@@ -24,9 +24,10 @@ bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiG
 // Intrinsic weather; profiles 1..4 are individual seasons, 5 cycles on the actual rod.
 void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner);
 void NeiGi_DrawSongOverlay(PlayState* play, int song, const char* owner);
-// External geometry retains identity shimmer without authored fitting/local FX.
+// External swords retain identity particles and fit their selected resource
+// bounds; other external meshes retain their existing optional shimmer.
 void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int shimmerKind,
-                                    bool shimmer, const char* owner);
+                                    bool shimmer, const char* owner, bool shop = false, float tilt = 0.f);
 // Owner-aware mesh/effect composition used by both foreign GI directions.
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
                             const float center[3], bool shimmer, const char* owner, bool shop = false);

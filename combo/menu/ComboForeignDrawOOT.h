@@ -22,6 +22,7 @@
 #include "ComboMaskShimmer.h"
 #include "ComboFairyBottle.h"
 #include "ComboSwordGiFit.h"
+#include "ComboDinSwordGi.h"
 #include "ComboFairyBottleDraw.h"
 #include "soh/Enhancements/randomizer/NeiGiRender.h"
 
@@ -720,7 +721,11 @@ inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo*
                 gSPSetGeometryMode(POLY_OPA_DISP++, G_CULL_BACK);
         }
     }
+    CLOSE_DISPS(play->state.gfxCtx);
+    if (info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z)
+        ComboDinSwordGi_DrawLayers(play, "oot", info->dls[0]);
     Matrix_Pop();
+    OPEN_DISPS(play->state.gfxCtx);
     gSPGrayscale(POLY_OPA_DISP++, false);
     gSPGrayscale(POLY_XLU_DISP++, false);
     OOT_FOREIGN_PIN_OPA();
