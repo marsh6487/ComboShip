@@ -1110,6 +1110,7 @@ static void GraceHourglass_KaleidoCycle(PlayState* play, s32 dir) {
                 ExtButton_ClearItem(btn);
                 gSaveContext.equips.buttonItems[btn] = (u8)newItem;
             }
+            gSaveContext.equips.cButtonSlots[btn - 1] = newItem > 0xFF ? SLOT_NONE : SLOT_PHANTOM_HOURGLASS;
             Interface_LoadItemIcon1(play, (u16)btn);
         }
     }
@@ -1117,25 +1118,23 @@ static void GraceHourglass_KaleidoCycle(PlayState* play, s32 dir) {
 
 static void GraceHourglass_KaleidoHandle(PlayState* play) {
     uint16_t selected = play->pauseCtx.cursorItem[PAUSE_ITEM];
-    u8 onThisItem = ExtInv_GetCurrentPage() == 1 &&
-                    (selected == ITEM_HYLIAS_GRACE || selected == EXT_ITEM_PHANTOM_HOURGLASS);
+    u8 onThisItem =
+        ExtInv_GetCurrentPage() == 1 && (selected == ITEM_HYLIAS_GRACE || selected == EXT_ITEM_PHANTOM_HOURGLASS);
     KaleidoWheel_Run(play, onThisItem,
-                     GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) &&
-                         GraceHourglass_IsOwned(EXT_ITEM_PHANTOM_HOURGLASS),
+                     GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) && GraceHourglass_IsOwned(EXT_ITEM_PHANTOM_HOURGLASS),
                      &sGraceHourglassSelectorActive, GraceHourglass_KaleidoCycle);
 }
 
 static void GraceHourglass_KaleidoDraw(PlayState* play) {
     uint16_t selected = play->pauseCtx.cursorItem[PAUSE_ITEM];
-    if (ExtInv_GetCurrentPage() != 1 ||
-        (selected != ITEM_HYLIAS_GRACE && selected != EXT_ITEM_PHANTOM_HOURGLASS) ||
+    if (ExtInv_GetCurrentPage() != 1 || (selected != ITEM_HYLIAS_GRACE && selected != EXT_ITEM_PHANTOM_HOURGLASS) ||
         !GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) || !GraceHourglass_IsOwned(EXT_ITEM_PHANTOM_HOURGLASS)) {
         return;
     }
     uint16_t other = selected == ITEM_HYLIAS_GRACE ? EXT_ITEM_PHANTOM_HOURGLASS : ITEM_HYLIAS_GRACE;
     void* icon = ExtInv_GetItemIcon(other);
-    KaleidoCycle_DrawRocStyle(play, play->pauseCtx.cursorSlot[PAUSE_ITEM], sGraceHourglassSelectorActive,
-                              1, 1, icon, icon, NULL, NULL, 32, 32);
+    KaleidoCycle_DrawRocStyle(play, play->pauseCtx.cursorSlot[PAUSE_ITEM], sGraceHourglassSelectorActive, 1, 1, icon,
+                              icon, NULL, NULL, 32, 32);
 }
 
 static void Shovel_HandleKaleidoSelector(PlayState* play) {
@@ -1682,6 +1681,15 @@ static void Wand_DrawKaleidoSelector(PlayState* play) {
 // on each side are the neighbouring runes' 24x24 glyphs — the gust-jar "mini icons on top" look.
 static u8 sSlateSelectorActive = 0;
 
+static void Slate_KaleidoSyncTitle(PlayState* play) {
+    static u8 namedRune = 0xFF;
+    u8 rune = Slate_RuneCount() ? Slate_GetRune() : 0xFF;
+    if (play->pauseCtx.namedItem == EXT_ITEM_SHEIKAH_SLATE && namedRune != rune) {
+        play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    }
+    namedRune = rune;
+}
+
 static void Slate_KaleidoCycle(PlayState* play, s32 dir) {
     Slate_SetRune(Slate_RuneNeighbor(Slate_GetRune(), dir));
     play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
@@ -1693,6 +1701,7 @@ static void Slate_HandleKaleidoSelector(PlayState* play) {
     PauseContext* pauseCtx = &play->pauseCtx;
     u8 onThisItem = (pauseCtx->cursorItem[PAUSE_ITEM] == EXT_ITEM_SHEIKAH_SLATE);
 
+    Slate_KaleidoSyncTitle(play);
     KaleidoWheel_Run(play, onThisItem, Slate_RuneCount() > 1, &sSlateSelectorActive, Slate_KaleidoCycle);
 }
 
@@ -2205,6 +2214,8 @@ bool IsItemCycling() {
 
 void KaleidoScope_ResetItemCycling() {
     gCurrentItemCyclingSlot = -1;
+    sGraceHourglassSelectorActive = 0;
+    sSlateSelectorActive = 0;
 }
 
 #pragma endregion

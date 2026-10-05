@@ -18,6 +18,9 @@ python3 -B tests/mm_presentation/run_foreign_scale_tests.py
 python3 -B scripts/diagnostics/run_mm_nei_tests.py
 python3 -B tests/mm_wallet/run_tests.py
 python3 -B tests/mm_editor/run_tests.py
+python3 -B tests/nei_shared_slot/run_tests.py
+python3 -B tests/nei_shared_slot/run_ui_tests.py
+python3 -B tests/nei_shared_slot/run_sync_tests.py
 python3 -B tests/mm_wolf/run_skin_tests.py
 python3 -B tests/mm_wolf/run_core_tests.py
 python3 -B tests/mm_wolf/run_host_tests.py

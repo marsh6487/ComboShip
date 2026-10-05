@@ -445,8 +445,7 @@ static inline void ExtInv_ClearPage2Items(void) { // Skijer's NEI
 // itemId is u16 so a page-2 slot can be given an EXT id (>0xFF); the store behind it is u16 too.
 // Skijer's NEI
 static inline void ExtInv_GiveItem(uint8_t slot, uint16_t itemId) {
-    if (slot == SLOT_PHANTOM_HOURGLASS &&
-        (itemId == ITEM_HYLIAS_GRACE || itemId == EXT_ITEM_PHANTOM_HOURGLASS)) {
+    if (slot == SLOT_PHANTOM_HOURGLASS && (itemId == ITEM_HYLIAS_GRACE || itemId == EXT_ITEM_PHANTOM_HOURGLASS)) {
         GraceHourglass_Grant(itemId);
         return;
     }

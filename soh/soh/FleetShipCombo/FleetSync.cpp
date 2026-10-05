@@ -408,6 +408,7 @@ void ApplyRegistryToNatives() {
 // for the Shovel/Dominion wheel. Runs on every extract and every apply. Slots are
 // extended_inventory.h SLOT_* (header not included in this TU).
 extern "C" void GraceHourglass_Heal(void);
+extern "C" void GraceHourglass_Grant(uint16_t item);
 
 static void RepairFlagOwnedCells(NeiSaveData* nei) {
     GraceHourglass_Heal();
@@ -791,7 +792,11 @@ void ApplyShared(const nlohmann::json& sh) {
             const bool validMask =
                 (i >= 24) && raw >= FC_OOT_MM_MASK_ITEM_BASE && raw < FC_OOT_MM_MASK_ITEM_BASE + FC_MM_MASK_COUNT;
             if (validPage2 || validMask) {
-                nei->ownedItems[i] = (uint16_t)raw; // additive
+                if (i == 41 - 24 && raw == ITEM_HYLIAS_GRACE) {
+                    GraceHourglass_Grant((uint16_t)raw);
+                } else {
+                    nei->ownedItems[i] = (uint16_t)raw; // additive
+                }
             }
         }
     }

@@ -12,6 +12,7 @@
 #include "2s2h/CustomMessage/PauseItemDescriptions.h" // NEI: C-Up descriptions for custom items
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "mods/extended_inventory.h" // NEI: page-aware kaleido (ExtInv_GetInventorySlot/GetSlotItem/GetItemIcon/SwitchPage/Update)
+#include "mods/ext_buttons/ext_buttons.h"
 #include "mods/items/custom_bottles.h"                      // NEI: bottle randomizer wheels A/B (Skijer's NEI)
 #include "archives/icon_item_static/icon_item_static_yar.h" // gABtnSymbolTex + gPausePromptCursorTex (cycle overlay)
 
@@ -59,6 +60,10 @@ static Vtx sCycleAButtonVtx[] = {
 
 s32 KaleidoScope_IsItemCycling(void) {
     return gCurrentItemCyclingSlot != -1;
+}
+
+void KaleidoScope_ResetItemCycling(void) {
+    gCurrentItemCyclingSlot = -1;
 }
 
 void KaleidoScope_HandleItemCycleExtras(PlayState* play, u8 slot, u8 canCycle, u8 leftItem, u8 rightItem,
@@ -541,22 +546,26 @@ static void GraceHourglass_KaleidoCycle(PlayState* play, s32 dir) {
                 ExtButton_ClearItem(0, btn);
                 BUTTON_ITEM_EQUIP(0, btn) = (u8)newItem;
             }
+            C_SLOT_EQUIP(0, btn) = newItem > 0xFF ? SLOT_NONE : SLOT_PHANTOM_HOURGLASS + 48;
             Interface_LoadItemIconImpl(play, (u8)btn);
         }
     }
     for (s32 btn = EQUIP_SLOT_D_RIGHT; btn <= EQUIP_SLOT_D_UP; ++btn) {
         if (ExtButton_GetDpadItem(0, btn) == oldItem) {
             ExtButton_SetDpadItem(0, btn, newItem);
+            DPAD_SLOT_EQUIP(0, btn) = SLOT_PHANTOM_HOURGLASS + 48;
             Interface_Dpad_LoadItemIconImpl(play, (u8)btn);
         }
     }
 }
 
 static void GraceHourglass_KaleidoHandle(PlayState* play) {
-    KaleidoWheel_Run(play, GRACE_HOURGLASS_KALEIDO_CELL,
-                     GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) &&
-                         GraceHourglass_IsOwned(EXT_ITEM_PHANTOM_HOURGLASS),
-                     GraceHourglass_KaleidoCycle);
+    u8 canToggle = GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) && GraceHourglass_IsOwned(EXT_ITEM_PHANTOM_HOURGLASS);
+    if (gCurrentItemCyclingSlot == GRACE_HOURGLASS_KALEIDO_CELL &&
+        (!canToggle || play->pauseCtx.cursorSlot[PAUSE_ITEM] != GRACE_HOURGLASS_KALEIDO_CELL)) {
+        KaleidoScope_ResetItemCycling();
+    }
+    KaleidoWheel_Run(play, GRACE_HOURGLASS_KALEIDO_CELL, canToggle, GraceHourglass_KaleidoCycle);
 }
 
 static void GraceHourglass_KaleidoDraw(PlayState* play) {
@@ -565,9 +574,9 @@ static void GraceHourglass_KaleidoDraw(PlayState* play) {
     void* icon = ExtInv_GetItemIcon(other);
     // Explicit textures retain the hourglass's full-width ID in the byte-based renderer.
     KaleidoScope_DrawItemCycleExtrasTinted(play, GRACE_HOURGLASS_KALEIDO_CELL,
-                                          GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) &&
-                                              GraceHourglass_IsOwned(EXT_ITEM_PHANTOM_HOURGLASS),
-                                          ITEM_HYLIAS_GRACE, ITEM_HYLIAS_GRACE, true, icon, icon, NULL, NULL);
+                                           GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) &&
+                                               GraceHourglass_IsOwned(EXT_ITEM_PHANTOM_HOURGLASS),
+                                           ITEM_HYLIAS_GRACE, ITEM_HYLIAS_GRACE, true, icon, icon, NULL, NULL);
 }
 
 static void Shovel_KaleidoHandle(PlayState* play) {
@@ -1012,10 +1021,20 @@ static void Wand_KaleidoDraw(PlayState* play) {
 // runes' 24x24 glyphs on each side — the gust-jar "mini icons on top" look.
 #define SLATE_KALEIDO_CELL (SLOT_SHEIKAH_SLATE - 24)
 
+static void Slate_KaleidoSyncTitle(PlayState* play) {
+    static u8 namedRune = 0xFF;
+    u8 rune = Slate_RuneCount() ? Slate_GetRune() : 0xFF;
+    if (play->pauseCtx.namedItem == EXT_ITEM_SHEIKAH_SLATE && namedRune != rune) {
+        play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    }
+    namedRune = rune;
+}
+
 static void Slate_KaleidoHandle(PlayState* play) {
     Input* input = CONTROLLER1(&play->state);
     PauseContext* pauseCtx = &play->pauseCtx;
 
+    Slate_KaleidoSyncTitle(play);
     if (ExtInv_GetSlotItem(SLOT_SHEIKAH_SLATE) == ITEM_NONE) {
         return;
     }
@@ -1131,7 +1150,7 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
         Slate_KaleidoHandle(play);   // Sheikah Slate rune selector (Skijer's NEI)
         Lantern_KaleidoHandle(play); // Lantern fire-type selector (ported from SoH)
         GraceHourglass_KaleidoHandle(play);
-        Shovel_KaleidoHandle(play);  // Shovel <-> Dominion Rod (2026-08-06 re-layout)
+        Shovel_KaleidoHandle(play); // Shovel <-> Dominion Rod (2026-08-06 re-layout)
         return;
     }
     if (page != 0) {
@@ -1282,7 +1301,7 @@ void KaleidoScope_DrawItemCycles(PlayState* play) {
         Slate_KaleidoDraw(play);   // Sheikah Slate rune selector (Skijer's NEI)
         Lantern_KaleidoDraw(play); // Lantern fire-type selector (ported from SoH)
         GraceHourglass_KaleidoDraw(play);
-        Shovel_KaleidoDraw(play);  // Shovel <-> Dominion Rod (2026-08-06 re-layout)
+        Shovel_KaleidoDraw(play); // Shovel <-> Dominion Rod (2026-08-06 re-layout)
         return;
     }
     if (page != 0) {

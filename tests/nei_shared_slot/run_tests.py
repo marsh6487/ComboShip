@@ -9,7 +9,6 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
 from run_mm_scene_randomization_tests import function
-from run_time_pedestal_tests import block_from
 
 for host in ("mm", "soh"):
     inventory = (ROOT / host / "mods/extended_inventory.c").read_text()

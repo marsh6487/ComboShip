@@ -505,6 +505,7 @@ void HealLeakedOwnedItems() {
 // for the Shovel/Dominion wheel. Runs on every extract and every apply. Slots are
 // extended_inventory.h SLOT_* (header not included in this TU).
 extern "C" void GraceHourglass_Heal(void);
+extern "C" void GraceHourglass_Grant(uint16_t item);
 
 static void RepairFlagOwnedCells(NeiSaveData* nei) {
     GraceHourglass_Heal();
@@ -988,8 +989,13 @@ void ApplyShared(const nlohmann::json& sh) {
                 const bool page2 =
                     (mm >= FC_OOT_PAGE2_FIRST + FC_PAGE2_MM_OFFSET && mm <= FC_OOT_PAGE2_LAST + FC_PAGE2_MM_OFFSET) ||
                     mm == ITEM_ELEMENTAL_WAND;
-                if (page2)
-                    nei->ownedItems[i] = mm; // peer ids are u8; EXT ids never arrive here
+                if (page2) {
+                    if (i == 41 - 24 && mm == ITEM_HYLIAS_GRACE) {
+                        GraceHourglass_Grant(mm);
+                    } else {
+                        nei->ownedItems[i] = mm; // peer ids are u8; EXT ids never arrive here
+                    }
+                }
             }
         }
     }

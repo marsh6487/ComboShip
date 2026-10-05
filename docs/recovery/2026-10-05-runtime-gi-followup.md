@@ -22,3 +22,18 @@ Eight supplied clips inspected at three frames each. Observed: compass native tu
 Independent isolated probes from `9eff802c`: `work-compass`, `work-songs`, `work-gi`. User requests compass information, fairy inside TP bottle, upright sword fit plus custom-mod particles, song-color shimmer for every warp song, Storms clef with rain/no thunder, Epona orange shimmer and Sun yellow shimmer/no circle. Preserve user-approved Lullaby/Saria visuals, custom model priority and existing inventory work.
 
 This is an explicitly incomplete candidate. No merge, sacred-master promotion or runtime acceptance. Keep recovery documentation on checkpoint branches and exclude it from PR #34.
+
+## Durable checkpoints and later findings
+
+User explicitly approved any GitHub checkpoints on Oct 4, 2026 (America/Chicago). Publication is unblocked. Verified source trees and branch heads:
+
+- Initial restoration: `5a52c70525d24e4fa480a80bb70cc378b8eeffa2`, `checkpoint/grace-slate-runtime-20261005`, tree `7b5d8d0dfc782acf1a784d79ec0b7d86f8a5ebe5` (byte-identical local `754df220`).
+- Song corrections: `6774acde1ea5029f50226929bede89e69a462a0e`, `checkpoint/songs-runtime-20261005`, tree `ca48960e3bd6a1ffe95407ec43b299a209a44a24`, local implementation `a76ad235` plus initial restoration/status.
+- Fairy/sword corrections: `a91c9f6a2a454d9ee90ad8a16224600d09c18501`, `checkpoint/fairy-runtime-20261005`, tree `d37b05413281234f2c727ffd9ee14fc99c72a52e`, local implementation `0423ab7d` plus initial restoration/status. Final focused GI verification continues.
+- Compass/save tests: `50f5062d5bf217b45a52adf41bfbb92cd45f524c`, `checkpoint/compass-runtime-20261005`, tree `c308b6dc5a898af804f83d8cf867af4718a897fa`, local `23a10094`.
+
+On Oct 5 at 00:20 Chicago, user confirmed generating a NEW seed with the Maps/Compasses information checkbox ON still produces generic dialogue. The prior formatter fixture manually hydrated the donor Context and did not prove generation/load propagation or the real CustomMessage formatter. This is an active defect investigation, not resolved by explaining the checkbox. Preserve the user's supplied OoTR reference requirements.
+
+Inventory review exposed missing MM button prototypes, stale equipped slot metadata, wheel state surviving pause/tab resets, incoming sync overriding the selected hourglass, and title cache staying stale after a programmatic rune grant. These have narrow fixes and production-derived tests in this checkpoint. Native UI behavior tests passed both hosts; full pause C syntax passed before the programmatic-title follow-up. The source-derived sync fixture is green in both hosts; baseline `9eff802c` is a failing negative control. New whole MM JSON and OoT NEI section serialization tests passed both hosts and ASan/UBSan; published-baseline serializers fail the lost-flags assertion in both hosts.
+
+Song worker full suite: 41 of 43 commands green; season grant and rod lifecycle fixtures link to the newly introduced Grace grant helper without projecting it. Root must repair those fixture boundaries, integrate isolated worker hunks, run the complete gate and publish a source-only candidate to PR #34. Existing sacred baselines remain unchanged; no in-game acceptance or merge.

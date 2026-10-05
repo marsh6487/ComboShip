@@ -128,5 +128,7 @@ int main(void){
 '''
 with tempfile.TemporaryDirectory(prefix='rod-lifecycle-') as td:
  path=Path(td)/'test.c';path.write_text(prefix+'\n'.join(parts)+checks);binary=Path(td)/'test'
- subprocess.run(['cc','-std=gnu17','-w','-Werror=implicit-function-declaration',*flags(),'-ffunction-sections','-fdata-sections',str(path),'-Wl,--gc-sections','-lm','-o',str(binary)],check=True)
+ # The real grant always uses the fixed Rod cell; Release-style inlining keeps
+ # the unrelated Grace shared-slot implementation outside this rod fixture.
+ subprocess.run(['cc','-std=gnu17','-O2','-w','-Werror=implicit-function-declaration',*flags(),'-ffunction-sections','-fdata-sections',str(path),'-Wl,--gc-sections','-lm','-o',str(binary)],check=True)
  subprocess.run([str(binary)],check=True)

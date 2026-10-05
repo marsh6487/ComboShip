@@ -14,7 +14,9 @@ def run(name,prefix,parts,checks):
   p=Path(td)/'test.cpp'
   p.write_text('#include "mods/extended_inventory.h"\n#include "mods/ext_buttons/ext_buttons.h"\n#include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"\n#include <cassert>\n#include <cstring>\n#include <iostream>\n'+prefix+'\n'+'\n'.join(parts)+'\nint main(){'+checks+'\nstd::cout<<"PASS '+name+'\\n";}')
   binary=Path(td)/'test'
-  subprocess.run(['c++','-std=c++20','-w',*(['-fpermissive'] if name in ('icon','native_dpad') else []),*flags(),'-ffunction-sections','-fdata-sections',str(p),'-Wl,--gc-sections','-o',str(binary)],check=True)
+  # Fold the fixed Rod slot in ExtInv_GiveItem so the unrelated shared Grace
+  # grant is not a fixture dependency. The actual season grant still executes.
+  subprocess.run(['c++','-std=c++20','-O2','-w',*(['-fpermissive'] if name in ('icon','native_dpad') else []),*flags(),'-ffunction-sections','-fdata-sections',str(p),'-Wl,--gc-sections','-o',str(binary)],check=True)
   subprocess.run([str(binary)],check=True)
 
 p='mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_item.c'
