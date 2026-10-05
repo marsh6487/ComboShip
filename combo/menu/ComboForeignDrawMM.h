@@ -741,6 +741,9 @@ inline void MM_DrawForeignSkullToken(const ComboForeignDrawInfoOOT* info) {
 // Generic rando song note: grayscale-tinted note DL (GetItem_DrawGenericMusicNote). No segments.
 inline void MM_DrawForeignMusicNote(const ComboForeignDrawInfoOOT* info) {
     if (info->count == 2) {
+        OPEN_DISPS(gPlayState->state.gfxCtx);
+        gSPGrayscale(POLY_XLU_DISP++, false);
+        CLOSE_DISPS(gPlayState->state.gfxCtx);
         MM_DrawForeignSimple(info); // Native warp color DL followed by its original clef.
         return;
     }

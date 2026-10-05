@@ -92,8 +92,7 @@ inline Mesh SampleSong(int song, uint32_t frame, const Basis& camera = {}) {
             mesh.Tri({ p + along, color, alpha }, { p + across, color, alpha }, { p - along, 0xD8FFD0, alpha });
             mesh.Tri({ p + along, color, alpha }, { p - along, 0xD8FFD0, alpha }, { p - across, color, alpha });
         } else {
-            // Lullaby/Nocturne/Zelda/Requiem retain their exact recovered hue
-            // with slow, bounded song motes rather than a generic item shimmer.
+            // Zelda/Nocturne/Requiem retain their existing bounded song motes.
             Glow(mesh, p, 2.5f, color, alpha, camera);
         }
     }

@@ -26,6 +26,7 @@ std::vector<std::pair<float, float>> stack;
 std::vector<std::pair<float, float>> submitted;
 std::vector<std::array<unsigned, 3>> flameColors;
 std::vector<std::vector<Vtx>> arena;
+bool portableSongLists=false;
 std::map<Gfx *, std::vector<Vtx>> vertexLoads;
 std::set<std::string> files;
 std::set<std::pair<std::string,std::string>> modFiles;
@@ -44,6 +45,7 @@ void Reset() {
   submitted.clear();
   flameColors.clear();
   arena.clear();
+  portableSongLists=false;
   pendingVertices = nullptr;
   vertexLoads.clear();
   std::memset(opa, 0, sizeof(opa));
@@ -77,6 +79,16 @@ std::vector<std::string> Drawn() {
     }
   }
   return paths;
+}
+void ExpectBoleroFireSubmitted() {
+  bool hotCore=false, warmBody=false;
+  for(const auto& [command,vertices]:vertexLoads)for(const auto& vertex:vertices) {
+    const auto* rgba=vertex.v.cn;
+    if(!rgba[3])continue;
+    hotCore|=rgba[0]==255 && rgba[1]==242 && rgba[2]==173;
+    warmBody|=rgba[0]==255 && rgba[1]==175 && rgba[2]==54;
+  }
+  assert(hotCore && warmBody && "Bolero must submit visible yellow-core and warm-body flame vertices alongside shared red shimmer");
 }
 } // namespace Fixture
 
@@ -205,9 +217,10 @@ void gSPVertex(Gfx *cmd, uintptr_t data, int n, int v0) {
   Fixture::vertexLoads[cmd] = std::vector<Vtx>(vertices, vertices + n);
   cmd->words.w0 = cmd->words.w1 = 0;
 }
-void gSPDisplayList(Gfx *, Gfx *) {
-  assert(false &&
-         "GI paths must be deferred, not resolved through the legacy wrapper");
+void gSPDisplayList(Gfx *packet, Gfx *list) {
+  assert(Fixture::portableSongLists &&
+         "authored GI paths must be deferred, not resolved through the legacy wrapper");
+  gDma1p(packet, G_DL_OTR_FILEPATH, list, 0, G_DL_PUSH);
 }
 #define ORIGINAL(name)                                                         \
   void name(PlayState *, GetItemEntry *) { Fixture::Original(); }
@@ -555,6 +568,7 @@ int main() {
     size_t copies=0;
     for(const auto& submitted:arena)if(submitted.size()==expected.size() && !std::memcmp(submitted.data(),expected.data(),expected.size()*sizeof(Vtx)))++copies;
     assert(copies==1 && stack.empty() && "one matching shared shimmer is mandatory even with ItemEffects off or no mod present");
+    if(song.song==CW_SONG_OOT_BOLERO)ExpectBoleroFireSubmitted();
 #ifdef COMBO_BUILD
     CwItemDrawInfo info{};assert(NeiGi_DescribeEntry(&songEntry,&info));
     assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.neiEffect==song.song && info.itemShimmer);

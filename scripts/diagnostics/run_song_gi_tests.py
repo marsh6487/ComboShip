@@ -110,6 +110,7 @@ int main() {
 struct PlayState { struct {void* gfxCtx;} state; uint32_t gameplayFrames; } play{};
 PlayState* gPlayState=&play;
 static int overlay=-1, season=-1, notes=0, genericShimmer=0, descriptions=0;
+static bool gray=true, grayAtNote=false;
 static std::array<uint8_t,4> env{};
 using Gfx=int;
 const char* gGiSongNoteDL="note";
@@ -118,7 +119,8 @@ const char* gGiSongNoteDL="note";
 #define Gfx_SetupDL25_Xlu(...) ((void)0)
 #define MATRIX_FINALIZE_AND_LOAD(...) ((void)0)
 #define gDPSetEnvColor(p,r,g,b,a) (env={uint8_t(r),uint8_t(g),uint8_t(b),uint8_t(a)})
-#define gSPDisplayList(...) (++notes)
+#define gSPDisplayList(...) (++notes,grayAtNote=gray)
+#define gSPGrayscale(p,state) (gray=state)
 void NeiGi_DrawSeasonOverlay(PlayState*,int profile,const char*) {season=profile;}
 void NeiGi_DrawSongOverlay(PlayState*,int song,const char*) {overlay=song;}
 void ComboDrawMaskShimmer(PlayState*,void*,const uint8_t*,const char*) {++genericShimmer;}
@@ -144,7 +146,7 @@ int main() {
     for(int id=RI_UNKNOWN;id<RI_MAX;++id) {
         const int song=ComboSongForMmItem(id);
         if(song<0)continue;
-        overlay=season=-1; notes=genericShimmer=descriptions=0; env={};
+        overlay=season=-1; notes=genericShimmer=descriptions=0; env={};gray=true;
         assert(MM_TryDrawNeiGi(static_cast<RandoItemId>(id)) &&
                "early NEI dispatcher must claim every native/imported song before shared GI table IDs");
         assert(descriptions==0);
@@ -152,6 +154,7 @@ int main() {
                               song==CW_SONG_EPONA || song==CW_SONG_SARIA || song==CW_SONG_STORMS || song==CW_SONG_SUN;
         uint8_t color[4];assert(ComboSongShimmerColor(song,color));
         assert(notes==1 && overlay==(hasOverlay?song:-1) && genericShimmer==0 && season==-1);
+        assert(!grayAtNote && "native MM notes must clear inherited grayscale before their native color is submitted");
         assert(!std::memcmp(env.data(),color,4));
     }
     for(int song=0;song<CW_SONG_COUNT;++song) {

@@ -839,6 +839,8 @@ inline void OOT_DrawForeignSimple(PlayState* play, const ComboForeignDrawInfo* i
     int32_t xs = (info->xluStart < 0 || info->xluStart > n) ? n : info->xluStart;
 
     OPEN_DISPS(play->state.gfxCtx);
+    if (info->drawKind == CW_DRAW_KIND_SONG_GI)
+        gSPGrayscale(POLY_XLU_DISP++, false);
 
     // ComboShip: replicate MM's AnimatedMat_Draw segment bind before the DLs (Moon's Tear).
     int32_t matSegs[kMaxMatEntries];

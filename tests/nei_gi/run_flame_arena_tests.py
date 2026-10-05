@@ -16,7 +16,10 @@ rcp=functions((ROOT/'soh/src/code/z_rcp.c').read_text())
 f=(ROOT/'tests/nei_gi/presentation_test.cpp').read_text()
 f='#define NEI_GI_FIXTURE_BOUNDARY_ONLY\n#include "ComboItemDrawABI.h"\n#include "objects/object_gi_fire/object_gi_fire.h"\n'+f
 f=f.replace('static void DrawWeaponFlameOverlay(PlayState *, u8 r, u8 g, u8 b) {\n  Fixture::flameColors.push_back({r, g, b});\n}', 'void gSPSegment(void *p, int n, uintptr_t a) { static_cast<Gfx*>(p)->words.w1=a; }\n'+rcp['Gfx_TwoTexScrollEx'].replace('= Graph_Alloc(', '= (Gfx*)Graph_Alloc(')+'\n'+functions((ROOT/'soh/soh/GbiWrap.cpp').read_text().replace('extern "C" ',''))['gDPSetTileSizeLerp']+'\n'+draw['DrawWeaponFlameOverlay'])
-f=f.replace('void gSPDisplayList(Gfx *, Gfx *) {\n  assert(false &&\n         "GI paths must be deferred, not resolved through the legacy wrapper");\n}', 'void gSPDisplayList(Gfx *p, Gfx *d) { __gSPDisplayList(p,d); }')
+# This fixture exercises the production flame wrapper's legacy display-list
+# call. Replace that boundary by function, so song-specific assertions in the
+# shared fixture do not silently leave the flame override unapplied.
+f=f.replace(functions(f)['gSPDisplayList'], 'void gSPDisplayList(Gfx *p, Gfx *d) { __gSPDisplayList(p,d); }')
 f=f.replace('  assert(tail >= reinterpret_cast<uintptr_t>(context->polyOpa.p)', '  if(tail < reinterpret_cast<uintptr_t>(context->polyOpa.p)) std::cerr << "allocation bytes="<<size<<" head="<<(context->polyOpa.p-Fixture::opa)<<" proposedTail="<<((reinterpret_cast<Gfx*>(tail))-Fixture::opa)<<"\\n";\n  assert(tail >= reinterpret_cast<uintptr_t>(context->polyOpa.p)')
 mm=functions((ROOT/'mm/2s2h/Rando/DrawItem.cpp').read_text())
 mmgi=functions((ROOT/'mm/2s2h/Rando/NeiGiPresentation.cpp').read_text())

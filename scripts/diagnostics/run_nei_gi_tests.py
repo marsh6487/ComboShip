@@ -176,10 +176,26 @@ FOREIGN_DRAW_STUB(OOT_DrawForeignFairyBottle)
 bool OOT_DrawForeignFairyContainer(PlayState*, const ComboForeignDrawInfo*) { ++foreignFallbackCalls; return true; }
 FOREIGN_DRAW_STUB(OOT_DrawForeignSoulFlame)
 FOREIGN_DRAW_STUB(OOT_DrawForeignOps)
-FOREIGN_DRAW_STUB(OOT_DrawForeignSimple)
 #undef FOREIGN_DRAW_STUB
 void ComboDrawSpinAttackGi(PlayState*, const char*, const char*, float, const uint8_t[4], const char*) {
     ++foreignFallbackCalls;
+}
+"""
+            # Song tests submit the actual portable note, while unrelated
+            # fallback families retain this fixture's original boundary stub.
+            oot_song_simple = functions(foreign_source)["OOT_DrawForeignSimple"].replace(
+                "OOT_DrawForeignSimple(", "Fixture_DrawForeignSongSimple(", 1)
+            foreign_shim += "\n" + foreign_source[foreign_source.index("#define COMBO_FOREIGN_MTX("):
+                                                    foreign_source.index("// Biggoron's Sword:")] + """
+constexpr int kMaxMatEntries=16;
+bool ComboForeignTexAnim_Run(PlayState*,const char*,const char*,bool,int32_t*,int32_t*) {assert(false);return false;}
+void ComboForeignTexAnim_Restore(PlayState*,const int32_t*,int32_t,bool) {assert(false);}
+extern "C" Gfx* Gfx_TwoTexScrollEx(GraphicsContext*,s32,u32,u32,s32,s32,s32,u32,u32,s32,s32,s32,s32,s32,s32) {assert(false);return nullptr;}
+extern "C" void gSPSegment(void*,int,uintptr_t) {assert(false);}
+""" + oot_song_simple + """
+void OOT_DrawForeignSimple(PlayState* play,const ComboForeignDrawInfo* info) {
+    if(info->drawKind==CW_DRAW_KIND_SONG_GI) Fixture_DrawForeignSongSimple(play,info);
+    else {++foreignFallbackCalls;Matrix_Scale(7,7,7,MTXMODE_APPLY);}
 }
 """
             mm_foreign_source = (ROOT / "combo/menu/ComboForeignDrawMM.h").read_text()
@@ -210,7 +226,13 @@ void DrawOotNeiCaneOfSomaria(RandoItemId) {assert(false);}
 """ + mm_foreign_info + """
 const ComboForeignDrawInfoOOT* selectedForeignInfoMM=nullptr;
 const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckId) {return selectedForeignInfoMM;}
-""" + "\n".join("void "+name+"(const ComboForeignDrawInfoOOT*) {assert(false);}" for name in mm_handlers)
+""" + "\n".join("void "+name+"(const ComboForeignDrawInfoOOT*) {assert(false);}" for name in mm_handlers
+                    if name not in {"MM_DrawForeignMusicNote", "MM_DrawForeignSimple"})
+            mm_pin = mm_foreign_source[mm_foreign_source.index("#define MM_FOREIGN_PIN_OPA()"):
+                                       mm_foreign_source.index("// Restore the segments a handler bound")]
+            mm_shop_support += "\n" + mm_pin + "\n" + """
+Gfx* MM_DrawForeignMagicJarDList(Gfx*,const char*,const uint8_t*) {assert(false);return nullptr;}
+""" + functions(mm_foreign_source)["MM_DrawForeignSimple"] + "\n" + functions(mm_foreign_source)["MM_DrawForeignMusicNote"]
             mm_draw_source=(ROOT/"mm/2s2h/Rando/DrawItem.cpp").read_text()
             # Keep the exact outer item conversion/context/early dispatcher and
             # actual foreign branch; unrelated switch bodies have own fixtures.
@@ -229,6 +251,7 @@ const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckId) {ret
             checks += (ROOT / "tests/mm_presentation/shop_dispatch_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/foreign_sword_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/legacy_mod_checks.inc").read_text()
+            checks += (ROOT / "tests/song_gi/foreign_dispatch_checks.inc").read_text()
             candidate = candidate.replace("  using namespace Fixture;\n", "  using namespace Fixture;\n" + checks, 1)
             source = Path(tmp) / "combo_gi_presentation.cpp"
             source.write_text("#define COMBO_BUILD 1\n" + candidate)

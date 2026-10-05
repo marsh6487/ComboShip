@@ -97,6 +97,16 @@ int main() {
     assert(shown.size()>=expected.size() && !memcmp(shown.data(),expected.data(),expected.size()*sizeof(Vtx)) &&
            "native MM songs must submit the matching shared shimmer even without optional effects or donor/mod resources");
     if(song.profile==CW_SONG_EPONA || song.profile==CW_SONG_SUN)assert(shown.size()==expected.size());
+    if(song.profile==CW_SONG_OOT_BOLERO) {
+      bool hotCore=false, warmBody=false;
+      for(const auto& vertex:shown) {
+        const auto* rgba=vertex.v.cn;
+        if(!rgba[3])continue;
+        hotCore|=rgba[0]==255 && rgba[1]==242 && rgba[2]==173;
+        warmBody|=rgba[0]==255 && rgba[1]==175 && rgba[2]==54;
+      }
+      assert(hotCore && warmBody && "native MM Bolero must submit the visible flame body and hot core in addition to red shimmer");
+    }
     assert(nativeDisplayLists.size()==1 && !strcmp(reinterpret_cast<const char*>(nativeDisplayLists.front()),
                                                   "__OTR__objects/object_gi_melody/gGiSongNoteDL") && matrices.empty());
   }

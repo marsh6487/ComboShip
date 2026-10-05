@@ -204,6 +204,7 @@ void DrawSong(RandoItemId randoItemId) {
     }
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gPlayState->state.gfxCtx);
     gDPSetEnvColor(POLY_XLU_DISP++, color[0], color[1], color[2], color[3]);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)&gGiSongNoteDL);
