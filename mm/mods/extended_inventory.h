@@ -334,6 +334,11 @@ void* Wand_ModeIcon(uint8_t mode);
 void* Wand_ModeNameTex(uint8_t mode);
 
 // ── Sheikah Slate runes (Skijer's NEI) — wand idiom over SLOT_SHEIKAH_SLATE ──
+void GraceHourglass_Heal(void);
+uint8_t GraceHourglass_IsOwned(uint16_t item);
+void GraceHourglass_Grant(uint16_t item);
+void* Slate_RuneNameTex(uint8_t rune);
+
 uint8_t Slate_RuneOwned(uint8_t rune);
 void Slate_GrantRune(uint8_t rune); // also hands over the slot on the first rune
 uint8_t Slate_RuneCount(void);      // owned runes
@@ -527,7 +532,7 @@ extern const uint8_t gPage2ItemAgeReqs[24];
 #define SLOT_DESIRE_SENSOR \
     39 // RETIRED cell (Desire Sensor -> Quartz of Motion, collect page); 39 is the Sheikah Slate now
 #define SLOT_LIGHT_ROD 40
-#define SLOT_HYLIAS_GRACE 41 // RETIRED item (2026-08-06); 41 is the Phantom Hourglass now
+#define SLOT_HYLIAS_GRACE 41 // shared with Phantom Hourglass; ownership is independent
 #define SLOT_LANTERN 42
 #define SLOT_MINISH_CAP 43
 #define SLOT_POKEBALL 44 // moved to the Crossover Items equipment page (Pikachu form); 44 is the Shadow Crystal now
@@ -598,6 +603,11 @@ static inline void ExtInv_ClearPage2Items(void) { // Skijer's NEI
 // itemId is u16 so a page-2 slot can be given an EXT id (>0xFF); the store behind it is u16 too.
 // Skijer's NEI
 static inline void ExtInv_GiveItem(uint8_t slot, uint16_t itemId) {
+    if (slot == SLOT_PHANTOM_HOURGLASS &&
+        (itemId == ITEM_HYLIAS_GRACE || itemId == EXT_ITEM_PHANTOM_HOURGLASS)) {
+        GraceHourglass_Grant(itemId);
+        return;
+    }
     if (slot >= 24 && slot < 48) {
         Nei_SetOwnedItem(slot, itemId);
     }

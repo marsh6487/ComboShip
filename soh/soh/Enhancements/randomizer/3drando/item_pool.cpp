@@ -671,10 +671,7 @@ bool GenerateItemPool() {
         AddItemToPool(RG_GUST_JAR, 2, 1, 1, 1);
         AddItemToPool(RG_BALL_AND_CHAIN, 2, 1, 1, 1);
         AddItemToPool(RG_LIGHT_ROD, 2, 1, 1, 1);
-        // RG_HYLIAS_GRACE REMOVED from the pool (user 2026-08-06): the item is retired outright —
-        // its noclip moves to the Soul spell (TODO). The RG stays defined and its logic.cpp CanUse
-        // cases still compile; an unobtainable item simply evaluates false there, and every use is
-        // an OR-alternative, so no location becomes unreachable.
+        AddItemToPool(RG_HYLIAS_GRACE, 2, 1, 1, 1);
         // The four 2026-08-06 page-2 additions (behaviorless-for-now real items):
         // Sheikah Slate: the pool item is gone — the FOUR RUNES are the placeable siblings now
         // (wand idiom: any order, each with its own textbox; the first found hands over the slate).

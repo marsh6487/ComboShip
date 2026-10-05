@@ -162,6 +162,11 @@ void* Wand_ModeIcon(uint8_t mode);
 void* Wand_ModeNameTex(uint8_t mode);
 
 // ── Sheikah Slate runes (Skijer's NEI) — wand idiom over SLOT_SHEIKAH_SLATE ──
+void GraceHourglass_Heal(void);
+uint8_t GraceHourglass_IsOwned(uint16_t item);
+void GraceHourglass_Grant(uint16_t item);
+void* Slate_RuneNameTex(uint8_t rune);
+
 uint8_t Slate_RuneOwned(uint8_t rune);
 void Slate_GrantRune(uint8_t rune); // also hands over the slot on the first rune
 uint8_t Slate_RuneCount(void);      // owned runes
@@ -440,6 +445,11 @@ static inline void ExtInv_ClearPage2Items(void) { // Skijer's NEI
 // itemId is u16 so a page-2 slot can be given an EXT id (>0xFF); the store behind it is u16 too.
 // Skijer's NEI
 static inline void ExtInv_GiveItem(uint8_t slot, uint16_t itemId) {
+    if (slot == SLOT_PHANTOM_HOURGLASS &&
+        (itemId == ITEM_HYLIAS_GRACE || itemId == EXT_ITEM_PHANTOM_HOURGLASS)) {
+        GraceHourglass_Grant(itemId);
+        return;
+    }
     if (slot >= 24 && slot < 48) {
         Nei_SetOwnedItem(slot, itemId);
     }

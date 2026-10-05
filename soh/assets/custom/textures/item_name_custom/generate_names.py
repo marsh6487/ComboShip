@@ -108,6 +108,11 @@ ALL_ITEMS = [
     ("gZonaiPermafrostNameTex", "Zonai Timer"),  # renamed (user 2026-08-06); symbol kept so no code changes
     # 2026-08-06 page-2 additions (regenerate to produce their name textures):
     ("gSheikahSlateNameTex", "Sheikah Slate"),
+    ("gSlateRuneBombNameTex", "Remote Bomb"),
+    ("gSlateRuneStasisNameTex", "Stasis"),
+    ("gSlateRuneCryonisNameTex", "Cryonis"),
+    ("gSlateRuneMasterCycleNameTex", "Master Cycle Zero"),
+    ("gSlateRuneSensorNameTex", "Sheikah Sensor"),
     ("gPhantomHourglassNameTex", "Phantom Hourglass"),
     ("gShadowCrystalNameTex", "Shadow Crystal"),
     ("gRodOfSeasonsNameTex", "Rod of Seasons"),
@@ -198,9 +203,11 @@ ALL_ITEMS = [
 def find_font():
     """Find Century Gothic Bold font."""
     paths = [
+        os.environ.get("NEI_NAME_FONT", ""),
         "C:/Windows/Fonts/GOTHICB.TTF",
         "C:\\Windows\\Fonts\\GOTHICB.TTF",
         os.path.join(OUTPUT_DIR, "..", "..", "fonts", "CenturyGothicBold.ttf"),
+        "/usr/share/fonts/opentype/urw-base35/URWGothic-Demi.otf",
     ]
     for p in paths:
         if os.path.exists(p):

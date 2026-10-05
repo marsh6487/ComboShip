@@ -580,8 +580,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     // Off by default: turning it on by default would silently change every existing seed.
     if (saveInfo.randoSaveOptions[RO_SHUFFLE_NEI_ITEMS] == RO_GENERIC_YES) {
         // The page-2 items, one copy each.
-        // 2026-08-06 re-layout: Hylia's Grace is OUT (item retired outright — its RI gives nothing
-        // now); the four new page-2 cells are IN as behaviorless-but-real items.
+        // Grace and the hourglass are independently obtainable siblings over cell 41.
         static const RandoItemId sNeiPoolItems[] = {
             RI_OOT_NEI_BALL_AND_CHAIN,
             RI_OOT_NEI_BEETLE,
@@ -591,6 +590,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             RI_OOT_NEI_DOMINION_ROD,
             RI_OOT_NEI_FIRE_ROD,
             RI_OOT_NEI_GUST_JAR,
+            RI_OOT_NEI_HYLIAS_GRACE,
             RI_OOT_NEI_ICE_ROD,
             RI_OOT_NEI_LANTERN,
             RI_OOT_NEI_LIGHT_ROD,

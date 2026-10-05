@@ -628,6 +628,9 @@ void* ExtInv_GetCustomItemNameTex(uint16_t itemId, uint8_t language) {
     // generate_names.py pipeline. Path strings, resolved by the RSP like every custom name.
     switch (itemId) {
         case EXT_ITEM_SHEIKAH_SLATE:
+            if (Slate_RuneCount() != 0) {
+                return Slate_RuneNameTex(Slate_GetRune());
+            }
             return (void*)"__OTR__textures/item_name_custom/gSheikahSlateNameTex";
         case EXT_ITEM_PHANTOM_HOURGLASS:
             return (void*)"__OTR__textures/item_name_custom/gPhantomHourglassNameTex";
@@ -1696,6 +1699,62 @@ void* Slate_RuneMiniIcon(uint8_t rune) {
 }
 void* Slate_RuneIcon(uint8_t rune) {
     return (rune < SLATE_RUNE_COUNT) ? sSlateRuneIcon[rune] : sSlateRuneIcon[0];
+}
+
+// Independent ownership behind the shared Grace / hourglass cell. Older saves
+// stored only the selected item; retain it and backfill its ownership.
+void GraceHourglass_Heal(void) {
+    NeiSaveData* nei = Nei_Save();
+    uint16_t current = ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS);
+    if (current == ITEM_HYLIAS_GRACE) {
+        nei->hyliasGraceOwned = 1;
+    } else if (current == EXT_ITEM_PHANTOM_HOURGLASS) {
+        nei->phantomHourglassOwned = 1;
+    } else if (current == ITEM_NONE) {
+        if (nei->hyliasGraceOwned) {
+            ExtInv_SetSlotItem(SLOT_PHANTOM_HOURGLASS, ITEM_HYLIAS_GRACE);
+        } else if (nei->phantomHourglassOwned) {
+            ExtInv_SetSlotItem(SLOT_PHANTOM_HOURGLASS, EXT_ITEM_PHANTOM_HOURGLASS);
+        }
+    }
+}
+
+uint8_t GraceHourglass_IsOwned(uint16_t item) {
+    const NeiSaveData* nei = Nei_Save();
+    if (item == ITEM_HYLIAS_GRACE) {
+        return nei->hyliasGraceOwned || ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS) == item;
+    }
+    if (item == EXT_ITEM_PHANTOM_HOURGLASS) {
+        return nei->phantomHourglassOwned || ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS) == item;
+    }
+    return 0;
+}
+
+void GraceHourglass_Grant(uint16_t item) {
+    if (item != ITEM_HYLIAS_GRACE && item != EXT_ITEM_PHANTOM_HOURGLASS) {
+        return;
+    }
+    GraceHourglass_Heal();
+    if (item == ITEM_HYLIAS_GRACE) {
+        Nei_Save()->hyliasGraceOwned = 1;
+    } else {
+        Nei_Save()->phantomHourglassOwned = 1;
+    }
+    // Finding a sibling does not change the player's existing selection/equips.
+    if (ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS) == ITEM_NONE) {
+        ExtInv_SetSlotItem(SLOT_PHANTOM_HOURGLASS, item);
+    }
+}
+
+void* Slate_RuneNameTex(uint8_t rune) {
+    static const char* const names[SLATE_RUNE_COUNT] = {
+        "__OTR__textures/item_name_custom/gSlateRuneBombNameTex",
+        "__OTR__textures/item_name_custom/gSlateRuneStasisNameTex",
+        "__OTR__textures/item_name_custom/gSlateRuneCryonisNameTex",
+        "__OTR__textures/item_name_custom/gSlateRuneMasterCycleNameTex",
+        "__OTR__textures/item_name_custom/gSlateRuneSensorNameTex",
+    };
+    return rune < SLATE_RUNE_COUNT ? (void*)names[rune] : NULL;
 }
 
 uint8_t Slate_RuneOwned(uint8_t rune) {

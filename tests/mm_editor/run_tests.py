@@ -40,7 +40,7 @@ def main():
     inventory = source("mm/mods/extended_inventory.c")
     production += inventory[inventory.index("static const uint8_t sWandQuest"):
                             inventory.index("static void* const sWandNameTex")]
-    for name in ["Wand_RandoMode", "Wand_ModeOwned", "Wand_GrantMode", "Slate_RuneOwned", "Slate_GrantRune",
+    for name in ["GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant", "Wand_RandoMode", "Wand_ModeOwned", "Wand_GrantMode", "Slate_RuneOwned", "Slate_GrantRune",
                  "Seasons_SeasonOwned", "Seasons_GrantSeason"]:
         production += function(inventory, name) + "\n"
     equipment = source("mm/mods/extended_equipment.c")

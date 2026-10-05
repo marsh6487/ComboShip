@@ -316,6 +316,9 @@ typedef struct NeiSaveData {
     uint8_t comboSpeedUpgrades;
     uint8_t comboSpeedRequired; // effective upgrade count from the saved OoT seed; 0 means default 5
     ComboRpgState comboRpg;     // full OoT RPG seed rules and capped counters; legacy speed fields retained above
+    // Independent items sharing inventory cell 41; append for existing saves.
+    uint8_t hyliasGraceOwned;
+    uint8_t phantomHourglassOwned;
 } NeiSaveData;
 
 // Hookshot-cell variant ids (which item currently fires from SLOT_HOOKSHOT). Returned by

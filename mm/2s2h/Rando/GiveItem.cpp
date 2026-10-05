@@ -1151,10 +1151,7 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             ExtInv_GiveItem(SLOT_LIGHT_ROD, ITEM_ROD_LIGHT);
             break;
         case RI_OOT_NEI_HYLIAS_GRACE:
-            // RETIRED (user 2026-08-06): Hylia's Grace is gone as an item — its cell (41) now belongs
-            // to the Phantom Hourglass and its noclip capability is slated to move into the Soul
-            // spell (TODO: wire that transfer when the Soul spell work lands). Old seeds that still
-            // place this RI get nothing rather than a dead cell. The RI stays defined (append-only).
+            ExtInv_GiveItem(SLOT_HYLIAS_GRACE, ITEM_HYLIAS_GRACE);
             break;
         case RI_OOT_NEI_LANTERN:
             ExtInv_GiveItem(SLOT_LANTERN, ITEM_LANTERN);

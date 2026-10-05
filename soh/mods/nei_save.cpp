@@ -264,6 +264,8 @@ void NeiSave_Save(SaveContext* saveContext, int sectionID, bool fullSave) {
     SaveManager::Instance->SaveData("timePedestalNoMasterSwordRepair", gNeiSave.timePedestalNoMasterSwordRepair);
     SaveManager::Instance->SaveArray("ownedItems", 48,
                                      [](size_t i) { SaveManager::Instance->SaveData("", gNeiSave.ownedItems[i]); });
+    SaveManager::Instance->SaveData("hyliasGraceOwned", gNeiSave.hyliasGraceOwned);
+    SaveManager::Instance->SaveData("phantomHourglassOwned", gNeiSave.phantomHourglassOwned);
     SaveManager::Instance->SaveData("shovelOwned", gNeiSave.shovelOwned);
     SaveManager::Instance->SaveData("dominionOwned", gNeiSave.dominionOwned);
     SaveManager::Instance->SaveData("pokeballOwned", gNeiSave.pokeballOwned);
@@ -368,6 +370,8 @@ void NeiSave_Load() {
     SaveManager::Instance->LoadArray("ownedItems", 48, [](size_t i) {
         SaveManager::Instance->LoadData("", gNeiSave.ownedItems[i], (uint16_t)0xFF); // ITEM_NONE (u16 store)
     });
+    SaveManager::Instance->LoadData("hyliasGraceOwned", gNeiSave.hyliasGraceOwned, (uint8_t)0);
+    SaveManager::Instance->LoadData("phantomHourglassOwned", gNeiSave.phantomHourglassOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("shovelOwned", gNeiSave.shovelOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("dominionOwned", gNeiSave.dominionOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("pokeballOwned", gNeiSave.pokeballOwned, (uint8_t)0);

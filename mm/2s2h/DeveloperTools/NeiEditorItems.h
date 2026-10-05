@@ -13,7 +13,7 @@ namespace NeiEditor {
 
 inline bool IsItem(RandoItemId id) {
     const auto item = Rando::StaticData::Items.find(id);
-    if (item == Rando::StaticData::Items.end() || !item->second.spoilerName || id == RI_OOT_NEI_HYLIAS_GRACE) {
+    if (item == Rando::StaticData::Items.end() || !item->second.spoilerName) {
         return false;
     }
     const std::string_view identity(item->second.spoilerName);
@@ -55,7 +55,6 @@ inline constexpr SlotItem slotItems[] = {
     { RI_OOT_NEI_WHIP, SLOT_WHIP, ITEM_WHIP },
     { RI_OOT_NEI_ZONAI_PERMAFROST, SLOT_ZONAI_PERMAFROST, ITEM_ZONAI_PERMAFROST },
     { RI_OOT_NEI_SHEIKAH_SLATE, SLOT_SHEIKAH_SLATE, EXT_ITEM_SHEIKAH_SLATE },
-    { RI_OOT_NEI_PHANTOM_HOURGLASS, SLOT_PHANTOM_HOURGLASS, EXT_ITEM_PHANTOM_HOURGLASS },
     { RI_OOT_NEI_SHADOW_CRYSTAL, SLOT_SHADOW_CRYSTAL, EXT_ITEM_SHADOW_CRYSTAL },
     { RI_OOT_NEI_ROD_OF_SEASONS, SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS },
 };
@@ -104,6 +103,12 @@ inline bool WandModeEarned(int mode) {
 }
 
 inline bool IsOwned(RandoItemId id) {
+    if (id == RI_OOT_NEI_HYLIAS_GRACE || id == RI_OOT_NEI_PHANTOM_HOURGLASS) {
+        const auto selected = Nei_GetOwnedItem(SLOT_PHANTOM_HOURGLASS);
+        const auto item = id == RI_OOT_NEI_HYLIAS_GRACE ? ITEM_HYLIAS_GRACE : EXT_ITEM_PHANTOM_HOURGLASS;
+        return GraceHourglass_IsOwned(item) &&
+               (selected == ITEM_HYLIAS_GRACE || selected == EXT_ITEM_PHANTOM_HOURGLASS);
+    }
     const auto* nei = Nei_Save();
     for (const auto& item : slotItems) {
         if (id == item.id) {
@@ -192,6 +197,11 @@ template <std::size_t N> inline bool IsOneOf(RandoItemId id, const RandoItemId (
 // restore that cell through the canonical setter without replaying earned grants
 // (the cane handler ignores owned skills, and replaying runes changes selection).
 inline bool RestoreOwnedHost(RandoItemId id) {
+    if (id == RI_OOT_NEI_HYLIAS_GRACE || id == RI_OOT_NEI_PHANTOM_HOURGLASS) {
+        const auto before = Nei_GetOwnedItem(SLOT_PHANTOM_HOURGLASS);
+        GraceHourglass_Heal();
+        return before != Nei_GetOwnedItem(SLOT_PHANTOM_HOURGLASS);
+    }
     const auto* nei = Nei_Save();
     uint8_t slot = SLOT_NONE;
     uint16_t item = ITEM_NONE;

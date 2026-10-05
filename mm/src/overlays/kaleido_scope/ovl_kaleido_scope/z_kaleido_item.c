@@ -500,7 +500,7 @@ static void Cane_KaleidoDraw(PlayState* play) {
 //   47 held the Dominion Rod  -> flag + clear (47 is the Rod of Seasons now)
 //   46 held either tool       -> backfill its flag (flags did not exist before)
 //   44 held the Pokeball      -> flag + clear (44 is the Shadow Crystal now)
-//   41 held Hylia's Grace     -> clear (the item is retired outright)
+//   41 held Grace / hourglass -> preserve and backfill independent ownership
 static void Page2Relayout_Heal(void) {
     NeiSaveData* nei = Nei_Save();
 
@@ -520,9 +520,54 @@ static void Page2Relayout_Heal(void) {
         nei->pokeballOwned = 1;
         ExtInv_SetSlotItem(SLOT_SHADOW_CRYSTAL, ITEM_NONE);
     }
-    if (ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS) == ITEM_HYLIAS_GRACE) {
-        ExtInv_SetSlotItem(SLOT_PHANTOM_HOURGLASS, ITEM_NONE);
+    GraceHourglass_Heal();
+}
+
+// Grace and the hourglass use distinct u16 identities behind one inventory cell.
+#define GRACE_HOURGLASS_KALEIDO_CELL (SLOT_PHANTOM_HOURGLASS - 24)
+
+static void GraceHourglass_KaleidoCycle(PlayState* play, s32 dir) {
+    uint16_t oldItem = ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS);
+    uint16_t newItem = oldItem == ITEM_HYLIAS_GRACE ? EXT_ITEM_PHANTOM_HOURGLASS : ITEM_HYLIAS_GRACE;
+    (void)dir;
+    ExtInv_SetSlotItem(SLOT_PHANTOM_HOURGLASS, newItem);
+    play->pauseCtx.cursorItem[PAUSE_ITEM] = newItem;
+    play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    for (s32 btn = EQUIP_SLOT_C_LEFT; btn <= EQUIP_SLOT_C_RIGHT; ++btn) {
+        if (ExtButton_GetItem(0, btn) == oldItem) {
+            if (newItem > 0xFF) {
+                ExtButton_SetItem(0, btn, newItem);
+            } else {
+                ExtButton_ClearItem(0, btn);
+                BUTTON_ITEM_EQUIP(0, btn) = (u8)newItem;
+            }
+            Interface_LoadItemIconImpl(play, (u8)btn);
+        }
     }
+    for (s32 btn = EQUIP_SLOT_D_RIGHT; btn <= EQUIP_SLOT_D_UP; ++btn) {
+        if (ExtButton_GetDpadItem(0, btn) == oldItem) {
+            ExtButton_SetDpadItem(0, btn, newItem);
+            Interface_Dpad_LoadItemIconImpl(play, (u8)btn);
+        }
+    }
+}
+
+static void GraceHourglass_KaleidoHandle(PlayState* play) {
+    KaleidoWheel_Run(play, GRACE_HOURGLASS_KALEIDO_CELL,
+                     GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) &&
+                         GraceHourglass_IsOwned(EXT_ITEM_PHANTOM_HOURGLASS),
+                     GraceHourglass_KaleidoCycle);
+}
+
+static void GraceHourglass_KaleidoDraw(PlayState* play) {
+    uint16_t current = ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS);
+    uint16_t other = current == ITEM_HYLIAS_GRACE ? EXT_ITEM_PHANTOM_HOURGLASS : ITEM_HYLIAS_GRACE;
+    void* icon = ExtInv_GetItemIcon(other);
+    // Explicit textures retain the hourglass's full-width ID in the byte-based renderer.
+    KaleidoScope_DrawItemCycleExtrasTinted(play, GRACE_HOURGLASS_KALEIDO_CELL,
+                                          GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) &&
+                                              GraceHourglass_IsOwned(EXT_ITEM_PHANTOM_HOURGLASS),
+                                          ITEM_HYLIAS_GRACE, ITEM_HYLIAS_GRACE, true, icon, icon, NULL, NULL);
 }
 
 static void Shovel_KaleidoHandle(PlayState* play) {
@@ -994,6 +1039,7 @@ static void Slate_KaleidoHandle(PlayState* play) {
         if (dir != 0) {
             Audio_PlaySfx(NA_SE_SY_CURSOR);
             Slate_SetRune(Slate_RuneNeighbor(Slate_GetRune(), dir));
+            pauseCtx->namedItem = PAUSE_ITEM_NONE;
             // Same HUD icon-cache reload as the wand wheel (slate rides an EXT-button marker).
             ExtInv_RefreshButtonIconsForItem(play, EXT_ITEM_SHEIKAH_SLATE);
         }
@@ -1084,6 +1130,7 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
         Wand_KaleidoHandle(play);    // Elemental Wand rod selector (Skijer's NEI)
         Slate_KaleidoHandle(play);   // Sheikah Slate rune selector (Skijer's NEI)
         Lantern_KaleidoHandle(play); // Lantern fire-type selector (ported from SoH)
+        GraceHourglass_KaleidoHandle(play);
         Shovel_KaleidoHandle(play);  // Shovel <-> Dominion Rod (2026-08-06 re-layout)
         return;
     }
@@ -1234,6 +1281,7 @@ void KaleidoScope_DrawItemCycles(PlayState* play) {
         Wand_KaleidoDraw(play);    // Elemental Wand rod selector (Skijer's NEI)
         Slate_KaleidoDraw(play);   // Sheikah Slate rune selector (Skijer's NEI)
         Lantern_KaleidoDraw(play); // Lantern fire-type selector (ported from SoH)
+        GraceHourglass_KaleidoDraw(play);
         Shovel_KaleidoDraw(play);  // Shovel <-> Dominion Rod (2026-08-06 re-layout)
         return;
     }

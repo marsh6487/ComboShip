@@ -85,7 +85,9 @@ int main() {
         NeiEditor::GrantAll();
         auto *nei = Nei_Save();
         REQUIRE(Nei_GetOwnedItem(39) == EXT_ITEM_SHEIKAH_SLATE);
-        REQUIRE(Nei_GetOwnedItem(41) == EXT_ITEM_PHANTOM_HOURGLASS);
+        REQUIRE(Nei_GetOwnedItem(41) == ITEM_HYLIAS_GRACE);
+        REQUIRE(NeiEditor::IsOwned(RI_OOT_NEI_HYLIAS_GRACE));
+        REQUIRE(NeiEditor::IsOwned(RI_OOT_NEI_PHANTOM_HOURGLASS));
         REQUIRE(Nei_GetOwnedItem(44) == EXT_ITEM_SHADOW_CRYSTAL);
         REQUIRE(Nei_GetOwnedItem(47) == EXT_ITEM_ROD_OF_SEASONS);
         REQUIRE(nei->slateRunesOwned == 0x1F);
@@ -125,6 +127,7 @@ int main() {
     } individual[] = {
         {RI_OOT_NEI_SHEIKAH_SLATE, 39, EXT_ITEM_SHEIKAH_SLATE},
         {RI_OOT_NEI_PHANTOM_HOURGLASS, 41, EXT_ITEM_PHANTOM_HOURGLASS},
+        {RI_OOT_NEI_HYLIAS_GRACE, 41, ITEM_HYLIAS_GRACE},
         {RI_OOT_NEI_SHADOW_CRYSTAL, 44, EXT_ITEM_SHADOW_CRYSTAL},
         {RI_OOT_NEI_ROD_OF_SEASONS, 47, EXT_ITEM_ROD_OF_SEASONS},
     };
@@ -141,7 +144,25 @@ int main() {
         REQUIRE(memcmp(&nativeBefore, &gSaveContext.save.saveInfo, sizeof(nativeBefore)) == 0);
     }
     reset();
-    REQUIRE(!NeiEditor::Grant(RI_OOT_NEI_HYLIAS_GRACE));
+    for (const auto first : {RI_OOT_NEI_HYLIAS_GRACE, RI_OOT_NEI_PHANTOM_HOURGLASS}) {
+        reset();
+        const auto second = first == RI_OOT_NEI_HYLIAS_GRACE ? RI_OOT_NEI_PHANTOM_HOURGLASS : RI_OOT_NEI_HYLIAS_GRACE;
+        REQUIRE(NeiEditor::Grant(first));
+        const auto selected = Nei_GetOwnedItem(41);
+        REQUIRE(NeiEditor::Grant(second));
+        REQUIRE(Nei_GetOwnedItem(41) == selected);
+        REQUIRE(NeiEditor::IsOwned(first) && NeiEditor::IsOwned(second));
+        const auto before = *Nei_Save();
+        REQUIRE(!NeiEditor::Grant(first) && !NeiEditor::Grant(second));
+        REQUIRE(memcmp(&before, Nei_Save(), sizeof(before)) == 0);
+        REQUIRE(gRandoPickupSerial == 2 && sharedObtained == 2);
+        Nei_SetOwnedItem(41, ITEM_NONE);
+        REQUIRE(NeiEditor::Grant(first));
+        REQUIRE(NeiEditor::IsOwned(first) && NeiEditor::IsOwned(second));
+        REQUIRE(gRandoPickupSerial == 2 && sharedObtained == 2);
+    }
+    puts("PASS Grace/hourglass: both pickup orders retain selection and ownership; regrants do not recount");
+    reset();
     REQUIRE(!NeiEditor::Grant(RI_BOW));
     REQUIRE(!NeiEditor::Grant(RI_UNKNOWN));
     REQUIRE(gRandoPickupSerial == 0 && sharedObtained == 0);
@@ -150,7 +171,7 @@ int main() {
     REQUIRE(Nei_GetOwnedItem(SLOT_FIRE_ROD) == ITEM_ROD_FIRE);
     REQUIRE(Nei_GetOwnedItem(41) == ITEM_NONE);
     REQUIRE(RI_OOT_NEI_HYLIAS_GRACE == 194 && RI_OOT_NEI_FIRE_ROD == 192);
-    puts("PASS individual canonical grants route through real randomizer recording; duplicates, ordinary/retired "
+    puts("PASS individual canonical grants route through real randomizer recording; duplicates and ordinary "
          "identities are ignored");
 
     // Any power can be the first grant and must also provide its usable host item.

@@ -41,6 +41,8 @@
     X("quartzOwned",     quartzOwned,     FCO_MERGE_MAX)          \
     X("quartzCategory",  quartzCategory,  FCO_MERGE_NEWEST)       \
     X("quartzSubcat",    quartzSubcat,    FCO_MERGE_NEWEST)       \
+    X("hyliasGraceOwned", hyliasGraceOwned, FCO_MERGE_MAX)       \
+    X("phantomHourglassOwned", phantomHourglassOwned, FCO_MERGE_MAX) \
     X("shovelOwned",     shovelOwned,     FCO_MERGE_MAX)          \
     X("dominionOwned",   dominionOwned,   FCO_MERGE_MAX)          \
     X("pokeballOwned",   pokeballOwned,   FCO_MERGE_MAX)          \
