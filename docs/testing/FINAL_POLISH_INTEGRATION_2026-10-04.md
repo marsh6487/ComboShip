@@ -15,7 +15,7 @@ The combined gate also includes the new flame fixture and the restored productio
 
 ## Current verification
 
-Targeted commands and results are recorded in `docs/recovery/2026-10-04-final-polish.md`. The complete 43-command `bash scripts/diagnostics/run_combo_nei_regressions.sh` and exact-head platform builds remain pending at this checkpoint. Formatting, collision, conflict-marker and whitespace gates pass.
+The complete 43-command `bash scripts/diagnostics/run_combo_nei_regressions.sh` passed on final implementation source `8f771524`, with the pinned historical source fixtures and pinned dependency headers. Exact resource/GLB parity passed for 62 GI models and 39 held components; HD icons/routes and optional-pack fallbacks also passed. Pinned clang-format 14, asset-collision, conflict-marker and whitespace gates pass. Exact-candidate Windows/Linux builds and packages follow publication.
 
 ## Runtime limits
 
@@ -25,4 +25,4 @@ Keep PR #34 draft. Both game modules must build together. No merge or master pro
 
 ## Final harness publication review
 
-An independent read-only publication review of `65145de1` found no Critical or Minor findings and one Important issue: the quest-held fixture was the remaining transitive consumer without native graph helpers or complete graphics arena initialization. The full gate reproduced that exact compile failure. Its runner now shares the same production helper extraction and temporary include path as the main/held fixtures; all three native arenas are initialized with explicit bounds. The quest-held runner passed after correction, covering five MM scenarios and seven OoT scenarios plus loaders/geometry/dispatch checks. The final complete gate and exact-candidate platform builds remain pending. No production behavior was changed for either harness repair.
+An independent read-only publication review of `65145de1` found no Critical or Minor findings and one Important issue: the quest-held fixture was the remaining transitive consumer without native graph helpers or complete graphics arena initialization. The full gate reproduced that exact compile failure. Its runner now shares the same production helper extraction and temporary include path as the main/held fixtures; all three native arenas are initialized with explicit bounds. The quest-held runner passed after correction, covering five MM scenarios and seven OoT scenarios plus loaders/geometry/dispatch checks. The final complete 43-command gate passed after this correction; exact-candidate platform builds follow publication. No production behavior was changed for either harness repair.
