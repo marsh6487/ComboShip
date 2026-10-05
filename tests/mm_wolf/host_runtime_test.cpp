@@ -345,8 +345,17 @@ int main(int argc, char** argv) {
     BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_C_RIGHT) = ITEM_MASK_DEKU;
     filtered = frame(BTN_CRIGHT);
     assert(!WolfLinkForm_IsReady() && (filtered.press.button & BTN_CRIGHT));
+    // An enabled equipment moveset must not reject activation or eject Wolf.
+    pendant = 1;
+    frame(BTN_CLEFT);
+    assert(WolfLinkForm_IsReady());
+    frame();
+    assert(WolfLinkForm_IsReady());
+    frame(BTN_CLEFT);
+    assert(!WolfLinkForm_IsReady());
+    pendant = 0;
     // Active tool/other-form arbitration must never silently steal their input/action.
-    for (u8* blocker : { &pendant, &beetle, &kite, &trident, &mario, &customItemBlock, &pakBodyModel, &o2rModel }) {
+    for (u8* blocker : { &beetle, &kite, &trident, &mario, &customItemBlock, &pakBodyModel, &o2rModel }) {
         *blocker = 1;
         frame(BTN_CLEFT);
         assert(!WolfLinkForm_IsReady());

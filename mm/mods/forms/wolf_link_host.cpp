@@ -83,8 +83,6 @@ const char* OwnerRejection(Player* player) {
         return "pak-body-model";
     if (O2rLoader_HasActiveModel())
         return "o2r-body-model";
-    if (ExtEquip_PendantActive())
-        return "pendant";
     if (Beetle_IsFlying())
         return "beetle";
     if (KiteSurf_IsActive())

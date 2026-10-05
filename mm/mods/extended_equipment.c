@@ -13,6 +13,7 @@
 #include "equipment/nei_equipment_presentation.h"
 #include "nei_save.h" // Skijer's NEI
 #include "transformation_masks/transformation_masks.h"
+#include "transformation_masks/wolf_link_form.h"
 #include "transformation_masks/assets/mm_asset_loader.h"
 #include "pak_loader/pak_loader.h"
 #include "oot_asset_loader/oot_asset_loader.h" // Trident: Phantom Ganon's lance lives in oot.o2r
@@ -464,7 +465,9 @@ u8 ExtEquip_PendantOwned(void) {
 }
 
 u8 ExtEquip_PendantActive(void) {
-    return ExtEquip_PendantOwned() && !Nei_Save()->pendantEffectOff;
+    // Wolf owns its moveset. Suspend the Pendant without changing ownership or
+    // the saved effect toggle, so human Link resumes the chosen behavior.
+    return ExtEquip_PendantOwned() && !Nei_Save()->pendantEffectOff && !WolfLinkForm_IsSelected();
 }
 
 void ExtEquip_TogglePendantEffect(void) {

@@ -9,6 +9,7 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
 from run_mm_nei_tests import flags
 from run_time_pedestal_tests import functions
+subprocess.run([sys.executable, str(ROOT/'tests/mm_wolf/run_equipment_policy_tests.py')], check=True)
 def run(command):
     result=subprocess.run(command,capture_output=True,text=True)
     if result.returncode:
