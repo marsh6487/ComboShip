@@ -12,6 +12,7 @@
 #include "mods/oot_asset_loader/oot_asset_loader.h"
 #include "GameInteractor/GameInteractor.h"
 #include "overlays/actors/ovl_En_Bom/z_en_bom.h"
+#include "objects/gameplay_keep/gameplay_keep.h"
 #include <cassert>
 #include <algorithm>
 #include <cstdlib>
@@ -145,6 +146,9 @@ u8 BoxMenu_Open(PlayState*, const BoxMenuEntry*, s32 count, s32 selected, u16 bu
 void* Wand_ModeIcon(u8) { static const char icon[] = "icon"; return (void*)icon; }
 void ExtInv_RefreshButtonIconsForItem(PlayState*, u16 item) { assert(item == ITEM_ELEMENTAL_WAND); }
 s32 func_8083485C(Player*, PlayState*) { return 0; }
+s16 Animation_GetLastFrame(void*) { return 12; }
+void PlayerAnimation_Change(PlayState*, SkelAnime*, PlayerAnimationHeader*, f32, f32, f32, u8, f32) {}
+s32 PlayerAnimation_Update(PlayState*, SkelAnime*) { return 1; }
 static void WandSand_SlabDraw(Actor*, PlayState*) {}
 static void WandWater_GeyserDraw(Actor*, PlayState*) {}
 static void WandMeteor_TintDraw(Actor*, PlayState*) {}
@@ -216,6 +220,7 @@ void ResetWorld(Player& player, PlayState& play) {
     sWindOn = 0; sWindDrainTimer = 0; sWindPrevInvinc = 0;
     sSandMeasured = 0; sSandTopOffset = sSandReach = 0;
     sMeteorBombUpdate = nullptr; sMeteorBombDraw = nullptr;
+    Player_InitElementalWandIA(&play, &player);
     sStormRayColBuilt = 0; sStormRayCol = {};
     spawnFails = onSlab = capeOwned = false; requestedObjects = 0; menuOpen = false;
     ownershipRule = WAND_RANDO_MEDALLIONS; registeredCollider = nullptr;

@@ -64,6 +64,51 @@ static const s16 sWandMagicCost[WAND_MODE_COUNT] = {
 // menu. Same length as the slate's rune row.
 #define WAND_WHEEL_HOLD_FRAMES 8
 
+// MM only copies skelAnimeUpper into the drawn skeleton when the upper action
+// returns true. Starting a clip from the input driver alone cannot show a cast.
+#define WAND_POSE_MORPH 6.0f
+typedef enum {
+    WAND_POSE_IDLE,
+    WAND_POSE_ATTACK,
+    WAND_POSE_SUMMON_CALL,
+    WAND_POSE_SUMMON_SWING,
+} WandPoseStage;
+
+static u8 sWandPoseStage = WAND_POSE_IDLE;
+
+static void Wand_PoseStart(PlayState* play, Player* player, u8 mode) {
+    PlayerAnimationHeader* anim;
+
+    if (player->stateFlags1 & PLAYER_STATE1_CARRYING_ACTOR) {
+        return;
+    }
+    if ((mode == WAND_MODE_METEOR) || (mode == WAND_MODE_STORM)) {
+        anim = (PlayerAnimationHeader*)gPlayerAnim_link_normal_light_bom;
+        sWandPoseStage = WAND_POSE_ATTACK;
+    } else {
+        anim = (PlayerAnimationHeader*)gPlayerAnim_link_magic_tame;
+        sWandPoseStage = WAND_POSE_SUMMON_CALL;
+    }
+    player->skelAnimeUpperBlendWeight = 0.0f;
+    PlayerAnimation_Change(play, &player->skelAnimeUpper, anim, 1.0f, 0.0f, Animation_GetLastFrame(anim),
+                           ANIMMODE_ONCE, WAND_POSE_MORPH);
+}
+
+static void Wand_PoseTick(PlayState* play, Player* player) {
+    if (!PlayerAnimation_Update(play, &player->skelAnimeUpper)) {
+        return;
+    }
+    if (sWandPoseStage == WAND_POSE_SUMMON_CALL) {
+        // MM has this one-handed swing; OoT's hammer_side_hit clip is absent.
+        PlayerAnimationHeader* swing = (PlayerAnimationHeader*)gPlayerAnim_link_fighter_Lnormal_kiru;
+        PlayerAnimation_Change(play, &player->skelAnimeUpper, swing, 1.0f, 0.0f, Animation_GetLastFrame(swing),
+                               ANIMMODE_ONCE, WAND_POSE_MORPH);
+        sWandPoseStage = WAND_POSE_SUMMON_SWING;
+        return;
+    }
+    sWandPoseStage = WAND_POSE_IDLE;
+}
+
 static void Wand_OnWheelConfirm(s32 index) {
     Wand_SetMode(Wand_ModeAt((u8)index));
     if (gPlayState != NULL) {
@@ -161,6 +206,8 @@ void Wand_TickInput(PlayState* play, Player* player) {
     // Pointers are dropped, never written through: that memory may belong to somebody else now.
     if (sLastScene != play->sceneId) {
         sLastScene = play->sceneId;
+        sWandPoseStage = WAND_POSE_IDLE;
+        sWasDrawn = 0;
         WandSand_Forget();
         WandWater_Forget();
         WandShadow_Forget();
@@ -174,6 +221,9 @@ void Wand_TickInput(PlayState* play, Player* player) {
     WandWind_Tick(play, player);
 
     u8 drawn = Wand_IsDrawn();
+    if (!drawn || ItemInput_IsBlocked(player, play)) {
+        sWandPoseStage = WAND_POSE_IDLE;
+    }
 
     // No guard clause anywhere below on purpose: an early return would skip the latch at the end,
     // and a frame the wand spent stowed HAS to be recorded or the next draw reads as a continuation.
@@ -210,10 +260,14 @@ void Wand_TickInput(PlayState* play, Player* player) {
             }
 
             // ---- PRESS C: cast ----
-            if (in.wasEquipped && in.isPressed && sWasDrawn && !ItemInput_IsBlocked(player, play) &&
-                !Wand_Cast(player, play, mode)) {
-                Audio_PlaySoundGeneral(NA_SE_SY_ERROR, &player->actor.world.pos, 4, &gSfxDefaultFreqAndVolScale,
-                                       &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            if (in.wasEquipped && in.isPressed && sWasDrawn && (sWandPoseStage == WAND_POSE_IDLE) &&
+                !ItemInput_IsBlocked(player, play)) {
+                if (Wand_Cast(player, play, mode)) {
+                    Wand_PoseStart(play, player, mode);
+                } else {
+                    Audio_PlaySoundGeneral(NA_SE_SY_ERROR, &player->actor.world.pos, 4, &gSfxDefaultFreqAndVolScale,
+                                           &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+                }
             }
         }
     } else {
@@ -236,10 +290,14 @@ void Wand_Draw(Player* player, PlayState* play) {
 /**
  * Per-rod upper action. Runs every frame while the wand is the held item.
  *
- * Returning func_8083485C keeps the vanilla hold/aim handling, which is what every rod wants as its
- * base. Nothing per-rod belongs here — the casting lives in Wand_TickInput, which can see the pad.
+ * Claim the upper body while a cast pose runs so MM copies it into the drawn
+ * skeleton. The input driver still owns casts and magic; vanilla owns idle.
  */
 s32 Player_UpperAction_ElementalWand(Player* player, PlayState* play) {
+    if (sWandPoseStage != WAND_POSE_IDLE) {
+        Wand_PoseTick(play, player);
+        return 1;
+    }
     return func_8083485C(player, play);
 }
 
@@ -248,6 +306,7 @@ s32 Player_UpperAction_ElementalWand(Player* player, PlayState* play) {
  * actors, aim reticles) belongs here.
  */
 void Player_InitElementalWandIA(PlayState* play, Player* player) {
+    sWandPoseStage = WAND_POSE_IDLE;
     (void)play;
     (void)player;
 }

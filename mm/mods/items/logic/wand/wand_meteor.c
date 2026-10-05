@@ -2,8 +2,8 @@
  * wand_meteor.c — Meteor Rod (Skijer's NEI).
  *
  * A real En_Bom, thrown instead of set down, and red. It keeps EnBom's horizontal behaviour — the
- * wall reflection, the friction, the fuse, the explosion — but its vertical motion is written as a
- * decaying sine arc rather than left to gravity, so it skips instead of dropping.
+ * wall reflection, the fuse and the explosion. Its vertical motion is a decaying sine arc and
+ * its launch speed survives the native rolling friction, so each hop travels forward.
  */
 
 #include "overlays/actors/ovl_En_Bom/z_en_bom.h" // EnBom.timer — never a hand-computed offset
@@ -13,6 +13,7 @@
 // buys a snap downward on the first frame.
 #define METEOR_SPAWN_DIST 30.0f
 #define METEOR_LAUNCH_SPEED 9.0f
+#define METEOR_WALL_SPEED_SCALE 0.7f // EnBom_Move's native loss on a wall reflection
 
 // How close an enemy has to be for the bomb to cook off against it. The vanilla AT collider only
 // exists once the bomb is ALREADY exploding, so contact has to be answered by proximity.
@@ -94,6 +95,9 @@ static void WandMeteor_Hop(Actor* thisx) {
 
     thisx->world.pos.y = thisx->floorHeight + (fabsf(sinf(M_PI * phase)) * peak);
     thisx->velocity.y = 0.0f;
+    // The forced arc owns floor contact. Leaving these latched makes native
+    // EnBom_Move apply rolling friction and offer this projectile for pickup.
+    thisx->bgCheckFlags &= ~(BGCHECKFLAG_GROUND | BGCHECKFLAG_GROUND_TOUCH);
     METEOR_HOP_TIME(thisx)++;
 }
 
@@ -101,6 +105,12 @@ static void WandMeteor_Update(Actor* thisx, PlayState* play) {
     // The wall bit is read BEFORE the vanilla update: EnBom_Move consumes and clears it while
     // bouncing (z_en_bom.c:227), so afterwards there is nothing left to see.
     u8 hitWall = (thisx->bgCheckFlags & BGCHECKFLAG_WALL) != 0;
+    f32 launchSpeed = thisx->speed;
+
+    if ((thisx->params == BOMB_TYPE_BODY) && (thisx->parent == NULL) &&
+        (thisx->floorHeight > BGCHECK_Y_MIN)) {
+        thisx->bgCheckFlags &= ~(BGCHECKFLAG_GROUND | BGCHECKFLAG_GROUND_TOUCH);
+    }
 
     // Only while it is still a body: once it is the explosion, params changed and the timer means
     // something else entirely.
@@ -117,7 +127,10 @@ static void WandMeteor_Update(Actor* thisx, PlayState* play) {
     sMeteorBombUpdate(thisx, play);
 
     // Over a pit there is no floor to arc above, so the bomb is handed back to gravity and falls.
-    if ((thisx->params == BOMB_TYPE_BODY) && (thisx->floorHeight > BGCHECK_Y_MIN)) {
+    if ((thisx->params == BOMB_TYPE_BODY) && (thisx->parent == NULL) && (thisx->floorHeight > BGCHECK_Y_MIN)) {
+        // EnBom_Move also applies air drag every frame. Cancel that for the
+        // scripted skip, while retaining its yaw reflection and wall slowdown.
+        thisx->speed = hitWall ? launchSpeed * METEOR_WALL_SPEED_SCALE : launchSpeed;
         WandMeteor_Hop(thisx);
     }
 }
@@ -130,7 +143,7 @@ u8 WandMeteor_Cast(Player* player, PlayState* play) {
                               player->actor.world.pos.y, player->actor.world.pos.z + (cs * METEOR_SPAWN_DIST), 0, yaw,
                               0, BOMB_TYPE_BODY);
 
-    if (bomb == NULL) {
+    if ((bomb == NULL) || (bomb->update == NULL)) {
         return 0;
     }
 

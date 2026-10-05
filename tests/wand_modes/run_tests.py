@@ -133,7 +133,8 @@ def main():
     selection = re.sub(r'\bthis\b', 'player', update[begin:end])
     modes += '\nvoid CompleteWandFrame(Player* player,PlayState* play,u16 press,u16 held){\n' + \
         '++play->gameplayFrames;play->state.input[0].press.button=press;play->state.input[0].cur.button=held;Input input;\n' + \
-        selection + '\nsPlayerControlInput=&input;Wand_TickInput(play,player);Player_ProcessItemButtons(player,play);\n}\n'
+        selection + '\nsPlayerControlInput=&input;Wand_TickInput(play,player);Player_ProcessItemButtons(player,play);' + \
+        '\nif(player->heldItemAction==PLAYER_IA_ELEMENTAL_WAND)Player_UpperAction_ElementalWand(player,play);\n}\n'
 
     oot_helper = 'soh/mods/items/helpers/equip_helper.c'
     oot_text = source(oot_helper)
@@ -169,6 +170,9 @@ def main():
                 '-ffunction-sections', '-fdata-sections', str(ROOT / 'tests/wand_modes' / test_path),
                 '-Wl,--gc-sections', '-o', str(binary)], check=True)
             subprocess.run([str(binary)], check=True)
+
+    if args.case in (None, 'modes') and SOURCE_REF is None:
+        subprocess.run([sys.executable, str(ROOT / 'tests/wand_modes/run_cast_regression_tests.py')], check=True)
 
 
 if __name__ == '__main__':
