@@ -95,7 +95,7 @@ static s32 Seasons_BuildWheel(BoxMenuEntry* out) {
     return SEASON_OFF + 1;
 }
 
-void Seasons_TickInput(PlayState* play, Player* player) {
+void Seasons_TickInput(PlayState* play, Player* player, Input* input) {
     BoxMenuEntry entries[SEASON_OFF + 1];
     if (sRodPlay != play || sRodScene != play->sceneId || play->gameplayFrames < sRodFrame) {
         sRodDrawn = 0;
@@ -130,7 +130,7 @@ void Seasons_TickInput(PlayState* play, Player* player) {
     if (!buttons || blocked || (player->stateFlags1 & PLAYER_STATE1_8000000) || player->meleeWeaponState != 0 ||
         ItemInput_CheckDamage(player, &sRodPrevInvinc) || play->pauseCtx.state != PAUSE_STATE_OFF ||
         play->csCtx.state != CS_STATE_IDLE || play->msgCtx.msgMode != MSGMODE_NONE ||
-        (play->state.input[0].press.button & (replacement & ~buttons))) {
+        (input->press.button & (replacement & ~buttons))) {
         sRodPendingDraw = 0;
         Seasons_Stow(play, player);
         return; // replacement remains available to native Player_UpdateItems
@@ -140,11 +140,16 @@ void Seasons_TickInput(PlayState* play, Player* player) {
             sRodPendingDraw = 0; // the request was rejected or replaced by another native item
             return;
         }
+        input->press.button &= ~buttons;
         play->state.input[0].press.button &= ~buttons;
         Seasons_TryFinishDraw(play, player);
         return;
     }
-    if (play->state.input[0].press.button & buttons) {
+    if (input->press.button & buttons) {
+        // Player_Update already copied/suppressed the pad and ran input hooks.
+        // Consume that effective edge too, so native dispatch cannot replay
+        // ITEM_EXT_BUTTON as an empty-hand request and stow the Rod this frame.
+        input->press.button &= ~buttons;
         play->state.input[0].press.button &= ~buttons;
         if (!sRodDrawn) {
             Player_UseItem(play, player, ITEM_NONE);

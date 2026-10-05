@@ -53,6 +53,8 @@ inline void from_json(const json& j, ExtButtonSaveInfo& extButtons) {
 inline void to_json(json& j, const NeiSaveData& n) {
     j = json{
         { "ownedItems", n.ownedItems },
+        { "hyliasGraceOwned", n.hyliasGraceOwned },
+        { "phantomHourglassOwned", n.phantomHourglassOwned },
         { "shovelOwned", n.shovelOwned },
         { "dominionOwned", n.dominionOwned },
         { "pokeballOwned", n.pokeballOwned },
@@ -168,6 +170,8 @@ inline void from_json(const json& j, NeiSaveData& n) {
         for (int i = 0; i < ARRAY_COUNT(n.ownedItems); i++)
             j.at("ownedItems").at(i).get_to(n.ownedItems[i]);
     }
+    n.hyliasGraceOwned = j.value("hyliasGraceOwned", (uint8_t)0);
+    n.phantomHourglassOwned = j.value("phantomHourglassOwned", (uint8_t)0);
     n.shovelOwned = j.value("shovelOwned", (uint8_t)0);
     n.dominionOwned = j.value("dominionOwned", (uint8_t)0);
     n.pokeballOwned = j.value("pokeballOwned", (uint8_t)0);

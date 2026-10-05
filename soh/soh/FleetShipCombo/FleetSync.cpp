@@ -407,7 +407,11 @@ void ApplyRegistryToNatives() {
 // the cell has to be re-seeded from the flags -- exactly what the kaleido's Page2Relayout_Heal does
 // for the Shovel/Dominion wheel. Runs on every extract and every apply. Slots are
 // extended_inventory.h SLOT_* (header not included in this TU).
+extern "C" void GraceHourglass_Heal(void);
+extern "C" void GraceHourglass_Grant(uint16_t item);
+
 static void RepairFlagOwnedCells(NeiSaveData* nei) {
+    GraceHourglass_Heal();
     const uint8_t kSlotWand = 27, kSlotSlate = 39, kSlotShovel = 46, kSlotRod = 47;
     const uint16_t kExtSheikahSlate = 0x0220; // EXT_ITEM_SHEIKAH_SLATE (same id in both games)
     const uint16_t kExtRodOfSeasons = 0x0223; // EXT_ITEM_ROD_OF_SEASONS (same id in both games)
@@ -788,7 +792,11 @@ void ApplyShared(const nlohmann::json& sh) {
             const bool validMask =
                 (i >= 24) && raw >= FC_OOT_MM_MASK_ITEM_BASE && raw < FC_OOT_MM_MASK_ITEM_BASE + FC_MM_MASK_COUNT;
             if (validPage2 || validMask) {
-                nei->ownedItems[i] = (uint16_t)raw; // additive
+                if (i == 41 - 24 && raw == ITEM_HYLIAS_GRACE) {
+                    GraceHourglass_Grant((uint16_t)raw);
+                } else {
+                    nei->ownedItems[i] = (uint16_t)raw; // additive
+                }
             }
         }
     }
@@ -1992,6 +2000,8 @@ static ItemGrantAudit::Snapshot CaptureItemGrantAudit() {
     snapshot.Add("nei.wandRodsOwned", nei->wandRodsOwned);
     snapshot.Add("nei.slateRunesOwned", nei->slateRunesOwned);
     snapshot.Add("nei.seasonsOwned", nei->seasonsOwned);
+    snapshot.Add("nei.hyliasGraceOwned", nei->hyliasGraceOwned);
+    snapshot.Add("nei.phantomHourglassOwned", nei->phantomHourglassOwned);
     snapshot.Add("nei.shovelOwned", nei->shovelOwned);
     snapshot.Add("nei.dominionOwned", nei->dominionOwned);
     snapshot.Add("nei.pokeballOwned", nei->pokeballOwned);

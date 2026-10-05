@@ -18,5 +18,7 @@ void AppendReceiptSource(CustomMessage::Entry& entry, const std::string& source)
 } // namespace Rando
 
 #ifdef COMBO_BUILD
+extern "C" COMBO_EXPORT int32_t MM_GetSeedItemIconInfo(const char* name, CwItemIconInfo* out);
+extern "C" COMBO_EXPORT int32_t MM_GetDungeonRewardIconInfo(int32_t dungeon, CwItemIconInfo* out);
 extern "C" COMBO_EXPORT int32_t MM_GetDungeonRewardName(int32_t dungeon, char* buffer, uint32_t capacity);
 #endif

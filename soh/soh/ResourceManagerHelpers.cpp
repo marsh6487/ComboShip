@@ -1,4 +1,5 @@
 #include "../../combo/NeiAssetPriorityResource.h"
+#include "../../combo/NeiWolfAssetResource.h"
 #include "ResourceManagerHelpers.h"
 #include "OTRGlobals.h"
 #include "variables.h"
@@ -971,6 +972,21 @@ extern "C" COMBO_EXPORT int32_t OOT_NeiResourceExists(const char* path) {
 
 #endif
 
+extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* path, float scale, float tilt, int shop,
+                                                float fit[2]) {
+    const int din =
+        NeiAssetPriority::GetDinSwordGiProfile("oot", game, path, CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
+    return NeiAssetPriority::GetGiModelFit("oot", game, path, scale, tilt, shop != 0, fit, din);
+}
+extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* game, const char* path) {
+    return NeiAssetPriority::GetDinSwordGiProfile("oot", game, path,
+                                                  CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
+}
+
+extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path) {
+    return NeiAssetPriority::IsCustomAsset("oot", game, path);
+}
+
 extern "C" int ResourceMgr_IsModAsset(const char* path) {
     return NeiAssetPriority::IsModAsset("oot", "oot", path);
 }
@@ -984,3 +1000,12 @@ extern "C" COMBO_EXPORT int OOT_NeiResourceIsMod(const char* path) {
     return ResourceMgr_IsModAsset(path);
 }
 #endif
+
+extern "C"
+#ifdef COMBO_BUILD
+    COMBO_EXPORT
+#endif
+    int
+    OOT_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner) {
+    return NeiWolfAsset::CopyResource("oot", destination, capacity, size, owner);
+}

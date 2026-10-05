@@ -454,7 +454,7 @@ void Message_DrawTextNES(PlayState* play, Gfx** gfxP, u16 textDrawPos) {
         msgCtx->textPosY = 48;
     }
 
-    if (msgCtx->itemId != 0xFE) {
+    if (!Message_DrawItemReceiptIcon(play, &gfx) && msgCtx->itemId != 0xFE) {
         Message_DrawItemIcon(play, &gfx);
     }
 

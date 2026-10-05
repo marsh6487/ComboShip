@@ -230,3 +230,5 @@ endif()
 
 # Install
 install(TARGETS ComboShip DESTINATION . COMPONENT combo)
+
+include("${CMAKE_SOURCE_DIR}/CMake/NeiWolfAsset.cmake")

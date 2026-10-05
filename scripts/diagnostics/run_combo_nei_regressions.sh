@@ -6,9 +6,13 @@ python3 -B scripts/diagnostics/run_nei_gi_tests.py --held --combo
 python3 -B tests/nei_gi/run_flame_arena_tests.py
 python3 -B scripts/diagnostics/run_mm_item_presentation_tests.py
 python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py
+python3 -B tests/item_receipts/run_seed_settings_tests.py --sanitizers
+python3 -B tests/item_receipts/run_mm_first_seed_gate_test.py --sanitizers
 python3 -B scripts/diagnostics/run_receipt_syntax_tests.py
 python3 -B scripts/diagnostics/run_song_gi_tests.py
 python3 -B scripts/diagnostics/run_sword_pose_tests.py
+python3 -B scripts/diagnostics/run_sword_mod_gi_tests.py
+python3 -B scripts/diagnostics/run_sword_fallback_tests.py --sanitize
 python3 -B scripts/diagnostics/run_fairy_bottle_tests.py
 python3 -B tests/seasons/run_tests.py
 python3 -B tests/seasons/run_rod_lifecycle_tests.py
@@ -18,10 +22,17 @@ python3 -B tests/mm_presentation/run_foreign_scale_tests.py
 python3 -B scripts/diagnostics/run_mm_nei_tests.py
 python3 -B tests/mm_wallet/run_tests.py
 python3 -B tests/mm_editor/run_tests.py
+python3 -B tests/nei_shared_slot/run_tests.py
+python3 -B tests/nei_shared_slot/run_ui_tests.py
+python3 -B tests/nei_shared_slot/run_sync_tests.py
+python3 -B tests/nei_shared_slot/run_save_tests.py
 python3 -B tests/mm_wolf/run_skin_tests.py
 python3 -B tests/mm_wolf/run_core_tests.py
 python3 -B tests/mm_wolf/run_host_tests.py
+python3 -B tests/mm_wolf/run_model_owner_tests.py
+python3 -B tests/mm_wolf/run_asset_packaging_tests.py
 python3 -B tests/mm_wolf/run_syntax_tests.py
+python3 -B tests/wand_modes/run_tests.py
 python3 -B scripts/diagnostics/run_receipt_soul_color_tests.py
 python3 -B scripts/diagnostics/run_nei_identity_tests.py
 python3 -B tests/nei_held/run_hand_fit_tests.py

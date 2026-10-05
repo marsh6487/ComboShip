@@ -72,7 +72,7 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-host-') as td:
              '-c',str(ROOT/path),'-o',obj]); objects.append(obj)
     binary=str(Path(td)/'host')
     options=['-DMM_WOLF_HOST','-I'+td] if (ROOT/'mm/mods/forms/wolf_link_host.cpp').exists() else []
-    run([os.environ.get('CXX','c++'),'-std=c++20',*flags(),*options,'-DMM_WOLF_NATIVE_HANDOFF',
+    run([os.environ.get('CXX','c++'),'-std=c++20',*flags(),*options,'-DMM_WOLF_NATIVE_HANDOFF','-DFMT_HEADER_ONLY',
          '-DWOLF_IMPLEMENTATION="'+str(ROOT/'mm/mods/transformation_masks/wolf_link_form.cpp')+'"',
          '-O1','-g','-fsanitize=undefined','-fno-sanitize-recover=all','-ffunction-sections','-fdata-sections',
          str(ROOT/'tests/mm_wolf/host_runtime_test.cpp'),*objects,'-Wl,--gc-sections','-o',binary])

@@ -14,7 +14,9 @@ def run(name,prefix,parts,checks):
   p=Path(td)/'test.cpp'
   p.write_text('#include "mods/extended_inventory.h"\n#include "mods/ext_buttons/ext_buttons.h"\n#include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"\n#include <cassert>\n#include <cstring>\n#include <iostream>\n'+prefix+'\n'+'\n'.join(parts)+'\nint main(){'+checks+'\nstd::cout<<"PASS '+name+'\\n";}')
   binary=Path(td)/'test'
-  subprocess.run(['c++','-std=c++20','-w',*(['-fpermissive'] if name in ('icon','native_dpad') else []),*flags(),'-ffunction-sections','-fdata-sections',str(p),'-Wl,--gc-sections','-o',str(binary)],check=True)
+  # Fold the fixed Rod slot in ExtInv_GiveItem so the unrelated shared Grace
+  # grant is not a fixture dependency. The actual season grant still executes.
+  subprocess.run(['c++','-std=c++20','-O2','-w',*(['-fpermissive'] if name in ('icon','native_dpad') else []),*flags(),'-ffunction-sections','-fdata-sections',str(p),'-Wl,--gc-sections','-o',str(binary)],check=True)
   subprocess.run([str(binary)],check=True)
 
 p='mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_item.c'
@@ -106,7 +108,7 @@ BoxMenu_Update(&play);assert(confirmed==1&&!sBoxMOpen);
 ''')
 
 rodpath=ROOT/'mm/mods/items/logic/item_rod_of_seasons.c'
-rodsource=rodpath.read_text() if rodpath.exists() else 'void Seasons_TickInput(PlayState*,Player*){}\nu8 Seasons_IsDrawn(){return 0;}'
+rodsource=rodpath.read_text() if rodpath.exists() else 'void Seasons_TickInput(PlayState*,Player*,Input*){}\nu8 Seasons_IsDrawn(){return 0;}'
 run('rod_input',r'''
 #include "mods/items/helpers/equip_helper.h"
 SaveContext gSaveContext{};PlayState* gPlayState=nullptr;
@@ -134,13 +136,13 @@ void ExtInv_RefreshButtonIconsForItem(PlayState*,u16){}
 ''',[(ROOT/'mm/mods/ext_buttons/ext_buttons.cpp').read_text().replace('#include "ext_buttons.h"','#include "mods/ext_buttons/ext_buttons.h"')]+[body('mm/mods/extended_inventory.c',n) for n in ['Seasons_SeasonOwned','Seasons_GrantSeason','Seasons_SeasonCount','Seasons_SeasonAt','Seasons_GetSeason','Seasons_SetSeason']]+[rodsource.split('// Seasonal particles')[0]],r'''
 PlayState play{};Player player{};gPlayState=&play;player.transformation=PLAYER_FORM_HUMAN;
 Seasons_GrantSeason(SEASON_WINTER);ExtButton_SetDpadItem(0,EQUIP_SLOT_D_UP,EXT_ITEM_ROD_OF_SEASONS);
-play.state.input[0].press.button=BTN_DUP;Seasons_TickInput(&play,&player);
+play.state.input[0].press.button=BTN_DUP;Seasons_TickInput(&play,&player,&play.state.input[0]);
 assert(Seasons_IsDrawn()&&menus==0);
-play.state.input[0].press.button=BTN_DUP;Seasons_TickInput(&play,&player);assert(menus==1&&confirmation);
+play.state.input[0].press.button=BTN_DUP;Seasons_TickInput(&play,&player,&play.state.input[0]);assert(menus==1&&confirmation);
 assert(entries[SEASON_WINTER].enabled&&entries[SEASON_OFF].enabled&&!entries[SEASON_SUMMER].enabled);
 confirmation(SEASON_SUMMER);assert(Seasons_GetSeason()==SEASON_WINTER);
 confirmation(SEASON_OFF);assert(Seasons_GetSeason()==SEASON_OFF);
-play.state.input[0].press.button=BTN_B;Seasons_TickInput(&play,&player);assert(!Seasons_IsDrawn());
+play.state.input[0].press.button=BTN_B;Seasons_TickInput(&play,&player,&play.state.input[0]);assert(!Seasons_IsDrawn());
 ''')
 
 codec=(ROOT/'mm/2s2h/BenJsonConversions.hpp').read_text()

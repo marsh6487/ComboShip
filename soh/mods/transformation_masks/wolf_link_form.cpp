@@ -1,9 +1,9 @@
 /**
  * Wolf Link full transformation.
  *
- * Assets are intentionally a loose `nei/wolf_link.bin`: mesh, weights,
- * skeleton, RGBA16 texture and all TP actions are loaded at runtime.  The
- * renderer reuses the SSBB CPU skinning path used by Pikachu.
+ * Separately supplied NEIWOLF1 exports contain the mesh, weights, skeleton,
+ * RGBA16 texture and TP clips. The owner's gWolfLinkData Blob is preferred,
+ * with a loose nei/<game>/wolf_link.bin fallback. Rendering reuses SSBB CPU skinning.
  *
  * Behaviour is a port of Twilight Princess' wolf procs as recovered by the
  * decompilation that Dusklight is built on (src/d/actor/d_a_alink_wolf.inc,
@@ -28,9 +28,12 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
+
+#include "../../../combo/NeiWolfAsset.h"
 
 #include "z64.h"
 #include "macros.h"
@@ -44,7 +47,8 @@
 extern "C" const char* Nei_AssetDir(void);
 
 #include <libultraship/bridge.h>
-#include <libultraship/libultraship.h>
+#include <ship/Context.h>
+#include <spdlog/spdlog.h>
 
 extern "C" {
 #include "expansions/ssbb/ssbb_anim.h"
@@ -56,7 +60,6 @@ extern PlayState* gPlayState;
 namespace {
 
 constexpr char kMagic[8] = { 'N', 'E', 'I', 'W', 'O', 'L', 'F', '1' };
-constexpr u32 kVersion = 1;
 constexpr size_t kHeaderSize = 8 + 20 * sizeof(u32);
 
 // The exporter writes vertex records packed (3f + 3s8 + 2s16 + u8 = 20 bytes).
@@ -65,6 +68,7 @@ constexpr size_t kHeaderSize = 8 + 20 * sizeof(u32);
 // field.  Every other record in the file happens to match its struct exactly
 // (weights 8, MtxF 64, SSBBSkinBonePos 12, SSBBBoneFrame 36).
 constexpr size_t kFileVertexStride = 20;
+constexpr size_t kMaxBlobSize = NeiWolfAsset::kMaxBlobSize;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Animations.  Names are the TP BCK names ("wl_<name>") as exported from the
@@ -281,6 +285,7 @@ static u8 sSelected = 0;
 static u8 sAssetsLoaded = 0;
 static s32 sDefIndex = -1;
 static std::vector<u8> sBlob;
+static std::string sAssetPath;
 static std::vector<SSBBSkinVertex> sVertices;
 static std::vector<u16> sTexture;
 static std::vector<StandardLimb> sLimbs;
@@ -344,6 +349,12 @@ static std::string FindAssetPath() {
         path = rel;
     }
     return path;
+}
+
+static bool RejectAsset(const char* reason, const char* detail = "") {
+    SPDLOG_WARN("SoH Wolf: asset rejected path={} reason={} detail={}", sAssetPath, reason, detail);
+    sBlob.clear();
+    return false;
 }
 
 static void BuildMeshDisplayList(u32 vertexCount) {
@@ -443,24 +454,37 @@ static bool LoadAssets() {
     if (sAssetsLoaded) {
         return true;
     }
-    std::ifstream file(FindAssetPath(), std::ios::binary | std::ios::ate);
-    if (!file) {
-        return false;
+    size_t resourceSize = 0;
+    const char* resourceOwner = nullptr;
+    const int resourceStatus = OOT_CopyWolfLinkResource(nullptr, 0, &resourceSize, &resourceOwner);
+    if (resourceStatus != 0) {
+        sAssetPath = std::string("@") + (resourceOwner ? resourceOwner : "unknown") + ":" + NeiWolfAsset::kResourcePath;
+        if (resourceStatus < 0 || resourceSize < kHeaderSize || resourceSize > kMaxBlobSize)
+            return RejectAsset("resource-blob");
+        sBlob.resize(resourceSize);
+        size_t copied = 0;
+        if (OOT_CopyWolfLinkResource(sBlob.data(), sBlob.size(), &copied, nullptr) != 1 || copied != resourceSize)
+            return RejectAsset("resource-copy");
+    } else {
+        sAssetPath = FindAssetPath();
+        std::ifstream file(sAssetPath, std::ios::binary | std::ios::ate);
+        if (!file)
+            return RejectAsset("open-failed");
+        const std::streamsize fileSize = file.tellg();
+        if (fileSize < (std::streamsize)kHeaderSize || fileSize > (std::streamsize)kMaxBlobSize)
+            return RejectAsset("file-size");
+        file.seekg(0, std::ios::beg);
+        sBlob.resize((size_t)fileSize);
+        if (!file.read((char*)sBlob.data(), fileSize))
+            return RejectAsset("read-failed");
     }
-    std::streamsize fileSize = file.tellg();
-    if (fileSize < (std::streamsize)kHeaderSize) {
-        return false;
-    }
-    file.seekg(0, std::ios::beg);
-    sBlob.resize((size_t)fileSize);
-    if (!file.read((char*)sBlob.data(), fileSize)) {
-        sBlob.clear();
-        return false;
-    }
-    if (std::memcmp(sBlob.data(), kMagic, 8) != 0 || ReadU32(sBlob.data() + 8) != kVersion) {
-        sBlob.clear();
-        return false;
-    }
+    if (std::memcmp(sBlob.data(), kMagic, sizeof(kMagic)) != 0)
+        return RejectAsset("magic");
+    const u32 version = ReadU32(sBlob.data() + 8);
+    if (version < NeiWolfAsset::kMinVersion || version > NeiWolfAsset::kMaxVersion)
+        return RejectAsset("version");
+    if (!NeiWolfAsset::Validate(sBlob))
+        return RejectAsset("validation");
 
     const u8* h = sBlob.data() + 12;
     u32 vertexCount = ReadU32(h + 0 * 4);
@@ -568,6 +592,11 @@ static bool LoadAssets() {
         sAnimationPointers[i] = &sAnimations[i];
     }
 
+    for (const char* name : kAnimNames) {
+        if (FindAnim(name) < 0)
+            return RejectAsset("missing-animation", name);
+    }
+
     BuildMeshDisplayList(vertexCount);
     BuildMaterialDisplayList(sTexture.data(), textureWidth, textureHeight);
 
@@ -614,6 +643,8 @@ static bool LoadAssets() {
         return false;
     }
     sAssetsLoaded = 1;
+    SPDLOG_INFO("SoH Wolf: asset loaded path={} bytes={} vertices={} bones={} animations={}", sAssetPath, sBlob.size(),
+                vertexCount, boneCount, animCount);
     return true;
 }
 

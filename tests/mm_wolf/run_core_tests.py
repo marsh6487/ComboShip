@@ -44,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-core-') as td:
                  '-ffunction-sections','-fdata-sections',*mode,'-c',str(ROOT/path),'-o',obj])
             objects.append(obj)
         options=['-DMM_WOLF_NATIVE_HANDOFF'] if 'nativeOwnsAction' in source.read_text() else []
-        run([os.environ.get('CXX','c++'),'-std=c++20',*flags(),*options,
+        run([os.environ.get('CXX','c++'),'-std=c++20',*flags(),*options,'-DFMT_HEADER_ONLY',
              '-DWOLF_IMPLEMENTATION="'+str(source)+'"','-ffunction-sections','-fdata-sections',*mode,
              str(ROOT/'tests/mm_wolf/core_runtime_test.cpp'),*objects,'-Wl,--gc-sections','-o',binary])
         run([binary,td])

@@ -5,6 +5,9 @@
 #include "2s2h/Rando/NeiLanternPresentation.h"
 #include "2s2h/Rando/NeiResourceRouting.h"
 #include "2s2h/Rando/NeiUsedMagicPresentation.h"
+#include "ComboMaskShimmer.h"
+#include "ComboSongDrawMM.h"
+#include "objects/object_gi_melody/object_gi_melody.h"
 #include "rod_runtime_test.cpp"
 #include <set>
 std::set<std::string> ownerBase, ownerAlt;
@@ -39,10 +42,15 @@ static bool itemEffects;
 extern "C" int32_t CVarGetInteger(const char* name,int32_t value) {
   return !strcmp(name,"gEnhancements.SkijerNEI.ItemEffects") ? itemEffects : value;
 }
-void DrawOotSlateRuneFlame(u8,u8,u8) {assert(false && "concrete non-Somaria GI must not borrow a flame");}
-void DrawSong(RandoItemId) {
-  assert(false && "songs have their own production dispatcher fixture");
+// Selected third-party resource graphs and Din layer eligibility have dedicated
+// production fixtures. This native NEI fixture supplies neither resource family.
+extern "C" int ResourceMgr_GetGiModelFitForGame(const char*,const char*,float,float,int,float[2]) {return 0;}
+extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char*,const char*) {return 0;}
+extern "C" Color_RGBA8 CosmeticEditor_GetChangedColor(u8,u8,u8,u8,const char*) {
+  assert(false && "native NEI fixture selected an absent Din layer"); return {};
 }
+void DrawOotSlateRuneFlame(u8,u8,u8) {assert(false && "concrete non-Somaria GI must not borrow a flame");}
+#include "mm_song_draw.inc"
 extern "C" void gSPVertex(Gfx *cmd, uintptr_t addr, int count, int v0) {
   cmd->words.w0 = (G_VTX << 24) | (count << 12) | ((v0 + count) << 1);
   cmd->words.w1 = addr;
@@ -64,8 +72,64 @@ int main() {
     gfx.polyXlu.d = std::end(xlu);
     gfx.overlay.p = overlay;
     gfx.overlay.d = std::end(overlay);
+    nativeDisplayLists.clear();
     Matrix_Translate(0, 0, 0, MTXMODE_NEW);
   };
+  const auto packedEffects = [&]() {
+    std::vector<Vtx> vertices;
+    for(Gfx* cmd=xlu;cmd<gfx.polyXlu.p;++cmd)if(cmd->words.w0>>24==G_VTX) {
+      const size_t count=(cmd->words.w0>>12)&255;
+      const auto* batch=reinterpret_cast<const Vtx*>(cmd->words.w1);
+      vertices.insert(vertices.end(),batch,batch+count);
+    }
+    return vertices;
+  };
+  struct Song {RandoItemId item;int profile;uint32_t hue;};
+  const Song songs[]={
+    {RI_OOT_SONG_MINUET_OF_FOREST,CW_SONG_OOT_MINUET,0x62FF62},
+    {RI_OOT_SONG_BOLERO_OF_FIRE,CW_SONG_OOT_BOLERO,0xFF3C00},
+    {RI_OOT_SONG_SERENADE_OF_WATER,CW_SONG_OOT_SERENADE,0x55B4DF},
+    {RI_OOT_SONG_REQUIEM_OF_SPIRIT,CW_SONG_OOT_REQUIEM,0xDE9E2F},
+    {RI_OOT_SONG_NOCTURNE_OF_SHADOW,CW_SONG_OOT_NOCTURNE,0xA028D2},
+    {RI_OOT_SONG_PRELUDE_OF_LIGHT,CW_SONG_OOT_PRELUDE,0xEDE73E},
+    {RI_SONG_EPONA,CW_SONG_EPONA,0xD96E30},{RI_SONG_SUN,CW_SONG_SUN,0xEDE73E}};
+  for(const auto& song:songs)for(bool effects:{false,true})for(bool alt:{false,true})for(bool donor:{false,true}) {
+    reset();play.gameplayFrames=42;itemEffects=effects;mmAltEnabled=alt;ownerRegistered=donor;
+    const uint8_t color[]={uint8_t(song.hue>>16),uint8_t(song.hue>>8),uint8_t(song.hue),255};
+    NeiGi_DrawShimmerOverlay(&play,color,nullptr);
+    const auto expected=packedEffects();assert(!expected.empty());
+    reset();const int descriptionsBefore=descriptorCalls;
+    assert(MM_TryDrawNeiGi(song.item) && descriptorCalls==descriptionsBefore);
+    const auto shown=packedEffects();
+    assert(shown.size()>=expected.size() && !memcmp(shown.data(),expected.data(),expected.size()*sizeof(Vtx)) &&
+           "native MM songs must submit the matching shared shimmer even without optional effects or donor/mod resources");
+    if(song.profile==CW_SONG_EPONA || song.profile==CW_SONG_SUN)assert(shown.size()==expected.size());
+    if(song.profile==CW_SONG_OOT_BOLERO) {
+      bool hotCore=false, warmBody=false;
+      for(const auto& vertex:shown) {
+        const auto* rgba=vertex.v.cn;
+        if(!rgba[3])continue;
+        hotCore|=rgba[0]==255 && rgba[1]==242 && rgba[2]==173;
+        warmBody|=rgba[0]==255 && rgba[1]==175 && rgba[2]==54;
+      }
+      assert(hotCore && warmBody && "native MM Bolero must submit the visible flame body and hot core in addition to red shimmer");
+    }
+    assert(nativeDisplayLists.size()==1 && !strcmp(reinterpret_cast<const char*>(nativeDisplayLists.front()),
+                                                  "__OTR__objects/object_gi_melody/gGiSongNoteDL") && matrices.empty());
+  }
+  reset();
+  assert(MM_TryDrawNeiGi(RI_SONG_STORMS));
+  const auto rainOnly=packedEffects();
+  reset();NeiGi_DrawMesh(&play,NeiGi::SampleSeason(42,1,NeiGi_CameraBasis(&play)));
+  const auto expectedRain=packedEffects();
+  assert(rainOnly.size()==expectedRain.size() && !memcmp(rainOnly.data(),expectedRain.data(),expectedRain.size()*sizeof(Vtx)));
+  for(RandoItemId song:{RI_SONG_HEALING,RI_SONG_SOARING,RI_SONG_TIME,RI_SONG_SONATA,RI_SONG_NOVA,
+                       RI_SONG_LULLABY,RI_SONG_LULLABY_INTRO,RI_SONG_ELEGY,RI_SONG_OATH,RI_SONG_DOUBLE_TIME,RI_SONG_INVERTED_TIME}) {
+    reset();assert(MM_TryDrawNeiGi(song));
+    assert(packedEffects().empty() && matrices.empty() && "regular MM songs must keep only their original note");
+  }
+  ownerRegistered=true;mmAltEnabled=false;itemEffects=false;
+  std::cout << "PASS real native MM song submission: mandatory colored shimmer, original note, rain-only Storms, plain regular songs and donor/Alt independence\n";
   const auto firstOpaquePath = [&]() {
     for (Gfx *cmd = opa; cmd < gfx.polyOpa.p; ++cmd)
       if (cmd->words.w0 >> 24 == G_DL_OTR_FILEPATH)
@@ -89,19 +153,19 @@ int main() {
         gfx.polyOpa.p = opa + 2, gfx.polyOpa.d = opa + 1;
       const auto opaHead = gfx.polyOpa.p, xluHead = gfx.polyXlu.p;
       const auto opaTail = gfx.polyOpa.d, xluTail = gfx.polyXlu.d;
-      const auto mesh = NeiGi::SampleSong(CW_SONG_SOARING, 42);
+      const auto mesh = NeiGi::SampleSong(CW_SONG_OOT_ZELDA, 42);
       if (draw == 0)
         NeiGi_DrawMesh(&play, mesh);
       if (draw == 1)
         assert(!NeiGi_DrawTexturedMesh(&play, mesh, guardedMaterial));
       if (draw == 2)
-        NeiGi_DrawSongOverlay(&play, CW_SONG_SOARING, "oot");
+        NeiGi_DrawSongOverlay(&play, CW_SONG_OOT_ZELDA, "oot");
       assert(gfx.polyOpa.p == opaHead && gfx.polyOpa.d == opaTail &&
              gfx.polyXlu.p == xluHead && gfx.polyXlu.d == xluTail &&
              gfx.overlay.p == overlay && matrices.empty());
     }
   reset();
-  assert(NeiGi_DrawTexturedMesh(&play, NeiGi::SampleSong(CW_SONG_SOARING, 42),
+  assert(NeiGi_DrawTexturedMesh(&play, NeiGi::SampleSong(CW_SONG_OOT_ZELDA, 42),
                                 guardedMaterial));
   int ownerDepth = 0;
   bool texturedVertices = false;

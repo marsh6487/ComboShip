@@ -85,8 +85,10 @@ void Graph_CloseDisps(Gfx**, GraphicsContext*, const char*, s32) {}
 #endif
 #ifdef HOST_MM
 void Matrix_RotateYF(f32, MatrixMode) {}
+void Matrix_RotateZF(f32, MatrixMode) { assert(false && "mask fixture unexpectedly rotated a sword"); }
 #else
 void Matrix_RotateY(f32, u8) {}
+void Matrix_RotateZ(f32, u8) { assert(false && "mask fixture unexpectedly rotated a sword"); }
 #endif
 void Matrix_ReplaceRotation(MtxF*) {}
 void Matrix_Get(MtxF* m) {
@@ -111,7 +113,14 @@ Color_RGB8 CVarGetColor24(const char*, Color_RGB8 color) { return color; }
 int32_t CVarGetInteger(const char*, int32_t value) { return value; }
 #endif
 int DinFireShield_DrawItem(PlayState*, int16_t) { return 0; }
+// Selected model fitting and Din layers have real dedicated sword fixtures.
+// This fixture provides neither model family to the production GI dispatcher.
+int ResourceMgr_GetGiModelFitForGame(const char*, const char*, float, float, int, float[2]) { return 0; }
+int ResourceMgr_GetDinSwordGiProfileForGame(const char*, const char*) { return 0; }
 #ifdef HOST_MM
+Color_RGBA8 CosmeticEditor_GetChangedColor(u8, u8, u8, u8, const char*) {
+    assert(false && "mask fixture unexpectedly selected a Din layer"); return {};
+}
 s16 Play_GetOriginalSceneId(s16 id) { return id; }
 s32 GetItem_DrawDungeonItem(PlayState*, s16, s32) { return false; }
 int32_t CVarGetInteger(const char*, int32_t value) { return value; }
@@ -128,12 +137,21 @@ static void GetItem_DrawBottleShimmer(PlayState*, s16) { assert(false); }
 /* PRODUCTION_FOREIGN_LINKAGE */
 using NeiGi::Kind;
 static bool HasResource(const char*) { return false; }
+#include "ComboSwordGiFit.h"
+#ifdef HOST_MM
+#define COMBO_DIN_SWORD_GI_HOST_MM
+#endif
+#include "ComboDinSwordGi.h"
+#ifdef HOST_MM
+#undef COMBO_DIN_SWORD_GI_HOST_MM
+#endif
 extern "C" {
 #ifdef HOST_MM
 #define Gfx_SetupDL_25Xlu Gfx_SetupDL25_Xlu
 #define Matrix_NewMtx(ctx, file, line) Matrix_Finalize(ctx)
 #define Gfx_SetupDL_25Opa Gfx_SetupDL25_Opa
 #define NEI_GI_ROTATE_Y Matrix_RotateYF
+#define Matrix_RotateZ Matrix_RotateZF
 #endif
 #include "soh/Enhancements/randomizer/NeiGiMeshRenderer.inc"
 #ifdef HOST_MM
@@ -141,6 +159,7 @@ extern "C" {
 #undef Matrix_NewMtx
 #undef Gfx_SetupDL_25Opa
 #undef NEI_GI_ROTATE_Y
+#undef Matrix_RotateZ
 #endif
 }
 

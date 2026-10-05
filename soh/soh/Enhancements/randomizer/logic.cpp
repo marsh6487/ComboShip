@@ -312,7 +312,7 @@ bool Logic::HasItem(RandomizerGet itemName) {
         case RG_DESIRE_SENSOR:
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && Slate_RuneOwned(SLATE_RUNE_SENSOR);
         case RG_HYLIAS_GRACE:
-            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_HYLIAS_GRACE, true);
+            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE);
         case RG_ZONAI_PERMAFROST:
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_ZONAI_PERMAFROST, true);
         case RG_DEKU_LEAF:

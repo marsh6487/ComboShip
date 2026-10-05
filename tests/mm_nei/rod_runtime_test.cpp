@@ -23,6 +23,9 @@ std::vector<std::pair<const void *, int>> children;
 RodProjSet sets[3][5]{};
 bool local[3]{};
 int nativeDraws = 0;
+#ifdef MM_REAL_RENDERER
+std::vector<const Gfx*> nativeDisplayLists;
+#endif
 bool resources = true;
 } // namespace
 extern "C" {
@@ -112,7 +115,12 @@ void Gfx_SetupDL25_Xlu(GraphicsContext *) {}
 void Graph_OpenDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
 void Graph_CloseDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
 #endif
-void gSPDisplayList(Gfx *, Gfx *) { ++nativeDraws; }
+void gSPDisplayList(Gfx *, Gfx *list) {
+  ++nativeDraws;
+#ifdef MM_REAL_RENDERER
+  nativeDisplayLists.push_back(list);
+#endif
+}
 void gSPSegment(void *, int, uintptr_t) {}
 Gfx *Gfx_TwoTexScroll(GraphicsContext *, s32, u32, u32, s32, s32, s32, u32, u32,
                       s32, s32) {

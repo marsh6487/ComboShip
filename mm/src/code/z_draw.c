@@ -384,12 +384,14 @@ static DrawItemTableEntry sDrawItemTable[] = {
 
 extern int ResourceMgr_IsModAsset(const char* path);
 extern int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
+extern int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path);
 static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
     return ComboFairyBottle_SelectShell(
         (const char*)sDrawItemTable[drawId].drawResources[0], (const char*)sDrawItemTable[drawId].drawResources[1],
         gGiEmptyBottleCorkDL, gGiEmptyBottleGlassDL, ResourceMgr_IsModAsset,
         "__OTR__@oot:objects/object_gi_fire/gGiBlueFireChamberstickDL",
-        ResourceMgr_IsModAssetForGame("oot", "objects/object_gi_fire/gGiBlueFireChamberstickDL"));
+        (ResourceMgr_IsModAssetForGame("oot", "objects/object_gi_fire/gGiBlueFireChamberstickDL") ||
+         ResourceMgr_IsCustomAssetForGame("oot", "objects/object_gi_fire/gGiBlueFireChamberstickDL")));
 }
 
 #define COMBO_FAIRY_HOST_MM
@@ -1383,12 +1385,24 @@ void GetItem_DrawFairyContainer(PlayState* play, s16 drawId) {
     if (ComboFairyBottle_IsBlueFireShell(shell.opaque)) {
         Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
     } else {
-        Matrix_Mult(&mtx, MTXMODE_APPLY);
+        // The native billboard matrix sizes a sprite, not an actor skeleton.
+        // Keep its anchor for the VFX; apply its full scale only to fallback contents.
+        Matrix_Translate(mtx.xw, mtx.yw, mtx.zw, MTXMODE_APPLY);
     }
     Matrix_ReplaceRotation(&play->billboardMtxF);
     Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
 
     if (!ComboFairyBottle_DrawVfx(play)) {
+        Matrix_Pop();
+        Matrix_Push();
+        Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
+        if (ComboFairyBottle_IsBlueFireShell(shell.opaque)) {
+            Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
+        } else {
+            Matrix_Mult(&mtx, MTXMODE_APPLY);
+        }
+        Matrix_ReplaceRotation(&play->billboardMtxF);
+        Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
         gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[2]);
     }

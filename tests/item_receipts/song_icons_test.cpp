@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include "combo/menu/ComboItemReceiptPresentation.h"
 #define RANDO_ENUM_BEGIN(x) enum x {
 #define RANDO_ENUM_ITEM(x) x,
 #define RANDO_ENUM_END(x) };
@@ -26,7 +27,7 @@ constexpr int ITEM_MEDALLION_FOREST = 0x66, ITEM_ROCS_FEATHER_SKIJER = 0xa0,
 constexpr int G_IM_FMT_RGBA = 0, G_IM_FMT_IA = 3, G_IM_SIZ_8b = 1, G_IM_SIZ_32b = 3;
 struct MessageContext {
     char textboxSegment[512]{};
-    int msgBufPos = 0, choiceNum = 0, textColorAlpha = 255, textPosX = 0, msgMode = 0;
+    int msgBufPos = 0, choiceNum = 0, textColorAlpha = 255, textPosX = 0, textPosY = 0, msgMode = 0;
 };
 struct PlayState { MessageContext msgCtx; } play;
 PlayState* gPlayState = &play;
@@ -61,6 +62,13 @@ constexpr int VB_DRAW_ITEM_ICON = 0;
 void DrawCustomItemIcon(Gfx**);
 bool GameInteractor_Should(int, bool, Gfx** gfx) { DrawCustomItemIcon(gfx); return false; }
 /* CUSTOM_ICON_FUNCTIONS */
+#include "combo/menu/ComboItemReceiptRender.h"
+// This song-only fixture leaves the separate dungeon-receipt layout inactive.
+CwItemReceiptPresentation sItemReceiptPresentation{};
+CwItemReceiptLayout sItemReceiptLayout{};
+int R_TEXT_CHAR_SCALE = 75;
+int Message_HasItemReceiptIcon() { return false; }
+void Message_DrawItemReceiptIcon(PlayState*, Gfx**) {}
 /* ENGINE_ICON_DRAW */
 // These are the selected native MM branches after the tested message-byte
 // lookup. Their original palette, texture format and rectangle are executed.

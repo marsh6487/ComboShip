@@ -1,5 +1,7 @@
 // Production OoT export; only runtime item/message ownership is replaced.
 #include "combo/menu/ComboItemReceiptText.h"
+#include "combo/menu/ComboItemReceiptPresentation.h"
+#include "soh/soh/Enhancements/custom-message/text.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -8,6 +10,9 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <unordered_map>
+using namespace std::literals::string_literals;
+#define SPDLOG_DEBUG(...) ((void)0)
 #define COMBO_BUILD
 #include "soh/soh/FleetShipCombo/FleetComboIds.h"
 #define RANDO_ENUM_BEGIN(x) enum x {
@@ -45,8 +50,12 @@ struct ReceiptOption {
 struct ReceiptPlacement {
   RandomizerGet item = RG_NONE;
   std::string name;
+  mutable Text placedName{};
   RandomizerGet GetPlacedRandomizerGet() const { return item; }
-  const std::string &GetPlacedItemName() const { return name; }
+  const Text &GetPlacedItemName() const {
+    placedName = Text(name);
+    return placedName;
+  }
 };
 struct ReceiptContext {
   int mqMode = 2, mqCount = 6, bossShuffle = 1, dungeonShuffle = 0,
@@ -277,14 +286,19 @@ constexpr int MF_RAW = 0;
 static std::string loadedMessage;
 struct CustomMessage {
   std::string english;
+  CwItemReceiptPresentation receiptPresentation{};
+  void operator+=(const std::string& value) { english += value; }
   CustomMessage() = default;
   CustomMessage(std::string en, int = 0) : english(std::move(en)) {}
+  CustomMessage(const Text& text, int = 0) : english(text.GetEnglish()) {}
   CustomMessage(std::string en, std::string, std::string, int = 0)
       : english(std::move(en)) {}
   void Replace(const char *key, const CustomMessage &value) {
-    size_t pos;
-    while ((pos = english.find(key)) != std::string::npos)
+    size_t pos = 0;
+    while ((pos = english.find(key, pos)) != std::string::npos) {
       english.replace(pos, std::strlen(key), value.english);
+      pos += value.english.size();
+    }
   }
   void Replace(const char *key, const std::string &value) {
     Replace(key, CustomMessage(value));
@@ -298,27 +312,31 @@ struct CustomMessage {
   static std::string ITEM_OBTAINED(uint8_t icon) {
     return std::string("\x13") + static_cast<char>(icon);
   }
-  void AutoFormat(int = 0) {
-    const std::string mm = ComboItemReceiptText::FromNeiMarkup(english);
-    english.clear();
-    constexpr uint8_t colors[] = {0x40, 0x41, 0x42, 0x43,
-                                  0x46, 0x44, 0x45, 0x47};
-    for (uint8_t c : mm) {
-      if (c < 8) {
-        english += '\x05';
-        english += static_cast<char>(colors[c]);
-      } else if (c == 0x10)
-        english += '\x04';
-      else if (c == 0x11)
-        english += '\x01';
-      else
-        english += static_cast<char>(c);
-    }
-    english += '\x02';
+  static std::string NEWLINE() { return "\x01"; }
+  static std::string WAIT_FOR_INPUT() { return "\x04"; }
+  static std::string PLAYER_NAME() { return "\x0F"; }
+  static std::string MESSAGE_END() { return "\x02"; }
+  static std::string COLOR(std::string c) { return "\x05" + c; }
+  std::vector<std::string> colors;
+  void FormatString(std::string& str) const;
+  void AutoFormatString(std::string& str) const;
+  void ReplaceSpecialCharacters(std::string& str) const;
+  void ReplaceColors(std::string& str) const;
+  void ReplaceAltarIcons(std::string& str) const;
+  void EncodeColors(std::string& str) const;
+  size_t FindNEWLINE(std::string& str, size_t start) const;
+  bool AddBreakString(std::string& str, size_t pos, std::string br) const;
+  void Format() { FormatString(english); }
+  void AutoFormat() { AutoFormatString(english); }
+  void AutoFormat(int icon) {
+    english.insert(0, ITEM_OBTAINED(icon));
+    AutoFormat();
+    Replace(WAIT_FOR_INPUT(), WAIT_FOR_INPUT() + ITEM_OBTAINED(icon));
   }
   std::string GetEnglish(int) const { return english; }
   void LoadIntoFont() const { loadedMessage = english; }
 };
+/* ACTUAL_FORMATTER */
 constexpr int RHT_DUNGEON_ORDINARY = 0, RHT_DUNGEON_MASTERFUL = 1;
 namespace Rando::StaticData {
 struct ReceiptHint {
@@ -366,7 +384,12 @@ struct PlayState {
 PlayState *gPlayState = &play;
 #define GET_PLAYER(play) (&receiptPlayer)
 namespace ComboRando {
-constexpr int GAME_MM = 1;
+constexpr int GAME_MM = 1, GAME_OOT = 0;
+std::string StripGameSuffix(const std::string& name) {
+  if (name.ends_with(" (MM)")) return name.substr(0, name.size() - 5);
+  if (name.ends_with(" (OOT)")) return name.substr(0, name.size() - 6);
+  return name;
+}
 struct ForeignItem {
   int itemGame = GAME_MM;
   bool trap = false;
@@ -397,11 +420,29 @@ int32_t FixtureMmReward(int32_t dungeon, char *buffer, uint32_t capacity) {
   std::memcpy(buffer, reward.c_str(), reward.size() + 1);
   return reward.size();
 }
+extern "C" int32_t OOT_GetSeedItemIconInfo(const char* name, CwItemIconInfo* out) {
+  *out = {};
+  out->path = std::strcmp(name, "Fire Medallion") == 0
+      ? "__OTR__textures/icon_item_24_static/gQuestIconMedallionFireTex"
+      : "__OTR__textures/icon_item_custom/gItemIconDekuLeafTex";
+  out->width = out->height = std::strcmp(name, "Fire Medallion") == 0 ? 24 : 32;
+  return 1;
+}
+static int32_t FixtureSeedIcon(const char* name, CwItemIconInfo* out) {
+  assert(std::string(name) == "Progressive Goron Lullaby");
+  *out = {};
+  out->path = "__OTR__icon_item_static_yar/gItemIconSongNoteTex";
+  out->width = 16; out->height = 24; out->isIA8 = 1;
+  return 1;
+}
 void *Combo_ResolveSym(const char *module, const char *symbol) {
-  assert(std::string(module) == "2ship" &&
-         std::string(symbol) == "MM_GetDungeonRewardName");
-  return mmRewardAvailable ? reinterpret_cast<void *>(FixtureMmReward)
-                           : nullptr;
+  assert(std::string(module) == "2ship");
+  if (std::string(symbol) == "MM_GetDungeonRewardName")
+    return mmRewardAvailable ? reinterpret_cast<void *>(FixtureMmReward) : nullptr;
+  if (std::string(symbol) == "MM_GetSeedItemIconInfo")
+    return reinterpret_cast<void *>(FixtureSeedIcon);
+  assert(std::string(symbol) == "MM_GetDungeonRewardIconInfo");
+  return nullptr;
 }
 void Randomizer_LatchComboForeign(RandomizerCheck) { ++foreignLatches; }
 const char *Randomizer_ComboForeignLatchedName(int32_t) {
@@ -418,10 +459,103 @@ void BuildIceTrapMessageNamed(CustomMessage &msg, const std::string &) {
   msg.english = "Trap receipt";
 }
 } // namespace Rando::Traps
+#ifndef COMBO_EXPORT
 #define COMBO_EXPORT
+#endif
 /* CONTEXT_BUILDERS */
 /* FOREIGN_BUILDER */
 /* DONOR_EXPORT */
+
+// Test-only entry point for the receiver integration. OoT is dormant while MM
+// owns the active save; its generated seed still supplies this saved option.
+extern "C" COMBO_EXPORT void FixtureConfigureForestCompassReceipt(int information) {
+  for (const auto &fixture : traditionalReceipts)
+    Rando::StaticData::itemNameToEnum[fixture.name] = fixture.item;
+  receiptContext.information = information;
+  receiptContext.generated = true;
+  receiptContext.spoiler = false;
+  receiptContext.bossShuffle = RO_BOSS_ROOM_ENTRANCE_SHUFFLE_OFF;
+  receiptContext.mqMode = 2;
+  receiptContext.mqCount = 6;
+  receiptContext.dungeon.mq = true;
+  receiptContext.placements[RC_PHANTOM_GANON] = {RG_DEKU_LEAF, "Deku Leaf"};
+  randoActive = false;
+  gPlayState = nullptr;
+}
+
+static void CheckForestCompassReceiptInformation() {
+  const auto contextBefore = receiptContext;
+  auto *playBefore = gPlayState;
+  const bool activeBefore = randoActive;
+  const auto saveBefore = gSaveContext;
+  const int resolutionsBefore = liveResolutionCalls;
+  const int latchesBefore = foreignLatches;
+  for (int information : {0, 1}) {
+    FixtureConfigureForestCompassReceipt(information);
+    char buffer[1269];
+    const int32_t size = OOT_GetItemReceiptText("Forest Temple Compass", buffer, sizeof(buffer));
+    assert(size > 0);
+    const std::string text(buffer, size);
+    CwItemReceiptPresentation presentation{};
+    assert(OOT_GetDungeonItemReceiptPresentation("Forest Temple Compass", &presentation) == information);
+    if (information) {
+      assert(ComboReceipt_HasIcon(&presentation));
+      assert(std::string(presentation.iconPath) == "__OTR__@oot:textures/icon_item_custom/gItemIconDekuLeafTex");
+      assert(presentation.rewardLine == 2 && presentation.iconWidth == 32 && presentation.iconHeight == 32);
+    }
+    assert(text.find("Forest Temple Compass") != std::string::npos);
+    if (information) {
+      assert(text.find("You got the Compass!") == std::string::npos && "On must replace the native tutorial");
+      assert(text.find("Now you can see hidden things.") == std::string::npos);
+      assert(text.find("masterful") == std::string::npos && "Compass information has exactly the title, boss, and reward lines");
+      assert(text.find("It points to") != std::string::npos);
+      assert(text.find("Phantom Ganon") != std::string::npos);
+      assert(text.find("Defeating the boss grants") != std::string::npos);
+      assert(text.find("Deku Leaf") != std::string::npos);
+      assert(text.find('\x10') == std::string::npos && "Compass information is one textbox");
+      assert(std::count(text.begin(), text.end(), '\x11') == 2);
+    } else {
+      assert(text.find("You got the Compass!") != std::string::npos);
+      assert(text.find("Now you can see hidden things.") != std::string::npos);
+      assert(text.find("masterful") != std::string::npos);
+      assert(text.find("Phantom Ganon") == std::string::npos);
+      assert(text.find("Defeating the boss grants") == std::string::npos);
+    }
+  }
+  assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+  assert(liveResolutionCalls == resolutionsBefore && foreignLatches == latchesBefore);
+  receiptContext = contextBefore;
+  gPlayState = playBefore;
+  randoActive = activeBefore;
+  std::cout << "Forest Temple Compass: saved Off reproduces tutorial/title; saved On replaces the tutorial with three boss/reward lines, dormant seed preserved passed\n";
+}
+
+static void CheckApprovedCompassExample() {
+  const auto contextBefore = receiptContext;
+  const auto overridesBefore = std::to_array(entranceOverrides);
+  receiptContext.information = 1;
+  receiptContext.bossShuffle = 1;
+  receiptContext.placements[RC_QUEEN_GOHMA] = {RG_KOKIRI_EMERALD, "Kokiri Emerald"};
+  receiptContext.placements[RC_VOLVAGIA] = {RG_FIRE_MEDALLION, "Fire Medallion"};
+  entranceOverrides[0] = {ENTR_DEKU_TREE_BOSS_ENTRANCE, 1, ENTR_FIRE_TEMPLE_BOSS_ENTRANCE, 1};
+  char buffer[1269];
+  const int size = OOT_GetItemReceiptText("Great Deku Tree Compass", buffer, sizeof(buffer));
+  assert(size > 0);
+  std::string plain;
+  for (int i = 0; i < size; ++i) {
+    const uint8_t c = buffer[i];
+    if (c == 0x11) plain += '\n';
+    else if (c >= 0x20) plain += c;
+  }
+  assert(plain == "You found the Deku Tree Compass!\nIt points to Volvagia!\nDefeating the boss grants the Fire Medallion!");
+  CwItemReceiptPresentation presentation{};
+  assert(OOT_GetDungeonItemReceiptPresentation("Great Deku Tree Compass", &presentation) == 1);
+  assert(std::string(presentation.iconPath) == "__OTR__@oot:textures/icon_item_24_static/gQuestIconMedallionFireTex");
+  assert(presentation.iconWidth == 24 && presentation.iconHeight == 24);
+  assert(liveResolutionCalls == 0);
+  receiptContext = contextBefore;
+  std::copy(overridesBefore.begin(), overridesBefore.end(), entranceOverrides);
+}
 
 int main() {
   // Item names and unresolved native text IDs come from the real OoT catalog.
@@ -439,6 +573,8 @@ int main() {
   }
   nativeMessages.push_back({0xFFFF, 0, nullptr, 0});
   sNesMessageEntryTablePtr = nativeMessages.data();
+  CheckForestCompassReceiptInformation();
+  CheckApprovedCompassExample();
   entranceOverrides[0] = {ENTR_DEKU_TREE_BOSS_ENTRANCE, 1,
                           ENTR_FOREST_TEMPLE_BOSS_ENTRANCE, 1};
   char buffer[1269];
@@ -497,8 +633,8 @@ int main() {
   assert(liveResolutionCalls == 0);
   for (int enabled : {0, 1}) {
     receiptContext.information = enabled;
-    assert(read("Great Deku Tree Compass").find("see hidden things") != std::string::npos);
-    assert(read("Great Deku Tree Map").find("Blue rooms") != std::string::npos);
+    assert((read("Great Deku Tree Compass").find("see hidden things") != std::string::npos) == !enabled);
+    assert((read("Great Deku Tree Map").find("Blue rooms") != std::string::npos) == !enabled);
   }
   const std::array<std::pair<const char *, const char *>, 4> mmMaps{
       {{"Woodfall Map", "Woodfall"},
@@ -517,7 +653,7 @@ int main() {
   }
   const auto shuffledCompass = read("Great Deku Tree Compass");
   assert(shuffledCompass.find("Phantom Ganon") != std::string::npos);
-  assert(shuffledCompass.find("ordinary") != std::string::npos);
+  assert(shuffledCompass.find("ordinary") == std::string::npos);
   receiptContext.placements[RC_QUEEN_GOHMA] = {RG_KOKIRI_EMERALD,
                                                "Kokiri Emerald"};
   receiptContext.placements[RC_PHANTOM_GANON] = {RG_DEKU_LEAF, "Deku Leaf"};
@@ -538,12 +674,17 @@ int main() {
   entranceOverrides[2] = {ENTR_DEKU_TREE_ENTRANCE, 1,
                           ENTR_WATER_TEMPLE_ENTRANCE, 1};
   EntranceTracker::data[ENTR_DODONGOS_CAVERN_ENTRANCE] = {
-      "Death Mountain Trail"};
+      "Dodongo's Cavern"};
   EntranceTracker::data[ENTR_DEKU_TREE_ENTRANCE] = {"Kokiri Forest"};
-  assert(read("Great Deku Tree Map").find("Death Mountain Trail") !=
+  assert(read("Great Deku Tree Map").find("Dodongo's Cavern") !=
          std::string::npos);
   assert(read("Great Deku Tree Map").find("Kokiri Forest") ==
          std::string::npos);
+  entranceOverrides[2].override = ENTR_FOREST_TEMPLE_ENTRANCE;
+  const auto forestMap = read("Forest Temple Map");
+  assert(forestMap.find("Deku Tree") != std::string::npos && forestMap.find("Kokiri Forest") == std::string::npos);
+  assert(forestMap.find('\x10') == std::string::npos && forestMap.find("vanilla") != std::string::npos);
+  entranceOverrides[2].override = ENTR_WATER_TEMPLE_ENTRANCE;
   // Ownership alone makes the pause view available, as for Start With. The
   // acquisition latch and item grant history have never been set in this save.
   assert(Randomizer_GetDungeonItemInfoTextId(ITEM_COMPASS) == 0);
@@ -561,7 +702,7 @@ int main() {
     assert(!fromTable && loadedMessage.find("You found") == std::string::npos);
     assert(loadedMessage.find(item == ITEM_COMPASS
                                   ? "Progressive Goron Lullaby (MM)"
-                                  : "Death Mountain Trail") !=
+                                  : "Dodongo's Cavern") !=
            std::string::npos);
   }
   assert(std::memcmp(&saveBeforeInfo, &gSaveContext, sizeof(gSaveContext)) ==
@@ -576,13 +717,13 @@ int main() {
   receiptContext.dungeon.mq = true;
   masterQuest = true; // runtime helper deliberately ignores this while dormant
   assert(OOT_MapCompassInfoEnabled() == 1);
-  assert(read("Great Deku Tree Map").find("masterful") != std::string::npos);
-  assert(read("Great Deku Tree Compass").find("masterful") !=
+  assert(read("Great Deku Tree Map").find("Master Quest") != std::string::npos);
+  assert(read("Great Deku Tree Compass").find("masterful") ==
          std::string::npos);
   assert(
       read("Great Deku Tree Compass").find("Progressive Goron Lullaby (MM)") !=
       std::string::npos);
-  assert(read("Great Deku Tree Map").find("Death Mountain Trail") !=
+  assert(read("Great Deku Tree Map").find("Dodongo's Cavern") !=
          std::string::npos);
   receiptContext.generated = false;
   assert(OOT_MapCompassInfoEnabled() == 0);
@@ -600,7 +741,7 @@ int main() {
   assert(read("Great Deku Tree Compass").find("Phantom Ganon") ==
          std::string::npos);
   assert(read("Great Deku Tree Compass").find("Lullaby") == std::string::npos);
-  assert(read("Great Deku Tree Map").find("Death Mountain Trail") ==
+  assert(read("Great Deku Tree Map").find("Dodongo's Cavern") ==
          std::string::npos);
   assert(read("Great Deku Tree Map").find("ordinary") != std::string::npos);
   receiptContext.information = 1;
@@ -612,7 +753,7 @@ int main() {
   loadedMessage.clear();
   BuildMapMessage(&nativeText, &nativeTable);
   assert(!nativeTable &&
-         loadedMessage.find("Death Mountain Trail") != std::string::npos);
+         loadedMessage.find("Dodongo's Cavern") != std::string::npos);
   receiptPlayer.getItemEntry.itemId = ITEM_COMPASS;
   nativeTable = true;
   BuildMapMessage(&nativeText, &nativeTable);
@@ -620,9 +761,9 @@ int main() {
                              std::string::npos);
   receiptPlayer.getItemEntry.modIndex = MOD_RANDOMIZER;
   masterQuest = true;
-  assert(read("Great Deku Tree Compass").find("masterful") !=
+  assert(read("Great Deku Tree Compass").find("masterful") ==
          std::string::npos);
-  assert(read("Great Deku Tree Map").find("masterful") != std::string::npos);
+  assert(read("Great Deku Tree Map").find("Master Quest") != std::string::npos);
   assert(read("Snowhead Compass").find("Goht") != std::string::npos);
   mmRewardAvailable = true;
   assert(read("Snowhead Compass").find("Progressive Hookshot (OOT)") !=
@@ -701,4 +842,5 @@ int main() {
   assert(OOT_GetItemReceiptText("Magic Meter", buffer, sizeof(buffer)) == 0);
   std::cout << "actual OoT export: full text, fixed tiers, binary lengths, "
                "guards and exceptions passed\n";
+  return 0;
 }

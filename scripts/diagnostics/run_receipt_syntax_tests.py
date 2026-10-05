@@ -14,6 +14,9 @@ def main():
         'soh/src/code/z_message_PAL.c', 'mm/2s2h/Rando/ItemReceiptText.cpp',
         'mm/2s2h/Rando/StaticData/Items.cpp',
         'soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp', 'mm/2s2h/Rando/DrawItem.cpp',
+        'mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_item.c',
+        'mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope_NES.c',
+        'soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_item.c',
     )
     prefixes = ('COSMETIC', 'ENHANCEMENT', 'SETTING', 'REMOTE', 'RANDOMIZER_SETTING',
                 'RANDOMIZER_ENHANCEMENT', 'CHEAT', 'DEVELOPER_TOOLS', 'AUDIO', 'WINDOW',

@@ -17,13 +17,23 @@ source=r'''
 #include <cstdint>
 #include "combo/menu/ComboItemDrawABI.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
+#include "soh/soh/Enhancements/randomizer/NeiGiFrameFit.h"
 using f32=float;using s16=int16_t;using Gfx=int;
 constexpr int MTXMODE_APPLY=1;
 struct PlayState{struct{void* gfxCtx;}state;uint32_t gameplayFrames=42;} play;
 using Matrix=std::array<std::array<float,3>,3>;
 Matrix m;
-void Reset(){m={{{1,0,0},{0,1,0},{0,0,1}}};}
+float lift;
+void Reset(){lift=0;m={{{1,0,0},{0,1,0},{0,0,1}}};}
 void Multiply(const Matrix& r){auto old=m;for(int i=0;i<3;++i)for(int j=0;j<3;++j){m[i][j]=0;for(int k=0;k<3;++k)m[i][j]+=old[i][k]*r[k][j];}}
+void Matrix_Translate(float,float y,float,int){lift+=y;}
+void ComboSwordGi_ApplyFit(const char*,const char*,float scale,float tilt,bool shop=false){
+    const float c=std::cos(tilt),s=std::sin(tilt);
+    NeiGi::FrameBounds bounds{"selected",{0,-670*s-268*c,0},{0,4122*s-268*c,0},2400,NeiGi::Kind::MasterSword,{}};
+    auto fit=NeiGi::FrameFit(bounds,scale,shop);Matrix_Translate(0,fit.lift,0,1);
+    // Apply the fit without depending on Matrix_Scale's later declaration.
+    Multiply({{{fit.scale,0,0},{0,fit.scale,0},{0,0,fit.scale}}});
+}
 void Matrix_RotateX(float a,int){Multiply({{{1,0,0},{0,std::cos(a),-std::sin(a)},{0,std::sin(a),std::cos(a)}}});}
 void Matrix_RotateY(float a,int){Multiply({{{std::cos(a),0,std::sin(a)},{0,1,0},{-std::sin(a),0,std::cos(a)}}});}
 void Matrix_RotateZ(float a,int){Multiply({{{std::cos(a),-std::sin(a),0},{std::sin(a),std::cos(a),0},{0,0,1}}});}
@@ -42,6 +52,7 @@ int32_t OOT_NeiAltAssetsEnabled(){return true;}
 int32_t OOT_NeiResourceExists(const char*){return true;}
 #define CVAR_ENHANCEMENT(x) x
 int CVarGetInteger(const char*,int){return 0;}
+void ComboDinSwordGi_DrawLayers(PlayState*,const char*,const char*) {}
 ''' + draw['DrawMmWeaponGi']+'\n'
 source+='\n'.join(owner[name] for name in ('CwSimple','CwCustomGi','CwAltSwordGi'))+'\n'
 if 'NeiGi_DrawSelectedSword' in native:
@@ -66,10 +77,47 @@ int main(){
         }
 '''
 if 'NeiGi_DrawSelectedSword' in native:
-    source+='Reset();NeiGi_DrawSelectedSword(&play,"selected");Check();\n'
+    source+='Reset();NeiGi_DrawSelectedSword(&play,"selected");Check();\nconst float high=m[1][0]*4122+m[1][1]*-268+m[1][2]*101+lift;\nassert(high<=48.001f && "actual selected Din equipment mesh exceeds the GI frame envelope");\n'
 source+='}\n}\n'
 with tempfile.TemporaryDirectory(prefix='sword-pose-') as temporary:
     path=Path(temporary); (path/'pose.cpp').write_text(source)
     subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),str(path/'pose.cpp'),'-o',str(path/'pose')],check=True)
     subprocess.run([str(path/'pose')],check=True)
 print('PASS actual native Four Sword and selected Kokiri/Master/longsword producer +X→+Y transforms across spins')
+
+# The inline GI helpers must use each actual host's matrix/GBI API, not only
+# the controlled geometry seam above.
+with tempfile.TemporaryDirectory(prefix='sword-gi-headers-') as temporary:
+    for game in ('soh','mm'):
+        unit='#include "global.h"\n'
+        if game=='soh':
+            unit+='#include "soh/ResourceManagerHelpers.h"\n'
+            includes=['soh','soh/include','soh/src','soh/assets','soh/mods']
+        else:
+            unit+='#include "2s2h/BenPort.h"\n#define COMBO_DIN_SWORD_GI_HOST_MM\n'
+            includes=['mm','mm/include','mm/include/PR','mm/src','mm/assets','mm/2s2h']
+        unit+='#include "ComboSwordGiFit.h"\n#include "ComboDinSwordGi.h"\n#include "NeiAssetPriorityResource.h"\n'
+        includes+=['libultraship/include','libultraship/src','combo','combo/menu']
+        path=Path(temporary)/(game+'.cpp');path.write_text(unit)
+        command=[os.environ.get('CXX','c++'),'-std=c++20','-DF3DEX_GBI_2','-DCOMBO_BUILD',
+                 '-DLOG_LEVEL_GAME_PRINTS=0','-DCONTROLLERBUTTONS_T=uint32_t','-DNON_EQUIVALENT',
+                 '-DNON_MATCHING','-fsyntax-only',*['-I'+str(ROOT/p) for p in includes],str(path)]
+        result=subprocess.run(command,capture_output=True,text=True)
+        if result.returncode:raise RuntimeError(result.stdout+result.stderr)
+        print('PASS real-header sword fit/Din-layer/resource helpers '+game)
+
+# Keep the actual native-MM foreign renderer include order in the gate. A small
+# helper unit alone cannot prove this boundary, and OoT compatibility aliases
+# hide a missing native MM matrix API.
+includes=['mm/include','mm/include/PR','mm/src','mm','mm/assets','mm/2s2h',
+          'libultraship/include','libultraship/src','combo','combo/menu']
+command=[os.environ.get('CXX','c++'),'-std=gnu++20','-DF3DEX_GBI_2','-DCOMBO_BUILD',
+         '-DCONTROLLERBUTTONS_T=uint32_t','-DLOG_LEVEL_GAME_PRINTS=0','-DNON_EQUIVALENT',
+         '-DNON_MATCHING','-DMM_BUILD_DLL','-DIMGUI_DEFINE_MATH_OPERATORS',
+         *['-I'+str(ROOT/p) for p in includes],
+         '-include','libultraship/bridge/consolevariablebridge.h',
+         '-include','ship/Context.h','-include','ship/window/Window.h','-fsyntax-only']
+for name in ('DrawItem.cpp','NeiGiPresentation.cpp'):
+    result=subprocess.run([*command,str(ROOT/'mm/2s2h/Rando'/name)],capture_output=True,text=True)
+    if result.returncode:raise RuntimeError(result.stdout+result.stderr)
+    print('PASS actual native MM '+name+' sword helper include order')

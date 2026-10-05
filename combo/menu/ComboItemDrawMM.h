@@ -211,18 +211,12 @@ static int32_t MM_FillDungeonTintInfo(RandoItemId id, s16 drawId, CwItemDrawInfo
 // DrawSong: 25Xlu + per-song gDPSetEnvColor + gGiSongNoteDL). Fully portable as a static
 // description. Returns 1 and fills env color if the item is a song. Color table mirrors DrawSong.
 static int32_t MM_FillSongDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
-    if (id == RI_SONG_STORMS) {
-        out->drawKind = CW_DRAW_KIND_SEASON_GI;
-        out->neiEffect = 6;
-        out->xluStartIndex = -1;
-        return 1;
-    }
     uint8_t rgb[4];
     if (!ComboSongShimmerColor(ComboSongForMmItem(id), rgb))
         return 0;
     out->drawKind = CW_DRAW_KIND_SONG_GI;
     out->neiEffect = ComboSongForMmItem(id);
-    out->itemShimmer = 1;
+    out->itemShimmer = ComboSongHasOverlay(out->neiEffect);
     std::memcpy(out->itemShimmerColor, rgb, 4);
     out->dlists[0] = gGiSongNoteDL;
     out->dlistCount = 1;

@@ -21,6 +21,7 @@ constexpr const char *kOriginalCane =
 constexpr const char *kOriginalSeasonsRod =
     "__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL";
 u8 seasonsDrawn = 0;
+bool seasonsRodMod = false;
 std::vector<std::string> resourceQueries, resourceLoads, caneEffects;
 u8 selectedCane = CANE_TYPE_SOMARIA;
 u8 aimingCane = 0, selectedCaneSkill = CANE_SKILL_SOMARIA_BLOCK;
@@ -112,6 +113,9 @@ bool NeiHeld_DrawRod(PlayState *play, int element) {
 u8 ResourceMgr_FileExists(const char *path) {
   resourceQueries.emplace_back(path);
   return available.contains(path);
+}
+int ResourceMgr_IsModAsset(const char *path) {
+  return seasonsRodMod && std::strcmp(path, kOriginalSeasonsRod) == 0;
 }
 Gfx *ResourceMgr_LoadGfxByName(const char *path) {
   assert(available.contains(path));
@@ -237,6 +241,19 @@ void testSeasonsRodWrapper(Player &player, PlayState &play,
       }
     }
   }
+  resetWrappers(graphics, opa, xlu);
+  available.insert(kOriginalSeasonsRod);
+  available.insert(NEI_HELD_PATH("rod_of_seasons"));
+  // A selected user archive at the original path wins over the built-in
+  // redesign, including when both resources are available in the same frame.
+  seasonsRodMod = true;
+  seasonsDrawn = 1;
+  const Player modBefore = player;
+  const CustomItemState modState = gCustomItemState;
+  CustomItems_DrawRodOfSeasons(&player, &play);
+  assert(drawn.empty() && nativeDraws == 1);
+  unchanged(player, modBefore, modState);
+  seasonsRodMod = false;
   resetWrappers(graphics, opa, xlu);
   available.insert(kOriginalSeasonsRod);
   available.insert(NEI_HELD_PATH("rod_of_seasons"));

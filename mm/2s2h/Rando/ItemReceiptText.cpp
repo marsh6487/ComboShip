@@ -4,6 +4,7 @@
 #include "2s2h/FleetShipCombo/FleetComboItems.h"
 #include "ComboItemReceiptText.h"
 #include "ComboSongReceiptText.h"
+#include "ComboSongDrawMM.h"
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -49,12 +50,21 @@ std::string ForeignRewardName(const ComboRando::ForeignItem& item) {
                                                                                                  : " (MM)");
 }
 
-std::string LoadedSeedDungeonRewardName(int32_t dungeon) {
+struct RewardIdentity {
+    std::string name;
+    int game = ComboRando::GAME_MM;
+    bool imported = false;
+    bool shared = false;
+};
+
+RewardIdentity LoadedSeedDungeonReward(int32_t dungeon) {
     static uint64_t generation = static_cast<uint64_t>(-1);
-    static std::array<std::string, 4> names;
+    static int slot = -1;
+    static std::array<RewardIdentity, 4> names;
     const uint64_t current = Rando::MiscBehavior::ComboRandoGen();
-    if (generation != current) {
+    if (generation != current || slot != gSaveContext.fileNum) {
         generation = current;
+        slot = gSaveContext.fileNum;
         names = {};
         try {
             const auto seed = nlohmann::json::parse(ComboRando::g_comboForeignJson);
@@ -67,12 +77,14 @@ std::string LoadedSeedDungeonRewardName(int32_t dungeon) {
                 if (placement == placements.end() || !placement->is_string())
                     continue;
                 const auto imported = foreign.find(checkName);
-                names[i] =
-                    imported != foreign.end()
-                        ? (imported->second.itemName.empty() ? std::string{} : ForeignRewardName(imported->second))
-                        : placement->get<std::string>();
-                if (names[i] == ComboRando::kForeignSentinelNameMM)
-                    names[i].clear();
+                if (imported != foreign.end()) {
+                    names[i] = { ComboRando::StripGameSuffix(imported->second.itemName), imported->second.itemGame,
+                                 true, imported->second.shared };
+                } else {
+                    names[i].name = placement->get<std::string>();
+                }
+                if (names[i].name == ComboRando::kForeignSentinelNameMM)
+                    names[i] = {};
             }
         } catch (...) { names = {}; }
     }
@@ -86,8 +98,13 @@ std::string DungeonRewardName(int32_t dungeon) {
 #ifdef COMBO_BUILD
     // The launcher pushes the selected seed before MM gameplay/save hydration.
     // Prefer it over dormant save data, which may still belong to a prior slot.
-    if (!ComboRando::g_comboForeignJson.empty())
-        return LoadedSeedDungeonRewardName(dungeon);
+    if (!ComboRando::g_comboForeignJson.empty()) {
+        const auto reward = LoadedSeedDungeonReward(dungeon);
+        return reward.name.empty() ? std::string{}
+                                   : reward.name + (reward.imported && !reward.shared
+                                                        ? (reward.game == ComboRando::GAME_OOT ? " (OOT)" : " (MM)")
+                                                        : "");
+    }
 #endif
     if (gSaveContext.fileNum == 0xFF || gSaveContext.save.shipSaveInfo.saveType != SAVETYPE_RANDO)
         return {};
@@ -257,7 +274,11 @@ const char* ConcreteReceiptName(RandoItemId id) {
 }
 
 void SetReceiptBody(CustomMessage::Entry& entry, std::string body) {
-    ComboItemReceiptText::Wrap(body, sNESFontWidths, 160, entry.icon == 0xFE ? 300.0f : 240.0f);
+    if (entry.receiptPresentation.singleBox) {
+        entry.icon = 0xFE; // The reward is a final-line sprite, not a header icon.
+    } else {
+        ComboItemReceiptText::Wrap(body, sNESFontWidths, 160, entry.icon == 0xFE ? 300.0f : 240.0f);
+    }
     entry.msg = std::move(body);
     entry.autoFormat = false;
 }
@@ -312,6 +333,83 @@ std::string Rando::GetDungeonMapCompassInfo(int32_t dungeon, bool compass) {
 }
 
 #ifdef COMBO_BUILD
+extern "C" COMBO_EXPORT int32_t MM_GetSeedItemIconInfo(const char* name, CwItemIconInfo* out) {
+    try {
+        if (!name || !out)
+            return 0;
+        *out = CwItemIconInfo{};
+        const std::string key = ComboRando::StripGameSuffix(name);
+        for (const auto& [id, item] : Rando::StaticData::Items) {
+            if (id == RI_UNKNOWN || id == RI_COMBO_FOREIGN || !item.name || key != item.name)
+                continue;
+            out->path = Rando::StaticData::GetIconTexturePath(id);
+            if (!out->path || std::strncmp(out->path, "__OTR__", 7))
+                return 0;
+            out->width = out->height = std::strstr(out->path, "icon_item_24_static") ? 24 : 32;
+            const int song =
+                id == RI_PROGRESSIVE_LULLABY ? ComboSongForMmItem(RI_SONG_LULLABY) : ComboSongForMmItem(id);
+            if (song >= 0 || std::strstr(out->path, "SongNote")) {
+                out->width = 16;
+                out->height = 24;
+                out->isIA8 = 1;
+                out->hasColor = ComboSongShimmerColor(song, out->color);
+            } else if (std::strstr(out->path, "gOcarinaBtnIcon")) {
+                out->width = out->height = 16;
+                out->isIA8 = 1;
+            } else if (std::strstr(out->path, "gHeartPieceIcon")) {
+                out->width = out->height = 48;
+                out->isIA8 = 1;
+            }
+            return 1;
+        }
+        return 0;
+    } catch (...) { return 0; }
+}
+
+extern "C" COMBO_EXPORT int32_t MM_GetDungeonRewardIconInfo(int32_t dungeon, CwItemIconInfo* out) {
+    try {
+        if (!out || dungeon < 0 || dungeon >= 4)
+            return 0;
+        *out = CwItemIconInfo{};
+        RewardIdentity reward;
+        if (!ComboRando::g_comboForeignJson.empty()) {
+            reward = LoadedSeedDungeonReward(dungeon);
+        } else {
+            if (gSaveContext.fileNum == 0xFF || gSaveContext.save.shipSaveInfo.saveType != SAVETYPE_RANDO)
+                return 0;
+            const auto check = kDungeonInformation[dungeon].reward;
+            const auto id = gSaveContext.save.shipSaveInfo.rando.randoSaveChecks[check].randoItemId;
+            if (id == RI_COMBO_FOREIGN) {
+                const auto* foreign = Rando::MiscBehavior::MM_LookupForeign(check);
+                if (foreign)
+                    reward = { ComboRando::StripGameSuffix(foreign->itemName), foreign->itemGame, true,
+                               foreign->shared };
+            } else {
+                const auto item = Rando::StaticData::Items.find(id);
+                if (id != RI_UNKNOWN && item != Rando::StaticData::Items.end() && item->second.name)
+                    reward.name = item->second.name;
+            }
+        }
+        if (reward.name.empty())
+            return 0;
+        if (reward.game == ComboRando::GAME_OOT) {
+            auto getIcon = reinterpret_cast<Fn_GetItemIconInfo>(Combo_ResolveSym("soh", "OOT_GetSeedItemIconInfo"));
+            if (!getIcon || getIcon(reward.name.c_str(), out) != 1)
+                return 0;
+            // Preserve the owner in the path when this result is consumed in OoT.
+            static std::unordered_map<std::string, std::string> paths;
+            CwItemReceiptPresentation p{};
+            p.singleBox = 1;
+            p.rewardLine = 2;
+            if (!ComboReceipt_CopyIcon(&p, out, "oot"))
+                return 0;
+            out->path = paths.emplace(p.iconPath, p.iconPath).first->second.c_str();
+            return 1;
+        }
+        return MM_GetSeedItemIconInfo(reward.name.c_str(), out);
+    } catch (...) { return 0; }
+}
+
 extern "C" COMBO_EXPORT int32_t MM_GetDungeonRewardName(int32_t dungeon, char* buffer, uint32_t capacity) {
     if (!buffer || !capacity)
         return 0;
@@ -328,7 +426,11 @@ extern "C" COMBO_EXPORT int32_t MM_GetDungeonRewardName(int32_t dungeon, char* b
 bool Rando::ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Entry& entry, RandoCheckId check) {
     // Capture dynamic descriptions before the cross grant. Cycle recollection
     // must keep that receipt's counters as well as its resolved item identity.
-    static std::unordered_map<int, std::string> bodies;
+    struct SavedReceipt {
+        std::string body;
+        CwItemReceiptPresentation presentation{};
+    };
+    static std::unordered_map<int, SavedReceipt> bodies;
     static int slot = -1;
     static uint64_t generation = static_cast<uint64_t>(-1);
     const uint64_t currentGeneration = MiscBehavior::ComboRandoGen();
@@ -340,7 +442,8 @@ bool Rando::ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Ent
     if (check != RC_UNKNOWN) {
         const auto saved = bodies.find(check);
         if (saved != bodies.end()) {
-            SetReceiptBody(entry, saved->second);
+            entry.receiptPresentation = saved->second.presentation;
+            SetReceiptBody(entry, saved->second.body);
             return true;
         }
     }
@@ -354,14 +457,22 @@ bool Rando::ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Ent
     if (size <= 0 || static_cast<size_t>(size) > sizeof(buffer))
         return false;
     std::string body(buffer, size); // explicit length retains color byte 0
+    entry.receiptPresentation = {};
+    static Fn_GetDungeonItemReceiptPresentation getPresentation = nullptr;
+    if (!getPresentation)
+        getPresentation = reinterpret_cast<Fn_GetDungeonItemReceiptPresentation>(
+            Combo_ResolveSym("soh", "OOT_GetDungeonItemReceiptPresentation"));
+    if (getPresentation && getPresentation(itemName, &entry.receiptPresentation) != 1)
+        entry.receiptPresentation = {};
     if (check != RC_UNKNOWN)
-        bodies[check] = body;
+        bodies[check] = { body, entry.receiptPresentation };
     SetReceiptBody(entry, std::move(body));
     return true;
 }
 #endif
 
 bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
+    entry.receiptPresentation = {};
     if (id == RI_TRAP)
         return false;
     const auto it = StaticData::Items.find(id);
@@ -373,8 +484,21 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     if (dungeon >= 0) {
         const std::string info = GetDungeonMapCompassInfo(dungeon, compass);
         if (!info.empty()) {
-            SetReceiptBody(entry,
-                           ComboItemReceiptText::FromNeiMarkup("You got the " + std::string(item.name) + "!^" + info));
+            entry.receiptPresentation.singleBox = 1;
+            entry.receiptPresentation.rewardLine = 2;
+            std::string body = "You found the %g" + std::string(item.name) + "%w!";
+            if (compass) {
+                body += "&It points to %r" + std::string(kDungeonInformation[dungeon].boss) + "%w!";
+                body += "&Defeating the boss grants the %g" + DungeonRewardName(dungeon) + "%w!";
+#ifdef COMBO_BUILD
+                CwItemIconInfo icon{};
+                if (MM_GetDungeonRewardIconInfo(dungeon, &icon) == 1)
+                    ComboReceipt_CopyIcon(&entry.receiptPresentation, &icon, "mm");
+#endif
+            } else {
+                body += "&Its entrance is at %c" + std::string(kDungeonInformation[dungeon].entrance) + "%w.";
+            }
+            SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(body));
             return true;
         }
     }

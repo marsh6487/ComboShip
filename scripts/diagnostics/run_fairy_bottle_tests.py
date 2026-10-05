@@ -52,7 +52,8 @@ def main():
     dispatch = function(source, 'OOT_DrawComboForeign')
     for name in sorted(set(re.findall(r'\bOOT_DrawForeign\w+', dispatch)) -
                        {'OOT_DrawForeignFairyBottle', 'OOT_DrawForeignFairyContainer'}):
-        bodies += 'void ' + name + '(PlayState*,const ComboForeignDrawInfo*) { assert(false); }\n'
+        bodies += 'void ' + name + '(PlayState*,const ComboForeignDrawInfo*' + \
+                  (',bool' if name == 'OOT_DrawForeignCustomGi' else '') + ') { assert(false); }\n'
     bodies += dispatch + '\n'
     source = (ROOT / 'combo/menu/ComboForeignDrawMM.h').read_text()
     bodies += function(source, 'MM_DrawForeignFairy') + '\n'

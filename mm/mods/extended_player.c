@@ -185,9 +185,9 @@ static const NeiItem sNeiItems[] = {
       "Du hast den %pWunschdetektor%w!&Ein verfluchtes Artefakt das&verborgene Schätze enthüllt...&für einen "
       "Preis.^Drücke %y\xA1%w zum Aktivieren.&%rKostet 3 Herzen%w pro Nutzung!^%g(Nur im Randomizer)%w:&%yGoldene "
       "Funken%w = Wichtige Items&sind noch in diesem Gebiet.&%rGanondorfs Lachen%w = Nichts mehr da." },
-    // RETIRED 2026-08-06: no inventory cell (41 belongs to the Phantom Hourglass). Row kept so old
-    // saves/icon lookups by ITEM id still resolve; NEI_NO_SLOT = never reachable from the kaleido.
-    { ITEM_HYLIAS_GRACE, PLAYER_IA_HYLIAS_GRACE, PLAYER_MODELGROUP_DEFAULT, NEI_NO_SLOT, AGE_REQ_NONE,
+    // Grace shares cell 41 with the independently owned Phantom Hourglass.
+    // Keep its original item/action identity and native fairy behavior.
+    { ITEM_HYLIAS_GRACE, PLAYER_IA_HYLIAS_GRACE, PLAYER_MODELGROUP_DEFAULT, SLOT_HYLIAS_GRACE, AGE_REQ_NONE,
       (void*)gItemIconHyliaGraceTex, func_8083485C, Player_InitHyliasGraceIA, Randomizer_DrawHyliaGrace,
       RG_HYLIAS_GRACE,
       "You got %pHylia's Grace%w!&A divine blessing that transforms&you into a %cfairy%w for 10 seconds.^Press "

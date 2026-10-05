@@ -1057,7 +1057,7 @@ static u8 sShovelSelectorActive = 0;
 
 // Fold a pre-re-layout save into the new cell assignment. Idempotent, cheap; runs from the handle
 // pass. 47 held the rod -> flag + clear; 46 backfills its flag; 44 pokeball -> flag + clear;
-// 41 hylia -> clear (item retired).
+// 41 Grace / hourglass -> retain the selected item and backfill ownership.
 static void Page2Relayout_Heal(void) {
     NeiSaveData* nei = Nei_Save();
 
@@ -1077,9 +1077,7 @@ static void Page2Relayout_Heal(void) {
         nei->pokeballOwned = 1;
         ExtInv_SetSlotItem(SLOT_SHADOW_CRYSTAL, ITEM_NONE);
     }
-    if (ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS) == ITEM_HYLIAS_GRACE) {
-        ExtInv_SetSlotItem(SLOT_PHANTOM_HOURGLASS, ITEM_NONE);
-    }
+    GraceHourglass_Heal();
 }
 
 static u8 ShovelSel_IsShovelCellItem(s32 item) {
@@ -1092,6 +1090,51 @@ static void Shovel_Cycle(PlayState* play, s32 dir) {
     ExtInv_SetSlotItem(SLOT_SHOVEL, next);
     Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                            &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+}
+
+// Grace / hourglass share cell 41; ownership and selected u16 item remain separate.
+static u8 sGraceHourglassSelectorActive = 0;
+
+static void GraceHourglass_KaleidoCycle(PlayState* play, s32 dir) {
+    uint16_t oldItem = ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS);
+    uint16_t newItem = oldItem == ITEM_HYLIAS_GRACE ? EXT_ITEM_PHANTOM_HOURGLASS : ITEM_HYLIAS_GRACE;
+    (void)dir;
+    ExtInv_SetSlotItem(SLOT_PHANTOM_HOURGLASS, newItem);
+    play->pauseCtx.cursorItem[PAUSE_ITEM] = newItem;
+    play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    for (s32 btn = 1; btn < ARRAY_COUNT(gSaveContext.equips.buttonItems); ++btn) {
+        if (ExtButton_GetItem(btn) == oldItem) {
+            if (newItem > 0xFF) {
+                ExtButton_SetItem(btn, newItem);
+            } else {
+                ExtButton_ClearItem(btn);
+                gSaveContext.equips.buttonItems[btn] = (u8)newItem;
+            }
+            gSaveContext.equips.cButtonSlots[btn - 1] = newItem > 0xFF ? SLOT_NONE : SLOT_PHANTOM_HOURGLASS;
+            Interface_LoadItemIcon1(play, (u16)btn);
+        }
+    }
+}
+
+static void GraceHourglass_KaleidoHandle(PlayState* play) {
+    uint16_t selected = play->pauseCtx.cursorItem[PAUSE_ITEM];
+    u8 onThisItem =
+        ExtInv_GetCurrentPage() == 1 && (selected == ITEM_HYLIAS_GRACE || selected == EXT_ITEM_PHANTOM_HOURGLASS);
+    KaleidoWheel_Run(play, onThisItem,
+                     GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) && GraceHourglass_IsOwned(EXT_ITEM_PHANTOM_HOURGLASS),
+                     &sGraceHourglassSelectorActive, GraceHourglass_KaleidoCycle);
+}
+
+static void GraceHourglass_KaleidoDraw(PlayState* play) {
+    uint16_t selected = play->pauseCtx.cursorItem[PAUSE_ITEM];
+    if (ExtInv_GetCurrentPage() != 1 || (selected != ITEM_HYLIAS_GRACE && selected != EXT_ITEM_PHANTOM_HOURGLASS) ||
+        !GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) || !GraceHourglass_IsOwned(EXT_ITEM_PHANTOM_HOURGLASS)) {
+        return;
+    }
+    uint16_t other = selected == ITEM_HYLIAS_GRACE ? EXT_ITEM_PHANTOM_HOURGLASS : ITEM_HYLIAS_GRACE;
+    void* icon = ExtInv_GetItemIcon(other);
+    KaleidoCycle_DrawRocStyle(play, play->pauseCtx.cursorSlot[PAUSE_ITEM], sGraceHourglassSelectorActive, 1, 1, icon,
+                              icon, NULL, NULL, 32, 32);
 }
 
 static void Shovel_HandleKaleidoSelector(PlayState* play) {
@@ -1638,8 +1681,18 @@ static void Wand_DrawKaleidoSelector(PlayState* play) {
 // on each side are the neighbouring runes' 24x24 glyphs — the gust-jar "mini icons on top" look.
 static u8 sSlateSelectorActive = 0;
 
+static void Slate_KaleidoSyncTitle(PlayState* play) {
+    static u8 namedRune = 0xFF;
+    u8 rune = Slate_RuneCount() ? Slate_GetRune() : 0xFF;
+    if (play->pauseCtx.namedItem == EXT_ITEM_SHEIKAH_SLATE && namedRune != rune) {
+        play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    }
+    namedRune = rune;
+}
+
 static void Slate_KaleidoCycle(PlayState* play, s32 dir) {
     Slate_SetRune(Slate_RuneNeighbor(Slate_GetRune(), dir));
+    play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
     Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                            &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
 }
@@ -1648,6 +1701,7 @@ static void Slate_HandleKaleidoSelector(PlayState* play) {
     PauseContext* pauseCtx = &play->pauseCtx;
     u8 onThisItem = (pauseCtx->cursorItem[PAUSE_ITEM] == EXT_ITEM_SHEIKAH_SLATE);
 
+    Slate_KaleidoSyncTitle(play);
     KaleidoWheel_Run(play, onThisItem, Slate_RuneCount() > 1, &sSlateSelectorActive, Slate_KaleidoCycle);
 }
 
@@ -2037,6 +2091,7 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
     Cane_HandleKaleidoSelector(play);
 
     // Shovel <-> Dominion Rod (shared cell 46; also folds pre-re-layout saves). Skijer's NEI
+    GraceHourglass_KaleidoHandle(play);
     Shovel_HandleKaleidoSelector(play);
 
     // Elemental Wand rod selector (A on the cell) — six rods share the page-2 slot the Bomb Arrows
@@ -2127,6 +2182,7 @@ void KaleidoScope_DrawItemCycles(PlayState* play) {
     Cane_DrawKaleidoSelector(play);
 
     // Shovel <-> Dominion Rod overlay (shared cell 46). Skijer's NEI
+    GraceHourglass_KaleidoDraw(play);
     Shovel_DrawKaleidoSelector(play);
 
     // Elemental Wand rod selector overlay. Skijer's NEI
@@ -2158,6 +2214,8 @@ bool IsItemCycling() {
 
 void KaleidoScope_ResetItemCycling() {
     gCurrentItemCyclingSlot = -1;
+    sGraceHourglassSelectorActive = 0;
+    sSlateSelectorActive = 0;
 }
 
 #pragma endregion

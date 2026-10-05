@@ -36,6 +36,10 @@
 
 #include "ComboItemDrawABI.h"
 #include "ComboFairyBottle.h"
+#include "ComboSwordGiFit.h"
+#define COMBO_DIN_SWORD_GI_HOST_MM
+#include "ComboDinSwordGi.h"
+#undef COMBO_DIN_SWORD_GI_HOST_MM
 #define COMBO_FAIRY_HOST_MM
 #include "ComboFairyBottleDraw.h"
 #undef COMBO_FAIRY_HOST_MM
@@ -740,6 +744,13 @@ inline void MM_DrawForeignSkullToken(const ComboForeignDrawInfoOOT* info) {
 
 // Generic rando song note: grayscale-tinted note DL (GetItem_DrawGenericMusicNote). No segments.
 inline void MM_DrawForeignMusicNote(const ComboForeignDrawInfoOOT* info) {
+    if (info->count == 2) {
+        OPEN_DISPS(gPlayState->state.gfxCtx);
+        gSPGrayscale(POLY_XLU_DISP++, false);
+        CLOSE_DISPS(gPlayState->state.gfxCtx);
+        MM_DrawForeignSimple(info); // Native warp color DL followed by its original clef.
+        return;
+    }
     GraphicsContext* gfxCtx = gPlayState->state.gfxCtx;
     OPEN_DISPS(gfxCtx);
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
@@ -1035,7 +1046,7 @@ inline void MM_DrawForeignBronzeScale(const ComboForeignDrawInfoOOT* info) {
 
 // Rotating custom OoT models. The two alpha values express independent, optional
 // grayscale (OPA) and weapon-flame (XLU) colors; the flame never tints the model.
-inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info) {
+inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info, bool shop = false) {
     if (info->primColorXlu[3])
         DrawOotSlateRuneFlame(info->primColorXlu[0], info->primColorXlu[1], info->primColorXlu[2]);
     Matrix_Push();
@@ -1107,6 +1118,8 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info) {
         }
     }
     CLOSE_DISPS(gfxCtx);
+    if (info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z)
+        ComboDinSwordGi_DrawLayers(gPlayState, "oot", info->dls[0]);
     Matrix_Pop();
 }
 
@@ -1203,6 +1216,17 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false) {
         MM_DrawNeiGi(recipe, shop);
         return;
     }
+    const bool fitSword = info->drawKind == CW_DRAW_KIND_CUSTOM_GI && info->count > 0 && info->neiShimmer > 0 &&
+                          info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
+                          NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
+    if (fitSword) {
+        Matrix_Push();
+        ComboSwordGi_ApplyFit("oot", info->dls[0], info->scale,
+                              info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z
+                                  ? info->ops[0].a * (3.14159265358979323846f / 32768.f)
+                                  : 0.f,
+                              shop);
+    }
     if (info->itemShimmer) {
         Matrix_Push();
     }
@@ -1273,11 +1297,11 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false) {
             break;
         case CW_DRAW_KIND_SEASON_GI:
             if (info->neiEffect == 5)
-                MM_DrawForeignCustomGi(info);
+                MM_DrawForeignCustomGi(info, shop);
             NeiGi_DrawSeasonOverlay(gPlayState, info->neiEffect, "oot");
             break;
         case CW_DRAW_KIND_CUSTOM_GI:
-            MM_DrawForeignCustomGi(info);
+            MM_DrawForeignCustomGi(info, shop);
             break;
         case CW_DRAW_KIND_MASTER_SWORD:
             MM_DrawForeignMasterSword(info);
@@ -1298,6 +1322,10 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false) {
     }
     if (info->itemShimmer) {
         Matrix_Pop();
+        if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
+            NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
+            NeiGi_DrawMesh(gPlayState, NeiGi::SampleSpecial(static_cast<NeiGi::Kind>(info->neiShimmer - 1),
+                                                            gPlayState->gameplayFrames, NeiGi_CameraBasis(gPlayState)));
         const bool mmOwner = info->drawKind == CW_DRAW_KIND_MM_MASK || info->drawKind == CW_DRAW_KIND_MM_REMAINS;
         if (info->drawKind == CW_DRAW_KIND_SONG_GI)
             NeiGi_DrawSongOverlay(gPlayState, info->neiEffect, "oot");
@@ -1311,6 +1339,8 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false) {
         else
             ComboDrawMaskShimmer(gPlayState, nullptr, info->itemShimmerColor, mmOwner ? "mm" : "oot");
     }
+    if (fitSword)
+        Matrix_Pop();
 }
 
 #undef MM_FOREIGN_PIN_OPA

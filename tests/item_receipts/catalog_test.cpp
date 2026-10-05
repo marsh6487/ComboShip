@@ -13,6 +13,12 @@ extern "C" {
 #include "mods/extended_inventory.h"
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
 }
+#include "2s2h_assets.h"
+#include "assets/interface/parameter_static/parameter_static.h"
+#include "assets/interface/icon_item_dungeon_static/icon_item_dungeon_static.h"
+#include "interface/icon_item_field_static/icon_item_field_static.h"
+#include "assets/archives/icon_item_static/icon_item_static_yar.h"
+#include "assets/archives/icon_item_24_static/icon_item_24_static_yar.h"
 #include "receipt_catalogs.inc"
 #include <cassert>
 #include <cstring>
@@ -21,7 +27,7 @@ extern "C" {
 
 extern "C" {
 PlayState *gPlayState = nullptr;
-float sNESFontWidths[160];
+
 const NeiItem *Nei_FindByItem(int32_t item) {
   for (const auto &nei : sReceiptNeiItems)
     if (nei.item != NEI_NO_ITEM && nei.item == item)
@@ -37,7 +43,7 @@ const NeiItem *Nei_FindByRg(int16_t id) {
 static NeiSaveData neiSave{};
 NeiSaveData *Nei_Save() { return &neiSave; }
 SaveContext gSaveContext{};
-TexturePtr gItemIcons[131]{};
+
 void Message_StageCustomItemIcon(void*, s16) {}
 static u8 stagedColor[3];
 static s16 stagedWidth, stagedHeight;
@@ -56,7 +62,7 @@ u8 Nei_BulletBagLevel() { return std::min<int>(3, neiSave.ootUpgrades & 7); }
 }
 
 namespace Rando::StaticData {
-const char* GetIconTexturePath(RandoItemId) { return nullptr; }
+
 const std::string& GetCheckDisplayName(RandoCheckId id) {
   static const std::map<RandoCheckId, std::string> names = {
     {RC_WOODFALL_TEMPLE_BOSS_WARP, "Woodfall Temple Boss Warp"},
@@ -81,7 +87,14 @@ const ComboRando::ForeignItem* MM_LookupForeign(RandoCheckId check) {
   return check == foreignRewardCheck ? &foreignReward : nullptr;
 }
 } // namespace Rando::MiscBehavior
+#ifndef COMPASS_DONOR_INTEGRATION
 extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled() { return mapCompassInfo; }
+extern "C" COMBO_EXPORT int32_t OOT_GetSeedItemIconInfo(const char* name, CwItemIconInfo* out) {
+  assert(std::string(name) == "Progressive Hookshot");
+  *out = { "__OTR__textures/icon_item_static/gItemIconHookshotTex", 32, 32, 0, 0, {} };
+  return 1;
+}
+#endif
 #include "receipt_map_pause.inc"
 
 static std::string SmallKeyDonorReceipt(const std::string& name) {
@@ -101,6 +114,7 @@ static std::string SmallKeyDonorReceipt(const std::string& name) {
   return {};
 }
 
+#ifndef COMPASS_DONOR_INTEGRATION
 extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char *name,
                                                        char *buffer,
                                                        uint32_t capacity) {
@@ -118,6 +132,7 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char *name,
   std::memcpy(buffer, body.data(), body.size());
   return body.size();
 }
+#endif
 
 static std::string FlattenReceiptLines(const std::string& body) {
   std::string flat;
@@ -129,6 +144,53 @@ static std::string FlattenReceiptLines(const std::string& body) {
   }
   return flat;
 }
+
+#ifdef COMPASS_DONOR_INTEGRATION
+extern "C" void FixtureConfigureForestCompassReceipt(int information);
+
+static void CheckForestCompassReceiveRoutes() {
+  gSaveContext.fileNum = 0;
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+  const auto saveBefore = gSaveContext;
+  const auto neiBefore = neiSave;
+  // The second Off is another loaded seed, so an On receipt cannot survive in
+  // the foreign-check cache after its seed generation changes.
+  for (int information : {0, 1, 0}) {
+    FixtureConfigureForestCompassReceipt(information);
+    ++generation;
+    CustomMessage::Entry native, foreign;
+    native.icon = foreign.icon = 0xF5;
+    assert(Rando::ApplyItemReceiptText(RI_OOT_COMPASS_FOREST_TEMPLE, native));
+    assert(Rando::ApplyForeignItemReceiptText("Forest Temple Compass", foreign, RC_CLOCK_TOWER_ROOF_OCARINA));
+    assert(!native.autoFormat && !foreign.autoFormat);
+    assert(native.icon == (information ? 0xFE : 0xF5) && foreign.icon == native.icon);
+    assert(native.msg == foreign.msg);
+    const auto text = FlattenReceiptLines(native.msg);
+    assert((text.find("You got the Compass!") != std::string::npos) == !information);
+    assert((text.find("Now you can see hidden things.") != std::string::npos) == !information);
+    assert(text.find("Forest Temple Compass") != std::string::npos);
+    assert((text.find("masterful") != std::string::npos) == !information);
+    assert((text.find("Phantom Ganon") != std::string::npos) == bool(information));
+    assert((text.find("Defeating the boss grants the") != std::string::npos) == bool(information));
+    assert((text.find("Deku Leaf") != std::string::npos) == bool(information));
+    assert(native.receiptPresentation.singleBox == information);
+    if (information) {
+      assert(native.msg.find('\x10') == std::string::npos);
+      assert(std::count(native.msg.begin(), native.msg.end(), '\x11') == 2);
+      assert(ComboReceipt_HasIcon(&native.receiptPresentation));
+      assert(std::string(native.receiptPresentation.iconPath) == "__OTR__@oot:textures/icon_item_custom/gItemIconDekuLeafTex");
+      assert(!std::memcmp(&native.receiptPresentation, &foreign.receiptPresentation, sizeof(native.receiptPresentation)));
+    }
+    const auto body = native.msg;
+    Rando::AppendReceiptSource(native, " (Bank reward)");
+    assert(native.msg.compare(0, body.size(), body) == 0);
+    assert(native.msg.substr(body.size()) == "\x10 (Bank reward)\xBF");
+    assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+    assert(!std::memcmp(&neiBefore, &neiSave, sizeof(neiBefore)));
+  }
+  std::cout << "Real OoT donor -> MM Forest Temple Compass native/foreign routes: saved Off tutorials/On three-line reward sprites, cache reset and source append passed\n";
+}
+#endif
 
 static void CheckConcreteSmallKeyReceipts() {
   const auto previousSave = gSaveContext;
@@ -222,7 +284,17 @@ static void CheckMapCompassInformation() {
     CustomMessage::Entry receipt;
     assert(Rando::ApplyItemReceiptText(compasses[d], receipt));
     assert(receipt.msg.find(bosses[d]) != std::string::npos && !receipt.autoFormat);
+    assert(receipt.msg.find('\x10') == std::string::npos && std::count(receipt.msg.begin(), receipt.msg.end(), '\x11') == 2);
+    assert(receipt.msg.find("Defeating the boss grants the") != std::string::npos);
+    assert(receipt.msg.find("Now you can see") == std::string::npos);
+    assert(receipt.icon == 0xFE && ComboReceipt_HasIcon(&receipt.receiptPresentation));
+    assert(std::string(receipt.receiptPresentation.iconPath).starts_with(d == 2 ? "__OTR__@oot:" : "__OTR__@mm:"));
+    if (d == 0) assert(std::strstr(receipt.receiptPresentation.iconPath, "KokiriSword"));
+    if (d == 1) assert(receipt.receiptPresentation.iconWidth == 16 && receipt.receiptPresentation.iconHeight == 24 && receipt.receiptPresentation.iconIA8);
+    if (d == 2) assert(std::string(receipt.receiptPresentation.iconPath) == "__OTR__@oot:textures/icon_item_static/gItemIconHookshotTex");
     assert(Rando::ApplyItemReceiptText(maps[d], receipt));
+    assert(receipt.receiptPresentation.singleBox && !ComboReceipt_HasIcon(&receipt.receiptPresentation));
+    assert(receipt.msg.find('\x10') == std::string::npos && std::count(receipt.msg.begin(), receipt.msg.end(), '\x11') == 1);
     assert(receipt.msg.find("entrance") != std::string::npos);
     assert(donorReads == reads && !std::memcmp(&before, &gSaveContext, sizeof(before)));
   }
@@ -277,10 +349,12 @@ static void CheckMapCompassInformation() {
 }
 
 int main() {
-  for (float &w : sNESFontWidths)
-    w = 8;
   PlayState play{};
   gPlayState = &play;
+#ifdef COMPASS_DONOR_INTEGRATION
+  CheckForestCompassReceiveRoutes();
+  return 0;
+#else
   // Header is deliberately a story entry with a different icon and next ID.
   const char bow[] = "\x00\x00\x20\x00\x03\xFF\xFF\xFF\xFF\xFF\xFF"
                      "You got the Hero's Bow!\x10Press \xB2 to aim.\x19\xBF";
@@ -323,7 +397,7 @@ int main() {
   Rando::StaticData::GetIconForZMessage(RI_SONG_LULLABY_INTRO);
   assert(stagedColor[0] == 255 && stagedColor[1] == 100 && stagedColor[2] == 100);
   const std::pair<RandoItemId, uint32_t> receiptColors[] = {
-      {RI_SONG_DOUBLE_TIME, 0x80D8F0}, {RI_SONG_ELEGY, 0xFF6200},         {RI_SONG_EPONA, 0x925731},
+      {RI_SONG_DOUBLE_TIME, 0x80D8F0}, {RI_SONG_ELEGY, 0xFF6200},         {RI_SONG_EPONA, 0xD96E30},
       {RI_SONG_HEALING, 0xFF96E6},     {RI_SONG_INVERTED_TIME, 0x4A70CA}, {RI_SONG_LULLABY_INTRO, 0xFF6464},
       {RI_SONG_LULLABY, 0xFF1414},     {RI_SONG_NOVA, 0x1414FF},          {RI_SONG_OATH, 0x620062},
       {RI_SONG_SARIA, 0x6ACB62},       {RI_SONG_SOARING, 0xC8A0FF},       {RI_SONG_SONATA, 0x62FF62},
@@ -553,4 +627,5 @@ int main() {
   assert(entry.msg == "brief");
   std::cout << "real native/FC item catalogs, donor descriptions, binary "
                "length, safe aliases and cold fallback passed\n";
+#endif
 }

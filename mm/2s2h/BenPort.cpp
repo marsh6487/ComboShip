@@ -1,4 +1,5 @@
 #include "../../combo/NeiAssetPriorityResource.h"
+#include "../../combo/NeiWolfAssetResource.h"
 #include "../../combo/menu/ItemGrantAuditBridge.h"
 #include "BenPort.h"
 #ifdef COMBO_BUILD
@@ -5330,10 +5331,34 @@ extern "C" bool Ship_HandleConsoleCrashAsReset() {
     return true;
 }
 
+extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* path, float scale, float tilt, int shop,
+                                                float fit[2]) {
+    const int din =
+        NeiAssetPriority::GetDinSwordGiProfile("mm", game, path, CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
+    return NeiAssetPriority::GetGiModelFit("mm", game, path, scale, tilt, shop != 0, fit, din);
+}
+extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* game, const char* path) {
+    return NeiAssetPriority::GetDinSwordGiProfile("mm", game, path,
+                                                  CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
+}
+
+extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path) {
+    return NeiAssetPriority::IsCustomAsset("mm", game, path);
+}
+
 extern "C" int ResourceMgr_IsModAsset(const char* path) {
     return NeiAssetPriority::IsModAsset("mm", "mm", path);
 }
 
 extern "C" int ResourceMgr_IsModAssetForGame(const char* game, const char* path) {
     return NeiAssetPriority::IsModAsset("mm", game, path);
+}
+
+extern "C"
+#ifdef COMBO_BUILD
+    COMBO_EXPORT
+#endif
+    int
+    MM_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner) {
+    return NeiWolfAsset::CopyResource("mm", destination, capacity, size, owner);
 }

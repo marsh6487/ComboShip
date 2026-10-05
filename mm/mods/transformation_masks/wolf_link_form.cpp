@@ -1,9 +1,9 @@
 /**
  * Wolf Link full transformation.
  *
- * Assets are intentionally a loose `nei/wolf_link.bin`: mesh, weights,
- * skeleton, RGBA16 texture and all TP actions are loaded at runtime.  The
- * renderer reuses the SSBB CPU skinning path used by Pikachu.
+ * Separately supplied NEIWOLF1 exports contain the mesh, weights, skeleton,
+ * RGBA16 texture and TP clips. The owner's gWolfLinkData Blob is preferred,
+ * with a loose nei/<game>/wolf_link.bin fallback. Rendering reuses SSBB CPU skinning.
  *
  * Behaviour is a port of Twilight Princess' wolf procs as recovered by the
  * decompilation that Dusklight is built on (src/d/actor/d_a_alink_wolf.inc,
@@ -28,9 +28,12 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
+
+#include "../../../combo/NeiWolfAsset.h"
 
 #include "z64.h"
 #include "macros.h"
@@ -49,6 +52,7 @@ extern "C" const char* Nei_AssetDir(void);
 
 #include <libultraship/bridge.h>
 #include <ship/Context.h>
+#include <spdlog/spdlog.h>
 
 extern "C" {
 #include "expansions/ssbb/ssbb_anim.h"
@@ -60,7 +64,6 @@ extern PlayState* gPlayState;
 namespace {
 
 constexpr char kMagic[8] = { 'N', 'E', 'I', 'W', 'O', 'L', 'F', '1' };
-constexpr u32 kVersion = 1;
 constexpr size_t kHeaderSize = 8 + 20 * sizeof(u32);
 
 // The exporter writes vertex records packed (3f + 3s8 + 2s16 + u8 = 20 bytes).
@@ -306,6 +309,7 @@ static u8 sSelected = 0;
 static u8 sAssetsLoaded = 0;
 static s32 sDefIndex = -1;
 static std::vector<u8> sBlob;
+static std::string sAssetPath;
 static std::vector<SSBBSkinVertex> sVertices;
 static std::vector<u16> sTexture;
 static std::vector<StandardLimb> sLimbs;
@@ -362,124 +366,26 @@ static bool RangeOk(u32 offset, u64 size) {
     return offset <= sBlob.size() && size <= sBlob.size() - offset;
 }
 
-// Check the serialized IEEE-754 bits, not isfinite(): platform builds enable fast-math.
-static bool FloatOk(const u8* p, f32 maxAbs) {
-    u32 bits = ReadU32(p) & 0x7FFFFFFFu;
-    u32 limit;
-    std::memcpy(&limit, &maxAbs, sizeof(limit));
-    return bits < 0x7F800000u && bits <= limit;
-}
-
-static bool ValidateBlob() {
-    if (sBlob.size() < kHeaderSize || sBlob.size() > kMaxBlobSize || std::memcmp(sBlob.data(), kMagic, 8) != 0 ||
-        ReadU32(sBlob.data() + 8) != kVersion)
-        return false;
-    const u8* h = sBlob.data() + 12;
-    auto value = [h](u32 i) { return ReadU32(h + i * 4); };
-    const u32 vertices = value(0), triangles = value(1), bones = value(2), anims = value(3);
-    const u32 width = value(4), height = value(5);
-    if (!vertices || vertices > 65535 || vertices % 3 || triangles != vertices / 3 || !bones ||
-        bones > SSBB_MAX_SKIN_BONES || !anims || anims > 65535 || value(18) != sBlob.size() || width < 8 ||
-        width > 1024 || height < 8 || height > 1024 || (width & (width - 1)) || (height & (height - 1)) ||
-        value(17) != width * height * 2)
-        return false;
-    struct Chunk {
-        u32 offset;
-        u64 size;
-    };
-    const Chunk chunks[] = { { value(6), (u64)vertices * 20 }, { value(7), (u64)vertices * 8 },
-                             { value(8), (u64)bones * 2 },     { value(9), (u64)bones * 64 },
-                             { value(10), (u64)bones * 12 },   { value(11), (u64)anims * 16 },
-                             { value(12), value(13) },         { value(14), value(15) },
-                             { value(16), value(17) } };
-    for (size_t i = 0; i < sizeof(chunks) / sizeof(chunks[0]); ++i) {
-        const Chunk& c = chunks[i];
-        if (!c.size || c.offset < kHeaderSize || !RangeOk(c.offset, c.size))
-            return false;
-        for (size_t j = 0; j < i; ++j)
-            if (c.offset < chunks[j].offset + chunks[j].size && chunks[j].offset < c.offset + c.size)
-                return false;
-    }
-    if ((value(9) | value(10) | value(11) | value(14)) & 3u)
-        return false;
-    for (u32 i = 0; i < vertices; ++i) {
-        const u8* v = sBlob.data() + value(6) + i * 20;
-        if (!FloatOk(v, 32767.0f) || !FloatOk(v + 4, 32767.0f) || !FloatOk(v + 8, 32767.0f))
-            return false;
-        const u8* w = sBlob.data() + value(7) + i * 8;
-        u32 sum = 0;
-        bool zero = false;
-        for (u32 j = 0; j < 4; ++j) {
-            if (w[j] >= bones || (zero && w[4 + j]))
-                return false;
-            zero |= w[4 + j] == 0;
-            sum += w[4 + j];
-        }
-        if (sum != 255)
-            return false;
-    }
-    for (u32 i = 0; i < bones; ++i) {
-        s16 parent = ReadS16(sBlob.data() + value(8) + i * 2);
-        // Exporter armature traversal orders parents before children and has one root at 0.
-        // This also rules out recursion cycles and disconnected subtrees.
-        if (i == 0 ? parent != -1 : parent < 0 || (u32)parent >= i)
-            return false;
-        for (u32 j = 0; j < 16; ++j)
-            if (!FloatOk(sBlob.data() + value(9) + i * 64 + j * 4, 32767.0f))
-                return false;
-        for (u32 j = 0; j < 3; ++j)
-            if (!FloatOk(sBlob.data() + value(10) + i * 12 + j * 4, 32767.0f))
-                return false;
-    }
-    for (u32 i = 0; i < anims; ++i) {
-        const u8* e = sBlob.data() + value(11) + i * 16;
-        u32 name = ReadU32(e), start = ReadU32(e + 12);
-        u16 count = ReadU16(e + 4), animBones = ReadU16(e + 6);
-        u64 size = (u64)count * animBones * sizeof(SSBBBoneFrame);
-        if (!count || animBones != bones || name < value(12) || (u64)name >= (u64)value(12) + value(13) ||
-            !std::memchr(sBlob.data() + name, 0, value(12) + value(13) - name) || !FloatOk(e + 8, 240.0f) ||
-            ReadF32(e + 8) <= 0 || (start & 3u) || start < value(14) || (u64)start + size > (u64)value(14) + value(15))
-            return false;
-        double maxScale[SSBB_MAX_SKIN_BONES] = {};
-        double maxTranslation[SSBB_MAX_SKIN_BONES] = {};
-        for (u64 j = 0; j < (u64)count * bones; ++j) {
-            const u8* f = sBlob.data() + start + j * 36;
-            for (u32 k = 0; k < 9; ++k)
-                if (!FloatOk(f + k * 4, k < 3 ? 32767.0f : k < 6 ? 100000.0f : 64.0f))
-                    return false;
-            const u32 bone = j % bones;
-            double translationSquared = 0.0;
-            for (u32 k = 0; k < 3; ++k) {
-                const double translation = ReadF32(f + k * 4);
-                translationSquared += translation * translation;
-                maxScale[bone] = std::max(maxScale[bone], std::fabs((double)ReadF32(f + (6 + k) * 4)));
-            }
-            maxTranslation[bone] = std::max(maxTranslation[bone], std::sqrt(translationSquared));
-        }
-        // Operator-norm bounds include every frame and fractional TRS interpolation.
-        // Finite inputs alone do not prevent overflow through a chain of scaled parents.
-        double worldScale[SSBB_MAX_SKIN_BONES] = {};
-        double worldTranslation[SSBB_MAX_SKIN_BONES] = {};
-        for (u32 bone = 0; bone < bones; ++bone) {
-            const s16 parent = ReadS16(sBlob.data() + value(8) + bone * 2);
-            const double parentScale = parent < 0 ? 1.0 : worldScale[parent];
-            const double parentTranslation = parent < 0 ? 0.0 : worldTranslation[parent];
-            worldScale[bone] = parentScale * maxScale[bone];
-            worldTranslation[bone] = parentTranslation + parentScale * maxTranslation[bone];
-            if (worldScale[bone] > 100000.0 || worldTranslation[bone] > 32767.0)
-                return false;
-        }
-    }
-    return true;
-}
-
 static std::string FindAssetPath() {
     const std::string rel = std::string(Nei_AssetDir()) + "/wolf_link.bin";
     std::string path = Ship::Context::LocateFileAcrossAppDirs(rel);
+    // Both hosts consume the same NEIWOLF1 layout and the same 26 TP clips.
+    // Reuse an existing SoH installation only when the MM file is absent. An
+    // invalid explicitly installed MM file must report its own validation error.
+    if (path.empty() && std::strcmp(Nei_AssetDir(), "nei/2ship") == 0)
+        path = Ship::Context::LocateFileAcrossAppDirs("nei/soh/wolf_link.bin");
     if (path.empty()) {
-        path = rel;
+        std::error_code error;
+        const auto absolute = std::filesystem::absolute(rel, error);
+        path = error ? rel : absolute.string();
     }
     return path;
+}
+
+static bool RejectAsset(const char* reason, const char* detail = "") {
+    SPDLOG_WARN("MM Wolf: asset rejected path={} reason={} detail={}", sAssetPath, reason, detail);
+    sBlob.clear();
+    return false;
 }
 
 static void BuildMeshDisplayList(u32 vertexCount) {
@@ -579,24 +485,38 @@ static bool LoadAssets() {
     if (sAssetsLoaded) {
         return true;
     }
-    std::ifstream file(FindAssetPath(), std::ios::binary | std::ios::ate);
-    if (!file) {
-        return false;
+    sAssetPath = FindAssetPath();
+    size_t resourceSize = 0;
+    const char* resourceOwner = nullptr;
+    const int resourceStatus = MM_CopyWolfLinkResource(nullptr, 0, &resourceSize, &resourceOwner);
+    if (resourceStatus != 0) {
+        sAssetPath = std::string("@") + (resourceOwner ? resourceOwner : "unknown") + ":" + NeiWolfAsset::kResourcePath;
+        if (resourceStatus < 0 || resourceSize < kHeaderSize || resourceSize > kMaxBlobSize)
+            return RejectAsset("resource-blob");
+        sBlob.resize(resourceSize);
+        size_t copied = 0;
+        if (MM_CopyWolfLinkResource(sBlob.data(), sBlob.size(), &copied, nullptr) != 1 || copied != resourceSize)
+            return RejectAsset("resource-copy");
+    } else {
+        sAssetPath = FindAssetPath();
+        std::ifstream file(sAssetPath, std::ios::binary | std::ios::ate);
+        if (!file)
+            return RejectAsset("open-failed");
+        const std::streamsize fileSize = file.tellg();
+        if (fileSize < (std::streamsize)kHeaderSize || fileSize > (std::streamsize)kMaxBlobSize)
+            return RejectAsset("file-size");
+        file.seekg(0, std::ios::beg);
+        sBlob.resize((size_t)fileSize);
+        if (!file.read((char*)sBlob.data(), fileSize))
+            return RejectAsset("read-failed");
     }
-    std::streamsize fileSize = file.tellg();
-    if (fileSize < (std::streamsize)kHeaderSize || fileSize > (std::streamsize)kMaxBlobSize) {
-        return false;
-    }
-    file.seekg(0, std::ios::beg);
-    sBlob.resize((size_t)fileSize);
-    if (!file.read((char*)sBlob.data(), fileSize)) {
-        sBlob.clear();
-        return false;
-    }
-    if (!ValidateBlob()) {
-        sBlob.clear();
-        return false;
-    }
+    if (std::memcmp(sBlob.data(), kMagic, sizeof(kMagic)) != 0)
+        return RejectAsset("magic");
+    const u32 version = ReadU32(sBlob.data() + 8);
+    if (version < NeiWolfAsset::kMinVersion || version > NeiWolfAsset::kMaxVersion)
+        return RejectAsset("version");
+    if (!NeiWolfAsset::Validate(sBlob))
+        return RejectAsset("validation");
 
     const u8* h = sBlob.data() + 12;
     u32 vertexCount = ReadU32(h + 0 * 4);
@@ -631,8 +551,7 @@ static bool LoadAssets() {
         !RangeOk(offInvBind, boneCount * sizeof(MtxF)) || !RangeOk(offBonePos, boneCount * sizeof(SSBBSkinBonePos)) ||
         !RangeOk(offEntries, animCount * 16) || !RangeOk(offNames, namesSize) || !RangeOk(offFrames, framesSize) ||
         !RangeOk(offTexture, textureSize) || textureSize != textureWidth * textureHeight * 2) {
-        sBlob.clear();
-        return false;
+        return RejectAsset("layout");
     }
 
     // Unpack the 20-byte file records into the padded runtime struct.
@@ -672,8 +591,7 @@ static bool LoadAssets() {
         s16 parent = ReadS16(sBlob.data() + offParents + i * 2);
         if (parent >= 0) {
             if ((u32)parent >= boneCount) {
-                sBlob.clear();
-                return false;
+                return RejectAsset("parent-index");
             }
             if (lastChild[parent] < 0) {
                 sLimbs[parent].child = (u8)i;
@@ -696,12 +614,18 @@ static bool LoadAssets() {
         u64 bytes = (u64)frameCount * animBones * sizeof(SSBBBoneFrame);
         if (nameOffset < offNames || nameOffset >= offNames + namesSize || animBones != boneCount ||
             !RangeOk(frameOffset, bytes)) {
-            sBlob.clear();
-            return false;
+            return RejectAsset("animation-layout");
         }
         sAnimations[i] = { (const char*)sBlob.data() + nameOffset, frameCount, animBones, frameRate,
                            (const SSBBBoneFrame*)(sBlob.data() + frameOffset) };
         sAnimationPointers[i] = &sAnimations[i];
+    }
+
+    // Validate required clips before caching or registering the asset. A rejected
+    // file can then be replaced and retried without restarting the application.
+    for (const char* name : kAnimNames) {
+        if (FindAnim(name) < 0)
+            return RejectAsset("missing-animation", name);
     }
 
     BuildMeshDisplayList(vertexCount);
@@ -747,10 +671,11 @@ static bool LoadAssets() {
 
     sDefIndex = SSBBChar_Register(&sDefinition);
     if (sDefIndex < 0) {
-        sBlob.clear();
-        return false;
+        return RejectAsset("character-registration");
     }
     sAssetsLoaded = 1;
+    SPDLOG_INFO("MM Wolf: asset loaded path={} bytes={} vertices={} bones={} animations={}", sAssetPath, sBlob.size(),
+                vertexCount, boneCount, animCount);
     return true;
 }
 
@@ -1584,12 +1509,15 @@ extern "C" u8 WolfLinkForm_LoadSkeleton(PlayState* play) {
 
     SSBBChar_Init(&sWolf.character, sDefIndex, play);
     if (!sWolf.character.initialized || !sWolf.character.jointTable || !sSkin.vtxBuf[0] || !sSkin.vtxBuf[1]) {
+        SPDLOG_WARN("MM Wolf: initialization rejected path={} reason=runtime-allocation", sAssetPath);
         WolfLinkForm_Cleanup(nullptr, play);
         return 0;
     }
     for (s32 i = 0; i < WANM_COUNT; ++i) {
         sWolf.animIndex[i] = FindAnim(kAnimNames[i]);
         if (sWolf.animIndex[i] < 0) {
+            SPDLOG_WARN("MM Wolf: initialization rejected path={} reason=missing-animation clip={}", sAssetPath,
+                        kAnimNames[i]);
             WolfLinkForm_Cleanup(nullptr, play);
             return 0;
         }

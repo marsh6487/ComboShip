@@ -64,7 +64,7 @@ int main() {
                 std::vector<RandoItemId> pool;
                 Rando::Logic::GeneratePools(info, checks, pool);
                 REQUIRE(std::count(pool.begin(), pool.end(), RI_OOT_NEI_PHANTOM_HOURGLASS) == enabled);
-                REQUIRE(std::count(pool.begin(), pool.end(), RI_OOT_NEI_HYLIAS_GRACE) == 0);
+                REQUIRE(std::count(pool.begin(), pool.end(), RI_OOT_NEI_HYLIAS_GRACE) == enabled);
                 if (enabled) {
                     const RandoItemId powers[] = {
                         RI_OOT_NEI_DESIRE_SENSOR,     RI_OOT_NEI_SLATE_RUNE_BOMB,    RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE,

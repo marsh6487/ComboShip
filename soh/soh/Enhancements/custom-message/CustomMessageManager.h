@@ -4,6 +4,7 @@
 #include <exception>
 #include <vector>
 #include <string>
+#include "ComboItemReceiptPresentation.h"
 
 #include "../../../include/z64item.h"
 #include "../../../include/z64.h"
@@ -39,6 +40,7 @@ typedef enum {
  */
 class CustomMessage {
   public:
+    CwItemReceiptPresentation receiptPresentation{};
     CustomMessage() = default;
     CustomMessage(std::string english_, std::string german_, std::string french_,
                   TextBoxType type_ = TEXTBOX_TYPE_BLACK, TextBoxPosition position_ = TEXTBOX_POS_BOTTOM);

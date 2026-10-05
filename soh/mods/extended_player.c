@@ -153,9 +153,9 @@ static const NeiItem sNeiItems[] = {
     // old saves; NEI_NO_SLOT = unreachable, NEI_NO_RG = off the give/draw/name path.
     { ITEM_DESIRE_SENSOR, PLAYER_IA_DESIRE_SENSOR, PLAYER_MODELGROUP_DEFAULT, NEI_NO_SLOT, AGE_REQ_NONE,
       (void*)gItemIconDesireSensorTex, func_8083485C, Player_InitDefaultIA, NULL, NEI_NO_RG, NULL, NULL, NULL },
-    // RETIRED 2026-08-06: no inventory cell (41 belongs to the Phantom Hourglass); noclip moves
-    // to the Soul spell (TODO). Row kept for icon/textbox lookups; NEI_NO_SLOT = unreachable.
-    { ITEM_HYLIAS_GRACE, PLAYER_IA_HYLIAS_GRACE, PLAYER_MODELGROUP_DEFAULT, NEI_NO_SLOT, AGE_REQ_NONE,
+    // Grace shares cell 41 with the independently owned Phantom Hourglass.
+    // Keep its original item/action identity and native fairy behavior.
+    { ITEM_HYLIAS_GRACE, PLAYER_IA_HYLIAS_GRACE, PLAYER_MODELGROUP_DEFAULT, SLOT_HYLIAS_GRACE, AGE_REQ_NONE,
       (void*)gItemIconHyliaGraceTex, func_8083485C, Player_InitHyliasGraceIA, Randomizer_DrawHyliaGrace,
       RG_HYLIAS_GRACE,
       "You got %pHylia's Grace%w!&A divine blessing that transforms&you into a %cfairy%w for 10 seconds.^Press "

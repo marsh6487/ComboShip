@@ -1,5 +1,15 @@
 #pragma once
 #include "ComboSongDraw.h"
+// Native color lists retain the vanilla clef material and normal base/Alt/mod
+// resolution. A grayscale replacement would bypass this authored material.
+static inline const char* ComboSongOotColorDlist(int song) {
+    static const char* colors[] = {
+        "__OTR__objects/object_gi_melody/gGiMinuetColorDL",   "__OTR__objects/object_gi_melody/gGiBoleroColorDL",
+        "__OTR__objects/object_gi_melody/gGiSerenadeColorDL", "__OTR__objects/object_gi_melody/gGiRequiemColorDL",
+        "__OTR__objects/object_gi_melody/gGiNocturneColorDL", "__OTR__objects/object_gi_melody/gGiPreludeColorDL"
+    };
+    return song >= CW_SONG_OOT_MINUET && song <= CW_SONG_OOT_PRELUDE ? colors[song - CW_SONG_OOT_MINUET] : nullptr;
+}
 // Include after OoT's RandomizerGet declarations. Identity must not be inferred
 // from GID aliases: Healing, Soaring and Oath all used the same purple note.
 static inline int ComboSongForOotItem(int rg) {

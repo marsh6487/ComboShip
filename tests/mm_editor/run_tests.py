@@ -40,8 +40,8 @@ def main():
     inventory = source("mm/mods/extended_inventory.c")
     production += inventory[inventory.index("static const uint8_t sWandQuest"):
                             inventory.index("static void* const sWandNameTex")]
-    for name in ["Wand_RandoMode", "Wand_ModeOwned", "Wand_GrantMode", "Slate_RuneOwned", "Slate_GrantRune",
-                 "Seasons_SeasonOwned", "Seasons_GrantSeason"]:
+    for name in ["GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant", "Wand_RandoMode", "Wand_ModeOwned", "Wand_GrantMode", "Slate_RuneOwned", "Slate_GrantRune",
+                 "Seasons_SeasonOwned", "Seasons_GrantSeason", "Seasons_SetSeason"]:
         production += function(inventory, name) + "\n"
     equipment = source("mm/mods/extended_equipment.c")
     for name in ["ExtEquip_GetBit", "ExtEquip_HasItem", "ExtEquip_CapeOwned", "ExtEquip_GiveCape", "ExtEquip_GiveItem"]:
@@ -108,6 +108,7 @@ def main():
         pool_binding += function(source("mm/2s2h/Rando/Logic/GeneratePools.cpp"), "GeneratePools") + "\n}\n"
         pool_binding += bindings[bindings.index("struct Binding {"):bindings.index("// Only roots that differ")]
         pool_binding += function(bindings, "HasMmLegacyGiMod") + "\n"
+        pool_binding += function(bindings, "GetSelectedOwnerSword") + "\n"
         pool_binding += function(bindings, "MM_DescribeNeiGi") + "\n"
         (build / "pool_binding_production.inc").write_text(pool_binding)
         pool_binary = build / "pool_binding_test"

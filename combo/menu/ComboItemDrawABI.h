@@ -68,7 +68,7 @@ typedef enum {
     CW_DRAW_KIND_MAGIC_JAR = 33,            /* OoT magic jar: custom Alt grayscale tint carried in primColorOpa */
     CW_DRAW_KIND_CUSTOM_GI = 31,            /* OoT custom: spin, ops transforms, scale, OPA/XLU; primColorOpa grayscale,
                                          primColorXlu weapon flame; alpha zero disables each independent tint/effect. */
-    CW_DRAW_KIND_SEASON_GI = 36,            /* 1..4: seasons; 5: rod + cycling weather; 6: rain/lightning song */
+    CW_DRAW_KIND_SEASON_GI = 36,            /* 1..4: seasons; 5: rod + cycling weather; 6: song rain */
     CW_DRAW_KIND_GRAYSCALE_LAYERS = 35,     /* per-DL grayscale layerPrimMask/colors; OPA/XLU split */
     CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT = 34, /* concrete static award; ops[0] native equipment selector */
     CW_DRAW_KIND_SONG_GI = 38,              /* note plus song profile in neiEffect; native env or grayscale tint */
