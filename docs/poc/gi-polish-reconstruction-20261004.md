@@ -90,3 +90,19 @@ failed before direct selected submission was restored.
 exactly one pink shimmer, native boss flame, and no live Morpha tentacle resource
 requests/submissions. Old isolated fixtures were brought up to the exact
 restored ABI/sword operation count; their production bodies remain unmodified.
+
+
+Direct redesigned-path mod overrides are now classified as external geometry.
+If either opaque or translucent pass is selected from a mod, native OoT and the
+owner descriptor retain that selected mesh and independent identity shimmer,
+but withhold authored fitting, model-local energy and upgrade flame. The
+owner emits `CUSTOM_GI`; native MM submits the same raw passes through
+`NeiGi_DrawExternalPresentation`. The recovered foreign custom dispatch already
+uses this kind without authored effects. Mario's mandatory shimmer remains
+exactly once, including this selected-mod route.
+
+RED: the actual native renderer attached authored energy to an arbitrary mod
+replacing a redesigned GI pass. GREEN: every bound model's OPA and available
+XLU overrides pass both base/Alt and effects off/on in native/owner/MM renderer
+fixtures; no generated fit or local effects, exact separate identity metadata.
+Native and `--combo` renderer suites, identity fixtures and real MM syntax pass.

@@ -107,7 +107,12 @@ jobs:
           git fetch --no-tags --depth=1 origin 122dd5f68cb37fcf515c3726f8a77043db5dcdf4
           # Match libultraship's ImGui dependency for the real save-editor draw fixture.
           git clone --depth=1 --branch v1.91.9b-docking https://github.com/ocornut/imgui.git "$RUNNER_TEMP/combo-nei-imgui"
-          CPATH="$RUNNER_TEMP/combo-nei-imgui${CPATH:+:$CPATH}" bash scripts/diagnostics/run_combo_nei_regressions.sh
+          # The real SaveEditor headers also reach ResourceManager and GuiTexture.
+          # Use the same pins as libultraship/cmake/dependencies/common.cmake.
+          git clone --depth=1 --branch v4.1.0 https://github.com/bshoshany/thread-pool.git "$RUNNER_TEMP/combo-nei-thread-pool"
+          mkdir -p "$RUNNER_TEMP/combo-nei-stb"
+          curl --fail --location https://raw.githubusercontent.com/nothings/stb/0bc88af4de5fb022db643c2d8e549a0927749354/stb_image.h --output "$RUNNER_TEMP/combo-nei-stb/stb_image.h"
+          CPATH="$RUNNER_TEMP/combo-nei-imgui:$RUNNER_TEMP/combo-nei-thread-pool/include:$RUNNER_TEMP/combo-nei-stb${CPATH:+:$CPATH}" bash scripts/diagnostics/run_combo_nei_regressions.sh
 
       - name: OoT diagnostic frame timing accounting
         run: |

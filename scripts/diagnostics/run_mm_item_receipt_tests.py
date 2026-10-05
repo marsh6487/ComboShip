@@ -293,6 +293,27 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
 
     # Execute the actual exported donor builder, with the authored descriptions.
     donor = (ROOT / 'tests/item_receipts/donor_test.cpp').read_text()
+    enum_gets = re.findall(r'RANDO_ENUM_ITEM\((RG_\w+)\)',
+                          (ROOT / 'soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h').read_text())
+    groups = (('RG_ZELDAS_LULLABY', 'RG_PRELUDE_OF_LIGHT', None),
+              ('RG_DEKU_TREE_MAP', 'RG_ICE_CAVERN_MAP', 0x66),
+              ('RG_DEKU_TREE_COMPASS', 'RG_ICE_CAVERN_COMPASS', 0x67),
+              ('RG_FOREST_TEMPLE_SMALL_KEY', 'RG_TREASURE_GAME_SMALL_KEY', 0x60),
+              ('RG_FOREST_TEMPLE_BOSS_KEY', 'RG_GANONS_CASTLE_BOSS_KEY', 0xC7))
+    traditional = 'const TraditionalReceiptFixture traditionalReceipts[] = {\n'
+    for first, last, expected_text in groups:
+        for rg in enum_gets[enum_gets.index(first):enum_gets.index(last) + 1]:
+            row = re.search(r'itemTable\[' + rg + r'\]\s*=\s*Item\([^\n]+', donor_catalog).group(0)
+            name = re.search(r'Text\{\s*("(?:[^"\\]|\\.)*")', row).group(1)
+            native_text = re.search(r'GID_\w+,\s*(0x[0-9A-Fa-f]+|TEXT_\w+)', row).group(1)
+            if native_text == 'TEXT_ITEM_DUNGEON_MAP':
+                native_text = '0x66'
+            elif native_text == 'TEXT_ITEM_COMPASS':
+                native_text = '0x67'
+            expected = '0xF3' if rg == 'RG_TREASURE_GAME_SMALL_KEY' else native_text if expected_text is None else hex(expected_text)
+            traditional += f'{{{rg}, {name}, {native_text}, {expected}}},\n'
+    traditional += '};\n'
+    donor = donor.replace('/* TRADITIONAL_CATALOG */', traditional)
     descriptions = 'const CustomItemMessageEntry receiptMessages[] = {\n'
     for rg in ('RG_CANE_OF_SOMARIA', 'RG_PROGRESSIVE_ROCS', 'RG_CANE_PACCI_FLIP',
                'RG_ROCS_CAPE', 'RG_QUARTZ_OF_MOTION', 'RG_DEKU_LEAF',

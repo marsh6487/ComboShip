@@ -11,6 +11,7 @@ The historical final candidate disappeared from the transient workspace. The sup
 | `6d5902fb8ada8dd8b5ce9fedec4a1fa6e93a07c9` | Safe wallet digits and descriptive localized MM songs | Remote tree `e4f335a0d6e1b3288b904ec6f058e621274083d3` equals the local tested tree; fetched branch verified | Editor, Wolf core/host, remaining GI/text presentation and combined review/builds |
 | `9d4886c54847b0eb267a8985d99bd55140011170` | Wolf loader, GI fit, traditional/exact-color receipts, Pikachu compatibility and WIP editor fixture | Remote tree `9e03696c4aa44929e0516d04360a4fa4f72a2b8c` equals local tree; fetched branch verified | Host/editor implementation, final presentation, review and builds |
 | `a79093a7c4c6a601c334c44e7578cb6ca945f83b` | Live editor grants, Wolf combat, themed songs and sanitized skin fixtures | Remote tree `4832641839853c68f577c2108f48312c174db1c7` equals local tree; fetched branch verified | Host, sword/receipt integration, preservation review and builds |
+| `167aa37c33c3f5be46de342287772100de5633fa` | Integrated Wolf host, upright swords, colored clefs and MM-owned Ikana icons | Remote tree `6942eb50ff1c26561b7624863a8d34abd1f16b62` equals local tree; fetched branch verified | Final edge cases, independent review and builds |
 
 ## MM skin section
 
@@ -43,7 +44,18 @@ Local worker commit `12d055506bbdb49280cd30e8502672b9a10e91e7` adds opt-in root 
 - `python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py` passed on the integrated tree with colored native IA8 song clefs and MM-owned Ikana shield icons, including cold aliases, foreign ownership and aspect/reset behavior. `run_receipt_syntax_tests.py` passed all seven full production translation units, including the jointly edited MM DrawItem dispatcher.
 - The combined regression gate now includes these host, syntax and sword tests.
 
-This remains a partial reconstruction checkpoint. Final malformed-transform guards, arbitrary mod FX exclusion, clear/regrant and concrete receipt boundaries, independent combined review and complete Windows/Linux builds remain in progress. In-game acceptance is not claimed.
+## Final catalog and mod checks
+
+- After integrating the final editor section, `tests/mm_editor/run_tests.py` passed all eight groups: actual current grants, clear/regrant host recovery without recounting earned powers, repeat/native inventory preservation, complete production Hourglass pools and Grace194/FireRod192 bindings, plus both real translation units. The extracted binding fixture now uses the production `Kind` alias and a declared effects-off CVar boundary. Its historical RED control reads published baseline `1c29c83f`, whose editor/registry blobs equal the original local control, so it survives a fresh checkout.
+- The completed direct OoT exporter fixture passes all 48 traditional catalog rows, including the Chest Game key's native text ID `0xF3`. `run_mm_item_receipt_tests.py` passed again on the integrated root. The tracked receipt report preserves the worker's sanitizer and source evidence.
+- `run_nei_gi_tests.py --combo` and `run_nei_identity_tests.py` passed again with arbitrary external OPA/XLU mod replacements. Those selected meshes retain independent shimmer while excluding authored fit and model-local energy.
+- CI now provides BS thread-pool v4.1.0 and stb headers at the project's exact pins. Actual SaveEditor compiler dependency expansion proved they are required alongside the already-provided ImGui/JSON/spdlog/SDL headers. The accepted fixed historical source commits used by preservation tests have been fetched unchanged.
+
+## Open independent review findings
+
+The checkpoint is deliberately incomplete. Independent review reproduced Wolf responding to raw A/B when MM suppressed or overrode effective input; the Wolf worker is fixing effective input capture and remote-tool/textbox ownership with the actual native selection block. GI review found selected standalone/Din sword recipes return before assigning their per-item shimmer identity. Receipt review found local concrete MM OoT small keys skip the donor because their FC count-chain length exceeds one. These are assigned narrow implementation/production-fixture fixes; do not treat the passing older fixtures as proof of these omitted cases.
+
+Final malformed-transform/renderer guards, the above review corrections, the complete combined gate and Windows/Linux builds remain in progress. In-game acceptance is not claimed.
 
 ## Resume
 

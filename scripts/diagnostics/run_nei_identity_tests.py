@@ -31,6 +31,7 @@ bool mod, selectedSword, resources; int enabled;
 #define CVAR_NEI_GI_EFFECTS "gEnhancements.SkijerNEI.ItemEffects"
 int CVarGetInteger(const char*,int) {return enabled;}
 bool HasLegacyGiMod(const Presentation&,bool) {return mod;}
+bool HasRedesignGiMod(const Presentation&) {return false;}
 bool HasSelectedSword(const Presentation&,bool,bool (*)(const char*)) {return selectedSword;}
 int OOT_NeiAltAssetsEnabled() {return true;}
 int OOT_NeiResourceExists(const char*) {return resources;}

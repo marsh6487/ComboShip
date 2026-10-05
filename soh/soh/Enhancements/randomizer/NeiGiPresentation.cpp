@@ -756,6 +756,11 @@ const char* SelectedSwordPath(const Presentation& item, bool altAssets, bool (*a
     return available(selected) ? selected : nullptr;
 }
 
+bool HasRedesignGiMod(const Presentation& item) {
+    return (item.opaque && ResourceMgr_IsModAssetForGame("oot", item.opaque)) ||
+           (item.translucent && ResourceMgr_IsModAssetForGame("oot", item.translucent));
+}
+
 bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available)(const char*)) {
     return SelectedSwordPath(item, altAssets, available) != nullptr;
 }
@@ -803,8 +808,8 @@ static void NeiGi_DrawSong(PlayState* play, int song) {
     NeiGi_DrawSongOverlay(play, song, nullptr);
 }
 
-static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool upgraded) {
-    if (!upgraded && item.draw == Randomizer_DrawMarioMask)
+static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool upgraded, bool legacy) {
+    if (legacy && item.draw == Randomizer_DrawMarioMask)
         return; // The legacy callback already draws its mask overlay.
     if (upgraded && item.effect == Kind::SeasonCycle)
         NeiGi_DrawSeasonOverlay(play, 5, nullptr);
@@ -852,17 +857,18 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     // Archive presence checks preserve the original model if a required pass is absent.
     const bool upgraded = !selectedSword && !HasLegacyGiMod(*item) && HasResource(item->opaque) &&
                           (!item->translucent || HasResource(item->translucent));
+    const bool authored = upgraded && !HasRedesignGiMod(*item);
     if (!upgraded && !entry->drawFunc && !item->alwaysShimmer)
         return false;
     Matrix_Push();
-    if (upgraded) {
+    if (authored) {
         if (const auto* bounds = NeiGi::FindFrameBounds(item->opaque)) {
             const auto fit = NeiGi::FrameFit(*bounds, item->scale, shop);
             Matrix_Translate(0, fit.lift, 0, MTXMODE_APPLY);
             Matrix_Scale(fit.scale, fit.scale, fit.scale, MTXMODE_APPLY);
         }
     }
-    if (upgraded && item->draw == Randomizer_DrawCaneSomariaUpgrade) {
+    if (authored && item->draw == Randomizer_DrawCaneSomariaUpgrade) {
         // Retain the original red skill-upgrade flame with the authored cane.
         Randomizer_DrawCaneSomariaUpgradeFlame(play);
     }
@@ -876,6 +882,9 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         Matrix_Scale(item->scale, item->scale, item->scale, MTXMODE_APPLY);
         Matrix_RotateY(Spin(play), MTXMODE_APPLY);
         Gfx_SetupDL_25Opa(play->state.gfxCtx);
+        gSPGrayscale(POLY_OPA_DISP++, false);
+        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
+        gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
         gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
                   G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
         gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, item->opaque, 0, G_DL_PUSH);
@@ -886,7 +895,7 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         GetItem_Draw(play, entry->gid);
     }
     Matrix_Pop();
-    NeiGi_DrawEffects(play, *item, upgraded);
+    NeiGi_DrawEffects(play, *item, authored, !upgraded && !selectedSword);
     if (upgraded && item->translucent != nullptr) {
         // Composite the crystal skin over its contained energy, using the same pose.
         OPEN_DISPS(play->state.gfxCtx);
@@ -894,6 +903,9 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         Matrix_Scale(item->scale, item->scale, item->scale, MTXMODE_APPLY);
         Matrix_RotateY(Spin(play), MTXMODE_APPLY);
         Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+        gSPGrayscale(POLY_XLU_DISP++, false);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+        gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
         gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
                   G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
         gDma1p(POLY_XLU_DISP++, G_DL_OTR_FILEPATH, item->translucent, 0, G_DL_PUSH);
@@ -960,6 +972,12 @@ static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* ou
         out->xluStartIndex = 1;
     }
     out->scale = item.scale;
+    // An override at either redesigned pass owns its geometry. Preserve its
+    // deferred selection and identity overlay without authored bounds/FX.
+    if (HasRedesignGiMod(item)) {
+        out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
+        return true;
+    }
     out->drawKind = CW_DRAW_KIND_NEI_GI;
     out->neiEffect = static_cast<int32_t>(item.effect);
     out->neiEffectCenter[0] = item.effectCenter.x;

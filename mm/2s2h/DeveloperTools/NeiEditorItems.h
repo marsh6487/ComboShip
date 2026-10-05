@@ -5,6 +5,7 @@ extern "C" {
 #include "mods/extended_inventory.h"
 #include "mods/extended_equipment.h"
 }
+#include <cstddef>
 #include <string_view>
 #include <vector>
 
@@ -114,7 +115,8 @@ inline bool IsOwned(RandoItemId id) {
     for (uint8_t i = 0; i < 6; ++i) {
         if (id == caneItems[i]) {
             // The base identity is progressive; explicit sibling identities own one skill.
-            return i == 0 ? (nei->caneSkills & 0x3F) == 0x3F : Nei_CaneHasSkill(i);
+            return Nei_GetOwnedItem(SLOT_CANE_OF_SOMARIA) == ITEM_CANE_OF_SOMARIA &&
+                   (i == 0 ? (nei->caneSkills & 0x3F) == 0x3F : Nei_CaneHasSkill(i));
         }
     }
     const int wand = WandMode(id);
@@ -125,9 +127,11 @@ inline bool IsOwned(RandoItemId id) {
     case RI_OOT_NEI_BOMB_ARROWS:
         return nei->bombArrowsOwned != 0;
     case RI_OOT_NEI_SHOVEL:
-        return nei->shovelOwned != 0;
+        return nei->shovelOwned &&
+               (Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_SHOVEL || Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_DOMINION_ROD);
     case RI_OOT_NEI_DOMINION_ROD:
-        return nei->dominionOwned != 0;
+        return nei->dominionOwned &&
+               (Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_SHOVEL || Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_DOMINION_ROD);
     case RI_OOT_NEI_POKE_BALL:
         return nei->pokeballOwned != 0;
     case RI_OOT_NEI_MARIO_MASK:
@@ -165,9 +169,60 @@ inline bool IsOwned(RandoItemId id) {
     }
 }
 
+template <std::size_t N> inline bool IsOneOf(RandoItemId id, const RandoItemId (&items)[N]) {
+    for (const auto item : items) {
+        if (id == item) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Clear Custom Items only removes cells. Retained powers still own their host;
+// restore that cell through the canonical setter without replaying earned grants
+// (the cane handler ignores owned skills, and replaying runes changes selection).
+inline bool RestoreOwnedHost(RandoItemId id) {
+    const auto* nei = Nei_Save();
+    uint8_t slot = SLOT_NONE;
+    uint16_t item = ITEM_NONE;
+    if ((id == RI_OOT_NEI_SHEIKAH_SLATE || IsOneOf(id, runeItems)) && nei->slateRunesOwned) {
+        slot = SLOT_SHEIKAH_SLATE;
+        item = EXT_ITEM_SHEIKAH_SLATE;
+    } else if ((id == RI_OOT_NEI_ROD_OF_SEASONS || IsOneOf(id, seasonItems)) && nei->seasonsOwned) {
+        slot = SLOT_ROD_OF_SEASONS;
+        item = EXT_ITEM_ROD_OF_SEASONS;
+    } else if (IsOneOf(id, caneItems) && nei->caneSkills) {
+        slot = SLOT_CANE_OF_SOMARIA;
+        item = ITEM_CANE_OF_SOMARIA;
+    } else if (id == RI_OOT_NEI_SHOVEL && nei->shovelOwned) {
+        slot = SLOT_SHOVEL;
+        item = ITEM_SHOVEL;
+    } else if (id == RI_OOT_NEI_DOMINION_ROD && nei->dominionOwned) {
+        slot = SLOT_SHOVEL;
+        item = ITEM_DOMINION_ROD;
+    } else if (WandMode(id) >= 0) {
+        for (uint8_t mode = 0; mode < WAND_MODE_COUNT; ++mode) {
+            if (Wand_ModeOwned(mode)) {
+                slot = SLOT_ELEMENTAL_WAND;
+                item = ITEM_ELEMENTAL_WAND;
+                break;
+            }
+        }
+    }
+    if (slot != SLOT_NONE && Nei_GetOwnedItem(slot) == ITEM_NONE) {
+        ExtInv_GiveItem(slot, item);
+        return true;
+    }
+    return false;
+}
+
 inline bool Grant(RandoItemId id) {
-    if (!IsItem(id) || IsOwned(id)) {
+    if (!IsItem(id)) {
         return false;
+    }
+    const bool restored = RestoreOwnedHost(id);
+    if (IsOwned(id)) {
+        return restored;
     }
     Rando::GiveItem(id);
     // The default wand rule reads the medallion quest bits, so obtaining a rod

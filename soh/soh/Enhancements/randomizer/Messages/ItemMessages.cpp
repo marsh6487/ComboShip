@@ -110,7 +110,7 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName, cha
         else if (rg >= RG_DEKU_TREE_COMPASS && rg <= RG_ICE_CAVERN_COMPASS)
             traditionalText = 0x67;
         else if (rg >= RG_FOREST_TEMPLE_SMALL_KEY && rg <= RG_TREASURE_GAME_SMALL_KEY)
-            traditionalText = 0x60;
+            traditionalText = rg == RG_TREASURE_GAME_SMALL_KEY ? 0xF3 : 0x60;
         else if (rg >= RG_FOREST_TEMPLE_BOSS_KEY && rg <= RG_GANONS_CASTLE_BOSS_KEY)
             traditionalText = 0xC7;
         else if (rg >= RG_ZELDAS_LULLABY && rg <= RG_PRELUDE_OF_LIGHT) {

@@ -97,8 +97,10 @@ int main() {
         REQUIRE(nei->shovelOwned && nei->dominionOwned && nei->bombArrowsOwned);
         REQUIRE(nei->pokeballOwned && nei->marioMaskOwned && nei->capeOwned);
         REQUIRE(Nei_GetOwnedItem(SLOT_ROCS) == ITEM_ROCS_CAPE);
+#ifndef MM_EDITOR_CONTROL
         for (const auto id : NeiEditor::Catalog())
             REQUIRE(NeiEditor::IsOwned(id));
+#endif
         REQUIRE(memcmp(&nativeBefore, &gSaveContext.save.saveInfo, sizeof(nativeBefore)) == 0);
 
         // An already-complete grant must not recount FC items, send new notifications,
@@ -115,7 +117,7 @@ int main() {
     }
     puts("PASS grant-all: current NEI handlers, four canonical slots, all powers/seasons/cane/wand rules, ordinary "
          "inventory and repeat safety");
-#if __has_include("2s2h/DeveloperTools/NeiEditorItems.h")
+#ifndef MM_EDITOR_CONTROL
     const struct {
         RandoItemId id;
         u8 slot;
@@ -184,6 +186,31 @@ int main() {
     REQUIRE(!NeiEditor::Grant(RI_OOT_NEI_ROCS_FEATHER));
     REQUIRE(Nei_GetOwnedItem(SLOT_ROCS) == ITEM_ROCS_CAPE);
     puts("PASS first-power host ownership, partial cane completion and Roc cape preservation");
+
+    // The existing Clear Custom Items control removes cells while retaining powers.
+    // Give All must restore the hosts without recounting already-earned powers.
+    reset();
+    NeiEditor::GrantAll();
+    Nei_Save()->slateMode = SLATE_RUNE_BOMB;
+    Nei_Save()->season = SEASON_SPRING;
+    const auto powered = *Nei_Save();
+    for (u8 slot = 24; slot < 48; ++slot)
+        Nei_SetOwnedItem(slot, ITEM_NONE);
+    REQUIRE(!NeiEditor::IsOwned(RI_OOT_NEI_CANE_OF_SOMARIA));
+    REQUIRE(!NeiEditor::IsOwned(RI_OOT_NEI_DOMINION_ROD));
+    NeiEditor::GrantAll();
+    REQUIRE(Nei_GetOwnedItem(SLOT_CANE_OF_SOMARIA) == ITEM_CANE_OF_SOMARIA);
+    REQUIRE(Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_SHOVEL || Nei_GetOwnedItem(SLOT_SHOVEL) == ITEM_DOMINION_ROD);
+    REQUIRE(Nei_GetOwnedItem(39) == EXT_ITEM_SHEIKAH_SLATE);
+    REQUIRE(Nei_GetOwnedItem(47) == EXT_ITEM_ROD_OF_SEASONS);
+    REQUIRE(Nei_Save()->slateMode == SLATE_RUNE_BOMB && Nei_Save()->season == SEASON_SPRING);
+    REQUIRE(Nei_Save()->caneSkills == powered.caneSkills);
+    const int caneFc = FcCombo_ItemForNative(RI_OOT_NEI_CANE_OF_SOMARIA);
+    REQUIRE(caneFc >= 0);
+    REQUIRE(Nei_Save()->comboObtainedFc[caneFc] == powered.comboObtainedFc[caneFc]);
+    REQUIRE(Nei_Save()->comboAppliedFc[caneFc] == powered.comboAppliedFc[caneFc]);
+    puts("PASS clear/regrant: retained powers recover their host cells without recounting cane skills or changing "
+         "rune/season selection");
 #endif
     return 0;
 }

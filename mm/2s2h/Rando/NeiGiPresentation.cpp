@@ -185,6 +185,12 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop) {
     }
     if (!play || info.dlistCount < 1 || !info.dlists[0])
         return;
+    if (info.drawKind == CW_DRAW_KIND_CUSTOM_GI) {
+        NeiGi_DrawExternalPresentation(play, info.dlists[0],
+                                       info.xluStartIndex == 1 && info.dlistCount > 1 ? info.dlists[1] : nullptr,
+                                       info.scale, info.neiShimmer - 1, info.itemShimmer, "oot");
+        return;
+    }
     Matrix_Push();
     if (info.neiSomariaUpgrade)
         DrawOotSlateRuneFlame(255, 60, 60);

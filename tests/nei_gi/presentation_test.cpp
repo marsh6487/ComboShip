@@ -322,6 +322,7 @@ int main() {
     CwItemDrawInfo songInfo{};
     assert(NeiGi_DescribeEntry(&songEntry, &songInfo));
     assert(songInfo.drawKind == CW_DRAW_KIND_SONG_GI && songInfo.neiEffect == song.second && songInfo.itemShimmer);
+    assert(songInfo.dlistCount==1 && songInfo.xluStartIndex==0);
     assert(std::memcmp(color, songInfo.itemShimmerColor, 4) == 0);
 #endif
   }
@@ -756,6 +757,45 @@ int main() {
     assert(vanilla == nativeBefore && Drawn().back() == fire && arena.size() == shimmerBefore + 2);
     dinSword=0; assert(NeiGi_Draw(&play,&entry));
   }
+  // A selected mod can also replace a redesigned GI pass itself. Exact path
+  // ownership does not make its arbitrary mesh inherit our authored fit/FX.
+  for(const auto& model:kPresentations) {
+    if(!model.opaque)continue;
+    for(bool useAlt:{false,true}) for(int effects:{0,1}) for(int pass:{0,1}) {
+      if(pass && !model.translucent)continue;
+      Reset(); alt=useAlt; enabled=effects;
+#ifdef COMBO_BUILD
+      ownerAlt=useAlt;
+#endif
+      files.insert(model.opaque); if(model.translucent)files.insert(model.translucent);
+      const char* overridden=pass?model.translucent:model.opaque;
+      if(useAlt)files.insert(std::string("alt/")+overridden);
+      modFiles.insert({"oot",(useAlt?"alt/":"")+std::string(overridden)});
+      GetItemEntry modEntry{}; modEntry.drawFunc=model.draw; modEntry.drawItemId=model.identity;modEntry.gid=model.nativeGid;
+      assert(NeiGi_Draw(&play,&modEntry));
+      assert(!submitted.empty() && submitted.front()==std::pair(model.scale,0.f));
+      assert(arena.size()==size_t(model.alwaysShimmer||effects) && "arbitrary redesigned-path mod inherited authored model-local energy");
+      assert(flameColors.empty() && fallback==0 && vanilla==0 && stack.empty() && matrix==1 && matrixY==0);
+#ifdef COMBO_BUILD
+      CwItemDrawInfo modInfo{}; assert(NeiGi_DescribeEntry(&modEntry,&modInfo));
+      assert(modInfo.drawKind==CW_DRAW_KIND_CUSTOM_GI && modInfo.neiEffect==0 && modInfo.neiShimmer==int(model.effect)+1);
+      assert(!modInfo.neiSomariaUpgrade && !modInfo.primColorOpa[3] && !modInfo.primColorXlu[3]);
+      const std::string slug=std::string(model.opaque).substr(std::strlen("__OTR__objects/nei_gi_redesign/"));
+      CwItemDrawInfo ownerInfo{}; assert(OOT_GetNeiGiDrawInfo(slug.substr(0,slug.find('/')).c_str(),&ownerInfo));
+      assert(ownerInfo.drawKind==CW_DRAW_KIND_CUSTOM_GI && ownerInfo.neiEffect==0);
+      submitted.clear();arena.clear();gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;
+      MM_DrawNeiGi(ownerInfo);
+      assert(submitted.front()==std::pair(model.scale,0.f));
+      assert(arena.size()==size_t(model.alwaysShimmer||effects));
+      assert(stack.empty() && matrix==1 && matrixY==0);
+#endif
+    }
+  }
+#ifdef COMBO_BUILD
+  ownerAlt=false;
+#endif
+  std::cout<<"PASS every redesigned GI override: both OPA/XLU selections, base/Alt, native/owner/MM, independent identity shimmer and no authored fit/energy\n";
+
   // A mod at an established model resource outranks authored GI geometry in
   // native common/shop selection and the owner-pinned foreign descriptor.
   struct ModBinding {CustomDrawFunc draw;const char* slug;const char* game;const char* legacy;int identity=0;};

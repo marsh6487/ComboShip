@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Exercise editor grants with production item data, grant arms, stores and FC recording."""
+import argparse
 import os
 from pathlib import Path
 import re
@@ -14,16 +15,23 @@ from run_mm_scene_randomization_tests import function
 from run_mm_nei_tests import flags
 
 
-def source(path):
+def source(path, control=False):
+    if control:
+        return subprocess.check_output(["git", "show", "1c29c83f5d676d02ececa7302c138f7aa46b952a:" + path], cwd=ROOT,
+                                       env={**os.environ, "GIT_NO_LAZY_FETCH": "1"}).decode("utf-8-sig")
     return (ROOT / path).read_text()
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--control", action="store_true", help="Run the old editor path; expected to fail missing-slot assertion")
+    args = parser.parse_args()
     items = source("mm/2s2h/Rando/StaticData/Items.cpp")
     macro = items[items.index("#define RI("):items.index("// clang-format off")]
     item_map = items[items.index("std::map<RandoItemId, RandoStaticItem> Items ="):
                      items.index("// clang-format on")]
     production = "namespace Rando::StaticData {\n" + macro + item_map + "\n}\n"
+    item_data = production
     nei = source("mm/mods/nei_save.cpp")
     for name in ["Nei_Save", "Nei_GetOwnedItem", "Nei_SetOwnedItem", "Nei_InitNewSave"]:
         production += function(nei, name) + "\n"
@@ -59,24 +67,23 @@ def main():
     production += '\n        default: fprintf(stderr, "unexpected editor grant %d\\n", (int)randoItemId); abort();\n'
     production += "    }\n}\n"
 
-    editor_header = ROOT / "mm/2s2h/DeveloperTools/NeiEditorItems.h"
-    if editor_header.exists():
+    if not args.control:
         production += '#include "2s2h/DeveloperTools/NeiEditorItems.h"\n'
     else:
         # RED control: execute the editor's current Give All Custom Items block and
         # actual debug helper. Registry data are projected from production into the
         # real NeiItem struct; only .item/.slot are read by this ownership-only path.
-        registry = source("mm/mods/extended_player.c")
+        registry = source("mm/mods/extended_player.c", control=True)
         registry = registry[registry.index("static const NeiItem sNeiItems[]"):
                             registry.index("#define NEI_ITEMS_COUNT")]
         entries = re.findall(r"\{\s*(ITEM_[A-Z0-9_]+).*?\b(SLOT_[A-Z0-9_]+|NEI_NO_SLOT),\s*AGE_REQ", registry, re.S)
         production += "static const NeiItem sNeiItems[] = {\n"
         production += "\n".join("{.item=" + item + ", .slot=" + slot + "}," for item, slot in entries)
         production += "\n};\n#define NEI_ITEMS_COUNT (sizeof(sNeiItems)/sizeof(sNeiItems[0]))\n"
-        production += function(source("mm/mods/extended_player.c"), "Nei_FindByItem") + "\n"
+        production += function(source("mm/mods/extended_player.c", control=True), "Nei_FindByItem") + "\n"
         production += function(inventory, "ExtInv_GetItemSlot") + "\n"
-        production += function(source("mm/mods/extended_player.c"), "ExtInv_DebugGiveAll") + "\n"
-        editor = source("mm/2s2h/DeveloperTools/SaveEditor.cpp")
+        production += function(source("mm/mods/extended_player.c", control=True), "ExtInv_DebugGiveAll") + "\n"
+        editor = source("mm/2s2h/DeveloperTools/SaveEditor.cpp", control=True)
         start = editor.index('    if (ImGui::Button("Give All Custom Items"))')
         end = editor.index("    // NOTE: visual slots", start)
         production += 'namespace ImGui { bool Button(const char* label) { return strcmp(label, "Give All Custom Items") == 0; } void SameLine() {} }\n'
@@ -90,11 +97,27 @@ def main():
         subprocess.run([*cxx, "-std=c++20", "-fpermissive", "-O0", "-g",
                         "-fsanitize=address,undefined,bounds", "-fno-sanitize-recover=all",
                         *flags(), "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
+                        *(["-DMM_EDITOR_CONTROL"] if args.control else []),
                         "-I" + str(build), "-include", "nlohmann/json.hpp",
                         "-Wall", "-Wextra", "-Wno-unused-parameter", "-Wno-missing-field-initializers",
                         str(ROOT / "tests/mm_editor/grant_test.cpp"), "-o", str(binary)], check=True)
         environment = {**os.environ, "ASAN_OPTIONS": os.environ.get("ASAN_OPTIONS", "") + ":detect_leaks=0"}
         subprocess.run([str(binary)], check=True, env=environment)
+        bindings = source("mm/2s2h/Rando/NeiGiPresentation.cpp")
+        pool_binding = item_data + "\nnamespace Rando::Logic {\n"
+        pool_binding += function(source("mm/2s2h/Rando/Logic/GeneratePools.cpp"), "GeneratePools") + "\n}\n"
+        pool_binding += bindings[bindings.index("struct Binding {"):bindings.index("// Only roots that differ")]
+        pool_binding += function(bindings, "HasMmLegacyGiMod") + "\n"
+        pool_binding += function(bindings, "MM_DescribeNeiGi") + "\n"
+        (build / "pool_binding_production.inc").write_text(pool_binding)
+        pool_binary = build / "pool_binding_test"
+        subprocess.run([*cxx, "-std=c++20", "-fpermissive", "-O0", "-g",
+                        "-fsanitize=address,undefined,bounds", "-fno-sanitize-recover=all",
+                        *flags(), "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
+                        "-I" + str(build), "-include", "nlohmann/json.hpp", "-include", "ship/Context.h",
+                        "-include", "spdlog/spdlog.h", str(ROOT / "tests/mm_editor/pool_binding_test.cpp"),
+                        "-Wl,--export-dynamic-symbol=OOT_GetNeiGiDrawInfo", "-ldl", "-o", str(pool_binary)], check=True)
+        subprocess.run([str(pool_binary)], check=True, env=environment)
         native_flags = ["-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
                         "-DNON_EQUIVALENT", "-DNON_MATCHING"]
         native_flags += ["-I" + str(ROOT / p) for p in

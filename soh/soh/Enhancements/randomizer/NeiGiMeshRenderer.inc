@@ -242,6 +242,51 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
     Matrix_Pop();
 }
 
+void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char* xlu, float scale,
+                                   int shimmerKind, bool shimmer, const char* owner) {
+    if (!play || !opa || scale <= 0 || shimmerKind < 0 || shimmerKind > int(Kind::MarioMask))
+        return;
+    const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
+    const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
+    Matrix_Push();
+    Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+#ifdef NEI_GI_ROTATE_Y
+    NEI_GI_ROTATE_Y(spin, MTXMODE_APPLY);
+#else
+    Matrix_RotateY(spin, MTXMODE_APPLY);
+#endif
+    OPEN_DISPS(play->state.gfxCtx);
+    if (owner) {
+        gSPComboRMPush(POLY_OPA_DISP++, owner);
+        gSPComboRMPush(POLY_XLU_DISP++, owner);
+    }
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
+    gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, opa, 0, G_DL_PUSH);
+    if (xlu) {
+        Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+        gSPGrayscale(POLY_XLU_DISP++, false);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+        gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+        gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+                  G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+        gDma1p(POLY_XLU_DISP++, G_DL_OTR_FILEPATH, xlu, 0, G_DL_PUSH);
+    }
+    if (owner) {
+        gSPComboRMPop(POLY_OPA_DISP++);
+        gSPComboRMPop(POLY_XLU_DISP++);
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Pop();
+    if (shimmer)
+        NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play),
+                                                static_cast<Kind>(shimmerKind)));
+}
+
 void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner) {
     if (!play || profile < 1 || profile > 6)
         return;

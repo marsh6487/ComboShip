@@ -60,7 +60,7 @@ struct ReceiptContext {
   } dungeon;
   ReceiptContext *GetDungeons() { return this; }
   Dungeon *GetDungeonFromScene(int scene) {
-    assert(scene == SCENE_DEKU_TREE || scene == SCENE_ICE_CAVERN);
+    assert(scene >= SCENE_DEKU_TREE && scene <= SCENE_ICE_CAVERN);
     return &dungeon;
   }
   std::map<RandomizerCheck, ReceiptPlacement> placements;
@@ -78,7 +78,7 @@ struct ReceiptContext {
 static bool masterQuest = false;
 static bool randoActive = true;
 bool ResourceMgr_IsSceneMasterQuest(int scene) {
-  assert(scene == SCENE_DEKU_TREE || scene == SCENE_ICE_CAVERN);
+  assert(scene >= SCENE_DEKU_TREE && scene <= SCENE_ICE_CAVERN);
   return randoActive && masterQuest;
 }
 struct {
@@ -137,6 +137,12 @@ struct CustomItemMessageEntry {
 };
 static bool stateAdvanced = false, throwOnRead = false;
 static int liveResolutionCalls = 0;
+struct TraditionalReceiptFixture {
+  RandomizerGet item;
+  const char* name;
+  uint16_t nativeText, expectedText;
+};
+/* TRADITIONAL_CATALOG */
 namespace Rando::StaticData {
 std::map<std::string, RandomizerGet> itemNameToEnum = {
     {"Cane of Somaria", RG_CANE_OF_SOMARIA},
@@ -194,6 +200,9 @@ struct Item {
                     : id == RG_DEKU_TREE_MAP     ? 0x66
                     : id == RG_MINUET_OF_FOREST  ? 0x73
                                                  : TEXT_RANDOMIZER_CUSTOM_ITEM;
+    for (const auto& fixture : traditionalReceipts)
+      if (fixture.item == id)
+        text = fixture.nativeText;
     return std::make_shared<GetItemEntry>(GetItemEntry{text});
   }
   std::shared_ptr<GetItemEntry> GetGIEntry(RandomizerGet *actual) const {
@@ -246,6 +255,8 @@ static const char dungeonMap[] =
     "You got the Dungeon Map!\x01" "Blue rooms are places you have visited.\x02";
 static const char smallKey[] =
     "You got a Small Key!\x01This key will open a locked door in this dungeon.\x02";
+static const char chestGameKey[] =
+    "You got a Key!\x01It opens the next door in the Treasure Chest Game.\x02";
 static const char bossKey[] =
     "You got the Boss Key!\x01Now you can get inside the chamber where the Boss lurks.\x02";
 static const char minuet[] =
@@ -257,6 +268,7 @@ MessageTableEntry nativeTable[] = {
     {0x67, 0, compass, sizeof(compass) - 1},
     {0x66, 0, dungeonMap, sizeof(dungeonMap) - 1},
     {0x60, 0, smallKey, sizeof(smallKey) - 1},
+    {0xF3, 0, chestGameKey, sizeof(chestGameKey) - 1},
     {0xC7, 0, bossKey, sizeof(bossKey) - 1},
     {0x73, 0, minuet, sizeof(minuet) - 1},
     {0xFFFF, 0, nullptr, 0}};
@@ -412,6 +424,21 @@ void BuildIceTrapMessageNamed(CustomMessage &msg, const std::string &) {
 /* DONOR_EXPORT */
 
 int main() {
+  // Item names and unresolved native text IDs come from the real OoT catalog.
+  // Message-table ownership is the seam; unique bodies reveal wrong IDs.
+  std::vector<std::string> songBodies;
+  songBodies.reserve(std::size(traditionalReceipts));
+  std::vector<MessageTableEntry> nativeMessages(nativeTable, nativeTable + std::size(nativeTable) - 1);
+  for (const auto& fixture : traditionalReceipts) {
+    Rando::StaticData::itemNameToEnum[fixture.name] = fixture.item;
+    if (fixture.item < RG_ZELDAS_LULLABY || fixture.item > RG_PRELUDE_OF_LIGHT || fixture.expectedText == 0x73)
+      continue;
+    songBodies.emplace_back(std::string("Native song tutorial: ") + fixture.name + "\x02");
+    const auto& body = songBodies.back();
+    nativeMessages.push_back({fixture.expectedText, 0, body.c_str(), static_cast<uint32_t>(body.size())});
+  }
+  nativeMessages.push_back({0xFFFF, 0, nullptr, 0});
+  sNesMessageEntryTablePtr = nativeMessages.data();
   entranceOverrides[0] = {ENTR_DEKU_TREE_BOSS_ENTRANCE, 1,
                           ENTR_FOREST_TEMPLE_BOSS_ENTRANCE, 1};
   char buffer[1269];
@@ -454,6 +481,20 @@ int main() {
   assert(read("Forest Temple Boss Key").find("Boss lurks") != std::string::npos);
   assert(read("Ganon's Castle Boss Key").find("Boss lurks") != std::string::npos);
   assert(read("Minuet of Forest").find("take you to the forest") != std::string::npos);
+  receiptContext.information = 0;
+  for (const auto& fixture : traditionalReceipts) {
+    const auto found = std::find_if(nativeMessages.begin(), nativeMessages.end(), [&](const auto& message) {
+      return message.textId == fixture.expectedText;
+    });
+    assert(found != nativeMessages.end());
+    std::string expected;
+    assert(ComboItemReceiptText::FromOotMessage(std::string_view(found->segment, found->msgSize), expected));
+    const auto receipt = read(fixture.name);
+    if (receipt.compare(0, expected.size(), expected) != 0)
+      std::cerr << "Replaced traditional receipt: " << fixture.name << '\n';
+    assert(receipt.compare(0, expected.size(), expected) == 0);
+  }
+  assert(liveResolutionCalls == 0);
   for (int enabled : {0, 1}) {
     receiptContext.information = enabled;
     assert(read("Great Deku Tree Compass").find("see hidden things") != std::string::npos);
