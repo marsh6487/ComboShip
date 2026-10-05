@@ -345,23 +345,42 @@ s32 SSBBSkin_ComputePose(SSBBCharacterInstance* inst) {
 
 // ── Draw ────────────────────────────────────────────────────────────────────
 
-void SSBBSkin_Draw(SSBBCharacterInstance* inst, PlayState* play, Vec3f* pos, Vec3s* rot) {
+static s32 SSBBSkin_ArenaHasSpace(const TwoHeadGfxArena* arena, size_t bytes) {
+    uintptr_t head = (uintptr_t)arena->p;
+    uintptr_t tail = (uintptr_t)arena->d;
+    // Integer subtraction avoids undefined pointer arithmetic for null or
+    // already-overlapping native heads; no arena is touched on rejection.
+    return head && tail >= head && tail - head >= bytes;
+}
+
+s32 SSBBSkin_Draw(SSBBCharacterInstance* inst, PlayState* play, Vec3f* pos, Vec3s* rot) {
     SSBBSkinMesh* skin;
     f32 s;
     s32 b;
     Mtx* worldMtx;
 
-    if (!inst || !inst->initialized || !inst->def || !inst->def->skinMesh)
-        return;
+    if (!inst || !inst->initialized || !inst->def || !inst->def->skinMesh || !play || !play->state.gfxCtx || !pos ||
+        !rot)
+        return 0;
 
     skin = inst->def->skinMesh;
     if (!skin->vtxBuf[0] || !skin->vtxBuf[1])
-        return;
+        return 0;
     if (!inst->ssbbAnim)
-        return;
+        return 0;
+
+    // Outer Open/CloseDisps plus the nested SetupDL25_Opa markers consume
+    // 9 opaque packets (10 with material). Xlu/overlay temporarily need two
+    // packets even though CloseDisps restores their heads. Vertices/DLs live
+    // in persistent buffers, so the only tail allocation is one aligned Mtx.
+    if (!SSBBSkin_ArenaHasSpace(&play->state.gfxCtx->polyOpa,
+                                (skin->materialDL ? 10 : 9) * sizeof(Gfx) + ALIGN16(sizeof(Mtx))) ||
+        !SSBBSkin_ArenaHasSpace(&play->state.gfxCtx->polyXlu, 2 * sizeof(Gfx)) ||
+        !SSBBSkin_ArenaHasSpace(&play->state.gfxCtx->overlay, 2 * sizeof(Gfx)))
+        return 0;
 
     if (!SSBBSkin_ComputePose(inst))
-        return;
+        return 0;
     if (CVarGetInteger("gExpansions.SSBB.SkinDebug", 0) == 1) {
         MtxF identity;
         s32 i;
@@ -406,4 +425,5 @@ void SSBBSkin_Draw(SSBBCharacterInstance* inst, PlayState* play, Vec3f* pos, Vec
     gSPDisplayList(POLY_OPA_DISP++, skin->displayList);
 
     CLOSE_DISPS(play->state.gfxCtx);
+    return 1;
 }

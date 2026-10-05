@@ -2991,7 +2991,8 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
     }
 
 #ifdef COMBO_BUILD
-    if (MM_TryDrawNeiGi(randoItemId))
+    const bool shop = actor && actor->id == ACTOR_EN_GIRLA;
+    if (MM_TryDrawNeiGi(randoItemId, shop))
         return;
     MM_NeiGiFallbackShimmer fallbackShimmer(randoItemId);
 #endif
@@ -3758,7 +3759,7 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
         case RI_COMBO_FOREIGN:
             // ComboShip: this MM check holds an OOT item — render the real OOT model (sentinel blue
             // rupee on any failure). The originating check identity is passed straight through.
-            MM_DrawComboForeign(randoCheckId);
+            MM_DrawComboForeign(randoCheckId, shop);
             break;
 #endif
         default:

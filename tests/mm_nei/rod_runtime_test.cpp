@@ -85,14 +85,33 @@ void Matrix_RotateXF(f32, MatrixMode);
 void Matrix_RotateYF(f32, MatrixMode);
 void Matrix_RotateZF(f32, MatrixMode);
 void Matrix_ReplaceRotation(MtxF *) {}
-Mtx *Matrix_Finalize(GraphicsContext *) {
+Mtx *Matrix_Finalize(GraphicsContext *gfx) {
+#ifdef MM_REAL_RENDERER
+  return static_cast<Mtx *>(GRAPH_ALLOC(gfx, sizeof(Mtx)));
+#else
   static Mtx m;
   return &m;
+#endif
 }
+#ifdef MM_REAL_RENDERER
+#include "mm_nei_graph.inc"
+static Gfx setupDl;
+void Gfx_SetupDL25_Opa(GraphicsContext *gfx) {
+  OPEN_DISPS(gfx);
+  __gSPDisplayList(POLY_OPA_DISP++, &setupDl);
+  CLOSE_DISPS(gfx);
+}
+void Gfx_SetupDL25_Xlu(GraphicsContext *gfx) {
+  OPEN_DISPS(gfx);
+  __gSPDisplayList(POLY_XLU_DISP++, &setupDl);
+  CLOSE_DISPS(gfx);
+}
+#else
 void Gfx_SetupDL25_Opa(GraphicsContext *) {}
 void Gfx_SetupDL25_Xlu(GraphicsContext *) {}
 void Graph_OpenDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
 void Graph_CloseDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
+#endif
 void gSPDisplayList(Gfx *, Gfx *) { ++nativeDraws; }
 void gSPSegment(void *, int, uintptr_t) {}
 Gfx *Gfx_TwoTexScroll(GraphicsContext *, s32, u32, u32, s32, s32, s32, u32, u32,

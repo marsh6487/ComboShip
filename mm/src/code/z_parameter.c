@@ -9817,7 +9817,7 @@ void Interface_Draw(PlayState* play) {
         if (GameInteractor_Should(VB_DRAW_RUPEE_COUNTER, true)) {
             sp2CC = 0;
             sp2C8 = RupeeCounter_BuildDigits(gSaveContext.save.saveInfo.playerData.rupees,
-                                            CUR_UPG_VALUE(UPG_WALLET) == 0 ? 2 : 3, counterDigits);
+                                             CUR_UPG_VALUE(UPG_WALLET) == 0 ? 2 : 3, counterDigits);
 
             magicAlpha = interfaceCtx->magicAlpha;
             if (magicAlpha > 180) {

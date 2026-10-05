@@ -545,7 +545,7 @@ void Message_DrawTextNES(PlayState* play, Gfx** gfxP, u16 textDrawPos) {
                 }
                 if ((u8)character == MESSAGE_COLOR_GREEN) {
                     const uint32_t rgb = ComboBossSoulSpanColor((const uint8_t*)msgCtx->decodedBuffer.schar + i + 1,
-                                                               sizeof(msgCtx->decodedBuffer.schar) - i - 1, true);
+                                                                sizeof(msgCtx->decodedBuffer.schar) - i - 1, true);
                     if (rgb) {
                         msgCtx->textColorR = (rgb >> 16) & 0xFF;
                         msgCtx->textColorG = (rgb >> 8) & 0xFF;

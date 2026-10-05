@@ -97,7 +97,8 @@ void NeiGi_DrawSeasonOverlay(PlayState*,int profile,const char*) {season=profile
 void NeiGi_DrawSongOverlay(PlayState*,int song,const char*) {overlay=song;}
 void ComboDrawMaskShimmer(PlayState*,void*,const uint8_t*,const char*) {++genericShimmer;}
 bool MM_DescribeNeiGi(RandoItemId,CwItemDrawInfo*) {++descriptions;return false;}
-void MM_DrawNeiGi(const CwItemDrawInfo&) {assert(false);}
+void MM_DrawNeiGi(const CwItemDrawInfo&,bool=false) {assert(false);}
+bool MM_TryDrawNeiGi(RandoItemId,bool shop=false);
 ''' + draw_song + '\n' + dispatcher + r'''
 int main() {
     for(int id=RI_UNKNOWN;id<RI_MAX;++id) {

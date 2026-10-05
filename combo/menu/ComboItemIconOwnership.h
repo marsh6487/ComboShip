@@ -7,9 +7,9 @@
 // This is MM's Mirror Shield, independent of which game's catalog carries its
 // extended-equipment identity. Cold aliases must never choose OoT's shield.
 static inline int ComboIconIsIkanaShieldName(const char* name) {
-    static const char* names[] = { "Shield of Ikana", "Ikana Mirror Shield", "Ikana Shield", "MM Mirror Shield",
-                                  "Mirror Shield (MM)", "Mirror Shield (Ikana)", "Shield of Ikana (MM)",
-                                  "Shield of Ikana (OOT)" };
+    static const char* names[] = { "Shield of Ikana",      "Ikana Mirror Shield",  "Ikana Shield",
+                                   "MM Mirror Shield",     "Mirror Shield (MM)",   "Mirror Shield (Ikana)",
+                                   "Shield of Ikana (MM)", "Shield of Ikana (OOT)" };
     if (!name)
         return 0;
     for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i)

@@ -124,3 +124,8 @@ concrete sword themes, preserving selected/Din geometry, protected priority and
 True Master flame fields. Full producer+resolver tests reproduced the loss first,
 then passed for both selection modes; sanitized actual foreign renderer dispatch
 receives each exact identity sampler and no generic overlay.
+# Review follow-up: actual MM shelf context
+
+The production `EnGirlA_RandoDrawFunc` → `Rando::DrawItem` → `DrawResolvedItem` path previously omitted the shop flag. A new fixture executes that exact callback/context path, the actual native selector and the actual foreign dispatcher against the shared renderer. Before the change it failed on Four Sword's lower edge (below the 0.5 shelf floor). `DrawResolvedItem` now derives shop context from its existing EnGirlA actor and forwards it through both native and foreign routes. Non-shop callers and selected mod priority retain their existing behavior.
+
+`run_nei_gi_tests.py --combo --sanitize` passes every MM binding through native/foreign shelf dispatch and through the corresponding world route. Actual MM `NeiGiPresentation.cpp` and `DrawItem.cpp` pass real-header syntax checks. The isolated song and dungeon-key fixtures now include the real updated selector signature and sword identity dependency; the song, key/cache sanitizer and sword-pose diagnostics pass.

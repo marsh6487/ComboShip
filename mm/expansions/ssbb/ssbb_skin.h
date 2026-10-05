@@ -55,8 +55,9 @@ void SSBBSkin_Init(SSBBSkinMesh* skin);
 // Free skin mesh runtime buffers
 void SSBBSkin_Destroy(SSBBSkinMesh* skin);
 
-// Full skinned draw: compute bone matrices, blend vertices, draw DL
-void SSBBSkin_Draw(SSBBCharacterInstance* inst, PlayState* play, Vec3f* pos, Vec3s* rot);
+// Full skinned draw: compute bone matrices, blend vertices, draw DL.
+// Returns 1 on submission, 0 when invalid or the native graphics arenas are full.
+s32 SSBBSkin_Draw(SSBBCharacterInstance* inst, PlayState* play, Vec3f* pos, Vec3s* rot);
 
 // Compute/query the current model-space pose, independent of graphics submission.
 // A query is valid only for the instance whose pose was most recently computed.

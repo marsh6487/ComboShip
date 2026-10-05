@@ -85,3 +85,11 @@ The aggregate clip bounds are conservative; an unusually large/canceling authore
 
 
 Independent review separately reran core/host/skin/fast-math fixtures after the effective-input repair. A proposed extra state1_20000000 defect was withdrawn after checking its existing IN_CUTSCENE alias and a native dispatch reproduction; the fixture now records that existing yield behavior.
+
+## Shared graphics-arena capacity checkpoint
+
+- Independent review reproduced valid skin drawing with an opaque arena 16 bytes short: the native command head crossed its matrix tail. Per-draw geometry is persistent; the dynamic cost is 9 opaque Gfx (10 with material) plus ALIGN16(sizeof(Mtx)), with two temporary Gfx slots in each xlu/overlay arena for nested native markers. On this 64-bit fixture ABI those bounds are 208/224 opaque bytes and 32 bytes per side arena.
+- The fixture now compiles the exact Graph_OpenDisps/Graph_CloseDisps and Gfx_SetupDL25_Opa bodies from native MM source, instead of replacing them. RED: a required-minus-one-byte arena submitted a draw. GREEN: preflight skips null, reversed, short opaque and one-slot xlu/overlay arenas without changing any command bytes, pointers, packed vertex buffers, buffer index or prior pose owner; exact capacity and one additional byte render without crossing head/tail. Actual production Pikachu still renders.
+- SSBBSkin_Draw reports whether it submitted a draw; existing callers may continue ignoring the result. Rejection happens before pose or vertex mutations and before native graphics helpers.
+- Fresh normal and -O2 -ffast-math skin fixtures pass ASan/UBSan/bounds/float-cast-overflow. Native matrix conversion and resource display-list submission remain test boundaries. Full platform/runtime acceptance is unchanged.
+- The new Wolf Player_Draw continuation needs a matching capacity-skipped result and its own marker/freeze overhead preflight; that follow-up is tracked separately from this shared-skin checkpoint.

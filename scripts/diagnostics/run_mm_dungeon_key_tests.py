@@ -70,6 +70,6 @@ with tempfile.TemporaryDirectory(prefix='mm-dungeon-keys-') as td:
     for name, body in parts.items():
         source = source.replace('/* PRODUCTION_' + name + ' */', body)
     (build / 'cache.cpp').write_text(source)
-    subprocess.run([cxx, '-std=c++20', *flags, '-I' + str(ROOT / 'combo/menu'), str(build / 'cache.cpp'),
+    subprocess.run([cxx, '-std=c++20', *flags, '-I' + str(ROOT), '-I' + str(ROOT / 'combo/menu'), str(build / 'cache.cpp'),
                     str(build / 'native.o'), '-o', str(build / 'cache')], check=True)
     subprocess.run([str(build / 'cache')], check=True)

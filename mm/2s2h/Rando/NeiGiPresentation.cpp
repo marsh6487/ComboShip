@@ -164,14 +164,7 @@ extern "C" bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh,
                                        const NeiGi::TextureMaterial& material) {
     if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, &material) || !HasResource(material.path))
         return false;
-    OPEN_DISPS(play->state.gfxCtx);
-    gSPComboRMPush(POLY_XLU_DISP++, "oot");
-    CLOSE_DISPS(play->state.gfxCtx);
-    NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material);
-    OPEN_DISPS(play->state.gfxCtx);
-    gSPComboRMPop(POLY_XLU_DISP++);
-    CLOSE_DISPS(play->state.gfxCtx);
-    return true;
+    return NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material, false, "oot");
 }
 
 void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b);
@@ -240,9 +233,8 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
     CwItemDrawInfo info{};
     const bool authored = describe(binding->slug, &info) == 1;
     out->neiShimmer = info.neiShimmer;
-    const bool mandatory = info.neiShimmer > 0 &&
-                           (NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1)) ||
-                            item == RI_OOT_IRON_KNUCKLE_AXE || item == RI_OOT_NEI_MARIO_MASK);
+    const bool mandatory = info.neiShimmer > 0 && (NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1)) ||
+                                                   item == RI_OOT_IRON_KNUCKLE_AXE || item == RI_OOT_NEI_MARIO_MASK);
     out->itemShimmer = mandatory || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0);
     out->stateDependent = 2;
     if (!authored || HasMmLegacyGiMod(item))
@@ -261,7 +253,7 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
 
 void DrawSong(RandoItemId item);
 
-bool MM_TryDrawNeiGi(RandoItemId item) {
+bool MM_TryDrawNeiGi(RandoItemId item, bool shop) {
     if (!gPlayState)
         return false;
     // Resolve song identity before the shared draw table, whose aliases can
@@ -273,7 +265,7 @@ bool MM_TryDrawNeiGi(RandoItemId item) {
     CwItemDrawInfo info{};
     if (!MM_DescribeNeiGi(item, &info))
         return false;
-    MM_DrawNeiGi(info);
+    MM_DrawNeiGi(info, shop);
     return true;
 }
 

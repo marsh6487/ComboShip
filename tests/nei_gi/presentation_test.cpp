@@ -29,8 +29,10 @@ std::vector<std::vector<Vtx>> arena;
 std::map<Gfx *, std::vector<Vtx>> vertexLoads;
 std::set<std::string> files;
 std::set<std::pair<std::string,std::string>> modFiles;
-Gfx opa[4096], xlu[4096];
-Mtx matrices[128];
+alignas(16) Gfx opa[0x2FC0], xlu[0x1000], overlay[0x800];
+Gfx setupDl{};
+Vtx *pendingVertices;
+size_t pendingVertexCount;
 GraphicsContext gfx{};
 PlayState play{};
 GetItemEntry shopEntry{};
@@ -42,14 +44,20 @@ void Reset() {
   submitted.clear();
   flameColors.clear();
   arena.clear();
+  pendingVertices = nullptr;
   vertexLoads.clear();
   std::memset(opa, 0, sizeof(opa));
   std::memset(xlu, 0, sizeof(xlu));
+  std::memset(overlay, 0, sizeof(overlay));
   stack.clear();
   files.clear();
   modFiles.clear();
   gfx.polyOpa.p = opa;
+  gfx.polyOpa.d = std::end(opa);
   gfx.polyXlu.p = xlu;
+  gfx.polyXlu.d = std::end(xlu);
+  gfx.overlay.p = overlay;
+  gfx.overlay.d = std::end(overlay);
   play.state.gfxCtx = &gfx;
   play.gameplayFrames = 42;
   play.billboardMtxF = {};
@@ -150,19 +158,43 @@ void Matrix_Get(MtxF *m) {
   m->xx = m->yy = m->zz = Fixture::matrix;
   m->yw = Fixture::matrixY;
 }
-void *Graph_Alloc(GraphicsContext *, size_t size) {
+void *DebitTail(GraphicsContext *context, size_t size) {
+  const auto tail =
+      (reinterpret_cast<uintptr_t>(context->polyOpa.d) & ~uintptr_t(15)) -
+      ((size + 15) & ~size_t(15));
+  assert(tail >= reinterpret_cast<uintptr_t>(context->polyOpa.p) &&
+         "production renderer tried to cross the real OPA head/tail");
+  context->polyOpa.d = reinterpret_cast<Gfx *>(tail);
+  return reinterpret_cast<void *>(tail);
+}
+void *Graph_Alloc(GraphicsContext *context, size_t size) {
   assert(size <= 1536 * sizeof(Vtx) && size % sizeof(Vtx) == 0);
   Fixture::arena.emplace_back(size / sizeof(Vtx));
-  return Fixture::arena.back().data();
+  Fixture::pendingVertices = static_cast<Vtx *>(DebitTail(context, size));
+  Fixture::pendingVertexCount = size / sizeof(Vtx);
+  return Fixture::pendingVertices;
 }
-Mtx *Matrix_NewMtx(GraphicsContext *, char *, int32_t) {
+Mtx *Matrix_NewMtx(GraphicsContext *context, char *, int32_t) {
+  if (Fixture::pendingVertices) {
+    std::copy_n(Fixture::pendingVertices, Fixture::pendingVertexCount,
+                Fixture::arena.back().data());
+    Fixture::pendingVertices = nullptr;
+  }
   Fixture::submitted.emplace_back(Fixture::matrix, Fixture::matrixY);
-  return &Fixture::matrices[Fixture::allocations++];
+  ++Fixture::allocations;
+  return static_cast<Mtx *>(DebitTail(context, sizeof(Mtx)));
 }
-void Gfx_SetupDL_25Opa(GraphicsContext *) {}
-void Gfx_SetupDL_25Xlu(GraphicsContext *) {}
-void Graph_OpenDisps(Gfx **, GraphicsContext *, const char *, int32_t) {}
-void Graph_CloseDisps(Gfx **, GraphicsContext *, const char *, int32_t) {}
+#include "nei_gi_graph.inc"
+void Gfx_SetupDL_25Opa(GraphicsContext *context) {
+  OPEN_DISPS(context);
+  __gSPDisplayList(POLY_OPA_DISP++, &Fixture::setupDl);
+  CLOSE_DISPS(context);
+}
+void Gfx_SetupDL_25Xlu(GraphicsContext *context) {
+  OPEN_DISPS(context);
+  __gSPDisplayList(POLY_XLU_DISP++, &Fixture::setupDl);
+  CLOSE_DISPS(context);
+}
 void FrameInterpolation_RecordOpenChild(const void *, int) {
   ++Fixture::interpolation;
 }
@@ -259,8 +291,132 @@ static void DrawWeaponFlameOverlay(PlayState *, u8 r, u8 g, u8 b) {
 #undef gSPSegment
 }
 
+#ifndef NEI_GI_FIXTURE_BOUNDARY_ONLY
 int main() {
   using namespace Fixture;
+  // This allocator uses the actual OPA tail for vertices and matrices,
+  // including OoT's alignment loss; setup functions also emit their real one
+  // command.
+  const NeiGi::TextureMaterial arenaMaterial{
+      "__OTR__objects/private/arena-test", false, false};
+  for (int draw = 0; draw < 7; ++draw)
+    for (int shortArena = 0; shortArena < 6; ++shortArena) {
+      Reset();
+      files.insert(arenaMaterial.path);
+      gfx.polyOpa.p = opa + 17;
+      gfx.polyXlu.p = xlu + 23;
+      if (shortArena == 0)
+        gfx.polyOpa.d = opa + 18;
+      if (shortArena == 1)
+        gfx.polyXlu.d = xlu + 24;
+      if (shortArena == 2)
+        gfx.polyOpa.d =
+            reinterpret_cast<Gfx *>(reinterpret_cast<uintptr_t>(opa + 17) + 15);
+      if (shortArena == 3)
+        gfx.polyXlu.d = xlu + 22;
+      if (shortArena == 4)
+        gfx.overlay.d = overlay + 1;
+      if (shortArena == 5)
+        gfx.polyOpa.d = opa + 16;
+      const auto opaHead = gfx.polyOpa.p, opaTail = gfx.polyOpa.d;
+      const auto xluHead = gfx.polyXlu.p, xluTail = gfx.polyXlu.d;
+      const auto mesh = NeiGi::SampleSong(CW_SONG_SOARING, 42);
+      const uint8_t color[4] = {80, 180, 240, 255};
+      const float center[3] = {};
+      if (draw == 0)
+        NeiGi_DrawMesh(&play, mesh);
+      if (draw == 1)
+        assert(!NeiGi_DrawTexturedMesh(&play, mesh, arenaMaterial));
+      if (draw == 2)
+        NeiGi_DrawSeasonOverlay(&play, 6, "oot");
+      if (draw == 3)
+        NeiGi_DrawShimmerOverlay(&play, color, "oot");
+      if (draw == 4)
+        NeiGi_DrawSongOverlay(&play, CW_SONG_SOARING, "oot");
+      if (draw == 5)
+        NeiGi_DrawPresentation(
+            &play, "__OTR__objects/nei_gi_redesign/fire_rod/gi_dl", nullptr, 1,
+            int(Kind::Fire), center, true, "oot");
+      if (draw == 6)
+        NeiGi_DrawExternalPresentation(&play, "__OTR__objects/arbitrary/gi_dl",
+                                       nullptr, 1, int(Kind::Fire), true,
+                                       "oot");
+      assert(gfx.polyOpa.p == opaHead && gfx.polyOpa.d == opaTail &&
+             gfx.polyXlu.p == xluHead && gfx.polyXlu.d == xluTail);
+      assert(arena.empty() && submitted.empty() && stack.empty() &&
+             matrix == 1 && matrixY == 0);
+    }
+  // Exact conservative mesh budget: three packed vertices, one matrix, two
+  // transient OPA debug nodes, one load/triangle and 32 fixed XLU commands.
+  NeiGi::Mesh arenaTriangle;
+  arenaTriangle.count = 3;
+  arenaTriangle.vertices[0] = {{0, 0, 0}, 0xFFFFFF, 255};
+  arenaTriangle.vertices[1] = {{1, 0, 0}, 0xFFFFFF, 255};
+  arenaTriangle.vertices[2] = {{0, 1, 0}, 0xFFFFFF, 255};
+  for (int padding : {0, 15, -1}) {
+    Reset();
+    gfx.polyOpa.p = opa + 17;
+    gfx.polyXlu.p = xlu + 23;
+    const auto needed =
+        3 * sizeof(Vtx) + ((sizeof(Mtx) + 15) & ~size_t(15)) + 2 * sizeof(Gfx);
+    gfx.polyOpa.d = reinterpret_cast<Gfx *>(
+        reinterpret_cast<uintptr_t>(gfx.polyOpa.p) + needed + padding);
+    gfx.polyXlu.d = gfx.polyXlu.p + 34;
+    gfx.overlay.d = overlay + 2;
+    const auto head = gfx.polyOpa.p, tail = gfx.polyOpa.d;
+    NeiGi_DrawMesh(&play, arenaTriangle);
+    if (padding == -1)
+      assert(arena.empty() && submitted.empty() && gfx.polyOpa.p == head &&
+             gfx.polyOpa.d == tail && gfx.polyXlu.p == xlu + 23);
+    else
+      assert(arena.size() == 1 && submitted.size() == 1 &&
+             gfx.polyOpa.d == head + 2);
+    assert(gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d &&
+           gfx.overlay.p == overlay && stack.empty());
+  }
+  // Once geometry has been submitted, expensive effects may decline, while the
+  // actual caller still has room for the shell, owner pop and restore matrix.
+  Reset();
+  gfx.polyOpa.d = opa + 40;
+  gfx.polyXlu.d = xlu + 128;
+  const float reservedCenter[3] = {};
+  NeiGi_DrawPresentation(
+      &play, "__OTR__objects/nei_gi_redesign/zonai_permafrost/gi_dl",
+      "__OTR__objects/nei_gi_redesign/zonai_permafrost/gi_xlu_dl", 1,
+      int(Kind::Zonai), reservedCenter, true, "oot");
+  assert(arena.empty() && submitted.size() == 3 && Drawn().size() == 2 &&
+         gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d &&
+         stack.empty());
+  Reset();
+  enabled = 1;
+  gfx.polyOpa.d = opa + 40;
+  gfx.polyXlu.d = xlu + 128;
+  files.insert("__OTR__objects/nei_gi_redesign/zonai_permafrost/gi_dl");
+  files.insert("__OTR__objects/nei_gi_redesign/zonai_permafrost/gi_xlu_dl");
+  GetItemEntry arenaEntry{};
+  arenaEntry.drawFunc = Randomizer_DrawZonaiPermafrost;
+  assert(NeiGi_Draw(&play, &arenaEntry));
+  assert(arena.empty() && submitted.size() == 2 && Drawn().size() == 2 &&
+         gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d &&
+         stack.empty());
+  // Repeated high-vertex songs fill a real arena; subsequent calls skip before
+  // all commands/allocations once even the wrapper no longer fits.
+  Reset();
+  gfx.polyOpa.d = opa + 4096;
+  gfx.polyXlu.d = xlu + 512;
+  for (int i = 0; i < 32; ++i) {
+    NeiGi_DrawSongOverlay(&play, CW_SONG_SOARING, "oot");
+    assert(gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d &&
+           gfx.overlay.p == overlay && stack.empty());
+  }
+  assert(!arena.empty());
+  Reset();
+  NeiGi_DrawSongOverlay(&play, CW_SONG_SOARING, "oot");
+  assert(arena.size() == 1 && !submitted.empty() && stack.empty());
+  std::cout
+      << "PASS real OPA-tail vertices/matrices, actual debug/setup commands: "
+         "short/invalid/overlay/exact/misaligned budgets, caller shell/restore "
+         "reserves and repeated Soaring exhaustion\n";
   const auto untouched = [] {
     assert(arena.empty() && submitted.empty() && gfx.polyOpa.p==opa && gfx.polyXlu.p==xlu);
     assert(stack.empty() && matrix==1 && matrixY==0 && interpolation==0);
@@ -1298,3 +1454,4 @@ int main() {
                "Alt paths, and matrix balance passed\n";
   return 0;
 }
+#endif

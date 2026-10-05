@@ -1,4 +1,5 @@
 #include "ComboItemDrawABI.h"
+#include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include <cstdio>
 #include <cstring>
 #include <map>

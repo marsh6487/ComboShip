@@ -24,6 +24,63 @@ static bool NeiGi_ValidScale(float scale) {
     return NeiGi_Finite(scale) && scale > 0.f && scale <= 2048.f;
 }
 
+// Both native allocators subtract the OPA tail without detecting exhaustion.
+// Leave space for queued heads, aligned vertices/matrices and the debug nodes
+// emitted by OPEN/CLOSE_DISPS (including each setup function's nested pair).
+struct NeiGi_ArenaBudget {
+    GraphicsContext* gfx = nullptr;
+    size_t matrixBytes = 0, opaCommands = 0, xluCommands = 0;
+};
+static thread_local NeiGi_ArenaBudget NeiGi_ReservedArena;
+
+static bool NeiGi_ArenaHasRoom(PlayState* play, size_t vertexBytes, size_t matrices, size_t opaCommands,
+                               size_t xluCommands) {
+    if (!play || !play->state.gfxCtx)
+        return false;
+    const auto* gfx = play->state.gfxCtx;
+    const auto remaining = [](const void* head, const void* tail, bool alignTail) {
+        uintptr_t begin = reinterpret_cast<uintptr_t>(head), end = reinterpret_cast<uintptr_t>(tail);
+        if (alignTail)
+            end &= ~uintptr_t(15); // OoT also discards a misaligned current tail.
+        return begin && end >= begin ? size_t(end - begin) : size_t(0);
+    };
+    const size_t opaAvailable = remaining(gfx->polyOpa.p, gfx->polyOpa.d, true);
+    const size_t xluAvailable = remaining(gfx->polyXlu.p, gfx->polyXlu.d, false);
+    const size_t overlayAvailable = remaining(gfx->overlay.p, gfx->overlay.d, false);
+    const auto reserved = NeiGi_ReservedArena.gfx == gfx ? NeiGi_ReservedArena : NeiGi_ArenaBudget{};
+    const size_t tailBytes =
+        ((vertexBytes + 15) & ~size_t(15)) + matrices * ((sizeof(Mtx) + 15) & ~size_t(15)) + reserved.matrixBytes;
+    return tailBytes <= opaAvailable &&
+           opaCommands + reserved.opaCommands <= (opaAvailable - tailBytes) / sizeof(Gfx) &&
+           xluCommands + reserved.xluCommands <= xluAvailable / sizeof(Gfx) && overlayAvailable / sizeof(Gfx) >= 2;
+}
+
+// Child meshes must leave their caller's owner-pop, shell and restore commands
+// plus matrices available. The reservation changes no native arena cursors.
+class NeiGi_ArenaScope {
+    NeiGi_ArenaBudget previous;
+    bool active;
+
+  public:
+    NeiGi_ArenaScope(PlayState* play, size_t matrices, size_t opaCommands, size_t xluCommands)
+        : previous(NeiGi_ReservedArena), active(NeiGi_ArenaHasRoom(play, 0, matrices, opaCommands, xluCommands)) {
+        if (active) {
+            if (NeiGi_ReservedArena.gfx != play->state.gfxCtx)
+                NeiGi_ReservedArena = { play->state.gfxCtx };
+            NeiGi_ReservedArena.matrixBytes += matrices * ((sizeof(Mtx) + 15) & ~size_t(15));
+            NeiGi_ReservedArena.opaCommands += opaCommands;
+            NeiGi_ReservedArena.xluCommands += xluCommands;
+        }
+    }
+    ~NeiGi_ArenaScope() {
+        if (active)
+            NeiGi_ReservedArena = previous;
+    }
+    explicit operator bool() const {
+        return active;
+    }
+};
+
 static bool NeiGi_ValidMesh(const NeiGi::Mesh& mesh, const NeiGi::TextureMaterial* material = nullptr,
                             bool seasonSunRays = false) {
     if (!mesh.count || mesh.count > mesh.vertices.size() || mesh.count % 3)
@@ -47,11 +104,12 @@ static bool NeiGi_ValidMesh(const NeiGi::Mesh& mesh, const NeiGi::TextureMateria
     return true;
 }
 
-static void NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kind orb,
-                                   const NeiGi::TextureMaterial* material, bool seasonSunRays = false) {
+static bool NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kind orb,
+                                   const NeiGi::TextureMaterial* material, bool seasonSunRays = false,
+                                   const char* owner = nullptr) {
     if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, material, seasonSunRays) || int(orb) < 0 ||
         int(orb) > int(Kind::MarioMask))
-        return;
+        return false;
     // Reuse shared vertices within each 32-entry RSP cache load. A full potion
     // shop must leave room in both the OPA arena and XLU command buffer.
     struct Batch {
@@ -105,11 +163,20 @@ static void NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kin
         }
     }
     finish();
+    size_t triangleCommands = 0;
+    for (size_t b = 0; b < batchCount; ++b)
+        triangleCommands += (batches[b].indexCount + 5) / 6;
+    // At most 30 fixed commands: debug pairs, two setup calls, texture-load
+    // expansion (seven commands), material state, one matrix and owner pair.
+    if (!NeiGi_ArenaHasRoom(play, vertexCount * sizeof(Vtx), 1, 2, 32 + batchCount + triangleCommands))
+        return false;
     auto* vertices = static_cast<Vtx*>(Graph_Alloc(play->state.gfxCtx, vertexCount * sizeof(Vtx)));
     if (vertices == nullptr)
-        return;
+        return false;
     std::memcpy(vertices, packed.data(), vertexCount * sizeof(Vtx));
     OPEN_DISPS(play->state.gfxCtx);
+    if (owner)
+        gSPComboRMPush(POLY_XLU_DISP++, owner);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gDPPipeSync(POLY_XLU_DISP++);
     gSPClearGeometryMode(POLY_XLU_DISP++,
@@ -170,7 +237,10 @@ static void NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kin
     }
     Matrix_Pop();
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    if (owner)
+        gSPComboRMPop(POLY_XLU_DISP++);
     CLOSE_DISPS(play->state.gfxCtx);
+    return true;
 }
 
 void NeiGi_DrawMesh(PlayState* play, const NeiGi::Mesh& mesh, Kind orb) {
@@ -180,8 +250,7 @@ void NeiGi_DrawMesh(PlayState* play, const NeiGi::Mesh& mesh, Kind orb) {
 bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiGi::TextureMaterial& material) {
     if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, &material) || !HasResource(material.path))
         return false;
-    NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material);
-    return true;
+    return NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material);
 }
 
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
@@ -194,6 +263,9 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
     const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
     const auto* bounds = NeiGi::FindFrameBounds(opa);
     if (!bounds || bounds->effect != kind)
+        return;
+    NeiGi_ArenaScope arena(play, 3, 16, 24);
+    if (!arena)
         return;
     Matrix_Push();
     const auto fit = NeiGi::FrameFit(*bounds, scale, shop);
@@ -279,6 +351,9 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
     if (!play || !play->state.gfxCtx || !opa || !NeiGi_ValidScale(scale) || shimmerKind < 0 ||
         shimmerKind > int(Kind::MarioMask))
         return;
+    NeiGi_ArenaScope arena(play, 2, 16, 16);
+    if (!arena)
+        return;
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
     Matrix_Push();
@@ -323,6 +398,9 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
 void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner) {
     if (!play || !play->state.gfxCtx || profile < 1 || profile > 6)
         return;
+    NeiGi_ArenaScope arena(play, 1, 2, 16);
+    if (!arena)
+        return;
     const bool stormSong = profile == 6;
     auto mesh = NeiGi::SampleSeason(play->gameplayFrames, stormSong ? 1 : profile, NeiGi_CameraBasis(play));
     OPEN_DISPS(play->state.gfxCtx);
@@ -354,6 +432,9 @@ void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner) {
 void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner) {
     if (!play || !play->state.gfxCtx || !color)
         return;
+    NeiGi_ArenaScope arena(play, 1, 2, 16);
+    if (!arena)
+        return;
     const bool ordinary = color[0] == 220 && color[1] == 225 && color[2] == 240;
     const bool dark = color[0] == 0 && color[1] == 0 && color[2] == 0;
     auto mesh = NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play));
@@ -383,6 +464,9 @@ void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const cha
 
 void NeiGi_DrawSongOverlay(PlayState* play, int song, const char* owner) {
     if (!play || !play->state.gfxCtx || song < 0 || song >= CW_SONG_COUNT)
+        return;
+    NeiGi_ArenaScope arena(play, 1, 2, 16);
+    if (!arena)
         return;
     if (song == CW_SONG_STORMS) {
         NeiGi_DrawSeasonOverlay(play, 6, owner);

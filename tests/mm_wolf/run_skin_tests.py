@@ -18,11 +18,27 @@ def run(command):
         raise SystemExit(result.returncode)
 
 with tempfile.TemporaryDirectory(prefix='mm-wolf-skin-') as td:
+    # Execute the exact native nested marker/setup bodies; stubbing these hides
+    # their temporary xlu/overlay slots and opaque command cost.
+    def native_body(path, signature):
+        source = (ROOT/path).read_text()
+        start = source.index(signature)
+        brace = source.index('{', start)
+        depth, end = 1, brace + 1
+        while depth:
+            depth += (source[end] == '{') - (source[end] == '}')
+            end += 1
+        return source[start:end]
+    native_graph = Path(td)/'native-graph.c'
+    native_graph.write_text('#include "global.h"\nGfx gSetupDLs[SETUPDL_MAX][6];\n' +
+                            native_body('mm/src/code/graph.c', 'void Graph_OpenDisps(') + '\n' +
+                            native_body('mm/src/code/graph.c', 'void Graph_CloseDisps(') + '\n' +
+                            native_body('mm/src/code/z_rcp.c', 'void Gfx_SetupDL25_Opa(') + '\n')
     options = ['-DMM_WOLF_SKIN_OPTIONS'] if 'preserveRootMotion' in (ROOT/'mm/expansions/ssbb/ssbb_skin.h').read_text() else []
     objects = []
     for i, source in enumerate(['mm/expansions/ssbb/ssbb_skin.c', 'mm/src/code/z_skin_matrix.c',
                               'mm/expansions/ssbb/characters/pikachu_ssbb_skin.c',
-                              'mm/expansions/ssbb/characters/pikachu_ssbb_skel.c']):
+                              'mm/expansions/ssbb/characters/pikachu_ssbb_skel.c', str(native_graph)]):
         obj = str(Path(td)/f'{i}.o')
         run([os.environ.get('CC','cc'), '-std=gnu11', *flags(), '-include', str(ROOT/'mm/include/variables.h'),
                         '-include', str(ROOT/'mm/include/functions.h'), '-include', str(ROOT/'mm/include/z64malloc.h'),

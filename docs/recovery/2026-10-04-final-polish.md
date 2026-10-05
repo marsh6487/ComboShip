@@ -13,6 +13,7 @@ The historical final candidate disappeared from the transient workspace. The sup
 | `a79093a7c4c6a601c334c44e7578cb6ca945f83b` | Live editor grants, Wolf combat, themed songs and sanitized skin fixtures | Remote tree `4832641839853c68f577c2108f48312c174db1c7` equals local tree; fetched branch verified | Host, sword/receipt integration, preservation review and builds |
 | `167aa37c33c3f5be46de342287772100de5633fa` | Integrated Wolf host, upright swords, colored clefs and MM-owned Ikana icons | Remote tree `6942eb50ff1c26561b7624863a8d34abd1f16b62` equals local tree; fetched branch verified | Final edge cases, independent review and builds |
 | `d5b9a68d3065f40bd02b468dd5dd468220c781d2` | Final editor/catalog/mod integration and explicit open review findings | Remote tree `9069ac12a0bd2020815aa959195619c7669b1851` equals local tree; fetched branch verified | Independent corrections, real arena bounds, whole gate and builds |
+| `3ec2c2181378772909f9740342d2d66b2b923360` | Independently verified Wolf input, selected sword identity, concrete keys and earned-wand corrections | Remote tree `dc8d93dca68147f64b07a5268b1a47503f89795e` equals local tree; fetched branch verified | MM shop integration, real arena preflights, whole gate and builds |
 
 ## MM skin section
 
@@ -61,8 +62,35 @@ Local worker commit `12d055506bbdb49280cd30e8502672b9a10e91e7` adds opt-in root 
 
 ## Remaining integration
 
-The actual MM shop callback previously did not forward shop context to the shared fit, despite renderer-level shop fixtures passing. The GI worker is correcting the native/foreign dispatch and adding a real shop callback fixture. Real engine graphics allocators subtract their tail without returning null; demand-only fixtures do not prove arena capacity. Shared GI mesh and MM skin draws are receiving narrow aligned-allocation/command head-tail preflights plus real finite-arena fixtures. Complete combined regressions, final review and Windows/Linux builds follow these corrections. This is still a partial checkpoint; in-game acceptance is not claimed.
+The actual MM shop callback now forwards `ACTOR_EN_GIRLA` context through native and foreign dispatch. Independent sanitized/fast-math production callback fixtures passed every authored binding's shelf route and unchanged null-actor world route. The stale extracted key-cache fixture now includes the real identity policy header and passes sanitizers.
+
+The MM shared skin's real arena preflight is integrated and independently verified: material/no-material draws reserve 10/9 opaque commands, aligned matrix space and two temporary entries in each side arena. Required-minus-one capacity previously crossed head/tail; genuine native helper/canary fixtures now reject before mutations and pass normal/fast-math sanitizers with actual Pikachu metadata. The Wolf host must still propagate a capacity-skipped draw and guard its new outer marker/freeze continuation. Existing arbitrary native get-item/equipment/mod submissions keep their inherited allocator contract; whole-frame/game headroom is not claimed.
+
+GI arena work is checkpointed explicitly WIP at worker `577bb764`. The production tail-crossing reproduction now passes with the actual OoT allocator/Open/Close/setup seams and shared mesh/model/restore reservations. Overlay, exact-fit and near-full boundaries, native shell caller reservation, MM helper seams, source-contract normalization and final syntax remain under refinement. Do not treat this WIP as a final gate candidate.
+
+Complete combined regressions, final independent arena review and Windows/Linux builds follow these corrections. This is still a partial checkpoint; in-game acceptance is not claimed.
 
 ## Resume
+
+## October 4 19:50 Chicago takeover
+
+The user requested takeover after the original root remained at local commit
+`9994843fec7798f5cb25e2ea0a95707f0f2f3292` while its final GI worker completed
+`282b00900d73daa5b1b9e6ea4bcdeeae2e1b104c`. The original worktrees were found
+and copied into a separate checkout; their source was preserved. Root source
+includes actual MM shelf forwarding, shared MM skin arena capacity checks and
+the earlier shared GI arena WIP. Worker completion was integrated as `7df56cb8`.
+This recovers existing local source; the underlying implementations remain the
+reconstruction already described above.
+
+Fresh `python3 -B scripts/diagnostics/run_nei_gi_tests.py --combo --sanitize
+--fast-math` and `python3 -B tests/mm_wolf/run_skin_tests.py --fast-math` passed.
+The complete NEI gate initially stopped at an older presentation fixture that
+omitted the restored song and colored-icon helper dependencies. Its production
+boundary coverage is being updated, not bypassed. A new independent final review
+also reproduced two arena integration gaps: intrinsic weapon flames and Wolf
+draw rejection reaching the subsequent native player effects. Their corrections,
+the whole regression gate and exact-head platform builds remain pending. This
+is an explicitly incomplete, recoverable source checkpoint.
 
 Fetch `recovery/final-polish-20261004`, inspect this note and the reconstruction plan, and continue the uncompleted sections. The checkpoint commit's message records its exact tree and tests. Do not treat the 43-command gate reported by the lost session as fresh proof. Keep the final PR draft and preserve its published ancestry. Existing authorization permits the final push to PR #34; no merge or master promotion is authorized.

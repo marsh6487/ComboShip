@@ -1350,7 +1350,7 @@ void Message_DrawText(PlayState* play, Gfx** gfxP) {
                 Message_SetTextColor(msgCtx, msgCtx->msgBufDecoded[++i] & 0xF);
                 if ((msgCtx->msgBufDecoded[i] & 0xF) == 2) {
                     const uint32_t rgb = ComboBossSoulSpanColor((const uint8_t*)msgCtx->msgBufDecoded + i + 1,
-                                                               sizeof(msgCtx->msgBufDecoded) - i - 1, false);
+                                                                sizeof(msgCtx->msgBufDecoded) - i - 1, false);
                     if (rgb) {
                         msgCtx->textColorR = (rgb >> 16) & 0xFF;
                         msgCtx->textColorG = (rgb >> 8) & 0xFF;

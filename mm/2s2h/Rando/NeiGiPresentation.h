@@ -4,7 +4,7 @@
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop = false);
 bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out);
-bool MM_TryDrawNeiGi(RandoItemId item);
+bool MM_TryDrawNeiGi(RandoItemId item, bool shop = false);
 
 // Wrap only the legacy fallback after the authored presentation was declined.
 // Its model may change the matrix; shimmer uses the incoming GI pose.

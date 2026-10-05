@@ -796,6 +796,9 @@ static void NeiGi_DrawSong(PlayState* play, int song) {
     uint8_t color[4];
     if (!ComboSongShimmerColor(song, color))
         return;
+    NeiGi_ArenaScope arena(play, 1, 2, 12);
+    if (!arena)
+        return;
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
@@ -860,6 +863,12 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     const bool authored = upgraded && !HasRedesignGiMod(*item);
     if (!upgraded && !entry->drawFunc && !item->alwaysShimmer)
         return false;
+    // Procedural effects leave space for the later translucent model shell.
+    // Legacy callbacks retain their own allocator behavior; this reservation
+    // covers only the model commands and matrices emitted by this wrapper.
+    NeiGi_ArenaScope arena(play, selectedSword ? 1 : upgraded ? (item->translucent ? 2 : 1) : 0, 16, 16);
+    if (!arena)
+        return true;
     Matrix_Push();
     if (authored) {
         if (const auto* bounds = NeiGi::FindFrameBounds(item->opaque)) {

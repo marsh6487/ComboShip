@@ -24,6 +24,8 @@ sanitize = ["-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "
 if "--fast-math" in sys.argv:
     sanitize.append("-ffast-math")
 with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
+    graph = functions((ROOT / "soh/src/code/graph.c").read_text())
+    (Path(tmp) / "nei_gi_graph.inc").write_text(graph["Graph_OpenDisps"] + "\n" + graph["Graph_CloseDisps"])
     draw = functions((ROOT / "soh/src/code/z_draw.c").read_text())
     player = functions((ROOT / "soh/src/code/z_player_lib.c").read_text())
     shop = functions((ROOT / "soh/src/overlays/actors/ovl_En_GirlA/z_en_girla.c").read_text())
@@ -180,11 +182,51 @@ void ComboDrawSpinAttackGi(PlayState*, const char*, const char*, float, const ui
     ++foreignFallbackCalls;
 }
 """
-            tested_bridge = (shim + route + "\n" + item_enum + "\n#include \"ComboSongDrawMM.h\"\n" + bindings + "\n" + fallback_class + "\n" +
+            mm_foreign_source = (ROOT / "combo/menu/ComboForeignDrawMM.h").read_text()
+            mm_foreign_info = re.search(r"struct ComboForeignDrawInfoOOT \{.*?\n\};",mm_foreign_source,re.S)[0]
+            mm_foreign_draw = functions(mm_foreign_source)["MM_DrawComboForeign"]
+            mm_handlers = sorted(set(re.findall(r"\b(MM_DrawForeign\w+)\(info\)", mm_foreign_draw)))
+            mm_shop_support = """
+using RandoCheckId=int;
+constexpr RandoCheckId RC_UNKNOWN=0;
+struct MmShopEnGirlA { Actor actor; s16 rotY; };
+struct MmShopSaveCheck { RandoItemId randoItemId=RI_NONE; };
+MmShopSaveCheck mmShopChecks[8];
+#define RANDO_SAVE_CHECKS mmShopChecks
+void Matrix_RotateYS(s16, u8) {}
+void func_800B8118(Actor*,PlayState*,int) {}
+void func_800B8050(Actor*,PlayState*,int) {}
+int DungeonItem_GetOwner(RandoItemId) {return -1;}
+bool GetItem_DrawDungeonItem(PlayState*,s16,int) {assert(false);return false;}
+int mmShopLegacyDraws;
+namespace Rando {
+void DrawItem(RandoItemId,RandoCheckId,Actor*);
+void DrawResolvedItem(RandoItemId,RandoCheckId,Actor*);
+RandoItemId ConvertItem(RandoItemId item,RandoCheckId) {return item;}
+namespace StaticData {struct FixtureItem {s16 drawId;};FixtureItem Items[RI_MAX];}
+}
+void DrawOotNeiUltrahand() {assert(false);}
+void DrawOotNeiCaneOfSomaria(RandoItemId) {assert(false);}
+""" + mm_foreign_info + """
+const ComboForeignDrawInfoOOT* selectedForeignInfoMM=nullptr;
+const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckId) {return selectedForeignInfoMM;}
+""" + "\n".join("void "+name+"(const ComboForeignDrawInfoOOT*) {assert(false);}" for name in mm_handlers)
+            mm_draw_source=(ROOT/"mm/2s2h/Rando/DrawItem.cpp").read_text()
+            # Keep the exact outer item conversion/context/early dispatcher and
+            # actual foreign branch; unrelated switch bodies have own fixtures.
+            resolved = mm_draw_source[mm_draw_source.index("void Rando::DrawResolvedItem("):]
+            prefix = resolved[:resolved.index("    switch (randoItemId) {")]
+            foreign_case = re.search(r"        case RI_COMBO_FOREIGN:.*?            break;", resolved,re.S)[0]
+            resolved = prefix + "    switch(randoItemId) {\n" + foreign_case + "\n        default: ++mmShopLegacyDraws;break;\n    }\n}"
+            draw_item = mm_draw_source[mm_draw_source.index("void Rando::DrawItem("):mm_draw_source.index("void Rando::DrawResolvedItem(")]
+            callback = functions((ROOT/"mm/2s2h/Rando/ActorBehavior/EnGirlA.cpp").read_text())["EnGirlA_RandoDrawFunc"].replace("EnGirlA*","MmShopEnGirlA*")
+            mm_shop_support += "\n" + mm_foreign_draw + "\n" + resolved + "\n" + draw_item + "\n" + callback + "\n#undef RANDO_SAVE_CHECKS\n"
+            tested_bridge = (shim + route + "\n" + item_enum + "\nbool MM_TryDrawNeiGi(RandoItemId,bool shop=false);\n#include \"ComboSongDrawMM.h\"\n" + bindings + "\n" + fallback_class + "\n" +
                              renderer + "\n" + fallback + "\n" + foreign_info + "\n" +
-                             foreign_shim + foreign_draw + "\n" + foreign_wrapper + "\n" + foreign_shop)
+                             foreign_shim + foreign_draw + "\n" + foreign_wrapper + "\n" + foreign_shop + "\n" + mm_shop_support)
             candidate = source.read_text().replace("int main() {", tested_bridge + "\nint main() {", 1)
             checks = (ROOT / "tests/mm_presentation/gi_bridge_checks.inc").read_text()
+            checks += (ROOT / "tests/mm_presentation/shop_dispatch_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/foreign_sword_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/legacy_mod_checks.inc").read_text()
             candidate = candidate.replace("  using namespace Fixture;\n", "  using namespace Fixture;\n" + checks, 1)

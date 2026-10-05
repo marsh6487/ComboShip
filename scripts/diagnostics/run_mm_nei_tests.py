@@ -14,6 +14,10 @@ def flags():
     return ['-DPLAYER_STATE1_LOADING=PLAYER_STATE1_200','-DPLAYER_STATE1_IN_ITEM_CS=0u','-DPLAYER_STATE1_GETTING_ITEM=PLAYER_STATE1_400','-DPLAYER_STATE1_DAMAGED=PLAYER_STATE1_4000000','-DPLAYER_STATE1_HANGING_OFF_LEDGE=0u','-DPLAYER_STATE1_CLIMBING_LEDGE=PLAYER_STATE1_4','-DF3DEX_GBI_2','-DLOG_LEVEL_GAME_PRINTS=0',*[f'-I{ROOT/p}' for p in ('mm','mm/2s2h','mm/include','mm/include/PR','mm/src','mm/assets','mm/mods','libultraship/include','combo','combo/menu')],'-include',str(ROOT/'mm/include/z64.h'),'-include',str(ROOT/'mm/mods/nei_oot_compat.h'),'-include',str(ROOT/'mm/soh/_nei_compat_core.h')]
 if __name__=='__main__':
     with tempfile.TemporaryDirectory(prefix='mm-nei-') as td:
+        sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
+        from run_time_pedestal_tests import functions
+        graph=functions((ROOT/'mm/src/code/graph.c').read_text())
+        (Path(td)/'mm_nei_graph.inc').write_text(graph['Graph_OpenDisps']+'\n'+graph['Graph_CloseDisps'])
         query=Path(td)/'rig_fit_query.cpp'
         write_query(ROOT, query)
         objects=[]
@@ -34,7 +38,7 @@ if __name__=='__main__':
             subprocess.run([os.environ.get('CXX','c++'),'-std=c++20',*flags(),'-ffunction-sections','-fdata-sections','-c',str(ROOT/'mm/2s2h/Rando'/source),'-o',obj],check=True)
             native.append(obj)
         binary=str(Path(td)/'renderer-runtime')
-        subprocess.run([os.environ.get('CXX','c++'),'-std=c++20',*flags(),'-ffunction-sections','-fdata-sections',str(ROOT/'tests/mm_nei/renderer_runtime_test.cpp'),str(query),*native,'-Wl,--gc-sections','-Wl,--export-dynamic-symbol=OOT_NeiResourceExists','-Wl,--export-dynamic-symbol=OOT_GetNeiGiDrawInfo','-o',binary],check=True)
+        subprocess.run([os.environ.get('CXX','c++'),'-std=c++20',*flags(),'-I'+td,'-ffunction-sections','-fdata-sections',str(ROOT/'tests/mm_nei/renderer_runtime_test.cpp'),str(query),*native,'-Wl,--gc-sections','-Wl,--export-dynamic-symbol=OOT_NeiResourceExists','-Wl,--export-dynamic-symbol=OOT_GetNeiGiDrawInfo','-o',binary],check=True)
         subprocess.run([binary],check=True)
 
     subprocess.run([sys.executable,'-B',str(ROOT/'tests/mm_nei/run_dispatch_tests.py')],check=True)
