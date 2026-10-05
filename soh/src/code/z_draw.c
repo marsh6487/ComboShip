@@ -401,11 +401,13 @@ DrawItemTableEntry sDrawItemTable[] = {
     { GetItem_DrawFishingPole, { gGiFishingPoleDL } },    // Fishing Pole
 };
 
+extern int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path);
 static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
     return ComboFairyBottle_SelectShell((const char*)sDrawItemTable[drawId].dlists[0],
                                         (const char*)sDrawItemTable[drawId].dlists[1], gGiBottleStopperDL, gGiBottleDL,
                                         ResourceMgr_IsModAsset, gGiBlueFireChamberstickDL,
-                                        ResourceMgr_IsModAsset(gGiBlueFireChamberstickDL));
+                                        (ResourceMgr_IsModAsset(gGiBlueFireChamberstickDL) ||
+                                         ResourceMgr_IsCustomAssetForGame("oot", gGiBlueFireChamberstickDL)));
 }
 
 #include "ComboFairyBottleDraw.h"

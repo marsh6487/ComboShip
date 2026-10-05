@@ -83,4 +83,36 @@ inline bool IsModAsset(const char* nativeGame, const char* game, const char* pat
                             return archive ? archive->GetPath() : std::string{};
                         });
 }
+// XML model replacements remain custom after users consolidate them into a
+// companion/base O2R. Archive provenance alone cannot identify that geometry.
+inline bool IsCustomAsset(const char* nativeGame, const char* game, const char* path) {
+    if (!game || !path)
+        return false;
+    std::string resource = path;
+    if (resource.compare(0, 7, "__OTR__") == 0)
+        resource.erase(0, 7);
+    std::string ownerGame = game;
+    if (!resource.empty() && resource[0] == '@') {
+        const auto colon = resource.find(':');
+        if (colon == std::string::npos)
+            return false;
+        ownerGame = resource.substr(1, colon - 1);
+        resource.erase(0, colon + 1);
+    }
+    auto owner = Ship::CrossRMRegistry::Get(ownerGame);
+#ifndef COMBO_BUILD
+    if (!owner && ownerGame == nativeGame) {
+        const auto context = Ship::Context::GetRawInstance();
+        if (context)
+            owner = context->GetResourceManager();
+    }
+#else
+    (void)nativeGame;
+#endif
+    if (!owner)
+        return false;
+    Ship::ResourceManagerScope scope(owner);
+    const auto model = owner->LoadResource(resource);
+    return model && model->GetInitData() && model->GetInitData()->IsCustom;
+}
 } // namespace NeiAssetPriority

@@ -529,11 +529,23 @@ inline bool OOT_DrawForeignFairyContainer(PlayState* play, const ComboForeignDra
     if (ComboFairyBottle_IsBlueFireShell(info->dls[0])) {
         Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
     } else {
-        Matrix_Mult(&contentsMtx, MTXMODE_APPLY);
+        // The native billboard matrix sizes a sprite, not an actor skeleton.
+        // Keep its anchor for the VFX; apply its full scale only to fallback contents.
+        Matrix_Translate(contentsMtx.xw, contentsMtx.yw, contentsMtx.zw, MTXMODE_APPLY);
     }
     Matrix_ReplaceRotation(&play->billboardMtxF);
     Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
     if (!ComboFairyBottle_DrawVfx(play)) {
+        Matrix_Pop();
+        Matrix_Push();
+        Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
+        if (ComboFairyBottle_IsBlueFireShell(info->dls[0])) {
+            Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
+        } else {
+            Matrix_Mult(&contentsMtx, MTXMODE_APPLY);
+        }
+        Matrix_ReplaceRotation(&play->billboardMtxF);
+        Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
         COMBO_FOREIGN_MTX(POLY_XLU_DISP++);
         gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[2]);
     }

@@ -5330,6 +5330,10 @@ extern "C" bool Ship_HandleConsoleCrashAsReset() {
     return true;
 }
 
+extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path) {
+    return NeiAssetPriority::IsCustomAsset("mm", game, path);
+}
+
 extern "C" int ResourceMgr_IsModAsset(const char* path) {
     return NeiAssetPriority::IsModAsset("mm", "mm", path);
 }

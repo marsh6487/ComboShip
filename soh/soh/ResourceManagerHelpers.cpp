@@ -971,6 +971,10 @@ extern "C" COMBO_EXPORT int32_t OOT_NeiResourceExists(const char* path) {
 
 #endif
 
+extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path) {
+    return NeiAssetPriority::IsCustomAsset("oot", game, path);
+}
+
 extern "C" int ResourceMgr_IsModAsset(const char* path) {
     return NeiAssetPriority::IsModAsset("oot", "oot", path);
 }
