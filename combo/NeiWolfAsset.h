@@ -1,4 +1,5 @@
 #pragma once
+#include "ComboExport.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -193,5 +194,7 @@ inline bool Validate(const std::vector<uint8_t>& blob) {
 
 // Copy ABI: 0 absent, 1 copied/size queried, -1 malformed or wrong resource type.
 // A present rejected resource never falls through to a lower-priority file.
-extern "C" int OOT_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner);
-extern "C" int MM_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner);
+extern "C" COMBO_OOT_EXPORT int OOT_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size,
+                                                         const char** owner);
+extern "C" COMBO_MM_EXPORT int MM_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size,
+                                                       const char** owner);

@@ -5334,12 +5334,11 @@ extern "C" bool Ship_HandleConsoleCrashAsReset() {
 extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* path, float scale, float tilt, int shop,
                                                 float fit[2]) {
     const int din =
-        NeiAssetPriority::GetDinSwordGiProfile("mm", game, path, CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
+        NeiAssetPriority::GetDinSwordGiProfile("mm", game, path, CVarGetInteger("gEnhancements.DinFireSword", 0));
     return NeiAssetPriority::GetGiModelFit("mm", game, path, scale, tilt, shop != 0, fit, din);
 }
 extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* game, const char* path) {
-    return NeiAssetPriority::GetDinSwordGiProfile("mm", game, path,
-                                                  CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
+    return NeiAssetPriority::GetDinSwordGiProfile("mm", game, path, CVarGetInteger("gEnhancements.DinFireSword", 0));
 }
 
 extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path) {

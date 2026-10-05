@@ -6,6 +6,7 @@
 #define COMBO_ITEM_DRAW_ABI_H
 
 #include <stdint.h>
+#include "../ComboExport.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -193,16 +194,16 @@ typedef struct {
 } CwItemIconInfo;
 // Resource-only editor sampling for foreign GI presentation. Host frames advance only
 // the sampling clock; no dormant native frame, game state or cosmetic patch loop runs.
-void OOT_SetGiCosmeticFrame(uint32_t hostFrame);
-void OOT_SampleGiCosmeticColor(const char* valueCvar, uint8_t fallbackR, uint8_t fallbackG, uint8_t fallbackB,
-                               uint8_t* outRGB);
+COMBO_OOT_EXPORT void OOT_SetGiCosmeticFrame(uint32_t hostFrame);
+COMBO_OOT_EXPORT void OOT_SampleGiCosmeticColor(const char* valueCvar, uint8_t fallbackR, uint8_t fallbackG,
+                                                uint8_t fallbackB, uint8_t* outRGB);
 typedef void (*Fn_SetGiCosmeticFrame)(uint32_t hostFrame);
 
 typedef int32_t (*Fn_GetItemIconInfo)(const char* itemName, CwItemIconInfo* out);
 // Uses the registered asset owner and its Alt mode; no engine state crosses.
 typedef int32_t (*Fn_NeiResourceExists)(const char* path);
-int32_t OOT_NeiResourceExists(const char* path);
-int32_t OOT_NeiAltAssetsEnabled(void);
+COMBO_OOT_EXPORT int32_t OOT_NeiResourceExists(const char* path);
+COMBO_OOT_EXPORT int32_t OOT_NeiAltAssetsEnabled(void);
 typedef int32_t (*Fn_GetNeiGiDrawInfo)(const char* slug, CwItemDrawInfo* out);
 
 /* Returns 1 and fills out on success; 0 if the item is unknown/undrawable; CW_DRAW_NOT_READY if the
