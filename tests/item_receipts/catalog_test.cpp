@@ -81,7 +81,9 @@ const ComboRando::ForeignItem* MM_LookupForeign(RandoCheckId check) {
   return check == foreignRewardCheck ? &foreignReward : nullptr;
 }
 } // namespace Rando::MiscBehavior
+#ifndef COMPASS_DONOR_INTEGRATION
 extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled() { return mapCompassInfo; }
+#endif
 #include "receipt_map_pause.inc"
 
 static std::string SmallKeyDonorReceipt(const std::string& name) {
@@ -101,6 +103,7 @@ static std::string SmallKeyDonorReceipt(const std::string& name) {
   return {};
 }
 
+#ifndef COMPASS_DONOR_INTEGRATION
 extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char *name,
                                                        char *buffer,
                                                        uint32_t capacity) {
@@ -118,6 +121,7 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char *name,
   std::memcpy(buffer, body.data(), body.size());
   return body.size();
 }
+#endif
 
 static std::string FlattenReceiptLines(const std::string& body) {
   std::string flat;
@@ -129,6 +133,45 @@ static std::string FlattenReceiptLines(const std::string& body) {
   }
   return flat;
 }
+
+#ifdef COMPASS_DONOR_INTEGRATION
+extern "C" void FixtureConfigureForestCompassReceipt(int information);
+
+static void CheckForestCompassReceiveRoutes() {
+  gSaveContext.fileNum = 0;
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+  const auto saveBefore = gSaveContext;
+  const auto neiBefore = neiSave;
+  // The second Off is another loaded seed, so an On receipt cannot survive in
+  // the foreign-check cache after its seed generation changes.
+  for (int information : {0, 1, 0}) {
+    FixtureConfigureForestCompassReceipt(information);
+    ++generation;
+    CustomMessage::Entry native, foreign;
+    native.icon = foreign.icon = 0xF5;
+    assert(Rando::ApplyItemReceiptText(RI_OOT_COMPASS_FOREST_TEMPLE, native));
+    assert(Rando::ApplyForeignItemReceiptText("Forest Temple Compass", foreign, RC_CLOCK_TOWER_ROOF_OCARINA));
+    assert(!native.autoFormat && !foreign.autoFormat);
+    assert(native.icon == 0xF5 && foreign.icon == 0xF5);
+    assert(native.msg == foreign.msg);
+    const auto text = FlattenReceiptLines(native.msg);
+    assert(text.find("You got the Compass!") != std::string::npos);
+    assert(text.find("Now you can see hidden things.") != std::string::npos);
+    assert(text.find("Forest Temple Compass") != std::string::npos);
+    assert(text.find("masterful") != std::string::npos);
+    assert((text.find("Phantom Ganon") != std::string::npos) == bool(information));
+    assert((text.find("The reward is") != std::string::npos) == bool(information));
+    assert((text.find("Deku Leaf") != std::string::npos) == bool(information));
+    const auto body = native.msg;
+    Rando::AppendReceiptSource(native, " (Bank reward)");
+    assert(native.msg.compare(0, body.size(), body) == 0);
+    assert(native.msg.substr(body.size()) == "\x10 (Bank reward)\xBF");
+    assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+    assert(!std::memcmp(&neiBefore, &neiSave, sizeof(neiBefore)));
+  }
+  std::cout << "Real OoT donor -> MM Forest Temple Compass native/foreign routes: saved Off/On, full tutorial/MQ/reward, cache reset and source append passed\n";
+}
+#endif
 
 static void CheckConcreteSmallKeyReceipts() {
   const auto previousSave = gSaveContext;
@@ -281,6 +324,10 @@ int main() {
     w = 8;
   PlayState play{};
   gPlayState = &play;
+#ifdef COMPASS_DONOR_INTEGRATION
+  CheckForestCompassReceiveRoutes();
+  return 0;
+#else
   // Header is deliberately a story entry with a different icon and next ID.
   const char bow[] = "\x00\x00\x20\x00\x03\xFF\xFF\xFF\xFF\xFF\xFF"
                      "You got the Hero's Bow!\x10Press \xB2 to aim.\x19\xBF";
@@ -553,4 +600,5 @@ int main() {
   assert(entry.msg == "brief");
   std::cout << "real native/FC item catalogs, donor descriptions, binary "
                "length, safe aliases and cold fallback passed\n";
+#endif
 }

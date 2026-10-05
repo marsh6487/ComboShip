@@ -344,7 +344,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
         'void BuildComboForeignMessage(Player* player,CustomMessage& msg) ' +
         block(exported, 'void BuildComboForeignMessage'))
     donor = donor.replace('/* DONOR_EXPORT */',
-        'extern "C" int32_t OOT_GetItemReceiptText(const char* itemName,char* buffer,uint32_t capacity) ' +
+        'extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName,char* buffer,uint32_t capacity) ' +
         block(exported, 'int32_t OOT_GetItemReceiptText'))
     tu = tmp / 'donor.cpp'
     tu.write_text(donor)
@@ -352,6 +352,27 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-I', str(ROOT), *extra,
                     str(tu), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)
+
+    # Link the real donor export to the real MM native/foreign receipt routes.
+    # Private engine fixtures remain separate, as the two DLLs are in-game.
+    donor_library = tmp / 'libcompass_donor.so'
+    donor_private = ['-Dmain=OotFixtureTestMain', '-DgSaveContext=ootFixtureSaveContext',
+                     '-DgPlayState=ootFixturePlayState', '-DNei_Save=ootFixtureNeiSave',
+                     '-DRando=OotFixtureRando', '-DCustomMessage=OotFixtureCustomMessage',
+                     '-DComboRando=OotFixtureComboRando', '-DCombo_ResolveSym=OotFixtureResolveSym',
+                     '-DCOMBO_EXPORT=__attribute__((visibility("default")))']
+    subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
+                    '-fPIC', '-shared', '-fvisibility=hidden',
+                    *donor_private, *extra, '-I', str(ROOT), str(tu), '-o', str(donor_library)], check=True)
+    integrated = tmp / 'compass_receiver'
+    result = subprocess.run([compiler, '-std=c++20', *mmflags, *extra, '-DCOMPASS_DONOR_INTEGRATION', '-I' + str(tmp),
+                    str(ROOT / 'tests/item_receipts/catalog_test.cpp'),
+                    str(ROOT / 'mm/2s2h/Rando/ItemReceiptText.cpp'),
+                    '-L' + str(tmp), '-lcompass_donor', '-Wl,-rpath,' + str(tmp), '-rdynamic', '-ldl',
+                    '-o', str(integrated)], capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError(result.stdout + result.stderr)
+    subprocess.run([str(integrated)], check=True)
 
     information = (ROOT / 'tests/item_receipts/information_test.cpp').read_text()
     hint = (ROOT / 'soh/soh/Enhancements/randomizer/hint.cpp').read_text()
