@@ -16,7 +16,7 @@ fixture = (ROOT / 'soh/tests/young_epona_test.c').read_text().replace(
     '/* PRODUCTION_HORSE */', '\n'.join(source[n] for n in names if n in source))
 npc_source = functions((ROOT / 'soh/src/overlays/actors/ovl_En_Horse_Link_Child/z_en_horse_link_child.c').read_text())
 fixture = fixture.replace('/* PRODUCTION_RANCH_UPDATE */', npc_source['EnHorseLinkChild_Update'])
-flags = ['-std=gnu2x', '-DF3DEX_GBI_2', '-DCOMBO_BUILD', '-Icombo', '-DLOG_LEVEL_GAME_PRINTS=0', '-DNDEBUG',
+flags = ['-std=gnu2x', '-DF3DEX_GBI_2', '-DCOMBO_BUILD', '-Icombo', '-Icombo/menu', '-DLOG_LEVEL_GAME_PRINTS=0', '-DNDEBUG',
          '-Werror=implicit-function-declaration', '-Wno-int-conversion',
          '-Wno-incompatible-pointer-types', '-Wno-discarded-qualifiers',
          '-Wno-discarded-array-qualifiers',
