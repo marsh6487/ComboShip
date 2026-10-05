@@ -21,9 +21,10 @@ def run_oot():
 
 def run_mm():
     sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
-    from run_mm_nei_tests import flags as mm_flags
+    from run_mm_nei_tests import flags as mm_flags, write_graph_helpers
     from rig_fit_query import write_query
     with tempfile.TemporaryDirectory(prefix='nei-quest-mm-') as td:
+        write_graph_helpers(td)
         query=Path(td)/'query.cpp';write_query(ROOT,query)
         text=(ROOT/'mm/mods/items/logic/item_elemental_wand.c').read_text()
         start=text.index('void Wand_Draw(');body=text[start:text.index('\n}',start)+2]
@@ -35,7 +36,7 @@ def run_mm():
             output=str(Path(td)/(source.stem+'.o'))
             subprocess.run(['cc','-std=gnu2x',*mm_flags(),'-ffunction-sections','-fdata-sections','-c',str(source),'-o',output],check=True);objects.append(output)
         binary=str(Path(td)/'quest')
-        subprocess.run(['c++','-std=c++20',*mm_flags(),'-ffunction-sections','-fdata-sections',str(ROOT/'tests/nei_quest_held/mm_runtime_test.cpp'),str(query),*objects,'-Wl,--gc-sections','-o',binary],check=True)
+        subprocess.run(['c++','-std=c++20',*mm_flags(),'-I'+td,'-ffunction-sections','-fdata-sections',str(ROOT/'tests/nei_quest_held/mm_runtime_test.cpp'),str(query),*objects,'-Wl,--gc-sections','-o',binary],check=True)
         for args in [['--partial-mod'],['--mod'],[],['--fallback'],['--missing']]:subprocess.run([binary,*args],check=True)
 
 if __name__=='__main__':
