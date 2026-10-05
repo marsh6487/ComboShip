@@ -1023,9 +1023,10 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemDrawInfo(const char* itemName, CwItem
     } catch (...) { return 0; }
 }
 
-static int32_t OOT_FillItemIconInfo(RandomizerGet rg, CwItemIconInfo* out) {
+static int32_t OOT_FillItemIconInfo(RandomizerGet rg, CwItemIconInfo* out, bool resolveProgressive = true) {
     RandomizerGet actual = RG_NONE;
-    auto gi = Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual);
+    auto gi = resolveProgressive ? Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual)
+                                 : Rando::StaticData::RetrieveItem(rg).GetGIEntryUnresolved();
     auto item = Rando::StaticData::RetrieveItem(actual != RG_NONE ? actual : rg);
     if ((actual != RG_NONE ? actual : rg) == RG_EXT_SHIELD_OF_IKANA) {
         out->path = COMBO_IKANA_SHIELD_ICON;
@@ -1073,6 +1074,21 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemIconInfo(const char* itemName, CwItem
         if (!OTRGlobals::Instance || !OTRGlobals::Instance->gRandomizer || !OTRGlobals::Instance->gRandoContext)
             return CW_DRAW_NOT_READY;
         return OOT_FillItemIconInfo(it->second, out);
+    } catch (...) { return 0; }
+}
+
+// Seed previews deliberately keep the pool identity and its catalog icon.
+// Equipment currently owned by either game must never choose the preview tier.
+extern "C" COMBO_EXPORT int32_t OOT_GetSeedItemIconInfo(const char* itemName, CwItemIconInfo* out) {
+    try {
+        if (!itemName || !out || !OTRGlobals::Instance || !OTRGlobals::Instance->gRandoContext)
+            return 0;
+        *out = CwItemIconInfo{};
+        const auto it = Rando::StaticData::itemNameToEnum.find(itemName);
+        if (it == Rando::StaticData::itemNameToEnum.end() || it->second == RG_NONE || it->second == RG_COMBO_FOREIGN ||
+            it->second == RG_HINT || it->second == RG_SOLD_OUT)
+            return 0;
+        return OOT_FillItemIconInfo(it->second, out, false);
     } catch (...) { return 0; }
 }
 

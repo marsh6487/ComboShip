@@ -10,6 +10,7 @@
 #include "../helpers/equip_helper.h"
 #include "macros.h"
 #include "functions.h"
+#include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/randomizer/NeiHeldPresentation.h"
 
 u8 Seasons_IsDrawn(void);
@@ -21,10 +22,11 @@ static const ItemHandPose sRodPose = {
 };
 
 void CustomItems_DrawRodOfSeasons(Player* player, PlayState* play) {
+    const char* original = "__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL";
     if (!Seasons_IsDrawn()) {
         return;
     }
-    if (NeiHeld_HasResources(NEI_HELD_PATH("rod_of_seasons"), NULL)) {
+    if (!ResourceMgr_IsModAsset(original) && NeiHeld_HasResources(NEI_HELD_PATH("rod_of_seasons"), NULL)) {
         Matrix_Push();
         if (ItemEquip_ApplyHandPose(player, &sRodPose) &&
             NeiHeld_DrawModel(play, NEI_HELD_PATH("rod_of_seasons"), NULL)) {
@@ -33,6 +35,5 @@ void CustomItems_DrawRodOfSeasons(Player* player, PlayState* play) {
         }
         Matrix_Pop();
     }
-    ItemEquip_DrawHeldModel(player, play, "__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL", NULL,
-                            &sRodPose);
+    ItemEquip_DrawHeldModel(player, play, original, NULL, &sRodPose);
 }

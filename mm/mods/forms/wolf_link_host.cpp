@@ -12,6 +12,7 @@
 #include "mods/transformation_masks/wolf_link_form.h"
 #include "expansions/sm64/sm64_mario.h"
 #include <libultraship/bridge/consolevariablebridge.h>
+#include <spdlog/spdlog.h>
 
 extern "C" {
 // MM installs these actions for knockback, electricity, freezing and thawing.
@@ -31,6 +32,8 @@ struct HostState {
     s16 scene = 0;
     u16 filter = 0;
     u16 toggle = 0;
+    u16 crystalPress = 0;
+    bool attemptLogged = false;
 };
 HostState sHost;
 
@@ -71,20 +74,54 @@ u16 ItemButtons(u16 item, bool forms) {
     return buttons;
 }
 
-bool OtherOwner(Player* player) {
-    return CustomForms_ActiveForm() != CUSTOM_FORM_NONE || Sm64Mario_IsActive() || CVarGetInteger("gSm64Mario", 0) ||
-           PakLoader_HasActiveModel() || O2rLoader_HasActiveModel() || ExtEquip_PendantActive() || Beetle_IsFlying() ||
-           KiteSurf_IsActive() || Trident_OwnsPlayerAction() || CustomItems_BlocksMovement(player);
+const char* OwnerRejection(Player* player) {
+    if (CustomForms_ActiveForm() != CUSTOM_FORM_NONE)
+        return "custom-form";
+    if (Sm64Mario_IsActive() || CVarGetInteger("gSm64Mario", 0))
+        return "mario-form";
+    if (PakLoader_HasActiveBodyModel())
+        return "pak-body-model";
+    if (O2rLoader_HasActiveModel())
+        return "o2r-body-model";
+    if (ExtEquip_PendantActive())
+        return "pendant";
+    if (Beetle_IsFlying())
+        return "beetle";
+    if (KiteSurf_IsActive())
+        return "kite";
+    if (Trident_OwnsPlayerAction())
+        return "trident";
+    if (CustomItems_BlocksMovement(player))
+        return "custom-item-action";
+    return nullptr;
+}
+
+const char* ReleaseRejection(PlayState* play, Player* player) {
+    if (player != GET_PLAYER(play))
+        return "non-player-actor";
+    if (player->transformation != PLAYER_FORM_HUMAN)
+        return "native-form";
+    if (player->currentMask != PLAYER_MASK_NONE)
+        return "worn-mask";
+    if (const char* owner = OwnerRejection(player))
+        return owner;
+    if (!CVarGetInteger("gMods.WolfLink.Enabled", 1))
+        return "disabled";
+    if (play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF)
+        return "scene-transition";
+    if (play->actorCtx.isOverrideInputOn)
+        return "override-input";
+    if (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_200 | PLAYER_STATE1_20))
+        return "native-input-state";
+    if (gSaveContext.save.saveInfo.playerData.health <= 0)
+        return "no-health";
+    if (player->stateFlags3 & PLAYER_STATE3_FLYING_WITH_HOOKSHOT)
+        return "hookshot-flight";
+    return nullptr;
 }
 
 bool MustRelease(PlayState* play, Player* player) {
-    return player != GET_PLAYER(play) || player->transformation != PLAYER_FORM_HUMAN ||
-           player->currentMask != PLAYER_MASK_NONE || OtherOwner(player) ||
-           !CVarGetInteger("gMods.WolfLink.Enabled", 1) || play->transitionTrigger != TRANS_TRIGGER_OFF ||
-           play->transitionMode != TRANS_MODE_OFF || play->actorCtx.isOverrideInputOn ||
-           (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_200 | PLAYER_STATE1_20)) ||
-           gSaveContext.save.saveInfo.playerData.health <= 0 ||
-           (player->stateFlags3 & PLAYER_STATE3_FLYING_WITH_HOOKSHOT);
+    return ReleaseRejection(play, player) != nullptr;
 }
 
 bool ContextAction(const Player* player) {
@@ -94,11 +131,35 @@ bool ContextAction(const Player* player) {
            player->csAction != PLAYER_CSACTION_NONE || player->textboxBtnCooldownTimer != 0;
 }
 
+const char* ActivationRejection(PlayState* play, Player* player) {
+    if (const char* release = ReleaseRejection(play, player))
+        return release;
+    if (NativeDamage(player))
+        return "native-damage";
+    if (ContextAction(player))
+        return "native-interaction";
+    if (player->heldActor || player->rightHandActor)
+        return "held-actor";
+    if (player->itemAction > PLAYER_IA_NONE)
+        return "held-item";
+    if (player->meleeWeaponState != PLAYER_MELEE_WEAPON_STATE_0)
+        return "melee-action";
+    if (Nei_Save()->ownedItems[SLOT_SHADOW_CRYSTAL - 24] != EXT_ITEM_SHADOW_CRYSTAL)
+        return "crystal-not-owned";
+    return nullptr;
+}
+
 bool CanActivate(PlayState* play, Player* player) {
-    return !MustRelease(play, player) && !NativeDamage(player) && !ContextAction(player) &&
-           player->heldActor == nullptr && player->rightHandActor == nullptr && player->itemAction <= PLAYER_IA_NONE &&
-           player->meleeWeaponState == PLAYER_MELEE_WEAPON_STATE_0 &&
-           Nei_Save()->ownedItems[SLOT_SHADOW_CRYSTAL - 24] == EXT_ITEM_SHADOW_CRYSTAL;
+    return ActivationRejection(play, player) == nullptr;
+}
+
+void LogAttempt(const char* result, Player* player) {
+    SPDLOG_INFO("MM Wolf: Shadow Crystal result={} frame={} scene={} raw={:04x} effective={:04x} "
+                "itemAction={} heldActor={} rightHandActor={} state1={:08x} state2={:08x} state3={:08x}",
+                result, sHost.frame, sHost.scene, sHost.raw.press.button, sHost.effective.press.button,
+                static_cast<s32>(player->itemAction), player->heldActor != nullptr, player->rightHandActor != nullptr,
+                player->stateFlags1, player->stateFlags2, player->stateFlags3);
+    sHost.attemptLogged = true;
 }
 
 bool Active(Player* player) {
@@ -134,14 +195,20 @@ extern "C" void WolfLinkHost_PreUpdate(PlayState* play, Player* player) {
     sHost.effective = Input{};
     sHost.filter = 0;
     sHost.toggle = 0;
+    sHost.crystalPress = sHost.raw.press.button & ItemButtons(EXT_ITEM_SHADOW_CRYSTAL, false);
+    sHost.attemptLogged = false;
 
-    if (MustRelease(play, player)) {
+    if (const char* release = ReleaseRejection(play, player)) {
+        if (sHost.crystalPress)
+            LogAttempt(release, player);
         if (Active(player))
             Stop(play, player);
         return;
     }
 
     if (sHost.raw.press.button & ItemButtons(0, true)) {
+        if (sHost.crystalPress)
+            LogAttempt("form-item-input", player);
         if (Active(player))
             Stop(play, player);
         return;
@@ -149,6 +216,8 @@ extern "C" void WolfLinkHost_PreUpdate(PlayState* play, Player* player) {
     if (Active(player) || CanActivate(play, player)) {
         sHost.toggle = ItemButtons(EXT_ITEM_SHADOW_CRYSTAL, false);
         sHost.filter = sHost.toggle;
+    } else if (sHost.crystalPress) {
+        LogAttempt(ActivationRejection(play, player), player);
     }
     if (Active(player)) {
         sHost.filter |= kItemButtons;
@@ -179,10 +248,19 @@ extern "C" void WolfLinkHost_FilterInput(Player* player, Input* input) {
     sHost.effective = *input;
     const u16 toggle = sHost.toggle;
     if (input->press.button & toggle) {
-        if (Active(player))
+        if (Active(player)) {
             Stop(sHost.play, player);
-        else if (CanActivate(sHost.play, player) && WolfLinkForm_LoadSkeleton(sHost.play))
+            LogAttempt("deactivated", player);
+        } else if (const char* rejection = ActivationRejection(sHost.play, player)) {
+            LogAttempt(rejection, player);
+        } else if (WolfLinkForm_LoadSkeleton(sHost.play)) {
             WolfLinkForm_Select(1);
+            LogAttempt("activated", player);
+        } else {
+            LogAttempt("asset-load-failed", player);
+        }
+    } else if (sHost.crystalPress && !sHost.attemptLogged) {
+        LogAttempt("input-suppressed", player);
     }
     sHost.filter = toggle;
     if (Active(player)) {

@@ -160,14 +160,14 @@ static u8 WandStorm_FireRay(Player* player, PlayState* play, Actor* target) {
     return 1;
 }
 
-// En_Okarina_Effect kills itself on Init when a scene weather tag already owns the weather, so a
-// NULL there is a legitimate "not now" and the cast reports failure rather than eating the magic.
+// En_Okarina_Effect kills itself on Init when rain already owns the weather. Native Actor_Spawn
+// still returns that actor, so its update must survive too before the cast can charge magic.
 static u8 WandStorm_CallStorm(Player* player, PlayState* play) {
     Actor* storm = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_OKARINA_EFFECT, player->actor.world.pos.x,
                                player->actor.world.pos.y + WAND_STORM_SPAWN_Y_OFFSET, player->actor.world.pos.z, 0, 0,
                                0, WAND_STORM_OKARINA_PARAMS);
 
-    return (storm != NULL);
+    return (storm != NULL) && (storm->update != NULL);
 }
 
 u8 WandStorm_Cast(Player* player, PlayState* play) {

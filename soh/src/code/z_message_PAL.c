@@ -2,6 +2,7 @@
 #include "young_epona.h"
 #include "message_data_static.h"
 #include "ComboBossSoulColor.h"
+#include "ComboItemReceiptRender.h"
 #include "vt.h"
 
 #include <string.h>
@@ -849,6 +850,47 @@ f32 sFontWidths[144] = {
     14.0f, // ?
 };
 
+// Receipt layout is staged by the message object, then reset before every
+// new textbox. Read-only donor exports never stage or alter this state.
+static CwItemReceiptPresentation sItemReceiptPresentation;
+static CwItemReceiptLayout sItemReceiptLayout;
+static int sItemReceiptFirstPage;
+
+void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation* presentation) {
+    memset(&sItemReceiptPresentation, 0, sizeof(sItemReceiptPresentation));
+    memset(&sItemReceiptLayout, 0, sizeof(sItemReceiptLayout));
+    sItemReceiptFirstPage = false;
+    if (presentation && presentation->singleBox == 1) {
+        sItemReceiptPresentation = *presentation;
+        if (!ComboReceipt_HasIcon(presentation))
+            sItemReceiptPresentation.iconPath[0] = '\0';
+    }
+}
+
+static void Message_ApplyItemReceiptLayout(PlayState* play) {
+    MessageContext* msgCtx = &play->msgCtx;
+    if (!sItemReceiptPresentation.singleBox)
+        return;
+    sItemReceiptLayout =
+        ComboReceipt_Layout(&sItemReceiptPresentation, msgCtx->font.msgBuf, msgCtx->msgLength, false, sFontWidths, 144);
+    sItemReceiptFirstPage = (uint32_t)msgCtx->msgBufPos <= sItemReceiptLayout.firstPageEnd;
+    R_TEXT_CHAR_SCALE = sItemReceiptFirstPage ? sItemReceiptLayout.textScale : 75;
+    R_TEXT_LINE_SPACING = 12;
+}
+
+static int Message_HasItemReceiptIcon(void) {
+    return sItemReceiptFirstPage && ComboReceipt_HasIcon(&sItemReceiptPresentation);
+}
+
+static void Message_DrawItemReceiptIcon(PlayState* play, Gfx** p) {
+    MessageContext* msgCtx = &play->msgCtx;
+    if (Message_HasItemReceiptIcon()) {
+        int y = msgCtx->textPosY - (sItemReceiptLayout.iconHeight - R_TEXT_CHAR_SCALE * 16 / 100) / 2;
+        *p = ComboReceipt_DrawIcon(*p, &sItemReceiptPresentation, &sItemReceiptLayout, msgCtx->textPosX + 4, y,
+                                   msgCtx->textColorAlpha);
+    }
+}
+
 u16 Message_DrawItemIcon(PlayState* play, u16 itemId, Gfx** p, u16 i) {
     s32 pad;
     Gfx* gfx = *p;
@@ -861,6 +903,12 @@ u16 Message_DrawItemIcon(PlayState* play, u16 itemId, Gfx** p, u16 i) {
     gDPPipeSync(gfx++);
     gDPSetCombineMode(gfx++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
     gDPSetPrimColor(gfx++, 0, 0, 255, 255, 255, msgCtx->textColorAlpha);
+
+    if (Message_HasItemReceiptIcon()) {
+        Message_DrawItemReceiptIcon(play, &gfx);
+        *p = gfx;
+        return i + 1;
+    }
 
     // Invalidate icon texture as it may have changed from the last time a text box had an icon
     gSPInvalidateTexCache(gfx++, (uintptr_t)msgCtx->textboxSegment + MESSAGE_STATIC_TEX_SIZE);
@@ -1648,6 +1696,13 @@ void Message_LoadItemIcon(PlayState* play, u16 itemId, s16 y) {
     InterfaceContext* interfaceCtx = &play->interfaceCtx;
     u8 language = sDisplayNextMessageAsEnglish ? LANGUAGE_ENG : gSaveContext.language;
 
+    if (Message_HasItemReceiptIcon()) {
+        memcpy((uintptr_t)msgCtx->textboxSegment + MESSAGE_STATIC_TEX_SIZE, sItemReceiptPresentation.iconPath,
+               strlen(sItemReceiptPresentation.iconPath) + 1);
+        msgCtx->msgBufPos++;
+        return;
+    }
+
     if (itemId == ITEM_DUNGEON_MAP) {
         interfaceCtx->mapPalette[30] = 0xFF;
         interfaceCtx->mapPalette[31] = 0xFF;
@@ -2251,7 +2306,8 @@ void Message_DecodeJPN(PlayState* play) {
             }
         } else if (curChar == MESSAGE_ITEM_ICON_JPN) {
             msgCtx->msgBufDecodedWide[++decodedBufPos] = font->msgBufWide[msgCtx->msgBufPos + 1];
-            if (GameInteractor_Should(VB_LOAD_ITEM_ICON, true, sDisplayNextMessageAsEnglish)) {
+            if (Message_HasItemReceiptIcon() ||
+                GameInteractor_Should(VB_LOAD_ITEM_ICON, true, sDisplayNextMessageAsEnglish)) {
                 Message_LoadItemIcon(play, font->msgBufWide[msgCtx->msgBufPos + 1], R_TEXTBOX_Y + 10);
             }
         } else if (curChar == MESSAGE_BACKGROUND_JPN) {
@@ -2310,6 +2366,8 @@ void Message_Decode(PlayState* play) {
     f32 timeInSeconds;
     MessageContext* msgCtx = &play->msgCtx;
     Font* font = &play->msgCtx.font;
+
+    Message_ApplyItemReceiptLayout(play);
 
     // #region SOH [NTSC] - allow switching languages mid text
     sTextBoxNum++;
@@ -2683,7 +2741,8 @@ void Message_Decode(PlayState* play) {
             msgCtx->msgBufDecoded[++decodedBufPos] = font->msgBuf[msgCtx->msgBufPos + 1];
             osSyncPrintf("ITEM_NO=(%d) (%d)\n", msgCtx->msgBufDecoded[decodedBufPos],
                          font->msgBuf[msgCtx->msgBufPos + 1]);
-            if (GameInteractor_Should(VB_LOAD_ITEM_ICON, true, sDisplayNextMessageAsEnglish)) {
+            if (Message_HasItemReceiptIcon() ||
+                GameInteractor_Should(VB_LOAD_ITEM_ICON, true, sDisplayNextMessageAsEnglish)) {
                 Message_LoadItemIcon(play, (u8)font->msgBuf[msgCtx->msgBufPos + 1], R_TEXTBOX_Y + 10);
             }
         } else if (temp_s2 == MESSAGE_BACKGROUND) {
@@ -2746,6 +2805,7 @@ void Message_OpenText(PlayState* play, u16 textId) {
     Font* font = &msgCtx->font;
     s16 textBoxType;
 
+    Message_SetItemReceiptPresentation(NULL);
     bool loadFromMessageTable = true;
     GameInteractor_ExecuteOnOpenText(&textId, &loadFromMessageTable);
 

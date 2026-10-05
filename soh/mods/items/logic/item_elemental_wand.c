@@ -261,8 +261,13 @@ void Wand_TickInput(PlayState* play, Player* player) {
             // ---- HOLD C: the two rods that do something while the button is down ----
             if (mode == WAND_MODE_TORNADO) {
                 WandWind_TickHover(player, in.isHeld);
-            } else if ((mode == WAND_MODE_SAND) && WandSand_HoldElapsed(player, in.isHeld)) {
-                Wand_Cast(player, play, WAND_MODE_SAND); // billed like any other slab
+            } else if (mode == WAND_MODE_SAND) {
+                // A press is handled below once. Held repeats share its equip/blocker gates, and
+                // passing false resets the repeat timer during drawing or an unavailable action.
+                u8 canHold = sWasDrawn && in.wasEquipped && !in.isPressed && !ItemInput_IsBlocked(player, play);
+                if (WandSand_HoldElapsed(player, canHold && in.isHeld)) {
+                    Wand_Cast(player, play, WAND_MODE_SAND); // billed like any other slab
+                }
             }
 
             // ---- PRESS C: cast. Only the press poses — the Sand hold repeats every few frames and

@@ -29,7 +29,10 @@ python3 -B tests/nei_shared_slot/run_save_tests.py
 python3 -B tests/mm_wolf/run_skin_tests.py
 python3 -B tests/mm_wolf/run_core_tests.py
 python3 -B tests/mm_wolf/run_host_tests.py
+python3 -B tests/mm_wolf/run_model_owner_tests.py
+python3 -B tests/mm_wolf/run_asset_packaging_tests.py
 python3 -B tests/mm_wolf/run_syntax_tests.py
+python3 -B tests/wand_modes/run_tests.py
 python3 -B scripts/diagnostics/run_receipt_soul_color_tests.py
 python3 -B scripts/diagnostics/run_nei_identity_tests.py
 python3 -B tests/nei_held/run_hand_fit_tests.py

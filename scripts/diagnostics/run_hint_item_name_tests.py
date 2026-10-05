@@ -117,7 +117,7 @@ def main():
     flags += ["-I" + str(root / p) for p in ("soh", "soh/include", "soh/src", "soh/assets",
                                               "libultraship/include")]
     if (root / "combo").is_dir():
-        flags += ["-DCOMBO_BUILD"]
+        flags += ["-DCOMBO_BUILD", "-I" + str(root / "combo/menu")]
     if args.sanitize:
         flags += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
     with tempfile.TemporaryDirectory(prefix="hint-item-names-") as temp:

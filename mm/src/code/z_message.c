@@ -9,6 +9,7 @@
 #include "interface/parameter_static/parameter_static.h"
 #include "z64save.h"
 #include "BenPort.h"
+#include "ComboItemReceiptRender.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "assets/archives/schedule_dma_static/schedule_dma_static_yar.h"
 #include "assets/archives/icon_item_static/icon_item_static_yar.h"
@@ -1114,6 +1115,52 @@ void Message_StageCustomItemIconTint(void* tex, s16 width, s16 height, u8 isIA8,
 }
 // #endregion
 
+// Value-owned layout staged by CustomMessage::Entry. It is never inherited by
+// native story text or by the next item receipt.
+extern f32 sNESFontWidths[160];
+static CwItemReceiptPresentation sItemReceiptPresentation;
+static CwItemReceiptLayout sItemReceiptLayout;
+static int sItemReceiptFirstPage;
+
+void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation* presentation) {
+    memset(&sItemReceiptPresentation, 0, sizeof(sItemReceiptPresentation));
+    memset(&sItemReceiptLayout, 0, sizeof(sItemReceiptLayout));
+    sItemReceiptFirstPage = false;
+    if (presentation && presentation->singleBox == 1) {
+        sItemReceiptPresentation = *presentation;
+        if (!ComboReceipt_HasIcon(presentation))
+            sItemReceiptPresentation.iconPath[0] = '\0';
+    }
+}
+
+static void Message_ApplyItemReceiptLayout(PlayState* play) {
+    MessageContext* msgCtx = &play->msgCtx;
+    if (!sItemReceiptPresentation.singleBox)
+        return;
+    sItemReceiptLayout =
+        ComboReceipt_Layout(&sItemReceiptPresentation, msgCtx->font.msgBuf.schar + 11,
+                            msgCtx->msgLength > 11 ? msgCtx->msgLength - 11 : 0, true, sNESFontWidths, 160);
+    sItemReceiptFirstPage = (uint32_t)msgCtx->msgBufPos <= sItemReceiptLayout.firstPageEnd + 11;
+    msgCtx->textCharScale = (sItemReceiptFirstPage ? sItemReceiptLayout.textScale : 75) / 100.0f;
+    msgCtx->unk11FFC = 12;
+    msgCtx->unk11F18 = 0;
+    msgCtx->unk11F1A[0] = msgCtx->unk11F1A[1] = msgCtx->unk11F1A[2] = 0;
+    sCharTexSize = msgCtx->textCharScale * 16.0f;
+    sCharTexScale = 1024.0f / msgCtx->textCharScale;
+}
+
+int Message_DrawItemReceiptIcon(PlayState* play, Gfx** gfxP) {
+    if (!sItemReceiptPresentation.singleBox)
+        return 0;
+    MessageContext* msgCtx = &play->msgCtx;
+    if (sItemReceiptFirstPage && ComboReceipt_HasIcon(&sItemReceiptPresentation)) {
+        *gfxP = ComboReceipt_DrawIcon(*gfxP, &sItemReceiptPresentation, &sItemReceiptLayout,
+                                      msgCtx->unk11FF8 + sItemReceiptLayout.iconX,
+                                      msgCtx->unk11FFA + sItemReceiptLayout.iconY, msgCtx->textColorAlpha);
+    }
+    return 1;
+}
+
 void Message_DrawItemIcon(PlayState* play, Gfx** gfxP) {
     MessageContext* msgCtx = &play->msgCtx;
     Gfx* gfx = *gfxP;
@@ -1334,7 +1381,7 @@ void Message_DrawTextDefault(PlayState* play, Gfx** gfxP) {
     play->msgCtx.textPosY = play->msgCtx.unk11FFA;
 
     sp130 = 0;
-    if (play->msgCtx.itemId != MESSAGE_ITEM_NONE) {
+    if (!Message_DrawItemReceiptIcon(play, &gfx) && play->msgCtx.itemId != MESSAGE_ITEM_NONE) {
         Message_DrawItemIcon(play, &gfx);
     }
     msgCtx->textColorR = msgCtx->unk120C8;
@@ -2515,6 +2562,8 @@ void Message_Decode(PlayState* play) {
     u16 curChar;
     u8 index2 = 0;
 
+    Message_ApplyItemReceiptLayout(play);
+
     // BENTODO do this somewhere else
     gSaveContext.options.language = LANGUAGE_ENG;
 
@@ -3450,6 +3499,7 @@ void Message_OpenText(PlayState* play, u16 textId) {
     Player* player = GET_PLAYER(play);
     f32 var_fv0;
 
+    Message_SetItemReceiptPresentation(NULL);
     bool loadFromMessageTable = true;
     GameInteractor_ExecuteOnOpenText(&textId, &loadFromMessageTable);
 
@@ -3600,6 +3650,7 @@ void Message_OpenText(PlayState* play, u16 textId) {
 }
 
 void func_801514B0(PlayState* play, u16 arg1, u8 arg2) {
+    Message_SetItemReceiptPresentation(NULL);
     MessageContext* msgCtx = &play->msgCtx;
     Font* font = &msgCtx->font;
     Player* player = GET_PLAYER(play);

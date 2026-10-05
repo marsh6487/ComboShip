@@ -38,6 +38,9 @@ struct Item {
       *actual = RG_TIER;
     return std::make_shared<GetItemEntry>(GetItemEntry{nativeId});
   }
+  std::shared_ptr<GetItemEntry> GetGIEntryUnresolved() {
+    return std::make_shared<GetItemEntry>(GetItemEntry{nativeId});
+  }
   Item CustomIcon(const char *path) {
     bottleIcons[id] = path;
     return *this;

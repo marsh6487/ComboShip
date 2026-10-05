@@ -169,6 +169,12 @@ void DrawOotExtTrident() {nativeCalled=CW_OOT_EQUIP_TRIDENT;}
 void DrawOotExtClimbBoots() {nativeCalled=CW_OOT_EQUIP_CLIMB_BOOTS;}
 void DrawOotExtRocBoots() {nativeCalled=CW_OOT_EQUIP_ROC_BOOTS;}
 /* HOST_NATIVE_DRAW */
+// The production custom dispatcher also handles Din's separate sword layers.
+// Their real material and host submission paths run in the sword fixture;
+// this static recipe fixture must never dispatch the sword-layer path.
+void ComboDinSwordGi_DrawLayers(PlayState*, const char*, const char*) {
+ assert(false && "static GI fixture unexpectedly selected Din sword layers");
+}
 /* HOST_CUSTOM_DRAW */
 int main() {
  CwItemDrawInfo dependency{};

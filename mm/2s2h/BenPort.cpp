@@ -1,4 +1,5 @@
 #include "../../combo/NeiAssetPriorityResource.h"
+#include "../../combo/NeiWolfAssetResource.h"
 #include "../../combo/menu/ItemGrantAuditBridge.h"
 #include "BenPort.h"
 #ifdef COMBO_BUILD
@@ -5351,4 +5352,13 @@ extern "C" int ResourceMgr_IsModAsset(const char* path) {
 
 extern "C" int ResourceMgr_IsModAssetForGame(const char* game, const char* path) {
     return NeiAssetPriority::IsModAsset("mm", game, path);
+}
+
+extern "C"
+#ifdef COMBO_BUILD
+    COMBO_EXPORT
+#endif
+    int
+    MM_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner) {
+    return NeiWolfAsset::CopyResource("mm", destination, capacity, size, owner);
 }

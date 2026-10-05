@@ -6,18 +6,49 @@
 #include <cstdlib>
 #include <limits>
 #include <map>
+#include <sstream>
+#include <spdlog/sinks/ostream_sink.h>
 
 static std::string assetDirectory;
 static int colliderInitializations, colliderDestructions, attackRegistrations;
 static Collider* lastAttack;
 static std::map<std::string, int32_t> integerCvars;
 static std::map<std::string, float> floatCvars;
+static std::map<std::string, std::string> locatedFiles;
+static std::ostringstream wolfLogs;
+static std::vector<u8> resourceBlob;
+static const char* resourceBlobOwner = "mm";
+static void captureWolfLogs() {
+    auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(wolfLogs);
+    auto logger = std::make_shared<spdlog::logger>("wolf-fixture", sink);
+    logger->set_pattern("%v");
+    spdlog::set_default_logger(logger);
+    wolfLogs.str("");
+}
+static bool logged(const char* message) {
+    return wolfLogs.str().find(message) != std::string::npos;
+}
 namespace Ship {
 std::string Context::LocateFileAcrossAppDirs(const std::string& p, const std::string&) {
-    return p;
+    const auto found = locatedFiles.find(p);
+    if (found != locatedFiles.end())
+        return found->second;
+    return std::filesystem::exists(p) ? std::filesystem::absolute(p).string() : std::string{};
 }
 } // namespace Ship
 extern "C" {
+int MM_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner) {
+    if (resourceBlob.empty())
+        return 0;
+    if (owner)
+        *owner = resourceBlobOwner;
+    *size = NeiWolfAsset::ResourcePayloadSize(resourceBlob.data(), resourceBlob.size());
+    if (!*size || (destination && capacity < *size))
+        return -1;
+    if (destination)
+        std::memcpy(destination, resourceBlob.data(), *size);
+    return 1;
+}
 const char* Nei_AssetDir(void) {
     return assetDirectory.c_str();
 }
@@ -134,7 +165,7 @@ static std::vector<u8> makeAsset() {
     constexpr u32 bones = 37, frames = 60;
     std::vector<u8> b(kHeaderSize, 0);
     std::memcpy(b.data(), kMagic, 8);
-    write32(b, 8, kVersion);
+    write32(b, 8, 1);
     auto chunk = [&](size_t size) {
         while (b.size() % 4)
             b.push_back(0);
@@ -185,6 +216,10 @@ static bool load(const std::vector<u8>& b) {
     out.close();
     return LoadAssets();
 }
+static void writeAsset(const std::string& path, const std::vector<u8>& b) {
+    std::ofstream out(path, std::ios::binary);
+    out.write((const char*)b.data(), b.size());
+}
 static void rejected(const char* label, const std::vector<u8>& b) {
     int before = sDefIndex;
     if (load(b)) {
@@ -196,12 +231,63 @@ static void rejected(const char* label, const std::vector<u8>& b) {
 int main(int argc, char** argv) {
     assert(argc == 2);
     assetDirectory = argv[1];
+    captureWolfLogs();
     const auto good = makeAsset();
     assert(load(good));
+    assert(logged("asset loaded path="));
     assert(sSkin.vertexCount == 3 && sSkin.boneCount == 37);
+    auto missingClip = good;
+    missingClip[field(missingClip, 12)] = 'x';
+    rejected("missing required animation", missingClip);
+    assert(!sAssetsLoaded && logged("reason=missing-animation detail=wl_armature_wl_waita"));
+    assert(load(good) && "replacing a rejected asset must permit a fresh load");
+    auto badHeader = good;
+    badHeader[0] = 'X';
+    rejected("wrong magic", badHeader);
+    assert(logged("reason=magic"));
+    badHeader = good;
+    write32(badHeader, 8, 3);
+    rejected("wrong version", badHeader);
+    assert(logged("reason=version"));
+    // File location is a fixture boundary; loading and validation remain the
+    // complete production implementation. No real TP mesh is claimed here.
+    const std::string originalDirectory = assetDirectory;
+    const std::string primaryPath = originalDirectory + "/wolf_link.bin";
+    const std::string donorPath = originalDirectory + "/soh-wolf-fixture.bin";
+    auto primary = good;
+    writeFloat(primary, field(primary, 6), 123.0f);
+    auto donor = good;
+    writeFloat(donor, field(donor, 6), 45.0f);
+    writeAsset(primaryPath, primary);
+    writeAsset(donorPath, donor);
+    assetDirectory = "nei/2ship";
+    locatedFiles["nei/2ship/wolf_link.bin"] = primaryPath;
+    locatedFiles["nei/soh/wolf_link.bin"] = donorPath;
+    sAssetsLoaded = 0;
+    assert(LoadAssets() && sAssetPath == primaryPath && sVertices[0].posX == 123.0f);
+    writeAsset(primaryPath, badHeader);
+    sAssetsLoaded = 0;
+    assert(!LoadAssets() && sAssetPath == primaryPath && !sAssetsLoaded);
+    writeAsset(primaryPath, primary);
+    assert(LoadAssets() && sVertices[0].posX == 123.0f && "fixed primary file must retry normally");
+    locatedFiles.erase("nei/2ship/wolf_link.bin");
+    std::remove(primaryPath.c_str());
+    sAssetsLoaded = 0;
+    assert(LoadAssets() && sAssetPath == donorPath && sVertices[0].posX == 45.0f);
+    auto invalidDonor = donor;
+    invalidDonor[field(invalidDonor, 12)] = 'x';
+    writeAsset(donorPath, invalidDonor);
+    sAssetsLoaded = 0;
+    assert(!LoadAssets() && !sAssetsLoaded && "the SoH fallback must pass the same MM clip validation");
+    writeAsset(donorPath, donor);
+    assert(LoadAssets() && sAssetPath == donorPath);
+    locatedFiles.clear();
+    assetDirectory = originalDirectory;
+    assert(load(good));
     auto b = good;
     write32(b, field(b, 6), 0x7fc00001);
     rejected("NaN vertex under fast-math", b);
+    assert(logged("reason=validation"));
     for (u32 bits : { 0x7f800000u, 0xff800000u, 0x7fc00001u, 0xffc00001u, 0x7f7fffffu }) {
         b = good;
         write32(b, field(b, 9), bits);

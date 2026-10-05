@@ -144,7 +144,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     icon = (ROOT / 'tests/item_receipts/icon_test.cpp').read_text()
     icon_source = (ROOT / 'combo/menu/ComboItemDrawOOT.h').read_text()
     icon = icon.replace('/* ICON_SELECTOR */',
-        'static int32_t OOT_FillItemIconInfo(RandomizerGet rg,CwItemIconInfo* out) ' +
+        'static int32_t OOT_FillItemIconInfo(RandomizerGet rg,CwItemIconInfo* out,bool resolveProgressive = true) ' +
         block(icon_source, 'static int32_t OOT_FillItemIconInfo'))
     tu = tmp / 'icon.cpp'
     tu.write_text(icon)
@@ -200,6 +200,45 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', *extra,
                     '-I', str(ROOT), str(tu), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)
+    layout = (ROOT / 'tests/item_receipts/layout_test.cpp').read_text()
+    for tag, game_engine, font_name, font_type in (
+        ('OOT', engine, 'sFontWidths', '144'),
+        ('MM', mm_message, 'sNESFontWidths', '160')):
+        font_engine = game_engine if tag == 'OOT' else (ROOT / 'mm/src/code/z_message_nes.c').read_text()
+        layout = layout.replace('/* ' + tag + '_FONT_WIDTHS */',
+            'float ' + font_name + '[' + font_type + '] = ' + block(font_engine, 'f32 ' + font_name) + ';')
+        start = game_engine.index('static CwItemReceiptPresentation sItemReceiptPresentation;')
+        end = game_engine.index('u16 Message_DrawItemIcon' if tag == 'OOT' else 'void Message_DrawItemIcon', start)
+        layout = layout.replace('/* ' + tag + '_RECEIPT_RENDERER */', game_engine[start:end])
+    nes = (ROOT / 'mm/src/code/z_message_nes.c').read_text()
+    nes_draw = block(nes, 'void Message_DrawTextNES')
+    begin = nes_draw.index('    msgCtx->textPosX =')
+    end = nes_draw.index('    msgCtx->textColorR =', begin)
+    dispatch = ('void Message_DrawTextNES(PlayState* play, Gfx** gfxP, u16 textDrawPos) {\n'
+                'MessageContext* msgCtx = &play->msgCtx; Gfx* gfx = *gfxP; s16 sp130;\n' +
+                nes_draw[begin:end] + '(void)sp130; (void)textDrawPos; *gfxP = gfx;\n}\n')
+    dispatch += 'void Message_DrawText(PlayState* play, Gfx** gfxP) ' + block(mm_message, 'void Message_DrawText(')
+    line_position = block(nes, '} else if ((curChar == MESSAGE_CARRIAGE_RETURN)')
+    line_position = line_position[1:line_position.index('            spC6++;')]
+    dispatch += ('\nvoid DecodeReceiptLine(int spC6, float spA4) {\n'
+                 'MessageContext* msgCtx = &play.msgCtx;\n' + line_position + '}\n')
+    space = nes_draw[nes_draw.index("            case ' ':") + len("            case ' ':"):]
+    space = space[:space.index('                break;')]
+    glyph = re.search(r'msgCtx->textPosX \+= \(s32\)\(sNESFontWidths\[\(u8\)character - \' \'\] \* msgCtx->textCharScale\);', nes_draw)[0]
+    dispatch += ('\nint NativeLineWidth(const std::string& line) {\n'
+                 'MessageContext* msgCtx = &play.msgCtx; msgCtx->textPosX = 0;\n'
+                 'for (uint8_t character : line) { if (character == \' \') {\n' + space +
+                 '} else {\n' + glyph.replace('(s32)', '(int)').replace('(u8)', '(uint8_t)') +
+                 '} } return msgCtx->textPosX; }\n')
+    layout = layout.replace('/* MM_TEXT_DISPATCH */', dispatch)
+    tu = tmp / 'layout.cpp'
+    tu.write_text(layout)
+    exe = tmp / 'layout'
+    subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', *extra,
+                    '-I', str(ROOT), str(tu), '-o', str(exe)], check=True)
+    subprocess.run([str(exe)], check=True)
+    if '--layout-only' in sys.argv:
+        raise SystemExit(0)
     magic = (ROOT / 'tests/item_receipts/magic_test.cpp').read_text()
     item_messages = (ROOT / 'soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp').read_text()
     magic = magic.replace('/* MAGIC_BUILDER */',
@@ -274,6 +313,10 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     inventory = (ROOT / 'mm/src/code/z_inventory.c').read_text()
     for declaration in ('u32 gUpgradeMasks', 'u8 gUpgradeShifts'):
         catalog += 'extern "C" ' + declaration + '[8] = ' + block(inventory, declaration) + ';\n'
+    catalog += 'const char* Rando::StaticData::GetIconTexturePath(RandoItemId randoItemId) ' + block(items, 'const char* GetIconTexturePath') + '\n'
+    catalog += 'extern "C" { TexturePtr gItemIcons[131] = ' + re.sub(r'(?m)^(\s*)(g\w+),', r'\1(TexturePtr)\2,', block(inventory, 'TexturePtr gItemIcons[]')) + '; }\n'
+    font_source = (ROOT / 'mm/src/code/z_message_nes.c').read_text()
+    catalog += 'extern "C" { float sNESFontWidths[160] = ' + block(font_source, 'f32 sNESFontWidths[160]') + '; }\n'
     (tmp / 'receipt_catalogs.inc').write_text(catalog)
     pause_desc = (ROOT / 'mm/2s2h/CustomMessage/PauseItemDescriptions.cpp').read_text()
     (tmp / 'receipt_map_pause.inc').write_text('extern "C" const char* PauseItemDesc_GetMapInfo(s32 dungeon,u16 itemId) ' +
@@ -326,19 +369,42 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
         descriptions += '{' + rg + ', 0, ' + text.group(1) + ', nullptr, nullptr},\n'
     descriptions += '};\n'
     donor = donor.replace('/* DONOR_MESSAGES */', descriptions)
+    formatter = (ROOT / 'soh/soh/Enhancements/custom-message/CustomMessageManager.cpp').read_text()
+    actual_formatter = "static const std::unordered_map<std::string, std::string> percentColors = {\n" \
+        "{\"w\", std::string(1, '\\x00')}, {\"r\", \"\\x41\"}, {\"g\", \"\\x42\"}, {\"b\", \"\\x43\"}," \
+        "{\"c\", \"\\x44\"}, {\"p\", \"\\x45\"}, {\"y\", \"\\x46\"}, {\"B\", \"\\x47\"}};\n" \
+        "static const std::map<std::string, std::string> colorToPercent;\n" \
+        "static const std::map<std::string, uint8_t> altarIcons;\n"
+    for signature in ('static const std::unordered_map<std::string, char> textBoxSpecialCharacters',
+                      'static std::map<std::string, int> pixelWidthTable'):
+        actual_formatter += signature + ' = ' + block(formatter, signature) + ';\n'
+    for signature in ('static size_t NextLineLength(const std::string* textStr, const size_t lastNewline, bool hasIcon = false)',
+                      'void CustomMessage::FormatString(std::string& str) const',
+                      'void CustomMessage::AutoFormatString(std::string& str) const',
+                      'size_t CustomMessage::FindNEWLINE(std::string& str, size_t lastNewline) const',
+                      'bool CustomMessage::AddBreakString(std::string& str, size_t pos, std::string breakString) const',
+                      'void CustomMessage::ReplaceSpecialCharacters(std::string& str) const',
+                      'void CustomMessage::ReplaceColors(std::string& str) const',
+                      'void CustomMessage::ReplaceAltarIcons(std::string& str) const',
+                      'void CustomMessage::EncodeColors(std::string& str) const'):
+        actual_formatter += signature + ' ' + block(formatter, signature) + '\n'
+    donor = donor.replace('/* ACTUAL_FORMATTER */', actual_formatter)
     exported = (ROOT / 'soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp').read_text()
     context_builders = 'bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received = true);\n'
     for signature in ('static bool DungeonInformationEnabled()',
                       'extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled(void)',
                       'static CustomMessage DungeonRewardName(RandomizerCheck check)',
                       'static int16_t DungeonEntranceDestination(int16_t entrance)',
+                      'static std::string DungeonPhysicalEntranceName(int16_t entrance)',
                       'static std::string DungeonEntranceSource(int16_t dungeonEntrance)',
+                      'static void AddDungeonRewardIcon(CustomMessage& msg, RandomizerCheck check)',
                       'bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received)',
                       'bool BuildTokenReceiptMessage(RandomizerGet rg, CustomMessage& msg)',
+                      'extern "C" COMBO_EXPORT int32_t OOT_GetDungeonItemReceiptPresentation(const char* itemName, CwItemReceiptPresentation* out)',
                       'extern "C" uint16_t Randomizer_GetDungeonItemInfoTextId(uint16_t cursorItem)',
                       'void BuildDungeonPauseInfoMessage(uint16_t* textId, bool* loadFromMessageTable)',
                       'void BuildMapMessage(uint16_t* textId, bool* loadFromMessageTable)'):
-        context_builders += signature + ' ' + block(exported, signature + ' {') + '\n'
+        context_builders += signature + ' ' + block(exported, 'int32_t OOT_GetDungeonItemReceiptPresentation' if 'OOT_GetDungeonItemReceiptPresentation' in signature else signature + ' {') + '\n'
     donor = donor.replace('/* CONTEXT_BUILDERS */', context_builders)
     donor = donor.replace('/* FOREIGN_BUILDER */',
         'void BuildComboForeignMessage(Player* player,CustomMessage& msg) ' +
@@ -350,7 +416,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     tu.write_text(donor)
     exe = tmp / 'donor'
     subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-I', str(ROOT), *extra,
-                    str(tu), '-o', str(exe)], check=True)
+                    str(tu), str(ROOT / 'soh/soh/Enhancements/custom-message/text.cpp'), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)
 
     # Link the real donor export to the real MM native/foreign receipt routes.
@@ -363,7 +429,8 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                      '-DCOMBO_EXPORT=__attribute__((visibility("default")))']
     subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
                     '-fPIC', '-shared', '-fvisibility=hidden',
-                    *donor_private, *extra, '-I', str(ROOT), str(tu), '-o', str(donor_library)], check=True)
+                    *donor_private, *extra, '-I', str(ROOT), str(tu),
+                    str(ROOT / 'soh/soh/Enhancements/custom-message/text.cpp'), '-o', str(donor_library)], check=True)
     integrated = tmp / 'compass_receiver'
     result = subprocess.run([compiler, '-std=c++20', *mmflags, *extra, '-DCOMPASS_DONOR_INTEGRATION', '-I' + str(tmp),
                     str(ROOT / 'tests/item_receipts/catalog_test.cpp'),

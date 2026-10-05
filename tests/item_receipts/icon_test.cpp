@@ -16,12 +16,17 @@ constexpr int ITEM_FISH = 0x19, ITEM_HEART_CONTAINER = 0x72;
 constexpr int ITEM_MEDALLION_FOREST = 0x66, ITEM_HEART_PIECE_2 = 0x7A;
 constexpr int ITEM_ROCS_FEATHER_SKIJER = 0xA0, ICON_SIZE_24 = 0;
 struct GetItemEntry { int itemId; };
+static int liveReads = 0;
 void* gItemIcons[256]{};
 namespace Rando::StaticData {
 struct Item {
     RandomizerGet rg;
     std::shared_ptr<GetItemEntry> GetGIEntry(RandomizerGet*) const {
-        return std::make_shared<GetItemEntry>(GetItemEntry{rg == RG_DOUBLE_DEFENSE ? (int)RG_DOUBLE_DEFENSE : 3});
+        ++liveReads;
+        return std::make_shared<GetItemEntry>(GetItemEntry{rg == RG_PROGRESSIVE_HOOKSHOT ? 4 : rg == RG_DOUBLE_DEFENSE ? (int)RG_DOUBLE_DEFENSE : 3});
+    }
+    std::shared_ptr<GetItemEntry> GetGIEntryUnresolved() const {
+        return std::make_shared<GetItemEntry>(GetItemEntry{3});
     }
     bool HasCustomIcon() const { return false; }
     const char* GetCustomIcon() const { return nullptr; }
@@ -46,5 +51,13 @@ int main() {
     assert(OOT_FillItemIconInfo(RG_EXT_SHIELD_OF_IKANA, &icon) == 1);
     assert(std::strcmp(icon.path, "__OTR__icon_item_static_yar/gItemIconMirrorShieldTex") == 0);
     assert(icon.width == 32 && icon.height == 32 && !icon.isIA8);
+    gItemIcons[4] = (void*)"__OTR__textures/icon_item_static/gItemIconLongshotTex";
+    const int before = liveReads;
+    icon = {};
+    assert(OOT_FillItemIconInfo(RG_PROGRESSIVE_HOOKSHOT, &icon, false) == 1);
+    assert(std::strstr(icon.path, "Bow") && liveReads == before && "Seed icon must not resolve inventory tiers");
+    icon = {};
+    assert(OOT_FillItemIconInfo(RG_PROGRESSIVE_HOOKSHOT, &icon) == 1);
+    assert(std::strstr(icon.path, "Longshot") && liveReads == before + 1);
     std::cout << "Double Defense icon uses the heart, not the colliding RG/item ID\n";
 }

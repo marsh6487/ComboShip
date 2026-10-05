@@ -7,7 +7,7 @@
 #include "mods/forms/custom_forms.h"
 
 static s32 otherForm = CUSTOM_FORM_NONE;
-static u8 pendant, beetle, kite, trident, mario, customItemBlock, pakModel, o2rModel;
+static u8 pendant, beetle, kite, trident, mario, customItemBlock, pakModel, pakBodyModel, o2rModel;
 static unsigned nativeActions, nativeDamageTicks, iceBursts, thawCompletions;
 static bool nativeAnimationDone;
 static u16 hookSuppressedButtons;
@@ -57,6 +57,9 @@ s32 CustomItems_BlocksMovement(Player*) {
 }
 u8 PakLoader_HasActiveModel(void) {
     return pakModel;
+}
+u8 PakLoader_HasActiveBodyModel(void) {
+    return pakBodyModel;
 }
 u8 O2rLoader_HasActiveModel(void) {
     return o2rModel;
@@ -120,6 +123,7 @@ static void WolfLinkHost_Destroy(PlayState*, Player*) {
 int main(int argc, char** argv) {
     assert(argc == 2);
     assetDirectory = argv[1];
+    captureWolfLogs();
     std::memset(&gSaveContext, 0, sizeof(gSaveContext));
     std::memset(gSaveContext.save.saveInfo.equips.buttonItems, ITEM_NONE,
                 sizeof(gSaveContext.save.saveInfo.equips.buttonItems));
@@ -167,11 +171,14 @@ int main(int argc, char** argv) {
         ++play.gameplayFrames;
         return filtered;
     };
+    pakModel = 1; // Equipment-only PAK activity must not own Link's body.
     frame(BTN_CLEFT);
+    pakModel = 0;
     if (!WolfLinkForm_IsSelected() || !WolfLinkForm_IsReady()) {
         std::fputs("FAIL full-width C-button Shadow Crystal did not activate the production MM Wolf runtime\n", stderr);
         return 1;
     }
+    assert(logged("result=activated"));
     player.stateFlags1 = PLAYER_STATE1_20;
     auto blocked = frame(BTN_B, BTN_R);
     if (sWolf.procOwnsPlayer || (player.stateFlags3 & PLAYER_STATE3_4)) {
@@ -182,6 +189,7 @@ int main(int argc, char** argv) {
     WolfLinkHost_Destroy(&play, &player);
     frame(BTN_CLEFT);
     assert(!WolfLinkForm_IsReady());
+    assert(logged("result=native-input-state"));
     player.stateFlags1 = 0;
     frame(BTN_CLEFT);
     assert(WolfLinkForm_IsReady());
@@ -204,6 +212,7 @@ int main(int argc, char** argv) {
     hookSuppressedButtons = BTN_CLEFT;
     frame(BTN_CLEFT);
     assert(WolfLinkForm_IsReady());
+    assert(logged("result=input-suppressed"));
     hookSuppressedButtons = 0;
     auto filtered = frame(BTN_B, BTN_R);
     assert(!(filtered.press.button & BTN_B) && !(filtered.cur.button & BTN_R));
@@ -337,12 +346,20 @@ int main(int argc, char** argv) {
     filtered = frame(BTN_CRIGHT);
     assert(!WolfLinkForm_IsReady() && (filtered.press.button & BTN_CRIGHT));
     // Active tool/other-form arbitration must never silently steal their input/action.
-    for (u8* blocker : { &pendant, &beetle, &kite, &trident, &mario, &customItemBlock, &pakModel, &o2rModel }) {
+    for (u8* blocker : { &pendant, &beetle, &kite, &trident, &mario, &customItemBlock, &pakBodyModel, &o2rModel }) {
         *blocker = 1;
         frame(BTN_CLEFT);
         assert(!WolfLinkForm_IsReady());
         *blocker = 0;
     }
+    assert(logged("result=pak-body-model") && logged("result=o2r-body-model"));
+    player.itemAction = PLAYER_IA_SWORD_KOKIRI;
+    frame(BTN_CLEFT);
+    assert(!WolfLinkForm_IsReady() && logged("result=held-item"));
+    const auto quietLogs = wolfLogs.str();
+    frame();
+    assert(wolfLogs.str() == quietLogs && "idle rejected states must not log per frame");
+    player.itemAction = PLAYER_IA_NONE;
     otherForm = CUSTOM_FORM_GARO;
     frame(BTN_CLEFT);
     assert(!WolfLinkForm_IsReady());
@@ -391,6 +408,8 @@ int main(int argc, char** argv) {
     sAssetsLoaded = 0;
     filtered = frame(BTN_CLEFT | BTN_B);
     assert(!WolfLinkForm_IsReady() && (filtered.press.button & BTN_B));
+    assert(logged("reason=open-failed") && logged("result=asset-load-failed"));
+    assert(logged((assetDirectory + "/wolf_link.bin").c_str()));
     std::puts("PASS production MM Wolf host: full-width C/D-pad toggles, native damage/freeze/thaw action dispatch, "
               "input/tool arbitration, rendering and teardown");
 }

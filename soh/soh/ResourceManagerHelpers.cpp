@@ -1,4 +1,5 @@
 #include "../../combo/NeiAssetPriorityResource.h"
+#include "../../combo/NeiWolfAssetResource.h"
 #include "ResourceManagerHelpers.h"
 #include "OTRGlobals.h"
 #include "variables.h"
@@ -999,3 +1000,12 @@ extern "C" COMBO_EXPORT int OOT_NeiResourceIsMod(const char* path) {
     return ResourceMgr_IsModAsset(path);
 }
 #endif
+
+extern "C"
+#ifdef COMBO_BUILD
+    COMBO_EXPORT
+#endif
+    int
+    OOT_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner) {
+    return NeiWolfAsset::CopyResource("oot", destination, capacity, size, owner);
+}

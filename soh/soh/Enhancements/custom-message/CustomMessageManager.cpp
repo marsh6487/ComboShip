@@ -262,7 +262,10 @@ bool CustomMessage::operator!=(const CustomMessage& operand) const {
     return !operator==(operand);
 }
 
+extern "C" void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation* presentation);
+
 void CustomMessage::LoadIntoFont() {
+    Message_SetItemReceiptPresentation(&receiptPresentation);
     MessageContext* msgCtx = &gPlayState->msgCtx;
     Font* font = &msgCtx->font;
     char* buffer = font->msgBuf;
