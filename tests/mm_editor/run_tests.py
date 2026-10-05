@@ -108,6 +108,7 @@ def main():
         pool_binding += function(source("mm/2s2h/Rando/Logic/GeneratePools.cpp"), "GeneratePools") + "\n}\n"
         pool_binding += bindings[bindings.index("struct Binding {"):bindings.index("// Only roots that differ")]
         pool_binding += function(bindings, "HasMmLegacyGiMod") + "\n"
+        pool_binding += function(bindings, "GetSelectedOwnerSword") + "\n"
         pool_binding += function(bindings, "MM_DescribeNeiGi") + "\n"
         (build / "pool_binding_production.inc").write_text(pool_binding)
         pool_binary = build / "pool_binding_test"

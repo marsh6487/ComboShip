@@ -121,4 +121,3 @@ def roots_for(archive):
            'objects/object_link_child/DinSleekEquipmentPOC1_MM_Child/SwordDL','objects/object_link_child/DinSleekEquipmentPOC1_MM_Child/RazorSwordDL',
            'objects/object_link_child/DinSleekEquipmentPOC1_MM_Child/MasterSwordDL','objects/object_link_child/DinSleekEquipmentPOC1_MM_Child/TwoHandedSwordDL']
     return [n for n in roots if n in ns]
-

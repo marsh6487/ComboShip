@@ -151,6 +151,10 @@ void DrawOotNeiCaneOfSomaria(int) {assert(0);}
 void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false) {assert(0);}
 void NeiGi_DrawSeasonOverlay(PlayState*,int,const char*) {assert(0 && "mask fixture must not select weather");}
 void NeiGi_DrawSongOverlay(PlayState*,int,const char*) {assert(false && "song dispatch has its own production fixture");}
+// Sword drawing/fitting is tested by the selected-model and foreign sword
+// fixtures. Masks must never enter either branch in this dispatcher.
+void ComboSwordGi_ApplyFit(const char*,const char*,float,float,bool=false) {assert(0 && "mask selected sword fit");}
+void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*,bool=false) {assert(0 && "mask selected custom sword draw");}
 /* OTHER_DRAW_HANDLERS */
 /* HOST_DISPATCH */
 int main() {

@@ -6,6 +6,8 @@ python3 -B scripts/diagnostics/run_nei_gi_tests.py --held --combo
 python3 -B tests/nei_gi/run_flame_arena_tests.py
 python3 -B scripts/diagnostics/run_mm_item_presentation_tests.py
 python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py
+python3 -B tests/item_receipts/run_seed_settings_tests.py --sanitizers
+python3 -B tests/item_receipts/run_mm_first_seed_gate_test.py --sanitizers
 python3 -B scripts/diagnostics/run_receipt_syntax_tests.py
 python3 -B scripts/diagnostics/run_song_gi_tests.py
 python3 -B scripts/diagnostics/run_sword_pose_tests.py

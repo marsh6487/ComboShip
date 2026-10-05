@@ -4,18 +4,22 @@
 | --- | --- |
 | Baseline | `9eff802cbf678047f72bfaa28ea00f999780857b`, including the Grace/hourglass and Slate title section; published PR #34 baseline is `1147a1a8`. |
 | Candidate | `poc/compass-information-20261005-correction`; isolated `work-compass` worktree. |
-| Scope | Diagnose the Forest Temple Compass receipt in MM and verify the seed setting through the real OoT export and MM native/foreign receipt consumers. Tests and this evidence note only. |
+| Scope | Diagnose the Forest Temple Compass receipt in MM, verify native seed-setting boundaries, and block generation/plando reload from the dormant OoT file-select while MM is foreground. |
 | Preservation | Native tutorial bodies, appended ordinary/masterful information, actual placed rewards, grants, receipt source append, save state, Start With ownership, Well/Ice exclusions and pedestal progression requirements. |
 | Configuration | Clip is an English receipt in MM with Save Editor visible. Its seed settings, build identity and asset configuration were not supplied. Test fixture uses an enabled/generated OoT seed with dormant OoT, no OoT PlayState, and an active MM randomizer save. |
-| Evidence | Direct inspection of the three supplied clip frames; exact Forest Temple Off/On donor and receiver tests, plus the full receipt/dungeon-information/altar/tracker runner. |
-| Verdict | Existing enabled receipt code passes the focused compiled checks; no production change is justified by the available evidence. This is not an in-game acceptance or master promotion. |
-| Recovery | Tests are reconstructed from current source; production source and baseline remain unchanged. Root publishes the coherent commit within the authorized checkpoint workflow. |
+| Evidence | Direct inspection of the three supplied clip frames; exact Forest Temple Off/On donor and receiver tests, plus the full receipt/dungeon-information/altar/tracker runner. The user subsequently reported generating a new seed with the information checkbox On and still receiving generic text. |
+| Verdict | The reported enabled runtime route remains broken. Isolated donor/receiver checks pass and do not reproduce that complete route; no production root cause is established by them. This is not an in-game acceptance or master promotion. |
+| Recovery | Baseline remains unchanged; the candidate changes only the shared foreground file-select predicate in ComboMenu and adds focused tests. Root publishes the coherent commit within the authorized checkpoint workflow. |
 
 The clip shows the native Compass tutorial followed by the Forest Temple
-Compass title, without a boss/reward paragraph. This matches the existing
-**Off** route, but the clip does not establish its saved option value. The
+Compass title, without a boss/reward paragraph. The clip does not establish
+its saved option value. The
 attached log begins mid-session and contains no compass option evidence; its
 visible seed ID must not be treated as proof of the clip's configuration.
+The user's later report explicitly describes a newly generated seed with the
+checkbox On and the same missing information. An Off explanation is therefore
+insufficient for the reported setup; the complete generation, saved-setting,
+donor hydration and receipt sequence must be investigated.
 
 The checkbox is **Randomizer → Hints/Traps → Static Hints → Maps and Compasses
 Give Information**. Its default is Off. Receipt and pause code reads the
@@ -63,6 +67,50 @@ retains AddressSanitizer and UndefinedBehaviorSanitizer.
 The clip SHA-256 is
 `31f4359ecb09a7dbd4fc0cc154127a87bdaf2bed25be320ebff6642e9db0be25`.
 No runtime test was run in the user's game, no active save was edited, and no
-seed setting was silently enabled. If the saved seed option is confirmed On
-and the receipt still omits reward information in game, that is a different
-reproduction requiring the actual save/seed and build identity.
+seed setting was silently enabled. The enabled runtime failure reported after
+these initial tests remains unresolved. The active save/seed and build identity
+have not been supplied; the tests above replace runtime context ownership with
+fixtures and must not be described as proof of the generation/load pipeline.
+
+The native setting probe now uses the actual CVar-backed Option constructor,
+registration/default, complete SetAllToContext and FinalizeSettings bodies,
+native Context/Logic/dungeon declarations and constructors, complete settings
+dump/restore exports, and SaveManager's real array traversal/templates. Off →
+On → Off → On survives MM-start preparation, seed snapshots and save-array
+round trips with an opposing live menu. Missing old keys/array entries default
+Off. This rules out ordinary omission at these tested boundaries; the fill
+worker, actual disk sections, module binding and game loops remain outside
+this probe. Removing the appended option from the actual copy loop is a
+behavioral negative control that fails at its first enabled generation.
+
+A separate concrete menu defect was reproduced. MM-first handoff runs the
+native SOH_ParkForComboMMResume, leaving gPlayState null and the dormant
+GameState main pointer equal to FileChoose_Main. Native SOH_IsOnFileSelect
+therefore still returns true. Both complete production menu panels previously
+accepted that query while MM was foreground and invoked Generate/Save mutation
+callbacks. The candidate requires OoT foreground as well as the native file-
+select query in both panels. The test executes both complete panels and native
+park/query bodies, with rendering and worker/reload callbacks as observers.
+Baseline fails four MM-foreground assertions; candidate passes true OoT file
+select, foreground return, gameplay, null/other state, missing exports and busy
+generation controls. This defect is **not** established as the cause of the
+reported freshly generated enabled receipt.
+
+Additional commands (normal and AddressSanitizer/UndefinedBehaviorSanitizer):
+
+```sh
+python3 -B tests/item_receipts/run_mm_first_seed_gate_test.py
+ASAN_OPTIONS=detect_leaks=0 python3 -B tests/item_receipts/run_mm_first_seed_gate_test.py --sanitizers
+python3 -B tests/item_receipts/run_mm_first_seed_gate_test.py --baseline 23a10094e51abbb39c03ec4d65dd32d4e55880fb
+python3 -B tests/item_receipts/run_seed_settings_tests.py
+ASAN_OPTIONS=detect_leaks=0 python3 -B tests/item_receipts/run_seed_settings_tests.py --sanitizers
+python3 -B tests/item_receipts/run_seed_settings_tests.py --drop-appended-option
+```
+
+The baseline and drop-option commands intentionally exit 1 at the named
+behavioral assertions; current normal/sanitizer commands exit 0. These tests
+do not run either game or demonstrate the user-facing layout. Subsequent user
+steering explicitly replaces the enabled compass tutorial with title, shuffled
+boss and actual reward name plus a sprite beside the reward line in one box;
+the previously passing tutorial-preservation On controls are historical
+evidence, not acceptance of that revised layout.
