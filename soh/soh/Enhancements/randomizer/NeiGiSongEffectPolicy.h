@@ -56,15 +56,14 @@ inline Mesh SampleSong(int song, uint32_t frame, const Basis& camera = {}) {
             const Point p{ 21 * std::cos(angle), -24 + phase * 38, 21 * std::sin(angle) };
             // The same tapered, curved warm body and yellow core used by the
             // real fire effect. Broad rising flames replace the thin red bands.
-            NeiUsedMagic::Flame(mesh, p, { 0, 1, 0 }, 15 + 3 * std::sin(t * 2 + i), 4.8f,
-                                t * 4 + i, camera, .65f + .35f * std::sin(phase * Tau * .5f));
+            NeiUsedMagic::Flame(mesh, p, { 0, 1, 0 }, 15 + 3 * std::sin(t * 2 + i), 4.8f, t * 4 + i, camera,
+                                .65f + .35f * std::sin(phase * Tau * .5f));
         }
         return mesh;
     }
     const bool water = song == CW_SONG_OOT_SERENADE;
     const bool sun = song == CW_SONG_OOT_PRELUDE;
-    const bool leaves =
-        song == CW_SONG_SARIA || song == CW_SONG_OOT_SARIA || song == CW_SONG_OOT_MINUET;
+    const bool leaves = song == CW_SONG_SARIA || song == CW_SONG_OOT_SARIA || song == CW_SONG_OOT_MINUET;
     if (water || sun) {
         for (int ring = 0; ring < 1; ++ring) {
             const auto point = [&](int j) {

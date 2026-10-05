@@ -259,9 +259,14 @@ inline bool Grant(RandoItemId id) {
 }
 
 inline void GrantAll() {
+    const uint8_t season = Nei_Save()->season;
+    const bool keepSeason = Seasons_SeasonOwned(season);
     for (const auto id : Catalog()) {
         Grant(id);
     }
+    // Individual season pickups select their reward. A bulk ownership repair
+    // should retain the player's choice instead of implicitly selecting Winter.
+    Seasons_SetSeason(keepSeason ? season : SEASON_SPRING);
 }
 
 } // namespace NeiEditor

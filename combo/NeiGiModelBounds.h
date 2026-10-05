@@ -14,7 +14,8 @@ namespace NeiGi {
 // Dynamic segment geometry and embedded matrices cannot establish static bounds.
 template <class Load> class ModelBoundsReader {
   public:
-    ModelBoundsReader(Load& load, float tilt) : mLoad(load), mSin(std::sin(tilt)), mCos(std::cos(tilt)) {}
+    ModelBoundsReader(Load& load, float tilt) : mLoad(load), mSin(std::sin(tilt)), mCos(std::cos(tilt)) {
+    }
 
     bool Read(const char* path, FrameBounds& out) {
         const auto root = std::dynamic_pointer_cast<Fast::DisplayList>(mLoad(path));
@@ -53,7 +54,8 @@ template <class Load> class ModelBoundsReader {
                 return true;
             if (op == G_DL_OTR_FILEPATH) {
                 if (!Walk(std::dynamic_pointer_cast<Fast::DisplayList>(
-                              mLoad(reinterpret_cast<const char*>(command.words.w1))), depth + 1))
+                              mLoad(reinterpret_cast<const char*>(command.words.w1))),
+                          depth + 1))
                     return false;
                 if ((command.words.w0 >> 16) & 1)
                     return true;
@@ -61,8 +63,8 @@ template <class Load> class ModelBoundsReader {
                 if (++i == commands.size())
                     return false;
                 const auto& args = commands[i];
-                if (!Vertices(mLoad(reinterpret_cast<const char*>(command.words.w1)),
-                              args.words.w1 & 0xffffu, args.words.w0))
+                if (!Vertices(mLoad(reinterpret_cast<const char*>(command.words.w1)), args.words.w1 & 0xffffu,
+                              args.words.w0))
                     return false;
             } else if (op == G_DL_OTR_HASH || op == G_VTX_OTR_HASH) {
                 if (++i == commands.size())
@@ -91,9 +93,8 @@ template <class Load> class ModelBoundsReader {
                         !Vertices(resource, offset / sizeof(Vtx), (command.words.w0 >> 12) & 0xff))
                         return false;
                 }
-            } else if (op == G_MTX || op == G_POPMTX || op == G_MTX_OTR ||
-                       op == G_MTX_OTR_FILEPATH || op == G_VTX || op == G_DL ||
-                       op == G_BRANCH_Z_OTR || op == G_BRANCH_Z) {
+            } else if (op == G_MTX || op == G_POPMTX || op == G_MTX_OTR || op == G_MTX_OTR_FILEPATH || op == G_VTX ||
+                       op == G_DL || op == G_BRANCH_Z_OTR || op == G_BRANCH_Z) {
                 return false;
             } else if (op == G_SETTIMG_OTR_HASH || op == G_MARKER || op == G_MOVEMEM_OTR) {
                 if (++i == commands.size())

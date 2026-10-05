@@ -165,14 +165,29 @@ bool HasMmLegacyGiMod(RandoItemId item) {
 bool GetSelectedOwnerSword(RandoItemId item, CwItemDrawInfo* out) {
     const char* name = nullptr;
     switch (item) {
-        case RI_SWORD_KOKIRI: name = "Kokiri Sword"; break;
-        case RI_SWORD_RAZOR: name = "Razor Sword"; break;
-        case RI_SWORD_GILDED: name = "Gilded Sword"; break;
-        case RI_OOT_MASTER_SWORD: name = "Master Sword"; break;
-        case RI_OOT_TRUE_MASTER_SWORD: name = "True Master Sword"; break;
-        case RI_OOT_BIGGORON_SWORD: name = "Biggoron's Sword"; break;
-        case RI_GREAT_FAIRY_SWORD: name = "Great Fairy's Sword"; break;
-        default: return false;
+        case RI_SWORD_KOKIRI:
+            name = "Kokiri Sword";
+            break;
+        case RI_SWORD_RAZOR:
+            name = "Razor Sword";
+            break;
+        case RI_SWORD_GILDED:
+            name = "Gilded Sword";
+            break;
+        case RI_OOT_MASTER_SWORD:
+            name = "Master Sword";
+            break;
+        case RI_OOT_TRUE_MASTER_SWORD:
+            name = "True Master Sword";
+            break;
+        case RI_OOT_BIGGORON_SWORD:
+            name = "Biggoron's Sword";
+            break;
+        case RI_GREAT_FAIRY_SWORD:
+            name = "Great Fairy's Sword";
+            break;
+        default:
+            return false;
     }
     static Fn_GetItemDrawInfo describe = nullptr;
     if (!describe)
@@ -221,8 +236,9 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop) {
     if (!play || info.dlistCount < 1 || !info.dlists[0])
         return;
     if (info.drawKind == CW_DRAW_KIND_CUSTOM_GI) {
-        const float tilt = info.opCount == 1 && info.ops[0].op == CW_OP_ROTATE_Z ?
-            info.ops[0].a * (3.14159265358979323846f / 32768.f) : 0.f;
+        const float tilt = info.opCount == 1 && info.ops[0].op == CW_OP_ROTATE_Z
+                               ? info.ops[0].a * (3.14159265358979323846f / 32768.f)
+                               : 0.f;
         if (!NeiGi_ValidScale(info.scale) || !NeiGi_Finite(tilt) || info.neiShimmer < 1 ||
             info.neiShimmer > int(Kind::MarioMask) + 1)
             return;
@@ -358,8 +374,8 @@ MM_NeiGiFallbackShimmer::~MM_NeiGiFallbackShimmer() {
         return;
     Matrix_Pop();
     if (NeiGi::IsSword(mKind))
-        NeiGi_DrawMesh(gPlayState, NeiGi::SampleSpecial(mKind, gPlayState->gameplayFrames,
-                                                       NeiGi_CameraBasis(gPlayState)));
+        NeiGi_DrawMesh(gPlayState,
+                       NeiGi::SampleSpecial(mKind, gPlayState->gameplayFrames, NeiGi_CameraBasis(gPlayState)));
     NeiGi_DrawMesh(gPlayState,
                    NeiGi::SampleShimmer(gPlayState->gameplayFrames, true, NeiGi_CameraBasis(gPlayState), mKind));
 }

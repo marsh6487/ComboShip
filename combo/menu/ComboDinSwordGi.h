@@ -25,11 +25,11 @@ static inline void ComboDinSwordGi_Material(Gfx** display, bool flame, Color_RGB
         gDPSetCombineLERP((*display)++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, SHADE, 0, 0, 0, 0,
                           COMBINED, COMBINED, 0, PRIMITIVE, 0);
     } else {
-        gDPSetCombineLERP((*display)++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, 0, 0, 0, SHADE, 0, 0, 0,
-                          COMBINED, COMBINED, 0, PRIMITIVE, 0);
+        gDPSetCombineLERP((*display)++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, 0, 0, 0, SHADE, 0, 0, 0, COMBINED,
+                          COMBINED, 0, PRIMITIVE, 0);
     }
-    gDPLoadTextureBlock((*display)++, flame ? DinSwordGi::flameTexture : DinSwordGi::coreTexture,
-                        G_IM_FMT_I, G_IM_SIZ_8b, 64, 32, 0, G_TX_WRAP, G_TX_WRAP, 6, 5, G_TX_NOLOD, G_TX_NOLOD);
+    gDPLoadTextureBlock((*display)++, flame ? DinSwordGi::flameTexture : DinSwordGi::coreTexture, G_IM_FMT_I,
+                        G_IM_SIZ_8b, 64, 32, 0, G_TX_WRAP, G_TX_WRAP, 6, 5, G_TX_NOLOD, G_TX_NOLOD);
     gDPSetTileSize((*display)++, 0, 0, scroll, 63 << 2, scroll + (31 << 2));
     gDPSetPrimColor((*display)++, 0, 0, core.r, core.g, core.b, alpha);
     gDPSetEnvColor((*display)++, outer.r, outer.g, outer.b, 255);

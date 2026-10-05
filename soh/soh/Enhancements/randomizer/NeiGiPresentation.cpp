@@ -3,7 +3,6 @@
 #include "NeiGiEnergyTexture.h"
 #include "NeiGiRender.h"
 #include "NeiGiShopFit.h"
-#include "ComboSwordGiFit.h"
 #include "ComboSongDrawOOT.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
 #include <algorithm>
@@ -19,6 +18,7 @@ extern "C" {
 #include "functions.h"
 #include "macros.h"
 }
+#include "ComboSwordGiFit.h"
 
 namespace {
 using NeiGi::Kind;
@@ -826,9 +826,8 @@ static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool up
     if (upgraded && item.effect == Kind::SeasonCycle)
         NeiGi_DrawSeasonOverlay(play, 5, nullptr);
     const bool shimmer = CVarGetInteger(CVAR_NEI_GI_EFFECTS, 0) != 0;
-    const bool energy =
-        (upgraded || NeiGi::IsSword(item.effect)) &&
-        (NeiGi::IsRod(item.effect) || NeiGi::IsSpell(item.effect) || NeiGi::IsSpecial(item.effect));
+    const bool energy = (upgraded || NeiGi::IsSword(item.effect)) &&
+                        (NeiGi::IsRod(item.effect) || NeiGi::IsSpell(item.effect) || NeiGi::IsSpecial(item.effect));
     if (!shimmer && !energy && !item.alwaysShimmer)
         return;
     Matrix_Push();

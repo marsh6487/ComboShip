@@ -1,8 +1,8 @@
 #ifndef COMBO_SWORD_GI_FIT_H
 #define COMBO_SWORD_GI_FIT_H
 
-extern "C" int ResourceMgr_GetGiModelFitForGame(const char* owner, const char* path, float scale, float tilt,
-                                                int shop, float fit[2]);
+extern "C" int ResourceMgr_GetGiModelFitForGame(const char* owner, const char* path, float scale, float tilt, int shop,
+                                                float fit[2]);
 
 static inline void ComboSwordGi_ApplyFit(const char* owner, const char* path, float scale, float tilt,
                                          bool shop = false) {

@@ -4569,6 +4569,21 @@ static void PakLoader_CheckMaskForce(void) {
     }
 }
 
+extern "C" u8 PakLoader_HasActiveBodyModel(void) {
+    PakLoader_CheckMaskForce();
+    const bool forced = sForcedModelIndex >= 0 && sForcedModelIndex < (s32)sModels.size();
+    if (!forced && !CVarGetInteger("gMods.PakLoader.Enabled", 0))
+        return 0;
+    const s32 bodyIdx = sGetActiveIndex();
+    if (bodyIdx < 0 || bodyIdx >= (s32)sModels.size())
+        return 0;
+    const PakModel& model = sModels[bodyIdx];
+    if (model.isEquipmentOnly)
+        return 0;
+    // MM's native linkAge is pinned adult; the NEI Time Gate owns the actual age.
+    return AdultLink_IsActive() ? model.adultReady : model.childReady;
+}
+
 extern "C" u8 PakLoader_HasActiveModel(void) {
     // Check if worn mask should auto-force a model
     PakLoader_CheckMaskForce();

@@ -92,6 +92,7 @@ int main() {
         REQUIRE(Nei_GetOwnedItem(47) == EXT_ITEM_ROD_OF_SEASONS);
         REQUIRE(nei->slateRunesOwned == 0x1F);
         REQUIRE(nei->seasonsOwned == 0x0F);
+        REQUIRE(nei->season == SEASON_SPRING);
         REQUIRE(nei->caneSkills == 0x3F);
         REQUIRE(nei->wandRodsOwned == 0x3F);
         for (u8 mode = 0; mode < 6; ++mode)
@@ -195,7 +196,25 @@ int main() {
         REQUIRE(NeiEditor::Grant(seasons[season]));
         REQUIRE(Nei_GetOwnedItem(47) == EXT_ITEM_ROD_OF_SEASONS);
         REQUIRE(Nei_Save()->seasonsOwned == (1u << season));
+        REQUIRE(Nei_Save()->season == season);
     }
+    // Bulk grants fill ownership without selecting the last newly granted
+    // season. Preserve every owned selection, including the blank/off coin.
+    for (u8 season = SEASON_SPRING; season <= SEASON_OFF; ++season) {
+        reset();
+        Nei_Save()->seasonsOwned = season == SEASON_OFF ? 0 : (1u << season);
+        Nei_Save()->season = season;
+        NeiEditor::GrantAll();
+        REQUIRE(Nei_Save()->seasonsOwned == 0x0F);
+        REQUIRE(Nei_Save()->season == season);
+    }
+    for (u8 invalid : {u8(SEASON_SUMMER), u8(255)}) {
+        reset();
+        Nei_Save()->season = invalid;
+        NeiEditor::GrantAll();
+        REQUIRE(Nei_Save()->season == SEASON_SPRING);
+    }
+    puts("PASS bulk season ownership: retain chosen season/off, default to Spring; individual grants still select their season");
     for (u8 initialSkill = 0; initialSkill < 6; ++initialSkill) {
         reset();
         Cane_GiveSkill(initialSkill);

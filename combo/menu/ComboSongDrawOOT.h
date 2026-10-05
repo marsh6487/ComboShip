@@ -4,12 +4,9 @@
 // resolution. A grayscale replacement would bypass this authored material.
 static inline const char* ComboSongOotColorDlist(int song) {
     static const char* colors[] = {
-        "__OTR__objects/object_gi_melody/gGiMinuetColorDL",
-        "__OTR__objects/object_gi_melody/gGiBoleroColorDL",
-        "__OTR__objects/object_gi_melody/gGiSerenadeColorDL",
-        "__OTR__objects/object_gi_melody/gGiRequiemColorDL",
-        "__OTR__objects/object_gi_melody/gGiNocturneColorDL",
-        "__OTR__objects/object_gi_melody/gGiPreludeColorDL"
+        "__OTR__objects/object_gi_melody/gGiMinuetColorDL",   "__OTR__objects/object_gi_melody/gGiBoleroColorDL",
+        "__OTR__objects/object_gi_melody/gGiSerenadeColorDL", "__OTR__objects/object_gi_melody/gGiRequiemColorDL",
+        "__OTR__objects/object_gi_melody/gGiNocturneColorDL", "__OTR__objects/object_gi_melody/gGiPreludeColorDL"
     };
     return song >= CW_SONG_OOT_MINUET && song <= CW_SONG_OOT_PRELUDE ? colors[song - CW_SONG_OOT_MINUET] : nullptr;
 }

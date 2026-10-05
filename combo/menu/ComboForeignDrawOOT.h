@@ -953,14 +953,16 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         return;
     }
 
-    const bool fitSword = info->drawKind == CW_DRAW_KIND_CUSTOM_GI && info->count > 0 &&
-                          info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
+    const bool fitSword = info->drawKind == CW_DRAW_KIND_CUSTOM_GI && info->count > 0 && info->neiShimmer > 0 &&
+                          info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
                           NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
     if (fitSword) {
         Matrix_Push();
         ComboSwordGi_ApplyFit("oot", info->dls[0], info->scale,
-                             info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z ?
-                                 info->ops[0].a * (3.14159265358979323846f / 32768.f) : 0.f, shop);
+                              info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z
+                                  ? info->ops[0].a * (3.14159265358979323846f / 32768.f)
+                                  : 0.f,
+                              shop);
     }
     // Authored NEI recipes carry their palette in neiEffect and render their
     // shimmer inside the shared presentation. Other recipes use the overlay.
@@ -1041,7 +1043,7 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
             NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
             NeiGi_DrawMesh(play, NeiGi::SampleSpecial(static_cast<NeiGi::Kind>(info->neiShimmer - 1),
-                                                         play->gameplayFrames, NeiGi_CameraBasis(play)));
+                                                      play->gameplayFrames, NeiGi_CameraBasis(play)));
         if (info->drawKind == CW_DRAW_KIND_SONG_GI)
             NeiGi_DrawSongOverlay(play, info->neiEffect, "mm");
         else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1)
