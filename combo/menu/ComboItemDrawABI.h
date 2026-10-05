@@ -6,7 +6,7 @@
 #define COMBO_ITEM_DRAW_ABI_H
 
 #include <stdint.h>
-#include "../ComboExport.h"
+#include "../ComboGameExport.h"
 
 #ifdef __cplusplus
 extern "C" {

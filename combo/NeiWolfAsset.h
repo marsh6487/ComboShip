@@ -1,5 +1,5 @@
 #pragma once
-#include "ComboExport.h"
+#include "ComboGameExport.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>

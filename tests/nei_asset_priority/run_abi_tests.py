@@ -62,3 +62,16 @@ with tempfile.TemporaryDirectory(prefix='nei-abi-') as temporary:
             expected = {name for name in sources if name.startswith(owner + '_')}
             assert exported == expected, f'{owner} bridge exports: {exported}; expected {expected}'
         print(f'PASS: {owner} native NEI bridge declarations and export ownership')
+
+    # Shared consumer headers must not define the native implementation macro.
+    # The existing dungeon-key cache fixture supplies its own empty decoration.
+    consumer = directory / 'consumer.cpp'
+    consumer.write_text(includes + '#define COMBO_EXPORT\n'
+                        'extern "C" COMBO_EXPORT void LegacyFixtureExport(void) {}\n', encoding='utf-8')
+    command = ([args.compiler, '/nologo', '/std:c++20', '/EHsc', '/W3', '/we4005', '/DCOMBO_BUILD',
+                '/I' + str(ROOT), '/c', str(consumer), '/Fo:' + str(directory / 'consumer.obj')]
+               if args.msvc else
+               [args.compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-DCOMBO_BUILD',
+                '-I' + str(ROOT), '-c', str(consumer), '-o', str(directory / 'consumer.o')])
+    subprocess.run(command, cwd=directory, check=True)
+    print('PASS: consumer headers preserve independent implementation export macros')
