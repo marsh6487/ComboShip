@@ -15,7 +15,7 @@ The combined gate also includes the new flame fixture and the restored productio
 
 ## Current verification
 
-The complete 43-command `bash scripts/diagnostics/run_combo_nei_regressions.sh` passed on final implementation source `8f771524`, with the pinned historical source fixtures and pinned dependency headers. Exact resource/GLB parity passed for 62 GI models and 39 held components; HD icons/routes and optional-pack fallbacks also passed. Pinned clang-format 14, asset-collision, conflict-marker and whitespace gates pass. Exact-candidate Windows/Linux builds and packages follow publication.
+The complete 43-command `bash scripts/diagnostics/run_combo_nei_regressions.sh` passed on final implementation source `8f771524`, with the pinned historical source fixtures and pinned dependency headers; the same complete NEI stage then passed in CI on published candidate `4612bd1a`. Exact resource/GLB parity passed for 62 GI models and 39 held components; HD icons/routes and optional-pack fallbacks also passed. Pinned clang-format 14, asset-collision, conflict-marker and whitespace gates pass. Exact-candidate Windows/Linux builds and packages follow publication.
 
 ## Runtime limits
 
@@ -30,3 +30,7 @@ An independent read-only publication review of `65145de1` found no Critical or M
 ## Fresh-runner logging dependency
 
 The first published-head CI run (`37255727563`, candidate `8cf71afc`) reached the editor suite and exposed a standalone pool-binding link failure against Ubuntu spdlog/external fmt 9. The local bundled spdlog headers automatically enabled fmt definitions; the external configuration did not. The same missing-link dependency was reproduced locally with external fmt enabled. The standalone pool fixture now defines `FMT_HEADER_ONLY` explicitly; the complete editor suite passes with both bundled and external configurations, including production pools/GI bindings and both real translation units. This correction changes only test compilation, with no game-code change. The new exact-head CI run supplies the final complete gate/platform result.
+
+## Final Young Epona harness dependency
+
+CI run `37256522886` on `4612bd1a` passed every preceding gate stage, including the complete NEI suite, and stopped in the final Young Epona stage. Its full `z_message_PAL.c` syntax check lacked the `combo/menu` include directory required by the shared receipt-color header. The same missing-header failure was reproduced locally. The runner now supplies `-Icombo/menu`, matching the production SoH CMake include list. Its runtime fixture and all five production translation units pass; the remaining seven commands in that workflow stage also pass, including player/actor behavior, real JSON save round trips, asset checks and independent Epona cosmetics in both games. This correction changes only the standalone harness compiler arguments. A new exact-head CI run must complete the entire gate and both platform builds/packages.
