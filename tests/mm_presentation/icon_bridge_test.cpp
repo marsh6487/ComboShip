@@ -10,26 +10,16 @@
 using s16 = int16_t;
 using u8 = uint8_t;
 using TexturePtr = void *;
-enum RandomizerGet {
-  RG_NONE,
-  RG_CUSTOM,
-  RG_PROGRESSIVE,
-  RG_TIER,
-  RG_NATIVE,
-  RG_BAD,
-  RG_BOTTLE_WITH_RED_POTION,
-  RG_BOTTLE_WITH_GREEN_POTION,
-  RG_BOTTLE_WITH_BLUE_POTION,
-  RG_BOTTLE_WITH_FAIRY,
-  RG_BOTTLE_WITH_FISH,
-  RG_BOTTLE_WITH_BLUE_FIRE,
-  RG_BOTTLE_WITH_BUGS,
-  RG_BOTTLE_WITH_POE,
-  RG_BOTTLE_WITH_BIG_POE,
-  RG_MAGIC_BEAN_PACK,
-  RG_DOUBLE_DEFENSE = 0x19,
-  RG_COUNT
-};
+#define RANDO_ENUM_BEGIN(x) enum x {
+#define RANDO_ENUM_ITEM(x) x,
+#define RANDO_ENUM_END(x) };
+#include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"
+#include "combo/menu/ComboSongDrawOOT.h"
+#include "combo/menu/ComboItemIconOwnership.h"
+constexpr RandomizerGet RG_CUSTOM=static_cast<RandomizerGet>(RG_MAX+1),
+  RG_PROGRESSIVE=static_cast<RandomizerGet>(RG_MAX+2), RG_TIER=static_cast<RandomizerGet>(RG_MAX+3),
+  RG_NATIVE=static_cast<RandomizerGet>(RG_MAX+4), RG_BAD=static_cast<RandomizerGet>(RG_MAX+5);
+constexpr int RG_COUNT=RG_MAX+6;
 constexpr int ICON_SIZE_24 = 24, ICON_SIZE_32 = 32, ITEM_MEDALLION_FOREST = 102,
               ITEM_HEART_CONTAINER = 0x72, ITEM_FISH = 0x19,
               ITEM_HEART_PIECE_2 = 122, ITEM_ROCS_FEATHER_SKIJER = 158;
@@ -53,10 +43,11 @@ struct Item {
     return *this;
   }
   bool HasCustomIcon() {
-    return bottleIcons.contains(id) || id == RG_CUSTOM || id == RG_TIER;
+    return bottleIcons.contains(id) || id == RG_CUSTOM || id == RG_TIER || ComboSongForOotItem(id)>=0;
   }
   const char *GetCustomIcon() {
-    return bottleIcons.contains(id) ? bottleIcons.at(id)
+    return ComboSongForOotItem(id)>=0 ? "__OTR__textures/icon_item_static/gSongNoteTex"
+           : bottleIcons.contains(id) ? bottleIcons.at(id)
            : id == RG_TIER
                ? (grants ? "__OTR__next-tier" : "__OTR__awarded-tier")
                : customPath;
@@ -69,6 +60,8 @@ Item RetrieveItem(RandomizerGet id) { return {id}; }
 static TexturePtr sMsgCustomIconTex = nullptr;
 static s16 sMsgCustomIconWidth = 32, sMsgCustomIconHeight = 32;
 static u8 sMsgCustomIconIA8 = 0;
+struct Color_RGB8 { u8 r,g,b; };
+static Color_RGB8 sMsgCustomIconColor{255,255,255};
 /* STAGE_ICON */
 namespace ComboRando {
 constexpr int GAME_OOT = 0;
@@ -94,6 +87,8 @@ int32_t DescribeIcon(const char *name, CwItemIconInfo *out) {
       std::string(name) == "progressive"   ? RG_PROGRESSIVE
       : std::string(name) == "blue-potion" ? RG_BOTTLE_WITH_BLUE_POTION
       : std::string(name) == "double-defense" ? RG_DOUBLE_DEFENSE
+      : std::string(name) == "ikana" ? RG_EXT_SHIELD_OF_IKANA
+      : std::string(name) == "song-sonata" ? RG_MM_SONG_SONATA
                                            : RG_CUSTOM,
       out);
 }
@@ -156,6 +151,25 @@ int main() {
   assert(Rando::ComboForeignMessageIcon(1) == 0xF5);
   assert(std::string((char *)sMsgCustomIconTex) ==
          "__OTR__@oot:textures/icon_item_static/gItemIconBottlePotionBlueTex");
+  info={};
+  assert(OOT_FillItemIconInfo(RG_EXT_SHIELD_OF_IKANA,&info)==1);
+  assert(std::string(info.path)=="__OTR__icon_item_static_yar/gItemIconMirrorShieldTex");
+  assert(info.width==32 && info.height==32 && !info.isIA8);
+  provider=false;
+  foreign.itemName="Ikana Mirror Shield";
+  assert(Rando::ComboForeignMessageIcon(1)==0xF5);
+  assert(std::string((char*)sMsgCustomIconTex)=="__OTR__icon_item_static_yar/gItemIconMirrorShieldTex");
+  provider=true;
+  foreign.itemName="ikana";
+  assert(Rando::ComboForeignMessageIcon(1)==0xF5);
+  assert(std::string((char*)sMsgCustomIconTex)=="__OTR__icon_item_static_yar/gItemIconMirrorShieldTex");
+  foreign.itemName="song-sonata";
+  assert(Rando::ComboForeignMessageIcon(1)==0xF5);
+  assert(sMsgCustomIconWidth==16 && sMsgCustomIconHeight==24 && sMsgCustomIconIA8);
+  assert(sMsgCustomIconColor.r==98 && sMsgCustomIconColor.g==255 && sMsgCustomIconColor.b==98);
+  foreign.itemName="blue-potion";
+  assert(Rando::ComboForeignMessageIcon(1)==0xF5);
+  assert(sMsgCustomIconColor.r==255 && sMsgCustomIconColor.g==255 && sMsgCustomIconColor.b==255);
   foreign.itemName = "progressive";
   assert(OOT_FillItemIconInfo(RG_CUSTOM, &info) == 1 && info.width == 32 &&
          !info.isIA8);

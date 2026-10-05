@@ -62,12 +62,14 @@ class NeiGi_ArenaScope {
     bool active;
 
   public:
-    NeiGi_ArenaScope(PlayState* play, size_t matrices, size_t opaCommands, size_t xluCommands)
-        : previous(NeiGi_ReservedArena), active(NeiGi_ArenaHasRoom(play, 0, matrices, opaCommands, xluCommands)) {
+    NeiGi_ArenaScope(PlayState* play, size_t matrices, size_t opaCommands, size_t xluCommands, size_t tailBytes = 0)
+        : previous(NeiGi_ReservedArena),
+          active(NeiGi_ArenaHasRoom(play, tailBytes, matrices, opaCommands, xluCommands)) {
         if (active) {
             if (NeiGi_ReservedArena.gfx != play->state.gfxCtx)
                 NeiGi_ReservedArena = { play->state.gfxCtx };
-            NeiGi_ReservedArena.matrixBytes += matrices * ((sizeof(Mtx) + 15) & ~size_t(15));
+            NeiGi_ReservedArena.matrixBytes +=
+                matrices * ((sizeof(Mtx) + 15) & ~size_t(15)) + ((tailBytes + 15) & ~size_t(15));
             NeiGi_ReservedArena.opaCommands += opaCommands;
             NeiGi_ReservedArena.xluCommands += xluCommands;
         }

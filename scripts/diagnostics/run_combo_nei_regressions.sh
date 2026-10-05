@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 python3 -B scripts/diagnostics/run_hint_item_name_tests.py
 python3 -B scripts/diagnostics/run_nei_gi_tests.py --held --combo
+python3 -B tests/nei_gi/run_flame_arena_tests.py
 python3 -B scripts/diagnostics/run_mm_item_presentation_tests.py
 python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py
 python3 -B scripts/diagnostics/run_receipt_syntax_tests.py

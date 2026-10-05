@@ -184,6 +184,10 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop) {
                                        info.scale, info.neiShimmer - 1, info.itemShimmer, "oot");
         return;
     }
+    // The native flame runs before the bounded presentation renderer. Check
+    // its scroll/matrix and the later model together before emitting either.
+    if (info.neiSomariaUpgrade && !NeiGi_ArenaHasRoom(play, 12 * sizeof(Gfx), 4, 20, 40))
+        return;
     Matrix_Push();
     if (info.neiSomariaUpgrade)
         DrawOotSlateRuneFlame(255, 60, 60);

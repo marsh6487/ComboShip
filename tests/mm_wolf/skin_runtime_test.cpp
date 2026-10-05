@@ -182,6 +182,19 @@ int main() {
     gfx.polyOpa.p = commands + 2;
     gfx.polyOpa.d = commands + 1;
     rejected();
+    const SSBBSkinDrawReserve reserve = {4 * sizeof(Gfx), sizeof(Gfx), sizeof(Gfx)};
+    arenas(required + reserve.opaBytes - 1, 3, 3);
+    const auto savedIndex = skin.bufIndex;
+    assert(!SSBBSkin_DrawWithReserve(&inst, &play, &position, &rotation, &reserve));
+    assert(skin.bufIndex == savedIndex && gfx.polyOpa.p == commands);
+    arenas(required + reserve.opaBytes, 2, 3);
+    assert(!SSBBSkin_DrawWithReserve(&inst, &play, &position, &rotation, &reserve));
+    arenas(required + reserve.opaBytes, 3, 2);
+    assert(!SSBBSkin_DrawWithReserve(&inst, &play, &position, &rotation, &reserve));
+    arenas(required + reserve.opaBytes, 3, 3);
+    assert(SSBBSkin_DrawWithReserve(&inst, &play, &position, &rotation, &reserve));
+    assert((uintptr_t)gfx.polyOpa.d - (uintptr_t)gfx.polyOpa.p == reserve.opaBytes);
+    assert(gfx.polyXlu.p == translucent && gfx.overlay.p == overlay);
     for (size_t extra : {size_t(0), size_t(1), sizeof(Gfx)}) {
       arenas(required + extra);
       const int before = displayLists;

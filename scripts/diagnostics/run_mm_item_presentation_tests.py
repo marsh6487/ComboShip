@@ -19,6 +19,7 @@ def function(source, name):
     return source[start:end]
 
 src = (ROOT / 'combo/menu/ComboItemDrawOOT.h').read_text()
+song_body = function(src, 'OOT_FillSongDrawInfo')
 body = function(src, 'OOT_FillItemDrawInfo')
 preamble = r'''
 #include <cassert>
@@ -34,6 +35,8 @@ using s16=int16_t; using s32=int32_t; using f32=float;
 #define RANDO_ENUM_ITEM(x) x,
 #define RANDO_ENUM_END(x) };
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"
+#include "combo/menu/ComboSongDrawOOT.h"
+const char* gGiSongNoteDL="__OTR__objects/object_gi_melody/gGiSongNoteDL";
 constexpr RandomizerGet RG_TEST_CUSTOM=static_cast<RandomizerGet>(RG_MAX+1),
  RG_TEST_NATIVE=static_cast<RandomizerGet>(RG_MAX+2),
  RG_TEST_PROGRESSIVE=static_cast<RandomizerGet>(RG_MAX+3),
@@ -108,11 +111,24 @@ int main() {
    assert(tableCalls==1);
  }
 
- std::cout<<"PASS actual GI boundary: custom fallback cannot become bottle; resolved tier and native rows preserved\n";
+ awardDraw=customDraw;
+ for(auto id : {RG_MM_SONG_SONATA,RG_MM_SONG_TIME}) {
+   info={};
+   assert(OOT_FillItemDrawInfo(id,&info)==1);
+   assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.dlistCount==1 && info.itemShimmer);
+   const uint8_t expected[4]={98,static_cast<uint8_t>(id==RG_MM_SONG_SONATA?255:177),
+                             static_cast<uint8_t>(id==RG_MM_SONG_SONATA?98:211),255};
+   assert(!std::memcmp(info.itemShimmerColor,expected,4));
+ }
+ info={};
+ assert(OOT_FillItemDrawInfo(RG_MM_SONG_STORMS,&info)==1);
+ assert(info.drawKind==CW_DRAW_KIND_SEASON_GI && info.neiEffect==6 && info.dlistCount==0);
+ assert(tableCalls==1);
+ std::cout<<"PASS actual GI boundary: custom fallback cannot become bottle; resolved tier, native rows and imported song recipes preserved\n";
 }
 '''
 with tempfile.TemporaryDirectory(prefix='mm-presentation-') as td:
-    test=Path(td)/'test.cpp';test.write_text(preamble+body+checks)
+    test=Path(td)/'test.cpp';test.write_text(preamble+song_body+body+checks)
     binary=Path(td)/'test'
     flags=['-std=c++20','-Wall','-Wextra','-I'+str(ROOT)]
     if '--sanitize' in __import__('sys').argv: flags += ['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g']
@@ -126,7 +142,9 @@ bindings = re.findall(r'itemTable\[(?:RG_BOTTLE_WITH_[A-Z_]+|RG_MAGIC_BEAN_PACK)
                       (ROOT / 'soh/soh/Enhancements/randomizer/item_list.cpp').read_text())
 fixture = fixture.replace('/* BOTTLE_ICON_BINDINGS */', '\n'.join(bindings))
 fixture = fixture.replace('/* OWNER_ICON */', function(src, 'OOT_FillItemIconInfo'))
-fixture = fixture.replace('/* STAGE_ICON */', function(message, 'Message_StageCustomItemIconEx') + '\n' + function(message, 'Message_StageCustomItemIcon'))
+fixture = fixture.replace('/* STAGE_ICON */', function(message, 'Message_StageCustomItemIconEx') + '\n' +
+                          function(message, 'Message_StageCustomItemIcon') + '\n' +
+                          function(message, 'Message_StageCustomItemIconTint'))
 fixture = fixture.replace('/* CONSUMER_ICON */', function(consumer, 'Rando::ComboForeignMessageIcon'))
 with tempfile.TemporaryDirectory(prefix='mm-icon-') as td:
     test=Path(td)/'test.cpp';test.write_text(fixture)

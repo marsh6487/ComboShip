@@ -11,7 +11,23 @@ static u8 pendant, beetle, kite, trident, mario, customItemBlock, pakModel, o2rM
 static unsigned nativeActions, nativeDamageTicks, iceBursts, thawCompletions;
 static bool nativeAnimationDone;
 static u16 hookSuppressedButtons;
+static unsigned drawContinuations;
 extern "C" {
+void WolfFixture_DrawNativePrefix(PlayState*, Player*);
+void Matrix_Push(void) {}
+void Matrix_Pop(void) {}
+Mtx* Matrix_Finalize(GraphicsContext* gfx) {
+    return (Mtx*)Graph_Alloc(gfx, sizeof(Mtx));
+}
+void Player_DrawGetItem(PlayState*, Player*) { ++drawContinuations; }
+void func_80122D44(PlayState* play, struct_80122D44_arg1*) {
+    ++drawContinuations;
+    OPEN_DISPS(play->state.gfxCtx);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+s32 CustomItems_OverrideDraw(Player*, PlayState*) { ++drawContinuations; return 0; }
+void ExtEquip_DrawBehavior(void*, void*) { ++drawContinuations; }
+#include "wolf-native-scroll-gbi.inc"
 Input* sPlayerControlInput;
 f32 sControlStickMagnitude;
 s16 sControlStickAngle;
@@ -274,9 +290,29 @@ int main(int argc, char** argv) {
     assert(!sWolf.procOwnsPlayer);
     player.talkActor = nullptr;
     player.stateFlags2 = 0;
-    gfx.polyOpa.p = commands;
-    gfx.polyOpa.d = commands + 128;
-    assert(WolfLinkHost_Draw(&play, &player));
+    Gfx xluCommands[128]{}, overlayCommands[128]{};
+    gfx.polyOpa.p = commands; gfx.polyOpa.d = commands;
+    gfx.polyXlu.p = xluCommands; gfx.polyXlu.d = xluCommands;
+    gfx.overlay.p = overlayCommands; gfx.overlay.d = overlayCommands;
+    const auto oldBuffer = sSkin.bufIndex;
+    assert(WolfLinkHost_Draw(&play, &player)==2 && "selected Wolf with exhausted arenas must skip the complete player draw");
+    WolfFixture_DrawNativePrefix(&play, &player);
+    assert(drawContinuations == 0 && gfx.overlay.p == gfx.overlay.d);
+    assert(sSkin.bufIndex==oldBuffer && gfx.polyOpa.p==gfx.polyOpa.d && gfx.polyXlu.p==gfx.polyXlu.d);
+    assert(WolfLinkForm_IsReady());
+    gfx.polyOpa.d=commands+128;
+    gfx.polyXlu.d=xluCommands+128;
+    gfx.overlay.d=overlayCommands+128;
+    player.stateFlags2 |= PLAYER_STATE2_4000;
+    gfx.polyOpa.d=commands+20;
+    assert(WolfLinkHost_Draw(&play, &player)==2 && "freeze scroll, matrix and native continuation must be reserved before skin submission");
+    WolfFixture_DrawNativePrefix(&play, &player);
+    assert(drawContinuations == 0 && gfx.polyOpa.p == commands);
+    assert(sSkin.bufIndex==oldBuffer);
+    gfx.polyOpa.d=commands+128;
+    WolfFixture_DrawNativePrefix(&play, &player);
+    assert(drawContinuations == 3 && gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d);
+    player.stateFlags2 &= ~PLAYER_STATE2_4000;
     frame(BTN_CLEFT);
     assert(!WolfLinkForm_IsReady() && !(player.stateFlags3 & PLAYER_STATE3_4));
     // Full-width D-pad store is independent from the three shared C slots.

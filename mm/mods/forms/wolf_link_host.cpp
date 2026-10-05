@@ -230,8 +230,7 @@ extern "C" u8 WolfLinkHost_Draw(PlayState* play, Player* player) {
         Stop(play, player);
         return 0;
     }
-    WolfLinkForm_Draw(play, player);
-    return 1;
+    return WolfLinkForm_Draw(play, player) ? 1 : 2;
 }
 
 extern "C" void WolfLinkHost_OnUseItem(PlayState* play, Player* player, s32 item) {

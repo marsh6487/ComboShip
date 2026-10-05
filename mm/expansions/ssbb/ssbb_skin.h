@@ -59,6 +59,15 @@ void SSBBSkin_Destroy(SSBBSkinMesh* skin);
 // Returns 1 on submission, 0 when invalid or the native graphics arenas are full.
 s32 SSBBSkin_Draw(SSBBCharacterInstance* inst, PlayState* play, Vec3f* pos, Vec3s* rot);
 
+// Space needed by the caller's native continuation after a successful skin draw.
+typedef struct {
+    u32 opaBytes;
+    u32 xluBytes;
+    u32 overlayBytes;
+} SSBBSkinDrawReserve;
+s32 SSBBSkin_DrawWithReserve(SSBBCharacterInstance* inst, PlayState* play, Vec3f* pos, Vec3s* rot,
+                             const SSBBSkinDrawReserve* reserve);
+
 // Compute/query the current model-space pose, independent of graphics submission.
 // A query is valid only for the instance whose pose was most recently computed.
 s32 SSBBSkin_ComputePose(SSBBCharacterInstance* inst);

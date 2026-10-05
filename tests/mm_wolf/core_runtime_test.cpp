@@ -80,14 +80,25 @@ s32 CollisionCheck_SetAT(PlayState*, CollisionCheckContext*, Collider* c) {
 }
 void ActorShadow_DrawFeet(Actor*, Lights*, PlayState*) {
 }
-void* Graph_Alloc(GraphicsContext*, size_t) {
+void* Graph_Alloc(GraphicsContext* gfx, size_t bytes) {
+#ifdef MM_WOLF_HOST
+    const uintptr_t tail = (uintptr_t)gfx->polyOpa.d - ALIGN16(bytes);
+    assert(tail >= (uintptr_t)gfx->polyOpa.p);
+    gfx->polyOpa.d = (Gfx*)tail;
+    return (void*)tail;
+#else
     static Mtx m;
     return &m;
+#endif
 }
+#ifdef MM_WOLF_HOST
+#include "wolf-native-graph.inc"
+#else
 void Graph_OpenDisps(Gfx**, Gfx*, GraphicsContext*, const char*, s32) {
 }
 void Graph_CloseDisps(Gfx**, Gfx*, GraphicsContext*, const char*, s32) {
 }
+#endif
 void Gfx_SetupDL25_Opa(GraphicsContext*) {
 }
 void Matrix_SetTranslateRotateYXZ(f32, f32, f32, Vec3s*) {

@@ -64,13 +64,11 @@ Local worker commit `12d055506bbdb49280cd30e8502672b9a10e91e7` adds opt-in root 
 
 The actual MM shop callback now forwards `ACTOR_EN_GIRLA` context through native and foreign dispatch. Independent sanitized/fast-math production callback fixtures passed every authored binding's shelf route and unchanged null-actor world route. The stale extracted key-cache fixture now includes the real identity policy header and passes sanitizers.
 
-The MM shared skin's real arena preflight is integrated and independently verified: material/no-material draws reserve 10/9 opaque commands, aligned matrix space and two temporary entries in each side arena. Required-minus-one capacity previously crossed head/tail; genuine native helper/canary fixtures now reject before mutations and pass normal/fast-math sanitizers with actual Pikachu metadata. The Wolf host must still propagate a capacity-skipped draw and guard its new outer marker/freeze continuation. Existing arbitrary native get-item/equipment/mod submissions keep their inherited allocator contract; whole-frame/game headroom is not claimed.
+The MM shared skin's real arena preflight is integrated and independently verified: material/no-material draws reserve 10/9 opaque commands, aligned matrix space and two temporary entries in each side arena. Required-minus-one capacity previously crossed head/tail; genuine native helper/canary fixtures now reject before mutations and pass normal/fast-math sanitizers with actual Pikachu metadata. The takeover correction below propagates a capacity-skipped draw and reserves its new outer marker/freeze continuation. Existing arbitrary native get-item/equipment/mod submissions keep their inherited allocator contract; whole-frame/game headroom is not claimed.
 
-GI arena work is checkpointed explicitly WIP at worker `577bb764`. The production tail-crossing reproduction now passes with the actual OoT allocator/Open/Close/setup seams and shared mesh/model/restore reservations. Overlay, exact-fit and near-full boundaries, native shell caller reservation, MM helper seams, source-contract normalization and final syntax remain under refinement. Do not treat this WIP as a final gate candidate.
+GI arena completion from worker `282b0090` is integrated as `7df56cb8`. Actual OoT allocator/Open/Close/setup seams, overlay and exact-fit boundaries, native shell caller reservations, MM helper seams and real-header syntax checks pass the sanitized/fast-math production GI runner. The final review found intrinsic flame allocations outside the original model reservation; the takeover correction below covers them.
 
-Complete combined regressions, final independent arena review and Windows/Linux builds follow these corrections. This is still a partial checkpoint; in-game acceptance is not claimed.
-
-## Resume
+Complete combined regressions and exact-head Windows/Linux builds follow the independently reviewed corrections. This is still a partial checkpoint; in-game acceptance is not claimed.
 
 ## October 4 19:50 Chicago takeover
 
@@ -94,3 +92,29 @@ the whole regression gate and exact-head platform builds remain pending. This
 is an explicitly incomplete, recoverable source checkpoint.
 
 Fetch `recovery/final-polish-20261004`, inspect this note and the reconstruction plan, and continue the uncompleted sections. The checkpoint commit's message records its exact tree and tests. Do not treat the 43-command gate reported by the lost session as fresh proof. Keep the final PR draft and preserve its published ancestry. Existing authorization permits the final push to PR #34; no merge or master promotion is authorized.
+
+## Takeover correction checkpoint
+
+Recovered source and worker integration were published as `ee6e5d6fbced1327612012bc6ec87d9bdc927229` on `recovery/final-polish-resume-20261004-1950`. The fetched remote commit/ref and tree `04d65c9d69aec99ccecef93dc65236a33f8e0f01` match the local snapshot `6957b3bf`. The original recovery branch/worktrees were preserved.
+
+The independent final reviewer inspected `7df56cb8` against published baseline `1c29c83f` and returned two Important findings, with no Critical or Minor findings. Both were reproduced before correction. Wolf draw rejection now returns a distinct selected/skipped status and returns from native Player_Draw before any continuation. The opt-in skin reserve includes nested native markers and the frozen shell's twelve-Gfx scroll, matrix and four translucent commands. Existing Pikachu callers retain the original zero-reserve API. Intrinsic OoT Somaria/selected True Master Sword flames and the MM Somaria bridge now preflight their real scroll, matrix, setup and debug costs with the subsequent model.
+
+Fresh verification after these corrections:
+
+- `python3 -B tests/mm_wolf/run_host_tests.py`: passes production host/core/skin, exact native Player_Draw Wolf branch, native Open/Close and frozen scroll. Exhausted arenas remain untouched, the selection remains active and sufficient capacity submits the skin and native shell. Other equipment/get-item/effect callbacks remain boundaries, as documented.
+- `python3 -B tests/mm_wolf/run_skin_tests.py --fast-math`: passes native marker/setup/allocator bounds, caller reserves and actual Pikachu metadata under sanitizers.
+- `python3 -B scripts/diagnostics/run_nei_gi_tests.py --combo --sanitize --fast-math`: passes native/foreign shelves, all 61 frames, exact capacities and shared shell reservations.
+- `python3 -B tests/nei_gi/run_flame_arena_tests.py`: passes actual OoT/MM flame, twelve-Gfx scroll and debug bodies under ASan/UBSan; short OPA/XLU arenas skip without allocations, full arenas draw the flame and model. LeakSanitizer alone is disabled because this sandbox cannot inspect processes.
+- The old presentation fixture now includes the production song draw policy, actual RandomizerGet enum, icon ownership and icon tint helper. Native/foreign/Ikana and colored song icon boundaries pass.
+- Pinned clang-format 14 checks pass for all 4,524 workflow-scoped source files; the collision gate reports no new paths; conflict-marker and whitespace checks pass.
+
+The expanded complete 43-command NEI gate is in progress. Windows/Linux builds and packages have not yet been started for this correction. This checkpoint is source verification, not game acceptance or promotion. See `docs/testing/FINAL_POLISH_INTEGRATION_2026-10-04.md` for the final review scope and pending acceptance.
+
+## Harness finalization resumed October 4 at 21:02 Chicago
+
+Resumed from local correction `de8d87f9896bfc7b2dce696538d8b54e58688d4a`; preserved all earlier worktrees and recovery branches. The last full gate stopped in the held-model runner with a missing generated `mm_nei_graph.inc`.
+
+- RED: `python3 -B tests/mm_nei/run_held_tests.py` reproduced the missing native graph include.
+- Native graphics helper generation is now shared by the main and held runners, and the held compiler receives its temporary include directory. The fixture initializes bounded OPA, XLU and overlay buffers because real native Open/Close touches all three; after adding the include, the previous uninitialized overlay caused SIGSEGV.
+- GREEN: the same held runner compiled and executed successfully: `PASS native MM held model dispatch`. No production game code was changed for this harness repair.
+- The complete 43-command regression gate and exact-candidate Windows/Linux builds remain pending. Recovery records stay on checkpoint branches; the final PR publication preserves its existing ancestry and excludes added recovery/workflow documentation.

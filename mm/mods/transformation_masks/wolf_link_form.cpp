@@ -1826,11 +1826,19 @@ extern "C" void WolfLinkForm_DrawShadow(Actor* actor, Lights* lights, PlayState*
     actor->shape.shadowScale = shadowScale;
 }
 
-extern "C" void WolfLinkForm_Draw(PlayState* play, Player* player) {
+extern "C" s32 WolfLinkForm_Draw(PlayState* play, Player* player) {
     if (!sWolf.initialized) {
-        return;
+        return 0;
+    }
+    // Player_Draw opens the native continuation and func_80122D44 opens
+    // another pair even without an active trail. Reserve before skinning so
+    // rejection cannot leave the caller with an exhausted command stream.
+    SSBBSkinDrawReserve reserve = { 4 * sizeof(Gfx), 4 * sizeof(Gfx), 4 * sizeof(Gfx) };
+    if (player->stateFlags2 & PLAYER_STATE2_4000) {
+        reserve.opaBytes += ALIGN16(12 * sizeof(Gfx)) + ALIGN16(sizeof(Mtx));
+        reserve.xluBytes += 4 * sizeof(Gfx);
     }
     Vec3f pos = player->actor.world.pos;
     Vec3s rot = player->actor.shape.rot;
-    SSBBSkin_Draw(&sWolf.character, play, &pos, &rot);
+    return SSBBSkin_DrawWithReserve(&sWolf.character, play, &pos, &rot, &reserve);
 }

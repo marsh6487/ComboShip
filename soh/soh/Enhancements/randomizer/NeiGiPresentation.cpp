@@ -864,9 +864,13 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     if (!upgraded && !entry->drawFunc && !item->alwaysShimmer)
         return false;
     // Procedural effects leave space for the later translucent model shell.
-    // Legacy callbacks retain their own allocator behavior; this reservation
-    // covers only the model commands and matrices emitted by this wrapper.
-    NeiGi_ArenaScope arena(play, selectedSword ? 1 : upgraded ? (item->translucent ? 2 : 1) : 0, 16, 16);
+    // Intrinsic flames allocate a twelve-packet scroll and a matrix before
+    // the model. Include their native setup/debug commands in the same scope.
+    const bool flame = (authored && item->draw == Randomizer_DrawCaneSomariaUpgrade) ||
+                       (selectedSword && item->effect == Kind::SwordAura);
+    const size_t modelMatrices = selectedSword ? 1 : upgraded ? (item->translucent ? 2 : 1) : 0;
+    NeiGi_ArenaScope arena(play, modelMatrices + (flame ? 1 : 0), flame ? 20 : 16, flame ? 32 : 16,
+                           flame ? 12 * sizeof(Gfx) : 0);
     if (!arena)
         return true;
     Matrix_Push();

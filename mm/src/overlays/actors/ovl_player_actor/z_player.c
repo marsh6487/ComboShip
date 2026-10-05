@@ -14433,6 +14433,9 @@ void Player_Draw(Actor* thisx, PlayState* play) {
     Matrix_Push();
     wolfDrawn = WolfLinkHost_Draw(play, this);
     Matrix_Pop();
+    if (wolfDrawn == 2) {
+        return;
+    }
     if (wolfDrawn) {
         // Keep MM's freeze shell and item/effect presentation while the Wolf mesh replaces Link.
         OPEN_DISPS(play->state.gfxCtx);

@@ -354,6 +354,11 @@ static s32 SSBBSkin_ArenaHasSpace(const TwoHeadGfxArena* arena, size_t bytes) {
 }
 
 s32 SSBBSkin_Draw(SSBBCharacterInstance* inst, PlayState* play, Vec3f* pos, Vec3s* rot) {
+    return SSBBSkin_DrawWithReserve(inst, play, pos, rot, NULL);
+}
+
+s32 SSBBSkin_DrawWithReserve(SSBBCharacterInstance* inst, PlayState* play, Vec3f* pos, Vec3s* rot,
+                             const SSBBSkinDrawReserve* reserve) {
     SSBBSkinMesh* skin;
     f32 s;
     s32 b;
@@ -373,10 +378,11 @@ s32 SSBBSkin_Draw(SSBBCharacterInstance* inst, PlayState* play, Vec3f* pos, Vec3
     // 9 opaque packets (10 with material). Xlu/overlay temporarily need two
     // packets even though CloseDisps restores their heads. Vertices/DLs live
     // in persistent buffers, so the only tail allocation is one aligned Mtx.
-    if (!SSBBSkin_ArenaHasSpace(&play->state.gfxCtx->polyOpa,
-                                (skin->materialDL ? 10 : 9) * sizeof(Gfx) + ALIGN16(sizeof(Mtx))) ||
-        !SSBBSkin_ArenaHasSpace(&play->state.gfxCtx->polyXlu, 2 * sizeof(Gfx)) ||
-        !SSBBSkin_ArenaHasSpace(&play->state.gfxCtx->overlay, 2 * sizeof(Gfx)))
+    if (!SSBBSkin_ArenaHasSpace(&play->state.gfxCtx->polyOpa, (skin->materialDL ? 10 : 9) * sizeof(Gfx) +
+                                                                  ALIGN16(sizeof(Mtx)) +
+                                                                  (reserve ? reserve->opaBytes : 0)) ||
+        !SSBBSkin_ArenaHasSpace(&play->state.gfxCtx->polyXlu, 2 * sizeof(Gfx) + (reserve ? reserve->xluBytes : 0)) ||
+        !SSBBSkin_ArenaHasSpace(&play->state.gfxCtx->overlay, 2 * sizeof(Gfx) + (reserve ? reserve->overlayBytes : 0)))
         return 0;
 
     if (!SSBBSkin_ComputePose(inst))

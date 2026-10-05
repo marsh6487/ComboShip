@@ -8,6 +8,7 @@ import tempfile
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
 from run_mm_nei_tests import flags
+from run_time_pedestal_tests import functions
 def run(command):
     result=subprocess.run(command,capture_output=True,text=True)
     if result.returncode:
@@ -24,12 +25,24 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-host-') as td:
         while depth:
             depth+=(player_source[end]=='{')-(player_source[end]=='}'); end+=1
         return player_source[start:end]
+    graph=functions((ROOT/'mm/src/code/graph.c').read_text())
+    (Path(td)/'wolf-native-graph.inc').write_text(graph['Graph_OpenDisps']+'\n'+graph['Graph_CloseDisps'])
+    gbi=functions((ROOT/'soh/soh/GbiWrap.cpp').read_text().replace('extern "C" ', ''))
+    (Path(td)/'wolf-native-scroll-gbi.inc').write_text(gbi['gDPSetTileSizeLerp']+'\nGfx gEffIceFragment3DL[1];\n')
+    rcp=functions((ROOT/'mm/src/code/z_rcp.c').read_text())
+    draw_start=player_source.index('    Matrix_Push();\n    wolfDrawn = WolfLinkHost_Draw')
+    draw_end=player_source.index('\n    // OoT "adult mode"',draw_start)
+    native_draw=('void WolfFixture_DrawNativePrefix(PlayState* play, Player* this) {\n'
+                 's32 wolfDrawn;\n'+player_source[draw_start:draw_end]+'\n}\n')
     native_actions=Path(td)/'native-freeze.c'
     input_start=player_source.index('    if (play->actorCtx.isOverrideInputOn && (this == GET_PLAYER(play))) {')
     input_end=player_source.index('\n    GameInteractor_ExecuteOnPassPlayerInputs(&input);',input_start)
     input_body=player_source[input_start:input_end]
     native_actions.write_text('#include "global.h"\n'
                               '#include "mods/forms/wolf_link_host.h"\n'
+                              '#include "mods/items/custom_items.h"\n'
+                              '#include "mods/extended_equipment.h"\n'
+                              'extern Gfx gEffIceFragment3DL[];\n'
                               'void GameInteractor_ExecuteOnPassPlayerInputs(Input*);\n'
                               'extern Input* sPlayerControlInput;\n'
                               'extern f32 sControlStickMagnitude;\n'
@@ -43,7 +56,8 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-host-') as td:
                               native_body('bool func_8082DA90(PlayState* play) {')+'\n'+
                               'void WolfFixture_SelectNativeInput(PlayState* play, Player* this, Input* out) {\n'
                               'Input input;\n'+input_body+'\n'
-                              'GameInteractor_ExecuteOnPassPlayerInputs(&input);\n*out=input;\n}\n')
+                              'GameInteractor_ExecuteOnPassPlayerInputs(&input);\n*out=input;\n}\n'+
+                              rcp['Gfx_TwoTexScrollEx']+'\n'+native_draw)
     objects=[]
     for i,path in enumerate(['mm/expansions/ssbb/ssbb_character.c','mm/expansions/ssbb/ssbb_skin.c',
                              'mm/src/code/z_skin_matrix.c','mm/src/code/z_lib.c','mm/mods/ext_buttons/ext_buttons.cpp',
@@ -57,7 +71,7 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-host-') as td:
              '-O1','-g','-fsanitize=undefined','-fno-sanitize-recover=all','-ffunction-sections','-fdata-sections',
              '-c',str(ROOT/path),'-o',obj]); objects.append(obj)
     binary=str(Path(td)/'host')
-    options=['-DMM_WOLF_HOST'] if (ROOT/'mm/mods/forms/wolf_link_host.cpp').exists() else []
+    options=['-DMM_WOLF_HOST','-I'+td] if (ROOT/'mm/mods/forms/wolf_link_host.cpp').exists() else []
     run([os.environ.get('CXX','c++'),'-std=c++20',*flags(),*options,'-DMM_WOLF_NATIVE_HANDOFF',
          '-DWOLF_IMPLEMENTATION="'+str(ROOT/'mm/mods/transformation_masks/wolf_link_form.cpp')+'"',
          '-O1','-g','-fsanitize=undefined','-fno-sanitize-recover=all','-ffunction-sections','-fdata-sections',

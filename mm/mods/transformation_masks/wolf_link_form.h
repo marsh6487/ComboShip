@@ -17,7 +17,7 @@ u8 WolfLinkForm_IsReady(void);
 u8 WolfLinkForm_OwnsPlayerAction(void);
 void WolfLinkForm_ReleaseAction(Player* player);
 void WolfLinkForm_ApplyCollisionShape(Player* player);
-void WolfLinkForm_Draw(PlayState* play, Player* player);
+s32 WolfLinkForm_Draw(PlayState* play, Player* player);
 void WolfLinkForm_DrawShadow(Actor* actor, Lights* lights, PlayState* play);
 void WolfLinkForm_Cleanup(Player* player, PlayState* play);
 
