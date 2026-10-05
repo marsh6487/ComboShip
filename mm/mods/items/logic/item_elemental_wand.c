@@ -90,8 +90,8 @@ static void Wand_PoseStart(PlayState* play, Player* player, u8 mode) {
         sWandPoseStage = WAND_POSE_SUMMON_CALL;
     }
     player->skelAnimeUpperBlendWeight = 0.0f;
-    PlayerAnimation_Change(play, &player->skelAnimeUpper, anim, 1.0f, 0.0f, Animation_GetLastFrame(anim),
-                           ANIMMODE_ONCE, WAND_POSE_MORPH);
+    PlayerAnimation_Change(play, &player->skelAnimeUpper, anim, 1.0f, 0.0f, Animation_GetLastFrame(anim), ANIMMODE_ONCE,
+                           WAND_POSE_MORPH);
 }
 
 static void Wand_PoseTick(PlayState* play, Player* player) {

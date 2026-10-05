@@ -107,8 +107,7 @@ static void WandMeteor_Update(Actor* thisx, PlayState* play) {
     u8 hitWall = (thisx->bgCheckFlags & BGCHECKFLAG_WALL) != 0;
     f32 launchSpeed = thisx->speed;
 
-    if ((thisx->params == BOMB_TYPE_BODY) && (thisx->parent == NULL) &&
-        (thisx->floorHeight > BGCHECK_Y_MIN)) {
+    if ((thisx->params == BOMB_TYPE_BODY) && (thisx->parent == NULL) && (thisx->floorHeight > BGCHECK_Y_MIN)) {
         thisx->bgCheckFlags &= ~(BGCHECKFLAG_GROUND | BGCHECKFLAG_GROUND_TOUCH);
     }
 
