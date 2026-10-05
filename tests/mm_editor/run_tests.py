@@ -111,7 +111,9 @@ def main():
         pool_binding += function(bindings, "MM_DescribeNeiGi") + "\n"
         (build / "pool_binding_production.inc").write_text(pool_binding)
         pool_binary = build / "pool_binding_test"
+        # Distro spdlog uses external fmt; this standalone fixture links no logging library.
         subprocess.run([*cxx, "-std=c++20", "-fpermissive", "-O0", "-g",
+                        "-DFMT_HEADER_ONLY",
                         "-fsanitize=address,undefined,bounds", "-fno-sanitize-recover=all",
                         *flags(), "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DCONTROLLERBUTTONS_T=uint32_t",
                         "-I" + str(build), "-include", "nlohmann/json.hpp", "-include", "ship/Context.h",
