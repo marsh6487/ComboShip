@@ -160,8 +160,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     # on SDL2main for WinMain, but ComboShip has its own main() (see above), so /ENTRY:mainCRTStartup
     # keeps it. Errors still persist to *_extract_error.log.
     if(MSVC)
+        # Both launchers initialize the games' hint tables on their main thread.
+        # The nested MSVC frames exceed the default 1 MiB executable stack.
+        # Reserve 8 MiB here; a game DLL cannot set its host thread's reserve.
         target_link_options(ComboShip PRIVATE
+            /STACK:8388608
             $<$<CONFIG:Release>:/SUBSYSTEM:WINDOWS;/ENTRY:mainCRTStartup>)
+        target_link_options(comborando PRIVATE /STACK:8388608)
     endif()
 else()
     # ComboShip Linux/macOS: the games' shared objects land in their own build dirs; mirror the
