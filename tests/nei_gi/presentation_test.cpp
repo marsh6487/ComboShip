@@ -22,11 +22,13 @@ int enabled, alt, dinSword, loads, allocations, fallback, interpolation, vanilla
     triforce;
 float matrix = 1;
 float matrixY = 0;
+int modelFitContext = -1;
 std::vector<std::pair<float, float>> stack;
 std::vector<std::pair<float, float>> submitted;
 std::vector<std::array<unsigned, 3>> flameColors;
 std::vector<std::vector<Vtx>> arena;
 bool portableSongLists=false;
+bool selectedCustomLists=false;
 std::map<Gfx *, std::vector<Vtx>> vertexLoads;
 std::set<std::string> files;
 std::set<std::pair<std::string,std::string>> modFiles;
@@ -42,10 +44,12 @@ void Reset() {
   vanilla = trap = triforce = 0;
   matrix = 1;
   matrixY = 0;
+  modelFitContext = -1;
   submitted.clear();
   flameColors.clear();
   arena.clear();
   portableSongLists=false;
+  selectedCustomLists=false;
   pendingVertices = nullptr;
   vertexLoads.clear();
   std::memset(opa, 0, sizeof(opa));
@@ -148,7 +152,10 @@ int ResourceMgr_IsModAssetForGame(const char* game,const char* path) {
   return Fixture::modFiles.contains({game,selected});
 }
 int ResourceMgr_IsModAsset(const char* path) {return ResourceMgr_IsModAssetForGame("oot",path);}
-int ResourceMgr_GetGiModelFitForGame(const char*,const char*,float,float,int,float[2]) {return 0;}
+int ResourceMgr_GetGiModelFitForGame(const char*,const char*,float,float,int context,float[2]) {
+  Fixture::modelFitContext=context;
+  return 0;
+}
 
 Gfx *ResourceMgr_LoadGfxByName(const char *path) {
   ++Fixture::loads;
@@ -166,6 +173,7 @@ void Matrix_Pop() {
   Fixture::stack.pop_back();
 }
 void Matrix_Scale(float x, float, float, uint8_t) { Fixture::matrix *= x; }
+void Matrix_RotateX(float, uint8_t) {}
 void Matrix_RotateY(float, uint8_t) {}
 void Matrix_RotateZ(float, uint8_t) {}
 void Matrix_Translate(float, float y, float, uint8_t mode) {
@@ -229,7 +237,7 @@ void gSPVertex(Gfx *cmd, uintptr_t data, int n, int v0) {
   cmd->words.w0 = cmd->words.w1 = 0;
 }
 void gSPDisplayList(Gfx *packet, Gfx *list) {
-  assert(Fixture::portableSongLists &&
+  assert((Fixture::portableSongLists || Fixture::selectedCustomLists) &&
          "authored GI paths must be deferred, not resolved through the legacy wrapper");
   gDma1p(packet, G_DL_OTR_FILEPATH, list, 0, G_DL_PUSH);
 }

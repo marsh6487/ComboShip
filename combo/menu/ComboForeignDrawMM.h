@@ -1168,7 +1168,7 @@ inline void MM_DrawForeignNativeEquipment(const ComboForeignDrawInfoOOT* info) {
 // Draw a foreign (OOT-bound) item's real OOT model at the current model matrix. Any resolution
 // failure falls back to the sentinel blue rupee (the RI_COMBO_FOREIGN item's GID_RUPEE_BLUE), so we
 // never draw blank. Mirrors Randomizer_DrawComboForeign (soh/.../draw.cpp).
-inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, bool mmPickup = false) {
+inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, int mmPickup = 0) {
     const ComboForeignDrawInfoOOT* info =
         (randoCheckId != RC_UNKNOWN) ? ComboResolveForeignDrawInfoOOT(randoCheckId) : nullptr;
     if (info == nullptr) {

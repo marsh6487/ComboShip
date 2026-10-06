@@ -823,10 +823,9 @@ static int16_t DungeonEntranceDestination(int16_t entrance) {
 }
 
 static int DungeonBossDestination(int dungeon) {
-    constexpr int entries[] = { ENTR_DEKU_TREE_ENTRANCE,       ENTR_DODONGOS_CAVERN_ENTRANCE,
-                                ENTR_JABU_JABU_ENTRANCE,       ENTR_FOREST_TEMPLE_ENTRANCE,
-                                ENTR_FIRE_TEMPLE_ENTRANCE,     ENTR_WATER_TEMPLE_ENTRANCE,
-                                ENTR_SPIRIT_TEMPLE_ENTRANCE,   ENTR_SHADOW_TEMPLE_ENTRANCE };
+    constexpr int entries[] = { ENTR_DEKU_TREE_ENTRANCE,     ENTR_DODONGOS_CAVERN_ENTRANCE, ENTR_JABU_JABU_ENTRANCE,
+                                ENTR_FOREST_TEMPLE_ENTRANCE, ENTR_FIRE_TEMPLE_ENTRANCE,     ENTR_WATER_TEMPLE_ENTRANCE,
+                                ENTR_SPIRIT_TEMPLE_ENTRANCE, ENTR_SHADOW_TEMPLE_ENTRANCE };
     constexpr int doors[] = { ENTR_DEKU_TREE_BOSS_ENTRANCE,     ENTR_DODONGOS_CAVERN_BOSS_ENTRANCE,
                               ENTR_JABU_JABU_BOSS_ENTRANCE,     ENTR_FOREST_TEMPLE_BOSS_ENTRANCE,
                               ENTR_FIRE_TEMPLE_BOSS_ENTRANCE,   ENTR_WATER_TEMPLE_BOSS_ENTRANCE,

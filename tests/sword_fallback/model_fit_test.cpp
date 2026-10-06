@@ -151,19 +151,30 @@ int main(){
             assert(high*pose.scale+pose.lift <= (shop?52.f:48.f)+.001f);
             assert(width*pose.scale <= (shop?76.f:104.f)+.001f);
         }
-        for(bool din:{false,true}) {
+        // Camera_KeepOn4's upright Item0 rows, with CustomItem's visible Y.
+        struct Receipt {int context;float origin,pitch,at,distance,fov,forward;};
+        const Receipt receipts[]={{1,51.3f,25.f,46.8f,39.2f,45.f,0.f},
+          {2,96.3f,55.f,94.8f,33.3f,55.f,12.f},
+          {1,81.3f,30.f,74.8f,47.6f,42.f,4.f},
+          {1,41.3f,-8.f,28.2f,46.8f,60.f,0.f},
+          {1,106.3f,40.f,95.2f,33.6f,80.f,6.f}};
+        for(bool din:{false,true})for(const auto& receipt:receipts) {
             dinEnabled=din;
-            pose={.21f,51.3f,0,0};
-            ComboSwordGi_ApplyFit("oot",e.path,.04f,1.8f,false,true);
+            pose={.21f,receipt.origin,0,0};
+            ComboSwordGi_ApplyFit("oot",e.path,.04f,1.8f,false,receipt.context);
             NeiGi_DrawSelectedSword(&play,e.path,false,false);
             const float low=din?e.layerLow:e.low,high=din?e.layerHigh:e.high,width=din?e.layerWidth:e.width;
-            const float pitch=25.f*NeiGi::Tau/360.f,camAt=46.8f,camDistance=39.2f,tanFov=std::tan(22.5f*NeiGi::Tau/360.f);
+            const float pitch=receipt.pitch*NeiGi::Tau/360.f;
+            const float camAt=receipt.at,camDistance=receipt.distance;
+            const float tanFov=std::tan(receipt.fov*NeiGi::Tau/720.f);
             for(int spin=0;spin<360;spin+=3)for(float y:{low,high}) {
-                const float z=.5f*width*pose.scale*std::cos(spin*NeiGi::Tau/360.f);
+                const float z=receipt.forward+.5f*width*pose.scale*std::cos(spin*NeiGi::Tau/360.f);
                 const float dy=pose.lift+y*pose.scale-camAt;
                 const float depth=camDistance-dy*std::sin(pitch)-z*std::cos(pitch);
                 const float projected=(dy*std::cos(pitch)-z*std::sin(pitch))/(depth*tanFov);
+                const float projectedX=.5f*width*pose.scale*std::sin(spin*NeiGi::Tau/360.f)/(depth*tanFov*(4.f/3.f));
                 assert(depth>0 && projected<.9f && projected>-.9f && "selected pack geometry clips MM receipt camera");
+                assert(projectedX<.9f && projectedX>-.9f);
             }
         }
     }
@@ -176,5 +187,5 @@ int main(){
             assert(bounds.maximum.y*pose.scale+pose.lift<=48.001f);
         }
     }
-    std::cout<<"PASS selected mod graph + native/producer GI route: "<<expected.size()<<" meshes, upright full-spin pickup/shop bounds including Din layers and actual MM receipt camera\n";
+    std::cout<<"PASS selected mod graph + native/producer GI route: "<<expected.size()<<" meshes, upright full-spin pickup/shop bounds including Din layers and all five actual MM receipt cameras\n";
 }

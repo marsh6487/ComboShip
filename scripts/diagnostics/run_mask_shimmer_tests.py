@@ -72,8 +72,8 @@ void* Combo_ResolveSym(const char*, const char*) { ++ownerLookups; return nullpt
 ''' + bindings + '''
 extern "C" const char* NeiResource_Route(const char*) { assert(false); return nullptr; }
 void DrawOotSlateRuneFlame(u8, u8, u8) { assert(false); }
-void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,bool mmPickup=false);
-bool MM_TryDrawNeiGi(RandoItemId,bool shop=false,bool mmPickup=false);
+void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,int mmPickup=0);
+bool MM_TryDrawNeiGi(RandoItemId,bool shop=false,int mmPickup=0);
 void DrawSong(RandoItemId) {assert(false && "songs have their own production dispatcher fixture");}
 ''' + function(nei, 'MM_DescribeNeiGi') + '\n' + function(nei, 'MM_DrawNeiGi') + '\n' + function(nei, 'MM_TryDrawNeiGi')
         fixture = fixture.replace('/* PRODUCTION_NEI_NATIVE_DISPATCH */', native_dispatch)

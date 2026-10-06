@@ -8,12 +8,12 @@ This candidate stays on the existing draft PR; no merge or master promotion.
 | --- | --- | --- |
 | Champion/Sage tunic missing, Sage medallions still visible | Load the tunic mesh through its OoT resource owner while MM is active. | Actual foreign descriptor and native draw callbacks; missing-resource recovery and active mod choice. |
 | Pendant/Bomb Arrows rupee sentinel | Cover the actual MM Pendant selected by the exported duplicate-name catalog and the Bomb Arrows custom recipe. | Actual catalog ordering, exported name boundary and production MM submission. |
-| Ice Rod, swords and Lantern clip overhead | Apply the tighter envelope only to MM CustomItem receipts; measure selected resource matrices and effect layers. Keep OoT and shop envelopes. | All 61 authored meshes and the six selected meshes from the supplied Din pack, spun through the native MM pickup camera. |
+| Ice Rod, swords and Lantern clip overhead | Apply receipt-specific fits, including Goron's steep camera; measure selected resource matrices and effect layers. Keep OoT and shop envelopes. | All 61 authored meshes and the six selected meshes from the supplied Din pack, spun through all five steady native MM form cameras. |
 | Bolero fire and Serenade circle | Filled orange flame tongues with yellow cores; remove only Serenade's ring. | Production particle geometry and offline production-triangle preview; native note/shimmer preserved. |
 | Heart Piece quarter icon, Pegasus boots icon | Route the existing full Heart Piece and stock anklet artwork in receipts/inventory. | Actual native loader/catalog paths; HUD progress slots and unrelated boots preserved. |
 | Map spacing and wording | Fixed native 75% text, measured wrapping and extra pages. Use the native ordinary/masterful hint table and colors verbatim, then “It seems the entrance is at [source].” | Real font widths, long Ice Cavern source, inverse source quantities, native page/icon handling. |
 | Missing compass hints | Follow forward mixed-pool dungeon/boss-door mappings; identify reward from the actual destination boss check. Bound cycles and state unavailable destinations explicitly. | Real Entrance objects through CreateEntranceOverrides and SOH_DumpEntranceOverrides, donor and MM receipt builders. |
-| Rod of Seasons MM behavior | Autumn warms EnWood02 canopy/leaf colors and adds bounded native falling leaves. Spring adds rain on Days 1/3; Day 2 stays native. Summer clears Day 2 rain/sky/storm ambience. Winter presents snow. | Native environment, weather actors, day schedule, selector/held-item lifecycle, restored native state and actual audio command boundaries. |
+| Rod of Seasons MM behavior | Autumn warms EnWood02 canopy/leaf colors and adds bounded native falling leaves while preserving native weather. Spring adds rain on Days 1/3 and preserves native Day 2 rain scheduling; Spring clears snow on all days. Summer clears Day 2 rain/sky/storm ambience. Winter presents snow. | Native environment, weather actors, day schedule, selector/held-item lifecycle, restored native state and actual audio command boundaries. |
 
 Autumn uses existing tree/leaf artwork and native falling-leaf actors. Ambient leaves
 have their own presentation RNG and bounded spawn budget; trunk, bush, collision,
@@ -41,7 +41,7 @@ fix for the invalid actor callback or prove Alt-Tab safe.
 ## Runtime acceptance
 
 Component/sanitizer tests and platform builds are separate from live acceptance.
-Retest the reported pickups with the active mod stack and Alt Assets on/off, long
+Retest the reported pickups across player forms with the active mod stack and Alt Assets on/off, long
 map/compass receipts, all four MM seasons including native Day 2 storm taper and
 Snowhead region changes, and Alt-Tab after the Champion's Tunic award. Install the
 matching game modules and port archives from one candidate build together.

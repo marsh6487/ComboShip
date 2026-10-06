@@ -1857,8 +1857,8 @@ void Environment_DrawSun(PlayState* play) {
 void Environment_DrawSunLensFlare(PlayState* play, EnvironmentContext* envCtx, View* view, GraphicsContext* gfxCtx,
                                   Vec3f vec) {
     if (((play->envCtx.precipitation[PRECIP_RAIN_CUR] == 0) || MMWeather_SeasonClearsRain()) &&
-        (MMWeather_Overcast() == 0.0f) &&
-        !(GET_ACTIVE_CAM(play)->stateFlags & CAM_STATE_UNDERWATER) && (play->skyboxId == SKYBOX_NORMAL_SKY)) {
+        (MMWeather_Overcast() == 0.0f) && !(GET_ACTIVE_CAM(play)->stateFlags & CAM_STATE_UNDERWATER) &&
+        (play->skyboxId == SKYBOX_NORMAL_SKY)) {
         f32 v0 = Math_CosS(CURRENT_TIME - CLOCK_TIME(12, 0));
 
         Environment_DrawLensFlare(play, &play->envCtx, &play->view, play->state.gfxCtx, vec, 370.0f, v0 * 120.0f, 0x190,

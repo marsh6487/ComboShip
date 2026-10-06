@@ -31,6 +31,7 @@ f += '\nextern "C" { PlayState* gPlayState = &Fixture::play; }\n'
 f += 'void* OotAssets_LoadGfxDirect(const char*) { static Gfx flame[1]; return flame; }\n'
 f += '#define Gfx_SetupDL25_Xlu Gfx_SetupDL_25Xlu\n'
 f += '#define MATRIX_FINALIZE_AND_LOAD(p, g) gSPMatrix(p, Matrix_NewMtx(g, (char*)__FILE__, __LINE__), G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH)\n'
+f += 'void MM_DrawNeiGi(const CwItemDrawInfo&, bool shop=false, int mmPickup=0);\n'
 f += mm['DrawOotSlateRuneFlame'] + '\n' + mmgi['MM_DrawNeiGi']
 f += r'''
 int main() {

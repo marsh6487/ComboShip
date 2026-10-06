@@ -3,19 +3,22 @@
 // serialized OPA/XLU asset, independently of the runtime frame-fit catalog.
 const auto receiptPose=FixtureMmReceiptPose();
 assert(std::abs(receiptPose.first-.21f)<.00001f && std::abs(receiptPose.second-51.3f)<.00001f);
-const float height=44.f; // Player_GetHeight's normal human row.
-const float normalizedHeight=.5f*(height+68.f);
-const float cameraAt=height+kMmPickupCamera[0]*.01f*normalizedHeight;
-const float cameraDistance=kMmPickupCamera[1]*.01f*normalizedHeight;
-const float cameraPitch=kMmPickupCamera[2]*NeiGi::Tau/360.f;
-const float cameraTan=std::tan(kMmPickupCamera[3]*NeiGi::Tau/720.f);
+const auto pickupVertices=FixtureMmPickupVertices();
 size_t nativePickupBindings=0;
-for(const auto& f:frames) {
+for(int form:{PLAYER_FORM_HUMAN,PLAYER_FORM_GORON,PLAYER_FORM_ZORA,PLAYER_FORM_DEKU,PLAYER_FORM_FIERCE_DEITY}) {
+ const auto& camera=kMmPickupCamera[form];
+ const float height=camera[0],normalizedHeight=.5f*(height+68.f);
+ const float cameraAt=height+camera[1]*.01f*normalizedHeight;
+ const float cameraDistance=camera[2]*.01f*normalizedHeight;
+ const float cameraPitch=camera[3]*NeiGi::Tau/360.f;
+ const float cameraTan=std::tan(camera[4]*NeiGi::Tau/720.f);
+ const float cameraForward=camera[5];
+ for(const auto& f:frames) {
   Reset();
   const std::string raw=std::string("__OTR__objects/nei_gi_redesign/")+f.slug+"/gi_dl";
   const std::string shell=std::string("__OTR__objects/nei_gi_redesign/")+f.slug+"/gi_xlu_dl";
   files.insert(raw);if(f.xlu)files.insert(shell);
-  FixtureMmReceiptPose();
+  FixtureMmReceiptPose(form);
   Actor receipt{};receipt.id=ACTOR_EN_ITEM00;
   receipt.home.rot.x=CustomItem::CALLED_ACTION|CustomItem::GIVE_ITEM_CUTSCENE;
   CwItemDrawInfo recipe{};
@@ -39,21 +42,64 @@ for(const auto& f:frames) {
   }
   assert(!submitted.empty() && mmShopLegacyDraws==0);
   const auto [s,y]=submitted.front();
-  // Spin extrema include the near side of the model, where perspective raises
-  // the projected tip. A local Y cap alone cannot establish screen containment.
-  for(int spin=0;spin<360;spin+=3)for(float localY:{f.low,f.high}) {
-    const float z=.5f*s*f.width*std::cos(spin*NeiGi::Tau/360.f);
-    const float dy=y+s*localY-cameraAt;
-    const float depth=cameraDistance-dy*std::sin(cameraPitch)-z*std::cos(cameraPitch);
-    const float screenY=(dy*std::cos(cameraPitch)-z*std::sin(cameraPitch))/(depth*cameraTan);
-    if(!(depth>0 && screenY<.9f && screenY>-.9f))
-      std::cerr<<"MM receipt clips: "<<f.slug<<" spin="<<spin<<" projectedY="<<screenY<<"\n";
-    assert(depth>0 && screenY<.9f && screenY>-.9f);
+  // Project each real serialized vertex, preserving its Y/radius relation.
+  // Goron's forward target offset and steep pitch make wide near-side models
+  // clip the bottom even when the previous human envelope contains their Y.
+  for(int spin=0;spin<360;spin+=3) {
+    const float angle=spin*NeiGi::Tau/360.f,c=std::cos(angle),sine=std::sin(angle);
+    for(const auto& point:pickupVertices.at(f.slug)) {
+      const float z=cameraForward+s*(point[0]*sine+point[2]*c);
+      const float dy=y+s*point[1]-cameraAt;
+      const float depth=cameraDistance-dy*std::sin(cameraPitch)-z*std::cos(cameraPitch);
+      const float screenY=(dy*std::cos(cameraPitch)-z*std::sin(cameraPitch))/(depth*cameraTan);
+      const float screenX=s*(point[0]*c-point[2]*sine)/(depth*cameraTan*(4.f/3.f));
+      if(!(depth>0 && screenY<1.f && screenY>-1.f))
+        std::cerr<<"MM receipt clips: form="<<form<<" "<<f.slug<<" spin="<<spin<<" projectedY="<<screenY<<"\n";
+      assert(depth>0 && screenY<1.f && screenY>-1.f);
+      assert(screenX<1.f && screenX>-1.f);
+    }
+    if(form==PLAYER_FORM_HUMAN)for(float localY:{f.low,f.high}) {
+      const float z=.5f*s*f.width*c,dy=y+s*localY-cameraAt;
+      const float depth=cameraDistance-dy*std::sin(cameraPitch)-z*std::cos(cameraPitch);
+      const float screenY=(dy*std::cos(cameraPitch)-z*std::sin(cameraPitch))/(depth*cameraTan);
+      assert(depth>0 && screenY<.9f && screenY>-.9f);
+    }
   }
   assert(stack.empty() && interpolation==0);
+ }
 }
-assert(nativePickupBindings>=50);
-std::cout<<"PASS actual MM CustomItem/DrawResolvedItem receipt route: all 61 authored OPA/XLU envelopes inside native closeup camera through a full spin\n";
+assert(nativePickupBindings>=5*50);
+std::cout<<"PASS actual MM CustomItem/DrawResolvedItem receipt route: all 61 serialized OPA/XLU models inside each of five native form cameras through a full spin; human margin retained\n";
+// The selected graph fitter has its own integer C seam. Exercise both active
+// custom routes so Goron's context cannot collapse back to the human fit.
+for(int form:{PLAYER_FORM_HUMAN,PLAYER_FORM_GORON,PLAYER_FORM_ZORA,PLAYER_FORM_DEKU,PLAYER_FORM_FIERCE_DEITY})
+ for(bool foreignReceipt:{false,true}) {
+  Reset();ownerAlt=alt=true;
+  const char* selected="__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL";
+  files.insert(selected);
+  FixtureMmReceiptPose(form);
+  Actor receipt{};receipt.id=ACTOR_EN_ITEM00;
+  receipt.home.rot.x=CustomItem::CALLED_ACTION|CustomItem::GIVE_ITEM_CUTSCENE;
+  if(foreignReceipt) {
+    selectedCustomLists=true;
+    CwItemDrawInfo owner{};assert(CwAltSwordGi(RG_MASTER_SWORD,&owner));
+    ComboForeignDrawInfoOOT foreign{};foreign.ok=true;
+    foreign.drawKind=owner.drawKind;foreign.count=owner.dlistCount;foreign.xluStart=owner.xluStartIndex;
+    foreign.scale=owner.scale;foreign.neiShimmer=owner.neiShimmer;foreign.itemShimmer=owner.itemShimmer;
+    foreign.opCount=owner.opCount;std::copy_n(owner.ops,owner.opCount,foreign.ops);
+    foreign.dls[0]=NeiResource_Route(owner.dlists[0]);
+    selectedForeignInfoMM=&foreign;
+    Rando::DrawResolvedItem(RI_COMBO_FOREIGN,1,&receipt);
+    selectedForeignInfoMM=nullptr;
+  } else {
+    Rando::DrawResolvedItem(RI_OOT_MASTER_SWORD,1,&receipt);
+  }
+  assert(modelFitContext==(form==PLAYER_FORM_GORON?3:2));
+  assert(Drawn()==std::vector<std::string>{std::string("__OTR__@oot:")+(selected+7)});
+  assert(stack.empty() && interpolation==0);
+ }
+ownerAlt=false;
+std::cout<<"PASS all five active MM native/foreign selected custom receipt routes retain resource fit contexts\n";
 // Lantern's donor-only legacy mesh previously fell through to MM's host loader
 // when a selected mod displaced the authored model. Preserve that exact mesh
 // and its owning manager through the same native receipt renderer.

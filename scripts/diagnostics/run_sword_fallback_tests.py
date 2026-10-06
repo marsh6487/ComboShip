@@ -39,7 +39,7 @@ enum RandoItemId {RI_NONE,RI_OOT_NEI_CANE_OF_SOMARIA,RI_OOT_NEI_CANE_PACCI_FLIP,
  RI_OOT_NEI_CANE_SOMARIA_PLATFORM,RI_OOT_NEI_CANE_PACCI_ULTRAHAND};
 PlayState* gPlayState=&play;
 const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(int){return &recipe;}
-void MM_DrawNeiGi(const CwItemDrawInfo&,bool,bool=false){assert(false);}
+void MM_DrawNeiGi(const CwItemDrawInfo&,bool,int=0){assert(false);}
 void DrawOotNeiUltrahand(){assert(false);}
 void DrawOotNeiCaneOfSomaria(RandoItemId){assert(false);}
 #define Matrix_RotateXF Matrix_RotateX

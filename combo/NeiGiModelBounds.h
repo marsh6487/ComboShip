@@ -196,7 +196,7 @@ bool SelectedModelFit(Load& load, const char* path, float scale, float tilt, int
             bounds.spinningWidth = std::max(bounds.spinningWidth, layerBounds.spinningWidth);
         }
     }
-    out = FrameFit(bounds, scale, presentation == 1, presentation == 2);
+    out = FrameFit(bounds, scale, presentation == 1, presentation >= 2 ? presentation - 1 : 0);
     return true;
 }
 } // namespace NeiGi

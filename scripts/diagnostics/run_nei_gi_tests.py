@@ -86,6 +86,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
     # Every bundled model is checked, including the eight formerly omitted
     # catalog entries and both real-engine owners of the Kokiri GI.
     all_frames = []
+    pickup_vertices = []
     for asset in sorted((ROOT / "soh/assets/custom/objects/nei_gi_redesign").iterdir()):
         if not asset.is_dir():
             continue
@@ -97,10 +98,14 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
         low = min(p[1] for p in vertices)*scale
         high = max(p[1] for p in vertices)*scale
         width = 2*max(math.hypot(p[0],p[2]) for p in vertices)*scale
+        for point in sorted(set(vertices)):
+            pickup_vertices.append(asset.name + ' ' + ' '.join(str(v*scale) for v in point))
         all_frames.append(f'{{"{asset.name}",{low}f,{high}f,{width}f,{float(meta["draw_scale"])}f,'
                           f'{str((asset/"gi_xlu_dl").exists()).lower()}}},')
     assert len(all_frames) == 61
     (Path(tmp) / "nei_all_frame_bounds.inc").write_text("\n".join(all_frames))
+    pickup_vertex_path = Path(tmp) / "mm_pickup_vertices.txt"
+    pickup_vertex_path.write_text("\n".join(pickup_vertices))
     names = ["nei_gi/effect_policy", "nei_gi/presentation"]
     if "--held" in sys.argv:
         names.append("nei_held/presentation")
@@ -163,11 +168,12 @@ void* Combo_ResolveSym(const char* owner, const char* name) {
     return nullptr;
 }
 void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b) { Fixture::flameColors.push_back({r,g,b}); }
-void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,bool mmPickup=false);
+void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,int mmPickup=0);
 #define Gfx_SetupDL25_Opa Gfx_SetupDL_25Opa
 #define Gfx_SetupDL25_Xlu Gfx_SetupDL_25Xlu
 #define Matrix_RotateYF Matrix_RotateY
 #define Matrix_RotateZF Matrix_RotateZ
+#define Matrix_RotateXF Matrix_RotateX
 #define MATRIX_FINALIZE_AND_LOAD(pkt, gfx) gSPMatrix(pkt, Matrix_NewMtx(gfx, (char*)__FILE__, __LINE__), G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH)
 """
             owner_functions = functions((ROOT / "combo/menu/ComboItemDrawOOT.h").read_text())
@@ -247,12 +253,12 @@ const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckId) {ret
 """ + "\n".join("void "+name+"(const ComboForeignDrawInfoOOT*" +
                     (", bool" if name == "MM_DrawForeignCustomGi" else "") +
                     ") {assert(false);}" for name in mm_handlers
-                    if name not in {"MM_DrawForeignMusicNote", "MM_DrawForeignSimple"})
+                    if name not in {"MM_DrawForeignMusicNote", "MM_DrawForeignSimple", "MM_DrawForeignCustomGi"})
             mm_pin = mm_foreign_source[mm_foreign_source.index("#define MM_FOREIGN_PIN_OPA()"):
                                        mm_foreign_source.index("// Restore the segments a handler bound")]
             mm_shop_support += "\n" + mm_pin + "\n" + """
 Gfx* MM_DrawForeignMagicJarDList(Gfx*,const char*,const uint8_t*) {assert(false);return nullptr;}
-""" + functions(mm_foreign_source)["MM_DrawForeignSimple"] + "\n" + functions(mm_foreign_source)["MM_DrawForeignMusicNote"]
+""" + functions(mm_foreign_source)["MM_DrawForeignSimple"] + "\n" + functions(mm_foreign_source)["MM_DrawForeignMusicNote"] + "\n" + functions(mm_foreign_source)["MM_DrawForeignCustomGi"]
             mm_draw_source=(ROOT/"mm/2s2h/Rando/DrawItem.cpp").read_text()
             # The receipt is a CustomItem actor, not Player_DrawGetItemImpl.
             # Execute its actual visible pose statements before the queue's
@@ -266,15 +272,45 @@ Gfx* MM_DrawForeignMagicJarDList(Gfx*,const char*,const uint8_t*) {assert(false)
             queue_source=(ROOT/'mm/2s2h/Rando/MiscBehavior/CheckQueue.cpp').read_text()
             queue_scale=re.search(r'Matrix_Scale\(30\.0f, 30\.0f, 30\.0f, MTXMODE_APPLY\);',queue_source)[0]
             camera_source=(ROOT/'mm/src/code/z_camera_data.inc').read_text()
-            camera_values=re.search(r'CameraModeValue D_801B5338\[\] = \{\s*CAM_FUNCDATA_KEEP4\(([^\n]+)',camera_source)[1].split(',')
-            camera_values=[float(camera_values[i]) for i in (0,1,2,5)]
-            pickup_support=form_enum+'''\nvoid FixtureActorScale(Actor* actor,float s) {actor->scale.x=actor->scale.y=actor->scale.z=s;}
+            # Use Camera_KeepOn4's actual transformation selector and Item0
+            # table, including the forward target offsets omitted by the old
+            # human-only test. Player_GetHeight supplies the upright heights.
+            camera_function=functions((ROOT/'mm/src/code/z_camera.c').read_text())['Camera_KeepOn4']
+            item_modes=re.search(r'CameraMode sCamSetItem0Modes\[\] = \{(.*?)\n\};',camera_source,re.S)[1]
+            mode_rows=dict((mode,row) for row,mode in re.findall(
+                r'CAM_SETTING_MODE_ENTRY\(CAM_FUNC_KEEPON4, (\w+)\),\s*// (\w+)',item_modes))
+            height_function=re.search(r'f32 Player_GetHeight\(Player\* player\) \{.*?\n\}',
+                                      (ROOT/'mm/src/code/z_actor.c').read_text(),re.S)[0]
+            camera_rows=[]
+            forms=re.findall(r'/\* \d+ \*/ (PLAYER_FORM_\w+),',form_enum)
+            for form in forms:
+                selected=re.search(r'case '+form+r':\s*camMode = (\w+);',camera_function)
+                mode=selected[1] if selected else 'CAM_MODE_NORMAL'
+                values=re.search(r'CameraModeValue '+mode_rows[mode]+r'\[\] = \{\s*CAM_FUNCDATA_KEEP4\(([^\n]+)',camera_source)[1].split(',')
+                def number(value):
+                    return float(int(value.strip(),0)) if '0x' in value else float(value)
+                camera_values=[number(values[i]) for i in (0,1,2,5,4)]
+                height_case=re.search(r'case '+form+r':.*?return ([^;]+);',height_function,re.S)
+                height_values=re.findall(r'(\d+)\.0f',height_case[0])
+                camera_rows.append('{'+','.join(str(v)+'f' for v in [float(height_values[-1]),*camera_values])+'}')
+            pickup_support='''\nvoid FixtureActorScale(Actor* actor,float s) {actor->scale.x=actor->scale.y=actor->scale.z=s;}
 std::pair<float,float> FixtureMmReceiptPose(int form=PLAYER_FORM_HUMAN) {
+ fixtureMmForm=form;
  Actor storage{};Actor* actor=&storage;
 '''+pose_body+'''\n Fixture::matrix=actor->scale.x;
  Fixture::matrixY=actor->world.pos.y+actor->shape.yOffset*actor->scale.y;
 '''+queue_scale+'''\n return {Fixture::matrix,Fixture::matrixY};
-}\n'''+f'constexpr float kMmPickupCamera[4]={{{",".join(str(v)+"f" for v in camera_values)}}};\n'
+}\n'''+f'constexpr float kMmPickupCamera[PLAYER_FORM_MAX][6]={{{",".join(camera_rows)}}};\n'+'''
+std::map<std::string,std::vector<std::array<float,3>>> FixtureMmPickupVertices() {
+ std::ifstream input('''+json.dumps(str(pickup_vertex_path))+''');
+ assert(input);
+ std::map<std::string,std::vector<std::array<float,3>>> vertices;
+ std::string slug;std::array<float,3> point{};
+ while(input>>slug>>point[0]>>point[1]>>point[2])vertices[slug].push_back(point);
+ assert(input.eof() && vertices.size()==61);
+ return vertices;
+}
+'''
             # Keep the exact outer item conversion/context/early dispatcher and
             # actual foreign branch; unrelated switch bodies have own fixtures.
             resolved = mm_draw_source[mm_draw_source.index("void Rando::DrawResolvedItem("):]
@@ -286,7 +322,7 @@ std::pair<float,float> FixtureMmReceiptPose(int form=PLAYER_FORM_HUMAN) {
             mm_shop_support += "\n" + mm_foreign_draw + "\n" + resolved + "\n" + draw_item + "\n" + callback + "\n#undef RANDO_SAVE_CHECKS\n"
             flags_source=(ROOT/'mm/2s2h/CustomItem/CustomItem.h').read_text()
             custom_flags='namespace CustomItem {\n'+re.search(r'enum CustomItemFlags.*?\n\};',flags_source,re.S)[0]+'\n}\n'
-            tested_bridge = (custom_flags + shim + route + "\n" + item_enum + "\nbool MM_TryDrawNeiGi(RandoItemId,bool shop=false,bool mmPickup=false);\n#include \"ComboSongDrawMM.h\"\n" + bindings + "\n" + fallback_class + "\n" +
+            tested_bridge = (form_enum + '\nint fixtureMmForm=PLAYER_FORM_HUMAN;\n#define GET_PLAYER_FORM fixtureMmForm\n' + custom_flags + shim + route + "\n" + item_enum + "\nbool MM_TryDrawNeiGi(RandoItemId,bool shop=false,int mmPickup=0);\n#include \"ComboSongDrawMM.h\"\n" + bindings + "\n" + fallback_class + "\n" +
                              renderer + "\n" + fallback + "\n" + foreign_info + "\n" +
                              foreign_shim + foreign_draw + "\n" + foreign_wrapper + "\n" + foreign_shop + "\n" + mm_shop_support)
             candidate = source.read_text().replace("int main() {", tested_bridge + "\n" + pickup_support + "\nint main() {", 1)

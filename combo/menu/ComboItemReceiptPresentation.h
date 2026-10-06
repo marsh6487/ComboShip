@@ -65,13 +65,12 @@ static inline int32_t ComboReceipt_GlyphWidth(uint8_t c, const float* widths, si
 static inline size_t ComboReceipt_CommandSize(uint8_t c, int mm) {
     if (mm)
         return c == 0x14 ? 2 : c >= 0x1B && c <= 0x1F ? 3 : 1;
-    return c == 0x05 || c == 0x06 || c == 0x0C || c == 0x0E || c == 0x13 || c == 0x14 || c == 0x1E
-               ? 2
-               : c == 0x07 || c == 0x11 || c == 0x12 ? 3 : 1;
+    return c == 0x05 || c == 0x06 || c == 0x0C || c == 0x0E || c == 0x13 || c == 0x14 || c == 0x1E ? 2
+           : c == 0x07 || c == 0x11 || c == 0x12                                                   ? 3
+                                                                                                   : 1;
 }
 
-static inline int32_t ComboReceipt_LineWidth(const char* body, size_t size, int mm,
-                                              const float* widths, size_t count) {
+static inline int32_t ComboReceipt_LineWidth(const char* body, size_t size, int mm, const float* widths, size_t count) {
     int32_t width = 0;
     for (size_t i = 0; i < size;) {
         uint8_t c = (uint8_t)body[i];
@@ -169,8 +168,8 @@ static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresent
             const uint8_t br = ++line == 3 ? (line = 0, page) : newline;
             size_t split = space != (size_t)-1 ? space : length;
             uint8_t splitColor = space != (size_t)-1 ? spaceColor : color;
-            const int32_t finishedWidth = ComboReceipt_LineWidth(wrapped + lineStart, split - lineStart,
-                                                                  mm, widths, count);
+            const int32_t finishedWidth =
+                ComboReceipt_LineWidth(wrapped + lineStart, split - lineStart, mm, widths, count);
             if (finishedWidth > pageWidth)
                 pageWidth = finishedWidth;
             if (space == (size_t)-1) {

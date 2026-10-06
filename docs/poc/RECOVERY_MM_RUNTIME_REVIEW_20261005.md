@@ -11,6 +11,7 @@ session; do not redo the completed implementation.
 - PR head branch: `poc/mm-gi-routing-followup-20261003`.
 - Starting head: `c10fd9a5cfd679ddff0c90defb15a06fc88f651a`.
 - Separate recovery branch: `checkpoint/mm-runtime-review-20261005`.
+- Original uploaded checkpoint: `135704f63a7331182ceacaf2867e41ef3c071746`.
 - Local isolated checkout: `/workspace/scratch/484d84d6ce17/comboship-runtime`.
 - Local working branch: `fix/comboship-runtime-review-20261005`.
 
@@ -41,7 +42,8 @@ Final native MM seasons design:
 - Autumn: EnWood02 tree canopy/leaf palettes and bounded native falling leaves;
   preserve native rain, snow and blizzard fog. Selected Alt materials remain
   authored. Ambient leaves use presentation RNG; native roll/drop behavior stays.
-- Spring: add rain on Days 1 and 3; Day 2 follows native weather.
+- Spring: add rain on Days 1 and 3; Day 2 follows native rain scheduling.
+  Spring clears snow on every day.
 - Summer: clear Day 2 rain, sky and native storm ambience.
 - Winter: present native snow particles. Native snow CUR/MAX/fog continue evolving
   underneath; no stale snapshots are restored. Supplemental actors are room scoped
@@ -56,27 +58,49 @@ native fields. The new native fixture covers both defects and Autumn preservatio
 
 ## Evidence and remaining work
 
-Focused checks passed before checkpoint, including actual all-61 MM pickup
-camera geometry, exact six-mesh Din archive, static producer/receiver routes,
-OoT/MM sword fallback, receipt native/foreign endpoints and generated route tables,
-song geometry, existing anklet/full Heart Piece routes, foliage, and crash reporter
-ownership/capture. The independent review has checked these paths.
+Focused checks passed before checkpoint, including the Human MM pickup camera,
+exact six-mesh Din archive, static producer/receiver routes, OoT/MM sword fallback,
+receipt native/foreign endpoints and generated route tables, song geometry,
+existing anklet/full Heart Piece routes, foliage and crash reporter ownership/capture.
+
+The October 6 continuation found that Goron's native Item0 camera needed a
+separate narrower, higher fit. The final correction forwards an integer receipt
+context through authored and selected-resource rendering. The existing C fit seam
+keeps modes 0 world, 1 shop, 2 ordinary MM receipt and 3 Goron receipt; the
+DrawInfo ABI is unchanged. All 61 actual serialized OPA/XLU meshes and all six
+roots/effect layers in the supplied Din pack now pass full-spin X/Y projection in
+all five native form cameras. Native/foreign forwarding and default/shop/OoT
+behavior also pass. These fixtures assume steady, unobstructed native cameras;
+they do not establish live GPU appearance or unknown external Lantern geometry.
+
+Independent review of the final weather and Goron revisions is complete with no
+remaining Critical, Important or Minor findings. The interrupted combined run
+stopped at Wolf packaging because this environment lacked CMake. CMake 3.31.6 was
+restored without changing repository dependency pins, and a fresh complete run
+of all 60 commands finished with exit 0 in 445.8 seconds. The additional receipt
+ASan/UBSan run (`--sanitizers`) finished with exit 0 in 146.0 seconds.
+
+Pinned clang-format 14 passed on all 4,512 files selected by the repository's
+format gate. Whitespace and asset-collision checks pass. Changed source/test
+hashes were retained and checked before publication; no implementation changed
+during the final gate. A fresh read-only review from `c10fd9a5` through the
+checkpoint and final working tree found no Critical, Important or Minor issues.
+The native weather sanitizer fixture is wired into the combined runner.
+
+Final local logs (scratch evidence, not prerequisites for source recovery):
+
+- `/tmp/comboship-bridge-final-combined-gate.log` and its `.status.json`.
+- `/tmp/comboship-bridge-final-receipts-asan-ubsan.log` and its `.status.json`.
+- `/tmp/comboship-bridge-format-check.log`.
 
 Remaining sequence:
 
-1. Wire `tests/seasons/run_native_weather_tests.py --sanitize` into the combined
-   runner. Run the full combined gate on the final formatted tree; at checkpoint
-   this cumulative pass has not yet been completed.
-2. Apply pinned clang-format 14 to remaining changed production files. Most GI,
-   icon, foliage and crash files have already been formatted. Keep parser fixtures
-   source compatible; do not format unrelated source changes.
-3. Complete the independent review of the final weather revision. Resolve actual
-   blockers and recheck only affected scopes, then run whitespace/asset collision
-   checks and the production receipt/weather syntax checks.
-4. Commit the verified final candidate, fast-forward PR 34's existing head under
+1. Commit the verified final candidate, fast-forward PR 34's existing head under
    active authorization, update its title/body, and wait for exact-commit CI.
    Fix build/check failures and provide the matching Windows build artifact.
-5. Live GPU/mod-stack appearance, native season transitions and Alt-Tab remain
+   Advance the recovery branch to the same candidate while retaining the original
+   checkpoint in its history. Preserve concurrent remote changes.
+2. Live GPU/mod-stack appearance, native season transitions and Alt-Tab remain
    user runtime acceptance. Do not equate fixture/build success with that proof.
 
 The Alt-Tab crash is **unresolved**: the supplied report/disassembly narrows it to
@@ -91,6 +115,7 @@ this fixes the invalid pointer or proves focus loss caused it.
 Dependency header paths currently available:
 
 ```sh
+PATH=/tmp/comboship-runtime-deps/cmake/cmake/data/bin:$PATH
 CPATH=/tmp/comboship-runtime-deps/json/single_include:/tmp/comboship-runtime-deps/spdlog/include:/tmp/comboship-runtime-deps/imgui:/tmp/comboship-runtime-deps/thread-pool/include:/tmp/comboship-runtime-deps/stb:/tmp/comboship-runtime-deps/platform-include
 ```
 

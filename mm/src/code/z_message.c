@@ -1147,8 +1147,8 @@ static void Message_ApplyItemReceiptLayout(PlayState* play) {
         sItemReceiptReflowed = true;
     }
     const uint32_t pagePosition = msgCtx->msgBufPos > 11 ? msgCtx->msgBufPos - 11 : 0;
-    sItemReceiptFirstPage = pagePosition >= sItemReceiptLayout.iconPageStart &&
-                            pagePosition <= sItemReceiptLayout.firstPageEnd;
+    sItemReceiptFirstPage =
+        pagePosition >= sItemReceiptLayout.iconPageStart && pagePosition <= sItemReceiptLayout.firstPageEnd;
     msgCtx->textCharScale = 0.75f;
     msgCtx->unk11FFC = 12;
     msgCtx->unk11F18 = 0;

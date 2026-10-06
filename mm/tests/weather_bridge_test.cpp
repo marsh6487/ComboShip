@@ -73,8 +73,8 @@ extern "C" void MMWeatherAudio_Thunder(float) {
 }
 extern "C" void Audio_SetAmbienceChannelIO(u8 channel, u8 port, u8 value) {
     assert(port == CHANNEL_IO_PORT_1);
-    const uint32_t cmd = MMWeather_ResolveAmbienceSeqCmd((SEQCMD_OP_SET_CHANNEL_IO << 28) |
-        (SEQ_PLAYER_AMBIENCE << 24) | (port << 16) | (channel << 8) | value);
+    const uint32_t cmd = MMWeather_ResolveAmbienceSeqCmd(
+        (SEQCMD_OP_SET_CHANNEL_IO << 28) | (SEQ_PLAYER_AMBIENCE << 24) | (port << 16) | (channel << 8) | value);
     value = cmd & 0xFF;
     if (channel == AMBIENCE_CHANNEL_RAIN) {
         nativeRainAmbience = value;

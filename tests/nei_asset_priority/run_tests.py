@@ -63,7 +63,7 @@ int main() {
         enabled = fire;
         float fit[2]{};
         assert(ResourceMgr_GetDinSwordGiProfileForGame("oot", "sword") == (fire ? 2 : 0));
-        for (int presentation = 0; presentation <= 2; ++presentation) {
+        for (int presentation = 0; presentation <= 3; ++presentation) {
             expectedPresentation = presentation;
             assert(ResourceMgr_GetGiModelFitForGame("oot", "sword", 1.0f, 0.0f, presentation, fit) == 1);
             assert(fit[0] == 3.0f && fit[1] == 4.0f);
@@ -75,5 +75,5 @@ int main() {
     subprocess.run(['c++', '-std=c++20', '-Wall', '-Wextra', '-Werror', str(unit), '-o', native_binary], check=True)
     subprocess.run([native_binary], check=True)
 print("PASS: base/Alt mod provenance, exact stock/companion paths, live selection changes")
-print("PASS: native MM GI bridge compiles without SoH macros, follows its menu setting and retains all three framing contexts")
+print("PASS: native MM GI bridge compiles without SoH macros, follows its menu setting and retains all four framing contexts")
 subprocess.run([sys.executable, str(ROOT / 'tests/nei_asset_priority/run_abi_tests.py')], check=True)

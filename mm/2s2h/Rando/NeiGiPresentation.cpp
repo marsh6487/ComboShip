@@ -244,7 +244,7 @@ extern "C" bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh,
 
 void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b);
 
-void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop, bool mmPickup) {
+void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop, int mmPickup) {
     PlayState* play = gPlayState;
     if (play && info.drawKind == CW_DRAW_KIND_SEASON_GI) {
         if (info.neiEffect >= 1 && info.neiEffect <= 4 && info.dlistCount == 0 && info.opCount == 0)
@@ -356,7 +356,7 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
 
 void DrawSong(RandoItemId item);
 
-bool MM_TryDrawNeiGi(RandoItemId item, bool shop, bool mmPickup) {
+bool MM_TryDrawNeiGi(RandoItemId item, bool shop, int mmPickup) {
     if (!gPlayState)
         return false;
     // Resolve song identity before the shared draw table, whose aliases can

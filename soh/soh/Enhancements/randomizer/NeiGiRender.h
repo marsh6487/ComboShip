@@ -28,9 +28,9 @@ void NeiGi_DrawSongOverlay(PlayState* play, int song, const char* owner);
 // swords. The item's identity still controls its optional particles.
 void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int shimmerKind,
                                     bool shimmer, const char* owner, bool shop = false, float tilt = 0.f,
-                                    bool fit = true, bool mmPickup = false);
+                                    bool fit = true, int mmPickup = 0);
 // Owner-aware mesh/effect composition used by both foreign GI directions.
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
                             const float center[3], bool shimmer, const char* owner, bool shop = false,
-                            bool mmPickup = false);
+                            int mmPickup = 0);
 }

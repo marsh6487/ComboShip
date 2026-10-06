@@ -148,12 +148,12 @@ using RandoItemId=int;
 enum {RI_NONE,RI_OOT_NEI_CANE_OF_SOMARIA,RI_OOT_NEI_CANE_PACCI_FLIP,RI_OOT_NEI_CANE_SOMARIA_BLOCK,RI_OOT_NEI_CANE_PACCI_STONE,RI_OOT_NEI_CANE_SOMARIA_PLATFORM,RI_OOT_NEI_CANE_PACCI_ULTRAHAND};
 void DrawOotNeiUltrahand() {assert(0);}
 void DrawOotNeiCaneOfSomaria(int) {assert(0);}
-void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,bool mmPickup=false) {assert(0);}
+void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,int mmPickup=0) {assert(0);}
 void NeiGi_DrawSeasonOverlay(PlayState*,int,const char*) {assert(0 && "mask fixture must not select weather");}
 void NeiGi_DrawSongOverlay(PlayState*,int,const char*) {assert(false && "song dispatch has its own production fixture");}
 // Sword drawing/fitting is tested by the selected-model and foreign sword
 // fixtures. Masks must never enter either branch in this dispatcher.
-void ComboSwordGi_ApplyFit(const char*,const char*,float,float,bool=false) {assert(0 && "mask selected sword fit");}
+void ComboSwordGi_ApplyFit(const char*,const char*,float,float,bool=false,int=0) {assert(0 && "mask selected sword fit");}
 void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*,bool=false) {assert(0 && "mask selected custom sword draw");}
 /* OTHER_DRAW_HANDLERS */
 /* HOST_DISPATCH */

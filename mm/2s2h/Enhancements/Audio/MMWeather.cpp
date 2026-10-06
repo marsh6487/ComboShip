@@ -87,7 +87,7 @@ extern "C" void MMWeather_Update(PlayState* play) {
         // actual IO requests, including En_Test4's stop at a rain target of eight.
         sNativeStormAmbienceMuted = MMWeather_SeasonClearsRain();
         ApplyStormAmbience(sNativeStormAmbienceMuted ? 0 : sNativeRainAmbience,
-                          sNativeStormAmbienceMuted ? 0 : sNativeThunderAmbience);
+                           sNativeStormAmbienceMuted ? 0 : sNativeThunderAmbience);
     }
     const int ticks = play->pauseCtx.state == PAUSE_STATE_OFF ? std::clamp<int>(R_UPDATE_RATE, 1, 3) : 0;
     const bool strike = sState.Step(sSettings, eligible, ticks);

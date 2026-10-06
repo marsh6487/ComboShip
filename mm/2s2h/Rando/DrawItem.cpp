@@ -3011,8 +3011,9 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
 
 #ifdef COMBO_BUILD
     const bool shop = actor && actor->id == ACTOR_EN_GIRLA;
-    const bool mmPickup = actor && actor->id == ACTOR_EN_ITEM00 && (actor->home.rot.x & CustomItem::CALLED_ACTION) &&
-                          (actor->home.rot.x & (CustomItem::GIVE_ITEM_CUTSCENE | CustomItem::GIVE_OVERHEAD));
+    const bool receipt = actor && actor->id == ACTOR_EN_ITEM00 && (actor->home.rot.x & CustomItem::CALLED_ACTION) &&
+                         (actor->home.rot.x & (CustomItem::GIVE_ITEM_CUTSCENE | CustomItem::GIVE_OVERHEAD));
+    const int mmPickup = receipt ? (GET_PLAYER_FORM == PLAYER_FORM_GORON ? 2 : 1) : 0;
     if (MM_TryDrawNeiGi(randoItemId, shop, mmPickup))
         return;
     MM_NeiGiFallbackShimmer fallbackShimmer(randoItemId);

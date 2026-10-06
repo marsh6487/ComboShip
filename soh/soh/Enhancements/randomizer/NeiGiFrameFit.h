@@ -38,7 +38,8 @@ inline const FrameBounds* FindFrameBounds(const char* path) {
 
 // The caller supplies its world/overhead/actor matrix. One correction encloses
 // model, local energy and crystal shell, preserving their relative positions.
-inline ShopFit FrameFit(const FrameBounds& bounds, float drawScale, bool shop, bool mmPickup = false) {
+// mmPickup is 0 for other draws, 1 for ordinary MM receipts, 2 for Goron.
+inline ShopFit FrameFit(const FrameBounds& bounds, float drawScale, bool shop, int mmPickup = 0) {
     ShopFit fit = shop ? bounds.preferredShop : ShopFit{ 1.f, PresentationOffsetY(bounds.effect) };
     const float low = bounds.minimum.y * drawScale, high = bounds.maximum.y * drawScale;
     const float height = high - low, width = bounds.spinningWidth * drawScale;
@@ -46,10 +47,13 @@ inline ShopFit FrameFit(const FrameBounds& bounds, float drawScale, bool shop, b
     // MM receipts use a CustomItem at human Y=51.3 with a .21 caller scale.
     // Its closeup camera sees the near side of a spinning model above the
     // local-Y tip. Leave room for that perspective rise and the upper border.
-    const float bottom = shop ? -22.f : mmPickup ? -44.f : -52.f;
-    const float top = shop ? (feather ? 62.f : 52.f) : mmPickup ? 16.f : 48.f;
+    // Goron's Item0 camera pitches 55 degrees toward a target 12 units ahead
+    // of the player. Its near-side vertices need a narrower, higher envelope.
+    const bool goron = mmPickup == 2;
+    const float bottom = shop ? -22.f : goron ? 36.f : mmPickup ? -44.f : -52.f;
+    const float top = shop ? (feather ? 62.f : 52.f) : goron ? 90.f : mmPickup ? 16.f : 48.f;
     fit.scale = std::min(fit.scale, (top - bottom) / height);
-    fit.scale = std::min(fit.scale, (shop ? 76.f : mmPickup ? 64.f : 104.f) / width);
+    fit.scale = std::min(fit.scale, (shop ? 76.f : goron ? 36.f : mmPickup ? 64.f : 104.f) / width);
     fit.lift = std::clamp(fit.lift, bottom - low * fit.scale, top - high * fit.scale);
     return fit;
 }

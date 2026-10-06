@@ -19,6 +19,7 @@ python3 -B scripts/diagnostics/run_sword_mod_gi_tests.py
 python3 -B scripts/diagnostics/run_sword_fallback_tests.py --sanitize
 python3 -B scripts/diagnostics/run_fairy_bottle_tests.py
 python3 -B tests/seasons/run_tests.py
+python3 -B tests/seasons/run_native_weather_tests.py --sanitize
 python3 -B scripts/diagnostics/run_mm_autumn_foliage_tests.py
 python3 -B tests/seasons/run_rod_lifecycle_tests.py
 python3 -B tests/seasons/run_oot_shop_tests.py

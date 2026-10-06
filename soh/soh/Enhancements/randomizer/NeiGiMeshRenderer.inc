@@ -260,7 +260,7 @@ bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiG
 }
 
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
-                            const float center[3], bool shimmer, const char* owner, bool shop, bool mmPickup) {
+                            const float center[3], bool shimmer, const char* owner, bool shop, int mmPickup) {
     if (!play || !play->state.gfxCtx || !opa || !center || !NeiGi_ValidScale(scale) || !NeiGi_Finite(center[0]) ||
         !NeiGi_Finite(center[1]) || !NeiGi_Finite(center[2]) || effect < 0 || effect > int(Kind::MarioMask))
         return;
@@ -353,7 +353,7 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
 }
 
 void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int shimmerKind,
-                                    bool shimmer, const char* owner, bool shop, float tilt, bool fit, bool mmPickup) {
+                                    bool shimmer, const char* owner, bool shop, float tilt, bool fit, int mmPickup) {
     if (!play || !play->state.gfxCtx || !opa || !NeiGi_ValidScale(scale) || shimmerKind < 0 ||
         shimmerKind > int(Kind::MarioMask))
         return;

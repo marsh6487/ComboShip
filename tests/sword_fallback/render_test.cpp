@@ -131,7 +131,7 @@ extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* owner,const c
   else if(!strncmp(path,"__OTR__",7))path+=7;
   return DinSwordGi::SelectedProfile(path,dinLayers,true,[](const char*){return true;});
 }
-static void ComboSwordGi_ApplyFit(const char*,const char*,float,float,bool,bool=false) {
+static void ComboSwordGi_ApplyFit(const char*,const char*,float,float,bool,int=0) {
   if(fitModel){Matrix_Translate(0,-20,0,MTXMODE_APPLY);Matrix_Scale(.5f,.5f,.5f,MTXMODE_APPLY);}
 }
 static void ComboDrawMaskShimmer(PlayState *, const char *,
