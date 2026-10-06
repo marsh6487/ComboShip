@@ -13,6 +13,7 @@
 #include <spdlog/spdlog.h>
 #include <ship/utils/StringHelper.h>
 #include "location_access.h"
+#include "../../../../combo/NeiGracePolicy.h"
 
 // Extended Inventory for Custom Items (Page 2)
 extern "C" {
@@ -312,7 +313,10 @@ bool Logic::HasItem(RandomizerGet itemName) {
         case RG_DESIRE_SENSOR:
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && Slate_RuneOwned(SLATE_RUNE_SENSOR);
         case RG_HYLIAS_GRACE:
-            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_HYLIAS_GRACE, true);
+            // Gated Grace remains a useful optional spell, but cannot be assumed
+            // by this game's solver before cross-game reward ownership is known.
+            return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && ctx->GetOption(RSK_HYLIAS_GRACE).Is(NEI_GRACE_ON) &&
+                   GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE);
         case RG_ZONAI_PERMAFROST:
             return ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS) && CheckInventory(ITEM_ZONAI_PERMAFROST, true);
         case RG_DEKU_LEAF:

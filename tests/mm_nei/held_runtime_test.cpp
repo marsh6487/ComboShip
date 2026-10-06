@@ -60,7 +60,7 @@ int main() {
   Player p{};
   PlayState play{};
   GraphicsContext gfx{};
-  Gfx opa[8192], xlu[8192];
+  Gfx opa[8192]{}, xlu[8192]{}, overlay[8192]{};
   play.state.gfxCtx = &gfx;
   p.transformation = PLAYER_FORM_HUMAN;
   p.actor.scale = {.01f, .01f, .01f};
@@ -71,6 +71,9 @@ int main() {
   gfx.polyOpa.p = opa;
   gfx.polyOpa.d = opa + 8192;
   gfx.polyXlu.p = xlu;
+  gfx.polyXlu.d = xlu + 8192;
+  gfx.overlay.p = overlay;
+  gfx.overlay.d = overlay + 8192;
   CustomItems_DrawBallChain(&p, &play);
   assert(models.size() == 1 && models[0] == NEI_HELD_PATH("ball"));
 
@@ -80,6 +83,7 @@ int main() {
     nativeDraws = 0;
     gfx.polyOpa.p = opa;
     gfx.polyXlu.p = xlu;
+    gfx.overlay.p = overlay;
     Matrix_Translate(0, 0, 0, MTXMODE_NEW);
   };
   for (int age : {0, 1}) {

@@ -18,6 +18,7 @@ inline void to_json(json& j, const DpadSaveInfo& dpadEquips) {
     j = json{
         { "dpadItems", dpadEquips.dpadItems },
         { "dpadSlots", dpadEquips.dpadSlots },
+        { "extItems", dpadEquips.extItems },
     };
 }
 
@@ -25,6 +26,11 @@ inline void from_json(const json& j, DpadSaveInfo& dpadEquips) {
     for (int i = 0; i < ARRAY_COUNT(dpadEquips.dpadItems); i++) {
         j.at("dpadItems").at(i).get_to(dpadEquips.dpadItems[i]);
         j.at("dpadSlots").at(i).get_to(dpadEquips.dpadSlots[i]);
+        if (j.contains("extItems")) {
+            j.at("extItems").at(i).get_to(dpadEquips.extItems[i]);
+        } else {
+            memset(dpadEquips.extItems[i], 0, sizeof(dpadEquips.extItems[i]));
+        }
     }
 }
 
@@ -47,6 +53,8 @@ inline void from_json(const json& j, ExtButtonSaveInfo& extButtons) {
 inline void to_json(json& j, const NeiSaveData& n) {
     j = json{
         { "ownedItems", n.ownedItems },
+        { "hyliasGraceOwned", n.hyliasGraceOwned },
+        { "phantomHourglassOwned", n.phantomHourglassOwned },
         { "shovelOwned", n.shovelOwned },
         { "dominionOwned", n.dominionOwned },
         { "pokeballOwned", n.pokeballOwned },
@@ -138,6 +146,8 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "sw97LayoutVersion", n.sw97LayoutVersion },
         { "slateMode", n.slateMode },
         { "slateRunesOwned", n.slateRunesOwned },
+        { "season", n.season },
+        { "seasonsOwned", n.seasonsOwned },
         { "ootCanGrab", n.ootCanGrab },
         { "activeCustomForm", n.activeCustomForm },
         { "marioMaskOwned", n.marioMaskOwned },
@@ -160,6 +170,8 @@ inline void from_json(const json& j, NeiSaveData& n) {
         for (int i = 0; i < ARRAY_COUNT(n.ownedItems); i++)
             j.at("ownedItems").at(i).get_to(n.ownedItems[i]);
     }
+    n.hyliasGraceOwned = j.value("hyliasGraceOwned", (uint8_t)0);
+    n.phantomHourglassOwned = j.value("phantomHourglassOwned", (uint8_t)0);
     n.shovelOwned = j.value("shovelOwned", (uint8_t)0);
     n.dominionOwned = j.value("dominionOwned", (uint8_t)0);
     n.pokeballOwned = j.value("pokeballOwned", (uint8_t)0);
@@ -268,6 +280,8 @@ inline void from_json(const json& j, NeiSaveData& n) {
     n.sw97LayoutVersion = j.value("sw97LayoutVersion", (uint8_t)0);
     n.slateMode = j.value("slateMode", (uint8_t)0);
     n.slateRunesOwned = j.value("slateRunesOwned", (uint8_t)0);
+    n.season = j.value("season", (uint8_t)0);
+    n.seasonsOwned = j.value("seasonsOwned", (uint8_t)0);
     n.ootCanGrab = j.value("ootCanGrab", (uint8_t)0);
     n.activeCustomForm = j.value("activeCustomForm", (uint8_t)0);
     n.marioMaskOwned = j.value("marioMaskOwned", (uint8_t)0);
@@ -370,7 +384,13 @@ inline void from_json(const json& j, RandoSaveInfo& rando) {
     j.at("randoEvents").get_to(rando.randoEvents);
     j.at("randoSaveChecks").get_to(rando.randoSaveChecks);
     j.at("finalSeed").get_to(rando.finalSeed);
-    j.at("randoSaveOptions").get_to(rando.randoSaveOptions);
+    // Options are append-only. A pre-option save has a shorter array; missing
+    // entries retain legacy zero values (Grace On), even when reusing a struct.
+    const auto savedOptions = j.at("randoSaveOptions").get<std::vector<u32>>();
+    memset(rando.randoSaveOptions, 0, sizeof(rando.randoSaveOptions));
+    for (size_t i = 0; i < savedOptions.size() && i < ARRAY_COUNT(rando.randoSaveOptions); ++i) {
+        rando.randoSaveOptions[i] = savedOptions[i];
+    }
     j.at("randoStartingItems").get_to(rando.randoStartingItems);
     j.at("foundDungeonKeys").get_to(rando.foundDungeonKeys);
     j.at("foundTriforcePieces").get_to(rando.foundTriforcePieces);

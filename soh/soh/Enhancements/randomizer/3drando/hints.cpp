@@ -815,7 +815,7 @@ static void CreateAltarHint(RandomizerHint hintKey, HintType hintType, std::vect
     std::vector<RandomizerCheck> locs = {};
     std::vector<RandomizerArea> areas = {};
     std::vector<std::string> foreignAreas = {};
-    if (ctx->GetOption(RSK_TOT_ALTAR_HINT)) {
+    if (ctx->GetOption(RSK_TOT_ALTAR_HINT) && !ctx->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION)) {
         // force marking the rewards as hinted if they are at the end of dungeons as they can be inferred
         const bool rewardsInferrable =
             ctx->GetOption(RSK_SHUFFLE_DUNGEON_REWARDS).Is(RO_DUNGEON_REWARDS_END_OF_DUNGEON) ||

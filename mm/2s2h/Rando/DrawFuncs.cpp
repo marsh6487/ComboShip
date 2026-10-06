@@ -144,6 +144,27 @@ extern void DrawEnLight(Color_RGB8 flameColor, Vec3f flameSize) {
     DrawSoulFlame(gPlayState, flameColor, flameSize);
 }
 
+// Use the same phase and draw body as native MM boss souls, scoped for the shared consumer.
+void DrawMmSoulFlame(PlayState* play, const uint8_t color[3], const float scale[3]) {
+    Matrix_Push();
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPComboRMPush(POLY_XLU_DISP++, "mm");
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    CLOSE_DISPS(play->state.gfxCtx);
+    DrawSoulFlame(play, { color[0], color[1], color[2] }, { scale[0], scale[1], scale[2] });
+    Gfx* empty = (Gfx*)GRAPH_ALLOC(play->state.gfxCtx, 8 * sizeof(Gfx));
+    for (int i = 0; i < 8; ++i) {
+        gSPEndDisplayList(&empty[i]);
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPComboRMPop(POLY_XLU_DISP++);
+    gSPSegment(POLY_XLU_DISP++, 8, (uintptr_t)empty);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+    CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Pop();
+}
+
 // MM owns this effect even when OoT owns the surrounding boss skeleton. Match the
 // vanilla OoT quad's bounds: x +/-12, y 2..42 versus MM x +/-400, y -480..1440.
 void DrawOotSoulFlame(PlayState* play, const uint8_t color[3], const float translate[3], const float scale[3]) {
@@ -1218,7 +1239,16 @@ extern void DrawOdolwa() {
     DrawEnLight({ 145, 20, 133 }, { 25.0f, 25.0f, 25.0f });
 }
 
+#ifdef COMBO_BUILD
+extern "C" int32_t ComboDrawNativeTwinmoldSoul();
+#endif
+
 extern void DrawTwinmold() {
+#ifdef COMBO_BUILD
+    if (ComboDrawNativeTwinmoldSoul()) {
+        return;
+    }
+#endif
     SETUP_DRAW(TWINMOLD_HEAD_LIMB_MAX);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
     Matrix_Scale(0.06f, 0.06f, 0.06f, MTXMODE_APPLY);

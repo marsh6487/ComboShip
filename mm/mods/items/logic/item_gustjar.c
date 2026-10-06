@@ -23,6 +23,7 @@
 #include "macros.h"
 #include "functions.h"
 #include "variables.h"
+#include "2s2h/Rando/NeiAirMagicPresentation.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 
 void Player_InitGustJarIA(PlayState* play, Player* this) {
@@ -345,19 +346,18 @@ void GustJar_SpawnBlowVFX(PlayState* play, Vec3f* nozzle, s16 aimYaw, u8 element
 }
 
 // =============================================================================
-// Tornado — the wind cone the jar summons at its mouth
+// Airflow — item-local wind strands at the jar's mouth
 // =============================================================================
 //
-// The cone mesh (object_nei_tornado) is intensity-only, so it comes out in whatever colour we
-// hand it. Only the BLOW is tinted, by the primed element's colour, which is what makes the
+// The private wisp texture is white plus alpha, so the strands take the colour we
+// hand them. Only the BLOW is tinted, by the primed element's colour, which makes the
 // damage type readable at a glance; the SUCK is always plain white, because sucking has no
 // damage type to communicate. The blow cone is also the larger of the two — it's the one that
 // hurts.
 //
-// Update side fills sGustTornado and feeds the ribbons; the draw hook emits the geometry.
+// Update caches the native nozzle, aim, bounds and mode; the draw hook samples the strands.
 // Drawn at the SAME dimensions the gameplay cone uses (item_gustjar.h), so what you see is what
 // grabs and what hits.
-#define GUST_TORNADO_RIBBONS 6
 // Texture scroll per frame, in quarter-texels. The texture is 64 tall = 256 quarter-texels, so
 // the blow traverses the whole cone in ~13 frames and the suck (inward, hence negative) in ~21.
 #define GUST_TORNADO_SCROLL_BLOW 20
@@ -366,6 +366,7 @@ void GustJar_SpawnBlowVFX(PlayState* play, Vec3f* nozzle, s16 aimYaw, u8 element
 static TornadoParams sGustTornado;
 static TornadoRibbons sGustRibbons;
 static u8 sGustTornadoOn = 0;
+static u8 sGustTornadoBlow = 0;
 
 static void GustJar_TornadoUpdate(PlayState* play, Vec3f* nozzle, s16 aimYaw, s16 aimPitch, u8 isBlow) {
     u8 element = (gjElement < GUST_ELEMENT_COUNT) ? gjElement : GUST_ELEMENT_WIND;
@@ -389,8 +390,9 @@ static void GustJar_TornadoUpdate(PlayState* play, Vec3f* nozzle, s16 aimYaw, s1
     // wind — the roll alone reads the same either way.
     Tornado_AdvanceScroll(&sGustTornado, 0, isBlow ? GUST_TORNADO_SCROLL_BLOW : GUST_TORNADO_SCROLL_SUCK);
     sGustTornadoOn = 1;
+    sGustTornadoBlow = isBlow;
 
-    Tornado_RibbonsUpdate(play, &sGustRibbons, &sGustTornado, GUST_TORNADO_RIBBONS);
+    // The item-local sampled strands supply the ribbons without six persistent blure slots.
 }
 
 static void GustJar_TornadoStop(PlayState* play) {
@@ -743,7 +745,11 @@ void CustomItems_DrawGustJar(Player* this, PlayState* play) {
     // cleared at the top of Handle_GustJar, so it can only be set when the jar is actually
     // sucking or blowing this frame.
     if (sGustTornadoOn) {
-        Tornado_Draw(play, &sGustTornado);
+        Vec3f direction;
+        Tornado_GetAxis(sGustTornado.yaw, sGustTornado.pitch, &direction);
+        u32 color = ((u32)sGustTornado.color.r << 16) | ((u32)sGustTornado.color.g << 8) | sGustTornado.color.b;
+        NeiAirMagic_DrawGust(play, &sGustTornado.origin, &direction, sGustTornado.length, sGustTornado.radius,
+                             sGustTornadoBlow, color);
     }
 }
 

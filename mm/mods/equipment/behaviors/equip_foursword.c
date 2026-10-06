@@ -113,6 +113,47 @@ update_prev:
 // Held-sword model, queried from the L_HAND limb override in z_player_lib.c. Returns 1 and fills
 // blade/handle while the Four Sword is equipped and its resources resolved.
 u8 FourSword_HeldSwordDL(void** blade, void** handle) {
+    if (FourSword_IsEquipped() && (NeiEquipment_IsLegacyMod(NEI_EQUIPMENT_FOUR_BLADE, FOURSWORD_BLADE_DL) ||
+                                   NeiEquipment_IsLegacyMod(NEI_EQUIPMENT_FOUR_HILT, FOURSWORD_HILT_DL))) {
+        // Keep the entire legacy pair if either half belongs to a selected mod.
+        // The base counterpart is loaded through its canonical path as well.
+        static Gfx modPair[2][2];
+        const char* paths[2] = { FOURSWORD_BLADE_DL, FOURSWORD_HILT_DL };
+        for (int i = 0; i < 2; ++i) {
+            if (!ResourceMgr_FileExists(paths[i]) &&
+                !(ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(paths[i]))
+#ifdef NEI_EQUIPMENT_MM
+                && !NeiResource_Available(paths[i])
+#endif
+            )
+                return 0;
+#ifdef NEI_EQUIPMENT_MM
+            // MM's existing legacy pair is local; an OoT-only donor mod is explicitly routed.
+            const u8 localAvailable = ResourceMgr_FileExists(paths[i]) ||
+                                      (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(paths[i]));
+            const char* route = (!ResourceMgr_IsModAsset(paths[i]) && (NeiResource_IsMod(paths[i]) || !localAvailable))
+                                    ? NeiResource_Route(paths[i])
+                                    : paths[i];
+#else
+            const char* route = paths[i];
+#endif
+            gDma1p(&modPair[i][0], G_DL_OTR_FILEPATH, route, 0, G_DL_PUSH);
+            gSPEndDisplayList(&modPair[i][1]);
+        }
+        *blade = modPair[0];
+        *handle = modPair[1];
+        return 1;
+    }
+
+    if (FourSword_IsEquipped() && NeiEquipment_HasFourSword()) {
+        Gfx* authoredBlade = NeiEquipment_ModelDL(NEI_EQUIPMENT_FOUR_BLADE, FOURSWORD_BLADE_DL);
+        Gfx* authoredHilt = NeiEquipment_ModelDL(NEI_EQUIPMENT_FOUR_HILT, FOURSWORD_HILT_DL);
+        if (authoredBlade != NULL && authoredHilt != NULL) {
+            *blade = authoredBlade;
+            *handle = authoredHilt;
+            return 1;
+        }
+    }
     static void* sBlade = NULL;
     static void* sHilt = NULL;
     static u8 sTried = 0;

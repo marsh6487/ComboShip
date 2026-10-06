@@ -2115,7 +2115,19 @@ void KaleidoScope_DrawInfoPanel(PlayState* play) {
                 POLY_OPA_DISP = KaleidoScope_QuadTextureIA8(POLY_OPA_DISP, sToEquipTextures[gSaveContext.language],
                                                             D_8082ADD8[gSaveContext.language], 16, 4);
             } else if ((pauseCtx->pageIndex == PAUSE_MAP) && sInDungeonScene) {
-
+                if (PauseItemDesc_GetTextId(pauseCtx->cursorItem[PAUSE_MAP], PAUSE_MAP) != 0) {
+                    static const char* prompts[] = { "C-Up: Dungeon info", "C-Oben: Dungeon-Info",
+                                                     "C-Haut: Infos du donjon", "C-Up: Dungeon info" };
+                    const char* prompt = prompts[gSaveContext.language];
+                    GfxPrint printer;
+                    GfxPrint_Init(&printer);
+                    GfxPrint_Open(&printer, POLY_OPA_DISP);
+                    GfxPrint_SetColor(&printer, 255, 255, 255, pauseCtx->alpha);
+                    GfxPrint_SetPos(&printer, (40 - strlen(prompt)) / 2, 25 - pauseCtx->infoPanelOffsetY / 8);
+                    GfxPrint_Printf(&printer, "%s", prompt);
+                    POLY_OPA_DISP = GfxPrint_Close(&printer);
+                    GfxPrint_Destroy(&printer);
+                }
             } else if ((pauseCtx->pageIndex == PAUSE_QUEST) && (pauseCtx->cursorSlot[PAUSE_QUEST] >= 6) &&
                        (pauseCtx->cursorSlot[PAUSE_QUEST] <= 0x11)) {
                 if (pauseCtx->namedItem != PAUSE_ITEM_NONE) {

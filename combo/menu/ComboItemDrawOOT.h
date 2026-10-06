@@ -18,7 +18,14 @@
 #define COMBO_ITEM_DRAW_OOT_H
 
 #include "ComboItemDrawABI.h"
+#include "ComboLiveCosmetics.h"
 #include "ComboExport.h"
+#include "ComboMaskShimmer.h"
+#include "ComboSongDrawOOT.h"
+#include "ComboItemIconOwnership.h"
+#include "objects/object_gi_melody/object_gi_melody.h"
+#include "ComboItemEffectColors.h"
+#include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include "libultraship/bridge.h" // CVarGetInteger / CVarGetColor24 (cosmetic key/nut colors)
 #include "libultraship/color.h"  // Color_RGB8
 #include "soh/cvar_prefixes.h"
@@ -45,6 +52,8 @@
 #include "objects/object_sst/object_sst.h"
 #include "objects/object_tw/object_tw.h"
 #include "objects/object_ganon2/object_ganon2.h"
+#include "objects/object_bv/object_bv.h"               // Barinade's procedural skeletal model
+#include "objects/object_mo/object_mo.h"               // non-skeletal Morpha core model
 #include "overlays/actors/ovl_Boss_Goma/z_boss_goma.h" // BOSSGOMA_LIMB_EYE / BOSSGOMA_LIMB_IRIS
 
 // Cosmetic tables owned by soh/.../draw.cpp; reused so the recipes can't drift from the real funcs.
@@ -88,6 +97,108 @@ static int32_t CwSimple(CwItemDrawInfo* out, const char* dl, bool xlu, float sca
     out->xluStartIndex = xlu ? 0 : -1;
     out->scale = scale;
     out->dlists[0] = dl;
+    return 1;
+}
+
+// Static custom GI bridge recipes. Paths stay in their asset owner's namespace, so its
+// selected Alt equipment is resolved by that resource manager at deferred submission time.
+extern "C" int32_t OOT_NeiAltAssetsEnabled(void);
+
+static int32_t CwCustomGi(CwItemDrawInfo* out, const char* opa, float scale, const char* xlu = nullptr) {
+    if (!OOT_NeiResourceExists(opa) || (xlu && !OOT_NeiResourceExists(xlu)))
+        return 0; // Never queue a half-present split model or an unresolved archive path.
+    CwSimple(out, opa, false, scale);
+    out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
+    if (xlu) {
+        out->dlists[1] = xlu;
+        out->dlistCount = 2;
+        out->xluStartIndex = 1;
+    }
+    return 1;
+}
+
+static int32_t CwNativeEquipment(CwItemDrawInfo* out, CwOotNativeEquipment equipment) {
+    out->drawKind = CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT;
+    out->opCount = 1;
+    out->ops[0] = { CW_OP_NATIVE_EQUIPMENT, static_cast<float>(equipment), 0, 0, {} };
+    return 1;
+}
+
+static int32_t CwFlameGi(CwItemDrawInfo* out, const char* path, float scale, Color_RGB8 flame) {
+    if (!CwCustomGi(out, path, scale))
+        return 0;
+    out->primColorXlu[0] = flame.r;
+    out->primColorXlu[1] = flame.g;
+    out->primColorXlu[2] = flame.b;
+    out->primColorXlu[3] = 255;
+    return 1;
+}
+
+static int32_t CwNativeMmSword(CwItemDrawInfo* out, const char* body, const char* detail, bool xlu) {
+    CwSimple(out, body, false, 0.0f); // MM's GI-authored meshes need no scale or extra rotation.
+    out->dlists[1] = detail;
+    out->dlistCount = 2;
+    out->xluStartIndex = xlu ? 1 : -1;
+    return 1;
+}
+
+// Only standalone equipment DLs are eligible: never submit a player fist/body as a GI.
+// The concrete award selects the sword family before this cosmetic choice is frozen on grant.
+static int32_t CwAltSwordGi(RandomizerGet rg, CwItemDrawInfo* out) {
+    if (!OOT_NeiAltAssetsEnabled())
+        return 0;
+    const char* selected = nullptr;
+    const char* fire = nullptr;
+    bool trueMaster = false;
+    NeiGi::Kind shimmer = NeiGi::Kind::Neutral;
+    switch (rg) {
+        case RG_KOKIRI_SWORD:
+        case RG_RAZOR_SWORD:
+        case RG_GILDED_SWORD:
+            shimmer = rg == RG_KOKIRI_SWORD  ? NeiGi::Kind::KokiriSword
+                      : rg == RG_RAZOR_SWORD ? NeiGi::Kind::RazorSword
+                                             : NeiGi::Kind::GildedSword;
+            selected = "__OTR__alt/objects/object_custom_equip/gCustomKokiriSwordDL";
+            fire = "__OTR__objects/din_fire_sword/progressive/child/SwordDL";
+            break;
+        case RG_TRUE_MASTER_SWORD:
+            trueMaster = true;
+            shimmer = NeiGi::Kind::SwordAura;
+            [[fallthrough]];
+        case RG_MASTER_SWORD:
+            if (!trueMaster)
+                shimmer = NeiGi::Kind::MasterSword;
+            selected = "__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL";
+            fire = "__OTR__objects/din_fire_sword/progressive/adult/SwordDL";
+            break;
+        case RG_BIGGORON_SWORD:
+        case RG_GREAT_FAIRY_SWORD:
+            shimmer = rg == RG_BIGGORON_SWORD ? NeiGi::Kind::BiggoronSword : NeiGi::Kind::GreatFairySword;
+            selected = "__OTR__alt/objects/object_custom_equip/gCustomLongswordDL";
+            fire = "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
+            break;
+        default:
+            return 0;
+    }
+    if (CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0) && OOT_NeiResourceExists(fire))
+        selected = fire;
+    if (!CwCustomGi(out, selected, .04f))
+        return 0;
+    // This route returns before the authored descriptor. Carry the concrete
+    // award's identity even when selected geometry owns the entire model.
+    out->neiShimmer = static_cast<int32_t>(shimmer) + 1;
+    out->itemShimmer = 1;
+    out->stateDependent = 2;
+    // Standalone equipment follows the native hand-local +X blade axis.
+    // Tilt it into +Y; an X quarter-turn after this would lay it flat in XZ.
+    out->opCount = 1;
+    out->ops[0] = { CW_OP_ROTATE_Z, 18774.682f, 0, 0, {} }; // 1.8 radians
+    if (trueMaster) {
+        out->primColorXlu[0] = 120;
+        out->primColorXlu[1] = 180;
+        out->primColorXlu[2] = 255;
+        out->primColorXlu[3] = 255;
+    }
     return 1;
 }
 
@@ -136,7 +247,8 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
     }
 
     // Boss souls: bespoke func the gid-keyed table can't express (vestigial skull-token gid).
-    // Grayscale-colored flame dl0 + generic skull dl1 (Randomizer_DrawBossSoul).
+    // The non-skeletal Morpha core has its own consumer. Keep canonical owner paths so its
+    // Alt replacement is selected by OoT's RM just like the native DrawMorpha routine.
     if (rg >= RG_GOHMA_SOUL && rg <= RG_GANON_SOUL) {
         static const uint8_t flameColors[9][3] = {
             { 0, 255, 0 },     // Gohma
@@ -152,9 +264,15 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
         int slot = (int)rg - (int)RG_GOHMA_SOUL;
         out->dlistCount = 2;
         out->drawKind = CW_DRAW_KIND_BOSS_SOUL;
-        out->xluStartIndex = 0;                   // both layers XLU
-        out->dlists[0] = gGiBlueFireFlameDL;      // flame (grayscale-tinted)
-        out->dlists[1] = gBossSoulSkullDL;        // generic soul skull
+        out->xluStartIndex = 0;              // both layers XLU
+        out->dlists[0] = gGiBlueFireFlameDL; // flame (grayscale-tinted)
+        out->dlists[1] = gBossSoulSkullDL;   // generic soul skull
+        if (slot == 5 && !CVarGetInteger(CVAR_RANDOMIZER_ENHANCEMENT("SimplerBossSoulModels"), 0)) {
+            out->drawKind = CW_DRAW_KIND_OOT_MORPHA_SOUL;
+            out->dlistCount = 3;
+            out->dlists[1] = gMorphaCoreMembraneDL;
+            out->dlists[2] = gMorphaCoreNucleusDL;
+        }
         uint8_t skullEnv = (slot == 8) ? 0 : 255; // Ganon skull env black, else white
         for (int c = 0; c < 3; c++) {
             out->primColorXlu[c] = flameColors[slot][c];
@@ -202,19 +320,26 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             "gCosmetics.Key.SpiritBoss", "gCosmetics.Key.ShadowBoss", "gCosmetics.Key.GanonsBoss",
         };
         int slot = rg - RG_FOREST_TEMPLE_BOSS_KEY;
+        out->stateDependent = 2;
         out->dlistCount = 2;
         out->xluStartIndex = 1;
-        if (!customKeys) { // vanilla models; the func's optional grayscale recolor is dropped
-            out->drawKind = CW_DRAW_KIND_SIMPLE;
+        if (!customKeys) {
+            out->drawKind = CW_DRAW_KIND_GRAYSCALE_LAYERS;
             out->dlists[0] = gGiBossKeyDL;
             out->dlists[1] = gGiBossKeyGemDL;
+            if (CVarGetInteger((std::string(cvars[slot]) + "Body.Changed").c_str(), 0))
+                CwLayerPrim(out, 0,
+                            CwLiveCosmeticColor((std::string(cvars[slot]) + "Body.Value").c_str(), { 255, 255, 0 }));
+            if (CVarGetInteger((std::string(cvars[slot]) + "Gem.Changed").c_str(), 0))
+                CwLayerPrim(out, 1,
+                            CwLiveCosmeticColor((std::string(cvars[slot]) + "Gem.Value").c_str(), { 255, 0, 0 }));
             return 1;
         }
         out->drawKind = CW_DRAW_KIND_COLOR_LAYERS;
         out->dlists[0] = gBossKeyCustomDL;
         out->dlists[1] = icons[slot];
-        CwLayerEnv(out, 0, CVarGetColor24((std::string(cvars[slot]) + "Body.Value").c_str(), { 255, 255, 0 }));
-        CwLayerEnv(out, 1, CVarGetColor24((std::string(cvars[slot]) + "Gem.Value").c_str(), { 255, 0, 0 }));
+        CwLayerEnv(out, 0, CwLiveCosmeticColor((std::string(cvars[slot]) + "Body.Value").c_str(), { 255, 255, 0 }));
+        CwLayerEnv(out, 1, CwLiveCosmeticColor((std::string(cvars[slot]) + "Gem.Value").c_str(), { 255, 0, 0 }));
         return 1;
     }
 
@@ -227,16 +352,20 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             gSmallKeyIconTreasureChestGameDL,
         };
         int slot = rg - RG_FOREST_TEMPLE_SMALL_KEY;
-        if (!customKeys) { // vanilla key; the func's grayscale recolor is dropped
-            return CwSimple(out, gGiSmallKeyDL, false, 0.0f);
+        out->stateDependent = 2;
+        if (!customKeys) {
+            CwSimple(out, gGiSmallKeyDL, false, 0.0f);
+            out->drawKind = CW_DRAW_KIND_GRAYSCALE_LAYERS;
+            CwLayerPrim(out, 0, CwLiveCosmeticColor(SmallBodyCvarValue[slot], { 255, 255, 255 }));
+            return 1;
         }
         out->drawKind = CW_DRAW_KIND_COLOR_LAYERS;
         out->dlistCount = 2;
         out->xluStartIndex = 1;
         out->dlists[0] = gSmallKeyCustomDL;
         out->dlists[1] = icons[slot];
-        CwLayerEnv(out, 0, CVarGetColor24(SmallBodyCvarValue[slot], { 255, 255, 255 }));
-        CwLayerEnv(out, 1, CVarGetColor24(SmallEmblemCvarValue[slot], SmallEmblemDefaultValue[slot]));
+        CwLayerEnv(out, 0, CwLiveCosmeticColor(SmallBodyCvarValue[slot], { 255, 255, 255 }));
+        CwLayerEnv(out, 1, CwLiveCosmeticColor(SmallEmblemCvarValue[slot], SmallEmblemDefaultValue[slot]));
         return 1;
     }
 
@@ -267,8 +396,12 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             Rando::GANONS_CASTLE, (Rando::DungeonKey)0,
         };
         int slot = rg - RG_FOREST_TEMPLE_KEY_RING;
+        out->stateDependent = 2;
         if (!customKeys) { // the vanilla path stacks five keys via matrix chaining — not portable
-            return CwSimple(out, gGiSmallKeyDL, false, 0.0f);
+            CwSimple(out, gGiSmallKeyDL, false, 0.0f);
+            out->drawKind = CW_DRAW_KIND_GRAYSCALE_LAYERS;
+            CwLayerPrim(out, 0, CwLiveCosmeticColor(SmallBodyCvarValue[slot], { 255, 255, 255 }));
+            return 1;
         }
         bool mq = slotDungeon[slot] != 0 && Rando::Context::GetInstance()->GetDungeon(slotDungeon[slot])->IsMQ();
         out->drawKind = CW_DRAW_KIND_COLOR_LAYERS;
@@ -277,9 +410,9 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
         out->dlists[0] = mq ? keysMQ[slot] : keys[slot];
         out->dlists[1] = gKeyringRingDL;
         out->dlists[2] = icons[slot];
-        CwLayerEnv(out, 0, CVarGetColor24(SmallBodyCvarValue[slot], { 255, 255, 255 }));
-        CwLayerEnv(out, 1, CVarGetColor24(CVAR_COSMETIC("Key.KeyringRing.Value"), { 255, 255, 255 }));
-        CwLayerEnv(out, 2, CVarGetColor24(SmallEmblemCvarValue[slot], SmallEmblemDefaultValue[slot]));
+        CwLayerEnv(out, 0, CwLiveCosmeticColor(SmallBodyCvarValue[slot], { 255, 255, 255 }));
+        CwLayerEnv(out, 1, CwLiveCosmeticColor(CVAR_COSMETIC("Key.KeyringRing.Value"), { 255, 255, 255 }));
+        CwLayerEnv(out, 2, CwLiveCosmeticColor(SmallEmblemCvarValue[slot], SmallEmblemDefaultValue[slot]));
         return 1;
     }
 
@@ -388,6 +521,172 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
     }
 
     switch (rg) {
+        case RG_BOMB_ARROWS:
+            if (!CwCustomGi(out, "__OTR__objects/object_nei_bombarrows/gBombarrowsGiveDL", .5f))
+                return 0;
+            out->opCount = 1;
+            out->ops[0] = { CW_OP_ROTATE_Z, 32768.f, 0, 0, {} };
+            return 1;
+        case RG_EXT_CANE_OF_BYRNA:
+            return CwCustomGi(out, "__OTR__objects/object_somaria/g_byrna_cane_give_dl", .25f);
+        case RG_LANTERN:
+            out->stateDependent = 2;
+            return CwCustomGi(out, "__OTR__objects/object_poh/gPoeLanternDL", .025f);
+        case RG_POKEBALL:
+            out->neiEffect = static_cast<int32_t>(NeiGi::Kind::Pokeball);
+            out->itemShimmer = CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0) != 0;
+            out->stateDependent = 2;
+            return CwCustomGi(out, "__OTR__objects/object_nei_pokeball/ItmPokeBall_opaque_dl", .18f);
+        case RG_MARIO_MASK:
+            out->stateDependent = 2;
+            if (!CwCustomGi(out, "__OTR__objects/object_nei_mario_mask/g_mario_mask_dl", .038f))
+                return 0;
+            out->opCount = 2;
+            out->ops[0] = { CW_OP_ROTATE_X, -16384.0f, 0, 0, {} };
+            out->ops[1] = { CW_OP_NO_CULL, 0, 0, 0, {} };
+            out->itemShimmer = 1;
+            ComboOotMaskShimmerColor(8, out->itemShimmerColor);
+            return 1;
+        case RG_NET:
+            return CwCustomGi(out, "__OTR__objects/object_nei_net/g_net_dl", .55f,
+                              "__OTR__objects/object_nei_net/g_net_xlu_dl");
+        case RG_ULTRASHOT:
+            return CwFlameGi(out, "__OTR__objects/object_gi_hookshot/gGiLongshotDL", .5f, { 255, 240, 130 });
+        case RG_BOTTOMLESS_BOTTLE:
+            if (!CwCustomGi(out, "__OTR__objects/object_gi_bottle/gGiBottleStopperDL", 0.0f,
+                            "__OTR__objects/object_gi_bottle/gGiBottleDL"))
+                return 0;
+            out->primColorXlu[0] = 190;
+            out->primColorXlu[1] = 60;
+            out->primColorXlu[2] = 230;
+            out->primColorXlu[3] = 255;
+            return 1;
+        case RG_EXT_FOUR_SWORD:
+            if (!CwCustomGi(out, "__OTR__objects/object_nei_four_sword/gNeiFourSwordBladeDL", .04f,
+                            "__OTR__objects/object_nei_four_sword/gNeiFourSwordHiltDL"))
+                return 0;
+            out->xluStartIndex = -1; // Both blade and hilt are opaque in the native callback.
+            out->opCount = 1;
+            out->ops[0] = { CW_OP_ROTATE_Z, 18774.682f, 0, 0, {} };
+            return 1;
+        case RG_EXT_SHIELD_OF_IKANA:
+            CwSimple(out, "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL", false, .035f);
+            out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
+            out->opCount = 1;
+            out->ops[0] = { CW_OP_ROTATE_X, 16384.0f, 0, 0, {} };
+            return 1;
+        case RG_CLAWSHOT:
+            return CwSimple(out, "__OTR__@mm:objects/object_gi_hookshot/gGiHookshotDL", false, 0.0f);
+        case RG_EXT_PENDANT_OF_MEMORIES:
+            CwSimple(out, "__OTR__@mm:objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL", false, .9f);
+            out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
+            return 1;
+        case RG_MM_PENDANT_OF_MEMORIES:
+            // The imported row wins the shared English name at catalog boot.
+            // Match MM's native OPA shell then XLU pendant, in MM's namespace.
+            CwSimple(out, "__OTR__@mm:objects/object_gi_reserve_c_01/gGiPendantOfMemoriesEmptyDL", false, 0.f);
+            out->dlists[1] = "__OTR__@mm:objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL";
+            out->dlistCount = 2;
+            out->xluStartIndex = 1;
+            return 1;
+        case RG_EXT_MAGIC_CAPE:
+            if (!CwCustomGi(out, "__OTR__objects/object_nei_magic_cape/gNeiMagicCapeDL", .55f,
+                            "__OTR__objects/object_nei_magic_cape/gNeiMagicCapeWaveDL"))
+                return 0;
+            out->xluStartIndex = -1;
+            out->opCount = 2;
+            out->ops[0] = { CW_OP_FRAME_PAIR, 3.0f, 0, 0, {} };
+            out->ops[1] = { CW_OP_TRANSLATE, 0, 22.0f, 0, {} };
+            return 1;
+        case RG_IRON_KNUCKLE_AXE:
+            return CwNativeEquipment(out, CW_OOT_EQUIP_AXE);
+        case RG_EXT_SPIRIT_BREASTPLATE:
+            return CwNativeEquipment(out, CW_OOT_EQUIP_SPIRIT_TUNIC);
+        case RG_EXT_CHAMPIONS_TUNIC:
+            return CwNativeEquipment(out, CW_OOT_EQUIP_CHAMPIONS_TUNIC);
+        case RG_EXT_WATER_DRAGON_SCALE:
+            return CwNativeEquipment(out, CW_OOT_EQUIP_SAGES_TUNIC);
+        case RG_EXT_PEGASUS_ANKLET:
+            return CwNativeEquipment(out, CW_OOT_EQUIP_PEGASUS_BOOTS);
+        case RG_EXT_TRIDENT:
+            return CwNativeEquipment(out, CW_OOT_EQUIP_TRIDENT);
+        case RG_EXT_CLIMB_BOOTS:
+            return CwNativeEquipment(out, CW_OOT_EQUIP_CLIMB_BOOTS);
+        case RG_EXT_ROC_BOOTS:
+            return CwNativeEquipment(out, CW_OOT_EQUIP_ROC_BOOTS);
+        case RG_WAND_SAND_ROD:
+            return CwCustomGi(out, "__OTR__objects/object_nei_wand_sand_rod/gNeiSandRodDL", .12f,
+                              "__OTR__objects/object_nei_wand_sand_rod/gNeiSandRodXluDL");
+        case RG_WAND_TORNADO_ROD:
+            return CwCustomGi(out, "__OTR__objects/object_nei_wand_tornado_rod/gNeiTornadoRodDL", .12f,
+                              "__OTR__objects/object_nei_wand_tornado_rod/gNeiTornadoRodXluDL");
+        case RG_WAND_WATER_ROD:
+            return CwCustomGi(out, "__OTR__objects/object_nei_wand_water_rod/gNeiWaterRodDL", .12f,
+                              "__OTR__objects/object_nei_wand_water_rod/gNeiWaterRodXluDL");
+        case RG_WAND_METEOR_ROD:
+            return CwCustomGi(out, "__OTR__objects/object_nei_wand_meteor_rod/gNeiMeteorRodDL", .12f,
+                              "__OTR__objects/object_nei_wand_meteor_rod/gNeiMeteorRodXluDL");
+        case RG_WAND_STORM_ROD:
+            return CwCustomGi(out, "__OTR__objects/object_nei_wand_storm_rod/gNeiStormRodDL", .12f,
+                              "__OTR__objects/object_nei_wand_storm_rod/gNeiStormRodXluDL");
+        case RG_WAND_SHADOW_SCEPTER:
+            return CwCustomGi(out, "__OTR__objects/object_nei_wand_shadow_scepter/gNeiShadowScepterDL", .12f,
+                              "__OTR__objects/object_nei_wand_shadow_scepter/gNeiShadowScepterXluDL");
+        case RG_SEASON_SPRING:
+        case RG_SEASON_SUMMER:
+        case RG_SEASON_AUTUMN:
+        case RG_SEASON_WINTER:
+            out->drawKind = CW_DRAW_KIND_SEASON_GI;
+            out->neiEffect = 1 + rg - RG_SEASON_SPRING;
+            out->dlistCount = 0;
+            out->xluStartIndex = -1;
+            return 1;
+        case RG_SHEIKAH_SLATE:
+            return CwCustomGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f);
+        case RG_SLATE_RUNE_BOMB:
+            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f, { 95, 220, 235 });
+        case RG_SLATE_RUNE_MASTER_CYCLE:
+            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f,
+                             { 100, 230, 190 });
+        case RG_SLATE_RUNE_STASIS:
+            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f, { 250, 200, 70 });
+        case RG_SLATE_RUNE_CRYONIS:
+            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f,
+                             { 150, 215, 255 });
+        case RG_DESIRE_SENSOR:
+            return CwFlameGi(out, "__OTR__objects/object_nei_sheikah_slate/gNeiSheikahSlateDL", .35f,
+                             { 200, 130, 255 });
+        case RG_PHANTOM_HOURGLASS:
+            return CwCustomGi(out, "__OTR__objects/object_nei_phantom_hourglass/gNeiPhantomHourglassDL", .35f);
+        case RG_SHADOW_CRYSTAL:
+            return CwCustomGi(out, "__OTR__objects/object_nei_shadow_crystal/gNeiShadowCrystalDL", .35f);
+        case RG_ROD_OF_SEASONS:
+            if (!CwCustomGi(out, "__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL", .35f))
+                return 0;
+            out->drawKind = CW_DRAW_KIND_SEASON_GI;
+            out->neiEffect = 5;
+            return 1;
+        case RG_QUARTZ_OF_MOTION:
+            return CwCustomGi(out, "__OTR__objects/object_nei_quartz_of_motion/gNeiQuartzOfMotionDL", .25f);
+        case RG_EXT_DIVINE_SHIELD:
+            return CwCustomGi(out, "__OTR__objects/object_nei_divine_shield/g_divine_shield_dl", .9f);
+        case RG_EXT_SHEIKAH_SHIELD:
+            return CwCustomGi(out, "__OTR__objects/object_nei_kite_shield/g_kite_shield_dl", .9f);
+        case RG_RAZOR_SWORD:
+            return CwNativeMmSword(out, "__OTR__@mm:objects/object_gi_sword_2/gGiRazorSwordDL",
+                                   "__OTR__@mm:objects/object_gi_sword_2/gGiRazorSwordEmptyDL", false);
+        case RG_GILDED_SWORD:
+            return CwNativeMmSword(out, "__OTR__@mm:objects/object_gi_sword_3/gGiGildedSwordDL",
+                                   "__OTR__@mm:objects/object_gi_sword_3/gGiGildedSwordEmptyDL", false);
+        case RG_GREAT_FAIRY_SWORD:
+            return CwNativeMmSword(out, "__OTR__@mm:objects/object_gi_sword_4/gGiGreatFairysSwordBladeDL",
+                                   "__OTR__@mm:objects/object_gi_sword_4/gGiGreatFairysSwordHiltEmblemDL", true);
+        case RG_TRUE_MASTER_SWORD:
+            out->primColorXlu[0] = 120;
+            out->primColorXlu[1] = 180;
+            out->primColorXlu[2] = 255;
+            out->primColorXlu[3] = 255; // Same independent weapon flame as the native callback.
+            [[fallthrough]];
         case RG_MASTER_SWORD: // seg8 scroll + scale/rotate (Randomizer_DrawMasterSword)
             out->drawKind = CW_DRAW_KIND_MASTER_SWORD;
             out->dlistCount = 1;
@@ -472,17 +771,151 @@ static bool OOT_IsStateDependentDraw(RandomizerGet rg) {
     }
 }
 
+static int32_t OOT_DrawDependency(RandomizerGet rg, const CwItemDrawInfo& info) {
+    if (rg == RG_MM_GREAT_SPIN_ATTACK || (rg >= RG_GOHMA_SOUL && rg <= RG_GANON_SOUL))
+        return 2;
+    if (OOT_IsStateDependentDraw(rg))
+        return 1;
+    if (info.stateDependent)
+        return info.stateDependent;
+    if (info.drawKind == CW_DRAW_KIND_NEI_GI)
+        return 2;
+    // Concrete swords can switch between the redesign and selected weapon pack.
+    // Refresh both recipes; progressive requests still freeze at grant time above.
+    switch (rg) {
+        case RG_KOKIRI_SWORD:
+        case RG_RAZOR_SWORD:
+        case RG_GILDED_SWORD:
+        case RG_MASTER_SWORD:
+        case RG_TRUE_MASTER_SWORD:
+        case RG_BIGGORON_SWORD:
+        case RG_GREAT_FAIRY_SWORD:
+            return 2;
+        default:
+            return 0;
+    }
+}
+
 extern "C" int32_t NeiGi_DescribeEntry(const GetItemEntry* entry, CwItemDrawInfo* out);
+
+extern "C" int32_t OOT_MagicJarUsesCustomAsset(const char* path);
+extern "C" int32_t OOT_ApplyGiHeartCosmetics(const char* path, int32_t piece, uint8_t r, uint8_t g, uint8_t b,
+                                             int32_t changed);
+
+// Match native GetItem_DrawDListWithCosmetics for custom magic jars. The donor
+// owns both the Alt classification and cosmetic value; the host only submits it.
+static void OOT_DescribeMagicJar(s16 drawId, CwItemDrawInfo* out) {
+    if (drawId != GID_MAGIC_SMALL && drawId != GID_MAGIC_LARGE)
+        return;
+    out->drawKind = CW_DRAW_KIND_MAGIC_JAR;
+    out->stateDependent = 2; // live cosmetic edits and Alt toggles must re-resolve
+    const bool changed = CVarGetInteger(CVAR_COSMETIC("Consumable.Magic.Changed"), 0);
+    const Color_RGB8 color =
+        changed ? CwLiveCosmeticColor(CVAR_COSMETIC("Consumable.Magic.Value"), { 0, 200, 0 }) : Color_RGB8{ 0, 200, 0 };
+    out->itemShimmer = 1;
+    out->itemShimmerColor[0] = color.r;
+    out->itemShimmerColor[1] = color.g;
+    out->itemShimmerColor[2] = color.b;
+    out->itemShimmerColor[3] = 255;
+    if (changed && OOT_MagicJarUsesCustomAsset(out->dlists[0])) {
+        out->primColorOpa[0] = color.r;
+        out->primColorOpa[1] = color.g;
+        out->primColorOpa[2] = color.b;
+        out->primColorOpa[3] = 255;
+    }
+}
+
+// Keep the border pass independent. The native body uses the editor's own
+// prim/env patch IDs; selected custom bodies use the accepted grayscale scope.
+static void OOT_DescribeHeartCosmetics(s16 drawId, CwItemDrawInfo* out) {
+    if (drawId != GID_HEART_PIECE && drawId != GID_HEART_CONTAINER)
+        return;
+    out->stateDependent = 2;
+    if (out->dlistCount < 2)
+        return;
+    const Color_RGB8 color = CwLiveCosmeticColor(CVAR_COSMETIC("Consumable.Hearts.Value"), { 255, 70, 50 });
+    const int32_t changed = CVarGetInteger(CVAR_COSMETIC("Consumable.Hearts.Changed"), 0);
+    const int32_t custom =
+        OOT_ApplyGiHeartCosmetics(out->dlists[1], drawId == GID_HEART_PIECE, color.r, color.g, color.b, changed);
+    if (custom && changed) {
+        out->drawKind = CW_DRAW_KIND_GRAYSCALE_LAYERS;
+        CwLayerPrim(out, 1, color);
+    }
+}
+
+static int32_t OOT_FillSongDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
+    const int song = ComboSongForOotItem(rg);
+    if (song < 0)
+        return 0;
+    out->drawKind = CW_DRAW_KIND_SONG_GI;
+    out->neiEffect = song;
+    const char* colorDl = ComboSongOotColorDlist(song);
+    out->dlistCount = 0;
+    if (colorDl)
+        out->dlists[out->dlistCount++] = colorDl;
+    out->dlists[out->dlistCount++] = gGiSongNoteDL;
+    out->xluStartIndex = 0;
+    out->itemShimmer = ComboSongHasOverlay(song);
+    ComboSongShimmerColor(song, out->primColorXlu);
+    std::memcpy(out->itemShimmerColor, out->primColorXlu, 4);
+    return 1;
+}
 
 static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     RandomizerGet actual = RG_NONE;
     GetItemEntry gi = *Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual);
-    if (actual != RG_NONE) {
-        out->resolvedName = Rando::StaticData::RetrieveItem(actual).GetName().english.c_str();
-    }
+    // Self/base tiers also need a frozen name (Cane, Roc, Stone of Agony).
+    // Otherwise a repeat receipt could ask the donor to describe its next tier.
+    out->resolvedName = Rando::StaticData::RetrieveItem(actual != RG_NONE ? actual : rg).GetName().english.c_str();
     // Progressive items resolve to the tier actually owed; classify THAT item's draw func, not the
     // placeholder's (drawItemId carries the resolved RandomizerGet for rando-table entries).
-    RandomizerGet effRg = (gi.tableId == TABLE_RANDOMIZER) ? (RandomizerGet)gi.drawItemId : rg;
+    RandomizerGet effRg = actual != RG_NONE                  ? actual
+                          : (gi.tableId == TABLE_RANDOMIZER) ? (RandomizerGet)gi.drawItemId
+                                                             : rg;
+    switch (effRg) {
+        case RG_KOKIRI_SWORD:
+        case RG_MASTER_SWORD:
+        case RG_BIGGORON_SWORD:
+        case RG_RAZOR_SWORD:
+        case RG_GILDED_SWORD:
+        case RG_TRUE_MASTER_SWORD:
+        case RG_GREAT_FAIRY_SWORD:
+            out->itemShimmer = 1;
+            ComboMaskShimmerColor(0, out->itemShimmerColor);
+            break;
+        default:
+            break;
+    }
+    int statProfile = -1;
+    switch (effRg) {
+        case RG_DEFENSE_UPGRADE:
+            statProfile = 0;
+            break;
+        case RG_SPEED_UPGRADE:
+            statProfile = 1;
+            break;
+        case RG_POWER_UPGRADE:
+            statProfile = 2;
+            break;
+        case RG_MAGIC_STAT_UPGRADE:
+            statProfile = 3;
+            break;
+        case RG_CRAWL_SPEED_UPGRADE:
+            statProfile = 4;
+            break;
+        case RG_CLIMB_SPEED_UPGRADE:
+            statProfile = 5;
+            break;
+        case RG_PUSH_SPEED_UPGRADE:
+            statProfile = 6;
+            break;
+        default:
+            break;
+    }
+    if (ComboRpgShimmerColor(statProfile, out->itemShimmerColor))
+        out->itemShimmer = 1;
+    if (CwAltSwordGi(effRg, out))
+        return 1;
     if (NeiGi_DescribeEntry(&gi, out)) {
         return 1;
     }
@@ -503,8 +936,16 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
         out->neiLegacyCane = 6;
     if (out->neiLegacyCane) {
         out->drawKind = CW_DRAW_KIND_NEI_CANE;
+        out->stateDependent = 2;
+        out->itemShimmer = CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0) != 0;
+        const bool pacci = out->neiLegacyCane == 2 || out->neiLegacyCane == 4 || out->neiLegacyCane == 6;
+        const uint8_t color[4] = { 255, static_cast<uint8_t>(pacci ? 215 : 60), static_cast<uint8_t>(pacci ? 70 : 60),
+                                   255 };
+        std::memcpy(out->itemShimmerColor, color, 4);
         return 1;
     }
+    if (OOT_FillSongDrawInfo(effRg, out))
+        return 1;
     if (gi.drawFunc != nullptr) {
         return 0; // A custom callback has no native gid row; gid 0 would masquerade as a bottle.
     }
@@ -521,6 +962,8 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     out->xluStartIndex = xluStart;
     out->scale = scale;
     out->drawKind = drawKind;
+    if (drawKind == CW_DRAW_KIND_FAIRY)
+        out->stateDependent = 2; // selected generic/fairy-specific shell follows live owner Alt/mod state
     for (int32_t i = 0; i < 4; i++) {
         out->primColorXlu[i] = colors[i];
         out->envColorXlu[i] = colors[4 + i];
@@ -537,7 +980,15 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     GetItem_GetDrawSetupDLs((s32)gi.gid, &setupOpa, &setupXlu);
     out->setupDlOpa = setupOpa;
     out->setupDlXlu = setupXlu;
-    out->itemShimmer = GetItem_GetShimmerColor((s16)gi.gid, out->itemShimmerColor);
+    uint8_t nativeShimmerColor[4] = {};
+    if (GetItem_GetShimmerColor((s16)gi.gid, nativeShimmerColor)) {
+        out->itemShimmer = 1;
+        std::memcpy(out->itemShimmerColor, nativeShimmerColor, sizeof(nativeShimmerColor));
+    }
+    // Apply after native eligibility so dormant-owner rainbow sampling drives
+    // the foreign jar body and its shimmer from the same host-frame hue.
+    OOT_DescribeMagicJar((s16)gi.gid, out);
+    OOT_DescribeHeartCosmetics((s16)gi.gid, out);
     return 1;
 }
 
@@ -580,16 +1031,26 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemDrawInfo(const char* itemName, CwItem
         if (result != 1) {
             return result;
         }
-        out->stateDependent = rg == RG_MM_GREAT_SPIN_ATTACK ? 2 : OOT_IsStateDependentDraw(rg) ? 1 : 0;
+        // Keep appearance-only refreshes live after acquisition freezes progressive tiers.
+        out->stateDependent = OOT_DrawDependency(rg, *out);
         return 1;
     } catch (...) { return 0; }
 }
 
-static int32_t OOT_FillItemIconInfo(RandomizerGet rg, CwItemIconInfo* out) {
+static int32_t OOT_FillItemIconInfo(RandomizerGet rg, CwItemIconInfo* out, bool resolveProgressive = true) {
     RandomizerGet actual = RG_NONE;
-    auto gi = Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual);
+    auto gi = resolveProgressive ? Rando::StaticData::RetrieveItem(rg).GetGIEntry(&actual)
+                                 : Rando::StaticData::RetrieveItem(rg).GetGIEntryUnresolved();
     auto item = Rando::StaticData::RetrieveItem(actual != RG_NONE ? actual : rg);
-    if (item.HasCustomIcon()) {
+    if ((actual != RG_NONE ? actual : rg) == RG_EXT_SHIELD_OF_IKANA) {
+        out->path = COMBO_IKANA_SHIELD_ICON;
+        out->width = out->height = 32;
+    } else if ((actual != RG_NONE ? actual : rg) == RG_DOUBLE_DEFENSE) {
+        // Its grant row deliberately stores RG_DOUBLE_DEFENSE in itemId. That
+        // number is also ITEM_FISH; it is not an inventory-icon index.
+        out->path = static_cast<const char*>(gItemIcons[ITEM_HEART_CONTAINER]);
+        out->width = out->height = 24;
+    } else if (item.HasCustomIcon()) {
         out->path = item.GetCustomIcon();
         out->width = out->height = item.GetCustomIconSize() == ICON_SIZE_24 ? 24 : 32;
     } else if (gi && gi->itemId >= 0 && gi->itemId < ITEM_ROCS_FEATHER_SKIJER) {
@@ -603,6 +1064,7 @@ static int32_t OOT_FillItemIconInfo(RandomizerGet rg, CwItemIconInfo* out) {
         out->width = 16;
         out->height = 24;
         out->isIA8 = 1;
+        out->hasColor = ComboSongShimmerColor(ComboSongForOotItem(actual != RG_NONE ? actual : rg), out->color);
     } else if (std::strstr(out->path, "/gOcarinaBtnIcon")) {
         out->width = out->height = 16;
         out->isIA8 = 1;
@@ -626,6 +1088,21 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemIconInfo(const char* itemName, CwItem
         if (!OTRGlobals::Instance || !OTRGlobals::Instance->gRandomizer || !OTRGlobals::Instance->gRandoContext)
             return CW_DRAW_NOT_READY;
         return OOT_FillItemIconInfo(it->second, out);
+    } catch (...) { return 0; }
+}
+
+// Seed previews deliberately keep the pool identity and its catalog icon.
+// Equipment currently owned by either game must never choose the preview tier.
+extern "C" COMBO_EXPORT int32_t OOT_GetSeedItemIconInfo(const char* itemName, CwItemIconInfo* out) {
+    try {
+        if (!itemName || !out || !OTRGlobals::Instance || !OTRGlobals::Instance->gRandoContext)
+            return 0;
+        *out = CwItemIconInfo{};
+        const auto it = Rando::StaticData::itemNameToEnum.find(itemName);
+        if (it == Rando::StaticData::itemNameToEnum.end() || it->second == RG_NONE || it->second == RG_COMBO_FOREIGN ||
+            it->second == RG_HINT || it->second == RG_SOLD_OUT)
+            return 0;
+        return OOT_FillItemIconInfo(it->second, out, false);
     } catch (...) { return 0; }
 }
 
@@ -687,15 +1164,15 @@ static void OOT_AnimLimbEnv(CwItemAnimDrawInfo* out, int32_t from, int32_t to, u
 
 // ComboShip (issue #86): the boss souls' REAL boss skeletons, described for MM to render through
 // combo/menu/ComboForeignAnim.h. 1:1 with DrawGohma/DrawKingDodongo/... in soh/.../randomizer/
-// draw.cpp. Barinade (per-limb rotation/scale surgery + an XLU post-limb pass) and Morpha (no
-// skeleton at all) are not expressible, so they keep the simplified flame+skull recipe.
+// draw.cpp. Barinade carries its native procedural profile and frozen clip pose.
+// Morpha has no skeleton and is served by its native core display lists through the static ABI.
 static bool OOT_BossSoulUsesSkeleton(RandomizerGet rg) {
     if (rg < RG_GOHMA_SOUL || rg > RG_GANON_SOUL ||
         CVarGetInteger(CVAR_RANDOMIZER_ENHANCEMENT("SimplerBossSoulModels"), 0)) {
         return false;
     }
     int slot = (int)rg - (int)RG_GOHMA_SOUL;
-    return slot != 2 && slot != 5; // Barinade / Morpha
+    return slot != 5; // Morpha uses the static core route.
 }
 
 static int32_t OOT_FillBossSoulAnim(int slot, CwItemAnimDrawInfo* out) {
@@ -723,6 +1200,18 @@ static int32_t OOT_FillBossSoulAnim(int slot, CwItemAnimDrawInfo* out) {
             out->nonFlexSkeleton = 1;
             out->translatePre[1] = -20.0f;
             out->scale = 0.003f;
+            return 1;
+        case 2: // Barinade
+            out->skelPath = gBarinadeBodySkel;
+            out->animPath = gBarinadeBodyAnim;
+            out->limbCount = 64;
+            out->nonFlexSkeleton = 1;
+            out->translatePre[1] = -25.0f;
+            out->scale = 0.03f;
+            out->proceduralProfile = CW_ANIM_PROFILE_OOT_BARINADE;
+            out->proceduralDlPaths[0] = gBarinadeDL_008D70;
+            out->proceduralDlPaths[1] = gBarinadeDL_008BB8;
+            out->freezeLastFrame = 1;
             return 1;
         case 3: // Phantom Ganon
             out->skelPath = gPhantomGanonSkel;
@@ -790,9 +1279,12 @@ static int32_t OOT_FillBossSoulAnim(int slot, CwItemAnimDrawInfo* out) {
             s9->height1 = 64;
             s9->yStep1 = 1;
             s9->yMask1 = 0xFF;
-            CwAnimLimbDL* l = &out->limbDLs[out->limbDLCount++]; // head swap + XLU ice hair (slot 0)
+            // A custom skeleton keeps its authored head. The native ice-hair
+            // post-pass remains active, with its owning Alt model/materials.
+            CwAnimLimbDL* l = &out->limbDLs[out->limbDLCount++];
             l->limbIndex = 21;
-            l->dlPath = gTwinrovaKotakeHeadDL;
+            if (!OOT_MagicJarUsesCustomAsset(gTwinrovaKotakeSkel))
+                l->dlPath = gTwinrovaKotakeHeadDL;
             l->postDlPath = gTwinrovaKotakeIceHairDL;
             l->postXlu = 1;
             return 1;

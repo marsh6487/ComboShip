@@ -3629,8 +3629,17 @@ typedef enum {
     // gate instead of riding RO_SHUFFLE_NEI_ITEMS.
     RO_CROSSOVER_POKEBALL,
     RO_CROSSOVER_MARIO_MASK,
+    RO_HYLIAS_GRACE,
+    RO_HYLIAS_GRACE_REWARDS,
     RO_MAX,
 } RandoOptionId;
+
+// Zero preserves the behavior of seeds created before the separate Grace option.
+typedef enum {
+    RO_GRACE_ON,
+    RO_GRACE_OFF,
+    RO_GRACE_GATED,
+} RandoOptionHyliasGrace;
 
 // Bomb Arrows treatment (Skijer's NEI). Bomb Arrows is the 7th value of the bow's element flag and
 // has no inventory cell; this is only about how you come by it. Values MUST match the

@@ -44,6 +44,36 @@ void WandShadow_Forget(void) {
     sShadowBolt.target = NULL;
 }
 
+// Grounded enemies keep world.pos at their feet. Measure against their native body height so a
+// bolt at +25 can hit that body without increasing its horizontal reach. Unset heights retain
+// the origin-point check; this does not invent a body for actors without one.
+static Actor* WandShadow_FindHit(PlayState* play) {
+    for (u8 i = 0; i < ARRAY_COUNT(sShadowEnemyCats); i++) {
+        Actor* enemy = play->actorCtx.actorLists[sShadowEnemyCats[i]].first;
+
+        while (enemy != NULL) {
+            if (enemy->update != NULL) {
+                f32 dx = sShadowBolt.pos.x - enemy->world.pos.x;
+                f32 dz = sShadowBolt.pos.z - enemy->world.pos.z;
+                f32 bottom = enemy->world.pos.y;
+                f32 top = bottom + ((enemy->colChkInfo.cylHeight > 0) ? enemy->colChkInfo.cylHeight : 0);
+                f32 dy = 0.0f;
+
+                if (sShadowBolt.pos.y < bottom) {
+                    dy = sShadowBolt.pos.y - bottom;
+                } else if (sShadowBolt.pos.y > top) {
+                    dy = sShadowBolt.pos.y - top;
+                }
+                if ((dx * dx + dy * dy + dz * dz) < (SHADOW_HIT_RADIUS * SHADOW_HIT_RADIUS)) {
+                    return enemy;
+                }
+            }
+            enemy = enemy->next;
+        }
+    }
+    return NULL;
+}
+
 // Re-acquired every frame rather than trusted: the enemy the bolt left Link chasing can die, or be
 // killed by something else, before the bolt arrives.
 void WandShadow_Tick(PlayState* play) {
@@ -61,8 +91,7 @@ void WandShadow_Tick(PlayState* play) {
     sShadowBolt.pos.x += Math_SinS(sShadowBolt.yaw) * SHADOW_SPEED;
     sShadowBolt.pos.z += Math_CosS(sShadowBolt.yaw) * SHADOW_SPEED;
 
-    Actor* hit = TargetSelect_FindNearest(play, sShadowEnemyCats, ARRAY_COUNT(sShadowEnemyCats), NULL, &sShadowBolt.pos,
-                                          SHADOW_HIT_RADIUS);
+    Actor* hit = WandShadow_FindHit(play);
     if (hit != NULL) {
         WandShadow_Stun(hit);
         Audio_PlaySoundGeneral(NA_SE_EN_FANTOM_DAMAGE, &sShadowBolt.pos, 4, &gSfxDefaultFreqAndVolScale,

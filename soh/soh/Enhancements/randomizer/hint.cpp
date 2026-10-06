@@ -298,13 +298,20 @@ const HintText Hint::GetHintText(size_t id) const {
 const CustomMessage Hint::GetHintMessage(MessageFormat format, size_t id) const {
     auto ctx = Rando::Context::GetInstance();
     CustomMessage hintText = CustomMessage("");
+    // Combo altar hints can be stored as fully composed MESSAGE text. Rebuild
+    // just the requirements from the saved options when compasses replace the
+    // reward-location paragraphs, so old composed text cannot leak them.
+    const bool compassInformation = ctx->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Is(RO_GENERIC_ON);
+    const HintType messageType = compassInformation && ownKey == RH_ALTAR_CHILD   ? HINT_TYPE_ALTAR_CHILD
+                                 : compassInformation && ownKey == RH_ALTAR_ADULT ? HINT_TYPE_ALTAR_ADULT
+                                                                                  : hintType;
 
     size_t chosenMessage = 0;
     if (hintTextsChosen.size() > id) {
         chosenMessage = id;
     }
 
-    if (hintType == HINT_TYPE_MESSAGE) {
+    if (messageType == HINT_TYPE_MESSAGE) {
         if (id < messages.size()) {
             hintText = messages[id];
 #ifdef COMBO_BUILD
@@ -323,8 +330,8 @@ const CustomMessage Hint::GetHintMessage(MessageFormat format, size_t id) const 
             hintText.SetTextBoxType(TEXTBOX_TYPE_BLUE);
         }
 #endif
-    } else if (hintType == HINT_TYPE_ALTAR_CHILD) {
-        if (ctx->GetOption(RSK_TOT_ALTAR_HINT)) {
+    } else if (messageType == HINT_TYPE_ALTAR_CHILD) {
+        if (ctx->GetOption(RSK_TOT_ALTAR_HINT) && !compassInformation) {
             hintText = StaticData::hintTextTable[RHT_CHILD_ALTAR_STONES].GetHintMessage();
         } else {
             hintText.SetTextBoxType(TEXTBOX_TYPE_BLUE);
@@ -336,8 +343,8 @@ const CustomMessage Hint::GetHintMessage(MessageFormat format, size_t id) const 
         } else {
             hintText += CustomMessage(StaticData::hintTextTable[RHT_CHILD_ALTAR_TEXT_END_DOTCLOSED].GetHintMessage());
         }
-    } else if (hintType == HINT_TYPE_ALTAR_ADULT) {
-        if (ctx->GetOption(RSK_TOT_ALTAR_HINT)) {
+    } else if (messageType == HINT_TYPE_ALTAR_ADULT) {
+        if (ctx->GetOption(RSK_TOT_ALTAR_HINT) && !compassInformation) {
             hintText = StaticData::hintTextTable[RHT_ADULT_ALTAR_MEDALLIONS].GetHintMessage();
         } else {
             hintText.SetTextBoxType(TEXTBOX_TYPE_BLUE);

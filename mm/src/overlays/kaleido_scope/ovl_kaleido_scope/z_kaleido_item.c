@@ -12,6 +12,7 @@
 #include "2s2h/CustomMessage/PauseItemDescriptions.h" // NEI: C-Up descriptions for custom items
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "mods/extended_inventory.h" // NEI: page-aware kaleido (ExtInv_GetInventorySlot/GetSlotItem/GetItemIcon/SwitchPage/Update)
+#include "mods/ext_buttons/ext_buttons.h"
 #include "mods/items/custom_bottles.h"                      // NEI: bottle randomizer wheels A/B (Skijer's NEI)
 #include "archives/icon_item_static/icon_item_static_yar.h" // gABtnSymbolTex + gPausePromptCursorTex (cycle overlay)
 
@@ -59,6 +60,10 @@ static Vtx sCycleAButtonVtx[] = {
 
 s32 KaleidoScope_IsItemCycling(void) {
     return gCurrentItemCyclingSlot != -1;
+}
+
+void KaleidoScope_ResetItemCycling(void) {
+    gCurrentItemCyclingSlot = -1;
 }
 
 void KaleidoScope_HandleItemCycleExtras(PlayState* play, u8 slot, u8 canCycle, u8 leftItem, u8 rightItem,
@@ -500,7 +505,7 @@ static void Cane_KaleidoDraw(PlayState* play) {
 //   47 held the Dominion Rod  -> flag + clear (47 is the Rod of Seasons now)
 //   46 held either tool       -> backfill its flag (flags did not exist before)
 //   44 held the Pokeball      -> flag + clear (44 is the Shadow Crystal now)
-//   41 held Hylia's Grace     -> clear (the item is retired outright)
+//   41 held Grace / hourglass -> preserve and backfill independent ownership
 static void Page2Relayout_Heal(void) {
     NeiSaveData* nei = Nei_Save();
 
@@ -520,9 +525,58 @@ static void Page2Relayout_Heal(void) {
         nei->pokeballOwned = 1;
         ExtInv_SetSlotItem(SLOT_SHADOW_CRYSTAL, ITEM_NONE);
     }
-    if (ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS) == ITEM_HYLIAS_GRACE) {
-        ExtInv_SetSlotItem(SLOT_PHANTOM_HOURGLASS, ITEM_NONE);
+    GraceHourglass_Heal();
+}
+
+// Grace and the hourglass use distinct u16 identities behind one inventory cell.
+#define GRACE_HOURGLASS_KALEIDO_CELL (SLOT_PHANTOM_HOURGLASS - 24)
+
+static void GraceHourglass_KaleidoCycle(PlayState* play, s32 dir) {
+    uint16_t oldItem = ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS);
+    uint16_t newItem = oldItem == ITEM_HYLIAS_GRACE ? EXT_ITEM_PHANTOM_HOURGLASS : ITEM_HYLIAS_GRACE;
+    (void)dir;
+    ExtInv_SetSlotItem(SLOT_PHANTOM_HOURGLASS, newItem);
+    play->pauseCtx.cursorItem[PAUSE_ITEM] = newItem;
+    play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    for (s32 btn = EQUIP_SLOT_C_LEFT; btn <= EQUIP_SLOT_C_RIGHT; ++btn) {
+        if (ExtButton_GetItem(0, btn) == oldItem) {
+            if (newItem > 0xFF) {
+                ExtButton_SetItem(0, btn, newItem);
+            } else {
+                ExtButton_ClearItem(0, btn);
+                BUTTON_ITEM_EQUIP(0, btn) = (u8)newItem;
+            }
+            C_SLOT_EQUIP(0, btn) = newItem > 0xFF ? SLOT_NONE : SLOT_PHANTOM_HOURGLASS + 48;
+            Interface_LoadItemIconImpl(play, (u8)btn);
+        }
     }
+    for (s32 btn = EQUIP_SLOT_D_RIGHT; btn <= EQUIP_SLOT_D_UP; ++btn) {
+        if (ExtButton_GetDpadItem(0, btn) == oldItem) {
+            ExtButton_SetDpadItem(0, btn, newItem);
+            DPAD_SLOT_EQUIP(0, btn) = SLOT_PHANTOM_HOURGLASS + 48;
+            Interface_Dpad_LoadItemIconImpl(play, (u8)btn);
+        }
+    }
+}
+
+static void GraceHourglass_KaleidoHandle(PlayState* play) {
+    u8 canToggle = GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) && GraceHourglass_IsOwned(EXT_ITEM_PHANTOM_HOURGLASS);
+    if (gCurrentItemCyclingSlot == GRACE_HOURGLASS_KALEIDO_CELL &&
+        (!canToggle || play->pauseCtx.cursorSlot[PAUSE_ITEM] != GRACE_HOURGLASS_KALEIDO_CELL)) {
+        KaleidoScope_ResetItemCycling();
+    }
+    KaleidoWheel_Run(play, GRACE_HOURGLASS_KALEIDO_CELL, canToggle, GraceHourglass_KaleidoCycle);
+}
+
+static void GraceHourglass_KaleidoDraw(PlayState* play) {
+    uint16_t current = ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS);
+    uint16_t other = current == ITEM_HYLIAS_GRACE ? EXT_ITEM_PHANTOM_HOURGLASS : ITEM_HYLIAS_GRACE;
+    void* icon = ExtInv_GetItemIcon(other);
+    // Explicit textures retain the hourglass's full-width ID in the byte-based renderer.
+    KaleidoScope_DrawItemCycleExtrasTinted(play, GRACE_HOURGLASS_KALEIDO_CELL,
+                                           GraceHourglass_IsOwned(ITEM_HYLIAS_GRACE) &&
+                                               GraceHourglass_IsOwned(EXT_ITEM_PHANTOM_HOURGLASS),
+                                           ITEM_HYLIAS_GRACE, ITEM_HYLIAS_GRACE, true, icon, icon, NULL, NULL);
 }
 
 static void Shovel_KaleidoHandle(PlayState* play) {
@@ -967,10 +1021,20 @@ static void Wand_KaleidoDraw(PlayState* play) {
 // runes' 24x24 glyphs on each side — the gust-jar "mini icons on top" look.
 #define SLATE_KALEIDO_CELL (SLOT_SHEIKAH_SLATE - 24)
 
+static void Slate_KaleidoSyncTitle(PlayState* play) {
+    static u8 namedRune = 0xFF;
+    u8 rune = Slate_RuneCount() ? Slate_GetRune() : 0xFF;
+    if (play->pauseCtx.namedItem == EXT_ITEM_SHEIKAH_SLATE && namedRune != rune) {
+        play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    }
+    namedRune = rune;
+}
+
 static void Slate_KaleidoHandle(PlayState* play) {
     Input* input = CONTROLLER1(&play->state);
     PauseContext* pauseCtx = &play->pauseCtx;
 
+    Slate_KaleidoSyncTitle(play);
     if (ExtInv_GetSlotItem(SLOT_SHEIKAH_SLATE) == ITEM_NONE) {
         return;
     }
@@ -994,6 +1058,7 @@ static void Slate_KaleidoHandle(PlayState* play) {
         if (dir != 0) {
             Audio_PlaySfx(NA_SE_SY_CURSOR);
             Slate_SetRune(Slate_RuneNeighbor(Slate_GetRune(), dir));
+            pauseCtx->namedItem = PAUSE_ITEM_NONE;
             // Same HUD icon-cache reload as the wand wheel (slate rides an EXT-button marker).
             ExtInv_RefreshButtonIconsForItem(play, EXT_ITEM_SHEIKAH_SLATE);
         }
@@ -1084,7 +1149,8 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
         Wand_KaleidoHandle(play);    // Elemental Wand rod selector (Skijer's NEI)
         Slate_KaleidoHandle(play);   // Sheikah Slate rune selector (Skijer's NEI)
         Lantern_KaleidoHandle(play); // Lantern fire-type selector (ported from SoH)
-        Shovel_KaleidoHandle(play);  // Shovel <-> Dominion Rod (2026-08-06 re-layout)
+        GraceHourglass_KaleidoHandle(play);
+        Shovel_KaleidoHandle(play); // Shovel <-> Dominion Rod (2026-08-06 re-layout)
         return;
     }
     if (page != 0) {
@@ -1234,7 +1300,8 @@ void KaleidoScope_DrawItemCycles(PlayState* play) {
         Wand_KaleidoDraw(play);    // Elemental Wand rod selector (Skijer's NEI)
         Slate_KaleidoDraw(play);   // Sheikah Slate rune selector (Skijer's NEI)
         Lantern_KaleidoDraw(play); // Lantern fire-type selector (ported from SoH)
-        Shovel_KaleidoDraw(play);  // Shovel <-> Dominion Rod (2026-08-06 re-layout)
+        GraceHourglass_KaleidoDraw(play);
+        Shovel_KaleidoDraw(play); // Shovel <-> Dominion Rod (2026-08-06 re-layout)
         return;
     }
     if (page != 0) {
@@ -2365,6 +2432,10 @@ void KaleidoScope_SwapDpadItemToCItem(PlayState* play, EquipSlot cEquipSlot) {
 
 void KaleidoScope_UpdateDpadItemEquip(PlayState* play) {
     PauseContext* pauseCtx = &play->pauseCtx;
+    extern s32 ExtButton_EquipItem(PlayState*, s32, u16, u8);
+    if (ExtButton_EquipItem(play, pauseCtx->equipTargetCBtn, pauseCtx->equipTargetItem, pauseCtx->equipTargetSlot)) {
+        return;
+    }
 
     if (pauseCtx->equipTargetCBtn == PAUSE_EQUIP_D_RIGHT) {
         // Swap if item is already equipped on other Item Buttons.
@@ -3100,8 +3171,12 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
                 return;
             }
 
-            // Equip item onto c buttons
-            if (pauseCtx->equipTargetCBtn == PAUSE_EQUIP_C_LEFT) {
+            // Keep the marker and u16 payload together when moving between C and D-pad.
+            extern s32 ExtButton_EquipItem(PlayState*, s32, u16, u8);
+            if (ExtButton_EquipItem(play, pauseCtx->equipTargetCBtn, pauseCtx->equipTargetItem,
+                                    pauseCtx->equipTargetSlot)) {
+                // Completed by the extended-button store.
+            } else if (pauseCtx->equipTargetCBtn == PAUSE_EQUIP_C_LEFT) {
                 // Swap if item is already equipped on CDown or CRight.
                 if (pauseCtx->equipTargetSlot == C_SLOT_EQUIP(0, EQUIP_SLOT_C_DOWN)) {
                     if ((BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_C_LEFT) & 0xFF) != ITEM_NONE) {

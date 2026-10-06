@@ -1,0 +1,25 @@
+{
+  "resource_count": 9,
+  "vertex_records": 5269,
+  "vertex_loads": 195,
+  "slug": "spirit_breastplate",
+  "name": "Spirit Breastplate",
+  "entry": "objects/nei_gi_redesign/spirit_breastplate/gi_dl",
+  "draw_scale": 1.0,
+  "matrix_scale": 0.040618896484375,
+  "triangles": 5534,
+  "bounds_author": [
+    [
+      -46.8125,
+      -48.375,
+      -15.375
+    ],
+    [
+      46.8125,
+      46.625,
+      15.75
+    ]
+  ],
+  "markers": {},
+  "runtime_tested": false
+}

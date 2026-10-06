@@ -234,11 +234,12 @@ static FnVoidArgless MM_PrepareForTransition = nullptr;
 typedef const char* (*FnDumpData)(void);
 static FnDumpData SOH_DumpRandoStaticData = nullptr;
 static FnDumpData MM_DumpRandoStaticData = nullptr;
-static FnDumpData SOH_DumpRandoSettings = nullptr;   // {cvar:value} OOT rando settings snapshot
-static FnDumpData SOH_DumpSharedItemPairs = nullptr; // NEI shared items: one copy per pair, cross-credited logic
-static FnDumpData SOH_DumpEnabledTricks = nullptr;   // [NameTag,...] the player's enabled OOT tricks
-static FnDumpData MM_DumpRandoSettings = nullptr;    // {cvar:value} MM rando settings snapshot
-static FnDumpData SOH_DumpRandoHintData = nullptr;   // OOT hint text/options schema (cross-hint Phase 2)
+static FnDumpData SOH_DumpRandoSettings = nullptr;     // {cvar:value} OOT rando settings snapshot
+static FnDumpData SOH_DumpSharedItemPairs = nullptr;   // NEI shared items: one copy per pair, cross-credited logic
+static FnDumpData SOH_DumpEnabledTricks = nullptr;     // [NameTag,...] the player's enabled OOT tricks
+static FnDumpData MM_DumpRandoSettings = nullptr;      // {cvar:value} MM rando settings snapshot
+static FnDumpData SOH_DumpRandoHintData = nullptr;     // OOT hint text/options schema (cross-hint Phase 2)
+static FnDumpData SOH_DumpAltarHintMessages = nullptr; // loaded seed's native requirement-only altar text
 // ComboShip: cross-hint Phase 3 — apply combo-generated hints + tell OOT whether this seed has any.
 typedef void (*FnApplyHints)(const char*);
 typedef void (*FnSetHintsPresent)(int);
@@ -252,6 +253,7 @@ typedef void (*FnVoidV)(void);
 typedef void (*FnTakeStr)(const char*);
 typedef void (*FnSetReloadCb)(int (*)(const char*));
 static FnVoidV SOH_PrepRandoContext = nullptr;
+static FnVoidV SOH_NormalizeComboGraceFromMM = nullptr;
 static FnTakeStr SOH_RestoreRandoSettings = nullptr;
 static FnTakeStr MM_RestoreRandoSettings = nullptr;
 static FnTakeStr SOH_SetCheckPrices = nullptr;
@@ -1327,14 +1329,52 @@ static void Combo_PushHintTrackerData(int slot) {
         ComboUI_SetHintTrackerData(-1, "", "");
         return;
     }
-    std::string hints, read;
+    nlohmann::json hintPayload;
+    std::string read;
+    bool compassInformation = false;
     {
         std::lock_guard<std::mutex> lk(g_containerMutex);
         auto& c = LoadOrCreateContainer(slot);
         const auto combo = c.value("combo", nlohmann::json::object());
-        hints = combo.value("rando", nlohmann::json::object()).value("hints", nlohmann::json::object()).dump();
+        const auto seed = combo.value("rando", nlohmann::json::object());
+        hintPayload = seed.value("hints", nlohmann::json::object());
+        compassInformation = seed.value("oot", nlohmann::json::object())
+                                 .value("settings", nlohmann::json::object())
+                                 .value("gRandoSettings.MapsCompassesGiveInformation", 0) != 0;
         read = combo.value("hintsRead", nlohmann::json::object()).dump();
     }
+    if (compassInformation && hintPayload.contains("oot") && hintPayload["oot"].is_array()) {
+        nlohmann::json replacements = nlohmann::json::object();
+        try {
+            if (SOH_DumpAltarHintMessages) {
+                const char* messages = SOH_DumpAltarHintMessages();
+                if (messages && *messages)
+                    replacements = nlohmann::json::parse(messages);
+            }
+        } catch (...) {}
+        auto& hints = hintPayload["oot"];
+        for (auto it = hints.begin(); it != hints.end();) {
+            if (!it->is_object()) {
+                ++it;
+                continue;
+            }
+            const auto key = it->value("checkName", "");
+            if (key != "__ALTAR_CHILD__" && key != "__ALTAR_ADULT__") {
+                ++it;
+                continue;
+            }
+            if (replacements.is_object() && replacements.contains(key) && replacements[key].is_array() &&
+                !replacements[key].empty()) {
+                (*it)["messages"] = replacements[key];
+                ++it;
+            } else {
+                // The authoritative host is not ready. Omit just these entries
+                // until the next push, never reveal their stale reward locations.
+                it = hints.erase(it);
+            }
+        }
+    }
+    const std::string hints = hintPayload.dump();
     ComboUI_SetHintTrackerData(slot, hints.c_str(), read.c_str());
 }
 
@@ -1668,6 +1708,8 @@ static void RunComboFill(std::string inputSeed, ComboRando::ComboGenProgress* pr
         return;
     }
 
+    if (SOH_NormalizeComboGraceFromMM)
+        SOH_NormalizeComboGraceFromMM();
     // Whole-fill retries (GAP-4): each attempt re-derives the master seed, so dumps, confined placement,
     // and prices re-roll deterministically per attempt. Budget lives in CrossWorldRando.h.
     const int kFillAttempts = ComboRando::kFillAttempts;
@@ -2062,6 +2104,8 @@ static int RunComboGenTest(int numSeeds, uint32_t seedBase) {
     const uint32_t sharedMask = SOH_ReadComboSharedCVars ? SOH_ReadComboSharedCVars() : 0;
     int failures = 0;
     auto t0 = std::chrono::steady_clock::now();
+    if (SOH_NormalizeComboGraceFromMM)
+        SOH_NormalizeComboGraceFromMM();
     for (int i = 0; i < numSeeds; ++i) {
         const uint32_t baseSeed = seedBase + static_cast<uint32_t>(i);
         ComboRando::CombinedFillResult result{};
@@ -2169,6 +2213,8 @@ static void RunComboPlaythrough(const std::string& inputSeed) {
     const int startCfg = SOH_ReadComboStartingGameCVar ? SOH_ReadComboStartingGameCVar() : 0;
     const uint32_t sharedMask = SOH_ReadComboSharedCVars ? SOH_ReadComboSharedCVars() : 0;
     bool pinStartOot = false, resolvedMmStart = false; // #135, same fallback as RunComboFill
+    if (SOH_NormalizeComboGraceFromMM)
+        SOH_NormalizeComboGraceFromMM();
     // Mirror RunComboFill including its retries — the player's seed may have come from attempt 1, and
     // validating only attempt 0 would either report "did not generate" or log a world they never got.
     for (int attempt = 0; attempt < ComboRando::kFillAttempts && !fill.success; ++attempt) {
@@ -2598,6 +2644,20 @@ static bool Combo_WriteMMSaveForSlot(int fileNum, const nlohmann::json& seed) {
     if (!MM_InitRandoSaveFile || seed.is_null()) {
         return false;
     }
+    // Save creation AND half-save repair must use this seed's settings, even if
+    // the menu changed after generation. Restore the user's UI on every return.
+    const std::string userSettings = MM_DumpRandoSettings ? MM_DumpRandoSettings() : "";
+    struct RestoreSettings {
+        const std::string& snapshot;
+        ~RestoreSettings() {
+            if (MM_RestoreRandoSettings && !snapshot.empty())
+                MM_RestoreRandoSettings(snapshot.c_str());
+        }
+    } restoreSettings{ userSettings };
+    if (MM_RestoreRandoSettings) {
+        const auto settings = seed.value("mm", nlohmann::json::object()).value("settings", nlohmann::json::object());
+        MM_RestoreRandoSettings(settings.dump().c_str());
+    }
     // OOT's save is current at both call sites (creation on OOT's thread, repair while OOT is parked),
     // so carry its file name into the matching MM save and both files show the player's name.
     unsigned char playerName[8] = { 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E }; // 0x3E = N64 blank glyph
@@ -2981,6 +3041,7 @@ int main(int argc, char** argv) {
     SOH_DumpEnabledTricks = (FnDumpData)GetSym(sohModule, "SOH_DumpEnabledTricks");
     MM_DumpRandoSettings = (FnDumpData)GetSym(mmModule, "MM_DumpRandoSettings");
     SOH_DumpRandoHintData = (FnDumpData)GetSym(sohModule, "SOH_DumpRandoHintData");
+    SOH_DumpAltarHintMessages = (FnDumpData)GetSym(sohModule, "SOH_DumpAltarHintMessages");
     SOH_ApplyComboHints = (FnApplyHints)GetSym(sohModule, "SOH_ApplyComboHints");
     SOH_SetComboHintsPresent = (FnSetHintsPresent)GetSym(sohModule, "SOH_SetComboHintsPresent");
     SOH_FireGenerationCompleteHooks = (FnVoidArgless)GetSym(sohModule, "SOH_FireGenerationCompleteHooks");
@@ -2988,6 +3049,7 @@ int main(int argc, char** argv) {
     SOH_SetComboHintRevealCb = (FnSetHintRevealOot)GetSym(sohModule, "SOH_SetComboHintRevealCb");
     MM_SetComboHintRevealCb = (FnSetHintRevealMm)GetSym(mmModule, "MM_SetComboHintRevealCb");
     SOH_PrepRandoContext = (FnVoidV)GetSym(sohModule, "SOH_PrepRandoContext");
+    SOH_NormalizeComboGraceFromMM = (FnVoidV)GetSym(sohModule, "SOH_NormalizeComboGraceFromMM");
     SOH_RestoreRandoSettings = (FnTakeStr)GetSym(sohModule, "SOH_RestoreRandoSettings");
     MM_RestoreRandoSettings = (FnTakeStr)GetSym(mmModule, "MM_RestoreRandoSettings");
     SOH_SetCheckPrices = (FnTakeStr)GetSym(sohModule, "SOH_SetCheckPrices");

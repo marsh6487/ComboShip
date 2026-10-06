@@ -1316,6 +1316,28 @@ static void DrawItemPoolTab() {
         NeiRando_EnableCrossover();
     }
     if (CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_NEI_ITEMS].cvar, RO_GENERIC_OFF)) {
+        static std::unordered_map<int32_t, const char*> graceOptions = {
+            { RO_GRACE_ON, "On" },
+            { RO_GRACE_OFF, "Off" },
+            { RO_GRACE_GATED, "Gated" },
+        };
+        // Combo's worker can retry both source pools. Hold this shared policy
+        // stable until generation completes, including when general sync is Off.
+        ImGui::BeginDisabled(CVarGetInteger("gGeneral.RandoGenerating", 0) != 0);
+        UIWidgets::CVarCombobox(
+            "Hylia's Grace", Rando::StaticData::Options[RO_HYLIAS_GRACE].cvar, &graceOptions,
+            UIWidgets::ComboboxOptions()
+                .DefaultIndex(RO_GRACE_OFF)
+                .Tooltip("On: include fairy flight in the seed. Off: exclude it.\n"
+                         "Gated: include it, but require the selected number of collected dungeon rewards to cast.\n"
+                         "Counts OoT stones/medallions and MM boss remains; magic is still required.\n"
+                         "The MM reachability solver does not use fairy flight."));
+        if (CVarGetInteger(Rando::StaticData::Options[RO_HYLIAS_GRACE].cvar, RO_GRACE_OFF) == RO_GRACE_GATED) {
+            UIWidgets::CVarSliderInt("Grace Dungeon Rewards Required",
+                                     Rando::StaticData::Options[RO_HYLIAS_GRACE_REWARDS].cvar,
+                                     UIWidgets::IntSliderOptions().Min(0).Max(13).DefaultValue(4));
+        }
+        ImGui::EndDisabled();
         // Bomb Arrows have no inventory slot any more — they are the last entry of the bow's
         // element wheel, so this is purely about how you come by them. The seed-locked value mirrors
         // into gMods.BombArrows.Mode because the in-game grant logic runs outside seeds too.

@@ -15,6 +15,7 @@ extern "C" {
 #include "overlays/actors/ovl_En_Trt/z_en_trt.h"
 
 void EnGirlA_Update2(EnGirlA* enGirlA, PlayState* play);
+void EnGirlA_InitialUpdate(EnGirlA* enGirlA, PlayState* play);
 void EnGirlA_DoNothing(EnGirlA* enGirlA, PlayState* play);
 void EnGirlA_SetupAction(EnGirlA* enGirlA, EnGirlAActionFunc action);
 }
@@ -29,6 +30,9 @@ static const std::vector<std::string> flavorTexts = {
 };
 
 bool CanBePurchased(RandoSaveCheck randoSaveCheck, RandoCheckId randoCheckId) {
+    if (randoSaveCheck.obtained) {
+        return false; // the randomized check is permanent; restock uses the original shop entry
+    }
     RandoItemId randoItemId = Rando::ConvertItem(randoSaveCheck.randoItemId, randoCheckId);
     return Rando::IsItemObtainable(randoItemId, randoCheckId) &&
            !(randoItemId >= RI_RUPEE_BLUE && randoItemId <= RI_RUPEE_SILVER &&
@@ -55,6 +59,14 @@ void EnGirlA_RandoRestock(PlayState* play, EnGirlA* enGirlA) {
     auto randoSaveCheck = RANDO_SAVE_CHECKS[enGirlA->actor.world.rot.z];
     RandoCheckId randoCheckId = (RandoCheckId)enGirlA->actor.world.rot.z;
 
+    if (randoSaveCheck.obtained) {
+        // params and objectSlot still describe the shelf's original native stock. Restore all
+        // native callbacks, model, text and price together after the purchase finishes.
+        enGirlA->actor.world.rot.z = RC_UNKNOWN;
+        enGirlA->mainActionFunc = EnGirlA_InitialUpdate;
+        EnGirlA_InitialUpdate(enGirlA, play);
+        return;
+    }
     if (CanBePurchased(randoSaveCheck, randoCheckId)) {
         enGirlA->isOutOfStock = false;
         enGirlA->actor.draw = EnGirlA_RandoDrawFunc;
@@ -78,6 +90,9 @@ s32 EnGirlA_RandoCanBuyFunc(PlayState* play, EnGirlA* enGirlA) {
 
 void EnGirlA_RandoBuyFunc(PlayState* play, EnGirlA* enGirlA) {
     auto& randoSaveCheck = RANDO_SAVE_CHECKS[enGirlA->actor.world.rot.z];
+    if (randoSaveCheck.obtained) {
+        return; // a stale callback cannot charge or deliver the same randomized check twice
+    }
     RandoCheckId randoCheckId = (RandoCheckId)enGirlA->actor.world.rot.z;
     RandoItemId randoItemId = Rando::ConvertItem(randoSaveCheck.randoItemId, randoCheckId);
 #ifdef COMBO_BUILD
@@ -152,6 +167,9 @@ void EnGirlA_RandoInit(EnGirlA* enGirlA, PlayState* play) {
 void renameStolenBombBag(u16* textId, bool* loadFromMessageTable) {
     RandoCheckId randoCheckId = RC_BOMB_SHOP_ITEM_04_OR_CURIOSITY_SHOP_ITEM;
     auto randoSaveCheck = RANDO_SAVE_CHECKS[randoCheckId];
+    if (randoSaveCheck.obtained) {
+        return;
+    }
     auto randoStaticItem = Rando::StaticData::Items[randoSaveCheck.randoItemId];
     auto entry = CustomMessage::LoadVanillaMessageTableEntry(*textId);
     entry.msg = "Tonight's special, stolen from the Bomb Shop: %r{{itemName}}%w. Check it out!\x19\xA8";
@@ -165,6 +183,9 @@ void renameStolenBombBag(u16* textId, bool* loadFromMessageTable) {
 void renameSpecialBargain(u16* textId, bool* loadFromMessageTable) {
     RandoCheckId randoCheckId = RC_CURIOSITY_SHOP_SPECIAL_ITEM;
     auto randoSaveCheck = RANDO_SAVE_CHECKS[randoCheckId];
+    if (randoSaveCheck.obtained) {
+        return;
+    }
     auto randoStaticItem = Rando::StaticData::Items[randoSaveCheck.randoItemId];
     auto entry = CustomMessage::LoadVanillaMessageTableEntry(*textId);
     entry.msg = "Tonight's bargain: %r{{itemName}}%w. Check it out!\x19\xA8";
@@ -311,7 +332,8 @@ void Rando::ActorBehavior::InitEnGirlABehavior() {
         EnGirlA* enGirlA = (EnGirlA*)actor;
 
         RandoCheckId randoCheckId = IdentifyShopItem(actor);
-        if (randoCheckId != RC_UNKNOWN && RANDO_SAVE_CHECKS[randoCheckId].shuffled) {
+        if (randoCheckId != RC_UNKNOWN && RANDO_SAVE_CHECKS[randoCheckId].shuffled &&
+            !RANDO_SAVE_CHECKS[randoCheckId].obtained) {
             enGirlA->actor.world.rot.z = randoCheckId;
             enGirlA->mainActionFunc = EnGirlA_RandoInit;
         }

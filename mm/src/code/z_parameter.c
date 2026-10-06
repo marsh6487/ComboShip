@@ -32,6 +32,7 @@ extern void FleetPicto_OnPhotoDiscarded(void);
 #include "overlays/actors/ovl_En_Elf/z_en_elf.h"
 #include <string.h>
 #include "2s2h/BenGui/HudEditor.h"
+#include "2s2h/Rando/RupeeCounterDigits.h"
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "2s2h_assets.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -4134,7 +4135,8 @@ void Interface_Dpad_LoadItemIconImpl(PlayState* play, u8 btn) {
     // at DPAD_BUTTON(btn) + EQUIP_SLOT_MAX; the D-pad HUD draw already sizes 24x24 quest icons at 24).
     {
         extern void* ExtInv_GetItemIcon(unsigned short itemId);
-        u8 it = DPAD_GET_CUR_FORM_BTN_ITEM(btn);
+        extern u16 ExtButton_GetDpadItem(s32 form, s32 btn);
+        u16 it = ExtButton_GetDpadItem(0, btn);
         void* neiIcon = ExtInv_GetItemIcon(it);
         interfaceCtx->iconItemSegment[DPAD_BUTTON(btn) + EQUIP_SLOT_MAX] = neiIcon ? (TexturePtr)neiIcon
                                                                            : (it < ARRAY_COUNT(gItemIcons))
@@ -6306,7 +6308,8 @@ void Interface_Dpad_DrawItemIconTexture(PlayState* play, TexturePtr texture, s16
     // Interface_DrawItemIconTexture; loading them as 32x32 shows garbage.
     extern uint8_t ExtInv_GetItemIconSize(unsigned short itemId);
     extern void* ExtInv_GetItemIcon(unsigned short itemId);
-    u8 dpadBtnItem = DPAD_GET_CUR_FORM_BTN_ITEM(button);
+    extern u16 ExtButton_GetDpadItem(s32 form, s32 btn);
+    u16 dpadBtnItem = ExtButton_GetDpadItem(0, button);
     s16 texSize = 32;
     s16 texScale = sDpadItemIconDD[button];
 
@@ -9442,10 +9445,6 @@ void Interface_DrawMinigameIcons(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-s16 sRupeeDigitsFirst[] = { 1, 0, 0, 0 };
-
-s16 sRupeeDigitsCount[] = { 2, 3, 3, 0 };
-
 Color_RGB16 sRupeeCounterIconPrimColors[] = {
     { 200, 255, 100 },
     { 170, 170, 255 },
@@ -9502,7 +9501,7 @@ void Interface_Draw(PlayState* play) {
     s16 sp2C8;
     PauseContext* pauseCtx = &play->pauseCtx;
     f32 minigameCountdownScale;
-    s16 counterDigits[4];
+    s16 counterDigits[RUPEE_COUNTER_MAX_DIGITS];
     s16 magicAlpha;
 
     OPEN_DISPS(play->state.gfxCtx);
@@ -9816,25 +9815,9 @@ void Interface_Draw(PlayState* play) {
                           PRIMITIVE, 0);
 
         if (GameInteractor_Should(VB_DRAW_RUPEE_COUNTER, true)) {
-            counterDigits[0] = counterDigits[1] = 0;
-            counterDigits[2] = gSaveContext.save.saveInfo.playerData.rupees;
-
-            if ((counterDigits[2] > 9999) || (counterDigits[2] < 0)) {
-                counterDigits[2] &= 0xDDD;
-            }
-
-            while (counterDigits[2] >= 100) {
-                counterDigits[0]++;
-                counterDigits[2] -= 100;
-            }
-
-            while (counterDigits[2] >= 10) {
-                counterDigits[1]++;
-                counterDigits[2] -= 10;
-            }
-
-            sp2CC = sRupeeDigitsFirst[CUR_UPG_VALUE(UPG_WALLET)];
-            sp2C8 = sRupeeDigitsCount[CUR_UPG_VALUE(UPG_WALLET)];
+            sp2CC = 0;
+            sp2C8 = RupeeCounter_BuildDigits(gSaveContext.save.saveInfo.playerData.rupees,
+                                             CUR_UPG_VALUE(UPG_WALLET) == 0 ? 2 : 3, counterDigits);
 
             magicAlpha = interfaceCtx->magicAlpha;
             if (magicAlpha > 180) {

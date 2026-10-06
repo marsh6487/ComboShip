@@ -3,13 +3,13 @@
  *
  * Controls:
  *   C Button:     Activate (consumes 24 magic)
- *   A (flying):   Ascend (drains timer faster)
+ *   A (flying):   Ascend
  *   B (flying):   Descend
- *   L (flying):   Sprint (drains timer faster)
+ *   L (flying):   Sprint
  *   Analog:       Flight direction
  *
  * Features:
- *   - Transform into fairy for 10 seconds
+ *   - Toggle fairy flight until the item button is pressed again
  *   - Free flight ignores collision
  *   - Green fairy glow visual effect
  *   - Farore's Wind style warp animation
@@ -31,9 +31,13 @@
 #include "objects/gameplay_keep/gameplay_keep.h"
 
 extern void Player_Draw(Actor* thisx, PlayState* play);
+extern int HGrace_CanActivateMM(void);
+extern void func_808354A4(PlayState* play, s32 exitIndex, s32 floorEffect2);
 
 static s8 sHGracePrevInvinc = 0;
 static s32 sHGPhaseEnd = 0; // Absolute hgTimer value when current animation phase ends
+static u8 sHGraceRoomPending;
+static s8 sHGraceForm = -1;
 
 // Saved fairy position — used to undo displacement from the normal collision
 // response (Actor_UpdateBgCheckInfo / OC) that runs after our code each frame.
@@ -203,7 +207,7 @@ static void HGrace_Stop(Player* p, PlayState* play) {
     p->cylinder.base.ocFlags1 |= OC1_ON;
 
     // Reset camera
-    func_8005B1A4(Play_GetCamera(play, 0));
+    Camera_SetFinishedFlag(Play_GetCamera(play, CAM_ID_MAIN));
 
     // Reset SW97 spirit mode effects
     if (hgForcedBySpell) {
@@ -226,6 +230,7 @@ static void HGrace_Stop(Player* p, PlayState* play) {
     hgForcedBySpell = 0;
     sFairyPosValid = 0;
     sPinkFairySkelInited = 0;
+    sHGraceForm = -1;
 
     // No cooldown - free to use again immediately
     (void)wasFairy;
@@ -234,6 +239,11 @@ static void HGrace_Stop(Player* p, PlayState* play) {
 static void HGrace_Start(Player* p, PlayState* play) {
     if (hgActive)
         return;
+    if (!HGrace_CanActivateMM()) {
+        Audio_PlaySoundGeneral(NA_SE_SY_ERROR, &p->actor.world.pos, 4, &gSfxDefaultFreqAndVolScale,
+                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+        return;
+    }
     if (!ItemMagic_HasEnough(play, HGRACE_MAGIC_COST)) {
         Audio_PlaySoundGeneral(NA_SE_SY_ERROR, &p->actor.world.pos, 4, &gSfxDefaultFreqAndVolScale,
                                &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
@@ -248,6 +258,7 @@ static void HGrace_Start(Player* p, PlayState* play) {
     hgState = HGRACE_STATE_CASTING;
     hgSubPhase = HGRACE_CAST_KAZE1;
     hgTimer = -2;
+    sHGraceForm = p->transformation;
     ItemMagic_Consume(play, HGRACE_MAGIC_COST);
 }
 
@@ -390,7 +401,7 @@ static void HGrace_StateWarpEnter(Player* p, PlayState* play) {
 
         // Release camera so it follows the fairy during flight
         p->stateFlags1 &= ~PLAYER_STATE1_IN_ITEM_CS;
-        func_8005B1A4(Play_GetCamera(play, 0));
+        Camera_SetFinishedFlag(Play_GetCamera(play, CAM_ID_MAIN));
 
         hgState = HGRACE_STATE_FAIRY;
         hgTimer = 0; // Toggle mode — no duration limit
@@ -478,13 +489,31 @@ static void HGrace_SpawnTrailSparkles(Player* p, PlayState* play, f32 actualSpee
 // Check proximity to transition actor entries (doors/loading planes) and trigger room transitions.
 // Uses transiActorCtx.list[] directly — works even if the door actor isn't spawned or reachable.
 // Returns 1 if a door transition was triggered.
+// Finish owned room work even if an external action cancels the spell mid-load.
+s32 HGrace_UpdateRoomChange(PlayState* play) {
+    if (sHGraceRoomPending) {
+        if (Room_ProcessRoomRequest(play, &play->roomCtx)) {
+            Room_FinishRoomChange(play, &play->roomCtx);
+            sHGraceRoomPending = 0;
+        }
+        return 1;
+    }
+    return 0;
+}
+
 static s32 HGrace_CheckDoorTransition(Player* p, PlayState* play) {
+    if (HGrace_UpdateRoomChange(play))
+        return 1;
+    if (play->roomCtx.status != 0 || play->transiActorCtx.list == NULL) {
+        return 0;
+    }
     for (s32 i = 0; i < play->transiActorCtx.count; i++) { // (MM TransitionActorList uses `count`)
         TransitionActorEntry* entry = &play->transiActorCtx.list[i];
-
-        // Skip disabled entries (negative id means destroyed)
-        if (entry->id < 0)
+        // Native hall handlers own preloaded rooms and vertical loading planes.
+        // Let them manage current/previous room lifetimes while Grace is active.
+        if (entry->id == ACTOR_EN_HOLL || entry->id == -ACTOR_EN_HOLL) {
             continue;
+        }
 
         f32 dx = p->actor.world.pos.x - (f32)entry->pos.x;
         f32 dy = p->actor.world.pos.y - (f32)entry->pos.y;
@@ -494,23 +523,25 @@ static s32 HGrace_CheckDoorTransition(Player* p, PlayState* play) {
         // Trigger range: 100 units XZ, 80 units Y (generous — fairy needs to reach through walls)
         if (xzDist < 100.0f && fabsf(dy) < 80.0f) {
             // Determine side: dot product of fairy-relative pos with door facing
-            f32 dot = dx * Math_SinS(entry->rotY) + dz * Math_CosS(entry->rotY);
+            // Native MM packs degree yaw above a seven-bit cutscene ID. A
+            // negative actor ID means the transition actor is already spawned.
+            s16 yaw = DEG_TO_BINANG((entry->rotY >> 7) & 0x1FF);
+            f32 dot = dx * Math_SinS(yaw) + dz * Math_CosS(yaw);
             s32 side = (dot < 0.0f) ? 0 : 1;
 
             s8 targetRoom = entry->sides[side].room;
-            if (targetRoom >= 0 && targetRoom != play->roomCtx.curRoom.num) {
-                // Load the target room
-                func_8009728C(play, &play->roomCtx, targetRoom);
+            if (targetRoom >= 0 && targetRoom < play->roomList.count && targetRoom != play->roomCtx.curRoom.num &&
+                Room_RequestNewRoom(play, &play->roomCtx, targetRoom)) {
+                sHGraceRoomPending = 1;
 
                 // Teleport fairy to the door position + push past it so it doesn't re-trigger
-                f32 pushDir = (side == 0) ? 1.0f : -1.0f;
-                p->actor.world.pos.x = (f32)entry->pos.x + Math_SinS(entry->rotY) * 80.0f * pushDir;
+                f32 pushDir = (side == 0) ? -1.0f : 1.0f;
+                p->actor.world.pos.x = (f32)entry->pos.x + Math_SinS(yaw) * 80.0f * pushDir;
                 p->actor.world.pos.y = (f32)entry->pos.y + 20.0f;
-                p->actor.world.pos.z = (f32)entry->pos.z + Math_CosS(entry->rotY) * 80.0f * pushDir;
+                p->actor.world.pos.z = (f32)entry->pos.z + Math_CosS(yaw) * 80.0f * pushDir;
                 sFairyPos = p->actor.world.pos;
-
-                // Swap rooms
-                func_80097534(play, &play->roomCtx);
+                sFairyPosValid = 1;
+                // Keep the previous room alive until native loading completes.
                 return 1;
             }
         }
@@ -558,11 +589,11 @@ static void HGrace_StateFairy(Player* p, PlayState* play) {
     u8 bBtn = CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_B);
     u8 lBtn = CHECK_BTN_ALL(play->state.input[0].cur.button, BTN_L);
 
-    // Use OOT's native stick processing (func_80077D10 + Camera_GetInputDirYaw)
-    // for camera-relative movement identical to normal gameplay.
+    // MM's native decoder writes both outputs and respects movement inversion.
+    // The old OoT address is a no-op link stub in this host.
     f32 stickMag;
     s16 stickAngle;
-    func_80077D10(&stickMag, &stickAngle, &play->state.input[0]);
+    Lib_GetControlStickData(&stickMag, &stickAngle, &play->state.input[0]);
     s16 worldYaw = Camera_GetInputDirYaw(GET_ACTIVE_CAM(play)) + stickAngle;
 
     // Speed: SW97 spirit fairy is faster
@@ -629,25 +660,17 @@ static void HGrace_StateFairy(Player* p, PlayState* play) {
     // This triggers scene transitions (doors, exits, grottos) while in fairy mode.
     if (floorPoly != NULL && play->transitionTrigger == TRANS_TRIGGER_OFF) {
         s32 exitIndex = SurfaceType_GetSceneExitIndex(&play->colCtx, floorPoly, floorBgId);
-        if (exitIndex != 0) {
+        if (exitIndex != 0 &&
+            (((play->sceneId != SCENE_GORONRACE) && (play->sceneId != SCENE_DEKU_KING)) || exitIndex < 3) &&
+            (((play->sceneId != SCENE_20SICHITAI) && (play->sceneId != SCENE_20SICHITAI2)) || exitIndex < 0x15) &&
+            (play->sceneId != SCENE_11GORONNOSATO || exitIndex < 6)) {
             // Deactivate fairy mode before transitioning
             HGrace_Stop(p, play);
 
-            play->nextEntrance = play->setupExitList[exitIndex - 1];
-            if (IS_RANDO) {
-                play->nextEntrance = Entrance_OverrideNextIndex(play->nextEntrance);
-            }
-
-            if (play->nextEntrance == ENTR_RETURN_GROTTO) {
-                gSaveContext.respawnFlag = 2;
-                play->nextEntrance = gSaveContext.respawn[RESPAWN_MODE_RETURN].entrance;
-                play->transitionType = TRANS_TYPE_FADE_WHITE;
-                gSaveContext.nextTransitionType = TRANS_TYPE_FADE_WHITE;
-            } else {
-                gSaveContext.retainWeatherMode = 1;
-                Scene_SetTransitionForNextEntrance(play);
-            }
-            play->transitionTrigger = TRANS_TRIGGER_START;
+            // Use the same MM exit, fade and 0xFFFF grotto-return semantics as
+            // Player_HandleExitsAndVoids in this player unity translation unit.
+            func_808354A4(play, exitIndex - 1,
+                          SurfaceType_GetFloorEffect(&play->colCtx, floorPoly, floorBgId) == FLOOR_EFFECT_2);
             return;
         }
     }
@@ -717,7 +740,7 @@ static void HGrace_StateWarpExit(Player* p, PlayState* play) {
     if (hgTimer >= HGRACE_WARP_OUT_DURATION) {
         p->stateFlags1 &= ~(PLAYER_STATE1_IN_ITEM_CS | PLAYER_STATE1_INPUT_DISABLED);
         p->invincibilityTimer = 20;
-        func_8005B1A4(Play_GetCamera(play, 0));
+        Camera_SetFinishedFlag(Play_GetCamera(play, CAM_ID_MAIN));
 
         // Reset SW97 spirit mode effects
         if (hgForcedBySpell) {
@@ -818,7 +841,36 @@ static void HGrace_StateIvan(Player* p, PlayState* play) {
 // Public API
 // =============================================================================
 
+void HGrace_ResetTransient(void) {
+    // Player_Init can follow heap replacement without Player_Destroy. Drop raw
+    // state only: never copy an old position or dereference an old actor pointer.
+    hgActive = 0;
+    hgState = HGRACE_STATE_IDLE;
+    hgSubPhase = hgTimer = hgCooldown = 0;
+    hgFairy = NULL;
+    hgForcedBySpell = 0;
+    sHGracePrevInvinc = 0;
+    sHGPhaseEnd = 0;
+    sHGraceRoomPending = 0;
+    sHGraceForm = -1;
+    sFairyPosValid = sPinkFairySkelInited = 0;
+    sFairyVelocity = (Vec3f){ 0 };
+    sFairyDimLevel = 0;
+    sIvanActor = NULL;
+    gIvanPossessActive = 0;
+}
+
 void Handle_HyliasGrace(Player* p, PlayState* play) {
+    if (hgActive && (play->transitionTrigger != TRANS_TRIGGER_OFF || play->csCtx.state != CS_STATE_IDLE ||
+                     p->csAction != PLAYER_CSACTION_NONE || (p->stateFlags1 & PLAYER_STATE1_DEAD) ||
+                     (sHGraceForm >= 0 && p->transformation != sHGraceForm))) {
+        HGrace_Stop(p, play);
+        return;
+    }
+    if (hgActive && sHGraceForm < 0)
+        sHGraceForm = p->transformation;
+    if (sHGraceRoomPending && HGrace_CheckDoorTransition(p, play))
+        return;
     if (!hgForcedBySpell) {
         // Normal path: item-based activation (Hylia's Grace on C-button)
         ItemInputState in;
@@ -835,8 +887,11 @@ void Handle_HyliasGrace(Player* p, PlayState* play) {
         }
 
         // Cannot use in water
-        if (p->stateFlags1 & PLAYER_STATE1_IN_WATER)
+        if (p->stateFlags1 & PLAYER_STATE1_IN_WATER) {
+            if (hgActive)
+                HGrace_Stop(p, play);
             return;
+        }
 
         if (!hgActive) {
             // Only block on otherButtonPressed when NOT active.

@@ -4,6 +4,7 @@
 #include "assets/soh_assets.h"
 #include "soh/Enhancements/randomizer/rando_hash.h"
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
+#include "soh/Enhancements/randomizer/OptionalNeiIcons.h"
 
 #include <libultraship/libultraship.h>
 #include <fast/Fast3dGui.h>
@@ -255,8 +256,7 @@ std::map<uint32_t, ItemMapEntry> customItemsMapping = {
     { RG_SPEED_UPGRADE, { RG_SPEED_UPGRADE, "RG_SPEED_UPGRADE", "RG_SPEED_UPGRADE_Faded", gStatSpeedTex } },
     { RG_POWER_UPGRADE, { RG_POWER_UPGRADE, "RG_POWER_UPGRADE", "RG_POWER_UPGRADE_Faded", gStatPowerTex } },
     { RG_MAGIC_STAT_UPGRADE,
-      { RG_MAGIC_STAT_UPGRADE, "RG_MAGIC_STAT_UPGRADE", "RG_MAGIC_STAT_UPGRADE_Faded",
-        (char*)gItemIcons[ITEM_MAGIC_SMALL] } },
+      { RG_MAGIC_STAT_UPGRADE, "RG_MAGIC_STAT_UPGRADE", "RG_MAGIC_STAT_UPGRADE_Faded", gStatMagicTex } },
     { RG_CRAWL_SPEED_UPGRADE,
       { RG_CRAWL_SPEED_UPGRADE, "RG_CRAWL_SPEED_UPGRADE", "RG_CRAWL_SPEED_UPGRADE_Faded", gCrawlSpeedTex } },
     { RG_CLIMB_SPEED_UPGRADE,
@@ -351,10 +351,11 @@ void RegisterImGuiItemIcons() {
     }
 
     for (const auto& entry : customItemsMapping) {
+        const char* texturePath = NeiOptionalIcons::Resolve(entry.second.texturePath.c_str());
         std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-            ->LoadGuiTexture(entry.second.name, entry.second.texturePath, "", ImVec4(1, 1, 1, 1));
+            ->LoadGuiTexture(entry.second.name, texturePath, "", ImVec4(1, 1, 1, 1));
         std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-            ->LoadGuiTexture(entry.second.nameFaded, entry.second.texturePath, "", ImVec4(1, 1, 1, 0.3f));
+            ->LoadGuiTexture(entry.second.nameFaded, texturePath, "", ImVec4(1, 1, 1, 0.3f));
     }
 
     for (const auto& entry : jabbernutMapping) {

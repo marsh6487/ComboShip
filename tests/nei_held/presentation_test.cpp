@@ -3,7 +3,6 @@
 #include "../nei_gi/presentation_test.cpp"
 #undef main
 #include "soh/Enhancements/randomizer/NeiHeldPresentation.cpp"
-extern "C" void Matrix_RotateX(float, uint8_t) {}
 
 int main() {
   using namespace Fixture;

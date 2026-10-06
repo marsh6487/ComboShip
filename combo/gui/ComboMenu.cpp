@@ -49,6 +49,12 @@ void ResolveComboGenSyms() {
         sRefreshStartingGameUI = (FnRefreshStartingGameUI)Combo_ResolveSym("soh", "SOH_RefreshComboStartingGameUI");
 }
 
+bool ComboSeedFileSelectActive() {
+    // MM-first saves leave a parked OoT FileChoose behind. Its main pointer
+    // remains FileChoose_Main, so the donor query alone also accepts MM gameplay.
+    return ComboUI::IsGameActive(0) && sIsOnFileSelect && sIsOnFileSelect();
+}
+
 // Bug 2: Anchor resync exports, one per game DLL — resolved the same way as the combo-gen syms
 // above. The button calls both so a resync pulls the peer's OOT AND MM team-state.
 typedef void (*FnRequestResync)(void);
@@ -1197,7 +1203,7 @@ void DrawComboPlandoPanel() {
 
     if (sPlando.loaded) {
         ImGui::SameLine();
-        const bool onFileSelect = sIsOnFileSelect && sIsOnFileSelect();
+        const bool onFileSelect = ComboSeedFileSelectActive();
         const bool canPlay = sRequestReload && onFileSelect;
         if (!canPlay)
             ImGui::BeginDisabled();
@@ -1780,7 +1786,7 @@ void ComboMenu::DrawComboPanel() {
     const bool running = p && p->running.load();
     // Generation may only run at the OOT file-select screen, so the worker can't race a live game
     // tick (the prior off-thread crash class).
-    const bool onFileSelect = sIsOnFileSelect && sIsOnFileSelect();
+    const bool onFileSelect = ComboSeedFileSelectActive();
     const bool canGenerate = sTrigger && onFileSelect && !running;
 
     if (!canGenerate)

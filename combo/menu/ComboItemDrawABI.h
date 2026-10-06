@@ -6,6 +6,7 @@
 #define COMBO_ITEM_DRAW_ABI_H
 
 #include <stdint.h>
+#include "../ComboGameExport.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,14 +57,23 @@ typedef enum {
     /* ComboShip: MM->OOT additions. The kinds above are OOT funcs replicated by MM; these are MM
      * funcs replicated by OOT. Where an MM func is byte-for-byte the same as its OOT twin
      * (DekuNuts/RecoveryHeart/Fish/Potion/Poes/GoronSword) the kind above is reused instead. */
-    CW_DRAW_KIND_MM_FAIRY_BOTTLE, /* OPA dl0; XLU dl1; seg8 scroll (32x320 layer 2); billboard dl2 */
-    CW_DRAW_KIND_MM_SOUL_FLAME,   /* MM enemy soul: billboard seg8 flame (primColorXlu), dl0 */
-    CW_DRAW_KIND_OPS,             /* ops[] bytecode below (transforms/colors/DLs); see CwDrawOpCode */
-    CW_DRAW_KIND_NEI_CANE,        /* concrete legacy cane skill rendered by the MM host */
-    CW_DRAW_KIND_NEI_GI,          /* replacement mesh plus host-rendered elemental energy */
-    CW_DRAW_KIND_MM_MASK,         /* imported MM mask: native MM resources and palette-free split passes */
-    CW_DRAW_KIND_MM_REMAINS,      /* imported boss remains: native MM OPA resource, scale 0.02 */
-    CW_DRAW_KIND_MM_SPIN_ATTACK,  /* MM Great Spin: native disk/cylinder, seg8 scroll, live burst color */
+    CW_DRAW_KIND_MM_FAIRY_BOTTLE,           /* OPA dl0; XLU dl1; seg8 scroll (32x320 layer 2); billboard dl2 */
+    CW_DRAW_KIND_MM_SOUL_FLAME,             /* MM enemy soul: billboard seg8 flame (primColorXlu), dl0 */
+    CW_DRAW_KIND_OPS,                       /* ops[] bytecode below (transforms/colors/DLs); see CwDrawOpCode */
+    CW_DRAW_KIND_NEI_CANE,                  /* concrete legacy cane skill rendered by the MM host */
+    CW_DRAW_KIND_NEI_GI,                    /* replacement mesh plus host-rendered elemental energy */
+    CW_DRAW_KIND_MM_MASK,                   /* imported MM mask: native MM resources and palette-free split passes */
+    CW_DRAW_KIND_MM_REMAINS,                /* imported boss remains: native MM OPA resource, scale 0.02 */
+    CW_DRAW_KIND_MM_SPIN_ATTACK,            /* MM Great Spin: native disk/cylinder, seg8 scroll, live burst color */
+    CW_DRAW_KIND_OOT_MORPHA_SOUL = 32,      /* native MM flame dl0 + OoT Morpha membrane/nucleus dl1/2 */
+    CW_DRAW_KIND_MAGIC_JAR = 33,            /* OoT magic jar: custom Alt grayscale tint carried in primColorOpa */
+    CW_DRAW_KIND_CUSTOM_GI = 31,            /* OoT custom: spin, ops transforms, scale, OPA/XLU; primColorOpa grayscale,
+                                         primColorXlu weapon flame; alpha zero disables each independent tint/effect. */
+    CW_DRAW_KIND_SEASON_GI = 36,            /* 1..4: seasons; 5: rod + cycling weather; 6: song rain */
+    CW_DRAW_KIND_GRAYSCALE_LAYERS = 35,     /* per-DL grayscale layerPrimMask/colors; OPA/XLU split */
+    CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT = 34, /* concrete static award; ops[0] native equipment selector */
+    CW_DRAW_KIND_SONG_GI = 38,              /* note plus song profile in neiEffect; native env or grayscale tint */
+    CW_DRAW_KIND_MM_FAIRY_CONTAINER = 37,   /* OPA shell0, XLU glass1/contents2; dl3 is its native Mtx path */
 } CwDrawKind;
 
 #define CW_DRAW_MAX_OPS 20
@@ -88,8 +98,24 @@ typedef enum {
     CW_OP_GRAYSCALE_COLOR, /* rgba */
     CW_OP_GRAYSCALE_ON,
     CW_OP_GRAYSCALE_OFF,
-    CW_OP_DLIST, /* a = index into dlists[] */
+    CW_OP_DLIST,            /* a = index into dlists[] */
+    CW_OP_FRAME_PAIR,       /* only CUSTOM_GI: choose one of two OPA DLs; a = frame bit (0..30) */
+    CW_OP_NATIVE_EQUIPMENT, /* only OOT_NATIVE_EQUIPMENT: a = CwOotNativeEquipment */
+    CW_OP_NO_CULL,          /* only CUSTOM_GI: draw a legacy single-sided plate from either side */
 } CwDrawOpCode;
+
+// Existing MM-native renderers for inline/palette-remapped OoT equipment. These concrete
+// selectors carry no progression logic, item grants or gameplay pointers across the ABI.
+typedef enum {
+    CW_OOT_EQUIP_AXE = 1,
+    CW_OOT_EQUIP_SPIRIT_TUNIC,
+    CW_OOT_EQUIP_CHAMPIONS_TUNIC,
+    CW_OOT_EQUIP_SAGES_TUNIC,
+    CW_OOT_EQUIP_PEGASUS_BOOTS,
+    CW_OOT_EQUIP_TRIDENT,
+    CW_OOT_EQUIP_CLIMB_BOOTS,
+    CW_OOT_EQUIP_ROC_BOOTS,
+} CwOotNativeEquipment;
 
 typedef struct {
     int32_t op; /* CwDrawOpCode */
@@ -154,17 +180,30 @@ typedef struct {
     /* Independent effect pass; never tint the mask model or change its material routing. */
     int32_t itemShimmer;
     uint8_t itemShimmerColor[4];
+    /* Optional model-independent NEI sampler: Kind + 1, or zero for the color overlay.
+     * Carries shimmer only; never apply authored mesh-local energy to a mod model. */
+    int32_t neiShimmer;
 } CwItemDrawInfo;
 
 typedef struct {
     const char* path;      /* owning archive's process-lifetime texture path */
     int32_t width, height; /* logical pixels, independent of high-resolution replacements */
     int32_t isIA8;         /* zero = RGBA32 */
+    int32_t hasColor;      /* append-only; zero preserves the default white */
+    uint8_t color[4];
 } CwItemIconInfo;
+// Resource-only editor sampling for foreign GI presentation. Host frames advance only
+// the sampling clock; no dormant native frame, game state or cosmetic patch loop runs.
+COMBO_OOT_EXPORT void OOT_SetGiCosmeticFrame(uint32_t hostFrame);
+COMBO_OOT_EXPORT void OOT_SampleGiCosmeticColor(const char* valueCvar, uint8_t fallbackR, uint8_t fallbackG,
+                                                uint8_t fallbackB, uint8_t* outRGB);
+typedef void (*Fn_SetGiCosmeticFrame)(uint32_t hostFrame);
+
 typedef int32_t (*Fn_GetItemIconInfo)(const char* itemName, CwItemIconInfo* out);
 // Uses the registered asset owner and its Alt mode; no engine state crosses.
 typedef int32_t (*Fn_NeiResourceExists)(const char* path);
-int32_t OOT_NeiResourceExists(const char* path);
+COMBO_OOT_EXPORT int32_t OOT_NeiResourceExists(const char* path);
+COMBO_OOT_EXPORT int32_t OOT_NeiAltAssetsEnabled(void);
 typedef int32_t (*Fn_GetNeiGiDrawInfo)(const char* slug, CwItemDrawInfo* out);
 
 /* Returns 1 and fills out on success; 0 if the item is unknown/undrawable; CW_DRAW_NOT_READY if the
@@ -179,10 +218,12 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
             return 6;
         case CW_DRAW_KIND_POES:
         case CW_DRAW_KIND_SCALE:
+        case CW_DRAW_KIND_MM_FAIRY_CONTAINER:
             return 4;
         case CW_DRAW_KIND_FAIRY:
         case CW_DRAW_KIND_MAGIC_SPELL:
         case CW_DRAW_KIND_MM_FAIRY_BOTTLE:
+        case CW_DRAW_KIND_OOT_MORPHA_SOUL:
             return 3;
         case CW_DRAW_KIND_MIRROR_SHIELD:
         case CW_DRAW_KIND_BLUE_FIRE:
@@ -196,7 +237,10 @@ static inline int32_t CwMinDlistsForKind(int32_t kind) {
             return 2;
         case CW_DRAW_KIND_OPS:
         case CW_DRAW_KIND_NEI_CANE:
-            return 0; /* the interpreter bounds-checks every CW_OP_DLIST index itself */
+        case CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT:
+            return 0; /* native kinds carry no resource lists; OPS bounds-checks every DL index */
+        case CW_DRAW_KIND_SEASON_GI:
+            return 0; /* weather-only profiles; resolvers separately require a model for profile 5 */
         default:
             return 1;
     }
@@ -248,6 +292,12 @@ typedef struct {
 #define CW_ANIM_MAX_LIMB_COLORS 6
 #define CW_ANIM_MAX_LIMB_DLS 4
 
+typedef enum {
+    CW_ANIM_PROFILE_NONE = 0,
+    CW_ANIM_PROFILE_OOT_BARINADE,
+    CW_ANIM_PROFILE_MM_TWINMOLD,
+} CwAnimProceduralProfile;
+
 /* ComboShip: animated variant — the owner describes a skeletal item and ComboForeignAnim.h loads it
  * via the owner's RM and drives the host's SkelAnime. APPEND-ONLY (POD C ABI, two DLLs). */
 typedef struct {
@@ -291,6 +341,10 @@ typedef struct {
     CwAnimSegBind flameSeg;
     /* 1 = recipe depends on live state (e.g. OOT's SimplerBossSoulModels CVar) — do not cache. */
     int32_t stateDependent;
+    /* Native procedural limb surgery; appended without changing existing record offsets. */
+    int32_t proceduralProfile;        /* CwAnimProceduralProfile */
+    const char* proceduralDlPaths[2]; /* Barinade: limb-25 ring and limbs-10..19 electric XLU DLs */
+    int32_t freezeLastFrame;          /* 1 = initialize the selected animation at its last frame, once mode */
 } CwItemAnimDrawInfo;
 typedef int32_t (*Fn_GetItemAnimDrawInfo)(const char* itemName, CwItemAnimDrawInfo* out);
 

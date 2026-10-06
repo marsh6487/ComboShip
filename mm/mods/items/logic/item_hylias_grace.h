@@ -1,10 +1,9 @@
 /**
  * Hylia's Grace Item Header
- * Fairy transformation spell - costs 24 MP (no fairy required), transforms Link into a fairy for 10 seconds
+ * Fairy transformation spell - costs 24 MP (no fairy required), toggles fairy flight
  *
  * Sequence: Farore's Wind cast -> blue warp enter -> fairy flight -> warp exit
  * A=ascend, B=descend, L=sprint, stick=direction
- * Ascending or sprinting drains timer 2x faster
  * No cooldown - can be used again immediately after previous use
  */
 
@@ -70,5 +69,8 @@ static const u16 sHGraceDoorActors[] = {
 #define hgCooldown gCustomItemState.hyliasGraceCooldown
 #define hgFairy gCustomItemState.hyliasGraceFairy
 #define hgForcedBySpell gCustomItemState.hyliasGraceForcedBySpell
+
+void HGrace_ResetTransient(void);
+s32 HGrace_UpdateRoomChange(PlayState* play);
 
 #endif // ITEM_HYLIAS_GRACE_H

@@ -1,5 +1,4 @@
 <DisplayList Version="0">
-	<CallDisplayList Path="objects/object_nei_sheikah_slate/mat_gNeiSheikahSlate"/>
-	<CallDisplayList Path="objects/object_nei_sheikah_slate/gNeiSheikahSlateDL_tri_0"/>
-	<EndDisplayList/>
+  <CallDisplayList Path="objects/nei_held_redesign/sheikah_slate/gi_dl"/>
+  <EndDisplayList/>
 </DisplayList>

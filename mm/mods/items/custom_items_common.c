@@ -19,6 +19,7 @@
 #include "logic/item_postman_hat.h"
 #include "logic/item_dekuleaf.h"
 #include "logic/item_shovel.h"
+#include "logic/item_hylias_grace.h"
 #include "../extended_inventory.h" // ExtInv_GetItemSlot — custom items must NOT use vanilla SLOT()/INV_CONTENT()
 #include "overlays/actors/ovl_En_Boom/z_en_boom.h" // EnBoom struct for Gale Boomerang multi-target override
 #include "soh/FleetShipCombo/FleetShipCombo.h"     // cross-game world-connector (loading zone)
@@ -388,6 +389,7 @@ static void FleetWarp_Tick(Player* p, PlayState* play) {
 }
 
 void CustomItems_Update(Player* p, PlayState* play) {
+    HGrace_UpdateRoomChange(play);
     // Run cancellation before any cutscene/transition or exclusive-item early return.
     CustomItems_CleanupTransientTools(p, play);
 
@@ -938,12 +940,14 @@ s32 CustomItems_OverrideDraw(Player* p, PlayState* play) {
     // so the draw gates itself on Slate_IsDrawn(). Skijer's NEI
     {
         extern void CustomItems_DrawSheikahSlate(Player * player, PlayState * play);
+        extern void CustomItems_DrawRodOfSeasons(Player * player, PlayState * play);
         extern void Stasis_Draw(PlayState * play);
         extern void Hourglass_Draw(PlayState * play);
         extern void Wand_Draw(Player * player, PlayState * play);
         extern void Cryonis_DrawGhost(PlayState * play);
 
         CustomItems_DrawSheikahSlate(p, play);
+        CustomItems_DrawRodOfSeasons(p, play);
         Stasis_Draw(play);       // chains + launch arrow on whatever the Stasis rune is holding
         Hourglass_Draw(play);    // the path the recall target is about to retrace
         Cryonis_DrawGhost(play); // where the ice would land while the aiming mode is up

@@ -199,7 +199,7 @@ typedef struct {
 static const GustElementColor sGustElementColors[GUST_ELEMENT_COUNT] = {
     // WIND is the bare gust jar's own element and reads GREEN, so a plain blow is visibly
     // "just wind" and not mistaken for an uncoloured/elementless one.
-    [GUST_ELEMENT_WIND] = { { 60, 220, 90, 255 }, { 20, 140, 50, 200 } },
+    [GUST_ELEMENT_WIND] = { { 221, 229, 239, 255 }, { 120, 136, 156, 200 } },
     [GUST_ELEMENT_FIRE] = { { 255, 80, 0, 255 }, { 255, 200, 0, 200 } },
     [GUST_ELEMENT_ICE] = { { 80, 180, 255, 255 }, { 150, 220, 255, 200 } },
     [GUST_ELEMENT_SHADOW] = { { 130, 50, 180, 255 }, { 80, 0, 130, 200 } },

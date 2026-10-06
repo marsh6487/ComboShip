@@ -64,19 +64,66 @@ static const s16 sWandMagicCost[WAND_MODE_COUNT] = {
 // menu. Same length as the slate's rune row.
 #define WAND_WHEEL_HOLD_FRAMES 8
 
-static void Wand_OnWheelConfirm(s32 index) {
-    Wand_SetMode(Wand_ModeAt((u8)index));
+// MM only copies skelAnimeUpper into the drawn skeleton when the upper action
+// returns true. Starting a clip from the input driver alone cannot show a cast.
+#define WAND_POSE_MORPH 6.0f
+typedef enum {
+    WAND_POSE_IDLE,
+    WAND_POSE_ATTACK,
+    WAND_POSE_SUMMON_CALL,
+    WAND_POSE_SUMMON_SWING,
+} WandPoseStage;
+
+static u8 sWandPoseStage = WAND_POSE_IDLE;
+
+static void Wand_PoseStart(PlayState* play, Player* player, u8 mode) {
+    PlayerAnimationHeader* anim;
+
+    if (player->stateFlags1 & PLAYER_STATE1_CARRYING_ACTOR) {
+        return;
+    }
+    if ((mode == WAND_MODE_METEOR) || (mode == WAND_MODE_STORM)) {
+        anim = (PlayerAnimationHeader*)gPlayerAnim_link_normal_light_bom;
+        sWandPoseStage = WAND_POSE_ATTACK;
+    } else {
+        anim = (PlayerAnimationHeader*)gPlayerAnim_link_magic_tame;
+        sWandPoseStage = WAND_POSE_SUMMON_CALL;
+    }
+    player->skelAnimeUpperBlendWeight = 0.0f;
+    PlayerAnimation_Change(play, &player->skelAnimeUpper, anim, 1.0f, 0.0f, Animation_GetLastFrame(anim), ANIMMODE_ONCE,
+                           WAND_POSE_MORPH);
 }
 
-// Owned rods only, in the order the kaleido wheel cycles them, so every entry is selectable. The
-// icon is the MEDALLION: the six rods share one staff sprite, so the element is the only thing that
-// tells them apart anywhere else either.
+static void Wand_PoseTick(PlayState* play, Player* player) {
+    if (!PlayerAnimation_Update(play, &player->skelAnimeUpper)) {
+        return;
+    }
+    if (sWandPoseStage == WAND_POSE_SUMMON_CALL) {
+        // MM has this one-handed swing; OoT's hammer_side_hit clip is absent.
+        PlayerAnimationHeader* swing = (PlayerAnimationHeader*)gPlayerAnim_link_fighter_Lnormal_kiru;
+        PlayerAnimation_Change(play, &player->skelAnimeUpper, swing, 1.0f, 0.0f, Animation_GetLastFrame(swing),
+                               ANIMMODE_ONCE, WAND_POSE_MORPH);
+        sWandPoseStage = WAND_POSE_SUMMON_SWING;
+        return;
+    }
+    sWandPoseStage = WAND_POSE_IDLE;
+}
+
+static void Wand_OnWheelConfirm(s32 index) {
+    Wand_SetMode(Wand_ModeAt((u8)index));
+    if (gPlayState != NULL) {
+        // The shared item id stays the same while the active rod's icon changes.
+        ExtInv_RefreshButtonIconsForItem(gPlayState, ITEM_ELEMENTAL_WAND);
+    }
+}
+
+// Owned rods only, in the existing mode order, with the same model-matched icons as inventory.
 static s32 Wand_BuildWheel(BoxMenuEntry* out) {
     s32 count = Wand_ModeCount();
 
     for (s32 i = 0; i < count; i++) {
-        out[i].iconPath = (const char*)ExtInv_GetItemIcon(Wand_ModeMedallion(Wand_ModeAt((u8)i)));
-        out[i].iconSize = 24; // quest icons, unlike the slate's 32x32 runes
+        out[i].iconPath = (const char*)Wand_ModeIcon(Wand_ModeAt((u8)i));
+        out[i].iconSize = 32; // logical slot size; HD raw texture scales supply the full pixels
         out[i].enabled = 1;
     }
     return count;
@@ -150,20 +197,28 @@ static u8 Wand_Cast(Player* player, PlayState* play, u8 mode) {
  */
 void Wand_TickInput(PlayState* play, Player* player) {
     static s16 sLastScene = -1;
+    static PlayState* sLastPlay = NULL;
+    static u32 sLastFrame = 0;
     static u8 sWasDrawn = 0;
     static s16 sHoldTimer = 0;
     BoxMenuEntry entries[WAND_MODE_COUNT];
     ItemInputState in;
+    u8 sandHeld = 0;
 
     // Everything a rod leaves in the world is an actor the new scene has already thrown away.
     // Pointers are dropped, never written through: that memory may belong to somebody else now.
-    if (sLastScene != play->sceneId) {
+    if ((sLastPlay != play) || (sLastScene != play->sceneId) || (play->gameplayFrames < sLastFrame)) {
+        sLastPlay = play;
         sLastScene = play->sceneId;
+        sWandPoseStage = WAND_POSE_IDLE;
+        sWasDrawn = 0;
+        sHoldTimer = 0;
         WandSand_Forget();
         WandWater_Forget();
         WandShadow_Forget();
         WandStorm_Forget();
     }
+    sLastFrame = play->gameplayFrames;
 
     // The rods that own something outside the wand keep running whatever the wand is doing, and
     // must keep running with it stowed — the bolt is mid-flight and the wind is still burning magic.
@@ -172,6 +227,9 @@ void Wand_TickInput(PlayState* play, Player* player) {
     WandWind_Tick(play, player);
 
     u8 drawn = Wand_IsDrawn();
+    if (!drawn || ItemInput_IsBlocked(player, play)) {
+        sWandPoseStage = WAND_POSE_IDLE;
+    }
 
     // No guard clause anywhere below on purpose: an early return would skip the latch at the end,
     // and a frame the wand spent stowed HAS to be recorded or the next draw reads as a continuation.
@@ -198,22 +256,32 @@ void Wand_TickInput(PlayState* play, Player* player) {
             // ---- HOLD C: the two rods that do something while the button is down ----
             if (mode == WAND_MODE_TORNADO) {
                 WandWind_TickHover(player, in.isHeld);
-            } else if ((mode == WAND_MODE_SAND) && WandSand_HoldElapsed(player, in.isHeld)) {
-                Wand_Cast(player, play, WAND_MODE_SAND); // billed like any other slab
+            } else if (mode == WAND_MODE_SAND) {
+                // A press is handled below once. Held drain and coverage share the equip/blocker
+                // gates; all other input paths reset Sand's cadence at the end of this frame.
+                u8 canHold = sWasDrawn && in.wasEquipped && !in.isPressed && !ItemInput_IsBlocked(player, play);
+                sandHeld = canHold && in.isHeld;
             }
 
             // ---- PRESS C: cast ----
-            if (in.wasEquipped && in.isPressed && sWasDrawn && !ItemInput_IsBlocked(player, play) &&
-                !Wand_Cast(player, play, mode)) {
-                Audio_PlaySoundGeneral(NA_SE_SY_ERROR, &player->actor.world.pos, 4, &gSfxDefaultFreqAndVolScale,
-                                       &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            if (in.wasEquipped && in.isPressed && sWasDrawn && (sWandPoseStage == WAND_POSE_IDLE) &&
+                !ItemInput_IsBlocked(player, play)) {
+                if (Wand_Cast(player, play, mode)) {
+                    Wand_PoseStart(play, player, mode);
+                } else {
+                    Audio_PlaySoundGeneral(NA_SE_SY_ERROR, &player->actor.world.pos, 4, &gSfxDefaultFreqAndVolScale,
+                                           &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+                }
             }
         }
     } else {
         sHoldTimer = 0;
     }
+    WandSand_TickHold(player, play, sandHeld);
     sWasDrawn = drawn;
 }
+
+#include "../objects/object_elemental_wand.c"
 
 // The world-space half of the rods, run from the player's draw pass: these emit into POLY_XLU and
 // the update pass has no display list open.
@@ -221,15 +289,20 @@ void Wand_Draw(Player* player, PlayState* play) {
     WandShadow_Draw(play);
     WandStorm_Draw(play);
     WandWind_Draw(player, play);
+    CustomItems_DrawElementalWand(player, play);
 }
 
 /**
  * Per-rod upper action. Runs every frame while the wand is the held item.
  *
- * Returning func_8083485C keeps the vanilla hold/aim handling, which is what every rod wants as its
- * base. Nothing per-rod belongs here — the casting lives in Wand_TickInput, which can see the pad.
+ * Claim the upper body while a cast pose runs so MM copies it into the drawn
+ * skeleton. The input driver still owns casts and magic; vanilla owns idle.
  */
 s32 Player_UpperAction_ElementalWand(Player* player, PlayState* play) {
+    if (sWandPoseStage != WAND_POSE_IDLE) {
+        Wand_PoseTick(play, player);
+        return 1;
+    }
     return func_8083485C(player, play);
 }
 
@@ -238,6 +311,7 @@ s32 Player_UpperAction_ElementalWand(Player* player, PlayState* play) {
  * actors, aim reticles) belongs here.
  */
 void Player_InitElementalWandIA(PlayState* play, Player* player) {
+    sWandPoseStage = WAND_POSE_IDLE;
     (void)play;
     (void)player;
 }

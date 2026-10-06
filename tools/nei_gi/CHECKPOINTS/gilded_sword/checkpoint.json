@@ -1,0 +1,60 @@
+{
+  "resource_count": 8,
+  "vertex_records": 4948,
+  "vertex_loads": 213,
+  "slug": "gilded_sword",
+  "name": "Gilded Sword",
+  "entry": "objects/nei_gi_redesign/gilded_sword/gi_dl",
+  "draw_scale": 1.0,
+  "matrix_scale": 0.0412445068359375,
+  "triangles": 2702,
+  "bounds_author": [
+    [
+      -15.0,
+      -27.0,
+      -2.9375
+    ],
+    [
+      15.0,
+      100.0,
+      2.9375
+    ]
+  ],
+  "markers": {
+    "visual_review_candidate": true,
+    "runtime_tested": false,
+    "preview_front_angle": 16,
+    "preview_back_angle": 164,
+    "guard_baseline_y": 0,
+    "original_gi_vertex_data_available": false,
+    "proportion_reference": "User-provided Gilded Sword image with the subsequent user-requested shorter blade; dimensions are visual review targets, not original GI vertex measurements.",
+    "reference_blade_to_hilt_ratio": 3.7037037037037037,
+    "reference_blade_tip_y": 100,
+    "reference_hilt_rear_y": -27,
+    "imported_approved_model": false
+  },
+  "notes": [
+    "User reference with the latest requested shorter blade: three broad contiguous gold diamonds, bent silver quillons with dark inset channels, short red grip and faceted silver pommel.",
+    "Three physical tempered-gold inlays occupy most of the blade width and have independent reflection materials.",
+    "The patterned blade segment was shortened from 121 to 94 author units while preserving the blade seat, guard and grip. This user-requested review adjustment supersedes the initial image-derived length target.",
+    "Absolute get-item size is a review target, not measured Nintendo GI coordinates."
+  ],
+  "runtime_tested": false,
+  "source_provenance": {
+    "bundle": "NEI_Sword_GI_Latest_20261003",
+    "art_checkpoint": "dd66ee65",
+    "authoring_recipe": "../../SOURCE/forged_swords/SOURCE/sword_forged.py",
+    "glb_sha256": "bb7291c2e40b03b2ae622ee629ed8fb4600b9be33ada7f26e757c2638d7ed41c",
+    "approved_glb_sha256": "19fc7da974f592bc2b04cc9b38ab34947dac10b046a3795603649c6e6079a1c6",
+    "resource_sha256": {
+      "edge_tex": "8c9b5b1548288588aece01a8e76afda8722485d75ab049ebe9f59b0978dc55a7",
+      "gi_dl": "18a8f6ea79bd04f73ef915dd460d71ea9b80ebd11150eb4357e9371de317d179",
+      "gold_recess_tex": "803e040c5cea30f99fed2ad2b91db4c780c12afcc77ac7515009e06d3c1cca72",
+      "gold_tex": "4e5b29e2944e2fe09421c00f401fa6c938d6cec6f5a41d9071d1025c12ea9698",
+      "mesh_opa_vtx": "1a72217209e76506caa644f50feaa1b01f0001a032e263726248784c9cfe1eeb",
+      "red_leather_tex": "3cc4b3bb143c51987323397e6af2e7dd3e6ee9dc7aba0dea5490b5d2a96bdc51",
+      "scale_mtx": "bba652b1cf8f43eb8f04a6fdc3fa639db60eab659614e7fcbef2bbac0943a4ad",
+      "steel_tex": "5ba49cfb20429ebcf49f5b76c0f464e1e83db89fc23e245062e96c9c5d1bd45f"
+    }
+  }
+}

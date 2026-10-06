@@ -4,7 +4,6 @@
 #undef main
 #include "soh/Enhancements/randomizer/NeiHeldPresentation.cpp"
 #include "soh/Enhancements/randomizer/NeiLanternPresentation.cpp"
-extern "C" void Matrix_RotateX(float, uint8_t) {}
 
 int main() {
     using namespace Fixture;

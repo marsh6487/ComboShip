@@ -25,7 +25,8 @@ with tempfile.TemporaryDirectory(prefix='nei-leaf-') as td:
     cc, cxx = os.environ.get('CC', 'cc'), os.environ.get('CXX', 'c++')
     common = ['-g', '-fsanitize=address,undefined', '-ffunction-sections', '-fdata-sections']
     cxx_flags = ['-std=c++20', '-I' + str(ROOT / 'tests/nei_leaf/stubs')]
-    cxx_flags += [flag for flag in flags() if not flag.startswith('-std=')]
+    cxx_flags += [flag for flag in flags()
+                  if not flag.startswith('-std=') and flag != '-Wno-incompatible-pointer-types']
     engine = str(Path(td) / 'mm_sfx.o')
     activation = str(Path(td) / 'activation.o')
     subprocess.run([cxx, *cxx_flags, *common, '-c', str(ROOT / 'tests/nei_leaf/mm_sfx_engine_fixture.cpp'),

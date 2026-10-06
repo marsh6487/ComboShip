@@ -29,6 +29,7 @@ void CustomItems_ResetTransientTools(Player* p, PlayState* play) {
     }
 
     // These globals outlive Player/PlayState on an in-process reset or scene load.
+    HGrace_ResetTransient();
     DekuLeaf_Stop(p, play);
     Shovel_Stop(p, play);
     if (sDekuLeafColInitialized) {
@@ -49,7 +50,7 @@ s32 CustomItems_HasStowableHeldItem(Player* p) {
     return gCustomItemState.lanternEquipped || gCustomItemState.lanternSwinging || fireRodActive ||
            fireRodFirstPerson || iceRodActive || iceRodFirstPerson || lightRodActive || lightRodFirstPerson ||
            gCustomItemState.gustJarEquipped || gCustomItemState.mogmaMittsActive ||
-           gCustomItemState.ballAndChainThrown || CustomItems_CanStowWhip();
+           gCustomItemState.ballAndChainThrown || CustomItems_CanStowWhip() || Seasons_IsDrawn();
 }
 
 void CustomItems_PutAwayHeldItems(Player* p, PlayState* play) {
@@ -57,6 +58,7 @@ void CustomItems_PutAwayHeldItems(Player* p, PlayState* play) {
         return;
     }
 
+    Seasons_Stow(play, p);
     Lantern_PutAway(p, play);
     FireRod_PutAway(p, play);
     IceRod_PutAway(p, play);

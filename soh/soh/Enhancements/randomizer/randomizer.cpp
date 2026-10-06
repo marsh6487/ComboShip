@@ -2289,6 +2289,9 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
         case RG_DESIRE_SENSOR:
             Slate_GrantRune(SLATE_RUNE_SENSOR);
             break;
+        case RG_HYLIAS_GRACE:
+            ExtInv_GiveItem(SLOT_HYLIAS_GRACE, ITEM_HYLIAS_GRACE);
+            break;
         case RG_PHANTOM_HOURGLASS:
             ExtInv_GiveItem(SLOT_PHANTOM_HOURGLASS, EXT_ITEM_PHANTOM_HOURGLASS);
             break;

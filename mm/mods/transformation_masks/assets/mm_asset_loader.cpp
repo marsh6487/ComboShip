@@ -33,6 +33,8 @@
 #include "soh/resource/type/Text.h"
 #include "functions.h"           // For Audio_SetFontInstrument, AudioLoad_IsFontLoadComplete
 #include "message_data_static.h" // MessageTableEntry struct
+#include "../../../../combo/NeiGiModelBounds.h"
+#include <ship/resource/ResourceManagerScope.h>
 
 // SoH globals that hold pointers into Text-resource std::string buffers. After
 // SetArchives → ResetVirtualFileSystem unloads+reloads every archive, those
@@ -866,6 +868,130 @@ extern "C" void* MmAssets_LoadFromOotArchive(const char* path, size_t* outSize) 
         MMASSETS_LOG("[OotAssets] Exception in LoadFromOotArchive '%s': %s", path, e.what());
     } catch (...) { MMASSETS_LOG("[OotAssets] Unknown exception in LoadFromOotArchive '%s'", path); }
     return nullptr;
+}
+
+// Bounds use private, unpatched typed companion resources. The renderer's
+// raw/deep-patched caches are never inspected or changed by this query.
+class OotGiResourceLoader {
+  public:
+    explicit OotGiResourceLoader(std::shared_ptr<Ship::ResourceManager> owner) : mOwner(std::move(owner)) {
+        if (sArchives != sOotArchives) {
+            sResources.clear();
+            sArchives = sOotArchives;
+        }
+    }
+    std::shared_ptr<Ship::IResource> Archive(const char* path) {
+        const std::string clean = Clean(path);
+        const auto cached = sResources.find(clean);
+        if (cached != sResources.end())
+            return cached->second;
+        for (const auto& archive : sOotArchives) {
+            if (!archive)
+                continue;
+            const auto file = archive->LoadFile(clean);
+            if (!file)
+                continue;
+            const auto resource = mOwner->GetResourceLoader()->LoadResource(clean, file);
+            if (resource) {
+                sResources[clean] = resource;
+                return resource;
+            }
+        }
+        return nullptr; // Boot-order absence must remain retryable.
+    }
+    std::shared_ptr<Ship::IResource> operator()(const char* path) {
+        const std::string clean = Clean(path);
+        if (mRoot) {
+            mRoot = false;
+            return Archive(clean.c_str());
+        }
+        if (mOrdinary)
+            return Ordinary(clean.c_str());
+        // Match OotAssets_HasModOverride, including its Alt gate. Once a
+        // mod child DL wins, its descendants use the ordinary MM manager.
+        if (mOwner->IsAltAssetsEnabled() && mOwner->GetArchiveManager()->HasFile("alt/" + clean)) {
+            if (const auto resource = Ordinary(clean.c_str()))
+                return resource;
+        }
+        if (const auto resource = Archive(clean.c_str()))
+            return resource;
+        // DeepLoadPatchDl leaves a resolvable missing child on the normal
+        // chain; preserve that last fallback rather than use a donor twin.
+        return mOwner->GetArchiveManager()->HasFile(clean) ? Ordinary(clean.c_str()) : nullptr;
+    }
+    std::shared_ptr<Ship::IResource> operator()(uint64_t hash) {
+        if (mOrdinary) {
+            const auto resource = mOwner->LoadResource(hash);
+            if (resource)
+                mNormal[resource.get()] = true;
+            return resource;
+        }
+        const char* path = MmAssets_HashToPath(hash);
+        return path ? (*this)(path) : nullptr;
+    }
+    // DeepLoadPatchDl leaves matrix resource commands on the normal chain.
+    std::shared_ptr<Ship::IResource> LoadMatrix(const char* path) {
+        return Ordinary(Clean(path).c_str());
+    }
+    std::shared_ptr<Ship::IResource> LoadMatrix(uint64_t hash) {
+        return mOwner->LoadResource(hash);
+    }
+    void Enter(const std::shared_ptr<Fast::DisplayList>& resource) {
+        mScopes.push_back(mOrdinary);
+        mOrdinary = mNormal.contains(resource.get());
+    }
+    void Leave() {
+        mOrdinary = mScopes.back();
+        mScopes.pop_back();
+    }
+    bool IsMaterialDisplayList(uintptr_t address) const {
+        // DrawOotBiggoronSwordReal installs only its texture scroll here.
+        return address == 0x08000001;
+    }
+
+  private:
+    static std::string Clean(const char* path) {
+        const std::string clean = path ? path : "";
+        return clean.starts_with("__OTR__") ? clean.substr(7) : clean;
+    }
+    std::shared_ptr<Ship::IResource> Ordinary(const char* path) {
+        const auto resource = mOwner->LoadResource(path);
+        if (resource)
+            mNormal[resource.get()] = true;
+        return resource;
+    }
+    inline static std::vector<std::shared_ptr<Ship::Archive>> sArchives;
+    inline static std::unordered_map<std::string, std::shared_ptr<Ship::IResource>> sResources;
+    std::shared_ptr<Ship::ResourceManager> mOwner;
+    std::unordered_map<const Ship::IResource*, bool> mNormal;
+    std::vector<bool> mScopes;
+    bool mOrdinary = false, mRoot = true;
+};
+
+// 0 means the primary donor is absent, -1 means a present graph cannot be
+// bounded, and 1 supplies a complete fit. Only absence selects native fallback.
+extern "C" int MmAssets_GetOotGiModelFit(const char* path, float scale, float tilt, int presentation, float fit[2]) {
+    if (!path || !fit || !std::isfinite(scale) || scale <= 0.f || !std::isfinite(tilt) ||
+        !MmAssets_OotArchivesLoaded() || !OTRGlobals::Instance || !OTRGlobals::Instance->context)
+        return 0;
+    const auto owner = OTRGlobals::Instance->context->GetResourceManager();
+    if (!owner)
+        return 0;
+    try {
+        Ship::ResourceManagerScope scope(owner);
+        OotGiResourceLoader load(owner);
+        if (!load.Archive(path))
+            return 0;
+        NeiGi::FrameBounds bounds{};
+        NeiGi::ModelBoundsReader<OotGiResourceLoader> reader(load, tilt);
+        if (!reader.Read(path, bounds))
+            return -1;
+        const auto correction =
+            NeiGi::FrameFit(bounds, scale, presentation == 1, presentation >= 2 ? presentation - 1 : 0);
+        fit[0] = correction.scale;
+        fit[1] = correction.lift;
+        return 1;
+    } catch (...) { return -1; }
 }
 
 /**

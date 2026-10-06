@@ -1,4 +1,5 @@
 #include "SohMenu.h"
+#include "../../../combo/NeiGracePolicy.h"
 #include "soh/Enhancements/randomizer/NeiGiPresentation.h"
 #include "soh/OTRGlobals.h"
 #include "UIWidgets.hpp"
@@ -1337,6 +1338,43 @@ void RegisterNEIMenu() {
                               "Single item: one wand in the pool; finding it unlocks all six rods.\n"
                               "Elemental shuffle: the six rods are separate items; the first found also\n"
                               "grants the wand itself."));
+
+    // Combo uses one MM-backed choice for both source pools, even with general
+    // settings sync disabled. Standalone SoH uses its own saved rando option.
+#ifdef COMBO_BUILD
+    static constexpr const char* graceModeCvar = "gRando.Options.RO_HYLIAS_GRACE";
+    static constexpr const char* graceRewardsCvar = "gRando.Options.RO_HYLIAS_GRACE_REWARDS";
+#else
+    static constexpr const char* graceModeCvar = CVAR_RANDOMIZER_SETTING("HyliasGrace");
+    static constexpr const char* graceRewardsCvar = CVAR_RANDOMIZER_SETTING("HyliasGraceRewards");
+#endif
+    static std::map<int32_t, const char*> graceModeMap = {
+        { NEI_GRACE_ON, "On" },
+        { NEI_GRACE_OFF, "Off" },
+        { NEI_GRACE_GATED, "Gated" },
+    };
+    mSohMenu->AddWidget(path, "Hylia's Grace", WIDGET_CVAR_COMBOBOX)
+        .CVar(graceModeCvar)
+        .RaceDisable(false)
+        .PreFunc(
+            [](WidgetInfo& info) { info.options->disabled = CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0; })
+        .Options(ComboboxOptions()
+                     .ComboMap(graceModeMap)
+                     .DefaultIndex(NEI_GRACE_OFF)
+                     .Tooltip("On: include fairy flight in the seed. Off: exclude it.\n"
+                              "Gated: include it, but require collected dungeon rewards to cast.\n"
+                              "This choice is saved with the seed; menu edits apply to the next seed.\n"
+                              "Gated fairy flight is optional in the solver."));
+    mSohMenu->AddWidget(path, "Grace Dungeon Rewards Required", WIDGET_CVAR_SLIDER_INT)
+        .CVar(graceRewardsCvar)
+        .RaceDisable(false)
+        .PreFunc([](WidgetInfo& info) {
+            info.options->disabled = CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0 ||
+                                     CVarGetInteger(graceModeCvar, NEI_GRACE_OFF) != NEI_GRACE_GATED;
+        })
+        .Options(IntSliderOptions().Min(0).Max(13).DefaultValue(4).Tooltip(
+            "Counts collected OoT spiritual stones/medallions and MM boss remains.\n"
+            "Magic is still required. A combined seed offers thirteen distinct rewards."));
 
     mSohMenu->AddWidget(path, "Crossover Items", WIDGET_SEPARATOR_TEXT);
 

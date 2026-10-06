@@ -389,7 +389,7 @@ s32 EnGirlA_TryChangeShopItemShip(EnGirlA* this, PlayState* play) {
     } else if (this->actor.params == SI_RANDOMIZED_ITEM) {
         ShopItemIdentity shopItemIdentity = Randomizer_IdentifyShopItem(play->sceneNum, this->randoSlotIndex);
         if (Flags_GetRandomizerInf(shopItemIdentity.identity.randomizerInf)) {
-            this->actor.params = SI_SOLD_OUT;
+            this->actor.params = this->randoOriginalShopItem >= 0 ? this->randoOriginalShopItem : SI_SOLD_OUT;
             GetItemEntry getItemEntry = Randomizer_GetItemFromKnownCheckWithoutObtainabilityCheck(
                 shopItemIdentity.identity.randomizerCheck, shopItemIdentity.ogItemId);
 

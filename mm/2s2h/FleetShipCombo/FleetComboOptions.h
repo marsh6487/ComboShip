@@ -44,5 +44,7 @@
     X("shovelOwned",     shovelOwned,     FCO_MERGE_MAX)          \
     X("dominionOwned",   dominionOwned,   FCO_MERGE_MAX)          \
     X("pokeballOwned",   pokeballOwned,   FCO_MERGE_MAX)          \
-    X("bombArrowsOwned", bombArrowsOwned, FCO_MERGE_MAX)
+    X("bombArrowsOwned", bombArrowsOwned, FCO_MERGE_MAX)         \
+    X("hyliasGraceOwned", hyliasGraceOwned, FCO_MERGE_MAX)       \
+    X("phantomHourglassOwned", phantomHourglassOwned, FCO_MERGE_MAX)
 // clang-format on

@@ -1,10 +1,12 @@
 ﻿#include "../../combo/menu/ItemGrantAuditBridge.h"
 #include "OTRGlobals.h"
 #include "OTRAudio.h"
+#include "CrashHandlerExt.h"
 #include "Enhancements/Graphics/PreludeLoadProbe.h"
 #include "Enhancements/debugger/FrameTimingProbe.h"
 #include "ComboExport.h"
 #include "ComboResolve.h"
+#include "../../combo/NeiGracePolicy.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -22,6 +24,7 @@
 #include "ResourceManagerHelpers.h"
 #include <fast/Fast3dWindow.h>
 #include <libultraship/bridge/audiobridge.h>
+#include <libultraship/bridge/crashhandlerbridge.h>
 #include <libultraship/bridge/gfxdebuggerbridge.h>
 #include <libultraship/bridge/windowbridge.h>
 #include <ship/Context.h>
@@ -4410,6 +4413,8 @@ extern "C" bool WindowIsRunning(void);
 
 extern "C" COMBO_EXPORT void SOH_ResumeGame(void) {
     ItemGrantAudit::Scope itemGrantAuditScope("SOH_ResumeGame");
+    // The resident games share the crash handler; restore OoT's reporter before resume.
+    CrashHandlerRegisterCallback(CrashHandler_PrintSohData);
     auto ctx = Ship::Context::GetRawInstance();
     // Flush every log line immediately so the resume diagnostics survive a hard crash (the console
     // window closes on crash; the log file is what we read afterward).
@@ -4766,6 +4771,18 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoSettings(void) {
     return cached.c_str();
 }
 
+// One policy for NEW combined seeds, independent of the general settings-sync
+// preference. The MM option is shared by the combo menus and governs both pools.
+// Replays restore their existing snapshots instead of calling this normalizer.
+extern "C" COMBO_EXPORT void SOH_NormalizeComboGraceFromMM(void) {
+    const auto mode = NeiGrace_SeedMode(CVarGetInteger("gRando.Options.RO_HYLIAS_GRACE", NEI_GRACE_OFF));
+    const auto rewards = NeiGrace_SeedRequired(CVarGetInteger("gRando.Options.RO_HYLIAS_GRACE_REWARDS", 4));
+    CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE", mode);
+    CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE_REWARDS", rewards);
+    CVarSetInteger(CVAR_RANDOMIZER_SETTING("HyliasGrace"), mode);
+    CVarSetInteger(CVAR_RANDOMIZER_SETTING("HyliasGraceRewards"), rewards);
+}
+
 // ComboShip: restore OOT rando settings from a {cvarName:value} snapshot (written by
 // SOH_DumpRandoSettings into the consolidated spoiler). Used by the reload/drop path so a seed plays
 // with its own settings; SOH_PrepRandoContext then pushes them into the Context via SetAllToContext.
@@ -4777,6 +4794,12 @@ extern "C" COMBO_EXPORT void SOH_RestoreRandoSettings(const char* json) {
         // Snapshot is authoritative: pre-clear so a spoiler without the key (pre-GAP-7, generated
         // with no exclusions applied) doesn't inherit this machine's local exclusions.
         CVarSetString(CVAR_RANDOMIZER_SETTING("ExcludedLocations"), "");
+        // Older seed snapshots predate this information option. They must not
+        // inherit a local menu choice when loaded on a newer build.
+        CVarSetInteger(CVAR_RANDOMIZER_SETTING("MapsCompassesGiveInformation"), 0);
+        // Pre-policy seeds included Grace whenever NEI was enabled.
+        CVarSetInteger(CVAR_RANDOMIZER_SETTING("HyliasGrace"), NEI_GRACE_ON);
+        CVarSetInteger(CVAR_RANDOMIZER_SETTING("HyliasGraceRewards"), 4);
         for (auto it = j.begin(); it != j.end(); ++it) {
             if (it.value().is_string())
                 CVarSetString(it.key().c_str(), it.value().get<std::string>().c_str());
@@ -5392,6 +5415,8 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoHintData(void) {
             { "startingMasterSword", static_cast<int>(ctx->GetOption(RSK_STARTING_MASTER_SWORD).Get()) },
             { "warpSongHints", static_cast<int>(ctx->GetOption(RSK_WARP_SONG_HINTS).Get()) },
             { "totAltarHint", static_cast<int>(ctx->GetOption(RSK_TOT_ALTAR_HINT).Get()) },
+            { "mapsCompassesGiveInformation",
+              static_cast<int>(ctx->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Get()) },
             // Area-type NPC item hints (staticHintInfoMap rows with targetItems) the combo composer
             // builds itself — native's FindItemsAndMarkHinted can't see an item cross-placed into MM.
             { "sheikLaHint", static_cast<int>(ctx->GetOption(RSK_SHEIK_LA_HINT).Get()) },
@@ -5614,6 +5639,30 @@ Combo_WalkComboHints(const nlohmann::json& hints, const std::function<bool(Rando
         emit(rh, checkName, messages);
         ++applied;
     }
+}
+
+// The tracker also displays baked altar messages from older seeds. Reuse the
+// native requirement-only builder after the selected slot's Context is loaded;
+// constructing a MESSAGE hint does not mark checks hinted or choose random names.
+extern "C" COMBO_EXPORT const char* SOH_DumpAltarHintMessages(void) {
+    static thread_local std::string cached;
+    cached = "{}";
+    try {
+        if (!OTRGlobals::Instance || !OTRGlobals::Instance->gRandoContext ||
+            !OTRGlobals::Instance->gRandoContext->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Is(RO_GENERIC_ON))
+            return cached.c_str();
+        nlohmann::json messages = nlohmann::json::object();
+        for (const auto& [key, name] : std::array<std::pair<RandomizerHint, const char*>, 2>{
+                 { { RH_ALTAR_CHILD, "__ALTAR_CHILD__" }, { RH_ALTAR_ADULT, "__ALTAR_ADULT__" } } }) {
+            const Rando::Hint hint(key, std::vector<CustomMessage>{});
+            const auto message = hint.GetHintMessage(MF_RAW);
+            messages[name] = nlohmann::json::array({ { { "en", message.GetEnglish(MF_RAW) },
+                                                       { "de", message.GetGerman(MF_RAW) },
+                                                       { "fr", message.GetFrench(MF_RAW) } } });
+        }
+        cached = messages.dump();
+    } catch (...) {}
+    return cached.c_str();
 }
 
 // ComboShip (#164): the launcher's combo Hint Tracker reveal sink.

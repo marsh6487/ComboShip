@@ -4,6 +4,7 @@
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
 #include "soh/Enhancements/randomizer/rng.h"
 #include "soh/OTRGlobals.h"
+#include "../../../../combo/NeiGracePolicy.h"
 
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -1440,6 +1441,7 @@ void Settings::CreateOptions() {
     OPT_U8(RSK_HINT_CLARITY, "Hint Clarity", {"Obscure", "Ambiguous", "Clear"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("HintClarity"), mOptionDescriptions[RSK_HINT_CLARITY], WIDGET_CVAR_COMBOBOX, RO_HINT_CLARITY_CLEAR, true, nullptr, IMFLAG_INDENT);
     OPT_U8(RSK_HINT_DISTRIBUTION, "Hint Distribution", {"Useless", "Balanced", "Strong", "Very Strong"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("HintDistribution"), mOptionDescriptions[RSK_HINT_DISTRIBUTION], WIDGET_CVAR_COMBOBOX, RO_HINT_DIST_BALANCED, true, nullptr, IMFLAG_UNINDENT);
     OPT_BOOL(RSK_TOT_ALTAR_HINT, "ToT Altar Hint", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("AltarHint"), mOptionDescriptions[RSK_TOT_ALTAR_HINT], WIDGET_CVAR_CHECKBOX, RO_GENERIC_ON, false, nullptr, IMFLAG_INDENT);
+    OPT_BOOL(RSK_MAPS_COMPASSES_GIVE_INFORMATION, "Maps and Compasses Give Information", CVAR_RANDOMIZER_SETTING("MapsCompassesGiveInformation"), mOptionDescriptions[RSK_MAPS_COMPASSES_GIVE_INFORMATION], IMFLAG_NONE, WIDGET_CVAR_CHECKBOX, RO_GENERIC_OFF);
     OPT_BOOL(RSK_GANONDORF_HINT, "Ganondorf Hint", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("GanondorfHint"), mOptionDescriptions[RSK_GANONDORF_HINT], WIDGET_CVAR_CHECKBOX, RO_GENERIC_ON, false, nullptr, IMFLAG_NONE);
     OPT_BOOL(RSK_SHEIK_LA_HINT, "Sheik Light Arrow Hint", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("SheikLAHint"), mOptionDescriptions[RSK_SHEIK_LA_HINT], WIDGET_CVAR_CHECKBOX, RO_GENERIC_ON, false, nullptr, IMFLAG_NONE);
     OPT_BOOL(RSK_BOSS_KEY_HINT, "Boss Door Hints", CVAR_RANDOMIZER_SETTING("BossKeyHint"), mOptionDescriptions[RSK_BOSS_KEY_HINT], IMFLAG_NONE);
@@ -1470,7 +1472,7 @@ void Settings::CreateOptions() {
     // ComboShip: unreadable (portal scene) and force-disabled in FinalizeSettings — don't offer the toggle.
     mOptions[RSK_MASK_SHOP_HINT].Hide();
 #endif
-    // TODO: Compasses show rewards/woth, maps show dungeon mode
+    // Map/compass information is configured with the static hints above.
     OPT_BOOL(RSK_BLUE_FIRE_ARROWS, "Blue Fire Arrows", CVAR_RANDOMIZER_SETTING("BlueFireArrows"), mOptionDescriptions[RSK_BLUE_FIRE_ARROWS]);
     OPT_BOOL(RSK_SUNLIGHT_ARROWS, "Sunlight Arrows", CVAR_RANDOMIZER_SETTING("SunlightArrows"), mOptionDescriptions[RSK_SUNLIGHT_ARROWS]);
     OPT_BOOL(RSK_SW97_SPELLS, "Sage Spells", CVAR_RANDOMIZER_SETTING("SW97Spells"), mOptionDescriptions[RSK_SW97_SPELLS]);
@@ -1496,6 +1498,20 @@ void Settings::CreateOptions() {
     OPT_U8(RSK_ELEMENTAL_WAND_SHUFFLE, "Elemental Wand", { "Medallions", "Single item", "Elemental shuffle" },
            OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ElementalWandShuffle"),
            mOptionDescriptions[RSK_ELEMENTAL_WAND_SHUFFLE], WIDGET_CVAR_COMBOBOX, RO_WAND_MEDALLIONS);
+    OPT_U8(RSK_HYLIAS_GRACE, "Hylia's Grace", { "On", "Off", "Gated" }, OptionCategory::Setting,
+           CVAR_RANDOMIZER_SETTING("HyliasGrace"),
+           "On: include fairy flight. Off: exclude it. Gated: require collected dungeon rewards to cast.",
+           WIDGET_CVAR_COMBOBOX, 1);
+    OPT_U8(RSK_HYLIAS_GRACE_REWARDS, "Grace Dungeon Rewards Required", {NumOpts(0, 13)}, OptionCategory::Setting,
+           CVAR_RANDOMIZER_SETTING("HyliasGraceRewards"), "Counts OoT stones/medallions and MM boss remains.",
+           WIDGET_CVAR_SLIDER_INT, 4, true);
+    OPT_CALLBACK(RSK_HYLIAS_GRACE, {
+        if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("HyliasGrace"), 1) == 2) {
+            mOptions[RSK_HYLIAS_GRACE_REWARDS].Unhide();
+        } else {
+            mOptions[RSK_HYLIAS_GRACE_REWARDS].Hide();
+        }
+    });
     OPT_BOOL(RSK_QUARTER_HEART, "Quarter Heart", CVAR_RANDOMIZER_SETTING("QuarterHeart"), "Adds Quarter Heart upgrades to the item pool. Each one permanently increases maximum health by a quarter heart. Replaces heart containers and heart pieces.");
     OPT_BOOL(RSK_DEFENSE_UPGRADE, "Defense Upgrade", CVAR_RANDOMIZER_SETTING("DefenseUpgrade"), "Adds Defense Upgrade items to the item pool.\nEach upgrade incrementally reduces incoming damage, scaling up to 50% reduction at the required cap (default 5 items).\nWith Double Defense and a maxed Defense stat, total damage reduction reaches 75%.");
     OPT_CALLBACK(RSK_DEFENSE_UPGRADE, {
@@ -2416,20 +2432,35 @@ void Settings::CreateOptions() {
                                                                    &mOptionGroups[RSG_MENU_SECTION_TRAPS] },
                               WidgetContainerType::COLUMN);
     mOptionGroups[RSG_MENU_SECTION_STATIC_HINTS] = OptionGroup::SubGroup(
-        "Static Hints", { &mOptions[RSK_TOT_ALTAR_HINT],     &mOptions[RSK_GANONDORF_HINT],
-                          &mOptions[RSK_SHEIK_LA_HINT],      &mOptions[RSK_BOSS_KEY_HINT],
-                          &mOptions[RSK_DAMPES_DIARY_HINT],  &mOptions[RSK_GREG_HINT],
-                          &mOptions[RSK_LOACH_HINT],         &mOptions[RSK_SARIA_HINT],
-                          &mOptions[RSK_MIDO_HINT],          &mOptions[RSK_FROGS_HINT],
-                          &mOptions[RSK_OOT_HINT],           &mOptions[RSK_BIGGORON_HINT],
-                          &mOptions[RSK_BIG_POES_HINT],      &mOptions[RSK_CHICKENS_HINT],
-                          &mOptions[RSK_MALON_HINT],         &mOptions[RSK_HBA_HINT],
-                          &mOptions[RSK_FISHING_POLE_HINT],  &mOptions[RSK_WARP_SONG_HINTS],
-                          &mOptions[RSK_SCRUB_TEXT_HINT],    &mOptions[RSK_MERCHANT_TEXT_HINT],
-                          &mOptions[RSK_KAK_10_SKULLS_HINT], &mOptions[RSK_KAK_20_SKULLS_HINT],
-                          &mOptions[RSK_KAK_30_SKULLS_HINT], &mOptions[RSK_KAK_40_SKULLS_HINT],
-                          &mOptions[RSK_KAK_50_SKULLS_HINT], &mOptions[RSK_KAK_100_SKULLS_HINT],
-                          &mOptions[RSK_MASK_SHOP_HINT] },
+        "Static Hints",
+        { &mOptions[RSK_TOT_ALTAR_HINT],
+          &mOptions[RSK_MAPS_COMPASSES_GIVE_INFORMATION],
+          &mOptions[RSK_GANONDORF_HINT],
+          &mOptions[RSK_SHEIK_LA_HINT],
+          &mOptions[RSK_BOSS_KEY_HINT],
+          &mOptions[RSK_DAMPES_DIARY_HINT],
+          &mOptions[RSK_GREG_HINT],
+          &mOptions[RSK_LOACH_HINT],
+          &mOptions[RSK_SARIA_HINT],
+          &mOptions[RSK_MIDO_HINT],
+          &mOptions[RSK_FROGS_HINT],
+          &mOptions[RSK_OOT_HINT],
+          &mOptions[RSK_BIGGORON_HINT],
+          &mOptions[RSK_BIG_POES_HINT],
+          &mOptions[RSK_CHICKENS_HINT],
+          &mOptions[RSK_MALON_HINT],
+          &mOptions[RSK_HBA_HINT],
+          &mOptions[RSK_FISHING_POLE_HINT],
+          &mOptions[RSK_WARP_SONG_HINTS],
+          &mOptions[RSK_SCRUB_TEXT_HINT],
+          &mOptions[RSK_MERCHANT_TEXT_HINT],
+          &mOptions[RSK_KAK_10_SKULLS_HINT],
+          &mOptions[RSK_KAK_20_SKULLS_HINT],
+          &mOptions[RSK_KAK_30_SKULLS_HINT],
+          &mOptions[RSK_KAK_40_SKULLS_HINT],
+          &mOptions[RSK_KAK_50_SKULLS_HINT],
+          &mOptions[RSK_KAK_100_SKULLS_HINT],
+          &mOptions[RSK_MASK_SHOP_HINT] },
         WidgetContainerType::SECTION, "This setting adds some hints at locations other than Gossip Stones.");
     mOptionGroups[RSG_MENU_COLUMN_STATIC_HINTS] =
         OptionGroup::SubGroup("", { &mOptionGroups[RSG_MENU_SECTION_STATIC_HINTS] }, WidgetContainerType::COLUMN);
@@ -2820,47 +2851,47 @@ void Settings::CreateOptions() {
                                                                           &mOptions[RSK_SKIP_PLANTING_BEANS],
                                                                           &mOptions[RSK_BIG_POE_COUNT],
                                                                       });
-    mOptionGroups[RSG_MISC] = OptionGroup("Miscellaneous Settings",
-                                          {
-                                              &mOptions[RSK_GOSSIP_STONE_HINTS],
-                                              &mOptions[RSK_HINT_CLARITY],
-                                              &mOptions[RSK_HINT_DISTRIBUTION],
-                                              &mOptions[RSK_TOT_ALTAR_HINT],
-                                              &mOptions[RSK_GANONDORF_HINT],
-                                              &mOptions[RSK_SHEIK_LA_HINT],
-                                              &mOptions[RSK_BOSS_KEY_HINT],
-                                              &mOptions[RSK_DAMPES_DIARY_HINT],
-                                              &mOptions[RSK_GREG_HINT],
-                                              &mOptions[RSK_LOACH_HINT],
-                                              &mOptions[RSK_SARIA_HINT],
-                                              &mOptions[RSK_MIDO_HINT],
-                                              &mOptions[RSK_FROGS_HINT],
-                                              &mOptions[RSK_OOT_HINT],
-                                              &mOptions[RSK_WARP_SONG_HINTS],
-                                              &mOptions[RSK_BIGGORON_HINT],
-                                              &mOptions[RSK_BIG_POES_HINT],
-                                              &mOptions[RSK_CHICKENS_HINT],
-                                              &mOptions[RSK_MALON_HINT],
-                                              &mOptions[RSK_HBA_HINT],
-                                              &mOptions[RSK_KAK_10_SKULLS_HINT],
-                                              &mOptions[RSK_KAK_20_SKULLS_HINT],
-                                              &mOptions[RSK_KAK_30_SKULLS_HINT],
-                                              &mOptions[RSK_KAK_40_SKULLS_HINT],
-                                              &mOptions[RSK_KAK_50_SKULLS_HINT],
-                                              &mOptions[RSK_KAK_100_SKULLS_HINT],
-                                              &mOptions[RSK_MASK_SHOP_HINT],
-                                              &mOptions[RSK_SCRUB_TEXT_HINT],
-                                              &mOptions[RSK_MERCHANT_TEXT_HINT],
-                                              &mOptions[RSK_FISHING_POLE_HINT],
-                                              // TODO: Compasses show Reward/WOTH, Maps show Dungeon Mode, Starting Time
-                                              &mOptions[RSK_DAMAGE_MULTIPLIER],
-                                              &mOptions[RSK_BLUE_FIRE_ARROWS],
-                                              &mOptions[RSK_SUNLIGHT_ARROWS],
-                                              &mOptions[RSK_SW97_SPELLS],
-                                              &mOptions[RSK_INFINITE_UPGRADES],
-                                              &mOptions[RSK_SKELETON_KEY],
-                                              &mOptions[RSK_SLINGBOW_BREAK_BEEHIVES],
-                                          });
+    mOptionGroups[RSG_MISC] = OptionGroup("Miscellaneous Settings", {
+                                                                        &mOptions[RSK_GOSSIP_STONE_HINTS],
+                                                                        &mOptions[RSK_HINT_CLARITY],
+                                                                        &mOptions[RSK_HINT_DISTRIBUTION],
+                                                                        &mOptions[RSK_TOT_ALTAR_HINT],
+                                                                        &mOptions[RSK_MAPS_COMPASSES_GIVE_INFORMATION],
+                                                                        &mOptions[RSK_GANONDORF_HINT],
+                                                                        &mOptions[RSK_SHEIK_LA_HINT],
+                                                                        &mOptions[RSK_BOSS_KEY_HINT],
+                                                                        &mOptions[RSK_DAMPES_DIARY_HINT],
+                                                                        &mOptions[RSK_GREG_HINT],
+                                                                        &mOptions[RSK_LOACH_HINT],
+                                                                        &mOptions[RSK_SARIA_HINT],
+                                                                        &mOptions[RSK_MIDO_HINT],
+                                                                        &mOptions[RSK_FROGS_HINT],
+                                                                        &mOptions[RSK_OOT_HINT],
+                                                                        &mOptions[RSK_WARP_SONG_HINTS],
+                                                                        &mOptions[RSK_BIGGORON_HINT],
+                                                                        &mOptions[RSK_BIG_POES_HINT],
+                                                                        &mOptions[RSK_CHICKENS_HINT],
+                                                                        &mOptions[RSK_MALON_HINT],
+                                                                        &mOptions[RSK_HBA_HINT],
+                                                                        &mOptions[RSK_KAK_10_SKULLS_HINT],
+                                                                        &mOptions[RSK_KAK_20_SKULLS_HINT],
+                                                                        &mOptions[RSK_KAK_30_SKULLS_HINT],
+                                                                        &mOptions[RSK_KAK_40_SKULLS_HINT],
+                                                                        &mOptions[RSK_KAK_50_SKULLS_HINT],
+                                                                        &mOptions[RSK_KAK_100_SKULLS_HINT],
+                                                                        &mOptions[RSK_MASK_SHOP_HINT],
+                                                                        &mOptions[RSK_SCRUB_TEXT_HINT],
+                                                                        &mOptions[RSK_MERCHANT_TEXT_HINT],
+                                                                        &mOptions[RSK_FISHING_POLE_HINT],
+                                                                        // TODO: Starting Time
+                                                                        &mOptions[RSK_DAMAGE_MULTIPLIER],
+                                                                        &mOptions[RSK_BLUE_FIRE_ARROWS],
+                                                                        &mOptions[RSK_SUNLIGHT_ARROWS],
+                                                                        &mOptions[RSK_SW97_SPELLS],
+                                                                        &mOptions[RSK_INFINITE_UPGRADES],
+                                                                        &mOptions[RSK_SKELETON_KEY],
+                                                                        &mOptions[RSK_SLINGBOW_BREAK_BEEHIVES],
+                                                                    });
     mOptionGroups[RSG_ITEM_POOL] =
         OptionGroup("Item Pool Settings", std::initializer_list<Option*>({ &mOptions[RSK_ITEM_POOL] }));
     // TODO: Progressive Goron Sword, Remove Double Defense
@@ -3519,6 +3550,13 @@ void Context::FinalizeSettings(const std::set<RandomizerCheck>& excludedLocation
 void Settings::ParseJson(const nlohmann::json& spoilerFileJson) {
     mContext->SetSeedString(spoilerFileJson.at("seed").get<std::string>());
     mContext->SetSeed(spoilerFileJson.at("finalSeed").get<uint32_t>());
+    // A native spoiler from before this option must not retain the setting
+    // from a previously loaded seed in the same Context.
+    mContext->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Set(RO_GENERIC_OFF);
+    // Pre-policy spoilers included Grace without a gate. Loading one after a
+    // newer seed must restore that behavior rather than inherit its restriction.
+    mContext->GetOption(RSK_HYLIAS_GRACE).Set(NEI_GRACE_ON);
+    mContext->GetOption(RSK_HYLIAS_GRACE_REWARDS).Set(4);
     nlohmann::json settingsJson = spoilerFileJson.value("settings", nlohmann::json());
     for (auto it = settingsJson.begin(); it != settingsJson.end(); ++it) {
         // todo load into cvars for UI

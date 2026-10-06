@@ -1,4 +1,5 @@
 #include "Logic.h"
+#include "../../../../combo/NeiGracePolicy.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "2s2h/FleetShipCombo/FleetShipCombo.h" // FleetShipCombo_GetActiveGame (combo-only items)
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -580,8 +581,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     // Off by default: turning it on by default would silently change every existing seed.
     if (saveInfo.randoSaveOptions[RO_SHUFFLE_NEI_ITEMS] == RO_GENERIC_YES) {
         // The page-2 items, one copy each.
-        // 2026-08-06 re-layout: Hylia's Grace is OUT (item retired outright — its RI gives nothing
-        // now); the four new page-2 cells are IN as behaviorless-but-real items.
+        // Grace and the hourglass are independently obtainable siblings over cell 41.
         static const RandoItemId sNeiPoolItems[] = {
             RI_OOT_NEI_BALL_AND_CHAIN,
             RI_OOT_NEI_BEETLE,
@@ -604,7 +604,6 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             RI_OOT_NEI_ZONAI_PERMAFROST,
             RI_OOT_NEI_PHANTOM_HOURGLASS,
             RI_OOT_NEI_SHADOW_CRYSTAL,
-            RI_OOT_NEI_ROD_OF_SEASONS,
             RI_OOT_NEI_SEASON_SPRING,
             RI_OOT_NEI_SEASON_SUMMER,
             RI_OOT_NEI_SEASON_AUTUMN,
@@ -618,6 +617,9 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         };
         for (RandoItemId neiItem : sNeiPoolItems) {
             itemPool.push_back(neiItem);
+        }
+        if (NeiGrace_InPool(saveInfo.randoSaveOptions[RO_HYLIAS_GRACE])) {
+            itemPool.push_back(RI_OOT_NEI_HYLIAS_GRACE);
         }
 
         // BOTH Roc's Feathers. They are DIFFERENT items sharing nothing but a name, and each has to

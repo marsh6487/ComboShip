@@ -160,6 +160,13 @@ void BoxMenu_Update(PlayState* play) {
 
     sBoxMPulse++;
 
+    // A zero hold button is a latched prompt (Rod of Seasons): A confirms, B cancels.
+    if (sBoxMHoldButton == 0 && CHECK_BTN_ALL(input->press.button, BTN_A)) {
+        BoxMenu_PlaySfx(NA_SE_SY_DECIDE);
+        BoxMenu_Close(play, 1);
+        return;
+    }
+
     // Release of the hold button confirms. The button is usually still down on the frame we open,
     // but if the caller opened on a press that had already been consumed we must not close on the
     // very first frame — wait until we have actually SEEN it down.

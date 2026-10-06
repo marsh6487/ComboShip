@@ -6,6 +6,10 @@
 #include "2s2h/Rando/DrawFuncs.h"
 #include "2s2h_assets.h"
 #include "Rando/SpinAttackGi.h"
+#include "2s2h/CustomItem/CustomItem.h"
+#include "ComboSongDrawMM.h"
+#include "ComboItemIconOwnership.h"
+#include "../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "mods/nei_save.h"                     // NeiSaveData chain tiers for progressive get-item draws
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_OOT_SWORD_* registry indices (chain tiers)
 
@@ -26,6 +30,9 @@ extern "C" {
 
 Gfx* ResourceMgr_LoadGfxByName(const char* path);
 u8 ResourceMgr_FileExists(const char* resName);
+u8 ResourceMgr_FileAltExists(const char* resName);
+bool ResourceMgr_IsAltAssetsEnabled();
+int ResourceMgr_IsModAsset(const char* path);
 void* OotAssets_LoadGfx(const char* otrPath);        // Skijer's NEI — resolve an OoT model DL from oot.o2r
 void* OotAssets_LoadGfxDirect(const char* otrPath);  // Skijer's NEI — archive-scoped load (defeats MM shadowing)
 void* OotAssets_LoadTexOrDList(const char* otrPath); // Skijer's NEI — texture/DL resource (Climb ladder seg-8 tex)
@@ -39,6 +46,7 @@ extern Gfx gIKAxeInlineDL[];                         // equipment/objects/ikaxe_
 
 #define COMBO_MASK_SHIMMER_HOST_MM
 #include "ComboMaskShimmer.h"
+#include "ComboOotBottleShimmerMM.h"
 #undef COMBO_MASK_SHIMMER_HOST_MM
 
 #ifdef COMBO_BUILD
@@ -51,12 +59,36 @@ void DrawOotNeiCaneOfSomaria(RandoItemId skill);
 void DrawOotNeiUltrahand();
 #include "ComboForeignDrawMM.h"
 
+extern "C" int32_t MM_GetItemAnimDrawInfo(const char* itemName, CwItemAnimDrawInfo* out);
+
+// Native MM and the foreign bridge use one selected-asset route for Twinmold's
+// head GI, including flex replacement matrices, blue skin and native soul flame.
+extern "C" int32_t ComboDrawNativeTwinmoldSoul() {
+    if (gPlayState == nullptr) {
+        return 0;
+    }
+    CwItemAnimDrawInfo info{};
+    const std::string& name = Rando::StaticData::GetItemDisplayName(RI_SOUL_BOSS_TWINMOLD);
+    if (MM_GetItemAnimDrawInfo(name.c_str(), &info) != 1) {
+        return 0;
+    }
+    Matrix_Push();
+    const int32_t drawn = ComboForeignAnim_Draw(&info, "mm", gPlayState);
+    Matrix_Pop();
+    return drawn;
+}
+
 extern "C" void Message_StageCustomItemIconEx(void* tex, s16 width, s16 height, u8 isIA8);
+extern "C" void Message_StageCustomItemIconTint(void* tex, s16 width, s16 height, u8 isIA8, u8 r, u8 g, u8 b);
 
 uint8_t Rando::ComboForeignMessageIcon(RandoCheckId check) {
     const auto* item = Rando::MiscBehavior::MM_LookupForeign(check);
     if (!item || item->itemGame != ComboRando::GAME_OOT || item->trap)
         return 0xFE;
+    if (ComboIconIsIkanaShieldName(item->itemName.c_str())) {
+        Message_StageCustomItemIconEx((void*)COMBO_IKANA_SHIELD_ICON, 32, 32, false);
+        return 0xF5;
+    }
     static Fn_GetItemIconInfo getIcon = nullptr;
     if (!getIcon)
         getIcon = (Fn_GetItemIconInfo)Combo_ResolveSym("soh", "OOT_GetItemIconInfo");
@@ -65,10 +97,16 @@ uint8_t Rando::ComboForeignMessageIcon(RandoCheckId check) {
     CwItemIconInfo icon{};
     if (getIcon(item->itemName.c_str(), &icon) != 1 || !icon.path || std::strncmp(icon.path, "__OTR__", 7) != 0 ||
         (icon.width < 1 || icon.width > 64 || icon.height < 1 || icon.height > 64 ||
-         (icon.isIA8 != 0 && icon.isIA8 != 1)))
+         (icon.isIA8 != 0 && icon.isIA8 != 1) || (icon.hasColor != 0 && icon.hasColor != 1)))
         return 0xFE;
-    const char* routed = ComboInternRoutedPathOOT(std::string("__OTR__@oot:") + (icon.path + 7));
-    Message_StageCustomItemIconEx((void*)routed, (s16)icon.width, (s16)icon.height, (u8)icon.isIA8);
+    const char* routed = ComboIconUsesMmOwnership(icon.path)
+                             ? icon.path
+                             : ComboInternRoutedPathOOT(std::string("__OTR__@oot:") + (icon.path + 7));
+    if (icon.hasColor)
+        Message_StageCustomItemIconTint((void*)routed, (s16)icon.width, (s16)icon.height, (u8)icon.isIA8, icon.color[0],
+                                        icon.color[1], icon.color[2]);
+    else
+        Message_StageCustomItemIconEx((void*)routed, (s16)icon.width, (s16)icon.height, (u8)icon.isIA8);
     return 0xF5;
 }
 
@@ -144,94 +182,36 @@ void DrawStrayFairy(RandoItemId randoItemId) {
 }
 
 void DrawSong(RandoItemId randoItemId) {
-    OPEN_DISPS(gPlayState->state.gfxCtx);
-
-    Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
-
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gPlayState->state.gfxCtx);
-
-    switch (randoItemId) {
-        case RI_SONG_SUN:
-            gDPSetEnvColor(POLY_XLU_DISP++, 237, 231, 62, 255);
-            break;
-        case RI_SONG_DOUBLE_TIME:
-        case RI_SONG_INVERTED_TIME:
-        case RI_SONG_TIME:
-            gDPSetEnvColor(POLY_XLU_DISP++, 98, 177, 211, 255);
-            break;
-        case RI_SONG_HEALING:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 150, 230, 255);
-            break;
-        case RI_SONG_STORMS:
-            gDPSetEnvColor(POLY_XLU_DISP++, 146, 146, 146, 255);
-            break;
-        case RI_SONG_SARIA:
-        case RI_SONG_SONATA:
-            gDPSetEnvColor(POLY_XLU_DISP++, 98, 255, 98, 255);
-            break;
-        case RI_SONG_SOARING:
-            gDPSetEnvColor(POLY_XLU_DISP++, 200, 160, 255, 255);
-            break;
-        case RI_SONG_ELEGY:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 98, 0, 255);
-            break;
-        case RI_SONG_LULLABY_INTRO:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 100, 100, 255);
-            break;
-        case RI_SONG_LULLABY:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 20, 20, 255);
-            break;
-        case RI_SONG_OATH:
-            gDPSetEnvColor(POLY_XLU_DISP++, 98, 0, 98, 255);
-            break;
-        case RI_SONG_EPONA:
-            gDPSetEnvColor(POLY_XLU_DISP++, 146, 87, 49, 255);
-            break;
-        case RI_SONG_NOVA:
-            gDPSetEnvColor(POLY_XLU_DISP++, 20, 20, 255, 255);
-            break;
-        // Skijer's NEI — OoT (SoH) warp songs. MM renders every song as one note (gGiSongNoteDL) tinted by
-        // env color, so the OoT warp songs reuse that exact note model, tinted to each sage's color.
-        case RI_OOT_SONG_MINUET_OF_FOREST:
-            gDPSetEnvColor(POLY_XLU_DISP++, 98, 255, 98, 255);
-            break;
-        case RI_OOT_SONG_BOLERO_OF_FIRE:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 60, 0, 255);
-            break;
-        case RI_OOT_SONG_SERENADE_OF_WATER:
-            gDPSetEnvColor(POLY_XLU_DISP++, 85, 180, 223, 255);
-            break;
-        // Zelda's Lullaby is not a warp song, but it renders the same way; pink, as in OoT's own UI.
-        case RI_OOT_SONG_ZELDAS_LULLABY:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 120, 200, 255);
-            break;
-        case RI_OOT_SONG_REQUIEM_OF_SPIRIT:
-            gDPSetEnvColor(POLY_XLU_DISP++, 222, 158, 47, 255);
-            break;
-        case RI_OOT_SONG_NOCTURNE_OF_SHADOW:
-            gDPSetEnvColor(POLY_XLU_DISP++, 160, 40, 210, 255);
-            break;
-        case RI_OOT_SONG_PRELUDE_OF_LIGHT:
-            gDPSetEnvColor(POLY_XLU_DISP++, 237, 231, 62, 255);
-            break;
-        // Skijer's NEI — the 3 NEI custom songs (no get-item model on the OoT side either); note tinted to
-        // each song's SoH quest-page ring color (soh z_kaleido_collect.c sMmPageSongs ring colors).
-        case RI_OOT_SONG_FUGUE_OF_HOME:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 170, 50, 255); // amber
-            break;
-        case RI_OOT_SONG_COMMAND_MELODY:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 120, 255, 255); // magenta
-            break;
-        case RI_OOT_SONG_BALLAD_OF_THE_HERO:
-            gDPSetEnvColor(POLY_XLU_DISP++, 255, 230, 120, 255); // gold
-            break;
-        default:
-            break;
+    if (!gPlayState)
+        return;
+    const int song = ComboSongForMmItem(randoItemId);
+    std::array<uint8_t, 4> color{ 220, 225, 240, 255 };
+    if (!ComboSongShimmerColor(song, color.data())) {
+        // These NEI songs have separate quest-page colors and no recovered
+        // themed profile. Preserve their established note presentation.
+        switch (randoItemId) {
+            case RI_OOT_SONG_FUGUE_OF_HOME:
+                color = { 255, 170, 50, 255 };
+                break;
+            case RI_OOT_SONG_COMMAND_MELODY:
+                color = { 255, 120, 255, 255 };
+                break;
+            case RI_OOT_SONG_BALLAD_OF_THE_HERO:
+                color = { 255, 230, 120, 255 };
+                break;
+            default:
+                break;
+        }
     }
-
+    OPEN_DISPS(gPlayState->state.gfxCtx);
+    Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gPlayState->state.gfxCtx);
+    gDPSetEnvColor(POLY_XLU_DISP++, color[0], color[1], color[2], color[3]);
     gSPDisplayList(POLY_XLU_DISP++, (Gfx*)&gGiSongNoteDL);
-
     CLOSE_DISPS(gPlayState->state.gfxCtx);
+    if (ComboSongHasOverlay(song))
+        NeiGi_DrawSongOverlay(gPlayState, song, nullptr);
 }
 
 void DrawDoubleDefense() {
@@ -611,6 +591,14 @@ void DrawTycoonWallet() {
 // archives mount LOWEST. The parent then draws with whatever MM data answers those child paths — the
 // Gerudo Mask rendered as flat grey stone that way. The deep loader patches every child reference to
 // a raw pointer from the OoT archive, which is also what stops the child-miss crashes.
+// The resource manager owns caching and current base/Alt resolution. A
+// winning local mod must precede archive-scoped companion loads as well.
+static Gfx* LoadNeiLegacyGfx(const char* path, bool direct) {
+    if (ResourceMgr_IsModAsset(path))
+        return ResourceMgr_LoadGfxByName(path);
+    return (Gfx*)(direct ? OotAssets_LoadGfxDirect(path) : OotAssets_LoadGfx(path));
+}
+
 static void DrawOotGetItemOpa(const char* otrPath, Gfx** cache) {
     if (*cache == NULL) {
         *cache = (Gfx*)OotAssets_LoadGfxDirect(otrPath);
@@ -657,9 +645,13 @@ void DrawOotBeanSoul() {
     DrawOotGetItemOpa("__OTR__objects/object_gi_bean/gGiBeanDL", &sCache);
 }
 
-// Native MM soul flame, tinted per OoT boss, plus the NEI skull from 2ship.o2r.
-// The effect can draw independently while the custom skull archive becomes ready.
+// Prefer the owning OoT model/animation recipe for imported boss souls. The
+// standalone fallback can draw its flame/skull while the OoT module is unavailable.
 void DrawOotBossSoul(RandoItemId randoItemId) {
+#ifdef COMBO_BUILD
+    if (MM_TryDrawOotBossSoul(randoItemId))
+        return;
+#endif
     static Gfx* sSkull = NULL;
     if (sSkull == NULL) {
         sSkull = ResourceMgr_LoadGfxByName("__OTR__objects/object_boss_soul/gGIBossSoulSkullDL");
@@ -767,12 +759,8 @@ static void DrawOotGetItemOpaOpa(const char* pathA, Gfx** cacheA, const char* pa
 static void DrawOotGetItemOpaXlu(const char* opaPath, Gfx** opaCache, const char* xluPath, Gfx** xluCache) {
     // Deep loader — see the note on DrawOotGetItemOpa. This helper is the one that crashed in the
     // 2026-08-13 log (0xC0000005 inside ResourceMgr_LoadGfxByName on a null resource).
-    if (*opaCache == NULL) {
-        *opaCache = (Gfx*)OotAssets_LoadGfxDirect(opaPath);
-    }
-    if (*xluCache == NULL) {
-        *xluCache = (Gfx*)OotAssets_LoadGfxDirect(xluPath);
-    }
+    *opaCache = LoadNeiLegacyGfx(opaPath, true);
+    *xluCache = LoadNeiLegacyGfx(xluPath, true);
     if (*opaCache == NULL || *xluCache == NULL) {
         return; // oot.o2r not mounted yet — try again next frame
     }
@@ -1253,9 +1241,7 @@ void DrawOotCompass() { // object_gi_compass, body Opa + glass Xlu (OoT GetItem_
 
 // Single opaque DL, grayscale-tinted.
 static void DrawOotGetItemOpaTint(const char* otrPath, Gfx** cache, u8 r, u8 g, u8 b) {
-    if (*cache == NULL) {
-        *cache = (Gfx*)OotAssets_LoadGfx(otrPath);
-    }
+    *cache = LoadNeiLegacyGfx(otrPath, false);
     if (*cache == NULL) {
         return; // archive not mounted yet — try again next frame
     }
@@ -1272,12 +1258,8 @@ static void DrawOotGetItemOpaTint(const char* otrPath, Gfx** cache, u8 r, u8 g, 
 // Two opaque DLs drawn in sequence, grayscale-tinted (tinted tunics / paired meshes).
 static void DrawOotGetItemOpaOpaTint(const char* pathA, Gfx** cacheA, const char* pathB, Gfx** cacheB, u8 r, u8 g,
                                      u8 b) {
-    if (*cacheA == NULL) {
-        *cacheA = (Gfx*)OotAssets_LoadGfx(pathA);
-    }
-    if (*cacheB == NULL) {
-        *cacheB = (Gfx*)OotAssets_LoadGfx(pathB);
-    }
+    *cacheA = LoadNeiLegacyGfx(pathA, false);
+    *cacheB = LoadNeiLegacyGfx(pathB, false);
     if (*cacheA == NULL || *cacheB == NULL) {
         return; // archive not mounted yet — try again next frame
     }
@@ -1396,9 +1378,7 @@ static bool TierLatch_NewPickup(u32* seen) {
 
 static bool DrawOotBiggoronSwordReal(void) {
     static Gfx* sCache = NULL;
-    if (sCache == NULL) {
-        sCache = (Gfx*)OotAssets_LoadGfxDirect("__OTR__objects/object_gi_longsword/gGiBiggoronSwordDL");
-    }
+    sCache = LoadNeiLegacyGfx("__OTR__objects/object_gi_longsword/gGiBiggoronSwordDL", true);
     if (sCache == NULL) {
         return false;
     }
@@ -1504,18 +1484,16 @@ void DrawOotQuartzOfMotion() {
     static Gfx* sCache = NULL;
     DrawOotGetItemOpa("__OTR__objects/object_gi_map/gGiStoneOfAgonyDL", &sCache);
 }
-static void DrawOotMaskShimmer() {
+static void DrawOotMaskShimmer(int mask = 8) {
     uint8_t color[4];
-    ComboMaskShimmerColor(0, color);
-    if (ResourceMgr_LoadGfxByName(gEffSparklesDL) != NULL) {
-        ComboDrawMaskShimmer(gPlayState, gEffSparklesDL, color, nullptr);
-    }
+    ComboOotMaskShimmerColor(mask, color);
+    ComboDrawMaskShimmer(gPlayState, nullptr, color, nullptr);
 }
 
 void DrawOotSkullMask() { // object_gi_skj_mask (OoT-unique)
     static Gfx* sCache = NULL;
     DrawOotGetItemOpa("__OTR__objects/object_gi_skj_mask/gGiSkullMaskDL", &sCache);
-    DrawOotMaskShimmer();
+    DrawOotMaskShimmer(1);
 }
 void DrawOotSpookyMask() { // object_gi_redead_mask (OoT-unique)
     // DIRECT loader: the plain one leaves the DL's texture/vertex hash refs to be resolved in MM's
@@ -1524,12 +1502,12 @@ void DrawOotSpookyMask() { // object_gi_redead_mask (OoT-unique)
     // reason the adult-Link limbs and the OoT hookshot chain use it. Skijer's NEI
     static Gfx* sDirect = NULL;
     if (DrawOotDirectOpa("__OTR__objects/object_gi_redead_mask/gGiSpookyMaskDL", &sDirect)) {
-        DrawOotMaskShimmer();
+        DrawOotMaskShimmer(2);
         return;
     }
     static Gfx* sCache = NULL;
     DrawOotGetItemOpa("__OTR__objects/object_gi_redead_mask/gGiSpookyMaskDL", &sCache);
-    DrawOotMaskShimmer();
+    DrawOotMaskShimmer(2);
 }
 void DrawOotGerudoMask() { // object_gi_gerudomask (OoT-unique)
     // Same as the Spooky Mask above — and this one is CI (it ships a TLUT,
@@ -1537,12 +1515,12 @@ void DrawOotGerudoMask() { // object_gi_gerudomask (OoT-unique)
     // colours" symptom. Direct load inlines them. Skijer's NEI
     static Gfx* sDirect = NULL;
     if (DrawOotDirectOpa("__OTR__objects/object_gi_gerudomask/gGiGerudoMaskDL", &sDirect)) {
-        DrawOotMaskShimmer();
+        DrawOotMaskShimmer(6);
         return;
     }
     static Gfx* sCache = NULL;
     DrawOotGetItemOpa("__OTR__objects/object_gi_gerudomask/gGiGerudoMaskDL", &sCache);
-    DrawOotMaskShimmer();
+    DrawOotMaskShimmer(6);
 }
 
 // Iron Boots — object_gi_boots_2 (OoT-unique), boots Opa + rivets Xlu (OoT GetItem_DrawOpa0Xlu1).
@@ -1726,10 +1704,33 @@ void DrawOotZoraTunic() {
 // Grayscale-tinted plain tunic (collar + tunic, no color DLs) — SoH's DrawCustomItemDiamondTint recolor
 // used for the "clothing" ext equipment (Magic Cape / Spirit Breastplate / Champion's Tunic) and stand-ins.
 static void DrawOotTunicTint(u8 r, u8 g, u8 b) {
+#ifdef COMBO_BUILD
+    const char* paths[] = { "__OTR__objects/object_gi_clothes/gGiTunicCollarDL",
+                            "__OTR__objects/object_gi_clothes/gGiTunicDL" };
+    for (auto& path : paths) {
+        // A local replacement keeps MM's live selection. Otherwise the OoT
+        // donor owns this geometry and all of its nested texture/vertex loads.
+        if (!ResourceMgr_IsModAsset(path)) {
+            if (!NeiResource_Available(path))
+                return;
+            path = NeiResource_Route(path);
+        }
+    }
+    OPEN_DISPS(gPlayState->state.gfxCtx);
+    Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+    gDPSetGrayscaleColor(POLY_OPA_DISP++, r, g, b, 255);
+    gSPGrayscale(POLY_OPA_DISP++, true);
+    for (const auto* path : paths)
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)path);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    CLOSE_DISPS(gPlayState->state.gfxCtx);
+#else
     static Gfx* sCollarCache = NULL;
     static Gfx* sTunicCache = NULL;
     DrawOotGetItemOpaOpaTint("__OTR__objects/object_gi_clothes/gGiTunicCollarDL", &sCollarCache,
                              "__OTR__objects/object_gi_clothes/gGiTunicDL", &sTunicCache, r, g, b);
+#endif
 }
 
 // Magic spells — object_gi_goddess (OoT-unique). OoT GetItem_DrawMagicSpell: Xlu with tex-scroll on
@@ -1887,9 +1888,7 @@ void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b);
 // cylinder, with its scrolling shine on segment 8.
 static void DrawOotMasterSwordTiered(u8 trueTier) {
     static Gfx* sCache = NULL;
-    if (sCache == NULL) {
-        sCache = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_toki_objects/object_toki_objects_DL_001BD0");
-    }
+    sCache = LoadNeiLegacyGfx("__OTR__objects/object_toki_objects/object_toki_objects_DL_001BD0", false);
     if (sCache == NULL) {
         return; // oot.o2r not mounted yet — try again next frame
     }
@@ -1932,9 +1931,7 @@ void DrawOotMasterSword() { // chain entry point — forwards to the tier Conver
 // Modeled at actor scale, so shrink to fit the get-item cylinder.
 void DrawOotNeiLantern() {
     static Gfx* sCache = NULL;
-    if (sCache == NULL) {
-        sCache = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_poh/gPoeLanternDL");
-    }
+    sCache = LoadNeiLegacyGfx("__OTR__objects/object_poh/gPoeLanternDL", false);
     if (sCache == NULL) {
         return; // oot.o2r not mounted yet — try again next frame
     }
@@ -1947,7 +1944,7 @@ void DrawOotNeiLantern() {
 }
 
 // --- REAL NEI meshes (2ship.o2r, packed from mm/assets/custom/objects/object_nei_* + object_somaria).
-// NULL-safe loader: existence-gated (ResourceMgr_FileExists) and cached, so an OLDER 2ship.o2r that
+// NULL-safe loader: existence-gated, with live base/Alt resolution, so an OLDER 2ship.o2r that
 // doesn't carry the object yet just returns NULL and the caller falls back to its documented
 // stand-in — o2r-version-proof, never a crash on unresolved symbols. Skijer's NEI ---
 extern "C" unsigned char OotAssets_PathAllowed(const char* p); // blocklist (oot_asset_loader.cpp):
@@ -1955,15 +1952,12 @@ extern "C" unsigned char OotAssets_PathAllowed(const char* p); // blocklist (oot
 // those load as NULL here so every call site draws its stand-in fallback instead.
 
 static Gfx* LoadNeiRealGfx(const char* otrPath, Gfx** cache, u8* tried) {
-    if (!OotAssets_PathAllowed(otrPath)) {
-        return NULL; // blocked family -> stand-in fallback (crash-proof)
-    }
-    if (!*tried) {
-        *tried = 1;
-        if (ResourceMgr_FileExists(otrPath)) {
-            *cache = ResourceMgr_LoadGfxByName(otrPath);
-        }
-    }
+    (void)tried; // retained call-site ABI; never negative-cache or pin an Alt mode
+    *cache = NULL;
+    if (!OotAssets_PathAllowed(otrPath))
+        return NULL;
+    if (ResourceMgr_FileExists(otrPath) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(otrPath)))
+        *cache = ResourceMgr_LoadGfxByName(otrPath);
     return *cache;
 }
 
@@ -2529,6 +2523,17 @@ void DrawOotGsToken() {
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 
+// Keep MM's native contents/materials and optional bottle motes, then add the
+// imported OoT item's NEI shimmer in the incoming GI pose.
+void DrawOotBottleWithShimmer(s16 drawId, const uint8_t color[4]) {
+    Matrix_Push();
+    GetItem_Draw(gPlayState, drawId);
+    Matrix_Pop();
+    if (drawId != GID_FAIRY && drawId != GID_FAIRY_2) {
+        ComboDrawMaskShimmer(gPlayState, nullptr, color, "mm");
+    } // native fairy draw already owns its matching pink hex shimmer
+}
+
 // Ruto's Letter — OoT bottle-with-letter (object_gi_bottle_letter, OoT-unique folder): contents Opa +
 // bottle glass Xlu, matching OoT z_draw { GetItem_DrawOpa0Xlu1, { gGiLetterBottleContentsDL, gGiLetterBottleDL } }.
 void DrawOotRutosLetter() {
@@ -2536,6 +2541,9 @@ void DrawOotRutosLetter() {
     static Gfx* xluCache = NULL;
     DrawOotGetItemOpaXlu("__OTR__objects/object_gi_bottle_letter/gGiLetterBottleContentsDL", &opaCache,
                          "__OTR__objects/object_gi_bottle_letter/gGiLetterBottleDL", &xluCache);
+    uint8_t color[4];
+    ComboMaskShimmerColor(0, color);
+    ComboDrawMaskShimmer(gPlayState, nullptr, color, "oot");
 }
 
 // Bottle with Blue Fire — no MM analog anywhere. Replica of OoT GetItem_DrawBlueFire (object_gi_fire,
@@ -2568,6 +2576,8 @@ void DrawOotBlueFireBottle() {
     gSPDisplayList(POLY_XLU_DISP++, sFlameCache);
     Matrix_Pop();
     CLOSE_DISPS(gPlayState->state.gfxCtx);
+    const uint8_t color[4] = { 100, 160, 255, 255 };
+    ComboDrawMaskShimmer(gPlayState, nullptr, color, "oot");
 }
 void DrawOotExtMagicCape() { // SoH parity: tunic tinted red/purple
     DrawOotTunicTint(180, 40, 120);
@@ -2635,6 +2645,9 @@ static u32 Pegasus_CrimsonRamp(u32 rgba) {
 }
 
 static Gfx* Pegasus_GetRecoloredBootsDL() {
+    const char* path = "__OTR__objects/object_gi_hoverboots/gGiHoverBootsDL";
+    if (ResourceMgr_IsModAsset(path))
+        return ResourceMgr_LoadGfxByName(path);
     static Gfx sDL[512];
     static bool sBuilt = false;
     if (sBuilt) {
@@ -2717,10 +2730,7 @@ void DrawOotExtTrident() {
     // is a thin silhouette and read as a needle at the shared size (Skijer asked for 2.5x).
     // Skijer's NEI
     static Gfx* sTrident = NULL;
-    if (sTrident == NULL) {
-        sTrident =
-            (Gfx*)OotAssets_LoadGfxDirect("__OTR__objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298");
-    }
+    sTrident = LoadNeiLegacyGfx("__OTR__objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298", true);
     if (sTrident == NULL) {
         static Gfx* c = NULL; // oot.o2r not ready — keep the old tinted stand-in rather than nothing
         DrawOotGetItemOpaTint("__OTR__objects/object_gi_longsword/gGiBiggoronSwordDL", &c, 120, 190, 230);
@@ -2745,6 +2755,8 @@ void DrawOotExtTrident() {
 // G_SETPRIMCOLOR/G_SETENVCOLOR pushed through `remap`. Per-SECTION recolors (Climb: yellow leather
 // vs silver iron) are only possible this way — a grayscale tint is one color for the whole mesh.
 static Gfx* BuildRecoloredOotGiDL(const char* otrPath, u32 (*remap)(u32), Gfx* dst, bool* built) {
+    if (ResourceMgr_IsModAsset(otrPath))
+        return ResourceMgr_LoadGfxByName(otrPath);
     if (*built) {
         return dst;
     }
@@ -2962,7 +2974,11 @@ void DrawOotNeiShadowCrystal() {
     DrawOotRodStandIn(&c, 150, 60, 220); // twilight violet
 }
 
-void DrawOotNeiRodOfSeasons() {
+void DrawOotNeiSeason(int profile) {
+    NeiGi_DrawSeasonOverlay(gPlayState, profile, "oot");
+    if (profile != 5)
+        return; // Only the actual rod has a model.
+
     static Gfx* real = NULL;
     static u8 tried = 0;
     if (DrawNeiRealOpa("__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL", &real, &tried, 0.35f, false)) {
@@ -2972,9 +2988,15 @@ void DrawOotNeiRodOfSeasons() {
     DrawOotRodStandIn(&c, 230, 60, 60); // seasonal red
 }
 
+void DrawOotNeiRodOfSeasons() {
+    DrawOotNeiSeason(5);
+}
+
 void Rando::DrawItem(RandoItemId randoItemId, RandoCheckId randoCheckId, Actor* actor) {
     // Raw world previews need the next tier. Concrete awards bypass this wrapper.
-    if (randoItemId == RI_OOT_NEI_CANE_OF_SOMARIA || randoItemId == RI_OOT_PROGRESSIVE_ROC) {
+    if (randoItemId == RI_OOT_NEI_CANE_OF_SOMARIA || randoItemId == RI_OOT_PROGRESSIVE_ROC ||
+        randoItemId == RI_OOT_PROGRESSIVE_HAMMER || randoItemId == RI_OOT_PROGRESSIVE_MASTER_SWORD ||
+        randoItemId == RI_OOT_PROGRESSIVE_BGS) {
         randoItemId = Rando::ConvertItem(randoItemId, randoCheckId);
     }
     Rando::DrawResolvedItem(randoItemId, randoCheckId, actor);
@@ -2988,8 +3010,19 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
     }
 
 #ifdef COMBO_BUILD
-    if (MM_TryDrawNeiGi(randoItemId))
+    const bool shop = actor && actor->id == ACTOR_EN_GIRLA;
+    const bool receipt = actor && actor->id == ACTOR_EN_ITEM00 && (actor->home.rot.x & CustomItem::CALLED_ACTION) &&
+                         (actor->home.rot.x & (CustomItem::GIVE_ITEM_CUTSCENE | CustomItem::GIVE_OVERHEAD));
+    const int mmPickup = receipt ? (GET_PLAYER_FORM == PLAYER_FORM_GORON ? 2 : 1) : 0;
+    if (MM_TryDrawNeiGi(randoItemId, shop, mmPickup))
         return;
+    // Match the retained legacy callback's concrete geometry, independently
+    // of the Great Fairy award's particle/shimmer identity.
+    const auto legacyFitKind =
+        randoItemId == RI_GREAT_FAIRY_SWORD && Nei_Save()->comboObtained[FC_OOT_SWORD_BIGGORON] == 0
+            ? NeiGi::Kind::BiggoronSword
+            : NeiGi::Kind::Neutral;
+    MM_NeiGiFallbackShimmer fallbackShimmer(randoItemId, shop, mmPickup, legacyFitKind);
 #endif
     const int dungeonOwner = DungeonItem_GetOwner(randoItemId);
     if (dungeonOwner >= 0 &&
@@ -3429,8 +3462,19 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
         case RI_OOT_DEKU_SHIELD: // real OoT object_gi_shield_1 mesh (direct load; Hero's Shield brown fallback)
             DrawOotDekuShield();
             break;
-        // Third wave (final cross items). The 8 MM-native bottled contents (big poe / potions / bugs /
-        // fairy / fish / mushroom / poe) draw through the DEFAULT GetItem_Draw path via their MM GIDs.
+        case RI_OOT_BOTTLE_BIG_POE:
+        case RI_OOT_BOTTLE_BLUE_POTION:
+        case RI_OOT_BOTTLE_BUGS:
+        case RI_OOT_BOTTLE_FAIRY:
+        case RI_OOT_BOTTLE_FISH:
+        case RI_OOT_BOTTLE_GREEN_POTION:
+        case RI_OOT_BOTTLE_MAGIC_MUSHROOM:
+        case RI_OOT_BOTTLE_POE: {
+            uint8_t color[4];
+            MM_OotBottleShimmerColor(randoItemId, color);
+            DrawOotBottleWithShimmer(Rando::StaticData::Items[randoItemId].drawId, color);
+            break;
+        }
         case RI_OOT_ABILITY_CLIMB: // SoH ladder draw replica (object_mori_objects)
             DrawOotClimbLadder();
             break;
@@ -3719,11 +3763,13 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
             DrawOotNeiShadowCrystal();
             break;
         case RI_OOT_NEI_ROD_OF_SEASONS:
+            DrawOotNeiRodOfSeasons();
+            break;
         case RI_OOT_NEI_SEASON_SPRING:
         case RI_OOT_NEI_SEASON_SUMMER:
         case RI_OOT_NEI_SEASON_AUTUMN:
         case RI_OOT_NEI_SEASON_WINTER:
-            DrawOotNeiRodOfSeasons();
+            DrawOotNeiSeason(1 + randoItemId - RI_OOT_NEI_SEASON_SPRING);
             break;
         case RI_OOT_EXT_SHEIKAH_SHIELD:
             DrawOotExtSheikahShield();
@@ -3741,7 +3787,7 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
         case RI_COMBO_FOREIGN:
             // ComboShip: this MM check holds an OOT item — render the real OOT model (sentinel blue
             // rupee on any failure). The originating check identity is passed straight through.
-            MM_DrawComboForeign(randoCheckId);
+            MM_DrawComboForeign(randoCheckId, shop, mmPickup);
             break;
 #endif
         default:

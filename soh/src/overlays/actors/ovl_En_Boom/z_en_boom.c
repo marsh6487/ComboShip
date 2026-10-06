@@ -1,3 +1,4 @@
+#include "mods/equipment/nei_equipment_presentation.h"
 /*
  * File: z_en_boom.c
  * Overlay: ovl_En_Boom
@@ -344,7 +345,12 @@ void EnBoom_Draw(Actor* thisx, PlayState* play) {
         Matrix_RotateY((this->activeTimer * 4000) * (M_PI / 0x8000), MTXMODE_APPLY);
         Matrix_Scale(0.15f, 0.15f, 0.15f, MTXMODE_APPLY);
         gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-        gSPDisplayList(POLY_XLU_DISP++, gIKAxeInlineDL);
+        {
+            Gfx* authored = NeiEquipment_ModelDL(NEI_EQUIPMENT_AXE, "__OTR__objects/object_ik/gIronKnuckleAxeDL");
+            if (authored == NULL)
+                authored = NeiEquipment_LegacyDL(NEI_EQUIPMENT_AXE, "__OTR__objects/object_ik/gIronKnuckleAxeDL");
+            gSPDisplayList(POLY_XLU_DISP++, authored != NULL ? authored : gIKAxeInlineDL);
+        }
     } else {
         // Zora fins (params 1/2): flat arc flight, no spin. Normal boomerang: fast spin.
         if (this->actor.params != 1 && this->actor.params != 2) {

@@ -362,6 +362,7 @@ typedef struct SaveInfo {
 typedef struct DpadSaveInfo {
     u8 dpadItems[4][4];
     u8 dpadSlots[4][4];
+    u16 extItems[4][4]; // real ids only where dpadItems holds ITEM_EXT_BUTTON
 } DpadSaveInfo;
 
 // Extended-button storage — parallels DpadSaveInfo, but holds the u16 REAL item id per

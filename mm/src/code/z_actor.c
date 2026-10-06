@@ -5,6 +5,7 @@
  */
 
 #include "z64actor.h"
+#include "crash_actor_context.h"
 #include "z64door.h"
 
 #include "prevent_bss_reordering.h"
@@ -2936,6 +2937,27 @@ void Actor_SpawnSetupActors(PlayState* play, ActorContext* actorCtx) {
     }
 }
 
+static MMCrashActorContext sCrashActorContext;
+
+const MMCrashActorContext* MM_GetCrashActorContext(void) {
+    return &sCrashActorContext;
+}
+
+static void Actor_RunUpdateWithCrashContext(Actor* actor, PlayState* play) {
+    // Preserve outer dispatch context if an actor synchronously updates another actor.
+    MMCrashActorContext previous = sCrashActorContext;
+    sCrashActorContext.sceneId = play->sceneId;
+    sCrashActorContext.room = play->roomCtx.curRoom.num;
+    sCrashActorContext.actorId = actor->id;
+    sCrashActorContext.category = actor->category;
+    sCrashActorContext.params = actor->params;
+    sCrashActorContext.actor = (uintptr_t)actor;
+    sCrashActorContext.callback = (uintptr_t)actor->update;
+    sCrashActorContext.active = 1;
+    actor->update(actor, play);
+    sCrashActorContext = previous;
+}
+
 typedef struct {
     /* 0x00 */ PlayState* play;
     /* 0x04 */ Actor* actor;
@@ -3016,7 +3038,7 @@ Actor* Actor_UpdateActor(UpdateActor_Params* params) {
                 }
 
                 if (GameInteractor_ShouldActorUpdate(actor)) {
-                    actor->update(actor, play);
+                    Actor_RunUpdateWithCrashContext(actor, play);
                     GameInteractor_ExecuteOnActorUpdate(actor);
                 }
                 DynaPoly_UnsetAllInteractFlags(play, &play->colCtx.dyna, actor);

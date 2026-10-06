@@ -12,6 +12,7 @@ extern "C" {
 bool NeiGi_Draw(PlayState* play, GetItemEntry* entry);
 // Uses shelf clearance only for replacement meshes; preserves original fallback poses.
 bool NeiGi_DrawShop(PlayState* play, GetItemEntry* entry);
+void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner);
 #ifdef __cplusplus
 }
 #endif

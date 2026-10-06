@@ -10,12 +10,23 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "soh/assets/custom"
+OPTIONAL_ASSETS = ROOT / "tools/nei_gi/OPTIONAL_ASSETS"
 CHECKPOINTS = Path(__file__).resolve().parent / "CHECKPOINTS"
 PREFIX = "objects/nei_gi_redesign/"
 ITEMS = ("fire_rod", "ice_rod", "light_rod", "rocs_feather", "time_gate", "whip", "shovel",
          "gust_jar", "hylia_grace", "zonai_permafrost", "demise_destruction", "ball_and_chain",
          "deku_leaf", "mogma_mitts", "switch_hook", "beetle", "lantern",
-         "spinner", "cane_of_somaria", "minish_cap", "rocs_cape")
+         "spinner", "cane_of_somaria", "minish_cap", "rocs_cape",
+         "divine_shield", "sheikah_shield", "shield_of_ikana", "magic_cape",
+         "spirit_breastplate", "sages_tunic", "champions_tunic", "pegasus_anklet",
+         "trident", "climb_boots", "roc_boots", "cane_of_byrna", "four_sword",
+         "pendant_of_memories", "elemental_wand", "sand_rod", "tornado_rod", "water_rod",
+         "meteor_rod", "storm_rod", "shadow_scepter", "sheikah_slate", "slate_bomb",
+         "slate_master_cycle", "slate_stasis", "slate_cryonis", "slate_sensor",
+         "phantom_hourglass", "shadow_crystal",
+         "rod_of_seasons", "kokiri_sword", "mm_kokiri_sword", "razor_sword",
+         "gilded_sword", "master_sword", "true_master_sword", "biggoron_sword",
+         "great_fairy_sword", "iron_knuckle_axe", "cojiro", "mario_mask")
 
 
 def face_key(points):
@@ -60,13 +71,14 @@ def read_glb(path):
     return doc, faces
 
 
-def verify(items=ITEMS, namespace=PREFIX, checkpoints=CHECKPOINTS):
+def verify(items=ITEMS, namespace=PREFIX, checkpoints=CHECKPOINTS, assets=ASSETS):
     report = {}
     for slug in items:
+        source_assets = OPTIONAL_ASSETS if assets == ASSETS and namespace == PREFIX and slug == "cojiro" else assets
         prefix = namespace + slug + "/"
         meta = json.loads((checkpoints / slug / "checkpoint.json").read_text())
         doc, expected = read_glb(checkpoints / slug / (slug + ".glb"))
-        matrix = (ASSETS / prefix / "scale_mtx").read_bytes()
+        matrix = (source_assets / prefix / "scale_mtx").read_bytes()
         assert len(matrix) == 128 and struct.unpack_from("<I", matrix, 4)[0] == 0x4F4D5458
         words = struct.unpack_from("<16I", matrix, 64)
         fixed = []
@@ -81,9 +93,9 @@ def verify(items=ITEMS, namespace=PREFIX, checkpoints=CHECKPOINTS):
             if not expected[render_pass]:
                 continue
             entry = "gi_dl" if render_pass == "opa" else "gi_xlu_dl"
-            dl = ET.parse(ASSETS / prefix / entry).getroot()
+            dl = ET.parse(source_assets / prefix / entry).getroot()
             assert dl.tag == "DisplayList" and dl[-1].tag == "EndDisplayList"
-            vertices = ET.parse(ASSETS / prefix / ("mesh_" + render_pass + "_vtx")).getroot()
+            vertices = ET.parse(source_assets / prefix / ("mesh_" + render_pass + "_vtx")).getroot()
             records = []
             for v in vertices:
                 values = {k: int(v.get(k)) for k in ("X", "Y", "Z", "S", "T", "R", "G", "B", "A")}
@@ -95,7 +107,7 @@ def verify(items=ITEMS, namespace=PREFIX, checkpoints=CHECKPOINTS):
             for cmd in dl:
                 if "Path" in cmd.attrib:
                     assert cmd.get("Path").startswith(prefix), (slug, "unrelated resource")
-                    assert (ASSETS / cmd.get("Path")).is_file(), (slug, "missing resource", cmd.attrib)
+                    assert (source_assets / cmd.get("Path")).is_file(), (slug, "missing resource", cmd.attrib)
                 if cmd.tag == "Matrix":
                     assert cmd.get("Param") == "G_MTX_PUSH"
                     depth += 1
@@ -126,7 +138,7 @@ def verify(items=ITEMS, namespace=PREFIX, checkpoints=CHECKPOINTS):
                         faces[face_key(p)] += 1
                         total += 1
                 elif cmd.tag == "LoadTextureBlock":
-                    texture = (ASSETS / cmd.get("Path")).read_bytes()
+                    texture = (source_assets / cmd.get("Path")).read_bytes()
                     kind, w, h, flags, sx, sy, size = struct.unpack_from("<IIIIffI", texture, 64)
                     assert kind == 1 and flags == 1 and sx == w / 32 and sy == h / 32
                     assert len(texture) == 92 + size and size == w * h * 4

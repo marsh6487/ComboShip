@@ -19,6 +19,7 @@
  */
 #include "global.h"
 #include "2s2h/Enhancements/Audio/AudioEditor.h"
+#include "2s2h/Enhancements/Audio/MMWeather.h"
 
 // Direct audio command (skips the queueing system)
 #define SEQCMD_SET_SEQPLAYER_VOLUME_NOW(seqPlayerIndex, duration, volume)                          \
@@ -452,7 +453,7 @@ void AudioSeq_ProcessSeqCmd(u32 cmd) {
  * Add the sequence cmd to the `sAudioSeqCmds` queue
  */
 void AudioSeq_QueueSeqCmd(u32 cmd) {
-    sAudioSeqCmds[sSeqCmdWritePos++] = cmd;
+    sAudioSeqCmds[sSeqCmdWritePos++] = MMWeather_ResolveAmbienceSeqCmd(cmd);
 }
 
 void AudioSeq_ProcessSeqCmds(void) {

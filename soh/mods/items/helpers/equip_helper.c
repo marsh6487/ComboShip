@@ -3,6 +3,7 @@
  */
 
 #include "equip_helper.h"
+#include "soh/Enhancements/randomizer/NeiHeldPresentation.h"
 #include <string.h>
 #include "../custom_items.h"
 #include "macros.h"
@@ -257,29 +258,14 @@ u8 ItemEquip_ApplyLeftHandPose(Player* player, const ItemHandPose* pose) {
     return ItemEquip_ApplyCapturedHandPose(player, pose, &sLeftHandMtx, sLeftHandMtxValid);
 }
 
-// Six wand rods carry an opaque and a translucent DL each, so a session can walk 12 paths before
-// the slate's and the rod's are counted. Sized to hold every handheld, not just the ones in hand.
-#define HAND_MODEL_CACHE 24
-
-// Keyed by the literal's ADDRESS — every caller passes a string literal, so identity is enough and
-// no strcmp runs per frame. ResourceMgr_LoadGfxByName crashes on a missing path, hence FileExists.
+// The resource manager already caches loaded lists and selects current Alt/MQ
+// resources. A second pointer-keyed cache can outlive that selection, remember
+// a missing archive forever, or run out after a session visits all NEI modes.
 static Gfx* ItemEquip_LoadHandGfx(const char* path) {
-    static const char* sPaths[HAND_MODEL_CACHE];
-    static Gfx* sDLs[HAND_MODEL_CACHE];
-    static u8 sCount = 0;
-
-    for (u8 i = 0; i < sCount; i++) {
-        if (sPaths[i] == path) {
-            return sDLs[i];
-        }
-    }
-    if (sCount >= HAND_MODEL_CACHE) {
+    if (path == NULL || !(ResourceMgr_FileExists(path) || NeiHeld_HasResources(path, NULL))) {
         return NULL;
     }
-    sPaths[sCount] = path;
-    sDLs[sCount] = ResourceMgr_FileExists(path) ? ResourceMgr_LoadGfxByName(path) : NULL;
-    sCount++;
-    return sDLs[sCount - 1];
+    return ResourceMgr_LoadGfxByName(path);
 }
 
 u8 ItemEquip_DrawHeldModel(Player* player, PlayState* play, const char* opaPath, const char* xluPath,

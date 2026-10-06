@@ -9,6 +9,7 @@
 #include "interface/parameter_static/parameter_static.h"
 #include "z64save.h"
 #include "BenPort.h"
+#include "ComboItemReceiptRender.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "assets/archives/schedule_dma_static/schedule_dma_static_yar.h"
 #include "assets/archives/icon_item_static/icon_item_static_yar.h"
@@ -1007,49 +1008,50 @@ Color_RGB8 D_801CFDEC[] = {
     { 255, 0, 255 }, { 255, 255, 255 }, { 255, 100, 0 },   { 0, 0, 0 },
 };
 
+// Receipt clefs use the same song themes as Rando::DrawSong.
 s16 D_801CFE04[] = {
-    150, // ITEM_SONG_SONATA
+    98,  // ITEM_SONG_SONATA
     255, // ITEM_SONG_LULLABY
-    100, // ITEM_SONG_NOVA
+    20,  // ITEM_SONG_NOVA
     255, // ITEM_SONG_ELEGY
-    255, // ITEM_SONG_OATH
-    255, // ITEM_SONG_SARIA
-    255, // ITEM_SONG_TIME
+    98,  // ITEM_SONG_OATH
+    98,  // ITEM_SONG_SARIA
+    98,  // ITEM_SONG_TIME
     255, // ITEM_SONG_HEALING
-    255, // ITEM_SONG_EPONA
-    255, // ITEM_SONG_SOARING
-    255, // ITEM_SONG_STORMS
-    255  // ITEM_SONG_SUN
+    146, // ITEM_SONG_EPONA
+    200, // ITEM_SONG_SOARING
+    146, // ITEM_SONG_STORMS
+    237  // ITEM_SONG_SUN
 
 };
 s16 D_801CFE1C[] = {
     255, // ITEM_SONG_SONATA
-    80,  // ITEM_SONG_LULLABY
-    150, // ITEM_SONG_NOVA
-    160, // ITEM_SONG_ELEGY
-    100, // ITEM_SONG_OATH
-    240, // ITEM_SONG_SARIA
-    255, // ITEM_SONG_TIME
-    255, // ITEM_SONG_HEALING
-    255, // ITEM_SONG_EPONA
-    255, // ITEM_SONG_SOARING
-    255, // ITEM_SONG_STORMS
-    255  // ITEM_SONG_SUN
+    20,  // ITEM_SONG_LULLABY
+    20,  // ITEM_SONG_NOVA
+    98,  // ITEM_SONG_ELEGY
+    0,   // ITEM_SONG_OATH
+    255, // ITEM_SONG_SARIA
+    177, // ITEM_SONG_TIME
+    150, // ITEM_SONG_HEALING
+    87,  // ITEM_SONG_EPONA
+    160, // ITEM_SONG_SOARING
+    146, // ITEM_SONG_STORMS
+    231  // ITEM_SONG_SUN
 
 };
 s16 D_801CFE34[] = {
-    100, // ITEM_SONG_SONATA
-    40,  // ITEM_SONG_LULLABY
+    98,  // ITEM_SONG_SONATA
+    20,  // ITEM_SONG_LULLABY
     255, // ITEM_SONG_NOVA
     0,   // ITEM_SONG_ELEGY
-    255, // ITEM_SONG_OATH
-    100, // ITEM_SONG_SARIA
-    255, // ITEM_SONG_TIME
-    255, // ITEM_SONG_HEALING
-    255, // ITEM_SONG_EPONA
+    98,  // ITEM_SONG_OATH
+    98,  // ITEM_SONG_SARIA
+    211, // ITEM_SONG_TIME
+    230, // ITEM_SONG_HEALING
+    49,  // ITEM_SONG_EPONA
     255, // ITEM_SONG_SOARING
-    255, // ITEM_SONG_STORMS
-    255  // ITEM_SONG_SUN
+    146, // ITEM_SONG_STORMS
+    62   // ITEM_SONG_SUN
 };
 
 static TexturePtr sStrayFairyIconTextures[] = {
@@ -1088,9 +1090,11 @@ static TexturePtr sMsgCustomIconTex = NULL;
 static s16 sMsgCustomIconWidth = 32;
 static s16 sMsgCustomIconHeight = 32;
 static u8 sMsgCustomIconIA8 = false;
+static Color_RGB8 sMsgCustomIconColor = { 255, 255, 255 };
 static s16 sMsgStrayFairyIndex = -1;
 
 void Message_StageCustomItemIconEx(void* tex, s16 width, s16 height, u8 isIA8) {
+    sMsgCustomIconColor = (Color_RGB8){ 255, 255, 255 };
     if (width < 1 || width > 64 || height < 1 || height > 64 || isIA8 > 1) {
         sMsgCustomIconTex = NULL;
         return;
@@ -1104,7 +1108,66 @@ void Message_StageCustomItemIconEx(void* tex, s16 width, s16 height, u8 isIA8) {
 void Message_StageCustomItemIcon(void* tex, s16 size) {
     Message_StageCustomItemIconEx(tex, size, size, false);
 }
+
+void Message_StageCustomItemIconTint(void* tex, s16 width, s16 height, u8 isIA8, u8 r, u8 g, u8 b) {
+    Message_StageCustomItemIconEx(tex, width, height, isIA8);
+    sMsgCustomIconColor = (Color_RGB8){ r, g, b };
+}
 // #endregion
+
+// Value-owned layout staged by CustomMessage::Entry. It is never inherited by
+// native story text or by the next item receipt.
+extern f32 sNESFontWidths[160];
+static CwItemReceiptPresentation sItemReceiptPresentation;
+static CwItemReceiptLayout sItemReceiptLayout;
+static int sItemReceiptFirstPage;
+static int sItemReceiptReflowed;
+
+void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation* presentation) {
+    memset(&sItemReceiptPresentation, 0, sizeof(sItemReceiptPresentation));
+    memset(&sItemReceiptLayout, 0, sizeof(sItemReceiptLayout));
+    sItemReceiptFirstPage = false;
+    sItemReceiptReflowed = false;
+    if (presentation && presentation->singleBox == 1) {
+        sItemReceiptPresentation = *presentation;
+        if (!ComboReceipt_HasIcon(presentation))
+            sItemReceiptPresentation.iconPath[0] = '\0';
+    }
+}
+
+static void Message_ApplyItemReceiptLayout(PlayState* play) {
+    MessageContext* msgCtx = &play->msgCtx;
+    if (!sItemReceiptPresentation.singleBox)
+        return;
+    if (!sItemReceiptReflowed) {
+        sItemReceiptLayout = ComboReceipt_Layout(&sItemReceiptPresentation, msgCtx->font.msgBuf.schar + 11,
+                                                 msgCtx->msgLength > 11 ? msgCtx->msgLength - 11 : 0,
+                                                 sizeof(msgCtx->font.msgBuf.schar) - 11, true, sNESFontWidths, 160);
+        msgCtx->msgLength = sItemReceiptLayout.bodySize + 11;
+        sItemReceiptReflowed = true;
+    }
+    const uint32_t pagePosition = msgCtx->msgBufPos > 11 ? msgCtx->msgBufPos - 11 : 0;
+    sItemReceiptFirstPage =
+        pagePosition >= sItemReceiptLayout.iconPageStart && pagePosition <= sItemReceiptLayout.firstPageEnd;
+    msgCtx->textCharScale = 0.75f;
+    msgCtx->unk11FFC = 12;
+    msgCtx->unk11F18 = 0;
+    msgCtx->unk11F1A[0] = msgCtx->unk11F1A[1] = msgCtx->unk11F1A[2] = 0;
+    sCharTexSize = msgCtx->textCharScale * 16.0f;
+    sCharTexScale = 1024.0f / msgCtx->textCharScale;
+}
+
+int Message_DrawItemReceiptIcon(PlayState* play, Gfx** gfxP) {
+    if (!sItemReceiptPresentation.singleBox)
+        return 0;
+    MessageContext* msgCtx = &play->msgCtx;
+    if (sItemReceiptFirstPage && ComboReceipt_HasIcon(&sItemReceiptPresentation)) {
+        *gfxP = ComboReceipt_DrawIcon(*gfxP, &sItemReceiptPresentation, &sItemReceiptLayout,
+                                      msgCtx->unk11FF8 + sItemReceiptLayout.iconX,
+                                      msgCtx->unk11FFA + sItemReceiptLayout.iconY, msgCtx->textColorAlpha);
+    }
+    return 1;
+}
 
 void Message_DrawItemIcon(PlayState* play, Gfx** gfxP) {
     MessageContext* msgCtx = &play->msgCtx;
@@ -1161,6 +1224,8 @@ void Message_DrawItemIcon(PlayState* play, Gfx** gfxP) {
     } else if ((msgCtx->itemId == MESSAGE_CUSTOM_ICON_ITEM) && (sMsgCustomIconTex != NULL)) {
         msgCtx->unk12016 = (msgCtx->unk12014 * sMsgCustomIconHeight) / sMsgCustomIconWidth;
         textureStep = (sMsgCustomIconWidth << 10) / msgCtx->unk12014;
+        gDPSetPrimColor(gfx++, 0, 0, sMsgCustomIconColor.r, sMsgCustomIconColor.g, sMsgCustomIconColor.b,
+                        msgCtx->textColorAlpha);
         if (sMsgCustomIconIA8) {
             gDPLoadTextureBlock(gfx++, msgCtx->textboxSegment[TEXTBOX_SEG_ICON], G_IM_FMT_IA, G_IM_SIZ_8b,
                                 sMsgCustomIconWidth, sMsgCustomIconHeight, 0, G_TX_NOMIRROR | G_TX_WRAP,
@@ -1324,7 +1389,7 @@ void Message_DrawTextDefault(PlayState* play, Gfx** gfxP) {
     play->msgCtx.textPosY = play->msgCtx.unk11FFA;
 
     sp130 = 0;
-    if (play->msgCtx.itemId != MESSAGE_ITEM_NONE) {
+    if (!Message_DrawItemReceiptIcon(play, &gfx) && play->msgCtx.itemId != MESSAGE_ITEM_NONE) {
         Message_DrawItemIcon(play, &gfx);
     }
     msgCtx->textColorR = msgCtx->unk120C8;
@@ -2077,7 +2142,11 @@ void Message_LoadItemIcon(PlayState* play, u16 itemId, s16 arg2) {
     // 2S2H [Rando] Staged custom icon — must be handled before the vanilla >= ITEM_B8 /
     // <= ITEM_REMAINS_TWINMOLD range checks, which would index native icon tables OOB with 0xFD.
     if ((itemId == MESSAGE_CUSTOM_ICON_ITEM) && (sMsgCustomIconTex != NULL)) {
-        if (sMsgCustomIconWidth == 24) {
+        if (sMsgCustomIconWidth == 16 && sMsgCustomIconHeight == 24 && sMsgCustomIconIA8) {
+            msgCtx->unk12010 = (msgCtx->unk11FF8 - D_801CFF88[gSaveContext.options.language]);
+            msgCtx->unk12012 = (arg2 + 0xA);
+            msgCtx->unk12014 = 0x10;
+        } else if (sMsgCustomIconWidth == 24) {
             // 24x24 quest-icon metrics (same as the ITEM_SKULL_TOKEN branch)
             msgCtx->unk12010 = (msgCtx->unk11FF8 - D_801CFF7C[gSaveContext.options.language]);
             msgCtx->unk12012 = (arg2 + 0xA);
@@ -2500,6 +2569,8 @@ void Message_Decode(PlayState* play) {
     s16 i;
     u16 curChar;
     u8 index2 = 0;
+
+    Message_ApplyItemReceiptLayout(play);
 
     // BENTODO do this somewhere else
     gSaveContext.options.language = LANGUAGE_ENG;
@@ -3373,6 +3444,9 @@ void Message_Decode(PlayState* play) {
         Message_DecodeCredits(play);
     } else {
         Message_DecodeNES(play);
+        if (sItemReceiptPresentation.singleBox) {
+            msgCtx->unk11FFA = msgCtx->textboxY + XREG(13) + XREG(12);
+        }
     }
 }
 
@@ -3436,6 +3510,7 @@ void Message_OpenText(PlayState* play, u16 textId) {
     Player* player = GET_PLAYER(play);
     f32 var_fv0;
 
+    Message_SetItemReceiptPresentation(NULL);
     bool loadFromMessageTable = true;
     GameInteractor_ExecuteOnOpenText(&textId, &loadFromMessageTable);
 
@@ -3586,6 +3661,7 @@ void Message_OpenText(PlayState* play, u16 textId) {
 }
 
 void func_801514B0(PlayState* play, u16 arg1, u8 arg2) {
+    Message_SetItemReceiptPresentation(NULL);
     MessageContext* msgCtx = &play->msgCtx;
     Font* font = &msgCtx->font;
     Player* player = GET_PLAYER(play);

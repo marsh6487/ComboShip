@@ -37,6 +37,9 @@ void PakLoader_Init(void);
  */
 u8 PakLoader_HasActiveModel(void);
 
+/** Body replacement ownership only; equipment packs and slot mixes do not own it. */
+u8 PakLoader_HasActiveBodyModel(void);
+
 /**
  * Swap player's skeleton with custom .pak model before vanilla draw.
  * Replaces skelAnime.skeleton (limb table) and dListCount.

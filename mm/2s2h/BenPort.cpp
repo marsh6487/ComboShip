@@ -1,3 +1,5 @@
+#include "../../combo/NeiAssetPriorityResource.h"
+#include "../../combo/NeiWolfAssetResource.h"
 #include "../../combo/menu/ItemGrantAuditBridge.h"
 #include "BenPort.h"
 #ifdef COMBO_BUILD
@@ -25,6 +27,7 @@
 #include <stb_image.h>
 #include <ship/resource/File.h>
 #include <ship/window/Window.h>
+#include <libultraship/bridge/crashhandlerbridge.h>
 
 #include "z64animation.h"
 #include "z64bgcheck.h"
@@ -3381,6 +3384,9 @@ extern "C" COMBO_EXPORT void MM_PrepareForTransition(void) {
 // straight to Play in South Clock Town for the given slot. Counterpart to OOT's SOH_ResumeGame.
 extern "C" COMBO_EXPORT void MM_ResumeGame(int fileNum) {
     ItemGrantAudit::Scope itemGrantAuditScope("MM_ResumeGame");
+    // Both games share one crash handler. MM_RunMain registered this only at first boot;
+    // OoT has since replaced it, so reclaim ownership before any MM resume work.
+    CrashHandlerRegisterCallback(CrashHandler_PrintExt);
     auto ctx = Ship::Context::GetRawInstance();
     ctx->GetLogger()->flush_on(spdlog::level::trace);
     SPDLOG_INFO("[ComboShip] MM_ResumeGame: begin (fileNum={})", fileNum);
@@ -3823,6 +3829,8 @@ extern "C" COMBO_EXPORT void MM_RestoreRandoSettings(const char* json) {
         auto j = nlohmann::json::parse(json);
         // Excluded checks: authoritative RC_-name array from the seed (skipped in the loop below). The
         // snapshot wins outright, so an absent list clears local exclusions (pre-GAP-7 spoilers).
+        CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE", RO_GRACE_ON);
+        CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE_REWARDS", 4);
         std::vector<RandoCheckId> excluded;
         if (j.contains("gRando.ExcludedChecks") && j["gRando.ExcludedChecks"].is_array()) {
             for (auto& n : j["gRando.ExcludedChecks"]) {
@@ -5327,4 +5335,53 @@ extern "C" bool Ship_HandleConsoleCrashAsReset() {
     });
 
     return true;
+}
+
+extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* path, float scale, float tilt, int shop,
+                                                float fit[2]) {
+    const int din =
+        NeiAssetPriority::GetDinSwordGiProfile("mm", game, path, CVarGetInteger("gEnhancements.DinFireSword", 0));
+    return NeiAssetPriority::GetGiModelFit("mm", game, path, scale, tilt, shop, fit, din);
+}
+extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* game, const char* path) {
+    return NeiAssetPriority::GetDinSwordGiProfile("mm", game, path, CVarGetInteger("gEnhancements.DinFireSword", 0));
+}
+
+extern "C" int MmAssets_GetOotGiModelFit(const char* path, float scale, float tilt, int presentation, float fit[2]);
+extern "C" int ResourceMgr_GetGiModelsFitForGame(const char* game, const char* const* paths, int count, float scale,
+                                                 float tilt, int presentation, float fit[2]) {
+    // The retained native Biggoron callback uses an archive-scoped donor
+    // unless a local primary mod wins. Only donor absence uses the MM twin.
+    if (game && std::strcmp(game, "oot-companion") == 0) {
+        if (!paths || count != 1 || !paths[0] ||
+            std::strcmp(paths[0], "objects/object_gi_longsword/gGiBiggoronSwordDL") != 0)
+            return 0;
+        const int result = MmAssets_GetOotGiModelFit(paths[0], scale, tilt, presentation, fit);
+        if (result)
+            return result > 0;
+        return NeiAssetPriority::GetGiModelsFit("mm", "mm", paths, count, scale, tilt, presentation, fit, false);
+    }
+    return NeiAssetPriority::GetGiModelsFit("mm", game, paths, count, scale, tilt, presentation, fit,
+                                            CVarGetInteger("gEnhancements.DinFireSword", 0));
+}
+
+extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path) {
+    return NeiAssetPriority::IsCustomAsset("mm", game, path);
+}
+
+extern "C" int ResourceMgr_IsModAsset(const char* path) {
+    return NeiAssetPriority::IsModAsset("mm", "mm", path);
+}
+
+extern "C" int ResourceMgr_IsModAssetForGame(const char* game, const char* path) {
+    return NeiAssetPriority::IsModAsset("mm", game, path);
+}
+
+extern "C"
+#ifdef COMBO_BUILD
+    COMBO_EXPORT
+#endif
+    int
+    MM_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner) {
+    return NeiWolfAsset::CopyResource("mm", destination, capacity, size, owner);
 }

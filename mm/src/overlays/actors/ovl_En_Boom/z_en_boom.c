@@ -1,3 +1,4 @@
+#include "mods/equipment/nei_equipment_presentation.h"
 /*
  * File: z_en_boom.c
  * Overlay: ovl_En_Boom
@@ -408,7 +409,12 @@ void EnBoom_Draw(Actor* thisx, PlayState* play) {
         Matrix_Scale(0.15f, 0.15f, 0.15f, MTXMODE_APPLY);
 
         MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-        gSPDisplayList(POLY_OPA_DISP++, gIKAxeInlineDL);
+        {
+            Gfx* authored = NeiEquipment_ModelDL(NEI_EQUIPMENT_AXE, "__OTR__objects/object_ik/gIronKnuckleAxeDL");
+            if (authored == NULL)
+                authored = NeiEquipment_LegacyDL(NEI_EQUIPMENT_AXE, "__OTR__objects/object_ik/gIronKnuckleAxeDL");
+            gSPDisplayList(POLY_OPA_DISP++, authored != NULL ? authored : gIKAxeInlineDL);
+        }
     } else if (modelDL != NULL) {
         Gfx_SetupDL25_Opa(play->state.gfxCtx);
         Matrix_RotateYS(this->unk_1CD * 0x2EE0, MTXMODE_APPLY);

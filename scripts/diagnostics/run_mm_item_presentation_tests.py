@@ -19,6 +19,7 @@ def function(source, name):
     return source[start:end]
 
 src = (ROOT / 'combo/menu/ComboItemDrawOOT.h').read_text()
+song_body = function(src, 'OOT_FillSongDrawInfo')
 body = function(src, 'OOT_FillItemDrawInfo')
 preamble = r'''
 #include <cassert>
@@ -27,8 +28,19 @@ preamble = r'''
 #include <string>
 #include <iostream>
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboItemEffectColors.h"
 using s16=int16_t; using s32=int32_t; using f32=float;
-enum RandomizerGet { RG_NONE, RG_TEST_CUSTOM, RG_TEST_NATIVE, RG_TEST_PROGRESSIVE, RG_TEST_TIER };
+#include <cstring>
+#define RANDO_ENUM_BEGIN(x) enum x {
+#define RANDO_ENUM_ITEM(x) x,
+#define RANDO_ENUM_END(x) };
+#include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"
+#include "combo/menu/ComboSongDrawOOT.h"
+const char* gGiSongNoteDL="__OTR__objects/object_gi_melody/gGiSongNoteDL";
+constexpr RandomizerGet RG_TEST_CUSTOM=static_cast<RandomizerGet>(RG_MAX+1),
+ RG_TEST_NATIVE=static_cast<RandomizerGet>(RG_MAX+2),
+ RG_TEST_PROGRESSIVE=static_cast<RandomizerGet>(RG_MAX+3),
+ RG_TEST_TIER=static_cast<RandomizerGet>(RG_MAX+4);
 constexpr int TABLE_RANDOMIZER=1;
 struct GetItemEntry { int tableId, drawItemId, gid; void (*drawFunc)(); int itemId=0; };
 void customDraw() {}
@@ -38,7 +50,8 @@ void Randomizer_DrawCaneSomariaUpgrade() {}
 void Randomizer_DrawCanePacciUpgrade() {}
 void Randomizer_DrawCanePacciUltrahand() {}
 void (*awardDraw)()=customDraw;
-int tableCalls=0; bool redesigned=false;
+int tableCalls=0; bool redesigned=false, effects=false;
+int CVarGetInteger(const char*, int) { return effects; }
 RandomizerGet described=RG_NONE;
 namespace Rando::StaticData {
 struct Name { std::string english="Awarded tier"; };
@@ -64,11 +77,16 @@ int GetItem_GetDrawTableEntry(int,void** out,int,int*,float*,int*,uint8_t*) {
 }
 void GetItem_GetDrawSetupDLs(int,void**,void**) {}
 int GetItem_GetShimmerColor(s16,uint8_t*) { return 0; }
+void OOT_DescribeHeartCosmetics(s16,CwItemDrawInfo*) {}
+void OOT_DescribeMagicJar(s16,CwItemDrawInfo*) {}
+int CwAltSwordGi(RandomizerGet,CwItemDrawInfo*) {return 0;}
+void ComboMaskShimmerColor(int,uint8_t*) {}
 '''
 checks = r'''
 int main() {
  CwItemDrawInfo info{};
  assert(OOT_FillItemDrawInfo(RG_TEST_CUSTOM,&info)==0);
+ assert(info.resolvedName && std::string(info.resolvedName)=="Awarded tier"); // self/base tiers also latch names
  assert(tableCalls==0); // custom callback must never consult bottle row zero
  redesigned=true;
  assert(OOT_FillItemDrawInfo(RG_TEST_CUSTOM,&info)==1);
@@ -84,14 +102,47 @@ int main() {
    awardDraw=skills[i]; info={};
    assert(OOT_FillItemDrawInfo(RG_TEST_CUSTOM,&info)==1);
    assert(info.drawKind==CW_DRAW_KIND_NEI_CANE && info.neiLegacyCane==expected[i]);
+   assert(!info.itemShimmer);
+   effects=true; info={};
+   assert(OOT_FillItemDrawInfo(RG_TEST_CUSTOM,&info)==1 && info.itemShimmer);
+   assert(info.itemShimmerColor[0]==255);
+   assert(info.itemShimmerColor[1]==((i==0 || i==2) ? 60 : 215));
+   effects=false;
    assert(tableCalls==1);
  }
 
- std::cout<<"PASS actual GI boundary: custom fallback cannot become bottle; resolved tier and native rows preserved\n";
+ awardDraw=customDraw;
+ for(auto id : {RG_MM_SONG_SONATA,RG_MM_SONG_TIME}) {
+   info={};
+   assert(OOT_FillItemDrawInfo(id,&info)==1);
+   assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.dlistCount==1 && !info.itemShimmer);
+   const uint8_t expected[4]={98,static_cast<uint8_t>(id==RG_MM_SONG_SONATA?255:177),
+                             static_cast<uint8_t>(id==RG_MM_SONG_SONATA?98:211),255};
+   assert(!std::memcmp(info.itemShimmerColor,expected,4));
+ }
+ info={};
+ assert(OOT_FillItemDrawInfo(RG_MM_SONG_STORMS,&info)==1);
+ assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.neiEffect==CW_SONG_STORMS && info.dlistCount==1 && info.itemShimmer);
+ assert(!strcmp(info.dlists[0],gGiSongNoteDL) && info.primColorXlu[0]==146 && info.primColorXlu[1]==146 && info.primColorXlu[2]==146);
+ const RandomizerGet warpIds[]={RG_MINUET_OF_FOREST,RG_BOLERO_OF_FIRE,RG_SERENADE_OF_WATER,
+                               RG_REQUIEM_OF_SPIRIT,RG_NOCTURNE_OF_SHADOW,RG_PRELUDE_OF_LIGHT};
+ const char* colorDls[]={"__OTR__objects/object_gi_melody/gGiMinuetColorDL","__OTR__objects/object_gi_melody/gGiBoleroColorDL",
+                        "__OTR__objects/object_gi_melody/gGiSerenadeColorDL","__OTR__objects/object_gi_melody/gGiRequiemColorDL",
+                        "__OTR__objects/object_gi_melody/gGiNocturneColorDL","__OTR__objects/object_gi_melody/gGiPreludeColorDL"};
+ const uint32_t hues[]={0x62FF62,0xFF3C00,0x55B4DF,0xDE9E2F,0xA028D2,0xEDE73E};
+ for(int i=0;i<6;++i) {
+   info={};assert(OOT_FillItemDrawInfo(warpIds[i],&info)==1);
+   assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.dlistCount==2 && info.xluStartIndex==0 && info.itemShimmer);
+   assert(!strcmp(info.dlists[0],colorDls[i]) && !strcmp(info.dlists[1],gGiSongNoteDL));
+   const uint8_t color[]={uint8_t(hues[i]>>16),uint8_t(hues[i]>>8),uint8_t(hues[i]),255};
+   assert(!memcmp(info.itemShimmerColor,color,4));
+ }
+ assert(tableCalls==1);
+ std::cout<<"PASS actual GI boundary: custom fallback cannot become bottle; resolved tier, native rows and imported song recipes preserved\n";
 }
 '''
 with tempfile.TemporaryDirectory(prefix='mm-presentation-') as td:
-    test=Path(td)/'test.cpp';test.write_text(preamble+body+checks)
+    test=Path(td)/'test.cpp';test.write_text(preamble+song_body+body+checks)
     binary=Path(td)/'test'
     flags=['-std=c++20','-Wall','-Wextra','-I'+str(ROOT)]
     if '--sanitize' in __import__('sys').argv: flags += ['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g']
@@ -101,11 +152,13 @@ with tempfile.TemporaryDirectory(prefix='mm-presentation-') as td:
 message = (ROOT / 'mm/src/code/z_message.c').read_text()
 consumer = (ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text()
 fixture = (ROOT / 'tests/mm_presentation/icon_bridge_test.cpp').read_text()
-bindings = re.findall(r'itemTable\[RG_BOTTLE_WITH_[A-Z_]+\]\.CustomIcon\([^;]+;',
+bindings = re.findall(r'itemTable\[(?:RG_BOTTLE_WITH_[A-Z_]+|RG_MAGIC_BEAN_PACK)\]\.CustomIcon\([^;]+;',
                       (ROOT / 'soh/soh/Enhancements/randomizer/item_list.cpp').read_text())
 fixture = fixture.replace('/* BOTTLE_ICON_BINDINGS */', '\n'.join(bindings))
 fixture = fixture.replace('/* OWNER_ICON */', function(src, 'OOT_FillItemIconInfo'))
-fixture = fixture.replace('/* STAGE_ICON */', function(message, 'Message_StageCustomItemIconEx') + '\n' + function(message, 'Message_StageCustomItemIcon'))
+fixture = fixture.replace('/* STAGE_ICON */', function(message, 'Message_StageCustomItemIconEx') + '\n' +
+                          function(message, 'Message_StageCustomItemIcon') + '\n' +
+                          function(message, 'Message_StageCustomItemIconTint'))
 fixture = fixture.replace('/* CONSUMER_ICON */', function(consumer, 'Rando::ComboForeignMessageIcon'))
 with tempfile.TemporaryDirectory(prefix='mm-icon-') as td:
     test=Path(td)/'test.cpp';test.write_text(fixture)

@@ -2,9 +2,13 @@
 #include "soh/frame_interpolation.h"
 #ifdef COMBO_BUILD
 #include "ComboItemDrawABI.h"
+extern "C" int32_t OOT_MagicJarUsesCustomAsset(const char* path);
 #endif
 #include "soh/OTRGlobals.h"
 #include <vector>
+#include <array>
+#include <map>
+#include <cstring>
 #include <spdlog/spdlog.h> // SPDLOG_INFO (MmSoul debug instrumentation)
 #include "soh/cvar_prefixes.h"
 #include "randomizerTypes.h"
@@ -90,6 +94,8 @@ extern SaveContext gSaveContext;
 }
 
 #include "ComboMaskShimmer.h"
+#include "ComboMorphaGi.h"
+#include "ComboItemEffectColors.h"
 
 #ifdef COMBO_BUILD
 // ComboShip: combo-owned animated cross-game item rendering (MM stray fairies). TU-glue: needs the
@@ -922,9 +928,13 @@ extern "C" void DrawBongoBongo(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+// Native head surgery applies only to the native rig; replacement skeletons
+// provide their own sisters geometry. Updated before this GI skeleton draw.
+static bool sKotakeGiCustomSkeleton = false;
+
 extern "C" s32 OverrideLimbDrawKotake(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
                                       void* thisx) {
-    if (limbIndex == 21) { // Head
+    if (limbIndex == 21 && !sKotakeGiCustomSkeleton) { // Head
         *dList = (Gfx*)gTwinrovaKotakeHeadDL;
     }
 
@@ -945,6 +955,9 @@ extern "C" void PostLimbDrawKotake(PlayState* play, s32 limbIndex, Gfx** dList, 
 
 #define LIMB_COUNT_KOTAKE 27
 extern "C" void DrawKotake(PlayState* play) {
+    const auto selectedSkeleton = ResourceMgr_GetResourceByNameHandlingMQ(gTwinrovaKotakeSkel);
+    sKotakeGiCustomSkeleton =
+        selectedSkeleton && selectedSkeleton->GetInitData() && selectedSkeleton->GetInitData()->IsCustom;
     static bool initialized = false;
     static SkelAnime skelAnime;
     static Vec3s jointTable[LIMB_COUNT_KOTAKE];
@@ -1763,10 +1776,8 @@ void Randomizer_DrawMarioMask(PlayState* play, GetItemEntry* getItemEntry) {
     CLOSE_DISPS(play->state.gfxCtx);
     Matrix_Pop();
     uint8_t shimmerColor[4];
-    ComboMaskShimmerColor(0, shimmerColor);
-    if (ResourceMgr_LoadGfxByName(gEffSparklesDL) != nullptr) {
-        ComboDrawMaskShimmer(play, gEffSparklesDL, shimmerColor, nullptr);
-    }
+    ComboOotMaskShimmerColor(8, shimmerColor);
+    ComboDrawMaskShimmer(play, nullptr, shimmerColor, nullptr);
 }
 
 // =============================================================================
@@ -1802,13 +1813,13 @@ void Randomizer_DrawNet(PlayState* play, GetItemEntry* getItemEntry) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Defined with the per-level sword draws below (upright + 45° hand-local sword presentation).
+// Defined with the per-level sword draws below (upright hand-local sword presentation).
 static void DrawMmWeaponGi(PlayState* play, Gfx* dl1, Gfx* dl2, f32 scale);
 
 void Randomizer_DrawExtFourSword(PlayState* play, GetItemEntry* getItemEntry) {
     // The REAL Four Sword model (soh.o2r object_nei_four_sword, converted out of the old pak).
     // Blade + hilt are separate DLs, both authored in hand-local space like the MM swords, so they
-    // take the same upright + 45° presentation. Falls back to the tinted Kokiri sword if the
+    // take the same upright presentation. Falls back to the tinted Kokiri sword if the
     // archive is stale.
     Gfx* blade = ResourceMgr_LoadGfxByName(dgNeiFourSwordBladeDL);
     Gfx* hilt = ResourceMgr_LoadGfxByName(dgNeiFourSwordHiltDL);
@@ -1854,7 +1865,26 @@ void Randomizer_DrawProgressiveBGS(PlayState* play, GetItemEntry* getItemEntry) 
 // before mm.o2r finished mounting cached NULL forever and the item silently fell back for the rest
 // of the run. When mm.o2r is genuinely absent MmAssets_IsAvailable() is false, so the retry costs
 // nothing. Skijer's NEI
+// Keep custom GI geometry and materials with their current owner. Deferred
+// paths remain valid across Alt toggles without retaining a loaded model pointer.
+static Gfx* NeiGi_ModOverrideDL(const char* path, bool importedMm) {
+    if (!path)
+        return nullptr;
+    const bool local = ResourceMgr_IsModAsset(path) != 0;
+    if (!local && (!importedMm || !ResourceMgr_IsModAssetForGame("mm", path)))
+        return nullptr;
+    const char* base = std::strncmp(path, "__OTR__", 7) == 0 ? path + 7 : path;
+    const std::string routed = std::string(local ? "__OTR__" : "__OTR__@mm:") + base;
+    static std::map<std::string, std::array<Gfx, 2>> wrappers;
+    auto& entry = *wrappers.try_emplace(routed).first;
+    gDma1p(&entry.second[0], G_DL_OTR_FILEPATH, entry.first.c_str(), 0, G_DL_PUSH);
+    gSPEndDisplayList(&entry.second[1]);
+    return entry.second.data();
+}
+
 static Gfx* LoadMmDLOnce(const char* path, Gfx** cache, u8* tried) {
+    if (Gfx* mod = NeiGi_ModOverrideDL(path, true))
+        return mod;
     if (!*tried && MmAssets_IsAvailable()) {
         *cache = (Gfx*)MmAssets_LoadResource(path);
         if (*cache != NULL) {
@@ -1872,15 +1902,14 @@ static Gfx* LoadMmDLOnce(const char* path, Gfx** cache, u8* tried) {
 // DLs looked wrong here no matter the angle: they are arm-local meshes, not GI models.
 // For meshes authored in HAND-LOCAL space (they are held-weapon models, not GI models): stand them
 // up and tilt them into a get-item pose by hand. Only the Four Sword needs this now — the MM sword
-// levels moved to their real GI models above. Spin around world-up, then upright, then tilt, then
-// shrink; ~1.8 rad is what makes a hand-local blade read like the Master Sword GI (45° left it
-// nearly horizontal).
+// levels moved to their real GI models above. Spin around world-up, rotate the
+// donor's +X blade into +Y with Z, then shrink. An extra X quarter turn after the
+// tilt lays the blade flat, so it must not be applied here.
 static void DrawMmWeaponGi(PlayState* play, Gfx* dl1, Gfx* dl2, f32 scale) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     s16 rotation = play->gameplayFrames * 0x2;
     Matrix_RotateY(rotation * 0.01f, MTXMODE_APPLY);
-    Matrix_RotateX(-M_PI / 2.0f, MTXMODE_APPLY);
     Matrix_RotateZ(1.8f, MTXMODE_APPLY);
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
@@ -1975,9 +2004,13 @@ void Randomizer_DrawGreatFairySword(PlayState* play, GetItemEntry* getItemEntry)
     DrawMmGiModel(play, blade, emblem, true); // el emblema del pomo va en XLU (así lo dibuja MM)
 }
 
+void Randomizer_DrawTrueMasterSwordFlame(PlayState* play) {
+    DrawWeaponFlameOverlay(play, 120, 180, 255);
+}
+
 void Randomizer_DrawTrueMasterSword(PlayState* play, GetItemEntry* getItemEntry) {
     // Sacred-blue boss-soul flame + the real Master Sword mesh (pedestal object).
-    DrawWeaponFlameOverlay(play, 120, 180, 255);
+    Randomizer_DrawTrueMasterSwordFlame(play);
     Randomizer_DrawMasterSword(play, getItemEntry);
 }
 
@@ -2041,13 +2074,15 @@ void Randomizer_DrawExtShieldOfIkana(PlayState* play, GetItemEntry* getItemEntry
     // ExtEquip_LoadMmShieldDLs in extended_equipment.c proves this path resolves cleanly in
     // mm.o2r — using object_gi_shield_3/gGiMirrorShieldDL crashed because its vertex hashes
     // didn't resolve in the OTR pack, and the unresolved bytes were executed as gsSPVertex.
+    Gfx* mod = NeiGi_ModOverrideDL("objects/object_link_child/gLinkHumanMirrorShieldDL", true);
     static Gfx* sCachedMmShieldDL = NULL;
     static u8 sLoadAttempted = 0;
-    if (!sLoadAttempted) {
+    if (!mod && !sLoadAttempted) {
         sLoadAttempted = 1;
         sCachedMmShieldDL = (Gfx*)TransformMasks_LoadMmDL("objects/object_link_child/gLinkHumanMirrorShieldDL");
     }
-    if (sCachedMmShieldDL == NULL) {
+    Gfx* selected = mod ? mod : sCachedMmShieldDL;
+    if (selected == NULL) {
         return; // mm.o2r not present — silent skip instead of crashing on a NULL DL
     }
 
@@ -2063,7 +2098,7 @@ void Randomizer_DrawExtShieldOfIkana(PlayState* play, GetItemEntry* getItemEntry
     Matrix_Scale(0.035f, 0.035f, 0.035f, MTXMODE_APPLY);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    gSPDisplayList(POLY_OPA_DISP++, sCachedMmShieldDL);
+    gSPDisplayList(POLY_OPA_DISP++, selected);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
@@ -2168,6 +2203,8 @@ static uint32_t Pegasus_CrimsonRamp(uint32_t rgba) {
 }
 
 static Gfx* Pegasus_GetRecoloredBootsDL() {
+    if (Gfx* mod = NeiGi_ModOverrideDL(gGiHoverBootsDL, false))
+        return mod;
     static std::vector<Gfx> sDL;
     if (!sDL.empty()) {
         return sDL.data();
@@ -2265,6 +2302,8 @@ void Randomizer_DrawExtTrident(PlayState* play, GetItemEntry* getItemEntry) {
 // G_SETPRIMCOLOR/G_SETENVCOLOR pushed through `remap`. Per-SECTION recolors (Climb: yellow leather
 // vs silver iron) are only possible this way — a grayscale tint is one color for the whole mesh.
 static Gfx* BuildRecoloredGiDL(const char* dlName, uint32_t (*remap)(uint32_t), std::vector<Gfx>& out) {
+    if (Gfx* mod = NeiGi_ModOverrideDL(dlName, false))
+        return mod;
     if (!out.empty()) {
         return out.data();
     }
@@ -2453,6 +2492,10 @@ void Randomizer_DrawBottomlessBottle(PlayState* play, GetItemEntry* getItemEntry
 // to a non-DisplayList yields a bogus pointer whose bytes get executed as GBI opcodes — the 0xC0000005
 // crash. Resolve first, skip the draw if it didn't, and say so once in the log. Skijer's NEI
 static void DrawCustomItemDiamondByPath(PlayState* play, const char* path, Gfx** cache, u8* tried, f32 scale) {
+    if (Gfx* mod = NeiGi_ModOverrideDL(path, false)) {
+        DrawCustomItemDiamond(play, mod, scale);
+        return;
+    }
     if (!*tried) {
         *tried = 1;
         if (ResourceMgr_FileExists(path)) {
@@ -2517,23 +2560,15 @@ void Randomizer_DrawNeiShadowCrystal(PlayState* play, GetItemEntry* getItemEntry
 }
 
 void Randomizer_DrawNeiRodOfSeasons(PlayState* play, GetItemEntry* getItemEntry) {
+    NeiGi_DrawSeasonOverlay(play, 5, nullptr);
     static Gfx* c = NULL;
     static u8 t = 0;
     DrawCustomItemDiamondByPath(play, "__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL", &c, &t, 0.35f);
 }
 
-// Seasons: the same rod model wrapped in its season's flame — the flame colour IS the season's
-// identity, matching its wheel glyph.
+// Individual season GIs contain weather only; the actual rod has a separate callback.
 static void DrawSeasonCommon(PlayState* play, u8 season) {
-    static Gfx* c = NULL;
-    static u8 t = 0;
-    u8 r;
-    u8 g;
-    u8 b;
-
-    Seasons_SeasonColor(season, &r, &g, &b);
-    DrawWeaponFlameOverlay(play, r, g, b);
-    DrawCustomItemDiamondByPath(play, "__OTR__objects/object_nei_rod_of_seasons/gNeiRodOfSeasonsDL", &c, &t, 0.35f);
+    NeiGi_DrawSeasonOverlay(play, 1 + season, nullptr);
 }
 
 void Randomizer_DrawSeasonSpring(PlayState* play, GetItemEntry* getItemEntry) {
@@ -2797,9 +2832,8 @@ void Randomizer_DrawMmMask(PlayState* play, GetItemEntry* getItemEntry) {
     CLOSE_DISPS(play->state.gfxCtx);
     Matrix_Pop();
     uint8_t shimmerColor[4];
-    Gfx* shimmer = MmMaskResolveDL("__OTR__objects/gameplay_keep/gEffSparklesDL");
-    if (shimmer != nullptr && ComboMmMaskShimmerColor(index, shimmerColor)) {
-        ComboDrawMaskShimmer(play, (const char*)shimmer, shimmerColor, nullptr);
+    if (ComboMmMaskShimmerColor(index, shimmerColor)) {
+        ComboDrawMaskShimmer(play, nullptr, shimmerColor, nullptr);
     }
 }
 
@@ -2934,10 +2968,8 @@ void Randomizer_DrawMmRemains(PlayState* play, GetItemEntry* getItemEntry) {
     CLOSE_DISPS(play->state.gfxCtx);
     Matrix_Pop();
     uint8_t shimmerColor[4];
-    Gfx* shimmer = MmMaskResolveDL("__OTR__objects/gameplay_keep/gEffSparklesDL");
-    if (shimmer != nullptr &&
-        ComboMmRemainsShimmerColor(getItemEntry->getItemId - (int32_t)RG_MM_REMAINS_ODOLWA, shimmerColor)) {
-        ComboDrawMaskShimmer(play, (const char*)shimmer, shimmerColor, nullptr);
+    if (ComboMmRemainsShimmerColor(getItemEntry->getItemId - (int32_t)RG_MM_REMAINS_ODOLWA, shimmerColor)) {
+        ComboDrawMaskShimmer(play, nullptr, shimmerColor, nullptr);
     }
 }
 
@@ -4358,6 +4390,9 @@ extern "C" void Randomizer_DrawDefenseUpgrade(PlayState* play, GetItemEntry* get
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gStatDefenseDL);
     CLOSE_DISPS(play->state.gfxCtx);
+    uint8_t color[4];
+    ComboRpgShimmerColor(0, color);
+    ComboDrawMaskShimmer(play, nullptr, color, nullptr);
 }
 
 extern "C" void Randomizer_DrawSpeedUpgrade(PlayState* play, GetItemEntry* getItemEntry) {
@@ -4367,6 +4402,9 @@ extern "C" void Randomizer_DrawSpeedUpgrade(PlayState* play, GetItemEntry* getIt
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gStatSpeedDL);
     CLOSE_DISPS(play->state.gfxCtx);
+    uint8_t color[4];
+    ComboRpgShimmerColor(1, color);
+    ComboDrawMaskShimmer(play, nullptr, color, nullptr);
 }
 
 extern "C" void Randomizer_DrawPowerUpgrade(PlayState* play, GetItemEntry* getItemEntry) {
@@ -4376,6 +4414,9 @@ extern "C" void Randomizer_DrawPowerUpgrade(PlayState* play, GetItemEntry* getIt
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gStatPowerDL);
     CLOSE_DISPS(play->state.gfxCtx);
+    uint8_t color[4];
+    ComboRpgShimmerColor(2, color);
+    ComboDrawMaskShimmer(play, nullptr, color, nullptr);
 }
 
 extern "C" void Randomizer_DrawCrawlSpeedUpgrade(PlayState* play, GetItemEntry* getItemEntry) {
@@ -4385,6 +4426,9 @@ extern "C" void Randomizer_DrawCrawlSpeedUpgrade(PlayState* play, GetItemEntry* 
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gStatCrawlSpeedDL);
     CLOSE_DISPS(play->state.gfxCtx);
+    uint8_t color[4];
+    ComboRpgShimmerColor(4, color);
+    ComboDrawMaskShimmer(play, nullptr, color, nullptr);
 }
 
 extern "C" void Randomizer_DrawClimbSpeedUpgrade(PlayState* play, GetItemEntry* getItemEntry) {
@@ -4394,6 +4438,9 @@ extern "C" void Randomizer_DrawClimbSpeedUpgrade(PlayState* play, GetItemEntry* 
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gStatClimbSpeedDL);
     CLOSE_DISPS(play->state.gfxCtx);
+    uint8_t color[4];
+    ComboRpgShimmerColor(5, color);
+    ComboDrawMaskShimmer(play, nullptr, color, nullptr);
 }
 
 extern "C" void Randomizer_DrawPushSpeedUpgrade(PlayState* play, GetItemEntry* getItemEntry) {
@@ -4403,4 +4450,7 @@ extern "C" void Randomizer_DrawPushSpeedUpgrade(PlayState* play, GetItemEntry* g
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gStatPushSpeedDL);
     CLOSE_DISPS(play->state.gfxCtx);
+    uint8_t color[4];
+    ComboRpgShimmerColor(6, color);
+    ComboDrawMaskShimmer(play, nullptr, color, nullptr);
 }

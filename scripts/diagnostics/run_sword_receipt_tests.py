@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Run native receipt selection/fallback bodies with selected resource geometry.
+
+The original callback remains a rendering boundary; production receipt flags,
+descriptor refusal, fallback scope and selected bounds traversal all execute.
+No scene execution or currently mounted pack selection is claimed.
+"""
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from run_mm_scene_randomization_tests import function
+
+ROOT = Path(__file__).resolve().parents[2]
+native = (ROOT / 'mm/2s2h/Rando/NeiGiPresentation.cpp').read_text()
+oot = (ROOT / 'soh/soh/Enhancements/randomizer/NeiGiPresentation.cpp').read_text()
+oot_draw = (ROOT / 'soh/soh/Enhancements/randomizer/draw.cpp').read_text()
+draw = (ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text()
+header = (ROOT / 'mm/2s2h/Rando/NeiGiPresentation.h').read_text()
+model = (ROOT / 'tests/sword_fallback/model_fit_test.cpp').read_text()
+resources = (ROOT / 'combo/NeiAssetPriorityResource.h').read_text()
+bridge = (ROOT / 'mm/2s2h/BenPort.cpp').read_text()
+companion = (ROOT / 'mm/mods/transformation_masks/assets/mm_asset_loader.cpp').read_text()
+common = model[:model.index('using f32=')]
+common = common.replace('name+=7;\n        auto it=', 'name+=7;\n        if(name[0]==\'@\'){const char* colon=strchr(name,\':\');if(!colon)return nullptr;name=colon+1;}\n        auto it=')
+ids = sorted(set(re.findall(r'\bRI_[A-Z0-9_]+\b', native)))
+declarations = 'enum RandoItemId {' + ','.join(ids) + '};\n'
+binding_start = native.index('struct Binding {')
+binding_end = native.index('// Only roots', binding_start)
+declarations += native[binding_start:binding_end]
+declarations += header[header.index('class MM_NeiGiFallbackShimmer'):]
+custom = (ROOT / 'mm/2s2h/CustomItem/CustomItem.h').read_text()
+flags_start = custom.index('enum CustomItemFlags')
+flags_end = custom.index('};',flags_start)+2
+declarations += '\nnamespace CustomItem {' + custom[flags_start:flags_end] + '}\n'
+production = '\n'.join(function(native, name) for name in [
+    'HasMmLegacyGiMod', 'GetSelectedOwnerGi', 'MM_DescribeNeiGi', 'MM_TryDrawNeiGi'])
+production += '\n' + native[native.index('MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer'):]
+start = draw.index('    const bool shop = actor && actor->id == ACTOR_EN_GIRLA;')
+end = draw.index('    const int dungeonOwner', start)
+dispatch = draw[start:end].replace('#endif', '')
+production += '\nvoid DrawReceipt(RandoItemId randoItemId, Actor* actor) {\n' + dispatch + '\nDrawNativeSword();\n}\n'
+template = (ROOT / 'tests/sword_fallback/receipt_test.cpp').read_text()
+source = template.replace('/* RESOURCE_TYPES */', common).replace('/* DECLARATIONS */', declarations)
+resource_fit = '\n'.join(function(resources, name) for name in ['GetDinSwordGiProfile', 'GetGiModelsFit'])
+if 'struct GiFitResourceLoader' in resources:
+    start=resources.index('struct GiFitResourceLoader')
+    resource_fit=resources[start:resources.index('inline bool GetGiModelsFit',start)]+resource_fit
+source = source.replace('/* RESOURCE_FIT */', 'namespace NeiAssetPriority {\n'+resource_fit+'\n}\n')
+source = source.replace('/* RESOURCE_API */', function(bridge,'ResourceMgr_GetGiModelsFitForGame'))
+companion_fit = ''
+if 'class OotGiResourceLoader' in companion:
+    begin=companion.index('class OotGiResourceLoader')
+    end=companion.index('extern "C" int MmAssets_GetOotGiModelFit',begin)
+    companion_fit=companion[begin:end]+function(companion,'MmAssets_GetOotGiModelFit')
+source = source.replace('/* COMPANION_FIT */',companion_fit)
+source = source.replace('/* PRODUCTION */', production)
+oot_production = '\n'.join(function(oot_draw, name) for name in [
+    'Randomizer_DrawProgressiveKokiriSword', 'Randomizer_DrawProgressiveMasterSword', 'Randomizer_DrawProgressiveBGS',
+    'Randomizer_DrawExtFourSword'])
+oot_production += '\n'+'\n'.join(function(oot, name) for name in ['Spin', 'HasLegacyGiMod', 'NeiGi_DrawEffects', 'NeiGi_DrawImpl'])
+source = source.replace('/* OOT_PRODUCTION */', oot_production)
+flags = ['-std=c++20', '-DF3DEX_GBI_2', '-DCOMBO_BUILD', '-I'+str(ROOT), '-I'+str(ROOT/'combo/menu'),
+         '-I'+str(ROOT/'libultraship/include')]
+if '--sanitize' in sys.argv:
+    flags += ['-g','-fsanitize=address,undefined','-fno-sanitize-recover=all','-fno-omit-frame-pointer','-fno-pie','-no-pie']
+with tempfile.TemporaryDirectory(prefix='sword-receipt-') as temporary:
+    cpp = Path(temporary)/'receipt.cpp';cpp.write_text(source)
+    binary = Path(temporary)/'receipt'
+    subprocess.run([os.environ.get('CXX','c++'),*flags,str(cpp),'-o',str(binary)],check=True)
+    subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
+    # Compile the exact typed companion query with real Ship/Fast APIs too.
+    # Only the existing global/context and archive-handle access are seams.
+    typed = '''#include <unordered_map>
+#include <ship/Context.h>
+#include <ship/resource/ResourceManager.h>
+#include <ship/resource/ResourceLoader.h>
+#include <ship/resource/ResourceManagerScope.h>
+#include <ship/resource/archive/Archive.h>
+#include "combo/NeiGiModelBounds.h"
+struct OTRGlobals { static OTRGlobals* Instance; std::shared_ptr<Ship::Context> context; };
+std::vector<std::shared_ptr<Ship::Archive>> sOotArchives;
+extern "C" unsigned char MmAssets_OotArchivesLoaded();
+extern "C" const char* MmAssets_HashToPath(unsigned long long);
+extern "C" {
+'''+companion_fit+'\n}\n'
+    typed_cpp=Path(temporary)/'typed.cpp';typed_cpp.write_text(typed)
+    subprocess.run([os.environ.get('CXX','c++'),*flags,'-fsyntax-only',str(typed_cpp)],check=True)
+    print('PASS real Ship/Fast typed companion GI bounds API and C linkage')

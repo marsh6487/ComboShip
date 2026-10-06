@@ -103,7 +103,16 @@ jobs:
         run: |
           # Fixed source fixtures from the accepted SoH history; never substitute current output.
           git fetch --no-tags --depth=1 https://github.com/marsh6487/Shipwright.git cec63fce86b1f582f6e61ad6a98eca6c3cca784b c77c18587a976f6d6cb5c8f91f27593286469218
-          bash scripts/diagnostics/run_combo_nei_regressions.sh
+          # HD icon routes compare grant behavior with this fixed ComboShip baseline.
+          git fetch --no-tags --depth=1 origin 122dd5f68cb37fcf515c3726f8a77043db5dcdf4
+          # Match libultraship's ImGui dependency for the real save-editor draw fixture.
+          git clone --depth=1 --branch v1.91.9b-docking https://github.com/ocornut/imgui.git "$RUNNER_TEMP/combo-nei-imgui"
+          # The real SaveEditor headers also reach ResourceManager and GuiTexture.
+          # Use the same pins as libultraship/cmake/dependencies/common.cmake.
+          git clone --depth=1 --branch v4.1.0 https://github.com/bshoshany/thread-pool.git "$RUNNER_TEMP/combo-nei-thread-pool"
+          mkdir -p "$RUNNER_TEMP/combo-nei-stb"
+          curl --fail --location https://raw.githubusercontent.com/nothings/stb/0bc88af4de5fb022db643c2d8e549a0927749354/stb_image.h --output "$RUNNER_TEMP/combo-nei-stb/stb_image.h"
+          CPATH="$RUNNER_TEMP/combo-nei-imgui:$RUNNER_TEMP/combo-nei-thread-pool/include:$RUNNER_TEMP/combo-nei-stb${CPATH:+:$CPATH}" bash scripts/diagnostics/run_combo_nei_regressions.sh
 
       - name: OoT diagnostic frame timing accounting
         run: |
@@ -155,6 +164,30 @@ jobs:
         run: |
           python3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py
           python3 -B scripts/diagnostics/run_foreign_soul_skeleton_tests.py --sanitize
+          python3 -B scripts/diagnostics/run_boss_soul_model_tests.py
+          python3 -B scripts/diagnostics/run_boss_soul_model_tests.py --sanitize
+          python3 -B scripts/diagnostics/run_barinade_syntax_tests.py
+          python3 -B scripts/diagnostics/run_twinrova_gi_replacement_tests.py
+          python3 -B scripts/diagnostics/run_twinrova_gi_replacement_tests.py --sanitize
+          python3 -B scripts/diagnostics/run_mm_oot_boss_import_bridge_tests.py
+          python3 -B scripts/diagnostics/run_mm_oot_boss_import_bridge_tests.py --sanitize
+
+      - name: Static OoT equipment GI bridge
+        run: |
+          python3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py
+          python3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py --sanitize
+
+      - name: Foreign OoT magic jar cosmetic presentation
+        run: |
+          python3 -B scripts/diagnostics/run_foreign_magic_jar_tests.py
+          ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_foreign_magic_jar_tests.py --sanitize
+
+      - name: Foreign OoT key and heart cosmetics
+        run: |
+          python3 -B scripts/diagnostics/run_oot_key_cosmetic_bridge_tests.py
+          ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_oot_key_cosmetic_bridge_tests.py --sanitize
+          python3 -B scripts/diagnostics/run_foreign_heart_cosmetic_tests.py
+          ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_foreign_heart_cosmetic_tests.py --sanitize
 
       - name: Great Spin GI presentation in both engines
         run: |

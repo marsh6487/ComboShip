@@ -1,3 +1,4 @@
+#include "mods/equipment/nei_equipment_presentation.h"
 /**
  * mm_player_form.cpp - MM Transformation Masks Form System
  *
@@ -15257,7 +15258,10 @@ static void MmForm_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec
             Matrix_Scale(axe->scale, axe->scale, axe->scale, MTXMODE_APPLY);
             Gfx_SetupDL_25Opa(play->state.gfxCtx);
             gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-            gSPDisplayList(POLY_OPA_DISP++, gIKAxeInlineDL);
+            Gfx* authoredAxe = NeiEquipment_ModelDL(NEI_EQUIPMENT_AXE, "__OTR__objects/object_ik/gIronKnuckleAxeDL");
+            if (authoredAxe == nullptr)
+                authoredAxe = NeiEquipment_LegacyDL(NEI_EQUIPMENT_AXE, "__OTR__objects/object_ik/gIronKnuckleAxeDL");
+            gSPDisplayList(POLY_OPA_DISP++, authoredAxe != nullptr ? authoredAxe : gIKAxeInlineDL);
             Matrix_Pop();
             CLOSE_DISPS(play->state.gfxCtx);
         }

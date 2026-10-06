@@ -12,13 +12,13 @@ from run_time_pedestal_tests import functions
 def flags():
     result = ["-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0"]
     result += ["-I" + str(ROOT / p) for p in
-               ("soh", "soh/include", "soh/src", "soh/assets", "soh/mods", "libultraship/include")]
+               ("soh", "soh/include", "soh/src", "soh/assets", "soh/mods", "combo/menu", "libultraship/include")]
     for config in ("CMake/soh-cvars.cmake", "CMake/lus-cvars.cmake"):
         for key, value in re.findall(r'set\((CVAR_PREFIX_\w+)\s+"?([^\s"\)]+)', (ROOT / config).read_text()):
             result.append(f'-D{key}="{value}"')
     return result
 
-if __name__ == "__main__":
+if __name__ == "__main__" and "--budget-only" not in sys.argv:
     subprocess.run([sys.executable,str(ROOT/"tests/nei_used_fx/run_interpolation_test.py")],check=True)
     subprocess.run([sys.executable,str(ROOT/'tests/nei_used_fx/source_contract_test.py')],check=True)
     subprocess.run([sys.executable,str(ROOT/'tests/nei_used_fx/material_test.py')],check=True)
@@ -26,14 +26,17 @@ if __name__ == "__main__":
     subprocess.run([sys.executable,str(ROOT/'tests/nei_used_fx/flight_particle_test.py')],check=True)
     subprocess.run([sys.executable,str(ROOT/'tests/nei_used_fx/preserve_approved_test.py')],check=True)
     subprocess.run([sys.executable,str(ROOT/'tests/nei_used_fx/preserve_accepted_fire_test.py')],check=True)
+if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="nei-used-fx-") as tmp:
+        graph=functions((ROOT/'soh/src/code/graph.c').read_text())
+        (Path(tmp)/'nei_gi_graph.inc').write_text(graph['Graph_OpenDisps']+'\n'+graph['Graph_CloseDisps'])
         # The budget test uses the established real-engine graphics fixture.
         # Its unrelated GI-dispatch regressions are stripped at link time.
         (Path(tmp)/'nei_gi_dispatch.inc').write_text(
             'void Player_DrawGetItemImpl(PlayState*, Player*, Vec3f*, s32);\n'
             'void EnGirlA_Draw(Actor*, PlayState*);\n')
         (Path(tmp)/'nei_gi_bounds.inc').write_text('')
-        for name in ("policy", "feedback_policy", "presentation", "budget"):
+        for name in (("budget",) if "--budget-only" in sys.argv else ("policy", "feedback_policy", "presentation", "budget")):
             binary = str(Path(tmp) / name)
             subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-O2", *flags(), '-I'+tmp,
                             '-ffunction-sections','-fdata-sections',

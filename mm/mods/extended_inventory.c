@@ -628,6 +628,9 @@ void* ExtInv_GetCustomItemNameTex(uint16_t itemId, uint8_t language) {
     // generate_names.py pipeline. Path strings, resolved by the RSP like every custom name.
     switch (itemId) {
         case EXT_ITEM_SHEIKAH_SLATE:
+            if (Slate_RuneCount() != 0) {
+                return Slate_RuneNameTex(Slate_GetRune());
+            }
             return (void*)"__OTR__textures/item_name_custom/gSheikahSlateNameTex";
         case EXT_ITEM_PHANTOM_HOURGLASS:
             return (void*)"__OTR__textures/item_name_custom/gPhantomHourglassNameTex";
@@ -1427,6 +1430,7 @@ void Sw97_RefreshButtonIcons(PlayState* play) {
 void ExtInv_RefreshButtonIconsForItem(PlayState* play, uint16_t itemId) {
     void Interface_LoadItemIconImpl(PlayState * play, u8 btn);
     void Interface_Dpad_LoadItemIconImpl(PlayState * play, u8 btn);
+    u16 ExtButton_GetDpadItem(s32 form, s32 btn);
     for (int32_t i = EQUIP_SLOT_C_LEFT; i <= EQUIP_SLOT_C_RIGHT; i++) {
         uint8_t it = GET_CUR_FORM_BTN_ITEM(i);
         uint16_t eff = (it == ITEM_EXT_BUTTON) ? EXT_BUTTON_ITEM(0, i) : it; // u16 items park a marker
@@ -1435,7 +1439,7 @@ void ExtInv_RefreshButtonIconsForItem(PlayState* play, uint16_t itemId) {
         }
     }
     for (int32_t i = EQUIP_SLOT_D_RIGHT; i <= EQUIP_SLOT_D_UP; i++) {
-        if (DPAD_GET_CUR_FORM_BTN_ITEM(i) == itemId) { // D-pad has no EXT-marker slots
+        if (ExtButton_GetDpadItem(0, i) == itemId) {
             Interface_Dpad_LoadItemIconImpl(play, (u8)i);
         }
     }
@@ -1538,11 +1542,14 @@ static void* const sWandNameTex[WAND_MODE_COUNT] = {
     (void*)gMeteorRodNameTex, (void*)gStormRodNameTex,   (void*)gShadowScepterNameTex,
 };
 
-// One icon for all six rods: the ELEMENT is the medallion the kaleido cell draws with it, not a
-// different staff sprite. Keeps the six modes reading as one item you retune.
+static void* const sWandIconTex[WAND_MODE_COUNT] = {
+    (void*)gItemIconSandRodTex,   (void*)gItemIconTornadoRodTex, (void*)gItemIconWaterRodTex,
+    (void*)gItemIconMeteorRodTex, (void*)gItemIconStormRodTex,   (void*)gItemIconShadowScepterTex,
+};
+
+// The active rod's icon matches its GI and held model; the inventory slot stays shared.
 void* Wand_ModeIcon(uint8_t mode) {
-    (void)mode;
-    return (void*)gItemIconElementalWandTex;
+    return (mode < WAND_MODE_COUNT) ? sWandIconTex[mode] : (void*)gItemIconElementalWandTex;
 }
 void* Wand_ModeNameTex(uint8_t mode) {
     return (mode < WAND_MODE_COUNT) ? sWandNameTex[mode] : sWandNameTex[0];
@@ -1694,6 +1701,62 @@ void* Slate_RuneIcon(uint8_t rune) {
     return (rune < SLATE_RUNE_COUNT) ? sSlateRuneIcon[rune] : sSlateRuneIcon[0];
 }
 
+// Independent ownership behind the shared Grace / hourglass cell. Older saves
+// stored only the selected item; retain it and backfill its ownership.
+void GraceHourglass_Heal(void) {
+    NeiSaveData* nei = Nei_Save();
+    uint16_t current = ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS);
+    if (current == ITEM_HYLIAS_GRACE) {
+        nei->hyliasGraceOwned = 1;
+    } else if (current == EXT_ITEM_PHANTOM_HOURGLASS) {
+        nei->phantomHourglassOwned = 1;
+    } else if (current == ITEM_NONE) {
+        if (nei->hyliasGraceOwned) {
+            ExtInv_SetSlotItem(SLOT_PHANTOM_HOURGLASS, ITEM_HYLIAS_GRACE);
+        } else if (nei->phantomHourglassOwned) {
+            ExtInv_SetSlotItem(SLOT_PHANTOM_HOURGLASS, EXT_ITEM_PHANTOM_HOURGLASS);
+        }
+    }
+}
+
+uint8_t GraceHourglass_IsOwned(uint16_t item) {
+    const NeiSaveData* nei = Nei_Save();
+    if (item == ITEM_HYLIAS_GRACE) {
+        return nei->hyliasGraceOwned || ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS) == item;
+    }
+    if (item == EXT_ITEM_PHANTOM_HOURGLASS) {
+        return nei->phantomHourglassOwned || ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS) == item;
+    }
+    return 0;
+}
+
+void GraceHourglass_Grant(uint16_t item) {
+    if (item != ITEM_HYLIAS_GRACE && item != EXT_ITEM_PHANTOM_HOURGLASS) {
+        return;
+    }
+    GraceHourglass_Heal();
+    if (item == ITEM_HYLIAS_GRACE) {
+        Nei_Save()->hyliasGraceOwned = 1;
+    } else {
+        Nei_Save()->phantomHourglassOwned = 1;
+    }
+    // Finding a sibling does not change the player's existing selection/equips.
+    if (ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS) == ITEM_NONE) {
+        ExtInv_SetSlotItem(SLOT_PHANTOM_HOURGLASS, item);
+    }
+}
+
+void* Slate_RuneNameTex(uint8_t rune) {
+    static const char* const names[SLATE_RUNE_COUNT] = {
+        "__OTR__textures/item_name_custom/gSlateRuneBombNameTex",
+        "__OTR__textures/item_name_custom/gSlateRuneStasisNameTex",
+        "__OTR__textures/item_name_custom/gSlateRuneCryonisNameTex",
+        "__OTR__textures/item_name_custom/gSlateRuneMasterCycleNameTex",
+        "__OTR__textures/item_name_custom/gSlateRuneSensorNameTex",
+    };
+    return rune < SLATE_RUNE_COUNT ? (void*)names[rune] : NULL;
+}
+
 uint8_t Slate_RuneOwned(uint8_t rune) {
     if (rune >= SLATE_RUNE_COUNT) {
         return 0;
@@ -1764,8 +1827,7 @@ uint8_t Slate_RuneNeighbor(uint8_t rune, int32_t dir) {
     return Slate_RuneAt(0);
 }
 
-// ── Rod of Seasons — four seasons in one page-2 cell (slate idiom). The rod is model-only here; the
-// state exists so a season found in MM reaches OoT, and OoT's seasons show up owned on this side. ──
+// Rod of Seasons: four sibling pickups share one rod; ownership crosses hosts unchanged.
 uint8_t Seasons_SeasonOwned(uint8_t season) {
     if (season == SEASON_OFF) {
         return 1; // the blank coin comes with the rod

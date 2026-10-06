@@ -19,5 +19,20 @@ extern "C" const char* NeiResource_Route(const char* path) {
         return nullptr;
     // unordered_set rehash preserves references/pointers to its elements.
     static std::unordered_set<std::string> paths;
+    if (path[7] == '@') {
+        if (std::strncmp(path + 7, "@oot:", 5) && std::strncmp(path + 7, "@mm:", 4))
+            return nullptr;
+        return paths.insert(path).first->c_str();
+    }
     return paths.insert(std::string("__OTR__@oot:") + (path + 7)).first->c_str();
+}
+
+extern "C" int NeiResource_IsMod(const char* path) {
+    if (!path)
+        return 0;
+    using Query = int (*)(const char*);
+    static Query query = nullptr;
+    if (!query)
+        query = reinterpret_cast<Query>(Combo_ResolveSym("soh", "OOT_NeiResourceIsMod"));
+    return query && query(path);
 }

@@ -13,6 +13,7 @@
 
 #include "PauseItemDescriptions.h"
 #include "CustomMessage.h"
+#include "2s2h/Rando/ItemReceiptText.h"
 
 extern "C" {
 #include "z64item.h"
@@ -42,12 +43,12 @@ static const ItemDescEntry sCustomItemDescs[] = {
     // costs a Heart Container rather than the 3 hearts this row used to advertise.)
     { ITEM_HYLIAS_GRACE,
       "Fairy flight for 10s. Ignores walls.\nA=up, B=down, L=sprint. 24 MP." }, // RETIRED item; row kept for old saves
-    // 2026-08-06 page-2 additions. Shadow Crystal and Rod of Seasons are model-only on this side.
+    // 2026-08-06 page-2 additions. Shadow Crystal remains model-only on this side.
     { EXT_ITEM_SHEIKAH_SLATE, "C draws the slate, then casts the\nactive rune. Hold L for the rune wheel." },
     { EXT_ITEM_PHANTOM_HOURGLASS,
       "C stops time and aims. C again rewinds\nwhat the reticle holds along its own\npath. C or B lets go." },
     { EXT_ITEM_SHADOW_CRYSTAL, "Cursed twilight crystal. Turns Link\ninto Wolf Link. OoT only for now." },
-    { EXT_ITEM_ROD_OF_SEASONS, "Rod bearing the four seasons.\nOoT only for now." },
+    { EXT_ITEM_ROD_OF_SEASONS, "Press its button to draw the rod.\nPress again to choose an unlocked\nseason." },
     { ITEM_ZONAI_PERMAFROST,
       "Toggle the time stop. 4 MP to start,\nthen 1 MP every 10 frames. Ends on\na second press or an empty meter." },
     { ITEM_DEMISE_DESTRUCTION, "Massive AoE explosion. Damages all\nenemies in range. Ground only. 12 MP." },
@@ -212,7 +213,20 @@ static const char* PauseItemDesc_Find(const ItemDescEntry* table, size_t count, 
     return NULL;
 }
 
+extern "C" const char* PauseItemDesc_GetMapInfo(s32 dungeon, u16 itemId) {
+    if (dungeon < 0 || dungeon >= 4 || (itemId != ITEM_COMPASS && itemId != ITEM_DUNGEON_MAP))
+        return NULL;
+    const bool compass = itemId == ITEM_COMPASS;
+    if (!CHECK_DUNGEON_ITEM(compass ? DUNGEON_COMPASS : DUNGEON_MAP, dungeon))
+        return NULL;
+    static std::string description;
+    description = Rando::GetDungeonMapCompassInfo(dungeon, compass);
+    return description.empty() ? NULL : description.c_str();
+}
+
 extern "C" const char* PauseItemDesc_Get(u16 itemId, s32 pageIndex) {
+    if (pageIndex == PAUSE_MAP)
+        return PauseItemDesc_GetMapInfo(gSaveContext.dungeonSceneSharedIndex, itemId);
     // The equipment and quest pages carry their own tables and share nothing with the item page.
     // NEI's equipment page rides PAUSE_MASK — MM has no PAUSE_EQUIP of its own.
     if (pageIndex == PAUSE_MASK) {

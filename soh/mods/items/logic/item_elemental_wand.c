@@ -125,15 +125,13 @@ static void Wand_OnWheelConfirm(s32 index) {
     Wand_SetMode(Wand_ModeAt((u8)index));
 }
 
-// Owned rods only, in the order the kaleido wheel cycles them, so every entry is selectable. The
-// icon is the MEDALLION: the six rods share one staff sprite, so the element is the only thing that
-// tells them apart anywhere else either.
+// Owned rods only, in the existing mode order, with the same model-matched icons as inventory.
 static s32 Wand_BuildWheel(BoxMenuEntry* out) {
     s32 count = Wand_ModeCount();
 
     for (s32 i = 0; i < count; i++) {
-        out[i].iconPath = (const char*)ExtInv_GetItemIcon(Wand_ModeMedallion(Wand_ModeAt((u8)i)));
-        out[i].iconSize = 24; // quest icons, unlike the slate's 32x32 runes
+        out[i].iconPath = (const char*)Wand_ModeIcon(Wand_ModeAt((u8)i));
+        out[i].iconSize = 32; // logical slot size; HD raw texture scales supply the full pixels
         out[i].enabled = 1;
     }
     return count;
@@ -263,8 +261,13 @@ void Wand_TickInput(PlayState* play, Player* player) {
             // ---- HOLD C: the two rods that do something while the button is down ----
             if (mode == WAND_MODE_TORNADO) {
                 WandWind_TickHover(player, in.isHeld);
-            } else if ((mode == WAND_MODE_SAND) && WandSand_HoldElapsed(player, in.isHeld)) {
-                Wand_Cast(player, play, WAND_MODE_SAND); // billed like any other slab
+            } else if (mode == WAND_MODE_SAND) {
+                // A press is handled below once. Held repeats share its equip/blocker gates, and
+                // passing false resets the repeat timer during drawing or an unavailable action.
+                u8 canHold = sWasDrawn && in.wasEquipped && !in.isPressed && !ItemInput_IsBlocked(player, play);
+                if (WandSand_HoldElapsed(player, canHold && in.isHeld)) {
+                    Wand_Cast(player, play, WAND_MODE_SAND); // billed like any other slab
+                }
             }
 
             // ---- PRESS C: cast. Only the press poses — the Sand hold repeats every few frames and

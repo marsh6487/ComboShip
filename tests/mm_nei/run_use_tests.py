@@ -282,6 +282,9 @@ run('native_stow_ownership',r'''
 #include "mods/items/logic/item_rod_ice.h"
 #include "mods/items/logic/item_rod_light.h"
 CustomItemState gCustomItemState{};ItemEquipState sMittsEquipState{};int stops=0,suppress=0;
+u8 seasonsDrawn=0;
+u8 Seasons_IsDrawn(){return seasonsDrawn;}
+void Seasons_Stow(PlayState*,Player*){seasonsDrawn=0;}
 void Lantern_PutAway(Player*,PlayState*){gCustomItemState.lanternEquipped=gCustomItemState.lanternSwinging=0;}
 void FireRod_PutAway(Player*,PlayState*){fireRodActive=fireRodFirstPerson=0;}
 void IceRod_PutAway(Player*,PlayState*){iceRodActive=iceRodFirstPerson=0;}
@@ -295,7 +298,7 @@ void DekuLeaf_Stop(Player*,PlayState*){gCustomItemState.dekuLeafActive=0;}
 void Shovel_Stop(Player*,PlayState*){gCustomItemState.shovelActive=0;}
 ''',[body('mm/mods/items/custom_items_stow.c',n) for n in ['CustomItems_CanStowWhip','CustomItems_HasStowableHeldItem','CustomItems_PutAwayHeldItems']],r'''
 Player p{},remote{};PlayState play{};play.actorCtx.actorLists[ACTORCAT_PLAYER].first=&p.actor;
-gCustomItemState.lanternEquipped=fireRodActive=iceRodFirstPerson=lightRodActive=1;
+gCustomItemState.lanternEquipped=fireRodActive=iceRodFirstPerson=lightRodActive=seasonsDrawn=1;
 CustomItems_PutAwayHeldItems(&remote,&play);assert(gCustomItemState.lanternEquipped&&fireRodActive);
 gCustomItemState.ballAndChainThrown=whipActive=1;whipState=WHIP_STATE_EQUIP;
 assert(CustomItems_HasStowableHeldItem(&p));CustomItems_PutAwayHeldItems(&p,&play);
@@ -382,6 +385,8 @@ void func_80839978(PlayState* play,Player* p){}
 void func_80839A10(PlayState* play,Player* p){}
 s32 RocsFeatherVanilla_TryUse(PlayState* play,Player* p,s32 item){return 0;}
 u8 CustomForms_UseItem(Player* p,ItemId item){return 0;}
+void WolfLinkHost_OnUseItem(PlayState* play,Player* p,s32 item){}
+void WolfLinkHost_RestorePlayerInput(Player* p,Input* input){}
 void CustomItems_PutAwayHeldItems(Player* p,PlayState* play){}
 void ItemEquip_BeginItemChangeSound(PlayState* play,Player* p,s32 action){}
 s32 OotSpells_TryUseItem(PlayState* play,Player* p,PlayerItemAction a,ItemId item){return 0;}

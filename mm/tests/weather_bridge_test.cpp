@@ -21,6 +21,8 @@ static float rainGain;
 static int resets;
 static int rainDraws;
 static int skyRebuilds;
+static uint8_t nativeRainAmbience;
+static uint8_t nativeThunderAmbience;
 f32 D_801F4E74;
 f32 D_801F4F28;
 u16 gSkyboxNumStars;
@@ -68,6 +70,19 @@ extern "C" void MMWeatherAudio_SetRain(float gain) {
     rainGain = gain;
 }
 extern "C" void MMWeatherAudio_Thunder(float) {
+}
+extern "C" void Audio_SetAmbienceChannelIO(u8 channel, u8 port, u8 value) {
+    assert(port == CHANNEL_IO_PORT_1);
+    const uint32_t cmd = MMWeather_ResolveAmbienceSeqCmd(
+        (SEQCMD_OP_SET_CHANNEL_IO << 28) | (SEQ_PLAYER_AMBIENCE << 24) | (port << 16) | (channel << 8) | value);
+    value = cmd & 0xFF;
+    if (channel == AMBIENCE_CHANNEL_RAIN) {
+        nativeRainAmbience = value;
+    } else if (channel == AMBIENCE_CHANNEL_LIGHTNING) {
+        nativeThunderAmbience = value;
+    } else {
+        assert(false);
+    }
 }
 
 static void AdvanceRain(PlayState* play) {
@@ -370,6 +385,101 @@ static void SkyOverrideRegression() {
     std::puts("PASS production sky: all day/time palettes, gloom, slot bindings, filters, stars and restoration");
 }
 
+static void SeasonWeatherRegression() {
+    static PlayState play{};
+    Camera camera{};
+    play.sceneId = SCENE_TOWN;
+    play.skyboxId = SKYBOX_NORMAL_SKY;
+    play.cameraPtrs[0] = &camera;
+    play.envCtx.stormState = STORM_STATE_OFF;
+    play.envCtx.lightSettingOverride = LIGHT_SETTING_OVERRIDE_NONE;
+    settings.clear();
+    MMWeather_Reset();
+    auto& nei = gSaveContext.save.shipSaveInfo.nei;
+    nei.seasonsOwned = 0x0F;
+    nei.season = SEASON_SPRING;
+    gSaveContext.save.day = 1;
+    const auto native = play.envCtx;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 30 && rainGain > 0 && MMWeather_Overcast() > 0);
+    assert(std::memcmp(&native, &play.envCtx, sizeof(native)) == 0);
+    int draws = rainDraws;
+    DrawWeatherFromPlay(&play);
+    assert(rainDraws == draws + 1);
+    // Spring adds rain on Days 1/3 and uses the actual Day 2 storm unchanged.
+    for (int day : { 1, 3 }) {
+        gSaveContext.save.day = day;
+        MMWeather_Update(&play);
+        assert(MMWeather_RainDensity() == 30 && rainGain > 0);
+    }
+    gSaveContext.save.day = 2;
+    play.envCtx.stormState = STORM_STATE_ON;
+    play.envCtx.precipitation[PRECIP_RAIN_MAX] = play.envCtx.precipitation[PRECIP_RAIN_CUR] = 60;
+    play.envCtx.lightningState = LIGHTNING_ON;
+    gWeatherMode = WEATHER_MODE_RAIN;
+    Audio_SetAmbienceChannelIO(AMBIENCE_CHANNEL_RAIN, CHANNEL_IO_PORT_1, 1);
+    Audio_SetAmbienceChannelIO(AMBIENCE_CHANNEL_LIGHTNING, CHANNEL_IO_PORT_1, 1);
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0 && rainGain == 0);
+    draws = rainDraws;
+    DrawWeatherFromPlay(&play);
+    assert(rainDraws == draws + 1);
+    auto storm = play.envCtx;
+    nei.season = SEASON_SUMMER;
+    assert(MMWeather_SeasonForPlay(&play) == SEASON_SUMMER); // before the cached update
+    MMWeather_Update(&play);
+    assert(MMWeather_SeasonClearsRain() && nativeRainAmbience == 0 && nativeThunderAmbience == 0);
+    draws = rainDraws;
+    DrawWeatherFromPlay(&play);
+    assert(rainDraws == draws && std::memcmp(&storm, &play.envCtx, sizeof(storm)) == 0);
+    assert(gWeatherMode == WEATHER_MODE_RAIN);
+    uint8_t first = 1, second = 1, blend = 255;
+    MMWeather_ApplySky(&first, &second, &blend);
+    assert(first == 0 && second == 0 && blend == 0);
+    nei.season = SEASON_AUTUMN;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0 && MMWeather_Overcast() == 0);
+    assert(nativeRainAmbience == 1 && nativeThunderAmbience == 1);
+    draws = rainDraws;
+    DrawWeatherFromPlay(&play);
+    assert(rainDraws == draws + 1);
+    first = second = 1;
+    MMWeather_ApplySky(&first, &second, &blend);
+    assert(first == 1 && second == 1); // Autumn retains the native rainy sky
+    nei.season = SEASON_WINTER;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0 && rainGain == 0 && MMWeather_Overcast() > 0);
+    nei.season = SEASON_SUMMER;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0 && MMWeather_Overcast() == 0);
+    nei.season = SEASON_OFF;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0 && MMWeather_Overcast() == 0);
+    nei.season = SEASON_SPRING;
+    gSaveContext.save.day = 1;
+    play.skyboxId = SKYBOX_NONE;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0 && rainGain == 0);
+    play.skyboxId = SKYBOX_NORMAL_SKY;
+    play.csCtx.state = 1;
+    MMWeather_Update(&play);
+    assert(MMWeather_Season() < 0 && MMWeather_RainDensity() == 0);
+    play.csCtx.state = CS_STATE_IDLE;
+    play.envCtx.lightSettingOverride = 1;
+    MMWeather_Update(&play);
+    assert(MMWeather_Season() < 0 && MMWeather_Overcast() == 0);
+    // Explicit enhancement settings retain priority even during a story light override.
+    settings[MM_WEATHER_CVAR("Enabled")] = 1;
+    for (int i = 0; i < 25; ++i)
+        MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 25 && rainGain > 0);
+    nei.seasonsOwned = 0;
+    std::memset(&play.envCtx, 0, sizeof(play.envCtx));
+    gWeatherMode = WEATHER_MODE_CLEAR;
+    MMWeather_Reset();
+    std::puts("PASS seasonal rain, snow sky, clear weather, Off, interior/story restore and user override");
+}
+
 int main() {
     static PlayState play{};
     Camera camera{};
@@ -455,4 +565,5 @@ int main() {
     OutdoorOverrideRegression();
     SkyOverrideRegression();
     MayorsResidenceRegression();
+    SeasonWeatherRegression();
 }

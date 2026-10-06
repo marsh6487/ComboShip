@@ -1,3 +1,5 @@
+#include "../../combo/NeiAssetPriorityResource.h"
+#include "../../combo/NeiWolfAssetResource.h"
 #include "ResourceManagerHelpers.h"
 #include "OTRGlobals.h"
 #include "variables.h"
@@ -27,6 +29,7 @@
 // ComboShip: audio loads pinned to OOT's own RM — the audio thread races active-RM swaps
 // (ResourceManagerScope) made on other threads.
 #include <ship/resource/CrossRMRegistry.h>
+#include <ship/resource/ResourceManagerScope.h>
 #define COMBO_OWN_RM() (Ship::CrossRMRegistry::GetOrActive("oot"))
 #else
 #define COMBO_OWN_RM() (Ship::Context::GetRawInstance()->GetResourceManager())
@@ -906,6 +909,58 @@ extern "C" s32* ResourceMgr_LoadCSByName(const char* path) {
 }
 
 #ifdef COMBO_BUILD
+// Dormant-owner queries: host MM's Alt toggle and resource cache never select OoT equipment.
+extern "C" COMBO_EXPORT int32_t OOT_NeiAltAssetsEnabled(void) {
+    const auto owner = Ship::CrossRMRegistry::Get("oot");
+    return owner && owner->IsAltAssetsEnabled();
+}
+
+extern "C" COMBO_EXPORT int32_t OOT_MagicJarUsesCustomAsset(const char* path) {
+    const auto owner = Ship::CrossRMRegistry::Get("oot");
+    if (!path || !owner)
+        return 0;
+    // Factories may load dependencies through Context's active resource manager.
+    // Keep those nested loads with the root owner, including Alt fallback.
+    Ship::ResourceManagerScope scope(owner);
+    std::string base = path;
+    if (base.compare(0, 7, "__OTR__") == 0)
+        base.erase(0, 7);
+    std::string selected = base;
+    if (owner->IsAltAssetsEnabled() && base.compare(0, 4, "alt/") != 0 &&
+        (owner->GetArchiveManager()->HasFile("alt/" + base) ||
+         owner->GetArchiveManager()->HasFile("alt/" + base + ".meta"))) {
+        selected = "alt/" + base;
+    }
+    // Exact registered-owner loads avoid dormant save/MQ helpers and native cache eviction.
+    // Match deferred resource fallback if a present Alt entry cannot actually be loaded.
+    auto resource = owner->LoadResource(selected, true);
+    if (!resource && selected != base)
+        resource = owner->LoadResource(base, true);
+    return resource && resource->GetInitData() && resource->GetInitData()->IsCustom;
+}
+
+// Native heart material offsets are owned by the Cosmetic Editor. Custom
+// geometry receives a draw tint instead, so those offsets never touch an Alt DL.
+extern "C" COMBO_EXPORT int32_t OOT_ApplyGiHeartCosmetics(const char* path, int32_t piece, uint8_t r, uint8_t g,
+                                                          uint8_t b, int32_t changed) {
+    const auto owner = Ship::CrossRMRegistry::Get("oot");
+    if (!path || !owner)
+        return 0;
+    if (OOT_MagicJarUsesCustomAsset(path))
+        return 1;
+    Ship::ResourceManagerScope scope(owner);
+    const char* primPatch = piece ? "Consumable_Hearts5" : "Consumable_Hearts7";
+    const char* envPatch = piece ? "Consumable_Hearts6" : "Consumable_Hearts8";
+    if (changed) {
+        ResourceMgr_PatchGfxByName(path, primPatch, 2, gsDPSetPrimColor(0, 0, r, g, b, 255));
+        ResourceMgr_PatchGfxByName(path, envPatch, 6, gsDPSetEnvColor(r / 2, g / 2, b / 2, 255));
+    } else {
+        ResourceMgr_UnpatchGfxByName(path, primPatch);
+        ResourceMgr_UnpatchGfxByName(path, envPatch);
+    }
+    return 0;
+}
+
 // Typed resource-only query for native MM. The owner may be inactive; never
 // consult OoT save/player state. Match deferred rendering using the registered
 // owner's Alt mode, which can differ from the currently active MM mode.
@@ -916,3 +971,47 @@ extern "C" COMBO_EXPORT int32_t OOT_NeiResourceExists(const char* path) {
 }
 
 #endif
+
+extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* path, float scale, float tilt, int shop,
+                                                float fit[2]) {
+    const int din =
+        NeiAssetPriority::GetDinSwordGiProfile("oot", game, path, CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
+    return NeiAssetPriority::GetGiModelFit("oot", game, path, scale, tilt, shop, fit, din);
+}
+extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* game, const char* path) {
+    return NeiAssetPriority::GetDinSwordGiProfile("oot", game, path,
+                                                  CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
+}
+
+extern "C" int ResourceMgr_GetGiModelsFitForGame(const char* game, const char* const* paths, int count, float scale,
+                                                 float tilt, int presentation, float fit[2]) {
+    return NeiAssetPriority::GetGiModelsFit("oot", game, paths, count, scale, tilt, presentation, fit,
+                                            CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
+}
+
+extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path) {
+    return NeiAssetPriority::IsCustomAsset("oot", game, path);
+}
+
+extern "C" int ResourceMgr_IsModAsset(const char* path) {
+    return NeiAssetPriority::IsModAsset("oot", "oot", path);
+}
+
+extern "C" int ResourceMgr_IsModAssetForGame(const char* game, const char* path) {
+    return NeiAssetPriority::IsModAsset("oot", game, path);
+}
+
+#ifdef COMBO_BUILD
+extern "C" COMBO_EXPORT int OOT_NeiResourceIsMod(const char* path) {
+    return ResourceMgr_IsModAsset(path);
+}
+#endif
+
+extern "C"
+#ifdef COMBO_BUILD
+    COMBO_EXPORT
+#endif
+    int
+    OOT_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner) {
+    return NeiWolfAsset::CopyResource("oot", destination, capacity, size, owner);
+}

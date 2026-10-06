@@ -88,6 +88,9 @@ SequenceData* ResourceMgr_LoadSeqPtrByName(const char* path);
 SoundFontSample* ResourceMgr_LoadAudioSample(const char* path);
 CollisionHeader* ResourceMgr_LoadColByName(const char* path);
 bool ResourceMgr_IsAltAssetsEnabled();
+// Archive provenance, respecting the resource owner and its current Alt mode.
+int ResourceMgr_IsModAsset(const char* path);
+int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
 SkeletonHeader* ResourceMgr_LoadSkeletonByName(const char* path, SkelAnime* skelAnime);
 void ResourceMgr_UnregisterSkeleton(SkelAnime* skelAnime);
 void ResourceMgr_ClearSkeletons();

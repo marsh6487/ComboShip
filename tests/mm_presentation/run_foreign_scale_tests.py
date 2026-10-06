@@ -57,6 +57,8 @@ def run_lifecycle():
     fixture=(ROOT/'tests/mm_presentation/scale_lifecycle_test.cpp').read_text()
     fixture=fixture.replace('/* MM_SAVE */',function(saves,'SaveManager_SaveCurrentForCombo')+function(saves,'SaveManager_LoadSaveFile'))
     fixture=fixture.replace('/* SCALE_CASE */',scale).replace('/* FOREIGN_QUEUE */',queue[start:end])
+    receipts=(ROOT/'mm/2s2h/Rando/ItemReceiptText.cpp').read_text()
+    fixture=fixture.replace('/* RECEIPT_SOURCE */',function(receipts,'Rando::AppendReceiptSource'))
     fixture=fixture.replace('/* SEND_FOREIGN */',function(queue,'Rando::MiscBehavior::SendForeignCheck'))
     check_source=(ROOT/'mm/2s2h/Rando/MiscBehavior/MiscBehavior.h').read_text()
     fixture=fixture.replace('/* BANK_SOURCE */',function(check_source,'BankRewardSourceSuffix'))

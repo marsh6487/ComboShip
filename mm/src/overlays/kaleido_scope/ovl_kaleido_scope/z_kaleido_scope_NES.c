@@ -3485,6 +3485,10 @@ void KaleidoScope_Update(PlayState* play) {
     s16 stepA;
     s16 stickAdjX = input->rel.stick_x;
 
+    if (pauseCtx->state != PAUSE_STATE_MAIN || pauseCtx->pageIndex != PAUSE_ITEM ||
+        pauseCtx->mainState != PAUSE_MAIN_STATE_IDLE) {
+        KaleidoScope_ResetItemCycling();
+    }
     MapDisp_UpdateDungeonMap(play);
 
     pauseCtx->stickAdjX = input->rel.stick_x;

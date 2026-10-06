@@ -27,7 +27,7 @@ std::vector<void *> allocations;
 std::map<Mtx *, MtxF> submitted;
 std::vector<Vec3f> visibleVertices;
 std::vector<Vtx> packedVertices;
-Gfx opa[100000], xlu[100000];
+Gfx opa[100000], xlu[100000], overlay[2048];
 GraphicsContext graphics{};
 PlayState play{};
 Player player{};
@@ -77,6 +77,7 @@ void lusprintf(const char *, int32_t, int32_t, const char *, ...) {
 void Graph_OpenDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
 void Graph_CloseDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
 u8 ResourceMgr_FileExists(const char *) { return 1; }
+int ResourceMgr_IsModAssetForGame(const char*, const char*) { return 0; }
 int NeiResource_Available(const char *) { return 1; }
 Gfx *ResourceMgr_LoadGfxByName(const char *) {
   static Gfx dl[1];
@@ -110,6 +111,9 @@ void draw(int element) {
   graphics.polyOpa.p = opa;
   graphics.polyOpa.d = opa + 100000;
   graphics.polyXlu.p = xlu;
+  graphics.polyXlu.d = std::end(xlu);
+  graphics.overlay.p = overlay;
+  graphics.overlay.d = std::end(overlay);
   FrameInterpolation_StartRecord();
   Matrix_Translate(0, 0, 0, MTXMODE_NEW);
   if (element == 0)
@@ -160,6 +164,9 @@ Snapshot effectDraw(bool baseline, bool release, float value, bool big,
   graphics.polyOpa.p = opa;
   graphics.polyOpa.d = opa + 100000;
   graphics.polyXlu.p = xlu;
+  graphics.polyXlu.d = std::end(xlu);
+  graphics.overlay.p = overlay;
+  graphics.overlay.d = std::end(overlay);
   visibleVertices.clear();
   packedVertices.clear();
   Matrix_Translate(10, 40, 5, MTXMODE_NEW);

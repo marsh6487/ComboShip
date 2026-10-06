@@ -23,6 +23,9 @@ std::vector<std::pair<const void *, int>> children;
 RodProjSet sets[3][5]{};
 bool local[3]{};
 int nativeDraws = 0;
+#ifdef MM_REAL_RENDERER
+std::vector<const Gfx*> nativeDisplayLists;
+#endif
 bool resources = true;
 } // namespace
 extern "C" {
@@ -37,6 +40,7 @@ RodProjSet *FireRod_GetProjSets() { return sets[0]; }
 RodProjSet *IceRod_GetProjSets() { return sets[1]; }
 RodProjSet *LightRod_GetProjSets() { return sets[2]; }
 u8 ResourceMgr_FileExists(const char *) { return 1; }
+int ResourceMgr_IsModAssetForGame(const char*, const char*) { return 0; }
 Gfx *ResourceMgr_LoadGfxByName(const char *) {
   static Gfx dl[1];
   return dl;
@@ -84,15 +88,39 @@ void Matrix_RotateXF(f32, MatrixMode);
 void Matrix_RotateYF(f32, MatrixMode);
 void Matrix_RotateZF(f32, MatrixMode);
 void Matrix_ReplaceRotation(MtxF *) {}
-Mtx *Matrix_Finalize(GraphicsContext *) {
+Mtx *Matrix_Finalize(GraphicsContext *gfx) {
+#ifdef MM_REAL_RENDERER
+  return static_cast<Mtx *>(GRAPH_ALLOC(gfx, sizeof(Mtx)));
+#else
   static Mtx m;
   return &m;
+#endif
 }
+#ifdef MM_REAL_RENDERER
+#include "mm_nei_graph.inc"
+static Gfx setupDl;
+void Gfx_SetupDL25_Opa(GraphicsContext *gfx) {
+  OPEN_DISPS(gfx);
+  __gSPDisplayList(POLY_OPA_DISP++, &setupDl);
+  CLOSE_DISPS(gfx);
+}
+void Gfx_SetupDL25_Xlu(GraphicsContext *gfx) {
+  OPEN_DISPS(gfx);
+  __gSPDisplayList(POLY_XLU_DISP++, &setupDl);
+  CLOSE_DISPS(gfx);
+}
+#else
 void Gfx_SetupDL25_Opa(GraphicsContext *) {}
 void Gfx_SetupDL25_Xlu(GraphicsContext *) {}
 void Graph_OpenDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
 void Graph_CloseDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
-void gSPDisplayList(Gfx *, Gfx *) { ++nativeDraws; }
+#endif
+void gSPDisplayList(Gfx *, Gfx *list) {
+  ++nativeDraws;
+#ifdef MM_REAL_RENDERER
+  nativeDisplayLists.push_back(list);
+#endif
+}
 void gSPSegment(void *, int, uintptr_t) {}
 Gfx *Gfx_TwoTexScroll(GraphicsContext *, s32, u32, u32, s32, s32, s32, u32, u32,
                       s32, s32) {

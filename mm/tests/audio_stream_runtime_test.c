@@ -38,6 +38,11 @@ u8 sSeqCmdWritePos;
 u8 sSeqCmdReadPos;
 u8 sStartSeqDisabled;
 u32 sAudioSeqCmds[256];
+// This fixture exercises sequence/font routing. The native season fixture runs
+// the real storm-channel composer through the production command queue.
+u32 MMWeather_ResolveAmbienceSeqCmd(u32 cmd) {
+    return cmd;
+}
 static const uint8_t sClockTownDaySeqIds[4] = {
     NA_BGM_CLOCK_TOWN_DAY_1,
     NA_BGM_CLOCK_TOWN_DAY_2,

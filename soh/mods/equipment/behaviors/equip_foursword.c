@@ -230,6 +230,45 @@ update_prev:
 
 // Queried by WeaponUpgrade_ApplyHeldSwordDL, the single L_HAND injection point.
 u8 FourSword_HeldSwordDL(void** blade, void** handle) {
+    if (FourSword_IsEquipped() && (NeiEquipment_IsLegacyMod(NEI_EQUIPMENT_FOUR_BLADE, FOURSWORD_BLADE_DL) ||
+                                   NeiEquipment_IsLegacyMod(NEI_EQUIPMENT_FOUR_HILT, FOURSWORD_HILT_DL))) {
+        // Keep the entire legacy pair if either half belongs to a selected mod.
+        // The base counterpart is loaded through its canonical path as well.
+        static Gfx modPair[2][2];
+        const char* paths[2] = { FOURSWORD_BLADE_DL, FOURSWORD_HILT_DL };
+        for (int i = 0; i < 2; ++i) {
+            if (!ResourceMgr_FileExists(paths[i]) &&
+                !(ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(paths[i]))
+#ifdef NEI_EQUIPMENT_MM
+                && !NeiResource_Available(paths[i])
+#endif
+            )
+                return 0;
+#ifdef NEI_EQUIPMENT_MM
+            // MM's existing legacy pair is local; an OoT-only donor mod is explicitly routed.
+            const char* route = (!ResourceMgr_IsModAsset(paths[i]) && NeiResource_IsMod(paths[i]))
+                                    ? NeiResource_Route(paths[i])
+                                    : paths[i];
+#else
+            const char* route = paths[i];
+#endif
+            gDma1p(&modPair[i][0], G_DL_OTR_FILEPATH, route, 0, G_DL_PUSH);
+            gSPEndDisplayList(&modPair[i][1]);
+        }
+        *blade = modPair[0];
+        *handle = modPair[1];
+        return 1;
+    }
+
+    if (FourSword_IsEquipped() && NeiEquipment_HasFourSword()) {
+        Gfx* authoredBlade = NeiEquipment_ModelDL(NEI_EQUIPMENT_FOUR_BLADE, FOURSWORD_BLADE_DL);
+        Gfx* authoredHilt = NeiEquipment_ModelDL(NEI_EQUIPMENT_FOUR_HILT, FOURSWORD_HILT_DL);
+        if (authoredBlade != NULL && authoredHilt != NULL) {
+            *blade = authoredBlade;
+            *handle = authoredHilt;
+            return 1;
+        }
+    }
     extern Gfx* ResourceMgr_LoadGfxByName(const char* path);
     static void* sBlade = NULL;
     static void* sHilt = NULL;
@@ -240,8 +279,13 @@ u8 FourSword_HeldSwordDL(void** blade, void** handle) {
     }
     if (!sTried) {
         sTried = 1;
-        sBlade = ResourceMgr_LoadGfxByName(FOURSWORD_BLADE_DL);
-        sHilt = ResourceMgr_LoadGfxByName(FOURSWORD_HILT_DL);
+        // A partial/missing archive must not reach the path-only loader.
+        if (ResourceMgr_FileExists(FOURSWORD_BLADE_DL)) {
+            sBlade = ResourceMgr_LoadGfxByName(FOURSWORD_BLADE_DL);
+        }
+        if (ResourceMgr_FileExists(FOURSWORD_HILT_DL)) {
+            sHilt = ResourceMgr_LoadGfxByName(FOURSWORD_HILT_DL);
+        }
         // A resource that fails to load comes back as the unresolved PATH STRING, not NULL, and the
         // interpreter would run "__OTR__objects/..." as F3DEX2 opcodes.
         if (sBlade != NULL && ((const char*)sBlade)[0] == '_') {

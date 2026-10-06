@@ -1,0 +1,54 @@
+{
+  "resource_count": 10,
+  "vertex_records": 2052,
+  "vertex_loads": 84,
+  "slug": "mm_kokiri_sword",
+  "name": "Kokiri Sword (MM)",
+  "entry": "objects/nei_gi_redesign/mm_kokiri_sword/gi_dl",
+  "draw_scale": 1.0,
+  "matrix_scale": 0.0412445068359375,
+  "triangles": 2144,
+  "bounds_author": [
+    [
+      -14.0,
+      -30.0,
+      -3.125
+    ],
+    [
+      14.0,
+      63.0,
+      3.125
+    ]
+  ],
+  "markers": {
+    "visual_review_candidate": true,
+    "runtime_tested": false,
+    "preview_front_angle": 16,
+    "preview_back_angle": 164,
+    "imported_approved_model": true
+  },
+  "notes": [
+    "MM Kokiri identity: broad clipped steel blade, rounded brass bar guard with two recessed fasteners, pale wrapped grip and violet pommel.",
+    "Rebuilt beveled steel, machined guard rims and grip fittings; continuous blade tang passes into the guard and upper grip."
+  ],
+  "runtime_tested": false,
+  "source_provenance": {
+    "bundle": "NEI_Sword_GI_Latest_20261003",
+    "art_checkpoint": "dd66ee65",
+    "authoring_recipe": "../../SOURCE/forged_swords/SOURCE/sword_forged.py",
+    "glb_sha256": "b30ca60f9ba459334d225072722a210f747664ec8970489304cf94357412911f",
+    "approved_glb_sha256": "b30ca60f9ba459334d225072722a210f747664ec8970489304cf94357412911f",
+    "resource_sha256": {
+      "brass_edge_tex": "b06c0cd24de2f847665dfe1f4ac43c7c9da474fa0f660bfd47c4e7ad6554c3c5",
+      "brass_tex": "f91dcc0c5c49a429e2bad5a41fcc4c43f47093f02fea4d5acf37c01ce47ef099",
+      "edge_tex": "8c9b5b1548288588aece01a8e76afda8722485d75ab049ebe9f59b0978dc55a7",
+      "gi_dl": "aa25afbea89b9ca66a38d7d576337ac1d12f36cca3f1ac56361a83f5c85334ce",
+      "mesh_opa_vtx": "0491c7eab9f4d14334a65f78d2f31ab1bb0604aa786030bbeede939bf6ce00b1",
+      "scale_mtx": "bba652b1cf8f43eb8f04a6fdc3fa639db60eab659614e7fcbef2bbac0943a4ad",
+      "steel_tex": "5ba49cfb20429ebcf49f5b76c0f464e1e83db89fc23e245062e96c9c5d1bd45f",
+      "violet_tex": "6c1d1fdf0353b6ba9379f79c511607e66c55955ec2f01649e7a43c3d36f88205",
+      "white_leather_tex": "b345559ef03ccbb86c46b5fb0a5a90347fe0822b16ad4042eee36d45c585e878",
+      "white_wrap_tex": "79cf04e8a3ee3721d4040d974e3335c7ca54163ad327daa4227ff7191d19a579"
+    }
+  }
+}

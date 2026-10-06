@@ -167,7 +167,12 @@ static void IKAxe_DrawAxe(PlayState* play) {
     Matrix_Scale(0.15f, 0.15f, 0.15f, MTXMODE_APPLY);
 
     gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    gSPDisplayList(POLY_XLU_DISP++, gIKAxeInlineDL);
+    {
+        Gfx* authored = NeiEquipment_ModelDL(NEI_EQUIPMENT_AXE, "__OTR__objects/object_ik/gIronKnuckleAxeDL");
+        if (authored == NULL)
+            authored = NeiEquipment_LegacyDL(NEI_EQUIPMENT_AXE, "__OTR__objects/object_ik/gIronKnuckleAxeDL");
+        gSPDisplayList(POLY_XLU_DISP++, authored != NULL ? authored : gIKAxeInlineDL);
+    }
 
     CLOSE_DISPS(play->state.gfxCtx);
 }

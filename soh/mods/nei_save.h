@@ -244,6 +244,9 @@ typedef struct NeiSaveData {
     // Local time-pedestal travel can create a legitimate adult save without the
     // story sword. This opts out of its load-time repair; it is not ownership.
     uint8_t timePedestalNoMasterSwordRepair;
+    // Independent items sharing inventory cell 41; append for existing saves.
+    uint8_t hyliasGraceOwned;
+    uint8_t phantomHourglassOwned;
 } NeiSaveData;
 
 #define RITO_FLAG_MASK_OWNED (1 << 0)

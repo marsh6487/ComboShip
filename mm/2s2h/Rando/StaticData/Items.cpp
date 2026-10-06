@@ -1,4 +1,5 @@
 #include "StaticData.h"
+#include "ComboSongDrawMM.h"
 #include <unordered_map>
 #include <cstring>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -13,6 +14,7 @@ extern "C" {
 extern s16 D_801CFF94[250];
 // 2S2H [Rando] z_message.c — stages a custom rgba32 textbox icon consumed by sentinel icon byte 0xF5
 void Message_StageCustomItemIcon(void* tex, s16 size);
+void Message_StageCustomItemIconTint(void* tex, s16 width, s16 height, u8 isIA8, u8 r, u8 g, u8 b);
 #include "assets/interface/parameter_static/parameter_static.h"
 #include "assets/interface/icon_item_dungeon_static/icon_item_dungeon_static.h"
 #include "interface/icon_item_field_static/icon_item_field_static.h"
@@ -628,6 +630,13 @@ RandoItemId GetItemIdFromVanillaItemId(u32 itemId) {
 
 // This exists because of nintendo being nintendo
 u8 GetIconForZMessage(RandoItemId randoItemId) {
+    const int song = ComboSongForMmItem(randoItemId);
+    uint8_t color[4];
+    if (ComboSongShimmerColor(song, color)) {
+        Message_StageCustomItemIconTint((void*)gItemIcons[ITEM_SONG_SONATA], 16, 24, true, color[0], color[1],
+                                        color[2]);
+        return 0xF5;
+    }
     switch (randoItemId) {
         case RI_MASK_CAPTAIN:
             return GI_MASK_TRUTH;
@@ -1136,16 +1145,21 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
             return "__OTR__textures/icon_item_custom/gItemIconSheikahSlateSensorTex";
         case RI_OOT_NEI_DOMINION_ROD:
             return "__OTR__textures/icon_item_custom/gItemIconDominionRodTex";
-        // Elemental Wand: the six rods ARE one wand, so they share its icon. The check name and the
-        // textbox already say which rod it is.
+        // Receipt and tracker icons match each rod's GI; all modes still share one inventory slot.
         case RI_OOT_NEI_ELEMENTAL_WAND:
-        case RI_OOT_NEI_WAND_SAND_ROD:
-        case RI_OOT_NEI_WAND_TORNADO_ROD:
-        case RI_OOT_NEI_WAND_WATER_ROD:
-        case RI_OOT_NEI_WAND_METEOR_ROD:
-        case RI_OOT_NEI_WAND_STORM_ROD:
-        case RI_OOT_NEI_WAND_SHADOW_SCEPTER:
             return "__OTR__textures/icon_item_custom/gItemIconElementalWandTex";
+        case RI_OOT_NEI_WAND_SAND_ROD:
+            return "__OTR__textures/icon_item_custom/gItemIconSandRodTex";
+        case RI_OOT_NEI_WAND_TORNADO_ROD:
+            return "__OTR__textures/icon_item_custom/gItemIconTornadoRodTex";
+        case RI_OOT_NEI_WAND_WATER_ROD:
+            return "__OTR__textures/icon_item_custom/gItemIconWaterRodTex";
+        case RI_OOT_NEI_WAND_METEOR_ROD:
+            return "__OTR__textures/icon_item_custom/gItemIconMeteorRodTex";
+        case RI_OOT_NEI_WAND_STORM_ROD:
+            return "__OTR__textures/icon_item_custom/gItemIconStormRodTex";
+        case RI_OOT_NEI_WAND_SHADOW_SCEPTER:
+            return "__OTR__textures/icon_item_custom/gItemIconShadowScepterTex";
         case RI_OOT_NEI_FIRE_ROD:
             return "__OTR__textures/icon_item_custom/gItemIconFireRodTex";
         case RI_OOT_NEI_GUST_JAR:
@@ -1226,8 +1240,8 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
             return "__OTR__textures/icon_item_custom/gItemIconSheikahSlateCryonisTex";
         case RI_OOT_EXT_MAGIC_CAPE:
             return "__OTR__textures/icon_item_custom/gItemIconMagicCapeTex";
-        case RI_OOT_EXT_PEGASUS_ANKLET: // = the PEGASUS BOOTS (renamed 2026-07-29)
-            return "__OTR__textures/icon_item_custom/gItemIconPegasusBootsTex";
+        case RI_OOT_EXT_PEGASUS_ANKLET:
+            return "__OTR__textures/icon_item_custom/gItemIconPegasusAnkletTex";
         case RI_OOT_EXT_SHEIKAH_SHIELD: // parity with SoH item_list, which uses the Gerudo Scimitar icon as its
                                         // stand-in
             return "__OTR__textures/icon_item_custom/gItemIconGerudoScimitarTex";

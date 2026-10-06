@@ -20,4 +20,10 @@ inline constexpr ShopFit kSwitchHookShopFit{ .70f, 8.f };
 inline constexpr ShopFit kFeatherShopFit{ 1.f, 16.f };
 inline constexpr ShopFit kSomariaShopFit{ 1.f, 2.f };
 inline constexpr ShopFit kRocsCapeShopFit{ 1.f, 4.f };
+// Sword pickup proportions are preserved; shelf-only poses fit the longer
+// serialized bounds inside the shop's existing display envelope.
+inline constexpr ShopFit kBiggoronSwordShopFit{ .70f, 16.f };
+inline constexpr ShopFit kGreatFairySwordShopFit{ .58f, 14.f };
+inline constexpr ShopFit kMasterSwordShopFit{ .80f, 14.f };
+inline constexpr ShopFit kGildedSwordShopFit{ .72f, 14.f };
 } // namespace NeiGi
