@@ -93,15 +93,18 @@ Final local logs (scratch evidence, not prerequisites for source recovery):
 - `/tmp/comboship-bridge-final-receipts-asan-ubsan.log` and its `.status.json`.
 - `/tmp/comboship-bridge-format-check.log`.
 
-Remaining sequence:
+## Verified publication and resume
 
-1. Commit the verified final candidate, fast-forward PR 34's existing head under
-   active authorization, update its title/body, and wait for exact-commit CI.
-   Fix build/check failures and provide the matching Windows build artifact.
-   Advance the recovery branch to the same candidate while retaining the original
-   checkpoint in its history. Preserve concurrent remote changes.
-2. Live GPU/mod-stack appearance, native season transitions and Alt-Tab remain
-   user runtime acceptance. Do not equate fixture/build success with that proof.
+Publication was independently verified on October 6, 2026:
+
+- PR #34 remains draft at code commit `af54f452a99ec59800bb59ba770f58d70deefbff`, tree `7b4cf0e5f94ba31d34a4e9bcb835b7381b0ce591`.
+- Before this documentation update, `checkpoint/mm-runtime-review-20261005` pointed to that same commit.
+- [Build Artifacts run 37395806721](https://github.com/marsh6487/ComboShip/actions/runs/37395806721) completed successfully on that exact commit: the gate, Windows build/package and Linux build/package jobs all passed.
+- This recovery-branch update adds checkpoint instructions and corrects the handoff status. It changes no implementation or tests; the tested code remains the published candidate above.
+
+Resume from the newest verified recovery branch and read `AGENTS.md` and this note. Do not repeat the completed reconstruction, 60-command gate or platform builds solely because a chat stalled or the transient workspace disappeared. Check the live PR head before further source work and preserve newer concurrent corrections. Record and verify a remote checkpoint at least every 10–15 minutes of active coding, including explicitly marked work in progress.
+
+Remaining acceptance: live GPU/mod-stack appearance, native season transitions and Alt-Tab testing. Keep fixture/build proof separate from those checks. No merge or master promotion is authorized.
 
 The Alt-Tab crash is **unresolved**: the supplied report/disassembly narrows it to
 an invalid native MM `Actor.update` callback. The old shared reporter incorrectly
