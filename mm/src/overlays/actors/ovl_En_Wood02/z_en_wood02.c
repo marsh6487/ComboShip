@@ -5,6 +5,7 @@
  */
 
 #include "z_en_wood02.h"
+#include "mods/items/objects/object_autumn_leaves.h"
 #include "objects/object_wood02/object_wood02.h"
 #include "2s2h/BenPort.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
@@ -566,6 +567,14 @@ void EnWood02_Draw(Actor* thisx, PlayState* play) {
     u8 blue;
     s32 autumn = (EnWood02_IsTree(this) || thisx->params == WOOD_LEAF_GREEN || thisx->params == WOOD_LEAF_YELLOW) &&
                  MMWeather_SeasonForPlay(play) == SEASON_AUTUMN && EnWood02_UsesNativeFoliage(this);
+
+    if (autumn && this->unk_144 == WOOD_AUTUMN_LEAF_MARKER) {
+        // Ambient leaves use the generated art too. Native impact leaves keep
+        // their original material and behavior.
+        Gfx_SetupDL25_Xlu(gfxCtx);
+        AutumnLeaves_Draw(play, (unsigned)this->actor.home.rot.y, 200);
+        return;
+    }
 
     OPEN_DISPS(gfxCtx);
 

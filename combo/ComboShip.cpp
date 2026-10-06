@@ -253,6 +253,7 @@ typedef void (*FnVoidV)(void);
 typedef void (*FnTakeStr)(const char*);
 typedef void (*FnSetReloadCb)(int (*)(const char*));
 static FnVoidV SOH_PrepRandoContext = nullptr;
+static FnVoidV SOH_NormalizeComboGraceFromMM = nullptr;
 static FnTakeStr SOH_RestoreRandoSettings = nullptr;
 static FnTakeStr MM_RestoreRandoSettings = nullptr;
 static FnTakeStr SOH_SetCheckPrices = nullptr;
@@ -1707,6 +1708,8 @@ static void RunComboFill(std::string inputSeed, ComboRando::ComboGenProgress* pr
         return;
     }
 
+    if (SOH_NormalizeComboGraceFromMM)
+        SOH_NormalizeComboGraceFromMM();
     // Whole-fill retries (GAP-4): each attempt re-derives the master seed, so dumps, confined placement,
     // and prices re-roll deterministically per attempt. Budget lives in CrossWorldRando.h.
     const int kFillAttempts = ComboRando::kFillAttempts;
@@ -2101,6 +2104,8 @@ static int RunComboGenTest(int numSeeds, uint32_t seedBase) {
     const uint32_t sharedMask = SOH_ReadComboSharedCVars ? SOH_ReadComboSharedCVars() : 0;
     int failures = 0;
     auto t0 = std::chrono::steady_clock::now();
+    if (SOH_NormalizeComboGraceFromMM)
+        SOH_NormalizeComboGraceFromMM();
     for (int i = 0; i < numSeeds; ++i) {
         const uint32_t baseSeed = seedBase + static_cast<uint32_t>(i);
         ComboRando::CombinedFillResult result{};
@@ -2208,6 +2213,8 @@ static void RunComboPlaythrough(const std::string& inputSeed) {
     const int startCfg = SOH_ReadComboStartingGameCVar ? SOH_ReadComboStartingGameCVar() : 0;
     const uint32_t sharedMask = SOH_ReadComboSharedCVars ? SOH_ReadComboSharedCVars() : 0;
     bool pinStartOot = false, resolvedMmStart = false; // #135, same fallback as RunComboFill
+    if (SOH_NormalizeComboGraceFromMM)
+        SOH_NormalizeComboGraceFromMM();
     // Mirror RunComboFill including its retries — the player's seed may have come from attempt 1, and
     // validating only attempt 0 would either report "did not generate" or log a world they never got.
     for (int attempt = 0; attempt < ComboRando::kFillAttempts && !fill.success; ++attempt) {
@@ -2637,6 +2644,20 @@ static bool Combo_WriteMMSaveForSlot(int fileNum, const nlohmann::json& seed) {
     if (!MM_InitRandoSaveFile || seed.is_null()) {
         return false;
     }
+    // Save creation AND half-save repair must use this seed's settings, even if
+    // the menu changed after generation. Restore the user's UI on every return.
+    const std::string userSettings = MM_DumpRandoSettings ? MM_DumpRandoSettings() : "";
+    struct RestoreSettings {
+        const std::string& snapshot;
+        ~RestoreSettings() {
+            if (MM_RestoreRandoSettings && !snapshot.empty())
+                MM_RestoreRandoSettings(snapshot.c_str());
+        }
+    } restoreSettings{ userSettings };
+    if (MM_RestoreRandoSettings) {
+        const auto settings = seed.value("mm", nlohmann::json::object()).value("settings", nlohmann::json::object());
+        MM_RestoreRandoSettings(settings.dump().c_str());
+    }
     // OOT's save is current at both call sites (creation on OOT's thread, repair while OOT is parked),
     // so carry its file name into the matching MM save and both files show the player's name.
     unsigned char playerName[8] = { 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E, 0x3E }; // 0x3E = N64 blank glyph
@@ -3028,6 +3049,7 @@ int main(int argc, char** argv) {
     SOH_SetComboHintRevealCb = (FnSetHintRevealOot)GetSym(sohModule, "SOH_SetComboHintRevealCb");
     MM_SetComboHintRevealCb = (FnSetHintRevealMm)GetSym(mmModule, "MM_SetComboHintRevealCb");
     SOH_PrepRandoContext = (FnVoidV)GetSym(sohModule, "SOH_PrepRandoContext");
+    SOH_NormalizeComboGraceFromMM = (FnVoidV)GetSym(sohModule, "SOH_NormalizeComboGraceFromMM");
     SOH_RestoreRandoSettings = (FnTakeStr)GetSym(sohModule, "SOH_RestoreRandoSettings");
     MM_RestoreRandoSettings = (FnTakeStr)GetSym(mmModule, "MM_RestoreRandoSettings");
     SOH_SetCheckPrices = (FnTakeStr)GetSym(sohModule, "SOH_SetCheckPrices");

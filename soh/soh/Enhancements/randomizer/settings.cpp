@@ -4,6 +4,7 @@
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
 #include "soh/Enhancements/randomizer/rng.h"
 #include "soh/OTRGlobals.h"
+#include "../../../../combo/NeiGracePolicy.h"
 
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -1497,6 +1498,20 @@ void Settings::CreateOptions() {
     OPT_U8(RSK_ELEMENTAL_WAND_SHUFFLE, "Elemental Wand", { "Medallions", "Single item", "Elemental shuffle" },
            OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ElementalWandShuffle"),
            mOptionDescriptions[RSK_ELEMENTAL_WAND_SHUFFLE], WIDGET_CVAR_COMBOBOX, RO_WAND_MEDALLIONS);
+    OPT_U8(RSK_HYLIAS_GRACE, "Hylia's Grace", { "On", "Off", "Gated" }, OptionCategory::Setting,
+           CVAR_RANDOMIZER_SETTING("HyliasGrace"),
+           "On: include fairy flight. Off: exclude it. Gated: require collected dungeon rewards to cast.",
+           WIDGET_CVAR_COMBOBOX, 1);
+    OPT_U8(RSK_HYLIAS_GRACE_REWARDS, "Grace Dungeon Rewards Required", {NumOpts(0, 13)}, OptionCategory::Setting,
+           CVAR_RANDOMIZER_SETTING("HyliasGraceRewards"), "Counts OoT stones/medallions and MM boss remains.",
+           WIDGET_CVAR_SLIDER_INT, 4, true);
+    OPT_CALLBACK(RSK_HYLIAS_GRACE, {
+        if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("HyliasGrace"), 1) == 2) {
+            mOptions[RSK_HYLIAS_GRACE_REWARDS].Unhide();
+        } else {
+            mOptions[RSK_HYLIAS_GRACE_REWARDS].Hide();
+        }
+    });
     OPT_BOOL(RSK_QUARTER_HEART, "Quarter Heart", CVAR_RANDOMIZER_SETTING("QuarterHeart"), "Adds Quarter Heart upgrades to the item pool. Each one permanently increases maximum health by a quarter heart. Replaces heart containers and heart pieces.");
     OPT_BOOL(RSK_DEFENSE_UPGRADE, "Defense Upgrade", CVAR_RANDOMIZER_SETTING("DefenseUpgrade"), "Adds Defense Upgrade items to the item pool.\nEach upgrade incrementally reduces incoming damage, scaling up to 50% reduction at the required cap (default 5 items).\nWith Double Defense and a maxed Defense stat, total damage reduction reaches 75%.");
     OPT_CALLBACK(RSK_DEFENSE_UPGRADE, {
@@ -3538,6 +3553,10 @@ void Settings::ParseJson(const nlohmann::json& spoilerFileJson) {
     // A native spoiler from before this option must not retain the setting
     // from a previously loaded seed in the same Context.
     mContext->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Set(RO_GENERIC_OFF);
+    // Pre-policy spoilers included Grace without a gate. Loading one after a
+    // newer seed must restore that behavior rather than inherit its restriction.
+    mContext->GetOption(RSK_HYLIAS_GRACE).Set(NEI_GRACE_ON);
+    mContext->GetOption(RSK_HYLIAS_GRACE_REWARDS).Set(4);
     nlohmann::json settingsJson = spoilerFileJson.value("settings", nlohmann::json());
     for (auto it = settingsJson.begin(); it != settingsJson.end(); ++it) {
         // todo load into cvars for UI

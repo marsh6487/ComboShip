@@ -25,6 +25,8 @@ u32 sAudioSeqCmds[256];
 static f32 D_808DE5B0;
 static u16 D_808DE340;
 static int snowDraws, rainDraws, spawns, refreshes;
+static int gameplayRandomCalls;
+static unsigned leafPalettes, leafDraws;
 static float rainGain;
 static u8 nativeRainAmbience, nativeThunderAmbience;
 static ObjectKankyo supplemental[32];
@@ -70,7 +72,7 @@ void ExtInv_RefreshButtonIconsForItem(PlayState*, u16 item) {
     ++refreshes;
 }
 void Actor_Kill(Actor* actor) { actor->update = actor->draw = nullptr; }
-f32 Rand_ZeroOne() { return 0.25f; }
+f32 Rand_ZeroOne() { ++gameplayRandomCalls; return 0.25f; }
 s16 Camera_GetCamDirPitch(Camera*) { return 0; }
 f32 Math_Vec3f_DistXZ(Vec3f* a, Vec3f* b) { return sqrtf(SQ(a->x - b->x) + SQ(a->z - b->z)); }
 f32 Math_Vec3f_DistXYZ(Vec3f* a, Vec3f* b) { return sqrtf(SQ(a->x-b->x) + SQ(a->y-b->y) + SQ(a->z-b->z)); }
@@ -96,6 +98,7 @@ void Play_GetScreenPos(PlayState*, Vec3f*, Vec3f* screen) { *screen = { 100, 100
 void Matrix_Translate(f32, f32, f32, MatrixMode) {}
 void Matrix_Scale(f32, f32, f32, MatrixMode) {}
 void Matrix_Mult(MtxF*, MatrixMode) {}
+void Matrix_RotateZS(s16, MatrixMode) {}
 Mtx* Matrix_Finalize(GraphicsContext*) { static Mtx matrix; return &matrix; }
 Gfx* Gfx_SetupDL(Gfx* gfx, u32) { return gfx; }
 void* Lib_SegmentedToVirtual(void* resource) { return resource; }
@@ -120,6 +123,7 @@ float OTRGetDimensionFromRightEdge(float value) { return value; }
 #define gSPDisplayList(pkt, dl) do { ++snowDraws; __gSPDisplayList(pkt, (Gfx*)(dl)); } while (0)
 #define gSPSegment(pkt, segment, resource) __gSPSegment(pkt, segment, (uintptr_t)(resource))
 #define Lib_SegmentedToVirtual(resource) ((void*)(resource))
+#include "mods/items/objects/object_autumn_leaves.h"
 
 typedef void (*BoxMenuConfirmFn)(s32);
 static u8 sBoxMOpen, sBoxMHoldSeen, sBoxMStickHeld;
@@ -200,8 +204,20 @@ static int DrawSnow(PlayState* play) {
     static Gfx commands[2048];
     play->state.gfxCtx->polyXlu.p = commands;
     int before = snowDraws;
+    leafPalettes = leafDraws = 0;
     for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].first; actor; actor = actor->next) {
         if (actor->draw) actor->draw(actor, play);
+    }
+    for (const Gfx* command = commands; command < play->state.gfxCtx->polyXlu.p; ++command) {
+        if ((command->words.w0 >> 24) == G_SETTIMG) {
+            for (unsigned palette = 0; palette < 4; ++palette) {
+                if (command->words.w1 == (uintptr_t)sAutumnLeafTextures[palette]) {
+                    assert(((command->words.w0 >> 19) & 3) == G_IM_SIZ_32b);
+                    leafPalettes |= 1 << palette;
+                    ++leafDraws;
+                }
+            }
+        }
     }
     return snowDraws - before;
 }
@@ -228,15 +244,42 @@ int main() {
     Frame(&play);
     assert(DrawSnow(&play) == 64);
     Confirm(&play, SEASON_AUTUMN);
-    assert(DrawSnow(&play) == 0 && play.actorCtx.actorLists[ACTORCAT_ITEMACTION].first->update == nullptr);
+    assert(DrawSnow(&play) == 32 && play.actorCtx.actorLists[ACTORCAT_ITEMACTION].first->update != nullptr);
+    assert(leafPalettes == 15 && leafDraws == 32);
+    auto* leaves = (ObjectKankyo*)play.actorCtx.actorLists[ACTORCAT_ITEMACTION].first;
+    const f32 beforeLeafY = leaves->unk_14C[0].unk_10;
+    const int beforeLeafRandom = gameplayRandomCalls;
+    Frame(&play);
+    assert(leaves->unk_14C[0].unk_10 < beforeLeafY && gameplayRandomCalls == beforeLeafRandom);
     Confirm(&play, SEASON_WINTER);
-    assert(spawns == firstSpawn + 2);
+    assert(spawns == firstSpawn + 1); // Autumn/Winter reuse the same native particle owner.
     Frame(&play);
     assert(DrawSnow(&play) == 64);
+    assert(leafDraws == 0 && leafPalettes == 0);
     Confirm(&play, SEASON_OFF);
     assert(play.envCtx.precipitation[PRECIP_SNOW_CUR] == 0 && play.envCtx.precipitation[PRECIP_SNOW_MAX] == 0);
     assert(DrawSnow(&play) == 0);
     std::puts("PASS real paused selector confirm: Winter/Spring/Off apply immediately, supplemental snow is removed");
+
+    Reset(&play, &camera, &gfx);
+    play.envCtx.stormState = STORM_STATE_OFF;
+    const int beforeAutumnSpawnRandom = gameplayRandomCalls;
+    Confirm(&play, SEASON_AUTUMN);
+    Frame(&play);
+    assert(play.envCtx.stormState == STORM_STATE_OFF && DrawSnow(&play) == 32);
+    assert(leafPalettes == 15 && leafDraws == 32);
+    assert(gameplayRandomCalls == beforeAutumnSpawnRandom);
+
+    // Scene-native snow actors must also initialize their autumn leaf phases
+    // without advancing the random sequence used by gameplay.
+    ObjectKankyo autumnNormal{}, autumnBlizzard{};
+    autumnNormal.actor.params = 3;
+    autumnBlizzard.actor.params = 2;
+    play.envCtx.precipitation[PRECIP_SNOW_CUR] = 128;
+    ObjectKankyo_Init(&autumnNormal.actor, &play);
+    ObjectKankyo_Init(&autumnBlizzard.actor, &play);
+    assert(gameplayRandomCalls == beforeAutumnSpawnRandom);
+    std::puts("PASS clear-weather Autumn submits all four generated RGBA palettes, native fall and gameplay RNG isolation");
 
     // Snowhead's actual blizzard actors and environment remain the native
     // owners. Winter reuses them, clear seasons suppress all variants, Off restores them.
@@ -270,18 +313,18 @@ int main() {
     Confirm(&play, SEASON_AUTUMN);
     Frame(&play);
     assert(play.envCtx.precipitation[PRECIP_SNOW_CUR] == 128 && play.envCtx.precipitation[PRECIP_SNOW_MAX] == 128);
-    assert(DrawSnow(&play) == 256 && NativeFogVisible(&play, SANDSTORM_A) && D_801F4E30 == 155);
+    assert(DrawSnow(&play) == 64 && NativeFogVisible(&play, SANDSTORM_A) && D_801F4E30 == 155);
     const auto autumnSnowhead = play.envCtx;
     Confirm(&play, SEASON_WINTER);
     assert(DrawSnow(&play) == 128 && play.envCtx.precipitation[PRECIP_SNOW_CUR] == 128);
     Confirm(&play, SEASON_AUTUMN);
-    assert(DrawSnow(&play) == 256 && NativeFogVisible(&play, SANDSTORM_A));
+    assert(DrawSnow(&play) == 64 && NativeFogVisible(&play, SANDSTORM_A));
     assert(std::memcmp(&autumnSnowhead, &play.envCtx, sizeof(autumnSnowhead)) == 0);
     Confirm(&play, SEASON_OFF);
     assert(play.envCtx.precipitation[PRECIP_SNOW_CUR] == 128 && play.envCtx.precipitation[PRECIP_SNOW_MAX] == 128);
     assert(play.envCtx.sandstormState == SANDSTORM_A && D_801F4E30 == 155 && DrawSnow(&play) > 0);
     assert(NativeFogVisible(&play, SANDSTORM_A));
-    std::puts("PASS native Snowhead actor reuse, Spring/Summer masking, Autumn native snow/fog and live Off restoration");
+    std::puts("PASS native Snowhead actor reuse, Spring/Summer masking, Autumn leaves/fog and live Off restoration");
 
     // Real Winter Fog tags write MAX only on exit. Native CUR/fog must never
     // become a saved seasonal count: continue its native decay and expose it on Off.
@@ -315,7 +358,7 @@ int main() {
     assert(play.envCtx.precipitation[PRECIP_SNOW_CUR] == 126 && DrawSnow(&play) == 64);
     const auto afterNativeTag = play.envCtx;
     Confirm(&play, SEASON_AUTUMN);
-    assert(DrawSnow(&play) == 126 && NativeFogVisible(&play, SANDSTORM_A));
+    assert(DrawSnow(&play) == 32 && NativeFogVisible(&play, SANDSTORM_A));
     assert(std::memcmp(&afterNativeTag, &play.envCtx, sizeof(afterNativeTag)) == 0);
     Confirm(&play, SEASON_OFF);
     assert(std::memcmp(&afterNativeTag, &play.envCtx, sizeof(afterNativeTag)) == 0);

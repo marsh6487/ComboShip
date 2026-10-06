@@ -29,6 +29,7 @@ void CustomItems_ResetTransientTools(Player* p, PlayState* play) {
     }
 
     // These globals outlive Player/PlayState on an in-process reset or scene load.
+    HGrace_ResetTransient();
     DekuLeaf_Stop(p, play);
     Shovel_Stop(p, play);
     if (sDekuLeafColInitialized) {

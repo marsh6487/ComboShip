@@ -19,6 +19,7 @@
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerMiscEnums.h"
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerOptions.h"
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerSettingKey.h"
+#include "combo/NeiGracePolicy.h"
 enum MessageFormat { MF_RAW, MF_FORMATTED, MF_AUTO_FORMAT, MF_CLEAN };
 constexpr int TEXTBOX_TYPE_BLUE = 2;
 struct CustomMessage {
@@ -165,7 +166,8 @@ void LoadSettings() {
 int main() {
   static_assert(RSK_MAPS_COMPASSES_GIVE_INFORMATION ==
                 RSK_PUSH_SPEED_UPGRADE_REQUIRED + 1);
-  static_assert(RSK_MAPS_COMPASSES_GIVE_INFORMATION + 1 == RSK_MAX);
+  static_assert(RSK_HYLIAS_GRACE == RSK_MAPS_COMPASSES_GIVE_INFORMATION + 1);
+  static_assert(RSK_HYLIAS_GRACE_REWARDS + 1 == RSK_MAX);
   auto ctx = Rando::Context::GetInstance();
   using namespace Rando;
   StaticData::hintTextTable[RHT_CHILD_ALTAR_STONES] = {
@@ -243,8 +245,12 @@ int main() {
   Settings settings;
   nlohmann::json spoiler{{"seed", "fixture"}, {"finalSeed", 123}};
   ctx->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Set(1);
+  ctx->GetOption(RSK_HYLIAS_GRACE).Set(NEI_GRACE_GATED);
+  ctx->GetOption(RSK_HYLIAS_GRACE_REWARDS).Set(7);
   settings.LoadSpoilerSettings(spoiler);
   assert(ctx->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Is(0));
+  assert(ctx->GetOption(RSK_HYLIAS_GRACE).Is(NEI_GRACE_ON));
+  assert(ctx->GetOption(RSK_HYLIAS_GRACE_REWARDS).Is(4));
   spoiler["settings"] = {{"Maps and Compasses Give Information", "On"}};
   settings.LoadSpoilerSettings(spoiler);
   assert(ctx->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Is(1));

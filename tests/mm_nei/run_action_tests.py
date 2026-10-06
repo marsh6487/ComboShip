@@ -130,6 +130,7 @@ bool leafSlot=true,shovelSlot=true;
 u8 ItemEquip_GetItemOnSlot(u8 slot){return slot==1&&leafSlot?ITEM_DEKU_LEAF:slot==2&&shovelSlot?ITEM_SHOVEL:ITEM_NONE;}
 void DinFireSword_Reset(){}
 void DinFireShield_Reset(){}
+void HGrace_ResetTransient(){} // Fairy reset behavior is exercised by tests/mm_grace.
 void WolfLinkHost_Destroy(PlayState*,Player*){}
 void WolfLinkHost_RestorePlayerInput(Player*,Input*){}
 void Effect_Destroy(PlayState*,s32){}

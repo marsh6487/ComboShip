@@ -18,6 +18,7 @@
 #include <unordered_map>
 #include <vector>
 #include <nlohmann/json.hpp>
+#include <spdlog/spdlog.h>
 #include "z64.h"
 #include "soh/SohGui/UIWidgets.hpp"
 #include "soh/cvar_prefixes.h"
@@ -29,6 +30,7 @@
 #include "soh/Enhancements/randomizer/rng.h"
 #include "rando/SharedItems.h"
 #include "ComboExport.h"
+#include "NeiGracePolicy.h"
 // Expose only native registration/section state to this synchronous fixture.
 #define private public
 #include "soh/Enhancements/randomizer/settings.h"
@@ -78,6 +80,8 @@ std::shared_ptr<Settings> Settings::mInstance;
 std::array<Location, RC_MAX> StaticData::locationTable;
 Location* StaticData::GetLocation(RandomizerCheck rc) { return &locationTable[rc]; }
 std::unordered_map<uint32_t, RandomizerHintTextKey> StaticData::trialData;
+std::unordered_map<std::string, RandomizerSettingKey> StaticData::optionNameToEnum;
+std::unordered_map<std::string, RandomizerCheck> StaticData::locationNameToEnum;
 std::array<std::pair<RandomizerCheck, RandomizerCheck>, 17> StaticData::randomizerFishingPondFish{};
 }
 
@@ -174,7 +178,8 @@ int main(int argc, char** argv) {
           "native checkbox default is Off");
     Check(settings->PopulateOptionNameToEnum().at("Maps and Compasses Give Information") ==
               RSK_MAPS_COMPASSES_GIVE_INFORMATION, "native option-name translation includes appended option");
-    static_assert(RSK_MAPS_COMPASSES_GIVE_INFORMATION + 1 == RSK_MAX);
+    static_assert(RSK_HYLIAS_GRACE == RSK_MAPS_COMPASSES_GIVE_INFORMATION + 1);
+    static_assert(RSK_HYLIAS_GRACE_REWARDS + 1 == RSK_MAX);
 
     // Fresh generation follows the actual critical order: native options copy,
     // native finalizer (including the MM-start forces), then settings snapshot
@@ -220,9 +225,23 @@ int main(int argc, char** argv) {
     json oldSection{{"randoSettings", json::array()}};
     oldSection["randoSettings"] = std::vector<int>(RSK_MAPS_COMPASSES_GIVE_INFORMATION, 0);
     context->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Set(1);
+    context->GetOption(RSK_HYLIAS_GRACE).Set(NEI_GRACE_GATED);
     storage.currentJsonContext = &oldSection;
     LoadNativeSettings();
     Check(context->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Is(0), "old save array defaults missing option Off");
+    Check(context->GetOption(RSK_HYLIAS_GRACE).Is(NEI_GRACE_ON), "old save array preserves ungated Grace");
+    for (int prior : {NEI_GRACE_OFF, NEI_GRACE_GATED}) {
+        context->GetOption(RSK_HYLIAS_GRACE).Set(prior);
+        context->GetOption(RSK_HYLIAS_GRACE_REWARDS).Set(7);
+        settings->ParseJson(json{{"seed", "legacy"}, {"finalSeed", 1}, {"settings", json::object()}});
+        Check(context->GetOption(RSK_HYLIAS_GRACE).Is(NEI_GRACE_ON) &&
+                  context->GetOption(RSK_HYLIAS_GRACE_REWARDS).Is(4),
+              "old native spoiler clears prior Off/Gated Grace policy in reused Context");
+        Check(NeiGrace_CanActivate(context->GetOption(RSK_HYLIAS_GRACE).Get(),
+                                  context->GetOption(RSK_HYLIAS_GRACE_REWARDS).Get(), 0, 0),
+              "legacy native spoiler permits Grace before any rewards");
+    }
+    std::puts("PASS full native spoiler parser restores legacy ungated Grace after Off/Gated seeds");
     if (argc > 1) DumpReceiptEntranceFixtures(context, argv[1]);
     context->GetLogic()->SetContext(nullptr);
     std::puts("PASS native CVar registration, MM-start generation prep, seed snapshot, save/reload, seed changes and old defaults");

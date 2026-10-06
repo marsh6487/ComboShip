@@ -5,6 +5,7 @@
 #include "ComboResolve.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "tests/test_require.h"
+#include "NeiGracePolicy.h"
 #include <algorithm>
 #include <cstring>
 
@@ -81,6 +82,19 @@ int main() {
     }
     puts("PASS production new pools: Hourglass once iff NEI enabled, solo/combo and all wand rules; five runes/four "
          "seasons; existing save untouched");
+
+    for (const auto mode : {RO_GRACE_ON, RO_GRACE_OFF, RO_GRACE_GATED}) {
+        RandoSaveInfo info{};
+        info.randoSaveOptions[RO_STARTING_HEALTH] = 3;
+        info.randoSaveOptions[RO_SHUFFLE_NEI_ITEMS] = RO_GENERIC_YES;
+        info.randoSaveOptions[RO_HYLIAS_GRACE] = mode;
+        std::vector<RandoCheckId> checks;
+        std::vector<RandoItemId> pool;
+        Rando::Logic::GeneratePools(info, checks, pool);
+        REQUIRE(std::count(pool.begin(), pool.end(), RI_OOT_NEI_HYLIAS_GRACE) == (mode != RO_GRACE_OFF));
+        REQUIRE(std::count(pool.begin(), pool.end(), RI_OOT_NEI_PHANTOM_HOURGLASS) == 1);
+    }
+    puts("PASS Grace seed pool: On/Gated include it, Off excludes it and keeps Hourglass");
 
     CwItemDrawInfo draw{};
     REQUIRE(MM_DescribeNeiGi((RandoItemId)194, &draw));

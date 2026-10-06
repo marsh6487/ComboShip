@@ -1,4 +1,5 @@
 #include "Logic.h"
+#include "../../../../combo/NeiGracePolicy.h"
 #include "Rando/MiscBehavior/ClockShuffle.h"
 #include "2s2h/FleetShipCombo/FleetShipCombo.h" // FleetShipCombo_GetActiveGame (combo-only items)
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -590,7 +591,6 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             RI_OOT_NEI_DOMINION_ROD,
             RI_OOT_NEI_FIRE_ROD,
             RI_OOT_NEI_GUST_JAR,
-            RI_OOT_NEI_HYLIAS_GRACE,
             RI_OOT_NEI_ICE_ROD,
             RI_OOT_NEI_LANTERN,
             RI_OOT_NEI_LIGHT_ROD,
@@ -617,6 +617,9 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         };
         for (RandoItemId neiItem : sNeiPoolItems) {
             itemPool.push_back(neiItem);
+        }
+        if (NeiGrace_InPool(saveInfo.randoSaveOptions[RO_HYLIAS_GRACE])) {
+            itemPool.push_back(RI_OOT_NEI_HYLIAS_GRACE);
         }
 
         // BOTH Roc's Feathers. They are DIFFERENT items sharing nothing but a name, and each has to

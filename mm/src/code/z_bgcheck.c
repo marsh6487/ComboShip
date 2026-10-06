@@ -1918,8 +1918,9 @@ s32 BgCheck_CheckWallImpl(CollisionContext* colCtx, u16 xpFlags, Vec3f* posResul
     // SAME full collision bypass as the gCheats.NoClip cheat (z_arms_hook.c SwitchHook_PlayerNoClip).
     {
         extern s32 SwitchHook_PlayerNoClip(void);
-        if ((CVarGetInteger("gCheats.NoClip", 0) || SwitchHook_PlayerNoClip()) && actor != NULL &&
-            actor->id == ACTOR_PLAYER) {
+        extern s32 HGrace_WantsNoClip(void);
+        if ((CVarGetInteger("gCheats.NoClip", 0) || SwitchHook_PlayerNoClip() || HGrace_WantsNoClip()) &&
+            actor != NULL && actor->id == ACTOR_PLAYER) {
             return false;
         }
     }

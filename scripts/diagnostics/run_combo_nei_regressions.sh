@@ -21,6 +21,7 @@ python3 -B scripts/diagnostics/run_sword_receipt_tests.py --sanitize
 python3 -B scripts/diagnostics/run_fairy_bottle_tests.py
 python3 -B tests/seasons/run_tests.py
 python3 -B tests/seasons/run_native_weather_tests.py --sanitize
+python3 -B tests/seasons/run_generated_leaf_texture_tests.py
 python3 -B scripts/diagnostics/run_mm_autumn_foliage_tests.py
 python3 -B tests/seasons/run_rod_lifecycle_tests.py
 python3 -B tests/seasons/run_oot_shop_tests.py
@@ -29,6 +30,10 @@ python3 -B tests/mm_presentation/run_foreign_scale_tests.py
 python3 -B scripts/diagnostics/run_mm_nei_tests.py
 python3 -B tests/mm_wallet/run_tests.py
 python3 -B tests/mm_editor/run_tests.py
+python3 -B tests/mm_grace/run_flight_tests.py
+python3 -B tests/mm_grace/run_pool_tests.py
+python3 -B tests/mm_grace/run_save_tests.py
+python3 -B tests/mm_grace/run_settings_tests.py
 python3 -B tests/nei_shared_slot/run_tests.py
 python3 -B tests/nei_shared_slot/run_ui_tests.py
 python3 -B tests/nei_shared_slot/run_sync_tests.py

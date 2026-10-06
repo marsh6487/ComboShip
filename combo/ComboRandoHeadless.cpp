@@ -184,6 +184,7 @@ int main(int argc, char** argv) {
     auto SOH_RestoreSettings = Sym<FnTakeStr>(soh, "SOH_RestoreRandoSettings");
     auto SOH_PrepContext = Sym<FnVoidV>(soh, "SOH_PrepRandoContext");
     auto MM_RestoreSettings = Sym<FnTakeStr>(mm, "MM_RestoreRandoSettings");
+    auto SOH_NormalizeComboGraceFromMM = Sym<FnVoidV>(soh, "SOH_NormalizeComboGraceFromMM");
     auto SOH_SetSeed = Sym<FnSetSeed>(soh, "SOH_SetComboRandoSeed");
     auto MM_SetSeed = Sym<FnSetSeed>(mm, "MM_SetComboRandoSeed");
     auto SOH_GetForced = Sym<FnGetForced>(soh, "SOH_GetForcedPlacements");
@@ -567,6 +568,8 @@ int main(int argc, char** argv) {
               << "\n";
     int failures = 0;
     auto t0 = std::chrono::steady_clock::now();
+    if (SOH_NormalizeComboGraceFromMM)
+        SOH_NormalizeComboGraceFromMM();
     for (int i = 0; i < count; ++i) {
         const uint32_t base = (haveMasterSeed ? masterSeedArg : ComboHash(seed)) + static_cast<uint32_t>(i);
         uint32_t masterSeed = base;

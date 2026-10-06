@@ -214,6 +214,7 @@ run('snow',r'''
 int activeSeason=SEASON_WINTER,spawns=0;
 u8 D_801F4E30;
 int MMWeather_Season(){return activeSeason;}
+int MMWeather_SeasonForPlay(PlayState*){return activeSeason;}
 void Actor_Kill(Actor* actor){actor->update=nullptr;actor->draw=nullptr;}
 Actor* Actor_Spawn(ActorContext*,PlayState*,s16,f32,f32,f32,s16,s16,s16,s32){++spawns;return nullptr;}
 ''',['// Seasonal particles'+rodsource.split('// Seasonal particles')[1].split('#include "../objects')[0]],r'''
@@ -353,6 +354,7 @@ int MMWeather_Season(){return activeSeason;}
 int MMWeather_SeasonForPlay(const PlayState*){return activeSeason;}
 void Actor_Kill(Actor* actor){actor->update=nullptr;actor->draw=nullptr;}
 f32 Rand_ZeroOne(){return .25f;}
+f32 MMWeather_RandomFloat(){assert(activeSeason==SEASON_AUTUMN);return .25f;}
 s16 Camera_GetCamDirPitch(Camera*){return 0;}
 f32 Math_Vec3f_DistXZ(Vec3f* a,Vec3f* b){return sqrtf(SQ(a->x-b->x)+SQ(a->z-b->z));}
 void func_808DBE8C(ObjectKankyo*){}

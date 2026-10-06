@@ -31,6 +31,7 @@
 #include "objects/gameplay_keep/gameplay_keep.h"
 
 extern void Player_Draw(Actor* thisx, PlayState* play);
+extern int HGrace_CanActivateOot(void);
 
 static s8 sHGracePrevInvinc = 0;
 static s32 sHGPhaseEnd = 0; // Absolute hgTimer value when current animation phase ends
@@ -231,6 +232,11 @@ static void HGrace_Stop(Player* p, PlayState* play) {
 static void HGrace_Start(Player* p, PlayState* play) {
     if (hgActive)
         return;
+    if (!HGrace_CanActivateOot()) {
+        Audio_PlaySoundGeneral(NA_SE_SY_ERROR, &p->actor.world.pos, 4, &gSfxDefaultFreqAndVolScale,
+                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+        return;
+    }
     if (!ItemMagic_HasEnough(play, HGRACE_MAGIC_COST)) {
         Audio_PlaySoundGeneral(NA_SE_SY_ERROR, &p->actor.world.pos, 4, &gSfxDefaultFreqAndVolScale,
                                &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);

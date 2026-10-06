@@ -22,8 +22,9 @@ def main():
     compiler = shlex.split(os.environ.get("CC", "cc"))
     with tempfile.TemporaryDirectory(prefix="mm-autumn-foliage-") as temporary:
         binary = Path(temporary) / "test"
-        actor = ROOT / "mm/src/overlays/actors/ovl_En_Wood02/z_en_wood02.c"
-        for inputs in (["-fsyntax-only", str(actor)],
+        actors = [ROOT / "mm/src/overlays/actors" / path for path in
+                  ("ovl_En_Wood02/z_en_wood02.c", "ovl_Obj_Tree/z_obj_tree.c")]
+        for inputs in (["-fsyntax-only", *map(str, actors)],
                        [str(ROOT / "mm/tests/autumn_foliage_test.c"),
                         "-Wl,--gc-sections", "-lm", "-o", str(binary)]):
             result = subprocess.run([*compiler, *flags, *inputs], cwd=ROOT,

@@ -29,9 +29,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sanitizers", action="store_true")
     parser.add_argument("--drop-appended-option", action="store_true",
-                        help="negative control: omit the last option during Context copy")
+                        help="negative control: omit the information option during Context copy")
     parser.add_argument("--dump-entrance-fixture", type=Path,
                         help="write native generated/dumped entrance tables for the receiver regression")
+    parser.add_argument("--drop-grace-reset", action="store_true",
+                        help="negative control: retain prior Grace policy on old native spoiler import")
     args = parser.parse_args()
     read = lambda path: (ROOT / path).read_text()
     settings = read("soh/soh/Enhancements/randomizer/settings.cpp")
@@ -47,17 +49,23 @@ def main():
         "Option::Option(size_t key_", "void Option::PopulateTextToNum()",
         "OptionValue::OptionValue(uint8_t val)", "uint8_t OptionValue::Get()",
         "void OptionValue::Set(uint8_t val)", "OptionValue::operator bool() const",
+        "uint8_t Option::GetValueFromText", "void Option::SetContextIndex",
         "const std::string& Option::GetName() const", "uint8_t Option::GetOptionIndex() const",
         "size_t Option::GetOptionCount() const",
         "uint8_t Option::GetMenuOptionDefault() const", "const std::string& Option::GetCVarName() const")]
     for signature in ("Settings::Settings()", "std::shared_ptr<Settings> Settings::GetInstance()",
                       "Option& Settings::GetOption", "const std::array<Option, RSK_MAX>& Settings::GetAllOptions()",
                       "std::unordered_map<std::string, RandomizerSettingKey> Settings::PopulateOptionNameToEnum()",
+                      "TrickSetting& Settings::GetTrickSetting", "void Settings::ParseJson",
                       "void Settings::AssignContext", "void Settings::ClearContext", "void Settings::SetAllToContext()",
                       "void Context::ResetTrickOptions()", "void Context::FinalizeSettings"):
         body = extract(settings, signature)
         if args.drop_appended_option and signature == "void Settings::SetAllToContext()":
-            body = body.replace("i < RSK_MAX", "i < RSK_MAX - 1", 1)
+            body = body.replace("mContext->GetOption(static_cast<RandomizerSettingKey>(i)).Set",
+                                "if (i != RSK_MAPS_COMPASSES_GIVE_INFORMATION) mContext->GetOption(static_cast<RandomizerSettingKey>(i)).Set", 1)
+        if args.drop_grace_reset and signature == "void Settings::ParseJson":
+            body = body.replace("mContext->GetOption(RSK_HYLIAS_GRACE).Set(NEI_GRACE_ON);", "")
+            body = body.replace("mContext->GetOption(RSK_HYLIAS_GRACE_REWARDS).Set(4);", "")
         functions.append(body)
     # Execute the exact target registration; no manual SetOption(On) substitutes
     # for the CVar-backed native boolean or its actual default/prefix.
@@ -73,6 +81,8 @@ def main():
                       "std::shared_ptr<Dungeons> Context::GetDungeons()", "DungeonInfo* Context::GetDungeon(size_t",
                       "std::shared_ptr<Trials> Context::GetTrials()", "bool Context::IsSeedGenerated()",
                       "void Context::SetSeedGenerated", "bool Context::IsSpoilerLoaded()", "void Context::SetSpoilerLoaded"):
+        functions.append(extract(context, signature))
+    for signature in ("void Context::SetSeedString", "void Context::SetSeed("):
         functions.append(extract(context, signature))
     for signature in ("ItemLocation::ItemLocation()", "ItemLocation::ItemLocation(const RandomizerCheck",
                       "RandomizerCheck ItemLocation::GetRandomizerCheck() const", "void ItemLocation::SetExcludedOption"):
@@ -113,7 +123,8 @@ def main():
         build = Path(directory)
         (build / "seed_settings_production.inc").write_text(functions)
         flags = ["-std=c++20", "-O1", "-g", "-ffunction-sections", "-fdata-sections",
-                 "-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DIMGUI_DEFINE_MATH_OPERATORS=", "-DLOG_LEVEL_GAME_PRINTS=0"]
+                 "-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DIMGUI_DEFINE_MATH_OPERATORS=", "-DLOG_LEVEL_GAME_PRINTS=0",
+                 "-DFMT_HEADER_ONLY"]
         # Use the actual configured CVar prefixes from the production CMake file.
         prefixes = read("CMake/soh-cvars.cmake")
         flags += ['-D' + key + '="' + value + '"' for key, value in

@@ -19,6 +19,7 @@
 #include "logic/item_postman_hat.h"
 #include "logic/item_dekuleaf.h"
 #include "logic/item_shovel.h"
+#include "logic/item_hylias_grace.h"
 #include "../extended_inventory.h" // ExtInv_GetItemSlot — custom items must NOT use vanilla SLOT()/INV_CONTENT()
 #include "overlays/actors/ovl_En_Boom/z_en_boom.h" // EnBoom struct for Gale Boomerang multi-target override
 #include "soh/FleetShipCombo/FleetShipCombo.h"     // cross-game world-connector (loading zone)
@@ -388,6 +389,7 @@ static void FleetWarp_Tick(Player* p, PlayState* play) {
 }
 
 void CustomItems_Update(Player* p, PlayState* play) {
+    HGrace_UpdateRoomChange(play);
     // Run cancellation before any cutscene/transition or exclusive-item early return.
     CustomItems_CleanupTransientTools(p, play);
 

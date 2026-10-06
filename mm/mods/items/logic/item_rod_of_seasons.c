@@ -201,7 +201,8 @@ void Seasons_UpdateWeather(PlayState* play) {
         sSeasonWeatherRoom = play->roomCtx.curRoom.num;
     }
     sSeasonWeatherFrame = play->gameplayFrames;
-    if (MMWeather_Season() != SEASON_WINTER) {
+    const int season = MMWeather_SeasonForPlay(play);
+    if (season != SEASON_WINTER && season != SEASON_AUTUMN) {
         Seasons_RemoveSnowActor(play);
         return;
     }

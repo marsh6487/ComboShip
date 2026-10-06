@@ -384,7 +384,13 @@ inline void from_json(const json& j, RandoSaveInfo& rando) {
     j.at("randoEvents").get_to(rando.randoEvents);
     j.at("randoSaveChecks").get_to(rando.randoSaveChecks);
     j.at("finalSeed").get_to(rando.finalSeed);
-    j.at("randoSaveOptions").get_to(rando.randoSaveOptions);
+    // Options are append-only. A pre-option save has a shorter array; missing
+    // entries retain legacy zero values (Grace On), even when reusing a struct.
+    const auto savedOptions = j.at("randoSaveOptions").get<std::vector<u32>>();
+    memset(rando.randoSaveOptions, 0, sizeof(rando.randoSaveOptions));
+    for (size_t i = 0; i < savedOptions.size() && i < ARRAY_COUNT(rando.randoSaveOptions); ++i) {
+        rando.randoSaveOptions[i] = savedOptions[i];
+    }
     j.at("randoStartingItems").get_to(rando.randoStartingItems);
     j.at("foundDungeonKeys").get_to(rando.foundDungeonKeys);
     j.at("foundTriforcePieces").get_to(rando.foundTriforcePieces);

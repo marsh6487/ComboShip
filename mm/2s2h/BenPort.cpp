@@ -3829,6 +3829,8 @@ extern "C" COMBO_EXPORT void MM_RestoreRandoSettings(const char* json) {
         auto j = nlohmann::json::parse(json);
         // Excluded checks: authoritative RC_-name array from the seed (skipped in the loop below). The
         // snapshot wins outright, so an absent list clears local exclusions (pre-GAP-7 spoilers).
+        CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE", RO_GRACE_ON);
+        CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE_REWARDS", 4);
         std::vector<RandoCheckId> excluded;
         if (j.contains("gRando.ExcludedChecks") && j["gRando.ExcludedChecks"].is_array()) {
             for (auto& n : j["gRando.ExcludedChecks"]) {

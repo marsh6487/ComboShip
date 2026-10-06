@@ -20,6 +20,10 @@
 #define OPEN_DISPS_PORT_HELPERS(gfxCtx)
 #define CLOSE_DISPS_PORT_HELPERS(gfxCtx)
 #include "overlays/actors/ovl_En_Wood02/z_en_wood02.c"
+#define sCylinderInit sBranchingTreeCylinderInit
+#undef FLAGS
+#include "overlays/actors/ovl_Obj_Tree/z_obj_tree.c"
+#undef sCylinderInit
 
 SaveContext gSaveContext;
 static PlayState play;
@@ -70,6 +74,12 @@ void Gfx_DrawDListOpa(PlayState* current, Gfx* displayList) {
 Mtx* Matrix_Finalize(GraphicsContext* context) {
     REQUIRE(context == &gfx);
     return &matrix;
+}
+void Matrix_RotateZYX(s16 x, s16 y, s16 z, MatrixMode mode) {
+    (void)x;
+    (void)y;
+    (void)z;
+    (void)mode;
 }
 f32 Math_SinS(s16 angle) {
     return sinf(angle * (3.14159265358979323846f / 32768.0f));
@@ -417,6 +427,53 @@ static void AssetOwnership(void) {
     puts("PASS selected Alt material ownership, native resource submission, no tint leaks and unchanged bushes");
 }
 
+static void BranchingTreeMaterials(void) {
+    Reset();
+    ObjTree tree;
+    memset(&tree, 0, sizeof(tree));
+    for (s16 large = 0; large <= 1; ++large) {
+        tree.dyna.actor.params = large;
+        liveSeason = SEASON_OFF;
+        BeginDraw();
+        ObjTree_Draw(&tree.dyna.actor, &play);
+        Gfx native[64];
+        size_t nativeSize = (gfx.polyOpa.p - opaque) * sizeof(Gfx);
+        memcpy(native, opaque, nativeSize);
+        REQUIRE(opaque[1].words.w1 == (uintptr_t)gTreeBodyDL);
+        liveSeason = SEASON_AUTUMN;
+        BeginDraw();
+        ObjTree_Draw(&tree.dyna.actor, &play);
+        REQUIRE(!memcmp(native, opaque, 2 * sizeof(Gfx)));
+        RequireTintScoped(opaque + 2, gfx.polyOpa.p, gTreeLeavesDL);
+        for (int season = SEASON_SPRING; season <= SEASON_OFF; ++season) {
+            if (season == SEASON_AUTUMN)
+                continue;
+            liveSeason = season;
+            BeginDraw();
+            ObjTree_Draw(&tree.dyna.actor, &play);
+            REQUIRE((gfx.polyOpa.p - opaque) * sizeof(Gfx) == nativeSize);
+            REQUIRE(!memcmp(native, opaque, nativeSize));
+        }
+        liveSeason = SEASON_AUTUMN;
+        for (int condition = 0; condition < 2; ++condition) {
+            eligible = condition != 0;
+            alt = condition != 0;
+            altList = gTreeLeavesDL;
+            BeginDraw();
+            ObjTree_Draw(&tree.dyna.actor, &play);
+            REQUIRE((gfx.polyOpa.p - opaque) * sizeof(Gfx) == nativeSize);
+            REQUIRE(!memcmp(native, opaque, nativeSize));
+        }
+        eligible = true;
+        altList = NULL; // Texture-only replacements still use native material.
+        BeginDraw();
+        ObjTree_Draw(&tree.dyna.actor, &play);
+        RequireTintScoped(opaque + 2, gfx.polyOpa.p, gTreeLeavesDL);
+        alt = false;
+    }
+    puts("PASS Clock Town branching-tree leaves, unchanged trunk, live Off/story and Alt material ownership");
+}
+
 static void Particles(void) {
     Reset();
     EnWood02 trees[20];
@@ -590,6 +647,7 @@ int main(int argc, char** argv) {
     if (argc == 1 || !strcmp(argv[1], "materials")) {
         Materials();
         AssetOwnership();
+        BranchingTreeMaterials();
     }
     if (argc == 1 || !strcmp(argv[1], "particles")) {
         Particles();
