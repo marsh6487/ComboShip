@@ -1,7 +1,7 @@
 /**
  * wand_wind.c — Tornado Rod (Skijer's NEI).
  *
- * A toggle, not a cast: two green tornadoes spin at Link's boots and every launch off the ground
+ * A toggle, not a cast: silver wind surrounds Link and every launch off the ground
  * comes out harder. It burns magic for as long as it is lit, and dies on damage, on an empty meter,
  * or on another press.
  *
@@ -9,30 +9,16 @@
  * that is one place per launch kind instead of one per input.
  */
 
-#include "../../objects/object_tornado.h" // header ONLY: the .cpp is its own TU (LNK1179)
+#include "2s2h/Rando/NeiAirMagicPresentation.h"
 
 #define WIND_BOOST 1.55f
 #define WIND_HOVER_RISE 4.0f   // held: the rise is pinned here instead of decaying into gravity
 #define WIND_DRAIN_INTERVAL 20 // frames between each point of magic
 #define WIND_DRAIN_COST 1
 
-// Tip at the boot, mouth above it — the only pitch value that stands the cone upright.
-#define WIND_TORNADO_PITCH (-0x4000)
-#define WIND_TORNADO_LENGTH 34.0f
-#define WIND_TORNADO_RADIUS 11.0f
-#define WIND_TORNADO_SPIN 0x1800
-#define WIND_TORNADO_SCROLL 18 // streaks travelling UP the column, in quarter-texels
-
-// Forest green, and bright: the cone takes ALL of its colour from the primitive.
-#define WIND_TINT_R 90
-#define WIND_TINT_G 225
-#define WIND_TINT_B 110
-#define WIND_TINT_A 190
-
 static u8 sWindOn = 0;
 static s16 sWindDrainTimer = 0;
 static s8 sWindPrevInvinc = 0;
-static TornadoParams sWindCone[2];
 
 static void WandWind_Stop(PlayState* play, Player* player) {
     if (!sWindOn) {
@@ -111,27 +97,10 @@ void WandWind_TickHover(Player* player, u8 held) {
 }
 
 // Drawn from the wand's draw hook, never from the tick: the tornado emits into POLY_XLU and the
-// update pass has no display list open.
+// update pass has no display list open. The envelope follows Link's body height.
 void WandWind_Draw(Player* player, PlayState* play) {
-    static const u8 kBootParts[2] = { PLAYER_BODYPART_LEFT_FOOT, PLAYER_BODYPART_RIGHT_FOOT };
-
     if (!sWindOn) {
         return;
     }
-    for (u8 i = 0; i < ARRAY_COUNT(kBootParts); i++) {
-        TornadoParams* cone = &sWindCone[i];
-
-        cone->origin = player->bodyPartsPos[kBootParts[i]];
-        cone->yaw = player->actor.shape.rot.y;
-        cone->pitch = WIND_TORNADO_PITCH;
-        cone->length = WIND_TORNADO_LENGTH;
-        cone->radius = WIND_TORNADO_RADIUS;
-        cone->color.r = WIND_TINT_R;
-        cone->color.g = WIND_TINT_G;
-        cone->color.b = WIND_TINT_B;
-        cone->color.a = WIND_TINT_A;
-        cone->spin += WIND_TORNADO_SPIN;
-        Tornado_AdvanceScroll(cone, 0, WIND_TORNADO_SCROLL);
-        Tornado_Draw(play, cone);
-    }
+    NeiAirMagic_DrawEnvelope(play, player);
 }

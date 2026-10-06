@@ -5,15 +5,14 @@
  *
  *   no lock-on  — the Song of Storms without the song. En_Okarina_Effect is what rains, thunders
  *                 and pulses the env flag the grottos and spots watch, so that half is one spawn.
- *   locked on   — a thunder ray, the yellow beam Barinade strings between its Baris.
+ *   locked on   — a travelling thunder ray, with item-local electrical geometry.
  *
- * Barinade is an OoT boss and object_bv is not in this game, so the beam is loaded out of the
- * companion oot.o2r the same way the Light Rod loads its orb. Without that archive the ray still
- * flies and still hits — it just has nothing to draw.
+ * Simulation retains the existing MM projectile. Private medallion-derived
+ * materials add surface detail; bounded geometry remains when they are absent.
  */
 
 #include "../../helpers/combat_helper.h" // the ray's AT cylinder
-#include "mods/oot_asset_loader/oot_asset_loader.h"
+#include "2s2h/Rando/NeiAirMagicPresentation.h"
 
 // Defined in z_player.c further down this same translation unit, and in no header — every consumer
 // declares it for itself (cane_pacci.c, equip_byrna.c, the elemental rods).
@@ -27,15 +26,9 @@ extern bool Player_IsZTargeting(Player* this);
 #define STORM_RAY_SPEED 18.0f
 #define STORM_RAY_LIFE 40
 #define STORM_RAY_SPAWN_HEIGHT 30.0f
-#define STORM_RAY_SCALE 0.9f
 #define STORM_RAY_RADIUS 22.0f
 #define STORM_RAY_HEIGHT 30.0f
 #define STORM_RAY_DAMAGE 2
-
-// Barinade's own zap-charge colours: white core, yellow rim.
-#define STORM_RAY_ENV_R 255
-#define STORM_RAY_ENV_G 255
-#define STORM_RAY_ENV_B 50
 
 static struct {
     Vec3f pos;
@@ -48,19 +41,6 @@ static struct {
 
 static ColliderCylinder sStormRayCol;
 static u8 sStormRayColBuilt = 0;
-
-static Gfx* sStormBeamMaterialDL = NULL;
-static Gfx* sStormBeamModelDL = NULL;
-static u8 sStormBeamTried = 0;
-
-static u8 WandStorm_LoadBeam(void) {
-    if (!sStormBeamTried) {
-        sStormBeamTried = 1;
-        sStormBeamMaterialDL = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_bv/gBarinadeDL_0135B0");
-        sStormBeamModelDL = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_bv/gBarinadeDL_013638");
-    }
-    return (sStormBeamMaterialDL != NULL) && (sStormBeamModelDL != NULL);
-}
 
 static void WandStorm_RayConfig(CombatColliderConfig* cfg) {
     cfg->dmgFlags = DMG_ZORA_BOOMERANG;
@@ -100,26 +80,10 @@ void WandStorm_Tick(PlayState* play, Player* player) {
 }
 
 void WandStorm_Draw(PlayState* play) {
-    if (!sStormRay.active || !WandStorm_LoadBeam()) {
+    if (!sStormRay.active) {
         return;
     }
-
-    OPEN_DISPS(play->state.gfxCtx);
-
-    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sStormBeamMaterialDL);
-    gDPPipeSync(POLY_XLU_DISP++);
-    gDPSetEnvColor(POLY_XLU_DISP++, STORM_RAY_ENV_R, STORM_RAY_ENV_G, STORM_RAY_ENV_B, 255);
-    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
-
-    Matrix_Translate(sStormRay.pos.x, sStormRay.pos.y, sStormRay.pos.z, MTXMODE_NEW);
-    Matrix_RotateZYX(sStormRay.pitch, sStormRay.yaw, 0, MTXMODE_APPLY);
-    Matrix_Scale(STORM_RAY_SCALE, STORM_RAY_SCALE, STORM_RAY_SCALE, MTXMODE_APPLY);
-
-    gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    gSPDisplayList(POLY_XLU_DISP++, sStormBeamModelDL);
-
-    CLOSE_DISPS(play->state.gfxCtx);
+    NeiAirMagic_DrawLightning(play, &sStormRay.pos, &sStormRay.vel);
 }
 
 // Aimed at the lock-on when there is one, straight ahead otherwise.

@@ -309,8 +309,10 @@ void CheckWindStormAndShadow() {
     assert(!Wand_Cast(&player, &play, 4) && gSaveContext.save.saveInfo.playerData.magic == 42);
     WandStorm_Tick(&play, &player);
     assert(sStormRay.pos.z > 17 && registeredCollider && sStormRayCol.elem.atDmgInfo.damage == 2);
-    modelPresent = false; sStormBeamTried = 0;
-    assert(!WandStorm_LoadBeam() && sStormRay.active);
+    modelPresent = false;
+    const float before = sStormRay.pos.z;
+    WandStorm_Tick(&play, &player);
+    assert(sStormRay.active && sStormRay.pos.z > before);
     sStormRayCol.base.atFlags |= AT_HIT; WandStorm_Tick(&play, &player); assert(!sStormRay.active);
 
     ResetWorld(player, play); assert(Wand_Cast(&player, &play, 5));
