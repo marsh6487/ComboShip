@@ -22,6 +22,7 @@
 // NEI: equipment page replaces the mask page (masks live on item-kaleido page 2)
 void KaleidoScope_DrawEquipment(PlayState* play);
 void KaleidoScope_UpdateEquipmentCursor(PlayState* play);
+void* KaleidoEquip_GetNameTex(void);
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/Enhancements/Saving/SavingEnhancements.h"
 
@@ -497,11 +498,15 @@ void Kaleido_LoadItemNameStatic(void** segment, u32 texIndex) {
     // name-texture table first (mirrors SoH z_kaleido_scope_PAL.c's ExtInv_GetCustomItemNameTex
     // branch). Returns an OTR path string usable directly as the name segment; NULL when the id
     // isn't registered → fall back to the vanilla array / empty texture.
-    {
+    if (texIndex <= 0xFFFF) {
         extern void* ExtInv_GetCustomItemNameTex(uint16_t itemId, uint8_t language);
+        extern void* ExtEquip_GetNameTex(u16 itemId, u8 language);
         // ExtInv_GetCustomItemNameTex ignores the language arg (MM has a single item_name_static
         // language set); pass 0 (MM's SaveContext has no `language` field like OoT's).
         void* customNameTex = ExtInv_GetCustomItemNameTex((uint16_t)texIndex, 0);
+        if (customNameTex == NULL) {
+            customNameTex = ExtEquip_GetNameTex((u16)texIndex, 0);
+        }
         if (customNameTex != NULL) {
             *segment = customNameTex;
             return;
@@ -1597,9 +1602,23 @@ f32 sCursorCirclesY[4];
 void KaleidoScope_UpdateNamePanel(PlayState* play) {
     PauseContext* pauseCtx = &play->pauseCtx;
     u16 namedItem;
+    void* equipmentName = NULL;
+
+    extern u8 gExtEquipGridNameContext;
+    if (pauseCtx->pageIndex != PAUSE_MASK && gExtEquipGridNameContext) {
+        gExtEquipGridNameContext = false;
+        pauseCtx->namedItem = PAUSE_ITEM_NONE;
+    }
+
+    // Alt modes can change the resource owner while the cursor stays on the same item.
+    if (pauseCtx->pageIndex == PAUSE_MASK && pauseCtx->cursorSpecialPos == 0 &&
+        pauseCtx->cursorItem[PAUSE_MASK] != PAUSE_ITEM_NONE) {
+        equipmentName = KaleidoEquip_GetNameTex();
+    }
 
     if ((pauseCtx->namedItem != pauseCtx->cursorItem[pauseCtx->pageIndex]) ||
-        ((pauseCtx->pageIndex == PAUSE_MAP) && (pauseCtx->cursorSpecialPos != 0))) {
+        ((pauseCtx->pageIndex == PAUSE_MAP) && (pauseCtx->cursorSpecialPos != 0)) ||
+        (equipmentName != NULL && equipmentName != pauseCtx->nameSegment)) {
 
         pauseCtx->namedItem = pauseCtx->cursorItem[pauseCtx->pageIndex];
         namedItem = pauseCtx->namedItem;
@@ -1610,7 +1629,11 @@ void KaleidoScope_UpdateNamePanel(PlayState* play) {
             if ((pauseCtx->pageIndex == PAUSE_MAP) && !sInDungeonScene) {
                 Kaleido_LoadMapNameStatic(&pauseCtx->nameSegment, namedItem);
             } else {
-                Kaleido_LoadItemNameStatic(&pauseCtx->nameSegment, namedItem);
+                if (equipmentName != NULL) {
+                    pauseCtx->nameSegment = equipmentName;
+                } else {
+                    Kaleido_LoadItemNameStatic(&pauseCtx->nameSegment, namedItem);
+                }
             }
             pauseCtx->nameDisplayTimer = 0;
         }

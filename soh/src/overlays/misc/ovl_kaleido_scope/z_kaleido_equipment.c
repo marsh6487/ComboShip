@@ -636,27 +636,28 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
             }
         }
 
-        gExtEquipGridNameContext = false; // re-armed below only while naming a page-2 grid cell
+        // Equipment name context can change while the item id stays the same (Cape/Champion).
+        u8 gridNameContext = extEquipPage && pauseCtx->cursorX[PAUSE_EQUIP] != 0;
+        if (gExtEquipGridNameContext != gridNameContext) {
+            pauseCtx->namedItem = PAUSE_ITEM_NONE;
+        }
+        gExtEquipGridNameContext = gridNameContext;
 
         if (pauseCtx->cursorX[PAUSE_EQUIP] == 0) {
             pauseCtx->cursorColorSet = 0;
 
-            if (pauseCtx->cursorY[PAUSE_EQUIP] <= 1) {
-                // Rows 0/1 = Magic Cape / Pendant of Memories. They no longer borrow the ext TUNIC-1 /
-                // BOOTS-2 ids for their label — those slots are the Champion's Tunic and the Climb
-                // Boots now, so the name box would lie. Left unnamed to match 2ship exactly until both
-                // games get dedicated Cape/Pendant name textures wired.
-                cursorItem = PAUSE_ITEM_NONE;
+            if (pauseCtx->cursorY[PAUSE_EQUIP] == 0 && ExtEquip_CapeOwned()) {
+                cursorItem = ITEM_EXT_TUNIC_1;
+            } else if (pauseCtx->cursorY[PAUSE_EQUIP] == 1 && ExtEquip_PendantOwned()) {
+                cursorItem = ITEM_EXT_BOOTS_2;
             } else {
-                // Rows 2/3 = the reserved slots — nothing to name yet (Skijer 2026-07-29).
+                // Unowned passives and reserved slots have no name.
                 cursorItem = PAUSE_ITEM_NONE;
             }
         } else {
             if (extEquipPage) {
                 // Extended equipment page: map cursor position to ext item ID. The name resolver runs
-                // later (z_kaleido_scope_PAL.c), so flag that the id it gets is a GRID slot — the one
-                // shared id (0xEA) means Climb Boots here, Pendant of Memories everywhere else.
-                gExtEquipGridNameContext = true;
+                // later (z_kaleido_scope_PAL.c), using the grid context published above.
                 cursorItem = ExtEquip_GetItemId(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP]);
             } else {
                 cursorItem = ITEM_SWORD_KOKIRI + sEquipmentItemOffsets[pauseCtx->cursorPoint[PAUSE_EQUIP]];
