@@ -855,11 +855,13 @@ f32 sFontWidths[144] = {
 static CwItemReceiptPresentation sItemReceiptPresentation;
 static CwItemReceiptLayout sItemReceiptLayout;
 static int sItemReceiptFirstPage;
+static int sItemReceiptReflowed;
 
 void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation* presentation) {
     memset(&sItemReceiptPresentation, 0, sizeof(sItemReceiptPresentation));
     memset(&sItemReceiptLayout, 0, sizeof(sItemReceiptLayout));
     sItemReceiptFirstPage = false;
+    sItemReceiptReflowed = false;
     if (presentation && presentation->singleBox == 1) {
         sItemReceiptPresentation = *presentation;
         if (!ComboReceipt_HasIcon(presentation))
@@ -871,10 +873,15 @@ static void Message_ApplyItemReceiptLayout(PlayState* play) {
     MessageContext* msgCtx = &play->msgCtx;
     if (!sItemReceiptPresentation.singleBox)
         return;
-    sItemReceiptLayout =
-        ComboReceipt_Layout(&sItemReceiptPresentation, msgCtx->font.msgBuf, msgCtx->msgLength, false, sFontWidths, 144);
-    sItemReceiptFirstPage = (uint32_t)msgCtx->msgBufPos <= sItemReceiptLayout.firstPageEnd;
-    R_TEXT_CHAR_SCALE = sItemReceiptFirstPage ? sItemReceiptLayout.textScale : 75;
+    if (!sItemReceiptReflowed) {
+        sItemReceiptLayout = ComboReceipt_Layout(&sItemReceiptPresentation, msgCtx->font.msgBuf, msgCtx->msgLength,
+                                                 sizeof(msgCtx->font.msgBuf), false, sFontWidths, 144);
+        msgCtx->msgLength = msgCtx->font.msgLength = sItemReceiptLayout.bodySize;
+        sItemReceiptReflowed = true;
+    }
+    sItemReceiptFirstPage = (uint32_t)msgCtx->msgBufPos >= sItemReceiptLayout.iconPageStart &&
+                            (uint32_t)msgCtx->msgBufPos <= sItemReceiptLayout.firstPageEnd;
+    R_TEXT_CHAR_SCALE = 75;
     R_TEXT_LINE_SPACING = 12;
 }
 
@@ -886,7 +893,8 @@ static void Message_DrawItemReceiptIcon(PlayState* play, Gfx** p) {
     MessageContext* msgCtx = &play->msgCtx;
     if (Message_HasItemReceiptIcon()) {
         int y = msgCtx->textPosY - (sItemReceiptLayout.iconHeight - R_TEXT_CHAR_SCALE * 16 / 100) / 2;
-        *p = ComboReceipt_DrawIcon(*p, &sItemReceiptPresentation, &sItemReceiptLayout, msgCtx->textPosX + 4, y,
+        *p = ComboReceipt_DrawIcon(*p, &sItemReceiptPresentation, &sItemReceiptLayout,
+                                   R_TEXT_INIT_XPOS + sItemReceiptLayout.iconX, y,
                                    msgCtx->textColorAlpha);
     }
 }
@@ -1703,6 +1711,11 @@ void Message_LoadItemIcon(PlayState* play, u16 itemId, s16 y) {
         return;
     }
 
+    // The alternate GI item ID names the pause menu's IA8 progress wedge.
+    // A receipt needs the full RGBA inventory icon at the normal mod path.
+    if (itemId == ITEM_HEART_PIECE_2)
+        itemId = ITEM_HEART_PIECE;
+
     if (itemId == ITEM_DUNGEON_MAP) {
         interfaceCtx->mapPalette[30] = 0xFF;
         interfaceCtx->mapPalette[31] = 0xFF;
@@ -2430,6 +2443,9 @@ void Message_Decode(PlayState* play) {
                 } else if (numLines == 2) {
                     R_TEXT_INIT_YPOS = (u16)(R_TEXTBOX_Y + 16);
                 }
+            }
+            if (sItemReceiptPresentation.singleBox) {
+                R_TEXT_INIT_YPOS = (u16)(R_TEXTBOX_Y + 16);
             }
             if (phi_s1 == MESSAGE_TEXTID) {
                 osSyncPrintf("NZ_NEXTMSG=%x, %x, %x\n", font->msgBuf[msgCtx->msgBufPos],

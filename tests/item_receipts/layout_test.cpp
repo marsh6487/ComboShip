@@ -24,13 +24,17 @@ static std::string path;
 
 namespace Oot {
 struct MessageContext {
-    struct { char msgBuf[1280]{}; } font;
-    int msgLength = 0, msgBufPos = 0, textPosX = 0, textPosY = 0, textColorAlpha = 192;
+    struct { char msgBuf[1280]{}; unsigned msgLength = 0; } font;
+    int msgLength = 0, msgBufPos = 0, textPosX = 0, textPosY = 0, textColorAlpha = 192, textBoxType = 2;
 };
 struct PlayState { MessageContext msgCtx; } play;
-int R_TEXT_CHAR_SCALE = 75, R_TEXT_LINE_SPACING = 12;
+using u16 = uint16_t;
+constexpr int TEXTBOX_TYPE_NONE_BOTTOM = 4;
+int R_TEXT_CHAR_SCALE = 75, R_TEXT_LINE_SPACING = 12, R_TEXT_INIT_XPOS = 65;
+int R_TEXT_INIT_YPOS = 28, R_TEXTBOX_Y = 12;
 /* OOT_FONT_WIDTHS */
 /* OOT_RECEIPT_RENDERER */
+/* OOT_DECODE_POSITION */
 }
 namespace Mm {
 using u16 = uint16_t;
@@ -40,6 +44,7 @@ struct MessageContext {
     int msgLength = 0, msgBufPos = 0, unk11FFC = 12, unk11F18 = 0, unk11F1A[3]{};
     int unk11FF8 = 65, unk11FFA = 28, textColorAlpha = 192;
     int textPosX = 0, textPosY = 0, itemId = 0xFE;
+    int textboxY = 12, textBoxType = 2;
     bool textIsCredits = false;
     float textCharScale = 0.75f;
 };
@@ -55,6 +60,45 @@ void Message_DrawItemIcon(PlayState*, Gfx**) { ++nativeIconDraws; }
 void Message_DrawTextDefault(PlayState*, Gfx**) { ++japaneseDraws; }
 void Message_DrawTextCredits(PlayState*, Gfx**) { ++creditsDraws; }
 /* MM_TEXT_DISPATCH */
+/* MM_DECODE_POSITION */
+}
+
+static std::string VisibleWords(const char* body, size_t size, int mm) {
+    std::string result;
+    for (size_t i = 0; i < size;) {
+        const uint8_t c = body[i];
+        const size_t command = ComboReceipt_CommandSize(c, mm);
+        if (c == (mm ? 0xBF : 0x02)) break;
+        if (c == (mm ? 0x11 : 0x01) || c == (mm ? 0x10 : 0x04) || c == ' ') {
+            if (!result.empty() && result.back() != ' ') result += ' ';
+        } else if (command == 1 && c >= 0x20) result += c;
+        i += command;
+    }
+    if (!result.empty() && result.back() == ' ') result.pop_back();
+    return result;
+}
+
+static void CheckReflow(const std::string& original, const char* body, size_t size, int mm,
+                        const float* widths, size_t count) {
+    assert(VisibleWords(body, size, mm) == VisibleWords(original.data(), original.size(), mm));
+    unsigned lines = 1;
+    int width = 0;
+    for (size_t i = 0; i < size;) {
+        const uint8_t c = body[i];
+        const size_t command = ComboReceipt_CommandSize(c, mm);
+        if (c == (mm ? 0xBF : 0x02)) break;
+        if (c == (mm ? 0x11 : 0x01)) {
+            assert(++lines <= 3 && "native line-offset storage must never receive a fourth line");
+            width = 0;
+        } else if (c == (mm ? 0x10 : 0x04)) {
+            lines = 1;
+            width = 0;
+        } else if (command == 1) {
+            width += ComboReceipt_GlyphWidth(c, widths, count);
+            assert(width <= 220 && "word wrapping must fit the actual native pen, including spaces");
+        }
+        i += command;
+    }
 }
 
 int main() {
@@ -72,7 +116,17 @@ int main() {
     // Staging owns its own copy, including the resource path.
     p.iconPath[0] = '\0';
     Oot::Message_ApplyItemReceiptLayout(&Oot::play);
-    assert(Oot::R_TEXT_CHAR_SCALE > 30 && Oot::R_TEXT_CHAR_SCALE < 75);
+    for (int lines = 0; lines <= 2; ++lines) {
+        Oot::FinishReceiptDecodePosition(lines);
+        assert(Oot::R_TEXT_INIT_YPOS == Oot::R_TEXTBOX_Y + 16 && "page quantity changed receipt baseline");
+    }
+    assert(Oot::R_TEXT_CHAR_SCALE == 75 && "long reward hints must wrap at the native readable font size");
+    CheckReflow(body, Oot::play.msgCtx.font.msgBuf, Oot::play.msgCtx.msgLength, false, Oot::sFontWidths, 144);
+    assert(!Oot::Message_HasItemReceiptIcon() && "a reward on a later page cannot appear beside the title");
+    Oot::play.msgCtx.msgBufPos = Oot::sItemReceiptLayout.iconPageStart;
+    const auto ootLength = Oot::play.msgCtx.msgLength;
+    Oot::Message_ApplyItemReceiptLayout(&Oot::play);
+    assert(Oot::play.msgCtx.msgLength == ootLength && "changing pages must not reflow the message twice");
     assert(Oot::R_TEXT_LINE_SPACING == 12 && Oot::Message_HasItemReceiptIcon());
     assert(Oot::sItemReceiptLayout.iconX + Oot::sItemReceiptLayout.iconWidth <= 220);
     Oot::play.msgCtx.textPosX = 65 + Oot::sItemReceiptLayout.iconX - 4;
@@ -85,6 +139,8 @@ int main() {
     assert(x1 > 65 && x2 <= 285 && y1 > 28 && y2 <= 76 && x2 - x1 == 24 && y2 - y1 == 24);
     assert(red == 255 && green == 255 && blue == 255 && alpha == 192);
     Oot::Message_SetItemReceiptPresentation(nullptr);
+    Oot::FinishReceiptDecodePosition(0);
+    assert(Oot::R_TEXT_INIT_YPOS == Oot::R_TEXTBOX_Y + 26 && "ordinary native receipt centering changed");
     Oot::Message_DrawItemReceiptIcon(&Oot::play, &gfx);
     assert(draws == 1 && !Oot::Message_HasItemReceiptIcon());
 
@@ -101,22 +157,35 @@ int main() {
     Mm::play.msgCtx.msgLength = text.size() + 12;
     Mm::Message_SetItemReceiptPresentation(&p);
     Mm::Message_ApplyItemReceiptLayout(&Mm::play);
-    assert(Mm::play.msgCtx.textCharScale > 0.25f && Mm::play.msgCtx.textCharScale < 0.75f);
+    for (int lines = 0; lines <= 2; ++lines) {
+        Mm::FinishReceiptDecodePosition(lines);
+        assert(Mm::play.msgCtx.unk11FFA == Mm::play.msgCtx.textboxY + 16 && "page quantity changed receipt baseline");
+    }
+    assert(Mm::play.msgCtx.textCharScale == 0.75f && "long reward hints must not change glyph/space proportions");
+    CheckReflow(text, Mm::play.msgCtx.font.msgBuf.schar + 11, Mm::play.msgCtx.msgLength - 11,
+                true, Mm::sNESFontWidths, 160);
     for (int line = 0; line < 3; ++line) {
         Mm::DecodeReceiptLine(line, 120.0f + line * 10.0f);
         assert(Mm::play.msgCtx.unk11F1A[line] == 0 && "native English decode shifted the fitted receipt away from its sprite");
     }
     assert(Mm::sItemReceiptLayout.iconX + Mm::sItemReceiptLayout.iconWidth <= 220);
     Mm::Message_DrawText(&Mm::play, &gfx);
+    assert(draws == 1 && "later-page reward icon appeared on the title page");
+    Mm::play.msgCtx.msgBufPos = Mm::sItemReceiptLayout.iconPageStart + 11;
+    Mm::Message_ApplyItemReceiptLayout(&Mm::play);
+    Mm::Message_DrawText(&Mm::play, &gfx);
     assert(draws == 2 && path == "__OTR__@mm:icon_item_static_yar/gItemIconSongNoteTex");
     assert(format == G_IM_FMT_IA && bits == G_IM_SIZ_8b && sourceWidth == 16 && sourceHeight == 24);
-    assert(x2 - x1 == 16 && y2 - y1 == 24 && x2 <= 285 && y1 > 28);
+    assert(x2 - x1 == 16 && y2 - y1 == 24 && x2 <= 285 && y1 >= 22 && y2 <= 76);
     assert(red == 128 && green == 216 && blue == 240 && alpha == 192);
     Mm::play.msgCtx.msgBufPos = Mm::sItemReceiptLayout.firstPageEnd + 12;
     Mm::Message_ApplyItemReceiptLayout(&Mm::play);
     Mm::Message_DrawText(&Mm::play, &gfx);
     assert(draws == 2 && Mm::play.msgCtx.textCharScale == 0.75f); // attribution's next page is ordinary
     Mm::Message_SetItemReceiptPresentation(nullptr);
+    Mm::FinishReceiptDecodePosition(0);
+    assert(Mm::play.msgCtx.unk11FFA == Mm::play.msgCtx.textboxY + 26 && "ordinary native receipt centering changed");
+    Mm::play.msgCtx.unk11FFA = 28;
     Mm::play.msgCtx.itemId = 1;
     Mm::Message_DrawText(&Mm::play, &gfx);
     assert(draws == 2 && Mm::nativeIconDraws == 1);
@@ -144,10 +213,74 @@ int main() {
     Mm::play.msgCtx.font.msgBuf.schar[compact.size() + 11] = '\xBF';
     Mm::play.msgCtx.msgLength = compact.size() + 12;
     Mm::play.msgCtx.msgBufPos = 0;
+    Mm::play.msgCtx.textIsCredits = false;
+    Mm::gSaveContext.options.language = Mm::LANGUAGE_ENG;
     Mm::Message_SetItemReceiptPresentation(&p);
     Mm::Message_ApplyItemReceiptLayout(&Mm::play);
-    const int nativeEnd = Mm::NativeLineWidth(reward);
+    CheckReflow(compact, Mm::play.msgCtx.font.msgBuf.schar + 11, Mm::play.msgCtx.msgLength - 11,
+                true, Mm::sNESFontWidths, 160);
+    const std::string wrapped(Mm::play.msgCtx.font.msgBuf.schar + 11, Mm::play.msgCtx.msgLength - 11);
+    assert(Mm::sItemReceiptLayout.firstPageEnd < wrapped.size() &&
+           static_cast<uint8_t>(wrapped[Mm::sItemReceiptLayout.firstPageEnd]) == 0xBF &&
+           "reward endpoint must still address its native terminator after reflow");
+    const size_t lastBreak = wrapped.find_last_of("\x10\x11", Mm::sItemReceiptLayout.firstPageEnd);
+    const std::string lastLine = wrapped.substr(lastBreak + 1, Mm::sItemReceiptLayout.firstPageEnd - lastBreak - 1);
+    const int nativeEnd = ComboReceipt_LineWidth(lastLine.data(), lastLine.size(), true, Mm::sNESFontWidths, 160);
     assert(Mm::sItemReceiptLayout.iconX >= nativeEnd + 4 && "reward text overlaps its final-line sprite");
+    size_t lineBegin = Mm::sItemReceiptLayout.iconPageStart;
+    for (size_t i = lineBegin; i <= Mm::sItemReceiptLayout.firstPageEnd; ++i) {
+        if (i == Mm::sItemReceiptLayout.firstPageEnd || wrapped[i] == '\x11') {
+            assert(ComboReceipt_LineWidth(wrapped.data() + lineBegin, i - lineBegin, true,
+                                          Mm::sNESFontWidths, 160) + 4 <= Mm::sItemReceiptLayout.iconX &&
+                   "tall sprite must clear the wrapped reward's preceding row");
+            lineBegin = i + 1;
+        }
+    }
     assert(Mm::sItemReceiptLayout.iconX + Mm::sItemReceiptLayout.iconWidth <= 220);
-    std::cout << "Real OoT/MM font fitting, English dispatch, reward-line rectangles, routed sprites, IA8/tint, native icon fallback and reset passed\n";
+    (void)Mm::NativeLineWidth(reward);
+    // The reported Ice Cavern entrance and multiple inverse entrances must use
+    // exactly the same font, spacing and authored paragraphs as the Deku map.
+    for (const std::string entrance : {"Deku Tree", "GV Behind Tent Grotto Entry",
+            "GV Behind Tent Grotto Entry, Bottom of the Well, Dodongo's Cavern"}) {
+        const std::string map = ComboItemReceiptText::FromNeiMarkup(
+            "You found the Ice Cavern Map!&It's %gordinary%w.&It seems the entrance is at %c" + entrance + "%w.");
+        p = {};
+        p.singleBox = 1;
+        std::memcpy(Mm::play.msgCtx.font.msgBuf.schar + 11, map.data(), map.size());
+        Mm::play.msgCtx.font.msgBuf.schar[map.size() + 11] = '\xBF';
+        Mm::play.msgCtx.msgLength = map.size() + 12;
+        Mm::play.msgCtx.msgBufPos = 0;
+        Mm::Message_SetItemReceiptPresentation(&p);
+        Mm::Message_ApplyItemReceiptLayout(&Mm::play);
+        assert(Mm::play.msgCtx.textCharScale == 0.75f);
+        CheckReflow(map, Mm::play.msgCtx.font.msgBuf.schar + 11, Mm::play.msgCtx.msgLength - 11,
+                    true, Mm::sNESFontWidths, 160);
+        assert(entrance == "Deku Tree" || std::memchr(Mm::play.msgCtx.font.msgBuf.schar + 11, '\x10',
+                                                    Mm::play.msgCtx.msgLength - 11));
+    }
+    // MM's END byte also indexes a ten-pixel font slot. It is a command, so
+    // these final lines must retain their exact three-line body at 218-220px.
+    for (const std::string entrance : {"Zora Shop", "LLR Tower", "MK Bazaar"}) {
+        const std::string finalLine = "It seems the entrance is at " + entrance + ".";
+        const int nativeWidth = Mm::NativeLineWidth(finalLine);
+        assert(nativeWidth >= 211 && nativeWidth <= 220);
+        const std::string map = ComboItemReceiptText::FromNeiMarkup(
+            "You found the Ice Cavern Map!&It's %gordinary%w.&It seems the entrance is at %c" + entrance + "%w.") + '\xBF';
+        p = {};
+        p.singleBox = 1;
+        std::memcpy(Mm::play.msgCtx.font.msgBuf.schar + 11, map.data(), map.size());
+        Mm::play.msgCtx.msgLength = map.size() + 11;
+        Mm::play.msgCtx.msgBufPos = 0;
+        Mm::Message_SetItemReceiptPresentation(&p);
+        Mm::Message_ApplyItemReceiptLayout(&Mm::play);
+        assert(static_cast<size_t>(Mm::play.msgCtx.msgLength) == map.size() + 11 &&
+               !std::memcmp(Mm::play.msgCtx.font.msgBuf.schar + 11, map.data(), map.size()) &&
+               "zero-width END must not move a fitting final word onto another page");
+        Mm::FinishReceiptDecodePosition(2);
+        assert(Mm::play.msgCtx.unk11FFA == Mm::play.msgCtx.textboxY + 16);
+        assert(ComboReceipt_LineWidth("\x10\xBF", 2, true, Mm::sNESFontWidths, 160) == 0);
+        CheckReflow(map, Mm::play.msgCtx.font.msgBuf.schar + 11, Mm::play.msgCtx.msgLength - 11,
+                    true, Mm::sNESFontWidths, 160);
+    }
+    std::cout << "Real OoT/MM fixed native typography, lossless hint wrapping/pages, English dispatch, later-page reward sprites and reset passed\n";
 }

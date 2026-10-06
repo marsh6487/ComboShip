@@ -822,6 +822,37 @@ static int16_t DungeonEntranceDestination(int16_t entrance) {
     return entrance;
 }
 
+static int DungeonBossDestination(int dungeon) {
+    constexpr int entries[] = { ENTR_DEKU_TREE_ENTRANCE,       ENTR_DODONGOS_CAVERN_ENTRANCE,
+                                ENTR_JABU_JABU_ENTRANCE,       ENTR_FOREST_TEMPLE_ENTRANCE,
+                                ENTR_FIRE_TEMPLE_ENTRANCE,     ENTR_WATER_TEMPLE_ENTRANCE,
+                                ENTR_SPIRIT_TEMPLE_ENTRANCE,   ENTR_SHADOW_TEMPLE_ENTRANCE };
+    constexpr int doors[] = { ENTR_DEKU_TREE_BOSS_ENTRANCE,     ENTR_DODONGOS_CAVERN_BOSS_ENTRANCE,
+                              ENTR_JABU_JABU_BOSS_ENTRANCE,     ENTR_FOREST_TEMPLE_BOSS_ENTRANCE,
+                              ENTR_FIRE_TEMPLE_BOSS_ENTRANCE,   ENTR_WATER_TEMPLE_BOSS_ENTRANCE,
+                              ENTR_SPIRIT_TEMPLE_BOSS_ENTRANCE, ENTR_SHADOW_TEMPLE_BOSS_ENTRANCE };
+    const auto ctx = OTRGlobals::Instance->gRandoContext;
+    if (ctx->GetOption(RSK_SHUFFLE_BOSS_ENTRANCES).Is(RO_BOSS_ROOM_ENTRANCE_SHUFFLE_OFF))
+        return dungeon;
+    unsigned visited = 0;
+    while (dungeon >= 0 && dungeon < 8 && !(visited & (1u << dungeon))) {
+        visited |= 1u << dungeon;
+        const int destination = DungeonEntranceDestination(doors[dungeon]);
+        int nextDungeon = -1;
+        for (int i = 0; i < 8; ++i) {
+            if (destination == doors[i])
+                return i;
+            if (destination == entries[i])
+                nextDungeon = i;
+        }
+        // Mixed pools can put another dungeon behind the boss door. Follow
+        // that dungeon's saved boss route rather than discarding the hint.
+        // An exterior/interior, boss-less dungeon or loop supplies no boss.
+        dungeon = nextDungeon;
+    }
+    return -1;
+}
+
 static std::string DungeonPhysicalEntranceName(int16_t entrance) {
     constexpr int entrances[] = { ENTR_DEKU_TREE_ENTRANCE,          ENTR_DODONGOS_CAVERN_ENTRANCE,
                                   ENTR_JABU_JABU_ENTRANCE,          ENTR_FOREST_TEMPLE_ENTRANCE,
@@ -930,12 +961,8 @@ bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool r
         const bool masterQuest =
             IS_RANDO ? ResourceMgr_IsSceneMasterQuest(scenes[dungeon]) : seedDungeon && seedDungeon->IsMQ();
         if (information && ootMap) {
-            typeHint = masterQuest ? CustomMessage("&It shows the %rMaster Quest%w layout.",
-                                                   "&Sie zeigt das %rMaster-Quest%w-Labyrinth.",
-                                                   "&Elle montre le donjon %rMaster Quest%w.")
-                                   : CustomMessage("&It shows the %gvanilla%w layout.",
-                                                   "&Sie zeigt das %gOriginal%w-Labyrinth.",
-                                                   "&Elle montre le donjon %goriginal%w.");
+            typeHint = Rando::StaticData::hintTextTable[masterQuest ? RHT_DUNGEON_MASTERFUL : RHT_DUNGEON_ORDINARY]
+                           .GetHintMessage();
         } else if (!information && !ctx->GetOption(RSK_MQ_DUNGEON_RANDOM).Is(RO_MQ_DUNGEONS_NONE) &&
                    !(ctx->GetOption(RSK_MQ_DUNGEON_RANDOM).Is(RO_MQ_DUNGEONS_SET_NUMBER) &&
                      ctx->GetOption(RSK_MQ_DUNGEON_COUNT).Is(MAX_MQ_DUNGEON_COUNT))) {
@@ -952,41 +979,35 @@ bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool r
                                           ENTR_BOTTOM_OF_THE_WELL_ENTRANCE, ENTR_ICE_CAVERN_ENTRANCE };
             const auto source = DungeonEntranceSource(entrances[dungeon]);
             if (!source.empty()) {
-                entranceHint = CustomMessage("&It points to the %c[[source]]%w entrance!",
-                                             "&Sie zeigt zum Eingang von %c[[source]]%w!",
-                                             "&Elle indique l'entrée de %c[[source]]%w!");
+                entranceHint = CustomMessage("&It seems the entrance is at %c[[source]]%w.",
+                                             "&Der Eingang scheint bei %c[[source]]%w zu liegen.",
+                                             "&L'entrée semble se trouver à %c[[source]]%w.");
                 entranceHint.Replace("[[source]]", source);
             }
         }
         if (information && ootCompass && dungeon < 8) {
-            constexpr int doors[] = { ENTR_DEKU_TREE_BOSS_ENTRANCE,     ENTR_DODONGOS_CAVERN_BOSS_ENTRANCE,
-                                      ENTR_JABU_JABU_BOSS_ENTRANCE,     ENTR_FOREST_TEMPLE_BOSS_ENTRANCE,
-                                      ENTR_FIRE_TEMPLE_BOSS_ENTRANCE,   ENTR_WATER_TEMPLE_BOSS_ENTRANCE,
-                                      ENTR_SPIRIT_TEMPLE_BOSS_ENTRANCE, ENTR_SHADOW_TEMPLE_BOSS_ENTRANCE };
             constexpr const char* bosses[] = { "Queen Gohma", "King Dodongo", "Barinade", "Phantom Ganon",
                                                "Volvagia",    "Morpha",       "Twinrova", "Bongo Bongo" };
             constexpr RandomizerCheck rewards[] = { RC_QUEEN_GOHMA, RC_KING_DODONGO, RC_BARINADE, RC_PHANTOM_GANON,
                                                     RC_VOLVAGIA,    RC_MORPHA,       RC_TWINROVA, RC_BONGO_BONGO };
-            const int destination = ctx->GetOption(RSK_SHUFFLE_BOSS_ENTRANCES).Is(RO_BOSS_ROOM_ENTRANCE_SHUFFLE_OFF)
-                                        ? doors[dungeon]
-                                        : DungeonEntranceDestination(doors[dungeon]);
-            for (size_t i = 0; i < 8; ++i) {
-                if (destination == doors[i]) {
-                    boss = bosses[i];
-                    rewardName = DungeonRewardName(rewards[i]);
-                    hasReward = true;
-                    AddDungeonRewardIcon(msg, rewards[i]);
-                    break;
-                }
+            const int assignedBoss = DungeonBossDestination(dungeon);
+            if (assignedBoss >= 0) {
+                boss = bosses[assignedBoss];
+                rewardName = DungeonRewardName(rewards[assignedBoss]);
+                hasReward = true;
+                AddDungeonRewardIcon(msg, rewards[assignedBoss]);
+            } else {
+                bossHint = CustomMessage("&Its boss door does not lead to a known boss room.",
+                                         "&Die Bosstür führt zu keinem bekannten Bossraum.",
+                                         "&Sa porte ne mène pas à une salle de boss connue.");
             }
-            // Mixed entrance pools can lead somewhere other than a boss room.
-            // Never substitute the vanilla boss for an unknown destination.
         }
     } else if (information && mmMap) {
         // Match MM's known native entrances; this port has no MM entrance graph.
         constexpr const char* entrances[] = { "Woodfall", "Snowhead", "Zora Cape's turtle", "Stone Tower" };
-        entranceHint = CustomMessage("&Its entrance is at %c[[source]]%w.", "&Der Eingang liegt bei %c[[source]]%w.",
-                                     "&Son entrée se trouve à %c[[source]]%w.");
+        entranceHint = CustomMessage("&It seems the entrance is at %c[[source]]%w.",
+                                     "&Der Eingang scheint bei %c[[source]]%w zu liegen.",
+                                     "&L'entrée semble se trouver à %c[[source]]%w.");
         entranceHint.Replace("[[source]]", entrances[rg - RG_MM_MAP_WOODFALL]);
     } else if (information && mmCompass) {
         // This port has no MM boss-entrance shuffle; Combo seeds currently
@@ -1029,7 +1050,7 @@ bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool r
         msg.Replace("Great Deku Tree", "Deku Tree");
         if (ComboReceipt_HasIcon(&msg.receiptPresentation))
             msg += CustomMessage::ITEM_OBTAINED(ITEM_CUSTOM);
-        msg.Format(); // the renderer fits these authored lines as one box
+        msg.Format(); // the renderer wraps authored lines at the native font size
     } else {
         msg.AutoFormat(ootCompass || mmCompass ? ITEM_COMPASS : ITEM_DUNGEON_MAP);
     }

@@ -1493,6 +1493,9 @@ int main() {
   assert(!NeiGi::FindFrameBounds("__OTR__@bad:objects/nei_gi_redesign/four_sword/gi_dl"));
   assert(!NeiGi::FindFrameBounds("__OTR__objects/nei_gi_redesign/four_sword/held_dl"));
   std::cout<<"PASS all 61 serialized GI frames: native/OoT/MM routes, pickup/shop/freestanding bounds and shared shell pose\n";
+#ifdef COMBO_BUILD
+#include "tests/mm_presentation/pickup_framing_checks.inc"
+#endif
   // Optional private USED surfaces must not load global textures or retain an
   // Alt-owned resource pointer. Missing base/Alt materials queue nothing.
   Reset();

@@ -6,6 +6,7 @@
 #include "2s2h/Rando/DrawFuncs.h"
 #include "2s2h_assets.h"
 #include "Rando/SpinAttackGi.h"
+#include "2s2h/CustomItem/CustomItem.h"
 #include "ComboSongDrawMM.h"
 #include "ComboItemIconOwnership.h"
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
@@ -1703,10 +1704,33 @@ void DrawOotZoraTunic() {
 // Grayscale-tinted plain tunic (collar + tunic, no color DLs) — SoH's DrawCustomItemDiamondTint recolor
 // used for the "clothing" ext equipment (Magic Cape / Spirit Breastplate / Champion's Tunic) and stand-ins.
 static void DrawOotTunicTint(u8 r, u8 g, u8 b) {
+#ifdef COMBO_BUILD
+    const char* paths[] = { "__OTR__objects/object_gi_clothes/gGiTunicCollarDL",
+                            "__OTR__objects/object_gi_clothes/gGiTunicDL" };
+    for (auto& path : paths) {
+        // A local replacement keeps MM's live selection. Otherwise the OoT
+        // donor owns this geometry and all of its nested texture/vertex loads.
+        if (!ResourceMgr_IsModAsset(path)) {
+            if (!NeiResource_Available(path))
+                return;
+            path = NeiResource_Route(path);
+        }
+    }
+    OPEN_DISPS(gPlayState->state.gfxCtx);
+    Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+    gDPSetGrayscaleColor(POLY_OPA_DISP++, r, g, b, 255);
+    gSPGrayscale(POLY_OPA_DISP++, true);
+    for (const auto* path : paths)
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)path);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    CLOSE_DISPS(gPlayState->state.gfxCtx);
+#else
     static Gfx* sCollarCache = NULL;
     static Gfx* sTunicCache = NULL;
     DrawOotGetItemOpaOpaTint("__OTR__objects/object_gi_clothes/gGiTunicCollarDL", &sCollarCache,
                              "__OTR__objects/object_gi_clothes/gGiTunicDL", &sTunicCache, r, g, b);
+#endif
 }
 
 // Magic spells — object_gi_goddess (OoT-unique). OoT GetItem_DrawMagicSpell: Xlu with tex-scroll on
@@ -2987,7 +3011,9 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
 
 #ifdef COMBO_BUILD
     const bool shop = actor && actor->id == ACTOR_EN_GIRLA;
-    if (MM_TryDrawNeiGi(randoItemId, shop))
+    const bool mmPickup = actor && actor->id == ACTOR_EN_ITEM00 && (actor->home.rot.x & CustomItem::CALLED_ACTION) &&
+                          (actor->home.rot.x & (CustomItem::GIVE_ITEM_CUTSCENE | CustomItem::GIVE_OVERHEAD));
+    if (MM_TryDrawNeiGi(randoItemId, shop, mmPickup))
         return;
     MM_NeiGiFallbackShimmer fallbackShimmer(randoItemId);
 #endif
@@ -3754,7 +3780,7 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
         case RI_COMBO_FOREIGN:
             // ComboShip: this MM check holds an OOT item — render the real OOT model (sentinel blue
             // rupee on any failure). The originating check identity is passed straight through.
-            MM_DrawComboForeign(randoCheckId, shop);
+            MM_DrawComboForeign(randoCheckId, shop, mmPickup);
             break;
 #endif
         default:

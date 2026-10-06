@@ -27,6 +27,7 @@
 #include <stb_image.h>
 #include <ship/resource/File.h>
 #include <ship/window/Window.h>
+#include <libultraship/bridge/crashhandlerbridge.h>
 
 #include "z64animation.h"
 #include "z64bgcheck.h"
@@ -3383,6 +3384,9 @@ extern "C" COMBO_EXPORT void MM_PrepareForTransition(void) {
 // straight to Play in South Clock Town for the given slot. Counterpart to OOT's SOH_ResumeGame.
 extern "C" COMBO_EXPORT void MM_ResumeGame(int fileNum) {
     ItemGrantAudit::Scope itemGrantAuditScope("MM_ResumeGame");
+    // Both games share one crash handler. MM_RunMain registered this only at first boot;
+    // OoT has since replaced it, so reclaim ownership before any MM resume work.
+    CrashHandlerRegisterCallback(CrashHandler_PrintExt);
     auto ctx = Ship::Context::GetRawInstance();
     ctx->GetLogger()->flush_on(spdlog::level::trace);
     SPDLOG_INFO("[ComboShip] MM_ResumeGame: begin (fileNum={})", fileNum);
@@ -5335,7 +5339,7 @@ extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* pa
                                                 float fit[2]) {
     const int din =
         NeiAssetPriority::GetDinSwordGiProfile("mm", game, path, CVarGetInteger("gEnhancements.DinFireSword", 0));
-    return NeiAssetPriority::GetGiModelFit("mm", game, path, scale, tilt, shop != 0, fit, din);
+    return NeiAssetPriority::GetGiModelFit("mm", game, path, scale, tilt, shop, fit, din);
 }
 extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* game, const char* path) {
     return NeiAssetPriority::GetDinSwordGiProfile("mm", game, path, CVarGetInteger("gEnhancements.DinFireSword", 0));

@@ -2,10 +2,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 python3 -B scripts/diagnostics/run_hint_item_name_tests.py
+python3 -B scripts/diagnostics/run_combo_crash_owner_tests.py
 python3 -B scripts/diagnostics/run_nei_gi_tests.py --held --combo
 python3 -B tests/nei_gi/run_flame_arena_tests.py
 python3 -B scripts/diagnostics/run_mm_item_presentation_tests.py
+python3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py --sanitize
 python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py
+python3 -B scripts/diagnostics/run_anklet_icon_tests.py
+python3 -B scripts/diagnostics/run_native_heart_receipt_icon_tests.py
 python3 -B tests/item_receipts/run_seed_settings_tests.py --sanitizers
 python3 -B tests/item_receipts/run_mm_first_seed_gate_test.py --sanitizers
 python3 -B scripts/diagnostics/run_receipt_syntax_tests.py
@@ -15,6 +19,7 @@ python3 -B scripts/diagnostics/run_sword_mod_gi_tests.py
 python3 -B scripts/diagnostics/run_sword_fallback_tests.py --sanitize
 python3 -B scripts/diagnostics/run_fairy_bottle_tests.py
 python3 -B tests/seasons/run_tests.py
+python3 -B scripts/diagnostics/run_mm_autumn_foliage_tests.py
 python3 -B tests/seasons/run_rod_lifecycle_tests.py
 python3 -B tests/seasons/run_oot_shop_tests.py
 python3 -B scripts/diagnostics/run_mm_mask_bridge_tests.py --sanitize

@@ -260,7 +260,7 @@ bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiG
 }
 
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
-                            const float center[3], bool shimmer, const char* owner, bool shop) {
+                            const float center[3], bool shimmer, const char* owner, bool shop, bool mmPickup) {
     if (!play || !play->state.gfxCtx || !opa || !center || !NeiGi_ValidScale(scale) || !NeiGi_Finite(center[0]) ||
         !NeiGi_Finite(center[1]) || !NeiGi_Finite(center[2]) || effect < 0 || effect > int(Kind::MarioMask))
         return;
@@ -274,7 +274,7 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
     if (!arena)
         return;
     Matrix_Push();
-    const auto fit = NeiGi::FrameFit(*bounds, scale, shop);
+    const auto fit = NeiGi::FrameFit(*bounds, scale, shop, mmPickup);
     Matrix_Translate(0.f, fit.lift, 0.f, MTXMODE_APPLY);
     Matrix_Scale(fit.scale, fit.scale, fit.scale, MTXMODE_APPLY);
     OPEN_DISPS(play->state.gfxCtx);
@@ -353,7 +353,7 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
 }
 
 void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int shimmerKind,
-                                    bool shimmer, const char* owner, bool shop, float tilt, bool fit) {
+                                    bool shimmer, const char* owner, bool shop, float tilt, bool fit, bool mmPickup) {
     if (!play || !play->state.gfxCtx || !opa || !NeiGi_ValidScale(scale) || shimmerKind < 0 ||
         shimmerKind > int(Kind::MarioMask))
         return;
@@ -363,8 +363,8 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
     Matrix_Push();
-    if (fit && NeiGi::IsSword(static_cast<Kind>(shimmerKind)))
-        ComboSwordGi_ApplyFit(owner ? owner : "oot", opa, scale, tilt, shop);
+    if (fit && (mmPickup || NeiGi::IsSword(static_cast<Kind>(shimmerKind))))
+        ComboSwordGi_ApplyFit(owner ? owner : "oot", opa, scale, tilt, shop, mmPickup);
     Matrix_Push();
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
 #ifdef NEI_GI_ROTATE_Y

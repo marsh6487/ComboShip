@@ -1121,11 +1121,13 @@ extern f32 sNESFontWidths[160];
 static CwItemReceiptPresentation sItemReceiptPresentation;
 static CwItemReceiptLayout sItemReceiptLayout;
 static int sItemReceiptFirstPage;
+static int sItemReceiptReflowed;
 
 void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation* presentation) {
     memset(&sItemReceiptPresentation, 0, sizeof(sItemReceiptPresentation));
     memset(&sItemReceiptLayout, 0, sizeof(sItemReceiptLayout));
     sItemReceiptFirstPage = false;
+    sItemReceiptReflowed = false;
     if (presentation && presentation->singleBox == 1) {
         sItemReceiptPresentation = *presentation;
         if (!ComboReceipt_HasIcon(presentation))
@@ -1137,11 +1139,17 @@ static void Message_ApplyItemReceiptLayout(PlayState* play) {
     MessageContext* msgCtx = &play->msgCtx;
     if (!sItemReceiptPresentation.singleBox)
         return;
-    sItemReceiptLayout =
-        ComboReceipt_Layout(&sItemReceiptPresentation, msgCtx->font.msgBuf.schar + 11,
-                            msgCtx->msgLength > 11 ? msgCtx->msgLength - 11 : 0, true, sNESFontWidths, 160);
-    sItemReceiptFirstPage = (uint32_t)msgCtx->msgBufPos <= sItemReceiptLayout.firstPageEnd + 11;
-    msgCtx->textCharScale = (sItemReceiptFirstPage ? sItemReceiptLayout.textScale : 75) / 100.0f;
+    if (!sItemReceiptReflowed) {
+        sItemReceiptLayout = ComboReceipt_Layout(&sItemReceiptPresentation, msgCtx->font.msgBuf.schar + 11,
+                                                 msgCtx->msgLength > 11 ? msgCtx->msgLength - 11 : 0,
+                                                 sizeof(msgCtx->font.msgBuf.schar) - 11, true, sNESFontWidths, 160);
+        msgCtx->msgLength = sItemReceiptLayout.bodySize + 11;
+        sItemReceiptReflowed = true;
+    }
+    const uint32_t pagePosition = msgCtx->msgBufPos > 11 ? msgCtx->msgBufPos - 11 : 0;
+    sItemReceiptFirstPage = pagePosition >= sItemReceiptLayout.iconPageStart &&
+                            pagePosition <= sItemReceiptLayout.firstPageEnd;
+    msgCtx->textCharScale = 0.75f;
     msgCtx->unk11FFC = 12;
     msgCtx->unk11F18 = 0;
     msgCtx->unk11F1A[0] = msgCtx->unk11F1A[1] = msgCtx->unk11F1A[2] = 0;
@@ -3436,6 +3444,9 @@ void Message_Decode(PlayState* play) {
         Message_DecodeCredits(play);
     } else {
         Message_DecodeNES(play);
+        if (sItemReceiptPresentation.singleBox) {
+            msgCtx->unk11FFA = msgCtx->textboxY + XREG(13) + XREG(12);
+        }
     }
 }
 

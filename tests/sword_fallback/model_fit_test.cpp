@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include "combo/NeiGiModelBounds.h"
+#include <fast/resource/type/Matrix.h>
 #include "combo/menu/ComboItemDrawABI.h"
 // Resource loading is the test boundary. Actual Fast resource payloads and the
 // production graph traversal/FrameFit execute below, on supplied mod archives.
@@ -23,6 +24,9 @@ size_t DisplayList::GetPointerSize() { return Instructions.size()*sizeof(Gfx); }
 Vertex::Vertex() : Resource(nullptr) {}
 Vtx* Vertex::GetPointer() { return VertexList.data(); }
 size_t Vertex::GetPointerSize() { return VertexList.size()*sizeof(Vtx); }
+Matrix::Matrix() : Resource(nullptr) {}
+Mtx* Matrix::GetPointer() { return &Matrx; }
+size_t Matrix::GetPointerSize() { return sizeof(Mtx); }
 }
 struct Loader {
     std::map<std::string,std::shared_ptr<Ship::IResource>> files;
@@ -52,7 +56,7 @@ using f32=float;using s16=int16_t;
 constexpr int MTXMODE_APPLY=1;
 struct PlayState {struct{void* gfxCtx;} state;uint32_t gameplayFrames=42;} play;
 struct Pose {float scale=1,lift=0,ry=0,rz=0;} pose;
-void Matrix_Translate(float,float y,float,int) {pose.lift+=y;}
+void Matrix_Translate(float,float y,float,int) {pose.lift+=y*pose.scale;}
 void Matrix_Scale(float x,float y,float z,int) {assert(x==y&&y==z);pose.scale*=x;}
 void Matrix_RotateY(float a,int) {pose.ry+=a;}
 void Matrix_RotateZ(float a,int) {pose.rz+=a;}
@@ -114,6 +118,22 @@ int main(){
                                {uintptr_t(G_ENDDL)<<24,0}});
     NeiGi::ModelBoundsReader<Loader> recursive(loader,0);
     assert(!recursive.Read("guard/recursive",guard));
+    // Actual XML replacements can bake a scale/translation in their DL. Fit
+    // transformed vertices, with modelview state shared across child calls.
+    auto matrix=std::make_shared<Fast::Matrix>();
+    const float values[16]={.5f,0,0,0, 0,.5f,0,0, 0,0,.5f,0, 0,20,0,1};
+    auto* words=reinterpret_cast<uint32_t*>(&matrix->Matrx);
+    for(int i=0;i<8;++i) {
+        const uint32_t a=int32_t(values[i*2]*65536.f),b=int32_t(values[i*2+1]*65536.f);
+        words[i]=(a&0xffff0000u)|(b>>16);words[i+8]=(a<<16)|(b&0xffffu);
+    }
+    loader.files["guard/matrix"]=matrix;loader.names[103]="guard/matrix";
+    List("guard/transformed",104,{{uintptr_t(G_MTX_OTR_FILEPATH)<<24,uintptr_t("guard/matrix")},
+      {uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("guard/vertices")},{3,0},
+      {uintptr_t(G_POPMTX)<<24,64},{uintptr_t(G_ENDDL)<<24,0}});
+    NeiGi::ModelBoundsReader<Loader> transformed(loader,0);
+    assert(transformed.Read("guard/transformed",guard) && guard.minimum.y==15 && guard.maximum.y==35 &&
+           "serialized resource matrices must establish selected model bounds");
     for(const auto& e:expected){
         const int profile=DinSwordGi::SelectedProfile(e.path+7,true,true,[](const char* key){
             if(!std::strncmp(key,"__OTR__",7))key+=7;return available.contains(key);});
@@ -131,6 +151,21 @@ int main(){
             assert(high*pose.scale+pose.lift <= (shop?52.f:48.f)+.001f);
             assert(width*pose.scale <= (shop?76.f:104.f)+.001f);
         }
+        for(bool din:{false,true}) {
+            dinEnabled=din;
+            pose={.21f,51.3f,0,0};
+            ComboSwordGi_ApplyFit("oot",e.path,.04f,1.8f,false,true);
+            NeiGi_DrawSelectedSword(&play,e.path,false,false);
+            const float low=din?e.layerLow:e.low,high=din?e.layerHigh:e.high,width=din?e.layerWidth:e.width;
+            const float pitch=25.f*NeiGi::Tau/360.f,camAt=46.8f,camDistance=39.2f,tanFov=std::tan(22.5f*NeiGi::Tau/360.f);
+            for(int spin=0;spin<360;spin+=3)for(float y:{low,high}) {
+                const float z=.5f*width*pose.scale*std::cos(spin*NeiGi::Tau/360.f);
+                const float dy=pose.lift+y*pose.scale-camAt;
+                const float depth=camDistance-dy*std::sin(pitch)-z*std::cos(pitch);
+                const float projected=(dy*std::cos(pitch)-z*std::sin(pitch))/(depth*tanFov);
+                assert(depth>0 && projected<.9f && projected>-.9f && "selected pack geometry clips MM receipt camera");
+            }
+        }
     }
     for(auto id:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD}){
         CwItemDrawInfo info{};
@@ -141,5 +176,5 @@ int main(){
             assert(bounds.maximum.y*pose.scale+pose.lift<=48.001f);
         }
     }
-    std::cout<<"PASS selected mod graph + native/producer GI route: "<<expected.size()<<" meshes, upright full-spin pickup/shop bounds including Din layers\n";
+    std::cout<<"PASS selected mod graph + native/producer GI route: "<<expected.size()<<" meshes, upright full-spin pickup/shop bounds including Din layers and actual MM receipt camera\n";
 }

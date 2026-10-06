@@ -24,6 +24,7 @@ typedef struct {
 // Variables are put before most headers as a hacky way to bypass bss reordering
 #include "z64environment.h"
 #include "global.h"
+#include "mods/extended_inventory.h"
 #include "sys_cfb.h"
 #include "BenPort.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
@@ -1266,7 +1267,7 @@ void func_800F6CEC(PlayState* play, u8 arg1, AdjLightSettings* adjLightSettings,
             lightSettings[temp_v1_2 + temp_v1].blendRateAndFogNear - lightSettings[temp_v1].blendRateAndFogNear;
     }
 
-    if ((arg1 >= 4) && (arg1 < 8) && (gWeatherMode == WEATHER_MODE_RAIN)) {
+    if ((arg1 >= 4) && (arg1 < 8) && (gWeatherMode == WEATHER_MODE_RAIN) && !MMWeather_SeasonClearsRain()) {
         adjLightSettings->ambientColor[0] = -50;
         adjLightSettings->ambientColor[1] = -100;
         adjLightSettings->ambientColor[2] = -100;
@@ -1625,7 +1626,8 @@ void Environment_UpdateSun(PlayState* play) {
     u16 phi_v0;
 
     if (!play->envCtx.sunDisabled) {
-        if ((play->envCtx.precipitation[PRECIP_RAIN_CUR] != 0) || (MMWeather_Overcast() > 0.0f)) {
+        if (((play->envCtx.precipitation[PRECIP_RAIN_CUR] != 0) && !MMWeather_SeasonClearsRain()) ||
+            (MMWeather_Overcast() > 0.0f)) {
             Math_SmoothStepToF(&sSunPrimAlpha, 0.0f, 0.5f, 4.0f, 0.01f);
         } else {
             Math_SmoothStepToF(&sSunPrimAlpha, 255.0f, 0.5f, 4.0f, 0.01f);
@@ -1786,13 +1788,18 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
 
     Environment_WipeRumbleRequests();
 
-    MMWeather_Update(play);
     if (pauseCtx->state == PAUSE_STATE_OFF) {
         Environment_UpdateSkyboxRotY(play);
         Environment_UpdateRain(play);
         Environment_UpdateTimeBasedSequence(play);
         Environment_UpdateNextDayTime();
         Environment_UpdateTime(play, envCtx, pauseCtx, msgCtx, gameOverCtx);
+    }
+    // Resolve the wheel selection and current day after native time/ambience
+    // updates, including paused selector frames, before this frame is rendered.
+    MMWeather_Update(play);
+    Seasons_UpdateWeather(play);
+    if (pauseCtx->state == PAUSE_STATE_OFF) {
         Environment_UpdateSun(play);
         Environment_UpdateLights(play, envCtx, lightCtx);
         Environment_UpdatePostmanEvents(play);
@@ -1849,7 +1856,8 @@ void Environment_DrawSun(PlayState* play) {
 
 void Environment_DrawSunLensFlare(PlayState* play, EnvironmentContext* envCtx, View* view, GraphicsContext* gfxCtx,
                                   Vec3f vec) {
-    if ((play->envCtx.precipitation[PRECIP_RAIN_CUR] == 0) && (MMWeather_Overcast() == 0.0f) &&
+    if (((play->envCtx.precipitation[PRECIP_RAIN_CUR] == 0) || MMWeather_SeasonClearsRain()) &&
+        (MMWeather_Overcast() == 0.0f) &&
         !(GET_ACTIVE_CAM(play)->stateFlags & CAM_STATE_UNDERWATER) && (play->skyboxId == SKYBOX_NORMAL_SKY)) {
         f32 v0 = Math_CosS(CURRENT_TIME - CLOCK_TIME(12, 0));
 
@@ -2198,8 +2206,8 @@ void Environment_DrawRain(PlayState* play, View* view, GraphicsContext* gfxCtx) 
         Environment_DrawRainImpl(play, view, gfxCtx);
         return;
     }
-    if (MMWeather_Season() >= 0) {
-        return; // owned clear/snow seasons suppress native rain; Off restores it unchanged
+    if (MMWeather_SeasonClearsRain() || MMWeather_Season() == SEASON_WINTER) {
+        return; // Summer's Day 2 and Winter mask rain; native targets keep progressing
     }
     if (!(GET_ACTIVE_CAM(play)->stateFlags & CAM_STATE_UNDERWATER) &&
         (play->envCtx.precipitation[PRECIP_SNOW_CUR] == 0)) {
@@ -2486,7 +2494,9 @@ static void Environment_DrawLightningImpl(PlayState* play, LightningBolt* bolts,
 }
 
 void Environment_DrawLightning(PlayState* play, s32 unused) {
-    Environment_DrawLightningImpl(play, sLightningBolts, ARRAY_COUNT(sLightningBolts), Rand_ZeroOne);
+    if (!MMWeather_SeasonClearsRain()) {
+        Environment_DrawLightningImpl(play, sLightningBolts, ARRAY_COUNT(sLightningBolts), Rand_ZeroOne);
+    }
     Environment_DrawLightningImpl(play, &sMMWeatherLightningBolt, 1, MMWeather_RandomFloat);
 }
 
@@ -2936,7 +2946,11 @@ void Environment_DrawSandstorm(PlayState* play, u8 sandstormState) {
         sp98 = 6.0f;
     }
 
-    if (play->envCtx.sandstormPrimA != 0) {
+    // Keep native blizzard alpha/state progressing while clear seasons hide its
+    // rendered fog. Other sandstorms, Autumn and Off retain native presentation.
+    const int season = MMWeather_SeasonForPlay(play);
+    if (play->envCtx.sandstormPrimA != 0 &&
+        !(sandstormState == SANDSTORM_A && (season == SEASON_SPRING || season == SEASON_SUMMER))) {
         index = 0;
         if (sandstormState >= SANDSTORM_B) {
             index = 4 * 3;
@@ -3474,7 +3488,9 @@ void Environment_DrawSkyboxStarsImpl(PlayState* play, Gfx** gfxP) {
 void Environment_Draw(PlayState* play) {
     Environment_SetupSkyboxStars(play);
     Environment_DrawSun(play);
-    Environment_UpdateLightningStrike(play);
+    if (!MMWeather_SeasonClearsRain()) {
+        Environment_UpdateLightningStrike(play);
+    }
     MMWeather_DrawLightning(play);
     Environment_DrawLightning(play, 0);
     Environment_DrawSkyboxFilters(play);

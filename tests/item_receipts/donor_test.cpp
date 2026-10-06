@@ -7,6 +7,8 @@
 #include <cassert>
 #include <cstring>
 #include <iostream>
+#include <fstream>
+#include <nlohmann/json.hpp>
 #include <map>
 #include <memory>
 #include <vector>
@@ -557,7 +559,52 @@ static void CheckApprovedCompassExample() {
   std::copy(overridesBefore.begin(), overridesBefore.end(), entranceOverrides);
 }
 
-int main() {
+extern "C" COMBO_EXPORT void FixtureConfigureGeneratedCompassRoute(const char* fixturePath, const char* route) {
+  FixtureConfigureForestCompassReceipt(1);
+  receiptContext.bossShuffle = 1;
+  receiptContext.placements[RC_VOLVAGIA] = {RG_FIRE_MEDALLION, "Fire Medallion"};
+  std::ifstream input(fixturePath);
+  const auto fixtures = nlohmann::json::parse(input);
+  std::fill(std::begin(entranceOverrides), std::end(entranceOverrides), EntranceOverride{});
+  size_t i = 0;
+  for (const auto& row : fixtures.at(route)) {
+    assert(i < std::size(entranceOverrides));
+    entranceOverrides[i++] = {row.at("index"), row.at("destination"), row.at("override"),
+                              row.at("overrideDestination")};
+  }
+}
+
+static void CheckGeneratedCompassRoutes(const char* fixturePath) {
+  if (!fixturePath) return;
+  const auto contextBefore = receiptContext;
+  const auto overridesBefore = std::to_array(entranceOverrides);
+  auto* playBefore = gPlayState;
+  const bool activeBefore = randoActive;
+  for (const auto* route : {"direct", "nested", "cycle", "deadEnd"}) {
+    FixtureConfigureGeneratedCompassRoute(fixturePath, route);
+    char buffer[1269];
+    const int size = OOT_GetItemReceiptText("Forest Temple Compass", buffer, sizeof(buffer));
+    assert(size > 0);
+    const std::string text(buffer, size);
+    const bool bossAssigned = std::string(route) == "direct" || std::string(route) == "nested";
+    assert((text.find("Volvagia") != std::string::npos) == bossAssigned &&
+           "native generated nested entrance must reveal the actual reachable boss");
+    assert((text.find("Fire Medallion") != std::string::npos) == bossAssigned);
+    assert(text.find("Phantom Ganon") == std::string::npos && "never invent the vanilla boss for a mixed route");
+    CwItemReceiptPresentation p{};
+    assert(OOT_GetDungeonItemReceiptPresentation("Forest Temple Compass", &p) == 1);
+    assert(ComboReceipt_HasIcon(&p) == bossAssigned);
+    if (!bossAssigned)
+      assert(text.find("boss room") != std::string::npos && "unknown routes need an explanation, not a title alone");
+  }
+  receiptContext = contextBefore;
+  std::copy(overridesBefore.begin(), overridesBefore.end(), entranceOverrides);
+  gPlayState = playBefore;
+  randoActive = activeBefore;
+  std::cout << "Native generated/dumped forward routes: direct and nested boss/reward identity, cycles/dead ends, and no vanilla invention passed\n";
+}
+
+int main(int argc, char** argv) {
   // Item names and unresolved native text IDs come from the real OoT catalog.
   // Message-table ownership is the seam; unique bodies reveal wrong IDs.
   std::vector<std::string> songBodies;
@@ -575,6 +622,7 @@ int main() {
   sNesMessageEntryTablePtr = nativeMessages.data();
   CheckForestCompassReceiptInformation();
   CheckApprovedCompassExample();
+  CheckGeneratedCompassRoutes(argc > 1 ? argv[1] : nullptr);
   entranceOverrides[0] = {ENTR_DEKU_TREE_BOSS_ENTRANCE, 1,
                           ENTR_FOREST_TEMPLE_BOSS_ENTRANCE, 1};
   char buffer[1269];
@@ -645,7 +693,7 @@ int main() {
     receiptContext.information = enabled;
     for (const auto &[map, entrance] : mmMaps) {
       const auto text = read(map);
-      assert((text.find("Its entrance is at") != std::string::npos) ==
+      assert((text.find("It seems the entrance is at") != std::string::npos) ==
              bool(enabled));
       if (enabled)
         assert(text.find(entrance) != std::string::npos);
@@ -683,7 +731,9 @@ int main() {
   entranceOverrides[2].override = ENTR_FOREST_TEMPLE_ENTRANCE;
   const auto forestMap = read("Forest Temple Map");
   assert(forestMap.find("Deku Tree") != std::string::npos && forestMap.find("Kokiri Forest") == std::string::npos);
-  assert(forestMap.find('\x10') == std::string::npos && forestMap.find("vanilla") != std::string::npos);
+  assert(forestMap.find('\x10') == std::string::npos && forestMap.find("ordinary") != std::string::npos);
+  assert(forestMap.find("It's \x02ordinary\x00.") != std::string::npos);
+  assert(forestMap.find("It seems the entrance is at \x05" "Deku Tree\x00.") != std::string::npos);
   entranceOverrides[2].override = ENTR_WATER_TEMPLE_ENTRANCE;
   // Ownership alone makes the pause view available, as for Start With. The
   // acquisition latch and item grant history have never been set in this save.
@@ -717,7 +767,7 @@ int main() {
   receiptContext.dungeon.mq = true;
   masterQuest = true; // runtime helper deliberately ignores this while dormant
   assert(OOT_MapCompassInfoEnabled() == 1);
-  assert(read("Great Deku Tree Map").find("Master Quest") != std::string::npos);
+  assert(read("Great Deku Tree Map").find("masterful") != std::string::npos);
   assert(read("Great Deku Tree Compass").find("masterful") ==
          std::string::npos);
   assert(
@@ -763,7 +813,7 @@ int main() {
   masterQuest = true;
   assert(read("Great Deku Tree Compass").find("masterful") ==
          std::string::npos);
-  assert(read("Great Deku Tree Map").find("Master Quest") != std::string::npos);
+  assert(read("Great Deku Tree Map").find("masterful") != std::string::npos);
   assert(read("Snowhead Compass").find("Goht") != std::string::npos);
   mmRewardAvailable = true;
   assert(read("Snowhead Compass").find("Progressive Hookshot (OOT)") !=
@@ -821,7 +871,7 @@ int main() {
       foreign.itemName = map;
       foreign.displayName = std::string(map) + " (MM)";
       BuildComboForeignMessage(&receiptPlayer, foreignMessage);
-      assert((foreignMessage.english.find("Its entrance is at") !=
+      assert((foreignMessage.english.find("It seems the entrance is at") !=
               std::string::npos) == bool(enabled));
       if (enabled)
         assert(foreignMessage.english.find(entrance) != std::string::npos);

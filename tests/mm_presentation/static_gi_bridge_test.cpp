@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
@@ -16,6 +17,7 @@
 #define RANDO_ENUM_END(x) };
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h"
 using s16=int16_t;using s32=int32_t;using f32=float;
+using u8=uint8_t;
 struct Color_RGB8 {uint8_t r,g,b;};
 #define CVAR_COSMETIC(x) x
 #define CVAR_ENHANCEMENT(x) x
@@ -40,6 +42,7 @@ void Randomizer_DrawCanePacciUltrahand() {} void Custom() {}
 struct GetItemEntry {int tableId,drawItemId,gid,itemId;void (*drawFunc)();};
 RandomizerGet concrete=RG_NONE;
 namespace Rando::StaticData {
+std::unordered_map<std::string,RandomizerGet> itemNameToEnum;
 struct Name {std::string english="concrete award";};
 struct Item {RandomizerGet rg;std::shared_ptr<GetItemEntry> GetGIEntry(RandomizerGet* actual) {
  *actual=concrete;return std::make_shared<GetItemEntry>(GetItemEntry{TABLE_RANDOMIZER,rg,rg==RG_MAGIC_STAT_UPGRADE?GID_MAGIC_LARGE:0,0,(rg==RG_MAGIC_STAT_UPGRADE || concrete==RG_KOKIRI_SWORD || concrete==RG_BIGGORON_SWORD)?nullptr:Custom});
@@ -81,7 +84,8 @@ namespace Ship {
  struct CrossRMRegistry {static std::shared_ptr<ResourceManager> Get(const char* game) {assert(!strcmp(game,"oot"));return ownerPresent?ownerRm:nullptr;}};
  struct ResourceManagerScope {std::shared_ptr<ResourceManager> old;ResourceManagerScope(std::shared_ptr<ResourceManager> rm):old(activeRm) {activeRm=rm;}~ResourceManagerScope(){activeRm=old;}};
 }
-void* ResourceMgr_LoadGfxByName(const char*) {assert(Ship::activeRm==Ship::ownerRm);magicLoaded=true;return magicResourcePresent?static_cast<void*>(&magicLoaded):nullptr;}
+struct Gfx;
+Gfx* ResourceMgr_LoadGfxByName(const char*) {assert(Ship::activeRm==Ship::ownerRm);magicLoaded=true;return magicResourcePresent?reinterpret_cast<Gfx*>(&magicLoaded):nullptr;}
 uint8_t ResourceGetIsCustomByName(const char*) {assert(magicLoaded && Ship::activeRm==Ship::ownerRm);return Ship::activeRm->IsAltAssetsEnabled();}
 #define COMBO_EXPORT
 /* OWNER_ALT_QUERY */
@@ -98,13 +102,19 @@ void OOT_DescribeHeartCosmetics(s16,CwItemDrawInfo*) {}
 /* OWNER_MAGIC_DESCRIPTOR */
 int32_t OOT_FillSongDrawInfo(RandomizerGet,CwItemDrawInfo*) {return 0;} // Songs have their own production fixture.
 /* OWNER_DESCRIPTOR */
+namespace ItemGrantAudit {struct Scope {Scope(const char*,int,int,bool) {}};}
+struct OTRGlobals {static inline OTRGlobals* Instance=nullptr;void* gRandomizer;void* gRandoContext;};
+static bool OOT_BossSoulUsesSkeleton(RandomizerGet) {return false;}
+/* OWNER_EXPORT */
 /* HOST_INFO */
 RandomizerGet selected=RG_SHEIKAH_SLATE;
+bool useExport=false;
 namespace ComboRando {constexpr int GAME_OOT=0;struct ForeignItem {int itemGame=GAME_OOT;std::string itemName="item",fakeItemName;bool HasDisguise()const{return false;}};}
 using RandoCheckId=int;
 namespace Rando::MiscBehavior {const ComboRando::ForeignItem* MM_LookupForeign(int) {static ComboRando::ForeignItem item;return &item;}}
 int malformed=0;
 int32_t Describe(const char*,CwItemDrawInfo* out) {
+ if(useExport)return OOT_GetItemDrawInfo("Pendant of Memories",out);
  int result=OOT_FillItemDrawInfo(selected,out);
  out->stateDependent=OOT_DrawDependency(selected,*out);
  if(malformed==1)out->opCount=CW_DRAW_MAX_OPS+1;
@@ -161,9 +171,18 @@ constexpr float M_PIf=3.14159265358979323846f;
 const char* gIKAxeInlineDL="__native_inline_axe";
 /* HOST_AXE_DRAW */
 int nativeCalled=0;
-void DrawOotExtSpiritBreastplate() {nativeCalled=CW_OOT_EQUIP_SPIRIT_TUNIC;}
-void DrawOotExtChampionsTunic() {nativeCalled=CW_OOT_EQUIP_CHAMPIONS_TUNIC;}
-void DrawOotExtSagesTunic() {nativeCalled=CW_OOT_EQUIP_SAGES_TUNIC;}
+std::set<std::string> hostResources,hostMods;
+int ResourceMgr_IsModAsset(const char* path) {return hostMods.contains(path);}
+uint8_t ResourceMgr_FileExists(const char* path) {return hostResources.contains(path);}
+void* OotAssets_LoadGfx(const char* path) {return hostResources.contains(path)?(void*)path:nullptr;}
+void* OotAssets_LoadGfxDirect(const char* path) {return OotAssets_LoadGfx(path);}
+const char* NeiResource_Route(const char* path) {return ComboInternRoutedPathOOT(std::string("__OTR__@oot:")+(path+7));}
+int NeiResource_Available(const char* path) {return OOT_NeiResourceExists(path);}
+int medallions=0;
+void DrawOotMedallionForest() {++medallions;} void DrawOotMedallionFire() {++medallions;}
+void DrawOotMedallionWater() {++medallions;} void DrawOotMedallionSpirit() {++medallions;}
+void DrawOotMedallionShadow() {++medallions;} void DrawOotMedallionLight() {++medallions;}
+/* HOST_TUNIC_DRAW */
 void DrawOotExtPegasusAnklet() {nativeCalled=CW_OOT_EQUIP_PEGASUS_BOOTS;}
 void DrawOotExtTrident() {nativeCalled=CW_OOT_EQUIP_TRIDENT;}
 void DrawOotExtClimbBoots() {nativeCalled=CW_OOT_EQUIP_CLIMB_BOOTS;}
@@ -177,6 +196,8 @@ void ComboDinSwordGi_DrawLayers(PlayState*, const char*, const char*) {
 }
 /* HOST_CUSTOM_DRAW */
 int main() {
+ OTRGlobals globals{&globals,&globals};OTRGlobals::Instance=&globals;
+ /* NAME_MAP_INIT */
  CwItemDrawInfo dependency{};
  for(auto sword:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,
                  RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD}) {
@@ -361,7 +382,8 @@ int main() {
   if(rg==RG_IRON_KNUCKLE_AXE) {
    assert(submitted.size()==1 && submitted[0].second=="__native_inline_axe");
    assert(transforms==std::vector<std::string>({"x","scale","translate"}));
-  } else assert(nativeCalled==static_cast<int>(info.ops[0].a));
+  } else if(rg!=RG_EXT_SPIRIT_BREASTPLATE && rg!=RG_EXT_CHAMPIONS_TUNIC && rg!=RG_EXT_WATER_DRAGON_SCALE)
+   assert(nativeCalled==static_cast<int>(info.ops[0].a));
   assert(matrixDepth==0);
  }
  selected=RG_IRON_KNUCKLE_AXE;concrete=RG_NONE;
@@ -382,5 +404,39 @@ int main() {
  assert(out.itemShimmerColor[0]==12 && out.itemShimmerColor[1]==210 && out.itemShimmerColor[2]==250);
  liveMagic={240,40,190}; out={}; assert(OOT_FillItemDrawInfo(RG_MAGIC_STAT_UPGRADE,&out)==1);
  assert(out.itemShimmerColor[0]==240 && out.itemShimmerColor[1]==40 && out.itemShimmerColor[2]==190);
+ concrete=RG_NONE;selected=RG_BOMB_ARROWS;info={};
+ resources.insert("__OTR__objects/object_nei_bombarrows/gBombarrowsGiveDL");
+ assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok && "Bomb Arrows must reach a portable GI recipe");
+ gfx.o=opa;gfx.x=xlu;submitted.clear();transforms.clear();
+ MM_DrawForeignCustomGi(&info);
+ assert((submitted==std::vector<std::pair<int,std::string>>({{0,"__OTR__@oot:objects/object_nei_bombarrows/gBombarrowsGiveDL"}})));
+ assert(info.scale==.5f && std::find(transforms.begin(),transforms.end(),"z")!=transforms.end() && matrixDepth==0);
+ assert(Rando::StaticData::itemNameToEnum.at("Pendant of Memories")==RG_MM_PENDANT_OF_MEMORIES);
+ useExport=true;info={};
+ assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok && "the exported Pendant English name must resolve the actual imported MM row");
+ assert(info.count==2 && info.xluStart==1);
+ assert(std::string(info.dls[0])=="__OTR__@mm:objects/object_gi_reserve_c_01/gGiPendantOfMemoriesEmptyDL");
+ assert(std::string(info.dls[1])=="__OTR__@mm:objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL");
+ useExport=false;
+ const char* collar="__OTR__objects/object_gi_clothes/gGiTunicCollarDL";
+ const char* tunic="__OTR__objects/object_gi_clothes/gGiTunicDL";
+ resources.insert(collar);resources.insert(tunic);
+ for(auto rg:{RG_EXT_CHAMPIONS_TUNIC,RG_EXT_WATER_DRAGON_SCALE,RG_EXT_SPIRIT_BREASTPLATE}) {
+  selected=rg;info={};assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
+  gfx.o=opa;gfx.x=xlu;submitted.clear();medallions=0;
+  MM_DrawForeignNativeEquipment(&info);
+  assert(submitted.size()==2 && "donor-only tunic geometry must be submitted while MM is active");
+  assert(submitted[0].second=="__OTR__@oot:objects/object_gi_clothes/gGiTunicCollarDL");
+  assert(submitted[1].second=="__OTR__@oot:objects/object_gi_clothes/gGiTunicDL");
+  if(rg==RG_EXT_WATER_DRAGON_SCALE)assert(medallions>0);
+  assert(matrixDepth==0);
+ }
+ hostResources.insert(collar);hostResources.insert(tunic);hostMods.insert(tunic);
+ submitted.clear();gfx.o=opa;DrawOotExtChampionsTunic();
+ assert(submitted.size()==2 && submitted[1].second==tunic && "a winning MM tunic replacement keeps its host owner");
+ hostResources.clear();hostMods.clear();resources.erase(tunic);
+ submitted.clear();gfx.o=opa;DrawOotExtChampionsTunic();assert(submitted.empty());
+ resources.insert(tunic);DrawOotExtChampionsTunic();assert(submitted.size()==2 && matrixDepth==0);
+ std::cout<<"PASS active MM donor-only tunics, live host overrides/missing recovery, exported duplicate-name Pendant and Bomb Arrows GI routing\n";
  std::cout<<"PASS production static custom GI recipes, rune flame, native MM tiers and resolved awards\n";
 }

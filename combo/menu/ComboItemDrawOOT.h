@@ -521,6 +521,12 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
     }
 
     switch (rg) {
+        case RG_BOMB_ARROWS:
+            if (!CwCustomGi(out, "__OTR__objects/object_nei_bombarrows/gBombarrowsGiveDL", .5f))
+                return 0;
+            out->opCount = 1;
+            out->ops[0] = { CW_OP_ROTATE_Z, 32768.f, 0, 0, {} };
+            return 1;
         case RG_EXT_CANE_OF_BYRNA:
             return CwCustomGi(out, "__OTR__objects/object_somaria/g_byrna_cane_give_dl", .25f);
         case RG_LANTERN:
@@ -574,6 +580,14 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
         case RG_EXT_PENDANT_OF_MEMORIES:
             CwSimple(out, "__OTR__@mm:objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL", false, .9f);
             out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
+            return 1;
+        case RG_MM_PENDANT_OF_MEMORIES:
+            // The imported row wins the shared English name at catalog boot.
+            // Match MM's native OPA shell then XLU pendant, in MM's namespace.
+            CwSimple(out, "__OTR__@mm:objects/object_gi_reserve_c_01/gGiPendantOfMemoriesEmptyDL", false, 0.f);
+            out->dlists[1] = "__OTR__@mm:objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL";
+            out->dlistCount = 2;
+            out->xluStartIndex = 1;
             return 1;
         case RG_EXT_MAGIC_CAPE:
             if (!CwCustomGi(out, "__OTR__objects/object_nei_magic_cape/gNeiMagicCapeDL", .55f,

@@ -143,6 +143,23 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     extra = ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-g'] if '--sanitizers' in sys.argv else []
     icon = (ROOT / 'tests/item_receipts/icon_test.cpp').read_text()
     icon_source = (ROOT / 'combo/menu/ComboItemDrawOOT.h').read_text()
+    # Use each production catalog row's actual CustomIcon arguments. The
+    # fixture replaces the catalog service, not the receipt's icon identity.
+    asset_names = ((ROOT / 'soh/assets/soh_assets.h').read_text() +
+                   (ROOT / 'soh/assets/textures/icon_item_24_static/icon_item_24_static.h').read_text())
+    catalog_data = []
+    for rg, name in [('RG_PIECE_OF_HEART', 'heart'), ('RG_EXT_PEGASUS_ANKLET', 'anklet')]:
+        row = next(line for line in donor_catalog.splitlines() if 'itemTable[' + rg + '] =' in line)
+        custom = re.search(r'\.CustomIcon\((\w+)(?:,\s*(ICON_SIZE_\d+))?\)', row)
+        path, size = 'nullptr', '1'
+        if custom:
+            resource = re.search(r'#define d' + custom[1] + r' "([^"]+)"', asset_names)
+            assert resource, (rg, custom[1], 'native asset name')
+            path = '"' + resource[1] + '"'
+            size = '0' if custom[2] == 'ICON_SIZE_24' else '1'
+        catalog_data += [f'static const char* {name}CatalogIcon = {path};',
+                         f'static int {name}CatalogIconSize = {size};']
+    icon = icon.replace('/* CATALOG_ICON_DATA */', '\n'.join(catalog_data))
     icon = icon.replace('/* ICON_SELECTOR */',
         'static int32_t OOT_FillItemIconInfo(RandomizerGet rg,CwItemIconInfo* out,bool resolveProgressive = true) ' +
         block(icon_source, 'static int32_t OOT_FillItemIconInfo'))
@@ -231,6 +248,27 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                  '} else {\n' + glyph.replace('(s32)', '(int)').replace('(u8)', '(uint8_t)') +
                  '} } return msgCtx->textPosX; }\n')
     layout = layout.replace('/* MM_TEXT_DISPATCH */', dispatch)
+    oot_decode = block(engine, 'void Message_Decode(PlayState* play)')
+    oot_position = 'if (msgCtx->textBoxType != TEXTBOX_TYPE_NONE_BOTTOM) ' + block(
+        oot_decode, 'if (msgCtx->textBoxType != TEXTBOX_TYPE_NONE_BOTTOM)')
+    oot_position += '\nif (sItemReceiptPresentation.singleBox) ' + block(
+        oot_decode, 'if (sItemReceiptPresentation.singleBox)')
+    layout = layout.replace('/* OOT_DECODE_POSITION */',
+        'void FinishReceiptDecodePosition(int numLines) { MessageContext* msgCtx = &play.msgCtx;\n'
+        'R_TEXT_INIT_YPOS = R_TEXTBOX_Y + 8;\n' + oot_position + '\n}\n')
+    mm_decode = block(mm_message, 'void Message_Decode(PlayState* play)')
+    mm_position = 'if (curChar == MESSAGE_BOX_BREAK2) ' + block(nes, 'if (curChar == MESSAGE_BOX_BREAK2)')
+    start = nes.index('if (curChar == MESSAGE_BOX_BREAK2)')
+    remaining = nes[start + len(mm_position):]
+    # Include native END positioning too, before the receipt-only override.
+    mm_position += ' else ' + block(remaining, 'else {')
+    mm_position += '\nif (sItemReceiptPresentation.singleBox) ' + block(
+        mm_decode, 'if (sItemReceiptPresentation.singleBox)')
+    layout = layout.replace('/* MM_DECODE_POSITION */',
+        '#define XREG(i) ((i) == 13 ? 4 : (i) == 10 ? 22 : (i) == 11 ? 16 : 12)\n'
+        'constexpr int MESSAGE_BOX_BREAK2 = 0x12, TEXTBOX_TYPE_3 = 3, TEXTBOX_TYPE_4 = 4;\n'
+        'void FinishReceiptDecodePosition(int numLines) { MessageContext* msgCtx = &play.msgCtx;\n'
+        'int curChar = 0xBF;\n' + mm_position + '\n}\n#undef XREG\n')
     tu = tmp / 'layout.cpp'
     tu.write_text(layout)
     exe = tmp / 'layout'
@@ -390,11 +428,16 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
         actual_formatter += signature + ' ' + block(formatter, signature) + '\n'
     donor = donor.replace('/* ACTUAL_FORMATTER */', actual_formatter)
     exported = (ROOT / 'soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp').read_text()
+    if '--compass-baseline' in sys.argv:
+        revision = sys.argv[sys.argv.index('--compass-baseline') + 1]
+        exported = subprocess.check_output(['git', 'show', revision + ':soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp'],
+                                           cwd=ROOT, text=True)
     context_builders = 'bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received = true);\n'
     for signature in ('static bool DungeonInformationEnabled()',
                       'extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled(void)',
                       'static CustomMessage DungeonRewardName(RandomizerCheck check)',
                       'static int16_t DungeonEntranceDestination(int16_t entrance)',
+                      *(['static int DungeonBossDestination(int dungeon)'] if 'static int DungeonBossDestination' in exported else []),
                       'static std::string DungeonPhysicalEntranceName(int16_t entrance)',
                       'static std::string DungeonEntranceSource(int16_t dungeonEntrance)',
                       'static void AddDungeonRewardIcon(CustomMessage& msg, RandomizerCheck check)',
@@ -417,7 +460,11 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     exe = tmp / 'donor'
     subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-I', str(ROOT), *extra,
                     str(tu), str(ROOT / 'soh/soh/Enhancements/custom-message/text.cpp'), '-o', str(exe)], check=True)
-    subprocess.run([str(exe)], check=True)
+    generated_routes = tmp / 'native-entrance-routes.json'
+    subprocess.run([sys.executable, str(ROOT / 'tests/item_receipts/run_seed_settings_tests.py'),
+                    '--dump-entrance-fixture', str(generated_routes),
+                    *(['--sanitizers'] if '--sanitizers' in sys.argv else [])], check=True)
+    subprocess.run([str(exe), str(generated_routes)], check=True)
 
     # Link the real donor export to the real MM native/foreign receipt routes.
     # Private engine fixtures remain separate, as the two DLLs are in-game.
@@ -439,7 +486,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                     '-o', str(integrated)], capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(result.stdout + result.stderr)
-    subprocess.run([str(integrated)], check=True)
+    subprocess.run([str(integrated), str(generated_routes)], check=True)
 
     information = (ROOT / 'tests/item_receipts/information_test.cpp').read_text()
     hint = (ROOT / 'soh/soh/Enhancements/randomizer/hint.cpp').read_text()

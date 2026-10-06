@@ -119,7 +119,7 @@ inline bool IsCustomAsset(const char* nativeGame, const char* game, const char* 
     return model && model->GetInitData() && model->GetInitData()->IsCustom;
 }
 inline bool GetGiModelFit(const char* nativeGame, const char* game, const char* path, float scale, float tilt,
-                          bool shop, float fit[2], int dinProfile = 0) {
+                          int presentation, float fit[2], int dinProfile = 0) {
     if (!game || !path || !fit || !std::isfinite(scale) || scale <= 0.f || !std::isfinite(tilt))
         return false;
     std::string resource = path;
@@ -149,7 +149,7 @@ inline bool GetGiModelFit(const char* nativeGame, const char* game, const char* 
     // Hash and filepath dependencies follow the same owner's live Alt selection.
     const auto load = [&](auto key) { return owner->LoadResource(key); };
     NeiGi::ShopFit correction{};
-    if (!NeiGi::SelectedModelFit(load, resource.c_str(), scale, tilt, shop, dinProfile, correction))
+    if (!NeiGi::SelectedModelFit(load, resource.c_str(), scale, tilt, presentation, dinProfile, correction))
         return false;
     fit[0] = correction.scale;
     fit[1] = correction.lift;

@@ -1,6 +1,5 @@
 #pragma once
 #include "NeiGiEffectPolicy.h"
-#include "NeiUsedMagicPolicy.h"
 #include "ComboSongDraw.h"
 
 namespace NeiGi {
@@ -41,6 +40,46 @@ inline void SongHeart(Mesh& mesh, Point center, float radius, uint32_t color, ui
     }
 }
 
+// A filled fire silhouette with three joined tongues and a broad yellow core.
+// The old transparent ribbons made only their thin centers visible, producing
+// detached red squiggles even when their outer geometry was wide.
+inline void SongFlame(Mesh& mesh, Point origin, float height, float width, float phase, float opacity,
+                      const Basis& camera) {
+    const Point axis{ 0, 1, 0 };
+    Point side = Cross(axis, camera.forward);
+    if (side.x * side.x + side.y * side.y + side.z * side.z < .001f)
+        side = camera.right;
+    side = Unit(side);
+    const auto tongue = [&](Point base, float length, float breadth, float bend, bool core) {
+        const auto center = [&](float u) {
+            return base + axis * (length * u) +
+                   side * (bend * u * u + .12f * breadth * std::sin(phase + u * 2.f) * u * u);
+        };
+        const auto edge = [&](float u) {
+            return side * (breadth * std::sin((.2f + .8f * u) * Tau * .5f) * (1.f - .22f * u));
+        };
+        const auto vertex = [&](float u, float across) {
+            const uint32_t middle = core ? (u < .6f ? 0xFFF2AD : 0xFFD35B) : (u < .6f ? 0xFFAF36 : 0xFF7D20);
+            const uint32_t rim = core ? middle : 0xF45D19;
+            const uint8_t alpha = uint8_t((core ? 245.f : (across ? 155.f : 225.f)) * opacity);
+            return EffectVertex{ center(u) + edge(u) * across, across ? rim : middle, u >= 1.f ? uint8_t(0) : alpha };
+        };
+        for (int j = 0; j < 5; ++j) {
+            const float u = j / 5.f, next = (j + 1) / 5.f;
+            for (float across : { -1.f, 1.f }) {
+                mesh.Tri(vertex(u, 0), vertex(u, across), vertex(next, across));
+                mesh.Tri(vertex(u, 0), vertex(next, across), vertex(next, 0));
+            }
+        }
+    };
+    // Short side tongues share the main flame's base and split toward their
+    // tips. Only the tips flicker sideways; the body stays broad and upright.
+    tongue(origin - side * (width * .48f), height * .67f, width * .56f, -width * .72f, false);
+    tongue(origin + side * (width * .43f), height * .78f, width * .5f, width * .62f, false);
+    tongue(origin, height, width, width * .12f * std::sin(phase), false);
+    tongue(origin + axis * (height * .04f), height * .61f, width * .48f, 0, true);
+}
+
 inline Mesh SampleSong(int song, uint32_t frame, const Basis& camera = {}) {
     Mesh mesh;
     const bool warp = song >= CW_SONG_OOT_MINUET && song <= CW_SONG_OOT_PRELUDE;
@@ -54,22 +93,20 @@ inline Mesh SampleSong(int song, uint32_t frame, const Basis& camera = {}) {
             const float phase = float((frame % 120u + i * 20u) % 120u) / 120.f;
             const float angle = i * Tau / 6 + t * .25f;
             const Point p{ 21 * std::cos(angle), -24 + phase * 38, 21 * std::sin(angle) };
-            // The same tapered, curved warm body and yellow core used by the
-            // real fire effect. Broad rising flames replace the thin red bands.
-            NeiUsedMagic::Flame(mesh, p, { 0, 1, 0 }, 15 + 3 * std::sin(t * 2 + i), 4.8f, t * 4 + i, camera,
-                                .65f + .35f * std::sin(phase * Tau * .5f));
+            SongFlame(mesh, p, 17 + 2 * std::sin(t * 2 + i), 6.6f, t * 4 + i, .7f + .3f * std::sin(phase * Tau * .5f),
+                      camera);
         }
         return mesh;
     }
-    const bool water = song == CW_SONG_OOT_SERENADE;
+    if (song == CW_SONG_OOT_SERENADE)
+        return mesh; // Keep the native note and shared shimmer; no encircling overlay.
     const bool sun = song == CW_SONG_OOT_PRELUDE;
     const bool leaves = song == CW_SONG_SARIA || song == CW_SONG_OOT_SARIA || song == CW_SONG_OOT_MINUET;
-    if (water || sun) {
+    if (sun) {
         for (int ring = 0; ring < 1; ++ring) {
             const auto point = [&](int j) {
                 const float a = j * Tau / 16 + t * .5f;
-                return water ? Point{ 20 * std::cos(a), 3.f * std::sin(2 * a + t), 20 * std::sin(a) }
-                             : Plane(camera, 20 * std::cos(a), 20 * std::sin(a));
+                return Plane(camera, 20 * std::cos(a), 20 * std::sin(a));
             };
             for (int j = 0; j < 16; ++j)
                 Band(mesh, point(j), point(j + 1), .65f, color, 0xFFF8FF, camera,

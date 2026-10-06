@@ -356,6 +356,7 @@ uint8_t Seasons_SeasonCount(void);        // owned seasons
 uint8_t Seasons_SeasonAt(uint8_t index);
 uint8_t Seasons_GetSeason(void); // active season (self-healing to an owned one)
 void Seasons_SetSeason(uint8_t season);
+void Seasons_UpdateWeather(struct PlayState* play);
 void ExtInv_DebugGiveAll(void); // NEI debug: grant all custom items to their slots
 
 typedef struct {

@@ -976,7 +976,7 @@ extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* pa
                                                 float fit[2]) {
     const int din =
         NeiAssetPriority::GetDinSwordGiProfile("oot", game, path, CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
-    return NeiAssetPriority::GetGiModelFit("oot", game, path, scale, tilt, shop != 0, fit, din);
+    return NeiAssetPriority::GetGiModelFit("oot", game, path, scale, tilt, shop, fit, din);
 }
 extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* game, const char* path) {
     return NeiAssetPriority::GetDinSwordGiProfile("oot", game, path,

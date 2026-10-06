@@ -902,7 +902,7 @@ static const char* sExtEquipIconPaths[4][3] = {
     // Tunics
     { dgItemIconChampionsTunicTex, dgItemIconMagicTunicTex, dgItemIconSagesTunicTex },
     // Boots
-    { dgItemIconPegasusBootsTex, dgItemIconClimbBootsTex, dgItemIconRocBootsTex },
+    { dgItemIconPegasusAnkletTex, dgItemIconClimbBootsTex, dgItemIconRocBootsTex },
 };
 
 void* ExtEquip_GetIcon(s16 equipType, u8 index) {

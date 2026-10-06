@@ -162,9 +162,22 @@ bool HasMmLegacyGiMod(RandoItemId item) {
            (second && ResourceMgr_IsModAssetForGame("mm", second));
 }
 
-bool GetSelectedOwnerSword(RandoItemId item, CwItemDrawInfo* out) {
+bool GetSelectedOwnerGi(RandoItemId item, CwItemDrawInfo* out) {
     const char* name = nullptr;
     switch (item) {
+        case RI_OOT_NEI_LANTERN:
+            // A native MM override owns its texture/material dependencies too.
+            if (ResourceMgr_IsModAssetForGame("mm", "objects/object_poh/gPoeLanternDL")) {
+                *out = CwItemDrawInfo{};
+                out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
+                out->dlists[0] = "__OTR__@mm:objects/object_poh/gPoeLanternDL";
+                out->dlistCount = 1;
+                out->xluStartIndex = -1;
+                out->scale = .025f;
+                return true;
+            }
+            name = "Lantern";
+            break;
         case RI_SWORD_KOKIRI:
             name = "Kokiri Sword";
             break;
@@ -194,8 +207,13 @@ bool GetSelectedOwnerSword(RandoItemId item, CwItemDrawInfo* out) {
         describe = reinterpret_cast<Fn_GetItemDrawInfo>(Combo_ResolveSym("soh", "OOT_GetItemDrawInfo"));
     CwItemDrawInfo selected{};
     if (!describe || describe(name, &selected) != 1 || selected.drawKind != CW_DRAW_KIND_CUSTOM_GI ||
-        selected.dlistCount != 1 || selected.opCount != 1 || selected.ops[0].op != CW_OP_ROTATE_Z ||
-        selected.neiShimmer <= 0 || !NeiGi::IsSword(static_cast<Kind>(selected.neiShimmer - 1)))
+        selected.dlistCount != 1)
+        return false;
+    if (item == RI_OOT_NEI_LANTERN) {
+        if (selected.opCount != 0)
+            return false;
+    } else if (selected.opCount != 1 || selected.ops[0].op != CW_OP_ROTATE_Z || selected.neiShimmer <= 0 ||
+               !NeiGi::IsSword(static_cast<Kind>(selected.neiShimmer - 1)))
         return false;
     *out = selected;
     return true;
@@ -226,7 +244,7 @@ extern "C" bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh,
 
 void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b);
 
-void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop) {
+void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop, bool mmPickup) {
     PlayState* play = gPlayState;
     if (play && info.drawKind == CW_DRAW_KIND_SEASON_GI) {
         if (info.neiEffect >= 1 && info.neiEffect <= 4 && info.dlistCount == 0 && info.opCount == 0)
@@ -248,13 +266,13 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop) {
         if (flame && !NeiGi_ArenaHasRoom(play, 12 * sizeof(Gfx), 4, 20, 40))
             return;
         Matrix_Push();
-        if (info.neiShimmer > 0 && NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1)))
-            ComboSwordGi_ApplyFit("oot", info.dlists[0], info.scale, tilt, shop);
+        if (mmPickup || (info.neiShimmer > 0 && NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1))))
+            ComboSwordGi_ApplyFit("oot", info.dlists[0], info.scale, tilt, shop, mmPickup);
         if (flame)
             DrawOotSlateRuneFlame(info.primColorXlu[0], info.primColorXlu[1], info.primColorXlu[2]);
-        NeiGi_DrawExternalPresentation(play, info.dlists[0],
-                                       info.xluStartIndex == 1 && info.dlistCount > 1 ? info.dlists[1] : nullptr,
-                                       info.scale, info.neiShimmer - 1, info.itemShimmer, "oot", shop, tilt, false);
+        NeiGi_DrawExternalPresentation(
+            play, info.dlists[0], info.xluStartIndex == 1 && info.dlistCount > 1 ? info.dlists[1] : nullptr, info.scale,
+            info.neiShimmer - 1, info.itemShimmer, "oot", shop, tilt, false, mmPickup);
         Matrix_Pop();
         return;
     }
@@ -265,10 +283,10 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop) {
     Matrix_Push();
     if (info.neiSomariaUpgrade)
         DrawOotSlateRuneFlame(255, 60, 60);
-    NeiGi_DrawPresentation(play, info.dlists[0],
-                           info.xluStartIndex == 1 && info.dlistCount > 1 ? info.dlists[1] : nullptr, info.scale,
-                           info.neiEffect, info.neiEffectCenter,
-                           info.itemShimmer || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0), "oot", shop);
+    NeiGi_DrawPresentation(
+        play, info.dlists[0], info.xluStartIndex == 1 && info.dlistCount > 1 ? info.dlists[1] : nullptr, info.scale,
+        info.neiEffect, info.neiEffectCenter,
+        info.itemShimmer || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0), "oot", shop, mmPickup);
     Matrix_Pop();
 }
 
@@ -316,9 +334,9 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
     out->itemShimmer = mandatory || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0);
     out->stateDependent = 2;
     const bool legacyMod = HasMmLegacyGiMod(item);
-    if (!authored && !legacyMod && GetSelectedOwnerSword(item, &info)) {
-        // The owner declined authored GI geometry because its standalone
-        // sword is selected. Keep MM's concrete award identity on that mesh.
+    if (!authored && !legacyMod && GetSelectedOwnerGi(item, &info)) {
+        // Keep the selected standalone geometry and MM's concrete award
+        // identity together when the owner declines the authored GI.
         info.neiShimmer = out->neiShimmer;
         authored = true;
     }
@@ -338,7 +356,7 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
 
 void DrawSong(RandoItemId item);
 
-bool MM_TryDrawNeiGi(RandoItemId item, bool shop) {
+bool MM_TryDrawNeiGi(RandoItemId item, bool shop, bool mmPickup) {
     if (!gPlayState)
         return false;
     // Resolve song identity before the shared draw table, whose aliases can
@@ -350,7 +368,7 @@ bool MM_TryDrawNeiGi(RandoItemId item, bool shop) {
     CwItemDrawInfo info{};
     if (!MM_DescribeNeiGi(item, &info))
         return false;
-    MM_DrawNeiGi(info, shop);
+    MM_DrawNeiGi(info, shop, mmPickup);
     return true;
 }
 

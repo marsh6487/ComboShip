@@ -808,7 +808,7 @@ static const char* sExtEquipIconPaths[4][3] = {
     // Tunics
     { dgItemIconChampionsTunicTex, dgItemIconMagicTunicTex, dgItemIconSagesTunicTex },
     // Boots
-    { dgItemIconPegasusBootsTex, dgItemIconClimbBootsTex, dgItemIconRocBootsTex },
+    { dgItemIconPegasusAnkletTex, dgItemIconClimbBootsTex, dgItemIconRocBootsTex },
 };
 
 // Left-column passives (Magic Cape / Pendant of Memories) — they left the ext grid, so their kaleido

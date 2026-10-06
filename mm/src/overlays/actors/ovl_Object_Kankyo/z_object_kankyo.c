@@ -325,32 +325,13 @@ void func_808DC454(ObjectKankyo* this, PlayState* play) {
     }
 }
 
-static s32 ObjectKankyo_IsSeasonSnowOwner(ObjectKankyo* this, PlayState* play) {
-    Actor* first = NULL;
-    for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].first; actor != NULL; actor = actor->next) {
-        if (actor->id != ACTOR_OBJECT_KANKYO || actor->params < 1 || actor->params > 3 || actor->update == NULL) {
-            continue;
-        }
-        if (first == NULL) {
-            first = actor;
-        }
-        if (actor->params == 2 && ((ObjectKankyo*)actor)->unk_114C == 0) {
-            return actor == &this->actor; // retain the native first blizzard updater when present
-        }
-    }
-    // The native instance counter is not reset on scene re-entry. Select one live
-    // actor even when no index-zero instance remains, including mixed snow variants.
-    return first == &this->actor;
-}
-
 static void ObjectKankyo_UpdateSnowTarget(PlayState* play) {
     if ((play->state.frames % 16) != 0) {
         return;
     }
     u8* count = &play->envCtx.precipitation[PRECIP_SNOW_CUR];
     u8 target = play->envCtx.precipitation[PRECIP_SNOW_MAX];
-    // A partially drained blizzard can leave an odd count. Clamp the final step
-    // so switching to a season reaches its target instead of oscillating around it.
+    // Clamp a final odd step so native target changes converge exactly.
     if (*count < target) {
         *count += MIN(2, target - *count);
     } else if (*count > target) {
@@ -358,23 +339,27 @@ static void ObjectKankyo_UpdateSnowTarget(PlayState* play) {
     }
 }
 
-void func_808DCB7C(ObjectKankyo* this, PlayState* play) {
-    if (MMWeather_Season() < 0 || ObjectKankyo_IsSeasonSnowOwner(this, play)) {
-        ObjectKankyo_UpdateSnowTarget(play);
+static void ObjectKankyo_UpdateSeasonSnowParticles(ObjectKankyo* this, PlayState* play) {
+    const int season = MMWeather_SeasonForPlay(play);
+    const u8 nativeCount = play->envCtx.precipitation[PRECIP_SNOW_CUR];
+    if (season == SEASON_WINTER || season == SEASON_SPRING || season == SEASON_SUMMER) {
+        // Particle positions are native actor state. Compose their count only
+        // during motion; weather tags and the next actor see the live native count.
+        play->envCtx.precipitation[PRECIP_SNOW_CUR] = season == SEASON_WINTER ? 64 : 0;
     }
     func_808DC454(this, play);
+    play->envCtx.precipitation[PRECIP_SNOW_CUR] = nativeCount;
+}
+
+void func_808DCB7C(ObjectKankyo* this, PlayState* play) {
+    ObjectKankyo_UpdateSnowTarget(play);
+    ObjectKankyo_UpdateSeasonSnowParticles(this, play);
 }
 
 void func_808DCBF8(ObjectKankyo* this, PlayState* play) {
     f32 temp_f0;
 
-    if (MMWeather_Season() >= 0) {
-        // Reuse the existing first blizzard updater. Off/story/ineligible weather
-        // immediately resumes the native drain below; no second actor is needed.
-        if (ObjectKankyo_IsSeasonSnowOwner(this, play)) {
-            ObjectKankyo_UpdateSnowTarget(play);
-        }
-    } else if ((play->envCtx.precipitation[PRECIP_SNOW_CUR] > 0) && (this->unk_114C == 0)) {
+    if ((play->envCtx.precipitation[PRECIP_SNOW_CUR] > 0) && (this->unk_114C == 0)) {
         if ((play->state.frames % 16) == 0) {
             play->envCtx.precipitation[PRECIP_SNOW_CUR] -= 9;
             if ((s8)play->envCtx.precipitation[PRECIP_SNOW_CUR] < 0) {
@@ -393,7 +378,7 @@ void func_808DCBF8(ObjectKankyo* this, PlayState* play) {
         D_801F4E30 = 0;
         play->envCtx.sandstormState = SANDSTORM_A;
     }
-    func_808DC454(this, play);
+    ObjectKankyo_UpdateSeasonSnowParticles(this, play);
 }
 
 void func_808DCDB4(ObjectKankyo* this, PlayState* play) {
@@ -561,9 +546,11 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
     f32 temp_f2;
     f32 tempf;
 
+    const int season = MMWeather_SeasonForPlay(play);
+    const u8 snowCount = season == SEASON_WINTER ? 64 : play->envCtx.precipitation[PRECIP_SNOW_CUR];
     if ((play->cameraPtrs[CAM_ID_MAIN]->stateFlags & CAM_STATE_UNDERWATER) ||
-        ((u8)play->envCtx.stormState == STORM_STATE_OFF && MMWeather_Season() != SEASON_SPRING &&
-         MMWeather_Season() != SEASON_WINTER)) {
+        (season == SEASON_SPRING || season == SEASON_SUMMER) ||
+        ((u8)play->envCtx.stormState == STORM_STATE_OFF && season != SEASON_WINTER)) {
         return;
     }
 
@@ -576,14 +563,14 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
         temp_f0 = CLAMP(temp_f0, 0.0f, 1.0f);
         Math_SmoothStepToF(&D_808DE5B0, temp_f0, 0.2f, 0.1f, 0.001f);
 
-        sp68 = play->envCtx.precipitation[PRECIP_SNOW_CUR];
+        sp68 = snowCount;
         sp68 *= D_808DE5B0;
 
-        if ((play->envCtx.precipitation[PRECIP_SNOW_CUR] >= 32) && (sp68 < 32)) {
+        if ((snowCount >= 32) && (sp68 < 32)) {
             sp68 = 32;
         }
     } else {
-        sp68 = play->envCtx.precipitation[PRECIP_SNOW_CUR];
+        sp68 = snowCount;
     }
 
     for (i = 0; i < sp68; i++) {
@@ -625,9 +612,7 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
             temp_f2 = ((1.0f < temp_f2) ? 0.0f : (((1.0f - temp_f2) > 1.0f) ? 1.0f : 1.0f - temp_f2));
 
             gDPPipeSync(POLY_XLU_DISP++);
-            const u8 spring = MMWeather_Season() == SEASON_SPRING;
-            gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, spring ? 190 : 255, spring ? 245 : 255, spring ? 200 : 255,
-                            (u8)(160.0f * temp_f2));
+            gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, (u8)(160.0f * temp_f2));
 
             Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
 

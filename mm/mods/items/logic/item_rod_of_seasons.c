@@ -105,7 +105,6 @@ void Seasons_TickInput(PlayState* play, Player* player, Input* input) {
         sRodScene = play->sceneId;
     }
     sRodFrame = play->gameplayFrames;
-    Seasons_UpdateWeather(play);
     if (!Seasons_SeasonCount() || player->transformation != PLAYER_FORM_HUMAN || MasterCycle_IsRiding()) {
         sRodPendingDraw = 0;
         Seasons_Stow(play, player);
@@ -164,50 +163,50 @@ void Seasons_TickInput(PlayState* play, Player* player, Input* input) {
 }
 
 // Seasonal particles use MM's native snow actor; the weather bridge owns rain, sky and light.
-// Keep the room's original target so the blank coin restores native Snowhead weather as well.
+// Native targets/counts remain live so Off always exposes the current scene weather.
 static PlayState* sSeasonWeatherPlay;
 static s32 sSeasonWeatherScene = -1;
 static s32 sSeasonWeatherRoom = -1;
 static u32 sSeasonWeatherFrame;
-static u8 sSeasonOwnsSnow;
-static u8 sSeasonNativeSnow;
-static u8 sSeasonLastSnow;
+static Actor* sSeasonSnowActor;
+
+static void Seasons_RemoveSnowActor(PlayState* play) {
+    if (sSeasonSnowActor == NULL) {
+        return;
+    }
+    // Actor_Kill defers removal. Compare against the live list before touching
+    // our pointer, since a room unload may already have freed this actor.
+    for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].first; actor != NULL; actor = actor->next) {
+        if (actor == sSeasonSnowActor && actor->id == ACTOR_OBJECT_KANKYO && actor->params == 1 &&
+            actor->room == sSeasonWeatherRoom) {
+            Actor_Kill(actor);
+            break;
+        }
+    }
+    sSeasonSnowActor = NULL;
+}
 
 void Seasons_UpdateWeather(PlayState* play) {
-    // A room change can retain the scene's environment. Release our target before
-    // taking the new room's snapshot, but never write into a different PlayState/scene.
+    // Only our supplemental actor belongs to this room. Native snow and its
+    // evolving precipitation/fog stay under the scene actors' control.
     if (sSeasonWeatherPlay == play && sSeasonWeatherScene == play->sceneId &&
-        play->gameplayFrames >= sSeasonWeatherFrame && sSeasonWeatherRoom != play->roomCtx.curRoom.num &&
-        sSeasonOwnsSnow && play->envCtx.precipitation[PRECIP_SNOW_MAX] == sSeasonLastSnow) {
-        play->envCtx.precipitation[PRECIP_SNOW_MAX] = sSeasonNativeSnow;
+        play->gameplayFrames >= sSeasonWeatherFrame && sSeasonWeatherRoom != play->roomCtx.curRoom.num) {
+        Seasons_RemoveSnowActor(play);
     }
     if (sSeasonWeatherPlay != play || sSeasonWeatherScene != play->sceneId ||
         sSeasonWeatherRoom != play->roomCtx.curRoom.num || play->gameplayFrames < sSeasonWeatherFrame) {
-        sSeasonOwnsSnow = 0;
+        sSeasonSnowActor = NULL;
         sSeasonWeatherPlay = play;
         sSeasonWeatherScene = play->sceneId;
         sSeasonWeatherRoom = play->roomCtx.curRoom.num;
     }
     sSeasonWeatherFrame = play->gameplayFrames;
-    int season = MMWeather_Season();
-    if (season < 0) {
-        if (sSeasonOwnsSnow && play->envCtx.precipitation[PRECIP_SNOW_MAX] == sSeasonLastSnow) {
-            play->envCtx.precipitation[PRECIP_SNOW_MAX] = sSeasonNativeSnow;
-        }
-        sSeasonOwnsSnow = 0;
-        return;
-    }
-    if (!sSeasonOwnsSnow || play->envCtx.precipitation[PRECIP_SNOW_MAX] != sSeasonLastSnow) {
-        sSeasonNativeSnow = play->envCtx.precipitation[PRECIP_SNOW_MAX];
-    }
-    sSeasonOwnsSnow = 1;
-    sSeasonLastSnow = season == SEASON_WINTER ? 64 : season == SEASON_SPRING ? 32 : 0;
-    play->envCtx.precipitation[PRECIP_SNOW_MAX] = sSeasonLastSnow;
-    if (sSeasonLastSnow == 0) {
+    if (MMWeather_Season() != SEASON_WINTER) {
+        Seasons_RemoveSnowActor(play);
         return;
     }
     for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].first; actor != NULL; actor = actor->next) {
-        if (actor->id == ACTOR_OBJECT_KANKYO && actor->params >= 1 && actor->params <= 3) {
+        if (actor->id == ACTOR_OBJECT_KANKYO && actor->params >= 1 && actor->params <= 3 && actor->update != NULL) {
             return; // reuse native snow rather than draw or update it twice
         }
     }
@@ -216,6 +215,7 @@ void Seasons_UpdateWeather(PlayState* play) {
         // Native snow actors persist across rooms. Our supplemental actor should
         // leave with this room, so a later room's native snow remains the sole owner.
         snow->room = play->roomCtx.curRoom.num;
+        sSeasonSnowActor = snow;
     }
 }
 

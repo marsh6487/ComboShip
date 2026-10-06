@@ -148,7 +148,7 @@ using RandoItemId=int;
 enum {RI_NONE,RI_OOT_NEI_CANE_OF_SOMARIA,RI_OOT_NEI_CANE_PACCI_FLIP,RI_OOT_NEI_CANE_SOMARIA_BLOCK,RI_OOT_NEI_CANE_PACCI_STONE,RI_OOT_NEI_CANE_SOMARIA_PLATFORM,RI_OOT_NEI_CANE_PACCI_ULTRAHAND};
 void DrawOotNeiUltrahand() {assert(0);}
 void DrawOotNeiCaneOfSomaria(int) {assert(0);}
-void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false) {assert(0);}
+void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,bool mmPickup=false) {assert(0);}
 void NeiGi_DrawSeasonOverlay(PlayState*,int,const char*) {assert(0 && "mask fixture must not select weather");}
 void NeiGi_DrawSongOverlay(PlayState*,int,const char*) {assert(false && "song dispatch has its own production fixture");}
 // Sword drawing/fitting is tested by the selected-model and foreign sword

@@ -1240,8 +1240,8 @@ const char* GetIconTexturePath(RandoItemId randoItemId) {
             return "__OTR__textures/icon_item_custom/gItemIconSheikahSlateCryonisTex";
         case RI_OOT_EXT_MAGIC_CAPE:
             return "__OTR__textures/icon_item_custom/gItemIconMagicCapeTex";
-        case RI_OOT_EXT_PEGASUS_ANKLET: // = the PEGASUS BOOTS (renamed 2026-07-29)
-            return "__OTR__textures/icon_item_custom/gItemIconPegasusBootsTex";
+        case RI_OOT_EXT_PEGASUS_ANKLET:
+            return "__OTR__textures/icon_item_custom/gItemIconPegasusAnkletTex";
         case RI_OOT_EXT_SHEIKAH_SHIELD: // parity with SoH item_list, which uses the Gerudo Scimitar icon as its
                                         // stand-in
             return "__OTR__textures/icon_item_custom/gItemIconGerudoScimitarTex";

@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <functional>
 #include <future>
+#include <fstream>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -60,6 +61,7 @@ extern "C" void CVarSetString(const char* key, const char* value) { stringCVars[
 // Pack availability is a fixture input to the complete native finalizer.
 struct OTRGlobals {
     static OTRGlobals* Instance;
+    std::shared_ptr<Rando::Context> gRandoContext;
     bool HasOriginal() const { return true; }
     bool HasMasterQuest() const { return true; }
 };
@@ -67,6 +69,10 @@ static OTRGlobals globals;
 OTRGlobals* OTRGlobals::Instance = &globals;
 
 namespace Rando {
+// The graph pool is a fixture boundary; every edge below is a native Entrance.
+// Generation and JSON dumping are the complete production function bodies.
+static std::vector<Entrance*> receiptEntrancePool;
+std::vector<Entrance*> GetShuffleableEntrances(EntranceType, bool) { return receiptEntrancePool; }
 std::weak_ptr<Context> Context::mContext;
 std::shared_ptr<Settings> Settings::mInstance;
 std::array<Location, RC_MAX> StaticData::locationTable;
@@ -94,7 +100,68 @@ static void ResetContext(std::shared_ptr<Rando::Context>& context) {
     Rando::Settings::GetInstance()->AssignContext(context);
 }
 
-int main() {
+static void DumpReceiptEntranceFixtures(const std::shared_ptr<Rando::Context>& context, const char* filename) {
+    using namespace Rando;
+    globals.gRandoContext = context;
+    context->GetOption(RSK_DECOUPLED_ENTRANCES).Set(0);
+    context->GetOption(RSK_SHUFFLE_BOSS_ENTRANCES).Set(RO_BOSS_ROOM_ENTRANCE_SHUFFLE_FULL);
+    context->GetEntranceShuffler()->SetNoRandomEntrances(false);
+    Entrance forest(RR_FOREST_TEMPLE_BOSS_ROOM, [] { return true; }, "true");
+    Entrance forestReverse(RR_FOREST_TEMPLE_BOSS_ENTRYWAY, [] { return true; }, "true");
+    Entrance deku(RR_DEKU_TREE_BOSS_ROOM, [] { return true; }, "true");
+    Entrance dekuReverse(RR_DEKU_TREE_BOSS_EXIT, [] { return true; }, "true");
+    Entrance fire(RR_FIRE_TEMPLE_BOSS_ROOM, [] { return true; }, "true");
+    Entrance fireReverse(RR_FIRE_TEMPLE_BOSS_ENTRYWAY, [] { return true; }, "true");
+    Entrance lobby(RR_DEKU_TREE_ENTRYWAY, [] { return true; }, "true");
+    Entrance lobbyReverse(RR_KF_OUTSIDE_DEKU_TREE, [] { return true; }, "true");
+    Entrance forestLobby(RR_FOREST_TEMPLE_ENTRYWAY, [] { return true; }, "true");
+    Entrance forestLobbyReverse(RR_SACRED_FOREST_MEADOW, [] { return true; }, "true");
+    Entrance house(RR_KF_MIDOS_HOUSE, [] { return true; }, "true");
+    Entrance houseReverse(RR_KOKIRI_FOREST, [] { return true; }, "true");
+    auto setup = [](Entrance& forward, Entrance& reverse, int index, int reverseIndex, EntranceType type) {
+        forward.SetIndex(index);
+        reverse.SetIndex(reverseIndex);
+        forward.BindTwoWay(&reverse);
+        forward.SetType(type);
+    };
+    setup(forest, forestReverse, ENTR_FOREST_TEMPLE_BOSS_ENTRANCE, ENTR_FOREST_TEMPLE_BOSS_DOOR, EntranceType::AdultBoss);
+    setup(deku, dekuReverse, ENTR_DEKU_TREE_BOSS_ENTRANCE, ENTR_DEKU_TREE_BOSS_DOOR, EntranceType::ChildBoss);
+    setup(fire, fireReverse, ENTR_FIRE_TEMPLE_BOSS_ENTRANCE, ENTR_FIRE_TEMPLE_BOSS_DOOR, EntranceType::AdultBoss);
+    setup(lobby, lobbyReverse, ENTR_DEKU_TREE_ENTRANCE, ENTR_KOKIRI_FOREST_OUTSIDE_DEKU_TREE, EntranceType::Dungeon);
+    setup(forestLobby, forestLobbyReverse, ENTR_FOREST_TEMPLE_ENTRANCE,
+          ENTR_SACRED_FOREST_MEADOW_OUTSIDE_TEMPLE, EntranceType::Dungeon);
+    setup(house, houseReverse, ENTR_MIDOS_HOUSE_0, ENTR_KOKIRI_FOREST_OUTSIDE_MIDOS_HOUSE, EntranceType::Interior);
+    forest.SetAsShuffled();
+    deku.SetAsShuffled();
+    receiptEntrancePool = { &forest, &deku };
+    forest.SetReplacement(&lobby);
+    deku.SetReplacement(&fire);
+    auto dump = [&]() {
+        context->GetEntranceShuffler()->CreateEntranceOverrides();
+        return json::parse(SOH_DumpEntranceOverrides());
+    };
+    json fixtures;
+    fixtures["nested"] = dump();
+    Check(fixtures["nested"][0]["index"] == ENTR_FOREST_TEMPLE_BOSS_ENTRANCE &&
+              fixtures["nested"][0]["override"] == ENTR_DEKU_TREE_ENTRANCE &&
+              fixtures["nested"][0]["destination"] == ENTR_FOREST_TEMPLE_BOSS_DOOR &&
+              fixtures["nested"][0]["overrideDestination"] == ENTR_KOKIRI_FOREST_OUTSIDE_DEKU_TREE,
+          "native generated table preserves forward and reverse directions");
+    forest.SetReplacement(&fire);
+    deku.SetReplacement(&deku);
+    fixtures["direct"] = dump();
+    forest.SetReplacement(&lobby);
+    deku.SetReplacement(&forestLobby);
+    fixtures["cycle"] = dump();
+    deku.SetReplacement(&house);
+    fixtures["deadEnd"] = dump();
+    std::ofstream(filename) << fixtures.dump(2);
+    receiptEntrancePool.clear();
+    globals.gRandoContext.reset();
+    std::puts("PASS native Entrance construction, CreateEntranceOverrides and consolidated JSON dump for compass routes");
+}
+
+int main(int argc, char** argv) {
     SaveManager storage;
     SaveManager::Instance = &storage;
     auto settings = Rando::Settings::GetInstance();
@@ -156,6 +223,7 @@ int main() {
     storage.currentJsonContext = &oldSection;
     LoadNativeSettings();
     Check(context->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Is(0), "old save array defaults missing option Off");
+    if (argc > 1) DumpReceiptEntranceFixtures(context, argv[1]);
     context->GetLogic()->SetContext(nullptr);
     std::puts("PASS native CVar registration, MM-start generation prep, seed snapshot, save/reload, seed changes and old defaults");
 }

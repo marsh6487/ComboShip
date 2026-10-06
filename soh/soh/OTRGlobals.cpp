@@ -1,6 +1,7 @@
 ﻿#include "../../combo/menu/ItemGrantAuditBridge.h"
 #include "OTRGlobals.h"
 #include "OTRAudio.h"
+#include "CrashHandlerExt.h"
 #include "Enhancements/Graphics/PreludeLoadProbe.h"
 #include "Enhancements/debugger/FrameTimingProbe.h"
 #include "ComboExport.h"
@@ -22,6 +23,7 @@
 #include "ResourceManagerHelpers.h"
 #include <fast/Fast3dWindow.h>
 #include <libultraship/bridge/audiobridge.h>
+#include <libultraship/bridge/crashhandlerbridge.h>
 #include <libultraship/bridge/gfxdebuggerbridge.h>
 #include <libultraship/bridge/windowbridge.h>
 #include <ship/Context.h>
@@ -4410,6 +4412,8 @@ extern "C" bool WindowIsRunning(void);
 
 extern "C" COMBO_EXPORT void SOH_ResumeGame(void) {
     ItemGrantAudit::Scope itemGrantAuditScope("SOH_ResumeGame");
+    // The resident games share the crash handler; restore OoT's reporter before resume.
+    CrashHandlerRegisterCallback(CrashHandler_PrintSohData);
     auto ctx = Ship::Context::GetRawInstance();
     // Flush every log line immediately so the resume diagnostics survive a hard crash (the console
     // window closes on crash; the log file is what we read afterward).

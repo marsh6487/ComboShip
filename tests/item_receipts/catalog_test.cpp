@@ -147,8 +147,9 @@ static std::string FlattenReceiptLines(const std::string& body) {
 
 #ifdef COMPASS_DONOR_INTEGRATION
 extern "C" void FixtureConfigureForestCompassReceipt(int information);
+extern "C" void FixtureConfigureGeneratedCompassRoute(const char* fixturePath, const char* route);
 
-static void CheckForestCompassReceiveRoutes() {
+static void CheckForestCompassReceiveRoutes(const char* fixturePath) {
   gSaveContext.fileNum = 0;
   gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
   const auto saveBefore = gSaveContext;
@@ -187,6 +188,24 @@ static void CheckForestCompassReceiveRoutes() {
     assert(native.msg.substr(body.size()) == "\x10 (Bank reward)\xBF");
     assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
     assert(!std::memcmp(&neiBefore, &neiSave, sizeof(neiBefore)));
+  }
+  if (fixturePath) {
+    for (const auto* route : {"direct", "nested", "cycle", "deadEnd"}) {
+      FixtureConfigureGeneratedCompassRoute(fixturePath, route);
+      ++generation;
+      CustomMessage::Entry native, foreign;
+      assert(Rando::ApplyItemReceiptText(RI_OOT_COMPASS_FOREST_TEMPLE, native));
+      assert(Rando::ApplyForeignItemReceiptText("Forest Temple Compass", foreign, RC_CLOCK_TOWER_ROOF_OCARINA));
+      assert(native.msg == foreign.msg && !native.autoFormat && native.icon == 0xFE);
+      const bool assigned = std::string(route) == "direct" || std::string(route) == "nested";
+      assert((native.msg.find("Volvagia") != std::string::npos) == assigned);
+      assert((native.msg.find("Fire Medallion") != std::string::npos) == assigned);
+      assert(native.msg.find("Phantom Ganon") == std::string::npos);
+      assert(ComboReceipt_HasIcon(&native.receiptPresentation) == assigned);
+      if (!assigned) assert(native.msg.find("boss room") != std::string::npos);
+      assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+      assert(!std::memcmp(&neiBefore, &neiSave, sizeof(neiBefore)));
+    }
   }
   std::cout << "Real OoT donor -> MM Forest Temple Compass native/foreign routes: saved Off tutorials/On three-line reward sprites, cache reset and source append passed\n";
 }
@@ -348,11 +367,13 @@ static void CheckMapCompassInformation() {
   std::cout << "MM map/compass information: four placed rewards, foreign owner names, native entrances, owned pause/Start With, gates and no save writes passed\n";
 }
 
-int main() {
+int main(int argc, char** argv) {
+  (void)argc;
+  (void)argv;
   PlayState play{};
   gPlayState = &play;
 #ifdef COMPASS_DONOR_INTEGRATION
-  CheckForestCompassReceiveRoutes();
+  CheckForestCompassReceiveRoutes(argc > 1 ? argv[1] : nullptr);
   return 0;
 #else
   // Header is deliberately a story entry with a different icon and next ID.

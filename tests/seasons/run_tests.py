@@ -212,14 +212,16 @@ assert(restored.seasonsOwned==0&&restored.season==SEASON_SPRING);
 
 run('snow',r'''
 int activeSeason=SEASON_WINTER,spawns=0;
+u8 D_801F4E30;
 int MMWeather_Season(){return activeSeason;}
+void Actor_Kill(Actor* actor){actor->update=nullptr;actor->draw=nullptr;}
 Actor* Actor_Spawn(ActorContext*,PlayState*,s16,f32,f32,f32,s16,s16,s16,s32){++spawns;return nullptr;}
 ''',['// Seasonal particles'+rodsource.split('// Seasonal particles')[1].split('#include "../objects')[0]],r'''
 PlayState play{};play.envCtx.precipitation[PRECIP_SNOW_MAX]=12;
-Seasons_UpdateWeather(&play);assert(play.envCtx.precipitation[PRECIP_SNOW_MAX]==64&&spawns==1);
-Actor snow{};snow.id=ACTOR_OBJECT_KANKYO;snow.params=2;play.actorCtx.actorLists[ACTORCAT_ITEMACTION].first=&snow;
+Seasons_UpdateWeather(&play);assert(play.envCtx.precipitation[PRECIP_SNOW_MAX]==12&&spawns==1);
+Actor snow{};snow.id=ACTOR_OBJECT_KANKYO;snow.params=2;snow.update=[](Actor*,PlayState*){};play.actorCtx.actorLists[ACTORCAT_ITEMACTION].first=&snow;
 Seasons_UpdateWeather(&play);assert(spawns==1);
-activeSeason=SEASON_SPRING;Seasons_UpdateWeather(&play);assert(play.envCtx.precipitation[PRECIP_SNOW_MAX]==32);
+activeSeason=SEASON_SPRING;Seasons_UpdateWeather(&play);assert(play.envCtx.precipitation[PRECIP_SNOW_MAX]==12&&play.envCtx.precipitation[PRECIP_SNOW_CUR]==0);
 activeSeason=-1;Seasons_UpdateWeather(&play);assert(play.envCtx.precipitation[PRECIP_SNOW_MAX]==12);
 activeSeason=SEASON_WINTER;Seasons_UpdateWeather(&play);
 play.roomCtx.curRoom.num=1;activeSeason=-1;Seasons_UpdateWeather(&play);
@@ -339,6 +341,8 @@ snowpath='mm/src/overlays/actors/ovl_Object_Kankyo/z_object_kankyo.c'
 snowfunctions=['ObjectKankyo_SetupAction','func_808DC454','func_808DCB7C','func_808DCBF8','func_808DBEB0','func_808DBFB0','ObjectKankyo_Init','ObjectKankyo_Update']
 if 'ObjectKankyo_UpdateSnowTarget' in (ROOT/snowpath).read_text():
  snowfunctions.insert(2,'ObjectKankyo_UpdateSnowTarget')
+if 'ObjectKankyo_UpdateSeasonSnowParticles' in (ROOT/snowpath).read_text():
+ snowfunctions.insert(2,'ObjectKankyo_UpdateSeasonSnowParticles')
 if 'ObjectKankyo_IsSeasonSnowOwner' in (ROOT/snowpath).read_text():
  snowfunctions.insert(2,'ObjectKankyo_IsSeasonSnowOwner')
 run('snow_native',r'''
@@ -346,6 +350,8 @@ run('snow_native',r'''
 int activeSeason=SEASON_WINTER,spawns=0;
 float D_808DE5B0=0;u8 D_801F4E30=0;u16 D_808DE340=0;
 int MMWeather_Season(){return activeSeason;}
+int MMWeather_SeasonForPlay(const PlayState*){return activeSeason;}
+void Actor_Kill(Actor* actor){actor->update=nullptr;actor->draw=nullptr;}
 f32 Rand_ZeroOne(){return .25f;}
 s16 Camera_GetCamDirPitch(Camera*){return 0;}
 f32 Math_Vec3f_DistXZ(Vec3f* a,Vec3f* b){return sqrtf(SQ(a->x-b->x)+SQ(a->z-b->z));}
@@ -375,20 +381,23 @@ play.envCtx.precipitation[PRECIP_SNOW_MAX]=12;
 Seasons_UpdateWeather(&play);assert(spawns==0);
 play.state.frames=16;
 ObjectKankyo_Update(&first.actor,&play);ObjectKankyo_Update(&second.actor,&play);
-assert(play.envCtx.precipitation[PRECIP_SNOW_CUR]==126); // one target updater, not native -9 or two target steps
+assert(play.envCtx.precipitation[PRECIP_SNOW_CUR]==119); // native first blizzard still drains by nine
 assert(first.unk_14C[0].epoch==1&&second.unk_14C[0].epoch==1); // actual particle motion ran once per native actor
 for(int i=0;i<80;i++){play.state.frames+=16;Seasons_UpdateWeather(&play);ObjectKankyo_Update(&first.actor,&play);ObjectKankyo_Update(&second.actor,&play);}
-assert(play.envCtx.precipitation[PRECIP_SNOW_CUR]==64&&spawns==0);
+assert(play.envCtx.precipitation[PRECIP_SNOW_CUR]==0&&spawns==0);
 assert(first.actor.params==2&&first.actionFunc==func_808DCBF8);
-assert(play.envCtx.sandstormState==SANDSTORM_A&&D_801F4E30==77);
-// A partially drained blizzard can have an odd particle count; target tracking must converge exactly.
+assert(play.envCtx.sandstormState==SANDSTORM_A&&D_801F4E30==0);
+// Spring hides snow without overwriting an odd native count or target.
+static_assert(PRECIP_SNOW_CUR==2&&PRECIP_SNOW_MAX==3&&WEATHER_MODE_SNOW==3);
 play.envCtx.precipitation[PRECIP_SNOW_CUR]=119;activeSeason=SEASON_SPRING;
+Seasons_UpdateWeather(&play);
+assert(play.envCtx.precipitation[PRECIP_SNOW_CUR]==119&&play.envCtx.precipitation[PRECIP_SNOW_MAX]==12);
 for(int i=0;i<80;i++){play.state.frames+=16;Seasons_UpdateWeather(&play);ObjectKankyo_Update(&first.actor,&play);ObjectKankyo_Update(&second.actor,&play);}
-assert(play.envCtx.precipitation[PRECIP_SNOW_CUR]==32);
-// Off and every story/ineligible state expose the service's -1: the unchanged native -9 drain resumes.
+assert(play.envCtx.precipitation[PRECIP_SNOW_CUR]==0);
+// Off exposes the live native state: its blizzard already drained while Spring was active.
 activeSeason=-1;Seasons_UpdateWeather(&play);assert(play.envCtx.precipitation[PRECIP_SNOW_MAX]==12);
 play.state.frames+=16;ObjectKankyo_Update(&first.actor,&play);ObjectKankyo_Update(&second.actor,&play);
-assert(play.envCtx.precipitation[PRECIP_SNOW_CUR]==23);
+assert(play.envCtx.precipitation[PRECIP_SNOW_CUR]==0);
 // Native instance numbering persists: a later scene can have no params2 index zero.
 PlayState revisit{};revisit.cameraPtrs[0]=&camera;revisit.view.at.z=1;
 ObjectKankyo later{};later.actor.id=ACTOR_OBJECT_KANKYO;later.actor.params=2;later.actor.update=ObjectKankyo_Update;
@@ -396,22 +405,24 @@ ObjectKankyo_Init(&later.actor,&revisit);assert(later.unk_114C>0);
 revisit.actorCtx.actorLists[ACTORCAT_ITEMACTION].first=&later.actor;
 activeSeason=SEASON_WINTER;Seasons_UpdateWeather(&revisit);revisit.state.frames=16;
 ObjectKankyo_Update(&later.actor,&revisit);
-assert(revisit.envCtx.precipitation[PRECIP_SNOW_CUR]==126);
+assert(revisit.envCtx.precipitation[PRECIP_SNOW_CUR]==128);
 activeSeason=-1;Seasons_UpdateWeather(&revisit);revisit.state.frames+=16;
 ObjectKankyo_Update(&later.actor,&revisit);
-assert(revisit.envCtx.precipitation[PRECIP_SNOW_CUR]==126); // preserve native indexed behavior when Off
-// An existing normal-snow actor and blizzard actor share one seasonal target updater.
+assert(revisit.envCtx.precipitation[PRECIP_SNOW_CUR]==128); // restore native count and indexed behavior when Off
+// Normal snow follows its native target while blizzard particles still update for Winter.
 ObjectKankyo normal{};normal.actor.id=ACTOR_OBJECT_KANKYO;normal.actor.params=3;normal.actor.update=ObjectKankyo_Update;
 ObjectKankyo_Init(&normal.actor,&revisit);normal.actor.next=&later.actor;
 revisit.actorCtx.actorLists[ACTORCAT_ITEMACTION].first=&normal.actor;
 activeSeason=SEASON_WINTER;Seasons_UpdateWeather(&revisit);revisit.state.frames+=16;
 ObjectKankyo_Update(&normal.actor,&revisit);ObjectKankyo_Update(&later.actor,&revisit);
-assert(revisit.envCtx.precipitation[PRECIP_SNOW_CUR]==124&&spawns==0);
+assert(revisit.envCtx.precipitation[PRECIP_SNOW_CUR]==126&&spawns==0);
 // Normal snow retains native target tracking; a rod-created actor is scoped to its room.
 PlayState next{};next.cameraPtrs[0]=&camera;next.view.at.z=1;next.roomCtx.curRoom.num=5;
 activeSeason=SEASON_WINTER;Seasons_UpdateWeather(&next);
 assert(spawns==1&&spawnedSnow.actor.params==1&&spawnedSnow.actor.room==5);
 next.state.frames=16;ObjectKankyo_Update(&spawnedSnow.actor,&next);
-assert(next.envCtx.precipitation[PRECIP_SNOW_CUR]==2);
+assert(next.envCtx.precipitation[PRECIP_SNOW_CUR]==0&&spawnedSnow.unk_14C[0].epoch==1);
 Seasons_UpdateWeather(&next);assert(spawns==1);
+activeSeason=-1;Seasons_UpdateWeather(&next);
+assert(next.envCtx.precipitation[PRECIP_SNOW_CUR]==0&&spawnedSnow.actor.update==nullptr);
 ''')

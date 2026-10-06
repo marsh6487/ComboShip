@@ -496,7 +496,7 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
                     ComboReceipt_CopyIcon(&entry.receiptPresentation, &icon, "mm");
 #endif
             } else {
-                body += "&Its entrance is at %c" + std::string(kDungeonInformation[dungeon].entrance) + "%w.";
+                body += "&It seems the entrance is at %c" + std::string(kDungeonInformation[dungeon].entrance) + "%w.";
             }
             SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(body));
             return true;

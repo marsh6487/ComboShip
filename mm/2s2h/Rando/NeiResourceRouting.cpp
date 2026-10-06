@@ -19,6 +19,11 @@ extern "C" const char* NeiResource_Route(const char* path) {
         return nullptr;
     // unordered_set rehash preserves references/pointers to its elements.
     static std::unordered_set<std::string> paths;
+    if (path[7] == '@') {
+        if (std::strncmp(path + 7, "@oot:", 5) && std::strncmp(path + 7, "@mm:", 4))
+            return nullptr;
+        return paths.insert(path).first->c_str();
+    }
     return paths.insert(std::string("__OTR__@oot:") + (path + 7)).first->c_str();
 }
 

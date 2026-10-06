@@ -125,8 +125,8 @@ void NeiGi_DrawSeasonOverlay(PlayState*,int profile,const char*) {season=profile
 void NeiGi_DrawSongOverlay(PlayState*,int song,const char*) {overlay=song;}
 void ComboDrawMaskShimmer(PlayState*,void*,const uint8_t*,const char*) {++genericShimmer;}
 bool MM_DescribeNeiGi(RandoItemId,CwItemDrawInfo*) {++descriptions;return false;}
-void MM_DrawNeiGi(const CwItemDrawInfo&,bool=false) {assert(false);}
-bool MM_TryDrawNeiGi(RandoItemId,bool shop=false);
+void MM_DrawNeiGi(const CwItemDrawInfo&,bool=false,bool=false) {assert(false);}
+bool MM_TryDrawNeiGi(RandoItemId,bool shop=false,bool mmPickup=false);
 ''' + draw_song + '\n' + dispatcher + r'''
 // Hand-recorded accepted samples from 9eff802c, quantized exactly as the
 // renderer packs positions. Protect the approved particles, not private source text.
@@ -157,12 +157,15 @@ int main() {
         assert(!grayAtNote && "native MM notes must clear inherited grayscale before their native color is submitted");
         assert(!std::memcmp(env.data(),color,4));
     }
+    assert(NeiGi::SampleSong(CW_SONG_OOT_SERENADE,42).count==0 &&
+           "Serenade must keep its note/shimmer without a circle ring");
     for(int song=0;song<CW_SONG_COUNT;++song) {
         for(uint32_t frame:{0u,42u,179u,180u,719u,720u,0xffffffffu}) {
             const auto mesh=NeiGi::SampleSong(song,frame);
             assert(mesh.count<=mesh.vertices.size() && mesh.count%3==0);
-            const bool themed=(song>=CW_SONG_OOT_MINUET && song<=CW_SONG_OOT_ZELDA) ||
-                              song==CW_SONG_SARIA || song==CW_SONG_OOT_SARIA;
+            const bool themed=((song>=CW_SONG_OOT_MINUET && song<=CW_SONG_OOT_ZELDA) &&
+                              song!=CW_SONG_OOT_SERENADE) || song==CW_SONG_SARIA || song==CW_SONG_OOT_SARIA;
+            if(song==CW_SONG_OOT_SERENADE)assert(mesh.count==0 && "Serenade must keep its note/shimmer without a circle ring");
             if(!themed)assert(mesh.count==0 && "unapproved normal songs, Epona and Sun must lose their themed shapes");
             else {
                 assert(mesh.count>0);
@@ -176,11 +179,22 @@ int main() {
                 if(song!=CW_SONG_OOT_BOLERO)assert(hue);
                 else {
                     bool hotCore=false, warmBody=false;
+                    float filledFireArea=0, filledCoreArea=0;
                     for(size_t i=0;i<mesh.count;++i) {
                         hotCore|=mesh.vertices[i].rgb==0xFFF2AD;
                         warmBody|=mesh.vertices[i].rgb==0xFFAF36;
                     }
+                    for(size_t i=0;i<mesh.count;i+=3) {
+                        const auto& a=mesh.vertices[i];const auto& b=mesh.vertices[i+1];const auto& c=mesh.vertices[i+2];
+                        const auto cross=NeiGi::Cross(b.p-a.p,c.p-a.p);
+                        const float area=.5f*std::sqrt(cross.x*cross.x+cross.y*cross.y+cross.z*cross.z);
+                        if(a.alpha>=90 && b.alpha>=90 && c.alpha>=90) {
+                            filledFireArea+=area;
+                            if(a.rgb==0xFFF2AD && b.rgb==0xFFF2AD && c.rgb==0xFFF2AD)filledCoreArea+=area;
+                        }
+                    }
                     assert(mesh.count>400 && hotCore && warmBody && "Bolero requires full tapered fire with a hot core, not red sticks");
+                    assert(filledFireArea>160 && filledCoreArea>20 && "Bolero needs broad filled flame silhouettes and hot cores, not transparent ribbon spines");
                 }
             }
         }
@@ -202,4 +216,4 @@ int main() {
     path=temp/'dispatch.cpp';path.write_text(source)
     subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),'-I'+str(ROOT/'combo/menu'),str(path),'-o',str(temp/'dispatch')],check=True)
     subprocess.run([str(temp/'dispatch')],check=True)
-print('PASS native OoT notes/shimmer, MM exports/dispatcher, plain regular songs and Bolero fire geometry')
+print('PASS native OoT notes/shimmer, MM exports/dispatcher, ring-free Serenade and filled Bolero fire geometry')

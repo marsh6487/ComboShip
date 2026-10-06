@@ -1118,7 +1118,9 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info, bool sho
         }
     }
     CLOSE_DISPS(gfxCtx);
-    if (info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z)
+    if (info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z && info->neiShimmer > 0 &&
+        info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
+        NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
         ComboDinSwordGi_DrawLayers(gPlayState, "oot", info->dls[0]);
     Matrix_Pop();
 }
@@ -1166,7 +1168,7 @@ inline void MM_DrawForeignNativeEquipment(const ComboForeignDrawInfoOOT* info) {
 // Draw a foreign (OOT-bound) item's real OOT model at the current model matrix. Any resolution
 // failure falls back to the sentinel blue rupee (the RI_COMBO_FOREIGN item's GID_RUPEE_BLUE), so we
 // never draw blank. Mirrors Randomizer_DrawComboForeign (soh/.../draw.cpp).
-inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false) {
+inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, bool mmPickup = false) {
     const ComboForeignDrawInfoOOT* info =
         (randoCheckId != RC_UNKNOWN) ? ComboResolveForeignDrawInfoOOT(randoCheckId) : nullptr;
     if (info == nullptr) {
@@ -1213,19 +1215,21 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false) {
         memcpy(recipe.neiEffectCenter, info->neiEffectCenter, sizeof(recipe.neiEffectCenter));
         recipe.neiSomariaUpgrade = info->neiSomariaUpgrade;
         recipe.itemShimmer = info->itemShimmer;
-        MM_DrawNeiGi(recipe, shop);
+        MM_DrawNeiGi(recipe, shop, mmPickup);
         return;
     }
-    const bool fitSword = info->drawKind == CW_DRAW_KIND_CUSTOM_GI && info->count > 0 && info->neiShimmer > 0 &&
-                          info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
-                          NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
-    if (fitSword) {
+    const bool fitModel =
+        info->drawKind == CW_DRAW_KIND_CUSTOM_GI && info->count > 0 &&
+        (info->opCount == 0 || (info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z)) &&
+        (mmPickup || (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
+                      NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1))));
+    if (fitModel) {
         Matrix_Push();
         ComboSwordGi_ApplyFit("oot", info->dls[0], info->scale,
                               info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z
                                   ? info->ops[0].a * (3.14159265358979323846f / 32768.f)
                                   : 0.f,
-                              shop);
+                              shop, mmPickup);
     }
     if (info->itemShimmer) {
         Matrix_Push();
@@ -1339,7 +1343,7 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false) {
         else
             ComboDrawMaskShimmer(gPlayState, nullptr, info->itemShimmerColor, mmOwner ? "mm" : "oot");
     }
-    if (fitSword)
+    if (fitModel)
         Matrix_Pop();
 }
 

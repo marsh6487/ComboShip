@@ -112,7 +112,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
         if name == "nei_gi/presentation" and "--combo" in sys.argv:
             mm_source = (ROOT / "mm/2s2h/Rando/NeiGiPresentation.cpp").read_text()
             mm_functions = functions(mm_source)
-            renderer = functions((ROOT / "mm/2s2h/Rando/DrawItem.cpp").read_text())["DrawSong"] + "\n" + mm_functions["HasMmLegacyGiMod"] + "\n" + mm_functions["GetSelectedOwnerSword"] + "\n" + mm_functions["MM_DrawNeiGi"] + "\n" + mm_functions["MM_DescribeNeiGi"] + "\n" + mm_functions["MM_TryDrawNeiGi"]
+            renderer = functions((ROOT / "mm/2s2h/Rando/DrawItem.cpp").read_text())["DrawSong"] + "\n" + mm_functions["HasMmLegacyGiMod"] + "\n" + mm_functions["GetSelectedOwnerGi"] + "\n" + mm_functions["MM_DrawNeiGi"] + "\n" + mm_functions["MM_DescribeNeiGi"] + "\n" + mm_functions["MM_TryDrawNeiGi"]
             # MM's item enum and binding table are copied verbatim so origin
             # selection is exercised without importing the unrelated MM engine.
             mm_types = (ROOT / "mm/2s2h/Rando/Types.h").read_text()
@@ -147,6 +147,8 @@ int32_t SelectedSwordFixture(const char* name,CwItemDrawInfo* out) {
       {"True Master Sword",RG_TRUE_MASTER_SWORD},{"Biggoron's Sword",RG_BIGGORON_SWORD},
       {"Great Fairy's Sword",RG_GREAT_FAIRY_SWORD}};
     for(auto [title,item]:names)if(!std::strcmp(title,name))return CwAltSwordGi(item,out);
+    if(!std::strcmp(name,"Lantern"))
+        return CwCustomGi(out,"__OTR__objects/object_poh/gPoeLanternDL",.025f);
     return 0;
 }
 void* Combo_ResolveSym(const char* owner, const char* name) {
@@ -161,7 +163,7 @@ void* Combo_ResolveSym(const char* owner, const char* name) {
     return nullptr;
 }
 void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b) { Fixture::flameColors.push_back({r,g,b}); }
-void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false);
+void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,bool mmPickup=false);
 #define Gfx_SetupDL25_Opa Gfx_SetupDL_25Opa
 #define Gfx_SetupDL25_Xlu Gfx_SetupDL_25Xlu
 #define Matrix_RotateYF Matrix_RotateY
@@ -252,6 +254,27 @@ const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckId) {ret
 Gfx* MM_DrawForeignMagicJarDList(Gfx*,const char*,const uint8_t*) {assert(false);return nullptr;}
 """ + functions(mm_foreign_source)["MM_DrawForeignSimple"] + "\n" + functions(mm_foreign_source)["MM_DrawForeignMusicNote"]
             mm_draw_source=(ROOT/"mm/2s2h/Rando/DrawItem.cpp").read_text()
+            # The receipt is a CustomItem actor, not Player_DrawGetItemImpl.
+            # Execute its actual visible pose statements before the queue's
+            # draw callback scale so camera framing probes use the active path.
+            custom_source=(ROOT/"mm/2s2h/CustomItem/CustomItem.cpp").read_text()
+            pickup_start=custom_source.index('                actor->shape.yOffset = 900.0f;')
+            pickup_end=custom_source.index('                actor->world.pos.y += height;',pickup_start)+len('                actor->world.pos.y += height;')
+            pose_body=custom_source[pickup_start:pickup_end].replace('GET_PLAYER_FORM','form').replace('Actor_SetScale','FixtureActorScale')
+            form_enum=re.search(r'typedef enum PlayerTransformation \{.*?\} PlayerTransformation;',
+                                (ROOT/'mm/include/z64player.h').read_text(),re.S)[0]
+            queue_source=(ROOT/'mm/2s2h/Rando/MiscBehavior/CheckQueue.cpp').read_text()
+            queue_scale=re.search(r'Matrix_Scale\(30\.0f, 30\.0f, 30\.0f, MTXMODE_APPLY\);',queue_source)[0]
+            camera_source=(ROOT/'mm/src/code/z_camera_data.inc').read_text()
+            camera_values=re.search(r'CameraModeValue D_801B5338\[\] = \{\s*CAM_FUNCDATA_KEEP4\(([^\n]+)',camera_source)[1].split(',')
+            camera_values=[float(camera_values[i]) for i in (0,1,2,5)]
+            pickup_support=form_enum+'''\nvoid FixtureActorScale(Actor* actor,float s) {actor->scale.x=actor->scale.y=actor->scale.z=s;}
+std::pair<float,float> FixtureMmReceiptPose(int form=PLAYER_FORM_HUMAN) {
+ Actor storage{};Actor* actor=&storage;
+'''+pose_body+'''\n Fixture::matrix=actor->scale.x;
+ Fixture::matrixY=actor->world.pos.y+actor->shape.yOffset*actor->scale.y;
+'''+queue_scale+'''\n return {Fixture::matrix,Fixture::matrixY};
+}\n'''+f'constexpr float kMmPickupCamera[4]={{{",".join(str(v)+"f" for v in camera_values)}}};\n'
             # Keep the exact outer item conversion/context/early dispatcher and
             # actual foreign branch; unrelated switch bodies have own fixtures.
             resolved = mm_draw_source[mm_draw_source.index("void Rando::DrawResolvedItem("):]
@@ -261,10 +284,12 @@ Gfx* MM_DrawForeignMagicJarDList(Gfx*,const char*,const uint8_t*) {assert(false)
             draw_item = mm_draw_source[mm_draw_source.index("void Rando::DrawItem("):mm_draw_source.index("void Rando::DrawResolvedItem(")]
             callback = functions((ROOT/"mm/2s2h/Rando/ActorBehavior/EnGirlA.cpp").read_text())["EnGirlA_RandoDrawFunc"].replace("EnGirlA*","MmShopEnGirlA*")
             mm_shop_support += "\n" + mm_foreign_draw + "\n" + resolved + "\n" + draw_item + "\n" + callback + "\n#undef RANDO_SAVE_CHECKS\n"
-            tested_bridge = (shim + route + "\n" + item_enum + "\nbool MM_TryDrawNeiGi(RandoItemId,bool shop=false);\n#include \"ComboSongDrawMM.h\"\n" + bindings + "\n" + fallback_class + "\n" +
+            flags_source=(ROOT/'mm/2s2h/CustomItem/CustomItem.h').read_text()
+            custom_flags='namespace CustomItem {\n'+re.search(r'enum CustomItemFlags.*?\n\};',flags_source,re.S)[0]+'\n}\n'
+            tested_bridge = (custom_flags + shim + route + "\n" + item_enum + "\nbool MM_TryDrawNeiGi(RandoItemId,bool shop=false,bool mmPickup=false);\n#include \"ComboSongDrawMM.h\"\n" + bindings + "\n" + fallback_class + "\n" +
                              renderer + "\n" + fallback + "\n" + foreign_info + "\n" +
                              foreign_shim + foreign_draw + "\n" + foreign_wrapper + "\n" + foreign_shop + "\n" + mm_shop_support)
-            candidate = source.read_text().replace("int main() {", tested_bridge + "\nint main() {", 1)
+            candidate = source.read_text().replace("int main() {", tested_bridge + "\n" + pickup_support + "\nint main() {", 1)
             checks = (ROOT / "tests/mm_presentation/gi_bridge_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/shop_dispatch_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/foreign_sword_checks.inc").read_text()

@@ -32,6 +32,7 @@ with tempfile.TemporaryDirectory(prefix="nei-priority-") as directory:
     unit.write_text('''#include <cassert>
 #include <cstring>
 static bool enabled = false;
+static int expectedPresentation = 0;
 static const char* expectedSetting = "''' + setting + '''";
 static int CVarGetInteger(const char* name, int fallback) {
     assert(std::strcmp(name, expectedSetting) == 0);
@@ -46,9 +47,10 @@ static int GetDinSwordGiProfile(const char* native, const char* owner, const cha
     return fire ? 2 : 0;
 }
 static bool GetGiModelFit(const char* native, const char* owner, const char* path,
-                          float scale, float tilt, bool shop, float* fit, int profile) {
+                          float scale, float tilt, int presentation, float* fit, int profile) {
     assert(std::strcmp(native, "mm") == 0 && std::strcmp(owner, "oot") == 0);
-    assert(std::strcmp(path, "sword") == 0 && scale == 1.0f && tilt == 0.0f && shop);
+    assert(std::strcmp(path, "sword") == 0 && scale == 1.0f && tilt == 0.0f);
+    assert(presentation == expectedPresentation);
     assert(profile == (enabled ? 2 : 0));
     fit[0] = 3.0f; fit[1] = 4.0f;
     return true;
@@ -61,8 +63,11 @@ int main() {
         enabled = fire;
         float fit[2]{};
         assert(ResourceMgr_GetDinSwordGiProfileForGame("oot", "sword") == (fire ? 2 : 0));
-        assert(ResourceMgr_GetGiModelFitForGame("oot", "sword", 1.0f, 0.0f, 1, fit) == 1);
-        assert(fit[0] == 3.0f && fit[1] == 4.0f);
+        for (int presentation = 0; presentation <= 2; ++presentation) {
+            expectedPresentation = presentation;
+            assert(ResourceMgr_GetGiModelFitForGame("oot", "sword", 1.0f, 0.0f, presentation, fit) == 1);
+            assert(fit[0] == 3.0f && fit[1] == 4.0f);
+        }
     }
 }
 '''.replace('for (bool fire : {false, true})', 'for (int fire = 0; fire <= 1; ++fire)'))
@@ -70,5 +75,5 @@ int main() {
     subprocess.run(['c++', '-std=c++20', '-Wall', '-Wextra', '-Werror', str(unit), '-o', native_binary], check=True)
     subprocess.run([native_binary], check=True)
 print("PASS: base/Alt mod provenance, exact stock/companion paths, live selection changes")
-print("PASS: native MM GI bridge compiles without SoH macros and follows its menu setting")
+print("PASS: native MM GI bridge compiles without SoH macros, follows its menu setting and retains all three framing contexts")
 subprocess.run([sys.executable, str(ROOT / 'tests/nei_asset_priority/run_abi_tests.py')], check=True)

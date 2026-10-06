@@ -2,9 +2,9 @@
 #include "ComboItemDrawABI.h"
 #include "Rando/Types.h"
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
-void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop = false);
+void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop = false, bool mmPickup = false);
 bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out);
-bool MM_TryDrawNeiGi(RandoItemId item, bool shop = false);
+bool MM_TryDrawNeiGi(RandoItemId item, bool shop = false, bool mmPickup = false);
 
 // Wrap only the legacy fallback after the authored presentation was declined.
 // Its model may change the matrix; shimmer uses the incoming GI pose.

@@ -3,8 +3,9 @@
 
 This uses native Option/Settings/Context declarations, real Option construction,
 the complete SetAllToContext and FinalizeSettings bodies, and SaveManager's real
-JSON traversal/templates. Graph fill, disk I/O and game loops are outside this
-boundary. It deliberately does not claim to reproduce the reported in-game bug.
+JSON traversal/templates. Its optional route fixture uses native Entrance edges
+and complete CreateEntranceOverrides/JSON dump bodies. The assigned edge pool is
+an input fixture; graph fill, disk I/O and game loops are outside this boundary.
 """
 import argparse
 import os
@@ -29,6 +30,8 @@ def main():
     parser.add_argument("--sanitizers", action="store_true")
     parser.add_argument("--drop-appended-option", action="store_true",
                         help="negative control: omit the last option during Context copy")
+    parser.add_argument("--dump-entrance-fixture", type=Path,
+                        help="write native generated/dumped entrance tables for the receiver regression")
     args = parser.parse_args()
     read = lambda path: (ROOT / path).read_text()
     settings = read("soh/soh/Enhancements/randomizer/settings.cpp")
@@ -66,6 +69,7 @@ def main():
                       "std::shared_ptr<Context> Context::GetInstance()", "ItemLocation* Context::GetItemLocation(size_t",
                       "ItemLocation* Context::GetItemLocation(const RandomizerCheck", "OptionValue& Context::GetOption",
                       "OptionValue& Context::GetTrickOption", "std::shared_ptr<Logic> Context::GetLogic()",
+                      "std::shared_ptr<EntranceShuffler> Context::GetEntranceShuffler()",
                       "std::shared_ptr<Dungeons> Context::GetDungeons()", "DungeonInfo* Context::GetDungeon(size_t",
                       "std::shared_ptr<Trials> Context::GetTrials()", "bool Context::IsSeedGenerated()",
                       "void Context::SetSeedGenerated", "bool Context::IsSpoilerLoaded()", "void Context::SetSpoilerLoaded"):
@@ -74,7 +78,16 @@ def main():
                       "RandomizerCheck ItemLocation::GetRandomizerCheck() const", "void ItemLocation::SetExcludedOption"):
         functions.append(extract(item, signature))
     functions.append(extract(read("soh/soh/Enhancements/randomizer/hint.cpp"), "Hint::Hint()"))
-    functions.append(extract(read("soh/soh/Enhancements/randomizer/entrance.cpp"), "EntranceShuffler::EntranceShuffler()"))
+    entrance = read("soh/soh/Enhancements/randomizer/entrance.cpp")
+    for signature in ("EntranceShuffler::EntranceShuffler()", "void EntranceShuffler::SetNoRandomEntrances",
+                      "void EntranceShuffler::CreateEntranceOverrides()",
+                      "Entrance::Entrance(RandomizerRegion", "void Entrance::SetParentRegion",
+                      "RandomizerRegion Entrance::GetParentRegionKey() const", "void Entrance::SetAsShuffled()",
+                      "bool Entrance::IsShuffled() const", "int16_t Entrance::GetIndex() const", "void Entrance::SetIndex",
+                      "void Entrance::SetReplacement", "Entrance* Entrance::GetReplacement() const",
+                      "EntranceType Entrance::GetType() const", "void Entrance::SetType",
+                      "Entrance* Entrance::GetReverse() const", "void Entrance::BindTwoWay"):
+        functions.append(extract(entrance, signature))
     logic = read("soh/soh/Enhancements/randomizer/logic.cpp")
     for signature in ("Logic::Logic()", "void Logic::SetContext"):
         functions.append(extract(logic, signature))
@@ -85,7 +98,8 @@ def main():
                                 fish, re.M))
     functions = "namespace Rando {\n" + "\n\n".join(functions) + "\n}\n"
     for signature in ('extern "C" COMBO_EXPORT const char* SOH_DumpRandoSettings',
-                      'extern "C" COMBO_EXPORT void SOH_RestoreRandoSettings'):
+                      'extern "C" COMBO_EXPORT void SOH_RestoreRandoSettings',
+                      'extern "C" COMBO_EXPORT const char* SOH_DumpEntranceOverrides'):
         functions += extract(otr, signature) + "\n"
     for signature in ("void SaveManager::SaveArray", "void SaveManager::LoadArray"):
         functions += extract(manager, signature) + "\n"
@@ -116,7 +130,10 @@ def main():
         binary = build / "seed_settings_test"
         subprocess.run([os.environ.get("CXX", "c++"), *flags, *includes, *map(str, sources),
                         "-Wl,--gc-sections", "-o", str(binary)], cwd=ROOT, check=True)
-        return subprocess.run([str(binary)], cwd=ROOT).returncode
+        command = [str(binary)]
+        if args.dump_entrance_fixture:
+            command.append(str(args.dump_entrance_fixture))
+        return subprocess.run(command, cwd=ROOT).returncode
 
 
 if __name__ == "__main__":

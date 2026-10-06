@@ -90,7 +90,7 @@ void* Combo_ResolveSym(const char*,const char*) {return reinterpret_cast<void*>(
 const char* NeiResource_Route(const char* path) {return path;}
 int ResourceMgr_IsModAssetForGame(const char*,const char*) {return mmMod;}
 ''' + bindings + '\n' + header[header.index('class MM_NeiGiFallbackShimmer'):] + '\n'
-source += function(mm,'HasMmLegacyGiMod')+'\n'+function(mm,'GetSelectedOwnerSword')+'\n'+function(mm,'MM_DescribeNeiGi')+'\n'+fallback
+source += function(mm,'HasMmLegacyGiMod')+'\n'+function(mm,'GetSelectedOwnerGi')+'\n'+function(mm,'MM_DescribeNeiGi')+'\n'+fallback
 source += r'''
 int main() {
     const std::pair<RandoItemId,Kind> awards[]={
