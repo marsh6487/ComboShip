@@ -32,7 +32,8 @@ static void* ExtEquip_LookupNameTex(u16 itemId, u8 language) {
 
         // Tunics
         case ITEM_EXT_TUNIC_1:
-            return (void*)gChampionsTunicNameTex;
+            // The left-column passive retains the old Cape id; the grid slot is Champion's Tunic.
+            return gExtEquipGridNameContext ? (void*)gChampionsTunicNameTex : (void*)gMagicCapeNameTex;
         case ITEM_EXT_TUNIC_2:
             return (void*)gMagicTunicNameTex;
         case ITEM_EXT_TUNIC_3:

@@ -30,6 +30,7 @@
 #include "2s2h/BenGui/CosmeticEditor.h"               // PlayerTunic_BindLocalColor (per-player tunic tint)
 #include "2s2h/FleetShipCombo/FleetComboIds.h"        // FC_SHIELD_* / FC_OOT_TUNIC/BOOTS ownership bits
 #include "2s2h/FleetShipCombo/FleetShipCombo.h"       // FleetShipCombo_GetActiveGame (combo ownership gate)
+#include "2s2h/Rando/NeiResourceRouting.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 #include "mods/extended_equipment.h"        // ExtEquip_* (Skijer's NEI)
@@ -145,7 +146,7 @@ static void KaleidoEquip_BuildUpgradeColVtx(PauseContext* pauseCtx) {
 
 // entry: itemId shown for icon/name, or -1 = empty cell.
 typedef struct {
-    s16 item;            // icon/name item id (-1 = empty; ids >= 0xE0 are NEI customs, no name)
+    s16 item;            // icon/name item id (-1 = empty; extended names use ExtEquip_GetNameTex)
     s16 equipType;       // >=0 ExtEquip type; -1 empty; -2 upgrade; -3 sword; -4 shield; -5 display-only
     s16 index;           // equip value / ext index (1-based) / upgrade row
     const char* ootIcon; // OoT icon OTR path (used when the OoT archive is present in mods/)
@@ -170,15 +171,19 @@ typedef struct {
 #define OOT_ICON_SHIELD_HYLIAN "__OTR__textures/icon_item_static/gItemIconShieldHylianTex"
 #define OOT_ICON_SHIELD_MIRROR "__OTR__textures/icon_item_static/gItemIconShieldMirrorTex"
 
-// OoT icon layer: these load when the player drops their SoH/OoT archive (soh.otr / oot.otr)
-// into 2ship's mods/ folder — OTR path strings ARE texture pointers in LUS. FileExists-gated
-// so absence costs nothing (falls back to the MM icons).
+// Prefer MM-local replacements, then the registered OoT owner. Deferred texture
+// paths retain HD metadata and the selected owner's independent Alt mode.
 static void* KaleidoEquip_OotTex(const char* path) {
     extern u8 ResourceMgr_FileExists(const char* resName);
-    if (path == NULL || !ResourceMgr_FileExists(path)) {
+    extern u8 ResourceMgr_FileAltExists(const char* resName);
+    extern bool ResourceMgr_IsAltAssetsEnabled(void);
+    if (path == NULL) {
         return NULL;
     }
-    return (void*)path;
+    if (ResourceMgr_FileExists(path) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path))) {
+        return (void*)path;
+    }
+    return NeiResource_Available(path) ? (void*)NeiResource_Route(path) : NULL;
 }
 
 // ---------------------------------------------------------------------------
@@ -227,15 +232,49 @@ static void* KaleidoEquip_UpgradeIcon(s16 row, s16 value) {
     return NULL;
 }
 
-// Item id whose NAME texture labels the hovered upgrade (MM name table only has the
-// native rows; the OoT-only rows show no name).
+// Item id whose name labels the hovered passive. The name resolver uses the non-grid context.
 static s16 KaleidoEquip_UpgradeNameItem(s16 row, s16 value) {
     if (value <= 0) {
         return -1;
     }
-    // Skijer 2026-07-16: rows 0/1 are the Cape/Pendant passives now — their NEI ids (0xE6/0xEA)
-    // have no vanilla name texture, so no name label (same as the strength/scale rows).
+    if (row == 0) {
+        return ITEM_EXT_TUNIC_1;
+    }
+    if (row == 1) {
+        return ITEM_EXT_BOOTS_2;
+    }
     return -1;
+}
+
+// Vanilla OoT equipment reuses MM/ext ids for fallback icons. Select its title by cell so a
+// Kokiri Tunic cannot inherit the Cape/Champion label, nor a Deku Shield the Hero's Shield label.
+void* KaleidoEquip_GetNameTex(void) {
+    static const char* sOotNames[4][3] = {
+        { NULL, "__OTR__textures/item_name_static/gMasterSwordItemNameENGTex",
+          "__OTR__textures/item_name_static/gBiggoronsSwordItemNameENGTex" },
+        { "__OTR__textures/item_name_static/gDekuShieldItemNameENGTex",
+          "__OTR__textures/item_name_static/gHylianShieldItemNameENGTex",
+          "__OTR__textures/item_name_static/gMirrorShieldItemNameENGTex" },
+        { "__OTR__textures/item_name_static/gKokiriTunicItemNameENGTex",
+          "__OTR__textures/item_name_static/gGoronTunicItemNameENGTex",
+          "__OTR__textures/item_name_static/gZoraTunicItemNameENGTex" },
+        { "__OTR__textures/item_name_static/gKokiriBootsItemNameENGTex",
+          "__OTR__textures/item_name_static/gIronBootsItemNameENGTex",
+          "__OTR__textures/item_name_static/gHoverBootsItemNameENGTex" },
+    };
+    if (sEquipSubPage != EQUIP_SUBPAGE_VANILLA || sEquipCursorX < 1 || sEquipCursorX > 3 || sEquipCursorY < 0 ||
+        sEquipCursorY > 3) {
+        return NULL;
+    }
+    if (sEquipCursorY == 0 && sEquipCursorX == 3 && WeaponUpgrade_HasGreatFairy()) {
+        return NULL; // Great Fairy's Sword uses the native MM name, like the Kokiri line.
+    }
+    const char* path = sOotNames[sEquipCursorY][sEquipCursorX - 1];
+    if (path == NULL) {
+        return NULL;
+    }
+    void* texture = KaleidoEquip_OotTex(path);
+    return texture != NULL ? texture : (void*)"__OTR__textures/virtual/gEmptyTexture";
 }
 
 // ---------------------------------------------------------------------------
@@ -867,18 +906,21 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
     }
 
     // --- Publish cursor state (name panel + drawn cursor) ---
-    // Flag the name resolver that any ext id it sees is a page-2 GRID slot: the one shared id (0xEA)
-    // means Climb Boots here and Pendant of Memories everywhere else. Skijer 2026-07-29
-    gExtEquipGridNameContext = (sEquipSubPage == EQUIP_SUBPAGE_EXT) && (sEquipCursorX != 0);
+    // Cape/Champion and Pendant/Climb Boots share ids. Refresh even when only the context or
+    // grid position changed (the two vanilla shields also share their fallback icon id).
+    u8 gridNameContext = (sEquipSubPage == EQUIP_SUBPAGE_EXT) && (sEquipCursorX != 0);
+    if (gExtEquipGridNameContext != gridNameContext ||
+        pauseCtx->cursorSlot[PAUSE_MASK] != EQUIP_CELL(sEquipCursorY, sEquipCursorX)) {
+        pauseCtx->namedItem = PAUSE_ITEM_NONE;
+    }
+    gExtEquipGridNameContext = gridNameContext;
 
     if (sEquipCursorX == 0) {
         s16 nameItem = KaleidoEquip_UpgradeNameItem(sEquipCursorY, KaleidoEquip_UpgradeValue(sEquipCursorY));
         pauseCtx->cursorItem[PAUSE_MASK] = (nameItem >= 0) ? (u16)nameItem : PAUSE_ITEM_NONE;
     } else {
         KaleidoEquip_GetCell(sEquipSubPage, sEquipCursorY, sEquipCursorX, &cell);
-        // Name-panel guard: NEI custom ids (>= 0xE0) have no vanilla name texture (ext names
-        // wired later via ExtEquip_GetNameTex).
-        pauseCtx->cursorItem[PAUSE_MASK] = (cell.item >= 0 && cell.item < 0xE0) ? (u16)cell.item : PAUSE_ITEM_NONE;
+        pauseCtx->cursorItem[PAUSE_MASK] = (cell.item >= 0) ? (u16)cell.item : PAUSE_ITEM_NONE;
     }
     pauseCtx->cursorSlot[PAUSE_MASK] = EQUIP_CELL(sEquipCursorY, sEquipCursorX);
     // Keep the shared cursor machinery in sync — the kaleido re-derives the drawn cursor from

@@ -814,7 +814,8 @@ static const char* sExtEquipIconPaths[4][3] = {
 // Left-column passives (Magic Cape / Pendant of Memories) — they left the ext grid, so their kaleido
 // icons come from here, NOT ExtEquip_GetIcon(grid). Mirror of the soh getters.
 void* ExtEquip_GetCapeIcon(void) {
-    return (void*)dgItemIconMagicCapeTex;
+    // The legacy MagicCape path is replaced by a purple tunic in older packs.
+    return (void*)"__OTR__textures/icon_item_custom/gItemIconMagicCapePassiveTex";
 }
 void* ExtEquip_GetPendantIcon(void) {
     return (void*)"__OTR__icon_item_static_yar/gItemIconPendantOfMemoriesTex";

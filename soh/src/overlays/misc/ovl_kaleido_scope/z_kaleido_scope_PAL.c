@@ -2211,6 +2211,10 @@ void KaleidoScope_DrawInfoPanel(PlayState* play) {
 void KaleidoScope_UpdateNamePanel(PlayState* play) {
     PauseContext* pauseCtx = &play->pauseCtx;
     u16 sp2A;
+    if (pauseCtx->pageIndex != PAUSE_EQUIP && gExtEquipGridNameContext) {
+        gExtEquipGridNameContext = false;
+        pauseCtx->namedItem = PAUSE_ITEM_NONE;
+    }
     bool pauseAnyCursor =
         (CVarGetInteger(CVAR_ENHANCEMENT("PauseAnyCursor"), 0) == PAUSE_ANY_CURSOR_RANDO_ONLY && IS_RANDO) ||
         (CVarGetInteger(CVAR_ENHANCEMENT("PauseAnyCursor"), 0) == PAUSE_ANY_CURSOR_ALWAYS_ON);

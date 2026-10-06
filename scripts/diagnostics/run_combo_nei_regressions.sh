@@ -53,6 +53,7 @@ python3 -B tests/nei_held/run_articulated_tests.py
 python3 -B tests/nei_asset_priority/run_tests.py
 python3 -B tests/nei_asset_priority/run_oot_gi_tests.py
 python3 -B tests/nei_held/run_equipment_tests.py
+python3 -B tests/mm_equipment_pause/run_tests.py --sanitize
 python3 -B tests/nei_quest_held/run_tests.py
 python3 -B tests/nei_used_fx/run_tests.py
 python3 -B tests/nei_leaf/run_tests.py
