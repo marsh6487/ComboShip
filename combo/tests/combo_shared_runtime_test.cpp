@@ -32,8 +32,20 @@ static auto SOH_RaiseSharedTier = raiseOot;
 static auto MM_RaiseSharedTier = raiseMm;
 static void (*SOH_GetCurrentPlayerName)(unsigned char*) = nullptr;
 static void (*MM_SetCheckPrices)(const char*) = nullptr;
+static nlohmann::json mmSettings = { { "menuSetting", 9 } }, settingsAtSave;
+static const char* dumpSettings() {
+    static std::string snapshot;
+    snapshot = mmSettings.dump();
+    return snapshot.c_str();
+}
+static void restoreSettings(const char* settings) {
+    mmSettings = nlohmann::json::parse(settings);
+}
+static auto MM_DumpRandoSettings = dumpSettings;
+static auto MM_RestoreRandoSettings = restoreSettings;
 static int saveResult = -1;
 static int initSave(int, const char*, const unsigned char*) {
+    settingsAtSave = mmSettings;
     return saveResult;
 }
 static auto MM_InitRandoSaveFile = initSave;
@@ -95,12 +107,19 @@ int main() {
     tiers[1][ComboRando::SF_BOMBCHU_BAG] = 1;
     Combo_SharedReconcileNow();
     check(raises == 1 && tiers[0][ComboRando::SF_BOMBCHU_BAG] == 0, "one-way family never raises OOT from MM");
-    nlohmann::json seed = { { "mm", { { "placements", nlohmann::json::object() } } } };
+    const auto userSettings = mmSettings;
+    nlohmann::json seed = {
+        { "mm", { { "placements", nlohmann::json::object() }, { "settings", { { "seedSetting", 7 } } } } }
+    };
     g_MmSaveInMemorySlot = -1;
     check(!Combo_WriteMMSaveForSlot(1, seed) && g_MmSaveInMemorySlot == -1,
           "failed MM creation must not claim residency");
+    check(settingsAtSave == seed["mm"]["settings"] && mmSettings == userSettings,
+          "failed MM creation must use seed settings and restore the user's menu");
     saveResult = 0;
     check(Combo_WriteMMSaveForSlot(1, seed) && g_MmSaveInMemorySlot == 1, "successful MM creation binds the real slot");
+    check(settingsAtSave == seed["mm"]["settings"] && mmSettings == userSettings,
+          "successful MM creation must use seed settings and restore the user's menu");
     g_sharedMask = 1u << ComboRando::SF_GORON_MASK;
     g_sharedReconcilePending = false;
     ResetCrossItemDedupForSeed(42);
