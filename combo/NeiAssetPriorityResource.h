@@ -185,4 +185,69 @@ inline int GetDinSwordGiProfile(const char* nativeGame, const char* game, const 
     return DinSwordGi::SelectedProfile(resource.c_str(), enabled, owner->IsAltAssetsEnabled(),
                                        [&](const char* dependency) { return bool(owner->LoadResource(dependency)); });
 }
+
+// Each independent pass retains its actual selected owner and live Alt lookup.
+// A secondary native sword pass may be a material-only/empty display list.
+struct GiFitResourceLoader {
+    std::shared_ptr<Ship::ResourceManager> owner;
+    bool materialSegment8;
+    std::shared_ptr<Ship::IResource> operator()(const char* path) {
+        return owner->LoadResource(path);
+    }
+    std::shared_ptr<Ship::IResource> operator()(uint64_t hash) {
+        return owner->LoadResource(hash);
+    }
+    bool IsMaterialDisplayList(uintptr_t address) const {
+        return materialSegment8 && address == 0x08000001;
+    }
+};
+
+inline bool GetGiModelsFit(const char* nativeGame, const char* game, const char* const* paths, int count, float scale,
+                           float tilt, int presentation, float fit[2], bool dinEnabled) {
+    if (!game || !paths || count < 1 || count > 16 || !fit || !std::isfinite(scale) || scale <= 0.f ||
+        !std::isfinite(tilt))
+        return false;
+    NeiGi::FrameBounds bounds{};
+    for (int i = 0; i < count; ++i) {
+        if (!paths[i])
+            return false;
+        std::string resource = paths[i];
+        if (resource.compare(0, 7, "__OTR__") == 0)
+            resource.erase(0, 7);
+        std::string ownerGame = game;
+        if (!resource.empty() && resource[0] == '@') {
+            const auto colon = resource.find(':');
+            if (colon == std::string::npos)
+                return false;
+            ownerGame = resource.substr(1, colon - 1);
+            resource.erase(0, colon + 1);
+        }
+        auto owner = Ship::CrossRMRegistry::Get(ownerGame);
+#ifndef COMBO_BUILD
+        if (!owner && ownerGame == nativeGame) {
+            const auto context = Ship::Context::GetRawInstance();
+            if (context)
+                owner = context->GetResourceManager();
+        }
+#else
+        (void)nativeGame;
+#endif
+        if (!owner)
+            return false;
+        const int din = i == 0 ? GetDinSwordGiProfile(nativeGame, game, paths[i], dinEnabled) : 0;
+        Ship::ResourceManagerScope scope(owner);
+        GiFitResourceLoader load{ owner, resource == "objects/object_gi_longsword/gGiBiggoronSwordDL" ||
+                                             resource == "objects/object_toki_objects/object_toki_objects_DL_001BD0" };
+        NeiGi::FrameBounds part{};
+        if (!NeiGi::SelectedModelBounds(load, resource.c_str(), tilt, din, part, true, count > 1))
+            return false;
+        NeiGi::MergeModelBounds(bounds, part);
+    }
+    if (!bounds.slug)
+        return false;
+    const auto correction = NeiGi::FrameFit(bounds, scale, presentation == 1, presentation >= 2 ? presentation - 1 : 0);
+    fit[0] = correction.scale;
+    fit[1] = correction.lift;
+    return true;
+}
 } // namespace NeiAssetPriority

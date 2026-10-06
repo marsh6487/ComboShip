@@ -286,6 +286,7 @@ MessageTableEntry nativeTable[] = {
 MessageTableEntry *sNesMessageEntryTablePtr = nativeTable;
 constexpr int MF_RAW = 0;
 static std::string loadedMessage;
+static CwItemReceiptPresentation loadedPresentation{};
 struct CustomMessage {
   std::string english;
   CwItemReceiptPresentation receiptPresentation{};
@@ -336,7 +337,7 @@ struct CustomMessage {
     Replace(WAIT_FOR_INPUT(), WAIT_FOR_INPUT() + ITEM_OBTAINED(icon));
   }
   std::string GetEnglish(int) const { return english; }
-  void LoadIntoFont() const { loadedMessage = english; }
+  void LoadIntoFont() const { loadedMessage = english; loadedPresentation = receiptPresentation; }
 };
 /* ACTUAL_FORMATTER */
 constexpr int RHT_DUNGEON_ORDINARY = 0, RHT_DUNGEON_MASTERFUL = 1;
@@ -422,17 +423,22 @@ int32_t FixtureMmReward(int32_t dungeon, char *buffer, uint32_t capacity) {
   std::memcpy(buffer, reward.c_str(), reward.size() + 1);
   return reward.size();
 }
+static bool seedIconAvailable = true;
 extern "C" int32_t OOT_GetSeedItemIconInfo(const char* name, CwItemIconInfo* out) {
   *out = {};
+  if (!seedIconAvailable) return 0;
   out->path = std::strcmp(name, "Fire Medallion") == 0
       ? "__OTR__textures/icon_item_24_static/gQuestIconMedallionFireTex"
+      : std::strcmp(name, "Kokiri Emerald") == 0
+      ? "__OTR__textures/icon_item_24_static/gQuestIconKokiriEmeraldTex"
       : "__OTR__textures/icon_item_custom/gItemIconDekuLeafTex";
-  out->width = out->height = std::strcmp(name, "Fire Medallion") == 0 ? 24 : 32;
+  out->width = out->height = std::strcmp(name, "Fire Medallion") == 0 || std::strcmp(name, "Kokiri Emerald") == 0 ? 24 : 32;
   return 1;
 }
 static int32_t FixtureSeedIcon(const char* name, CwItemIconInfo* out) {
   assert(std::string(name) == "Progressive Goron Lullaby");
   *out = {};
+  if (!seedIconAvailable) return 0;
   out->path = "__OTR__icon_item_static_yar/gItemIconSongNoteTex";
   out->width = 16; out->height = 24; out->isIA8 = 1;
   return 1;
@@ -503,19 +509,19 @@ static void CheckForestCompassReceiptInformation() {
     if (information) {
       assert(ComboReceipt_HasIcon(&presentation));
       assert(std::string(presentation.iconPath) == "__OTR__@oot:textures/icon_item_custom/gItemIconDekuLeafTex");
-      assert(presentation.rewardLine == 2 && presentation.iconWidth == 32 && presentation.iconHeight == 32);
+      assert(presentation.rewardLine == 1 && presentation.iconWidth == 32 && presentation.iconHeight == 32);
     }
     assert(text.find("Forest Temple Compass") != std::string::npos);
     if (information) {
       assert(text.find("You got the Compass!") == std::string::npos && "On must replace the native tutorial");
       assert(text.find("Now you can see hidden things.") == std::string::npos);
-      assert(text.find("masterful") == std::string::npos && "Compass information has exactly the title, boss, and reward lines");
+      assert(text.find("masterful") == std::string::npos && "Compass receipt has only its title and boss with reward icon");
       assert(text.find("It points to") != std::string::npos);
       assert(text.find("Phantom Ganon") != std::string::npos);
-      assert(text.find("Defeating the boss grants") != std::string::npos);
-      assert(text.find("Deku Leaf") != std::string::npos);
+      assert(text.find("Defeating the boss grants") == std::string::npos);
+      assert(text.find("You received a ") != std::string::npos);
       assert(text.find('\x10') == std::string::npos && "Compass information is one textbox");
-      assert(std::count(text.begin(), text.end(), '\x11') == 2);
+      assert(std::count(text.begin(), text.end(), '\x11') == 1);
     } else {
       assert(text.find("You got the Compass!") != std::string::npos);
       assert(text.find("Now you can see hidden things.") != std::string::npos);
@@ -529,7 +535,7 @@ static void CheckForestCompassReceiptInformation() {
   receiptContext = contextBefore;
   gPlayState = playBefore;
   randoActive = activeBefore;
-  std::cout << "Forest Temple Compass: saved Off reproduces tutorial/title; saved On replaces the tutorial with three boss/reward lines, dormant seed preserved passed\n";
+  std::cout << "Forest Temple Compass: saved Off tutorial; saved On two-line boss/reward sprite, dormant seed preserved passed\n";
 }
 
 static void CheckApprovedCompassExample() {
@@ -539,21 +545,26 @@ static void CheckApprovedCompassExample() {
   receiptContext.bossShuffle = 1;
   receiptContext.placements[RC_QUEEN_GOHMA] = {RG_KOKIRI_EMERALD, "Kokiri Emerald"};
   receiptContext.placements[RC_VOLVAGIA] = {RG_FIRE_MEDALLION, "Fire Medallion"};
-  entranceOverrides[0] = {ENTR_DEKU_TREE_BOSS_ENTRANCE, 1, ENTR_FIRE_TEMPLE_BOSS_ENTRANCE, 1};
-  char buffer[1269];
-  const int size = OOT_GetItemReceiptText("Great Deku Tree Compass", buffer, sizeof(buffer));
-  assert(size > 0);
-  std::string plain;
-  for (int i = 0; i < size; ++i) {
-    const uint8_t c = buffer[i];
-    if (c == 0x11) plain += '\n';
-    else if (c >= 0x20) plain += c;
+  for (bool shuffled : {false, true}) {
+    entranceOverrides[0] = {ENTR_DEKU_TREE_BOSS_ENTRANCE, 1,
+        shuffled ? ENTR_FIRE_TEMPLE_BOSS_ENTRANCE : ENTR_DEKU_TREE_BOSS_ENTRANCE, 1};
+    char buffer[1269];
+    const int size = OOT_GetItemReceiptText("Great Deku Tree Compass", buffer, sizeof(buffer));
+    assert(size > 0);
+    std::string plain;
+    for (int i = 0; i < size; ++i) {
+      const uint8_t c = buffer[i];
+      if (c == 0x11) plain += '\n';
+      else if (c >= 0x20) plain += c;
+    }
+    assert(plain == std::string("You received a Deku Tree Compass!\nIt points to ") +
+        (shuffled ? "Volvagia" : "Queen Gohma"));
+    CwItemReceiptPresentation presentation{};
+    assert(OOT_GetDungeonItemReceiptPresentation("Great Deku Tree Compass", &presentation) == 1);
+    assert(std::string(presentation.iconPath) == std::string("__OTR__@oot:textures/icon_item_24_static/") +
+        (shuffled ? "gQuestIconMedallionFireTex" : "gQuestIconKokiriEmeraldTex"));
+    assert(presentation.rewardLine == 1 && presentation.iconWidth == 24 && presentation.iconHeight == 24);
   }
-  assert(plain == "You found the Deku Tree Compass!\nIt points to Volvagia!\nDefeating the boss grants the Fire Medallion!");
-  CwItemReceiptPresentation presentation{};
-  assert(OOT_GetDungeonItemReceiptPresentation("Great Deku Tree Compass", &presentation) == 1);
-  assert(std::string(presentation.iconPath) == "__OTR__@oot:textures/icon_item_24_static/gQuestIconMedallionFireTex");
-  assert(presentation.iconWidth == 24 && presentation.iconHeight == 24);
   assert(liveResolutionCalls == 0);
   receiptContext = contextBefore;
   std::copy(overridesBefore.begin(), overridesBefore.end(), entranceOverrides);
@@ -589,11 +600,12 @@ static void CheckGeneratedCompassRoutes(const char* fixturePath) {
     const bool bossAssigned = std::string(route) == "direct" || std::string(route) == "nested";
     assert((text.find("Volvagia") != std::string::npos) == bossAssigned &&
            "native generated nested entrance must reveal the actual reachable boss");
-    assert((text.find("Fire Medallion") != std::string::npos) == bossAssigned);
+    assert(text.find("Fire Medallion") == std::string::npos);
     assert(text.find("Phantom Ganon") == std::string::npos && "never invent the vanilla boss for a mixed route");
     CwItemReceiptPresentation p{};
     assert(OOT_GetDungeonItemReceiptPresentation("Forest Temple Compass", &p) == 1);
     assert(ComboReceipt_HasIcon(&p) == bossAssigned);
+    if (bossAssigned) assert(p.rewardLine == 1 && std::strstr(p.iconPath, "MedallionFire"));
     if (!bossAssigned)
       assert(text.find("boss room") != std::string::npos && "unknown routes need an explanation, not a title alone");
   }
@@ -706,15 +718,17 @@ int main(int argc, char** argv) {
                                                "Kokiri Emerald"};
   receiptContext.placements[RC_PHANTOM_GANON] = {RG_DEKU_LEAF, "Deku Leaf"};
   auto rewardCompass = read("Great Deku Tree Compass");
-  assert(rewardCompass.find("Deku Leaf") != std::string::npos &&
+  CwItemReceiptPresentation rewardPresentation{};
+  assert(OOT_GetDungeonItemReceiptPresentation("Great Deku Tree Compass", &rewardPresentation) == 1);
+  assert(std::strstr(rewardPresentation.iconPath, "DekuLeaf") &&
          rewardCompass.find("Kokiri Emerald") == std::string::npos);
   receiptContext.placements[RC_PHANTOM_GANON] = {RG_COMBO_FOREIGN,
                                                  "Combo Foreign Item"};
   rewardForeign.itemName = "Progressive Goron Lullaby";
   rewardForeign.displayName = "Progressive Goron Lullaby (MM)";
-  assert(
-      read("Great Deku Tree Compass").find("Progressive Goron Lullaby (MM)") !=
-      std::string::npos);
+  assert(read("Great Deku Tree Compass").find("Progressive Goron Lullaby (MM)") == std::string::npos);
+  assert(OOT_GetDungeonItemReceiptPresentation("Great Deku Tree Compass", &rewardPresentation) == 1);
+  assert(std::string(rewardPresentation.iconPath) == "__OTR__@mm:icon_item_static_yar/gItemIconSongNoteTex");
   assert(liveResolutionCalls == 0 && foreignLatches == 0);
   receiptContext.dungeonShuffle = 1;
   entranceOverrides[1] = {ENTR_DODONGOS_CAVERN_ENTRANCE, 1,
@@ -770,9 +784,17 @@ int main(int argc, char** argv) {
   assert(read("Great Deku Tree Map").find("masterful") != std::string::npos);
   assert(read("Great Deku Tree Compass").find("masterful") ==
          std::string::npos);
-  assert(
-      read("Great Deku Tree Compass").find("Progressive Goron Lullaby (MM)") !=
-      std::string::npos);
+  assert(read("Great Deku Tree Compass").find("Progressive Goron Lullaby (MM)") == std::string::npos);
+  assert(OOT_GetDungeonItemReceiptPresentation("Great Deku Tree Compass", &rewardPresentation) == 1);
+  assert(rewardPresentation.rewardLine == 1 && std::strstr(rewardPresentation.iconPath, "@mm:"));
+  // A missing sprite must retain the placed reward as readable text.
+  seedIconAvailable = false;
+  const auto missingSprite = read("Great Deku Tree Compass");
+  assert(missingSprite.find("Progressive Goron Lullaby (MM)") != std::string::npos);
+  assert(missingSprite.find("Defeating the boss grants") != std::string::npos);
+  assert(OOT_GetDungeonItemReceiptPresentation("Great Deku Tree Compass", &rewardPresentation) == 1);
+  assert(!ComboReceipt_HasIcon(&rewardPresentation) && rewardPresentation.rewardLine == 2);
+  seedIconAvailable = true;
   assert(read("Great Deku Tree Map").find("Dodongo's Cavern") !=
          std::string::npos);
   receiptContext.generated = false;
@@ -807,8 +829,9 @@ int main(int argc, char** argv) {
   receiptPlayer.getItemEntry.itemId = ITEM_COMPASS;
   nativeTable = true;
   BuildMapMessage(&nativeText, &nativeTable);
-  assert(!nativeTable && loadedMessage.find("Progressive Goron Lullaby (MM)") !=
-                             std::string::npos);
+  assert(!nativeTable && loadedMessage.find("Progressive Goron Lullaby (MM)") == std::string::npos);
+  assert(loadedMessage.find("Phantom Ganon") != std::string::npos && loadedPresentation.rewardLine == 1);
+  assert(std::string(loadedPresentation.iconPath) == "__OTR__@mm:icon_item_static_yar/gItemIconSongNoteTex");
   receiptPlayer.getItemEntry.modIndex = MOD_RANDOMIZER;
   masterQuest = true;
   assert(read("Great Deku Tree Compass").find("masterful") ==

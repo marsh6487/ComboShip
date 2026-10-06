@@ -16,7 +16,9 @@ oot_prelude = oot_draw.split('#include "ComboMaskShimmer.h"', 1)[0]
 oot_interpolation = ('#include "soh/frame_interpolation.h"'
                      if '#include "soh/frame_interpolation.h"' in oot_prelude else '')
 foreign = (ROOT / 'combo/menu/ComboForeignAnim.h').read_text()
-foreign_linkage = re.search(r'extern "C" \{\nvoid FrameInterpolation_RecordOpenChild[^}]+\}', foreign).group(0)
+interpolation_declarations = re.findall(r'^void FrameInterpolation_Record(?:OpenChild|CloseChild)\([^;]*\);$', foreign, re.M)
+assert len(interpolation_declarations) == 2
+foreign_linkage = 'extern "C" {\n' + '\n'.join(interpolation_declarations) + '\n}'
 
 def function(source, name):
     match = re.search(r'^(?:(?:static|inline) )?(?:void|s32|bool) ' + re.escape(name) + r'\([^;{}]*\)\s*\{', source, re.M)

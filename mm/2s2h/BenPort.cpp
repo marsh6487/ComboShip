@@ -5345,6 +5345,24 @@ extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* game, const c
     return NeiAssetPriority::GetDinSwordGiProfile("mm", game, path, CVarGetInteger("gEnhancements.DinFireSword", 0));
 }
 
+extern "C" int MmAssets_GetOotGiModelFit(const char* path, float scale, float tilt, int presentation, float fit[2]);
+extern "C" int ResourceMgr_GetGiModelsFitForGame(const char* game, const char* const* paths, int count, float scale,
+                                                 float tilt, int presentation, float fit[2]) {
+    // The retained native Biggoron callback uses an archive-scoped donor
+    // unless a local primary mod wins. Only donor absence uses the MM twin.
+    if (game && std::strcmp(game, "oot-companion") == 0) {
+        if (!paths || count != 1 || !paths[0] ||
+            std::strcmp(paths[0], "objects/object_gi_longsword/gGiBiggoronSwordDL") != 0)
+            return 0;
+        const int result = MmAssets_GetOotGiModelFit(paths[0], scale, tilt, presentation, fit);
+        if (result)
+            return result > 0;
+        return NeiAssetPriority::GetGiModelsFit("mm", "mm", paths, count, scale, tilt, presentation, fit, false);
+    }
+    return NeiAssetPriority::GetGiModelsFit("mm", game, paths, count, scale, tilt, presentation, fit,
+                                            CVarGetInteger("gEnhancements.DinFireSword", 0));
+}
+
 extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path) {
     return NeiAssetPriority::IsCustomAsset("mm", game, path);
 }

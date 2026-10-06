@@ -983,6 +983,12 @@ extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* game, const c
                                                   CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
 }
 
+extern "C" int ResourceMgr_GetGiModelsFitForGame(const char* game, const char* const* paths, int count, float scale,
+                                                 float tilt, int presentation, float fit[2]) {
+    return NeiAssetPriority::GetGiModelsFit("oot", game, paths, count, scale, tilt, presentation, fit,
+                                            CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
+}
+
 extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path) {
     return NeiAssetPriority::IsCustomAsset("oot", game, path);
 }

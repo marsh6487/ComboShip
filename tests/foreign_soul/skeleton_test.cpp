@@ -27,7 +27,9 @@ struct Mtx {
   float x = 0, y = 0, z = 0;
   float sx = 1, sy = 1, sz = 1;
   float rx = 0;
+  float padding[9]{};
 };
+static_assert(sizeof(Mtx) == 64);
 struct Gfx {
   int kind = 0, seg = 0;
   uintptr_t target = 0;
@@ -198,7 +200,9 @@ using LimbArg = void *;
 using OverrideLimbDrawOpa = s32 (*)(PlayState *, s32, Gfx **, Vec3f *, Vec3s *,
                                     LimbArg);
 using PostLimbDrawOpa = void (*)(PlayState *, s32, Gfx **, Vec3s *, LimbArg);
+extern "C" {
 #include "native_draw.inc"
+}
 static int normalInits = 0, flexInits = 0, updates = 0;
 static int freezes = 0;
 int16_t Animation_GetLastFrame(void*) { return 42; }
@@ -423,6 +427,40 @@ struct BarinadeSkeletonResource : Ship::IResource {
   }
   void* GetRawPointer() override { return &h; }
 };
+// Barinade's selected flex meshes also draw on XLU and read other limbs via
+// segment 13 (the reported crash command samples offset 0x100, matrix 4).
+// Replay the real recorded streams independently, after the palette is filled.
+static uintptr_t checkBarinadeXluMatrices(GraphicsContext& c, Gfx* opaBegin = nullptr,
+                                          Gfx* xluBegin = nullptr, uintptr_t inheritedPalette = 0) {
+  uintptr_t opaPalette = 0;
+  uintptr_t opaFinalPalette = 0;
+  for (Gfx* p = opaBegin ? opaBegin : c.opa; p < c.op; ++p) {
+    if (p->kind == 1 && p->seg == 13) {
+      if (!opaPalette) opaPalette = p->target;
+      opaFinalPalette = p->target;
+    }
+  }
+  assert(opaPalette);
+  uintptr_t xluPalette = inheritedPalette;
+  int meshes = 0;
+  for (Gfx* p = xluBegin ? xluBegin : c.xlu; p < c.xp; ++p) {
+    if (p->kind == 1 && p->seg == 13) xluPalette = p->target;
+    if (p->kind != 3) continue;
+    const std::string path((const char*)p->target);
+    if (path.find(":barinade_limb_") == std::string::npos) continue;
+    assert(xluPalette && "flex Barinade XLU mesh has no matrix segment 13");
+    assert(xluPalette == opaPalette && "XLU must use this draw's actual limb palette");
+    const Mtx* sampled = (const Mtx*)(xluPalette + 0x100);
+    assert(sampled->x == 10 && "referenced limb matrix must be initialized before playback");
+    ++meshes;
+  }
+  assert(meshes == 27);
+  assert(xluPalette != opaPalette && "XLU must release the flex matrix palette after drawing");
+  assert(xluPalette == opaFinalPalette && "both streams must restore the same empty display list");
+  const Gfx* cleanup = (const Gfx*)xluPalette;
+  for (int i = 0; i < CFA_EMPTY_DL_ENTRIES; ++i) assert(cleanup[i].kind == 0);
+  return opaPalette;
+}
 static void checkBarinade(std::shared_ptr<Ship::ResourceManager> owner,
                           std::shared_ptr<Ship::ResourceManager> host) {
   CwItemAnimDrawInfo info{};
@@ -479,6 +517,7 @@ static void checkBarinade(std::shared_ptr<Ship::ResourceManager> owner,
     current = {}; scrollRequests.clear();
     assert(ComboForeignAnim_Draw(&info, "oot", &play));
     assert(Ship::Context::GetRawInstance()->rm == host && matrices.empty());
+    if (alt) checkBarinadeXluMatrices(c);
     int opa = 0, xlu = 0, seg13 = 0, ring = 0, electric = 0;
     for (Gfx* p = c.opa; p < c.op; ++p) {
       if (p->kind == 1 && p->seg == 13) seg13++;
@@ -501,6 +540,31 @@ static void checkBarinade(std::shared_ptr<Ship::ResourceManager> owner,
     assert(c.op[-1].kind == 1 && c.op[-1].seg == 9 && ((Gfx*)c.op[-1].target)[0].kind == 0);
   }
   assert(freezes == 2); // one frozen initialization per owning Alt selection, cache retained
+  // The original native opaque entry must retain its previous XLU state.
+  {
+    auto flex = std::static_pointer_cast<BarinadeSkeletonResource>(owner->replacement[info.skelPath]);
+    Vec3s joints[64]{};
+    joints[0].x = 10;
+    GraphicsContext c; PlayState p{{&c, 60}, 8, {}};
+    current = {};
+    SkelAnime_DrawFlexOpa(&p, flex->h.sh.segment, joints, 63, nullptr, nullptr, nullptr);
+    assert(c.op != c.opa && c.xp == c.xlu);
+  }
+  // Two models in one frame must rebind their own palettes, even after another
+  // model or scene left a stale translucent matrix segment behind.
+  {
+    owner->alt = true;
+    GraphicsContext c; PlayState p{{&c, 61}, 8, {}};
+    current = {};
+    assert(ComboForeignAnim_Draw(&info, "oot", &p));
+    const uintptr_t first = checkBarinadeXluMatrices(c, nullptr, nullptr, 0xDEADBEEF);
+    Gfx* opaBegin = c.op;
+    Gfx* xluBegin = c.xp;
+    current = {};
+    assert(ComboForeignAnim_Draw(&info, "oot", &p));
+    const uintptr_t second = checkBarinadeXluMatrices(c, opaBegin, xluBegin, first);
+    assert(first != second && matrices.empty());
+  }
   // Compatible selected custom rigs keep their native electricity, ring and limb motion.
   barinadeCustom = true;
   CwItemAnimDrawInfo custom{};

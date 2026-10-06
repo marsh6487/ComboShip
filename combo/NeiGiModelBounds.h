@@ -21,12 +21,24 @@ template <class Load> class ModelBoundsReader {
     ModelBoundsReader(Load& load, float tilt) : mLoad(load), mSin(std::sin(tilt)), mCos(std::cos(tilt)) {
     }
 
-    bool Read(const char* path, FrameBounds& out) {
+    bool Read(const char* path, FrameBounds& out, bool allowEmpty = false) {
         const auto root = std::dynamic_pointer_cast<Fast::DisplayList>(mLoad(path));
-        if (!Walk(root, 0) || !mVertices || !mStack.empty())
+        if (!Walk(root, 0) || !mStack.empty())
             return false;
+        if (!mVertices) {
+            out = {};
+            return allowEmpty; // Native sword detail/color passes can be geometry-free.
+        }
         out = { "selected_sword", { 0, mLow, 0 }, { 0, mHigh, 0 }, 2.f * mRadius, Kind::Neutral, {} };
         return mHigh > mLow && mRadius > 0.f;
+    }
+
+    bool RestoresModelView() const {
+        for (int row = 0; row < 4; ++row)
+            for (int column = 0; column < 4; ++column)
+                if (std::abs(mMatrix[row][column] - (row == column ? 1.f : 0.f)) > .00001f)
+                    return false;
+        return true;
     }
 
   private:
@@ -55,6 +67,12 @@ template <class Load> class ModelBoundsReader {
     }
 
     using Matrix = std::array<std::array<float, 4>, 4>;
+    template <class Key> std::shared_ptr<Ship::IResource> MatrixResource(Key key) {
+        if constexpr (requires { mLoad.LoadMatrix(key); })
+            return mLoad.LoadMatrix(key);
+        else
+            return mLoad(key);
+    }
     bool ApplyMatrix(const std::shared_ptr<Ship::IResource>& resource, uint32_t flags) {
         const auto matrix = std::dynamic_pointer_cast<Fast::Matrix>(resource);
         // LOAD/projection matrices replace the host pose; an outer GI fit
@@ -97,6 +115,23 @@ template <class Load> class ModelBoundsReader {
     bool Walk(const std::shared_ptr<Fast::DisplayList>& list, unsigned depth) {
         if (!list || list->UCode != ucode_f3dex2 || depth >= 32)
             return false;
+        struct Scope {
+            Load& load;
+            Scope(Load& loader, const std::shared_ptr<Fast::DisplayList>& resource) : load(loader) {
+                if constexpr (requires {
+                                  load.Enter(resource);
+                                  load.Leave();
+                              })
+                    load.Enter(resource);
+            }
+            ~Scope() {
+                if constexpr (requires {
+                                  load.Enter(std::shared_ptr<Fast::DisplayList>{});
+                                  load.Leave();
+                              })
+                    load.Leave();
+            }
+        } scope(mLoad, list);
         const auto& commands = list->Instructions;
         for (size_t i = 0; i < commands.size(); ++i) {
             if (++mCommands > 16384)
@@ -120,7 +155,7 @@ template <class Load> class ModelBoundsReader {
                               args.words.w0))
                     return false;
             } else if (op == G_MTX_OTR_FILEPATH) {
-                if (!ApplyMatrix(mLoad(reinterpret_cast<const char*>(command.words.w1)),
+                if (!ApplyMatrix(MatrixResource(reinterpret_cast<const char*>(command.words.w1)),
                                  (command.words.w0 & 0xffu) ^ G_MTX_PUSH))
                     return false;
             } else if (op == G_POPMTX) {
@@ -133,7 +168,7 @@ template <class Load> class ModelBoundsReader {
                 if (++i == commands.size())
                     return false;
                 const uint64_t hash = (uint64_t(commands[i].words.w0) << 32) | uint32_t(commands[i].words.w1);
-                const auto resource = mLoad(hash);
+                const auto resource = op == G_MTX_OTR ? MatrixResource(hash) : mLoad(hash);
                 if (op == G_DL_OTR_HASH) {
                     if (!Walk(std::dynamic_pointer_cast<Fast::DisplayList>(resource), depth + 1))
                         return false;
@@ -159,7 +194,15 @@ template <class Load> class ModelBoundsReader {
                         !Vertices(resource, offset / sizeof(Vtx), (command.words.w0 >> 12) & 0xff))
                         return false;
                 }
-            } else if (op == G_MTX || op == G_VTX || op == G_DL || op == G_BRANCH_Z_OTR || op == G_BRANCH_Z) {
+            } else if (op == G_DL) {
+                // Only a caller that installs a known geometry-free material
+                // segment may admit its raw call. Other raw geometry fails.
+                if constexpr (requires { mLoad.IsMaterialDisplayList(command.words.w1); }) {
+                    if (mLoad.IsMaterialDisplayList(command.words.w1))
+                        continue;
+                }
+                return false;
+            } else if (op == G_MTX || op == G_VTX || op == G_BRANCH_Z_OTR || op == G_BRANCH_Z) {
                 return false;
             } else if (op == G_SETTIMG_OTR_HASH || op == G_MARKER || op == G_MOVEMEM_OTR) {
                 if (++i == commands.size())
@@ -178,11 +221,10 @@ template <class Load> class ModelBoundsReader {
 };
 
 template <class Load>
-bool SelectedModelFit(Load& load, const char* path, float scale, float tilt, int presentation, int dinProfile,
-                      ShopFit& out) {
-    FrameBounds bounds{};
+bool SelectedModelBounds(Load& load, const char* path, float tilt, int dinProfile, FrameBounds& bounds,
+                         bool allowEmpty = false, bool requireRestoredModelView = false) {
     ModelBoundsReader<Load> reader(load, tilt);
-    if (!reader.Read(path, bounds))
+    if (!reader.Read(path, bounds, allowEmpty) || (requireRestoredModelView && !reader.RestoresModelView()))
         return false;
     if (dinProfile >= 1 && dinProfile <= 3) {
         const auto& layers = DinSwordGi::profiles[dinProfile - 1];
@@ -196,7 +238,42 @@ bool SelectedModelFit(Load& load, const char* path, float scale, float tilt, int
             bounds.spinningWidth = std::max(bounds.spinningWidth, layerBounds.spinningWidth);
         }
     }
+    return true;
+}
+
+inline void MergeModelBounds(FrameBounds& bounds, const FrameBounds& part) {
+    if (!part.slug)
+        return; // A successfully traversed, geometry-free material/detail pass.
+    if (!bounds.slug) {
+        bounds = part;
+        return;
+    }
+    bounds.minimum.y = std::min(bounds.minimum.y, part.minimum.y);
+    bounds.maximum.y = std::max(bounds.maximum.y, part.maximum.y);
+    bounds.spinningWidth = std::max(bounds.spinningWidth, part.spinningWidth);
+}
+
+template <class Load>
+bool SelectedModelsFit(Load& load, const char* const* paths, int count, float scale, float tilt, int presentation,
+                       int dinProfile, ShopFit& out) {
+    if (!paths || count < 1 || count > 16)
+        return false;
+    FrameBounds bounds{};
+    for (int i = 0; i < count; ++i) {
+        FrameBounds part{};
+        if (!paths[i] || !SelectedModelBounds(load, paths[i], tilt, i == 0 ? dinProfile : 0, part, true, count > 1))
+            return false;
+        MergeModelBounds(bounds, part);
+    }
+    if (!bounds.slug)
+        return false;
     out = FrameFit(bounds, scale, presentation == 1, presentation >= 2 ? presentation - 1 : 0);
     return true;
+}
+
+template <class Load>
+bool SelectedModelFit(Load& load, const char* path, float scale, float tilt, int presentation, int dinProfile,
+                      ShopFit& out) {
+    return SelectedModelsFit(load, &path, 1, scale, tilt, presentation, dinProfile, out);
 }
 } // namespace NeiGi

@@ -486,15 +486,19 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
         if (!info.empty()) {
             entry.receiptPresentation.singleBox = 1;
             entry.receiptPresentation.rewardLine = 2;
-            std::string body = "You found the %g" + std::string(item.name) + "%w!";
+            std::string body = (compass ? "You received a %g" : "You found the %g") + std::string(item.name) + "%w!";
             if (compass) {
-                body += "&It points to %r" + std::string(kDungeonInformation[dungeon].boss) + "%w!";
-                body += "&Defeating the boss grants the %g" + DungeonRewardName(dungeon) + "%w!";
+                body += "&It points to %r" + std::string(kDungeonInformation[dungeon].boss) + "%w";
 #ifdef COMBO_BUILD
                 CwItemIconInfo icon{};
                 if (MM_GetDungeonRewardIconInfo(dungeon, &icon) == 1)
                     ComboReceipt_CopyIcon(&entry.receiptPresentation, &icon, "mm");
 #endif
+                if (ComboReceipt_HasIcon(&entry.receiptPresentation)) {
+                    entry.receiptPresentation.rewardLine = 1;
+                } else {
+                    body += "!&Defeating the boss grants the %g" + DungeonRewardName(dungeon) + "%w!";
+                }
             } else {
                 body += "&It seems the entrance is at %c" + std::string(kDungeonInformation[dungeon].entrance) + "%w.";
             }

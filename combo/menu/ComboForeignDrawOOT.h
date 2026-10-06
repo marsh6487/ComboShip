@@ -953,16 +953,24 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         return;
     }
 
-    const bool fitSword = info->drawKind == CW_DRAW_KIND_CUSTOM_GI && info->count > 0 && info->neiShimmer > 0 &&
-                          info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
-                          NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
+    const bool swordIdentity = info->neiShimmer > 0 &&
+                               info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
+                               NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
+    const bool fitSword = info->count > 0 && swordIdentity &&
+                          (info->drawKind == CW_DRAW_KIND_CUSTOM_GI || info->drawKind == CW_DRAW_KIND_SIMPLE ||
+                           info->drawKind == CW_DRAW_KIND_MASTER_SWORD || info->drawKind == CW_DRAW_KIND_GORON_SWORD);
     if (fitSword) {
         Matrix_Push();
-        ComboSwordGi_ApplyFit("oot", info->dls[0], info->scale,
-                              info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z
-                                  ? info->ops[0].a * (3.14159265358979323846f / 32768.f)
-                                  : 0.f,
-                              shop);
+        const float scale = info->drawKind == CW_DRAW_KIND_MASTER_SWORD  ? .05f
+                            : info->drawKind == CW_DRAW_KIND_GORON_SWORD ? 1.f
+                            : info->scale > 0                            ? info->scale
+                                                                         : 1.f;
+        const float tilt =
+            info->drawKind == CW_DRAW_KIND_MASTER_SWORD ? 2.1f
+            : info->drawKind == CW_DRAW_KIND_CUSTOM_GI && info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z
+                ? info->ops[0].a * (3.14159265358979323846f / 32768.f)
+                : 0.f;
+        ComboSwordGi_ApplyModelsFit("oot", info->dls, info->count, scale, tilt, shop);
     }
     // Authored NEI recipes carry their palette in neiEffect and render their
     // shimmer inside the shared presentation. Other recipes use the overlay.

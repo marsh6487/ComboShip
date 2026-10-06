@@ -227,6 +227,10 @@ void OOT_DrawForeignSimple(PlayState* play,const ComboForeignDrawInfo* info) {
             mm_foreign_draw = functions(mm_foreign_source)["MM_DrawComboForeign"]
             mm_handlers = sorted(set(re.findall(r"\b(MM_DrawForeign\w+)\(info(?:, shop)?\)", mm_foreign_draw)))
             mm_shop_support = """
+#include "mm/2s2h/FleetShipCombo/FleetComboIds.h"
+struct FixtureNeiSaveData { uint8_t comboObtained[FC_COMBO_OBTAINED_SIZE] = {}; };
+FixtureNeiSaveData fixtureNeiSaveData;
+FixtureNeiSaveData* Nei_Save() { return &fixtureNeiSaveData; }
 using RandoCheckId=int;
 constexpr RandoCheckId RC_UNKNOWN=0;
 struct MmShopEnGirlA { Actor actor; s16 rotY; };

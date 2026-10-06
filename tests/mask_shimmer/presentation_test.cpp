@@ -116,6 +116,7 @@ int DinFireShield_DrawItem(PlayState*, int16_t) { return 0; }
 // Selected model fitting and Din layers have real dedicated sword fixtures.
 // This fixture provides neither model family to the production GI dispatcher.
 int ResourceMgr_GetGiModelFitForGame(const char*, const char*, float, float, int, float[2]) { return 0; }
+int ResourceMgr_GetGiModelsFitForGame(const char*, const char* const*, int, float, float, int, float[2]) { return 0; }
 int ResourceMgr_GetDinSwordGiProfileForGame(const char*, const char*) { return 0; }
 #ifdef HOST_MM
 Color_RGBA8 CosmeticEditor_GetChangedColor(u8, u8, u8, u8, const char*) {

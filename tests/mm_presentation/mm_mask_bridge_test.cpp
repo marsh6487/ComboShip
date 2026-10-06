@@ -153,7 +153,7 @@ void NeiGi_DrawSeasonOverlay(PlayState*,int,const char*) {assert(0 && "mask fixt
 void NeiGi_DrawSongOverlay(PlayState*,int,const char*) {assert(false && "song dispatch has its own production fixture");}
 // Sword drawing/fitting is tested by the selected-model and foreign sword
 // fixtures. Masks must never enter either branch in this dispatcher.
-void ComboSwordGi_ApplyFit(const char*,const char*,float,float,bool=false,int=0) {assert(0 && "mask selected sword fit");}
+void ComboSwordGi_ApplyModelsFit(const char*,const char* const*,int,float,float,bool=false,int=0) {assert(0 && "mask selected sword fit");}
 void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*,bool=false) {assert(0 && "mask selected custom sword draw");}
 /* OTHER_DRAW_HANDLERS */
 /* HOST_DISPATCH */

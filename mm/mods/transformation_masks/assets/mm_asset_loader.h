@@ -22,6 +22,9 @@
 extern "C" {
 #endif
 
+// Internal MM sword receipt bounds seam; never reads the renderer's patched cache.
+int MmAssets_GetOotGiModelFit(const char* path, float scale, float tilt, int presentation, float fit[2]);
+
 /**
  * Initialize MM asset detection
  * Checks for mm.o2r and loads it if found

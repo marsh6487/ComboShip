@@ -37,6 +37,8 @@ static std::vector<std::vector<int32_t>> scrollParams;
 static bool flameAvailable = true;
 static bool dinLayers;
 static bool fitModel;
+static int fittedRoots;
+static float fittedDrawScale, fittedTilt;
 static int interpolation, shimmers, sentinels, identityDraws;
 static NeiGi::Mesh identityMesh;
 static ComboForeignDrawInfo recipe;
@@ -131,7 +133,13 @@ extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char* owner,const c
   else if(!strncmp(path,"__OTR__",7))path+=7;
   return DinSwordGi::SelectedProfile(path,dinLayers,true,[](const char*){return true;});
 }
-static void ComboSwordGi_ApplyFit(const char*,const char*,float,float,bool,int=0) {
+static void ComboSwordGi_ApplyFit(const char*,const char*,float scale,float tilt,bool,int=0) {
+  fittedRoots=1;fittedDrawScale=scale;fittedTilt=tilt;
+  if(fitModel){Matrix_Translate(0,-20,0,MTXMODE_APPLY);Matrix_Scale(.5f,.5f,.5f,MTXMODE_APPLY);}
+}
+static void ComboSwordGi_ApplyModelsFit(const char*,const char* const* paths,int count,float scale,float tilt,bool,int=0) {
+  for(int i=0;i<count;++i)assert(paths[i]);
+  fittedRoots=count;fittedDrawScale=scale;fittedTilt=tilt;
   if(fitModel){Matrix_Translate(0,-20,0,MTXMODE_APPLY);Matrix_Scale(.5f,.5f,.5f,MTXMODE_APPLY);}
 }
 static void ComboDrawMaskShimmer(PlayState *, const char *,
@@ -157,7 +165,10 @@ UNUSED_HANDLER(OOT_DrawForeignPoes)
 UNUSED_HANDLER(OOT_DrawForeignFairyBottle)
 UNUSED_HANDLER(OOT_DrawForeignSoulFlame)
 UNUSED_HANDLER(OOT_DrawForeignOps)
-UNUSED_HANDLER(OOT_DrawForeignSimple)
+static constexpr int kMaxMatEntries=8;
+template<class...Args>void ComboForeignTexAnim_Run(Args...){assert(false);}
+template<class...Args>void ComboForeignTexAnim_Restore(Args...){assert(false);}
+static Gfx* MM_DrawForeignMagicJarDList(Gfx*,const char*,const uint8_t*){assert(false);return nullptr;}
 static void NeiGi_DrawSeasonOverlay(PlayState*,int,const char*) {
   assert(false && "sword fixture must not select weather");
 }
@@ -250,6 +261,7 @@ static void Reset(int kind, bool trueTier, bool shimmer) {
   flameAvailable = true;
   dinLayers = false;
   fitModel = false;
+  fittedRoots=0;fittedDrawScale=fittedTilt=0;
   recipe = {};
   recipe.count = 1;
   recipe.xluStart = -1;
@@ -364,6 +376,24 @@ int main() {
   Dispatch();
   assert(CheckStream(opa, gfx.polyOpa.p, false).size() == 1 &&
          CheckStream(xlu, gfx.polyXlu.p, false).size() == 1);
+  Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);
+  recipe.neiShimmer=int(NeiGi::Kind::MasterSword)+1;fitModel=true;
+  recipe.count=2;recipe.xluStart=1;recipe.dls[1]="__OTR__@oot:objects/test/oversizedSwordSkinDL";
+  Dispatch();
+  assert(fittedRoots==2&&"foreign selected sword fit omitted its independent translucent root");
+  assert(CheckStream(opa,gfx.polyOpa.p,false)[0].path==recipe.dls[0]);
+  assert(CheckStream(xlu,gfx.polyXlu.p,false)[0].path==recipe.dls[1]);
+  Reset(CW_DRAW_KIND_SIMPLE,false,true);
+  recipe.neiShimmer=int(NeiGi::Kind::RazorSword)+1;fitModel=true;
+  recipe.scale=0;recipe.count=2;recipe.xluStart=-1;
+  recipe.opCount=1;recipe.ops[0]={CW_OP_ROTATE_Z,18774.682f,0,0,{}};
+  recipe.dls[0]="__OTR__@mm:objects/object_gi_sword_2/gGiRazorSwordDL";
+  recipe.dls[1]="__OTR__@mm:objects/object_gi_sword_2/gGiRazorSwordEmptyDL";
+  Dispatch();
+  assert(fittedRoots==2&&fittedDrawScale==1.f&&fittedTilt==0.f&&"native GI recipe bypassed its effective-scale fit");
+  const auto nativeBody=CheckStream(opa,gfx.polyOpa.p,false);
+  assert(nativeBody.size()==2&&nativeBody[0].path==recipe.dls[0]&&nativeBody[1].path==recipe.dls[1]);
+  assert(identityDraws==2&&nativeBody[0].pose==nativeBody[1].pose);
   std::cout << "PASS actual OoT sword fallback dispatch: owner scopes, signed "
                "transforms, independent blade/flame, shimmer pose, stream "
                "cursors and segment cleanup\n";

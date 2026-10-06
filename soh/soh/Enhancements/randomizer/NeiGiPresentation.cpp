@@ -19,6 +19,7 @@ extern "C" {
 #include "macros.h"
 }
 #include "ComboSwordGiFit.h"
+#include "ComboSwordGiLegacyFit.h"
 
 namespace {
 using NeiGi::Kind;
@@ -886,7 +887,19 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     if (selectedSword) {
         ComboSwordGi_ApplyFit("oot", selectedSword, .04f, 1.8f, shop);
     } else if (upgraded && !authored && NeiGi::IsSword(item->effect)) {
-        ComboSwordGi_ApplyFit("oot", item->opaque, item->scale, 0.f, shop);
+        const char* paths[] = { item->opaque, item->translucent };
+        ComboSwordGi_ApplyModelsFit("oot", paths, item->translucent ? 2 : 1, item->scale, 0.f, shop);
+    } else if (!upgraded && NeiGi::IsSword(item->effect)) {
+        const bool fourSwordFallback = item->draw == Randomizer_DrawExtFourSword &&
+                                       !HasResource("__OTR__objects/object_nei_four_sword/gNeiFourSwordBladeDL");
+        const auto legacyKind =
+            item->draw == Randomizer_DrawProgressiveMasterSword || fourSwordFallback ? Kind::KokiriSword : item->effect;
+        const float legacyScale = fourSwordFallback                                     ? .55f
+                                  : item->draw == Randomizer_DrawProgressiveMasterSword ? .6f
+                                  : item->draw == Randomizer_DrawProgressiveKokiriSword ? .55f
+                                  : item->draw == Randomizer_DrawProgressiveBGS         ? .5f
+                                                                                        : 0.f;
+        ComboSwordGi_ApplyLegacyFit("oot", legacyKind, shop, 0, legacyScale);
     } else if (authored) {
         if (const auto* bounds = NeiGi::FindFrameBounds(item->opaque)) {
             const auto fit = NeiGi::FrameFit(*bounds, item->scale, shop);

@@ -156,6 +156,11 @@ int ResourceMgr_GetGiModelFitForGame(const char*,const char*,float,float,int con
   Fixture::modelFitContext=context;
   return 0;
 }
+int ResourceMgr_GetGiModelsFitForGame(const char* game,const char* const* paths,int count,float scale,float tilt,int context,float fit[2]) {
+  assert(paths && count > 0);
+  return ResourceMgr_GetGiModelFitForGame(game,paths[0],scale,tilt,context,fit);
+}
+uint8_t MmAssets_IsAvailable() { return 1; }
 
 Gfx *ResourceMgr_LoadGfxByName(const char *path) {
   ++Fixture::loads;

@@ -70,6 +70,10 @@
 extern "C" {
 void FrameInterpolation_RecordOpenChild(const void* a, int b);
 void FrameInterpolation_RecordCloseChild(void);
+// Native opaque-only callers keep their original segment state. Foreign flex
+// skeletons may replay the same limb meshes on XLU, which needs the same palette.
+void SkelAnime_DrawFlexOpaWithXlu(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dListCount,
+                                  OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, CFA_LIMB_ARG arg);
 }
 
 // ---- Local mirrors of MM's loaded TextureAnimation layout (mm/2s2h/resource/type/
@@ -982,8 +986,9 @@ inline int32_t ComboForeignAnim_Draw(const CwItemAnimDrawInfo* info, const char*
             SkelAnime_DrawOpa(play, skelEntry.skelAnime.skeleton, skelEntry.skelAnime.jointTable,
                               CfaOverrideLimbDrawOpa, CfaPostLimbDrawOpa, NULL);
         } else {
-            SkelAnime_DrawFlexOpa(play, skelEntry.skelAnime.skeleton, skelEntry.skelAnime.jointTable,
-                                  skelEntry.skelAnime.dListCount, CfaOverrideLimbDrawOpa, CfaPostLimbDrawOpa, NULL);
+            SkelAnime_DrawFlexOpaWithXlu(play, skelEntry.skelAnime.skeleton, skelEntry.skelAnime.jointTable,
+                                         skelEntry.skelAnime.dListCount, CfaOverrideLimbDrawOpa, CfaPostLimbDrawOpa,
+                                         NULL);
         }
 
         OPEN_DISPS(play->state.gfxCtx);

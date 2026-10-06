@@ -1031,7 +1031,11 @@ bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool r
         }
 #endif
     }
-    if (hasReward) {
+    const bool bossLineReward =
+        received && information && (ootCompass || mmCompass) && ComboReceipt_HasIcon(&msg.receiptPresentation);
+    if (bossLineReward)
+        msg.receiptPresentation.rewardLine = 1;
+    if (hasReward && !bossLineReward) {
         rewardHint = CustomMessage("&Defeating the boss grants the %g[[reward]]%w!",
                                    "&Der Boss hinterlässt %g[[reward]]%w!", "&Vaincre le boss donne %g[[reward]]%w!");
         rewardHint.Replace("[[reward]]", rewardName);
@@ -1039,6 +1043,8 @@ bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool r
     if (boss) {
         bossHint = CustomMessage("&It points to %r[[boss]]%w!", "&Er zeigt zu %r[[boss]]%w!",
                                  "&Elle pointe vers %r[[boss]]%w!");
+        if (bossLineReward)
+            bossHint.Replace("%w!", "%w");
         bossHint.Replace("[[boss]]", boss);
     }
     msg.Replace("[[typeHint]]", typeHint);
@@ -1046,6 +1052,8 @@ bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool r
     msg.Replace("[[rewardHint]]", rewardHint);
     msg.Replace("[[entranceHint]]", entranceHint);
     if (information) {
+        if (received && (ootCompass || mmCompass))
+            msg.Replace("You found the ", rg == RG_ICE_CAVERN_COMPASS ? "You received an " : "You received a ");
         msg.Replace("Great Deku Tree", "Deku Tree");
         if (ComboReceipt_HasIcon(&msg.receiptPresentation))
             msg += CustomMessage::ITEM_OBTAINED(ITEM_CUSTOM);

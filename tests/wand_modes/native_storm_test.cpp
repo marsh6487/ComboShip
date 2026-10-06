@@ -1,4 +1,4 @@
-// A killed storm actor is a failed cast, even though native spawn returns it.
+// Native weather remains available to songs and the Rod of Seasons, independently of the Storm wand.
 #include "global.h"
 #include "GameInteractor/GameInteractor.h"
 #include "overlays/actors/ovl_En_Okarina_Effect/z_en_okarina_effect.h"
@@ -15,8 +15,6 @@ LightningStrike gLightningStrike{};
 std::vector<void*> allocations;
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_UPDATE_DURING_OCARINA)
-#define WAND_STORM_SPAWN_Y_OFFSET -30.0f
-#define WAND_STORM_OKARINA_PARAMS 1
 
 ActorProfile* Actor_LoadOverlay(ActorContext*, s16 id) {
     assert(id == ACTOR_EN_OKARINA_EFFECT);
@@ -53,18 +51,18 @@ int main() {
     play.objectCtx.numEntries = 1;
     play.objectCtx.slots[0].id = GAMEPLAY_KEEP;
 
-    assert(WandStorm_CallStorm(&player, &play));
+    Actor* spawned = Actor_Spawn(&play.actorCtx, &play, ACTOR_EN_OKARINA_EFFECT, 0, -30, 0, 0, 0, 0, 1);
     Actor* accepted = play.actorCtx.actorLists[ACTORCAT_ITEMACTION].first;
-    assert(accepted && accepted->init == nullptr && accepted->update != nullptr);
+    assert(spawned == accepted && accepted->init == nullptr && accepted->update != nullptr);
     accepted->update(accepted, &play);
     assert(play.envCtx.precipitation[PRECIP_SOS_MAX] == 60);
 
     play.envCtx.precipitation[PRECIP_RAIN_CUR] = 1;
-    bool result = WandStorm_CallStorm(&player, &play);
+    spawned = Actor_Spawn(&play.actorCtx, &play, ACTOR_EN_OKARINA_EFFECT, 0, -30, 0, 0, 0, 0, 1);
     Actor* rejected = accepted->next;
     assert(rejected != nullptr && rejected->update == nullptr);
-    assert(!result && "a native storm killed during Init must not count as a cast");
+    assert(spawned == rejected && "native weather still rejects a second rain owner during Init");
 
     for (void* allocation : allocations) std::free(allocation);
-    std::cout << "PASS native Storm weather spawn success and Init rejection\n";
+    std::cout << "PASS native weather spawn success and Init rejection, independent of wand dispatch\n";
 }

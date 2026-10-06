@@ -71,7 +71,13 @@ with tempfile.TemporaryDirectory(prefix='foreign-soul-') as td:
         p.write_text('#pragma once\n')
     for host in ['mm', 'oot']:
         engine = (ROOT / ('mm/src/code/z_skelanime.c' if host == 'mm' else 'soh/src/code/z_skelanime.c')).read_text()
-        production = '\n'.join(function(engine, n) for n in ['SkelAnime_DrawLimbOpa', 'SkelAnime_DrawOpa', 'SkelAnime_DrawFlexLimbOpa', 'SkelAnime_DrawFlexOpa'])
+        draw_names = ['SkelAnime_DrawLimbOpa', 'SkelAnime_DrawOpa', 'SkelAnime_DrawFlexLimbOpa']
+        if 'static void SkelAnime_DrawFlexOpaImpl(' in engine:
+            draw_names += ['SkelAnime_DrawFlexOpaImpl']
+        draw_names += ['SkelAnime_DrawFlexOpa']
+        if 'void SkelAnime_DrawFlexOpaWithXlu(' in engine:
+            draw_names += ['SkelAnime_DrawFlexOpaWithXlu']
+        production = '\n'.join(function(engine, n) for n in draw_names)
         # C's implicit void-pointer conversions need explicit casts in this C++ harness.
         production = production.replace('= Lib_SegmentedToVirtual(skeleton[', '= (StandardLimb*)Lib_SegmentedToVirtual(skeleton[')
         production = production.replace('Mtx* mtx = GRAPH_ALLOC(', 'Mtx* mtx = (Mtx*)GRAPH_ALLOC(')

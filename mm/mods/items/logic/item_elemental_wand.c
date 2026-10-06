@@ -197,22 +197,28 @@ static u8 Wand_Cast(Player* player, PlayState* play, u8 mode) {
  */
 void Wand_TickInput(PlayState* play, Player* player) {
     static s16 sLastScene = -1;
+    static PlayState* sLastPlay = NULL;
+    static u32 sLastFrame = 0;
     static u8 sWasDrawn = 0;
     static s16 sHoldTimer = 0;
     BoxMenuEntry entries[WAND_MODE_COUNT];
     ItemInputState in;
+    u8 sandHeld = 0;
 
     // Everything a rod leaves in the world is an actor the new scene has already thrown away.
     // Pointers are dropped, never written through: that memory may belong to somebody else now.
-    if (sLastScene != play->sceneId) {
+    if ((sLastPlay != play) || (sLastScene != play->sceneId) || (play->gameplayFrames < sLastFrame)) {
+        sLastPlay = play;
         sLastScene = play->sceneId;
         sWandPoseStage = WAND_POSE_IDLE;
         sWasDrawn = 0;
+        sHoldTimer = 0;
         WandSand_Forget();
         WandWater_Forget();
         WandShadow_Forget();
         WandStorm_Forget();
     }
+    sLastFrame = play->gameplayFrames;
 
     // The rods that own something outside the wand keep running whatever the wand is doing, and
     // must keep running with it stowed — the bolt is mid-flight and the wind is still burning magic.
@@ -251,12 +257,10 @@ void Wand_TickInput(PlayState* play, Player* player) {
             if (mode == WAND_MODE_TORNADO) {
                 WandWind_TickHover(player, in.isHeld);
             } else if (mode == WAND_MODE_SAND) {
-                // A press is handled below once. Held repeats share its equip/blocker gates, and
-                // passing false resets the repeat timer during drawing or an unavailable action.
+                // A press is handled below once. Held drain and coverage share the equip/blocker
+                // gates; all other input paths reset Sand's cadence at the end of this frame.
                 u8 canHold = sWasDrawn && in.wasEquipped && !in.isPressed && !ItemInput_IsBlocked(player, play);
-                if (WandSand_HoldElapsed(player, canHold && in.isHeld)) {
-                    Wand_Cast(player, play, WAND_MODE_SAND); // billed like any other slab
-                }
+                sandHeld = canHold && in.isHeld;
             }
 
             // ---- PRESS C: cast ----
@@ -273,6 +277,7 @@ void Wand_TickInput(PlayState* play, Player* player) {
     } else {
         sHoldTimer = 0;
     }
+    WandSand_TickHold(player, play, sandHeld);
     sWasDrawn = drawn;
 }
 

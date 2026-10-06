@@ -18,7 +18,7 @@ info = foreign[foreign.index('struct ComboForeignDrawInfo {'):foreign.index('\n}
 macros = foreign[foreign.index('#define COMBO_FOREIGN_MTX'):foreign.index('// Biggoron')]
 handlers = macros + '\n' + '\n'.join(function(foreign,name) for name in [
     'OOT_RestoreForeignSegs','OOT_DrawForeignGoronSword','OOT_DrawForeignWeaponFlame',
-    'OOT_DrawForeignMasterSword','OOT_DrawForeignCustomGi','OOT_DrawComboForeign'])
+    'OOT_DrawForeignMasterSword','OOT_DrawForeignCustomGi','OOT_DrawForeignSimple','OOT_DrawComboForeign'])
 flags=['-std=gnu++20','-DF3DEX_GBI_2','-DCOMBO_BUILD','-DLOG_LEVEL_GAME_PRINTS=0',
        '-DCONTROLLERBUTTONS_T=uint32_t','-DNON_EQUIVALENT','-DNON_MATCHING']
 if '--sanitize' in sys.argv:
@@ -30,7 +30,7 @@ with tempfile.TemporaryDirectory(prefix='sword-fallback-') as temporary:
     mm=(ROOT/'combo/menu/ComboForeignDrawMM.h').read_text()
     mm_info=mm[mm.index('struct ComboForeignDrawInfoOOT {'):mm.index('\n};',mm.index('struct ComboForeignDrawInfoOOT {'))+3]
     mm_dispatch=function(mm,'MM_DrawComboForeign')
-    mm_handlers=sorted(set(re.findall(r'\b(MM_DrawForeign\w+)\(info(?:, shop)?\)',mm_dispatch)) - {'MM_DrawForeignCustomGi'})
+    mm_handlers=sorted(set(re.findall(r'\b(MM_DrawForeign\w+)\(info(?:, shop)?\)',mm_dispatch)) - {'MM_DrawForeignCustomGi','MM_DrawForeignSimple'})
     mm_prefix=r'''
 using ComboForeignDrawInfoOOT=ComboForeignDrawInfo;
 using RandoCheckId=int;constexpr int RC_UNKNOWN=0;
@@ -53,7 +53,7 @@ void DrawOotNeiCaneOfSomaria(RandoItemId){assert(false);}
     mm_stubs='\n'.join('void '+name+'(const ComboForeignDrawInfoOOT*){assert(false);}' for name in mm_handlers)
     mm_handlers_text=macros+'\n'+function(foreign,'OOT_RestoreForeignSegs')+'\n'+function(foreign,'OOT_DrawForeignWeaponFlame')+'\n'+mm_prefix
     mm_handlers_text+='void DrawOotSlateRuneFlame(uint8_t r,uint8_t g,uint8_t b){const uint8_t c[]={r,g,b,255};OOT_DrawForeignWeaponFlame(&play,c);}\n'
-    mm_handlers_text+=mm_macros+'\n'+mm_stubs+'\n'+function(mm,'MM_DrawForeignCustomGi')+'\n'+mm_dispatch
+    mm_handlers_text+=mm_macros+'\n'+mm_stubs+'\n'+function(mm,'MM_DrawForeignCustomGi')+'\n'+function(mm,'MM_DrawForeignSimple')+'\n'+mm_dispatch
     mm_handlers_text+='\nvoid OOT_DrawComboForeign(PlayState*,GetItemEntry*,bool shop=false){MM_DrawComboForeign(1,shop);}\n'
     for host,host_info,host_handlers in [('oot',info,handlers),('mm',mm_info.replace('ComboForeignDrawInfoOOT','ComboForeignDrawInfo'),mm_handlers_text)]:
         source=Path(temporary)/(host+'.cpp')

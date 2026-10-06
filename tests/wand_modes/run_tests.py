@@ -56,7 +56,10 @@ def declaration(path, start):
 def main():
     global SOURCE_REF
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--case', choices=['native-storm', 'shadow', 'modes', 'oot-sand'])
+    parser.add_argument('--case', choices=['native-storm', 'native-water', 'shadow', 'modes', 'oot-sand'])
+    parser.add_argument('--check', choices=['sand', 'held-sand', 'water', 'storm', 'destroy'],
+                        help='run one focused modes acceptance check')
+    parser.add_argument('--sanitize', action='store_true', help='enable AddressSanitizer and UndefinedBehaviorSanitizer')
     parser.add_argument('--source-ref', help='run the same expectations against an earlier source revision')
     args = parser.parse_args()
     SOURCE_REF = args.source_ref
@@ -73,7 +76,31 @@ def main():
         'Actor_SpawnAsChildAndCutscene', 'Actor_Spawn'])
     production += '\n' + bodies('mm/src/code/z_scene.c', ['Object_GetSlot', 'Object_IsLoaded'])
     production += '\n' + storm_body
-    production += '\n' + bodies('mm/mods/items/logic/wand/wand_storm.c', ['WandStorm_CallStorm'])
+
+    water_actor = 'mm/src/overlays/actors/ovl_Obj_Hunsui/z_obj_hunsui.c'
+    water_text = source(water_actor)
+    water_native = bodies(actor, ['Actor_Kill', 'Actor_Destroy', 'Actor_SetWorldToHome', 'Actor_SetShapeRotToWorld',
+        'Actor_SetFocus', 'Actor_SetScale', 'Actor_SetObjectDependency', 'Actor_Init', 'Actor_AddToCategory',
+        'Actor_SpawnAsChildAndCutscene', 'Actor_Spawn', 'Flags_GetSwitch', 'Flags_SetSwitch', 'Flags_UnsetSwitch'])
+    water_native += '\n' + bodies('mm/src/code/z_scene.c', ['Object_GetSlot', 'Object_IsLoaded'])
+    water_native += '\n' + bodies('mm/src/code/z_bg_item.c', ['DynaPolyActor_Init', 'DynaPolyActor_LoadMesh'])
+    water_native += '\n' + bodies('mm/src/code/z_bgcheck.c', ['BgActor_SetActor', 'DynaPoly_IsBgIdBgActor',
+        'DynaPoly_SetBgActor', 'DynaPoly_GetActor', 'DynaPoly_DeleteBgActor'])
+    chain_names = [name for name in functions(source('mm/src/code/z_lib.c')) if name.startswith('IChain_Apply_')]
+    water_native += '\n' + bodies('mm/src/code/z_lib.c', chain_names)
+    water_native += '\n' + re.search(r'void \(\*sInitChainHandlers\[\]\).*?\n};', source('mm/src/code/z_lib.c'), re.S)[0]
+    water_native += '\n' + bodies('mm/src/code/z_lib.c', ['Actor_ProcessInitChain'])
+    water_native += '\n' + bodies('mm/src/code/z_sub_s.c', ['SubS_FillCutscenesList'])
+    water_native += '\n' + bodies('mm/src/code/graph.c', ['Graph_OpenDisps', 'Graph_CloseDisps'])
+    water_native += '\n' + water_text[water_text.index('AnimatedMaterial* D_80B9DED0;'):
+                                     water_text.index('s32 func_80B9C450(')]
+    water_native += '\n' + bodies(water_actor, ['func_80B9C450', 'ObjHunsui_Init', 'ObjHunsui_Destroy',
+        'ObjHunsui_Draw', 'func_80B9DA60', 'ObjHunsui_Reset'])
+    water_mode = re.sub(r'^#include[^\n]*\n', '', source('mm/mods/items/logic/wand/wand_water.c'), flags=re.M)
+    # The old stone draw is irrelevant to the acceptance test. The native Hunsui draw above stays real.
+    if 'WandWater_GeyserDraw' in functions(water_mode):
+        water_mode = water_mode.replace(functions(water_mode)['WandWater_GeyserDraw'], '')
+    water_native += '\n' + re.sub(r'\bthis\b', 'self', water_mode)
 
     shadow_path = 'mm/mods/items/logic/wand/wand_shadow.c'
     shadow = re.sub(r'^#include[^\n]*\n', '', source(shadow_path), flags=re.M)
@@ -153,10 +180,11 @@ def main():
     with tempfile.TemporaryDirectory(prefix='mm-wand-') as directory:
         temp = Path(directory)
         (temp / 'production.inc').write_text(production)
+        (temp / 'native_water.inc').write_text(water_native)
         (temp / 'shadow.inc').write_text(shadow)
         (temp / 'modes.inc').write_text(modes)
         (temp / 'oot_sand.inc').write_text(oot)
-        for name, test_path in [('native-storm', 'native_storm_test.cpp'), ('shadow', 'shadow_test.cpp'),
+        for name, test_path in [('native-storm', 'native_storm_test.cpp'), ('native-water', 'native_water_test.cpp'), ('shadow', 'shadow_test.cpp'),
                 ('modes', 'modes_test.cpp'), ('oot-sand', 'oot_sand_test.cpp')]:
             if args.case and args.case != name:
                 continue
@@ -166,12 +194,17 @@ def main():
                 sys.path.insert(0, str(ROOT / 'tests/nei_held'))
                 from run_articulated_tests import flags as oot_flags
                 compiler_flags = oot_flags()[1:]
+            if args.sanitize:
+                compiler_flags += ['-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer']
+                # Native C passes D-pad values beyond EquipSlot's named members. That is valid in
+                # C; the C++ fixture's enum-range check is a language-translation false positive.
+                compiler_flags += ['-fno-sanitize=enum']
             subprocess.run(['c++', '-std=c++20', '-fpermissive', *compiler_flags, '-I' + str(temp),
                 '-ffunction-sections', '-fdata-sections', str(ROOT / 'tests/wand_modes' / test_path),
                 '-Wl,--gc-sections', '-o', str(binary)], check=True)
-            subprocess.run([str(binary)], check=True)
+            subprocess.run([str(binary), *([args.check] if args.check and name == 'modes' else [])], check=True)
 
-    if args.case in (None, 'modes') and SOURCE_REF is None:
+    if args.case in (None, 'modes') and SOURCE_REF is None and not args.check:
         subprocess.run([sys.executable, str(ROOT / 'tests/wand_modes/run_cast_regression_tests.py')], check=True)
 
 

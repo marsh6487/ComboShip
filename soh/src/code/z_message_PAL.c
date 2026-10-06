@@ -892,7 +892,9 @@ static int Message_HasItemReceiptIcon(void) {
 static void Message_DrawItemReceiptIcon(PlayState* play, Gfx** p) {
     MessageContext* msgCtx = &play->msgCtx;
     if (Message_HasItemReceiptIcon()) {
-        int y = msgCtx->textPosY - (sItemReceiptLayout.iconHeight - R_TEXT_CHAR_SCALE * 16 / 100) / 2;
+        int y = sItemReceiptPresentation.rewardLine == 1
+                    ? R_TEXT_INIT_YPOS + sItemReceiptLayout.iconY
+                    : msgCtx->textPosY - (sItemReceiptLayout.iconHeight - R_TEXT_CHAR_SCALE * 16 / 100) / 2;
         *p = ComboReceipt_DrawIcon(*p, &sItemReceiptPresentation, &sItemReceiptLayout,
                                    R_TEXT_INIT_XPOS + sItemReceiptLayout.iconX, y, msgCtx->textColorAlpha);
     }

@@ -172,12 +172,13 @@ static void CheckForestCompassReceiveRoutes(const char* fixturePath) {
     assert(text.find("Forest Temple Compass") != std::string::npos);
     assert((text.find("masterful") != std::string::npos) == !information);
     assert((text.find("Phantom Ganon") != std::string::npos) == bool(information));
-    assert((text.find("Defeating the boss grants the") != std::string::npos) == bool(information));
-    assert((text.find("Deku Leaf") != std::string::npos) == bool(information));
+    assert(text.find("Defeating the boss grants the") == std::string::npos);
+    assert((text.find("You received a ") != std::string::npos) == bool(information));
     assert(native.receiptPresentation.singleBox == information);
     if (information) {
       assert(native.msg.find('\x10') == std::string::npos);
-      assert(std::count(native.msg.begin(), native.msg.end(), '\x11') == 2);
+      assert(std::count(native.msg.begin(), native.msg.end(), '\x11') == 1);
+      assert(native.receiptPresentation.rewardLine == 1);
       assert(ComboReceipt_HasIcon(&native.receiptPresentation));
       assert(std::string(native.receiptPresentation.iconPath) == "__OTR__@oot:textures/icon_item_custom/gItemIconDekuLeafTex");
       assert(!std::memcmp(&native.receiptPresentation, &foreign.receiptPresentation, sizeof(native.receiptPresentation)));
@@ -199,15 +200,19 @@ static void CheckForestCompassReceiveRoutes(const char* fixturePath) {
       assert(native.msg == foreign.msg && !native.autoFormat && native.icon == 0xFE);
       const bool assigned = std::string(route) == "direct" || std::string(route) == "nested";
       assert((native.msg.find("Volvagia") != std::string::npos) == assigned);
-      assert((native.msg.find("Fire Medallion") != std::string::npos) == assigned);
+      assert(native.msg.find("Fire Medallion") == std::string::npos);
       assert(native.msg.find("Phantom Ganon") == std::string::npos);
       assert(ComboReceipt_HasIcon(&native.receiptPresentation) == assigned);
+      if (assigned) {
+        assert(native.receiptPresentation.rewardLine == 1);
+        assert(std::string(native.receiptPresentation.iconPath) == "__OTR__@oot:textures/icon_item_24_static/gQuestIconMedallionFireTex");
+      }
       if (!assigned) assert(native.msg.find("boss room") != std::string::npos);
       assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
       assert(!std::memcmp(&neiBefore, &neiSave, sizeof(neiBefore)));
     }
   }
-  std::cout << "Real OoT donor -> MM Forest Temple Compass native/foreign routes: saved Off tutorials/On three-line reward sprites, cache reset and source append passed\n";
+  std::cout << "Real OoT donor -> MM compass native/foreign routes: two-line boss/reward sprites, saved Off tutorials, cache reset and source append passed\n";
 }
 #endif
 
@@ -303,8 +308,10 @@ static void CheckMapCompassInformation() {
     CustomMessage::Entry receipt;
     assert(Rando::ApplyItemReceiptText(compasses[d], receipt));
     assert(receipt.msg.find(bosses[d]) != std::string::npos && !receipt.autoFormat);
-    assert(receipt.msg.find('\x10') == std::string::npos && std::count(receipt.msg.begin(), receipt.msg.end(), '\x11') == 2);
-    assert(receipt.msg.find("Defeating the boss grants the") != std::string::npos);
+    assert(receipt.msg.find('\x10') == std::string::npos && std::count(receipt.msg.begin(), receipt.msg.end(), '\x11') == 1);
+    assert(receipt.msg.find("You received a ") != std::string::npos);
+    assert(receipt.msg.find("Defeating the boss grants the") == std::string::npos);
+    assert(receipt.receiptPresentation.rewardLine == 1);
     assert(receipt.msg.find("Now you can see") == std::string::npos);
     assert(receipt.icon == 0xFE && ComboReceipt_HasIcon(&receipt.receiptPresentation));
     assert(std::string(receipt.receiptPresentation.iconPath).starts_with(d == 2 ? "__OTR__@oot:" : "__OTR__@mm:"));

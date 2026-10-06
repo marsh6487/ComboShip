@@ -101,6 +101,9 @@ static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresent
     const uint8_t page = mm ? 0x10 : 0x04;
     const uint8_t end = mm ? 0xBF : 0x02;
     const int hasIcon = ComboReceipt_HasIcon(p);
+    // Two-line compass receipts align the sprite's top with the boss row.
+    // Its height then leaves the title row free to use the whole text width.
+    const int bossLineIcon = hasIcon && p->rewardLine == 1;
     if (hasIcon) {
         result.iconWidth = p->iconWidth > 24 ? 24 : p->iconWidth;
         result.iconHeight = result.iconWidth * p->iconHeight / p->iconWidth;
@@ -113,7 +116,7 @@ static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresent
     unsigned line = 0;
     int32_t width = 0, pageWidth = 0;
     uint8_t color = mm ? 0 : 0x40, spaceColor = color;
-    int mainBody = 1, iconPositioned = 0;
+    int mainBody = 1, iconPositioned = 0, bossLine = 0;
     for (size_t i = 0; i < size;) {
         const uint8_t c = (uint8_t)body[i];
         const size_t command = ComboReceipt_CommandSize(c, mm);
@@ -123,8 +126,8 @@ static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresent
             color = mm ? c : (uint8_t)body[i + 1];
         if (c == page || c == end) {
             if (mainBody && hasIcon) {
-                result.iconX = (width > pageWidth ? width : pageWidth) + 4;
-                result.iconY = (int32_t)line * 12 - (result.iconHeight - 12) / 2;
+                result.iconX = (bossLineIcon ? width : (width > pageWidth ? width : pageWidth)) + 4;
+                result.iconY = (int32_t)line * 12 - (bossLineIcon ? 0 : (result.iconHeight - 12) / 2);
                 result.iconPageStart = (uint32_t)pageStart;
                 result.firstPageEnd = (uint32_t)length;
                 iconPositioned = 1;
@@ -132,6 +135,8 @@ static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresent
             mainBody = 0;
         }
         if (c == newline || c == page) {
+            if (c == newline)
+                bossLine = 1;
             if (width > pageWidth)
                 pageWidth = width;
             uint8_t br = c;
@@ -160,9 +165,9 @@ static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresent
             ++i;
             continue;
         }
-        // A 24px sprite spans adjacent 12px rows. Keep its column clear on
-        // the entire information page, including a wrapped reward's prior row.
-        const int32_t available = 220 - (mainBody && hasIcon ? result.iconWidth + 4 : 0);
+        // Centered sprites span adjacent rows. A top-aligned boss sprite only
+        // needs its column reserved after the authored title break.
+        const int32_t available = 220 - (mainBody && hasIcon && (!bossLineIcon || bossLine) ? result.iconWidth + 4 : 0);
         const int32_t glyph = c != end && command == 1 ? ComboReceipt_GlyphWidth(c, widths, count) : 0;
         if (width + glyph > available && width > 0) {
             const uint8_t br = ++line == 3 ? (line = 0, page) : newline;
@@ -207,8 +212,8 @@ static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresent
         i += command;
     }
     if (hasIcon && !iconPositioned) {
-        result.iconX = (width > pageWidth ? width : pageWidth) + 4;
-        result.iconY = (int32_t)line * 12 - (result.iconHeight - 12) / 2;
+        result.iconX = (bossLineIcon ? width : (width > pageWidth ? width : pageWidth)) + 4;
+        result.iconY = (int32_t)line * 12 - (bossLineIcon ? 0 : (result.iconHeight - 12) / 2);
         result.iconPageStart = (uint32_t)pageStart;
         result.firstPageEnd = (uint32_t)length;
     }

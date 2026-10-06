@@ -152,7 +152,7 @@ template<class... T> void NeiGi_DrawPresentation(T...) { assert(false); }
 template<class... T> void NeiGi_DrawMesh(T...) { assert(false); }
 template<class... T> void NeiGi_DrawSeasonOverlay(T...) { assert(false); }
 template<class... T> void NeiGi_DrawSongOverlay(T...) { assert(false); }
-template<class... T> void ComboSwordGi_ApplyFit(T...) { assert(false); }
+template<class... T> void ComboSwordGi_ApplyModelsFit(T...) { assert(false); }
 template<class... T> void ComboDrawSpinAttackGi(T...) { assert(false); }
 #define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
 #define POLY_OPA_DISP opaPtr

@@ -1,5 +1,6 @@
 // Execute both engines' per-message stage/apply/draw boundary with the real
 // native font widths. GBI recording replaces only the GPU command sink.
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -282,5 +283,46 @@ int main() {
         CheckReflow(map, Mm::play.msgCtx.font.msgBuf.schar + 11, Mm::play.msgCtx.msgLength - 11,
                     true, Mm::sNESFontWidths, 160);
     }
-    std::cout << "Real OoT/MM fixed native typography, lossless hint wrapping/pages, English dispatch, later-page reward sprites and reset passed\n";
+    // The requested receipt uses a real reward sprite beside its second line.
+    p = {};
+    p.singleBox = 1;
+    p.rewardLine = 1;
+    const CwItemIconInfo emerald{ "__OTR__textures/icon_item_24_static/gQuestIconKokiriEmeraldTex", 24, 24, 0, 0, {} };
+    assert(ComboReceipt_CopyIcon(&p, &emerald, "oot"));
+    const std::string bossLine = "It points to Queen Gohma";
+    const std::string ootReceipt = "You received a Deku Tree Compass!\x01" + bossLine + '\x02';
+    Oot::play.msgCtx.msgBufPos = 0;
+    std::memcpy(Oot::play.msgCtx.font.msgBuf, ootReceipt.data(), ootReceipt.size());
+    Oot::play.msgCtx.msgLength = ootReceipt.size();
+    Oot::Message_SetItemReceiptPresentation(&p);
+    Oot::Message_ApplyItemReceiptLayout(&Oot::play);
+    Oot::FinishReceiptDecodePosition(1);
+    const std::string ootWrapped(Oot::play.msgCtx.font.msgBuf, Oot::play.msgCtx.msgLength);
+    assert(std::count(ootWrapped.begin(), ootWrapped.end(), '\x01') == 1 && ootWrapped.find('\x04') == std::string::npos);
+    assert(Oot::sItemReceiptLayout.iconPageStart == 0 && Oot::sItemReceiptLayout.iconY == 12);
+    assert(Oot::sItemReceiptLayout.iconX >= ComboReceipt_LineWidth(bossLine.data(), bossLine.size(), false, Oot::sFontWidths, 144) + 4);
+    Oot::play.msgCtx.textPosY = Oot::R_TEXT_INIT_YPOS + 12;
+    const int beforeOot = draws;
+    Oot::Message_DrawItemReceiptIcon(&Oot::play, &gfx);
+    assert(draws == beforeOot + 1 && sourceWidth == 24 && sourceHeight == 24);
+    assert(path == "__OTR__@oot:textures/icon_item_24_static/gQuestIconKokiriEmeraldTex");
+    assert(y1 == Oot::R_TEXT_INIT_YPOS + 12 && x2 <= 285 && y2 <= 76);
+
+    const std::string mmReceipt = ComboItemReceiptText::FromNeiMarkup("You received a Deku Tree Compass!&" + bossLine) + '\xBF';
+    Mm::play.msgCtx.msgBufPos = 0;
+    std::memcpy(Mm::play.msgCtx.font.msgBuf.schar + 11, mmReceipt.data(), mmReceipt.size());
+    Mm::play.msgCtx.msgLength = mmReceipt.size() + 11;
+    Mm::Message_SetItemReceiptPresentation(&p);
+    Mm::Message_ApplyItemReceiptLayout(&Mm::play);
+    Mm::FinishReceiptDecodePosition(1);
+    const std::string mmWrapped(Mm::play.msgCtx.font.msgBuf.schar + 11, Mm::play.msgCtx.msgLength - 11);
+    assert(std::count(mmWrapped.begin(), mmWrapped.end(), '\x11') == 1 && mmWrapped.find('\x10') == std::string::npos);
+    assert(Mm::sItemReceiptLayout.iconPageStart == 0 && Mm::sItemReceiptLayout.iconY == 12);
+    assert(Mm::sItemReceiptLayout.iconX >= Mm::NativeLineWidth(bossLine) + 4);
+    const int beforeMm = draws;
+    assert(Mm::Message_DrawItemReceiptIcon(&Mm::play, &gfx));
+    assert(draws == beforeMm + 1 && sourceWidth == 24 && sourceHeight == 24);
+    assert(path == "__OTR__@oot:textures/icon_item_24_static/gQuestIconKokiriEmeraldTex");
+    assert(y1 == Mm::play.msgCtx.unk11FFA + 12 && x2 <= 285 && y2 <= 76);
+    std::cout << "Real OoT/MM native typography, two-line boss/reward sprites, wrapping/pages, English dispatch and reset passed\n";
 }

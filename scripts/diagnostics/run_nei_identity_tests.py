@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Run the production descriptor when replacement geometry is unavailable.
 
-Only archive selection and CVar reads are controlled: the ABI fields returned
-by the real producer must still drive the host's independent effect pass.
+Archive selection, CVar reads and absent model-fit graphs are controlled: the
+real producer's ABI fields still drive the host's independent effect pass.
+Actual selected graph fitting is exercised by the dedicated receipt fixture.
 """
 import os
 import re
@@ -77,7 +78,7 @@ source = source[:source.index('int main() {')] + r'''
 #include "mm/2s2h/Rando/Types.h"
 struct PlayState {uint32_t gameplayFrames=47;};
 PlayState play; PlayState* gPlayState=&play;
-Kind awardKind=Kind::Fire; bool mmMod; int pushes, draws;
+Kind awardKind=Kind::Fire; bool mmMod; int pushes, draws, fitCalls;
 NeiGi::Mesh captured;
 void Matrix_Push() {++pushes;} void Matrix_Pop() {assert(pushes>0);--pushes;}
 NeiGi::Basis NeiGi_CameraBasis(PlayState*) {return {};}
@@ -89,6 +90,10 @@ int Describe(const char*,CwItemDrawInfo* out) {
 void* Combo_ResolveSym(const char*,const char*) {return reinterpret_cast<void*>(Describe);}
 const char* NeiResource_Route(const char* path) {return path;}
 int ResourceMgr_IsModAssetForGame(const char*,const char*) {return mmMod;}
+void ComboSwordGi_ApplyLegacyFit(const char* owner,Kind kind,bool shop=false,int pickup=0) {
+    assert(!strcmp(owner,"mm") && kind==awardKind && NeiGi::IsSword(kind) && !shop && !pickup);
+    ++fitCalls;
+}
 ''' + bindings + '\n' + header[header.index('class MM_NeiGiFallbackShimmer'):] + '\n'
 source += function(mm,'HasMmLegacyGiMod')+'\n'+function(mm,'GetSelectedOwnerGi')+'\n'+function(mm,'MM_DescribeNeiGi')+'\n'+fallback
 source += r'''
@@ -113,9 +118,10 @@ int main() {
            award.first==RI_OOT_EXT_FOUR_SWORD) assert(!authored);
         assert(info.neiShimmer==int(award.second)+1);
         assert(info.itemShimmer==(NeiGi::IsSword(award.second)||effects));
-        draws=0;
+        draws=0; fitCalls=0;
         {MM_NeiGiFallbackShimmer fallback(award.first);}
         assert(draws==(NeiGi::IsSword(award.second) ? 2 : effects) && "selected sword mesh lost its intrinsic particles");
+        assert(fitCalls==int(NeiGi::IsSword(award.second)) && "only sword fallbacks enter the model-fit boundary");
         assert(pushes==0);
         if(draws) {
             const auto expected=NeiGi::SampleShimmer(play.gameplayFrames,true,{},award.second);

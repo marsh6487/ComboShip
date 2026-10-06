@@ -17,6 +17,7 @@ python3 -B scripts/diagnostics/run_song_gi_tests.py
 python3 -B scripts/diagnostics/run_sword_pose_tests.py
 python3 -B scripts/diagnostics/run_sword_mod_gi_tests.py
 python3 -B scripts/diagnostics/run_sword_fallback_tests.py --sanitize
+python3 -B scripts/diagnostics/run_sword_receipt_tests.py --sanitize
 python3 -B scripts/diagnostics/run_fairy_bottle_tests.py
 python3 -B tests/seasons/run_tests.py
 python3 -B tests/seasons/run_native_weather_tests.py --sanitize
@@ -39,6 +40,7 @@ python3 -B tests/mm_wolf/run_model_owner_tests.py
 python3 -B tests/mm_wolf/run_asset_packaging_tests.py
 python3 -B tests/mm_wolf/run_syntax_tests.py
 python3 -B tests/wand_modes/run_tests.py
+python3 -B tests/nei_air_magic/run_tests.py
 python3 -B scripts/diagnostics/run_receipt_soul_color_tests.py
 python3 -B scripts/diagnostics/run_nei_identity_tests.py
 python3 -B tests/nei_held/run_hand_fit_tests.py

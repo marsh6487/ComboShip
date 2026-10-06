@@ -3016,7 +3016,13 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
     const int mmPickup = receipt ? (GET_PLAYER_FORM == PLAYER_FORM_GORON ? 2 : 1) : 0;
     if (MM_TryDrawNeiGi(randoItemId, shop, mmPickup))
         return;
-    MM_NeiGiFallbackShimmer fallbackShimmer(randoItemId);
+    // Match the retained legacy callback's concrete geometry, independently
+    // of the Great Fairy award's particle/shimmer identity.
+    const auto legacyFitKind =
+        randoItemId == RI_GREAT_FAIRY_SWORD && Nei_Save()->comboObtained[FC_OOT_SWORD_BIGGORON] == 0
+            ? NeiGi::Kind::BiggoronSword
+            : NeiGi::Kind::Neutral;
+    MM_NeiGiFallbackShimmer fallbackShimmer(randoItemId, shop, mmPickup, legacyFitKind);
 #endif
     const int dungeonOwner = DungeonItem_GetOwner(randoItemId);
     if (dungeonOwner >= 0 &&

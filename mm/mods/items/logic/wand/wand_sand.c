@@ -1,8 +1,8 @@
 /**
  * wand_sand.c — Sand Rod (Skijer's NEI).
  *
- * Sand slabs laid in front of Link, placeable in mid-air. Standing on one starts it crumbling: it
- * shrinks away in a puff of earth instead of shaking and dropping like the Obj_Lift it is built on.
+ * Small sand slabs placed under Link, then ahead while the bound button is held. Standing on one
+ * starts it crumbling: it shrinks away in a puff of earth instead of shaking and dropping like Obj_Lift.
  * That is the whole read of the rod — ground you make, that will not hold you for long.
  *
  * Obj_Lift is used for its slab mesh and its dynapoly (somaria_cubes.c documents the trick). Its
@@ -17,11 +17,11 @@
 // The ring is a spam limit, not the lifetime: a slab normally dies by being stood on.
 #define SAND_MAX_SLABS 8
 
-// Native size, like the cane's platform. The mesh here is MM's Dampé elevator rather than OoT's
-// collapsing platform, and every distance below is measured off the collision at this scale, so the
-// rod re-fits itself to the model instead of inheriting OoT's number.
-#define SAND_SLAB_SCALE 1.0f
+// Match the small OoT summon scale, rather than enlarging MM's elevator to scale 1.
+// Placement and coverage are measured from the registered mesh at this summon scale.
+#define SAND_SLAB_SCALE 0.05f
 #define SAND_HOLD_INTERVAL 6 // frames between coverage checks while the button is held
+#define SAND_HOLD_MAGIC_COST 2
 
 // How far ahead the next slab lands, as a share of the slab's own reach. Under 1.0 so consecutive
 // slabs overlap instead of leaving a seam to fall through.
@@ -43,9 +43,8 @@
 // runs on this actor again except its destroy, which only reads dyna.bgId — so the field is free.
 #define SAND_CRUMBLE(actor) ((actor)->home.rot.x)
 
-// ObjLift reads a scene switch flag out of (params >> 1) & 0x7F, and with params 0 that is flag 0.
-// Only its Init matters here — the update that would WRITE the flag is replaced.
-#define SAND_SWITCH_FLAG 0
+// Positive initial rotZ makes native Init skip its switch gate. Init clears the rotation again.
+#define SAND_INIT_SWITCH_BYPASS 1
 
 // Desert sand over the slab's own stone texture, and the same colour for the dust.
 #define SAND_ENV_R 214
@@ -53,8 +52,9 @@
 #define SAND_ENV_B 112
 
 static Actor* sSandSlabs[SAND_MAX_SLABS];
+static ActorFunc sSandNativeDestroy = NULL;
 static u8 sSandNextSlot = 0;
-static s16 sSandHoldTimer = 0;
+static s16 sSandHoldTimer = SAND_HOLD_INTERVAL;
 static FX_Color sSandDustColor = { SAND_ENV_R, SAND_ENV_G, SAND_ENV_B, 255 };
 
 // The slab is MEASURED off its own registered collision, not guessed: world units from the actor
@@ -91,6 +91,16 @@ static void WandSand_NextSpot(Player* player, Vec3f* out) {
     s16 yaw = player->actor.shape.rot.y;
     f32 dist = sSandMeasured ? (sSandReach * SAND_STEP_FRACTION) : SAND_FALLBACK_DIST;
 
+    // The first platform must support Link at the cast position. Later platforms overlap the
+    // existing road in front of him; an empty ring also starts under him again.
+    u8 hasSlab = 0;
+    for (u8 i = 0; i < SAND_MAX_SLABS; i++) {
+        hasSlab |= sSandSlabs[i] != NULL;
+    }
+    if (!hasSlab) {
+        dist = 0.0f;
+    }
+
     out->x = player->actor.world.pos.x + (Math_SinS(yaw) * dist);
     out->y = player->actor.world.pos.y - sSandTopOffset;
     out->z = player->actor.world.pos.z + (Math_CosS(yaw) * dist);
@@ -121,6 +131,13 @@ static void WandSand_Drop(Actor* slab) {
         if (sSandSlabs[i] == slab) {
             sSandSlabs[i] = NULL;
         }
+    }
+}
+
+static void WandSand_SlabDestroy(Actor* thisx, PlayState* play) {
+    WandSand_Drop(thisx);
+    if (sSandNativeDestroy != NULL) {
+        sSandNativeDestroy(thisx, play);
     }
 }
 
@@ -185,7 +202,7 @@ void WandSand_Forget(void) {
         sSandSlabs[i] = NULL;
     }
     sSandNextSlot = 0;
-    sSandHoldTimer = 0;
+    sSandHoldTimer = SAND_HOLD_INTERVAL;
 }
 
 // Overflow only — a slab normally ends by crumbling under Link. This is the backstop that stops a
@@ -204,30 +221,37 @@ u8 WandSand_Cast(Player* player, PlayState* play) {
     Vec3f pos;
     s16 yaw = player->actor.shape.rot.y;
 
-    if (Object_GetSlot(&play->objectCtx, OBJECT_D_LIFT) < 0) {
+    s32 slot = Object_GetSlot(&play->objectCtx, OBJECT_D_LIFT);
+    if (slot < 0) {
+        if (play->objectCtx.numEntries >= ARRAY_COUNT(play->objectCtx.slots)) {
+            return 0;
+        }
         Object_SpawnPersistent(&play->objectCtx, OBJECT_D_LIFT);
         return 0; // not resident yet this frame
+    }
+    if (!Object_IsLoaded(&play->objectCtx, slot)) {
+        return 0;
     }
 
     // Placed blind, with no raycast on purpose: that is what lets a slab hang in mid-air over a gap.
     WandSand_NextSpot(player, &pos);
 
-    // ObjLift's init kills itself when SAND_SWITCH_FLAG is already set. Nothing else runs between
-    // these two lines — this is inside the player's own update — so the flag is put straight back.
-    u8 flagWasSet = Flags_GetSwitch(play, SAND_SWITCH_FLAG) != 0;
-    if (flagWasSet) {
-        Flags_UnsetSwitch(play, SAND_SWITCH_FLAG);
-    }
-    Actor* slab = Actor_Spawn(&play->actorCtx, play, ACTOR_OBJ_LIFT, pos.x, pos.y, pos.z, 0, yaw, 0, 0);
-    if (flagWasSet) {
-        Flags_SetSwitch(play, SAND_SWITCH_FLAG);
-    }
+    // Use the native Init bypass without writing switches or firing scene-flag hooks.
+    Actor* slab =
+        Actor_Spawn(&play->actorCtx, play, ACTOR_OBJ_LIFT, pos.x, pos.y, pos.z, 0, yaw, SAND_INIT_SWITCH_BYPASS, 0);
 
-    if ((slab == NULL) || (slab->update == NULL)) {
+    if ((slab == NULL) || (slab->init != NULL) || (slab->update == NULL)) {
+        return 0;
+    }
+    s32 bgId = ((DynaPolyActor*)slab)->bgId;
+    if ((bgId < 0) || (bgId >= BG_ACTOR_MAX)) {
+        Actor_Kill(slab);
         return 0;
     }
 
-    // destroy is left alone: ObjLift's destroy is what unregisters the dynapoly.
+    // External room/object cleanup must release our pointer as well as native dynapoly.
+    sSandNativeDestroy = slab->destroy;
+    slab->destroy = WandSand_SlabDestroy;
     slab->update = WandSand_SlabUpdate;
     slab->draw = WandSand_SlabDraw;
     Actor_SetScale(slab, SAND_SLAB_SCALE);
@@ -253,18 +277,13 @@ u8 WandSand_Cast(Player* player, PlayState* play) {
 }
 
 /**
- * Should the held button lay one right now? The caller casts, so a held slab is billed and gated
- * exactly like a pressed one.
- *
- * This is what makes the rod a road: it only lays a slab when the step ahead has nothing standable
- * under it, so holding the button and walking forward keeps producing ground for as long as you
- * keep going, and standing still stops costing magic.
+ * The held channel has its own cadence. A pressed cast pays once and resets this timer; skipped
+ * or blocked input also resets it, so returning to Sand cannot immediately spend an old interval.
  */
 u8 WandSand_HoldElapsed(Player* player, u8 held) {
-    Vec3f spot;
-
+    (void)player;
     if (!held) {
-        sSandHoldTimer = 0;
+        sSandHoldTimer = SAND_HOLD_INTERVAL;
         return 0;
     }
     if (--sSandHoldTimer > 0) {
@@ -272,6 +291,20 @@ u8 WandSand_HoldElapsed(Player* player, u8 held) {
     }
     sSandHoldTimer = SAND_HOLD_INTERVAL;
 
+    return 1;
+}
+
+// Holding spends magic while supported and while moving. Coverage only decides whether to add
+// another platform; that spawn does not go through Wand_Cast and therefore cannot bill twice.
+void WandSand_TickHold(Player* player, PlayState* play, u8 held) {
+    Vec3f spot;
+
+    if (!WandSand_HoldElapsed(player, held) || !ItemMagic_HasEnough(play, SAND_HOLD_MAGIC_COST)) {
+        return;
+    }
+    ItemMagic_Consume(play, SAND_HOLD_MAGIC_COST);
     WandSand_NextSpot(player, &spot);
-    return !WandSand_Covers(&spot);
+    if (!WandSand_Covers(&spot)) {
+        WandSand_Cast(player, play);
+    }
 }

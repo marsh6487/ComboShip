@@ -45,6 +45,8 @@ extern "C" int32_t CVarGetInteger(const char* name,int32_t value) {
 // Selected third-party resource graphs and Din layer eligibility have dedicated
 // production fixtures. This native NEI fixture supplies neither resource family.
 extern "C" int ResourceMgr_GetGiModelFitForGame(const char*,const char*,float,float,int,float[2]) {return 0;}
+extern "C" int ResourceMgr_GetGiModelsFitForGame(const char*,const char* const*,int,float,float,int,float[2]) {return 0;}
+extern "C" uint8_t MmAssets_IsAvailable() {return 1;}
 extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char*,const char*) {return 0;}
 extern "C" Color_RGBA8 CosmeticEditor_GetChangedColor(u8,u8,u8,u8,const char*) {
   assert(false && "native NEI fixture selected an absent Din layer"); return {};
