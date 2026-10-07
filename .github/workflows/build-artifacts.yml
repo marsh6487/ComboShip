@@ -224,6 +224,7 @@ jobs:
           python3 scripts/diagnostics/run_texture_failure_command_tests.py --sanitize
           GFX_DL_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -g -fno-omit-frame-pointer' python3 scripts/diagnostics/run_gfx_display_list_address_tests.py
           python3 scripts/diagnostics/run_alt_segment_binding_tests.py
+          python3 -B scripts/diagnostics/run_carpet_segment_restore_tests.py
 
       - name: Vertex lighting and texture generation equivalence
         run: |
