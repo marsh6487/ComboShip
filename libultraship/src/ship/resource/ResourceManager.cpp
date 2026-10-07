@@ -251,7 +251,7 @@ ResourceManager::LoadResourceAsync(const ResourceIdentifier& identifier, bool lo
     // Check for and remove the OTR signature
     if (OtrSignatureCheck(identifier.Path.c_str())) {
         auto newFilePath = identifier.Path.substr(7);
-        return LoadResourceAsync({ newFilePath, identifier.Owner, identifier.Parent }, loadExact, priority, initData);
+        return LoadResourceAsync({ newFilePath, identifier.Owner, identifier.Parent }, loadExact, priority);
     }
 
     // Check the cache before queueing the job.
@@ -286,7 +286,7 @@ std::shared_ptr<IResource> ResourceManager::LoadResource(const ResourceIdentifie
                                                          std::shared_ptr<ResourceInitData> initData) {
     // Match LoadResourceAsync's signature handling before consulting the same cache.
     if (OtrSignatureCheck(identifier.Path.c_str())) {
-        return LoadResource({ identifier.Path.substr(7), identifier.Owner, identifier.Parent }, loadExact, initData);
+        return LoadResource({ identifier.Path.substr(7), identifier.Owner, identifier.Parent }, loadExact);
     }
     // A synchronous cache hit does not need an allocated promise/future pair.
     if (auto cachedResource = GetCachedResource(identifier, loadExact)) {

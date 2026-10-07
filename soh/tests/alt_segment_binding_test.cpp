@@ -54,17 +54,20 @@ struct ResourceIdentifier {
     std::shared_ptr<Archive> Parent;
     auto operator<=>(const ResourceIdentifier&) const = default;
 };
-struct FixtureArchive {
+class Archive {
+  public:
     std::set<std::string> files;
     bool HasFile(const std::string& path) {
         return files.contains(path);
     }
 };
+using FixtureArchive = Archive;
 struct FixtureLoader {
     std::shared_ptr<ResourceInitData> lastInitData;
     std::map<std::string, std::shared_ptr<IResource>> resources;
     std::shared_ptr<IResource> LoadResource(const std::string& path, std::shared_ptr<File>,
-                                            std::shared_ptr<ResourceInitData> initData) {
+                                            std::shared_ptr<ResourceInitData> initData,
+                                            std::shared_ptr<Archive> = nullptr) {
         lastInitData = initData;
         const auto found = resources.find(path);
         return found == resources.end() ? nullptr : found->second;
@@ -93,6 +96,10 @@ class ResourceManager {
     }
     std::shared_ptr<File> LoadFileProcess(const std::string& path) {
         return mArchiveManager->HasFile(path) ? std::make_shared<File>() : nullptr;
+    }
+    std::shared_ptr<File> LoadFileProcess(const ResourceIdentifier& identifier) {
+        auto archive = identifier.Parent ? identifier.Parent : mArchiveManager;
+        return archive->HasFile(identifier.Path) ? std::make_shared<File>() : nullptr;
     }
     std::shared_ptr<IResource> LoadResourceProcess(const ResourceIdentifier&, bool = false,
                                                    std::shared_ptr<ResourceInitData> = nullptr);
@@ -265,7 +272,11 @@ int main(int argc, char** argv) {
     scoped->mResourceCache.clear();
     REQUIRE(scoped->LoadResource(path, true, initData) == native);
     REQUIRE(scoped->loader->lastInitData == nullptr); // Existing Async prefix contract.
-    auto parent = std::shared_ptr<Ship::Archive>(native, reinterpret_cast<Ship::Archive*>(native.get()));
+    scoped->mResourceCache.clear();
+    REQUIRE(scoped->LoadResourceAsync(path, true, BS::pr::highest, initData).get() == native);
+    REQUIRE(scoped->loader->lastInitData == nullptr);
+    auto parent = std::make_shared<Ship::Archive>();
+    parent->files.insert(name);
     scoped->mDefaultCacheArchive = parent;
     scoped->mResourceCache[{ name, 0, parent }] = replacement;
     REQUIRE(scoped->LoadResource(path) == replacement);
