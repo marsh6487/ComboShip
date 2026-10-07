@@ -83,7 +83,7 @@ for host in ('soh','mm'):
         with tempfile.TemporaryDirectory(prefix='ikana-owner-pose-') as temp:
             cpp=Path(temp)/'test.cpp';cpp.write_text(candidate);binary=Path(temp)/'test'
             nativeflags=[f for f in flags if f!='-DCOMBO_BUILD']
-            nativeflags+=['-DF3DEX_GBI_2','-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF']
+            nativeflags+=['-DF3DEX_GBI_2','-DFMT_HEADER_ONLY','-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF']
             if combo:nativeflags+=['-DCOMBO_BUILD']
             if host=='mm':nativeflags+=['-DMM_BUILD_DLL','-DTEST_HOST_MM']
             subprocess.run([os.environ.get('CXX','c++'),*nativeflags,str(cpp),*[str(ROOT/p) for p in sources],'-o',str(binary)],check=True)

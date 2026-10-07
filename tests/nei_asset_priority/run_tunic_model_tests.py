@@ -15,7 +15,9 @@ scope = (ROOT / "libultraship/include/ship/resource/ResourceManagerScope.h").rea
 query = function((ROOT / "soh/soh/ResourceManagerHelpers.cpp").read_text(), "ResourceMgr_IsGiModelAvailableForGame")
 fixture = fixture.replace("/* PRODUCTION_SCOPE */", scope[scope.index("namespace Ship {"):])
 fixture = fixture.replace("/* PRODUCTION_QUERY */", query)
-flags = ["-std=c++20", "-DF3DEX_GBI_2", "-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF", "-Wall", "-Wextra", "-Werror",
+# System spdlog may select external fmt even with logging disabled. Keep this
+# resource-only executable self-contained with either system or bundled fmt.
+flags = ["-std=c++20", "-DF3DEX_GBI_2", "-DFMT_HEADER_ONLY", "-DSPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_OFF", "-Wall", "-Wextra", "-Werror",
          "-I" + str(ROOT / "libultraship/include")]
 if "--sanitize" in sys.argv:
     flags += ["-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"]

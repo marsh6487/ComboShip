@@ -33,7 +33,8 @@
 #include "soh/cvar_prefixes.h"
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h" // COLORSCHEME_*
 #include "variables.h"
-#include "soh/OTRGlobals.h" // rando-context null guards (MM calls us while OOT is dormant)
+#include "soh/OTRGlobals.h"             // rando-context null guards (MM calls us while OOT is dormant)
+#include "soh/ResourceManagerHelpers.h" // owner-specific model queries used by Ikana recipes
 #include <string>
 #include "soh/Enhancements/randomizer/dungeon.h"   // Rando::DungeonKey / GetDungeon()->IsMQ() (key-ring MQ variants)
 #include "objects/object_gi_fire/object_gi_fire.h" // gGiBlueFireFlameDL (boss-soul flame)
