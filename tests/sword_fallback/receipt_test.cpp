@@ -8,6 +8,8 @@ struct PlayState {struct {void* gfxCtx;}state;uint32_t gameplayFrames=42;} play;
 PlayState* gPlayState=&play;
 struct Pose {float scale=1,lift=0,ry=0,rz=0;bool operator==(const Pose&)const=default;} pose;
 std::vector<Pose> poses;
+void Matrix_Get(MtxF* m){m->xx=pose.scale;m->yw=pose.lift;}
+void Matrix_Put(MtxF* m){pose.scale=m->xx;pose.lift=m->yw;pose.ry=pose.rz=0;}
 void Matrix_Push(){poses.push_back(pose);}
 void Matrix_Pop(){assert(!poses.empty());pose=poses.back();poses.pop_back();}
 void Matrix_Translate(float,float y,float,int){pose.lift+=y*pose.scale;}
@@ -164,6 +166,9 @@ const char gGiBiggoronSwordDL[]="objects/object_gi_longsword/gGiBiggoronSwordDL"
 #define gDPSetEnvColor(...) ((void)0)
 #define gSPMatrix(...) ((void)0)
 #define gDma1p(...) ((void)0)
+const char* NeiGi_BaseSwordPath(const char*){return nullptr;}
+int32_t OOT_NeiResourceExists(const char*){return 0;}
+template<class...T>void NeiGi_DrawPresentation(T...){assert(false);}
 /* OOT_PRODUCTION */
 }
 int main(){
@@ -182,7 +187,11 @@ int main(){
         assert(nativePose.lift+8000*nativePose.scale<=origin+.21f*top+.001f&&"native legacy receipt leaves second selected sword root above the frame");
         assert(nativePose.lift-900*nativePose.scale>=origin+.21f*bottom-.001f);
         assert(nativeDraws==1&&effects.size()==2&&"receipt correction changed legacy callback or sword identity effects");
-        assert(effects[0]==nativePose&&effects[1]==nativePose&&"legacy model and particles/shimmer must share one fit");
+        const auto frame=NeiGi::FrameFit(*NeiGi::FindSwordFrameBounds(Kind::RazorSword),1.f,false,
+                                        form==PLAYER_FORM_GORON?2:1);
+        const Pose expected{caller.scale*frame.scale,caller.lift+caller.scale*frame.lift,0,0};
+        assert(effects[0]==expected&&effects[1]==expected&&effects[0]!=nativePose&&
+               "legacy binary receipt effects must retain the authored award footprint");
         assert(pose==caller&&poses.empty()&&"legacy callback transforms escaped its receipt scope");
     }
     LegacyVertex("test/bgsVertices",5,{{-200,-900,0},{200,8000,0}});
@@ -277,7 +286,9 @@ int main(){
     assert(NativeOot::NeiGi_DrawImpl(&play,&entry,false));
     assert(nativePose.lift+8000*nativePose.scale<=48.001f&&nativePose.lift-900*nativePose.scale>=-56.001f&&
            "native OoT legacy mod receipt bypassed selected model fitting");
-    assert(nativeDraws==1&&effects.size()>=2&&effects[0].scale==nativePose.scale&&effects[0].lift==nativePose.lift);
+    const auto razorFrame=NeiGi::FrameFit(*NeiGi::FindSwordFrameBounds(Kind::RazorSword),1.f,false);
+    assert(nativeDraws==1&&effects.size()>=2&&effects[0].scale==razorFrame.scale&&effects[0].lift==razorFrame.lift&&
+           "native OoT legacy effects inherited selected geometry units");
     assert(pose==ootCaller&&poses.empty());
     Vertex("test/kokiriVertices",13,{{-200,-900,0},{200,8000,0}});
     List("objects/object_gi_sword_1/gGiKokiriSwordDL",14,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/kokiriVertices")},{2,0},{uintptr_t(G_ENDDL)<<24,0}});

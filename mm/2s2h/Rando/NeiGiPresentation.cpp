@@ -278,13 +278,16 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop, int mmPickup) {
         if (flame && !NeiGi_ArenaHasRoom(play, 12 * sizeof(Gfx), 4, 20, 40))
             return;
         Matrix_Push();
-        if (mmPickup || (info.neiShimmer > 0 && NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1))))
-            ComboSwordGi_ApplyModelsFit("oot", info.dlists, info.dlistCount, info.scale, tilt, shop, mmPickup);
-        if (flame)
+        if (flame) {
+            Matrix_Push();
+            if (NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1)))
+                ComboSwordGi_ApplyEffectFit(static_cast<Kind>(info.neiShimmer - 1), shop, mmPickup);
             DrawOotSlateRuneFlame(info.primColorXlu[0], info.primColorXlu[1], info.primColorXlu[2]);
+            Matrix_Pop();
+        }
         NeiGi_DrawExternalPresentation(
             play, info.dlists[0], info.xluStartIndex == 1 && info.dlistCount > 1 ? info.dlists[1] : nullptr, info.scale,
-            info.neiShimmer - 1, info.itemShimmer, "oot", shop, tilt, false, mmPickup);
+            info.neiShimmer - 1, info.itemShimmer, "oot", shop, tilt, true, mmPickup);
         Matrix_Pop();
         return;
     }
@@ -398,7 +401,7 @@ bool MM_TryDrawNeiGi(RandoItemId item, bool shop, int mmPickup) {
 }
 
 MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer(RandoItemId item, bool shop, int mmPickup, Kind fitKind)
-    : mKind(Kind::Neutral), mEnabled(false) {
+    : mKind(Kind::Neutral), mEnabled(false), mShop(shop), mMmPickup(mmPickup) {
     if (!gPlayState)
         return;
     // Its legacy drawer already has an unconditional mask shimmer.
@@ -421,9 +424,13 @@ MM_NeiGiFallbackShimmer::~MM_NeiGiFallbackShimmer() {
     if (!mEnabled)
         return;
     Matrix_Pop();
-    if (NeiGi::IsSword(mKind))
+    Matrix_Pop(); // Restore the caller before composing award-space effects.
+    Matrix_Push();
+    if (NeiGi::IsSword(mKind)) {
+        ComboSwordGi_ApplyEffectFit(mKind, mShop, mMmPickup);
         NeiGi_DrawMesh(gPlayState,
                        NeiGi::SampleSpecial(mKind, gPlayState->gameplayFrames, NeiGi_CameraBasis(gPlayState)));
+    }
     NeiGi_DrawMesh(gPlayState,
                    NeiGi::SampleShimmer(gPlayState->gameplayFrames, true, NeiGi_CameraBasis(gPlayState), mKind));
     Matrix_Pop();

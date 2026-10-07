@@ -19,7 +19,7 @@ assert(mmKokiri.neiEffect != ootKokiri.neiEffect);
 for (const auto& origin : {std::pair{mmKokiri, 0xA46CFFu}, std::pair{ootKokiri, 0x78C850u}}) {
     Reset();
     MM_DrawNeiGi(origin.first);
-    assert(Drawn() == std::vector<std::string>{origin.first.dlists[0]});
+    assert(Drawn(true) == std::vector<std::string>{origin.first.dlists[0]});
     assert(!arena.empty()); // Intrinsic particles are carried without the optional toggle.
     bool carriesColor = false;
     for (const auto& mesh : arena)

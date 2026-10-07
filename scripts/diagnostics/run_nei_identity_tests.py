@@ -98,6 +98,9 @@ void ComboSwordGi_ApplyLegacyFit(const char* owner,Kind kind,bool shop=false,int
     assert(!strcmp(owner,"mm") && kind==awardKind && NeiGi::IsSword(kind) && !shop && !pickup);
     ++fitCalls;
 }
+void ComboSwordGi_ApplyEffectFit(Kind kind,bool shop=false,int pickup=0) {
+    assert(kind==awardKind && NeiGi::IsSword(kind) && !shop && !pickup);
+}
 ''' + bindings + '\n' + header[header.index('class MM_NeiGiFallbackShimmer'):] + '\n'
 source += function(mm,'HasMmLegacyGiMod')+'\n'+function(mm,'GetSelectedOwnerGi')+'\n'+function(mm,'MM_DescribeNeiGi')+'\n'+fallback
 source += r'''
