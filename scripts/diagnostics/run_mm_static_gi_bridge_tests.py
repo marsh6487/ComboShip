@@ -38,6 +38,7 @@ fixture = fixture.replace('/* NAME_MAP_INIT */', '\n'.join(
     f'Rando::StaticData::itemNameToEnum[{json.dumps(entries[rg])}]={rg};' for rg in order if rg in entries))
 fixture = fixture.replace('/* OWNER_MAGIC_QUERY */', function((ROOT/'soh/soh/ResourceManagerHelpers.cpp').read_text(), 'OOT_MagicJarUsesCustomAsset'))
 fixture = fixture.replace('/* HOST_INFO */', host[host.index('struct ComboForeignDrawInfoOOT {'):host.index('\n};', host.index('struct ComboForeignDrawInfoOOT {'))+3])
+fixture=fixture.replace('/* HOST_RESOLVER */','inline bool ResourceMgr_IsAltAssetsEnabled(){return true;}\n#include "combo/menu/ComboSwordGiAssetSelection.h"\n/* HOST_RESOLVER */')
 fixture = fixture.replace('/* HOST_RESOLVER */', 'int32_t ComboNativeMmImport(const char*) {return -1;}\n' + function(host, 'ComboFillForeignDrawInfoOOT'))
 fixture = fixture.replace('/* HOST_NATIVE_DRAW */', function(host, 'MM_DrawForeignNativeEquipment'))
 fixture = fixture.replace('/* HOST_AXE_DRAW */', function((ROOT/'mm/2s2h/Rando/DrawItem.cpp').read_text(), 'DrawOotIronKnuckleAxe'))

@@ -29,6 +29,8 @@ std::vector<float> submittedYaw;
 int modelFitContext = -1;
 std::vector<std::pair<float, float>> stack;
 std::vector<std::pair<float, float>> submitted;
+std::vector<std::pair<float, float>> effectSubmitted;
+float selectedFitScale=1, selectedFitLift=0;
 std::vector<std::array<unsigned, 3>> flameColors;
 std::vector<std::vector<Vtx>> arena;
 bool portableSongLists=false;
@@ -54,6 +56,8 @@ void Reset() {
   submittedYaw.clear();
   modelFitContext = -1;
   submitted.clear();
+  effectSubmitted.clear();
+  selectedFitScale=1; selectedFitLift=0;
   flameColors.clear();
   arena.clear();
   portableSongLists=false;
@@ -81,13 +85,19 @@ void Original() {
   ++fallback;
   Matrix_Scale(7, 7, 7, MTXMODE_APPLY);
 }
-std::vector<std::string> Drawn() {
+std::vector<std::string> Drawn(bool retainBaseRoute = false) {
   std::vector<std::string> paths;
   for (auto range :
        {std::pair(opa, gfx.polyOpa.p), std::pair(xlu, gfx.polyXlu.p)}) {
     for (Gfx *p = range.first; p != range.second; ++p) {
-      if (((p->words.w0 >> 24) & 255) == G_DL_OTR_FILEPATH)
-        paths.emplace_back(reinterpret_cast<const char *>(p->words.w1));
+      if (((p->words.w0 >> 24) & 255) == G_DL_OTR_FILEPATH) {
+        const char* path = reinterpret_cast<const char *>(p->words.w1);
+        // Existing model-identity checks compare the authored slug. Dedicated
+        // routing regressions retain and assert the exact archive owner marker.
+        if (!retainBaseRoute && !std::strncmp(path,"__OTR__@oot-gi-base:",20))
+          paths.emplace_back(std::string("__OTR__")+(path+20));
+        else paths.emplace_back(path);
+      }
     }
   }
   return paths;
@@ -160,9 +170,10 @@ int ResourceMgr_IsModAssetForGame(const char* game,const char* path) {
   return Fixture::modFiles.contains({game,selected});
 }
 int ResourceMgr_IsModAsset(const char* path) {return ResourceMgr_IsModAssetForGame("oot",path);}
-int ResourceMgr_GetGiModelFitForGame(const char*,const char*,float,float,int context,float[2]) {
+int ResourceMgr_GetGiModelFitForGame(const char*,const char*,float,float,int context,float fit[2]) {
   Fixture::modelFitContext=context;
-  return 0;
+  fit[0]=Fixture::selectedFitScale;fit[1]=Fixture::selectedFitLift;
+  return Fixture::selectedFitScale!=1 || Fixture::selectedFitLift!=0;
 }
 int ResourceMgr_GetGiModelsFitForGame(const char* game,const char* const* paths,int count,float scale,float tilt,int context,float fit[2]) {
   assert(paths && count > 0);
@@ -204,6 +215,7 @@ void Matrix_ReplaceRotation(MtxF *) {
     Fixture::matrixYaw = 0;
   }
 }
+void Matrix_Put(MtxF *m) { Fixture::matrix=m->xx; Fixture::matrixY=m->yw; }
 void Matrix_Get(MtxF *m) {
   *m = {};
   m->xx = m->yy = m->zz = Fixture::matrix;
@@ -232,6 +244,7 @@ void *Graph_Alloc(GraphicsContext *context, size_t size) {
 }
 Mtx *Matrix_NewMtx(GraphicsContext *context, char *, int32_t) {
   if (Fixture::pendingVertices) {
+    Fixture::effectSubmitted.emplace_back(Fixture::matrix, Fixture::matrixY);
     std::copy_n(Fixture::pendingVertices, Fixture::pendingVertexCount,
                 Fixture::arena.back().data());
     Fixture::pendingVertices = nullptr;
@@ -352,6 +365,9 @@ static void DrawWeaponFlameOverlay(PlayState *, u8 r, u8 g, u8 b) {
 #ifndef NEI_GI_FIXTURE_BOUNDARY_ONLY
 int main() {
   using namespace Fixture;
+#ifdef COMBO_BUILD
+#include "tests/sword_fallback/effects_toggle_checks.inc"
+#endif
   // This allocator uses the actual OPA tail for vertices and matrices,
   // including OoT's alignment loss; setup functions also emit their real one
   // command.
@@ -1068,7 +1084,11 @@ int main() {
                          std::pair{GID_SWORD_BGS,"biggoron_sword"}}) {
     Reset(); entry={}; entry.gid=test.first;
     assert(NeiGi_Draw(&play,&entry));
+#ifdef COMBO_BUILD
+    assert(vanilla == 0 && arena.empty()); // Absent shipped data cannot borrow a mod-capable fallback.
+#else
     assert(vanilla == 1 && arena.size() == 2);
+#endif
     Reset(); entry={}; entry.gid=test.first;
     const std::string path=std::string("__OTR__objects/nei_gi_redesign/")+test.second+"/gi_dl";
     files.insert(path); assert(NeiGi_Draw(&play,&entry));
@@ -1106,6 +1126,11 @@ int main() {
       modFiles.insert({"oot",(useAlt?"alt/":"")+std::string(overridden)});
       GetItemEntry modEntry{}; modEntry.drawFunc=model.draw; modEntry.drawItemId=model.identity;modEntry.gid=model.nativeGid;
       assert(NeiGi_Draw(&play,&modEntry));
+#ifdef COMBO_BUILD
+      if(!useAlt && NeiGi::IsSword(model.effect))
+        assert(Drawn(true)==std::vector<std::string>{std::string("__OTR__@oot-gi-base:")+(model.opaque+7)});
+      else
+#endif
       assert(!submitted.empty() && submitted.front()==std::pair(model.scale,0.f));
       assert(arena.size()==size_t(model.alwaysShimmer||effects)+NeiGi::IsSword(model.effect) && "selected sword lost its intrinsic particles");
       assert(flameColors.empty() && fallback==0 && vanilla==0 && stack.empty() && matrix==1 && matrixY==0);
@@ -1187,15 +1212,21 @@ int main() {
     const auto path=std::string("__OTR__objects/nei_gi_redesign/")+test.slug+"/gi_dl";
     files.insert(path);files.insert(test.legacy);
     const auto* selected=FindPresentation(&entry);assert(selected);
+    bool vanillaSword=false;
+#ifdef COMBO_BUILD
+    vanillaSword=!selectedAlt && NeiGi::IsSword(selected->effect);
+#endif
     std::vector<std::string> authoredPaths{path};
     if(selected->translucent){files.insert(selected->translucent);authoredPaths.push_back(selected->translucent);}
     if(selectedAlt)files.insert(std::string("alt/")+test.legacy);
     assert(NeiGi_Draw(&play,&entry)&&fallback==0&&Drawn()==authoredPaths);
     modFiles.insert({test.game,selectedAlt?std::string("alt/")+test.legacy:std::string(test.legacy)});
     gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
-    assert(NeiGi_Draw(&play,&entry)&&fallback==1&&Drawn().empty());
+    assert(NeiGi_Draw(&play,&entry)&&fallback==(vanillaSword?0:1)&&
+           Drawn()==(vanillaSword?authoredPaths:std::vector<std::string>{}));
     gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
-    assert(NeiGi_DrawShop(&play,&entry)&&fallback==1&&Drawn().empty());
+    assert(NeiGi_DrawShop(&play,&entry)&&fallback==(vanillaSword?0:1)&&
+           Drawn()==(vanillaSword?authoredPaths:std::vector<std::string>{}));
 #ifdef COMBO_BUILD
     CwItemDrawInfo info{};assert(!OOT_GetNeiGiDrawInfo(test.slug,&info));
     modFiles.clear();assert(OOT_GetNeiGiDrawInfo(test.slug,&info));
@@ -1204,7 +1235,8 @@ int main() {
       // manager, which TransformMasks_LoadMmDL consults before the donor.
       modFiles.insert({"oot",selectedAlt?std::string("alt/")+test.legacy:std::string(test.legacy)});
       gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
-      assert(NeiGi_Draw(&play,&entry)&&fallback==1&&Drawn().empty());
+      assert(NeiGi_Draw(&play,&entry)&&fallback==(vanillaSword?0:1)&&
+             Drawn()==(vanillaSword?authoredPaths:std::vector<std::string>{}));
       assert(!OOT_GetNeiGiDrawInfo(test.slug,&info));
       modFiles.clear();assert(OOT_GetNeiGiDrawInfo(test.slug,&info));
     }
@@ -1270,7 +1302,13 @@ int main() {
     if(selectedAlt)files.insert(std::string("alt/")+kokiri);
     modFiles.insert({"oot",selectedAlt?std::string("alt/")+kokiri:std::string(kokiri)});
     entry={};entry.drawFunc=Randomizer_DrawProgressiveMasterSword;
+#ifdef COMBO_BUILD
+    assert(NeiGi_Draw(&play,&entry)&&fallback==(selectedAlt?1:0)&&
+           Drawn()==(selectedAlt?std::vector<std::string>{}:
+                    std::vector<std::string>{"__OTR__objects/nei_gi_redesign/master_sword/gi_dl"}));
+#else
     assert(NeiGi_Draw(&play,&entry)&&fallback==1&&Drawn().empty());
+#endif
     gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
     entry.drawFunc=Randomizer_DrawMasterSword;
     assert(NeiGi_Draw(&play,&entry)&&fallback==0&&Drawn()==std::vector<std::string>{authored});
@@ -1447,7 +1485,11 @@ int main() {
     matrix = .25f;
     matrixY = 6;
     assert(NeiGi_DrawShop(&play, &entry));
+#ifdef COMBO_BUILD
+    assert(fallback == (NeiGi::IsSword(FindPresentation(&entry)->effect)?0:1) && matrix == .25f && matrixY == 6);
+#else
     assert(fallback == 1 && matrix == .25f && matrixY == 6);
+#endif
   }
   if (preview.is_open())
     preview << "]}\n";

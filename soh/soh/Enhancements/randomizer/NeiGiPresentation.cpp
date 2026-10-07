@@ -22,6 +22,9 @@ extern "C" {
 }
 #include "ComboSwordGiFit.h"
 #include "ComboSwordGiLegacyFit.h"
+#ifdef COMBO_BUILD
+#include "ComboItemDrawABI.h"
+#endif
 
 namespace {
 using NeiGi::Kind;
@@ -851,6 +854,15 @@ static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool up
 }
 }
 
+#ifdef COMBO_BUILD
+static const char* NeiGi_BaseSwordPath(const char* path) {
+    if (!path || std::strncmp(path, "__OTR__", 7) != 0 || !OOT_NeiEnsureGiBaseOwner())
+        return nullptr;
+    static std::unordered_set<std::string> paths;
+    return paths.insert(std::string("__OTR__@oot-gi-base:") + (path + 7)).first->c_str();
+}
+#endif
+
 static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     if (play == nullptr || entry == nullptr)
         return false;
@@ -866,6 +878,19 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     const Presentation* item = FindPresentation(entry);
     if (item == nullptr)
         return false;
+#ifdef COMBO_BUILD
+    if (NeiGi::IsSword(item->effect) && !ResourceMgr_IsAltAssetsEnabled()) {
+        const char* opaque = NeiGi_BaseSwordPath(item->opaque);
+        const char* translucent = item->translucent ? NeiGi_BaseSwordPath(item->translucent) : nullptr;
+        if (opaque && OOT_NeiResourceExists(opaque) &&
+            (!item->translucent || (translucent && OOT_NeiResourceExists(translucent)))) {
+            const float center[] = { item->effectCenter.x, item->effectCenter.y, item->effectCenter.z };
+            NeiGi_DrawPresentation(play, opaque, translucent, item->scale, static_cast<int>(item->effect), center,
+                                   item->alwaysShimmer || CVarGetInteger(CVAR_NEI_GI_EFFECTS, 0), "oot-gi-base", shop);
+        }
+        return true; // Missing shipped data must not borrow a base-path mod.
+    }
+#endif
     const char* selectedSword = SelectedSwordPath(*item, ResourceMgr_IsAltAssetsEnabled(), HasResource);
     // Queue stable paths for the interpreter. Loading through the legacy GBI wrapper
     // here would evict/reload base resources on each draw when Alt Assets is enabled.
@@ -886,6 +911,8 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     if (!arena)
         return true;
     Matrix_Push();
+    MtxF callerMatrix;
+    Matrix_Get(&callerMatrix);
     if (selectedSword) {
         ComboSwordGi_ApplyFit("oot", selectedSword, .04f, 1.8f, shop);
     } else if (upgraded && !authored && NeiGi::IsSword(item->effect)) {
@@ -915,8 +942,13 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     }
     Matrix_Push();
     if (selectedSword) {
-        if (item->effect == Kind::SwordAura)
+        if (item->effect == Kind::SwordAura) {
+            Matrix_Push();
+            Matrix_Put(&callerMatrix);
+            ComboSwordGi_ApplyEffectFit(item->effect, shop);
             Randomizer_DrawTrueMasterSwordFlame(play);
+            Matrix_Pop();
+        }
         NeiGi_DrawSelectedSword(play, selectedSword, shop, false);
     } else if (upgraded) {
         OPEN_DISPS(play->state.gfxCtx);
@@ -936,7 +968,13 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         GetItem_Draw(play, entry->gid);
     }
     Matrix_Pop();
+    Matrix_Push();
+    if (!authored && NeiGi::IsSword(item->effect)) {
+        Matrix_Put(&callerMatrix);
+        ComboSwordGi_ApplyEffectFit(item->effect, shop);
+    }
     NeiGi_DrawEffects(play, *item, authored, !upgraded && !selectedSword);
+    Matrix_Pop();
     if (upgraded && item->translucent != nullptr) {
         // Composite the crystal skin over its contained energy, using the same pose.
         OPEN_DISPS(play->state.gfxCtx);
@@ -987,13 +1025,6 @@ static bool NeiGi_FillSeasonInfo(int season, CwItemDrawInfo* out) {
     out->dlistCount = 0;
     out->xluStartIndex = -1;
     return true;
-}
-
-static const char* NeiGi_BaseSwordPath(const char* path) {
-    if (!path || std::strncmp(path, "__OTR__", 7) != 0 || !OOT_NeiEnsureGiBaseOwner())
-        return nullptr;
-    static std::unordered_set<std::string> paths;
-    return paths.insert(std::string("__OTR__@oot-gi-base:") + (path + 7)).first->c_str();
 }
 
 static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* out, bool swordAltAssets = true) {

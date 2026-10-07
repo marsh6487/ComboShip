@@ -24,6 +24,9 @@ symbol='if(!strcmp(name,"'+query+'"))return reinterpret_cast<void*>('+query+');'
 source=source.replace('/* ASSET_QUERY_SYMBOL */',symbol)
 begin=mm.index('struct Binding {');end=mm.index('// Only roots',begin)
 source=source.replace('/* MM_BINDINGS */',mm[begin:end])
+foreign=(ROOT/'combo/menu/ComboForeignDrawMM.h').read_text()
+info=foreign[foreign.index('struct ComboForeignDrawInfoOOT {'):foreign.index('\n};',foreign.index('struct ComboForeignDrawInfoOOT {'))+3]
+source=source.replace('/* FOREIGN_RESOLVER */',info+'\n'+function(foreign,'ComboFillForeignDrawInfoOOT'))
 source=source.replace('/* MM_SELECTION */','\n'.join(mf[n] for n in ('HasMmLegacyGiMod','GetSelectedOwnerGi','MM_DescribeNeiGi')))
 with tempfile.TemporaryDirectory(prefix='sword-asset-toggle-') as tmp:
     cpp=Path(tmp)/'toggle.cpp';cpp.write_text(source);binary=Path(tmp)/'toggle'

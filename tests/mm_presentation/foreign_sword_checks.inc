@@ -246,7 +246,7 @@
                 entry.drawFunc = Randomizer_DrawComboForeign;
                 entry.comboForeignCheck = RC_LINKS_POCKET;
                 GetItemEntry_Draw(&play, entry);
-                assert(Drawn() == std::vector<std::string>{native.dlists[0]});
+                assert(Drawn(true) == std::vector<std::string>{native.dlists[0]});
                 assert(!submitted.empty() && submitted.front() == std::pair(worldFit.scale*b.drawScale, worldFit.lift));
                 const auto worldMatrices = submitted;
                 const auto worldMeshes = arena;
@@ -260,7 +260,7 @@
                 shop.actor.params = SI_RANDOMIZED_ITEM;
                 shopEntry = entry;
                 EnGirlA_Draw(&shop.actor, &play);
-                assert(Drawn() == std::vector<std::string>{native.dlists[0]});
+                assert(Drawn(true) == std::vector<std::string>{native.dlists[0]});
                 const auto [scale, y] = submitted.front();
                 const float height = scale * (b.maximum[1] - b.minimum[1]);
                 std::cout << "foreign " << b.slug << ": shelf bottom=" << y + scale * b.minimum[1]

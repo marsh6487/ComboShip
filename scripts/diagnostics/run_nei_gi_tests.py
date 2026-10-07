@@ -20,6 +20,10 @@ for config in ("CMake/soh-cvars.cmake", "CMake/lus-cvars.cmake"):
     for key, value in re.findall(r'set\((CVAR_PREFIX_\w+)\s+"?([^\s"\)]+)', (ROOT / config).read_text()):
         flags.append(f'-D{key}="{value}"')
 cc = os.environ.get("CXX", "c++")
+if "--sword-toggle-only" in sys.argv:
+    flags.append("-DSWORD_TOGGLE_REGRESSION_ONLY")
+if "--sword-regressions-only" in sys.argv:
+    flags.append("-DSWORD_REGRESSIONS_ONLY")
 sanitize = ["-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"] if "--sanitize" in sys.argv else []
 if "--fast-math" in sys.argv:
     sanitize.append("-ffast-math")
@@ -193,8 +197,9 @@ bool ComboForeignAnim_Draw(const CwItemAnimDrawInfo*, const char*, PlayState*) {
 #define FOREIGN_DRAW_STUB(name) \\
     void name(PlayState*, const ComboForeignDrawInfo*) { ++foreignFallbackCalls; Matrix_Scale(7,7,7,MTXMODE_APPLY); }
 FOREIGN_DRAW_STUB(OOT_DrawForeignGoronSword)
-FOREIGN_DRAW_STUB(OOT_DrawForeignMasterSword)
-void OOT_DrawForeignCustomGi(PlayState*, const ComboForeignDrawInfo*, bool) { ++foreignFallbackCalls; Matrix_Scale(7,7,7,MTXMODE_APPLY); }
+void OOT_DrawForeignMasterSword(PlayState*, const ComboForeignDrawInfo*, bool=true) { ++foreignFallbackCalls; Matrix_Scale(7,7,7,MTXMODE_APPLY); }
+void OOT_DrawForeignCustomGi(PlayState*, const ComboForeignDrawInfo*, bool, bool=true) { ++foreignFallbackCalls; Matrix_Scale(7,7,7,MTXMODE_APPLY); }
+void OOT_DrawForeignWeaponFlame(PlayState*, const uint8_t color[4]) { Fixture::flameColors.push_back({color[0],color[1],color[2]}); }
 FOREIGN_DRAW_STUB(OOT_DrawForeignDekuNuts)
 FOREIGN_DRAW_STUB(OOT_DrawForeignRecoveryHeart)
 FOREIGN_DRAW_STUB(OOT_DrawForeignFish)
@@ -230,7 +235,7 @@ void OOT_DrawForeignSimple(PlayState* play,const ComboForeignDrawInfo* info) {
             mm_foreign_source = (ROOT / "combo/menu/ComboForeignDrawMM.h").read_text()
             mm_foreign_info = re.search(r"struct ComboForeignDrawInfoOOT \{.*?\n\};",mm_foreign_source,re.S)[0]
             mm_foreign_draw = functions(mm_foreign_source)["MM_DrawComboForeign"]
-            mm_handlers = sorted(set(re.findall(r"\b(MM_DrawForeign\w+)\(info(?:, shop)?\)", mm_foreign_draw)))
+            mm_handlers = sorted(set(re.findall(r"\b(MM_DrawForeign\w+)\(", mm_foreign_draw)))
             mm_shop_support = """
 #include "mm/2s2h/FleetShipCombo/FleetComboIds.h"
 struct FixtureNeiSaveData { uint8_t comboObtained[FC_COMBO_OBTAINED_SIZE] = {}; };
@@ -260,7 +265,7 @@ void DrawOotNeiCaneOfSomaria(RandoItemId) {assert(false);}
 const ComboForeignDrawInfoOOT* selectedForeignInfoMM=nullptr;
 const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckId) {return selectedForeignInfoMM;}
 """ + "\n".join("void "+name+"(const ComboForeignDrawInfoOOT*" +
-                    (", bool" if name == "MM_DrawForeignCustomGi" else "") +
+                    (", bool" if name in {"MM_DrawForeignCustomGi", "MM_DrawForeignMasterSword"} else "") +
                     ") {assert(false);}" for name in mm_handlers
                     if name not in {"MM_DrawForeignMusicNote", "MM_DrawForeignSimple", "MM_DrawForeignCustomGi"})
             mm_pin = mm_foreign_source[mm_foreign_source.index("#define MM_FOREIGN_PIN_OPA()"):

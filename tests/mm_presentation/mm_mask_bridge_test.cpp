@@ -162,7 +162,9 @@ void NeiGi_DrawSongOverlay(PlayState*,int,const char*) {assert(false && "song di
 // Sword drawing/fitting is tested by the selected-model and foreign sword
 // fixtures. Masks must never enter either branch in this dispatcher.
 void ComboSwordGi_ApplyModelsFit(const char*,const char* const*,int,float,float,bool=false,int=0) {assert(0 && "mask selected sword fit");}
-void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*,bool=false) {assert(0 && "mask selected custom sword draw");}
+void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*,bool=false,bool=true) {assert(0 && "mask selected custom sword draw");}
+void ComboSwordGi_ApplyEffectFit(NeiGi::Kind,bool=false,int=0) {assert(0 && "mask selected sword effects fit");}
+void DrawOotSlateRuneFlame(uint8_t,uint8_t,uint8_t) {assert(0 && "mask selected sword flame");}
 /* OTHER_DRAW_HANDLERS */
 /* HOST_DISPATCH */
 int main() {

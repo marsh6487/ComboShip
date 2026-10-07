@@ -31,6 +31,7 @@ a=draw.index('const char* SmallBodyCvarValue');b=draw.index('Color_RGB8 MapOrCom
 fixture=fixture.replace('/* KEY_PALETTE_TABLES */',draw[a:b])
 a=host.index('struct ComboForeignDrawInfoOOT {');b=host.index('\n};',a)+3
 fixture=fixture.replace('/* HOST_INFO */',host[a:b])
+fixture=fixture.replace('/* HOST_RESOLVER */','inline bool ResourceMgr_IsAltAssetsEnabled(){return true;}\n#include "combo/menu/ComboSwordGiAssetSelection.h"\n/* HOST_RESOLVER */')
 fixture=fixture.replace('/* HOST_RESOLVER */','int32_t ComboNativeMmImport(const char*) {return -1;}\n'+function(host,'ComboFillForeignDrawInfoOOT'))
 a=host.index('struct ComboForeignDrawCacheOOT {');b=host.index('} // namespace',a)
 fixture=fixture.replace('/* HOST_CACHE */',host[a:b])

@@ -364,12 +364,17 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
         return;
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
+    const bool sword = NeiGi::IsSword(static_cast<Kind>(shimmerKind));
     Matrix_Push();
-    if (fit && (mmPickup || NeiGi::IsSword(static_cast<Kind>(shimmerKind)))) {
+    if (fit && mmPickup && !sword) {
         const char* paths[] = { opa, xlu };
         ComboSwordGi_ApplyModelsFit(owner ? owner : "oot", paths, xlu ? 2 : 1, scale, tilt, shop, mmPickup);
     }
     Matrix_Push();
+    if (fit && sword) {
+        const char* paths[] = { opa, xlu };
+        ComboSwordGi_ApplyModelsFit(owner ? owner : "oot", paths, xlu ? 2 : 1, scale, tilt, shop, mmPickup);
+    }
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
 #ifdef NEI_GI_ROTATE_Y
     NEI_GI_ROTATE_Y(spin, MTXMODE_APPLY);
@@ -413,9 +418,11 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
         ComboDinSwordGi_DrawLayers(play, owner ? owner : "oot", opa);
     Matrix_Pop();
     // Sword particles belong to the awarded sword, including mod geometry.
-    if (NeiGi::IsSword(static_cast<Kind>(shimmerKind)))
+    if (sword) {
+        ComboSwordGi_ApplyEffectFit(static_cast<Kind>(shimmerKind), shop, mmPickup);
         NeiGi_DrawMesh(play, NeiGi::SampleSpecial(static_cast<Kind>(shimmerKind), play->gameplayFrames,
                                                  NeiGi_CameraBasis(play)));
+    }
     if (shimmer)
         NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play),
                                                   static_cast<Kind>(shimmerKind)));
