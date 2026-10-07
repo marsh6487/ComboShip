@@ -27,14 +27,19 @@ entry = re.search(r'ITEMTYPE_SMALLKEY,\s*(\w+),.*?RHT_TREASURE_GAME_SMALL_KEY,\s
 assert entry, 'Cannot recover the production Chest Game get-item entry'
 gi, item, obj, text, mod = entry.groups()
 fixture = r'''
-#include "combo/menu/ComboDungeonKeyReceipt.h"
-#include "combo/menu/ComboKeyReceiptText.h"
 #include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <map>
 #include <string>
+#include <string_view>
+#include <type_traits>
+// Windows RPC headers define this before MM includes the receipt helper.
+#define small char
+#include "combo/menu/ComboDungeonKeyReceipt.h"
+#include "combo/menu/ComboKeyReceiptText.h"
+static_assert(std::is_same_v<small, char>, "Receipt headers must preserve the Windows SDK macro");
 constexpr int TEXTBOX_TYPE_BLUE=2, ITEM_KEY_SMALL=0x77, GI_DOOR_KEY=0x71,
     OBJECT_GI_KEY=1, OBJECT_INVALID=-1, MOD_NONE=0, MOD_RANDOMIZER=1;
 enum RandomizerGet { RG_NONE, RG_TREASURE_GAME_SMALL_KEY };

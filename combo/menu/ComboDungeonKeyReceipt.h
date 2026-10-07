@@ -6,7 +6,7 @@
 namespace ComboDungeonKeyReceipt {
 struct Style {
     const char* color = nullptr;
-    bool small = false;
+    bool isSmallKey = false;
 };
 
 // Canonical receipt colors, independent of the receiving game and inventory.
@@ -52,7 +52,7 @@ inline std::string Markup(std::string_view name) {
     const auto style = Find(name);
     if (!style.color)
         return {};
-    std::string body = style.small ? "You found a " : "You found the ";
+    std::string body = style.isSmallKey ? "You found a " : "You found the ";
     body += style.color;
     body.append(name);
     body += "%w!";

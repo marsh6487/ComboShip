@@ -344,7 +344,7 @@ bool BuildDungeonKeyReceiptMessage(RandomizerGet rg, CustomMessage& msg) {
                         TEXTBOX_TYPE_BLUE);
     CustomMessage article(item.GetArticle(), TEXTBOX_TYPE_BLUE);
     if (article.GetEnglish(MF_RAW).empty())
-        article = style.small ? CustomMessage("a ", "einen ", "une ") : CustomMessage("the ", "den ", "la ");
+        article = style.isSmallKey ? CustomMessage("a ", "einen ", "une ") : CustomMessage("the ", "den ", "la ");
     msg.Replace("[[article]]", article);
     msg.Replace("[[color]]", style.color);
     msg.Replace("[[name]]", name);
