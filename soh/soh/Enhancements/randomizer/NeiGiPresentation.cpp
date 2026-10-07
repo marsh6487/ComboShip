@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cstring>
 #include <iterator>
+#include <string>
+#include <unordered_set>
 #include "draw.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/frame_interpolation.h"
@@ -987,7 +989,14 @@ static bool NeiGi_FillSeasonInfo(int season, CwItemDrawInfo* out) {
     return true;
 }
 
-static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* out) {
+static const char* NeiGi_BaseSwordPath(const char* path) {
+    if (!path || std::strncmp(path, "__OTR__", 7) != 0 || !OOT_NeiEnsureGiBaseOwner())
+        return nullptr;
+    static std::unordered_set<std::string> paths;
+    return paths.insert(std::string("__OTR__@oot-gi-base:") + (path + 7)).first->c_str();
+}
+
+static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* out, bool swordAltAssets = true) {
     if (!out)
         return false;
     // Identity belongs to the award, independently of the mesh selected by
@@ -996,24 +1005,30 @@ static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* ou
     out->neiShimmer = static_cast<int32_t>(item.effect) + 1;
     out->itemShimmer = item.alwaysShimmer || CVarGetInteger(CVAR_NEI_GI_EFFECTS, 0);
     out->stateDependent = 2;
-    if (!item.opaque || HasLegacyGiMod(item, true) ||
-        HasSelectedSword(item, OOT_NeiAltAssetsEnabled(),
-                         [](const char* path) { return OOT_NeiResourceExists(path) != 0; }) ||
+    const bool vanillaSword = NeiGi::IsSword(item.effect) && !swordAltAssets;
+    if (!item.opaque ||
+        (!vanillaSword && (HasLegacyGiMod(item, true) ||
+                           HasSelectedSword(item, OOT_NeiAltAssetsEnabled(),
+                                            [](const char* path) { return OOT_NeiResourceExists(path) != 0; }))) ||
         !OOT_NeiResourceExists(item.opaque) || (item.translucent && !OOT_NeiResourceExists(item.translucent))) {
         return false;
     }
-    out->dlists[0] = item.opaque;
+    out->dlists[0] = vanillaSword ? NeiGi_BaseSwordPath(item.opaque) : item.opaque;
+    if (!out->dlists[0] || (vanillaSword && !OOT_NeiResourceExists(out->dlists[0])))
+        return false;
     out->dlistCount = 1;
     out->xluStartIndex = -1;
     if (item.translucent) {
-        out->dlists[1] = item.translucent;
+        out->dlists[1] = vanillaSword ? NeiGi_BaseSwordPath(item.translucent) : item.translucent;
+        if (!out->dlists[1] || (vanillaSword && !OOT_NeiResourceExists(out->dlists[1])))
+            return false;
         out->dlistCount = 2;
         out->xluStartIndex = 1;
     }
     out->scale = item.scale;
     // An override at either redesigned pass owns its geometry. Preserve its
     // deferred selection and identity overlay without authored bounds/FX.
-    if (HasRedesignGiMod(item)) {
+    if (!vanillaSword && HasRedesignGiMod(item)) {
         out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
         return true;
     }
@@ -1051,12 +1066,13 @@ extern "C" int32_t NeiGi_DescribeEntry(const GetItemEntry* entry, CwItemDrawInfo
 }
 
 // Concrete presentation lookup for MM's native NEI items: never resolve through OoT's save.
-extern "C" COMBO_EXPORT int32_t OOT_GetNeiGiDrawInfo(const char* slug, CwItemDrawInfo* out) {
+extern "C" COMBO_EXPORT int32_t OOT_GetNeiGiDrawInfoForAssets(const char* slug, int32_t altAssets,
+                                                              CwItemDrawInfo* out) {
     if (!slug || !out)
         return 0;
     if (std::strcmp(slug, "mm_kokiri_sword") == 0) {
         *out = CwItemDrawInfo{};
-        return NeiGi_FillCrossGameInfo(kMmKokiriPresentation, out);
+        return NeiGi_FillCrossGameInfo(kMmKokiriPresentation, out, altAssets != 0);
     }
     for (size_t i = 0; i < std::size(kSeasons); ++i) {
         if (std::strcmp(slug, kSeasons[i].slug) == 0) {
@@ -1072,9 +1088,13 @@ extern "C" COMBO_EXPORT int32_t OOT_GetNeiGiDrawInfo(const char* slug, CwItemDra
         const size_t length = std::strlen(slug);
         if (std::strncmp(name, slug, length) == 0 && std::strcmp(name + length, "/gi_dl") == 0) {
             *out = CwItemDrawInfo{};
-            return NeiGi_FillCrossGameInfo(item, out);
+            return NeiGi_FillCrossGameInfo(item, out, altAssets != 0);
         }
     }
     return 0;
+}
+
+extern "C" COMBO_EXPORT int32_t OOT_GetNeiGiDrawInfo(const char* slug, CwItemDrawInfo* out) {
+    return OOT_GetNeiGiDrawInfoForAssets(slug, 1, out);
 }
 #endif

@@ -18,15 +18,19 @@ python3 -B scripts/diagnostics/run_sword_pose_tests.py
 python3 -B scripts/diagnostics/run_sword_mod_gi_tests.py
 python3 -B scripts/diagnostics/run_sword_fallback_tests.py --sanitize
 python3 -B scripts/diagnostics/run_sword_receipt_tests.py --sanitize
+python3 -B scripts/diagnostics/run_sword_asset_toggle_tests.py --sanitize
+python3 -B scripts/diagnostics/run_sword_resource_view_tests.py --sanitize
 python3 -B scripts/diagnostics/run_fairy_bottle_tests.py
 python3 -B tests/seasons/run_tests.py
 python3 -B tests/seasons/run_native_weather_tests.py --sanitize
 python3 -B tests/seasons/run_generated_leaf_texture_tests.py
+python3 -B tests/seasons/run_leaf_combiner_tests.py
 python3 -B scripts/diagnostics/run_mm_autumn_foliage_tests.py
 python3 -B tests/seasons/run_rod_lifecycle_tests.py
 python3 -B tests/seasons/run_oot_shop_tests.py
 python3 -B scripts/diagnostics/run_mm_mask_bridge_tests.py --sanitize
 python3 -B tests/mm_presentation/run_foreign_scale_tests.py
+python3 -B tests/mm_cape/run_texture_tests.py
 python3 -B scripts/diagnostics/run_mm_nei_tests.py
 python3 -B tests/mm_wallet/run_tests.py
 python3 -B tests/mm_editor/run_tests.py

@@ -20,8 +20,9 @@
 // Gfx_RegisterBlendedTexture) detects the OTR signature and resolves the resource at use time.
 // The cloth enables itself when the OoT archive is mounted; without oot.o2r it stays invisible
 // (the passive half-cost never depends on this).
+#include "align_asset_macro.h"
 #define dgMantTex "__OTR__overlays/ovl_En_Ganon_Mant/gMantTex"
-static const char gMantTex[] = dgMantTex;
+static const ALIGN_ASSET(2) char gMantTex[] = dgMantTex;
 #include "soh/ResourceManagerHelpers.h"
 
 // ---------------------------------------------------------------------------
@@ -464,29 +465,13 @@ static void MagicCape_Draw(Player* player, PlayState* play) {
         sCapeNeedsRootSnap = 0;
     }
 
-    // Resolve the mant texture to its RAW DATA POINTER once, BEFORE OPEN_DISPS (2ship's OPEN_DISPS
-    // opens a scope block only CLOSE_DISPS may close — no early-outs between them). Passing the OTR
-    // PATH to gDPLoadTextureBlock never loaded TMEM here (the cloth sampled whatever texture the
-    // scene left bound — the "random scene textures" bug); the RESOLVED pointer is the proven
-    // companion-texture pattern (same as Magic Dark's diamond tex).
-    static void* sMantTexData = NULL;
-    {
-        extern u8 ResourceMgr_FileExists(const char* resName);
-        extern void* OotAssets_LoadTexOrDList(const char* otrPath);
-        static s8 sMantTexState = 0; // 0 unknown, 1 resolved, -1 missing
-
-        if (sMantTexState == 0) {
-            sMantTexState = -1;
-            if (ResourceMgr_FileExists(gMantTex)) {
-                sMantTexData = OotAssets_LoadTexOrDList(gMantTex);
-                if (sMantTexData != NULL) {
-                    sMantTexState = 1;
-                }
-            }
-        }
-        if (sMantTexState < 0) {
-            return;
-        }
+    // Keep the OTR path in SETTIMG so the renderer retains the selected texture's format, flags,
+    // dimensions and HD scale. A cached raw pixel pointer loses that metadata and decodes RGBA32
+    // replacements as the native 32x64 RGBA16 texture. Resolve at draw time so Alt/resource changes
+    // cannot leave a stale pixel pointer. Check availability BEFORE OPEN_DISPS (no early-outs inside).
+    extern void* OotAssets_LoadTexOrDList(const char* otrPath);
+    if (!ResourceMgr_FileExists(gMantTex) || OotAssets_LoadTexOrDList(gMantTex) == NULL) {
+        return;
     }
 
     // --- Render (MM: dynamic DL over our own vertex buffer; only the TEXTURE comes from the
@@ -523,7 +508,7 @@ static void MagicCape_Draw(Player* player, PlayState* play) {
         gSPTexture(DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);                                                 \
         gDPSetCombineMode(DISP++, G_CC_MODULATERGBA, G_CC_MODULATERGBA);                                              \
         gDPSetPrimColor(DISP++, 0, 0, sCapeP.r, sCapeP.g, sCapeP.b, sCapeP.a);                                        \
-        gDPLoadTextureBlock(DISP++, sMantTexData, G_IM_FMT_RGBA, G_IM_SIZ_16b, CAPE_TEX_WIDTH, CAPE_TEX_HEIGHT, 0,    \
+        gDPLoadTextureBlock(DISP++, gMantTex, G_IM_FMT_RGBA, G_IM_SIZ_16b, CAPE_TEX_WIDTH, CAPE_TEX_HEIGHT, 0,        \
                             G_TX_WRAP | G_TX_NOMIRROR, G_TX_WRAP | G_TX_NOMIRROR, 5, 6, G_TX_NOLOD, G_TX_NOLOD);      \
         /* 12 strands x 12 joints -> 11 strips: load 2 strands (24 vtx), emit the quads between. */                   \
         for (strip = 0; strip < CAPE_NUM_STRANDS - 1; strip++) {                                                      \

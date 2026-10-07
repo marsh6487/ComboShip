@@ -37,6 +37,9 @@ using RandoCheckId=int;constexpr int RC_UNKNOWN=0;
 enum RandoItemId {RI_NONE,RI_OOT_NEI_CANE_OF_SOMARIA,RI_OOT_NEI_CANE_PACCI_FLIP,
  RI_OOT_NEI_CANE_SOMARIA_BLOCK,RI_OOT_NEI_CANE_PACCI_STONE,
  RI_OOT_NEI_CANE_SOMARIA_PLATFORM,RI_OOT_NEI_CANE_PACCI_ULTRAHAND};
+namespace Rando {void DrawResolvedItem(RandoItemId,RandoCheckId,Actor*) {
+ assert(false && "sword-only fixture unexpectedly dispatched a native MM alias");
+}}
 PlayState* gPlayState=&play;
 const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(int){return &recipe;}
 void MM_DrawNeiGi(const CwItemDrawInfo&,bool,int=0){assert(false);}

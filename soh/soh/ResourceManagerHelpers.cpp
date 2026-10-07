@@ -965,9 +965,58 @@ extern "C" COMBO_EXPORT int32_t OOT_ApplyGiHeartCosmetics(const char* path, int3
 // consult OoT save/player state. Match deferred rendering using the registered
 // owner's Alt mode, which can differ from the currently active MM mode.
 extern "C" COMBO_EXPORT int32_t OOT_NeiResourceExists(const char* path) {
+    constexpr char basePrefix[] = "__OTR__@oot-gi-base:";
+    if (path && std::strncmp(path, basePrefix, sizeof(basePrefix) - 1) == 0) {
+        const auto baseOwner = Ship::CrossRMRegistry::Get("oot-gi-base");
+        return baseOwner && bool(baseOwner->LoadResource(path + sizeof(basePrefix) - 1, true));
+    }
     const auto owner = Ship::CrossRMRegistry::Get("oot");
-    return path && owner &&
-           (ResourceMgr_FileExists(path) || (owner->IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path)));
+    if (!path || !owner)
+        return 0;
+    std::string resource = path;
+    if (resource.compare(0, 7, "__OTR__") == 0)
+        resource.erase(0, 7);
+    if (resource.empty() || resource[0] == '@')
+        return 0;
+    // ExtensionCache is initialized by OoT's engine startup. In an MM-first
+    // session the resident owner archives can be ready before that cache.
+    const auto archives = owner->GetArchiveManager();
+    if (!archives)
+        return 0;
+    // The resource loader also resolves alias-only .meta entries. Keep the
+    // availability gate consistent with both base and selected Alt loading.
+    const auto exists = [&](const std::string& name) {
+        return archives->HasFile(name) || archives->HasFile(name + ".meta");
+    };
+    return exists(resource) || (owner->IsAltAssetsEnabled() && exists("alt/" + resource));
+}
+
+extern "C" COMBO_EXPORT int32_t OOT_NeiEnsureGiBaseOwner(void) {
+    const auto owner = Ship::CrossRMRegistry::Get("oot");
+    if (!owner || !owner->GetArchiveManager())
+        return 0;
+    if (Ship::CrossRMRegistry::Get("oot-gi-base"))
+        return 1;
+    const std::vector<std::string> shipped{ Ship::Context::LocateFileAcrossAppDirs("soh.o2r", "soh"),
+                                            Ship::Context::LocateFileAcrossAppDirs("soh.o2r") };
+    const auto archives = owner->GetArchiveManager()->GetArchives();
+    if (!archives)
+        return 0;
+    for (const auto& archive : *archives) {
+        if (!archive)
+            continue;
+        const auto path = NeiAssetPriority::NormalizeArchive(archive->GetPath());
+        for (const auto& stock : shipped) {
+            if (stock.empty() || path != NeiAssetPriority::NormalizeArchive(stock))
+                continue;
+            const auto view = owner->CreateResourceView(archive);
+            if (!view)
+                return 0;
+            Ship::CrossRMRegistry::Register("oot-gi-base", view);
+            return 1;
+        }
+    }
+    return 0; // Missing shipped GI data must never borrow a mod archive.
 }
 
 #endif

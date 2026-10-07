@@ -227,7 +227,8 @@
                 CwItemDrawInfo native{};
                 assert(MM_DescribeNeiGi(id, &native));
                 assert(native.drawKind == CW_DRAW_KIND_NEI_GI);
-                assert(std::strncmp(native.dlists[0], "__OTR__@oot:", 12) == 0);
+                assert(std::strncmp(native.dlists[0], useAlt ? "__OTR__@oot:" : "__OTR__@oot-gi-base:",
+                                    useAlt ? 12 : 20) == 0);
                 ComboForeignDrawInfo foreign{};
                 foreign.ok = true;
                 foreign.drawKind = native.drawKind;

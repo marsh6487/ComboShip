@@ -56,3 +56,20 @@ for(auto [item,gi] : {
 }
 Reset();ownerAlt=false;
 std::cout << "PASS native MM GI mod priority over standalone equipment: all four native sword families\n";
+
+// Missing shipped vanilla sword geometry must be handled before the legacy
+// dispatch, which can borrow a local or donor base-path mod even with Alt OFF.
+for (auto item : {RI_SWORD_KOKIRI, RI_SWORD_RAZOR, RI_SWORD_GILDED,
+                  RI_OOT_MASTER_SWORD, RI_OOT_TRUE_MASTER_SWORD,
+                  RI_OOT_BIGGORON_SWORD, RI_GREAT_FAIRY_SWORD, RI_OOT_EXT_FOUR_SWORD}) {
+  Reset(); alt=false; ownerAlt=true;
+  modFiles.insert({"mm","__OTR__objects/object_toki_objects/object_toki_objects_DL_001BD0"});
+  CwItemDrawInfo missing{};
+  assert(!MM_DescribeNeiGi(item,&missing));
+  mmShopLegacyDraws=0;
+  Rando::DrawResolvedItem(item,1,nullptr);
+  assert(mmShopLegacyDraws==0 && "missing vanilla sword fell through to mod-capable legacy dispatch");
+  assert(Drawn().empty() && arena.empty() && stack.empty());
+}
+Reset(); ownerAlt=false;
+std::cout << "PASS native MM vanilla sword missing-resource dispatch: all eight awards refuse mod-capable fallback\n";

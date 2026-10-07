@@ -33,8 +33,16 @@
     assert(MM_TryDrawNeiGi(model.item));
     gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;
     modFiles.insert({"mm",activeAlt?"alt/"+legacy:legacy});
-    assert(!MM_DescribeNeiGi(model.item,&info));
-    assert(!MM_TryDrawNeiGi(model.item)&&gfx.polyOpa.p==opa&&gfx.polyXlu.p==xlu);
+    const bool vanillaSword = !activeAlt &&
+      (model.item == RI_SWORD_KOKIRI || model.item == RI_OOT_EXT_FOUR_SWORD);
+    if(vanillaSword) {
+      assert(MM_DescribeNeiGi(model.item,&info));
+      assert(std::strncmp(info.dlists[0],"__OTR__@oot-gi-base:",20)==0);
+      assert(MM_TryDrawNeiGi(model.item));
+    } else {
+      assert(!MM_DescribeNeiGi(model.item,&info));
+      assert(!MM_TryDrawNeiGi(model.item)&&gfx.polyOpa.p==opa&&gfx.polyXlu.p==xlu);
+    }
     // MM-specific GI paths must not disable the OoT inline source models.
     if(std::strcmp(model.slug,"mm_kokiri_sword")&&std::strcmp(model.slug,"shield_of_ikana")&&std::strcmp(model.slug,"magic_cape"))
       assert(OOT_GetNeiGiDrawInfo(model.slug,&info));

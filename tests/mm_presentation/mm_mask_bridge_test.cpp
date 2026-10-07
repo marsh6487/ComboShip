@@ -13,6 +13,8 @@
 #include "soh/mods/mm_sources/objects/object_gi_masks_all.h"
 #include "soh/mods/mm_sources/objects/object_mm_rando_items.h"
 #include "z64item.h"
+/* NATIVE_ITEM_IDS */
+/* HOST_NATIVE_IMPORT */
 #define RANDO_ENUM_BEGIN(x) enum x {
 #define RANDO_ENUM_ITEM(x) x,
 #define RANDO_ENUM_END(x) };
@@ -144,8 +146,14 @@ ComboForeignDrawInfoOOT current;
 const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(int rc) {return ComboFillForeignDrawInfoOOT(rc,current)==ComboForeignResolveOOT::Ok?&current:nullptr;}
 void GetItem_Draw(PlayState*,int gid) {assert(gid==GID_RUPEE_BLUE);++sentinels;}
 bool ComboForeignAnim_Draw(const CwItemAnimDrawInfo*,const char*,PlayState*) {assert(0);return false;}
-using RandoItemId=int;
-enum {RI_NONE,RI_OOT_NEI_CANE_OF_SOMARIA,RI_OOT_NEI_CANE_PACCI_FLIP,RI_OOT_NEI_CANE_SOMARIA_BLOCK,RI_OOT_NEI_CANE_PACCI_STONE,RI_OOT_NEI_CANE_SOMARIA_PLATFORM,RI_OOT_NEI_CANE_PACCI_ULTRAHAND};
+struct Actor {};
+std::vector<RandoItemId> nativeDraws;
+namespace Rando {
+void DrawResolvedItem(RandoItemId item, RandoCheckId check, Actor*) {
+ assert(check == RC_UNKNOWN);
+ nativeDraws.push_back(item);
+}
+}
 void DrawOotNeiUltrahand() {assert(0);}
 void DrawOotNeiCaneOfSomaria(int) {assert(0);}
 void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,int mmPickup=0) {assert(0);}
@@ -158,6 +166,37 @@ void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*,bool=false) {assert(0
 /* OTHER_DRAW_HANDLERS */
 /* HOST_DISPATCH */
 int main() {
+ // These are OoT-owned aliases at MM checks, not native placements. The
+ // resolver/dispatcher must select MM's existing concrete draw handler.
+ const std::pair<const char*,RandoItemId> imports[] = {
+  {"Woodfall Map",RI_WOODFALL_MAP},{"Snowhead Map",RI_SNOWHEAD_MAP},
+  {"Great Bay Map",RI_GREAT_BAY_MAP},{"Stone Tower Map",RI_STONE_TOWER_MAP},
+  {"Woodfall Compass",RI_WOODFALL_COMPASS},{"Snowhead Compass",RI_SNOWHEAD_COMPASS},
+  {"Great Bay Compass",RI_GREAT_BAY_COMPASS},{"Stone Tower Compass",RI_STONE_TOWER_COMPASS},
+  {"Woodfall Small Key",RI_WOODFALL_SMALL_KEY},{"Snowhead Small Key",RI_SNOWHEAD_SMALL_KEY},
+  {"Great Bay Small Key",RI_GREAT_BAY_SMALL_KEY},{"Stone Tower Small Key",RI_STONE_TOWER_SMALL_KEY},
+  {"Woodfall Boss Key",RI_WOODFALL_BOSS_KEY},{"Snowhead Boss Key",RI_SNOWHEAD_BOSS_KEY},
+  {"Great Bay Boss Key",RI_GREAT_BAY_BOSS_KEY},{"Stone Tower Boss Key",RI_STONE_TOWER_BOSS_KEY},
+  {"Soul of Odolwa",RI_SOUL_BOSS_ODOLWA},{"Soul of Goht",RI_SOUL_BOSS_GOHT},
+  {"Soul of Gyorg",RI_SOUL_BOSS_GYORG},{"Soul of Twinmold",RI_SOUL_BOSS_TWINMOLD},
+  {"Soul of Majora",RI_SOUL_BOSS_MAJORA},{"Bottle With Gold Dust",RI_BOTTLE_GOLD_DUST},
+  {"Bottle with Magic Mushroom",RI_OOT_BOTTLE_MAGIC_MUSHROOM},
+  {"Tingle's Clock Town Map",RI_TINGLE_MAP_CLOCK_TOWN},
+  {"Tingle's Woodfall Map",RI_TINGLE_MAP_WOODFALL},
+  {"Tingle's Snowhead Map",RI_TINGLE_MAP_SNOWHEAD},
+  {"Tingle's Romani Ranch Map",RI_TINGLE_MAP_ROMANI_RANCH},
+  {"Tingle's Great Bay Map",RI_TINGLE_MAP_GREAT_BAY},
+  {"Tingle's Stone Tower Map",RI_TINGLE_MAP_STONE_TOWER}
+ };
+ for(auto [name,native]:imports) {
+  foreign.itemName=name;current={};nativeDraws.clear();
+  MM_DrawComboForeign(static_cast<RandoCheckId>(1));
+  assert(nativeDraws == std::vector<RandoItemId>{native} &&
+         "OoT imports of MM items must dispatch their native MM models");
+  assert(foreign.itemGame==ComboRando::GAME_OOT && foreign.itemName==name);
+ }
+ std::cout<<"PASS 29 OoT-owned MM aliases through production foreign resolver and native dispatch; grant owner and names preserved\n";
+ foreign.itemName="mask";current={};
  for(auto& cmd:opa)cmd.stream=0;
  for(auto& cmd:xlu)cmd.stream=1;
  assert(CwMinDlistsForKind(CW_DRAW_KIND_MM_MASK)==2);

@@ -107,6 +107,8 @@ int main() {
 #include "mm/2s2h/Rando/Types.h"
 #include "combo/menu/ComboSongDrawMM.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiSongEffectPolicy.h"
+using NeiGi::Kind;
+bool ResourceMgr_IsAltAssetsEnabled() {return false;}
 struct PlayState { struct {void* gfxCtx;} state; uint32_t gameplayFrames; } play{};
 PlayState* gPlayState=&play;
 static int overlay=-1, season=-1, notes=0, genericShimmer=0, descriptions=0;

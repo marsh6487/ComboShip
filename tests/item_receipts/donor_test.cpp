@@ -787,13 +787,14 @@ int main(int argc, char** argv) {
   assert(read("Great Deku Tree Compass").find("Progressive Goron Lullaby (MM)") == std::string::npos);
   assert(OOT_GetDungeonItemReceiptPresentation("Great Deku Tree Compass", &rewardPresentation) == 1);
   assert(rewardPresentation.rewardLine == 1 && std::strstr(rewardPresentation.iconPath, "@mm:"));
-  // A missing sprite must retain the placed reward as readable text.
+  // Receipt layout stays on two lines even if this plando has no reward sprite.
   seedIconAvailable = false;
   const auto missingSprite = read("Great Deku Tree Compass");
-  assert(missingSprite.find("Progressive Goron Lullaby (MM)") != std::string::npos);
-  assert(missingSprite.find("Defeating the boss grants") != std::string::npos);
+  assert(missingSprite.find("It points to") != std::string::npos);
+  assert(missingSprite.find("Progressive Goron Lullaby (MM)") == std::string::npos);
+  assert(missingSprite.find("Defeating the boss grants") == std::string::npos);
   assert(OOT_GetDungeonItemReceiptPresentation("Great Deku Tree Compass", &rewardPresentation) == 1);
-  assert(!ComboReceipt_HasIcon(&rewardPresentation) && rewardPresentation.rewardLine == 2);
+  assert(!ComboReceipt_HasIcon(&rewardPresentation) && rewardPresentation.rewardLine == 1);
   seedIconAvailable = true;
   assert(read("Great Deku Tree Map").find("Dodongo's Cavern") !=
          std::string::npos);
@@ -839,8 +840,9 @@ int main(int argc, char** argv) {
   assert(read("Great Deku Tree Map").find("masterful") != std::string::npos);
   assert(read("Snowhead Compass").find("Goht") != std::string::npos);
   mmRewardAvailable = true;
-  assert(read("Snowhead Compass").find("Progressive Hookshot (OOT)") !=
+  assert(read("Snowhead Compass").find("Progressive Hookshot (OOT)") ==
          std::string::npos);
+  assert(read("Snowhead Compass").find("Defeating the boss grants") == std::string::npos);
   assert(read("Ice Cavern Compass").find("Phantom Ganon") == std::string::npos);
   assert(read("Ice Cavern Compass").find("reward") == std::string::npos);
   receiptContext.mqMode = RO_MQ_DUNGEONS_NONE;

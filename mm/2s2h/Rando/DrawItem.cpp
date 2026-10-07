@@ -50,6 +50,8 @@ extern Gfx gIKAxeInlineDL[];                         // equipment/objects/ikaxe_
 #undef COMBO_MASK_SHIMMER_HOST_MM
 
 #ifdef COMBO_BUILD
+#include "ComboGiReceiptTrace.h"
+#define COMBO_GI_RECEIPT_TRACE
 // ComboShip: cross-game foreign-item rendering. A check holding RI_COMBO_FOREIGN actually holds an
 // OOT item; MM_DrawComboForeign renders the real OOT model via "@oot:" cross-RM routing (sentinel
 // blue rupee when it can't be resolved). Bodies live in the combo-owned TU-glue header, included
@@ -3016,6 +3018,9 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
     const int mmPickup = receipt ? (GET_PLAYER_FORM == PLAYER_FORM_GORON ? 2 : 1) : 0;
     if (MM_TryDrawNeiGi(randoItemId, shop, mmPickup))
         return;
+#ifdef COMBO_GI_RECEIPT_TRACE
+    ComboGiReceiptTrace::Native(randoItemId, mmPickup);
+#endif
     // Match the retained legacy callback's concrete geometry, independently
     // of the Great Fairy award's particle/shimmer identity.
     const auto legacyFitKind =
@@ -3787,7 +3792,7 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
         case RI_COMBO_FOREIGN:
             // ComboShip: this MM check holds an OOT item — render the real OOT model (sentinel blue
             // rupee on any failure). The originating check identity is passed straight through.
-            MM_DrawComboForeign(randoCheckId, shop, mmPickup);
+            MM_DrawComboForeign(randoCheckId, shop, mmPickup, actor);
             break;
 #endif
         default:

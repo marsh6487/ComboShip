@@ -40,7 +40,9 @@ production = '\n'.join(function(native, name) for name in [
 production += '\n' + native[native.index('MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer'):]
 start = draw.index('    const bool shop = actor && actor->id == ACTOR_EN_GIRLA;')
 end = draw.index('    const int dungeonOwner', start)
-dispatch = draw[start:end].replace('#endif', '')
+# The outer COMBO_BUILD guard starts before this extraction. Remove only its
+# closing directive; keep nested diagnostic guards balanced.
+dispatch = ''.join(draw[start:end].rsplit('#endif', 1))
 production += '\nvoid DrawReceipt(RandoItemId randoItemId, Actor* actor) {\n' + dispatch + '\nDrawNativeSword();\n}\n'
 template = (ROOT / 'tests/sword_fallback/receipt_test.cpp').read_text()
 source = template.replace('/* RESOURCE_TYPES */', common).replace('/* DECLARATIONS */', declarations)
@@ -69,7 +71,7 @@ if '--sanitize' in sys.argv:
 with tempfile.TemporaryDirectory(prefix='sword-receipt-') as temporary:
     cpp = Path(temporary)/'receipt.cpp';cpp.write_text(source)
     binary = Path(temporary)/'receipt'
-    subprocess.run([os.environ.get('CXX','c++'),*flags,str(cpp),'-o',str(binary)],check=True)
+    subprocess.run([os.environ.get('CXX','c++'),*flags,str(cpp),str(ROOT/'soh/soh/resource/type/Array.cpp'),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})
     # Compile the exact typed companion query with real Ship/Fast APIs too.
     # Only the existing global/context and archive-handle access are seams.

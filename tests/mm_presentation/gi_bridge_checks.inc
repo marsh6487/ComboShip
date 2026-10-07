@@ -8,7 +8,7 @@ Reset();
 files.insert("__OTR__objects/nei_gi_redesign/mm_kokiri_sword/gi_dl");
 CwItemDrawInfo mmKokiri{};
 assert(MM_DescribeNeiGi(RI_SWORD_KOKIRI, &mmKokiri));
-assert(std::strcmp(mmKokiri.dlists[0], "__OTR__@oot:objects/nei_gi_redesign/mm_kokiri_sword/gi_dl") == 0);
+assert(std::strcmp(mmKokiri.dlists[0], "__OTR__@oot-gi-base:objects/nei_gi_redesign/mm_kokiri_sword/gi_dl") == 0);
 assert(NeiGi::ColorHex(static_cast<Kind>(mmKokiri.neiEffect)) == 0xA46CFF);
 files.insert("__OTR__objects/nei_gi_redesign/kokiri_sword/gi_dl");
 CwItemDrawInfo ootKokiri{};

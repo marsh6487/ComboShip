@@ -27,7 +27,9 @@ static void AutumnLeaves_Draw(PlayState* play, unsigned index, u8 alpha) {
     OPEN_DISPS(gfxCtx);
     gDPPipeSync(POLY_XLU_DISP++);
     gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_CULL_BACK);
-    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+    // Native snow setup is two-cycle. Preserve cycle one: sampling TEXEL0
+    // again in cycle two selects the unowned neighboring texture slot.
+    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA_PRIM, G_CC_PASS2);
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, alpha);
     gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
     gDPSetTextureLUT(POLY_XLU_DISP++, G_TT_NONE);

@@ -337,6 +337,13 @@ static void CheckMapCompassInformation() {
   assert(!PauseItemDesc_GetMapInfo(0, ITEM_KEY_BOSS));
   foreignRewardCheck = RC_UNKNOWN;
   assert(Rando::GetDungeonMapCompassInfo(2, true).empty()); // Missing foreign data never names the sentinel.
+  CustomMessage::Entry missingReward;
+  assert(Rando::ApplyItemReceiptText(RI_GREAT_BAY_COMPASS, missingReward));
+  assert(missingReward.msg.find("Gyorg") != std::string::npos);
+  assert(std::count(missingReward.msg.begin(), missingReward.msg.end(), '\x11') == 1);
+  assert(missingReward.msg.find("Defeating the boss grants") == std::string::npos);
+  assert(!ComboReceipt_HasIcon(&missingReward.receiptPresentation) &&
+         missingReward.receiptPresentation.rewardLine == 1);
   mapCompassInfo = false;
   for (int d = 0; d < 4; ++d) {
     assert(Rando::GetDungeonMapCompassInfo(d, true).empty());

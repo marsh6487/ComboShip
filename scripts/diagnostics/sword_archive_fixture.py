@@ -62,7 +62,9 @@ class Archive:
 
     def mesh(self,root):
         vertices=[];triangles=[];cache={};visited=set();missing=set();matrices=[];vertex_resources=set()
+        modelview=np.eye(4);stack=[]
         def execute(path,depth=0):
+            nonlocal modelview
             assert depth<32,(root,'Recursive DL')
             visited.add(path)
             for op,w0,w1,ref in self.commands(path):
@@ -88,7 +90,7 @@ class Archive:
                     assert 0<=v0<=32 and 0< n<=32 and end<=32 and start+n<=count,(ref,n,v0,start,count)
                     vertex_resources.add(ref)
                     for j in range(n):
-                        xyz=coords[start+j]
+                        xyz=(np.append(coords[start+j],1)@modelview)[:3]
                         cache[v0+j]=len(vertices);vertices.append(xyz)
                 elif op in (0x05,0x06):
                     words=[w0] if op==0x05 else [w0,w1]
@@ -96,10 +98,28 @@ class Archive:
                         indices=[((word>>s)&255)//2 for s in (16,8,0)]
                         assert all(k in cache for k in indices),(path,'Uninitialized vertex',indices)
                         triangles.append([cache[k] for k in indices])
-                elif op in (0xDA,0x36,0x29,0xD8): matrices.append((path,hex(op),ref))
+                elif op==0x36:
+                    matrices.append((path,hex(op),ref))
+                    assert ref is not None,(path,'Unresolved matrix')
+                    raw=self.z.read(ref)
+                    assert struct.unpack_from('<I',raw,4)[0]==0x4F4D5458 and len(raw)==128,(ref,'Not binary matrix')
+                    words=struct.unpack_from('<16I',raw,64)
+                    fixed=[]
+                    for integer,fraction in zip(words[:8],words[8:]):
+                        fixed.extend(((integer&0xffff0000)|(fraction>>16),(integer<<16&0xffff0000)|(fraction&0xffff)))
+                    decoded=np.array([v if v<2**31 else v-2**32 for v in fixed],dtype=float).reshape(4,4)/65536
+                    flags=(w0&255)^1
+                    assert not flags&~1,(path,'Unsupported projection/load matrix')
+                    if flags&1:stack.append(modelview.copy())
+                    modelview=decoded@modelview
+                elif op==0xD8:
+                    matrices.append((path,hex(op),ref))
+                    assert w1%64==0 and 0<w1//64<=len(stack),(path,'Unbalanced matrix pop')
+                    modelview=stack[-w1//64];del stack[-w1//64:]
+                elif op in (0xDA,0x29): raise AssertionError((root,'Unsupported XML matrix',path,ref))
         execute(root)
         assert not missing,(root,missing)
-        assert not matrices,(root,'Geometry has matrix operations',matrices)
+        assert not stack and np.array_equal(modelview,np.eye(4)),(root,'Unrestored modelview')
         points=np.asarray(vertices,dtype=float);faces=np.asarray(triangles,dtype=int)
         unique=np.unique(points,axis=0)
         _,_,axes=np.linalg.svd(unique-unique.mean(0),full_matrices=False)

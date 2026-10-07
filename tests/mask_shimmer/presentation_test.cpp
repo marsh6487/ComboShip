@@ -43,6 +43,7 @@ static std::string legacyModPath;
 
 extern "C" {
 #ifdef HOST_MM
+bool ResourceMgr_IsAltAssetsEnabled() { return false; }
 int ResourceMgr_IsModAssetForGame(const char* game, const char* path) {
     assert(!strcmp(game, "mm"));
     return legacyModPath == path;
@@ -291,10 +292,10 @@ int main() {
     // supplies independent identity when that module is available.
     legacyModPath = "objects/object_nei_fire_rod/Cylinder_001_opaque_dl";
     assert(!MM_TryDrawNeiGi(RI_OOT_NEI_FIRE_ROD));
-    assert(ownerLookups == 1 && paths.empty() && vertexLoads.empty());
+    assert(ownerLookups == 2 && paths.empty() && vertexLoads.empty());
     legacyModPath.clear();
     assert(!MM_TryDrawNeiGi(RI_OOT_NEI_WHIP)); // Fixture has no dormant OoT module.
-    assert(ownerLookups == 2);
+    assert(ownerLookups == 4);
 #endif
     Reset(47);
 #ifdef HOST_MM

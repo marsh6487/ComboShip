@@ -22,6 +22,10 @@ int enabled, alt, dinSword, loads, allocations, fallback, interpolation, vanilla
     triforce;
 float matrix = 1;
 float matrixY = 0;
+float matrixYaw = 0;
+bool sunProbe = false;
+std::vector<float> yawStack;
+std::vector<float> submittedYaw;
 int modelFitContext = -1;
 std::vector<std::pair<float, float>> stack;
 std::vector<std::pair<float, float>> submitted;
@@ -44,6 +48,10 @@ void Reset() {
   vanilla = trap = triforce = 0;
   matrix = 1;
   matrixY = 0;
+  matrixYaw = 0;
+  sunProbe = false;
+  yawStack.clear();
+  submittedYaw.clear();
   modelFitContext = -1;
   submitted.clear();
   flameColors.clear();
@@ -170,12 +178,15 @@ Gfx *ResourceMgr_LoadGfxByName(const char *path) {
 }
 void Matrix_Push() {
   Fixture::stack.emplace_back(Fixture::matrix, Fixture::matrixY);
+  Fixture::yawStack.push_back(Fixture::matrixYaw);
 }
 void Matrix_Pop() {
   assert(!Fixture::stack.empty());
   Fixture::matrix = Fixture::stack.back().first;
   Fixture::matrixY = Fixture::stack.back().second;
   Fixture::stack.pop_back();
+  Fixture::matrixYaw = Fixture::yawStack.back();
+  Fixture::yawStack.pop_back();
 }
 void Matrix_Scale(float x, float, float, uint8_t) { Fixture::matrix *= x; }
 void Matrix_RotateX(float, uint8_t) {}
@@ -188,11 +199,20 @@ void Matrix_Translate(float, float y, float, uint8_t mode) {
   } else
     Fixture::matrixY += y * Fixture::matrix;
 }
-void Matrix_ReplaceRotation(MtxF *) {}
+void Matrix_ReplaceRotation(MtxF *) {
+  if (Fixture::sunProbe) {
+    Fixture::matrixYaw = 0;
+  }
+}
 void Matrix_Get(MtxF *m) {
   *m = {};
   m->xx = m->yy = m->zz = Fixture::matrix;
   m->yw = Fixture::matrixY;
+  if (Fixture::sunProbe) {
+    m->xx = m->zz = std::cos(Fixture::matrixYaw) * Fixture::matrix;
+    m->xz = std::sin(Fixture::matrixYaw) * Fixture::matrix;
+    m->zx = -m->xz;
+  }
 }
 void *DebitTail(GraphicsContext *context, size_t size) {
   const auto tail =
@@ -217,6 +237,7 @@ Mtx *Matrix_NewMtx(GraphicsContext *context, char *, int32_t) {
     Fixture::pendingVertices = nullptr;
   }
   Fixture::submitted.emplace_back(Fixture::matrix, Fixture::matrixY);
+  if (Fixture::sunProbe) Fixture::submittedYaw.push_back(Fixture::matrixYaw);
   ++Fixture::allocations;
   return static_cast<Mtx *>(DebitTail(context, sizeof(Mtx)));
 }
@@ -668,6 +689,47 @@ int main() {
     assert(gfx.polyOpa.p > opa && !arena.empty());
     assert(stack.empty());
   }
+
+  // The summer sun's local vertices must stay fixed while the held item
+  // spins. Native matrix billboarding is interpolated; CPU counter-rotated
+  // vertices snap at game ticks under an interpolated parent rotation.
+  std::vector<std::vector<Vtx>> summerGeometry;
+  unsigned previousScroll = 0;
+  for (unsigned tick = 0; tick < 3; ++tick) {
+    Reset(); sunProbe = true; matrixYaw = float(tick) * 0.7f;
+    const float callerYaw = matrixYaw;
+    play.gameplayFrames = 180 + tick;
+    NeiGi_DrawSeasonOverlay(&play, 5, "oot");
+    assert(arena.size() >= 2);
+    assert(submittedYaw.size() >= 3);
+    for (size_t i = 0; i + 1 < submittedYaw.size(); ++i)
+      assert(submittedYaw[i] == 0 && "both sun passes must face the camera independently of the parent spin");
+    assert(submittedYaw.back() == callerYaw);
+    if (tick == 0) summerGeometry = arena;
+    else {
+      assert(arena.size() == summerGeometry.size());
+      for (size_t pass = 0; pass < arena.size(); ++pass) {
+        assert(arena[pass].size() == summerGeometry[pass].size());
+        for (size_t vertex = 0; vertex < arena[pass].size(); ++vertex)
+          assert(!std::memcmp(arena[pass][vertex].v.ob, summerGeometry[pass][vertex].v.ob,
+                              sizeof(arena[pass][vertex].v.ob)) &&
+                 "summer sun counter-rotation must not be baked into tick-dependent vertices");
+      }
+    }
+    assert(matrixYaw == callerYaw && stack.empty());
+    bool foundScroll = false;
+    unsigned scroll = 0;
+    for (Gfx* command = xlu; command < gfx.polyXlu.p; ++command) {
+      if ((command->words.w0 >> 24) == G_SETTILESIZE) {
+        scroll = (command->words.w0 >> 12) & 0xFFF;
+        foundScroll = true;
+      }
+    }
+    assert(foundScroll);
+    if (tick) assert((scroll + 128 - previousScroll) % 128 == 1);
+    previousScroll = scroll;
+  }
+  Reset();
 
   // Seasons are intrinsic weather in the common, shop and overhead routes,
   // even with optional effects disabled and authored season/rod assets present.
@@ -1476,7 +1538,7 @@ int main() {
 #include "nei_all_frame_bounds.inc"
   };
   assert(std::size(frames)==61);
-  for(const auto& f:frames) for(const char* owner:{"","@oot:","@mm:"}) for(int route:{0,1,2}) {
+  for(const auto& f:frames) for(const char* owner:{"","@oot:","@mm:","@oot-gi-base:"}) for(int route:{0,1,2}) {
     Reset();
     const std::string path=std::string("__OTR__")+owner+"objects/nei_gi_redesign/"+f.slug+"/gi_dl";
     const std::string shell=std::string("__OTR__")+owner+"objects/nei_gi_redesign/"+f.slug+"/gi_xlu_dl";

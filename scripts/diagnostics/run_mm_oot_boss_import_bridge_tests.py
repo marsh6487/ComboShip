@@ -23,7 +23,7 @@ fixture = fixture.replace('/* DONOR_NAMES */', 'constexpr const char* names[] = 
 a = host.index('struct ComboForeignDrawInfoOOT {')
 b = host.index('\n};', a) + 3
 fixture = fixture.replace('/* HOST_INFO */', host[a:b])
-fixture = fixture.replace('/* HOST_RESOLVER */', function(host, 'ComboFillForeignDrawInfoOOT'))
+fixture = fixture.replace('/* HOST_RESOLVER */', 'int32_t ComboNativeMmImport(const char*) {return -1;}\n' + function(host, 'ComboFillForeignDrawInfoOOT'))
 helper = function(host, 'MM_TryDrawOotBossSoul') if 'MM_TryDrawOotBossSoul(' in host else 'bool MM_TryDrawOotBossSoul(RandoItemId) {return false;}'
 fixture = fixture.replace('/* HOST_IMPORT_HELPER */', helper)
 fixture = fixture.replace('/* NATIVE_IMPORT_DRAW */', function(native, 'DrawOotBossSoul'))

@@ -12,15 +12,19 @@
 #include <set>
 std::set<std::string> ownerBase, ownerAlt;
 bool ownerAltEnabled = false, mmAltEnabled = false, ownerRegistered = true;
+extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return mmAltEnabled; }
 static std::set<std::string> descriptorPaths;
 static int descriptorCalls;
 extern "C" __attribute__((visibility("default"))) int32_t
 OOT_NeiResourceExists(const char *path) {
+  constexpr char stockPrefix[]="__OTR__@oot-gi-base:";
+  if (!strncmp(path,stockPrefix,sizeof(stockPrefix)-1))
+    return ownerRegistered && ownerBase.contains(std::string("__OTR__")+(path+sizeof(stockPrefix)-1));
   return ownerRegistered && (ownerBase.contains(path) ||
                              (ownerAltEnabled && ownerAlt.contains(path)));
 }
 extern "C" __attribute__((visibility("default"))) int32_t
-OOT_GetNeiGiDrawInfo(const char* slug, CwItemDrawInfo* out) {
+OOT_GetNeiGiDrawInfoForAssets(const char* slug, int32_t altAssets, CwItemDrawInfo* out) {
   ++descriptorCalls;
   std::string prefix=std::string("__OTR__objects/nei_gi_redesign/")+slug;
   const char* opa=descriptorPaths.insert(prefix+"/gi_dl").first->c_str();
@@ -31,12 +35,18 @@ OOT_GetNeiGiDrawInfo(const char* slug, CwItemDrawInfo* out) {
   assert(bounds);
   out->neiEffect = static_cast<int>(bounds->effect);
   out->neiShimmer = out->neiEffect + 1;
+  if (!altAssets && NeiGi::IsSword(bounds->effect))
+    opa=descriptorPaths.insert(std::string("__OTR__@oot-gi-base:")+(opa+7)).first->c_str();
   if(!OOT_NeiResourceExists(opa) || (skin && !OOT_NeiResourceExists(skin))) return 0;
   out->drawKind = CW_DRAW_KIND_NEI_GI;
   out->dlistCount = split ? 2 : 1;
   out->dlists[0]=opa; out->dlists[1]=skin; out->xluStartIndex=split ? 1 : -1;
   out->scale=1; out->itemShimmer=1;
   return 1;
+}
+extern "C" __attribute__((visibility("default"))) int32_t
+OOT_GetNeiGiDrawInfo(const char* slug, CwItemDrawInfo* out) {
+  return OOT_GetNeiGiDrawInfoForAssets(slug,1,out);
 }
 static bool itemEffects;
 extern "C" int32_t CVarGetInteger(const char* name,int32_t value) {
@@ -213,22 +223,28 @@ int main() {
   CwItemDrawInfo described{};
   assert(!MM_DescribeNeiGi(RI_BOW,&described) && descriptorCalls==0);
   for(auto [id,slug] : candidates) {
-    reset(); ownerBase.clear(); ownerAlt.clear();
-    assert(!MM_TryDrawNeiGi(id) && gfx.polyOpa.p==opa && gfx.polyXlu.p==xlu);
     const std::string raw=std::string("__OTR__objects/nei_gi_redesign/")+slug;
+    const bool vanillaSword=NeiGi::IsSword(NeiGi::FindFrameBounds((raw+"/gi_dl").c_str())->effect);
+    reset(); ownerBase.clear(); ownerAlt.clear(); mmAltEnabled=false;
+    assert(MM_TryDrawNeiGi(id)==vanillaSword && gfx.polyOpa.p==opa && gfx.polyXlu.p==xlu);
     ownerAlt.insert(raw+"/gi_dl"); ownerAlt.insert(raw+"/gi_xlu_dl");
     ownerAltEnabled=false; mmAltEnabled=true;
     assert(!MM_DescribeNeiGi(id,&described));
     ownerAltEnabled=true; mmAltEnabled=false;
+    if(vanillaSword) {
+      assert(!MM_DescribeNeiGi(id,&described));
+      ownerBase.insert(raw+"/gi_dl");
+    }
     assert(MM_DescribeNeiGi(id,&described));
-    assert(std::string(described.dlists[0])==std::string("__OTR__@oot:")+raw.substr(7)+"/gi_dl");
+    const std::string ownerPrefix=vanillaSword?"__OTR__@oot-gi-base:":"__OTR__@oot:";
+    assert(std::string(described.dlists[0])==ownerPrefix+raw.substr(7)+"/gi_dl");
     assert(MM_TryDrawNeiGi(id));
     int bodies=0,skins=0;
     for(auto range : {std::pair(opa,gfx.polyOpa.p),std::pair(xlu,gfx.polyXlu.p)})
       for(Gfx* cmd=range.first;cmd<range.second;++cmd)
         if(cmd->words.w0>>24==G_DL_OTR_FILEPATH) {
           std::string path=(const char*)cmd->words.w1;
-          assert(path.starts_with("__OTR__@oot:objects/nei_gi_redesign/"));
+          assert(path.starts_with(ownerPrefix+"objects/nei_gi_redesign/"));
           if(path.ends_with("/gi_dl")) ++bodies; else ++skins;
         }
     assert(bodies==1 && skins==(described.dlistCount==2) && matrices.empty());

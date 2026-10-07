@@ -36,6 +36,7 @@ bool HasRedesignGiMod(const Presentation&) {return false;}
 bool HasSelectedSword(const Presentation&,bool,bool (*)(const char*)) {return selectedSword;}
 int OOT_NeiAltAssetsEnabled() {return true;}
 int OOT_NeiResourceExists(const char*) {return resources;}
+const char* NeiGi_BaseSwordPath(const char* path) {return path;}
 ''' + body + r'''
 int main() {
     for(Kind kind : {Kind::Fire,Kind::Ice,Kind::Light,Kind::Hylia,Kind::Zonai,Kind::Demise,
@@ -87,7 +88,10 @@ int Describe(const char*,CwItemDrawInfo* out) {
     Presentation p{nullptr,"__OTR__objects/nei_gi_redesign/test/gi_dl",nullptr,1,awardKind,{},NeiGi::IsSword(awardKind)};
     return NeiGi_FillCrossGameInfo(p,out);
 }
-void* Combo_ResolveSym(const char*,const char*) {return reinterpret_cast<void*>(Describe);}
+void* Combo_ResolveSym(const char*,const char* name) {
+    return !strcmp(name,"OOT_GetNeiGiDrawInfo") ? reinterpret_cast<void*>(Describe) : nullptr;
+}
+bool ResourceMgr_IsAltAssetsEnabled() {return true;}
 const char* NeiResource_Route(const char* path) {return path;}
 int ResourceMgr_IsModAssetForGame(const char*,const char*) {return mmMod;}
 void ComboSwordGi_ApplyLegacyFit(const char* owner,Kind kind,bool shop=false,int pickup=0) {

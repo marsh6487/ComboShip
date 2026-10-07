@@ -20,7 +20,9 @@ inline const FrameBounds* FindFrameBounds(const char* path) {
     if (!path || std::strncmp(path, "__OTR__", 7))
         return nullptr;
     path += 7;
-    if (!std::strncmp(path, "@oot:", 5))
+    if (!std::strncmp(path, "@oot-gi-base:", 13))
+        path += 13;
+    else if (!std::strncmp(path, "@oot:", 5))
         path += 5;
     else if (!std::strncmp(path, "@mm:", 4))
         path += 4;

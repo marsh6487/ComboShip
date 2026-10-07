@@ -204,7 +204,13 @@ typedef int32_t (*Fn_GetItemIconInfo)(const char* itemName, CwItemIconInfo* out)
 typedef int32_t (*Fn_NeiResourceExists)(const char* path);
 COMBO_OOT_EXPORT int32_t OOT_NeiResourceExists(const char* path);
 COMBO_OOT_EXPORT int32_t OOT_NeiAltAssetsEnabled(void);
+COMBO_OOT_EXPORT int32_t OOT_NeiEnsureGiBaseOwner(void);
+COMBO_OOT_EXPORT int32_t OOT_GetNeiGiDrawInfo(const char* slug, CwItemDrawInfo* out);
 typedef int32_t (*Fn_GetNeiGiDrawInfo)(const char* slug, CwItemDrawInfo* out);
+// The active host supplies its sword asset mode without changing the donor's
+// resource manager or per-game setting. Zero selects the authored sword GI.
+COMBO_OOT_EXPORT int32_t OOT_GetNeiGiDrawInfoForAssets(const char* slug, int32_t altAssets, CwItemDrawInfo* out);
+typedef int32_t (*Fn_GetNeiGiDrawInfoForAssets)(const char* slug, int32_t altAssets, CwItemDrawInfo* out);
 
 /* Returns 1 and fills out on success; 0 if the item is unknown/undrawable; CW_DRAW_NOT_READY if the
  * producer's state isn't up yet. itemName is in the owning game's namespace (MM: RI_* spoilerName). */

@@ -72,6 +72,7 @@ extern "C" int ResourceMgr_GetGiModelFitForGame(const char*,const char* path,flo
     out[0]=fit.scale;out[1]=fit.lift;return 1;
 }
 int CVarGetInteger(const char*,int);
+bool ResourceMgr_IsAltAssetsEnabled(){return mmOwner->alt;}
 /* RESOURCE_API */
 #include "combo/menu/ComboSwordGiLegacyFit.h"
 /* DECLARATIONS */
@@ -101,7 +102,9 @@ int OwnerItemDescribe(const char*,CwItemDrawInfo* out){
     out->neiShimmer=int(Kind::RazorSword)+1;out->opCount=1;out->ops[0].op=CW_OP_ROTATE_Z;return 1;
 }
 void* Combo_ResolveSym(const char*,const char* name){
-    return !strcmp(name,"OOT_GetNeiGiDrawInfo")?reinterpret_cast<void*>(OwnerNeiDescribe):reinterpret_cast<void*>(OwnerItemDescribe);
+    if(!strcmp(name,"OOT_GetNeiGiDrawInfo"))return reinterpret_cast<void*>(OwnerNeiDescribe);
+    if(!strcmp(name,"OOT_GetItemDrawInfo"))return reinterpret_cast<void*>(OwnerItemDescribe);
+    return nullptr; // Missing optional exports must not alias an incompatible function.
 }
 void DrawSong(RandoItemId){assert(false);}
 void MM_DrawNeiGi(const CwItemDrawInfo&,bool,int){assert(false&&"legacy mod must retain its native callback");}
@@ -165,8 +168,8 @@ const char gGiBiggoronSwordDL[]="objects/object_gi_longsword/gGiBiggoronSwordDL"
 }
 int main(){
     OTRGlobals::Instance=&globals;
-    Vertex("test/bodyVertices",1,{{-200,-600,0},{200,4200,0}});
-    Vertex("test/detailVertices",2,{{-300,-900,0},{300,8000,0}});
+    LegacyVertex("test/bodyVertices",1,{{-200,-600,0},{200,4200,0}});
+    LegacyVertex("test/detailVertices",2,{{-300,-900,0},{300,8000,0}});
     List("objects/object_gi_sword_2/gGiRazorSwordDL",3,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/bodyVertices")},{2,0},{uintptr_t(G_ENDDL)<<24,0}});
     List("objects/object_gi_sword_2/gGiRazorSwordEmptyDL",4,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/detailVertices")},{2,0},{uintptr_t(G_ENDDL)<<24,0}});
     Actor receipt{ACTOR_EN_ITEM00,{{CustomItem::CALLED_ACTION|CustomItem::GIVE_ITEM_CUTSCENE}}};
@@ -182,8 +185,8 @@ int main(){
         assert(effects[0]==nativePose&&effects[1]==nativePose&&"legacy model and particles/shimmer must share one fit");
         assert(pose==caller&&poses.empty()&&"legacy callback transforms escaped its receipt scope");
     }
-    Vertex("test/bgsVertices",5,{{-200,-900,0},{200,8000,0}});
-    Vertex("test/fairyVertices",6,{{-20,-20,0},{20,40,0}});
+    LegacyVertex("test/bgsVertices",5,{{-200,-900,0},{200,8000,0}});
+    LegacyVertex("test/fairyVertices",6,{{-20,-20,0},{20,40,0}});
     List("objects/object_gi_longsword/gGiBiggoronSwordDL",7,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/bgsVertices")},{2,0},{uintptr_t(G_ENDDL)<<24,0}});
     List("objects/object_gi_sword_4/gGiGreatFairysSwordBladeDL",8,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/fairyVertices")},{2,0},{uintptr_t(G_ENDDL)<<24,0}});
     List("objects/object_gi_sword_4/gGiGreatFairysSwordHiltEmblemDL",9,{{uintptr_t(G_ENDDL)<<24,0}});

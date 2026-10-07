@@ -20,7 +20,8 @@ extern "C" const char* NeiResource_Route(const char* path) {
     // unordered_set rehash preserves references/pointers to its elements.
     static std::unordered_set<std::string> paths;
     if (path[7] == '@') {
-        if (std::strncmp(path + 7, "@oot:", 5) && std::strncmp(path + 7, "@mm:", 4))
+        if (std::strncmp(path + 7, "@oot:", 5) && std::strncmp(path + 7, "@mm:", 4) &&
+            std::strncmp(path + 7, "@oot-gi-base:", 13))
             return nullptr;
         return paths.insert(path).first->c_str();
     }

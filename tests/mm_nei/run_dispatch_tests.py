@@ -80,24 +80,43 @@ ownerfn=functions(owner.replace('extern "C" COMBO_EXPORT ','')).get('OOT_NeiReso
 assert ownerfn
 ownerprefix='''#include <cassert>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <set>
 #include <iostream>
-std::set<std::string> base,alt; bool registered=true,activeMmAlt=false;
+std::set<std::string> base,alt; bool registered=true,stockRegistered=true,activeMmAlt=false;
 namespace Ship {
-struct ResourceManager { bool alt=false; bool IsAltAssetsEnabled(){return alt;} };
+struct Archive {
+ bool HasFile(const std::string& path) {
+  return path.starts_with("alt/") ? alt.contains("__OTR__"+path.substr(4)) : base.contains("__OTR__"+path);
+ }
+};
+struct ResourceManager {
+ bool alt=false; bool IsAltAssetsEnabled(){return alt;}
+ std::shared_ptr<Archive> GetArchiveManager(){return std::make_shared<Archive>();}
+ bool LoadResource(const char* path,bool exact){assert(exact);return base.contains(std::string("__OTR__")+path);}
+};
 std::shared_ptr<ResourceManager> owner=std::make_shared<ResourceManager>();
-struct CrossRMRegistry { static std::shared_ptr<ResourceManager> Get(const char* name){assert(std::string(name)=="oot");return registered?owner:nullptr;} };
+struct CrossRMRegistry {
+  static std::shared_ptr<ResourceManager> Get(const char* name){
+    if(std::string(name)=="oot-gi-base")return stockRegistered?owner:nullptr;
+    assert(std::string(name)=="oot");return registered?owner:nullptr;
+  }
+};
 }
-bool ResourceMgr_FileExists(const char* p){return base.contains(p);}
-bool ResourceMgr_FileAltExists(const char* p){return alt.contains(p);}
+// OoT's legacy ExtensionCache is cold during this MM-first owner query.
+bool ResourceMgr_FileExists(const char*){return false;}
+bool ResourceMgr_FileAltExists(const char*){return false;}
 '''
 ownerchecks='''int main(){
  const char* p="__OTR__objects/nei/test"; assert(!OOT_NeiResourceExists(nullptr));assert(!OOT_NeiResourceExists(p));
  alt.insert(p);activeMmAlt=true;assert(!OOT_NeiResourceExists(p));Ship::owner->alt=true;activeMmAlt=false;assert(OOT_NeiResourceExists(p));
  alt.clear();assert(!OOT_NeiResourceExists(p));base.insert(p);Ship::owner->alt=false;assert(OOT_NeiResourceExists(p));registered=false;assert(!OOT_NeiResourceExists(p));
- std::cout<<"PASS actual owner export: inactive owner, divergent MM/OoT Alt, late absence and missing registration\\n";
+ const char* stock="__OTR__@oot-gi-base:objects/nei/test";
+ assert(OOT_NeiResourceExists(stock));base.clear();alt.insert(p);Ship::owner->alt=true;
+ assert(!OOT_NeiResourceExists(stock));base.insert(p);stockRegistered=false;assert(!OOT_NeiResourceExists(stock));
+ std::cout<<"PASS actual owner export: inactive owner, divergent MM/OoT Alt, exact shipped lookup, late absence and missing registration\\n";
 }'''
 with tempfile.TemporaryDirectory(prefix='mm-nei-dispatch-') as td:
     for name,source in [('dispatch','#include <cstring>\n'+prefix+'\n'.join(parts)+checks),('owner',ownerprefix+ownerfn+ownerchecks)]:

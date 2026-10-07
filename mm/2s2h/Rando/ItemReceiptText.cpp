@@ -482,8 +482,7 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     bool compass;
     const int dungeon = MapCompassDungeon(id, compass);
     if (dungeon >= 0) {
-        const std::string info = GetDungeonMapCompassInfo(dungeon, compass);
-        if (!info.empty()) {
+        if (MapCompassInfoEnabled()) {
             entry.receiptPresentation.singleBox = 1;
             entry.receiptPresentation.rewardLine = 2;
             std::string body = (compass ? "You received a %g" : "You found the %g") + std::string(item.name) + "%w!";
@@ -494,11 +493,7 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
                 if (MM_GetDungeonRewardIconInfo(dungeon, &icon) == 1)
                     ComboReceipt_CopyIcon(&entry.receiptPresentation, &icon, "mm");
 #endif
-                if (ComboReceipt_HasIcon(&entry.receiptPresentation)) {
-                    entry.receiptPresentation.rewardLine = 1;
-                } else {
-                    body += "!&Defeating the boss grants the %g" + DungeonRewardName(dungeon) + "%w!";
-                }
+                entry.receiptPresentation.rewardLine = 1;
             } else {
                 body += "&It seems the entrance is at %c" + std::string(kDungeonInformation[dungeon].entrance) + "%w.";
             }

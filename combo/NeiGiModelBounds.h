@@ -5,6 +5,12 @@
 #include <fast/resource/type/DisplayList.h>
 #include <fast/resource/type/Matrix.h>
 #include <fast/resource/type/Vertex.h>
+#include <fast/lus_gbi.h>
+#ifdef MM_BUILD_DLL
+#include "../mm/2s2h/resource/type/Array.h"
+#else
+#include "../soh/soh/resource/type/Array.h"
+#endif
 #include <array>
 #include <cmath>
 #include <limits>
@@ -42,28 +48,56 @@ template <class Load> class ModelBoundsReader {
     }
 
   private:
-    bool Vertices(const std::shared_ptr<Ship::IResource>& resource, size_t offset, size_t count) {
-        const auto vertices = std::dynamic_pointer_cast<Fast::Vertex>(resource);
-        if (!vertices || count == 0 || offset > vertices->VertexList.size() ||
-            count > vertices->VertexList.size() - offset || (mVertices += count) > 65536)
-            return false;
-        for (size_t i = offset; i < offset + count; ++i) {
-            const auto& p = vertices->VertexList[i].v.ob;
-            float transformed[3]{};
-            for (int axis = 0; axis < 3; ++axis) {
-                transformed[axis] = mMatrix[3][axis];
-                for (int input = 0; input < 3; ++input)
-                    transformed[axis] += p[input] * mMatrix[input][axis];
-                if (!std::isfinite(transformed[axis]))
+    template <class Visit> bool WithVertexData(const std::shared_ptr<Ship::IResource>& resource, Visit visit) {
+        if (const auto vertices = std::dynamic_pointer_cast<Fast::Vertex>(resource))
+            return visit(vertices->VertexList);
+        // Binary sword packs use the host's SOH_Array factory; XML vertices
+        // use Fast::Vertex. Scalar arrays are not geometry, and the declared
+        // count must match the storage filled by the binary factory.
+        if (const auto array = std::dynamic_pointer_cast<SOH::Array>(resource);
+            array && array->ArrayType == SOH::ArrayResourceType::Vertex && array->ArrayCount == array->Vertices.size())
+            return visit(array->Vertices);
+        return false;
+    }
+
+    bool Vertices(const std::shared_ptr<Ship::IResource>& resource, size_t offset, size_t count,
+                  bool byteOffset = false) {
+        return WithVertexData(resource, [&](const auto& vertices) {
+            if (byteOffset) {
+                const size_t stride = sizeof(vertices[0]);
+                // The interpreter caches a vertex pointer in hash packets.
+                // Validate it against this exact selected resource's storage.
+                if (offset > 0xfffffu) {
+                    const uintptr_t base = reinterpret_cast<uintptr_t>(vertices.data());
+                    if (offset < base || offset - base >= vertices.size() * stride)
+                        return false;
+                    offset -= base;
+                }
+                if (offset % stride)
                     return false;
+                offset /= stride;
             }
-            const float x = transformed[0] * mCos - transformed[1] * mSin;
-            const float y = transformed[0] * mSin + transformed[1] * mCos;
-            mLow = std::min(mLow, y);
-            mHigh = std::max(mHigh, y);
-            mRadius = std::max(mRadius, std::hypot(x, transformed[2]));
-        }
-        return true;
+            if (count == 0 || offset > vertices.size() || count > vertices.size() - offset ||
+                (mVertices += count) > 65536)
+                return false;
+            for (size_t i = offset; i < offset + count; ++i) {
+                const auto& p = vertices[i].v.ob;
+                float transformed[3]{};
+                for (int axis = 0; axis < 3; ++axis) {
+                    transformed[axis] = mMatrix[3][axis];
+                    for (int input = 0; input < 3; ++input)
+                        transformed[axis] += p[input] * mMatrix[input][axis];
+                    if (!std::isfinite(transformed[axis]))
+                        return false;
+                }
+                const float x = transformed[0] * mCos - transformed[1] * mSin;
+                const float y = transformed[0] * mSin + transformed[1] * mCos;
+                mLow = std::min(mLow, y);
+                mHigh = std::max(mHigh, y);
+                mRadius = std::max(mRadius, std::hypot(x, transformed[2]));
+            }
+            return true;
+        });
     }
 
     using Matrix = std::array<std::array<float, 4>, 4>;
@@ -178,20 +212,7 @@ template <class Load> class ModelBoundsReader {
                     if (!ApplyMatrix(resource, (command.words.w0 & 0xffu) ^ G_MTX_PUSH))
                         return false;
                 } else {
-                    const auto vertex = std::dynamic_pointer_cast<Fast::Vertex>(resource);
-                    if (!vertex)
-                        return false;
-                    size_t offset = command.words.w1;
-                    // The interpreter caches a vertex pointer in the command.
-                    // Recover the offset against this exact selected resource.
-                    if (offset > 0xfffffu) {
-                        const uintptr_t base = reinterpret_cast<uintptr_t>(vertex->GetPointer());
-                        if (offset < base || offset - base >= vertex->GetPointerSize())
-                            return false;
-                        offset -= base;
-                    }
-                    if (offset % sizeof(Vtx) ||
-                        !Vertices(resource, offset / sizeof(Vtx), (command.words.w0 >> 12) & 0xff))
+                    if (!Vertices(resource, command.words.w1, (command.words.w0 >> 12) & 0xff, true))
                         return false;
                 }
             } else if (op == G_DL) {

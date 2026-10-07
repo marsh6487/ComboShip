@@ -18,6 +18,10 @@ owner=(ROOT/'combo/menu/ComboItemDrawOOT.h').read_text()
 draw=(ROOT/'soh/soh/Enhancements/randomizer/draw.cpp').read_text()
 host=(ROOT/'combo/menu/ComboForeignDrawMM.h').read_text()
 fixture=(ROOT/'tests/mm_presentation/mm_mask_bridge_test.cpp').read_text()
+native_ids=re.search(r'typedef enum \{[^{}]*\} RandoItemId;', (ROOT/'mm/2s2h/Rando/Types.h').read_text(), re.S)[0]
+fixture=fixture.replace('/* NATIVE_ITEM_IDS */',native_ids)
+imports=ROOT/'combo/menu/ComboMmNativeImports.h'
+fixture=fixture.replace('/* HOST_NATIVE_IMPORT */', '#include "combo/menu/ComboMmNativeImports.h"' if imports.exists() else 'int32_t ComboNativeMmImport(const char*) {return -1;}')
 shimmer=(ROOT/'combo/menu/ComboMaskShimmer.h').read_text()
 palette=shimmer[shimmer.index('// 0 = ordinary mask;'):shimmer.index('// The shared NEI mesh renderer')]
 a=draw.index('typedef enum {\n    MM_MASK_DRAW_OPA0_XLU1');b=draw.index('\n#ifdef COMBO_BUILD',a)

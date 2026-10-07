@@ -1031,8 +1031,7 @@ bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool r
         }
 #endif
     }
-    const bool bossLineReward =
-        received && information && (ootCompass || mmCompass) && ComboReceipt_HasIcon(&msg.receiptPresentation);
+    const bool bossLineReward = received && information && (ootCompass || mmCompass);
     if (bossLineReward)
         msg.receiptPresentation.rewardLine = 1;
     if (hasReward && !bossLineReward) {

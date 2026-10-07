@@ -4,6 +4,10 @@
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "ComboResolve.h"
 #include "ComboSongDrawMM.h"
+#ifdef COMBO_BUILD
+#include "ComboGiReceiptTrace.h"
+#define COMBO_GI_RECEIPT_TRACE
+#endif
 #include "ComboSwordGiFit.h"
 #include "ComboSwordGiLegacyFit.h"
 #include <algorithm>
@@ -11,6 +15,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 extern "C" {
 int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
+bool ResourceMgr_IsAltAssetsEnabled();
 #include "functions.h"
 #include "macros.h"
 #include "mods/nei_oot_compat.h"
@@ -164,6 +169,8 @@ bool HasMmLegacyGiMod(RandoItemId item) {
 }
 
 bool GetSelectedOwnerGi(RandoItemId item, CwItemDrawInfo* out) {
+    if (item != RI_OOT_NEI_LANTERN && !ResourceMgr_IsAltAssetsEnabled())
+        return false;
     const char* name = nullptr;
     switch (item) {
         case RI_OOT_NEI_LANTERN:
@@ -246,6 +253,10 @@ extern "C" bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh,
 void DrawOotSlateRuneFlame(u8 r, u8 g, u8 b);
 
 void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop, int mmPickup) {
+#ifdef COMBO_GI_RECEIPT_TRACE
+    ComboGiReceiptTrace::Dispatch(info.resolvedName, info.drawKind, info.dlists, info.dlistCount, info.scale, -1,
+                                  mmPickup);
+#endif
     PlayState* play = gPlayState;
     if (play && info.drawKind == CW_DRAW_KIND_SEASON_GI) {
         if (info.neiEffect >= 1 && info.neiEffect <= 4 && info.dlistCount == 0 && info.opCount == 0)
@@ -284,10 +295,11 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop, int mmPickup) {
     Matrix_Push();
     if (info.neiSomariaUpgrade)
         DrawOotSlateRuneFlame(255, 60, 60);
+    const char* owner = std::strncmp(info.dlists[0], "__OTR__@oot-gi-base:", 20) == 0 ? "oot-gi-base" : "oot";
     NeiGi_DrawPresentation(
         play, info.dlists[0], info.xluStartIndex == 1 && info.dlistCount > 1 ? info.dlists[1] : nullptr, info.scale,
         info.neiEffect, info.neiEffectCenter,
-        info.itemShimmer || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0), "oot", shop, mmPickup);
+        info.itemShimmer || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0), owner, shop, mmPickup);
     Matrix_Pop();
 }
 
@@ -325,16 +337,23 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
     static Fn_GetNeiGiDrawInfo describe = nullptr;
     if (!describe)
         describe = (Fn_GetNeiGiDrawInfo)Combo_ResolveSym("soh", "OOT_GetNeiGiDrawInfo");
-    if (!describe)
+    static Fn_GetNeiGiDrawInfoForAssets describeForAssets = nullptr;
+    if (!describeForAssets)
+        describeForAssets = (Fn_GetNeiGiDrawInfoForAssets)Combo_ResolveSym("soh", "OOT_GetNeiGiDrawInfoForAssets");
+    if (!describe && !describeForAssets)
         return false;
     CwItemDrawInfo info{};
-    bool authored = describe(binding->slug, &info) == 1;
+    const bool altAssets = ResourceMgr_IsAltAssetsEnabled();
+    bool authored =
+        (describeForAssets ? describeForAssets(binding->slug, altAssets, &info) : describe(binding->slug, &info)) == 1;
     out->neiShimmer = info.neiShimmer;
     const bool mandatory = info.neiShimmer > 0 && (NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1)) ||
                                                    item == RI_OOT_IRON_KNUCKLE_AXE || item == RI_OOT_NEI_MARIO_MASK);
     out->itemShimmer = mandatory || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0);
     out->stateDependent = 2;
-    const bool legacyMod = HasMmLegacyGiMod(item);
+    const bool vanillaSword =
+        !altAssets && info.neiShimmer > 0 && NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1));
+    const bool legacyMod = !vanillaSword && HasMmLegacyGiMod(item);
     if (!authored && !legacyMod && GetSelectedOwnerGi(item, &info)) {
         // Keep the selected standalone geometry and MM's concrete award
         // identity together when the owner declines the authored GI.
@@ -367,8 +386,13 @@ bool MM_TryDrawNeiGi(RandoItemId item, bool shop, int mmPickup) {
         return true;
     }
     CwItemDrawInfo info{};
-    if (!MM_DescribeNeiGi(item, &info))
-        return false;
+    if (!MM_DescribeNeiGi(item, &info)) {
+        // The declined descriptor still supplies the award's identity. A
+        // missing shipped sword in vanilla mode must not reach legacy drawers
+        // that can select a local or donor mod at a base resource path.
+        return !ResourceMgr_IsAltAssetsEnabled() && info.neiShimmer > 0 &&
+               NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1));
+    }
     MM_DrawNeiGi(info, shop, mmPickup);
     return true;
 }

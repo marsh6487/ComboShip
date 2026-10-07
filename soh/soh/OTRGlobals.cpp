@@ -2225,6 +2225,7 @@ extern "C" void DeinitOTR() {
     // ComboShip: drop the resident-RM refs now so the ResourceManager is destroyed here on the
     // main thread. Left in these statics / the registry, it would die during DLL-unload static
     // destructors, where its thread pool joins workers under the loader lock and deadlocks.
+    Ship::CrossRMRegistry::Unregister("oot-gi-base");
     Ship::CrossRMRegistry::Unregister("oot");
     sOOTResourceManager = nullptr;
 #endif

@@ -65,7 +65,7 @@ namespace Ship {
  extern std::shared_ptr<ResourceManager> activeRm;
  struct InitData {bool IsCustom;};
  struct Resource {std::shared_ptr<InitData> init;std::shared_ptr<InitData> GetInitData(){return init;}};
- struct Archive {bool HasFile(const std::string& path) {if(path=="alt/magic")return magicAltPresent;assert(path=="alt/magic.meta");return magicAltMetaPresent;}};
+ struct Archive {bool HasFile(const std::string& path) {if(path=="alt/magic")return magicAltPresent;if(path=="alt/magic.meta")return magicAltMetaPresent;return resources.count("__OTR__"+path);}};
  struct ResourceManager {
   bool owner;bool IsAltAssetsEnabled() {return owner?ownerAlt:hostAlt;}
   std::shared_ptr<Archive> GetArchiveManager() {assert(owner);return std::make_shared<Archive>();}
@@ -90,7 +90,14 @@ uint8_t ResourceGetIsCustomByName(const char*) {assert(magicLoaded && Ship::acti
 #define COMBO_EXPORT
 /* OWNER_ALT_QUERY */
 /* OWNER_MAGIC_QUERY */
-int OOT_NeiResourceExists(const char* path) {return resources.count(path);}
+// MM starts first: OoT's legacy ExtensionCache has never been populated.
+int ColdOotFileExists(const char*) {return 0;}
+int ColdOotFileAltExists(const char*) {return 0;}
+#define ResourceMgr_FileExists ColdOotFileExists
+#define ResourceMgr_FileAltExists ColdOotFileAltExists
+/* OWNER_RESOURCE_QUERY */
+#undef ResourceMgr_FileExists
+#undef ResourceMgr_FileAltExists
 void ComboMaskShimmerColor(int,uint8_t* color) {color[0]=255;color[1]=255;color[2]=255;color[3]=255;}
 void ComboOotMaskShimmerColor(int i,uint8_t* color) {ComboMaskShimmerColor(i,color);}
 void Seasons_SeasonColor(uint8_t season,uint8_t* r,uint8_t* g,uint8_t* b) {
@@ -196,6 +203,21 @@ void ComboDinSwordGi_DrawLayers(PlayState*, const char*, const char*) {
 }
 /* HOST_CUSTOM_DRAW */
 int main() {
+ resources.insert("__OTR__objects/object_gi_clothes/gGiTunicCollarDL");
+ assert(OOT_NeiResourceExists("__OTR__objects/object_gi_clothes/gGiTunicCollarDL") == 1 &&
+        "MM-first tunic lookup must use the resident owner archive, not a cold OoT ExtensionCache");
+ resources.clear();
+ resources.insert("__OTR__objects/object_gi_clothes/alias-only.meta");
+ assert(OOT_NeiResourceExists("__OTR__objects/object_gi_clothes/alias-only") == 1 &&
+        "a cold owner must accept a resource supplied only through alias metadata");
+ resources.clear();
+ resources.insert("__OTR__alt/objects/object_gi_clothes/alias-only.meta");
+ assert(OOT_NeiResourceExists("objects/object_gi_clothes/alias-only") == 0);
+ ownerAlt=true;
+ assert(OOT_NeiResourceExists("objects/object_gi_clothes/alias-only") == 1 &&
+        "alias-only Alt resources must follow the registered owner's Alt selection");
+ ownerAlt=false;
+ resources.clear();
  OTRGlobals globals{&globals,&globals};OTRGlobals::Instance=&globals;
  /* NAME_MAP_INIT */
  CwItemDrawInfo dependency{};

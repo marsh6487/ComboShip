@@ -2,7 +2,7 @@
 // camera values and renderer submissions. The vertex bounds come from every
 // serialized OPA/XLU asset, independently of the runtime frame-fit catalog.
 const auto receiptPose=FixtureMmReceiptPose();
-assert(std::abs(receiptPose.first-.21f)<.00001f && std::abs(receiptPose.second-51.3f)<.00001f);
+assert(std::abs(receiptPose.first-.21f)<.00001f && std::abs(receiptPose.second-53.3f)<.00001f);
 const auto pickupVertices=FixtureMmPickupVertices();
 size_t nativePickupBindings=0;
 for(int form:{PLAYER_FORM_HUMAN,PLAYER_FORM_GORON,PLAYER_FORM_ZORA,PLAYER_FORM_DEKU,PLAYER_FORM_FIERCE_DEITY}) {

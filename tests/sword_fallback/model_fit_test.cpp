@@ -7,9 +7,15 @@
 #include <string>
 #include <vector>
 #include "combo/NeiGiModelBounds.h"
+#include <fast/lus_gbi.h>
+#ifdef MM_BUILD_DLL
+#include "mm/2s2h/resource/type/Array.h"
+#else
+#include "soh/soh/resource/type/Array.h"
+#endif
 #include <fast/resource/type/Matrix.h>
 #include "combo/menu/ComboItemDrawABI.h"
-// Resource loading is the test boundary. Actual Fast resource payloads and the
+// Resource loading is the test boundary. Actual Fast/SOH resource payloads and the
 // production graph traversal/FrameFit execute below, on supplied mod archives.
 namespace Ship {
 IResource::IResource(std::shared_ptr<ResourceInitData> init) : mInitData(init) {}
@@ -52,6 +58,14 @@ void Vertex(const char* name,uint64_t hash,std::initializer_list<std::array<int1
     for(auto p:points){Vtx vertex{};std::copy(p.begin(),p.end(),vertex.v.ob);vertices->VertexList.push_back(vertex);}
     loader.files[name]=vertices;loader.names[hash]=name;
 }
+void LegacyVertex(const char* name,uint64_t hash,std::initializer_list<std::array<int16_t,3>> points) {
+    auto vertices=std::make_shared<SOH::Array>();
+    vertices->ArrayType=SOH::ArrayResourceType::Vertex;
+    vertices->ArrayScalarType=SOH::ScalarType::ZSCALAR_NONE;
+    vertices->ArrayCount=points.size();
+    for(auto p:points){Fast::F3DVtx vertex{};std::copy(p.begin(),p.end(),vertex.v.ob);vertices->Vertices.push_back(vertex);}
+    loader.files[name]=vertices;loader.names[hash]=name;
+}
 using f32=float;using s16=int16_t;
 constexpr int MTXMODE_APPLY=1;
 struct PlayState {struct{void* gfxCtx;} state;uint32_t gameplayFrames=42;} play;
@@ -91,7 +105,7 @@ enum RandomizerGet{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_TRUE_MASTER
 int32_t OOT_NeiAltAssetsEnabled(){return 1;}
 int32_t OOT_NeiResourceExists(const char* path){return bool(loader(path));}
 /* PRODUCTION */
-struct Expected {const char* path;float low,high,width,layerLow,layerHigh,layerWidth;int dinProfile;};
+struct Expected {const char* path;float low,high,width,layerLow,layerHigh,layerWidth;int dinProfile;float tilt=1.8f,scale=.04f;};
 std::vector<Expected> expected;
 /* ARCHIVES */
 int main(){
@@ -105,6 +119,36 @@ int main(){
     NeiGi::FrameBounds guard{};
     NeiGi::ModelBoundsReader<Loader> cached(loader,0);
     assert(cached.Read("guard/cached",guard)&&guard.minimum.y==-10&&guard.maximum.y==30);
+    // Binary O2R sword vertices use the registered SOH_Array factory, not
+    // Fast::Vertex. Preserve that type before and after interpreter caching.
+    LegacyVertex("guard/legacyVertices",105,{{10,-10,0},{20,20,2},{30,30,3}});
+    auto legacy=std::dynamic_pointer_cast<SOH::Array>(loader("guard/legacyVertices"));
+    List("guard/legacy",106,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("guard/legacyVertices")},{3,0},
+                            {uintptr_t(G_ENDDL)<<24,0}});
+    NeiGi::ModelBoundsReader<Loader> legacyReader(loader,0);
+    assert(legacyReader.Read("guard/legacy",guard)&&guard.minimum.y==-10&&guard.maximum.y==30 &&
+           "binary SOH_Array vertices must receive the same fit as XML Fast::Vertex");
+    for(auto offset:{uintptr_t(sizeof(Vtx)),uintptr_t(legacy->GetPointer())+sizeof(Vtx)}) {
+        List("guard/legacyHash",107,{{uintptr_t(G_VTX_OTR_HASH)<<24 | 2u<<12,offset},{0,105},
+                                    {uintptr_t(G_ENDDL)<<24,0}});
+        NeiGi::ModelBoundsReader<Loader> legacyHash(loader,0);
+        assert(legacyHash.Read("guard/legacyHash",guard)&&guard.minimum.y==20&&guard.maximum.y==30);
+    }
+    auto legacyDl=std::dynamic_pointer_cast<Fast::DisplayList>(loader("guard/legacyHash"));
+    ++legacyDl->Instructions[0].words.w1;
+    NeiGi::ModelBoundsReader<Loader> misalignedLegacy(loader,0);
+    assert(!misalignedLegacy.Read("guard/legacyHash",guard));
+    legacyDl->Instructions[0].words.w1=3*sizeof(Vtx);
+    NeiGi::ModelBoundsReader<Loader> pastLegacyEnd(loader,0);
+    assert(!pastLegacyEnd.Read("guard/legacyHash",guard));
+    legacy->ArrayType=SOH::ArrayResourceType::Scalar;
+    NeiGi::ModelBoundsReader<Loader> scalarArray(loader,0);
+    assert(!scalarArray.Read("guard/legacy",guard));
+    legacy->ArrayType=SOH::ArrayResourceType::Vertex;
+    ++legacy->ArrayCount;
+    NeiGi::ModelBoundsReader<Loader> malformedArray(loader,0);
+    assert(!malformedArray.Read("guard/legacy",guard));
+    --legacy->ArrayCount;
     auto cachedDl=std::dynamic_pointer_cast<Fast::DisplayList>(loader("guard/cached"));
     ++cachedDl->Instructions[0].words.w1;
     NeiGi::ModelBoundsReader<Loader> stale(loader,0);
@@ -138,14 +182,17 @@ int main(){
         const int profile=DinSwordGi::SelectedProfile(e.path+7,true,true,[](const char* key){
             if(!std::strncmp(key,"__OTR__",7))key+=7;return available.contains(key);});
         assert(profile==e.dinProfile && "Din eligibility disagrees with the actual supplied archive");
-        NeiGi::FrameBounds bounds{};NeiGi::ModelBoundsReader<Loader> reader(loader,1.8f);
+        NeiGi::FrameBounds bounds{};NeiGi::ModelBoundsReader<Loader> reader(loader,e.tilt);
         assert(reader.Read(e.path,bounds));
+        assert(reader.RestoresModelView());
         assert(std::abs(bounds.minimum.y-e.low)<.01f&&std::abs(bounds.maximum.y-e.high)<.01f);
         assert(std::abs(bounds.spinningWidth-e.width)<.01f);
         for(bool din:{false,true})for(bool shop:{false,true})for(uint32_t frame=0;frame<360;++frame){
             dinEnabled=din;
-            pose={};play.gameplayFrames=frame;NeiGi_DrawSelectedSword(&play,e.path,shop);
-            assert(std::abs(pose.rz-1.8f)<.0001f);
+            pose={};play.gameplayFrames=frame;
+            if(e.tilt==1.8f)NeiGi_DrawSelectedSword(&play,e.path,shop);
+            else {ComboSwordGi_ApplyFit("mm",e.path,e.scale,e.tilt,shop);Matrix_Scale(e.scale,e.scale,e.scale,1);}
+            assert(std::abs(pose.rz-e.tilt)<.0001f);
             const float low=din?e.layerLow:e.low, high=din?e.layerHigh:e.high, width=din?e.layerWidth:e.width;
             assert(low*pose.scale+pose.lift >= (shop?-22.f:-52.f)-.001f);
             assert(high*pose.scale+pose.lift <= (shop?52.f:48.f)+.001f);
@@ -161,8 +208,9 @@ int main(){
         for(bool din:{false,true})for(const auto& receipt:receipts) {
             dinEnabled=din;
             pose={.21f,receipt.origin,0,0};
-            ComboSwordGi_ApplyFit("oot",e.path,.04f,1.8f,false,receipt.context);
-            NeiGi_DrawSelectedSword(&play,e.path,false,false);
+            ComboSwordGi_ApplyFit("oot",e.path,e.scale,e.tilt,false,receipt.context);
+            if(e.tilt==1.8f)NeiGi_DrawSelectedSword(&play,e.path,false,false);
+            else Matrix_Scale(e.scale,e.scale,e.scale,1);
             const float low=din?e.layerLow:e.low,high=din?e.layerHigh:e.high,width=din?e.layerWidth:e.width;
             const float pitch=receipt.pitch*NeiGi::Tau/360.f;
             const float camAt=receipt.at,camDistance=receipt.distance;

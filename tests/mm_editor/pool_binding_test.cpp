@@ -41,6 +41,7 @@ extern "C" int32_t OOT_GetNeiGiDrawInfo(const char *slug, CwItemDrawInfo *out) {
     *out = CwItemDrawInfo{};
     return 1;
 }
+extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return false; }
 extern "C" int ResourceMgr_IsModAssetForGame(const char *game, const char *path) {
     REQUIRE(strcmp(game, "mm") == 0);
     return modPath == path;

@@ -197,8 +197,10 @@ static bool NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kin
         gDPSetTextureFilter(POLY_XLU_DISP++, G_TF_BILERP);
         gDPLoadTextureBlock(POLY_XLU_DISP++, NeiGi::SeasonSunRayTexture().data(), G_IM_FMT_I, G_IM_SIZ_8b, 32, 32, 0,
                             G_TX_WRAP, G_TX_CLAMP, 5, 5, G_TX_NOLOD, G_TX_NOLOD);
-        const uint32_t scroll = (play->gameplayFrames / 4u) % 32u;
-        gDPSetTileSize(POLY_XLU_DISP++, G_TX_RENDERTILE, scroll * 4, 0, (scroll + 31) * 4, 31 * 4);
+        // Tile coordinates are quarter texels. Keep the same average speed
+        // without jumping a whole texel every four game ticks.
+        const uint32_t scroll = play->gameplayFrames % 128u;
+        gDPSetTileSize(POLY_XLU_DISP++, G_TX_RENDERTILE, scroll, 0, scroll + 31 * 4, 31 * 4);
         gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA, G_CC_PASS2);
     } else if (material) {
         gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
@@ -427,16 +429,26 @@ void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner) {
     if (!arena)
         return;
     const bool stormSong = profile == 6;
-    auto mesh = NeiGi::SampleSeason(play->gameplayFrames, stormSong ? 1 : profile, NeiGi_CameraBasis(play));
+    const bool sun = NeiGi::SeasonProfile(play->gameplayFrames, profile) == 2;
+    if (sun) {
+        Matrix_Push();
+        // Record the billboard through the native matrix interpolator. Baking
+        // its inverse parent rotation into vertices snaps at game ticks while
+        // the held GI's parent spin continues between those ticks.
+        Matrix_ReplaceRotation(&play->billboardMtxF);
+    }
+    const auto camera = sun ? NeiGi::Basis{} : NeiGi_CameraBasis(play);
+    auto mesh = NeiGi::SampleSeason(play->gameplayFrames, stormSong ? 1 : profile, camera);
     OPEN_DISPS(play->state.gfxCtx);
     gSPGrayscale(POLY_XLU_DISP++, false);
     if (owner)
         gSPComboRMPush(POLY_XLU_DISP++, owner);
     CLOSE_DISPS(play->state.gfxCtx);
     NeiGi_DrawMesh(play, mesh, Kind::Neutral);
-    if (NeiGi::SeasonProfile(play->gameplayFrames, profile) == 2) {
-        const auto rays = NeiGi::SampleSeasonSunRays(play->gameplayFrames, profile, NeiGi_CameraBasis(play));
+    if (sun) {
+        const auto rays = NeiGi::SampleSeasonSunRays(play->gameplayFrames, profile, camera);
         NeiGi_DrawMeshMaterial(play, rays, Kind::Neutral, nullptr, true);
+        Matrix_Pop();
     }
     OPEN_DISPS(play->state.gfxCtx);
     if (owner)

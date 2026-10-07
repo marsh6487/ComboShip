@@ -141,7 +141,10 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
 extern "C" { PlayState* gPlayState = &Fixture::play; }
 bool ownerAlt = false;
 extern "C" int32_t OOT_NeiAltAssetsEnabled(void) { return ownerAlt; }
+extern "C" int32_t OOT_NeiEnsureGiBaseOwner(void) { return 1; }
 extern "C" int32_t OOT_NeiResourceExists(const char* path) {
+    if(path && !std::strncmp(path,"__OTR__@oot-gi-base:",20))
+        return ResourceMgr_FileExists((std::string("__OTR__")+(path+20)).c_str());
     return path && (ResourceMgr_FileExists(path) || (ownerAlt && ResourceMgr_FileAltExists(path)));
 }
 /* SELECTED_SWORD_PRODUCER */
@@ -160,6 +163,8 @@ void* Combo_ResolveSym(const char* owner, const char* name) {
     assert(std::strcmp(owner, "soh") == 0);
     if (std::strcmp(name, "OOT_GetNeiGiDrawInfo") == 0)
         return reinterpret_cast<void*>(OOT_GetNeiGiDrawInfo);
+    if (std::strcmp(name, "OOT_GetNeiGiDrawInfoForAssets") == 0)
+        return reinterpret_cast<void*>(OOT_GetNeiGiDrawInfoForAssets);
     if (std::strcmp(name, "OOT_NeiResourceExists") == 0)
         return reinterpret_cast<void*>(OOT_NeiResourceExists);
     if (std::strcmp(name, "OOT_GetItemDrawInfo") == 0)

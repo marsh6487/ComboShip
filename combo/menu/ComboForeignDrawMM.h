@@ -35,6 +35,7 @@
 #include <unordered_set>
 
 #include "ComboItemDrawABI.h"
+#include "ComboMmNativeImports.h"
 #include "ComboFairyBottle.h"
 #include "ComboSwordGiFit.h"
 #define COMBO_DIN_SWORD_GI_HOST_MM
@@ -64,6 +65,7 @@ namespace {
 
 struct ComboForeignDrawInfoOOT {
     bool ok = false;
+    int32_t nativeMmItem = -1;
     int32_t count = 0;
     int32_t xluStart = -1; // first XLU entry in dls[] order; -1 = all OPA
     float scale = 0.0f;    // extra uniform model scale; 0 = none (OOT rupees: 0.7)
@@ -122,6 +124,16 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
         return ComboForeignResolveOOT::Unknown;
     }
 
+    const char* drawName =
+        namedItem ? namedItem : (fi->HasDisguise() ? fi->fakeItemName.c_str() : fi->itemName.c_str());
+    const int32_t nativeItem = ComboNativeMmImport(drawName);
+    if (nativeItem >= 0) {
+        info.nativeMmItem = nativeItem;
+        info.resolvedName = drawName;
+        info.ok = true;
+        return ComboForeignResolveOOT::Ok;
+    }
+
     static Fn_GetItemDrawInfo sGetItemDrawInfo = nullptr;
     if (sGetItemDrawInfo == nullptr) {
         // soh already loaded by the exe (ComboMenuModel pattern); resolution is process-wide.
@@ -137,8 +149,6 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
         sSetGiCosmeticFrame(static_cast<uint32_t>(gPlayState->gameplayFrames));
     // A disguised trap must draw the item it pretends to be. Same namespace, so the itemGame dispatch
     // above is unaffected. Not state-dependent: like OOT, the disguise holds until the get-item cutscene.
-    const char* drawName =
-        namedItem ? namedItem : (fi->HasDisguise() ? fi->fakeItemName.c_str() : fi->itemName.c_str());
     CwItemDrawInfo raw{};
     int32_t rcStatic = sGetItemDrawInfo(drawName, &raw);
     if (rcStatic == CW_DRAW_NOT_READY) {
@@ -1168,11 +1178,20 @@ inline void MM_DrawForeignNativeEquipment(const ComboForeignDrawInfoOOT* info) {
 // Draw a foreign (OOT-bound) item's real OOT model at the current model matrix. Any resolution
 // failure falls back to the sentinel blue rupee (the RI_COMBO_FOREIGN item's GID_RUPEE_BLUE), so we
 // never draw blank. Mirrors Randomizer_DrawComboForeign (soh/.../draw.cpp).
-inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, int mmPickup = 0) {
+inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, int mmPickup = 0,
+                                Actor* actor = nullptr) {
     const ComboForeignDrawInfoOOT* info =
         (randoCheckId != RC_UNKNOWN) ? ComboResolveForeignDrawInfoOOT(randoCheckId) : nullptr;
     if (info == nullptr) {
         GetItem_Draw(gPlayState, GID_RUPEE_BLUE);
+        return;
+    }
+#ifdef COMBO_GI_RECEIPT_TRACE
+    ComboGiReceiptTrace::Dispatch(info->resolvedName.c_str(), info->drawKind, info->dls, info->count, info->scale,
+                                  info->nativeMmItem, mmPickup);
+#endif
+    if (info->nativeMmItem >= 0) {
+        Rando::DrawResolvedItem(static_cast<RandoItemId>(info->nativeMmItem), RC_UNKNOWN, actor);
         return;
     }
 
