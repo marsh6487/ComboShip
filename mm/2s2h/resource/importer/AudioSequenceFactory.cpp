@@ -1,4 +1,5 @@
 #include "2s2h/resource/importer/AudioSequenceFactory.h"
+#include "../../../../combo/audio/MMAudioTraceBridge.h"
 #include "2s2h/resource/type/AudioSequence.h"
 #include "2s2h/resource/importer/AudioSoundFontFactory.h"
 #include <ship/Context.h>
@@ -22,6 +23,7 @@ ResourceFactoryBinaryAudioSequenceV2::ReadResource(std::shared_ptr<Ship::File> f
 
     auto audioSequence = std::make_shared<AudioSequence>(initData);
     auto reader = std::get<std::shared_ptr<Ship::BinaryReader>>(file->Reader);
+    audioSequence->sequence.resolvedFont = -1;
 
     audioSequence->sequence.seqDataSize = reader->ReadUInt32();
     audioSequence->sequence.seqData = new char[audioSequence->sequence.seqDataSize];
@@ -34,6 +36,10 @@ ResourceFactoryBinaryAudioSequenceV2::ReadResource(std::shared_ptr<Ship::File> f
     audioSequence->sequence.cachePolicy = reader->ReadUByte();
 
     audioSequence->sequence.numFonts = reader->ReadUInt32();
+    if (audioSequence->sequence.numFonts < 0 || audioSequence->sequence.numFonts > 16) {
+        SPDLOG_ERROR("Sequence '{}' has an invalid font count", initData->Path);
+        return nullptr;
+    }
     for (uint32_t i = 0; i < 16; i++) {
         audioSequence->sequence.fonts[i] = 0;
     }
@@ -41,6 +47,8 @@ ResourceFactoryBinaryAudioSequenceV2::ReadResource(std::shared_ptr<Ship::File> f
         audioSequence->sequence.fonts[i] = reader->ReadUByte();
     }
 
+    MM_AudioTraceResource(1, reinterpret_cast<uintptr_t>(audioSequence->sequence.seqData), initData->Path.c_str(),
+                          nullptr, 0);
     return audioSequence;
 }
 
@@ -321,6 +329,7 @@ ResourceFactoryXMLAudioSequenceV0::ReadResource(std::shared_ptr<Ship::File> file
     auto sequence = std::make_shared<AudioSequence>(initData);
     auto child = std::get<std::shared_ptr<tinyxml2::XMLDocument>>(file->Reader)->FirstChildElement();
     unsigned int i = 0;
+    sequence->sequence.resolvedFont = -1;
 
     sequence->sequence.medium =
         ResourceFactoryXMLSoundFontV0::MediumStrToInt(child->Attribute("Medium"), initData->Path.c_str());
@@ -335,6 +344,10 @@ ResourceFactoryXMLAudioSequenceV0::ReadResource(std::shared_ptr<Ship::File> file
     tinyxml2::XMLElement* fontsElement = child->FirstChildElement();
     tinyxml2::XMLElement* fontElement = fontsElement->FirstChildElement();
     while (fontElement != nullptr) {
+        if (i >= 16) {
+            SPDLOG_ERROR("Sequence '{}' has more than 16 font operands", initData->Path);
+            return nullptr;
+        }
         sequence->sequence.fonts[i] = fontElement->IntAttribute("FontIdx");
         fontElement = fontElement->NextSiblingElement();
         i++;
@@ -397,6 +410,8 @@ ResourceFactoryXMLAudioSequenceV0::ReadResource(std::shared_ptr<Ship::File> file
         }
     }
 
+    MM_AudioTraceResource(1, reinterpret_cast<uintptr_t>(sequence->sequence.seqData), initData->Path.c_str(), path,
+                          streamed);
     return sequence;
 }
 } // namespace SOH

@@ -1,8 +1,15 @@
+#include "din_fire_shield.h"
 /**
  * @file z_draw.c
  * @brief Draw get-item models
  */
 #include "global.h"
+#include "2s2h/BenGui/CosmeticEditor.h"
+#include "2s2h/Enhancements/ItemVisuals.h"
+#include <libultraship/bridge/consolevariablebridge.h>
+#include <libultraship/bridge/resourcebridge.h>
+#include "ComboFairyBottle.h"
+#include "assets/objects/gameplay_keep/gameplay_keep.h"
 #include "assets/objects/object_gi_arrow/object_gi_arrow.h"
 #include "assets/objects/object_gi_arrowcase/object_gi_arrowcase.h"
 #include "assets/objects/object_gi_bean/object_gi_bean.h"
@@ -375,12 +382,423 @@ static DrawItemTableEntry sDrawItemTable[] = {
     { GetItem_DrawOpa01, { gGiFierceDeityMaskFaceDL, gGiFierceDeityMaskHairAndHatDL } },
 };
 
+extern int ResourceMgr_IsModAsset(const char* path);
+extern int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
+extern int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path);
+static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
+    return ComboFairyBottle_SelectShell(
+        (const char*)sDrawItemTable[drawId].drawResources[0], (const char*)sDrawItemTable[drawId].drawResources[1],
+        gGiEmptyBottleCorkDL, gGiEmptyBottleGlassDL, ResourceMgr_IsModAsset,
+        "__OTR__@oot:objects/object_gi_fire/gGiBlueFireChamberstickDL",
+        (ResourceMgr_IsModAssetForGame("oot", "objects/object_gi_fire/gGiBlueFireChamberstickDL") ||
+         ResourceMgr_IsCustomAssetForGame("oot", "objects/object_gi_fire/gGiBlueFireChamberstickDL")));
+}
+
+#define COMBO_FAIRY_HOST_MM
+#include "ComboFairyBottleDraw.h"
+#undef COMBO_FAIRY_HOST_MM
+
 /**
  * Draw "Get Item" Model
  * Calls the corresponding draw function for the given draw ID
  */
-void GetItem_Draw(PlayState* play, s16 drawId) {
+// Resolve an O2R display list by its __OTR__ path (defined in BenPort.cpp). Used to verify a get-item
+// model actually loaded before we feed it to the interpreter.
+extern Gfx* ResourceMgr_LoadGfxByName(const char* path);
+
+// Palette resolution is independent of replacement assets. Both hosts use these helpers
+// for the vanilla GI lists as well as the existing TP map/compass replacements.
+s32 GetItem_GetDungeonItemTint(s16 drawId, s32 owner, Color_RGBA8* color, u8* strength) {
+    static const Color_RGBA8 defaults[4] = {
+        { 236, 120, 186, 255 },
+        { 129, 173, 70, 255 },
+        { 99, 90, 183, 255 },
+        { 177, 165, 83, 255 },
+    };
+    static const char* ids[4] = { "Items.Woodfall", "Items.Snowhead", "Items.GreatBay", "Items.StoneTower" };
+    if (owner < 0 || owner >= 4 || color == NULL || strength == NULL ||
+        !CVarGetInteger("gEnhancements.DungeonItemColors", 0)) {
+        return false;
+    }
+    switch (drawId) {
+        case GID_KEY_SMALL:
+        case GID_KEY_BOSS:
+            *strength = 192; // Preserve the established neutral highlights.
+            break;
+        case GID_DUNGEON_MAP:
+            *strength = 96; // Retain the parchment markings.
+            break;
+        case GID_COMPASS:
+            *strength = 176;
+            break;
+        default:
+            return false;
+    }
+    *color = CosmeticEditor_GetChangedColor(defaults[owner].r, defaults[owner].g, defaults[owner].b, 255, ids[owner]);
+    return true;
+}
+
+// A vanilla boss key has a separate gem layer. An edited emblem row colors that
+// layer too; untouched rows preserve the original native gem, even with no key pack.
+s32 GetItem_GetDungeonKeyEmblemTint(s32 owner, Color_RGBA8* color) {
+    static const Color_RGBA8 defaults[4] = {
+        { 236, 120, 186, 255 },
+        { 129, 173, 70, 255 },
+        { 99, 90, 183, 255 },
+        { 201, 38, 41, 255 },
+    };
+    static const char* ids[4] = { "Items.WoodfallEmblem", "Items.SnowheadEmblem", "Items.GreatBayEmblem",
+                                  "Items.StoneTowerEmblem" };
+    static const char* changed[4] = {
+        "gCosmetic.Items.WoodfallEmblem.Changed",
+        "gCosmetic.Items.SnowheadEmblem.Changed",
+        "gCosmetic.Items.GreatBayEmblem.Changed",
+        "gCosmetic.Items.StoneTowerEmblem.Changed",
+    };
+    if (owner < 0 || owner >= 4 || color == NULL || !CVarGetInteger(changed[owner], 0)) {
+        return false;
+    }
+    *color = CosmeticEditor_GetChangedColor(defaults[owner].r, defaults[owner].g, defaults[owner].b, 255, ids[owner]);
+    return true;
+}
+
+// Replacement-model selection is a separate, optional path.
+extern bool ResourceMgr_IsAltAssetsEnabled(void);
+extern u8 ResourceMgr_FileAltExists(const char* path);
+
+s32 GetItem_GetDungeonKeyModel(s16 drawId, s32 owner, const char** metalPath, const char** emblemPath,
+                               Color_RGBA8* metalColor, Color_RGBA8* emblemColor) {
+    static const Color_RGBA8 metalDefaults[2] = { { 213, 224, 236, 255 }, { 233, 191, 66, 255 } };
+    static const Color_RGBA8 emblemDefaults[4] = {
+        { 236, 120, 186, 255 },
+        { 129, 173, 70, 255 },
+        { 99, 90, 183, 255 },
+        { 201, 38, 41, 255 },
+    };
+    static const char* ids[4] = { "Items.Woodfall", "Items.Snowhead", "Items.GreatBay", "Items.StoneTower" };
+    static const char* emblemIds[4] = { "Items.WoodfallEmblem", "Items.SnowheadEmblem", "Items.GreatBayEmblem",
+                                        "Items.StoneTowerEmblem" };
+    static const char* paths[4][2][2] = {
+        { { "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallSmallKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallSmallKeyEmblemDL" },
+          { "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallBossKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallBossKeyEmblemDL" } },
+        { { "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadSmallKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadSmallKeyEmblemDL" },
+          { "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadBossKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadBossKeyEmblemDL" } },
+        { { "__OTR__alt/objects/cor_mm_keys_poc2/GreatBaySmallKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/GreatBaySmallKeyEmblemDL" },
+          { "__OTR__alt/objects/cor_mm_keys_poc2/GreatBayBossKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/GreatBayBossKeyEmblemDL" } },
+        { { "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerSmallKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerSmallKeyEmblemDL" },
+          { "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerBossKeyMetalDL",
+            "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerBossKeyEmblemDL" } },
+    };
+    s32 kind;
+    if (owner < 0 || owner >= 4 || metalPath == NULL || emblemPath == NULL || metalColor == NULL ||
+        emblemColor == NULL || !ResourceMgr_IsAltAssetsEnabled()) {
+        return false;
+    }
+    if (drawId == GID_KEY_SMALL) {
+        kind = 0;
+    } else if (drawId == GID_KEY_BOSS) {
+        kind = 1;
+    } else {
+        return false;
+    }
+    *metalPath = paths[owner][kind][0];
+    *emblemPath = paths[owner][kind][1];
+    if (!ResourceMgr_FileAltExists(*metalPath) || !ResourceMgr_FileAltExists(*emblemPath)) {
+        return false;
+    }
+    *metalColor = metalDefaults[kind];
+    *emblemColor = emblemDefaults[owner];
+    if (CVarGetInteger("gEnhancements.DungeonItemColors", 0)) {
+        // Unchanged rows keep neutral steel/gold; a selected dungeon hex colors the metal.
+        *metalColor = CosmeticEditor_GetChangedColor(metalColor->r, metalColor->g, metalColor->b, 255, ids[owner]);
+    }
+    // Emblems have their own picker, independent of key metal and the general checkbox.
+    *emblemColor =
+        CosmeticEditor_GetChangedColor(emblemColor->r, emblemColor->g, emblemColor->b, 255, emblemIds[owner]);
+    return true;
+}
+
+static s32 GetItem_TryDrawDungeonKey(PlayState* play, s16 drawId, s32 owner) {
+    const char *metalPath, *emblemPath;
+    Color_RGBA8 metalColor, emblemColor;
+    Gfx *metal, *emblem;
+    if (!GetItem_GetDungeonKeyModel(drawId, owner, &metalPath, &emblemPath, &metalColor, &emblemColor)) {
+        return false;
+    }
+    metal = ResourceMgr_LoadGfxByName(metalPath);
+    emblem = ResourceMgr_LoadGfxByName(emblemPath);
+    if (metal == NULL || emblem == NULL) {
+        return false;
+    }
+    Matrix_Push();
+    // Quarter-unit detail is stored as integer vertices at 4x scale in the O2R.
+    Matrix_Scale(0.25f, 0.25f, 0.25f, MTXMODE_APPLY);
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_OPA_DISP++, metalColor.r, metalColor.g, metalColor.b, 255);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPDisplayList(POLY_OPA_DISP++, metal);
+    gDPPipeSync(POLY_OPA_DISP++);
+    gDPSetEnvColor(POLY_OPA_DISP++, emblemColor.r, emblemColor.g, emblemColor.b, 255);
+    gSPDisplayList(POLY_OPA_DISP++, emblem);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
+    CLOSE_DISPS(play->state.gfxCtx);
+    Matrix_Pop();
+    return true;
+}
+
+s32 GetItem_DrawDungeonItem(PlayState* play, s16 drawId, s32 owner) {
+    Color_RGBA8 color, emblem;
+    u8 strength = 0;
+    s32 tintBody, tintGem;
+    if (GetItem_TryDrawDungeonKey(play, drawId, owner)) {
+        return true;
+    }
+    tintBody = GetItem_GetDungeonItemTint(drawId, owner, &color, &strength);
+    tintGem = drawId == GID_KEY_BOSS && GetItem_GetDungeonKeyEmblemTint(owner, &emblem);
+    if ((!tintBody && !tintGem) ||
+        ResourceMgr_LoadGfxByName((const char*)sDrawItemTable[drawId].drawResources[0]) == NULL) {
+        return false;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    if (tintBody) {
+        gDPSetGrayscaleColor(POLY_OPA_DISP++, color.r, color.g, color.b, strength);
+        gSPGrayscale(POLY_OPA_DISP++, true);
+    }
+    if (tintGem) {
+        gDPSetGrayscaleColor(POLY_XLU_DISP++, emblem.r, emblem.g, emblem.b, 192);
+        gSPGrayscale(POLY_XLU_DISP++, true);
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+    // The real table draw preserves selected GI geometry, materials and pass routing.
     sDrawItemTable[drawId].drawFunc(play, drawId);
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    if (tintGem) {
+        gSPGrayscale(POLY_XLU_DISP++, false);
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+    return true;
+}
+
+#define COMBO_MASK_SHIMMER_HOST_MM
+#include "ComboMaskShimmer.h"
+#undef COMBO_MASK_SHIMMER_HOST_MM
+
+s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]) {
+    switch (drawId) {
+        case GID_FAIRY:
+        case GID_FAIRY_2: {
+            const uint8_t pink[4] = { 255, 160, 235, 255 };
+            memcpy(color, pink, sizeof(pink));
+            return true;
+        }
+        case GID_MASK_POSTMAN:
+            return ComboMmMaskShimmerColor(0, color);
+        case GID_MASK_ALL_NIGHT:
+            return ComboMmMaskShimmerColor(1, color);
+        case GID_MASK_BLAST:
+            return ComboMmMaskShimmerColor(2, color);
+        case GID_MASK_STONE:
+            return ComboMmMaskShimmerColor(3, color);
+        case GID_MASK_GREAT_FAIRY:
+            return ComboMmMaskShimmerColor(4, color);
+        case GID_MASK_DEKU:
+            return ComboMmMaskShimmerColor(5, color);
+        case GID_MASK_KEATON:
+            return ComboMmMaskShimmerColor(6, color);
+        case GID_MASK_BREMEN:
+            return ComboMmMaskShimmerColor(7, color);
+        case GID_MASK_BUNNY:
+            return ComboMmMaskShimmerColor(8, color);
+        case GID_MASK_DON_GERO:
+            return ComboMmMaskShimmerColor(9, color);
+        case GID_MASK_SCENTS:
+            return ComboMmMaskShimmerColor(10, color);
+        case GID_MASK_GORON:
+            return ComboMmMaskShimmerColor(11, color);
+        case GID_MASK_ROMANI:
+            return ComboMmMaskShimmerColor(12, color);
+        case GID_MASK_CIRCUS_LEADER:
+            return ComboMmMaskShimmerColor(13, color);
+        case GID_MASK_KAFEIS_MASK:
+            return ComboMmMaskShimmerColor(14, color);
+        case GID_MASK_COUPLE:
+            return ComboMmMaskShimmerColor(15, color);
+        case GID_MASK_TRUTH:
+            return ComboMmMaskShimmerColor(16, color);
+        case GID_MASK_ZORA:
+            return ComboMmMaskShimmerColor(17, color);
+        case GID_MASK_KAMARO:
+            return ComboMmMaskShimmerColor(18, color);
+        case GID_MASK_GIBDO:
+            return ComboMmMaskShimmerColor(19, color);
+        case GID_MASK_GARO:
+            return ComboMmMaskShimmerColor(20, color);
+        case GID_MASK_CAPTAIN:
+            return ComboMmMaskShimmerColor(21, color);
+        case GID_MASK_GIANT:
+            return ComboMmMaskShimmerColor(22, color);
+        case GID_MASK_FIERCE_DEITY:
+            return ComboMmMaskShimmerColor(23, color);
+        case GID_REMAINS_ODOLWA:
+            return ComboMmRemainsShimmerColor(0, color);
+        case GID_REMAINS_GOHT:
+            return ComboMmRemainsShimmerColor(1, color);
+        case GID_REMAINS_GYORG:
+            return ComboMmRemainsShimmerColor(2, color);
+        case GID_REMAINS_TWINMOLD:
+            return ComboMmRemainsShimmerColor(3, color);
+        case GID_MASK_SUN:
+            color[0] = 255;
+            color[1] = 205;
+            color[2] = 70;
+            color[3] = 255;
+            return true;
+        default:
+            return false;
+    }
+}
+
+static void GetItem_DrawShimmer(PlayState* play, const uint8_t color[4]) {
+    ComboDrawMaskShimmer(play, NULL, color, NULL);
+}
+
+static s32 GetItem_BottleShimmerColor(s16 drawId, Color_RGBA8* color) {
+    switch (drawId) {
+        case GID_POTION_RED:
+            *color = CosmeticEditor_GetChangedColor(255, 70, 50, 255, "HUD.Hearts");
+            return true;
+        case GID_POTION_GREEN:
+            *color = CosmeticEditor_GetChangedColor(0, 200, 0, 255, "HUD.Magic");
+            return true;
+        case GID_POTION_BLUE:
+            *color = (Color_RGBA8){ 100, 160, 255, 255 };
+            return true;
+        case GID_FAIRY:
+        case GID_FAIRY_2:
+            *color = (Color_RGBA8){ 255, 160, 235, 255 };
+            return true;
+        case GID_POE:
+            *color = (Color_RGBA8){ 100, 0, 200, 255 };
+            return true;
+        case GID_BIG_POE:
+            *color = (Color_RGBA8){ 150, 200, 0, 255 };
+            return true;
+        default:
+            return false;
+    }
+}
+
+static void GetItem_DrawBottleShimmer(PlayState* play, s16 drawId) {
+    Color_RGBA8 color;
+    s32 i;
+
+    if (!CVarGetInteger("gEnhancements.BottleShimmer", 0) || !GetItem_BottleShimmerColor(drawId, &color) ||
+        ResourceMgr_LoadGfxByName(gEffSparklesDL) == NULL) {
+        return;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    gSPClearGeometryMode(POLY_XLU_DISP++, G_FOG | G_LIGHTING);
+
+    // Three local-space motes, evaluated from game time. Draw frequency and number of
+    // visible bottles cannot advance an effect pool, consume RNG, or accelerate the shimmer.
+    for (i = 0; i < 3; i++) {
+        u32 phase = (play->gameplayFrames + i * 43) & 127;
+        s16 angle = (s16)(play->gameplayFrames * 384 + i * 21845);
+        f32 fade = (phase < 64 ? phase : 128 - phase) / 64.0f;
+        f32 radius = (drawId == GID_FAIRY || drawId == GID_FAIRY_2) ? 23.0f : 29.0f;
+        f32 scale = 0.055f + 0.04f * fade;
+
+        Matrix_Push();
+        Matrix_Translate(Math_SinS(angle) * radius, -28.0f + phase * 0.5f, Math_CosS(angle) * radius, MTXMODE_APPLY);
+        Matrix_ReplaceRotation(&play->billboardMtxF);
+        Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+        gDPSetPrimColor(POLY_XLU_DISP++, 0x80, 0x80, (color.r + 765) / 4, (color.g + 765) / 4, (color.b + 765) / 4,
+                        (u8)(112.0f * fade));
+        gDPSetEnvColor(POLY_XLU_DISP++, color.r, color.g, color.b, 0);
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_XLU_DISP++, gEffSparklesDL);
+        Matrix_Pop();
+    }
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+void GetItem_Draw(PlayState* play, s16 drawId) {
+    if (DinFireShield_DrawItem(play, drawId))
+        return;
+    s32 owner = -1;
+    Color_RGBA8 shimmerColor;
+    s32 shimmer;
+    uint8_t maskColor[4];
+    s32 itemShimmer;
+    // Guard against an out-of-range drawId and a get-item whose model resource does NOT resolve (a
+    // missing/incompatible o2r, a missing asset, a rando/combo item without a resident object). Feeding
+    // gSPDisplayList a display list the Fast3D interpreter can't resolve dereferences a bad address and
+    // crashes 2ship with a 0xC0000005 access violation (this crashed in GetItem_DrawRecoveryHeart ->
+    // object_gi_heart/gGiRecoveryHeartDL). Skip the draw instead of crashing — the item just doesn't
+    // render, which is recoverable; a crash is not.
+    if (drawId < 0 || drawId >= (s32)ARRAY_COUNT(sDrawItemTable) || sDrawItemTable[drawId].drawFunc == NULL) {
+        return;
+    }
+    void* primaryDL = sDrawItemTable[drawId].drawResources[0];
+    if (primaryDL != NULL && ResourceMgr_LoadGfxByName((const char*)primaryDL) == NULL) {
+        return; // primary model didn't load -> don't hand the interpreter a bad DL
+    }
+    // Randomizer draws supply the true owner before this entry point. This fallback
+    // covers ordinary dungeon rewards; an overworld minimap index is never an owner.
+    switch (Play_GetOriginalSceneId(play->sceneId)) {
+        case SCENE_MITURIN:
+        case SCENE_MITURIN_BS:
+            owner = 0;
+            break;
+        case SCENE_HAKUGIN:
+        case SCENE_HAKUGIN_BS:
+            owner = 1;
+            break;
+        case SCENE_SEA:
+        case SCENE_SEA_BS:
+            owner = 2;
+            break;
+        case SCENE_INISIE_N:
+        case SCENE_INISIE_R:
+        case SCENE_INISIE_BS:
+            owner = 3;
+            break;
+    }
+    if (GetItem_DrawDungeonItem(play, drawId, owner)) {
+        return;
+    }
+    shimmer = CVarGetInteger("gEnhancements.BottleShimmer", 0) && GetItem_BottleShimmerColor(drawId, &shimmerColor);
+    itemShimmer = GetItem_GetShimmerColor(drawId, maskColor);
+    if (shimmer || itemShimmer) {
+        Matrix_Push();
+    }
+    sDrawItemTable[drawId].drawFunc(play, drawId);
+    if (shimmer || itemShimmer) {
+        // Some fairy draws leave a billboard transform behind. Motes use the incoming
+        // bottle transform, not the contents' billboard matrix.
+        Matrix_Pop();
+        if (shimmer) {
+            GetItem_DrawBottleShimmer(play, drawId);
+        }
+        if (itemShimmer) {
+            GetItem_DrawShimmer(play, maskColor);
+        }
+    }
 }
 
 #ifdef COMBO_BUILD
@@ -400,6 +818,7 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         KIND_POTION = 5,
         KIND_POES = 8,
         KIND_MM_FAIRY_BOTTLE = 21,
+        KIND_MM_FAIRY_CONTAINER = 37,
     };
     static const s8 sOrder0[] = { 0 };
     static const s8 sOrder01[] = { 0, 1 };
@@ -495,10 +914,11 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         count = 1;
         xluStart = -1;
     } else if (drawFunc == GetItem_DrawFairyContainer) {
-        // Bottle (OPA) + glass (XLU); the AnimatedMat scroll is replicated by the consumer
-        // (matAnimPath). The billboarded contents DL needs a Mtx resource and is dropped.
-        order = sOrder01;
-        count = 2;
+        // Keep the native contents and its placement matrix; the consumer loads
+        // the matrix through the owning MM resource manager before billboarding.
+        kind = KIND_MM_FAIRY_CONTAINER;
+        order = sOrderRaw;
+        count = 4;
         xluStart = 1;
     } else if (drawFunc == GetItem_DrawGoronSword) {
         kind = KIND_GORON_SWORD;
@@ -550,6 +970,11 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
             return 0; // padded/unused rows (e.g. GID_37) are not drawable
         }
         outDlists[i] = res[order[i]];
+    }
+    if (kind == KIND_MM_FAIRY_BOTTLE || kind == KIND_MM_FAIRY_CONTAINER) {
+        const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
+        outDlists[0] = (void*)shell.opaque;
+        outDlists[1] = (void*)shell.glass;
     }
     *outXluStart = (xluStart > count) ? count : xluStart;
     if (outDrawKind != NULL) {
@@ -635,27 +1060,38 @@ void GetItem_DrawPoes(PlayState* play, s16 drawId) {
 
 void GetItem_DrawFairyBottle(PlayState* play, s16 drawId) {
     s32 pad;
+    const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
+    const ComboFairyBottleMotion motion = ComboFairyBottle_Sample(play->gameplayFrames);
 
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)shell.opaque);
 
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[1]);
+    if (strcmp(shell.opaque, shell.glass) != 0) {
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)shell.glass);
+    }
     gSPSegment(POLY_XLU_DISP++, 0x08,
                Gfx_TwoTexScrollEx(play->state.gfxCtx, G_TX_RENDERTILE, play->state.frames * 0, play->state.frames * 0,
                                   32, 32, 1, play->state.frames, -(play->state.frames * 6), 32, 320, 0, 0, 1, -6));
 
     Matrix_Push();
+    if (ComboFairyBottle_IsBlueFireShell(shell.opaque)) {
+        Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
+    }
+    Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
     Matrix_ReplaceRotation(&play->billboardMtxF);
+    Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
 
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[2]);
+    if (!ComboFairyBottle_DrawVfx(play)) {
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[2]);
+    }
 
     Matrix_Pop();
 
@@ -759,6 +1195,37 @@ void GetItem_DrawDekuNuts(PlayState* play, s16 drawId) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+// Custom models do not share the native command offsets used by Cosmetic Editor.
+// Resolve through the display-list bridge first so the first Alt draw is classified
+// correctly, then scope the live MM cosmetic tint to this body draw only.
+Gfx* GetItem_DrawDListWithCosmetics(Gfx* gfx, const char* dlist, s16 drawId) {
+    Gfx drawCommand;
+    const char* cosmeticId = NULL;
+    Color_RGBA8 color;
+
+    gSPDisplayList(&drawCommand, (Gfx*)dlist);
+
+    if ((drawId == GID_MAGIC_JAR_SMALL || drawId == GID_MAGIC_JAR_BIG) &&
+        CVarGetInteger(CVAR_COSMETIC_CHANGED("HUD.Magic"), 0) && ResourceGetIsCustomByName(dlist)) {
+        cosmeticId = "HUD.Magic";
+        color = CosmeticEditor_GetChangedColor(0, 200, 0, 255, cosmeticId);
+    } else if ((drawId == GID_HEART_PIECE || drawId == GID_HEART_CONTAINER || drawId == GID_RECOVERY_HEART) &&
+               CVarGetInteger(CVAR_COSMETIC_CHANGED("HUD.Hearts"), 0) && ResourceGetIsCustomByName(dlist)) {
+        cosmeticId = "HUD.Hearts";
+        color = CosmeticEditor_GetChangedColor(255, 70, 50, 255, cosmeticId);
+    }
+
+    if (cosmeticId != NULL) {
+        gDPSetGrayscaleColor(gfx++, color.r, color.g, color.b, 255);
+        gSPGrayscale(gfx++, true);
+    }
+    *gfx++ = drawCommand;
+    if (cosmeticId != NULL) {
+        gSPGrayscale(gfx++, false);
+    }
+    return gfx;
+}
+
 void GetItem_DrawRecoveryHeart(PlayState* play, s16 drawId) {
     s32 pad;
 
@@ -771,7 +1238,8 @@ void GetItem_DrawRecoveryHeart(PlayState* play, s16 drawId) {
                                   -(play->state.frames * 3), 32, 32, 1, play->state.frames * 0,
                                   -(play->state.frames * 2), 32, 32, 0, -3, 0, -2));
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[0]);
+    POLY_XLU_DISP =
+        GetItem_DrawDListWithCosmetics(POLY_XLU_DISP, (const char*)sDrawItemTable[drawId].drawResources[0], drawId);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -803,7 +1271,8 @@ void GetItem_DrawOpa0(PlayState* play, s16 drawId) {
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
+    POLY_OPA_DISP =
+        GetItem_DrawDListWithCosmetics(POLY_OPA_DISP, (const char*)sDrawItemTable[drawId].drawResources[0], drawId);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -858,7 +1327,8 @@ void GetItem_DrawXlu01(PlayState* play, s16 drawId) {
 
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[0]);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[1]);
+    POLY_XLU_DISP =
+        GetItem_DrawDListWithCosmetics(POLY_XLU_DISP, (const char*)sDrawItemTable[drawId].drawResources[1], drawId);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -892,6 +1362,8 @@ void GetItem_DrawSeahorse(PlayState* play, s16 drawId) {
 void GetItem_DrawFairyContainer(PlayState* play, s16 drawId) {
     s32 pad;
     MtxF mtx;
+    const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
+    const ComboFairyBottleMotion motion = ComboFairyBottle_Sample(play->gameplayFrames);
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -900,17 +1372,41 @@ void GetItem_DrawFairyContainer(PlayState* play, s16 drawId) {
     AnimatedMat_Draw(play, Lib_SegmentedToVirtual(gGiFairyBottleTexAnim));
 
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)shell.opaque);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[1]);
+    if (strcmp(shell.opaque, shell.glass) != 0) {
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)shell.glass);
+    }
 
     Matrix_MtxToMtxF(ResourceMgr_LoadMtxByName(Lib_SegmentedToVirtual(sDrawItemTable[drawId].drawResources[3])), &mtx);
-    Matrix_Mult(&mtx, MTXMODE_APPLY);
+    Matrix_Push();
+    Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
+    if (ComboFairyBottle_IsBlueFireShell(shell.opaque)) {
+        Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
+    } else {
+        // The native billboard matrix sizes a sprite, not an actor skeleton.
+        // Keep its anchor for the VFX; apply its full scale only to fallback contents.
+        Matrix_Translate(mtx.xw, mtx.yw, mtx.zw, MTXMODE_APPLY);
+    }
     Matrix_ReplaceRotation(&play->billboardMtxF);
+    Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
 
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[2]);
+    if (!ComboFairyBottle_DrawVfx(play)) {
+        Matrix_Pop();
+        Matrix_Push();
+        Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
+        if (ComboFairyBottle_IsBlueFireShell(shell.opaque)) {
+            Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
+        } else {
+            Matrix_Mult(&mtx, MTXMODE_APPLY);
+        }
+        Matrix_ReplaceRotation(&play->billboardMtxF);
+        Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[2]);
+    }
+    Matrix_Pop();
 
     CLOSE_DISPS(play->state.gfxCtx);
 }

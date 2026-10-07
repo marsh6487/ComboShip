@@ -5,9 +5,11 @@
  */
 
 #include "z_object_kankyo.h"
+#include "2s2h/Enhancements/Audio/MMWeather.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "BenPort.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
+#include "mods/items/objects/object_autumn_leaves.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_UPDATE_DURING_OCARINA)
 
@@ -51,16 +53,17 @@ void func_808DBE8C(ObjectKankyo* this) {
 
 void func_808DBEB0(ObjectKankyo* this, PlayState* play) {
     s32 i;
+    f32 (*particleRandom)(void) = MMWeather_SeasonForPlay(play) == SEASON_AUTUMN ? MMWeather_RandomFloat : Rand_ZeroOne;
 
     D_808DE5B0 = 0.0f;
-    this->unk_144 = Rand_ZeroOne() * 360.0f;
-    this->unk_148 = Rand_ZeroOne() * 360.0f;
+    this->unk_144 = particleRandom() * 360.0f;
+    this->unk_148 = particleRandom() * 360.0f;
     if (play->envCtx.precipitation[PRECIP_SNOW_CUR] == 128) {
         D_808DE5B0 = 1.0f;
         this->unk_114E = 1;
 
         for (i = 0; i < play->envCtx.precipitation[PRECIP_SNOW_CUR]; i++) {
-            this->unk_14C[i].unk_10 = Rand_ZeroOne() * -200.0f;
+            this->unk_14C[i].unk_10 = particleRandom() * -200.0f;
         }
     } else {
         this->unk_114E = 0;
@@ -69,10 +72,11 @@ void func_808DBEB0(ObjectKankyo* this, PlayState* play) {
 }
 
 void func_808DBFB0(ObjectKankyo* this, PlayState* play) {
+    f32 (*particleRandom)(void) = MMWeather_SeasonForPlay(play) == SEASON_AUTUMN ? MMWeather_RandomFloat : Rand_ZeroOne;
     D_808DE5B0 = 0.0f;
     this->unk_114E = 0;
-    this->unk_144 = Rand_ZeroOne() * 360.0f;
-    this->unk_148 = Rand_ZeroOne() * 360.0f;
+    this->unk_144 = particleRandom() * 360.0f;
+    this->unk_148 = particleRandom() * 360.0f;
     this->unk_114C = D_808DE340;
     D_808DE340++;
     ObjectKankyo_SetupAction(this, func_808DCBF8);
@@ -214,13 +218,14 @@ void func_808DC454(ObjectKankyo* this, PlayState* play) {
     spCC = y / magnitude;
     spC8 = z / magnitude;
 
+    f32 (*particleRandom)(void) = MMWeather_SeasonForPlay(play) == SEASON_AUTUMN ? MMWeather_RandomFloat : Rand_ZeroOne;
     for (i = 0; i < play->envCtx.precipitation[PRECIP_SNOW_CUR]; i++) {
         switch (this->unk_14C[i].unk_1C) {
             case 0:
                 this->unk_14C[i].unk_00 = play->view.eye.x + (spD0 * 120.0f);
                 this->unk_14C[i].unk_04 = play->view.eye.y + (spCC * 120.0f);
                 this->unk_14C[i].unk_08 = play->view.eye.z + (spC8 * 120.0f);
-                this->unk_14C[i].unk_0C = (Rand_ZeroOne() - 0.5f) * (2.0f * temp_120);
+                this->unk_14C[i].unk_0C = (particleRandom() - 0.5f) * (2.0f * temp_120);
 
                 temp_f22 = (Camera_GetCamDirPitch(GET_ACTIVE_CAM(play)) * 0.004f) + 60.0f;
                 if (temp_f22 < 20.0f) {
@@ -236,11 +241,11 @@ void func_808DC454(ObjectKankyo* this, PlayState* play) {
                     }
                 }
 
-                this->unk_14C[i].unk_14 = (Rand_ZeroOne() - 0.5f) * (2.0f * temp_120);
+                this->unk_14C[i].unk_14 = (particleRandom() - 0.5f) * (2.0f * temp_120);
                 if (play->envCtx.precipitation[PRECIP_SOS_MAX] == 0) {
-                    this->unk_14C[i].unk_18 = (Rand_ZeroOne() * 3.0f) + 1.0f;
+                    this->unk_14C[i].unk_18 = (particleRandom() * 3.0f) + 1.0f;
                 } else {
-                    this->unk_14C[i].unk_18 = (Rand_ZeroOne() * 3.0f) + 8.0f;
+                    this->unk_14C[i].unk_18 = (particleRandom() * 3.0f) + 8.0f;
                 }
                 this->unk_14C[i].unk_1C++;
                 this->unk_14C[i].epoch++;
@@ -261,8 +266,8 @@ void func_808DC454(ObjectKankyo* this, PlayState* play) {
                 spBC = -play->envCtx.windDirection.z / magnitude;
 
                 if (i == 0) {
-                    this->unk_144 += 0.049999997f * Rand_ZeroOne();
-                    this->unk_148 += 0.049999997f * Rand_ZeroOne();
+                    this->unk_144 += 0.049999997f * particleRandom();
+                    this->unk_148 += 0.049999997f * particleRandom();
                 }
 
                 phi_f20 = play->envCtx.windSpeed / 120.0f;
@@ -324,17 +329,35 @@ void func_808DC454(ObjectKankyo* this, PlayState* play) {
     }
 }
 
-void func_808DCB7C(ObjectKankyo* this, PlayState* play) {
-    if (play->envCtx.precipitation[PRECIP_SNOW_CUR] < play->envCtx.precipitation[PRECIP_SNOW_MAX]) {
-        if ((play->state.frames % 16) == 0) {
-            play->envCtx.precipitation[PRECIP_SNOW_CUR] += 2;
-        }
-    } else if (play->envCtx.precipitation[PRECIP_SNOW_MAX] < play->envCtx.precipitation[PRECIP_SNOW_CUR]) {
-        if ((play->state.frames % 16) == 0) {
-            play->envCtx.precipitation[PRECIP_SNOW_CUR] -= 2;
-        }
+static void ObjectKankyo_UpdateSnowTarget(PlayState* play) {
+    if ((play->state.frames % 16) != 0) {
+        return;
+    }
+    u8* count = &play->envCtx.precipitation[PRECIP_SNOW_CUR];
+    u8 target = play->envCtx.precipitation[PRECIP_SNOW_MAX];
+    // Clamp a final odd step so native target changes converge exactly.
+    if (*count < target) {
+        *count += MIN(2, target - *count);
+    } else if (*count > target) {
+        *count -= MIN(2, *count - target);
+    }
+}
+
+static void ObjectKankyo_UpdateSeasonSnowParticles(ObjectKankyo* this, PlayState* play) {
+    const int season = MMWeather_SeasonForPlay(play);
+    const u8 nativeCount = play->envCtx.precipitation[PRECIP_SNOW_CUR];
+    if (season == SEASON_WINTER || season == SEASON_AUTUMN || season == SEASON_SPRING || season == SEASON_SUMMER) {
+        // Particle positions are native actor state. Compose their count only
+        // during motion; weather tags and the next actor see the live native count.
+        play->envCtx.precipitation[PRECIP_SNOW_CUR] = season == SEASON_WINTER ? 64 : season == SEASON_AUTUMN ? 32 : 0;
     }
     func_808DC454(this, play);
+    play->envCtx.precipitation[PRECIP_SNOW_CUR] = nativeCount;
+}
+
+void func_808DCB7C(ObjectKankyo* this, PlayState* play) {
+    ObjectKankyo_UpdateSnowTarget(play);
+    ObjectKankyo_UpdateSeasonSnowParticles(this, play);
 }
 
 void func_808DCBF8(ObjectKankyo* this, PlayState* play) {
@@ -359,7 +382,7 @@ void func_808DCBF8(ObjectKankyo* this, PlayState* play) {
         D_801F4E30 = 0;
         play->envCtx.sandstormState = SANDSTORM_A;
     }
-    func_808DC454(this, play);
+    ObjectKankyo_UpdateSeasonSnowParticles(this, play);
 }
 
 void func_808DCDB4(ObjectKankyo* this, PlayState* play) {
@@ -527,8 +550,13 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
     f32 temp_f2;
     f32 tempf;
 
+    const int season = MMWeather_SeasonForPlay(play);
+    const u8 snowCount = season == SEASON_WINTER   ? 64
+                         : season == SEASON_AUTUMN ? 32
+                                                   : play->envCtx.precipitation[PRECIP_SNOW_CUR];
     if ((play->cameraPtrs[CAM_ID_MAIN]->stateFlags & CAM_STATE_UNDERWATER) ||
-        ((u8)play->envCtx.stormState == STORM_STATE_OFF)) {
+        (season == SEASON_SPRING || season == SEASON_SUMMER) ||
+        ((u8)play->envCtx.stormState == STORM_STATE_OFF && season != SEASON_WINTER && season != SEASON_AUTUMN)) {
         return;
     }
 
@@ -541,14 +569,14 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
         temp_f0 = CLAMP(temp_f0, 0.0f, 1.0f);
         Math_SmoothStepToF(&D_808DE5B0, temp_f0, 0.2f, 0.1f, 0.001f);
 
-        sp68 = play->envCtx.precipitation[PRECIP_SNOW_CUR];
+        sp68 = snowCount;
         sp68 *= D_808DE5B0;
 
-        if ((play->envCtx.precipitation[PRECIP_SNOW_CUR] >= 32) && (sp68 < 32)) {
+        if ((snowCount >= 32) && (sp68 < 32)) {
             sp68 = 32;
         }
     } else {
-        sp68 = play->envCtx.precipitation[PRECIP_SNOW_CUR];
+        sp68 = snowCount;
     }
 
     for (i = 0; i < sp68; i++) {
@@ -584,6 +612,18 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
             }
 
             Matrix_Translate(worldPos.x, worldPos.y, worldPos.z, MTXMODE_NEW);
+            if (season == SEASON_AUTUMN) {
+                // Same camera-relative drift, fall, wind and interpolation as
+                // snowfall, with four private RGBA sprites and a gentle flutter.
+                f32 leafScale = 0.035f + (i & 7) * 0.002f;
+                Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
+                Matrix_RotateZS((s16)(play->gameplayFrames * 180 + i * 1300), MTXMODE_APPLY);
+                Matrix_Scale(leafScale, leafScale, leafScale, MTXMODE_APPLY);
+                temp_f2 = CLAMP(1.0f - Math_Vec3f_DistXYZ(&worldPos, &play->view.eye) / 300.0f, 0.0f, 1.0f);
+                AutumnLeaves_Draw(play, i, (u8)(220.0f * temp_f2));
+                FrameInterpolation_RecordCloseChild();
+                continue;
+            }
             tempf = (i & 7) * 0.008f;
             Matrix_Scale(0.05f + tempf, 0.05f + tempf, 0.05f + tempf, MTXMODE_APPLY);
             temp_f2 = Math_Vec3f_DistXYZ(&worldPos, &play->view.eye) / 300.0f;

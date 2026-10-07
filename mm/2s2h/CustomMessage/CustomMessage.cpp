@@ -5,6 +5,7 @@
 extern "C" {
 #include "variables.h"
 extern f32 sNESFontWidths[160];
+void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation* presentation);
 }
 
 CustomMessage::Entry activeCustomMessage;
@@ -164,6 +165,7 @@ CustomMessage::Entry CustomMessage::LoadVanillaMessageTableEntry(u16 textId) {
 }
 
 void CustomMessage::LoadCustomMessageIntoFont(CustomMessage::Entry entry) {
+    Message_SetItemReceiptPresentation(&entry.receiptPresentation);
     MessageContext* msgCtx = &gPlayState->msgCtx;
     Font* font = &msgCtx->font;
 

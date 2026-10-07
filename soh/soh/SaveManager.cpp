@@ -1,4 +1,8 @@
+#include "../../combo/menu/ItemGrantAuditBridge.h"
 #include "SaveManager.h"
+#ifdef COMBO_BUILD
+#include "ComboExport.h"
+#endif
 #include "OTRGlobals.h"
 #include "Enhancements/game-interactor/GameInteractor.h"
 #include "Enhancements/randomizer/SeedContext.h"
@@ -24,9 +28,17 @@
 #include <filesystem>
 #include <array>
 #include <mutex>
+#include <thread>
+#include <chrono>
 
 extern "C" SaveContext gSaveContext;
 using namespace std::string_literals;
+
+static void ResetYoungHorseSaveData() {
+    gSaveContext.ship.youngHorseData = {};
+    gSaveContext.ship.youngHorseData.scene = -1;
+    gSaveContext.ship.youngHorseDataValid = false;
+}
 
 #ifdef COMBO_BUILD
 #include "rando/CrossForeign.h" // ComboShip: merged-save IO callback typedefs (FnComboReadSave/Write)
@@ -165,7 +177,7 @@ SaveManager::SaveManager() {
 }
 
 void SaveManager::LoadRandomizer() {
-    if (gSaveContext.ship.quest.id != QUEST_RANDOMIZER) {
+    if (!IS_RANDO) { // IS_RANDO covers QUEST_RANDOMIZER AND the OoTxMM combo (both carry rando data)
         return;
     }
 
@@ -263,6 +275,17 @@ void SaveManager::LoadRandomizer() {
                                     gSaveContext.ship.quest.data.randomizer.triforcePiecesCollected);
     SaveManager::Instance->LoadData("bombchuUpgradeLevel", gSaveContext.ship.quest.data.randomizer.bombchuUpgradeLevel);
 
+    SaveManager::Instance->LoadData("quarterHearts", gSaveContext.ship.quest.data.randomizer.quarterHearts);
+    SaveManager::Instance->LoadData("defenseUpgrades", gSaveContext.ship.quest.data.randomizer.defenseUpgrades);
+    SaveManager::Instance->LoadData("speedUpgrades", gSaveContext.ship.quest.data.randomizer.speedUpgrades);
+    SaveManager::Instance->LoadData("powerUpgrades", gSaveContext.ship.quest.data.randomizer.powerUpgrades);
+    SaveManager::Instance->LoadData("magicStatUpgrades", gSaveContext.ship.quest.data.randomizer.magicStatUpgrades);
+    SaveManager::Instance->LoadData("crawlSpeedUpgrades", gSaveContext.ship.quest.data.randomizer.crawlSpeedUpgrades);
+    SaveManager::Instance->LoadData("climbSpeedUpgrades", gSaveContext.ship.quest.data.randomizer.climbSpeedUpgrades);
+    SaveManager::Instance->LoadData("pushSpeedUpgrades", gSaveContext.ship.quest.data.randomizer.pushSpeedUpgrades);
+    SaveManager::Instance->LoadData("comboNativeMagicLevel",
+                                    gSaveContext.ship.quest.data.randomizer.comboNativeMagicLevel);
+
     SaveManager::Instance->LoadData("pendingIceTrapCount", gSaveContext.ship.pendingIceTrapCount);
 
     std::shared_ptr<Randomizer> randomizer = OTRGlobals::Instance->gRandomizer;
@@ -292,7 +315,9 @@ void SaveManager::LoadRandomizer() {
 }
 
 void SaveManager::SaveRandomizer(SaveContext* saveContext, int sectionID, bool fullSave) {
-    if (saveContext->ship.quest.id != QUEST_RANDOMIZER) {
+    // QUEST_OOTXMM (combo) is a rando save too — without this it wrote a NULL randomizer section,
+    // which then crashed the startup meta read (randoBlock["seed"] on null data).
+    if (saveContext->ship.quest.id != QUEST_RANDOMIZER && saveContext->ship.quest.id != QUEST_OOTXMM) {
         return;
     }
 
@@ -417,7 +442,17 @@ void SaveManager::SaveRandomizer(SaveContext* saveContext, int sectionID, bool f
                 });
 
                 std::vector<RandomizerArea> areas = hint->GetHintedAreas();
+                const std::vector<std::string>& foreignAreas = hint->GetForeignAreas();
                 SaveManager::Instance->SaveArray("areas", areas.size(), [&](size_t i) {
+                    // Combo rando: a slot pointing at the OTHER game has no RandomizerArea, so the
+                    // enum here is RA_NONE and this used to write "an Isolated Place" straight into
+                    // the save file. The spoiler was right and the screen was wrong for exactly that
+                    // reason — the save is what the running game reads back. Same rule the spoiler
+                    // writer uses: the foreign name travels as text. Skijer's NEI
+                    if (i < foreignAreas.size() && !foreignAreas[i].empty()) {
+                        SaveManager::Instance->SaveData("", foreignAreas[i]);
+                        return;
+                    }
                     SaveManager::Instance->SaveData(
                         "", Rando::StaticData::hintTextTable[Rando::StaticData::areaNames[areas[i]]]
                                 .GetClear()
@@ -438,6 +473,17 @@ void SaveManager::SaveRandomizer(SaveContext* saveContext, int sectionID, bool f
     SaveManager::Instance->SaveData("triforcePiecesCollected",
                                     saveContext->ship.quest.data.randomizer.triforcePiecesCollected);
     SaveManager::Instance->SaveData("bombchuUpgradeLevel", saveContext->ship.quest.data.randomizer.bombchuUpgradeLevel);
+
+    SaveManager::Instance->SaveData("quarterHearts", saveContext->ship.quest.data.randomizer.quarterHearts);
+    SaveManager::Instance->SaveData("defenseUpgrades", saveContext->ship.quest.data.randomizer.defenseUpgrades);
+    SaveManager::Instance->SaveData("speedUpgrades", saveContext->ship.quest.data.randomizer.speedUpgrades);
+    SaveManager::Instance->SaveData("powerUpgrades", saveContext->ship.quest.data.randomizer.powerUpgrades);
+    SaveManager::Instance->SaveData("magicStatUpgrades", saveContext->ship.quest.data.randomizer.magicStatUpgrades);
+    SaveManager::Instance->SaveData("crawlSpeedUpgrades", saveContext->ship.quest.data.randomizer.crawlSpeedUpgrades);
+    SaveManager::Instance->SaveData("climbSpeedUpgrades", saveContext->ship.quest.data.randomizer.climbSpeedUpgrades);
+    SaveManager::Instance->SaveData("pushSpeedUpgrades", saveContext->ship.quest.data.randomizer.pushSpeedUpgrades);
+    SaveManager::Instance->SaveData("comboNativeMagicLevel",
+                                    saveContext->ship.quest.data.randomizer.comboNativeMagicLevel);
 
     SaveManager::Instance->SaveData("pendingIceTrapCount", saveContext->ship.pendingIceTrapCount);
 
@@ -652,7 +698,14 @@ void SaveManager::StartupCheckAndInitMeta(int fileNum) {
     fileMetaInfo[fileNum].requiresMasterQuest = baseBlock["isMasterQuest"];
 
     fileMetaInfo[fileNum].randoSave = isRando;
-    if (isRando) {
+    // Guard against a malformed / incomplete rando save (a randomizer section whose "data" is null,
+    // e.g. an old broken combo save): reading randoBlock["seed"] on null threw a JSON exception and
+    // crashed the whole boot. Treat such a file as rando-without-details instead of crashing.
+    bool randoDataValid = isRando && metaSaveBlock["sections"].contains("randomizer") &&
+                          metaSaveBlock["sections"]["randomizer"].contains("data") &&
+                          metaSaveBlock["sections"]["randomizer"]["data"].is_object() &&
+                          metaSaveBlock["sections"]["randomizer"]["data"].contains("seed");
+    if (randoDataValid) {
         nlohmann::json& randoBlock = metaSaveBlock["sections"]["randomizer"]["data"];
 
         for (int i = 0; i < ARRAY_COUNT(fileMetaInfo[fileNum].seedHash); i++) {
@@ -664,10 +717,18 @@ void SaveManager::StartupCheckAndInitMeta(int fileNum) {
             (int16_t)baseBlock["randomizerInf"][RAND_INF_HAS_WALLET >> 4] & (1 << (RAND_INF_HAS_WALLET & 0xF));
         fileMetaInfo[fileNum].triforcePieces = randoBlock.value("triforcePiecesCollected", 0);
         nlohmann::json& randoSettings = randoBlock["randoSettings"];
-        fileMetaInfo[fileNum].maxTriforcePieces = randoSettings[RSK_TRIFORCE_HUNT_PIECES_TOTAL].get<uint8_t>();
+        // randoSettings is indexed by RandomizerSettingKey, and that enum grows every time a
+        // setting is added, so a file written by an older build is simply shorter than the enum is
+        // now. Indexing past its end yields null and get<uint8_t>() throws, which used to take the
+        // whole game down on the title screen. Treat missing entries as unset instead.
+        auto randoSetting = [&randoSettings](size_t key) -> uint8_t {
+            return (key < randoSettings.size() && !randoSettings[key].is_null()) ? randoSettings[key].get<uint8_t>()
+                                                                                 : 0;
+        };
+        fileMetaInfo[fileNum].maxTriforcePieces = randoSetting(RSK_TRIFORCE_HUNT_PIECES_TOTAL);
         fileMetaInfo[fileNum].hasFishingRod = (int16_t)baseBlock["randomizerInf"][RAND_INF_FISHING_POLE_FOUND >> 4] &
                                               (1 << (RAND_INF_FISHING_POLE_FOUND & 0xF));
-        fileMetaInfo[fileNum].fishingPoleShuffled = randoSettings[RSK_SHUFFLE_FISHING_POLE].get<uint8_t>() != 0;
+        fileMetaInfo[fileNum].fishingPoleShuffled = randoSetting(RSK_SHUFFLE_FISHING_POLE) != 0;
         fileMetaInfo[fileNum].requiresMasterQuest = randoBlock["masterQuestDungeonCount"] > 0;
         // If the file is not marked as Master Quest, it could still theoretically be a rando save with all 12 MQ
         // dungeons, in which case we don't actually require a vanilla OTR.
@@ -737,6 +798,7 @@ void SaveManager::InitMeta(int fileNum) {
 }
 
 void SaveManager::InitFile(bool isDebug) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT save-init");
     for (InitFunc& func : initFuncs) {
         func(isDebug);
     }
@@ -751,6 +813,7 @@ void SaveManager::InitFileImpl(bool isDebug) {
 }
 
 void SaveManager::InitFileNormal() {
+    ResetYoungHorseSaveData();
     gSaveContext.totalDays = 0;
     gSaveContext.bgsDayCount = 0;
 
@@ -804,6 +867,9 @@ void SaveManager::InitFileNormal() {
         gSaveContext.equips.cButtonSlots[button] = SLOT_NONE;
     }
     gSaveContext.equips.equipment = 0x1100;
+    for (int button = 0; button < ARRAY_COUNT(gSaveContext.ship.extButtons.items); button++) {
+        gSaveContext.ship.extButtons.items[button] = 0;
+    }
 
     // Inventory
     for (int item = 0; item < ARRAY_COUNT(gSaveContext.inventory.items); item++) {
@@ -993,7 +1059,11 @@ void SaveManager::InitFileDebug() {
         ITEM_BOTTLE,    ITEM_POTION_RED,    ITEM_POTION_GREEN, ITEM_POTION_BLUE, ITEM_POCKET_EGG,  ITEM_WEIRD_EGG,
     };
     for (int item = 0; item < ARRAY_COUNT(gSaveContext.inventory.items); item++) {
-        gSaveContext.inventory.items[item] = sItems[item];
+        if (item < sItems.size()) {
+            gSaveContext.inventory.items[item] = sItems[item];
+        } else {
+            gSaveContext.inventory.items[item] = ITEM_NONE;
+        }
     }
     static std::array<s8, 16> sAmmo = { 50, 50, 10, 30, 1, 1, 30, 1, 50, 1, 1, 1, 1, 1, 1, 1 };
     for (int ammo = 0; ammo < ARRAY_COUNT(gSaveContext.inventory.ammo); ammo++) {
@@ -1116,7 +1186,11 @@ void SaveManager::InitFileMaxed() {
         ITEM_FAIRY,     ITEM_FAIRY,        ITEM_BUG,     ITEM_FISH,     ITEM_CLAIM_CHECK, ITEM_MASK_BUNNY,
     };
     for (int item = 0; item < ARRAY_COUNT(gSaveContext.inventory.items); item++) {
-        gSaveContext.inventory.items[item] = sItems[item];
+        if (item < sItems.size()) {
+            gSaveContext.inventory.items[item] = sItems[item];
+        } else {
+            gSaveContext.inventory.items[item] = ITEM_NONE;
+        }
     }
     static std::array<s8, 16> sAmmo = { 30, 40, 40, 50, 0, 0, 50, 0, 50, 0, 0, 0, 0, 0, 15, 0 };
     for (int ammo = 0; ammo < ARRAY_COUNT(gSaveContext.inventory.ammo); ammo++) {
@@ -1241,6 +1315,9 @@ void SaveManager::SaveFileThreaded(int fileNum, SaveContext* saveContext, int se
     } else {
         saveBlock["fileType"] = FILE_TYPE_SAVE_VANILLA;
     }
+    // Fleet Ship Combo: a COMBO save is a rando save (fileType RANDO) PLUS this flag, so on load we
+    // can restore QUEST_OOTXMM (the rando fileType alone would reduce it back to QUEST_RANDOMIZER).
+    saveBlock["fleetCombo"] = IS_OOTXMM;
     if (sectionID == SECTION_ID_BASE) {
         for (auto& sectionHandlerPair : sectionSaveHandlers) {
             auto& saveFuncInfo = sectionHandlerPair.second;
@@ -1308,13 +1385,34 @@ void SaveManager::SaveFileThreaded(int fileNum, SaveContext* saveContext, int se
             std::filesystem::remove(tempFile);
         }
 #else
-        std::filesystem::rename(tempFile, fileName);
+        // Another reader (the tracker mirroring shared state, an antivirus, the Windows indexer) can
+        // still hold the file open: CRT streams open without FILE_SHARE_DELETE, so rename() throws,
+        // and an uncaught exception on this worker thread means std::terminate with no crash dialog.
+        // Retry briefly, then give up gracefully, keeping the .temp file so no data is lost.
+        bool renamed = false;
+        for (int attempt = 0; attempt < 20 && !renamed; attempt++) {
+            try {
+                std::filesystem::rename(tempFile, fileName);
+                renamed = true;
+            } catch (const std::filesystem::filesystem_error& e) {
+                if (attempt == 19) {
+                    SPDLOG_ERROR("Save rename failed after retries (file locked?): {}", e.what());
+                } else {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+                }
+            }
+        }
 #endif
     }
 
     delete saveContext;
-    InitMeta(fileNum);
-    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnSaveFile>(fileNum, sectionID);
+    try {
+        InitMeta(fileNum);
+        GameInteractor::Instance->ExecuteHooks<GameInteractor::OnSaveFile>(fileNum, sectionID);
+    } catch (const std::exception& e) {
+        // Never let a post-save hook exception escape this worker thread (std::terminate).
+        SPDLOG_ERROR("Post-save step threw: {}", e.what());
+    }
     SPDLOG_INFO("Save File Finish - fileNum: {}", fileNum);
     saveMtx.unlock();
 }
@@ -1341,7 +1439,76 @@ void SaveManager::SaveSection(int fileNum, int sectionID, bool threaded) {
 }
 
 void SaveManager::SaveFile(int fileNum) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT save-write");
     SaveSection(fileNum, SECTION_ID_BASE, true);
+}
+
+// FleetSync: build the full saveBlock-shaped json from the LIVE gSaveContext, synchronously and
+// without touching disk (mirror of SaveFileThreaded's SECTION_ID_BASE path into a LOCAL json —
+// the member saveBlock is left alone so an in-flight threaded save isn't disturbed).
+nlohmann::json SaveManager::SaveToJsonObject() {
+    saveMtx.lock();
+    nlohmann::json block;
+    block["version"] = 1;
+    if (IS_RANDO) {
+        block["fileType"] = FILE_TYPE_SAVE_RANDO;
+    } else {
+        block["fileType"] = FILE_TYPE_SAVE_VANILLA;
+    }
+    block["fleetCombo"] = IS_OOTXMM; // see SaveFileThreaded: restore QUEST_OOTXMM on load
+    auto saveContext = new SaveContext;
+    memcpy(saveContext, &gSaveContext, sizeof(gSaveContext));
+    for (auto& sectionHandlerPair : sectionSaveHandlers) {
+        auto& saveFuncInfo = sectionHandlerPair.second;
+        if (!saveFuncInfo.saveWithBase || (saveFuncInfo.name == "randomizer" && !IS_RANDO)) {
+            continue;
+        }
+        nlohmann::json& sectionBlock = block["sections"][saveFuncInfo.name];
+        sectionBlock["version"] = sectionHandlerPair.second.version;
+        currentJsonContext = &sectionBlock["data"];
+        sectionHandlerPair.second.func(saveContext, SECTION_ID_BASE, true);
+    }
+    delete saveContext;
+    saveMtx.unlock();
+    return block;
+}
+
+// FleetSync: apply a saveBlock-shaped json to the live game state (mirror of LoadFile's section
+// dispatch, minus the disk read). Resets to a clean file first so absent sections read as defaults.
+void SaveManager::LoadFromJsonObject(nlohmann::json& saveBlockJson) {
+    saveMtx.lock();
+    InitFile(false);
+    if (saveBlockJson.contains("fileType") && saveBlockJson["fileType"] == FILE_TYPE_SAVE_RANDO) {
+        gSaveContext.ship.quest.id = QUEST_RANDOMIZER;
+    }
+    if (saveBlockJson.contains("fleetCombo") && saveBlockJson["fleetCombo"].get<bool>()) {
+        gSaveContext.ship.quest.id = QUEST_OOTXMM; // Fleet Ship Combo save (rando + paired MM slot)
+    }
+    if (saveBlockJson.contains("sections")) {
+        for (auto& block : saveBlockJson["sections"].items()) {
+            std::string sectionName = block.key();
+            int sectionVersion = block.value()["version"];
+            if (sectionName == "randomizer" && sectionVersion != 1) {
+                sectionVersion = 1;
+            }
+            if (!sectionLoadHandlers.contains(sectionName)) {
+                SPDLOG_WARN("FleetSync anchor contains unloadable section " + sectionName);
+                continue;
+            }
+            SectionLoadHandler& handler = sectionLoadHandlers[sectionName];
+            if (!handler.contains(sectionVersion)) {
+                SPDLOG_ERROR("FleetSync anchor section " + sectionName + " has unloadable version " +
+                             std::to_string(sectionVersion));
+                continue;
+            }
+            currentJsonContext = &block.value()["data"];
+            if (currentJsonContext->empty()) {
+                continue;
+            }
+            handler[sectionVersion]();
+        }
+    }
+    saveMtx.unlock();
 }
 
 void SaveManager::SaveGlobal() {
@@ -1359,6 +1526,7 @@ void SaveManager::SaveGlobal() {
 }
 
 void SaveManager::LoadFile(int fileNum) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT save-load");
     saveMtx.lock();
     SPDLOG_INFO("Load File - fileNum: {}", fileNum);
     std::filesystem::path fileName = GetFileName(fileNum);
@@ -1393,6 +1561,9 @@ void SaveManager::LoadFile(int fileNum) {
         }
         if (saveBlock.contains("fileType") && saveBlock["fileType"] == FILE_TYPE_SAVE_RANDO) {
             gSaveContext.ship.quest.id = QUEST_RANDOMIZER;
+        }
+        if (saveBlock.contains("fleetCombo") && saveBlock["fleetCombo"].get<bool>()) {
+            gSaveContext.ship.quest.id = QUEST_OOTXMM; // Fleet Ship Combo save (rando + paired MM slot)
         }
         switch (saveBlock["version"].get<int>()) {
             case 1:
@@ -1539,6 +1710,7 @@ void SaveManager::CreateDefaultGlobal() {
 }
 
 void SaveManager::LoadBaseVersion1() {
+    ResetYoungHorseSaveData();
     SaveManager::Instance->LoadData("entranceIndex", gSaveContext.entranceIndex);
     SaveManager::Instance->LoadData("linkAge", gSaveContext.linkAge);
     SaveManager::Instance->LoadData("cutsceneIndex", gSaveContext.cutsceneIndex);
@@ -1678,6 +1850,7 @@ void SaveManager::LoadBaseVersion1() {
 }
 
 void SaveManager::LoadBaseVersion2() {
+    ResetYoungHorseSaveData();
     SaveManager::Instance->LoadData("entranceIndex", gSaveContext.entranceIndex);
     SaveManager::Instance->LoadData("linkAge", gSaveContext.linkAge);
     SaveManager::Instance->LoadData("cutsceneIndex", gSaveContext.cutsceneIndex);
@@ -1887,6 +2060,7 @@ void SaveManager::LoadBaseVersion2() {
 }
 
 void SaveManager::LoadBaseVersion3() {
+    ResetYoungHorseSaveData();
     SaveManager::Instance->LoadData("entranceIndex", gSaveContext.entranceIndex);
     SaveManager::Instance->LoadData("linkAge", gSaveContext.linkAge);
     SaveManager::Instance->LoadData("cutsceneIndex", gSaveContext.cutsceneIndex);
@@ -2101,6 +2275,7 @@ void SaveManager::LoadBaseVersion3() {
 }
 
 void SaveManager::LoadBaseVersion4() {
+    ResetYoungHorseSaveData();
     SaveManager::Instance->LoadData("entranceIndex", gSaveContext.entranceIndex);
     SaveManager::Instance->LoadData("linkAge", gSaveContext.linkAge);
     SaveManager::Instance->LoadData("cutsceneIndex", gSaveContext.cutsceneIndex);
@@ -2159,6 +2334,12 @@ void SaveManager::LoadBaseVersion4() {
             SaveManager::Instance->LoadData("", gSaveContext.equips.cButtonSlots[i], static_cast<uint8_t>(SLOT_NONE));
         });
         SaveManager::Instance->LoadData("equipment", gSaveContext.equips.equipment);
+        // Real (u16) ids for buttons whose buttonItems entry is the ITEM_EXT_BUTTON marker. Absent in
+        // saves written before the extended-button infra existed, hence the 0 default.
+        SaveManager::Instance->LoadArray(
+            "extButtonItems", ARRAY_COUNT(gSaveContext.ship.extButtons.items), [](size_t i) {
+                SaveManager::Instance->LoadData("", gSaveContext.ship.extButtons.items[i], static_cast<uint16_t>(0));
+            });
     });
     SaveManager::Instance->LoadStruct("inventory", []() {
         SaveManager::Instance->LoadArray("items", ARRAY_COUNT(gSaveContext.inventory.items), [](size_t i) {
@@ -2273,6 +2454,16 @@ void SaveManager::LoadBaseVersion4() {
     SaveManager::Instance->LoadData("dogParams", gSaveContext.dogParams);
     SaveManager::Instance->LoadData("filenameLanguage", gSaveContext.ship.filenameLanguage);
     SaveManager::Instance->LoadData("maskMemory", gSaveContext.ship.maskMemory);
+    SaveManager::Instance->LoadStruct("youngHorseData", []() {
+        SaveManager::Instance->LoadData("valid", gSaveContext.ship.youngHorseDataValid);
+        SaveManager::Instance->LoadData("scene", gSaveContext.ship.youngHorseData.scene, static_cast<s16>(-1));
+        SaveManager::Instance->LoadStruct("pos", []() {
+            SaveManager::Instance->LoadData("x", gSaveContext.ship.youngHorseData.pos.x);
+            SaveManager::Instance->LoadData("y", gSaveContext.ship.youngHorseData.pos.y);
+            SaveManager::Instance->LoadData("z", gSaveContext.ship.youngHorseData.pos.z);
+        });
+        SaveManager::Instance->LoadData("angle", gSaveContext.ship.youngHorseData.angle);
+    });
 }
 
 void SaveManager::SaveBase(SaveContext* saveContext, int sectionID, bool fullSave) {
@@ -2327,6 +2518,10 @@ void SaveManager::SaveBase(SaveContext* saveContext, int sectionID, bool fullSav
             SaveManager::Instance->SaveData("", saveContext->equips.cButtonSlots[i]);
         });
         SaveManager::Instance->SaveData("equipment", saveContext->equips.equipment);
+        // Real (u16) ids for buttons whose buttonItems entry is the ITEM_EXT_BUTTON marker.
+        SaveManager::Instance->SaveArray(
+            "extButtonItems", ARRAY_COUNT(saveContext->ship.extButtons.items),
+            [&](size_t i) { SaveManager::Instance->SaveData("", saveContext->ship.extButtons.items[i]); });
     });
     SaveManager::Instance->SaveStruct("inventory", [&]() {
         SaveManager::Instance->SaveArray("items", ARRAY_COUNT(saveContext->inventory.items), [&](size_t i) {
@@ -2439,6 +2634,16 @@ void SaveManager::SaveBase(SaveContext* saveContext, int sectionID, bool fullSav
     SaveManager::Instance->SaveData("dogParams", saveContext->dogParams);
     SaveManager::Instance->SaveData("filenameLanguage", saveContext->ship.filenameLanguage);
     SaveManager::Instance->SaveData("maskMemory", saveContext->ship.maskMemory);
+    SaveManager::Instance->SaveStruct("youngHorseData", [&]() {
+        SaveManager::Instance->SaveData("valid", saveContext->ship.youngHorseDataValid);
+        SaveManager::Instance->SaveData("scene", saveContext->ship.youngHorseData.scene);
+        SaveManager::Instance->SaveStruct("pos", [&]() {
+            SaveManager::Instance->SaveData("x", saveContext->ship.youngHorseData.pos.x);
+            SaveManager::Instance->SaveData("y", saveContext->ship.youngHorseData.pos.y);
+            SaveManager::Instance->SaveData("z", saveContext->ship.youngHorseData.pos.z);
+        });
+        SaveManager::Instance->SaveData("angle", saveContext->ship.youngHorseData.angle);
+    });
 }
 
 // Load a string into a char array based on size and ensuring it is null terminated when overflowed
@@ -2704,10 +2909,10 @@ typedef struct {
     /* 0x13E1 */ u8 natureAmbienceId;
     /* 0x13E2 */ u8 buttonStatus[5];
     /* 0x13E7 */ u8 forceRisingButtonAlphas; // alpha related
-    /* 0x13E8 */ u16 unk_13E8;               // alpha type?
-    /* 0x13EA */ u16 unk_13EA;               // also alpha type?
-    /* 0x13EC */ u16 unk_13EC;               // alpha type counter?
-    /* 0x13EE */ u16 unk_13EE;               // previous alpha type?
+    /* 0x13E8 */ u16 nextHudVisibilityMode;  // alpha type?
+    /* 0x13EA */ u16 hudVisibilityMode;      // also alpha type?
+    /* 0x13EC */ u16 hudVisibilityModeTimer; // alpha type counter?
+    /* 0x13EE */ u16 prevHudVisibilityMode;  // previous alpha type?
     /* 0x13F0 */ s16 unk_13F0;               // magic related
     /* 0x13F2 */ s16 unk_13F2;               // magic related
     /* 0x13F4 */ s16 unk_13F4;               // magic related
@@ -2968,12 +3173,12 @@ extern "C" void Save_CopyFile(int from, int to) {
 // registers routing via SOH_SetDeleteForeignSave so OOT's erase forwards the slot to MM, and calls
 // SOH_DeleteSaveFile so MM's erase can wipe OOT's matching save. See docs/UPSTREAM_MERGES.md.
 extern "C" void (*gComboDeleteForeignSave)(int fileNum) = nullptr;
-extern "C" __declspec(dllexport) void SOH_SetDeleteForeignSave(void (*cb)(int)) {
+extern "C" COMBO_EXPORT void SOH_SetDeleteForeignSave(void (*cb)(int)) {
     gComboDeleteForeignSave = cb;
 }
 // Inbound: launcher calls this when MM erases a slot. Goes straight to DeleteZeldaFile (NOT
 // Save_DeleteFile) so it does not re-fire OOT's own erase seam and loop back into MM.
-extern "C" __declspec(dllexport) void SOH_DeleteSaveFile(int fileNum) {
+extern "C" COMBO_EXPORT void SOH_DeleteSaveFile(int fileNum) {
     if (SaveManager::Instance) {
         SaveManager::Instance->DeleteZeldaFile(fileNum);
     }
@@ -2981,14 +3186,13 @@ extern "C" __declspec(dllexport) void SOH_DeleteSaveFile(int fileNum) {
 
 // ComboShip: launcher pushes its merged-save IO callbacks at boot. When set, OOT per-slot save
 // read/write routes through the .combosav container (see SaveFileThreaded/LoadFile).
-extern "C" __declspec(dllexport) void SOH_SetComboSaveIO(ComboRando::FnComboReadSave r,
-                                                         ComboRando::FnComboWriteSave w) {
+extern "C" COMBO_EXPORT void SOH_SetComboSaveIO(ComboRando::FnComboReadSave r, ComboRando::FnComboWriteSave w) {
     gComboReadGameSave = r;
     gComboWriteGameSave = w;
 }
 
 // ComboShip: launcher registers its whole-container copy for file-select "copy file".
-extern "C" __declspec(dllexport) void SOH_SetCopyContainer(void (*cb)(int, int)) {
+extern "C" COMBO_EXPORT void SOH_SetCopyContainer(void (*cb)(int, int)) {
     gComboCopyContainer = cb;
 }
 #endif

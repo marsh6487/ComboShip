@@ -19,6 +19,7 @@
 #include "fast/debug/GfxDebugger.h"
 
 #include "fast/resource/type/Texture.h"
+#include "fast/RenderCostProbe.h"
 #include "ship/resource/Resource.h"
 
 // TODO figure out why changing these to 640x480 makes the game only render in a quarter of the window
@@ -357,6 +358,28 @@ struct ColorCombiner {
     uint8_t shader_input_mapping[2][7];
 };
 
+// Prepared state is valid only within consecutive pure triangle commands.
+// No resource ownership or vertex transforms survive a command boundary.
+struct TriangleRenderState {
+    bool valid = false;
+    ColorCombiner* comb = nullptr;
+    bool use_alpha = false, use_fog = false, use_blend_color = false, use_grayscale = false;
+    uint32_t tm = 0;
+    uint32_t tex_width[2]{}, tex_height[2]{}, tex_width2[2]{}, tex_height2[2]{}, effective_tile[2]{};
+    uint8_t numInputs = 0;
+    bool usedTextures[2]{};
+    GfxClipParameters clip_parameters{};
+    bool reusePackedVertices = false;
+    uint64_t packedVertexMask = 0;
+};
+
+// Reuse attributes already emitted into the current submission buffer. Entries
+// cannot survive a flush, command barrier or frame boundary.
+struct PackedTriangleVertex {
+    size_t offset;
+    uint8_t count;
+};
+
 struct RenderingState {
     uint8_t depth_test_and_mask; // 1: depth test, 2: depth mask
     bool decal_mode;
@@ -425,6 +448,16 @@ class Interpreter {
 
     // private: TODO make these private
     void Flush();
+    bool mRenderCostEveryFrame = false;
+    uint64_t mDiagnosticFrameId = 0;
+    bool mAltRenderLookup = false; // scoped by OoT RunCommands; never enabled by MM
+    void SetCollectRenderCosts(bool enabled) {
+        mCollectRenderCosts = enabled;
+    }
+    const RenderCostReport& GetRenderCostReport() const {
+        return mRenderCost.Report();
+    }
+    void UploadTextureMeasured(const uint8_t* rgba32, uint32_t width, uint32_t height);
     ShaderProgram* LookupOrCreateShaderProgram(uint64_t id0, uint64_t id1);
     ColorCombiner* LookupOrCreateColorCombiner(const ColorCombinerKey& key);
     void ShaderCacheClear();
@@ -432,6 +465,7 @@ class Interpreter {
     std::shared_ptr<Ship::IResource> ResolveResourceCached(const char* path);
     bool TextureCacheLookup(int i, const TextureCacheKey& key);
     void TextureCacheDelete(const uint8_t* origAddr);
+    void TextureCacheDeleteByPalette(const uint8_t* paletteAddr, size_t paletteSize);
     void ImportTextureRgba16(int tile, bool importReplacement);
     void ImportTextureRgba32(int tile, bool importReplacement);
     void ImportTextureIA4(int tile, bool importReplacement);
@@ -455,6 +489,8 @@ class Interpreter {
     void GfxSpPopMatrix(uint32_t count);
     void GfxSpVertex(size_t numVertices, size_t destIndex, const F3DVtx* vertices);
     void GfxSpModifyVertex(uint16_t vtxIdx, uint8_t where, uint32_t val);
+    template <bool ReuseState, bool PackVertices>
+    void GfxSpTri1Impl(uint8_t vtx1Idx, uint8_t vtx2Idx, uint8_t vtx3Idx, bool isRect);
     void GfxSpTri1(uint8_t vtx1Idx, uint8_t vtx2Idx, uint8_t vtx3Idx, bool isRect);
     void GfxSpGeometryMode(uint32_t clear, uint32_t set);
     void GfxSpExtraGeometryMode(uint32_t clear, uint32_t set);
@@ -514,8 +550,15 @@ class Interpreter {
     RSP* mRsp;
     RDP* mRdp;
     RenderingState mRenderingState{};
+    TriangleRenderState mTriangleState{};
+    PackedTriangleVertex mPackedTriangleVertices[MAX_VERTICES]{};
+    bool mTriangleStateReuseEnabled = false; // Port opt-in; MM retains the original path.
+    bool mTriangleStateReuseAllowed = false; // Only set while dispatching pure triangle commands.
 
     GfxTextureCache mTextureCache{};
+    RenderCostProbe mRenderCost;
+    bool mCollectRenderCosts = false;
+    uint64_t mDiagnosticCacheClears = 0, mDiagnosticCacheDeletes = 0;
     std::unordered_map<const void*, std::shared_ptr<Ship::IResource>> mResolvedResourceCache;
     bool mResolvedResourceCacheEnabled = false;
     std::map<ColorCombinerKey, ColorCombiner> mColorCombinerPool; // color_combiner_pool;
@@ -569,6 +612,9 @@ class Interpreter {
     // 0 = previous tick, 1 = current tick. Set by the port before each
     // DrawAndRunGraphicsCommands call, like mInterpolationIndex.
     float mInterpolationT = 1.0f;
+    // Port-owned gameplay clock, sampled once before interpolated redraws.
+    // Instance-local: OoT and MM must never share a scrolling clock.
+    uint32_t mGameTick = 0;
 };
 
 void gfx_set_target_ucode(UcodeHandlers ucode);

@@ -439,8 +439,9 @@ void SkelAnime_DrawFlexLimbOpa(PlayState* play, s32 limbIndex, void** skeleton, 
  * Limbs in a flexible skeleton have meshes that can stretch to line up with other limbs.
  * An array of matrices is dynamically allocated so each limb can access any transform to ensure its meshes line up.
  */
-void SkelAnime_DrawFlexOpa(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dListCount,
-                           OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, void* arg) {
+static void SkelAnime_DrawFlexOpaImpl(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dListCount,
+                                      OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, void* arg,
+                                      s32 bindXlu) {
     StandardLimb* rootLimb;
     s32 pad;
     Gfx* newDList;
@@ -459,6 +460,9 @@ void SkelAnime_DrawFlexOpa(PlayState* play, void** skeleton, Vec3s* jointTable, 
     OPEN_DISPS(play->state.gfxCtx);
 
     gSPSegment(POLY_OPA_DISP++, 0xD, mtx);
+    if (bindXlu) {
+        gSPSegment(POLY_XLU_DISP++, 0x0D, mtx);
+    }
 
     Matrix_Push();
 
@@ -497,6 +501,18 @@ void SkelAnime_DrawFlexOpa(PlayState* play, void** skeleton, Vec3s* jointTable, 
     Matrix_Pop();
     CLOSE_DISPS(play->state.gfxCtx);
 }
+
+void SkelAnime_DrawFlexOpa(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dListCount,
+                           OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, void* arg) {
+    SkelAnime_DrawFlexOpaImpl(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw, arg, false);
+}
+
+#ifdef COMBO_BUILD
+void SkelAnime_DrawFlexOpaWithXlu(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dListCount,
+                                  OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, void* arg) {
+    SkelAnime_DrawFlexOpaImpl(play, skeleton, jointTable, dListCount, overrideLimbDraw, postLimbDraw, arg, true);
+}
+#endif
 
 /**
  * Copies frame data from the frame data table, indexed by the joint index table.

@@ -2,6 +2,7 @@
 #include "2s2h/BenGui/BenGui.hpp"
 #include "CosmeticEditor.h"
 #include "2s2h/ShipInit.hpp"
+#include <fast/Fast3dWindow.h>
 #ifdef COMBO_BUILD
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
@@ -10,6 +11,8 @@
 
 extern "C" {
 #include "macros.h"
+#include "mods/nei_save.h" // Skijer's NEI: equipment-driven tunic color (Nei_Save()->vanillaTunic)
+#include "mods/extended_equipment.h"
 
 void ResourceMgr_PatchGfxByName(const char* path, const char* patchName, int index, Gfx instruction);
 void ResourceMgr_UnpatchGfxByName(const char* path, const char* patchName);
@@ -25,7 +28,6 @@ Gfx* Gfx_DrawTexRectIA16_DropShadow(Gfx* gfx, TexturePtr texture, s16 textureWid
 Gfx* Gfx_DrawTexRectIA8_DropShadowOffset(Gfx* gfx, TexturePtr texture, s16 textureWidth, s16 textureHeight,
                                          s16 rectLeft, s16 rectTop, s16 rectWidth, s16 rectHeight, u16 dsdx, u16 dtdy,
                                          s16 r, s16 g, s16 b, s16 a, s32 masks, s32 rects);
-void gfx_texture_cache_clear();
 }
 
 Color_RGBA8 ColorRGBA8(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
@@ -34,14 +36,26 @@ Color_RGBA8 ColorRGBA8(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 }
 
 static const std::map<CosmeticGroup, const char*> sCosmeticGroupLabels = {
-    { COSMETICS_GROUP_PLAYER, "Player" }, { COSMETICS_GROUP_EFFECTS, "Effects" }, { COSMETICS_GROUP_TRAILS, "Trails" },
-    { COSMETICS_GROUP_HUD, "HUD" },       { COSMETICS_GROUP_BUTTONS, "Buttons" }, { COSMETICS_GROUP_MENUS, "Menus" },
+    { COSMETICS_GROUP_PLAYER, "Player" },       { COSMETICS_GROUP_EFFECTS, "Effects" },
+    { COSMETICS_GROUP_TRAILS, "Trails" },       { COSMETICS_GROUP_HUD, "HUD" },
+    { COSMETICS_GROUP_BUTTONS, "Buttons" },     { COSMETICS_GROUP_MENUS, "Menus" },
+    { COSMETICS_GROUP_ITEMS, "Dungeon Items" }, { COSMETICS_GROUP_EPONA, "Epona" },
 };
 
 // clang-format off
 std::map<std::string, CosmeticOption> cosmeticOptions = {
+    COSMETIC_OPTION("Items.Woodfall",               "Woodfall",                 COSMETICS_GROUP_ITEMS,        ColorRGBA8(236, 120, 186, 255), false, true, false),
+    COSMETIC_OPTION("Items.WoodfallEmblem", "Woodfall emblem", COSMETICS_GROUP_ITEMS, ColorRGBA8(236, 120, 186, 255), false, true, false),
+    COSMETIC_OPTION("Items.Snowhead",               "Snowhead",                 COSMETICS_GROUP_ITEMS,        ColorRGBA8(129, 173,  70, 255), false, true, false),
+    COSMETIC_OPTION("Items.SnowheadEmblem", "Snowhead emblem", COSMETICS_GROUP_ITEMS, ColorRGBA8(129, 173, 70, 255), false, true, false),
+    COSMETIC_OPTION("Items.GreatBay",               "Great Bay",                COSMETICS_GROUP_ITEMS,        ColorRGBA8( 99,  90, 183, 255), false, true, false),
+    COSMETIC_OPTION("Items.GreatBayEmblem", "Great Bay emblem", COSMETICS_GROUP_ITEMS, ColorRGBA8(99, 90, 183, 255), false, true, false),
+    COSMETIC_OPTION("Items.StoneTower",             "Stone Tower",              COSMETICS_GROUP_ITEMS,        ColorRGBA8(177, 165,  83, 255), false, true, false),
+    COSMETIC_OPTION("Items.StoneTowerEmblem", "Stone Tower emblem", COSMETICS_GROUP_ITEMS, ColorRGBA8(201, 38, 41, 255), false, true, false),
     COSMETIC_OPTION("HUD.Hearts",                   "Hearts",                   COSMETICS_GROUP_HUD,          ColorRGBA8(255,  70,  50, 255), false, true, false),
+    COSMETIC_OPTION("HUD.DDHearts",                 "Double Defense Hearts",    COSMETICS_GROUP_HUD,          ColorRGBA8(200,   0,   0, 255), false, true, false),
     COSMETIC_OPTION("HUD.Magic",                    "Magic",                    COSMETICS_GROUP_HUD,          ColorRGBA8(  0, 200,   0, 255), false, true, false),
+    COSMETIC_OPTION("HUD.InfiniteMagic",            "Infinite Magic / Chateau Romani", COSMETICS_GROUP_HUD,   ColorRGBA8(  0,   0, 200, 255), false, true, false),
     COSMETIC_OPTION("HUD.SmallKey",                 "Small Key",                COSMETICS_GROUP_HUD,          ColorRGBA8(  0, 200, 230, 255), false, true, false),
     COSMETIC_OPTION("HUD.RupeeIcon",                "Rupee Icon",               COSMETICS_GROUP_HUD,          ColorRGBA8(200, 255, 100, 255), false, true, false),
     COSMETIC_OPTION("HUD.Minimap",                  "Minimap",                  COSMETICS_GROUP_HUD,          ColorRGBA8(  0, 255, 255, 160), false, true, false),
@@ -55,6 +69,30 @@ std::map<std::string, CosmeticOption> cosmeticOptions = {
     COSMETIC_OPTION("Effects.IceArrowSec",          "Ice Arrow Secondary",      COSMETICS_GROUP_EFFECTS,      ColorRGBA8(  0,   0, 255, 128), false, true, false),
     COSMETIC_OPTION("Effects.LightArrowPrim",       "Light Arrow Primary",      COSMETICS_GROUP_EFFECTS,      ColorRGBA8(255, 255, 170, 255), false, true, false),
     COSMETIC_OPTION("Effects.LightArrowSec",        "Light Arrow Secondary",    COSMETICS_GROUP_EFFECTS,      ColorRGBA8(255, 255,   0, 128), false, true, false),
+    COSMETIC_OPTION("Custom.DinFireShieldCore", "Din Fire Shield Core", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 225, 122, 255), false, true, false),
+    COSMETIC_OPTION("Custom.DinFireShieldOuter", "Din Fire Shield Outer", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 43, 3, 255), false, true, false),
+    COSMETIC_OPTION("Custom.DinFireSwordCore", "Din Fire Sword Core", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 225, 122, 255), false, true, false),
+    COSMETIC_OPTION("Custom.DinFireSwordOuter", "Din Fire Sword Outer", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 43, 3, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionFirePrimary", "Fire Medallion Arrow Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 200, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionFireSecondary", "Fire Medallion Arrow Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 0, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionWaterPrimary", "Water Medallion Arrow Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(170, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionWaterSecondary", "Water Medallion Arrow Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(0, 0, 255, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionForestPrimary", "Forest Medallion Arrow Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(170, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionForestSecondary", "Forest Medallion Arrow Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(0, 255, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionShadowPrimary", "Shadow Medallion Arrow Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(0, 0, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionShadowSecondary", "Shadow Medallion Arrow Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(0, 0, 0, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionLightPrimary", "Light Medallion Arrow Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionLightSecondary", "Light Medallion Arrow Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(170, 170, 170, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionSpiritPrimary", "Spirit Medallion Arrow Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 255, 170, 255), false, true, false),
+    COSMETIC_OPTION("Arrows.MedallionSpiritSecondary", "Spirit Medallion Arrow Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 255, 0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionFirePrimary", "Fire Medallion Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 200, 0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionFireSecondary", "Fire Medallion Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 0, 0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionWaterPrimary", "Water Medallion Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(150, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionWaterSecondary", "Water Medallion Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(0, 100, 255, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionForestPrimary", "Forest Medallion Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 255, 170, 255), false, true, false),
+    COSMETIC_OPTION("Magic.MedallionForestSecondary", "Forest Medallion Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(150, 255, 0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.DinsPrimary", "Din's Fire Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 200, 0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.DinsSecondary", "Din's Fire Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 0, 0, 255), false, true, false),
     COSMETIC_OPTION("Trails.KokiriSwordTrail",      "Kokiri Sword Trail",       COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
     COSMETIC_OPTION("Trails.RazorSwordTrail",       "Razor Sword Trail",        COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
     COSMETIC_OPTION("Trails.GildedSwordTrail",      "Gilded Sword Trail",       COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
@@ -81,6 +119,9 @@ std::map<std::string, CosmeticOption> cosmeticOptions = {
     COSMETIC_OPTION("Player.GoronTunic",            "Goron Tunic",              COSMETICS_GROUP_PLAYER,       ColorRGBA8( 30, 105,  27, 255), false, true, false),
     COSMETIC_OPTION("Player.ZoraTunic",             "Zora Tunic",               COSMETICS_GROUP_PLAYER,       ColorRGBA8( 30, 105,  27, 255), false, true, false),
     COSMETIC_OPTION("Player.KafeiHair",             "Kafei Hair",               COSMETICS_GROUP_PLAYER,       ColorRGBA8( 64,   0, 163, 255), false, true, false),
+    COSMETIC_OPTION("Epona.Coat",                   "Coat",                     COSMETICS_GROUP_EPONA,        ColorRGBA8(173,  57,   0, 255), false, true, false),
+    COSMETIC_OPTION("Epona.Eyes",                   "Eyes",                     COSMETICS_GROUP_EPONA,        ColorRGBA8( 24,  24,  24, 255), false, true, false),
+    COSMETIC_OPTION("Epona.WhiteHair",              "White Hair (Mane / Forelock / Hooves)", COSMETICS_GROUP_EPONA, ColorRGBA8(255, 255, 255, 255), false, true, false),
 };
 // clang-format on
 
@@ -218,6 +259,16 @@ Gfx disableGrayscale[] = {
 // and shades it lighter or darker based on the difference between the average color and the target color.
 void ShadePaletteNewBase(const PaletteTarget& target, uint32_t begin, uint32_t end, Color_RGBA8 newBase,
                          SHADE_MODE mode) {
+    // These resources include both raw RGBA16 textures and CI palettes. Expire
+    // only their GPU copies/dependents; rainbow must retain the scene cache.
+    auto window = std::dynamic_pointer_cast<Fast::Fast3dWindow>(Ship::Context::GetRawInstance()->GetWindow());
+    if (window != nullptr) {
+        if (auto interpreter = window->GetInterpreterWeak().lock()) {
+            interpreter->TextureCacheDelete(target.data);
+            interpreter->TextureCacheDeleteByPalette(target.data, (static_cast<size_t>(end) + 1) * sizeof(uint16_t));
+        }
+    }
+
     uint8_t* data = target.data;
 
     uint32_t maxR = 0;
@@ -381,6 +432,16 @@ void ShadeRGBA16NewBase(const char* path, uint32_t begin, uint32_t end, Color_RG
     PaletteTarget target = ResolvePaletteTarget(path);
     if (target.data == nullptr || target.original == nullptr) {
         return;
+    }
+
+    // Rainbow updates change these pickup pixels every tick. Expire only their
+    // GPU copies, including on reset; a full clear also evicts every scene/HD
+    // texture and the resolved-resource cache. Custom textures return above.
+    auto window = std::dynamic_pointer_cast<Fast::Fast3dWindow>(Ship::Context::GetRawInstance()->GetWindow());
+    if (window != nullptr) {
+        if (auto interpreter = window->GetInterpreterWeak().lock()) {
+            interpreter->TextureCacheDelete(target.data);
+        }
     }
 
     uint8_t* data = target.data;
@@ -631,6 +692,7 @@ extern "C" Gfx* Gfx_DrawTexRectIA8_DropShadowOffsetOverride(Gfx* pkt, TexturePtr
 const char* kCosmeticRainbowSyncCvar = "gCosmetics.RainbowSync";
 const char* kCosmeticRainbowSpeedCvar = "gCosmetics.RainbowSpeed";
 const char* kCosmeticRandomizeOnSeedGenCvar = "gCosmetics.RandomizeOnSeedGen";
+const char* kCosmeticRandomizeOnSceneLoadCvar = "gCosmetics.RandomizeOnSceneLoad";
 int sCosmeticRainbowHue = 0;
 
 void CosmeticEditorSave() {
@@ -930,6 +992,12 @@ void CosmeticEditorWindow::DrawElement() {
                                    .Size(ImVec2(300.0f, 0.0f))
                                    .Color(THEME_COLOR));
     UIWidgets::CVarCheckbox(
+        "Randomize All Cosmetics on Scene Reload", kCosmeticRandomizeOnSceneLoadCvar,
+        UIWidgets::CheckboxOptions()
+            .Color(THEME_COLOR)
+            .Tooltip("Randomizes unlocked cosmetics, including mod cosmetics, whenever you enter or reload a scene. "
+                     "Disabled by default; locked colors are preserved."));
+    UIWidgets::CVarCheckbox(
         "Randomize all Cosmetics on Randomizer Generation", kCosmeticRandomizeOnSeedGenCvar,
         UIWidgets::CheckboxOptions()
             .Color(THEME_COLOR)
@@ -966,6 +1034,26 @@ void CosmeticEditorWindow::DrawElement() {
         if (ImGui::BeginTabItem("Link & Items")) {
             UIWidgets::Separator(true, true, 2.0f, 2.0f);
             CosmeticEditorDrawGroup(COSMETICS_GROUP_PLAYER, "Link");
+            UIWidgets::CVarCheckbox(
+                "Dungeon item colours", "gEnhancements.DungeonItemColors",
+                UIWidgets::CheckboxOptions()
+                    .Color(THEME_COLOR)
+                    .Tooltip("Use each dungeon's colour on its small keys, boss keys, maps and compass bodies. "
+                             "Colours apply to vanilla and replacement dungeon items in either game. "
+                             "Shuffled items keep their owning dungeon's colour; compass glass stays clear. "
+                             "Independent emblem colours also apply to an edited boss-key gem."));
+            CosmeticEditorDrawGroup(COSMETICS_GROUP_ITEMS);
+            UIWidgets::CVarCheckbox(
+                "Bottle shimmer", "gEnhancements.BottleShimmer",
+                UIWidgets::CheckboxOptions()
+                    .Color(THEME_COLOR)
+                    .Tooltip("Add three subtle drifting motes around potions, bottled fairies and Poes."));
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Epona")) {
+            UIWidgets::Separator(true, true, 2.0f, 2.0f);
+            CosmeticEditorDrawGroup(COSMETICS_GROUP_EPONA);
             ImGui::EndTabItem();
         }
 
@@ -978,6 +1066,14 @@ void CosmeticEditorWindow::DrawElement() {
         if (ImGui::BeginTabItem("Effects")) {
             UIWidgets::Separator(true, true, 2.0f, 2.0f);
             CosmeticEditorDrawGroup(COSMETICS_GROUP_EFFECTS);
+            UIWidgets::CVarCheckbox(
+                "Elemental impact sounds", CVAR_COSMETIC("Arrows.ElementalImpactSounds"),
+                UIWidgets::CheckboxOptions()
+                    .DefaultValue(false)
+                    .Color(THEME_COLOR)
+                    .Tooltip(
+                        "Use flame ignition, ice breaking, and a light-arrow hit sound for elemental arrow impacts. "
+                        "Turn off to use the original impact sounds."));
             CosmeticEditorDrawGroup(COSMETICS_GROUP_TRAILS);
             ImGui::EndTabItem();
         }
@@ -1006,6 +1102,10 @@ void CosmeticEditorWindow::InitElement() {
         return;
     }
 
+    // Native fixed-index callbacks must know which player models are replaced
+    // before their first invocation, including saved Changed/Rainbow settings.
+    RefreshDynamicCosmeticsStateIfNeeded();
+
     for (auto& [id, option] : cosmeticOptions) {
         Color_RGBA8 cvarColor = CVarGetColor(option.valuesCvar, option.defaultColor);
         option.currentColor =
@@ -1014,9 +1114,13 @@ void CosmeticEditorWindow::InitElement() {
     }
     CosmeticEditorSave();
 
-    RefreshDynamicCosmeticsStateIfNeeded();
     ApplyDynamicCosmetics();
 
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s8 sceneId, s8 spawnNum) {
+        if (gSaveContext.gameMode == GAMEMODE_NORMAL && CVarGetInteger(kCosmeticRandomizeOnSceneLoadCvar, 0)) {
+            CosmeticEditorRandomizeAllElements();
+        }
+    });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnRandoSeedGeneration>([]() {
         if (CVarGetInteger(kCosmeticRandomizeOnSeedGenCvar, 0)) {
             CosmeticEditorRandomizeAllElements();
@@ -1035,46 +1139,63 @@ Gfx humanTunic[] = {
     gsSPEndDisplayList(),
 };
 
-static RegisterShipInitFunc humanTunicPatch(
-    []() {
-        if (!IsCustomHumanModelActive() && CVarGetInteger(kHumanTunicOption.colorChangedCvar, 0)) {
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanWaistDL", "setPrim", 5,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanRightThighDL", "setPrim", 10,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanLeftThighDL", "setPrim", 10,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanHeadDL", "setPrim", 92,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanHatDL", "setPrim", 10,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanCollarDL", "setPrim", 5,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim1", 10,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim2", 65,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim1", 10,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim2", 65,
-                                       gsSPDisplayList(humanTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_child/gLinkHumanTorsoDL", "setPrim", 5,
-                                       gsSPDisplayList(humanTunic));
-        } else {
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanWaistDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanRightThighDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanLeftThighDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanHeadDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanHatDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanCollarDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim1");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim2");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim1");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim2");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_child/gLinkHumanTorsoDL", "setPrim");
-        }
-    },
-    { kHumanTunicOption.colorChangedCvar });
+// One tunic display list whose prim color IS the tunic color. `white` entries carry no color: they
+// reset prim to white for the geometry that follows the tunic in the same list.
+struct TunicPatchSite {
+    const char* path;
+    const char* name;
+    int index;
+    bool white;
+};
+
+// The display list every site jumps to while the per-player tint owns the tunic: segment 0x07,
+// bound per draw with the color of whoever is about to be rendered. The low bit is what tells
+// Fast3D the word is a segmented address and not a host pointer (Interpreter::SegAddr), and it is
+// what OTRExporter sets on every segmented display list it writes.
+static Gfx* const kTunicColorSegment = (Gfx*)0x07000001;
+
+static void PatchTunicSites(const TunicPatchSite* sites, size_t count, Gfx* colorDl) {
+    for (size_t i = 0; i < count; i++) {
+        ResourceMgr_PatchGfxByName(sites[i].path, sites[i].name, sites[i].index,
+                                   gsSPDisplayList(sites[i].white ? backToWhite : colorDl));
+    }
+}
+
+static void UnpatchTunicSites(const TunicPatchSite* sites, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        ResourceMgr_UnpatchGfxByName(sites[i].path, sites[i].name);
+    }
+}
+
+static bool sPerPlayerTint = false;
+
+static const TunicPatchSite kHumanTunicSites[] = {
+    { "objects/object_link_child/gLinkHumanWaistDL", "setPrim", 5, false },
+    { "objects/object_link_child/gLinkHumanRightThighDL", "setPrim", 10, false },
+    { "objects/object_link_child/gLinkHumanLeftThighDL", "setPrim", 10, false },
+    { "objects/object_link_child/gLinkHumanHeadDL", "setPrim", 92, false },
+    { "objects/object_link_child/gLinkHumanHatDL", "setPrim", 10, false },
+    { "objects/object_link_child/gLinkHumanCollarDL", "setPrim", 5, false },
+    { "objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim1", 10, false },
+    { "objects/object_link_child/gLinkHumanLeftShoulderDL", "setPrim2", 65, false },
+    { "objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim1", 10, false },
+    { "objects/object_link_child/gLinkHumanRightShoulderDL", "setPrim2", 65, false },
+    { "objects/object_link_child/gLinkHumanTorsoDL", "setPrim", 5, false },
+};
+
+static void ApplyHumanTunicPatch() {
+    if (sPerPlayerTint) {
+        return;
+    }
+
+    if (!IsCustomHumanModelActive() && CVarGetInteger(kHumanTunicOption.colorChangedCvar, 0)) {
+        PatchTunicSites(kHumanTunicSites, ARRAY_COUNT(kHumanTunicSites), humanTunic);
+    } else {
+        UnpatchTunicSites(kHumanTunicSites, ARRAY_COUNT(kHumanTunicSites));
+    }
+}
+
+static RegisterShipInitFunc humanTunicPatch([]() { ApplyHumanTunicPatch(); }, { kHumanTunicOption.colorChangedCvar });
 
 static RegisterShipInitFunc humanTunicColor(
     []() {
@@ -1082,6 +1203,69 @@ static RegisterShipInitFunc humanTunicColor(
         humanTunic[0] = gsDPSetPrimColor(0, 0, changedColor.r, changedColor.g, changedColor.b, 255);
     },
     { kHumanTunicOption.colorCvar });
+
+// Skijer's NEI: equipment-driven tunic color. MM has no native tunic-color system, but 2ship
+// recolors the human tunic by GFX-patching the body DLs' setPrim -> a tiny Gfx that sets the prim
+// color (see humanTunic / humanTunicPatch above). We reuse that exact mechanism, driven by the
+// equipped OoT tunic (Nei_Save()->vanillaTunic): 1 Goron = red, 2 Zora = blue, 0 Kokiri = restore
+// the player's HumanTunic cosmetic (or the baked green).
+Gfx neiEquipTunic[] = {
+    gsDPSetPrimColor(0, 0, 0, 0, 0, 0),
+    gsDPPipeSync(),
+    gsSPEndDisplayList(),
+};
+
+static int8_t sNeiLastTunic = -1;
+
+static void NeiTunic_UpdateEquipmentColor() {
+    // In a Harpoon room the tunic belongs to the per-player tint; re-patching here every frame
+    // would overwrite it the frame after it is installed.
+    if (sPerPlayerTint) {
+        return;
+    }
+
+    uint8_t tunic = Nei_Save()->vanillaTunic;
+    u8 extTunic = ExtEquip_GetCurrent(EQUIP_TYPE_TUNIC);
+    int8_t colorMode = extTunic != 0 ? (int8_t)(extTunic + 2) : (int8_t)tunic;
+
+    if (colorMode != 0) {
+        // Goron / Zora: (re)apply every frame so it survives scene reloads that drop the patch. The
+        // patch + color are idempotent, so re-applying is cheap.
+        Color_RGBA8 c;
+        switch (colorMode) {
+            case 1:
+                c = ColorRGBA8(180, 55, 35, 255);
+                break;
+            case 2:
+            case 3:
+                c = ColorRGBA8(35, 85, 195, 255);
+                break;
+            case 4:
+                c = gSaveContext.save.saveInfo.playerData.rupees > 0 ? ColorRGBA8(225, 145, 45, 255)
+                                                                     : ColorRGBA8(35, 35, 40, 255);
+                break;
+            default:
+                // Sage's Tunic: white, briefly dyed with a medallion's color while its
+                // resistance is absorbing damage (ExtEquip_SagesFlash).
+                c.a = 255;
+                ExtEquip_GetSagesTunicColor(&c.r, &c.g, &c.b);
+                break;
+        }
+        neiEquipTunic[0] = gsDPSetPrimColor(0, 0, c.r, c.g, c.b, 255);
+        PatchTunicSites(kHumanTunicSites, ARRAY_COUNT(kHumanTunicSites), neiEquipTunic);
+        sNeiLastTunic = colorMode;
+    } else if (sNeiLastTunic != 0) {
+        // Transitioned to Kokiri: restore ONCE — re-apply the HumanTunic cosmetic if it's active,
+        // otherwise remove the patch so the baked-green tunic shows.
+        sNeiLastTunic = 0;
+        ApplyHumanTunicPatch();
+    }
+}
+
+static RegisterShipInitFunc neiEquipTunicColorHook([]() {
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateUpdate>(
+        []() { NeiTunic_UpdateEquipmentColor(); });
+});
 
 // Player.HumanHair
 
@@ -1106,7 +1290,6 @@ static RegisterShipInitFunc humanHairPatch(
 
             ShadePaletteRevert("objects/object_link_child/object_link_child_Tex_005400", 0, 127);
         }
-        gfx_texture_cache_clear();
     },
     { kHumanHairOption.colorChangedCvar });
 
@@ -1125,30 +1308,30 @@ Gfx dekuTunic[] = {
     gsSPEndDisplayList(),
 };
 
-static RegisterShipInitFunc dekuTunicPatch(
-    []() {
-        if (!IsCustomDekuModelActive() && CVarGetInteger(kDekuTunicOption.colorChangedCvar, 0)) {
-            ResourceMgr_PatchGfxByName("objects/object_link_nuts/gLinkDekuWaistDL", "setPrim", 22,
-                                       gsSPDisplayList(dekuTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_nuts/gLinkDekuHeadDL", "setPrim1", 55,
-                                       gsSPDisplayList(dekuTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_nuts/gLinkDekuHeadDL", "setPrim2", 76,
-                                       gsSPDisplayList(backToWhite));
-            ResourceMgr_PatchGfxByName("objects/object_link_nuts/gLinkDekuHatDL", "setPrim", 29,
-                                       gsSPDisplayList(dekuTunic));
+static const TunicPatchSite kDekuTunicSites[] = {
+    { "objects/object_link_nuts/gLinkDekuWaistDL", "setPrim", 22, false },
+    { "objects/object_link_nuts/gLinkDekuHeadDL", "setPrim1", 55, false },
+    { "objects/object_link_nuts/gLinkDekuHeadDL", "setPrim2", 76, true },
+    { "objects/object_link_nuts/gLinkDekuHatDL", "setPrim", 29, false },
+};
 
-            ShadePaletteWhite("objects/object_link_nuts/object_link_nuts_TLUT_003EB0", 243, 254, MODE_MAX);
-        } else {
-            ResourceMgr_UnpatchGfxByName("objects/object_link_nuts/gLinkDekuWaistDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_nuts/gLinkDekuHeadDL", "setPrim1");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_nuts/gLinkDekuHeadDL", "setPrim2");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_nuts/gLinkDekuHatDL", "setPrim");
+static const char* const kDekuTunicPalette = "objects/object_link_nuts/object_link_nuts_TLUT_003EB0";
 
-            ShadePaletteRevert("objects/object_link_nuts/object_link_nuts_TLUT_003EB0", 243, 254);
-        }
-        gfx_texture_cache_clear();
-    },
-    { kDekuTunicOption.colorChangedCvar });
+static void ApplyDekuTunicPatch() {
+    if (sPerPlayerTint) {
+        return;
+    }
+
+    if (!IsCustomDekuModelActive() && CVarGetInteger(kDekuTunicOption.colorChangedCvar, 0)) {
+        PatchTunicSites(kDekuTunicSites, ARRAY_COUNT(kDekuTunicSites), dekuTunic);
+        ShadePaletteWhite(kDekuTunicPalette, 243, 254, MODE_MAX);
+    } else {
+        UnpatchTunicSites(kDekuTunicSites, ARRAY_COUNT(kDekuTunicSites));
+        ShadePaletteRevert(kDekuTunicPalette, 243, 254);
+    }
+}
+
+static RegisterShipInitFunc dekuTunicPatch([]() { ApplyDekuTunicPatch(); }, { kDekuTunicOption.colorChangedCvar });
 
 static RegisterShipInitFunc dekuTunicColor(
     []() {
@@ -1185,7 +1368,6 @@ static RegisterShipInitFunc dekuHairPatch(
             ShadePaletteRevert("objects/object_link_nuts/object_link_nuts_TLUT_003EB0", 109, 122);
             ShadePaletteRevert("objects/object_link_nuts/object_link_nuts_TLUT_003EB0", 124, 242);
         }
-        gfx_texture_cache_clear();
     },
     { kDekuHairOption.colorChangedCvar });
 
@@ -1227,7 +1409,6 @@ static RegisterShipInitFunc kafeiHairPatch(
             ShadePaletteRevert("objects/object_test3/gKafeiBody2TLUT", 1, 3);
             ShadePaletteRevert("objects/object_test3/gKafeiBody2TLUT", 8, 255);
         }
-        gfx_texture_cache_clear();
     },
     { kKafeiHairOption.colorChangedCvar });
 
@@ -1246,39 +1427,97 @@ Gfx goronTunic[] = {
     gsSPEndDisplayList(),
 };
 
-static RegisterShipInitFunc goronTunicPatch(
-    []() {
-        if (!IsCustomGoronModelActive() && CVarGetInteger(kGoronTunicOption.colorChangedCvar, 0)) {
-            ResourceMgr_PatchGfxByName("objects/object_link_goron/gLinkGoronWaistDL", "setPrim", 16,
-                                       gsSPDisplayList(goronTunic));
-            ResourceMgr_PatchGfxByName("objects/object_link_goron/gLinkGoronHatDL", "setPrim", 17,
-                                       gsSPDisplayList(goronTunic));
+static const TunicPatchSite kGoronTunicSites[] = {
+    { "objects/object_link_goron/gLinkGoronWaistDL", "setPrim", 16, false },
+    { "objects/object_link_goron/gLinkGoronHatDL", "setPrim", 17, false },
+};
 
-            ShadePaletteWhite("objects/object_link_goron/object_link_goron_Tex_002780", 0, 127, MODE_MAX);
-        } else {
-            ResourceMgr_UnpatchGfxByName("objects/object_link_goron/gLinkGoronWaistDL", "setPrim");
-            ResourceMgr_UnpatchGfxByName("objects/object_link_goron/gLinkGoronHatDL", "setPrim");
+static const char* const kGoronTunicPalette = "objects/object_link_goron/object_link_goron_Tex_002780";
+// Second Goron texture: its color lives in the palette itself, so it can only ever hold ONE color.
+static const char* const kGoronTunicBasePalette = "objects/object_link_goron/object_link_goron_Tex_00CEB8";
 
-            ShadePaletteRevert("objects/object_link_goron/object_link_goron_Tex_002780", 0, 127);
-            ShadePaletteRevert("objects/object_link_goron/object_link_goron_Tex_00CEB8", 0, 127);
-        }
-        gfx_texture_cache_clear();
-    },
-    { kGoronTunicOption.colorChangedCvar });
+static void ApplyGoronTunicPatch() {
+    if (sPerPlayerTint) {
+        return;
+    }
+
+    if (!IsCustomGoronModelActive() && CVarGetInteger(kGoronTunicOption.colorChangedCvar, 0)) {
+        PatchTunicSites(kGoronTunicSites, ARRAY_COUNT(kGoronTunicSites), goronTunic);
+        ShadePaletteWhite(kGoronTunicPalette, 0, 127, MODE_MAX);
+    } else {
+        UnpatchTunicSites(kGoronTunicSites, ARRAY_COUNT(kGoronTunicSites));
+        ShadePaletteRevert(kGoronTunicPalette, 0, 127);
+        ShadePaletteRevert(kGoronTunicBasePalette, 0, 127);
+    }
+}
+
+static RegisterShipInitFunc goronTunicPatch([]() { ApplyGoronTunicPatch(); }, { kGoronTunicOption.colorChangedCvar });
 
 static RegisterShipInitFunc goronTunicColor(
     []() {
         Color_RGBA8 changedColor = CVarGetColor(kGoronTunicOption.colorCvar, {});
         goronTunic[0] = gsDPSetPrimColor(0, 0, changedColor.r, changedColor.g, changedColor.b, 255);
 
-        if (IsCustomGoronModelActive() || !CVarGetInteger(kGoronTunicOption.colorChangedCvar, 0)) {
+        if (sPerPlayerTint || IsCustomGoronModelActive() || !CVarGetInteger(kGoronTunicOption.colorChangedCvar, 0)) {
             return;
         }
 
-        ShadePaletteNewBase("objects/object_link_goron/object_link_goron_Tex_00CEB8", 0, 127, changedColor, MODE_MAX);
-        gfx_texture_cache_clear();
+        ShadePaletteNewBase(kGoronTunicBasePalette, 0, 127, changedColor, MODE_MAX);
     },
     { kGoronTunicOption.colorCvar });
+
+// Per-player tunic tint. The patch above recolors the tunic through ONE global Gfx — one color per
+// frame, useless once several players share the screen — so this re-points those jumps at segment
+// 0x07, which each draw then binds to its own color. Zora is absent on purpose: its color lives in
+// a TLUT gradient, not in a prim color, so it physically cannot differ between players.
+void PlayerTunic_SetPerPlayerTint(bool enabled) {
+    // Called every frame: patching is idempotent and a scene reload can drop it (the same reason the
+    // equipment tunic re-applies its own). The palette work runs only on the transition.
+    bool changed = sPerPlayerTint != enabled;
+    sPerPlayerTint = enabled;
+
+    if (!enabled) {
+        if (changed) {
+            // Each Apply* drops our patch and puts back whatever the cosmetic editor wants; -1 makes
+            // the equipment tunic re-decide instead of assuming it still owns what it patched last.
+            ApplyHumanTunicPatch();
+            ApplyDekuTunicPatch();
+            ApplyGoronTunicPatch();
+            sNeiLastTunic = -1;
+        }
+        return;
+    }
+
+    if (!IsCustomHumanModelActive()) {
+        PatchTunicSites(kHumanTunicSites, ARRAY_COUNT(kHumanTunicSites), kTunicColorSegment);
+    }
+    if (!IsCustomDekuModelActive()) {
+        PatchTunicSites(kDekuTunicSites, ARRAY_COUNT(kDekuTunicSites), kTunicColorSegment);
+    }
+    if (!IsCustomGoronModelActive()) {
+        PatchTunicSites(kGoronTunicSites, ARRAY_COUNT(kGoronTunicSites), kTunicColorSegment);
+    }
+
+    if (!changed) {
+        return;
+    }
+
+    // Deku and Goron need their tunic texture greyscaled, or the prim color multiplies against the
+    // baked green. Human's is already neutral.
+    if (!IsCustomDekuModelActive()) {
+        ShadePaletteWhite(kDekuTunicPalette, 243, 254, MODE_MAX);
+    }
+    if (!IsCustomGoronModelActive()) {
+        ShadePaletteWhite(kGoronTunicPalette, 0, 127, MODE_MAX);
+    }
+}
+
+Color_RGBA8 PlayerTunic_ResolveLocalColor() {
+    if (!IsCustomHumanModelActive() && CVarGetInteger(kHumanTunicOption.colorChangedCvar, 0)) {
+        return CVarGetColor(kHumanTunicOption.colorCvar, kHumanTunicOption.defaultColor);
+    }
+    return kHumanTunicOption.defaultColor;
+}
 
 // Player.ZoraTunic
 static const Color_RGBA8 zoraSkinColor = { 197, 247, 247, 255 };
@@ -1322,8 +1561,6 @@ static RegisterShipInitFunc zoraTunicColor(
         // Boomerangs
         ShadePaletteGradient("objects/gameplay_keep/gameplay_keep_Tex_0700B0", 80, 511, zoraTunicBaseColor,
                              changedColor, zoraSkinColor);
-
-        gfx_texture_cache_clear();
     },
     { kZoraTunicOption.colorCvar });
 
@@ -1343,8 +1580,6 @@ static RegisterShipInitFunc zoraTunicPatch(
 
         ShadePaletteRevert("objects/object_link_zora/object_link_zora_Tex_010228", 80, 511);
         ShadePaletteRevert("objects/gameplay_keep/gameplay_keep_Tex_0700B0", 80, 511);
-
-        gfx_texture_cache_clear();
     },
     { kZoraTunicOption.colorChangedCvar });
 
@@ -1410,7 +1645,6 @@ static RegisterShipInitFunc heartsColorDLPatch(
 
             ShadeRGBA16Revert("objects/gameplay_keep/gDropRecoveryHeartTex", 0, 1023);
         }
-        gfx_texture_cache_clear();
     },
     { kHeartsOption.colorChangedCvar });
 
@@ -1430,7 +1664,6 @@ static RegisterShipInitFunc heartsColorDLUpdate(
 
         Color_RGBA8 changedColor = CVarGetColor(kHeartsOption.colorCvar, {});
         ShadeRGBA16NewBase("objects/gameplay_keep/gDropRecoveryHeartTex", 0, 1023, changedColor, MODE_AVG);
-        gfx_texture_cache_clear();
     },
     { kHeartsOption.colorCvar });
 
@@ -1479,7 +1712,6 @@ static RegisterShipInitFunc magicColorDLPatch(
             ShadeRGBA16Revert("objects/gameplay_keep/gDropMagicSmallTex", 0, 1023);
             ShadeRGBA16Revert("objects/gameplay_keep/gDropMagicLargeTex", 0, 1023);
         }
-        gfx_texture_cache_clear();
     },
     { kMagicOption.colorChangedCvar });
 
@@ -1500,6 +1732,5 @@ static RegisterShipInitFunc magicColorDLUpdate(
         Color_RGBA8 changedColor = CVarGetColor(kMagicOption.colorCvar, {});
         ShadeRGBA16NewBase("objects/gameplay_keep/gDropMagicSmallTex", 0, 1023, changedColor, MODE_AVG);
         ShadeRGBA16NewBase("objects/gameplay_keep/gDropMagicLargeTex", 0, 1023, changedColor, MODE_AVG);
-        gfx_texture_cache_clear();
     },
     { kMagicOption.colorCvar });

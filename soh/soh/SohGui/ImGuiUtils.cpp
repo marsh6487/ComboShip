@@ -4,7 +4,10 @@
 #include "assets/soh_assets.h"
 #include "soh/Enhancements/randomizer/rando_hash.h"
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
+#include "soh/Enhancements/randomizer/OptionalNeiIcons.h"
 
+#include <libultraship/libultraship.h>
+#include <fast/Fast3dGui.h>
 #include <fast/Fast3dGui.h>
 
 extern "C" {
@@ -137,6 +140,91 @@ std::map<uint32_t, ItemMapEntry> itemMapping = {
     ITEM_MAP_ENTRY(ITEM_MAGIC_LARGE),
 };
 
+// Custom items mapping (second inventory page)
+std::map<uint32_t, ItemMapEntry> customItemMapping = {
+    { ITEM_ROCS_FEATHER_SKIJER,
+      { ITEM_ROCS_FEATHER_SKIJER, "ITEM_ROCS_FEATHER_SKIJER", "ITEM_ROCS_FEATHER_SKIJER_Faded",
+        (char*)gItemIconRocsFeatherTex } },
+    { ITEM_ROCS_CAPE, { ITEM_ROCS_CAPE, "ITEM_ROCS_CAPE", "ITEM_ROCS_CAPE_Faded", (char*)gItemIconRocsCapeTex } },
+    { ITEM_DESIRE_SENSOR,
+      { ITEM_DESIRE_SENSOR, "ITEM_DESIRE_SENSOR", "ITEM_DESIRE_SENSOR_Faded", (char*)gItemIconDesireSensorTex } },
+    { ITEM_HYLIAS_GRACE,
+      { ITEM_HYLIAS_GRACE, "ITEM_HYLIAS_GRACE", "ITEM_HYLIAS_GRACE_Faded", (char*)gItemIconHyliaGraceTex } },
+    { ITEM_ZONAI_PERMAFROST,
+      { ITEM_ZONAI_PERMAFROST, "ITEM_ZONAI_PERMAFROST", "ITEM_ZONAI_PERMAFROST_Faded",
+        (char*)gItemIconZonaiPermafrostTex } },
+    { ITEM_DEMISE_DESTRUCTION,
+      { ITEM_DEMISE_DESTRUCTION, "ITEM_DEMISE_DESTRUCTION", "ITEM_DEMISE_DESTRUCTION_Faded",
+        (char*)gItemIconDemiseDestructionTex } },
+    { ITEM_DEKU_LEAF, { ITEM_DEKU_LEAF, "ITEM_DEKU_LEAF", "ITEM_DEKU_LEAF_Faded", (char*)gItemIconDekuLeafTex } },
+    { ITEM_SWITCH_HOOK,
+      { ITEM_SWITCH_HOOK, "ITEM_SWITCH_HOOK", "ITEM_SWITCH_HOOK_Faded", (char*)gItemIconSwitchHookTex } },
+    { ITEM_MOGMA_MITTS,
+      { ITEM_MOGMA_MITTS, "ITEM_MOGMA_MITTS", "ITEM_MOGMA_MITTS_Faded", (char*)gItemIconMogmaMittsTex } },
+    { ITEM_GUST_JAR, { ITEM_GUST_JAR, "ITEM_GUST_JAR", "ITEM_GUST_JAR_Faded", (char*)gItemIconGustJarTex } },
+    { ITEM_BALL_AND_CHAIN,
+      { ITEM_BALL_AND_CHAIN, "ITEM_BALL_AND_CHAIN", "ITEM_BALL_AND_CHAIN_Faded", (char*)gItemIconBallAndChainTex } },
+    { ITEM_WHIP, { ITEM_WHIP, "ITEM_WHIP", "ITEM_WHIP_Faded", (char*)gItemIconWhipTex } },
+    { ITEM_SPINNER, { ITEM_SPINNER, "ITEM_SPINNER", "ITEM_SPINNER_Faded", (char*)gItemIconSpinnerTex } },
+    { ITEM_CANE_OF_SOMARIA,
+      { ITEM_CANE_OF_SOMARIA, "ITEM_CANE_OF_SOMARIA", "ITEM_CANE_OF_SOMARIA_Faded",
+        (char*)gItemIconCaneOfSomariaTex } },
+    { ITEM_DOMINION_ROD,
+      { ITEM_DOMINION_ROD, "ITEM_DOMINION_ROD", "ITEM_DOMINION_ROD_Faded", (char*)gItemIconDominionRodTex } },
+    { ITEM_TIME_GATE, { ITEM_TIME_GATE, "ITEM_TIME_GATE", "ITEM_TIME_GATE_Faded", (char*)gItemIconTimeGateTex } },
+    { ITEM_BOMB_ARROWS,
+      { ITEM_BOMB_ARROWS, "ITEM_BOMB_ARROWS", "ITEM_BOMB_ARROWS_Faded", (char*)gItemIconBombArrowsTex } },
+    { ITEM_ROD_FIRE, { ITEM_ROD_FIRE, "ITEM_ROD_FIRE", "ITEM_ROD_FIRE_Faded", (char*)gItemIconFireRodTex } },
+    { ITEM_ROD_ICE, { ITEM_ROD_ICE, "ITEM_ROD_ICE", "ITEM_ROD_ICE_Faded", (char*)gItemIconIceRodTex } },
+    { ITEM_ROD_LIGHT, { ITEM_ROD_LIGHT, "ITEM_ROD_LIGHT", "ITEM_ROD_LIGHT_Faded", (char*)gItemIconLightRodTex } },
+    { ITEM_BEETLE, { ITEM_BEETLE, "ITEM_BEETLE", "ITEM_BEETLE_Faded", (char*)gItemIconBeetleTex } },
+    { ITEM_SHOVEL, { ITEM_SHOVEL, "ITEM_SHOVEL", "ITEM_SHOVEL_Faded", (char*)gItemIconShovelTex } },
+    { ITEM_MINISH_CAP, { ITEM_MINISH_CAP, "ITEM_MINISH_CAP", "ITEM_MINISH_CAP_Faded", (char*)gItemIconMinishCapTex } },
+    { ITEM_LANTERN, { ITEM_LANTERN, "ITEM_LANTERN", "ITEM_LANTERN_Faded", (char*)gItemIconPending2Tex } },
+    { ITEM_CHATEAU_ROMANI,
+      { ITEM_CHATEAU_ROMANI, "ITEM_CHATEAU_ROMANI", "ITEM_CHATEAU_ROMANI_Faded",
+        (char*)"__OTR__icon_item_static_yar/gItemIconChateauRomaniTex" } }, // Skijer's NEI — use mm.o2r icon
+    { ITEM_POKEBALL, { ITEM_POKEBALL, "ITEM_POKEBALL", "ITEM_POKEBALL_Faded", (char*)gItemIconPokeballTex } },
+    // Rito Mask (Skijer's NEI): not a page-2 item — it shares the Farore's Wind cell,
+    // so it turns up in the PAGE-1 grid of the save editor. Without a row here that
+    // cell would find no texture and draw no button at all (dead cell).
+    { ITEM_RITO_MASK, { ITEM_RITO_MASK, "ITEM_RITO_MASK", "ITEM_RITO_MASK_Faded", (char*)gItemIconRitoMaskTex } },
+    // Bottle Randomizer custom items (Skijer's NEI). MM bottle contents use their REAL mm.o2r icons
+    // (icon_item_static_yar). Net + Bottomless are new items with pending placeholders (TODO: real
+    // textures in icon_item_custom).
+    { ITEM_GOLD_DUST,
+      { ITEM_GOLD_DUST, "ITEM_GOLD_DUST", "ITEM_GOLD_DUST_Faded",
+        (char*)"__OTR__icon_item_static_yar/gItemIconBottledGoldDustTex" } },
+    { ITEM_HOT_SPRING_WATER,
+      { ITEM_HOT_SPRING_WATER, "ITEM_HOT_SPRING_WATER", "ITEM_HOT_SPRING_WATER_Faded",
+        (char*)"__OTR__icon_item_static_yar/gItemIconHotSpringWaterTex" } },
+    { ITEM_DEKU_PRINCESS,
+      { ITEM_DEKU_PRINCESS, "ITEM_DEKU_PRINCESS", "ITEM_DEKU_PRINCESS_Faded",
+        (char*)"__OTR__icon_item_static_yar/gItemIconBottledDekuPrincessTex" } },
+    { ITEM_SEAHORSE,
+      { ITEM_SEAHORSE, "ITEM_SEAHORSE", "ITEM_SEAHORSE_Faded",
+        (char*)"__OTR__icon_item_static_yar/gItemIconBottledSeahorseTex" } },
+    { ITEM_SPRING_WATER,
+      { ITEM_SPRING_WATER, "ITEM_SPRING_WATER", "ITEM_SPRING_WATER_Faded",
+        (char*)"__OTR__icon_item_static_yar/gItemIconSpringWaterTex" } },
+    { ITEM_ZORA_EGG,
+      { ITEM_ZORA_EGG, "ITEM_ZORA_EGG", "ITEM_ZORA_EGG_Faded",
+        (char*)"__OTR__icon_item_static_yar/gItemIconBottledZoraEggTex" } },
+    { ITEM_HYLIAN_LOACH,
+      { ITEM_HYLIAN_LOACH, "ITEM_HYLIAN_LOACH", "ITEM_HYLIAN_LOACH_Faded",
+        (char*)"__OTR__icon_item_static_yar/gItemIconBottledHylianLoachTex" } },
+    { ITEM_OBABA_DRINK,
+      { ITEM_OBABA_DRINK, "ITEM_OBABA_DRINK", "ITEM_OBABA_DRINK_Faded",
+        (char*)"__OTR__icon_item_static_yar/gItemIconEmptyBottle2Tex" } },
+    { ITEM_MAGIC_MUSHROOM,
+      { ITEM_MAGIC_MUSHROOM, "ITEM_MAGIC_MUSHROOM", "ITEM_MAGIC_MUSHROOM_Faded",
+        (char*)"__OTR__icon_item_static_yar/gItemIconBottledMushroomTex" } },
+    { ITEM_NET, { ITEM_NET, "ITEM_NET", "ITEM_NET_Faded", (char*)gItemIconNetTex } },
+    { ITEM_BOTTOMLESS_BOTTLE,
+      { ITEM_BOTTOMLESS_BOTTLE, "ITEM_BOTTOMLESS_BOTTLE", "ITEM_BOTTOMLESS_BOTTLE_Faded",
+        (char*)gItemIconBottomlessBottleTex } },
+};
+
 std::map<uint32_t, ItemMapEntry> gregMapping = {
     { ITEM_RUPEE_GREEN, { ITEM_RUPEE_GREEN, "ITEM_RUPEE_GREEN", "ITEM_RUPEE_GREEN_Faded", gRupeeCounterIconTex } }
 };
@@ -162,6 +250,19 @@ std::map<uint32_t, ItemMapEntry> customItemsMapping = {
         RG_POWER_BRACELET,
         { RG_POWER_BRACELET, "RG_POWER_BRACELET", "RG_POWER_BRACELET_Faded", gGrabTex },
     },
+    { RG_QUARTER_HEART,
+      { RG_QUARTER_HEART, "RG_QUARTER_HEART", "RG_QUARTER_HEART_Faded", (char*)gItemIcons[ITEM_HEART_PIECE] } },
+    { RG_DEFENSE_UPGRADE, { RG_DEFENSE_UPGRADE, "RG_DEFENSE_UPGRADE", "RG_DEFENSE_UPGRADE_Faded", gStatDefenseTex } },
+    { RG_SPEED_UPGRADE, { RG_SPEED_UPGRADE, "RG_SPEED_UPGRADE", "RG_SPEED_UPGRADE_Faded", gStatSpeedTex } },
+    { RG_POWER_UPGRADE, { RG_POWER_UPGRADE, "RG_POWER_UPGRADE", "RG_POWER_UPGRADE_Faded", gStatPowerTex } },
+    { RG_MAGIC_STAT_UPGRADE,
+      { RG_MAGIC_STAT_UPGRADE, "RG_MAGIC_STAT_UPGRADE", "RG_MAGIC_STAT_UPGRADE_Faded", gStatMagicTex } },
+    { RG_CRAWL_SPEED_UPGRADE,
+      { RG_CRAWL_SPEED_UPGRADE, "RG_CRAWL_SPEED_UPGRADE", "RG_CRAWL_SPEED_UPGRADE_Faded", gCrawlSpeedTex } },
+    { RG_CLIMB_SPEED_UPGRADE,
+      { RG_CLIMB_SPEED_UPGRADE, "RG_CLIMB_SPEED_UPGRADE", "RG_CLIMB_SPEED_UPGRADE_Faded", gClimbSpeedTex } },
+    { RG_PUSH_SPEED_UPGRADE,
+      { RG_PUSH_SPEED_UPGRADE, "RG_PUSH_SPEED_UPGRADE", "RG_PUSH_SPEED_UPGRADE_Faded", gPushSpeedTex } },
 };
 
 std::map<uint32_t, ItemMapEntry> jabbernutMapping = {
@@ -228,6 +329,17 @@ void RegisterImGuiItemIcons() {
             ->LoadGuiTexture(entry.second.nameFaded, entry.second.texturePath, "", ImVec4(1, 1, 1, 0.3f));
     }
 
+    for (const auto& entry : customItemMapping) {
+        // Custom item icons are in soh.o2r — skip if resource not found (OTR not regenerated yet)
+        auto res = Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(entry.second.texturePath, true);
+        if (res) {
+            std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
+                ->LoadGuiTexture(entry.second.name, entry.second.texturePath, "", ImVec4(1, 1, 1, 1));
+            std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
+                ->LoadGuiTexture(entry.second.nameFaded, entry.second.texturePath, "", ImVec4(1, 1, 1, 0.3f));
+        }
+    }
+
     for (const auto& entry : gregMapping) {
         ImVec4 gregGreen = ImVec4(42.0f / 255.0f, 169.0f / 255.0f, 40.0f / 255.0f, 1.0f);
         ImVec4 gregFadedGreen = gregGreen;
@@ -239,10 +351,11 @@ void RegisterImGuiItemIcons() {
     }
 
     for (const auto& entry : customItemsMapping) {
+        const char* texturePath = NeiOptionalIcons::Resolve(entry.second.texturePath.c_str());
         std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-            ->LoadGuiTexture(entry.second.name, entry.second.texturePath, "", ImVec4(1, 1, 1, 1));
+            ->LoadGuiTexture(entry.second.name, texturePath, "", ImVec4(1, 1, 1, 1));
         std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-            ->LoadGuiTexture(entry.second.nameFaded, entry.second.texturePath, "", ImVec4(1, 1, 1, 0.3f));
+            ->LoadGuiTexture(entry.second.nameFaded, texturePath, "", ImVec4(1, 1, 1, 0.3f));
     }
 
     for (const auto& entry : jabbernutMapping) {

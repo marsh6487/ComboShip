@@ -5,6 +5,7 @@
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/BenGui/Notification.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
+#include "2s2h/Rando/ItemReceiptText.h"
 #include "2s2h/ShipUtils.h"
 #include "Traps.h"
 #ifdef COMBO_BUILD
@@ -75,7 +76,11 @@ void Rando::MiscBehavior::SendForeignCheck(RandoCheckId rc) {
         if (gMMComboCrossDeliver)
             gMMComboCrossDeliver((int)it->second.itemGame, it->second.itemName.c_str(), checkName.c_str());
         MMAnchor_BroadcastCrossItem((int)it->second.itemGame, it->second.itemName.c_str(), checkName.c_str());
-        Notification::Emit({ .message = "Sent to Hyrule:", .suffix = it->second.displayName });
+        // A trap latches under its disguise's tier, not its own; never name a trap's toast with it.
+        const char* resolved = it->second.trap ? nullptr : Rando::ComboForeignLatchedName(rc);
+        Notification::Emit(
+            { .message = "You found",
+              .suffix = ComboRando::ShownForeignName(it->second, resolved) + BankRewardSourceSuffix(rc) });
         SPDLOG_INFO("[ComboShip] MM delivered foreign item '{}' to OOT (from check '{}')", it->second.itemName,
                     checkName);
     } else {
@@ -156,22 +161,40 @@ void Rando::MiscBehavior::CheckQueue() {
                             // A foreign trap fires on the FINDER, like a native RI_TRAP: MM's own trap
                             // message + effect, and never cross-delivered (nothing to send).
                             const bool foreignTrap = fi != nullptr && fi->trap;
-                            std::string foreignName = Rando::StaticData::GetItemName(RI_COMBO_FOREIGN, false, cid);
-                            CustomMessage::Entry entry = {
-                                .textboxType = 2,
-                                .icon = Rando::StaticData::GetIconForZMessage(RI_COMBO_FOREIGN),
-                                .msg = foreignTrap ? GetTrapMessage() : ("You found " + foreignName + "!"),
-                            };
-                            if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
-                                CustomMessage::SetActiveCustomMessage(entry.msg, entry);
-                            } else if (Rando::MiscBehavior::ShouldShowForeignCutscene(cid)) {
-                                CustomMessage::StartTextbox(entry.msg + "\x1C\x02\x10", entry);
-                            }
                             // ComboShip (bug 3): cycleObtained wipes every Song of Time, so this branch
                             // re-runs on cycle re-collection. Only cross-deliver/broadcast the FIRST
                             // time this check is permanently obtained, or a cycle reset would re-grant
                             // the item into OOT's save on every replay.
                             bool wasObtained = randoSaveCheck.obtained;
+                            if (!foreignTrap && !wasObtained) {
+                                // Freeze the held-up model/name BEFORE the cross-grant moves OOT's save.
+                                Rando::LatchComboForeign(cid);
+                            }
+                            std::string foreignName = Rando::StaticData::GetItemName(RI_COMBO_FOREIGN, false, cid);
+                            if (fi != nullptr) {
+                                const char* peek = Rando::ComboForeignLatchedName(cid);
+                                if (peek != nullptr) {
+                                    foreignName = ComboRando::ShownForeignName(*fi, peek);
+                                }
+                            }
+                            CustomMessage::Entry entry = {
+                                .textboxType = 2,
+                                .icon = Rando::ComboForeignMessageIcon(cid),
+                                .msg = foreignTrap ? GetTrapMessage() : ("You found " + foreignName + "!"),
+                            };
+                            if (!foreignTrap && fi != nullptr) {
+                                // Resolve before SendForeignCheck changes the donor's progressive tier.
+                                const char* resolved = Rando::ComboForeignLatchedName(cid);
+                                Rando::ApplyForeignItemReceiptText(resolved ? resolved : fi->itemName.c_str(), entry,
+                                                                   cid);
+                            }
+                            Rando::AppendReceiptSource(entry, BankRewardSourceSuffix(cid));
+                            if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
+                                CustomMessage::SetActiveCustomMessage(entry.msg, entry);
+                            } else if (Rando::MiscBehavior::ShouldShowForeignCutscene(cid)) {
+                                CustomMessage::StartTextbox(entry.autoFormat ? entry.msg + "\x1C\x02\x10" : entry.msg,
+                                                            entry);
+                            }
                             randoSaveCheck.cycleObtained = true;
                             randoSaveCheck.obtained = true;
                             randoSaveCheck.eligible = false;
@@ -238,17 +261,20 @@ void Rando::MiscBehavior::CheckQueue() {
                             .icon = Rando::StaticData::GetIconForZMessage(randoItemId),
                             .msg = (prefix == "" ? "" : prefix + " ") + message + (randoItemId == RI_TRAP ? "" : "!"),
                         };
+                        Rando::ApplyItemReceiptText(randoItemId, entry);
+                        Rando::AppendReceiptSource(entry, BankRewardSourceSuffix((RandoCheckId)CUSTOM_ITEM_PARAM));
 
                         if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
                             CustomMessage::SetActiveCustomMessage(entry.msg, entry);
                         } else if (Rando::StaticData::ShouldShowGetItemCutscene(randoItemId)) {
-                            CustomMessage::StartTextbox(entry.msg + "\x1C\x02\x10", entry);
+                            CustomMessage::StartTextbox(entry.autoFormat ? entry.msg + "\x1C\x02\x10" : entry.msg,
+                                                        entry);
                         } else {
                             if (Rando::StaticData::Items[randoItemId].randoItemType != RITYPE_JUNK) {
                                 Notification::Emit({
                                     .itemIcon = Rando::StaticData::GetIconTexturePath(randoItemId),
                                     .message = prefix,
-                                    .suffix = message,
+                                    .suffix = message + BankRewardSourceSuffix((RandoCheckId)CUSTOM_ITEM_PARAM),
                                 });
                             }
                         }
@@ -259,7 +285,7 @@ void Rando::MiscBehavior::CheckQueue() {
                         // doesn't re-share an already-permanent check.
                         bool wasObtained = randoSaveCheck.obtained;
 #endif
-                        Rando::GiveItem(randoItemId);
+                        Rando::GiveItem(randoItemId, (RandoCheckId)CUSTOM_ITEM_PARAM);
                         randoSaveCheck.cycleObtained = true;
                         randoSaveCheck.obtained = true;
                         randoSaveCheck.eligible = false;
@@ -298,7 +324,7 @@ void Rando::MiscBehavior::CheckQueue() {
                         }
 
                         Matrix_Scale(30.0f, 30.0f, 30.0f, MTXMODE_APPLY);
-                        Rando::DrawItem(randoItemId, randoCheckId, actor);
+                        Rando::DrawResolvedItem(randoItemId, randoCheckId, actor);
                     } });
             return;
         }

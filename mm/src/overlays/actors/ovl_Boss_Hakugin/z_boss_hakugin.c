@@ -1,3 +1,4 @@
+#include "din_fire_sword.h"
 /*
  * File: z_boss_hakugin.c
  * Overlay: ovl_Boss_Hakugin
@@ -1627,9 +1628,8 @@ void BossHakugin_FrozenBeforeFight(BossHakugin* this, PlayState* play) {
         DECR(this->timer);
     }
 
-    if (GameInteractor_Should(VB_GOHT_UNFREEZE,
-                              (this->iceCollider.base.acFlags & AC_HIT) &&
-                                  (this->iceCollider.elem.acHitElem->atDmgInfo.dmgFlags == DMG_FIRE_ARROW))) {
+    if (GameInteractor_Should(VB_GOHT_UNFREEZE, (this->iceCollider.base.acFlags & AC_HIT) &&
+                                                    (DinFireSword_IsFireHit(play, this->iceCollider.elem.acHitElem)))) {
         this->iceCollider.base.atFlags &= ~AT_HIT;
         this->iceCollider.base.acFlags &= ~AC_HIT;
         this->iceCollider.base.ocFlags1 &= ~OC1_HIT;

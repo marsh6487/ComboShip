@@ -14,6 +14,7 @@ extern "C" {
 }
 
 #include <string>
+#include "ComboItemReceiptPresentation.h"
 
 namespace CustomMessage {
 struct Entry {
@@ -25,6 +26,7 @@ struct Entry {
     uint16_t secondItemCost = 0xFFFF;
     bool autoFormat = true;
     std::string msg = "";
+    CwItemReceiptPresentation receiptPresentation{};
 };
 
 void RegisterHooks();

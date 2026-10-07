@@ -1,0 +1,31 @@
+{
+  "resource_count": 3,
+  "vertex_records": 13643,
+  "vertex_loads": 443,
+  "slug": "mario_mask",
+  "name": "Mario Mask",
+  "entry": "objects/nei_gi_redesign/mario_mask/gi_dl",
+  "draw_scale": 1.0,
+  "matrix_scale": 0.040618896484375,
+  "triangles": 11188,
+  "bounds_author": [
+    [
+      -31.1875,
+      -30.0,
+      -16.375
+    ],
+    [
+      31.1875,
+      39.875,
+      29.5625
+    ]
+  ],
+  "markers": {},
+  "notes": [
+    "GI-only sculpted Mario face mask, red M cap, blue eyes and rounded mustache.",
+    "Fully volumetric front, closed sides, shallow padded reverse and leather straps.",
+    "No native Mario actor/player mesh or held-model resource is replaced.",
+    "Authored front faces +Z. The shared GI renderer supplies its normal Y-axis spin."
+  ],
+  "runtime_tested": false
+}

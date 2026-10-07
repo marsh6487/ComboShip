@@ -1,3 +1,4 @@
+#include "../../../../combo/menu/ItemGrantAuditBridge.h"
 #include "savefile.h"
 #include "soh/OTRGlobals.h"
 #include "soh/ResourceManagerHelpers.h"
@@ -51,7 +52,11 @@ static uint16_t rupeeCounts[] = {
 };
 
 void StartingItemGive(GetItemEntry getItemEntry, RandomizerCheck randomizerCheck) {
+    ItemGrantAudit::Scope itemGrantAuditScope("OOT starting-check", (int)getItemEntry.getItemId, (int)randomizerCheck);
 #ifdef COMBO_BUILD
+    SPDLOG_INFO("[ItemGrantAudit] OOT starting reward: slot={} check={} mod={} item={} getItem={}",
+                (int)gSaveContext.fileNum, (int)randomizerCheck, (int)getItemEntry.modIndex, (int)getItemEntry.itemId,
+                (int)getItemEntry.getItemId);
     // ComboShip: an unplaced save-creation check yields ITEM_NONE/MOD_NONE; Item_Give(0xFF) would
     // assert. Skip it loudly instead of crashing file creation (belt-and-suspenders behind the fix).
     if (getItemEntry.modIndex == MOD_NONE && getItemEntry.itemId == ITEM_NONE) {
@@ -442,6 +447,18 @@ extern "C" void Randomizer_InitSaveFile() {
 
     // Reset Bombchu Bag Upgrade
     gSaveContext.ship.quest.data.randomizer.bombchuUpgradeLevel = 0;
+
+    // A new seed can be created without restarting the process.
+    auto& stats = gSaveContext.ship.quest.data.randomizer;
+    stats.quarterHearts = 0;
+    stats.defenseUpgrades = 0;
+    stats.speedUpgrades = 0;
+    stats.powerUpgrades = 0;
+    stats.magicStatUpgrades = 0;
+    stats.crawlSpeedUpgrades = 0;
+    stats.climbSpeedUpgrades = 0;
+    stats.pushSpeedUpgrades = 0;
+    stats.comboNativeMagicLevel = 0;
 
     SetStartingItems();
 

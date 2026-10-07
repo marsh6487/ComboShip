@@ -262,7 +262,10 @@ bool CustomMessage::operator!=(const CustomMessage& operand) const {
     return !operator==(operand);
 }
 
+extern "C" void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation* presentation);
+
 void CustomMessage::LoadIntoFont() {
+    Message_SetItemReceiptPresentation(&receiptPresentation);
     MessageContext* msgCtx = &gPlayState->msgCtx;
     Font* font = &msgCtx->font;
     char* buffer = font->msgBuf;
@@ -768,6 +771,14 @@ void CustomMessage::InsertNames(std::vector<CustomMessage> toInsert) {
             temp.Capitalize();
         }
         Replace("[[" + std::to_string(a + 1) + "]]", temp);
+    }
+}
+
+void CustomMessage::ReplaceUnfilledNames(const std::string& fallback) {
+    // Altar/WOTH templates ask for up to ~16 slots; sweep with headroom. Replace is a no-op when the
+    // token is absent, so overshooting is free. Skijer's NEI
+    for (uint8_t a = 1; a <= 32; a++) {
+        Replace("[[" + std::to_string(a) + "]]", std::string(fallback));
     }
 }
 

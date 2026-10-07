@@ -1,0 +1,55 @@
+{
+  "resource_count": 11,
+  "vertex_records": 12068,
+  "vertex_loads": 432,
+  "slug": "four_sword",
+  "name": "Four Sword",
+  "entry": "objects/nei_gi_redesign/four_sword/gi_dl",
+  "draw_scale": 1.0,
+  "matrix_scale": 0.0412445068359375,
+  "triangles": 8660,
+  "bounds_author": [
+    [
+      -19.5,
+      -35.3125,
+      -4.375
+    ],
+    [
+      19.5,
+      78.0,
+      4.375
+    ]
+  ],
+  "markers": {
+    "visual_review_candidate": true,
+    "runtime_tested": false,
+    "preview_front_angle": 16,
+    "preview_back_angle": 164,
+    "imported_approved_model": true
+  },
+  "notes": [
+    "Four Sword follows the user-supplied reference: curved gold guard with three integral recessed bands, round red ruby, ivory cloth grip and circular blue/gold Triforce pommel.",
+    "No dangling cloth tails. Blade tang and forked collar join continuously; reflective steel and gold are real exported materials."
+  ],
+  "runtime_tested": false,
+  "source_provenance": {
+    "bundle": "NEI_Sword_GI_Latest_20261003",
+    "art_checkpoint": "dd66ee65",
+    "authoring_recipe": "../../SOURCE/forged_swords/SOURCE/sword_forged.py",
+    "glb_sha256": "23d165c71c6a1b4119bdf6115f538cb05a96c2534b43b239702550e8e464e527",
+    "approved_glb_sha256": "23d165c71c6a1b4119bdf6115f538cb05a96c2534b43b239702550e8e464e527",
+    "resource_sha256": {
+      "edge_tex": "8c9b5b1548288588aece01a8e76afda8722485d75ab049ebe9f59b0978dc55a7",
+      "gi_dl": "591c6d49c609dcad58afa185f3283d26b8279bb93e88cc2107f70be529f03a4d",
+      "gold_edge_tex": "d499b1a4d2f97541a6805df075e60932c1a08eecee2110c1cf0a695830e8b406",
+      "gold_tex": "4e5b29e2944e2fe09421c00f401fa6c938d6cec6f5a41d9071d1025c12ea9698",
+      "guard_groove_tex": "f8ec402c9c5db2a271aaa5f896c0bfa15812a8e297ce7969266dbc06429abe2f",
+      "ivory_cloth_tex": "b88fc44bd3a6fafc795e43e1e4c128191cd2e3485a25a1bdaa4171b2b0fb6e35",
+      "mesh_opa_vtx": "619587b717fb53a5ac17c363690edef6eb518b714f671c7b72661d8e406b2b2e",
+      "pommel_blue_tex": "c1355e75c29ed7e9242151f6eac0de73af446bcd4675fcb3cf59fae5923925bd",
+      "ruby_tex": "f1312863f0566109d575bca6cad118a25d4bf53e1bc7cc18b1e5ce5e8522f267",
+      "scale_mtx": "bba652b1cf8f43eb8f04a6fdc3fa639db60eab659614e7fcbef2bbac0943a4ad",
+      "steel_tex": "5ba49cfb20429ebcf49f5b76c0f464e1e83db89fc23e245062e96c9c5d1bd45f"
+    }
+  }
+}

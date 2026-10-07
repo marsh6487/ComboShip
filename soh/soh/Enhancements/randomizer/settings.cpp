@@ -4,6 +4,7 @@
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
 #include "soh/Enhancements/randomizer/rng.h"
 #include "soh/OTRGlobals.h"
+#include "../../../../combo/NeiGracePolicy.h"
 
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -12,6 +13,7 @@
 #include <ship/window/gui/Gui.h>
 
 #ifdef COMBO_BUILD
+#include "rando/SharedItems.h" // ComboShip: Shared Items family indices (SF_WALLET)
 // ComboShip (#136): combo owns the win condition (combined Triforce goal), forced in FinalizeSettings.
 // A plain constant, not an #ifdef inside the OPT_CALLBACK macro arguments.
 extern "C" int gComboGoalHunt;
@@ -21,6 +23,8 @@ extern "C" int gComboGoalRequired;
 extern "C" int gComboGoalPieces;
 // ComboShip (#135): 1 when the resolved starting game is MM, which forces age/forest/exclusions below.
 extern "C" int gComboStartingGameMM;
+// ComboShip: Shared Items bitmask (combo/rando/SharedItems.h), pushed by SOH_SetComboSharedItems.
+extern "C" int gComboSharedMask;
 static constexpr bool kComboOwnsWincon = true;
 // ComboShip (#136): OOT's half of the combo-owned pool, for the menu-side dependent-count ranges.
 // Mirrors CwOotPieces in combo/rando/CrossWorldRando.h — the two splits must stay identical.
@@ -1437,6 +1441,7 @@ void Settings::CreateOptions() {
     OPT_U8(RSK_HINT_CLARITY, "Hint Clarity", {"Obscure", "Ambiguous", "Clear"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("HintClarity"), mOptionDescriptions[RSK_HINT_CLARITY], WIDGET_CVAR_COMBOBOX, RO_HINT_CLARITY_CLEAR, true, nullptr, IMFLAG_INDENT);
     OPT_U8(RSK_HINT_DISTRIBUTION, "Hint Distribution", {"Useless", "Balanced", "Strong", "Very Strong"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("HintDistribution"), mOptionDescriptions[RSK_HINT_DISTRIBUTION], WIDGET_CVAR_COMBOBOX, RO_HINT_DIST_BALANCED, true, nullptr, IMFLAG_UNINDENT);
     OPT_BOOL(RSK_TOT_ALTAR_HINT, "ToT Altar Hint", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("AltarHint"), mOptionDescriptions[RSK_TOT_ALTAR_HINT], WIDGET_CVAR_CHECKBOX, RO_GENERIC_ON, false, nullptr, IMFLAG_INDENT);
+    OPT_BOOL(RSK_MAPS_COMPASSES_GIVE_INFORMATION, "Maps and Compasses Give Information", CVAR_RANDOMIZER_SETTING("MapsCompassesGiveInformation"), mOptionDescriptions[RSK_MAPS_COMPASSES_GIVE_INFORMATION], IMFLAG_NONE, WIDGET_CVAR_CHECKBOX, RO_GENERIC_OFF);
     OPT_BOOL(RSK_GANONDORF_HINT, "Ganondorf Hint", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("GanondorfHint"), mOptionDescriptions[RSK_GANONDORF_HINT], WIDGET_CVAR_CHECKBOX, RO_GENERIC_ON, false, nullptr, IMFLAG_NONE);
     OPT_BOOL(RSK_SHEIK_LA_HINT, "Sheik Light Arrow Hint", {"Off", "On"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("SheikLAHint"), mOptionDescriptions[RSK_SHEIK_LA_HINT], WIDGET_CVAR_CHECKBOX, RO_GENERIC_ON, false, nullptr, IMFLAG_NONE);
     OPT_BOOL(RSK_BOSS_KEY_HINT, "Boss Door Hints", CVAR_RANDOMIZER_SETTING("BossKeyHint"), mOptionDescriptions[RSK_BOSS_KEY_HINT], IMFLAG_NONE);
@@ -1467,10 +1472,214 @@ void Settings::CreateOptions() {
     // ComboShip: unreadable (portal scene) and force-disabled in FinalizeSettings — don't offer the toggle.
     mOptions[RSK_MASK_SHOP_HINT].Hide();
 #endif
-    // TODO: Compasses show rewards/woth, maps show dungeon mode
+    // Map/compass information is configured with the static hints above.
     OPT_BOOL(RSK_BLUE_FIRE_ARROWS, "Blue Fire Arrows", CVAR_RANDOMIZER_SETTING("BlueFireArrows"), mOptionDescriptions[RSK_BLUE_FIRE_ARROWS]);
     OPT_BOOL(RSK_SUNLIGHT_ARROWS, "Sunlight Arrows", CVAR_RANDOMIZER_SETTING("SunlightArrows"), mOptionDescriptions[RSK_SUNLIGHT_ARROWS]);
+    OPT_BOOL(RSK_SW97_SPELLS, "Sage Spells", CVAR_RANDOMIZER_SETTING("SW97Spells"), mOptionDescriptions[RSK_SW97_SPELLS]);
     OPT_BOOL(RSK_ROCS_FEATHER, "Roc's Feather", CVAR_RANDOMIZER_SETTING("RocsFeather"), mOptionDescriptions[RSK_ROCS_FEATHER]);
+    OPT_BOOL(RSK_SKIJER_CUSTOM_ITEMS, "Skijer's Custom Items", CVAR_RANDOMIZER_SETTING("SkijerCustomItems"), mOptionDescriptions[RSK_SKIJER_CUSTOM_ITEMS], IMFLAG_NONE, WIDGET_CVAR_CHECKBOX, RO_GENERIC_ON);
+    OPT_BOOL(RSK_MM_MASKS_ALL, "Add All MM Masks to Rando", CVAR_RANDOMIZER_SETTING("MmMasksAll"), mOptionDescriptions[RSK_MM_MASKS_ALL]);
+    OPT_BOOL(RSK_MM_SONGS, "Add MM Songs to Rando", CVAR_RANDOMIZER_SETTING("MmSongs"), mOptionDescriptions[RSK_MM_SONGS]);
+    OPT_BOOL(RSK_MM_MASKS_TRANSFORM, "Add Transformation Masks to Rando", CVAR_RANDOMIZER_SETTING("MmMasksTransform"), mOptionDescriptions[RSK_MM_MASKS_TRANSFORM]);
+    OPT_BOOL(RSK_EXT_EQUIPMENT, "Extended Equipment", CVAR_RANDOMIZER_SETTING("ExtEquipment"), mOptionDescriptions[RSK_EXT_EQUIPMENT]);
+    OPT_BOOL(RSK_NEI_WEAPON_UPGRADES, "NEI Weapon Upgrades", CVAR_RANDOMIZER_SETTING("NeiWeaponUpgrades"), mOptionDescriptions[RSK_NEI_WEAPON_UPGRADES]);
+    OPT_BOOL(RSK_CROSSOVER_POKEBALL, "Include Pikachu Pokeball", CVAR_RANDOMIZER_SETTING("CrossoverPokeball"), mOptionDescriptions[RSK_CROSSOVER_POKEBALL]);
+    OPT_BOOL(RSK_CROSSOVER_MARIO_MASK, "Include Mario Mask", CVAR_RANDOMIZER_SETTING("CrossoverMarioMask"), mOptionDescriptions[RSK_CROSSOVER_MARIO_MASK]);
+    // Bomb Arrows are no longer an inventory item — they are the 7th value of the bow's element
+    // wheel. This decides how you come by them. "Bomb Bag" is what the old
+    // gMods.BombArrows.AutoGrantOnBag checkbox did; that checkbox is gone, subsumed here.
+    OPT_U8(RSK_SHUFFLE_BOMB_ARROWS, "Shuffle Bomb Arrows", { "Off", "Bomb Bag", "Shuffled" }, OptionCategory::Setting,
+           CVAR_RANDOMIZER_SETTING("ShuffleBombArrows"), mOptionDescriptions[RSK_SHUFFLE_BOMB_ARROWS],
+           WIDGET_CVAR_COMBOBOX, RO_BOMB_ARROWS_OFF);
+    // Elemental Wand — six rods, one page-2 cell, one slot flag. Only the unlock differs:
+    //   Medallions       one wand in the pool; a rod works if you own its OoT medallion
+    //   Single item      one wand in the pool; finding it unlocks all six rods
+    //   Elemental shuffle six separate rods in the pool; the first found also grants the slot
+    OPT_U8(RSK_ELEMENTAL_WAND_SHUFFLE, "Elemental Wand", { "Medallions", "Single item", "Elemental shuffle" },
+           OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ElementalWandShuffle"),
+           mOptionDescriptions[RSK_ELEMENTAL_WAND_SHUFFLE], WIDGET_CVAR_COMBOBOX, RO_WAND_MEDALLIONS);
+    OPT_U8(RSK_HYLIAS_GRACE, "Hylia's Grace", { "On", "Off", "Gated" }, OptionCategory::Setting,
+           CVAR_RANDOMIZER_SETTING("HyliasGrace"),
+           "On: include fairy flight. Off: exclude it. Gated: require collected dungeon rewards to cast.",
+           WIDGET_CVAR_COMBOBOX, 1);
+    OPT_U8(RSK_HYLIAS_GRACE_REWARDS, "Grace Dungeon Rewards Required", {NumOpts(0, 13)}, OptionCategory::Setting,
+           CVAR_RANDOMIZER_SETTING("HyliasGraceRewards"), "Counts OoT stones/medallions and MM boss remains.",
+           WIDGET_CVAR_SLIDER_INT, 4, true);
+    OPT_CALLBACK(RSK_HYLIAS_GRACE, {
+        if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("HyliasGrace"), 1) == 2) {
+            mOptions[RSK_HYLIAS_GRACE_REWARDS].Unhide();
+        } else {
+            mOptions[RSK_HYLIAS_GRACE_REWARDS].Hide();
+        }
+    });
+    OPT_BOOL(RSK_QUARTER_HEART, "Quarter Heart", CVAR_RANDOMIZER_SETTING("QuarterHeart"), "Adds Quarter Heart upgrades to the item pool. Each one permanently increases maximum health by a quarter heart. Replaces heart containers and heart pieces.");
+    OPT_BOOL(RSK_DEFENSE_UPGRADE, "Defense Upgrade", CVAR_RANDOMIZER_SETTING("DefenseUpgrade"), "Adds Defense Upgrade items to the item pool.\nEach upgrade incrementally reduces incoming damage, scaling up to 50% reduction at the required cap (default 5 items).\nWith Double Defense and a maxed Defense stat, total damage reduction reaches 75%.");
+    OPT_CALLBACK(RSK_DEFENSE_UPGRADE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("DefenseUpgrade"), 0);
+        if (on) {
+            mOptions[RSK_DEFENSE_UPGRADE_ADJUSTABLE].Unhide();
+            if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("DefenseUpgradeAdjustable"), 0)) {
+                mOptions[RSK_DEFENSE_UPGRADE_TOTAL].Unhide();
+                mOptions[RSK_DEFENSE_UPGRADE_REQUIRED].Unhide();
+            }
+        } else {
+            mOptions[RSK_DEFENSE_UPGRADE_ADJUSTABLE].Hide();
+            mOptions[RSK_DEFENSE_UPGRADE_TOTAL].Hide();
+            mOptions[RSK_DEFENSE_UPGRADE_REQUIRED].Hide();
+        }
+    });
+    OPT_BOOL(RSK_SPEED_UPGRADE, "Speed Upgrade", CVAR_RANDOMIZER_SETTING("SpeedUpgrade"), "Adds Speed Upgrade items to the item pool.\nEach upgrade incrementally increases Link's ground movement speed, scaling up to 1.4x at the required cap (default 5 items).");
+    OPT_CALLBACK(RSK_SPEED_UPGRADE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("SpeedUpgrade"), 0);
+        if (on) {
+            mOptions[RSK_SPEED_UPGRADE_ADJUSTABLE].Unhide();
+            if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("SpeedUpgradeAdjustable"), 0)) {
+                mOptions[RSK_SPEED_UPGRADE_TOTAL].Unhide();
+                mOptions[RSK_SPEED_UPGRADE_REQUIRED].Unhide();
+            }
+        } else {
+            mOptions[RSK_SPEED_UPGRADE_ADJUSTABLE].Hide();
+            mOptions[RSK_SPEED_UPGRADE_TOTAL].Hide();
+            mOptions[RSK_SPEED_UPGRADE_REQUIRED].Hide();
+        }
+    });
+    OPT_BOOL(RSK_POWER_UPGRADE, "Power Upgrade", CVAR_RANDOMIZER_SETTING("PowerUpgrade"), "Adds Power Upgrade items to the item pool.\nEach upgrade increases the chance of dealing double damage on hit, reaching guaranteed 2x at the cap (default 5 items).");
+    OPT_CALLBACK(RSK_POWER_UPGRADE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("PowerUpgrade"), 0);
+        if (on) {
+            mOptions[RSK_POWER_UPGRADE_ADJUSTABLE].Unhide();
+            if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("PowerUpgradeAdjustable"), 0)) {
+                mOptions[RSK_POWER_UPGRADE_TOTAL].Unhide();
+                mOptions[RSK_POWER_UPGRADE_REQUIRED].Unhide();
+            }
+        } else {
+            mOptions[RSK_POWER_UPGRADE_ADJUSTABLE].Hide();
+            mOptions[RSK_POWER_UPGRADE_TOTAL].Hide();
+            mOptions[RSK_POWER_UPGRADE_REQUIRED].Hide();
+        }
+    });
+    OPT_BOOL(RSK_MAGIC_STAT_UPGRADE, "Magic Stat Upgrade", CVAR_RANDOMIZER_SETTING("MagicStatUpgrade"), "Replaces progressive magic with a new item that fills the magic bar in smaller increments.\nCollecting the required cap fills the bar completely (default 8 items).\nLogic considers magic available after 2 magic stat items (half a normal magic bar).\nInfinite magic is not in the pool when enabled.");
+    OPT_CALLBACK(RSK_MAGIC_STAT_UPGRADE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("MagicStatUpgrade"), 0);
+        if (on) {
+            mOptions[RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE].Unhide();
+            if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("MagicStatUpgradeAdjustable"), 0)) {
+                mOptions[RSK_MAGIC_STAT_UPGRADE_TOTAL].Unhide();
+                mOptions[RSK_MAGIC_STAT_UPGRADE_REQUIRED].Unhide();
+            }
+            CVarSetInteger(CVAR_RANDOMIZER_SETTING("SariaHint"), 0);
+            mOptions[RSK_SARIA_HINT].Disable("Saria's Hint is disabled because the Magic Stat Upgrade replaces the magic meter.");
+            CVarSetInteger(CVAR_RANDOMIZER_SETTING("StartingMagicMeter"), 0);
+            mOptions[RSK_STARTING_MAGIC_METER].Disable("Disabled because the Magic Stat Upgrade controls the magic meter.");
+        } else {
+            mOptions[RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE].Hide();
+            mOptions[RSK_MAGIC_STAT_UPGRADE_TOTAL].Hide();
+            mOptions[RSK_MAGIC_STAT_UPGRADE_REQUIRED].Hide();
+            mOptions[RSK_SARIA_HINT].Enable();
+            mOptions[RSK_STARTING_MAGIC_METER].Enable();
+        }
+    });
+    OPT_BOOL(RSK_DEFENSE_UPGRADE_ADJUSTABLE, "Adjustable Defense", CVAR_RANDOMIZER_SETTING("DefenseUpgradeAdjustable"), "Enables custom Total and Percent Required sliders for Defense Upgrades, overriding the default pool counts.");
+    OPT_CALLBACK(RSK_DEFENSE_UPGRADE_ADJUSTABLE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("DefenseUpgradeAdjustable"), 0);
+        if (on) { mOptions[RSK_DEFENSE_UPGRADE_TOTAL].Unhide(); mOptions[RSK_DEFENSE_UPGRADE_REQUIRED].Unhide(); }
+        else    { mOptions[RSK_DEFENSE_UPGRADE_TOTAL].Hide();   mOptions[RSK_DEFENSE_UPGRADE_REQUIRED].Hide();   }
+    });
+    OPT_U8(RSK_DEFENSE_UPGRADE_TOTAL, "Defense Total", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("DefenseUpgradeTotal"), "How many Defense Upgrade items are placed in the pool.",    WIDGET_CVAR_SLIDER_INT, 4,  false, nullptr, IMFLAG_NONE);
+    OPT_U8(RSK_DEFENSE_UPGRADE_REQUIRED, "Defense % Required", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("DefenseUpgradeRequired"), "Percentage of Defense Upgrade items needed to reach max defense bonus.", WIDGET_CVAR_SLIDER_INT, 99, false, nullptr, IMFLAG_NONE);
+    OPT_BOOL(RSK_SPEED_UPGRADE_ADJUSTABLE, "Adjustable Speed", CVAR_RANDOMIZER_SETTING("SpeedUpgradeAdjustable"), "Enables custom Total and Percent Required sliders for Speed Upgrades, overriding the default pool counts.");
+    OPT_CALLBACK(RSK_SPEED_UPGRADE_ADJUSTABLE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("SpeedUpgradeAdjustable"), 0);
+        if (on) { mOptions[RSK_SPEED_UPGRADE_TOTAL].Unhide(); mOptions[RSK_SPEED_UPGRADE_REQUIRED].Unhide(); }
+        else    { mOptions[RSK_SPEED_UPGRADE_TOTAL].Hide();   mOptions[RSK_SPEED_UPGRADE_REQUIRED].Hide();   }
+    });
+    OPT_U8(RSK_SPEED_UPGRADE_TOTAL, "Speed Total", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("SpeedUpgradeTotal"), "How many Speed Upgrade items are placed in the pool.",    WIDGET_CVAR_SLIDER_INT, 4,  false, nullptr, IMFLAG_NONE);
+    OPT_U8(RSK_SPEED_UPGRADE_REQUIRED, "Speed % Required", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("SpeedUpgradeRequired"), "Percentage of Speed Upgrade items needed to reach max speed bonus.", WIDGET_CVAR_SLIDER_INT, 99, false, nullptr, IMFLAG_NONE);
+    OPT_BOOL(RSK_POWER_UPGRADE_ADJUSTABLE, "Adjustable Power", CVAR_RANDOMIZER_SETTING("PowerUpgradeAdjustable"), "Enables custom Total and Percent Required sliders for Power Upgrades, overriding the default pool counts.");
+    OPT_CALLBACK(RSK_POWER_UPGRADE_ADJUSTABLE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("PowerUpgradeAdjustable"), 0);
+        if (on) { mOptions[RSK_POWER_UPGRADE_TOTAL].Unhide(); mOptions[RSK_POWER_UPGRADE_REQUIRED].Unhide(); }
+        else    { mOptions[RSK_POWER_UPGRADE_TOTAL].Hide();   mOptions[RSK_POWER_UPGRADE_REQUIRED].Hide();   }
+    });
+    OPT_U8(RSK_POWER_UPGRADE_TOTAL, "Power Total", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("PowerUpgradeTotal"), "How many Power Upgrade items are placed in the pool.",    WIDGET_CVAR_SLIDER_INT, 4,  false, nullptr, IMFLAG_NONE);
+    OPT_U8(RSK_POWER_UPGRADE_REQUIRED, "Power % Required", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("PowerUpgradeRequired"), "Percentage of Power Upgrade items needed to reach max power bonus.", WIDGET_CVAR_SLIDER_INT, 99, false, nullptr, IMFLAG_NONE);
+    OPT_BOOL(RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE, "Adjustable Magic", CVAR_RANDOMIZER_SETTING("MagicStatUpgradeAdjustable"), "Enables custom Total and Percent Required sliders for Magic Stat Upgrades, overriding the default pool counts.\nMagic logic threshold is always half of a normal magic bar.");
+    OPT_CALLBACK(RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("MagicStatUpgradeAdjustable"), 0);
+        if (on) { mOptions[RSK_MAGIC_STAT_UPGRADE_TOTAL].Unhide(); mOptions[RSK_MAGIC_STAT_UPGRADE_REQUIRED].Unhide(); }
+        else    { mOptions[RSK_MAGIC_STAT_UPGRADE_TOTAL].Hide();   mOptions[RSK_MAGIC_STAT_UPGRADE_REQUIRED].Hide();   }
+    });
+    OPT_U8(RSK_MAGIC_STAT_UPGRADE_TOTAL, "Magic Total", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("MagicStatUpgradeTotal"), "How many Magic Stat Upgrade items are placed in the pool.",    WIDGET_CVAR_SLIDER_INT, 7,  false, nullptr, IMFLAG_NONE);
+    OPT_U8(RSK_MAGIC_STAT_UPGRADE_REQUIRED, "Magic % Required", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("MagicStatUpgradeRequired"), "Percentage of Magic Stat Upgrade items needed to reach full magic capacity.", WIDGET_CVAR_SLIDER_INT, 99, false, nullptr, IMFLAG_NONE);
+    OPT_BOOL(RSK_CRAWL_SPEED_UPGRADE, "Crawl Speed Upgrade", CVAR_RANDOMIZER_SETTING("CrawlSpeedUpgrade"), "Adds Crawl Speed Upgrade items to the pool. Collecting them gradually increases Link's crawlspace movement speed up to 5x. Disables the Crawl Speed enhancement slider while active.");
+    OPT_CALLBACK(RSK_CRAWL_SPEED_UPGRADE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("CrawlSpeedUpgrade"), 0);
+        if (on) {
+            mOptions[RSK_CRAWL_SPEED_UPGRADE_ADJUSTABLE].Unhide();
+            if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("CrawlSpeedUpgradeAdjustable"), 0)) {
+                mOptions[RSK_CRAWL_SPEED_UPGRADE_TOTAL].Unhide();
+                mOptions[RSK_CRAWL_SPEED_UPGRADE_REQUIRED].Unhide();
+            }
+        } else {
+            mOptions[RSK_CRAWL_SPEED_UPGRADE_ADJUSTABLE].Hide();
+            mOptions[RSK_CRAWL_SPEED_UPGRADE_TOTAL].Hide();
+            mOptions[RSK_CRAWL_SPEED_UPGRADE_REQUIRED].Hide();
+        }
+    });
+    OPT_BOOL(RSK_CRAWL_SPEED_UPGRADE_ADJUSTABLE, "Adjustable Crawl", CVAR_RANDOMIZER_SETTING("CrawlSpeedUpgradeAdjustable"), "Enables custom Total and Percent Required sliders for Crawl Speed Upgrades, overriding the default pool counts.");
+    OPT_CALLBACK(RSK_CRAWL_SPEED_UPGRADE_ADJUSTABLE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("CrawlSpeedUpgradeAdjustable"), 0);
+        if (on) { mOptions[RSK_CRAWL_SPEED_UPGRADE_TOTAL].Unhide(); mOptions[RSK_CRAWL_SPEED_UPGRADE_REQUIRED].Unhide(); }
+        else    { mOptions[RSK_CRAWL_SPEED_UPGRADE_TOTAL].Hide();   mOptions[RSK_CRAWL_SPEED_UPGRADE_REQUIRED].Hide();   }
+    });
+    OPT_U8(RSK_CRAWL_SPEED_UPGRADE_TOTAL, "Crawl Total", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("CrawlSpeedUpgradeTotal"), "How many Crawl Speed Upgrade items are placed in the pool.",    WIDGET_CVAR_SLIDER_INT, 4, false, nullptr, IMFLAG_NONE);
+    OPT_U8(RSK_CRAWL_SPEED_UPGRADE_REQUIRED, "Crawl % Required", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("CrawlSpeedUpgradeRequired"), "Percentage of Crawl Speed Upgrade items needed to reach max crawl speed.", WIDGET_CVAR_SLIDER_INT, 99, false, nullptr, IMFLAG_NONE);
+    OPT_BOOL(RSK_CLIMB_SPEED_UPGRADE, "Climb Speed Upgrade", CVAR_RANDOMIZER_SETTING("ClimbSpeedUpgrade"), "Adds Climb Speed Upgrade items to the pool. Collecting them gradually increases Link's vine and ladder climb speed up to +5. Disables the Climb Speed enhancement slider while active.");
+    OPT_CALLBACK(RSK_CLIMB_SPEED_UPGRADE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("ClimbSpeedUpgrade"), 0);
+        if (on) {
+            mOptions[RSK_CLIMB_SPEED_UPGRADE_ADJUSTABLE].Unhide();
+            if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("ClimbSpeedUpgradeAdjustable"), 0)) {
+                mOptions[RSK_CLIMB_SPEED_UPGRADE_TOTAL].Unhide();
+                mOptions[RSK_CLIMB_SPEED_UPGRADE_REQUIRED].Unhide();
+            }
+        } else {
+            mOptions[RSK_CLIMB_SPEED_UPGRADE_ADJUSTABLE].Hide();
+            mOptions[RSK_CLIMB_SPEED_UPGRADE_TOTAL].Hide();
+            mOptions[RSK_CLIMB_SPEED_UPGRADE_REQUIRED].Hide();
+        }
+    });
+    OPT_BOOL(RSK_CLIMB_SPEED_UPGRADE_ADJUSTABLE, "Adjustable Climb", CVAR_RANDOMIZER_SETTING("ClimbSpeedUpgradeAdjustable"), "Enables custom Total and Percent Required sliders for Climb Speed Upgrades, overriding the default pool counts.");
+    OPT_CALLBACK(RSK_CLIMB_SPEED_UPGRADE_ADJUSTABLE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("ClimbSpeedUpgradeAdjustable"), 0);
+        if (on) { mOptions[RSK_CLIMB_SPEED_UPGRADE_TOTAL].Unhide(); mOptions[RSK_CLIMB_SPEED_UPGRADE_REQUIRED].Unhide(); }
+        else    { mOptions[RSK_CLIMB_SPEED_UPGRADE_TOTAL].Hide();   mOptions[RSK_CLIMB_SPEED_UPGRADE_REQUIRED].Hide();   }
+    });
+    OPT_U8(RSK_CLIMB_SPEED_UPGRADE_TOTAL, "Climb Total", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ClimbSpeedUpgradeTotal"), "How many Climb Speed Upgrade items are placed in the pool.",    WIDGET_CVAR_SLIDER_INT, 4, false, nullptr, IMFLAG_NONE);
+    OPT_U8(RSK_CLIMB_SPEED_UPGRADE_REQUIRED, "Climb % Required", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ClimbSpeedUpgradeRequired"), "Percentage of Climb Speed Upgrade items needed to reach max climb speed.", WIDGET_CVAR_SLIDER_INT, 99, false, nullptr, IMFLAG_NONE);
+    OPT_BOOL(RSK_PUSH_SPEED_UPGRADE, "Push Speed Upgrade", CVAR_RANDOMIZER_SETTING("PushSpeedUpgrade"), "Adds Push Speed Upgrade items to the pool. Collecting them gradually increases Link's block push speed up to +5. Disables the Faster Block Push enhancement slider while active.");
+    OPT_CALLBACK(RSK_PUSH_SPEED_UPGRADE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("PushSpeedUpgrade"), 0);
+        if (on) {
+            mOptions[RSK_PUSH_SPEED_UPGRADE_ADJUSTABLE].Unhide();
+            if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("PushSpeedUpgradeAdjustable"), 0)) {
+                mOptions[RSK_PUSH_SPEED_UPGRADE_TOTAL].Unhide();
+                mOptions[RSK_PUSH_SPEED_UPGRADE_REQUIRED].Unhide();
+            }
+        } else {
+            mOptions[RSK_PUSH_SPEED_UPGRADE_ADJUSTABLE].Hide();
+            mOptions[RSK_PUSH_SPEED_UPGRADE_TOTAL].Hide();
+            mOptions[RSK_PUSH_SPEED_UPGRADE_REQUIRED].Hide();
+        }
+    });
+    OPT_BOOL(RSK_PUSH_SPEED_UPGRADE_ADJUSTABLE, "Adjustable Push", CVAR_RANDOMIZER_SETTING("PushSpeedUpgradeAdjustable"), "Enables custom Total and Percent Required sliders for Push Speed Upgrades, overriding the default pool counts.");
+    OPT_CALLBACK(RSK_PUSH_SPEED_UPGRADE_ADJUSTABLE, {
+        bool on = CVarGetInteger(CVAR_RANDOMIZER_SETTING("PushSpeedUpgradeAdjustable"), 0);
+        if (on) { mOptions[RSK_PUSH_SPEED_UPGRADE_TOTAL].Unhide(); mOptions[RSK_PUSH_SPEED_UPGRADE_REQUIRED].Unhide(); }
+        else    { mOptions[RSK_PUSH_SPEED_UPGRADE_TOTAL].Hide();   mOptions[RSK_PUSH_SPEED_UPGRADE_REQUIRED].Hide();   }
+    });
+    OPT_U8(RSK_PUSH_SPEED_UPGRADE_TOTAL, "Push Total", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("PushSpeedUpgradeTotal"), "How many Push Speed Upgrade items are placed in the pool.",    WIDGET_CVAR_SLIDER_INT, 4, false, nullptr, IMFLAG_NONE);
+    OPT_U8(RSK_PUSH_SPEED_UPGRADE_REQUIRED, "Push % Required", {NumOpts(1, 100)}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("PushSpeedUpgradeRequired"), "Percentage of Push Speed Upgrade items needed to reach max push speed.", WIDGET_CVAR_SLIDER_INT, 99, false, nullptr, IMFLAG_NONE);
     OPT_U8(RSK_INFINITE_UPGRADES, "Infinite Upgrades", {"Off", "Progressive", "Condensed Progressive"}, OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("InfiniteUpgrades"), mOptionDescriptions[RSK_INFINITE_UPGRADES]);
     OPT_BOOL(RSK_SKELETON_KEY, "Skeleton Key", CVAR_RANDOMIZER_SETTING("SkeletonKey"), mOptionDescriptions[RSK_SKELETON_KEY]);
     OPT_BOOL(RSK_SLINGBOW_BREAK_BEEHIVES, "Slingshot/Bow Can Break Beehives", CVAR_RANDOMIZER_SETTING("SlingBowBeehives"), mOptionDescriptions[RSK_SLINGBOW_BREAK_BEEHIVES]);
@@ -1943,6 +2152,7 @@ void Settings::CreateOptions() {
                                                                       &mOptions[RSK_BIG_POE_COUNT],
                                                                       &mOptions[RSK_BLUE_FIRE_ARROWS],
                                                                       &mOptions[RSK_SUNLIGHT_ARROWS],
+                                                                      &mOptions[RSK_SW97_SPELLS],
                                                                       &mOptions[RSK_FULL_WALLETS],
                                                                       &mOptions[RSK_SLINGBOW_BREAK_BEEHIVES],
                                                                       &mOptions[RSK_SWORDLESS_EPONA_ITEMS],
@@ -2222,20 +2432,35 @@ void Settings::CreateOptions() {
                                                                    &mOptionGroups[RSG_MENU_SECTION_TRAPS] },
                               WidgetContainerType::COLUMN);
     mOptionGroups[RSG_MENU_SECTION_STATIC_HINTS] = OptionGroup::SubGroup(
-        "Static Hints", { &mOptions[RSK_TOT_ALTAR_HINT],     &mOptions[RSK_GANONDORF_HINT],
-                          &mOptions[RSK_SHEIK_LA_HINT],      &mOptions[RSK_BOSS_KEY_HINT],
-                          &mOptions[RSK_DAMPES_DIARY_HINT],  &mOptions[RSK_GREG_HINT],
-                          &mOptions[RSK_LOACH_HINT],         &mOptions[RSK_SARIA_HINT],
-                          &mOptions[RSK_MIDO_HINT],          &mOptions[RSK_FROGS_HINT],
-                          &mOptions[RSK_OOT_HINT],           &mOptions[RSK_BIGGORON_HINT],
-                          &mOptions[RSK_BIG_POES_HINT],      &mOptions[RSK_CHICKENS_HINT],
-                          &mOptions[RSK_MALON_HINT],         &mOptions[RSK_HBA_HINT],
-                          &mOptions[RSK_FISHING_POLE_HINT],  &mOptions[RSK_WARP_SONG_HINTS],
-                          &mOptions[RSK_SCRUB_TEXT_HINT],    &mOptions[RSK_MERCHANT_TEXT_HINT],
-                          &mOptions[RSK_KAK_10_SKULLS_HINT], &mOptions[RSK_KAK_20_SKULLS_HINT],
-                          &mOptions[RSK_KAK_30_SKULLS_HINT], &mOptions[RSK_KAK_40_SKULLS_HINT],
-                          &mOptions[RSK_KAK_50_SKULLS_HINT], &mOptions[RSK_KAK_100_SKULLS_HINT],
-                          &mOptions[RSK_MASK_SHOP_HINT] },
+        "Static Hints",
+        { &mOptions[RSK_TOT_ALTAR_HINT],
+          &mOptions[RSK_MAPS_COMPASSES_GIVE_INFORMATION],
+          &mOptions[RSK_GANONDORF_HINT],
+          &mOptions[RSK_SHEIK_LA_HINT],
+          &mOptions[RSK_BOSS_KEY_HINT],
+          &mOptions[RSK_DAMPES_DIARY_HINT],
+          &mOptions[RSK_GREG_HINT],
+          &mOptions[RSK_LOACH_HINT],
+          &mOptions[RSK_SARIA_HINT],
+          &mOptions[RSK_MIDO_HINT],
+          &mOptions[RSK_FROGS_HINT],
+          &mOptions[RSK_OOT_HINT],
+          &mOptions[RSK_BIGGORON_HINT],
+          &mOptions[RSK_BIG_POES_HINT],
+          &mOptions[RSK_CHICKENS_HINT],
+          &mOptions[RSK_MALON_HINT],
+          &mOptions[RSK_HBA_HINT],
+          &mOptions[RSK_FISHING_POLE_HINT],
+          &mOptions[RSK_WARP_SONG_HINTS],
+          &mOptions[RSK_SCRUB_TEXT_HINT],
+          &mOptions[RSK_MERCHANT_TEXT_HINT],
+          &mOptions[RSK_KAK_10_SKULLS_HINT],
+          &mOptions[RSK_KAK_20_SKULLS_HINT],
+          &mOptions[RSK_KAK_30_SKULLS_HINT],
+          &mOptions[RSK_KAK_40_SKULLS_HINT],
+          &mOptions[RSK_KAK_50_SKULLS_HINT],
+          &mOptions[RSK_KAK_100_SKULLS_HINT],
+          &mOptions[RSK_MASK_SHOP_HINT] },
         WidgetContainerType::SECTION, "This setting adds some hints at locations other than Gossip Stones.");
     mOptionGroups[RSG_MENU_COLUMN_STATIC_HINTS] =
         OptionGroup::SubGroup("", { &mOptionGroups[RSG_MENU_SECTION_STATIC_HINTS] }, WidgetContainerType::COLUMN);
@@ -2244,6 +2469,112 @@ void Settings::CreateOptions() {
                               std::initializer_list<OptionGroup*>{
                                   &mOptionGroups[RSG_MENU_COLUMN_HINTS_TRAPS],
                                   &mOptionGroups[RSG_MENU_COLUMN_STATIC_HINTS],
+                              },
+                              WidgetContainerType::TABLE);
+    mOptionGroups[RSG_MENU_SECTION_STARTING_EQUIPS] = OptionGroup::SubGroup(
+        "Equips",
+        { &mOptions[RSK_LINKS_POCKET], &mOptions[RSK_LINKS_POCKET_REWARD], &mOptions[RSK_STARTING_KOKIRI_SWORD],
+          &mOptions[RSK_STARTING_MASTER_SWORD], &mOptions[RSK_STARTING_DEKU_SHIELD] },
+        WidgetContainerType::SECTION);
+    mOptionGroups[RSG_MENU_SECTION_STARTING_ITEMS] = OptionGroup::SubGroup("Items",
+                                                                           {
+                                                                               &mOptions[RSK_STARTING_OCARINA],
+                                                                               &mOptions[RSK_STARTING_STICKS],
+                                                                               &mOptions[RSK_STARTING_NUTS],
+                                                                               &mOptions[RSK_STARTING_BEANS],
+                                                                               &mOptions[RSK_STARTING_SKULLTULA_TOKEN],
+                                                                               &mOptions[RSK_STARTING_HEARTS],
+                                                                           },
+                                                                           WidgetContainerType::SECTION);
+    mOptionGroups[RSG_MENU_COLUMN_STARTING_EQUIPMENT] =
+        OptionGroup::SubGroup("",
+                              std::initializer_list<OptionGroup*>{
+                                  &mOptionGroups[RSG_MENU_SECTION_STARTING_EQUIPS],
+                                  &mOptionGroups[RSG_MENU_SECTION_STARTING_ITEMS],
+                              },
+                              WidgetContainerType::COLUMN);
+    mOptionGroups[RSG_MENU_SECTION_NORMAL_SONGS] = OptionGroup::SubGroup("Normal Songs",
+                                                                         {
+                                                                             &mOptions[RSK_STARTING_ZELDAS_LULLABY],
+                                                                             &mOptions[RSK_STARTING_EPONAS_SONG],
+                                                                             &mOptions[RSK_STARTING_SARIAS_SONG],
+                                                                             &mOptions[RSK_STARTING_SUNS_SONG],
+                                                                             &mOptions[RSK_STARTING_SONG_OF_TIME],
+                                                                             &mOptions[RSK_STARTING_SONG_OF_STORMS],
+                                                                         },
+                                                                         WidgetContainerType::SECTION);
+    mOptionGroups[RSG_MENU_SECTION_WARP_SONGS] = OptionGroup::SubGroup("Warp Songs",
+                                                                       {
+                                                                           &mOptions[RSK_STARTING_MINUET_OF_FOREST],
+                                                                           &mOptions[RSK_STARTING_BOLERO_OF_FIRE],
+                                                                           &mOptions[RSK_STARTING_SERENADE_OF_WATER],
+                                                                           &mOptions[RSK_STARTING_REQUIEM_OF_SPIRIT],
+                                                                           &mOptions[RSK_STARTING_NOCTURNE_OF_SHADOW],
+                                                                           &mOptions[RSK_STARTING_PRELUDE_OF_LIGHT],
+                                                                       },
+                                                                       WidgetContainerType::SECTION);
+    mOptionGroups[RSG_MENU_COLUMN_STARTING_SONGS] =
+        OptionGroup::SubGroup("",
+                              std::initializer_list<OptionGroup*>{
+                                  &mOptionGroups[RSG_MENU_SECTION_NORMAL_SONGS],
+                                  &mOptionGroups[RSG_MENU_SECTION_WARP_SONGS],
+                              },
+                              WidgetContainerType::COLUMN);
+    mOptionGroups[RSG_MENU_SIDEBAR_STARTING_ITEMS] =
+        OptionGroup::SubGroup("Starting Items",
+                              std::initializer_list<OptionGroup*>{
+                                  &mOptionGroups[RSG_MENU_COLUMN_STARTING_EQUIPMENT],
+                                  &mOptionGroups[RSG_MENU_COLUMN_STARTING_SONGS],
+                              },
+                              WidgetContainerType::TABLE);
+    mOptionGroups[RSG_MENU_SECTION_STAT_UPGRADES] =
+        OptionGroup::SubGroup("Stat Upgrades",
+                              {
+                                  &mOptions[RSK_QUARTER_HEART],
+                                  &mOptions[RSK_DEFENSE_UPGRADE],
+                                  &mOptions[RSK_DEFENSE_UPGRADE_ADJUSTABLE],
+                                  &mOptions[RSK_SPEED_UPGRADE],
+                                  &mOptions[RSK_SPEED_UPGRADE_ADJUSTABLE],
+                                  &mOptions[RSK_POWER_UPGRADE],
+                                  &mOptions[RSK_POWER_UPGRADE_ADJUSTABLE],
+                                  &mOptions[RSK_MAGIC_STAT_UPGRADE],
+                                  &mOptions[RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE],
+                                  &mOptions[RSK_CRAWL_SPEED_UPGRADE],
+                                  &mOptions[RSK_CRAWL_SPEED_UPGRADE_ADJUSTABLE],
+                                  &mOptions[RSK_CLIMB_SPEED_UPGRADE],
+                                  &mOptions[RSK_CLIMB_SPEED_UPGRADE_ADJUSTABLE],
+                                  &mOptions[RSK_PUSH_SPEED_UPGRADE],
+                                  &mOptions[RSK_PUSH_SPEED_UPGRADE_ADJUSTABLE],
+                              },
+                              WidgetContainerType::SECTION);
+    mOptionGroups[RSG_MENU_COLUMN_STAT_UPGRADES] =
+        OptionGroup::SubGroup("", { &mOptionGroups[RSG_MENU_SECTION_STAT_UPGRADES] }, WidgetContainerType::COLUMN);
+    mOptionGroups[RSG_MENU_SECTION_STAT_UPGRADE_SLIDERS] =
+        OptionGroup::SubGroup("Amounts",
+                              {
+                                  &mOptions[RSK_DEFENSE_UPGRADE_TOTAL],
+                                  &mOptions[RSK_DEFENSE_UPGRADE_REQUIRED],
+                                  &mOptions[RSK_SPEED_UPGRADE_TOTAL],
+                                  &mOptions[RSK_SPEED_UPGRADE_REQUIRED],
+                                  &mOptions[RSK_POWER_UPGRADE_TOTAL],
+                                  &mOptions[RSK_POWER_UPGRADE_REQUIRED],
+                                  &mOptions[RSK_MAGIC_STAT_UPGRADE_TOTAL],
+                                  &mOptions[RSK_MAGIC_STAT_UPGRADE_REQUIRED],
+                                  &mOptions[RSK_CRAWL_SPEED_UPGRADE_TOTAL],
+                                  &mOptions[RSK_CRAWL_SPEED_UPGRADE_REQUIRED],
+                                  &mOptions[RSK_CLIMB_SPEED_UPGRADE_TOTAL],
+                                  &mOptions[RSK_CLIMB_SPEED_UPGRADE_REQUIRED],
+                                  &mOptions[RSK_PUSH_SPEED_UPGRADE_TOTAL],
+                                  &mOptions[RSK_PUSH_SPEED_UPGRADE_REQUIRED],
+                              },
+                              WidgetContainerType::SECTION);
+    mOptionGroups[RSG_MENU_COLUMN_STAT_UPGRADE_SLIDERS] = OptionGroup::SubGroup(
+        "", { &mOptionGroups[RSG_MENU_SECTION_STAT_UPGRADE_SLIDERS] }, WidgetContainerType::COLUMN);
+    mOptionGroups[RSG_MENU_SIDEBAR_STAT_UPGRADES] =
+        OptionGroup::SubGroup("Stat Upgrades",
+                              std::initializer_list<OptionGroup*>{
+                                  &mOptionGroups[RSG_MENU_COLUMN_STAT_UPGRADES],
+                                  &mOptionGroups[RSG_MENU_COLUMN_STAT_UPGRADE_SLIDERS],
                               },
                               WidgetContainerType::TABLE);
     mOptionGroups[RSG_OPEN] = OptionGroup("Open Settings", {
@@ -2381,6 +2712,35 @@ void Settings::CreateOptions() {
                                             &mOptions[RSK_SHUFFLE_100_GS_REWARD],
                                             &mOptions[RSK_SHUFFLE_BEAN_SOULS],
                                             &mOptions[RSK_ROCS_FEATHER],
+                                            &mOptions[RSK_QUARTER_HEART],
+                                            &mOptions[RSK_DEFENSE_UPGRADE],
+                                            &mOptions[RSK_DEFENSE_UPGRADE_ADJUSTABLE],
+                                            &mOptions[RSK_DEFENSE_UPGRADE_TOTAL],
+                                            &mOptions[RSK_DEFENSE_UPGRADE_REQUIRED],
+                                            &mOptions[RSK_SPEED_UPGRADE],
+                                            &mOptions[RSK_SPEED_UPGRADE_ADJUSTABLE],
+                                            &mOptions[RSK_SPEED_UPGRADE_TOTAL],
+                                            &mOptions[RSK_SPEED_UPGRADE_REQUIRED],
+                                            &mOptions[RSK_POWER_UPGRADE],
+                                            &mOptions[RSK_POWER_UPGRADE_ADJUSTABLE],
+                                            &mOptions[RSK_POWER_UPGRADE_TOTAL],
+                                            &mOptions[RSK_POWER_UPGRADE_REQUIRED],
+                                            &mOptions[RSK_MAGIC_STAT_UPGRADE],
+                                            &mOptions[RSK_MAGIC_STAT_UPGRADE_ADJUSTABLE],
+                                            &mOptions[RSK_MAGIC_STAT_UPGRADE_TOTAL],
+                                            &mOptions[RSK_MAGIC_STAT_UPGRADE_REQUIRED],
+                                            &mOptions[RSK_CRAWL_SPEED_UPGRADE],
+                                            &mOptions[RSK_CRAWL_SPEED_UPGRADE_ADJUSTABLE],
+                                            &mOptions[RSK_CRAWL_SPEED_UPGRADE_TOTAL],
+                                            &mOptions[RSK_CRAWL_SPEED_UPGRADE_REQUIRED],
+                                            &mOptions[RSK_CLIMB_SPEED_UPGRADE],
+                                            &mOptions[RSK_CLIMB_SPEED_UPGRADE_ADJUSTABLE],
+                                            &mOptions[RSK_CLIMB_SPEED_UPGRADE_TOTAL],
+                                            &mOptions[RSK_CLIMB_SPEED_UPGRADE_REQUIRED],
+                                            &mOptions[RSK_PUSH_SPEED_UPGRADE],
+                                            &mOptions[RSK_PUSH_SPEED_UPGRADE_ADJUSTABLE],
+                                            &mOptions[RSK_PUSH_SPEED_UPGRADE_TOTAL],
+                                            &mOptions[RSK_PUSH_SPEED_UPGRADE_REQUIRED],
                                             &mOptions[RSK_SHUFFLE_BOSS_SOULS],
                                             &mOptions[RSK_SHUFFLE_DEKU_STICK_BAG],
                                             &mOptions[RSK_SHUFFLE_DEKU_NUT_BAG],
@@ -2491,46 +2851,47 @@ void Settings::CreateOptions() {
                                                                           &mOptions[RSK_SKIP_PLANTING_BEANS],
                                                                           &mOptions[RSK_BIG_POE_COUNT],
                                                                       });
-    mOptionGroups[RSG_MISC] = OptionGroup("Miscellaneous Settings",
-                                          {
-                                              &mOptions[RSK_GOSSIP_STONE_HINTS],
-                                              &mOptions[RSK_HINT_CLARITY],
-                                              &mOptions[RSK_HINT_DISTRIBUTION],
-                                              &mOptions[RSK_TOT_ALTAR_HINT],
-                                              &mOptions[RSK_GANONDORF_HINT],
-                                              &mOptions[RSK_SHEIK_LA_HINT],
-                                              &mOptions[RSK_BOSS_KEY_HINT],
-                                              &mOptions[RSK_DAMPES_DIARY_HINT],
-                                              &mOptions[RSK_GREG_HINT],
-                                              &mOptions[RSK_LOACH_HINT],
-                                              &mOptions[RSK_SARIA_HINT],
-                                              &mOptions[RSK_MIDO_HINT],
-                                              &mOptions[RSK_FROGS_HINT],
-                                              &mOptions[RSK_OOT_HINT],
-                                              &mOptions[RSK_WARP_SONG_HINTS],
-                                              &mOptions[RSK_BIGGORON_HINT],
-                                              &mOptions[RSK_BIG_POES_HINT],
-                                              &mOptions[RSK_CHICKENS_HINT],
-                                              &mOptions[RSK_MALON_HINT],
-                                              &mOptions[RSK_HBA_HINT],
-                                              &mOptions[RSK_KAK_10_SKULLS_HINT],
-                                              &mOptions[RSK_KAK_20_SKULLS_HINT],
-                                              &mOptions[RSK_KAK_30_SKULLS_HINT],
-                                              &mOptions[RSK_KAK_40_SKULLS_HINT],
-                                              &mOptions[RSK_KAK_50_SKULLS_HINT],
-                                              &mOptions[RSK_KAK_100_SKULLS_HINT],
-                                              &mOptions[RSK_MASK_SHOP_HINT],
-                                              &mOptions[RSK_SCRUB_TEXT_HINT],
-                                              &mOptions[RSK_MERCHANT_TEXT_HINT],
-                                              &mOptions[RSK_FISHING_POLE_HINT],
-                                              // TODO: Compasses show Reward/WOTH, Maps show Dungeon Mode, Starting Time
-                                              &mOptions[RSK_DAMAGE_MULTIPLIER],
-                                              &mOptions[RSK_BLUE_FIRE_ARROWS],
-                                              &mOptions[RSK_SUNLIGHT_ARROWS],
-                                              &mOptions[RSK_INFINITE_UPGRADES],
-                                              &mOptions[RSK_SKELETON_KEY],
-                                              &mOptions[RSK_SLINGBOW_BREAK_BEEHIVES],
-                                          });
+    mOptionGroups[RSG_MISC] = OptionGroup("Miscellaneous Settings", {
+                                                                        &mOptions[RSK_GOSSIP_STONE_HINTS],
+                                                                        &mOptions[RSK_HINT_CLARITY],
+                                                                        &mOptions[RSK_HINT_DISTRIBUTION],
+                                                                        &mOptions[RSK_TOT_ALTAR_HINT],
+                                                                        &mOptions[RSK_MAPS_COMPASSES_GIVE_INFORMATION],
+                                                                        &mOptions[RSK_GANONDORF_HINT],
+                                                                        &mOptions[RSK_SHEIK_LA_HINT],
+                                                                        &mOptions[RSK_BOSS_KEY_HINT],
+                                                                        &mOptions[RSK_DAMPES_DIARY_HINT],
+                                                                        &mOptions[RSK_GREG_HINT],
+                                                                        &mOptions[RSK_LOACH_HINT],
+                                                                        &mOptions[RSK_SARIA_HINT],
+                                                                        &mOptions[RSK_MIDO_HINT],
+                                                                        &mOptions[RSK_FROGS_HINT],
+                                                                        &mOptions[RSK_OOT_HINT],
+                                                                        &mOptions[RSK_WARP_SONG_HINTS],
+                                                                        &mOptions[RSK_BIGGORON_HINT],
+                                                                        &mOptions[RSK_BIG_POES_HINT],
+                                                                        &mOptions[RSK_CHICKENS_HINT],
+                                                                        &mOptions[RSK_MALON_HINT],
+                                                                        &mOptions[RSK_HBA_HINT],
+                                                                        &mOptions[RSK_KAK_10_SKULLS_HINT],
+                                                                        &mOptions[RSK_KAK_20_SKULLS_HINT],
+                                                                        &mOptions[RSK_KAK_30_SKULLS_HINT],
+                                                                        &mOptions[RSK_KAK_40_SKULLS_HINT],
+                                                                        &mOptions[RSK_KAK_50_SKULLS_HINT],
+                                                                        &mOptions[RSK_KAK_100_SKULLS_HINT],
+                                                                        &mOptions[RSK_MASK_SHOP_HINT],
+                                                                        &mOptions[RSK_SCRUB_TEXT_HINT],
+                                                                        &mOptions[RSK_MERCHANT_TEXT_HINT],
+                                                                        &mOptions[RSK_FISHING_POLE_HINT],
+                                                                        // TODO: Starting Time
+                                                                        &mOptions[RSK_DAMAGE_MULTIPLIER],
+                                                                        &mOptions[RSK_BLUE_FIRE_ARROWS],
+                                                                        &mOptions[RSK_SUNLIGHT_ARROWS],
+                                                                        &mOptions[RSK_SW97_SPELLS],
+                                                                        &mOptions[RSK_INFINITE_UPGRADES],
+                                                                        &mOptions[RSK_SKELETON_KEY],
+                                                                        &mOptions[RSK_SLINGBOW_BREAK_BEEHIVES],
+                                                                    });
     mOptionGroups[RSG_ITEM_POOL] =
         OptionGroup("Item Pool Settings", std::initializer_list<Option*>({ &mOptions[RSK_ITEM_POOL] }));
     // TODO: Progressive Goron Sword, Remove Double Defense
@@ -2729,6 +3090,10 @@ void Context::FinalizeSettings(const std::set<RandomizerCheck>& excludedLocation
         if (mOptions[RSK_FOREST].Is(RO_CLOSED_FOREST_ON)) {
             mOptions[RSK_FOREST].Set(RO_CLOSED_FOREST_DEKU_ONLY);
         }
+    }
+    // ComboShip: Shared Wallets has no MM equivalent for Child Wallet, so force it off (see deviations/rando.md).
+    if (gComboSharedMask & (1 << ComboRando::SF_WALLET)) {
+        mOptions[RSK_SHUFFLE_CHILD_WALLET].Set(RO_GENERIC_OFF);
     }
 #endif
     // ComboShip: (#133/#134) sub-options are meaningless without their parents
@@ -3185,6 +3550,13 @@ void Context::FinalizeSettings(const std::set<RandomizerCheck>& excludedLocation
 void Settings::ParseJson(const nlohmann::json& spoilerFileJson) {
     mContext->SetSeedString(spoilerFileJson.at("seed").get<std::string>());
     mContext->SetSeed(spoilerFileJson.at("finalSeed").get<uint32_t>());
+    // A native spoiler from before this option must not retain the setting
+    // from a previously loaded seed in the same Context.
+    mContext->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Set(RO_GENERIC_OFF);
+    // Pre-policy spoilers included Grace without a gate. Loading one after a
+    // newer seed must restore that behavior rather than inherit its restriction.
+    mContext->GetOption(RSK_HYLIAS_GRACE).Set(NEI_GRACE_ON);
+    mContext->GetOption(RSK_HYLIAS_GRACE_REWARDS).Set(4);
     nlohmann::json settingsJson = spoilerFileJson.value("settings", nlohmann::json());
     for (auto it = settingsJson.begin(); it != settingsJson.end(); ++it) {
         // todo load into cvars for UI

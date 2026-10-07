@@ -20,12 +20,16 @@ Like [OOTMM](https://ootmm.com/), ComboShip shuffles items across *both* games a
 
 ## Got issues?
 
-Check out the [nightly build](https://nightly.link/Varuuna/ComboShip/workflows/build-artifacts/develop/ComboShip-windows.zip) to see if your issue has already been fixed for an upcoming release.
+Check out the nightly builds to see if your issue has already been fixed for an upcoming release:
+- [Windows](https://nightly.link/Varuuna/ComboShip/workflows/build-artifacts/develop/ComboShip-windows.zip)
+- [Linux](https://nightly.link/Varuuna/ComboShip/workflows/build-artifacts/develop/ComboShip-linux.zip) / [Linux AppImage](https://nightly.link/Varuuna/ComboShip/workflows/build-artifacts/develop/ComboShip-linux-appimage.zip)
 If you can still reproduce it, please create an issue.
 
 ## Building
 
-ComboShip currently builds on **Windows** only. macOS and Linux support will return later.
+ComboShip builds on **Windows** (below) and **Linux** — see
+[`docs/BUILDING_LINUX.md`](docs/BUILDING_LINUX.md) for Linux build, run and
+AppImage packaging instructions. macOS support will return later.
 
 ### Prerequisites
 
@@ -44,12 +48,12 @@ cmake -B build/x64 -A x64
 Helper scripts in `scripts/` wrap `cmake --build` and default to a Debug build (pass `--Release` for Release):
 
 ```powershell
-./scripts/build-comboship.ps1  ->  ComboShip.exe
+./scripts/build-comboship.ps1  ->  Fleet.exe
 ```
 
 ## Packaging
 
-`cpack` produces a single Windows ZIP bundling the full runtime (`ComboShip.exe`, the engine and UI DLLs, both ports, and assets):
+`cpack` produces a single Windows ZIP bundling the full runtime (`Fleet.exe`, the engine and UI DLLs, both ports, and assets):
 
 ```powershell
 cpack

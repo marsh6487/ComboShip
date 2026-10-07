@@ -21,8 +21,12 @@
 //
 // Exit codes: 0 = beatable as configured; 3 = beatable only with all tricks; 1 = not beatable / seed
 // failed; 2 = setup error.
+#ifdef _WIN32
 #define NOMINMAX // windows.h min/max macros clash with std::min/std::max in CrossWorldRando.h
 #include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
 
 #include <algorithm>
 #include <chrono>
@@ -30,6 +34,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
 
@@ -67,9 +72,25 @@ bool ResolveStartingGameMM(int cfg, uint32_t masterSeed) {
     return cfg == 1;
 }
 
-template <typename T> T Sym(HMODULE m, const char* name) {
+// Same module-loading seam as ComboShip.cpp's LoadDll/GetSym (see there for the RTLD notes).
+#ifdef _WIN32
+typedef HMODULE DllHandle;
+DllHandle LoadGameModule(const char* name) {
+    return LoadLibraryA(name);
+}
+template <typename T> T Sym(DllHandle m, const char* name) {
     return reinterpret_cast<T>(GetProcAddress(m, name));
 }
+#else
+typedef void* DllHandle;
+DllHandle LoadGameModule(const char* name) {
+    // Bare names search the system library paths; the tool runs from the game dir, so anchor there.
+    return dlopen((std::string("./") + name).c_str(), RTLD_NOW | RTLD_GLOBAL);
+}
+template <typename T> T Sym(DllHandle m, const char* name) {
+    return reinterpret_cast<T>(dlsym(m, name));
+}
+#endif
 
 std::string ReadFile(const std::string& path) {
     std::ifstream f(path, std::ios::binary);
@@ -105,6 +126,8 @@ int main(int argc, char** argv) {
     int triforceTotalArg = -1;
     // #135: starting game. Absent (-1) => read the menu CVar, same as in-game.
     int startingGameArg = -1;
+    // Shared Items: "all", "none", or a comma-separated key list (see SharedItems.h). Empty => menu CVars.
+    std::string sharedItemsArg;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         if (a == "--triforce-required" && i + 1 < argc)
@@ -118,6 +141,8 @@ int main(int argc, char** argv) {
                 std::cerr << "[comborando] --starting-game must be oot, mm or random (got '" << v << "')\n";
                 return 2;
             }
+        } else if (a == "--shared-items" && i + 1 < argc) {
+            sharedItemsArg = argv[++i];
         } else if (a == "--seed" && i + 1 < argc)
             seed = argv[++i];
         else if (a == "--count" && i + 1 < argc)
@@ -132,10 +157,18 @@ int main(int argc, char** argv) {
         }
     }
 
-    HMODULE soh = LoadLibraryA("soh.dll");
-    HMODULE mm = LoadLibraryA("2ship.dll");
+#ifdef _WIN32
+    DllHandle soh = LoadGameModule("soh.dll");
+    DllHandle mm = LoadGameModule("2ship.dll");
+#elif defined(__APPLE__)
+    DllHandle soh = LoadGameModule("libsoh.dylib");
+    DllHandle mm = LoadGameModule("lib2ship.dylib");
+#else
+    DllHandle soh = LoadGameModule("libsoh.so");
+    DllHandle mm = LoadGameModule("lib2ship.so");
+#endif
     if (!soh || !mm) {
-        std::cerr << "[comborando] failed to load soh.dll / 2ship.dll — run from the game directory\n";
+        std::cerr << "[comborando] failed to load the soh / 2ship game modules — run from the game directory\n";
         return 2;
     }
 
@@ -143,11 +176,15 @@ int main(int argc, char** argv) {
     auto MM_InitRandoHeadless = Sym<FnVoidV>(mm, "MM_InitRandoHeadless");
     auto SOH_Dump = Sym<FnDump>(soh, "SOH_DumpRandoStaticData");
     auto MM_Dump = Sym<FnDump>(mm, "MM_DumpRandoStaticData");
+    // Without this the headless pool keeps every duplicated MM copy and diverges from the in-game
+    // layout for the same seed, which is the parity the validator exists to prove.
+    auto SOH_DumpSharedPairs = Sym<FnDump>(soh, "SOH_DumpSharedItemPairs");
     auto SOH_DumpSettings = Sym<FnDump>(soh, "SOH_DumpRandoSettings");
     auto MM_DumpSettings = Sym<FnDump>(mm, "MM_DumpRandoSettings");
     auto SOH_RestoreSettings = Sym<FnTakeStr>(soh, "SOH_RestoreRandoSettings");
     auto SOH_PrepContext = Sym<FnVoidV>(soh, "SOH_PrepRandoContext");
     auto MM_RestoreSettings = Sym<FnTakeStr>(mm, "MM_RestoreRandoSettings");
+    auto SOH_NormalizeComboGraceFromMM = Sym<FnVoidV>(soh, "SOH_NormalizeComboGraceFromMM");
     auto SOH_SetSeed = Sym<FnSetSeed>(soh, "SOH_SetComboRandoSeed");
     auto MM_SetSeed = Sym<FnSetSeed>(mm, "MM_SetComboRandoSeed");
     auto SOH_GetForced = Sym<FnGetForced>(soh, "SOH_GetForcedPlacements");
@@ -169,6 +206,9 @@ int main(int argc, char** argv) {
     // #135: starting game — also pushed before every dump (it forces OOT's age/forest/exclusions).
     auto SOH_SetComboStartingGame = Sym<void (*)(int)>(soh, "SOH_SetComboStartingGame");
     auto SOH_ReadComboStartingGameCVar = Sym<int (*)(void)>(soh, "SOH_ReadComboStartingGameCVar");
+    // Shared Items: also pushed before every dump (shapes OOT's wallet force + MM's trimmed pool).
+    auto SOH_SetComboSharedItems = Sym<void (*)(uint32_t)>(soh, "SOH_SetComboSharedItems");
+    auto SOH_ReadComboSharedCVars = Sym<uint32_t (*)(void)>(soh, "SOH_ReadComboSharedCVars");
 
     ComboRando::OracleFns oot{ Sym<FnOracleVoid>(soh, "Combo_SOH_Rando_Reset"),
                                Sym<FnOracleSetItems>(soh, "Combo_SOH_Rando_SetOwnedItems"),
@@ -222,6 +262,9 @@ int main(int argc, char** argv) {
         }
         // #135: the seed's starting game. Absent on old spoilers, which all started in OOT.
         const bool mmStart = spoiler.value("startingGame", std::string("OOT")) == "MM";
+        // Shared Items: absent on old spoilers -> mask 0 -> feature off.
+        const uint32_t sharedMask =
+            ComboRando::SharedMaskFromKeys(spoiler.value("sharedItems", nlohmann::json::array()));
 
         auto ootEnabledTricks =
             spoiler.value("oot", nlohmann::json::object()).value("enabledTricks", nlohmann::json::array());
@@ -267,6 +310,8 @@ int main(int argc, char** argv) {
                 MM_SetComboGoal(goal.hunt ? 1 : 0, goal.required, ComboRando::CwMmPieces(goal.total));
             if (SOH_SetComboStartingGame)
                 SOH_SetComboStartingGame(mmStart ? 1 : 0);
+            if (SOH_SetComboSharedItems)
+                SOH_SetComboSharedItems(sharedMask);
             // A real in-game save's placement map lists only SHUFFLED checks; non-shuffled items the
             // oracle still gates on (OOT vanilla shop items, MM boss remains when not shuffled) live in
             // the dump's fixed[]. Merge them in so those gates (e.g. MM RemainsCount for the Moon) resolve.
@@ -313,7 +358,8 @@ int main(int argc, char** argv) {
             mergeFixed(mmDump, "mm");
             return ComboRando::RunPlaythrough(passFlat.dump(), oot, mmO, label, MM_Restore, ptOut, sohDump, mmDump,
                                               ComboRando::OotAccessFromDump(sohDump) != ComboRando::OotAccess::NO_LOGIC,
-                                              /*progressionOnly*/ false, goal, mmStart);
+                                              /*progressionOnly*/ false, goal, mmStart, sharedMask,
+                                              SOH_DumpSharedPairs ? SOH_DumpSharedPairs() : "");
         };
 
         // Affordability canary: re-check every priced purchase in the walk against the wallets held
@@ -351,16 +397,20 @@ int main(int argc, char** argv) {
                                       << mwS << " wallet(s) at sphere " << sph.value("sphere", -1) << "\n";
                         }
                     }
-                    // ComboShip: both games' wallet now normalizes to "Progressive Wallet"; attribute to
-                    // the item's HOME game (itemGame), derived from the check game + foreign flag, so a
-                    // cross-placed wallet still credits its owner's tier (matches the pre-rename semantics).
+                    // Both games' wallet normalizes to "Progressive Wallet"; attribute to the home game
+                    // unless shared, where a pickup raises both (see Combo_SharedReconcileNow).
                     if (item == "Progressive Wallet") {
-                        bool fgn = st.value("foreign", false);
-                        std::string homeGame = fgn ? (game == "oot" ? "mm" : "oot") : game;
-                        if (homeGame == "oot")
+                        if (sharedMask & (1u << ComboRando::SF_WALLET)) {
                             ++ow;
-                        else
                             ++mw;
+                        } else {
+                            bool fgn = st.value("foreign", false);
+                            std::string homeGame = fgn ? (game == "oot" ? "mm" : "oot") : game;
+                            if (homeGame == "oot")
+                                ++ow;
+                            else
+                                ++mw;
+                        }
                     }
                 }
             }
@@ -447,6 +497,7 @@ int main(int argc, char** argv) {
 
     // ---- Generate + validate mode. ----
     // Restore a reported seed's settings so generation matches it; otherwise live CVar defaults apply.
+    std::optional<uint32_t> settingsSharedMask;
     if (!settingsFile.empty()) {
         if (!SOH_RestoreSettings || !MM_RestoreSettings) {
             std::cerr << "[comborando] --settings needs the settings-restore exports — rebuild soh.dll / 2ship.dll\n";
@@ -454,6 +505,8 @@ int main(int argc, char** argv) {
         }
         try {
             auto sj = nlohmann::json::parse(ReadFile(settingsFile));
+            if (sj.contains("sharedItems"))
+                settingsSharedMask = ComboRando::SharedMaskFromKeys(sj["sharedItems"]);
             const auto& oot = sj.contains("oot") ? sj["oot"] : sj;
             const auto& mm = sj.contains("mm") ? sj["mm"] : sj;
             if (oot.contains("settings"))
@@ -488,6 +541,22 @@ int main(int argc, char** argv) {
     const int startCfg = startingGameArg >= 0            ? startingGameArg
                          : SOH_ReadComboStartingGameCVar ? SOH_ReadComboStartingGameCVar()
                                                          : 0;
+    // Shared Items: --shared-items wins ("all"/"none"/comma-separated keys); else the menu CVars.
+    uint32_t sharedMask = 0;
+    if (sharedItemsArg == "all") {
+        sharedMask = ComboRando::SharedMaskAll();
+    } else if (sharedItemsArg.empty() && settingsSharedMask) {
+        sharedMask = *settingsSharedMask;
+    } else if (sharedItemsArg == "none" || sharedItemsArg.empty()) {
+        sharedMask = (sharedItemsArg.empty() && SOH_ReadComboSharedCVars) ? SOH_ReadComboSharedCVars() : 0;
+    } else {
+        nlohmann::json keys = nlohmann::json::array();
+        std::stringstream ss(sharedItemsArg);
+        std::string tok;
+        while (std::getline(ss, tok, ','))
+            keys.push_back(tok);
+        sharedMask = ComboRando::SharedMaskFromKeys(keys);
+    }
     std::cout << "[comborando] validating " << count << " seed(s) from "
               << (haveMasterSeed ? "masterSeed " + std::to_string(masterSeedArg) : "'" + seed + "'")
               << (goal.hunt ? " (Triforce Hunt, " + std::to_string(goal.required) + " of " +
@@ -499,6 +568,8 @@ int main(int argc, char** argv) {
               << "\n";
     int failures = 0;
     auto t0 = std::chrono::steady_clock::now();
+    if (SOH_NormalizeComboGraceFromMM)
+        SOH_NormalizeComboGraceFromMM();
     for (int i = 0; i < count; ++i) {
         const uint32_t base = (haveMasterSeed ? masterSeedArg : ComboHash(seed)) + static_cast<uint32_t>(i);
         uint32_t masterSeed = base;
@@ -525,6 +596,9 @@ int main(int argc, char** argv) {
             // Same reason (#135): an MM start forces OOT's age/forest/exclusions.
             if (SOH_SetComboStartingGame)
                 SOH_SetComboStartingGame(mmStart ? 1 : 0);
+            // Shared Items: shapes OOT's wallet-force before the dump (settings.cpp reads gComboSharedMask).
+            if (SOH_SetComboSharedItems)
+                SOH_SetComboSharedItems(sharedMask);
             sohDump = SOH_Dump();
             mmDump = MM_Dump();
             if (goal.hunt) {
@@ -546,7 +620,8 @@ int main(int argc, char** argv) {
             }
             ComboRando::OotAccess ootAccess = ComboRando::OotAccessFromDump(sohDump);
             r = ComboRando::CrossWorldCombinedFill(sohDump, mmDump, masterSeed, oot, mmO, nullptr, forced, ootAccess,
-                                                   goal, mmStart ? ComboRando::GAME_MM : ComboRando::GAME_OOT);
+                                                   goal, mmStart ? ComboRando::GAME_MM : ComboRando::GAME_OOT,
+                                                   SOH_DumpSharedPairs ? SOH_DumpSharedPairs() : "", sharedMask);
             if (r.success) {
                 resolvedMmStart = mmStart;
                 // Cross-hint data (Phase 2/3 mirror of RunComboFill, incl. the same area maps so the
@@ -576,7 +651,7 @@ int main(int argc, char** argv) {
                         goal.hunt ? ComboRando::MakeTriforceHuntGoal(goal.required)
                         : noLogic ? ComboRando::MmOnlyMajoraGoal
                                   : ComboRando::DefaultGanonMajoraGoal,
-                        !noLogic, mmStart);
+                        !noLogic, mmStart, nullptr, sharedMask, SOH_DumpSharedPairs ? SOH_DumpSharedPairs() : "");
                 else
                     std::cout << "[comborando]   pare-down skipped (no enabled hint surface needs requiredness)\n";
             }
@@ -617,12 +692,20 @@ int main(int argc, char** argv) {
                                              { "requiredPieces", goal.required },
                                              { "totalPieces", goal.total } };
                     consolidated["startingGame"] = resolvedMmStart ? "MM" : "OOT"; // #135
+                    // Shared Items: the EFFECTIVE mask (families actually trimmed this fill), not the
+                    // requested one — a family with no OOT copies was left alone (see CrossWorldRando.h).
+                    nlohmann::json sharedItemsJson = fillSpoiler.value("sharedItems", nlohmann::json::array());
+                    const uint32_t effectiveSharedMask = ComboRando::SharedMaskFromKeys(sharedItemsJson);
+                    consolidated["sharedItems"] = sharedItemsJson;
                     // ComboShip: suffix cross-game item-name collisions in the placements (parity with
                     // RunComboFill's consolidated writer) so the headless spoiler shows "(OOT)"/"(MM)".
                     nlohmann::json ootPl = fillSpoiler.value("oot", nlohmann::json::object());
                     nlohmann::json mmPl = fillSpoiler.value("mm", nlohmann::json::object());
+                    const auto sharedPairs =
+                        ComboRando::ResolveSharedPairs(SOH_DumpSharedPairs ? SOH_DumpSharedPairs() : "", mmDump);
                     ComboRando::SuffixCrossGameItems(ootPl, mmPl, fillSpoiler.value("foreign", nlohmann::json::array()),
-                                                     sohDump, mmDump);
+                                                     sohDump, mmDump,
+                                                     ComboRando::SharedUntaggedNames(effectiveSharedMask, sharedPairs));
                     consolidated["oot"] = { { "settings", nlohmann::json::parse(SOH_DumpSettings()) },
                                             { "enabledTricks", SOH_DumpEnabledTricks
                                                                    ? nlohmann::json::parse(SOH_DumpEnabledTricks())
@@ -639,7 +722,8 @@ int main(int argc, char** argv) {
                     ComboRando::AssignTrapDisguises(foreignArr, fillSpoiler.value("oot", nlohmann::json::object()),
                                                     fillSpoiler.value("mm", nlohmann::json::object()), sohDump, mmDump,
                                                     masterSeed);
-                    consolidated["foreign"] = ComboRando::BuildForeignArray(foreignArr);
+                    consolidated["foreign"] =
+                        ComboRando::BuildForeignArray(foreignArr, effectiveSharedMask, sharedPairs);
                     // OOT entrance layout (parity with ComboShip.cpp's consolidated writer) — this is
                     // what --playthrough installs into the region graph before walking.
                     {

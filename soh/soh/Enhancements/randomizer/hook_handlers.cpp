@@ -1,5 +1,8 @@
 ﻿#include "soh/OTRGlobals.h"
 #include "soh/ResourceManagerHelpers.h"
+#ifdef COMBO_BUILD
+#include "ComboExport.h"
+#endif
 #include "soh/Enhancements/enhancementTypes.h"
 #include "soh/Enhancements/custom-message/CustomMessageTypes.h"
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
@@ -31,6 +34,9 @@ extern "C" {
 #include "variables.h"
 #include "soh/Enhancements/randomizer/ShuffleTradeItems.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance.h"
+#include "mods/nei_save.h"                     // Skijer's NEI — shared combo goal flags
+#include "soh/FleetShipCombo/FleetComboIds.h"  // FC_GOAL_*
+#include "soh/FleetShipCombo/FleetShipCombo.h" // FleetCombo_BeatBothBosses
 #include "soh/Enhancements/randomizer/randomizer_grotto.h"
 #include "src/overlays/actors/ovl_Bg_Treemouth/z_bg_treemouth.h"
 #include "src/overlays/actors/ovl_Bg_Jya_Bigmirror/z_bg_jya_bigmirror.h"
@@ -75,6 +81,7 @@ static ObjectExtension::Register<ScrubIdentity> RegisterScrubIdentity;
 
 extern SaveContext gSaveContext;
 extern PlayState* gPlayState;
+extern u8 gKeatonClimbActive; // keaton_form.cpp
 extern void func_8084DFAC(PlayState* play, Player* player);
 extern void func_80B8FE00(ObjBean*); // trigger planting
 extern void Player_SetupActionPreserveAnimMovement(PlayState* play, Player* player, PlayerActionFunc actionFunc,
@@ -538,12 +545,16 @@ void OOT_DeliverForeign(RandomizerCheck rc) {
         Anchor_BroadcastCrossItem((int)fi->itemGame, fi->itemName.c_str(), checkName.c_str());
         SPDLOG_INFO("[ComboShip] OOT sprang foreign trap '{}' locally (from check '{}')", fi->itemName, checkName);
     } else if (fi) {
+        // ComboShip: freeze the held-up model BEFORE the cross-grant moves MM's save. After the fi
+        // lookup on purpose: it can build the foreign map and bump the generation the cache keys on.
+        Randomizer_LatchComboForeign(rc);
         // Grant straight into the dormant target game's resident save (and persist it there), then
         // share with networked teammates. Replaces the old JSON mailbox + per-frame drain.
         if (gComboCrossDeliver)
             gComboCrossDeliver((int)fi->itemGame, fi->itemName.c_str(), checkName.c_str());
         Anchor_BroadcastCrossItem((int)fi->itemGame, fi->itemName.c_str(), checkName.c_str());
-        Notification::Emit({ .message = "Sent to Termina:", .suffix = fi->displayName });
+        const char* resolved = Randomizer_ComboForeignLatchedName((int32_t)rc);
+        Notification::Emit({ .message = "You found", .suffix = ComboRando::ShownForeignName(*fi, resolved) });
         SPDLOG_INFO("[ComboShip] OOT delivered foreign item '{}' to MM (from check '{}')", fi->itemName, checkName);
     } else {
         SPDLOG_WARN("[ComboShip] OOT foreign sentinel at '{}' but no foreign-map entry; dropping", checkName);
@@ -556,7 +567,7 @@ void OOT_ComboHintRevealed(RandomizerHint hintKey);
 
 // ComboShip: launcher pushes the baked combo rando (foreign map + cross-hints) once per save-load.
 // Store the blob and rebuild the OOT foreign cache from it. Idempotent (pushed at bind and load).
-extern "C" __declspec(dllexport) void SOH_LoadComboRando(const char* json) {
+extern "C" COMBO_EXPORT void SOH_LoadComboRando(const char* json) {
     ComboRando::Combo_SetForeignJson(json);
     g_ootForeignMap = ComboRando::LoadForeignForGame(0, ComboRando::GAME_OOT);
     ++g_ootForeignGen; // invalidate the foreign-draw caches keyed on this
@@ -1242,7 +1253,9 @@ void RandomizerOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_l
 
     switch (id) {
         case VB_CLIMB:
-            if (RAND_GET_OPTION(RSK_SHUFFLE_CLIMB) && !Flags_GetRandomizerInf(RAND_INF_CAN_CLIMB)) {
+            // Keaton climbs on his own shuffled Climb does not gate him.
+            if (RAND_GET_OPTION(RSK_SHUFFLE_CLIMB) && !Flags_GetRandomizerInf(RAND_INF_CAN_CLIMB) &&
+                !gKeatonClimbActive) {
                 s32* x = va_arg(args, s32*);
                 s32* y = va_arg(args, s32*);
 
@@ -2124,6 +2137,30 @@ void RandomizerOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_l
             break;
         }
         case VB_SLAY_GANON:
+            // Fleet Ship Combo, Beat Both Bosses: the goal spans two games, so Ganon falling is only
+            // half of it. Record the win in the SHARED flags, and if Majora is still standing, take
+            // the same road the non-Ganon win conditions already take — no slaying cutscene, the
+            // check is handed over, and Link is put back outside the castle to keep playing. The run
+            // ends on whichever boss dies second, in whichever game that happens to be.
+            if (FleetCombo_BeatBothBosses()) {
+                NeiSaveData* nei = Nei_Save();
+                nei->comboGoalFlags |= FC_GOAL_GANON_BEATEN;
+                if (!(nei->comboGoalFlags & FC_GOAL_MAJORA_BEATEN)) {
+                    *should = false;
+                    Flags_SetRandomizerInf(RAND_INF_DUNGEONS_DONE_GANONS_TOWER);
+                    randomizerQueuedChecks.push(RC_GANON);
+                    CheckTriggers();
+                    // Save on the spot: the shared flag has to survive even if the player quits here,
+                    // or Termina would never learn that Ganon is already down.
+                    SaveManager::Instance->SaveFile(gSaveContext.fileNum);
+                    gPlayState->nextEntranceIndex = ENTR_OUTSIDE_GANONS_CASTLE_1_2;
+                    gPlayState->transitionTrigger = TRANS_TRIGGER_START;
+                    gPlayState->transitionType = TRANS_TYPE_FADE_WHITE;
+                    gSaveContext.nextTransitionType = TRANS_TYPE_FADE_WHITE_SLOW;
+                    break;
+                }
+                // Majora already fell: this IS the end of the run, so let the vanilla path run.
+            }
             if (RAND_GET_OPTION(RSK_WINCON).IsNot(RO_WINCON_DEFEAT_GANON)) {
                 *should = false;
                 Flags_SetRandomizerInf(RAND_INF_DUNGEONS_DONE_GANONS_TOWER);

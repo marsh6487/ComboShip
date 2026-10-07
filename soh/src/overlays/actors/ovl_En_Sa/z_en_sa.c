@@ -484,6 +484,7 @@ void func_80AF6170(CsCmdActorCue* csAction, Vec3f* dst) {
 void EnSa_Init(Actor* thisx, PlayState* play) {
     EnSa* this = (EnSa*)thisx;
     s32 pad;
+    s32 initMode;
 
     ActorShape_Init(&this->actor.shape, 0.0f, ActorShadow_DrawCircle, 12.0f);
     SkelAnime_InitFlex(play, &this->skelAnime, &gSariaSkel, NULL, this->jointTable, this->morphTable, 17);
@@ -491,7 +492,14 @@ void EnSa_Init(Actor* thisx, PlayState* play) {
     Collider_SetCylinder(play, &this->collider, &this->actor, &sCylinderInit);
     CollisionCheck_SetInfo2(&this->actor.colChkInfo, NULL, &sColChkInfoInit);
 
-    switch (func_80AF5DFC(this, play)) {
+    initMode = func_80AF5DFC(this, play);
+    osSyncPrintf("[SariaSpawnProbe] stage=init scene=%d params=0x%04X cutscene=0x%04X adult=%d rando=%d zeldaLetter=%d "
+                 "sariasSong=%d initMode=%d\n",
+                 play->sceneNum, (u16)this->actor.params, (u16)gSaveContext.cutsceneIndex, LINK_IS_ADULT, IS_RANDO,
+                 Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_ZELDAS_LETTER), CHECK_QUEST_ITEM(QUEST_SONG_SARIA),
+                 initMode);
+
+    switch (initMode) {
         case 2:
             EnSa_ChangeAnim(this, ENSA_ANIM1_11);
             this->actionFunc = func_80AF6448;
@@ -520,6 +528,11 @@ void EnSa_Init(Actor* thisx, PlayState* play) {
             this->actionFunc = func_80AF68E4;
             break;
         case 0:
+            osSyncPrintf(
+                "[SariaSpawnProbe] stage=kill reason=eligibility-zero scene=%d params=0x%04X adult=%d rando=%d "
+                "zeldaLetter=%d sariasSong=%d\n",
+                play->sceneNum, (u16)this->actor.params, LINK_IS_ADULT, IS_RANDO,
+                Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_ZELDAS_LETTER), CHECK_QUEST_ITEM(QUEST_SONG_SARIA));
             Actor_Kill(&this->actor);
             return;
     }

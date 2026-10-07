@@ -1,9 +1,14 @@
 #include "global.h"
+#include "soh/Enhancements/debugger/FrameTimingProbe.h"
+#include <stdio.h>
+#include "din_fire_sword.h"
 #include "vt.h"
 
 #include "overlays/actors/ovl_Arms_Hook/z_arms_hook.h"
 #include "overlays/actors/ovl_En_Arrow/z_en_arrow.h"
 #include "overlays/actors/ovl_En_Part/z_en_part.h"
+#include "overlays/actors/ovl_En_Viewer/static_story_actor.h"
+#include "overlays/actors/ovl_Bg_Toki_Swd/z_bg_toki_swd.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/gameplay_dangeon_keep/gameplay_dangeon_keep.h"
 #include "objects/object_bdoor/object_bdoor.h"
@@ -17,6 +22,18 @@
 
 #include "soh/ActorDB.h"
 #include "soh/OTRGlobals.h"
+#include "mods/transformation_masks/transformation_masks.h"
+#include "mods/transformation_masks/mm_mask_wear.h"
+
+// SW97 Shadow Medallion stealth — defined in expansions/sw97/player/sw97_player_behavior.inc.c
+// (compiled into z_player.c's TU via sw97_router.c). Returns nonzero while the
+// Shadow spell is active. Same hook semantics as Stone Mask: enemies can't detect Link.
+extern s32 Sw97_ShadowStealthActive(void);
+
+// SW97 per-actor blindness — Shadow ARROW and Shadow-element gustjar BLOW tag
+// individual enemies as "can't see Link" for ~10 sec. Returns nonzero while the
+// passed actor has an active blindness timer.
+extern s32 Sw97_IsBlinded(Actor* actor);
 
 #include <string.h>
 #include <stdlib.h>
@@ -90,6 +107,14 @@ f32 iceTrapScale;
 
 // For Link's voice pitch SFX modifier
 static f32 freqMultiplier = 1;
+
+// Skijer's NEI shared time control (mods/items/helpers/timestop_helper.c).
+// gChampionSlowFactor: 1.0f = normal, 0.0f = fully stopped, in between = slow motion.
+// It is defined in mods/extended_equipment.c and arbitrated by timestop_helper so
+// Champion's Tunic, Zonai Permafrost and the Phantom Hourglass cannot fight over it.
+extern f32 gChampionSlowFactor;
+extern s32 TimeCtl_IsActorExempt(Actor* actor);
+extern s32 TimeCtl_GetStutterFrames(void);
 
 void ActorShape_Init(ActorShape* shape, f32 yOffset, ActorShadowFunc shadowDraw, f32 shadowScale) {
     shape->yOffset = yOffset;
@@ -1283,6 +1308,16 @@ void Actor_Destroy(Actor* actor, PlayState* play) {
 void Actor_UpdatePos(Actor* actor) {
     f32 speedRate = R_UPDATE_RATE * 0.5f;
 
+    // Skijer's NEI time control. Only a FULL stop zeroes motion here. A PARTIAL
+    // slowdown deliberately does NOT scale speedRate: the slow is expressed by letting
+    // the actor tick 1 frame in N (see the freeze in Actor_UpdateAll), and scaling its
+    // motion on top of that MULTIPLIES the two — which is why a nominal 0.15 read as a
+    // dead stop instead of slow motion. Exemptions (Link, native projectiles, Link's
+    // children) are centralized in TimeCtl_IsActorExempt.
+    if ((gChampionSlowFactor <= 0.0f) && !TimeCtl_IsActorExempt(actor)) {
+        speedRate = 0.0f;
+    }
+
     actor->world.pos.x += (actor->velocity.x * speedRate) + actor->colChkInfo.displacement.x;
     actor->world.pos.y += (actor->velocity.y * speedRate) + actor->colChkInfo.displacement.y;
     actor->world.pos.z += (actor->velocity.z * speedRate) + actor->colChkInfo.displacement.z;
@@ -1400,6 +1435,15 @@ f32 Actor_HeightDiff(Actor* actorA, Actor* actorB) {
 
 f32 Player_GetHeight(Player* player) {
     f32 offset = (player->stateFlags1 & PLAYER_STATE1_ON_HORSE) ? 32.0f : 0.0f;
+
+    // Transformation Masks: use form-specific height from MM decomp z_actor.c:1374-1400.
+    // Fixes camera positioning during get-item, Z-targeting, and general gameplay.
+    {
+        f32 formHeight = TransformMasks_GetFormHeight();
+        if (formHeight > 0.0f) {
+            return offset + formHeight;
+        }
+    }
 
     if (LINK_IS_ADULT) {
         return offset + 68.0f;
@@ -1602,7 +1646,15 @@ s32 Actor_ActorAIsFacingAndNearActorB(Actor* actorA, Actor* actorB, f32 range, s
 }
 
 s32 func_8002E234(Actor* actor, f32 arg1, s32 arg2) {
-    if ((actor->bgCheckFlags & 0x1) && (arg1 < -11.0f)) {
+    // bgCheckFlags 0x800 = MM's BGCHECKFLAG_PLAYER_800 (mm z_actor.c:1766). An actor
+    // owning it never hugs small drops: it leaves the ground the instant the floor
+    // falls away, so ledges and ramps LAUNCH it instead of gluing it to the terrain.
+    // MM's Goron roll (Player_Action_96) sets the flag on entry and clears it on exit.
+    // MM puts the exemption in this function's CALLER, because there the <=11-unit hug
+    // is part of the on-ground branch condition; OOT instead splits that hug down here,
+    // so the check belongs here. Nothing in vanilla OOT ever sets 0x800, so this is
+    // inert for every other actor.
+    if ((actor->bgCheckFlags & 0x1) && ((arg1 < -11.0f) || (actor->bgCheckFlags & 0x800))) {
         actor->bgCheckFlags &= ~0x1;
         actor->bgCheckFlags |= 0x4;
 
@@ -2115,12 +2167,36 @@ s32 GiveItemEntryFromActorWithFixedRange(Actor* actor, PlayState* play, GetItemE
 // If you're doing something for randomizer, you're probably looking for GiveItemEntryFromActor
 s32 Actor_OfferGetItem(Actor* actor, PlayState* play, s32 getItemId, f32 xzRange, f32 yRange) {
     Player* player = GET_PLAYER(play);
+    s32 localTimePedestal =
+        actor->id == ACTOR_BG_TOKI_SWD && actor->params == BG_TOKI_SWD_TIME_PEDESTAL && getItemId == GI_NONE;
 
-    if (!(player->stateFlags1 &
-          (PLAYER_STATE1_DEAD | PLAYER_STATE1_CHARGING_SPIN_ATTACK | PLAYER_STATE1_HANGING_OFF_LEDGE |
-           PLAYER_STATE1_CLIMBING_LEDGE | PLAYER_STATE1_JUMPING | PLAYER_STATE1_FREEFALL | PLAYER_STATE1_FIRST_PERSON |
-           PLAYER_STATE1_CLIMBING_LADDER)) &&
-        Player_GetExplosiveHeld(player) < 0) {
+    // Transformation masks (Skijer's NEI): the Zora swim needs a wider offer window.
+    // Vanilla's yRange is 10.0f (Actor_OfferGetItemNearby) — fine on land, where the
+    // player and a floor item share the ground plane, but a swimming Zora floats well
+    // above sea-floor drops, so heart pieces / small keys / rando checks were never
+    // offered at all and MmForm_HandleFormInteractions had nothing to accept. The
+    // JUMPING/FREEFALL veto is dropped for the same reason: the dolphin jump and the
+    // fast-swim arcs set them, and there is nothing unsafe about accepting an item
+    // mid-arc underwater. Deliberately NOT applied on land — this is swim-only.
+    u32 blockedStates = PLAYER_STATE1_DEAD | PLAYER_STATE1_CHARGING_SPIN_ATTACK | PLAYER_STATE1_HANGING_OFF_LEDGE |
+                        PLAYER_STATE1_CLIMBING_LEDGE | PLAYER_STATE1_JUMPING | PLAYER_STATE1_FREEFALL |
+                        PLAYER_STATE1_FIRST_PERSON | PLAYER_STATE1_CLIMBING_LADDER;
+
+    {
+        extern u8 MmForm_IsZoraSwimming(Player * player);
+
+        if (MmForm_IsZoraSwimming(player)) {
+            if (xzRange < 60.0f) {
+                xzRange = 60.0f;
+            }
+            if (yRange < 60.0f) {
+                yRange = 60.0f;
+            }
+            blockedStates &= ~(PLAYER_STATE1_JUMPING | PLAYER_STATE1_FREEFALL);
+        }
+    }
+
+    if (!(player->stateFlags1 & blockedStates) && Player_GetExplosiveHeld(player) < 0) {
         if ((((player->heldActor != NULL) || (actor == player->talkActor)) &&
              ((getItemId > GI_NONE) && (getItemId < GI_MAX))) ||
             (!(player->stateFlags1 & (PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_IN_CUTSCENE)))) {
@@ -2128,10 +2204,12 @@ s32 Actor_OfferGetItem(Actor* actor, PlayState* play, s32 getItemId, f32 xzRange
                 s16 yawDiff = actor->yawTowardsPlayer - player->actor.shape.rot.y;
                 s32 absYawDiff = ABS(yawDiff);
 
-                if ((getItemId != GI_NONE) || (player->getItemDirection < absYawDiff)) {
+                if (localTimePedestal || (getItemId != GI_NONE) || (player->getItemDirection < absYawDiff)) {
                     player->getItemId = getItemId;
                     player->interactRangeActor = actor;
-                    player->getItemDirection = absYawDiff;
+                    // The custom ceremony handles alignment. Keep its offer
+                    // ahead of ordinary carry actors until the next frame.
+                    player->getItemDirection = localTimePedestal ? 0x8000 : absYawDiff;
                     return true;
                 }
             }
@@ -2239,18 +2317,53 @@ void Actor_SetPlayerKnockbackSmallNoDamage(PlayState* play, Actor* actor, f32 ar
 }
 
 void Player_PlaySfx(Actor* actor, u16 sfxId) {
+    // Suppress OOT SFX when in MM transformation form.
+    // MM forms play their own sounds via MmSfx_PlayAtPos / MmForm_PlaySfx.
+    // Keep: floor/surface SFX (WALK, JUMP, LAND, SLIP), environmental, water, status effects.
+    extern u8 TransformMasks_IsTransformed(void);
+    extern u8 GerudoForm_IsActive(void);
+    // Gerudo is the exception — soh.o2r doesn't ship MM combat SFX, so its
+    // dual-scimitar combo plays vanilla OOT sword sounds (NA_SE_IT_SWORD_SWING,
+    // etc.) directly. Without this carve-out the swing audio is silently
+    // dropped by the NA_SE_IT_* block below. Same pattern as
+    // Player_PlayVoiceSfx's Gerudo exception (z_player.c:1833).
+    if (actor->id == ACTOR_PLAYER && TransformMasks_IsTransformed() && !GerudoForm_IsActive()) {
+        // Block ALL item/weapon SFX (NA_SE_IT_* = 0x1800-0x18FF)
+        if ((sfxId & 0xF800) == 0x1800) {
+            return;
+        }
+        // Block ALL voice SFX (NA_SE_VO_LI_*)
+        if (sfxId >= NA_SE_VO_LI_SWORD_N && sfxId <= NA_SE_VO_LI_ELECTRIC_SHOCK_LV_KID) {
+            return;
+        }
+        // Block only combat SFX that MM handles via its own system.
+        // Keep body sounds (BODY_HIT, DAMAGE) — they're form-neutral impacts.
+        switch (sfxId) {
+            case NA_SE_PL_THROW:
+            case NA_SE_PL_CHANGE_ARMS:
+            case NA_SE_PL_CATCH_BOOMERANG:
+            case NA_SE_PL_KNOCK:
+            case NA_SE_PL_SPARK:
+                return;
+        }
+    }
+
     if (actor->id != ACTOR_PLAYER || sfxId < NA_SE_VO_LI_SWORD_N || sfxId > NA_SE_VO_LI_ELECTRIC_SHOCK_LV_KID) {
         Audio_PlaySoundGeneral(sfxId, &actor->projectedPos, 4, &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
                                &gSfxDefaultReverb);
     } else {
-        freqMultiplier = CVarGetFloat(CVAR_LINK_VOICE_FREQ_MULTIPLIER, 1.0);
-        if (freqMultiplier <= 0) {
-            freqMultiplier = 1;
+        // Custom voice pack interception: a loaded pack may replace this Link
+        // voice id with a sample from a .pak in mods/. If it handles the id we
+        // skip the vanilla SFX so we don't double-play.
+        extern u8 VoicePack_PlayIfMatch(u16 sfxId, Vec3f * pos);
+        if (!VoicePack_PlayIfMatch(sfxId, &actor->projectedPos)) {
+            freqMultiplier = CVarGetFloat(CVAR_LINK_VOICE_FREQ_MULTIPLIER, 1.0);
+            if (freqMultiplier <= 0) {
+                freqMultiplier = 1;
+            }
+            Audio_PlaySoundGeneral(sfxId, &actor->projectedPos, 4, &freqMultiplier, &gSfxDefaultFreqAndVolScale,
+                                   &gSfxDefaultReverb);
         }
-        // Authentic behavior uses D_801333E0 for both freqScale and a4
-        // Audio_PlaySoundGeneral(sfxId, &actor->projectedPos, 4, &D_801333E0 , &D_801333E0, &D_801333E8);
-        Audio_PlaySoundGeneral(sfxId, &actor->projectedPos, 4, &freqMultiplier, &gSfxDefaultFreqAndVolScale,
-                               &gSfxDefaultReverb);
     }
 
     if (actor->id == ACTOR_PLAYER) {
@@ -2527,6 +2640,9 @@ void func_80030488(PlayState* play) {
 void Actor_DisableLens(PlayState* play) {
     if (play->actorCtx.lensActive) {
         play->actorCtx.lensActive = false;
+        // lensFromLantern is NOT cleared here: it belongs to the Poe-fire lantern, which
+        // re-asserts it every frame anyway. Clearing it made turning the Lens of Truth off
+        // (or any cutscene calling this) fight the lantern for the flag. Skijer's NEI
         Magic_Reset(play);
     }
 }
@@ -2572,6 +2688,9 @@ u32 D_80116068[ACTORCAT_MAX] = {
 };
 
 void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
+    FrameTimingSpan updateAllSpan = FrameTiming_BeginSpan();
+    uint64_t actorsVisited = 0;
+    uint64_t actorsUpdated = 0;
     Actor* refActor;
     Actor* actor;
     Player* player;
@@ -2626,6 +2745,7 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
 
         actor = actorCtx->actorLists[i].head;
         while (actor != NULL) {
+            actorsVisited++;
             if (actor->world.pos.y < -25000.0f) {
                 actor->world.pos.y = -25000.0f;
             }
@@ -2664,9 +2784,23 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                 }
             } else {
                 Math_Vec3f_Copy(&actor->prevPos, &actor->world.pos);
-                actor->xzDistToPlayer = Actor_WorldDistXZToActor(actor, &player->actor);
-                actor->yDistToPlayer = Actor_HeightDiff(actor, &player->actor);
-                actor->xyzDistToPlayerSq = SQ(actor->xzDistToPlayer) + SQ(actor->yDistToPlayer);
+
+                // Stone Mask + SW97 Shadow Medallion: enemies and NPCs can't detect Link.
+                // Also covers hostile MISC actors like Leever (ACTORCAT_MISC) that would
+                // otherwise bypass the gate.
+                // Sw97_IsBlinded is a per-actor gate (Shadow Arrow / Shadow gustjar
+                // tag specific targets) and fires regardless of category.
+                if (((MmMaskWear_IsStoneMaskActive() || Sw97_ShadowStealthActive()) &&
+                     (i == ACTORCAT_ENEMY || i == ACTORCAT_NPC || (actor->flags & ACTOR_FLAG_HOSTILE))) ||
+                    Sw97_IsBlinded(actor)) {
+                    actor->xzDistToPlayer = 32000.0f;
+                    actor->yDistToPlayer = 32000.0f;
+                    actor->xyzDistToPlayerSq = SQ(32000.0f) + SQ(32000.0f);
+                } else {
+                    actor->xzDistToPlayer = Actor_WorldDistXZToActor(actor, &player->actor);
+                    actor->yDistToPlayer = Actor_HeightDiff(actor, &player->actor);
+                    actor->xyzDistToPlayerSq = SQ(actor->xzDistToPlayer) + SQ(actor->yDistToPlayer);
+                }
 
                 actor->yawTowardsPlayer = Actor_WorldYawTowardActor(actor, &player->actor);
                 actor->flags &= ~ACTOR_FLAG_SFX_FOR_PLAYER_BODY_HIT;
@@ -2688,8 +2822,29 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                         actor->colorFilterTimer--;
                     }
                     if (GameInteractor_ShouldActorUpdate(actor)) {
+                        FrameTimingSpan actorSpan = FrameTiming_BeginSpan();
+                        char actorTimingName[48];
+                        if (actorSpan.epoch != 0) {
+                            snprintf(actorTimingName, sizeof(actorTimingName), "id=%04x params=%04x",
+                                     (unsigned)(u16)actor->id, (unsigned)(u16)actor->params);
+                        }
+                        actorsUpdated++;
                         actor->update(actor, play);
+                        if (actorSpan.epoch != 0) {
+                            FrameTiming_EndNamedSpan("actor_update", actorTimingName, actorSpan);
+                        }
+                        actorSpan = FrameTiming_BeginSpan();
                         GameInteractor_ExecuteOnActorUpdate(actor);
+                        FrameTiming_EndNamedSpan("actor_update_detail", "update_hook", actorSpan);
+                        // Skijer's NEI partial slowdown: re-freeze for TimeCtl_GetStutterFrames()
+                        // after each update, so the actor ticks 1 frame in N and its animations and
+                        // AI timers slow with it. The interval is derived from the requested factor,
+                        // so 0.33 really is a third of normal speed. A FULL stop is not handled here
+                        // — timestop_helper drives that directly so newly spawned actors are caught.
+                        if ((gChampionSlowFactor > 0.0f) && (gChampionSlowFactor < 1.0f) &&
+                            !TimeCtl_IsActorExempt(actor)) {
+                            actor->freezeTimer = TimeCtl_GetStutterFrames();
+                        }
                     }
                     func_8003F8EC(play, &play->colCtx.dyna, actor);
                 }
@@ -2723,6 +2878,11 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
     Attention_Update(&actorCtx->targetCtx, player, actor, play);
     TitleCard_Update(play, &actorCtx->titleCtx);
     DynaPoly_UpdateBgActorTransforms(play, &play->colCtx.dyna);
+    if (updateAllSpan.epoch != 0) {
+        FrameTiming_Count("actors_update_visited", actorsVisited);
+        FrameTiming_Count("actors_updated", actorsUpdated);
+    }
+    FrameTiming_EndNamedSpan("play_update", "actors", updateAllSpan);
 }
 
 void Actor_FaultPrint(Actor* actor, char* command) {
@@ -2747,8 +2907,17 @@ void Actor_FaultPrint(Actor* actor, char* command) {
 }
 
 void Actor_Draw(PlayState* play, Actor* actor) {
+    FrameTimingSpan actorSpan = FrameTiming_BeginSpan();
+    FrameTimingSpan detailSpan = actorSpan;
+    char actorTimingName[48];
     FaultClient faultClient;
     Lights* lights;
+
+    if (actorSpan.epoch != 0) {
+        snprintf(actorTimingName, sizeof(actorTimingName), "id=%04x params=%04x", (unsigned)(u16)actor->id,
+                 (unsigned)(u16)actor->params);
+        FrameTiming_Count("actors_drawn", 1);
+    }
 
     Fault_AddClient(&faultClient, Actor_FaultPrint, actor, "Actor_draw");
 
@@ -2761,6 +2930,8 @@ void Actor_Draw(PlayState* play, Actor* actor) {
                    (actor->flags & ACTOR_FLAG_IGNORE_POINTLIGHTS) ? NULL : &actor->world.pos);
     Lights_Draw(lights, play->state.gfxCtx);
 
+    FrameTiming_EndNamedSpan("actor_draw_detail", "lighting", detailSpan);
+    detailSpan = FrameTiming_BeginSpan();
     FrameInterpolation_RecordActorPosRotMatrix();
     if (actor->flags & ACTOR_FLAG_IGNORE_QUAKE) {
         Matrix_SetTranslateRotateYXZ(
@@ -2796,7 +2967,25 @@ void Actor_Draw(PlayState* play, Actor* actor) {
         }
     }
 
-    actor->draw(actor, play);
+    {
+        // Phantom Hourglass: the recall drains everything but Link and its target to grey. Skijer's NEI
+        extern u8 Hourglass_ShouldDrawGray(Actor * actor);
+        extern void Hourglass_PushGray(PlayState * play);
+        extern void Hourglass_PopGray(PlayState * play);
+        u8 recallGray = Hourglass_ShouldDrawGray(actor);
+
+        if (recallGray) {
+            Hourglass_PushGray(play);
+        }
+        FrameTiming_EndNamedSpan("actor_draw_detail", "setup", detailSpan);
+        detailSpan = FrameTiming_BeginSpan();
+        actor->draw(actor, play);
+        FrameTiming_EndNamedSpan("actor_draw_detail", "draw_callback", detailSpan);
+        detailSpan = FrameTiming_BeginSpan();
+        if (recallGray) {
+            Hourglass_PopGray(play);
+        }
+    }
 
     if (actor->colorFilterTimer != 0) {
         if (actor->colorFilterParams & 0x2000) {
@@ -2806,14 +2995,27 @@ void Actor_Draw(PlayState* play, Actor* actor) {
         }
     }
 
+    FrameTiming_EndNamedSpan("actor_draw_detail", "restore", detailSpan);
+    detailSpan = FrameTiming_BeginSpan();
     if (actor->shape.shadowDraw != NULL) {
         actor->shape.shadowDraw(actor, lights, play);
     }
+
+    // VB_ACTOR_POST_DRAW: subscribers (e.g. Harpoon's Triforce Thief carrier
+    // indicator) can draw extra geometry attached to this actor after its
+    // own draw + shadow pass.
+    FrameTiming_EndNamedSpan("actor_draw_detail", "shadow", detailSpan);
+    detailSpan = FrameTiming_BeginSpan();
+    GameInteractor_Should(VB_ACTOR_POST_DRAW, true, play, actor);
 
     CLOSE_DISPS(play->state.gfxCtx);
     FrameInterpolation_RecordCloseChild();
 
     Fault_RemoveClient(&faultClient);
+    FrameTiming_EndNamedSpan("actor_draw_detail", "post_draw_hook_cleanup", detailSpan);
+    if (actorSpan.epoch != 0) {
+        FrameTiming_EndNamedSpan("actor_draw", actorTimingName, actorSpan);
+    }
 }
 
 void Actor_UpdateFlaggedAudio(Actor* actor) {
@@ -2862,6 +3064,29 @@ void Actor_DrawLensActors(PlayState* play, s32 numInvisibleActors, Actor** invis
     Actor** invisibleActor;
     GraphicsContext* gfxCtx;
     s32 i;
+
+    // Poe lantern: whole-screen lens with no overlay (no red tint, no circle mask).
+    //
+    // The room's lens mode still decides WHAT the lens does to these actors, and the
+    // two modes are opposites — go by the value, the LensMode enum names above read
+    // the wrong way round:
+    //   0 (LENS_MODE_HIDE_ACTORS): actors invisible by default → the lens reveals them.
+    //   1 (LENS_MODE_SHOW_ACTORS): actors visible by default (fake walls, fake floors,
+    //                              illusory chests) → the lens has to make them vanish.
+    // Drawing both cases is what made fake geometry stay solid on screen while only the
+    // hidden actors appeared; in mode 1 the correct output is to draw nothing at all.
+    // ...but only when the lantern is the one driving the lens. The Lens of Truth ITEM parks
+    // magicState in MAGIC_STATE_CONSUME_LENS while it runs; the lantern never does, so that is
+    // what tells the two apart — and it keeps the real Lens' circle overlay intact.
+    if (play->actorCtx.lensFromLantern && (gSaveContext.magicState != MAGIC_STATE_CONSUME_LENS)) {
+        if (play->roomCtx.curRoom.lensMode != LENS_MODE_SHOW_ACTORS) {
+            invisibleActor = &invisibleActors[0];
+            for (i = 0; i < numInvisibleActors; i++) {
+                Actor_Draw(play, *(invisibleActor++));
+            }
+        }
+        return;
+    }
 
     gfxCtx = play->state.gfxCtx;
 
@@ -2977,8 +3202,9 @@ s32 Ship_CalcShouldDrawAndUpdate(PlayState* play, Actor* actor, Vec3f* projected
         return true;
     }
 
-    // Skip cutscne actors that depend on culling to hide from camera pans
-    if (actor->id == ACTOR_EN_VIEWER) {
+    // Scripted cutscene actors depend on culling during camera pans. Static
+    // scene-editor placements share this actor ID but should honor the settings.
+    if (actor->id == ACTOR_EN_VIEWER && !StaticStoryActor_IsParam(actor->params)) {
         return false;
     }
 
@@ -3039,6 +3265,10 @@ s32 Ship_CalcShouldDrawAndUpdate(PlayState* play, Actor* actor, Vec3f* projected
 // #endregion
 
 void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
+    FrameTimingSpan listSpan = FrameTiming_BeginSpan();
+    FrameTimingSpan phaseSpan = listSpan;
+    uint64_t actorsVisited = 0;
+    uint64_t actorsCulled = 0;
     s32 invisibleActorCounter;
     Actor* invisibleActors[INVISIBLE_ACTOR_MAX];
     ActorListEntry* actorListEntry;
@@ -3055,6 +3285,7 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
         actor = actorListEntry->head;
 
         while (actor != NULL) {
+            actorsVisited++;
             char* actorName = ActorDB_Retrieve(actor->id)->name;
 
             gDPNoOpString(POLY_OPA_DISP++, actorName, i);
@@ -3069,7 +3300,12 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
 
             if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(69) == 0)) {
                 if (actor->sfx != 0) {
-                    Actor_UpdateFlaggedAudio(actor);
+                    // Suppress continuous item SFX on player when in MM form
+                    extern u8 TransformMasks_IsTransformed(void);
+                    if (!(actor->id == ACTOR_PLAYER && TransformMasks_IsTransformed() &&
+                          (actor->sfx & 0xF800) == 0x1800)) {
+                        Actor_UpdateFlaggedAudio(actor); // upstream renamed func_80030ED8
+                    }
                 }
             }
 
@@ -3096,6 +3332,12 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
                 }
             }
 
+            // Count geometric culling only; lens deferral and debug suppression are separate.
+            if (listSpan.epoch != 0 && actor->init == NULL && actor->draw != NULL &&
+                !(actor->flags & (ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_INSIDE_CULLING_VOLUME)) &&
+                !shipShouldDraw) {
+                actorsCulled++;
+            }
             actor->isDrawn = false;
 
             if ((HREG(64) != 1) || ((HREG(65) != -1) && (HREG(65) != HREG(66))) || (HREG(71) == 0)) {
@@ -3105,7 +3347,7 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
                     // #endregion
                     if ((actor->flags & ACTOR_FLAG_REACT_TO_LENS) &&
                         ((play->roomCtx.curRoom.lensMode == LENS_MODE_HIDE_ACTORS) || play->actorCtx.lensActive ||
-                         (actor->room != play->roomCtx.curRoom.num))) {
+                         play->actorCtx.lensFromLantern || (actor->room != play->roomCtx.curRoom.num))) {
                         assert(invisibleActorCounter < INVISIBLE_ACTOR_MAX);
                         invisibleActors[invisibleActorCounter] = actor;
                         invisibleActorCounter++;
@@ -3122,16 +3364,27 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
         }
     }
 
+    FrameTiming_EndNamedSpan("actor_draw_all", "actor_traversal", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
+
     if ((HREG(64) != 1) || (HREG(73) != 0)) {
         Effect_DrawAll(play->state.gfxCtx);
     }
+
+    FrameTiming_EndNamedSpan("actor_draw_all", "effects", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
 
     if ((HREG(64) != 1) || (HREG(74) != 0)) {
         EffectSs_DrawAll(play);
     }
 
+    FrameTiming_EndNamedSpan("actor_draw_all", "effects_ss", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
+
     if ((HREG(64) != 1) || (HREG(72) != 0)) {
-        if (play->actorCtx.lensActive) {
+        // Skijer's NEI: lensFromLantern is the Poe-fire lantern's own lens; it is
+        // independent of the Lens of Truth (no magic, no lensActive) so both can be on.
+        if (play->actorCtx.lensActive || play->actorCtx.lensFromLantern) {
             Actor_DrawLensActors(play, invisibleActorCounter, invisibleActors);
             if ((play->csCtx.state != CS_STATE_IDLE) || Player_InCsMode(play)) {
                 Actor_DisableLens(play);
@@ -3139,21 +3392,39 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
         }
     }
 
+    FrameTiming_EndNamedSpan("actor_draw_all", "lens_actors", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
+
     Actor_DrawFaroresWindPointer(play);
+
+    FrameTiming_EndNamedSpan("actor_draw_all", "farores_wind", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
 
     if (IREG(32) == 0) {
         Lights_DrawGlow(play);
     }
 
+    FrameTiming_EndNamedSpan("actor_draw_all", "light_glow", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
+
     if ((HREG(64) != 1) || (HREG(75) != 0)) {
         TitleCard_Draw(play, &actorCtx->titleCtx);
     }
+
+    FrameTiming_EndNamedSpan("actor_draw_all", "title_card", phaseSpan);
+    phaseSpan = FrameTiming_BeginSpan();
 
     if ((HREG(64) != 1) || (HREG(76) != 0)) {
         CollisionCheck_DrawCollision(play, &play->colChkCtx);
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
+    FrameTiming_EndNamedSpan("actor_draw_all", "collision_debug", phaseSpan);
+    if (listSpan.epoch != 0) {
+        FrameTiming_Count("actors_draw_visited", actorsVisited);
+        FrameTiming_Count("actors_draw_culled", actorsCulled);
+        FrameTiming_Count("actors_lens_queued", invisibleActorCounter);
+    }
 }
 
 void Actor_KillAllWithMissingObject(PlayState* play, ActorContext* actorCtx) {
@@ -3473,11 +3744,38 @@ void Actor_SpawnTransitionActors(PlayState* play, ActorContext* actorCtx) {
 
 Actor* Actor_SpawnEntry(ActorContext* actorCtx, ActorEntry* actorEntry, PlayState* play) {
     gMapLoading = 1;
-    Actor* ret;
+    Actor* ret = NULL;
+    s32 shouldSpawn;
+    const char* progressionActorName = NULL;
 
-    if (GameInteractor_Should(VB_SPAWN_ACTOR_ENTRY, true, actorCtx, actorEntry, play, &ret)) {
+    if (actorEntry->id == ACTOR_EN_SA) {
+        progressionActorName = "Saria";
+    } else if (actorEntry->id == ACTOR_EN_MA1) {
+        progressionActorName = "ChildMalon";
+    }
+
+    if (progressionActorName != NULL) {
+        osSyncPrintf("[ProgressionActorProbe] actor=%s stage=scene-entry scene=%d params=0x%04X pos=(%d,%d,%d) "
+                     "rot=(%d,%d,%d)\n",
+                     progressionActorName, play->sceneNum, (u16)actorEntry->params, actorEntry->pos.x,
+                     actorEntry->pos.y, actorEntry->pos.z, actorEntry->rot.x, actorEntry->rot.y, actorEntry->rot.z);
+    }
+
+    shouldSpawn = GameInteractor_Should(VB_SPAWN_ACTOR_ENTRY, true, actorCtx, actorEntry, play, &ret);
+    if (progressionActorName != NULL) {
+        osSyncPrintf(
+            "[ProgressionActorProbe] actor=%s stage=spawn-hook scene=%d params=0x%04X allowed=%d override=%p\n",
+            progressionActorName, play->sceneNum, (u16)actorEntry->params, shouldSpawn, (void*)ret);
+    }
+
+    if (shouldSpawn) {
         ret = Actor_Spawn(actorCtx, play, actorEntry->id, actorEntry->pos.x, actorEntry->pos.y, actorEntry->pos.z,
                           actorEntry->rot.x, actorEntry->rot.y, actorEntry->rot.z, actorEntry->params);
+    }
+
+    if (progressionActorName != NULL) {
+        osSyncPrintf("[ProgressionActorProbe] actor=%s stage=spawn-result scene=%d params=0x%04X actor=%p\n",
+                     progressionActorName, play->sceneNum, (u16)actorEntry->params, (void*)ret);
     }
 
     gMapLoading = 0;
@@ -3663,9 +3961,17 @@ Actor* Actor_Find(ActorContext* actorCtx, s32 actorId, s32 actorCategory) {
  * Play the death sound effect and flash the screen white for 4 frames.
  * While the screen flashes, the game freezes.
  */
+// Trirod kill-to-learn (Skijer's NEI): enemies teach their echo when defeated
+// with the rod drawn. Defined in expansions/trirod/trirod.c, which lives in the
+// custom_items.c unity TU — hence the extern, not an include.
+void Trirod_NotifyEnemyDown(PlayState* play, Actor* actor);
+
 void Enemy_StartFinishingBlow(PlayState* play, Actor* actor) {
     play->actorCtx.freezeFlashTimer = 5;
     SoundSource_PlaySfxAtFixedWorldPos(play, &actor->world.pos, 20, NA_SE_EN_LAST_DAMAGE);
+    // Nearly every enemy funnels its death through here, which makes it the one
+    // spot the Trirod can watch without touching each actor. Skijer's NEI
+    Trirod_NotifyEnemyDown(play, actor);
 }
 
 s16 FaceChange_UpdateBlinking(s16* arg0, s16 arg1, s16 arg2, s16 arg3) {
@@ -4788,24 +5094,27 @@ u8 Actor_ApplyDamage(Actor* actor) {
 }
 
 void Actor_SetDropFlag(Actor* actor, ColliderInfo* colInfo, s32 freezeFlag) {
+    // A flaming sword still awards the sword's native drops. Do not classify
+    // this feature's added fire bit as an actual Fire Arrow killing blow.
+    u32 damageFlags = DinFireSword_OriginalDamageFlags(gPlayState, colInfo->acHitInfo);
     if (colInfo->acHitInfo == NULL) {
         actor->dropFlag = 0x00;
-    } else if (freezeFlag && (colInfo->acHitInfo->toucher.dmgFlags & 0x10060000)) {
+    } else if (freezeFlag && (damageFlags & 0x10060000)) {
         actor->freezeTimer = colInfo->acHitInfo->toucher.damage;
         actor->dropFlag = 0x00;
-    } else if (colInfo->acHitInfo->toucher.dmgFlags & 0x0800) {
+    } else if (damageFlags & 0x0800) {
         actor->dropFlag = 0x01;
-    } else if (colInfo->acHitInfo->toucher.dmgFlags & 0x1000) {
+    } else if (damageFlags & 0x1000) {
         actor->dropFlag = 0x02;
-    } else if (colInfo->acHitInfo->toucher.dmgFlags & 0x4000) {
+    } else if (damageFlags & 0x4000) {
         actor->dropFlag = 0x04;
-    } else if (colInfo->acHitInfo->toucher.dmgFlags & 0x8000) {
+    } else if (damageFlags & 0x8000) {
         actor->dropFlag = 0x08;
-    } else if (colInfo->acHitInfo->toucher.dmgFlags & 0x10000) {
+    } else if (damageFlags & 0x10000) {
         actor->dropFlag = 0x10;
-    } else if (colInfo->acHitInfo->toucher.dmgFlags & 0x2000) {
+    } else if (damageFlags & 0x2000) {
         actor->dropFlag = 0x20;
-    } else if (colInfo->acHitInfo->toucher.dmgFlags & 0x80000) {
+    } else if (damageFlags & 0x80000) {
         if (freezeFlag) {
             actor->freezeTimer = colInfo->acHitInfo->toucher.damage;
         }
@@ -4824,24 +5133,25 @@ void Actor_SetDropFlagJntSph(Actor* actor, ColliderJntSph* jntSph, s32 freezeFla
 
     for (i = jntSph->count - 1; i >= 0; i--) {
         curColInfo = &jntSph->elements[i].info;
+        u32 damageFlags = DinFireSword_OriginalDamageFlags(gPlayState, curColInfo->acHitInfo);
         if (curColInfo->acHitInfo == NULL) {
             flag = 0x00;
-        } else if (freezeFlag && (curColInfo->acHitInfo->toucher.dmgFlags & 0x10060000)) {
+        } else if (freezeFlag && (damageFlags & 0x10060000)) {
             actor->freezeTimer = curColInfo->acHitInfo->toucher.damage;
             flag = 0x00;
-        } else if (curColInfo->acHitInfo->toucher.dmgFlags & 0x0800) {
+        } else if (damageFlags & 0x0800) {
             flag = 0x01;
-        } else if (curColInfo->acHitInfo->toucher.dmgFlags & 0x1000) {
+        } else if (damageFlags & 0x1000) {
             flag = 0x02;
-        } else if (curColInfo->acHitInfo->toucher.dmgFlags & 0x4000) {
+        } else if (damageFlags & 0x4000) {
             flag = 0x04;
-        } else if (curColInfo->acHitInfo->toucher.dmgFlags & 0x8000) {
+        } else if (damageFlags & 0x8000) {
             flag = 0x08;
-        } else if (curColInfo->acHitInfo->toucher.dmgFlags & 0x10000) {
+        } else if (damageFlags & 0x10000) {
             flag = 0x10;
-        } else if (curColInfo->acHitInfo->toucher.dmgFlags & 0x2000) {
+        } else if (damageFlags & 0x2000) {
             flag = 0x20;
-        } else if (curColInfo->acHitInfo->toucher.dmgFlags & 0x80000) {
+        } else if (damageFlags & 0x80000) {
             if (freezeFlag) {
                 actor->freezeTimer = curColInfo->acHitInfo->toucher.damage;
             }

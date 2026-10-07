@@ -1,3 +1,4 @@
+#include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "SaveManager.h"
 
 #include <fstream>
@@ -8,6 +9,7 @@
 #include "BenPort.h"
 #include "2s2h/BenGui/Notification.h"
 #include <ship/window/Window.h>
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 extern "C" {
@@ -36,6 +38,7 @@ extern SaveContext gSaveContext;
 const std::filesystem::path savesFolderPath(Ship::Context::GetPathRelativeToAppDirectory("saves", appShortName));
 
 #ifdef COMBO_BUILD
+#include "ComboExport.h"        // ComboShip: COMBO_EXPORT for MM_InvalidateOwlBlobSlot
 #include "rando/CrossForeign.h" // ComboShip: merged-save IO callback typedefs + GameId
 
 // ComboShip: launcher-provided .combosav IO. When set, a main per-slot file{N}.json read/write routes
@@ -197,9 +200,9 @@ int SaveManager_ReadSaveFile(const std::filesystem::path& fileName, nlohmann::js
 extern "C" int gComboOwlBlobSlot = -1;
 #endif
 
-void SaveManager_InitNewSaveForSlot(int mmFileNum, const unsigned char* ootName8) {
-    Sram_InitNewSave();
 #ifdef COMBO_BUILD
+void SaveManager_BuildComboBaseline(const unsigned char* ootName8) {
+    Sram_InitNewSave();
     // ComboShip: carry the OOT-entered file name over (same font codes in both games; anything
     // outside the shared 0x00-0x3F range, e.g. JP glyphs, becomes a space).
     if (ootName8 != nullptr) {
@@ -227,9 +230,18 @@ void SaveManager_InitNewSaveForSlot(int mmFileNum, const unsigned char* ootName8
     SET_WEEKEVENTREG(WEEKEVENTREG_ENTERED_WEST_CLOCK_TOWN);
     SET_WEEKEVENTREG(WEEKEVENTREG_ENTERED_NORTH_CLOCK_TOWN);
     // ComboShip: stamp RANDO before the write, not after. Every caller re-stamps it moments later, but
-    // this function PERSISTS, so leaving it VANILLA opened a window where the container briefly held a
-    // vanilla MM save, which silently disables every IS_RANDO hook. Combo has no vanilla mode.
+    // the caller below PERSISTS, so leaving it VANILLA opened a window where the container briefly held
+    // a vanilla MM save, which silently disables every IS_RANDO hook. Combo has no vanilla mode.
     gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+}
+#endif
+
+void SaveManager_InitNewSaveForSlot(int mmFileNum, const unsigned char* ootName8) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM save-init");
+#ifdef COMBO_BUILD
+    SaveManager_BuildComboBaseline(ootName8);
+#else
+    Sram_InitNewSave();
 #endif
     nlohmann::json j;
     // Fresh json with no owlSave, and Combo_WriteGameSave replaces the whole mm section — that is what
@@ -244,6 +256,17 @@ void SaveManager_InitNewSaveForSlot(int mmFileNum, const unsigned char* ootName8
 }
 
 void SaveManager_SaveCurrentForCombo() {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM save-write");
+#ifdef COMBO_BUILD
+    // Guard the write itself, not each caller's own gate. 0xFF (no save) reaches here on real,
+    // non-buggy paths (play proceeding after a failed load), so refuse and return — don't assert.
+    if (gSaveContext.fileNum < 0 || gSaveContext.fileNum > 2) {
+        SPDLOG_ERROR("[ComboShip] SaveManager_SaveCurrentForCombo: refusing write, fileNum={} is not a "
+                     "loaded slot",
+                     gSaveContext.fileNum);
+        return;
+    }
+#endif
     int mmFileNum = (int)gSaveContext.fileNum + 1;
     std::string fileName = SaveManager_GetFileName(mmFileNum);
     nlohmann::json j;
@@ -256,6 +279,14 @@ void SaveManager_SaveCurrentForCombo() {
 #endif
     j["newCycleSave"]["save"] = gSaveContext.save;
 #ifdef COMBO_BUILD
+    // ComboShip (#death-jingle-hang): this is the only save writer with no "don't persist while dead"
+    // guard. Floor health in the SERIALIZED doc only — never touch live gSaveContext or the load path.
+    bool comboDeadForSave = ((gPlayState != nullptr && gPlayState->gameOverCtx.state != GAMEOVER_INACTIVE) ||
+                             gSaveContext.save.saveInfo.playerData.health == 0) &&
+                            gSaveContext.save.saveInfo.playerData.health < 0x30;
+    if (comboDeadForSave) {
+        j["newCycleSave"]["save"]["saveInfo"]["playerData"]["health"] = 0x30;
+    }
     if (j.contains("owlSave")) {
         if (gComboOwlBlobSlot == mmFileNum) {
             // gSaveContext descends from this blob, so refresh the WHOLE SaveContext — same shape the
@@ -271,6 +302,9 @@ void SaveManager_SaveCurrentForCombo() {
                 j["owlSave"]["save"]["shipSaveInfo"]["pauseSaveEntrance"] =
                     keep.at("shipSaveInfo").at("pauseSaveEntrance");
                 j["owlSave"]["save"]["shipSaveInfo"]["respawn"] = keep.at("shipSaveInfo").at("respawn");
+                if (comboDeadForSave) {
+                    j["owlSave"]["save"]["saveInfo"]["playerData"]["health"] = 0x30;
+                }
             } catch (...) {
                 SPDLOG_ERROR("[ComboShip] Owl blob refresh failed; dropping it");
                 j.erase("owlSave");
@@ -299,19 +333,23 @@ extern "C" void Combo_MMDropOwlSaveBlob(void) try {
 
 // ComboShip (#182): the launcher can replace a slot's mm section behind MM's back (copy/erase/evict),
 // which would leave the descent flag pointing at a blob gSaveContext never came from.
-extern "C" __declspec(dllexport) void MM_InvalidateOwlBlobSlot(void) {
+extern "C" COMBO_EXPORT void MM_InvalidateOwlBlobSlot(void) {
     gComboOwlBlobSlot = -1;
 }
 #endif
 
-// ComboShip: nothing usable was loaded, so leave gSaveContext pointing at NO slot. 0xFF is the "no save"
+// ComboShip: nothing usable is loaded, so leave gSaveContext pointing at NO slot. 0xFF is the "no save"
 // sentinel every dormant writer tests (Combo_MM_GiveDormantResolved, MM_MarkForeignObtained, MMAnchor's
 // PumpDormant), so a stray write lands nowhere instead of persisting the PREVIOUS slot's save — or
-// zeroed vanilla BSS — into the failed slot. Clearing saveType makes IS_RANDO false for the same reason:
-// the peek trackers must not keep drawing the previous slot's save as if it were this one.
-static int SaveManager_LoadFailedForCombo(int code) {
+// zeroed/never-loaded BSS — into the failed slot. Clearing saveType makes IS_RANDO false for the same
+// reason: the peek trackers must not keep drawing the previous slot's save as if it were this one.
+void SaveManager_MarkNoSaveLoaded() {
     gSaveContext.fileNum = 0xFF;
     gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_VANILLA;
+}
+
+static int SaveManager_LoadFailedForCombo(int code) {
+    SaveManager_MarkNoSaveLoaded();
     return code;
 }
 
@@ -320,6 +358,7 @@ static int SaveManager_LoadFailedForCombo(int code) {
 // loudly. Nothing repairs the slot — re-create the file. 0 ok, -1 missing, -2 unreadable, -3 migrate,
 // -4 no usable save page (neither key, or owlSave unparseable with no newCycleSave), -5 parse.
 int SaveManager_LoadSaveFile(int mmFileNum) {
+    ItemGrantAudit::Scope itemGrantAuditScope("MM save-load");
     std::string fileName = SaveManager_GetFileName(mmFileNum);
     nlohmann::json j;
     int result = SaveManager_ReadSaveFile(fileName, j);
@@ -704,6 +743,25 @@ extern "C" void SaveManager_SysFlashrom_WriteData(u8* saveBuffer, u32 pageNum, u
     std::string fileName = SaveManager_GetFileNameFromFlashSave(flashSave);
 
     bool isBackup = false;
+    // FleetSync: 0-based slot of the file being written (matches gSaveContext.fileNum), for the
+    // OnSaveFile hook fired after a successful full (non-backup) save write.
+    s16 hookFileNum = -1;
+    switch (flashSave) {
+        case FLASH_SAVE_FILE_1_NEW_CYCLE_SAVE:
+        case FLASH_SAVE_FILE_1_OWL_SAVE:
+            hookFileNum = 0;
+            break;
+        case FLASH_SAVE_FILE_2_NEW_CYCLE_SAVE:
+        case FLASH_SAVE_FILE_2_OWL_SAVE:
+            hookFileNum = 1;
+            break;
+        case FLASH_SAVE_FILE_3_NEW_CYCLE_SAVE:
+        case FLASH_SAVE_FILE_3_OWL_SAVE:
+            hookFileNum = 2;
+            break;
+        default:
+            break;
+    }
 
     if (flashSave == FLASH_SAVE_UNAVAILABLE) {
         return;
@@ -771,6 +829,9 @@ extern "C" void SaveManager_SysFlashrom_WriteData(u8* saveBuffer, u32 pageNum, u
                 j["type"] = "2S2H_SAVE";
 
                 SaveManager_WriteSaveFile(fileName, j);
+                if (hookFileNum >= 0) {
+                    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnSaveFile>(hookFileNum);
+                }
             } else {
                 // If IS_VALID_FILE fails, we should delete the save file, even if there is an owl save in it, because
                 // they just deleted the new cycle save
@@ -823,6 +884,9 @@ extern "C" void SaveManager_SysFlashrom_WriteData(u8* saveBuffer, u32 pageNum, u
                 gComboOwlBlobSlot = (int)gSaveContext.fileNum + 1; // #182: gSaveContext now matches the blob
 #endif
                 SaveManager_WriteSaveFile(fileName, j);
+                if (hookFileNum >= 0) {
+                    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnSaveFile>(hookFileNum);
+                }
             } else {
 #ifdef COMBO_BUILD
                 gComboOwlBlobSlot = -1; // #182: func_80147314 is deleting the blob

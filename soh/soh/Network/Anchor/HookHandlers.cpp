@@ -117,7 +117,11 @@ void Anchor::RegisterHooks() {
 
     COND_HOOK(OnGameFrameUpdate, isConnected, [&]() {
         ProcessIncomingPacketQueue();
-        ComboPumpDormantTick(); // A6: drive dormant sibling's apply while OOT is foreground (no-op non-combo)
+        // The launcher remembers the last slot across file select. Only drive the dormant sibling
+        // (and shared-tier reconciliation) while the foreground save is actually loaded.
+        if (IsSaveLoaded()) {
+            ComboPumpDormantTick(); // A6: no-op in non-combo builds
+        }
     });
 
     COND_HOOK(OnPlayerSfx, isConnected, [&](u16 sfxId) { SendPacket_PlayerSfx(sfxId); });

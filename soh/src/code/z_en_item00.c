@@ -843,10 +843,27 @@ void EnItem00_Update(Actor* thisx, PlayState* play) {
         return;
     }
 
-    if (!((this->actor.xzDistToPlayer <= 30.0f) && (this->actor.yDistToPlayer >= -50.0f) &&
-          (this->actor.yDistToPlayer <= 50.0f))) {
-        if (!Actor_HasParent(&this->actor, play)) {
-            return;
+    // Transformation masks (Skijer's NEI): widen the collect/offer window while the Zora
+    // swim owns the body. This gate runs BEFORE Actor_OfferGetItemNearby below, so
+    // without it a swimming Zora never even gets the offer for heart pieces / small keys
+    // / rando checks — the 30/±50 box assumes a player standing on the same floor as the
+    // drop. MM does exactly this, with these exact numbers, for its own wide case (the
+    // curled Goron ball): see 2Ship z_en_item00.c:537-542, PLAYER_STATE3_1000 -> 60/±100.
+    {
+        extern u8 MmForm_IsZoraSwimming(Player * player);
+        f32 collectXZ = 30.0f;
+        f32 collectY = 50.0f;
+
+        if (MmForm_IsZoraSwimming(GET_PLAYER(play))) {
+            collectXZ = 60.0f;
+            collectY = 100.0f;
+        }
+
+        if (!((this->actor.xzDistToPlayer <= collectXZ) && (this->actor.yDistToPlayer >= -collectY) &&
+              (this->actor.yDistToPlayer <= collectY))) {
+            if (!Actor_HasParent(&this->actor, play)) {
+                return;
+            }
         }
     }
 
@@ -1471,7 +1488,7 @@ void EnItem00_DrawHeartContainer(EnItem00* this, PlayState* play) {
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     func_8002ED80(&this->actor, play, 0);
     gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-    gSPDisplayList(POLY_XLU_DISP++, gHeartContainerInteriorDL);
+    POLY_XLU_DISP = GetItem_DrawDListWithCosmetics(POLY_XLU_DISP, gHeartContainerInteriorDL, GID_HEART_CONTAINER);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -1487,7 +1504,7 @@ void EnItem00_DrawHeartPiece(EnItem00* this, PlayState* play) {
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     func_8002ED80(&this->actor, play, 0);
     gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-    gSPDisplayList(POLY_XLU_DISP++, gHeartPieceInteriorDL);
+    POLY_XLU_DISP = GetItem_DrawDListWithCosmetics(POLY_XLU_DISP, gHeartPieceInteriorDL, GID_HEART_PIECE);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
