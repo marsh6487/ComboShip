@@ -59,7 +59,7 @@ int main() {
         ComboRando::item.itemName = alias;
         stagedPath.clear();
         assert(Rando::ComboForeignMessageIcon(17) == 0xF5 && "cold Ikana alias lost its native MM icon");
-        assert(stagedPath == "__OTR__icon_item_static_yar/gItemIconMirrorShieldTex");
+        assert(stagedPath == COMBO_IKANA_SHIELD_ICON);
         assert(width == 32 && height == 32 && !ia8);
     }
     donorReady = true;
@@ -75,7 +75,7 @@ int main() {
     ComboRando::item.itemName = "unknown borrowed name";
     donorIcon = {"__OTR__icon_item_static_yar/gItemIconMirrorShieldTex", 32, 32, 0, 0, {}};
     assert(Rando::ComboForeignMessageIcon(17) == 0xF5);
-    assert(stagedPath == "__OTR__icon_item_static_yar/gItemIconMirrorShieldTex");
+    assert(stagedPath == COMBO_IKANA_SHIELD_ICON);
     ComboRando::item.trap = true;
     stagedPath = "untouched";
     assert(Rando::ComboForeignMessageIcon(17) == 0xFE && stagedPath == "untouched");

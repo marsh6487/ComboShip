@@ -34,7 +34,6 @@ void Audio_PlaySoundGeneral(u16, Vec3f*, u8, f32*, f32*, s8*) {}
 CAST_BOUNDARY(WandSand_Cast) CAST_BOUNDARY(WandWind_Cast) CAST_BOUNDARY(WandWater_Cast)
 CAST_BOUNDARY(WandMeteor_Cast) CAST_BOUNDARY(WandStorm_Cast) CAST_BOUNDARY(WandShadow_Cast)
 u8 WandSand_HoldElapsed(Player*, u8) { return 0; }
-void WandSand_TickHold(Player*, PlayState*, u8) {}
 void WandSand_Forget() {} void WandWater_Forget() {} void WandShadow_Forget() {} void WandStorm_Forget() {}
 void WandShadow_Tick(PlayState*) {} void WandStorm_Tick(PlayState*,Player*) {} void WandWind_Tick(PlayState*,Player*) {}
 void WandWind_TickHover(Player*,u8) {}

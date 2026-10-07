@@ -2,7 +2,12 @@
 #define COMBO_ITEM_ICON_OWNERSHIP_H
 #include <string.h>
 
-#define COMBO_IKANA_SHIELD_ICON "__OTR__icon_item_static_yar/gItemIconMirrorShieldTex"
+#define COMBO_IKANA_SHIELD_ICON_NATIVE "__OTR__icon_item_static_yar/gItemIconMirrorShieldTex"
+#ifdef COMBO_BUILD
+#define COMBO_IKANA_SHIELD_ICON "__OTR__@mm:icon_item_static_yar/gItemIconMirrorShieldTex"
+#else
+#define COMBO_IKANA_SHIELD_ICON COMBO_IKANA_SHIELD_ICON_NATIVE
+#endif
 
 // This is MM's Mirror Shield, independent of which game's catalog carries its
 // extended-equipment identity. Cold aliases must never choose OoT's shield.
@@ -19,6 +24,6 @@ static inline int ComboIconIsIkanaShieldName(const char* name) {
 }
 
 static inline int ComboIconUsesMmOwnership(const char* path) {
-    return path && !strcmp(path, COMBO_IKANA_SHIELD_ICON);
+    return path && (!strcmp(path, COMBO_IKANA_SHIELD_ICON) || !strcmp(path, COMBO_IKANA_SHIELD_ICON_NATIVE));
 }
 #endif

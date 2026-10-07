@@ -56,12 +56,17 @@ def declaration(path, start):
 def main():
     global SOURCE_REF
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--case', choices=['native-storm', 'native-water', 'shadow', 'modes', 'oot-sand'])
-    parser.add_argument('--check', choices=['sand', 'held-sand', 'water', 'storm', 'destroy'],
-                        help='run one focused modes acceptance check')
+    parser.add_argument('--case', choices=['native-storm', 'native-water', 'shadow', 'modes', 'oot-sand', 'behavior', 'sand-parity'])
+    parser.add_argument('--check', choices=['sand', 'held-sand', 'water', 'storm', 'destroy', 'sand-path', 'storm-hits'],
+                        help='run one focused modes or behavior acceptance check')
     parser.add_argument('--sanitize', action='store_true', help='enable AddressSanitizer and UndefinedBehaviorSanitizer')
     parser.add_argument('--source-ref', help='run the same expectations against an earlier source revision')
     args = parser.parse_args()
+    if args.check:
+        check_case = 'behavior' if args.check in ('sand-path', 'storm-hits') else 'modes'
+        if args.case and args.case != check_case:
+            parser.error('--check ' + args.check + ' requires --case ' + check_case)
+        args.case = check_case
     SOURCE_REF = args.source_ref
     actor = 'mm/src/code/z_actor.c'
     storm = 'mm/src/overlays/actors/ovl_En_Okarina_Effect/z_en_okarina_effect.c'
@@ -177,6 +182,34 @@ def main():
     oot += '\n' + bodies(oot_wand, ['Wand_IsDrawn', 'Wand_OnWheelConfirm', 'Wand_BuildWheel',
         'Wand_ActiveWheelIndex', 'Wand_Cast', 'Wand_TickInput'])
 
+    # Replace the old fixture's collider boundaries with the real engine pipeline.
+    # This catches a projectile that registers successfully but misses low enemies.
+    behavior_fixture = (ROOT / 'tests/wand_modes/modes_test.cpp').read_text()
+    fixture_functions = functions(behavior_fixture)
+    for name in ['Collider_InitCylinder', 'Collider_SetCylinder', 'CollisionCheck_SetAT', 'main']:
+        behavior_fixture = behavior_fixture.replace(fixture_functions[name], '')
+    collision = 'mm/src/code/z_collision_check.c'
+    collision_names = ['Collider_InitBase', 'Collider_SetBase', 'Collider_ResetATBase',
+        'Collider_InitElementDamageInfoAT', 'Collider_SetElementDamageInfoAT', 'Collider_ResetATElementUnk',
+        'Collider_InitElementDamageInfoAC', 'Collider_SetElementDamageInfoAC', 'Collider_InitElement',
+        'Collider_SetElement', 'Collider_ResetATElement', 'Collider_InitCylinderDim', 'Collider_SetCylinderDim',
+        'Collider_InitCylinder', 'Collider_SetCylinder', 'Collider_ResetCylinderAT',
+        'CollisionCheck_GetElementATDamage', 'CollisionCheck_GetDamageAndEffectOnElementAC',
+        'CollisionCheck_ApplyElementATDefense', 'CollisionCheck_IsElementNotAT', 'CollisionCheck_IsElementNotAC',
+        'CollisionCheck_NoSharedFlags', 'CollisionCheck_SetBounce', 'CollisionCheck_SetATvsAC',
+        'CollisionCheck_AC_CylVsCyl', 'CollisionCheck_ApplyDamage']
+    behavior_native = bodies(collision, collision_names)
+    behavior_native += '\ntypedef s32 (*ColChkResetFunc)(PlayState*, Collider*);\n' + \
+        'ColChkResetFunc sATResetFuncs[COLSHAPE_MAX] = {nullptr, Collider_ResetCylinderAT};\n'
+    behavior_native += bodies(collision, ['CollisionCheck_SetAT'])
+    behavior_native += '\n' + bodies('mm/src/code/sys_math3d.c', ['Math3D_CylVsCylOverlapCenterDist'])
+    behavior_native += '\n' + bodies('mm/src/code/z_actor.c', ['Actor_ApplyDamage'])
+    slime = source('mm/src/overlays/actors/ovl_En_Slime/z_en_slime.c')
+    behavior_native += '\n' + re.search(r'typedef enum EnSlimeDamageEffect \{.*?} EnSlimeDamageEffect;', slime, re.S)[0]
+    behavior_native += '\n' + re.search(r'static ColliderCylinderInit sCylinderInit = \{.*?\n};', slime, re.S)[0]
+    behavior_native += '\n' + re.search(r'static DamageTable sDamageTable = \{.*?\n};', slime, re.S)[0]
+    behavior_native += '\n' + bodies('mm/src/overlays/actors/ovl_En_Slime/z_en_slime.c', ['EnSlime_UpdateDamage'])
+
     with tempfile.TemporaryDirectory(prefix='mm-wand-') as directory:
         temp = Path(directory)
         (temp / 'production.inc').write_text(production)
@@ -184,9 +217,12 @@ def main():
         (temp / 'shadow.inc').write_text(shadow)
         (temp / 'modes.inc').write_text(modes)
         (temp / 'oot_sand.inc').write_text(oot)
+        (temp / 'behavior_fixture.inc').write_text(behavior_fixture)
+        (temp / 'behavior_native.inc').write_text(behavior_native)
         for name, test_path in [('native-storm', 'native_storm_test.cpp'), ('native-water', 'native_water_test.cpp'), ('shadow', 'shadow_test.cpp'),
-                ('modes', 'modes_test.cpp'), ('oot-sand', 'oot_sand_test.cpp')]:
-            if args.case and args.case != name:
+                ('modes', 'modes_test.cpp'), ('oot-sand', 'oot_sand_test.cpp'), ('behavior', 'behavior_test.cpp')]:
+            parity_case = args.case == 'sand-parity' and name in ('oot-sand', 'behavior')
+            if args.case and args.case != name and not parity_case:
                 continue
             binary = temp / name
             compiler_flags = flags()
@@ -202,7 +238,19 @@ def main():
             subprocess.run(['c++', '-std=c++20', '-fpermissive', *compiler_flags, '-I' + str(temp),
                 '-ffunction-sections', '-fdata-sections', str(ROOT / 'tests/wand_modes' / test_path),
                 '-Wl,--gc-sections', '-o', str(binary)], check=True)
-            subprocess.run([str(binary), *([args.check] if args.check and name == 'modes' else [])], check=True)
+            if not parity_case:
+                subprocess.run([str(binary), *([args.check] if args.check else [])], check=True)
+
+        if args.case in (None, 'sand-parity'):
+            donor = subprocess.check_output([str(temp / 'oot-sand'), 'sand-parity'], text=True).splitlines()
+            port = subprocess.check_output([str(temp / 'behavior'), 'sand-parity'], text=True).splitlines()
+            if donor != port:
+                for index, (expected, actual) in enumerate(zip(donor, port)):
+                    if expected != actual:
+                        raise AssertionError(f'Sand differs from OoT at observation {index}:\nOoT {expected}\nMM  {actual}')
+                raise AssertionError(f'Sand trace lengths differ: OoT {len(donor)}, MM {len(port)}')
+            print(f'PASS OoT/MM Sand parity: {len(donor)} observations, C/D-pad, four headings, two meshes, '
+                  'walking/pausing/turning, placement, billing, crumble and ring overflow')
 
     if args.case in (None, 'modes') and SOURCE_REF is None and not args.check:
         subprocess.run([sys.executable, str(ROOT / 'tests/wand_modes/run_cast_regression_tests.py')], check=True)

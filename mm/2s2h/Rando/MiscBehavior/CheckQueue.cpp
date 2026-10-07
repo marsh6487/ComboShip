@@ -191,8 +191,11 @@ void Rando::MiscBehavior::CheckQueue() {
                             Rando::AppendReceiptSource(entry, BankRewardSourceSuffix(cid));
                             if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
                                 CustomMessage::SetActiveCustomMessage(entry.msg, entry);
-                            } else if (Rando::MiscBehavior::ShouldShowForeignCutscene(cid)) {
-                                CustomMessage::StartTextbox(entry.autoFormat ? entry.msg + "\x1C\x02\x10" : entry.msg,
+                            } else if (entry.capeVisibilityChoice ||
+                                       Rando::MiscBehavior::ShouldShowForeignCutscene(cid)) {
+                                CustomMessage::StartTextbox(entry.autoFormat && !entry.capeVisibilityChoice
+                                                                ? entry.msg + "\x1C\x02\x10"
+                                                                : entry.msg,
                                                             entry);
                             }
                             randoSaveCheck.cycleObtained = true;
@@ -266,8 +269,11 @@ void Rando::MiscBehavior::CheckQueue() {
 
                         if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
                             CustomMessage::SetActiveCustomMessage(entry.msg, entry);
-                        } else if (Rando::StaticData::ShouldShowGetItemCutscene(randoItemId)) {
-                            CustomMessage::StartTextbox(entry.autoFormat ? entry.msg + "\x1C\x02\x10" : entry.msg,
+                        } else if (entry.capeVisibilityChoice ||
+                                   Rando::StaticData::ShouldShowGetItemCutscene(randoItemId)) {
+                            CustomMessage::StartTextbox(entry.autoFormat && !entry.capeVisibilityChoice
+                                                            ? entry.msg + "\x1C\x02\x10"
+                                                            : entry.msg,
                                                         entry);
                         } else {
                             if (Rando::StaticData::Items[randoItemId].randoItemType != RITYPE_JUNK) {

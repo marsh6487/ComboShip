@@ -16,6 +16,7 @@
 #include "soh/ShipInit.hpp"
 #include "soh/ObjectExtension/ObjectExtension.h"
 #include "item_category_adj.h"
+#include "ComboCapeReceiptChoice.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #ifdef COMBO_BUILD
 #include "rando/CrossForeign.h" // ComboShip: cross-world foreign-item marker map
@@ -604,6 +605,7 @@ void RandomizerOnPlayerUpdateForRCQueueHandler() {
     GetItemEntry getItemEntry =
         Rando::Context::GetInstance()->GetFinalGIEntry(rc, true, (GetItemID)vanillaRandomizerGet);
     GetItemCategory getItemCategory = Randomizer_AdjustItemCategory(getItemEntry);
+    bool capeVisibilityChoice = getItemEntry.modIndex == MOD_RANDOMIZER && getItemEntry.getItemId == RG_EXT_MAGIC_CAPE;
 
 #ifdef COMBO_BUILD
     // ComboShip: a foreign check holds an MM item. It flows through the normal get-item presentation
@@ -617,6 +619,7 @@ void RandomizerOnPlayerUpdateForRCQueueHandler() {
         // animations would identify every trap on sight.
         const bool major = fi != nullptr && (fi->advancement || fi->HasDisguise());
         getItemCategory = major ? ITEM_CATEGORY_MAJOR : ITEM_CATEGORY_JUNK;
+        capeVisibilityChoice = fi && !fi->trap && ComboCapeReceiptChoice::IsCape(fi->itemName.c_str());
     }
 #endif
 
@@ -629,6 +632,8 @@ void RandomizerOnPlayerUpdateForRCQueueHandler() {
         SPDLOG_INFO("Queuing Item mod {} item {} from RC {}", getItemEntry.modIndex, getItemEntry.itemId,
                     static_cast<uint32_t>(rc));
         if (
+            // The cape's receipt asks for an appearance preference, even when other pickups are skipped.
+            !capeVisibilityChoice &&
             // Skipping ItemGet animation incompatible with checks that require closing a text box to finish
             rc != RC_HF_OCARINA_OF_TIME_ITEM && rc != RC_SPIRIT_TEMPLE_SILVER_GAUNTLETS_CHEST &&
             rc != RC_MARKET_BOMBCHU_BOWLING_FIRST_PRIZE && rc != RC_MARKET_BOMBCHU_BOWLING_SECOND_PRIZE &&

@@ -18,6 +18,8 @@
 #define COMBO_ITEM_DRAW_OOT_H
 
 #include "ComboItemDrawABI.h"
+#include <ship/resource/CrossRMRegistry.h>
+#include <ship/resource/ResourceManagerScope.h>
 #include "ComboLiveCosmetics.h"
 #include "ComboExport.h"
 #include "ComboMaskShimmer.h"
@@ -569,12 +571,20 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             out->opCount = 1;
             out->ops[0] = { CW_OP_ROTATE_Z, 18774.682f, 0, 0, {} };
             return 1;
-        case RG_EXT_SHIELD_OF_IKANA:
-            CwSimple(out, "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL", false, .035f);
+        case RG_EXT_SHIELD_OF_IKANA: {
+            const char* path = "objects/object_link_child/gLinkHumanMirrorShieldDL";
+            const bool local = ResourceMgr_IsModAssetForGame("oot", path);
+            CwSimple(out,
+                     local ? "__OTR__objects/object_link_child/gLinkHumanMirrorShieldDL"
+                           : "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL",
+                     false, .035f);
             out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
             out->opCount = 1;
-            out->ops[0] = { CW_OP_ROTATE_X, 16384.0f, 0, 0, {} };
+            float tilt = 1.5707963267948966f;
+            ResourceMgr_GetIkanaShieldGiTiltXForGame(local ? "oot" : "mm", path, &tilt);
+            out->ops[0] = { CW_OP_ROTATE_X, tilt * (32768.f / 3.14159265358979323846f), 0, 0, {} };
             return 1;
+        }
         case RG_CLAWSHOT:
             return CwSimple(out, "__OTR__@mm:objects/object_gi_hookshot/gGiHookshotDL", false, 0.0f);
         case RG_EXT_PENDANT_OF_MEMORIES:
@@ -783,6 +793,19 @@ static int32_t OOT_DrawDependency(RandomizerGet rg, const CwItemDrawInfo& info) 
     // Concrete swords can switch between the redesign and selected weapon pack.
     // Refresh both recipes; progressive requests still freeze at grant time above.
     switch (rg) {
+        // Selected bottle recipes change their OPA/XLU split. Refresh the
+        // descriptor after Alt changes while keeping acquisition state frozen.
+        case RG_BOTTLE_WITH_RED_POTION:
+        case RG_BOTTLE_WITH_GREEN_POTION:
+        case RG_BOTTLE_WITH_BLUE_POTION:
+        case RG_RED_POTION_REFILL:
+        case RG_GREEN_POTION_REFILL:
+        case RG_BLUE_POTION_REFILL:
+        case RG_BUY_RED_POTION_30:
+        case RG_BUY_RED_POTION_40:
+        case RG_BUY_RED_POTION_50:
+        case RG_BUY_GREEN_POTION:
+        case RG_BUY_BLUE_POTION:
         case RG_KOKIRI_SWORD:
         case RG_RAZOR_SWORD:
         case RG_GILDED_SWORD:
@@ -954,6 +977,12 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     f32 scale = 0.0f;
     int32_t drawKind = CW_DRAW_KIND_SIMPLE;
     uint8_t colors[16] = {};
+    // Potion recipe classification loads the selected wrappers. The dormant
+    // donor's Alt state must win even when MM currently owns the Context.
+    const auto drawOwner = Ship::CrossRMRegistry::Get("oot");
+    if (!drawOwner)
+        return CW_DRAW_NOT_READY;
+    Ship::ResourceManagerScope drawOwnerScope(drawOwner);
     int32_t n = GetItem_GetDrawTableEntry((s32)gi.gid, dls, CW_DRAW_MAX_DLISTS, &xluStart, &scale, &drawKind, colors);
     if (n <= 0) {
         return 0; // unsupported/non-portable draw func
@@ -962,6 +991,8 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     out->xluStartIndex = xluStart;
     out->scale = scale;
     out->drawKind = drawKind;
+    if (drawKind == CW_DRAW_KIND_ELEMENTAL_ARROW)
+        out->neiEffect = NeiArrowGi_ProfileForDrawId(effRg, RG_FIRE_ARROWS, RG_ICE_ARROWS, RG_LIGHT_ARROWS);
     if (drawKind == CW_DRAW_KIND_FAIRY)
         out->stateDependent = 2; // selected generic/fairy-specific shell follows live owner Alt/mod state
     for (int32_t i = 0; i < 4; i++) {

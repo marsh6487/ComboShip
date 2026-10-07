@@ -4,10 +4,14 @@ cd "$(dirname "$0")/../.."
 python3 -B scripts/diagnostics/run_hint_item_name_tests.py
 python3 -B scripts/diagnostics/run_combo_crash_owner_tests.py
 python3 -B scripts/diagnostics/run_nei_gi_tests.py --held --combo
+python3 -B tests/elemental_arrow_gi/run_tests.py
 python3 -B tests/nei_gi/run_flame_arena_tests.py
 python3 -B scripts/diagnostics/run_mm_item_presentation_tests.py
 python3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py --sanitize
 python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py
+python3 -B tests/item_receipts/run_key_receipt_tests.py --sanitizers
+python3 -B tests/cape_choice/run_tests.py
+python3 -B tests/cape_choice/run_tests.py --sanitize
 python3 -B scripts/diagnostics/run_anklet_icon_tests.py
 python3 -B scripts/diagnostics/run_native_heart_receipt_icon_tests.py
 python3 -B tests/item_receipts/run_seed_settings_tests.py --sanitizers
@@ -21,6 +25,7 @@ python3 -B scripts/diagnostics/run_sword_receipt_tests.py --sanitize
 python3 -B scripts/diagnostics/run_sword_asset_toggle_tests.py --sanitize
 python3 -B scripts/diagnostics/run_sword_resource_view_tests.py --sanitize
 python3 -B scripts/diagnostics/run_fairy_bottle_tests.py
+python3 -B scripts/diagnostics/run_bottle_gi_tests.py
 python3 -B tests/seasons/run_tests.py
 python3 -B tests/seasons/run_native_weather_tests.py --sanitize
 python3 -B tests/seasons/run_generated_leaf_texture_tests.py
@@ -56,6 +61,8 @@ python3 -B tests/nei_held/run_hand_fit_tests.py
 python3 -B tests/nei_held/run_articulated_tests.py
 python3 -B tests/nei_asset_priority/run_tests.py
 python3 -B tests/nei_asset_priority/run_oot_gi_tests.py
+python3 -B tests/nei_asset_priority/run_tunic_model_tests.py --sanitize
+python3 -B tests/ikana_gi/run_tests.py --sanitize
 python3 -B tests/nei_held/run_equipment_tests.py
 python3 -B tests/mm_equipment_pause/run_tests.py --sanitize
 python3 -B tests/nei_quest_held/run_tests.py

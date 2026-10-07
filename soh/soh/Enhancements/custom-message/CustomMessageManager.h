@@ -41,6 +41,7 @@ typedef enum {
 class CustomMessage {
   public:
     CwItemReceiptPresentation receiptPresentation{};
+    bool capeVisibilityChoice = false;
     CustomMessage() = default;
     CustomMessage(std::string english_, std::string german_, std::string french_,
                   TextBoxType type_ = TEXTBOX_TYPE_BLACK, TextBoxPosition position_ = TEXTBOX_POS_BOTTOM);

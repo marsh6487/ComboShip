@@ -25,6 +25,26 @@
 #include "mods/nei_save.h" // Skijer's NEI: mmQuestItems (MM/custom song ownership for the MM quest page)
 #include "mods/transformation_masks/transformation_masks.h" // MmForm_GetOcarinaPlaybackInstrument
 
+static u8 sCapeVisibilityChoice;
+
+void Message_SetCapeVisibilityChoice(int enabled) {
+    sCapeVisibilityChoice = enabled != 0;
+}
+
+static int Message_HandleCapeVisibilityChoice(PlayState* play) {
+    MessageContext* msgCtx = &play->msgCtx;
+    if (!sCapeVisibilityChoice || msgCtx->msgMode != MSGMODE_TEXT_DONE ||
+        msgCtx->textboxEndType != TEXTBOX_ENDTYPE_2_CHOICE)
+        return false;
+    // Fast-text B/C-up presses must never accept the appearance preference.
+    if (CHECK_BTN_ALL(play->state.input[0].press.button, BTN_A) && Message_ShouldAdvance(play)) {
+        Nei_Save()->capeHidden = msgCtx->choiceIndex != 0;
+        sCapeVisibilityChoice = false;
+        Message_CloseTextbox(play);
+    }
+    return true;
+}
+
 // SOH [Enhancement] Text Speed which fills whole box in one frame
 #define TEXT_SPEED_INSTANT 6
 
@@ -881,7 +901,7 @@ static void Message_ApplyItemReceiptLayout(PlayState* play) {
     }
     sItemReceiptFirstPage = (uint32_t)msgCtx->msgBufPos >= sItemReceiptLayout.iconPageStart &&
                             (uint32_t)msgCtx->msgBufPos <= sItemReceiptLayout.firstPageEnd;
-    R_TEXT_CHAR_SCALE = 75;
+    R_TEXT_CHAR_SCALE = sItemReceiptFirstPage ? sItemReceiptLayout.textScale : 75;
     R_TEXT_LINE_SPACING = 12;
 }
 
@@ -1416,7 +1436,9 @@ void Message_DrawText(PlayState* play, Gfx** gfxP) {
                 }
                 break;
             case ' ':
-                msgCtx->textPosX += CVarGetInteger(CVAR_ENHANCEMENT("TextSpacing"), 6);
+                msgCtx->textPosX += sItemReceiptPresentation.singleBox && sItemReceiptFirstPage
+                                        ? 6 * sItemReceiptLayout.textScale / 75
+                                        : CVarGetInteger(CVAR_ENHANCEMENT("TextSpacing"), 6);
                 break;
             case MESSAGE_BOX_BREAK:
                 if (msgCtx->msgMode == MSGMODE_TEXT_DISPLAYING) {
@@ -2823,6 +2845,7 @@ void Message_OpenText(PlayState* play, u16 textId) {
     s16 textBoxType;
 
     Message_SetItemReceiptPresentation(NULL);
+    Message_SetCapeVisibilityChoice(false);
     bool loadFromMessageTable = true;
     GameInteractor_ExecuteOnOpenText(&textId, &loadFromMessageTable);
 
@@ -4834,6 +4857,9 @@ void Message_Update(PlayState* play) {
             }
             break;
         case MSGMODE_TEXT_DONE:
+            if (Message_HandleCapeVisibilityChoice(play)) {
+                break;
+            }
             if (msgCtx->textboxEndType == TEXTBOX_ENDTYPE_FADING) {
                 msgCtx->stateTimer--;
                 if (msgCtx->stateTimer == 0) {
@@ -4966,6 +4992,7 @@ UNK_TYPE D_80153D7C = 0x00000000;
 s16 gGameOverTimer = 0;
 
 #define MESSAGE_PAL_SHIP_SAVESTATE_FIELDS(F) \
+    F(sCapeVisibilityChoice)                 \
     F(sOcarinaButtonIndexBufPos)             \
     F(sOcarinaButtonIndexBufLen)             \
     F(sOcarinaButtonIndexBuf)                \

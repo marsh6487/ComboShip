@@ -10,6 +10,11 @@
 #include <cstdio>
 #include <cstring>
 
+void MMAutumnSceneFoliage_Update(const PlayState*) {
+}
+void MMAutumnSceneFoliage_Reset() {
+}
+
 static_assert(PRECIP_RAIN_MAX == 0 && PRECIP_RAIN_CUR == 1 && PRECIP_SNOW_CUR == 2 && PRECIP_SNOW_MAX == 3);
 static_assert(WEATHER_MODE_RAIN == 1 && WEATHER_MODE_SNOW == 3 && SEASON_WINTER == 3);
 
@@ -26,7 +31,7 @@ static f32 D_808DE5B0;
 static u16 D_808DE340;
 static int snowDraws, rainDraws, spawns, refreshes;
 static int gameplayRandomCalls;
-static unsigned leafPalettes, leafDraws;
+static unsigned leafPalettes, leafDraws, firstLeafAlpha;
 static float rainGain;
 static u8 nativeRainAmbience, nativeThunderAmbience;
 static ObjectKankyo supplemental[32];
@@ -205,10 +210,16 @@ static int DrawSnow(PlayState* play) {
     play->state.gfxCtx->polyXlu.p = commands;
     int before = snowDraws;
     leafPalettes = leafDraws = 0;
+    firstLeafAlpha = 0;
     for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].first; actor; actor = actor->next) {
         if (actor->draw) actor->draw(actor, play);
     }
+    bool havePrim = false;
     for (const Gfx* command = commands; command < play->state.gfxCtx->polyXlu.p; ++command) {
+        if ((command->words.w0 >> 24) == G_SETPRIMCOLOR && !havePrim) {
+            firstLeafAlpha = command->words.w1 & 255;
+            havePrim = true;
+        }
         if ((command->words.w0 >> 24) == G_SETTIMG) {
             for (unsigned palette = 0; palette < 4; ++palette) {
                 if (command->words.w1 == (uintptr_t)sAutumnLeafTextures[palette]) {
@@ -222,7 +233,55 @@ static int DrawSnow(PlayState* play) {
     return snowDraws - before;
 }
 
+static void AutumnCoverageRegression() {
+    static PlayState play;
+    Camera camera{};
+    GraphicsContext gfx{};
+    Reset(&play, &camera, &gfx);
+    play.sceneId = SCENE_00KEIKOKU;
+    camera.fov = 60;
+    Confirm(&play, SEASON_AUTUMN);
+    for (int frame = 0; frame < 30; ++frame) Frame(&play);
+    auto* actor = (ObjectKankyo*)play.actorCtx.actorLists[ACTORCAT_ITEMACTION].first;
+    unsigned near = 0, middle = 0, far = 0;
+    for (const auto& p : actor->unk_14C) {
+        if (!p.unk_1C) continue;
+        Vec3f pos{p.unk_00 + p.unk_0C, p.unk_04 + p.unk_10, p.unk_08 + p.unk_14};
+        const float distance = Math_Vec3f_DistXZ(&pos, &play.view.eye);
+        near += distance < 1200;
+        middle += distance >= 1200 && distance < 3200;
+        far += distance >= 3200;
+    }
+    assert(near && middle && far); // The old snow bubble never reaches the middle/background.
+    assert(near == 16 && middle == 32 && far == 48); // User requested a quieter foreground.
+    auto first = actor->unk_14C[0];
+    play.view.eye.x += 30;
+    play.view.at = {30, 0, -1}; // Turn the view without dragging existing leaves along.
+    Frame(&play);
+    assert(actor->unk_14C[0].epoch == first.epoch);
+    assert(fabsf(actor->unk_14C[0].unk_00 - first.unk_00) < 2);
+    assert(fabsf(actor->unk_14C[0].unk_08 - first.unk_08) < 2);
+    assert(DrawSnow(&play) <= 128);
+    // A background leaf must retain visible alpha rather than inherit the snow's 300-unit fade.
+    actor->unk_14C[0].unk_00 = actor->unk_14C[0].unk_0C = actor->unk_14C[0].unk_10 = actor->unk_14C[0].unk_14 = 0;
+    actor->unk_14C[0].unk_04 = 0;
+    actor->unk_14C[0].unk_18 = 30;
+    for (float distance : { 1500.0f, 6000.0f }) {
+        actor->unk_14C[0].unk_08 = distance;
+        DrawSnow(&play);
+        assert(firstLeafAlpha > 100);
+    }
+    Player link{};
+    link.actor.world.pos.z = actor->unk_14C[0].unk_08;
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &link.actor;
+    DrawSnow(&play);
+    assert(firstLeafAlpha == 0); // The clear pocket follows Link, even after camera/wind movement.
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = nullptr;
+    std::puts("PASS autumn foreground/midground/background coverage, world stability and bounded rendering");
+}
+
 int main() {
+    AutumnCoverageRegression();
     static PlayState play;
     Camera camera{};
     GraphicsContext gfx{};
@@ -244,8 +303,8 @@ int main() {
     Frame(&play);
     assert(DrawSnow(&play) == 64);
     Confirm(&play, SEASON_AUTUMN);
-    assert(DrawSnow(&play) == 32 && play.actorCtx.actorLists[ACTORCAT_ITEMACTION].first->update != nullptr);
-    assert(leafPalettes == 15 && leafDraws == 32);
+    assert(DrawSnow(&play) == 96 && play.actorCtx.actorLists[ACTORCAT_ITEMACTION].first->update != nullptr);
+    assert(leafPalettes == 15 && leafDraws == 96);
     auto* leaves = (ObjectKankyo*)play.actorCtx.actorLists[ACTORCAT_ITEMACTION].first;
     const f32 beforeLeafY = leaves->unk_14C[0].unk_10;
     const int beforeLeafRandom = gameplayRandomCalls;
@@ -253,6 +312,10 @@ int main() {
     assert(leaves->unk_14C[0].unk_10 < beforeLeafY && gameplayRandomCalls == beforeLeafRandom);
     Confirm(&play, SEASON_WINTER);
     assert(spawns == firstSpawn + 1); // Autumn/Winter reuse the same native particle owner.
+    const int beforeRestoreRandom = gameplayRandomCalls;
+    assert(DrawSnow(&play) == 64);
+    assert(leaves->unk_14C[0].unk_1C == 1 && firstLeafAlpha > 0);
+    assert(gameplayRandomCalls == beforeRestoreRandom);
     Frame(&play);
     assert(DrawSnow(&play) == 64);
     assert(leafDraws == 0 && leafPalettes == 0);
@@ -266,8 +329,8 @@ int main() {
     const int beforeAutumnSpawnRandom = gameplayRandomCalls;
     Confirm(&play, SEASON_AUTUMN);
     Frame(&play);
-    assert(play.envCtx.stormState == STORM_STATE_OFF && DrawSnow(&play) == 32);
-    assert(leafPalettes == 15 && leafDraws == 32);
+    assert(play.envCtx.stormState == STORM_STATE_OFF && DrawSnow(&play) == 96);
+    assert(leafPalettes == 15 && leafDraws == 96);
     assert(gameplayRandomCalls == beforeAutumnSpawnRandom);
 
     // Scene-native snow actors must also initialize their autumn leaf phases
@@ -313,12 +376,12 @@ int main() {
     Confirm(&play, SEASON_AUTUMN);
     Frame(&play);
     assert(play.envCtx.precipitation[PRECIP_SNOW_CUR] == 128 && play.envCtx.precipitation[PRECIP_SNOW_MAX] == 128);
-    assert(DrawSnow(&play) == 64 && NativeFogVisible(&play, SANDSTORM_A) && D_801F4E30 == 155);
+    assert(DrawSnow(&play) == 96 && NativeFogVisible(&play, SANDSTORM_A) && D_801F4E30 == 155);
     const auto autumnSnowhead = play.envCtx;
     Confirm(&play, SEASON_WINTER);
     assert(DrawSnow(&play) == 128 && play.envCtx.precipitation[PRECIP_SNOW_CUR] == 128);
     Confirm(&play, SEASON_AUTUMN);
-    assert(DrawSnow(&play) == 64 && NativeFogVisible(&play, SANDSTORM_A));
+    assert(DrawSnow(&play) == 96 && NativeFogVisible(&play, SANDSTORM_A));
     assert(std::memcmp(&autumnSnowhead, &play.envCtx, sizeof(autumnSnowhead)) == 0);
     Confirm(&play, SEASON_OFF);
     assert(play.envCtx.precipitation[PRECIP_SNOW_CUR] == 128 && play.envCtx.precipitation[PRECIP_SNOW_MAX] == 128);
@@ -358,7 +421,7 @@ int main() {
     assert(play.envCtx.precipitation[PRECIP_SNOW_CUR] == 126 && DrawSnow(&play) == 64);
     const auto afterNativeTag = play.envCtx;
     Confirm(&play, SEASON_AUTUMN);
-    assert(DrawSnow(&play) == 32 && NativeFogVisible(&play, SANDSTORM_A));
+    assert(DrawSnow(&play) == 96 && NativeFogVisible(&play, SANDSTORM_A));
     assert(std::memcmp(&afterNativeTag, &play.envCtx, sizeof(afterNativeTag)) == 0);
     Confirm(&play, SEASON_OFF);
     assert(std::memcmp(&afterNativeTag, &play.envCtx, sizeof(afterNativeTag)) == 0);

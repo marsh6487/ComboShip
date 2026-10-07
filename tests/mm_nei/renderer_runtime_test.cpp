@@ -28,7 +28,7 @@ OOT_GetNeiGiDrawInfoForAssets(const char* slug, int32_t altAssets, CwItemDrawInf
   ++descriptorCalls;
   std::string prefix=std::string("__OTR__objects/nei_gi_redesign/")+slug;
   const char* opa=descriptorPaths.insert(prefix+"/gi_dl").first->c_str();
-  const bool split=!strcmp(slug,"phantom_hourglass") || !strcmp(slug,"shadow_crystal");
+  const bool split=!strcmp(slug,"phantom_hourglass");
   const char* skin=split ? descriptorPaths.insert(prefix+"/gi_xlu_dl").first->c_str() : nullptr;
   *out = {};
   const auto *bounds = NeiGi::FindFrameBounds(opa);
@@ -116,15 +116,15 @@ int main() {
     assert(shown.size()>=expected.size() && !memcmp(shown.data(),expected.data(),expected.size()*sizeof(Vtx)) &&
            "native MM songs must submit the matching shared shimmer even without optional effects or donor/mod resources");
     if(song.profile==CW_SONG_EPONA || song.profile==CW_SONG_SUN)assert(shown.size()==expected.size());
-    if(song.profile==CW_SONG_OOT_BOLERO) {
-      bool hotCore=false, warmBody=false;
-      for(const auto& vertex:shown) {
-        const auto* rgba=vertex.v.cn;
-        if(!rgba[3])continue;
-        hotCore|=rgba[0]==255 && rgba[1]==242 && rgba[2]==173;
-        warmBody|=rgba[0]==255 && rgba[1]==175 && rgba[2]==54;
-      }
-      assert(hotCore && warmBody && "native MM Bolero must submit the visible flame body and hot core in addition to red shimmer");
+    if(song.profile==CW_SONG_OOT_BOLERO)assert(shown.size()==expected.size() && "Bolero must retain only red shimmer");
+    if(song.profile==CW_SONG_OOT_PRELUDE) {
+      reset();NeiGi_DrawMesh(&play,NeiGi::SampleSong(song.profile,42,NeiGi_CameraBasis(&play)));
+      const auto motes=packedEffects();
+      assert(shown.size()==expected.size()+motes.size() &&
+             !memcmp(shown.data()+expected.size(),motes.data(),motes.size()*sizeof(Vtx)));
+      assert(motes.size()>0 && motes.size()<300 && "Prelude light particles must replace its broad ring/disc");
+      // Restore the note draw used by the shared assertion below.
+      reset();assert(MM_TryDrawNeiGi(song.item));
     }
     assert(nativeDisplayLists.size()==1 && !strcmp(reinterpret_cast<const char*>(nativeDisplayLists.front()),
                                                   "__OTR__objects/object_gi_melody/gGiSongNoteDL") && matrices.empty());
@@ -135,10 +135,19 @@ int main() {
   reset();NeiGi_DrawMesh(&play,NeiGi::SampleSeason(42,1,NeiGi_CameraBasis(&play)));
   const auto expectedRain=packedEffects();
   assert(rainOnly.size()==expectedRain.size() && !memcmp(rainOnly.data(),expectedRain.data(),expectedRain.size()*sizeof(Vtx)));
-  for(RandoItemId song:{RI_SONG_HEALING,RI_SONG_SOARING,RI_SONG_TIME,RI_SONG_SONATA,RI_SONG_NOVA,
+  for(RandoItemId song:{RI_SONG_HEALING,RI_SONG_TIME,RI_SONG_SONATA,RI_SONG_NOVA,
                        RI_SONG_LULLABY,RI_SONG_LULLABY_INTRO,RI_SONG_ELEGY,RI_SONG_OATH,RI_SONG_DOUBLE_TIME,RI_SONG_INVERTED_TIME}) {
     reset();assert(MM_TryDrawNeiGi(song));
     assert(packedEffects().empty() && matrices.empty() && "regular MM songs must keep only their original note");
+  }
+  for(bool effects:{false,true})for(bool alt:{false,true})for(bool donor:{false,true}) {
+    reset();itemEffects=effects;mmAltEnabled=alt;ownerRegistered=donor;
+    NeiGi_DrawMesh(&play,NeiGi::SampleSong(CW_SONG_SOARING,42,NeiGi_CameraBasis(&play)));
+    const auto feathers=packedEffects();assert(feathers.size()>400);
+    reset();assert(MM_TryDrawNeiGi(RI_SONG_SOARING));
+    const auto shown=packedEffects();
+    assert(shown.size()==feathers.size() && !memcmp(shown.data(),feathers.data(),shown.size()*sizeof(Vtx)) && matrices.empty());
+    assert(nativeDisplayLists.size()==1 && "Soaring feathers must accompany the native song note");
   }
   ownerRegistered=true;mmAltEnabled=false;itemEffects=false;
   std::cout << "PASS real native MM song submission: mandatory colored shimmer, original note, rain-only Storms, plain regular songs and donor/Alt independence\n";

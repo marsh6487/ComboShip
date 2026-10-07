@@ -88,7 +88,7 @@ new=re.sub(r'static bool NeiGi_DrawMeshMaterial\(.*?\) \{',
 start=new.index('{')+1;end=new.index('    // Reuse shared vertices')
 assert tokens(new[start:end])==tokens('''
     if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, material, seasonSunRays) || int(orb) < 0 ||
-        int(orb) > int(Kind::MarioMask))
+        int(orb) > int(Kind::Gold))
         return false;
 ''')
 new=new[:start]+'\n    if (mesh.count == 0)\n        return;\n'+new[end:]

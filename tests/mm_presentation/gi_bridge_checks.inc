@@ -19,7 +19,7 @@ assert(mmKokiri.neiEffect != ootKokiri.neiEffect);
 for (const auto& origin : {std::pair{mmKokiri, 0xA46CFFu}, std::pair{ootKokiri, 0x78C850u}}) {
     Reset();
     MM_DrawNeiGi(origin.first);
-    assert(Drawn() == std::vector<std::string>{origin.first.dlists[0]});
+    assert(Drawn(true) == std::vector<std::string>{origin.first.dlists[0]});
     assert(!arena.empty()); // Intrinsic particles are carried without the optional toggle.
     bool carriesColor = false;
     for (const auto& mesh : arena)
@@ -84,7 +84,9 @@ for (const auto& item : {
     std::pair{ RI_OOT_NEI_CANE_PACCI_FLIP, Kind::Pacci },
     std::pair{ RI_OOT_NEI_CANE_PACCI_STONE, Kind::Pacci },
     std::pair{ RI_OOT_NEI_CANE_PACCI_ULTRAHAND, Kind::Pacci },
-    std::pair{ RI_OOT_NEI_POKE_BALL, Kind::Pokeball } }) {
+    std::pair{ RI_OOT_NEI_POKE_BALL, Kind::Pokeball },
+    std::pair{ RI_OOT_EXT_TRIDENT, Kind::Gold },
+    std::pair{ RI_OOT_EXT_ROC_BOOTS, Kind::Gold } }) {
     for (int optionalEffects : {0, 1}) {
         Reset(); enabled = optionalEffects;
         { MM_NeiGiFallbackShimmer shimmer(item.first); }

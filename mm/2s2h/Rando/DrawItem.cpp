@@ -36,8 +36,9 @@ int ResourceMgr_IsModAsset(const char* path);
 void* OotAssets_LoadGfx(const char* otrPath);        // Skijer's NEI — resolve an OoT model DL from oot.o2r
 void* OotAssets_LoadGfxDirect(const char* otrPath);  // Skijer's NEI — archive-scoped load (defeats MM shadowing)
 void* OotAssets_LoadTexOrDList(const char* otrPath); // Skijer's NEI — texture/DL resource (Climb ladder seg-8 tex)
-uint16_t Nei_GetOwnedItem(uint8_t slot);             // mods/nei_save.cpp — Roc chain level for its draw (u16 store)
-extern Gfx gIKAxeInlineDL[];                         // equipment/objects/ikaxe_DL — axe with segments pre-resolved
+int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt);
+uint16_t Nei_GetOwnedItem(uint8_t slot); // mods/nei_save.cpp — Roc chain level for its draw (u16 store)
+extern Gfx gIKAxeInlineDL[];             // equipment/objects/ikaxe_DL — axe with segments pre-resolved
 }
 
 #define COMBO_SPIN_GI_HOST_MM
@@ -63,14 +64,14 @@ void DrawOotNeiUltrahand();
 
 extern "C" int32_t MM_GetItemAnimDrawInfo(const char* itemName, CwItemAnimDrawInfo* out);
 
-// Native MM and the foreign bridge use one selected-asset route for Twinmold's
-// head GI, including flex replacement matrices, blue skin and native soul flame.
-extern "C" int32_t ComboDrawNativeTwinmoldSoul() {
+// Native and foreign MM boss GIs share the owning-Alt cache and loaded skeleton
+// type dispatch. Reusing the recipe also keeps the native soul flame and skin.
+extern "C" int32_t ComboDrawNativeMmBossSoul(RandoItemId id) {
     if (gPlayState == nullptr) {
         return 0;
     }
     CwItemAnimDrawInfo info{};
-    const std::string& name = Rando::StaticData::GetItemDisplayName(RI_SOUL_BOSS_TWINMOLD);
+    const std::string& name = Rando::StaticData::GetItemDisplayName(id);
     if (MM_GetItemAnimDrawInfo(name.c_str(), &info) != 1) {
         return 0;
     }
@@ -78,6 +79,10 @@ extern "C" int32_t ComboDrawNativeTwinmoldSoul() {
     const int32_t drawn = ComboForeignAnim_Draw(&info, "mm", gPlayState);
     Matrix_Pop();
     return drawn;
+}
+
+extern "C" int32_t ComboDrawNativeTwinmoldSoul() {
+    return ComboDrawNativeMmBossSoul(RI_SOUL_BOSS_TWINMOLD);
 }
 
 extern "C" void Message_StageCustomItemIconEx(void* tex, s16 width, s16 height, u8 isIA8);
@@ -102,7 +107,7 @@ uint8_t Rando::ComboForeignMessageIcon(RandoCheckId check) {
          (icon.isIA8 != 0 && icon.isIA8 != 1) || (icon.hasColor != 0 && icon.hasColor != 1)))
         return 0xFE;
     const char* routed = ComboIconUsesMmOwnership(icon.path)
-                             ? icon.path
+                             ? COMBO_IKANA_SHIELD_ICON
                              : ComboInternRoutedPathOOT(std::string("__OTR__@oot:") + (icon.path + 7));
     if (icon.hasColor)
         Message_StageCustomItemIconTint((void*)routed, (s16)icon.width, (s16)icon.height, (u8)icon.isIA8, icon.color[0],
@@ -3795,6 +3800,17 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
             MM_DrawComboForeign(randoCheckId, shop, mmPickup, actor);
             break;
 #endif
+        case RI_SHIELD_MIRROR: {
+            // The authored GI returns above. Only the native/pack fallback
+            // needs to correct a selected horizontal shield mesh.
+            float tilt = 0.f;
+            ResourceMgr_GetIkanaShieldGiTiltXForGame("mm", "objects/object_gi_shield_3/gGiMirrorShieldDL", &tilt);
+            Matrix_Push();
+            Matrix_RotateXF(tilt, MTXMODE_APPLY);
+            GetItem_Draw(gPlayState, Rando::StaticData::Items[randoItemId].drawId);
+            Matrix_Pop();
+            break;
+        }
         default:
             GetItem_Draw(gPlayState, Rando::StaticData::Items[randoItemId].drawId);
             break;

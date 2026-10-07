@@ -340,12 +340,15 @@ drawn=true;hand=false;CustomItems_DrawRodOfSeasons(&player,&play);assert(models=
 
 snowpath='mm/src/overlays/actors/ovl_Object_Kankyo/z_object_kankyo.c'
 snowfunctions=['ObjectKankyo_SetupAction','func_808DC454','func_808DCB7C','func_808DCBF8','func_808DBEB0','func_808DBFB0','ObjectKankyo_Init','ObjectKankyo_Update']
+autumnfunctions=['ObjectKankyo_IsAutumnOwner','ObjectKankyo_AutumnBand','ObjectKankyo_InitAutumnParticle',
+                 'ObjectKankyo_UpdateAutumnParticles','ObjectKankyo_RestoreAutumnParticle']
 if 'ObjectKankyo_UpdateSnowTarget' in (ROOT/snowpath).read_text():
  snowfunctions.insert(2,'ObjectKankyo_UpdateSnowTarget')
 if 'ObjectKankyo_UpdateSeasonSnowParticles' in (ROOT/snowpath).read_text():
  snowfunctions.insert(2,'ObjectKankyo_UpdateSeasonSnowParticles')
 if 'ObjectKankyo_IsSeasonSnowOwner' in (ROOT/snowpath).read_text():
  snowfunctions.insert(2,'ObjectKankyo_IsSeasonSnowOwner')
+snowfunctions=autumnfunctions+snowfunctions
 run('snow_native',r'''
 #include "overlays/actors/ovl_Object_Kankyo/z_object_kankyo.h"
 int activeSeason=SEASON_WINTER,spawns=0;

@@ -10,8 +10,21 @@ extern "C" {
 #include "fixture_api.h"
 }
 #define COMBO_EXPORT
+namespace Ship {
+static bool ownerActive=false;
+struct CrossRMRegistry { static int Get(const char* game) { assert(!strcmp(game,"mm")); return 1; } };
+struct ResourceManagerScope {
+ bool previous=ownerActive;
+ ResourceManagerScope(int) { ownerActive=true; }
+ ~ResourceManagerScope() { ownerActive=previous; }
+};
+}
 enum RandoItemId {
   RI_UNKNOWN = 0,
+  RI_SHIELD_MIRROR,
+  RI_ARROW_FIRE,
+  RI_ARROW_ICE,
+  RI_ARROW_LIGHT,
   RI_WOODFALL_SMALL_KEY,
   RI_WOODFALL_BOSS_KEY,
   RI_WOODFALL_MAP,
@@ -69,7 +82,10 @@ enum RandoItemId {
   RI_OOT_RUTOS_LETTER,
   RI_OOT_NEI_LANTERN,
   RI_OOT_NEI_POKE_BALL,
-  RI_OOT_NEI_MARIO_MASK
+  RI_OOT_NEI_MARIO_MASK,
+  RI_RED_POTION_REFILL,
+  RI_GREEN_POTION_REFILL,
+  RI_BLUE_POTION_REFILL
 };
 #include "ComboOotBottleShimmerMM.h"
 /* PRODUCTION_OWNER */
@@ -107,6 +123,7 @@ struct Scope {
   Scope(const char *, int, int, bool) {}
 };
 } // namespace ItemGrantAudit
+extern "C" int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char*, const char*, float*) { return 0; }
 /* PRODUCTION_OPS */
 /* PRODUCTION_CROSS */
 int32_t MM_FillSongDrawInfo(RandoItemId, CwItemDrawInfo *) { return 0; }
@@ -138,6 +155,7 @@ const char *gGiMoonsTearTexAnim = "__OTR__unrelated/tearTex";
 const char *gGiFairyBottleEmptyDL = "__OTR__unrelated/bottle";
 const char *gGiFairyBottleTexAnim = "__OTR__unrelated/bottleTex";
 void *Combo_ResolveSym(const char *, const char *);
+#include "combo/menu/ComboSwordGiAssetSelection.h"
 extern "C" const char *NeiResource_Route(const char *path) {
   static std::unordered_set<std::string> paths;
   return paths.insert(std::string("__OTR__@oot:") + (path + 7)).first->c_str();

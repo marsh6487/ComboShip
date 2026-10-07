@@ -57,13 +57,26 @@ with tempfile.TemporaryDirectory(prefix='foreign-soul-') as td:
     mmrecipe += '#include "' + str(ROOT / 'mm/assets/objects/object_boss_hakugin/object_boss_hakugin.h') + '"\n'
     mmrecipe += 'enum RandoItemId { RI_SOUL_BOSS_GOHT, RI_SOUL_BOSS_GYORG, RI_SOUL_BOSS_ODOLWA, RI_SOUL_BOSS_TWINMOLD };\n'
     mmrecipe += '\n'.join(production_function(mm, n) for n in ['MM_AnimSeg', 'MM_AnimTexSeg', 'MM_AnimSoulFlame', 'MM_FillBossSoulAnim'])
-    mmrecipe += '\nnamespace Rando::StaticData { const std::string& GetItemDisplayName(RandoItemId id) { assert(id == RI_SOUL_BOSS_TWINMOLD); static std::string name = "Soul of Twinmold"; return name; } }\n'
-    mmrecipe += 'static bool twinmoldRecipeAvailable = true;\nextern "C" int32_t MM_GetItemAnimDrawInfo(const char* name, CwItemAnimDrawInfo* out) { assert(!strcmp(name,"Soul of Twinmold")); return twinmoldRecipeAvailable ? MM_FillBossSoulAnim(RI_SOUL_BOSS_TWINMOLD, out) : 0; }\n'
+    mmrecipe += '\nnamespace Rando::StaticData { const std::string& GetItemDisplayName(RandoItemId id) { static const std::string names[] = {"Soul of Goht", "Soul of Gyorg", "Soul of Odolwa", "Soul of Twinmold"}; assert(id >= RI_SOUL_BOSS_GOHT && id <= RI_SOUL_BOSS_TWINMOLD); return names[id]; } }\n'
+    mmrecipe += 'static bool twinmoldRecipeAvailable = true;\nextern "C" int32_t MM_GetItemAnimDrawInfo(const char* name, CwItemAnimDrawInfo* out) { for (int id = RI_SOUL_BOSS_GOHT; id <= RI_SOUL_BOSS_TWINMOLD; ++id) { if (Rando::StaticData::GetItemDisplayName((RandoItemId)id) == name) return twinmoldRecipeAvailable ? MM_FillBossSoulAnim((RandoItemId)id, out) : 0; } assert(false); return 0; }\n'
     drawitem = (ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text()
+    native_bosses = (ROOT / 'mm/2s2h/Rando/DrawFuncs.cpp').read_text()
+    if '--baseline-mm-bosses' in sys.argv or '--baseline-mm-bosses-type' in sys.argv:
+        drawitem = subprocess.check_output(['git', 'show', '13901c677d0084e0305eec4672c0557f4434aea7:mm/2s2h/Rando/DrawItem.cpp'], cwd=ROOT, text=True)
+        native_bosses = subprocess.check_output(['git', 'show', '13901c677d0084e0305eec4672c0557f4434aea7:mm/2s2h/Rando/DrawFuncs.cpp'], cwd=ROOT, text=True)
+    if 'int32_t ComboDrawNativeMmBossSoul(' in drawitem:
+        mmrecipe += production_function(drawitem, 'ComboDrawNativeMmBossSoul')
     mmrecipe += production_function(drawitem, 'ComboDrawNativeTwinmoldSoul')
-    mmrecipe += '\nstatic int nativeTwinmoldFallbacks = 0;\n#define SETUP_DRAW(n) PlayState* play = gPlayState; SkelAnime skelAnime{}; ++nativeTwinmoldFallbacks; OPEN_DISPS(gPlayState->state.gfxCtx);\n#define SETUP_FLEX_SKEL(...) ((void)0)\nstatic void DrawEnLight(Color_RGB8, Vec3f) {}\n'
-    mmrecipe += production_function((ROOT / 'mm/2s2h/Rando/DrawFuncs.cpp').read_text(), 'DrawTwinmold')
+    mmrecipe += '\nstatic int nativeTwinmoldFallbacks = 0;\n#define SETUP_DRAW(n) PlayState* play = gPlayState; SkelAnime skelAnime{}; ++nativeTwinmoldFallbacks; OPEN_DISPS(gPlayState->state.gfxCtx);\n#define SETUP_FLEX_SKEL(...) ((void)0)\nstatic void DrawEnLight(Color_RGB8 color, Vec3f scale) {\n#ifdef HOST_MM\nDrawSoulFlame(gPlayState, color, scale);\n#endif\n}\n'
+    mmrecipe += production_function(native_bosses, 'DrawTwinmold')
     mmrecipe += '\n#undef SETUP_DRAW\n#undef SETUP_FLEX_SKEL\n'
+    # Execute the native boss entry points with their real static initialization
+    # macros. The local play alias adapts only the fixture's OPEN_DISPS boundary.
+    macros = native_bosses[native_bosses.index('#define SETUP_DRAW('):native_bosses.index('// Soul Effects\nstatic void')]
+    macros = macros.replace('#define SETUP_DRAW(LIMB_MAX)', '#define SETUP_DRAW(LIMB_MAX) PlayState* play = gPlayState;')
+    mmrecipe += '\n#ifdef HOST_MM\n' + macros
+    mmrecipe += '\n'.join(production_function(native_bosses, name) for name in ['DrawGoht', 'DrawGyorg', 'DrawOdolwa'])
+    mmrecipe += '\n#undef SETUP_DRAW\n#undef SETUP_DRAW_TYPE\n#undef SETUP_SKEL\n#undef SETUP_FLEX_SKEL\n#endif\n'
     (build / 'twinmold_production.inc').write_text(mmrecipe)
     for path in ['ship/Context.h', 'ship/resource/ResourceManager.h', 'ship/resource/ResourceManagerScope.h', 'ship/resource/CrossRMRegistry.h']:
         p = build / path
@@ -89,6 +102,8 @@ with tempfile.TemporaryDirectory(prefix='foreign-soul-') as td:
         flags = ['-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-Wno-unused-variable', '-Wno-unused-but-set-variable']
         flags += ['-DCOMBO_BUILD']
         if host == 'mm': flags += ['-DHOST_MM']
+        if '--baseline-mm-bosses-type' in sys.argv or '--native-mm-bosses-alt-first' in sys.argv:
+            flags += ['-DNATIVE_MM_BOSS_ALT_FIRST']
         if '--baseline' in sys.argv or '--baseline-aura' in sys.argv: flags += ['-DSKIP_BARINADE_TESTS', '-DSKIP_TWINMOLD_TESTS']
         if '--baseline-barinade' in sys.argv: flags += ['-DSKIP_TWINMOLD_TESTS']
         if '--sanitize' in sys.argv: flags += ['-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer', '-fno-pie', '-no-pie']

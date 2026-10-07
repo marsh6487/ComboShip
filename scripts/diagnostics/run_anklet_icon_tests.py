@@ -39,6 +39,7 @@ run(r'''
 #include "mm/2s2h/Rando/Types.h"
 #include "mm/include/z64item.h"
 #include "combo/menu/ComboSongDrawMM.h"
+#include "combo/menu/ComboItemIconOwnership.h"
 using s16 = int16_t; using u8 = uint8_t;
 static const char* gItemIcons[256]{};
 static s16 D_801CFF94[250]{};
@@ -75,6 +76,7 @@ for host in ('soh', 'mm'):
 #include <cstdint>
 #include <cstring>
 #include "mm/mods/equipment/ext_equip_icon_assets.h"
+#include "combo/menu/ComboItemIconOwnership.h"
 using s16 = int16_t; using u8 = uint8_t;
 ''' + paths + '\n' + getter + r'''
 int main() {

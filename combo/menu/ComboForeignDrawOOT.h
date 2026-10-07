@@ -40,6 +40,7 @@
 #include "soh/Enhancements/randomizer/hook_handlers.h" // OOT_LookupForeign / OOT_GetQueuedDrawCheck
 #include "soh/Enhancements/randomizer/static_data.h"
 #include "ComboResolve.h" // Combo_ResolveSym (process-wide combo-ABI symbol resolution)
+#include "ComboSwordGiAssetSelection.h"
 
 namespace {
 struct ComboForeignDrawInfo {
@@ -110,6 +111,11 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
     const char* drawName = fi->HasDisguise() ? fi->fakeItemName.c_str() : fi->itemName.c_str();
     CwItemDrawInfo raw{};
     int32_t rcStatic = sGetItemDrawInfo(drawName, &raw);
+    const int32_t baseChoice = ComboSwordGi_SelectBaseAssets(raw, ResourceMgr_IsAltAssetsEnabled());
+    if (baseChoice == CW_DRAW_NOT_READY)
+        return ComboForeignResolve::NotReady;
+    if (baseChoice == 2)
+        rcStatic = 1;
     if (rcStatic == CW_DRAW_NOT_READY) {
         return ComboForeignResolve::NotReady; // MM's rando state isn't up — retry, don't freeze
     }
@@ -148,10 +154,12 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
         }
         const bool routedMm = strncmp(p, "__OTR__@mm:", 11) == 0;
         const bool routedOot = strncmp(p, "__OTR__@oot:", 12) == 0;
-        if (p[7] == '@' && !routedMm && !routedOot)
+        const bool routedBase = strncmp(p, "__OTR__@oot-gi-base:", 20) == 0;
+        if (p[7] == '@' && !routedMm && !routedOot && !routedBase)
             return ComboForeignResolve::Unknown;
-        info.dls[i] = ComboInternRoutedPath(
-            routedMm || routedOot ? std::string(p) : std::string("__OTR__@mm:") + (p + sizeof(kOtrPrefix) - 1));
+        info.dls[i] = ComboInternRoutedPath(routedMm || routedOot || routedBase
+                                                ? std::string(p)
+                                                : std::string("__OTR__@mm:") + (p + sizeof(kOtrPrefix) - 1));
     }
     info.count = n;
     info.xluStart = raw.xluStartIndex;
@@ -172,6 +180,9 @@ inline ComboForeignResolve ComboFillForeignDrawInfo(RandomizerCheck rc, int slot
         info.resolvedName = raw.resolvedName;
     }
     info.drawKind = raw.drawKind;
+    if (raw.drawKind == CW_DRAW_KIND_ELEMENTAL_ARROW &&
+        (raw.neiEffect < 1 || raw.neiEffect > 3 || raw.dlistCount != 1 || raw.opCount != 0))
+        return ComboForeignResolve::Unknown;
     if (raw.opCount < 0 || raw.opCount > CW_DRAW_MAX_OPS)
         return ComboForeignResolve::Unknown;
     if (raw.drawKind == CW_DRAW_KIND_SEASON_GI &&
@@ -615,8 +626,9 @@ inline void OOT_DrawForeignWeaponFlame(PlayState* play, const uint8_t color[4]) 
 
 // Concrete imported Master/True Master legacy drawer: native scroll, .05
 // scale, 2.1-radian tilt and the True tier's separate gold blade/blue flame.
-inline void OOT_DrawForeignMasterSword(PlayState* play, const ComboForeignDrawInfo* info) {
-    OOT_DrawForeignWeaponFlame(play, info->primColorXlu);
+inline void OOT_DrawForeignMasterSword(PlayState* play, const ComboForeignDrawInfo* info, bool drawFlame = true) {
+    if (drawFlame)
+        OOT_DrawForeignWeaponFlame(play, info->primColorXlu);
     Matrix_Push();
     Matrix_Scale(.05f, .05f, .05f, MTXMODE_APPLY);
     Matrix_RotateZ(2.1f, MTXMODE_APPLY);
@@ -647,8 +659,10 @@ inline void OOT_DrawForeignMasterSword(PlayState* play, const ComboForeignDrawIn
 
 // Selected standalone/Din GI recipe. Match MM_DrawForeignCustomGi's signed
 // spin, hand-local transforms, split passes and independent optional flame.
-inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo* info, bool shop = false) {
-    OOT_DrawForeignWeaponFlame(play, info->primColorXlu);
+inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo* info, bool shop = false,
+                                    bool drawFlame = true) {
+    if (drawFlame)
+        OOT_DrawForeignWeaponFlame(play, info->primColorXlu);
     Matrix_Push();
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     Matrix_RotateY((bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f, MTXMODE_APPLY);
@@ -954,11 +968,19 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
     }
 
     const bool swordIdentity = info->neiShimmer > 0 &&
-                               info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
+                               info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Gold) + 1 &&
                                NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
     const bool fitSword = info->count > 0 && swordIdentity &&
                           (info->drawKind == CW_DRAW_KIND_CUSTOM_GI || info->drawKind == CW_DRAW_KIND_SIMPLE ||
                            info->drawKind == CW_DRAW_KIND_MASTER_SWORD || info->drawKind == CW_DRAW_KIND_GORON_SWORD);
+    const bool swordFlame = swordIdentity && info->primColorXlu[3] &&
+                            (info->drawKind == CW_DRAW_KIND_CUSTOM_GI || info->drawKind == CW_DRAW_KIND_MASTER_SWORD);
+    if (swordFlame) {
+        Matrix_Push();
+        ComboSwordGi_ApplyEffectFit(static_cast<NeiGi::Kind>(info->neiShimmer - 1), shop);
+        OOT_DrawForeignWeaponFlame(play, info->primColorXlu);
+        Matrix_Pop();
+    }
     if (fitSword) {
         Matrix_Push();
         const float scale = info->drawKind == CW_DRAW_KIND_MASTER_SWORD  ? .05f
@@ -974,11 +996,20 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
     }
     // Authored NEI recipes carry their palette in neiEffect and render their
     // shimmer inside the shared presentation. Other recipes use the overlay.
-    const bool overlayShimmer = info->itemShimmer && info->drawKind != CW_DRAW_KIND_NEI_GI;
+    const bool overlayShimmer =
+        info->itemShimmer && info->drawKind != CW_DRAW_KIND_NEI_GI && info->drawKind != CW_DRAW_KIND_ELEMENTAL_ARROW;
     if (overlayShimmer) {
         Matrix_Push();
     }
     switch (info->drawKind) {
+        case CW_DRAW_KIND_ELEMENTAL_ARROW: {
+            auto core = *info;
+            core.count = 1;
+            core.xluStart = -1;
+            OOT_DrawForeignSimple(play, &core);
+            NeiGi_DrawElementalArrow(play, info->neiEffect);
+            break;
+        }
         case CW_DRAW_KIND_NEI_GI:
             NeiGi_DrawPresentation(play, info->dls[0], info->xluStart == 1 && info->count > 1 ? info->dls[1] : nullptr,
                                    info->scale, info->neiEffect, info->neiEffectCenter,
@@ -992,10 +1023,10 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
             OOT_DrawForeignGoronSword(play, info);
             break;
         case CW_DRAW_KIND_MASTER_SWORD:
-            OOT_DrawForeignMasterSword(play, info);
+            OOT_DrawForeignMasterSword(play, info, !swordFlame);
             break;
         case CW_DRAW_KIND_CUSTOM_GI:
-            OOT_DrawForeignCustomGi(play, info, shop);
+            OOT_DrawForeignCustomGi(play, info, shop, !swordFlame);
             break;
         case CW_DRAW_KIND_DEKU_NUTS:
             OOT_DrawForeignDekuNuts(play, info);
@@ -1046,15 +1077,22 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
             OOT_DrawForeignSimple(play, info);
             break;
     }
-    if (overlayShimmer) {
+    if (overlayShimmer)
         Matrix_Pop();
-        if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1 &&
+    if (fitSword)
+        Matrix_Pop();
+    if (overlayShimmer) {
+        if (swordIdentity) {
+            Matrix_Push();
+            ComboSwordGi_ApplyEffectFit(static_cast<NeiGi::Kind>(info->neiShimmer - 1), shop);
+        }
+        if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Gold) + 1 &&
             NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
             NeiGi_DrawMesh(play, NeiGi::SampleSpecial(static_cast<NeiGi::Kind>(info->neiShimmer - 1),
                                                       play->gameplayFrames, NeiGi_CameraBasis(play)));
         if (info->drawKind == CW_DRAW_KIND_SONG_GI)
             NeiGi_DrawSongOverlay(play, info->neiEffect, "mm");
-        else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::MarioMask) + 1)
+        else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Gold) + 1)
             NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play),
                                                       static_cast<NeiGi::Kind>(info->neiShimmer - 1)));
         else if (info->neiEffect == static_cast<int32_t>(NeiGi::Kind::Pokeball))
@@ -1063,7 +1101,7 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         else
             ComboDrawMaskShimmer(play, nullptr, info->itemShimmerColor, "mm");
     }
-    if (fitSword)
+    if (overlayShimmer && swordIdentity)
         Matrix_Pop();
 }
 

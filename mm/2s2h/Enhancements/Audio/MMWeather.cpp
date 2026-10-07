@@ -1,6 +1,7 @@
 #include "MMWeather.h"
 #include "MMWeatherAudio.h"
 #include "MMWeatherState.h"
+#include "2s2h/Enhancements/Graphics/AutumnSceneFoliage.h"
 
 #include <algorithm>
 #include "global.h"
@@ -8,6 +9,7 @@
 
 namespace {
 MMWeather::State sState;
+MMWeather::State sAutumnState;
 MMWeather::Settings sSettings;
 PlayState* sPlay = nullptr;
 int sScene = -1;
@@ -31,7 +33,14 @@ bool OutdoorEligible(const PlayState* play) {
 }
 
 int SeasonRainDensity() {
+    if (sSeason == SEASON_AUTUMN) {
+        return (sAutumnState.Density() * 3) / 5;
+    }
     return sSeason == SEASON_SPRING && (CURRENT_DAY == 1 || CURRENT_DAY == 3) ? 30 : 0;
+}
+
+float SeasonRainIntensity() {
+    return sSeason == SEASON_AUTUMN ? sAutumnState.Intensity() * 0.6f : SeasonRainDensity() > 0 ? 1.0f : 0.0f;
 }
 
 void ApplyStormAmbience(uint8_t rain, uint8_t thunder) {
@@ -44,11 +53,13 @@ void ApplyStormAmbience(uint8_t rain, uint8_t thunder) {
 } // namespace
 
 extern "C" void MMWeather_Reset() {
+    MMAutumnSceneFoliage_Reset();
     if (sNativeStormAmbienceMuted) {
         ApplyStormAmbience(sNativeRainAmbience, sNativeThunderAmbience);
     }
     sNativeStormAmbienceMuted = false;
     sState.Reset();
+    sAutumnState.Reset();
     sPlay = nullptr;
     sScene = sRoom = -1;
     sSeason = -1;
@@ -82,6 +93,7 @@ extern "C" void MMWeather_Update(PlayState* play) {
     // The rod defers to story presentation; the user's explicit weather override
     // continues to follow its existing independent eligibility/settings above.
     sSeason = MMWeather_SeasonForPlay(play);
+    MMAutumnSceneFoliage_Update(play);
     if (MMWeather_SeasonClearsRain() || sNativeStormAmbienceMuted) {
         // Native channels stop before precipitation reaches zero. Preserve their
         // actual IO requests, including En_Test4's stop at a rain target of eight.
@@ -91,12 +103,17 @@ extern "C" void MMWeather_Update(PlayState* play) {
     }
     const int ticks = play->pauseCtx.state == PAUSE_STATE_OFF ? std::clamp<int>(R_UPDATE_RATE, 1, 3) : 0;
     const bool strike = sState.Step(sSettings, eligible, ticks);
+    MMWeather::Settings autumn;
+    autumn.enabled = sSeason == SEASON_AUTUMN;
+    autumn.intermittent = true;
+    autumn.thunder = false;
+    sAutumnState.Step(autumn, autumn.enabled, ticks);
     if (!eligible) {
         MMWeather_ClearBolts();
         MMWeatherAudio_Reset();
         return;
     }
-    const float seasonRain = SeasonRainDensity() > 0 ? 1.0f : 0.0f;
+    const float seasonRain = SeasonRainIntensity();
     MMWeatherAudio_SetRain(std::max(sState.Intensity(), seasonRain) *
                            std::clamp(CVarGetInteger(MM_WEATHER_CVAR("RainVolume"), 100), 0, 100) / 100.0f);
     if (strike) {
@@ -161,7 +178,10 @@ extern "C" int MMWeather_RainDensity() {
 }
 
 extern "C" float MMWeather_Overcast() {
-    const float seasonal = SeasonRainDensity() > 0 ? 0.75f : sSeason == SEASON_WINTER ? 0.65f : 0.0f;
+    const float seasonal = sSeason == SEASON_AUTUMN   ? sAutumnState.Intensity() * 0.5f
+                           : SeasonRainDensity() > 0  ? 0.75f
+                           : sSeason == SEASON_WINTER ? 0.65f
+                                                      : 0.0f;
     return std::max(sState.Overcast(sSettings), seasonal);
 }
 

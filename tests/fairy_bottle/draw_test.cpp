@@ -18,6 +18,10 @@ using s32 = int32_t;
 using u8 = uint8_t;
 using f32 = float;
 struct Gfx { int stream = 0; };
+// This fixture supplies only fairy rows; the independent bottle fixture runs
+// the real selected-wrapper classifier and the complete potion branches.
+Gfx* ResourceMgr_LoadGfxByName(const char*) { return nullptr; }
+int ComboBottleGi_HasPotionRecipe(const char*,const char*,const char*,Gfx*(*)(const char*)) { return 0; }
 struct GraphicsContext {};
 struct MtxF {
     float x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1;
@@ -29,6 +33,9 @@ struct PlayState {
     uint32_t gameplayFrames = 0;
     MtxF billboardMtxF;
 };
+extern "C" void NeiGi_DrawElementalArrow(PlayState*, int) {
+    assert(false && "fairy fixture must not dispatch elemental arrows");
+}
 GraphicsContext gfx;
 PlayState play{{&gfx}, 0, {}};
 PlayState* gPlayState = &play;

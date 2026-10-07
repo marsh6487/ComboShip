@@ -208,18 +208,46 @@ def hourglass():
 
 
 def shadow_crystal():
-    m=model('shadow_crystal','Shadow Crystal')
-    m.material('obsidian',[.025,.018,.042],metal=.4,rough=.21)
-    m.material('violet',rgb(0x9E38DA),'energy',emission=.5)
-    m.material('crystal_skin',[.62,.38,.80],alpha=.24,rough=.12)
-    m.crystal('Black shadow core','obsidian',[0,0,0],19,72,6)
-    m.crystal('Violet translucent facets','crystal_skin',[0,0,0],21,78,6)
-    for j in range(6):
-        a=TAU*j/6
-        m.tube('Violet fracture seam','violet',[[0,-31,0],[18*math.cos(a),-10,18*math.sin(a)],
-               [14*math.cos(a+.08),16,14*math.sin(a+.08)],[0,33,0]],.65,5)
-    m.notes=['Black crystalline body, restrained violet fractures and transparent facets.',
-             'GI-only redesign preserves original item ownership and transformation behavior.']
+    """Repackage the preserved black/orange mesh; do not reinterpret its shape."""
+    from pathlib import Path
+    import xml.etree.ElementTree as ET
+    assets=Path(__file__).resolve().parents[3]/'soh/assets/custom'
+    prefix='objects/object_nei_shadow_crystal/'
+    m=Model('shadow_crystal','Shadow Crystal',
+            'objects/nei_gi_redesign/shadow_crystal/gi_dl',1.,.5)
+    for group in range(3):
+        material=ET.parse(assets/(prefix+f'mat_shadow_crystal_{group}')).getroot()
+        prim=next(command for command in material if command.tag=='SetPrimColor')
+        name=f'original_{group}'
+        m.material(name,[int(prim.get(channel))/255 for channel in ('R','G','B')],
+                   metal=.35,rough=.2)
+        positions=[];normals=[];uvs=[];triangles=[];cache={}
+        for command in ET.parse(assets/(prefix+f'shadow_crystal_tri_{group}')).getroot():
+            if command.tag=='LoadVertices':
+                vertices=list(ET.parse(assets/command.get('Path')).getroot())
+                offset,count,start=(int(command.get(key)) for key in
+                                    ('VertexOffset','Count','VertexBufferIndex'))
+                for index in range(count):
+                    vertex=vertices[offset+index]
+                    cache[start+index]=len(positions)
+                    positions.append([int(vertex.get(axis)) for axis in ('X','Y','Z')])
+                    normals.append([(((int(vertex.get(channel))+128)%256)-128)/127
+                                    for channel in ('R','G','B')])
+                    uvs.append([int(vertex.get(axis))/1024 for axis in ('S','T')])
+            elif command.tag in ('Triangle1','Triangles2'):
+                fields=[('V00','V01','V02')]
+                if command.tag=='Triangles2':fields.append(('V10','V11','V12'))
+                triangles.extend([[cache[int(command.get(key))] for key in fields_one]
+                                  for fields_one in fields])
+        p=np.asarray(positions,float);tri=np.asarray(triangles,int)
+        # Omit only the two already-collapsed source faces. Preserve original
+        # winding and byte-normal values rather than recalculating/smoothing.
+        visible=np.any(np.cross(p[tri[:,1]]-p[tri[:,0]],p[tri[:,2]]-p[tri[:,0]]),axis=1)
+        m.parts.append(dict(name=f'Original Shadow Crystal material {group}',mat=name,
+                            p=p,n=np.asarray(normals),uv=np.asarray(uvs),tri=tri[visible]))
+    m.notes=['Preserved black/orange Shadow Crystal mesh: original material groups, normals, UVs and winding.',
+             'All 614 renderable source triangles retained; two pre-existing zero-area faces omitted.',
+             'Opaque GI only; no interpreted violet crystal shell. Item ownership and Wolf Link behavior unchanged.']
     return m
 
 
@@ -264,6 +292,15 @@ def main():
     names=args.items or list(BUILDERS)
     for name in names:
         if name not in BUILDERS:parser.error('Unknown quest GI candidate: '+name)
+    if 'shadow_crystal' in names:
+        # Rebuilding an opaque restoration must not leave the previous violet
+        # shell in the resource tree or in the derived fit catalog.
+        import shutil
+        root=Path(__file__).resolve().parents[1]
+        obsolete=[root/'RESOURCES/objects/nei_gi_redesign/shadow_crystal']
+        if args.install:obsolete.append(root.parents[1]/'soh/assets/custom/objects/nei_gi_redesign/shadow_crystal')
+        for directory in obsolete:
+            if directory.is_dir():shutil.rmtree(directory)
     build({name:BUILDERS[name] for name in names},Path(__file__).resolve().parents[1],args.install)
 
 

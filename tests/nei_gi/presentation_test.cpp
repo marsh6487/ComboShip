@@ -29,6 +29,8 @@ std::vector<float> submittedYaw;
 int modelFitContext = -1;
 std::vector<std::pair<float, float>> stack;
 std::vector<std::pair<float, float>> submitted;
+std::vector<std::pair<float, float>> effectSubmitted;
+float selectedFitScale=1, selectedFitLift=0;
 std::vector<std::array<unsigned, 3>> flameColors;
 std::vector<std::vector<Vtx>> arena;
 bool portableSongLists=false;
@@ -36,6 +38,7 @@ bool selectedCustomLists=false;
 std::map<Gfx *, std::vector<Vtx>> vertexLoads;
 std::set<std::string> files;
 std::set<std::pair<std::string,std::string>> modFiles;
+std::set<std::pair<std::string,std::string>> invalidGiModels;
 alignas(16) Gfx opa[0x2FC0], xlu[0x1000], overlay[0x800];
 Gfx setupDl{};
 Vtx *pendingVertices;
@@ -54,6 +57,8 @@ void Reset() {
   submittedYaw.clear();
   modelFitContext = -1;
   submitted.clear();
+  effectSubmitted.clear();
+  selectedFitScale=1; selectedFitLift=0;
   flameColors.clear();
   arena.clear();
   portableSongLists=false;
@@ -66,6 +71,7 @@ void Reset() {
   stack.clear();
   files.clear();
   modFiles.clear();
+  invalidGiModels.clear();
   gfx.polyOpa.p = opa;
   gfx.polyOpa.d = std::end(opa);
   gfx.polyXlu.p = xlu;
@@ -81,26 +87,25 @@ void Original() {
   ++fallback;
   Matrix_Scale(7, 7, 7, MTXMODE_APPLY);
 }
-std::vector<std::string> Drawn() {
+std::vector<std::string> Drawn(bool retainBaseRoute = false) {
   std::vector<std::string> paths;
   for (auto range :
        {std::pair(opa, gfx.polyOpa.p), std::pair(xlu, gfx.polyXlu.p)}) {
     for (Gfx *p = range.first; p != range.second; ++p) {
-      if (((p->words.w0 >> 24) & 255) == G_DL_OTR_FILEPATH)
-        paths.emplace_back(reinterpret_cast<const char *>(p->words.w1));
+      if (((p->words.w0 >> 24) & 255) == G_DL_OTR_FILEPATH) {
+        const char* path = reinterpret_cast<const char *>(p->words.w1);
+        // Existing model-identity checks compare the authored slug. Dedicated
+        // routing regressions retain and assert the exact archive owner marker.
+        if (!retainBaseRoute && !std::strncmp(path,"__OTR__@oot-gi-base:",20))
+          paths.emplace_back(std::string("__OTR__")+(path+20));
+        else paths.emplace_back(path);
+      }
     }
   }
   return paths;
 }
-void ExpectBoleroFireSubmitted() {
-  bool hotCore=false, warmBody=false;
-  for(const auto& [command,vertices]:vertexLoads)for(const auto& vertex:vertices) {
-    const auto* rgba=vertex.v.cn;
-    if(!rgba[3])continue;
-    hotCore|=rgba[0]==255 && rgba[1]==242 && rgba[2]==173;
-    warmBody|=rgba[0]==255 && rgba[1]==175 && rgba[2]==54;
-  }
-  assert(hotCore && warmBody && "Bolero must submit visible yellow-core and warm-body flame vertices alongside shared red shimmer");
+void ExpectBoleroShimmerOnly() {
+  assert(arena.size()==1 && "Bolero must submit only its shared red shimmer, without flame particles");
 }
 } // namespace Fixture
 
@@ -160,9 +165,19 @@ int ResourceMgr_IsModAssetForGame(const char* game,const char* path) {
   return Fixture::modFiles.contains({game,selected});
 }
 int ResourceMgr_IsModAsset(const char* path) {return ResourceMgr_IsModAssetForGame("oot",path);}
-int ResourceMgr_GetGiModelFitForGame(const char*,const char*,float,float,int context,float[2]) {
+int ResourceMgr_IsGiModelAvailableForGame(const char* game,const char* path) {
+  bool selectedAlt=Fixture::alt;
+#ifdef COMBO_BUILD
+  if(!std::strcmp(game,"oot"))selectedAlt=ownerAlt;
+#endif
+  const std::string key=std::strncmp(path,"__OTR__",7)?std::string("__OTR__")+path:path;
+  const std::string selected=selectedAlt&&Fixture::files.contains("alt/"+key)?"alt/"+key:key;
+  return Fixture::files.contains(selected) && !Fixture::invalidGiModels.contains({game,selected});
+}
+int ResourceMgr_GetGiModelFitForGame(const char*,const char*,float,float,int context,float fit[2]) {
   Fixture::modelFitContext=context;
-  return 0;
+  fit[0]=Fixture::selectedFitScale;fit[1]=Fixture::selectedFitLift;
+  return Fixture::selectedFitScale!=1 || Fixture::selectedFitLift!=0;
 }
 int ResourceMgr_GetGiModelsFitForGame(const char* game,const char* const* paths,int count,float scale,float tilt,int context,float fit[2]) {
   assert(paths && count > 0);
@@ -204,6 +219,7 @@ void Matrix_ReplaceRotation(MtxF *) {
     Fixture::matrixYaw = 0;
   }
 }
+void Matrix_Put(MtxF *m) { Fixture::matrix=m->xx; Fixture::matrixY=m->yw; }
 void Matrix_Get(MtxF *m) {
   *m = {};
   m->xx = m->yy = m->zz = Fixture::matrix;
@@ -232,6 +248,7 @@ void *Graph_Alloc(GraphicsContext *context, size_t size) {
 }
 Mtx *Matrix_NewMtx(GraphicsContext *context, char *, int32_t) {
   if (Fixture::pendingVertices) {
+    Fixture::effectSubmitted.emplace_back(Fixture::matrix, Fixture::matrixY);
     std::copy_n(Fixture::pendingVertices, Fixture::pendingVertexCount,
                 Fixture::arena.back().data());
     Fixture::pendingVertices = nullptr;
@@ -352,6 +369,9 @@ static void DrawWeaponFlameOverlay(PlayState *, u8 r, u8 g, u8 b) {
 #ifndef NEI_GI_FIXTURE_BOUNDARY_ONLY
 int main() {
   using namespace Fixture;
+#ifdef COMBO_BUILD
+#include "tests/sword_fallback/effects_toggle_checks.inc"
+#endif
   // This allocator uses the actual OPA tail for vertices and matrices,
   // including OoT's alignment loss; setup functions also emit their real one
   // command.
@@ -548,7 +568,6 @@ int main() {
                      std::pair{ RG_MM_SONG_LULLABY, CW_SONG_LULLABY },
                      std::pair{ RG_MM_SONG_NOVA, CW_SONG_NOVA },
                      std::pair{ RG_MM_SONG_HEALING, CW_SONG_HEALING },
-                     std::pair{ RG_MM_SONG_SOARING, CW_SONG_SOARING },
                      std::pair{ RG_MM_SONG_ELEGY, CW_SONG_ELEGY },
                      std::pair{ RG_MM_SONG_OATH, CW_SONG_OATH },
                      std::pair{ RG_MM_SONG_DOUBLE_TIME, CW_SONG_DOUBLE_TIME } }) {
@@ -569,6 +588,21 @@ int main() {
     assert(std::memcmp(color, songInfo.itemShimmerColor, 4) == 0);
 #endif
   }
+  Reset();
+  NeiGi_DrawMesh(&play,NeiGi::SampleSong(CW_SONG_SOARING,42,NeiGi_CameraBasis(&play)));
+  const auto expectedFeathers=arena;
+  assert(!expectedFeathers.empty() && expectedFeathers.front().size()>400);
+  Reset();
+  GetItemEntry soaringEntry{};
+  soaringEntry.tableId=TABLE_RANDOMIZER;soaringEntry.drawItemId=RG_MM_SONG_SOARING;
+  assert(NeiGi_Draw(&play,&soaringEntry));
+  assert(Drawn()==std::vector<std::string>{gGiSongNoteDL} && arena.size()==expectedFeathers.size() && stack.empty());
+  for(size_t i=0;i<arena.size();++i)assert(arena[i].size()==expectedFeathers[i].size() &&
+      !memcmp(arena[i].data(),expectedFeathers[i].data(),arena[i].size()*sizeof(Vtx)));
+#ifdef COMBO_BUILD
+  CwItemDrawInfo soaringInfo{};
+  assert(NeiGi_DescribeEntry(&soaringEntry,&soaringInfo) && soaringInfo.itemShimmer && soaringInfo.neiEffect==CW_SONG_SOARING);
+#endif
   Reset();
   GetItemEntry stormEntry{};
   stormEntry.gid = GID_SONG_STORM;
@@ -613,7 +647,7 @@ int main() {
     size_t copies=0;
     for(const auto& submitted:arena)if(submitted.size()==expected.size() && !std::memcmp(submitted.data(),expected.data(),expected.size()*sizeof(Vtx)))++copies;
     assert(copies==1 && stack.empty() && "one matching shared shimmer is mandatory even with ItemEffects off or no mod present");
-    if(song.song==CW_SONG_OOT_BOLERO)ExpectBoleroFireSubmitted();
+    if(song.song==CW_SONG_OOT_BOLERO)ExpectBoleroShimmerOnly();
 #ifdef COMBO_BUILD
     CwItemDrawInfo info{};assert(NeiGi_DescribeEntry(&songEntry,&info));
     assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.neiEffect==song.song && info.itemShimmer);
@@ -662,6 +696,37 @@ int main() {
     assert(!arena.empty() && stack.empty());
   }
   std::cout << "PASS sword native/shared bindings: approved palettes and intrinsic particles\n";
+
+  // These items retain the shared optional shimmer with a gold halo. A neutral
+  // binding would produce blue vertices even though the meshes themselves are gold.
+  for (CustomDrawFunc draw : {Randomizer_DrawExtTrident, Randomizer_DrawExtRocBoots}) {
+    Reset();
+    enabled = 1;
+    entry = {};
+    entry.drawFunc = draw;
+    const auto* binding = FindPresentation(&entry);
+    assert(binding);
+    files.insert(binding->opaque);
+    assert(NeiGi_Draw(&play, &entry) && arena.size() == 1);
+    bool gold = false;
+    for (const auto& vertex : arena.front())
+      gold |= vertex.v.cn[0] == 255 && vertex.v.cn[1] == 212 && vertex.v.cn[2] == 90;
+    assert(gold && "Trident and Roc's Boots must emit gold shimmer vertices");
+    Reset();
+    enabled = 1;
+    const float center[] = {0, 0, 0};
+    NeiGi_DrawPresentation(&play, binding->opaque, nullptr, binding->scale,
+                          int(binding->effect), center, true, nullptr);
+    gold = false;
+    for (const auto& vertices : arena)
+      for (const auto& vertex : vertices)
+        gold |= vertex.v.cn[0] == 255 && vertex.v.cn[1] == 212 && vertex.v.cn[2] == 90;
+    assert(gold && stack.empty());
+    Reset();
+    files.insert(binding->opaque);
+    assert(NeiGi_Draw(&play, &entry) && arena.empty());
+  }
+  std::cout << "PASS Trident/Roc's Boots gold shimmer in native/shared draws and optional-off behavior\n";
 
   // Rune identification survives the shared Slate silhouette and animation.
   std::set<uint32_t> runeHues;
@@ -1068,7 +1133,11 @@ int main() {
                          std::pair{GID_SWORD_BGS,"biggoron_sword"}}) {
     Reset(); entry={}; entry.gid=test.first;
     assert(NeiGi_Draw(&play,&entry));
+#ifdef COMBO_BUILD
+    assert(vanilla == 0 && arena.empty()); // Absent shipped data cannot borrow a mod-capable fallback.
+#else
     assert(vanilla == 1 && arena.size() == 2);
+#endif
     Reset(); entry={}; entry.gid=test.first;
     const std::string path=std::string("__OTR__objects/nei_gi_redesign/")+test.second+"/gi_dl";
     files.insert(path); assert(NeiGi_Draw(&play,&entry));
@@ -1106,6 +1175,11 @@ int main() {
       modFiles.insert({"oot",(useAlt?"alt/":"")+std::string(overridden)});
       GetItemEntry modEntry{}; modEntry.drawFunc=model.draw; modEntry.drawItemId=model.identity;modEntry.gid=model.nativeGid;
       assert(NeiGi_Draw(&play,&modEntry));
+#ifdef COMBO_BUILD
+      if(!useAlt && NeiGi::IsSword(model.effect))
+        assert(Drawn(true)==std::vector<std::string>{std::string("__OTR__@oot-gi-base:")+(model.opaque+7)});
+      else
+#endif
       assert(!submitted.empty() && submitted.front()==std::pair(model.scale,0.f));
       assert(arena.size()==size_t(model.alwaysShimmer||effects)+NeiGi::IsSword(model.effect) && "selected sword lost its intrinsic particles");
       assert(flameColors.empty() && fallback==0 && vanilla==0 && stack.empty() && matrix==1 && matrixY==0);
@@ -1178,6 +1252,61 @@ int main() {
     {Randomizer_DrawNeiPhantomHourglass,"phantom_hourglass","oot","__OTR__objects/object_nei_phantom_hourglass/gNeiPhantomHourglassDL"},
     {Randomizer_DrawNeiShadowCrystal,"shadow_crystal","oot","__OTR__objects/object_nei_shadow_crystal/gNeiShadowCrystalDL"},
   };
+  // A partial legacy tunic pack must not turn a fully available authored GI
+  // into an empty native draw plus its independent shimmer. Test each pass,
+  // invalid types/empty models, both owners and both asset settings.
+  for(const auto& test:modBindings) {
+    if(std::strcmp(test.slug,"spirit_breastplate") && std::strcmp(test.slug,"sages_tunic") &&
+       std::strcmp(test.slug,"champions_tunic"))continue;
+    const char* legacy[] = {"__OTR__objects/object_gi_clothes/gGiTunicCollarDL",
+                           "__OTR__objects/object_gi_clothes/gGiTunicDL"};
+    for(int selectedAlt:{0,1}) for(bool altPack:{false,true}) for(int missing:{0,1}) for(bool invalid:{false,true}) {
+      if(altPack && !selectedAlt)continue;
+      Reset();alt=selectedAlt;enabled=1;
+#ifdef COMBO_BUILD
+      ownerAlt=selectedAlt;
+#endif
+      entry={};entry.drawFunc=test.draw;
+      const auto authored=std::string("__OTR__objects/nei_gi_redesign/")+test.slug+"/gi_dl";
+      files.insert(authored);
+      const std::string selected[]={(altPack?"alt/":"")+std::string(legacy[0]),
+                                    (altPack?"alt/":"")+std::string(legacy[1])};
+      for(int pass=0;pass<2;++pass)
+        if(pass!=missing || invalid)files.insert(selected[pass]);
+      modFiles.insert({"oot",selected[1-missing]});
+      if(invalid)invalidGiModels.insert({"oot",selected[missing]});
+      assert(NeiGi_Draw(&play,&entry) && fallback==0 && Drawn()==std::vector<std::string>{authored} &&
+             "incomplete legacy tunic geometry must retain the authored model, not only shimmer");
+      assert(!arena.empty() && stack.empty());
+#ifdef COMBO_BUILD
+      CwItemDrawInfo info{};
+      assert(OOT_GetNeiGiDrawInfoForAssets(test.slug,selectedAlt,&info)==1 && info.dlistCount==1 &&
+             std::string(info.dlists[0])==authored && info.neiShimmer==int(NeiGi::Kind::Neutral)+1);
+      // An MM replacement still needs the donor pass that its native drawer
+      // uses. An unusable donor pass cannot be hidden by a host mod marker.
+      invalidGiModels.clear();invalidGiModels.insert({"oot",selected[missing]});
+      files.insert(selected[missing]);modFiles.clear();modFiles.insert({"mm",selected[1-missing]});
+      assert(OOT_GetNeiGiDrawInfoForAssets(test.slug,selectedAlt,&info)==1 &&
+             std::string(info.dlists[0])==authored);
+      const auto mmItem=!std::strcmp(test.slug,"spirit_breastplate") ? RI_OOT_EXT_SPIRIT_BREASTPLATE :
+                        !std::strcmp(test.slug,"sages_tunic") ? RI_OOT_EXT_WATER_DRAGON_SCALE : RI_OOT_EXT_CHAMPIONS_TUNIC;
+      gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;arena.clear();
+      const auto routed="__OTR__@oot:"+authored.substr(7);
+      assert(MM_TryDrawNeiGi(mmItem,false,1) && Drawn()==std::vector<std::string>{routed} &&
+             !arena.empty() && stack.empty() && "MM receipts must draw the recovered model and its shimmer together");
+      // A valid donor copy cannot rescue an unusable selected host override:
+      // the native drawer would use the MM replacement for this pass.
+      invalidGiModels.clear();invalidGiModels.insert({"mm",selected[missing]});
+      modFiles.clear();modFiles.insert({"mm",selected[missing]});
+      assert(OOT_GetNeiGiDrawInfoForAssets(test.slug,selectedAlt,&info)==1 &&
+             std::string(info.dlists[0])==authored);
+      gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;arena.clear();
+      assert(MM_TryDrawNeiGi(mmItem,false,1) && Drawn()==std::vector<std::string>{routed} &&
+             !arena.empty() && stack.empty());
+#endif
+    }
+  }
+  std::cout<<"PASS incomplete legacy tunic recipes retain all three authored GIs and their shimmer\n";
   for(const auto& test:modBindings)for(int selectedAlt:{0,1}){
     Reset();alt=selectedAlt;
 #ifdef COMBO_BUILD
@@ -1186,16 +1315,27 @@ int main() {
     entry={};entry.drawFunc=test.draw;entry.drawItemId=test.identity;
     const auto path=std::string("__OTR__objects/nei_gi_redesign/")+test.slug+"/gi_dl";
     files.insert(path);files.insert(test.legacy);
+    if(!std::strcmp(test.slug,"spirit_breastplate") || !std::strcmp(test.slug,"sages_tunic") ||
+       !std::strcmp(test.slug,"champions_tunic")) {
+      files.insert("__OTR__objects/object_gi_clothes/gGiTunicCollarDL");
+      files.insert("__OTR__objects/object_gi_clothes/gGiTunicDL");
+    }
     const auto* selected=FindPresentation(&entry);assert(selected);
+    bool vanillaSword=false;
+#ifdef COMBO_BUILD
+    vanillaSword=!selectedAlt && NeiGi::IsSword(selected->effect);
+#endif
     std::vector<std::string> authoredPaths{path};
     if(selected->translucent){files.insert(selected->translucent);authoredPaths.push_back(selected->translucent);}
     if(selectedAlt)files.insert(std::string("alt/")+test.legacy);
     assert(NeiGi_Draw(&play,&entry)&&fallback==0&&Drawn()==authoredPaths);
     modFiles.insert({test.game,selectedAlt?std::string("alt/")+test.legacy:std::string(test.legacy)});
     gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
-    assert(NeiGi_Draw(&play,&entry)&&fallback==1&&Drawn().empty());
+    assert(NeiGi_Draw(&play,&entry)&&fallback==(vanillaSword?0:1)&&
+           Drawn()==(vanillaSword?authoredPaths:std::vector<std::string>{}));
     gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
-    assert(NeiGi_DrawShop(&play,&entry)&&fallback==1&&Drawn().empty());
+    assert(NeiGi_DrawShop(&play,&entry)&&fallback==(vanillaSword?0:1)&&
+           Drawn()==(vanillaSword?authoredPaths:std::vector<std::string>{}));
 #ifdef COMBO_BUILD
     CwItemDrawInfo info{};assert(!OOT_GetNeiGiDrawInfo(test.slug,&info));
     modFiles.clear();assert(OOT_GetNeiGiDrawInfo(test.slug,&info));
@@ -1204,7 +1344,8 @@ int main() {
       // manager, which TransformMasks_LoadMmDL consults before the donor.
       modFiles.insert({"oot",selectedAlt?std::string("alt/")+test.legacy:std::string(test.legacy)});
       gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
-      assert(NeiGi_Draw(&play,&entry)&&fallback==1&&Drawn().empty());
+      assert(NeiGi_Draw(&play,&entry)&&fallback==(vanillaSword?0:1)&&
+             Drawn()==(vanillaSword?authoredPaths:std::vector<std::string>{}));
       assert(!OOT_GetNeiGiDrawInfo(test.slug,&info));
       modFiles.clear();assert(OOT_GetNeiGiDrawInfo(test.slug,&info));
     }
@@ -1270,7 +1411,13 @@ int main() {
     if(selectedAlt)files.insert(std::string("alt/")+kokiri);
     modFiles.insert({"oot",selectedAlt?std::string("alt/")+kokiri:std::string(kokiri)});
     entry={};entry.drawFunc=Randomizer_DrawProgressiveMasterSword;
+#ifdef COMBO_BUILD
+    assert(NeiGi_Draw(&play,&entry)&&fallback==(selectedAlt?1:0)&&
+           Drawn()==(selectedAlt?std::vector<std::string>{}:
+                    std::vector<std::string>{"__OTR__objects/nei_gi_redesign/master_sword/gi_dl"}));
+#else
     assert(NeiGi_Draw(&play,&entry)&&fallback==1&&Drawn().empty());
+#endif
     gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
     entry.drawFunc=Randomizer_DrawMasterSword;
     assert(NeiGi_Draw(&play,&entry)&&fallback==0&&Drawn()==std::vector<std::string>{authored});
@@ -1447,7 +1594,11 @@ int main() {
     matrix = .25f;
     matrixY = 6;
     assert(NeiGi_DrawShop(&play, &entry));
+#ifdef COMBO_BUILD
+    assert(fallback == (NeiGi::IsSword(FindPresentation(&entry)->effect)?0:1) && matrix == .25f && matrixY == 6);
+#else
     assert(fallback == 1 && matrix == .25f && matrixY == 6);
+#endif
   }
   if (preview.is_open())
     preview << "]}\n";

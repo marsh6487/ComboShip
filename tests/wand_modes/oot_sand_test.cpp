@@ -1,4 +1,4 @@
-// SoH's same Sand hold defect, with its native headers/cache/magic/slab code.
+// The authoritative OoT donor, with native headers/cache/magic/slab code.
 #include "z64.h"
 #include "functions.h"
 #include "variables.h"
@@ -12,6 +12,7 @@
 #include <cstring>
 #include <iostream>
 #include <vector>
+#include <algorithm>
 
 SaveContext gSaveContext{};
 PlayState* gPlayState;
@@ -19,6 +20,7 @@ f32 gSfxDefaultFreqAndVolScale = 1;
 s8 gSfxDefaultReverb = 0;
 std::vector<Actor*> actors;
 CollisionHeader collision{};
+bool onSlab = false;
 #define WAND_WHEEL_HOLD_FRAMES 8
 #define WAND_POSE_IDLE 0
 static u8 sWandPoseStage = WAND_POSE_IDLE;
@@ -64,22 +66,55 @@ s32 Object_GetIndex(ObjectContext*, s16) { return 0; }
 s32 Object_Spawn(ObjectContext*, s16) { return 0; }
 void Actor_Kill(Actor* actor) { actor->update = nullptr; }
 void Actor_SetScale(Actor* actor, f32 scale) { actor->scale = {scale, scale, scale}; }
-s32 DynaPolyActor_IsPlayerOnTop(DynaPolyActor*) { return 0; }
+s32 DynaPolyActor_IsPlayerOnTop(DynaPolyActor*) { return onSlab; }
 void FX_SpawnRadialDust(PlayState*, Vec3f*, f32, f32, u8, FX_Color*) {}
 void SoundSource_PlaySfxAtFixedWorldPos(PlayState*, Vec3f*, s32, u16) {}
 static void WandSand_SlabDraw(Actor*, PlayState*) {}
 void LiveActor(Actor*, PlayState*) {}
-Actor* Actor_Spawn(ActorContext*, PlayState* play, s16 id, f32 x, f32 y, f32 z, s16, s16, s16, s16) {
+Actor* Actor_Spawn(ActorContext*, PlayState* play, s16 id, f32 x, f32 y, f32 z, s16, s16 yaw, s16, s16) {
     assert(id == ACTOR_OBJ_LIFT);
     auto* slab = new DynaPolyActor{};
-    slab->actor.world.pos = {x, y, z}; slab->actor.update = LiveActor; slab->bgId = 0;
-    play->colCtx.dyna.bgActors[0].colHeader = &collision;
+    slab->actor.world.pos = {x, y, z}; slab->actor.update = LiveActor;
+    slab->actor.shape.rot.y = yaw;
+    while (std::any_of(actors.begin(), actors.end(), [&](Actor* other) {
+        return other->update && ((DynaPolyActor*)other)->bgId == slab->bgId;
+    })) ++slab->bgId;
+    assert(slab->bgId < BG_ACTOR_MAX);
+    play->colCtx.dyna.bgActors[slab->bgId].colHeader = &collision;
     actors.push_back(&slab->actor); return &slab->actor;
 }
 
 #include "oot_sand.inc"
 
-int main() {
+static int SandParityMagic() { return gSaveContext.magic; }
+static void SandParityRefill() { gSaveContext.magic = 48; }
+static void ResetSandParity(Player& player, PlayState& play, u16 button, s16 yaw, float halfX) {
+    for (Actor* actor : actors) delete (DynaPolyActor*)actor;
+    actors.clear(); player = {}; play = {}; gSaveContext = {}; onSlab = false;
+    WandSand_Forget(); sSandMeasured = 0; sSandTopOffset = sSandReach = 0;
+    gPlayState = &play;
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
+    player.heldItemAction = PLAYER_IA_ELEMENTAL_WAND;
+    player.actor.shape.rot.y = yaw;
+    gSaveContext.magicCapacity = gSaveContext.magic = 48;
+    std::memset(gSaveContext.equips.buttonItems, ITEM_NONE, sizeof(gSaveContext.equips.buttonItems));
+    gSaveContext.equips.buttonItems[button == BTN_CLEFT ? 1 : 4] = ITEM_ELEMENTAL_WAND;
+    collision.minBounds = {-(s16)(halfX / .05f), -60, -600};
+    collision.maxBounds = {(s16)(halfX / .05f), 20, 600};
+    player.heldItemAction = PLAYER_IA_NONE;
+    ++play.gameplayFrames; Wand_TickInput(&play, &player);
+    player.heldItemAction = PLAYER_IA_ELEMENTAL_WAND;
+}
+
+#include "sand_parity_scenario.h"
+
+int main(int argc, char** argv) {
+    if (argc > 1) {
+        if (std::strcmp(argv[1], "sand-parity")) return 2;
+        CheckSandParity();
+        for (Actor* actor : actors) delete (DynaPolyActor*)actor;
+        return 0;
+    }
     Player player{}; PlayState play{};
     gPlayState = &play;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;

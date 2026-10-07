@@ -85,7 +85,7 @@ int main() {
         CwItemDrawInfo info{};
         assert(MM_FillSongDrawInfo(static_cast<RandoItemId>(id),&info)==1);
         const bool overlay=(song>=CW_SONG_OOT_MINUET && song<=CW_SONG_OOT_SARIA) ||
-                           song==CW_SONG_EPONA || song==CW_SONG_SARIA || song==CW_SONG_STORMS || song==CW_SONG_SUN;
+                           song==CW_SONG_EPONA || song==CW_SONG_SARIA || song==CW_SONG_STORMS || song==CW_SONG_SUN || song==CW_SONG_SOARING;
         assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.neiEffect==song && info.dlistCount==1 && info.hasEnvColor);
         assert(bool(info.itemShimmer)==overlay && "ordinary MM songs must keep their native note without new effects");
         assert(!memcmp(info.itemShimmerColor,info.envColor,4));
@@ -153,11 +153,23 @@ int main() {
                "early NEI dispatcher must claim every native/imported song before shared GI table IDs");
         assert(descriptions==0);
         const bool hasOverlay=(song>=CW_SONG_OOT_MINUET && song<=CW_SONG_OOT_SARIA) ||
-                              song==CW_SONG_EPONA || song==CW_SONG_SARIA || song==CW_SONG_STORMS || song==CW_SONG_SUN;
+                              song==CW_SONG_EPONA || song==CW_SONG_SARIA || song==CW_SONG_STORMS || song==CW_SONG_SUN || song==CW_SONG_SOARING;
         uint8_t color[4];assert(ComboSongShimmerColor(song,color));
         assert(notes==1 && overlay==(hasOverlay?song:-1) && genericShimmer==0 && season==-1);
         assert(!grayAtNote && "native MM notes must clear inherited grayscale before their native color is submitted");
         assert(!std::memcmp(env.data(),color,4));
+    }
+    assert(NeiGi::SampleSong(CW_SONG_OOT_BOLERO,42).count==0 && "Bolero retains its red shimmer without fire particles");
+    const auto soaring=NeiGi::SampleSong(CW_SONG_SOARING,42);
+    assert(soaring.count>400 && "Soaring lost its feather geometry");
+    bool rachis=false;
+    for(size_t i=0;i<soaring.count;++i)rachis|=soaring.vertices[i].rgb==0xFFF9FF && soaring.vertices[i].alpha>0;
+    assert(rachis && "Soaring needs the feather's white spine, not generic motes");
+    const auto prelude=NeiGi::SampleSong(CW_SONG_OOT_PRELUDE,42);
+    assert(prelude.count>0);
+    for(size_t i=0;i<prelude.count;i+=3)for(size_t j=0;j<3;++j) {
+        const auto edge=prelude.vertices[i+j].p-prelude.vertices[i+(j+1)%3].p;
+        assert(edge.x*edge.x+edge.y*edge.y+edge.z*edge.z<144 && "Prelude needs small light particles, not a circle or central disc");
     }
     assert(NeiGi::SampleSong(CW_SONG_OOT_SERENADE,42).count==0 &&
            "Serenade must keep its note/shimmer without a circle ring");
@@ -166,7 +178,7 @@ int main() {
             const auto mesh=NeiGi::SampleSong(song,frame);
             assert(mesh.count<=mesh.vertices.size() && mesh.count%3==0);
             const bool themed=((song>=CW_SONG_OOT_MINUET && song<=CW_SONG_OOT_ZELDA) &&
-                              song!=CW_SONG_OOT_SERENADE) || song==CW_SONG_SARIA || song==CW_SONG_OOT_SARIA;
+                              song!=CW_SONG_OOT_SERENADE && song!=CW_SONG_OOT_BOLERO) || song==CW_SONG_SARIA || song==CW_SONG_OOT_SARIA || song==CW_SONG_SOARING;
             if(song==CW_SONG_OOT_SERENADE)assert(mesh.count==0 && "Serenade must keep its note/shimmer without a circle ring");
             if(!themed)assert(mesh.count==0 && "unapproved normal songs, Epona and Sun must lose their themed shapes");
             else {
@@ -178,26 +190,7 @@ int main() {
                     assert(std::abs(v.p.x)<60&&std::abs(v.p.y)<60&&std::abs(v.p.z)<60);
                     hue |= v.rgb==ComboSongColorHex(song);
                 }
-                if(song!=CW_SONG_OOT_BOLERO)assert(hue);
-                else {
-                    bool hotCore=false, warmBody=false;
-                    float filledFireArea=0, filledCoreArea=0;
-                    for(size_t i=0;i<mesh.count;++i) {
-                        hotCore|=mesh.vertices[i].rgb==0xFFF2AD;
-                        warmBody|=mesh.vertices[i].rgb==0xFFAF36;
-                    }
-                    for(size_t i=0;i<mesh.count;i+=3) {
-                        const auto& a=mesh.vertices[i];const auto& b=mesh.vertices[i+1];const auto& c=mesh.vertices[i+2];
-                        const auto cross=NeiGi::Cross(b.p-a.p,c.p-a.p);
-                        const float area=.5f*std::sqrt(cross.x*cross.x+cross.y*cross.y+cross.z*cross.z);
-                        if(a.alpha>=90 && b.alpha>=90 && c.alpha>=90) {
-                            filledFireArea+=area;
-                            if(a.rgb==0xFFF2AD && b.rgb==0xFFF2AD && c.rgb==0xFFF2AD)filledCoreArea+=area;
-                        }
-                    }
-                    assert(mesh.count>400 && hotCore && warmBody && "Bolero requires full tapered fire with a hot core, not red sticks");
-                    assert(filledFireArea>160 && filledCoreArea>20 && "Bolero needs broad filled flame silhouettes and hot cores, not transparent ribbon spines");
-                }
+                assert(hue);
             }
         }
     }
@@ -218,4 +211,4 @@ int main() {
     path=temp/'dispatch.cpp';path.write_text(source)
     subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),'-I'+str(ROOT/'combo/menu'),str(path),'-o',str(temp/'dispatch')],check=True)
     subprocess.run([str(temp/'dispatch')],check=True)
-print('PASS native OoT notes/shimmer, MM exports/dispatcher, ring-free Serenade and filled Bolero fire geometry')
+print('PASS native OoT notes/shimmer, MM exports/dispatcher, shimmer-only Bolero, rising Prelude light motes and restored Soaring feathers')

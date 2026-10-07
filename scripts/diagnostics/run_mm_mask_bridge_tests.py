@@ -30,6 +30,7 @@ a=owner.index('static int32_t OOT_DescribeCustomDraw(');b=owner.index('    // RP
 fixture=fixture.replace('/* OWNER_DESCRIPTOR */',owner[a:b]+'    return 0;\n}\n'+function(owner,'OOT_FillItemDrawInfo'))
 a=host.index('struct ComboForeignDrawInfoOOT {');b=host.index('\n};',a)+3
 fixture=fixture.replace('/* HOST_INFO */',host[a:b])
+fixture=fixture.replace('/* HOST_RESOLVER */','inline bool ResourceMgr_IsAltAssetsEnabled(){return true;}\n#include "combo/menu/ComboSwordGiAssetSelection.h"\n/* HOST_RESOLVER */')
 fixture=fixture.replace('/* HOST_RESOLVER */',function(host,'ComboFillForeignDrawInfoOOT'))
 cache=host[host.index('struct ComboForeignDrawCacheOOT {'):host.index('} // namespace')]
 fixture=fixture.replace('/* HOST_CACHE */',cache.replace('ComboResolveForeignDrawInfoOOT','TestResolveForeignDrawInfoOOT'))
@@ -37,8 +38,8 @@ fixture=fixture.replace('/* HOST_MAGIC_DRAW */',function(host,'MM_DrawForeignMag
 fixture=fixture.replace('/* HOST_SIMPLE_DRAW */',function(host,'MM_DrawForeignSimple'))
 fixture=fixture.replace('/* HOST_SPIN_DRAW */',function(host,'MM_DrawForeignSpinAttack'))
 foreign=function(host,'MM_DrawComboForeign')
-handlers=set(re.findall(r'\b(MM_DrawForeign\w+)\(info\)',foreign))
-fixture=fixture.replace('/* OTHER_DRAW_HANDLERS */','\n'.join('void '+n+'(const ComboForeignDrawInfoOOT*) { assert(0); }' for n in sorted(handlers) if n not in {'MM_DrawForeignSimple','MM_DrawForeignSpinAttack'}))
+handlers=set(re.findall(r'\b(MM_DrawForeign\w+)\(',foreign))
+fixture=fixture.replace('/* OTHER_DRAW_HANDLERS */','\n'.join('template<class...T>void '+n+'(T...) { assert(0); }' for n in sorted(handlers) if n not in {'MM_DrawForeignSimple','MM_DrawForeignSpinAttack','MM_DrawForeignCustomGi'}))
 fixture=fixture.replace('/* HOST_DISPATCH */',foreign)
 # Named RG and ITEM ordering must match the real registrations and native table.
 ids=re.findall(r'RANDO_ENUM_ITEM\((RG_MM_MASK_\w+)\)',(ROOT/'soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h').read_text())

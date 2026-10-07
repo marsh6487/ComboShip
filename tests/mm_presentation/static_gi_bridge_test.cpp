@@ -50,7 +50,11 @@ struct Item {RandomizerGet rg;std::shared_ptr<GetItemEntry> GetGIEntry(Randomize
 Item RetrieveItem(RandomizerGet rg) {return {rg};}
 }
 int NeiGi_DescribeEntry(const GetItemEntry*,CwItemDrawInfo*) {return 0;}
+int ResourceMgr_IsModAssetForGame(const char*,const char*);
+int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char*,const char*,float*);
+bool DrawOwnerActive();
 int GetItem_GetDrawTableEntry(int,void** dls,int,int*,float*,int*,uint8_t*) {
+ assert(DrawOwnerActive());
  if(concrete!=RG_MAGIC_STAT_UPGRADE && concrete!=RG_KOKIRI_SWORD && concrete!=RG_BIGGORON_SWORD)return 0;
  dls[0]=(void*)"__OTR__native_sword_row";return 1;
 }
@@ -84,6 +88,7 @@ namespace Ship {
  struct CrossRMRegistry {static std::shared_ptr<ResourceManager> Get(const char* game) {assert(!strcmp(game,"oot"));return ownerPresent?ownerRm:nullptr;}};
  struct ResourceManagerScope {std::shared_ptr<ResourceManager> old;ResourceManagerScope(std::shared_ptr<ResourceManager> rm):old(activeRm) {activeRm=rm;}~ResourceManagerScope(){activeRm=old;}};
 }
+bool DrawOwnerActive() { return Ship::activeRm==Ship::ownerRm; }
 struct Gfx;
 Gfx* ResourceMgr_LoadGfxByName(const char*) {assert(Ship::activeRm==Ship::ownerRm);magicLoaded=true;return magicResourcePresent?reinterpret_cast<Gfx*>(&magicLoaded):nullptr;}
 uint8_t ResourceGetIsCustomByName(const char*) {assert(magicLoaded && Ship::activeRm==Ship::ownerRm);return Ship::activeRm->IsAltAssetsEnabled();}
@@ -180,6 +185,8 @@ const char* gIKAxeInlineDL="__native_inline_axe";
 int nativeCalled=0;
 std::set<std::string> hostResources,hostMods;
 int ResourceMgr_IsModAsset(const char* path) {return hostMods.contains(path);}
+int ResourceMgr_IsModAssetForGame(const char*,const char* path) {return ResourceMgr_IsModAsset(path);}
+int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char*,const char*,float*) {return 0;}
 uint8_t ResourceMgr_FileExists(const char* path) {return hostResources.contains(path);}
 void* OotAssets_LoadGfx(const char* path) {return hostResources.contains(path)?(void*)path:nullptr;}
 void* OotAssets_LoadGfxDirect(const char* path) {return OotAssets_LoadGfx(path);}

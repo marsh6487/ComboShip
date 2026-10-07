@@ -1198,7 +1198,16 @@ extern void DrawWolfos() {
 }
 
 // Boss Souls
+#ifdef COMBO_BUILD
+extern "C" int32_t ComboDrawNativeMmBossSoul(RandoItemId id);
+#endif
+
 extern void DrawGoht() {
+#ifdef COMBO_BUILD
+    if (ComboDrawNativeMmBossSoul(RI_SOUL_BOSS_GOHT)) {
+        return;
+    }
+#endif
     SETUP_DRAW(GOHT_LIMB_MAX);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
     Matrix_Translate(0.0f, -20.0f, 0.0f, MTXMODE_APPLY);
@@ -1213,6 +1222,11 @@ extern void DrawGoht() {
 }
 
 extern void DrawGyorg() {
+#ifdef COMBO_BUILD
+    if (ComboDrawNativeMmBossSoul(RI_SOUL_BOSS_GYORG)) {
+        return;
+    }
+#endif
     SETUP_DRAW(GYORG_LIMB_MAX);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
     Matrix_Translate(0.0f, -20.0f, 0.0f, MTXMODE_APPLY);
@@ -1226,6 +1240,11 @@ extern void DrawGyorg() {
 }
 
 extern void DrawOdolwa() {
+#ifdef COMBO_BUILD
+    if (ComboDrawNativeMmBossSoul(RI_SOUL_BOSS_ODOLWA)) {
+        return;
+    }
+#endif
     SETUP_DRAW(ODOLWA_LIMB_MAX);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);

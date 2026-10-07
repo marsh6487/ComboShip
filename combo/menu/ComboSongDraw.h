@@ -52,11 +52,11 @@ static inline int ComboSongAlwaysShimmers(int song) {
     return (song >= CW_SONG_OOT_MINUET && song <= CW_SONG_OOT_PRELUDE) || song == CW_SONG_EPONA ||
            song == CW_SONG_OOT_EPONA || song == CW_SONG_SUN;
 }
-// Portable itemShimmer also gates song-local overlays: rain and the two
-// approved Zelda/Saria profiles. Other regular songs keep their plain note.
+// Portable itemShimmer also gates song-local overlays, including Soaring's
+// authored feathers. Other regular songs keep their plain note.
 static inline int ComboSongHasOverlay(int song) {
     return ComboSongAlwaysShimmers(song) || song == CW_SONG_STORMS || song == CW_SONG_OOT_ZELDA ||
-           song == CW_SONG_SARIA || song == CW_SONG_OOT_SARIA;
+           song == CW_SONG_SARIA || song == CW_SONG_OOT_SARIA || song == CW_SONG_SOARING;
 }
 static inline int ComboSongShimmerColor(int song, uint8_t color[4]) {
     if (song < 0 || song >= CW_SONG_COUNT || !color)

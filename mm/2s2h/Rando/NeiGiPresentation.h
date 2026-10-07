@@ -7,7 +7,7 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out);
 bool MM_TryDrawNeiGi(RandoItemId item, bool shop = false, int mmPickup = 0);
 
 // Wrap only the legacy fallback after the authored presentation was declined.
-// Its model may change the matrix; model and identity effects share one fit.
+// Its model may change the matrix; identity effects retain authored GI units.
 class MM_NeiGiFallbackShimmer {
   public:
     explicit MM_NeiGiFallbackShimmer(RandoItemId item, bool shop = false, int mmPickup = 0,
@@ -19,4 +19,6 @@ class MM_NeiGiFallbackShimmer {
   private:
     NeiGi::Kind mKind;
     bool mEnabled;
+    bool mShop;
+    int mMmPickup;
 };

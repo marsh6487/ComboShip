@@ -27,9 +27,19 @@ preamble = r'''
 #include <memory>
 #include <string>
 #include <iostream>
+#include <cstring>
 #include "combo/menu/ComboItemDrawABI.h"
 #include "combo/menu/ComboItemEffectColors.h"
 using s16=int16_t; using s32=int32_t; using f32=float;
+namespace Ship {
+static bool ownerActive=false;
+struct CrossRMRegistry { static int Get(const char* game) { assert(!strcmp(game,"oot")); return 1; } };
+struct ResourceManagerScope {
+ bool previous=ownerActive;
+ ResourceManagerScope(int) { ownerActive=true; }
+ ~ResourceManagerScope() { ownerActive=previous; }
+};
+}
 #include <cstring>
 #define RANDO_ENUM_BEGIN(x) enum x {
 #define RANDO_ENUM_ITEM(x) x,
@@ -73,6 +83,7 @@ int NeiGi_DescribeEntry(const GetItemEntry*,CwItemDrawInfo* out) {
  out->dlistCount=1;return 1;
 }
 int GetItem_GetDrawTableEntry(int,void** out,int,int*,float*,int*,uint8_t*) {
+ assert(Ship::ownerActive);
  ++tableCalls;out[0]=(void*)"__OTR__native";return 1;
 }
 void GetItem_GetDrawSetupDLs(int,void**,void**) {}
@@ -94,7 +105,7 @@ int main() {
  redesigned=false;
  assert(OOT_FillItemDrawInfo(RG_TEST_PROGRESSIVE,&info)==0);
  assert(described==RG_TEST_TIER && std::string(info.resolvedName)=="Awarded tier");
- assert(OOT_FillItemDrawInfo(RG_TEST_NATIVE,&info)==1 && tableCalls==1);
+ assert(OOT_FillItemDrawInfo(RG_TEST_NATIVE,&info)==1 && tableCalls==1 && !Ship::ownerActive);
  void (*skills[])()={Randomizer_DrawCaneOfSomaria,Randomizer_DrawCanePacci,
    Randomizer_DrawCaneSomariaUpgrade,Randomizer_DrawCanePacciUpgrade,Randomizer_DrawCanePacciUltrahand};
  int expected[]={1,2,3,4,6};

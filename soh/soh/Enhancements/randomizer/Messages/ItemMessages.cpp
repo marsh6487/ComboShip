@@ -18,7 +18,10 @@
 #include "soh/Enhancements/randomizer/randomizer_entrance_tracker.h"
 #include "soh/FleetShipCombo/FleetComboIds.h"
 #include "ComboSongDrawOOT.h"
+#include "ComboCapeReceiptChoice.h"
 #include "ComboItemReceiptPresentation.h"
+#include "ComboKeyReceiptText.h"
+#include "ComboDungeonKeyReceipt.h"
 #include "soh/ShipInit.hpp"
 #include <soh/ResourceManagerHelpers.h>
 #ifdef COMBO_BUILD
@@ -58,6 +61,7 @@ struct CustomItemMessageEntry {
 };
 extern const CustomItemMessageEntry* GetCustomItemMessage(s16 rgId);
 
+bool BuildDungeonKeyReceiptMessage(RandomizerGet rg, CustomMessage& msg);
 bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received = true);
 bool BuildTokenReceiptMessage(RandomizerGet rg, CustomMessage& msg);
 
@@ -99,22 +103,22 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName, cha
             return 0;
         const RandomizerGet rg = found->second;
         auto item = Rando::StaticData::RetrieveItem(rg);
-        // Consumables/traps retain their normal brief receipts.
-        if (item.GetCategory() == ITEM_CATEGORY_JUNK)
-            return 0;
+        // Consumables export their normal brief native receipts too. Refusing
+        // them here forced the receiving queue into generic name/icon text.
         std::string body;
-        // Randomizer dungeon keys point at a generic custom message, but MM
-        // still needs the full traditional OoT tutorial. Native song receipt
-        // IDs are safe here; teaching/cutscene text is never requested.
+        CustomMessage keyMessage;
+        if (BuildDungeonKeyReceiptMessage(rg, keyMessage)) {
+            keyMessage.AutoFormat();
+            if (!ComboItemReceiptText::FromOotMessage(keyMessage.GetEnglish(MF_RAW), body))
+                return 0;
+        }
+        // Maps, compasses and songs retain their traditional receipts.
+        // Teaching/cutscene text is never requested.
         uint16_t traditionalText = 0;
         if (rg >= RG_DEKU_TREE_MAP && rg <= RG_ICE_CAVERN_MAP)
             traditionalText = 0x66;
         else if (rg >= RG_DEKU_TREE_COMPASS && rg <= RG_ICE_CAVERN_COMPASS)
             traditionalText = 0x67;
-        else if (rg >= RG_FOREST_TEMPLE_SMALL_KEY && rg <= RG_TREASURE_GAME_SMALL_KEY)
-            traditionalText = rg == RG_TREASURE_GAME_SMALL_KEY ? 0xF3 : 0x60;
-        else if (rg >= RG_FOREST_TEMPLE_BOSS_KEY && rg <= RG_GANONS_CASTLE_BOSS_KEY)
-            traditionalText = 0xC7;
         else if (rg >= RG_ZELDAS_LULLABY && rg <= RG_PRELUDE_OF_LIGHT) {
             if (const auto gi = item.GetGIEntryUnresolved())
                 traditionalText = gi->textId;
@@ -330,6 +334,23 @@ void BuildTriforceMessage(CustomMessage& msg) {
     msg.Format(ITEM_CUSTOM);
 }
 
+bool BuildDungeonKeyReceiptMessage(RandomizerGet rg, CustomMessage& msg) {
+    const auto item = Rando::StaticData::RetrieveItem(rg);
+    const CustomMessage name(item.GetName(), TEXTBOX_TYPE_BLUE);
+    const auto style = ComboDungeonKeyReceipt::Find(name.GetEnglish(MF_RAW));
+    if (!style.color)
+        return false;
+    msg = CustomMessage(ComboKeyReceiptText::kEnglish, ComboKeyReceiptText::kGerman, ComboKeyReceiptText::kFrench,
+                        TEXTBOX_TYPE_BLUE);
+    CustomMessage article(item.GetArticle(), TEXTBOX_TYPE_BLUE);
+    if (article.GetEnglish(MF_RAW).empty())
+        article = style.small ? CustomMessage("a ", "einen ", "une ") : CustomMessage("the ", "den ", "la ");
+    msg.Replace("[[article]]", article);
+    msg.Replace("[[color]]", style.color);
+    msg.Replace("[[name]]", name);
+    return true;
+}
+
 void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
     int16_t rgid;
     if (player->getItemEntry.objectId != OBJECT_INVALID) {
@@ -338,14 +359,15 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
         rgid = player->getItemId;
     }
 
-    if (BuildDungeonItemReceiptMessage(static_cast<RandomizerGet>(rgid), msg) ||
-        BuildTokenReceiptMessage(static_cast<RandomizerGet>(rgid), msg)) {
+    const bool dungeonKey = BuildDungeonKeyReceiptMessage(static_cast<RandomizerGet>(rgid), msg);
+    if (!dungeonKey && (BuildDungeonItemReceiptMessage(static_cast<RandomizerGet>(rgid), msg) ||
+                        BuildTokenReceiptMessage(static_cast<RandomizerGet>(rgid), msg))) {
         return;
     }
 
     // Check if this is a custom item with a detailed message
     const CustomItemMessageEntry* customMsg = GetCustomItemMessage(rgid);
-    if (customMsg != nullptr) {
+    if (!dungeonKey && customMsg != nullptr) {
         // Use the detailed custom message. Pass the real ItemID so Message_LoadItemIcon's
         // ">= ITEM_ROCS_FEATHER_SKIJER" branch fires (z_message_PAL.c:1671) and loads the
         // 32x32 icon via ExtInv_GetItemIcon(itemId). Without this, AutoFormat() with no
@@ -356,25 +378,28 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
         return;
     }
 
-    // Fall back to generic "You found X!" message for other items
-    msg = CustomMessage("You found [[article]][[color]][[name]]%w!", "Du hast [[article]][[color]][[name]]%w gefunden!",
-                        "Vous avez trouvé [[article]][[color]][[name]]%w!", TEXTBOX_TYPE_BLUE);
-    CustomMessage name =
-        CustomMessage(Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid)).GetName(), TEXTBOX_TYPE_BLUE);
-    if (rgid == RG_OPEN_CHEST &&
-        OTRGlobals::Instance->gRandoContext->GetOption(RSK_SHUFFLE_OPEN_CHEST).Is(RO_OPEN_CHEST_PROGRESSIVE)) {
-        // message is built before the item is given, so the flags still say which copy this is
-        name = Flags_GetRandomizerInf(RAND_INF_CAN_OPEN_CHEST)
-                   ? CustomMessage("Open Big Chests", "Große Truhen öffnen", "Ouvrir les grands coffres",
-                                   TEXTBOX_TYPE_BLUE)
-                   : CustomMessage("Open Small Chests", "Kleine Truhen öffnen", "Ouvrir les petits coffres",
-                                   TEXTBOX_TYPE_BLUE);
+    if (!dungeonKey) {
+        // Fall back to generic "You found X!" message for other items.
+        msg = CustomMessage("You found [[article]][[color]][[name]]%w!",
+                            "Du hast [[article]][[color]][[name]]%w gefunden!",
+                            "Vous avez trouvé [[article]][[color]][[name]]%w!", TEXTBOX_TYPE_BLUE);
+        CustomMessage name = CustomMessage(Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid)).GetName(),
+                                           TEXTBOX_TYPE_BLUE);
+        if (rgid == RG_OPEN_CHEST &&
+            OTRGlobals::Instance->gRandoContext->GetOption(RSK_SHUFFLE_OPEN_CHEST).Is(RO_OPEN_CHEST_PROGRESSIVE)) {
+            // message is built before the item is given, so the flags still say which copy this is
+            name = Flags_GetRandomizerInf(RAND_INF_CAN_OPEN_CHEST)
+                       ? CustomMessage("Open Big Chests", "Große Truhen öffnen", "Ouvrir les grands coffres",
+                                       TEXTBOX_TYPE_BLUE)
+                       : CustomMessage("Open Small Chests", "Kleine Truhen öffnen", "Ouvrir les petits coffres",
+                                       TEXTBOX_TYPE_BLUE);
+        }
+        CustomMessage article = CustomMessage(
+            Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid)).GetArticle(), TEXTBOX_TYPE_BLUE);
+        msg.Replace("[[article]]", article);
+        msg.Replace("[[color]]", Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid)).GetColor());
+        msg.Replace("[[name]]", name);
     }
-    CustomMessage article = CustomMessage(
-        Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid)).GetArticle(), TEXTBOX_TYPE_BLUE);
-    msg.Replace("[[article]]", article);
-    msg.Replace("[[color]]", Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid)).GetColor());
-    msg.Replace("[[name]]", name);
     if (Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid)).HasCustomIcon()) {
         // Use the real ItemID from the item table so vanilla's Message_LoadItemIcon picks
         // up the ">= ITEM_ROCS_FEATHER_SKIJER" branch and resolves via ExtInv_GetItemIcon.
@@ -513,6 +538,10 @@ void BuildComboForeignMessage(Player* player, CustomMessage& msg) {
                 }
                 const auto found = Rando::StaticData::itemNameToEnum.find(receiptName);
                 if (found != Rando::StaticData::itemNameToEnum.end()) {
+                    if (BuildDungeonKeyReceiptMessage(found->second, msg)) {
+                        msg.AutoFormat();
+                        return;
+                    }
                     if (BuildDungeonItemReceiptMessage(found->second, msg) ||
                         BuildTokenReceiptMessage(found->second, msg)) {
                         // The foreign sentinel has no local custom icon. Keep
@@ -731,6 +760,9 @@ void BuildItemMessage(u16* textId, bool* loadFromMessageTable) {
 #ifdef COMBO_BUILD
     } else if (player->getItemEntry.getItemId == RG_COMBO_FOREIGN) {
         BuildComboForeignMessage(player, msg);
+        const auto* foreign = OOT_LookupForeignByCheck((RandomizerCheck)player->getItemEntry.comboForeignCheck);
+        msg.capeVisibilityChoice =
+            foreign && !foreign->trap && ComboCapeReceiptChoice::IsCape(foreign->itemName.c_str());
 #endif
     } else if (player->getItemEntry.getItemId == RG_QUARTER_HEART) {
         BuildQuarterHeartMessage(msg);
@@ -750,6 +782,7 @@ void BuildItemMessage(u16* textId, bool* loadFromMessageTable) {
         BuildPushSpeedUpgradeMessage(msg);
     } else {
         BuildCustomItemMessage(player, msg);
+        msg.capeVisibilityChoice = player->getItemEntry.getItemId == RG_EXT_MAGIC_CAPE;
     }
     *loadFromMessageTable = false;
     msg.LoadIntoFont();
@@ -1156,6 +1189,28 @@ void BuildSmallKeyMessage(uint16_t* textId, bool* loadFromMessageTable) {
     msg.LoadIntoFont();
 }
 
+void BuildChestGameSmallKeyMessage(uint16_t* textId, bool* loadFromMessageTable) {
+    // Shuffled single keys retain the vanilla GI_DOOR_KEY entry and 0xF3
+    // textbox. It has no dungeon-specific RG for BuildCustomItemMessage.
+    if (!IS_RANDO || !gPlayState || *textId != 0x00F3 ||
+        !OTRGlobals::Instance->gRandoContext->GetOption(RSK_SHUFFLE_CHEST_MINIGAME).Is(RO_CHEST_GAME_SINGLE_KEYS)) {
+        return;
+    }
+    const auto* player = GET_PLAYER(gPlayState);
+    const auto& entry = player->getItemEntry;
+    if (entry.objectId == OBJECT_INVALID || entry.modIndex != MOD_NONE || entry.getItemId != GI_DOOR_KEY ||
+        entry.itemId != ITEM_KEY_SMALL || player->getItemId != entry.getItemId) {
+        return;
+    }
+    CustomMessage msg;
+    if (!BuildDungeonKeyReceiptMessage(RG_TREASURE_GAME_SMALL_KEY, msg)) {
+        return;
+    }
+    msg.AutoFormat(ITEM_KEY_SMALL);
+    msg.LoadIntoFont();
+    *loadFromMessageTable = false;
+}
+
 // Time Gate custom item - "Travel through time?" Yes/No prompt
 void BuildTimeGateMessage(uint16_t* textId, bool* loadFromMessageTable) {
     CustomMessage msg = CustomMessage("Travel through time?\x1B%g&&Yes&No%w", "Durch die Zeit reisen?\x1B%g&&Ja&Nein%w",
@@ -1167,6 +1222,7 @@ void BuildTimeGateMessage(uint16_t* textId, bool* loadFromMessageTable) {
 
 void RegisterItemMessages() {
     COND_ID_HOOK(OnOpenText, TEXT_RANDOMIZER_CUSTOM_ITEM, true, BuildItemMessage);
+    COND_ID_HOOK(OnOpenText, 0x00F3, true, BuildChestGameSmallKeyMessage);
     COND_ID_HOOK(OnOpenText, TEXT_DESC_DUNGEON_MAP_INFO, true, BuildDungeonPauseInfoMessage);
     COND_ID_HOOK(OnOpenText, TEXT_DESC_DUNGEON_COMPASS_INFO, true, BuildDungeonPauseInfoMessage);
     COND_ID_HOOK(OnOpenText, TEXT_ITEM_DUNGEON_MAP,
