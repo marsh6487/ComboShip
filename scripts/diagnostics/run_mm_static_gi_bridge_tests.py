@@ -47,7 +47,8 @@ fixture = fixture.replace('/* HOST_TUNIC_DRAW */', '\n'.join(function(native, na
     'LoadNeiLegacyGfx', 'DrawOotGetItemOpaOpaTint', 'DrawOotTunicTint',
     'DrawOotExtSpiritBreastplate', 'DrawOotExtChampionsTunic', 'DrawOotExtSagesTunic')))
 if 'inline void MM_DrawForeignCustomGi(' in host:
-    fixture = fixture.replace('/* HOST_CUSTOM_DRAW */', function(host, 'MM_DrawForeignCustomGi'))
+    fixture = fixture.replace('/* HOST_CUSTOM_DRAW */', '#include "combo/menu/ComboSwordGiEffectFit.h"\n' +
+                              function(host, 'MM_DrawForeignCustomGi'))
 else:
     fixture = fixture.replace('/* HOST_CUSTOM_DRAW */', 'void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*) {}')
 with tempfile.TemporaryDirectory(prefix='mm-static-gi-') as td:
