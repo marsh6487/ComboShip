@@ -37,7 +37,7 @@ fixture = fixture.replace('/* PRODUCTION_MIDNA_AUDIO_ROUTING */', production)
 flags = ['-std=gnu2x', '-DF3DEX_GBI_2', '-DLOG_LEVEL_GAME_PRINTS=0', '-DNDEBUG',
          '-Werror=implicit-function-declaration', '-Wno-int-conversion',
          '-Wno-incompatible-pointer-types', '-Wno-discarded-qualifiers',
-         '-Ilibultraship/include', '-Isoh/include', '-Isoh/src', '-Isoh/assets', '-Isoh', '-Isoh/mods']
+         '-Ilibultraship/include', '-Isoh/include', '-Isoh/src', '-Isoh/assets', '-Isoh', '-Isoh/mods', '-Icombo']
 for path in ('CMake/soh-cvars.cmake', 'CMake/lus-cvars.cmake'):
     for key, value in re.findall(r'set\((CVAR_PREFIX_\w+)\s+"?([^\s"\)]+)', (ROOT/path).read_text()):
         flags.append(f'-D{key}="{value}"')

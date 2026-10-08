@@ -14,6 +14,7 @@ from run_time_pedestal_tests import functions
 
 ROOT = Path(__file__).resolve().parents[2]
 flags = ["-std=c++20", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0"]
+# Both native CMake targets expose shared bridges, including their standalone stubs.
 flags += ["-I" + str(ROOT / p) for p in
           ("soh", "soh/include", "soh/src", "soh/assets", "soh/mods", "libultraship/include", "combo", "combo/menu")]
 for config in ("CMake/soh-cvars.cmake", "CMake/lus-cvars.cmake"):

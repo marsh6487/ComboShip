@@ -3,7 +3,7 @@
 Baseline: `a82852a3a02c8cabc541cce7c124da71c5755efb` on `develop` (daily polish PR #38).
 Candidate branch: `poc/sword-held-upright-polish-20261008`. Keep this candidate separate from the accepted baseline until runtime acceptance.
 
-The cumulative candidate also carries the later Summer atmosphere, autumn visibility/Alt foliage, Moon's Tear ownership, and cross-game Farore's Wind integrations from `bridge/combined-recovery-20261008` at `31186f6fb43da092c9bd260e0fc209f5bab673f0`. Its earlier sword snapshot is superseded by the final held-model priority, native MM carrier, and Four Sword shelf fixes here. The later integration delta was applied on top of those fixes; the recovery branch is retained as a merge parent. Feature-specific evidence and runtime limitations remain in the corresponding POC documents.
+The cumulative candidate also carries the later Summer atmosphere, autumn visibility/Alt foliage, Moon's Tear ownership, and cross-game Farore's Wind integrations from `bridge/combined-recovery-20261008`, including its final diagnostic dependency fixes at `3cee3121d2dd0f468938a6a39fd12eef11a5a899`. Its earlier sword snapshot is superseded by the final held-model priority, native MM carrier, and Four Sword shelf fixes here. The later integration delta was applied on top of those fixes; the recovery branch is retained as a merge parent. Feature-specific evidence and runtime limitations remain in the corresponding POC documents.
 
 ## Behavior
 
