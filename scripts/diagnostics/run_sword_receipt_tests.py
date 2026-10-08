@@ -61,7 +61,7 @@ source = source.replace('/* COMPANION_FIT */',companion_fit)
 source = source.replace('/* PRODUCTION */', production)
 oot_production = '\n'.join(function(oot_draw, name) for name in [
     'Randomizer_DrawProgressiveKokiriSword', 'Randomizer_DrawProgressiveMasterSword', 'Randomizer_DrawProgressiveBGS',
-    'Randomizer_DrawExtFourSword'])
+    'Randomizer_DrawExtFourSwordPresentation', 'Randomizer_DrawExtFourSword'])
 oot_production += '\n'+'\n'.join(function(oot, name) for name in ['Spin', 'HasLegacyGiMod', 'NeiGi_DrawEffects', 'NeiGi_DrawImpl'])
 source = source.replace('/* OOT_PRODUCTION */', oot_production)
 flags = ['-std=c++20', '-DF3DEX_GBI_2', '-DCOMBO_BUILD', '-I'+str(ROOT), '-I'+str(ROOT/'combo/menu'),
@@ -91,3 +91,9 @@ extern "C" {
     typed_cpp=Path(temporary)/'typed.cpp';typed_cpp.write_text(typed)
     subprocess.run([os.environ.get('CXX','c++'),*flags,'-fsyntax-only',str(typed_cpp)],check=True)
     print('PASS real Ship/Fast typed companion GI bounds API and C linkage')
+    # Model bounds alone omit billboard stars that extend past the blade.
+    # Project the production procedural meshes through every actual Item0 camera.
+    camera_binary=Path(temporary)/'effect-cameras'
+    subprocess.run([os.environ.get('CXX','c++'),*flags,'-O2',
+                    str(ROOT/'tests/sword_fallback/effect_camera_test.cpp'),'-o',str(camera_binary)],check=True)
+    subprocess.run([str(camera_binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})

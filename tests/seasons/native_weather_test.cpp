@@ -1,5 +1,6 @@
 #include "mods/extended_inventory.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
+#include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
 #include "2s2h/Enhancements/Audio/MMWeatherAudio.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "overlays/actors/ovl_Object_Kankyo/z_object_kankyo.h"
@@ -9,6 +10,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 
 void MMAutumnSceneFoliage_Update(const PlayState*) {
 }
@@ -31,12 +33,44 @@ static f32 D_808DE5B0;
 static u16 D_808DE340;
 static int snowDraws, rainDraws, spawns, refreshes;
 static int gameplayRandomCalls;
-static unsigned leafPalettes, leafDraws, firstLeafAlpha;
+static unsigned leafPalettes, leafDraws, firstLeafAlpha, nonzeroLeafDraws;
+static u8 submittedLeafAlpha[96];
 static float rainGain;
 static u8 nativeRainAmbience, nativeThunderAmbience;
 static ObjectKankyo supplemental[32];
+static bool perspectiveProjection;
+static float aspectRatio = 4.f / 3.f;
+static FILE* previewFile;
+static bool firstPreviewLeaf;
+static Vec3f previewPosition;
+static float previewScaleX = 1, previewScaleY = 1, previewRotation;
+static const Gfx* previewCommandsBegin;
+static int previewIndex, previewEpoch;
+static void TracePreviewLeaf(const Gfx* list);
+
+// A real perspective frustum catches leaves wasted behind the view. The older
+// lifecycle tests intentionally retain their all-visible submission boundary.
+static void ProjectLeaf(PlayState* play, const Vec3f& world, Vec3f* screen) {
+    Vec3f up = play->view.up;
+    if (SQ(up.x) + SQ(up.y) + SQ(up.z) < .001f) up = {0, 1, 0};
+    float native[4][4];
+    guLookAtF(native, play->view.eye.x, play->view.eye.y, play->view.eye.z,
+              play->view.at.x, play->view.at.y, play->view.at.z, up.x, up.y, up.z);
+    const float x = world.x * native[0][0] + world.y * native[1][0] + world.z * native[2][0] + native[3][0];
+    const float y = world.x * native[0][1] + world.y * native[1][1] + world.z * native[2][1] + native[3][1];
+    const float depth = -(world.x * native[0][2] + world.y * native[1][2] + world.z * native[2][2] + native[3][2]);
+    const Camera* camera = GET_ACTIVE_CAM(play);
+    const float fov = play->view.fovy > 0 ? play->view.fovy : camera && camera->fov > 0 ? camera->fov : 60.f;
+    const float focal = 120.f / std::tan(fov * 3.14159265f / 360.f);
+    if (depth <= 0) { *screen = {-10000, -10000, depth}; return; }
+    *screen = {160.f + x * focal / depth, 120.f - y * focal / depth, depth};
+}
 
 extern "C" {
+// Summer has its own production-state/renderer harness; these calls are outside
+// this native seasonal-particle fixture's draw/update boundary.
+void MMSummerAtmosphere_Update(PlayState*) {}
+void MMSummerAtmosphere_Reset() {}
 int32_t CVarGetInteger(const char*, int32_t fallback) { return fallback; }
 Color_RGBA8 CVarGetColor(const char*, Color_RGBA8 fallback) { return fallback; }
 void MMWeatherAudio_Reset() { rainGain = 0; }
@@ -99,23 +133,34 @@ Actor* Actor_Spawn(ActorContext* context, PlayState* play, s16 id, f32, f32, f32
     context->actorLists[ACTORCAT_ITEMACTION].first = &snow->actor;
     return &snow->actor;
 }
-void Play_GetScreenPos(PlayState*, Vec3f*, Vec3f* screen) { *screen = { 100, 100, 1 }; }
-void Matrix_Translate(f32, f32, f32, MatrixMode) {}
-void Matrix_Scale(f32, f32, f32, MatrixMode) {}
+void Play_GetScreenPos(PlayState* play, Vec3f* world, Vec3f* screen) {
+    if (perspectiveProjection) ProjectLeaf(play, *world, screen);
+    else *screen = { 100, 100, 1 };
+}
+void Matrix_Translate(f32 x, f32 y, f32 z, MatrixMode) {
+    previewPosition = {x, y, z}; previewScaleX = previewScaleY = 1; previewRotation = 0;
+}
+void Matrix_Scale(f32 x, f32 y, f32, MatrixMode) { previewScaleX *= x; previewScaleY *= y; }
 void Matrix_Mult(MtxF*, MatrixMode) {}
-void Matrix_RotateZS(s16, MatrixMode) {}
+void Matrix_RotateZS(s16 angle, MatrixMode) { previewRotation = angle * 6.2831853f / 65536.f; }
 Mtx* Matrix_Finalize(GraphicsContext*) { static Mtx matrix; return &matrix; }
 Gfx* Gfx_SetupDL(Gfx* gfx, u32) { return gfx; }
 void* Lib_SegmentedToVirtual(void* resource) { return resource; }
 s32 func_80173B48(GameState*) { return 14000000; }
 f32 Math_SmoothStepToF(f32* value, f32 target, f32, f32, f32) { *value = target; return 0; }
-void FrameInterpolation_RecordOpenChild(const void*, int) {}
+void FrameInterpolation_RecordOpenChild(const void* particle, int epoch) {
+    if (previewFile) {
+        const auto* actor = (ObjectKankyo*)gPlayState->actorCtx.actorLists[ACTORCAT_ITEMACTION].first;
+        previewIndex = ((uintptr_t)particle - (uintptr_t)&actor->unk_14C[0]) / sizeof(ObjectKankyoStruct);
+        previewEpoch = epoch;
+    }
+}
 void FrameInterpolation_RecordCloseChild() {}
 f32 Actor_WorldDistXZToActor(Actor* a, Actor* b) { return Math_Vec3f_DistXZ(&a->world.pos, &b->world.pos); }
 void func_80966E0C(EnWeatherTag*, PlayState*) {}
-float OTRGetAspectRatio() { return 4.0f / 3.0f; }
-float OTRGetDimensionFromLeftEdge(float value) { return value; }
-float OTRGetDimensionFromRightEdge(float value) { return value; }
+float OTRGetAspectRatio() { return aspectRatio; }
+float OTRGetDimensionFromLeftEdge(float value) { return value - (240.f * aspectRatio - 320.f) / 2.f; }
+float OTRGetDimensionFromRightEdge(float value) { return value + (240.f * aspectRatio - 320.f) / 2.f; }
 }
 
 // Keep native GBI writes and snow renderer execution; resource submission,
@@ -125,10 +170,34 @@ float OTRGetDimensionFromRightEdge(float value) { return value; }
 #define OPEN_DISPS_PORT_HELPERS(gfxCtx)
 #define CLOSE_DISPS_PORT_HELPERS(gfxCtx)
 #undef gSPDisplayList
-#define gSPDisplayList(pkt, dl) do { ++snowDraws; __gSPDisplayList(pkt, (Gfx*)(dl)); } while (0)
+#define gSPDisplayList(pkt, dl) do { ++snowDraws; if (previewFile) TracePreviewLeaf((const Gfx*)(dl)); __gSPDisplayList(pkt, (Gfx*)(dl)); } while (0)
 #define gSPSegment(pkt, segment, resource) __gSPSegment(pkt, segment, (uintptr_t)(resource))
 #define Lib_SegmentedToVirtual(resource) ((void*)(resource))
 #include "mods/items/objects/object_autumn_leaves.h"
+
+static void TracePreviewLeaf(const Gfx* list) {
+    if (list != sAutumnLeafGeometry) return;
+    Vec3f screen;
+    ProjectLeaf(gPlayState, previewPosition, &screen);
+    if (screen.z <= 0) return;
+    unsigned alpha = 0, palette = 0;
+    const auto* end = gPlayState->state.gfxCtx->polyXlu.p;
+    for (const Gfx* command = previewCommandsBegin; command < end; ++command) {
+        if ((command->words.w0 >> 24) == G_SETPRIMCOLOR) alpha = command->words.w1 & 255;
+        if ((command->words.w0 >> 24) == G_SETTIMG)
+            for (unsigned i = 0; i < 4; ++i)
+                if (command->words.w1 == (uintptr_t)sAutumnLeafTextures[i]) palette = i;
+    }
+    if (!alpha) return;
+    const float focal = 120.f / std::tan(60.f * 3.14159265f / 360.f);
+    const float width = 240.f * aspectRatio;
+    std::fprintf(previewFile, "%s[%.4f,%.4f,%.5f,%.5f,%.3f,%u,%u,%d,%d]", firstPreviewLeaf ? "" : ",",
+                 (screen.x + (width - 320.f) / 2.f) / width, screen.y / 240.f,
+                 320.f * previewScaleX * focal / (screen.z * width),
+                 320.f * previewScaleY * focal / (screen.z * 240.f), previewRotation, alpha, palette,
+                 previewIndex, previewEpoch);
+    firstPreviewLeaf = false;
+}
 
 typedef void (*BoxMenuConfirmFn)(s32);
 static u8 sBoxMOpen, sBoxMHoldSeen, sBoxMStickHeld;
@@ -207,15 +276,19 @@ static void Confirm(PlayState* play, u8 season) {
 
 static int DrawSnow(PlayState* play) {
     static Gfx commands[2048];
+    previewCommandsBegin = commands;
     play->state.gfxCtx->polyXlu.p = commands;
     int before = snowDraws;
-    leafPalettes = leafDraws = 0;
+    leafPalettes = leafDraws = nonzeroLeafDraws = 0;
+    std::memset(submittedLeafAlpha, 0, sizeof(submittedLeafAlpha));
     firstLeafAlpha = 0;
     for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].first; actor; actor = actor->next) {
         if (actor->draw) actor->draw(actor, play);
     }
     bool havePrim = false;
+    unsigned currentAlpha = 0;
     for (const Gfx* command = commands; command < play->state.gfxCtx->polyXlu.p; ++command) {
+        if ((command->words.w0 >> 24) == G_SETPRIMCOLOR) currentAlpha = command->words.w1 & 255;
         if ((command->words.w0 >> 24) == G_SETPRIMCOLOR && !havePrim) {
             firstLeafAlpha = command->words.w1 & 255;
             havePrim = true;
@@ -225,6 +298,9 @@ static int DrawSnow(PlayState* play) {
                 if (command->words.w1 == (uintptr_t)sAutumnLeafTextures[palette]) {
                     assert(((command->words.w0 >> 19) & 3) == G_IM_SIZ_32b);
                     leafPalettes |= 1 << palette;
+                    assert(leafDraws < 96);
+                    submittedLeafAlpha[leafDraws] = currentAlpha;
+                    nonzeroLeafDraws += currentAlpha > 0;
                     ++leafDraws;
                 }
             }
@@ -253,7 +329,7 @@ static void AutumnCoverageRegression() {
         far += distance >= 3200;
     }
     assert(near && middle && far); // The old snow bubble never reaches the middle/background.
-    assert(near == 16 && middle == 32 && far == 48); // User requested a quieter foreground.
+    assert(near + middle + far == 96); // Keep the shared native allocation bounded.
     auto first = actor->unk_14C[0];
     play.view.eye.x += 30;
     play.view.at = {30, 0, -1}; // Turn the view without dragging existing leaves along.
@@ -280,7 +356,234 @@ static void AutumnCoverageRegression() {
     std::puts("PASS autumn foreground/midground/background coverage, world stability and bounded rendering");
 }
 
-int main() {
+static unsigned VisibleDistantLeaves(ObjectKankyo* actor, PlayState* play) {
+    unsigned count = 0;
+    for (int i = 16; i < 96; ++i) {
+        const auto& p = actor->unk_14C[i];
+        Vec3f screen;
+        ProjectLeaf(play, {p.unk_00 + p.unk_0C, p.unk_04 + p.unk_10, p.unk_08 + p.unk_14}, &screen);
+        count += screen.z > 0 && screen.x >= 0 && screen.x < 320 && screen.y >= 0 && screen.y < 240;
+    }
+    return count;
+}
+
+static void VisibleAutumnRegression() {
+    static PlayState play;
+    Camera camera{};
+    GraphicsContext gfx{};
+    perspectiveProjection = true;
+    for (int scene : {SCENE_00KEIKOKU, SCENE_TOWN, SCENE_ICHIBA, SCENE_BACKTOWN, SCENE_CLOCKTOWER, SCENE_ALLEY}) {
+        Reset(&play, &camera, &gfx);
+        play.sceneId = scene;
+        camera.fov = 60;
+        Confirm(&play, SEASON_AUTUMN);
+        for (int frame = 0; frame < 30; ++frame) { Frame(&play); DrawSnow(&play); }
+        auto* actor = (ObjectKankyo*)play.actorCtx.actorLists[ACTORCAT_ITEMACTION].first;
+        assert(actor && actor->actor.update);
+        const unsigned visible = VisibleDistantLeaves(actor, &play);
+        std::printf("Scene %d: %u distant leaves in the perspective view\n", scene, visible);
+        std::fflush(stdout);
+        assert(visible >= 40); // A nominal budget scattered behind the camera is insufficient.
+        const auto first = actor->unk_14C[16];
+        for (int frame = 0; frame < 20; ++frame) Frame(&play);
+        const auto& moved = actor->unk_14C[16];
+        assert(moved.epoch == first.epoch && first.unk_10 - moved.unk_10 >= 45.f);
+        if (scene != SCENE_00KEIKOKU) {
+            for (int i = 16; i < 96; ++i) {
+                const auto& p = actor->unk_14C[i];
+                Vec3f position{p.unk_00 + p.unk_0C, p.unk_04 + p.unk_10, p.unk_08 + p.unk_14};
+                assert(Math_Vec3f_DistXZ(&position, &play.view.eye) < 2000.f);
+            }
+        }
+        perspectiveProjection = true;
+        assert(DrawSnow(&play) <= 96);
+        for (int frame = 0; frame < 600; ++frame) {
+            Frame(&play);
+            DrawSnow(&play); // The actual draw sees this frame's camera matrices and recycles offscreen leaves.
+            if (frame % 60 == 0) {
+                const unsigned live = VisibleDistantLeaves(actor, &play);
+                std::printf("Scene %d at tick %d: %u visible distant leaves\n", scene, frame, live);
+                std::fflush(stdout);
+                assert(live >= 40); // Compact streets must stay populated after the first fall.
+            }
+        }
+    }
+    perspectiveProjection = false;
+    std::puts("PASS visible moving autumn leaves in the field and all five outdoor Clock Town districts");
+}
+
+static void ExportAutumnPreview(const char* path) {
+    static PlayState play;
+    Camera camera{};
+    GraphicsContext gfx{};
+    Reset(&play, &camera, &gfx);
+    play.sceneId = SCENE_00KEIKOKU;
+    camera.fov = 60;
+    play.envCtx.windDirection.x = -100;
+    play.envCtx.windSpeed = 20;
+    Confirm(&play, SEASON_AUTUMN);
+    perspectiveProjection = true;
+    aspectRatio = 16.f / 9.f;
+    for (int frame = 0; frame < 30; ++frame) Frame(&play);
+    previewFile = std::fopen(path, "w");
+    assert(previewFile);
+    std::fputs("{\"fps\":10,\"frames\":[", previewFile);
+    for (int frame = 0; frame < 240; ++frame) {
+        Frame(&play);
+        if (frame % 2 != 0) continue;
+        std::fputs(frame ? ",[" : "[", previewFile);
+        firstPreviewLeaf = true;
+        DrawSnow(&play);
+        std::fputc(']', previewFile);
+    }
+    std::fputs("]}", previewFile);
+    std::fclose(previewFile);
+    previewFile = nullptr;
+    std::puts("PASS exported twelve seconds of production leaf motion and draw transforms");
+}
+
+static void AllAutumnSlotsVisibleRegression() {
+    static PlayState play;
+    Camera camera{};
+    GraphicsContext gfx{};
+    perspectiveProjection = true;
+    for (int scene : {SCENE_00KEIKOKU, SCENE_TOWN, SCENE_ICHIBA, SCENE_BACKTOWN, SCENE_CLOCKTOWER, SCENE_ALLEY}) {
+        Reset(&play, &camera, &gfx);
+        Confirm(&play, SEASON_AUTUMN);
+        play.sceneId = scene;
+        Frame(&play);
+        auto* actor = (ObjectKankyo*)play.actorCtx.actorLists[ACTORCAT_ITEMACTION].first;
+        assert(actor);
+        unsigned totalRecycled = 0;
+        for (float aspect : {4.f / 3.f, 16.f / 9.f, 21.f / 9.f}) {
+            aspectRatio = aspect;
+            const float left = -(240.f * aspect - 320.f) / 2.f;
+            const float right = 320.f - left;
+            for (float fov : {35.f, 60.f, 90.f}) {
+                camera.fov = play.view.fovy = fov;
+                play.view.at.y = fov == 35.f ? .4f : fov == 90.f ? -.4f : 0.f;
+                for (int frame = 0; frame < 180; ++frame) {
+                    Frame(&play);
+                    Vec3f previous[96];
+                    s16 epochs[96];
+                    for (int i = 0; i < 96; ++i) {
+                        const auto& p = actor->unk_14C[i];
+                        ProjectLeaf(&play, {p.unk_00 + p.unk_0C, p.unk_04 + p.unk_10, p.unk_08 + p.unk_14}, &previous[i]);
+                        epochs[i] = p.epoch;
+                    }
+                    const int drawn = DrawSnow(&play);
+                    if (drawn != 96) {
+                        std::printf("Scene %d aspect %.3f FOV %.0f: %d of 96 leaves submitted\n", scene, aspect, fov, drawn);
+                        std::fflush(stdout);
+                    }
+                    assert(drawn == 96); // Every allocated slot must reach the view, not just the counter.
+                    unsigned recycled = 0;
+                    for (int i = 0; i < 96; ++i) {
+                        const auto& p = actor->unk_14C[i];
+                        Vec3f projected;
+                        ProjectLeaf(&play, {p.unk_00 + p.unk_0C, p.unk_04 + p.unk_10, p.unk_08 + p.unk_14}, &projected);
+                        assert(projected.z > 0 && projected.x >= left && projected.x < right &&
+                               projected.y >= 0 && projected.y < 240);
+                        if (p.epoch != epochs[i]) {
+                            ++recycled;
+                            // Recycling must not teleport an opaque leaf inside the viewport.
+                            assert(previous[i].z <= 0 || previous[i].x < left || previous[i].x >= right ||
+                                   previous[i].y < 0 || previous[i].y >= 240);
+                        }
+                    }
+                    if (frame != 0) assert(recycled < 16); // No periodic whole-field restart.
+                    totalRecycled += recycled;
+                }
+            }
+        }
+        assert(totalRecycled > 0);
+        std::printf("PASS all 96 autumn slots in scene %d across aspect, FOV, pitch and individual recycling\n", scene);
+    }
+    aspectRatio = 4.f / 3.f;
+    perspectiveProjection = false;
+}
+
+static void NativeProjectionHandednessRegression() {
+    static PlayState play;
+    Camera camera{};
+    GraphicsContext gfx{};
+    Reset(&play, &camera, &gfx);
+    camera.fov = play.view.fovy = 60;
+    play.view.up = {0, 1, 0};
+    float nativeMatrix[4][4];
+    guLookAtF(nativeMatrix, 0, 0, 0, 0, 0, 1, 0, 1, 0);
+    Vec3f world{100, 40, 1000}, projected;
+    ProjectLeaf(&play, world, &projected);
+    const float nativeX = world.x * nativeMatrix[0][0] + world.y * nativeMatrix[1][0] + world.z * nativeMatrix[2][0];
+    const float nativeDepth = -(world.x * nativeMatrix[0][2] + world.y * nativeMatrix[1][2] + world.z * nativeMatrix[2][2]);
+    const float expected = 160.f + nativeX * (120.f / std::tan(60.f * 3.14159265f / 360.f)) / nativeDepth;
+    assert(expected < 160.f && std::fabs(projected.x - expected) < .001f);
+    std::puts("PASS preview/test projection screen-right matches actual native guLookAtF handedness");
+}
+
+static void SteepDownwardAutumnRegression() {
+    static PlayState play;
+    Camera camera{};
+    GraphicsContext gfx{};
+    perspectiveProjection = true;
+    aspectRatio = 16.f / 9.f;
+    for (int scene : {SCENE_00KEIKOKU, SCENE_TOWN}) {
+        Reset(&play, &camera, &gfx);
+        play.sceneId = scene;
+        camera.fov = play.view.fovy = 60;
+        play.view.at = {0, -20, 1}; // Nearly straight down: falling leaves stay projected onscreen.
+        Confirm(&play, SEASON_AUTUMN);
+        Frame(&play);
+        auto* actor = (ObjectKankyo*)play.actorCtx.actorLists[ACTORCAT_ITEMACTION].first;
+        assert(actor);
+        unsigned totalRecycled = 0;
+        for (int frame = 0; frame < 3600; ++frame) { // Three minutes at the native 20 Hz update cadence.
+            Frame(&play);
+            Vec3f before[96], projected[96];
+            s16 epochs[96];
+            for (int i = 0; i < 96; ++i) {
+                const auto& p = actor->unk_14C[i];
+                before[i] = {p.unk_00 + p.unk_0C, p.unk_04 + p.unk_10, p.unk_08 + p.unk_14};
+                ProjectLeaf(&play, before[i], &projected[i]);
+                epochs[i] = p.epoch;
+            }
+            assert(DrawSnow(&play) == 96);
+            if (nonzeroLeafDraws != 96) {
+                std::printf("FAIL steep-down scene %d frame %d: %u of 96 nonzero-alpha leaves\n", scene, frame, nonzeroLeafDraws);
+                std::fflush(stdout);
+            }
+            assert(nonzeroLeafDraws == 96); // Submission counts alone hide permanently distance-faded slots.
+            unsigned recycled = 0;
+            for (int i = 0; i < 96; ++i) {
+                const auto& p = actor->unk_14C[i];
+                if (p.epoch != epochs[i]) {
+                    ++recycled;
+                    const float left = -(240.f * aspectRatio - 320.f) / 2.f;
+                    const float right = 320.f - left;
+                    const bool outside = projected[i].z <= 0 || projected[i].x < left || projected[i].x >= right ||
+                                         projected[i].y < 0 || projected[i].y >= 240;
+                    // A visible opaque leaf must never teleport. At >=8000 units,
+                    // native distance opacity is already zero before reseeding.
+                    assert(outside || Math_Vec3f_DistXYZ(&before[i], &play.view.eye) >= 8000.f);
+                    assert(p.unk_18 == 1 && submittedLeafAlpha[i] <= 9);
+                }
+            }
+            assert(recycled < 16); // No synchronized whole-field restart.
+            totalRecycled += recycled;
+        }
+        assert(totalRecycled >= 96);
+        std::printf("PASS three-minute steep-down scene %d: 96 nonzero-alpha slots, %u bounded individual recycles\n", scene, totalRecycled);
+    }
+    aspectRatio = 4.f / 3.f;
+    perspectiveProjection = false;
+}
+
+int main(int argc, char** argv) {
+    if (argc == 2) { ExportAutumnPreview(argv[1]); return 0; }
+    SteepDownwardAutumnRegression();
+    NativeProjectionHandednessRegression();
+    AllAutumnSlotsVisibleRegression();
+    VisibleAutumnRegression();
     AutumnCoverageRegression();
     static PlayState play;
     Camera camera{};

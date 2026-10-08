@@ -83,6 +83,7 @@ const Binding kBindings[] = {
     { RI_OOT_EXT_CANE_OF_BYRNA, "cane_of_byrna" },
     { RI_OOT_EXT_FOUR_SWORD, "four_sword" },
     { RI_PENDANT_OF_MEMORIES, "pendant_of_memories" },
+    { RI_ROOM_KEY, "room_key" },
     { RI_OOT_NEI_SHEIKAH_SLATE, "sheikah_slate" },
     { RI_OOT_NEI_SLATE_RUNE_BOMB, "slate_bomb" },
     { RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE, "slate_master_cycle" },
@@ -107,6 +108,10 @@ bool HasMmLegacyGiMod(RandoItemId item) {
     const char* opaque = nullptr;
     const char* second = nullptr;
     switch (item) {
+        case RI_ROOM_KEY:
+            opaque = "objects/object_gi_reserve_b_00/gGiRoomKeyDL";
+            second = "objects/object_gi_reserve_b_00/gGiRoomKeyEmptyDL";
+            break;
         case RI_OOT_NEI_FIRE_ROD:
             opaque = "objects/object_nei_fire_rod/Cylinder_001_opaque_dl";
             break;
@@ -280,8 +285,10 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop, int mmPickup) {
         Matrix_Push();
         if (flame) {
             Matrix_Push();
-            if (NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1)))
+            if (NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1))) {
+                ComboSwordGi_ApplyPresentationSize(shop, mmPickup);
                 ComboSwordGi_ApplyEffectFit(static_cast<Kind>(info.neiShimmer - 1), shop, mmPickup);
+            }
             DrawOotSlateRuneFlame(info.primColorXlu[0], info.primColorXlu[1], info.primColorXlu[2]);
             Matrix_Pop();
         }
@@ -414,8 +421,10 @@ MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer(RandoItemId item, bool shop, in
         mKind = static_cast<Kind>(info.neiShimmer - 1);
     if (mEnabled) {
         Matrix_Push();
-        if (NeiGi::IsSword(mKind))
+        if (NeiGi::IsSword(mKind)) {
+            ComboSwordGi_ApplyPresentationSize(shop, mmPickup);
             ComboSwordGi_ApplyLegacyFit("mm", fitKind == Kind::Neutral ? mKind : fitKind, shop, mmPickup);
+        }
         Matrix_Push();
     }
 }
@@ -427,6 +436,7 @@ MM_NeiGiFallbackShimmer::~MM_NeiGiFallbackShimmer() {
     Matrix_Pop(); // Restore the caller before composing award-space effects.
     Matrix_Push();
     if (NeiGi::IsSword(mKind)) {
+        ComboSwordGi_ApplyPresentationSize(mShop, mMmPickup);
         ComboSwordGi_ApplyEffectFit(mKind, mShop, mMmPickup);
         NeiGi_DrawMesh(gPlayState,
                        NeiGi::SampleSpecial(mKind, gPlayState->gameplayFrames, NeiGi_CameraBasis(gPlayState)));

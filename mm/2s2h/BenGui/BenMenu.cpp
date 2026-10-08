@@ -1843,6 +1843,11 @@ void BenMenu::AddEnhancements() {
     // Dialogue Enhancements
     path.column = SECTION_COLUMN_2;
     AddWidget(path, "Dialogue", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Random Rupee Names", WIDGET_CVAR_CHECKBOX)
+        .CVar("gRandoEnhancements.RandomizeRupeeNames")
+        .Options(CheckboxOptions()
+                     .Tooltip("Randomize the currency name in randomizer pickup textboxes. Shared with SoH.")
+                     .DefaultValue(true));
     AddWidget(path, "Fast Bank Selection", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Dialogue.FastBankSelection")
         .Options(CheckboxOptions().Tooltip(

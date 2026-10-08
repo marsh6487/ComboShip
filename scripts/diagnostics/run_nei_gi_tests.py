@@ -14,8 +14,9 @@ from run_time_pedestal_tests import functions
 
 ROOT = Path(__file__).resolve().parents[2]
 flags = ["-std=c++20", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0"]
+# Both native CMake targets expose shared bridges, including their standalone stubs.
 flags += ["-I" + str(ROOT / p) for p in
-          ("soh", "soh/include", "soh/src", "soh/assets", "soh/mods", "libultraship/include", "combo/menu")]
+          ("soh", "soh/include", "soh/src", "soh/assets", "soh/mods", "libultraship/include", "combo", "combo/menu")]
 for config in ("CMake/soh-cvars.cmake", "CMake/lus-cvars.cmake"):
     for key, value in re.findall(r'set\((CVAR_PREFIX_\w+)\s+"?([^\s"\)]+)', (ROOT / config).read_text()):
         flags.append(f'-D{key}="{value}"')
@@ -55,6 +56,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
         ("trident", "ExtTrident"), ("climb_boots", "ExtClimbBoots"), ("roc_boots", "ExtRocBoots"),
         ("cane_of_byrna", "ExtCaneOfByrna"), ("four_sword", "ExtFourSword"),
         ("pendant_of_memories", "ExtPendantOfMemories"), ("elemental_wand", "ElementalWand"),
+        ("room_key", "MmTradeQuest", "RG_MM_ROOM_KEY"),
         ("sand_rod", "ElementalWand", "RG_WAND_SAND_ROD"),
         ("tornado_rod", "ElementalWand", "RG_WAND_TORNADO_ROD"),
         ("water_rod", "ElementalWand", "RG_WAND_WATER_ROD"),
@@ -106,7 +108,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
             pickup_vertices.append(asset.name + ' ' + ' '.join(str(v*scale) for v in point))
         all_frames.append(f'{{"{asset.name}",{low}f,{high}f,{width}f,{float(meta["draw_scale"])}f,'
                           f'{str((asset/"gi_xlu_dl").exists()).lower()}}},')
-    assert len(all_frames) == 61
+    assert len(all_frames) == 62
     (Path(tmp) / "nei_all_frame_bounds.inc").write_text("\n".join(all_frames))
     pickup_vertex_path = Path(tmp) / "mm_pickup_vertices.txt"
     pickup_vertex_path.write_text("\n".join(pickup_vertices))
@@ -325,7 +327,7 @@ std::map<std::string,std::vector<std::array<float,3>>> FixtureMmPickupVertices()
  std::map<std::string,std::vector<std::array<float,3>>> vertices;
  std::string slug;std::array<float,3> point{};
  while(input>>slug>>point[0]>>point[1]>>point[2])vertices[slug].push_back(point);
- assert(input.eof() && vertices.size()==61);
+ assert(input.eof() && vertices.size()==62);
  return vertices;
 }
 '''

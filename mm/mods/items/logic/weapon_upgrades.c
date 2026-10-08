@@ -10,6 +10,10 @@
  */
 #include "weapon_upgrades.h"
 #include "../../nei_save.h" // Skijer's NEI
+#include "../../extended_equipment.h"
+#include "../../equipment/nei_equipment_presentation.h"
+#include "../../../../combo/NeiHeldSword.h"
+#include "adult_link_render.h"
 
 u8 WeaponUpgrade_HasHammerAxe(void) {
     return (Nei_Save()->weaponUpgrades & WEAPON_UPGRADE_HAMMER_AXE) != 0;
@@ -133,16 +137,13 @@ static IKAxePropState* IKAxe_PropSlot(Actor* actor) {
     return NULL;
 }
 
-// In-hand (held) sword model swap — pak_loader-style: keep the OOT/pak hand and draw the MM
-// SWORD PIECES (blade + handle) from o2r on top. We can't use MM's combined LeftHandHolding*Sword
-// DL because its object_link_child hand collides with OOT's object_link_child (which has no Razor/
-// Gilded blade) → it renders empty. The standalone piece DLs are MM-specific, so their sub-
-// resources resolve to mm.o2r and render. Builds a compound DL [hand][blade][handle] like the
-// Twilight clawshot. `ootHand` is the resolved OOT hand DL for this limb/LOD; returns 1 if it set
-// *dList (caller leaves the vanilla DL otherwise).
+// Exact reviewed GI geometry in the native human/adult hand frame. The donor
+// mesh graph is atomic; all modelview changes live in balanced resource pushes.
 u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8 bodyEnvR, u8 bodyEnvG, u8 bodyEnvB) {
     extern void* MmAssets_LoadResource(const char* path);
     extern s32 CVarGetInteger(const char* name, s32 defaultValue);
+    extern u8 Player_IsCustomLinkModel(Player * player);
+    extern u8 FourSword_IsEquipped(void);
     // Cached loaded pieces per variant.
     static void* sRazorBlade = NULL;
     static void* sRazorHandle = NULL;
@@ -155,11 +156,66 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     if (dList == NULL || ootHand == NULL || player == NULL) {
         return 0;
     }
+    if (player->transformation != PLAYER_FORM_HUMAN || Player_IsCustomLinkModel(player) ||
+        (player->leftHandType != PLAYER_MODELTYPE_LH_ONE_HAND_SWORD &&
+         player->leftHandType != PLAYER_MODELTYPE_LH_TWO_HAND_SWORD)) {
+        return 0;
+    }
 
     void* blade = NULL;
     void* handle = NULL;
+    const int frame = AdultLink_UsesAdultPresentation(player) ? NEI_HELD_SWORD_OOT_ADULT : NEI_HELD_SWORD_MM_HUMAN;
+    int model = -1;
+    if (player->heldItemId == ITEM_SWORD_KOKIRI && player->heldItemAction == PLAYER_IA_SWORD_KOKIRI) {
+        model = WeaponUpgrade_KokiriLevel() == 0 ? NEI_HELD_SWORD_MM_KOKIRI
+                : WeaponUpgrade_HasGilded() && CVarGetInteger("gEnhancements.SkijerNEI.GildedUsesGildedLook", 1)
+                    ? NEI_HELD_SWORD_GILDED
+                    : NEI_HELD_SWORD_RAZOR;
+    } else if (player->heldItemId == ITEM_SWORD_RAZOR && player->heldItemAction == PLAYER_IA_SWORD_RAZOR) {
+        model = NEI_HELD_SWORD_RAZOR;
+    } else if (player->heldItemId == ITEM_SWORD_GILDED && player->heldItemAction == PLAYER_IA_SWORD_GILDED) {
+        model = NEI_HELD_SWORD_GILDED;
+    } else if (player->heldItemId == ITEM_SWORD_MASTER && player->heldItemAction == PLAYER_IA_SWORD_MASTER) {
+        model = WeaponUpgrade_HasTrueMaster() ? NEI_HELD_SWORD_TRUE_MASTER : NEI_HELD_SWORD_MASTER;
+    } else if (player->heldItemId == ITEM_SWORD_BGS && player->heldItemAction == PLAYER_IA_SWORD_BIGGORON) {
+        model = WeaponUpgrade_HasGreatFairy() && CVarGetInteger("gEnhancements.SkijerNEI.BgsUsesGfsLook", 1)
+                    ? NEI_HELD_SWORD_GREAT_FAIRY
+                    : NEI_HELD_SWORD_BIGGORON;
+    } else if (player->heldItemId == ITEM_SWORD_GREAT_FAIRY && player->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED) {
+        model = NEI_HELD_SWORD_GREAT_FAIRY;
+    } else if (FourSword_IsEquipped() && player->heldItemId == ITEM_EXT_SWORD_2 &&
+               player->heldItemAction == PLAYER_IA_SWORD_KOKIRI) {
+        model = NEI_HELD_SWORD_FOUR;
+    }
+    extern u8 FourSword_HeldSwordDLForFrame(void** blade, void** handle, int frame);
+    if (model < 0)
+        return 0; // Custom items can reuse sword actions (net, rods, etc.).
+    if (model >= 0 && NeiHeldSword_EquipmentSelected(model, frame))
+        return 0;
+    if (frame == NEI_HELD_SWORD_MM_HUMAN && player->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD) {
+        extern u16 gEquipMasks[];
+        extern u8 gEquipShifts[];
+        // Native MM chooses its combined sword hand from the equipped nibble,
+        // even when NEI's progressive blade advances beyond that native tier.
+        const int equipped = GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD);
+        const int nativeModel = equipped == EQUIP_VALUE_SWORD_RAZOR    ? NEI_HELD_SWORD_RAZOR
+                                : equipped == EQUIP_VALUE_SWORD_GILDED ? NEI_HELD_SWORD_GILDED
+                                                                       : NEI_HELD_SWORD_MM_KOKIRI;
+        if (NeiHeldSword_EquipmentSelected(nativeModel, frame))
+            return 0;
+    } else if (frame == NEI_HELD_SWORD_MM_HUMAN && player->leftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD &&
+               NeiHeldSword_EquipmentSelected(NEI_HELD_SWORD_GREAT_FAIRY, frame)) {
+        // MM's native two-hand array always owns the GFS combined hand, even
+        // when the imported longsword's selected visual tier is Biggoron.
+        return 0;
+    }
 
-    if (player->heldItemAction == PLAYER_IA_SWORD_KOKIRI && WeaponUpgrade_KokiriLevel() >= 1) {
+    if (FourSword_HeldSwordDLForFrame(&blade, &handle, frame)) {
+        // The Four Sword pair getter keeps a selected legacy pair authoritative.
+    } else if (model >= 0 && !NeiHeldSword_UpgradePiecesSelected(model) &&
+               (blade = NeiHeldSword_ModelDL(model, frame)) != NULL) {
+        // Whole exact authored blade+hilt, without get-item particles/shimmer.
+    } else if (player->heldItemAction == PLAYER_IA_SWORD_KOKIRI && WeaponUpgrade_KokiriLevel() >= 1) {
         u8 gilded = WeaponUpgrade_HasGilded() && CVarGetInteger("gEnhancements.SkijerNEI.GildedUsesGildedLook", 1);
         if (gilded) {
             if (!sGildedTried) {
@@ -202,7 +258,7 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     if (handle != NULL) {
         gSPDisplayList(d++, (Gfx*)handle);
     }
-    gSPDisplayList(d++, ootHand);
+    gSPDisplayList(d++, (Gfx*)ootHand);
     // Restore the standard player-limb render state so the next limb (the torso) doesn't inherit
     // the MM sword's material and render black.
     gDPPipeSync(d++);

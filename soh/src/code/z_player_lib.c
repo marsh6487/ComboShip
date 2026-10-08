@@ -50,6 +50,7 @@ extern u8 ItemEquip_HoldsClosedFist(void);
 extern u8 ItemEquip_HoldsEmptyHand(void);
 
 #include <stdlib.h>
+#include <string.h>
 
 // SW97: Forward declaration - defined in sw97_player_hooks.c (compiled in z_player.c TU)
 
@@ -1962,16 +1963,21 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
                 Gfx** openDLs = &gPlayerLeftHandOpenDLs[gSaveContext.linkAge];
                 *dList = Player_ResolveLimbDLForDummyOrLocal(openDLs[sDListsLodOffset]);
                 sLeftHandType = PLAYER_MODELTYPE_LH_OPEN;
-            } else if (!extOwnsWeapon) {
+            } else if (!hideLH && !TransformMasks_IsTransformedAny()) {
                 mayDrawProgressiveFire = !hideLH;
-                // NEI progressive sword upgrades: keep an OOT open hand and draw the MM Razor /
-                // Gilded / Great Fairy's Sword pieces (loaded from o2r) on top — pak_loader-style
-                // (sword then hand), supporting mods. No-op unless the upgraded sword is wielded.
+                // Keep the age/LOD-correct fist and the native sword hand type.
+                // The exact authored mesh changes only this limb's display list.
                 Gfx** openDLs = &gPlayerLeftHandOpenDLs[gSaveContext.linkAge];
-                void* ootHand = Player_ResolveLimbDLForDummyOrLocal(openDLs[sDListsLodOffset]);
-                if (WeaponUpgrade_ApplyHeldSwordDL(dList, ootHand, this, sPlayerBodyEnvColor.r, sPlayerBodyEnvColor.g,
+                Gfx* ootHand = Player_ResolveLimbDLForDummyOrLocal(openDLs[sDListsLodOffset]);
+                Gfx* fist = Player_ResolveLimbDLForDummyOrLocal(
+                    gPlayerLeftHandClosedDLs[gSaveContext.linkAge + sDListsLodOffset]);
+                if (WeaponUpgrade_ApplyHeldSwordDL(dList, fist, this, sPlayerBodyEnvColor.r, sPlayerBodyEnvColor.g,
                                                    sPlayerBodyEnvColor.b)) {
-                    sLeftHandType = PLAYER_MODELTYPE_LH_OPEN;
+                    // Each deferred player/clone draw retains its own hand and
+                    // body color; the helper's scratch compound is reused.
+                    Gfx* compound = (Gfx*)Graph_Alloc(play->state.gfxCtx, 8 * sizeof(Gfx));
+                    memcpy(compound, *dList, 8 * sizeof(Gfx));
+                    *dList = compound;
                 } else if (sLeftHandType == PLAYER_MODELTYPE_LH_OPEN) {
                     // No upgraded sword to draw, so ootHand was resolved and then dropped:
                     // *dList kept whatever vanilla picked earlier, which is LINK's hand even

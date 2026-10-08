@@ -4,6 +4,8 @@
 #include "2s2h/FleetShipCombo/FleetComboItems.h"
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h"
 #include "2s2h/Rando/ItemReceiptText.h"
+#include <nlohmann/json.hpp>
+#include "2s2h/Rando/Rando.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
 #include "ComboExport.h"
 #include "ComboItemReceiptText.h"
@@ -85,6 +87,13 @@ const std::string& GetCheckDisplayName(RandoCheckId id) {
 namespace CustomMessage {
 static Entry shownSong;
 static bool startedSong;
+static Entry nativeRupeeLoaded;
+static int nativeRupeeLoads = 0;
+Entry LoadVanillaMessageTableEntry(u16) {
+  return {.textboxType=3, .textboxYPos=2, .icon=0xA7, .nextMessageID=0x1234,
+          .firstItemCost=0x5678, .secondItemCost=0x9ABC, .msg="Native rupee receipt"};
+}
+void LoadCustomMessageIntoFont(Entry entry) { nativeRupeeLoaded=std::move(entry);++nativeRupeeLoads; }
 void SetActiveCustomMessage(std::string msg, Entry options) { options.msg=std::move(msg);shownSong=options;startedSong=false; }
 void StartTextbox(std::string msg, Entry options) { options.msg=std::move(msg);shownSong=options;startedSong=true; }
 }
@@ -100,6 +109,17 @@ static bool donorReady = true;
 static int donorReads = 0;
 static uint64_t generation = 0;
 static bool mapCompassInfo = false;
+static int randomRupeeNames = 0;
+extern "C" int32_t CVarGetInteger(const char* name, int32_t fallback) {
+  if (std::strcmp(name, "gRandoEnhancements.RandomizeRupeeNames") == 0)
+    return randomRupeeNames < 0 ? fallback : randomRupeeNames;
+  return fallback;
+}
+using NativeRupeeHook = void (*)(u16*, bool*);
+static std::map<u16,NativeRupeeHook> nativeRupeeHooks;
+#define COND_ID_HOOK(kind,id,condition,callback) do { if(condition) nativeRupeeHooks[id]=callback; } while(0)
+#include "receipt_rupee_hooks.inc"
+#undef COND_ID_HOOK
 static RandoCheckId foreignRewardCheck = RC_UNKNOWN;
 static ComboRando::ForeignItem foreignReward;
 namespace Rando::MiscBehavior {
@@ -423,11 +443,107 @@ static void CheckMapCompassInformation() {
   std::cout << "MM map/compass information: four placed rewards, foreign owner names, native entrances, owned pause/Start With, gates and no save writes passed\n";
 }
 
+static void CheckRandomRupeeReceipts() {
+  const auto saved = gSaveContext;
+  gSaveContext.fileNum = 0;
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+  const struct { RandoItemId id; const char* name; const char* amount; unsigned color; } cases[] = {
+    {RI_RUPEE_GREEN, "Green Rupee", "1", 2}, {RI_RUPEE_BLUE, "Blue Rupee", "5", 3},
+    {RI_RUPEE_RED, "Red Rupee", "20", 1}, {RI_RUPEE_PURPLE, "Purple Rupee", "50", 6},
+    {RI_RUPEE_SILVER, "Silver Rupee", "100", 0}, {RI_RUPEE_HUGE, "Huge Rupee", "200", 4}
+  };
+  for (int enabled : {-1, 1}) {
+    randomRupeeNames = enabled;
+    for (auto [id, name, amount, color] : cases) {
+      for (auto lang : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+        gSaveContext.options.language = lang;
+        for (bool foreign : {false, true}) {
+          const auto before = gSaveContext;
+          CustomMessage::Entry receipt;
+          receipt.icon = 0xF5;
+          const bool applied = foreign ? Rando::ApplyForeignItemReceiptText(name, receipt)
+                                       : Rando::ApplyItemReceiptText(id, receipt);
+          assert(applied && "rupee enhancement must work without the donor/message table");
+          const std::string value = std::string(1, static_cast<char>(color)) + amount;
+          assert(!receipt.autoFormat && receipt.msg.find(value) != std::string::npos);
+          assert(receipt.msg.find(name) == std::string::npos);
+          assert(receipt.msg.find("%") == std::string::npos);
+          assert(receipt.msg.find("[P]") == std::string::npos);
+          assert(receipt.icon == 0xF5 && !receipt.receiptPresentation.singleBox);
+          assert(!std::memcmp(&gSaveContext, &before, sizeof(before)));
+        }
+      }
+    }
+  }
+  // Disabled and non-randomizer modes retain the ordinary native/donor path.
+  donorReady = false;
+  randomRupeeNames = 0;
+  CustomMessage::Entry receipt;
+  assert(!Rando::ApplyItemReceiptText(RI_RUPEE_BLUE, receipt));
+  assert(!Rando::ApplyForeignItemReceiptText("Blue Rupee", receipt));
+  randomRupeeNames = 1;
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_VANILLA;
+  assert(!Rando::ApplyItemReceiptText(RI_RUPEE_BLUE, receipt));
+  assert(!Rando::ApplyForeignItemReceiptText("Blue Rupee", receipt));
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+  assert(!Rando::ApplyForeignItemReceiptText("Silver Rupee (Forest Temple)", receipt));
+  donorReady = true;
+  randomRupeeNames = 0;
+  gSaveContext = saved;
+  std::cout << "Localized random rupee receipts: native/foreign values, live/default setting, modes and non-currency exclusion passed\n";
+}
+
+static void CheckNativeRupeeHooks() {
+  RegisterNativeRandomRupeeNames();
+  assert(nativeRupeeHooks.size()==7 && "native repeat/minigame rupee boxes need the enhancement too");
+  const struct {u16 text; const char* amount; unsigned color;} cases[] = {
+    {0xC4,"1",2},{0x2,"5",3},{0x3,"10",3},{0x4,"20",1},
+    {0x5,"50",6},{0x6,"100",0},{0x7,"200",4}
+  };
+  const auto saved=gSaveContext;
+  const auto* savedTable=gPlayState->msgCtx.messageTableNES;
+  MessageTableEntry table[]={{0xFFFF}};
+  gPlayState->msgCtx.messageTableNES=table;
+  gSaveContext.fileNum=0;
+  gSaveContext.save.shipSaveInfo.saveType=SAVETYPE_RANDO;
+  gSaveContext.options.language=LANGUAGE_ENG;
+  randomRupeeNames=1;
+  for(auto [id,amount,color]:cases) {
+    assert(nativeRupeeHooks.count(id));
+    auto text=id;bool load=true;
+    const auto before=gSaveContext;
+    nativeRupeeHooks[id](&text,&load);
+    const auto& receipt=CustomMessage::nativeRupeeLoaded;
+    assert(!load && text==id && !receipt.autoFormat);
+    assert(receipt.msg.find(std::string(1,char(color))+amount)!=std::string::npos && receipt.msg.back()==char(0xBF));
+    assert(receipt.textboxType==3 && receipt.textboxYPos==2 && receipt.icon==0xA7 &&
+           receipt.nextMessageID==0x1234 && receipt.firstItemCost==0x5678 && receipt.secondItemCost==0x9ABC);
+    assert(!std::memcmp(&gSaveContext,&before,sizeof(before)));
+  }
+  // Unrelated dialogue never registers, and live guards leave native loading intact.
+  assert(!nativeRupeeHooks.count(0x1C14) && !nativeRupeeHooks.count(CUSTOM_MESSAGE_ID));
+  const int before=CustomMessage::nativeRupeeLoads;
+  for(int guard=0;guard<4;++guard) {
+    auto id=u16(0x4);bool load=guard!=0;
+    randomRupeeNames=guard==1?0:1;
+    gSaveContext.fileNum=guard==2?0xFF:0;
+    gSaveContext.save.shipSaveInfo.saveType=guard==3?SAVETYPE_VANILLA:SAVETYPE_RANDO;
+    nativeRupeeHooks.at(id)(&id,&load);
+    assert(load==(guard!=0) && CustomMessage::nativeRupeeLoads==before);
+  }
+  randomRupeeNames=0;
+  gSaveContext=saved;
+  gPlayState->msgCtx.messageTableNES=const_cast<MessageTableEntry*>(savedTable);
+  std::cout<<"Native MM rupee award hooks: seven IDs including10, live guards, header/icon/END and save isolation passed\n";
+}
+
 int main(int argc, char** argv) {
   (void)argc;
   (void)argv;
   PlayState play{};
   gPlayState = &play;
+  CheckRandomRupeeReceipts();
+  CheckNativeRupeeHooks();
   // A real cape identity carries the prompt marker through the native and
   // cross-game builders without changing ownership or visibility at preview
   // time.

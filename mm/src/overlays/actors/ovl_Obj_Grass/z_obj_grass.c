@@ -15,6 +15,7 @@
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "GameInteractor/GameInteractor.h"
+#include "2s2h/Enhancements/Audio/MMWeather.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED)
 
@@ -469,6 +470,7 @@ void ObjGrass_DrawOpa(Actor* thisx, PlayState* play2) {
     s32 j;
     Vec3s rot = { 0, 0, 0 };
     ObjGrassElement* grassElem;
+    s32 autumn = MMWeather_SeasonForPlay(play) == SEASON_AUTUMN;
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -476,6 +478,10 @@ void ObjGrass_DrawOpa(Actor* thisx, PlayState* play2) {
 
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
     gSPDisplayList(POLY_OPA_DISP++, gObjGrass_D_809AA9F0);
+    if (autumn) {
+        gDPSetGrayscaleColor(POLY_OPA_DISP++, 217, 156, 69, 255);
+        gSPGrayscale(POLY_OPA_DISP++, true);
+    }
 
     for (i = 0; i < this->activeGrassGroups; i++) {
         grassGroup = &this->grassGroups[i];
@@ -507,6 +513,9 @@ void ObjGrass_DrawOpa(Actor* thisx, PlayState* play2) {
         }
     }
 
+    if (autumn) {
+        gSPGrayscale(POLY_OPA_DISP++, false);
+    }
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
@@ -517,12 +526,17 @@ void ObjGrass_DrawXlu(Actor* thisx, PlayState* play) {
     s32 i;
     s32 j;
     Vec3s rot = { 0, 0, 0 };
+    s32 autumn = MMWeather_SeasonForPlay(play) == SEASON_AUTUMN;
 
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
 
     gSPDisplayList(POLY_XLU_DISP++, gObjGrass_D_809AAA68);
+    if (autumn) {
+        gDPSetGrayscaleColor(POLY_XLU_DISP++, 217, 156, 69, 255);
+        gSPGrayscale(POLY_XLU_DISP++, true);
+    }
 
     for (i = 0; i < this->activeGrassGroups; i++) {
         grassGroup = &this->grassGroups[i];
@@ -548,6 +562,9 @@ void ObjGrass_DrawXlu(Actor* thisx, PlayState* play) {
         }
     }
 
+    if (autumn) {
+        gSPGrayscale(POLY_XLU_DISP++, false);
+    }
     CLOSE_DISPS(play->state.gfxCtx);
 }
 

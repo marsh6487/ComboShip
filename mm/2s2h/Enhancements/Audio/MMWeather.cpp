@@ -2,6 +2,7 @@
 #include "MMWeatherAudio.h"
 #include "MMWeatherState.h"
 #include "2s2h/Enhancements/Graphics/AutumnSceneFoliage.h"
+#include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
 
 #include <algorithm>
 #include "global.h"
@@ -53,6 +54,7 @@ void ApplyStormAmbience(uint8_t rain, uint8_t thunder) {
 } // namespace
 
 extern "C" void MMWeather_Reset() {
+    MMSummerAtmosphere_Reset();
     MMAutumnSceneFoliage_Reset();
     if (sNativeStormAmbienceMuted) {
         ApplyStormAmbience(sNativeRainAmbience, sNativeThunderAmbience);

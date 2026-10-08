@@ -16,6 +16,7 @@ args=parser.parse_args()
 owner=functions((ROOT/'combo/menu/ComboItemDrawOOT.h').read_text())
 native=functions((ROOT/'soh/soh/Enhancements/randomizer/NeiGiPresentation.cpp').read_text())
 production='\n'.join(owner[n] for n in ('CwSimple','CwCustomGi','CwAltSwordGi'))+'\n'+native['Spin']+'\n'+native['NeiGi_DrawSelectedSword']
+production+='\n'+(ROOT/'tests/sword_fallback/shelf_baseline.inc').read_text()
 fixture=(ROOT/'tests/sword_fallback/model_fit_test.cpp').read_text().replace('/* PRODUCTION */',production)
 
 def data_for(archive):
@@ -68,9 +69,13 @@ def data_for(archive):
     roots=roots_for(archive)+[path for path in native_roots if path in available]
     assert roots,(archive.path,'No sword geometry roots exercised')
     for root in roots:
-        tilt,scale=(0.,1.) if root in native_roots else (1.8,.04)
+        tilt,scale=(0.,1.) if root in native_roots else (math.pi/2,.04)
         _,points,_=archive.mesh(root);visit(root)
         low,high,width=bounds(points,tilt);layer_low,layer_high,layer_width=low,high,width
+        # Independently decode the vertices after serialized resource matrices.
+        # Keep each actual height/radius pair for the camera projection rather
+        # than constructing corners from unrelated blade/hilt extrema.
+        layer_points=[]
         profile=0
         for index,(name,custom,marker) in enumerate((
           ('adult','gCustomMasterSwordDL','objects/object_link_boy/DinSleekEquipmentPOC1_OOT_Adult/SwordDL'),
@@ -84,8 +89,9 @@ def data_for(archive):
                 profile=index+1
                 for path in required[:2]:
                     _,p,_=archive.mesh(path);visit(path)
+                    layer_points.extend(p.tolist())
                     b=bounds(p,tilt);layer_low=min(layer_low,b[0]);layer_high=max(layer_high,b[1]);layer_width=max(layer_width,b[2])
-        expect.append((root,low,high,width,layer_low,layer_high,layer_width,profile,tilt,scale))
+        expect.append((root,low,high,width,layer_low,layer_high,layer_width,profile,tilt,scale,points.tolist(),layer_points))
     # Eligibility only queries Din dependencies and these two pack markers.
     # Keep their actual archive membership, without compiling thousands of
     # unrelated player textures into this geometry fixture.
@@ -102,8 +108,10 @@ def build(lists,vertices,matrices,expect,available):
         src+='{auto m=std::make_shared<Fast::Matrix>();const uint32_t words[]={'+','.join(str(w)+'u' for w in words)+'};memcpy(&m->Matrx,words,sizeof(words));loader.files['+json.dumps(name)+']=m;loader.names['+str(crc64(name))+'ULL]='+json.dumps(name)+';}\n'
     for name,commands in lists.items():
         src+='List('+json.dumps(name)+f',{crc64(name)}ULL,'+'{'+','.join('{'+str(w0)+','+str(w1)+'}' for w0,w1 in commands)+'});\n'
-    for name,low,high,width,layer_low,layer_high,layer_width,profile,tilt,scale in expect:
-        src+='expected.push_back({'+json.dumps('__OTR__'+name)+f',{low:.9f}f,{high:.9f}f,{width:.9f}f,{layer_low:.9f}f,{layer_high:.9f}f,{layer_width:.9f}f,{profile},{tilt:.9f}f,{scale:.9f}f'+'});\n'
+    def coordinates(points):
+        return '{'+','.join('{'+','.join(f'{float(value):.17g}' for value in point)+'}' for point in points)+'}'
+    for name,low,high,width,layer_low,layer_high,layer_width,profile,tilt,scale,points,layer_points in expect:
+        src+='expected.push_back({'+json.dumps('__OTR__'+name)+f',{low:.9f}f,{high:.9f}f,{width:.9f}f,{layer_low:.9f}f,{layer_high:.9f}f,{layer_width:.9f}f,{profile},{tilt:.9f}f,{scale:.9f}f,'+coordinates(points)+','+coordinates(layer_points)+'});\n'
     for path in sorted(available):src+='available.insert('+json.dumps(path)+');\n'
     src+='}\n'
     return fixture.replace('/* ARCHIVES */',src)
@@ -118,9 +126,11 @@ with tempfile.TemporaryDirectory(prefix='sword-mod-gi-') as temporary:
         else:
             root='alt/objects/object_custom_equip/gCustomMasterSwordDL';v='selected/vertices'
             points=[(-670,-268,-74),(-670,809,101),(4122,-268,-74),(4122,809,101)]
-            c,s=math.cos(1.8),math.sin(1.8);upright=[(x*c-y*s,x*s+y*c,z) for x,y,z in points]
+            c,s=math.cos(math.pi/2),math.sin(math.pi/2);upright=[(x*c-y*s,x*s+y*c,z) for x,y,z in points]
             b=(min(p[1] for p in upright),max(p[1] for p in upright),2*max(math.hypot(p[0],p[2]) for p in upright))
-            data=({root:[(0x24000000,'(uintptr_t)'+json.dumps('__OTR__'+v)),(4,0),(0xdf000000,0)]},{v:('Vertex',points)},{},[(root,*b,*b,0,1.8,.04)],{root,v})
+            # This synthetic graph exercises resource fitting, not camera
+            # acceptance for any installed sword archive.
+            data=({root:[(0x24000000,'(uintptr_t)'+json.dumps('__OTR__'+v)),(4,0),(0xdf000000,0)]},{v:('Vertex',points)},{},[(root,*b,*b,0,math.pi/2,.04,[],[])],{root,v})
         source=out/f'fit-{i}.cpp';source.write_text(build(*data));binary=out/f'fit-{i}'
         for host in (('oot','mm') if args.host=='both' else (args.host,)):
             print('HOST '+host,flush=True)

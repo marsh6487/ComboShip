@@ -79,7 +79,7 @@ source = source[:source.index('int main() {')] + r'''
 #include "mm/2s2h/Rando/Types.h"
 struct PlayState {uint32_t gameplayFrames=47;};
 PlayState play; PlayState* gPlayState=&play;
-Kind awardKind=Kind::Fire; bool mmMod; int pushes, draws, fitCalls;
+Kind awardKind=Kind::Fire; bool mmMod; int pushes, draws, fitCalls, sizeCalls;
 NeiGi::Mesh captured;
 void Matrix_Push() {++pushes;} void Matrix_Pop() {assert(pushes>0);--pushes;}
 NeiGi::Basis NeiGi_CameraBasis(PlayState*) {return {};}
@@ -94,6 +94,10 @@ void* Combo_ResolveSym(const char*,const char* name) {
 bool ResourceMgr_IsAltAssetsEnabled() {return true;}
 const char* NeiResource_Route(const char* path) {return path;}
 int ResourceMgr_IsModAssetForGame(const char*,const char*) {return mmMod;}
+void ComboSwordGi_ApplyPresentationSize(bool shop=false,int pickup=0) {
+    assert(NeiGi::IsSword(awardKind) && !shop && !pickup);
+    ++sizeCalls;
+}
 void ComboSwordGi_ApplyLegacyFit(const char* owner,Kind kind,bool shop=false,int pickup=0) {
     assert(!strcmp(owner,"mm") && kind==awardKind && NeiGi::IsSword(kind) && !shop && !pickup);
     ++fitCalls;
@@ -125,10 +129,11 @@ int main() {
            award.first==RI_OOT_EXT_FOUR_SWORD) assert(!authored);
         assert(info.neiShimmer==int(award.second)+1);
         assert(info.itemShimmer==(NeiGi::IsSword(award.second)||effects));
-        draws=0; fitCalls=0;
+        draws=0; fitCalls=0; sizeCalls=0;
         {MM_NeiGiFallbackShimmer fallback(award.first);}
         assert(draws==(NeiGi::IsSword(award.second) ? 2 : effects) && "selected sword mesh lost its intrinsic particles");
         assert(fitCalls==int(NeiGi::IsSword(award.second)) && "only sword fallbacks enter the model-fit boundary");
+        assert(sizeCalls==2*int(NeiGi::IsSword(award.second)) && "only swords size the separate model and effect passes");
         assert(pushes==0);
         if(draws) {
             const auto expected=NeiGi::SampleShimmer(play.gameplayFrames,true,{},award.second);

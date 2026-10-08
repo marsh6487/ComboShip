@@ -212,14 +212,21 @@ extern "C" void Picto_SyncClear(void) {
 // tradeAdultOwned bitmask (4 bytes, native) so 2Ship can mirror which trade items the player owns for
 // the Anju exchange. <Save>/file<N>_tradeitems.bin. The Pendant of Memories crossing over also re-grants
 // its Ext Boots 2 combat moveset on the OoT side.
+// ComboShip instead persists each playthrough in its .combosav and bridges ownership through
+// FleetSync. These unversioned files identify only a slot number, so importing one can resurrect
+// an earlier playthrough's Moon's Tear (or other trade items) in a fresh combined save.
+// Keep the legacy bridge only for the standalone builds that still use it.
 static void TradeItems_SyncWrite(void) {
+#ifndef COMBO_BUILD
     std::ofstream f(Nei_SidecarPath("_tradeitems.bin"), std::ios::binary | std::ios::trunc);
     if (f) {
         f.write(reinterpret_cast<const char*>(&gNeiSave.tradeAdultOwned), sizeof(gNeiSave.tradeAdultOwned));
     }
+#endif
 }
 
 static void TradeItems_SyncRead(void) {
+#ifndef COMBO_BUILD
     std::ifstream f(Nei_SidecarPath("_tradeitems.bin"), std::ios::binary);
     if (f) {
         uint32_t v = 0;
@@ -235,6 +242,7 @@ static void TradeItems_SyncRead(void) {
             // truth and needs nothing here. Skijer's NEI
         }
     }
+#endif
 }
 
 namespace {
@@ -352,7 +360,7 @@ void NeiSave_Save(SaveContext* saveContext, int sectionID, bool fullSave) {
     SaveManager::Instance->SaveData("slateMode", gNeiSave.slateMode);
     SaveManager::Instance->SaveData("slateRunesOwned", gNeiSave.slateRunesOwned);
     SaveManager::Instance->SaveData("ritoMaskFlags", gNeiSave.ritoMaskFlags);
-    TradeItems_SyncWrite(); // mirror the MM trade-item flags next to the save for 2Ship
+    TradeItems_SyncWrite(); // standalone legacy bridge; ComboShip uses the combined save + FleetSync
 }
 
 void NeiSave_Load() {
@@ -473,7 +481,7 @@ void NeiSave_Load() {
     SaveManager::Instance->LoadData("ritoMaskFlags", gNeiSave.ritoMaskFlags, (uint8_t)0);
     // Cross-game: a pictograph synced from 2Ship (shared sidecar) wins over the SOH save copy.
     Picto_SyncRead();
-    TradeItems_SyncRead(); // merge MM trade-item ownership from the cross-game sidecar
+    TradeItems_SyncRead(); // standalone legacy bridge; never overrides a ComboShip playthrough
     // Session wheel trackers must not leak across files (per-frame reconcile would ghost-write).
     Bottle_WheelResetTracking();
 }

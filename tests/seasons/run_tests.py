@@ -340,7 +340,8 @@ drawn=true;hand=false;CustomItems_DrawRodOfSeasons(&player,&play);assert(models=
 
 snowpath='mm/src/overlays/actors/ovl_Object_Kankyo/z_object_kankyo.c'
 snowfunctions=['ObjectKankyo_SetupAction','func_808DC454','func_808DCB7C','func_808DCBF8','func_808DBEB0','func_808DBFB0','ObjectKankyo_Init','ObjectKankyo_Update']
-autumnfunctions=['ObjectKankyo_IsAutumnOwner','ObjectKankyo_AutumnBand','ObjectKankyo_InitAutumnParticle',
+autumnfunctions=['ObjectKankyo_IsAutumnOwner','ObjectKankyo_AutumnBand',
+                 'ObjectKankyo_IsCompactAutumnScene','ObjectKankyo_AutumnViewBasis','ObjectKankyo_InitAutumnParticle',
                  'ObjectKankyo_UpdateAutumnParticles','ObjectKankyo_RestoreAutumnParticle']
 if 'ObjectKankyo_UpdateSnowTarget' in (ROOT/snowpath).read_text():
  snowfunctions.insert(2,'ObjectKankyo_UpdateSnowTarget')
@@ -358,6 +359,8 @@ int MMWeather_SeasonForPlay(const PlayState*){return activeSeason;}
 void Actor_Kill(Actor* actor){actor->update=nullptr;actor->draw=nullptr;}
 f32 Rand_ZeroOne(){return .25f;}
 f32 MMWeather_RandomFloat(){assert(activeSeason==SEASON_AUTUMN);return .25f;}
+// Window aspect is an external boundary; use the native 4:3 fixture viewport.
+f32 OTRGetAspectRatio(){return 4.0f/3.0f;}
 s16 Camera_GetCamDirPitch(Camera*){return 0;}
 f32 Math_Vec3f_DistXZ(Vec3f* a,Vec3f* b){return sqrtf(SQ(a->x-b->x)+SQ(a->z-b->z));}
 void func_808DBE8C(ObjectKankyo*){}
