@@ -7,9 +7,13 @@
 #include "ComboCapeReceiptChoice.h"
 #include "ComboSongReceiptText.h"
 #include "ComboSongDrawMM.h"
+#include "ComboRupeeNames.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <iterator>
+#include <random>
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
 #include "ComboResolve.h"
@@ -285,6 +289,53 @@ void SetReceiptBody(CustomMessage::Entry& entry, std::string body) {
     entry.autoFormat = false;
 }
 
+bool RandomRupeeReceipt(const char* name, CustomMessage::Entry& entry) {
+    if (!name || gSaveContext.fileNum == 0xFF ||
+        gSaveContext.save.shipSaveInfo.saveType != SAVETYPE_RANDO ||
+        !CVarGetInteger("gRandoEnhancements.RandomizeRupeeNames", 1))
+        return false;
+    struct Currency {
+        const char* name;
+        const char* amount;
+        const char* color;
+    };
+    static constexpr Currency currencies[] = {
+        { "Green Rupee", "1", "%g" }, { "Blue Rupee", "5", "%b" },
+        { "10 Rupees", "10", "%b" },
+        { "Red Rupee", "20", "%r" }, { "Purple Rupee", "50", "%p" },
+        { "Silver Rupee", "100", "%w" }, { "Huge Rupee", "200", "%y" },
+    };
+    for (const auto& currency : currencies) {
+        if (std::strcmp(name, currency.name))
+            continue;
+        const char* const* names = ComboRupeeNames::englishRupeeNames;
+        size_t count = std::size(ComboRupeeNames::englishRupeeNames);
+        std::string prefix = "You found ";
+        std::string suffix = "%w!";
+        if (gSaveContext.options.language == LANGUAGE_GER) {
+            names = ComboRupeeNames::germanRupeeNames;
+            count = std::size(ComboRupeeNames::germanRupeeNames);
+            prefix = "Du hast ";
+            suffix = "%w gefunden!";
+        } else if (gSaveContext.options.language == LANGUAGE_FRE) {
+            names = ComboRupeeNames::frenchRupeeNames;
+            count = std::size(ComboRupeeNames::frenchRupeeNames);
+            prefix = "Vous obtenez ";
+        }
+        // Cosmetic randomness stays independent of the gameplay/seed generators.
+        static std::mt19937 random(std::random_device{}());
+        const size_t choice = std::uniform_int_distribution<size_t>(0, count - 1)(random);
+        std::string nickname = names[choice];
+        if (nickname == "[P]")
+            nickname.assign(1, '\x16'); // MM's player-name command.
+        entry.receiptPresentation = {};
+        SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(
+                                  prefix + currency.color + currency.amount + " " + nickname + suffix));
+        return true;
+    }
+    return false;
+}
+
 bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry) {
     if (!gPlayState || !gPlayState->msgCtx.messageTableNES)
         return false;
@@ -307,6 +358,24 @@ bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry) {
     return false;
 }
 } // namespace
+
+bool Rando::ApplyNativeRandomRupeeReceipt(uint16_t textId, CustomMessage::Entry& entry) {
+    const char* name;
+    switch (textId) {
+        case 0xC4: name = "Green Rupee"; break;
+        case 0x2: name = "Blue Rupee"; break;
+        case 0x3: name = "10 Rupees"; break;
+        case 0x4: name = "Red Rupee"; break;
+        case 0x5: name = "Purple Rupee"; break;
+        case 0x6: name = "Silver Rupee"; break;
+        case 0x7: name = "Huge Rupee"; break;
+        default: return false;
+    }
+    if (!RandomRupeeReceipt(name, entry))
+        return false;
+    entry.msg += '\xBF'; // Direct native boxes do not use the queued finalizer.
+    return true;
+}
 
 bool Rando::MapCompassInfoEnabled() {
 #ifdef COMBO_BUILD
@@ -429,6 +498,8 @@ bool Rando::ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Ent
     entry.capeVisibilityChoice = ComboCapeReceiptChoice::IsCape(itemName);
     if (!itemName || !*itemName)
         return false;
+    if (RandomRupeeReceipt(itemName, entry))
+        return true;
     const auto keyBody = ComboDungeonKeyReceipt::Markup(itemName);
     if (!keyBody.empty()) {
         entry.receiptPresentation = {};
@@ -491,6 +562,8 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     if (it == StaticData::Items.end())
         return false;
     const auto& item = it->second;
+    if (RandomRupeeReceipt(item.name, entry))
+        return true;
     const auto keyBody = item.name ? ComboDungeonKeyReceipt::Markup(item.name) : std::string{};
     if (!keyBody.empty()) {
         SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(keyBody));

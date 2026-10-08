@@ -17,6 +17,7 @@
 #include "soh/ObjectExtension/ObjectExtension.h"
 #include "item_category_adj.h"
 #include "ComboCapeReceiptChoice.h"
+#include "ComboDungeonPickup.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #ifdef COMBO_BUILD
 #include "rando/CrossForeign.h" // ComboShip: cross-world foreign-item marker map
@@ -606,6 +607,10 @@ void RandomizerOnPlayerUpdateForRCQueueHandler() {
         Rando::Context::GetInstance()->GetFinalGIEntry(rc, true, (GetItemID)vanillaRandomizerGet);
     GetItemCategory getItemCategory = Randomizer_AdjustItemCategory(getItemEntry);
     bool capeVisibilityChoice = getItemEntry.modIndex == MOD_RANDOMIZER && getItemEntry.getItemId == RG_EXT_MAGIC_CAPE;
+    bool dungeonInformationPickup =
+        getItemEntry.modIndex == MOD_RANDOMIZER &&
+        ((getItemEntry.getItemId >= RG_DEKU_TREE_MAP && getItemEntry.getItemId <= RG_ICE_CAVERN_MAP) ||
+         (getItemEntry.getItemId >= RG_DEKU_TREE_COMPASS && getItemEntry.getItemId <= RG_ICE_CAVERN_COMPASS));
 
 #ifdef COMBO_BUILD
     // ComboShip: a foreign check holds an MM item. It flows through the normal get-item presentation
@@ -619,6 +624,7 @@ void RandomizerOnPlayerUpdateForRCQueueHandler() {
         // animations would identify every trap on sight.
         const bool major = fi != nullptr && (fi->advancement || fi->HasDisguise());
         getItemCategory = major ? ITEM_CATEGORY_MAJOR : ITEM_CATEGORY_JUNK;
+        dungeonInformationPickup = fi && ComboDungeonPickup::IsMapOrCompass(fi->itemName);
         capeVisibilityChoice = fi && !fi->trap && ComboCapeReceiptChoice::IsCape(fi->itemName.c_str());
     }
 #endif
@@ -644,9 +650,7 @@ void RandomizerOnPlayerUpdateForRCQueueHandler() {
             (CVarGetInteger(CVAR_RANDOMIZER_ENHANCEMENT("TimeSavers.SkipGetItemAnimation"), SGIA_JUNK) == SGIA_ALL ||
              (CVarGetInteger(CVAR_RANDOMIZER_ENHANCEMENT("TimeSavers.SkipGetItemAnimation"), SGIA_JUNK) == SGIA_JUNK &&
               (
-                  // crude fix to ensure map hints are readable. Ideally replace with better hint tracking.
-                  !(getItemEntry.getItemId >= RG_DEKU_TREE_MAP && getItemEntry.getItemId <= RG_ICE_CAVERN_MAP &&
-                    getItemEntry.modIndex == MOD_RANDOMIZER) &&
+                  !dungeonInformationPickup &&
                   (getItemCategory == ITEM_CATEGORY_JUNK || getItemCategory == ITEM_CATEGORY_SKULLTULA_TOKEN ||
                    getItemCategory == ITEM_CATEGORY_HEALTH || getItemCategory == ITEM_CATEGORY_LESSER))))) {
             Item_DropCollectible(gPlayState, &spawnPos, static_cast<int16_t>(ITEM00_SOH_GIVE_ITEM_ENTRY | 0x8000));

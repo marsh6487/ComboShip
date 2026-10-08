@@ -83,6 +83,7 @@ const Binding kBindings[] = {
     { RI_OOT_EXT_CANE_OF_BYRNA, "cane_of_byrna" },
     { RI_OOT_EXT_FOUR_SWORD, "four_sword" },
     { RI_PENDANT_OF_MEMORIES, "pendant_of_memories" },
+    { RI_ROOM_KEY, "room_key" },
     { RI_OOT_NEI_SHEIKAH_SLATE, "sheikah_slate" },
     { RI_OOT_NEI_SLATE_RUNE_BOMB, "slate_bomb" },
     { RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE, "slate_master_cycle" },
@@ -107,6 +108,10 @@ bool HasMmLegacyGiMod(RandoItemId item) {
     const char* opaque = nullptr;
     const char* second = nullptr;
     switch (item) {
+        case RI_ROOM_KEY:
+            opaque = "objects/object_gi_reserve_b_00/gGiRoomKeyDL";
+            second = "objects/object_gi_reserve_b_00/gGiRoomKeyEmptyDL";
+            break;
         case RI_OOT_NEI_FIRE_ROD:
             opaque = "objects/object_nei_fire_rod/Cylinder_001_opaque_dl";
             break;

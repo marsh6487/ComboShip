@@ -198,6 +198,7 @@ int main() {
   {"Soul of Gyorg",RI_SOUL_BOSS_GYORG},{"Soul of Twinmold",RI_SOUL_BOSS_TWINMOLD},
   {"Soul of Majora",RI_SOUL_BOSS_MAJORA},{"Bottle With Gold Dust",RI_BOTTLE_GOLD_DUST},
   {"Bottle with Magic Mushroom",RI_OOT_BOTTLE_MAGIC_MUSHROOM},
+  {"Room Key",RI_ROOM_KEY},
   {"Tingle's Clock Town Map",RI_TINGLE_MAP_CLOCK_TOWN},
   {"Tingle's Woodfall Map",RI_TINGLE_MAP_WOODFALL},
   {"Tingle's Snowhead Map",RI_TINGLE_MAP_SNOWHEAD},
@@ -212,7 +213,7 @@ int main() {
          "OoT imports of MM items must dispatch their native MM models");
   assert(foreign.itemGame==ComboRando::GAME_OOT && foreign.itemName==name);
  }
- std::cout<<"PASS 29 OoT-owned MM aliases through production foreign resolver and native dispatch; grant owner and names preserved\n";
+ std::cout<<"PASS 30 OoT-owned MM aliases through production foreign resolver and native dispatch; grant owner and names preserved\n";
  foreign.itemName="mask";current={};
  for(auto& cmd:opa)cmd.stream=0;
  for(auto& cmd:xlu)cmd.stream=1;

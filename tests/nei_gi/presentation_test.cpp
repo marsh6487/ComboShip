@@ -337,6 +337,7 @@ ORIGINAL(Randomizer_DrawExtTrident)
 ORIGINAL(Randomizer_DrawExtClimbBoots)
 ORIGINAL(Randomizer_DrawExtRocBoots)
 ORIGINAL(Randomizer_DrawExtPendantOfMemories)
+ORIGINAL(Randomizer_DrawMmTradeQuest)
 ORIGINAL(Randomizer_DrawNeiSheikahSlate)
 ORIGINAL(Randomizer_DrawSlateRuneBomb)
 ORIGINAL(Randomizer_DrawSlateRuneMasterCycle)
@@ -1371,6 +1372,32 @@ int main() {
   }
   {
     Reset();
+#ifdef COMBO_BUILD
+    GetItemEntry room{};
+    room.tableId = TABLE_RANDOMIZER;
+    room.drawFunc = Randomizer_DrawMmTradeQuest;
+    room.drawItemId = RG_MM_ROOM_KEY;
+    const char* roomPath = "__OTR__objects/nei_gi_redesign/room_key/gi_dl";
+    files.insert(roomPath);
+    CwItemDrawInfo roomInfo{};
+    assert(NeiGi_DescribeEntry(&room, &roomInfo) == 1 &&
+           "Room Key must select its authored GI instead of the generic MM trade callback");
+    assert(roomInfo.dlistCount == 1 && !std::strcmp(roomInfo.dlists[0], roomPath));
+    assert(NeiGi_Draw(&play, &room) && Drawn() == std::vector<std::string>{roomPath});
+    assert(MM_DescribeNeiGi(RI_ROOM_KEY, &roomInfo));
+    room.drawItemId = RG_MM_MOONS_TEAR;
+    assert(!NeiGi_DescribeEntry(&room, &roomInfo) && "Room Key binding captured another trade item");
+    room.drawItemId = RG_MM_ROOM_KEY;
+    for (const char* part : {"gGiRoomKeyDL", "gGiRoomKeyEmptyDL"}) {
+      Reset(); files.insert(roomPath);
+      modFiles.insert({"mm", std::string("__OTR__objects/object_gi_reserve_b_00/") + part});
+      assert(NeiGi_Draw(&play, &room) && fallback == 1 && Drawn().empty());
+      assert(!MM_DescribeNeiGi(RI_ROOM_KEY, &roomInfo));
+    }
+    Reset();
+    assert(NeiGi_Draw(&play, &room) && fallback==1 && Drawn().empty() &&
+           "missing authored Room Key must call its original native GI callback");
+#endif
     GetItemEntry optionalCojiro{};
     optionalCojiro.tableId = TABLE_VANILLA;
     optionalCojiro.gid = GID_COJIRO;
@@ -1689,13 +1716,13 @@ int main() {
       triangle(cmd->words.w1);
   }
   assert(decoded == mesh.count && vertexLoads.size() > 1);
-  // Exercise the shared production draw for all 61 serialized models at the
+  // Exercise the shared production draw for all 62 serialized models at the
   // actual pickup/shop/freestanding caller scales and both owner routes.
   struct FrameFixture {const char* slug;float low,high,width,drawScale;bool xlu;};
   const FrameFixture frames[] = {
 #include "nei_all_frame_bounds.inc"
   };
-  assert(std::size(frames)==61);
+  assert(std::size(frames)==62);
   for(const auto& f:frames) for(const char* owner:{"","@oot:","@mm:","@oot-gi-base:"}) for(int route:{0,1,2}) {
     Reset();
     const std::string path=std::string("__OTR__")+owner+"objects/nei_gi_redesign/"+f.slug+"/gi_dl";
@@ -1725,7 +1752,7 @@ int main() {
   }
   assert(!NeiGi::FindFrameBounds("__OTR__@bad:objects/nei_gi_redesign/four_sword/gi_dl"));
   assert(!NeiGi::FindFrameBounds("__OTR__objects/nei_gi_redesign/four_sword/held_dl"));
-  std::cout<<"PASS all 61 serialized GI frames: native/OoT/MM routes, pickup/shop/freestanding bounds and shared shell pose\n";
+  std::cout<<"PASS all 62 serialized GI frames: native/OoT/MM routes, pickup/shop/freestanding bounds and shared shell pose\n";
 #ifdef COMBO_BUILD
 #include "tests/mm_presentation/pickup_framing_checks.inc"
 #endif

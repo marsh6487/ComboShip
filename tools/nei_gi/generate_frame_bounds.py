@@ -33,6 +33,7 @@ preferred = {
     'master_sword':'kMasterSwordShopFit', 'true_master_sword':'kMasterSwordShopFit',
     'gilded_sword':'kGildedSwordShopFit', 'biggoron_sword':'kBiggoronSwordShopFit',
     'great_fairy_sword':'kGreatFairySwordShopFit',
+    'room_key':'{ .65f, 8.f }',
 }
 plain = {'whip','deku_leaf','mogma_mitts','gust_jar','beetle','spinner','minish_cap','lantern','mario_mask','cojiro'}
 
@@ -62,7 +63,7 @@ def row(directory):
 
 def generate():
     bundled=sorted(d for d in ASSETS.iterdir() if d.is_dir())
-    assert len(bundled)==61
+    assert len(bundled)==62
     optional=OPTIONAL/'cojiro'
     rows=[row(d) for d in bundled]
     if optional.exists():

@@ -37,6 +37,7 @@ inline int32_t ComboNativeMmImport(const char* name) {
         { "Soul of Majora", RI_SOUL_BOSS_MAJORA },
         { "Bottle With Gold Dust", RI_BOTTLE_GOLD_DUST },
         { "Bottle with Magic Mushroom", RI_OOT_BOTTLE_MAGIC_MUSHROOM },
+        { "Room Key", RI_ROOM_KEY },
         { "Tingle's Clock Town Map", RI_TINGLE_MAP_CLOCK_TOWN },
         { "Tingle's Woodfall Map", RI_TINGLE_MAP_WOODFALL },
         { "Tingle's Snowhead Map", RI_TINGLE_MAP_SNOWHEAD },
