@@ -494,7 +494,8 @@ int main() {
       if (custom) {
         assert(strstr(descriptor.dlists[0],
                       mode == 2 ? "din_fire_sword" : "object_custom_equip"));
-        assert(descriptor.opCount == 1 && descriptor.ops[0].op == CW_OP_ROTATE_Z && descriptor.ops[0].a == 18774.682f &&
+        // Export the pickup's +X blade with one quarter-turn into upright +Y.
+        assert(descriptor.opCount == 1 && descriptor.ops[0].op == CW_OP_ROTATE_Z && descriptor.ops[0].a == 16384.f &&
                descriptor.scale == .04f);
       } else if (id == RI_OOT_TRUE_MASTER_SWORD) {
         const uint8_t gold[4] = {255, 215, 110, 255};
