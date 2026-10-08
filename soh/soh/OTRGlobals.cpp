@@ -1920,6 +1920,10 @@ bool VerifyArchiveVersion(OTRVersion version) {
 
 // ComboShip: forward declarations — defined further down with the combo exports.
 extern "C" void (*gComboSceneSwitchCallback)(int fileNum);
+static int sComboFwSwitchSlot = -1;
+extern "C" void SOH_QueueFwHandoff(int slot) {
+    sComboFwSwitchSlot = slot;
+}
 // Launcher poll: returns the next save slot backed up for a release mismatch, or -1 if none.
 extern "C" int (*gComboOutdatedSaveNotice)();
 // Shared Items pokes (defined with the rest of the Shared Items ABI further down).
@@ -2131,12 +2135,19 @@ static void Combo_FinishInit() {
     });
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameFrameUpdate>([]() {
-        if (!sComboSwitchPending)
+        if (!sComboSwitchPending && sComboFwSwitchSlot < 0)
             return;
+        bool isFwReturn = sComboFwSwitchSlot >= 0;
+        if (isFwReturn)
+            sComboSwitchFileNum = sComboFwSwitchSlot;
+        sComboFwSwitchSlot = -1;
         sComboSwitchPending = false;
-        SaveManager::Instance->SaveFile(sComboSwitchFileNum);
+        if (isFwReturn && gPlayState)
+            Play_PerformSave(gPlayState); // Capture live scene flags and native save/equipment bookkeeping.
+        else
+            SaveManager::Instance->SaveFile(sComboSwitchFileNum);
         SaveManager::Instance->ThreadPoolWait();
-        if (gComboSceneSwitchCallback) {
+        if (!isFwReturn && gComboSceneSwitchCallback) {
             gComboSceneSwitchCallback(sComboSwitchFileNum);
         }
         if (gGameState) {

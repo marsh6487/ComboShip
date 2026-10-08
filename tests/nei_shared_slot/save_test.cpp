@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <map>
 #include <memory>
@@ -39,12 +40,20 @@ extern "C" {
 SaveManager* SaveManager::Instance = nullptr;
 SaveManager::SaveManager() {}
 
-// Unrelated sidecar I/O and session wheel tracking are not part of this section
-// persistence test. The real NEI save/load bodies still call these observers.
+// Keep the real trade sidecar I/O. Only its application directory is supplied
+// by the fixture; it must never touch a user's Save directory.
+static std::filesystem::path sFixtureSaveDirectory;
+namespace Ship {
+struct Context {
+    static std::string GetPathRelativeToAppDirectory(const char*) {
+        return sFixtureSaveDirectory.string();
+    }
+};
+}
+
+// Unrelated photo I/O and session wheel tracking stay outside this fixture.
 static void Bottle_WheelResetTracking() {}
 static void Picto_SyncRead() {}
-static void TradeItems_SyncWrite() {}
-static void TradeItems_SyncRead() {}
 #endif
 
 using json = nlohmann::json;
@@ -52,8 +61,10 @@ extern "C" {
 SaveContext gSaveContext{};
 // Observe no engine audit service in this synchronous storage fixture. Real
 // slot writers and serializer scopes retain their production audit calls.
+#ifdef COMBO_BUILD
 void ItemGrantAudit_Begin(const char*, int, int, int) {}
 void ItemGrantAudit_End(void) {}
+#endif
 }
 
 #include "nei_save_production.inc"
@@ -110,6 +121,63 @@ static void LoadBlob(json section) {
     manager->currentJsonContext = nullptr;
 #endif
 }
+
+#if !HOST_MM
+static void CheckTradeSidecarOwnership() {
+    // These are independent trade-wheel entries: Moon's Tear is bit 11,
+    // Zelda's Letter is bit 22. A reused file number is not a save identity.
+    constexpr uint32_t moon = 0x00000800;
+    constexpr uint32_t letter = 0x00400000;
+    gSaveContext.fileNum = 0;
+    const auto sidecar = sFixtureSaveDirectory / "file1_tradeitems.bin";
+    {
+        std::ofstream file(sidecar, std::ios::binary);
+        file.write(reinterpret_cast<const char*>(&moon), sizeof(moon));
+        Check(bool(file), "the fixture created an old slot's Moon's Tear sidecar");
+    }
+    LoadBlob({{"tradeAdultOwned", letter}});
+#ifdef COMBO_BUILD
+    Check(Nei_Save()->tradeAdultOwned == letter,
+          "a combined save with Zelda's Letter must not acquire Moon's Tear from an old sidecar");
+    LoadBlob(json::object());
+    Check(Nei_Save()->tradeAdultOwned == 0,
+          "a fresh combined save must stay empty despite a reused slot's sidecar");
+    LoadBlob({{"tradeAdultOwned", moon | letter}});
+    Check(Nei_Save()->tradeAdultOwned == (moon | letter),
+          "legitimately saved Moon's Tear and Zelda's Letter must both survive loading");
+    LoadBlob({{"tradeAdultOwned", letter}});
+    LoadBlob(SaveBlob());
+    Check(Nei_Save()->tradeAdultOwned == letter,
+          "combined save/load must preserve canonical ownership without reimporting the sidecar");
+    {
+        uint32_t legacy = 0;
+        std::ifstream file(sidecar, std::ios::binary);
+        file.read(reinterpret_cast<char*>(&legacy), sizeof(legacy));
+        Check(bool(file) && legacy == moon,
+              "saving a combined file must leave legacy standalone sidecar bytes untouched");
+    }
+    std::filesystem::remove(sidecar);
+    SaveBlob();
+    Check(!std::filesystem::exists(sidecar),
+          "a combined save must not create a legacy trade sidecar");
+    std::puts("PASS trade ownership: combined JSON is authoritative across empty, letter, Moon and reload cases");
+#else
+    Check(Nei_Save()->tradeAdultOwned == (moon | letter),
+          "standalone SoH must retain its legacy cross-game sidecar import");
+    Nei_Save()->tradeAdultOwned = letter;
+    SaveBlob();
+    {
+        uint32_t legacy = 0;
+        std::ifstream file(sidecar, std::ios::binary);
+        file.read(reinterpret_cast<char*>(&legacy), sizeof(legacy));
+        Check(bool(file) && legacy == letter,
+              "standalone SoH must retain its legacy cross-game sidecar export");
+    }
+    std::filesystem::remove(sidecar);
+    std::puts("PASS trade ownership: standalone legacy sidecar import/export retained");
+#endif
+}
+#endif
 
 static uint16_t Selected() {
     return ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS);
@@ -252,6 +320,9 @@ int main() {
 #if !HOST_MM
     SaveManager manager;
     SaveManager::Instance = &manager;
+    sFixtureSaveDirectory = std::getenv("NEI_SAVE_TEST_DIRECTORY");
+    std::filesystem::create_directories(sFixtureSaveDirectory);
+    CheckTradeSidecarOwnership();
 #endif
     CheckBothOwnedRoundtrips();
     CheckLegacySelectedItems();

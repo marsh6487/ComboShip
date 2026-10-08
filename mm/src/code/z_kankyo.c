@@ -2,6 +2,7 @@
 #include "z64light.h"
 #include "z64math.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
+#include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 typedef enum {
@@ -1804,6 +1805,7 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
         Environment_UpdateLights(play, envCtx, lightCtx);
         Environment_UpdatePostmanEvents(play);
     }
+    MMSummerAtmosphere_Update(play);
 }
 
 void Environment_DrawSun(PlayState* play) {

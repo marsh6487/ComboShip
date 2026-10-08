@@ -142,7 +142,7 @@ static IKAxePropState* IKAxe_PropSlot(Actor* actor) {
 u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8 bodyEnvR, u8 bodyEnvG, u8 bodyEnvB) {
     extern void* MmAssets_LoadResource(const char* path);
     extern s32 CVarGetInteger(const char* name, s32 defaultValue);
-    extern u8 Player_IsCustomLinkModel(Player* player);
+    extern u8 Player_IsCustomLinkModel(Player * player);
     extern u8 FourSword_IsEquipped(void);
     // Cached loaded pieces per variant.
     static void* sRazorBlade = NULL;
@@ -169,7 +169,8 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     if (player->heldItemId == ITEM_SWORD_KOKIRI && player->heldItemAction == PLAYER_IA_SWORD_KOKIRI) {
         model = WeaponUpgrade_KokiriLevel() == 0 ? NEI_HELD_SWORD_MM_KOKIRI
                 : WeaponUpgrade_HasGilded() && CVarGetInteger("gEnhancements.SkijerNEI.GildedUsesGildedLook", 1)
-                    ? NEI_HELD_SWORD_GILDED : NEI_HELD_SWORD_RAZOR;
+                    ? NEI_HELD_SWORD_GILDED
+                    : NEI_HELD_SWORD_RAZOR;
     } else if (player->heldItemId == ITEM_SWORD_RAZOR && player->heldItemAction == PLAYER_IA_SWORD_RAZOR) {
         model = NEI_HELD_SWORD_RAZOR;
     } else if (player->heldItemId == ITEM_SWORD_GILDED && player->heldItemAction == PLAYER_IA_SWORD_GILDED) {
@@ -178,9 +179,9 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
         model = WeaponUpgrade_HasTrueMaster() ? NEI_HELD_SWORD_TRUE_MASTER : NEI_HELD_SWORD_MASTER;
     } else if (player->heldItemId == ITEM_SWORD_BGS && player->heldItemAction == PLAYER_IA_SWORD_BIGGORON) {
         model = WeaponUpgrade_HasGreatFairy() && CVarGetInteger("gEnhancements.SkijerNEI.BgsUsesGfsLook", 1)
-                    ? NEI_HELD_SWORD_GREAT_FAIRY : NEI_HELD_SWORD_BIGGORON;
-    } else if (player->heldItemId == ITEM_SWORD_GREAT_FAIRY &&
-               player->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED) {
+                    ? NEI_HELD_SWORD_GREAT_FAIRY
+                    : NEI_HELD_SWORD_BIGGORON;
+    } else if (player->heldItemId == ITEM_SWORD_GREAT_FAIRY && player->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED) {
         model = NEI_HELD_SWORD_GREAT_FAIRY;
     } else if (FourSword_IsEquipped() && player->heldItemId == ITEM_EXT_SWORD_2 &&
                player->heldItemAction == PLAYER_IA_SWORD_KOKIRI) {
@@ -197,13 +198,12 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
         // Native MM chooses its combined sword hand from the equipped nibble,
         // even when NEI's progressive blade advances beyond that native tier.
         const int equipped = GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD);
-        const int nativeModel = equipped == EQUIP_VALUE_SWORD_RAZOR ? NEI_HELD_SWORD_RAZOR
+        const int nativeModel = equipped == EQUIP_VALUE_SWORD_RAZOR    ? NEI_HELD_SWORD_RAZOR
                                 : equipped == EQUIP_VALUE_SWORD_GILDED ? NEI_HELD_SWORD_GILDED
-                                : NEI_HELD_SWORD_MM_KOKIRI;
+                                                                       : NEI_HELD_SWORD_MM_KOKIRI;
         if (NeiHeldSword_EquipmentSelected(nativeModel, frame))
             return 0;
-    } else if (frame == NEI_HELD_SWORD_MM_HUMAN &&
-               player->leftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD &&
+    } else if (frame == NEI_HELD_SWORD_MM_HUMAN && player->leftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD &&
                NeiHeldSword_EquipmentSelected(NEI_HELD_SWORD_GREAT_FAIRY, frame)) {
         // MM's native two-hand array always owns the GFS combined hand, even
         // when the imported longsword's selected visual tier is Biggoron.

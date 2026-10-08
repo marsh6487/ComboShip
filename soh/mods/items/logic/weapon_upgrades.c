@@ -155,8 +155,8 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     if (dList == NULL || ootHand == NULL || player == NULL) {
         return 0;
     }
-    if (Player_IsCustomLinkModel() || (player->leftHandType != PLAYER_MODELTYPE_LH_SWORD &&
-                                      player->leftHandType != PLAYER_MODELTYPE_LH_BGS)) {
+    if (Player_IsCustomLinkModel() ||
+        (player->leftHandType != PLAYER_MODELTYPE_LH_SWORD && player->leftHandType != PLAYER_MODELTYPE_LH_BGS)) {
         return 0;
     }
     const u8 fourEquipped = FourSword_IsEquipped();
@@ -171,7 +171,8 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     if (player->heldItemAction == PLAYER_IA_SWORD_KOKIRI) {
         model = WeaponUpgrade_KokiriLevel() == 0 ? NEI_HELD_SWORD_KOKIRI
                 : WeaponUpgrade_HasGilded() && CVarGetInteger("gEnhancements.SkijerNEI.GildedUsesGildedLook", 1)
-                    ? NEI_HELD_SWORD_GILDED : NEI_HELD_SWORD_RAZOR;
+                    ? NEI_HELD_SWORD_GILDED
+                    : NEI_HELD_SWORD_RAZOR;
     } else if (player->heldItemAction == PLAYER_IA_SWORD_MASTER) {
         model = WeaponUpgrade_HasTrueMaster() ? NEI_HELD_SWORD_TRUE_MASTER : NEI_HELD_SWORD_MASTER;
     } else if (player->heldItemAction == PLAYER_IA_SWORD_BIGGORON) {
@@ -179,7 +180,8 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
             gSaveContext.swordHealth <= 0.0f)
             return 0; // Keep the existing broken-knife presentation.
         model = WeaponUpgrade_HasGreatFairy() && CVarGetInteger("gEnhancements.SkijerNEI.BgsUsesGfsLook", 1)
-                    ? NEI_HELD_SWORD_GREAT_FAIRY : NEI_HELD_SWORD_BIGGORON;
+                    ? NEI_HELD_SWORD_GREAT_FAIRY
+                    : NEI_HELD_SWORD_BIGGORON;
     } else {
         return 0;
     }

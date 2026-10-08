@@ -290,8 +290,7 @@ void SetReceiptBody(CustomMessage::Entry& entry, std::string body) {
 }
 
 bool RandomRupeeReceipt(const char* name, CustomMessage::Entry& entry) {
-    if (!name || gSaveContext.fileNum == 0xFF ||
-        gSaveContext.save.shipSaveInfo.saveType != SAVETYPE_RANDO ||
+    if (!name || gSaveContext.fileNum == 0xFF || gSaveContext.save.shipSaveInfo.saveType != SAVETYPE_RANDO ||
         !CVarGetInteger("gRandoEnhancements.RandomizeRupeeNames", 1))
         return false;
     struct Currency {
@@ -300,10 +299,9 @@ bool RandomRupeeReceipt(const char* name, CustomMessage::Entry& entry) {
         const char* color;
     };
     static constexpr Currency currencies[] = {
-        { "Green Rupee", "1", "%g" }, { "Blue Rupee", "5", "%b" },
-        { "10 Rupees", "10", "%b" },
-        { "Red Rupee", "20", "%r" }, { "Purple Rupee", "50", "%p" },
-        { "Silver Rupee", "100", "%w" }, { "Huge Rupee", "200", "%y" },
+        { "Green Rupee", "1", "%g" },  { "Blue Rupee", "5", "%b" },    { "10 Rupees", "10", "%b" },
+        { "Red Rupee", "20", "%r" },   { "Purple Rupee", "50", "%p" }, { "Silver Rupee", "100", "%w" },
+        { "Huge Rupee", "200", "%y" },
     };
     for (const auto& currency : currencies) {
         if (std::strcmp(name, currency.name))
@@ -329,8 +327,8 @@ bool RandomRupeeReceipt(const char* name, CustomMessage::Entry& entry) {
         if (nickname == "[P]")
             nickname.assign(1, '\x16'); // MM's player-name command.
         entry.receiptPresentation = {};
-        SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(
-                                  prefix + currency.color + currency.amount + " " + nickname + suffix));
+        SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(prefix + currency.color + currency.amount + " " +
+                                                                  nickname + suffix));
         return true;
     }
     return false;
@@ -362,14 +360,29 @@ bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry) {
 bool Rando::ApplyNativeRandomRupeeReceipt(uint16_t textId, CustomMessage::Entry& entry) {
     const char* name;
     switch (textId) {
-        case 0xC4: name = "Green Rupee"; break;
-        case 0x2: name = "Blue Rupee"; break;
-        case 0x3: name = "10 Rupees"; break;
-        case 0x4: name = "Red Rupee"; break;
-        case 0x5: name = "Purple Rupee"; break;
-        case 0x6: name = "Silver Rupee"; break;
-        case 0x7: name = "Huge Rupee"; break;
-        default: return false;
+        case 0xC4:
+            name = "Green Rupee";
+            break;
+        case 0x2:
+            name = "Blue Rupee";
+            break;
+        case 0x3:
+            name = "10 Rupees";
+            break;
+        case 0x4:
+            name = "Red Rupee";
+            break;
+        case 0x5:
+            name = "Purple Rupee";
+            break;
+        case 0x6:
+            name = "Silver Rupee";
+            break;
+        case 0x7:
+            name = "Huge Rupee";
+            break;
+        default:
+            return false;
     }
     if (!RandomRupeeReceipt(name, entry))
         return false;

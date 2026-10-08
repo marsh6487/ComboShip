@@ -3052,8 +3052,7 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
                 player->transformation == PLAYER_FORM_HUMAN &&
                 (player->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD ||
                  player->leftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD)) {
-                const char* handPath =
-                    (const char*)gPlayerLeftHandClosedDLs[PLAYER_FORM_HUMAN * 2 + sPlayerLod];
+                const char* handPath = (const char*)gPlayerLeftHandClosedDLs[PLAYER_FORM_HUMAN * 2 + sPlayerLod];
                 if (handPath != NULL && ResourceMgr_FileExists(handPath)) {
                     Gfx* hand = ResourceMgr_LoadGfxByName(handPath);
                     Gfx* heldSword = *dList;

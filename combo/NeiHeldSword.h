@@ -51,8 +51,8 @@ static inline bool NeiHeldSword_Available(const char* path) {
     if (path && strncmp(path, "__OTR__@oot-gi-base:", 20) == 0)
         return OOT_NeiResourceExists(path) != 0;
 #endif
-    return path && (ResourceMgr_FileExists(path) ||
-                    (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path)));
+    return path &&
+           (ResourceMgr_FileExists(path) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path)));
 #endif
 }
 
@@ -114,8 +114,9 @@ static inline bool NeiHeldSword_EquipmentSelected(int sword, int frame) {
         "__OTR__objects/object_link_boy/gLinkAdultLeftHandHoldingBgsNearDL",
         "__OTR__objects/object_link_boy/gLinkAdultLeftHandHoldingBgsFarDL",
     };
-    const int family = sword == NEI_HELD_SWORD_MASTER || sword == NEI_HELD_SWORD_TRUE_MASTER ? 2
-                       : sword == NEI_HELD_SWORD_BIGGORON || sword == NEI_HELD_SWORD_GREAT_FAIRY ? 4 : 0;
+    const int family = sword == NEI_HELD_SWORD_MASTER || sword == NEI_HELD_SWORD_TRUE_MASTER     ? 2
+                       : sword == NEI_HELD_SWORD_BIGGORON || sword == NEI_HELD_SWORD_GREAT_FAIRY ? 4
+                                                                                                 : 0;
     for (int i = family; i < family + 2; ++i)
         if (NeiHeldSword_SelectedResource("oot", oot[i]))
             return true;
@@ -131,16 +132,16 @@ static inline bool NeiHeldSword_EquipmentSelected(int sword, int frame) {
         } else {
             // The native BGS array also contains these health-dependent hand
             // variants. A selected combined hand remains authoritative.
-            if (NeiHeldSword_SelectedResource("oot",
-                    "__OTR__objects/object_link_boy/gLinkAdultHandHoldingBrokenGiantsKnifeDL") ||
-                NeiHeldSword_SelectedResource("oot",
-                    "__OTR__objects/object_link_boy/gLinkAdultHandHoldingBrokenGiantsKnifeFarDL"))
+            if (NeiHeldSword_SelectedResource(
+                    "oot", "__OTR__objects/object_link_boy/gLinkAdultHandHoldingBrokenGiantsKnifeDL") ||
+                NeiHeldSword_SelectedResource(
+                    "oot", "__OTR__objects/object_link_boy/gLinkAdultHandHoldingBrokenGiantsKnifeFarDL"))
                 return true;
         }
 #endif
         if (frame == NEI_HELD_SWORD_OOT_CHILD && twoHand) {
-            if (NeiHeldSword_SelectedResource("oot",
-                    "__OTR__objects/object_link_child/gLinkChildLeftHandHoldingMasterSwordDL"))
+            if (NeiHeldSword_SelectedResource(
+                    "oot", "__OTR__objects/object_link_child/gLinkChildLeftHandHoldingMasterSwordDL"))
                 return true;
         } else {
             const int physical = frame == NEI_HELD_SWORD_OOT_CHILD ? 0 : twoHand ? 4 : 2;
@@ -151,15 +152,14 @@ static inline bool NeiHeldSword_EquipmentSelected(int sword, int frame) {
     }
     // MM swords can also be selected/imported in OoT; explicit owner queries
     // keep those mods authoritative even when the local object names overlap.
-    const char* mm = sword == NEI_HELD_SWORD_RAZOR
-                         ? "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingRazorSwordDL"
-                    : sword == NEI_HELD_SWORD_GILDED
-                         ? "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingGildedSwordDL"
-                    : sword == NEI_HELD_SWORD_GREAT_FAIRY
-                         ? "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingGreatFairysSwordDL"
-                         : "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingKokiriSwordDL";
-    return (frame == NEI_HELD_SWORD_MM_HUMAN || sword == NEI_HELD_SWORD_RAZOR ||
-            sword == NEI_HELD_SWORD_GILDED || sword == NEI_HELD_SWORD_GREAT_FAIRY) &&
+    const char* mm =
+        sword == NEI_HELD_SWORD_RAZOR    ? "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingRazorSwordDL"
+        : sword == NEI_HELD_SWORD_GILDED ? "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingGildedSwordDL"
+        : sword == NEI_HELD_SWORD_GREAT_FAIRY
+            ? "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingGreatFairysSwordDL"
+            : "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingKokiriSwordDL";
+    return (frame == NEI_HELD_SWORD_MM_HUMAN || sword == NEI_HELD_SWORD_RAZOR || sword == NEI_HELD_SWORD_GILDED ||
+            sword == NEI_HELD_SWORD_GREAT_FAIRY) &&
            NeiHeldSword_SelectedResource("mm", mm);
 }
 
@@ -176,6 +176,5 @@ static inline bool NeiHeldSword_UpgradePiecesSelected(int sword) {
     } else if (sword == NEI_HELD_SWORD_GREAT_FAIRY) {
         blade = "__OTR__objects/object_link_child/gLinkHumanGreatFairysSwordDL";
     }
-    return (blade && NeiHeldSword_SelectedResource("mm", blade)) ||
-           (hilt && NeiHeldSword_SelectedResource("mm", hilt));
+    return (blade && NeiHeldSword_SelectedResource("mm", blade)) || (hilt && NeiHeldSword_SelectedResource("mm", hilt));
 }

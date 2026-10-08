@@ -10,8 +10,8 @@ extern "C" {
 }
 
 using ComboRupeeNames::englishRupeeNames;
-using ComboRupeeNames::germanRupeeNames;
 using ComboRupeeNames::frenchRupeeNames;
+using ComboRupeeNames::germanRupeeNames;
 
 void BuildRupeeMessage(uint16_t* textId, bool* loadFromMessageTable) {
     CustomMessage msg =

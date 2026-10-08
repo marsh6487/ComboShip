@@ -3,6 +3,8 @@
 Baseline: `a82852a3a02c8cabc541cce7c124da71c5755efb` on `develop` (daily polish PR #38).
 Candidate branch: `poc/sword-held-upright-polish-20261008`. Keep this candidate separate from the accepted baseline until runtime acceptance.
 
+The cumulative candidate also carries the later Summer atmosphere, autumn visibility/Alt foliage, Moon's Tear ownership, and cross-game Farore's Wind integrations from `bridge/combined-recovery-20261008` at `31186f6fb43da092c9bd260e0fc209f5bab673f0`. Its earlier sword snapshot is superseded by the final held-model priority, native MM carrier, and Four Sword shelf fixes here. The later integration delta was applied on top of those fixes; the recovery branch is retained as a merge parent. Feature-specific evidence and runtime limitations remain in the corresponding POC documents.
+
 ## Behavior
 
 - Four Sword and the progressive sword families reuse the exact redesigned GI mesh/material graph as held weapons in OoT and MM. Resource-only grip matrices attach them to the native adult, child, or MM human fist. Held weapons do not add GI particles or shimmer. All nine source meshes and their materials remain byte-for-byte unchanged.
@@ -14,7 +16,7 @@ Candidate branch: `poc/sword-held-upright-polish-20261008`. Keep this candidate 
 - MM shares SoH's unchanged English, German, and French random rupee name pools and the default-on `gRandoEnhancements.RandomizeRupeeNames` setting. Queued native/foreign rupee receipts and the seven native award textboxes use the enhancement, including the 10-rupee award. Original rupee value, color, icon, grant, and native textbox headers are preserved. Nickname selection uses an independent cosmetic random generator; it does not consume seed/gameplay randomness. Turning the setting off takes effect without reloading. Native price/bank dialogue and dungeon silver-rupee puzzle names are excluded. MM currently forces English in its native message dispatch; the other locale builders are verified but do not establish additional runtime language support.
 - Dungeon maps and compasses keep the existing middle pickup tier. MM's Junk Only setting preserves both native and imported information receipts; Everything But Major and Always may skip them. SoH's Skip Junk setting preserves native and imported maps and compasses, while Skip All may bypass them. Exact dungeon names cover older foreign seed metadata without changing item ownership, fill logic, grants, or disguised-trap handling.
 
-No animation, melee reach, collision, save, inventory, equipment ownership, or transformation code is changed. Per-draw compound copies prevent later players/clones from changing an earlier deferred sword or body-color submission.
+The sword/GI/receipt changes do not change animation, melee reach, collision, save, inventory, equipment ownership, or transformations. Per-draw compound copies prevent later players/clones from changing an earlier deferred sword or body-color submission. The carried integrations have their own documented save and gameplay behavior.
 
 ## Verification
 

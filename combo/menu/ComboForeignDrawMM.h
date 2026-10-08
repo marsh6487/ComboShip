@@ -1085,7 +1085,8 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info, bool sho
                 Matrix_RotateXF(op.a * (3.14159265358979323846f / 32768.0f), MTXMODE_APPLY);
                 break;
             case CW_OP_ROTATE_Z:
-                Matrix_RotateZF(ComboSwordGi_SelectedTilt(op.a * (3.14159265358979323846f / 32768.0f), shop && sword), MTXMODE_APPLY);
+                Matrix_RotateZF(ComboSwordGi_SelectedTilt(op.a * (3.14159265358979323846f / 32768.0f), shop && sword),
+                                MTXMODE_APPLY);
                 break;
             case CW_OP_SCALE:
                 Matrix_Scale(op.a, op.b, op.c, MTXMODE_APPLY);

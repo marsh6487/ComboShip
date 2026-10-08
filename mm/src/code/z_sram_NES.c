@@ -1,4 +1,5 @@
 #include "global.h"
+#include "gameplay/ComboFaroresWind.h"
 #include "z64horse.h"
 #include "overlays/gamestates/ovl_file_choose/z_file_select.h"
 #include <string.h>
@@ -459,6 +460,7 @@ void Sram_ClearFlagsAtDawnOfTheFirstDay(void) {
  */
 void Sram_SaveEndOfCycle(PlayState* play) {
     GameInteractor_ExecuteBeforeEndOfCycleSave();
+    ComboFw_ClearLocalPoint(); // MM puzzle flags reset; OOT's point survives the rewind.
     s16 sceneId;
     s32 j;
     s32 i;
@@ -1272,6 +1274,8 @@ void Sram_InitDebugSave(void) {
 void Sram_ResetSaveFromMoonCrash(SramContext* sramCtx) {
     s32 i;
     s32 cutsceneIndex = gSaveContext.save.cutsceneIndex;
+
+    ComboFw_ClearLocalPoint(); // A rolled-back MM cycle must not retain its old puzzle-state warp.
 
     // ComboShip: 0xFF means no slot is loaded (MM debug save, or a .combosav mm half that failed to
     // load). It has no row in the page tables, so read nothing and leave the live save alone.
