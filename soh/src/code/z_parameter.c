@@ -1,5 +1,6 @@
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "global.h"
+#include "gameplay/ComboFaroresWind.h"
 #include "vt.h"
 #include "textures/parameter_static/parameter_static.h"
 #include "textures/do_action_static/do_action_static.h"
@@ -1251,6 +1252,13 @@ void func_80083108(PlayState* play) {
                     interfaceCtx->restrictions.farores = 0;
                     interfaceCtx->restrictions.dinsNayrus = 0;
                 }
+#ifdef COMBO_BUILD
+                // Recall stays available; creating a new point requires a scene with its own DOWN.
+                interfaceCtx->restrictions.farores =
+                    !CVarGetInteger("gSm64Mario", 0) &&
+                    (play->sceneNum == SCENE_GROTTOS || play->sceneNum == SCENE_FAIRYS_FOUNTAIN) &&
+                    !ComboFw_HasPoint(gSaveContext.respawn[RESPAWN_MODE_TOP].data > 0);
+#endif
                 if (interfaceCtx->restrictions.farores != 0) {
                     for (i = 1; i < ARRAY_COUNT(gSaveContext.equips.buttonItems); i++) {
                         if (gSaveContext.equips.buttonItems[i] == ITEM_FARORES_WIND) {

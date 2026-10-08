@@ -6,6 +6,7 @@
 
 #include <libultraship/libultra.h>
 #include "global.h"
+#include "gameplay/ComboFaroresWind.h"
 #include "din_fire_shield.h"
 #include "din_fire_sword.h"
 
@@ -4170,7 +4171,15 @@ void Player_UseItem(PlayState* play, Player* this, s32 item) {
             } else if ((temp = Player_ActionToMagicSpell(this, itemAction)) >= 0) {
                 // Handle magic spells
                 s32 isMedallionSpell = SW97_MEDALLIONS_ENABLED() && Sw97_IsMedallionItem(item);
-                if (((itemAction == PLAYER_IA_FARORES_WIND) && (gSaveContext.respawn[RESPAWN_MODE_TOP].data > 0) &&
+#ifdef COMBO_BUILD
+                if (itemAction == PLAYER_IA_FARORES_WIND && !isMedallionSpell &&
+                    !ComboFw_HasPoint(gSaveContext.respawn[RESPAWN_MODE_TOP].data > 0) &&
+                    (play->sceneNum == SCENE_GROTTOS || play->sceneNum == SCENE_FAIRYS_FOUNTAIN)) {
+                    // DOWN is the parent entrance here; don't silently set a point outside.
+                    Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
+                } else
+#endif
+                if (((itemAction == PLAYER_IA_FARORES_WIND) && ComboFw_HasPoint(gSaveContext.respawn[RESPAWN_MODE_TOP].data > 0) &&
                      !isMedallionSpell) ||
                     ((gSaveContext.magicCapacity != 0) && (gSaveContext.magicState == MAGIC_STATE_IDLE) &&
                      // Magic Cape (Skijer): castable with HALF the magic — matches the halved consume
@@ -7098,7 +7107,7 @@ s32 Player_ActionHandler_13(Player* this, PlayState* play) {
             if (this->unk_6AD == 4) {
                 sp2C = Player_ActionToMagicSpell(this, this->itemAction);
                 if (sp2C >= 0) {
-                    if ((sp2C != 3) || (gSaveContext.respawn[RESPAWN_MODE_TOP].data <= 0) || sSw97SpellActive) {
+                    if ((sp2C != 3) || !ComboFw_HasPoint(gSaveContext.respawn[RESPAWN_MODE_TOP].data > 0) || sSw97SpellActive) {
                         func_8083AF44(play, this, sp2C);
                     } else {
                         Player_SetupAction(play, this, Player_Action_8085063C, 1);
@@ -17568,17 +17577,25 @@ void Player_Action_8085063C(Player* this, PlayState* play) {
         s32 respawnData = gSaveContext.respawn[RESPAWN_MODE_TOP].data;
 
         if (play->msgCtx.choiceIndex == 0) { // Returns to FW
-            gSaveContext.respawnFlag = 3;
-            play->transitionTrigger = TRANS_TRIGGER_START;
-            play->nextEntranceIndex = gSaveContext.respawn[RESPAWN_MODE_TOP].entranceIndex;
-            play->transitionType = TRANS_TYPE_FADE_WHITE_FAST;
-            Interface_SetSubTimerToFinalSecond(play);
-            return;
+            s32 result = ComboFw_RequestReturn();
+            if (result > 0)
+                return;
+            if (result < 0) {
+                Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
+            } else {
+                gSaveContext.respawnFlag = 3;
+                play->transitionTrigger = TRANS_TRIGGER_START;
+                play->nextEntranceIndex = gSaveContext.respawn[RESPAWN_MODE_TOP].entranceIndex;
+                play->transitionType = TRANS_TYPE_FADE_WHITE_FAST;
+                Interface_SetSubTimerToFinalSecond(play);
+                return;
+            }
         }
 
         if (play->msgCtx.choiceIndex == 1) { // Unsets FW
             gSaveContext.respawn[RESPAWN_MODE_TOP].data = -respawnData;
             gSaveContext.fw.set = 0;
+            ComboFw_ClearPoint();
             Sfx_PlaySfxAtPos(&gSaveContext.respawn[RESPAWN_MODE_TOP].pos, NA_SE_PL_MAGIC_WIND_VANISH);
         }
 
@@ -17598,6 +17615,7 @@ void Player_Action_8085076C(Player* this, PlayState* play) {
     }
 
     if (this->av2.actionVar2++ == 20) {
+        ComboFw_ClearPoint();
         gSaveContext.respawn[RESPAWN_MODE_TOP].data = respawnData + 1;
         Sfx_PlaySfxAtPos(&gSaveContext.respawn[RESPAWN_MODE_TOP].pos, NA_SE_PL_MAGIC_WIND_WARP);
     }
@@ -17728,6 +17746,7 @@ void Player_Action_808507F4(Player* this, PlayState* play) {
                 gSaveContext.fw.roomIndex = gSaveContext.respawn[RESPAWN_MODE_DOWN].roomIndex;
                 gSaveContext.fw.tempSwchFlags = gSaveContext.respawn[RESPAWN_MODE_DOWN].tempSwchFlags;
                 gSaveContext.fw.tempCollectFlags = gSaveContext.respawn[RESPAWN_MODE_DOWN].tempCollectFlags;
+                ComboFw_PublishPoint();
                 this->av2.actionVar2 = 2;
             }
         } else if (this->av1.actionVar1 >= 0) {
