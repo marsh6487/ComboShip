@@ -18,6 +18,9 @@ def extract(source,name):
 names=['Player_OverrideLimbDrawGameplayDefault','Player_OverrideLimbDrawGameplayFirstPerson','Player_ApplyNeiHeldHand']
 nf={n:extract(native,n) for n in names}
 af={n:extract(adult.replace('extern "C" ',''),n) for n in ['AdultLink_UsesAdultPresentation','AdultLink_ApplyNeiHeldHand','AdultLink_OverrideLimb']}
+native_start=native.index('            u8 handIsSpokenFor =')
+native_end=native.index('            // ⚠️ ESTE OCULTADO',native_start)
+native_sword=native[native_start:native_end]
 for name in ['Player_OverrideLimbDrawGameplayDefault','Player_OverrideLimbDrawGameplayFirstPerson']:
  assert 'Player_ApplyNeiHeldHand(play, player, limbIndex, dList)' in nf[name]
 # Exercise the complete final adult override, not just an intermediate helper.
@@ -28,14 +31,24 @@ prefix=r'''
 #include <cassert>
 #include <string>
 #include <iostream>
+#include <array>
+#include <cstring>
 SaveContext gSaveContext{};
 PlayState* gPlayState=nullptr;
 u16 gEquipMasks[4]{};u8 gEquipShifts[4]{};
 bool mode=false,lantern=false,hook=true,hasHand=true,claimedHand=false;
 int form=CUSTOM_FORM_NONE, sPlayerLod=0,sPlayerLeftHandType=0;
-u8 sReady=0,sIsChildRig=0,sIsMod=0;
+u8 sReady=0,sIsChildRig=0,sIsMod=0,sIsForm=0;
+bool extOwnsSwordDL=false,odwalda=false,goht=false,gold=false,customBody=false,heldEnabled=false,dinSelected=false;
+int heldCalls=0,tunicR=30,tunicG=105,tunicB=27;
 FlexSkeletonHeader skel{},*sSkel=nullptr;
-Gfx nativeLeft{},nativeRight{},adultLeft{},adultRight{},customHand{},replacement{},vanillaHook{};
+Gfx nativeLeft{},nativeRight{},adultLeft{},adultRight{},customHand{},replacement{},vanillaHook{},swordMesh{},dinHand{};
+static Gfx heldScratch[8]{};
+static std::array<std::array<Gfx,8>,16> swordFrames;
+static unsigned swordAllocations=0;
+static Gfx* AllocateSword(size_t size){assert(size==8*sizeof(Gfx)&&swordAllocations<swordFrames.size());return swordFrames[swordAllocations++].data();}
+#undef GRAPH_ALLOC
+#define GRAPH_ALLOC(context,size) AllocateSword(size)
 Gfx* gPlayerLeftHandClosedDLs[10]{};Gfx* gPlayerRightHandClosedDLs[10]{};
 std::string resolved;
 s32 AdultLink_IsActive(){return mode;}
@@ -46,7 +59,27 @@ f32 CustomForms_RootDropAfter(){return 0;}
 Gfx* CustomForms_HandDL(Player*,s32,u8* claimed){*claimed=claimedHand;return &customHand;}
 u8 CustomForms_HidesSheath(Player*){return 0;}
 const char* ExtEquip_GetShieldDLOverride(){return nullptr;}
-void* DinFireSword_HandDL(PlayState*,Player*,Gfx*){return nullptr;}
+u8 ExtEquip_ShouldHideSwordDL(){return extOwnsSwordDL;}
+u8 BossRemains_IsOdolwaWorn(){return odwalda;}
+u8 BossRemains_IsGohtWorn(){return goht;}
+u8 Trident_GoldenArmor(){return gold;}
+u8 Player_IsCustomLinkModel(Player*){return customBody;}
+s32 CVarGetInteger(const char* name,s32 fallback){
+ if(std::strstr(name,"TunicR"))return tunicR;
+ if(std::strstr(name,"TunicG"))return tunicG;
+ if(std::strstr(name,"TunicB"))return tunicB;
+ return fallback;
+}
+u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dl,void* hand,Player* p,u8 r,u8 g,u8 b){
+ ++heldCalls;
+ if(!heldEnabled||!hand||(p->leftHandType!=PLAYER_MODELTYPE_LH_ONE_HAND_SWORD&&p->leftHandType!=PLAYER_MODELTYPE_LH_TWO_HAND_SWORD))return 0;
+ std::memset(heldScratch,0,sizeof(heldScratch));
+ heldScratch[0].words.w0=G_DL<<24;heldScratch[0].words.w1=reinterpret_cast<uintptr_t>(&swordMesh);
+ heldScratch[1].words.w0=G_DL<<24;heldScratch[1].words.w1=reinterpret_cast<uintptr_t>(hand);
+ heldScratch[3].words.w0=G_SETENVCOLOR<<24;heldScratch[3].words.w1=(uint32_t(r)<<24)|(uint32_t(g)<<16)|(uint32_t(b)<<8);
+ heldScratch[5].words.w0=G_ENDDL<<24;*dl=heldScratch;return 1;
+}
+void* DinFireSword_HandDL(PlayState*,Player*,Gfx*){return dinSelected?&dinHand:nullptr;}
 void* DinFireShield_HandDL(PlayState*,Player*,Gfx*){return nullptr;}
 void Player_ApplyBackEquipmentVisibility(s32,Gfx**){}
 bool NeiLantern_UsesGrip(const Player*){return lantern;}
@@ -107,10 +140,51 @@ int main(){
  }
  claimedHand=true;Gfx* limb=&customHand;AdultLink_OverrideLimb(&play,PLAYER_LIMB_RIGHT_HAND,&limb,&pos,&rot,&p.actor);assert(limb==&replacement&&capturedHand==&customHand);
  assert(gSaveContext.save.linkAge==0);
- std::cout<<"PASS native form/LOD fist resolution, final adult/custom/child-rig selectors and read-only actual-rig age query\n";
+ // Execute the native sword seam and the full adult override. Deferred clones
+ // must retain their original fist/color after the helper's scratch is reused.
+ sIsMod=sIsForm=sIsChildRig=0;claimedHand=false;form=CUSTOM_FORM_NONE;mode=false;
+ p.leftHandType=PLAYER_MODELTYPE_LH_ONE_HAND_SWORD;sPlayerLeftHandType=p.leftHandType;heldEnabled=true;heldCalls=0;
+ Gfx* first=&vanillaHook;ApplyNativeSwordStage(&play,&p,&first);
+ assert(first!=&vanillaHook&&first!=heldScratch&&first[1].words.w1==reinterpret_cast<uintptr_t>(&nativeLeft));
+ assert(first[3].words.w1==0&&sPlayerLeftHandType==p.leftHandType);
+ std::array<Gfx,8> nativeSnapshot;std::memcpy(nativeSnapshot.data(),first,sizeof(nativeSnapshot));
+ gold=true;Gfx* second=&vanillaHook;ApplyNativeSwordStage(&play,&p,&second);gold=false;
+ assert(first!=second&&second[3].words.w1==0xffcd2800&&std::memcmp(first,nativeSnapshot.data(),sizeof(nativeSnapshot))==0);
+ for(int owner=0;owner<7;++owner){
+  extOwnsSwordDL=owner==0;odwalda=owner==1;goht=owner==2;customBody=owner==3;
+  form=owner==4?CUSTOM_FORM_KEATON:CUSTOM_FORM_NONE;p.actor.scale.y=owner==5?-.01f:.01f;
+  p.transformation=owner==6?PLAYER_FORM_GORON:PLAYER_FORM_HUMAN;heldCalls=0;
+  Gfx* skipped=&vanillaHook;ApplyNativeSwordStage(&play,&p,&skipped);assert(skipped==&vanillaHook&&heldCalls==0);
+ }
+ extOwnsSwordDL=odwalda=goht=customBody=false;form=CUSTOM_FORM_NONE;p.actor.scale.y=.01f;p.transformation=PLAYER_FORM_HUMAN;
+ // Local adult mode owns only the local adult body; a native peer still gets
+ // its real human fist. A local custom/child form owns its equipment entirely.
+ mode=true;sReady=1;sSkel=&skel;heldCalls=0;first=&vanillaHook;
+ ApplyNativeSwordStage(&play,&p,&first);assert(first==&vanillaHook&&heldCalls==0);
+ remote=p;first=&vanillaHook;ApplyNativeSwordStage(&play,&remote,&first);assert(first!=&vanillaHook&&first[1].words.w1==reinterpret_cast<uintptr_t>(&nativeLeft));
+ form=CUSTOM_FORM_KEATON;sIsChildRig=1;first=&vanillaHook;heldCalls=0;
+ ApplyNativeSwordStage(&play,&p,&first);assert(first==&vanillaHook&&heldCalls==0);
+ sIsChildRig=0;form=CUSTOM_FORM_NONE;sDL_LHSword=&vanillaHook;
+ first=&customHand;AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&first,&pos,&rot,&p.actor);
+ assert(first!=heldScratch&&first[1].words.w1==reinterpret_cast<uintptr_t>(&adultLeft)&&first[3].words.w1==0x1e691b00);
+ std::array<Gfx,8> adultSnapshot;std::memcpy(adultSnapshot.data(),first,sizeof(adultSnapshot));
+ tunicR=99;tunicG=88;tunicB=77;second=&customHand;
+ AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);
+ assert(first!=second&&second[3].words.w1==0x63584d00&&std::memcmp(first,adultSnapshot.data(),sizeof(adultSnapshot))==0);
+ gold=true;second=&customHand;AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);gold=false;assert(second[3].words.w1==0xffcd2800);
+ for(int owner=0;owner<8;++owner){
+  sIsMod=owner==0;sIsForm=owner==1;sIsChildRig=owner==2;
+  form=owner==3?CUSTOM_FORM_KEATON:CUSTOM_FORM_NONE;extOwnsSwordDL=owner==4;odwalda=owner==5;goht=owner==6;
+  p.actor.scale.y=owner==7?-.01f:.01f;heldCalls=0;second=&customHand;
+  AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);assert(heldCalls==0);
+ }
+ sIsMod=sIsForm=sIsChildRig=0;extOwnsSwordDL=odwalda=goht=false;p.actor.scale.y=.01f;form=CUSTOM_FORM_NONE;
+ dinSelected=true;second=&customHand;AdultLink_OverrideLimb(&play,PLAYER_LIMB_LEFT_HAND,&second,&pos,&rot,&p.actor);assert(second==&dinHand);
+ std::cout<<"PASS native/adult held sword fists, isolated frame compounds/colors, form/equipment/Din priority and original final hand selectors\n";
 }
 '''
-parts=[af['AdultLink_UsesAdultPresentation'],nf['Player_ApplyNeiHeldHand'],af['AdultLink_ApplyNeiHeldHand'],af['AdultLink_OverrideLimb']]
+parts=[af['AdultLink_UsesAdultPresentation'],nf['Player_ApplyNeiHeldHand'],af['AdultLink_ApplyNeiHeldHand'],af['AdultLink_OverrideLimb'],
+       'static void ApplyNativeSwordStage(PlayState* play,Player* player,Gfx** dList){\n'+native_sword+'\n}']
 with tempfile.TemporaryDirectory(prefix='mm-nei-hands-') as td:
  path=Path(td)/'hands.cpp';path.write_text(prefix+'\n'.join(parts)+checks);binary=Path(td)/'hands'
  subprocess.run(['c++','-std=c++20',*flags(),str(path),'-o',str(binary)],check=True)

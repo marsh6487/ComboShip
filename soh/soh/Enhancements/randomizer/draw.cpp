@@ -2075,6 +2075,20 @@ void Randomizer_DrawExtShieldOfIkana(PlayState* play, GetItemEntry* getItemEntry
     // mm.o2r — using object_gi_shield_3/gGiMirrorShieldDL crashed because its vertex hashes
     // didn't resolve in the OTR pack, and the unresolved bytes were executed as gsSPVertex.
     Gfx* mod = NeiGi_ModOverrideDL("objects/object_link_child/gLinkHumanMirrorShieldDL", true);
+#ifdef COMBO_BUILD
+    // The pose probe and deferred draw must select the same MM-owned graph.
+    // The legacy companion loads through the active host and retains a raw
+    // pointer, which can disagree with MM after an owner/Alt selection change.
+    static Gfx sMmShieldDL[2];
+    Gfx* selected = mod;
+    if (!selected &&
+        ResourceMgr_IsGiModelAvailableForGame("mm", "objects/object_link_child/gLinkHumanMirrorShieldDL")) {
+        gDma1p(&sMmShieldDL[0], G_DL_OTR_FILEPATH, "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL", 0,
+               G_DL_PUSH);
+        gSPEndDisplayList(&sMmShieldDL[1]);
+        selected = sMmShieldDL;
+    }
+#else
     static Gfx* sCachedMmShieldDL = NULL;
     static u8 sLoadAttempted = 0;
     if (!mod && !sLoadAttempted) {
@@ -2082,6 +2096,7 @@ void Randomizer_DrawExtShieldOfIkana(PlayState* play, GetItemEntry* getItemEntry
         sCachedMmShieldDL = (Gfx*)TransformMasks_LoadMmDL("objects/object_link_child/gLinkHumanMirrorShieldDL");
     }
     Gfx* selected = mod ? mod : sCachedMmShieldDL;
+#endif
     if (selected == NULL) {
         return; // mm.o2r not present — silent skip instead of crashing on a NULL DL
     }

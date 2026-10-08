@@ -28,12 +28,37 @@ struct Material {
     uint32_t color;
 };
 constexpr Material kMaterials[] = {
+    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_01BE50", 0xD99C45FF },
+    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_01C650", 0xD99C45FF },
+    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_01DE50", 0xD99C45FF },
+    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_02C050", 0xD99C45FF },
     { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_021650", 0xD99C45FF },
     { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_0216D0", 0xD99C45FF },
     { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_0218D0", 0xD99C45FF },
     { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_034898", 0xB96848FF },
+    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_034098", 0xB96848FF },
+    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_037098", 0xB96848FF },
     { "Z2_21MITURINMAE", "Z2_21MITURINMAETex_0055D0", 0xB96848FF },
 };
+
+uint32_t WholeListColor(std::string path) {
+    if (path.starts_with("alt/"))
+        path.erase(0, 4);
+    // The accepted POC3 foliage roots call private child materials. Follow
+    // these exact foliage-only roots without guessing their private texture names.
+    for (const auto* suffix : { "", "_scene" }) {
+        const std::string prefix = "scenes/nonmq/Z2_00KEIKOKU" + std::string(suffix) + "/Z2_00KEIKOKU_room_00DL_";
+        for (const auto* top : { "0153A8", "015DF0", "016598" }) {
+            if (path == prefix + top)
+                return 0xD99C45FF;
+        }
+        for (const auto* side : { "0158E8", "016180", "016A38" }) {
+            if (path == prefix + side)
+                return 0xB96848FF;
+        }
+    }
+    return 0;
+}
 
 uint32_t MaterialColor(uint64_t hash) {
     static const auto colors = [] {
@@ -271,13 +296,24 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                 continue;
             }
             auto commands = BuildVariant(resource->Instructions);
-            if (commands.empty()) {
+            const auto wholeColor = WholeListColor(path);
+            if (commands.empty() && wholeColor == 0) {
                 // Ordinary scene materials stay owned by the resource manager;
                 // don't retain or duplicate every non-foliage list in the scene.
                 sIgnored[resource.get()] = resource;
                 continue;
             }
             Variant variant{ resource, resource->Instructions, std::move(commands) };
+            if (variant.commands.empty()) {
+                // Execute the intact root as a pushed child, then restore the
+                // color even when that root ends with a tail branch. Copies
+                // retain all dynamic child calls, geometry and alpha commands.
+                variant.commands = {
+                    gsSPGrayscale(true),
+                    gsDPSetGrayscaleColor(wholeColor >> 24, (wholeColor >> 16) & 255, (wholeColor >> 8) & 255, 255),
+                    gsSPDisplayList(variant.original.data()), gsSPGrayscale(false), gsSPEndDisplayList()
+                };
+            }
             it = sVariants.emplace(resource.get(), std::move(variant)).first;
         }
         if (it->second.Apply()) {

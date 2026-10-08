@@ -177,6 +177,11 @@ extern "C" COMBO_EXPORT void MM_SetOnComboReturnCallback(void (*cb)(int kind)) {
     gComboReturnCallback = cb;
 }
 static bool sComboReturnPending = false;
+static bool sComboFwReturnPending = false;
+extern "C" void MM_CaptureFwDeparture(void);
+extern "C" void MM_QueueFwHandoff(void) {
+    sComboFwReturnPending = true;
+}
 // ComboShip: Ctrl+R reset while MM is foreground. Like the portal return, but only persists MM if
 // autosave is enabled (an authentic reset otherwise discards unsaved progress). Set via the export.
 static bool sComboResetReturnPending = false;
@@ -195,6 +200,7 @@ extern "C" void Combo_RequestOwlSaveQuit(void) {
 // would immediately quit the new one.
 static void Combo_ClearReturnRequests(void) {
     sComboReturnPending = false;
+    sComboFwReturnPending = false;
     sComboResetReturnPending = false;
     sComboOwlSaveQuitPending = false;
 }
@@ -1393,11 +1399,13 @@ extern "C" void InitOTR(int argc, char* argv[]) {
         }
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>([]() {
-        if (!sComboReturnPending && !sComboResetReturnPending && !sComboOwlSaveQuitPending)
+        if (!sComboReturnPending && !sComboFwReturnPending && !sComboResetReturnPending && !sComboOwlSaveQuitPending)
             return;
+        const bool isFwReturn = sComboFwReturnPending;
         const bool isReset = sComboResetReturnPending;
         const bool isOwlSaveQuit = sComboOwlSaveQuitPending;
         sComboReturnPending = false;
+        sComboFwReturnPending = false;
         sComboResetReturnPending = false;
         sComboOwlSaveQuitPending = false;
         // An owl save quit lands on OOT's title, like Ctrl+R, rather than resuming OOT gameplay.
@@ -1415,10 +1423,13 @@ extern "C" void InitOTR(int argc, char* argv[]) {
         // persist outside gameplay: the title/attract path wipes save first (Sram_InitNewSave). An owl
         // save has already written itself through the flashrom seam.
         if (!isOwlSaveQuit && (!isReset || CVarGetInteger("gEnhancements.Saving.Autosave", 0)) &&
-            gSaveContext.gameMode == GAMEMODE_NORMAL)
+            gSaveContext.gameMode == GAMEMODE_NORMAL) {
+            if (isFwReturn)
+                MM_CaptureFwDeparture();
             SaveManager_SaveCurrentForCombo();
+        }
         if (gComboReturnCallback)
-            gComboReturnCallback(isOwlSaveQuit ? 2 : (isReset ? 1 : 0));
+            gComboReturnCallback(isOwlSaveQuit ? 2 : (isReset ? 1 : (isFwReturn ? 3 : 0)));
         if (auto fast3d = std::dynamic_pointer_cast<Fast::Fast3dWindow>(Ship::Context::GetRawInstance()->GetWindow())) {
             fast3d->SetIsRunning(false);
         }

@@ -12,8 +12,15 @@ from run_mm_nei_tests import flags
 from run_mm_weather_tests import production_function
 
 
+def source(path):
+    baseline = next((arg.split('=', 1)[1] for arg in sys.argv if arg.startswith('--preview-baseline=')), None)
+    if baseline and path.endswith('/z_object_kankyo.c'):
+        return subprocess.check_output(['git', 'show', baseline + ':' + path], cwd=ROOT, text=True)
+    return (ROOT / path).read_text()
+
+
 def body(path, name):
-    return re.sub(r'\bthis\b', 'self', production_function((ROOT / path).read_text(), name))
+    return re.sub(r'\bthis\b', 'self', production_function(source(path), name))
 
 
 with tempfile.TemporaryDirectory(prefix='native-season-weather-') as temporary:
@@ -22,11 +29,14 @@ with tempfile.TemporaryDirectory(prefix='native-season-weather-') as temporary:
     environment = 'mm/src/code/z_kankyo.c'
     rod = 'mm/mods/items/logic/item_rod_of_seasons.c'
     parts = [body('mm/src/audio/sequence.c', 'AudioSeq_QueueSeqCmd')]
+    parts += [body('mm/2s2h/gu_pc.c', 'guMtxIdentF'), body('mm/src/libultra/gu/lookat.c', 'guLookAtF')]
     parts += [body(snow, name) for name in (
-        'ObjectKankyo_SetupAction', 'ObjectKankyo_IsAutumnOwner', 'ObjectKankyo_AutumnBand', 'ObjectKankyo_InitAutumnParticle',
+        'ObjectKankyo_SetupAction', 'ObjectKankyo_IsAutumnOwner', 'ObjectKankyo_AutumnBand',
+        'ObjectKankyo_IsCompactAutumnScene', 'ObjectKankyo_AutumnViewBasis', 'ObjectKankyo_InitAutumnParticle',
         'ObjectKankyo_UpdateAutumnParticles', 'ObjectKankyo_RestoreAutumnParticle', 'func_808DC454',
         'ObjectKankyo_UpdateSnowTarget', 'ObjectKankyo_UpdateSeasonSnowParticles', 'func_808DCB7C', 'func_808DCBF8',
-        'func_808DBEB0', 'func_808DBFB0', 'ObjectKankyo_Init', 'ObjectKankyo_Update', 'func_808DD3C8')]
+        'func_808DBEB0', 'func_808DBFB0', 'ObjectKankyo_Init', 'ObjectKankyo_Update', 'func_808DD3C8')
+        if name in source(snow)]
     rod_source = (ROOT / rod).read_text()
     parts.append('// Seasonal particles' + rod_source.split('// Seasonal particles')[1].split('#include "../objects')[0])
     parts += [body('mm/mods/extended_inventory.c', name) for name in ('Seasons_SeasonOwned', 'Seasons_SetSeason')]
@@ -64,5 +74,6 @@ with tempfile.TemporaryDirectory(prefix='native-season-weather-') as temporary:
     ], capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(result.stdout + result.stderr)
-    subprocess.run([str(binary)], check=True,
+    output = next((arg.split('=', 1)[1] for arg in sys.argv if arg.startswith('--preview-output=')), None)
+    subprocess.run([str(binary), *([output] if output else [])], check=True,
                    env={**os.environ, 'ASAN_OPTIONS': os.environ.get('ASAN_OPTIONS', '') + ':detect_leaks=0'})

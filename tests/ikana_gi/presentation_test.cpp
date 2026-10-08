@@ -13,12 +13,13 @@
 using s16 = int16_t; using u8 = uint8_t;
 constexpr int MTXMODE_APPLY=1, G_MTX_NOPUSH=0, G_MTX_LOAD=0, G_MTX_MODELVIEW=0;
 constexpr int RI_SHIELD_MIRROR=1, RG_EXT_SHIELD_OF_IKANA=1;
-struct Gfx {}; struct GraphicsContext {}; struct State { GraphicsContext* gfxCtx; };
+struct Gfx {const char* route=nullptr;}; struct GraphicsContext {}; struct State { GraphicsContext* gfxCtx; };
 struct PlayState { State state; int gameplayFrames=0; }; struct GetItemEntry {};
 GraphicsContext ctx; PlayState play{{&ctx}}; PlayState* gPlayState=&play;
-Gfx commands[64], model; Gfx* opa=commands;
+Gfx commands[64], model, wrongHostModel; Gfx* opa=commands;
 float poseX=0, scale=1, height=0, depth=0;
-bool flat=false, ootMod=false, canMeasure=true;
+bool flat=false, ootMod=false, canMeasure=true, useMod=true, donorAvailable=true;
+const char* drawnRoute=nullptr;
 std::string poseOwner;
 int failures=0;
 std::vector<std::pair<float,float>> stack;
@@ -31,8 +32,10 @@ void Matrix_RotateXF(float angle,u8){poseX+=angle;}
 void Matrix_Scale(float x,float,float,u8){scale*=x;}
 void* Matrix_NewMtx(GraphicsContext*,char*,int){return nullptr;}
 void Gfx_SetupDL_25Opa(GraphicsContext*){}
-void record() {
-    const float y=flat?2.f:100.f, z=flat?100.f:2.f;
+void record(const Gfx* selected=nullptr) {
+    drawnRoute=selected?selected->route:nullptr;
+    const bool selectedFlat=selected==&wrongHostModel?!flat:flat;
+    const float y=selectedFlat?2.f:100.f, z=selectedFlat?100.f:2.f;
     height=scale*(std::abs(std::cos(poseX))*y+std::abs(std::sin(poseX))*z);
     depth=scale*(std::abs(std::sin(poseX))*y+std::abs(std::cos(poseX))*z);
 }
@@ -40,9 +43,15 @@ void record() {
 #define CLOSE_DISPS(x) ((void)(x))
 #define POLY_OPA_DISP opa
 #define gSPMatrix(p,...) ((void)(p))
-#define gSPDisplayList(p,dl) ((void)(p),(void)(dl),record())
-Gfx* NeiGi_ModOverrideDL(const char*,bool){return &model;}
-void* TransformMasks_LoadMmDL(const char*){return &model;}
+#define gSPDisplayList(p,dl) ((void)(p),record(dl))
+constexpr int G_DL_OTR_FILEPATH=1,G_DL_PUSH=0;
+void gDma1p(Gfx* out,int,const char* path,int,int){out->route=path;}
+void gSPEndDisplayList(Gfx*){}
+Gfx* NeiGi_ModOverrideDL(const char*,bool){return useMod?&model:nullptr;}
+void* TransformMasks_LoadMmDL(const char*){return &wrongHostModel;}
+int ResourceMgr_IsGiModelAvailableForGame(const char* owner,const char*){
+    check(!std::strcmp(owner,"mm"),"donor availability must follow measured MM owner");return donorAvailable;
+}
 int ResourceMgr_IsModAssetForGame(const char* game,const char*){return !std::strcmp(game,"oot")?ootMod:!ootMod;}
 int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* owner,const char*,float* tilt){
     poseOwner=owner;
@@ -111,6 +120,20 @@ int main(){
     poseX=0;scale=1;DrawNativeIkanaGI();
     check(height<depth,"unreadable native graph preserves its original unrotated pose");
     check(stack.empty(),"unreadable shield matrix stack balanced");
+    // An unscoped companion can load a different host shield at the same path.
+    // Queue the measured MM owner's graph and refresh its pose on every draw.
+    useMod=false;ootMod=false;canMeasure=true;
+    for(bool donorFlat:{true,false,true,false}) {
+        flat=donorFlat;poseX=0;scale=1;opa=commands;
+        Randomizer_DrawExtShieldOfIkana(&play,nullptr);
+        check(height>depth*10,"native no-mod shield must draw the same upright MM geometry it measured");
+        check(drawnRoute&&!std::strcmp(drawnRoute,"__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL"),
+              "native no-mod shield keeps MM root/dependency ownership live across donor toggles");
+    }
+    donorAvailable=false;opa=commands;
+    Randomizer_DrawExtShieldOfIkana(&play,nullptr);
+    check(opa==commands,"missing MM shield must skip without borrowing host geometry");
+    useMod=true;donorAvailable=true;
     auto oot=std::make_shared<Ship::ResourceManager>(),mm=std::make_shared<Ship::ResourceManager>();
     Ship::CrossRMRegistry::owners={{"oot",oot},{"mm",mm}};
     constexpr char path[]="icon_item_static_yar/gItemIconMirrorShieldTex";

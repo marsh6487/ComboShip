@@ -1175,12 +1175,15 @@ int main() {
       modFiles.insert({"oot",(useAlt?"alt/":"")+std::string(overridden)});
       GetItemEntry modEntry{}; modEntry.drawFunc=model.draw; modEntry.drawItemId=model.identity;modEntry.gid=model.nativeGid;
       assert(NeiGi_Draw(&play,&modEntry));
+      const float expectedSize=NeiGi::IsSword(model.effect)?1.15f:1.f;
+      const float expectedLift=NeiGi::IsSword(model.effect)?.3f:0.f;
 #ifdef COMBO_BUILD
       if(!useAlt && NeiGi::IsSword(model.effect))
         assert(Drawn(true)==std::vector<std::string>{std::string("__OTR__@oot-gi-base:")+(model.opaque+7)});
       else
 #endif
-      assert(!submitted.empty() && submitted.front()==std::pair(model.scale,0.f));
+      assert(!submitted.empty() && std::abs(submitted.front().first-model.scale*expectedSize)<.00001f &&
+             std::abs(submitted.front().second-expectedLift)<.0001f);
       assert(arena.size()==size_t(model.alwaysShimmer||effects)+NeiGi::IsSword(model.effect) && "selected sword lost its intrinsic particles");
       assert(flameColors.empty() && fallback==0 && vanilla==0 && stack.empty() && matrix==1 && matrixY==0);
 #ifdef COMBO_BUILD
@@ -1192,7 +1195,8 @@ int main() {
       assert(ownerInfo.drawKind==CW_DRAW_KIND_CUSTOM_GI && ownerInfo.neiEffect==0);
       submitted.clear();arena.clear();gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;
       MM_DrawNeiGi(ownerInfo);
-      assert(submitted.front()==std::pair(model.scale,0.f));
+      assert(std::abs(submitted.front().first-model.scale*expectedSize)<.00001f &&
+             std::abs(submitted.front().second-expectedLift)<.0001f);
       assert(arena.size()==size_t(model.alwaysShimmer||effects)+NeiGi::IsSword(model.effect));
       assert(stack.empty() && matrix==1 && matrixY==0);
 #endif

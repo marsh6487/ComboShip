@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <map>
 #include <memory>
@@ -19,6 +20,7 @@
 extern "C" {
 #include "z64save.h"
 #include "z64item.h"
+#include "z64animation.h"
 #include "macros.h"
 }
 #else
@@ -26,6 +28,10 @@ extern "C" {
 #include "macros.h"
 #endif
 #include "mods/extended_inventory.h"
+#include "mods/extended_equipment.h"
+#if HOST_MM
+#include "mods/nei_oot_compat.h"
+#endif
 #include "combo/rando/RpgStatsJson.h"
 #if HOST_MM
 #include "2s2h/FleetShipCombo/FleetComboOptions.h"
@@ -39,23 +45,44 @@ extern "C" {
 SaveManager* SaveManager::Instance = nullptr;
 SaveManager::SaveManager() {}
 
-// Unrelated sidecar I/O and session wheel tracking are not part of this section
-// persistence test. The real NEI save/load bodies still call these observers.
+// Keep the real trade sidecar I/O. Only its application directory is supplied
+// by the fixture; it must never touch a user's Save directory.
+static std::filesystem::path sFixtureSaveDirectory;
+namespace Ship {
+struct Context {
+    static std::string GetPathRelativeToAppDirectory(const char*) {
+        return sFixtureSaveDirectory.string();
+    }
+};
+}
+
+// Unrelated photo I/O and session wheel tracking stay outside this fixture.
 static void Bottle_WheelResetTracking() {}
 static void Picto_SyncRead() {}
-static void TradeItems_SyncWrite() {}
-static void TradeItems_SyncRead() {}
 #endif
 
 using json = nlohmann::json;
 extern "C" {
 SaveContext gSaveContext{};
+ExtendedEquipmentState gExtEquipState{};
+ExtEquipBehaviorState gExtEquipBehavior{};
+// Actor lifetime, icon generation, and CVar/UI activation are outside the
+// equipment ownership/persistence boundary exercised below.
+void ByrnaOrb_Forget(void) {}
+void ExtEquip_OnPlayerSceneInit(void) {}
+void ExtEquip_GenerateIcons(void) {}
+void CVarSetInteger(const char*, int32_t) {}
 // Observe no engine audit service in this synchronous storage fixture. Real
 // slot writers and serializer scopes retain their production audit calls.
+#ifdef COMBO_BUILD
 void ItemGrantAudit_Begin(const char*, int, int, int) {}
 void ItemGrantAudit_End(void) {}
+#endif
 }
 
+static u8 sExtEquipInitInProgress = 0;
+static u8 sTransformBackup[4] = {};
+static u8 sTransformBackupValid = 0;
 #include "nei_save_production.inc"
 
 static_assert(sizeof(NeiSaveData::ownedItems[0]) == sizeof(uint16_t));
@@ -110,6 +137,149 @@ static void LoadBlob(json section) {
     manager->currentJsonContext = nullptr;
 #endif
 }
+
+static void CheckEquipmentLayoutInitialization() {
+    constexpr uint32_t pendant = 0x00080000;
+    constexpr uint32_t moon = 0x00000800;
+    constexpr uint32_t modernOwned = 0x0F400000; // all boots + Champion and Sage tunics
+    for (uint8_t equippedBoots : {uint8_t(0), uint8_t(2), uint8_t(3)}) {
+        Reset();
+        for (uint8_t index = 1; index <= 3; ++index)
+            ExtEquip_GiveItem(EQUIP_TYPE_BOOTS, index);
+        ExtEquip_GiveItem(EQUIP_TYPE_TUNIC, 1);
+        ExtEquip_GiveItem(EQUIP_TYPE_TUNIC, 3);
+        Nei_Save()->extEquipBoots = equippedBoots;
+        Nei_Save()->extEquipTunic = 3;
+        Nei_Save()->tradeAdultOwned = moon;
+        ExtEquip_Init();
+        Check(Nei_Save()->tradeAdultOwned == moon,
+              "modern starting Climb Boots must not become a Pendant on first equipment initialization");
+        Check(Nei_Save()->extEquipOwnedBits == modernOwned,
+              "modern starting boots and tunics must retain all granted ownership");
+        Check(Nei_Save()->capeOwned == 0,
+              "a modern Champion tunic must not become the legacy Magic Cape");
+        Check(Nei_Save()->extEquipBoots == equippedBoots && Nei_Save()->extEquipTunic == 3,
+              "current equipment selections must survive first initialization");
+        Nei_Save()->tradeAdultOwned |= pendant; // independently earned, preserved across reload
+        Nei_Save()->pendantOwned = 1;
+        LoadBlob(SaveBlob());
+        ExtEquip_Init();
+        ExtEquip_Init();
+        Check(Nei_Save()->tradeAdultOwned == (moon | pendant) && Nei_Save()->pendantOwned == 1 &&
+                  Nei_Save()->extEquipOwnedBits == modernOwned &&
+                  Nei_Save()->extEquipBoots == equippedBoots && Nei_Save()->extEquipTunic == 3,
+              "current layouts and legitimately earned Pendant must survive reload and repeated initialization");
+    }
+    // Missing version keys still identify a legacy save, even though the new
+    // initializer now selects the current layouts. Owned OR equipped implies owned.
+    for (bool owned : {false, true}) {
+        Reset();
+        LoadBlob({{"extEquipOwnedBits", owned ? 0x0D000000 : 0x08000000},
+                  {"extEquipBoots", owned ? 0 : 2}, {"tradeAdultOwned", moon}});
+        ExtEquip_Init();
+        Check(Nei_Save()->tradeAdultOwned == (moon | pendant),
+              "a genuine legacy owned or equipped Pendant slot must migrate to trade ownership");
+        Check((Nei_Save()->extEquipOwnedBits & 0x0C000000) == 0 && Nei_Save()->extEquipBoots == 0,
+              "legacy Pendant/Dragon Scale slots must be retired during migration");
+        const auto migrated = SaveBlob();
+        LoadBlob(migrated);
+        ExtEquip_Init();
+        Check(SaveBlob() == migrated, "legacy equipment migration must persist and run only once");
+    }
+    Reset();
+    LoadBlob({{"extEquipOwnedBits", 0x01400000}, {"extEquipTunic", 3}});
+    ExtEquip_Init();
+    Check(Nei_Save()->capeOwned == 1 && Nei_Save()->extEquipOwnedBits == 0x00400000 &&
+              Nei_Save()->extEquipTunic == 1,
+          "legacy Cape/Champion tunics must retain their original migration");
+    std::puts("PASS equipment layouts: modern grants, selections, reload, earned Pendant and genuine legacy migration");
+}
+
+static void CheckSuppliedRepairedSave() {
+    const char* path = std::getenv("NEI_SAVE_TEST_COMBO_SAVE");
+    if (!path)
+        return;
+    std::ifstream file(path);
+    Check(bool(file), "the supplied repaired combined save must be readable");
+    json combined;
+    file >> combined;
+#if HOST_MM
+    const auto section = combined.at(json::json_pointer("/mm/newCycleSave/save/shipSaveInfo/nei"));
+#else
+    const auto section = combined.at(json::json_pointer("/oot/sections/nei/data"));
+#endif
+    LoadBlob(section);
+    const auto ownedBefore = Nei_Save()->extEquipOwnedBits;
+    for (int round = 0; round < 2; ++round) {
+        ExtEquip_Init();
+        Check((Nei_Save()->tradeAdultOwned & 0x00080800) == 0 && Nei_Save()->pendantOwned == 0,
+              "the supplied repair must keep Moon's Tear and Pendant absent after equipment initialization");
+        Check(Nei_Save()->comboObtainedFc[210] == 0 && Nei_Save()->comboAppliedFc[210] == 0 &&
+                  Nei_Save()->comboObtainedFc[40] == 0 && Nei_Save()->comboAppliedFc[40] == 0,
+              "the supplied repair must not retain a pending Moon or Pendant grant");
+        Check(Nei_Save()->extEquipOwnedBits == ownedBefore,
+              "the supplied repair must retain its legitimate modern equipment");
+        LoadBlob(SaveBlob());
+    }
+    std::puts("PASS supplied repaired save: native NEI load/init/save/reload retains equipment without phantom items");
+}
+
+#if !HOST_MM
+static void CheckTradeSidecarOwnership() {
+    // These are independent trade-wheel entries: Moon's Tear is bit 11,
+    // Zelda's Letter is bit 22. A reused file number is not a save identity.
+    constexpr uint32_t moon = 0x00000800;
+    constexpr uint32_t letter = 0x00400000;
+    gSaveContext.fileNum = 0;
+    const auto sidecar = sFixtureSaveDirectory / "file1_tradeitems.bin";
+    {
+        std::ofstream file(sidecar, std::ios::binary);
+        file.write(reinterpret_cast<const char*>(&moon), sizeof(moon));
+        Check(bool(file), "the fixture created an old slot's Moon's Tear sidecar");
+    }
+    LoadBlob({{"tradeAdultOwned", letter}});
+#ifdef COMBO_BUILD
+    Check(Nei_Save()->tradeAdultOwned == letter,
+          "a combined save with Zelda's Letter must not acquire Moon's Tear from an old sidecar");
+    LoadBlob(json::object());
+    Check(Nei_Save()->tradeAdultOwned == 0,
+          "a fresh combined save must stay empty despite a reused slot's sidecar");
+    LoadBlob({{"tradeAdultOwned", moon | letter}});
+    Check(Nei_Save()->tradeAdultOwned == (moon | letter),
+          "legitimately saved Moon's Tear and Zelda's Letter must both survive loading");
+    LoadBlob({{"tradeAdultOwned", letter}});
+    LoadBlob(SaveBlob());
+    Check(Nei_Save()->tradeAdultOwned == letter,
+          "combined save/load must preserve canonical ownership without reimporting the sidecar");
+    {
+        uint32_t legacy = 0;
+        std::ifstream file(sidecar, std::ios::binary);
+        file.read(reinterpret_cast<char*>(&legacy), sizeof(legacy));
+        Check(bool(file) && legacy == moon,
+              "saving a combined file must leave legacy standalone sidecar bytes untouched");
+    }
+    std::filesystem::remove(sidecar);
+    SaveBlob();
+    Check(!std::filesystem::exists(sidecar),
+          "a combined save must not create a legacy trade sidecar");
+    std::puts("PASS trade ownership: combined JSON is authoritative across empty, letter, Moon and reload cases");
+#else
+    Check(Nei_Save()->tradeAdultOwned == (moon | letter),
+          "standalone SoH must retain its legacy cross-game sidecar import");
+    Nei_Save()->tradeAdultOwned = letter;
+    SaveBlob();
+    {
+        uint32_t legacy = 0;
+        std::ifstream file(sidecar, std::ios::binary);
+        file.read(reinterpret_cast<char*>(&legacy), sizeof(legacy));
+        Check(bool(file) && legacy == letter,
+              "standalone SoH must retain its legacy cross-game sidecar export");
+    }
+    std::filesystem::remove(sidecar);
+    std::puts("PASS trade ownership: standalone legacy sidecar import/export retained");
+#endif
+}
+#endif
 
 static uint16_t Selected() {
     return ExtInv_GetSlotItem(SLOT_PHANTOM_HOURGLASS);
@@ -252,12 +422,17 @@ int main() {
 #if !HOST_MM
     SaveManager manager;
     SaveManager::Instance = &manager;
+    sFixtureSaveDirectory = std::getenv("NEI_SAVE_TEST_DIRECTORY");
+    std::filesystem::create_directories(sFixtureSaveDirectory);
+    CheckTradeSidecarOwnership();
 #endif
+    CheckEquipmentLayoutInitialization();
     CheckBothOwnedRoundtrips();
     CheckLegacySelectedItems();
     CheckFlagsOnlyRepair();
     CheckSlateModes();
     CheckFleetOwnershipMerge();
+    CheckSuppliedRepairedSave();
     std::puts(HOST_MM ? "PASS host: MM native save" : "PASS host: OoT native save");
     return 0;
 }

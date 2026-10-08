@@ -45,6 +45,10 @@ extern "C" void Nei_InitNewSave(void) {
     ItemGrantAudit::Scope itemGrantAuditScope("MM custom-init");
     NeiSaveData* n = &gSaveContext.save.shipSaveInfo.nei;
     memset(n, 0, sizeof(*n));
+    // New grants use the current equipment layouts. Version 0 is reserved for
+    // loaded legacy saves, whose old slots must migrate at player initialization.
+    n->extTunicLayoutVersion = 1;
+    n->extBootsLayoutVersion = 1;
     // ownedItems is u16 now, so memset(0xFF) would write 0xFFFF per entry — and the empty marker is
     // ITEM_NONE (0xFF), not 0xFFFF. Fill it element by element. Skijer's NEI
     for (int i = 0; i < (int)(sizeof(n->ownedItems) / sizeof(n->ownedItems[0])); i++) {

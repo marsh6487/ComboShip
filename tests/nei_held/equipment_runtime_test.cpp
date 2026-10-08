@@ -4,23 +4,34 @@
 #include <cstring>
 #include "mods/equipment/nei_equipment_presentation.h"
 #include "mods/equipment/nei_equipment_resources.inc"
+#include "../../combo/NeiHeldSword.h"
 std::set<std::string> resources, alternate, modded, donorModded, foreignModded;
 bool altEnabled=false;
 bool equipped=true;
 Gfx nativeDL[1]{};
 extern "C" {
+SaveContext gSaveContext{};
 uint8_t ResourceMgr_FileExists(const char* p){return resources.contains(p);}
 uint8_t ResourceMgr_FileAltExists(const char* p){return alternate.contains(p);}
 bool ResourceMgr_IsAltAssetsEnabled(){return altEnabled;}
 int ResourceMgr_IsModAsset(const char* p){return modded.contains(p) || (altEnabled && alternate.contains(p));}
 int ResourceMgr_IsModAssetForGame(const char*, const char* p){return foreignModded.contains(p);}
+int32_t OOT_NeiEnsureGiBaseOwner(){return 1;}
+int32_t OOT_NeiResourceExists(const char* p){
+ const char* prefix="__OTR__@oot-gi-base:";
+ return std::string(p).starts_with(prefix) && resources.contains(std::string("__OTR__")+(p+std::strlen(prefix)));
+}
 Gfx* ResourceMgr_LoadGfxByName(const char* p){assert(resources.contains(p));return nativeDL;}
 Gfx* OotAssets_LoadGfxDirect(const char*){return nativeDL;}
 u8 FourSword_IsEquipped(){return equipped;}
 #ifdef NEI_EQUIPMENT_MM
-int NeiResource_Available(const char* p){return resources.contains(p);}
+u8 AdultLink_IsActive(){return 0;}
+#endif
+#ifdef NEI_EQUIPMENT_MM
+int NeiResource_EnsureGiBaseOwner(){return 1;}
+int NeiResource_Available(const char* p){return std::string(p).starts_with("__OTR__@oot-gi-base:")?OOT_NeiResourceExists(p):resources.contains(p);}
 int NeiResource_IsMod(const char* p){return donorModded.contains(p);}
-const char* NeiResource_Route(const char* p){static std::set<std::string> paths;return paths.insert(std::string("__OTR__@oot:")+(p+7)).first->c_str();}
+const char* NeiResource_Route(const char* p){static std::set<std::string> paths;return paths.insert(p[7]=='@'?std::string(p):std::string("__OTR__@oot:")+(p+7)).first->c_str();}
 #endif
 }
 #define FOURSWORD_BLADE_DL "__OTR__objects/object_nei_four_sword/gNeiFourSwordBladeDL"
@@ -94,6 +105,36 @@ int main(int argc,char**){
  assert(FourSword_HeldSwordDL(&blade,&hilt));
  assert(std::string((const char*)((Gfx*)blade)[0].words.w1)==FOURSWORD_BLADE_DL);
  assert(std::string((const char*)((Gfx*)hilt)[0].words.w1)==FOURSWORD_HILT_DL);
+ // A complete redesigned GI mesh in a held frame supersedes the older split
+ // authored model. No second hilt is drawn over the exact complete sword.
+ altEnabled=false;alternate.clear();
+ for (const char* name : {"edge_tex", "gi_dl", "gold_edge_tex", "gold_tex", "guard_groove_tex",
+                         "ivory_cloth_tex", "mesh_opa_vtx", "pommel_blue_tex", "ruby_tex",
+                         "scale_mtx", "steel_tex"})
+  resources.insert(std::string("__OTR__objects/nei_gi_redesign/four_sword/")+name);
+#ifdef NEI_EQUIPMENT_MM
+ const char* redesignedFour="__OTR__objects/nei_held_swords/four_sword/mm_human/held_dl";
+ resources.insert("__OTR__objects/nei_held_swords/four_sword/mm_human/grip_mtx");
+#else
+ gSaveContext.linkAge=LINK_AGE_ADULT;
+ const char* redesignedFour="__OTR__objects/nei_held_swords/four_sword/oot_adult/held_dl";
+ resources.insert("__OTR__objects/nei_held_swords/four_sword/oot_adult/grip_mtx");
+#endif
+ resources.insert(redesignedFour);
+ assert(FourSword_HeldSwordDL(&blade,&hilt));
+ assert(hilt==nullptr && "Four Sword still draws its older authored hilt over the redesigned whole GI mesh");
+#ifdef NEI_EQUIPMENT_MM
+ assert(std::string((const char*)((Gfx*)blade)[0].words.w1)==
+        "__OTR__@oot-gi-base:objects/nei_held_swords/four_sword/mm_human/held_dl");
+#else
+ assert(std::string((const char*)((Gfx*)blade)[0].words.w1)==std::string("__OTR__@oot-gi-base:")+(redesignedFour+7));
+#endif
+ // An active mod of either old half retains the whole selected legacy pair.
+ modded.insert(FOURSWORD_HILT_DL);
+ assert(FourSword_HeldSwordDL(&blade,&hilt));
+ assert(hilt!=nullptr);
+ assert(std::string((const char*)((Gfx*)hilt)[0].words.w1)==FOURSWORD_HILT_DL);
+ modded.clear();
  altEnabled=false;alternate={FOURSWORD_HILT_DL};modded={FOURSWORD_BLADE_DL};resources={FOURSWORD_BLADE_DL};
  assert(!FourSword_HeldSwordDL(&blade,&hilt)); // inactive Alt cannot complete a legacy pair
  modded.clear();

@@ -195,7 +195,7 @@ static int32_t CwAltSwordGi(RandomizerGet rg, CwItemDrawInfo* out) {
     // Standalone equipment follows the native hand-local +X blade axis.
     // Tilt it into +Y; an X quarter-turn after this would lay it flat in XZ.
     out->opCount = 1;
-    out->ops[0] = { CW_OP_ROTATE_Z, 18774.682f, 0, 0, {} }; // 1.8 radians
+    out->ops[0] = { CW_OP_ROTATE_Z, 16384.f, 0, 0, {} }; // +X blade to straight-up +Y.
     if (trueMaster) {
         out->primColorXlu[0] = 120;
         out->primColorXlu[1] = 180;
@@ -570,7 +570,7 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
                 return 0;
             out->xluStartIndex = -1; // Both blade and hilt are opaque in the native callback.
             out->opCount = 1;
-            out->ops[0] = { CW_OP_ROTATE_Z, 18774.682f, 0, 0, {} };
+            out->ops[0] = { CW_OP_ROTATE_Z, 16384.f, 0, 0, {} };
             return 1;
         case RG_EXT_SHIELD_OF_IKANA: {
             const char* path = "objects/object_link_child/gLinkHumanMirrorShieldDL";

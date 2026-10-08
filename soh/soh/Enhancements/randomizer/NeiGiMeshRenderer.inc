@@ -407,7 +407,11 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
     const bool sword = NeiGi::IsSword(static_cast<Kind>(shimmerKind));
+    if (sword)
+        tilt = ComboSwordGi_SelectedTilt(tilt, shop);
     Matrix_Push();
+    if (fit && sword)
+        ComboSwordGi_ApplyPresentationSize(shop, mmPickup);
     if (fit && mmPickup && !sword) {
         const char* paths[] = { opa, xlu };
         ComboSwordGi_ApplyModelsFit(owner ? owner : "oot", paths, xlu ? 2 : 1, scale, tilt, shop, mmPickup);
