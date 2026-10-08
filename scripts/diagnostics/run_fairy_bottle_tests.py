@@ -54,6 +54,7 @@ def main():
                        {'OOT_DrawForeignFairyBottle', 'OOT_DrawForeignFairyContainer'}):
         bodies += 'template<class...T>void ' + name + '(T...) { assert(false); }\n'
     bodies += 'template<class...T>void ComboSwordGi_ApplyEffectFit(T...) { assert(false); }\n'
+    bodies += 'template<class...T>void ComboSwordGi_ApplyPresentationSize(T...) { assert(false); }\n'
     bodies += dispatch + '\n'
     source = (ROOT / 'combo/menu/ComboForeignDrawMM.h').read_text()
     bodies += function(source, 'MM_DrawForeignFairy') + '\n'

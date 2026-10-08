@@ -791,12 +791,14 @@ bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available
 
 static void NeiGi_DrawSelectedSword(PlayState* play, const char* path, bool shop = false, bool fit = true) {
     OPEN_DISPS(play->state.gfxCtx);
-    if (fit)
-        ComboSwordGi_ApplyFit("oot", path, .04f, 1.8f, shop);
+    if (fit) {
+        ComboSwordGi_ApplyPresentationSize(shop);
+        ComboSwordGi_ApplyFit("oot", path, .04f, ComboSwordGi_SelectedTilt(1.5707963267948966f, shop), shop);
+    }
     Matrix_RotateY(Spin(play), MTXMODE_APPLY);
     // Standalone donor blades point along +X. Z alone turns that axis into
     // upright +Y; an extra X quarter turn would lay it flat in XZ.
-    Matrix_RotateZ(1.8f, MTXMODE_APPLY);
+    Matrix_RotateZ(ComboSwordGi_SelectedTilt(1.5707963267948966f, shop), MTXMODE_APPLY);
     Matrix_Scale(.04f, .04f, .04f, MTXMODE_APPLY);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     gSPGrayscale(POLY_OPA_DISP++, false);
@@ -925,9 +927,11 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         return true;
     Matrix_Push();
     MtxF callerMatrix;
+    if (!authored && NeiGi::IsSword(item->effect))
+        ComboSwordGi_ApplyPresentationSize(shop);
     Matrix_Get(&callerMatrix);
     if (selectedSword) {
-        ComboSwordGi_ApplyFit("oot", selectedSword, .04f, 1.8f, shop);
+        ComboSwordGi_ApplyFit("oot", selectedSword, .04f, ComboSwordGi_SelectedTilt(1.5707963267948966f, shop), shop);
     } else if (upgraded && !authored && NeiGi::IsSword(item->effect)) {
         const char* paths[] = { item->opaque, item->translucent };
         ComboSwordGi_ApplyModelsFit("oot", paths, item->translucent ? 2 : 1, item->scale, 0.f, shop);
@@ -975,6 +979,8 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
                   G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
         gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, item->opaque, 0, G_DL_PUSH);
         CLOSE_DISPS(play->state.gfxCtx);
+    } else if (entry->drawFunc == Randomizer_DrawExtFourSword) {
+        Randomizer_DrawExtFourSwordPresentation(play, entry, shop);
     } else if (entry->drawFunc) {
         entry->drawFunc(play, entry);
     } else {
