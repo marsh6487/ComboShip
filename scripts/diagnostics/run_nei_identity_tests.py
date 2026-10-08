@@ -82,6 +82,9 @@ PlayState play; PlayState* gPlayState=&play;
 Kind awardKind=Kind::Fire; bool mmMod; int pushes, draws, fitCalls;
 NeiGi::Mesh captured;
 void Matrix_Push() {++pushes;} void Matrix_Pop() {assert(pushes>0);--pushes;}
+constexpr int MTXMODE_APPLY=1;
+void Matrix_Translate(float,float,float,int) {}
+void Matrix_Scale(float,float,float,int) {}
 NeiGi::Basis NeiGi_CameraBasis(PlayState*) {return {};}
 void NeiGi_DrawMesh(PlayState*,const NeiGi::Mesh& mesh) {captured=mesh;++draws;}
 int Describe(const char*,CwItemDrawInfo* out) {
@@ -101,7 +104,8 @@ void ComboSwordGi_ApplyLegacyFit(const char* owner,Kind kind,bool shop=false,int
 void ComboSwordGi_ApplyEffectFit(Kind kind,bool shop=false,int pickup=0) {
     assert(kind==awardKind && NeiGi::IsSword(kind) && !shop && !pickup);
 }
-''' + bindings + '\n' + header[header.index('class MM_NeiGiFallbackShimmer'):] + '\n'
+''' + function((ROOT/'combo/menu/ComboSwordGiEffectFit.h').read_text(),
+               'ComboSwordGi_ApplyPresentationSize') + '\n' + bindings + '\n' + header[header.index('class MM_NeiGiFallbackShimmer'):] + '\n'
 source += function(mm,'HasMmLegacyGiMod')+'\n'+function(mm,'GetSelectedOwnerGi')+'\n'+function(mm,'MM_DescribeNeiGi')+'\n'+fallback
 source += r'''
 int main() {
