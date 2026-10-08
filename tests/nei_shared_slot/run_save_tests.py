@@ -3,8 +3,9 @@
 
 The complete MM NeiSaveData JSON overloads and OoT NEI save/load functions are
 extracted verbatim. OoT uses the production SaveManager declaration, templates,
-and array traversal; a fixture binds its current section synchronously. Thread
-startup and unrelated photo/trade sidecars are outside this test boundary.
+and array traversal; a fixture binds its current section synchronously. Trade
+sidecar I/O is real, with only the application Save directory supplied by the
+fixture. Thread startup and unrelated photo sidecars remain outside the boundary.
 
 --serializer-ref compiles older serializers against the current native data
 headers to demonstrate that omitting the appended flags fails these checks.
@@ -59,6 +60,8 @@ def production_for(host, serializer_ref):
         parts.insert(0, "static NeiSaveData gNeiSave;")
         parts.append(extract(save, "NeiSave_Init"))
         serializers = source_at("soh/mods/nei_save.cpp", serializer_ref)
+        parts.extend(extract(serializers, name) for name in
+                     ("Nei_SidecarPath", "TradeItems_SyncWrite", "TradeItems_SyncRead"))
         parts.extend(extract(serializers, name) for name in ("NeiSave_Save", "NeiSave_Load"))
         manager = source_at("soh/soh/SaveManager.cpp")
         parts.extend(extract(manager, name) for name in ("SaveManager::SaveArray", "SaveManager::LoadArray"))
@@ -78,6 +81,7 @@ def main():
     parser.add_argument("--serializer-ref", help="git revision supplying only the NEI serializers")
     parser.add_argument("--host", choices=("mm", "soh"), help="test only one host")
     parser.add_argument("--sanitizers", action="store_true", help="enable AddressSanitizer and UBSan")
+    parser.add_argument("--standalone", action="store_true", help="test the non-ComboShip build")
     args = parser.parse_args()
     hosts = (args.host,) if args.host else ("mm", "soh")
     failed = False
@@ -92,15 +96,18 @@ def main():
             includes = ["-I" + str(p) for p in (build, ROOT, ROOT / host, ROOT / host / "include",
                         ROOT / host / "include/PR", ROOT / host / "2s2h", ROOT / host / "assets",
                         ROOT / "libultraship/include", ROOT / "combo")]
-            flags = ["-std=c++20", "-O1", "-g", "-DF3DEX_GBI_2", "-DCOMBO_BUILD",
+            flags = ["-std=c++20", "-O1", "-g", "-DF3DEX_GBI_2",
                      "-DLOG_LEVEL_GAME_PRINTS=0", "-DHOST_MM=" + str(int(host == "mm"))]
+            if not args.standalone:
+                flags.append("-DCOMBO_BUILD")
             if args.sanitizers:
                 flags += ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer"]
             binary = build / "nei_save_test"
             subprocess.run([os.environ.get("CXX", "c++"), *flags, *includes,
                             str(ROOT / "tests/nei_shared_slot/save_test.cpp"), "-o", str(binary)],
                            cwd=ROOT, check=True)
-            result = subprocess.run([str(binary)], cwd=ROOT)
+            result = subprocess.run([str(binary)], cwd=ROOT,
+                                    env={**os.environ, "NEI_SAVE_TEST_DIRECTORY": str(build / "Save")})
             failed |= result.returncode != 0
     return int(failed)
 
