@@ -1,5 +1,6 @@
 // A nonidentity binary fit must change geometry, not the award's procedural
-// effect footprint. Compare against the real authored presentation as control.
+// effect footprint. Compare against an independently enlarged authored control; model-unit
+// correction must stay independent of this shared presentation enlargement.
 #ifndef SWORD_TOGGLE_REGRESSION_ONLY
 for (const auto& sword : kPresentations) {
   if (!NeiGi::IsSword(sword.effect)) continue;
@@ -8,23 +9,35 @@ for (const auto& sword : kPresentations) {
   for (bool shop : {false, true}) for (int pickup : {0, 1, 2}) {
     Reset(); ownerAlt=alt=true;
     const float center[3]={sword.effectCenter.x,sword.effectCenter.y,sword.effectCenter.z};
+    const float frameCenter=shop?15.f:pickup==2?63.f:pickup?-14.f:-2.f;
+    const float size=shop||pickup==2?1.f:1.15f;
+    Matrix_Translate(0,(1.f-size)*frameCenter,0,MTXMODE_APPLY);
+    Matrix_Scale(size,size,size,MTXMODE_APPLY);
     NeiGi_DrawPresentation(&play,sword.opaque,sword.translucent,sword.scale,
                           int(sword.effect),center,true,"oot",shop,pickup);
     const auto expectedEffects=effectSubmitted;
+    const auto sameEffects=[&]() {
+      if(effectSubmitted.size()!=expectedEffects.size())return false;
+      for(size_t i=0;i<effectSubmitted.size();++i)
+        if(std::abs(effectSubmitted[i].first-expectedEffects[i].first)>.000001f ||
+           std::abs(effectSubmitted[i].second-expectedEffects[i].second)>.0001f)return false;
+      return true;
+    };
     assert(!expectedEffects.empty());
     Reset(); ownerAlt=alt=true; selectedFitScale=.01f; selectedFitLift=-29;
     NeiGi_DrawExternalPresentation(&play,selected,nullptr,.04f,int(sword.effect),
-                                  true,"oot",shop,1.8f,true,pickup);
-    assert(std::abs(submitted.front().first-.0004f)<.000001f && submitted.front().second==-29 &&
+                                  true,"oot",shop,1.5707963267948966f,true,pickup);
+    assert(std::abs(submitted.front().first-.0004f*size)<.000001f &&
+           std::abs(submitted.front().second-((1.f-size)*frameCenter-29.f*size))<.0001f &&
            "binary sword geometry lost its accepted resource fit");
-    assert(effectSubmitted==expectedEffects && "binary model fitting shrank the sword particles/shimmer");
+    assert(sameEffects() && "binary model fitting shrank the sword particles/shimmer");
     assert(matrix==1 && matrixY==0 && stack.empty());
     if (!pickup) {
       Reset(); ownerAlt=alt=true; files.insert(selected);
       selectedFitScale=.01f; selectedFitLift=-29;
       GetItemEntry custom{};custom.drawFunc=sword.draw;custom.gid=sword.nativeGid;
       assert(shop?NeiGi_DrawShop(&play,&custom):NeiGi_Draw(&play,&custom));
-      assert(effectSubmitted==expectedEffects && "native OoT binary sword effects inherited mesh fit");
+      assert(sameEffects() && "native OoT binary sword effects inherited mesh fit");
       assert(matrix==1 && matrixY==0 && stack.empty());
     }
   }

@@ -666,6 +666,8 @@ inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo*
     Matrix_Push();
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     Matrix_RotateY((bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f, MTXMODE_APPLY);
+    const bool sword = info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Gold) + 1 &&
+                       NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
     int selectedOpaque = -1;
     bool noCull = false;
     for (int i = 0; i < info->opCount; ++i) {
@@ -675,7 +677,8 @@ inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo*
                 Matrix_RotateX(op.a * (3.14159265358979323846f / 32768.f), MTXMODE_APPLY);
                 break;
             case CW_OP_ROTATE_Z:
-                Matrix_RotateZ(op.a * (3.14159265358979323846f / 32768.f), MTXMODE_APPLY);
+                Matrix_RotateZ(ComboSwordGi_SelectedTilt(op.a * (3.14159265358979323846f / 32768.f), shop && sword),
+                               MTXMODE_APPLY);
                 break;
             case CW_OP_SCALE:
                 Matrix_Scale(op.a, op.b, op.c, MTXMODE_APPLY);
@@ -975,6 +978,10 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
                            info->drawKind == CW_DRAW_KIND_MASTER_SWORD || info->drawKind == CW_DRAW_KIND_GORON_SWORD);
     const bool swordFlame = swordIdentity && info->primColorXlu[3] &&
                             (info->drawKind == CW_DRAW_KIND_CUSTOM_GI || info->drawKind == CW_DRAW_KIND_MASTER_SWORD);
+    if (fitSword) {
+        Matrix_Push();
+        ComboSwordGi_ApplyPresentationSize(shop);
+    }
     if (swordFlame) {
         Matrix_Push();
         ComboSwordGi_ApplyEffectFit(static_cast<NeiGi::Kind>(info->neiShimmer - 1), shop);
@@ -990,7 +997,7 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         const float tilt =
             info->drawKind == CW_DRAW_KIND_MASTER_SWORD ? 2.1f
             : info->drawKind == CW_DRAW_KIND_CUSTOM_GI && info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z
-                ? info->ops[0].a * (3.14159265358979323846f / 32768.f)
+                ? ComboSwordGi_SelectedTilt(info->ops[0].a * (3.14159265358979323846f / 32768.f), shop && swordIdentity)
                 : 0.f;
         ComboSwordGi_ApplyModelsFit("oot", info->dls, info->count, scale, tilt, shop);
     }
@@ -1102,6 +1109,8 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
             ComboDrawMaskShimmer(play, nullptr, info->itemShimmerColor, "mm");
     }
     if (overlayShimmer && swordIdentity)
+        Matrix_Pop();
+    if (fitSword)
         Matrix_Pop();
 }
 
