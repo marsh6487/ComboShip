@@ -25,6 +25,8 @@ void MMAutumnSceneFoliage_Update(const PlayState*) {
 }
 void MMAutumnSceneFoliage_Reset() {
 }
+extern "C" void MMSummerAtmosphere_Reset() {
+}
 static uint8_t nativeRainAmbience;
 static uint8_t nativeThunderAmbience;
 f32 D_801F4E74;

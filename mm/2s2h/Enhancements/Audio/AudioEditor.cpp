@@ -1,5 +1,6 @@
 #include "AudioEditor.h"
 #include "MMWeather.h"
+#include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
 
 #include <map>
 #include <set>
@@ -37,7 +38,7 @@ static WidgetInfo voicePitchEnable;
 static WidgetInfo randoMusicOnSceneChange;
 static WidgetInfo randomAudioOnSeedGen;
 static WidgetInfo useSongCategories;
-static std::array<WidgetInfo, 8> weatherWidgets;
+static std::array<WidgetInfo, 10> weatherWidgets;
 
 namespace AudioPreview {
 
@@ -1056,6 +1057,18 @@ void RegisterAudioWidgets() {
                      .DefaultValue(100)
                      .Color(THEME_COLOR)
                      .Tooltip("Higher values produce thunder more often during added rain."));
+    weatherWidgets[8] = { .name = "Summer Day/Night Atmosphere", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    weatherWidgets[8]
+        .CVar(MM_SUMMER_CVAR("Enabled"))
+        .Options(CheckboxOptions().DefaultValue(true).Color(THEME_COLOR)
+                     .Tooltip("While the Rod of Seasons selects Summer outdoors, adds drifting dandelion fluff by day "
+                              "and softly pulsing fireflies after dusk."));
+    weatherWidgets[9] = { .name = "Soft Summer Sunbeams (Preview Option)", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    weatherWidgets[9]
+        .CVar(MM_SUMMER_CVAR("Sunbeams"))
+        .Options(CheckboxOptions().DefaultValue(false).Color(THEME_COLOR)
+                     .Tooltip("Adds three soft shafts of sunlight during clear Summer days. "
+                              "Experimental option; disabled by default for review."));
     for (auto& widget : weatherWidgets) {
         AddAudioSearchWidget(widget);
     }
