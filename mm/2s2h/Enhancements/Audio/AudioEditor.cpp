@@ -1060,13 +1060,17 @@ void RegisterAudioWidgets() {
     weatherWidgets[8] = { .name = "Summer Day/Night Atmosphere", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
     weatherWidgets[8]
         .CVar(MM_SUMMER_CVAR("Enabled"))
-        .Options(CheckboxOptions().DefaultValue(true).Color(THEME_COLOR)
+        .Options(CheckboxOptions()
+                     .DefaultValue(true)
+                     .Color(THEME_COLOR)
                      .Tooltip("While the Rod of Seasons selects Summer outdoors, adds drifting dandelion fluff by day "
                               "and softly pulsing fireflies after dusk."));
     weatherWidgets[9] = { .name = "Soft Summer Sunbeams (Preview Option)", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
     weatherWidgets[9]
         .CVar(MM_SUMMER_CVAR("Sunbeams"))
-        .Options(CheckboxOptions().DefaultValue(false).Color(THEME_COLOR)
+        .Options(CheckboxOptions()
+                     .DefaultValue(false)
+                     .Color(THEME_COLOR)
                      .Tooltip("Adds three soft shafts of sunlight during clear Summer days. "
                               "Experimental option; disabled by default for review."));
     for (auto& widget : weatherWidgets) {

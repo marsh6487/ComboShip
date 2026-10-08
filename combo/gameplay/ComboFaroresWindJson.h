@@ -4,10 +4,18 @@
 #include <stdexcept>
 
 inline nlohmann::json ComboFw_EncodePoint(const ComboFwPoint& p) {
-    return {{"version", 1}, {"game", p.game}, {"entrance", p.entrance}, {"room", p.room},
-            {"yaw", p.yaw}, {"age", p.age}, {"x", p.x}, {"y", p.y}, {"z", p.z},
-            {"tempSwitchFlags", p.tempSwitchFlags}, {"tempCollectFlags", p.tempCollectFlags},
-            {"tempCollectFlagsLow", p.tempCollectFlagsLow}};
+    return { { "version", 1 },
+             { "game", p.game },
+             { "entrance", p.entrance },
+             { "room", p.room },
+             { "yaw", p.yaw },
+             { "age", p.age },
+             { "x", p.x },
+             { "y", p.y },
+             { "z", p.z },
+             { "tempSwitchFlags", p.tempSwitchFlags },
+             { "tempCollectFlags", p.tempCollectFlags },
+             { "tempCollectFlagsLow", p.tempCollectFlagsLow } };
 }
 
 inline bool ComboFw_DecodePoint(const nlohmann::json& j, ComboFwPoint& p) {
@@ -30,9 +38,17 @@ inline bool ComboFw_DecodePoint(const nlohmann::json& j, ComboFwPoint& p) {
                 throw std::runtime_error("Farore flags overflow");
             return value.get<uint32_t>();
         };
-        ComboFwPoint decoded{integer("game"), integer("entrance"), integer("room"), integer("yaw"),
-                             integer("age"), j.at("x").get<float>(), j.at("y").get<float>(), j.at("z").get<float>(),
-                             flags("tempSwitchFlags"), flags("tempCollectFlags"), flags("tempCollectFlagsLow")};
+        ComboFwPoint decoded{ integer("game"),
+                              integer("entrance"),
+                              integer("room"),
+                              integer("yaw"),
+                              integer("age"),
+                              j.at("x").get<float>(),
+                              j.at("y").get<float>(),
+                              j.at("z").get<float>(),
+                              flags("tempSwitchFlags"),
+                              flags("tempCollectFlags"),
+                              flags("tempCollectFlagsLow") };
         if (!ComboFw_PointValid(&decoded))
             return false;
         p = decoded;

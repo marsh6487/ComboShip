@@ -141,7 +141,7 @@ static IKAxePropState* IKAxe_PropSlot(Actor* actor) {
 u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8 bodyEnvR, u8 bodyEnvG, u8 bodyEnvB) {
     extern void* MmAssets_LoadResource(const char* path);
     extern s32 CVarGetInteger(const char* name, s32 defaultValue);
-    extern u8 Player_IsCustomLinkModel(Player* player);
+    extern u8 Player_IsCustomLinkModel(Player * player);
     extern u8 FourSword_IsEquipped(void);
     // Cached loaded pieces per variant.
     static void* sRazorBlade = NULL;
@@ -168,7 +168,8 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     if (player->heldItemId == ITEM_SWORD_KOKIRI && player->heldItemAction == PLAYER_IA_SWORD_KOKIRI) {
         model = WeaponUpgrade_KokiriLevel() == 0 ? NEI_HELD_SWORD_MM_KOKIRI
                 : WeaponUpgrade_HasGilded() && CVarGetInteger("gEnhancements.SkijerNEI.GildedUsesGildedLook", 1)
-                    ? NEI_HELD_SWORD_GILDED : NEI_HELD_SWORD_RAZOR;
+                    ? NEI_HELD_SWORD_GILDED
+                    : NEI_HELD_SWORD_RAZOR;
     } else if (player->heldItemId == ITEM_SWORD_RAZOR && player->heldItemAction == PLAYER_IA_SWORD_RAZOR) {
         model = NEI_HELD_SWORD_RAZOR;
     } else if (player->heldItemId == ITEM_SWORD_GILDED && player->heldItemAction == PLAYER_IA_SWORD_GILDED) {
@@ -177,9 +178,9 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
         model = WeaponUpgrade_HasTrueMaster() ? NEI_HELD_SWORD_TRUE_MASTER : NEI_HELD_SWORD_MASTER;
     } else if (player->heldItemId == ITEM_SWORD_BGS && player->heldItemAction == PLAYER_IA_SWORD_BIGGORON) {
         model = WeaponUpgrade_HasGreatFairy() && CVarGetInteger("gEnhancements.SkijerNEI.BgsUsesGfsLook", 1)
-                    ? NEI_HELD_SWORD_GREAT_FAIRY : NEI_HELD_SWORD_BIGGORON;
-    } else if (player->heldItemId == ITEM_SWORD_GREAT_FAIRY &&
-               player->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED) {
+                    ? NEI_HELD_SWORD_GREAT_FAIRY
+                    : NEI_HELD_SWORD_BIGGORON;
+    } else if (player->heldItemId == ITEM_SWORD_GREAT_FAIRY && player->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED) {
         model = NEI_HELD_SWORD_GREAT_FAIRY;
     }
     extern u8 FourSword_HeldSwordDLForFrame(void** blade, void** handle, int frame);

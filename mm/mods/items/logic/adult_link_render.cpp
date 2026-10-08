@@ -658,8 +658,8 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
             break;
     }
     if (limbIndex == PLAYER_LIMB_LEFT_HAND && *dList != nullptr && !sIsMod && !sIsForm && !sIsChildRig &&
-        CustomForms_ActiveForm() == CUSTOM_FORM_NONE && p->actor.scale.y >= 0.0f &&
-        !ExtEquip_ShouldHideSwordDL() && !BossRemains_IsOdolwaWorn() && !BossRemains_IsGohtWorn()) {
+        CustomForms_ActiveForm() == CUSTOM_FORM_NONE && p->actor.scale.y >= 0.0f && !ExtEquip_ShouldHideSwordDL() &&
+        !BossRemains_IsOdolwaWorn() && !BossRemains_IsGohtWorn()) {
         Gfx* heldSword = *dList;
         u8 goldenArmor = Trident_GoldenArmor();
         if (WeaponUpgrade_ApplyHeldSwordDL(&heldSword, sDL_LHClosed, p,

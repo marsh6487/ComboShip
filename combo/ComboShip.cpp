@@ -637,8 +637,7 @@ static int Combo_RequestFwReturn(int sourceGame, int slot) {
     if (Combo_ReadFwPoint(slot, &point) != 1 || point.game == sourceGame)
         return 0;
     if (point.game == 1) {
-        if (!MM_SetFwArrival || !MM_ResumeGame || !MM_SetComboEntryIsResume ||
-            !MM_SetFwArrival(slot, &point))
+        if (!MM_SetFwArrival || !MM_ResumeGame || !MM_SetComboEntryIsResume || !MM_SetFwArrival(slot, &point))
             return 0;
         MM_SetComboEntryIsResume(1);
         g_PendingMMFileNum = slot;
@@ -647,8 +646,8 @@ static int Combo_RequestFwReturn(int sourceGame, int slot) {
             return 0;
         // MM's clean-frame return hook saves progress and announces kind 3 to the launcher.
     }
-    std::cout << "[ComboShip] Farore recall " << sourceGame << " -> " << point.game
-              << " (slot " << slot << ", entrance " << point.entrance << ", room " << point.room << ")" << std::endl;
+    std::cout << "[ComboShip] Farore recall " << sourceGame << " -> " << point.game << " (slot " << slot
+              << ", entrance " << point.entrance << ", room " << point.room << ")" << std::endl;
     return 1;
 }
 
@@ -3556,7 +3555,7 @@ int main(int argc, char** argv) {
         std::exit(0);
     }
 
-    const ComboFwCallbacks fwCallbacks{Combo_ReadFwPoint, Combo_WriteFwPoint, Combo_RequestFwReturn};
+    const ComboFwCallbacks fwCallbacks{ Combo_ReadFwPoint, Combo_WriteFwPoint, Combo_RequestFwReturn };
     if (SOH_SetFwCallbacks)
         SOH_SetFwCallbacks(&fwCallbacks);
     if (MM_SetFwCallbacks)

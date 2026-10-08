@@ -42,16 +42,19 @@ constexpr Material kMaterials[] = {
 };
 
 uint32_t WholeListColor(std::string path) {
-    if (path.starts_with("alt/")) path.erase(0, 4);
+    if (path.starts_with("alt/"))
+        path.erase(0, 4);
     // The accepted POC3 foliage roots call private child materials. Follow
     // these exact foliage-only roots without guessing their private texture names.
     for (const auto* suffix : { "", "_scene" }) {
         const std::string prefix = "scenes/nonmq/Z2_00KEIKOKU" + std::string(suffix) + "/Z2_00KEIKOKU_room_00DL_";
         for (const auto* top : { "0153A8", "015DF0", "016598" }) {
-            if (path == prefix + top) return 0xD99C45FF;
+            if (path == prefix + top)
+                return 0xD99C45FF;
         }
         for (const auto* side : { "0158E8", "016180", "016A38" }) {
-            if (path == prefix + side) return 0xB96848FF;
+            if (path == prefix + side)
+                return 0xB96848FF;
         }
     }
     return 0;
@@ -305,11 +308,11 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                 // Execute the intact root as a pushed child, then restore the
                 // color even when that root ends with a tail branch. Copies
                 // retain all dynamic child calls, geometry and alpha commands.
-                variant.commands = { gsSPGrayscale(true),
-                                     gsDPSetGrayscaleColor(wholeColor >> 24, (wholeColor >> 16) & 255,
-                                                           (wholeColor >> 8) & 255, 255),
-                                     gsSPDisplayList(variant.original.data()), gsSPGrayscale(false),
-                                     gsSPEndDisplayList() };
+                variant.commands = {
+                    gsSPGrayscale(true),
+                    gsDPSetGrayscaleColor(wholeColor >> 24, (wholeColor >> 16) & 255, (wholeColor >> 8) & 255, 255),
+                    gsSPDisplayList(variant.original.data()), gsSPGrayscale(false), gsSPEndDisplayList()
+                };
             }
             it = sVariants.emplace(resource.get(), std::move(variant)).first;
         }

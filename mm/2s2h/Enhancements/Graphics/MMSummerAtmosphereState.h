@@ -52,8 +52,12 @@ class State {
   public:
     void Reset();
     void Step(const Input& input, const View& view);
-    const std::array<Particle, kParticleCount>& Particles() const { return particles; }
-    const std::vector<Beam>& Beams() const { return beams; }
+    const std::array<Particle, kParticleCount>& Particles() const {
+        return particles;
+    }
+    const std::vector<Beam>& Beams() const {
+        return beams;
+    }
 
   private:
     void Spawn(size_t index, const View& view);

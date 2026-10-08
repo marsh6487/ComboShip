@@ -50,9 +50,17 @@ extern "C" void ComboFw_PublishPoint(void) {
     const auto* fw = Nei_Save();
     if (!sFwCallbacks.write || !fw->fwSet)
         return;
-    ComboFwPoint p{1, fw->fwEntrance, fw->fwRoomIndex, fw->fwYaw, -1,
-                   fw->fwPosX, fw->fwPosY, fw->fwPosZ, fw->fwTempSwitchFlags, fw->fwTempCollectFlags,
-                   gSaveContext.respawn[RESPAWN_MODE_DOWN].unk_18};
+    ComboFwPoint p{ 1,
+                    fw->fwEntrance,
+                    fw->fwRoomIndex,
+                    fw->fwYaw,
+                    -1,
+                    fw->fwPosX,
+                    fw->fwPosY,
+                    fw->fwPosZ,
+                    fw->fwTempSwitchFlags,
+                    fw->fwTempCollectFlags,
+                    gSaveContext.respawn[RESPAWN_MODE_DOWN].unk_18 };
     sFwCallbacks.write(gSaveContext.fileNum, &p);
 }
 
@@ -166,7 +174,7 @@ extern "C" int ComboFw_ApplyArrival(void) {
         return 0;
     AdoptNativePoint(sFwArrival);
     auto& top = gSaveContext.respawn[RESPAWN_MODE_TOP];
-    top.pos = {sFwArrival.x, sFwArrival.y, sFwArrival.z};
+    top.pos = { sFwArrival.x, sFwArrival.y, sFwArrival.z };
     top.yaw = (int16_t)sFwArrival.yaw;
     top.playerParams = PLAYER_PARAMS(0xFF, PLAYER_START_MODE_D);
     top.entrance = (uint16_t)sFwArrival.entrance;

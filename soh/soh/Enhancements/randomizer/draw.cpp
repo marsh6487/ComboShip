@@ -2081,9 +2081,10 @@ void Randomizer_DrawExtShieldOfIkana(PlayState* play, GetItemEntry* getItemEntry
     // pointer, which can disagree with MM after an owner/Alt selection change.
     static Gfx sMmShieldDL[2];
     Gfx* selected = mod;
-    if (!selected && ResourceMgr_IsGiModelAvailableForGame("mm", "objects/object_link_child/gLinkHumanMirrorShieldDL")) {
-        gDma1p(&sMmShieldDL[0], G_DL_OTR_FILEPATH,
-               "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL", 0, G_DL_PUSH);
+    if (!selected &&
+        ResourceMgr_IsGiModelAvailableForGame("mm", "objects/object_link_child/gLinkHumanMirrorShieldDL")) {
+        gDma1p(&sMmShieldDL[0], G_DL_OTR_FILEPATH, "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL", 0,
+               G_DL_PUSH);
         gSPEndDisplayList(&sMmShieldDL[1]);
         selected = sMmShieldDL;
     }

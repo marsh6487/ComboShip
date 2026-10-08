@@ -4,11 +4,21 @@
 #include <cmath>
 
 namespace MMSummer {
-Vec3 Vec3::operator+(Vec3 other) const { return { x + other.x, y + other.y, z + other.z }; }
-Vec3 Vec3::operator-(Vec3 other) const { return { x - other.x, y - other.y, z - other.z }; }
-Vec3 Vec3::operator*(float scale) const { return { x * scale, y * scale, z * scale }; }
-float Dot(Vec3 a, Vec3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-float Length(Vec3 value) { return std::sqrt(Dot(value, value)); }
+Vec3 Vec3::operator+(Vec3 other) const {
+    return { x + other.x, y + other.y, z + other.z };
+}
+Vec3 Vec3::operator-(Vec3 other) const {
+    return { x - other.x, y - other.y, z - other.z };
+}
+Vec3 Vec3::operator*(float scale) const {
+    return { x * scale, y * scale, z * scale };
+}
+float Dot(Vec3 a, Vec3 b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+float Length(Vec3 value) {
+    return std::sqrt(Dot(value, value));
+}
 Vec3 Normalize(Vec3 value) {
     const float length = Length(value);
     return length > 0.0001f ? value * (1.0f / length) : Vec3{ 0, 1, 0 };
@@ -19,9 +29,12 @@ static float Smooth(float value) {
 }
 float NightWeight(float hour) {
     hour = std::fmod(hour + 24.0f, 24.0f);
-    if (hour < 5 || hour >= 19) return 1;
-    if (hour < 7) return 1 - Smooth((hour - 5) / 2);
-    if (hour < 17) return 0;
+    if (hour < 5 || hour >= 19)
+        return 1;
+    if (hour < 7)
+        return 1 - Smooth((hour - 5) / 2);
+    if (hour < 17)
+        return 0;
     return Smooth((hour - 17) / 2);
 }
 bool InView(Vec3 position, const View& view, float margin) {
@@ -38,7 +51,8 @@ float State::Random() {
     return (random >> 8) / 16777216.0f;
 }
 void State::Reset() {
-    for (auto& p : particles) p.alpha = 0;
+    for (auto& p : particles)
+        p.alpha = 0;
     beams.clear();
     random = 0x53554D52;
     elapsed = 0;
@@ -49,9 +63,8 @@ void State::Spawn(size_t index, const View& view) {
     p.kind = index < kMoteCount ? Kind::Mote : Kind::Firefly;
     const size_t ordinal = p.kind == Kind::Mote ? index : index - kMoteCount;
     const float x = -0.90f + (ordinal % 8 + 0.2f + Random() * 0.6f) * (1.80f / 8);
-    const float y = p.kind == Kind::Mote
-                        ? -0.80f + (ordinal / 8 + 0.2f + Random() * 0.6f) * (1.60f / 4)
-                        : -0.80f + (ordinal / 8 + 0.2f + Random() * 0.6f) * (1.10f / 5);
+    const float y = p.kind == Kind::Mote ? -0.80f + (ordinal / 8 + 0.2f + Random() * 0.6f) * (1.60f / 4)
+                                         : -0.80f + (ordinal / 8 + 0.2f + Random() * 0.6f) * (1.10f / 5);
     // 20% near, 40% middle, 40% far; no circle of effects around Link.
     const size_t tier = ordinal % 10;
     const float depth = tier < 2 ? 200 + Random() * 180 : tier < 6 ? 500 + Random() * 550 : 1200 + Random() * 1100;
@@ -63,14 +76,16 @@ void State::Spawn(size_t index, const View& view) {
     p.orbit = p.kind == Kind::Firefly ? 6 + Random() * 16 : 2 + Random() * 4;
     p.drift = view.right * (p.kind == Kind::Mote ? 3 + Random() * 4 : Random() - 0.5f);
     p.drift.y += p.kind == Kind::Mote ? 1 + Random() * 2 : 0;
-    p.radius = std::clamp(depth * (p.kind == Kind::Mote ? 0.0032f : 0.0025f), 0.45f, p.kind == Kind::Mote ? 7.0f : 4.0f);
+    p.radius =
+        std::clamp(depth * (p.kind == Kind::Mote ? 0.0032f : 0.0025f), 0.45f, p.kind == Kind::Mote ? 7.0f : 4.0f);
     p.age = p.alpha = 0;
     ++p.generation;
 }
 void State::BuildBeams(const Input& input, const View& view, float daylight) {
     beams.clear();
     const auto sun = Normalize(input.sunDirection);
-    if (!input.sunbeams || daylight <= 0.01f || sun.y <= 0.15f) return;
+    if (!input.sunbeams || daylight <= 0.01f || sun.y <= 0.15f)
+        return;
     // Three softly feathered, depth-tested strips. No framebuffer distortion,
     // screen tint, scene material edits, or dedicated actor slots.
     for (size_t index = 0; index < 3; ++index) {
@@ -87,10 +102,8 @@ void State::BuildBeams(const Input& input, const View& view, float daylight) {
             const float width = halfHeight * (0.035f + 0.12f * rows[row]);
             const Vec3 center = top - sun * (length * rows[row]);
             for (size_t column = 0; column < 3; ++column) {
-                beam.vertices[row * 3 + column] = {
-                    center + view.right * ((static_cast<float>(column) - 1) * width),
-                    row > 0 && row < 3 && column == 1 ? opacity : 0
-                };
+                beam.vertices[row * 3 + column] = { center + view.right * ((static_cast<float>(column) - 1) * width),
+                                                    row > 0 && row < 3 && column == 1 ? opacity : 0 };
             }
         }
         beams.push_back(beam);
@@ -116,7 +129,8 @@ void State::Step(const Input& input, const View& view) {
                                  p.orbit * 0.45f * (std::sin(angle * 0.7f) - std::sin(p.phase * 0.7f)),
                                  p.orbit * 0.6f * (std::cos(angle * 0.8f) - std::cos(p.phase * 0.8f)) };
             p.position = p.anchor + p.drift * p.age + hover;
-            if (!InView(p.position, view, 1.10f)) Spawn(i, view);
+            if (!InView(p.position, view, 1.10f))
+                Spawn(i, view);
         }
         const Vec3 relative = p.position - view.eye;
         const float depth = std::max(100.0f, Dot(relative, view.forward));
@@ -125,8 +139,7 @@ void State::Step(const Input& input, const View& view) {
         const float edge = Smooth((1.08f - std::max(x, y)) / 0.18f);
         const float pulse = 0.5f + 0.5f * std::sin(p.age * p.frequency + p.phase);
         p.alpha = Smooth(p.age / 0.8f) * edge *
-                  (p.kind == Kind::Mote ? daylight * (0.40f + 0.24f * pulse)
-                                        : night * (0.12f + 0.82f * pulse * pulse));
+                  (p.kind == Kind::Mote ? daylight * (0.40f + 0.24f * pulse) : night * (0.12f + 0.82f * pulse * pulse));
     }
     initialized = true;
     BuildBeams(input, view, daylight);

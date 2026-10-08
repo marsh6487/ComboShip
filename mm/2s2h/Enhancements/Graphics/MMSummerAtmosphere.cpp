@@ -18,7 +18,9 @@ MMSummer::View sView;
 PlayState* sPlay = nullptr;
 int sScene = -1, sRoom = -1;
 
-MMSummer::Vec3 Vector(Vec3f value) { return { value.x, value.y, value.z }; }
+MMSummer::Vec3 Vector(Vec3f value) {
+    return { value.x, value.y, value.z };
+}
 MMSummer::Vec3 Cross(MMSummer::Vec3 a, MMSummer::Vec3 b) {
     return { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
 }
@@ -29,7 +31,8 @@ MMSummer::View ReadView(PlayState* play) {
     view.forward = MMSummer::Normalize(Vector(camera->at) - view.eye);
     // guLookAtF stores a backward look axis, so screen right is forward × up.
     auto right = Cross(view.forward, Vector(play->view.up));
-    if (MMSummer::Length(right) < 0.0001f) right = { 1, 0, 0 };
+    if (MMSummer::Length(right) < 0.0001f)
+        right = { 1, 0, 0 };
     view.right = MMSummer::Normalize(right);
     view.up = MMSummer::Normalize(Cross(view.right, view.forward));
     view.tanHalfFov = std::tan(std::clamp(camera->fov, 10.0f, 120.0f) * 0.00872664626f);
@@ -67,8 +70,8 @@ extern "C" void MMSummerAtmosphere_Update(PlayState* play) {
         sRoom = play->roomCtx.curRoom.num;
     }
     MMSummer::Input input;
-    input.eligible = MMWeather_SeasonForPlay(play) == SEASON_SUMMER &&
-                     CVarGetInteger(MM_SUMMER_CVAR("Enabled"), 1) != 0;
+    input.eligible =
+        MMWeather_SeasonForPlay(play) == SEASON_SUMMER && CVarGetInteger(MM_SUMMER_CVAR("Enabled"), 1) != 0;
     if (!input.eligible) {
         sState.Reset();
         return;
@@ -86,7 +89,8 @@ extern "C" void MMSummerAtmosphere_Update(PlayState* play) {
 }
 extern "C" void MMSummerAtmosphere_Draw(PlayState* play) {
     if (!play || sPlay != play || MMWeather_SeasonForPlay(play) != SEASON_SUMMER ||
-        !CVarGetInteger(MM_SUMMER_CVAR("Enabled"), 1)) return;
+        !CVarGetInteger(MM_SUMMER_CVAR("Enabled"), 1))
+        return;
 
     GraphicsContext* gfxCtx = play->state.gfxCtx;
     OPEN_DISPS(gfxCtx);
@@ -101,13 +105,14 @@ extern "C" void MMSummerAtmosphere_Draw(PlayState* play) {
     gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
     const uint8_t* activeTexture = nullptr;
     for (const auto& p : sState.Particles()) {
-        if (p.alpha < 1.0f / 255) continue;
+        if (p.alpha < 1.0f / 255)
+            continue;
         const bool firefly = p.kind == MMSummer::Kind::Firefly;
         const auto* texture = firefly ? MMSummer::kGlowTexture.data() : MMSummer::kDandelionTexture.data();
         if (texture != activeTexture) {
             gDPPipeSync(POLY_XLU_DISP++);
-            gDPLoadTextureBlock(POLY_XLU_DISP++, texture, G_IM_FMT_IA, G_IM_SIZ_8b, 16, 16, 0,
-                                G_TX_CLAMP, G_TX_CLAMP, 4, 4, G_TX_NOLOD, G_TX_NOLOD);
+            gDPLoadTextureBlock(POLY_XLU_DISP++, texture, G_IM_FMT_IA, G_IM_SIZ_8b, 16, 16, 0, G_TX_CLAMP, G_TX_CLAMP,
+                                4, 4, G_TX_NOLOD, G_TX_NOLOD);
             activeTexture = texture;
         }
         FrameInterpolation_RecordOpenChild(&p, static_cast<int>(p.generation));
@@ -116,8 +121,8 @@ extern "C" void MMSummerAtmosphere_Draw(PlayState* play) {
         Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
         Matrix_Scale(p.radius / 100, p.radius / 100, 1, MTXMODE_APPLY);
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
-        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, firefly ? 238 : 255, firefly ? 255 : 244,
-                        firefly ? 154 : 204, static_cast<uint8_t>(std::lround(p.alpha * 255)));
+        gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, firefly ? 238 : 255, firefly ? 255 : 244, firefly ? 154 : 204,
+                        static_cast<uint8_t>(std::lround(p.alpha * 255)));
         gSPDisplayList(POLY_XLU_DISP++, sQuadGeometry);
         Matrix_Pop();
         FrameInterpolation_RecordCloseChild();
@@ -133,10 +138,10 @@ extern "C" void MMSummerAtmosphere_Draw(PlayState* play) {
             auto* vertices = static_cast<Vtx*>(GRAPH_ALLOC(gfxCtx, sizeof(Vtx) * beam.vertices.size()));
             for (size_t i = 0; i < beam.vertices.size(); ++i) {
                 const auto relative = beam.vertices[i].position - sView.eye;
-                const Vtx vertex = VTX(static_cast<s16>(std::lround(relative.x)),
-                                       static_cast<s16>(std::lround(relative.y)),
-                                       static_cast<s16>(std::lround(relative.z)), 0, 0,
-                                       255, 244, 204, static_cast<u8>(std::lround(beam.vertices[i].alpha * 255)));
+                const Vtx vertex =
+                    VTX(static_cast<s16>(std::lround(relative.x)), static_cast<s16>(std::lround(relative.y)),
+                        static_cast<s16>(std::lround(relative.z)), 0, 0, 255, 244, 204,
+                        static_cast<u8>(std::lround(beam.vertices[i].alpha * 255)));
                 vertices[i] = vertex;
             }
             gSPVertex(POLY_XLU_DISP++, (uintptr_t)vertices, 12, 0);

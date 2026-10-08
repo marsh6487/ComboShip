@@ -27,13 +27,15 @@ int main() {
     State state;
     auto view = TestView();
     auto input = TestInput();
-    for (int i = 0; i < 40; ++i) state.Step(input, view);
+    for (int i = 0; i < 40; ++i)
+        state.Step(input, view);
     assert(Visible(state, Kind::Mote) >= 24);
     assert(Visible(state, Kind::Firefly) == 0);
     // Far seeds still occupy several pixels at a 720p/60-degree view;
     // a dust-sized radius hides the seed tuft even with the correct texture.
     for (const auto& p : state.Particles()) {
-        if (p.kind == Kind::Mote) assert(p.radius / Dot(p.position - view.eye, view.forward) > 0.0027f);
+        if (p.kind == Kind::Mote)
+            assert(p.radius / Dot(p.position - view.eye, view.forward) > 0.0027f);
     }
     assert(state.Beams().size() == 0); // Shafts remain an independent review option.
     input.hour = 23;
@@ -47,7 +49,8 @@ int main() {
 
     const auto frozen = state.Particles();
     input.paused = true;
-    for (int i = 0; i < 30; ++i) state.Step(input, view);
+    for (int i = 0; i < 30; ++i)
+        state.Step(input, view);
     for (size_t i = 0; i < frozen.size(); ++i) {
         assert(Length(state.Particles()[i].position - frozen[i].position) == 0);
         assert(state.Particles()[i].alpha == frozen[i].alpha);
@@ -75,7 +78,8 @@ int main() {
     // inside the frustum, without relying on native snow actors or RNG.
     view.eye.x += 5000;
     state.Step(input, view);
-    for (const auto& p : state.Particles()) assert(InView(p.position, view, 1.10f));
+    for (const auto& p : state.Particles())
+        assert(InView(p.position, view, 1.10f));
 
     input.hour = 12;
     input.sunbeams = true;
@@ -85,7 +89,8 @@ int main() {
         for (size_t i = 0; i < beam.vertices.size(); ++i) {
             assert(std::isfinite(beam.vertices[i].position.x));
             assert(beam.vertices[i].alpha >= 0 && beam.vertices[i].alpha <= 0.12f);
-            if (i < 3 || i >= 9 || i % 3 != 1) assert(beam.vertices[i].alpha == 0);
+            if (i < 3 || i >= 9 || i % 3 != 1)
+                assert(beam.vertices[i].alpha == 0);
         }
         assert(beam.vertices[4].alpha > 0);
     }
@@ -102,7 +107,8 @@ int main() {
     assert(state.Beams().empty());
     input = TestInput();
     state.Step(input, view);
-    for (const auto& p : state.Particles()) assert(p.alpha == 0);
+    for (const auto& p : state.Particles())
+        assert(p.alpha == 0);
     std::puts("PASS summer: day/night/dusk, pause, continuous flight, recycling, camera travel, beams, rain, reset");
 }
 #else

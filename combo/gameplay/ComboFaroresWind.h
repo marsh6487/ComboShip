@@ -16,11 +16,11 @@ typedef struct ComboFwPoint {
 } ComboFwPoint;
 
 static inline int ComboFw_PointValid(const ComboFwPoint* p) {
-    return p && (p->game == 0 || p->game == 1) && p->entrance >= 0 && p->entrance <= 0xFFFF &&
-           p->room >= 0 && p->room <= 255 && p->yaw >= -32768 && p->yaw <= 32767 &&
-           ((p->game == 0 && (p->age == 0 || p->age == 1)) || (p->game == 1 && p->age == -1)) &&
-           isfinite(p->x) && isfinite(p->y) && isfinite(p->z) &&
-           fabsf(p->x) <= 1000000 && fabsf(p->y) <= 1000000 && fabsf(p->z) <= 1000000;
+    return p && (p->game == 0 || p->game == 1) && p->entrance >= 0 && p->entrance <= 0xFFFF && p->room >= 0 &&
+           p->room <= 255 && p->yaw >= -32768 && p->yaw <= 32767 &&
+           ((p->game == 0 && (p->age == 0 || p->age == 1)) || (p->game == 1 && p->age == -1)) && isfinite(p->x) &&
+           isfinite(p->y) && isfinite(p->z) && fabsf(p->x) <= 1000000 && fabsf(p->y) <= 1000000 &&
+           fabsf(p->z) <= 1000000;
 }
 
 typedef struct ComboFwCallbacks {
@@ -48,15 +48,28 @@ int ComboFw_ConsumeArrivalAnimation(void);
 // ordinary entrance spawn and discard the malformed point instead of indexing unloaded resources.
 void ComboFw_ValidateArrivalRoom(int roomCount);
 #else
-static inline int ComboFw_HasPoint(int nativeSet) { return nativeSet; }
-static inline void ComboFw_SyncPoint(void) {}
-static inline void ComboFw_PublishPoint(void) {}
-static inline void ComboFw_ClearPoint(void) {}
-static inline void ComboFw_ClearLocalPoint(void) {}
-static inline int ComboFw_RequestReturn(void) { return 0; }
-static inline int ComboFw_ApplyArrival(void) { return 0; }
-static inline int ComboFw_ConsumeArrivalAnimation(void) { return 0; }
-static inline void ComboFw_ValidateArrivalRoom(int roomCount) {}
+static inline int ComboFw_HasPoint(int nativeSet) {
+    return nativeSet;
+}
+static inline void ComboFw_SyncPoint(void) {
+}
+static inline void ComboFw_PublishPoint(void) {
+}
+static inline void ComboFw_ClearPoint(void) {
+}
+static inline void ComboFw_ClearLocalPoint(void) {
+}
+static inline int ComboFw_RequestReturn(void) {
+    return 0;
+}
+static inline int ComboFw_ApplyArrival(void) {
+    return 0;
+}
+static inline int ComboFw_ConsumeArrivalAnimation(void) {
+    return 0;
+}
+static inline void ComboFw_ValidateArrivalRoom(int roomCount) {
+}
 #endif
 #ifdef __cplusplus
 }

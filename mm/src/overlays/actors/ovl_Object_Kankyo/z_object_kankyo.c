@@ -213,7 +213,7 @@ static s32 ObjectKankyo_IsCompactAutumnScene(PlayState* play) {
 
 static void ObjectKankyo_AutumnViewBasis(PlayState* play, Vec3f* forward, Vec3f* right, Vec3f* up) {
     *forward = (Vec3f){ play->view.at.x - play->view.eye.x, play->view.at.y - play->view.eye.y,
-                       play->view.at.z - play->view.eye.z };
+                        play->view.at.z - play->view.eye.z };
     f32 length = sqrtf(SQ(forward->x) + SQ(forward->y) + SQ(forward->z));
     if (length < 0.001f) {
         *forward = (Vec3f){ 0.0f, 0.0f, 1.0f };
@@ -223,10 +223,10 @@ static void ObjectKankyo_AutumnViewBasis(PlayState* play, Vec3f* forward, Vec3f*
         forward->z /= length;
     }
     Vec3f viewUp = play->view.up;
-    if (SQ(viewUp.x) + SQ(viewUp.y) + SQ(viewUp.z) < 0.001f) viewUp = (Vec3f){ 0.0f, 1.0f, 0.0f };
-    *right = (Vec3f){ viewUp.y * forward->z - viewUp.z * forward->y,
-                     viewUp.z * forward->x - viewUp.x * forward->z,
-                     viewUp.x * forward->y - viewUp.y * forward->x };
+    if (SQ(viewUp.x) + SQ(viewUp.y) + SQ(viewUp.z) < 0.001f)
+        viewUp = (Vec3f){ 0.0f, 1.0f, 0.0f };
+    *right = (Vec3f){ viewUp.y * forward->z - viewUp.z * forward->y, viewUp.z * forward->x - viewUp.x * forward->z,
+                      viewUp.x * forward->y - viewUp.y * forward->x };
     length = sqrtf(SQ(right->x) + SQ(right->y) + SQ(right->z));
     if (length < 0.001f) {
         *right = (Vec3f){ 1.0f, 0.0f, 0.0f };
@@ -235,9 +235,8 @@ static void ObjectKankyo_AutumnViewBasis(PlayState* play, Vec3f* forward, Vec3f*
         right->y /= length;
         right->z /= length;
     }
-    *up = (Vec3f){ forward->y * right->z - forward->z * right->y,
-                  forward->z * right->x - forward->x * right->z,
-                  forward->x * right->y - forward->y * right->x };
+    *up = (Vec3f){ forward->y * right->z - forward->z * right->y, forward->z * right->x - forward->x * right->z,
+                   forward->x * right->y - forward->y * right->x };
 }
 
 static void ObjectKankyo_InitAutumnParticle(ObjectKankyo* this, PlayState* play, s32 index) {
@@ -248,8 +247,9 @@ static void ObjectKankyo_InitAutumnParticle(ObjectKankyo* this, PlayState* play,
     Vec3f forward, right, up;
     ObjectKankyo_AutumnViewBasis(play, &forward, &right, &up);
     const Camera* camera = GET_ACTIVE_CAM(play);
-    const f32 fov = play->view.fovy > 0.0f ? play->view.fovy
-                                         : camera != NULL && camera->fov > 0.0f ? camera->fov : 60.0f;
+    const f32 fov = play->view.fovy > 0.0f                 ? play->view.fovy
+                    : camera != NULL && camera->fov > 0.0f ? camera->fov
+                                                           : 60.0f;
     const f32 halfHeight = tanf(CLAMP(fov, 5.0f, 150.0f) * 0.00872665f);
     const f32 aspect = MAX(OTRGetAspectRatio(), 4.0f / 3.0f);
     // Permute a jittered 12x8 layout so every depth band covers the whole view.
@@ -742,9 +742,8 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
         // #endregion
 
         if (season == SEASON_AUTUMN &&
-            (screenPos.z <= 0.0f || screenPos.x < xMin || screenPos.x >= xMax ||
-             screenPos.y < 0.0f || screenPos.y >= SCREEN_HEIGHT ||
-             Math_Vec3f_DistXYZ(&worldPos, &play->view.eye) >= autumnFadeDistance)) {
+            (screenPos.z <= 0.0f || screenPos.x < xMin || screenPos.x >= xMax || screenPos.y < 0.0f ||
+             screenPos.y >= SCREEN_HEIGHT || Math_Vec3f_DistXYZ(&worldPos, &play->view.eye) >= autumnFadeDistance)) {
             // Recycle only offscreen or fully distance-faded leaves. A steep
             // downward view can keep falling leaves onscreen past the fade range.
             // The new epoch skips interpolation; each replacement fades in alone.
@@ -784,12 +783,14 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
                 temp_f2 = CLAMP((autumnFadeDistance - distance) / 2000.0f, 0.0f, 1.0f) *
                           CLAMP((nearDistance - 150.0f) / 200.0f, 0.0f, 1.0f) *
                           MIN(this->unk_14C[i].unk_18 / 24.0f, 1.0f);
-                const f32 edgeFade = CLAMP(MIN(screenPos.x - xMin, xMax - screenPos.x) / ((xMax - xMin) * 0.1f), 0.0f, 1.0f) *
-                                     CLAMP(MIN(screenPos.y, SCREEN_HEIGHT - screenPos.y) / (SCREEN_HEIGHT * 0.1f), 0.0f, 1.0f);
+                const f32 edgeFade =
+                    CLAMP(MIN(screenPos.x - xMin, xMax - screenPos.x) / ((xMax - xMin) * 0.1f), 0.0f, 1.0f) *
+                    CLAMP(MIN(screenPos.y, SCREEN_HEIGHT - screenPos.y) / (SCREEN_HEIGHT * 0.1f), 0.0f, 1.0f);
                 u8 alpha = (u8)(220.0f * temp_f2 * edgeFade);
                 // Keep edge-fading slots faintly present; the camera/Link clear
                 // pocket and far-distance fade still suppress them completely.
-                if (alpha == 0 && temp_f2 > 0.0f) alpha = 1;
+                if (alpha == 0 && temp_f2 > 0.0f)
+                    alpha = 1;
                 AutumnLeaves_Draw(play, i, alpha);
                 FrameInterpolation_RecordCloseChild();
                 continue;

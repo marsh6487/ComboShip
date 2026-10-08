@@ -29,9 +29,17 @@ extern "C" void ComboFw_PublishPoint(void) {
     if (!sFwCallbacks.write || !gSaveContext.fw.set)
         return;
     const auto& fw = gSaveContext.fw;
-    ComboFwPoint p{0, fw.entranceIndex, fw.roomIndex, fw.yaw, (int32_t)gSaveContext.linkAge,
-                   (float)fw.pos.x, (float)fw.pos.y, (float)fw.pos.z,
-                   (uint32_t)fw.tempSwchFlags, (uint32_t)fw.tempCollectFlags, 0};
+    ComboFwPoint p{ 0,
+                    fw.entranceIndex,
+                    fw.roomIndex,
+                    fw.yaw,
+                    (int32_t)gSaveContext.linkAge,
+                    (float)fw.pos.x,
+                    (float)fw.pos.y,
+                    (float)fw.pos.z,
+                    (uint32_t)fw.tempSwchFlags,
+                    (uint32_t)fw.tempCollectFlags,
+                    0 };
     sFwCallbacks.write(gSaveContext.fileNum, &p);
 }
 
@@ -89,7 +97,7 @@ extern "C" void ComboFw_ClearPoint(void) {
 static void PrepareNativeReturn(const ComboFwPoint& p) {
     AdoptNativePoint(p);
     auto& top = gSaveContext.respawn[RESPAWN_MODE_TOP];
-    top.pos = {p.x, p.y, p.z};
+    top.pos = { p.x, p.y, p.z };
     top.yaw = (int16_t)p.yaw;
     top.playerParams = 0x6FF;
     top.entranceIndex = (int16_t)p.entrance;
@@ -160,5 +168,7 @@ extern "C" int ComboFw_ApplyArrival(void) {
     return 1;
 }
 
-extern "C" int ComboFw_ConsumeArrivalAnimation(void) { return 0; } // Native OOT start mode handles it.
+extern "C" int ComboFw_ConsumeArrivalAnimation(void) {
+    return 0;
+} // Native OOT start mode handles it.
 #endif

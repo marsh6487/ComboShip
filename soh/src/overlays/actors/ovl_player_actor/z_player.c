@@ -4179,12 +4179,12 @@ void Player_UseItem(PlayState* play, Player* this, s32 item) {
                     Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
                 } else
 #endif
-                if (((itemAction == PLAYER_IA_FARORES_WIND) && ComboFw_HasPoint(gSaveContext.respawn[RESPAWN_MODE_TOP].data > 0) &&
-                     !isMedallionSpell) ||
-                    ((gSaveContext.magicCapacity != 0) && (gSaveContext.magicState == MAGIC_STATE_IDLE) &&
-                     // Magic Cape (Skijer): castable with HALF the magic — matches the halved consume
-                     // in func_8083AF44 (MAGIC_REQ(sMagicSpellCosts[...])).
-                     (gSaveContext.magic >= MAGIC_REQ(sMagicSpellCosts[temp])))) {
+                    if (((itemAction == PLAYER_IA_FARORES_WIND) &&
+                         ComboFw_HasPoint(gSaveContext.respawn[RESPAWN_MODE_TOP].data > 0) && !isMedallionSpell) ||
+                        ((gSaveContext.magicCapacity != 0) && (gSaveContext.magicState == MAGIC_STATE_IDLE) &&
+                         // Magic Cape (Skijer): castable with HALF the magic — matches the halved consume
+                         // in func_8083AF44 (MAGIC_REQ(sMagicSpellCosts[...])).
+                         (gSaveContext.magic >= MAGIC_REQ(sMagicSpellCosts[temp])))) {
                     this->itemAction = itemAction;
                     this->unk_6AD = 4;
                     sSw97SpellActive = isMedallionSpell;
@@ -7107,7 +7107,8 @@ s32 Player_ActionHandler_13(Player* this, PlayState* play) {
             if (this->unk_6AD == 4) {
                 sp2C = Player_ActionToMagicSpell(this, this->itemAction);
                 if (sp2C >= 0) {
-                    if ((sp2C != 3) || !ComboFw_HasPoint(gSaveContext.respawn[RESPAWN_MODE_TOP].data > 0) || sSw97SpellActive) {
+                    if ((sp2C != 3) || !ComboFw_HasPoint(gSaveContext.respawn[RESPAWN_MODE_TOP].data > 0) ||
+                        sSw97SpellActive) {
                         func_8083AF44(play, this, sp2C);
                     } else {
                         Player_SetupAction(play, this, Player_Action_8085063C, 1);
