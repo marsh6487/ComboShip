@@ -394,8 +394,7 @@ static void AssetOwnership(void) {
     liveSeason = SEASON_AUTUMN;
     BeginDraw();
     EnWood02_Draw(&tree.actor, &play);
-    REQUIRE((gfx.polyXlu.p - translucent) * sizeof(Gfx) == nativeSize);
-    REQUIRE(!memcmp(native, translucent, nativeSize));
+    RequireTintScoped(translucent, gfx.polyXlu.p, D_808C4D70[tree.drawType]);
     altList = NULL;
     BeginDraw();
     EnWood02_Draw(&tree.actor, &play);
@@ -461,8 +460,13 @@ static void BranchingTreeMaterials(void) {
             altList = gTreeLeavesDL;
             BeginDraw();
             ObjTree_Draw(&tree.dyna.actor, &play);
-            REQUIRE((gfx.polyOpa.p - opaque) * sizeof(Gfx) == nativeSize);
-            REQUIRE(!memcmp(native, opaque, nativeSize));
+            if (eligible) {
+                REQUIRE(!memcmp(native, opaque, 2 * sizeof(Gfx)));
+                RequireTintScoped(opaque + 2, gfx.polyOpa.p, gTreeLeavesDL);
+            } else {
+                REQUIRE((gfx.polyOpa.p - opaque) * sizeof(Gfx) == nativeSize);
+                REQUIRE(!memcmp(native, opaque, nativeSize));
+            }
         }
         eligible = true;
         altList = NULL; // Texture-only replacements still use native material.

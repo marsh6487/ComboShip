@@ -565,8 +565,9 @@ void EnWood02_Draw(Actor* thisx, PlayState* play) {
     u8 red;
     u8 green;
     u8 blue;
-    s32 autumn = (EnWood02_IsTree(this) || thisx->params == WOOD_LEAF_GREEN || thisx->params == WOOD_LEAF_YELLOW) &&
-                 MMWeather_SeasonForPlay(play) == SEASON_AUTUMN && EnWood02_UsesNativeFoliage(this);
+    s32 autumn = (EnWood02_IsTree(this) ||
+                  ((thisx->params == WOOD_LEAF_GREEN || thisx->params == WOOD_LEAF_YELLOW) &&
+                   EnWood02_UsesNativeFoliage(this))) && MMWeather_SeasonForPlay(play) == SEASON_AUTUMN;
 
     if (autumn && this->unk_144 == WOOD_AUTUMN_LEAF_MARKER) {
         // Ambient leaves use the generated art too. Native impact leaves keep

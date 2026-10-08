@@ -168,6 +168,42 @@ static void CheckVariant(const std::shared_ptr<Fast::DisplayList>& list, const s
 }
 
 int main() {
+    // POC3 beds call private material lists and no longer load the old native
+    // texture in their root. Seasonal color must follow this established root.
+    {
+        auto rm = Ship::Context::GetRawInstance()->rm;
+        const char* path = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKU_room_00DL_015DF0";
+        auto bed = std::make_shared<Fast::DisplayList>();
+        const auto hash = CRC64("scenes/nonmq/Z2_00KEIKOKU/foliage_poc3/bed_top_material");
+        bed->Instructions = {Command(uintptr_t(G_DL_OTR_HASH) << 24, 0),
+                             Command(hash >> 32, hash & 0xFFFFFFFF), gsSPEndDisplayList()};
+        const auto original = bed->Instructions;
+        rm->archive->files[std::string("alt/") + path] = bed;
+        rm->resources[std::string("alt/") + path] = bed;
+        rm->alt = true;
+        PlayState play{};
+        play.sceneId = SCENE_00KEIKOKU;
+        MMAutumnSceneFoliage_Update(&play);
+        assert((bed->Instructions[0].words.w0 >> 24) == G_DL);
+        const auto* wrapped = (const Gfx*)bed->Instructions[0].words.w1;
+        assert((wrapped[0].words.w0 >> 24) == G_SETGRAYSCALE && wrapped[0].words.w1 == 1);
+        assert(wrapped[1].words.w1 == 0xD99C45FF);
+        assert((wrapped[2].words.w0 >> 24) == G_DL);
+        const auto* preserved = (const Gfx*)wrapped[2].words.w1;
+        for (size_t i = 0; i < original.size(); ++i) assert(SameCommand(preserved[i], original[i]));
+        assert((wrapped[3].words.w0 >> 24) == G_SETGRAYSCALE && wrapped[3].words.w1 == 0);
+        assert((wrapped[4].words.w0 >> 24) == G_ENDDL);
+        MMAutumnSceneFoliage_Reset();
+        assert(Equal(bed->Instructions, original));
+        rm->alt = false;
+        std::puts("PASS edited Alt bed keeps private child materials and exact geometry under a scoped seasonal color");
+    }
+    for (const auto* name : {"Z2_00KEIKOKUTex_034098", "Z2_00KEIKOKUTex_037098"}) {
+        auto forest = List((std::string("alt/scenes/nonmq/Z2_00KEIKOKU/") + name).c_str());
+        const auto original = forest->Instructions;
+        const auto changed = BuildVariant(original);
+        assert(!changed.empty() && Equal(RemoveTint(changed), original));
+    }
     CheckActualMaterials();
     auto rm = Ship::Context::GetRawInstance()->rm;
     constexpr const char* path = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKU_room_00DL_0153A8";

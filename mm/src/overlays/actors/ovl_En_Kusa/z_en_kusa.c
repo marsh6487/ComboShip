@@ -13,6 +13,7 @@
 
 #include "2s2h/ShipUtils.h"
 #include "GameInteractor/GameInteractor.h"
+#include "2s2h/Enhancements/Audio/MMWeather.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_THROW_ONLY)
 
@@ -710,6 +711,7 @@ void EnKusa_Update(Actor* thisx, PlayState* play2) {
 void EnKusa_DrawBush(Actor* thisx, PlayState* play2) {
     PlayState* play = play2;
     EnKusa* this = (EnKusa*)thisx;
+    s32 autumn = MMWeather_SeasonForPlay(play) == SEASON_AUTUMN;
 
     Ship_ExtendedCullingActorAdjustProjectedZ(&this->actor);
 
@@ -720,7 +722,16 @@ void EnKusa_DrawBush(Actor* thisx, PlayState* play2) {
             EnKusa_ApplySway(&D_80936AD8[this->kusaMtxIdx]);
         }
 
+        OPEN_DISPS(play->state.gfxCtx);
+        if (autumn) {
+            gDPSetGrayscaleColor(POLY_OPA_DISP++, 217, 156, 69, 255);
+            gSPGrayscale(POLY_OPA_DISP++, true);
+        }
         Gfx_DrawDListOpa(play, gKusaBushType1DL);
+        if (autumn) {
+            gSPGrayscale(POLY_OPA_DISP++, false);
+        }
+        CLOSE_DISPS(play->state.gfxCtx);
 
     } else if (this->actor.projectedPos.z < 1300.0f) {
         s32 alpha;
@@ -732,7 +743,14 @@ void EnKusa_DrawBush(Actor* thisx, PlayState* play2) {
 
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
         gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, alpha);
+        if (autumn) {
+            gDPSetGrayscaleColor(POLY_XLU_DISP++, 217, 156, 69, 255);
+            gSPGrayscale(POLY_XLU_DISP++, true);
+        }
         gSPDisplayList(POLY_XLU_DISP++, gKusaBushType2DL);
+        if (autumn) {
+            gSPGrayscale(POLY_XLU_DISP++, false);
+        }
 
         CLOSE_DISPS(play->state.gfxCtx);
     }
@@ -751,6 +769,18 @@ void EnKusa_DrawGrass(Actor* thisx, PlayState* play) {
                 EnKusa_ApplySway(&D_80936AD8[this->kusaMtxIdx]);
             }
         }
+        // Scope RGB treatment around the selected grass draw, so texture and
+        // model replacements receive it too. Cut stumps keep their material.
+        s32 autumn = MMWeather_SeasonForPlay(play) == SEASON_AUTUMN;
+        OPEN_DISPS(play->state.gfxCtx);
+        if (autumn) {
+            gDPSetGrayscaleColor(POLY_OPA_DISP++, 217, 156, 69, 255);
+            gSPGrayscale(POLY_OPA_DISP++, true);
+        }
         Gfx_DrawDListOpa(play, gKusaSproutDL);
+        if (autumn) {
+            gSPGrayscale(POLY_OPA_DISP++, false);
+        }
+        CLOSE_DISPS(play->state.gfxCtx);
     }
 }

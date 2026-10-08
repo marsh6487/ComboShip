@@ -206,20 +206,70 @@ static s32 ObjectKankyo_AutumnBand(s32 index) {
                                                                                          : 2;
 }
 
+static s32 ObjectKankyo_IsCompactAutumnScene(PlayState* play) {
+    return play->sceneId == SCENE_TOWN || play->sceneId == SCENE_ICHIBA || play->sceneId == SCENE_BACKTOWN ||
+           play->sceneId == SCENE_CLOCKTOWER || play->sceneId == SCENE_ALLEY;
+}
+
+static void ObjectKankyo_AutumnViewBasis(PlayState* play, Vec3f* forward, Vec3f* right, Vec3f* up) {
+    *forward = (Vec3f){ play->view.at.x - play->view.eye.x, play->view.at.y - play->view.eye.y,
+                       play->view.at.z - play->view.eye.z };
+    f32 length = sqrtf(SQ(forward->x) + SQ(forward->y) + SQ(forward->z));
+    if (length < 0.001f) {
+        *forward = (Vec3f){ 0.0f, 0.0f, 1.0f };
+    } else {
+        forward->x /= length;
+        forward->y /= length;
+        forward->z /= length;
+    }
+    Vec3f viewUp = play->view.up;
+    if (SQ(viewUp.x) + SQ(viewUp.y) + SQ(viewUp.z) < 0.001f) viewUp = (Vec3f){ 0.0f, 1.0f, 0.0f };
+    *right = (Vec3f){ viewUp.y * forward->z - viewUp.z * forward->y,
+                     viewUp.z * forward->x - viewUp.x * forward->z,
+                     viewUp.x * forward->y - viewUp.y * forward->x };
+    length = sqrtf(SQ(right->x) + SQ(right->y) + SQ(right->z));
+    if (length < 0.001f) {
+        *right = (Vec3f){ 1.0f, 0.0f, 0.0f };
+    } else {
+        right->x /= length;
+        right->y /= length;
+        right->z /= length;
+    }
+    *up = (Vec3f){ forward->y * right->z - forward->z * right->y,
+                  forward->z * right->x - forward->x * right->z,
+                  forward->x * right->y - forward->y * right->x };
+}
+
 static void ObjectKankyo_InitAutumnParticle(ObjectKankyo* this, PlayState* play, s32 index) {
-    static const f32 minimum[] = { 250.0f, 1200.0f, 3200.0f };
+    static const f32 minimum[] = { 700.0f, 1200.0f, 3200.0f };
     static const f32 maximum[] = { 1000.0f, 2800.0f, 6000.0f };
     const s32 band = ObjectKankyo_AutumnBand(index);
     ObjectKankyoStruct* particle = &this->unk_14C[index];
-    const f32 angle = MMWeather_RandomFloat() * 6.2831853f;
-    const f32 radius = minimum[band] + MMWeather_RandomFloat() * (maximum[band] - minimum[band]);
-    // Turning the view reveals existing world-space leaves. Camera motion does
-    // not move their origins; recycling is limited to distant/below-view leaves.
-    particle->unk_00 = play->view.eye.x + sinf(angle) * radius;
-    particle->unk_04 = play->view.eye.y + (MMWeather_RandomFloat() - 0.25f) * (350.0f + band * 650.0f);
-    particle->unk_08 = play->view.eye.z + cosf(angle) * radius;
+    Vec3f forward, right, up;
+    ObjectKankyo_AutumnViewBasis(play, &forward, &right, &up);
+    const Camera* camera = GET_ACTIVE_CAM(play);
+    const f32 fov = play->view.fovy > 0.0f ? play->view.fovy
+                                         : camera != NULL && camera->fov > 0.0f ? camera->fov : 60.0f;
+    const f32 halfHeight = tanf(CLAMP(fov, 5.0f, 150.0f) * 0.00872665f);
+    const f32 aspect = MAX(OTRGetAspectRatio(), 4.0f / 3.0f);
+    // Permute a jittered 12x8 layout so every depth band covers the whole view.
+    // The small near leaves stay farther from the camera; no budget sits behind it.
+    const s32 cell = (index * 37) % OBJECT_KANKYO_AUTUMN_COUNT;
+    const f32 x = (((cell % 12 + 0.15f + MMWeather_RandomFloat() * 0.7f) / 12.0f) * 2.0f - 1.0f) * 0.85f;
+    const f32 y = (((cell / 12 + 0.15f + MMWeather_RandomFloat() * 0.7f) / 8.0f) * 2.0f - 1.0f) * 0.85f;
+    f32 radius = minimum[band] + MMWeather_RandomFloat() * (maximum[band] - minimum[band]);
+    if (band != 0 && ObjectKankyo_IsCompactAutumnScene(play)) {
+        radius = MAX(radius * 0.3f, 600.0f);
+    }
+    Vec3f ray = { forward.x + right.x * x * halfHeight * aspect + up.x * y * halfHeight,
+                  forward.y + right.y * x * halfHeight * aspect + up.y * y * halfHeight,
+                  forward.z + right.z * x * halfHeight * aspect + up.z * y * halfHeight };
+    radius /= sqrtf(SQ(ray.x) + SQ(ray.y) + SQ(ray.z));
+    particle->unk_00 = play->view.eye.x + ray.x * radius;
+    particle->unk_04 = play->view.eye.y + ray.y * radius;
+    particle->unk_08 = play->view.eye.z + ray.z * radius;
     particle->unk_0C = particle->unk_10 = particle->unk_14 = 0.0f;
-    particle->unk_18 = 0.0f; // Fade-in age; native snow uses this as fall speed.
+    particle->unk_18 = 1.0f; // Begin faintly, then fade in; every slot is submitted in view.
     particle->unk_1C = 2;
     particle->epoch++;
 }
@@ -233,20 +283,18 @@ static void ObjectKankyo_UpdateAutumnParticles(ObjectKankyo* this, PlayState* pl
     for (s32 i = 0; i < OBJECT_KANKYO_AUTUMN_COUNT; ++i) {
         ObjectKankyoStruct* particle = &this->unk_14C[i];
         const s32 band = ObjectKankyo_AutumnBand(i);
-        Vec3f position = { particle->unk_00 + particle->unk_0C, particle->unk_04 + particle->unk_10,
-                           particle->unk_08 + particle->unk_14 };
-        if (particle->unk_1C != 2 || Math_Vec3f_DistXZ(&position, &play->view.eye) > 1600.0f + band * 3200.0f ||
-            position.y < play->view.eye.y - 450.0f - band * 450.0f) {
+        if (particle->unk_1C != 2) {
             ObjectKankyo_InitAutumnParticle(this, play, i);
         }
-        const f32 phase = play->gameplayFrames * 0.025f + i * 2.4f;
-        particle->unk_0C += sinf(phase) * 0.45f;
-        particle->unk_14 += cosf(phase * 0.7f) * 0.45f;
+        const f32 phase = play->gameplayFrames * 0.055f + i * 2.4f;
+        const f32 flutter = 0.9f + band * 0.45f;
+        particle->unk_0C += sinf(phase) * flutter;
+        particle->unk_14 += cosf(phase * 0.7f) * flutter;
         if (windLength > 0.001f) {
-            particle->unk_0C -= play->envCtx.windDirection.x / windLength * wind * 2.0f;
-            particle->unk_14 -= play->envCtx.windDirection.z / windLength * wind * 2.0f;
+            particle->unk_0C -= play->envCtx.windDirection.x / windLength * wind * (3.0f + band);
+            particle->unk_14 -= play->envCtx.windDirection.z / windLength * wind * (3.0f + band);
         }
-        particle->unk_10 -= 0.7f + (i & 7) * 0.12f;
+        particle->unk_10 -= 2.6f + band * 0.8f + (i & 7) * 0.24f;
         particle->unk_18 = MIN(particle->unk_18 + 1.0f, 24.0f);
     }
 }
@@ -638,6 +686,7 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
     f32 tempf;
 
     const int season = MMWeather_SeasonForPlay(play);
+    const f32 autumnFadeDistance = 8000.0f;
     const u8 snowCount = season == SEASON_WINTER   ? 64
                          : season == SEASON_AUTUMN ? OBJECT_KANKYO_AUTUMN_COUNT
                                                    : play->envCtx.precipitation[PRECIP_SNOW_CUR];
@@ -692,6 +741,19 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
         }
         // #endregion
 
+        if (season == SEASON_AUTUMN &&
+            (screenPos.z <= 0.0f || screenPos.x < xMin || screenPos.x >= xMax ||
+             screenPos.y < 0.0f || screenPos.y >= SCREEN_HEIGHT ||
+             Math_Vec3f_DistXYZ(&worldPos, &play->view.eye) >= autumnFadeDistance)) {
+            // Recycle only offscreen or fully distance-faded leaves. A steep
+            // downward view can keep falling leaves onscreen past the fade range.
+            // The new epoch skips interpolation; each replacement fades in alone.
+            // Visible opaque leaves retain their world-space trajectories.
+            ObjectKankyo_InitAutumnParticle(this, play, i);
+            worldPos = (Vec3f){ this->unk_14C[i].unk_00, this->unk_14C[i].unk_04, this->unk_14C[i].unk_08 };
+            Play_GetScreenPos(play, &worldPos, &screenPos);
+        }
+
         if ((screenPos.x >= xMin) && (screenPos.x < xMax) && (screenPos.y >= 0.0f) && (screenPos.y < SCREEN_HEIGHT)) {
             FrameInterpolation_RecordOpenChild(&this->unk_14C[i], this->unk_14C[i].epoch);
             if (!spB4) {
@@ -719,10 +781,16 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
                 Actor* player = play->actorCtx.actorLists[ACTORCAT_PLAYER].first;
                 const f32 nearDistance =
                     player != NULL ? MIN(distance, Math_Vec3f_DistXYZ(&worldPos, &player->world.pos)) : distance;
-                temp_f2 = CLAMP((8000.0f - distance) / 2000.0f, 0.0f, 1.0f) *
+                temp_f2 = CLAMP((autumnFadeDistance - distance) / 2000.0f, 0.0f, 1.0f) *
                           CLAMP((nearDistance - 150.0f) / 200.0f, 0.0f, 1.0f) *
                           MIN(this->unk_14C[i].unk_18 / 24.0f, 1.0f);
-                AutumnLeaves_Draw(play, i, (u8)(220.0f * temp_f2));
+                const f32 edgeFade = CLAMP(MIN(screenPos.x - xMin, xMax - screenPos.x) / ((xMax - xMin) * 0.1f), 0.0f, 1.0f) *
+                                     CLAMP(MIN(screenPos.y, SCREEN_HEIGHT - screenPos.y) / (SCREEN_HEIGHT * 0.1f), 0.0f, 1.0f);
+                u8 alpha = (u8)(220.0f * temp_f2 * edgeFade);
+                // Keep edge-fading slots faintly present; the camera/Link clear
+                // pocket and far-distance fade still suppress them completely.
+                if (alpha == 0 && temp_f2 > 0.0f) alpha = 1;
+                AutumnLeaves_Draw(play, i, alpha);
                 FrameInterpolation_RecordCloseChild();
                 continue;
             }
