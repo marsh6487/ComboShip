@@ -4,6 +4,7 @@ from pathlib import Path
 import os
 import shlex
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -12,12 +13,22 @@ def main():
     sources = (
         'mm/src/code/z_message.c', 'mm/src/code/z_message_nes.c',
         'soh/src/code/z_message_PAL.c', 'mm/2s2h/Rando/ItemReceiptText.cpp',
+        'mm/2s2h/CustomMessage/CustomMessage.cpp', 'mm/2s2h/Rando/MiscBehavior/CheckQueue.cpp',
         'mm/2s2h/Rando/StaticData/Items.cpp',
+        'soh/soh/Enhancements/custom-message/CustomMessageManager.cpp',
+        'soh/soh/Enhancements/randomizer/hook_handlers.cpp',
         'soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp', 'mm/2s2h/Rando/DrawItem.cpp',
         'mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_item.c',
         'mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope_NES.c',
         'soh/src/overlays/misc/ovl_kaleido_scope/z_kaleido_item.c',
+        'mm/2s2h/Enhancements/Cutscenes/StoryCutscenes/SkipLearningEponasSong.cpp',
+        'mm/2s2h/Enhancements/Cutscenes/StoryCutscenes/SkipLearningSongOfHealing.cpp',
+        'mm/2s2h/Enhancements/Cutscenes/StoryCutscenes/SkipLearningSongOfSoaring.cpp',
+        'mm/2s2h/Enhancements/Cutscenes/StoryCutscenes/SkipLearningSongOfStorms.cpp',
+        'mm/2s2h/Enhancements/Cutscenes/StoryCutscenes/SkipLearningSongOfTime.cpp',
     )
+    if len(sys.argv) > 1:
+        sources = tuple(sys.argv[1:])
     prefixes = ('COSMETIC', 'ENHANCEMENT', 'SETTING', 'REMOTE', 'RANDOMIZER_SETTING',
                 'RANDOMIZER_ENHANCEMENT', 'CHEAT', 'DEVELOPER_TOOLS', 'AUDIO', 'WINDOW',
                 'TRACKER', 'GENERAL', 'GAMEPLAY_STATS', 'TIME_DISPLAY')

@@ -1,3 +1,4 @@
+#include "NeiElementalArrowGi.h"
 // Shared by the OoT and MM host renderers. The enclosing TU supplies native GBI/matrix APIs.
 NeiGi::Basis NeiGi_CameraBasis(PlayState* play) {
     MtxF m;
@@ -114,7 +115,7 @@ static bool NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kin
                                    const NeiGi::TextureMaterial* material, bool seasonSunRays = false,
                                    const char* owner = nullptr) {
     if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, material, seasonSunRays) || int(orb) < 0 ||
-        int(orb) > int(Kind::MarioMask))
+        int(orb) > int(Kind::Gold))
         return false;
     // Reuse shared vertices within each 32-entry RSP cache load. A full potion
     // shop must leave room in both the OPA arena and XLU command buffer.
@@ -261,10 +262,51 @@ bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiG
     return NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material);
 }
 
+void NeiGi_DrawElementalArrow(PlayState* play, int profile) {
+    if (!play || !play->state.gfxCtx || !NeiArrowGi::Valid(profile))
+        return;
+    const auto layers = NeiArrowGi::Sample(profile, play->gameplayFrames, NeiGi_CameraBasis(play));
+    // Admit the complete effect before changing any display-list cursor. Use
+    // unshared vertex counts and one command per triangle as safe upper bounds.
+    const size_t vertices = layers.veil.count + layers.energy.count + layers.shimmer.count;
+    const size_t batches = (layers.veil.count + 29) / 30 + (layers.energy.count + 29) / 30 +
+                           (layers.shimmer.count + 29) / 30;
+    if (!NeiGi_ArenaHasRoom(play, vertices * sizeof(Vtx), 4, 16, 128 + batches + vertices / 3))
+        return;
+    NeiGi_ArenaScope arena(play, 1, 2, 16);
+    if (!arena)
+        return;
+    const char* texture = NeiArrowGi::Texture(profile);
+    // Private base assets belong to OoT in both hosts. Native MM's arrow core
+    // still belongs to MM; only the three new aura textures use this bracket.
+    const bool textured = HasResource(texture);
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    if (textured)
+        gSPComboRMPush(POLY_XLU_DISP++, "oot");
+    CLOSE_DISPS(play->state.gfxCtx);
+    const NeiGi::TextureMaterial material{texture};
+    if (!textured || !NeiGi_DrawTexturedMesh(play, layers.veil, material))
+        NeiGi_DrawMesh(play, layers.veil);
+    OPEN_DISPS(play->state.gfxCtx);
+    if (textured)
+        gSPComboRMPop(POLY_XLU_DISP++);
+    CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawMesh(play, layers.energy);
+    NeiGi_DrawMesh(play, layers.shimmer);
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+    gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
                             const float center[3], bool shimmer, const char* owner, bool shop, int mmPickup) {
     if (!play || !play->state.gfxCtx || !opa || !center || !NeiGi_ValidScale(scale) || !NeiGi_Finite(center[0]) ||
-        !NeiGi_Finite(center[1]) || !NeiGi_Finite(center[2]) || effect < 0 || effect > int(Kind::MarioMask))
+        !NeiGi_Finite(center[1]) || !NeiGi_Finite(center[2]) || effect < 0 || effect > int(Kind::Gold))
         return;
     const Kind kind = static_cast<Kind>(effect);
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
@@ -357,19 +399,24 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
 void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int shimmerKind,
                                     bool shimmer, const char* owner, bool shop, float tilt, bool fit, int mmPickup) {
     if (!play || !play->state.gfxCtx || !opa || !NeiGi_ValidScale(scale) || shimmerKind < 0 ||
-        shimmerKind > int(Kind::MarioMask))
+        shimmerKind > int(Kind::Gold))
         return;
     NeiGi_ArenaScope arena(play, 2, 16, 16);
     if (!arena)
         return;
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
+    const bool sword = NeiGi::IsSword(static_cast<Kind>(shimmerKind));
     Matrix_Push();
-    if (fit && (mmPickup || NeiGi::IsSword(static_cast<Kind>(shimmerKind)))) {
+    if (fit && mmPickup && !sword) {
         const char* paths[] = { opa, xlu };
         ComboSwordGi_ApplyModelsFit(owner ? owner : "oot", paths, xlu ? 2 : 1, scale, tilt, shop, mmPickup);
     }
     Matrix_Push();
+    if (fit && sword) {
+        const char* paths[] = { opa, xlu };
+        ComboSwordGi_ApplyModelsFit(owner ? owner : "oot", paths, xlu ? 2 : 1, scale, tilt, shop, mmPickup);
+    }
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
 #ifdef NEI_GI_ROTATE_Y
     NEI_GI_ROTATE_Y(spin, MTXMODE_APPLY);
@@ -413,9 +460,11 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
         ComboDinSwordGi_DrawLayers(play, owner ? owner : "oot", opa);
     Matrix_Pop();
     // Sword particles belong to the awarded sword, including mod geometry.
-    if (NeiGi::IsSword(static_cast<Kind>(shimmerKind)))
+    if (sword) {
+        ComboSwordGi_ApplyEffectFit(static_cast<Kind>(shimmerKind), shop, mmPickup);
         NeiGi_DrawMesh(play, NeiGi::SampleSpecial(static_cast<Kind>(shimmerKind), play->gameplayFrames,
                                                  NeiGi_CameraBasis(play)));
+    }
     if (shimmer)
         NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play),
                                                   static_cast<Kind>(shimmerKind)));

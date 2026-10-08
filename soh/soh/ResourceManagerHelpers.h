@@ -91,6 +91,9 @@ bool ResourceMgr_IsAltAssetsEnabled();
 // Archive provenance, respecting the resource owner and its current Alt mode.
 int ResourceMgr_IsModAsset(const char* path);
 int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
+// Selected root type check for complete legacy tunic recipes; no retained pointers.
+int ResourceMgr_IsGiModelAvailableForGame(const char* game, const char* path);
+int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt);
 SkeletonHeader* ResourceMgr_LoadSkeletonByName(const char* path, SkelAnime* skelAnime);
 void ResourceMgr_UnregisterSkeleton(SkelAnime* skelAnime);
 void ResourceMgr_ClearSkeletons();

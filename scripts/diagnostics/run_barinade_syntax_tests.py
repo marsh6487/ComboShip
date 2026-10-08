@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile production Barinade/Twinmold callbacks/freeze against both actual engine headers."""
+"""Compile boss callbacks, native MM dispatch and freeze against actual engine headers."""
 import os
 from pathlib import Path
 import re
@@ -58,10 +58,17 @@ with tempfile.TemporaryDirectory(prefix='barinade-syntax-') as temporary:
             unit += '\n#include <string>\n#include "Rando/StaticData/StaticData.h"\n'
             unit += 'extern "C" int32_t MM_GetItemAnimDrawInfo(const char*, CwItemAnimDrawInfo*);\n'
             unit += 'int32_t ComboForeignAnim_Draw(const CwItemAnimDrawInfo*, const char*, PlayState*);\n'
-            unit += function((ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text(), 'ComboDrawNativeTwinmoldSoul')
+            drawitem = (ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text()
+            if 'int32_t ComboDrawNativeMmBossSoul(' in drawitem:
+                unit += function(drawitem, 'ComboDrawNativeMmBossSoul')
+            unit += function(drawitem, 'ComboDrawNativeTwinmoldSoul')
             unit += '\n#include "objects/gameplay_keep/gameplay_keep.h"\n// Rando.h only references json by reference here; its external dependency is opaque.\nnamespace nlohmann { class json; }\n#include "Rando/DrawFuncs.h"\n'
             native = (ROOT / 'mm/2s2h/Rando/DrawFuncs.cpp').read_text()
             unit += function(native, 'DrawSoulFlame') + '\n' + function(native, 'DrawMmSoulFlame')
+            for object_name in ['object_boss_hakugin', 'object_boss03', 'object_boss01', 'object_boss02']:
+                unit += '\n#include "objects/' + object_name + '/' + object_name + '.h"\n'
+            unit += native[native.index('#define SETUP_DRAW('):native.index('// Soul Effects\nstatic void')]
+            unit += '\n'.join(function(native, name) for name in ['DrawGoht', 'DrawGyorg', 'DrawOdolwa', 'DrawTwinmold'])
 
         if host == 'oot':
             native = (ROOT / 'soh/soh/Enhancements/randomizer/draw.cpp').read_text()
@@ -76,4 +83,4 @@ with tempfile.TemporaryDirectory(prefix='barinade-syntax-') as temporary:
                  '-DCONTROLLERBUTTONS_T=uint32_t', '-DNON_EQUIVALENT', '-DNON_MATCHING', '-Wno-comma-subscript', '-fsyntax-only']
         if host == 'mm': flags += ['-DHOST_MM']
         subprocess.run([os.environ.get('CXX', 'c++'), *flags, *['-I' + str(ROOT / p) for p in includes], str(path)], check=True)
-        print('PASS production Barinade/Twinmold callbacks and Animation_Change/GetLastFrame against ' + host + ' headers')
+        print('PASS production boss callbacks/native MM dispatch and Animation_Change/GetLastFrame against ' + host + ' headers')

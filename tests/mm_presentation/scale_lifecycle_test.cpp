@@ -194,6 +194,7 @@ struct Entry {
   uint8_t icon;
   std::string msg;
   bool autoFormat = true;
+  bool capeVisibilityChoice = false;
 };
 std::string shown;
 void SetActiveCustomMessage(std::string msg, Entry) { shown = msg; }

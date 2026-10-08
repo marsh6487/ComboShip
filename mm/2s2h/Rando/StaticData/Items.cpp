@@ -1,4 +1,5 @@
 #include "StaticData.h"
+#include "ComboItemIconOwnership.h"
 #include "ComboSongDrawMM.h"
 #include <unordered_map>
 #include <cstring>
@@ -630,6 +631,10 @@ RandoItemId GetItemIdFromVanillaItemId(u32 itemId) {
 
 // This exists because of nintendo being nintendo
 u8 GetIconForZMessage(RandoItemId randoItemId) {
+    if (randoItemId == RI_SHIELD_MIRROR) {
+        Message_StageCustomItemIcon((void*)COMBO_IKANA_SHIELD_ICON, 32);
+        return 0xF5;
+    }
     const int song = ComboSongForMmItem(randoItemId);
     uint8_t color[4];
     if (ComboSongShimmerColor(song, color)) {
@@ -738,6 +743,8 @@ u8 GetIconForZMessage(RandoItemId randoItemId) {
 
 const char* GetIconTexturePath(RandoItemId randoItemId) {
     switch (randoItemId) {
+        case RI_SHIELD_MIRROR:
+            return COMBO_IKANA_SHIELD_ICON;
         case RI_BOMBCHU:
         case RI_BOMBCHU_5:
             return (const char*)gItemIcons[ITEM_BOMBCHU];

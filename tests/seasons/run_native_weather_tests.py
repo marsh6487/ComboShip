@@ -23,7 +23,8 @@ with tempfile.TemporaryDirectory(prefix='native-season-weather-') as temporary:
     rod = 'mm/mods/items/logic/item_rod_of_seasons.c'
     parts = [body('mm/src/audio/sequence.c', 'AudioSeq_QueueSeqCmd')]
     parts += [body(snow, name) for name in (
-        'ObjectKankyo_SetupAction', 'func_808DC454',
+        'ObjectKankyo_SetupAction', 'ObjectKankyo_IsAutumnOwner', 'ObjectKankyo_AutumnBand', 'ObjectKankyo_InitAutumnParticle',
+        'ObjectKankyo_UpdateAutumnParticles', 'ObjectKankyo_RestoreAutumnParticle', 'func_808DC454',
         'ObjectKankyo_UpdateSnowTarget', 'ObjectKankyo_UpdateSeasonSnowParticles', 'func_808DCB7C', 'func_808DCBF8',
         'func_808DBEB0', 'func_808DBFB0', 'ObjectKankyo_Init', 'ObjectKankyo_Update', 'func_808DD3C8')]
     rod_source = (ROOT / rod).read_text()

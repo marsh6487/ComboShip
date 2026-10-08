@@ -1042,12 +1042,34 @@ extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* pa
     return NeiAssetPriority::IsCustomAsset("oot", game, path);
 }
 
+extern "C" int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt) {
+    return NeiAssetPriority::GetIkanaShieldGiTiltX("oot", game, path, tilt);
+}
+
 extern "C" int ResourceMgr_IsModAsset(const char* path) {
     return NeiAssetPriority::IsModAsset("oot", "oot", path);
 }
 
 extern "C" int ResourceMgr_IsModAssetForGame(const char* game, const char* path) {
     return NeiAssetPriority::IsModAsset("oot", game, path);
+}
+
+extern "C" int ResourceMgr_IsGiModelAvailableForGame(const char* game, const char* path) {
+    if (!game || !path || (std::strcmp(game, "oot") && std::strcmp(game, "mm")))
+        return 0;
+    auto owner = Ship::CrossRMRegistry::Get(game);
+#ifndef COMBO_BUILD
+    if (!owner && std::strcmp(game, "oot") == 0)
+        if (const auto context = Ship::Context::GetRawInstance())
+            owner = context->GetResourceManager();
+#endif
+    if (!owner)
+        return 0;
+    // XML factories may resolve dependencies through the active Context. The
+    // selected owner's normal load also retains its Alt/.meta/cache policy.
+    Ship::ResourceManagerScope scope(owner);
+    const auto model = std::dynamic_pointer_cast<Fast::DisplayList>(owner->LoadResource(path));
+    return model && !model->Instructions.empty();
 }
 
 #ifdef COMBO_BUILD

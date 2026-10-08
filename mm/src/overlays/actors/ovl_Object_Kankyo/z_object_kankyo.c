@@ -191,6 +191,85 @@ void func_808DC18C(ObjectKankyo* this, PlayState* play) {
     this->unk_14C[2].unk_04 = Math_Vec3f_Yaw(&gZeroVec3f, &sp30) + 0x8000;
 }
 
+static s32 ObjectKankyo_IsAutumnOwner(ObjectKankyo* this, PlayState* play) {
+    for (Actor* actor = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].first; actor != NULL; actor = actor->next) {
+        if (actor->id == ACTOR_OBJECT_KANKYO && actor->params >= 1 && actor->params <= 3 && actor->update != NULL) {
+            return actor == &this->actor;
+        }
+    }
+    return false;
+}
+
+static s32 ObjectKankyo_AutumnBand(s32 index) {
+    return index < OBJECT_KANKYO_AUTUMN_NEAR_COUNT                                       ? 0
+           : index < OBJECT_KANKYO_AUTUMN_NEAR_COUNT + OBJECT_KANKYO_AUTUMN_MIDDLE_COUNT ? 1
+                                                                                         : 2;
+}
+
+static void ObjectKankyo_InitAutumnParticle(ObjectKankyo* this, PlayState* play, s32 index) {
+    static const f32 minimum[] = { 250.0f, 1200.0f, 3200.0f };
+    static const f32 maximum[] = { 1000.0f, 2800.0f, 6000.0f };
+    const s32 band = ObjectKankyo_AutumnBand(index);
+    ObjectKankyoStruct* particle = &this->unk_14C[index];
+    const f32 angle = MMWeather_RandomFloat() * 6.2831853f;
+    const f32 radius = minimum[band] + MMWeather_RandomFloat() * (maximum[band] - minimum[band]);
+    // Turning the view reveals existing world-space leaves. Camera motion does
+    // not move their origins; recycling is limited to distant/below-view leaves.
+    particle->unk_00 = play->view.eye.x + sinf(angle) * radius;
+    particle->unk_04 = play->view.eye.y + (MMWeather_RandomFloat() - 0.25f) * (350.0f + band * 650.0f);
+    particle->unk_08 = play->view.eye.z + cosf(angle) * radius;
+    particle->unk_0C = particle->unk_10 = particle->unk_14 = 0.0f;
+    particle->unk_18 = 0.0f; // Fade-in age; native snow uses this as fall speed.
+    particle->unk_1C = 2;
+    particle->epoch++;
+}
+
+static void ObjectKankyo_UpdateAutumnParticles(ObjectKankyo* this, PlayState* play) {
+    if (!ObjectKankyo_IsAutumnOwner(this, play)) {
+        return;
+    }
+    const f32 windLength = sqrtf(SQ((f32)play->envCtx.windDirection.x) + SQ((f32)play->envCtx.windDirection.z));
+    const f32 wind = CLAMP(play->envCtx.windSpeed / 120.0f, 0.0f, 1.0f);
+    for (s32 i = 0; i < OBJECT_KANKYO_AUTUMN_COUNT; ++i) {
+        ObjectKankyoStruct* particle = &this->unk_14C[i];
+        const s32 band = ObjectKankyo_AutumnBand(i);
+        Vec3f position = { particle->unk_00 + particle->unk_0C, particle->unk_04 + particle->unk_10,
+                           particle->unk_08 + particle->unk_14 };
+        if (particle->unk_1C != 2 || Math_Vec3f_DistXZ(&position, &play->view.eye) > 1600.0f + band * 3200.0f ||
+            position.y < play->view.eye.y - 450.0f - band * 450.0f) {
+            ObjectKankyo_InitAutumnParticle(this, play, i);
+        }
+        const f32 phase = play->gameplayFrames * 0.025f + i * 2.4f;
+        particle->unk_0C += sinf(phase) * 0.45f;
+        particle->unk_14 += cosf(phase * 0.7f) * 0.45f;
+        if (windLength > 0.001f) {
+            particle->unk_0C -= play->envCtx.windDirection.x / windLength * wind * 2.0f;
+            particle->unk_14 -= play->envCtx.windDirection.z / windLength * wind * 2.0f;
+        }
+        particle->unk_10 -= 0.7f + (i & 7) * 0.12f;
+        particle->unk_18 = MIN(particle->unk_18 + 1.0f, 24.0f);
+    }
+}
+
+static void ObjectKankyo_RestoreAutumnParticle(ObjectKankyo* this, PlayState* play, s32 index) {
+    ObjectKankyoStruct* particle = &this->unk_14C[index];
+    Vec3f direction = { play->view.at.x - play->view.eye.x, play->view.at.y - play->view.eye.y,
+                        play->view.at.z - play->view.eye.z };
+    const f32 length = sqrtf(SQ(direction.x) + SQ(direction.y) + SQ(direction.z));
+    const f32 scale = length > 0.001f ? 120.0f / length : 0.0f;
+    // Match the native snow's initial volume/speed on the confirm render, which
+    // can precede actor update. Cosmetic reinitialization uses the private RNG.
+    particle->unk_00 = play->view.eye.x + direction.x * scale;
+    particle->unk_04 = play->view.eye.y + direction.y * scale;
+    particle->unk_08 = play->view.eye.z + (length > 0.001f ? direction.z * scale : 120.0f);
+    particle->unk_0C = (MMWeather_RandomFloat() - 0.5f) * 240.0f;
+    particle->unk_10 = MAX(Camera_GetCamDirPitch(GET_ACTIVE_CAM(play)) * 0.004f + 60.0f, 20.0f);
+    particle->unk_14 = (MMWeather_RandomFloat() - 0.5f) * 240.0f;
+    particle->unk_18 = MMWeather_RandomFloat() * 3.0f + (play->envCtx.precipitation[PRECIP_SOS_MAX] ? 8.0f : 1.0f);
+    particle->unk_1C = 1;
+    particle->epoch++;
+}
+
 void func_808DC454(ObjectKankyo* this, PlayState* play) {
     s16 i;
     s32 pad1;
@@ -220,6 +299,10 @@ void func_808DC454(ObjectKankyo* this, PlayState* play) {
 
     f32 (*particleRandom)(void) = MMWeather_SeasonForPlay(play) == SEASON_AUTUMN ? MMWeather_RandomFloat : Rand_ZeroOne;
     for (i = 0; i < play->envCtx.precipitation[PRECIP_SNOW_CUR]; i++) {
+        if (this->unk_14C[i].unk_1C == 2) {
+            // Distant positions and fade age cannot become native snow speed.
+            ObjectKankyo_RestoreAutumnParticle(this, play, i);
+        }
         switch (this->unk_14C[i].unk_1C) {
             case 0:
                 this->unk_14C[i].unk_00 = play->view.eye.x + (spD0 * 120.0f);
@@ -346,10 +429,14 @@ static void ObjectKankyo_UpdateSnowTarget(PlayState* play) {
 static void ObjectKankyo_UpdateSeasonSnowParticles(ObjectKankyo* this, PlayState* play) {
     const int season = MMWeather_SeasonForPlay(play);
     const u8 nativeCount = play->envCtx.precipitation[PRECIP_SNOW_CUR];
-    if (season == SEASON_WINTER || season == SEASON_AUTUMN || season == SEASON_SPRING || season == SEASON_SUMMER) {
+    if (season == SEASON_AUTUMN) {
+        ObjectKankyo_UpdateAutumnParticles(this, play);
+        return;
+    }
+    if (season == SEASON_WINTER || season == SEASON_SPRING || season == SEASON_SUMMER) {
         // Particle positions are native actor state. Compose their count only
         // during motion; weather tags and the next actor see the live native count.
-        play->envCtx.precipitation[PRECIP_SNOW_CUR] = season == SEASON_WINTER ? 64 : season == SEASON_AUTUMN ? 32 : 0;
+        play->envCtx.precipitation[PRECIP_SNOW_CUR] = season == SEASON_WINTER ? 64 : 0;
     }
     func_808DC454(this, play);
     play->envCtx.precipitation[PRECIP_SNOW_CUR] = nativeCount;
@@ -552,7 +639,7 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
 
     const int season = MMWeather_SeasonForPlay(play);
     const u8 snowCount = season == SEASON_WINTER   ? 64
-                         : season == SEASON_AUTUMN ? 32
+                         : season == SEASON_AUTUMN ? OBJECT_KANKYO_AUTUMN_COUNT
                                                    : play->envCtx.precipitation[PRECIP_SNOW_CUR];
     if ((play->cameraPtrs[CAM_ID_MAIN]->stateFlags & CAM_STATE_UNDERWATER) ||
         (season == SEASON_SPRING || season == SEASON_SUMMER) ||
@@ -560,11 +647,15 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
         return;
     }
 
+    if (season == SEASON_AUTUMN && !ObjectKankyo_IsAutumnOwner(this, play)) {
+        return; // Multiple native blizzard actors share one bounded autumn layer.
+    }
+
     OPEN_DISPS(play->state.gfxCtx);
 
     spB4 = false;
 
-    if (this->actor.params == 3) {
+    if (this->actor.params == 3 && season != SEASON_AUTUMN) {
         temp_f0 = func_80173B48(&play->state) / 1.4e7f;
         temp_f0 = CLAMP(temp_f0, 0.0f, 1.0f);
         Math_SmoothStepToF(&D_808DE5B0, temp_f0, 0.2f, 0.1f, 0.001f);
@@ -580,6 +671,12 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
     }
 
     for (i = 0; i < sp68; i++) {
+        if (season == SEASON_AUTUMN && this->unk_14C[i].unk_1C != 2) {
+            // Paused confirmation can draw before the next actor update.
+            ObjectKankyo_InitAutumnParticle(this, play, i);
+        } else if (season != SEASON_AUTUMN && this->unk_14C[i].unk_1C == 2) {
+            ObjectKankyo_RestoreAutumnParticle(this, play, i);
+        }
         worldPos.x = this->unk_14C[i].unk_00 + this->unk_14C[i].unk_0C;
         worldPos.y = this->unk_14C[i].unk_04 + this->unk_14C[i].unk_10;
         worldPos.z = this->unk_14C[i].unk_08 + this->unk_14C[i].unk_14;
@@ -613,13 +710,18 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
 
             Matrix_Translate(worldPos.x, worldPos.y, worldPos.z, MTXMODE_NEW);
             if (season == SEASON_AUTUMN) {
-                // Same camera-relative drift, fall, wind and interpolation as
-                // snowfall, with four private RGBA sprites and a gentle flutter.
-                f32 leafScale = 0.035f + (i & 7) * 0.002f;
+                const s32 band = ObjectKankyo_AutumnBand(i);
+                f32 leafScale = (0.035f + (i & 7) * 0.002f) * (1.0f + band * 0.7f);
                 Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
                 Matrix_RotateZS((s16)(play->gameplayFrames * 180 + i * 1300), MTXMODE_APPLY);
                 Matrix_Scale(leafScale, leafScale, leafScale, MTXMODE_APPLY);
-                temp_f2 = CLAMP(1.0f - Math_Vec3f_DistXYZ(&worldPos, &play->view.eye) / 300.0f, 0.0f, 1.0f);
+                const f32 distance = Math_Vec3f_DistXYZ(&worldPos, &play->view.eye);
+                Actor* player = play->actorCtx.actorLists[ACTORCAT_PLAYER].first;
+                const f32 nearDistance =
+                    player != NULL ? MIN(distance, Math_Vec3f_DistXYZ(&worldPos, &player->world.pos)) : distance;
+                temp_f2 = CLAMP((8000.0f - distance) / 2000.0f, 0.0f, 1.0f) *
+                          CLAMP((nearDistance - 150.0f) / 200.0f, 0.0f, 1.0f) *
+                          MIN(this->unk_14C[i].unk_18 / 24.0f, 1.0f);
                 AutumnLeaves_Draw(play, i, (u8)(220.0f * temp_f2));
                 FrameInterpolation_RecordCloseChild();
                 continue;

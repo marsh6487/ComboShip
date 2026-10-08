@@ -14,6 +14,8 @@
 #include "ComboExport.h"
 #include "ComboResolve.h"
 #include "ComboItemDrawABI.h"
+#include <ship/resource/CrossRMRegistry.h>
+#include <ship/resource/ResourceManagerScope.h>
 #include "ComboSongDrawMM.h"
 #include "ComboOotBottleShimmerMM.h"
 #include "2s2h/Rando/NeiGiPresentation.h"
@@ -84,6 +86,7 @@ extern "C" s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDl
 
 // Which setup DL the row's func emits (NULL = plain 25). The consumer must submit the same one.
 extern "C" void GetItem_GetDrawSetupDLs(s32 drawId, void** outOpa, void** outXlu);
+extern "C" int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt);
 
 // --- CW_DRAW_KIND_OPS emitters. Bounds-checked; an overflowing recipe is truncated, never written
 // out of range (the consumer just draws fewer layers).
@@ -662,6 +665,7 @@ static void MM_AnimSoulFlame(CwItemAnimDrawInfo* out, const uint8_t rgb[3], floa
 
 // Native MM boss models whose draw routines fit the existing skeletal ABI. Canonical
 // paths are loaded through MM's RM, including its own Alt selection and vanilla fallback.
+// Native Goht/Gyorg/Odolwa use this same recipe to avoid a rig cached across Alt changes.
 // Twinmold uses its native head rig/clip and a dedicated initialized matrix-13 profile.
 static int32_t MM_FillBossSoulAnim(RandoItemId id, CwItemAnimDrawInfo* out) {
     uint8_t flame[3];
@@ -1121,6 +1125,12 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     f32 scale = 0.0f;
     s32 xluSeg8TexScroll = 0;
     s32 drawKind = CW_DRAW_KIND_SIMPLE;
+    // Recipe classification follows MM's registered resources and Alt state
+    // while this export is invoked from OoT's graph thread.
+    const auto drawOwner = Ship::CrossRMRegistry::Get("mm");
+    if (!drawOwner)
+        return CW_DRAW_NOT_READY;
+    Ship::ResourceManagerScope drawOwnerScope(drawOwner);
     int32_t n = GetItem_GetDrawTableEntry((s32)it->second.drawId, dls, CW_DRAW_MAX_DLISTS, &xluStart, &scale,
                                           &xluSeg8TexScroll, &drawKind);
     if (n <= 0) {
@@ -1132,6 +1142,8 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     out->hasEnvColor = 0;
     out->xluSeg8TexScroll = xluSeg8TexScroll;
     out->drawKind = drawKind;
+    if (drawKind == CW_DRAW_KIND_ELEMENTAL_ARROW)
+        out->neiEffect = NeiArrowGi_ProfileForDrawId(id, RI_ARROW_FIRE, RI_ARROW_ICE, RI_ARROW_LIGHT);
     if (drawKind == CW_DRAW_KIND_MM_FAIRY_BOTTLE || drawKind == CW_DRAW_KIND_MM_FAIRY_CONTAINER)
         out->stateDependent = 2; // selected shell follows live MM owner Alt/mod state
     for (int32_t i = 0; i < n; i++) {
@@ -1160,6 +1172,29 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
         out->matAnimPath = gGiFairyBottleTexAnim; // GetItem_DrawFairyContainer's AnimatedMat_Draw
         out->matAnimBindOpa = 1;
     }
+    if (id == RI_SHIELD_MIRROR) {
+        out->stateDependent = 2; // The selected owner's Alt geometry can change its pose.
+        float tilt = 0.f;
+        if (drawKind == CW_DRAW_KIND_SIMPLE && n == 2 && xluStart == 1 &&
+            ResourceMgr_GetIkanaShieldGiTiltXForGame("mm", "objects/object_gi_shield_3/gGiMirrorShieldDL", &tilt) &&
+            tilt != 0.f) {
+            // Preserve the native split passes and caller spin. CUSTOM_GI
+            // would add another spin; OPS carries only this pose correction.
+            out->drawKind = CW_DRAW_KIND_OPS;
+            out->opCount = 0;
+            MM_Op(out, CW_OP_PUSH);
+            if (scale > 0.f)
+                MM_OpV(out, CW_OP_SCALE, scale, scale, scale);
+            MM_OpV(out, CW_OP_ROTATE_X, tilt * (32768.f / 3.14159265358979323846f), 0.f, 0.f);
+            MM_Op(out, CW_OP_SETUP_OPA);
+            MM_Op(out, CW_OP_LOAD_MATRIX);
+            MM_OpV(out, CW_OP_DLIST, 0.f, 0.f, 0.f);
+            MM_Op(out, CW_OP_SETUP_XLU);
+            MM_Op(out, CW_OP_LOAD_MATRIX);
+            MM_OpV(out, CW_OP_DLIST, 1.f, 0.f, 0.f);
+            MM_Op(out, CW_OP_POP);
+        }
+    }
     return 1;
 }
 
@@ -1185,6 +1220,8 @@ extern "C" COMBO_EXPORT int32_t MM_GetItemDrawInfo(const char* itemName, CwItemD
         if (MM_IsProgressiveItem(id)) {
             out->stateDependent = 1; // Freeze the awarded tier before its concrete appearance refreshes.
         } else if (out->stateDependent == 2 || DungeonItem_GetOwner(id) >= 0 || id == RI_GREAT_SPIN_ATTACK ||
+                   id == RI_RED_POTION_REFILL || id == RI_GREEN_POTION_REFILL || id == RI_BLUE_POTION_REFILL ||
+                   id == RI_OOT_BOTTLE_GREEN_POTION || id == RI_OOT_BOTTLE_BLUE_POTION ||
                    MM_IsSwordAppearanceDependent(id)) {
             out->stateDependent = 2;
         } else {

@@ -3,6 +3,8 @@
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h"
 #include "2s2h/FleetShipCombo/FleetComboItems.h"
 #include "ComboItemReceiptText.h"
+#include "ComboDungeonKeyReceipt.h"
+#include "ComboCapeReceiptChoice.h"
 #include "ComboSongReceiptText.h"
 #include "ComboSongDrawMM.h"
 #include <algorithm>
@@ -424,6 +426,15 @@ extern "C" COMBO_EXPORT int32_t MM_GetDungeonRewardName(int32_t dungeon, char* b
 }
 
 bool Rando::ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Entry& entry, RandoCheckId check) {
+    entry.capeVisibilityChoice = ComboCapeReceiptChoice::IsCape(itemName);
+    if (!itemName || !*itemName)
+        return false;
+    const auto keyBody = ComboDungeonKeyReceipt::Markup(itemName);
+    if (!keyBody.empty()) {
+        entry.receiptPresentation = {};
+        SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(keyBody));
+        return true;
+    }
     // Capture dynamic descriptions before the cross grant. Cycle recollection
     // must keep that receipt's counters as well as its resolved item identity.
     struct SavedReceipt {
@@ -472,6 +483,7 @@ bool Rando::ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Ent
 #endif
 
 bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
+    entry.capeVisibilityChoice = id == RI_OOT_EXT_MAGIC_CAPE;
     entry.receiptPresentation = {};
     if (id == RI_TRAP)
         return false;
@@ -479,6 +491,11 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     if (it == StaticData::Items.end())
         return false;
     const auto& item = it->second;
+    const auto keyBody = item.name ? ComboDungeonKeyReceipt::Markup(item.name) : std::string{};
+    if (!keyBody.empty()) {
+        SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(keyBody));
+        return true;
+    }
     bool compass;
     const int dungeon = MapCompassDungeon(id, compass);
     if (dungeon >= 0) {
@@ -531,8 +548,13 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
                                   std::to_string(count) + "%w " + (count == 1 ? "token" : "tokens") + place + "."));
         return true;
     }
+    // A junk reward still owns a native receipt. Prefer that brief body over
+    // the queue's generic name/icon text, then allow imported ammo/refills to
+    // use their donor or local registry when MM has no matching native GI.
+    if (item.randoItemType == RITYPE_JUNK && NativeReceipt(item.getItemId, item.itemId, entry))
+        return true;
     if (item.randoItemType != RITYPE_MAJOR && item.randoItemType != RITYPE_MASK &&
-        item.randoItemType != RITYPE_LESSER && item.randoItemType != RITYPE_HEALTH)
+        item.randoItemType != RITYPE_LESSER && item.randoItemType != RITYPE_HEALTH && item.randoItemType != RITYPE_JUNK)
         return false;
     const char* concrete = ConcreteReceiptName(id);
     // Cross-game text export carries English bytes only. MM owns the meaning

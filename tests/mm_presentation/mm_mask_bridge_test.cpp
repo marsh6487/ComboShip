@@ -13,6 +13,18 @@
 #include "soh/mods/mm_sources/objects/object_gi_masks_all.h"
 #include "soh/mods/mm_sources/objects/object_mm_rando_items.h"
 #include "z64item.h"
+// The actual owner export scopes its resource manager even for native mask rows.
+namespace Ship {
+inline bool ownerActive = false;
+struct CrossRMRegistry {
+ static int Get(const char* game) { assert(!std::strcmp(game,"oot")); return 1; }
+};
+struct ResourceManagerScope {
+ bool before = ownerActive;
+ explicit ResourceManagerScope(int owner) { assert(owner==1); ownerActive=true; }
+ ~ResourceManagerScope() { ownerActive=before; }
+};
+}
 /* NATIVE_ITEM_IDS */
 /* HOST_NATIVE_IMPORT */
 #define RANDO_ENUM_BEGIN(x) enum x {
@@ -159,10 +171,13 @@ void DrawOotNeiCaneOfSomaria(int) {assert(0);}
 void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,int mmPickup=0) {assert(0);}
 void NeiGi_DrawSeasonOverlay(PlayState*,int,const char*) {assert(0 && "mask fixture must not select weather");}
 void NeiGi_DrawSongOverlay(PlayState*,int,const char*) {assert(false && "song dispatch has its own production fixture");}
+extern "C" void NeiGi_DrawElementalArrow(PlayState*,int) {assert(false && "mask fixture must not dispatch elemental arrows");}
 // Sword drawing/fitting is tested by the selected-model and foreign sword
 // fixtures. Masks must never enter either branch in this dispatcher.
 void ComboSwordGi_ApplyModelsFit(const char*,const char* const*,int,float,float,bool=false,int=0) {assert(0 && "mask selected sword fit");}
-void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*,bool=false) {assert(0 && "mask selected custom sword draw");}
+void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*,bool=false,bool=true) {assert(0 && "mask selected custom sword draw");}
+void ComboSwordGi_ApplyEffectFit(NeiGi::Kind,bool=false,int=0) {assert(0 && "mask selected sword effects fit");}
+void DrawOotSlateRuneFlame(uint8_t,uint8_t,uint8_t) {assert(0 && "mask selected sword flame");}
 /* OTHER_DRAW_HANDLERS */
 /* HOST_DISPATCH */
 int main() {

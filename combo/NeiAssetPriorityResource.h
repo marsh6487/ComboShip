@@ -155,6 +155,29 @@ inline bool GetGiModelFit(const char* nativeGame, const char* game, const char* 
     fit[1] = correction.lift;
     return true;
 }
+inline bool GetIkanaShieldGiTiltX(const char* nativeGame, const char* game, const char* path, float* tilt) {
+    if (!game || !path || !tilt || (std::strcmp(game, "oot") && std::strcmp(game, "mm")))
+        return false;
+    auto owner = Ship::CrossRMRegistry::Get(game);
+#ifndef COMBO_BUILD
+    if (!owner && std::strcmp(game, nativeGame) == 0)
+        if (const auto context = Ship::Context::GetRawInstance())
+            owner = context->GetResourceManager();
+#else
+    (void)nativeGame;
+#endif
+    if (!owner)
+        return false;
+    Ship::ResourceManagerScope scope(owner);
+    const auto load = [&](auto key) { return owner->LoadResource(key); };
+    NeiGi::ModelBoundsReader<decltype(load), true> reader(load, 0.f);
+    NeiGi::FrameBounds bounds{};
+    if (!reader.Read(path, bounds))
+        return false;
+    *tilt = reader.ShieldTiltX();
+    return true;
+}
+
 inline int GetDinSwordGiProfile(const char* nativeGame, const char* game, const char* path, bool enabled) {
     if (!game || !path || !enabled)
         return 0;

@@ -27,6 +27,7 @@ struct Entry {
     bool autoFormat = true;
     std::string msg = "";
     CwItemReceiptPresentation receiptPresentation{};
+    bool capeVisibilityChoice = false;
 };
 
 void RegisterHooks();

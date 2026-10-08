@@ -22,6 +22,26 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "mods/nei_save.h" // Skijer's NEI: OoT warp-song ownership (free-play recognition bits 24-29)
 
+static u8 sCapeVisibilityChoice;
+
+void Message_SetCapeVisibilityChoice(int enabled) {
+    sCapeVisibilityChoice = enabled != 0;
+}
+
+static int Message_HandleCapeVisibilityChoice(PlayState* play) {
+    MessageContext* msgCtx = &play->msgCtx;
+    if (!sCapeVisibilityChoice || msgCtx->msgMode != MSGMODE_TEXT_DONE ||
+        msgCtx->textboxEndType != TEXTBOX_ENDTYPE_TWO_CHOICE)
+        return false;
+    // Fast-text B/C-up presses must never accept the appearance preference.
+    if (CHECK_BTN_ALL(play->state.input[0].press.button, BTN_A) && Message_ShouldAdvance(play)) {
+        Nei_Save()->capeHidden = msgCtx->choiceIndex != 0;
+        sCapeVisibilityChoice = false;
+        Message_CloseTextbox(play);
+    }
+    return true;
+}
+
 const char* gBombersNotebookPhotos[] = {
     gBombersNotebookPhotoAnjuTex,
     gBombersNotebookPhotoKafeiTex,
@@ -1149,12 +1169,17 @@ static void Message_ApplyItemReceiptLayout(PlayState* play) {
     const uint32_t pagePosition = msgCtx->msgBufPos > 11 ? msgCtx->msgBufPos - 11 : 0;
     sItemReceiptFirstPage =
         pagePosition >= sItemReceiptLayout.iconPageStart && pagePosition <= sItemReceiptLayout.firstPageEnd;
-    msgCtx->textCharScale = 0.75f;
+    msgCtx->textCharScale = sItemReceiptFirstPage ? sItemReceiptLayout.textScale / 100.0f : 0.75f;
     msgCtx->unk11FFC = 12;
     msgCtx->unk11F18 = 0;
     msgCtx->unk11F1A[0] = msgCtx->unk11F1A[1] = msgCtx->unk11F1A[2] = 0;
     sCharTexSize = msgCtx->textCharScale * 16.0f;
     sCharTexScale = 1024.0f / msgCtx->textCharScale;
+}
+
+int Message_ItemReceiptSpaceWidth(int nativeWidth) {
+    return sItemReceiptPresentation.singleBox && sItemReceiptFirstPage ? 6 * sItemReceiptLayout.textScale / 75
+                                                                       : nativeWidth;
 }
 
 int Message_DrawItemReceiptIcon(PlayState* play, Gfx** gfxP) {
@@ -3511,6 +3536,7 @@ void Message_OpenText(PlayState* play, u16 textId) {
     f32 var_fv0;
 
     Message_SetItemReceiptPresentation(NULL);
+    Message_SetCapeVisibilityChoice(false);
     bool loadFromMessageTable = true;
     GameInteractor_ExecuteOnOpenText(&textId, &loadFromMessageTable);
 
@@ -6194,6 +6220,9 @@ void Message_Update(PlayState* play) {
                         break;
                 }
 
+                if (Message_HandleCapeVisibilityChoice(play)) {
+                    break;
+                }
                 if (GameInteractor_Should(VB_MSG_CAPTURE_MSGMODE_TEXT_DONE, false)) {
                     // no-op
                 } else if ((msgCtx->textboxEndType == TEXTBOX_ENDTYPE_TWO_CHOICE) &&

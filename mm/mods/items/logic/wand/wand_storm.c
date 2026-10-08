@@ -68,6 +68,9 @@ void WandStorm_Tick(PlayState* play, Player* player) {
         Combat_InitCylinder(play, &sStormRayCol, &player->actor, &cfg);
     }
     Combat_UpdateCylinder(&sStormRayCol, &sStormRay.pos, &cfg);
+    // The ray position is its center. A cylinder based there only hits above
+    // the bolt: a landing Chuchu is 26 units tall and free shots fly at 30.
+    sStormRayCol.dim.yShift = -(s16)(STORM_RAY_HEIGHT * 0.5f);
     Combat_RegisterCollider(play, &sStormRayCol);
 }
 

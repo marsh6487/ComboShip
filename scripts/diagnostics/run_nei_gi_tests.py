@@ -20,6 +20,10 @@ for config in ("CMake/soh-cvars.cmake", "CMake/lus-cvars.cmake"):
     for key, value in re.findall(r'set\((CVAR_PREFIX_\w+)\s+"?([^\s"\)]+)', (ROOT / config).read_text()):
         flags.append(f'-D{key}="{value}"')
 cc = os.environ.get("CXX", "c++")
+if "--sword-toggle-only" in sys.argv:
+    flags.append("-DSWORD_TOGGLE_REGRESSION_ONLY")
+if "--sword-regressions-only" in sys.argv:
+    flags.append("-DSWORD_REGRESSIONS_ONLY")
 sanitize = ["-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"] if "--sanitize" in sys.argv else []
 if "--fast-math" in sys.argv:
     sanitize.append("-ffast-math")
@@ -129,6 +133,8 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
             foreign_source = (ROOT / "combo/menu/ComboForeignDrawOOT.h").read_text()
             foreign_info = re.search(r"struct ComboForeignDrawInfo \{.*?\n\};", foreign_source, re.S)[0]
             foreign_draw = functions(foreign_source)["OOT_DrawComboForeign"]
+            if "--baseline-gold-overlays" in sys.argv:
+                foreign_draw=foreign_draw.replace("Kind::Gold","Kind::MarioMask")
             foreign_shop = functions(foreign_source.replace('extern "C" ', ''))["OOT_DrawComboForeignShop"]
             foreign_wrapper = functions((ROOT / "soh/soh/Enhancements/randomizer/draw.cpp").read_text()
                                         .replace('extern "C" ', ''))["Randomizer_DrawComboForeign"]
@@ -193,8 +199,9 @@ bool ComboForeignAnim_Draw(const CwItemAnimDrawInfo*, const char*, PlayState*) {
 #define FOREIGN_DRAW_STUB(name) \\
     void name(PlayState*, const ComboForeignDrawInfo*) { ++foreignFallbackCalls; Matrix_Scale(7,7,7,MTXMODE_APPLY); }
 FOREIGN_DRAW_STUB(OOT_DrawForeignGoronSword)
-FOREIGN_DRAW_STUB(OOT_DrawForeignMasterSword)
-void OOT_DrawForeignCustomGi(PlayState*, const ComboForeignDrawInfo*, bool) { ++foreignFallbackCalls; Matrix_Scale(7,7,7,MTXMODE_APPLY); }
+void OOT_DrawForeignMasterSword(PlayState*, const ComboForeignDrawInfo*, bool=true) { ++foreignFallbackCalls; Matrix_Scale(7,7,7,MTXMODE_APPLY); }
+void OOT_DrawForeignCustomGi(PlayState*, const ComboForeignDrawInfo*, bool, bool=true) { ++foreignFallbackCalls; Matrix_Scale(7,7,7,MTXMODE_APPLY); }
+void OOT_DrawForeignWeaponFlame(PlayState*, const uint8_t color[4]) { Fixture::flameColors.push_back({color[0],color[1],color[2]}); }
 FOREIGN_DRAW_STUB(OOT_DrawForeignDekuNuts)
 FOREIGN_DRAW_STUB(OOT_DrawForeignRecoveryHeart)
 FOREIGN_DRAW_STUB(OOT_DrawForeignFish)
@@ -223,14 +230,16 @@ extern "C" Gfx* Gfx_TwoTexScrollEx(GraphicsContext*,s32,u32,u32,s32,s32,s32,u32,
 extern "C" void gSPSegment(void*,int,uintptr_t) {assert(false);}
 """ + oot_song_simple + """
 void OOT_DrawForeignSimple(PlayState* play,const ComboForeignDrawInfo* info) {
-    if(info->drawKind==CW_DRAW_KIND_SONG_GI) Fixture_DrawForeignSongSimple(play,info);
+    if(info->drawKind==CW_DRAW_KIND_SONG_GI || info->drawKind==CW_DRAW_KIND_ELEMENTAL_ARROW) Fixture_DrawForeignSongSimple(play,info);
     else {++foreignFallbackCalls;Matrix_Scale(7,7,7,MTXMODE_APPLY);}
 }
 """
             mm_foreign_source = (ROOT / "combo/menu/ComboForeignDrawMM.h").read_text()
             mm_foreign_info = re.search(r"struct ComboForeignDrawInfoOOT \{.*?\n\};",mm_foreign_source,re.S)[0]
             mm_foreign_draw = functions(mm_foreign_source)["MM_DrawComboForeign"]
-            mm_handlers = sorted(set(re.findall(r"\b(MM_DrawForeign\w+)\(info(?:, shop)?\)", mm_foreign_draw)))
+            if "--baseline-gold-overlays" in sys.argv:
+                mm_foreign_draw=mm_foreign_draw.replace("Kind::Gold","Kind::MarioMask")
+            mm_handlers = sorted(set(re.findall(r"\b(MM_DrawForeign\w+)\(", mm_foreign_draw)))
             mm_shop_support = """
 #include "mm/2s2h/FleetShipCombo/FleetComboIds.h"
 struct FixtureNeiSaveData { uint8_t comboObtained[FC_COMBO_OBTAINED_SIZE] = {}; };
@@ -260,7 +269,7 @@ void DrawOotNeiCaneOfSomaria(RandoItemId) {assert(false);}
 const ComboForeignDrawInfoOOT* selectedForeignInfoMM=nullptr;
 const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckId) {return selectedForeignInfoMM;}
 """ + "\n".join("void "+name+"(const ComboForeignDrawInfoOOT*" +
-                    (", bool" if name == "MM_DrawForeignCustomGi" else "") +
+                    (", bool" if name in {"MM_DrawForeignCustomGi", "MM_DrawForeignMasterSword"} else "") +
                     ") {assert(false);}" for name in mm_handlers
                     if name not in {"MM_DrawForeignMusicNote", "MM_DrawForeignSimple", "MM_DrawForeignCustomGi"})
             mm_pin = mm_foreign_source[mm_foreign_source.index("#define MM_FOREIGN_PIN_OPA()"):
@@ -338,8 +347,10 @@ std::map<std::string,std::vector<std::array<float,3>>> FixtureMmPickupVertices()
             checks = (ROOT / "tests/mm_presentation/gi_bridge_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/shop_dispatch_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/foreign_sword_checks.inc").read_text()
+            checks += (ROOT / "tests/mm_presentation/gold_shimmer_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/legacy_mod_checks.inc").read_text()
             checks += (ROOT / "tests/song_gi/foreign_dispatch_checks.inc").read_text()
+            checks += (ROOT / "tests/elemental_arrow_gi/foreign_dispatch_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/selected_sword_checks.inc").read_text()
             candidate = candidate.replace("  using namespace Fixture;\n", "  using namespace Fixture;\n" + checks, 1)
             source = Path(tmp) / "combo_gi_presentation.cpp"

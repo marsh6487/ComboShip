@@ -1,18 +1,22 @@
 // Production OoT export; only runtime item/message ownership is replaced.
 #include "combo/menu/ComboItemReceiptText.h"
+#include "combo/menu/ComboKeyReceiptText.h"
+#include "combo/menu/ComboDungeonKeyReceipt.h"
 #include "combo/menu/ComboItemReceiptPresentation.h"
+#include "combo/menu/ComboItemReceiptText.h"
 #include "soh/soh/Enhancements/custom-message/text.h"
+#include "tests/item_receipts/key_receipt_fixtures.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstring>
-#include <iostream>
 #include <fstream>
-#include <nlohmann/json.hpp>
+#include <iostream>
 #include <map>
 #include <memory>
-#include <vector>
+#include <nlohmann/json.hpp>
 #include <unordered_map>
+#include <vector>
 using namespace std::literals::string_literals;
 #define SPDLOG_DEBUG(...) ((void)0)
 #define COMBO_BUILD
@@ -32,6 +36,11 @@ constexpr int ITEM_CATEGORY_JUNK = 0, ITEM_CATEGORY_MAJOR = 1,
 constexpr int TEXTBOX_TYPE_BLUE = 2, ITEM_COMPASS = 0x75,
               ITEM_DUNGEON_MAP = 0x76, ITEM_SKULL_TOKEN = 0x71,
               ITEM_CUSTOM = 0xFF;
+using ItemID = int;
+constexpr int OBJECT_INVALID = -1, ITEM_NONE = 0xFF,
+              ITEM_ROCS_FEATHER_SKIJER = 0xA4, RAND_INF_CAN_OPEN_CHEST = 0,
+              RO_OPEN_CHEST_PROGRESSIVE = 1;
+bool Flags_GetRandomizerInf(int) { return false; }
 enum {
 #define DEFINE_SCENE(a, b, scene, ...) scene,
 #include "soh/include/tables/scene_table.h"
@@ -132,6 +141,7 @@ struct ReceiptNeiSave {
 ReceiptNeiSave *Nei_Save() { return &receiptNeiSave; }
 struct GetItemEntry {
   uint16_t textId;
+  uint16_t itemId = ITEM_NONE;
 };
 struct MessageTableEntry {
   uint16_t textId;
@@ -154,6 +164,11 @@ struct TraditionalReceiptFixture {
   uint16_t nativeText, expectedText;
 };
 /* TRADITIONAL_CATALOG */
+struct KeyCatalogFixture {
+  RandomizerGet item;
+  const char *name;
+};
+/* KEY_CATALOG */
 namespace Rando::StaticData {
 std::map<std::string, RandomizerGet> itemNameToEnum = {
     {"Cane of Somaria", RG_CANE_OF_SOMARIA},
@@ -170,6 +185,7 @@ std::map<std::string, RandomizerGet> itemNameToEnum = {
     {"New Wave Bossa Nova", RG_MM_SONG_NOVA},
     {"Song of Healing", RG_MM_SONG_HEALING},
     {"Song of Storms (MM)", RG_MM_SONG_STORMS},
+    {"Song of Soaring", RG_MM_SONG_SOARING},
     {"Great Deku Tree Compass", RG_DEKU_TREE_COMPASS},
     {"Great Deku Tree Map", RG_DEKU_TREE_MAP},
     {"Forest Temple Small Key", RG_FOREST_TEMPLE_SMALL_KEY},
@@ -201,6 +217,14 @@ struct Item {
     return "Item";
   }
   std::string GetColor() const { return "%g"; }
+  std::string GetArticle() const {
+    for (const auto &fixture : KeyReceiptFixtures::entries)
+      if (!fixture.mm && GetName() == fixture.name)
+        return fixture.article;
+    return {}; // Imported MM rows have no localized article in the OoT catalog.
+  }
+  bool HasCustomIcon() const { return false; }
+  int GetItemID() const { return ITEM_NONE; }
   std::shared_ptr<GetItemEntry> GetGIEntryUnresolved() const {
     if (throwOnRead)
       throw 1;
@@ -209,20 +233,27 @@ struct Item {
                     : id == RG_MAGIC_DOUBLE      ? 0xE8
                     : id == RG_DEKU_TREE_COMPASS ? 0x67
                     : id == RG_DEKU_TREE_MAP     ? 0x66
+                    : id == RG_GREEN_RUPEE       ? 0x6F
                     : id == RG_MINUET_OF_FOREST  ? 0x73
                                                  : TEXT_RANDOMIZER_CUSTOM_ITEM;
     for (const auto& fixture : traditionalReceipts)
       if (fixture.item == id)
         text = fixture.nativeText;
-    return std::make_shared<GetItemEntry>(GetItemEntry{text});
+    uint16_t icon = ITEM_NONE;
+    if (id >= RG_FOREST_TEMPLE_SMALL_KEY && id <= RG_TREASURE_GAME_SMALL_KEY)
+      icon = 0x77;
+    if (id >= RG_FOREST_TEMPLE_BOSS_KEY && id <= RG_GANONS_CASTLE_BOSS_KEY)
+      icon = 0x74;
+    return std::make_shared<GetItemEntry>(GetItemEntry{text, icon});
   }
-  std::shared_ptr<GetItemEntry> GetGIEntry(RandomizerGet *actual) const {
+  std::shared_ptr<GetItemEntry>
+  GetGIEntry(RandomizerGet *actual = nullptr) const {
     ++liveResolutionCalls;
-    if (stateAdvanced && id == RG_CANE_OF_SOMARIA)
+    if (actual && stateAdvanced && id == RG_CANE_OF_SOMARIA)
       *actual = RG_CANE_PACCI_FLIP;
-    if (stateAdvanced && id == RG_PROGRESSIVE_ROCS)
+    if (actual && stateAdvanced && id == RG_PROGRESSIVE_ROCS)
       *actual = RG_ROCS_CAPE;
-    if (stateAdvanced && id == RG_STONE_OF_AGONY)
+    if (actual && stateAdvanced && id == RG_STONE_OF_AGONY)
       *actual = RG_QUARTZ_OF_MOTION;
     return GetGIEntryUnresolved();
   }
@@ -272,7 +303,9 @@ static const char bossKey[] =
     "You got the Boss Key!\x01Now you can get inside the chamber where the Boss lurks.\x02";
 static const char minuet[] =
     "You have learned the Minuet of Forest!\x01" "A melody that will take you to the forest.\x02";
+static const char greenRupee[] = "You got a Green Rupee!\x01It is worth one Rupee.\x02";
 MessageTableEntry nativeTable[] = {
+    {0x6F,0,greenRupee,sizeof(greenRupee)-1},
     {0x68, 0, stone, sizeof(stone) - 1},
     {0xE4, 0, magic, sizeof(magic) - 1},
     {0xE8, 0, doubleMagic, sizeof(doubleMagic) - 1},
@@ -378,8 +411,9 @@ constexpr int MOD_RANDOMIZER = 1;
 struct Player {
   struct {
     int comboForeignCheck = RC_RECEIPT_FIXTURE, getItemId = RG_NONE,
-        modIndex = MOD_RANDOMIZER, itemId = 0;
+        modIndex = MOD_RANDOMIZER, itemId = 0, objectId = 0;
   } getItemEntry;
+  int getItemId = RG_NONE;
 } receiptPlayer;
 struct PlayState {
   int sceneNum = SCENE_DEKU_TREE;
@@ -471,6 +505,7 @@ void BuildIceTrapMessageNamed(CustomMessage &msg, const std::string &) {
 #define COMBO_EXPORT
 #endif
 /* CONTEXT_BUILDERS */
+/* NATIVE_ITEM_BUILDER */
 /* FOREIGN_BUILDER */
 /* DONOR_EXPORT */
 
@@ -671,14 +706,50 @@ int main(int argc, char** argv) {
   assert(read("New Wave Bossa Nova").find("\x03New Wave") != std::string::npos);
   assert(read("Song of Healing").find("\x06Song") != std::string::npos);
   assert(read("Song of Storms (MM)").find("rain") != std::string::npos);
-  // Export keeps the native tutorial body even for randomizer keys whose GI
-  // entry points at the generic custom textbox. Extra seed info follows it.
-  assert(read("Forest Temple Small Key").find("locked door") != std::string::npos);
-  assert(read("Forest Temple Boss Key").find("Boss lurks") != std::string::npos);
-  assert(read("Ganon's Castle Boss Key").find("Boss lurks") != std::string::npos);
+  for (const auto &fixture : keyCatalog)
+    Rando::StaticData::itemNameToEnum.emplace(fixture.name, fixture.item);
+  // Exercise the real OoT export with the exact native catalog identities.
+  // The encoded receipt must retain its owner's name and palette in MM.
+  for (const auto &fixture : KeyReceiptFixtures::entries) {
+    const auto body = read(fixture.name);
+    if (KeyReceiptFixtures::Flatten(body) !=
+        KeyReceiptFixtures::Expected(fixture)) {
+      std::cerr << "Incorrect exported key name/color: " << fixture.name
+                << '\n';
+      for (unsigned char byte : body)
+        std::cerr << unsigned(byte) << ' ';
+      std::cerr << '\n';
+    }
+    assert(KeyReceiptFixtures::Flatten(body) ==
+           KeyReceiptFixtures::Expected(fixture));
+  }
+  for (const auto &fixture : KeyReceiptFixtures::entries) {
+    receiptPlayer.getItemEntry.getItemId =
+        Rando::StaticData::itemNameToEnum.at(fixture.name);
+    CustomMessage native;
+    BuildCustomItemMessage(&receiptPlayer, native);
+    std::string body;
+    assert(
+        ComboItemReceiptText::FromOotMessage(native.GetEnglish(MF_RAW), body));
+    assert(KeyReceiptFixtures::Flatten(body) ==
+           KeyReceiptFixtures::Expected(fixture));
+  }
+  receiptPlayer.getItemEntry.getItemId = RG_NONE;
+  // Native icon resolution above retains the established path; donor export
+  // itself must never resolve a progressive item against the live inventory.
+  liveResolutionCalls = 0;
+  for (const auto *excluded : {"Skeleton Key", "Room Key", "Woodfall Key Ring",
+                               "Ice Cavern Small Key"}) {
+    assert(ComboDungeonKeyReceipt::Markup(excluded).empty());
+  }
   assert(read("Minuet of Forest").find("take you to the forest") != std::string::npos);
   receiptContext.information = 0;
   for (const auto& fixture : traditionalReceipts) {
+    if ((fixture.item >= RG_FOREST_TEMPLE_SMALL_KEY &&
+         fixture.item <= RG_TREASURE_GAME_SMALL_KEY) ||
+        (fixture.item >= RG_FOREST_TEMPLE_BOSS_KEY &&
+         fixture.item <= RG_GANONS_CASTLE_BOSS_KEY))
+      continue; // Keys now have the requested dungeon-named randomizer receipt.
     const auto found = std::find_if(nativeMessages.begin(), nativeMessages.end(), [&](const auto& message) {
       return message.textId == fixture.expectedText;
     });
@@ -888,6 +959,26 @@ int main(int argc, char** argv) {
   resolvedForeign = nullptr;
   BuildComboForeignMessage(&receiptPlayer, foreignMessage);
   assert(foreignMessage.english.find("Unknown MM Item") != std::string::npos);
+  const auto beforeKeys = foreign;
+  const auto beforeResolvedKey = resolvedForeign;
+  for (const auto &fixture : KeyReceiptFixtures::entries) {
+    if (!fixture.mm)
+      continue;
+    foreign.itemName = fixture.name;
+    foreign.displayName = std::string(fixture.name) + " (MM)";
+    resolvedForeign = fixture.name;
+    BuildComboForeignMessage(&receiptPlayer, foreignMessage);
+    std::string body;
+    assert(ComboItemReceiptText::FromOotMessage(
+        foreignMessage.GetEnglish(MF_RAW), body));
+    assert(KeyReceiptFixtures::Flatten(body) ==
+           KeyReceiptFixtures::Expected(fixture));
+    assert(foreignMessage.english.find(char(0x13)) == std::string::npos);
+  }
+  foreign = beforeKeys;
+  resolvedForeign = beforeResolvedKey;
+  std::cout << "All 34 key names/colors passed in OoT native/export receipts; "
+               "all 8 MM keys passed the foreign receipt path\n";
   // The actual receive route for MM Maps found in OoT uses this same info,
   // independently of the donor export and the MM-native catalog fixture.
   for (int enabled : {0, 1}) {
@@ -905,7 +996,8 @@ int main(int argc, char** argv) {
   assert(OOT_GetItemReceiptText("Deku Leaf", buffer, 5) == 0);
   assert(OOT_GetItemReceiptText("unknown", buffer, sizeof(buffer)) == 0);
   assert(OOT_GetItemReceiptText("Ice Trap", buffer, sizeof(buffer)) == 0);
-  assert(OOT_GetItemReceiptText("Green Rupee", buffer, sizeof(buffer)) == 0);
+  assert(read("Green Rupee").find("one Rupee") != std::string::npos);
+  assert(read("Song of Soaring").find("statue") != std::string::npos);
   assert(OOT_GetItemReceiptText(nullptr, buffer, sizeof(buffer)) == 0);
   assert(OOT_GetItemReceiptText("Deku Leaf", nullptr, sizeof(buffer)) == 0);
   globals.gRandoContext = nullptr;

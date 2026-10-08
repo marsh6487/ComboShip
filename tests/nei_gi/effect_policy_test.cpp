@@ -33,6 +33,27 @@ int main() {
            std::abs(a.y - b.y) < .0001f &&
            std::abs(a.z - b.z) < .0001f;
   };
+  // Restoring the black/orange mesh must also replace its old violet energy.
+  // Removing either shadow wisps or orange embers breaks the two-tone effect.
+  for (uint32_t frame : {0u, 19u, 47u, 179u, 180u, 65535u,
+                        std::numeric_limits<uint32_t>::max()}) {
+    for (const auto &mesh : {SampleSpecial(Kind::DarkCrystal, frame),
+                            SampleShimmer(frame, true, {}, Kind::DarkCrystal)}) {
+      bool dark = false, ember = false;
+      for (size_t index = 0; index < mesh.count; ++index) {
+        const auto &vertex = mesh.vertices[index];
+        const unsigned red = vertex.rgb >> 16;
+        const unsigned green = (vertex.rgb >> 8) & 255;
+        const unsigned blue = vertex.rgb & 255;
+        if (!vertex.alpha)
+          continue;
+        dark |= red <= 48 && green <= 48 && blue <= 48;
+        ember |= red >= 150 && green >= 40 && green < red && blue < green / 2;
+        assert(vertex.rgb != 0x9E38DA && vertex.rgb != 0xD5B6FF);
+      }
+      assert(dark && ember && "Shadow Crystal needs visible charcoal and burnt-orange particles");
+    }
+  }
   for (size_t sword = 0; sword < std::size(swords); ++sword) {
     const Kind kind = swords[sword];
     assert(IsSword(kind));

@@ -50,7 +50,7 @@ struct MessageContext {
     float textCharScale = 0.75f;
 };
 struct PlayState { MessageContext msgCtx; } play;
-float sCharTexSize = 12, sCharTexScale = 1024 / 0.75f;
+int sCharTexSize = 12, sCharTexScale = 1024 / 0.75f;
 /* MM_FONT_WIDTHS */
 /* MM_RECEIPT_RENDERER */
 constexpr int LANGUAGE_ENG = 1, LANGUAGE_JPN = 0, VB_DRAW_OCARINA_STAFF = 1;
@@ -80,7 +80,7 @@ static std::string VisibleWords(const char* body, size_t size, int mm) {
 }
 
 static void CheckReflow(const std::string& original, const char* body, size_t size, int mm,
-                        const float* widths, size_t count) {
+                        const float* widths, size_t count, int scale = 75) {
     assert(VisibleWords(body, size, mm) == VisibleWords(original.data(), original.size(), mm));
     unsigned lines = 1;
     int width = 0;
@@ -95,7 +95,11 @@ static void CheckReflow(const std::string& original, const char* body, size_t si
             lines = 1;
             width = 0;
         } else if (command == 1) {
-            width += ComboReceipt_GlyphWidth(c, widths, count);
+            // Use the engine's submitted pen advance, independently of the fitter.
+            width += mm ? Mm::NativeLineWidth(std::string(1, static_cast<char>(c)))
+                        : c == ' ' ? 6 * scale / 75
+                                   : c >= 0x20 && static_cast<size_t>(c - 0x20) < count
+                                         ? static_cast<int>(widths[c - 0x20] * (scale / 100.0f)) : 0;
             assert(width <= 220 && "word wrapping must fit the actual native pen, including spaces");
         }
         i += command;
@@ -239,9 +243,9 @@ int main() {
     }
     assert(Mm::sItemReceiptLayout.iconX + Mm::sItemReceiptLayout.iconWidth <= 220);
     (void)Mm::NativeLineWidth(reward);
-    // The reported Ice Cavern entrance and multiple inverse entrances must use
-    // exactly the same font, spacing and authored paragraphs as the Deku map.
-    for (const std::string entrance : {"Deku Tree", "GV Behind Tent Grotto Entry",
+    // The reported Spirit/Shadow entrance must never strand its final words
+    // on a second page. Multiple inverse entrances retain every name too.
+    for (const std::string entrance : {"Deku Tree", "Shadow Temple", "Shadow Temple Entryway", "GV Behind Tent Grotto Entry",
             "GV Behind Tent Grotto Entry, Bottom of the Well, Dodongo's Cavern"}) {
         const std::string map = ComboItemReceiptText::FromNeiMarkup(
             "You found the Ice Cavern Map!&It's %gordinary%w.&It seems the entrance is at %c" + entrance + "%w.");
@@ -253,15 +257,52 @@ int main() {
         Mm::play.msgCtx.msgBufPos = 0;
         Mm::Message_SetItemReceiptPresentation(&p);
         Mm::Message_ApplyItemReceiptLayout(&Mm::play);
-        assert(Mm::play.msgCtx.textCharScale == 0.75f);
+        assert(Mm::play.msgCtx.textCharScale >= 0.55f && Mm::play.msgCtx.textCharScale <= 0.75f);
+        assert(entrance != "Deku Tree" || Mm::play.msgCtx.textCharScale == 0.75f);
         CheckReflow(map, Mm::play.msgCtx.font.msgBuf.schar + 11, Mm::play.msgCtx.msgLength - 11,
-                    true, Mm::sNESFontWidths, 160);
-        assert(entrance == "Deku Tree" || std::memchr(Mm::play.msgCtx.font.msgBuf.schar + 11, '\x10',
-                                                    Mm::play.msgCtx.msgLength - 11));
+                    true, Mm::sNESFontWidths, 160, Mm::sItemReceiptLayout.textScale);
+        assert(!std::memchr(Mm::play.msgCtx.font.msgBuf.schar + 11, '\x10', Mm::play.msgCtx.msgLength - 11) &&
+               "a short map hint must fit one native textbox without truncation");
+        assert(Mm::sCharTexSize == static_cast<int>(16 * Mm::play.msgCtx.textCharScale));
+        // The same receipt also needs to fit in OoT, retaining all words.
+        const std::string ootMap = "You found the Ice Cavern Map!\x01It's \x05\x42ordinary\x05\x40.\x01"
+                                   "It seems the entrance is at \x05\x44" + entrance + "\x05\x40.\x02";
+        std::memcpy(Oot::play.msgCtx.font.msgBuf, ootMap.data(), ootMap.size());
+        Oot::play.msgCtx.msgLength = ootMap.size();
+        Oot::play.msgCtx.msgBufPos = 0;
+        Oot::Message_SetItemReceiptPresentation(&p);
+        Oot::Message_ApplyItemReceiptLayout(&Oot::play);
+        assert(!std::memchr(Oot::play.msgCtx.font.msgBuf, '\x04', Oot::play.msgCtx.msgLength));
+        assert(Oot::R_TEXT_CHAR_SCALE >= 55 && Oot::R_TEXT_CHAR_SCALE <= 75);
+        CheckReflow(ootMap, Oot::play.msgCtx.font.msgBuf, Oot::play.msgCtx.msgLength,
+                    false, Oot::sFontWidths, 144, Oot::R_TEXT_CHAR_SCALE);
     }
+    // Shrinking a map must not shrink a later attribution page or the next
+    // ordinary dialogue. Explicit authored page breaks remain intact.
+    const std::string attributedMap = ComboItemReceiptText::FromNeiMarkup(
+        "You found the Spirit Temple Map!&It's %gordinary%w.&It seems the entrance is at %cShadow Temple Entryway%w.") +
+        "\x10" "Bank reward attribution." + '\xBF';
+    p = {};p.singleBox=1;
+    std::memcpy(Mm::play.msgCtx.font.msgBuf.schar+11, attributedMap.data(), attributedMap.size());
+    Mm::play.msgCtx.msgLength=attributedMap.size()+11;Mm::play.msgCtx.msgBufPos=0;
+    Mm::Message_SetItemReceiptPresentation(&p);Mm::Message_ApplyItemReceiptLayout(&Mm::play);
+    assert(Mm::play.msgCtx.textCharScale<.75f);
+    const std::string attributed(Mm::play.msgCtx.font.msgBuf.schar+11,Mm::play.msgCtx.msgLength-11);
+    assert(std::count(attributed.begin(),attributed.end(),'\x10')==1 && attributed.find("Bank reward attribution.")!=std::string::npos);
+    Mm::play.msgCtx.msgBufPos=Mm::sItemReceiptLayout.firstPageEnd+12;
+    Mm::Message_ApplyItemReceiptLayout(&Mm::play);
+    assert(Mm::play.msgCtx.textCharScale==.75f && Mm::Message_ItemReceiptSpaceWidth(6)==6);
+    Mm::Message_SetItemReceiptPresentation(nullptr);
+    assert(Mm::Message_ItemReceiptSpaceWidth(9)==9);
+    char shortBuffer[32]="WWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
+    const std::string before(shortBuffer,30);
+    const auto noCapacity=ComboReceipt_Layout(&p,shortBuffer,30,30,true,Mm::sNESFontWidths,160);
+    assert(noCapacity.textScale==75 && noCapacity.bodySize==30 && std::string(shortBuffer,30)==before);
     // MM's END byte also indexes a ten-pixel font slot. It is a command, so
     // these final lines must retain their exact three-line body at 218-220px.
     for (const std::string entrance : {"Zora Shop", "LLR Tower", "MK Bazaar"}) {
+        Mm::Message_SetItemReceiptPresentation(nullptr);
+        Mm::play.msgCtx.textCharScale = 0.75f;
         const std::string finalLine = "It seems the entrance is at " + entrance + ".";
         const int nativeWidth = Mm::NativeLineWidth(finalLine);
         assert(nativeWidth >= 211 && nativeWidth <= 220);

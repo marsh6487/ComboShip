@@ -1,4 +1,5 @@
 #include "CustomMessageManager.h"
+#include "ComboCapeReceiptChoice.h"
 #include "CustomMessageInterfaceAddon.h"
 #include <algorithm>
 #include <stdint.h>
@@ -263,6 +264,7 @@ bool CustomMessage::operator!=(const CustomMessage& operand) const {
 }
 
 extern "C" void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation* presentation);
+extern "C" void Message_SetCapeVisibilityChoice(int enabled);
 
 void CustomMessage::LoadIntoFont() {
     Message_SetItemReceiptPresentation(&receiptPresentation);
@@ -271,21 +273,27 @@ void CustomMessage::LoadIntoFont() {
     char* buffer = font->msgBuf;
     const size_t maxBufferSize = sizeof(font->msgBuf);
     font->charTexBuf[0] = (type << 4) | position;
+    std::string body;
+    auto language = ComboCapeReceiptChoice::Language::English;
     switch (gSaveContext.language) {
         case LANGUAGE_FRA:
-            msgCtx->msgLength = font->msgLength =
-                static_cast<u32>(SohUtils::CopyStringToCharBuffer(buffer, GetFrench(MF_RAW), maxBufferSize));
+            body = GetFrench(MF_RAW);
+            language = ComboCapeReceiptChoice::Language::French;
             break;
         case LANGUAGE_GER:
-            msgCtx->msgLength = font->msgLength =
-                static_cast<u32>(SohUtils::CopyStringToCharBuffer(buffer, GetGerman(MF_RAW), maxBufferSize));
+            body = GetGerman(MF_RAW);
+            language = ComboCapeReceiptChoice::Language::German;
             break;
         case LANGUAGE_ENG:
         default:
-            msgCtx->msgLength = font->msgLength =
-                static_cast<u32>(SohUtils::CopyStringToCharBuffer(buffer, GetEnglish(MF_RAW), maxBufferSize));
+            body = GetEnglish(MF_RAW);
             break;
     }
+    if (capeVisibilityChoice)
+        body = ComboCapeReceiptChoice::Append(std::move(body), false, language);
+    Message_SetCapeVisibilityChoice(capeVisibilityChoice);
+    msgCtx->msgLength = font->msgLength =
+        static_cast<u32>(SohUtils::CopyStringToCharBuffer(buffer, body, maxBufferSize));
 }
 
 void CustomMessage::Replace(std::string&& oldStr, std::string&& newStr) {

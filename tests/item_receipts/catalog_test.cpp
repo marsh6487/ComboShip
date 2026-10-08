@@ -1,13 +1,16 @@
 // Uses real MM item IDs, the production static/FC catalogs and receipt builder.
 // The font/message table and donor service are the runtime boundaries.
+#include "2s2h/CustomItem/CustomItem.h"
 #include "2s2h/FleetShipCombo/FleetComboItems.h"
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h"
 #include "2s2h/Rando/ItemReceiptText.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
-#include "rando/CrossForeign.h"
 #include "ComboExport.h"
 #include "ComboItemReceiptText.h"
 #include "ComboSongDrawMM.h"
+#include "ComboItemIconOwnership.h"
+#include "key_receipt_fixtures.h"
+#include "rando/CrossForeign.h"
 extern "C" {
 #include "message_data_static.h"
 #include "mods/extended_inventory.h"
@@ -44,7 +47,12 @@ static NeiSaveData neiSave{};
 NeiSaveData *Nei_Save() { return &neiSave; }
 SaveContext gSaveContext{};
 
-void Message_StageCustomItemIcon(void*, s16) {}
+static const char* stagedIconPath;
+static s16 stagedIconWidth;
+void Message_StageCustomItemIcon(void* path, s16 width) {
+    stagedIconPath = static_cast<const char*>(path);
+    stagedIconWidth = width;
+}
 static u8 stagedColor[3];
 static s16 stagedWidth, stagedHeight;
 static u8 stagedIA8;
@@ -74,6 +82,19 @@ const std::string& GetCheckDisplayName(RandoCheckId id) {
 }
 }
 
+namespace CustomMessage {
+static Entry shownSong;
+static bool startedSong;
+void SetActiveCustomMessage(std::string msg, Entry options) { options.msg=std::move(msg);shownSong=options;startedSong=false; }
+void StartTextbox(std::string msg, Entry options) { options.msg=std::move(msg);shownSong=options;startedSong=true; }
+}
+static int songGrants=0;
+static u8 grantedSong;
+extern "C" u8 Item_Give(PlayState* play, u8 item) {
+  assert(play==gPlayState);++songGrants;grantedSong=item;return item;
+}
+#include "receipt_song_grants.inc"
+
 static std::string requested;
 static bool donorReady = true;
 static int donorReads = 0;
@@ -102,11 +123,11 @@ static std::string SmallKeyDonorReceipt(const std::string& name) {
     const int fc = FcCombo_ItemForNative(id);
     if (name != gFcComboItems[fc].ootName)
       continue;
-    // The donor boundary supplies a complete converted native tutorial.
-    // Chest Game owns a different native body (0xF3 rather than 0x60).
-    const std::string native = id == RI_OOT_SMALL_KEY_TREASURE_GAME
-        ? "You got a Key!\x01It opens the next door in the Treasure Chest Game.\x02"
-        : "You got a Small Key!\x01This key will open a locked door in this dungeon.\x02";
+    // Dungeon keys use SoH's concise named randomizer receipt. Chest Game
+    // owns a separate native tutorial (0xF3), as before.
+    if (id != RI_OOT_SMALL_KEY_TREASURE_GAME)
+      return ComboItemReceiptText::FromNeiMarkup("You found a %g" + name + "%w!");
+    const std::string native = "You got a Key!\x01It opens the next door in the Treasure Chest Game.\x02";
     std::string body;
     assert(ComboItemReceiptText::FromOotMessage(native, body));
     return body;
@@ -216,55 +237,76 @@ static void CheckForestCompassReceiveRoutes(const char* fixturePath) {
 }
 #endif
 
-static void CheckConcreteSmallKeyReceipts() {
+static void CheckDungeonKeyReceipts() {
   const auto previousSave = gSaveContext;
   const auto previousNei = neiSave;
   gSaveContext.fileNum = 0;
   gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
-  donorReady = true;
-  for (int enabled : {0, 1}) {
-    mapCompassInfo = enabled;
-    assert(Rando::MapCompassInfoEnabled() == bool(enabled));
-    for (int id = RI_OOT_SMALL_KEY_BOTTOM_OF_THE_WELL; id <= RI_OOT_SMALL_KEY_WATER_TEMPLE; ++id) {
-      const auto key = static_cast<RandoItemId>(id);
-      const int fc = FcCombo_ItemForNative(key);
-      assert(fc >= 0 && gFcComboItems[fc].chainLen > 1);
-      const char* name = gFcComboItems[fc].ootName;
-      const std::string expected = FlattenReceiptLines(SmallKeyDonorReceipt(name));
-      for (int count : {0, int(gFcComboItems[fc].chainLen)}) {
-        neiSave.comboObtainedFc[fc] = count;
-        const auto saveBefore = gSaveContext;
-        const auto neiBefore = neiSave;
-        CustomMessage::Entry concrete;
-        concrete.icon = 0xF5;
-        concrete.msg = "generic name-only receipt";
-        requested.clear();
-        const bool accepted = Rando::ApplyItemReceiptText(key, concrete);
-        if (!accepted)
-          std::cerr << "Missing concrete MM key tutorial: " << name << '\n';
-        assert(accepted && "count-chain key bypassed the concrete receipt donor");
-        assert(requested == name && !concrete.autoFormat);
-        assert(FlattenReceiptLines(concrete.msg) == expected);
-        // Direct foreign-sentinel composition must agree with the local item.
-        CustomMessage::Entry foreign;
-        foreign.icon = 0xF5;
-        assert(Rando::ApplyForeignItemReceiptText(name, foreign));
-        assert(foreign.msg == concrete.msg && !foreign.autoFormat);
-        assert(concrete.msg.find("The reward is") == std::string::npos);
-        assert(concrete.msg.find("Its entrance is") == std::string::npos);
-        const std::string body = concrete.msg;
-        Rando::AppendReceiptSource(concrete, " (Bank reward)");
-        assert(concrete.msg.compare(0, body.size(), body) == 0);
-        assert(concrete.msg.substr(body.size()) == "\x10 (Bank reward)\xBF");
-        assert(std::memcmp(&gSaveContext, &saveBefore, sizeof(saveBefore)) == 0);
-        assert(std::memcmp(&neiSave, &neiBefore, sizeof(neiBefore)) == 0);
+  for (bool donorAvailable : {true, false}) {
+    donorReady = donorAvailable;
+    for (int enabled : {0, 1}) {
+      mapCompassInfo = enabled;
+      assert(Rando::MapCompassInfoEnabled() == bool(enabled));
+      for (const auto &fixture : KeyReceiptFixtures::entries) {
+        const auto found = std::find_if(
+            Rando::StaticData::Items.begin(), Rando::StaticData::Items.end(),
+            [&](const auto &row) {
+              return row.second.name &&
+                     std::string_view(row.second.name) == fixture.name;
+            });
+        assert(found != Rando::StaticData::Items.end());
+        const auto key = found->first;
+        const int fc = FcCombo_ItemForNative(key);
+        assert(fc >= 0);
+        const char *name = fixture.name;
+        const std::string expected = KeyReceiptFixtures::Expected(fixture);
+        for (int count : {0, int(gFcComboItems[fc].chainLen)}) {
+          neiSave.comboObtainedFc[fc] = count;
+          const auto saveBefore = gSaveContext;
+          const auto neiBefore = neiSave;
+          CustomMessage::Entry concrete;
+          concrete.icon = 0xF5;
+          concrete.msg = "generic name-only receipt";
+          requested.clear();
+          const bool accepted = Rando::ApplyItemReceiptText(key, concrete);
+          if (!accepted)
+            std::cerr << "Missing dungeon-named MM key receipt: " << name
+                      << '\n';
+          assert(accepted && "dungeon key skipped the receipt builder");
+          assert(!concrete.autoFormat && concrete.icon == 0xF5);
+          if (FlattenReceiptLines(concrete.msg) != expected)
+            std::cerr << "Incorrect key name/color: " << name << '\n';
+          assert(FlattenReceiptLines(concrete.msg) == expected);
+          // Direct foreign-sentinel composition must agree with the local item.
+          CustomMessage::Entry foreign;
+          foreign.icon = 0xF5;
+          assert(Rando::ApplyForeignItemReceiptText(name, foreign));
+          assert(foreign.msg == concrete.msg && !foreign.autoFormat);
+          assert(concrete.msg.find("The reward is") == std::string::npos);
+          assert(concrete.msg.find("Its entrance is") == std::string::npos);
+          const std::string body = concrete.msg;
+          Rando::AppendReceiptSource(concrete, " (Bank reward)");
+          assert(concrete.msg.compare(0, body.size(), body) == 0);
+          assert(concrete.msg.substr(body.size()) == "\x10 (Bank reward)\xBF");
+          assert(std::memcmp(&gSaveContext, &saveBefore, sizeof(saveBefore)) ==
+                 0);
+          assert(std::memcmp(&neiSave, &neiBefore, sizeof(neiBefore)) == 0);
+        }
       }
     }
   }
   gSaveContext = previousSave;
   neiSave = previousNei;
   mapCompassInfo = false;
-  std::cout << "All ten concrete OoT small keys preserve native tutorials in MM; foreign, count, append and info guards passed\n";
+  donorReady = true;
+  CustomMessage::Entry excluded;
+  excluded.msg = "original skeleton-key receipt";
+  assert(!Rando::ApplyItemReceiptText(RI_SKELETON_KEY, excluded));
+  assert(excluded.msg == "original skeleton-key receipt");
+  assert(!Rando::ApplyItemReceiptText(RI_TRAP, CustomMessage::shownSong));
+  std::cout
+      << "All 34 OoT/MM key receipts retain dungeon names/colors in native and "
+         "foreign MM routes, with donor on/off, counts and source append\n";
 }
 
 static void CheckMapCompassInformation() {
@@ -386,6 +428,23 @@ int main(int argc, char** argv) {
   (void)argv;
   PlayState play{};
   gPlayState = &play;
+  // A real cape identity carries the prompt marker through the native and
+  // cross-game builders without changing ownership or visibility at preview
+  // time.
+  const auto capeSaveBefore = gSaveContext;
+  const auto capeNeiBefore = neiSave;
+  CustomMessage::Entry cape;
+  Rando::ApplyItemReceiptText(RI_OOT_EXT_MAGIC_CAPE, cape);
+  assert(cape.capeVisibilityChoice);
+  Rando::ApplyForeignItemReceiptText("Magic Cape", cape);
+  assert(cape.capeVisibilityChoice);
+  Rando::ApplyItemReceiptText(RI_OOT_NEI_ROCS_CAPE, cape);
+  assert(!cape.capeVisibilityChoice &&
+         "Roc's Cape must not open the Magic Cape choice");
+  Rando::ApplyForeignItemReceiptText("Roc's Cape", cape);
+  assert(!cape.capeVisibilityChoice);
+  assert(!std::memcmp(&capeSaveBefore, &gSaveContext, sizeof(capeSaveBefore)));
+  assert(!std::memcmp(&capeNeiBefore, &neiSave, sizeof(capeNeiBefore)));
 #ifdef COMPASS_DONOR_INTEGRATION
   CheckForestCompassReceiveRoutes(argc > 1 ? argv[1] : nullptr);
   return 0;
@@ -401,14 +460,29 @@ int main(int argc, char** argv) {
   const uint16_t hookText =
       Player_GetItemReceiptTextId(GI_HOOKSHOT, ITEM_HOOKSHOT);
   assert(hookText != 0);
-  MessageTableEntry table[] = {{bowText, 0, bow, sizeof(bow) - 1},
+  const char rupee[] = "\x00\x00\x20\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+                       "You got a Green Rupee!\x11It's worth one Rupee.\x19\xBF";
+  const char arrows[] = "\x00\x00\x20\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+                        "You got 10 Arrows!\x11Use them with your bow.\x19\xBF";
+  const auto rupeeText=Player_GetItemReceiptTextId(GI_RUPEE_GREEN,ITEM_RUPEE_GREEN);
+  const auto arrowsText=Player_GetItemReceiptTextId(GI_ARROWS_10,ITEM_ARROWS_10);
+  assert(rupeeText && arrowsText);
+  MessageTableEntry table[] = {{rupeeText,0,rupee,sizeof(rupee)-1},
+                               {arrowsText,0,arrows,sizeof(arrows)-1},
+                               {bowText, 0, bow, sizeof(bow) - 1},
                                {hookText, 0, hook, sizeof(hook) - 1},
                                {0xFFFF, 0, nullptr, 0}};
   play.msgCtx.messageTableNES = table;
   CustomMessage::Entry entry;
   entry.icon = 0xF5;
-  CheckConcreteSmallKeyReceipts();
+  CheckDungeonKeyReceipts();
   CheckMapCompassInformation();
+  // Native MM receipt and exported icon both retain MM's own shield artwork.
+  stagedIconPath = nullptr;
+  assert(Rando::StaticData::GetIconForZMessage(RI_SHIELD_MIRROR) == 0xF5);
+  assert(stagedIconPath && !std::strcmp(stagedIconPath, COMBO_IKANA_SHIELD_ICON));
+  assert(stagedIconWidth == 32);
+  assert(!std::strcmp(Rando::StaticData::GetIconTexturePath(RI_SHIELD_MIRROR), COMBO_IKANA_SHIELD_ICON));
   // GI_NONE song rows must still take the engine's 16x24 IA8 note branch.
   const std::pair<RandoItemId, int> songIcons[] = {
       { RI_SONG_SONATA, ITEM_SONG_SONATA }, { RI_SONG_LULLABY, ITEM_SONG_LULLABY },
@@ -656,7 +730,18 @@ int main(int argc, char** argv) {
                                             RC_CLOCK_TOWER_ROOF_OCARINA));
   assert(donorReads == readsBeforeSlot + 1);
   entry.msg = "brief";
-  assert(!Rando::ApplyItemReceiptText(RI_RUPEE_GREEN, entry));
+  for(const auto [id, detail] : {std::pair{RI_RUPEE_GREEN,"one Rupee"},std::pair{RI_ARROWS_10,"your bow"}}) {
+    entry={};entry.icon=Rando::StaticData::GetIconForZMessage(id);
+    const auto icon=entry.icon;
+    const int reads=donorReads;
+    assert(Rando::ApplyItemReceiptText(id,entry) && "junk receipts must use their brief native body instead of generic queue dialogue");
+    assert(FlattenReceiptLines(entry.msg).find(detail)!=std::string::npos && !entry.autoFormat && entry.icon==icon);
+    assert(donorReads==reads && entry.msg.find('\x19')==std::string::npos);
+    Rando::AppendReceiptSource(entry,"");assert(entry.msg.back()=='\xBF');
+  }
+  CheckDirectSongGrants();
+  std::cout << "Native junk receipts and five actual story-song grants in ENG/FRE/GER, cutscene on/off passed\n";
+  entry.msg="brief";
   assert(!Rando::ApplyItemReceiptText(RI_TRAP, entry));
   assert(!Rando::ApplyItemReceiptText(RI_MAX, entry));
   assert(entry.msg == "brief");

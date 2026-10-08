@@ -22,7 +22,7 @@ namespace NeiGi {
 // calls. This deliberately does not substitute the authored GI catalog bounds.
 // Resource modelview matrices are part of the selected geometry. Dynamic
 // segment geometry or matrices that replace the caller's pose remain unsupported.
-template <class Load> class ModelBoundsReader {
+template <class Load, bool TrackDepth = false> class ModelBoundsReader {
   public:
     ModelBoundsReader(Load& load, float tilt) : mLoad(load), mSin(std::sin(tilt)), mCos(std::cos(tilt)) {
     }
@@ -36,7 +36,14 @@ template <class Load> class ModelBoundsReader {
             return allowEmpty; // Native sword detail/color passes can be geometry-free.
         }
         out = { "selected_sword", { 0, mLow, 0 }, { 0, mHigh, 0 }, 2.f * mRadius, Kind::Neutral, {} };
-        return mHigh > mLow && mRadius > 0.f;
+        return (mHigh > mLow || (TrackDepth && mDepthHigh > mDepthLow)) && mRadius > 0.f;
+    }
+
+    float ShieldTiltX() const {
+        static_assert(TrackDepth);
+        // Correct an XZ-oriented shield without tilting an already upright
+        // replacement. The margin leaves ordinary thick/angled meshes alone.
+        return mDepthHigh - mDepthLow > 2.f * (mHigh - mLow) ? 1.5707963267948966f : 0.f;
     }
 
     bool RestoresModelView() const {
@@ -95,6 +102,10 @@ template <class Load> class ModelBoundsReader {
                 mLow = std::min(mLow, y);
                 mHigh = std::max(mHigh, y);
                 mRadius = std::max(mRadius, std::hypot(x, transformed[2]));
+                if constexpr (TrackDepth) {
+                    mDepthLow = std::min(mDepthLow, transformed[2]);
+                    mDepthHigh = std::max(mDepthHigh, transformed[2]);
+                }
             }
             return true;
         });
@@ -236,6 +247,7 @@ template <class Load> class ModelBoundsReader {
     Load& mLoad;
     float mSin, mCos, mLow = std::numeric_limits<float>::max(), mHigh = -std::numeric_limits<float>::max();
     float mRadius = 0;
+    float mDepthLow = std::numeric_limits<float>::max(), mDepthHigh = -std::numeric_limits<float>::max();
     size_t mVertices = 0, mCommands = 0;
     Matrix mMatrix{ { { { 1, 0, 0, 0 } }, { { 0, 1, 0, 0 } }, { { 0, 0, 1, 0 } }, { { 0, 0, 0, 1 } } } };
     std::vector<Matrix> mStack;

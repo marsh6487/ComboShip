@@ -10,6 +10,7 @@
  */
 
 #include "extended_equipment.h"
+#include "../../combo/menu/ComboItemIconOwnership.h"
 #include "equipment/nei_equipment_presentation.h"
 #include "nei_save.h" // Skijer's NEI
 #include "transformation_masks/transformation_masks.h"
@@ -899,7 +900,7 @@ static const char* sExtEquipIconPaths[4][3] = {
     { dgItemIconCaneOfByrnaTex, dgItemIconFourSwordTex, dgItemIconTridentTex },
     // Shields
     { dgItemIconGoddessShieldTex, dgItemIconKiteShieldTex,
-      "__OTR__icon_item_static_yar/gItemIconMirrorShieldTex" }, // Shield of Ikana (MM mirror shield)
+      COMBO_IKANA_SHIELD_ICON }, // Shield of Ikana (MM mirror shield)
     // Tunics
     { dgItemIconChampionsTunicTex, dgItemIconMagicTunicTex, dgItemIconSagesTunicTex },
     // Boots

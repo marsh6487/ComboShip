@@ -40,86 +40,32 @@ inline void SongHeart(Mesh& mesh, Point center, float radius, uint32_t color, ui
     }
 }
 
-// A filled fire silhouette with three joined tongues and a broad yellow core.
-// The old transparent ribbons made only their thin centers visible, producing
-// detached red squiggles even when their outer geometry was wide.
-inline void SongFlame(Mesh& mesh, Point origin, float height, float width, float phase, float opacity,
-                      const Basis& camera) {
-    const Point axis{ 0, 1, 0 };
-    Point side = Cross(axis, camera.forward);
-    if (side.x * side.x + side.y * side.y + side.z * side.z < .001f)
-        side = camera.right;
-    side = Unit(side);
-    const auto tongue = [&](Point base, float length, float breadth, float bend, bool core) {
-        const auto center = [&](float u) {
-            return base + axis * (length * u) +
-                   side * (bend * u * u + .12f * breadth * std::sin(phase + u * 2.f) * u * u);
-        };
-        const auto edge = [&](float u) {
-            return side * (breadth * std::sin((.2f + .8f * u) * Tau * .5f) * (1.f - .22f * u));
-        };
-        const auto vertex = [&](float u, float across) {
-            const uint32_t middle = core ? (u < .6f ? 0xFFF2AD : 0xFFD35B) : (u < .6f ? 0xFFAF36 : 0xFF7D20);
-            const uint32_t rim = core ? middle : 0xF45D19;
-            const uint8_t alpha = uint8_t((core ? 245.f : (across ? 155.f : 225.f)) * opacity);
-            return EffectVertex{ center(u) + edge(u) * across, across ? rim : middle, u >= 1.f ? uint8_t(0) : alpha };
-        };
-        for (int j = 0; j < 5; ++j) {
-            const float u = j / 5.f, next = (j + 1) / 5.f;
-            for (float across : { -1.f, 1.f }) {
-                mesh.Tri(vertex(u, 0), vertex(u, across), vertex(next, across));
-                mesh.Tri(vertex(u, 0), vertex(next, across), vertex(next, 0));
-            }
-        }
-    };
-    // Short side tongues share the main flame's base and split toward their
-    // tips. Only the tips flicker sideways; the body stays broad and upright.
-    tongue(origin - side * (width * .48f), height * .67f, width * .56f, -width * .72f, false);
-    tongue(origin + side * (width * .43f), height * .78f, width * .5f, width * .62f, false);
-    tongue(origin, height, width, width * .12f * std::sin(phase), false);
-    tongue(origin + axis * (height * .04f), height * .61f, width * .48f, 0, true);
-}
-
 inline Mesh SampleSong(int song, uint32_t frame, const Basis& camera = {}) {
     Mesh mesh;
     const bool warp = song >= CW_SONG_OOT_MINUET && song <= CW_SONG_OOT_PRELUDE;
-    const bool approved = song == CW_SONG_OOT_ZELDA || song == CW_SONG_SARIA || song == CW_SONG_OOT_SARIA;
+    const bool approved =
+        song == CW_SONG_OOT_ZELDA || song == CW_SONG_SARIA || song == CW_SONG_OOT_SARIA || song == CW_SONG_SOARING;
     if (!warp && !approved)
         return mesh; // Plain regular notes; Epona/Sun use only the shared shimmer, Storms uses rain.
     const uint32_t color = ComboSongColorHex(song);
     const float t = (frame % 720u) * (Tau / 360.f);
-    if (song == CW_SONG_OOT_BOLERO) {
-        for (int i = 0; i < 6; ++i) {
-            const float phase = float((frame % 120u + i * 20u) % 120u) / 120.f;
-            const float angle = i * Tau / 6 + t * .25f;
-            const Point p{ 21 * std::cos(angle), -24 + phase * 38, 21 * std::sin(angle) };
-            SongFlame(mesh, p, 17 + 2 * std::sin(t * 2 + i), 6.6f, t * 4 + i, .7f + .3f * std::sin(phase * Tau * .5f),
-                      camera);
-        }
-        return mesh;
-    }
-    if (song == CW_SONG_OOT_SERENADE)
+    if (song == CW_SONG_OOT_BOLERO || song == CW_SONG_OOT_SERENADE)
         return mesh; // Keep the native note and shared shimmer; no encircling overlay.
-    const bool sun = song == CW_SONG_OOT_PRELUDE;
-    const bool leaves = song == CW_SONG_SARIA || song == CW_SONG_OOT_SARIA || song == CW_SONG_OOT_MINUET;
-    if (sun) {
-        for (int ring = 0; ring < 1; ++ring) {
-            const auto point = [&](int j) {
-                const float a = j * Tau / 16 + t * .5f;
-                return Plane(camera, 20 * std::cos(a), 20 * std::sin(a));
-            };
-            for (int j = 0; j < 16; ++j)
-                Band(mesh, point(j), point(j + 1), .65f, color, 0xFFF8FF, camera,
-                     uint8_t(120 + 90 * (.5f + .5f * std::sin(t + j * .3f))));
+    if (song == CW_SONG_SOARING) {
+        for (int i = 0; i < 6; ++i) {
+            const float phase = float((frame % 240u + i * 40u) % 240u) / 240.f;
+            const float angle = i * Tau / 6 + t * .25f;
+            const Point p{ 23 * std::cos(angle), 28 - 56 * phase, 23 * std::sin(angle) };
+            SongFeather(mesh, p, t * .4f + i, color, uint8_t(210 * std::sin(phase * Tau * .5f)), camera);
         }
-        if (sun)
-            Glow(mesh, {}, 28.f, color, 85, camera);
         return mesh;
     }
+    const bool light = song == CW_SONG_OOT_PRELUDE;
+    const bool leaves = song == CW_SONG_SARIA || song == CW_SONG_OOT_SARIA || song == CW_SONG_OOT_MINUET;
     for (int i = 0; i < 9; ++i) {
         const float phase = float((frame % 240u + i * 27u) % 240u) / 240.f;
         const float angle = i * 2.399963f + t * .4f;
-        Point p{ 23 * std::cos(angle), 28 - 56 * phase, 23 * std::sin(angle) };
+        Point p{ 23 * std::cos(angle), light ? -28 + 56 * phase : 28 - 56 * phase, 23 * std::sin(angle) };
         const uint8_t alpha = uint8_t(210 * std::sin(phase * Tau * .5f));
         if (leaves) {
             const float roll = t + i;
@@ -128,7 +74,8 @@ inline Mesh SampleSong(int song, uint32_t frame, const Basis& camera = {}) {
             mesh.Tri({ p + along, color, alpha }, { p + across, color, alpha }, { p - along, 0xD8FFD0, alpha });
             mesh.Tri({ p + along, color, alpha }, { p - along, 0xD8FFD0, alpha }, { p - across, color, alpha });
         } else {
-            // Zelda/Nocturne/Requiem retain their existing bounded song motes.
+            // Prelude has rising light motes; Zelda/Nocturne/Requiem keep their
+            // existing bounded particles.
             Glow(mesh, p, 2.5f, color, alpha, camera);
         }
     }

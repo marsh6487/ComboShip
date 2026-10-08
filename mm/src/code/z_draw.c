@@ -4,11 +4,13 @@
  * @brief Draw get-item models
  */
 #include "global.h"
+#include "ComboElementalArrowGi.h"
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "2s2h/Enhancements/ItemVisuals.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <libultraship/bridge/resourcebridge.h>
 #include "ComboFairyBottle.h"
+#include "ComboBottleGi.h"
 #include "assets/objects/gameplay_keep/gameplay_keep.h"
 #include "assets/objects/object_gi_arrow/object_gi_arrow.h"
 #include "assets/objects/object_gi_arrowcase/object_gi_arrowcase.h"
@@ -819,6 +821,7 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         KIND_POES = 8,
         KIND_MM_FAIRY_BOTTLE = 21,
         KIND_MM_FAIRY_CONTAINER = 37,
+        KIND_ELEMENTAL_ARROW = 39,
     };
     static const s8 sOrder0[] = { 0 };
     static const s8 sOrder01[] = { 0, 1 };
@@ -827,6 +830,7 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
     static const s8 sOrder1032[] = { 1, 0, 3, 2 };
     static const s8 sOrderWallet[] = { 1, 0, 2, 3, 4, 5, 6, 7 };
     static const s8 sOrderRaw[] = { 0, 1, 2, 3, 4, 5, 6, 7 };
+    static const s8 sBottlePotion[] = { 1, 3, 5 };
     void (*drawFunc)(PlayState*, s16);
     void** res;
     const s8* order;
@@ -877,9 +881,10 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         count = 2;
         xluStart = 1;
     } else if (drawFunc == GetItem_DrawMagicArrow) {
-        order = sOrder012;
-        count = 3;
-        xluStart = 1;
+        order = sOrder0;
+        count = 1;
+        xluStart = -1;
+        kind = KIND_ELEMENTAL_ARROW;
     } else if (drawFunc == GetItem_DrawUpgrades) {
         order = sOrder1023;
         count = 4;
@@ -941,10 +946,20 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         count = 1;
         xluStart = 0;
     } else if (drawFunc == GetItem_DrawPotion) {
-        kind = KIND_POTION;
-        order = sOrderRaw;
-        count = 6;
-        xluStart = 4;
+        if (ComboBottleGi_HasPotionRecipe((const char*)res[0], (const char*)res[3], (const char*)res[5],
+                                          ResourceMgr_LoadGfxByName)) {
+            if (maxDlists < 3) {
+                return 0;
+            }
+            order = sBottlePotion;
+            count = 3;
+            xluStart = 0;
+        } else {
+            kind = KIND_POTION;
+            order = sOrderRaw;
+            count = 6;
+            xluStart = 4;
+        }
     } else if (drawFunc == GetItem_DrawPoes) {
         kind = KIND_POES;
         order = sOrderRaw;
@@ -1143,22 +1158,30 @@ void GetItem_DrawPotion(PlayState* play, s16 drawId) {
 
     OPEN_DISPS(play->state.gfxCtx);
 
-    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    if (ComboBottleGi_HasPotionRecipe(
+            (const char*)sDrawItemTable[drawId].drawResources[0], (const char*)sDrawItemTable[drawId].drawResources[3],
+            (const char*)sDrawItemTable[drawId].drawResources[5], ResourceMgr_LoadGfxByName)) {
+        Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[1]);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[3]);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[5]);
+    } else {
+        Gfx_SetupDL25_Opa(play->state.gfxCtx);
+        gSPSegment(POLY_OPA_DISP++, 0x08,
+                   Gfx_TwoTexScrollEx(play->state.gfxCtx, G_TX_RENDERTILE, -play->state.frames, play->state.frames, 32,
+                                      32, 1, -play->state.frames, play->state.frames, 32, 32, -1, 1, -1, 1));
+        MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[1]);
+        gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
+        gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[2]);
+        gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[3]);
 
-    gSPSegment(POLY_OPA_DISP++, 0x08,
-               Gfx_TwoTexScrollEx(play->state.gfxCtx, G_TX_RENDERTILE, -play->state.frames, play->state.frames, 32, 32,
-                                  1, -play->state.frames, play->state.frames, 32, 32, -1, 1, -1, 1));
-    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[1]);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[2]);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[3]);
-
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[4]);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[5]);
+        Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+        MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[4]);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[5]);
+    }
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -1441,13 +1464,8 @@ void GetItem_DrawMagicArrow(PlayState* play, s16 drawId) {
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
 
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[1]);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[2]);
-
     CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawElementalArrow(play, NeiArrowGi_ProfileForDrawId(drawId, GID_ARROW_FIRE, GID_ARROW_ICE, GID_ARROW_LIGHT));
 }
 
 void GetItem_DrawUpgrades(PlayState* play, s16 drawId) {

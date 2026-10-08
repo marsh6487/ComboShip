@@ -257,7 +257,7 @@ void Wand_TickInput(PlayState* play, Player* player) {
             if (mode == WAND_MODE_TORNADO) {
                 WandWind_TickHover(player, in.isHeld);
             } else if (mode == WAND_MODE_SAND) {
-                // A press is handled below once. Held drain and coverage share the equip/blocker
+                // A press is handled below once. Held placement shares the equip/blocker
                 // gates; all other input paths reset Sand's cadence at the end of this frame.
                 u8 canHold = sWasDrawn && in.wasEquipped && !in.isPressed && !ItemInput_IsBlocked(player, play);
                 sandHeld = canHold && in.isHeld;
@@ -277,7 +277,9 @@ void Wand_TickInput(PlayState* play, Player* player) {
     } else {
         sHoldTimer = 0;
     }
-    WandSand_TickHold(player, play, sandHeld);
+    if (WandSand_HoldElapsed(player, sandHeld)) {
+        Wand_Cast(player, play, WAND_MODE_SAND);
+    }
     sWasDrawn = drawn;
 }
 

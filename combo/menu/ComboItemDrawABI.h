@@ -4,6 +4,7 @@
  * storage (path literals from asset headers — process-lifetime). */
 #ifndef COMBO_ITEM_DRAW_ABI_H
 #define COMBO_ITEM_DRAW_ABI_H
+#include "ComboElementalArrowGi.h"
 
 #include <stdint.h>
 #include "../ComboGameExport.h"
@@ -74,6 +75,7 @@ typedef enum {
     CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT = 34, /* concrete static award; ops[0] native equipment selector */
     CW_DRAW_KIND_SONG_GI = 38,              /* note plus song profile in neiEffect; native env or grayscale tint */
     CW_DRAW_KIND_MM_FAIRY_CONTAINER = 37,   /* OPA shell0, XLU glass1/contents2; dl3 is its native Mtx path */
+    CW_DRAW_KIND_ELEMENTAL_ARROW = 39,      /* owner arrow core dl0; host aura profile 1..3 in neiEffect */
 } CwDrawKind;
 
 #define CW_DRAW_MAX_OPS 20

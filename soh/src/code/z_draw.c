@@ -6,6 +6,8 @@
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/randomizer/NeiGiPresentation.h"
 #include "ComboFairyBottle.h"
+#include "ComboBottleGi.h"
+#include "ComboElementalArrowGi.h"
 #include "objects/object_gi_key/object_gi_key.h"
 #include "objects/object_gi_jewel/object_gi_jewel.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
@@ -547,7 +549,8 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         KIND_MAGIC_SPELL = 11,
         KIND_SCALE = 12,
         KIND_SKULL_TOKEN = 13,
-        KIND_MUSIC_NOTE = 14
+        KIND_MUSIC_NOTE = 14,
+        KIND_ELEMENTAL_ARROW = 39
     };
     static const s8 sOrder0[] = { 0 };
     static const s8 sOrder01[] = { 0, 1 };
@@ -561,6 +564,7 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
     static const s8 sIdent3[] = { 0, 1, 2 };
     static const s8 sIdent4[] = { 0, 1, 2, 3 };
     static const s8 sIdent6[] = { 0, 1, 2, 3, 4, 5 };
+    static const s8 sBottlePotion[] = { 1, 3, 5 };
     void (*drawFunc)(PlayState*, s16);
     Gfx** res;
     const s8* order;
@@ -600,10 +604,20 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         xluStart = 0;
         kind = KIND_FISH;
     } else if (drawFunc == GetItem_DrawPotion) {
-        order = sIdent6;
-        count = 6;
-        xluStart = 4;
-        kind = KIND_POTION;
+        if (ComboBottleGi_HasPotionRecipe((const char*)res[0], (const char*)res[3], (const char*)res[5],
+                                          ResourceMgr_LoadGfxByName)) {
+            if (maxDlists < 3) {
+                return 0;
+            }
+            order = sBottlePotion;
+            count = 3;
+            xluStart = 0; // Owning palette, translucent liquid, then neutral glass.
+        } else {
+            order = sIdent6;
+            count = 6;
+            xluStart = 4;
+            kind = KIND_POTION;
+        }
     } else if (drawFunc == GetItem_DrawMirrorShield) {
         order = sIdent2;
         count = 2;
@@ -730,9 +744,10 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         count = 2;
         xluStart = 1;
     } else if (drawFunc == GetItem_DrawMagicArrow) {
-        order = sOrder012;
-        count = 3;
-        xluStart = 1;
+        order = sOrder0;
+        count = 1;
+        xluStart = -1;
+        kind = KIND_ELEMENTAL_ARROW;
     } else if (drawFunc == GetItem_DrawOpa10Xlu2) {
         order = sOrder102;
         count = 3;
@@ -1125,21 +1140,31 @@ void GetItem_DrawPotion(PlayState* play, s16 drawId) {
 
     OPEN_DISPS(play->state.gfxCtx);
 
-    Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    gSPSegment(POLY_OPA_DISP++, 0x08,
-               Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, -1 * (play->state.frames * 1), 1 * (play->state.frames * 1),
-                                  32, 32, 1, -1 * (play->state.frames * 1), 1 * (play->state.frames * 1), 32, 32, -1, 1,
-                                  -1, 1));
-    gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[1]);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[0]);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[2]);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[3]);
+    if (ComboBottleGi_HasPotionRecipe((const char*)sDrawItemTable[drawId].dlists[0],
+                                      (const char*)sDrawItemTable[drawId].dlists[3],
+                                      (const char*)sDrawItemTable[drawId].dlists[5], ResourceMgr_LoadGfxByName)) {
+        Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+        gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[1]);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[3]);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[5]);
+    } else {
+        Gfx_SetupDL_25Opa(play->state.gfxCtx);
+        gSPSegment(POLY_OPA_DISP++, 0x08,
+                   Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, -1 * (play->state.frames * 1),
+                                      1 * (play->state.frames * 1), 32, 32, 1, -1 * (play->state.frames * 1),
+                                      1 * (play->state.frames * 1), 32, 32, -1, 1, -1, 1));
+        gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+        gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[1]);
+        gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[0]);
+        gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[2]);
+        gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[3]);
 
-    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
-    gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[4]);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[5]);
+        Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+        gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[4]);
+        gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[5]);
+    }
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -1346,12 +1371,8 @@ void GetItem_DrawMagicArrow(PlayState* play, s16 drawId) {
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[0]);
 
-    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
-    gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[1]);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[2]);
-
     CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawElementalArrow(play, NeiArrowGi_ProfileForDrawId(drawId, GID_ARROW_FIRE, GID_ARROW_ICE, GID_ARROW_LIGHT));
 }
 
 void GetItem_DrawMagicSpell(PlayState* play, s16 drawId) {

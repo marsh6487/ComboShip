@@ -11,7 +11,7 @@
 /* Value-owned receipt metadata. No save, inventory, C++ object, or temporary
  * texture pointer crosses the DLL boundary. Zero means ordinary formatting. */
 typedef struct {
-    int32_t singleBox; /* authored information layout; long hints may page */
+    int32_t singleBox; /* authored information layout; fit short map hints */
     int32_t rewardLine;
     char iconPath[512];
     int32_t iconWidth, iconHeight, iconIA8, iconHasColor;
@@ -56,10 +56,16 @@ static inline int ComboReceipt_CopyIcon(CwItemReceiptPresentation* p, const CwIt
     return ComboReceipt_HasIcon(p);
 }
 
-/* Both Latin renderers truncate each glyph and advance spaces by six pixels.
- * A fixed native scale preserves the proportions between letters and words. */
+/* Match the native pen, including its per-glyph integer truncation. Receipt
+ * spaces scale with letters; ordinary dialogue keeps its native spacing. */
+static inline int32_t ComboReceipt_GlyphWidthScaled(uint8_t c, const float* widths, size_t count, int32_t scale) {
+    return c == ' '                                  ? 6 * scale / 75
+           : c >= 0x20 && (size_t)(c - 0x20) < count ? (int32_t)(widths[c - 0x20] * (scale / 100.0f))
+                                                     : 0;
+}
+
 static inline int32_t ComboReceipt_GlyphWidth(uint8_t c, const float* widths, size_t count) {
-    return c == ' ' ? 6 : c >= 0x20 && (size_t)(c - 0x20) < count ? (int32_t)(widths[c - 0x20] * 0.75f) : 0;
+    return ComboReceipt_GlyphWidthScaled(c, widths, count, 75);
 }
 
 static inline size_t ComboReceipt_CommandSize(uint8_t c, int mm) {
@@ -70,7 +76,8 @@ static inline size_t ComboReceipt_CommandSize(uint8_t c, int mm) {
                                                                                                    : 1;
 }
 
-static inline int32_t ComboReceipt_LineWidth(const char* body, size_t size, int mm, const float* widths, size_t count) {
+static inline int32_t ComboReceipt_LineWidthScaled(const char* body, size_t size, int mm, const float* widths,
+                                                   size_t count, int32_t scale) {
     int32_t width = 0;
     for (size_t i = 0; i < size;) {
         uint8_t c = (uint8_t)body[i];
@@ -80,21 +87,27 @@ static inline int32_t ComboReceipt_LineWidth(const char* body, size_t size, int 
         // MM's END byte is also in the font table; commands never advance
         // the native pen, even when their numeric value has a glyph width.
         if (command == 1 && c != (mm ? 0xBF : 0x02))
-            width += ComboReceipt_GlyphWidth(c, widths, count);
+            width += ComboReceipt_GlyphWidthScaled(c, widths, count, scale);
         i += command;
     }
     return width;
 }
 
-/* Reflow once before native decoding. Authored hint paragraphs keep their line
- * breaks; long names wrap at words and every fourth line becomes a normal page.
- * The final reward sprite follows its text onto that page. No font shrinking,
- * story commands, save changes or inventory-dependent item resolution occurs. */
-static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresentation* p, char* body, size_t size,
-                                                      size_t capacity, int mm, const float* widths, size_t count) {
-    CwItemReceiptLayout result = { 75, 0, 0, 0, 0, 0, 0, (uint32_t)size };
+static inline int32_t ComboReceipt_LineWidth(const char* body, size_t size, int mm, const float* widths, size_t count) {
+    return ComboReceipt_LineWidthScaled(body, size, mm, widths, count, 75);
+}
+
+/* Reflow before native decoding. Track generated pages independently of
+ * authored page breaks so map fitting never removes a later attribution. */
+static inline CwItemReceiptLayout ComboReceipt_LayoutAtScale(const CwItemReceiptPresentation* p, char* body,
+                                                             size_t size, size_t capacity, int mm, const float* widths,
+                                                             size_t count, int32_t scale, int* overflow) {
+    CwItemReceiptLayout result = { scale, 0, 0, 0, 0, 0, 0, (uint32_t)size };
     const CwItemReceiptLayout unchanged = result;
     char wrapped[1280];
+    int generatedPage = 0;
+    if (overflow)
+        *overflow = 1; // Capacity/malformed failures must not qualify as a fitted body.
     if (!body || size > capacity || capacity > sizeof(wrapped))
         return result;
     const uint8_t newline = mm ? 0x11 : 0x01;
@@ -125,6 +138,8 @@ static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresent
         if ((mm && c <= 8) || (!mm && c == 0x05))
             color = mm ? c : (uint8_t)body[i + 1];
         if (c == page || c == end) {
+            if (mainBody && !hasIcon)
+                result.firstPageEnd = (uint32_t)length;
             if (mainBody && hasIcon) {
                 result.iconX = (bossLineIcon ? width : (width > pageWidth ? width : pageWidth)) + 4;
                 result.iconY = (int32_t)line * 12 - (bossLineIcon ? 0 : (result.iconHeight - 12) / 2);
@@ -143,6 +158,8 @@ static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresent
             if (c == newline && ++line == 3) {
                 br = page;
                 line = 0;
+                if (mainBody)
+                    generatedPage = 1;
             } else if (c == page) {
                 line = 0;
             }
@@ -168,13 +185,17 @@ static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresent
         // Centered sprites span adjacent rows. A top-aligned boss sprite only
         // needs its column reserved after the authored title break.
         const int32_t available = 220 - (mainBody && hasIcon && (!bossLineIcon || bossLine) ? result.iconWidth + 4 : 0);
-        const int32_t glyph = c != end && command == 1 ? ComboReceipt_GlyphWidth(c, widths, count) : 0;
+        const int32_t activeScale = mainBody ? scale : 75;
+        const int32_t glyph =
+            c != end && command == 1 ? ComboReceipt_GlyphWidthScaled(c, widths, count, activeScale) : 0;
         if (width + glyph > available && width > 0) {
             const uint8_t br = ++line == 3 ? (line = 0, page) : newline;
+            if (br == page && mainBody)
+                generatedPage = 1;
             size_t split = space != (size_t)-1 ? space : length;
             uint8_t splitColor = space != (size_t)-1 ? spaceColor : color;
             const int32_t finishedWidth =
-                ComboReceipt_LineWidth(wrapped + lineStart, split - lineStart, mm, widths, count);
+                ComboReceipt_LineWidthScaled(wrapped + lineStart, split - lineStart, mm, widths, count, activeScale);
             if (finishedWidth > pageWidth)
                 pageWidth = finishedWidth;
             if (space == (size_t)-1) {
@@ -197,7 +218,8 @@ static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresent
                 wrapped[lineStart++] = (char)splitColor;
                 length += restore;
             }
-            width = ComboReceipt_LineWidth(wrapped + lineStart, length - lineStart, mm, widths, count);
+            width =
+                ComboReceipt_LineWidthScaled(wrapped + lineStart, length - lineStart, mm, widths, count, activeScale);
             space = (size_t)-1;
         }
         if (command > capacity - length)
@@ -218,8 +240,52 @@ static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresent
         result.firstPageEnd = (uint32_t)length;
     }
     memcpy(body, wrapped, length);
+    if (mainBody && !hasIcon)
+        result.firstPageEnd = (uint32_t)length;
     result.bodySize = (uint32_t)length;
+    if (overflow)
+        *overflow = generatedPage;
     return result;
+}
+
+/* Compass sprites retain the established native layout. Maps first keep their
+ * three authored rows and select the largest readable size that fits. Very
+ * long inverse entrance lists may share the title's short layout hint row.
+ * Genuine long bodies still page safely instead of truncating or overflowing. */
+static inline CwItemReceiptLayout ComboReceipt_Layout(const CwItemReceiptPresentation* p, char* body, size_t size,
+                                                      size_t capacity, int mm, const float* widths, size_t count) {
+    char candidate[1280];
+    if (body && size <= capacity && capacity <= sizeof(candidate) && p && p->singleBox && p->rewardLine != 1 &&
+        !ComboReceipt_HasIcon(p)) {
+        for (int mergeTitle = 0; mergeTitle < 2; ++mergeTitle) {
+            for (int32_t scale = 75; scale >= 55; --scale) {
+                memcpy(candidate, body, size);
+                if (mergeTitle) {
+                    // Only join the first authored newline. Command arguments
+                    // and explicit page boundaries are never interpreted as text.
+                    for (size_t i = 0; i < size;) {
+                        const uint8_t c = (uint8_t)candidate[i];
+                        const size_t command = ComboReceipt_CommandSize(c, mm);
+                        if (command > size - i || c == (mm ? 0x10 : 0x04) || c == (mm ? 0xBF : 0x02))
+                            break;
+                        if (c == (mm ? 0x11 : 0x01)) {
+                            candidate[i] = ' ';
+                            break;
+                        }
+                        i += command;
+                    }
+                }
+                int overflow = 0;
+                CwItemReceiptLayout fitted =
+                    ComboReceipt_LayoutAtScale(p, candidate, size, capacity, mm, widths, count, scale, &overflow);
+                if (!overflow) {
+                    memcpy(body, candidate, fitted.bodySize);
+                    return fitted;
+                }
+            }
+        }
+    }
+    return ComboReceipt_LayoutAtScale(p, body, size, capacity, mm, widths, count, 75, NULL);
 }
 
 #endif

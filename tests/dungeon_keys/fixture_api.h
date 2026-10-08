@@ -12,7 +12,7 @@ typedef char Gfx;
 typedef struct {
   u8 r, g, b, a;
 } Color_RGBA8;
-typedef struct {
+typedef struct PlayState {
   struct {
     void *gfxCtx;
   } state;

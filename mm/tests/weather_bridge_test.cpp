@@ -21,6 +21,10 @@ static float rainGain;
 static int resets;
 static int rainDraws;
 static int skyRebuilds;
+void MMAutumnSceneFoliage_Update(const PlayState*) {
+}
+void MMAutumnSceneFoliage_Reset() {
+}
 static uint8_t nativeRainAmbience;
 static uint8_t nativeThunderAmbience;
 f32 D_801F4E74;
@@ -480,7 +484,57 @@ static void SeasonWeatherRegression() {
     std::puts("PASS seasonal rain, snow sky, clear weather, Off, interior/story restore and user override");
 }
 
+static void AutumnShowerRegression() {
+    static PlayState play{};
+    Camera camera{};
+    play.sceneId = SCENE_00KEIKOKU;
+    play.skyboxId = SKYBOX_NORMAL_SKY;
+    play.cameraPtrs[0] = &camera;
+    play.envCtx.lightSettingOverride = LIGHT_SETTING_OVERRIDE_NONE;
+    settings.clear();
+    MMWeather_Reset();
+    auto& nei = gSaveContext.save.shipSaveInfo.nei;
+    nei.seasonsOwned = 0x0F;
+    nei.season = SEASON_AUTUMN;
+    gSaveContext.save.day = 1;
+    const auto native = play.envCtx;
+    bool wet = false, dryAfterWet = false;
+    for (int frame = 0; frame < 2500; ++frame) {
+        ++play.gameplayFrames;
+        MMWeather_Update(&play);
+        const int density = MMWeather_RainDensity();
+        assert(density >= 0 && density <= 15);
+        assert(MMWeather_Overcast() <= 0.5f);
+        assert(rainGain >= 0 && rainGain <= 0.6f);
+        if (density > 0) {
+            wet = true;
+            assert(rainGain > 0 && MMWeather_Overcast() > 0);
+        } else if (wet)
+            dryAfterWet = true;
+        assert(std::memcmp(&native, &play.envCtx, sizeof(native)) == 0);
+    }
+    assert(wet && dryAfterWet);
+    const int density = MMWeather_RainDensity();
+    play.pauseCtx.state = PAUSE_STATE_MAIN;
+    for (int frame = 0; frame < 100; ++frame)
+        MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == density);
+    play.pauseCtx.state = PAUSE_STATE_OFF;
+    nei.season = SEASON_OFF;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0 && rainGain == 0 && MMWeather_Overcast() == 0);
+    nei.season = SEASON_AUTUMN;
+    play.skyboxId = SKYBOX_NONE;
+    for (int frame = 0; frame < 1000; ++frame)
+        MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0 && rainGain == 0);
+    nei.seasonsOwned = 0;
+    MMWeather_Reset();
+    std::puts("PASS gentle autumn wet/dry cycle, audio/sky agreement, pause, Off and indoor cleanup");
+}
+
 int main() {
+    AutumnShowerRegression();
     static PlayState play{};
     Camera camera{};
     play.cameraPtrs[0] = &camera;

@@ -22,6 +22,7 @@ def verify_windows_reward_export_contract():
 
 
 verify_windows_reward_export_contract()
+subprocess.run([sys.executable, str(ROOT / 'scripts/diagnostics/run_chest_game_key_receipt_tests.py')], check=True)
 
 
 def block(source, start):
@@ -44,6 +45,7 @@ preamble = r'''
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
 #include <map>
 #include <string>
 #include <iostream>
@@ -64,12 +66,16 @@ int gMMComboGoalRequired=0;
 int (*gMMComboOtherTriforceCount)()=nullptr;
 int CVarGetInteger(const char*,int fallback) { return fallback; }
 int granted=0,delivered=0;
+bool showCutscene=true;
+bool donorAvailable=true;
+const char* latchedName="Deku Leaf";
 bool queued=true;
 namespace CustomMessage {
-struct Entry { uint8_t textboxType=0,textboxYPos=0,icon=0xFE; uint16_t nextMessageID=0xFFFF,firstItemCost=0xFFFF,secondItemCost=0xFFFF; bool autoFormat=true; std::string msg; };
+struct Entry { uint8_t textboxType=0,textboxYPos=0,icon=0xFE; uint16_t nextMessageID=0xFFFF,firstItemCost=0xFFFF,secondItemCost=0xFFFF; bool autoFormat=true; std::string msg; bool capeVisibilityChoice=false; };
 Entry shown;
-void SetActiveCustomMessage(std::string msg,Entry e) { e.msg=msg;shown=e; }
-void StartTextbox(std::string msg,Entry e) { e.msg=msg;shown=e; }
+int shownCount=0;
+void SetActiveCustomMessage(std::string msg,Entry e) { e.msg=msg;shown=e;++shownCount; }
+void StartTextbox(std::string msg,Entry e) { e.msg=msg;shown=e;++shownCount; }
 std::string RemoveColorCodes(std::string s) { return s; }
 }
 namespace Notification { struct Info { const char* itemIcon=nullptr;std::string message,suffix; };void Emit(Info){} }
@@ -85,9 +91,9 @@ void AppendReceiptSource(CustomMessage::Entry&,const std::string&);
 namespace StaticData {
 struct Item {RandoItemType randoItemType=RITYPE_MAJOR;};
 std::map<RandoItemId,Item> Items;
-std::string GetItemName(RandoItemId,bool=true,RandoCheckId=RC_UNKNOWN) {return "the Deku Leaf";}
+std::string GetItemName(RandoItemId id,bool=true,RandoCheckId=RC_UNKNOWN) {return id==RI_OOT_EXT_MAGIC_CAPE ? "the Magic Cape" : "the Deku Leaf";}
 uint8_t GetIconForZMessage(RandoItemId) {return 0xF5;}
-bool ShouldShowGetItemCutscene(RandoItemId) {return true;}
+bool ShouldShowGetItemCutscene(RandoItemId) {return showCutscene;}
 const char* GetIconTexturePath(RandoItemId) {return "icon";}
 std::string GetCheckDisplayName(RandoCheckId) {return "test check";}
 }
@@ -95,12 +101,12 @@ RandoItemId ConvertItem(RandoItemId i,RandoCheckId){return i;}
 RandoItemId CurrentJunkItem(RandoCheckId){return RI_RUPEE_GREEN;}
 void GiveItem(RandoItemId,RandoCheckId){++granted;}
 void LatchComboForeign(RandoCheckId){}
-const char* ComboForeignLatchedName(RandoCheckId){return "Deku Leaf";}
+const char* ComboForeignLatchedName(RandoCheckId){return latchedName;}
 uint8_t ComboForeignMessageIcon(RandoCheckId){return 0xF5;}
 namespace MiscBehavior {
 std::string BankRewardSourceSuffix(RandoCheckId){return " (Bank reward)";}
 const ComboRando::ForeignItem* MM_LookupForeign(RandoCheckId){return &foreign;}
-bool ShouldShowForeignCutscene(RandoCheckId){return true;}
+bool ShouldShowForeignCutscene(RandoCheckId){return showCutscene;}
 void OfferTrapItem(){}
 void SendForeignCheck(RandoCheckId){++delivered;}
 void BroadcastCheckObtainedIfFirst(RandoCheckId,RandoItemId,bool){}
@@ -108,17 +114,23 @@ std::string GetTrapMessage(){return "A trap!";}
 }
 // This seam stands in for the engine/catalog lookup, not for receipt selection.
 bool ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& e) {
+ if(id==RI_OOT_EXT_MAGIC_CAPE) {
+   e.capeVisibilityChoice=true;
+   if(!donorAvailable) return false;
+   e.msg="You got the Magic Cape!";e.autoFormat=false;return true;
+ }
  if(id!=RI_OOT_NEI_DEKU_LEAF) return false;
  e.msg="You got the Deku Leaf!\x10Use it to glide and blow gusts.";e.autoFormat=false;return true;
 }
 bool ApplyForeignItemReceiptText(const char* name,CustomMessage::Entry& e,RandoCheckId=RC_UNKNOWN) {
+ if(std::string(name)=="Magic Cape") return ApplyItemReceiptText(RI_OOT_EXT_MAGIC_CAPE,e);
  if(std::string(name)!="Deku Leaf") return false;
  return ApplyItemReceiptText(RI_OOT_NEI_DEKU_LEAF,e);
 }
 }
 '''
 checks_source = r'''
-int main() {
+int main(int argc,char** argv) {
  Actor actor; PlayState play;
  checks[param].randoItemId=RI_OOT_NEI_DEKU_LEAF;
  Apply(&actor,&play);
@@ -134,6 +146,30 @@ int main() {
  Apply(&actor,&play);
  assert(CustomMessage::shown.msg.find("glide")==std::string::npos && "trap revealed its disguise description");
  assert(delivered==1);
+ // Visibility is a required player choice even when all pickup animations are skipped.
+ showCutscene=false;flags=0;checks[param]={RI_OOT_EXT_MAGIC_CAPE};
+ const int shownBefore=CustomMessage::shownCount;
+ Apply(&actor,&play);
+ assert(CustomMessage::shownCount==shownBefore+1 && CustomMessage::shown.capeVisibilityChoice);
+ assert(granted==2 && checks[RC_UNKNOWN].obtained);
+ param=RC_UNKNOWN;checks[param]={RI_COMBO_FOREIGN};latchedName="Magic Cape";foreign.itemName="Magic Cape";foreign.trap=false;
+ Apply(&actor,&play);
+ assert(CustomMessage::shownCount==shownBefore+2 && CustomMessage::shown.capeVisibilityChoice);
+ assert(delivered==2 && granted==2);
+ param=RC_UNKNOWN;checks[param]={RI_COMBO_FOREIGN};foreign.trap=true;
+ Apply(&actor,&play);
+ assert(CustomMessage::shownCount==shownBefore+2 && "disguised cape trap opened a visibility prompt");
+ donorAvailable=false;param=RC_UNKNOWN;checks[param]={RI_OOT_EXT_MAGIC_CAPE};
+ Apply(&actor,&play);
+ assert(CustomMessage::shown.capeVisibilityChoice && CustomMessage::shown.autoFormat);
+ assert(CustomMessage::shown.msg.find('\x1C')==std::string::npos && "native fallback fades before the choice");
+ assert(argc==3);
+ std::ofstream(argv[1],std::ios::binary)<<CustomMessage::shown.msg;
+ param=RC_UNKNOWN;checks[param]={RI_COMBO_FOREIGN};foreign.trap=false;
+ Apply(&actor,&play);
+ assert(CustomMessage::shown.capeVisibilityChoice && CustomMessage::shown.autoFormat);
+ assert(CustomMessage::shown.msg.find('\x1C')==std::string::npos && "foreign fallback fades before the choice");
+ std::ofstream(argv[2],std::ios::binary)<<CustomMessage::shown.msg;
  std::cout<<"queued native/foreign receipts, icons, bank attribution, grants and traps passed\n";
 }
 '''
@@ -296,7 +332,11 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                   '\n}\nusing Rando::MiscBehavior::Apply;\n' + checks_source)
     exe = tmp / 'queue'
     subprocess.run([compiler, '-std=c++20', '-DCOMBO_BUILD', '-I', str(ROOT), *extra, str(tu), '-o', str(exe)], check=True)
-    subprocess.run([str(exe)], check=True)
+    native_fallback, foreign_fallback = tmp / 'native-cape.bin', tmp / 'foreign-cape.bin'
+    subprocess.run([str(exe), str(native_fallback), str(foreign_fallback)], check=True)
+    subprocess.run([sys.executable, '-B', str(ROOT / 'tests/cape_choice/run_tests.py'),
+                    '--queued-fallback', str(native_fallback), '--queued-fallback', str(foreign_fallback),
+                    *(['--sanitize'] if '--sanitizers' in sys.argv else [])], check=True)
     codec = tmp / 'codec'
     subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-I', str(ROOT), *extra,
                     str(ROOT / 'tests/item_receipts/codec_test.cpp'), '-o', str(codec)], check=True)
@@ -355,6 +395,27 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     catalog += 'extern "C" { TexturePtr gItemIcons[131] = ' + re.sub(r'(?m)^(\s*)(g\w+),', r'\1(TexturePtr)\2,', block(inventory, 'TexturePtr gItemIcons[]')) + '; }\n'
     font_source = (ROOT / 'mm/src/code/z_message_nes.c').read_text()
     catalog += 'extern "C" { float sNESFontWidths[160] = ' + block(font_source, 'f32 sNESFontWidths[160]') + '; }\n'
+    # Run the actual story-skip grant lambdas against the real receipt builder.
+    grant_rows = (
+        ('SkipLearningSongOfSoaring.cpp', 'RI_SONG_SOARING', 'ITEM_SONG_SOARING', 'statue', 'statue', 'statue'),
+        ('SkipLearningSongOfHealing.cpp', 'RI_SONG_HEALING', 'ITEM_SONG_HEALING', 'masks', 'masques', 'Masken'),
+        ('SkipLearningSongOfTime.cpp', 'RI_SONG_TIME', 'ITEM_SONG_TIME', 'Termina', 'Termina', 'Termina'),
+        ('SkipLearningSongOfStorms.cpp', 'RI_SONG_STORMS', 'ITEM_SONG_STORMS', 'thunder', 'tonnerre', 'Donner'),
+        ('SkipLearningEponasSong.cpp', 'RI_SONG_EPONA', 'ITEM_SONG_EPONA', 'horse', 'cheval', 'Pferd'),
+    )
+    grants = ''
+    for index, (filename, ri, item, *descriptions) in enumerate(grant_rows):
+        text = (ROOT / 'mm/2s2h/Enhancements/Cutscenes/StoryCutscenes' / filename).read_text()
+        grants += f'void GiveStorySong{index}(Actor* actor, PlayState* play) ' + block(text, '.giveItem =') + '\n'
+    grants += 'void CheckDirectSongGrants() { Actor actor{};\n'
+    for index, (filename, ri, item, *descriptions) in enumerate(grant_rows):
+        for lang, detail in zip(('LANGUAGE_ENG', 'LANGUAGE_FRE', 'LANGUAGE_GER'), descriptions):
+            grants += f'for(bool cutscene : {{false,true}}) {{ actor.home.rot.x=cutscene?CustomItem::GIVE_ITEM_CUTSCENE:0; gSaveContext.options.language={lang}; const int before=songGrants; GiveStorySong{index}(&actor,gPlayState);\n'
+            grants += f'assert(songGrants==before+1 && grantedSong=={item}); assert(CustomMessage::startedSong==!cutscene);\n'
+            grants += f'const auto& shown=CustomMessage::shownSong; assert(!shown.autoFormat && shown.icon==Rando::StaticData::GetIconForZMessage({ri}) && shown.textboxType==2);\n'
+            grants += f'assert(shown.msg.find("{detail}")!=std::string::npos && shown.msg.back()==char(0xBF) && shown.msg.find(char(0x1C))==std::string::npos); }}\n'
+    grants += 'gSaveContext.options.language=LANGUAGE_ENG; }\n'
+    (tmp / 'receipt_song_grants.inc').write_text(grants)
     (tmp / 'receipt_catalogs.inc').write_text(catalog)
     pause_desc = (ROOT / 'mm/2s2h/CustomMessage/PauseItemDescriptions.cpp').read_text()
     (tmp / 'receipt_map_pause.inc').write_text('extern "C" const char* PauseItemDesc_GetMapInfo(s32 dungeon,u16 itemId) ' +
@@ -395,11 +456,21 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
             traditional += f'{{{rg}, {name}, {native_text}, {expected}}},\n'
     traditional += '};\n'
     donor = donor.replace('/* TRADITIONAL_CATALOG */', traditional)
+    # Use the production key names/IDs, independently of the expected palette
+    # fixture. This also covers MM keys and existing OoT key rings.
+    keys = 'const KeyCatalogFixture keyCatalog[] = {\n'
+    for row in donor_catalog.splitlines():
+        key = re.search(r'itemTable\[(RG_\w+)\]\s*=\s*Item\(', row)
+        name = re.search(r'Text\{\s*("(?:[^"\\]|\\.)*")', row)
+        if key and name and name[1].endswith(('Small Key"', 'Boss Key"', 'Key Ring"')):
+            keys += f'{{{key[1]}, {name[1]}}},\n'
+    keys += '};\n'
+    donor = donor.replace('/* KEY_CATALOG */', keys)
     descriptions = 'const CustomItemMessageEntry receiptMessages[] = {\n'
     for rg in ('RG_CANE_OF_SOMARIA', 'RG_PROGRESSIVE_ROCS', 'RG_CANE_PACCI_FLIP',
                'RG_ROCS_CAPE', 'RG_QUARTZ_OF_MOTION', 'RG_DEKU_LEAF',
                'RG_MM_REMAINS_GOHT', 'RG_MM_SONG_LULLABY', 'RG_MM_SONG_LULLABY_INTRO', 'RG_MM_SONG_NOVA',
-               'RG_MM_SONG_HEALING', 'RG_MM_SONG_STORMS'):
+               'RG_MM_SONG_HEALING', 'RG_MM_SONG_STORMS', 'RG_MM_SONG_SOARING'):
         text = re.search(r'\{\s*' + rg + r',.*?,\s*((?:"(?:[^"\\]|\\.)*"\s*)+)',
                          (ROOT / 'soh/soh/Enhancements/randomizer/randomizer.cpp').read_text(), re.S)
         if not text:
@@ -433,7 +504,8 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
         exported = subprocess.check_output(['git', 'show', revision + ':soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp'],
                                            cwd=ROOT, text=True)
     context_builders = 'bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received = true);\n'
-    for signature in ('static bool DungeonInformationEnabled()',
+    for signature in ('bool BuildDungeonKeyReceiptMessage(RandomizerGet rg, CustomMessage& msg)',
+                      'static bool DungeonInformationEnabled()',
                       'extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled(void)',
                       'static CustomMessage DungeonRewardName(RandomizerCheck check)',
                       'static int16_t DungeonEntranceDestination(int16_t entrance)',
@@ -449,6 +521,9 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                       'void BuildMapMessage(uint16_t* textId, bool* loadFromMessageTable)'):
         context_builders += signature + ' ' + block(exported, 'int32_t OOT_GetDungeonItemReceiptPresentation' if 'OOT_GetDungeonItemReceiptPresentation' in signature else signature + ' {') + '\n'
     donor = donor.replace('/* CONTEXT_BUILDERS */', context_builders)
+    donor = donor.replace('/* NATIVE_ITEM_BUILDER */',
+        'void BuildCustomItemMessage(Player* player, CustomMessage& msg) ' +
+        block(exported, 'void BuildCustomItemMessage'))
     donor = donor.replace('/* FOREIGN_BUILDER */',
         'void BuildComboForeignMessage(Player* player,CustomMessage& msg) ' +
         block(exported, 'void BuildComboForeignMessage'))

@@ -62,6 +62,19 @@ void* Combo_ResolveSym(const char*,const char* name){
 }
 /* MM_BINDINGS */
 /* MM_SELECTION */
+namespace ComboRando {
+constexpr int GAME_OOT=0;
+struct ForeignItem {int itemGame=0;std::string itemName="Master Sword",fakeItemName;bool HasDisguise()const{return false;}} foreignItem;
+}
+namespace Rando::MiscBehavior {const ComboRando::ForeignItem* MM_LookupForeign(int){return &ComboRando::foreignItem;}}
+using RandoCheckId=int;
+struct {uint32_t gameplayFrames=42;} fakePlay;
+auto* gPlayState=&fakePlay;
+int ComboNativeMmImport(const char*){return -1;}
+enum class ComboForeignResolveOOT{Ok,Unknown,NotReady};
+const char* ComboInternRoutedPathOOT(const std::string& s){static std::unordered_set<std::string> paths;return paths.insert(s).first->c_str();}
+#include "combo/menu/ComboSwordGiAssetSelection.h"
+/* FOREIGN_RESOLVER */
 int main(){
     resources.insert(kMmKokiriPresentation.opaque);
     for(const auto& item:kPresentations)resources.insert(item.opaque);
@@ -88,6 +101,28 @@ int main(){
         }else assert(info.drawKind==CW_DRAW_KIND_CUSTOM_GI&&strstr(info.dlists[0],"object_custom_equip"));
         assert(ootAlt==donor&&mmAlt==host&&"GI selection mutated either owner's global asset state");
     }
+    // A foreign OoT award must honor MM's independent Alt state, including
+    // repeated draws through the resolver's cached producer function.
+    for(bool host:{true,false,true,false}) {
+      ootAlt=true;mmAlt=host;legacyMod=mmLegacyMod=false;
+      ComboForeignDrawInfoOOT foreign{};
+      assert(ComboFillForeignDrawInfoOOT(1,foreign,"Master Sword")==ComboForeignResolveOOT::Ok);
+      if(host)assert(foreign.drawKind==CW_DRAW_KIND_CUSTOM_GI && strstr(foreign.dls[0],"object_custom_equip"));
+      else assert(foreign.drawKind==CW_DRAW_KIND_NEI_GI &&
+                  !strcmp(foreign.dls[0],"__OTR__@oot-gi-base:objects/nei_gi_redesign/master_sword/gi_dl") &&
+                  "foreign sword ignored the active MM vanilla asset setting");
+      assert(foreign.appearanceDependent && foreign.stateDependent);
+    }
+    // Missing shipped data is retryable, so a later host toggle cannot remain
+    // frozen in the foreign renderer's negative cache.
+    ootAlt=true;mmAlt=false;legacyMod=mmLegacyMod=false;
+    resources.erase("__OTR__objects/nei_gi_redesign/master_sword/gi_dl");
+    ComboForeignDrawInfoOOT missing{};
+    assert(ComboFillForeignDrawInfoOOT(1,missing,"Master Sword")==ComboForeignResolveOOT::NotReady &&
+           "missing vanilla sword was permanently cached as an unknown foreign item");
+    mmAlt=true;missing={};
+    assert(ComboFillForeignDrawInfoOOT(1,missing,"Master Sword")==ComboForeignResolveOOT::Ok);
+    resources.insert("__OTR__objects/nei_gi_redesign/master_sword/gi_dl");
     // A surviving/base-path mod must not suppress the authored vanilla sword.
     ootAlt=true;mmAlt=false;legacyMod=mmLegacyMod=true;
     CwItemDrawInfo info{};assert(MM_DescribeNeiGi(RI_SWORD_RAZOR,&info)&&info.drawKind==CW_DRAW_KIND_NEI_GI);

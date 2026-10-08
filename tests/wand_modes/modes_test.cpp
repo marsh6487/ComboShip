@@ -183,8 +183,13 @@ Actor* Actor_Spawn(ActorContext*, PlayState* play, s16 id, f32 x, f32 y, f32 z, 
         if (rz <= 0 && Flags_GetSwitch(play, 0)) Actor_Kill(actor);
         actor->world.rot.z = actor->shape.rot.z = 0;
         actor->destroy = NativePlatformDestroy;
-        ((DynaPolyActor*)actor)->bgId = collisionFails ? BG_ACTOR_MAX : 0;
-        play->colCtx.dyna.bgActors[0].colHeader = &slabCollision;
+        s32 bgId = 0;
+        while (std::any_of(actors.begin(), actors.end(), [&](Actor* other) {
+            return other != actor && other->id == ACTOR_OBJ_LIFT && other->update &&
+                ((DynaPolyActor*)other)->bgId == bgId;
+        })) ++bgId;
+        ((DynaPolyActor*)actor)->bgId = collisionFails ? BG_ACTOR_MAX : bgId;
+        if (bgId < BG_ACTOR_MAX) play->colCtx.dyna.bgActors[bgId].colHeader = &slabCollision;
     } else if (id == ACTOR_OBJ_HUNSUI) {
         // Native Init/draw/destroy and collision ownership are executed by native-water.
         auto* water = (ObjHunsui*)actor;
@@ -305,8 +310,9 @@ void CheckSandWaterAndMeteor() {
     ResetWorld(player, play); assert(Wand_Cast(&player, &play, 0));
     Actor* slab = sSandSlabs[0];
     assert(std::fabs(slab->world.pos.y + 1) < 0.01f && slab->scale.x == 0.05f && slab->scale.y == 0.05f && slab->room == -1);
-    assert(slab->world.pos.x == player.actor.world.pos.x && slab->world.pos.z == player.actor.world.pos.z &&
-        "the first small Sand platform must be centered under Link");
+    assert(slab->world.pos.x == player.actor.world.pos.x &&
+        std::fabs(slab->world.pos.z - player.actor.world.pos.z - 25.5f) < .01f &&
+        "the first Sand platform must be one measured step ahead, matching OoT");
     assert(!WandSand_HoldElapsed(&player, 1));
     onSlab = true; for (int frame = 0; frame < 23; ++frame) slab->update(slab, &play);
     assert(slab->update != nullptr && slab->scale.x == 0.05f);
@@ -430,26 +436,40 @@ void CheckHeldSandBlocked() {
     auto hold = [&](int frames) {
         for (int frame = 0; frame < frames; ++frame) { ++play.gameplayFrames; Wand_TickInput(&play, &player); }
     };
-    hold(5);
-    assert(actors.size() == 1 && gSaveContext.save.saveInfo.playerData.magic == 46);
-    hold(1);
-    assert(actors.size() == 1 && gSaveContext.save.saveInfo.playerData.magic == 44 &&
-        "holding on existing support must continuously drain base 2 magic every six frames");
+    hold(12);
+    assert(actors.size() == 1 && gSaveContext.save.saveInfo.playerData.magic == 46 &&
+        "a covered solid step ahead must not spend magic, matching OoT");
     player.actor.world.pos.z = 120;
+    hold(1);
+    assert(actors.size() == 2 && gSaveContext.save.saveInfo.playerData.magic == 44 &&
+        "a successful held placement must be billed exactly like a pressed one");
     hold(6);
-    assert(actors.size() == 2 && gSaveContext.save.saveInfo.playerData.magic == 42 &&
-        "the held interval pays once even when it also spawns a slab");
-    hold(6);
-    assert(actors.size() == 2 && gSaveContext.save.saveInfo.playerData.magic == 40);
-    capeOwned = true; hold(6);
-    assert(gSaveContext.save.saveInfo.playerData.magic == 39);
+    assert(actors.size() == 2 && gSaveContext.save.saveInfo.playerData.magic == 44);
+    capeOwned = true; player.actor.world.pos.z += 120; hold(6);
+    assert(actors.size() == 3 && gSaveContext.save.saveInfo.playerData.magic == 43);
     capeOwned = false;
 
-    // Each skipped input path restarts the interval; returning cannot bill immediately.
+    spawnFails = true; player.actor.world.pos.z += 120; hold(6);
+    assert(actors.size() == 3 && gSaveContext.save.saveInfo.playerData.magic == 43 &&
+        "a failed held summon must not consume magic");
+    spawnFails = false; hold(6);
+    assert(actors.size() == 4 && gSaveContext.save.saveInfo.playerData.magic == 41);
+
+    // Standing still can still require a replacement after the supporting slab
+    // starts crumbling. The replacement, rather than a timer, spends magic.
+    Actor* crumbling = actors.back(); onSlab = true;
+    crumbling->update(crumbling, &play); onSlab = false;
+    hold(6);
+    assert(actors.size() == 5 && gSaveContext.save.saveInfo.playerData.magic == 39);
+
+    // Each skipped input path resets coverage. Returning checks immediately,
+    // as in OoT's zero-initialized held cadence, and bills only a new platform.
     auto resetCadence = [&]() {
         int before = gSaveContext.save.saveInfo.playerData.magic;
-        hold(5); assert(gSaveContext.save.saveInfo.playerData.magic == before);
-        hold(1); assert(gSaveContext.save.saveInfo.playerData.magic == before - 2);
+        auto count = actors.size(); player.actor.world.pos.z += 120;
+        hold(1);
+        assert(actors.size() == count + 1 && gSaveContext.save.saveInfo.playerData.magic == before - 2);
+        hold(5); assert(actors.size() == count + 1 && gSaveContext.save.saveInfo.playerData.magic == before - 2);
     };
     hold(5); player.stateFlags1 = PLAYER_STATE1_SHIELDING; hold(1); player.stateFlags1 = 0;
     resetCadence();

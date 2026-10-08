@@ -11,6 +11,7 @@ OPTIONAL = ROOT / 'tools/nei_gi/OPTIONAL_ASSETS/objects/nei_gi_redesign'
 TARGET = ROOT / 'soh/soh/Enhancements/randomizer/NeiGiFrameBounds.inc'
 
 effects = {
+    'trident':'Gold', 'roc_boots':'Gold',
     'fire_rod':'Fire', 'ice_rod':'Ice', 'light_rod':'Light', 'deku_leaf':'Leaf',
     'hylia_grace':'Hylia', 'zonai_permafrost':'Zonai', 'demise_destruction':'Demise',
     'elemental_wand':'Light', 'sand_rod':'Sand', 'tornado_rod':'Tornado', 'water_rod':'Water',

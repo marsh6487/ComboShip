@@ -204,6 +204,7 @@ extern "C" {
 #include "native_draw.inc"
 }
 static int normalInits = 0, flexInits = 0, updates = 0;
+static FlexSkeletonHeader* resolveNativeFlexHeader(FlexSkeletonHeader* header);
 static int freezes = 0;
 int16_t Animation_GetLastFrame(void*) { return 42; }
 void Animation_Change(SkelAnime* a, AnimationHeader*, float speed, float start, float end, u8 mode, float morph) {
@@ -221,6 +222,7 @@ void SkelAnime_Init(PlayState *, SkelAnime *a, SkeletonHeader *h,
 void SkelAnime_InitFlex(PlayState *, SkelAnime *a, FlexSkeletonHeader *h,
                         AnimationHeader *, Vec3s *j, Vec3s *, int) {
   flexInits++;
+  h = resolveNativeFlexHeader(h);
   a->skeleton = h->sh.segment;
   a->jointTable = j;
   a->dListCount = h->dListCount;
@@ -277,6 +279,17 @@ struct CrossRMRegistry {
   static void RegisterTeardownListener(void (*)()){};
 };
 } // namespace Ship
+static FlexSkeletonHeader* resolveNativeFlexHeader(FlexSkeletonHeader* header) {
+  // Native initialization receives an OTR path; the shared consumer receives
+  // the owning factory's loaded header. Resource I/O is the fixture boundary.
+  if (!std::strncmp((const char*)header, "__OTR__", 7)) {
+    const auto rm = Ship::Context::GetRawInstance()->GetResourceManager();
+    const auto resource = rm->LoadResource((const char*)header);
+    assert(resource);
+    return (FlexSkeletonHeader*)resource->GetRawPointer();
+  }
+  return header;
+}
 extern "C" void FrameInterpolation_RecordOpenChild(const void *, int) {}
 extern "C" void FrameInterpolation_RecordCloseChild() {}
 #include "foreign_anim.h"
@@ -307,6 +320,99 @@ struct AnimationResource : Ship::IResource {
   AnimationHeader h;
   void *GetRawPointer() override { return &h; }
 };
+#if defined(HOST_MM) && !defined(SKIP_TWINMOLD_TESTS)
+struct MmBossSkeletonResource : Ship::IResource {
+  CfaLoadedFlexSkeletonHeader h{};
+  std::vector<StandardLimb> limbs;
+  std::vector<void*> pointers;
+  std::string body, head;
+  MmBossSkeletonResource(int limbCount, bool replacement)
+      : limbs(limbCount - 1), pointers(limbCount - 1),
+        body(replacement ? "__OTR__mm_soul_custom_body" : "__OTR__mm_soul_native_body"),
+        head(replacement ? "__OTR__mm_soul_custom_head" : "__OTR__mm_soul_native_head") {
+    h.sh = {pointers.data(), (u8)(limbCount - 1), (u8)(replacement ? 0 : 1)};
+    h.dListCount = replacement ? 0 : 2;
+    limbs[0].child = 1;
+    limbs[0].dList = (Gfx*)body.c_str();
+    limbs[1].dList = (Gfx*)head.c_str();
+    limbs[1].jointPos = {3, 0, 0};
+    for (int i = 0; i < limbCount - 1; ++i) pointers[i] = &limbs[i];
+  }
+  void* GetRawPointer() override { return &h; }
+};
+static void checkNativeMmBosses(std::shared_ptr<Ship::ResourceManager> owner) {
+  Ship::Context::GetRawInstance()->rm = owner;
+  for (auto id : {RI_SOUL_BOSS_GOHT, RI_SOUL_BOSS_GYORG, RI_SOUL_BOSS_ODOLWA}) {
+    CwItemAnimDrawInfo info{};
+    assert(MM_FillBossSoulAnim(id, &info));
+    auto anim = std::make_shared<AnimationResource>();
+    owner->normal[info.skelPath] = std::make_shared<MmBossSkeletonResource>(info.limbCount, false);
+    owner->replacement[info.skelPath] = std::make_shared<MmBossSkeletonResource>(info.limbCount, true);
+    owner->normal[info.animPath] = owner->replacement[info.animPath] = anim;
+    CfaClearCaches();
+    const int beforeNormal = normalInits, beforeFlex = flexInits;
+#ifdef NATIVE_MM_BOSS_ALT_FIRST
+    const bool selections[] = {true, false, true, false};
+#else
+    const bool selections[] = {false, true, false, true};
+#endif
+    for (bool alt : selections) {
+      owner->alt = alt;
+      GraphicsContext c; PlayState p{{&c, 221}, 70, {}};
+      gPlayState = &p;
+      current = {};
+      switch (id) {
+        case RI_SOUL_BOSS_GOHT: DrawGoht(); break;
+        case RI_SOUL_BOSS_GYORG: DrawGyorg(); break;
+        case RI_SOUL_BOSS_ODOLWA: DrawOdolwa(); break;
+        default: assert(false);
+      }
+      int meshes = 0, matrixSegments = 0;
+      const Mtx* modelMatrix = nullptr;
+      for (Gfx* cmd = c.opa; cmd < c.op; ++cmd) {
+        if (cmd->kind == 2) modelMatrix = (const Mtx*)cmd->target;
+        if (cmd->kind == 3) {
+          std::string path = (const char*)cmd->target;
+          const auto marker = path.find("mm_soul_");
+          assert(marker != std::string::npos);
+          assert(path.substr(marker).starts_with(alt ? "mm_soul_custom_" : "mm_soul_native_"));
+          assert(modelMatrix && modelMatrix->sx == info.scale && modelMatrix->sy == info.scale);
+          assert(modelMatrix->y == info.translatePre[1]);
+          meshes++;
+        }
+        matrixSegments += cmd->kind == 1 && cmd->seg == 13;
+      }
+      assert(meshes == 2);
+      // A selected normal replacement must use the rigid drawer and never
+      // write into the absent flex matrix array (dListCount is zero).
+      assert(alt ? matrixSegments == 0 : matrixSegments >= 1);
+      assert(Ship::Context::GetRawInstance()->rm == owner && matrices.empty());
+      // Both selected rigs keep the native model transform and soul palette.
+      const uintptr_t flameColor = (uintptr_t(info.flameColor[0]) << 24) |
+                                   (uintptr_t(info.flameColor[1]) << 16) |
+                                   (uintptr_t(info.flameColor[2]) << 8);
+      int flames = 0, nativeColors = 0;
+      const Mtx* flameMatrix = nullptr;
+      for (Gfx* cmd = c.xlu; cmd < c.xp; ++cmd) {
+        if (cmd->kind == 2) flameMatrix = (const Mtx*)cmd->target;
+        flames += cmd->kind == 3 && !std::strcmp((const char*)cmd->target, gameplay_keep_DL_01ACF0);
+        if (cmd->kind == 3) {
+          assert(flameMatrix && flameMatrix->sx == info.scale * info.flameScale[0]);
+          assert(flameMatrix->sy == info.scale * info.flameScale[1]);
+        }
+        nativeColors += cmd->kind == 4 && cmd->target == flameColor;
+      }
+      assert(flames == 1 && nativeColors == 1);
+    }
+    assert(normalInits == beforeNormal + 1 && flexInits == beforeFlex + 1);
+    assert(current.y == 0 && current.sx == 1 && current.sy == 1 && current.sz == 1);
+  }
+  owner->alt = false;
+  gPlayState = nullptr;
+  CfaClearCaches();
+  std::cout << "Native Goht/Gyorg/Odolwa: live owning Alt selection, selected rigid/flex dispatch, matrix bounds and native flame palettes passed\n";
+}
+#endif
 #ifndef SKIP_TWINMOLD_TESTS
 struct TwinmoldSkeletonResource : Ship::IResource {
   CfaLoadedFlexSkeletonHeader h{};
@@ -715,6 +821,9 @@ int main() {
 #endif
   Ship::Context::GetRawInstance()->rm = twinmoldHost;
   checkTwinmold(mm, twinmoldHost);
+#ifdef HOST_MM
+  checkNativeMmBosses(mm);
+#endif
   Ship::Context::GetRawInstance()->rm = mm;
   current = {};
   #endif

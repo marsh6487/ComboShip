@@ -38,6 +38,14 @@ inline const FrameBounds* FindFrameBounds(const char* path) {
     return nullptr;
 }
 
+inline const FrameBounds* FindSwordFrameBounds(Kind kind) {
+    if (IsSword(kind))
+        for (const auto& bounds : kFrameBounds)
+            if (bounds.effect == kind)
+                return &bounds;
+    return nullptr;
+}
+
 // The caller supplies its world/overhead/actor matrix. One correction encloses
 // model, local energy and crystal shell, preserving their relative positions.
 // mmPickup is 0 for other draws, 1 for ordinary MM receipts, 2 for Goron.

@@ -5369,6 +5369,10 @@ extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* pa
     return NeiAssetPriority::IsCustomAsset("mm", game, path);
 }
 
+extern "C" int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt) {
+    return NeiAssetPriority::GetIkanaShieldGiTiltX("mm", game, path, tilt);
+}
+
 extern "C" int ResourceMgr_IsModAsset(const char* path) {
     return NeiAssetPriority::IsModAsset("mm", "mm", path);
 }

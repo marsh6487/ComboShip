@@ -1,11 +1,13 @@
 
 #include "CustomMessage.h"
+#include "ComboCapeReceiptChoice.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 
 extern "C" {
 #include "variables.h"
 extern f32 sNESFontWidths[160];
 void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation* presentation);
+void Message_SetCapeVisibilityChoice(int enabled);
 }
 
 CustomMessage::Entry activeCustomMessage;
@@ -190,6 +192,15 @@ void CustomMessage::LoadCustomMessageIntoFont(CustomMessage::Entry entry) {
         CustomMessage::AddLineBreaks(&entry.msg);
         CustomMessage::EnsureMessageEnd(&entry.msg);
     }
+
+    if (entry.capeVisibilityChoice) {
+        const auto language = gSaveContext.options.language == LANGUAGE_GER ? ComboCapeReceiptChoice::Language::German
+                              : gSaveContext.options.language == LANGUAGE_FRE
+                                  ? ComboCapeReceiptChoice::Language::French
+                                  : ComboCapeReceiptChoice::Language::English;
+        entry.msg = ComboCapeReceiptChoice::Append(std::move(entry.msg), true, language);
+    }
+    Message_SetCapeVisibilityChoice(entry.capeVisibilityChoice);
 
     // If message is too long, truncate it and add the message end character
     if (entry.msg.length() > BUFFER_SIZE - MESSAGE_HEADER_SIZE) {

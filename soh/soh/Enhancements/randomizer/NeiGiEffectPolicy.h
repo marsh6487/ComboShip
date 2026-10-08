@@ -43,7 +43,8 @@ enum class Kind {
     Somaria,
     Pacci,
     Pokeball,
-    MarioMask
+    MarioMask,
+    Gold
 };
 constexpr float Tau = 6.28318530718f;
 // The authored Four Sword's high center is lowered in GI space only. Its
@@ -87,8 +88,9 @@ constexpr uint32_t ColorHex(Kind kind) {
         case Kind::Storm:
             return 0xB5A8FF;
         case Kind::Shadow:
-        case Kind::DarkCrystal:
             return 0x9E38DA;
+        case Kind::DarkCrystal:
+            return 0x201C1B;
         case Kind::Slate:
             return 0x30CAFA;
         case Kind::SlateBomb:
@@ -112,6 +114,7 @@ constexpr uint32_t ColorHex(Kind kind) {
         case Kind::RazorSword:
             return 0xBDD6EA;
         case Kind::GildedSword:
+        case Kind::Gold:
             return 0xFFD45A;
         case Kind::MasterSword:
             return 0x6F8FFF;
@@ -370,7 +373,27 @@ inline Mesh SampleSpecial(Kind kind, uint32_t frame, const Basis& camera = {}) {
             else
                 Glow(m, p, kind == Kind::Hourglass ? .4f : .75f, color, alpha, camera);
         }
-    } else if (kind == Kind::Tornado || kind == Kind::Shadow || kind == Kind::DarkCrystal || kind == Kind::CaneBlue) {
+    } else if (kind == Kind::DarkCrystal) {
+        // Thin charcoal wisps with copper rims leave the original silhouette
+        // readable; staggered embers rise outside its black/orange body.
+        for (int ring = 0; ring < 2; ++ring) {
+            auto p = [&](int j) {
+                const float f = j / 16.f, a = f * Tau * 1.3f + t * (ring ? -1.f : 1.f) + ring * Tau * .5f;
+                const float r = 13.5f + .8f * std::sin(t * 2 + f * Tau);
+                return Point{ r * std::cos(a), -19 + 38 * f, r * std::sin(a) };
+            };
+            for (int j = 0; j < 16; ++j)
+                Band(m, p(j), p(j + 1), .42f, color, 0xA54B1B, camera, 105);
+        }
+        for (int i = 0; i < 8; ++i) {
+            const float f = float((frame % 180u + i * 23u) % 180u) / 180.f;
+            const float a = i * 2.399963f + f * 1.6f, r = 12.f + 3.f * f;
+            const Point p{ r * std::cos(a), -25.f + 54.f * f, r * std::sin(a) };
+            const uint8_t alpha = uint8_t(220 * std::sin(f * Tau * .5f));
+            Glow(m, p, .8f, 0xD76B20, alpha, camera);
+            Band(m, p, p - Point{ .15f, 1.4f, 0 }, .17f, 0xD76B20, 0xFFD19A, camera, alpha);
+        }
+    } else if (kind == Kind::Tornado || kind == Kind::Shadow || kind == Kind::CaneBlue) {
         for (int ring = 0; ring < 2; ++ring) {
             auto p = [&](int j) {
                 const float f = j / 24.f, a = f * Tau * 1.6f + t * (ring ? -.9f : 1.4f) + ring * Tau * .5f;
@@ -434,10 +457,12 @@ inline Mesh SampleShimmer(uint32_t frame, bool enabled, const Basis& camera = {}
         const uint32_t hue = kind == Kind::Pokeball          ? (i % 2 ? 0xFFFFFF : 0xE73842)
                              : kind == Kind::FourSword       ? FourSwordColors[i % FourSwordColors.size()]
                              : kind == Kind::GreatFairySword ? fairyHue
+                             : kind == Kind::DarkCrystal     ? (i % 3 == 0 ? ColorHex(kind) : 0xD76B20)
                              : kind == Kind::Neutral         ? 0xA8E9FF
                                                              : ColorHex(kind);
         Glow(m, p, 7 * pulse, hue, 140, camera);
-        Star(m, p, 6 * pulse, t * .5f, kind == Kind::Neutral ? 0xE6F8FF : hue, camera, leaf ? 0xB0FFB0 : 0xFFFFFF);
+        const uint32_t core = kind == Kind::DarkCrystal ? 0xFFD19A : leaf ? 0xB0FFB0 : 0xFFFFFF;
+        Star(m, p, 6 * pulse, t * .5f, kind == Kind::Neutral ? 0xE6F8FF : hue, camera, core);
     }
     return m;
 }

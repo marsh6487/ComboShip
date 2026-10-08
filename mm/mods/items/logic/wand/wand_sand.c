@@ -1,8 +1,8 @@
 /**
  * wand_sand.c — Sand Rod (Skijer's NEI).
  *
- * Small sand slabs placed under Link, then ahead while the bound button is held. Standing on one
- * starts it crumbling: it shrinks away in a puff of earth instead of shaking and dropping like Obj_Lift.
+ * Sand slabs laid in front of Link, placeable in mid-air. Standing on one starts it crumbling: it
+ * shrinks away in a puff of earth instead of shaking and dropping like Obj_Lift.
  * That is the whole read of the rod — ground you make, that will not hold you for long.
  *
  * Obj_Lift is used for its slab mesh and its dynapoly (somaria_cubes.c documents the trick). Its
@@ -21,7 +21,6 @@
 // Placement and coverage are measured from the registered mesh at this summon scale.
 #define SAND_SLAB_SCALE 0.05f
 #define SAND_HOLD_INTERVAL 6 // frames between coverage checks while the button is held
-#define SAND_HOLD_MAGIC_COST 2
 
 // How far ahead the next slab lands, as a share of the slab's own reach. Under 1.0 so consecutive
 // slabs overlap instead of leaving a seam to fall through.
@@ -54,7 +53,7 @@
 static Actor* sSandSlabs[SAND_MAX_SLABS];
 static ActorFunc sSandNativeDestroy = NULL;
 static u8 sSandNextSlot = 0;
-static s16 sSandHoldTimer = SAND_HOLD_INTERVAL;
+static s16 sSandHoldTimer = 0;
 static FX_Color sSandDustColor = { SAND_ENV_R, SAND_ENV_G, SAND_ENV_B, 255 };
 
 // The slab is MEASURED off its own registered collision, not guessed: world units from the actor
@@ -90,16 +89,6 @@ static void WandSand_Measure(PlayState* play, Actor* slab) {
 static void WandSand_NextSpot(Player* player, Vec3f* out) {
     s16 yaw = player->actor.shape.rot.y;
     f32 dist = sSandMeasured ? (sSandReach * SAND_STEP_FRACTION) : SAND_FALLBACK_DIST;
-
-    // The first platform must support Link at the cast position. Later platforms overlap the
-    // existing road in front of him; an empty ring also starts under him again.
-    u8 hasSlab = 0;
-    for (u8 i = 0; i < SAND_MAX_SLABS; i++) {
-        hasSlab |= sSandSlabs[i] != NULL;
-    }
-    if (!hasSlab) {
-        dist = 0.0f;
-    }
 
     out->x = player->actor.world.pos.x + (Math_SinS(yaw) * dist);
     out->y = player->actor.world.pos.y - sSandTopOffset;
@@ -202,7 +191,7 @@ void WandSand_Forget(void) {
         sSandSlabs[i] = NULL;
     }
     sSandNextSlot = 0;
-    sSandHoldTimer = SAND_HOLD_INTERVAL;
+    sSandHoldTimer = 0;
 }
 
 // Overflow only — a slab normally ends by crumbling under Link. This is the backstop that stops a
@@ -277,13 +266,15 @@ u8 WandSand_Cast(Player* player, PlayState* play) {
 }
 
 /**
- * The held channel has its own cadence. A pressed cast pays once and resets this timer; skipped
- * or blocked input also resets it, so returning to Sand cannot immediately spend an old interval.
+ * Match OoT's Sand Scepter: check the step ahead immediately on a new hold, then every six frames.
+ * The caller uses Wand_Cast so only a successful new slab spends magic, just like a pressed cast.
+ * A solid slab already covering the step costs nothing; a crumbling one needs a replacement.
  */
 u8 WandSand_HoldElapsed(Player* player, u8 held) {
-    (void)player;
+    Vec3f spot;
+
     if (!held) {
-        sSandHoldTimer = SAND_HOLD_INTERVAL;
+        sSandHoldTimer = 0;
         return 0;
     }
     if (--sSandHoldTimer > 0) {
@@ -291,20 +282,6 @@ u8 WandSand_HoldElapsed(Player* player, u8 held) {
     }
     sSandHoldTimer = SAND_HOLD_INTERVAL;
 
-    return 1;
-}
-
-// Holding spends magic while supported and while moving. Coverage only decides whether to add
-// another platform; that spawn does not go through Wand_Cast and therefore cannot bill twice.
-void WandSand_TickHold(Player* player, PlayState* play, u8 held) {
-    Vec3f spot;
-
-    if (!WandSand_HoldElapsed(player, held) || !ItemMagic_HasEnough(play, SAND_HOLD_MAGIC_COST)) {
-        return;
-    }
-    ItemMagic_Consume(play, SAND_HOLD_MAGIC_COST);
     WandSand_NextSpot(player, &spot);
-    if (!WandSand_Covers(&spot)) {
-        WandSand_Cast(player, play);
-    }
+    return !WandSand_Covers(&spot);
 }

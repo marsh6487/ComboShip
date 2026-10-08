@@ -15,7 +15,11 @@ extern "C" {
 }
 #include "ComboItemDrawABI.h"
 #include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
+#include "soh/Enhancements/randomizer/NeiGiFrameFit.h"
 #include "combo/DinSwordGiResources.h"
+extern "C" void NeiGi_DrawElementalArrow(PlayState*, int) {
+  assert(false && "sword fixture must not dispatch elemental arrows");
+}
 #include <libultraship/bridge/consolevariablebridge.h>
 /* PRODUCTION_INFO */
 static Gfx opa[1024], xlu[1024];
@@ -142,6 +146,7 @@ static void ComboSwordGi_ApplyModelsFit(const char*,const char* const* paths,int
   fittedRoots=count;fittedDrawScale=scale;fittedTilt=tilt;
   if(fitModel){Matrix_Translate(0,-20,0,MTXMODE_APPLY);Matrix_Scale(.5f,.5f,.5f,MTXMODE_APPLY);}
 }
+#include "ComboSwordGiEffectFit.h"
 static void ComboDrawMaskShimmer(PlayState *, const char *,
                                  const uint8_t *color, const char *owner) {
   assert(pose == Pose{} && (!strcmp(owner, "mm") || !strcmp(owner,"oot")));
@@ -176,8 +181,18 @@ static bool OOT_DrawForeignFairyContainer(PlayState*,const ComboForeignDrawInfo*
 static void NeiGi_DrawSongOverlay(PlayState*,int,const char*) {assert(false);}
 static NeiGi::Basis NeiGi_CameraBasis(PlayState*) {return {};}
 static void NeiGi_DrawMesh(PlayState*,const NeiGi::Mesh& mesh) {
-  Pose expected{};if(fitModel){expected.scale*=.5f;expected.y-=20;}
-  assert(pose==expected && "sword model and particles do not share the fitted presentation");
+  Pose expected{};
+  if(recipe.neiShimmer>0 && NeiGi::IsSword(static_cast<NeiGi::Kind>(recipe.neiShimmer-1))) {
+    // Master Sword's authored world fit shifts its tip below the 48-unit edge,
+    // regardless of the arbitrary .5/-20 model correction used by this fixture.
+    if(recipe.neiShimmer==int(NeiGi::Kind::MasterSword)+1)
+      expected.y+=(48.f-72.590332031f);
+    else if(recipe.neiShimmer==int(NeiGi::Kind::SwordAura)+1)
+      expected.y+=(48.f-67.970947266f);
+    else expected=pose; // The full production renderer gate checks every other award.
+  }
+  assert(std::abs(pose.scale-expected.scale)<.00001f && std::abs(pose.y-expected.y)<.0001f &&
+         "foreign binary sword particles/shimmer inherited model coordinate fitting");
   identityMesh=mesh;++identityDraws;
 }
 #ifdef HOST_MM_ROUTE
@@ -343,6 +358,12 @@ int main() {
         identityMesh.vertices[i].alpha==wanted.vertices[i].alpha && identityMesh.vertices[i].p.x==wanted.vertices[i].p.x);
     assert(CheckStream(opa,gfx.polyOpa.p,false).size()==1 && CheckStream(xlu,gfx.polyXlu.p,false).empty());
   }
+  Reset(CW_DRAW_KIND_CUSTOM_GI, true, true);
+  recipe.neiShimmer=int(NeiGi::Kind::SwordAura)+1;fitModel=true;
+  Dispatch();
+  const auto presentationFlame=CheckStream(xlu,gfx.polyXlu.p,false);
+  assert(!presentationFlame.empty() && presentationFlame.front().pose.scale==10.f &&
+         "True Master presentation flame inherited the binary geometry scale");
   Reset(CW_DRAW_KIND_CUSTOM_GI, false, true);
   recipe.neiShimmer = int(NeiGi::Kind::MasterSword) + 1;
   dinLayers = true;

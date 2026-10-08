@@ -2088,13 +2088,15 @@ void Randomizer_DrawExtShieldOfIkana(PlayState* play, GetItemEntry* getItemEntry
 
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
-    // gLinkHumanMirrorShieldDL is modelled in arm-local space (oriented for Link's left arm
-    // joint). Apply order matters: RotateY first so the spin happens around world-up, THEN
-    // tilt +90° X so the shield stands upright facing the camera like the other shield GIs
-    // (with -90° it presented face-DOWN).
+    // Worn shield packs can use either upright or arm-local XZ geometry.
+    // Probe the same selected owner; preserve the old tilt if it cannot be read.
+    const char* path = "objects/object_link_child/gLinkHumanMirrorShieldDL";
+    const char* owner = ResourceMgr_IsModAssetForGame("oot", path) ? "oot" : "mm";
+    float tilt = M_PI / 2.0f;
+    ResourceMgr_GetIkanaShieldGiTiltXForGame(owner, path, &tilt);
     s16 rotation = play->gameplayFrames * 0x2;
     Matrix_RotateY(rotation * 0.01f, MTXMODE_APPLY);
-    Matrix_RotateX(M_PI / 2.0f, MTXMODE_APPLY);
+    Matrix_RotateX(tilt, MTXMODE_APPLY);
     Matrix_Scale(0.035f, 0.035f, 0.035f, MTXMODE_APPLY);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);

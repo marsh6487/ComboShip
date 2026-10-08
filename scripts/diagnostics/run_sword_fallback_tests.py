@@ -30,7 +30,7 @@ with tempfile.TemporaryDirectory(prefix='sword-fallback-') as temporary:
     mm=(ROOT/'combo/menu/ComboForeignDrawMM.h').read_text()
     mm_info=mm[mm.index('struct ComboForeignDrawInfoOOT {'):mm.index('\n};',mm.index('struct ComboForeignDrawInfoOOT {'))+3]
     mm_dispatch=function(mm,'MM_DrawComboForeign')
-    mm_handlers=sorted(set(re.findall(r'\b(MM_DrawForeign\w+)\(info(?:, shop)?\)',mm_dispatch)) - {'MM_DrawForeignCustomGi','MM_DrawForeignSimple'})
+    mm_handlers=sorted(set(re.findall(r'\b(MM_DrawForeign\w+)\(',mm_dispatch)) - {'MM_DrawForeignCustomGi','MM_DrawForeignSimple'})
     mm_prefix=r'''
 using ComboForeignDrawInfoOOT=ComboForeignDrawInfo;
 using RandoCheckId=int;constexpr int RC_UNKNOWN=0;
@@ -53,7 +53,7 @@ void DrawOotNeiCaneOfSomaria(RandoItemId){assert(false);}
 #define MATRIX_FINALIZE_AND_LOAD(pkt, gfx) gSPMatrix(pkt,Matrix_NewMtx(gfx,(char*)__FILE__,__LINE__),G_MTX_MODELVIEW|G_MTX_LOAD|G_MTX_NOPUSH)
 '''
     mm_macros=mm[mm.index('#define MM_FOREIGN_PIN_OPA'):mm.index('inline void MM_RestoreForeignSegs')]
-    mm_stubs='\n'.join('void '+name+'(const ComboForeignDrawInfoOOT*){assert(false);}' for name in mm_handlers)
+    mm_stubs='\n'.join('template<class...T> void '+name+'(const ComboForeignDrawInfoOOT*,T...){assert(false);}' for name in mm_handlers)
     mm_handlers_text=macros+'\n'+function(foreign,'OOT_RestoreForeignSegs')+'\n'+function(foreign,'OOT_DrawForeignWeaponFlame')+'\n'+mm_prefix
     mm_handlers_text+='void DrawOotSlateRuneFlame(uint8_t r,uint8_t g,uint8_t b){const uint8_t c[]={r,g,b,255};OOT_DrawForeignWeaponFlame(&play,c);}\n'
     mm_handlers_text+=mm_macros+'\n'+mm_stubs+'\n'+function(mm,'MM_DrawForeignCustomGi')+'\n'+function(mm,'MM_DrawForeignSimple')+'\n'+mm_dispatch

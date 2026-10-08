@@ -31,6 +31,7 @@
 #include "2s2h/FleetShipCombo/FleetComboIds.h"        // FC_SHIELD_* / FC_OOT_TUNIC/BOOTS ownership bits
 #include "2s2h/FleetShipCombo/FleetShipCombo.h"       // FleetShipCombo_GetActiveGame (combo ownership gate)
 #include "2s2h/Rando/NeiResourceRouting.h"
+#include "../../../../../combo/menu/ComboItemIconOwnership.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 #include "mods/extended_equipment.h"        // ExtEquip_* (Skijer's NEI)
@@ -179,6 +180,11 @@ static void* KaleidoEquip_OotTex(const char* path) {
     extern bool ResourceMgr_IsAltAssetsEnabled(void);
     if (path == NULL) {
         return NULL;
+    }
+    // This native MM icon must not consult the OoT donor or the cold
+    // filename cache used for optional imported equipment textures.
+    if (ComboIconUsesMmOwnership(path)) {
+        return (void*)COMBO_IKANA_SHIELD_ICON;
     }
     if (ResourceMgr_FileExists(path) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path))) {
         return (void*)path;
