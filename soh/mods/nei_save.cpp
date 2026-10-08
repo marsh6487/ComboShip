@@ -252,6 +252,10 @@ constexpr const char* kSaveSectionName = "nei";
 void NeiSave_Init(bool isDebug) {
     ItemGrantAudit::Scope itemGrantAuditScope("OOT custom-init");
     memset(&gNeiSave, 0, sizeof(gNeiSave));
+    // New grants use the current equipment layouts. Version 0 is reserved for
+    // loaded legacy saves, whose old slots must migrate at player initialization.
+    gNeiSave.extTunicLayoutVersion = 1;
+    gNeiSave.extBootsLayoutVersion = 1;
     // Empty custom slots = ITEM_NONE (0xFF), not 0 (=ITEM_STICK). Skijer's NEI
     // ownedItems is u16 now, so memset(0xFF) would write 0xFFFF per entry — and the empty marker
     // is ITEM_NONE (0xFF), not 0xFFFF. Fill it element by element. Skijer's NEI

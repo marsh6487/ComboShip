@@ -44,13 +44,14 @@ def option_block(source, name):
     return source[start:end]
 
 
-def production_for(host, serializer_ref):
+def production_for(host, serializer_ref, init_ref=None):
     save = source_at(f"{host}/mods/nei_save.cpp")
+    initializers = source_at(f"{host}/mods/nei_save.cpp", init_ref)
     inventory = source_at(f"{host}/mods/extended_inventory.c")
     names = ("Nei_Save", "Nei_GetOwnedItem", "Nei_SetOwnedItem")
     parts = [extract(save, name) for name in names]
     if host == "mm":
-        parts.append(extract(save, "Nei_InitNewSave"))
+        parts.append(extract(initializers, "Nei_InitNewSave"))
         conversions = source_at("mm/2s2h/BenJsonConversions.hpp", serializer_ref)
         for signature in ("inline void to_json(json& j, const NeiSaveData& n)",
                           "inline void from_json(const json& j, NeiSaveData& n)"):
@@ -58,7 +59,7 @@ def production_for(host, serializer_ref):
         fleet = source_at("mm/2s2h/FleetShipCombo/FleetSync.cpp")
     else:
         parts.insert(0, "static NeiSaveData gNeiSave;")
-        parts.append(extract(save, "NeiSave_Init"))
+        parts.append(extract(initializers, "NeiSave_Init"))
         serializers = source_at("soh/mods/nei_save.cpp", serializer_ref)
         parts.extend(extract(serializers, name) for name in
                      ("Nei_SidecarPath", "TradeItems_SyncWrite", "TradeItems_SyncRead"))
@@ -66,6 +67,20 @@ def production_for(host, serializer_ref):
         manager = source_at("soh/soh/SaveManager.cpp")
         parts.extend(extract(manager, name) for name in ("SaveManager::SaveArray", "SaveManager::LoadArray"))
         fleet = source_at("soh/soh/FleetShipCombo/FleetSync.cpp")
+    equipment = source_at(f"{host}/mods/extended_equipment.c")
+    trade = source_at(f"{host}/mods/items/logic/trade_items.c")
+    for definition, source in (("TRADE_ADULT_PENDANT", equipment), ("TRADE_ADULT_COUNT", trade)):
+        parts.append(re.search(r"^#define " + definition + r"\s+.*$", source, re.M).group())
+    parts.append(extract(trade, "TradeAdult_GiveIndex"))
+    parts.append(extract(equipment, "ExtEquip_SetCurrentByType"))
+    # Keep the real persisted extended-slot writer. Engine behavior cleanup,
+    # vanilla-base equipment updates and player/render refresh remain outside
+    # this fixture's trade and extended-ownership boundary.
+    parts.append("void ExtEquip_SetSlot(s16 type, u8 index) {\n"
+                 "    assert(index == 0); ExtEquip_SetCurrentByType(type, index);\n}")
+    parts.extend(extract(equipment, name) for name in
+                 ("ExtEquip_GetBit", "ExtEquip_HasItem", "ExtEquip_GiveItem", "ExtEquip_GetCurrent",
+                  "ExtEquip_RemoveItem", "ExtEquip_Init"))
     parts.extend(extract(inventory, name) for name in
                  ("GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant",
                   "Slate_RuneOwned", "Slate_RuneCount", "Slate_RuneAt", "Slate_GetRune", "Slate_SetRune"))
@@ -79,6 +94,8 @@ def production_for(host, serializer_ref):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serializer-ref", help="git revision supplying only the NEI serializers")
+    parser.add_argument("--init-ref", help="git revision supplying only the new-save initializers")
+    parser.add_argument("--combo-save", type=Path, help="verify a supplied repaired combined save has no phantom trade items")
     parser.add_argument("--host", choices=("mm", "soh"), help="test only one host")
     parser.add_argument("--sanitizers", action="store_true", help="enable AddressSanitizer and UBSan")
     parser.add_argument("--standalone", action="store_true", help="test the non-ComboShip build")
@@ -86,10 +103,11 @@ def main():
     hosts = (args.host,) if args.host else ("mm", "soh")
     failed = False
     for host in hosts:
-        print(f"Testing {host}; serializers: {args.serializer_ref or 'working tree'}", flush=True)
+        print(f"Testing {host}; serializers: {args.serializer_ref or 'working tree'}; "
+              f"initializers: {args.init_ref or 'working tree'}", flush=True)
         with tempfile.TemporaryDirectory(prefix=f"nei-save-{host}-") as directory:
             build = Path(directory)
-            (build / "nei_save_production.inc").write_text(production_for(host, args.serializer_ref))
+            (build / "nei_save_production.inc").write_text(production_for(host, args.serializer_ref, args.init_ref))
             # SaveManager holds only a shared_ptr to this type here. The fixture
             # constructor does not create threads or register unrelated sections.
             (build / "BS_thread_pool.hpp").write_text("#pragma once\nnamespace BS { class thread_pool; }\n")
@@ -107,7 +125,9 @@ def main():
                             str(ROOT / "tests/nei_shared_slot/save_test.cpp"), "-o", str(binary)],
                            cwd=ROOT, check=True)
             result = subprocess.run([str(binary)], cwd=ROOT,
-                                    env={**os.environ, "NEI_SAVE_TEST_DIRECTORY": str(build / "Save")})
+                                    env={**os.environ, "NEI_SAVE_TEST_DIRECTORY": str(build / "Save"),
+                                         **({"NEI_SAVE_TEST_COMBO_SAVE": str(args.combo_save.resolve())}
+                                            if args.combo_save else {})})
             failed |= result.returncode != 0
     return int(failed)
 
