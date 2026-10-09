@@ -16,6 +16,7 @@ extern "C" {
 #include "ComboItemDrawABI.h"
 #include "combo/menu/ComboBottleContents.h"
 #include "combo/menu/ComboElementalArrowGi.h"
+#include "combo/menu/ComboRewardGi.h"
 #include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include "soh/Enhancements/randomizer/NeiGiFrameFit.h"
 #include "combo/DinSwordGiResources.h"
@@ -24,6 +25,9 @@ extern "C" void NeiGi_DrawElementalArrow(PlayState*, int) {
 }
 extern "C" void NeiGi_DrawElementalArrowForOwner(PlayState*, int, int, int) {
   assert(false && "sword fixture must not dispatch elemental arrows");
+}
+extern "C" void NeiGi_DrawRewardMaterial(PlayState*, int, const char*, const char*, const char*) {
+  assert(false && "sword fixture must not dispatch reward materials");
 }
 extern "C" int NeiGi_DrawElementalSpell(PlayState*, int, int, int) {
   assert(false && "sword fixture must not dispatch elemental spells");return 0;

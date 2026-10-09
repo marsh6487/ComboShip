@@ -64,13 +64,17 @@ oot_production = '\n'.join(function(oot_draw, name) for name in [
     'Randomizer_DrawProgressiveKokiriSword', 'Randomizer_DrawProgressiveMasterSword', 'Randomizer_DrawProgressiveBGS',
     'Randomizer_DrawExtFourSwordPresentation', 'Randomizer_DrawExtFourSword'])
 oot_production += '\n'+'\n'.join(function(oot, name) for name in ['Spin', 'HasLegacyGiMod', 'NeiGi_DrawEffects', 'NeiGi_DrawImpl'])
-# The full TU declares these private elemental helpers before NeiGi_DrawImpl.
+# The full TU declares these private effect helpers before NeiGi_DrawImpl.
 # Keep their exact production signatures, but fail if a sword enters that lane.
 elemental_boundaries = '\n'.join(
     function(renderer, name).split('{', 1)[0] +
     '{ assert(false && "sword receipt must not enter elemental crystal sheen"); ' + result + ' }'
     for name, result in [('NeiGi_DrawMeshMaterial', 'return false;'), ('NeiGi_RestoreElemental', '')])
-oot_production = elemental_boundaries + '\n' + oot_production
+sages_declaration = re.search(r'^void NeiGi_DrawSagesTunicMedallions\([^;]+;',
+    (ROOT / 'soh/soh/Enhancements/randomizer/NeiGiRender.h').read_text(), re.M)[0]
+sages_boundary = sages_declaration + '\n' + function(renderer, 'NeiGi_DrawSagesTunicMedallions').split('{', 1)[0] + \
+    '{ assert(false && "sword receipt must not enter Sage medallion fountain"); }'
+oot_production = elemental_boundaries + '\n' + sages_boundary + '\n' + oot_production
 source = source.replace('/* OOT_PRODUCTION */', oot_production)
 flags = ['-std=c++20', '-DF3DEX_GBI_2', '-DCOMBO_BUILD', '-I'+str(ROOT), '-I'+str(ROOT/'combo/menu'),
          '-I'+str(ROOT/'libultraship/include')]

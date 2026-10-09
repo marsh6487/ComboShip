@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 fixture = (ROOT / "tests/nei_gi/tunic_material_test.cpp").read_text()
 mm = functions((ROOT / "mm/2s2h/Rando/DrawItem.cpp").read_text())
 oot = functions((ROOT / "soh/soh/Enhancements/randomizer/draw.cpp").read_text())
-flags = ["-std=c++20", "-DF3DEX_GBI_2", "-I" + str(ROOT / "libultraship/include")]
+flags = ["-std=c++20", "-DF3DEX_GBI_2", "-I" + str(ROOT), "-I" + str(ROOT / "libultraship/include")]
 if "--sanitize" in sys.argv:
     flags += ["-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"]
 with tempfile.TemporaryDirectory(prefix="tunic-material-") as td:
@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix="tunic-material-") as td:
         # without setting primitive/environment colors. Do not mock that state.
         setup = re.search(r"/\* SETUPDL_25 \*/(.*?)\n\s*\},", source.read_text(), re.S)[1]
         if host == "mm":
-            names = ("LoadNeiLegacyGfx", "DrawOotGetItemOpaOpaTint", "DrawOotTunicTint",
+            names = ("LoadNeiLegacyGfx", "DrawOotMedallion", "DrawOotGetItemOpaOpaTint", "DrawOotTunicTint",
                      "DrawOotExtSpiritBreastplate", "DrawOotExtChampionsTunic", "DrawOotExtSagesTunic")
             drawers = "\n".join(mm[name] for name in names)
         else:

@@ -10,6 +10,7 @@
 #include <vector>
 #include <unordered_map>
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboRewardGi.h"
 #include "combo/menu/ComboBottleContents.h"
 #include "combo/menu/ComboItemEffectColors.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
@@ -180,6 +181,7 @@ void Matrix_RotateXF(float,int) {transforms.push_back("x");}
 void Matrix_RotateZF(float,int) {transforms.push_back("z");}
 void Matrix_Translate(float,float,float,int) {transforms.push_back("translate");}
 void Gfx_SetupDL25_Opa(GraphicsContext*) {} void Gfx_SetupDL25_Xlu(GraphicsContext*) {}
+void Gfx_SetupDL26_Opa(GraphicsContext*) {}
 void DrawOotSlateRuneFlame(uint8_t r,uint8_t g,uint8_t b) {assert(matrixDepth==0);flames.push_back({r,g,b});}
 #ifndef M_PIf
 constexpr float M_PIf=3.14159265358979323846f;
@@ -196,10 +198,9 @@ void* OotAssets_LoadGfx(const char* path) {return hostResources.contains(path)?(
 void* OotAssets_LoadGfxDirect(const char* path) {return OotAssets_LoadGfx(path);}
 const char* NeiResource_Route(const char* path) {return ComboInternRoutedPathOOT(std::string("__OTR__@oot:")+(path+7));}
 int NeiResource_Available(const char* path) {return OOT_NeiResourceExists(path);}
-int medallions=0;
-void DrawOotMedallionForest() {++medallions;} void DrawOotMedallionFire() {++medallions;}
-void DrawOotMedallionWater() {++medallions;} void DrawOotMedallionSpirit() {++medallions;}
-void DrawOotMedallionShadow() {++medallions;} void DrawOotMedallionLight() {++medallions;}
+void NeiGi_DrawRewardMaterial(PlayState*, int, const char*, const char*, const char*) {
+ assert(false && "Sage's Tunic miniature medallions must keep the native material");
+}
 /* HOST_TUNIC_DRAW */
 void DrawOotExtPegasusAnklet() {nativeCalled=CW_OOT_EQUIP_PEGASUS_BOOTS;}
 void DrawOotExtTrident() {nativeCalled=CW_OOT_EQUIP_TRIDENT;}
@@ -454,14 +455,32 @@ int main() {
  const char* collar="__OTR__objects/object_gi_clothes/gGiTunicCollarDL";
  const char* tunic="__OTR__objects/object_gi_clothes/gGiTunicDL";
  resources.insert(collar);resources.insert(tunic);
+ const char* medallionFaces[] = {
+  "__OTR__objects/object_gi_medal/gGiForestMedallionFaceDL",
+  "__OTR__objects/object_gi_medal/gGiFireMedallionFaceDL",
+  "__OTR__objects/object_gi_medal/gGiWaterMedallionFaceDL",
+  "__OTR__objects/object_gi_medal/gGiSpiritMedallionFaceDL",
+  "__OTR__objects/object_gi_medal/gGiShadowMedallionFaceDL",
+  "__OTR__objects/object_gi_medal/gGiLightMedallionFaceDL",
+ };
+ const char* medallionRing="__OTR__objects/object_gi_medal/gGiMedallionDL";
+ for(const char* path:medallionFaces)hostResources.insert(path);
+ hostResources.insert(medallionRing);
  for(auto rg:{RG_EXT_CHAMPIONS_TUNIC,RG_EXT_WATER_DRAGON_SCALE,RG_EXT_SPIRIT_BREASTPLATE}) {
   selected=rg;info={};assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok);
-  gfx.o=opa;gfx.x=xlu;submitted.clear();medallions=0;
+  gfx.o=opa;gfx.x=xlu;submitted.clear();
   MM_DrawForeignNativeEquipment(&info);
-  assert(submitted.size()==2 && "donor-only tunic geometry must be submitted while MM is active");
-  assert(submitted[0].second=="__OTR__@oot:objects/object_gi_clothes/gGiTunicCollarDL");
-  assert(submitted[1].second=="__OTR__@oot:objects/object_gi_clothes/gGiTunicDL");
-  if(rg==RG_EXT_WATER_DRAGON_SCALE)assert(medallions>0);
+  assert(submitted.size()>=2 && "donor-only tunic geometry must be submitted while MM is active");
+  const size_t medallionCommands=submitted.size()-2;
+  assert(submitted[medallionCommands].second=="__OTR__@oot:objects/object_gi_clothes/gGiTunicCollarDL");
+  assert(submitted[medallionCommands+1].second=="__OTR__@oot:objects/object_gi_clothes/gGiTunicDL");
+  if(rg==RG_EXT_WATER_DRAGON_SCALE) {
+   assert(medallionCommands>0 && medallionCommands%2==0);
+   for(size_t i=0;i<medallionCommands;i+=2) {
+    assert(std::find(std::begin(medallionFaces),std::end(medallionFaces),submitted[i].second)!=std::end(medallionFaces));
+    assert(submitted[i+1].second==medallionRing);
+   }
+  } else assert(medallionCommands==0);
   assert(matrixDepth==0);
  }
  hostResources.insert(collar);hostResources.insert(tunic);hostMods.insert(tunic);

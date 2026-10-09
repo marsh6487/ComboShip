@@ -97,9 +97,29 @@ assert tokens(new[start:end])==tokens('''
     size_t triangleCommands = 0;
     for (size_t b = 0; b < batchCount; ++b)
         triangleCommands += (batches[b].indexCount + 5) / 6;
-    if (!NeiGi_ArenaHasRoom(play, vertexCount * sizeof(Vtx), 1, 2, 32 + batchCount + triangleCommands))
+    const bool scrolling = material && material->scrolling;
+    const size_t scrollBytes = scrolling ? 2 * sizeof(Gfx) : 0;
+    if (!NeiGi_ArenaHasRoom(play, vertexCount * sizeof(Vtx) + scrollBytes, 1, 2,
+                           32 + batchCount + triangleCommands + (scrolling ? 1 : 0)))
         return false;
 ''')
+new=new[:start]+new[end:]
+# The reward-only scroll fragment is absent when no texture material is
+# supplied. Require its exact allocation and commands before normalizing it;
+# the complete untextured batcher below still compares with the fixed source.
+allocation='auto* vertices = static_cast<Vtx*>(Graph_Alloc(play->state.gfxCtx, vertexCount * sizeof(Vtx) + scrollBytes));'
+assert new.count(allocation)==1,'expected exactly the scroll-aware vertex allocation'
+new=new.replace(allocation,allocation.replace(' + scrollBytes',''),1)
+start=new.index('    Gfx* scroll = nullptr;');end=new.index('    OPEN_DISPS',start)
+assert tokens(new[start:end])==tokens('''
+    Gfx* scroll = nullptr;
+    if (scrolling) {
+        scroll = reinterpret_cast<Gfx*>(vertices + vertexCount);
+        const auto offset = RewardGi_Scroll(play->gameplayFrames);
+        gDPSetTileSize(scroll, G_TX_RENDERTILE, offset.s, offset.t, offset.s + 31 * 4, offset.t + 31 * 4);
+        gSPEndDisplayList(scroll + 1);
+    }
+'''),'unexpected reward-only scroll fragment'
 new=new[:start]+new[end:]
 for op in ('Push','Pop'):
     new,count=re.subn(r'    if \(owner\)\n        gSPComboRM'+op+r'\(POLY_XLU_DISP\+\+(?:, owner)?\);\n','',new)

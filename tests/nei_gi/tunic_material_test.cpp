@@ -8,6 +8,7 @@
 #include <iostream>
 #include <set>
 #include <string>
+#include "combo/menu/ComboRewardGi.h"
 using u8 = uint8_t;
 using s16 = int16_t;
 using s32 = int32_t;
@@ -35,6 +36,7 @@ Mtx* Matrix_NewMtx(GraphicsContext*, const char*, int) { return &matrix; }
 void Gfx_SetupDL25_Opa(GraphicsContext* ctx) { __gSPDisplayList(ctx->polyOpa.p++, setup25); }
 void Gfx_SetupDL_25Opa(GraphicsContext* ctx) { Gfx_SetupDL25_Opa(ctx); }
 void Gfx_SetupDL_26Opa(GraphicsContext* ctx) { Gfx_SetupDL25_Opa(ctx); }
+void Gfx_SetupDL26_Opa(GraphicsContext* ctx) { Gfx_SetupDL25_Opa(ctx); }
 int ResourceMgr_IsModAsset(const char*) { return 0; }
 int NeiResource_Available(const char*) { return 1; }
 const char* NeiResource_Route(const char* path) {
@@ -53,12 +55,9 @@ const char* gGiSpiritMedallionFaceDL = "__OTR__spirit";
 const char* gGiShadowMedallionFaceDL = "__OTR__shadow";
 const char* gGiLightMedallionFaceDL = "__OTR__light";
 const char* gGiMedallionDL = "__OTR__medallion";
-void DrawOotMedallionForest() {}
-void DrawOotMedallionFire() {}
-void DrawOotMedallionWater() {}
-void DrawOotMedallionSpirit() {}
-void DrawOotMedallionShadow() {}
-void DrawOotMedallionLight() {}
+void NeiGi_DrawRewardMaterial(PlayState*, int, const char*, const char*, const char*) {
+    assert(false && "Sage's Tunic miniature medallions must keep the native material");
+}
 /* PRODUCTION_DRAWERS */
 
 struct Material {

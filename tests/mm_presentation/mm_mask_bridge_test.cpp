@@ -10,6 +10,7 @@
 #include "combo/menu/ComboItemDrawABI.h"
 #include "combo/menu/ComboBottleContents.h"
 #include "combo/menu/ComboElementalArrowGi.h"
+#include "combo/menu/ComboRewardGi.h"
 #include "combo/menu/ComboItemEffectColors.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include "soh/mods/mm_sources/objects/object_gi_masks_all.h"
@@ -175,6 +176,7 @@ void NeiGi_DrawSeasonOverlay(PlayState*,int,const char*) {assert(0 && "mask fixt
 void NeiGi_DrawSongOverlay(PlayState*,int,const char*) {assert(false && "song dispatch has its own production fixture");}
 extern "C" void NeiGi_DrawElementalArrow(PlayState*,int) {assert(false && "mask fixture must not dispatch elemental arrows");}
 extern "C" void NeiGi_DrawElementalArrowForOwner(PlayState*,int,int,int) {assert(false && "mask fixture must not dispatch elemental arrows");}
+extern "C" void NeiGi_DrawRewardMaterial(PlayState*,int,const char*,const char*,const char*) {assert(false && "mask fixture must not dispatch reward materials");}
 extern "C" int NeiGi_DrawElementalSpell(PlayState*,int,int,int) {assert(false && "mask fixture must not dispatch elemental spells");return 0;}
 extern "C" int ComboBottleContents_Draw(PlayState*,int) {assert(false && "mask fixture must not dispatch bottle contents");return 0;}
 // Sword drawing/fitting is tested by the selected-model and foreign sword
