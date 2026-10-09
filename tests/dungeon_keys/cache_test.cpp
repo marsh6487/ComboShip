@@ -1,4 +1,5 @@
 #include "ComboItemDrawABI.h"
+#include "combo/menu/ComboElementalArrowGi.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include <cstdio>
 #include <cstring>
@@ -52,6 +53,9 @@ enum RandoItemId {
   RI_OOT_MASTER_SWORD,
   RI_OOT_TRUE_MASTER_SWORD,
   RI_OOT_BIGGORON_SWORD,
+  RI_OOT_DINS_FIRE,
+  RI_OOT_FARORES_WIND,
+  RI_OOT_NAYRUS_LOVE,
   RI_PROGRESSIVE_BOW,
   RI_PROGRESSIVE_BOMB_BAG,
   RI_PROGRESSIVE_WALLET,
@@ -399,7 +403,7 @@ int main() {
       RI_OOT_BOTTLE_POE,          RI_OOT_RUTOS_LETTER};
   const uint8_t bottleColors[][3] = {
       {150, 200, 0},   {100, 160, 255}, {100, 160, 255}, {220, 225, 240},
-      {255, 160, 235}, {220, 225, 240}, {0, 200, 0},     {220, 225, 240},
+      {255, 160, 235}, {220, 225, 240}, {0, 200, 0},     {222, 100, 245},
       {100, 0, 200},   {220, 225, 240}};
   for (int i = 0; i < 10; ++i) {
     Rando::StaticData::Items[bottles[i]] = {(i == 1 || i == 9) ? -1 : 0,

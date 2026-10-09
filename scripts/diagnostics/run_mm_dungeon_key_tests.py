@@ -43,7 +43,7 @@ parts = {
     'OWNER_MASTER_CASE': master_case,
     'PRODUCER': '\n'.join(function(mm, n) for n in ['MM_IsProgressiveItem', 'MM_IsStateDependentDraw',
                                                    'MM_FillImportedSwordFallback', 'MM_IsSwordAppearanceDependent',
-                                                   'MM_FillItemDrawInfo', 'MM_GetItemDrawInfo']),
+                                                   'MM_FillElementalSpellDrawInfo', 'MM_FillItemDrawInfo', 'MM_GetItemDrawInfo']),
     'CACHE': oot[oot.index('namespace {'):oot.index('} // namespace') + len('} // namespace')],
     'HOST': function(oot, 'OOT_DrawForeignOps'),
 }
