@@ -1,4 +1,5 @@
 #include "../../../../combo/menu/ItemGrantAuditBridge.h"
+#include "../../../../combo/menu/ComboToolReceiptText.h"
 #include "randomizer.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
@@ -125,6 +126,13 @@ static const CustomItemMessageEntry customItemMessages[] = {
     // Skijer's NEI: page-2 custom items + the 24 MM masks + Bottle with Magic Mushroom moved their
     // messages into the unified registry (sNeiItems[] in extended_player.c). GetCustomItemMessage
     // falls back to those rows via Nei_FindByRg. Only items NOT in that registry remain below.
+
+    // ITEM_CUSTOM stages the catalog's custom icon. Extended item IDs would
+    // truncate in the one-byte pickup icon command.
+    { RG_PHANTOM_HOURGLASS, ITEM_CUSTOM, ComboToolReceiptText::kPhantomHourglass.english,
+      ComboToolReceiptText::kPhantomHourglass.german, ComboToolReceiptText::kPhantomHourglass.french },
+    { RG_SHADOW_CRYSTAL, ITEM_CUSTOM, ComboToolReceiptText::kShadowCrystal.english,
+      ComboToolReceiptText::kShadowCrystal.german, ComboToolReceiptText::kShadowCrystal.french },
 
     // ─────────────────────────────────────────────────────────────────────────
     // Extended Equipment (12 items, equipment page 2 - toggled via [L] in pause)

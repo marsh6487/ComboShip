@@ -8,6 +8,7 @@
 #include "ComboFairyBottle.h"
 #include "ComboBottleGi.h"
 #include "ComboElementalArrowGi.h"
+#include "ComboRewardGi.h"
 #include "objects/object_gi_key/object_gi_key.h"
 #include "objects/object_gi_jewel/object_gi_jewel.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
@@ -951,9 +952,11 @@ void GetItem_DrawJewel(PlayState* play, s16 drawId) {
     gDPSetEnvColor(POLY_OPA_DISP++, envOpaColor[0], envOpaColor[1], envOpaColor[2], 255);
     gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[1]);
 
-    Matrix_Pop();
-
     CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawRewardMaterial(play, RewardGi_ProfileForPaths((const char*)sDrawItemTable[drawId].dlists[0], NULL),
+                             (const char*)sDrawItemTable[drawId].dlists[0],
+                             (const char*)sDrawItemTable[drawId].dlists[1], "oot");
+    Matrix_Pop();
 }
 
 void GetItem_DrawMaskOrBombchu(PlayState* play, s16 drawId) {
@@ -1119,6 +1122,9 @@ void GetItem_DrawEggOrMedallion(PlayState* play, s16 drawId) {
     gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[1]);
 
     CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawRewardMaterial(play, RewardGi_ProfileForPaths((const char*)sDrawItemTable[drawId].dlists[0], NULL),
+                             (const char*)sDrawItemTable[drawId].dlists[0],
+                             (const char*)sDrawItemTable[drawId].dlists[1], "oot");
 }
 
 void GetItem_DrawCompass(PlayState* play, s16 drawId) {

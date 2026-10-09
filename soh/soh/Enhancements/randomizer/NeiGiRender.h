@@ -6,6 +6,7 @@
 #include "NeiGiBottleShimmerPolicy.h"
 #include "NeiElementalSpellGi.h"
 #include "ComboElementalArrowGi.h"
+#include "ComboRewardGi.h"
 #include "z64.h"
 namespace NeiGi {
 // Private RGBA32 resources use a 32x32 logical tile; resource metadata owns
@@ -14,6 +15,7 @@ struct TextureMaterial {
     const char* path;
     bool repeatS = false;
     bool repeatT = false;
+    bool scrolling = false;
 };
 } // namespace NeiGi
 extern "C" {
@@ -31,6 +33,8 @@ bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiG
 // Intrinsic weather; profiles 1..4 are individual seasons, 5 cycles on the actual rod.
 void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner);
 void NeiGi_DrawSongOverlay(PlayState* play, int song, const char* owner);
+// Intrinsic Sage fountain; retains the native medallion materials and launch animation.
+void NeiGi_DrawSagesTunicMedallions(PlayState* play, const char* owner = nullptr);
 // Selected external geometry uses its resource bounds for MM receipts and
 // swords. The item's identity still controls its optional particles.
 void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int shimmerKind,

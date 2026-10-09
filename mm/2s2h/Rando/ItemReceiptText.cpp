@@ -7,6 +7,7 @@
 #include "ComboCapeReceiptChoice.h"
 #include "ComboSongReceiptText.h"
 #include "ComboMagicItemReceiptText.h"
+#include "ComboToolReceiptText.h"
 #include "ComboSongDrawMM.h"
 #include "ComboRupeeNames.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -358,6 +359,20 @@ bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry) {
 }
 } // namespace
 
+static bool ToolItemReceipt(const char* itemName, CustomMessage::Entry& entry) {
+    if (!itemName)
+        return false;
+    const auto* tool = ComboToolReceiptText::Find(itemName);
+    if (!tool)
+        return false;
+    const char* body = gSaveContext.options.language == LANGUAGE_GER   ? tool->german
+                       : gSaveContext.options.language == LANGUAGE_FRE ? tool->french
+                                                                       : tool->english;
+    entry.receiptPresentation = {};
+    SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(body));
+    return true;
+}
+
 static bool MagicItemReceipt(const char* itemName, CustomMessage::Entry& entry) {
     if (!itemName)
         return false;
@@ -532,7 +547,7 @@ bool Rando::ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Ent
     entry.capeVisibilityChoice = ComboCapeReceiptChoice::IsCape(itemName);
     if (!itemName || !*itemName)
         return false;
-    if (MagicItemReceipt(itemName, entry))
+    if (ToolItemReceipt(itemName, entry) || MagicItemReceipt(itemName, entry))
         return true;
     if (RandomRupeeReceipt(itemName, entry))
         return true;
@@ -598,7 +613,7 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     if (it == StaticData::Items.end())
         return false;
     const auto& item = it->second;
-    if (MagicItemReceipt(item.name, entry))
+    if (ToolItemReceipt(item.name, entry) || MagicItemReceipt(item.name, entry))
         return true;
     if (RandomRupeeReceipt(item.name, entry))
         return true;

@@ -3274,6 +3274,11 @@ void BenMenu::AddNEI() {
     AddWidget(masksPath, "Enable Transformation Masks", WIDGET_CVAR_CHECKBOX)
         .CVar("gMods.TransformMasks.Enabled")
         .Options(CheckboxOptions().Tooltip("Deku/Goron/Zora/FD transformation-mask systems.").DefaultValue(true));
+    AddWidget(masksPath, "Use HD Wolf Link", WIDGET_CVAR_CHECKBOX)
+        .CVar("gMods.WolfLink.UseHDModel")
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+            "Use the Twilight Princess Wolf Link model with soft blue eyes and a cuff chain.\n"
+            "Applies the next time you transform into Wolf Link."));
     AddWidget(masksPath, "Instant Transform", WIDGET_CVAR_CHECKBOX)
         .CVar("gMods.TransformMasks.InstantTransform")
         .Options(CheckboxOptions().Tooltip("Skip the transformation cutscene."));

@@ -558,6 +558,43 @@ int main(int argc, char** argv) {
   (void)argv;
   PlayState play{};
   gPlayState = &play;
+  // Utility tutorials must work in an MM-first seed without querying OoT.
+  const struct { RandoItemId id; const char* name; char color; char extraButton; unsigned pages; } tools[] = {
+    {RI_OOT_NEI_PHANTOM_HOURGLASS, "Phantom Hourglass", '\x04', '\xB4', 4},
+    {RI_OOT_NEI_SHADOW_CRYSTAL, "Shadow Crystal", '\x06', '\xB0', 3},
+  };
+  for (bool ready : {false, true}) {
+    donorReady = ready;
+    for (int language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+      gSaveContext.options.language = language;
+      for (const auto& tool : tools) {
+        CustomMessage::Entry native, foreign;
+        native.icon = foreign.icon = 0xF5;
+        const auto saveBefore = gSaveContext;
+        const auto neiBefore = neiSave;
+        const int readsBefore = donorReads;
+        assert(Rando::ApplyItemReceiptText(tool.id, native) && "utility pickup still uses generic text");
+        assert(Rando::ApplyForeignItemReceiptText(tool.name, foreign));
+        assert(native.msg == foreign.msg && !native.autoFormat && !foreign.autoFormat);
+        assert(native.icon == 0xF5 && foreign.icon == 0xF5);
+        assert(native.msg.find('\xB2') != std::string::npos && "C-button glyph was not encoded for MM");
+        assert(native.msg.find('\xB1') != std::string::npos && native.msg.find(tool.extraButton) != std::string::npos);
+        assert(native.msg.substr(0, native.msg.find('\x10')).find(tool.color) != std::string::npos);
+        assert(native.msg.find('%') == std::string::npos && native.msg.size() <= 1269);
+        unsigned lines = 1, pages = 1;
+        for (char c : native.msg) {
+          if (c == '\x10') { lines = 1; ++pages; }
+          if (c == '\x11') assert(++lines <= 3 && "tutorial exceeds MM's line-offset table");
+        }
+        assert(pages == tool.pages && "tutorial instruction spilled onto an extra page");
+        assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+        assert(!std::memcmp(&neiBefore, &neiSave, sizeof(neiBefore)));
+        assert(donorReads == readsBefore && "shared tool tutorial queried the OoT donor");
+      }
+    }
+  }
+  gSaveContext.options.language = LANGUAGE_ENG;
+  std::cout << "PASS Hourglass/Crystal MM tutorials: native/foreign, all locales, cold/warm donor, glyphs, colors, pages and save isolation\n";
   const struct {
     RandoItemId id;
     const char* name;

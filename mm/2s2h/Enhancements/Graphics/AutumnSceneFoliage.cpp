@@ -38,6 +38,10 @@ constexpr Material kMaterials[] = {
     { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_034898", 0xB96848FF },
     { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_034098", 0xB96848FF },
     { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_037098", 0xB96848FF },
+    // Exported brush tops also draw terrain, so their nonempty per-material
+    // variant bypasses the whole-list fallback. Match the private foliage loads.
+    { "Z2_00KEIKOKU", "foliage_poc3/leaves_rgba", 0xB96848FF },
+    { "Z2_00KEIKOKU", "foliage_poc3/stems_rgba", 0xB96848FF },
     { "Z2_21MITURINMAE", "Z2_21MITURINMAETex_0055D0", 0xB96848FF },
 };
 

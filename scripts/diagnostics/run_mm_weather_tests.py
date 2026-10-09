@@ -87,7 +87,8 @@ def main():
         # spell out the conversion only in the C++ fixture.
         sky.append(re.sub(r"\bgSkybox(?:Clear|Cloudy)\dTex\b", r"(TexturePtr)\g<0>",
                           array_declaration(skybox, "sSkyboxTextures")))
-        for source, name in ((environment, "Environment_LerpWeight"),
+        for source, name in ((skybox, "Skybox_IsOotSkyActive"),
+                             (environment, "Environment_LerpWeight"),
                              (skybox_draw, "Skybox_SetColors"),
                              (environment, "Environment_UpdateSkybox"),
                              (environment, "Environment_DrawSkyboxFilters"),
@@ -111,7 +112,9 @@ def main():
             structs + "\nLightningBolt sLightningBolts[3];\n"
             "static LightningBolt sMMWeatherLightningBolt = { .state = LIGHTNING_BOLT_INACTIVE };\n" +
             "\n".join(functions))
-        result = subprocess.run([*compiler, *flags, *game_flags, "-Wno-error",
+        # The real sky-star helper includes its normal spdlog call; use the same
+        # standalone fmt mode as the other production-header fixtures.
+        result = subprocess.run([*compiler, *flags, *game_flags, "-Wno-error", "-DFMT_HEADER_ONLY",
                         "-include", "nlohmann/json.hpp", "-I" + str(build),
                         str(ROOT / "mm/tests/weather_bridge_test.cpp"),
                         str(ROOT / "mm/2s2h/Enhancements/Audio/MMWeather.cpp"),

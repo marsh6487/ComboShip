@@ -826,6 +826,13 @@ void RegisterNEIMenu() {
                                            "Equip transformation masks from the MM Masks inventory page.\n\n"
                                            "REQUIRES: mm.o2r from 2Ship2Harkinian Keiichi Alfa 4.0.0"));
 
+    mSohMenu->AddWidget(path, "Use HD Wolf Link", WIDGET_CVAR_CHECKBOX)
+        .CVar("gMods.WolfLink.UseHDModel")
+        .RaceDisable(false)
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+            "Use the Twilight Princess Wolf Link model with soft blue eyes and a cuff chain.\n"
+            "Applies the next time you transform into Wolf Link."));
+
     mSohMenu->AddWidget(path, "Instant Transform", WIDGET_CVAR_CHECKBOX)
         .CVar("gMods.TransformMasks.InstantTransform")
         .RaceDisable(false)

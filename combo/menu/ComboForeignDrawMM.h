@@ -35,6 +35,7 @@
 #include <unordered_set>
 
 #include "ComboItemDrawABI.h"
+#include "ComboRewardGi.h"
 #include "ComboMmNativeImports.h"
 #include "ComboFairyBottle.h"
 #include "ComboBottleContents.h"
@@ -281,6 +282,7 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
 struct ComboForeignDrawCacheOOT {
     std::unordered_map<int32_t, ComboForeignDrawInfoOOT> map;
     std::unordered_map<int32_t, std::string> receiptNames;
+    std::unordered_map<int32_t, std::string> swordReceiptNames;
     int slot = -1;
     uint64_t gen = (uint64_t)-1;
 };
@@ -292,6 +294,7 @@ inline ComboForeignDrawCacheOOT& ComboForeignDrawCacheOOTGet() {
     if (slot != c.slot || gen != c.gen) {
         c.map.clear();
         c.receiptNames.clear();
+        c.swordReceiptNames.clear();
         c.slot = slot;
         c.gen = gen;
     }
@@ -309,7 +312,11 @@ inline const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckI
     // A state-dependent recipe (progressive tier, Triforce shard, junk/trap) is re-resolved every
     // frame; caching it would freeze whichever model happened to be correct on the first draw.
     ComboForeignDrawInfoOOT info{}; // built locally: a failure must not clobber a live cached recipe
-    if (ComboFillForeignDrawInfoOOT(rc, info) == ComboForeignResolveOOT::NotReady) {
+    // Once granted, refresh only the frozen concrete sword's appearance.
+    // Resolving its progressive placeholder again would select the NEXT tier.
+    auto receipt = c.swordReceiptNames.find(rc);
+    const char* namedItem = receipt != c.swordReceiptNames.end() ? receipt->second.c_str() : nullptr;
+    if (ComboFillForeignDrawInfoOOT(rc, info, namedItem) == ComboForeignResolveOOT::NotReady) {
         c.map.erase(rc); // transient — retry next frame instead of freezing the sentinel in
         return nullptr;
     }
@@ -333,6 +340,13 @@ inline void ComboLatchForeignDrawOOT(RandoCheckId rc) {
         c.receiptNames[rc] = info.resolvedName;
     if (info.animOk) {
         return; // that class's state-dependence is a CVar (SimplerBossSoulModels), not save state
+    }
+    // Progressive producers use stateDependent=1 to freeze the awarded tier.
+    // Its sword mesh must still follow the host's live Alt Assets selection.
+    if (!info.resolvedName.empty() && info.neiShimmer > 0 &&
+        NeiGi::IsSword(static_cast<NeiGi::Kind>(info.neiShimmer - 1))) {
+        c.swordReceiptNames[rc] = info.resolvedName;
+        info.appearanceDependent = true;
     }
     info.stateDependent = info.appearanceDependent; // Freeze tiers while keeping appearance live.
     c.map[rc] = info;
@@ -697,10 +711,12 @@ inline void MM_DrawForeignJewel(const ComboForeignDrawInfoOOT* info) {
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 128, info->primColorOpa[0], info->primColorOpa[1], info->primColorOpa[2], 255);
     gDPSetEnvColor(POLY_OPA_DISP++, info->envColorOpa[0], info->envColorOpa[1], info->envColorOpa[2], 255);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)info->dls[1]);
-    Matrix_Pop();
     CLOSE_DISPS(gfxCtx);
     int32_t segs[] = { 0x08, 0x09 };
+    // Complete the native recipe's allocating tail before optional materials.
     MM_RestoreForeignSegs(segs, 2);
+    NeiGi_DrawRewardMaterial(play, RewardGi_ProfileForPaths(info->dls[0], nullptr), info->dls[0], info->dls[1], "oot");
+    Matrix_Pop();
 }
 
 // Din's Fire / Farore's Wind / Nayru's Love: XLU seg8 scroll, dl0,1,2 (GetItem_DrawMagicSpell).
@@ -1291,7 +1307,8 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
                 : 0.f;
         ComboSwordGi_ApplyModelsFit("oot", info->dls, info->count, scale, tilt, shop, mmPickup);
     }
-    const bool overlayShimmer = info->itemShimmer && info->drawKind != CW_DRAW_KIND_ELEMENTAL_ARROW &&
+    const int reward = RewardGi_ProfileForPaths(info->dls[0], info->count > 1 ? info->dls[1] : nullptr);
+    const bool overlayShimmer = info->itemShimmer && !reward && info->drawKind != CW_DRAW_KIND_ELEMENTAL_ARROW &&
                                 info->drawKind != CW_DRAW_KIND_MAGIC_SPELL;
     if (overlayShimmer) {
         Matrix_Push();
@@ -1400,6 +1417,8 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
             MM_DrawForeignSimple(info);
             break;
     }
+    if (reward >= 1 && reward <= 6)
+        NeiGi_DrawRewardMaterial(gPlayState, reward, info->dls[0], info->count > 1 ? info->dls[1] : nullptr, "oot");
     if (overlayShimmer)
         Matrix_Pop();
     if (fitModel && swordIdentity)

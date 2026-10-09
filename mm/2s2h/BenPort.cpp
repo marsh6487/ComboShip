@@ -5350,6 +5350,11 @@ extern "C" bool Ship_HandleConsoleCrashAsReset() {
     return true;
 }
 
+#include "../../combo/NeiRewardGiResource.h"
+extern "C" int ResourceMgr_GetRewardSurfaceForGame(const char* game, const char* path, NeiGi::Mesh* mesh) {
+    return NeiGi::GetRewardSurface("mm", game, path, mesh);
+}
+
 extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* path, float scale, float tilt, int shop,
                                                 float fit[2]) {
     const int din =
@@ -5401,4 +5406,14 @@ extern "C"
     int
     MM_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner) {
     return NeiWolfAsset::CopyResource("mm", destination, capacity, size, owner);
+}
+
+extern "C"
+#ifdef COMBO_BUILD
+    COMBO_EXPORT
+#endif
+    int
+    MM_CopyWolfLinkModelResource(int useHD, uint8_t* destination, size_t capacity, size_t* size, const char** owner,
+                                 const char** path) {
+    return NeiWolfAsset::CopyResource("mm", destination, capacity, size, owner, useHD != 0, path);
 }

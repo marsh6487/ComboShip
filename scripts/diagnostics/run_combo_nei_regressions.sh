@@ -5,7 +5,11 @@ python3 -B scripts/diagnostics/run_hint_item_name_tests.py
 python3 -B scripts/diagnostics/run_combo_crash_owner_tests.py
 python3 -B scripts/diagnostics/run_nei_gi_tests.py --held --combo
 python3 -B tests/elemental_arrow_gi/run_tests.py
+python3 -B tests/reward_gi/run_tests.py
+python3 -B tests/reward_gi/run_asset_packaging_tests.py
 python3 -B tests/nei_gi/run_flame_arena_tests.py
+python3 -B tests/nei_gi/run_sages_tunic_particle_tests.py
+python3 -B tools/nei_gi/check_time_gate_solidity.py
 python3 -B scripts/diagnostics/run_mm_item_presentation_tests.py
 python3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py --sanitize
 python3 -B scripts/diagnostics/run_tunic_material_tests.py --sanitize
@@ -57,6 +61,9 @@ python3 -B tests/nei_shared_slot/run_sync_tests.py
 python3 -B tests/nei_shared_slot/run_save_tests.py
 python3 -B tests/mm_wolf/run_skin_tests.py
 python3 -B tests/mm_wolf/run_core_tests.py
+python3 -B tests/mm_wolf/run_material_glow_tests.py
+python3 -B tests/mm_wolf/run_bundled_asset_tests.py
+python3 -B tests/mm_wolf/run_real_asset_tests.py soh/assets/custom/objects/forms/wolf_link/gWolfLinkData soh/assets/custom/objects/forms/wolf_link/gWolfLinkHDData
 python3 -B tests/mm_wolf/run_host_tests.py
 python3 -B tests/mm_wolf/run_model_owner_tests.py
 python3 -B tests/mm_wolf/run_asset_packaging_tests.py

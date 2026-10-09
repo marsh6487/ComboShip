@@ -3,6 +3,7 @@
 #include "combo/menu/ComboKeyReceiptText.h"
 #include "combo/menu/ComboDungeonKeyReceipt.h"
 #include "combo/menu/ComboMagicItemReceiptText.h"
+#include "combo/menu/ComboToolReceiptText.h"
 #include "combo/menu/ComboItemReceiptPresentation.h"
 #include "combo/menu/ComboItemReceiptText.h"
 #include "soh/soh/Enhancements/custom-message/text.h"
@@ -36,7 +37,7 @@ constexpr int ITEM_CATEGORY_JUNK = 0, ITEM_CATEGORY_MAJOR = 1,
               TEXT_RANDOMIZER_CUSTOM_ITEM = 0x9000;
 constexpr int TEXTBOX_TYPE_BLUE = 2, ITEM_COMPASS = 0x75,
               ITEM_DUNGEON_MAP = 0x76, ITEM_SKULL_TOKEN = 0x71,
-              ITEM_CUSTOM = 0xFF;
+              ITEM_CUSTOM = 0x9C;
 using ItemID = int;
 constexpr int OBJECT_INVALID = -1, ITEM_NONE = 0xFF,
               ITEM_ELEMENTAL_WAND = 0xD0, EXT_ITEM_SHEIKAH_SLATE = 0x220,
@@ -191,6 +192,8 @@ std::map<std::string, RandomizerGet> itemNameToEnum = {
     {"Storm Rod", RG_WAND_STORM_ROD},
     {"Shadow Scepter", RG_WAND_SHADOW_SCEPTER},
     {"Sheikah Slate", RG_SHEIKAH_SLATE},
+    {"Phantom Hourglass", RG_PHANTOM_HOURGLASS},
+    {"Shadow Crystal", RG_SHADOW_CRYSTAL},
     {"Rune: Remote Bomb", RG_SLATE_RUNE_BOMB},
     {"Rune: Stasis", RG_SLATE_RUNE_STASIS},
     {"Rune: Cryonis", RG_SLATE_RUNE_CRYONIS},
@@ -833,6 +836,28 @@ int main(int argc, char** argv) {
   }
   receiptContext.customItems = 1;
   randoActive = true;
+  const struct { const char* name; const char* effect; char color; char extraButton; } tools[] = {
+      {"Phantom Hourglass", "rewind", '\x04', '\xB4'},
+      {"Shadow Crystal", "Wolf Link", '\x06', '\xB0'}};
+  for (const auto& tool : tools) {
+    const auto body = read(tool.name);
+    assert(body.find(tool.effect) != std::string::npos && body.find(tool.color) != std::string::npos);
+    Player player{};
+    player.getItemId = Rando::StaticData::itemNameToEnum.at(tool.name);
+    player.getItemEntry.objectId = OBJECT_INVALID;
+    CustomMessage native;
+    BuildCustomItemMessage(&player, native);
+    for (const auto& text : {native.GetEnglish(MF_RAW), native.GetGerman(MF_RAW), native.GetFrench(MF_RAW)}) {
+      assert(text.starts_with(CustomMessage::ITEM_OBTAINED(ITEM_CUSTOM)) &&
+             "extended item ID truncated instead of using its custom icon");
+      std::string converted;
+      assert(ComboItemReceiptText::FromOotMessage(text, converted));
+      assert(converted.find('\xB2') != std::string::npos && converted.find('\xB1') != std::string::npos);
+      assert(converted.find(tool.extraButton) != std::string::npos && converted.find(tool.color) != std::string::npos);
+      assert(converted.find('%') == std::string::npos && converted.size() <= sizeof(buffer));
+    }
+  }
+  std::cout << "PASS Hourglass/Crystal OoT tutorials: custom icons, all locales, encoded glyphs/colors and donor export\n";
   const struct { const char* name; const char* effect; } magicItems[] = {
       {"Elemental Wand", "medallion"}, {"Sand Rod", "platform"},
       {"Tornado Rod", "jump"}, {"Water Rod", "water"},

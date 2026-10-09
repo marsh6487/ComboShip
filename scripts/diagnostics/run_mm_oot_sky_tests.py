@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import shlex
 import subprocess
+import sys
 import tempfile
 import zipfile
 
@@ -40,6 +41,7 @@ def main():
                 manifest.write_text("\n".join(archive.namelist()))
             run.append(str(manifest))
         subprocess.run(run, check=True)
+    subprocess.run([sys.executable, str(ROOT / "tests/skybox/run_oot_sky_star_tests.py")], check=True)
 
 
 if __name__ == "__main__":

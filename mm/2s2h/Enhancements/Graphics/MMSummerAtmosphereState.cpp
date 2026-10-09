@@ -141,8 +141,10 @@ void State::Step(const Input& input, const View& view) {
         const float y = std::abs(Dot(relative, view.up)) / (depth * view.tanHalfFov);
         const float edge = Smooth((1.08f - std::max(x, y)) / 0.18f);
         const float pulse = 0.5f + 0.5f * std::sin(p.age * p.frequency + p.phase);
+        // Keep the dim phase readable and spend less of each pulse near dark,
+        // while retaining the same soft 0.94 peak and entry/edge/night fades.
         p.alpha = Smooth(p.age / 0.8f) * edge *
-                  (p.kind == Kind::Mote ? daylight * (0.58f + 0.22f * pulse) : night * (0.12f + 0.82f * pulse * pulse));
+                  (p.kind == Kind::Mote ? daylight * (0.58f + 0.22f * pulse) : night * (0.30f + 0.64f * pulse));
     }
     initialized = true;
     BuildBeams(input, view, daylight);

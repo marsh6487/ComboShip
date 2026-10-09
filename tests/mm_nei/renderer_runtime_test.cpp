@@ -10,6 +10,9 @@
 #include "objects/object_gi_melody/object_gi_melody.h"
 #include "rod_runtime_test.cpp"
 #include <set>
+#ifndef NEI_GI_REWARD_FIXTURE
+extern "C" int ResourceMgr_GetRewardSurfaceForGame(const char*,const char*,NeiGi::Mesh*) { return 0; }
+#endif
 std::set<std::string> ownerBase, ownerAlt;
 bool ownerAltEnabled = false, mmAltEnabled = false, ownerRegistered = true;
 extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return mmAltEnabled; }
@@ -272,6 +275,41 @@ int main() {
       assert(!MM_TryDrawNeiGi(id) && gfx.polyOpa.p==opa && gfx.polyXlu.p==xlu);
     }
   }
+  // Native MM's CPU availability probe must use the inactive OoT donor and
+  // its own Alt setting before the GPU owner scope is ever submitted.
+  for (bool donorAlt : {false, true}) for (bool hostAlt : {false, true}) {
+    reset(); ownerBase.clear(); ownerAlt.clear(); ownerRegistered = true;
+    ownerAltEnabled = donorAlt; mmAltEnabled = hostAlt; itemEffects = false;
+    play.state.frames = play.gameplayFrames = 9;
+    auto& donorFiles = donorAlt ? ownerAlt : ownerBase;
+    donorFiles.insert("__OTR__objects/nei_gi_redesign/sages_tunic/gi_dl");
+    donorFiles.insert("__OTR__objects/object_gi_medal/gGiMedallionDL");
+    std::set<std::string> expectedFaces;
+    for (const char* name : {"Forest", "Fire", "Water", "Spirit", "Shadow", "Light"}) {
+      expectedFaces.insert(std::string("__OTR__objects/object_gi_medal/gGi") + name + "MedallionFaceDL");
+    }
+    donorFiles.insert(expectedFaces.begin(), expectedFaces.end());
+    assert(MM_TryDrawNeiGi(RI_OOT_EXT_WATER_DRAGON_SCALE));
+    std::set<std::string> faces;
+    int depth = 0, medalBodies = 0, tunics = 0;
+    for (Gfx* cmd = opa; cmd < gfx.polyOpa.p; ++cmd) {
+      const auto op = cmd->words.w0 >> 24;
+      if (op == G_COMBO_RM_PUSH) {
+        assert(!strcmp(reinterpret_cast<const char*>(cmd->words.w1), "oot"));
+        ++depth;
+      }
+      if (op == G_COMBO_RM_POP) assert(--depth >= 0);
+      if (op != G_DL_OTR_FILEPATH) continue;
+      const std::string path = reinterpret_cast<const char*>(cmd->words.w1);
+      if (path.find("/object_gi_medal/") != std::string::npos) {
+        assert(depth == 1 && "deferred medal textures must retain their OoT resource owner");
+        if (path.ends_with("MedallionFaceDL")) faces.insert(path);
+        else if (path.ends_with("gGiMedallionDL")) ++medalBodies;
+      } else if (path.ends_with("/sages_tunic/gi_dl")) ++tunics;
+    }
+    assert(faces == expectedFaces && medalBodies == 6 && tunics == 1 && depth == 0 && matrices.empty());
+  }
+  std::cout << "PASS native MM Sage fountain: inactive donor availability, divergent host/donor Alt and six owner-scoped medals\n";
   // Missing authored resources still use the shared shimmer around the
   // existing model, without inheriting a legacy drawer's scale/translation.
   for (auto [id,slug] : candidates) {

@@ -1,6 +1,7 @@
 #include "2s2h/Enhancements/Audio/MMWeather.h"
 #include "2s2h/Enhancements/Audio/MMWeatherAudio.h"
 #include "global.h"
+#include "BenPort.h"
 #include "mods/extended_inventory.h"
 #include "2s2h/Rando/Rando.h"
 #include "assets/misc/skyboxes/d2_cloud_static.h"
@@ -48,6 +49,9 @@ extern "C" u16 Nei_GetOwnedItem(u8 slot) {
 
 extern "C" void Skybox_Calculate128(SkyboxContext*, s32) {
     ++skyRebuilds;
+}
+extern "C" bool ResourceMgr_IsAltAssetsEnabled(void) {
+    return false; // This fixture exercises the native sky; OoT ownership has its own fixture.
 }
 extern "C" void Gfx_SetupDL57_Opa(GraphicsContext*) {
 }

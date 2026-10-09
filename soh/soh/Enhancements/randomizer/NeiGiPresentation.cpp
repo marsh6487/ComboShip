@@ -952,6 +952,8 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
             Matrix_Scale(fit.scale, fit.scale, fit.scale, MTXMODE_APPLY);
         }
     }
+    if (authored && item->draw == Randomizer_DrawExtSagesTunic)
+        NeiGi_DrawSagesTunicMedallions(play);
     if (authored && item->draw == Randomizer_DrawCaneSomariaUpgrade) {
         // Retain the original red skill-upgrade flame with the authored cane.
         Randomizer_DrawCaneSomariaUpgradeFlame(play);

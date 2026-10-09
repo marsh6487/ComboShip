@@ -307,6 +307,7 @@ struct WolfRuntime {
 static WolfRuntime sWolf;
 static u8 sSelected = 0;
 static u8 sAssetsLoaded = 0;
+static bool sLoadedHDModel = false;
 static s32 sDefIndex = -1;
 static std::vector<u8> sBlob;
 static std::string sAssetPath;
@@ -446,7 +447,11 @@ static void BuildMaterialDisplayList(const u16* texture, u32 width, u32 height) 
     }
     gSPLoadGeometryMode(gfx++, geometryMode);
     gDPPipeSync(gfx++);
-    gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, 1, COMBINED, 0, PRIMITIVE, 0, 0, 0, 0, COMBINED);
+    // Wolf atlases are opaque. Use texture alpha as an inverse emission mask:
+    // 1 retains lit fur; 0 keeps the authored eye color bright in shadow. Output
+    // alpha stays opaque, so the eye mask cannot cut holes into the baked face.
+    gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, 1, COMBINED, TEXEL0, TEXEL0_ALPHA, TEXEL0, 0, 0, 0,
+                      COMBINED);
     gSPSetOtherMode(gfx++, G_SETOTHERMODE_H, 4, 20,
                     G_TF_BILERP | G_TC_FILT | G_TP_PERSP | G_TT_NONE | G_AD_NOISE | G_PM_NPRIMITIVE | G_CK_NONE |
                         G_TD_CLAMP | G_CYC_2CYCLE | G_CD_MAGICSQ | G_TL_TILE);
@@ -482,20 +487,28 @@ static s32 FindAnim(const char* name) {
 }
 
 static bool LoadAssets() {
-    if (sAssetsLoaded) {
+    const bool useHD = CVarGetInteger(NeiWolfAsset::kHDModelCVar, 1) != 0;
+    // Never invalidate live skin, animation or display-list pointers. Model
+    // changes are applied after cleanup, on the next transformation.
+    if (sAssetsLoaded && (sWolf.initialized || sLoadedHDModel == useHD)) {
         return true;
     }
+    sAssetsLoaded = 0;
     sAssetPath = FindAssetPath();
     size_t resourceSize = 0;
     const char* resourceOwner = nullptr;
-    const int resourceStatus = MM_CopyWolfLinkResource(nullptr, 0, &resourceSize, &resourceOwner);
+    const char* resourcePath = nullptr;
+    const int resourceStatus =
+        MM_CopyWolfLinkModelResource(useHD, nullptr, 0, &resourceSize, &resourceOwner, &resourcePath);
     if (resourceStatus != 0) {
-        sAssetPath = std::string("@") + (resourceOwner ? resourceOwner : "unknown") + ":" + NeiWolfAsset::kResourcePath;
+        sAssetPath = std::string("@") + (resourceOwner ? resourceOwner : "unknown") + ":" +
+                     (resourcePath ? resourcePath : NeiWolfAsset::kResourcePath);
         if (resourceStatus < 0 || resourceSize < kHeaderSize || resourceSize > kMaxBlobSize)
             return RejectAsset("resource-blob");
         sBlob.resize(resourceSize);
         size_t copied = 0;
-        if (MM_CopyWolfLinkResource(sBlob.data(), sBlob.size(), &copied, nullptr) != 1 || copied != resourceSize)
+        if (MM_CopyWolfLinkModelResource(useHD, sBlob.data(), sBlob.size(), &copied, nullptr, nullptr) != 1 ||
+            copied != resourceSize)
             return RejectAsset("resource-copy");
     } else {
         sAssetPath = FindAssetPath();
@@ -669,11 +682,15 @@ static bool LoadAssets() {
     sDefinition.rotOrder = SSBB_ROT_ORDER_ZYX;
     sDefinition.skinMesh = &sSkin;
 
-    sDefIndex = SSBBChar_Register(&sDefinition);
+    // The registry stores this stable definition pointer. Reuse its slot when
+    // switching models instead of exhausting the character registry.
+    if (sDefIndex < 0)
+        sDefIndex = SSBBChar_Register(&sDefinition);
     if (sDefIndex < 0) {
         return RejectAsset("character-registration");
     }
     sAssetsLoaded = 1;
+    sLoadedHDModel = useHD;
     SPDLOG_INFO("MM Wolf: asset loaded path={} bytes={} vertices={} bones={} animations={}", sAssetPath, sBlob.size(),
                 vertexCount, boneCount, animCount);
     return true;

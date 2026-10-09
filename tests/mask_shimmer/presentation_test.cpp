@@ -76,6 +76,7 @@ void Matrix_Translate(f32 x, f32 y, f32 z, MatrixMode) {
 Mtx* Matrix_Finalize(GraphicsContext*) { return &matrix; }
 void Gfx_SetupDL25_Xlu(GraphicsContext*) {}
 void Gfx_SetupDL25_Opa(GraphicsContext*) {}
+void Gfx_SetupDL26_Opa(GraphicsContext*) {}
 void Graph_OpenDisps(Gfx**, Gfx*, GraphicsContext*, const char*, s32) {}
 void Graph_CloseDisps(Gfx**, Gfx*, GraphicsContext*, const char*, s32) {}
 #else
@@ -86,6 +87,7 @@ void Matrix_Translate(f32 x, f32 y, f32 z, u8) {
 Mtx* Matrix_NewMtx(GraphicsContext*, char*, s32) { return &matrix; }
 void Gfx_SetupDL_25Xlu(GraphicsContext*) {}
 void Gfx_SetupDL_25Opa(GraphicsContext*) {}
+void Gfx_SetupDL_26Opa(GraphicsContext*) {}
 void Graph_OpenDisps(Gfx**, GraphicsContext*, const char*, s32) {}
 void Graph_CloseDisps(Gfx**, GraphicsContext*, const char*, s32) {}
 #endif
@@ -158,6 +160,7 @@ extern "C" {
 #define Gfx_SetupDL_25Xlu Gfx_SetupDL25_Xlu
 #define Matrix_NewMtx(ctx, file, line) Matrix_Finalize(ctx)
 #define Gfx_SetupDL_25Opa Gfx_SetupDL25_Opa
+#define Gfx_SetupDL_26Opa Gfx_SetupDL26_Opa
 #define NEI_GI_ROTATE_Y Matrix_RotateYF
 #define Matrix_RotateZ Matrix_RotateZF
 #endif
@@ -166,6 +169,7 @@ extern "C" {
 #undef Gfx_SetupDL_25Xlu
 #undef Matrix_NewMtx
 #undef Gfx_SetupDL_25Opa
+#undef Gfx_SetupDL_26Opa
 #undef NEI_GI_ROTATE_Y
 #undef Matrix_RotateZ
 #endif

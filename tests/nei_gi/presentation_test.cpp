@@ -114,6 +114,9 @@ void ExpectBoleroShimmerOnly() {
 } // namespace Fixture
 
 extern "C" {
+#ifndef NEI_GI_REWARD_FIXTURE
+int ResourceMgr_GetRewardSurfaceForGame(const char*,const char*,NeiGi::Mesh*) { return 0; }
+#endif
 void NeiUsedMagic_DrawChargeFocus(PlayState*, int) {}
 uintptr_t gSegments[NUM_SEGMENTS];
 GameInfo gameInfo{};
@@ -271,6 +274,9 @@ void Gfx_SetupDL_25Opa(GraphicsContext *context) {
   OPEN_DISPS(context);
   __gSPDisplayList(POLY_OPA_DISP++, &Fixture::setupDl);
   CLOSE_DISPS(context);
+}
+void Gfx_SetupDL_26Opa(GraphicsContext *context) {
+  Gfx_SetupDL_25Opa(context);
 }
 void Gfx_SetupDL_25Xlu(GraphicsContext *context) {
   OPEN_DISPS(context);

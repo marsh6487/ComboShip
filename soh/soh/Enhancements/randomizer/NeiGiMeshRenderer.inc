@@ -1,4 +1,6 @@
 #include "NeiElementalArrowGi.h"
+#include "ComboRewardGi.h"
+extern "C" int ResourceMgr_GetRewardSurfaceForGame(const char* game, const char* path, NeiGi::Mesh* mesh);
 // Shared by the OoT and MM host renderers. The enclosing TU supplies native GBI/matrix APIs.
 NeiGi::Basis NeiGi_CameraBasis(PlayState* play) {
     MtxF m;
@@ -175,12 +177,22 @@ static bool NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kin
         triangleCommands += (batches[b].indexCount + 5) / 6;
     // At most 30 fixed commands: debug pairs, two setup calls, texture-load
     // expansion (seven commands), material state, one matrix and owner pair.
-    if (!NeiGi_ArenaHasRoom(play, vertexCount * sizeof(Vtx), 1, 2, 32 + batchCount + triangleCommands))
+    const bool scrolling = material && material->scrolling;
+    const size_t scrollBytes = scrolling ? 2 * sizeof(Gfx) : 0;
+    if (!NeiGi_ArenaHasRoom(play, vertexCount * sizeof(Vtx) + scrollBytes, 1, 2,
+                           32 + batchCount + triangleCommands + (scrolling ? 1 : 0)))
         return false;
-    auto* vertices = static_cast<Vtx*>(Graph_Alloc(play->state.gfxCtx, vertexCount * sizeof(Vtx)));
+    auto* vertices = static_cast<Vtx*>(Graph_Alloc(play->state.gfxCtx, vertexCount * sizeof(Vtx) + scrollBytes));
     if (vertices == nullptr)
         return false;
     std::memcpy(vertices, packed.data(), vertexCount * sizeof(Vtx));
+    Gfx* scroll = nullptr;
+    if (scrolling) {
+        scroll = reinterpret_cast<Gfx*>(vertices + vertexCount);
+        const auto offset = RewardGi_Scroll(play->gameplayFrames);
+        gDPSetTileSize(scroll, G_TX_RENDERTILE, offset.s, offset.t, offset.s + 31 * 4, offset.t + 31 * 4);
+        gSPEndDisplayList(scroll + 1);
+    }
     OPEN_DISPS(play->state.gfxCtx);
     if (owner)
         gSPComboRMPush(POLY_XLU_DISP++, owner);
@@ -212,6 +224,11 @@ static bool NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kin
                             5, G_TX_NOLOD, G_TX_NOLOD);
         // Resource RGBA multiplied by each sampled vertex's color AND alpha.
         gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA, G_CC_PASS2);
+        if (scrolling) {
+            // Execute the common material fragment directly. Scene segment
+            // bindings belong to the GPU and need not equal CPU gSegments.
+            __gSPDisplayList(POLY_XLU_DISP++, scroll);
+        }
     } else if (orb != Kind::Neutral) {
         const auto color = palette ? NeiGi::OrbColors{palette->hot, palette->edge} : NeiGi::OrbPalette(orb);
         gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
@@ -420,6 +437,73 @@ int NeiGi_DrawElementalSpell(PlayState* play, int profile, int mmOwner, int shop
     return true;
 }
 
+void NeiGi_DrawSagesTunicMedallions(PlayState* play, const char* owner) {
+    static constexpr const char* faces[] = {
+        "__OTR__objects/object_gi_medal/gGiForestMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiFireMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiWaterMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiSpiritMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiShadowMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiLightMedallionFaceDL",
+    };
+    static constexpr const char* body = "__OTR__objects/object_gi_medal/gGiMedallionDL";
+    // This intrinsic pass must leave the caller's model, owner-pop and restore
+    // tail intact. Missing original medal resources retain the robe alone.
+    if (!HasResource(body) || !NeiGi_ArenaHasRoom(play, 0, 6, 48, 2))
+        return;
+#ifdef NEI_GI_NATIVE_MM
+    const uint32_t frame = play->state.frames;
+#else
+    const uint32_t frame = play->gameplayFrames;
+#endif
+    const uint32_t bits = (frame * 2u) & 0xFFFFu;
+    const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
+    OPEN_DISPS(play->state.gfxCtx);
+    if (owner)
+        gSPComboRMPush(POLY_OPA_DISP++, owner);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    for (int i = 0; i < 6; ++i) {
+        if (!HasResource(faces[i]))
+            continue;
+        const float t = (frame + i * 7u) % 40u;
+        const float theta = 1.5707963267948966f + i * 1.0471975511965976f;
+        float scale = .35f;
+        if (t < 4.f)
+            scale *= t / 4.f;
+        else if (t >= 31.f)
+            scale *= (39.f - t) / 8.f;
+        if (scale <= .001f)
+            continue;
+#ifdef NEI_GI_NATIVE_MM
+        Gfx_SetupDL26_Opa(play->state.gfxCtx);
+#else
+        Gfx_SetupDL_26Opa(play->state.gfxCtx);
+#endif
+        Matrix_Push();
+#ifdef NEI_GI_ROTATE_Y
+        NEI_GI_ROTATE_Y(spin, MTXMODE_APPLY);
+#else
+        Matrix_RotateY(spin, MTXMODE_APPLY);
+#endif
+        Matrix_Translate(std::cos(theta) * 1.5f * t, (std::sin(theta) * 1.5f + 1.5f) * t - .5f * .07f * t * t, 14.f,
+                         MTXMODE_APPLY);
+        Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+#ifdef NEI_GI_ROTATE_Y
+        NEI_GI_ROTATE_Y(frame * .09f + i, MTXMODE_APPLY);
+#else
+        Matrix_RotateY(frame * .09f + i, MTXMODE_APPLY);
+#endif
+        gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+                  G_MTX_MODELVIEW | G_MTX_LOAD);
+        gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, faces[i], 0, G_DL_PUSH);
+        gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, body, 0, G_DL_PUSH);
+        Matrix_Pop();
+    }
+    if (owner)
+        gSPComboRMPop(POLY_OPA_DISP++);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
                             const float center[3], bool shimmer, const char* owner, bool shop, int mmPickup) {
     if (!play || !play->state.gfxCtx || !opa || !center || !NeiGi_ValidScale(scale) || !NeiGi_Finite(center[0]) ||
@@ -438,6 +522,8 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
     const auto fit = NeiGi::FrameFit(*bounds, scale, shop, mmPickup);
     Matrix_Translate(0.f, fit.lift, 0.f, MTXMODE_APPLY);
     Matrix_Scale(fit.scale, fit.scale, fit.scale, MTXMODE_APPLY);
+    if (std::strcmp(bounds->slug, "sages_tunic") == 0)
+        NeiGi_DrawSagesTunicMedallions(play, owner);
     OPEN_DISPS(play->state.gfxCtx);
     if (owner) {
         gSPComboRMPush(POLY_OPA_DISP++, owner);
@@ -671,6 +757,48 @@ void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const cha
     OPEN_DISPS(play->state.gfxCtx);
     if (owner)
         gSPComboRMPop(POLY_XLU_DISP++);
+    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+    gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+// All nine rewards share this material and scroll fragment. Identity selects
+// only the periodic energy image and hex tint; the selected model supplies
+// the triangles. Missing/unsupported resources leave the native draw visible.
+void NeiGi_DrawRewardMaterial(PlayState* play, int profile, const char* surfacePath, const char* settingPath,
+                              const char* owner) {
+    uint8_t color[4];
+    if (!play || !owner || !surfacePath || !RewardGi_ShimmerColor(profile, color)) return;
+    NeiGi_ArenaScope arena(play, 1, 2, 16);
+    if (!arena) return;
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi::Mesh mesh{};
+    constexpr const char* metal = "__OTR__objects/nei_reward_gi/metal";
+    if (settingPath && HasResource(metal) && ResourceMgr_GetRewardSurfaceForGame(owner, settingPath, &mesh)) {
+        // Keep the original lighting beneath a restrained brushed-gold layer.
+        for (size_t i = 0; i < mesh.count; ++i) {
+            mesh.vertices[i].rgb = 0xE6C780;
+            mesh.vertices[i].alpha = 92;
+        }
+        const NeiGi::TextureMaterial material{metal, true, true};
+        NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material, false, "oot");
+    }
+    const char* energy = RewardGi_Texture(profile);
+    if (HasResource(energy) && ResourceMgr_GetRewardSurfaceForGame(owner, surfacePath, &mesh)) {
+        for (size_t i = 0; i < mesh.count; ++i) {
+            mesh.vertices[i].rgb = RewardGi_Color(profile);
+            mesh.vertices[i].alpha = 220;
+        }
+        const NeiGi::TextureMaterial material{energy, true, true, true};
+        NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material, false, "oot");
+    }
+    NeiGi_DrawShimmerOverlay(play, color, owner);
+    OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
     gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);

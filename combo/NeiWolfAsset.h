@@ -16,6 +16,10 @@ inline constexpr size_t kHeaderSize = 88, kAudioHeaderSize = 92;
 inline constexpr size_t kMaxBlobSize = 64 * 1024 * 1024;
 inline constexpr uint32_t kMaxBones = 64;
 inline constexpr char kResourcePath[] = "objects/forms/wolf_link/gWolfLinkData";
+inline constexpr char kHDResourcePath[] = "objects/forms/wolf_link/gWolfLinkHDData";
+inline constexpr char kAltResourcePath[] = "alt/objects/forms/wolf_link/gWolfLinkData";
+inline constexpr char kAltHDResourcePath[] = "alt/objects/forms/wolf_link/gWolfLinkHDData";
+inline constexpr char kHDModelCVar[] = "gMods.WolfLink.UseHDModel";
 
 inline uint16_t ReadU16(const uint8_t* p) {
     return (uint16_t)p[0] | (uint16_t)p[1] << 8;
@@ -198,3 +202,9 @@ extern "C" COMBO_OOT_EXPORT int OOT_CopyWolfLinkResource(uint8_t* destination, s
                                                          const char** owner);
 extern "C" COMBO_MM_EXPORT int MM_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size,
                                                        const char** owner);
+// The model-aware ABI preserves the legacy copy entry points and reports the
+// exact selected key, including fallback on older port archives.
+extern "C" COMBO_OOT_EXPORT int OOT_CopyWolfLinkModelResource(int useHD, uint8_t* destination, size_t capacity,
+                                                              size_t* size, const char** owner, const char** path);
+extern "C" COMBO_MM_EXPORT int MM_CopyWolfLinkModelResource(int useHD, uint8_t* destination, size_t capacity,
+                                                            size_t* size, const char** owner, const char** path);

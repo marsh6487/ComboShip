@@ -37,7 +37,7 @@
         const r=sub(p.position,view.eye),depth=Math.max(100,dot(r,view.forward));
         const x=Math.abs(dot(r,view.right))/(depth*view.tanHalfFov*view.aspect),y=Math.abs(dot(r,view.up))/(depth*view.tanHalfFov);
         const edge=smooth((1.08-Math.max(x,y))/0.18),pulse=0.5+0.5*Math.sin(p.age*p.frequency+p.phase);
-        p.alpha=smooth(p.age/0.8)*edge*(p.kind?night*(0.12+0.82*pulse*pulse):daylight*(0.58+0.22*pulse));
+        p.alpha=smooth(p.age/0.8)*edge*(p.kind?night*(0.30+0.64*pulse):daylight*(0.58+0.22*pulse));
       });
       this.initialized=true;this.beams=[];
       if(sunbeams&&daylight>0.01){

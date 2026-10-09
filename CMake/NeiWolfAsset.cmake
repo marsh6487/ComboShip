@@ -1,5 +1,6 @@
-# The TP-derived Wolf model is a separately supplied loose asset. Never discover
-# one in tests or generate a substitute for a distributable build.
+# Standard and HD Wolf models are bundled in each game's assets/custom tree and
+# included automatically by GenerateSohOtr/Generate2ShipOtr. Retain this explicit
+# loose-file deployment option for older port archives and development fixtures.
 set(NEI_WOLF_LINK_ASSET "" CACHE FILEPATH "Path to the real exported NEI wolf_link.bin to deploy and package")
 if(NEI_WOLF_LINK_ASSET)
     if(NOT EXISTS "${NEI_WOLF_LINK_ASSET}" OR IS_DIRECTORY "${NEI_WOLF_LINK_ASSET}")
@@ -32,5 +33,5 @@ if(NEI_WOLF_LINK_ASSET)
     install(FILES "${NEI_WOLF_LINK_ASSET}" DESTINATION nei/soh RENAME wolf_link.bin COMPONENT combo)
     install(FILES "${NEI_WOLF_LINK_ASSET}" DESTINATION nei/2ship RENAME wolf_link.bin COMPONENT combo)
 else()
-    message(STATUS "ComboShip Wolf asset not configured; set NEI_WOLF_LINK_ASSET to deploy a real wolf_link.bin")
+    message(STATUS "ComboShip Wolf models are bundled in soh.o2r/2ship.o2r; no loose Wolf asset configured")
 endif()

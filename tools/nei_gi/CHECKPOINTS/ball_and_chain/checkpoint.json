@@ -22,7 +22,8 @@
   ],
   "markers": {},
   "notes": [
-    "Visual POC3: six sharp four-sided iron spikes with true pointed tips replace the rounded bosses, following user correction of the TP reference. Forged iron plates and heavy rectangular links preserved."
+    "Visual POC3: six sharp four-sided iron spikes with true pointed tips replace the rounded bosses, following user correction of the TP reference. Forged iron plates and heavy rectangular links preserved.",
+    "Metallic POC1: brushed silver plate faces, polished bevels, spikes and shackle/links use camera-relative reflection mapping. Original dark seams, aged trim, geometry, normals, UVs and attachment scales retained."
   ],
   "runtime_tested": false
 }

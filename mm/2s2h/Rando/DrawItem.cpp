@@ -8,6 +8,7 @@
 #include "Rando/SpinAttackGi.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "ComboSongDrawMM.h"
+#include "ComboRewardGi.h"
 #include "ComboItemIconOwnership.h"
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "mods/nei_save.h"                     // NeiSaveData chain tiers for progressive get-item draws
@@ -901,14 +902,12 @@ void DrawOotClaimCheck() {
 // the colored face DL then the shared gold ring (gGiMedallionDL), both opaque. All six share the one ring.
 // Exact vanilla recipe: the medallion DLs need the SETUPDL_26 state — under the generic 25 helper they
 // render NOTHING (same lesson as the SoH side of the Sage's Tunic medallion ring).
-static void DrawOotMedallion(const char* faceOtrPath, Gfx** faceCache) {
+static void DrawOotMedallion(const char* faceOtrPath, Gfx** faceCache, bool rewardMaterial = true) {
     static Gfx* sRingCache = NULL;
-    if (*faceCache == NULL) {
-        *faceCache = (Gfx*)OotAssets_LoadGfx(faceOtrPath);
-    }
-    if (sRingCache == NULL) {
-        sRingCache = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_gi_medal/gGiMedallionDL");
-    }
+    // Resolve through MM every draw so a local/Alt replacement and its surface
+    // pass use the same selection. The resource manager caches the actual data.
+    *faceCache = (Gfx*)OotAssets_LoadGfx(faceOtrPath);
+    sRingCache = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_gi_medal/gGiMedallionDL");
     if (*faceCache == NULL || sRingCache == NULL) {
         return; // oot.o2r not mounted yet — try again next frame
     }
@@ -918,6 +917,9 @@ static void DrawOotMedallion(const char* faceOtrPath, Gfx** faceCache) {
     gSPDisplayList(POLY_OPA_DISP++, *faceCache);
     gSPDisplayList(POLY_OPA_DISP++, sRingCache);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
+    if (rewardMaterial)
+        NeiGi_DrawRewardMaterial(gPlayState, RewardGi_ProfileForPaths(faceOtrPath, nullptr), faceOtrPath,
+                                 "__OTR__objects/object_gi_medal/gGiMedallionDL", "mm");
 }
 void DrawOotMedallionFire() {
     static Gfx* c = NULL;
@@ -949,12 +951,8 @@ void DrawOotMedallionWater() {
 // GetItem_DrawJewel{Kokiri,Goron,Zora}). The animated shine lives on tex-scroll segments 8/9.
 static void DrawOotStone(const char* gemPath, Gfx** gemCache, const char* settingPath, Gfx** settingCache, u8 pxR,
                          u8 pxG, u8 pxB, u8 exR, u8 exG, u8 exB, u8 poR, u8 poG, u8 poB, u8 eoR, u8 eoG, u8 eoB) {
-    if (*gemCache == NULL) {
-        *gemCache = (Gfx*)OotAssets_LoadGfx(gemPath);
-    }
-    if (*settingCache == NULL) {
-        *settingCache = (Gfx*)OotAssets_LoadGfx(settingPath);
-    }
+    *gemCache = (Gfx*)OotAssets_LoadGfx(gemPath);
+    *settingCache = (Gfx*)OotAssets_LoadGfx(settingPath);
     if (*gemCache == NULL || *settingCache == NULL) {
         return; // oot.o2r not mounted yet — try again next frame
     }
@@ -975,6 +973,7 @@ static void DrawOotStone(const char* gemPath, Gfx** gemCache, const char* settin
     gDPSetEnvColor(POLY_OPA_DISP++, eoR, eoG, eoB, 255);
     gSPDisplayList(POLY_OPA_DISP++, *settingCache);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
+    NeiGi_DrawRewardMaterial(gPlayState, RewardGi_ProfileForPaths(gemPath, nullptr), gemPath, settingPath, "mm");
 }
 void DrawOotStoneKokiriEmerald() {
     static Gfx* gemCache = NULL;
@@ -2621,10 +2620,15 @@ void DrawOotExtSagesTunic() { // Legacy RI_WATER_DRAGON_SCALE identity, now Sage
     // Tunic in the middle, with the 6 medallions that feed it launching out of it in angled
     // ballistic arcs — the Triforce Thief drop-launch look (angled velocity + gravity + spin
     // while airborne), staggered into a continuous fountain. Pop-in/shrink-out masks the loop.
-    static void (*const sMedallionDraws[6])() = {
-        DrawOotMedallionForest, DrawOotMedallionFire,   DrawOotMedallionWater,
-        DrawOotMedallionSpirit, DrawOotMedallionShadow, DrawOotMedallionLight,
+    static const char* const sMedallionFaces[6] = {
+        "__OTR__objects/object_gi_medal/gGiForestMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiFireMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiWaterMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiSpiritMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiShadowMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiLightMedallionFaceDL",
     };
+    static Gfx* sMedallionCaches[6]{};
     const f32 kV0 = 1.5f;       // outward launch speed (model units/frame)
     const f32 kUpBias = 1.5f;   // added to every launch's vertical speed (fountain lift)
     const f32 kGravity = 0.07f; // per-frame² pull on the arcs
@@ -2653,7 +2657,8 @@ void DrawOotExtSagesTunic() { // Legacy RI_WATER_DRAGON_SCALE identity, now Sage
         Matrix_Translate(vx * t, vy * t - 0.5f * kGravity * t * t, kZOffset, MTXMODE_APPLY);
         Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
         Matrix_RotateYF((f32)gPlayState->state.frames * 0.09f + i, MTXMODE_APPLY); // spin while flying
-        sMedallionDraws[i]();
+        // The accepted tunic fountain keeps its miniature base medallions.
+        DrawOotMedallion(sMedallionFaces[i], &sMedallionCaches[i], false);
         Matrix_Pop();
     }
     DrawOotTunicTint(235, 240, 245, true);

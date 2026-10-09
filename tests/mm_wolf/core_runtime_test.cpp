@@ -18,6 +18,7 @@ static std::map<std::string, std::string> locatedFiles;
 static std::ostringstream wolfLogs;
 static std::vector<u8> resourceBlob;
 static const char* resourceBlobOwner = "mm";
+static const char *resourceBlobPath = NeiWolfAsset::kResourcePath;
 static void captureWolfLogs() {
     auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(wolfLogs);
     auto logger = std::make_shared<spdlog::logger>("wolf-fixture", sink);
@@ -48,6 +49,13 @@ int MM_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size,
     if (destination)
         std::memcpy(destination, resourceBlob.data(), *size);
     return 1;
+}
+int MM_CopyWolfLinkModelResource(int, uint8_t *destination, size_t capacity,
+                                 size_t *size, const char **owner,
+                                 const char **path) {
+  if (path)
+    *path = resourceBlobPath;
+  return MM_CopyWolfLinkResource(destination, capacity, size, owner);
 }
 const char* Nei_AssetDir(void) {
     return assetDirectory.c_str();

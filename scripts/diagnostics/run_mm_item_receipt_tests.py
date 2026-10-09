@@ -476,12 +476,19 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     keys += '};\n'
     donor = donor.replace('/* KEY_CATALOG */', keys)
     descriptions = 'const CustomItemMessageEntry receiptMessages[] = {\n'
+    randomizer_messages = (ROOT / 'soh/soh/Enhancements/randomizer/randomizer.cpp').read_text()
+    # Copy the real shared-tool rows, including their icon and all locales.
+    for rg in ('RG_PHANTOM_HOURGLASS', 'RG_SHADOW_CRYSTAL'):
+        row = re.search(r'\{\s*' + rg + r',\s*[^,]+,\s*ComboToolReceiptText::.*?\}',
+                        randomizer_messages, re.S)
+        assert row, f'Missing shared tool receipt: {rg}'
+        descriptions += row.group(0) + ',\n'
     for rg in ('RG_CANE_OF_SOMARIA', 'RG_PROGRESSIVE_ROCS', 'RG_CANE_PACCI_FLIP',
                'RG_ROCS_CAPE', 'RG_QUARTZ_OF_MOTION', 'RG_DEKU_LEAF',
                'RG_MM_REMAINS_GOHT', 'RG_MM_SONG_LULLABY', 'RG_MM_SONG_LULLABY_INTRO', 'RG_MM_SONG_NOVA',
                'RG_MM_SONG_HEALING', 'RG_MM_SONG_STORMS', 'RG_MM_SONG_SOARING'):
         text = re.search(r'\{\s*' + rg + r',.*?,\s*((?:"(?:[^"\\]|\\.)*"\s*)+)',
-                         (ROOT / 'soh/soh/Enhancements/randomizer/randomizer.cpp').read_text(), re.S)
+                         randomizer_messages, re.S)
         if not text:
             text = re.search(r'\b' + rg + r',\s*((?:"(?:[^"\\]|\\.)*"\s*)+)', registry)
         descriptions += '{' + rg + ', 0, ' + text.group(1) + ', nullptr, nullptr},\n'
