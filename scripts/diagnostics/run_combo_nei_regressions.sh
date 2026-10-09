@@ -8,6 +8,7 @@ python3 -B tests/elemental_arrow_gi/run_tests.py
 python3 -B tests/nei_gi/run_flame_arena_tests.py
 python3 -B scripts/diagnostics/run_mm_item_presentation_tests.py
 python3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py --sanitize
+python3 -B scripts/diagnostics/run_tunic_material_tests.py --sanitize
 python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py
 python3 -B tests/item_receipts/run_key_receipt_tests.py --sanitizers
 python3 -B tests/cape_choice/run_tests.py
@@ -25,8 +26,14 @@ python3 -B scripts/diagnostics/run_sword_receipt_tests.py --sanitize
 python3 -B scripts/diagnostics/run_sword_asset_toggle_tests.py --sanitize
 python3 -B scripts/diagnostics/run_sword_resource_view_tests.py --sanitize
 python3 -B scripts/diagnostics/run_fairy_bottle_tests.py
+python3 -B scripts/diagnostics/run_bottle_polish_tests.py
+python3 -B scripts/diagnostics/run_bottle_contents_tests.py
 python3 -B scripts/diagnostics/run_bottle_gi_tests.py
 python3 -B tests/seasons/run_tests.py
+python3 -B tests/seasons/run_mode_tests.py
+python3 -B tests/seasons/run_oot_mode_tests.py
+python3 -B tests/seasons/run_mode_pool_tests.py
+python3 -B tests/seasons/run_mode_save_tests.py
 python3 -B tests/seasons/run_native_weather_tests.py --sanitize
 python3 -B tests/seasons/run_generated_leaf_texture_tests.py
 python3 -B tests/seasons/run_leaf_combiner_tests.py
@@ -40,6 +47,7 @@ python3 -B scripts/diagnostics/run_mm_nei_tests.py
 python3 -B tests/mm_wallet/run_tests.py
 python3 -B tests/mm_editor/run_tests.py
 python3 -B tests/mm_grace/run_flight_tests.py
+python3 -B tests/mm_grace/run_particle_tests.py
 python3 -B tests/mm_grace/run_pool_tests.py
 python3 -B tests/mm_grace/run_save_tests.py
 python3 -B tests/mm_grace/run_settings_tests.py
@@ -64,7 +72,11 @@ python3 -B tests/nei_asset_priority/run_oot_gi_tests.py
 python3 -B tests/nei_asset_priority/run_tunic_model_tests.py --sanitize
 python3 -B tests/ikana_gi/run_tests.py --sanitize
 python3 -B tests/nei_held/run_equipment_tests.py
+python3 -B tests/nei_held/run_four_sword_visibility_tests.py
 python3 -B tests/mm_equipment_pause/run_tests.py --sanitize
+python3 -B tests/mm_equipment_pause/run_ownership_tests.py --sanitize
+python3 -B tests/mm_pause_inventory/run_tests.py --sanitize
+python3 -B tests/combo_button_transfer/run_tests.py --sanitize
 python3 -B tests/nei_quest_held/run_tests.py
 python3 -B tests/nei_used_fx/run_tests.py
 python3 -B tests/nei_leaf/run_tests.py

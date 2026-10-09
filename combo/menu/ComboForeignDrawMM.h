@@ -37,6 +37,7 @@
 #include "ComboItemDrawABI.h"
 #include "ComboMmNativeImports.h"
 #include "ComboFairyBottle.h"
+#include "ComboBottleContents.h"
 #include "ComboSwordGiFit.h"
 #define COMBO_DIN_SWORD_GI_HOST_MM
 #include "ComboDinSwordGi.h"
@@ -638,7 +639,7 @@ inline void MM_DrawForeignPoes(const ComboForeignDrawInfoOOT* info) {
 inline void MM_DrawForeignFairy(const ComboForeignDrawInfoOOT* info) {
     PlayState* play = gPlayState;
     GraphicsContext* gfxCtx = play->state.gfxCtx;
-    const ComboFairyBottleMotion motion = ComboFairyBottle_Sample(play->gameplayFrames);
+    const ComboFairyBottleMotion motion = ComboFairyBottle_SampleForShell(play->gameplayFrames, info->dls[0]);
     OPEN_DISPS(gfxCtx);
     Gfx_SetupDL25_Opa(gfxCtx);
     MM_FOREIGN_PIN_OPA();
@@ -660,7 +661,7 @@ inline void MM_DrawForeignFairy(const ComboForeignDrawInfoOOT* info) {
     Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
     Matrix_ReplaceRotation(&play->billboardMtxF);
     Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
-    if (!ComboFairyBottle_DrawVfx(play)) {
+    if (!ComboFairyBottle_DrawVfx(play, info->dls[0])) {
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
         gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[2]);
     }
@@ -668,6 +669,8 @@ inline void MM_DrawForeignFairy(const ComboForeignDrawInfoOOT* info) {
     CLOSE_DISPS(gfxCtx);
     int32_t segs[] = { 0x08 };
     MM_RestoreForeignSegs(segs, 1);
+    if (ComboFairyBottle_IsBundledShell(info->dls[0]))
+        ComboBottleShimmer_DrawMotes(play, CW_SHIMMER_FAIRY);
 }
 
 // Spiritual stones: seg9 XLU + seg8 OPA (static binds), rotate, per-layer prim/env colors, gem dl0
@@ -703,6 +706,8 @@ inline void MM_DrawForeignJewel(const ComboForeignDrawInfoOOT* info) {
 // Din's Fire / Farore's Wind / Nayru's Love: XLU seg8 scroll, dl0,1,2 (GetItem_DrawMagicSpell).
 inline void MM_DrawForeignMagicSpell(const ComboForeignDrawInfoOOT* info) {
     PlayState* play = gPlayState;
+    if (!NeiGi_CanDrawElementalSpellFallback(play))
+        return;
     GraphicsContext* gfxCtx = play->state.gfxCtx;
     OPEN_DISPS(gfxCtx);
     Gfx_SetupDL25_Xlu(gfxCtx);
@@ -1286,7 +1291,8 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
                 : 0.f;
         ComboSwordGi_ApplyModelsFit("oot", info->dls, info->count, scale, tilt, shop, mmPickup);
     }
-    const bool overlayShimmer = info->itemShimmer && info->drawKind != CW_DRAW_KIND_ELEMENTAL_ARROW;
+    const bool overlayShimmer = info->itemShimmer && info->drawKind != CW_DRAW_KIND_ELEMENTAL_ARROW &&
+                                info->drawKind != CW_DRAW_KIND_MAGIC_SPELL;
     if (overlayShimmer) {
         Matrix_Push();
     }
@@ -1296,7 +1302,7 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
             core.count = 1;
             core.xluStart = -1;
             MM_DrawForeignSimple(&core);
-            NeiGi_DrawElementalArrow(gPlayState, info->neiEffect);
+            NeiGi_DrawElementalArrowForOwner(gPlayState, info->neiEffect, 0, shop);
             break;
         }
         case CW_DRAW_KIND_GORON_SWORD:
@@ -1330,7 +1336,8 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
             MM_DrawForeignJewel(info);
             break;
         case CW_DRAW_KIND_MAGIC_SPELL:
-            MM_DrawForeignMagicSpell(info);
+            if (!NeiGi_DrawElementalSpell(gPlayState, info->neiEffect, 0, shop))
+                MM_DrawForeignMagicSpell(info);
             break;
         case CW_DRAW_KIND_SCALE:
             MM_DrawForeignScale(info);
@@ -1362,6 +1369,11 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
             break;
         case CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT:
             MM_DrawForeignNativeEquipment(info);
+            break;
+        case CW_DRAW_KIND_BOTTLE_CONTENTS:
+            if (!ComboBottleContents_Draw(gPlayState, ComboBottleContents_Profile(info->dls[0]))) {
+                MM_DrawForeignSimple(info);
+            }
             break;
         case CW_DRAW_KIND_SEASON_GI:
             if (info->neiEffect == 5)

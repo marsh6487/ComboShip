@@ -2,6 +2,7 @@
 // catalog/message/font services are seams, with key rows read from item_list.cpp.
 #include "ComboItemReceiptText.h"
 #include "ComboDungeonKeyReceipt.h"
+#include "ComboMagicItemReceiptText.h"
 #if __has_include("ComboKeyReceiptText.h")
 #include "ComboKeyReceiptText.h"
 #endif
@@ -99,6 +100,10 @@ void BuildMagicStatUpgradeMessage(CustomMessage&) {}
 void BuildCrawlSpeedUpgradeMessage(CustomMessage&) {}
 void BuildClimbSpeedUpgradeMessage(CustomMessage&) {}
 void BuildPushSpeedUpgradeMessage(CustomMessage&) {}
+extern "C" uint8_t Wand_RandoMode(void) { return 0; }
+// This key-only fixture has custom-item tutorials disabled, like its dungeon
+// information service above. The wand tutorial has its own production fixture.
+bool WandMedallionDescriptionsEnabled() { return false; }
 /* DONOR_EXPORT */
 extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled() { return 0; }
 extern "C" COMBO_EXPORT int32_t OOT_GetDungeonItemReceiptPresentation(const char*, void*) { return 0; }

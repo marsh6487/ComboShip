@@ -15,8 +15,12 @@ int main() {
       {"__OTR__objects/nei_rod_attack/frost_surge", false, false},
       {"__OTR__objects/nei_rod_attack/light_surge", false, false}};
   const NeiGi::TextureMaterial releases[] = {
-      {"__OTR__objects/nei_rod_attack/fire_release_crest", true, false},
-      {"__OTR__objects/nei_rod_attack/ice_release_crest", true, false},
+      {"__OTR__objects/nei_rod_cast_poc6/fire_natural", true, false},
+      {"__OTR__objects/nei_rod_cast_poc6/ice_fracture_release", true, false},
+      {"__OTR__objects/nei_rod_attack/light_surge", false, false}};
+  const NeiGi::TextureMaterial flows[] = {
+      {"__OTR__objects/nei_rod_cast_poc6/fire_natural", true, true},
+      {"__OTR__objects/nei_rod_cast_poc6/ice_fracture_release", true, true},
       {"__OTR__objects/nei_rod_attack/light_surge", false, false}};
   const NeiGi::TextureMaterial iceWake{"__OTR__objects/nei_rod_attack/ice_release_flow", true, true};
   const Basis cameras[] = {{},
@@ -31,6 +35,7 @@ int main() {
     const auto &release = releases[kind == Kind::Fire  ? 0
                                    : kind == Kind::Ice ? 1
                                                        : 2];
+    const auto &flow = flows[kind == Kind::Fire ? 0 : kind == Kind::Ice ? 1 : 2];
     size_t maxBytes = 0, maxCommands = 0;
     for (const auto &camera : cameras)
       for (uint32_t frame = 0; frame < 180; ++frame) {
@@ -41,6 +46,7 @@ int main() {
         files.insert(rays.path);
         files.insert(attack.path);
         files.insert(release.path);
+        files.insert(flow.path);
         auto draw = [&](const Mesh &mesh) {
           NeiGi_DrawMesh(&play, kind == Kind::Ice ? IceAtmosphere(mesh) : mesh);
           if (kind == Kind::Ice)
@@ -80,11 +86,11 @@ int main() {
           NeiGi_DrawTexturedMesh(
               &play, SampleChargeSurface(kind, frame, 1, camera), kind == Kind::Fire ? release : rays);
         draw(SampleChargeSparks(kind, frame, 1, camera));
-        NeiGi_DrawMesh(&play, SampleSpin(kind, frame, 150, true, camera));
+        draw(SampleSpin(kind, frame, 150, true, camera));
         NeiGi_DrawTexturedMesh(&play, SampleSpinSurface(kind, frame, 150, true),
                                release);
         NeiGi_DrawTexturedMesh(&play, SampleSpinFlow(kind, frame, 150, true, 1),
-                               release);
+                               flow);
         NeiGi_DrawMesh(&play, NeiGi::SampleOrb(kind, camera), kind);
         NeiGi_DrawMesh(&play, NeiGi::SampleEnergy(kind, frame, camera));
         size_t bytes = 0;

@@ -7,6 +7,7 @@
 #include "ComboExport.h"
 #include "ComboResolve.h"
 #include "../../combo/NeiGracePolicy.h"
+#include "../../combo/NeiSeasonsPolicy.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -4793,6 +4794,14 @@ extern "C" COMBO_EXPORT void SOH_NormalizeComboGraceFromMM(void) {
     CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE_REWARDS", rewards);
     CVarSetInteger(CVAR_RANDOMIZER_SETTING("HyliasGrace"), mode);
     CVarSetInteger(CVAR_RANDOMIZER_SETTING("HyliasGraceRewards"), rewards);
+    // Keep Rod policy stable for both source pools, even with general settings sync disabled.
+    const auto seasons =
+        NeiSeasons_SeedMode(CVarGetInteger("gRando.Options.RO_ROD_OF_SEASONS", NEI_SEASONS_INDIVIDUAL));
+    const auto startRod = CVarGetInteger("gRando.Options.RO_STARTING_ROD_OF_SEASONS", 0) != 0;
+    CVarSetInteger("gRando.Options.RO_ROD_OF_SEASONS", seasons);
+    CVarSetInteger("gRando.Options.RO_STARTING_ROD_OF_SEASONS", startRod);
+    CVarSetInteger(CVAR_RANDOMIZER_SETTING("RodOfSeasons"), seasons);
+    CVarSetInteger(CVAR_RANDOMIZER_SETTING("StartingRodOfSeasons"), startRod);
 }
 
 // ComboShip: restore OOT rando settings from a {cvarName:value} snapshot (written by
@@ -4812,6 +4821,8 @@ extern "C" COMBO_EXPORT void SOH_RestoreRandoSettings(const char* json) {
         // Pre-policy seeds included Grace whenever NEI was enabled.
         CVarSetInteger(CVAR_RANDOMIZER_SETTING("HyliasGrace"), NEI_GRACE_ON);
         CVarSetInteger(CVAR_RANDOMIZER_SETTING("HyliasGraceRewards"), 4);
+        CVarSetInteger(CVAR_RANDOMIZER_SETTING("RodOfSeasons"), NEI_SEASONS_INDIVIDUAL);
+        CVarSetInteger(CVAR_RANDOMIZER_SETTING("StartingRodOfSeasons"), 0);
         for (auto it = j.begin(); it != j.end(); ++it) {
             if (it.value().is_string())
                 CVarSetString(it.key().c_str(), it.value().get<std::string>().c_str());

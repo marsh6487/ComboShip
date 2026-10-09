@@ -60,6 +60,7 @@ def main() -> None:
         "ExtEquip_IsOotMirrorSkinActive",
         "ExtEquip_ShouldHideSwordDL",
         "FourSword_HeldSwordDL",
+        "FourSword_IsEquipped",
         "ItemEquip_HoldsEmptyHand",
         "KiteSurf_AdjustLimb",
         "Nei_HeldItemUsesOotHookshotModel",

@@ -24,6 +24,7 @@
 #include "ComboExport.h"
 #include "ComboMaskShimmer.h"
 #include "ComboSongDrawOOT.h"
+#include "ComboBottleContents.h"
 #include "ComboItemIconOwnership.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
 #include "ComboItemEffectColors.h"
@@ -968,6 +969,16 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
         std::memcpy(out->itemShimmerColor, color, 4);
         return 1;
     }
+    if (effRg == RG_BOTTLE_WITH_MAGIC_MUSHROOM || effRg == RG_MM_BOTTLE_GOLD_DUST) {
+        const int content = effRg == RG_BOTTLE_WITH_MAGIC_MUSHROOM ? CW_BOTTLE_MUSHROOM : CW_BOTTLE_GOLD_DUST;
+        out->drawKind = CW_DRAW_KIND_BOTTLE_CONTENTS;
+        out->dlistCount = 1;
+        out->xluStartIndex = 0;
+        out->dlists[0] = content == CW_BOTTLE_MUSHROOM ? "__OTR__objects/combo_bottle_gi/MushroomBottle"
+                                                       : "__OTR__objects/combo_bottle_gi/GoldDustBottle";
+        out->itemShimmer = ComboBottleContents_Color(content, out->itemShimmerColor);
+        return 1;
+    }
     if (OOT_FillSongDrawInfo(effRg, out))
         return 1;
     if (gi.drawFunc != nullptr) {
@@ -994,6 +1005,8 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     out->drawKind = drawKind;
     if (drawKind == CW_DRAW_KIND_ELEMENTAL_ARROW)
         out->neiEffect = NeiArrowGi_ProfileForDrawId(effRg, RG_FIRE_ARROWS, RG_ICE_ARROWS, RG_LIGHT_ARROWS);
+    if (drawKind == CW_DRAW_KIND_MAGIC_SPELL)
+        out->neiEffect = NeiArrowGi_ProfileForDrawId(effRg, RG_DINS_FIRE, RG_FARORES_WIND, RG_NAYRUS_LOVE);
     if (drawKind == CW_DRAW_KIND_FAIRY)
         out->stateDependent = 2; // selected generic/fairy-specific shell follows live owner Alt/mod state
     for (int32_t i = 0; i < 4; i++) {

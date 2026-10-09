@@ -7,6 +7,8 @@
 
 namespace Rando {
 bool ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry);
+// Native repeat/minigame awards bypass the randomizer check receipt builders.
+bool ApplyNativeRandomRupeeReceipt(uint16_t textId, CustomMessage::Entry& entry);
 // Read-only seed information; returns no text while the shared setting is disabled.
 bool MapCompassInfoEnabled();
 std::string GetDungeonMapCompassInfo(int32_t dungeon, bool compass);

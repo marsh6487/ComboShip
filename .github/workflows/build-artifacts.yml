@@ -176,6 +176,8 @@ jobs:
         run: |
           python3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py
           python3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py --sanitize
+          python3 -B scripts/diagnostics/run_tunic_material_tests.py
+          python3 -B scripts/diagnostics/run_tunic_material_tests.py --sanitize
 
       - name: Foreign OoT magic jar cosmetic presentation
         run: |

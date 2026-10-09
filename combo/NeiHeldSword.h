@@ -122,6 +122,23 @@ static inline bool NeiHeldSword_EquipmentSelected(int sword, int frame) {
             return true;
     if (frame == NEI_HELD_SWORD_OOT_ADULT || frame == NEI_HELD_SWORD_OOT_CHILD) {
         const bool twoHand = sword == NEI_HELD_SWORD_BIGGORON || sword == NEI_HELD_SWORD_GREAT_FAIRY;
+#ifndef NEI_EQUIPMENT_MM
+        if (!twoHand) {
+            // EquipmentAlwaysVisible can interchange the two one-hand rig
+            // sources, including Four Sword's child extended-item carrier.
+            for (int i = 0; i < 4; ++i)
+                if (NeiHeldSword_SelectedResource("oot", oot[i]))
+                    return true;
+        } else {
+            // The native BGS array also contains these health-dependent hand
+            // variants. A selected combined hand remains authoritative.
+            if (NeiHeldSword_SelectedResource(
+                    "oot", "__OTR__objects/object_link_boy/gLinkAdultHandHoldingBrokenGiantsKnifeDL") ||
+                NeiHeldSword_SelectedResource(
+                    "oot", "__OTR__objects/object_link_boy/gLinkAdultHandHoldingBrokenGiantsKnifeFarDL"))
+                return true;
+        }
+#endif
         if (frame == NEI_HELD_SWORD_OOT_CHILD && twoHand) {
             if (NeiHeldSword_SelectedResource(
                     "oot", "__OTR__objects/object_link_child/gLinkChildLeftHandHoldingMasterSwordDL"))

@@ -1,9 +1,12 @@
 #include "2s2h/BenGui/UIWidgets.hpp"
 #include "2s2h/BenGui/BenGui.hpp"
 #include "CosmeticEditor.h"
+#include <cmath>
+#include <cstring>
 #include "2s2h/ShipInit.hpp"
 #include <fast/Fast3dWindow.h>
 #ifdef COMBO_BUILD
+#include "ComboExport.h"
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
 #endif
@@ -93,6 +96,10 @@ std::map<std::string, CosmeticOption> cosmeticOptions = {
     COSMETIC_OPTION("Magic.MedallionForestSecondary", "Forest Medallion Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(150, 255, 0, 255), false, true, false),
     COSMETIC_OPTION("Magic.DinsPrimary", "Din's Fire Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 200, 0, 255), false, true, false),
     COSMETIC_OPTION("Magic.DinsSecondary", "Din's Fire Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 0, 0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.FaroresPrimary", "Farore's Wind Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(255, 255, 0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.FaroresSecondary", "Farore's Wind Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(100, 200, 0, 255), false, true, false),
+    COSMETIC_OPTION("Magic.NayrusPrimary", "Nayru's Love Primary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(170, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Magic.NayrusSecondary", "Nayru's Love Secondary", COSMETICS_GROUP_EFFECTS, ColorRGBA8(0, 100, 255, 255), false, true, false),
     COSMETIC_OPTION("Trails.KokiriSwordTrail",      "Kokiri Sword Trail",       COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
     COSMETIC_OPTION("Trails.RazorSwordTrail",       "Razor Sword Trail",        COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
     COSMETIC_OPTION("Trails.GildedSwordTrail",      "Gilded Sword Trail",       COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
@@ -694,6 +701,70 @@ const char* kCosmeticRainbowSpeedCvar = "gCosmetics.RainbowSpeed";
 const char* kCosmeticRandomizeOnSeedGenCvar = "gCosmetics.RandomizeOnSeedGen";
 const char* kCosmeticRandomizeOnSceneLoadCvar = "gCosmetics.RandomizeOnSceneLoad";
 int sCosmeticRainbowHue = 0;
+
+#ifdef COMBO_BUILD
+// Resource-only donor clock. Sampling advances no dormant engine frame or patches.
+static bool sGiCosmeticFrameSet = false;
+static uint32_t sGiCosmeticFrame = 0;
+static uint64_t sGiCosmeticHue = 0;
+static int sGiNativeHueSnapshot = 0;
+extern "C" COMBO_EXPORT void MM_SetGiCosmeticFrame(uint32_t hostFrame) {
+    if (!sGiCosmeticFrameSet || sCosmeticRainbowHue != sGiNativeHueSnapshot) {
+        sGiCosmeticFrameSet = true;
+        sGiCosmeticFrame = hostFrame;
+        sGiNativeHueSnapshot = sCosmeticRainbowHue;
+        sGiCosmeticHue = sCosmeticRainbowHue;
+        return;
+    }
+    if (hostFrame == sGiCosmeticFrame)
+        return;
+    uint64_t delta = hostFrame > sGiCosmeticFrame ? hostFrame - sGiCosmeticFrame : 1;
+    sGiCosmeticFrame = hostFrame;
+    float speed = CVarGetFloat(kCosmeticRainbowSpeedCvar, .6f);
+    if (speed <= 0.f)
+        speed = .6f;
+    if (!std::isfinite(speed))
+        return;
+    const uint64_t period = static_cast<uint64_t>(std::ceil(360 * speed));
+    if (sGiCosmeticHue >= period) {
+        sGiCosmeticHue = 0;
+        --delta;
+    }
+    sGiCosmeticHue = (sGiCosmeticHue + delta) % period;
+}
+extern "C" COMBO_EXPORT void MM_SampleGiCosmeticColor(const char* valueCvar, uint8_t r, uint8_t g, uint8_t b,
+                                                      uint8_t* outRGB) {
+    if (!outRGB)
+        return;
+    Color_RGB8 color = { r, g, b };
+    if (valueCvar)
+        color = CVarGetColor24(valueCvar, color);
+    float speed = CVarGetFloat(kCosmeticRainbowSpeedCvar, .6f);
+    if (speed <= 0.f)
+        speed = .6f;
+    if (valueCvar && std::isfinite(speed)) {
+        int index = 0;
+        for (const auto& [id, option] : cosmeticOptions) {
+            if (CosmeticEditorIsSuppressed(option))
+                continue;
+            if (std::strcmp(valueCvar, option.valuesCvar) == 0 && option.supportsRainbow &&
+                CVarGetInteger(option.rainbowCvar, 0)) {
+                const double frequency = 2 * M_PI / (360 * speed);
+                const auto phase = sGiCosmeticFrameSet ? sGiCosmeticHue : sCosmeticRainbowHue;
+                color.r = static_cast<uint8_t>(sin(frequency * (phase + index)) * 127 + 128);
+                color.g = static_cast<uint8_t>(sin(frequency * (phase + index) + 2 * M_PI / 3) * 127 + 128);
+                color.b = static_cast<uint8_t>(sin(frequency * (phase + index) + 4 * M_PI / 3) * 127 + 128);
+                break;
+            }
+            if (!CVarGetInteger(kCosmeticRainbowSyncCvar, 0))
+                index += static_cast<int>(60 * speed);
+        }
+    }
+    outRGB[0] = color.r;
+    outRGB[1] = color.g;
+    outRGB[2] = color.b;
+}
+#endif
 
 void CosmeticEditorSave() {
     Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();

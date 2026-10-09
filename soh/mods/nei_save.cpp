@@ -349,6 +349,8 @@ void NeiSave_Save(SaveContext* saveContext, int sectionID, bool fullSave) {
     SaveManager::Instance->SaveData("trirodFullList", gNeiSave.trirodFullList);
     SaveManager::Instance->SaveData("season", gNeiSave.season);
     SaveManager::Instance->SaveData("seasonsOwned", gNeiSave.seasonsOwned);
+    SaveManager::Instance->SaveData("seasonsRodOwned", gNeiSave.seasonsRodOwned);
+    SaveManager::Instance->SaveData("seasonsGates", gNeiSave.seasonsGates);
     SaveManager::Instance->SaveData("quartzOwned", gNeiSave.quartzOwned);
     SaveManager::Instance->SaveData("quartzCategory", gNeiSave.quartzCategory);
     SaveManager::Instance->SaveData("quartzSubcat", gNeiSave.quartzSubcat);
@@ -468,6 +470,8 @@ void NeiSave_Load() {
     // to anyway (Seasons_GetSeason heals it to an owned one).
     SaveManager::Instance->LoadData("season", gNeiSave.season, (uint8_t)SEASON_SPRING);
     SaveManager::Instance->LoadData("seasonsOwned", gNeiSave.seasonsOwned, (uint8_t)0);
+    SaveManager::Instance->LoadData("seasonsRodOwned", gNeiSave.seasonsRodOwned, (uint8_t)0);
+    SaveManager::Instance->LoadData("seasonsGates", gNeiSave.seasonsGates, (uint8_t)0);
     SaveManager::Instance->LoadData("quartzOwned", gNeiSave.quartzOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("quartzCategory", gNeiSave.quartzCategory, (uint8_t)0);
     SaveManager::Instance->LoadData("quartzSubcat", gNeiSave.quartzSubcat, (uint8_t)0);

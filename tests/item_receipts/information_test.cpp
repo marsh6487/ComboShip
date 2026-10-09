@@ -20,6 +20,7 @@
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerOptions.h"
 #include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerSettingKey.h"
 #include "combo/NeiGracePolicy.h"
+#include "combo/NeiSeasonsPolicy.h"
 enum MessageFormat { MF_RAW, MF_FORMATTED, MF_AUTO_FORMAT, MF_CLEAN };
 constexpr int TEXTBOX_TYPE_BLUE = 2;
 struct CustomMessage {
@@ -167,7 +168,8 @@ int main() {
   static_assert(RSK_MAPS_COMPASSES_GIVE_INFORMATION ==
                 RSK_PUSH_SPEED_UPGRADE_REQUIRED + 1);
   static_assert(RSK_HYLIAS_GRACE == RSK_MAPS_COMPASSES_GIVE_INFORMATION + 1);
-  static_assert(RSK_HYLIAS_GRACE_REWARDS + 1 == RSK_MAX);
+  static_assert(RSK_HYLIAS_GRACE_REWARDS + 1 == RSK_ROD_OF_SEASONS);
+  static_assert(RSK_STARTING_ROD_OF_SEASONS + 1 == RSK_MAX);
   auto ctx = Rando::Context::GetInstance();
   using namespace Rando;
   StaticData::hintTextTable[RHT_CHILD_ALTAR_STONES] = {

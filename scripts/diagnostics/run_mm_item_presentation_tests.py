@@ -30,6 +30,7 @@ preamble = r'''
 #include <cstring>
 #include "combo/menu/ComboItemDrawABI.h"
 #include "combo/menu/ComboItemEffectColors.h"
+#include "combo/menu/ComboBottleContents.h"
 using s16=int16_t; using s32=int32_t; using f32=float;
 namespace Ship {
 static bool ownerActive=false;
@@ -126,7 +127,8 @@ int main() {
  for(auto id : {RG_MM_SONG_SONATA,RG_MM_SONG_TIME}) {
    info={};
    assert(OOT_FillItemDrawInfo(id,&info)==1);
-   assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.dlistCount==1 && !info.itemShimmer);
+   assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.dlistCount==1);
+   assert(bool(info.itemShimmer)==(id==RG_MM_SONG_SONATA)); // Accepted POC2 intrinsic Sonata leaves.
    const uint8_t expected[4]={98,static_cast<uint8_t>(id==RG_MM_SONG_SONATA?255:177),
                              static_cast<uint8_t>(id==RG_MM_SONG_SONATA?98:211),255};
    assert(!std::memcmp(info.itemShimmerColor,expected,4));

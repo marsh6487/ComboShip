@@ -17,8 +17,9 @@
 #include "transformation_masks/wolf_link_form.h"
 #include "transformation_masks/assets/mm_asset_loader.h"
 #include "pak_loader/pak_loader.h"
-#include "oot_asset_loader/oot_asset_loader.h" // Trident: Phantom Ganon's lance lives in oot.o2r
-#include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_SHIELD_IKANA (Trident's Mirror fallback)
+#include "oot_asset_loader/oot_asset_loader.h"   // Trident: Phantom Ganon's lance lives in oot.o2r
+#include "2s2h/FleetShipCombo/FleetComboIds.h"   // FC_SHIELD_IKANA (Trident's Mirror fallback)
+#include "2s2h/FleetShipCombo/FleetComboItems.h" // FCI_KOKIRI_SWORD acquisition receipt
 
 // trade_items.c ships no header; declared locally, as the save editor does. The Pendant of
 // Memories lives on the adult trade wheel — that bit is its ONLY ownership flag since the ext
@@ -585,6 +586,38 @@ static void ExtEquip_ApplyTridentShieldPolicy(void) {
     }
 }
 
+void ExtEquip_RecordNativeSwordOwnership(void) {
+    u16 sword = GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD);
+    if (ExtEquip_GetCurrent(EQUIP_TYPE_SWORD) != 0 || sword < EQUIP_VALUE_SWORD_KOKIRI ||
+        sword > EQUIP_VALUE_SWORD_GILDED ||
+        BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_B) != ITEM_SWORD_KOKIRI + sword - EQUIP_VALUE_SWORD_KOKIRI) {
+        return;
+    }
+    // This native tier is already materialized, including a real starter with no grant receipt.
+    // Retain its ownership when another sword takes B, without replaying a progressive grant.
+    NeiSaveData* nei = Nei_Save();
+    if (nei->comboObtainedFc[FCI_KOKIRI_SWORD] < sword) {
+        nei->comboObtainedFc[FCI_KOKIRI_SWORD] = (u8)sword;
+    }
+    if (nei->comboAppliedFc[FCI_KOKIRI_SWORD] < sword) {
+        nei->comboAppliedFc[FCI_KOKIRI_SWORD] = (u8)sword;
+    }
+}
+
+void ExtEquip_RecordNativeShieldOwnership(void) {
+    if (ExtEquip_GetCurrent(EQUIP_TYPE_SHIELD) != 0 || Nei_Save()->vanillaShieldSkin != 0) {
+        return;
+    }
+    switch (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD)) {
+        case EQUIP_VALUE_SHIELD_HERO:
+            Nei_Save()->shieldOwned |= FC_SHIELD_HYLIAN;
+            break;
+        case EQUIP_VALUE_SHIELD_MIRROR:
+            Nei_Save()->shieldOwned |= FC_SHIELD_IKANA;
+            break;
+    }
+}
+
 void ExtEquip_SetSlot(s16 equipType, u8 index) {
     u8 old;
 
@@ -594,6 +627,11 @@ void ExtEquip_SetSlot(s16 equipType, u8 index) {
     old = ExtEquip_GetCurrent(equipType);
     if (old == index) {
         return;
+    }
+    if (equipType == EQUIP_TYPE_SHIELD) {
+        ExtEquip_RecordNativeShieldOwnership();
+    } else if (equipType == EQUIP_TYPE_SWORD) {
+        ExtEquip_RecordNativeSwordOwnership();
     }
     if (old != 0) {
         ExtEquip_CleanupSlot(equipType, old);

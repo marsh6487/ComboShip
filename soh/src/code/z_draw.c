@@ -405,11 +405,14 @@ DrawItemTableEntry sDrawItemTable[] = {
 
 extern int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path);
 static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
-    return ComboFairyBottle_SelectShell((const char*)sDrawItemTable[drawId].dlists[0],
-                                        (const char*)sDrawItemTable[drawId].dlists[1], gGiBottleStopperDL, gGiBottleDL,
-                                        ResourceMgr_IsModAsset, gGiBlueFireChamberstickDL,
-                                        (ResourceMgr_IsModAsset(gGiBlueFireChamberstickDL) ||
-                                         ResourceMgr_IsCustomAssetForGame("oot", gGiBlueFireChamberstickDL)));
+    ComboFairyBottleShell shell = ComboFairyBottle_SelectShell(
+        (const char*)sDrawItemTable[drawId].dlists[0], (const char*)sDrawItemTable[drawId].dlists[1],
+        gGiBottleStopperDL, gGiBottleDL, ResourceMgr_IsModAsset, gGiBlueFireChamberstickDL,
+        (ResourceMgr_IsModAsset(gGiBlueFireChamberstickDL) ||
+         ResourceMgr_IsCustomAssetForGame("oot", gGiBlueFireChamberstickDL)));
+    return ComboFairyBottle_BundledShell(shell, (const char*)sDrawItemTable[drawId].dlists[0],
+                                         (const char*)sDrawItemTable[drawId].dlists[1], ResourceMgr_IsModAsset,
+                                         ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/EmptyXlu"));
 }
 
 #include "ComboFairyBottleDraw.h"
@@ -457,11 +460,8 @@ s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]) {
             memcpy(color, c, 4);
             return true;
         }
-        case GID_FAIRY: {
-            const uint8_t c[4] = { 255, 160, 235, 255 };
-            memcpy(color, c, 4);
-            return true;
-        }
+        case GID_FAIRY:
+            return ComboBottleShimmer_Color(CW_SHIMMER_FAIRY, color);
         case GID_POE: {
             const uint8_t c[4] = { 100, 0, 200, 255 };
             memcpy(color, c, 4);
@@ -1033,7 +1033,7 @@ void GetItem_DrawPoes(PlayState* play, s16 drawId) {
 void GetItem_DrawFairy(PlayState* play, s16 drawId) {
     s32 pad;
     const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
-    const ComboFairyBottleMotion motion = ComboFairyBottle_Sample(play->gameplayFrames);
+    const ComboFairyBottleMotion motion = ComboFairyBottle_SampleForShell(play->gameplayFrames, shell.opaque);
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -1057,13 +1057,15 @@ void GetItem_DrawFairy(PlayState* play, s16 drawId) {
     Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
     Matrix_ReplaceRotation(&play->billboardMtxF);
     Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
-    if (!ComboFairyBottle_DrawVfx(play)) {
+    if (!ComboFairyBottle_DrawVfx(play, shell.opaque)) {
         gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
         gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[2]);
     }
     Matrix_Pop();
 
     CLOSE_DISPS(play->state.gfxCtx);
+    if (ComboFairyBottle_IsBundledShell(shell.opaque))
+        ComboBottleShimmer_DrawMotes(play, CW_SHIMMER_FAIRY);
 }
 
 void GetItem_DrawMirrorShield(PlayState* play, s16 drawId) {
@@ -1377,6 +1379,12 @@ void GetItem_DrawMagicArrow(PlayState* play, s16 drawId) {
 
 void GetItem_DrawMagicSpell(PlayState* play, s16 drawId) {
     s32 pad;
+
+    if (NeiGi_DrawElementalSpell(
+            play, NeiArrowGi_ProfileForDrawId(drawId, GID_DINS_FIRE, GID_FARORES_WIND, GID_NAYRUS_LOVE), 0, 0))
+        return;
+    if (!NeiGi_CanDrawElementalSpellFallback(play))
+        return;
 
     OPEN_DISPS(play->state.gfxCtx);
 

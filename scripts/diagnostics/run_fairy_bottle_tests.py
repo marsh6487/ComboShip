@@ -55,7 +55,6 @@ def main():
         bodies += 'template<class...T>void ' + name + '(T...) { assert(false); }\n'
     bodies += 'template<class...T>void ComboSwordGi_ApplyEffectFit(T...) { assert(false); }\n'
     bodies += 'template<class...T>void ComboSwordGi_ApplyPresentationSize(T...) { assert(false); }\n'
-    bodies += 'float ComboSwordGi_SelectedTilt(float,bool=false) { assert(false); return 0; }\n'
     bodies += dispatch + '\n'
     source = (ROOT / 'combo/menu/ComboForeignDrawMM.h').read_text()
     bodies += function(source, 'MM_DrawForeignFairy') + '\n'
@@ -67,7 +66,7 @@ def main():
             flags = ['-DCOMBO_FAIRY_HOST_MM'] if host == 'mm' else []
             subprocess.run([*shlex.split(os.environ.get('CXX', 'c++')), '-std=c++20', '-Wall', '-Wextra',
                             '-Wno-unused-parameter', '-Wno-unused-variable', '-Wno-sign-compare',
-                            '-Wno-missing-field-initializers', *flags, '-I' + str(ROOT), '-I' + str(build),
+                            '-Wno-missing-field-initializers', '-DCOMBO_BUILD', *flags, '-I' + str(ROOT), '-I' + str(build),
                             str(ROOT / 'tests/fairy_bottle/draw_test.cpp'), '-o', str(binary)], check=True)
             print('HOST ' + host, flush=True)
             subprocess.run([str(binary)], check=True)

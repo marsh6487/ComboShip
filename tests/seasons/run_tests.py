@@ -10,6 +10,10 @@ from run_mm_weather_tests import production_function
 def body(path,name): return production_function((ROOT/path).read_text(),name)
 def run(name,prefix,parts,checks):
  if len(sys.argv)>1 and sys.argv[1]!=name:return
+ if any('Seasons_SeasonOwned(' in part or 'Seasons_HasRod(' in part for part in parts):
+  parts.insert(0, body('mm/mods/extended_inventory.c', 'Seasons_HasRod'))
+  prefix += '\nu16 Nei_GetOwnedItem(u8 slot){return Nei_Save()->ownedItems[slot-24];}\n'
+  prefix += 'u8 Seasons_RandoMode(){return NEI_SEASONS_INDIVIDUAL;}\nvoid Seasons_UpdateGates(){}\n'
  with tempfile.TemporaryDirectory(prefix='seasons-') as td:
   p=Path(td)/'test.cpp'
   p.write_text('#include "mods/extended_inventory.h"\n#include "mods/ext_buttons/ext_buttons.h"\n#include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"\n#include <cassert>\n#include <cstring>\n#include <iostream>\n'+prefix+'\n'+'\n'.join(parts)+'\nint main(){'+checks+'\nstd::cout<<"PASS '+name+'\\n";}')
@@ -74,7 +78,8 @@ if len(sys.argv)==1 or sys.argv[1]=='pool':
  text=(ROOT/'mm/2s2h/Rando/Logic/GeneratePools.cpp').read_text()
  pool=re.search(r'sNeiPoolItems\[\]\s*=\s*\{(.*?)\};',text,re.S).group(1)
  assert not re.search(r'\bRI_OOT_NEI_ROD_OF_SEASONS\b',pool),'bare rod must not be a placeable reward'
- for s in ['SPRING','SUMMER','AUTUMN','WINTER']: assert 'RI_OOT_NEI_SEASON_'+s in pool
+ for s in ['SPRING','SUMMER','AUTUMN','WINTER']: assert 'RI_OOT_NEI_SEASON_'+s in text
+ assert 'NEI_SEASONS_INDIVIDUAL' in text and 'RO_STARTING_ROD_OF_SEASONS' in text
  print('PASS pool')
 
 shop='mm/2s2h/Rando/ActorBehavior/EnGirlA.cpp'

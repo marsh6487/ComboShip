@@ -2299,7 +2299,7 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             ExtInv_GiveItem(SLOT_SHADOW_CRYSTAL, EXT_ITEM_SHADOW_CRYSTAL);
             break;
         case RG_ROD_OF_SEASONS:
-            ExtInv_GiveItem(SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS);
+            Seasons_GrantRod();
             break;
         // Crossover Items. Both registry rows carry NEI_NO_SLOT, so the generic default arm
         // below (ExtInv_SetItemById) silently drops them — the item would be consumed by the

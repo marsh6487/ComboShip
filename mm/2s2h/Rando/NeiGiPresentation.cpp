@@ -12,6 +12,7 @@
 #include "ComboSwordGiLegacyFit.h"
 #include <algorithm>
 #include <cstring>
+#include <string>
 #include <libultraship/bridge/consolevariablebridge.h>
 extern "C" {
 int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
@@ -83,6 +84,7 @@ const Binding kBindings[] = {
     { RI_OOT_EXT_CANE_OF_BYRNA, "cane_of_byrna" },
     { RI_OOT_EXT_FOUR_SWORD, "four_sword" },
     { RI_PENDANT_OF_MEMORIES, "pendant_of_memories" },
+    { RI_ROOM_KEY, "room_key" },
     { RI_OOT_NEI_SHEIKAH_SLATE, "sheikah_slate" },
     { RI_OOT_NEI_SLATE_RUNE_BOMB, "slate_bomb" },
     { RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE, "slate_master_cycle" },
@@ -107,6 +109,10 @@ bool HasMmLegacyGiMod(RandoItemId item) {
     const char* opaque = nullptr;
     const char* second = nullptr;
     switch (item) {
+        case RI_ROOM_KEY:
+            opaque = "objects/object_gi_reserve_b_00/gGiRoomKeyDL";
+            second = "objects/object_gi_reserve_b_00/gGiRoomKeyEmptyDL";
+            break;
         case RI_OOT_NEI_FIRE_ROD:
             opaque = "objects/object_nei_fire_rod/Cylinder_001_opaque_dl";
             break;
@@ -137,7 +143,6 @@ bool HasMmLegacyGiMod(RandoItemId item) {
             opaque = "objects/object_nei_magic_spell/gDemiseDestructionGiveDL";
             break;
         case RI_SWORD_KOKIRI:
-        case RI_OOT_EXT_FOUR_SWORD:
             opaque = "objects/object_gi_sword_1/gGiKokiriSwordGuardDL";
             second = "objects/object_gi_sword_1/gGiKokiriSwordBladeHiltDL";
             break;
@@ -233,7 +238,9 @@ extern "C" {
 #define NeiGi_DrawTexturedMesh NeiGi_DrawTexturedMeshNative
 #define NEI_GI_ROTATE_Y Matrix_RotateYF
 #define NEI_GI_ROTATE_Z Matrix_RotateZF
+#define NEI_GI_NATIVE_MM 1
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiMeshRenderer.inc"
+#undef NEI_GI_NATIVE_MM
 #undef NeiGi_DrawTexturedMesh
 #undef NEI_GI_ROTATE_Y
 #undef NEI_GI_ROTATE_Z
@@ -384,6 +391,12 @@ void DrawSong(RandoItemId item);
 bool MM_TryDrawNeiGi(RandoItemId item, bool shop, int mmPickup) {
     if (!gPlayState)
         return false;
+    const int arrow = NeiArrowGi_ProfileForDrawId(item, RI_ARROW_FIRE, RI_ARROW_ICE, RI_ARROW_LIGHT);
+    if (shop && arrow)
+        return NeiGi_DrawElementalArrowShop(gPlayState, arrow);
+    const int spell = NeiArrowGi_ProfileForDrawId(item, RI_OOT_DINS_FIRE, RI_OOT_FARORES_WIND, RI_OOT_NAYRUS_LOVE);
+    if (spell)
+        return NeiGi_DrawElementalSpell(gPlayState, spell, 1, shop);
     // Resolve song identity before the shared draw table, whose aliases can
     // otherwise route imported/native songs through an unrelated note drawer.
     if (ComboSongForMmItem(item) >= 0) {

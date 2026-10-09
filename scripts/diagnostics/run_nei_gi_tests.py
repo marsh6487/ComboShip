@@ -56,6 +56,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
         ("trident", "ExtTrident"), ("climb_boots", "ExtClimbBoots"), ("roc_boots", "ExtRocBoots"),
         ("cane_of_byrna", "ExtCaneOfByrna"), ("four_sword", "ExtFourSword"),
         ("pendant_of_memories", "ExtPendantOfMemories"), ("elemental_wand", "ElementalWand"),
+        ("room_key", "MmTradeQuest", "RG_MM_ROOM_KEY"),
         ("sand_rod", "ElementalWand", "RG_WAND_SAND_ROD"),
         ("tornado_rod", "ElementalWand", "RG_WAND_TORNADO_ROD"),
         ("water_rod", "ElementalWand", "RG_WAND_WATER_ROD"),
@@ -107,7 +108,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
             pickup_vertices.append(asset.name + ' ' + ' '.join(str(v*scale) for v in point))
         all_frames.append(f'{{"{asset.name}",{low}f,{high}f,{width}f,{float(meta["draw_scale"])}f,'
                           f'{str((asset/"gi_xlu_dl").exists()).lower()}}},')
-    assert len(all_frames) == 61
+    assert len(all_frames) == 62
     (Path(tmp) / "nei_all_frame_bounds.inc").write_text("\n".join(all_frames))
     pickup_vertex_path = Path(tmp) / "mm_pickup_vertices.txt"
     pickup_vertex_path.write_text("\n".join(pickup_vertices))
@@ -191,6 +192,7 @@ void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,int mmPickup=0);
             owner_functions = functions((ROOT / "combo/menu/ComboItemDrawOOT.h").read_text())
             shim = shim.replace("/* SELECTED_SWORD_PRODUCER */", "\n".join(
                 owner_functions[name] for name in ("CwSimple", "CwCustomGi", "CwAltSwordGi")))
+            spell_producer = functions((ROOT / "combo/menu/ComboItemDrawMM.h").read_text())["MM_FillElementalSpellDrawInfo"]
             foreign_shim = """
 const ComboForeignDrawInfo* selectedForeignInfo = nullptr;
 int foreignFallbackCalls = 0;
@@ -227,9 +229,15 @@ void ComboDrawSpinAttackGi(PlayState*, const char*, const char*, float, const ui
 constexpr int kMaxMatEntries=16;
 bool ComboForeignTexAnim_Run(PlayState*,const char*,const char*,bool,int32_t*,int32_t*) {assert(false);return false;}
 void ComboForeignTexAnim_Restore(PlayState*,const int32_t*,int32_t,bool) {assert(false);}
-extern "C" Gfx* Gfx_TwoTexScrollEx(GraphicsContext*,s32,u32,u32,s32,s32,s32,u32,u32,s32,s32,s32,s32,s32,s32) {assert(false);return nullptr;}
-extern "C" void gSPSegment(void*,int,uintptr_t) {assert(false);}
-""" + oot_song_simple + """
+bool spellFallbackAllowed=false;
+extern "C" Gfx* Gfx_TwoTexScrollEx(GraphicsContext* gfx,s32,u32,u32,s32,s32,s32,u32,u32,s32,s32,s32,s32,s32,s32) {
+    assert(spellFallbackAllowed);return static_cast<Gfx*>(Graph_Alloc(gfx,12*sizeof(Gfx)));
+}
+extern "C" void gSPSegment(void* dst,int segment,uintptr_t address) {
+    assert(spellFallbackAllowed);auto* cmd=static_cast<Gfx*>(dst);
+    cmd->words.w0=(G_MOVEWORD<<24)|(G_MW_SEGMENT<<16)|segment*4;cmd->words.w1=address;
+}
+""" + functions(foreign_source)["OOT_RestoreForeignSegs"] + "\n" + functions(foreign_source)["OOT_DrawForeignMagicSpell"] + "\n" + oot_song_simple + """
 void OOT_DrawForeignSimple(PlayState* play,const ComboForeignDrawInfo* info) {
     if(info->drawKind==CW_DRAW_KIND_SONG_GI || info->drawKind==CW_DRAW_KIND_ELEMENTAL_ARROW) Fixture_DrawForeignSongSimple(play,info);
     else {++foreignFallbackCalls;Matrix_Scale(7,7,7,MTXMODE_APPLY);}
@@ -326,7 +334,7 @@ std::map<std::string,std::vector<std::array<float,3>>> FixtureMmPickupVertices()
  std::map<std::string,std::vector<std::array<float,3>>> vertices;
  std::string slug;std::array<float,3> point{};
  while(input>>slug>>point[0]>>point[1]>>point[2])vertices[slug].push_back(point);
- assert(input.eof() && vertices.size()==61);
+ assert(input.eof() && vertices.size()==62);
  return vertices;
 }
 '''
@@ -341,9 +349,14 @@ std::map<std::string,std::vector<std::array<float,3>>> FixtureMmPickupVertices()
             mm_shop_support += "\n" + mm_foreign_draw + "\n" + resolved + "\n" + draw_item + "\n" + callback + "\n#undef RANDO_SAVE_CHECKS\n"
             flags_source=(ROOT/'mm/2s2h/CustomItem/CustomItem.h').read_text()
             custom_flags='namespace CustomItem {\n'+re.search(r'enum CustomItemFlags.*?\n\};',flags_source,re.S)[0]+'\n}\n'
-            tested_bridge = (form_enum + '\nint fixtureMmForm=PLAYER_FORM_HUMAN;\n#define GET_PLAYER_FORM fixtureMmForm\n' + custom_flags + shim + route + "\n" + item_enum + "\nbool MM_TryDrawNeiGi(RandoItemId,bool shop=false,int mmPickup=0);\n#include \"ComboSongDrawMM.h\"\n" + bindings + "\n" + fallback_class + "\n" +
+            tested_bridge = (form_enum + '\nint fixtureMmForm=PLAYER_FORM_HUMAN;\n#define GET_PLAYER_FORM fixtureMmForm\n' + custom_flags + shim + route + "\n" + item_enum + "\n" + spell_producer + "\nbool MM_TryDrawNeiGi(RandoItemId,bool shop=false,int mmPickup=0);\n#include \"ComboSongDrawMM.h\"\n" + bindings + "\n" + fallback_class + "\n" +
                              renderer + "\n" + fallback + "\n" + foreign_info + "\n" +
                              foreign_shim + foreign_draw + "\n" + foreign_wrapper + "\n" + foreign_shop + "\n" + mm_shop_support)
+            tested_bridge = ('#include "ComboBottleContents.h"\n'
+                             'int ComboBottleContents_Draw(PlayState*,int) {assert(false);return 0;}\n' + tested_bridge)
+            # The production renderer now includes the real runtime resolver.
+            # Keep this fixture's donor simulator distinct from that inline API.
+            tested_bridge = tested_bridge.replace("Combo_ResolveSym(", "Fixture_ResolveSym(")
             candidate = source.read_text().replace("int main() {", tested_bridge + "\n" + pickup_support + "\nint main() {", 1)
             checks = (ROOT / "tests/mm_presentation/gi_bridge_checks.inc").read_text()
             checks += (ROOT / "tests/mm_presentation/shop_dispatch_checks.inc").read_text()

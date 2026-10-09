@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include "global.h"
+#include "mods/extended_inventory.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 namespace {
@@ -133,23 +134,12 @@ extern "C" int MMWeather_SeasonForPlay(const PlayState* play) {
         play->envCtx.lightSettingOverride != LIGHT_SETTING_OVERRIDE_NONE || play->envCtx.customSkyboxFilter) {
         return -1;
     }
-    const auto& nei = gSaveContext.save.shipSaveInfo.nei;
-    if (!nei.seasonsOwned || nei.season == SEASON_OFF) {
-        return -1;
-    }
-    if (nei.season < SEASON_COUNT && (nei.seasonsOwned & (1 << nei.season))) {
-        return nei.season;
-    }
-    for (int season = 0; season < SEASON_COUNT; ++season) {
-        if (nei.seasonsOwned & (1 << season)) {
-            return season;
-        }
-    }
-    return -1;
+    const uint8_t season = Seasons_GetSeason();
+    return season < SEASON_COUNT ? season : -1;
 }
 
 extern "C" int MMWeather_SeasonClearsRain() {
-    return sSeason == SEASON_SUMMER && CURRENT_DAY == 2;
+    return sSeason == SEASON_SUMMER;
 }
 
 extern "C" uint32_t MMWeather_ResolveAmbienceSeqCmd(uint32_t cmd) {
@@ -192,8 +182,20 @@ extern "C" uint8_t MMWeather_Shade(uint8_t value) {
 }
 
 extern "C" void MMWeather_ApplySky(uint8_t* first, uint8_t* second, uint8_t* blend) {
-    if (MMWeather_SeasonClearsRain()) {
+    // Native CLOUD also describes ordinary daytime cloud geometry. Start the
+    // active season's presentation from its requested baseline instead of
+    // inheriting that texture as an already-overcast OoT sky. Explicit outdoor
+    // weather still composes afterward; SeasonForPlay retains story/interior gates.
+    const bool nativeStorm =
+        sPlay != nullptr &&
+        (sPlay->envCtx.stormState == STORM_STATE_ON || gWeatherMode == WEATHER_MODE_RAIN ||
+         sPlay->envCtx.precipitation[PRECIP_RAIN_CUR] > 0 || sPlay->envCtx.precipitation[PRECIP_RAIN_MAX] > 0);
+    if (sSeason == SEASON_SUMMER || (sSeason == SEASON_AUTUMN && !nativeStorm) ||
+        (sSeason == SEASON_SPRING && SeasonRainDensity() > 0)) {
         *first = *second = *blend = 0;
+    } else if (sSeason == SEASON_WINTER) {
+        *first = *second = 1;
+        *blend = 0;
     }
     const float amount = MMWeather_Overcast();
     if (amount > 0.0f) {

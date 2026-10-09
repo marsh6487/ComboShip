@@ -1,6 +1,9 @@
 /* RESOURCE_TYPES */
 #include <unordered_map>
 #include <stdexcept>
+#include "combo/menu/ComboElementalArrowGi.h"
+#include "soh/soh/Enhancements/randomizer/NeiElementalGiColors.h"
+namespace NeiGi {struct TextureMaterial;}
 using f32=float;using s16=int16_t;
 constexpr int MTXMODE_APPLY=1;
 using Kind=NeiGi::Kind;
@@ -112,6 +115,12 @@ void* Combo_ResolveSym(const char*,const char* name){
     return nullptr; // Missing optional exports must not alias an incompatible function.
 }
 void DrawSong(RandoItemId){assert(false);}
+extern "C" int NeiGi_DrawElementalArrowShop(PlayState*,int){
+    assert(false && "sword receipt must not dispatch elemental arrows");return 0;
+}
+extern "C" int NeiGi_DrawElementalSpell(PlayState*,int,int,int){
+    assert(false && "sword receipt must not dispatch elemental spells");return 0;
+}
 void MM_DrawNeiGi(const CwItemDrawInfo&,bool,int){assert(false&&"legacy mod must retain its native callback");}
 NeiGi::Basis NeiGi_CameraBasis(PlayState*){return {};}
 std::vector<Pose> effects;
@@ -152,7 +161,7 @@ void LegacyRazor(PlayState*,GetItemEntry*){DrawNativeSword();}
 void DrawCustomItemDiamond(PlayState*,Gfx*,float scale){Matrix_Scale(scale,scale,scale,1);DrawNativeSword();}
 void DrawCustomItemDiamondTint(PlayState* p,Gfx* dl,Gfx*,float scale,int,int,int){DrawCustomItemDiamond(p,dl,scale);}
 Gfx* ResourceMgr_LoadGfxByName(const char*){return nullptr;}
-void DrawMmWeaponGi(PlayState*,Gfx*,Gfx*,float){assert(false);}
+void DrawMmWeaponGi(PlayState*,Gfx*,Gfx*,float,bool){assert(false);}
 const char dgNeiFourSwordBladeDL[]="__OTR__objects/object_nei_four_sword/gNeiFourSwordBladeDL";
 const char dgNeiFourSwordHiltDL[]="__OTR__objects/object_nei_four_sword/gNeiFourSwordHiltDL";
 const char gGiKokiriSwordDL[]="objects/object_gi_sword_1/gGiKokiriSwordDL";

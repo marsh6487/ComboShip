@@ -122,6 +122,30 @@ void Actor_ProcessInitChain(Actor* actor, InitChainEntry* init) {
     (void)actor;
     (void)init;
 }
+// Sanitizer registration can retain the complete branching-tree profile even
+// when section GC removes these unrelated engine paths in an ordinary build.
+// This fixture exercises tree/leaf rendering and spawning; fail if a retained
+// initializer, destructor, or sway helper is accidentally executed.
+void DynaPolyActor_Init(DynaPolyActor* actor, s32 flags) {
+    REQUIRE(!"branching-tree DynaPoly initialization is outside this fixture");
+}
+void CollisionHeader_GetVirtual(CollisionHeader* source, CollisionHeader** destination) {
+    REQUIRE(!"branching-tree collision initialization is outside this fixture");
+}
+s32 DynaPoly_SetBgActor(PlayState* current, DynaCollisionContext* context, Actor* actor, CollisionHeader* header) {
+    REQUIRE(!"branching-tree background registration is outside this fixture");
+    return 0;
+}
+void DynaPoly_DeleteBgActor(PlayState* current, DynaCollisionContext* context, s32 id) {
+    REQUIRE(!"branching-tree background destruction is outside this fixture");
+}
+void CollisionCheck_SetInfo2(CollisionCheckInfo* info, DamageTable* damage, CollisionCheckInfoInit2* init) {
+    REQUIRE(!"branching-tree collision setup is outside this fixture");
+}
+f32 Math_SmoothStepToF(f32* value, f32 target, f32 fraction, f32 step, f32 minimum) {
+    REQUIRE(!"branching-tree sway is outside this fixture");
+    return 0.0f;
+}
 s32 Collider_InitCylinder(PlayState* current, ColliderCylinder* collider) {
     (void)current;
     memset(collider, 0, sizeof(*collider));

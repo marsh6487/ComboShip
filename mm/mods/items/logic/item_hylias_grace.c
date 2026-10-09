@@ -86,8 +86,8 @@ static void HGrace_SpawnFairySparkles(Player* p, PlayState* play) {
         primColor = (Color_RGBA8){ 255, 220, 100, 255 };
         envColor = (Color_RGBA8){ 200, 150, 30, 255 };
     } else {
-        primColor = (Color_RGBA8){ 150, 255, 150, 255 };
-        envColor = (Color_RGBA8){ 50, 200, 50, 255 };
+        primColor = (Color_RGBA8){ 255, 180, 220, 255 };
+        envColor = (Color_RGBA8){ 255, 100, 180, 255 };
     }
 
     for (u8 i = 0; i < 3; i++) {
@@ -129,7 +129,7 @@ static void HGrace_SpawnWarpSparkles(PlayState* play, Vec3f* center) {
 }
 
 // =============================================================================
-// Fairy draw function (green fairy — replaces Link's model during fairy mode)
+// Fairy draw function (pink fairy — replaces Link's model during fairy mode)
 //
 // Body: 3-layer glow circles (large dim + medium + bright core) using the
 //       light-system pattern (dithering + gGlowCircleDL, billboarded).
@@ -465,8 +465,8 @@ static void HGrace_SpawnTrailSparkles(Player* p, PlayState* play, f32 actualSpee
         primColor = (Color_RGBA8){ 255, 200, 80, 255 };
         envColor = (Color_RGBA8){ 200, 120, 20, 255 };
     } else {
-        primColor = (Color_RGBA8){ 120, 255, 120, 255 };
-        envColor = (Color_RGBA8){ 30, 180, 30, 255 };
+        primColor = (Color_RGBA8){ 255, 180, 220, 255 };
+        envColor = (Color_RGBA8){ 255, 100, 180, 255 };
     }
 
     Vec3f accel = { 0.0f, 0.0f, 0.0f };

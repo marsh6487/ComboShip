@@ -280,7 +280,8 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     glyph = re.search(r'msgCtx->textPosX \+= \(s32\)\(sNESFontWidths\[\(u8\)character - \' \'\] \* msgCtx->textCharScale\);', nes_draw)[0]
     dispatch += ('\nint NativeLineWidth(const std::string& line) {\n'
                  'MessageContext* msgCtx = &play.msgCtx; msgCtx->textPosX = 0;\n'
-                 'for (uint8_t character : line) { if (character == \' \') {\n' + space +
+                 # MM's color commands do not index the native glyph table.
+                 'for (uint8_t character : line) { if (character <= 8) continue; if (character == \' \') {\n' + space +
                  '} else {\n' + glyph.replace('(s32)', '(int)').replace('(u8)', '(uint8_t)') +
                  '} } return msgCtx->textPosX; }\n')
     layout = layout.replace('/* MM_TEXT_DISPATCH */', dispatch)
@@ -417,6 +418,14 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     grants += 'gSaveContext.options.language=LANGUAGE_ENG; }\n'
     (tmp / 'receipt_song_grants.inc').write_text(grants)
     (tmp / 'receipt_catalogs.inc').write_text(catalog)
+    rupee_hooks = ROOT / 'mm/2s2h/Enhancements/Dialogue/RandomRupeeNames.cpp'
+    rupee_code = 'void RegisterNativeRandomRupeeNames() {}\n'
+    if rupee_hooks.exists():
+        rupee_source = rupee_hooks.read_text()
+        rupee_code = 'void BuildNativeRandomRupeeName(u16* textId,bool* loadFromMessageTable) ' + \
+            block(rupee_source,'void BuildNativeRandomRupeeName') + '\n'
+        rupee_code += 'void RegisterNativeRandomRupeeNames() ' + block(rupee_source,'void RegisterNativeRandomRupeeNames')
+    (tmp / 'receipt_rupee_hooks.inc').write_text(rupee_code)
     pause_desc = (ROOT / 'mm/2s2h/CustomMessage/PauseItemDescriptions.cpp').read_text()
     (tmp / 'receipt_map_pause.inc').write_text('extern "C" const char* PauseItemDesc_GetMapInfo(s32 dungeon,u16 itemId) ' +
                                              block(pause_desc, 'const char* PauseItemDesc_GetMapInfo'))
@@ -505,6 +514,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                                            cwd=ROOT, text=True)
     context_builders = 'bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received = true);\n'
     for signature in ('bool BuildDungeonKeyReceiptMessage(RandomizerGet rg, CustomMessage& msg)',
+                      'static bool WandMedallionDescriptionsEnabled()',
                       'static bool DungeonInformationEnabled()',
                       'extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled(void)',
                       'static CustomMessage DungeonRewardName(RandomizerCheck check)',
@@ -518,7 +528,9 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                       'extern "C" COMBO_EXPORT int32_t OOT_GetDungeonItemReceiptPresentation(const char* itemName, CwItemReceiptPresentation* out)',
                       'extern "C" uint16_t Randomizer_GetDungeonItemInfoTextId(uint16_t cursorItem)',
                       'void BuildDungeonPauseInfoMessage(uint16_t* textId, bool* loadFromMessageTable)',
-                      'void BuildMapMessage(uint16_t* textId, bool* loadFromMessageTable)'):
+                      'void BuildMapMessage(uint16_t* textId, bool* loadFromMessageTable)',
+                      'static bool SplitWandMedallionMessage(std::string& prefix, std::string& ending, int& icon)',
+                      'void BuildWandMedallionMessage(uint16_t* textId, bool* loadFromMessageTable)'):
         context_builders += signature + ' ' + block(exported, 'int32_t OOT_GetDungeonItemReceiptPresentation' if 'OOT_GetDungeonItemReceiptPresentation' in signature else signature + ' {') + '\n'
     donor = donor.replace('/* CONTEXT_BUILDERS */', context_builders)
     donor = donor.replace('/* NATIVE_ITEM_BUILDER */',

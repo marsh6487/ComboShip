@@ -100,28 +100,33 @@ for(int form:{PLAYER_FORM_HUMAN,PLAYER_FORM_GORON,PLAYER_FORM_ZORA,PLAYER_FORM_D
  }
 ownerAlt=false;
 std::cout<<"PASS all five active MM native/foreign selected custom receipt routes retain resource fit contexts\n";
-// Lantern's donor-only legacy mesh previously fell through to MM's host loader
-// when a selected mod displaced the authored model. Preserve that exact mesh
-// and its owning manager through the same native receipt renderer.
-for(const char* owner:{"oot","mm"})for(int selectedAlt:{0,1}) {
+// Generic Poe actor mods must not replace the complete authored Lantern item.
+// If either authored pass is missing, retain the legacy mesh and its owning
+// manager through the actual native receipt renderer.
+for(const char* owner:{"oot","mm"})for(int selectedAlt:{0,1})for(int missing:{-1,0,1}) {
   Reset();alt=selectedAlt;ownerAlt=selectedAlt;
   const char* legacy="__OTR__objects/object_poh/gPoeLanternDL";
   files.insert(legacy);if(selectedAlt)files.insert(std::string("alt/")+legacy);
-  files.insert("__OTR__objects/nei_gi_redesign/lantern/gi_dl");
-  files.insert("__OTR__objects/nei_gi_redesign/lantern/gi_xlu_dl");
+  const char* authored[]={"__OTR__objects/nei_gi_redesign/lantern/gi_dl",
+                          "__OTR__objects/nei_gi_redesign/lantern/gi_xlu_dl"};
+  for(int pass=0;pass<2;++pass)if(pass!=missing)files.insert(authored[pass]);
   modFiles.insert({owner,selectedAlt?std::string("alt/")+legacy:std::string(legacy)});
   CwItemDrawInfo selected{};
-  assert(MM_DescribeNeiGi(RI_OOT_NEI_LANTERN,&selected) && "native MM Lantern must retain its selected legacy mod");
-  const std::string routed=std::string("__OTR__@")+owner+":objects/object_poh/gPoeLanternDL";
-  assert(selected.drawKind==CW_DRAW_KIND_CUSTOM_GI && selected.dlistCount==1 && selected.opCount==0);
-  CwItemDrawInfo identity{};assert(!OOT_GetNeiGiDrawInfo("lantern",&identity));
+  assert(MM_DescribeNeiGi(RI_OOT_NEI_LANTERN,&selected));
+  const std::vector<std::string> routed=missing<0?std::vector<std::string>{
+    "__OTR__@oot:objects/nei_gi_redesign/lantern/gi_dl",
+    "__OTR__@oot:objects/nei_gi_redesign/lantern/gi_xlu_dl"}:
+    std::vector<std::string>{std::string("__OTR__@")+owner+":objects/object_poh/gPoeLanternDL"};
+  assert(selected.drawKind==(missing<0?CW_DRAW_KIND_NEI_GI:CW_DRAW_KIND_CUSTOM_GI) &&
+         selected.dlistCount==routed.size() && selected.opCount==0);
+  CwItemDrawInfo identity{};assert(OOT_GetNeiGiDrawInfo("lantern",&identity)==(missing<0));
   assert(selected.neiShimmer==identity.neiShimmer && selected.scale==.025f);
-  assert(selected.dlists[0]==routed);
+  for(size_t pass=0;pass<routed.size();++pass)assert(selected.dlists[pass]==routed[pass]);
   FixtureMmReceiptPose();Actor receipt{};receipt.id=ACTOR_EN_ITEM00;
   receipt.home.rot.x=CustomItem::CALLED_ACTION|CustomItem::GIVE_ITEM_CUTSCENE;
   Rando::DrawResolvedItem(RI_OOT_NEI_LANTERN,1,&receipt);
-  assert(Drawn()==std::vector<std::string>{routed} && mmShopLegacyDraws==0);
+  assert(Drawn()==routed && mmShopLegacyDraws==0);
   assert(stack.empty() && interpolation==0);
 }
 ownerAlt=false;
-std::cout<<"PASS native MM Lantern selected OOT/MM base/Alt legacy model ownership through receipt route\n";
+std::cout<<"PASS native MM Lantern authored cage/glass receipts and OOT/MM base/Alt missing-pass fallback ownership\n";

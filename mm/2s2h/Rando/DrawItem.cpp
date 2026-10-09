@@ -61,6 +61,9 @@ extern Gfx gIKAxeInlineDL[];             // equipment/objects/ikaxe_DL — axe w
 void DrawOotNeiCaneOfSomaria(RandoItemId skill);
 void DrawOotNeiUltrahand();
 #include "ComboForeignDrawMM.h"
+#define COMBO_BOTTLE_HOST_MM
+#include "ComboBottleContentsDraw.h"
+#undef COMBO_BOTTLE_HOST_MM
 
 extern "C" int32_t MM_GetItemAnimDrawInfo(const char* itemName, CwItemAnimDrawInfo* out);
 
@@ -1710,7 +1713,17 @@ void DrawOotZoraTunic() {
 
 // Grayscale-tinted plain tunic (collar + tunic, no color DLs) — SoH's DrawCustomItemDiamondTint recolor
 // used for the "clothing" ext equipment (Magic Cape / Spirit Breastplate / Champion's Tunic) and stand-ins.
-static void DrawOotTunicTint(u8 r, u8 g, u8 b) {
+static void DrawOotTunicTint(u8 r, u8 g, u8 b, bool initializeMaterial = false) {
+    // The bare clothes lists normally follow native collar/tunic color lists.
+    // Grayscale supplies the identity tint but does not initialize material
+    // color or alpha. Do not inherit a previous item's transparent material.
+    if (initializeMaterial) {
+        OPEN_DISPS(gPlayState->state.gfxCtx);
+        gDPPipeSync(POLY_OPA_DISP++);
+        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
+        gDPSetEnvColor(POLY_OPA_DISP++, 80, 80, 80, 255);
+        CLOSE_DISPS(gPlayState->state.gfxCtx);
+    }
 #ifdef COMBO_BUILD
     const char* paths[] = { "__OTR__objects/object_gi_clothes/gGiTunicCollarDL",
                             "__OTR__objects/object_gi_clothes/gGiTunicDL" };
@@ -1768,6 +1781,8 @@ static bool LoadOotMagicSpellDiamondOrb(Gfx** diamond, Gfx** orb) {
 static void DrawOotMagicSpell(const char* colorPath, Gfx** colorCache) {
     Gfx* diamond;
     Gfx* orb;
+    if (!NeiGi_CanDrawElementalSpellFallback(gPlayState))
+        return;
     if (*colorCache == NULL) {
         *colorCache = (Gfx*)OotAssets_LoadGfx(colorPath);
     }
@@ -1782,14 +1797,20 @@ static void DrawOotMagicSpell(const char* colorPath, Gfx** colorCache) {
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 void DrawOotDinsFire() {
+    if (NeiGi_DrawElementalSpell(gPlayState, 1, 1, 0))
+        return;
     static Gfx* c = NULL;
     DrawOotMagicSpell("__OTR__objects/object_gi_goddess/gGiDinsFireColorDL", &c);
 }
 void DrawOotFaroresWind() {
+    if (NeiGi_DrawElementalSpell(gPlayState, 2, 1, 0))
+        return;
     static Gfx* c = NULL;
     DrawOotMagicSpell("__OTR__objects/object_gi_goddess/gGiFaroresWindColorDL", &c);
 }
 void DrawOotNayrusLove() {
+    if (NeiGi_DrawElementalSpell(gPlayState, 3, 1, 0))
+        return;
     static Gfx* c = NULL;
     DrawOotMagicSpell("__OTR__objects/object_gi_goddess/gGiNayrusLoveColorDL", &c);
 }
@@ -2536,9 +2557,10 @@ void DrawOotBottleWithShimmer(s16 drawId, const uint8_t color[4]) {
     Matrix_Push();
     GetItem_Draw(gPlayState, drawId);
     Matrix_Pop();
-    if (drawId != GID_FAIRY && drawId != GID_FAIRY_2) {
+    uint8_t nativeColor[4];
+    if (!GetItem_GetShimmerColor(drawId, nativeColor)) {
         ComboDrawMaskShimmer(gPlayState, nullptr, color, "mm");
-    } // native fairy draw already owns its matching pink hex shimmer
+    } // Intrinsic bottle shimmer is already submitted by the native drawer.
 }
 
 // Ruto's Letter — OoT bottle-with-letter (object_gi_bottle_letter, OoT-unique folder): contents Opa +
@@ -2590,10 +2612,10 @@ void DrawOotExtMagicCape() { // SoH parity: tunic tinted red/purple
     DrawOotTunicTint(180, 40, 120);
 }
 void DrawOotExtSpiritBreastplate() { // SoH parity: tunic tinted orange
-    DrawOotTunicTint(235, 110, 20);
+    DrawOotTunicTint(235, 110, 20, true);
 }
 void DrawOotExtChampionsTunic() { // SoH parity: tunic tinted BotW champion blue
-    DrawOotTunicTint(0, 120, 215);
+    DrawOotTunicTint(0, 120, 215, true);
 }
 void DrawOotExtSagesTunic() { // Legacy RI_WATER_DRAGON_SCALE identity, now Sage's
     // Tunic in the middle, with the 6 medallions that feed it launching out of it in angled
@@ -2634,7 +2656,7 @@ void DrawOotExtSagesTunic() { // Legacy RI_WATER_DRAGON_SCALE identity, now Sage
         sMedallionDraws[i]();
         Matrix_Pop();
     }
-    DrawOotTunicTint(235, 240, 245);
+    DrawOotTunicTint(235, 240, 245, true);
 }
 // The hover-boots GI colors its i4 textures through per-section prim/env colors (brown leather:
 // cloth prim 80,40,0 / env 40,20,0 ≈ 22% luminance), so a multiplicative grayscale tint can only

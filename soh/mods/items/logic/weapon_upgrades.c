@@ -10,6 +10,7 @@
  */
 #include "weapon_upgrades.h"
 #include "../../nei_save.h" // Skijer's NEI
+#include "../../extended_equipment.h"
 #include "../../../../combo/NeiHeldSword.h"
 
 u8 WeaponUpgrade_HasHammerAxe(void) {
@@ -154,13 +155,14 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     if (dList == NULL || ootHand == NULL || player == NULL) {
         return 0;
     }
-    if (Player_IsCustomLinkModel() ||
+    const u8 fourEquipped = FourSword_IsEquipped();
+    if ((!fourEquipped && Player_IsCustomLinkModel()) ||
         (player->leftHandType != PLAYER_MODELTYPE_LH_SWORD && player->leftHandType != PLAYER_MODELTYPE_LH_BGS)) {
         return 0;
     }
-    const u8 fourEquipped = FourSword_IsEquipped();
-    if (!fourEquipped && player->heldItemId != ITEM_SWORD_KOKIRI && player->heldItemId != ITEM_SWORD_MASTER &&
-        player->heldItemId != ITEM_SWORD_BGS && player->heldItemId != ITEM_SWORD_KNIFE)
+    if (player->heldItemId != ITEM_SWORD_KOKIRI && player->heldItemId != ITEM_SWORD_MASTER &&
+        player->heldItemId != ITEM_SWORD_BGS && player->heldItemId != ITEM_SWORD_KNIFE &&
+        !(fourEquipped && player->heldItemId == ITEM_EXT_SWORD_2))
         return 0; // The net and other custom items reuse sword actions.
 
     void* blade = NULL;
@@ -183,7 +185,9 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     } else {
         return 0;
     }
-    if (NeiHeldSword_EquipmentSelected(model, gSaveContext.linkAge))
+    // Generic Kokiri/Master/Din equipment owns its native sword family. Four
+    // Sword has its own authored model and legacy override pair, even on a skin.
+    if (!fourEquipped && NeiHeldSword_EquipmentSelected(model, gSaveContext.linkAge))
         return 0;
 
     // Four Sword first: it replaces whichever sword is in hand while equipped, so it outranks the

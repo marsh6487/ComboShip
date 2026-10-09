@@ -65,7 +65,9 @@ void Check(){
 }
 int main(){
     for(uint32_t frame:{0u,42u,179u,180u,32767u,65535u}){
-        play.gameplayFrames=frame;Reset();DrawMmWeaponGi(&play,nullptr,nullptr,.04f);
+        play.gameplayFrames=frame;Reset();DrawMmWeaponGi(&play,nullptr,nullptr,.04f,false);
+        Check();
+        Reset();DrawMmWeaponGi(&play,nullptr,nullptr,.04f,true);
         assert(std::abs(m[1][0]/.04f-std::sin(1.8f))<.00001f && "legacy Four Sword shelf pose changed");
         for(auto id:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD}){
             CwItemDrawInfo info{};assert(CwAltSwordGi(id,&info));
@@ -85,7 +87,7 @@ with tempfile.TemporaryDirectory(prefix='sword-pose-') as temporary:
     path=Path(temporary); (path/'pose.cpp').write_text(source)
     subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),str(path/'pose.cpp'),'-o',str(path/'pose')],check=True)
     subprocess.run([str(path/'pose')],check=True)
-print('PASS preserved native Four Sword legacy pose and upright selected sword producer transforms across spins')
+print('PASS upright native Four Sword/selected sword pickups and preserved native Four Sword shelf pose across spins')
 
 # The inline GI helpers must use each actual host's matrix/GBI API, not only
 # the controlled geometry seam above.

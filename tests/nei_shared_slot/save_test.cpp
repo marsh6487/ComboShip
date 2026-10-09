@@ -418,6 +418,28 @@ static void CheckFleetOwnershipMerge() {
     std::puts("PASS native Fleet option table: both flags import/export with MAX, missing-key retention and persistence");
 }
 
+static void CheckSeasonsRoundtrip() {
+    Reset();
+    auto* nei = Nei_Save();
+    nei->seasonsOwned = 8;
+    nei->season = SEASON_WINTER;
+    nei->seasonsRodOwned = 1;
+    nei->seasonsGates = 5;
+    nei->ownedItems[23] = EXT_ITEM_ROD_OF_SEASONS;
+    auto saved = SaveBlob();
+    Reset();
+    LoadBlob(saved);
+    Check(nei->seasonsRodOwned == 1 && nei->seasonsGates == 5, "Rod ownership and completion gates survive native save");
+    Check(nei->seasonsOwned == 8 && nei->season == SEASON_WINTER && nei->ownedItems[23] == EXT_ITEM_ROD_OF_SEASONS,
+          "original season pickup, active selector and full u16 Rod remain intact");
+    saved.erase("seasonsRodOwned");
+    saved.erase("seasonsGates");
+    LoadBlob(saved);
+    Check(nei->seasonsRodOwned == 0 && nei->seasonsGates == 0, "older save lacks appended Rod/gate keys");
+    Check(nei->seasonsOwned == 8 && nei->ownedItems[23] == EXT_ITEM_ROD_OF_SEASONS, "older save retains original Rod ownership");
+    std::puts("PASS native seasons save: Rod/gates/selector roundtrip and old ownership retained");
+}
+
 int main() {
 #if !HOST_MM
     SaveManager manager;
@@ -428,6 +450,7 @@ int main() {
 #endif
     CheckEquipmentLayoutInitialization();
     CheckBothOwnedRoundtrips();
+    CheckSeasonsRoundtrip();
     CheckLegacySelectedItems();
     CheckFlagsOnlyRepair();
     CheckSlateModes();

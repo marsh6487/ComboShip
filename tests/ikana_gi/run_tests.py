@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='ikana-presentation-') as temp:
     mm=read('combo/menu/ComboItemDrawMM.h')
     exported=exported.replace('/* MM_PRODUCER */','\n'.join(function(mm,name) for name in
         ('MM_Op','MM_OpV','MM_IsProgressiveItem','MM_IsStateDependentDraw','MM_IsSwordAppearanceDependent',
-         'MM_FillItemDrawInfo','MM_GetItemDrawInfo')))
+         'MM_FillElementalSpellDrawInfo','MM_FillItemDrawInfo','MM_GetItemDrawInfo')))
     native=read('mm/src/code/z_draw.c')
     row=re.search(r'\{ GetItem_DrawOpa0Xlu1, \{ (gGiMirrorShieldEmptyDL), (gGiMirrorShieldDL) \} \}',native)
     assert row,'actual native MM shield row'

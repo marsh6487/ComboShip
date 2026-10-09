@@ -19,6 +19,11 @@ extern "C" {
 #include "objects/gameplay_keep/gameplay_keep.h"
 #define CVAR_COSMETIC(x) "gCosmetics." x
 }
+extern "C" s32 GetItem_GetShimmerColor(s16,uint8_t*);
+void* Combo_ResolveSym(const char*,const char*);
+#ifndef HOST_MM
+void* Combo_ResolveSym(const char*,const char*) { assert(false); return nullptr; }
+#endif
 /* PRODUCTION_DRAW_PRELUDE */
 #include "soh/Enhancements/randomizer/NeiGiRender.h"
 #include "soh/Enhancements/randomizer/NeiGiEnergyTexture.h"
@@ -136,6 +141,7 @@ static void GetItem_DrawBottleShimmer(PlayState*, s16) { assert(false); }
 #endif
 #include "ComboMaskShimmer.h"
 #include "ComboItemEffectColors.h"
+#include "ComboBottleContents.h"
 /* PRODUCTION_FOREIGN_LINKAGE */
 using NeiGi::Kind;
 static bool HasResource(const char*) { return false; }
@@ -324,7 +330,7 @@ int main() {
         allocationFailure = false;
     }
 #ifdef HOST_MM
-    assert(eligible == 31); // 24 inventory masks, Sun Mask GI, four remains and two bottled-fairy rows.
+    assert(eligible == 35); // Masks/remains, two fairies, three receipt contents and Seahorse.
     for (int id : {GID_FAIRY,GID_FAIRY_2}) {
         uint8_t pink[4]{};
         const uint8_t expectedPink[4]={255,160,235,255};
@@ -345,6 +351,39 @@ int main() {
     assert(blueBottle[0]==100 && blueBottle[1]==160 && blueBottle[2]==255);
     assert(eligible > 8);
 #endif
+    for (int profile : {CW_SHIMMER_MUSHROOM,CW_SHIMMER_PRINCESS,CW_SHIMMER_GOLD_DUST,CW_SHIMMER_FAIRY,CW_SHIMMER_SEAHORSE}) {
+        uint8_t color[4]; assert(ComboBottleShimmer_Color(profile,color));
+        Reset(47); NeiGi_DrawShimmerOverlay(&play,color,nullptr); Check(color,false);
+    }
+    for (int frame : {0,27,719,65535}) {
+        Reset(frame); ComboBottleShimmer_DrawMotes(&play,CW_SHIMMER_FAIRY);
+        const auto actual=ExpandedVertices(false);
+        const auto expected=NeiGi::SampleBottleMotes(CW_SHIMMER_FAIRY,frame,true,NeiGi_CameraBasis(&play));
+        assert(actual.size()==192 && actual.size()==expected.count && resourceLoads==0);
+        for(size_t i=0;i<actual.size();++i) {
+            const auto& v=expected.vertices[i];
+            assert(actual[i].v.ob[0]==std::lround(v.p.x*16) && actual[i].v.ob[1]==std::lround(v.p.y*16) && actual[i].v.ob[2]==std::lround(v.p.z*16));
+            assert(actual[i].v.cn[0]==255 && actual[i].v.cn[1]==160 && actual[i].v.cn[2]==235 && actual[i].v.cn[3]==v.alpha);
+        }
+        assert(depth==0 && stack.empty() && transform.scale==1 && transform.x==0 && transform.y==0 && transform.z==0);
+        uintptr_t prim=0,env=0;
+        for(Gfx* cmd=xlu;cmd<gfx.polyXlu.p;++cmd) {
+            if((cmd->words.w0>>24)==G_SETPRIMCOLOR)prim=cmd->words.w1;
+            if((cmd->words.w0>>24)==G_SETENVCOLOR)env=cmd->words.w1;
+        }
+        assert(prim==0xffffffff && env==0xffffffff);
+    }
+    for(int profile:{0,int(CW_SHIMMER_PRINCESS),int(CW_SHIMMER_SEAHORSE)}) {
+        Reset(47);ComboBottleShimmer_DrawMotes(&play,profile);assert(gfx.polyXlu.p==xlu && vertexLoads.empty());
+    }
+    Reset(47);allocationFailure=true;ComboBottleShimmer_DrawMotes(&play,CW_SHIMMER_FAIRY);
+    assert(ExpandedVertices(false).empty() && depth==0 && stack.empty());allocationFailure=false;
+    for(int remaining=0;remaining<64;++remaining) {
+        Reset(47);gfx.polyOpa.d=opa+remaining;gfx.polyXlu.d=xlu+remaining;
+        ComboBottleShimmer_DrawMotes(&play,CW_SHIMMER_FAIRY);
+        assert(gfx.polyOpa.p<=gfx.polyOpa.d && gfx.polyXlu.p<=gfx.polyXlu.d && depth==0 && stack.empty());
+    }
+    puts("PASS exact bottle five-star colors and real-GBI fairy motes, state/matrix restoration, failed allocation and arena boundaries");
     for (int profile = 0; profile < 9; ++profile) {
         uint8_t color[4]; ComboMaskShimmerColor(profile, color);
         Reset(47); ComboDrawMaskShimmer(&play, "__OTR__@mm:objects/gameplay_keep/gEffSparklesDL", color, "mm"); Check(color, true);

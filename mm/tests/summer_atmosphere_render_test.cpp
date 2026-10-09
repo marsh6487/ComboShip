@@ -94,7 +94,7 @@ static size_t Draw(PlayState& play, bool expectTexture = true) {
     translations.clear();
     MMSummerAtmosphere_Draw(&play);
     const size_t commands = gfx.polyXlu.p - xlu;
-    assert(commands < 400); // Includes texture setup, 40 matrices, and optional shafts.
+    assert(commands < 400); // Includes the denser dusk field, texture setup, and optional shafts.
     assert(stack == 0 && children == 0 && scopes == 0);
     bool privateIA = false, depthTest = false;
     for (const Gfx* p = xlu; p < gfx.polyXlu.p; ++p) {
@@ -157,7 +157,7 @@ int main() {
     gSaveContext.save.time = CLOCK_TIME(23, 0);
     MMSummerAtmosphere_Update(&play);
     Draw(play);
-    assert(matrices == 40 && vertexLoads == 0);
+    assert(matrices == 56 && vertexLoads == 0);
     assert(textures.size() == 1 && textures[0] != fluff);
     const auto* glow = textures[0];
     for (int y = 0; y < 8; ++y)

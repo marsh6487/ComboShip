@@ -16,6 +16,12 @@ def main():
 #define main ExistingRendererTests
 #include "tests/din_fire_sword_test.c"
 #undef main
+#include "mods/items/logic/weapon_upgrades.h"
+// This fixture selects ordinary Din swords; active Four is tested separately.
+u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* hand, Player* player, u8 r, u8 g, u8 b) {
+    REQUIRE(0 && "Inactive Four Sword must not build a compound in the Din fixture");
+    return 0;
+}
 static Gfx brokenMesh[1], pakMesh[1];
 static Gfx* chosenPak;
 static s32 sLeftHandType, sDListsLodOffset;

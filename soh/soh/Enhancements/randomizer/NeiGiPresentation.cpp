@@ -24,6 +24,7 @@ extern "C" {
 #include "ComboSwordGiLegacyFit.h"
 #ifdef COMBO_BUILD
 #include "ComboItemDrawABI.h"
+#include "ComboResolve.h"
 #endif
 
 namespace {
@@ -343,6 +344,14 @@ const Presentation kPresentations[] = {
       0,
       false,
       -1 },
+    { Randomizer_DrawMmTradeQuest,
+      GI_PATH("room_key"),
+      nullptr,
+      1.f,
+      Kind::Neutral,
+      {},
+      { .65f, 8.f },
+      RG_MM_ROOM_KEY },
     { Randomizer_DrawNeiSheikahSlate,
       GI_PATH("sheikah_slate"),
       nullptr,
@@ -643,6 +652,8 @@ bool HasResource(const char* path) {
 // Only resource-backed legacy GI routes participate. In particular, the
 // wand's old GI is an inline stand-in: a held-only wand mod must retain the new
 // GI while its held wrapper independently preserves that mod's model.
+// The Lantern's old Poe actor mesh is also a stand-in. Generic Poe replacements
+// must not suppress its authored cage/glass; dedicated GI overrides stay live.
 bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
     // This progressive callback draws a Kokiri placeholder. The real Master
     // callback and MM foreign recipe use Temple geometry instead.
@@ -669,7 +680,6 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
         { "gust_jar", "oot", "objects/object_nei_gust_jar/jar_model_dl" },
         { "time_gate", "oot", "objects/object_nei_time_gate/g_timegate_dl" },
         { "minish_cap", "oot", "objects/object_nei_minish_cap/Cylinder_opaque_dl" },
-        { "lantern", "oot", "objects/object_poh/gPoeLanternDL" },
         { "mario_mask", "oot", "objects/object_nei_mario_mask/g_mario_mask_dl" },
         { "cojiro", "oot", "objects/object_gi_niwatori/gGiChickenDL", "objects/object_gi_niwatori/gGiCojiroColorDL",
           "objects/object_gi_niwatori/gGiChickenEyesDL" },
@@ -678,11 +688,9 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
         { "shield_of_ikana", "mm", "objects/object_link_child/gLinkHumanMirrorShieldDL" },
         { "magic_cape", "oot", "objects/object_nei_magic_cape/gNeiMagicCapeDL",
           "objects/object_nei_magic_cape/gNeiMagicCapeWaveDL" },
-        { "spirit_breastplate", "oot", "objects/object_gi_clothes/gGiTunicCollarDL",
-          "objects/object_gi_clothes/gGiTunicDL" },
-        { "sages_tunic", "oot", "objects/object_gi_clothes/gGiTunicCollarDL", "objects/object_gi_clothes/gGiTunicDL" },
-        { "champions_tunic", "oot", "objects/object_gi_clothes/gGiTunicCollarDL",
-          "objects/object_gi_clothes/gGiTunicDL" },
+        // Shared vanilla clothes packs replace the Goron/Zora tunic recipes,
+        // not the three distinct authored equipment GIs. Their replacements
+        // are selected at each item's own path by HasRedesignGiMod instead.
         { "pegasus_anklet", "oot", "objects/object_gi_hoverboots/gGiHoverBootsDL" },
         { "trident", "oot", "objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298" },
         { "climb_boots", "oot", "objects/object_gi_boots_2/gGiIronBootsDL",
@@ -693,6 +701,8 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
         { "four_sword", "oot", "objects/object_nei_four_sword/gNeiFourSwordBladeDL",
           "objects/object_nei_four_sword/gNeiFourSwordHiltDL" },
         { "pendant_of_memories", "mm", "objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL" },
+        { "room_key", "mm", "objects/object_gi_reserve_b_00/gGiRoomKeyDL",
+          "objects/object_gi_reserve_b_00/gGiRoomKeyEmptyDL" },
         { "sheikah_slate", "oot", "objects/object_nei_sheikah_slate/gNeiSheikahSlateDL" },
         { "slate_bomb", "oot", "objects/object_nei_sheikah_slate/gNeiSheikahSlateDL" },
         { "slate_master_cycle", "oot", "objects/object_nei_sheikah_slate/gNeiSheikahSlateDL" },
@@ -733,18 +743,6 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
                         ResourceMgr_IsModAssetForGame("mm", path));
             };
             const bool replaced = selectedMod(model.opaque) || selectedMod(model.second) || selectedMod(model.third);
-            if (replaced &&
-                (item.draw == Randomizer_DrawExtSpiritBreastplate || item.draw == Randomizer_DrawExtSagesTunic ||
-                 item.draw == Randomizer_DrawExtChampionsTunic)) {
-                // All three legacy tunics share a collar/body recipe. A pack
-                // with only one pass (or a non-DL/empty pass) must not suppress
-                // a complete authored GI and leave its shimmer drawing alone.
-                for (const auto* path : { model.opaque, model.second }) {
-                    const bool mmOverride = includeMmHost && ResourceMgr_IsModAssetForGame("mm", path);
-                    if (!ResourceMgr_IsGiModelAvailableForGame(mmOverride ? "mm" : "oot", path))
-                        return false;
-                }
-            }
             return replaced;
         }
     }
@@ -920,6 +918,7 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     // the model. Include their native setup/debug commands in the same scope.
     const bool flame = (authored && item->draw == Randomizer_DrawCaneSomariaUpgrade) ||
                        (selectedSword && item->effect == Kind::SwordAura);
+    const bool crystalSheen = authored && item->translucent && NeiGi::IsSpell(item->effect);
     const size_t modelMatrices = selectedSword ? 1 : upgraded ? (item->translucent ? 2 : 1) : 0;
     NeiGi_ArenaScope arena(play, modelMatrices + (flame ? 1 : 0), flame ? 20 : 16, flame ? 32 : 16,
                            flame ? 12 * sizeof(Gfx) : 0);
@@ -979,6 +978,8 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
                   G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
         gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, item->opaque, 0, G_DL_PUSH);
         CLOSE_DISPS(play->state.gfxCtx);
+    } else if (entry->drawFunc == Randomizer_DrawExtFourSword) {
+        Randomizer_DrawExtFourSwordPresentation(play, entry, shop);
     } else if (entry->drawFunc) {
         entry->drawFunc(play, entry);
     } else {
@@ -1008,6 +1009,19 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         Matrix_Pop();
         CLOSE_DISPS(play->state.gfxCtx);
     }
+    if (crystalSheen) {
+        // Optional polish must not displace the intact core/shell on a short
+        // arena. Reserve its restore before admitting any highlight vertices.
+        NeiGi_ArenaScope sheenArena(play, 1, 2, 20);
+        if (sheenArena) {
+            Matrix_Push();
+            Matrix_RotateY(Spin(play), MTXMODE_APPLY);
+            const auto sheen = NeiGi::SampleCrystalSheen(play->gameplayFrames, NeiGi_CameraBasis(play));
+            if (NeiGi_DrawMeshMaterial(play, sheen, Kind::Neutral, nullptr))
+                NeiGi_RestoreElemental(play);
+            Matrix_Pop();
+        }
+    }
     Matrix_Pop();
     return true;
 }
@@ -1021,6 +1035,14 @@ extern "C" bool OOT_DrawComboForeignShop(PlayState* play, GetItemEntry* entry);
 #endif
 
 extern "C" bool NeiGi_DrawShop(PlayState* play, GetItemEntry* entry) {
+    if (entry && !entry->drawFunc) {
+        const int arrow = NeiArrowGi_ProfileForDrawId(entry->gid, GID_ARROW_FIRE, GID_ARROW_ICE, GID_ARROW_LIGHT);
+        if (arrow && NeiGi_DrawElementalArrowShop(play, arrow))
+            return true;
+        const int profile = NeiArrowGi_ProfileForDrawId(entry->gid, GID_DINS_FIRE, GID_FARORES_WIND, GID_NAYRUS_LOVE);
+        if (profile && NeiGi_DrawElementalSpell(play, profile, 0, 1))
+            return true;
+    }
     if (NeiGi_DrawImpl(play, entry, true))
         return true;
 #ifdef COMBO_BUILD

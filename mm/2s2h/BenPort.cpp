@@ -3842,6 +3842,8 @@ extern "C" COMBO_EXPORT void MM_RestoreRandoSettings(const char* json) {
         // snapshot wins outright, so an absent list clears local exclusions (pre-GAP-7 spoilers).
         CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE", RO_GRACE_ON);
         CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE_REWARDS", 4);
+        CVarSetInteger("gRando.Options.RO_ROD_OF_SEASONS", NEI_SEASONS_INDIVIDUAL);
+        CVarSetInteger("gRando.Options.RO_STARTING_ROD_OF_SEASONS", 0);
         std::vector<RandoCheckId> excluded;
         if (j.contains("gRando.ExcludedChecks") && j["gRando.ExcludedChecks"].is_array()) {
             for (auto& n : j["gRando.ExcludedChecks"]) {

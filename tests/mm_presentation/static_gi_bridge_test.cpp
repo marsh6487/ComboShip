@@ -10,6 +10,7 @@
 #include <vector>
 #include <unordered_map>
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboBottleContents.h"
 #include "combo/menu/ComboItemEffectColors.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #define RANDO_ENUM_BEGIN(x) enum x {
@@ -167,6 +168,9 @@ int matrixDepth=0, cullDisable=0, cullRestore=0;
 #define gSPDisplayList(p,dl) submitted.emplace_back((p)->stream,(const char*)(dl))
 #define gDPSetGrayscaleColor(p,...) ((void)(p))
 #define gSPGrayscale(p,...) ((void)(p))
+#define gDPPipeSync(p) ((void)(p))
+#define gDPSetPrimColor(p,...) ((void)(p))
+#define gDPSetEnvColor(p,...) ((void)(p))
 #define gSPClearGeometryMode(p,...) ((void)(p), ++cullDisable)
 #define gSPSetGeometryMode(p,...) ((void)(p), ++cullRestore)
 void Matrix_Push() {++matrixDepth;} void Matrix_Pop() {assert(matrixDepth>0);--matrixDepth;}

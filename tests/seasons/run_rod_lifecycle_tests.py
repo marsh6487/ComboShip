@@ -39,6 +39,9 @@ int MMWeather_Season(void){return -1;}
 void Seasons_UpdateWeather(PlayState* play){}
 NeiSaveData* Nei_Save(void){return &gSaveContext.save.shipSaveInfo.nei;}
 void Nei_SetOwnedItem(u8 slot,u16 item){Nei_Save()->ownedItems[slot-24]=item;}
+u16 Nei_GetOwnedItem(u8 slot){return Nei_Save()->ownedItems[slot-24];}
+u8 Seasons_RandoMode(void){return NEI_SEASONS_INDIVIDUAL;}
+void Seasons_UpdateGates(void){}
 u16 ExtButton_GetItem(s32 form,s32 btn){return BUTTON_ITEM_EQUIP(form,btn)==ITEM_EXT_BUTTON?EXT_BUTTON_ITEM(form,btn):BUTTON_ITEM_EQUIP(form,btn);}
 u16 ExtButton_GetDpadItem(s32 form,s32 btn){return gSaveContext.save.shipSaveInfo.dpadEquips.extItems[form][btn];}
 void ItemEquip_PlayEquipSFX(PlayState* play,Player* p){++rodEquips;}
@@ -65,7 +68,7 @@ parts+=[body(player,n) for n in ['Player_InitItemAction','Player_UseItem','Playe
 parts+=[body(lib,n) for n in ['Player_GetItemOnButton','Player_Dpad_GetItemOnButton']]
 parts+=[body(player,n) for n in ['func_8082FDC4','func_Dpad_8082FDC4','Player_ItemIsInUse','Player_ProcessItemButtons']]
 parts+=[body('mm/mods/items/helpers/equip_helper.c',n) for n in ['ItemInput_IsBlockedEx','ItemInput_IsBlocked']]
-parts+=[body('mm/mods/extended_inventory.c',n) for n in ['Seasons_SeasonOwned','Seasons_GrantSeason','Seasons_SeasonCount','Seasons_SeasonAt','Seasons_GetSeason','Seasons_SetSeason']]
+parts+=[body('mm/mods/extended_inventory.c',n) for n in ['Seasons_HasRod','Seasons_GrantRod','Seasons_SeasonOwned','Seasons_GrantSeason','Seasons_SeasonCount','Seasons_SeasonAt','Seasons_GetSeason','Seasons_SetSeason']]
 parts+=[(ROOT/'mm/mods/items/logic/item_rod_of_seasons.c').read_text().split('// Seasonal particles')[0]]
 # Keep MM's real choice of overridden/suppressed physical input and the final
 # OnPassPlayerInputs policy hook. Animation/world scheduling remains a boundary.
@@ -210,7 +213,11 @@ int main(void){
  Player_StartChangingHeldItem(&p,&play);Player_FinishItemChange(&play,&p);p.upperActionFunc=NULL;
  TickRod(&p,&play,0);assert(!Seasons_IsDrawn()&&!rodEquips&&p.heldItemAction==PLAYER_IA_SWORD_KOKIRI);
  ResetRod(&p,&play,ITEM_NONE);TickRod(&p,&play,BTN_DUP);assert(Seasons_IsDrawn()&&rodEquips==1);
- puts("PASS rod native use/finish/init lifecycle, final hand capture and cancellation");
+ // An empty starting Rod still draws and opens the wheel's Off entry.
+ ResetRod(&p,&play,ITEM_NONE);Nei_Save()->seasonsOwned=0;Nei_Save()->season=SEASON_OFF;
+ TickRod(&p,&play,BTN_DUP);assert(Seasons_IsDrawn()&&rodEquips==1);
+ TickRod(&p,&play,BTN_DUP);assert(menus==1&&Seasons_GetSeason()==SEASON_OFF);
+ puts("PASS rod native use/finish/init lifecycle, final hand capture, empty starting Rod and cancellation");
 }
 '''
 with tempfile.TemporaryDirectory(prefix='rod-lifecycle-') as td:

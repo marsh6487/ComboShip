@@ -117,6 +117,11 @@ new,count=re.subn(r'\(seasonSunRays \? 31\s*: material\s*\? 32\s*: 63\)', '63',n
 assert count==1,'expected the one seasonal/material V texture coordinate'
 a=new.index('    if (seasonSunRays) {');b=new.index('    } else if (orb != Kind::Neutral) {',a)
 new=new[:a]+'    if (orb != Kind::Neutral) {'+new[b+len('    } else if (orb != Kind::Neutral) {'):]
+# Accepted POC6 permits an owner/editor palette at this one color selection.
+# Normalize that exact addition only; retain the complete historical batcher.
+palette='palette ? NeiGi::OrbColors{palette->hot, palette->edge} : NeiGi::OrbPalette(orb)'
+assert new.count(palette)==1,'expected the one accepted elemental palette selection'
+new=new.replace(palette,'NeiGi::OrbPalette(orb)',1)
 assert tokens(old)==tokens(new),'Existing GI batcher command path changed'
 print('USED VFX source contract: rod gameplay, Time Gate state, local/remote shot dispatch, flight particle size alone suppressed; impact particles, gameplay and RNG cadence preserved')
 

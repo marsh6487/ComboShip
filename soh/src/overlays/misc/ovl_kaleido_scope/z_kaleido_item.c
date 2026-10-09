@@ -1609,8 +1609,18 @@ static void ArrowWheel_Cycle(PlayState* play, s32 dir) {
 // reminder of what you are still missing.
 static u8 sWandSelectorActive = 0;
 
+static void Wand_KaleidoSyncTitle(PlayState* play) {
+    static u8 namedMode = 0xFF;
+    u8 mode = Wand_ModeCount() ? Wand_GetMode() : 0xFF;
+    if (play->pauseCtx.namedItem == ITEM_ELEMENTAL_WAND && namedMode != mode) {
+        play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    }
+    namedMode = mode;
+}
+
 static void Wand_KaleidoCycle(PlayState* play, s32 dir) {
     Wand_SetMode(Wand_ModeNeighbor(Wand_GetMode(), dir));
+    play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
     Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                            &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
 }
@@ -1619,6 +1629,7 @@ static void Wand_HandleKaleidoSelector(PlayState* play) {
     PauseContext* pauseCtx = &play->pauseCtx;
     u8 onThisItem = (pauseCtx->cursorItem[PAUSE_ITEM] == ITEM_ELEMENTAL_WAND);
 
+    Wand_KaleidoSyncTitle(play);
     KaleidoWheel_Run(play, onThisItem, Wand_ModeCount() > 1, &sWandSelectorActive, Wand_KaleidoCycle);
 }
 

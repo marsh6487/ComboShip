@@ -75,6 +75,7 @@ s32 CustomItems_OverrideDraw(Player* player, PlayState* play);
 // the back while we suppress the duplicate MM-CHILD shield the adult sheath DL already bakes in.
 const char* ExtEquip_GetShieldDLOverride(void);
 u8 ExtEquip_ShouldHideSwordDL(void);
+u8 FourSword_IsEquipped(void);
 u8 Trident_GoldenArmor(void);
 s32 BossRemains_IsOdolwaWorn(void);
 s32 BossRemains_IsGohtWorn(void);
@@ -657,9 +658,9 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
             }
             break;
     }
-    if (limbIndex == PLAYER_LIMB_LEFT_HAND && *dList != nullptr && !sIsMod && !sIsForm && !sIsChildRig &&
-        CustomForms_ActiveForm() == CUSTOM_FORM_NONE && p->actor.scale.y >= 0.0f && !ExtEquip_ShouldHideSwordDL() &&
-        !BossRemains_IsOdolwaWorn() && !BossRemains_IsGohtWorn()) {
+    if (limbIndex == PLAYER_LIMB_LEFT_HAND && *dList != nullptr && (!sIsMod || FourSword_IsEquipped()) && !sIsForm &&
+        !sIsChildRig && CustomForms_ActiveForm() == CUSTOM_FORM_NONE && p->actor.scale.y >= 0.0f &&
+        !ExtEquip_ShouldHideSwordDL() && !BossRemains_IsOdolwaWorn() && !BossRemains_IsGohtWorn()) {
         Gfx* heldSword = *dList;
         u8 goldenArmor = Trident_GoldenArmor();
         if (WeaponUpgrade_ApplyHeldSwordDL(&heldSword, sDL_LHClosed, p,

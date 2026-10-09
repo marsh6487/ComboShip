@@ -13,6 +13,7 @@ extern "C" {
 #include "variables.h"
 #include "functions.h"
 #include "macros.h"
+#include "mods/extended_inventory.h"
 
 uint8_t Randomizer_GetSettingValue(RandomizerSettingKey randoSettingKey);
 GetItemEntry Randomizer_GetItemFromKnownCheck(RandomizerCheck randomizerCheck, GetItemID ogId);
@@ -138,6 +139,8 @@ void GiveLinksPocketItem() {
 }
 
 void SetStartingItems() {
+    if (Randomizer_GetSettingValue(RSK_STARTING_ROD_OF_SEASONS))
+        Seasons_GrantRod();
     int startingAge = OTRGlobals::Instance->gRandoContext->GetOption(RSK_SELECTED_STARTING_AGE).Get();
     if (Randomizer_GetSettingValue(RSK_STARTING_KOKIRI_SWORD))
         Item_Give(NULL, ITEM_SWORD_KOKIRI);

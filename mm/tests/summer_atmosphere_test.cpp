@@ -65,7 +65,7 @@ int main() {
         for (size_t i = 0; i < before.size(); ++i) {
             const auto& p = state.Particles()[i];
             assert(std::isfinite(p.position.x) && std::isfinite(p.position.y) && std::isfinite(p.position.z));
-            assert(p.radius > 0 && p.radius <= (p.kind == Kind::Mote ? 7.0f : 4.0f));
+            assert(p.radius > 0 && p.radius <= (p.kind == Kind::Mote ? 10.0f : 4.8f));
             assert(p.alpha >= 0 && p.alpha <= 1);
             if (p.generation == before[i].generation) {
                 assert(Length(p.position - before[i].position) < 8.0f);

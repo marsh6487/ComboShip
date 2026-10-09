@@ -70,6 +70,7 @@
 // Skijer's NEI: extended-equipment / weapon-upgrade draw hooks (Iron Knuckle's Axe model
 // replacement — hide the hammer head, draw the axe DL following the left-hand limb matrix).
 extern u8 ExtEquip_ShouldHideSwordDL(void);
+extern u8 FourSword_IsEquipped(void);
 extern void ExtEquip_DrawSwordDL(void* play);
 // Extended-equipment SHIELD draw hooks: GetShieldDLOverride returns "HIDE" when an ext shield
 // (Divine/Kite/Ikana) is equipped so the native Hero/Mirror model is suppressed; the custom model
@@ -3047,7 +3048,7 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
             // This limb path also reaches clones drawn without a post-limb callback. Each draw
             // owns its compound: later players must not overwrite a deferred blade/hand list.
             if (!handIsSpokenFor && *dList != NULL && !AdultLink_UsesAdultPresentation(player) &&
-                !Player_IsCustomLinkModel(player) && player->actor.scale.y >= 0.0f &&
+                (!Player_IsCustomLinkModel(player) || FourSword_IsEquipped()) && player->actor.scale.y >= 0.0f &&
                 !(player == GET_PLAYER(play) && CustomForms_ActiveForm() != CUSTOM_FORM_NONE) &&
                 player->transformation == PLAYER_FORM_HUMAN &&
                 (player->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD ||

@@ -604,10 +604,6 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             RI_OOT_NEI_ZONAI_PERMAFROST,
             RI_OOT_NEI_PHANTOM_HOURGLASS,
             RI_OOT_NEI_SHADOW_CRYSTAL,
-            RI_OOT_NEI_SEASON_SPRING,
-            RI_OOT_NEI_SEASON_SUMMER,
-            RI_OOT_NEI_SEASON_AUTUMN,
-            RI_OOT_NEI_SEASON_WINTER,
             // Sheikah Slate: the pool item is gone — the FOUR RUNES are the placeable siblings now
             // (wand idiom: any order, each with its own textbox; the first found hands over the slate).
             RI_OOT_NEI_SLATE_RUNE_BOMB,
@@ -617,6 +613,15 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         };
         for (RandoItemId neiItem : sNeiPoolItems) {
             itemPool.push_back(neiItem);
+        }
+        const auto seasonMode = NeiSeasons_SeedMode(saveInfo.randoSaveOptions[RO_ROD_OF_SEASONS]);
+        if (seasonMode == NEI_SEASONS_INDIVIDUAL) {
+            itemPool.push_back(RI_OOT_NEI_SEASON_SPRING);
+            itemPool.push_back(RI_OOT_NEI_SEASON_SUMMER);
+            itemPool.push_back(RI_OOT_NEI_SEASON_AUTUMN);
+            itemPool.push_back(RI_OOT_NEI_SEASON_WINTER);
+        } else if (!saveInfo.randoSaveOptions[RO_STARTING_ROD_OF_SEASONS]) {
+            itemPool.push_back(RI_OOT_NEI_ROD_OF_SEASONS);
         }
         if (NeiGrace_InPool(saveInfo.randoSaveOptions[RO_HYLIAS_GRACE])) {
             itemPool.push_back(RI_OOT_NEI_HYLIAS_GRACE);

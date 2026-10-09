@@ -8,6 +8,8 @@
 #include <vector>
 #include <unordered_map>
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboBottleContents.h"
+#include "combo/menu/ComboElementalArrowGi.h"
 #include "combo/menu/ComboItemEffectColors.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include "soh/mods/mm_sources/objects/object_gi_masks_all.h"
@@ -172,6 +174,9 @@ void MM_DrawNeiGi(const CwItemDrawInfo&,bool shop=false,int mmPickup=0) {assert(
 void NeiGi_DrawSeasonOverlay(PlayState*,int,const char*) {assert(0 && "mask fixture must not select weather");}
 void NeiGi_DrawSongOverlay(PlayState*,int,const char*) {assert(false && "song dispatch has its own production fixture");}
 extern "C" void NeiGi_DrawElementalArrow(PlayState*,int) {assert(false && "mask fixture must not dispatch elemental arrows");}
+extern "C" void NeiGi_DrawElementalArrowForOwner(PlayState*,int,int,int) {assert(false && "mask fixture must not dispatch elemental arrows");}
+extern "C" int NeiGi_DrawElementalSpell(PlayState*,int,int,int) {assert(false && "mask fixture must not dispatch elemental spells");return 0;}
+extern "C" int ComboBottleContents_Draw(PlayState*,int) {assert(false && "mask fixture must not dispatch bottle contents");return 0;}
 // Sword drawing/fitting is tested by the selected-model and foreign sword
 // fixtures. Masks must never enter either branch in this dispatcher.
 void ComboSwordGi_ApplyPresentationSize(bool=false,int=0) {assert(0 && "mask sword presentation size");}
@@ -198,6 +203,7 @@ int main() {
   {"Soul of Gyorg",RI_SOUL_BOSS_GYORG},{"Soul of Twinmold",RI_SOUL_BOSS_TWINMOLD},
   {"Soul of Majora",RI_SOUL_BOSS_MAJORA},{"Bottle With Gold Dust",RI_BOTTLE_GOLD_DUST},
   {"Bottle with Magic Mushroom",RI_OOT_BOTTLE_MAGIC_MUSHROOM},
+  {"Room Key",RI_ROOM_KEY},
   {"Tingle's Clock Town Map",RI_TINGLE_MAP_CLOCK_TOWN},
   {"Tingle's Woodfall Map",RI_TINGLE_MAP_WOODFALL},
   {"Tingle's Snowhead Map",RI_TINGLE_MAP_SNOWHEAD},
@@ -212,7 +218,7 @@ int main() {
          "OoT imports of MM items must dispatch their native MM models");
   assert(foreign.itemGame==ComboRando::GAME_OOT && foreign.itemName==name);
  }
- std::cout<<"PASS 29 OoT-owned MM aliases through production foreign resolver and native dispatch; grant owner and names preserved\n";
+ std::cout<<"PASS 30 OoT-owned MM aliases through production foreign resolver and native dispatch; grant owner and names preserved\n";
  foreign.itemName="mask";current={};
  for(auto& cmd:opa)cmd.stream=0;
  for(auto& cmd:xlu)cmd.stream=1;

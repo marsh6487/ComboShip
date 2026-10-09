@@ -4,6 +4,10 @@
 #include <set>
 #include <string>
 #include "mods/items/logic/weapon_upgrades.h"
+#include "mods/extended_equipment.h"
+#ifdef NEI_EQUIPMENT_MM
+#include "mods/forms/custom_forms.h"
+#endif
 #include "../../combo/NeiHeldSword.h"
 
 static std::set<std::string> local, donor, shipped, alternate, localMods, foreignMods;
@@ -27,6 +31,14 @@ int32_t OOT_NeiResourceExists(const char* p) {
     return donor.contains(p);
 }
 #ifdef NEI_EQUIPMENT_MM
+u16 gEquipMasks[] = {0x000f, 0x00f0, 0x0f00, 0xf000};
+u8 gEquipShifts[] = {0, 4, 8, 12};
+Gfx* gPlayerLeftHandClosedDLs[2 * PLAYER_FORM_MAX]{};
+s32 CustomForms_ActiveForm() { return CUSTOM_FORM_NONE; }
+s32 BossRemains_IsOdolwaWorn() { return 0; }
+s32 BossRemains_IsGohtWorn() { return 0; }
+u8 Trident_GoldenArmor() { return 0; }
+Gfx* ResourceMgr_LoadGfxByName(const char*) { return hand; }
 s32 AdultLink_IsActive() { return adult || adultMode; }
 s32 AdultLink_UsesAdultPresentation(const Player*) { return adult; }
 u8 Player_IsCustomLinkModel(Player*) { return bodySelected; }
@@ -69,6 +81,17 @@ u8 FourSword_HeldSwordDLForFrame(void** blade, void** hilt, int frame) {
 #endif
 }
 #include "held_sword_bindings.inc"
+#ifdef NEI_EQUIPMENT_MM
+static int sPlayerLod = 0, nativeAllocations = 0;
+static Gfx nativeFrameCompound[8];
+static Gfx* nativeAllocate(size_t size) {
+    assert(size == sizeof(nativeFrameCompound) && nativeAllocations++ == 0);
+    return nativeFrameCompound;
+}
+#undef GRAPH_ALLOC
+#define GRAPH_ALLOC(context, size) nativeAllocate(size)
+#include "held_sword_native_bindings.inc"
+#endif
 
 static int frame() {
 #ifdef NEI_EQUIPMENT_MM
@@ -129,7 +152,14 @@ static void expectAuthored(Player& player, int sword) {
 static void expectUntouched(Player& player) {
     const Player before = player;
     Gfx* selected = original;
-    assert(!WeaponUpgrade_ApplyHeldSwordDL(&selected, hand, &player, 12, 34, 56));
+    const auto applied = WeaponUpgrade_ApplyHeldSwordDL(&selected, hand, &player, 12, 34, 56);
+    if (applied) {
+        std::cerr << "Unexpected sword override: item=" << int(player.heldItemId)
+                  << " action=" << int(player.heldItemAction) << " four=" << fourEquipped
+                  << " Alt=" << altOn << " local mods=" << localMods.size()
+                  << " foreign mods=" << foreignMods.size() << "\n";
+    }
+    assert(!applied);
     assert(selected == original && std::memcmp(&player, &before, sizeof(player)) == 0);
 }
 
@@ -142,6 +172,18 @@ static void expectCombinedHandPriority(Player& player, int sword, const char* pa
     // An inactive Alt hand does not own the draw; a live toggle immediately does.
     alternate.insert(path); altOn = false; expectAuthored(player, sword);
     altOn = true; expectUntouched(player); alternate.clear(); altOn = false;
+}
+
+static void expectFourSeparateFromGenericSwordMods(Player& player, const char* path) {
+    for (bool alt : {false, true}) {
+        altOn = alt;
+        localMods.insert(path); expectAuthored(player, NEI_HELD_SWORD_FOUR); localMods.clear();
+        foreignMods.insert(path); expectAuthored(player, NEI_HELD_SWORD_FOUR); foreignMods.clear();
+    }
+    alternate.insert(path);
+    altOn = false; expectAuthored(player, NEI_HELD_SWORD_FOUR);
+    altOn = true; expectAuthored(player, NEI_HELD_SWORD_FOUR);
+    alternate.clear(); altOn = false;
 }
 
 int main() {
@@ -201,12 +243,37 @@ int main() {
         "__OTR__objects/object_link_boy/gLinkAdultLeftHandHoldingMasterSwordFarDL",
     };
 #ifdef NEI_EQUIPMENT_MM
+    swordHand(player, PLAYER_IA_SWORD_KOKIRI, ITEM_SWORD_KOKIRI);
+    for (u8 level : {1, 2}) {
+        kokiriLevel = level;
+        const int model = level == 1 ? NEI_HELD_SWORD_RAZOR : NEI_HELD_SWORD_GILDED;
+        // Native MM selects the combined source from its equipped sword nibble,
+        // independently of the progressive blade chosen by the NEI upgrade.
+        const char* nativeHands[] = {
+            "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingKokiriSwordDL",
+            "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingRazorSwordDL",
+            "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingGildedSwordDL",
+        };
+        for (u16 equip = 1; equip <= 3; ++equip) {
+            gSaveContext.save.saveInfo.equips.equipment = equip;
+            expectCombinedHandPriority(player, model, nativeHands[equip - 1]);
+        }
+    }
+    gSaveContext.save.saveInfo.equips.equipment = 0; kokiriLevel = 0;
     adult = true;
     swordHand(player, PLAYER_IA_SWORD_RAZOR, ITEM_SWORD_RAZOR);
     for (const char* path : adultOneHands) expectCombinedHandPriority(player, NEI_HELD_SWORD_RAZOR, path);
     swordHand(player, PLAYER_IA_SWORD_GILDED, ITEM_SWORD_GILDED);
     for (const char* path : adultOneHands) expectCombinedHandPriority(player, NEI_HELD_SWORD_GILDED, path);
     adult = false;
+    swordHand(player, PLAYER_IA_SWORD_BIGGORON, ITEM_SWORD_BGS);
+    fairyLook = false;
+    for (u8 upgrade : {0, 1}) {
+        greatFairy = upgrade;
+        expectCombinedHandPriority(player, NEI_HELD_SWORD_BIGGORON,
+            "__OTR__objects/object_link_child/gLinkHumanLeftHandHoldingGreatFairysSwordDL");
+    }
+    greatFairy = 1; fairyLook = true;
 #else
     gSaveContext.linkAge = LINK_AGE_ADULT;
     swordHand(player, PLAYER_IA_SWORD_KOKIRI, ITEM_SWORD_KOKIRI);
@@ -234,6 +301,42 @@ int main() {
     expectAuthored(player, NEI_HELD_SWORD_KOKIRI); localMods.clear();
 #endif
     swordHand(player, PLAYER_IA_SWORD_KOKIRI, ITEM_NET); expectUntouched(player);
+    // A selected Four Sword slot does not own another item that happens to
+    // reuse a sword action. Its own extended carrier remains a valid sword.
+    fourEquipped = true; expectUntouched(player);
+#ifdef NEI_EQUIPMENT_MM
+    // Execute the actual native limb injection with the real handler. MM's Net
+    // leaves ONE_HAND_SWORD on Player while replacing its DL with a closed fist.
+    PlayState nativePlay{};
+    nativePlay.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
+    const char* nativeHandPath = "__OTR__objects/object_link_child/gLinkHumanLeftHandClosedDL";
+    local.insert(nativeHandPath);
+    gPlayerLeftHandClosedDLs[PLAYER_FORM_HUMAN * 2] = (Gfx*)nativeHandPath;
+    Gfx* nativeNet = hand;
+    ApplyNativeHeldSwordStage(&nativePlay, &player, &nativeNet);
+    assert(nativeNet == hand && nativeAllocations == 0);
+#endif
+    swordHand(player, PLAYER_IA_SWORD_MASTER, ITEM_NET); expectUntouched(player);
+    swordHand(player, PLAYER_IA_SWORD_KOKIRI, ITEM_EXT_SWORD_2);
+    expectAuthored(player, NEI_HELD_SWORD_FOUR);
+#ifdef NEI_EQUIPMENT_MM
+    Gfx* nativeFour = hand;
+    const Player nativeBefore = player;
+    ApplyNativeHeldSwordStage(&nativePlay, &player, &nativeFour);
+    assert(nativeFour == nativeFrameCompound && nativeAllocations == 1 &&
+           nativeFour[1].words.w1 == reinterpret_cast<uintptr_t>(hand) &&
+           std::memcmp(&player, &nativeBefore, sizeof(player)) == 0);
+    adult = true;
+    for (const char* path : adultOneHands) expectFourSeparateFromGenericSwordMods(player, path);
+    adult = false;
+#else
+    // The separate Four Sword item retains its authored body even if generic
+    // child/adult sword equipment is replaced; its own pair mods are separate.
+    gSaveContext.linkAge = LINK_AGE_CHILD;
+    for (const char* path : adultOneHands) expectFourSeparateFromGenericSwordMods(player, path);
+    gSaveContext.linkAge = LINK_AGE_ADULT;
+#endif
+    fourEquipped = false; expectUntouched(player);
 #ifdef NEI_EQUIPMENT_MM
     swordHand(player, PLAYER_IA_SWORD_RAZOR, ITEM_SWORD_RAZOR); expectAuthored(player, NEI_HELD_SWORD_RAZOR);
     swordHand(player, PLAYER_IA_SWORD_GILDED, ITEM_SWORD_GILDED); expectAuthored(player, NEI_HELD_SWORD_GILDED);
@@ -252,6 +355,10 @@ int main() {
     gSaveContext.swordHealth = 0; greatFairy = 0;
     fourEquipped = true; expectAuthored(player, NEI_HELD_SWORD_FOUR);
     fourEquipped = false; expectAuthored(player, NEI_HELD_SWORD_BIGGORON);
+    for (const char* path : {
+             "__OTR__objects/object_link_boy/gLinkAdultHandHoldingBrokenGiantsKnifeDL",
+             "__OTR__objects/object_link_boy/gLinkAdultHandHoldingBrokenGiantsKnifeFarDL"})
+        expectCombinedHandPriority(player, NEI_HELD_SWORD_BIGGORON, path);
     swordHand(player, PLAYER_IA_SWORD_BIGGORON, ITEM_SWORD_KNIFE);
     gSaveContext.swordHealth = 0; expectUntouched(player);
     gSaveContext.swordHealth = 8; expectAuthored(player, NEI_HELD_SWORD_BIGGORON);

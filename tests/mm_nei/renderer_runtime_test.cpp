@@ -52,6 +52,7 @@ static bool itemEffects;
 extern "C" int32_t CVarGetInteger(const char* name,int32_t value) {
   return !strcmp(name,"gEnhancements.SkijerNEI.ItemEffects") ? itemEffects : value;
 }
+extern "C" Color_RGB8 CVarGetColor24(const char*,Color_RGB8 value) {return value;}
 // Selected third-party resource graphs and Din layer eligibility have dedicated
 // production fixtures. This native NEI fixture supplies neither resource family.
 extern "C" int ResourceMgr_GetGiModelFitForGame(const char*,const char*,float,float,int,float[2]) {return 0;}
@@ -104,7 +105,12 @@ int main() {
     {RI_OOT_SONG_REQUIEM_OF_SPIRIT,CW_SONG_OOT_REQUIEM,0xDE9E2F},
     {RI_OOT_SONG_NOCTURNE_OF_SHADOW,CW_SONG_OOT_NOCTURNE,0xA028D2},
     {RI_OOT_SONG_PRELUDE_OF_LIGHT,CW_SONG_OOT_PRELUDE,0xEDE73E},
-    {RI_SONG_EPONA,CW_SONG_EPONA,0xD96E30},{RI_SONG_SUN,CW_SONG_SUN,0xEDE73E}};
+    {RI_SONG_EPONA,CW_SONG_EPONA,0xD96E30},{RI_SONG_SUN,CW_SONG_SUN,0xEDE73E},
+    {RI_SONG_HEALING,CW_SONG_HEALING,0xFF96E6},{RI_SONG_SONATA,CW_SONG_SONATA,0x62FF62},
+    {RI_SONG_LULLABY_INTRO,CW_SONG_LULLABY_INTRO,0xFF6464},{RI_SONG_LULLABY,CW_SONG_LULLABY,0xFF1414},
+    {RI_SONG_NOVA,CW_SONG_NOVA,0x1414FF},{RI_SONG_ELEGY,CW_SONG_ELEGY,0xFF6200},
+    {RI_SONG_OATH,CW_SONG_OATH,0x620062},{RI_SONG_DOUBLE_TIME,CW_SONG_DOUBLE_TIME,0x80D8F0},
+    {RI_SONG_INVERTED_TIME,CW_SONG_INVERTED_TIME,0x4A70CA}};
   for(const auto& song:songs)for(bool effects:{false,true})for(bool alt:{false,true})for(bool donor:{false,true}) {
     reset();play.gameplayFrames=42;itemEffects=effects;mmAltEnabled=alt;ownerRegistered=donor;
     const uint8_t color[]={uint8_t(song.hue>>16),uint8_t(song.hue>>8),uint8_t(song.hue),255};
@@ -135,11 +141,15 @@ int main() {
   reset();NeiGi_DrawMesh(&play,NeiGi::SampleSeason(42,1,NeiGi_CameraBasis(&play)));
   const auto expectedRain=packedEffects();
   assert(rainOnly.size()==expectedRain.size() && !memcmp(rainOnly.data(),expectedRain.data(),expectedRain.size()*sizeof(Vtx)));
-  for(RandoItemId song:{RI_SONG_HEALING,RI_SONG_TIME,RI_SONG_SONATA,RI_SONG_NOVA,
+  for(RandoItemId song:{RI_SONG_HEALING,RI_SONG_SONATA,RI_SONG_NOVA,
                        RI_SONG_LULLABY,RI_SONG_LULLABY_INTRO,RI_SONG_ELEGY,RI_SONG_OATH,RI_SONG_DOUBLE_TIME,RI_SONG_INVERTED_TIME}) {
+    reset();NeiGi_DrawSongOverlay(&play,ComboSongForMmItem(song),nullptr);
+    const auto expected=packedEffects();assert(!expected.empty());
     reset();assert(MM_TryDrawNeiGi(song));
-    assert(packedEffects().empty() && matrices.empty() && "regular MM songs must keep only their original note");
+    const auto shown=packedEffects();
+    assert(shown.size()==expected.size() && !memcmp(shown.data(),expected.data(),expected.size()*sizeof(Vtx)) && matrices.empty());
   }
+  reset();assert(MM_TryDrawNeiGi(RI_SONG_TIME));assert(packedEffects().empty() && matrices.empty());
   for(bool effects:{false,true})for(bool alt:{false,true})for(bool donor:{false,true}) {
     reset();itemEffects=effects;mmAltEnabled=alt;ownerRegistered=donor;
     NeiGi_DrawMesh(&play,NeiGi::SampleSong(CW_SONG_SOARING,42,NeiGi_CameraBasis(&play)));

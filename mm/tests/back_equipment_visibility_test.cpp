@@ -87,6 +87,10 @@ Gfx* FourSword_HeldSwordDL(void) {
     return nullptr;
 }
 
+u8 FourSword_IsEquipped(void) {
+    return 0;
+}
+
 // Keep optional Din hand replacements disabled for native/adult visibility checks.
 void* DinFireSword_HandDL(PlayState*, Player*, void*) {
     return nullptr;

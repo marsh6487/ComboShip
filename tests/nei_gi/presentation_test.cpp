@@ -37,6 +37,8 @@ bool portableSongLists=false;
 bool selectedCustomLists=false;
 std::map<Gfx *, std::vector<Vtx>> vertexLoads;
 std::set<std::string> files;
+std::map<std::string, int> cosmeticFlags;
+std::map<std::string, Color_RGB8> cosmeticColors;
 std::set<std::pair<std::string,std::string>> modFiles;
 std::set<std::pair<std::string,std::string>> invalidGiModels;
 alignas(16) Gfx opa[0x2FC0], xlu[0x1000], overlay[0x800];
@@ -70,6 +72,8 @@ void Reset() {
   std::memset(overlay, 0, sizeof(overlay));
   stack.clear();
   files.clear();
+  cosmeticFlags.clear();
+  cosmeticColors.clear();
   modFiles.clear();
   invalidGiModels.clear();
   gfx.polyOpa.p = opa;
@@ -125,11 +129,15 @@ f32 Math_SinS(s16) { return 0; }
 f32 Math_CosS(s16) { return 1; }
 void Matrix_RotateZYX(s16, s16, s16, u8) {}
 int32_t CVarGetInteger(const char *name, int32_t) {
+  if (auto it=Fixture::cosmeticFlags.find(name);it!=Fixture::cosmeticFlags.end()) return it->second;
   if (std::strcmp(name, CVAR_NEI_GI_EFFECTS) == 0) return Fixture::enabled;
   if (std::strcmp(name, CVAR_ENHANCEMENT("DinFireSword")) == 0) return Fixture::dinSword;
   return 0;
 }
-Color_RGB8 CVarGetColor24(const char*,Color_RGB8 value) {return value;}
+Color_RGB8 CVarGetColor24(const char* name,Color_RGB8 value) {
+  auto it=Fixture::cosmeticColors.find(name);
+  return it==Fixture::cosmeticColors.end()?value:it->second;
+}
 int ResourceMgr_GetDinSwordGiProfileForGame(const char*,const char* path) {
   if(!std::strncmp(path,"__OTR__@oot:",12))path+=12;
   else if(!std::strncmp(path,"__OTR__",7))path+=7;
@@ -322,6 +330,9 @@ ORIGINAL(Randomizer_DrawPokeball)
 ORIGINAL(Randomizer_DrawCryonis)
 ORIGINAL(Randomizer_DrawElementalWand)
 ORIGINAL(Randomizer_DrawExtFourSword)
+void Randomizer_DrawExtFourSwordPresentation(PlayState* play, GetItemEntry* entry, int) {
+  Randomizer_DrawExtFourSword(play, entry);
+}
 ORIGINAL(Randomizer_DrawExtDivineShield)
 ORIGINAL(Randomizer_DrawExtSheikahShield)
 ORIGINAL(Randomizer_DrawExtShieldOfIkana)
@@ -334,6 +345,7 @@ ORIGINAL(Randomizer_DrawExtTrident)
 ORIGINAL(Randomizer_DrawExtClimbBoots)
 ORIGINAL(Randomizer_DrawExtRocBoots)
 ORIGINAL(Randomizer_DrawExtPendantOfMemories)
+ORIGINAL(Randomizer_DrawMmTradeQuest)
 ORIGINAL(Randomizer_DrawNeiSheikahSlate)
 ORIGINAL(Randomizer_DrawSlateRuneBomb)
 ORIGINAL(Randomizer_DrawSlateRuneMasterCycle)
@@ -565,12 +577,18 @@ int main() {
   assert(6.f + .25f * (submitted[0].second + submitted[0].first * four.maximum[1]) <= 19.f &&
          "Four Sword clips the shelf's upper edge despite passing its height test");
   for (auto song : { std::pair{ RG_MM_SONG_SONATA, CW_SONG_SONATA },
+                     std::pair{ RG_MM_SONG_LULLABY_INTRO, CW_SONG_LULLABY_INTRO },
                      std::pair{ RG_MM_SONG_LULLABY, CW_SONG_LULLABY },
                      std::pair{ RG_MM_SONG_NOVA, CW_SONG_NOVA },
                      std::pair{ RG_MM_SONG_HEALING, CW_SONG_HEALING },
                      std::pair{ RG_MM_SONG_ELEGY, CW_SONG_ELEGY },
                      std::pair{ RG_MM_SONG_OATH, CW_SONG_OATH },
-                     std::pair{ RG_MM_SONG_DOUBLE_TIME, CW_SONG_DOUBLE_TIME } }) {
+                     std::pair{ RG_MM_SONG_DOUBLE_TIME, CW_SONG_DOUBLE_TIME },
+                     std::pair{ RG_MM_SONG_INVERTED_TIME, CW_SONG_INVERTED_TIME } }) {
+    Reset();
+    NeiGi_DrawSongOverlay(&play,song.second,nullptr);
+    const auto expectedSong=arena;
+    assert(expectedSong.size()==2);
     Reset();
     GetItemEntry songEntry{};
     songEntry.tableId = TABLE_RANDOMIZER;
@@ -579,11 +597,13 @@ int main() {
     assert(ComboSongShimmerColor(song.second, color));
     assert(NeiGi_Draw(&play, &songEntry));
     assert(Drawn() == std::vector<std::string>{ gGiSongNoteDL });
-    assert(arena.empty() && stack.empty() && "ordinary songs retain native note geometry without unapproved themed particles");
+    assert(arena.size()==expectedSong.size() && stack.empty() && "MM song must submit its shimmer and selected particle profile");
+    for(size_t i=0;i<expectedSong.size();++i)assert(arena[i].size()==expectedSong[i].size() &&
+        !memcmp(arena[i].data(),expectedSong[i].data(),expectedSong[i].size()*sizeof(Vtx)));
 #ifdef COMBO_BUILD
     CwItemDrawInfo songInfo{};
     assert(NeiGi_DescribeEntry(&songEntry, &songInfo));
-    assert(songInfo.drawKind == CW_DRAW_KIND_SONG_GI && songInfo.neiEffect == song.second && !songInfo.itemShimmer);
+    assert(songInfo.drawKind == CW_DRAW_KIND_SONG_GI && songInfo.neiEffect == song.second && songInfo.itemShimmer);
     assert(songInfo.dlistCount==1 && songInfo.xluStartIndex==0);
     assert(std::memcmp(color, songInfo.itemShimmerColor, 4) == 0);
 #endif
@@ -866,9 +886,9 @@ int main() {
   assert(fallback == 1 && Drawn().empty());
   files.insert("__OTR__objects/nei_gi_redesign/demise_destruction/gi_xlu_dl");
   assert(NeiGi_Draw(&play, &entry));
-  assert(fallback == 1 && Drawn().size() == 2 && allocations == 4);
-  assert(arena.size() == 2 &&
-         arena.front().size() > 30); // Intrinsic energy, shimmer OFF.
+  assert(fallback == 1 && Drawn().size() == 2 && allocations == 6);
+  assert(arena.size() == 3 &&
+         arena.front().size() > 30); // Intrinsic energy + facet sheen, shimmer OFF.
   assert(Drawn()[1].ends_with("/gi_xlu_dl") && gfx.polyXlu.p > xlu);
   assert(matrix == 1 && stack.empty() && interpolation == 0);
 
@@ -1207,6 +1227,63 @@ int main() {
 #endif
   std::cout<<"PASS every redesigned GI override: both OPA/XLU selections, base/Alt, native/owner/MM, independent identity shimmer and no authored fit/energy\n";
 
+  // A Poe actor replacement is not a replacement for the authored Lantern
+  // item. Both passes must survive generic actor mods, including MM-first
+  // selection with independent donor/host Alt settings.
+  for(int ootAlt:{0,1}) for(int mmAlt:{0,1}) for(int effects:{0,1})
+  for(const char* modOwner:{"oot","mm"}) for(bool altPack:{false,true}) {
+    Reset();alt=ootAlt;enabled=effects;
+#ifdef COMBO_BUILD
+    ownerAlt=ootAlt;
+#endif
+    entry={};entry.drawFunc=Randomizer_DrawLantern;
+    const std::vector<std::string> authored={
+      "__OTR__objects/nei_gi_redesign/lantern/gi_dl",
+      "__OTR__objects/nei_gi_redesign/lantern/gi_xlu_dl"};
+    for(const auto& path:authored)files.insert(path);
+    const std::string poe="__OTR__objects/object_poh/gPoeLanternDL";
+    files.insert(poe);
+    const auto selectedPoe=altPack?"alt/"+poe:poe;
+    files.insert(selectedPoe);modFiles.insert({modOwner,selectedPoe});
+    assert(NeiGi_Draw(&play,&entry) && fallback==0 && Drawn()==authored &&
+           "a generic Poe actor mod must not suppress the authored Lantern GI");
+    gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;arena.clear();submitted.clear();
+    assert(NeiGi_DrawShop(&play,&entry) && fallback==0 && Drawn()==authored);
+    assert(stack.empty() && matrix==1 && matrixY==0 && loads==0);
+#ifdef COMBO_BUILD
+    alt=mmAlt;
+    CwItemDrawInfo info{};
+    assert(OOT_GetNeiGiDrawInfoForAssets("lantern",mmAlt,&info)==1 &&
+           info.drawKind==CW_DRAW_KIND_NEI_GI && info.dlistCount==2 && info.xluStartIndex==1);
+    assert(std::string(info.dlists[0])==authored[0] && std::string(info.dlists[1])==authored[1]);
+    assert(MM_DescribeNeiGi(RI_OOT_NEI_LANTERN,&info) &&
+           info.drawKind==CW_DRAW_KIND_NEI_GI && info.dlistCount==2 && info.xluStartIndex==1);
+    const std::vector<std::string> routed={
+      "__OTR__@oot:objects/nei_gi_redesign/lantern/gi_dl",
+      "__OTR__@oot:objects/nei_gi_redesign/lantern/gi_xlu_dl"};
+    assert(std::string(info.dlists[0])==routed[0] && std::string(info.dlists[1])==routed[1]);
+    for(bool shop:{false,true}) {
+      gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;arena.clear();submitted.clear();
+      assert(MM_TryDrawNeiGi(RI_OOT_NEI_LANTERN,shop,shop?0:1) && Drawn()==routed);
+      assert(arena.size()==size_t(effects) && stack.empty() && matrix==1 && matrixY==0 && loads==0);
+    }
+#endif
+    // A missing metal or glass pass still preserves the established fallback;
+    // the selection correction must not emit a partial authored model.
+    for(const auto& missing:authored) {
+      files.erase(missing);gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;arena.clear();
+      assert(NeiGi_Draw(&play,&entry) && fallback==1 && Drawn().empty());
+#ifdef COMBO_BUILD
+      assert(OOT_GetNeiGiDrawInfoForAssets("lantern",mmAlt,&info)==0);
+#endif
+      files.insert(missing);
+    }
+  }
+#ifdef COMBO_BUILD
+  ownerAlt=false;
+#endif
+  std::cout<<"PASS authored Lantern ignores generic Poe mods: both passes, native/shop/MM, independent Alt, shimmer and missing-pass fallback\n";
+
   // A mod at an established model resource outranks authored GI geometry in
   // native common/shop selection and the owner-pinned foreign descriptor.
   struct ModBinding {CustomDrawFunc draw;const char* slug;const char* game;const char* legacy;int identity=0;};
@@ -1222,7 +1299,6 @@ int main() {
     {Randomizer_DrawGustJar,"gust_jar","oot","__OTR__objects/object_nei_gust_jar/jar_model_dl"},
     {Randomizer_DrawTimeGate,"time_gate","oot","__OTR__objects/object_nei_time_gate/g_timegate_dl"},
     {Randomizer_DrawMinishCap,"minish_cap","oot","__OTR__objects/object_nei_minish_cap/Cylinder_opaque_dl"},
-    {Randomizer_DrawLantern,"lantern","oot","__OTR__objects/object_poh/gPoeLanternDL"},
     {Randomizer_DrawMarioMask,"mario_mask","oot","__OTR__objects/object_nei_mario_mask/g_mario_mask_dl"},
     {Randomizer_DrawExtDivineShield,"divine_shield","oot","__OTR__objects/object_nei_divine_shield/g_divine_shield_dl"},
     {Randomizer_DrawExtSheikahShield,"sheikah_shield","oot","__OTR__objects/object_nei_kite_shield/g_kite_shield_dl"},
@@ -1311,6 +1387,48 @@ int main() {
     }
   }
   std::cout<<"PASS incomplete legacy tunic recipes retain all three authored GIs and their shimmer\n";
+  // Vanilla clothes replacements are shared by Goron/Zora tunics. Even a
+  // complete pack at those roots is not a replacement for any of these three
+  // distinct authored awards. This catches the path the earlier repair left
+  // open by rejecting only incomplete generic packs.
+  for(const auto& test:modBindings) {
+    if(std::strcmp(test.slug,"spirit_breastplate") && std::strcmp(test.slug,"sages_tunic") &&
+       std::strcmp(test.slug,"champions_tunic"))continue;
+    for(int hostAlt:{0,1}) for(int donorAlt:{0,1}) for(const char* replacementOwner:{"oot","mm"}) {
+      Reset();alt=hostAlt;enabled=1;
+#ifdef COMBO_BUILD
+      ownerAlt=donorAlt;
+#else
+      if(donorAlt!=hostAlt)continue;
+#endif
+      entry={};entry.drawFunc=test.draw;
+      const auto authored=std::string("__OTR__objects/nei_gi_redesign/")+test.slug+"/gi_dl";
+      files.insert(authored);
+      for(const auto* legacy:{"__OTR__objects/object_gi_clothes/gGiTunicCollarDL",
+                             "__OTR__objects/object_gi_clothes/gGiTunicDL"}) {
+        files.insert(legacy);
+        files.insert(std::string("alt/")+legacy);
+        modFiles.insert({replacementOwner,legacy});
+        modFiles.insert({replacementOwner,std::string("alt/")+legacy});
+      }
+      assert(NeiGi_Draw(&play,&entry) && fallback==0 && Drawn()==std::vector<std::string>{authored} &&
+             !arena.empty() && stack.empty() && "complete generic clothes packs must not bypass a distinct authored tunic GI");
+      gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;arena.clear();
+      assert(NeiGi_DrawShop(&play,&entry) && fallback==0 && Drawn()==std::vector<std::string>{authored});
+#ifdef COMBO_BUILD
+      CwItemDrawInfo info{};
+      assert(OOT_GetNeiGiDrawInfoForAssets(test.slug,hostAlt,&info)==1 && info.drawKind==CW_DRAW_KIND_NEI_GI &&
+             std::string(info.dlists[0])==authored);
+      const auto mmItem=!std::strcmp(test.slug,"spirit_breastplate")?RI_OOT_EXT_SPIRIT_BREASTPLATE:
+                        !std::strcmp(test.slug,"sages_tunic")?RI_OOT_EXT_WATER_DRAGON_SCALE:RI_OOT_EXT_CHAMPIONS_TUNIC;
+      gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;arena.clear();
+      const auto routed=std::string("__OTR__@oot:")+authored.substr(7);
+      assert(MM_TryDrawNeiGi(mmItem,false,1) && Drawn()==std::vector<std::string>{routed} &&
+             !arena.empty() && stack.empty());
+#endif
+    }
+  }
+  std::cout<<"PASS complete generic clothes packs preserve all three individual tunic GIs\n";
   for(const auto& test:modBindings)for(int selectedAlt:{0,1}){
     Reset();alt=selectedAlt;
 #ifdef COMBO_BUILD
@@ -1329,19 +1447,21 @@ int main() {
 #ifdef COMBO_BUILD
     vanillaSword=!selectedAlt && NeiGi::IsSword(selected->effect);
 #endif
+    const bool distinctTunic=!std::strcmp(test.slug,"spirit_breastplate") ||
+                             !std::strcmp(test.slug,"sages_tunic") || !std::strcmp(test.slug,"champions_tunic");
     std::vector<std::string> authoredPaths{path};
     if(selected->translucent){files.insert(selected->translucent);authoredPaths.push_back(selected->translucent);}
     if(selectedAlt)files.insert(std::string("alt/")+test.legacy);
     assert(NeiGi_Draw(&play,&entry)&&fallback==0&&Drawn()==authoredPaths);
     modFiles.insert({test.game,selectedAlt?std::string("alt/")+test.legacy:std::string(test.legacy)});
     gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
-    assert(NeiGi_Draw(&play,&entry)&&fallback==(vanillaSword?0:1)&&
-           Drawn()==(vanillaSword?authoredPaths:std::vector<std::string>{}));
+    assert(NeiGi_Draw(&play,&entry)&&fallback==((vanillaSword||distinctTunic)?0:1)&&
+           Drawn()==((vanillaSword||distinctTunic)?authoredPaths:std::vector<std::string>{}));
     gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
-    assert(NeiGi_DrawShop(&play,&entry)&&fallback==(vanillaSword?0:1)&&
-           Drawn()==(vanillaSword?authoredPaths:std::vector<std::string>{}));
+    assert(NeiGi_DrawShop(&play,&entry)&&fallback==((vanillaSword||distinctTunic)?0:1)&&
+           Drawn()==((vanillaSword||distinctTunic)?authoredPaths:std::vector<std::string>{}));
 #ifdef COMBO_BUILD
-    CwItemDrawInfo info{};assert(!OOT_GetNeiGiDrawInfo(test.slug,&info));
+    CwItemDrawInfo info{};assert(bool(OOT_GetNeiGiDrawInfo(test.slug,&info))==distinctTunic);
     modFiles.clear();assert(OOT_GetNeiGiDrawInfo(test.slug,&info));
     if(std::strcmp(test.game,"mm")==0){
       // Imported MM model files can also be replaced in OoT's local archive
@@ -1354,12 +1474,12 @@ int main() {
       modFiles.clear();assert(OOT_GetNeiGiDrawInfo(test.slug,&info));
     }
     if(std::strcmp(test.game,"oot")==0 && std::strcmp(test.slug,"magic_cape") && std::strcmp(test.slug,"four_sword")){
-      // A native MM mod protects its exported descriptor, but does not affect
-      // the OoT host's own selected model or GI.
+      // A native MM legacy mod protects its exported descriptor, except for
+      // shared clothes packs unrelated to the three distinct authored tunics.
       modFiles.insert({"mm",selectedAlt?std::string("alt/")+test.legacy:std::string(test.legacy)});
       gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;fallback=0;
       assert(NeiGi_Draw(&play,&entry)&&fallback==0&&Drawn()==authoredPaths);
-      assert(!OOT_GetNeiGiDrawInfo(test.slug,&info));
+      assert(bool(OOT_GetNeiGiDrawInfo(test.slug,&info))==distinctTunic);
       modFiles.clear();assert(OOT_GetNeiGiDrawInfo(test.slug,&info));
     }
     assert(info.dlistCount==authoredPaths.size()&&std::strcmp(info.dlists[0],path.c_str())==0);
@@ -1368,6 +1488,32 @@ int main() {
   }
   {
     Reset();
+#ifdef COMBO_BUILD
+    GetItemEntry room{};
+    room.tableId = TABLE_RANDOMIZER;
+    room.drawFunc = Randomizer_DrawMmTradeQuest;
+    room.drawItemId = RG_MM_ROOM_KEY;
+    const char* roomPath = "__OTR__objects/nei_gi_redesign/room_key/gi_dl";
+    files.insert(roomPath);
+    CwItemDrawInfo roomInfo{};
+    assert(NeiGi_DescribeEntry(&room, &roomInfo) == 1 &&
+           "Room Key must select its authored GI instead of the generic MM trade callback");
+    assert(roomInfo.dlistCount == 1 && !std::strcmp(roomInfo.dlists[0], roomPath));
+    assert(NeiGi_Draw(&play, &room) && Drawn() == std::vector<std::string>{roomPath});
+    assert(MM_DescribeNeiGi(RI_ROOM_KEY, &roomInfo));
+    room.drawItemId = RG_MM_MOONS_TEAR;
+    assert(!NeiGi_DescribeEntry(&room, &roomInfo) && "Room Key binding captured another trade item");
+    room.drawItemId = RG_MM_ROOM_KEY;
+    for (const char* part : {"gGiRoomKeyDL", "gGiRoomKeyEmptyDL"}) {
+      Reset(); files.insert(roomPath);
+      modFiles.insert({"mm", std::string("__OTR__objects/object_gi_reserve_b_00/") + part});
+      assert(NeiGi_Draw(&play, &room) && fallback == 1 && Drawn().empty());
+      assert(!MM_DescribeNeiGi(RI_ROOM_KEY, &roomInfo));
+    }
+    Reset();
+    assert(NeiGi_Draw(&play, &room) && fallback==1 && Drawn().empty() &&
+           "missing authored Room Key must call its original native GI callback");
+#endif
     GetItemEntry optionalCojiro{};
     optionalCojiro.tableId = TABLE_VANILLA;
     optionalCojiro.gid = GID_COJIRO;
@@ -1627,9 +1773,10 @@ int main() {
   for (const auto &vertices : arena)
     vertexBytes += vertices.size() * sizeof(Vtx);
   std::cout << "Potion shop: " << vertexBytes << " arena vertex bytes, "
-            << gfx.polyXlu.p - xlu << " XLU commands\n"
+            << gfx.polyXlu.p - xlu << " XLU commands, " << allocations << " matrices\n"
             << std::flush;
-  assert(vertexBytes < 80 * 1024 && allocations <= 32 && stack.empty());
+  // Three crystal sheen passes each add one mesh matrix and one restore.
+  assert(vertexBytes < 80 * 1024 && allocations <= 38 && stack.empty());
 
   // Deku Leaf's optional shimmer is green, including glint centers and halos.
   Reset();
@@ -1686,13 +1833,13 @@ int main() {
       triangle(cmd->words.w1);
   }
   assert(decoded == mesh.count && vertexLoads.size() > 1);
-  // Exercise the shared production draw for all 61 serialized models at the
+  // Exercise the shared production draw for all 62 serialized models at the
   // actual pickup/shop/freestanding caller scales and both owner routes.
   struct FrameFixture {const char* slug;float low,high,width,drawScale;bool xlu;};
   const FrameFixture frames[] = {
 #include "nei_all_frame_bounds.inc"
   };
-  assert(std::size(frames)==61);
+  assert(std::size(frames)==62);
   for(const auto& f:frames) for(const char* owner:{"","@oot:","@mm:","@oot-gi-base:"}) for(int route:{0,1,2}) {
     Reset();
     const std::string path=std::string("__OTR__")+owner+"objects/nei_gi_redesign/"+f.slug+"/gi_dl";
@@ -1717,12 +1864,21 @@ int main() {
     } else {
       assert(bottom>=-52.00001f && top<=48.00001f && s*f.width<=104.00001f);
     }
-    if(f.xlu) assert(submitted[submitted.size()-2]==submitted.front()); // final command restores effect state
+    if(f.xlu) {
+      const bool sheen=NeiGi::IsSpell(b->effect);
+      // Shell, optional packed sheen matrix, then the original state restore.
+      assert(submitted[submitted.size()-(sheen?3:2)]==submitted.front());
+      if(sheen) {
+        const auto& highlight=submitted[submitted.size()-2];
+        assert(std::abs(highlight.first*16-submitted.front().first)<.000001f &&
+               highlight.second==submitted.front().second);
+      }
+    }
     assert(stack.empty() && std::pair(matrix,matrixY)==incoming && interpolation==0);
   }
   assert(!NeiGi::FindFrameBounds("__OTR__@bad:objects/nei_gi_redesign/four_sword/gi_dl"));
   assert(!NeiGi::FindFrameBounds("__OTR__objects/nei_gi_redesign/four_sword/held_dl"));
-  std::cout<<"PASS all 61 serialized GI frames: native/OoT/MM routes, pickup/shop/freestanding bounds and shared shell pose\n";
+  std::cout<<"PASS all 62 serialized GI frames: native/OoT/MM routes, pickup/shop/freestanding bounds and shared shell pose\n";
 #ifdef COMBO_BUILD
 #include "tests/mm_presentation/pickup_framing_checks.inc"
 #endif

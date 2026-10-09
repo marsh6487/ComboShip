@@ -8,6 +8,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include "ComboBottleContents.h"
 #define COMBO_MASK_SHIMMER_HOST_MM
 #include "ComboMaskShimmer.h"
 #undef COMBO_MASK_SHIMMER_HOST_MM

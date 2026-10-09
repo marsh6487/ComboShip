@@ -40,6 +40,15 @@ int main() {
       assert(spin.count < spin.vertices.size());
       assert(height == 192); // Native full-height wall; texture alpha defines
                              // the elemental crest.
+      // The tall envelope must not become a uniformly opaque white curtain.
+      bool tinted = false, transparentTop = false;
+      for (size_t i = 0; i < spin.count; ++i) {
+        const auto& v = spin.vertices[i];
+        assert(v.alpha < 190);
+        tinted |= v.alpha > 60 && v.rgb != 0xFFFFFF;
+        transparentTop |= v.p.y >= 191.9f && v.alpha < 20;
+      }
+      assert(tinted && transparentTop);
       if (kind != Kind::Light) {
         const auto flow = SampleSpinFlow(kind, frame, 150, true, 1);
         const auto next = SampleSpinFlow(kind, frame + 1, 150, true, 1);
@@ -53,19 +62,29 @@ int main() {
                spin.vertices[0].u); // Independent material motion.
       }
     }
-    // Fire reuses Light's charge fixtures; the production-dispatch test checks
-    // that only the bound texture differs.
+    // Fire has its own warm, rising ember buildup, independent of Light's rays.
     for (const auto sampler : {SampleCharge, SampleChargeSparks, SampleChargeSurface}) {
       const auto fire = sampler(Kind::Fire, frame, 1, {});
-      const auto light = sampler(Kind::Light, frame, 1, {});
-      assert(fire.count == light.count && fire.count > 0);
+      assert(fire.count > 0 && fire.count < fire.vertices.size());
+      size_t warm = 0, visible = 0;
       for (size_t i = 0; i < fire.count; ++i) {
-        const auto& a = fire.vertices[i]; const auto& b = light.vertices[i];
-        assert(a.p.x == b.p.x && a.p.y == b.p.y && a.p.z == b.p.z);
-        assert(a.rgb == b.rgb && a.alpha == b.alpha && a.u == b.u && a.v == b.v);
+        const auto& v = fire.vertices[i];
+        if (v.alpha > 30) {
+          ++visible;
+          const auto red = (v.rgb >> 16) & 255, green = (v.rgb >> 8) & 255;
+          warm += red > green * 1.25f && (v.rgb & 255) < 120;
+        }
       }
+      assert(visible > 5 && warm > visible / 2);
     }
+    const auto iceRelease = SampleSpin(Kind::Ice, frame, 150, true);
+    size_t elevatedFaces = 0;
+    for (size_t i = 0; i < iceRelease.count; i += 3)
+      elevatedFaces += iceRelease.vertices[i].p.y > 12 &&
+                       iceRelease.vertices[i + 1].p.y > 12 &&
+                       iceRelease.vertices[i + 2].p.y > 12;
+    assert(elevatedFaces > 12); // Actual ice facets above the floor rim.
   }
-  std::cout << "PASS substantial Ice/Fire bolts, native-height elemental "
-               "walls, Light-shaped Fire charge\n";
+  std::cout << "PASS accepted bolts, warm Fire charge, translucent native-height "
+               "release fronts and elevated Ice facets\n";
 }

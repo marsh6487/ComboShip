@@ -106,6 +106,9 @@ void Environment_UpdatePostmanEvents(PlayState*) {}
 void Environment_DrawRainImpl(PlayState*, View*, GraphicsContext*) { ++rainDraws; }
 u32 Environment_GetStormState(PlayState* play) { return play->envCtx.stormState; }
 NeiSaveData* Nei_Save() { return &gSaveContext.save.shipSaveInfo.nei; }
+u16 Nei_GetOwnedItem(u8 slot) { return Nei_Save()->ownedItems[slot - 24]; }
+u8 Seasons_RandoMode() { return NEI_SEASONS_INDIVIDUAL; }
+void Seasons_UpdateGates() {}
 void ExtInv_RefreshButtonIconsForItem(PlayState*, u16 item) {
     assert(item == EXT_ITEM_ROD_OF_SEASONS);
     ++refreshes;
@@ -798,11 +801,11 @@ int main(int argc, char** argv) {
     assert(light.ambientColor[0] == -50 && light.light1Color[0] == -100);
     gSaveContext.save.day = 3;
     Confirm(&play, SEASON_SUMMER);
-    assert(!MMWeather_SeasonClearsRain());
+    assert(MMWeather_SeasonClearsRain());
     draws = rainDraws;
     DrawRainFromPlay(&play);
-    assert(rainDraws == draws + 1); // Summer does not erase other-day native weather
-    std::puts("PASS real native Day 2 schedule: Spring Days 1/3, Summer clear sky/light/rain/ambience, Autumn/native and Off");
+    assert(rainDraws == draws); // Summer's clear policy applies on all three days.
+    std::puts("PASS real native schedule: Spring Days 1/3, Summer all-day clear sky/light/rain/ambience, Autumn/native and Off");
 
     // A direct actor query must respect the current scene/story/camera state
     // even while the cached rendering bridge still contains last frame's season.

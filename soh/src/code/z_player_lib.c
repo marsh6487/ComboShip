@@ -48,6 +48,7 @@ extern void ItemEquip_CaptureHandMatrix(void);
 extern void ItemEquip_CaptureLeftHandMatrix(void);
 extern u8 ItemEquip_HoldsClosedFist(void);
 extern u8 ItemEquip_HoldsEmptyHand(void);
+extern u8 FourSword_IsEquipped(void);
 
 #include <stdlib.h>
 #include <string.h>
@@ -2022,14 +2023,24 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
     // bit even after a Great Fairy upgrade. Select the fitted progressive blade
     // after equipment hooks while the explicit fire option owns this upgrade.
     // Disabling fire/Alt or removing the new assets restores the normal choices.
-    if (mayDrawProgressiveFire && *dList != NULL) {
+    // Four Sword also owns its blade after generic equipment/PAK hooks. Those
+    // hooks can select a native sword or an empty slot for the borrowed action.
+    if (mayDrawProgressiveFire && (*dList != NULL || FourSword_IsEquipped())) {
         void* closedHand =
             Player_ResolveLimbDLForDummyOrLocal(gPlayerLeftHandClosedDLs[gSaveContext.linkAge + sDListsLodOffset]);
-        Gfx* dinHand = DinFireSword_HandDL(play, this, closedHand, sPlayerBodyEnvColor.r, sPlayerBodyEnvColor.g,
-                                           sPlayerBodyEnvColor.b);
-        if (dinHand != NULL) {
-            *dList = dinHand;
+        if (FourSword_IsEquipped() && WeaponUpgrade_ApplyHeldSwordDL(dList, closedHand, this, sPlayerBodyEnvColor.r,
+                                                                     sPlayerBodyEnvColor.g, sPlayerBodyEnvColor.b)) {
+            Gfx* compound = (Gfx*)Graph_Alloc(play->state.gfxCtx, 8 * sizeof(Gfx));
+            memcpy(compound, *dList, 8 * sizeof(Gfx));
+            *dList = compound;
             sLeftHandType = this->leftHandType;
+        } else {
+            Gfx* dinHand = DinFireSword_HandDL(play, this, closedHand, sPlayerBodyEnvColor.r, sPlayerBodyEnvColor.g,
+                                               sPlayerBodyEnvColor.b);
+            if (dinHand != NULL) {
+                *dList = dinHand;
+                sLeftHandType = this->leftHandType;
+            }
         }
     }
 

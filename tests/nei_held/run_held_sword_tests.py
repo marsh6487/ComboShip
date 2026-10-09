@@ -30,6 +30,13 @@ def main():
         for host, flags in [("soh", ["-DCOMBO_BUILD", *oot_flags()]), ("mm", ["-std=c++20", "-DNEI_EQUIPMENT_MM", *mm_flags()])]:
             source = (ROOT / host / "mods/items/logic/weapon_upgrades.c").read_text()
             (directory / "held_sword_bindings.inc").write_text(function(source, "WeaponUpgrade_ApplyHeldSwordDL"))
+            if host == "mm":
+                native = (ROOT / "mm/src/code/z_player_lib.c").read_text()
+                begin = native.index("            u8 handIsSpokenFor =")
+                end = native.index("            // ⚠️ ESTE OCULTADO", begin)
+                (directory / "held_sword_native_bindings.inc").write_text(
+                    "static void ApplyNativeHeldSwordStage(PlayState* play, Player* player, Gfx** dList) {\n"
+                    "u8 extOwnsSwordDL = 0;\n" + native[begin:end] + "\n}\n")
             binary = directory / host
             bridge = ([str(ROOT / "mm/2s2h/Rando/NeiResourceRouting.cpp"),
                        "-Wl,--export-dynamic-symbol=OOT_NeiResourceExists",

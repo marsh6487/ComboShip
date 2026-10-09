@@ -64,6 +64,8 @@ u8 BossRemains_IsOdolwaWorn(){return odwalda;}
 u8 BossRemains_IsGohtWorn(){return goht;}
 u8 Trident_GoldenArmor(){return gold;}
 u8 Player_IsCustomLinkModel(Player*){return customBody;}
+// Active Four Sword is covered by the dedicated Four Sword visibility fixture.
+u8 FourSword_IsEquipped(){return 0;}
 s32 CVarGetInteger(const char* name,s32 fallback){
  if(std::strstr(name,"TunicR"))return tunicR;
  if(std::strstr(name,"TunicG"))return tunicG;

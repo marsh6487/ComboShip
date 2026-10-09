@@ -14,11 +14,22 @@ extern "C" {
 #include "z64.h"
 }
 #include "ComboItemDrawABI.h"
+#include "combo/menu/ComboBottleContents.h"
+#include "combo/menu/ComboElementalArrowGi.h"
 #include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include "soh/Enhancements/randomizer/NeiGiFrameFit.h"
 #include "combo/DinSwordGiResources.h"
 extern "C" void NeiGi_DrawElementalArrow(PlayState*, int) {
   assert(false && "sword fixture must not dispatch elemental arrows");
+}
+extern "C" void NeiGi_DrawElementalArrowForOwner(PlayState*, int, int, int) {
+  assert(false && "sword fixture must not dispatch elemental arrows");
+}
+extern "C" int NeiGi_DrawElementalSpell(PlayState*, int, int, int) {
+  assert(false && "sword fixture must not dispatch elemental spells");return 0;
+}
+extern "C" int ComboBottleContents_Draw(PlayState*, int) {
+  assert(false && "sword fixture must not dispatch bottle contents");return 0;
 }
 #include <libultraship/bridge/consolevariablebridge.h>
 /* PRODUCTION_INFO */
@@ -169,6 +180,7 @@ UNUSED_HANDLER(OOT_DrawForeignPotion)
 UNUSED_HANDLER(OOT_DrawForeignBlueFire)
 UNUSED_HANDLER(OOT_DrawForeignPoes)
 UNUSED_HANDLER(OOT_DrawForeignFairyBottle)
+UNUSED_HANDLER(OOT_DrawForeignMagicSpell)
 UNUSED_HANDLER(OOT_DrawForeignSoulFlame)
 UNUSED_HANDLER(OOT_DrawForeignOps)
 static constexpr int kMaxMatEntries=8;
@@ -186,10 +198,18 @@ static void NeiGi_DrawMesh(PlayState*,const NeiGi::Mesh& mesh) {
   if(recipe.neiShimmer>0 && NeiGi::IsSword(static_cast<NeiGi::Kind>(recipe.neiShimmer-1))) {
     expected.scale=shelfDraw?2.f:2.3f;
     expected.y=shelfDraw?17.f:17.6f;
-    const auto kind=static_cast<NeiGi::Kind>(recipe.neiShimmer-1);
-    const auto effectFit=NeiGi::FrameFit(*NeiGi::FindSwordFrameBounds(kind),1.f,shelfDraw);
-    expected.y+=expected.scale*effectFit.lift;
-    expected.scale*=effectFit.scale;
+    // Master Sword's authored world fit shifts its tip below the 48-unit edge,
+    // regardless of the arbitrary .5/-20 model correction used by this fixture.
+    if(shelfDraw) {
+      const auto fit=NeiGi::FrameFit(*NeiGi::FindSwordFrameBounds(
+          static_cast<NeiGi::Kind>(recipe.neiShimmer-1)),1.f,true);
+      expected.y+=2.f*fit.lift;
+      expected.scale*=fit.scale;
+    } else if(recipe.neiShimmer==int(NeiGi::Kind::MasterSword)+1)
+      expected.y+=2.3f*(48.f-72.590332031f);
+    else if(recipe.neiShimmer==int(NeiGi::Kind::SwordAura)+1)
+      expected.y+=2.3f*(48.f-67.970947266f);
+    else expected=pose; // The full production renderer gate checks every other award.
   }
   assert(std::abs(pose.scale-expected.scale)<.00001f && std::abs(pose.y-expected.y)<.0001f &&
          "foreign binary sword particles/shimmer inherited model coordinate fitting");

@@ -10,6 +10,7 @@
  */
 #include "weapon_upgrades.h"
 #include "../../nei_save.h" // Skijer's NEI
+#include "../../extended_equipment.h"
 #include "../../equipment/nei_equipment_presentation.h"
 #include "../../../../combo/NeiHeldSword.h"
 #include "adult_link_render.h"
@@ -155,7 +156,8 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     if (dList == NULL || ootHand == NULL || player == NULL) {
         return 0;
     }
-    if (player->transformation != PLAYER_FORM_HUMAN || Player_IsCustomLinkModel(player) ||
+    const u8 fourEquipped = FourSword_IsEquipped();
+    if (player->transformation != PLAYER_FORM_HUMAN || (!fourEquipped && Player_IsCustomLinkModel(player)) ||
         (player->leftHandType != PLAYER_MODELTYPE_LH_ONE_HAND_SWORD &&
          player->leftHandType != PLAYER_MODELTYPE_LH_TWO_HAND_SWORD)) {
         return 0;
@@ -182,12 +184,36 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
                     : NEI_HELD_SWORD_BIGGORON;
     } else if (player->heldItemId == ITEM_SWORD_GREAT_FAIRY && player->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED) {
         model = NEI_HELD_SWORD_GREAT_FAIRY;
+    } else if (FourSword_IsEquipped() && player->heldItemId == ITEM_EXT_SWORD_2 &&
+               player->heldItemAction == PLAYER_IA_SWORD_KOKIRI) {
+        model = NEI_HELD_SWORD_FOUR;
     }
     extern u8 FourSword_HeldSwordDLForFrame(void** blade, void** handle, int frame);
-    if (model < 0 && !FourSword_IsEquipped())
+    if (model < 0)
         return 0; // Custom items can reuse sword actions (net, rods, etc.).
-    if (model >= 0 && NeiHeldSword_EquipmentSelected(model, frame))
+    // A selected native/Din sword does not own the separate Four Sword item.
+    // Its getter still preserves a mod of the actual Four Sword blade/hilt.
+    if (!fourEquipped && model >= 0 && NeiHeldSword_EquipmentSelected(model, frame))
         return 0;
+    if (!fourEquipped && frame == NEI_HELD_SWORD_MM_HUMAN &&
+        player->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD) {
+        extern u16 gEquipMasks[];
+        extern u8 gEquipShifts[];
+        // Native MM chooses its combined sword hand from the equipped nibble,
+        // even when NEI's progressive blade advances beyond that native tier.
+        const int equipped = GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD);
+        const int nativeModel = equipped == EQUIP_VALUE_SWORD_RAZOR    ? NEI_HELD_SWORD_RAZOR
+                                : equipped == EQUIP_VALUE_SWORD_GILDED ? NEI_HELD_SWORD_GILDED
+                                                                       : NEI_HELD_SWORD_MM_KOKIRI;
+        if (NeiHeldSword_EquipmentSelected(nativeModel, frame))
+            return 0;
+    } else if (!fourEquipped && frame == NEI_HELD_SWORD_MM_HUMAN &&
+               player->leftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD &&
+               NeiHeldSword_EquipmentSelected(NEI_HELD_SWORD_GREAT_FAIRY, frame)) {
+        // MM's native two-hand array always owns the GFS combined hand, even
+        // when the imported longsword's selected visual tier is Biggoron.
+        return 0;
+    }
 
     if (FourSword_HeldSwordDLForFrame(&blade, &handle, frame)) {
         // The Four Sword pair getter keeps a selected legacy pair authoritative.

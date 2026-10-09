@@ -1,5 +1,6 @@
 #include "SohMenu.h"
 #include "../../../combo/NeiGracePolicy.h"
+#include "../../../combo/NeiSeasonsPolicy.h"
 #include "soh/Enhancements/randomizer/NeiGiPresentation.h"
 #include "soh/OTRGlobals.h"
 #include "UIWidgets.hpp"
@@ -493,6 +494,44 @@ void RegisterNEIMenu() {
     // ===================== Tab: Modes =====================
     path.sidebarName = "Modes";
     path.column = SECTION_COLUMN_1;
+#ifdef COMBO_BUILD
+    static constexpr const char* seasonsModeCvar = "gRando.Options.RO_ROD_OF_SEASONS";
+    static constexpr const char* startingRodCvar = "gRando.Options.RO_STARTING_ROD_OF_SEASONS";
+#else
+    static constexpr const char* seasonsModeCvar = CVAR_RANDOMIZER_SETTING("RodOfSeasons");
+    static constexpr const char* startingRodCvar = CVAR_RANDOMIZER_SETTING("StartingRodOfSeasons");
+#endif
+    static std::map<int32_t, const char*> seasonsModeMap = {
+        { NEI_SEASONS_INDIVIDUAL, "Individual seasons" },
+        { NEI_SEASONS_ROD, "Rod" },
+        { NEI_SEASONS_GATED, "Gated" },
+    };
+    mSohMenu->AddWidget(path, "Rod of Seasons", WIDGET_CVAR_COMBOBOX)
+        .CVar(seasonsModeCvar)
+        .RaceDisable(false)
+        .PreFunc(
+            [](WidgetInfo& info) { info.options->disabled = CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0; })
+        .Options(ComboboxOptions()
+                     .ComboMap(seasonsModeMap)
+                     .DefaultIndex(NEI_SEASONS_INDIVIDUAL)
+                     .Tooltip("Individual seasons: four pickups; the first also grants the Rod.\n"
+                              "Rod: one pickup unlocks all four seasons. Gated: one Rod, with seasons\n"
+                              "unlocked by completed checks or dungeons in either game.\n"
+                              "Spring: Song of Storms check, Jabu, Water Temple, or Great Bay.\n"
+                              "Summer: Fire Temple or Stone Tower. Autumn: Forest Temple or Woodfall.\n"
+                              "Winter: Ice Cavern's final Sheik check or Snowhead.\n"
+                              "This choice is saved with the seed; menu edits apply to the next seed.\n"
+                              "Season abilities are optional in the solver."));
+    mSohMenu->AddWidget(path, "Start with Rod of Seasons", WIDGET_CVAR_CHECKBOX)
+        .CVar(startingRodCvar)
+        .RaceDisable(false)
+        .PreFunc(
+            [](WidgetInfo& info) { info.options->disabled = CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0; })
+        .Options(CheckboxOptions().Tooltip(
+            "Start with the Rod instead of shuffling its base pickup. Individual season pickups\n"
+            "remain shuffled; Gated still requires the season checks. Rod mode starts with all four.\n"
+            "Starting with the Rod does not require enabling the other NEI pool items."));
+
     mSohMenu->AddWidget(path, "Crossover Items", WIDGET_SEPARATOR_TEXT);
     mSohMenu->AddWidget(path, "Enable Crossover Items", WIDGET_CVAR_CHECKBOX)
         .CVar("gBrokenItems.Enabled")

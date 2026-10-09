@@ -89,6 +89,7 @@ constexpr int TEXT_RANDOMIZER_CUSTOM_ITEM=0xF8, TEXT_DESC_DUNGEON_MAP_INFO=0x930
     TEXT_ITEM_COMPASS=0x67, TEXT_ITEM_KEY_BOSS=0xC7, TEXT_ITEM_KEY_SMALL=0x60;
 bool DungeonInformationEnabled(){return false;}
 void BuildItemMessage(uint16_t*,bool*){}
+void BuildWandMedallionMessage(uint16_t*,bool*){}
 void BuildDungeonPauseInfoMessage(uint16_t*,bool*){}
 void BuildMapMessage(uint16_t*,bool*){}
 void BuildBossKeyMessage(uint16_t*,bool*){}
@@ -99,6 +100,8 @@ int main(){
     const uint16_t nativeText=/* TEXT */;
     receiptPlayer={native,native.getItemId};
     RegisterItemMessages();
+    for(uint16_t id=0x3C; id<=0x41; ++id)
+        assert(handlers.at(id)==BuildWandMedallionMessage && "native medallion tutorial hook is missing");
     assert(handlers.count(nativeText) && "Shuffled Chest Game key bypasses its dungeon receipt");
     const auto callback=handlers.at(nativeText);
     for(int repeat=0;repeat<2;++repeat) {

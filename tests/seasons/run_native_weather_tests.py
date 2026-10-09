@@ -39,7 +39,8 @@ with tempfile.TemporaryDirectory(prefix='native-season-weather-') as temporary:
         if name in source(snow)]
     rod_source = (ROOT / rod).read_text()
     parts.append('// Seasonal particles' + rod_source.split('// Seasonal particles')[1].split('#include "../objects')[0])
-    parts += [body('mm/mods/extended_inventory.c', name) for name in ('Seasons_SeasonOwned', 'Seasons_SetSeason')]
+    parts += [body('mm/mods/extended_inventory.c', name) for name in
+              ('Seasons_HasRod', 'Seasons_SeasonOwned', 'Seasons_SeasonAt', 'Seasons_GetSeason', 'Seasons_SetSeason')]
     parts.append(body(rod, 'Seasons_OnWheelConfirm'))
     parts += [body('mm/mods/items/helpers/box_menu.c', name) for name in ('BoxMenu_Close', 'BoxMenu_Update')]
     parts += [body(environment, name) for name in

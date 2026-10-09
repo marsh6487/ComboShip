@@ -253,6 +253,65 @@ inline void IceCrystal(Mesh& m, Point center, Point direction, float length, flo
         face(nextLo, lo, base);
     }
 }
+// A pale reflection band clipped to the front facets. It follows the incoming
+// GI camera/rotation and drifts gently; it never fills or leaves the crystal.
+inline Mesh SampleCrystalSheen(uint32_t frame, const Basis& camera = {}, float radius = 22.2f,
+                               float halfHeight = 37.f) {
+    Mesh mesh;
+    const Point points[] = { { 0, halfHeight, 0 }, { radius, 0, 0 },  { 0, 0, radius },
+                             { -radius, 0, 0 },    { 0, 0, -radius }, { 0, -halfHeight, 0 } };
+    auto dot = [](Point a, Point b) { return a.x * b.x + a.y * b.y + a.z * b.z; };
+    const auto light = Unit(camera.forward + camera.up * .65f - camera.right * .45f);
+    const auto halfway = Unit(camera.forward + light);
+    const float phase = (frame % 360u) * (Tau / 360.f);
+    const float center = radius * (-.18f + .48f * std::sin(phase));
+    const float width = radius * .22f;
+    const float offsets[] = { -1.f, -.3f, 0.f, .3f, 1.f };
+    const float weights[] = { 0.f, .65f, 1.f, .65f, 0.f };
+    auto coordinate = [&](Point p) { return dot(p, camera.right) + .28f * dot(p, camera.up) - center; };
+    for (int j = 0; j < 4; ++j)
+        for (int half = 0; half < 2; ++half) {
+            const Point a = points[half ? 5 : 0], b = points[1 + (half ? (j + 1) % 4 : j)],
+                        c = points[1 + (half ? j : (j + 1) % 4)];
+            const auto normal = Unit(Cross(c - a, b - a));
+            const float facing = dot(normal, camera.forward);
+            if (facing <= .001f)
+                continue;
+            const float specular = std::pow(std::fmax(0.f, dot(normal, halfway)), 5.f);
+            const float peak = 112.f * (.35f + .65f * specular);
+            for (int strip = 0; strip < 4; ++strip) {
+                std::array<Point, 8> polygon{ a, b, c };
+                size_t count = 3;
+                auto clip = [&](float boundary, bool greater) {
+                    std::array<Point, 8> result{};
+                    size_t n = 0;
+                    for (size_t i = 0; i < count; ++i) {
+                        const Point from = polygon[i], to = polygon[(i + 1) % count];
+                        const float x = coordinate(from), y = coordinate(to);
+                        const bool inside = greater ? x >= boundary : x <= boundary;
+                        const bool next = greater ? y >= boundary : y <= boundary;
+                        if (inside)
+                            result[n++] = from;
+                        if (inside != next)
+                            result[n++] = from + (to - from) * ((boundary - x) / (y - x));
+                    }
+                    polygon = result;
+                    count = n;
+                };
+                const float low = width * offsets[strip], high = width * offsets[strip + 1];
+                clip(low, true);
+                clip(high, false);
+                auto vertex = [&](Point p) {
+                    const float f = std::fmax(0.f, std::fmin(1.f, (coordinate(p) - low) / (high - low)));
+                    const float strength = weights[strip] + f * (weights[strip + 1] - weights[strip]);
+                    return EffectVertex{ p * 1.0005f, 0xEDF6FF, uint8_t(peak * strength) };
+                };
+                for (size_t i = 1; i + 1 < count; ++i)
+                    mesh.Tri(vertex(polygon[0]), vertex(polygon[i]), vertex(polygon[i + 1]));
+            }
+        }
+    return mesh;
+}
 // All swords point up +Y. Camera axes only shape the soft skirts; emission
 // paths remain in the corrected model's own coordinates.
 inline float SwordBladeTip(Kind kind) {

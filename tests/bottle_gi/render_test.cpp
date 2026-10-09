@@ -33,6 +33,7 @@ Gfx* ResourceMgr_LoadGfxByName(const char* path) {
 int ResourceMgr_IsModAsset(const char*) { return 0; }
 int ResourceMgr_IsModAssetForGame(const char*,const char*) { return 0; }
 int ResourceMgr_IsCustomAssetForGame(const char*,const char*) { return 0; }
+int ResourceMgr_FileExists(const char*) { return 0; }
 static GraphicsContext gfx;
 static PlayState play{{&gfx, 37}};
 static Gfx opa[64], xlu[64];

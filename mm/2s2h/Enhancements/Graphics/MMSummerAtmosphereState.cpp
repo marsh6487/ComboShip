@@ -63,8 +63,9 @@ void State::Spawn(size_t index, const View& view) {
     p.kind = index < kMoteCount ? Kind::Mote : Kind::Firefly;
     const size_t ordinal = p.kind == Kind::Mote ? index : index - kMoteCount;
     const float x = -0.90f + (ordinal % 8 + 0.2f + Random() * 0.6f) * (1.80f / 8);
-    const float y = p.kind == Kind::Mote ? -0.80f + (ordinal / 8 + 0.2f + Random() * 0.6f) * (1.60f / 4)
-                                         : -0.80f + (ordinal / 8 + 0.2f + Random() * 0.6f) * (1.10f / 5);
+    const float y = p.kind == Kind::Mote
+                        ? -0.80f + (ordinal / 8 + 0.2f + Random() * 0.6f) * (1.60f / 4)
+                        : -0.80f + (ordinal / 8 + 0.2f + Random() * 0.6f) * (1.10f / ((kFireflyCount + 7) / 8));
     // 20% near, 40% middle, 40% far; no circle of effects around Link.
     const size_t tier = ordinal % 10;
     const float depth = tier < 2 ? 200 + Random() * 180 : tier < 6 ? 500 + Random() * 550 : 1200 + Random() * 1100;
@@ -76,8 +77,10 @@ void State::Spawn(size_t index, const View& view) {
     p.orbit = p.kind == Kind::Firefly ? 6 + Random() * 16 : 2 + Random() * 4;
     p.drift = view.right * (p.kind == Kind::Mote ? 3 + Random() * 4 : Random() - 0.5f);
     p.drift.y += p.kind == Kind::Mote ? 1 + Random() * 2 : 0;
+    // Make the fine tuft readable against detailed foliage; widen firefly halos
+    // gently without increasing their peak opacity or adding another draw pass.
     p.radius =
-        std::clamp(depth * (p.kind == Kind::Mote ? 0.0032f : 0.0025f), 0.45f, p.kind == Kind::Mote ? 7.0f : 4.0f);
+        std::clamp(depth * (p.kind == Kind::Mote ? 0.0045f : 0.0030f), 0.45f, p.kind == Kind::Mote ? 10.0f : 4.8f);
     p.age = p.alpha = 0;
     ++p.generation;
 }
@@ -139,7 +142,7 @@ void State::Step(const Input& input, const View& view) {
         const float edge = Smooth((1.08f - std::max(x, y)) / 0.18f);
         const float pulse = 0.5f + 0.5f * std::sin(p.age * p.frequency + p.phase);
         p.alpha = Smooth(p.age / 0.8f) * edge *
-                  (p.kind == Kind::Mote ? daylight * (0.40f + 0.24f * pulse) : night * (0.12f + 0.82f * pulse * pulse));
+                  (p.kind == Kind::Mote ? daylight * (0.58f + 0.22f * pulse) : night * (0.12f + 0.82f * pulse * pulse));
     }
     initialized = true;
     BuildBeams(input, view, daylight);

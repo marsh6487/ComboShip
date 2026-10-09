@@ -4,6 +4,8 @@
 #include "2s2h/FleetShipCombo/FleetComboItems.h"
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h"
 #include "2s2h/Rando/ItemReceiptText.h"
+#include <nlohmann/json.hpp>
+#include "2s2h/Rando/Rando.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
 #include "ComboExport.h"
 #include "ComboItemReceiptText.h"
@@ -85,6 +87,13 @@ const std::string& GetCheckDisplayName(RandoCheckId id) {
 namespace CustomMessage {
 static Entry shownSong;
 static bool startedSong;
+static Entry nativeRupeeLoaded;
+static int nativeRupeeLoads = 0;
+Entry LoadVanillaMessageTableEntry(u16) {
+  return {.textboxType=3, .textboxYPos=2, .icon=0xA7, .nextMessageID=0x1234,
+          .firstItemCost=0x5678, .secondItemCost=0x9ABC, .msg="Native rupee receipt"};
+}
+void LoadCustomMessageIntoFont(Entry entry) { nativeRupeeLoaded=std::move(entry);++nativeRupeeLoads; }
 void SetActiveCustomMessage(std::string msg, Entry options) { options.msg=std::move(msg);shownSong=options;startedSong=false; }
 void StartTextbox(std::string msg, Entry options) { options.msg=std::move(msg);shownSong=options;startedSong=true; }
 }
@@ -100,6 +109,33 @@ static bool donorReady = true;
 static int donorReads = 0;
 static uint64_t generation = 0;
 static bool mapCompassInfo = false;
+static int randomRupeeNames = 0;
+static int wandRule = 0;
+static bool neiEnabled = true;
+#ifdef COMPASS_DONOR_INTEGRATION
+extern "C" void FixtureConfigureWandReceipt(int rule, int customItems);
+#endif
+static void SyncWandFixtureSettings() {
+#ifdef COMPASS_DONOR_INTEGRATION
+  // Production ComboSettingsSync mirrors these two options between hosts.
+  FixtureConfigureWandReceipt(wandRule, neiEnabled);
+#endif
+}
+extern "C" uint8_t Wand_RandoMode() { return wandRule; }
+extern "C" int32_t CVarGetInteger(const char* name, int32_t fallback) {
+  if (std::strcmp(name, "gRando.Options.RO_ELEMENTAL_WAND_SHUFFLE") == 0)
+    return wandRule;
+  if (std::strcmp(name, "gRando.Options.RO_SHUFFLE_NEI_ITEMS") == 0)
+    return neiEnabled;
+  if (std::strcmp(name, "gRandoEnhancements.RandomizeRupeeNames") == 0)
+    return randomRupeeNames < 0 ? fallback : randomRupeeNames;
+  return fallback;
+}
+using NativeRupeeHook = void (*)(u16*, bool*);
+static std::map<u16,NativeRupeeHook> nativeRupeeHooks;
+#define COND_ID_HOOK(kind,id,condition,callback) do { if(condition) nativeRupeeHooks[id]=callback; } while(0)
+#include "receipt_rupee_hooks.inc"
+#undef COND_ID_HOOK
 static RandoCheckId foreignRewardCheck = RC_UNKNOWN;
 static ComboRando::ForeignItem foreignReward;
 namespace Rando::MiscBehavior {
@@ -423,11 +459,237 @@ static void CheckMapCompassInformation() {
   std::cout << "MM map/compass information: four placed rewards, foreign owner names, native entrances, owned pause/Start With, gates and no save writes passed\n";
 }
 
+static void CheckRandomRupeeReceipts() {
+  const auto saved = gSaveContext;
+  gSaveContext.fileNum = 0;
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+  const struct { RandoItemId id; const char* name; const char* amount; unsigned color; } cases[] = {
+    {RI_RUPEE_GREEN, "Green Rupee", "1", 2}, {RI_RUPEE_BLUE, "Blue Rupee", "5", 3},
+    {RI_RUPEE_RED, "Red Rupee", "20", 1}, {RI_RUPEE_PURPLE, "Purple Rupee", "50", 6},
+    {RI_RUPEE_SILVER, "Silver Rupee", "100", 0}, {RI_RUPEE_HUGE, "Huge Rupee", "200", 4}
+  };
+  for (int enabled : {-1, 1}) {
+    randomRupeeNames = enabled;
+    for (auto [id, name, amount, color] : cases) {
+      for (auto lang : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+        gSaveContext.options.language = lang;
+        for (bool foreign : {false, true}) {
+          const auto before = gSaveContext;
+          CustomMessage::Entry receipt;
+          receipt.icon = 0xF5;
+          const bool applied = foreign ? Rando::ApplyForeignItemReceiptText(name, receipt)
+                                       : Rando::ApplyItemReceiptText(id, receipt);
+          assert(applied && "rupee enhancement must work without the donor/message table");
+          const std::string value = std::string(1, static_cast<char>(color)) + amount;
+          assert(!receipt.autoFormat && receipt.msg.find(value) != std::string::npos);
+          assert(receipt.msg.find(name) == std::string::npos);
+          assert(receipt.msg.find("%") == std::string::npos);
+          assert(receipt.msg.find("[P]") == std::string::npos);
+          assert(receipt.icon == 0xF5 && !receipt.receiptPresentation.singleBox);
+          assert(!std::memcmp(&gSaveContext, &before, sizeof(before)));
+        }
+      }
+    }
+  }
+  // Disabled and non-randomizer modes retain the ordinary native/donor path.
+  donorReady = false;
+  randomRupeeNames = 0;
+  CustomMessage::Entry receipt;
+  assert(!Rando::ApplyItemReceiptText(RI_RUPEE_BLUE, receipt));
+  assert(!Rando::ApplyForeignItemReceiptText("Blue Rupee", receipt));
+  randomRupeeNames = 1;
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_VANILLA;
+  assert(!Rando::ApplyItemReceiptText(RI_RUPEE_BLUE, receipt));
+  assert(!Rando::ApplyForeignItemReceiptText("Blue Rupee", receipt));
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+  assert(!Rando::ApplyForeignItemReceiptText("Silver Rupee (Forest Temple)", receipt));
+  donorReady = true;
+  randomRupeeNames = 0;
+  gSaveContext = saved;
+  std::cout << "Localized random rupee receipts: native/foreign values, live/default setting, modes and non-currency exclusion passed\n";
+}
+
+static void CheckNativeRupeeHooks() {
+  RegisterNativeRandomRupeeNames();
+  assert(nativeRupeeHooks.size()==7 && "native repeat/minigame rupee boxes need the enhancement too");
+  const struct {u16 text; const char* amount; unsigned color;} cases[] = {
+    {0xC4,"1",2},{0x2,"5",3},{0x3,"10",3},{0x4,"20",1},
+    {0x5,"50",6},{0x6,"100",0},{0x7,"200",4}
+  };
+  const auto saved=gSaveContext;
+  const auto* savedTable=gPlayState->msgCtx.messageTableNES;
+  MessageTableEntry table[]={{0xFFFF}};
+  gPlayState->msgCtx.messageTableNES=table;
+  gSaveContext.fileNum=0;
+  gSaveContext.save.shipSaveInfo.saveType=SAVETYPE_RANDO;
+  gSaveContext.options.language=LANGUAGE_ENG;
+  randomRupeeNames=1;
+  for(auto [id,amount,color]:cases) {
+    assert(nativeRupeeHooks.count(id));
+    auto text=id;bool load=true;
+    const auto before=gSaveContext;
+    nativeRupeeHooks[id](&text,&load);
+    const auto& receipt=CustomMessage::nativeRupeeLoaded;
+    assert(!load && text==id && !receipt.autoFormat);
+    assert(receipt.msg.find(std::string(1,char(color))+amount)!=std::string::npos && receipt.msg.back()==char(0xBF));
+    assert(receipt.textboxType==3 && receipt.textboxYPos==2 && receipt.icon==0xA7 &&
+           receipt.nextMessageID==0x1234 && receipt.firstItemCost==0x5678 && receipt.secondItemCost==0x9ABC);
+    assert(!std::memcmp(&gSaveContext,&before,sizeof(before)));
+  }
+  // Unrelated dialogue never registers, and live guards leave native loading intact.
+  assert(!nativeRupeeHooks.count(0x1C14) && !nativeRupeeHooks.count(CUSTOM_MESSAGE_ID));
+  const int before=CustomMessage::nativeRupeeLoads;
+  for(int guard=0;guard<4;++guard) {
+    auto id=u16(0x4);bool load=guard!=0;
+    randomRupeeNames=guard==1?0:1;
+    gSaveContext.fileNum=guard==2?0xFF:0;
+    gSaveContext.save.shipSaveInfo.saveType=guard==3?SAVETYPE_VANILLA:SAVETYPE_RANDO;
+    nativeRupeeHooks.at(id)(&id,&load);
+    assert(load==(guard!=0) && CustomMessage::nativeRupeeLoads==before);
+  }
+  randomRupeeNames=0;
+  gSaveContext=saved;
+  gPlayState->msgCtx.messageTableNES=const_cast<MessageTableEntry*>(savedTable);
+  std::cout<<"Native MM rupee award hooks: seven IDs including10, live guards, header/icon/END and save isolation passed\n";
+}
+
 int main(int argc, char** argv) {
   (void)argc;
   (void)argv;
   PlayState play{};
   gPlayState = &play;
+  const struct {
+    RandoItemId id;
+    const char* name;
+    const char* effect;
+    uint8_t color;
+  } magicItems[] = {
+    {RI_OOT_NEI_ELEMENTAL_WAND, "Elemental Wand", "medallion", 5},
+    {RI_OOT_NEI_WAND_SAND_ROD, "Sand Rod", "platform", 4},
+    {RI_OOT_NEI_WAND_TORNADO_ROD, "Tornado Rod", "jump", 2},
+    {RI_OOT_NEI_WAND_WATER_ROD, "Water Rod", "water", 3},
+    {RI_OOT_NEI_WAND_METEOR_ROD, "Meteor Rod", "explosive", 1},
+    {RI_OOT_NEI_WAND_STORM_ROD, "Storm Rod", "lightning", 5},
+    {RI_OOT_NEI_WAND_SHADOW_SCEPTER, "Shadow Scepter", "stun", 6},
+    {RI_OOT_NEI_SHEIKAH_SLATE, "Sheikah Slate", "rune", 5},
+    {RI_OOT_NEI_SLATE_RUNE_BOMB, "Rune: Remote Bomb", "detonate", 5},
+    {RI_OOT_NEI_SLATE_RUNE_STASIS, "Rune: Stasis", "Freeze", 4},
+    {RI_OOT_NEI_SLATE_RUNE_CRYONIS, "Rune: Cryonis", "pillar", 3},
+    {RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE, "Rune: Master Cycle", "motorcycle", 2},
+    {RI_OOT_NEI_DESIRE_SENSOR, "Rune: Sheikah Sensor", "Heart Container", 6},
+  };
+  const struct { RandoItemId id; const char* name; const char* power; } medallions[] = {
+    {RI_OOT_MEDALLION_SPIRIT, "Spirit Medallion", "Sand Rod"},
+    {RI_OOT_MEDALLION_FOREST, "Forest Medallion", "Tornado Rod"},
+    {RI_OOT_MEDALLION_WATER, "Water Medallion", "Water Rod"},
+    {RI_OOT_MEDALLION_FIRE, "Fire Medallion", "Meteor Rod"},
+    {RI_OOT_MEDALLION_LIGHT, "Light Medallion", "Storm Rod"},
+    {RI_OOT_MEDALLION_SHADOW, "Shadow Medallion", "Shadow Scepter"},
+  };
+  donorReady = false;
+  SyncWandFixtureSettings();
+  for (const auto& medallion : medallions) {
+    CustomMessage::Entry native, foreign;
+    const auto saveBefore = gSaveContext;
+    const auto neiBefore = neiSave;
+    assert(Rando::ApplyItemReceiptText(medallion.id, native));
+    assert(Rando::ApplyForeignItemReceiptText(medallion.name, foreign) && "medallion unlock needs its rod tutorial without a donor");
+    assert(native.msg == foreign.msg);
+    assert(native.msg.find(medallion.name) != std::string::npos);
+    assert(native.msg.find(medallion.power) != std::string::npos);
+    assert(native.msg.find("awakens") != std::string::npos);
+    assert(native.msg.size() <= 1269 && "magic description exceeds MM's textbox body capacity");
+    assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+    assert(!std::memcmp(&neiBefore, &neiSave, sizeof(neiBefore)));
+  }
+  for (int language : {LANGUAGE_GER, LANGUAGE_FRE}) {
+    gSaveContext.options.language = language;
+    for (const auto& medallion : medallions) {
+      CustomMessage::Entry native, foreign;
+      assert(Rando::ApplyItemReceiptText(medallion.id, native));
+      assert(Rando::ApplyForeignItemReceiptText(medallion.name, foreign));
+      assert(native.msg == foreign.msg);
+      assert(native.msg.find(language == LANGUAGE_GER ? "erweckt" : "pouvoir") != std::string::npos);
+      assert(native.msg.find('\xB2') != std::string::npos && native.msg.size() <= 1269);
+    }
+  }
+  gSaveContext.options.language = LANGUAGE_ENG;
+  for (int rule : {1, 2}) {
+    wandRule = rule;
+    SyncWandFixtureSettings();
+    for (const auto& medallion : medallions) {
+      CustomMessage::Entry receipt;
+      Rando::ApplyItemReceiptText(medallion.id, receipt);
+      assert(receipt.msg.find("awakens") == std::string::npos && "medallions unlock rods only in medallion mode");
+    }
+  }
+  wandRule = 0;
+  neiEnabled = false;
+  SyncWandFixtureSettings();
+  for (const auto& medallion : medallions) {
+    CustomMessage::Entry receipt;
+    Rando::ApplyItemReceiptText(medallion.id, receipt);
+    assert(receipt.msg.find("awakens") == std::string::npos && "disabled wand pool must retain ordinary medallion text");
+  }
+  neiEnabled = true;
+  SyncWandFixtureSettings();
+  for (bool ready : {false, true}) {
+    donorReady = ready;
+    gSaveContext.options.language = LANGUAGE_ENG;
+    for (const auto& item : magicItems) {
+      CustomMessage::Entry native, foreign;
+      native.msg = foreign.msg = "generic grant";
+      const auto saveBefore = gSaveContext;
+      const auto neiBefore = neiSave;
+      assert(Rando::ApplyItemReceiptText(item.id, native) && "native magic item has no description");
+      assert(Rando::ApplyForeignItemReceiptText(item.name, foreign) && "foreign magic item has no description");
+      assert(native.msg == foreign.msg && native.msg.find(item.effect) != std::string::npos);
+      assert(native.msg.find('\xB2') != std::string::npos && "missing equipped C-button glyph");
+      assert(native.msg.find('\xB3') != std::string::npos && native.msg.find('\xB0') != std::string::npos);
+      assert(native.msg.substr(0, native.msg.find('\x10')).find(char(item.color)) != std::string::npos);
+      assert(native.msg.find('%') == std::string::npos && "raw color markup leaked into a receipt");
+      assert(native.msg.size() <= 1269 && "magic description exceeds MM's textbox body capacity");
+      assert(!native.autoFormat && !native.capeVisibilityChoice && native.receiptPresentation.singleBox == 0);
+      assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+      assert(!std::memcmp(&neiBefore, &neiSave, sizeof(neiBefore)));
+    }
+    for (int language : {LANGUAGE_GER, LANGUAGE_FRE}) {
+      gSaveContext.options.language = language;
+      for (const auto& item : magicItems) {
+        CustomMessage::Entry native, foreign;
+        assert(Rando::ApplyItemReceiptText(item.id, native));
+        assert(Rando::ApplyForeignItemReceiptText(item.name, foreign));
+        assert(native.msg == foreign.msg);
+        assert(native.msg.find(language == LANGUAGE_GER ? "ziehen" : "sortir") != std::string::npos);
+        assert(native.msg.find('\xB2') != std::string::npos);
+        assert(native.msg.size() <= 1269);
+      }
+    }
+  }
+  gSaveContext.options.language = LANGUAGE_ENG;
+  for (int rule : {0, 1, 2}) {
+    wandRule = rule;
+    SyncWandFixtureSettings();
+    CustomMessage::Entry receipt;
+    assert(Rando::ApplyItemReceiptText(RI_OOT_NEI_ELEMENTAL_WAND, receipt));
+    assert(receipt.msg.find(rule == 0 ? "medallion" : rule == 1 ? "All six" : "separately") != std::string::npos);
+    if (rule != 2) {
+      for (const char* effect : {"platform", "wind", "water", "explosive", "lightning", "stun"})
+        assert(receipt.msg.find(effect) != std::string::npos && "shared wand pickup must teach every power");
+      if (rule == 0) {
+        for (const char* medallion : {"Spirit:", "Forest:", "Water:", "Fire:", "Light:", "Shadow:"})
+          assert(receipt.msg.find(medallion) != std::string::npos && "missing medallion-to-rod explanation");
+      }
+      const auto footer = receipt.msg.find("Equip to");
+      assert(footer != std::string::npos && receipt.msg.find("Equip to", footer+1) == std::string::npos);
+    }
+  }
+  wandRule = 0;
+  SyncWandFixtureSettings();
+  donorReady = true;
+  std::cout << "PASS 13 magic pickups and six medallion tutorials: effects, colors, glyphs, all locales, cold/warm donor, three wand rules and complete universal guide\n";
+  CheckRandomRupeeReceipts();
+  CheckNativeRupeeHooks();
   // A real cape identity carries the prompt marker through the native and
   // cross-game builders without changing ownership or visibility at preview
   // time.
