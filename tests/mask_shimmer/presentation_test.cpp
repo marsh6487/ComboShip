@@ -126,6 +126,9 @@ int DinFireShield_DrawItem(PlayState*, int16_t) { return 0; }
 int ResourceMgr_GetGiModelFitForGame(const char*, const char*, float, float, int, float[2]) { return 0; }
 int ResourceMgr_GetGiModelsFitForGame(const char*, const char* const*, int, float, float, int, float[2]) { return 0; }
 int ResourceMgr_GetDinSwordGiProfileForGame(const char*, const char*) { return 0; }
+int ResourceMgr_GetRewardSurfaceForGame(const char*, const char*, NeiGi::Mesh*) {
+    assert(false && "mask shimmer fixture must not query reward geometry"); return 0;
+}
 #ifdef HOST_MM
 Color_RGBA8 CosmeticEditor_GetChangedColor(u8, u8, u8, u8, const char*) {
     assert(false && "mask fixture unexpectedly selected a Din layer"); return {};
