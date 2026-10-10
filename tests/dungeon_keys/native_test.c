@@ -1,4 +1,17 @@
 #include "fixture_api.h"
+#include "combo/menu/ComboFairyBottle.h"
+static const char gGiEmptyBottleCorkDL[] =
+    "__OTR__objects/object_gi_bottle/gGiEmptyBottleCorkDL";
+static const char gGiEmptyBottleGlassDL[] =
+    "__OTR__objects/object_gi_bottle/gGiEmptyBottleGlassDL";
+static int ResourceMgr_IsModAsset(const char *path) {
+  assert(false && "Dungeon-item draws must not resolve bottle ownership");
+  return 0;
+}
+static int ResourceMgr_FileExists(const char *path) {
+  assert(false && "Dungeon-item draws must not resolve bundled bottle assets");
+  return 0;
+}
 int testSpinRed = 17;
 bool testAlt = true;
 int testColors = 1, testChanged = 0, testEmblemChanged = 0, testMissing = 0,

@@ -89,7 +89,8 @@ enum RandoItemId {
   RI_OOT_NEI_MARIO_MASK,
   RI_RED_POTION_REFILL,
   RI_GREEN_POTION_REFILL,
-  RI_BLUE_POTION_REFILL
+  RI_BLUE_POTION_REFILL,
+  RI_BOTTLE_EMPTY
 };
 #include "ComboOotBottleShimmerMM.h"
 /* PRODUCTION_OWNER */
@@ -171,6 +172,7 @@ enum RandomizerGet {
   RG_MASTER_SWORD,
   RG_TRUE_MASTER_SWORD,
   RG_BIGGORON_SWORD,
+  RG_GIANTS_KNIFE,
   RG_GREAT_FAIRY_SWORD
 };
 static bool ownerAltEnabled, ownerDin, ownerNotReady, ownerModuleReady;

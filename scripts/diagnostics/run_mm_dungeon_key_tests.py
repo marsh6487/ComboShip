@@ -47,11 +47,11 @@ parts = {
     'CACHE': oot[oot.index('namespace {'):oot.index('} // namespace') + len('} // namespace')],
     'HOST': function(oot, 'OOT_DrawForeignOps'),
 }
-native_names = ['GetItem_GetDungeonItemTint', 'GetItem_GetDungeonKeyEmblemTint', 'GetItem_GetDungeonKeyModel',
-                'GetItem_TryDrawDungeonKey', 'GetItem_DrawDungeonItem', 'GetItem_DrawOpa0',
+native_names = ['GetItem_EmptyBottleShell', 'GetItem_GetDungeonItemTint', 'GetItem_GetDungeonKeyEmblemTint',
+                'GetItem_GetDungeonKeyModel', 'GetItem_TryDrawDungeonKey', 'GetItem_DrawDungeonItem', 'GetItem_DrawOpa0',
                 'GetItem_DrawOpa0Xlu1', 'GetItem_DrawCompass']
 fixture = ROOT / 'tests/dungeon_keys'
-flags = ['-Wall', '-Wextra', '-Werror', '-Wno-unused-function', '-Wno-unused-parameter', '-Wno-unused-variable']
+flags = ['-I' + str(ROOT), '-Wall', '-Wextra', '-Werror', '-Wno-unused-function', '-Wno-unused-parameter', '-Wno-unused-variable']
 if '--sanitize' in sys.argv:
     flags += ['-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer',
               '-fno-pie', '-no-pie']
@@ -70,6 +70,6 @@ with tempfile.TemporaryDirectory(prefix='mm-dungeon-keys-') as td:
     for name, body in parts.items():
         source = source.replace('/* PRODUCTION_' + name + ' */', body)
     (build / 'cache.cpp').write_text(source)
-    subprocess.run([cxx, '-std=c++20', *flags, '-I' + str(ROOT), '-I' + str(ROOT / 'combo/menu'), str(build / 'cache.cpp'),
+    subprocess.run([cxx, '-std=c++20', *flags, '-I' + str(ROOT / 'combo/menu'), str(build / 'cache.cpp'),
                     str(build / 'native.o'), '-o', str(build / 'cache')], check=True)
     subprocess.run([str(build / 'cache')], check=True)
