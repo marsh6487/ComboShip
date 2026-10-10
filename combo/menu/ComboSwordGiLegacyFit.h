@@ -61,6 +61,7 @@ static inline void ComboSwordGi_ApplyLegacyFit(const char* host, NeiGi::Kind kin
             tilt = 2.1f;
             break;
         case NeiGi::Kind::BiggoronSword:
+        case NeiGi::Kind::GiantsKnife:
             if (!std::strcmp(host, "mm") &&
                 !ResourceMgr_IsModAssetForGame("mm", "objects/object_gi_longsword/gGiBiggoronSwordDL")) {
                 paths[0] = "objects/object_gi_longsword/gGiBiggoronSwordDL";
@@ -77,7 +78,7 @@ static inline void ComboSwordGi_ApplyLegacyFit(const char* host, NeiGi::Kind kin
                 paths[0] = "__OTR__@oot:objects/object_nei_four_sword/gNeiFourSwordBladeDL";
                 paths[1] = "__OTR__@oot:objects/object_nei_four_sword/gNeiFourSwordHiltDL";
                 scale = .04f;
-                tilt = 1.8f;
+                tilt = ComboSwordGi_SelectedTilt(1.5707963267948966f, shop);
             }
             count = 2;
             break;

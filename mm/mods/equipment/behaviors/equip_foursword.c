@@ -4,6 +4,7 @@
  * R + B held for 15 frames summons three clone actors (four_sword_clone.c) that hold formation
  * around Link and mirror the item he just used. Included by ext_equip_behavior.c (unity build).
  */
+#include "../../../../combo/NeiHeldSword.h"
 
 #include "overlays/actors/ovl_En_Arrow/z_en_arrow.h"
 
@@ -112,7 +113,7 @@ update_prev:
 
 // Held-sword model, queried from the L_HAND limb override in z_player_lib.c. Returns 1 and fills
 // blade/handle while the Four Sword is equipped and its resources resolved.
-u8 FourSword_HeldSwordDL(void** blade, void** handle) {
+u8 FourSword_HeldSwordDLForFrame(void** blade, void** handle, int frame) {
     if (FourSword_IsEquipped() && (NeiEquipment_IsLegacyMod(NEI_EQUIPMENT_FOUR_BLADE, FOURSWORD_BLADE_DL) ||
                                    NeiEquipment_IsLegacyMod(NEI_EQUIPMENT_FOUR_HILT, FOURSWORD_HILT_DL))) {
         // Keep the entire legacy pair if either half belongs to a selected mod.
@@ -145,6 +146,14 @@ u8 FourSword_HeldSwordDL(void** blade, void** handle) {
         return 1;
     }
 
+    if (FourSword_IsEquipped()) {
+        Gfx* exactSword = NeiHeldSword_ModelDL(NEI_HELD_SWORD_FOUR, frame);
+        if (exactSword != NULL) {
+            *blade = exactSword;
+            *handle = NULL;
+            return 1;
+        }
+    }
     if (FourSword_IsEquipped() && NeiEquipment_HasFourSword()) {
         Gfx* authoredBlade = NeiEquipment_ModelDL(NEI_EQUIPMENT_FOUR_BLADE, FOURSWORD_BLADE_DL);
         Gfx* authoredHilt = NeiEquipment_ModelDL(NEI_EQUIPMENT_FOUR_HILT, FOURSWORD_HILT_DL);
@@ -178,6 +187,12 @@ u8 FourSword_HeldSwordDL(void** blade, void** handle) {
     *blade = sBlade;
     *handle = sHilt;
     return 1;
+}
+
+// Native callers stay in MM's human frame, including peers while the local
+// Time Gate uses its adult overlay. The held handler supplies the actual frame.
+u8 FourSword_HeldSwordDL(void** blade, void** handle) {
+    return FourSword_HeldSwordDLForFrame(blade, handle, NEI_HELD_SWORD_MM_HUMAN);
 }
 
 // The sword action rides on ITEM_EXT_SWORD_2 itself (ExtEquip_SetSlot puts it on B and

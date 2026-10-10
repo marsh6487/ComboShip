@@ -10,6 +10,10 @@ from run_mm_weather_tests import production_function
 def body(path,name): return production_function((ROOT/path).read_text(),name)
 def run(name,prefix,parts,checks):
  if len(sys.argv)>1 and sys.argv[1]!=name:return
+ if any('Seasons_SeasonOwned(' in part or 'Seasons_HasRod(' in part for part in parts):
+  parts.insert(0, body('mm/mods/extended_inventory.c', 'Seasons_HasRod'))
+  prefix += '\nu16 Nei_GetOwnedItem(u8 slot){return Nei_Save()->ownedItems[slot-24];}\n'
+  prefix += 'u8 Seasons_RandoMode(){return NEI_SEASONS_INDIVIDUAL;}\nvoid Seasons_UpdateGates(){}\n'
  with tempfile.TemporaryDirectory(prefix='seasons-') as td:
   p=Path(td)/'test.cpp'
   p.write_text('#include "mods/extended_inventory.h"\n#include "mods/ext_buttons/ext_buttons.h"\n#include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"\n#include <cassert>\n#include <cstring>\n#include <iostream>\n'+prefix+'\n'+'\n'.join(parts)+'\nint main(){'+checks+'\nstd::cout<<"PASS '+name+'\\n";}')
@@ -74,7 +78,8 @@ if len(sys.argv)==1 or sys.argv[1]=='pool':
  text=(ROOT/'mm/2s2h/Rando/Logic/GeneratePools.cpp').read_text()
  pool=re.search(r'sNeiPoolItems\[\]\s*=\s*\{(.*?)\};',text,re.S).group(1)
  assert not re.search(r'\bRI_OOT_NEI_ROD_OF_SEASONS\b',pool),'bare rod must not be a placeable reward'
- for s in ['SPRING','SUMMER','AUTUMN','WINTER']: assert 'RI_OOT_NEI_SEASON_'+s in pool
+ for s in ['SPRING','SUMMER','AUTUMN','WINTER']: assert 'RI_OOT_NEI_SEASON_'+s in text
+ assert 'NEI_SEASONS_INDIVIDUAL' in text and 'RO_STARTING_ROD_OF_SEASONS' in text
  print('PASS pool')
 
 shop='mm/2s2h/Rando/ActorBehavior/EnGirlA.cpp'
@@ -340,7 +345,8 @@ drawn=true;hand=false;CustomItems_DrawRodOfSeasons(&player,&play);assert(models=
 
 snowpath='mm/src/overlays/actors/ovl_Object_Kankyo/z_object_kankyo.c'
 snowfunctions=['ObjectKankyo_SetupAction','func_808DC454','func_808DCB7C','func_808DCBF8','func_808DBEB0','func_808DBFB0','ObjectKankyo_Init','ObjectKankyo_Update']
-autumnfunctions=['ObjectKankyo_IsAutumnOwner','ObjectKankyo_AutumnBand','ObjectKankyo_InitAutumnParticle',
+autumnfunctions=['ObjectKankyo_IsAutumnOwner','ObjectKankyo_AutumnBand',
+                 'ObjectKankyo_IsCompactAutumnScene','ObjectKankyo_AutumnViewBasis','ObjectKankyo_InitAutumnParticle',
                  'ObjectKankyo_UpdateAutumnParticles','ObjectKankyo_RestoreAutumnParticle']
 if 'ObjectKankyo_UpdateSnowTarget' in (ROOT/snowpath).read_text():
  snowfunctions.insert(2,'ObjectKankyo_UpdateSnowTarget')
@@ -358,6 +364,8 @@ int MMWeather_SeasonForPlay(const PlayState*){return activeSeason;}
 void Actor_Kill(Actor* actor){actor->update=nullptr;actor->draw=nullptr;}
 f32 Rand_ZeroOne(){return .25f;}
 f32 MMWeather_RandomFloat(){assert(activeSeason==SEASON_AUTUMN);return .25f;}
+// Window aspect is an external boundary; use the native 4:3 fixture viewport.
+f32 OTRGetAspectRatio(){return 4.0f/3.0f;}
 s16 Camera_GetCamDirPitch(Camera*){return 0;}
 f32 Math_Vec3f_DistXZ(Vec3f* a,Vec3f* b){return sqrtf(SQ(a->x-b->x)+SQ(a->z-b->z));}
 void func_808DBE8C(ObjectKankyo*){}

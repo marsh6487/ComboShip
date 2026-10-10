@@ -4,6 +4,7 @@
  * R + B held for 15 frames summons three clone actors (actors/four_sword_clone.c) that hold
  * formation around Link and mirror the item he just used. Included by ext_equip_behavior.c.
  */
+#include "../../../../combo/NeiHeldSword.h"
 
 #define FOURSWORD_BLADE_DL "__OTR__objects/object_nei_four_sword/gNeiFourSwordBladeDL"
 #define FOURSWORD_HILT_DL "__OTR__objects/object_nei_four_sword/gNeiFourSwordHiltDL"
@@ -260,6 +261,14 @@ u8 FourSword_HeldSwordDL(void** blade, void** handle) {
         return 1;
     }
 
+    if (FourSword_IsEquipped()) {
+        Gfx* exactSword = NeiHeldSword_ModelDL(NEI_HELD_SWORD_FOUR, gSaveContext.linkAge);
+        if (exactSword != NULL) {
+            *blade = exactSword;
+            *handle = NULL;
+            return 1;
+        }
+    }
     if (FourSword_IsEquipped() && NeiEquipment_HasFourSword()) {
         Gfx* authoredBlade = NeiEquipment_ModelDL(NEI_EQUIPMENT_FOUR_BLADE, FOURSWORD_BLADE_DL);
         Gfx* authoredHilt = NeiEquipment_ModelDL(NEI_EQUIPMENT_FOUR_HILT, FOURSWORD_HILT_DL);

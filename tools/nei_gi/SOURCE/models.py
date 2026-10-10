@@ -418,7 +418,7 @@ def gate():
         rr=np.arange(1,min(w,h)/2);xs=np.clip(np.rint(cx+np.cos(a)*rr).astype(int),0,w-1);ys=np.clip(np.rint(cy-np.sin(a)*rr).astype(int),0,h-1)
         hits=rr[alpha[ys,xs]>230];r=(hits[-1] if len(hits) else min(w,h)*.35)/min(w,h)*106
         outline.append([math.cos(a)*r,math.sin(a)*r])
-    m.polygon('Carved gear body','frame',outline,depth=6,bevel=.6)
+    m.polygon('Carved gear body','frame',outline,depth=6,bevel=.6,closed_sides=True)
     for sign in [-1,1]:
         p=np.array([[0,0,sign*3.1]]+[[x,y,sign*3.1] for x,y in outline]);uv=np.c_[p[:,0]/106+.5,.5-p[:,1]/106]
         tri=[[0,j+1,(j+1)%len(outline)+1] for j in range(len(outline))]

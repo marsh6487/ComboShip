@@ -5,6 +5,7 @@
 #include "soh/Enhancements/randomizer/rng.h"
 #include "soh/OTRGlobals.h"
 #include "../../../../combo/NeiGracePolicy.h"
+#include "../../../../combo/NeiSeasonsPolicy.h"
 
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -1498,6 +1499,16 @@ void Settings::CreateOptions() {
     OPT_U8(RSK_ELEMENTAL_WAND_SHUFFLE, "Elemental Wand", { "Medallions", "Single item", "Elemental shuffle" },
            OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("ElementalWandShuffle"),
            mOptionDescriptions[RSK_ELEMENTAL_WAND_SHUFFLE], WIDGET_CVAR_COMBOBOX, RO_WAND_MEDALLIONS);
+    OPT_U8(RSK_ROD_OF_SEASONS, "Rod of Seasons", { "Individual seasons", "Rod", "Gated" },
+           OptionCategory::Setting, CVAR_RANDOMIZER_SETTING("RodOfSeasons"),
+           "Rod: one pickup unlocks all four seasons. Individual seasons: four pickups; the first grants the Rod.\n"
+           "Gated: one Rod; seasons unlock on completion of dungeon/event checks in either game.\n"
+           "Spring: Windmill Song of Storms check OR Jabu OR Water Temple OR Great Bay.\n"
+           "Summer: Fire Temple OR Stone Tower. Autumn: Forest Temple OR Woodfall. Winter: Ice Cavern's final Sheik check OR Snowhead.\n"
+           "Gates apply only in Gated mode. Seasons are not used by the reachability solver.",
+           WIDGET_CVAR_COMBOBOX, NEI_SEASONS_INDIVIDUAL);
+    OPT_BOOL(RSK_STARTING_ROD_OF_SEASONS, "Start with Rod of Seasons", CVAR_RANDOMIZER_SETTING("StartingRodOfSeasons"),
+             "Start with the Rod. Rod mode grants all seasons; Individual and Gated keep their normal unlock rules.");
     OPT_U8(RSK_HYLIAS_GRACE, "Hylia's Grace", { "On", "Off", "Gated" }, OptionCategory::Setting,
            CVAR_RANDOMIZER_SETTING("HyliasGrace"),
            "On: include fairy flight. Off: exclude it. Gated: require collected dungeon rewards to cast.",
@@ -3557,6 +3568,8 @@ void Settings::ParseJson(const nlohmann::json& spoilerFileJson) {
     // newer seed must restore that behavior rather than inherit its restriction.
     mContext->GetOption(RSK_HYLIAS_GRACE).Set(NEI_GRACE_ON);
     mContext->GetOption(RSK_HYLIAS_GRACE_REWARDS).Set(4);
+    mContext->GetOption(RSK_ROD_OF_SEASONS).Set(NEI_SEASONS_INDIVIDUAL);
+    mContext->GetOption(RSK_STARTING_ROD_OF_SEASONS).Set(0);
     nlohmann::json settingsJson = spoilerFileJson.value("settings", nlohmann::json());
     for (auto it = settingsJson.begin(); it != settingsJson.end(); ++it) {
         // todo load into cvars for UI

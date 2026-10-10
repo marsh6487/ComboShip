@@ -5,6 +5,11 @@
 #include "mods/extended_inventory.h"
 #include "mods/nei_save.h"
 #include "mods/forms/custom_forms.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/ShipInit.hpp"
+
+static GameInteractor fixtureInteractor;
+GameInteractor* GameInteractor::Instance = &fixtureInteractor;
 
 static s32 otherForm = CUSTOM_FORM_NONE;
 static u8 pendant, beetle, kite, trident, mario, customItemBlock, pakModel, pakBodyModel, o2rModel;
@@ -13,6 +18,8 @@ static bool nativeAnimationDone;
 static u16 hookSuppressedButtons;
 static unsigned drawContinuations;
 extern "C" {
+void Play_Init(GameState*) {}
+void TitleSetup_Init(GameState*) {}
 void WolfFixture_DrawNativePrefix(PlayState*, Player*);
 void Matrix_Push(void) {}
 void Matrix_Pop(void) {}
@@ -128,6 +135,8 @@ int main(int argc, char** argv) {
     std::memset(gSaveContext.save.saveInfo.equips.buttonItems, ITEM_NONE,
                 sizeof(gSaveContext.save.saveInfo.equips.buttonItems));
     gSaveContext.save.saveInfo.playerData.health = 48;
+    integerCvars["gMods.TransformMasks.Enabled"] = 0; // Native MM Wolf does not depend on OoT's master gate.
+    ShipInit::InitAll();
     Nei_Save()->ownedItems[SLOT_SHADOW_CRYSTAL - 24] = EXT_ITEM_SHADOW_CRYSTAL;
     PlayState play{};
     Player player{};
@@ -135,6 +144,8 @@ int main(int argc, char** argv) {
     GraphicsContext gfx{};
     Gfx commands[128]{};
     play.state.gfxCtx = &gfx;
+    play.state.running = true;
+    play.state.init = Play_Init;
     play.cameraPtrs[0] = &camera;
     gPlayState = &play;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
@@ -387,8 +398,28 @@ int main(int argc, char** argv) {
     assert(WolfLinkForm_IsReady());
     play.transitionTrigger = TRANS_TRIGGER_START;
     frame();
-    assert(!WolfLinkForm_IsReady());
+    assert(!WolfLinkForm_IsReady() && WolfLinkForm_IsSelected() &&
+           "normal scene transition must retain the selection while releasing old-scene runtime");
+    assert(!(player.stateFlags3 & PLAYER_STATE3_4) && player.cylinder.dim.radius == 12);
+    play.state.running = false;
+    WolfLinkHost_Destroy(&play, &player);
+    assert(!WolfLinkForm_IsReady() && WolfLinkForm_IsSelected() && !sWolf.atCylInit);
+    ++play.sceneId;
+    play.gameplayFrames = 0;
+    play.state.running = true;
+    play.transitionTrigger = TRANS_TRIGGER_END;
+    frame();
+    assert(!WolfLinkForm_IsReady() && WolfLinkForm_IsSelected());
     play.transitionTrigger = TRANS_TRIGGER_OFF;
+    frame();
+    assert(WolfLinkForm_IsReady() && WolfLinkForm_IsSelected() && sWolf.owner == &player &&
+           "arrival restores Wolf without a second Shadow Crystal press");
+    frame(BTN_CLEFT);
+    assert(!WolfLinkForm_IsReady() && !WolfLinkForm_IsSelected());
+    ++play.sceneId;
+    frame();
+    assert(!WolfLinkForm_IsReady() && !WolfLinkForm_IsSelected() &&
+           "deliberate detransformation must survive the next scene");
     frame(BTN_CLEFT);
     assert(WolfLinkForm_IsReady());
     player.stateFlags1 = PLAYER_STATE1_DEAD;
@@ -399,11 +430,99 @@ int main(int argc, char** argv) {
     assert(WolfLinkForm_IsReady());
     ++play.sceneId;
     frame();
-    assert(!WolfLinkForm_IsReady());
+    assert(WolfLinkForm_IsReady() && WolfLinkForm_IsSelected() && sWolf.owner == &player &&
+           "scene-id fallback must rebuild the transient runtime and retain Wolf");
+    Player replacement{};
+    replacement.transformation = PLAYER_FORM_HUMAN;
+    replacement.actor.bgCheckFlags = BGCHECKFLAG_GROUND;
+    replacement.cylinder.dim.radius = 12;
+    replacement.cylinder.dim.height = 50;
+    replacement.actor.shape.shadowDraw = ActorShadow_DrawFeet;
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &replacement.actor;
+    play.state.input[0] = {};
+    WolfLinkHost_PreUpdate(&play, &replacement);
+    Input replacementInput{};
+    WolfLinkHost_FilterInput(&replacement, &replacementInput);
+    WolfLinkHost_BeforeAction(&play, &replacement, &replacementInput);
+    assert(WolfLinkForm_IsReady() && WolfLinkForm_IsSelected() && sWolf.owner == &replacement &&
+           "actor replacement must not dereference the departed owner or erase the selection");
+    play.state.running = false;
+    WolfLinkHost_Destroy(&play, &replacement);
+    assert(!WolfLinkForm_IsReady() && WolfLinkForm_IsSelected());
+    play.state.running = true;
+    // The departed actor is gone in-game; reconstruct the next native player here.
+    player = Player{};
+    player.transformation = PLAYER_FORM_HUMAN;
+    player.actor.bgCheckFlags = BGCHECKFLAG_GROUND;
+    player.cylinder.dim.radius = 12;
+    player.cylinder.dim.height = 50;
+    player.actor.shape.shadowDraw = ActorShadow_DrawFeet;
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
+    frame();
+    assert(WolfLinkForm_IsReady());
+    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnSaveLoad>((s16)gSaveContext.fileNum);
+    assert(!WolfLinkForm_IsReady() && !WolfLinkForm_IsSelected() &&
+           "same-slot save reload must clear the transient Wolf selection");
     frame(BTN_CLEFT);
     assert(WolfLinkForm_IsReady());
+    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnSaveInit>((s16)gSaveContext.fileNum);
+    assert(!WolfLinkForm_IsReady() && !WolfLinkForm_IsSelected());
+    frame(BTN_CLEFT);
+    ++gSaveContext.fileNum;
+    frame();
+    assert(!WolfLinkForm_IsReady() && !WolfLinkForm_IsSelected() && "file switching resets Wolf");
+    frame(BTN_CLEFT);
+    integerCvars["gMods.WolfLink.Enabled"] = 0;
+    frame();
+    assert(!WolfLinkForm_IsReady() && !WolfLinkForm_IsSelected());
+    integerCvars["gMods.WolfLink.Enabled"] = 1;
+    frame();
+    assert(!WolfLinkForm_IsReady());
+    frame(BTN_CLEFT);
+    play.transitionTrigger = TRANS_TRIGGER_START;
+    frame();
+    assert(WolfLinkForm_IsSelected() && !WolfLinkForm_IsReady());
+    integerCvars["gMods.WolfLink.Enabled"] = 0;
+    frame();
+    assert(!WolfLinkForm_IsSelected() && !WolfLinkForm_IsReady() &&
+           "disable also cancels a pending scene restoration");
+    integerCvars["gMods.WolfLink.Enabled"] = 1;
+    play.transitionTrigger = TRANS_TRIGGER_OFF;
+    frame(BTN_CLEFT);
+    play.state.running = false;
+    play.state.init = TitleSetup_Init;
     WolfLinkHost_Destroy(&play, &player);
-    assert(!WolfLinkForm_IsReady() && !sWolf.atCylInit && !(player.stateFlags3 & PLAYER_STATE3_4));
+    assert(!WolfLinkForm_IsReady() && !WolfLinkForm_IsSelected() && "title handoff resets Wolf");
+    play.state.running = true;
+    play.state.init = Play_Init;
+    frame(BTN_CLEFT);
+    gSaveContext.gameMode = GAMEMODE_OWL_SAVE;
+    play.state.running = false;
+    WolfLinkHost_Destroy(&play, &player);
+    assert(!WolfLinkForm_IsReady() && !WolfLinkForm_IsSelected() && !sWolf.atCylInit &&
+           !(player.stateFlags3 & PLAYER_STATE3_4) && "owl-save quit resets Wolf");
+    gSaveContext.gameMode = GAMEMODE_NORMAL;
+    play.state.running = true;
+    frame(BTN_CLEFT);
+    assert(sWolfAudio.voices[0].clip == kWolfClips && "a deliberate MM entry starts the supplied Wolf cue");
+    frame(BTN_CLEFT);
+    assert(!WolfLinkForm_IsReady() && !WolfLinkForm_IsSelected() &&
+           sWolfAudio.voices[0].clip == kWolfClips + 1 &&
+           "the deliberate MM exit starts Human audio after runtime cleanup");
+    s16 tailPcm[1024]{};
+    play.pauseCtx.state = PAUSE_STATE_MAIN;
+    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnGameStateUpdate>();
+    MM_WolfLinkSfx_MixInto(tailPcm, 512);
+    assert(sWolfAudio.voices[0].position == 0 &&
+           std::all_of(std::begin(tailPcm), std::end(tailPcm), [](s16 value) { return value == 0; }) &&
+           "the registered MM game-state hook pauses Human tails without an active Wolf player");
+    play.pauseCtx.state = PAUSE_STATE_OFF;
+    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnGameStateUpdate>();
+    MM_WolfLinkSfx_MixInto(tailPcm, 512);
+    assert(sWolfAudio.voices[0].position > 0 &&
+           std::any_of(std::begin(tailPcm), std::end(tailPcm), [](s16 value) { return value != 0; }));
+    GameInteractor::Instance->ExecuteHooks<GameInteractor::OnSaveLoad>((s16)gSaveContext.fileNum);
+    assert(!sWolfAudio.voices[0].clip && !sWolfAudio.voices[1].clip);
     // A malformed replacement on a fresh load retains the normal player's draw, input and shape.
     sAssetsLoaded = 0;
     auto bad = makeAsset();
@@ -420,5 +539,5 @@ int main(int argc, char** argv) {
     assert(logged("reason=open-failed") && logged("result=asset-load-failed"));
     assert(logged((assetDirectory + "/wolf_link.bin").c_str()));
     std::puts("PASS production MM Wolf host: full-width C/D-pad toggles, native damage/freeze/thaw action dispatch, "
-              "input/tool arbitration, rendering and teardown");
+              "input/tool arbitration, rendering, scene/actor persistence, save/file/title resets and teardown");
 }

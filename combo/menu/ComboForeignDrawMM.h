@@ -35,8 +35,10 @@
 #include <unordered_set>
 
 #include "ComboItemDrawABI.h"
+#include "ComboRewardGi.h"
 #include "ComboMmNativeImports.h"
 #include "ComboFairyBottle.h"
+#include "ComboBottleContents.h"
 #include "ComboSwordGiFit.h"
 #define COMBO_DIN_SWORD_GI_HOST_MM
 #include "ComboDinSwordGi.h"
@@ -280,6 +282,7 @@ inline ComboForeignResolveOOT ComboFillForeignDrawInfoOOT(RandoCheckId rc, Combo
 struct ComboForeignDrawCacheOOT {
     std::unordered_map<int32_t, ComboForeignDrawInfoOOT> map;
     std::unordered_map<int32_t, std::string> receiptNames;
+    std::unordered_map<int32_t, std::string> swordReceiptNames;
     int slot = -1;
     uint64_t gen = (uint64_t)-1;
 };
@@ -291,6 +294,7 @@ inline ComboForeignDrawCacheOOT& ComboForeignDrawCacheOOTGet() {
     if (slot != c.slot || gen != c.gen) {
         c.map.clear();
         c.receiptNames.clear();
+        c.swordReceiptNames.clear();
         c.slot = slot;
         c.gen = gen;
     }
@@ -308,7 +312,11 @@ inline const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckI
     // A state-dependent recipe (progressive tier, Triforce shard, junk/trap) is re-resolved every
     // frame; caching it would freeze whichever model happened to be correct on the first draw.
     ComboForeignDrawInfoOOT info{}; // built locally: a failure must not clobber a live cached recipe
-    if (ComboFillForeignDrawInfoOOT(rc, info) == ComboForeignResolveOOT::NotReady) {
+    // Once granted, refresh only the frozen concrete sword's appearance.
+    // Resolving its progressive placeholder again would select the NEXT tier.
+    auto receipt = c.swordReceiptNames.find(rc);
+    const char* namedItem = receipt != c.swordReceiptNames.end() ? receipt->second.c_str() : nullptr;
+    if (ComboFillForeignDrawInfoOOT(rc, info, namedItem) == ComboForeignResolveOOT::NotReady) {
         c.map.erase(rc); // transient — retry next frame instead of freezing the sentinel in
         return nullptr;
     }
@@ -332,6 +340,13 @@ inline void ComboLatchForeignDrawOOT(RandoCheckId rc) {
         c.receiptNames[rc] = info.resolvedName;
     if (info.animOk) {
         return; // that class's state-dependence is a CVar (SimplerBossSoulModels), not save state
+    }
+    // Progressive producers use stateDependent=1 to freeze the awarded tier.
+    // Its sword mesh must still follow the host's live Alt Assets selection.
+    if (!info.resolvedName.empty() && info.neiShimmer > 0 &&
+        NeiGi::IsSword(static_cast<NeiGi::Kind>(info.neiShimmer - 1))) {
+        c.swordReceiptNames[rc] = info.resolvedName;
+        info.appearanceDependent = true;
     }
     info.stateDependent = info.appearanceDependent; // Freeze tiers while keeping appearance live.
     c.map[rc] = info;
@@ -638,7 +653,7 @@ inline void MM_DrawForeignPoes(const ComboForeignDrawInfoOOT* info) {
 inline void MM_DrawForeignFairy(const ComboForeignDrawInfoOOT* info) {
     PlayState* play = gPlayState;
     GraphicsContext* gfxCtx = play->state.gfxCtx;
-    const ComboFairyBottleMotion motion = ComboFairyBottle_Sample(play->gameplayFrames);
+    const ComboFairyBottleMotion motion = ComboFairyBottle_SampleForShell(play->gameplayFrames, info->dls[0]);
     OPEN_DISPS(gfxCtx);
     Gfx_SetupDL25_Opa(gfxCtx);
     MM_FOREIGN_PIN_OPA();
@@ -660,7 +675,7 @@ inline void MM_DrawForeignFairy(const ComboForeignDrawInfoOOT* info) {
     Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
     Matrix_ReplaceRotation(&play->billboardMtxF);
     Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
-    if (!ComboFairyBottle_DrawVfx(play)) {
+    if (!ComboFairyBottle_DrawVfx(play, info->dls[0])) {
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
         gSPDisplayList(POLY_XLU_DISP++, (Gfx*)info->dls[2]);
     }
@@ -668,6 +683,8 @@ inline void MM_DrawForeignFairy(const ComboForeignDrawInfoOOT* info) {
     CLOSE_DISPS(gfxCtx);
     int32_t segs[] = { 0x08 };
     MM_RestoreForeignSegs(segs, 1);
+    if (ComboFairyBottle_IsBundledShell(info->dls[0]))
+        ComboBottleShimmer_DrawMotes(play, CW_SHIMMER_FAIRY);
 }
 
 // Spiritual stones: seg9 XLU + seg8 OPA (static binds), rotate, per-layer prim/env colors, gem dl0
@@ -694,15 +711,19 @@ inline void MM_DrawForeignJewel(const ComboForeignDrawInfoOOT* info) {
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 128, info->primColorOpa[0], info->primColorOpa[1], info->primColorOpa[2], 255);
     gDPSetEnvColor(POLY_OPA_DISP++, info->envColorOpa[0], info->envColorOpa[1], info->envColorOpa[2], 255);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)info->dls[1]);
-    Matrix_Pop();
     CLOSE_DISPS(gfxCtx);
     int32_t segs[] = { 0x08, 0x09 };
+    // Complete the native recipe's allocating tail before optional materials.
     MM_RestoreForeignSegs(segs, 2);
+    NeiGi_DrawRewardMaterial(play, RewardGi_ProfileForPaths(info->dls[0], nullptr), info->dls[0], info->dls[1], "oot");
+    Matrix_Pop();
 }
 
 // Din's Fire / Farore's Wind / Nayru's Love: XLU seg8 scroll, dl0,1,2 (GetItem_DrawMagicSpell).
 inline void MM_DrawForeignMagicSpell(const ComboForeignDrawInfoOOT* info) {
     PlayState* play = gPlayState;
+    if (!NeiGi_CanDrawElementalSpellFallback(play))
+        return;
     GraphicsContext* gfxCtx = play->state.gfxCtx;
     OPEN_DISPS(gfxCtx);
     Gfx_SetupDL25_Xlu(gfxCtx);
@@ -1074,6 +1095,8 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info, bool sho
     const uint32_t bits = (static_cast<uint32_t>(gPlayState->gameplayFrames) * 2u) & 0xFFFFu;
     const int32_t rotation = bits >= 0x8000u ? static_cast<int32_t>(bits) - 0x10000 : bits;
     Matrix_RotateYF(rotation * .01f, MTXMODE_APPLY);
+    const bool sword = info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1 &&
+                       NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
     int selectedOpaque = -1;
     bool noCull = false;
     for (int i = 0; i < info->opCount; ++i) {
@@ -1083,7 +1106,8 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info, bool sho
                 Matrix_RotateXF(op.a * (3.14159265358979323846f / 32768.0f), MTXMODE_APPLY);
                 break;
             case CW_OP_ROTATE_Z:
-                Matrix_RotateZF(op.a * (3.14159265358979323846f / 32768.0f), MTXMODE_APPLY);
+                Matrix_RotateZF(ComboSwordGi_SelectedTilt(op.a * (3.14159265358979323846f / 32768.0f), shop && sword),
+                                MTXMODE_APPLY);
                 break;
             case CW_OP_SCALE:
                 Matrix_Scale(op.a, op.b, op.c, MTXMODE_APPLY);
@@ -1140,7 +1164,7 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info, bool sho
     }
     CLOSE_DISPS(gfxCtx);
     if (info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z && info->neiShimmer > 0 &&
-        info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Gold) + 1 &&
+        info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1 &&
         NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
         ComboDinSwordGi_DrawLayers(gPlayState, "oot", info->dls[0]);
     Matrix_Pop();
@@ -1249,7 +1273,7 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
         return;
     }
     const bool swordIdentity = info->neiShimmer > 0 &&
-                               info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Gold) + 1 &&
+                               info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1 &&
                                NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
     const bool fitModel =
         info->count > 0 &&
@@ -1260,6 +1284,10 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
                             info->drawKind == CW_DRAW_KIND_GORON_SWORD)));
     const bool swordFlame = swordIdentity && info->primColorXlu[3] &&
                             (info->drawKind == CW_DRAW_KIND_CUSTOM_GI || info->drawKind == CW_DRAW_KIND_MASTER_SWORD);
+    if (fitModel && swordIdentity) {
+        Matrix_Push();
+        ComboSwordGi_ApplyPresentationSize(shop, mmPickup);
+    }
     if (swordFlame) {
         Matrix_Push();
         ComboSwordGi_ApplyEffectFit(static_cast<NeiGi::Kind>(info->neiShimmer - 1), shop, mmPickup);
@@ -1275,11 +1303,13 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
         const float tilt =
             info->drawKind == CW_DRAW_KIND_MASTER_SWORD ? 2.1f
             : info->drawKind == CW_DRAW_KIND_CUSTOM_GI && info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z
-                ? info->ops[0].a * (3.14159265358979323846f / 32768.f)
+                ? ComboSwordGi_SelectedTilt(info->ops[0].a * (3.14159265358979323846f / 32768.f), shop && swordIdentity)
                 : 0.f;
         ComboSwordGi_ApplyModelsFit("oot", info->dls, info->count, scale, tilt, shop, mmPickup);
     }
-    const bool overlayShimmer = info->itemShimmer && info->drawKind != CW_DRAW_KIND_ELEMENTAL_ARROW;
+    const int reward = RewardGi_ProfileForPaths(info->dls[0], info->count > 1 ? info->dls[1] : nullptr);
+    const bool overlayShimmer = info->itemShimmer && !reward && info->drawKind != CW_DRAW_KIND_ELEMENTAL_ARROW &&
+                                info->drawKind != CW_DRAW_KIND_MAGIC_SPELL;
     if (overlayShimmer) {
         Matrix_Push();
     }
@@ -1289,7 +1319,7 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
             core.count = 1;
             core.xluStart = -1;
             MM_DrawForeignSimple(&core);
-            NeiGi_DrawElementalArrow(gPlayState, info->neiEffect);
+            NeiGi_DrawElementalArrowForOwner(gPlayState, info->neiEffect, 0, shop);
             break;
         }
         case CW_DRAW_KIND_GORON_SWORD:
@@ -1323,7 +1353,8 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
             MM_DrawForeignJewel(info);
             break;
         case CW_DRAW_KIND_MAGIC_SPELL:
-            MM_DrawForeignMagicSpell(info);
+            if (!NeiGi_DrawElementalSpell(gPlayState, info->neiEffect, 0, shop))
+                MM_DrawForeignMagicSpell(info);
             break;
         case CW_DRAW_KIND_SCALE:
             MM_DrawForeignScale(info);
@@ -1356,6 +1387,11 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
         case CW_DRAW_KIND_OOT_NATIVE_EQUIPMENT:
             MM_DrawForeignNativeEquipment(info);
             break;
+        case CW_DRAW_KIND_BOTTLE_CONTENTS:
+            if (!ComboBottleContents_Draw(gPlayState, ComboBottleContents_Profile(info->dls[0]))) {
+                MM_DrawForeignSimple(info);
+            }
+            break;
         case CW_DRAW_KIND_SEASON_GI:
             if (info->neiEffect == 5)
                 MM_DrawForeignCustomGi(info, shop, !swordFlame);
@@ -1381,6 +1417,8 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
             MM_DrawForeignSimple(info);
             break;
     }
+    if (reward >= 1 && reward <= 6)
+        NeiGi_DrawRewardMaterial(gPlayState, reward, info->dls[0], info->count > 1 ? info->dls[1] : nullptr, "oot");
     if (overlayShimmer)
         Matrix_Pop();
     if (fitModel && swordIdentity)
@@ -1390,14 +1428,14 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
             Matrix_Push();
             ComboSwordGi_ApplyEffectFit(static_cast<NeiGi::Kind>(info->neiShimmer - 1), shop, mmPickup);
         }
-        if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Gold) + 1 &&
+        if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1 &&
             NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
             NeiGi_DrawMesh(gPlayState, NeiGi::SampleSpecial(static_cast<NeiGi::Kind>(info->neiShimmer - 1),
                                                             gPlayState->gameplayFrames, NeiGi_CameraBasis(gPlayState)));
         const bool mmOwner = info->drawKind == CW_DRAW_KIND_MM_MASK || info->drawKind == CW_DRAW_KIND_MM_REMAINS;
         if (info->drawKind == CW_DRAW_KIND_SONG_GI)
             NeiGi_DrawSongOverlay(gPlayState, info->neiEffect, "oot");
-        else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Gold) + 1)
+        else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1)
             NeiGi_DrawMesh(gPlayState,
                            NeiGi::SampleShimmer(gPlayState->gameplayFrames, true, NeiGi_CameraBasis(gPlayState),
                                                 static_cast<NeiGi::Kind>(info->neiShimmer - 1)));
@@ -1410,6 +1448,8 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
     if (overlayShimmer && swordIdentity)
         Matrix_Pop();
     if (fitModel && !swordIdentity)
+        Matrix_Pop();
+    if (fitModel && swordIdentity)
         Matrix_Pop();
 }
 

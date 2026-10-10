@@ -41,6 +41,7 @@
 #include "gui/ComboGenProgress.h"
 #include "ComboExtract.h"
 #include "ComboSettingsImport.h"
+#include "gameplay/ComboFaroresWindJson.h"
 
 // Surfaces the real exception behind a silent terminate()/exit(3). With the shared dynamic
 // CRT, exceptions thrown in soh.dll/2ship.dll propagate across the DLL boundary to here.
@@ -229,6 +230,13 @@ static FnVoidArgless SOH_NotifyComboReturn = nullptr;
 typedef void (*FnMMResume)(int);
 static FnMMResume MM_ResumeGame = nullptr;
 static FnVoidArgless MM_PrepareForTransition = nullptr;
+static int g_PendingMMFileNum = -1;
+typedef void (*FnSetFwCallbacks)(const ComboFwCallbacks*);
+typedef int (*FnSetFwArrival)(int, const ComboFwPoint*);
+static FnSetFwCallbacks SOH_SetFwCallbacks = nullptr;
+static FnSetFwCallbacks MM_SetFwCallbacks = nullptr;
+static FnSetFwArrival SOH_SetFwArrival = nullptr;
+static FnSetFwArrival MM_SetFwArrival = nullptr;
 
 // ComboShip: headless static-data dump exports
 typedef const char* (*FnDumpData)(void);
@@ -594,9 +602,57 @@ static void Combo_WriteGameSave(int game, int fileNum, const char* json) {
     FlushContainer(fileNum);
 }
 
-// Record which game the player is now in, so a quit-and-reload resumes there. Set at the two
-// transitions only — NOT from save writes: loading an OOT save itself writes sections (rando and
-// check-tracker OnLoadGame handlers), which would stamp OOT over the MM the player actually left in.
+// One authoritative, slot-scoped point. Native fw structs remain unchanged for save compatibility.
+static int Combo_ReadFwPoint(int slot, ComboFwPoint* point) {
+    if (!ComboIsValidSlot(slot) || !point)
+        return 0;
+    std::lock_guard<std::mutex> lk(g_containerMutex);
+    auto& c = LoadOrCreateContainer(slot);
+    auto combo = c.find("combo");
+    if (combo == c.end())
+        return -1;
+    if (!combo->is_object())
+        return 0;
+    if (!combo->contains("faroresWind"))
+        return -1;
+    return ComboFw_DecodePoint((*combo)["faroresWind"], *point) ? 1 : 0;
+}
+
+static int Combo_WriteFwPoint(int slot, const ComboFwPoint* point) {
+    if (!ComboIsValidSlot(slot) || (point && !ComboFw_PointValid(point)))
+        return 0;
+    std::lock_guard<std::mutex> lk(g_containerMutex);
+    auto& c = LoadOrCreateContainer(slot);
+    if (c.contains("combo") && !c["combo"].is_object())
+        return 0;
+    c["combo"]["faroresWind"] = point ? ComboFw_EncodePoint(*point) : nlohmann::json(nullptr);
+    FlushContainer(slot);
+    return 1;
+}
+
+static int Combo_RequestFwReturn(int sourceGame, int slot) {
+    if (sourceGame != 0 && sourceGame != 1)
+        return 0;
+    ComboFwPoint point{};
+    if (Combo_ReadFwPoint(slot, &point) != 1 || point.game == sourceGame)
+        return 0;
+    if (point.game == 1) {
+        if (!MM_SetFwArrival || !MM_ResumeGame || !MM_SetComboEntryIsResume || !MM_SetFwArrival(slot, &point))
+            return 0;
+        MM_SetComboEntryIsResume(1);
+        g_PendingMMFileNum = slot;
+    } else {
+        if (!SOH_SetFwArrival || !SOH_ResumeGame || !SOH_SetFwArrival(slot, &point))
+            return 0;
+        // MM's clean-frame return hook saves progress and announces kind 3 to the launcher.
+    }
+    std::cout << "[ComboShip] Farore recall " << sourceGame << " -> " << point.game << " (slot " << slot
+              << ", entrance " << point.entrance << ", room " << point.room << ")" << std::endl;
+    return 1;
+}
+
+// Record the foreground game at transitions. Save-load handlers also write, so save writes cannot
+// decide which game a quit-and-reload should resume.
 static void Combo_SetLastGame(int fileNum, int game) {
     std::lock_guard<std::mutex> lk(g_containerMutex);
     auto& c = LoadOrCreateContainer(fileNum);
@@ -1575,8 +1631,6 @@ static int ComboRandRange(int minV, int maxV) {
     int range = maxV - minV + 1;
     return minV + (range > 0 ? static_cast<int>(s % static_cast<uint32_t>(range)) : 0);
 }
-
-static int g_PendingMMFileNum = -1;
 
 // ComboShip: write a seed's spoiler under its own hash-icon name. Returns the path (empty on failure).
 // Worker-safe: pointing the CVar at it is a separate main-thread step (RememberComboSpoiler).
@@ -2727,6 +2781,7 @@ static void Combo_OnOOTSaveInit(int fileNum) {
         std::lock_guard<std::mutex> lk(g_containerMutex);
         auto& c = LoadOrCreateContainer(fileNum);
         c["combo"]["notes"] = "";
+        c["combo"]["faroresWind"] = nullptr; // Fresh file must not inherit a previous seed's point.
         if (c["combo"].contains("hintsRead"))
             c["combo"].erase("hintsRead");
         FlushContainer(fileNum);
@@ -2877,7 +2932,7 @@ static void Combo_OnOOTSceneSwitch(int fileNum) {
     // OOT game loop is already exiting (gGameState->running = false set by the hook).
 }
 
-// Why MM handed control back: 0 = portal, 1 = Ctrl+R reset, 2 = owl-save quit (see BenPort.cpp).
+// Why MM handed control back: 0 = portal, 1 = Ctrl+R reset, 2 = owl-save quit, 3 = Farore recall.
 static int g_mmReturnKind = 0;
 
 static void Combo_OnMMReturn(int kind) {
@@ -3034,6 +3089,10 @@ int main(int argc, char** argv) {
     SOH_NotifyComboReturn = (FnVoidArgless)GetSym(sohModule, "SOH_NotifyComboReturn");
     MM_ResumeGame = (FnMMResume)GetSym(mmModule, "MM_ResumeGame");
     MM_PrepareForTransition = (FnVoidArgless)GetSym(mmModule, "MM_PrepareForTransition");
+    SOH_SetFwCallbacks = (FnSetFwCallbacks)GetSym(sohModule, "SOH_SetFwCallbacks");
+    MM_SetFwCallbacks = (FnSetFwCallbacks)GetSym(mmModule, "MM_SetFwCallbacks");
+    SOH_SetFwArrival = (FnSetFwArrival)GetSym(sohModule, "SOH_SetFwArrival");
+    MM_SetFwArrival = (FnSetFwArrival)GetSym(mmModule, "MM_SetFwArrival");
     SOH_DumpRandoStaticData = (FnDumpData)GetSym(sohModule, "SOH_DumpRandoStaticData");
     MM_DumpRandoStaticData = (FnDumpData)GetSym(mmModule, "MM_DumpRandoStaticData");
     SOH_DumpRandoSettings = (FnDumpData)GetSym(sohModule, "SOH_DumpRandoSettings");
@@ -3496,6 +3555,11 @@ int main(int argc, char** argv) {
         std::exit(0);
     }
 
+    const ComboFwCallbacks fwCallbacks{ Combo_ReadFwPoint, Combo_WriteFwPoint, Combo_RequestFwReturn };
+    if (SOH_SetFwCallbacks)
+        SOH_SetFwCallbacks(&fwCallbacks);
+    if (MM_SetFwCallbacks)
+        MM_SetFwCallbacks(&fwCallbacks);
     if (SOH_SetOnNewSaveCallback && MM_InitRandoSaveFile) {
         SOH_SetOnNewSaveCallback(Combo_OnOOTSaveInit);
         std::cout << "[ComboShip] OOT new-save callback registered." << std::endl;
@@ -3593,8 +3657,8 @@ int main(int argc, char** argv) {
                 ComboAnchor::SetActiveGame(0);                 // route Anchor back to OOT, deactivate MM's adapter
                 Combo_SetForegroundGame(ComboRando::GAME_OOT); // hide MM trackers, restore OOT's
                 if (g_PendingMMFileNum >= 0) {
-                    if (g_mmReturnKind == 0) {
-                        // Portal return: the player is continuing in OOT, so that's where a reload goes.
+                    if (g_mmReturnKind == 0 || g_mmReturnKind == 3) {
+                        // Portal/Farore return continues in OOT, so that's where a reload goes.
                         // A reset or owl-save quit ends the session in MM — leave lastGame alone.
                         Combo_SetLastGame(g_PendingMMFileNum, ComboRando::GAME_OOT);
                     } else {

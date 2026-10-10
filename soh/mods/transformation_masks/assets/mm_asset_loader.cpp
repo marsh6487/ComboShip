@@ -1241,7 +1241,8 @@ static std::shared_ptr<Ship::IResource> MmAssets_LoadResourceObjectFromMmArchive
             return nullptr;
         }
 
-        auto resource = resourceManager->GetResourceLoader()->LoadResource(pathStr, file);
+        // Keep metadata aliases and their targets in the same native archive.
+        auto resource = resourceManager->GetResourceLoader()->LoadResource(pathStr, file, nullptr, sMmArchive);
         if (resource) {
             // Keep resource alive in our cache
             sMmResourceCache[pathStr] = resource;
@@ -2323,6 +2324,10 @@ SoundFont* MmSfx_LoadFont(s32 fontId) {
         MMSFX_LOG("[MmSfx] Exception in LoadFont(%d): %s", fontId, e.what());
     } catch (...) { MMSFX_LOG("[MmSfx] Unknown exception in LoadFont(%d)", fontId); }
     return nullptr;
+}
+
+SequenceData* MmSfx_LoadSequence(void) {
+    return static_cast<SequenceData*>(MmAssets_LoadFromMmArchive("audio/sequences/Sequence_0", nullptr));
 }
 
 SoundFont* MmSfx_GetFontForSfx(u16 sfxId) {
@@ -5435,7 +5440,7 @@ s32 MmSfx_PlayEx(u16 sfxId, Vec3f* pos, u8 token, f32* freqScale, f32* vol, s8* 
     }
 
     // Boot the isolated MM SFX engine on the GAME thread (loads Sequence_0 +
-    // Soundfont_0/1 via ResourceMgr — must NOT run on the audio thread).
+    // resident Soundfont_0/1 from mm.o2r — must NOT run on the audio thread).
     // Idempotent; once ready it becomes the sole SFX path (the old MmDirectAudio
     // hand-map is dead). No CVar — the new engine is the default and only path.
     MmSfxSynth_Init();

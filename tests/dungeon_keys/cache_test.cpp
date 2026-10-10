@@ -1,4 +1,5 @@
 #include "ComboItemDrawABI.h"
+#include "combo/menu/ComboElementalArrowGi.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include <cstdio>
 #include <cstring>
@@ -52,6 +53,9 @@ enum RandoItemId {
   RI_OOT_MASTER_SWORD,
   RI_OOT_TRUE_MASTER_SWORD,
   RI_OOT_BIGGORON_SWORD,
+  RI_OOT_DINS_FIRE,
+  RI_OOT_FARORES_WIND,
+  RI_OOT_NAYRUS_LOVE,
   RI_PROGRESSIVE_BOW,
   RI_PROGRESSIVE_BOMB_BAG,
   RI_PROGRESSIVE_WALLET,
@@ -85,7 +89,8 @@ enum RandoItemId {
   RI_OOT_NEI_MARIO_MASK,
   RI_RED_POTION_REFILL,
   RI_GREEN_POTION_REFILL,
-  RI_BLUE_POTION_REFILL
+  RI_BLUE_POTION_REFILL,
+  RI_BOTTLE_EMPTY
 };
 #include "ComboOotBottleShimmerMM.h"
 /* PRODUCTION_OWNER */
@@ -167,6 +172,7 @@ enum RandomizerGet {
   RG_MASTER_SWORD,
   RG_TRUE_MASTER_SWORD,
   RG_BIGGORON_SWORD,
+  RG_GIANTS_KNIFE,
   RG_GREAT_FAIRY_SWORD
 };
 static bool ownerAltEnabled, ownerDin, ownerNotReady, ownerModuleReady;
@@ -399,7 +405,7 @@ int main() {
       RI_OOT_BOTTLE_POE,          RI_OOT_RUTOS_LETTER};
   const uint8_t bottleColors[][3] = {
       {150, 200, 0},   {100, 160, 255}, {100, 160, 255}, {220, 225, 240},
-      {255, 160, 235}, {220, 225, 240}, {0, 200, 0},     {220, 225, 240},
+      {255, 160, 235}, {220, 225, 240}, {0, 200, 0},     {222, 100, 245},
       {100, 0, 200},   {220, 225, 240}};
   for (int i = 0; i < 10; ++i) {
     Rando::StaticData::Items[bottles[i]] = {(i == 1 || i == 9) ? -1 : 0,
@@ -494,7 +500,8 @@ int main() {
       if (custom) {
         assert(strstr(descriptor.dlists[0],
                       mode == 2 ? "din_fire_sword" : "object_custom_equip"));
-        assert(descriptor.opCount == 1 && descriptor.ops[0].op == CW_OP_ROTATE_Z && descriptor.ops[0].a == 18774.682f &&
+        // Export the pickup's +X blade with one quarter-turn into upright +Y.
+        assert(descriptor.opCount == 1 && descriptor.ops[0].op == CW_OP_ROTATE_Z && descriptor.ops[0].a == 16384.f &&
                descriptor.scale == .04f);
       } else if (id == RI_OOT_TRUE_MASTER_SWORD) {
         const uint8_t gold[4] = {255, 215, 110, 255};

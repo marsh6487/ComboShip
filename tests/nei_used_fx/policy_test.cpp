@@ -105,7 +105,7 @@ int main() {
     for (auto kind : {Kind::Fire, Kind::Ice})
       for (int layer = 0; layer < 2; ++layer) {
         const auto flow = SampleSpinFlow(kind, frame, 500, true, layer);
-        valid(flow, 540);
+        valid(flow, 540, layer ? 70 : 100);
         for (size_t i = 0; i < flow.count; ++i) {
           assert(std::abs(flow.vertices[i].u * 1024) < 32767 &&
                  std::abs(flow.vertices[i].v * 1024) < 32767);

@@ -77,9 +77,9 @@ static const ItemDescEntry sCustomItemDescs[] = {
     { EXT_ITEM_SHEIKAH_SLATE, TEXT_DESC_SHEIKAH_SLATE,
       "C draws the slate, then casts the&active rune. Hold L for the rune wheel." },
     { EXT_ITEM_PHANTOM_HOURGLASS, TEXT_DESC_PHANTOM_HOURGLASS,
-      "C stops time and aims. C again rewinds&what the reticle holds along its own&path. C or B lets go." },
+      "Item button: aim, then rewind.&Press again to stop; B cancels aim.&Hold R while aiming to rewind Link." },
     { EXT_ITEM_SHADOW_CRYSTAL, TEXT_DESC_SHADOW_CRYSTAL,
-      "Turn into Wolf Link. Bite combo&and a running dash. Press again&to turn back." },
+      "Turn into Wolf Link.&B attacks; moving + A dashes.&Use crystal again to turn back." },
     { EXT_ITEM_ROD_OF_SEASONS, TEXT_DESC_ROD_OF_SEASONS,
       "C draws the rod, then opens the season&prompt. A confirms, B cancels, and a&new season reloads the scene." },
     // Bottle row

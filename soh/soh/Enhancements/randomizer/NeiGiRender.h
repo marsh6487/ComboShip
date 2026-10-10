@@ -3,7 +3,10 @@
 #include "NeiGiEffectPolicy.h"
 #include "NeiGiFrameFit.h"
 #include "NeiGiSongEffectPolicy.h"
+#include "NeiGiBottleShimmerPolicy.h"
+#include "NeiElementalSpellGi.h"
 #include "ComboElementalArrowGi.h"
+#include "ComboRewardGi.h"
 #include "z64.h"
 namespace NeiGi {
 // Private RGBA32 resources use a 32x32 logical tile; resource metadata owns
@@ -12,6 +15,7 @@ struct TextureMaterial {
     const char* path;
     bool repeatS = false;
     bool repeatT = false;
+    bool scrolling = false;
 };
 } // namespace NeiGi
 extern "C" {
@@ -20,11 +24,17 @@ extern "C" {
 // these functions do not add GI rotation or optional pickup shimmer.
 NeiGi::Basis NeiGi_CameraBasis(PlayState* play);
 void NeiGi_DrawMesh(PlayState* play, const NeiGi::Mesh& mesh, NeiGi::Kind orb = NeiGi::Kind::Neutral);
+bool NeiGi_CanDrawLayers(PlayState* play, size_t matrices, size_t opa, size_t xlu);
+// Reserve the caller's later casing/restore commands while the child allocates.
+bool NeiGi_DrawMeshWithTail(PlayState* play, const NeiGi::Mesh& mesh, const char* owner, size_t matrices, size_t opa,
+                            size_t xlu);
 // False queues nothing, so the caller can keep its geometry-only fallback.
 bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiGi::TextureMaterial& material);
 // Intrinsic weather; profiles 1..4 are individual seasons, 5 cycles on the actual rod.
 void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner);
 void NeiGi_DrawSongOverlay(PlayState* play, int song, const char* owner);
+// Intrinsic Sage fountain; retains the native medallion materials and launch animation.
+void NeiGi_DrawSagesTunicMedallions(PlayState* play, const char* owner = nullptr);
 // Selected external geometry uses its resource bounds for MM receipts and
 // swords. The item's identity still controls its optional particles.
 void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int shimmerKind,

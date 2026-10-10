@@ -36,12 +36,15 @@ def main():
     for name in ["Nei_Save", "Nei_GetOwnedItem", "Nei_SetOwnedItem", "Nei_InitNewSave"]:
         production += function(nei, name) + "\n"
     production += nei[nei.index("#define NEI_CANE_SKILL_MAX"):nei.index('extern "C" uint8_t Nei_CaneActiveSkill')]
-    production += function(source("mm/mods/items/logic/item_cane_of_somaria.c"), "Cane_GiveSkill")
+    production += function(source("mm/mods/items/logic/item_cane_of_somaria.c"), "Cane_GiveSkill") + "\n"
+    seasons = source("mm/2s2h/Rando/NeiSeasons.cpp").replace('extern "C" ', '')
+    for name in ["Seasons_RandoMode", "Seasons_UpdateGates"]:
+        production += function(seasons, name) + "\n"
     inventory = source("mm/mods/extended_inventory.c")
     production += inventory[inventory.index("static const uint8_t sWandQuest"):
                             inventory.index("static void* const sWandNameTex")]
     for name in ["GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant", "Wand_RandoMode", "Wand_ModeOwned", "Wand_GrantMode", "Slate_RuneOwned", "Slate_GrantRune",
-                 "Seasons_SeasonOwned", "Seasons_GrantSeason", "Seasons_SetSeason"]:
+                 "Seasons_HasRod", "Seasons_GrantRod", "Seasons_SeasonOwned", "Seasons_GrantSeason", "Seasons_SetSeason"]:
         production += function(inventory, name) + "\n"
     equipment = source("mm/mods/extended_equipment.c")
     for name in ["ExtEquip_GetBit", "ExtEquip_HasItem", "ExtEquip_CapeOwned", "ExtEquip_GiveCape", "ExtEquip_GiveItem"]:

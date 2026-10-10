@@ -2,6 +2,7 @@
 #include "z64light.h"
 #include "z64math.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
+#include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 typedef enum {
@@ -1804,6 +1805,7 @@ void Environment_Update(PlayState* play, EnvironmentContext* envCtx, LightContex
         Environment_UpdateLights(play, envCtx, lightCtx);
         Environment_UpdatePostmanEvents(play);
     }
+    MMSummerAtmosphere_Update(play);
 }
 
 void Environment_DrawSun(PlayState* play) {
@@ -3192,7 +3194,10 @@ void Environment_WarpSongLeave(PlayState* play) {
 void Environment_SetupSkyboxStars(PlayState* play) {
     f32 phi_f0;
 
-    if ((play->envCtx.skybox1Index == 0) && (play->skyboxId == SKYBOX_NORMAL_SKY)) {
+    // Ported OoT sky artwork already contains stars. Keep the native layer for
+    // fallback skies and frames where the skybox itself is not being drawn.
+    if ((play->envCtx.skybox1Index == 0) && (play->skyboxId == SKYBOX_NORMAL_SKY) &&
+        (play->envCtx.skyboxDisabled || !Skybox_IsOotSkyActive(&play->skyboxCtx, play->skyboxId))) {
         if ((CURRENT_TIME >= CLOCK_TIME(21, 0)) || (CURRENT_TIME < CLOCK_TIME(2, 0))) {
             phi_f0 = 1.0f;
         } else if (CURRENT_TIME > CLOCK_TIME(19, 0)) {

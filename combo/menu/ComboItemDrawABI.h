@@ -76,6 +76,7 @@ typedef enum {
     CW_DRAW_KIND_SONG_GI = 38,              /* note plus song profile in neiEffect; native env or grayscale tint */
     CW_DRAW_KIND_MM_FAIRY_CONTAINER = 37,   /* OPA shell0, XLU glass1/contents2; dl3 is its native Mtx path */
     CW_DRAW_KIND_ELEMENTAL_ARROW = 39,      /* owner arrow core dl0; host aura profile 1..3 in neiEffect */
+    CW_DRAW_KIND_BOTTLE_CONTENTS = 40,      /* shared casing; dl0 marker selects mushroom/princess/gold dust */
 } CwDrawKind;
 
 #define CW_DRAW_MAX_OPS 20
@@ -199,6 +200,9 @@ typedef struct {
 COMBO_OOT_EXPORT void OOT_SetGiCosmeticFrame(uint32_t hostFrame);
 COMBO_OOT_EXPORT void OOT_SampleGiCosmeticColor(const char* valueCvar, uint8_t fallbackR, uint8_t fallbackG,
                                                 uint8_t fallbackB, uint8_t* outRGB);
+COMBO_MM_EXPORT void MM_SetGiCosmeticFrame(uint32_t hostFrame);
+COMBO_MM_EXPORT void MM_SampleGiCosmeticColor(const char* valueCvar, uint8_t fallbackR, uint8_t fallbackG,
+                                              uint8_t fallbackB, uint8_t* outRGB);
 typedef void (*Fn_SetGiCosmeticFrame)(uint32_t hostFrame);
 
 typedef int32_t (*Fn_GetItemIconInfo)(const char* itemName, CwItemIconInfo* out);

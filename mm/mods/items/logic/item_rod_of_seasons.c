@@ -105,7 +105,8 @@ void Seasons_TickInput(PlayState* play, Player* player, Input* input) {
         sRodScene = play->sceneId;
     }
     sRodFrame = play->gameplayFrames;
-    if (!Seasons_SeasonCount() || player->transformation != PLAYER_FORM_HUMAN || MasterCycle_IsRiding()) {
+    Seasons_UpdateGates();
+    if (!Seasons_HasRod() || player->transformation != PLAYER_FORM_HUMAN || MasterCycle_IsRiding()) {
         sRodPendingDraw = 0;
         Seasons_Stow(play, player);
         return;

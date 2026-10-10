@@ -61,6 +61,11 @@ def main():
                 raise RuntimeError(result.stdout + result.stderr)
             print("PASS real-header weather syntax:", source, flush=True)
         executable = build / "weather_bridge_test"
+        inventory = (ROOT / "mm/mods/extended_inventory.c").read_text()
+        (build / "weather_seasons.inc").write_text("\n".join(
+            production_function(inventory, name) for name in
+            ("Seasons_HasRod", "Seasons_SeasonOwned", "Seasons_SeasonAt",
+             "Seasons_GetSeason", "Seasons_SetSeason")))
         environment = (ROOT / "mm/src/code/z_kankyo.c").read_text()
         play = (ROOT / "mm/src/code/z_play.c").read_text()
         spin = (ROOT / "mm/src/overlays/actors/ovl_En_M_Thunder/z_en_m_thunder.c").read_text()
@@ -82,7 +87,8 @@ def main():
         # spell out the conversion only in the C++ fixture.
         sky.append(re.sub(r"\bgSkybox(?:Clear|Cloudy)\dTex\b", r"(TexturePtr)\g<0>",
                           array_declaration(skybox, "sSkyboxTextures")))
-        for source, name in ((environment, "Environment_LerpWeight"),
+        for source, name in ((skybox, "Skybox_IsOotSkyActive"),
+                             (environment, "Environment_LerpWeight"),
                              (skybox_draw, "Skybox_SetColors"),
                              (environment, "Environment_UpdateSkybox"),
                              (environment, "Environment_DrawSkyboxFilters"),
@@ -106,10 +112,14 @@ def main():
             structs + "\nLightningBolt sLightningBolts[3];\n"
             "static LightningBolt sMMWeatherLightningBolt = { .state = LIGHTNING_BOLT_INACTIVE };\n" +
             "\n".join(functions))
-        result = subprocess.run([*compiler, *flags, *game_flags, "-Wno-error", "-I" + str(build),
+        # The real sky-star helper includes its normal spdlog call; use the same
+        # standalone fmt mode as the other production-header fixtures.
+        result = subprocess.run([*compiler, *flags, *game_flags, "-Wno-error", "-DFMT_HEADER_ONLY",
+                        "-include", "nlohmann/json.hpp", "-I" + str(build),
                         str(ROOT / "mm/tests/weather_bridge_test.cpp"),
                         str(ROOT / "mm/2s2h/Enhancements/Audio/MMWeather.cpp"),
                         str(ROOT / "mm/2s2h/Enhancements/Audio/MMWeatherState.cpp"),
+                        str(ROOT / "mm/2s2h/Rando/NeiSeasons.cpp"),
                         "-o", str(executable)], capture_output=True, text=True)
         if result.returncode:
             raise RuntimeError(result.stdout + result.stderr)

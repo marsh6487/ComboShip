@@ -196,7 +196,7 @@ for (const auto& item : kPresentations) {
     }
     ++authored;
 }
-assert(authored == 66);
+assert(authored == 68);
 std::cout << "PASS real owner descriptors and MM host draw: all authored bindings, effects, split passes, concrete Somaria flame, missing-resource fallback\n";
 Reset();
 

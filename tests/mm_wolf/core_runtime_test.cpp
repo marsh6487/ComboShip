@@ -1,5 +1,6 @@
 // The Wolf implementation is included so private loader/proc behavior is exercised directly.
 // No validation or combat implementation is copied into the fixture.
+#include "2s2h/GameInteractor/GameInteractor.h"
 #include WOLF_IMPLEMENTATION
 #include <cassert>
 #include <cstdio>
@@ -18,6 +19,7 @@ static std::map<std::string, std::string> locatedFiles;
 static std::ostringstream wolfLogs;
 static std::vector<u8> resourceBlob;
 static const char* resourceBlobOwner = "mm";
+static const char *resourceBlobPath = NeiWolfAsset::kResourcePath;
 static void captureWolfLogs() {
     auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(wolfLogs);
     auto logger = std::make_shared<spdlog::logger>("wolf-fixture", sink);
@@ -49,6 +51,13 @@ int MM_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size,
         std::memcpy(destination, resourceBlob.data(), *size);
     return 1;
 }
+int MM_CopyWolfLinkModelResource(int, uint8_t *destination, size_t capacity,
+                                 size_t *size, const char **owner,
+                                 const char **path) {
+  if (path)
+    *path = resourceBlobPath;
+  return MM_CopyWolfLinkResource(destination, capacity, size, owner);
+}
 const char* Nei_AssetDir(void) {
     return assetDirectory.c_str();
 }
@@ -76,7 +85,7 @@ s16 sins(u16 a) {
 s16 coss(u16 a) {
     return (s16)(std::cos(a * (3.14159265358979323846f / 32768)) * 32767);
 }
-int GameInteractor_InvertControl(int) {
+int GameInteractor_InvertControl(GIInvertType) {
     return 1;
 }
 s16 Math_Atan2S_XY(f32 x, f32 y) {
@@ -87,6 +96,8 @@ s16 Camera_GetInputDirYaw(Camera*) {
 }
 void Player_PlaySfx(Player*, u16) {
 }
+void AudioSfx_PlaySfx(u16, Vec3f*, u8, f32*, f32*, s8*) {}
+void AudioSfx_StopByPosAndId(Vec3f*, u16) {}
 s32 Collider_InitCylinder(PlayState*, ColliderCylinder* c) {
     ++colliderInitializations;
     std::memset(c, 0, sizeof(*c));

@@ -148,6 +148,8 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "slateRunesOwned", n.slateRunesOwned },
         { "season", n.season },
         { "seasonsOwned", n.seasonsOwned },
+        { "seasonsRodOwned", n.seasonsRodOwned },
+        { "seasonsGates", n.seasonsGates },
         { "ootCanGrab", n.ootCanGrab },
         { "activeCustomForm", n.activeCustomForm },
         { "marioMaskOwned", n.marioMaskOwned },
@@ -282,6 +284,8 @@ inline void from_json(const json& j, NeiSaveData& n) {
     n.slateRunesOwned = j.value("slateRunesOwned", (uint8_t)0);
     n.season = j.value("season", (uint8_t)0);
     n.seasonsOwned = j.value("seasonsOwned", (uint8_t)0);
+    n.seasonsRodOwned = j.value("seasonsRodOwned", (uint8_t)0);
+    n.seasonsGates = j.value("seasonsGates", (uint8_t)0);
     n.ootCanGrab = j.value("ootCanGrab", (uint8_t)0);
     n.activeCustomForm = j.value("activeCustomForm", (uint8_t)0);
     n.marioMaskOwned = j.value("marioMaskOwned", (uint8_t)0);

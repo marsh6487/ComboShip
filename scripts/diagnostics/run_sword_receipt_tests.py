@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 native = (ROOT / 'mm/2s2h/Rando/NeiGiPresentation.cpp').read_text()
 oot = (ROOT / 'soh/soh/Enhancements/randomizer/NeiGiPresentation.cpp').read_text()
 oot_draw = (ROOT / 'soh/soh/Enhancements/randomizer/draw.cpp').read_text()
+renderer = (ROOT / 'soh/soh/Enhancements/randomizer/NeiGiMeshRenderer.inc').read_text()
 draw = (ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text()
 header = (ROOT / 'mm/2s2h/Rando/NeiGiPresentation.h').read_text()
 model = (ROOT / 'tests/sword_fallback/model_fit_test.cpp').read_text()
@@ -61,8 +62,19 @@ source = source.replace('/* COMPANION_FIT */',companion_fit)
 source = source.replace('/* PRODUCTION */', production)
 oot_production = '\n'.join(function(oot_draw, name) for name in [
     'Randomizer_DrawProgressiveKokiriSword', 'Randomizer_DrawProgressiveMasterSword', 'Randomizer_DrawProgressiveBGS',
-    'Randomizer_DrawExtFourSword'])
+    'Randomizer_DrawExtFourSwordPresentation', 'Randomizer_DrawExtFourSword'])
 oot_production += '\n'+'\n'.join(function(oot, name) for name in ['Spin', 'HasLegacyGiMod', 'NeiGi_DrawEffects', 'NeiGi_DrawImpl'])
+# The full TU declares these private effect helpers before NeiGi_DrawImpl.
+# Keep their exact production signatures, but fail if a sword enters that lane.
+elemental_boundaries = '\n'.join(
+    function(renderer, name).split('{', 1)[0] +
+    '{ assert(false && "sword receipt must not enter elemental crystal sheen"); ' + result + ' }'
+    for name, result in [('NeiGi_DrawMeshMaterial', 'return false;'), ('NeiGi_RestoreElemental', '')])
+sages_declaration = re.search(r'^void NeiGi_DrawSagesTunicMedallions\([^;]+;',
+    (ROOT / 'soh/soh/Enhancements/randomizer/NeiGiRender.h').read_text(), re.M)[0]
+sages_boundary = sages_declaration + '\n' + function(renderer, 'NeiGi_DrawSagesTunicMedallions').split('{', 1)[0] + \
+    '{ assert(false && "sword receipt must not enter Sage medallion fountain"); }'
+oot_production = elemental_boundaries + '\n' + sages_boundary + '\n' + oot_production
 source = source.replace('/* OOT_PRODUCTION */', oot_production)
 flags = ['-std=c++20', '-DF3DEX_GBI_2', '-DCOMBO_BUILD', '-I'+str(ROOT), '-I'+str(ROOT/'combo/menu'),
          '-I'+str(ROOT/'libultraship/include')]
@@ -91,3 +103,9 @@ extern "C" {
     typed_cpp=Path(temporary)/'typed.cpp';typed_cpp.write_text(typed)
     subprocess.run([os.environ.get('CXX','c++'),*flags,'-fsyntax-only',str(typed_cpp)],check=True)
     print('PASS real Ship/Fast typed companion GI bounds API and C linkage')
+    # Model bounds alone omit billboard stars that extend past the blade.
+    # Project the production procedural meshes through every actual Item0 camera.
+    camera_binary=Path(temporary)/'effect-cameras'
+    subprocess.run([os.environ.get('CXX','c++'),*flags,'-O2',
+                    str(ROOT/'tests/sword_fallback/effect_camera_test.cpp'),'-o',str(camera_binary)],check=True)
+    subprocess.run([str(camera_binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})

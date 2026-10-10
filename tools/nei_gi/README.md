@@ -1,5 +1,11 @@
 # NEI GI upgrade candidate
 
+The isolated [Ball & Chain metallic POC1](PREVIEWS/ballchain-metallic-poc1.md)
+gives the accepted GI and held ball brushed silver reflections through the
+existing forged sword exporter. Meshes and fitting remain unchanged. Rebuild
+both with `python3 tools/nei_gi/SOURCE/build_ballchain_metal.py --install`;
+the record covers the material comparison and runtime review still needed.
+
 The current asset set contains **62 serialized GI models**: 61 bundled under
 `soh/assets/custom/objects/nei_gi_redesign/`, plus optional Cojiro resources under
 `tools/nei_gi/OPTIONAL_ASSETS/`. The latest pass adds

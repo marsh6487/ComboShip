@@ -1,4 +1,5 @@
 #include "global.h"
+#include "gameplay/ComboFaroresWind.h"
 
 #ifdef COMBO_BUILD
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
@@ -36,6 +37,7 @@ void TitleSetup_InitImpl(GameState* gameState) {
         // A portal return is never a cutscene arrival: a never-played MM-start save still holds the
         // pending intro (0xFFF1), which would shift Play_Init's entrance lookup onto a garbage layer.
         gSaveContext.cutsceneIndex = 0;
+        ComboFw_ApplyArrival(); // Queued Farore recall overrides the fixed portal arrival.
         gComboReturnFileNum = -1;
         gameState->running = false;
         SET_NEXT_GAMESTATE(gameState, Play_Init, PlayState);

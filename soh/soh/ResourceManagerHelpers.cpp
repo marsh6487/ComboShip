@@ -1021,6 +1021,11 @@ extern "C" COMBO_EXPORT int32_t OOT_NeiEnsureGiBaseOwner(void) {
 
 #endif
 
+#include "../../combo/NeiRewardGiResource.h"
+extern "C" int ResourceMgr_GetRewardSurfaceForGame(const char* game, const char* path, NeiGi::Mesh* mesh) {
+    return NeiGi::GetRewardSurface("oot", game, path, mesh);
+}
+
 extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* path, float scale, float tilt, int shop,
                                                 float fit[2]) {
     const int din =
@@ -1085,4 +1090,14 @@ extern "C"
     int
     OOT_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner) {
     return NeiWolfAsset::CopyResource("oot", destination, capacity, size, owner);
+}
+
+extern "C"
+#ifdef COMBO_BUILD
+    COMBO_EXPORT
+#endif
+    int
+    OOT_CopyWolfLinkModelResource(int useHD, uint8_t* destination, size_t capacity, size_t* size, const char** owner,
+                                  const char** path) {
+    return NeiWolfAsset::CopyResource("oot", destination, capacity, size, owner, useHD != 0, path);
 }

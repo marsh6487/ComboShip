@@ -44,7 +44,8 @@ enum class Kind {
     Pacci,
     Pokeball,
     MarioMask,
-    Gold
+    Gold,
+    GiantsKnife // Append to preserve the existing cross-engine effect IDs.
 };
 constexpr float Tau = 6.28318530718f;
 // The authored Four Sword's high center is lowered in GI space only. Its
@@ -120,6 +121,8 @@ constexpr uint32_t ColorHex(Kind kind) {
             return 0x6F8FFF;
         case Kind::BiggoronSword:
             return 0xFF9A42;
+        case Kind::GiantsKnife:
+            return 0xCFD9E6;
         case Kind::GreatFairySword:
             return 0x79BE84;
         case Kind::FourSword:
@@ -140,7 +143,7 @@ inline bool IsSlate(Kind k) {
     return k == Kind::Slate || (k >= Kind::SlateBomb && k <= Kind::SlateSensor);
 }
 inline bool IsSword(Kind k) {
-    return k == Kind::SwordAura || (k >= Kind::KokiriSword && k <= Kind::FourSword);
+    return k == Kind::SwordAura || k == Kind::GiantsKnife || (k >= Kind::KokiriSword && k <= Kind::FourSword);
 }
 inline bool IsSpecial(Kind k) {
     return (k >= Kind::Sand && k <= Kind::CaneBlue) || IsSlate(k) || IsSword(k);
@@ -253,6 +256,65 @@ inline void IceCrystal(Mesh& m, Point center, Point direction, float length, flo
         face(nextLo, lo, base);
     }
 }
+// A pale reflection band clipped to the front facets. It follows the incoming
+// GI camera/rotation and drifts gently; it never fills or leaves the crystal.
+inline Mesh SampleCrystalSheen(uint32_t frame, const Basis& camera = {}, float radius = 22.2f,
+                               float halfHeight = 37.f) {
+    Mesh mesh;
+    const Point points[] = { { 0, halfHeight, 0 }, { radius, 0, 0 },  { 0, 0, radius },
+                             { -radius, 0, 0 },    { 0, 0, -radius }, { 0, -halfHeight, 0 } };
+    auto dot = [](Point a, Point b) { return a.x * b.x + a.y * b.y + a.z * b.z; };
+    const auto light = Unit(camera.forward + camera.up * .65f - camera.right * .45f);
+    const auto halfway = Unit(camera.forward + light);
+    const float phase = (frame % 360u) * (Tau / 360.f);
+    const float center = radius * (-.18f + .48f * std::sin(phase));
+    const float width = radius * .22f;
+    const float offsets[] = { -1.f, -.3f, 0.f, .3f, 1.f };
+    const float weights[] = { 0.f, .65f, 1.f, .65f, 0.f };
+    auto coordinate = [&](Point p) { return dot(p, camera.right) + .28f * dot(p, camera.up) - center; };
+    for (int j = 0; j < 4; ++j)
+        for (int half = 0; half < 2; ++half) {
+            const Point a = points[half ? 5 : 0], b = points[1 + (half ? (j + 1) % 4 : j)],
+                        c = points[1 + (half ? j : (j + 1) % 4)];
+            const auto normal = Unit(Cross(c - a, b - a));
+            const float facing = dot(normal, camera.forward);
+            if (facing <= .001f)
+                continue;
+            const float specular = std::pow(std::fmax(0.f, dot(normal, halfway)), 5.f);
+            const float peak = 112.f * (.35f + .65f * specular);
+            for (int strip = 0; strip < 4; ++strip) {
+                std::array<Point, 8> polygon{ a, b, c };
+                size_t count = 3;
+                auto clip = [&](float boundary, bool greater) {
+                    std::array<Point, 8> result{};
+                    size_t n = 0;
+                    for (size_t i = 0; i < count; ++i) {
+                        const Point from = polygon[i], to = polygon[(i + 1) % count];
+                        const float x = coordinate(from), y = coordinate(to);
+                        const bool inside = greater ? x >= boundary : x <= boundary;
+                        const bool next = greater ? y >= boundary : y <= boundary;
+                        if (inside)
+                            result[n++] = from;
+                        if (inside != next)
+                            result[n++] = from + (to - from) * ((boundary - x) / (y - x));
+                    }
+                    polygon = result;
+                    count = n;
+                };
+                const float low = width * offsets[strip], high = width * offsets[strip + 1];
+                clip(low, true);
+                clip(high, false);
+                auto vertex = [&](Point p) {
+                    const float f = std::fmax(0.f, std::fmin(1.f, (coordinate(p) - low) / (high - low)));
+                    const float strength = weights[strip] + f * (weights[strip + 1] - weights[strip]);
+                    return EffectVertex{ p * 1.0005f, 0xEDF6FF, uint8_t(peak * strength) };
+                };
+                for (size_t i = 1; i + 1 < count; ++i)
+                    mesh.Tri(vertex(polygon[0]), vertex(polygon[i]), vertex(polygon[i + 1]));
+            }
+        }
+    return mesh;
+}
 // All swords point up +Y. Camera axes only shape the soft skirts; emission
 // paths remain in the corrected model's own coordinates.
 inline float SwordBladeTip(Kind kind) {
@@ -264,13 +326,15 @@ inline float SwordBladeTip(Kind kind) {
         case Kind::RazorSword:
             return 35.f;
         case Kind::BiggoronSword:
-            return 51.f;
+            return 109.5f;
+        case Kind::GiantsKnife:
+            return 100.3f;
         case Kind::GildedSword:
-            return 64.5f;
+            return 61.8f;
         case Kind::MasterSword:
-            return 71.f;
+            return 70.2f;
         case Kind::SwordAura:
-            return 66.f;
+            return 70.2f;
         case Kind::GreatFairySword:
             return 100.f;
         case Kind::FourSword:
@@ -283,7 +347,7 @@ inline float SwordEmissionBase(Kind kind) {
     // Centered legacy meshes put their guards below the origin. These starts
     // lie just above the measured, exported blade seats, rather than halfway
     // up the longer blades. Forged meshes keep their guard at Y=0.
-    return kind == Kind::RazorSword ? -9.f : kind == Kind::BiggoronSword ? -20.f : 8.f;
+    return kind == Kind::RazorSword ? -9.f : 8.f;
 }
 inline Mesh SampleSword(Kind kind, uint32_t frame, const Basis& camera) {
     Mesh m;
@@ -339,8 +403,8 @@ inline Mesh SampleSword(Kind kind, uint32_t frame, const Basis& camera) {
             Band(m, p, p + Point{ .25f, .9f, 0 }, .18f, color, 0xFFFFFF, camera, alpha);
             Glow(m, p, .45f, color, alpha, camera);
         }
-    } else if (kind == Kind::GildedSword || kind == Kind::BiggoronSword) {
-        const bool forge = kind == Kind::BiggoronSword;
+    } else if (kind == Kind::GildedSword || kind == Kind::BiggoronSword || kind == Kind::GiantsKnife) {
+        const bool forge = kind != Kind::GildedSword;
         const uint32_t lifetime = forge ? 90u : 360u;
         for (int i = 0; i < 8; ++i) {
             const float f = float((frame % lifetime + i * (forge ? 11u : 43u)) % lifetime) / lifetime;

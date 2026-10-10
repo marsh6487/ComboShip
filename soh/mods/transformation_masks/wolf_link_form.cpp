@@ -50,6 +50,9 @@ extern "C" const char* Nei_AssetDir(void);
 #include <ship/Context.h>
 #include <spdlog/spdlog.h>
 
+#define WOLF_AUDIO_MIX_SYMBOL OOT_WolfLinkSfx_MixInto
+#include "../../../combo/NeiWolfSfx.inc.cpp"
+
 extern "C" {
 #include "expansions/ssbb/ssbb_anim.h"
 #include "expansions/ssbb/ssbb_character.h"
@@ -278,11 +281,21 @@ struct WolfRuntime {
     ColliderCylinder atCyl;
     u8 atCylInit = 0;
     u8 atActive = 0;
+    Vec3f chainAudioPos{};
+    Vec3f chainLastPos{};
+    f32 chainVolume = 0.1f;
+    f32 chainFrequency = 1.2f;
+    f32 chainDistance = 0;
+    s8 chainReverb = 0;
+    u8 chainCooldown = 0;
+    u8 chainPositionValid = 0;
+    u8 chainPlaying = 0;
 };
 
 static WolfRuntime sWolf;
 static u8 sSelected = 0;
 static u8 sAssetsLoaded = 0;
+static bool sLoadedHDModel = false;
 static s32 sDefIndex = -1;
 static std::vector<u8> sBlob;
 static std::string sAssetPath;
@@ -415,7 +428,11 @@ static void BuildMaterialDisplayList(const u16* texture, u32 width, u32 height) 
     }
     gSPLoadGeometryMode(gfx++, geometryMode);
     gDPPipeSync(gfx++);
-    gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, 1, COMBINED, 0, PRIMITIVE, 0, 0, 0, 0, COMBINED);
+    // Wolf atlases are opaque. Use texture alpha as an inverse emission mask:
+    // 1 retains lit fur; 0 keeps the authored eye color bright in shadow. Output
+    // alpha stays opaque, so the eye mask cannot cut holes into the baked face.
+    gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, 1, COMBINED, TEXEL0, TEXEL0_ALPHA, TEXEL0, 0, 0, 0,
+                      COMBINED);
     gSPSetOtherMode(gfx++, G_SETOTHERMODE_H, 4, 20,
                     G_TF_BILERP | G_TC_FILT | G_TP_PERSP | G_TT_NONE | G_AD_NOISE | G_PM_NPRIMITIVE | G_CK_NONE |
                         G_TD_CLAMP | G_CYC_2CYCLE | G_CD_MAGICSQ | G_TL_TILE);
@@ -451,19 +468,27 @@ static s32 FindAnim(const char* name) {
 }
 
 static bool LoadAssets() {
-    if (sAssetsLoaded) {
+    const bool useHD = CVarGetInteger(NeiWolfAsset::kHDModelCVar, 1) != 0;
+    // Never invalidate live skin, animation or display-list pointers. Model
+    // changes are applied after cleanup, on the next transformation.
+    if (sAssetsLoaded && (sWolf.initialized || sLoadedHDModel == useHD)) {
         return true;
     }
+    sAssetsLoaded = 0;
     size_t resourceSize = 0;
     const char* resourceOwner = nullptr;
-    const int resourceStatus = OOT_CopyWolfLinkResource(nullptr, 0, &resourceSize, &resourceOwner);
+    const char* resourcePath = nullptr;
+    const int resourceStatus =
+        OOT_CopyWolfLinkModelResource(useHD, nullptr, 0, &resourceSize, &resourceOwner, &resourcePath);
     if (resourceStatus != 0) {
-        sAssetPath = std::string("@") + (resourceOwner ? resourceOwner : "unknown") + ":" + NeiWolfAsset::kResourcePath;
+        sAssetPath = std::string("@") + (resourceOwner ? resourceOwner : "unknown") + ":" +
+                     (resourcePath ? resourcePath : NeiWolfAsset::kResourcePath);
         if (resourceStatus < 0 || resourceSize < kHeaderSize || resourceSize > kMaxBlobSize)
             return RejectAsset("resource-blob");
         sBlob.resize(resourceSize);
         size_t copied = 0;
-        if (OOT_CopyWolfLinkResource(sBlob.data(), sBlob.size(), &copied, nullptr) != 1 || copied != resourceSize)
+        if (OOT_CopyWolfLinkModelResource(useHD, sBlob.data(), sBlob.size(), &copied, nullptr, nullptr) != 1 ||
+            copied != resourceSize)
             return RejectAsset("resource-copy");
     } else {
         sAssetPath = FindAssetPath();
@@ -637,12 +662,16 @@ static bool LoadAssets() {
     sDefinition.rotOrder = SSBB_ROT_ORDER_ZYX;
     sDefinition.skinMesh = &sSkin;
 
-    sDefIndex = SSBBChar_Register(&sDefinition);
+    // The registry stores this stable definition pointer. Reuse its slot when
+    // switching models instead of exhausting the character registry.
+    if (sDefIndex < 0)
+        sDefIndex = SSBBChar_Register(&sDefinition);
     if (sDefIndex < 0) {
         sBlob.clear();
         return false;
     }
     sAssetsLoaded = 1;
+    sLoadedHDModel = useHD;
     SPDLOG_INFO("SoH Wolf: asset loaded path={} bytes={} vertices={} bones={} animations={}", sAssetPath, sBlob.size(),
                 vertexCount, boneCount, animCount);
     return true;
@@ -759,6 +788,56 @@ static WolfInput ReadInput(Player* player, PlayState* play) {
 
 static bool OnGround(Player* player) {
     return (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) != 0;
+}
+
+static f32 WolfAudioGain(const char* name, f32 fallback) {
+    const f32 gain = CVarGetFloat(name, fallback);
+    u32 bits;
+    std::memcpy(&bits, &gain, sizeof(bits));
+    return (bits & 0x7F800000u) != 0x7F800000u ? std::clamp(gain, 0.0f, 1.0f) : fallback;
+}
+
+static void StopChainSfx() {
+    if (sWolf.chainPlaying)
+        Audio_StopSfxByPosAndId(&sWolf.chainAudioPos, NA_SE_IT_HOOKSHOT_REFLECT);
+    sWolf.chainPlaying = sWolf.chainPositionValid = sWolf.chainCooldown = 0;
+    sWolf.chainDistance = 0;
+}
+
+static void UpdateChainSfx(Player* player, bool permitted) {
+    sWolf.chainVolume = WolfAudioGain("gMods.WolfLink.ChainVolume", 0.1f);
+    if (!permitted || !OnGround(player) || std::fabs(player->linearVelocity) <= 0.5f ||
+        (player->stateFlags1 & PLAYER_STATE1_IN_WATER) || (player->stateFlags3 & PLAYER_STATE3_FLYING_WITH_HOOKSHOT) ||
+        sWolf.chainVolume == 0) {
+        StopChainSfx();
+        return;
+    }
+    const Vec3f current = player->actor.world.pos;
+    if (!sWolf.chainPositionValid) {
+        sWolf.chainLastPos = current;
+        sWolf.chainPositionValid = 1;
+        return;
+    }
+    const f32 dx = current.x - sWolf.chainLastPos.x;
+    const f32 dz = current.z - sWolf.chainLastPos.z;
+    const f32 travel = std::sqrt(dx * dx + dz * dz);
+    sWolf.chainLastPos = current;
+    if (travel < 0.1f || travel > 150.0f) {
+        StopChainSfx();
+        return;
+    }
+    sWolf.chainAudioPos = player->actor.projectedPos;
+    sWolf.chainDistance += travel;
+    if (sWolf.chainCooldown)
+        --sWolf.chainCooldown;
+    if (sWolf.chainDistance < 30.0f || sWolf.chainCooldown)
+        return;
+    sWolf.chainDistance = 0;
+    sWolf.chainCooldown = 8;
+    sWolf.chainPlaying = 1;
+    // Reflect is the existing one-shot metal clink; Hookshot Chain is a loop.
+    Audio_PlaySoundGeneral(NA_SE_IT_HOOKSHOT_REFLECT, &sWolf.chainAudioPos, 4, &sWolf.chainFrequency,
+                           &sWolf.chainVolume, &sWolf.chainReverb);
 }
 
 // getCutDirection: stick relative to facing, or DIR_NONE when neutral.
@@ -1112,7 +1191,7 @@ static void ProcWaitAttackInit(Player* player, PlayState* play, s32 attackType) 
     sWolf.attackSpeed = hio->speed;
     sWolf.comboWindow = TpFrames(kComboDuration);
     sWolf.atActive = 0; // armed inside the judgement window
-    Player_PlaySfx(&player->actor, sWolf.comboCount == 4 ? NA_SE_VO_LI_SWORD_L : NA_SE_VO_LI_SWORD_N);
+    WolfAudio_Play(WolfAudioCue::Bite, WolfAudioGain("gMods.WolfLink.VoiceVolume", 0.8f));
     Player_PlaySfx(&player->actor, NA_SE_IT_SWORD_SWING);
 }
 
@@ -1194,7 +1273,7 @@ static void ProcJumpAttackInit(Player* player, PlayState* play, s32 param) {
     FacePlayer(player, player->actor.shape.rot.y);
     sWolf.comboWindow = TpFrames(kComboDuration);
     sWolf.atActive = 1;
-    Player_PlaySfx(&player->actor, finisher ? NA_SE_VO_LI_SWORD_L : NA_SE_VO_LI_SWORD_N);
+    WolfAudio_Play(WolfAudioCue::Jump, WolfAudioGain("gMods.WolfLink.VoiceVolume", 0.8f));
     Player_PlaySfx(&player->actor, NA_SE_PL_SKIP);
 }
 
@@ -1276,7 +1355,7 @@ static void ProcRollAttackInit(Player* player, PlayState* play, s32 dir) {
     sWolf.atActive = 0;
     player->linearVelocity = 0.0f;
     FacePlayer(player, player->actor.shape.rot.y);
-    Player_PlaySfx(&player->actor, NA_SE_VO_LI_SWORD_L);
+    WolfAudio_Play(WolfAudioCue::Spin, WolfAudioGain("gMods.WolfLink.VoiceVolume", 0.8f));
     Player_PlaySfx(&player->actor, NA_SE_IT_SWORD_SWING_HARD);
 }
 
@@ -1442,6 +1521,14 @@ extern "C" u8 WolfLinkForm_IsEnabled(void) {
     if (!CVarGetInteger("gMods.WolfLink.Enabled", 1)) {
         return 0;
     }
+    size_t resourceSize = 0;
+    const int resourceStatus = OOT_CopyWolfLinkModelResource(CVarGetInteger(NeiWolfAsset::kHDModelCVar, 1) != 0,
+                                                             nullptr, 0, &resourceSize, nullptr, nullptr);
+    // Use the loader's owner/model selection before the legacy file fallback.
+    // A present malformed resource must not enable a different loose model.
+    if (resourceStatus != 0) {
+        return resourceStatus > 0 ? 1 : 0;
+    }
     std::ifstream file(FindAssetPath(), std::ios::binary);
     return file.good() ? 1 : 0;
 }
@@ -1452,6 +1539,20 @@ extern "C" u8 WolfLinkForm_IsSelected(void) {
 
 extern "C" void WolfLinkForm_Select(u8 selected) {
     sSelected = selected ? 1 : 0;
+}
+
+extern "C" void WolfLinkForm_UpdateSfx(PlayState* play) {
+    const f32 master = std::clamp(CVarGetInteger("gSettings.Volume.Master", 40), 0, 100) / 100.0f;
+    const f32 sfx = std::clamp(CVarGetInteger("gSettings.Volume.SFX", 100), 0, 100) / 100.0f;
+    const bool live =
+        play && gSaveContext.gameMode == GAMEMODE_NORMAL && !play->transitionTrigger && !play->transitionMode;
+    WolfAudio_Publish(live, live && (play->pauseCtx.state || play->pauseCtx.debugState), master * sfx);
+}
+
+extern "C" void WolfLinkForm_PlayTransformSfx(u8 toWolf) {
+    WolfLinkForm_UpdateSfx(gPlayState);
+    WolfAudio_Play(toWolf ? WolfAudioCue::Enter : WolfAudioCue::Exit,
+                   WolfAudioGain("gMods.WolfLink.TransformVolume", 0.65f));
 }
 
 // Speed multiplier for Link's own locomotion while the wolf is active
@@ -1465,7 +1566,7 @@ extern "C" f32 WolfLinkForm_SpeedMultiplier(void) {
 }
 
 extern "C" u8 WolfLinkForm_LoadSkeleton(PlayState* play) {
-    std::memset(&sWolf, 0, sizeof(sWolf));
+    sWolf = WolfRuntime{};
     for (s32& index : sWolf.animIndex) {
         index = -1;
     }
@@ -1492,6 +1593,8 @@ extern "C" u8 WolfLinkForm_LoadSkeleton(PlayState* play) {
 }
 
 extern "C" void WolfLinkForm_Cleanup(void) {
+    StopChainSfx();
+    WolfAudio_Stop();
     if (sWolf.character.def && sWolf.character.def->skinMesh) {
         SSBBSkin_Destroy(sWolf.character.def->skinMesh);
     }
@@ -1510,6 +1613,7 @@ extern "C" void WolfLinkForm_Cleanup(void) {
 }
 
 extern "C" void WolfLinkForm_Update(Player* player, PlayState* play) {
+    WolfLinkForm_UpdateSfx(play);
     if (!sWolf.initialized || !sWolf.character.ssbbAnim) {
         return;
     }
@@ -1604,6 +1708,7 @@ extern "C" void WolfLinkForm_Update(Player* player, PlayState* play) {
         player->actor.world.rot.y = player->yaw = player->actor.shape.rot.y;
     }
     UpdateAttackCollider(player, play);
+    UpdateChainSfx(player, !in.blocked && sWolf.proc != PROC_WOLF_DAMAGE);
     sWolf.wasOnGround = OnGround(player);
     AdvanceAnim();
 }

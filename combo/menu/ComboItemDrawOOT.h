@@ -24,6 +24,7 @@
 #include "ComboExport.h"
 #include "ComboMaskShimmer.h"
 #include "ComboSongDrawOOT.h"
+#include "ComboBottleContents.h"
 #include "ComboItemIconOwnership.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
 #include "ComboItemEffectColors.h"
@@ -175,8 +176,11 @@ static int32_t CwAltSwordGi(RandomizerGet rg, CwItemDrawInfo* out) {
             fire = "__OTR__objects/din_fire_sword/progressive/adult/SwordDL";
             break;
         case RG_BIGGORON_SWORD:
+        case RG_GIANTS_KNIFE:
         case RG_GREAT_FAIRY_SWORD:
-            shimmer = rg == RG_BIGGORON_SWORD ? NeiGi::Kind::BiggoronSword : NeiGi::Kind::GreatFairySword;
+            shimmer = rg == RG_GREAT_FAIRY_SWORD ? NeiGi::Kind::GreatFairySword
+                      : rg == RG_GIANTS_KNIFE    ? NeiGi::Kind::GiantsKnife
+                                                 : NeiGi::Kind::BiggoronSword;
             selected = "__OTR__alt/objects/object_custom_equip/gCustomLongswordDL";
             fire = "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
             break;
@@ -195,7 +199,7 @@ static int32_t CwAltSwordGi(RandomizerGet rg, CwItemDrawInfo* out) {
     // Standalone equipment follows the native hand-local +X blade axis.
     // Tilt it into +Y; an X quarter-turn after this would lay it flat in XZ.
     out->opCount = 1;
-    out->ops[0] = { CW_OP_ROTATE_Z, 18774.682f, 0, 0, {} }; // 1.8 radians
+    out->ops[0] = { CW_OP_ROTATE_Z, 16384.f, 0, 0, {} }; // +X blade to straight-up +Y.
     if (trueMaster) {
         out->primColorXlu[0] = 120;
         out->primColorXlu[1] = 180;
@@ -570,7 +574,7 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
                 return 0;
             out->xluStartIndex = -1; // Both blade and hilt are opaque in the native callback.
             out->opCount = 1;
-            out->ops[0] = { CW_OP_ROTATE_Z, 18774.682f, 0, 0, {} };
+            out->ops[0] = { CW_OP_ROTATE_Z, 16384.f, 0, 0, {} };
             return 1;
         case RG_EXT_SHIELD_OF_IKANA: {
             const char* path = "objects/object_link_child/gLinkHumanMirrorShieldDL";
@@ -968,6 +972,16 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
         std::memcpy(out->itemShimmerColor, color, 4);
         return 1;
     }
+    if (effRg == RG_BOTTLE_WITH_MAGIC_MUSHROOM || effRg == RG_MM_BOTTLE_GOLD_DUST) {
+        const int content = effRg == RG_BOTTLE_WITH_MAGIC_MUSHROOM ? CW_BOTTLE_MUSHROOM : CW_BOTTLE_GOLD_DUST;
+        out->drawKind = CW_DRAW_KIND_BOTTLE_CONTENTS;
+        out->dlistCount = 1;
+        out->xluStartIndex = 0;
+        out->dlists[0] = content == CW_BOTTLE_MUSHROOM ? "__OTR__objects/combo_bottle_gi/MushroomBottle"
+                                                       : "__OTR__objects/combo_bottle_gi/GoldDustBottle";
+        out->itemShimmer = ComboBottleContents_Color(content, out->itemShimmerColor);
+        return 1;
+    }
     if (OOT_FillSongDrawInfo(effRg, out))
         return 1;
     if (gi.drawFunc != nullptr) {
@@ -994,8 +1008,10 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
     out->drawKind = drawKind;
     if (drawKind == CW_DRAW_KIND_ELEMENTAL_ARROW)
         out->neiEffect = NeiArrowGi_ProfileForDrawId(effRg, RG_FIRE_ARROWS, RG_ICE_ARROWS, RG_LIGHT_ARROWS);
-    if (drawKind == CW_DRAW_KIND_FAIRY)
-        out->stateDependent = 2; // selected generic/fairy-specific shell follows live owner Alt/mod state
+    if (drawKind == CW_DRAW_KIND_MAGIC_SPELL)
+        out->neiEffect = NeiArrowGi_ProfileForDrawId(effRg, RG_DINS_FIRE, RG_FARORES_WIND, RG_NAYRUS_LOVE);
+    if (drawKind == CW_DRAW_KIND_FAIRY || effRg == RG_EMPTY_BOTTLE)
+        out->stateDependent = 2; // selected bottle shell follows live owner Alt/mod state
     for (int32_t i = 0; i < 4; i++) {
         out->primColorXlu[i] = colors[i];
         out->envColorXlu[i] = colors[4 + i];

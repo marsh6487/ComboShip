@@ -29,6 +29,7 @@
 #include "2s2h/CustomMessage/PauseItemDescriptions.h" // NEI: C-Up descriptions for ext equipment
 #include "2s2h/BenGui/CosmeticEditor.h"               // PlayerTunic_BindLocalColor (per-player tunic tint)
 #include "2s2h/FleetShipCombo/FleetComboIds.h"        // FC_SHIELD_* / FC_OOT_TUNIC/BOOTS ownership bits
+#include "2s2h/FleetShipCombo/FleetComboItems.h"      // FCI_KOKIRI_SWORD acquisition receipt
 #include "2s2h/FleetShipCombo/FleetShipCombo.h"       // FleetShipCombo_GetActiveGame (combo ownership gate)
 #include "2s2h/Rando/NeiResourceRouting.h"
 #include "../../../../../combo/menu/ComboItemIconOwnership.h"
@@ -383,8 +384,12 @@ static u8 KaleidoEquip_CellOwned(EquipCell* cell) {
             if (FleetShipCombo_GetActiveGame() < 0) {
                 return true;
             }
-            return (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) >= EQUIP_VALUE_SWORD_KOKIRI) ||
-                   (WeaponUpgrade_KokiriLevel() > 0);
+            return Nei_Save()->comboObtainedFc[FCI_KOKIRI_SWORD] != 0 || WeaponUpgrade_KokiriLevel() > 0 ||
+                   (ExtEquip_GetCurrent(EQUIP_TYPE_SWORD) == 0 &&
+                    GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) >= EQUIP_VALUE_SWORD_KOKIRI &&
+                    GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) <= EQUIP_VALUE_SWORD_GILDED &&
+                    BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_B) ==
+                        ITEM_SWORD_KOKIRI + GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) - EQUIP_VALUE_SWORD_KOKIRI);
         case CELL_SWORD_MASTER:
             if (FleetShipCombo_GetActiveGame() < 0) {
                 return true;
@@ -409,7 +414,9 @@ static u8 KaleidoEquip_CellOwned(EquipCell* cell) {
             if (FleetShipCombo_GetActiveGame() < 0) {
                 return true;
             }
-            return (Nei_Save()->shieldOwned & (cell->index == 1 ? FC_SHIELD_HYLIAN : FC_SHIELD_IKANA)) != 0;
+            return (Nei_Save()->shieldOwned & (cell->index == 1 ? FC_SHIELD_HYLIAN : FC_SHIELD_IKANA)) != 0 ||
+                   (ExtEquip_GetCurrent(EQUIP_TYPE_SHIELD) == 0 && Nei_Save()->vanillaShieldSkin == 0 &&
+                    GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) == cell->index);
         case CELL_TUNIC: // Kokiri (idx 0) always; in COMBO, Goron/Zora require synced ownership
                          // (comboObtained via FleetSync). Standalone keeps "always available".
             if (cell->index == 0 || FleetShipCombo_GetActiveGame() < 0) {
@@ -462,22 +469,8 @@ static u8 KaleidoEquip_CellEquipped(EquipCell* cell) {
     }
 }
 
-// Can the cursor land on this grid position?
-//
-// Skijer 2026-07-31 FIX — this is why page 2 "no dejaba equipar nada". The old comment claimed SoH
-// only lets the cursor sit on OWNED ext cells; it does the opposite. soh z_kaleido_equipment.c:398:
-//
-//     // On extended page, cursor can land on any equipment slot (all owned)
-//     if (extEquipPage) { pauseAnyCursor = true; }
-//
-// and the entry scans at :569 / :610 read `(gBitFlags[...] & equipment) || extEquipPage`. So in OoT
-// the whole 4x3 ext grid is always hoverable; ownership only gates the ACTION (ExtEquip_Equip
-// silently refuses) and the DRAW (unowned cells render greyscaled — which KaleidoScope_DrawEquipment
-// here already does). Requiring ownership to LAND meant that with no extEquipOwnedBits set — the
-// normal state, since nothing in 2ship grants them outside the save editor — not one of the 12 cells
-// was reachable: the page showed 12 greyed icons and the cursor refused to enter. And because
-// ExtEquip_Equip is what flips CVAR_EXT_EQUIP_ENABLED on, ExtEquip_UpdateBehavior kept early-returning
-// too, so none of the 12 behaviors ever ran either. Now 1:1 with OoT.
+// Equipment cells represent acquired inventory, like the item and OoT equipment pages.
+// Keep cursor eligibility consistent with the draw and action ownership checks.
 static u8 KaleidoEquip_CursorCanSit(s16 row, s16 col) {
     EquipCell cell;
 
@@ -487,12 +480,6 @@ static u8 KaleidoEquip_CursorCanSit(s16 row, s16 col) {
     KaleidoEquip_GetCell(sEquipSubPage, row, col, &cell);
     if (cell.equipType == CELL_EMPTY) {
         return false;
-    }
-    if (cell.equipType == CELL_DISPLAY) {
-        return true; // hoverable for the name/preview, A just error-beeps
-    }
-    if (sEquipSubPage == EQUIP_SUBPAGE_EXT) {
-        return true; // soh parity: every populated ext cell is hoverable, owned or not
     }
     return KaleidoEquip_CellOwned(&cell);
 }
@@ -514,6 +501,9 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
     // leaves the slot bare/Kokiri), then the vanilla value goes on top. The old order — vanilla
     // write, then a deferred cleanup restoring the ext piece's snapshot — is what overwrote a freshly
     // equipped Master Sword with the Kokiri Sword.
+    if (cell.equipType == CELL_SWORD || cell.equipType == CELL_SWORD_MASTER || cell.equipType == CELL_SWORD_BGS) {
+        ExtEquip_RecordNativeSwordOwnership();
+    }
     if (cell.equipType == CELL_SWORD) {
         // Kokiri line: equip the highest owned progressive tier (Kokiri/Razor/Gilded).
         u8 level = WeaponUpgrade_KokiriLevel(); // 0/1/2
@@ -562,17 +552,10 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
             Audio_PlaySfx(NA_SE_SY_ERROR);
             return;
         }
+        ExtEquip_RecordNativeShieldOwnership();
     }
 
     if (cell.equipType == CELL_SHIELD) {
-        // Remember the shield being swapped out stays owned (MM has no owned-shield bitmask;
-        // the NEI/FleetCombo shieldOwned store is exactly for this).
-        u16 curShield = GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD);
-        if (curShield == 1) {
-            Nei_Save()->shieldOwned |= FC_SHIELD_HYLIAN;
-        } else if (curShield == 2) {
-            Nei_Save()->shieldOwned |= FC_SHIELD_IKANA;
-        }
         Nei_Save()->shieldOwned |= (cell.index == 1) ? FC_SHIELD_HYLIAN : FC_SHIELD_IKANA;
         ExtEquip_Unequip(EQUIP_TYPE_SHIELD);
         SET_EQUIP_VALUE(EQUIP_TYPE_SHIELD, cell.index);
@@ -585,7 +568,7 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
     if (cell.equipType == CELL_SHIELD_DEKU) {
         // Deku shield: equip AS Hero (same IA / raise gate / collider), then flag the Deku skin so
         // the draw shows OoT's smaller Deku model instead of the Hylian/Hero one.
-        Nei_Save()->shieldOwned |= FC_SHIELD_DEKU | FC_SHIELD_HYLIAN;
+        Nei_Save()->shieldOwned |= FC_SHIELD_DEKU;
         ExtEquip_Unequip(EQUIP_TYPE_SHIELD);
         SET_EQUIP_VALUE(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_HERO);
         Nei_Save()->vanillaShieldSkin = 1;
@@ -785,6 +768,23 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
 
     // --- Grid sub-pages (vanilla / ext): OoT 4x4 cursor space ---
 
+    // A sub-page or save-file change can leave the persistent cursor on an unowned cell.
+    // Find a populated cell before accepting input or publishing its title.
+    if (pauseCtx->cursorSpecialPos == 0 && !KaleidoEquip_CursorCanSit(sEquipCursorY, sEquipCursorX)) {
+        for (col = 0; col <= 3; col++) {
+            for (row = 0; row < 4; row++) {
+                if (KaleidoEquip_CursorCanSit(row, col)) {
+                    sEquipCursorX = col;
+                    sEquipCursorY = row;
+                    goto EQUIPMENT_CURSOR_VALID;
+                }
+            }
+        }
+        KaleidoScope_MoveCursorToSpecialPos(play, PAUSE_CURSOR_PAGE_LEFT);
+        return;
+    EQUIPMENT_CURSOR_VALID:;
+    }
+
     // Entering the grid from the page-switch special position (vanilla-cursor behavior):
     // scan for the first cell the cursor can sit on, nearest the entered side.
     if (pauseCtx->cursorSpecialPos != 0) {
@@ -926,7 +926,8 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
         pauseCtx->cursorItem[PAUSE_MASK] = (nameItem >= 0) ? (u16)nameItem : PAUSE_ITEM_NONE;
     } else {
         KaleidoEquip_GetCell(sEquipSubPage, sEquipCursorY, sEquipCursorX, &cell);
-        pauseCtx->cursorItem[PAUSE_MASK] = (cell.item >= 0) ? (u16)cell.item : PAUSE_ITEM_NONE;
+        pauseCtx->cursorItem[PAUSE_MASK] =
+            (cell.item >= 0 && KaleidoEquip_CellOwned(&cell)) ? (u16)cell.item : PAUSE_ITEM_NONE;
     }
     pauseCtx->cursorSlot[PAUSE_MASK] = EQUIP_CELL(sEquipCursorY, sEquipCursorX);
     // Keep the shared cursor machinery in sync — the kaleido re-derives the drawn cursor from
@@ -1181,6 +1182,9 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                 }
 
                 owned = KaleidoEquip_CellOwned(&cell);
+                if (!owned) {
+                    continue;
+                }
                 equipped = KaleidoEquip_CellEquipped(&cell);
 
                 // OoT icon first (visual 1:1 when the OoT archive is in mods/), then the
@@ -1208,17 +1212,10 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                     gSPVertex(POLY_OPA_DISP++, &pauseCtx->maskVtx[EQUIP_CELL(row, col) * 4], 4, 0);
                     POLY_OPA_DISP = Gfx_DrawTexQuadIA8(POLY_OPA_DISP, gEquippedItemOutlineTex, 32, 32, 0);
                 }
-                if (!owned) {
-                    gDPSetGrayscaleColor(POLY_OPA_DISP++, 109, 109, 109, 255);
-                    gSPGrayscale(POLY_OPA_DISP++, true);
-                }
                 gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255,
                                 equipped ? pauseCtx->alpha : (pauseCtx->alpha * 3) / 4);
                 gSPVertex(POLY_OPA_DISP++, &pauseCtx->maskVtx[EQUIP_CELL(row, col) * 4], 4, 0);
                 KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, icon, 32, 32, 0);
-                if (!owned) {
-                    gSPGrayscale(POLY_OPA_DISP++, false);
-                }
             }
         }
     }

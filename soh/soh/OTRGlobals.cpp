@@ -7,6 +7,7 @@
 #include "ComboExport.h"
 #include "ComboResolve.h"
 #include "../../combo/NeiGracePolicy.h"
+#include "../../combo/NeiSeasonsPolicy.h"
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -1519,7 +1520,7 @@ void VanillaItemTable_Init() {
         GET_ITEM(ITEM_POTION_RED,       OBJECT_GI_LIQUID,        GID_POTION_RED,       0x43, 0x80, CHEST_ANIM_LONG,  ITEM_CATEGORY_JUNK,            MOD_NONE, GI_POTION_RED),
         GET_ITEM(ITEM_POTION_GREEN,     OBJECT_GI_LIQUID,        GID_POTION_GREEN,     0x44, 0x80, CHEST_ANIM_LONG,  ITEM_CATEGORY_JUNK,            MOD_NONE, GI_POTION_GREEN),
         GET_ITEM(ITEM_POTION_BLUE,      OBJECT_GI_LIQUID,        GID_POTION_BLUE,      0x45, 0x80, CHEST_ANIM_LONG,  ITEM_CATEGORY_JUNK,            MOD_NONE, GI_POTION_BLUE),
-        GET_ITEM(ITEM_FAIRY,            OBJECT_GI_BOTTLE,        GID_BOTTLE,           0x46, 0x80, CHEST_ANIM_LONG,  ITEM_CATEGORY_JUNK,            MOD_NONE, GI_FAIRY),
+        GET_ITEM(ITEM_FAIRY,            OBJECT_GI_SOUL,          GID_FAIRY,            0x46, 0x80, CHEST_ANIM_LONG,  ITEM_CATEGORY_JUNK,            MOD_NONE, GI_FAIRY),
         GET_ITEM(ITEM_MILK_BOTTLE,      OBJECT_GI_MILK,          GID_MILK,             0x98, 0x80, CHEST_ANIM_LONG,  ITEM_CATEGORY_MAJOR,           MOD_NONE, GI_MILK_BOTTLE),
         GET_ITEM(ITEM_LETTER_RUTO,      OBJECT_GI_BOTTLE_LETTER, GID_LETTER_RUTO,      0x99, 0x80, CHEST_ANIM_LONG,  ITEM_CATEGORY_MAJOR,           MOD_NONE, GI_LETTER_RUTO),
         GET_ITEM(ITEM_BEAN,             OBJECT_GI_BEAN,          GID_BEAN,             0x48, 0x80, CHEST_ANIM_SHORT, ITEM_CATEGORY_MAJOR,           MOD_NONE, GI_BEAN),
@@ -1920,6 +1921,10 @@ bool VerifyArchiveVersion(OTRVersion version) {
 
 // ComboShip: forward declarations — defined further down with the combo exports.
 extern "C" void (*gComboSceneSwitchCallback)(int fileNum);
+static int sComboFwSwitchSlot = -1;
+extern "C" void SOH_QueueFwHandoff(int slot) {
+    sComboFwSwitchSlot = slot;
+}
 // Launcher poll: returns the next save slot backed up for a release mismatch, or -1 if none.
 extern "C" int (*gComboOutdatedSaveNotice)();
 // Shared Items pokes (defined with the rest of the Shared Items ABI further down).
@@ -2131,12 +2136,19 @@ static void Combo_FinishInit() {
     });
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameFrameUpdate>([]() {
-        if (!sComboSwitchPending)
+        if (!sComboSwitchPending && sComboFwSwitchSlot < 0)
             return;
+        bool isFwReturn = sComboFwSwitchSlot >= 0;
+        if (isFwReturn)
+            sComboSwitchFileNum = sComboFwSwitchSlot;
+        sComboFwSwitchSlot = -1;
         sComboSwitchPending = false;
-        SaveManager::Instance->SaveFile(sComboSwitchFileNum);
+        if (isFwReturn && gPlayState)
+            Play_PerformSave(gPlayState); // Capture live scene flags and native save/equipment bookkeeping.
+        else
+            SaveManager::Instance->SaveFile(sComboSwitchFileNum);
         SaveManager::Instance->ThreadPoolWait();
-        if (gComboSceneSwitchCallback) {
+        if (!isFwReturn && gComboSceneSwitchCallback) {
             gComboSceneSwitchCallback(sComboSwitchFileNum);
         }
         if (gGameState) {
@@ -4782,6 +4794,14 @@ extern "C" COMBO_EXPORT void SOH_NormalizeComboGraceFromMM(void) {
     CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE_REWARDS", rewards);
     CVarSetInteger(CVAR_RANDOMIZER_SETTING("HyliasGrace"), mode);
     CVarSetInteger(CVAR_RANDOMIZER_SETTING("HyliasGraceRewards"), rewards);
+    // Keep Rod policy stable for both source pools, even with general settings sync disabled.
+    const auto seasons =
+        NeiSeasons_SeedMode(CVarGetInteger("gRando.Options.RO_ROD_OF_SEASONS", NEI_SEASONS_INDIVIDUAL));
+    const auto startRod = CVarGetInteger("gRando.Options.RO_STARTING_ROD_OF_SEASONS", 0) != 0;
+    CVarSetInteger("gRando.Options.RO_ROD_OF_SEASONS", seasons);
+    CVarSetInteger("gRando.Options.RO_STARTING_ROD_OF_SEASONS", startRod);
+    CVarSetInteger(CVAR_RANDOMIZER_SETTING("RodOfSeasons"), seasons);
+    CVarSetInteger(CVAR_RANDOMIZER_SETTING("StartingRodOfSeasons"), startRod);
 }
 
 // ComboShip: restore OOT rando settings from a {cvarName:value} snapshot (written by
@@ -4801,6 +4821,8 @@ extern "C" COMBO_EXPORT void SOH_RestoreRandoSettings(const char* json) {
         // Pre-policy seeds included Grace whenever NEI was enabled.
         CVarSetInteger(CVAR_RANDOMIZER_SETTING("HyliasGrace"), NEI_GRACE_ON);
         CVarSetInteger(CVAR_RANDOMIZER_SETTING("HyliasGraceRewards"), 4);
+        CVarSetInteger(CVAR_RANDOMIZER_SETTING("RodOfSeasons"), NEI_SEASONS_INDIVIDUAL);
+        CVarSetInteger(CVAR_RANDOMIZER_SETTING("StartingRodOfSeasons"), 0);
         for (auto it = j.begin(); it != j.end(); ++it) {
             if (it.value().is_string())
                 CVarSetString(it.key().c_str(), it.value().get<std::string>().c_str());

@@ -26,7 +26,7 @@ Matrix m;
 float lift;
 void Reset(){lift=0;m={{{1,0,0},{0,1,0},{0,0,1}}};}
 void Multiply(const Matrix& r){auto old=m;for(int i=0;i<3;++i)for(int j=0;j<3;++j){m[i][j]=0;for(int k=0;k<3;++k)m[i][j]+=old[i][k]*r[k][j];}}
-void Matrix_Translate(float,float y,float,int){lift+=y;}
+void Matrix_Translate(float x,float y,float z,int){lift+=m[1][0]*x+m[1][1]*y+m[1][2]*z;}
 void ComboSwordGi_ApplyFit(const char*,const char*,float scale,float tilt,bool shop=false){
     const float c=std::cos(tilt),s=std::sin(tilt);
     NeiGi::FrameBounds bounds{"selected",{0,-670*s-268*c,0},{0,4122*s-268*c,0},2400,NeiGi::Kind::MasterSword,{}};
@@ -38,6 +38,7 @@ void Matrix_RotateX(float a,int){Multiply({{{1,0,0},{0,std::cos(a),-std::sin(a)}
 void Matrix_RotateY(float a,int){Multiply({{{std::cos(a),0,std::sin(a)},{0,1,0},{-std::sin(a),0,std::cos(a)}}});}
 void Matrix_RotateZ(float a,int){Multiply({{{std::cos(a),-std::sin(a),0},{std::sin(a),std::cos(a),0},{0,0,1}}});}
 void Matrix_Scale(float a,float b,float c,int){assert(a==b&&b==c);Multiply({{{a,0,0},{0,b,0},{0,0,c}}});}
+#include "combo/menu/ComboSwordGiEffectFit.h"
 #define OPEN_DISPS(...) ((void)0)
 #define CLOSE_DISPS(...) ((void)0)
 #define Gfx_SetupDL_25Opa(...) ((void)0)
@@ -47,7 +48,7 @@ void Matrix_Scale(float a,float b,float c,int){assert(a==b&&b==c);Multiply({{{a,
 #define gSPMatrix(...) ((void)0)
 #define gSPDisplayList(...) ((void)0)
 #define gDma1p(...) ((void)0)
-enum RandomizerGet{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_TRUE_MASTER_SWORD,RG_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD};
+enum RandomizerGet{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_TRUE_MASTER_SWORD,RG_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GIANTS_KNIFE,RG_GREAT_FAIRY_SWORD};
 int32_t OOT_NeiAltAssetsEnabled(){return true;}
 int32_t OOT_NeiResourceExists(const char*){return true;}
 #define CVAR_ENHANCEMENT(x) x
@@ -60,12 +61,15 @@ if 'NeiGi_DrawSelectedSword' in native:
 source+=r'''
 void Check(){
     const float length=std::sqrt(m[0][0]*m[0][0]+m[1][0]*m[1][0]+m[2][0]*m[2][0]);
-    assert(m[1][0]/length>.95f && "extra X quarter-turn lays the native +X donor blade flat instead of upright +Y");
+    assert(m[1][0]/length>.99999f && "selected +X sword must point straight up through the full GI spin");
 }
 int main(){
     for(uint32_t frame:{0u,42u,179u,180u,32767u,65535u}){
-        play.gameplayFrames=frame;Reset();DrawMmWeaponGi(&play,nullptr,nullptr,.04f);Check();
-        for(auto id:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD}){
+        play.gameplayFrames=frame;Reset();DrawMmWeaponGi(&play,nullptr,nullptr,.04f,false);
+        Check();
+        Reset();DrawMmWeaponGi(&play,nullptr,nullptr,.04f,true);
+        assert(std::abs(m[1][0]/.04f-std::sin(1.8f))<.00001f && "legacy Four Sword shelf pose changed");
+        for(auto id:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GIANTS_KNIFE,RG_GREAT_FAIRY_SWORD}){
             CwItemDrawInfo info{};assert(CwAltSwordGi(id,&info));
             Reset();Matrix_RotateY(.84f,MTXMODE_APPLY);
             for(int i=0;i<info.opCount;++i){const auto& op=info.ops[i];const float angle=op.a*(6.28318530718f/65536.f);
@@ -77,13 +81,13 @@ int main(){
         }
 '''
 if 'NeiGi_DrawSelectedSword' in native:
-    source+='Reset();NeiGi_DrawSelectedSword(&play,"selected");Check();\nconst float high=m[1][0]*4122+m[1][1]*-268+m[1][2]*101+lift;\nassert(high<=48.001f && "actual selected Din equipment mesh exceeds the GI frame envelope");\n'
+    source+='Reset();NeiGi_DrawSelectedSword(&play,"selected");Check();\nconst float high=m[1][0]*4122+m[1][1]*-268+m[1][2]*101+lift;\nassert(high<=55.501f && "enlarged selected Din equipment mesh exceeds the GI frame envelope");\n'
 source+='}\n}\n'
 with tempfile.TemporaryDirectory(prefix='sword-pose-') as temporary:
     path=Path(temporary); (path/'pose.cpp').write_text(source)
     subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),str(path/'pose.cpp'),'-o',str(path/'pose')],check=True)
     subprocess.run([str(path/'pose')],check=True)
-print('PASS actual native Four Sword and selected Kokiri/Master/longsword producer +X→+Y transforms across spins')
+print('PASS upright native Four Sword/selected sword pickups and preserved native Four Sword shelf pose across spins')
 
 # The inline GI helpers must use each actual host's matrix/GBI API, not only
 # the controlled geometry seam above.

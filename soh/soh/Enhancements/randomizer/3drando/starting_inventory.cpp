@@ -17,6 +17,7 @@ static void AddItemToInventory(RandomizerGet item, size_t count = 1) {
 void GenerateStartingInventory() {
     auto ctx = Rando::Context::GetInstance();
     StartingInventory.clear();
+    AddItemToInventory(RG_ROD_OF_SEASONS, ctx->GetOption(RSK_STARTING_ROD_OF_SEASONS) ? 1 : 0);
 
     if (ctx->GetOption(RSK_SHUFFLE_MAPANDCOMPASS).Is(RO_DUNGEON_ITEM_LOC_STARTWITH)) {
         for (auto* dungeon : ctx->GetDungeons()->GetDungeonList()) {

@@ -23,6 +23,7 @@ if __name__ == "__main__" and "--budget-only" not in sys.argv:
     subprocess.run([sys.executable,str(ROOT/'tests/nei_used_fx/source_contract_test.py')],check=True)
     subprocess.run([sys.executable,str(ROOT/'tests/nei_used_fx/material_test.py')],check=True)
     subprocess.run([sys.executable,str(ROOT/'tests/nei_used_fx/attack_material_test.py')],check=True)
+    subprocess.run([sys.executable,str(ROOT/'tests/nei_used_fx/cast_material_test.py')],check=True)
     subprocess.run([sys.executable,str(ROOT/'tests/nei_used_fx/flight_particle_test.py')],check=True)
     subprocess.run([sys.executable,str(ROOT/'tests/nei_used_fx/preserve_approved_test.py')],check=True)
     subprocess.run([sys.executable,str(ROOT/'tests/nei_used_fx/preserve_accepted_fire_test.py')],check=True)
@@ -42,6 +43,13 @@ if __name__ == "__main__":
                             '-ffunction-sections','-fdata-sections',
                             str(ROOT / "tests/nei_used_fx" / (name + "_test.cpp")), '-Wl,--gc-sections',
                             "-o", binary], check=True)
+            subprocess.run([binary], check=True)
+        if "--budget-only" not in sys.argv:
+            from run_mm_nei_tests import flags as mm_flags
+            binary = str(Path(tmp) / "mm-presentation")
+            subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-O2", *mm_flags(),
+                            "-I" + str(ROOT), "-DNEI_USED_FX_MM",
+                            str(ROOT / "tests/nei_used_fx/presentation_test.cpp"), "-o", binary], check=True)
             subprocess.run([binary], check=True)
         # Compile the public interface as C, just as the unity item sources use it.
         source = Path(tmp) / "abi.c"

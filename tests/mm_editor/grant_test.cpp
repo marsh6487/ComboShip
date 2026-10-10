@@ -252,6 +252,20 @@ int main() {
     puts("PASS clear/regrant: retained powers recover their host cells without recounting cane skills or changing "
          "rune/season selection");
 
+    reset();
+    gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+    RANDO_SAVE_OPTIONS[RO_ROD_OF_SEASONS] = NEI_SEASONS_GATED;
+    REQUIRE(NeiEditor::Grant(RI_OOT_NEI_ROD_OF_SEASONS));
+    REQUIRE(Nei_Save()->seasonsOwned == 0 && Nei_Save()->season == SEASON_OFF);
+    const int rodCount = sharedObtained;
+    const u32 rodSerial = gRandoPickupSerial;
+    Nei_SetOwnedItem(SLOT_ROD_OF_SEASONS, ITEM_NONE);
+    REQUIRE(NeiEditor::Grant(RI_OOT_NEI_ROD_OF_SEASONS));
+    REQUIRE(Nei_GetOwnedItem(SLOT_ROD_OF_SEASONS) == EXT_ITEM_ROD_OF_SEASONS);
+    REQUIRE(Nei_Save()->seasonsOwned == 0 && Nei_Save()->season == SEASON_OFF);
+    REQUIRE(sharedObtained == rodCount && gRandoPickupSerial == rodSerial);
+    puts("PASS empty gated Rod host repair retains Off and does not replay the earned pickup");
+
     // Medallions make a wand mode usable, but do not constitute an earned wand.
     wandRule = WAND_RANDO_MEDALLIONS;
     for (const auto id : {RI_OOT_NEI_ELEMENTAL_WAND, RI_OOT_NEI_WAND_SAND_ROD}) {

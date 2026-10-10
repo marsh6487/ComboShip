@@ -350,6 +350,10 @@ void* Slate_RuneMiniIcon(uint8_t rune); // 24x24 rune glyph (wheel previews / te
 void* Slate_RuneIcon(uint8_t rune);     // 32x32 slate-with-rune-badge (cell / HUD)
 
 // ── Rod of Seasons (Skijer's NEI) — slate idiom over SLOT_ROD_OF_SEASONS ──
+uint8_t Seasons_RandoMode(void); // saved seed policy; zero retains legacy season pickups
+void Seasons_UpdateGates(void);  // latch native completion checks, independent of shuffled rewards
+uint8_t Seasons_HasRod(void);
+void Seasons_GrantRod(void);
 uint8_t Seasons_SeasonOwned(uint8_t season);
 void Seasons_GrantSeason(uint8_t season); // also hands over the rod on the first season
 uint8_t Seasons_SeasonCount(void);        // owned seasons

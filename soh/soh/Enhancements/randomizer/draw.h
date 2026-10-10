@@ -84,11 +84,13 @@ void Randomizer_DrawNet(PlayState* play, GetItemEntry* getItemEntry);
 // Extended Equipment Get-Item 3D Models
 void Randomizer_DrawExtCaneOfByrna(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawExtFourSword(PlayState* play, GetItemEntry* getItemEntry);
+void Randomizer_DrawExtFourSwordPresentation(PlayState* play, GetItemEntry* getItemEntry, int shop);
 // NEI Weapon Upgrades (progressive weapons)
 void Randomizer_DrawProgressiveHammer(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawProgressiveKokiriSword(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawProgressiveMasterSword(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawProgressiveBGS(PlayState* play, GetItemEntry* getItemEntry);
+void Randomizer_DrawGiantsKnife(PlayState* play, GetItemEntry* getItemEntry);
 // Per-level identities of the NEI weapon chains (what the progressive resolution hands out).
 void Randomizer_DrawRazorSword(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawGildedSword(PlayState* play, GetItemEntry* getItemEntry);

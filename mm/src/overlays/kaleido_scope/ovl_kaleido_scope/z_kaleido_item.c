@@ -921,10 +921,20 @@ static void Sw97Wheel_Draw(PlayState* play, s32 cell, u8 isSling) {
 // still missing. This is the pattern that keeps the page-2 slot array from growing.
 #define WAND_KALEIDO_CELL (SLOT_ELEMENTAL_WAND - 24)
 
+static void Wand_KaleidoSyncTitle(PlayState* play) {
+    static u8 namedMode = 0xFF;
+    u8 mode = Wand_ModeCount() ? Wand_GetMode() : 0xFF;
+    if (play->pauseCtx.namedItem == ITEM_ELEMENTAL_WAND && namedMode != mode) {
+        play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    }
+    namedMode = mode;
+}
+
 static void Wand_KaleidoHandle(PlayState* play) {
     Input* input = CONTROLLER1(&play->state);
     PauseContext* pauseCtx = &play->pauseCtx;
 
+    Wand_KaleidoSyncTitle(play);
     if (ExtInv_GetSlotItem(SLOT_ELEMENTAL_WAND) == ITEM_NONE) {
         return;
     }
@@ -948,6 +958,7 @@ static void Wand_KaleidoHandle(PlayState* play) {
         if (dir != 0) {
             Audio_PlaySfx(NA_SE_SY_CURSOR);
             Wand_SetMode(Wand_ModeNeighbor(Wand_GetMode(), dir));
+            pauseCtx->namedItem = PAUSE_ITEM_NONE;
             // The HUD caches the resolved icon per button (iconItemSegment[]); the item id did not
             // change, so ask for the reload — same reasoning as Sw97_RefreshButtonIcons.
             ExtInv_RefreshButtonIconsForItem(play, ITEM_ELEMENTAL_WAND);
@@ -1893,6 +1904,21 @@ void KaleidoScope_UpdateItemCursor(PlayState* play) {
             return;
         }
 
+        // An empty first page leaves the cursor on an arrow. L must work there too,
+        // otherwise owned customs and masks on the other pages cannot be reached.
+        if ((pauseCtx->debugEditor == DEBUG_EDITOR_NONE) &&
+            CHECK_BTN_ALL(CONTROLLER1(&play->state)->press.button, BTN_L) && ExtInv_CanSwitchPage() &&
+            (ExtInv_GetMaxPages() > 1)) {
+            ExtInv_SwitchPage();
+            pauseCtx->namedItem = PAUSE_ITEM_NONE;
+            cursorItem = ExtInv_GetSlotItem(ExtInv_GetInventorySlot(pauseCtx->cursorPoint[PAUSE_ITEM]));
+            pauseCtx->cursorItem[PAUSE_ITEM] =
+                (pauseCtx->cursorSpecialPos != 0 || cursorItem == ITEM_NONE) ? PAUSE_ITEM_NONE : cursorItem;
+            Audio_PlaySfx(NA_SE_SY_HP_RECOVER);
+            // A simultaneous C/A press must not act on the previous page's item.
+            return;
+        }
+
         // Move cursor left/right
         if (pauseCtx->cursorSpecialPos == 0) {
             // cursor is currently on a slot
@@ -2007,8 +2033,11 @@ void KaleidoScope_UpdateItemCursor(PlayState* play) {
                         continue;
                     }
 
-                    // No item available
-                    KaleidoScope_MoveCursorToSpecialPos(play, PAUSE_CURSOR_PAGE_RIGHT);
+                    // The grid remains navigable before the first item is obtained.
+                    pauseCtx->cursorPoint[PAUSE_ITEM] = 0;
+                    pauseCtx->cursorXIndex[PAUSE_ITEM] = 0;
+                    pauseCtx->cursorYIndex[PAUSE_ITEM] = 0;
+                    moveCursorResult = PAUSE_CURSOR_RESULT_SLOT;
                     break;
                 }
             }
@@ -2045,8 +2074,11 @@ void KaleidoScope_UpdateItemCursor(PlayState* play) {
                         continue;
                     }
 
-                    // No item available
-                    KaleidoScope_MoveCursorToSpecialPos(play, PAUSE_CURSOR_PAGE_LEFT);
+                    // The grid remains navigable before the first item is obtained.
+                    pauseCtx->cursorPoint[PAUSE_ITEM] = 5;
+                    pauseCtx->cursorXIndex[PAUSE_ITEM] = 5;
+                    pauseCtx->cursorYIndex[PAUSE_ITEM] = 0;
+                    moveCursorResult = PAUSE_CURSOR_RESULT_SLOT;
                     break;
                 }
             }
@@ -2117,14 +2149,6 @@ void KaleidoScope_UpdateItemCursor(PlayState* play) {
 
             pauseCtx->cursorItem[PAUSE_ITEM] = cursorItem;
             pauseCtx->cursorSlot[PAUSE_ITEM] = cursorSlot;
-
-            // NEI: L cycles the extended-inventory sub-page (vanilla / custom items / MM masks).
-            // Handled here in the cursor update (like equip / C-Up description) so the press is
-            // reliably detected. Takes effect next frame when cursorItem recomputes on the new page.
-            if (CHECK_BTN_ALL(CONTROLLER1(&play->state)->press.button, BTN_L) && ExtInv_CanSwitchPage()) {
-                ExtInv_SwitchPage();
-                Audio_PlaySfx(NA_SE_SY_HP_RECOVER);
-            }
 
             // NEI: per-slot item cycles (bottle wheels; more selectors later). While a cycle is
             // open it captures the input — skip equip/description handling below.

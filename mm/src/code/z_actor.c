@@ -5,6 +5,7 @@
  */
 
 #include "z64actor.h"
+#include "gameplay/ComboFaroresWind.h"
 #include "crash_actor_context.h"
 #include "z64door.h"
 
@@ -2654,6 +2655,7 @@ static u8 sOotFwRoomIndex = 0;
 
 // OoT func_8002FA60 — called from Actor_InitContext on every scene load.
 void OotFw_OnSceneInit(PlayState* play) {
+    ComboFw_SyncPoint();
     NeiSaveData* nei = Nei_Save();
 
     if (nei->fwSet) {

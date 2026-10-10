@@ -1247,7 +1247,7 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             ExtInv_GiveItem(SLOT_SHADOW_CRYSTAL, EXT_ITEM_SHADOW_CRYSTAL);
             break;
         case RI_OOT_NEI_ROD_OF_SEASONS:
-            ExtInv_GiveItem(SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS);
+            Seasons_GrantRod();
             break;
         // Rod of Seasons — sibling items over the rod's cell (slate idiom). Each lights its own
         // season, and the first one obtained hands over the rod itself.

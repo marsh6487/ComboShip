@@ -280,7 +280,8 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     glyph = re.search(r'msgCtx->textPosX \+= \(s32\)\(sNESFontWidths\[\(u8\)character - \' \'\] \* msgCtx->textCharScale\);', nes_draw)[0]
     dispatch += ('\nint NativeLineWidth(const std::string& line) {\n'
                  'MessageContext* msgCtx = &play.msgCtx; msgCtx->textPosX = 0;\n'
-                 'for (uint8_t character : line) { if (character == \' \') {\n' + space +
+                 # MM's color commands do not index the native glyph table.
+                 'for (uint8_t character : line) { if (character <= 8) continue; if (character == \' \') {\n' + space +
                  '} else {\n' + glyph.replace('(s32)', '(int)').replace('(u8)', '(uint8_t)') +
                  '} } return msgCtx->textPosX; }\n')
     layout = layout.replace('/* MM_TEXT_DISPATCH */', dispatch)
@@ -417,6 +418,14 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     grants += 'gSaveContext.options.language=LANGUAGE_ENG; }\n'
     (tmp / 'receipt_song_grants.inc').write_text(grants)
     (tmp / 'receipt_catalogs.inc').write_text(catalog)
+    rupee_hooks = ROOT / 'mm/2s2h/Enhancements/Dialogue/RandomRupeeNames.cpp'
+    rupee_code = 'void RegisterNativeRandomRupeeNames() {}\n'
+    if rupee_hooks.exists():
+        rupee_source = rupee_hooks.read_text()
+        rupee_code = 'void BuildNativeRandomRupeeName(u16* textId,bool* loadFromMessageTable) ' + \
+            block(rupee_source,'void BuildNativeRandomRupeeName') + '\n'
+        rupee_code += 'void RegisterNativeRandomRupeeNames() ' + block(rupee_source,'void RegisterNativeRandomRupeeNames')
+    (tmp / 'receipt_rupee_hooks.inc').write_text(rupee_code)
     pause_desc = (ROOT / 'mm/2s2h/CustomMessage/PauseItemDescriptions.cpp').read_text()
     (tmp / 'receipt_map_pause.inc').write_text('extern "C" const char* PauseItemDesc_GetMapInfo(s32 dungeon,u16 itemId) ' +
                                              block(pause_desc, 'const char* PauseItemDesc_GetMapInfo'))
@@ -467,12 +476,25 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     keys += '};\n'
     donor = donor.replace('/* KEY_CATALOG */', keys)
     descriptions = 'const CustomItemMessageEntry receiptMessages[] = {\n'
+    randomizer_messages = (ROOT / 'soh/soh/Enhancements/randomizer/randomizer.cpp').read_text()
+    # Copy the real shared-tool rows, including their icon and all locales.
+    for rg in ('RG_PHANTOM_HOURGLASS', 'RG_SHADOW_CRYSTAL'):
+        row = re.search(r'\{\s*' + rg + r',\s*[^,]+,\s*ComboToolReceiptText::.*?\}',
+                        randomizer_messages, re.S)
+        assert row, f'Missing shared tool receipt: {rg}'
+        descriptions += row.group(0) + ',\n'
+    for rg in ('RG_SKULL_MASK', 'RG_SPOOKY_MASK', 'RG_MASK_OF_TRUTH', 'RG_MM_MASK_TRUTH', 'RG_GERUDO_MASK',
+               'RG_KEATON_MASK', 'RG_MM_MASK_KEATON'):
+        row = re.search(r'\{\s*' + rg + r',\s*[^,]+,\s*ComboMaskReceiptText::.*?\}',
+                        randomizer_messages, re.S)
+        assert row, f'Missing shared mask receipt: {rg}'
+        descriptions += row.group(0) + ',\n'
     for rg in ('RG_CANE_OF_SOMARIA', 'RG_PROGRESSIVE_ROCS', 'RG_CANE_PACCI_FLIP',
                'RG_ROCS_CAPE', 'RG_QUARTZ_OF_MOTION', 'RG_DEKU_LEAF',
                'RG_MM_REMAINS_GOHT', 'RG_MM_SONG_LULLABY', 'RG_MM_SONG_LULLABY_INTRO', 'RG_MM_SONG_NOVA',
                'RG_MM_SONG_HEALING', 'RG_MM_SONG_STORMS', 'RG_MM_SONG_SOARING'):
         text = re.search(r'\{\s*' + rg + r',.*?,\s*((?:"(?:[^"\\]|\\.)*"\s*)+)',
-                         (ROOT / 'soh/soh/Enhancements/randomizer/randomizer.cpp').read_text(), re.S)
+                         randomizer_messages, re.S)
         if not text:
             text = re.search(r'\b' + rg + r',\s*((?:"(?:[^"\\]|\\.)*"\s*)+)', registry)
         descriptions += '{' + rg + ', 0, ' + text.group(1) + ', nullptr, nullptr},\n'
@@ -505,6 +527,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                                            cwd=ROOT, text=True)
     context_builders = 'bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received = true);\n'
     for signature in ('bool BuildDungeonKeyReceiptMessage(RandomizerGet rg, CustomMessage& msg)',
+                      'static bool WandMedallionDescriptionsEnabled()',
                       'static bool DungeonInformationEnabled()',
                       'extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled(void)',
                       'static CustomMessage DungeonRewardName(RandomizerCheck check)',
@@ -518,7 +541,9 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                       'extern "C" COMBO_EXPORT int32_t OOT_GetDungeonItemReceiptPresentation(const char* itemName, CwItemReceiptPresentation* out)',
                       'extern "C" uint16_t Randomizer_GetDungeonItemInfoTextId(uint16_t cursorItem)',
                       'void BuildDungeonPauseInfoMessage(uint16_t* textId, bool* loadFromMessageTable)',
-                      'void BuildMapMessage(uint16_t* textId, bool* loadFromMessageTable)'):
+                      'void BuildMapMessage(uint16_t* textId, bool* loadFromMessageTable)',
+                      'static bool SplitWandMedallionMessage(std::string& prefix, std::string& ending, int& icon)',
+                      'void BuildWandMedallionMessage(uint16_t* textId, bool* loadFromMessageTable)'):
         context_builders += signature + ' ' + block(exported, 'int32_t OOT_GetDungeonItemReceiptPresentation' if 'OOT_GetDungeonItemReceiptPresentation' in signature else signature + ' {') + '\n'
     donor = donor.replace('/* CONTEXT_BUILDERS */', context_builders)
     donor = donor.replace('/* NATIVE_ITEM_BUILDER */',

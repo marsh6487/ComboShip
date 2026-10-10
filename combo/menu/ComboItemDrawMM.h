@@ -17,6 +17,7 @@
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
 #include "ComboSongDrawMM.h"
+#include "ComboBottleContents.h"
 #include "ComboOotBottleShimmerMM.h"
 #include "2s2h/Rando/NeiGiPresentation.h"
 #include "2s2h/Rando/NeiResourceRouting.h"
@@ -1022,6 +1023,26 @@ static bool MM_IsSwordAppearanceDependent(RandoItemId id) {
     }
 }
 
+static int32_t MM_FillElementalSpellDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
+    const int profile = NeiArrowGi_ProfileForDrawId(id, RI_OOT_DINS_FIRE, RI_OOT_FARORES_WIND, RI_OOT_NAYRUS_LOVE);
+    if (!out || !profile)
+        return 0;
+    out->drawKind = CW_DRAW_KIND_MAGIC_SPELL;
+    out->neiEffect = profile;
+    out->opCount = 0;
+    out->dlistCount = 3;
+    out->xluStartIndex = 0;
+    out->scale = 1.f;
+    // Keep the established three-list recipe contract for both resolvers.
+    // The procedural GI uses MM's editor palette; these assets belong to OoT.
+    out->dlists[0] = "__OTR__@oot:objects/object_gi_goddess/gGiMagicSpellDiamondDL";
+    out->dlists[1] = profile == 1   ? "__OTR__@oot:objects/object_gi_goddess/gGiDinsFireColorDL"
+                     : profile == 2 ? "__OTR__@oot:objects/object_gi_goddess/gGiFaroresWindColorDL"
+                                    : "__OTR__@oot:objects/object_gi_goddess/gGiNayrusLoveColorDL";
+    out->dlists[2] = "__OTR__@oot:objects/object_gi_goddess/gGiMagicSpellOrbDL";
+    return 1;
+}
+
 static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     bool progressiveConverted = false;
     // ComboShip (#88): a progressive item's model is the tier the player is owed, not the static base
@@ -1055,6 +1076,8 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
         return 0;
     }
     CwItemDrawInfo nei{};
+    if (MM_FillElementalSpellDrawInfo(id, out))
+        return 1;
     if (MM_DescribeNeiGi(id, &nei)) {
         const char* resolvedName = out->resolvedName;
         *out = nei;
@@ -1144,7 +1167,8 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     out->drawKind = drawKind;
     if (drawKind == CW_DRAW_KIND_ELEMENTAL_ARROW)
         out->neiEffect = NeiArrowGi_ProfileForDrawId(id, RI_ARROW_FIRE, RI_ARROW_ICE, RI_ARROW_LIGHT);
-    if (drawKind == CW_DRAW_KIND_MM_FAIRY_BOTTLE || drawKind == CW_DRAW_KIND_MM_FAIRY_CONTAINER)
+    if (drawKind == CW_DRAW_KIND_MM_FAIRY_BOTTLE || drawKind == CW_DRAW_KIND_MM_FAIRY_CONTAINER ||
+        id == RI_BOTTLE_EMPTY)
         out->stateDependent = 2; // selected shell follows live MM owner Alt/mod state
     for (int32_t i = 0; i < n; i++) {
         out->dlists[i] = (const char*)dls[i];

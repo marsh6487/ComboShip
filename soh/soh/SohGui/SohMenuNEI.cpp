@@ -1,5 +1,6 @@
 #include "SohMenu.h"
 #include "../../../combo/NeiGracePolicy.h"
+#include "../../../combo/NeiSeasonsPolicy.h"
 #include "soh/Enhancements/randomizer/NeiGiPresentation.h"
 #include "soh/OTRGlobals.h"
 #include "UIWidgets.hpp"
@@ -37,6 +38,7 @@ extern "C" {
 #include "z64animation.h"
 #include "transformation_masks/assets/mm_asset_loader.h"
 #include "mods/transformation_masks/transformation_masks.h"
+#include "mods/transformation_masks/mask_progression.h"
 #include "mods/pak_loader/pak_loader.h"
 #include "mods/voice_pack/voice_pack.h"
 void PikachuControls_OpenWindow(void); // pikachu_hud.cpp — Pikachu mode bindings window
@@ -493,6 +495,44 @@ void RegisterNEIMenu() {
     // ===================== Tab: Modes =====================
     path.sidebarName = "Modes";
     path.column = SECTION_COLUMN_1;
+#ifdef COMBO_BUILD
+    static constexpr const char* seasonsModeCvar = "gRando.Options.RO_ROD_OF_SEASONS";
+    static constexpr const char* startingRodCvar = "gRando.Options.RO_STARTING_ROD_OF_SEASONS";
+#else
+    static constexpr const char* seasonsModeCvar = CVAR_RANDOMIZER_SETTING("RodOfSeasons");
+    static constexpr const char* startingRodCvar = CVAR_RANDOMIZER_SETTING("StartingRodOfSeasons");
+#endif
+    static std::map<int32_t, const char*> seasonsModeMap = {
+        { NEI_SEASONS_INDIVIDUAL, "Individual seasons" },
+        { NEI_SEASONS_ROD, "Rod" },
+        { NEI_SEASONS_GATED, "Gated" },
+    };
+    mSohMenu->AddWidget(path, "Rod of Seasons", WIDGET_CVAR_COMBOBOX)
+        .CVar(seasonsModeCvar)
+        .RaceDisable(false)
+        .PreFunc(
+            [](WidgetInfo& info) { info.options->disabled = CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0; })
+        .Options(ComboboxOptions()
+                     .ComboMap(seasonsModeMap)
+                     .DefaultIndex(NEI_SEASONS_INDIVIDUAL)
+                     .Tooltip("Individual seasons: four pickups; the first also grants the Rod.\n"
+                              "Rod: one pickup unlocks all four seasons. Gated: one Rod, with seasons\n"
+                              "unlocked by completed checks or dungeons in either game.\n"
+                              "Spring: Song of Storms check, Jabu, Water Temple, or Great Bay.\n"
+                              "Summer: Fire Temple or Stone Tower. Autumn: Forest Temple or Woodfall.\n"
+                              "Winter: Ice Cavern's final Sheik check or Snowhead.\n"
+                              "This choice is saved with the seed; menu edits apply to the next seed.\n"
+                              "Season abilities are optional in the solver."));
+    mSohMenu->AddWidget(path, "Start with Rod of Seasons", WIDGET_CVAR_CHECKBOX)
+        .CVar(startingRodCvar)
+        .RaceDisable(false)
+        .PreFunc(
+            [](WidgetInfo& info) { info.options->disabled = CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0; })
+        .Options(CheckboxOptions().Tooltip(
+            "Start with the Rod instead of shuffling its base pickup. Individual season pickups\n"
+            "remain shuffled; Gated still requires the season checks. Rod mode starts with all four.\n"
+            "Starting with the Rod does not require enabling the other NEI pool items."));
+
     mSohMenu->AddWidget(path, "Crossover Items", WIDGET_SEPARATOR_TEXT);
     mSohMenu->AddWidget(path, "Enable Crossover Items", WIDGET_CVAR_CHECKBOX)
         .CVar("gBrokenItems.Enabled")
@@ -696,9 +736,11 @@ void RegisterNEIMenu() {
         .CVar("gMods.KeatonMaskTransform")
         .RaceDisable(false)
         .Options(CheckboxOptions().DefaultValue(true).Tooltip(
-            "Wearing the Keaton Mask transforms Link into a Keaton (visual form).\n"
-            "Remove the mask to revert. If the Keaton model isn't shipped yet the\n"
-            "mask falls back to plain cosmetic wear.\n\n"
+            "Both the OoT and MM Keaton Masks transform Link into a Keaton.\n"
+            "Use the mask again to revert; turn this option off for cosmetic wear.\n"
+            "B: punch combo; hold B after a punch, then release: charged magic shot.\n"
+            "A: long jump; B in the air: kick; hold A at a wall: climb.\n"
+            "Hold R to reflect projectiles. Ordinary walls and charged shots use magic.\n\n"
             "Model ships inside soh.o2r (objects/forms/keaton)."));
 
     mSohMenu->AddWidget(path, "Gerudo Mask Transform", WIDGET_CVAR_CHECKBOX)
@@ -786,6 +828,46 @@ void RegisterNEIMenu() {
         .Options(CheckboxOptions().Tooltip("Allows you to transform with certain masks like in Majora's Mask.\n"
                                            "Equip transformation masks from the MM Masks inventory page.\n\n"
                                            "REQUIRES: mm.o2r from 2Ship2Harkinian Keiichi Alfa 4.0.0"));
+
+    mSohMenu->AddWidget(path, "Child Dungeon Mask Rewards", WIDGET_CVAR_CHECKBOX)
+        .CVar("gMods.TransformMasks.ChildDungeonGates")
+        .RaceDisable(false)
+        .PreFunc([](WidgetInfo& info) { info.options->disabled = !MaskProgression_IsCompatible(); })
+        .Options(CheckboxOptions()
+                     .DefaultValue(false)
+                     .DisabledTooltip(
+                         "Unavailable for seeds using Add All MM Masks to Rando or Add Transformation Masks to Rando.\n"
+                         "Those seeds can require a mask before its child dungeon is cleared.")
+                     .Tooltip("Optional OoT progression for vanilla or a quieter randomizer run.\n"
+                              "Clear Deku Tree: receive Deku and Keaton Masks.\n"
+                              "Clear Dodongo's Cavern: receive Goron Mask.\n"
+                              "Clear Jabu-Jabu's Belly: receive Zora Mask.\n"
+                              "Use the boss blue warp to complete each dungeon. Masks appear on the MM Masks page.\n"
+                              "Early pickups can transform only after their matching dungeon is cleared.\n"
+                              "Completed dungeons on existing saves also grant their masks.\n"
+                              "OFF (default): keep current pickups and transformation behavior.\n"
+                              "Other forms and MM's native progression keep their existing rules.\n"
+                              "The individual transformation options still apply.\n\n"
+                              "REQUIRES: MM Masks inventory + Enable Transformation Masks + mm.o2r."));
+
+    mSohMenu->AddWidget(path, "OoT Goron/Zora Transformations", WIDGET_CVAR_CHECKBOX)
+        .CVar("gMods.TransformMasks.OotGoronZora")
+        .RaceDisable(false)
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+            "Allow the OoT Goron and Zora Masks to trigger their MM forms.\n"
+            "ON (default): keep existing transformation behavior, including masks\n"
+            "placed in custom scenes. OFF: wear those two masks as ordinary OoT masks.\n"
+            "If already transformed, use the same mask once more to return to Link.\n"
+            "The original MM transformation masks keep their existing behavior.\n"
+            "Keaton and Gerudo use their own transformation options.\n\n"
+            "REQUIRES: Enable Transformation Masks + mm.o2r."));
+
+    mSohMenu->AddWidget(path, "Use HD Wolf Link", WIDGET_CVAR_CHECKBOX)
+        .CVar("gMods.WolfLink.UseHDModel")
+        .RaceDisable(false)
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+            "Use the Twilight Princess Wolf Link model with soft blue eyes and a cuff chain.\n"
+            "Applies the next time you transform into Wolf Link."));
 
     mSohMenu->AddWidget(path, "Instant Transform", WIDGET_CVAR_CHECKBOX)
         .CVar("gMods.TransformMasks.InstantTransform")

@@ -3,6 +3,7 @@
 #endif
 
 #include "global.h"
+#include "gameplay/ComboFaroresWind.h"
 #include "vt.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include <string.h>
@@ -573,6 +574,7 @@ u32 func_80096FE8(PlayState* play, RoomContext* roomCtx) {
     roomCtx->activeBufPage = 0;
     roomCtx->status = 0;
 
+    ComboFw_ValidateArrivalRoom(play->numRooms);
     frontRoom = gSaveContext.respawnFlag > 0 ? ((void)0, gSaveContext.respawn[gSaveContext.respawnFlag - 1].roomIndex)
                                              : play->setupEntranceList[play->curSpawn].room;
     Room_RequestNewRoom(play, roomCtx, frontRoom);

@@ -20,6 +20,7 @@
  */
 
 #include "adult_link_render.h"
+#include "weapon_upgrades.h"
 
 #include <libultraship/bridge.h>
 #include <spdlog/spdlog.h>
@@ -73,6 +74,11 @@ s32 CustomItems_OverrideDraw(Player* player, PlayState* play);
 // or NULL for a vanilla shield. extended_equipment.h:392. Used so PostLimb keeps drawing ext shields on
 // the back while we suppress the duplicate MM-CHILD shield the adult sheath DL already bakes in.
 const char* ExtEquip_GetShieldDLOverride(void);
+u8 ExtEquip_ShouldHideSwordDL(void);
+u8 FourSword_IsEquipped(void);
+u8 Trident_GoldenArmor(void);
+s32 BossRemains_IsOdolwaWorn(void);
+s32 BossRemains_IsGohtWorn(void);
 
 // z_player_lib.c: shared late-stage policy for native, adult, and custom-form
 // equipment limbs. Calling it after this renderer's sheath replacement keeps
@@ -651,6 +657,21 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
                 }
             }
             break;
+    }
+    if (limbIndex == PLAYER_LIMB_LEFT_HAND && *dList != nullptr && (!sIsMod || FourSword_IsEquipped()) && !sIsForm &&
+        !sIsChildRig && CustomForms_ActiveForm() == CUSTOM_FORM_NONE && p->actor.scale.y >= 0.0f &&
+        !ExtEquip_ShouldHideSwordDL() && !BossRemains_IsOdolwaWorn() && !BossRemains_IsGohtWorn()) {
+        Gfx* heldSword = *dList;
+        u8 goldenArmor = Trident_GoldenArmor();
+        if (WeaponUpgrade_ApplyHeldSwordDL(&heldSword, sDL_LHClosed, p,
+                                           goldenArmor ? 255 : (u8)CVarGetInteger("gAdultLink.TunicR", 30),
+                                           goldenArmor ? 205 : (u8)CVarGetInteger("gAdultLink.TunicG", 105),
+                                           goldenArmor ? 40 : (u8)CVarGetInteger("gAdultLink.TunicB", 27))) {
+            // The helper's staging list is shared; the skeleton's deferred draw owns this copy.
+            Gfx* frameSword = static_cast<Gfx*>(GRAPH_ALLOC(play->state.gfxCtx, 8 * sizeof(Gfx)));
+            std::memcpy(frameSword, heldSword, 8 * sizeof(Gfx));
+            *dList = frameSword;
+        }
     }
     if (*dList != NULL) {
         Gfx* dinHand = NULL;
