@@ -1,5 +1,5 @@
-// Only the archive/cache services are test boundaries. Exercise the production
-// transformation and lifecycle with real GBI instructions and MM PlayState.
+// Exercise production transformation/lifecycle and extracted renderer handlers
+// with real GBI/MM headers. Archive/cache services and GPU submission are seams.
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
@@ -16,8 +16,15 @@ extern "C" {
 }
 
 namespace Ship {
+struct ResourceInitData {
+    std::string Path;
+};
 struct IResource {
     virtual ~IResource() = default;
+    std::shared_ptr<ResourceInitData> initData;
+    std::shared_ptr<ResourceInitData> GetInitData() {
+        return initData;
+    }
 };
 static std::string activeGame = "oot";
 struct OwnRMScope {
@@ -35,10 +42,20 @@ struct CrossRMRegistry {
         teardown = listener;
     }
 };
+struct Archive {
+    std::string GetPath() {
+        return "fixture.o2r";
+    }
+};
 struct ArchiveManager {
     std::map<std::string, std::shared_ptr<IResource>> files;
+    std::string archiveLookup;
     bool HasFile(const std::string& path) {
         return files.contains(path);
+    }
+    std::shared_ptr<Archive> GetArchiveFromFile(const std::string& path) {
+        archiveLookup = path;
+        return HasFile(path) ? std::make_shared<Archive>() : nullptr;
     }
     std::shared_ptr<std::vector<std::string>> ListFiles(const std::string& mask) {
         auto result = std::make_shared<std::vector<std::string>>();
@@ -55,6 +72,7 @@ struct ResourceManager {
     std::shared_ptr<ArchiveManager> archive = std::make_shared<ArchiveManager>();
     bool alt = false;
     unsigned loads = 0;
+    bool OtrSignatureCheck(const char* path);
     bool IsAltAssetsEnabled() {
         return alt;
     }
@@ -97,6 +115,12 @@ extern "C" int MMWeather_SeasonForPlay(const PlayState*) {
     return season;
 }
 
+static std::map<std::string, unsigned> sForestReports;
+template <class... Args> static void ForestReport(const char* format, Args&&...) {
+    ++sForestReports[format];
+}
+#define SPDLOG_INFO(...) ForestReport(__VA_ARGS__)
+#define SPDLOG_WARN(...) ForestReport(__VA_ARGS__)
 #include "autumn_scene_foliage_production.inc"
 
 static Gfx Command(uintptr_t w0, uintptr_t w1) {
@@ -183,6 +207,7 @@ static void CheckScopedForestCommands(const Variant& variant, const std::vector<
 }
 
 #include "autumn_scene_forest_fixture.h"
+#include "autumn_scene_renderer_fixture.h"
 static void CheckForestDrawOwners() {
     constexpr const char* wallpaper = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_034098";
     constexpr const char* canopy = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_037098";
@@ -421,6 +446,7 @@ int main() {
         assert(!changed.empty() && Equal(RemoveTint(changed), original));
     }
     CheckForestDrawOwners();
+    CheckRenderedForestTransitions();
     CheckActualMaterials();
     CheckPrivateBrushMaterials();
     auto rm = Ship::Context::GetRawInstance()->rm;

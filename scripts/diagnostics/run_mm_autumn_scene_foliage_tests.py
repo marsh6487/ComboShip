@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import struct
 import subprocess
@@ -10,6 +11,20 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def production_function(source, name):
+    match = re.search(r"^(?:static )?(?:bool|void\*?|int32_t|F3DGfx\*&?)\s+" +
+                      re.escape(name) + r"\([^;{}]*\)\s*\{", source, re.M)
+    if not match:
+        raise RuntimeError(f"Missing production function: {name}")
+    masked = re.sub(r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"',
+                    lambda m: " " * len(m.group()), source, flags=re.S)
+    pos, depth = match.end(), 1
+    while depth:
+        depth += (masked[pos] == "{") - (masked[pos] == "}")
+        pos += 1
+    return source[match.start():pos] + "\n"
 
 
 def main():
@@ -37,6 +52,8 @@ def main():
                 texture = f"scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_{suffix}"
                 coverage_cases.append((path, texture, triangles, archive.read(path)))
     source = (ROOT / "mm/2s2h/Enhancements/Graphics/AutumnSceneFoliage.cpp").read_text()
+    renderer = (ROOT / "libultraship/src/fast/interpreter.cpp").read_text()
+    manager = (ROOT / "libultraship/src/ship/resource/ResourceManager.cpp").read_text()
     start = source.find("namespace {")
     if start < 0:
         start = source.index("void MMAutumnSceneFoliage_Update")
@@ -48,6 +65,18 @@ def main():
     with tempfile.TemporaryDirectory(prefix="mm-autumn-scene-foliage-") as temporary:
         build = Path(temporary)
         (build / "autumn_scene_foliage_production.inc").write_text(source[start:])
+        renderer_functions = ["GfxExecStack::start", "GfxExecStack::stop", "GfxExecStack::currCmd",
+                              "GfxExecStack::branch", "GfxExecStack::call", "GfxExecStack::ret",
+                              "Interpreter::SegAddr", "gfx_check_image_signature",
+                              "ComboIsUnresolvedSegmentTarget", "ComboResolveDisplayListTarget",
+                              "gfx_dl_handler_common", "gfx_end_dl_handler_common", "gfx_marker_handler_otr",
+                              "gfx_vtx_hash_handler_custom", "gfx_set_timg_otr_hash_handler_custom",
+                              "gfx_set_grayscale_handler_custom", "gfx_set_intensity_handler_custom",
+                              "Interpreter::GfxDpSetGrayscaleColor", "gfx_quad_handler_f3dex2"]
+        (build / "autumn_scene_renderer_production.inc").write_text(
+            "\n".join(production_function(renderer, name) for name in renderer_functions))
+        (build / "autumn_scene_renderer_signature.inc").write_text(
+            production_function(manager, "ResourceManager::OtrSignatureCheck"))
         fixtures = "static void CheckActualMaterials() {\n"
         if args.materials:
             for path in material_paths:
