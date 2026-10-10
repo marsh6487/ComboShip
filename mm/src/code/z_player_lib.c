@@ -4,12 +4,15 @@
 #include "din_fire_sword.h"
 #include "din_fire_shield.h"
 #include "mods/items/logic/adult_link_render.h"
+#include "mods/items/logic/weapon_upgrades.h"
+#include "mods/forms/custom_forms.h"
 /**
  * File: z_player_lib.c
  * Description: Set of library functions to interact with the Player system
  */
 
 #include "global.h"
+#include <string.h>
 #include <libultraship/log/luslog.h> // 2S2H [Port] lusprintf (LUS 464 exports it via API_EXPORT)
 #include "2s2h/GameInteractor/GameInteractor.h"
 
@@ -67,6 +70,7 @@
 // Skijer's NEI: extended-equipment / weapon-upgrade draw hooks (Iron Knuckle's Axe model
 // replacement — hide the hammer head, draw the axe DL following the left-hand limb matrix).
 extern u8 ExtEquip_ShouldHideSwordDL(void);
+extern u8 FourSword_IsEquipped(void);
 extern void ExtEquip_DrawSwordDL(void* play);
 // Extended-equipment SHIELD draw hooks: GetShieldDLOverride returns "HIDE" when an ext shield
 // (Divine/Kite/Ikana) is equipped so the native Hero/Mirror model is suppressed; the custom model
@@ -3040,33 +3044,26 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
 
             u8 handIsSpokenFor = extOwnsSwordDL || BossRemains_IsOdolwaWorn() || BossRemains_IsGohtWorn();
 
-            // Skijer's NEI Four Sword (ext sword 2): blade+hilt from 2ship.o2r over Link's fist. The
-            // HAND GOES LAST — the blade DL leaves G_TEXTURE_GEN on and G_LIGHTING off (env-map
-            // shine) and the torso would inherit it.
-            // It goes in the limb override, not in ExtEquip_DrawSwordDL, because the clones draw
-            // with postLimbDraw == NULL and only this path reaches them.
-            if (!handIsSpokenFor && (player->transformation == PLAYER_FORM_HUMAN) &&
-                (player->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD)) {
-                extern u8 FourSword_HeldSwordDL(void** blade, void** handle);
-                static Gfx sFourSwordHandDL[6];
-                void* fourSwordBlade = NULL;
-                void* fourSwordHilt = NULL;
-
-                if (FourSword_HeldSwordDL(&fourSwordBlade, &fourSwordHilt)) {
-                    Gfx closedHandInstr = gsSPDisplayListOTRFilePath(gLinkHumanLeftHandClosedDL);
-                    Gfx* d = sFourSwordHandDL;
-
-                    gSPDisplayList(d++, (Gfx*)fourSwordBlade);
-                    if (fourSwordHilt != NULL) {
-                        gSPDisplayList(d++, (Gfx*)fourSwordHilt);
+            // Keep the native human fist and reuse the reviewed GI sword mesh in its held frame.
+            // This limb path also reaches clones drawn without a post-limb callback. Each draw
+            // owns its compound: later players must not overwrite a deferred blade/hand list.
+            if (!handIsSpokenFor && *dList != NULL && !AdultLink_UsesAdultPresentation(player) &&
+                (!Player_IsCustomLinkModel(player) || FourSword_IsEquipped()) && player->actor.scale.y >= 0.0f &&
+                !(player == GET_PLAYER(play) && CustomForms_ActiveForm() != CUSTOM_FORM_NONE) &&
+                player->transformation == PLAYER_FORM_HUMAN &&
+                (player->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD ||
+                 player->leftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD)) {
+                const char* handPath = (const char*)gPlayerLeftHandClosedDLs[PLAYER_FORM_HUMAN * 2 + sPlayerLod];
+                if (handPath != NULL && ResourceMgr_FileExists(handPath)) {
+                    Gfx* hand = ResourceMgr_LoadGfxByName(handPath);
+                    Gfx* heldSword = *dList;
+                    u8 goldenArmor = Trident_GoldenArmor();
+                    if (WeaponUpgrade_ApplyHeldSwordDL(&heldSword, hand, player, goldenArmor ? 255 : 0,
+                                                       goldenArmor ? 205 : 0, goldenArmor ? 40 : 0)) {
+                        Gfx* frameSword = GRAPH_ALLOC(play->state.gfxCtx, 8 * sizeof(Gfx));
+                        memcpy(frameSword, heldSword, 8 * sizeof(Gfx));
+                        *dList = frameSword;
                     }
-                    *d++ = closedHandInstr;
-                    gDPPipeSync(d++);
-                    gSPLoadGeometryMode(d++, G_ZBUFFER | G_SHADE | G_CULL_BACK | G_LIGHTING | G_SHADING_SMOOTH);
-                    gSPEndDisplayList(d);
-
-                    *dList = sFourSwordHandDL;
-                    sPlayerLeftHandType = PLAYER_MODELTYPE_LH_CLOSED;
                 }
             }
 

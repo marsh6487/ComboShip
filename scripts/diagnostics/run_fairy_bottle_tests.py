@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
+import sys
 import tempfile
 
 from run_mm_scene_randomization_tests import function
@@ -24,7 +25,7 @@ def native(namespace, path, draws, member, resource_type, rows, constants):
         parts.append('void ' + name + '(PlayState*,s16)' + (';' if name in draws else ' {}'))
     parts += [f'struct Entry {{void (*drawFunc)(PlayState*,s16);{resource_type} {member}[8];}};',
               'Entry sDrawItemTable[]={' + ','.join(rows) + '};',
-              function(source, 'GetItem_FairyBottleShell'), export]
+              function(source, 'GetItem_EmptyBottleShell'), function(source, 'GetItem_FairyBottleShell'), export]
     parts += [function(source, name) for name in draws]
     if namespace == 'oot':
         shimmer = function(source, 'GetItem_GetShimmerColor')
@@ -35,6 +36,7 @@ def native(namespace, path, draws, member, resource_type, rows, constants):
 
 
 def main():
+    subprocess.run([sys.executable, '-B', str(ROOT / 'tests/fairy_bottle/run_receipt_tests.py')], check=True)
     bodies = native('oot', 'soh/src/code/z_draw.c', ['GetItem_DrawFairy'], 'dlists', 'Gfx*',
                     ['{GetItem_DrawFairy,{(Gfx*)opaque,(Gfx*)glass,(Gfx*)fairy}}'],
                     'const char* gGiBottleStopperDL=genericOpaque; const char* gGiBottleDL=genericGlass;\n'
@@ -54,6 +56,8 @@ def main():
                        {'OOT_DrawForeignFairyBottle', 'OOT_DrawForeignFairyContainer'}):
         bodies += 'template<class...T>void ' + name + '(T...) { assert(false); }\n'
     bodies += 'template<class...T>void ComboSwordGi_ApplyEffectFit(T...) { assert(false); }\n'
+    bodies += 'template<class...T>void ComboSwordGi_ApplyPresentationSize(T...) { assert(false); }\n'
+    bodies += 'template<class...T>float ComboSwordGi_ParticleScale(T...) { assert(false); return 1.f; }\n'
     bodies += dispatch + '\n'
     source = (ROOT / 'combo/menu/ComboForeignDrawMM.h').read_text()
     bodies += function(source, 'MM_DrawForeignFairy') + '\n'
@@ -65,7 +69,7 @@ def main():
             flags = ['-DCOMBO_FAIRY_HOST_MM'] if host == 'mm' else []
             subprocess.run([*shlex.split(os.environ.get('CXX', 'c++')), '-std=c++20', '-Wall', '-Wextra',
                             '-Wno-unused-parameter', '-Wno-unused-variable', '-Wno-sign-compare',
-                            '-Wno-missing-field-initializers', *flags, '-I' + str(ROOT), '-I' + str(build),
+                            '-Wno-missing-field-initializers', '-DCOMBO_BUILD', *flags, '-I' + str(ROOT), '-I' + str(build),
                             str(ROOT / 'tests/fairy_bottle/draw_test.cpp'), '-o', str(binary)], check=True)
             print('HOST ' + host, flush=True)
             subprocess.run([str(binary)], check=True)

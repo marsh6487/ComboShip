@@ -10,6 +10,9 @@
 #include "objects/object_gi_melody/object_gi_melody.h"
 #include "rod_runtime_test.cpp"
 #include <set>
+#ifndef NEI_GI_REWARD_FIXTURE
+extern "C" int ResourceMgr_GetRewardSurfaceForGame(const char*,const char*,NeiGi::Mesh*) { return 0; }
+#endif
 std::set<std::string> ownerBase, ownerAlt;
 bool ownerAltEnabled = false, mmAltEnabled = false, ownerRegistered = true;
 extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return mmAltEnabled; }
@@ -52,6 +55,7 @@ static bool itemEffects;
 extern "C" int32_t CVarGetInteger(const char* name,int32_t value) {
   return !strcmp(name,"gEnhancements.SkijerNEI.ItemEffects") ? itemEffects : value;
 }
+extern "C" Color_RGB8 CVarGetColor24(const char*,Color_RGB8 value) {return value;}
 // Selected third-party resource graphs and Din layer eligibility have dedicated
 // production fixtures. This native NEI fixture supplies neither resource family.
 extern "C" int ResourceMgr_GetGiModelFitForGame(const char*,const char*,float,float,int,float[2]) {return 0;}
@@ -104,7 +108,12 @@ int main() {
     {RI_OOT_SONG_REQUIEM_OF_SPIRIT,CW_SONG_OOT_REQUIEM,0xDE9E2F},
     {RI_OOT_SONG_NOCTURNE_OF_SHADOW,CW_SONG_OOT_NOCTURNE,0xA028D2},
     {RI_OOT_SONG_PRELUDE_OF_LIGHT,CW_SONG_OOT_PRELUDE,0xEDE73E},
-    {RI_SONG_EPONA,CW_SONG_EPONA,0xD96E30},{RI_SONG_SUN,CW_SONG_SUN,0xEDE73E}};
+    {RI_SONG_EPONA,CW_SONG_EPONA,0xD96E30},{RI_SONG_SUN,CW_SONG_SUN,0xEDE73E},
+    {RI_SONG_HEALING,CW_SONG_HEALING,0xFF96E6},{RI_SONG_SONATA,CW_SONG_SONATA,0x62FF62},
+    {RI_SONG_LULLABY_INTRO,CW_SONG_LULLABY_INTRO,0xFF6464},{RI_SONG_LULLABY,CW_SONG_LULLABY,0xFF1414},
+    {RI_SONG_NOVA,CW_SONG_NOVA,0x1414FF},{RI_SONG_ELEGY,CW_SONG_ELEGY,0xFF6200},
+    {RI_SONG_OATH,CW_SONG_OATH,0x620062},{RI_SONG_DOUBLE_TIME,CW_SONG_DOUBLE_TIME,0x80D8F0},
+    {RI_SONG_INVERTED_TIME,CW_SONG_INVERTED_TIME,0x4A70CA}};
   for(const auto& song:songs)for(bool effects:{false,true})for(bool alt:{false,true})for(bool donor:{false,true}) {
     reset();play.gameplayFrames=42;itemEffects=effects;mmAltEnabled=alt;ownerRegistered=donor;
     const uint8_t color[]={uint8_t(song.hue>>16),uint8_t(song.hue>>8),uint8_t(song.hue),255};
@@ -135,11 +144,15 @@ int main() {
   reset();NeiGi_DrawMesh(&play,NeiGi::SampleSeason(42,1,NeiGi_CameraBasis(&play)));
   const auto expectedRain=packedEffects();
   assert(rainOnly.size()==expectedRain.size() && !memcmp(rainOnly.data(),expectedRain.data(),expectedRain.size()*sizeof(Vtx)));
-  for(RandoItemId song:{RI_SONG_HEALING,RI_SONG_TIME,RI_SONG_SONATA,RI_SONG_NOVA,
+  for(RandoItemId song:{RI_SONG_HEALING,RI_SONG_SONATA,RI_SONG_NOVA,
                        RI_SONG_LULLABY,RI_SONG_LULLABY_INTRO,RI_SONG_ELEGY,RI_SONG_OATH,RI_SONG_DOUBLE_TIME,RI_SONG_INVERTED_TIME}) {
+    reset();NeiGi_DrawSongOverlay(&play,ComboSongForMmItem(song),nullptr);
+    const auto expected=packedEffects();assert(!expected.empty());
     reset();assert(MM_TryDrawNeiGi(song));
-    assert(packedEffects().empty() && matrices.empty() && "regular MM songs must keep only their original note");
+    const auto shown=packedEffects();
+    assert(shown.size()==expected.size() && !memcmp(shown.data(),expected.data(),expected.size()*sizeof(Vtx)) && matrices.empty());
   }
+  reset();assert(MM_TryDrawNeiGi(RI_SONG_TIME));assert(packedEffects().empty() && matrices.empty());
   for(bool effects:{false,true})for(bool alt:{false,true})for(bool donor:{false,true}) {
     reset();itemEffects=effects;mmAltEnabled=alt;ownerRegistered=donor;
     NeiGi_DrawMesh(&play,NeiGi::SampleSong(CW_SONG_SOARING,42,NeiGi_CameraBasis(&play)));
@@ -262,6 +275,41 @@ int main() {
       assert(!MM_TryDrawNeiGi(id) && gfx.polyOpa.p==opa && gfx.polyXlu.p==xlu);
     }
   }
+  // Native MM's CPU availability probe must use the inactive OoT donor and
+  // its own Alt setting before the GPU owner scope is ever submitted.
+  for (bool donorAlt : {false, true}) for (bool hostAlt : {false, true}) {
+    reset(); ownerBase.clear(); ownerAlt.clear(); ownerRegistered = true;
+    ownerAltEnabled = donorAlt; mmAltEnabled = hostAlt; itemEffects = false;
+    play.state.frames = play.gameplayFrames = 9;
+    auto& donorFiles = donorAlt ? ownerAlt : ownerBase;
+    donorFiles.insert("__OTR__objects/nei_gi_redesign/sages_tunic/gi_dl");
+    donorFiles.insert("__OTR__objects/object_gi_medal/gGiMedallionDL");
+    std::set<std::string> expectedFaces;
+    for (const char* name : {"Forest", "Fire", "Water", "Spirit", "Shadow", "Light"}) {
+      expectedFaces.insert(std::string("__OTR__objects/object_gi_medal/gGi") + name + "MedallionFaceDL");
+    }
+    donorFiles.insert(expectedFaces.begin(), expectedFaces.end());
+    assert(MM_TryDrawNeiGi(RI_OOT_EXT_WATER_DRAGON_SCALE));
+    std::set<std::string> faces;
+    int depth = 0, medalBodies = 0, tunics = 0;
+    for (Gfx* cmd = opa; cmd < gfx.polyOpa.p; ++cmd) {
+      const auto op = cmd->words.w0 >> 24;
+      if (op == G_COMBO_RM_PUSH) {
+        assert(!strcmp(reinterpret_cast<const char*>(cmd->words.w1), "oot"));
+        ++depth;
+      }
+      if (op == G_COMBO_RM_POP) assert(--depth >= 0);
+      if (op != G_DL_OTR_FILEPATH) continue;
+      const std::string path = reinterpret_cast<const char*>(cmd->words.w1);
+      if (path.find("/object_gi_medal/") != std::string::npos) {
+        assert(depth == 1 && "deferred medal textures must retain their OoT resource owner");
+        if (path.ends_with("MedallionFaceDL")) faces.insert(path);
+        else if (path.ends_with("gGiMedallionDL")) ++medalBodies;
+      } else if (path.ends_with("/sages_tunic/gi_dl")) ++tunics;
+    }
+    assert(faces == expectedFaces && medalBodies == 6 && tunics == 1 && depth == 0 && matrices.empty());
+  }
+  std::cout << "PASS native MM Sage fountain: inactive donor availability, divergent host/donor Alt and six owner-scoped medals\n";
   // Missing authored resources still use the shared shimmer around the
   // existing model, without inheriting a legacy drawer's scale/translation.
   for (auto [id,slug] : candidates) {

@@ -177,6 +177,11 @@ extern "C" COMBO_EXPORT void MM_SetOnComboReturnCallback(void (*cb)(int kind)) {
     gComboReturnCallback = cb;
 }
 static bool sComboReturnPending = false;
+static bool sComboFwReturnPending = false;
+extern "C" void MM_CaptureFwDeparture(void);
+extern "C" void MM_QueueFwHandoff(void) {
+    sComboFwReturnPending = true;
+}
 // ComboShip: Ctrl+R reset while MM is foreground. Like the portal return, but only persists MM if
 // autosave is enabled (an authentic reset otherwise discards unsaved progress). Set via the export.
 static bool sComboResetReturnPending = false;
@@ -195,6 +200,7 @@ extern "C" void Combo_RequestOwlSaveQuit(void) {
 // would immediately quit the new one.
 static void Combo_ClearReturnRequests(void) {
     sComboReturnPending = false;
+    sComboFwReturnPending = false;
     sComboResetReturnPending = false;
     sComboOwlSaveQuitPending = false;
 }
@@ -1393,11 +1399,13 @@ extern "C" void InitOTR(int argc, char* argv[]) {
         }
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>([]() {
-        if (!sComboReturnPending && !sComboResetReturnPending && !sComboOwlSaveQuitPending)
+        if (!sComboReturnPending && !sComboFwReturnPending && !sComboResetReturnPending && !sComboOwlSaveQuitPending)
             return;
+        const bool isFwReturn = sComboFwReturnPending;
         const bool isReset = sComboResetReturnPending;
         const bool isOwlSaveQuit = sComboOwlSaveQuitPending;
         sComboReturnPending = false;
+        sComboFwReturnPending = false;
         sComboResetReturnPending = false;
         sComboOwlSaveQuitPending = false;
         // An owl save quit lands on OOT's title, like Ctrl+R, rather than resuming OOT gameplay.
@@ -1415,10 +1423,13 @@ extern "C" void InitOTR(int argc, char* argv[]) {
         // persist outside gameplay: the title/attract path wipes save first (Sram_InitNewSave). An owl
         // save has already written itself through the flashrom seam.
         if (!isOwlSaveQuit && (!isReset || CVarGetInteger("gEnhancements.Saving.Autosave", 0)) &&
-            gSaveContext.gameMode == GAMEMODE_NORMAL)
+            gSaveContext.gameMode == GAMEMODE_NORMAL) {
+            if (isFwReturn)
+                MM_CaptureFwDeparture();
             SaveManager_SaveCurrentForCombo();
+        }
         if (gComboReturnCallback)
-            gComboReturnCallback(isOwlSaveQuit ? 2 : (isReset ? 1 : 0));
+            gComboReturnCallback(isOwlSaveQuit ? 2 : (isReset ? 1 : (isFwReturn ? 3 : 0)));
         if (auto fast3d = std::dynamic_pointer_cast<Fast::Fast3dWindow>(Ship::Context::GetRawInstance()->GetWindow())) {
             fast3d->SetIsRunning(false);
         }
@@ -3831,6 +3842,8 @@ extern "C" COMBO_EXPORT void MM_RestoreRandoSettings(const char* json) {
         // snapshot wins outright, so an absent list clears local exclusions (pre-GAP-7 spoilers).
         CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE", RO_GRACE_ON);
         CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE_REWARDS", 4);
+        CVarSetInteger("gRando.Options.RO_ROD_OF_SEASONS", NEI_SEASONS_INDIVIDUAL);
+        CVarSetInteger("gRando.Options.RO_STARTING_ROD_OF_SEASONS", 0);
         std::vector<RandoCheckId> excluded;
         if (j.contains("gRando.ExcludedChecks") && j["gRando.ExcludedChecks"].is_array()) {
             for (auto& n : j["gRando.ExcludedChecks"]) {
@@ -5337,6 +5350,11 @@ extern "C" bool Ship_HandleConsoleCrashAsReset() {
     return true;
 }
 
+#include "../../combo/NeiRewardGiResource.h"
+extern "C" int ResourceMgr_GetRewardSurfaceForGame(const char* game, const char* path, NeiGi::Mesh* mesh) {
+    return NeiGi::GetRewardSurface("mm", game, path, mesh);
+}
+
 extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* path, float scale, float tilt, int shop,
                                                 float fit[2]) {
     const int din =
@@ -5388,4 +5406,14 @@ extern "C"
     int
     MM_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner) {
     return NeiWolfAsset::CopyResource("mm", destination, capacity, size, owner);
+}
+
+extern "C"
+#ifdef COMBO_BUILD
+    COMBO_EXPORT
+#endif
+    int
+    MM_CopyWolfLinkModelResource(int useHD, uint8_t* destination, size_t capacity, size_t* size, const char** owner,
+                                 const char** path) {
+    return NeiWolfAsset::CopyResource("mm", destination, capacity, size, owner, useHD != 0, path);
 }

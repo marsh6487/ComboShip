@@ -8,6 +8,8 @@ extern "C" {
 #include "global.h"
 #include "din_fire_shield.h"
 #include "din_fire_sword.h"
+#include "mods/forms/custom_forms.h"
+#include "mods/items/logic/weapon_upgrades.h"
 
 SaveContext gSaveContext;
 u16 gEquipMasks[] = { 0xF, 0xF0, 0xF00, 0xF000 };
@@ -52,6 +54,19 @@ u8 WeaponUpgrade_HasGreatFairy(void) {
     return 0;
 }
 
+// This visibility fixture supplies no authored sword replacement resources.
+u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx**, void*, Player*, u8, u8, u8) {
+    return 0;
+}
+
+u8 Trident_GoldenArmor(void) {
+    return 0;
+}
+
+s32 CustomForms_ActiveForm(void) {
+    return CUSTOM_FORM_NONE;
+}
+
 const char* ExtEquip_GetShieldDLOverride(void) {
     return nullptr;
 }
@@ -70,6 +85,10 @@ u8 Nei_HeldItemUsesOotHookshotModel(Player*) {
 
 Gfx* FourSword_HeldSwordDL(void) {
     return nullptr;
+}
+
+u8 FourSword_IsEquipped(void) {
+    return 0;
 }
 
 // Keep optional Din hand replacements disabled for native/adult visibility checks.
@@ -136,6 +155,7 @@ extern Gfx* gPlayerSwordSheaths[];
 }
 
 static u8 sIsMod = 0;
+static u8 sIsForm = 0;
 static u8 sIsChildRig = 0;
 static Gfx* sDL_LHClosed;
 static Gfx* sDL_LHSword;
@@ -178,7 +198,7 @@ static void ResetCVar(s32 value) {
 }
 
 static Player MakePlayer(void) {
-    static Vec3s joints[PLAYER_LIMB_MAX];
+    static PlayerAnimationFrame frame = {};
     static Gfx* left[2];
     static Gfx* right[2];
     static Gfx* sheath[2];
@@ -196,7 +216,7 @@ static Player MakePlayer(void) {
     player.rightHandType = PLAYER_MODELTYPE_RH_OPEN;
     player.heldItemId = ITEM_NONE;
     player.heldItemAction = PLAYER_IA_NONE;
-    player.skelAnime.jointTable = joints;
+    player.skelAnime.jointTable = frame.frameTable;
     player.leftHandDLists = left;
     player.rightHandDLists = right;
     player.sheathDLists = sheath;
@@ -204,6 +224,8 @@ static Player MakePlayer(void) {
 }
 
 static Gfx* DrawNative(Player* player, s32 limbIndex, Gfx* incoming) {
+    PlayState play = {};
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player->actor;
     Vec3f pos = {};
     Vec3s rot = {};
     Gfx* dList = incoming;
@@ -211,11 +233,13 @@ static Gfx* DrawNative(Player* player, s32 limbIndex, Gfx* incoming) {
     sPlayerCurBodyPartPos = &player->bodyPartsPos[0];
     sPlayerLod = 0;
     D_801F59E0 = 0;
-    Player_OverrideLimbDrawGameplayDefault(nullptr, limbIndex, &dList, &pos, &rot, &player->actor);
+    Player_OverrideLimbDrawGameplayDefault(&play, limbIndex, &dList, &pos, &rot, &player->actor);
     return dList;
 }
 
 static Gfx* DrawAdult(Player* player, s32 limbIndex, Gfx* incoming) {
+    PlayState play = {};
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player->actor;
     Vec3f pos = {};
     Vec3s rot = {};
     Gfx* dList = incoming;
@@ -223,7 +247,7 @@ static Gfx* DrawAdult(Player* player, s32 limbIndex, Gfx* incoming) {
     sPlayerCurBodyPartPos = &player->bodyPartsPos[0];
     sPlayerLod = 0;
     D_801F59E0 = 0;
-    AdultLink_OverrideLimb(nullptr, limbIndex, &dList, &pos, &rot, &player->actor);
+    AdultLink_OverrideLimb(&play, limbIndex, &dList, &pos, &rot, &player->actor);
     return dList;
 }
 

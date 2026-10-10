@@ -58,6 +58,7 @@ void guMtxF2L(float mf[4][4], Mtx *destination) {
 f32 Math_SinS(s16 a) { return std::sin(a * (3.14159265358979323846f / 32768)); }
 f32 Math_CosS(s16 a) { return std::cos(a * (3.14159265358979323846f / 32768)); }
 void Gfx_SetupDL25_Opa(GraphicsContext *) {}
+void Gfx_SetupDL26_Opa(GraphicsContext *) {}
 void Gfx_SetupDL25_Xlu(GraphicsContext *) {}
 void gSPDisplayList(Gfx *, Gfx *) { std::abort(); } // Held model is available.
 void gSPVertex(Gfx *, uintptr_t address, int count, int) {

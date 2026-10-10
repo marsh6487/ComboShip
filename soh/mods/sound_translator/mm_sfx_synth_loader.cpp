@@ -1,8 +1,8 @@
 /*
  * mm_sfx_synth_loader.cpp — boot/asset wiring for the isolated MM SFX engine.
  *
- * Loads Sequence_0 + Soundfont_0/1 from mm.o2r via SoH's ResourceManager (the
- * structs are binary-compatible with the mmsfx ones, so we reinterpret_cast),
+ * Loads resident Sequence_0 + Soundfont_0/1 directly from mm.o2r (the structs
+ * are binary-compatible with the mmsfx ones, so we reinterpret_cast),
  * starts the SFX sequence on the isolated player, installs the per-channel
  * sfxState + the 0xBE freq/stereo custom function (ported verbatim from MM
  * code_8019AF00.c), and exposes MmSfxSynth_Init().
@@ -14,8 +14,7 @@
  */
 #include <libultraship/libultraship.h>
 #include <libultraship/log/luslog.h>
-#include "z64audio.h" // SoH SoundFont / SequenceData (global scope)
-#include "soh/ResourceManagerHelpers.h"
+#include "z64audio.h"                                         // SoH SoundFont / SequenceData (global scope)
 #include "mods/transformation_masks/assets/mm_asset_loader.h" // MmAssets_IsAvailable
 
 #include "mm_sfx_synth_ctx.h"
@@ -31,11 +30,6 @@
 extern "C" void MmSfxSynth_Log(const char* msg) {
     lusprintf(__FILE__, __LINE__, LUSLOG_LEVEL_INFO, "[MmSfxSynth] %s", msg);
 }
-
-// Patches a freshly (re)loaded MM SoundFont's sample pointers to mm.o2r's
-// binary (ResourceMgr can hand back stale OOT sample pointers). Provided by
-// mm_asset_loader.cpp.
-extern "C" void MmSfxBridge_PatchFontSamples(::SoundFont* sf, const char* path);
 
 namespace mmsfx {
 
@@ -132,26 +126,25 @@ extern "C" int MmSfxSynth_Init(void) {
     MmSfxSynth_InitEngine();
     MMSYN_LOG("Init: engine pools OK (numNotes=%d)", gMmSfx.numNotes);
 
-    // 2) soundfonts 0 and 1 (binary-compatible -> reinterpret into mmsfx)
-    static const char* kFontPaths[2] = {
-        "audio/fonts/Soundfont_0",
-        "audio/fonts/Soundfont_1",
-    };
+    // 2) Archive-scoped, resident fonts. The table below is a shallow copy:
+    // every instrument/drum pointer must outlive the isolated engine. Global
+    // lookup does not retain its resource owner, and RegisterMmFonts evicts
+    // those same paths after this loader has started the SFX sequence.
+    // MmSfx_LoadFont pins the MM resource and its samples in sMmResourceCache.
     for (s32 f = 0; f < 2; f++) {
-        ::SoundFont* sf = ResourceMgr_LoadAudioSoundFontByName(kFontPaths[f]);
+        ::SoundFont* sf = MmSfx_LoadFont(f);
         if (sf == nullptr) {
-            MMSYN_LOG("Init: font %d (%s) not ready — retry next call", f, kFontPaths[f]);
+            MMSYN_LOG("Init: resident MM font %d not ready — retry next call", f);
             return 0; // assets not ready yet; retry next call
         }
-        MmSfxBridge_PatchFontSamples(sf, kFontPaths[f]);
         sFontTable[f] = *reinterpret_cast<mmsfx::SoundFont*>(sf);
-        MMSYN_LOG("Init: font %d loaded (inst=%d drums=%d sfx=%d)", f, sFontTable[f].numInstruments,
+        MMSYN_LOG("Init: resident MM font %d loaded (inst=%d drums=%d sfx=%d)", f, sFontTable[f].numInstruments,
                   sFontTable[f].numDrums, sFontTable[f].numSfx);
     }
     gMmSfx.soundFontList = sFontTable;
 
     // 3) the SFX sequence program (Sequence_0)
-    SequenceData* sd = ResourceMgr_LoadSeqPtrByName("audio/sequences/Sequence_0");
+    SequenceData* sd = MmSfx_LoadSequence();
     if (sd == nullptr || sd->seqData == nullptr) {
         MMSYN_LOG("Init: Sequence_0 not ready — retry next call");
         return 0;

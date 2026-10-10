@@ -12,6 +12,7 @@
 #include "ComboSwordGiLegacyFit.h"
 #include <algorithm>
 #include <cstring>
+#include <string>
 #include <libultraship/bridge/consolevariablebridge.h>
 extern "C" {
 int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
@@ -83,6 +84,7 @@ const Binding kBindings[] = {
     { RI_OOT_EXT_CANE_OF_BYRNA, "cane_of_byrna" },
     { RI_OOT_EXT_FOUR_SWORD, "four_sword" },
     { RI_PENDANT_OF_MEMORIES, "pendant_of_memories" },
+    { RI_ROOM_KEY, "room_key" },
     { RI_OOT_NEI_SHEIKAH_SLATE, "sheikah_slate" },
     { RI_OOT_NEI_SLATE_RUNE_BOMB, "slate_bomb" },
     { RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE, "slate_master_cycle" },
@@ -107,6 +109,10 @@ bool HasMmLegacyGiMod(RandoItemId item) {
     const char* opaque = nullptr;
     const char* second = nullptr;
     switch (item) {
+        case RI_ROOM_KEY:
+            opaque = "objects/object_gi_reserve_b_00/gGiRoomKeyDL";
+            second = "objects/object_gi_reserve_b_00/gGiRoomKeyEmptyDL";
+            break;
         case RI_OOT_NEI_FIRE_ROD:
             opaque = "objects/object_nei_fire_rod/Cylinder_001_opaque_dl";
             break;
@@ -137,7 +143,6 @@ bool HasMmLegacyGiMod(RandoItemId item) {
             opaque = "objects/object_nei_magic_spell/gDemiseDestructionGiveDL";
             break;
         case RI_SWORD_KOKIRI:
-        case RI_OOT_EXT_FOUR_SWORD:
             opaque = "objects/object_gi_sword_1/gGiKokiriSwordGuardDL";
             second = "objects/object_gi_sword_1/gGiKokiriSwordBladeHiltDL";
             break;
@@ -233,7 +238,9 @@ extern "C" {
 #define NeiGi_DrawTexturedMesh NeiGi_DrawTexturedMeshNative
 #define NEI_GI_ROTATE_Y Matrix_RotateYF
 #define NEI_GI_ROTATE_Z Matrix_RotateZF
+#define NEI_GI_NATIVE_MM 1
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiMeshRenderer.inc"
+#undef NEI_GI_NATIVE_MM
 #undef NeiGi_DrawTexturedMesh
 #undef NEI_GI_ROTATE_Y
 #undef NEI_GI_ROTATE_Z
@@ -270,7 +277,7 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop, int mmPickup) {
                                ? info.ops[0].a * (3.14159265358979323846f / 32768.f)
                                : 0.f;
         if (!NeiGi_ValidScale(info.scale) || !NeiGi_Finite(tilt) || info.neiShimmer < 1 ||
-            info.neiShimmer > int(Kind::Gold) + 1)
+            info.neiShimmer > int(Kind::GiantsKnife) + 1)
             return;
         const bool flame = tilt != 0.f && info.primColorXlu[3];
         // The native scroll/flame allocates before the shared renderer. Check
@@ -280,8 +287,10 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop, int mmPickup) {
         Matrix_Push();
         if (flame) {
             Matrix_Push();
-            if (NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1)))
+            if (NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1))) {
+                ComboSwordGi_ApplyPresentationSize(shop, mmPickup);
                 ComboSwordGi_ApplyEffectFit(static_cast<Kind>(info.neiShimmer - 1), shop, mmPickup);
+            }
             DrawOotSlateRuneFlame(info.primColorXlu[0], info.primColorXlu[1], info.primColorXlu[2]);
             Matrix_Pop();
         }
@@ -382,6 +391,12 @@ void DrawSong(RandoItemId item);
 bool MM_TryDrawNeiGi(RandoItemId item, bool shop, int mmPickup) {
     if (!gPlayState)
         return false;
+    const int arrow = NeiArrowGi_ProfileForDrawId(item, RI_ARROW_FIRE, RI_ARROW_ICE, RI_ARROW_LIGHT);
+    if (shop && arrow)
+        return NeiGi_DrawElementalArrowShop(gPlayState, arrow);
+    const int spell = NeiArrowGi_ProfileForDrawId(item, RI_OOT_DINS_FIRE, RI_OOT_FARORES_WIND, RI_OOT_NAYRUS_LOVE);
+    if (spell)
+        return NeiGi_DrawElementalSpell(gPlayState, spell, 1, shop);
     // Resolve song identity before the shared draw table, whose aliases can
     // otherwise route imported/native songs through an unrelated note drawer.
     if (ComboSongForMmItem(item) >= 0) {
@@ -409,13 +424,15 @@ MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer(RandoItemId item, bool shop, in
         return;
     CwItemDrawInfo info{};
     MM_DescribeNeiGi(item, &info);
-    mEnabled = info.itemShimmer && info.neiShimmer > 0 && info.neiShimmer <= static_cast<int>(Kind::Gold) + 1;
+    mEnabled = info.itemShimmer && info.neiShimmer > 0 && info.neiShimmer <= static_cast<int>(Kind::GiantsKnife) + 1;
     if (mEnabled)
         mKind = static_cast<Kind>(info.neiShimmer - 1);
     if (mEnabled) {
         Matrix_Push();
-        if (NeiGi::IsSword(mKind))
+        if (NeiGi::IsSword(mKind)) {
+            ComboSwordGi_ApplyPresentationSize(shop, mmPickup);
             ComboSwordGi_ApplyLegacyFit("mm", fitKind == Kind::Neutral ? mKind : fitKind, shop, mmPickup);
+        }
         Matrix_Push();
     }
 }
@@ -427,9 +444,11 @@ MM_NeiGiFallbackShimmer::~MM_NeiGiFallbackShimmer() {
     Matrix_Pop(); // Restore the caller before composing award-space effects.
     Matrix_Push();
     if (NeiGi::IsSword(mKind)) {
+        ComboSwordGi_ApplyPresentationSize(mShop, mMmPickup);
         ComboSwordGi_ApplyEffectFit(mKind, mShop, mMmPickup);
         NeiGi_DrawMesh(gPlayState,
-                       NeiGi::SampleSpecial(mKind, gPlayState->gameplayFrames, NeiGi_CameraBasis(gPlayState)));
+                       NeiGi::SampleSpecial(mKind, gPlayState->gameplayFrames, NeiGi_CameraBasis(gPlayState),
+                                            ComboSwordGi_ParticleScale(mKind, mShop, mMmPickup)));
     }
     NeiGi_DrawMesh(gPlayState,
                    NeiGi::SampleShimmer(gPlayState->gameplayFrames, true, NeiGi_CameraBasis(gPlayState), mKind));

@@ -1,4 +1,5 @@
 #include "global.h"
+#include "gameplay/ComboFaroresWind.h"
 #include "soh/Enhancements/debugger/FrameTimingProbe.h"
 #include <stdio.h>
 #include "din_fire_sword.h"
@@ -2448,6 +2449,8 @@ f32 D_8015BC18;
 
 void func_8002FA60(PlayState* play) {
     Vec3f lightPos;
+
+    ComboFw_SyncPoint();
 
     if (gSaveContext.fw.set) {
         gSaveContext.respawn[RESPAWN_MODE_TOP].data = 0x28;

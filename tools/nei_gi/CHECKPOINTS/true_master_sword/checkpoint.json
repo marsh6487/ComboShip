@@ -1,64 +1,85 @@
 {
-  "resource_count": 11,
-  "vertex_records": 2671,
-  "vertex_loads": 102,
+  "resource_count": 7,
+  "vertex_records": 2400,
+  "vertex_loads": 82,
   "slug": "true_master_sword",
   "name": "True Master Sword",
   "entry": "objects/nei_gi_redesign/true_master_sword/gi_dl",
-  "draw_scale": 1.0,
+  "draw_scale": 1,
   "matrix_scale": 0.0412445068359375,
-  "triangles": 2218,
+  "triangles": 800,
   "bounds_author": [
     [
-      -19.0,
-      -37.0,
-      -3.6875
+      -16.4375,
+      -33.125,
+      -6.625
     ],
     [
-      19.0,
-      103.0,
-      3.6875
+      16.4375,
+      106.375,
+      6.625
     ]
   ],
   "markers": {
-    "visual_review_candidate": true,
-    "runtime_tested": false,
+    "guard_baseline_y": 0,
     "preview_front_angle": 16,
     "preview_back_angle": 164,
-    "guard_baseline_y": 0,
-    "original_gi_vertex_data_available": false,
-    "proportion_reference": "User-provided steel/gold sword images; component ratios are visual targets, not original GI vertex measurements.",
-    "reference_blade_to_hilt_ratio": 2.7837837837837838,
-    "reference_blade_tip_y": 103,
-    "reference_hilt_rear_y": -37,
+    "source": "supplied Twilight Princess MasterSword.obj",
+    "texture_upscale": 4,
+    "blade_length_factor": 1,
+    "held_grip_y": -18.75,
+    "held_tip_y": 106.375,
+    "visual_review_candidate": true,
+    "runtime_tested": false,
+    "supersedes_tp_planar_environment_card": true,
+    "blade_depth_factor": 1.5,
+    "planar_fittings_depth_factor": 1.2,
+    "depth_parts": [
+      {
+        "part": "TP blade",
+        "factor": 1.5
+      },
+      {
+        "part": "TP winged hilt and grip",
+        "factor": 1.2
+      },
+      {
+        "part": "True Master blue inset jewel",
+        "factor": 1.2
+      },
+      {
+        "part": "True Master blue inset jewel",
+        "factor": 1.2
+      },
+      {
+        "part": "Four Sword sheen over TP blade",
+        "factor": 1.5
+      }
+    ],
     "imported_approved_model": false
   },
   "notes": [
-    "Gold reference: long stepped gold blade and straight rounded-cap guard; longer white grip and blue inset gem.",
-    "Reflection bands use the game-supported G_TEXTURE_GEN material, not an image overlay.",
-    "Level-four pigments: blade #E0A800, white hilt/grip #F8F8F8, gem #4870D0.",
-    "Reconstructed from the distinct user-provided steel/gold silhouettes; these models deliberately have different blade and hilt proportions.",
-    "Part dimensions are visual review targets, not measured Nintendo get-item coordinates."
+    "Original TP blade and hilt geometry with original UV atlas bindings; 4x Lanczos upscale with conservative sharpening.",
+    "TP zero-thickness environment card is replaced by a Four-Sword-style normal-generated reflection decal over the opaque blade.",
+    "White hilt/grip #F8F8F8, blue jewel #4870D0, tempered gold blade #E0A800.",
+    "Offline candidate only; gameplay and user acceptance remain pending.",
+    "Rotation depth pass: blade and attached relief 1.5x; planar fittings 1.2x; rounded grips retained. Face-on X/Y silhouette, UVs and materials retained."
   ],
   "runtime_tested": false,
   "source_provenance": {
-    "bundle": "NEI_Sword_GI_Latest_20261003",
-    "art_checkpoint": "dd66ee65",
-    "authoring_recipe": "../../SOURCE/forged_swords/SOURCE/sword_forged.py",
-    "glb_sha256": "86eb15acd183d082dbee2ea1144eb21733d9b6a3d5292a0f296a8a2091b4600e",
-    "approved_glb_sha256": "f428c0ecb2f57f02ee2bedc19a4e855d98f413db766eea4e1036057ef8277847",
+    "bundle": "TP_Sword_GI_POC2_20261009",
+    "baseline_commit": "c0181856968dd6f3869be0d1aa240743091fd6a8",
+    "authoring_recipe": "tools/tp_sword_gi/build.py",
     "resource_sha256": {
-      "blue_gem_tex": "554c9a06fe5468bd4098d53ad7024bca0dac4135ef87ca286f86048e253859f4",
-      "gi_dl": "65683a9e9c64fc55b1725f3d3d3439e96b1e22464406fec2a02617271c18aff2",
-      "gold_edge_tex": "d499b1a4d2f97541a6805df075e60932c1a08eecee2110c1cf0a695830e8b406",
-      "gold_recess_tex": "803e040c5cea30f99fed2ad2b91db4c780c12afcc77ac7515009e06d3c1cca72",
-      "gold_tex": "4e5b29e2944e2fe09421c00f401fa6c938d6cec6f5a41d9071d1025c12ea9698",
-      "mesh_opa_vtx": "22ab74f9e71bff0e94bd0a7fd455bac4d0177dc9344eba0d9a62d5cf120fd17c",
+      "blue_jewel_tex": "72421640b6b9bb6e3c596596fc9d301bdd7d55766179e72038537ba3662d608c",
+      "four_sword_sheen_tex": "7082f409f15a3c92d82f81ea4247489b3ffe8fead36ff7ab360951a67759a761",
+      "gi_dl": "5cdc4a5cc04effad558f64ad7529b49f3aac2588ad189c78b373242e59a923e2",
+      "mesh_opa_vtx": "349643779eae1ac1553de986c64d1cf3181b11408e596d8bc68b1a22e7be526a",
       "scale_mtx": "bba652b1cf8f43eb8f04a6fdc3fa639db60eab659614e7fcbef2bbac0943a4ad",
-      "steel_tex": "5ba49cfb20429ebcf49f5b76c0f464e1e83db89fc23e245062e96c9c5d1bd45f",
-      "white_leather_tex": "b345559ef03ccbb86c46b5fb0a5a90347fe0822b16ad4042eee36d45c585e878",
-      "white_tex": "b36e015d506a653070e7b58fb0b713a7f916c4f6caa8487897ce4f4f5dcb4337",
-      "white_wrap_tex": "79cf04e8a3ee3721d4040d974e3335c7ca54163ad327daa4227ff7191d19a579"
-    }
+      "tp_blade_tex": "8c55fb306f75193e9f97b04d20a41975fe34de3b3860f78f45d4204e74a06bb5",
+      "tp_hilt_tex": "14614224f47a00cb9a76f7cc93080997b17f54e25f94a3e0e539da9f7288ce66"
+    },
+    "glb_sha256": "0308ceac1db262783ba05d4dff3ff54478bbf286aa42db8b6f5ec8bd51db3e76",
+    "acceptance": "pending user visual review and configuration-specific runtime test"
   }
 }

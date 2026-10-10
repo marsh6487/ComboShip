@@ -22,15 +22,22 @@ const NeiGi::TextureMaterial kAttackMaterial[] = { { kFireAttackTexture, false, 
                                                    { kLightAttackTexture, false, false } };
 alignas(2) static const char kIceWakeTexture[] = "__OTR__objects/nei_rod_attack/ice_release_flow";
 const NeiGi::TextureMaterial kIceWakeMaterial{ kIceWakeTexture, true, true };
-alignas(2) static const char kFireReleaseTexture[] = "__OTR__objects/nei_rod_attack/fire_release_crest";
-alignas(2) static const char kIceReleaseTexture[] = "__OTR__objects/nei_rod_attack/ice_release_crest";
+alignas(2) static const char kFireReleaseTexture[] = "__OTR__objects/nei_rod_cast_poc6/fire_natural";
+alignas(2) static const char kIceReleaseTexture[] = "__OTR__objects/nei_rod_cast_poc6/ice_fracture_release";
 const NeiGi::TextureMaterial kReleaseMaterial[] = { { kFireReleaseTexture, true, false },
                                                     { kIceReleaseTexture, true, false },
                                                     { kLightAttackTexture, false, false } };
-void DrawAttackSurface(PlayState* play, const NeiGi::Mesh& mesh, int element, bool release = false) {
+alignas(2) static const char kFireFlowTexture[] = "__OTR__objects/nei_rod_cast_poc6/fire_natural";
+alignas(2) static const char kIceFlowTexture[] = "__OTR__objects/nei_rod_cast_poc6/ice_fracture_release";
+const NeiGi::TextureMaterial kReleaseFlowMaterial[] = { { kFireFlowTexture, true, true },
+                                                        { kIceFlowTexture, true, true },
+                                                        { kLightAttackTexture, false, false } };
+void DrawAttackSurface(PlayState* play, const NeiGi::Mesh& mesh, int element, bool release = false, bool flow = false) {
     if (element < 0 || element > 2 || !mesh.count)
         return;
-    if (!NeiGi_DrawTexturedMesh(play, mesh, release ? kReleaseMaterial[element] : kAttackMaterial[element])) {
+    const auto& material =
+        release ? (flow ? kReleaseFlowMaterial[element] : kReleaseMaterial[element]) : kAttackMaterial[element];
+    if (!NeiGi_DrawTexturedMesh(play, mesh, material)) {
         auto fallback = mesh;
         const uint32_t colors[] = { 0xFFB657, 0xA5E9FF, 0xFFF3B8 };
         for (size_t i = 0; i < fallback.count; ++i) {
@@ -155,11 +162,11 @@ extern "C" void NeiUsedMagic_DrawSpin(PlayState* play, Player* player, int eleme
     origin.y += 5;
     const MatrixScope matrix(origin);
     Draw(play, NeiUsedMagic::SampleSpin(Element(element), play->gameplayFrames, radius, big, NeiGi_CameraBasis(play)),
-         false);
+         element == 1);
     DrawAttackSurface(play, NeiUsedMagic::SampleSpinSurface(Element(element), play->gameplayFrames, radius, big),
                       element, true);
     DrawAttackSurface(play, NeiUsedMagic::SampleSpinFlow(Element(element), play->gameplayFrames, radius, big, 1),
-                      element, true);
+                      element, true, true);
 }
 extern "C" void NeiUsedMagic_DrawBurst(PlayState* play, int element, const Vec3f* position, float size, float life) {
     if (!play || !Position(position) || size <= 0 || life <= 0)

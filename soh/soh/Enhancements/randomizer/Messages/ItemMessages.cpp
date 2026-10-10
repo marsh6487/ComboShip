@@ -20,6 +20,7 @@
 #include "ComboSongDrawOOT.h"
 #include "ComboCapeReceiptChoice.h"
 #include "ComboItemReceiptPresentation.h"
+#include "ComboMagicItemReceiptText.h"
 #include "ComboKeyReceiptText.h"
 #include "ComboDungeonKeyReceipt.h"
 #include "soh/ShipInit.hpp"
@@ -64,6 +65,14 @@ extern const CustomItemMessageEntry* GetCustomItemMessage(s16 rgId);
 bool BuildDungeonKeyReceiptMessage(RandomizerGet rg, CustomMessage& msg);
 bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received = true);
 bool BuildTokenReceiptMessage(RandomizerGet rg, CustomMessage& msg);
+
+static bool WandMedallionDescriptionsEnabled() {
+    if (!OTRGlobals::Instance || !OTRGlobals::Instance->gRandoContext)
+        return false;
+    const auto ctx = OTRGlobals::Instance->gRandoContext;
+    return (IS_RANDO || ctx->IsSeedGenerated() || ctx->IsSpoilerLoaded()) &&
+           Wand_RandoMode() == WAND_RANDO_MEDALLIONS && ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS).Is(RO_GENERIC_ON);
+}
 
 static bool DungeonInformationEnabled() {
     if (!OTRGlobals::Instance || !OTRGlobals::Instance->gRandoContext || !OTRGlobals::Instance->gRandomizer)
@@ -178,6 +187,8 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName, cha
             builder(message); // same read-only description builder as OoT's own receipt
             if (!ComboItemReceiptText::FromOotMessage(message.GetEnglish(MF_RAW), body))
                 return 0;
+        } else if (const auto* magic = ComboMagicItemReceiptText::Find(itemName, Wand_RandoMode())) {
+            body = ComboItemReceiptText::FromNeiMarkup(ComboMagicItemReceiptText::Body(*magic));
         } else {
             const auto* custom = GetCustomItemMessage(rg);
             if (custom && custom->english && *custom->english) {
@@ -196,6 +207,15 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName, cha
                         break;
                     }
                 }
+            }
+        }
+        if (WandMedallionDescriptionsEnabled()) {
+            if (const auto* medallion = ComboMagicItemReceiptText::FindMedallion(itemName, Wand_RandoMode())) {
+                if (body.empty())
+                    body = ComboItemReceiptText::FromNeiMarkup(ComboMagicItemReceiptText::MedallionReceipt(*medallion));
+                else
+                    body += '\x10' +
+                            ComboItemReceiptText::FromNeiMarkup(ComboMagicItemReceiptText::MedallionSuffix(*medallion));
             }
         }
         if (body.empty() || body.size() > capacity)
@@ -365,6 +385,18 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
         return;
     }
 
+    if (!dungeonKey) {
+        const auto name = Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid)).GetName().GetEnglish();
+        if (const auto* magic = ComboMagicItemReceiptText::Find(name, Wand_RandoMode())) {
+            using ComboMagicItemReceiptText::Language;
+            msg = CustomMessage(ComboMagicItemReceiptText::Body(*magic),
+                                ComboMagicItemReceiptText::Body(*magic, Language::German),
+                                ComboMagicItemReceiptText::Body(*magic, Language::French), TEXTBOX_TYPE_BLUE);
+            msg.AutoFormat(static_cast<ItemID>(magic->slate ? EXT_ITEM_SHEIKAH_SLATE : ITEM_ELEMENTAL_WAND));
+            return;
+        }
+    }
+
     // Check if this is a custom item with a detailed message
     const CustomItemMessageEntry* customMsg = GetCustomItemMessage(rgid);
     if (!dungeonKey && customMsg != nullptr) {
@@ -374,7 +406,15 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
         // argument leaves the message without an ITEM_OBTAINED token at all, and the
         // textbox renders with no icon on the left.
         msg = CustomMessage(customMsg->english, customMsg->german, customMsg->french, TEXTBOX_TYPE_BLUE);
-        msg.AutoFormat(customMsg->itemId);
+        if (rgid == RG_SKULL_MASK || rgid == RG_SPOOKY_MASK || rgid == RG_MASK_OF_TRUTH || rgid == RG_GERUDO_MASK) {
+            // Spooky's icon byte is '&' (0x26), which the markup formatter
+            // converts to a newline. Reserve icon width with a safe token,
+            // then install the native icon after markup has been encoded.
+            msg.AutoFormat(ITEM_CUSTOM);
+            msg.Replace(CustomMessage::ITEM_OBTAINED(ITEM_CUSTOM), CustomMessage::ITEM_OBTAINED(customMsg->itemId));
+        } else {
+            msg.AutoFormat(customMsg->itemId);
+        }
         return;
     }
 
@@ -1211,6 +1251,90 @@ void BuildChestGameSmallKeyMessage(uint16_t* textId, bool* loadFromMessageTable)
     *loadFromMessageTable = false;
 }
 
+static bool SplitWandMedallionMessage(std::string& prefix, std::string& ending, int& icon) {
+    icon = -1;
+    for (size_t offset = 0; offset < prefix.size();) {
+        const uint8_t code = prefix[offset];
+        const size_t parameters =
+            code == 0x05 || code == 0x06 || code == 0x0C || code == 0x0E || code == 0x13 || code == 0x14 || code == 0x1E
+                ? 1
+            : code == 0x07 || code == 0x11 || code == 0x12 ? 2
+            : code == 0x15                                 ? 3
+                                                           : 0;
+        if (prefix.size() - offset <= parameters)
+            return false;
+        if (code == 0x13)
+            icon = static_cast<uint8_t>(prefix[offset + 1]);
+        // Keep the native finish/next-textbox behavior after the lesson.
+        // Moving FADE too prevents the original timer from dismissing it early.
+        if (code == 0x02 || code == 0x0B || code == 0x07 || code == 0x0E || code == 0x11) {
+            ending = prefix.substr(offset);
+            prefix.resize(offset);
+            return true;
+        }
+        offset += parameters + 1;
+    }
+    return false;
+}
+
+void BuildWandMedallionMessage(uint16_t* textId, bool* loadFromMessageTable) {
+    if (!IS_RANDO || !gPlayState || !WandMedallionDescriptionsEnabled())
+        return;
+    const char* name;
+    switch (*textId) {
+        case 0x003C:
+            name = "Fire Medallion";
+            break;
+        case 0x003D:
+            name = "Water Medallion";
+            break;
+        case 0x003E:
+            name = "Forest Medallion";
+            break;
+        case 0x003F:
+            name = "Spirit Medallion";
+            break;
+        case 0x0040:
+            name = "Light Medallion";
+            break;
+        case 0x0041:
+            name = "Shadow Medallion";
+            break;
+        default:
+            return;
+    }
+    const auto* medallion = ComboMagicItemReceiptText::FindMedallion(name, Wand_RandoMode());
+    const auto vanilla = CustomMessage::LoadVanillaMessageTableEntry(*textId);
+    auto prefix = vanilla.GetEnglish(MF_RAW);
+    if (prefix.empty())
+        return;
+    std::string ending;
+    int icon;
+    if (!SplitWandMedallionMessage(prefix, ending, icon))
+        return;
+    // The loader puts the CURRENT locale's native text in its English slot.
+    // Copy that prefix into each slot, then add the matching localized tutorial.
+    using ComboMagicItemReceiptText::Language;
+    CustomMessage tutorial(ComboMagicItemReceiptText::MedallionSuffix(*medallion),
+                           ComboMagicItemReceiptText::MedallionSuffix(*medallion, Language::German),
+                           ComboMagicItemReceiptText::MedallionSuffix(*medallion, Language::French));
+    if (icon >= 0)
+        tutorial.AutoFormat(static_cast<ItemID>(icon));
+    else
+        tutorial.AutoFormat();
+    const auto append = [&](std::string suffix) {
+        if (!suffix.empty() && suffix.back() == '\x02')
+            suffix.pop_back();
+        return prefix + '\x04' + suffix + ending;
+    };
+    // Native bytes are already encoded; formatting the prefix again would
+    // mistake control arguments (for example COLOR 0x40) for markup tokens.
+    CustomMessage msg(append(tutorial.GetEnglish(MF_RAW)), append(tutorial.GetGerman(MF_RAW)),
+                      append(tutorial.GetFrench(MF_RAW)), vanilla.GetTextBoxType(), vanilla.GetTextBoxPosition());
+    msg.LoadIntoFont();
+    *loadFromMessageTable = false;
+}
+
 // Time Gate custom item - "Travel through time?" Yes/No prompt
 void BuildTimeGateMessage(uint16_t* textId, bool* loadFromMessageTable) {
     CustomMessage msg = CustomMessage("Travel through time?\x1B%g&&Yes&No%w", "Durch die Zeit reisen?\x1B%g&&Ja&Nein%w",
@@ -1223,6 +1347,12 @@ void BuildTimeGateMessage(uint16_t* textId, bool* loadFromMessageTable) {
 void RegisterItemMessages() {
     COND_ID_HOOK(OnOpenText, TEXT_RANDOMIZER_CUSTOM_ITEM, true, BuildItemMessage);
     COND_ID_HOOK(OnOpenText, 0x00F3, true, BuildChestGameSmallKeyMessage);
+    COND_ID_HOOK(OnOpenText, 0x003C, true, BuildWandMedallionMessage);
+    COND_ID_HOOK(OnOpenText, 0x003D, true, BuildWandMedallionMessage);
+    COND_ID_HOOK(OnOpenText, 0x003E, true, BuildWandMedallionMessage);
+    COND_ID_HOOK(OnOpenText, 0x003F, true, BuildWandMedallionMessage);
+    COND_ID_HOOK(OnOpenText, 0x0040, true, BuildWandMedallionMessage);
+    COND_ID_HOOK(OnOpenText, 0x0041, true, BuildWandMedallionMessage);
     COND_ID_HOOK(OnOpenText, TEXT_DESC_DUNGEON_MAP_INFO, true, BuildDungeonPauseInfoMessage);
     COND_ID_HOOK(OnOpenText, TEXT_DESC_DUNGEON_COMPASS_INFO, true, BuildDungeonPauseInfoMessage);
     COND_ID_HOOK(OnOpenText, TEXT_ITEM_DUNGEON_MAP,

@@ -14,6 +14,8 @@
 #include "PauseItemDescriptions.h"
 #include "CustomMessage.h"
 #include "2s2h/Rando/ItemReceiptText.h"
+#include "ComboPauseTutorialText.h"
+#include "ComboItemReceiptText.h"
 
 extern "C" {
 #include "z64item.h"
@@ -23,6 +25,11 @@ extern "C" {
 #include "message_data_static.h"
 #include "mods/extended_inventory.h" // Sw97_* / Wand_* (Skijer's NEI)
 #include "mods/extended_equipment.h" // ITEM_EXT_* ids for the equipment-page table
+#include "mods/items/logic/weapon_upgrades.h"
+u8 Cane_GetType(void);
+u8 Cane_GetActiveSkill(void);
+s32 TradeAdult_CursorIndex(void);
+extern f32 sNESFontWidths[160];
 }
 
 // ---------------------------------------------------------------------------
@@ -43,11 +50,11 @@ static const ItemDescEntry sCustomItemDescs[] = {
     // costs a Heart Container rather than the 3 hearts this row used to advertise.)
     { ITEM_HYLIAS_GRACE,
       "Fairy flight for 10s. Ignores walls.\nA=up, B=down, L=sprint. 24 MP." }, // RETIRED item; row kept for old saves
-    // 2026-08-06 page-2 additions. Shadow Crystal remains model-only on this side.
+    // 2026-08-06 page-2 additions.
     { EXT_ITEM_SHEIKAH_SLATE, "C draws the slate, then casts the\nactive rune. Hold L for the rune wheel." },
     { EXT_ITEM_PHANTOM_HOURGLASS,
-      "C stops time and aims. C again rewinds\nwhat the reticle holds along its own\npath. C or B lets go." },
-    { EXT_ITEM_SHADOW_CRYSTAL, "Cursed twilight crystal. Turns Link\ninto Wolf Link. OoT only for now." },
+      "Item button: aim, then rewind.\nPress again to stop; B cancels aim.\nHold R while aiming to rewind Link." },
+    { EXT_ITEM_SHADOW_CRYSTAL, "Turn into Wolf Link.\nB attacks; moving + A dashes.\nUse crystal again to turn back." },
     { EXT_ITEM_ROD_OF_SEASONS, "Press its button to draw the rod.\nPress again to choose an unlocked\nseason." },
     { ITEM_ZONAI_PERMAFROST,
       "Toggle the time stop. 4 MP to start,\nthen 1 MP every 10 frames. Ends on\na second press or an empty meter." },
@@ -309,24 +316,23 @@ extern "C" u8 PauseItemDesc_VanillaTextExists(u16 textId) {
  * swap the font buffer underneath. Resolved once, since the item range differs per ROM revision.
  */
 static u16 PauseItemDesc_GetTemplateTextId() {
-    static u16 sTemplateTextId = 0;
-
-    if (sTemplateTextId == 0) {
-        for (u16 textId = 0x1700; textId < 0x1740; textId++) {
-            if (PauseItemDesc_VanillaTextExists(textId)) {
-                sTemplateTextId = textId;
-                break;
-            }
+    // The message table can change when a save/ROM is reloaded. Validate against
+    // the live table instead of retaining a text id from the previous session.
+    for (u16 textId = 0x1700; textId < 0x1740; textId++) {
+        if (PauseItemDesc_VanillaTextExists(textId)) {
+            return textId;
         }
     }
-
-    return sTemplateTextId;
+    return 0;
 }
 
-extern "C" void PauseItemDesc_Show(PlayState* play, const char* desc, u8 textBoxPos) {
+static bool PauseItemDesc_ShowBody(PlayState* play, std::string desc, u8 textBoxPos, bool encoded) {
+    if (play == NULL || desc.empty()) {
+        return false;
+    }
     u16 templateTextId = PauseItemDesc_GetTemplateTextId();
     if (templateTextId == 0) {
-        return;
+        return false;
     }
 
     func_801514B0(play, templateTextId, textBoxPos);
@@ -334,20 +340,110 @@ extern "C" void PauseItemDesc_Show(PlayState* play, const char* desc, u8 textBox
     MessageContext* msgCtx = &play->msgCtx;
     Font* font = &msgCtx->font;
 
-    // Keep the template's header bytes: func_801514B0 already derived unk11F08/unk11F18/unk11F0C
-    // from the first word of the buffer, so only the body may change.
+    // Keep the template's first word: func_801514B0 already derived
+    // unk11F08/unk11F18/unk11F0C from it. The icon is decoded later and belongs
+    // to that vanilla item, so custom pause help uses the no-icon sentinel.
     CustomMessage::Entry entry;
     entry.textboxType = font->msgBuf.schar[0];
     entry.textboxYPos = font->msgBuf.schar[1];
-    entry.icon = font->msgBuf.schar[2];
+    entry.icon = 0xFE;
     entry.nextMessageID = 0xFFFF;
     entry.firstItemCost = 0xFFFF;
     entry.secondItemCost = 0xFFFF;
-    entry.msg = desc;
+    entry.msg = std::move(desc);
+    entry.autoFormat = !encoded;
+    if (encoded) {
+        ComboItemReceiptText::Wrap(entry.msg, sNESFontWidths, 160, entry.icon == 0xFE ? 300.0f : 240.0f);
+        CustomMessage::EnsureMessageEnd(&entry.msg);
+    }
 
     CustomMessage::LoadCustomMessageIntoFont(entry);
 
     msgCtx->msgBufPos = 0;
     msgCtx->textDrawPos = 0;
     msgCtx->decodedTextLen = 0;
+    return true;
+}
+
+extern "C" void PauseItemDesc_Show(PlayState* play, const char* desc, u8 textBoxPos) {
+    if (desc != NULL) {
+        PauseItemDesc_ShowBody(play, desc, textBoxPos, false);
+    }
+}
+
+static std::string PauseItemDesc_Tutorial(u16 itemId, s32 pageIndex) {
+    using namespace ComboPauseTutorialText;
+    using TutorialLanguage = ComboPauseTutorialText::Language;
+    const auto language = gSaveContext.options.language == LANGUAGE_GER   ? TutorialLanguage::German
+                          : gSaveContext.options.language == LANGUAGE_FRE ? TutorialLanguage::French
+                                                                          : TutorialLanguage::English;
+    if (pageIndex != PAUSE_ITEM) {
+        return {};
+    }
+    if (itemId == ITEM_ELEMENTAL_WAND) {
+        return Wand(Wand_GetMode(), Wand_RandoMode(), language);
+    }
+    if (itemId == EXT_ITEM_SHEIKAH_SLATE) {
+        return Slate(Slate_GetRune(), language);
+    }
+    if (itemId == ITEM_CANE_OF_SOMARIA) {
+        return Cane(Cane_GetType(), Cane_GetActiveSkill(), true);
+    }
+    if (itemId == EXT_ITEM_PHANTOM_HOURGLASS) {
+        return Shared("Phantom Hourglass", language);
+    }
+    if (itemId == EXT_ITEM_SHADOW_CRYSTAL) {
+        return Shared("Shadow Crystal", language);
+    }
+    if (itemId == ITEM_OOT_MASK_PLACEHOLDER) {
+        return OotMask(OotMask_CursorIndex(), language);
+    }
+    if (itemId == ITEM_MASK_KEATON) {
+        return Shared("Keaton Mask (MM)", language);
+    }
+    if (itemId == ITEM_TRADE_PLACEHOLDER) {
+        return Trade(TradeAdult_CursorIndex());
+    }
+    if (itemId == ITEM_HAMMER && WeaponUpgrade_HasHammerAxe()) {
+        return "Iron Knuckle's Axe.&Double damage and reach.&C-Up aims; the item's button throws.&The axe returns like "
+               "a boomerang.";
+    }
+    if (itemId == ITEM_LONGSHOT_OOT && Nei_HookshotLevel() >= 3) {
+        return "Ultrashot.&Four times the reach and twice the speed.&Pull yourself to a distant target.";
+    }
+    return {};
+}
+
+extern "C" u8 PauseItemDesc_ShowItem(PlayState* play, u16 itemId, s32 pageIndex, u8 textBoxPos) {
+    auto tutorial = PauseItemDesc_Tutorial(itemId, pageIndex);
+    if (!tutorial.empty()) {
+        // MM color commands include zero bytes. Keep the std::string length
+        // throughout the display path; never reconstruct this body from c_str().
+        return PauseItemDesc_ShowBody(play, ComboItemReceiptText::FromNeiMarkup(tutorial), textBoxPos, true);
+    }
+    const char* desc = PauseItemDesc_Get(itemId, pageIndex);
+    return desc != NULL && PauseItemDesc_ShowBody(play, desc, textBoxPos, false);
+}
+
+extern "C" u8 PauseItemDesc_ShowEquipment(PlayState* play, s16 subPage, s16 row, s16 col, u8 textBoxPos) {
+    using namespace ComboPauseTutorialText;
+    std::string tutorial;
+    if (col == 0) {
+        if ((row == 0 && ExtEquip_CapeOwned()) || (row == 1 && ExtEquip_PendantOwned())) {
+            tutorial = Passive(row);
+        }
+    } else if (subPage == 0) {
+        tutorial = VanillaEquipment(row, col, WeaponUpgrade_KokiriLevel(), WeaponUpgrade_HasTrueMaster(),
+                                    WeaponUpgrade_HasGreatFairy(), true);
+    } else if (subPage == 1 && row >= 0 && row < 4 && col >= 1 && col <= 3) {
+        return PauseItemDesc_ShowItem(play, ITEM_EXT_SWORD_1 + row * 3 + col - 1, PAUSE_MASK, textBoxPos);
+    }
+    return !tutorial.empty() &&
+           PauseItemDesc_ShowBody(play, ComboItemReceiptText::FromNeiMarkup(tutorial), textBoxPos, true);
+}
+
+extern "C" u8 PauseItemDesc_ShowForm(PlayState* play, s32 form, u8 textBoxPos) {
+    const auto tutorial = ComboPauseTutorialText::Form(form);
+    return !tutorial.empty() &&
+           PauseItemDesc_ShowBody(play, ComboItemReceiptText::FromNeiMarkup(tutorial), textBoxPos, true);
 }

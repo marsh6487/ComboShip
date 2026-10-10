@@ -85,10 +85,12 @@ new=re.sub(r'static bool NeiGi_DrawMeshMaterial\(.*?\) \{',
 # The renderer input/capacity guards have their own real-arena regressions.
 # Normalize only those exact additions; retain the fixed historical batcher
 # and untextured material/command behavior as the comparison baseline.
+# The authored sword candidate appends the separate Giant's Knife kind. Its
+# routing and real render path are covered by the sword/NEI fixtures above.
 start=new.index('{')+1;end=new.index('    // Reuse shared vertices')
 assert tokens(new[start:end])==tokens('''
     if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, material, seasonSunRays) || int(orb) < 0 ||
-        int(orb) > int(Kind::Gold))
+        int(orb) > int(Kind::GiantsKnife))
         return false;
 ''')
 new=new[:start]+'\n    if (mesh.count == 0)\n        return;\n'+new[end:]
@@ -97,9 +99,29 @@ assert tokens(new[start:end])==tokens('''
     size_t triangleCommands = 0;
     for (size_t b = 0; b < batchCount; ++b)
         triangleCommands += (batches[b].indexCount + 5) / 6;
-    if (!NeiGi_ArenaHasRoom(play, vertexCount * sizeof(Vtx), 1, 2, 32 + batchCount + triangleCommands))
+    const bool scrolling = material && material->scrolling;
+    const size_t scrollBytes = scrolling ? 2 * sizeof(Gfx) : 0;
+    if (!NeiGi_ArenaHasRoom(play, vertexCount * sizeof(Vtx) + scrollBytes, 1, 2,
+                           32 + batchCount + triangleCommands + (scrolling ? 1 : 0)))
         return false;
 ''')
+new=new[:start]+new[end:]
+# The reward-only scroll fragment is absent when no texture material is
+# supplied. Require its exact allocation and commands before normalizing it;
+# the complete untextured batcher below still compares with the fixed source.
+allocation='auto* vertices = static_cast<Vtx*>(Graph_Alloc(play->state.gfxCtx, vertexCount * sizeof(Vtx) + scrollBytes));'
+assert new.count(allocation)==1,'expected exactly the scroll-aware vertex allocation'
+new=new.replace(allocation,allocation.replace(' + scrollBytes',''),1)
+start=new.index('    Gfx* scroll = nullptr;');end=new.index('    OPEN_DISPS',start)
+assert tokens(new[start:end])==tokens('''
+    Gfx* scroll = nullptr;
+    if (scrolling) {
+        scroll = reinterpret_cast<Gfx*>(vertices + vertexCount);
+        const auto offset = RewardGi_Scroll(play->gameplayFrames);
+        gDPSetTileSize(scroll, G_TX_RENDERTILE, offset.s, offset.t, offset.s + 31 * 4, offset.t + 31 * 4);
+        gSPEndDisplayList(scroll + 1);
+    }
+'''),'unexpected reward-only scroll fragment'
 new=new[:start]+new[end:]
 for op in ('Push','Pop'):
     new,count=re.subn(r'    if \(owner\)\n        gSPComboRM'+op+r'\(POLY_XLU_DISP\+\+(?:, owner)?\);\n','',new)
@@ -117,6 +139,11 @@ new,count=re.subn(r'\(seasonSunRays \? 31\s*: material\s*\? 32\s*: 63\)', '63',n
 assert count==1,'expected the one seasonal/material V texture coordinate'
 a=new.index('    if (seasonSunRays) {');b=new.index('    } else if (orb != Kind::Neutral) {',a)
 new=new[:a]+'    if (orb != Kind::Neutral) {'+new[b+len('    } else if (orb != Kind::Neutral) {'):]
+# Accepted POC6 permits an owner/editor palette at this one color selection.
+# Normalize that exact addition only; retain the complete historical batcher.
+palette='palette ? NeiGi::OrbColors{palette->hot, palette->edge} : NeiGi::OrbPalette(orb)'
+assert new.count(palette)==1,'expected the one accepted elemental palette selection'
+new=new.replace(palette,'NeiGi::OrbPalette(orb)',1)
 assert tokens(old)==tokens(new),'Existing GI batcher command path changed'
 print('USED VFX source contract: rod gameplay, Time Gate state, local/remote shot dispatch, flight particle size alone suppressed; impact particles, gameplay and RNG cadence preserved')
 

@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 #include "soh/OTRGlobals.h" // CVarGetInteger
 #include "../../../../../combo/NeiGracePolicy.h"
+#include "../../../../../combo/NeiSeasonsPolicy.h"
 
 std::vector<RandomizerGet> itemPool = {};
 std::vector<RandomizerGet> lesserPool = {};
@@ -684,11 +685,15 @@ bool GenerateItemPool() {
         AddItemToPool(RG_SLATE_RUNE_CRYONIS, 2, 1, 1, 1);
         AddItemToPool(RG_PHANTOM_HOURGLASS, 2, 1, 1, 1);
         AddItemToPool(RG_SHADOW_CRYSTAL, 2, 1, 1, 1);
-        // The rod itself is not shuffled, only its four seasons — the first one found hands it over.
-        AddItemToPool(RG_SEASON_SPRING, 2, 1, 1, 1);
-        AddItemToPool(RG_SEASON_SUMMER, 2, 1, 1, 1);
-        AddItemToPool(RG_SEASON_AUTUMN, 2, 1, 1, 1);
-        AddItemToPool(RG_SEASON_WINTER, 2, 1, 1, 1);
+        if (NeiSeasons_SeedMode(ctx->GetOption(RSK_ROD_OF_SEASONS).Get()) == NEI_SEASONS_INDIVIDUAL) {
+            // Each season remains one independent pickup; the first grants the Rod.
+            AddItemToPool(RG_SEASON_SPRING, 2, 1, 1, 1);
+            AddItemToPool(RG_SEASON_SUMMER, 2, 1, 1, 1);
+            AddItemToPool(RG_SEASON_AUTUMN, 2, 1, 1, 1);
+            AddItemToPool(RG_SEASON_WINTER, 2, 1, 1, 1);
+        } else if (!ctx->GetOption(RSK_STARTING_ROD_OF_SEASONS)) {
+            AddItemToPool(RG_ROD_OF_SEASONS, 2, 1, 1, 1);
+        }
         AddItemToPool(RG_LANTERN, 2, 1, 1, 1);
         AddItemToPool(RG_MINISH_CAP, 2, 1, 1, 1);
         // Dual Cane (Skijer's NEI): SIX copies, because the cane is six separate

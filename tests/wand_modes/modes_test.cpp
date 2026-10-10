@@ -65,6 +65,7 @@ s32 CVarGetInteger(const char* name, s32 fallback) {
 }
 NeiSaveData* Nei_Save() { return &gSaveContext.save.shipSaveInfo.nei; }
 u8 ExtEquip_CapeOwned() { return capeOwned; }
+void ExtEquip_ToggleFromCButton(u16) { assert(false && "Wand frame dispatched unrelated equipment"); }
 u8 Pacci_UltrahandModeActive() { return 0; }
 u8 Sw97_IsBowItem(u8) { return 0; }
 u8 Sw97_IsSlingItem(u8) { return 0; }

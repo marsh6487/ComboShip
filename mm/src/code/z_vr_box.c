@@ -94,15 +94,19 @@ static s32 Skybox_HasOotTextures(void) {
     return true;
 }
 
+s32 Skybox_IsOotSkyActive(const SkyboxContext* skyboxCtx, s16 skyboxId) {
+    return ((skyboxId == SKYBOX_NORMAL_SKY) || (skyboxId == SKYBOX_3)) && skyboxCtx->ootSkyDLists[0] &&
+           skyboxCtx->ootSkyDLists[1] && CVarGetInteger("gEnhancements.Graphics.UseOotSkyTextures", 0) &&
+           ResourceMgr_IsAltAssetsEnabled();
+}
+
 s32 Skybox_PrepareOot(SkyboxContext* skyboxCtx, s16 skyboxId, u16 time, u8* timeBlend) {
     u8 first = 3;
     u8 second = 3;
     u16 start = 0;
     u16 end = 0;
 
-    if (((skyboxId != SKYBOX_NORMAL_SKY) && (skyboxId != SKYBOX_3)) || !skyboxCtx->ootSkyDLists[0] ||
-        !skyboxCtx->ootSkyDLists[1] || !CVarGetInteger("gEnhancements.Graphics.UseOotSkyTextures", 0) ||
-        !ResourceMgr_IsAltAssetsEnabled()) {
+    if (!Skybox_IsOotSkyActive(skyboxCtx, skyboxId)) {
         return false;
     }
 

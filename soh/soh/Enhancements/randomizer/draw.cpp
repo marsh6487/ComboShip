@@ -96,11 +96,13 @@ extern SaveContext gSaveContext;
 #include "ComboMaskShimmer.h"
 #include "ComboMorphaGi.h"
 #include "ComboItemEffectColors.h"
+#include "ComboSwordGiEffectFit.h"
 
 #ifdef COMBO_BUILD
 // ComboShip: combo-owned animated cross-game item rendering (MM stray fairies). TU-glue: needs the
 // engine headers above (z64.h/macros.h/functions.h) already in scope.
 #include "ComboForeignAnim.h"
+#include "ComboBottleContentsDraw.h"
 #endif
 
 const char* SmallBodyCvarValue[10] = {
@@ -1814,9 +1816,13 @@ void Randomizer_DrawNet(PlayState* play, GetItemEntry* getItemEntry) {
 }
 
 // Defined with the per-level sword draws below (upright hand-local sword presentation).
-static void DrawMmWeaponGi(PlayState* play, Gfx* dl1, Gfx* dl2, f32 scale);
+static void DrawMmWeaponGi(PlayState* play, Gfx* dl1, Gfx* dl2, f32 scale, bool shop);
 
 void Randomizer_DrawExtFourSword(PlayState* play, GetItemEntry* getItemEntry) {
+    Randomizer_DrawExtFourSwordPresentation(play, getItemEntry, false);
+}
+
+void Randomizer_DrawExtFourSwordPresentation(PlayState* play, GetItemEntry* getItemEntry, int shop) {
     // The REAL Four Sword model (soh.o2r object_nei_four_sword, converted out of the old pak).
     // Blade + hilt are separate DLs, both authored in hand-local space like the MM swords, so they
     // take the same upright presentation. Falls back to the tinted Kokiri sword if the
@@ -1827,7 +1833,7 @@ void Randomizer_DrawExtFourSword(PlayState* play, GetItemEntry* getItemEntry) {
         DrawCustomItemDiamondTint(play, (Gfx*)gGiKokiriSwordDL, NULL, 0.55f, 0, 180, 80);
         return;
     }
-    DrawMmWeaponGi(play, blade, hilt, 0.04f);
+    DrawMmWeaponGi(play, blade, hilt, 0.04f, shop != 0);
 }
 
 // NEI Weapon Upgrades — progressive weapons. The get-item model shows the base weapon
@@ -1843,6 +1849,10 @@ void Randomizer_DrawProgressiveKokiriSword(PlayState* play, GetItemEntry* getIte
 void Randomizer_DrawProgressiveMasterSword(PlayState* play, GetItemEntry* getItemEntry) {
     // Master sword mesh, sacred-blue tint
     DrawCustomItemDiamondTint(play, (Gfx*)gGiKokiriSwordDL, NULL, 0.6f, 120, 180, 255);
+}
+
+void Randomizer_DrawGiantsKnife(PlayState* play, GetItemEntry* getItemEntry) {
+    GetItem_Draw(play, GID_SWORD_BGS);
 }
 
 void Randomizer_DrawProgressiveBGS(PlayState* play, GetItemEntry* getItemEntry) {
@@ -1905,12 +1915,12 @@ static Gfx* LoadMmDLOnce(const char* path, Gfx** cache, u8* tried) {
 // levels moved to their real GI models above. Spin around world-up, rotate the
 // donor's +X blade into +Y with Z, then shrink. An extra X quarter turn after the
 // tilt lays the blade flat, so it must not be applied here.
-static void DrawMmWeaponGi(PlayState* play, Gfx* dl1, Gfx* dl2, f32 scale) {
+static void DrawMmWeaponGi(PlayState* play, Gfx* dl1, Gfx* dl2, f32 scale, bool shop) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     s16 rotation = play->gameplayFrames * 0x2;
     Matrix_RotateY(rotation * 0.01f, MTXMODE_APPLY);
-    Matrix_RotateZ(1.8f, MTXMODE_APPLY);
+    Matrix_RotateZ(ComboSwordGi_SelectedTilt(1.5707963267948966f, shop), MTXMODE_APPLY);
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
@@ -2075,6 +2085,20 @@ void Randomizer_DrawExtShieldOfIkana(PlayState* play, GetItemEntry* getItemEntry
     // mm.o2r — using object_gi_shield_3/gGiMirrorShieldDL crashed because its vertex hashes
     // didn't resolve in the OTR pack, and the unresolved bytes were executed as gsSPVertex.
     Gfx* mod = NeiGi_ModOverrideDL("objects/object_link_child/gLinkHumanMirrorShieldDL", true);
+#ifdef COMBO_BUILD
+    // The pose probe and deferred draw must select the same MM-owned graph.
+    // The legacy companion loads through the active host and retains a raw
+    // pointer, which can disagree with MM after an owner/Alt selection change.
+    static Gfx sMmShieldDL[2];
+    Gfx* selected = mod;
+    if (!selected &&
+        ResourceMgr_IsGiModelAvailableForGame("mm", "objects/object_link_child/gLinkHumanMirrorShieldDL")) {
+        gDma1p(&sMmShieldDL[0], G_DL_OTR_FILEPATH, "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL", 0,
+               G_DL_PUSH);
+        gSPEndDisplayList(&sMmShieldDL[1]);
+        selected = sMmShieldDL;
+    }
+#else
     static Gfx* sCachedMmShieldDL = NULL;
     static u8 sLoadAttempted = 0;
     if (!mod && !sLoadAttempted) {
@@ -2082,6 +2106,7 @@ void Randomizer_DrawExtShieldOfIkana(PlayState* play, GetItemEntry* getItemEntry
         sCachedMmShieldDL = (Gfx*)TransformMasks_LoadMmDL("objects/object_link_child/gLinkHumanMirrorShieldDL");
     }
     Gfx* selected = mod ? mod : sCachedMmShieldDL;
+#endif
     if (selected == NULL) {
         return; // mm.o2r not present — silent skip instead of crashing on a NULL DL
     }
@@ -2123,10 +2148,23 @@ void Randomizer_DrawExtMagicCape(PlayState* play, GetItemEntry* getItemEntry) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+static void DrawCustomTunicTint(PlayState* play, u8 r, u8 g, u8 b) {
+    // These bare clothes lists omit the vanilla material-color passes.
+    // Initialize neutral opaque material before applying the identity tint.
+    {
+        OPEN_DISPS(play->state.gfxCtx);
+        gDPPipeSync(POLY_OPA_DISP++);
+        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
+        gDPSetEnvColor(POLY_OPA_DISP++, 80, 80, 80, 255);
+        CLOSE_DISPS(play->state.gfxCtx);
+    }
+    DrawCustomItemDiamondTint(play, (Gfx*)gGiTunicCollarDL, (Gfx*)gGiTunicDL, -1.0f, r, g, b);
+}
+
 void Randomizer_DrawExtSpiritBreastplate(PlayState* play, GetItemEntry* getItemEntry) {
     // Spirit Tunic (Skijer 2026-07-16): plain vanilla tunic get-item model tinted ORANGE — the armor
     // composite is gone (recolor tunic now), same DrawCustomItemDiamondTint as Cape/Champion.
-    DrawCustomItemDiamondTint(play, (Gfx*)gGiTunicCollarDL, (Gfx*)gGiTunicDL, -1.0f, 235, 110, 20);
+    DrawCustomTunicTint(play, 235, 110, 20);
 }
 
 void Randomizer_DrawExtSagesTunic(PlayState* play, GetItemEntry* getItemEntry) {
@@ -2181,12 +2219,12 @@ void Randomizer_DrawExtSagesTunic(PlayState* play, GetItemEntry* getItemEntry) {
     CLOSE_DISPS(play->state.gfxCtx);
 
     // Drawn last: the tint helper mutates the current matrix without restoring it.
-    DrawCustomItemDiamondTint(play, (Gfx*)gGiTunicCollarDL, (Gfx*)gGiTunicDL, -1.0f, 240, 244, 250);
+    DrawCustomTunicTint(play, 240, 244, 250);
 }
 
 void Randomizer_DrawExtChampionsTunic(PlayState* play, GetItemEntry* getItemEntry) {
     // Tunic model with BotW champion blue
-    DrawCustomItemDiamondTint(play, (Gfx*)gGiTunicCollarDL, (Gfx*)gGiTunicDL, -1.0f, 0, 120, 215);
+    DrawCustomTunicTint(play, 0, 120, 215);
 }
 
 // The hover-boots GI colors its i4 textures through per-section prim/env colors (brown leather:
@@ -2870,6 +2908,15 @@ void Randomizer_DrawChateauRomani(PlayState* play, GetItemEntry* getItemEntry) {
 // Reuses OOT's Odd Mushroom DL (loaded via OTR path) on a vanilla bottle base.
 // =============================================================================
 void Randomizer_DrawBottleWithMagicMushroom(PlayState* play, GetItemEntry* getItemEntry) {
+#ifdef COMBO_BUILD
+    if (ComboBottleContents_Draw(play, CW_BOTTLE_MUSHROOM)) {
+        uint8_t color[4];
+        ComboBottleContents_Color(CW_BOTTLE_MUSHROOM, color);
+        ComboDrawMaskShimmer(play, nullptr, color, nullptr);
+        return;
+    }
+#endif
+
     // MM's REAL Magic Mushroom GI mesh (mm.o2r object_gi_magicmushroom), archive-scoped like the
     // sword levels. Fallback when mm.o2r is absent: OoT's odd mushroom inside the bottle glass.
     static Gfx* sMmMushroom = NULL;
@@ -4365,6 +4412,15 @@ void Randomizer_DrawMmFrog(PlayState* play, GetItemEntry* getItemEntry) {
 // folder, so GSP_MM_DL resolves from mm.o2r (MmAssets gate like its peers).
 // =============================================================================
 void Randomizer_DrawMmGoldDustBottle(PlayState* play, GetItemEntry* getItemEntry) {
+#ifdef COMBO_BUILD
+    if (ComboBottleContents_Draw(play, CW_BOTTLE_GOLD_DUST)) {
+        uint8_t color[4];
+        ComboBottleContents_Color(CW_BOTTLE_GOLD_DUST, color);
+        ComboDrawMaskShimmer(play, nullptr, color, nullptr);
+        return;
+    }
+#endif
+
     if (!MmAssets_IsAvailable())
         return;
 

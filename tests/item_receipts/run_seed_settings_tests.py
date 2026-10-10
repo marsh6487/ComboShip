@@ -46,6 +46,7 @@ def main():
     option = read("soh/soh/Enhancements/randomizer/option.cpp")
     functions = [extract(option, signature) for signature in (
         "Option Option::Bool(RandomizerSettingKey key_, std::string name_, std::string cvarName_",
+        "Option Option::U8(RandomizerSettingKey key_, std::string name_, std::vector<std::string> options_",
         "Option::Option(size_t key_", "void Option::PopulateTextToNum()",
         "OptionValue::OptionValue(uint8_t val)", "uint8_t OptionValue::Get()",
         "void OptionValue::Set(uint8_t val)", "OptionValue::operator bool() const",
@@ -73,6 +74,12 @@ def main():
     functions.append("void RegisterInformationOption(Settings& settings) {\n"
                      "#define OPT_BOOL(rsk, ...) settings.mOptions[rsk] = Option::Bool(rsk, __VA_ARGS__)\n"
                      "    auto& mOptionDescriptions = settings.mOptionDescriptions;\n" + registration + "\n#undef OPT_BOOL\n}")
+    seasons_registration = settings[settings.index("    OPT_U8(RSK_ROD_OF_SEASONS,"):
+                                    settings.index("    OPT_U8(RSK_HYLIAS_GRACE,")]
+    functions.append("void RegisterSeasonsOptions(Settings& settings) {\n"
+                     "#define OPT_U8(rsk, ...) settings.mOptions[rsk] = Option::U8(rsk, __VA_ARGS__)\n"
+                     "#define OPT_BOOL(rsk, ...) settings.mOptions[rsk] = Option::Bool(rsk, __VA_ARGS__)\n" +
+                     seasons_registration + "\n#undef OPT_U8\n#undef OPT_BOOL\n}")
     for signature in ("Context::Context()", "std::shared_ptr<Context> Context::CreateInstance()",
                       "std::shared_ptr<Context> Context::GetInstance()", "ItemLocation* Context::GetItemLocation(size_t",
                       "ItemLocation* Context::GetItemLocation(const RandomizerCheck", "OptionValue& Context::GetOption",
@@ -119,6 +126,22 @@ def main():
     load_block = manager[load_start:manager.index("});", load_start) + 3]
     functions += "void SaveNativeSettings() { auto randoContext = Rando::Context::GetInstance();\n" + save_block + "\n}\n"
     functions += "void LoadNativeSettings() { auto randoContext = Rando::Context::GetInstance();\n" + load_block + "\n}\n"
+    functions += extract(read("soh/soh/Enhancements/randomizer/NeiSeasons.cpp"),
+                         'extern "C" uint8_t Seasons_RandoMode') + "\n"
+    # Execute the complete native item-count helper and complete NEI source pool
+    # block against the real saved Context, including pool-density behavior.
+    pool = read("soh/soh/Enhancements/randomizer/3drando/item_pool.cpp")
+    functions += "Rando::Context* ctx;\n"
+    functions += pool[pool.index("std::vector<RandomizerGet> itemPool"):
+                      pool.index("void AddItemToPool(")]
+    functions += extract(pool, "void AddItemToPool(") + "\n"
+    functions += "void GenerateNativeNeiPool() {\n" + extract(pool, "if (ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS)) {") + "\n}\n"
+    starting = read("soh/soh/Enhancements/randomizer/3drando/starting_inventory.cpp")
+    functions += "std::vector<RandomizerGet> StartingInventory;\n"
+    functions += extract(starting, "static void AddItemToInventory(") + "\n"
+    start_prefix = starting[starting.index("    auto ctx =", starting.index("void GenerateStartingInventory")):
+                            starting.index("    if (ctx->GetOption(RSK_SHUFFLE_MAPANDCOMPASS)")]
+    functions += "void GenerateNativeStartingRod() {\n" + start_prefix + "\n}\n"
     with tempfile.TemporaryDirectory(prefix="compass-seed-settings-") as directory:
         build = Path(directory)
         (build / "seed_settings_production.inc").write_text(functions)

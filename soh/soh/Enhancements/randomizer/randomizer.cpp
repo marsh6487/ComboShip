@@ -1,4 +1,6 @@
 #include "../../../../combo/menu/ItemGrantAuditBridge.h"
+#include "../../../../combo/menu/ComboToolReceiptText.h"
+#include "../../../../combo/menu/ComboMaskReceiptText.h"
 #include "randomizer.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
@@ -102,6 +104,20 @@ struct CustomItemMessageEntry {
  * Descriptions, Lore, and Translations provided by Gemini 3.0
  */
 static const CustomItemMessageEntry customItemMessages[] = {
+    { RG_SKULL_MASK, ITEM_MASK_SKULL, ComboMaskReceiptText::kSkull.english, ComboMaskReceiptText::kSkull.german,
+      ComboMaskReceiptText::kSkull.french },
+    { RG_SPOOKY_MASK, ITEM_MASK_SPOOKY, ComboMaskReceiptText::kSpooky.english, ComboMaskReceiptText::kSpooky.german,
+      ComboMaskReceiptText::kSpooky.french },
+    { RG_MASK_OF_TRUTH, ITEM_MASK_TRUTH, ComboMaskReceiptText::kTruth.english, ComboMaskReceiptText::kTruth.german,
+      ComboMaskReceiptText::kTruth.french },
+    { RG_MM_MASK_TRUTH, ITEM_CUSTOM, ComboMaskReceiptText::kTruth.english, ComboMaskReceiptText::kTruth.german,
+      ComboMaskReceiptText::kTruth.french },
+    { RG_GERUDO_MASK, ITEM_MASK_GERUDO, ComboMaskReceiptText::kGerudo.english, ComboMaskReceiptText::kGerudo.german,
+      ComboMaskReceiptText::kGerudo.french },
+    { RG_KEATON_MASK, ITEM_MASK_KEATON, ComboMaskReceiptText::kKeaton.english, ComboMaskReceiptText::kKeaton.german,
+      ComboMaskReceiptText::kKeaton.french },
+    { RG_MM_MASK_KEATON, ITEM_CUSTOM, ComboMaskReceiptText::kKeaton.english, ComboMaskReceiptText::kKeaton.german,
+      ComboMaskReceiptText::kKeaton.french },
     // Movement Items
     // Skijer's progressive Roc's Feather (extended inventory page 2)
     { RG_PROGRESSIVE_ROCS, static_cast<ItemID>(ITEM_ROCS_FEATHER_SKIJER),
@@ -125,6 +141,13 @@ static const CustomItemMessageEntry customItemMessages[] = {
     // Skijer's NEI: page-2 custom items + the 24 MM masks + Bottle with Magic Mushroom moved their
     // messages into the unified registry (sNeiItems[] in extended_player.c). GetCustomItemMessage
     // falls back to those rows via Nei_FindByRg. Only items NOT in that registry remain below.
+
+    // ITEM_CUSTOM stages the catalog's custom icon. Extended item IDs would
+    // truncate in the one-byte pickup icon command.
+    { RG_PHANTOM_HOURGLASS, ITEM_CUSTOM, ComboToolReceiptText::kPhantomHourglass.english,
+      ComboToolReceiptText::kPhantomHourglass.german, ComboToolReceiptText::kPhantomHourglass.french },
+    { RG_SHADOW_CRYSTAL, ITEM_CUSTOM, ComboToolReceiptText::kShadowCrystal.english,
+      ComboToolReceiptText::kShadowCrystal.german, ComboToolReceiptText::kShadowCrystal.french },
 
     // ─────────────────────────────────────────────────────────────────────────
     // Extended Equipment (12 items, equipment page 2 - toggled via [L] in pause)
@@ -2299,7 +2322,7 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             ExtInv_GiveItem(SLOT_SHADOW_CRYSTAL, EXT_ITEM_SHADOW_CRYSTAL);
             break;
         case RG_ROD_OF_SEASONS:
-            ExtInv_GiveItem(SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS);
+            Seasons_GrantRod();
             break;
         // Crossover Items. Both registry rows carry NEI_NO_SLOT, so the generic default arm
         // below (ExtInv_SetItemById) silently drops them — the item would be consumed by the

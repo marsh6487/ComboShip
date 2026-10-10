@@ -32,6 +32,10 @@ u8 PauseItemDesc_VanillaTextExists(u16 textId);
  * `textBoxPos` is the same argument func_801514B0 takes (3 = upper rows, 1 = lower rows).
  */
 void PauseItemDesc_Show(PlayState* play, const char* desc, u8 textBoxPos);
+// Route the selected identity/mode and preserve encoded message byte lengths.
+u8 PauseItemDesc_ShowItem(PlayState* play, u16 itemId, s32 pageIndex, u8 textBoxPos);
+u8 PauseItemDesc_ShowEquipment(PlayState* play, s16 subPage, s16 row, s16 col, u8 textBoxPos);
+u8 PauseItemDesc_ShowForm(PlayState* play, s32 form, u8 textBoxPos);
 
 #ifdef __cplusplus
 }

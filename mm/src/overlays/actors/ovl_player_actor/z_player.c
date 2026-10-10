@@ -2394,7 +2394,8 @@ GetItemEntry sGetItemTable[GI_MAX - 1] = {
     // GI_FAIRY
     GET_ITEM(ITEM_FAIRY, OBJECT_GI_BOTTLE_04, GID_FAIRY, 0x5E, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0), CHEST_ANIM_LONG),
     // GI_DEKU_PRINCESS
-    GET_ITEM(ITEM_FAIRY, OBJECT_GI_BOTTLE, GID_BOTTLE, 0x5F, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0), CHEST_ANIM_LONG),
+    GET_ITEM(ITEM_FAIRY, OBJECT_GI_BOTTLE, GID_BOTTLE_DEKU_PRINCESS, 0x5F, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0),
+             CHEST_ANIM_LONG),
     // GI_MILK_BOTTLE
     GET_ITEM(ITEM_MILK_BOTTLE, OBJECT_GI_MILK, GID_MILK, 0x60, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0), CHEST_ANIM_LONG),
     // GI_MILK_HALF
@@ -2417,10 +2418,10 @@ GetItemEntry sGetItemTable[GI_MAX - 1] = {
     GET_ITEM(ITEM_ZORA_EGG, OBJECT_GI_BOTTLE_15, GID_ZORA_EGG, 0x69, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0),
              CHEST_ANIM_LONG),
     // GI_GOLD_DUST
-    GET_ITEM(ITEM_GOLD_DUST, OBJECT_GI_BOTTLE_16, GID_SEAHORSE, 0x6A, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0),
+    GET_ITEM(ITEM_GOLD_DUST, OBJECT_GI_BOTTLE_16, GID_BOTTLE_GOLD_DUST, 0x6A, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0),
              CHEST_ANIM_LONG),
     // GI_MUSHROOM
-    GET_ITEM(ITEM_MUSHROOM, OBJECT_GI_MAGICMUSHROOM, GID_MUSHROOM, 0x6B, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0),
+    GET_ITEM(ITEM_MUSHROOM, OBJECT_GI_MAGICMUSHROOM, GID_BOTTLE_MUSHROOM, 0x6B, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0),
              CHEST_ANIM_LONG),
     // GI_6C
     GET_ITEM(ITEM_NONE, OBJECT_UNSET_0, GID_NONE, 0x6C, GIFIELD(0, ITEM00_RUPEE_GREEN), 0),
@@ -4242,6 +4243,10 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
                 }
             }
             // #endregion
+        } else if (i != EQUIP_SLOT_B && item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_BOOTS_3) {
+            // C/D equipment presses toggle the slot without replacing the held item.
+            // B carries the equipped extended sword itself and follows normal sword use.
+            ExtEquip_ToggleFromCButton(item);
         } else if (item == ITEM_F0) {
             if (this->blastMaskTimer == 0) {
                 EnBom* bomb = (EnBom*)Actor_Spawn(&play->actorCtx, play, ACTOR_EN_BOM, this->actor.focus.pos.x,
@@ -5006,6 +5011,11 @@ void Player_UseItem(PlayState* play, Player* this, ItemId item) {
     // Net borrows the Kokiri Sword action, but its model/capture identity is heldItemId.
     // An accepted Net <-> sword change must still initialize the requested identity.
     bool netItemChanged = (item != this->heldItemId) && ((item == ITEM_NET) || (this->heldItemId == ITEM_NET));
+    // The extended swords share Kokiri's action, but their render/behavior identity is the item ID.
+    // A same-action B switch must still pass through the accepted native item-change path.
+    bool extSwordItemChanged =
+        (item != this->heldItemId) && ((item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_SWORD_3) ||
+                                       (this->heldItemId >= ITEM_EXT_SWORD_1 && this->heldItemId <= ITEM_EXT_SWORD_3));
 
     // NEI-DBG: mask-wear tracing (remove after diagnosis)
     if (item != ITEM_NONE && item != ITEM_FD) {
@@ -5111,7 +5121,7 @@ void Player_UseItem(PlayState* play, Player* this, ItemId item) {
                 }
                 gSaveContext.save.equippedMask = this->currentMask;
             }
-        } else if ((itemAction != this->heldItemAction) || netItemChanged ||
+        } else if ((itemAction != this->heldItemAction) || netItemChanged || extSwordItemChanged ||
                    ((this->heldActor == NULL) && (Player_ExplosiveFromIA(this, itemAction) > PLAYER_EXPLOSIVE_NONE))) {
             u8 nextAnimType;
 
@@ -5129,7 +5139,7 @@ void Player_UseItem(PlayState* play, Player* this, ItemId item) {
                 this->stateFlags3 |= PLAYER_STATE3_START_CHANGING_HELD_ITEM;
             } else {
                 // Init new held item for use
-                if (netItemChanged) {
+                if (netItemChanged || extSwordItemChanged) {
                     this->heldItemId = item;
                 }
                 Player_DestroyHookshot(this);
@@ -14101,6 +14111,59 @@ s32 Player_UpdateNoclip(Player* this, PlayState* play) {
 // mods/equipment/behaviors/equip_kite_shield.c. Mirrors the SoH placement. Skijer's NEI
 #include "mods/equipment/kite_surf.c"
 
+static void Player_UpdateCustomItems(Player* this, PlayState* play) {
+    u16 toggleButton = 0;
+    ItemId item = ITEM_NONE;
+    s32 button;
+
+    // Match native B/C priority before considering D-pad equipment. Custom tools run first
+    // and otherwise treat a clothing/sword selection as an instruction to put themselves away.
+    for (button = EQUIP_SLOT_B; button < ARRAY_COUNT(sPlayerItemButtons); button++) {
+        if (play->state.input[0].press.button & sPlayerItemButtons[button]) {
+            if (button != EQUIP_SLOT_B) {
+                item = C_BTN_ITEM(button);
+                if (item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_BOOTS_3) {
+                    item = Player_GetItemOnButton(play, this, button);
+                    toggleButton = sPlayerItemButtons[button];
+                }
+            }
+            break;
+        }
+    }
+    if (button == ARRAY_COUNT(sPlayerItemButtons) && CVarGetInteger("gEnhancements.Dpad.DpadEquips", 0)) {
+        for (button = EQUIP_SLOT_D_RIGHT; button < ARRAY_COUNT(sDpadItemButtons); button++) {
+            if (play->state.input[0].press.button & sDpadItemButtons[button]) {
+                item = DPAD_BTN_ITEM(button);
+                if (item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_BOOTS_3) {
+                    item = Player_Dpad_GetItemOnButton(play, this, button);
+                    toggleButton = sDpadItemButtons[button];
+                }
+                break;
+            }
+        }
+    }
+
+    if (item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_BOOTS_3 &&
+        !(TransformMasks_IsTransformedAny() && MmForm_GetCurrentForm() == MM_PLAYER_FORM_PIKACHU)) {
+        s16 equipType = (item - ITEM_EXT_SWORD_1) / 3;
+        u8 index = ((item - ITEM_EXT_SWORD_1) % 3) + 1;
+        if (!ExtEquip_HasItem(equipType, index) || ExtEquip_SlotRetired(equipType, index) ||
+            (ExtEquip_GetCurrent(equipType) != index &&
+             (!ExtEquip_CheckAgeReq(equipType, index) ||
+              (equipType == EQUIP_TYPE_SHIELD && ExtEquip_GetCurrent(EQUIP_TYPE_SWORD) == 3 &&
+               !ExtEquip_TridentAllowsShield(index, 0))))) {
+            toggleButton = 0;
+        }
+    } else {
+        toggleButton = 0;
+    }
+
+    play->state.input[0].press.button &= ~toggleButton;
+    CustomItems_Update(this, play);
+    // Restore only the reserved equipment edge; keep unrelated tool-consumed presses consumed.
+    play->state.input[0].press.button |= toggleButton;
+}
+
 void Player_Update(Actor* thisx, PlayState* play) {
     static Vec3f sDogSpawnPos;
     Player* this = (Player*)thisx;
@@ -14127,7 +14190,7 @@ void Player_Update(Actor* thisx, PlayState* play) {
     // NEI custom-items dispatch: run the per-frame custom item input/logic here, before the
     // vanilla item update (so item C-button presses are handled). Defined in the item TU
     // (custom_items_common.c), which is #included above at mods/items/logic/custom_items.c.
-    CustomItems_Update(this, play);
+    Player_UpdateCustomItems(this, play);
 
     // Skijer's NEI "Pause Play": after the quest page closes itself for a song, this pulls out the
     // ocarina and auto-plays it in-world (state machine in z_kaleido_collect.c; idle no-op otherwise).

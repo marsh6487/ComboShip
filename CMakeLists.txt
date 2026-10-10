@@ -311,6 +311,7 @@ add_custom_target(
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Checking custom asset trees for new path collisions...")
 add_dependencies(combo CheckAssetCollisions)
+include(CMake/NeiRewardGiAssets.cmake)
 
 add_custom_target(
     GenerateSohOtr

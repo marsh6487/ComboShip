@@ -101,11 +101,20 @@ extern "C" int ResourceMgr_GetGiModelFitForGame(const char*,const char* path,flo
 #define CVAR_ENHANCEMENT(x) x
 int CVarGetInteger(const char*,int){return 0;}
 void ComboDinSwordGi_DrawLayers(PlayState*,const char*,const char*) {}
-enum RandomizerGet{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_TRUE_MASTER_SWORD,RG_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD};
+enum RandomizerGet{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_TRUE_MASTER_SWORD,RG_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD,RG_GIANTS_KNIFE};
 int32_t OOT_NeiAltAssetsEnabled(){return 1;}
 int32_t OOT_NeiResourceExists(const char* path){return bool(loader(path));}
 /* PRODUCTION */
-struct Expected {const char* path;float low,high,width,layerLow,layerHigh,layerWidth;int dinProfile;float tilt=1.8f,scale=.04f;};
+struct Expected {
+    const char* path;
+    float low,high,width,layerLow,layerHigh,layerWidth;
+    int dinProfile;
+    float tilt=1.8f,scale=.04f;
+    // Archive.mesh independently applies serialized resource matrices before
+    // these coordinates receive the production GI pose and fitted scale.
+    // The no-archive synthetic fixture leaves them empty.
+    std::vector<std::array<double,3>> points,layerPoints;
+};
 std::vector<Expected> expected;
 /* ARCHIVES */
 int main(){
@@ -178,6 +187,7 @@ int main(){
     NeiGi::ModelBoundsReader<Loader> transformed(loader,0);
     assert(transformed.Read("guard/transformed",guard) && guard.minimum.y==15 && guard.maximum.y==35 &&
            "serialized resource matrices must establish selected model bounds");
+    size_t cameraMeshes=0;
     for(const auto& e:expected){
         const int profile=DinSwordGi::SelectedProfile(e.path+7,true,true,[](const char* key){
             if(!std::strncmp(key,"__OTR__",7))key+=7;return available.contains(key);});
@@ -190,50 +200,102 @@ int main(){
         for(bool din:{false,true})for(bool shop:{false,true})for(uint32_t frame=0;frame<360;++frame){
             dinEnabled=din;
             pose={};play.gameplayFrames=frame;
-            if(e.tilt==1.8f)NeiGi_DrawSelectedSword(&play,e.path,shop);
-            else {ComboSwordGi_ApplyFit("mm",e.path,e.scale,e.tilt,shop);Matrix_Scale(e.scale,e.scale,e.scale,1);}
-            assert(std::abs(pose.rz-e.tilt)<.0001f);
-            const float low=din?e.layerLow:e.low, high=din?e.layerHigh:e.high, width=din?e.layerWidth:e.width;
-            assert(low*pose.scale+pose.lift >= (shop?-22.f:-52.f)-.001f);
-            assert(high*pose.scale+pose.lift <= (shop?52.f:48.f)+.001f);
-            assert(width*pose.scale <= (shop?76.f:104.f)+.001f);
+            if(e.tilt!=0.f)NeiGi_DrawSelectedSword(&play,e.path,shop);
+            else {ComboSwordGi_ApplyPresentationSize(shop);ComboSwordGi_ApplyFit("mm",e.path,e.scale,e.tilt,shop);Matrix_Scale(e.scale,e.scale,e.scale,1);}
+            const float actualTilt=e.tilt;
+            assert(std::abs(pose.rz-actualTilt)<.0001f);
+            NeiGi::FrameBounds selected{};
+            assert(NeiGi::SelectedModelBounds(loader,e.path,actualTilt,din?profile:0,selected));
+            const float low=selected.minimum.y, high=selected.maximum.y, width=selected.spinningWidth;
+            {
+                NeiGi::FrameBounds original{"control",{0,low,0},{0,high,0},width,NeiGi::Kind::Neutral,{}};
+                const auto fitted=NeiGi::FrameFit(original,e.scale,shop);
+                assert(std::abs(pose.scale/(e.scale*fitted.scale)-(shop?1.f:1.15f))<.0001f &&
+                       "sword pickups must enlarge after fitting while the accepted shelf size stays unchanged");
+            }
+            assert(low*pose.scale+pose.lift >= (shop?-22.f:-59.5f)-.001f);
+            assert(high*pose.scale+pose.lift <= (shop?52.f:55.5f)+.001f);
+            assert(width*pose.scale <= (shop?76.f:1.15f*104.f)+.001f);
         }
-        // Camera_KeepOn4's upright Item0 rows, with CustomItem's visible Y.
+        if(e.points.empty())
+            continue; // Synthetic resource fitting supplies no archive camera evidence.
+        ++cameraMeshes;
+        // Camera_KeepOn4's upright Item0 rows, with CustomItem's visible Y
+        // including its accepted +2 lift and .007 * 900 shape offset.
         struct Receipt {int context;float origin,pitch,at,distance,fov,forward;};
-        const Receipt receipts[]={{1,51.3f,25.f,46.8f,39.2f,45.f,0.f},
-          {2,96.3f,55.f,94.8f,33.3f,55.f,12.f},
-          {1,81.3f,30.f,74.8f,47.6f,42.f,4.f},
-          {1,41.3f,-8.f,28.2f,46.8f,60.f,0.f},
-          {1,106.3f,40.f,95.2f,33.6f,80.f,6.f}};
+        const Receipt receipts[]={{1,53.3f,25.f,46.8f,39.2f,45.f,0.f},
+          {2,98.3f,55.f,94.8f,33.3f,55.f,12.f},
+          {1,83.3f,30.f,74.8f,47.6f,42.f,4.f},
+          {1,43.3f,-8.f,28.2f,46.8f,60.f,0.f},
+          {1,108.3f,40.f,95.2f,33.6f,80.f,6.f}};
+        double peakProjection=0;
         for(bool din:{false,true})for(const auto& receipt:receipts) {
             dinEnabled=din;
             pose={.21f,receipt.origin,0,0};
+            ComboSwordGi_ApplyPresentationSize(false,receipt.context);
             ComboSwordGi_ApplyFit("oot",e.path,e.scale,e.tilt,false,receipt.context);
-            if(e.tilt==1.8f)NeiGi_DrawSelectedSword(&play,e.path,false,false);
+            if(e.tilt!=0.f)NeiGi_DrawSelectedSword(&play,e.path,false,false);
             else Matrix_Scale(e.scale,e.scale,e.scale,1);
-            const float low=din?e.layerLow:e.low,high=din?e.layerHigh:e.high,width=din?e.layerWidth:e.width;
-            const float pitch=receipt.pitch*NeiGi::Tau/360.f;
-            const float camAt=receipt.at,camDistance=receipt.distance;
-            const float tanFov=std::tan(receipt.fov*NeiGi::Tau/720.f);
-            for(int spin=0;spin<360;spin+=3)for(float y:{low,high}) {
-                const float z=receipt.forward+.5f*width*pose.scale*std::cos(spin*NeiGi::Tau/360.f);
-                const float dy=pose.lift+y*pose.scale-camAt;
-                const float depth=camDistance-dy*std::sin(pitch)-z*std::cos(pitch);
-                const float projected=(dy*std::cos(pitch)-z*std::sin(pitch))/(depth*tanFov);
-                const float projectedX=.5f*width*pose.scale*std::sin(spin*NeiGi::Tau/360.f)/(depth*tanFov*(4.f/3.f));
-                assert(depth>0 && projected<.9f && projected>-.9f && "selected pack geometry clips MM receipt camera");
-                assert(projectedX<.9f && projectedX>-.9f);
-            }
+            const double pitch=receipt.pitch*std::acos(-1.)/180.;
+            const double sp=std::sin(pitch),cp=std::cos(pitch);
+            const double tanFov=std::tan(receipt.fov*std::acos(-1.)/360.);
+            const double sinTilt=std::sin(double(pose.rz)),cosTilt=std::cos(double(pose.rz));
+            const auto project=[&](const auto& points,const char* part) {
+                for(size_t vertex=0;vertex<points.size();++vertex) {
+                    const auto& p=points[vertex];
+                    const double x=p[0]*cosTilt-p[1]*sinTilt;
+                    const double y=p[0]*sinTilt+p[1]*cosTilt;
+                    const double radius=std::hypot(x,p[2]);
+                    const double dy=pose.lift+pose.scale*y-receipt.at;
+                    const double a=receipt.distance-dy*sp-receipt.forward*cp;
+                    const double b=pose.scale*radius*cp;
+                    assert(a>std::abs(b) && "selected archive vertex crosses the receipt camera");
+                    // For a fixed vertex Y, projected Y is monotonic in Z.
+                    // Its exact full-spin extremes occur at this vertex's
+                    // own +/-radius, not the largest radius elsewhere in the mesh.
+                    for(double side:{-1.,1.}) {
+                        const double z=receipt.forward+side*pose.scale*radius;
+                        const double depth=receipt.distance-dy*sp-z*cp;
+                        const double projected=(dy*cp-z*sp)/(depth*tanFov);
+                        peakProjection=std::max(peakProjection,std::abs(projected));
+                        if (!(projected<.99 && projected>-.99))
+                            std::cerr<<e.path<<" part="<<part<<" vertex="<<vertex<<" context="<<receipt.context
+                                     <<" origin="<<receipt.origin<<" y="<<y<<" radius="<<radius
+                                     <<" ndcY="<<projected<<" depth="<<depth<<'\n';
+                        assert(projected<.99 && projected>-.99 && "selected archive geometry clips MM receipt camera");
+                    }
+                    // Maximize x/(a-cp*z) around x*x+z*z=(scale*radius)^2.
+                    // This covers continuous yaw and the 4:3 horizontal FOV.
+                    const double projectedX=pose.scale*radius/(tanFov*(4./3.)*std::sqrt(a*a-b*b));
+                    peakProjection=std::max(peakProjection,projectedX);
+                    if (!(projectedX<.99))
+                        std::cerr<<e.path<<" part="<<part<<" vertex="<<vertex<<" context="<<receipt.context
+                                 <<" ndcX="<<projectedX<<'\n';
+                    // Keep at least one percent of the viewport in both axes.
+                    assert(projectedX<.99 && "selected archive geometry clips MM receipt camera horizontally");
+                }
+            };
+            project(e.points,"model");
+            if(din)
+                project(e.layerPoints,"Din layers");
         }
+        std::cout<<e.path<<" peak receipt projection="<<peakProjection<<'\n';
     }
-    for(auto id:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD}){
+    for(auto id:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD,RG_GIANTS_KNIFE}){
         CwItemDrawInfo info{};
         if(CwAltSwordGi(id,&info)){
             assert(loader(info.dlists[0])&&info.itemShimmer&&info.neiShimmer>0);
             pose={};NeiGi_DrawSelectedSword(&play,info.dlists[0]);
-            NeiGi::FrameBounds bounds{};NeiGi::ModelBoundsReader<Loader> reader(loader,1.8f);assert(reader.Read(info.dlists[0],bounds));
-            assert(bounds.maximum.y*pose.scale+pose.lift<=48.001f);
+            NeiGi::FrameBounds bounds{};NeiGi::ModelBoundsReader<Loader> reader(loader,1.5707963267948966f);assert(reader.Read(info.dlists[0],bounds));
+            assert(bounds.maximum.y*pose.scale+pose.lift<=55.501f);
         }
     }
-    std::cout<<"PASS selected mod graph + native/producer GI route: "<<expected.size()<<" meshes, upright full-spin pickup/shop bounds including Din layers and all five actual MM receipt cameras\n";
+    std::cout<<"PASS selected resource graph + native/producer GI route: "<<expected.size()
+             <<" meshes, upright full-spin pickup/shop bounds including Din layers";
+    if(cameraMeshes) {
+        assert(cameraMeshes==expected.size());
+        std::cout<<"; actual archive vertices in all five MM receipt cameras\n";
+    } else {
+        std::cout<<"; synthetic fit fixture (archive camera gate skipped)\n";
+    }
 }

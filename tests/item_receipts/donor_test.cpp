@@ -2,6 +2,9 @@
 #include "combo/menu/ComboItemReceiptText.h"
 #include "combo/menu/ComboKeyReceiptText.h"
 #include "combo/menu/ComboDungeonKeyReceipt.h"
+#include "combo/menu/ComboMagicItemReceiptText.h"
+#include "combo/menu/ComboToolReceiptText.h"
+#include "combo/menu/ComboMaskReceiptText.h"
 #include "combo/menu/ComboItemReceiptPresentation.h"
 #include "combo/menu/ComboItemReceiptText.h"
 #include "soh/soh/Enhancements/custom-message/text.h"
@@ -35,12 +38,17 @@ constexpr int ITEM_CATEGORY_JUNK = 0, ITEM_CATEGORY_MAJOR = 1,
               TEXT_RANDOMIZER_CUSTOM_ITEM = 0x9000;
 constexpr int TEXTBOX_TYPE_BLUE = 2, ITEM_COMPASS = 0x75,
               ITEM_DUNGEON_MAP = 0x76, ITEM_SKULL_TOKEN = 0x71,
-              ITEM_CUSTOM = 0xFF;
+              ITEM_CUSTOM = 0x9C, ITEM_MASK_KEATON = 0x24, ITEM_MASK_SKULL = 0x25,
+              ITEM_MASK_SPOOKY = 0x26, ITEM_MASK_GERUDO = 0x2A, ITEM_MASK_TRUTH = 0x2B;
 using ItemID = int;
 constexpr int OBJECT_INVALID = -1, ITEM_NONE = 0xFF,
+              ITEM_ELEMENTAL_WAND = 0xD0, EXT_ITEM_SHEIKAH_SLATE = 0x220,
               ITEM_ROCS_FEATHER_SKIJER = 0xA4, RAND_INF_CAN_OPEN_CHEST = 0,
               RO_OPEN_CHEST_PROGRESSIVE = 1;
 bool Flags_GetRandomizerInf(int) { return false; }
+static uint8_t wandRule = 0;
+uint8_t Wand_RandoMode() { return wandRule; }
+constexpr int WAND_RANDO_MEDALLIONS = 0;
 enum {
 #define DEFINE_SCENE(a, b, scene, ...) scene,
 #include "soh/include/tables/scene_table.h"
@@ -70,7 +78,7 @@ struct ReceiptPlacement {
 };
 struct ReceiptContext {
   int mqMode = 2, mqCount = 6, bossShuffle = 1, dungeonShuffle = 0,
-      information = 1;
+      information = 1, customItems = 1;
   bool generated = true, spoiler = false;
   bool IsSeedGenerated() const { return generated; }
   bool IsSpoilerLoaded() const { return spoiler; }
@@ -89,6 +97,7 @@ struct ReceiptContext {
             : key == RSK_MQ_DUNGEON_COUNT          ? mqCount
             : key == RSK_SHUFFLE_BOSS_ENTRANCES    ? bossShuffle
             : key == RSK_SHUFFLE_DUNGEON_ENTRANCES ? dungeonShuffle
+            : key == RSK_SKIJER_CUSTOM_ITEMS       ? customItems
                                                    : information};
   }
   ReceiptPlacement *GetItemLocation(RandomizerCheck check) {
@@ -102,7 +111,7 @@ bool ResourceMgr_IsSceneMasterQuest(int scene) {
   return randoActive && masterQuest;
 }
 struct {
-  int fileNum = 0, mapIndex = 0;
+  int fileNum = 0, mapIndex = 0, language = 0;
   struct {
     int gsTokens = 0;
     uint8_t dungeonItems[10]{};
@@ -171,6 +180,34 @@ struct KeyCatalogFixture {
 /* KEY_CATALOG */
 namespace Rando::StaticData {
 std::map<std::string, RandomizerGet> itemNameToEnum = {
+    {"Spirit Medallion", RG_SPIRIT_MEDALLION},
+    {"Forest Medallion", RG_FOREST_MEDALLION},
+    {"Water Medallion", RG_WATER_MEDALLION},
+    {"Fire Medallion", RG_FIRE_MEDALLION},
+    {"Light Medallion", RG_LIGHT_MEDALLION},
+    {"Shadow Medallion", RG_SHADOW_MEDALLION},
+    {"Elemental Wand", RG_ELEMENTAL_WAND},
+    {"Sand Rod", RG_WAND_SAND_ROD},
+    {"Tornado Rod", RG_WAND_TORNADO_ROD},
+    {"Water Rod", RG_WAND_WATER_ROD},
+    {"Meteor Rod", RG_WAND_METEOR_ROD},
+    {"Storm Rod", RG_WAND_STORM_ROD},
+    {"Shadow Scepter", RG_WAND_SHADOW_SCEPTER},
+    {"Sheikah Slate", RG_SHEIKAH_SLATE},
+    {"Phantom Hourglass", RG_PHANTOM_HOURGLASS},
+    {"Shadow Crystal", RG_SHADOW_CRYSTAL},
+    {"Skull Mask", RG_SKULL_MASK},
+    {"Spooky Mask", RG_SPOOKY_MASK},
+    {"Mask of Truth", RG_MASK_OF_TRUTH},
+    {"Mask of Truth (MM)", RG_MM_MASK_TRUTH},
+    {"Gerudo Mask", RG_GERUDO_MASK},
+    {"Keaton Mask", RG_KEATON_MASK},
+    {"Keaton Mask (MM)", RG_MM_MASK_KEATON},
+    {"Rune: Remote Bomb", RG_SLATE_RUNE_BOMB},
+    {"Rune: Stasis", RG_SLATE_RUNE_STASIS},
+    {"Rune: Cryonis", RG_SLATE_RUNE_CRYONIS},
+    {"Rune: Master Cycle", RG_SLATE_RUNE_MASTER_CYCLE},
+    {"Rune: Sheikah Sensor", RG_DESIRE_SENSOR},
     {"Cane of Somaria", RG_CANE_OF_SOMARIA},
     {"Progressive Roc", RG_PROGRESSIVE_ROCS},
     {"Stone of Agony", RG_STONE_OF_AGONY},
@@ -205,16 +242,20 @@ std::map<std::string, RandomizerGet> itemNameToEnum = {
     {"Ice Trap", RG_ICE_TRAP},
     {"Green Rupee", RG_GREEN_RUPEE},
     {"None", RG_NONE}};
+struct ReceiptItemName : std::string {
+  ReceiptItemName(const std::string& value) : std::string(value) {}
+  const std::string& GetEnglish() const { return *this; }
+};
 struct Item {
   RandomizerGet id;
   int GetCategory() {
     return id == RG_GREEN_RUPEE ? ITEM_CATEGORY_JUNK : ITEM_CATEGORY_MAJOR;
   }
-  std::string GetName() const {
+  ReceiptItemName GetName() const {
     for (const auto &[name, rg] : itemNameToEnum)
       if (rg == id)
         return name;
-    return "Item";
+    return std::string("Item");
   }
   std::string GetColor() const { return "%g"; }
   std::string GetArticle() const {
@@ -235,6 +276,12 @@ struct Item {
                     : id == RG_DEKU_TREE_MAP     ? 0x66
                     : id == RG_GREEN_RUPEE       ? 0x6F
                     : id == RG_MINUET_OF_FOREST  ? 0x73
+                    : id == RG_FIRE_MEDALLION    ? 0x3C
+                    : id == RG_WATER_MEDALLION   ? 0x3D
+                    : id == RG_FOREST_MEDALLION  ? 0x3E
+                    : id == RG_SPIRIT_MEDALLION  ? 0x3F
+                    : id == RG_LIGHT_MEDALLION   ? 0x40
+                    : id == RG_SHADOW_MEDALLION  ? 0x41
                                                  : TEXT_RANDOMIZER_CUSTOM_ITEM;
     for (const auto& fixture : traditionalReceipts)
       if (fixture.item == id)
@@ -304,7 +351,14 @@ static const char bossKey[] =
 static const char minuet[] =
     "You have learned the Minuet of Forest!\x01" "A melody that will take you to the forest.\x02";
 static const char greenRupee[] = "You got a Green Rupee!\x01It is worth one Rupee.\x02";
+static const char medallionPrefix[] = "Native medallion reward text.\x02";
 MessageTableEntry nativeTable[] = {
+    {0x3C, 0, medallionPrefix, sizeof(medallionPrefix)-1},
+    {0x3D, 0, medallionPrefix, sizeof(medallionPrefix)-1},
+    {0x3E, 0, medallionPrefix, sizeof(medallionPrefix)-1},
+    {0x3F, 0, medallionPrefix, sizeof(medallionPrefix)-1},
+    {0x40, 0, medallionPrefix, sizeof(medallionPrefix)-1},
+    {0x41, 0, medallionPrefix, sizeof(medallionPrefix)-1},
     {0x6F,0,greenRupee,sizeof(greenRupee)-1},
     {0x68, 0, stone, sizeof(stone) - 1},
     {0xE4, 0, magic, sizeof(magic) - 1},
@@ -319,22 +373,40 @@ MessageTableEntry nativeTable[] = {
 MessageTableEntry *sNesMessageEntryTablePtr = nativeTable;
 constexpr int MF_RAW = 0;
 static std::string loadedMessage;
+static std::string nativePrefixControls, nativeEnding = "\x02";
 static CwItemReceiptPresentation loadedPresentation{};
 struct CustomMessage {
-  std::string english;
+  std::string english, german, french;
+  int type = 0, position = 0;
   CwItemReceiptPresentation receiptPresentation{};
   void operator+=(const std::string& value) { english += value; }
   CustomMessage() = default;
-  CustomMessage(std::string en, int = 0) : english(std::move(en)) {}
+  CustomMessage(std::string en, int boxType = 0, int boxPosition = 0)
+      : english(std::move(en)), type(boxType), position(boxPosition) {}
   CustomMessage(const Text& text, int = 0) : english(text.GetEnglish()) {}
-  CustomMessage(std::string en, std::string, std::string, int = 0)
-      : english(std::move(en)) {}
+  CustomMessage(std::string en, std::string ger, std::string fre, int boxType = 0, int boxPosition = 0)
+      : english(std::move(en)), german(std::move(ger)), french(std::move(fre)), type(boxType), position(boxPosition) {}
+  static CustomMessage LoadVanillaMessageTableEntry(uint16_t textId) {
+    assert(textId >= 0x3C && textId <= 0x41);
+    // Engine table boundary: the production loader returns the selected
+    // locale's native prefix in its English slot.
+    return CustomMessage(nativePrefixControls + std::string("\x13\x69") + (gSaveContext.language == 1 ? "Native German reward." :
+                                    gSaveContext.language == 2 ? "Native French reward." :
+                                                               "Native English reward.") + nativeEnding, 2, 3);
+  }
+  int GetTextBoxType() const { return type; }
+  int GetTextBoxPosition() const { return position; }
   void Replace(const char *key, const CustomMessage &value) {
-    size_t pos = 0;
-    while ((pos = english.find(key, pos)) != std::string::npos) {
-      english.replace(pos, std::strlen(key), value.english);
-      pos += value.english.size();
-    }
+    const auto replace = [&](std::string& body, const std::string& replacement) {
+      size_t pos = 0;
+      while ((pos = body.find(key, pos)) != std::string::npos) {
+        body.replace(pos, std::strlen(key), replacement);
+        pos += replacement.size();
+      }
+    };
+    replace(english, value.english);
+    replace(german, value.german.empty() ? value.english : value.german);
+    replace(french, value.french.empty() ? value.english : value.french);
   }
   void Replace(const char *key, const std::string &value) {
     Replace(key, CustomMessage(value));
@@ -362,15 +434,28 @@ struct CustomMessage {
   void EncodeColors(std::string& str) const;
   size_t FindNEWLINE(std::string& str, size_t start) const;
   bool AddBreakString(std::string& str, size_t pos, std::string br) const;
-  void Format() { FormatString(english); }
-  void AutoFormat() { AutoFormatString(english); }
+  void Format() {
+    for (auto* value : {&english, &german, &french})
+      if (!value->empty()) FormatString(*value);
+  }
+  void AutoFormat() {
+    for (auto* value : {&english, &german, &french})
+      if (!value->empty()) AutoFormatString(*value);
+  }
   void AutoFormat(int icon) {
-    english.insert(0, ITEM_OBTAINED(icon));
+    for (auto* value : {&english, &german, &french})
+      if (!value->empty()) value->insert(0, ITEM_OBTAINED(icon));
     AutoFormat();
     Replace(WAIT_FOR_INPUT(), WAIT_FOR_INPUT() + ITEM_OBTAINED(icon));
   }
   std::string GetEnglish(int) const { return english; }
-  void LoadIntoFont() const { loadedMessage = english; loadedPresentation = receiptPresentation; }
+  std::string GetGerman(int) const { return german.empty() ? english : german; }
+  std::string GetFrench(int) const { return french.empty() ? english : french; }
+  void LoadIntoFont() const {
+    loadedMessage = gSaveContext.language == 1 && !german.empty() ? german :
+                    gSaveContext.language == 2 && !french.empty() ? french : english;
+    loadedPresentation = receiptPresentation;
+  }
 };
 /* ACTUAL_FORMATTER */
 constexpr int RHT_DUNGEON_ORDINARY = 0, RHT_DUNGEON_MASTERFUL = 1;
@@ -511,6 +596,11 @@ void BuildIceTrapMessageNamed(CustomMessage &msg, const std::string &) {
 
 // Test-only entry point for the receiver integration. OoT is dormant while MM
 // owns the active save; its generated seed still supplies this saved option.
+extern "C" COMBO_EXPORT void FixtureConfigureWandReceipt(int rule, int customItems) {
+  wandRule = rule;
+  receiptContext.customItems = customItems;
+}
+
 extern "C" COMBO_EXPORT void FixtureConfigureForestCompassReceipt(int information) {
   for (const auto &fixture : traditionalReceipts)
     Rando::StaticData::itemNameToEnum[fixture.name] = fixture.item;
@@ -680,6 +770,178 @@ int main(int argc, char** argv) {
     assert(size > 0);
     return std::string(buffer, size);
   };
+  const struct { uint16_t text; const char* name; const char* power; } medallions[] = {
+      {0x3F, "Spirit Medallion", "Sand Rod"},
+      {0x3E, "Forest Medallion", "Tornado Rod"},
+      {0x3D, "Water Medallion", "Water Rod"},
+      {0x3C, "Fire Medallion", "Meteor Rod"},
+      {0x40, "Light Medallion", "Storm Rod"},
+      {0x41, "Shadow Medallion", "Shadow Scepter"}};
+  for (const auto& medallion : medallions) {
+    const auto body = read(medallion.name);
+    assert(body.find("Native medallion reward text.") != std::string::npos);
+    assert(body.find(medallion.power) != std::string::npos && body.find("awakens") != std::string::npos);
+  }
+  for (int language : {0, 1, 2}) {
+    gSaveContext.language = language;
+    for (const auto& medallion : medallions) {
+      auto text = medallion.text;
+      bool native = true;
+      loadedMessage = "sentinel";
+      BuildWandMedallionMessage(&text, &native);
+      assert(!native && text == medallion.text);
+      assert(loadedMessage.find(language == 1 ? "Native German reward." :
+                                language == 2 ? "Native French reward." : "Native English reward.") != std::string::npos);
+      assert(loadedMessage.find(language == 1 ? "erweckt" : language == 2 ? "pouvoir" : "awakens") != std::string::npos);
+      assert(loadedMessage.find('\x13') != std::string::npos && loadedMessage.back() == '\x02');
+      assert(std::count(loadedMessage.begin(), loadedMessage.end(), '\x02') == 1);
+    }
+  }
+  gSaveContext.language = 0;
+  // Native prefix bytes are already encoded. COLOR's 0x40 is not an '@'
+  // markup token, SHIFT's 0x0B and SFX's 0x02 are arguments, and the original
+  // ending command must execute after the added tutorial.
+  nativePrefixControls = std::string("\x05\x40\x06\x0B\x12\x00\x02", 7);
+  for (const auto& ending : {std::string("\x02"), std::string("\x0B\x02", 2),
+                             std::string("\x07\x00\x26\x02", 4), std::string("\x0E\x26\x02", 3),
+                             std::string("\x11\x00\x26\x02", 4)}) {
+    nativeEnding = ending;
+    auto text = medallions[0].text;
+    bool native = true;
+    BuildWandMedallionMessage(&text, &native);
+    assert(!native);
+    assert(loadedMessage.starts_with(nativePrefixControls) && "native prefix control arguments were reformatted");
+    assert(loadedMessage.ends_with(ending) && "native ending must follow the added lesson");
+    assert(loadedMessage.find("awakens") < loadedMessage.size()-ending.size());
+  }
+  nativePrefixControls.clear();
+  nativeEnding = "\x07";
+  auto malformedText = medallions[0].text;
+  bool malformedNative = true;
+  loadedMessage = "sentinel";
+  BuildWandMedallionMessage(&malformedText, &malformedNative);
+  assert(malformedNative && loadedMessage == "sentinel" && "truncated native control must retain the table path");
+  nativeEnding = "\x02";
+  for (uint8_t rule : {1, 2}) {
+    wandRule = rule;
+    for (const auto& medallion : medallions) {
+      assert(read(medallion.name).find("awakens") == std::string::npos);
+      auto text = medallion.text;
+      bool native = true;
+      loadedMessage = "sentinel";
+      BuildWandMedallionMessage(&text, &native);
+      assert(native && loadedMessage == "sentinel");
+    }
+  }
+  wandRule = 0;
+  for (bool customItems : {false, true}) {
+    receiptContext.customItems = customItems;
+    randoActive = !customItems;
+    auto text = medallions[0].text;
+    bool native = true;
+    loadedMessage = "sentinel";
+    BuildWandMedallionMessage(&text, &native);
+    assert(native && loadedMessage == "sentinel");
+  }
+  receiptContext.customItems = 1;
+  randoActive = true;
+  const struct { const char* name; const char* effect; char color; char extraButton; } tools[] = {
+      {"Phantom Hourglass", "rewind", '\x04', '\xB4'},
+      {"Shadow Crystal", "Wolf Link", '\x06', '\xB0'}};
+  for (const auto& tool : tools) {
+    const auto body = read(tool.name);
+    assert(body.find(tool.effect) != std::string::npos && body.find(tool.color) != std::string::npos);
+    Player player{};
+    player.getItemId = Rando::StaticData::itemNameToEnum.at(tool.name);
+    player.getItemEntry.objectId = OBJECT_INVALID;
+    CustomMessage native;
+    BuildCustomItemMessage(&player, native);
+    for (const auto& text : {native.GetEnglish(MF_RAW), native.GetGerman(MF_RAW), native.GetFrench(MF_RAW)}) {
+      assert(text.starts_with(CustomMessage::ITEM_OBTAINED(ITEM_CUSTOM)) &&
+             "extended item ID truncated instead of using its custom icon");
+      std::string converted;
+      assert(ComboItemReceiptText::FromOotMessage(text, converted));
+      assert(converted.find('\xB2') != std::string::npos && converted.find('\xB1') != std::string::npos);
+      assert(converted.find(tool.extraButton) != std::string::npos && converted.find(tool.color) != std::string::npos);
+      assert(converted.find('%') == std::string::npos && converted.size() <= sizeof(buffer));
+    }
+  }
+  std::cout << "PASS Hourglass/Crystal OoT tutorials: custom icons, all locales, encoded glyphs/colors and donor export\n";
+  const struct { const char* name; const char* detail; int icon; } masks[] = {
+      {"Skull Mask", "monster", ITEM_MASK_SKULL},
+      {"Spooky Mask", "scare", ITEM_MASK_SPOOKY},
+      {"Mask of Truth", "Show it", ITEM_MASK_TRUTH},
+      {"Mask of Truth (MM)", "Show it", ITEM_CUSTOM},
+      {"Gerudo Mask", "Urbosa", ITEM_MASK_GERUDO},
+      {"Keaton Mask", "reflect", ITEM_MASK_KEATON},
+      {"Keaton Mask (MM)", "reflect", ITEM_CUSTOM}};
+  for (const auto& mask : masks) {
+    const auto body = read(mask.name);
+    assert(body.find(mask.detail) != std::string::npos);
+    Player player{};
+    player.getItemId = Rando::StaticData::itemNameToEnum.at(mask.name);
+    player.getItemEntry.objectId = OBJECT_INVALID;
+    CustomMessage native;
+    BuildCustomItemMessage(&player, native);
+    for (const auto& text : {native.GetEnglish(MF_RAW), native.GetGerman(MF_RAW), native.GetFrench(MF_RAW)}) {
+      assert(text.starts_with(CustomMessage::ITEM_OBTAINED(mask.icon)));
+      std::string converted;
+      assert(ComboItemReceiptText::FromOotMessage(text, converted));
+      assert(converted.find('\xB2') != std::string::npos && converted.find('%') == std::string::npos);
+      assert(converted.size() <= sizeof(buffer));
+      if (std::string_view(mask.name).starts_with("Keaton Mask")) {
+        for (char glyph : {'\xB0', '\xB1', '\xB4'})
+          assert(converted.find(glyph) != std::string::npos);
+      }
+    }
+    if (mask.icon == ITEM_MASK_GERUDO || std::string_view(mask.name).starts_with("Keaton Mask")) {
+      for (const auto glyph : {'\xB0', '\xB1', '\xB4'})
+        assert(body.find(glyph) != std::string::npos);
+    }
+  }
+  std::cout << "PASS OoT mask descriptions and Gerudo/Keaton tutorials: native icons, locales and donor export\n";
+  const struct { const char* name; const char* effect; } magicItems[] = {
+      {"Elemental Wand", "medallion"}, {"Sand Rod", "platform"},
+      {"Tornado Rod", "jump"}, {"Water Rod", "water"},
+      {"Meteor Rod", "explosive"}, {"Storm Rod", "lightning"},
+      {"Shadow Scepter", "stun"}, {"Sheikah Slate", "rune"},
+      {"Rune: Remote Bomb", "detonate"}, {"Rune: Stasis", "Freeze"},
+      {"Rune: Cryonis", "pillar"}, {"Rune: Master Cycle", "motorcycle"},
+      {"Rune: Sheikah Sensor", "Heart Container"}};
+  for (const auto& magic : magicItems) {
+    const auto body = read(magic.name);
+    assert(body.find(magic.effect) != std::string::npos);
+    assert(body.find('\xB2') != std::string::npos && body.find('\xB3') != std::string::npos);
+    Player player{};
+    player.getItemId = Rando::StaticData::itemNameToEnum.at(magic.name);
+    player.getItemEntry.objectId = OBJECT_INVALID;
+    CustomMessage native;
+    BuildCustomItemMessage(&player, native);
+    std::string converted;
+    assert(ComboItemReceiptText::FromOotMessage(native.GetEnglish(MF_RAW), converted));
+    assert(converted.find(magic.effect) != std::string::npos);
+  }
+  for (uint8_t rule : {0, 1, 2}) {
+    wandRule = rule;
+    const auto body = read("Elemental Wand");
+    assert(body.find(rule == 0 ? "medallion" : rule == 1 ? "All six" : "separately") != std::string::npos);
+    if (rule != 2) {
+      assert(body.size() <= 1269 && "shared wand export exceeds MM's body capacity");
+      for (const char* effect : {"platform", "wind", "water", "explosive", "lightning", "stun"})
+        assert(body.find(effect) != std::string::npos && "shared wand export must teach every power");
+      Player player{};
+      player.getItemId = RG_ELEMENTAL_WAND;
+      player.getItemEntry.objectId = OBJECT_INVALID;
+      CustomMessage native;
+      BuildCustomItemMessage(&player, native);
+      std::string converted;
+      assert(ComboItemReceiptText::FromOotMessage(native.GetEnglish(MF_RAW), converted));
+      assert(converted.size() <= 1269);
+      for (const char* effect : {"platform", "wind", "water", "explosive", "lightning", "stun"})
+        assert(converted.find(effect) != std::string::npos && "shared OoT wand pickup must teach every power");
+    }
+  }
+  wandRule = 0;
   const auto cane = read("Cane of Somaria"), roc = read("Progressive Roc"),
              agony = read("Stone of Agony");
   assert(cane.find("Statue") != std::string::npos &&

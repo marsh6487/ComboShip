@@ -11,8 +11,12 @@
 #include "mods/pak_loader/pak_loader.h"
 #include "mods/transformation_masks/wolf_link_form.h"
 #include "expansions/sm64/sm64_mario.h"
+#include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/ShipInit.hpp"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <spdlog/spdlog.h>
+
+extern "C" PlayState* gPlayState;
 
 extern "C" {
 // MM installs these actions for knockback, electricity, freezing and thawing.
@@ -30,6 +34,7 @@ struct HostState {
     Input effective{};
     u32 frame = 0;
     s16 scene = 0;
+    s16 file = -1;
     u16 filter = 0;
     u16 toggle = 0;
     u16 crystalPress = 0;
@@ -94,7 +99,7 @@ const char* OwnerRejection(Player* player) {
     return nullptr;
 }
 
-const char* ReleaseRejection(PlayState* play, Player* player) {
+const char* SelectionRejection(PlayState* play, Player* player) {
     if (player != GET_PLAYER(play))
         return "non-player-actor";
     if (player->transformation != PLAYER_FORM_HUMAN)
@@ -105,16 +110,30 @@ const char* ReleaseRejection(PlayState* play, Player* player) {
         return owner;
     if (!CVarGetInteger("gMods.WolfLink.Enabled", 1))
         return "disabled";
-    if (play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF)
-        return "scene-transition";
-    if (play->actorCtx.isOverrideInputOn)
-        return "override-input";
-    if (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_200 | PLAYER_STATE1_20))
-        return "native-input-state";
+    if (gSaveContext.gameMode != GAMEMODE_NORMAL)
+        return "game-mode";
+    if (player->stateFlags1 & PLAYER_STATE1_DEAD)
+        return "dead";
     if (gSaveContext.save.saveInfo.playerData.health <= 0)
         return "no-health";
     if (player->stateFlags3 & PLAYER_STATE3_FLYING_WITH_HOOKSHOT)
         return "hookshot-flight";
+    return nullptr;
+}
+
+bool SceneTransition(PlayState* play) {
+    return play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF;
+}
+
+const char* ReleaseRejection(PlayState* play, Player* player) {
+    if (const char* selection = SelectionRejection(play, player))
+        return selection;
+    if (SceneTransition(play))
+        return "scene-transition";
+    if (play->actorCtx.isOverrideInputOn)
+        return "override-input";
+    if (player->stateFlags1 & (PLAYER_STATE1_200 | PLAYER_STATE1_20))
+        return "native-input-state";
     return nullptr;
 }
 
@@ -169,6 +188,31 @@ void Stop(PlayState* play, Player* player) {
     sHost.filter = 0;
 }
 
+void Suspend(PlayState* play, Player* player) {
+    const u8 selected = WolfLinkForm_IsSelected();
+    Stop(play, player);
+    WolfLinkForm_Select(selected);
+}
+
+void ReleaseForState(PlayState* play, Player* player) {
+    if (SelectionRejection(play, player)) {
+        Stop(play, player);
+    } else if (SceneTransition(play)) {
+        Suspend(play, player);
+    } else if (Active(player)) {
+        Stop(play, player);
+    }
+    // A pending arrival waits for native input/override processing to finish.
+}
+
+void ResetSession() {
+    // Save hooks may run without a live player, including a same-slot reload.
+    PlayState* play = gPlayState == sHost.play ? gPlayState : nullptr;
+    Player* player = play && GET_PLAYER(play) == sHost.player ? sHost.player : nullptr;
+    Stop(play, player);
+    sHost = HostState{};
+}
+
 void Filter(Input* input, u16 buttons) {
     input->cur.button &= ~buttons;
     input->press.button &= ~buttons;
@@ -179,15 +223,21 @@ void Filter(Input* input, u16 buttons) {
 extern "C" void WolfLinkHost_PreUpdate(PlayState* play, Player* player) {
     if (player != GET_PLAYER(play))
         return;
+    WolfLinkForm_UpdateSfx(play);
+    if (sHost.file != -1 && sHost.file != gSaveContext.fileNum) {
+        Stop(sHost.play == play ? play : nullptr, sHost.player == player ? player : nullptr);
+        sHost = HostState{};
+    }
     if (sHost.player && (sHost.player != player || sHost.play != play)) {
         // A missed destroy must not dereference an actor/play allocation from the old scene.
-        Stop(nullptr, nullptr);
+        Suspend(nullptr, nullptr);
     } else if (sHost.player && (sHost.scene != play->sceneId || play->gameplayFrames < sHost.frame)) {
-        Stop(play, player);
+        Suspend(play, player);
     }
     sHost.play = play;
     sHost.player = player;
     sHost.scene = play->sceneId;
+    sHost.file = gSaveContext.fileNum;
     sHost.frame = play->gameplayFrames;
     sHost.raw = play->state.input[0];
     sHost.effective = Input{};
@@ -199,18 +249,20 @@ extern "C" void WolfLinkHost_PreUpdate(PlayState* play, Player* player) {
     if (const char* release = ReleaseRejection(play, player)) {
         if (sHost.crystalPress)
             LogAttempt(release, player);
-        if (Active(player))
-            Stop(play, player);
+        if (WolfLinkForm_IsSelected() || WolfLinkForm_IsReady())
+            ReleaseForState(play, player);
         return;
     }
 
     if (sHost.raw.press.button & ItemButtons(0, true)) {
         if (sHost.crystalPress)
             LogAttempt("form-item-input", player);
-        if (Active(player))
+        if (WolfLinkForm_IsSelected() || WolfLinkForm_IsReady())
             Stop(play, player);
         return;
     }
+    if (WolfLinkForm_IsSelected() && !WolfLinkForm_IsReady() && !WolfLinkForm_LoadSkeleton(play))
+        Stop(play, player);
     if (Active(player) || CanActivate(play, player)) {
         sHost.toggle = ItemButtons(EXT_ITEM_SHADOW_CRYSTAL, false);
         sHost.filter = sHost.toggle;
@@ -248,11 +300,13 @@ extern "C" void WolfLinkHost_FilterInput(Player* player, Input* input) {
     if (input->press.button & toggle) {
         if (Active(player)) {
             Stop(sHost.play, player);
+            WolfLinkForm_PlayTransformSfx(0);
             LogAttempt("deactivated", player);
         } else if (const char* rejection = ActivationRejection(sHost.play, player)) {
             LogAttempt(rejection, player);
         } else if (WolfLinkForm_LoadSkeleton(sHost.play)) {
             WolfLinkForm_Select(1);
+            WolfLinkForm_PlayTransformSfx(1);
             LogAttempt("activated", player);
         } else {
             LogAttempt("asset-load-failed", player);
@@ -277,7 +331,7 @@ extern "C" void WolfLinkHost_BeforeAction(PlayState* play, Player* player, Input
         return;
     // Native damage/scene processing runs inside Player_UpdateCommon after PreUpdate.
     if (MustRelease(play, player)) {
-        Stop(play, player);
+        ReleaseForState(play, player);
         return;
     }
     const bool native = NativeDamage(player);
@@ -303,20 +357,36 @@ extern "C" u8 WolfLinkHost_Draw(PlayState* play, Player* player) {
     if (!Active(player))
         return 0;
     if (MustRelease(play, player)) {
-        Stop(play, player);
+        ReleaseForState(play, player);
         return 0;
     }
     return WolfLinkForm_Draw(play, player) ? 1 : 2;
 }
 
 extern "C" void WolfLinkHost_OnUseItem(PlayState* play, Player* player, s32 item) {
-    if (Active(player) && FormItem(item))
+    if (sHost.player == player && WolfLinkForm_IsSelected() && FormItem(item))
         Stop(play, player);
 }
 
 extern "C" void WolfLinkHost_Destroy(PlayState* play, Player* player) {
-    if (sHost.player == player) {
-        Stop(play, player);
+    if (sHost.player == player && sHost.play == play) {
+        const bool retain = !play->state.running && play->state.init == Play_Init &&
+                            sHost.file == gSaveContext.fileNum && !SelectionRejection(play, player);
+        if (retain)
+            Suspend(play, player);
+        else
+            Stop(play, player);
         sHost = HostState{};
+        if (retain)
+            sHost.file = gSaveContext.fileNum;
     }
 }
+
+static void RegisterWolfLinkHost() {
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSaveInit>([](s16) { ResetSession(); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSaveLoad>([](s16) { ResetSession(); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateUpdate>(
+        []() { WolfLinkForm_UpdateSfx(gPlayState); });
+}
+
+static RegisterShipInitFunc initWolfLinkHost(RegisterWolfLinkHost, {});

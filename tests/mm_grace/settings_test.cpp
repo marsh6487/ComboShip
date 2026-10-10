@@ -1,5 +1,6 @@
 #include "2s2h/Rando/Rando.h"
 #include "NeiGracePolicy.h"
+#include "NeiSeasonsPolicy.h"
 #include "tests/test_require.h"
 #include <cstdio>
 #include <cstring>
@@ -88,5 +89,19 @@ int main(int argc, char** argv) {
     REQUIRE(CVarGetInteger("gRando.Options.RO_HYLIAS_GRACE", -1) == NEI_GRACE_ON);
     REQUIRE(CVarGetInteger("gRandoSettings.HyliasGrace", -1) == NEI_GRACE_ON);
     puts("PASS native combined generation normalization with sync Off, validation and legacy replay policy");
+    for (int mode = NEI_SEASONS_INDIVIDUAL; mode <= NEI_SEASONS_GATED; ++mode) {
+        config["gRando.Options.RO_ROD_OF_SEASONS"] = mode;
+        config["gRando.Options.RO_STARTING_ROD_OF_SEASONS"] = 1;
+        config["gRandoSettings.RodOfSeasons"] = 99;
+        config["gRandoSettings.StartingRodOfSeasons"] = 0;
+        SOH_NormalizeComboGraceFromMM();
+        REQUIRE(CVarGetInteger("gRandoSettings.RodOfSeasons", -1) == mode);
+        REQUIRE(CVarGetInteger("gRandoSettings.StartingRodOfSeasons", -1) == 1);
+    }
+    MM_RestoreRandoSettings("{}"); SOH_RestoreRandoSettings("{}");
+    REQUIRE(CVarGetInteger("gRando.Options.RO_ROD_OF_SEASONS", -1) == NEI_SEASONS_INDIVIDUAL);
+    REQUIRE(CVarGetInteger("gRando.Options.RO_STARTING_ROD_OF_SEASONS", -1) == 0);
+    REQUIRE(CVarGetInteger("gRandoSettings.RodOfSeasons", -1) == NEI_SEASONS_INDIVIDUAL);
+    REQUIRE(CVarGetInteger("gRandoSettings.StartingRodOfSeasons", -1) == 0);
     SeedApplication();
 }

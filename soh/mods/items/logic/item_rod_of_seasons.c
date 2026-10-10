@@ -339,7 +339,8 @@ void Seasons_TickInput(PlayState* play, Player* player) {
     BoxMenuEntry entries[SEASON_SLOTS];
     u16 btnMask;
 
-    if (Seasons_SeasonCount() == 0) {
+    Seasons_UpdateGates();
+    if (!Seasons_HasRod()) {
         return;
     }
 

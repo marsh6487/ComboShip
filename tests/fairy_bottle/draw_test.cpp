@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include <vector>
 #include "combo/menu/ComboFairyBottle.h"
+#include "combo/menu/ComboBottleContents.h"
 #include "combo/menu/ComboItemDrawABI.h"
 #include "combo/menu/ComboSongDraw.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
@@ -36,6 +37,8 @@ struct PlayState {
 extern "C" void NeiGi_DrawElementalArrow(PlayState*, int) {
     assert(false && "fairy fixture must not dispatch elemental arrows");
 }
+extern "C" void NeiGi_DrawElementalArrowForOwner(PlayState*,int,int,int) { assert(false); }
+extern "C" int NeiGi_DrawElementalSpell(PlayState*,int,int,int) { assert(false); return 0; }
 GraphicsContext gfx;
 PlayState play{{&gfx}, 0, {}};
 PlayState* gPlayState = &play;
@@ -68,8 +71,18 @@ Gfx* xluPtr;
 int foreignRestores = 0, hostFallbacks = 0, ownerScope = 1;
 bool ownerPresent = true, matrixPresent = true, matrixPointerPresent = true, materialPresent = true;
 bool fairyResources = false;
+bool bundledShell = false;
+std::string gpuOwner;
+std::vector<std::string> gpuOwners;
+#ifdef COMBO_FAIRY_HOST_MM
+const char* fairyHost = "mm";
+#else
+const char* fairyHost = "oot";
+#endif
+void PushGpuOwner(const char* owner) { gpuOwners.push_back(gpuOwner); gpuOwner=owner; }
+void PopGpuOwner() { assert(!gpuOwners.empty()); gpuOwner=gpuOwners.back(); gpuOwners.pop_back(); }
 int animationFrame = -1, skeletonDraws = 0;
-int shimmerDraws = 0;
+int shimmerDraws = 0, moteDraws = 0;
 uint8_t fairyPrim[4]{}, fairyEnv[4]{};
 
 void Matrix_Push() { stack.push_back(current); }
@@ -90,6 +103,7 @@ template <class... T> uintptr_t Gfx_TwoTexScrollEx(T...) { return 1; }
 template <class T> T Lib_SegmentedToVirtual(T path) { return path; }
 Mtx* ResourceMgr_LoadMtxByName(void* path) { assert(path == matrixPath); return &nativePlacement; }
 void AnimatedMat_Draw(PlayState*, const char* path) { assert(path == gGiFairyBottleTexAnim); events.push_back("mat"); }
+int ComboBottleContents_Draw(PlayState*, int) { assert(false); return 0; }
 void GetItem_Draw(PlayState*, int id);
 struct Color_RGB8 { uint8_t r,g,b; };
 int CVarGetInteger(const char*,int) { return 0; }
@@ -159,6 +173,7 @@ template<class... T> void NeiGi_DrawPresentation(T...) { assert(false); }
 template<class... T> void NeiGi_DrawMesh(T...) { assert(false); }
 template<class... T> void NeiGi_DrawSeasonOverlay(T...) { assert(false); }
 template<class... T> void NeiGi_DrawSongOverlay(T...) { assert(false); }
+float ComboSwordGi_SelectedTilt(float,bool) { assert(false && "fairy fixture unexpectedly tilted a sword"); return 0; }
 template<class... T> void ComboSwordGi_ApplyModelsFit(T...) { assert(false); }
 template<class... T> void ComboDrawSpinAttackGi(T...) { assert(false); }
 #define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
@@ -171,9 +186,11 @@ template<class... T> void ComboDrawSpinAttackGi(T...) { assert(false); }
 #define Gfx_SetupDL25_Opa(...) events.push_back("opa")
 #define Gfx_SetupDL25_Xlu(...) events.push_back("xlu")
 #define OOT_FOREIGN_PIN_OPA() ((void)0)
-#define OOT_FOREIGN_PIN_XLU() ((void)0)
+#define OOT_FOREIGN_PIN_XLU() (gpuOwner="mm")
 #define MM_FOREIGN_PIN_OPA() ((void)0)
-#define MM_FOREIGN_PIN_XLU() ((void)0)
+#define MM_FOREIGN_PIN_XLU() (gpuOwner="oot")
+#define gSPComboRMPush(p,owner) ((void)(p),PushGpuOwner(owner))
+#define gSPComboRMPop(p) ((void)(p),PopGpuOwner())
 #define MATRIX_NEWMTX(...) (&current)
 #define gSPMatrix(p,m,flags) LoadMatrix(p,m)
 #define MATRIX_FINALIZE_AND_LOAD(p,ctx) LoadMatrix(p,&current)
@@ -196,7 +213,9 @@ SkeletonHeader fairySkeleton{6};
 SkeletonHeader fairySkeleton{14};
 #endif
 AnimationHeader fairyAnimation;
-extern "C" uint8_t ResourceMgr_FileExists(const char*) { return fairyResources; }
+extern "C" uint8_t ResourceMgr_FileExists(const char* path) {
+    return strstr(path,"combo_bottle_gi") ? bundledShell : fairyResources;
+}
 extern "C" uint8_t ResourceMgr_FileAltExists(const char*) { return 0; }
 extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return false; }
 extern "C" SkeletonHeader* ResourceMgr_LoadSkeletonByName(const char* path, SkelAnime* registered) {
@@ -213,6 +232,7 @@ void Animation_Change(SkelAnime*,AnimationHeader*,float speed,float start,float,
 }
 template <typename Override>
 Gfx* SkelAnime_Draw(PlayState* play,void**,Vec3s*,Override limb,void*,void*,Gfx* gfx) {
+    assert(gpuOwner==fairyHost && "host fairy limbs were submitted under the foreign bottle's resource owner and disappear");
     ++skeletonDraws;
     Matrix_Push();
 #ifdef COMBO_FAIRY_HOST_MM
@@ -254,10 +274,15 @@ bool Same(const MtxF& a, const MtxF& b) {
     return Near(a.x,b.x) && Near(a.y,b.y) && Near(a.z,b.z) && Near(a.sx,b.sx) && Near(a.sy,b.sy) &&
            Near(a.sz,b.sz) && a.billboard == b.billboard;
 }
+extern "C" void ComboBottleShimmer_DrawMotes(PlayState* p,int profile) {
+    assert(p==&play && profile==CW_SHIMMER_FAIRY && Same(current,initial));
+    ++moteDraws;
+}
 void Reset(uint32_t frame) {
+    gpuOwner=fairyHost; gpuOwners.clear();
     play.gameplayFrames = frame; play.state.frames = 999; // dormant-owner clock cannot drive the motion
     current = initial = {10,20,30,2,2,2};
-    draws.clear(); events.clear(); stack.clear(); foreignRestores = hostFallbacks = skeletonDraws = shimmerDraws = 0;
+    draws.clear(); events.clear(); stack.clear(); foreignRestores = hostFallbacks = skeletonDraws = shimmerDraws = moteDraws = 0;
     opaPtr = opa; xluPtr = xlu;
     for (auto& command : opa) command.stream = 0;
     for (auto& command : xlu) command.stream = 1;
@@ -294,6 +319,13 @@ int main() {
            "XML TP shell imported in a built-in O2R was rejected as non-mod");
     assert(ComboFairyBottle_IsBlueFireShell(mm::GetItem_FairyBottleShell(0).opaque));
     customModels.clear();
+    bundledShell=true;
+    assert(strstr(oot::GetItem_FairyBottleShell(0).glass,"combo_bottle_gi/EmptyXlu") &&
+           strstr(mm::GetItem_FairyBottleShell(0).glass,"combo_bottle_gi/EmptyXlu") &&
+           "fresh build with no optional bottle pack must still use the bundled TP casing");
+    selectedMods={glass};
+    assert(oot::GetItem_FairyBottleShell(0).glass==glass && mm::GetItem_FairyBottleShell(0).glass==glass);
+    selectedMods.clear();bundledShell=false;
     for (uint32_t frame = 0; frame < 360; ++frame) {
         auto motion = ComboFairyBottle_Sample(frame), repeat = ComboFairyBottle_Sample(frame + 360);
         assert(std::abs(motion.x) <= .65001f && std::abs(motion.y) <= 1.15001f && std::abs(motion.z) <= .35001f);
@@ -375,6 +407,33 @@ int main() {
     selectedMods = {blueFire,glass};
     assert(oot::GetItem_FairyBottleShell(0).opaque == opaque && mm::GetItem_FairyBottleShell(0).opaque == opaque);
     puts("PASS selected TP BlueFire shell once, animated host-local fairy wings/glow in pink, no blue flame, native contents fallback");
+    selectedMods.clear(); bundledShell=true; fairyResources=true;
+    info.dls[0]="__OTR__objects/combo_bottle_gi/EmptyOpaque";
+    info.dls[1]="__OTR__objects/combo_bottle_gi/EmptyXlu";
+    for (int route=0;route<6;++route) {
+        MtxF first;
+        for(uint32_t frame:{0u,27u}) {
+            Reset(frame);
+            if(route==0)oot::GetItem_DrawFairy(&play,0);
+            else if(route==1)mm::GetItem_DrawFairyBottle(&play,1);
+            else if(route==2)mm::GetItem_DrawFairyContainer(&play,0);
+            else if(route==3)OOT_DrawForeignFairyContainer(&play,&info);
+            else if(route==4)MM_DrawForeignFairy(&info);
+            else OOT_DrawForeignFairyBottle(&play,&info);
+            const auto& pose=draws.back().pose;
+            assert(draws.back().path=="fairy-vfx" && skeletonDraws==1);
+            assert(moteDraws==1 && "accepted bundled fairy requires four local deterministic motes once at the incoming bottle pose");
+            assert(Near(pose.sx,2*ComboFairyBottle_SampleForShell(frame,info.dls[0]).scaleX*.008f) && "accepted bundled fairy must keep the 2x native skeleton scale");
+            assert(pose.y>=initial.y-17.001f && pose.y<=initial.y-2.999f &&
+                   "bundled TP casing needs the fairy centered inside its body, without the vanilla sprite anchor");
+            assert(std::abs(pose.x-initial.x)<=4.001f && std::abs(pose.z-initial.z)<=2.001f);
+            assert(gpuOwners.empty() && Same(current,initial) && stack.empty());
+            if(frame==0)first=pose;
+            else assert(std::hypot(pose.x-first.x,pose.y-first.y)>3.f && "bundled fairy bounce is too small to read");
+        }
+    }
+    puts("PASS bundled fairy casing: centered visible bounce and host resource ownership in all native/foreign routes");
+    bundledShell=false; fairyResources=false;
     selectedMods.clear(); info.dls[0]=opaque; info.dls[1]=glass;
     selectedForeign = &info; GetItemEntry entry;
     for (int missing = 0; missing < 6; ++missing) {
@@ -396,5 +455,13 @@ int main() {
     info.dls[3]="__OTR__@mm:matrix"; info.count=4; info.itemShimmer=true;
     Reset(27); OOT_DrawComboForeign(&play,&entry);
     assert(hostFallbacks==0 && shimmerDraws==1 && draws.size()==3 && stack.empty() && Same(current,initial));
+    bundledShell=fairyResources=true;
+    info.dls[0]="__OTR__objects/combo_bottle_gi/EmptyOpaque";
+    info.dls[1]="__OTR__objects/combo_bottle_gi/EmptyXlu";
+    for(bool overlay:{true,false}) {
+        info.itemShimmer=overlay;Reset(27);OOT_DrawComboForeign(&play,&entry);
+        assert(hostFallbacks==0 && skeletonDraws==1 && moteDraws==1 && shimmerDraws==int(overlay));
+        assert(stack.empty() && Same(current,initial) && gpuOwners.empty());
+    }
     puts("PASS real foreign dispatcher + native fallback: exactly one pink overlay for missing resources and complete recipes");
 }

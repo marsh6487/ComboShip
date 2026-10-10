@@ -6,6 +6,7 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #endif
 #include "z64save.h"
+#include "gameplay/ComboFaroresWind.h"
 
 void Setup_InitRegs(void) {
     XREG(2) = 0;
@@ -110,6 +111,7 @@ void Setup_InitImpl(SetupState* this) {
         // and re-runs ShipInit::Init("IS_RANDO"). COND_* macros are unregister-then-register, so it's
         // idempotent. Without it the combo force-spawn loads a rando save whose behaviors never activate.
         GameInteractor_ExecuteOnSaveLoad(gSaveContext.fileNum);
+        ComboFw_ApplyArrival(); // After load hooks; before Play reads entrance/respawn.
 
         // ComboShip (#182): consume the owl save like Sram_OpenSave does, so it can't shadow the newer
         // state we just continued into. Vetoed for Persistent Owl Saves and for pause/auto saves.

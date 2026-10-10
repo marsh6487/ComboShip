@@ -1372,6 +1372,30 @@ static void DrawItemPoolTab() {
                 "Elemental shuffle: the six rods are separate items; the first found also grants\n"
                 "the wand itself."));
     }
+    // Starting Rod is independent of the NEI pool; its mode must remain selectable
+    // when only the starting item is enabled.
+    ImGui::BeginDisabled(CVarGetInteger("gGeneral.RandoGenerating", 0) != 0);
+    static std::unordered_map<int32_t, const char*> seasonsOptions = {
+        { NEI_SEASONS_INDIVIDUAL, "Individual seasons" },
+        { NEI_SEASONS_ROD, "Rod" },
+        { NEI_SEASONS_GATED, "Gated" },
+    };
+    UIWidgets::CVarCombobox(
+        "Rod of Seasons", Rando::StaticData::Options[RO_ROD_OF_SEASONS].cvar, &seasonsOptions,
+        UIWidgets::ComboboxOptions()
+            .DefaultIndex(NEI_SEASONS_INDIVIDUAL)
+            .Tooltip("Rod: one pickup unlocks all four seasons.\n"
+                     "Individual seasons: four pickups; the first grants the Rod.\n"
+                     "Gated: one Rod; seasons unlock on completed dungeon/event checks in either game.\n"
+                     "Spring: Windmill Song of Storms check OR Jabu OR Water Temple OR Great Bay.\n"
+                     "Summer: Fire Temple OR Stone Tower. Autumn: Forest Temple OR Woodfall.\n"
+                     "Winter: Ice Cavern's final Sheik check OR Snowhead. Gates apply only in Gated mode.\n"
+                     "Seasons are not used by the reachability solver."));
+    CVarCheckbox("Start with Rod of Seasons", Rando::StaticData::Options[RO_STARTING_ROD_OF_SEASONS].cvar,
+                 CheckboxOptions({ { .tooltip = "Start with the Rod even when the NEI pool is disabled.\n"
+                                                "Rod mode grants all seasons; Individual and Gated\n"
+                                                "keep their normal unlock rules." } }));
+    ImGui::EndDisabled();
     UIWidgets::EndCard();
 
     UIWidgets::EndCardLayout();

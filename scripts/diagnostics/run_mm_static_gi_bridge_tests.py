@@ -44,10 +44,11 @@ fixture = fixture.replace('/* HOST_NATIVE_DRAW */', function(host, 'MM_DrawForei
 fixture = fixture.replace('/* HOST_AXE_DRAW */', function((ROOT/'mm/2s2h/Rando/DrawItem.cpp').read_text(), 'DrawOotIronKnuckleAxe'))
 native = (ROOT/'mm/2s2h/Rando/DrawItem.cpp').read_text()
 fixture = fixture.replace('/* HOST_TUNIC_DRAW */', '\n'.join(function(native, name) for name in (
-    'LoadNeiLegacyGfx', 'DrawOotGetItemOpaOpaTint', 'DrawOotTunicTint',
+    'LoadNeiLegacyGfx', 'DrawOotMedallion', 'DrawOotGetItemOpaOpaTint', 'DrawOotTunicTint',
     'DrawOotExtSpiritBreastplate', 'DrawOotExtChampionsTunic', 'DrawOotExtSagesTunic')))
 if 'inline void MM_DrawForeignCustomGi(' in host:
-    fixture = fixture.replace('/* HOST_CUSTOM_DRAW */', function(host, 'MM_DrawForeignCustomGi'))
+    fixture = fixture.replace('/* HOST_CUSTOM_DRAW */', '#include "combo/menu/ComboSwordGiEffectFit.h"\n' +
+                              function(host, 'MM_DrawForeignCustomGi'))
 else:
     fixture = fixture.replace('/* HOST_CUSTOM_DRAW */', 'void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*) {}')
 with tempfile.TemporaryDirectory(prefix='mm-static-gi-') as td:

@@ -1,4 +1,6 @@
 *.zip
+!tools/reward_gi/assets.zip
+/soh/assets/custom/objects/nei_reward_gi/
 *.otr
 *.o2r
 .DS_Store

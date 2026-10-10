@@ -97,6 +97,8 @@ std::map<RandoOptionId, RandoStaticOption> Options = {
     RO(RO_CROSSOVER_MARIO_MASK,        RO_GENERIC_OFF),
     RO(RO_HYLIAS_GRACE,               RO_GRACE_OFF),
     RO(RO_HYLIAS_GRACE_REWARDS,        4),
+    RO(RO_ROD_OF_SEASONS,             NEI_SEASONS_INDIVIDUAL),
+    RO(RO_STARTING_ROD_OF_SEASONS,    RO_GENERIC_OFF),
 };
 // clang-format on
 

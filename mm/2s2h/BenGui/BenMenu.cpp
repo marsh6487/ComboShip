@@ -1843,6 +1843,11 @@ void BenMenu::AddEnhancements() {
     // Dialogue Enhancements
     path.column = SECTION_COLUMN_2;
     AddWidget(path, "Dialogue", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Random Rupee Names", WIDGET_CVAR_CHECKBOX)
+        .CVar("gRandoEnhancements.RandomizeRupeeNames")
+        .Options(CheckboxOptions()
+                     .Tooltip("Randomize the currency name in randomizer pickup textboxes. Shared with SoH.")
+                     .DefaultValue(true));
     AddWidget(path, "Fast Bank Selection", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Dialogue.FastBankSelection")
         .Options(CheckboxOptions().Tooltip(
@@ -3269,6 +3274,11 @@ void BenMenu::AddNEI() {
     AddWidget(masksPath, "Enable Transformation Masks", WIDGET_CVAR_CHECKBOX)
         .CVar("gMods.TransformMasks.Enabled")
         .Options(CheckboxOptions().Tooltip("Deku/Goron/Zora/FD transformation-mask systems.").DefaultValue(true));
+    AddWidget(masksPath, "Use HD Wolf Link", WIDGET_CVAR_CHECKBOX)
+        .CVar("gMods.WolfLink.UseHDModel")
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+            "Use the Twilight Princess Wolf Link model with soft blue eyes and a cuff chain.\n"
+            "Applies the next time you transform into Wolf Link."));
     AddWidget(masksPath, "Instant Transform", WIDGET_CVAR_CHECKBOX)
         .CVar("gMods.TransformMasks.InstantTransform")
         .Options(CheckboxOptions().Tooltip("Skip the transformation cutscene."));

@@ -10,12 +10,14 @@ namespace NeiWolfAsset {
 // Preserve the owner's archive and live Alt priorities. In ComboShip the other
 // initialized game may supply the same model, but never Context's active owner.
 inline int CopyResource(const char* nativeGame, uint8_t* destination, size_t capacity, size_t* size,
-                        const char** selectedOwner) {
+                        const char** selectedOwner, bool useHD = false, const char** selectedKey = nullptr) {
     if (!size)
         return -1;
     *size = 0;
     if (selectedOwner)
         *selectedOwner = nullptr;
+    if (selectedKey)
+        *selectedKey = nullptr;
     const char* owners[] = { nativeGame, std::strcmp(nativeGame, "mm") == 0 ? "oot" : "mm" };
     for (const char* game : owners) {
         auto manager = Ship::CrossRMRegistry::Get(game);
@@ -29,15 +31,22 @@ inline int CopyResource(const char* nativeGame, uint8_t* destination, size_t cap
         if (!manager || !manager->GetArchiveManager())
             continue;
         const auto archives = manager->GetArchiveManager();
-        const std::string path = kResourcePath;
         const auto has = [&](const std::string& key) {
             return archives->HasFile(key) || archives->HasFile(key + ".meta");
         };
-        const std::string selectedPath = manager->IsAltAssetsEnabled() && has("alt/" + path) ? "alt/" + path : path;
+        const bool alt = manager->IsAltAssetsEnabled();
+        const char* selectedPath = alt && has(kAltResourcePath) ? kAltResourcePath : kResourcePath;
+        // Keep owner priority first. Missing HD assets on an older installation
+        // fall back to that owner's regular Wolf; present broken HD never does.
+        const char* hdPath = alt && has(kAltHDResourcePath) ? kAltHDResourcePath : kHDResourcePath;
+        if (useHD && has(hdPath))
+            selectedPath = hdPath;
         if (!has(selectedPath))
             continue;
         if (selectedOwner)
             *selectedOwner = game;
+        if (selectedKey)
+            *selectedKey = selectedPath;
         Ship::ResourceManagerScope scope(manager);
         const auto resource = std::dynamic_pointer_cast<Ship::Blob>(manager->LoadResource(selectedPath, true));
         if (!resource)

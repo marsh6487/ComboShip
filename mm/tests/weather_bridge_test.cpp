@@ -1,6 +1,9 @@
 #include "2s2h/Enhancements/Audio/MMWeather.h"
 #include "2s2h/Enhancements/Audio/MMWeatherAudio.h"
 #include "global.h"
+#include "BenPort.h"
+#include "mods/extended_inventory.h"
+#include "2s2h/Rando/Rando.h"
 #include "assets/misc/skyboxes/d2_cloud_static.h"
 #include "assets/misc/skyboxes/d2_fine_static.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -25,6 +28,8 @@ void MMAutumnSceneFoliage_Update(const PlayState*) {
 }
 void MMAutumnSceneFoliage_Reset() {
 }
+extern "C" void MMSummerAtmosphere_Reset() {
+}
 static uint8_t nativeRainAmbience;
 static uint8_t nativeThunderAmbience;
 f32 D_801F4E74;
@@ -34,8 +39,19 @@ u8 sSkyboxIsChanging;
 s32 sEnvSkyboxNumStars;
 Gfx* sSkyboxStarsDList;
 
+extern "C" NeiSaveData* Nei_Save() {
+    return &gSaveContext.save.shipSaveInfo.nei;
+}
+extern "C" u16 Nei_GetOwnedItem(u8 slot) {
+    return Nei_Save()->ownedItems[slot - 24];
+}
+#include "weather_seasons.inc"
+
 extern "C" void Skybox_Calculate128(SkyboxContext*, s32) {
     ++skyRebuilds;
+}
+extern "C" bool ResourceMgr_IsAltAssetsEnabled(void) {
+    return false; // This fixture exercises the native sky; OoT ownership has its own fixture.
 }
 extern "C" void Gfx_SetupDL57_Opa(GraphicsContext*) {
 }
@@ -415,6 +431,9 @@ static void SeasonWeatherRegression() {
         gSaveContext.save.day = day;
         MMWeather_Update(&play);
         assert(MMWeather_RainDensity() == 30 && rainGain > 0);
+        uint8_t first = 1, second = 1, blend = 255;
+        MMWeather_ApplySky(&first, &second, &blend);
+        assert(first == 0 && second == 1 && blend == 191); // Soft Spring rain sky, even over native CLOUD.
     }
     gSaveContext.save.day = 2;
     play.envCtx.stormState = STORM_STATE_ON;
@@ -440,6 +459,15 @@ static void SeasonWeatherRegression() {
     uint8_t first = 1, second = 1, blend = 255;
     MMWeather_ApplySky(&first, &second, &blend);
     assert(first == 0 && second == 0 && blend == 0);
+    for (int day : { 1, 2, 3 }) {
+        gSaveContext.save.day = day;
+        MMWeather_Update(&play);
+        first = second = 1;
+        blend = 255;
+        MMWeather_ApplySky(&first, &second, &blend);
+        assert(first == 0 && second == 0 && blend == 0);
+        assert(MMWeather_SeasonClearsRain());
+    }
     nei.season = SEASON_AUTUMN;
     MMWeather_Update(&play);
     assert(MMWeather_RainDensity() == 0 && MMWeather_Overcast() == 0);
@@ -449,10 +477,20 @@ static void SeasonWeatherRegression() {
     assert(rainDraws == draws + 1);
     first = second = 1;
     MMWeather_ApplySky(&first, &second, &blend);
-    assert(first == 1 && second == 1); // Autumn retains the native rainy sky
+    assert(first == 1 && second == 1); // A real native Day 2 storm retains its cover.
+    play.envCtx.stormState = STORM_STATE_OFF;
+    play.envCtx.precipitation[PRECIP_RAIN_CUR] = play.envCtx.precipitation[PRECIP_RAIN_MAX] = 0;
+    gWeatherMode = WEATHER_MODE_CLEAR;
+    first = second = 1;
+    blend = 255;
+    MMWeather_ApplySky(&first, &second, &blend);
+    assert(first == 0 && second == 0 && blend == 0); // Ordinary dry native CLOUD clears.
     nei.season = SEASON_WINTER;
     MMWeather_Update(&play);
     assert(MMWeather_RainDensity() == 0 && rainGain == 0 && MMWeather_Overcast() > 0);
+    first = second = blend = 0;
+    MMWeather_ApplySky(&first, &second, &blend);
+    assert(first == 1 && second == 1 && blend == 0); // Winter remains overcast over native FINE.
     nei.season = SEASON_SUMMER;
     MMWeather_Update(&play);
     assert(MMWeather_RainDensity() == 0 && MMWeather_Overcast() == 0);
@@ -506,6 +544,10 @@ static void AutumnShowerRegression() {
         assert(density >= 0 && density <= 15);
         assert(MMWeather_Overcast() <= 0.5f);
         assert(rainGain >= 0 && rainGain <= 0.6f);
+        uint8_t first = 1, second = 1, blend = 255;
+        MMWeather_ApplySky(&first, &second, &blend);
+        const uint8_t cover = static_cast<uint8_t>(255.0f * MMWeather_Overcast());
+        assert(first == 0 && blend == cover && second == (cover > 0 ? 1 : 0));
         if (density > 0) {
             wet = true;
             assert(rainGain > 0 && MMWeather_Overcast() > 0);
@@ -531,6 +573,56 @@ static void AutumnShowerRegression() {
     nei.seasonsOwned = 0;
     MMWeather_Reset();
     std::puts("PASS gentle autumn wet/dry cycle, audio/sky agreement, pause, Off and indoor cleanup");
+}
+
+static void GatedSeasonWeatherRegression() {
+    static PlayState play{};
+    Camera camera{};
+    play.sceneId = SCENE_TOWN;
+    play.skyboxId = SKYBOX_NORMAL_SKY;
+    play.cameraPtrs[0] = &camera;
+    play.envCtx.lightSettingOverride = LIGHT_SETTING_OVERRIDE_NONE;
+    settings.clear();
+    MMWeather_Reset();
+    gSaveContext = {};
+    gSaveContext.save.day = 1;
+    gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+    gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_ROD_OF_SEASONS] = NEI_SEASONS_GATED;
+    auto& nei = *Nei_Save();
+    nei.seasonsRodOwned = 1;
+    nei.season = SEASON_OFF;
+    assert(MMWeather_SeasonForPlay(&play) == -1 && nei.seasonsGates == 0);
+
+    WEEKEVENTREG(WEEKEVENTREG_CLEARED_GREAT_BAY_TEMPLE >> 8) |= WEEKEVENTREG_CLEARED_GREAT_BAY_TEMPLE & 0xFF;
+    nei.season = SEASON_SPRING;
+    assert(MMWeather_SeasonForPlay(&play) == SEASON_SPRING);
+    MMWeather_Update(&play);
+    assert(MMWeather_Season() == SEASON_SPRING && MMWeather_RainDensity() == 30 && rainGain > 0);
+    assert(nei.seasonsOwned == 0 && nei.seasonsGates == (1u << SEASON_SPRING));
+
+    WEEKEVENTREG(WEEKEVENTREG_CLEARED_SNOWHEAD_TEMPLE >> 8) |= WEEKEVENTREG_CLEARED_SNOWHEAD_TEMPLE & 0xFF;
+    Seasons_SetSeason(SEASON_WINTER);
+    MMWeather_Update(&play);
+    uint8_t first = 0, second = 0, blend = 255;
+    MMWeather_ApplySky(&first, &second, &blend);
+    assert(MMWeather_Season() == SEASON_WINTER && first == 1 && second == 1 && blend == 0);
+    // Real completion adapters latch unlocks across a Song of Time flag reset.
+    WEEKEVENTREG(WEEKEVENTREG_CLEARED_GREAT_BAY_TEMPLE >> 8) &= ~(WEEKEVENTREG_CLEARED_GREAT_BAY_TEMPLE & 0xFF);
+    WEEKEVENTREG(WEEKEVENTREG_CLEARED_SNOWHEAD_TEMPLE >> 8) &= ~(WEEKEVENTREG_CLEARED_SNOWHEAD_TEMPLE & 0xFF);
+    assert(MMWeather_SeasonForPlay(&play) == SEASON_WINTER);
+    Seasons_SetSeason(SEASON_OFF);
+    MMWeather_Update(&play);
+    assert(MMWeather_Season() == -1 && MMWeather_RainDensity() == 0 && MMWeather_Overcast() == 0);
+    // An invalid selection heals through the same available-season query as the wheel.
+    nei.season = SEASON_SUMMER;
+    assert(MMWeather_SeasonForPlay(&play) == SEASON_SPRING && nei.season == SEASON_SPRING);
+    nei.seasonsRodOwned = 0;
+    MMWeather_Update(&play);
+    assert(MMWeather_Season() == -1 && MMWeather_RainDensity() == 0 && rainGain == 0);
+    assert(nei.seasonsOwned == 0 && nei.seasonsRodOwned == 0 && nei.seasonsGates != 0);
+    gSaveContext = {};
+    MMWeather_Reset();
+    std::puts("PASS gated Rod weather uses real completion unlocks, persisted gates, Off and Rod ownership");
 }
 
 int main() {
@@ -620,4 +712,5 @@ int main() {
     SkyOverrideRegression();
     MayorsResidenceRegression();
     SeasonWeatherRegression();
+    GatedSeasonWeatherRegression();
 }

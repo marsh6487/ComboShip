@@ -68,7 +68,7 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
     }
 
     bool Vertices(const std::shared_ptr<Ship::IResource>& resource, size_t offset, size_t count,
-                  bool byteOffset = false) {
+                  bool byteOffset = false, size_t cacheIndex = 0) {
         return WithVertexData(resource, [&](const auto& vertices) {
             if (byteOffset) {
                 const size_t stride = sizeof(vertices[0]);
@@ -99,6 +99,10 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
                 }
                 const float x = transformed[0] * mCos - transformed[1] * mSin;
                 const float y = transformed[0] * mSin + transformed[1] * mCos;
+                if constexpr (requires { mLoad.SurfaceVertex(transformed, cacheIndex); }) {
+                    if (!mLoad.SurfaceVertex(transformed, cacheIndex + i - offset))
+                        return false;
+                }
                 mLow = std::min(mLow, y);
                 mHigh = std::max(mHigh, y);
                 mRadius = std::max(mRadius, std::hypot(x, transformed[2]));
@@ -197,7 +201,7 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
                     return false;
                 const auto& args = commands[i];
                 if (!Vertices(mLoad(reinterpret_cast<const char*>(command.words.w1)), args.words.w1 & 0xffffu,
-                              args.words.w0))
+                              args.words.w0, false, (args.words.w1 >> 16) & 0xffffu))
                     return false;
             } else if (op == G_MTX_OTR_FILEPATH) {
                 if (!ApplyMatrix(MatrixResource(reinterpret_cast<const char*>(command.words.w1)),
@@ -223,7 +227,26 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
                     if (!ApplyMatrix(resource, (command.words.w0 & 0xffu) ^ G_MTX_PUSH))
                         return false;
                 } else {
-                    if (!Vertices(resource, command.words.w1, (command.words.w0 >> 12) & 0xff, true))
+                    const size_t count = (command.words.w0 >> 12) & 0xff;
+                    const size_t end = (command.words.w0 >> 1) & 0x7f;
+                    if (!Vertices(resource, command.words.w1, count, true, end - count))
+                        return false;
+                }
+            } else if (op == G_TRI1_OTR) {
+                if constexpr (requires { mLoad.SurfaceTriangle(size_t{}, size_t{}, size_t{}); }) {
+                    // XML Triangle1 uses direct indices in separate words;
+                    // the native packed TRI1/TRI2 encoding below uses index*2.
+                    if (!mLoad.SurfaceTriangle(command.words.w0 & 0xffffffu, (command.words.w1 >> 16) & 0xffffu,
+                                               command.words.w1 & 0xffffu))
+                        return false;
+                }
+            } else if (op == G_TRI1 || op == G_TRI2 || op == G_QUAD) {
+                if constexpr (requires { mLoad.SurfaceTriangle(size_t{}, size_t{}, size_t{}); }) {
+                    const auto triangle = [&](uintptr_t word) {
+                        const size_t a = (word >> 16) & 0xff, b = (word >> 8) & 0xff, c = word & 0xff;
+                        return !(a & 1 || b & 1 || c & 1) && mLoad.SurfaceTriangle(a / 2, b / 2, c / 2);
+                    };
+                    if (!triangle(command.words.w0) || ((op == G_TRI2 || op == G_QUAD) && !triangle(command.words.w1)))
                         return false;
                 }
             } else if (op == G_DL) {

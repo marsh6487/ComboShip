@@ -1,4 +1,5 @@
 #include "mm/2s2h/Rando/Types.h"
+#include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include <cassert>
 #include <cstdint>
 #include <iostream>
@@ -14,16 +15,20 @@ uint64_t ComboRandoGen() { return generation; }
 struct ComboForeignDrawInfoOOT {
   bool ok = true, stateDependent = true, appearanceDependent = true,
        animOk = false;
+  int neiShimmer = 0;
   std::string resolvedName = "Magic Meter";
 };
 enum class ComboForeignResolveOOT { Ok, NotReady, Unknown };
 static ComboForeignDrawInfoOOT pending;
 static bool ready = true;
 ComboForeignResolveOOT
-ComboFillForeignDrawInfoOOT(RandoCheckId, ComboForeignDrawInfoOOT &out) {
+ComboFillForeignDrawInfoOOT(RandoCheckId, ComboForeignDrawInfoOOT &out,
+                           const char *namedItem = nullptr) {
   if (!ready)
     return ComboForeignResolveOOT::NotReady;
   out = pending;
+  if (namedItem)
+    out.resolvedName = namedItem;
   return ComboForeignResolveOOT::Ok;
 }
 /* FOREIGN_CACHE */

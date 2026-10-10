@@ -945,7 +945,10 @@ typedef enum GetItemDrawId {
     /* 0x73 */ GID_CHATEAU,
     /* 0x74 */ GID_PICTOGRAPH_BOX,
     /* 0x75 */ GID_MASK_FIERCE_DEITY,
-    /* 0x76 */ GID_MAXIMUM // 2S2H [Port] Changed from GID_MAX because that's a reserved macro on MacOS(?)
+    /* 0x76 */ GID_BOTTLE_MUSHROOM,
+    /* 0x77 */ GID_BOTTLE_DEKU_PRINCESS,
+    /* 0x78 */ GID_BOTTLE_GOLD_DUST,
+    /* 0x79 */ GID_MAXIMUM // 2S2H [Port] Changed from GID_MAX because that's a reserved macro on MacOS(?)
 } GetItemDrawId;
 
 #endif

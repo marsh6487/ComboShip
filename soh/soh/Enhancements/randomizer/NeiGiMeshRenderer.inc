@@ -1,4 +1,6 @@
 #include "NeiElementalArrowGi.h"
+#include "ComboRewardGi.h"
+extern "C" int ResourceMgr_GetRewardSurfaceForGame(const char* game, const char* path, NeiGi::Mesh* mesh);
 // Shared by the OoT and MM host renderers. The enclosing TU supplies native GBI/matrix APIs.
 NeiGi::Basis NeiGi_CameraBasis(PlayState* play) {
     MtxF m;
@@ -113,9 +115,9 @@ static bool NeiGi_ValidMesh(const NeiGi::Mesh& mesh, const NeiGi::TextureMateria
 
 static bool NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kind orb,
                                    const NeiGi::TextureMaterial* material, bool seasonSunRays = false,
-                                   const char* owner = nullptr) {
+                                   const char* owner = nullptr, const NeiElementalGi::Palette* palette = nullptr) {
     if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, material, seasonSunRays) || int(orb) < 0 ||
-        int(orb) > int(Kind::Gold))
+        int(orb) > int(Kind::GiantsKnife))
         return false;
     // Reuse shared vertices within each 32-entry RSP cache load. A full potion
     // shop must leave room in both the OPA arena and XLU command buffer.
@@ -175,12 +177,22 @@ static bool NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kin
         triangleCommands += (batches[b].indexCount + 5) / 6;
     // At most 30 fixed commands: debug pairs, two setup calls, texture-load
     // expansion (seven commands), material state, one matrix and owner pair.
-    if (!NeiGi_ArenaHasRoom(play, vertexCount * sizeof(Vtx), 1, 2, 32 + batchCount + triangleCommands))
+    const bool scrolling = material && material->scrolling;
+    const size_t scrollBytes = scrolling ? 2 * sizeof(Gfx) : 0;
+    if (!NeiGi_ArenaHasRoom(play, vertexCount * sizeof(Vtx) + scrollBytes, 1, 2,
+                           32 + batchCount + triangleCommands + (scrolling ? 1 : 0)))
         return false;
-    auto* vertices = static_cast<Vtx*>(Graph_Alloc(play->state.gfxCtx, vertexCount * sizeof(Vtx)));
+    auto* vertices = static_cast<Vtx*>(Graph_Alloc(play->state.gfxCtx, vertexCount * sizeof(Vtx) + scrollBytes));
     if (vertices == nullptr)
         return false;
     std::memcpy(vertices, packed.data(), vertexCount * sizeof(Vtx));
+    Gfx* scroll = nullptr;
+    if (scrolling) {
+        scroll = reinterpret_cast<Gfx*>(vertices + vertexCount);
+        const auto offset = RewardGi_Scroll(play->gameplayFrames);
+        gDPSetTileSize(scroll, G_TX_RENDERTILE, offset.s, offset.t, offset.s + 31 * 4, offset.t + 31 * 4);
+        gSPEndDisplayList(scroll + 1);
+    }
     OPEN_DISPS(play->state.gfxCtx);
     if (owner)
         gSPComboRMPush(POLY_XLU_DISP++, owner);
@@ -212,8 +224,13 @@ static bool NeiGi_DrawMeshMaterial(PlayState* play, const NeiGi::Mesh& mesh, Kin
                             5, G_TX_NOLOD, G_TX_NOLOD);
         // Resource RGBA multiplied by each sampled vertex's color AND alpha.
         gDPSetCombineMode(POLY_XLU_DISP++, G_CC_MODULATEIA, G_CC_PASS2);
+        if (scrolling) {
+            // Execute the common material fragment directly. Scene segment
+            // bindings belong to the GPU and need not equal CPU gSegments.
+            __gSPDisplayList(POLY_XLU_DISP++, scroll);
+        }
     } else if (orb != Kind::Neutral) {
-        const auto color = NeiGi::OrbPalette(orb);
+        const auto color = palette ? NeiGi::OrbColors{palette->hot, palette->edge} : NeiGi::OrbPalette(orb);
         gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
         gDPSetTextureLUT(POLY_XLU_DISP++, G_TT_NONE);
         gDPSetTextureFilter(POLY_XLU_DISP++, G_TF_BILERP);
@@ -256,46 +273,64 @@ void NeiGi_DrawMesh(PlayState* play, const NeiGi::Mesh& mesh, Kind orb) {
     NeiGi_DrawMeshMaterial(play, mesh, orb, nullptr);
 }
 
+bool NeiGi_DrawMeshWithTail(PlayState* play, const NeiGi::Mesh& mesh, const char* owner,
+                            size_t matrices, size_t opa, size_t xlu) {
+    NeiGi_ArenaScope arena(play, matrices, opa, xlu);
+    if (!arena)
+        return false;
+    return NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, nullptr, false, owner);
+}
+
 bool NeiGi_DrawTexturedMesh(PlayState* play, const NeiGi::Mesh& mesh, const NeiGi::TextureMaterial& material) {
     if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, &material) || !HasResource(material.path))
         return false;
     return NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material);
 }
 
-void NeiGi_DrawElementalArrow(PlayState* play, int profile) {
-    if (!play || !play->state.gfxCtx || !NeiArrowGi::Valid(profile))
-        return;
-    const auto layers = NeiArrowGi::Sample(profile, play->gameplayFrames, NeiGi_CameraBasis(play));
-    // Admit the complete effect before changing any display-list cursor. Use
-    // unshared vertex counts and one command per triangle as safe upper bounds.
-    const size_t vertices = layers.veil.count + layers.energy.count + layers.shimmer.count;
-    const size_t batches = (layers.veil.count + 29) / 30 + (layers.energy.count + 29) / 30 +
-                           (layers.shimmer.count + 29) / 30;
-    if (!NeiGi_ArenaHasRoom(play, vertices * sizeof(Vtx), 4, 16, 128 + batches + vertices / 3))
-        return;
-    NeiGi_ArenaScope arena(play, 1, 2, 16);
-    if (!arena)
-        return;
-    const char* texture = NeiArrowGi::Texture(profile);
-    // Private base assets belong to OoT in both hosts. Native MM's arrow core
-    // still belongs to MM; only the three new aura textures use this bracket.
-    const bool textured = HasResource(texture);
-    OPEN_DISPS(play->state.gfxCtx);
-    gSPGrayscale(POLY_XLU_DISP++, false);
-    if (textured)
-        gSPComboRMPush(POLY_XLU_DISP++, "oot");
-    CLOSE_DISPS(play->state.gfxCtx);
-    const NeiGi::TextureMaterial material{texture};
-    if (!textured || !NeiGi_DrawTexturedMesh(play, layers.veil, material))
-        NeiGi_DrawMesh(play, layers.veil);
-    OPEN_DISPS(play->state.gfxCtx);
-    if (textured)
-        gSPComboRMPop(POLY_XLU_DISP++);
-    CLOSE_DISPS(play->state.gfxCtx);
-    NeiGi_DrawMesh(play, layers.energy);
-    NeiGi_DrawMesh(play, layers.shimmer);
+static NeiElementalGi::Palette NeiGi_ElementalPalette(PlayState* play, int profile, bool spell, bool mmOwner) {
+#ifdef NEI_GI_NATIVE_MM
+    constexpr bool nativeMm = true;
+#else
+    constexpr bool nativeMm = false;
+#endif
+    return NeiElementalGi::ReadPalette(profile, spell, mmOwner, [&](const char* key, uint32_t& rgb) {
+        const std::string base(key);
+        if (!CVarGetInteger((base + ".Changed").c_str(), 0) && !CVarGetInteger((base + ".Rainbow").c_str(), 0))
+            return false;
+        const std::string value = base + (mmOwner ? ".Color" : ".Value");
+        Color_RGB8 color = {uint8_t(rgb >> 16), uint8_t(rgb >> 8), uint8_t(rgb)};
+        color = CVarGetColor24(value.c_str(), color);
+#ifdef COMBO_BUILD
+        if (mmOwner != nativeMm) {
+            using Clock = void (*)(uint32_t);
+            using Sample = void (*)(const char*, uint8_t, uint8_t, uint8_t, uint8_t*);
+            // Retry resolution until the donor is loaded. Sample colors afresh on every draw.
+            static Clock ootClock = nullptr, mmClock = nullptr;
+            static Sample ootSample = nullptr, mmSample = nullptr;
+            auto& clock = mmOwner ? mmClock : ootClock;
+            auto& sample = mmOwner ? mmSample : ootSample;
+            if (!clock) clock = reinterpret_cast<Clock>(Combo_ResolveSym(mmOwner ? "2ship" : "soh",
+                mmOwner ? "MM_SetGiCosmeticFrame" : "OOT_SetGiCosmeticFrame"));
+            if (!sample) sample = reinterpret_cast<Sample>(Combo_ResolveSym(mmOwner ? "2ship" : "soh",
+                mmOwner ? "MM_SampleGiCosmeticColor" : "OOT_SampleGiCosmeticColor"));
+            if (clock) clock(play->gameplayFrames);
+            if (sample) {
+                uint8_t sampled[3] = {color.r, color.g, color.b};
+                sample(value.c_str(), color.r, color.g, color.b, sampled);
+                color = {sampled[0], sampled[1], sampled[2]};
+            }
+        }
+#endif
+        rgb = uint32_t(color.r) << 16 | uint32_t(color.g) << 8 | color.b;
+        return true;
+    });
+}
+
+static void NeiGi_RestoreElemental(PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    gDPSetGrayscaleColor(POLY_XLU_DISP++, 255, 255, 255, 255);
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
     gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
     gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
@@ -303,10 +338,176 @@ void NeiGi_DrawElementalArrow(PlayState* play, int profile) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+void NeiGi_DrawElementalArrowForOwner(PlayState* play, int profile, int mmOwner, int shop) {
+    if (!play || !play->state.gfxCtx || !NeiArrowGi::Valid(profile))
+        return;
+    const auto palette = NeiGi_ElementalPalette(play, profile, false, mmOwner != 0);
+    auto layers = NeiArrowGi::Sample(profile, play->gameplayFrames, NeiGi_CameraBasis(play), &palette, shop != 0);
+    const size_t vertices = layers.veil.count + layers.energy.count + layers.shimmer.count;
+    const size_t batches = (layers.veil.count + 29) / 30 + (layers.energy.count + 29) / 30 +
+                           (layers.shimmer.count + 29) / 30;
+    if (!NeiGi_ArenaHasRoom(play, vertices * sizeof(Vtx), 4, 16, 144 + batches + vertices / 3))
+        return;
+    NeiGi_ArenaScope arena(play, 1, 2, 20);
+    if (!arena)
+        return;
+    const char* texture = NeiArrowGi::Texture(profile);
+    // The selected core stays in its native owner. Private aura art belongs to OoT.
+    const bool textured = HasResource(texture);
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    if (textured) gSPComboRMPush(POLY_XLU_DISP++, "oot");
+    CLOSE_DISPS(play->state.gfxCtx);
+    const NeiGi::TextureMaterial material{texture};
+    if (!textured || !NeiGi_DrawTexturedMesh(play, layers.veil, material)) {
+        NeiGi_DrawMesh(play, layers.veil);
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    if (textured) gSPComboRMPop(POLY_XLU_DISP++);
+    CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawMesh(play, layers.energy);
+    NeiGi_DrawMesh(play, layers.shimmer);
+    NeiGi_RestoreElemental(play);
+}
+
+void NeiGi_DrawElementalArrow(PlayState* play, int profile) {
+#ifdef NEI_GI_NATIVE_MM
+    NeiGi_DrawElementalArrowForOwner(play, profile, 1, 0);
+#else
+    NeiGi_DrawElementalArrowForOwner(play, profile, 0, 0);
+#endif
+}
+
+int NeiGi_DrawElementalArrowShop(PlayState* play, int profile) {
+    // OPA setup also emits nested XLU debug markers before CLOSE_DISPS.
+    if (!play || !play->state.gfxCtx || !NeiArrowGi::Valid(profile) || !NeiGi_ArenaHasRoom(play, 0, 1, 12, 2))
+        return false;
+#ifdef NEI_GI_NATIVE_MM
+    constexpr int owner = 1;
+    const char* core = "__OTR__objects/object_gi_m_arrow/gGiMagicArrowAmmoDL";
+#else
+    constexpr int owner = 0;
+    const char* core = "__OTR__objects/object_gi_m_arrow/gGiMagicArrowDL";
+#endif
+    // Resolve the original resource at draw time so native Alt/model selection
+    // keeps working. The caller's shelf tilt, scale and origin remain intact.
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, core, 0, G_DL_PUSH);
+    CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawElementalArrowForOwner(play, profile, owner, 1);
+    return true;
+}
+
+int NeiGi_CanDrawElementalSpellFallback(PlayState* play) {
+    // Twelve scroll commands, eight benign seg8 restore entries and one
+    // native modelview. Gfx is larger than Mtx/8 on the 64-bit host.
+    return NeiGi_ArenaHasRoom(play, 20 * sizeof(Gfx), 1, 12, 24);
+}
+
+int NeiGi_DrawElementalSpell(PlayState* play, int profile, int mmOwner, int shop) {
+    if (!play || !play->state.gfxCtx || !NeiArrowGi::Valid(profile))
+        return false;
+    const auto palette = NeiGi_ElementalPalette(play, profile, true, mmOwner != 0);
+    const auto layers = NeiSpellGi::Sample(profile, play->gameplayFrames, NeiGi_CameraBasis(play), &palette, shop != 0);
+    size_t vertices = 0, batches = 0;
+    for (const auto* mesh : {&layers.back, &layers.veil, &layers.energy, &layers.front, &layers.shimmer}) {
+        vertices += mesh->count;
+        batches += (mesh->count + 29) / 30;
+    }
+    // All five layers or none: do not leave half a crystal when a shelf fills the arena.
+    if (!NeiGi_ArenaHasRoom(play, vertices * sizeof(Vtx), 6, 20, 220 + batches + vertices / 3))
+        return false;
+    NeiGi_ArenaScope arena(play, 1, 2, 20);
+    if (!arena)
+        return false;
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawMesh(play, layers.back);
+    const auto kind = profile == 1 ? Kind::Fire : profile == 2 ? Kind::Hylia : Kind::Ice;
+    NeiGi_DrawMeshMaterial(play, layers.veil, kind, nullptr, false, nullptr, &palette);
+    NeiGi_DrawMesh(play, layers.energy);
+    NeiGi_DrawMesh(play, layers.front);
+    NeiGi_DrawMesh(play, layers.shimmer);
+    NeiGi_RestoreElemental(play);
+    return true;
+}
+
+void NeiGi_DrawSagesTunicMedallions(PlayState* play, const char* owner) {
+    static constexpr const char* faces[] = {
+        "__OTR__objects/object_gi_medal/gGiForestMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiFireMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiWaterMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiSpiritMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiShadowMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiLightMedallionFaceDL",
+    };
+    static constexpr const char* body = "__OTR__objects/object_gi_medal/gGiMedallionDL";
+    // This intrinsic pass must leave the caller's model, owner-pop and restore
+    // tail intact. Missing original medal resources retain the robe alone.
+    if (!HasResource(body) || !NeiGi_ArenaHasRoom(play, 0, 6, 48, 2))
+        return;
+#ifdef NEI_GI_NATIVE_MM
+    const uint32_t frame = play->state.frames;
+#else
+    const uint32_t frame = play->gameplayFrames;
+#endif
+    const uint32_t bits = (frame * 2u) & 0xFFFFu;
+    const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
+    OPEN_DISPS(play->state.gfxCtx);
+    if (owner)
+        gSPComboRMPush(POLY_OPA_DISP++, owner);
+    gSPGrayscale(POLY_OPA_DISP++, false);
+    for (int i = 0; i < 6; ++i) {
+        if (!HasResource(faces[i]))
+            continue;
+        const float t = (frame + i * 7u) % 40u;
+        const float theta = 1.5707963267948966f + i * 1.0471975511965976f;
+        float scale = .35f;
+        if (t < 4.f)
+            scale *= t / 4.f;
+        else if (t >= 31.f)
+            scale *= (39.f - t) / 8.f;
+        if (scale <= .001f)
+            continue;
+#ifdef NEI_GI_NATIVE_MM
+        Gfx_SetupDL26_Opa(play->state.gfxCtx);
+#else
+        Gfx_SetupDL_26Opa(play->state.gfxCtx);
+#endif
+        Matrix_Push();
+#ifdef NEI_GI_ROTATE_Y
+        NEI_GI_ROTATE_Y(spin, MTXMODE_APPLY);
+#else
+        Matrix_RotateY(spin, MTXMODE_APPLY);
+#endif
+        Matrix_Translate(std::cos(theta) * 1.5f * t, (std::sin(theta) * 1.5f + 1.5f) * t - .5f * .07f * t * t, 14.f,
+                         MTXMODE_APPLY);
+        Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+#ifdef NEI_GI_ROTATE_Y
+        NEI_GI_ROTATE_Y(frame * .09f + i, MTXMODE_APPLY);
+#else
+        Matrix_RotateY(frame * .09f + i, MTXMODE_APPLY);
+#endif
+        gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+                  G_MTX_MODELVIEW | G_MTX_LOAD);
+        gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, faces[i], 0, G_DL_PUSH);
+        gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, body, 0, G_DL_PUSH);
+        Matrix_Pop();
+    }
+    if (owner)
+        gSPComboRMPop(POLY_OPA_DISP++);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
                             const float center[3], bool shimmer, const char* owner, bool shop, int mmPickup) {
     if (!play || !play->state.gfxCtx || !opa || !center || !NeiGi_ValidScale(scale) || !NeiGi_Finite(center[0]) ||
-        !NeiGi_Finite(center[1]) || !NeiGi_Finite(center[2]) || effect < 0 || effect > int(Kind::Gold))
+        !NeiGi_Finite(center[1]) || !NeiGi_Finite(center[2]) || effect < 0 || effect > int(Kind::GiantsKnife))
         return;
     const Kind kind = static_cast<Kind>(effect);
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
@@ -321,6 +522,8 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
     const auto fit = NeiGi::FrameFit(*bounds, scale, shop, mmPickup);
     Matrix_Translate(0.f, fit.lift, 0.f, MTXMODE_APPLY);
     Matrix_Scale(fit.scale, fit.scale, fit.scale, MTXMODE_APPLY);
+    if (std::strcmp(bounds->slug, "sages_tunic") == 0)
+        NeiGi_DrawSagesTunicMedallions(play, owner);
     OPEN_DISPS(play->state.gfxCtx);
     if (owner) {
         gSPComboRMPush(POLY_OPA_DISP++, owner);
@@ -359,7 +562,7 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
         NeiGi_DrawMesh(play, NeiGi::SampleEnergy(kind, play->gameplayFrames, camera));
     }
     if (NeiGi::IsSpecial(kind))
-        NeiGi_DrawMesh(play, NeiGi::SampleSpecial(kind, play->gameplayFrames, camera));
+        NeiGi_DrawMesh(play, NeiGi::SampleSpecial(kind, play->gameplayFrames, camera, 1.f / fit.scale));
     Matrix_Pop();
     if (shimmer)
         NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, camera, kind));
@@ -383,6 +586,18 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
         gDma1p(POLY_XLU_DISP++, G_DL_OTR_FILEPATH, xlu, 0, G_DL_PUSH);
         Matrix_Pop();
     }
+    CLOSE_DISPS(play->state.gfxCtx);
+    if (xlu && NeiGi::IsSpell(kind)) {
+        Matrix_Push();
+#ifdef NEI_GI_ROTATE_Y
+        NEI_GI_ROTATE_Y(spin, MTXMODE_APPLY);
+#else
+        Matrix_RotateY(spin, MTXMODE_APPLY);
+#endif
+        NeiGi_DrawMesh(play, NeiGi::SampleCrystalSheen(play->gameplayFrames, NeiGi_CameraBasis(play)));
+        Matrix_Pop();
+    }
+    OPEN_DISPS(play->state.gfxCtx);
     if (owner) {
         gSPComboRMPop(POLY_OPA_DISP++);
         gSPComboRMPop(POLY_XLU_DISP++);
@@ -399,7 +614,7 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
 void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int shimmerKind,
                                     bool shimmer, const char* owner, bool shop, float tilt, bool fit, int mmPickup) {
     if (!play || !play->state.gfxCtx || !opa || !NeiGi_ValidScale(scale) || shimmerKind < 0 ||
-        shimmerKind > int(Kind::Gold))
+        shimmerKind > int(Kind::GiantsKnife))
         return;
     NeiGi_ArenaScope arena(play, 2, 16, 16);
     if (!arena)
@@ -407,7 +622,11 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     const float spin = (bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f;
     const bool sword = NeiGi::IsSword(static_cast<Kind>(shimmerKind));
+    if (sword)
+        tilt = ComboSwordGi_SelectedTilt(tilt, shop);
     Matrix_Push();
+    if (fit && sword)
+        ComboSwordGi_ApplyPresentationSize(shop, mmPickup);
     if (fit && mmPickup && !sword) {
         const char* paths[] = { opa, xlu };
         ComboSwordGi_ApplyModelsFit(owner ? owner : "oot", paths, xlu ? 2 : 1, scale, tilt, shop, mmPickup);
@@ -463,7 +682,9 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
     if (sword) {
         ComboSwordGi_ApplyEffectFit(static_cast<Kind>(shimmerKind), shop, mmPickup);
         NeiGi_DrawMesh(play, NeiGi::SampleSpecial(static_cast<Kind>(shimmerKind), play->gameplayFrames,
-                                                 NeiGi_CameraBasis(play)));
+                                                 NeiGi_CameraBasis(play),
+                                                 ComboSwordGi_ParticleScale(static_cast<Kind>(shimmerKind), shop,
+                                                                            mmPickup, fit)));
     }
     if (shimmer)
         NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play),
@@ -538,6 +759,70 @@ void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const cha
     OPEN_DISPS(play->state.gfxCtx);
     if (owner)
         gSPComboRMPop(POLY_XLU_DISP++);
+    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+    gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+// All nine rewards share this material and scroll fragment. Identity selects
+// only the periodic energy image and hex tint; the selected model supplies
+// the triangles. Missing/unsupported resources leave the native draw visible.
+void NeiGi_DrawRewardMaterial(PlayState* play, int profile, const char* surfacePath, const char* settingPath,
+                              const char* owner) {
+    uint8_t color[4];
+    if (!play || !owner || !surfacePath || !RewardGi_ShimmerColor(profile, color)) return;
+    NeiGi_ArenaScope arena(play, 1, 2, 16);
+    if (!arena) return;
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi::Mesh mesh{};
+    constexpr const char* metal = "__OTR__objects/nei_reward_gi/metal";
+    if (settingPath && HasResource(metal) && ResourceMgr_GetRewardSurfaceForGame(owner, settingPath, &mesh)) {
+        // Keep the original lighting beneath a restrained brushed-gold layer.
+        for (size_t i = 0; i < mesh.count; ++i) {
+            mesh.vertices[i].rgb = 0xE6C780;
+            mesh.vertices[i].alpha = 92;
+        }
+        const NeiGi::TextureMaterial material{metal, true, true};
+        NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material, false, "oot");
+    }
+    const char* energy = RewardGi_Texture(profile);
+    if (HasResource(energy) && ResourceMgr_GetRewardSurfaceForGame(owner, surfacePath, &mesh)) {
+        for (size_t i = 0; i < mesh.count; ++i) {
+            mesh.vertices[i].rgb = RewardGi_Color(profile);
+            mesh.vertices[i].alpha = 220;
+        }
+        const NeiGi::TextureMaterial material{energy, true, true, true};
+        NeiGi_DrawMeshMaterial(play, mesh, Kind::Neutral, &material, false, "oot");
+    }
+    NeiGi_DrawShimmerOverlay(play, color, owner);
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
+    gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);
+    gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
+              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+// Four faint GI-local motes for the accepted bundled fairy. Sampling uses
+// only the active host frame; the caller has restored its incoming bottle pose.
+void ComboBottleShimmer_DrawMotes(PlayState* play, int profile) {
+    if (!play || !play->state.gfxCtx || profile != CW_SHIMMER_FAIRY)
+        return;
+    NeiGi_ArenaScope arena(play, 1, 2, 16);
+    if (!arena)
+        return;
+    const auto mesh = NeiGi::SampleBottleMotes(profile, play->gameplayFrames, true, NeiGi_CameraBasis(play));
+    OPEN_DISPS(play->state.gfxCtx);
+    gSPGrayscale(POLY_XLU_DISP++, false);
+    CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawMesh(play, mesh, Kind::Neutral);
+    OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, 255);
     gDPSetEnvColor(POLY_XLU_DISP++, 255, 255, 255, 255);

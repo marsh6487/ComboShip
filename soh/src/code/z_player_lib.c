@@ -48,8 +48,10 @@ extern void ItemEquip_CaptureHandMatrix(void);
 extern void ItemEquip_CaptureLeftHandMatrix(void);
 extern u8 ItemEquip_HoldsClosedFist(void);
 extern u8 ItemEquip_HoldsEmptyHand(void);
+extern u8 FourSword_IsEquipped(void);
 
 #include <stdlib.h>
+#include <string.h>
 
 // SW97: Forward declaration - defined in sw97_player_hooks.c (compiled in z_player.c TU)
 
@@ -1255,11 +1257,13 @@ void Player_DrawImpl(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dL
         // A form's face textures ship under the vanilla eye symbol, so the same
         // name-based rule applies. Without this the head renders Link's eyes
         // through the form's own palette — the garbled face bug.
-        void* formEye = pakEye ? NULL : CustomForms_ResolveVanillaTexture(sEyeTextures[gSaveContext.linkAge][eyeIndex]);
-        if (pakEye) {
-            gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)pakEye);
-        } else if (formEye) {
+        void* formEye = (pakEye && !CustomForms_PreferFaceTextures())
+                            ? NULL
+                            : CustomForms_ResolveVanillaTexture(sEyeTextures[gSaveContext.linkAge][eyeIndex]);
+        if (formEye) {
             gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)formEye);
+        } else if (pakEye) {
+            gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)pakEye);
         } else {
             gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sEyeTextures[gSaveContext.linkAge][eyeIndex]));
         }
@@ -1962,16 +1966,21 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
                 Gfx** openDLs = &gPlayerLeftHandOpenDLs[gSaveContext.linkAge];
                 *dList = Player_ResolveLimbDLForDummyOrLocal(openDLs[sDListsLodOffset]);
                 sLeftHandType = PLAYER_MODELTYPE_LH_OPEN;
-            } else if (!extOwnsWeapon) {
+            } else if (!hideLH && !TransformMasks_IsTransformedAny()) {
                 mayDrawProgressiveFire = !hideLH;
-                // NEI progressive sword upgrades: keep an OOT open hand and draw the MM Razor /
-                // Gilded / Great Fairy's Sword pieces (loaded from o2r) on top — pak_loader-style
-                // (sword then hand), supporting mods. No-op unless the upgraded sword is wielded.
+                // Keep the age/LOD-correct fist and the native sword hand type.
+                // The exact authored mesh changes only this limb's display list.
                 Gfx** openDLs = &gPlayerLeftHandOpenDLs[gSaveContext.linkAge];
-                void* ootHand = Player_ResolveLimbDLForDummyOrLocal(openDLs[sDListsLodOffset]);
-                if (WeaponUpgrade_ApplyHeldSwordDL(dList, ootHand, this, sPlayerBodyEnvColor.r, sPlayerBodyEnvColor.g,
+                Gfx* ootHand = Player_ResolveLimbDLForDummyOrLocal(openDLs[sDListsLodOffset]);
+                Gfx* fist = Player_ResolveLimbDLForDummyOrLocal(
+                    gPlayerLeftHandClosedDLs[gSaveContext.linkAge + sDListsLodOffset]);
+                if (WeaponUpgrade_ApplyHeldSwordDL(dList, fist, this, sPlayerBodyEnvColor.r, sPlayerBodyEnvColor.g,
                                                    sPlayerBodyEnvColor.b)) {
-                    sLeftHandType = PLAYER_MODELTYPE_LH_OPEN;
+                    // Each deferred player/clone draw retains its own hand and
+                    // body color; the helper's scratch compound is reused.
+                    Gfx* compound = (Gfx*)Graph_Alloc(play->state.gfxCtx, 8 * sizeof(Gfx));
+                    memcpy(compound, *dList, 8 * sizeof(Gfx));
+                    *dList = compound;
                 } else if (sLeftHandType == PLAYER_MODELTYPE_LH_OPEN) {
                     // No upgraded sword to draw, so ootHand was resolved and then dropped:
                     // *dList kept whatever vanilla picked earlier, which is LINK's hand even
@@ -2016,14 +2025,24 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
     // bit even after a Great Fairy upgrade. Select the fitted progressive blade
     // after equipment hooks while the explicit fire option owns this upgrade.
     // Disabling fire/Alt or removing the new assets restores the normal choices.
-    if (mayDrawProgressiveFire && *dList != NULL) {
+    // Four Sword also owns its blade after generic equipment/PAK hooks. Those
+    // hooks can select a native sword or an empty slot for the borrowed action.
+    if (mayDrawProgressiveFire && (*dList != NULL || FourSword_IsEquipped())) {
         void* closedHand =
             Player_ResolveLimbDLForDummyOrLocal(gPlayerLeftHandClosedDLs[gSaveContext.linkAge + sDListsLodOffset]);
-        Gfx* dinHand = DinFireSword_HandDL(play, this, closedHand, sPlayerBodyEnvColor.r, sPlayerBodyEnvColor.g,
-                                           sPlayerBodyEnvColor.b);
-        if (dinHand != NULL) {
-            *dList = dinHand;
+        if (FourSword_IsEquipped() && WeaponUpgrade_ApplyHeldSwordDL(dList, closedHand, this, sPlayerBodyEnvColor.r,
+                                                                     sPlayerBodyEnvColor.g, sPlayerBodyEnvColor.b)) {
+            Gfx* compound = (Gfx*)Graph_Alloc(play->state.gfxCtx, 8 * sizeof(Gfx));
+            memcpy(compound, *dList, 8 * sizeof(Gfx));
+            *dList = compound;
             sLeftHandType = this->leftHandType;
+        } else {
+            Gfx* dinHand = DinFireSword_HandDL(play, this, closedHand, sPlayerBodyEnvColor.r, sPlayerBodyEnvColor.g,
+                                               sPlayerBodyEnvColor.b);
+            if (dinHand != NULL) {
+                *dList = dinHand;
+                sLeftHandType = this->leftHandType;
+            }
         }
     }
 
