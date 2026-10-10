@@ -107,6 +107,8 @@ jobs:
           # The Great Fairy adapter also compares untouched native actor routines
           # against the develop baseline; shallow PR checkouts do not contain it.
           git fetch --no-tags --depth=1 origin 122dd5f68cb37fcf515c3726f8a77043db5dcdf4 a82852a3a02c8cabc541cce7c124da71c5755efb
+          # Gerudo GI UVs, rig and isolated cuff edits compare to this fixed pre-polish baseline.
+          git fetch --no-tags --depth=1 origin c0181856968dd6f3869be0d1aa240743091fd6a8
           # Match libultraship's ImGui dependency for the real save-editor draw fixture.
           git clone --depth=1 --branch v1.91.9b-docking https://github.com/ocornut/imgui.git "$RUNNER_TEMP/combo-nei-imgui"
           # The real SaveEditor headers also reach ResourceManager and GuiTexture.
