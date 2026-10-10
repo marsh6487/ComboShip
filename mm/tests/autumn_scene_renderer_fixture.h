@@ -54,6 +54,7 @@ struct RawTexMetadata {
 struct Stats {
     unsigned triangles = 0, tinted = 0, vertexLoads = 0;
     std::vector<uintptr_t> vertexPointers;
+    std::vector<uint32_t> palettes;
     std::map<std::string, std::pair<unsigned, unsigned>> materials; // total, tinted
 };
 struct Interpreter {
@@ -77,6 +78,8 @@ struct Interpreter {
         auto& material = stats.materials[texture];
         ++material.first;
         const auto color = rdp.grayscale_color;
+        stats.palettes.push_back(
+            rdp.grayscale ? uint32_t(color.r) << 24 | uint32_t(color.g) << 16 | uint32_t(color.b) << 8 | color.a : 0);
         if (rdp.grayscale && color.r == 185 && color.g == 104 && color.b == 72 && color.a == 255) {
             ++stats.tinted;
             ++material.second;
@@ -158,6 +161,9 @@ static Stats Draw(std::vector<Gfx>& root) {
                 break;
             case G_TRI2:
                 gfx_quad_handler_f3dex2(&gfx, &cmd);
+                break;
+            case G_TRI1:
+                gfx_tri1_handler_f3dex2(&gfx, &cmd);
                 break;
         }
         if (!jumped)

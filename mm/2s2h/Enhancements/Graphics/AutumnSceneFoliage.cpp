@@ -21,30 +21,29 @@ extern "C" {
 }
 
 namespace {
+const char* SceneResourceName(int sceneId) {
+    switch (sceneId) {
+#define DEFINE_SCENE(name, enumId, ...) \
+    case enumId:                        \
+        return #name;
+#define DEFINE_SCENE_UNSET(...)
+#include "tables/scene_table.h"
+#undef DEFINE_SCENE
+#undef DEFINE_SCENE_UNSET
+        default:
+            return nullptr;
+    }
+}
+
 // Texture identity, rather than command offsets or an old scene export, owns
 // the palette. Both generated scene namespaces and explicit Alt hashes occur
 // in edited packs. No source texture, UV, vertex or alpha command is changed.
 struct Material {
-    const char* scene;
-    const char* texture;
+    const char* path;
     uint32_t color;
 };
 constexpr Material kMaterials[] = {
-    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_01BE50", 0xD99C45FF },
-    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_01C650", 0xD99C45FF },
-    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_01DE50", 0xD99C45FF },
-    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_02C050", 0xD99C45FF },
-    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_021650", 0xD99C45FF },
-    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_0216D0", 0xD99C45FF },
-    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_0218D0", 0xD99C45FF },
-    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_034898", 0xB96848FF },
-    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_034098", 0xB96848FF },
-    { "Z2_00KEIKOKU", "Z2_00KEIKOKUTex_037098", 0xB96848FF },
-    // Exported brush tops also draw terrain, so their nonempty per-material
-    // variant bypasses the whole-list fallback. Match the private foliage loads.
-    { "Z2_00KEIKOKU", "foliage_poc3/leaves_rgba", 0xB96848FF },
-    { "Z2_00KEIKOKU", "foliage_poc3/stems_rgba", 0xB96848FF },
-    { "Z2_21MITURINMAE", "Z2_21MITURINMAETex_0055D0", 0xB96848FF },
+#include "AutumnSceneMaterials.inc"
 };
 
 uint32_t ForestListColor(std::string path) {
@@ -88,8 +87,12 @@ uint32_t MaterialColor(uint64_t hash) {
         std::map<uint64_t, uint32_t> result;
         for (const auto& material : kMaterials) {
             for (const auto* suffix : { "", "_scene" }) {
-                const std::string path =
-                    "scenes/nonmq/" + std::string(material.scene) + suffix + "/" + material.texture;
+                std::string path = material.path;
+                if (path.starts_with("scenes/nonmq/")) {
+                    path.insert(path.find('/', 13), suffix);
+                } else if (*suffix != '\0') {
+                    continue; // Shared misc texture paths have no generated scene namespace.
+                }
                 result[CRC64(path.c_str())] = material.color;
                 result[CRC64(("alt/" + path).c_str())] = material.color;
             }
@@ -106,8 +109,11 @@ size_t MaterialCommandLength(uint8_t opcode) {
         case G_VTX_OTR_HASH:
         case G_MARKER:
         case G_DL_OTR_HASH:
+        case G_MTX_OTR:
             return 2;
         case G_VTX:
+        case G_MTX:
+        case G_POPMTX:
         case G_CULLDL:
         case G_TRI1:
         case G_TRI2:
@@ -123,6 +129,7 @@ size_t MaterialCommandLength(uint8_t opcode) {
         case G_LOADTLUT:
         case G_SETTILESIZE:
         case G_LOADBLOCK:
+        case G_LOADTILE:
         case G_SETTILE:
         case G_SETPRIMCOLOR:
         case G_SETENVCOLOR:
@@ -163,7 +170,11 @@ std::vector<RendererPointerSlot> RendererPointerSlots(const std::vector<Gfx>& so
 
 std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source) {
     std::vector<Gfx> result;
-    uint32_t color = 0;
+    uint32_t imageColor = 0;
+    bool tileSlot[8]{};
+    uint32_t loadedColors[2]{};
+    unsigned renderTile = G_TX_RENDERTILE;
+    bool explicitLoads = false;
     bool changed = false;
     for (size_t i = 0; i < source.size();) {
         const auto opcode = static_cast<uint8_t>(source[i].words.w0 >> 24);
@@ -172,13 +183,30 @@ std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source) {
             return {};
         }
         if (opcode == G_SETTIMG_OTR_HASH) {
-            color = MaterialColor((uint64_t(source[i + 1].words.w0) << 32) | source[i + 1].words.w1);
-        } else if (opcode == G_SETTIMG || opcode == G_DL || opcode == G_DL_OTR_HASH) {
+            imageColor = MaterialColor((uint64_t(source[i + 1].words.w0) << 32) | source[i + 1].words.w1);
+        } else if (opcode == G_SETTIMG) {
+            imageColor = 0;
+        } else if (opcode == G_SETTILE) {
+            // Match Interpreter::GfxDpSetTile: address 0 owns texture slot 0;
+            // every nonzero TMEM address owns texture slot 1.
+            tileSlot[(source[i].words.w1 >> 24) & 7] = (source[i].words.w0 & 0x1FF) != 0;
+        } else if (opcode == G_LOADBLOCK || opcode == G_LOADTILE) {
+            // A second image may populate a detail tile without replacing the
+            // grass in the primary render tile. Follow TMEM ownership, not the
+            // last image command (which may also be a palette load).
+            loadedColors[tileSlot[(source[i].words.w1 >> 24) & 7]] = imageColor;
+            explicitLoads = true;
+        } else if (opcode == G_TEXTURE) {
+            renderTile = (source[i].words.w0 >> 8) & 7;
+        } else if (opcode == G_DL || opcode == G_DL_OTR_HASH) {
             // A child list can change texture state. Require a subsequent
             // explicit selected texture load before recoloring more triangles.
-            color = 0;
+            imageColor = 0;
+            loadedColors[0] = loadedColors[1] = 0;
+            explicitLoads = false;
         }
         if (opcode == G_TRI1 || opcode == G_TRI2) {
+            const uint32_t color = explicitLoads ? loadedColors[tileSlot[renderTile]] : imageColor;
             size_t end = i + 1;
             while (end < source.size()) {
                 const auto next = source[end].words.w0 >> 24;
@@ -329,9 +357,7 @@ void ClearCache() {
 } // namespace
 
 void MMAutumnSceneFoliage_Update(const PlayState* play) {
-    const char* scene = play && play->sceneId == SCENE_00KEIKOKU      ? "Z2_00KEIKOKU"
-                        : play && play->sceneId == SCENE_21MITURINMAE ? "Z2_21MITURINMAE"
-                                                                      : nullptr;
+    const char* scene = play ? SceneResourceName(play->sceneId) : nullptr;
     if (scene == nullptr || MMWeather_SeasonForPlay(play) != SEASON_AUTUMN) {
         MMAutumnSceneFoliage_Reset();
         return;
