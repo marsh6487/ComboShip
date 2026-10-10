@@ -91,7 +91,7 @@ def fixture(host):
         code += r'''
 struct MessageTableEntry {u16 textId;};
 struct Font {struct {char schar[1280];} msgBuf;};
-struct MessageContext {Font font; MessageTableEntry* messageTableNES; int msgLength,msgBufPos,textDrawPos,decodedTextLen;};
+struct MessageContext {Font font; MessageTableEntry* messageTableNES; int msgLength,msgBufPos,textDrawPos,decodedTextLen; u16 currentTextId,nextTextId,unk1206C,unk12070,unk12074; int unk11F18,itemId,textboxY;};
 struct PauseContext {s16 cursorX[4],cursorY[4];};
 struct PlayState {MessageContext msgCtx; PauseContext pauseCtx;};
 static PlayState state; static PlayState* gPlayState=&state;
@@ -99,12 +99,27 @@ static struct {int dungeonSceneSharedIndex; struct {int language;} options;} gSa
 namespace Rando {std::string GetDungeonMapCompassInfo(s32,bool) {return "map";}}
 namespace CustomMessage {
 struct Entry {u8 textboxType,textboxYPos,icon; u16 nextMessageID,firstItemCost,secondItemCost; std::string msg; bool autoFormat=true;};
-void LoadCustomMessageIntoFont(const Entry& entry) {shown=entry.msg;}
+void LoadCustomMessageIntoFont(const Entry& entry) {
+    shown=entry.msg;
+    char* header=state.msgCtx.font.msgBuf.schar;
+    header[0]=entry.textboxType;header[1]=entry.textboxYPos;header[2]=entry.icon;
+    for(int i=3;i<11;++i)header[i]=char(0xFF);
+}
 void EnsureMessageEnd(std::string* body) {if(body->empty() || body->back()!='\xBF')*body+='\xBF';}
 }
 static u16 chosenTemplate;
-void func_801514B0(PlayState*,u16 textId,u8) {chosenTemplate=textId;}
+void func_801514B0(PlayState* play,u16 textId,u8) {
+    chosenTemplate=textId;play->msgCtx.currentTextId=textId;
+    play->msgCtx.font.msgBuf.schar[2]=0; // first vanilla template is the Ocarina
+}
+#define MESSAGE_CUSTOM_ICON_ITEM 0xFD
+#define MESSAGE_ITEM_NONE 9999
+static int sMsgStrayFairyIndex=-1,iconLoads;
+static u8 D_801CFF94[256]={ITEM_OCARINA_OF_TIME};
+void Message_LoadItemIcon(PlayState*,u8,int) {++iconLoads;}
+
 '''
+        code += function((ROOT / "mm/src/code/z_message.c").read_text(), "Message_DecodeHeader") + "\n"
         # Tables and lookup functions are copied unchanged from the production translation unit.
         code += source[source.index("struct ItemDescEntry"):]
         if "PauseItemDesc_ShowItem(" not in source:
@@ -121,6 +136,20 @@ contains(describe(ITEM_OOT_MASK_PLACEHOLDER),"Gerudo", "MM mask placeholder pres
 contains(describe(ITEM_OOT_MASK_PLACEHOLDER),"Urbosa", "MM Gerudo tutorial teaches rage finisher");
 contains(describe(ITEM_TRADE_PLACEHOLDER),"Pocket Egg", "MM trade placeholder preserves selected identity");
 const auto hourglass = describe(EXT_ITEM_PHANTOM_HOURGLASS);
+Message_DecodeHeader(&state);
+check(state.msgCtx.itemId==0xFE && iconLoads==0,"MM custom helper does not load inherited Ocarina icon");
+static const u16 helperItems[]={EXT_ITEM_SHADOW_CRYSTAL,ITEM_GUST_JAR,ITEM_ELEMENTAL_WAND,EXT_ITEM_SHEIKAH_SLATE};
+for(u16 id:helperItems) {
+    describe(id);Message_DecodeHeader(&state);
+    check(state.msgCtx.itemId==0xFE && iconLoads==0,"MM custom item helper remains iconless after header decode");
+}
+PauseItemDesc_ShowEquipment(&state,0,0,1,1);Message_DecodeHeader(&state);
+check(state.msgCtx.itemId==0xFE && iconLoads==0,"MM equipment helper does not borrow template icon");
+PauseItemDesc_ShowForm(&state,1,1);Message_DecodeHeader(&state);
+check(state.msgCtx.itemId==0xFE && iconLoads==0,"MM form helper does not borrow template icon");
+// A genuinely native description keeps its correct header icon.
+iconLoads=0;state.msgCtx.msgBufPos=0;state.msgCtx.font.msgBuf.schar[2]=0;Message_DecodeHeader(&state);
+check(state.msgCtx.itemId==ITEM_OCARINA_OF_TIME && iconLoads==1,"native helper header icon behavior is preserved");
 check(hourglass.size() > strlen(hourglass.c_str()), "MM encoded body retains embedded white-color zero bytes");
 contains(hourglass, "Release", "MM text after embedded zero reaches display boundary");
 check(!hourglass.empty() && hourglass.back()=='\xBF', "MM encoded tutorial has message terminator");
@@ -209,6 +238,47 @@ shown.clear(); table=true; OnOpenTextDescHook(&snapshot,&table); check(shown.emp
 state.pauseCtx.cursorX[PAUSE_EQUIP]=1;
 '''
     code += r'''
+for(const auto language:{ComboPauseTutorialText::Language::English,ComboPauseTutorialText::Language::German,ComboPauseTutorialText::Language::French}) {
+    for(const char* name:{"Phantom Hourglass","Shadow Crystal"}) {
+        const auto* receipt=ComboToolReceiptText::Find(name);
+        const std::string original=language==ComboPauseTutorialText::Language::German ? receipt->german :
+            language==ComboPauseTutorialText::Language::French ? receipt->french : receipt->english;
+        const auto expected=original.substr(original.find('&')+1);
+        const auto tutorial=ComboPauseTutorialText::Shared(name,language);
+        check(tutorial.substr(tutorial.find('&')+1)==expected && tutorial.front()=='%' && tutorial.substr(0,tutorial.find('&')).find('!')==std::string::npos,
+              "tool helper keeps colored heading and complete controls without localized grant wording");
+        check(original.find("!&")!=std::string::npos,"pickup receipt retains grant introduction");
+    }
+}
+static const char* rodNames[]={"Sand Rod","Tornado Rod","Water Rod","Meteor Rod","Storm Rod","Shadow Scepter"};
+static const char* runeNames[]={"Rune: Remote Bomb","Rune: Stasis","Rune: Cryonis","Rune: Master Cycle","Rune: Sheikah Sensor"};
+for(const auto language:{ComboPauseTutorialText::Language::English,ComboPauseTutorialText::Language::German,ComboPauseTutorialText::Language::French}) {
+    for(int rule=0;rule<3;++rule) for(int mode=-1;mode<6;++mode) {
+        const auto receipt=ComboMagicItemReceiptText::Body(*ComboMagicItemReceiptText::Find(mode<0 ? "Elemental Wand" : rodNames[mode],rule),language);
+        const auto tutorial=ComboPauseTutorialText::Wand(mode,rule,language);
+        check(tutorial.substr(tutorial.find('&')+1)==receipt.substr(receipt.find('&')+1) && tutorial.front()=='%' && tutorial.substr(0,tutorial.find('&')).find('!')==std::string::npos,
+              "rod helper keeps heading, power, wheel controls and fallback guide without grant wording");
+    }
+    for(int active=-1;active<5;++active) {
+        const auto receipt=ComboMagicItemReceiptText::Body(*ComboMagicItemReceiptText::Find(active<0 ? "Sheikah Slate" : runeNames[active]),language);
+        const auto tutorial=ComboPauseTutorialText::Slate(active,language);
+        check(tutorial.substr(tutorial.find('&')+1)==receipt.substr(receipt.find('&')+1) && tutorial.front()=='%' && tutorial.substr(0,tutorial.find('&')).find('!')==std::string::npos,
+              "rune helper keeps heading, localized power and wheel controls without learned/grant wording");
+    }
+}
+for(int mode=0;mode<6;++mode) {
+    wandMode=mode;const auto tutorial=describe(ITEM_ELEMENTAL_WAND);
+    check(tutorial.find("You got")==std::string::npos,"production scepter helper excludes grant wording");
+}
+for(int active=0;active<5;++active) {
+    rune=active;const auto tutorial=describe(EXT_ITEM_SHEIKAH_SLATE);
+    check(tutorial.find("You learned")==std::string::npos,"production rune helper excludes learned wording");
+}
+for(u16 id:{EXT_ITEM_PHANTOM_HOURGLASS,EXT_ITEM_SHADOW_CRYSTAL}) {
+    const auto tutorial=describe(id);
+    check(tutorial.find("You got")==std::string::npos,"production tool helper excludes pickup grant wording");
+    contains(tutorial,"Equip to","production tool helper retains equip controls");
+}
 contains(describe(EXT_ITEM_PHANTOM_HOURGLASS),"recorded path", "Hourglass reuses full recorded-path tutorial");
 contains(describe(EXT_ITEM_SHADOW_CRYSTAL),"bites", "Shadow Crystal reuses current combat tutorial");
 wandMode=0; contains(describe(ITEM_ELEMENTAL_WAND),"temporary platform", "Sand Rod reaches power tutorial");

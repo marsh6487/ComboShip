@@ -14,6 +14,7 @@ import subprocess
 import tempfile
 
 import run_ownership_tests as ownership
+import run_doll_stream_tests as doll_streams
 
 ROOT = Path(__file__).resolve().parents[2]
 FOLDER = ROOT / "mm/src/overlays/kaleido_scope/ovl_kaleido_scope"
@@ -364,6 +365,7 @@ def main():
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-g"]
         subprocess.run(command, check=True)
         subprocess.run([str(exe)], check=True)
+    doll_streams.main()
 
 
 if __name__ == "__main__":

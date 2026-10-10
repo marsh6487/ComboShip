@@ -10,13 +10,28 @@
 namespace ComboPauseTutorialText {
 using Language = ComboMagicItemReceiptText::Language;
 
+inline std::string AsTutorial(std::string receipt) {
+    // Shared tool/power receipts lead with grant/learned wording, a colored
+    // name and "!&". Keep that name as a heading and retain all controls.
+    const auto nameStart = receipt.find('%');
+    const auto grantLineEnd = receipt.find('&');
+    if (nameStart != std::string::npos && grantLineEnd != std::string::npos && nameStart < grantLineEnd &&
+        receipt[grantLineEnd - 1] == '!') {
+        receipt.erase(grantLineEnd - 1, 1);
+        receipt.erase(0, nameStart);
+    }
+    return receipt;
+}
+
 inline std::string Shared(const char* name, Language language = Language::English) {
     if (!name)
         return {};
-    if (const auto* entry = ComboToolReceiptText::Find(name))
-        return language == Language::German   ? entry->german
-               : language == Language::French ? entry->french
-                                              : entry->english;
+    if (const auto* entry = ComboToolReceiptText::Find(name)) {
+        const std::string receipt = language == Language::German   ? entry->german
+                                    : language == Language::French ? entry->french
+                                                                   : entry->english;
+        return AsTutorial(receipt);
+    }
     if (const auto* entry = ComboMaskReceiptText::Find(name))
         return language == Language::German   ? entry->german
                : language == Language::French ? entry->french
@@ -29,14 +44,14 @@ inline std::string Wand(int mode, int rule, Language language = Language::Englis
         "Sand Rod", "Tornado Rod", "Water Rod", "Meteor Rod", "Storm Rod", "Shadow Scepter"
     };
     const auto* entry = ComboMagicItemReceiptText::Find(mode >= 0 && mode < 6 ? names[mode] : "Elemental Wand", rule);
-    return entry ? ComboMagicItemReceiptText::Body(*entry, language) : std::string{};
+    return entry ? AsTutorial(ComboMagicItemReceiptText::Body(*entry, language)) : std::string{};
 }
 
 inline std::string Slate(int rune, Language language = Language::English) {
     static const char* names[] = { "Rune: Remote Bomb", "Rune: Stasis", "Rune: Cryonis", "Rune: Master Cycle",
                                    "Rune: Sheikah Sensor" };
     const auto* entry = ComboMagicItemReceiptText::Find(rune >= 0 && rune < 5 ? names[rune] : "Sheikah Slate");
-    return entry ? ComboMagicItemReceiptText::Body(*entry, language) : std::string{};
+    return entry ? AsTutorial(ComboMagicItemReceiptText::Body(*entry, language)) : std::string{};
 }
 
 inline std::string Cane(int type, int skill, bool mm) {

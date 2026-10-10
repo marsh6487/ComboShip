@@ -340,12 +340,13 @@ static bool PauseItemDesc_ShowBody(PlayState* play, std::string desc, u8 textBox
     MessageContext* msgCtx = &play->msgCtx;
     Font* font = &msgCtx->font;
 
-    // Keep the template's header bytes: func_801514B0 already derived unk11F08/unk11F18/unk11F0C
-    // from the first word of the buffer, so only the body may change.
+    // Keep the template's first word: func_801514B0 already derived
+    // unk11F08/unk11F18/unk11F0C from it. The icon is decoded later and belongs
+    // to that vanilla item, so custom pause help uses the no-icon sentinel.
     CustomMessage::Entry entry;
     entry.textboxType = font->msgBuf.schar[0];
     entry.textboxYPos = font->msgBuf.schar[1];
-    entry.icon = font->msgBuf.schar[2];
+    entry.icon = 0xFE;
     entry.nextMessageID = 0xFFFF;
     entry.firstItemCost = 0xFFFF;
     entry.secondItemCost = 0xFFFF;

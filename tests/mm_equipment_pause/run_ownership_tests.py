@@ -171,6 +171,11 @@ void ExtEquip_ToggleCapeVisibility() { save.capeHidden = !save.capeHidden; }
 void ExtEquip_TogglePendantEffect() { save.pendantEffectOff = !save.pendantEffectOff; }
 void Interface_LoadItemIconImpl(PlayState*, u8) { ++iconLoads; }
 void Audio_PlaySfx(int sfx) { if (sfx == NA_SE_SY_ERROR) ++errors; }
+static int gSfxDefaultPos;
+static float gSfxDefaultFreqAndVolScale;
+static int8_t gSfxDefaultReverb;
+#define NA_SE_IT_SHIELD_REMOVE 4
+void Audio_PlaySoundGeneral(int, int*, int, float*, float*, int8_t*) {}
 int BrokenItems_Enabled() { return 0; }
 int BrokenItems_CurrentForm() { return 0; }
 int BrokenItems_FormCount() { return 0; }
@@ -226,7 +231,7 @@ void RecordPrimColor(u8, u8, u8, u8) {}
         code += selectors.defines(pause, prefix)
     functions = ["ExtEquip_GetBit", "ExtEquip_HasItem", "ExtEquip_GiveItem", "ExtEquip_GetItemId",
                  "ExtEquip_TridentAllowsShield", "ExtEquip_SetCurrentByType", "ExtEquip_ApplyVanillaBase",
-                 "ExtEquip_ApplyTridentShieldPolicy", "ExtEquip_SetSlot", "ExtEquip_Equip"]
+                 "ExtEquip_ApplyTridentShieldPolicy", "ExtEquip_SetSlot", "ExtEquip_Equip", "ExtEquip_ToggleFromCButton"]
     if "void ExtEquip_RecordNativeShieldOwnership(" in equipment:
         functions.insert(0, "ExtEquip_RecordNativeShieldOwnership")
     if "void ExtEquip_RecordNativeSwordOwnership(" in equipment:
@@ -373,6 +378,69 @@ int main() {
     ExtEquip_GiveItem(EQUIP_TYPE_SWORD,3);
     KaleidoEquip_EquipCell(&play,0,3); ExtEquip_Unequip(EQUIP_TYPE_SWORD);
     check(KaleidoEquip_CellOwned(&kokiri), "native starter Kokiri survives an earned Trident equip/unequip");
+    for (u8 index = 1; index <= 3; ++index) {
+        Reset(); sEquipSubPage = 1;
+        ExtEquip_GiveItem(EQUIP_TYPE_SWORD,index);
+        KaleidoEquip_EquipCell(&play,0,index);
+        check(buttons[EQUIP_SLOT_B] == ExtEquip_GetItemId(EQUIP_TYPE_SWORD,index),
+              "every owned extended sword, including Byrna, puts its own identity on B");
+        check(nativeEquipment[EQUIP_TYPE_SWORD] == EQUIP_VALUE_SWORD_NONE,
+              "an extended sword carrier cannot manufacture a native sword equip");
+        check(save.comboObtainedFc[FCI_KOKIRI_SWORD] == 0 && save.comboAppliedFc[FCI_KOKIRI_SWORD] == 0,
+              "an extended sword carrier preserves native ownership receipt counts");
+        KaleidoEquip_EquipCell(&play,0,index);
+        check(buttons[EQUIP_SLOT_B] == ITEM_NONE && currentExt[EQUIP_TYPE_SWORD] == 0,
+              "removing any extended sword, including Byrna, releases B");
+    }
+    for (u8 index = 1; index <= 3; ++index) {
+        Reset(); ExtEquip_GiveItem(EQUIP_TYPE_TUNIC,index);
+        const u32 owned = save.extEquipOwnedBits;
+        ExtEquip_ToggleFromCButton(ExtEquip_GetItemId(EQUIP_TYPE_TUNIC,index));
+        check(enabled && currentExt[EQUIP_TYPE_TUNIC] == index && save.extEquipTunic == index,
+              "an owned C-assigned tunic opts into equipment behavior with the legacy toggle off");
+        check(save.extEquipOwnedBits == owned && buttons[EQUIP_SLOT_B] == ITEM_NONE,
+              "a tunic C toggle preserves earned ownership and does not take B");
+        ExtEquip_ToggleFromCButton(ExtEquip_GetItemId(EQUIP_TYPE_TUNIC,index));
+        check(currentExt[EQUIP_TYPE_TUNIC] == 0 && save.extEquipTunic == 0,
+              "a second tunic C press removes the same equipment in RAM and save");
+    }
+    for (s16 type = 0; type <= 3; ++type) for (u8 index = 1; index <= 3; ++index) {
+        Reset(); const NeiSaveData before = save;
+        ExtEquip_ToggleFromCButton(ExtEquip_GetItemId(type,index));
+        check(!enabled && currentExt[type] == 0 && std::memcmp(&before,&save,sizeof(save)) == 0,
+              "an unowned C-assigned equipment item cannot opt in or mutate acquisition/loadout state");
+    }
+    for (u8 shield = 0; shield <= 3; ++shield) {
+        Reset(); sEquipSubPage = 1;
+        ExtEquip_GiveItem(EQUIP_TYPE_SWORD,3);
+        for (u8 index = 1; index <= 3; ++index) ExtEquip_GiveItem(EQUIP_TYPE_SHIELD,index);
+        save.shieldOwned = FC_SHIELD_IKANA;
+        if (shield != 0) ExtEquip_SetSlot(EQUIP_TYPE_SHIELD,shield);
+        const NeiSaveData before = save;
+        KaleidoEquip_EquipCell(&play,0,3);
+        const u8 expectedShield = shield == 1 || shield == 3 ? shield : 0;
+        check(currentExt[EQUIP_TYPE_SHIELD] == expectedShield && save.extEquipShield == expectedShield,
+              "Trident retains a selected compatible shield and never auto-equips an owned shield");
+        check(nativeEquipment[EQUIP_TYPE_SHIELD] == (expectedShield == 3 ? EQUIP_VALUE_SHIELD_MIRROR :
+              expectedShield == 1 ? EQUIP_VALUE_SHIELD_HERO : EQUIP_VALUE_SHIELD_NONE),
+              "Trident's native shield projection follows the explicit compatible selection");
+        check(save.extEquipOwnedBits == before.extEquipOwnedBits && save.shieldOwned == before.shieldOwned,
+              "Trident's shield policy preserves genuine extended and native ownership");
+        const NeiSaveData equipped = save;
+        Draw(&play); Publish(&play.pauseCtx); Draw(&play);
+        check(std::memcmp(&equipped,&save,sizeof(save)) == 0 && currentExt[EQUIP_TYPE_SHIELD] == expectedShield,
+              "equipment-page reentry does not re-select another shield or mutate the loadout");
+    }
+    for (u8 shield : {(u8)EQUIP_VALUE_SHIELD_HERO,(u8)EQUIP_VALUE_SHIELD_MIRROR}) {
+        Reset(); sEquipSubPage = 1; ExtEquip_GiveItem(EQUIP_TYPE_SWORD,3); ExtEquip_GiveItem(EQUIP_TYPE_SHIELD,1);
+        nativeEquipment[EQUIP_TYPE_SHIELD] = shield;
+        KaleidoEquip_EquipCell(&play,0,3);
+        check(currentExt[EQUIP_TYPE_SHIELD] == 0 && nativeEquipment[EQUIP_TYPE_SHIELD] ==
+              (shield == EQUIP_VALUE_SHIELD_MIRROR ? EQUIP_VALUE_SHIELD_MIRROR : EQUIP_VALUE_SHIELD_NONE),
+              "Trident retains a selected native Mirror but does not substitute an owned Divine for Hero");
+        check(save.shieldOwned == (shield == EQUIP_VALUE_SHIELD_HERO ? FC_SHIELD_HYLIAN : 0),
+              "clearing an incompatible genuine Hero preserves its earned ownership");
+    }
     for (u8 borrowed : { (u8)ITEM_SWORD_MASTER, (u8)ITEM_SWORD_BGS, (u8)ITEM_EXT_SWORD_2, (u8)ITEM_EXT_SWORD_3 }) {
         Reset(); nativeEquipment[EQUIP_TYPE_SWORD] = EQUIP_VALUE_SWORD_GILDED; buttons[EQUIP_SLOT_B] = borrowed;
         check(!KaleidoEquip_CellOwned(&kokiri), "borrowed sword slot cannot prove native Kokiri ownership");

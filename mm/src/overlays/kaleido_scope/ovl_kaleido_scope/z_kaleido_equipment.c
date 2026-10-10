@@ -934,8 +934,8 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
 
 // ---------------------------------------------------------------------------
 // Link doll: render the player's LIVE skeleton into the isolated framebuffer.
-// SoH technique: gsSPSetFB redirects the OPA stream into the doll FB, so none of
-// the pause pages' RDP state/segments are affected. Composite happens later as a
+// Replay both player streams into the doll FB, so translucent equipment cannot
+// escape into the pause pages. Composite happens later as a
 // page-space quad (see KaleidoScope_DrawEquipment).
 // ---------------------------------------------------------------------------
 static void KaleidoEquip_RenderDollFB(PlayState* play) {
@@ -969,14 +969,17 @@ static void KaleidoEquip_RenderDollFB(PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
 
     // SoH structure: the doll renders during the WORK pass (before the main scene), inside the
-    // isolated FB. The doll's commands are written into the OPA stream but EXECUTED from WORK
-    // via a display-list call; the main OPA pass BRANCHES OVER them (opaRef patch below), so
-    // the page's own drawing is completely untouched. (Doing SetFB mid-OPA killed the page.)
+    // isolated FB. Replay OPA then XLU from WORK and branch over both captured
+    // lists in their main passes. Player callbacks draw translucent shields and
+    // replacement-model effects on XLU as well as the opaque skeleton on OPA.
     Gfx* opaRef = POLY_OPA_DISP;
     POLY_OPA_DISP++;
+    Gfx* xluRef = POLY_XLU_DISP;
+    POLY_XLU_DISP++;
 
     gsSPSetFB(WORK_DISP++, gPauseLinkFrameBuffer);
     gSPDisplayList(WORK_DISP++, POLY_OPA_DISP);
+    gSPDisplayList(WORK_DISP++, POLY_XLU_DISP);
 
     // Clear the doll FB to transparent black so the page shows through around Link.
     gDPPipeSync(POLY_OPA_DISP++);
@@ -987,19 +990,33 @@ static void KaleidoEquip_RenderDollFB(PlayState* play) {
     gDPFillRectangle(POLY_OPA_DISP++, 0, 0, EQUIP_DOLL_FBW - 1, EQUIP_DOLL_FBH - 1);
     gDPPipeSync(POLY_OPA_DISP++);
 
-    // 3D state for the doll
+    // Player_DrawImpl expects the caller's render/combine setup. Restore the
+    // native no-fog player state after the clear; cycle/geometry alone leaves
+    // NOOP, and the gameplay fog blender would misread vertex alpha as fog.
+    POLY_OPA_DISP = Gfx_SetupDL26(POLY_OPA_DISP);
     gDPSetCycleType(POLY_OPA_DISP++, G_CYC_2CYCLE);
     gSPLoadGeometryMode(POLY_OPA_DISP++, G_ZBUFFER | G_SHADE | G_CULL_BACK | G_LIGHTING | G_SHADING_SMOOTH);
     gSPTexture(POLY_OPA_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
     gSPViewport(POLY_OPA_DISP++, &sDollViewport);
+    gDPPipeSync(POLY_XLU_DISP++);
+    POLY_XLU_DISP = Gfx_SetupDL26(POLY_XLU_DISP);
+    gDPSetScissor(POLY_XLU_DISP++, G_SC_NON_INTERLACE, 0, 0, EQUIP_DOLL_FBW, EQUIP_DOLL_FBH);
+    gDPSetCycleType(POLY_XLU_DISP++, G_CYC_2CYCLE);
+    gSPLoadGeometryMode(POLY_XLU_DISP++, G_ZBUFFER | G_SHADE | G_CULL_BACK | G_LIGHTING | G_SHADING_SMOOTH);
+    gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
+    gSPViewport(POLY_XLU_DISP++, &sDollViewport);
 
     guPerspective(perspMtx, &perspNorm, 60.0f, (f32)EQUIP_DOLL_FBW / (f32)EQUIP_DOLL_FBH, 10.0f, 4000.0f, 1.0f);
     gSPPerspNormalize(POLY_OPA_DISP++, perspNorm);
     gSPMatrix(POLY_OPA_DISP++, perspMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
+    gSPPerspNormalize(POLY_XLU_DISP++, perspNorm);
+    gSPMatrix(POLY_XLU_DISP++, perspMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
     guLookAt(lookAtMtx, 0.0f, 0.0f, -100.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
     gSPMatrix(POLY_OPA_DISP++, lookAtMtx, G_MTX_NOPUSH | G_MTX_MUL | G_MTX_PROJECTION);
+    gSPMatrix(POLY_XLU_DISP++, lookAtMtx, G_MTX_NOPUSH | G_MTX_MUL | G_MTX_PROJECTION);
 
     gSPSetLights1(POLY_OPA_DISP++, sDollLights);
+    gSPSetLights1(POLY_XLU_DISP++, sDollLights);
 
     // CRITICAL: the player limb DLs reference segment 0x0C for the cull display list (set by
     // Player_DrawGameplay before Player_DrawImpl). Without it, segment 0x0C is garbage and the
@@ -1047,10 +1064,13 @@ static void KaleidoEquip_RenderDollFB(PlayState* play) {
 
     gDPPipeSync(POLY_OPA_DISP++);
 
-    // Terminate the WORK-executed sublist, patch the reserved slot so the main OPA pass
-    // jumps over the doll commands, and restore the main framebuffer for the WORK stream.
+    // Terminate both WORK-executed sublists and skip them in the main passes.
+    // Restore the main framebuffer only after translucent preview draws finish.
     gSPEndDisplayList(POLY_OPA_DISP++);
     gSPBranchList(opaRef, POLY_OPA_DISP);
+    gDPPipeSync(POLY_XLU_DISP++);
+    gSPEndDisplayList(POLY_XLU_DISP++);
+    gSPBranchList(xluRef, POLY_XLU_DISP);
     gsSPResetFB(WORK_DISP++);
 
     CLOSE_DISPS(play->state.gfxCtx);

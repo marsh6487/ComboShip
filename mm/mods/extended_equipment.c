@@ -18,7 +18,7 @@
 #include "transformation_masks/assets/mm_asset_loader.h"
 #include "pak_loader/pak_loader.h"
 #include "oot_asset_loader/oot_asset_loader.h"   // Trident: Phantom Ganon's lance lives in oot.o2r
-#include "2s2h/FleetShipCombo/FleetComboIds.h"   // FC_SHIELD_IKANA (Trident's Mirror fallback)
+#include "2s2h/FleetShipCombo/FleetComboIds.h"   // Native shield ownership
 #include "2s2h/FleetShipCombo/FleetComboItems.h" // FCI_KOKIRI_SWORD acquisition receipt
 
 // trade_items.c ships no header; declared locally, as the save editor does. The Pendant of
@@ -519,13 +519,12 @@ static void ExtEquip_ReloadBIcon(void) {
 static void ExtEquip_ApplyVanillaBase(s16 equipType, u8 oldIndex, u8 index) {
     switch (equipType) {
         case EQUIP_TYPE_SWORD:
-            // Four Sword / Trident ride the B button as THEMSELVES (ExtPlayer_GetItemAction aliases
-            // their ids to the one-hand sword action): the equipment nibble and the save never see a
-            // Kokiri Sword the player may not own. Byrna is an add-on to whatever sword is held.
-            if (index == 2 || index == 3) {
+            // Extended swords ride B as themselves through the native one-hand sword action.
+            // This keeps Byrna drawable/swingable without inventing a native sword receipt.
+            if (index >= 1 && index <= 3) {
                 gSaveContext.save.saveInfo.equips.buttonItems[0][0] = ExtEquip_GetItemId(EQUIP_TYPE_SWORD, index);
                 ExtEquip_ReloadBIcon();
-            } else if (index == 0 && (oldIndex == 2 || oldIndex == 3)) {
+            } else if (index == 0 && (oldIndex >= 1 && oldIndex <= 3)) {
                 SET_EQUIP_VALUE(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_NONE);
                 gSaveContext.save.saveInfo.equips.buttonItems[0][0] = ITEM_NONE;
                 ExtEquip_ReloadBIcon();
@@ -575,15 +574,10 @@ static void ExtEquip_ApplyTridentShieldPolicy(void) {
     if (ExtEquip_TridentAllowsShield(ExtEquip_GetCurrent(EQUIP_TYPE_SHIELD), GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD))) {
         return;
     }
-    if (ExtEquip_HasItem(EQUIP_TYPE_SHIELD, 1)) {
-        ExtEquip_SetSlot(EQUIP_TYPE_SHIELD, 1);
-        return;
-    }
+    // Keep an explicitly selected compatible shield; ownership alone must not select one.
+    ExtEquip_RecordNativeShieldOwnership();
     ExtEquip_SetSlot(EQUIP_TYPE_SHIELD, 0);
-    if (Nei_Save()->shieldOwned & FC_SHIELD_IKANA) {
-        Inventory_ChangeEquipment(EQUIP_VALUE_SHIELD_MIRROR);
-        ExtEquip_RefreshPlayer();
-    }
+    Inventory_ChangeEquipment(EQUIP_VALUE_SHIELD_NONE);
 }
 
 void ExtEquip_RecordNativeSwordOwnership(void) {
@@ -777,9 +771,6 @@ void ExtEquip_ClearTransformBackup(void) {
 void ExtEquip_ToggleFromCButton(u16 itemId) {
     if (itemId < ITEM_EXT_SWORD_1 || itemId > ITEM_EXT_BOOTS_3)
         return;
-    if (!ExtEquip_IsEnabled())
-        return;
-
     // Pikachu cannot use extended equipment
     if (TransformMasks_IsTransformedAny() && MmForm_GetCurrentForm() == MM_PLAYER_FORM_PIKACHU)
         return;
