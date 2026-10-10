@@ -80,7 +80,9 @@ Result Check(Kind kind, const Camera& view, bool enlarge, bool sweep) {
             // The production CameraBasis is the billboard axes transformed
             // into the uniform caller matrix's local coordinates.
             const Basis camera{ { cy, 0, sy }, { sp * sy, cp, -sp * cy }, { -cp * sy, sp, cp * cy } };
-            for (const auto mesh : {SampleShimmer(frame, true, camera, kind), SampleSword(kind, frame, camera)})
+            for (const auto mesh : {SampleShimmer(frame, true, camera, kind),
+                                   SampleSword(kind, frame, camera,
+                                               ComboSwordGi_ParticleScale(kind, false, view.context, enlarge))})
             for (size_t i = 0; i < mesh.count; ++i) {
                 const auto& v = mesh.vertices[i];
                 if (!v.alpha)

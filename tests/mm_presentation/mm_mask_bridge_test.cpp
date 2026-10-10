@@ -186,6 +186,7 @@ float ComboSwordGi_SelectedTilt(float,bool=false) {assert(0 && "mask selected sw
 void ComboSwordGi_ApplyModelsFit(const char*,const char* const*,int,float,float,bool=false,int=0) {assert(0 && "mask selected sword fit");}
 void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT*,bool=false,bool=true) {assert(0 && "mask selected custom sword draw");}
 void ComboSwordGi_ApplyEffectFit(NeiGi::Kind,bool=false,int=0) {assert(0 && "mask selected sword effects fit");}
+float ComboSwordGi_ParticleScale(NeiGi::Kind,bool=false,int=0,bool=true) {assert(0 && "mask selected sword particle size");return 1.f;}
 void DrawOotSlateRuneFlame(uint8_t,uint8_t,uint8_t) {assert(0 && "mask selected sword flame");}
 /* OTHER_DRAW_HANDLERS */
 /* HOST_DISPATCH */

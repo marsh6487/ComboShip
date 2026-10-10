@@ -2340,11 +2340,8 @@ void KaleidoScope_UpdateItemCursor(PlayState* play) {
                         // So: custom text first, vanilla message only when it really exists.
                         u8 textBoxPos = (pauseCtx->cursorYIndex[PAUSE_ITEM] < 2) ? 3 : 1;
                         u16 vanillaTextId = 0x1700 + pauseCtx->cursorItem[PAUSE_ITEM];
-                        const char* customDesc = PauseItemDesc_Get(pauseCtx->cursorItem[PAUSE_ITEM], PAUSE_ITEM);
-
-                        if (customDesc != NULL) {
+                        if (PauseItemDesc_ShowItem(play, pauseCtx->cursorItem[PAUSE_ITEM], PAUSE_ITEM, textBoxPos)) {
                             pauseCtx->itemDescriptionOn = true;
-                            PauseItemDesc_Show(play, customDesc, textBoxPos);
                         } else if (PauseItemDesc_VanillaTextExists(vanillaTextId)) {
                             pauseCtx->itemDescriptionOn = true;
                             func_801514B0(play, vanillaTextId, textBoxPos);

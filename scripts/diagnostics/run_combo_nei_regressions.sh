@@ -3,6 +3,8 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 python3 -B scripts/diagnostics/run_hint_item_name_tests.py
 python3 -B scripts/diagnostics/run_combo_crash_owner_tests.py
+python3 -B tools/nei_gi/test_tunic_clearance.py
+python3 -B tools/nei_gi/SOURCE/mario_sm64_poc3.py --verify
 python3 -B scripts/diagnostics/run_nei_gi_tests.py --held --combo
 python3 -B tests/elemental_arrow_gi/run_tests.py
 python3 -B tests/reward_gi/run_tests.py
@@ -89,7 +91,11 @@ python3 -B tests/nei_held/run_equipment_tests.py
 python3 -B tests/nei_held/run_four_sword_visibility_tests.py
 python3 -B tests/mm_equipment_pause/run_tests.py --sanitize
 python3 -B tests/mm_equipment_pause/run_ownership_tests.py --sanitize
+python3 -B tests/mm_equipment_pause/run_preview_transition_tests.py
+python3 -B tests/mm_equipment_pause/run_preview_transition_tests.py --sanitize
 python3 -B tests/mm_pause_inventory/run_tests.py --sanitize
+python3 -B tests/pause_tutorials/run_tests.py
+python3 -B tests/pause_tutorials/run_tests.py --sanitize
 python3 -B tests/combo_button_transfer/run_tests.py --sanitize
 python3 -B tests/nei_quest_held/run_tests.py
 python3 -B tests/nei_used_fx/run_tests.py

@@ -704,7 +704,8 @@ inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo*
                 Matrix_RotateX(op.a * (3.14159265358979323846f / 32768.f), MTXMODE_APPLY);
                 break;
             case CW_OP_ROTATE_Z:
-                Matrix_RotateZ(ComboSwordGi_SelectedTilt(op.a * (3.14159265358979323846f / 32768.f), shop && sword),
+                Matrix_RotateZ(sword ? ComboSwordGi_SelectedTilt(op.a * (3.14159265358979323846f / 32768.f), shop)
+                                     : op.a * (3.14159265358979323846f / 32768.f),
                                MTXMODE_APPLY);
                 break;
             case CW_OP_SCALE:
@@ -1132,8 +1133,11 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
         }
         if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1 &&
             NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
-            NeiGi_DrawMesh(play, NeiGi::SampleSpecial(static_cast<NeiGi::Kind>(info->neiShimmer - 1),
-                                                      play->gameplayFrames, NeiGi_CameraBasis(play)));
+            NeiGi_DrawMesh(
+                play,
+                NeiGi::SampleSpecial(
+                    static_cast<NeiGi::Kind>(info->neiShimmer - 1), play->gameplayFrames, NeiGi_CameraBasis(play),
+                    ComboSwordGi_ParticleScale(static_cast<NeiGi::Kind>(info->neiShimmer - 1), shop, 0, fitSword)));
         if (info->drawKind == CW_DRAW_KIND_SONG_GI)
             NeiGi_DrawSongOverlay(play, info->neiEffect, "mm");
         else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1)

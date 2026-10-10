@@ -349,22 +349,25 @@ inline float SwordEmissionBase(Kind kind) {
     // up the longer blades. Forged meshes keep their guard at Y=0.
     return kind == Kind::RazorSword ? -9.f : 8.f;
 }
-inline Mesh SampleSword(Kind kind, uint32_t frame, const Basis& camera) {
+inline Mesh SampleSword(Kind kind, uint32_t frame, const Basis& camera, float particleScale = 1.f) {
     Mesh m;
     const float t = Time(frame), top = SwordBladeTip(kind), bottom = SwordEmissionBase(kind);
     const uint32_t color = ColorHex(kind);
+    const float size = std::isfinite(particleScale) && particleScale > 0.f ? particleScale : 1.f;
     if (kind == Kind::KokiriSword || kind == Kind::GreatFairySword) {
         const bool fairy = kind == Kind::GreatFairySword;
-        for (int i = 0; i < 10; ++i) {
+        for (int i = 0; i < 14; ++i) {
             const uint32_t age = frame % 360u + i * 31u;
             const float f = float(age % 180u) / 180.f;
             const float a = i * 2.399963f + f * Tau * (fairy ? 1.5f : .5f);
             const float radius = fairy ? 10.f : 4.8f;
-            const Point p{ radius * std::cos(a), bottom + (top - bottom) * f, radius * std::sin(a) };
-            const Point along{ std::sin(a) * .5f, fairy ? 1.3f : .9f, std::cos(a) * .5f };
-            const Point across{ std::cos(a) * (fairy ? .65f : .45f), .1f, -std::sin(a) * (fairy ? .65f : .45f) };
+            const float pad = (fairy ? 2.6f : 2.f) * size;
+            const Point p{ radius * std::cos(a), bottom + pad + (top - bottom - 2.f * pad) * f, radius * std::sin(a) };
+            const Point along = Point{ std::sin(a) * .6f, fairy ? 2.6f : 2.f, std::cos(a) * .6f } * size;
+            const Point across =
+                Point{ std::cos(a) * (fairy ? 1.35f : 1.1f), .1f, -std::sin(a) * (fairy ? 1.35f : 1.1f) } * size;
             const uint32_t hue = fairy && (age / 180u) % 2 ? 0x9382C4 : color;
-            const uint8_t alpha = uint8_t((fairy ? 165 : 145) * std::sin(f * Tau * .5f));
+            const uint8_t alpha = uint8_t(220 * std::sin(f * Tau * .5f));
             // Pointed local flecks/petals retain their shape while the GI spins.
             m.Tri({ p + along, hue, alpha }, { p + across, hue, alpha }, { p - along, hue, alpha });
             m.Tri({ p + along, hue, alpha }, { p - along, hue, alpha }, { p - across, hue, alpha });
@@ -382,43 +385,46 @@ inline Mesh SampleSword(Kind kind, uint32_t frame, const Basis& camera) {
                 return Point{ radius * std::sin(a), bottom + (top - bottom) * f, radius * std::cos(a) };
             };
             for (int j = 0; j < 14; ++j)
-                Band(m, p(j), p(j + 1), blessing ? .45f : .32f, hue, blessing ? 0xF4C95D : 0xFFFFFF, camera,
-                     blessing ? 145 : 115);
+                Band(m, p(j), p(j + 1), (blessing ? .9f : .65f) * size, hue, blessing ? 0xF4C95D : 0xFFFFFF, camera,
+                     blessing ? 205 : 180);
         }
         if (blessing) {
             for (int i = 0; i < 6; ++i) {
                 const float f = float((frame % 360u + i * 59u) % 360u) / 360.f;
                 const float a = i * 2.399963f + t;
-                Glow(m, { 5.5f * std::cos(a), bottom + (top - bottom) * f, 5.5f * std::sin(a) }, .55f, 0xF4C95D,
-                     uint8_t(165 * std::sin(f * Tau * .5f)), camera);
+                Glow(m, { 5.5f * std::cos(a), bottom + (top - bottom) * f, 5.5f * std::sin(a) }, 1.2f * size, 0xF4C95D,
+                     uint8_t(210 * std::sin(f * Tau * .5f)), camera);
             }
         }
     } else if (kind == Kind::RazorSword) {
-        for (int i = 0; i < 8; ++i) {
+        for (int i = 0; i < 12; ++i) {
             const float f = float((frame % 180u + i * 23u) % 180u) / 180.f;
-            const float y = bottom + (top - bottom) * f;
+            const float pad = 2.4f * size;
+            const float y = bottom + pad + (top - bottom - 2.f * pad) * f;
             const float edge = (i % 2 ? -1.f : 1.f) * (5.8f - 1.7f * f);
             const Point p{ edge, y, 1.5f * std::sin(t + i) };
-            const uint8_t alpha = uint8_t(170 * std::sin(f * Tau * .5f));
-            Band(m, p, p + Point{ .25f, .9f, 0 }, .18f, color, 0xFFFFFF, camera, alpha);
-            Glow(m, p, .45f, color, alpha, camera);
+            const uint8_t alpha = uint8_t(225 * std::sin(f * Tau * .5f));
+            Band(m, p, p + Point{ .35f, 2.4f, 0 } * size, .45f * size, color, 0xFFFFFF, camera, alpha);
+            Glow(m, p, 1.1f * size, color, alpha, camera);
         }
     } else if (kind == Kind::GildedSword || kind == Kind::BiggoronSword || kind == Kind::GiantsKnife) {
         const bool forge = kind != Kind::GildedSword;
         const uint32_t lifetime = forge ? 90u : 360u;
-        for (int i = 0; i < 8; ++i) {
+        for (int i = 0; i < 12; ++i) {
             const float f = float((frame % lifetime + i * (forge ? 11u : 43u)) % lifetime) / lifetime;
             const float a = i * 2.399963f + (forge ? f * 1.6f : (frame % 360u) * (Tau / 360.f));
-            const Point p{ 5.2f * std::cos(a), bottom + (top - bottom) * f, 5.2f * std::sin(a) };
-            const uint8_t alpha = uint8_t((forge ? 175 : 150) * std::sin(f * Tau * .5f));
-            Glow(m, p, forge ? .55f : .7f, color, alpha, camera);
+            const float pad = (forge ? 2.8f : 1.4f) * size;
+            const Point p{ 5.2f * std::cos(a), bottom + pad + (top - bottom - (forge ? pad : 2.f * pad)) * f,
+                           5.2f * std::sin(a) };
+            const uint8_t alpha = uint8_t(220 * std::sin(f * Tau * .5f));
+            Glow(m, p, (forge ? 1.25f : 1.4f) * size, color, alpha, camera);
             if (forge)
-                Band(m, p, p - Point{ .2f, 1.5f, 0 }, .16f, color, 0xFFE6BA, camera, alpha);
+                Band(m, p, p - Point{ .25f, 2.8f, 0 } * size, .32f * size, color, 0xFFE6BA, camera, alpha);
         }
     }
     return m;
 }
-inline Mesh SampleSpecial(Kind kind, uint32_t frame, const Basis& camera = {}) {
+inline Mesh SampleSpecial(Kind kind, uint32_t frame, const Basis& camera = {}, float particleScale = 1.f) {
     Mesh m;
     const float t = Time(frame);
     const uint32_t color = ColorHex(kind);
@@ -491,7 +497,7 @@ inline Mesh SampleSpecial(Kind kind, uint32_t frame, const Basis& camera = {}) {
                 Band(m, p(j), p(j + 1), .22f, color, 0xD1F8FF, camera, 120);
             }
     } else if (IsSword(kind)) {
-        return SampleSword(kind, frame, camera);
+        return SampleSword(kind, frame, camera, particleScale);
     }
     return m;
 }

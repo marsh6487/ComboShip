@@ -1106,7 +1106,8 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info, bool sho
                 Matrix_RotateXF(op.a * (3.14159265358979323846f / 32768.0f), MTXMODE_APPLY);
                 break;
             case CW_OP_ROTATE_Z:
-                Matrix_RotateZF(ComboSwordGi_SelectedTilt(op.a * (3.14159265358979323846f / 32768.0f), shop && sword),
+                Matrix_RotateZF(sword ? ComboSwordGi_SelectedTilt(op.a * (3.14159265358979323846f / 32768.0f), shop)
+                                      : op.a * (3.14159265358979323846f / 32768.0f),
                                 MTXMODE_APPLY);
                 break;
             case CW_OP_SCALE:
@@ -1303,7 +1304,8 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
         const float tilt =
             info->drawKind == CW_DRAW_KIND_MASTER_SWORD ? 2.1f
             : info->drawKind == CW_DRAW_KIND_CUSTOM_GI && info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z
-                ? ComboSwordGi_SelectedTilt(info->ops[0].a * (3.14159265358979323846f / 32768.f), shop && swordIdentity)
+                ? (swordIdentity ? ComboSwordGi_SelectedTilt(info->ops[0].a * (3.14159265358979323846f / 32768.f), shop)
+                                 : info->ops[0].a * (3.14159265358979323846f / 32768.f))
                 : 0.f;
         ComboSwordGi_ApplyModelsFit("oot", info->dls, info->count, scale, tilt, shop, mmPickup);
     }
@@ -1430,8 +1432,11 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
         }
         if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1 &&
             NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
-            NeiGi_DrawMesh(gPlayState, NeiGi::SampleSpecial(static_cast<NeiGi::Kind>(info->neiShimmer - 1),
-                                                            gPlayState->gameplayFrames, NeiGi_CameraBasis(gPlayState)));
+            NeiGi_DrawMesh(gPlayState, NeiGi::SampleSpecial(
+                                           static_cast<NeiGi::Kind>(info->neiShimmer - 1), gPlayState->gameplayFrames,
+                                           NeiGi_CameraBasis(gPlayState),
+                                           ComboSwordGi_ParticleScale(static_cast<NeiGi::Kind>(info->neiShimmer - 1),
+                                                                      shop, mmPickup, fitModel)));
         const bool mmOwner = info->drawKind == CW_DRAW_KIND_MM_MASK || info->drawKind == CW_DRAW_KIND_MM_REMAINS;
         if (info->drawKind == CW_DRAW_KIND_SONG_GI)
             NeiGi_DrawSongOverlay(gPlayState, info->neiEffect, "oot");

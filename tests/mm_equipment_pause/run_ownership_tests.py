@@ -181,6 +181,9 @@ void BrokenItems_EquipForm(PlayState*, int) {}
 const char* PauseItemDesc_GetEquipUpgrade(s16) { return nullptr; }
 const char* PauseItemDesc_Get(u16, int) { return nullptr; }
 void PauseItemDesc_Show(PlayState*, const char*, int) {}
+u8 PauseItemDesc_ShowItem(PlayState*, u16, s32, u8) { return 0; }
+u8 PauseItemDesc_ShowEquipment(PlayState*, s16, s16, s16, u8) { return 0; }
+u8 PauseItemDesc_ShowForm(PlayState*, s32, u8) { return 0; }
 void KaleidoScope_SetCursorVtxPos(PauseContext*, u16, Vtx*) {}
 void KaleidoScope_MoveCursorToSpecialPos(PlayState* play, s16 pos) { play->pauseCtx.cursorSpecialPos = pos; }
 void KaleidoScope_MoveCursorFromSpecialPos(PlayState* play) { play->pauseCtx.cursorSpecialPos = 0; }

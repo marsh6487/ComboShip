@@ -859,7 +859,8 @@ static void NeiGi_DrawSong(PlayState* play, int song) {
         NeiGi_DrawSongOverlay(play, song, nullptr);
 }
 
-static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool upgraded, bool legacy) {
+static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool upgraded, bool legacy,
+                              float particleScale = 1.f) {
     if (legacy && item.draw == Randomizer_DrawMarioMask)
         return; // The legacy callback already draws its mask overlay.
     if (upgraded && item.effect == Kind::SeasonCycle)
@@ -878,7 +879,7 @@ static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool up
         NeiGi_DrawMesh(play, NeiGi::SampleOrb(item.effect, camera), item.effect);
         NeiGi_DrawMesh(play, NeiGi::SampleEnergy(item.effect, play->gameplayFrames, camera));
         if (NeiGi::IsSpecial(item.effect))
-            NeiGi_DrawMesh(play, NeiGi::SampleSpecial(item.effect, play->gameplayFrames, camera));
+            NeiGi_DrawMesh(play, NeiGi::SampleSpecial(item.effect, play->gameplayFrames, camera, particleScale));
         Matrix_Pop();
     }
     if (shimmer || item.alwaysShimmer)
@@ -946,8 +947,11 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         return true;
     Matrix_Push();
     MtxF callerMatrix;
+    float particleScale = 1.f;
     if (!authored && NeiGi::IsSword(item->effect))
         ComboSwordGi_ApplyPresentationSize(shop);
+    if (!authored && NeiGi::IsSword(item->effect))
+        particleScale = ComboSwordGi_ParticleScale(item->effect, shop);
     Matrix_Get(&callerMatrix);
     if (selectedSword) {
         ComboSwordGi_ApplyFit("oot", selectedSword, .04f, ComboSwordGi_SelectedTilt(1.5707963267948966f, shop), shop);
@@ -968,6 +972,7 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     } else if (authored) {
         if (const auto* bounds = NeiGi::FindFrameBounds(item->opaque)) {
             const auto fit = NeiGi::FrameFit(*bounds, item->scale, shop);
+            particleScale = 1.f / fit.scale;
             Matrix_Translate(0, fit.lift, 0, MTXMODE_APPLY);
             Matrix_Scale(fit.scale, fit.scale, fit.scale, MTXMODE_APPLY);
         }
@@ -1013,7 +1018,7 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         Matrix_Put(&callerMatrix);
         ComboSwordGi_ApplyEffectFit(item->effect, shop);
     }
-    NeiGi_DrawEffects(play, *item, authored, !upgraded && !selectedSword);
+    NeiGi_DrawEffects(play, *item, authored, !upgraded && !selectedSword, particleScale);
     Matrix_Pop();
     if (upgraded && item->translucent != nullptr) {
         // Composite the crystal skin over its contained energy, using the same pose.

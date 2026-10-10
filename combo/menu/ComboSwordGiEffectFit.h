@@ -15,10 +15,20 @@ static inline void ComboSwordGi_ApplyPresentationSize(bool shop = false, int mmP
     Matrix_Scale(size, size, size, MTXMODE_APPLY);
 }
 
-// The pre-polish selected sword shelf used the 1.8-radian native pose.
-// Descriptors carry straight-up pickup poses; retain that shelf recipe only.
-static inline float ComboSwordGi_SelectedTilt(float tilt, bool shop = false) {
-    return shop && tilt > 1.5707f && tilt < 1.5709f ? 1.8f : tilt;
+// Both current and older selected +X sword recipes must stand upright in
+// pickups and shelves. Fit the same pose that the geometry and Din layers draw.
+static inline float ComboSwordGi_SelectedTilt(float tilt, bool = false) {
+    return std::abs(tilt - 1.8f) < .0002f ? 1.5707963267948966f : tilt;
+}
+
+// Fit emission paths to the award footprint, but cancel that fit for each
+// leaf, spark and ribbon's own dimensions. Binary model units never enter here.
+static inline float ComboSwordGi_ParticleScale(NeiGi::Kind kind, bool shop = false, int mmPickup = 0,
+                                               bool presentation = true) {
+    const auto* bounds = NeiGi::FindSwordFrameBounds(kind);
+    const float scale = bounds ? NeiGi::FrameFit(*bounds, 1.f, shop, mmPickup).scale : 1.f;
+    const float size = !presentation || shop || mmPickup == 2 ? 1.f : 1.15f;
+    return 1.f / (scale * size);
 }
 
 // Procedural effects use authored GI units. A binary weapon's coordinate

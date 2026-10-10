@@ -61,6 +61,7 @@ static int fittedRoots;
 static float fittedDrawScale, fittedTilt;
 static int interpolation, shimmers, sentinels, identityDraws;
 static NeiGi::Mesh identityMesh;
+static float identityParticleSpan;
 static ComboForeignDrawInfo recipe;
 void FrameInterpolation_RecordOpenChild(const void *, int) { ++interpolation; }
 void FrameInterpolation_RecordCloseChild() {
@@ -217,6 +218,10 @@ static void NeiGi_DrawMesh(PlayState*,const NeiGi::Mesh& mesh) {
   }
   assert(std::abs(pose.scale-expected.scale)<.00001f && std::abs(pose.y-expected.y)<.0001f &&
          "foreign binary sword particles/shimmer inherited model coordinate fitting");
+  if(identityDraws==0 && recipe.neiShimmer==int(NeiGi::Kind::KokiriSword)+1) {
+    const auto d=mesh.vertices[0].p-mesh.vertices[2].p;
+    identityParticleSpan=std::sqrt(d.x*d.x+d.y*d.y+d.z*d.z)*pose.scale;
+  }
   identityMesh=mesh;++identityDraws;
 }
 #ifdef HOST_MM_ROUTE
@@ -302,6 +307,7 @@ static void Reset(int kind, bool trueTier, bool shimmer) {
   arena.clear();
   scrollParams.clear();
   interpolation = shimmers = sentinels = identityDraws = 0;
+  identityParticleSpan=0.f;
   flameAvailable = true;
   dinLayers = false;
   fitModel = shelfDraw = false;
@@ -383,6 +389,8 @@ int main() {
                  NeiGi::Kind::GiantsKnife}) {
     Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);recipe.neiShimmer=int(kind)+1;
     Dispatch();assert(identityDraws==2 && shimmers==0);
+    assert(std::abs(CheckStream(opa,gfx.polyOpa.p,false)[0].pose.rz-1.5707963267948966f)<.0001f &&
+           "older selected sword descriptor retained its slanted pose");
     const auto wanted=NeiGi::SampleShimmer(play.gameplayFrames,true,{},kind);
     assert(identityMesh.count==wanted.count);
     for(size_t i=0;i<wanted.count;++i)assert(identityMesh.vertices[i].rgb==wanted.vertices[i].rgb &&
@@ -457,20 +465,42 @@ int main() {
     assert(std::abs(angle-1.5707963267948966f)<.000001f &&
            "sword shelf correction changed a non-sword quarter turn, including Ikana shield");
   }
+#ifdef HOST_MM_ROUTE
+  Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);
+  recipe.neiShimmer=int(NeiGi::Kind::KokiriSword)+1;
+  Dispatch();
+  const float fittedParticleSpan=identityParticleSpan;
+  Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);
+  recipe.neiShimmer=int(NeiGi::Kind::KokiriSword)+1;
+  recipe.opCount=2;
+  recipe.ops[1]={CW_OP_TRANSLATE,0,0,0,{}};
+  Dispatch();
+  assert(std::abs(identityParticleSpan-fittedParticleSpan)<.0001f &&
+         "custom sword particles compensated for a presentation scale that was never applied");
+  Reset(CW_DRAW_KIND_CUSTOM_GI,false,false);
+  fitModel=true;
+  recipe.dls[0]="__OTR__@oot:objects/non_sword/slanted_receipt_model";
+  MM_DrawComboForeign(1,false,1);
+  const auto genericReceipt=CheckStream(opa,gfx.polyOpa.p,false);
+  assert(genericReceipt.size()==1 && std::abs(genericReceipt[0].pose.rz-1.8f)<.0001f);
+  assert(std::abs(fittedTilt-genericReceipt[0].pose.rz)<.0001f &&
+         "MM receipt fit changed a non-sword model's selected pose");
+  assert(pose==Pose{} && stack.empty() && interpolation==0);
+#endif
   // Exercise both real foreign dispatchers with the pickup descriptor. Shops
-  // retain the previously accepted selected model fit/pose and Din layers.
+  // use the upright selected model pose and retain matching Din layers.
   Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);
   recipe.neiShimmer=int(NeiGi::Kind::MasterSword)+1;
   recipe.ops[0].a=16384.f;fitModel=true;dinLayers=true;
   Dispatch(true);
   const auto shelfBody=CheckStream(opa,gfx.polyOpa.p,false);
   const auto shelfFlame=CheckStream(xlu,gfx.polyXlu.p,false);
-  assert(std::abs(fittedTilt-1.8f)<.00001f);
+  assert(std::abs(fittedTilt-1.5707963267948966f)<.00001f);
   assert(shelfBody.size()==2 && shelfFlame.size()==1);
   assert(shelfBody[0].pose==shelfBody[1].pose && shelfBody[0].pose==shelfFlame[0].pose);
   assert(std::abs(shelfBody[0].pose.scale-.04f)<.00001f && shelfBody[0].pose.y==-23.f &&
-         std::abs(shelfBody[0].pose.rz-1.8f)<.00001f &&
-         "selected sword shelf changed its accepted size, fit, pose or Din layer placement");
+         std::abs(shelfBody[0].pose.rz-1.5707963267948966f)<.00001f &&
+         "selected sword shelf lost its upright pose, framing or Din layer placement");
   std::cout << "PASS actual OoT sword fallback dispatch: owner scopes, signed "
                "transforms, independent blade/flame, shimmer pose, stream "
                "cursors and segment cleanup\n";

@@ -68,7 +68,7 @@ int main(){
         play.gameplayFrames=frame;Reset();DrawMmWeaponGi(&play,nullptr,nullptr,.04f,false);
         Check();
         Reset();DrawMmWeaponGi(&play,nullptr,nullptr,.04f,true);
-        assert(std::abs(m[1][0]/.04f-std::sin(1.8f))<.00001f && "legacy Four Sword shelf pose changed");
+        Check();
         for(auto id:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GIANTS_KNIFE,RG_GREAT_FAIRY_SWORD}){
             CwItemDrawInfo info{};assert(CwAltSwordGi(id,&info));
             Reset();Matrix_RotateY(.84f,MTXMODE_APPLY);
@@ -82,12 +82,13 @@ int main(){
 '''
 if 'NeiGi_DrawSelectedSword' in native:
     source+='Reset();NeiGi_DrawSelectedSword(&play,"selected");Check();\nconst float high=m[1][0]*4122+m[1][1]*-268+m[1][2]*101+lift;\nassert(high<=55.501f && "enlarged selected Din equipment mesh exceeds the GI frame envelope");\n'
+    source+='Reset();NeiGi_DrawSelectedSword(&play,"selected",true);Check();\n'
 source+='}\n}\n'
 with tempfile.TemporaryDirectory(prefix='sword-pose-') as temporary:
     path=Path(temporary); (path/'pose.cpp').write_text(source)
     subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),str(path/'pose.cpp'),'-o',str(path/'pose')],check=True)
     subprocess.run([str(path/'pose')],check=True)
-print('PASS upright native Four Sword/selected sword pickups and preserved native Four Sword shelf pose across spins')
+print('PASS upright native Four Sword/selected sword pickups and shelves across spins')
 
 # The inline GI helpers must use each actual host's matrix/GBI API, not only
 # the controlled geometry seam above.

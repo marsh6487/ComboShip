@@ -562,7 +562,7 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
         NeiGi_DrawMesh(play, NeiGi::SampleEnergy(kind, play->gameplayFrames, camera));
     }
     if (NeiGi::IsSpecial(kind))
-        NeiGi_DrawMesh(play, NeiGi::SampleSpecial(kind, play->gameplayFrames, camera));
+        NeiGi_DrawMesh(play, NeiGi::SampleSpecial(kind, play->gameplayFrames, camera, 1.f / fit.scale));
     Matrix_Pop();
     if (shimmer)
         NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, camera, kind));
@@ -682,7 +682,9 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
     if (sword) {
         ComboSwordGi_ApplyEffectFit(static_cast<Kind>(shimmerKind), shop, mmPickup);
         NeiGi_DrawMesh(play, NeiGi::SampleSpecial(static_cast<Kind>(shimmerKind), play->gameplayFrames,
-                                                 NeiGi_CameraBasis(play)));
+                                                 NeiGi_CameraBasis(play),
+                                                 ComboSwordGi_ParticleScale(static_cast<Kind>(shimmerKind), shop,
+                                                                            mmPickup, fit)));
     }
     if (shimmer)
         NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play),

@@ -447,7 +447,8 @@ MM_NeiGiFallbackShimmer::~MM_NeiGiFallbackShimmer() {
         ComboSwordGi_ApplyPresentationSize(mShop, mMmPickup);
         ComboSwordGi_ApplyEffectFit(mKind, mShop, mMmPickup);
         NeiGi_DrawMesh(gPlayState,
-                       NeiGi::SampleSpecial(mKind, gPlayState->gameplayFrames, NeiGi_CameraBasis(gPlayState)));
+                       NeiGi::SampleSpecial(mKind, gPlayState->gameplayFrames, NeiGi_CameraBasis(gPlayState),
+                                            ComboSwordGi_ParticleScale(mKind, mShop, mMmPickup)));
     }
     NeiGi_DrawMesh(gPlayState,
                    NeiGi::SampleShimmer(gPlayState->gameplayFrames, true, NeiGi_CameraBasis(gPlayState), mKind));

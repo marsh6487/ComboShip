@@ -388,6 +388,7 @@ static void DrawWeaponFlameOverlay(PlayState *, u8 r, u8 g, u8 b) {
 #ifndef NEI_GI_FIXTURE_BOUNDARY_ONLY
 int main() {
   using namespace Fixture;
+  #include "tests/nei_gi/sword_particle_readability_test.inc"
 #include "tests/nei_gi/giants_knife_presentation_test.inc"
 #ifdef COMBO_BUILD
 #include "tests/sword_fallback/effects_toggle_checks.inc"

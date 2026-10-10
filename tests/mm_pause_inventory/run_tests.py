@@ -49,6 +49,7 @@ uint32_t GameInteractor_Dpad(GIDpadType type, uint32_t buttons) { return 0; }
 const char* PauseItemDesc_Get(u16 item, s32 page) { return NULL; }
 u8 PauseItemDesc_VanillaTextExists(u16 textId) { return 0; }
 void PauseItemDesc_Show(PlayState* play, const char* desc, u8 position) {}
+u8 PauseItemDesc_ShowItem(PlayState* play, u16 item, s32 page, u8 position) { return 0; }
 void func_801514B0(PlayState* play, u16 textId, u8 position) {}
 s32 KaleidoScope_IsItemCycling(void) { return cycleActive; }
 void KaleidoScope_HandleItemCycles(PlayState* play) {}

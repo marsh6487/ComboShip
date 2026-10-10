@@ -10,6 +10,7 @@
 #include "soh/Enhancements/custom-message/CustomMessageTypes.h"
 #include "soh/Enhancements/custom-message/CustomMessageManager.h"
 #include "soh/ShipInit.hpp"
+#include "ComboPauseTutorialText.h"
 
 extern "C" {
 #include "z64.h"
@@ -19,6 +20,11 @@ extern "C" {
 #include "mods/extended_equipment.h"
 #include "expansions/sw97/sw97_config.h"
 #include "mods/extended_inventory.h" // Sw97_EffectiveElement / Wand_GetMode (Skijer's NEI)
+#include "mods/items/logic/weapon_upgrades.h"
+u8 Cane_GetType(void);
+u8 Cane_GetActiveSkill(void);
+extern PlayState* gPlayState;
+s32 TradeAdult_IndexOfItem(u8 item);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +249,72 @@ static const ItemDescEntry sVanillaItemDescs[] = {
 
 extern "C" uint16_t Randomizer_GetDungeonItemInfoTextId(uint16_t cursorItem);
 
+// Reserved within the existing pause-description range. The lookup snapshots
+// the selected tutorial before Message_StartTextbox invokes OnOpenText.
+static constexpr u16 kDynamicTutorialTextId = 0x94FF;
+static std::string sPendingTutorial;
+
+static std::string PauseItemDesc_Tutorial(u16 cursorItem, s32 pageIndex) {
+    using namespace ComboPauseTutorialText;
+    using TutorialLanguage = ComboPauseTutorialText::Language;
+    const auto language = gSaveContext.language == LANGUAGE_GER   ? TutorialLanguage::German
+                          : gSaveContext.language == LANGUAGE_FRA ? TutorialLanguage::French
+                                                                  : TutorialLanguage::English;
+    if (pageIndex == PAUSE_ITEM) {
+        if (cursorItem == ITEM_ELEMENTAL_WAND)
+            return Wand(Wand_GetMode(), Wand_RandoMode(), language);
+        if (cursorItem == EXT_ITEM_SHEIKAH_SLATE)
+            return Slate(Slate_GetRune(), language);
+        if (cursorItem == ITEM_CANE_OF_SOMARIA)
+            return Cane(Cane_GetType(), Cane_GetActiveSkill(), false);
+        if (cursorItem == EXT_ITEM_PHANTOM_HOURGLASS)
+            return Shared("Phantom Hourglass", language);
+        if (cursorItem == EXT_ITEM_SHADOW_CRYSTAL)
+            return Shared("Shadow Crystal", language);
+        if (cursorItem >= ITEM_MASK_KEATON && cursorItem <= ITEM_MASK_TRUTH)
+            return OotMask(cursorItem - ITEM_MASK_KEATON, language);
+        if (cursorItem == ITEM_MM_MASK_KEATON)
+            return Shared("Keaton Mask (MM)", language);
+        if (cursorItem == ITEM_HAMMER && WeaponUpgrade_HasHammerAxe())
+            return "Iron Knuckle's Axe.&Double damage and reach.&C-Up aims; the item's button throws.&The axe returns "
+                   "like a boomerang.";
+        if (cursorItem == ITEM_LONGSHOT && Nei_UltrashotOwned())
+            return "Ultrashot.&Four times the reach and twice the speed.&Pull yourself to a distant target.";
+        // The unified wheel includes MM trades and the child chain, not just
+        // the contiguous eleven adult OoT ids. Pendant retains its combat text.
+        if (cursorItem <= 0xFF && cursorItem != ITEM_EXT_BOOTS_2) {
+            const s32 trade = TradeAdult_IndexOfItem(static_cast<u8>(cursorItem));
+            if (trade >= 0)
+                return Trade(trade);
+        }
+    }
+    if (pageIndex == PAUSE_EQUIP) {
+        if (cursorItem == ITEM_OCARINA_TIME || cursorItem == ITEM_MARIO_MASK || cursorItem == ITEM_POKEBALL)
+            return Form(cursorItem == ITEM_OCARINA_TIME ? 0 : cursorItem == ITEM_MARIO_MASK ? 1 : 2);
+        if (gPlayState != NULL) {
+            const auto& pause = gPlayState->pauseCtx;
+            const s16 row = pause.cursorY[PAUSE_EQUIP], col = pause.cursorX[PAUSE_EQUIP];
+            if (col == 0 && ((row == 0 && ExtEquip_CapeOwned()) || (row == 1 && ExtEquip_PendantOwned())))
+                return Passive(row);
+            if (!ExtEquip_GetPage() && cursorItem != PAUSE_ITEM_NONE) {
+                if (row == 0 && col == 3 && !WeaponUpgrade_HasGreatFairy() && cursorItem != ITEM_HEART_PIECE_2) {
+                    return cursorItem == ITEM_SWORD_KNIFE
+                               ? "Broken Giant's Knife.&The fragile blade has broken.&A equips the broken knife."
+                               : "Giant's Knife.&A powerful, fragile two-handed blade.&Repeated hits can break it.&A "
+                                 "equips this sword.";
+                }
+                return VanillaEquipment(row, col, WeaponUpgrade_KokiriLevel(), WeaponUpgrade_HasTrueMaster(),
+                                        WeaponUpgrade_HasGreatFairy());
+            }
+        }
+    }
+    return {};
+}
+
 extern "C" u16 PauseItemDesc_GetTextId(u16 cursorItem, s32 pageIndex) {
+    sPendingTutorial = PauseItemDesc_Tutorial(cursorItem, pageIndex);
+    if (!sPendingTutorial.empty())
+        return kDynamicTutorialTextId;
     if (pageIndex == PAUSE_MAP)
         return Randomizer_GetDungeonItemInfoTextId(cursorItem);
     // Custom items + masks + SW97 arrows on ITEM pages
@@ -308,9 +379,9 @@ extern "C" u16 PauseItemDesc_GetTextId(u16 cursorItem, s32 pageIndex) {
 // Message hook: build and load description into font
 // ---------------------------------------------------------------------------
 
-static void BuildDescMessage(const char* desc, uint16_t* textId, bool* loadFromMessageTable) {
+static void BuildDescMessage(const std::string& desc, uint16_t* textId, bool* loadFromMessageTable) {
     CustomMessage msg = CustomMessage(desc, desc, desc);
-    msg.Format();
+    msg.AutoFormat();
     msg.LoadIntoFont();
     *loadFromMessageTable = false;
 }
@@ -329,6 +400,11 @@ static const size_t sAllDescCounts[] = {
 
 // Single hook for all descriptions: fires on ANY OnOpenText, checks if textId matches
 static void OnOpenTextDescHook(uint16_t* textId, bool* loadFromMessageTable) {
+    if (*textId == kDynamicTutorialTextId && !sPendingTutorial.empty()) {
+        BuildDescMessage(sPendingTutorial, textId, loadFromMessageTable);
+        sPendingTutorial.clear();
+        return;
+    }
     for (size_t t = 0; t < ARRAY_COUNT(sAllDescs); t++) {
         for (size_t i = 0; i < sAllDescCounts[t]; i++) {
             if (sAllDescs[t][i].textId == *textId) {

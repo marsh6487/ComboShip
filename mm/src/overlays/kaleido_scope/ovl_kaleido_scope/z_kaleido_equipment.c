@@ -702,7 +702,7 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
 
     pauseCtx->cursorColorSet = PAUSE_CURSOR_COLOR_SET_WHITE;
 
-    if (pauseCtx->pageIndex != PAUSE_MASK) {
+    if (pauseCtx->pageIndex != PAUSE_MASK || pauseCtx->itemDescriptionOn) {
         return;
     }
 
@@ -751,6 +751,11 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
             CHECK_BTN_ALL(input->press.button, BTN_A)) {
             BrokenItems_EquipForm(play, sTransformCursor);
             Audio_PlaySfx(NA_SE_SY_DECIDE);
+        } else if ((pauseCtx->state == PAUSE_STATE_MAIN) && (pauseCtx->mainState == PAUSE_MAIN_STATE_IDLE) &&
+                   pauseCtx->cursorSpecialPos == 0 && CHECK_BTN_ALL(input->press.button, BTN_CUP)) {
+            if (PauseItemDesc_ShowForm(play, sTransformCursor, 3)) {
+                pauseCtx->itemDescriptionOn = true;
+            }
         }
 
         // Name-panel guard: custom ids (>= 0xE0) would index past the name-texture tables.
@@ -889,22 +894,11 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
             KaleidoEquip_AssignCButton(play, sEquipCursorY, sEquipCursorX,
                                        input->press.button & (BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT));
         } else if (CHECK_BTN_ALL(input->press.button, BTN_CUP)) {
-            // C-Up reads the cell out, the way it does on the item page. Only ext equipment and the
-            // upgrade column (Magic Cape / Pendant) have a description; the vanilla cells fall through
-            // to the error cue. Skijer's NEI
-            const char* desc = NULL;
-
-            if (sEquipCursorX == 0) {
-                desc = PauseItemDesc_GetEquipUpgrade(sEquipCursorY);
-            } else {
-                EquipCell descCell;
-
-                KaleidoEquip_GetCell(sEquipSubPage, sEquipCursorY, sEquipCursorX, &descCell);
-                desc = (descCell.item >= 0) ? PauseItemDesc_Get((u16)descCell.item, PAUSE_MASK) : NULL;
-            }
-            if (desc != NULL) {
+            // Cell coordinates distinguish shields, tunics and boots that share
+            // fallback icons, and separate passive Cape/Pendant from grid items.
+            if (PauseItemDesc_ShowEquipment(play, sEquipSubPage, sEquipCursorY, sEquipCursorX,
+                                            (sEquipCursorY < 2) ? 3 : 1)) {
                 pauseCtx->itemDescriptionOn = true;
-                PauseItemDesc_Show(play, desc, (sEquipCursorY < 2) ? 3 : 1);
             } else {
                 Audio_PlaySfx(NA_SE_SY_ERROR);
             }
@@ -959,8 +953,7 @@ static void KaleidoEquip_RenderDollFB(PlayState* play) {
     }
 
     if (gPauseLinkFrameBuffer == -1) {
-        // upscale=false → the FB is exactly 64x112 pixels, so the ImageRectangle composite
-        // below can sample it with deterministic texel coords.
+        // Keep the supersampled framebuffer at its exact native dimensions.
         gPauseLinkFrameBuffer =
             gfx_create_framebuffer(EQUIP_DOLL_FBW, EQUIP_DOLL_FBH, EQUIP_DOLL_FBW, EQUIP_DOLL_FBH, false);
     }
@@ -1063,44 +1056,52 @@ static void KaleidoEquip_RenderDollFB(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Composite the doll FB on the OVERLAY stream via gDPImageRectangle — the exact pattern
-// 2ship's own framebuffer_effects.c uses (FB_DrawFromFramebuffer), guaranteed to sample FBs.
-// Screen-space (doesn't tilt with the page cube during transitions — acceptable v1).
+// Like OoT's equipment image, the framebuffer quad belongs to the page's modelview.
+// Keep the cached image on incoming/off-axis pages so it moves with the cube throughout
+// a transition rather than staying in a fixed screen rectangle until pageIndex changes.
 static void KaleidoEquip_DrawDollImage(PlayState* play) {
+    static u64 sDollTextureDimensions[2] = { 0, 0 };
     PauseContext* pauseCtx = &play->pauseCtx;
-    extern Mtx gIdentityMtx;
-    // Screen rect (320x240 space) — OoT equipment layout order: [upgrade column | Link | grid].
-    // The upgrade column lives on maskVtx column 0 (page x -96..-68 ≈ screen 64..92), the equipment
-    // grid on maskVtx columns 3..5 (page x 0.. ≈ screen 160..). The doll fills the gap between them
-    // (screen 96..160) so it no longer covers the upgrade cells (Skijer 2026-07-16 position fix).
-    s32 x0 = 86; // centered in the upgrades(-112..-84)..grid(0..) gap, like OoT's Link at page ~-36
-    s32 y0 = 68;
-    s32 x1 = x0 + EQUIP_DOLL_WIDTH;
-    s32 y1 = y0 + EQUIP_DOLL_HEIGHT;
+    Vtx* vertices;
+    s32 i;
 
-    if (gPauseLinkFrameBuffer == -1 || pauseCtx->pageIndex != PAUSE_MASK) {
+    if (gPauseLinkFrameBuffer == -1) {
         return;
+    }
+
+    // The settled pause projection maps these page coordinates to the former
+    // (86,68)..(150,180) screen rectangle within one pixel, preserving its placement.
+    vertices = GRAPH_ALLOC(play->state.gfxCtx, 4 * sizeof(Vtx));
+    for (i = 0; i < 4; i++) {
+        vertices[i].v.ob[0] = (i & 1) ? -10 : -72;
+        vertices[i].v.ob[1] = (i & 2) ? -58 : 50;
+        vertices[i].v.ob[2] = 0;
+        vertices[i].v.flag = 0;
+        vertices[i].v.tc[0] = (i & 1) ? EQUIP_DOLL_FBW << 5 : 0;
+        vertices[i].v.tc[1] = (i & 2) ? EQUIP_DOLL_FBH << 5 : 0;
+        vertices[i].v.cn[0] = vertices[i].v.cn[1] = vertices[i].v.cn[2] = vertices[i].v.cn[3] = 255;
     }
 
     OPEN_DISPS(play->state.gfxCtx);
 
-    gSPMatrix(OVERLAY_DISP++, &gIdentityMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    gDPSetEnvColor(OVERLAY_DISP++, 255, 255, 255, pauseCtx->alpha);
-    gDPSetOtherMode(OVERLAY_DISP++,
-                    G_AD_NOISE | G_CD_NOISE | G_CK_NONE | G_TC_FILT | G_TF_POINT | G_TT_NONE | G_TL_TILE | G_TD_CLAMP |
-                        G_TP_NONE | G_CYC_1CYCLE | G_PM_NPRIMITIVE,
-                    G_AC_NONE | G_ZS_PRIM | G_RM_CLD_SURF | G_RM_CLD_SURF2);
-    gSPClearGeometryMode(OVERLAY_DISP++, G_CULL_BOTH | G_FOG | G_LIGHTING | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR);
-    gSPSetGeometryMode(OVERLAY_DISP++, G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH);
-    // clang-format off
-    gDPSetCombineLERP(OVERLAY_DISP++, TEXEL0, 0, ENVIRONMENT, 0, 0, 0, 0, ENVIRONMENT, TEXEL0, 0, ENVIRONMENT, 0, 0, 0, 0, ENVIRONMENT);
-    // clang-format on
+    gDPPipeSync(POLY_OPA_DISP++);
+    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+    gDPSetTextureFilter(POLY_OPA_DISP++, G_TF_POINT);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
+    gDPSetTileCustom(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, EQUIP_DOLL_FBW, EQUIP_DOLL_FBH, 0,
+                     G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD,
+                     G_TX_NOLOD);
+    // Like OoT's equipment image, seed the loaded dimensions before binding the FB.
+    // LoadTile only records metadata here; the immediate FB bind prevents a CPU upload
+    // of this aligned, signature-safe placeholder before the quad is submitted.
+    gDPSetTextureImage(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, EQUIP_DOLL_FBW, sDollTextureDimensions);
+    gDPLoadSync(POLY_OPA_DISP++);
+    gDPLoadTile(POLY_OPA_DISP++, G_TX_LOADTILE, 0, 0, (EQUIP_DOLL_FBW - 1) << 2, (EQUIP_DOLL_FBH - 1) << 2);
+    gSPVertex(POLY_OPA_DISP++, vertices, 4, 0);
+    gDPSetTextureImageFB(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, EQUIP_DOLL_FBW, gPauseLinkFrameBuffer);
+    gSP1Quadrangle(POLY_OPA_DISP++, 0, 2, 3, 1, 0);
 
-    gDPSetTextureImageFB(OVERLAY_DISP++, 0, 0, 0, gPauseLinkFrameBuffer);
-    gDPImageRectangle(OVERLAY_DISP++, x0 << 2, y0 << 2, 0, 0, x1 << 2, y1 << 2, EQUIP_DOLL_FBW, EQUIP_DOLL_FBH,
-                      G_TX_RENDERTILE, EQUIP_DOLL_FBW, EQUIP_DOLL_FBH);
-
-    gDPPipeSync(OVERLAY_DISP++);
+    gDPPipeSync(POLY_OPA_DISP++);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }

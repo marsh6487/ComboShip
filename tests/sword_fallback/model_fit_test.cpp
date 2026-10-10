@@ -202,16 +202,7 @@ int main(){
             pose={};play.gameplayFrames=frame;
             if(e.tilt!=0.f)NeiGi_DrawSelectedSword(&play,e.path,shop);
             else {ComboSwordGi_ApplyPresentationSize(shop);ComboSwordGi_ApplyFit("mm",e.path,e.scale,e.tilt,shop);Matrix_Scale(e.scale,e.scale,e.scale,1);}
-            const Pose current=pose;
-            if(shop && e.tilt!=0.f) {
-                pose={};Baseline_DrawSelectedSword(&play,e.path,true);
-                assert(std::abs(current.scale-pose.scale)<.000001f &&
-                       std::abs(current.lift-pose.lift)<.00001f && current.ry==pose.ry &&
-                       std::abs(current.rz-pose.rz)<.000001f &&
-                       "selected shelf scale, position and rotation changed from preserved baseline");
-                pose=current;
-            }
-            const float actualTilt=shop && e.tilt!=0.f ? 1.8f : e.tilt;
+            const float actualTilt=e.tilt;
             assert(std::abs(pose.rz-actualTilt)<.0001f);
             NeiGi::FrameBounds selected{};
             assert(NeiGi::SelectedModelBounds(loader,e.path,actualTilt,din?profile:0,selected));
