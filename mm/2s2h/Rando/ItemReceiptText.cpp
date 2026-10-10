@@ -8,6 +8,7 @@
 #include "ComboSongReceiptText.h"
 #include "ComboMagicItemReceiptText.h"
 #include "ComboToolReceiptText.h"
+#include "ComboMaskReceiptText.h"
 #include "ComboSongDrawMM.h"
 #include "ComboRupeeNames.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -359,6 +360,20 @@ bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry) {
 }
 } // namespace
 
+static bool MaskItemReceipt(const char* itemName, CustomMessage::Entry& entry) {
+    if (!itemName)
+        return false;
+    const auto* mask = ComboMaskReceiptText::Find(itemName);
+    if (!mask)
+        return false;
+    const char* body = gSaveContext.options.language == LANGUAGE_GER   ? mask->german
+                       : gSaveContext.options.language == LANGUAGE_FRE ? mask->french
+                                                                       : mask->english;
+    entry.receiptPresentation = {};
+    SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(body));
+    return true;
+}
+
 static bool ToolItemReceipt(const char* itemName, CustomMessage::Entry& entry) {
     if (!itemName)
         return false;
@@ -547,7 +562,7 @@ bool Rando::ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Ent
     entry.capeVisibilityChoice = ComboCapeReceiptChoice::IsCape(itemName);
     if (!itemName || !*itemName)
         return false;
-    if (ToolItemReceipt(itemName, entry) || MagicItemReceipt(itemName, entry))
+    if (MaskItemReceipt(itemName, entry) || ToolItemReceipt(itemName, entry) || MagicItemReceipt(itemName, entry))
         return true;
     if (RandomRupeeReceipt(itemName, entry))
         return true;
@@ -613,7 +628,7 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     if (it == StaticData::Items.end())
         return false;
     const auto& item = it->second;
-    if (ToolItemReceipt(item.name, entry) || MagicItemReceipt(item.name, entry))
+    if (MaskItemReceipt(item.name, entry) || ToolItemReceipt(item.name, entry) || MagicItemReceipt(item.name, entry))
         return true;
     if (RandomRupeeReceipt(item.name, entry))
         return true;

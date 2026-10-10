@@ -39,6 +39,7 @@ constexpr Sword swords[] = {
     { "Gilded", Kind::GildedSword }, { "Kokiri", Kind::KokiriSword },
     { "MmKokiri", Kind::MmKokiriSword }, { "Master", Kind::MasterSword },
     { "TrueMaster", Kind::SwordAura }, { "Biggoron", Kind::BiggoronSword },
+    { "GiantsKnife", Kind::GiantsKnife },
     { "GreatFairy", Kind::GreatFairySword },
 };
 struct Witness {

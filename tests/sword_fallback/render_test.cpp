@@ -209,10 +209,10 @@ static void NeiGi_DrawMesh(PlayState*,const NeiGi::Mesh& mesh) {
           static_cast<NeiGi::Kind>(recipe.neiShimmer-1)),1.f,true);
       expected.y+=2.f*fit.lift;
       expected.scale*=fit.scale;
-    } else if(recipe.neiShimmer==int(NeiGi::Kind::MasterSword)+1)
-      expected.y+=2.3f*(48.f-72.590332031f);
-    else if(recipe.neiShimmer==int(NeiGi::Kind::SwordAura)+1)
-      expected.y+=2.3f*(48.f-67.970947266f);
+    } else if(recipe.neiShimmer==int(NeiGi::Kind::MasterSword)+1 ||
+              recipe.neiShimmer==int(NeiGi::Kind::SwordAura)+1)
+      // Independent quantized TP blade tip and serialized source scale.
+      expected.y+=2.3f*(48.f-106.375f*.659912109375f);
     else expected=pose; // The full production renderer gate checks every other award.
   }
   assert(std::abs(pose.scale-expected.scale)<.00001f && std::abs(pose.y-expected.y)<.0001f &&
@@ -379,7 +379,8 @@ int main() {
               std::vector<int32_t>({47, 0, 32, 32, 0, 0, 32, 32, 1, 0, 0, 0}));
       }
   for(auto kind:{NeiGi::Kind::KokiriSword,NeiGi::Kind::RazorSword,NeiGi::Kind::GildedSword,
-                 NeiGi::Kind::MasterSword,NeiGi::Kind::SwordAura,NeiGi::Kind::BiggoronSword,NeiGi::Kind::GreatFairySword}) {
+                 NeiGi::Kind::MasterSword,NeiGi::Kind::SwordAura,NeiGi::Kind::BiggoronSword,NeiGi::Kind::GreatFairySword,
+                 NeiGi::Kind::GiantsKnife}) {
     Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);recipe.neiShimmer=int(kind)+1;
     Dispatch();assert(identityDraws==2 && shimmers==0);
     const auto wanted=NeiGi::SampleShimmer(play.gameplayFrames,true,{},kind);

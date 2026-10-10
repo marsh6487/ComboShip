@@ -1257,11 +1257,13 @@ void Player_DrawImpl(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dL
         // A form's face textures ship under the vanilla eye symbol, so the same
         // name-based rule applies. Without this the head renders Link's eyes
         // through the form's own palette — the garbled face bug.
-        void* formEye = pakEye ? NULL : CustomForms_ResolveVanillaTexture(sEyeTextures[gSaveContext.linkAge][eyeIndex]);
-        if (pakEye) {
-            gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)pakEye);
-        } else if (formEye) {
+        void* formEye = (pakEye && !CustomForms_PreferFaceTextures())
+                            ? NULL
+                            : CustomForms_ResolveVanillaTexture(sEyeTextures[gSaveContext.linkAge][eyeIndex]);
+        if (formEye) {
             gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)formEye);
+        } else if (pakEye) {
+            gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)pakEye);
         } else {
             gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sEyeTextures[gSaveContext.linkAge][eyeIndex]));
         }

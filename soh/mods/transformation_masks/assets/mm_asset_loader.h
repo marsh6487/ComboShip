@@ -392,6 +392,10 @@ void MmSfx_Shutdown(void);
  */
 SoundFont* MmSfx_LoadFont(s32 fontId);
 
+// Resident MM SFX program, archive-scoped and pinned with the soundfonts.
+// Global music registration may replace/remap its same-name Sequence_0.
+SequenceData* MmSfx_LoadSequence(void);
+
 /**
  * Get SoundFont for a specific SFX ID
  * @param sfxId MM SFX ID

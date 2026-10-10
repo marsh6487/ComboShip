@@ -22,7 +22,7 @@ effects = {
     'cane_of_somaria':'Somaria', 'cane_of_byrna':'CaneBlue', 'four_sword':'FourSword',
     'kokiri_sword':'KokiriSword', 'mm_kokiri_sword':'MmKokiriSword', 'razor_sword':'RazorSword',
     'gilded_sword':'GildedSword', 'master_sword':'MasterSword', 'true_master_sword':'SwordAura',
-    'biggoron_sword':'BiggoronSword', 'great_fairy_sword':'GreatFairySword', 'mario_mask':'MarioMask',
+    'biggoron_sword':'BiggoronSword', 'giants_knife':'GiantsKnife', 'great_fairy_sword':'GreatFairySword', 'mario_mask':'MarioMask',
 }
 preferred = {
     'fire_rod':'kRodShopFit', 'ice_rod':'kRodShopFit', 'light_rod':'kRodShopFit',
@@ -31,7 +31,7 @@ preferred = {
     'time_gate':'kTimeGateShopFit', 'switch_hook':'kSwitchHookShopFit', 'rocs_feather':'kFeatherShopFit',
     'cane_of_somaria':'kSomariaShopFit', 'rocs_cape':'kRocsCapeShopFit',
     'master_sword':'kMasterSwordShopFit', 'true_master_sword':'kMasterSwordShopFit',
-    'gilded_sword':'kGildedSwordShopFit', 'biggoron_sword':'kBiggoronSwordShopFit',
+    'gilded_sword':'kGildedSwordShopFit', 'biggoron_sword':'kBiggoronSwordShopFit', 'giants_knife':'kBiggoronSwordShopFit',
     'great_fairy_sword':'kGreatFairySwordShopFit',
     'room_key':'{ .65f, 8.f }',
 }
@@ -63,7 +63,7 @@ def row(directory):
 
 def generate():
     bundled=sorted(d for d in ASSETS.iterdir() if d.is_dir())
-    assert len(bundled)==62
+    assert len(bundled)==63
     optional=OPTIONAL/'cojiro'
     rows=[row(d) for d in bundled]
     if optional.exists():

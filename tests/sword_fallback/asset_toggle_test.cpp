@@ -38,6 +38,7 @@ const Presentation kPresentations[]={
     {"__OTR__objects/nei_gi_redesign/razor_sword/gi_dl",nullptr,1,Kind::RazorSword},
     {"__OTR__objects/nei_gi_redesign/gilded_sword/gi_dl",nullptr,1,Kind::GildedSword},
     {"__OTR__objects/nei_gi_redesign/biggoron_sword/gi_dl",nullptr,1,Kind::BiggoronSword},
+    {"__OTR__objects/nei_gi_redesign/giants_knife/gi_dl",nullptr,1,Kind::GiantsKnife},
     {"__OTR__objects/nei_gi_redesign/great_fairy_sword/gi_dl",nullptr,1,Kind::GreatFairySword},
     {"__OTR__objects/nei_gi_redesign/fire_rod/gi_dl",nullptr,1,Kind::Fire},
 };
@@ -67,6 +68,7 @@ const SwordAward swordAwards[]={
     {RG_TRUE_MASTER_SWORD,"True Master Sword","true_master_sword",Kind::SwordAura,"Progressive Master Sword",RG_PROGRESSIVE_MASTER_SWORD},
     {RG_BIGGORON_SWORD,"Biggoron's Sword","biggoron_sword",Kind::BiggoronSword,"Progressive Biggoron's Sword",RG_PROGRESSIVE_BGS},
     {RG_GREAT_FAIRY_SWORD,"Great Fairy's Sword","great_fairy_sword",Kind::GreatFairySword,"Progressive Biggoron's Sword",RG_PROGRESSIVE_BGS},
+    {RG_GIANTS_KNIFE,"Giant's Knife","giants_knife",Kind::GiantsKnife,nullptr,RG_GIANTS_KNIFE},
 };
 int donorSwordTier=0,progressiveRequests=0;
 int OwnerItemDescribe(const char* name,CwItemDrawInfo* out){
@@ -139,14 +141,16 @@ int main(){
     }
     // A foreign OoT award must honor MM's independent Alt state, including
     // repeated draws through the resolver's cached producer function.
+    for(const auto& award:{std::pair{"Master Sword","master_sword"},std::pair{"Giant's Knife","giants_knife"}})
     for(bool host:{true,false,true,false}) {
       ootAlt=true;mmAlt=host;legacyMod=mmLegacyMod=false;
       ComboForeignDrawInfoOOT foreign{};
-      assert(ComboFillForeignDrawInfoOOT(1,foreign,"Master Sword")==ComboForeignResolveOOT::Ok);
+      assert(ComboFillForeignDrawInfoOOT(1,foreign,award.first)==ComboForeignResolveOOT::Ok);
       if(host)assert(foreign.drawKind==CW_DRAW_KIND_CUSTOM_GI && strstr(foreign.dls[0],"object_custom_equip"));
       else assert(foreign.drawKind==CW_DRAW_KIND_NEI_GI &&
-                  !strcmp(foreign.dls[0],"__OTR__@oot-gi-base:objects/nei_gi_redesign/master_sword/gi_dl") &&
+                  foreign.dls[0]==std::string("__OTR__@oot-gi-base:objects/nei_gi_redesign/")+award.second+"/gi_dl" &&
                   "foreign sword ignored the active MM vanilla asset setting");
+      assert(foreign.neiShimmer==int(!strcmp(award.second,"giants_knife")?Kind::GiantsKnife:Kind::MasterSword)+1);
       assert(foreign.appearanceDependent && foreign.stateDependent);
     }
     // Missing shipped data is retryable, so a later host toggle cannot remain
@@ -219,7 +223,7 @@ int main(){
     const auto* retry=ComboResolveForeignDrawInfoOOT(17);
     assert(retry&&retry->drawKind==CW_DRAW_KIND_NEI_GI&&retry->resolvedName=="Master Sword");
     assert(strstr(retry->dls[0],"@oot-gi-base:objects/nei_gi_redesign/master_sword/"));
-    std::cout<<"PASS seven sword identities, independent MM/OoT asset states, repeated vanilla/custom transitions, surviving legacy mods and unchanged non-sword priority\n";
+    std::cout<<"PASS seven native sword identities and distinct foreign Giant's Knife, independent MM/OoT asset states, repeated vanilla/custom transitions, surviving legacy mods and unchanged non-sword priority\n";
     std::cout<<"PASS all seven progressive foreign sword receipts retain their awarded tier while switching Din/authored GIs after grant\n";
     std::cout<<"PASS both starting asset modes, live uncollected previews, generation/slot resets and missing shipped-resource retry of the frozen tier\n";
 }

@@ -28,6 +28,7 @@
 #include "objects/object_gi_bomb_1/object_gi_bomb_1.h"
 #include "objects/object_gi_purse/object_gi_purse.h"
 #include "objects/object_gi_gerudo/object_gi_gerudo.h"
+#include "objects/object_gi_gerudo_warrior/object_gi_gerudo_warrior.h"
 #include "objects/object_gi_arrow/object_gi_arrow.h"
 #include "objects/object_gi_bomb_2/object_gi_bomb_2.h"
 #include "objects/object_gi_egg/object_gi_egg.h"
@@ -329,7 +330,7 @@ DrawItemTableEntry sDrawItemTable[] = {
     // zora mask, OBJECT_GI_ZORAMASK
     { GetItem_DrawMaskOrBombchu, { gGiZoraMaskDL } },
     // gerudo mask, OBJECT_GI_GERUDOMASK
-    { GetItem_DrawMaskOrBombchu, { gGiGerudoMaskDL } },
+    { GetItem_DrawMaskOrBombchu, { gGiGerudoWarriorMaskDL } },
     // cojiro, OBJECT_GI_NIWATORI
     { GetItem_DrawOpa10Xlu2, { gGiChickenDL, gGiCojiroColorDL, gGiChickenEyesDL } },
     // hover boots, OBJECT_GI_HOVERBOOTS
@@ -405,6 +406,19 @@ DrawItemTableEntry sDrawItemTable[] = {
 };
 
 extern int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path);
+static ComboFairyBottleShell GetItem_EmptyBottleShell(s16 drawId) {
+    ComboFairyBottleShell shell = { (const char*)sDrawItemTable[drawId].dlists[0],
+                                    (const char*)sDrawItemTable[drawId].dlists[1] };
+    if (shell.opaque != gGiBottleStopperDL || shell.glass != gGiBottleDL) {
+        return shell; // Other two-pass items retain their native recipe.
+    }
+    // ROM archives can shadow native-name aliases. Select the private casing
+    // in the recipe, while explicit empty-bottle mods still own both passes.
+    return ComboFairyBottle_BundledShell(shell, shell.opaque, shell.glass, ResourceMgr_IsModAsset,
+                                         ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/EmptyOpaque") &&
+                                             ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/EmptyXlu"));
+}
+
 static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
     ComboFairyBottleShell shell = ComboFairyBottle_SelectShell(
         (const char*)sDrawItemTable[drawId].dlists[0], (const char*)sDrawItemTable[drawId].dlists[1],
@@ -582,6 +596,11 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
     *outDrawKind = KIND_SIMPLE;
     drawFunc = sDrawItemTable[drawId].drawFunc;
     res = sDrawItemTable[drawId].dlists;
+    const s32 isEmptyBottle = drawFunc == GetItem_DrawOpa0Xlu1 && (const char*)res[0] == gGiBottleStopperDL &&
+                              (const char*)res[1] == gGiBottleDL;
+    if (isEmptyBottle && maxDlists < 2) {
+        return 0; // The opaque marker and glass are one complete recipe.
+    }
 
     // -- Non-portable funcs: kind-tagged, carried in identity order for the consumer's 1:1 handler.
     if (drawFunc == GetItem_DrawGoronSword) {
@@ -799,6 +818,10 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
     }
     if (kind == KIND_FAIRY) {
         const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
+        outDlists[0] = (void*)shell.opaque;
+        outDlists[1] = (void*)shell.glass;
+    } else if (isEmptyBottle) {
+        const ComboFairyBottleShell shell = GetItem_EmptyBottleShell(drawId);
         outDlists[0] = (void*)shell.opaque;
         outDlists[1] = (void*)shell.glass;
     }
@@ -1296,16 +1319,17 @@ void GetItem_DrawOpa0(PlayState* play, s16 drawId) {
 
 void GetItem_DrawOpa0Xlu1(PlayState* play, s16 drawId) {
     s32 pad;
+    const ComboFairyBottleShell shell = GetItem_EmptyBottleShell(drawId);
 
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[0]);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)shell.opaque);
 
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[1]);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)shell.glass);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }

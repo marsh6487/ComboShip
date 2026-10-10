@@ -483,6 +483,12 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                         randomizer_messages, re.S)
         assert row, f'Missing shared tool receipt: {rg}'
         descriptions += row.group(0) + ',\n'
+    for rg in ('RG_SKULL_MASK', 'RG_SPOOKY_MASK', 'RG_MASK_OF_TRUTH', 'RG_MM_MASK_TRUTH', 'RG_GERUDO_MASK',
+               'RG_KEATON_MASK', 'RG_MM_MASK_KEATON'):
+        row = re.search(r'\{\s*' + rg + r',\s*[^,]+,\s*ComboMaskReceiptText::.*?\}',
+                        randomizer_messages, re.S)
+        assert row, f'Missing shared mask receipt: {rg}'
+        descriptions += row.group(0) + ',\n'
     for rg in ('RG_CANE_OF_SOMARIA', 'RG_PROGRESSIVE_ROCS', 'RG_CANE_PACCI_FLIP',
                'RG_ROCS_CAPE', 'RG_QUARTZ_OF_MOTION', 'RG_DEKU_LEAF',
                'RG_MM_REMAINS_GOHT', 'RG_MM_SONG_LULLABY', 'RG_MM_SONG_LULLABY_INTRO', 'RG_MM_SONG_NOVA',

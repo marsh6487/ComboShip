@@ -18,6 +18,7 @@ extern void StasisSfx_MixInto(s16* outBuf, u32 numSamples);
 // Phantom Hourglass Recall cues (mods/items/logic/hourglass_sfx.inc.c). Two voices: one-shots plus
 // the looping rewind bed. Silent unless the item's own tick is refreshing it.
 extern void HourglassSfx_MixInto(s16* outBuf, u32 numSamples);
+extern void MM_WolfLinkSfx_MixInto(s16* outBuf, u32 numSamples);
 
 AudioTask* AudioThread_UpdateImpl(void);
 void AudioThread_SetFadeOutTimer(s32 seqPlayerIndex, s32 fadeTimer);
@@ -84,6 +85,7 @@ void AudioMgr_CreateNextAudioBuffer(s16* samples, u32 num_samples) {
     StasisSfx_MixInto(samples, num_samples);
     // Mix the Phantom Hourglass Recall cues
     HourglassSfx_MixInto(samples, num_samples);
+    MM_WolfLinkSfx_MixInto(samples, num_samples);
     gAudioCtx.audioRandom = (gAudioCtx.audioRandom + gAudioCtx.totalTaskCount) * osGetCount();
 }
 

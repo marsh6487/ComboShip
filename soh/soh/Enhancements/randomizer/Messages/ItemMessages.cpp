@@ -406,7 +406,15 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
         // argument leaves the message without an ITEM_OBTAINED token at all, and the
         // textbox renders with no icon on the left.
         msg = CustomMessage(customMsg->english, customMsg->german, customMsg->french, TEXTBOX_TYPE_BLUE);
-        msg.AutoFormat(customMsg->itemId);
+        if (rgid == RG_SKULL_MASK || rgid == RG_SPOOKY_MASK || rgid == RG_MASK_OF_TRUTH || rgid == RG_GERUDO_MASK) {
+            // Spooky's icon byte is '&' (0x26), which the markup formatter
+            // converts to a newline. Reserve icon width with a safe token,
+            // then install the native icon after markup has been encoded.
+            msg.AutoFormat(ITEM_CUSTOM);
+            msg.Replace(CustomMessage::ITEM_OBTAINED(ITEM_CUSTOM), CustomMessage::ITEM_OBTAINED(customMsg->itemId));
+        } else {
+            msg.AutoFormat(customMsg->itemId);
+        }
         return;
     }
 

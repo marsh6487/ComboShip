@@ -42,9 +42,15 @@ python3 -B tests/seasons/run_native_weather_tests.py --sanitize
 python3 -B tests/seasons/run_generated_leaf_texture_tests.py
 python3 -B tests/seasons/run_leaf_combiner_tests.py
 python3 -B scripts/diagnostics/run_mm_autumn_foliage_tests.py
+python3 -B scripts/diagnostics/run_mm_autumn_scene_foliage_tests.py
 python3 -B tests/seasons/run_rod_lifecycle_tests.py
 python3 -B tests/seasons/run_oot_shop_tests.py
 python3 -B scripts/diagnostics/run_mm_mask_bridge_tests.py --sanitize
+python3 -B scripts/diagnostics/run_mask_transformation_tests.py
+python3 -B scripts/diagnostics/run_mask_progression_tests.py
+python3 -B scripts/diagnostics/run_gerudo_mask_tests.py
+python3 -B tests/great_fairy_facial/run_tests.py
+python3 -B tests/oot_zora/run_tests.py
 python3 -B tests/mm_presentation/run_foreign_scale_tests.py
 python3 -B tests/mm_cape/run_texture_tests.py
 python3 -B scripts/diagnostics/run_mm_nei_tests.py
@@ -65,6 +71,7 @@ python3 -B tests/mm_wolf/run_material_glow_tests.py
 python3 -B tests/mm_wolf/run_bundled_asset_tests.py
 python3 -B tests/mm_wolf/run_real_asset_tests.py soh/assets/custom/objects/forms/wolf_link/gWolfLinkData soh/assets/custom/objects/forms/wolf_link/gWolfLinkHDData
 python3 -B tests/mm_wolf/run_host_tests.py
+python3 -B tests/mm_wolf/run_audio_tests.py
 python3 -B tests/mm_wolf/run_model_owner_tests.py
 python3 -B tests/mm_wolf/run_asset_packaging_tests.py
 python3 -B tests/mm_wolf/run_syntax_tests.py
@@ -87,6 +94,7 @@ python3 -B tests/combo_button_transfer/run_tests.py --sanitize
 python3 -B tests/nei_quest_held/run_tests.py
 python3 -B tests/nei_used_fx/run_tests.py
 python3 -B tests/nei_leaf/run_tests.py
+python3 -B tests/mm_sfx_lifetime/run_tests.py
 python3 -B tests/nei_whip/run_tests.py
 python3 -B tests/nei_lantern_grip/run_tests.py
 python3 -B scripts/diagnostics/run_switch_hook_instant_tests.py
@@ -99,3 +107,4 @@ python3 -B tools/nei_held/verify_assets.py
 python3 -B tools/nei_icons/build.py --verify
 python3 -B tools/nei_icons/verify_routes.py
 python3 -B tests/optional_assets/run_tests.py
+python3 -B tests/build_inputs/run_mod_discovery_tests.py

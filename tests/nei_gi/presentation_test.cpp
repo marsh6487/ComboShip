@@ -368,6 +368,7 @@ ORIGINAL(Randomizer_DrawSeasonWinter)
 ORIGINAL(Randomizer_DrawProgressiveKokiriSword)
 ORIGINAL(Randomizer_DrawProgressiveMasterSword)
 ORIGINAL(Randomizer_DrawProgressiveBGS)
+ORIGINAL(Randomizer_DrawGiantsKnife)
 ORIGINAL(Randomizer_DrawMasterSword)
 ORIGINAL(Randomizer_DrawRazorSword)
 ORIGINAL(Randomizer_DrawGildedSword)
@@ -387,6 +388,7 @@ static void DrawWeaponFlameOverlay(PlayState *, u8 r, u8 g, u8 b) {
 #ifndef NEI_GI_FIXTURE_BOUNDARY_ONLY
 int main() {
   using namespace Fixture;
+#include "tests/nei_gi/giants_knife_presentation_test.inc"
 #ifdef COMBO_BUILD
 #include "tests/sword_fallback/effects_toggle_checks.inc"
 #endif
@@ -1696,7 +1698,8 @@ int main() {
               << ", height=" << scale * (b.maximum[1] - b.minimum[1])
               << ", spinning width=" << scale * b.spinningWidth << '\n'
               << std::flush;
-    assert(y + scale * b.minimum[1] >= .5f);
+    // Float32 composition at the exact shelf boundary may lose one ULP.
+    assert(y + scale * b.minimum[1] >= .5f - .000002f);
     // The approved feather retains its full size; only its shelf lift changes.
     const bool feather = b.draw == Randomizer_DrawRocsFeather || b.draw == Randomizer_DrawRocsFeatherSkijer;
     assert(scale * (b.maximum[1] - b.minimum[1]) <= (feather ? 21.f : 19.f));
@@ -1839,13 +1842,13 @@ int main() {
       triangle(cmd->words.w1);
   }
   assert(decoded == mesh.count && vertexLoads.size() > 1);
-  // Exercise the shared production draw for all 62 serialized models at the
+  // Exercise the shared production draw for all 63 serialized models at the
   // actual pickup/shop/freestanding caller scales and both owner routes.
   struct FrameFixture {const char* slug;float low,high,width,drawScale;bool xlu;};
   const FrameFixture frames[] = {
 #include "nei_all_frame_bounds.inc"
   };
-  assert(std::size(frames)==62);
+  assert(std::size(frames)==63);
   for(const auto& f:frames) for(const char* owner:{"","@oot:","@mm:","@oot-gi-base:"}) for(int route:{0,1,2}) {
     Reset();
     const std::string path=std::string("__OTR__")+owner+"objects/nei_gi_redesign/"+f.slug+"/gi_dl";
@@ -1884,7 +1887,7 @@ int main() {
   }
   assert(!NeiGi::FindFrameBounds("__OTR__@bad:objects/nei_gi_redesign/four_sword/gi_dl"));
   assert(!NeiGi::FindFrameBounds("__OTR__objects/nei_gi_redesign/four_sword/held_dl"));
-  std::cout<<"PASS all 62 serialized GI frames: native/OoT/MM routes, pickup/shop/freestanding bounds and shared shell pose\n";
+  std::cout<<"PASS all "<<std::size(frames)<<" serialized GI frames: native/OoT/MM routes, pickup/shop/freestanding bounds and shared shell pose\n";
 #ifdef COMBO_BUILD
 #include "tests/mm_presentation/pickup_framing_checks.inc"
 #endif

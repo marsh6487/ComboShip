@@ -50,6 +50,9 @@ extern "C" const char* Nei_AssetDir(void);
 #include <ship/Context.h>
 #include <spdlog/spdlog.h>
 
+#define WOLF_AUDIO_MIX_SYMBOL OOT_WolfLinkSfx_MixInto
+#include "../../../combo/NeiWolfSfx.inc.cpp"
+
 extern "C" {
 #include "expansions/ssbb/ssbb_anim.h"
 #include "expansions/ssbb/ssbb_character.h"
@@ -278,6 +281,15 @@ struct WolfRuntime {
     ColliderCylinder atCyl;
     u8 atCylInit = 0;
     u8 atActive = 0;
+    Vec3f chainAudioPos{};
+    Vec3f chainLastPos{};
+    f32 chainVolume = 0.1f;
+    f32 chainFrequency = 1.2f;
+    f32 chainDistance = 0;
+    s8 chainReverb = 0;
+    u8 chainCooldown = 0;
+    u8 chainPositionValid = 0;
+    u8 chainPlaying = 0;
 };
 
 static WolfRuntime sWolf;
@@ -778,6 +790,56 @@ static bool OnGround(Player* player) {
     return (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) != 0;
 }
 
+static f32 WolfAudioGain(const char* name, f32 fallback) {
+    const f32 gain = CVarGetFloat(name, fallback);
+    u32 bits;
+    std::memcpy(&bits, &gain, sizeof(bits));
+    return (bits & 0x7F800000u) != 0x7F800000u ? std::clamp(gain, 0.0f, 1.0f) : fallback;
+}
+
+static void StopChainSfx() {
+    if (sWolf.chainPlaying)
+        Audio_StopSfxByPosAndId(&sWolf.chainAudioPos, NA_SE_IT_HOOKSHOT_REFLECT);
+    sWolf.chainPlaying = sWolf.chainPositionValid = sWolf.chainCooldown = 0;
+    sWolf.chainDistance = 0;
+}
+
+static void UpdateChainSfx(Player* player, bool permitted) {
+    sWolf.chainVolume = WolfAudioGain("gMods.WolfLink.ChainVolume", 0.1f);
+    if (!permitted || !OnGround(player) || std::fabs(player->linearVelocity) <= 0.5f ||
+        (player->stateFlags1 & PLAYER_STATE1_IN_WATER) || (player->stateFlags3 & PLAYER_STATE3_FLYING_WITH_HOOKSHOT) ||
+        sWolf.chainVolume == 0) {
+        StopChainSfx();
+        return;
+    }
+    const Vec3f current = player->actor.world.pos;
+    if (!sWolf.chainPositionValid) {
+        sWolf.chainLastPos = current;
+        sWolf.chainPositionValid = 1;
+        return;
+    }
+    const f32 dx = current.x - sWolf.chainLastPos.x;
+    const f32 dz = current.z - sWolf.chainLastPos.z;
+    const f32 travel = std::sqrt(dx * dx + dz * dz);
+    sWolf.chainLastPos = current;
+    if (travel < 0.1f || travel > 150.0f) {
+        StopChainSfx();
+        return;
+    }
+    sWolf.chainAudioPos = player->actor.projectedPos;
+    sWolf.chainDistance += travel;
+    if (sWolf.chainCooldown)
+        --sWolf.chainCooldown;
+    if (sWolf.chainDistance < 30.0f || sWolf.chainCooldown)
+        return;
+    sWolf.chainDistance = 0;
+    sWolf.chainCooldown = 8;
+    sWolf.chainPlaying = 1;
+    // Reflect is the existing one-shot metal clink; Hookshot Chain is a loop.
+    Audio_PlaySoundGeneral(NA_SE_IT_HOOKSHOT_REFLECT, &sWolf.chainAudioPos, 4, &sWolf.chainFrequency,
+                           &sWolf.chainVolume, &sWolf.chainReverb);
+}
+
 // getCutDirection: stick relative to facing, or DIR_NONE when neutral.
 static WolfDir CutDirection(const WolfInput& in, Player* player) {
     if (in.stickMag < 20.0f) {
@@ -1129,7 +1191,7 @@ static void ProcWaitAttackInit(Player* player, PlayState* play, s32 attackType) 
     sWolf.attackSpeed = hio->speed;
     sWolf.comboWindow = TpFrames(kComboDuration);
     sWolf.atActive = 0; // armed inside the judgement window
-    Player_PlaySfx(&player->actor, sWolf.comboCount == 4 ? NA_SE_VO_LI_SWORD_L : NA_SE_VO_LI_SWORD_N);
+    WolfAudio_Play(WolfAudioCue::Bite, WolfAudioGain("gMods.WolfLink.VoiceVolume", 0.8f));
     Player_PlaySfx(&player->actor, NA_SE_IT_SWORD_SWING);
 }
 
@@ -1211,7 +1273,7 @@ static void ProcJumpAttackInit(Player* player, PlayState* play, s32 param) {
     FacePlayer(player, player->actor.shape.rot.y);
     sWolf.comboWindow = TpFrames(kComboDuration);
     sWolf.atActive = 1;
-    Player_PlaySfx(&player->actor, finisher ? NA_SE_VO_LI_SWORD_L : NA_SE_VO_LI_SWORD_N);
+    WolfAudio_Play(WolfAudioCue::Jump, WolfAudioGain("gMods.WolfLink.VoiceVolume", 0.8f));
     Player_PlaySfx(&player->actor, NA_SE_PL_SKIP);
 }
 
@@ -1293,7 +1355,7 @@ static void ProcRollAttackInit(Player* player, PlayState* play, s32 dir) {
     sWolf.atActive = 0;
     player->linearVelocity = 0.0f;
     FacePlayer(player, player->actor.shape.rot.y);
-    Player_PlaySfx(&player->actor, NA_SE_VO_LI_SWORD_L);
+    WolfAudio_Play(WolfAudioCue::Spin, WolfAudioGain("gMods.WolfLink.VoiceVolume", 0.8f));
     Player_PlaySfx(&player->actor, NA_SE_IT_SWORD_SWING_HARD);
 }
 
@@ -1479,6 +1541,20 @@ extern "C" void WolfLinkForm_Select(u8 selected) {
     sSelected = selected ? 1 : 0;
 }
 
+extern "C" void WolfLinkForm_UpdateSfx(PlayState* play) {
+    const f32 master = std::clamp(CVarGetInteger("gSettings.Volume.Master", 40), 0, 100) / 100.0f;
+    const f32 sfx = std::clamp(CVarGetInteger("gSettings.Volume.SFX", 100), 0, 100) / 100.0f;
+    const bool live =
+        play && gSaveContext.gameMode == GAMEMODE_NORMAL && !play->transitionTrigger && !play->transitionMode;
+    WolfAudio_Publish(live, live && (play->pauseCtx.state || play->pauseCtx.debugState), master * sfx);
+}
+
+extern "C" void WolfLinkForm_PlayTransformSfx(u8 toWolf) {
+    WolfLinkForm_UpdateSfx(gPlayState);
+    WolfAudio_Play(toWolf ? WolfAudioCue::Enter : WolfAudioCue::Exit,
+                   WolfAudioGain("gMods.WolfLink.TransformVolume", 0.65f));
+}
+
 // Speed multiplier for Link's own locomotion while the wolf is active
 // (Player_GetMovementSpeedAndYaw): TP wolf 25 / human 23 normally, A-dash 45 / 23.
 extern "C" f32 WolfLinkForm_SpeedMultiplier(void) {
@@ -1490,7 +1566,7 @@ extern "C" f32 WolfLinkForm_SpeedMultiplier(void) {
 }
 
 extern "C" u8 WolfLinkForm_LoadSkeleton(PlayState* play) {
-    std::memset(&sWolf, 0, sizeof(sWolf));
+    sWolf = WolfRuntime{};
     for (s32& index : sWolf.animIndex) {
         index = -1;
     }
@@ -1517,6 +1593,8 @@ extern "C" u8 WolfLinkForm_LoadSkeleton(PlayState* play) {
 }
 
 extern "C" void WolfLinkForm_Cleanup(void) {
+    StopChainSfx();
+    WolfAudio_Stop();
     if (sWolf.character.def && sWolf.character.def->skinMesh) {
         SSBBSkin_Destroy(sWolf.character.def->skinMesh);
     }
@@ -1535,6 +1613,7 @@ extern "C" void WolfLinkForm_Cleanup(void) {
 }
 
 extern "C" void WolfLinkForm_Update(Player* player, PlayState* play) {
+    WolfLinkForm_UpdateSfx(play);
     if (!sWolf.initialized || !sWolf.character.ssbbAnim) {
         return;
     }
@@ -1629,6 +1708,7 @@ extern "C" void WolfLinkForm_Update(Player* player, PlayState* play) {
         player->actor.world.rot.y = player->yaw = player->actor.shape.rot.y;
     }
     UpdateAttackCollider(player, play);
+    UpdateChainSfx(player, !in.blocked && sWolf.proc != PROC_WOLF_DAMAGE);
     sWolf.wasOnGround = OnGround(player);
     AdvanceAnim();
 }

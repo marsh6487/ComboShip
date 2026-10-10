@@ -472,6 +472,16 @@ const Presentation kPresentations[] = {
       0,
       true,
       -1 },
+    { Randomizer_DrawGiantsKnife,
+      GI_PATH("giants_knife"),
+      nullptr,
+      1.f,
+      Kind::GiantsKnife,
+      { 0.0000f, 0.0000f, 0.0000f },
+      NeiGi::kBiggoronSwordShopFit,
+      0,
+      true,
+      -1 },
     { Randomizer_DrawProgressiveBGS,
       GI_PATH("biggoron_sword"),
       nullptr,
@@ -563,6 +573,14 @@ const Presentation kMmKokiriPresentation{
 const Presentation* FindPresentation(const GetItemEntry* entry) {
     if (!entry)
         return nullptr;
+    // Knife and Biggoron deliberately share the original native GID. Keep
+    // their concrete award identity before selecting the generic GID fallback.
+    if (entry->gid == GID_SWORD_BGS && ((entry->tableId == TABLE_RANDOMIZER && entry->drawItemId == RG_GIANTS_KNIFE) ||
+                                        (!entry->drawFunc && entry->getItemId == GI_SWORD_KNIFE))) {
+        for (const auto& candidate : kPresentations)
+            if (candidate.draw == Randomizer_DrawGiantsKnife)
+                return &candidate;
+    }
     const Presentation* fallback = nullptr;
     for (const auto& candidate : kPresentations) {
         if (!entry->drawFunc && !candidate.draw && candidate.nativeGid == entry->gid)
@@ -717,6 +735,7 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
         { "master_sword", "oot", "objects/object_toki_objects/object_toki_objects_DL_001BD0" },
         { "true_master_sword", "oot", "objects/object_toki_objects/object_toki_objects_DL_001BD0" },
         { "biggoron_sword", "oot", "objects/object_gi_longsword/gGiBiggoronSwordDL" },
+        { "giants_knife", "oot", "objects/object_gi_longsword/gGiBiggoronSwordDL" },
         { "razor_sword", "mm", "objects/object_gi_sword_2/gGiRazorSwordDL",
           "objects/object_gi_sword_2/gGiRazorSwordEmptyDL" },
         { "gilded_sword", "mm", "objects/object_gi_sword_3/gGiGildedSwordDL",
@@ -761,7 +780,8 @@ const char* SelectedSwordPath(const Presentation& item, bool altAssets, bool (*a
     } else if (std::strstr(item.opaque, "/master_sword/") || std::strstr(item.opaque, "/true_master_sword/")) {
         selected = "__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL";
         fire = "__OTR__objects/din_fire_sword/progressive/adult/SwordDL";
-    } else if (std::strstr(item.opaque, "/biggoron_sword/") || std::strstr(item.opaque, "/great_fairy_sword/")) {
+    } else if (std::strstr(item.opaque, "/biggoron_sword/") || std::strstr(item.opaque, "/great_fairy_sword/") ||
+               std::strstr(item.opaque, "/giants_knife/")) {
         selected = "__OTR__alt/objects/object_custom_equip/gCustomLongswordDL";
         fire = "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
     }

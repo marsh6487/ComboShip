@@ -1851,6 +1851,10 @@ void Randomizer_DrawProgressiveMasterSword(PlayState* play, GetItemEntry* getIte
     DrawCustomItemDiamondTint(play, (Gfx*)gGiKokiriSwordDL, NULL, 0.6f, 120, 180, 255);
 }
 
+void Randomizer_DrawGiantsKnife(PlayState* play, GetItemEntry* getItemEntry) {
+    GetItem_Draw(play, GID_SWORD_BGS);
+}
+
 void Randomizer_DrawProgressiveBGS(PlayState* play, GetItemEntry* getItemEntry) {
     // Biggoron's Sword mesh
     DrawCustomItemDiamond(play, (Gfx*)gGiBiggoronSwordDL, 0.5f);

@@ -168,6 +168,120 @@ static unsigned CountMaterialTriangles(const std::vector<Gfx>& commands, const c
     assert(!tint); // Seasonal state must not leak past a tinted batch.
     return count;
 }
+static void CheckScopedForestCommands(const Variant& variant, const std::vector<Gfx>& original) {
+    assert(Equal(variant.original, original));
+    const auto& commands = variant.commands;
+    assert(commands.size() == 5);
+    assert(SameCommand(commands[0], gsSPGrayscale(true)));
+    assert(SameCommand(commands[1], gsDPSetGrayscaleColor(185, 104, 72, 255)));
+    const auto* draw = reinterpret_cast<const Gfx*>(commands[2].words.w1);
+    assert(draw != variant.original.data()); // The renderer writes resolved texture pointers into executed lists.
+    assert(Equal(std::vector<Gfx>(draw, draw + original.size()), original));
+    assert(SameCommand(commands[2], gsSPDisplayList(draw)));
+    assert(SameCommand(commands[3], gsSPGrayscale(false)));
+    assert(SameCommand(commands[4], gsSPEndDisplayList()));
+}
+
+#include "autumn_scene_forest_fixture.h"
+static void CheckForestDrawOwners() {
+    constexpr const char* wallpaper = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_034098";
+    constexpr const char* canopy = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_037098";
+    assert(CountMaterialTriangles(kActualForestCommands, wallpaper) == 14);
+    assert(CountMaterialTriangles(kActualForestCommands, canopy) == 8);
+    const auto wallHash = CRC64(wallpaper);
+    const auto canopyHash = CRC64(canopy);
+    unsigned cases = 0;
+    for (const auto* suffix : { "", "_scene" }) {
+        for (const auto* prefix : { "", "alt/" }) {
+            for (const auto* setup : { "", "Set_001200", "Set_001340", "Set_0014C0", "Set_0015D0", "Set_001750",
+                                       "Set_0019F0", "Set_001B30", "Set_001C90", "Set_001E60" }) {
+                // Start with both private, then mixed native/private, then native.
+                for (const unsigned privateMask : { 3, 1, 2, 0 }) {
+                    auto original = kActualForestCommands;
+                    for (size_t i = 0; i < original.size(); ++i) {
+                        const auto op = original[i].words.w0 >> 24;
+                        if (op == G_SETTIMG_OTR_HASH) {
+                            const auto hash = (uint64_t(original[i + 1].words.w0) << 32) | original[i + 1].words.w1;
+                            const auto replacement =
+                                hash == wallHash && (privateMask & 1) ? CRC64("custom/test_private_forest/wallpaper")
+                                : hash == canopyHash && (privateMask & 2) ? CRC64("custom/test_private_forest/canopy")
+                                                                          : hash;
+                            original[i + 1] = Command(replacement >> 32, replacement & 0xFFFFFFFF);
+                        }
+                        if (op == G_SETTIMG_OTR_HASH || op == G_VTX_OTR_HASH || op == G_DL_OTR_HASH || op == G_MARKER)
+                            ++i;
+                    }
+                    ClearCache();
+                    auto rm = std::make_shared<Ship::ResourceManager>();
+                    Ship::Context::GetRawInstance()->rm = rm;
+                    const auto path = std::string(prefix) + "scenes/nonmq/Z2_00KEIKOKU" + suffix +
+                                      "/Z2_00KEIKOKU_room_00" + setup + "DL_0241B0";
+                    auto resource = std::make_shared<Fast::DisplayList>();
+                    resource->Instructions = original;
+                    rm->archive->files[path] = resource;
+                    rm->resources[path] = resource;
+                    rm->alt = std::string(prefix) == "alt/";
+                    PlayState play{};
+                    play.sceneId = SCENE_00KEIKOKU;
+                    season = SEASON_AUTUMN;
+                    MMAutumnSceneFoliage_Update(&play);
+                    if ((resource->Instructions[0].words.w0 >> 24) != G_DL) {
+                        std::fprintf(stderr, "FAIL %s: both private forest layers remain untinted\n", path.c_str());
+                        assert(false);
+                    }
+                    const auto branch = resource->Instructions[0];
+                    const auto& variant = sVariants.at(resource.get());
+                    CheckScopedForestCommands(variant, original);
+                    assert(branch.words.w1 == reinterpret_cast<uintptr_t>(variant.commands.data()));
+                    for (size_t i = 1; i < original.size(); ++i)
+                        assert(SameCommand(resource->Instructions[i], original[i]));
+                    auto* draw = reinterpret_cast<Gfx*>(variant.commands[2].words.w1);
+                    for (size_t i = 0; i < original.size(); ++i) {
+                        const auto op = draw[i].words.w0 >> 24;
+                        if (op == G_SETTIMG_OTR_HASH)
+                            draw[i].words.w1 = uintptr_t(0x10000000) + i * 256;
+                        if (op == G_SETTIMG_OTR_HASH || op == G_VTX_OTR_HASH || op == G_DL_OTR_HASH || op == G_MARKER)
+                            ++i;
+                    }
+                    for (unsigned i = 0; i < 100; ++i)
+                        MMAutumnSceneFoliage_Update(&play);
+                    assert(SameCommand(resource->Instructions[0], branch) && rm->loads == 0 && sVariants.size() == 1);
+                    season = SEASON_OFF;
+                    MMAutumnSceneFoliage_Update(&play);
+                    assert(Equal(resource->Instructions, original));
+                    season = SEASON_AUTUMN;
+                    MMAutumnSceneFoliage_Update(&play);
+                    assert(SameCommand(resource->Instructions[0], branch) && sVariants.size() == 1 && rm->loads == 0);
+                    ClearCache();
+                    assert(Equal(resource->Instructions, original));
+                    ++cases;
+                }
+            }
+        }
+    }
+    std::printf("PASS %u actual forest draw cases: 14 wallpaper + 8 canopy triangles, native/private/mixed bindings, "
+                "both namespaces, Alt, all ten setups, exact restoration and cache reuse\n",
+                cases);
+    for (const auto* name : { "Z2_00KEIKOKU_room_01DL_0241B0", "Z2_00KEIKOKU_room_00Set_999999DL_0241B0",
+                              "Z2_00KEIKOKU_room_00DL_0241B1" }) {
+        ClearCache();
+        auto rm = std::make_shared<Ship::ResourceManager>();
+        Ship::Context::GetRawInstance()->rm = rm;
+        const auto path = std::string("scenes/nonmq/Z2_00KEIKOKU/") + name;
+        auto resource = List("custom/test_private_forest/unrelated");
+        const auto original = resource->Instructions;
+        rm->archive->files[path] = resource;
+        rm->resources[path] = resource;
+        PlayState play{};
+        play.sceneId = SCENE_00KEIKOKU;
+        season = SEASON_AUTUMN;
+        MMAutumnSceneFoliage_Update(&play);
+        assert(Equal(resource->Instructions, original) && sVariants.empty());
+    }
+    ClearCache();
+    std::puts("PASS forest owner matching excludes other rooms, unknown setups and neighboring draws");
+}
+
 static void CheckActualMaterial(const char* path, const std::vector<Gfx>& original, const char* texture,
                                 unsigned expectedTriangles) {
     const auto variant = BuildVariant(original);
@@ -194,7 +308,11 @@ static void CheckActualMaterial(const char* path, const std::vector<Gfx>& origin
     assert((branch.words.w0 >> 24) == G_DL);
     const auto& applied = sVariants.at(resource.get()).commands;
     assert(branch.words.w1 == reinterpret_cast<uintptr_t>(applied.data()));
-    assert(Equal(applied, variant));
+    if (applied.size() == 5 && (applied[0].words.w0 >> 24) == G_SETGRAYSCALE) {
+        CheckScopedForestCommands(sVariants.at(resource.get()), original);
+    } else {
+        assert(Equal(applied, variant));
+    }
     for (unsigned i = 0; i < 100; ++i)
         MMAutumnSceneFoliage_Update(&play);
     assert(SameCommand(resource->Instructions[0], branch) && rm->loads == 0 && sVariants.size() == 1);
@@ -302,6 +420,7 @@ int main() {
         const auto changed = BuildVariant(original);
         assert(!changed.empty() && Equal(RemoveTint(changed), original));
     }
+    CheckForestDrawOwners();
     CheckActualMaterials();
     CheckPrivateBrushMaterials();
     auto rm = Ship::Context::GetRawInstance()->rm;

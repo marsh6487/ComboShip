@@ -1167,7 +1167,8 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     out->drawKind = drawKind;
     if (drawKind == CW_DRAW_KIND_ELEMENTAL_ARROW)
         out->neiEffect = NeiArrowGi_ProfileForDrawId(id, RI_ARROW_FIRE, RI_ARROW_ICE, RI_ARROW_LIGHT);
-    if (drawKind == CW_DRAW_KIND_MM_FAIRY_BOTTLE || drawKind == CW_DRAW_KIND_MM_FAIRY_CONTAINER)
+    if (drawKind == CW_DRAW_KIND_MM_FAIRY_BOTTLE || drawKind == CW_DRAW_KIND_MM_FAIRY_CONTAINER ||
+        id == RI_BOTTLE_EMPTY)
         out->stateDependent = 2; // selected shell follows live MM owner Alt/mod state
     for (int32_t i = 0; i < n; i++) {
         out->dlists[i] = (const char*)dls[i];

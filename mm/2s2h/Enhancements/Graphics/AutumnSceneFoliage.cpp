@@ -45,6 +45,23 @@ constexpr Material kMaterials[] = {
     { "Z2_21MITURINMAE", "Z2_21MITURINMAETex_0055D0", 0xB96848FF },
 };
 
+uint32_t ForestListColor(std::string path) {
+    if (path.starts_with("alt/"))
+        path.erase(0, 4);
+    // This exact draw owns only the lower forest wallpaper and upper canopy.
+    // Scope both together even when a replacement exposes private or mixed
+    // texture identities. Do not recolor adjacent terrain or architecture.
+    for (const auto* suffix : { "", "_scene" }) {
+        const std::string prefix = "scenes/nonmq/Z2_00KEIKOKU" + std::string(suffix) + "/Z2_00KEIKOKU_room_00";
+        for (const auto* setup : { "", "Set_001200", "Set_001340", "Set_0014C0", "Set_0015D0", "Set_001750",
+                                   "Set_0019F0", "Set_001B30", "Set_001C90", "Set_001E60" }) {
+            if (path == prefix + setup + "DL_0241B0")
+                return 0xB96848FF;
+        }
+    }
+    return 0;
+}
+
 uint32_t WholeListColor(std::string path) {
     if (path.starts_with("alt/"))
         path.erase(0, 4);
@@ -172,6 +189,9 @@ struct Variant {
     std::shared_ptr<Fast::DisplayList> source;
     std::vector<Gfx> original;
     std::vector<Gfx> commands;
+    // The interpreter writes resolved texture pointers into executed lists.
+    // A scoped child must not mutate the immutable source comparison above.
+    std::vector<Gfx> draw;
 
     Gfx Branch() const {
         return gsSPBranchList(commands.data());
@@ -299,24 +319,25 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
             if (ignored != sIgnored.end() && ignored->second.lock() == resource) {
                 continue;
             }
-            auto commands = BuildVariant(resource->Instructions);
-            const auto wholeColor = WholeListColor(path);
+            const auto forestColor = ForestListColor(path);
+            auto commands = forestColor != 0 ? std::vector<Gfx>{} : BuildVariant(resource->Instructions);
+            const auto wholeColor = forestColor != 0 ? forestColor : WholeListColor(path);
             if (commands.empty() && wholeColor == 0) {
                 // Ordinary scene materials stay owned by the resource manager;
                 // don't retain or duplicate every non-foliage list in the scene.
                 sIgnored[resource.get()] = resource;
                 continue;
             }
-            Variant variant{ resource, resource->Instructions, std::move(commands) };
+            Variant variant{ resource, resource->Instructions, std::move(commands), {} };
             if (variant.commands.empty()) {
                 // Execute the intact root as a pushed child, then restore the
                 // color even when that root ends with a tail branch. Copies
                 // retain all dynamic child calls, geometry and alpha commands.
-                variant.commands = {
-                    gsSPGrayscale(true),
-                    gsDPSetGrayscaleColor(wholeColor >> 24, (wholeColor >> 16) & 255, (wholeColor >> 8) & 255, 255),
-                    gsSPDisplayList(variant.original.data()), gsSPGrayscale(false), gsSPEndDisplayList()
-                };
+                variant.draw = variant.original;
+                variant.commands = { gsSPGrayscale(true),
+                                     gsDPSetGrayscaleColor(wholeColor >> 24, (wholeColor >> 16) & 255,
+                                                           (wholeColor >> 8) & 255, 255),
+                                     gsSPDisplayList(variant.draw.data()), gsSPGrayscale(false), gsSPEndDisplayList() };
             }
             it = sVariants.emplace(resource.get(), std::move(variant)).first;
         }

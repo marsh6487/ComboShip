@@ -398,6 +398,18 @@ static DrawItemTableEntry sDrawItemTable[] = {
 extern int ResourceMgr_IsModAsset(const char* path);
 extern int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
 extern int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path);
+static ComboFairyBottleShell GetItem_EmptyBottleShell(s16 drawId) {
+    ComboFairyBottleShell shell = { (const char*)sDrawItemTable[drawId].drawResources[0],
+                                    (const char*)sDrawItemTable[drawId].drawResources[1] };
+    if (shell.opaque != gGiEmptyBottleCorkDL || shell.glass != gGiEmptyBottleGlassDL) {
+        return shell; // Other two-pass items retain their native recipe.
+    }
+    // Keep this selection separate from the fairy's Blue Fire/mod precedence.
+    return ComboFairyBottle_BundledShell(shell, shell.opaque, shell.glass, ResourceMgr_IsModAsset,
+                                         ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/EmptyOpaque") &&
+                                             ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/EmptyXlu"));
+}
+
 static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
     ComboFairyBottleShell shell = ComboFairyBottle_SelectShell(
         (const char*)sDrawItemTable[drawId].drawResources[0], (const char*)sDrawItemTable[drawId].drawResources[1],
@@ -873,6 +885,11 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
     }
     drawFunc = sDrawItemTable[drawId].drawFunc;
     res = sDrawItemTable[drawId].drawResources;
+    const s32 isEmptyBottle = drawFunc == GetItem_DrawOpa0Xlu1 && (const char*)res[0] == gGiEmptyBottleCorkDL &&
+                              (const char*)res[1] == gGiEmptyBottleGlassDL;
+    if (isEmptyBottle && maxDlists < 2) {
+        return 0;
+    }
 
     if (drawFunc == GetItem_DrawRemains) {
         // Single OPA DL at 0.02 scale; see the portability note in the header comment.
@@ -1026,6 +1043,10 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
     }
     if (kind == KIND_MM_FAIRY_BOTTLE || kind == KIND_MM_FAIRY_CONTAINER) {
         const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
+        outDlists[0] = (void*)shell.opaque;
+        outDlists[1] = (void*)shell.glass;
+    } else if (isEmptyBottle) {
+        const ComboFairyBottleShell shell = GetItem_EmptyBottleShell(drawId);
         outDlists[0] = (void*)shell.opaque;
         outDlists[1] = (void*)shell.glass;
     }
@@ -1345,18 +1366,19 @@ void GetItem_DrawOpa0(PlayState* play, s16 drawId) {
  */
 void GetItem_DrawOpa0Xlu1(PlayState* play, s16 drawId) {
     s32 pad;
+    const ComboFairyBottleShell shell = GetItem_EmptyBottleShell(drawId);
 
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)shell.opaque);
 
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[1]);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)shell.glass);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }

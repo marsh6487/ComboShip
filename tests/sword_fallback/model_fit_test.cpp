@@ -101,7 +101,7 @@ extern "C" int ResourceMgr_GetGiModelFitForGame(const char*,const char* path,flo
 #define CVAR_ENHANCEMENT(x) x
 int CVarGetInteger(const char*,int){return 0;}
 void ComboDinSwordGi_DrawLayers(PlayState*,const char*,const char*) {}
-enum RandomizerGet{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_TRUE_MASTER_SWORD,RG_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD};
+enum RandomizerGet{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_TRUE_MASTER_SWORD,RG_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD,RG_GIANTS_KNIFE};
 int32_t OOT_NeiAltAssetsEnabled(){return 1;}
 int32_t OOT_NeiResourceExists(const char* path){return bool(loader(path));}
 /* PRODUCTION */
@@ -290,7 +290,7 @@ int main(){
         }
         std::cout<<e.path<<" peak receipt projection="<<peakProjection<<'\n';
     }
-    for(auto id:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD}){
+    for(auto id:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD,RG_GIANTS_KNIFE}){
         CwItemDrawInfo info{};
         if(CwAltSwordGi(id,&info)){
             assert(loader(info.dlists[0])&&info.itemShimmer&&info.neiShimmer>0);

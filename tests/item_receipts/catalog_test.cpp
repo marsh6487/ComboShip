@@ -558,6 +558,57 @@ int main(int argc, char** argv) {
   (void)argv;
   PlayState play{};
   gPlayState = &play;
+  // Cosmetic masks retain their OoT descriptions; Gerudo/Keaton teach their forms.
+  // MM-first pickups must not depend on a hydrated OoT module or mutate saves.
+  const struct { RandoItemId id; const char* name; const char* detail; } masks[] = {
+    {RI_OOT_MASK_SKULL, "Skull Mask", "monster"},
+    {RI_OOT_MASK_SPOOKY, "Spooky Mask", "scare"},
+    {RI_MASK_TRUTH, "Mask of Truth", "Show it"},
+    {RI_OOT_MASK_GERUDO, "Gerudo Mask", "Urbosa"},
+    {RI_MASK_KEATON, "Keaton Mask", "reflect"},
+  };
+  for (bool ready : {false, true}) {
+    donorReady = ready;
+    for (int language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+      gSaveContext.options.language = language;
+      for (const auto& mask : masks) {
+        CustomMessage::Entry native, foreign;
+        native.icon = foreign.icon = 0xF5;
+        const auto saveBefore = gSaveContext;
+        const auto neiBefore = neiSave;
+        const int readsBefore = donorReads;
+        assert(Rando::ApplyItemReceiptText(mask.id, native) && "mask still uses generic receipt");
+        assert(Rando::ApplyForeignItemReceiptText(mask.name, foreign));
+        assert(native.msg == foreign.msg && !native.autoFormat && !foreign.autoFormat);
+        assert(native.icon == 0xF5 && foreign.icon == 0xF5);
+        assert(native.msg.find('\xB2') != std::string::npos && "missing MM C glyph");
+        assert(native.msg.find('%') == std::string::npos && native.msg.size() <= 1269);
+        if (language == LANGUAGE_ENG) assert(native.msg.find(mask.detail) != std::string::npos);
+        if (mask.id == RI_MASK_KEATON) {
+          CustomMessage::Entry imported;
+          imported.icon = native.icon; // Compare the same header-icon wrapping width.
+          assert(Rando::ApplyForeignItemReceiptText("Keaton Mask (MM)", imported));
+          assert(imported.msg == native.msg && "Keaton copies have different tutorials");
+          for (char glyph : {'\xB0', '\xB1', '\xB4'})
+            assert(native.msg.find(glyph) != std::string::npos);
+          if (language == LANGUAGE_ENG) {
+            for (const char* move : {"punch", "charge", "jump", "kick", "climb", "magic"})
+              assert(native.msg.find(move) != std::string::npos && "missing Keaton instruction");
+          }
+        }
+        unsigned lines = 1;
+        for (char c : native.msg) {
+          if (c == '\x10') lines = 1;
+          if (c == '\x11') assert(++lines <= 3 && "mask receipt exceeds MM line offsets");
+        }
+        assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+        assert(!std::memcmp(&neiBefore, &neiSave, sizeof(neiBefore)));
+        assert(donorReads == readsBefore && "mask receipt queried dormant OoT");
+      }
+    }
+  }
+  gSaveContext.options.language = LANGUAGE_ENG;
+  std::cout << "PASS mask receipts: native/foreign, locales, cold/warm donor, glyphs and save isolation\n";
   // Utility tutorials must work in an MM-first seed without querying OoT.
   const struct { RandoItemId id; const char* name; char color; char extraButton; unsigned pages; } tools[] = {
     {RI_OOT_NEI_PHANTOM_HOURGLASS, "Phantom Hourglass", '\x04', '\xB4', 4},

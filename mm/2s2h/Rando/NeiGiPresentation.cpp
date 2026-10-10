@@ -277,7 +277,7 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop, int mmPickup) {
                                ? info.ops[0].a * (3.14159265358979323846f / 32768.f)
                                : 0.f;
         if (!NeiGi_ValidScale(info.scale) || !NeiGi_Finite(tilt) || info.neiShimmer < 1 ||
-            info.neiShimmer > int(Kind::Gold) + 1)
+            info.neiShimmer > int(Kind::GiantsKnife) + 1)
             return;
         const bool flame = tilt != 0.f && info.primColorXlu[3];
         // The native scroll/flame allocates before the shared renderer. Check
@@ -424,7 +424,7 @@ MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer(RandoItemId item, bool shop, in
         return;
     CwItemDrawInfo info{};
     MM_DescribeNeiGi(item, &info);
-    mEnabled = info.itemShimmer && info.neiShimmer > 0 && info.neiShimmer <= static_cast<int>(Kind::Gold) + 1;
+    mEnabled = info.itemShimmer && info.neiShimmer > 0 && info.neiShimmer <= static_cast<int>(Kind::GiantsKnife) + 1;
     if (mEnabled)
         mKind = static_cast<Kind>(info.neiShimmer - 1);
     if (mEnabled) {

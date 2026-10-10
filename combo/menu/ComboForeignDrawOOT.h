@@ -693,7 +693,7 @@ inline void OOT_DrawForeignCustomGi(PlayState* play, const ComboForeignDrawInfo*
     Matrix_Push();
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
     Matrix_RotateY((bits >= 0x8000u ? int32_t(bits) - 0x10000 : int32_t(bits)) * .01f, MTXMODE_APPLY);
-    const bool sword = info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Gold) + 1 &&
+    const bool sword = info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1 &&
                        NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
     int selectedOpaque = -1;
     bool noCull = false;
@@ -998,7 +998,7 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
     }
 
     const bool swordIdentity = info->neiShimmer > 0 &&
-                               info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Gold) + 1 &&
+                               info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1 &&
                                NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
     const bool fitSword = info->count > 0 && swordIdentity &&
                           (info->drawKind == CW_DRAW_KIND_CUSTOM_GI || info->drawKind == CW_DRAW_KIND_SIMPLE ||
@@ -1130,13 +1130,13 @@ inline void OOT_DrawComboForeign(PlayState* play, GetItemEntry* getItemEntry, bo
             Matrix_Push();
             ComboSwordGi_ApplyEffectFit(static_cast<NeiGi::Kind>(info->neiShimmer - 1), shop);
         }
-        if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Gold) + 1 &&
+        if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1 &&
             NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
             NeiGi_DrawMesh(play, NeiGi::SampleSpecial(static_cast<NeiGi::Kind>(info->neiShimmer - 1),
                                                       play->gameplayFrames, NeiGi_CameraBasis(play)));
         if (info->drawKind == CW_DRAW_KIND_SONG_GI)
             NeiGi_DrawSongOverlay(play, info->neiEffect, "mm");
-        else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Gold) + 1)
+        else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1)
             NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play),
                                                       static_cast<NeiGi::Kind>(info->neiShimmer - 1)));
         else if (info->neiEffect == static_cast<int32_t>(NeiGi::Kind::Pokeball))

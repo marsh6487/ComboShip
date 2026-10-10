@@ -1,5 +1,6 @@
 #include "../../../../combo/menu/ItemGrantAuditBridge.h"
 #include "../../../../combo/menu/ComboToolReceiptText.h"
+#include "../../../../combo/menu/ComboMaskReceiptText.h"
 #include "randomizer.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
@@ -103,6 +104,20 @@ struct CustomItemMessageEntry {
  * Descriptions, Lore, and Translations provided by Gemini 3.0
  */
 static const CustomItemMessageEntry customItemMessages[] = {
+    { RG_SKULL_MASK, ITEM_MASK_SKULL, ComboMaskReceiptText::kSkull.english, ComboMaskReceiptText::kSkull.german,
+      ComboMaskReceiptText::kSkull.french },
+    { RG_SPOOKY_MASK, ITEM_MASK_SPOOKY, ComboMaskReceiptText::kSpooky.english, ComboMaskReceiptText::kSpooky.german,
+      ComboMaskReceiptText::kSpooky.french },
+    { RG_MASK_OF_TRUTH, ITEM_MASK_TRUTH, ComboMaskReceiptText::kTruth.english, ComboMaskReceiptText::kTruth.german,
+      ComboMaskReceiptText::kTruth.french },
+    { RG_MM_MASK_TRUTH, ITEM_CUSTOM, ComboMaskReceiptText::kTruth.english, ComboMaskReceiptText::kTruth.german,
+      ComboMaskReceiptText::kTruth.french },
+    { RG_GERUDO_MASK, ITEM_MASK_GERUDO, ComboMaskReceiptText::kGerudo.english, ComboMaskReceiptText::kGerudo.german,
+      ComboMaskReceiptText::kGerudo.french },
+    { RG_KEATON_MASK, ITEM_MASK_KEATON, ComboMaskReceiptText::kKeaton.english, ComboMaskReceiptText::kKeaton.german,
+      ComboMaskReceiptText::kKeaton.french },
+    { RG_MM_MASK_KEATON, ITEM_CUSTOM, ComboMaskReceiptText::kKeaton.english, ComboMaskReceiptText::kKeaton.german,
+      ComboMaskReceiptText::kKeaton.french },
     // Movement Items
     // Skijer's progressive Roc's Feather (extended inventory page 2)
     { RG_PROGRESSIVE_ROCS, static_cast<ItemID>(ITEM_ROCS_FEATHER_SKIJER),

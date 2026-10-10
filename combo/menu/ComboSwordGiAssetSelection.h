@@ -5,7 +5,7 @@
 // The active host chooses appearance; the producing donor keeps its own Alt
 // mode. Re-resolve only the awarded sword's authored, archive-pinned recipe.
 static inline int32_t ComboSwordGi_SelectBaseAssets(CwItemDrawInfo& info, bool altAssets) {
-    if (altAssets || info.neiShimmer < 1 || info.neiShimmer > int32_t(NeiGi::Kind::MarioMask) + 1)
+    if (altAssets || info.neiShimmer < 1 || info.neiShimmer > int32_t(NeiGi::Kind::GiantsKnife) + 1)
         return 1;
     const auto* bounds = NeiGi::FindSwordFrameBounds(static_cast<NeiGi::Kind>(info.neiShimmer - 1));
     if (!bounds)

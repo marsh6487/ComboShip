@@ -85,10 +85,12 @@ new=re.sub(r'static bool NeiGi_DrawMeshMaterial\(.*?\) \{',
 # The renderer input/capacity guards have their own real-arena regressions.
 # Normalize only those exact additions; retain the fixed historical batcher
 # and untextured material/command behavior as the comparison baseline.
+# The authored sword candidate appends the separate Giant's Knife kind. Its
+# routing and real render path are covered by the sword/NEI fixtures above.
 start=new.index('{')+1;end=new.index('    // Reuse shared vertices')
 assert tokens(new[start:end])==tokens('''
     if (!play || !play->state.gfxCtx || !NeiGi_ValidMesh(mesh, material, seasonSunRays) || int(orb) < 0 ||
-        int(orb) > int(Kind::Gold))
+        int(orb) > int(Kind::GiantsKnife))
         return false;
 ''')
 new=new[:start]+'\n    if (mesh.count == 0)\n        return;\n'+new[end:]

@@ -69,7 +69,7 @@ for(int form:{PLAYER_FORM_HUMAN,PLAYER_FORM_GORON,PLAYER_FORM_ZORA,PLAYER_FORM_D
  }
 }
 assert(nativePickupBindings>=5*50);
-std::cout<<"PASS actual MM CustomItem/DrawResolvedItem receipt route: all 61 serialized OPA/XLU models inside each of five native form cameras through a full spin; human margin retained\n";
+std::cout<<"PASS actual MM CustomItem/DrawResolvedItem receipt route: all "<<std::size(frames)<<" serialized OPA/XLU models inside each of five native form cameras through a full spin; human margin retained\n";
 // The selected graph fitter has its own integer C seam. Exercise both active
 // custom routes so Goron's context cannot collapse back to the human fit.
 for(int form:{PLAYER_FORM_HUMAN,PLAYER_FORM_GORON,PLAYER_FORM_ZORA,PLAYER_FORM_DEKU,PLAYER_FORM_FIERCE_DEITY})

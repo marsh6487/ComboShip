@@ -30,6 +30,7 @@
         { Kind::GildedSword, "gilded_sword", 0xFFD45A },
         { Kind::MasterSword, "master_sword", 0x6F8FFF },
         { Kind::BiggoronSword, "biggoron_sword", 0xFF9A42 },
+        { Kind::GiantsKnife, "giants_knife", 0xCFD9E6 },
         { Kind::GreatFairySword, "great_fairy_sword", 0x79BE84 },
         { Kind::FourSword, "four_sword", 0x315B2F },
         { Kind::SwordAura, "true_master_sword", 0xFFF4D6 },
@@ -174,7 +175,7 @@
     selectedForeignInfo = nullptr;
     foreignFallbackCalls = 0;
     Reset();
-    std::cout << "PASS real MM-to-OoT foreign sword dispatch: nine palettes, intrinsic particles, one shared shimmer, optional toggle and mask overlays\n";
+    std::cout << "PASS real MM-to-OoT foreign sword dispatch: ten palettes, intrinsic particles, one shared shimmer, optional toggle and mask overlays\n";
 }
 
 // Exercise the real sentinel callback through EnGirlA, using the native MM
@@ -266,7 +267,9 @@
                 std::cout << "foreign " << b.slug << ": shelf bottom=" << y + scale * b.minimum[1]
                           << ", height=" << height << '\n' << std::flush;
                 assert(height <= 19.f);
-                assert(y + scale * b.minimum[1] >= .5f);
+                // Float32 parent/local composition can lose one ULP at the
+                // exact .5 shelf floor; retain a two-millionth-unit allowance.
+                assert(y + scale * b.minimum[1] >= .5f - .000002f);
                 assert(scale * b.spinningWidth <= 19.f);
                 assert(submitted.size() == worldMatrices.size() && arena.size() == worldMeshes.size());
                 for (size_t i = 0; i < submitted.size(); ++i) {

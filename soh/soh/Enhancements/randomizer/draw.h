@@ -90,6 +90,7 @@ void Randomizer_DrawProgressiveHammer(PlayState* play, GetItemEntry* getItemEntr
 void Randomizer_DrawProgressiveKokiriSword(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawProgressiveMasterSword(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawProgressiveBGS(PlayState* play, GetItemEntry* getItemEntry);
+void Randomizer_DrawGiantsKnife(PlayState* play, GetItemEntry* getItemEntry);
 // Per-level identities of the NEI weapon chains (what the progressive resolution hands out).
 void Randomizer_DrawRazorSword(PlayState* play, GetItemEntry* getItemEntry);
 void Randomizer_DrawGildedSword(PlayState* play, GetItemEntry* getItemEntry);

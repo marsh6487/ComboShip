@@ -4,6 +4,7 @@
 #include "combo/menu/ComboDungeonKeyReceipt.h"
 #include "combo/menu/ComboMagicItemReceiptText.h"
 #include "combo/menu/ComboToolReceiptText.h"
+#include "combo/menu/ComboMaskReceiptText.h"
 #include "combo/menu/ComboItemReceiptPresentation.h"
 #include "combo/menu/ComboItemReceiptText.h"
 #include "soh/soh/Enhancements/custom-message/text.h"
@@ -37,7 +38,8 @@ constexpr int ITEM_CATEGORY_JUNK = 0, ITEM_CATEGORY_MAJOR = 1,
               TEXT_RANDOMIZER_CUSTOM_ITEM = 0x9000;
 constexpr int TEXTBOX_TYPE_BLUE = 2, ITEM_COMPASS = 0x75,
               ITEM_DUNGEON_MAP = 0x76, ITEM_SKULL_TOKEN = 0x71,
-              ITEM_CUSTOM = 0x9C;
+              ITEM_CUSTOM = 0x9C, ITEM_MASK_KEATON = 0x24, ITEM_MASK_SKULL = 0x25,
+              ITEM_MASK_SPOOKY = 0x26, ITEM_MASK_GERUDO = 0x2A, ITEM_MASK_TRUTH = 0x2B;
 using ItemID = int;
 constexpr int OBJECT_INVALID = -1, ITEM_NONE = 0xFF,
               ITEM_ELEMENTAL_WAND = 0xD0, EXT_ITEM_SHEIKAH_SLATE = 0x220,
@@ -194,6 +196,13 @@ std::map<std::string, RandomizerGet> itemNameToEnum = {
     {"Sheikah Slate", RG_SHEIKAH_SLATE},
     {"Phantom Hourglass", RG_PHANTOM_HOURGLASS},
     {"Shadow Crystal", RG_SHADOW_CRYSTAL},
+    {"Skull Mask", RG_SKULL_MASK},
+    {"Spooky Mask", RG_SPOOKY_MASK},
+    {"Mask of Truth", RG_MASK_OF_TRUTH},
+    {"Mask of Truth (MM)", RG_MM_MASK_TRUTH},
+    {"Gerudo Mask", RG_GERUDO_MASK},
+    {"Keaton Mask", RG_KEATON_MASK},
+    {"Keaton Mask (MM)", RG_MM_MASK_KEATON},
     {"Rune: Remote Bomb", RG_SLATE_RUNE_BOMB},
     {"Rune: Stasis", RG_SLATE_RUNE_STASIS},
     {"Rune: Cryonis", RG_SLATE_RUNE_CRYONIS},
@@ -858,6 +867,39 @@ int main(int argc, char** argv) {
     }
   }
   std::cout << "PASS Hourglass/Crystal OoT tutorials: custom icons, all locales, encoded glyphs/colors and donor export\n";
+  const struct { const char* name; const char* detail; int icon; } masks[] = {
+      {"Skull Mask", "monster", ITEM_MASK_SKULL},
+      {"Spooky Mask", "scare", ITEM_MASK_SPOOKY},
+      {"Mask of Truth", "Show it", ITEM_MASK_TRUTH},
+      {"Mask of Truth (MM)", "Show it", ITEM_CUSTOM},
+      {"Gerudo Mask", "Urbosa", ITEM_MASK_GERUDO},
+      {"Keaton Mask", "reflect", ITEM_MASK_KEATON},
+      {"Keaton Mask (MM)", "reflect", ITEM_CUSTOM}};
+  for (const auto& mask : masks) {
+    const auto body = read(mask.name);
+    assert(body.find(mask.detail) != std::string::npos);
+    Player player{};
+    player.getItemId = Rando::StaticData::itemNameToEnum.at(mask.name);
+    player.getItemEntry.objectId = OBJECT_INVALID;
+    CustomMessage native;
+    BuildCustomItemMessage(&player, native);
+    for (const auto& text : {native.GetEnglish(MF_RAW), native.GetGerman(MF_RAW), native.GetFrench(MF_RAW)}) {
+      assert(text.starts_with(CustomMessage::ITEM_OBTAINED(mask.icon)));
+      std::string converted;
+      assert(ComboItemReceiptText::FromOotMessage(text, converted));
+      assert(converted.find('\xB2') != std::string::npos && converted.find('%') == std::string::npos);
+      assert(converted.size() <= sizeof(buffer));
+      if (std::string_view(mask.name).starts_with("Keaton Mask")) {
+        for (char glyph : {'\xB0', '\xB1', '\xB4'})
+          assert(converted.find(glyph) != std::string::npos);
+      }
+    }
+    if (mask.icon == ITEM_MASK_GERUDO || std::string_view(mask.name).starts_with("Keaton Mask")) {
+      for (const auto glyph : {'\xB0', '\xB1', '\xB4'})
+        assert(body.find(glyph) != std::string::npos);
+    }
+  }
+  std::cout << "PASS OoT mask descriptions and Gerudo/Keaton tutorials: native icons, locales and donor export\n";
   const struct { const char* name; const char* effect; } magicItems[] = {
       {"Elemental Wand", "medallion"}, {"Sand Rod", "platform"},
       {"Tornado Rod", "jump"}, {"Water Rod", "water"},

@@ -364,7 +364,7 @@ source_group("include" FILES ${Header_Files__include})
 file(GLOB_RECURSE soh__ CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "soh/*.c" "soh/*.cpp" "soh/*.h" "soh/*.hpp")
 
 # mods (only .cpp files - .c files are included via #include pattern)
-file(GLOB_RECURSE mods__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "mods/*.cpp" "mods/*.h" "mods/*.hpp")
+file(GLOB_RECURSE mods__ CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "mods/*.cpp" "mods/*.h" "mods/*.hpp")
 list(APPEND soh__ ${mods__})
 
 # expansions (only .cpp files - .c files are included via #include pattern)

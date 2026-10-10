@@ -44,7 +44,8 @@ enum class Kind {
     Pacci,
     Pokeball,
     MarioMask,
-    Gold
+    Gold,
+    GiantsKnife // Append to preserve the existing cross-engine effect IDs.
 };
 constexpr float Tau = 6.28318530718f;
 // The authored Four Sword's high center is lowered in GI space only. Its
@@ -120,6 +121,8 @@ constexpr uint32_t ColorHex(Kind kind) {
             return 0x6F8FFF;
         case Kind::BiggoronSword:
             return 0xFF9A42;
+        case Kind::GiantsKnife:
+            return 0xCFD9E6;
         case Kind::GreatFairySword:
             return 0x79BE84;
         case Kind::FourSword:
@@ -140,7 +143,7 @@ inline bool IsSlate(Kind k) {
     return k == Kind::Slate || (k >= Kind::SlateBomb && k <= Kind::SlateSensor);
 }
 inline bool IsSword(Kind k) {
-    return k == Kind::SwordAura || (k >= Kind::KokiriSword && k <= Kind::FourSword);
+    return k == Kind::SwordAura || k == Kind::GiantsKnife || (k >= Kind::KokiriSword && k <= Kind::FourSword);
 }
 inline bool IsSpecial(Kind k) {
     return (k >= Kind::Sand && k <= Kind::CaneBlue) || IsSlate(k) || IsSword(k);
@@ -323,13 +326,15 @@ inline float SwordBladeTip(Kind kind) {
         case Kind::RazorSword:
             return 35.f;
         case Kind::BiggoronSword:
-            return 51.f;
+            return 109.5f;
+        case Kind::GiantsKnife:
+            return 100.3f;
         case Kind::GildedSword:
-            return 64.5f;
+            return 61.8f;
         case Kind::MasterSword:
-            return 71.f;
+            return 70.2f;
         case Kind::SwordAura:
-            return 66.f;
+            return 70.2f;
         case Kind::GreatFairySword:
             return 100.f;
         case Kind::FourSword:
@@ -342,7 +347,7 @@ inline float SwordEmissionBase(Kind kind) {
     // Centered legacy meshes put their guards below the origin. These starts
     // lie just above the measured, exported blade seats, rather than halfway
     // up the longer blades. Forged meshes keep their guard at Y=0.
-    return kind == Kind::RazorSword ? -9.f : kind == Kind::BiggoronSword ? -20.f : 8.f;
+    return kind == Kind::RazorSword ? -9.f : 8.f;
 }
 inline Mesh SampleSword(Kind kind, uint32_t frame, const Basis& camera) {
     Mesh m;
@@ -398,8 +403,8 @@ inline Mesh SampleSword(Kind kind, uint32_t frame, const Basis& camera) {
             Band(m, p, p + Point{ .25f, .9f, 0 }, .18f, color, 0xFFFFFF, camera, alpha);
             Glow(m, p, .45f, color, alpha, camera);
         }
-    } else if (kind == Kind::GildedSword || kind == Kind::BiggoronSword) {
-        const bool forge = kind == Kind::BiggoronSword;
+    } else if (kind == Kind::GildedSword || kind == Kind::BiggoronSword || kind == Kind::GiantsKnife) {
+        const bool forge = kind != Kind::GildedSword;
         const uint32_t lifetime = forge ? 90u : 360u;
         for (int i = 0; i < 8; ++i) {
             const float f = float((frame % lifetime + i * (forge ? 11u : 43u)) % lifetime) / lifetime;

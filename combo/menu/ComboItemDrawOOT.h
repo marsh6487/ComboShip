@@ -176,8 +176,11 @@ static int32_t CwAltSwordGi(RandomizerGet rg, CwItemDrawInfo* out) {
             fire = "__OTR__objects/din_fire_sword/progressive/adult/SwordDL";
             break;
         case RG_BIGGORON_SWORD:
+        case RG_GIANTS_KNIFE:
         case RG_GREAT_FAIRY_SWORD:
-            shimmer = rg == RG_BIGGORON_SWORD ? NeiGi::Kind::BiggoronSword : NeiGi::Kind::GreatFairySword;
+            shimmer = rg == RG_GREAT_FAIRY_SWORD ? NeiGi::Kind::GreatFairySword
+                      : rg == RG_GIANTS_KNIFE    ? NeiGi::Kind::GiantsKnife
+                                                 : NeiGi::Kind::BiggoronSword;
             selected = "__OTR__alt/objects/object_custom_equip/gCustomLongswordDL";
             fire = "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
             break;
@@ -1007,8 +1010,8 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
         out->neiEffect = NeiArrowGi_ProfileForDrawId(effRg, RG_FIRE_ARROWS, RG_ICE_ARROWS, RG_LIGHT_ARROWS);
     if (drawKind == CW_DRAW_KIND_MAGIC_SPELL)
         out->neiEffect = NeiArrowGi_ProfileForDrawId(effRg, RG_DINS_FIRE, RG_FARORES_WIND, RG_NAYRUS_LOVE);
-    if (drawKind == CW_DRAW_KIND_FAIRY)
-        out->stateDependent = 2; // selected generic/fairy-specific shell follows live owner Alt/mod state
+    if (drawKind == CW_DRAW_KIND_FAIRY || effRg == RG_EMPTY_BOTTLE)
+        out->stateDependent = 2; // selected bottle shell follows live owner Alt/mod state
     for (int32_t i = 0; i < 4; i++) {
         out->primColorXlu[i] = colors[i];
         out->envColorXlu[i] = colors[4 + i];

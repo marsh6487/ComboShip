@@ -25,7 +25,7 @@ code='#include <cassert>\n#include <cstdint>\n#include <cstring>\n#include "mm/i
 code+='\n'.join('char '+name+'[]="'+paths.get(name,name)+'";' for name in resources)
 code+='\n#include "combo/menu/ComboBottleContents.h"\nextern "C" int ComboBottleContents_Draw(PlayState*,int content){++compositionDraws;chosenContent=content;return compositionAvailable;}\n'
 code+='\n'+'\n'.join('void '+name+'(PlayState*,s16) '+(';' if name=='GetItem_DrawSeahorseBottle' else '{++nativeDraws;}' if name=='GetItem_DrawOpa0Xlu1' else '{}') for name in callbacks)
-code+='\n'+table+'\n'+function(source,'GetItem_FairyBottleShell')+'\n'+export+'\n'+function(source,'GetItem_DrawSeahorseBottle')+'\nint main(){\n'
+code+='\n'+table+'\n'+function(source,'GetItem_EmptyBottleShell')+'\n'+function(source,'GetItem_FairyBottleShell')+'\n'+export+'\n'+function(source,'GetItem_DrawSeahorseBottle')+'\nint main(){\n'
 items=(ROOT/'mm/2s2h/Rando/StaticData/Items.cpp').read_text()
 player=(ROOT/'mm/src/overlays/actors/ovl_player_actor/z_player.c').read_text()
 for gi,want in [('GI_MUSHROOM','MushroomBottle'),('GI_DEKU_PRINCESS','PrincessBottle'),('GI_GOLD_DUST','GoldDustBottle'),('GI_SEAHORSE','SeahorseBottle')]:

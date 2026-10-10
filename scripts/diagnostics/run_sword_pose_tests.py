@@ -48,7 +48,7 @@ void Matrix_Scale(float a,float b,float c,int){assert(a==b&&b==c);Multiply({{{a,
 #define gSPMatrix(...) ((void)0)
 #define gSPDisplayList(...) ((void)0)
 #define gDma1p(...) ((void)0)
-enum RandomizerGet{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_TRUE_MASTER_SWORD,RG_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD};
+enum RandomizerGet{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_TRUE_MASTER_SWORD,RG_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GIANTS_KNIFE,RG_GREAT_FAIRY_SWORD};
 int32_t OOT_NeiAltAssetsEnabled(){return true;}
 int32_t OOT_NeiResourceExists(const char*){return true;}
 #define CVAR_ENHANCEMENT(x) x
@@ -69,7 +69,7 @@ int main(){
         Check();
         Reset();DrawMmWeaponGi(&play,nullptr,nullptr,.04f,true);
         assert(std::abs(m[1][0]/.04f-std::sin(1.8f))<.00001f && "legacy Four Sword shelf pose changed");
-        for(auto id:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD}){
+        for(auto id:{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_MASTER_SWORD,RG_TRUE_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GIANTS_KNIFE,RG_GREAT_FAIRY_SWORD}){
             CwItemDrawInfo info{};assert(CwAltSwordGi(id,&info));
             Reset();Matrix_RotateY(.84f,MTXMODE_APPLY);
             for(int i=0;i<info.opCount;++i){const auto& op=info.ops[i];const float angle=op.a*(6.28318530718f/65536.f);

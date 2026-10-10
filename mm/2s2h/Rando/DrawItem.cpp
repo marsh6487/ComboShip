@@ -6,6 +6,7 @@
 #include "2s2h/Rando/DrawFuncs.h"
 #include "2s2h_assets.h"
 #include "Rando/SpinAttackGi.h"
+#include "Rando/NeiResourceRouting.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "ComboSongDrawMM.h"
 #include "ComboRewardGi.h"
@@ -1519,6 +1520,18 @@ void DrawOotSpookyMask() { // object_gi_redead_mask (OoT-unique)
     DrawOotMaskShimmer(2);
 }
 void DrawOotGerudoMask() { // object_gi_gerudomask (OoT-unique)
+    // Query the registered OoT owner and keep every deferred child/texture
+    // lookup on that owner. MM's local archive scanner cannot see soh.o2r.
+    constexpr const char* warrior = "__OTR__objects/object_gi_gerudo_warrior/gGiGerudoWarriorMaskDL";
+    if (NeiResource_Available(warrior)) {
+        OPEN_DISPS(gPlayState->state.gfxCtx);
+        Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+        MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)NeiResource_Route(warrior));
+        CLOSE_DISPS(gPlayState->state.gfxCtx);
+        DrawOotMaskShimmer(6);
+        return;
+    }
     // Same as the Spooky Mask above — and this one is CI (it ships a TLUT,
     // object_gi_gerudomaskTLUT_000000), so an unresolved palette is exactly the "right model, wrong
     // colours" symptom. Direct load inlines them. Skijer's NEI

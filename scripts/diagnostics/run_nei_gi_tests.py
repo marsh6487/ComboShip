@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 from run_time_pedestal_tests import functions
 
 ROOT = Path(__file__).resolve().parents[2]
-flags = ["-std=c++20", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0"]
+flags = ["-std=c++20", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0", "-I" + str(ROOT)]
 # Both native CMake targets expose shared bridges, including their standalone stubs.
 flags += ["-I" + str(ROOT / p) for p in
           ("soh", "soh/include", "soh/src", "soh/assets", "soh/mods", "libultraship/include", "combo", "combo/menu")]
@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
         ("rod_of_seasons", "NeiRodOfSeasons"), ("kokiri_sword", "ProgressiveKokiriSword"),
         ("razor_sword", "RazorSword"), ("gilded_sword", "GildedSword"),
         ("master_sword", "MasterSword"), ("true_master_sword", "TrueMasterSword"),
-        ("biggoron_sword", "ProgressiveBGS"), ("great_fairy_sword", "GreatFairySword"),
+        ("biggoron_sword", "ProgressiveBGS"), ("giants_knife", "GiantsKnife"), ("great_fairy_sword", "GreatFairySword"),
         ("iron_knuckle_axe", "IronKnuckleAxe"))
     for binding in bindings:
         slug, callback = binding[:2]
@@ -108,7 +108,7 @@ with tempfile.TemporaryDirectory(prefix="nei-gi-tests-") as tmp:
             pickup_vertices.append(asset.name + ' ' + ' '.join(str(v*scale) for v in point))
         all_frames.append(f'{{"{asset.name}",{low}f,{high}f,{width}f,{float(meta["draw_scale"])}f,'
                           f'{str((asset/"gi_xlu_dl").exists()).lower()}}},')
-    assert len(all_frames) == 62
+    assert len(all_frames) == 63
     (Path(tmp) / "nei_all_frame_bounds.inc").write_text("\n".join(all_frames))
     pickup_vertex_path = Path(tmp) / "mm_pickup_vertices.txt"
     pickup_vertex_path.write_text("\n".join(pickup_vertices))
@@ -334,7 +334,7 @@ std::map<std::string,std::vector<std::array<float,3>>> FixtureMmPickupVertices()
  std::map<std::string,std::vector<std::array<float,3>>> vertices;
  std::string slug;std::array<float,3> point{};
  while(input>>slug>>point[0]>>point[1]>>point[2])vertices[slug].push_back(point);
- assert(input.eof() && vertices.size()==62);
+ assert(input.eof() && vertices.size()==63);
  return vertices;
 }
 '''
