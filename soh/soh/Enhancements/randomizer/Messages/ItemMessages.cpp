@@ -168,8 +168,7 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName, cha
             std::memcpy(buffer, body.data(), body.size());
             return static_cast<int32_t>(body.size());
         }
-        if (found->second == RG_NONE ||
-            found->second == RG_COMBO_FOREIGN || found->second == RG_ICE_TRAP)
+        if (found->second == RG_NONE || found->second == RG_COMBO_FOREIGN || found->second == RG_ICE_TRAP)
             return 0;
         const RandomizerGet rg = found->second;
         auto item = Rando::StaticData::RetrieveItem(rg);
@@ -690,9 +689,10 @@ void BuildComboForeignMessage(Player* player, CustomMessage& msg) {
                 // do not necessarily have an exact OoT catalog key.
                 if (const auto* receipt = ComboVanillaItemReceiptText::Find(receiptName)) {
                     using ComboVanillaItemReceiptText::Language;
-                    msg = CustomMessage(ComboVanillaItemReceiptText::Body(*receipt),
-                                        ComboVanillaItemReceiptText::Body(*receipt, Language::German),
-                                        ComboVanillaItemReceiptText::Body(*receipt, Language::French), TEXTBOX_TYPE_BLUE);
+                    msg =
+                        CustomMessage(ComboVanillaItemReceiptText::Body(*receipt),
+                                      ComboVanillaItemReceiptText::Body(*receipt, Language::German),
+                                      ComboVanillaItemReceiptText::Body(*receipt, Language::French), TEXTBOX_TYPE_BLUE);
                     msg.Replace(receipt->englishName, name);
                     msg.Replace(receipt->germanName, name);
                     msg.Replace(receipt->frenchName, name);

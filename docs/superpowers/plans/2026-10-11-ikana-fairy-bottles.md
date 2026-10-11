@@ -80,3 +80,6 @@ An independent read-only review found one Important issue: a live donor could ov
 All 21 inventory contents have lessons: Ruto's Letter, Big Poe, Blue Fire, Blue/Red/Green Potion, Fairy, Fish, Bugs, Poe, Milk, Gold Dust, Hot Spring Water, Deku Princess, Seahorse, Spring Water, Zora Egg, Hylian Loach, Obaba's Drink, Chateau Romani and Magic Mushroom. Empty bottles, half milk and refill/captured-name aliases are covered separately. Native capture interactions retain their existing host receipt banks.
 
 Runtime acceptance remains pending: recheck the shield's chin direction under the selected mod stack, fairy core visibility at the screenshot's camera angle, and pink mote readability. Source, command-boundary, sanitizer and header checks are not a substitute for those visual checks.
+
+
+The first remote follow-up attempt stopped at the formatting gate. Clang-format 14.0.6 reformatted only the receipt catalog and OoT receipt handler. Its `--dry-run --Werror` check passes on all six changed production C/C++ files; the full receipt suite and both changed receipt translation units were revalidated after formatting.

@@ -8,10 +8,35 @@
 // available for MM-first pickups before those banks have been loaded.
 namespace ComboVanillaItemReceiptText {
 enum class Kind {
-    Sword, Master, Knife, Biggoron, Shield, Mirror, Fish, Bugs, Poe, BigPoe,
-    Empty, RedPotion, GreenPotion, BluePotion, Fairy, BlueFire, Milk, HalfMilk, RutoLetter,
-    GoldDust, HotSpringWater, DekuPrincess, Seahorse, SpringWater, ZoraEgg, HylianLoach,
-    ObabaDrink, Chateau, MagicMushroom
+    Sword,
+    Master,
+    Knife,
+    Biggoron,
+    Shield,
+    Mirror,
+    Fish,
+    Bugs,
+    Poe,
+    BigPoe,
+    Empty,
+    RedPotion,
+    GreenPotion,
+    BluePotion,
+    Fairy,
+    BlueFire,
+    Milk,
+    HalfMilk,
+    RutoLetter,
+    GoldDust,
+    HotSpringWater,
+    DekuPrincess,
+    Seahorse,
+    SpringWater,
+    ZoraEgg,
+    HylianLoach,
+    ObabaDrink,
+    Chateau,
+    MagicMushroom
 };
 enum class Language { English, German, French };
 struct Entry {
@@ -45,18 +70,17 @@ inline constexpr Entry entries[] = {
       "une Bouteille de Potion Verte", Kind::GreenPotion },
     { "Bottle with Blue Potion", 0x45, "a Bottle with Blue Potion", "eine Flasche blaues Elixier",
       "une Bouteille de Potion Bleue", Kind::BluePotion },
-    { "Bottle with Fairy", 0x46, "a Bottle with Fairy", "eine Flasche mit Fee",
-      "une Bouteille avec une Fée", Kind::Fairy },
+    { "Bottle with Fairy", 0x46, "a Bottle with Fairy", "eine Flasche mit Fee", "une Bouteille avec une Fée",
+      Kind::Fairy },
     { "Bottle with Blue Fire", 0x5D, "a Bottle with Blue Fire", "eine Flasche blaues Feuer",
       "une Bouteille de Flamme Bleue", Kind::BlueFire },
-    { "Bottle with Milk", 0x98, "a Bottle with Milk", "eine Flasche Milch",
-      "une Bouteille de Lait", Kind::Milk },
-    { "Milk (Half)", 0, "a Half Bottle of Milk", "eine halbe Flasche Milch",
-      "une demi-Bouteille de Lait", Kind::HalfMilk },
+    { "Bottle with Milk", 0x98, "a Bottle with Milk", "eine Flasche Milch", "une Bouteille de Lait", Kind::Milk },
+    { "Milk (Half)", 0, "a Half Bottle of Milk", "eine halbe Flasche Milch", "une demi-Bouteille de Lait",
+      Kind::HalfMilk },
     { "Bottle with Ruto's Letter", 0x99, "a Bottle with Ruto's Letter", "Rutos Brief in einer Flasche",
       "une Bouteille avec la Lettre de Ruto", Kind::RutoLetter },
-    { "Bottle With Gold Dust", 0, "a Bottle with Gold Dust", "eine Flasche Goldstaub",
-      "une Bouteille de Poudre d'Or", Kind::GoldDust },
+    { "Bottle With Gold Dust", 0, "a Bottle with Gold Dust", "eine Flasche Goldstaub", "une Bouteille de Poudre d'Or",
+      Kind::GoldDust },
     { "Bottle with Hot Spring Water", 0, "Bottled Hot Spring Water", "heißes Quellwasser",
       "une Bouteille d'Eau de Source Chaude", Kind::HotSpringWater },
     { "Bottle with Deku Princess", 0, "the Deku Princess in a Bottle", "die Deku-Prinzessin in einer Flasche",
@@ -65,18 +89,18 @@ inline constexpr Entry entries[] = {
       "un Hippocampe en Bouteille", Kind::Seahorse },
     { "Bottle with Spring Water", 0, "Bottled Spring Water", "Quellwasser in einer Flasche",
       "une Bouteille d'Eau de Source", Kind::SpringWater },
-    { "Bottle with Zora Egg", 0, "a Bottled Zora Egg", "ein Zora-Ei in einer Flasche",
-      "un Oeuf Zora en Bouteille", Kind::ZoraEgg },
+    { "Bottle with Zora Egg", 0, "a Bottled Zora Egg", "ein Zora-Ei in einer Flasche", "un Oeuf Zora en Bouteille",
+      Kind::ZoraEgg },
     { "Bottle with Hylian Loach", 0, "a Bottled Hylian Loach", "eine Hylia-Grundel in einer Flasche",
       "une Loche d'Hyrule en Bouteille", Kind::HylianLoach },
-    { "Bottle with Obaba's Drink", 0, "Obaba's Special Drink", "Obabas Spezialgetränk",
-      "la Boisson Spéciale d'Obaba", Kind::ObabaDrink },
+    { "Bottle with Obaba's Drink", 0, "Obaba's Special Drink", "Obabas Spezialgetränk", "la Boisson Spéciale d'Obaba",
+      Kind::ObabaDrink },
     { "Bottle of Chateau Romani", 0, "a Bottle of Chateau Romani", "eine Flasche Chateau Romani",
       "une Bouteille de Château Romani", Kind::Chateau },
     { "Bottle with Magic Mushroom", 0, "a Bottle with Magic Mushroom", "eine Flasche mit Zauberpilz",
       "une Bouteille avec un Champignon Magique", Kind::MagicMushroom },
-    { "Red Potion Refill", 0x43, "a Red Potion Refill", "rotes Elixier zum Nachfüllen",
-      "une recharge de Potion Rouge", Kind::RedPotion },
+    { "Red Potion Refill", 0x43, "a Red Potion Refill", "rotes Elixier zum Nachfüllen", "une recharge de Potion Rouge",
+      Kind::RedPotion },
     { "Green Potion Refill", 0x44, "a Green Potion Refill", "grünes Elixier zum Nachfüllen",
       "une recharge de Potion Verte", Kind::GreenPotion },
     { "Blue Potion Refill", 0x45, "a Blue Potion Refill", "blaues Elixier zum Nachfüllen",
@@ -84,31 +108,46 @@ inline constexpr Entry entries[] = {
     { "Milk Refill", 0x98, "a Milk Refill", "Milch zum Nachfüllen", "une recharge de Lait", Kind::Milk },
     { "Chateau Romani Refill", 0, "a Chateau Romani Refill", "Chateau Romani zum Nachfüllen",
       "une recharge de Château Romani", Kind::Chateau },
-    { "Gold Dust Refill", 0, "a Gold Dust Refill", "Goldstaub zum Nachfüllen",
-      "une recharge de Poudre d'Or", Kind::GoldDust },
+    { "Gold Dust Refill", 0, "a Gold Dust Refill", "Goldstaub zum Nachfüllen", "une recharge de Poudre d'Or",
+      Kind::GoldDust },
 };
 inline const Entry* Find(std::string_view name) {
     for (const auto& entry : entries)
         if (name == entry.name)
             return &entry;
     // Exact catalog, refill and captured-content spellings used by both hosts.
-    struct Alias { const char* name; const char* canonical; };
+    struct Alias {
+        const char* name;
+        const char* canonical;
+    };
     static constexpr Alias aliases[] = {
-        { "Bottle of Milk", "Bottle with Milk" }, { "Milk", "Milk Refill" },
-        { "Half Bottle of Milk", "Milk (Half)" }, { "Bottle with Half Milk", "Milk (Half)" },
-        { "Fairy", "Bottle with Fairy" }, { "Fish", "Bottle with Fish" },
-        { "Bugs", "Bottle with Bugs" }, { "Poe", "Bottle with Poe" }, { "Big Poe", "Bottle with Big Poe" },
-        { "Blue Fire", "Bottle with Blue Fire" }, { "Ruto's Letter", "Bottle with Ruto's Letter" },
-        { "Red Potion", "Red Potion Refill" }, { "Green Potion", "Green Potion Refill" },
+        { "Bottle of Milk", "Bottle with Milk" },
+        { "Milk", "Milk Refill" },
+        { "Half Bottle of Milk", "Milk (Half)" },
+        { "Bottle with Half Milk", "Milk (Half)" },
+        { "Fairy", "Bottle with Fairy" },
+        { "Fish", "Bottle with Fish" },
+        { "Bugs", "Bottle with Bugs" },
+        { "Poe", "Bottle with Poe" },
+        { "Big Poe", "Bottle with Big Poe" },
+        { "Blue Fire", "Bottle with Blue Fire" },
+        { "Ruto's Letter", "Bottle with Ruto's Letter" },
+        { "Red Potion", "Red Potion Refill" },
+        { "Green Potion", "Green Potion Refill" },
         { "Blue Potion", "Blue Potion Refill" },
-        { "Bottle with Gold Dust", "Bottle With Gold Dust" }, { "Gold Dust", "Gold Dust Refill" },
+        { "Bottle with Gold Dust", "Bottle With Gold Dust" },
+        { "Gold Dust", "Gold Dust Refill" },
         { "Bottled Hot Spring Water", "Bottle with Hot Spring Water" },
         { "Hot Spring Water", "Bottle with Hot Spring Water" },
         { "Deku Princess", "Bottle with Deku Princess" },
-        { "Bottled Seahorse", "Bottle with Seahorse" }, { "Seahorse", "Bottle with Seahorse" },
-        { "Bottled Spring Water", "Bottle with Spring Water" }, { "Spring Water", "Bottle with Spring Water" },
-        { "Zora Egg", "Bottle with Zora Egg" }, { "Hylian Loach", "Bottle with Hylian Loach" },
-        { "Obaba's Special Drink", "Bottle with Obaba's Drink" }, { "Obaba's Drink", "Bottle with Obaba's Drink" },
+        { "Bottled Seahorse", "Bottle with Seahorse" },
+        { "Seahorse", "Bottle with Seahorse" },
+        { "Bottled Spring Water", "Bottle with Spring Water" },
+        { "Spring Water", "Bottle with Spring Water" },
+        { "Zora Egg", "Bottle with Zora Egg" },
+        { "Hylian Loach", "Bottle with Hylian Loach" },
+        { "Obaba's Special Drink", "Bottle with Obaba's Drink" },
+        { "Obaba's Drink", "Bottle with Obaba's Drink" },
         { "Chateau Romani", "Bottle of Chateau Romani" },
         { "Bottle with Chateau Romani", "Bottle of Chateau Romani" },
         { "Magic Mushroom", "Bottle with Magic Mushroom" },
@@ -121,23 +160,27 @@ inline const Entry* Find(std::string_view name) {
     return nullptr;
 }
 inline std::string BottleLesson(Kind kind, Language language) {
-    struct Lesson { Kind kind; const char* english; const char* german; const char* french; };
+    struct Lesson {
+        Kind kind;
+        const char* english;
+        const char* german;
+        const char* french;
+    };
     static constexpr Lesson lessons[] = {
         { Kind::Empty, "Swing the empty bottle to catch&fish, bugs, fairies or other contents.",
           "Schwinge die leere Flasche, um&Fische, Käfer oder Feen zu fangen.",
           "Utilisez la bouteille vide pour&capturer poissons, insectes ou fées." },
-        { Kind::RedPotion, "Drink it to restore your hearts.",
-          "Trinke es, um deine Herzen&aufzufüllen.", "Buvez-la pour restaurer&votre énergie vitale." },
-        { Kind::GreenPotion, "Drink it to restore your magic.",
-          "Trinke es, um deine Magie&aufzufüllen.", "Buvez-la pour restaurer&votre magie." },
+        { Kind::RedPotion, "Drink it to restore your hearts.", "Trinke es, um deine Herzen&aufzufüllen.",
+          "Buvez-la pour restaurer&votre énergie vitale." },
+        { Kind::GreenPotion, "Drink it to restore your magic.", "Trinke es, um deine Magie&aufzufüllen.",
+          "Buvez-la pour restaurer&votre magie." },
         { Kind::BluePotion, "Drink it to restore&your hearts and magic.",
           "Trinke es, um deine Herzen&und Magie aufzufüllen.",
           "Buvez-la pour restaurer&votre énergie vitale et votre magie." },
         { Kind::Fairy, "Release it to recover hearts.&A bottled fairy can also revive you&if you fall in battle.",
           "Lass sie frei, um Herzen zu heilen.&Eine Fee in der Flasche belebt dich&auch nach einer Niederlage.",
           "Libérez-la pour récupérer de la vie.&Une fée en bouteille peut aussi&vous ranimer après une défaite." },
-        { Kind::BlueFire, "Release blue fire to melt red ice.",
-          "Lass blaues Feuer frei, um&rotes Eis zu schmelzen.",
+        { Kind::BlueFire, "Release blue fire to melt red ice.", "Lass blaues Feuer frei, um&rotes Eis zu schmelzen.",
           "Libérez la flamme bleue pour&faire fondre la glace rouge." },
         { Kind::Milk, "This bottle holds two drinks.&Each drink restores five hearts.",
           "Die Flasche enthält zwei Portionen.&Jede heilt fünf Herzen.",
@@ -181,8 +224,9 @@ inline std::string BottleLesson(Kind kind, Language language) {
     };
     for (const auto& lesson : lessons)
         if (lesson.kind == kind)
-            return language == Language::German ? lesson.german
-                   : language == Language::French ? lesson.french : lesson.english;
+            return language == Language::German   ? lesson.german
+                   : language == Language::French ? lesson.french
+                                                  : lesson.english;
     return {};
 }
 inline std::string Body(const Entry& entry, Language language = Language::English) {
