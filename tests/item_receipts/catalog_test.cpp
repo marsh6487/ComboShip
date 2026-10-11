@@ -873,13 +873,20 @@ int main(int argc, char** argv) {
   const auto tableBeforeEquipment = play.msgCtx.messageTableNES;
   const RandoItemId nativeEquipment[] = {RI_SWORD_KOKIRI, RI_SWORD_RAZOR,
                                          RI_SWORD_GILDED, RI_GREAT_FAIRY_SWORD,
-                                         RI_SHIELD_HERO,  RI_SHIELD_MIRROR};
+                                         RI_SHIELD_HERO,  RI_SHIELD_MIRROR,
+                                         RI_BOTTLE_EMPTY, RI_BOTTLE_RED_POTION,
+                                         RI_BOTTLE_MILK, RI_BOTTLE_GOLD_DUST,
+                                         RI_BOTTLE_CHATEAU_ROMANI};
   std::vector<std::string> equipmentBodies;
   std::vector<MessageTableEntry> equipmentMessages;
   equipmentBodies.reserve(std::size(nativeEquipment));
   for (const auto id : nativeEquipment) {
     const auto &item = Rando::StaticData::Items.at(id);
-    const auto text = Player_GetItemReceiptTextId(item.getItemId, item.itemId);
+    // Native receipt IDs from MM's real player get-item table. Red's catalog
+    // GI is a model alias; Chateau's full bottle differs from its refill GI.
+    const auto text = id == RI_BOTTLE_RED_POTION ? 0x5B
+                     : id == RI_BOTTLE_CHATEAU_ROMANI ? 0x6F
+                     : Player_GetItemReceiptTextId(item.getItemId, item.itemId);
     assert(text);
     equipmentBodies.emplace_back(
         std::string(MESSAGE_HEADER_SIZE, '\0') + "Native MM tutorial: " +
@@ -911,7 +918,9 @@ int main(int argc, char** argv) {
   const RandoItemId importedEquipment[] = {
       RI_OOT_MASTER_SWORD,  RI_OOT_BIGGORON_SWORD, RI_OOT_DEKU_SHIELD,
       RI_OOT_MIRROR_SHIELD, RI_OOT_BOTTLE_FISH,    RI_OOT_BOTTLE_BUGS,
-      RI_OOT_BOTTLE_POE,    RI_OOT_BOTTLE_BIG_POE};
+      RI_OOT_BOTTLE_POE,    RI_OOT_BOTTLE_BIG_POE,
+      RI_OOT_BOTTLE_BLUE_FIRE, RI_OOT_BOTTLE_BLUE_POTION, RI_OOT_BOTTLE_GREEN_POTION,
+      RI_OOT_BOTTLE_FAIRY, RI_OOT_BOTTLE_MAGIC_MUSHROOM, RI_OOT_RUTOS_LETTER};
   const auto donorBeforeEquipment = donorReady;
   donorReady = false;
   for (int language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
@@ -924,7 +933,7 @@ int main(int argc, char** argv) {
       assert(entry.msg.find('\x10') != std::string::npos &&
              entry.msg.size() < 1269);
       assert(
-          entry.msg.find(id >= RI_OOT_BOTTLE_BIG_POE && id <= RI_OOT_BOTTLE_POE
+          entry.msg.find((id >= RI_OOT_BOTTLE_BIG_POE && id <= RI_OOT_BOTTLE_POE) || id == RI_OOT_RUTOS_LETTER
                              ? '\xB2'
                              : '\xB0') != std::string::npos);
       assert(entry.icon == 0xE7 && !entry.capeVisibilityChoice &&
@@ -932,6 +941,53 @@ int main(int argc, char** argv) {
       assert(!std::memcmp(&before, &gSaveContext, sizeof(before)));
     }
   }
+  const auto playBeforeBottles = gPlayState;
+  gPlayState = nullptr;
+  const RandoItemId nativeBottlesAndRefills[] = { RI_BOTTLE_EMPTY, RI_BOTTLE_RED_POTION, RI_BOTTLE_MILK,
+      RI_BOTTLE_GOLD_DUST, RI_BOTTLE_CHATEAU_ROMANI, RI_RED_POTION_REFILL, RI_GREEN_POTION_REFILL,
+      RI_BLUE_POTION_REFILL, RI_MILK_REFILL, RI_CHATEAU_ROMANI_REFILL, RI_GOLD_DUST_REFILL,
+      RI_FAIRY_REFILL, RI_MUSHROOM };
+  for (int language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+    gSaveContext.options.language = language;
+    for (auto id : nativeBottlesAndRefills) {
+      entry = {}; entry.icon = 0xE7;
+      const auto before = gSaveContext;
+      assert(Rando::ApplyItemReceiptText(id, entry));
+      assert(entry.msg.find('\xB2') != std::string::npos && entry.msg.find('\x10') != std::string::npos);
+      assert(entry.icon == 0xE7 && entry.msg.size() < 1269);
+      assert(!std::memcmp(&before, &gSaveContext, sizeof(before)));
+    }
+    for (const char* name : {"Bottle with Hot Spring Water", "Deku Princess", "Seahorse", "Spring Water",
+        "Zora Egg", "Hylian Loach", "Obaba's Drink", "Milk (Half)"}) {
+      entry = {}; entry.icon = 0xE7;
+      assert(Rando::ApplyForeignItemReceiptText(name, entry));
+      assert(entry.msg.find('\xB2') != std::string::npos && entry.msg.find('\x10') != std::string::npos);
+      assert(entry.icon == 0xE7);
+    }
+  }
+  // A live donor exports English bytes even when its native banks are absent.
+  // MM must still own the language of its local bottle fallback lessons.
+  donorReady = true;
+  for (int language : {LANGUAGE_GER, LANGUAGE_FRE}) {
+    gSaveContext.options.language = language;
+    const char* opening = language == LANGUAGE_GER ? "Du hast" : "Vous obtenez";
+    for (auto id : nativeBottlesAndRefills) {
+      entry = {}; entry.icon = 0xE7;
+      assert(Rando::ApplyItemReceiptText(id, entry));
+      assert(entry.msg.find(opening) != std::string::npos && "live English donor bypassed localized bottle lesson");
+      assert(entry.icon == 0xE7);
+    }
+    for (const char* name : {"Bottle with Fairy", "Bottle with Blue Fire", "Bottle with Red Potion",
+        "Bottle with Green Potion", "Bottle with Blue Potion", "Bottle with Fish", "Bottle with Bugs",
+        "Bottle with Poe", "Bottle with Big Poe", "Bottle with Ruto's Letter", "Bottle with Hot Spring Water",
+        "Deku Princess", "Seahorse", "Spring Water", "Zora Egg", "Hylian Loach", "Obaba's Drink", "Milk (Half)"}) {
+      entry = {}; entry.icon = 0xE7;
+      assert(Rando::ApplyForeignItemReceiptText(name, entry));
+      assert(entry.msg.find(opening) != std::string::npos && "foreign bottle lesson lost MM locale");
+      assert(entry.icon == 0xE7);
+    }
+  }
+  gPlayState = playBeforeBottles;
   gSaveContext.options.language = LANGUAGE_ENG;
   donorReady = donorBeforeEquipment;
   std::cout

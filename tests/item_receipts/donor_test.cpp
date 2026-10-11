@@ -197,6 +197,14 @@ const EquipmentBottleFixture equipmentBottleReceipts[] = {
     {RG_DEKU_SHIELD, "Deku Shield", 0x4C},
     {RG_HYLIAN_SHIELD, "Hylian Shield", 0x4D},
     {RG_MIRROR_SHIELD, "Mirror Shield", 0x4E},
+    {RG_EMPTY_BOTTLE, "Empty Bottle", 0x42},
+    {RG_BOTTLE_WITH_RED_POTION, "Bottle with Red Potion", 0x43},
+    {RG_BOTTLE_WITH_GREEN_POTION, "Bottle with Green Potion", 0x44},
+    {RG_BOTTLE_WITH_BLUE_POTION, "Bottle with Blue Potion", 0x45},
+    {RG_BOTTLE_WITH_FAIRY, "Bottle with Fairy", 0x46},
+    {RG_BOTTLE_WITH_MILK, "Bottle with Milk", 0x98},
+    {RG_BOTTLE_WITH_BLUE_FIRE, "Bottle with Blue Fire", 0x5D},
+    {RG_RUTOS_LETTER, "Bottle with Ruto's Letter", 0x99},
     {RG_BOTTLE_WITH_FISH, "Bottle with Fish", 0x47},
     {RG_BOTTLE_WITH_BUGS, "Bottle with Bugs", 0x7A},
     {RG_BOTTLE_WITH_POE, "Bottle with Poe", 0x97},
@@ -884,6 +892,25 @@ int main(int argc, char** argv) {
   assert(master.find("Equipment") != std::string::npos &&
          master.find('\xB1') != std::string::npos &&
          "Master Sword requires its full equipment/B tutorial");
+  for (const char* name : {"Bottle of Milk", "Milk (Half)", "Bottled Hot Spring Water", "Deku Princess",
+      "Bottled Seahorse", "Bottled Spring Water", "Zora Egg", "Hylian Loach", "Obaba's Special Drink",
+      "Bottle of Chateau Romani", "Bottle With Gold Dust", "Bottle with Magic Mushroom",
+      "Red Potion Refill", "Green Potion Refill", "Blue Potion Refill", "Milk Refill", "Fairy",
+      "Chateau Romani Refill", "Gold Dust Refill"}) {
+    const auto body = read(name);
+    assert(body.find('\xB2') != std::string::npos && body.find('\x10') != std::string::npos);
+    foreign.itemGame = ComboRando::GAME_MM;
+    foreign.itemName = name;
+    foreign.displayName = std::string(name) + " (MM)";
+    resolvedForeign = name;
+    CustomMessage imported;
+    BuildComboForeignMessage(&receiptPlayer, imported);
+    assert(imported.GetEnglish(MF_RAW).find("You found") == std::string::npos);
+    assert(imported.GetEnglish(MF_RAW).find('\xA1') != std::string::npos);
+    assert(imported.GetEnglish(MF_RAW).find("(MM)") != std::string::npos);
+  }
+  // Additional aliases produce foreign latches but never alter grants or saves.
+  foreignLatches = latchesBeforeTutorials + static_cast<int>(std::size(equipmentBottleReceipts));
   const auto bankBeforeTutorials = sNesMessageEntryTablePtr;
   sNesMessageEntryTablePtr = nullptr;
   for (const auto &fixture : equipmentBottleReceipts) {

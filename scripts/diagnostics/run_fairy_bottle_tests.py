@@ -36,6 +36,7 @@ def native(namespace, path, draws, member, resource_type, rows, constants):
 
 
 def main():
+    subprocess.run([sys.executable, '-B', str(ROOT / 'tests/fairy_bottle/run_glow_pose_tests.py')], check=True)
     subprocess.run([sys.executable, '-B', str(ROOT / 'tests/fairy_bottle/run_receipt_tests.py')], check=True)
     bodies = native('oot', 'soh/src/code/z_draw.c', ['GetItem_DrawFairy'], 'dlists', 'Gfx*',
                     ['{GetItem_DrawFairy,{(Gfx*)opaque,(Gfx*)glass,(Gfx*)fairy}}',

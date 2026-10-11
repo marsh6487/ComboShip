@@ -50,15 +50,22 @@ int main() {
                     assert(motes.count == 0);
                 } else {
                     assert(motes.count == 4 * 16 * 3);
+                    for (size_t mote = 0; mote < 4; ++mote) {
+                        const auto& core = motes.vertices[mote * 48];
+                        const auto& edge = motes.vertices[mote * 48 + 1];
+                        const auto delta = edge.p - core.p;
+                        assert(std::sqrt(delta.x*delta.x + delta.y*delta.y + delta.z*delta.z) >= 1.79f && "pink mote is too small to read beside the fairy");
+                        assert(core.alpha >= 96 && "pink mote is too faint behind the bottle glass");
+                    }
                     const auto repeated = NeiGi::SampleBottleMotes(profile, frame, true, camera);
                     assert(repeated.count == motes.count);
                     for (size_t i = 0; i < motes.count; ++i) {
                         const auto& v = motes.vertices[i];
                         assert(sameVertex(v, repeated.vertices[i]));
                         assert(std::isfinite(v.p.x) && std::isfinite(v.p.y) && std::isfinite(v.p.z));
-                        assert(std::hypot(v.p.x,v.p.z) <= 15);
-                        assert(v.p.y >= -23 && v.p.y <= 7);
-                        assert(v.alpha <= 96 && v.rgb == 0xFFA0EB);
+                        assert(std::hypot(v.p.x,v.p.z) <= 24);
+                        assert(v.p.y >= -26 && v.p.y <= 6);
+                        assert(v.alpha <= 224 && v.rgb == 0xFFA0EB);
                     }
                 }
             }
@@ -72,5 +79,5 @@ int main() {
         for (size_t i=0;i<a.count;++i) assert(sameVertex(a.vertices[i],b.vertices[i]));
     }
     puts("PASS: unchanged NEI geometry/alpha, identity recolor, deterministic sampling, disabled effects");
-    puts("PASS: four finite, faint, contained fairy-only motes over 720 frames and two cameras");
+    puts("PASS: four readable, bounded fairy-only motes over 720 frames and two cameras");
 }

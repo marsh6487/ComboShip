@@ -26,10 +26,10 @@ inline Mesh SampleBottleMotes(int profile, uint32_t frame, bool enabled, const B
     const Point fairy{ 4 * std::sin(phase), -10 + 7 * std::sin(phase * 1.5f + .4f), 2 * std::cos(phase) };
     for (int i = 0; i < 4; ++i) {
         const float a = (frame % 360u) * (Tau / 360.f) + i * Tau / 4;
-        const float radius = 5.0f + i * .65f;
-        const Point center = fairy + Point{ radius * std::cos(a), 3 * std::sin(a * 2 + i), radius * std::sin(a) };
+        const float radius = 12.0f + i;
+        const Point center = fairy + Point{ radius * std::cos(a), 5 * std::sin(a * 2 + i), radius * std::sin(a) };
         const float pulse = .5f - .5f * std::cos(a * 2 + i);
-        Glow(mesh, center, .65f + .35f * pulse, 0xFFA0EBu, uint8_t(32 + 64 * pulse), camera);
+        Glow(mesh, center, 1.8f + 1.2f * pulse, 0xFFA0EBu, uint8_t(96 + 128 * pulse), camera);
     }
     return mesh;
 }

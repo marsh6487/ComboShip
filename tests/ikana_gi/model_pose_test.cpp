@@ -125,28 +125,38 @@ int main(){
                                   {uintptr_t(G_POPMTX)<<24,64},{uintptr_t(G_ENDDL)<<24,0}});
         for(int frame:{0,1,2})for(int originOffset:{0,6000}) {
             auto points=geometry.points;
-            // Rz(+90) makes the authored chin -Y become +X. The third frame
+            // Rz(-90) matches the native worn decal: its chin points toward -X. The third frame
             // also puts the front normal in -Y, like an arm-local XZ shield.
-            if(frame)for(auto& p:points){auto q=p;p={int16_t(-q[1]),frame==1?q[0]:int16_t(-q[2]),frame==1?q[2]:q[0]};}
+            if(frame)for(auto& p:points){auto q=p;p={q[1],frame==1?int16_t(-q[0]):int16_t(-q[2]),frame==1?q[2]:int16_t(-q[0])};}
             for(auto& p:points){p[0]+=originOffset;p[1]-=originOffset/2;p[2]+=originOffset/3;}
             VertexPoints(*owner,"actual_vertices",points,binary);
             float tilt=-99,roll=-99,legacyTilt=-99;
             assert(ResourceMgr_GetIkanaShieldGiPoseForGame("oot","actual_root",&tilt,&roll));
             assert(std::abs(tilt-(frame==2?float(M_PI/2):0.f))<.00001f);
-            assert(std::abs(roll-(frame?-float(M_PI/2):0.f))<.00001f);
+            assert(std::abs(roll-(frame?float(M_PI/2):0.f))<.00001f);
             assert(ResourceMgr_GetIkanaShieldGiTiltXForGame("oot","actual_root",&legacyTilt)&&legacyTilt==tilt);
-            const auto chin=ApplyPose(frame?std::array<float,3>{1,0,0}:std::array<float,3>{0,-1,0},tilt,roll);
+            const auto chin=ApplyPose(frame?std::array<float,3>{-1,0,0}:std::array<float,3>{0,-1,0},tilt,roll);
             assert(chin[1]<-.999f&&std::abs(chin[0])<.00001f&&"face chin must point down, not up");
         }
         std::cout<<"PASS selected serialized Ikana vertices/matrix: "<<geometry.name<<(binary?" binary":" XML")<<"; upright, sidewaysXY/XZ, off-center origins and chin-down sign\n";
     }
+    // MM native worn shield decal, object_link_childVtx_015EE8. Texture T
+    // increases toward negative X (2251 at -1195, -144 at 851): chin is -X.
+    VertexPoints(*oot,"native_decal",{{-172,50,-403},{88,-804,-153},{-433,-804,-153},
+        {640,-507,-248},{-985,-507,-248},{-1195,50,-403},{851,50,-403},
+        {640,608,-248},{88,905,-153},{-433,905,-153},{-985,608,-248}},true);
+    List(*oot,"native_worn",{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("native_decal")},
+        {11,0},{uintptr_t(G_ENDDL)<<24,0}});
+    float decalTilt=-99,decalRoll=-99;
+    assert(ResourceMgr_GetIkanaShieldGiPoseForGame("oot","native_worn",&decalTilt,&decalRoll));
+    assert(ApplyPose({-1,0,0},decalTilt,decalRoll)[1]<-.999f && "native Ikana decal is upside down");
     // The tolerance intentionally leaves ambiguous near-square geometry alone.
     for(int halfWidth:{1000,1049,1050,1060}) {
         VertexPoints(*oot,"square_vertices",{{int16_t(-halfWidth),-1000,-20},{int16_t(halfWidth),1000,20}},false);
         List(*oot,"square_root",{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("square_vertices")},{2,0},{uintptr_t(G_ENDDL)<<24,0}});
         float tilt=-99,roll=-99;
         assert(ResourceMgr_GetIkanaShieldGiPoseForGame("oot","square_root",&tilt,&roll)&&tilt==0);
-        assert(roll==(halfWidth>1050?-float(M_PI/2):0.f));
+        assert(roll==(halfWidth>1050?float(M_PI/2):0.f));
     }
     // Resource matrices contribute before the caller chooses an outer pose.
     auto matrix=std::make_shared<Fast::Matrix>();
@@ -163,14 +173,14 @@ int main(){
     assert(ResourceMgr_GetIkanaShieldGiPoseForGame("oot","transformed",&tilt,&roll)&&tilt==0&&roll==0);
     assert(ResourceMgr_GetIkanaShieldGiTiltXForGame("oot","transformed",&tilt)&&tilt==0);
     // A descendant matrix can rotate the same planar geometry in its plane.
-    const float sidewaysMatrix[4][4]={{0,1,0,0},{-1,0,0,0},{0,0,1,0},{0,0,0,1}};
+    const float sidewaysMatrix[4][4]={{0,-1,0,0},{1,0,0,0},{0,0,1,0},{0,0,0,1}};
     for(int row=0;row<4;++row)for(int col=0;col<4;col+=2){
         const uint32_t a=int32_t(sidewaysMatrix[row][col]*65536),b=int32_t(sidewaysMatrix[row][col+1]*65536);
         words[row*2+col/2]=(a&0xffff0000u)|(b>>16);words[8+row*2+col/2]=(a<<16)|(b&0xffffu);
     }
     Vertices(*oot,"vertices",false,false);
-    assert(ResourceMgr_GetIkanaShieldGiPoseForGame("oot","transformed",&tilt,&roll)&&tilt==0&&roll==-float(M_PI/2));
-    assert(ApplyPose({1,0,0},tilt,roll)[1]<-.999f);
+    assert(ResourceMgr_GetIkanaShieldGiPoseForGame("oot","transformed",&tilt,&roll)&&tilt==0&&roll==float(M_PI/2));
+    assert(ApplyPose({-1,0,0},tilt,roll)[1]<-.999f);
     // Missing/invalid descendants decline the correction and restore Context.
     oot->files["vertices"]=std::make_shared<Fast::Texture>();tilt=77;roll=88;
     assert(!ResourceMgr_GetIkanaShieldGiPoseForGame("oot",worn,&tilt,&roll)&&tilt==77&&roll==88);

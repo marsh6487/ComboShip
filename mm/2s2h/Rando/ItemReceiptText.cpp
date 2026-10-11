@@ -585,6 +585,13 @@ bool Rando::ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Ent
         return true;
     if (RandomRupeeReceipt(itemName, entry))
         return true;
+    // The donor ABI exports English bytes only. Native MM bottles are handled
+    // before this route; imported/cold-bank bottle lessons use MM's locale.
+    if (gSaveContext.options.language != LANGUAGE_ENG) {
+        const auto* receipt = ComboVanillaItemReceiptText::Find(itemName);
+        if (receipt && receipt->kind >= ComboVanillaItemReceiptText::Kind::Fish)
+            return VanillaItemFallback(itemName, entry);
+    }
     const auto keyBody = ComboDungeonKeyReceipt::Markup(itemName);
     if (!keyBody.empty()) {
         entry.receiptPresentation = {};
@@ -745,14 +752,29 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     if (item.randoItemType == RITYPE_JUNK && NativeReceipt(item.getItemId, item.itemId, entry))
         return true;
     switch (id) {
+        case RI_BOTTLE_RED_POTION:
+            // GI_POTION_RED_BOTTLE is a model-only alias with ITEM_LONGSHOT.
+            if (NativeReceipt(GI_POTION_RED, ITEM_POTION_RED, entry))
+                return true;
+            break;
+        case RI_BOTTLE_CHATEAU_ROMANI:
+            // GI_CHATEAU describes the refill (ITEM_CHATEAU_2), not this bottle.
+            if (NativeReceipt(GI_CHATEAU_BOTTLE, ITEM_CHATEAU, entry))
+                return true;
+            break;
         case RI_SWORD_KOKIRI:
         case RI_SWORD_RAZOR:
         case RI_SWORD_GILDED:
         case RI_GREAT_FAIRY_SWORD:
         case RI_SHIELD_HERO:
         case RI_SHIELD_MIRROR:
-            // MM owns these equipment tutorials. A shared OoT name must not
-            // replace the native lesson or describe OoT's upgrade mechanics.
+        case RI_BOTTLE_EMPTY:
+        case RI_BOTTLE_MILK:
+        case RI_BOTTLE_GOLD_DUST:
+        case RI_GOLD_DUST_REFILL:
+        case RI_MUSHROOM:
+            // MM owns these equipment and bottle tutorials. Shared OoT names
+            // must not replace their native lessons or content mechanics.
             if (NativeReceipt(item.getItemId, item.itemId, entry,
                               id == RI_SHIELD_MIRROR && gSaveContext.options.language == LANGUAGE_ENG ? item.name
                                                                                                       : nullptr)) {

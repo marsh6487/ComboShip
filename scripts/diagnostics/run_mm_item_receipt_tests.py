@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+subprocess.run([sys.executable, '-B', str(ROOT / 'tests/item_receipts/run_bottle_contents_tests.py')], check=True)
 
 
 def verify_windows_reward_export_contract():

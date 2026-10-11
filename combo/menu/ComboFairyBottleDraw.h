@@ -29,8 +29,12 @@ static s32 ComboFairyBottle_GlowLimb(PlayState* play, s32 limb, Gfx** dList, Vec
 #endif
     if (limb == glowLimb) {
         const float pulse = 1.5f + .15f * sinf((float)(play->gameplayFrames % 16u) * .3926990817f);
-        // Actor glow-to-wing scale ratio, while retaining the GI's incoming scale.
-        Matrix_ReplaceRotation(&play->billboardMtxF);
+        // The native core DL multiplies segment 01 by the camera billboard.
+        // Remove the limb's rotation here, as EnElf does, so that rotation is
+        // applied once. Preserve the GI position and incoming scale.
+        MtxF identity = { 0 };
+        identity.xx = identity.yy = identity.zz = identity.ww = 1.0f;
+        Matrix_ReplaceRotation(&identity);
         Matrix_Scale(pulse, pulse, pulse, MTXMODE_APPLY);
     }
     return 0;

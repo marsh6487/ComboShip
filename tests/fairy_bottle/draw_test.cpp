@@ -27,6 +27,7 @@ struct GraphicsContext {};
 struct MtxF {
     float x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1;
     bool billboard = false;
+    float xx = 0, yy = 0, zz = 0, ww = 0;
 };
 using Mtx = MtxF;
 struct PlayState {
@@ -89,7 +90,7 @@ void Matrix_Push() { stack.push_back(current); }
 void Matrix_Pop() { assert(!stack.empty()); current = stack.back(); stack.pop_back(); }
 void Matrix_Translate(float x, float y, float z, int) { current.x += x; current.y += y; current.z += z; }
 void Matrix_Scale(float x, float y, float z, int) { current.sx *= x; current.sy *= y; current.sz *= z; }
-void Matrix_ReplaceRotation(MtxF*) { current.billboard = true; }
+void Matrix_ReplaceRotation(MtxF* pose) { current.billboard = pose == &play.billboardMtxF; }
 void Matrix_Mult(MtxF* mtx, int) { current.x += mtx->x; current.y += mtx->y; current.z += mtx->z; current.sx *= mtx->sx; current.sy *= mtx->sy; current.sz *= mtx->sz; }
 void Matrix_MtxToMtxF(Mtx* input, MtxF* output) { *output = *input; }
 void LoadMatrix(Gfx* command, MtxF* pose) { loaded[command->stream] = *pose; }
@@ -240,7 +241,7 @@ Gfx* SkelAnime_Draw(PlayState* play,void**,Vec3s*,Override limb,void*,void*,Gfx*
 #else
     limb(play,8,nullptr,nullptr,nullptr,nullptr,&gfx);
 #endif
-    assert(current.billboard);
+    assert(!current.billboard && "native fairy core DL owns the billboard rotation");
     Matrix_Pop();
     LoadMatrix(gfx,&current); DrawList(gfx,"fairy-vfx");
     return gfx+1;

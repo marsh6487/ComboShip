@@ -156,7 +156,19 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName, cha
             !OTRGlobals::Instance->gRandomizer)
             return 0;
         const auto found = Rando::StaticData::itemNameToEnum.find(itemName);
-        if (found == Rando::StaticData::itemNameToEnum.end() || found->second == RG_NONE ||
+        if (found == Rando::StaticData::itemNameToEnum.end()) {
+            // Captured MM contents and refill aliases may have no OoT rando
+            // row. Export their read-only lesson without inventing an RG/GI.
+            const auto* receipt = ComboVanillaItemReceiptText::Find(itemName);
+            if (!receipt || receipt->kind < ComboVanillaItemReceiptText::Kind::Fish)
+                return 0;
+            const auto body = ComboItemReceiptText::FromNeiMarkup(ComboVanillaItemReceiptText::Body(*receipt));
+            if (body.empty() || body.size() > capacity)
+                return 0;
+            std::memcpy(buffer, body.data(), body.size());
+            return static_cast<int32_t>(body.size());
+        }
+        if (found->second == RG_NONE ||
             found->second == RG_COMBO_FOREIGN || found->second == RG_ICE_TRAP)
             return 0;
         const RandomizerGet rg = found->second;
@@ -673,6 +685,19 @@ void BuildComboForeignMessage(Player* player, CustomMessage& msg) {
                         msg.AutoFormat();
                         return;
                     }
+                }
+                // MM-only contents and native aliases such as Bottle of Milk
+                // do not necessarily have an exact OoT catalog key.
+                if (const auto* receipt = ComboVanillaItemReceiptText::Find(receiptName)) {
+                    using ComboVanillaItemReceiptText::Language;
+                    msg = CustomMessage(ComboVanillaItemReceiptText::Body(*receipt),
+                                        ComboVanillaItemReceiptText::Body(*receipt, Language::German),
+                                        ComboVanillaItemReceiptText::Body(*receipt, Language::French), TEXTBOX_TYPE_BLUE);
+                    msg.Replace(receipt->englishName, name);
+                    msg.Replace(receipt->germanName, name);
+                    msg.Replace(receipt->frenchName, name);
+                    msg.AutoFormat();
+                    return;
                 }
             }
         }

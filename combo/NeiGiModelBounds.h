@@ -53,7 +53,8 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
         // Bounds cannot identify a sideways face inside a square rim. Leave
         // ambiguous frames alone; correct only a clearly longer X axis.
         const float height = ShieldTiltX() != 0.f ? mDepthHigh - mDepthLow : mHigh - mLow;
-        return mWidthHigh - mWidthLow > 1.05f * height ? -1.5707963267948966f : 0.f;
+        // The worn MM shield's face is authored with its chin toward -X.
+        return mWidthHigh - mWidthLow > 1.05f * height ? 1.5707963267948966f : 0.f;
     }
 
     bool RestoresModelView() const {
