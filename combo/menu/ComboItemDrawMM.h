@@ -88,6 +88,7 @@ extern "C" s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDl
 // Which setup DL the row's func emits (NULL = plain 25). The consumer must submit the same one.
 extern "C" void GetItem_GetDrawSetupDLs(s32 drawId, void** outOpa, void** outXlu);
 extern "C" int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt);
+extern "C" int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* game, const char* path, float* tilt, float* roll);
 
 // --- CW_DRAW_KIND_OPS emitters. Bounds-checked; an overflowing recipe is truncated, never written
 // out of range (the consumer just draws fewer layers).
@@ -1198,10 +1199,11 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     }
     if (id == RI_SHIELD_MIRROR) {
         out->stateDependent = 2; // The selected owner's Alt geometry can change its pose.
-        float tilt = 0.f;
+        float tilt = 0.f, roll = 0.f;
         if (drawKind == CW_DRAW_KIND_SIMPLE && n == 2 && xluStart == 1 &&
-            ResourceMgr_GetIkanaShieldGiTiltXForGame("mm", "objects/object_gi_shield_3/gGiMirrorShieldDL", &tilt) &&
-            tilt != 0.f) {
+            ResourceMgr_GetIkanaShieldGiPoseForGame("mm", "objects/object_gi_shield_3/gGiMirrorShieldDL", &tilt,
+                                                    &roll) &&
+            (tilt != 0.f || roll != 0.f)) {
             // Preserve the native split passes and caller spin. CUSTOM_GI
             // would add another spin; OPS carries only this pose correction.
             out->drawKind = CW_DRAW_KIND_OPS;
@@ -1209,7 +1211,10 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
             MM_Op(out, CW_OP_PUSH);
             if (scale > 0.f)
                 MM_OpV(out, CW_OP_SCALE, scale, scale, scale);
-            MM_OpV(out, CW_OP_ROTATE_X, tilt * (32768.f / 3.14159265358979323846f), 0.f, 0.f);
+            if (roll != 0.f)
+                MM_OpV(out, CW_OP_ROTATE_Z, roll * (32768.f / 3.14159265358979323846f), 0.f, 0.f);
+            if (tilt != 0.f)
+                MM_OpV(out, CW_OP_ROTATE_X, tilt * (32768.f / 3.14159265358979323846f), 0.f, 0.f);
             MM_Op(out, CW_OP_SETUP_OPA);
             MM_Op(out, CW_OP_LOAD_MATRIX);
             MM_OpV(out, CW_OP_DLIST, 0.f, 0.f, 0.f);

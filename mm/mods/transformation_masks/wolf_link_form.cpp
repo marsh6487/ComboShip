@@ -274,6 +274,7 @@ struct WolfRuntime {
 
     WolfProc proc = PROC_WOLF_MOVE;
     u8 procOwnsPlayer = 0;
+    u8 presentationOnly = 0;
 
     // A-dash mode (FLG1_DASH_MODE): timer field_0x30d0, cooldown field_0x30d2
     s16 dashModeTimer = 0;
@@ -462,7 +463,9 @@ static void BuildMaterialDisplayList(const u16* texture, u32 width, u32 height) 
     // Wolf atlases are opaque. Use texture alpha as an inverse emission mask:
     // 1 retains lit fur; 0 keeps the authored eye color bright in shadow. Output
     // alpha stays opaque, so the eye mask cannot cut holes into the baked face.
-    gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, 1, COMBINED, TEXEL0, TEXEL0_ALPHA, TEXEL0, 0, 0, 0,
+    // Cycle two swaps the texture selectors: TEXEL1 still reads our tile 0.
+    // TEXEL0 here would sample the previous actor's unowned neighboring tile.
+    gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, 1, COMBINED, TEXEL1, TEXEL1_ALPHA, TEXEL1, 0, 0, 0,
                       COMBINED);
     gSPSetOtherMode(gfx++, G_SETOTHERMODE_H, 4, 20,
                     G_TF_BILERP | G_TC_FILT | G_TP_PERSP | G_TT_NONE | G_AD_NOISE | G_PM_NPRIMITIVE | G_CK_NONE |
@@ -1116,7 +1119,8 @@ static void ProcDashInit(Player* player, PlayState* play) {
         player->speedXZ = init;
     }
     FacePlayer(player, player->actor.shape.rot.y);
-    Player_PlaySfx(player, NA_SE_PL_ROLL_DUST);
+    // MM's rolling dust loops unless requested with its native one-frame lifetime.
+    Player_PlaySfx(player, NA_SE_PL_ROLL_DUST - SFX_FLAG);
 }
 
 static void DashUpdate(Player* player, PlayState* play, const WolfInput& in) {
@@ -1579,10 +1583,15 @@ extern "C" void WolfLinkForm_PlayTransformSfx(u8 toWolf) {
                    WolfAudioGain("gMods.WolfLink.TransformVolume", 0.65f));
 }
 
+extern "C" void WolfLinkForm_PlayExertionSfx(void) {
+    WolfLinkForm_UpdateSfx(gPlayState);
+    WolfAudio_Play(WolfAudioCue::Exertion, WolfAudioGain("gMods.WolfLink.VoiceVolume", 0.8f));
+}
+
 // Speed multiplier for Link's own locomotion while the wolf is active
 // (Player_GetMovementSpeedAndYaw): TP wolf 25 / human 23 normally, A-dash 45 / 23.
 extern "C" f32 WolfLinkForm_SpeedMultiplier(void) {
-    if (!sWolf.initialized) {
+    if (!sWolf.initialized || sWolf.presentationOnly) {
         return 1.0f;
     }
     f32 base = DashModeActive() ? (kADashMaxSpeed / kTpHumanRun) : (kNopMaxSpeed / kTpHumanRun);
@@ -1644,8 +1653,21 @@ extern "C" void WolfLinkForm_ReleaseAction(Player* player) {
     }
 }
 
+extern "C" void WolfLinkForm_SuspendAction(Player* player) {
+    if (!sWolf.initialized || sWolf.presentationOnly)
+        return;
+    WolfLinkForm_ReleaseAction(player);
+    StopChainSfx();
+    WolfAudio_Stop();
+    if (player && player == sWolf.owner)
+        player->cylinder.dim = sWolf.savedCylinder;
+    sWolf.presentationOnly = 1;
+    SetLoopAnim(WANM_WAIT, kNopIdleAnmSpeed);
+    SSBBSkin_ComputePose(&sWolf.character);
+}
+
 extern "C" void WolfLinkForm_ApplyCollisionShape(Player* player) {
-    if (!sWolf.initialized || player != sWolf.owner)
+    if (!sWolf.initialized || sWolf.presentationOnly || player != sWolf.owner)
         return;
     f32 scale = RenderScale();
     player->cylinder.dim.radius = (s16)std::max(12.0f, 40.0f * scale);
@@ -1698,6 +1720,7 @@ extern "C" void WolfLinkForm_Update(Player* player, PlayState* play, const Input
     }
     if (player != sWolf.owner)
         return;
+    sWolf.presentationOnly = 0;
     // ── body / collider shape (wolf is long and low) ──
     f32 s = RenderScale();
     for (s32 i = 0; i < PLAYER_BODYPART_MAX; ++i) {

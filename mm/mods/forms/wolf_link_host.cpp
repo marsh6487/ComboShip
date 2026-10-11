@@ -197,12 +197,9 @@ void Suspend(PlayState* play, Player* player) {
 void ReleaseForState(PlayState* play, Player* player) {
     if (SelectionRejection(play, player)) {
         Stop(play, player);
-    } else if (SceneTransition(play)) {
-        Suspend(play, player);
     } else if (Active(player)) {
-        Stop(play, player);
+        WolfLinkForm_SuspendAction(player);
     }
-    // A pending arrival waits for native input/override processing to finish.
 }
 
 void ResetSession() {
@@ -246,11 +243,11 @@ extern "C" void WolfLinkHost_PreUpdate(PlayState* play, Player* player) {
     sHost.crystalPress = sHost.raw.press.button & ItemButtons(EXT_ITEM_SHADOW_CRYSTAL, false);
     sHost.attemptLogged = false;
 
-    if (const char* release = ReleaseRejection(play, player)) {
+    if (const char* selection = SelectionRejection(play, player)) {
         if (sHost.crystalPress)
-            LogAttempt(release, player);
+            LogAttempt(selection, player);
         if (WolfLinkForm_IsSelected() || WolfLinkForm_IsReady())
-            ReleaseForState(play, player);
+            Stop(play, player);
         return;
     }
 
@@ -263,6 +260,14 @@ extern "C" void WolfLinkHost_PreUpdate(PlayState* play, Player* player) {
     }
     if (WolfLinkForm_IsSelected() && !WolfLinkForm_IsReady() && !WolfLinkForm_LoadSkeleton(play))
         Stop(play, player);
+    // Restore the selected presentation before native entrance/exit controls finish.
+    // Those actions retain their input, speed and collision ownership.
+    if (const char* release = ReleaseRejection(play, player)) {
+        if (sHost.crystalPress)
+            LogAttempt(release, player);
+        ReleaseForState(play, player);
+        return;
+    }
     if (Active(player) || CanActivate(play, player)) {
         sHost.toggle = ItemButtons(EXT_ITEM_SHADOW_CRYSTAL, false);
         sHost.filter = sHost.toggle;
@@ -296,6 +301,11 @@ extern "C" void WolfLinkHost_FilterInput(Player* player, Input* input) {
     if (sHost.player != player)
         return;
     sHost.effective = *input;
+    if (MustRelease(sHost.play, player)) {
+        ReleaseForState(sHost.play, player);
+        sHost.filter = 0;
+        return;
+    }
     const u16 toggle = sHost.toggle;
     if (input->press.button & toggle) {
         if (Active(player)) {
@@ -349,8 +359,36 @@ extern "C" void WolfLinkHost_BeforeAction(PlayState* play, Player* player, Input
 }
 
 extern "C" void WolfLinkHost_ApplyCollisionShape(Player* player) {
-    if (Active(player))
+    if (Active(player) && !MustRelease(sHost.play, player))
         WolfLinkForm_ApplyCollisionShape(player);
+}
+
+extern "C" u8 WolfLinkHost_PlayFootstep(Player* player) {
+    if (!Active(player) || SelectionRejection(sHost.play, player))
+        return 0;
+    switch (player->floorSfxOffset) {
+        case NA_SE_PL_WALK_GROUND - SFX_FLAG:
+        case NA_SE_PL_WALK_SAND - SFX_FLAG:
+        case NA_SE_PL_WALK_CONCRETE - SFX_FLAG:
+        case NA_SE_PL_WALK_DIRT - SFX_FLAG:
+        case NA_SE_PL_WALK_GRASS - SFX_FLAG:
+        case NA_SE_PL_WALK_SNOW - SFX_FLAG:
+        case NA_SE_PL_WALK_ICE - SFX_FLAG:
+            if (!(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND))
+                return 1;
+            // Match MM Wolfos' complete paw-contact cue, without Link's metal equipment layer.
+            Player_PlaySfx(player, NA_SE_EN_WOLFOS_WALK);
+            return 1;
+        default:
+            return 0; // Retain native water, magma, metal/glass and unknown surface contacts.
+    }
+}
+
+extern "C" u8 WolfLinkHost_PlayClimbVoice(Player* player, u16 sfxId) {
+    if (sfxId != NA_SE_VO_LI_CLIMB_END || !Active(player) || SelectionRejection(sHost.play, player))
+        return 0;
+    WolfLinkForm_PlayExertionSfx();
+    return 1;
 }
 
 extern "C" u8 WolfLinkHost_Draw(PlayState* play, Player* player) {
@@ -358,7 +396,8 @@ extern "C" u8 WolfLinkHost_Draw(PlayState* play, Player* player) {
         return 0;
     if (MustRelease(play, player)) {
         ReleaseForState(play, player);
-        return 0;
+        if (!Active(player))
+            return 0;
     }
     return WolfLinkForm_Draw(play, player) ? 1 : 2;
 }

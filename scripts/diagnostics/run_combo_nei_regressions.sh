@@ -60,6 +60,7 @@ python3 -B tests/mm_wallet/run_tests.py
 python3 -B tests/mm_editor/run_tests.py
 python3 -B tests/mm_grace/run_flight_tests.py
 python3 -B tests/mm_grace/run_particle_tests.py
+python3 -B tests/mm_grace/run_orientation_tests.py
 python3 -B tests/mm_grace/run_pool_tests.py
 python3 -B tests/mm_grace/run_save_tests.py
 python3 -B tests/mm_grace/run_settings_tests.py
@@ -71,6 +72,7 @@ python3 -B tests/mm_wolf/run_skin_tests.py
 python3 -B tests/mm_wolf/run_core_tests.py
 python3 -B tests/mm_wolf/run_material_glow_tests.py
 python3 -B tests/mm_wolf/run_bundled_asset_tests.py
+python3 -B tests/mm_wolf/run_eye_palette_tests.py
 python3 -B tests/mm_wolf/run_real_asset_tests.py soh/assets/custom/objects/forms/wolf_link/gWolfLinkData soh/assets/custom/objects/forms/wolf_link/gWolfLinkHDData
 python3 -B tests/mm_wolf/run_host_tests.py
 python3 -B tests/mm_wolf/run_audio_tests.py
@@ -91,6 +93,8 @@ python3 -B tests/nei_held/run_equipment_tests.py
 python3 -B tests/nei_held/run_four_sword_visibility_tests.py
 python3 -B tests/mm_equipment_pause/run_tests.py --sanitize
 python3 -B tests/mm_equipment_pause/run_ownership_tests.py --sanitize
+python3 -B tests/oot_equipment_pause/run_access_tests.py
+python3 -B tests/oot_equipment_pause/run_access_tests.py --sanitize
 python3 -B tests/mm_equipment_pause/run_preview_transition_tests.py
 python3 -B tests/mm_equipment_pause/run_preview_transition_tests.py --sanitize
 python3 -B tests/mm_pause_inventory/run_tests.py --sanitize

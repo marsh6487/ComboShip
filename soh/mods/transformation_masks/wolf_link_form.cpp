@@ -431,7 +431,9 @@ static void BuildMaterialDisplayList(const u16* texture, u32 width, u32 height) 
     // Wolf atlases are opaque. Use texture alpha as an inverse emission mask:
     // 1 retains lit fur; 0 keeps the authored eye color bright in shadow. Output
     // alpha stays opaque, so the eye mask cannot cut holes into the baked face.
-    gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, 1, COMBINED, TEXEL0, TEXEL0_ALPHA, TEXEL0, 0, 0, 0,
+    // Cycle two swaps the texture selectors: TEXEL1 still reads our tile 0.
+    // TEXEL0 here would sample the previous actor's unowned neighboring tile.
+    gDPSetCombineLERP(gfx++, TEXEL0, 0, SHADE, 0, 0, 0, 0, 1, COMBINED, TEXEL1, TEXEL1_ALPHA, TEXEL1, 0, 0, 0,
                       COMBINED);
     gSPSetOtherMode(gfx++, G_SETOTHERMODE_H, 4, 20,
                     G_TF_BILERP | G_TC_FILT | G_TP_PERSP | G_TT_NONE | G_AD_NOISE | G_PM_NPRIMITIVE | G_CK_NONE |

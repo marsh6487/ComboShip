@@ -420,14 +420,9 @@ static ComboFairyBottleShell GetItem_EmptyBottleShell(s16 drawId) {
 }
 
 static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
-    ComboFairyBottleShell shell = ComboFairyBottle_SelectShell(
-        (const char*)sDrawItemTable[drawId].dlists[0], (const char*)sDrawItemTable[drawId].dlists[1],
-        gGiBottleStopperDL, gGiBottleDL, ResourceMgr_IsModAsset, gGiBlueFireChamberstickDL,
-        (ResourceMgr_IsModAsset(gGiBlueFireChamberstickDL) ||
-         ResourceMgr_IsCustomAssetForGame("oot", gGiBlueFireChamberstickDL)));
-    return ComboFairyBottle_BundledShell(shell, (const char*)sDrawItemTable[drawId].dlists[0],
-                                         (const char*)sDrawItemTable[drawId].dlists[1], ResourceMgr_IsModAsset,
-                                         ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/EmptyXlu"));
+    // Content models such as Blue Fire can bake a flame into their shell.
+    // Reuse the empty bottle's selected casing without inheriting any content.
+    return GetItem_EmptyBottleShell(GID_BOTTLE);
 }
 
 #include "ComboFairyBottleDraw.h"

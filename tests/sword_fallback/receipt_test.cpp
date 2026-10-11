@@ -134,7 +134,7 @@ using CustomDrawFunc=void(*)(PlayState*,GetItemEntry*);
 struct GetItemEntry {CustomDrawFunc drawFunc;int gid=0;};
 struct Vec3f {float x,y,z;};
 struct Presentation {CustomDrawFunc draw;const char* opaque;const char* translucent;float scale;Kind effect;
-                     Vec3f effectCenter{};bool alwaysShimmer=true;};
+                     Vec3f effectCenter{};bool alwaysShimmer=true;Kind shimmer=Kind::Neutral;};
 Presentation selected{};
 const Presentation* FindPresentation(GetItemEntry*){return &selected;}
 int SongForEntry(GetItemEntry*){return -1;}

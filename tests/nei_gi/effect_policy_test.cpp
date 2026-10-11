@@ -25,6 +25,23 @@ int main() {
   static_assert(int(Kind::SwordAura) == 17 && int(Kind::SlateSensor) == 24 &&
                 int(Kind::KokiriSword) == 25 && int(Kind::FourSword) == 32 &&
                 int(Kind::Gold) == 37 && int(Kind::GiantsKnife) == 38);
+  static_assert(int(Kind::DivineShield)==39 && int(Kind::IronKnuckleAxe)==49);
+  for(int profile=int(Kind::DivineShield);profile<=int(Kind::Last);++profile) {
+    const auto kind=static_cast<Kind>(profile);
+    assert(IsEquipment(kind)&&!IsSword(kind)&&!IsRod(kind)&&!IsSpell(kind)&&!IsSpecial(kind));
+    for(uint32_t frame:{0u,42u,179u,360u,std::numeric_limits<uint32_t>::max()}) {
+      assert(SampleOrb(kind).count==0&&SampleEnergy(kind,frame).count==0&&SampleSpecial(kind,frame).count==0);
+      const auto stars=SampleShimmer(frame,true,{},kind);
+      assert(stars.count==360&&SampleShimmer(frame,false,{},kind).count==0);
+      for(size_t cluster=0;cluster<5;++cluster) {
+        const auto hue=cluster%2?EquipmentShimmerSecondary(kind):ColorHex(kind);
+        for(size_t vertex=0;vertex<72;++vertex) {
+          const bool core=vertex>=48&&(vertex-48)%3==0;
+          assert(stars.vertices[cluster*72+vertex].rgb==(core?0xFFFFFF:hue));
+        }
+      }
+    }
+  }
   const uint32_t swordHues[] = {0x78C850, 0xA46CFF, 0xBDD6EA, 0xFFD45A,
                                 0x6F8FFF, 0xFF9A42, 0x79BE84, 0x315B2F,
                                 0xFFF4D6, 0xCFD9E6};

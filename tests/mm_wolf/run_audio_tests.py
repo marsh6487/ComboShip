@@ -27,8 +27,8 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--host', choices=('mm', 'soh'))
 parser.add_argument('cases', nargs='*')
 args = parser.parse_args()
-if any(case not in ('voice', 'chain', 'transform', 'mixer', 'defaults') for case in args.cases):
-    parser.error('cases must be voice, chain, transform, mixer or defaults')
+if any(case not in ('voice', 'chain', 'transform', 'mixer', 'defaults', 'dash', 'exertion') for case in args.cases):
+    parser.error('cases must be voice, chain, transform, mixer, defaults, dash or exertion')
 
 with tempfile.TemporaryDirectory(prefix='wolf-audio-') as directory:
     build = Path(directory)
@@ -49,5 +49,6 @@ with tempfile.TemporaryDirectory(prefix='wolf-audio-') as directory:
              str(ROOT / 'tests/mm_wolf/audio_runtime_test.cpp'),
              *([str(ROOT / 'soh/mods/transformation_masks/wolf_link_audio_hooks.cpp')] if host == 'soh' else []),
              obj, '-pthread', '-Wl,--gc-sections', '-o', binary])
-        for case in args.cases or ['voice', 'chain', 'transform', 'mixer', 'defaults']:
+        cases = args.cases or ['voice', 'chain', 'transform', 'mixer', 'defaults'] + (['dash', 'exertion'] if host == 'mm' else [])
+        for case in cases:
             run([binary, case])

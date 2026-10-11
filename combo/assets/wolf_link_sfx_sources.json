@@ -96,6 +96,30 @@
       "sample_rate": 44100,
       "sample_count": 29508,
       "duration_seconds": 0.6691156462585034
+    },
+    {
+      "source": "TP_WolfLink_Huff_A1.wav",
+      "wav_sha256": "3f85432569f8c57f3820aa302c5524bb4efa2fa592b327b91446b0ea5a0882f3",
+      "pcm_sha256": "2edb3bcca391a1025eacbe933a9246ebd392eca7a20ec491bcad071065994700",
+      "sample_rate": 16000,
+      "sample_count": 5417,
+      "duration_seconds": 0.3385625
+    },
+    {
+      "source": "TP_WolfLink_Huff_A2.wav",
+      "wav_sha256": "78b7761d5dfbc25c18fb5a98014e804b49a3b7ac9af06353967242111bde1809",
+      "pcm_sha256": "55236fc8b58291ec064e47854bfdd0417b2ad069025c16159797958c571155bb",
+      "sample_rate": 16000,
+      "sample_count": 5299,
+      "duration_seconds": 0.3311875
+    },
+    {
+      "source": "TP_WolfLink_Huff_A3.wav",
+      "wav_sha256": "277993403e963e5932bfb4acf288ac4cddd2bffd1fcf23d55ca6528666284637",
+      "pcm_sha256": "519bdf7d84a06715d6942e60444b2884aa1d3914ac433ee76e1b59b6dabf550d",
+      "sample_rate": 16000,
+      "sample_count": 5780,
+      "duration_seconds": 0.36125
     }
   ]
 }

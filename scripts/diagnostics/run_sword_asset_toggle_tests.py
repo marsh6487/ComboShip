@@ -14,7 +14,7 @@ ids=sorted(set(re.findall(r'\bRI_[A-Z0-9_]+\b',mm)))
 source=source.replace('/* ITEM_IDS */','enum RandoItemId{'+','.join(ids)+'};')
 names=['SelectedSwordPath','HasSelectedSword']
 if 'NeiGi_BaseSwordPath' in of:names.append('NeiGi_BaseSwordPath')
-names.append('NeiGi_FillCrossGameInfo')
+names += ['PresentationShimmer', 'NeiGi_FillCrossGameInfo']
 source=source.replace('/* OWNER_SELECTION */','\n'.join(of[n] for n in names))
 source=source.replace('/* OWNER_CUSTOM_RECIPE */','\n'.join(owner[n] for n in ('CwSimple','CwCustomGi','CwAltSwordGi')))
 source=source.replace('/* OWNER_DEPENDENCY */','\n'.join(owner[n] for n in ('OOT_IsStateDependentDraw','OOT_DrawDependency')))

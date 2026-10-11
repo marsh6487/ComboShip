@@ -20,6 +20,7 @@ NS = {"c": "http://www.collada.org/2005/11/COLLADASchema"}
 RESOURCE = "objects/forms/wolf_link/gWolfLinkData"
 HD_RESOURCE = "objects/forms/wolf_link/gWolfLinkHDData"
 SOFT_SHA = "3f9d052d6542ff46e0c1b4e6f60a96dcfc821aeb32e42d871016c9250f152f5a"
+SOFT_GLOW_SHA = "8e1cfe015918952253568cdf5ef9e127faf7b78162d33f692dc4963dda47c49e"
 VERTEX = struct.Struct("<3f3bhhB")
 LINKS, CUFF_BONE, CHAIN_PARENT, SPACING = 6, 17, 17, 8.5
 ANCHOR = np.array([33.0, 18.8, 38.0, 1.0])
@@ -141,12 +142,18 @@ def drape(anchors, velocity=None):
     return m
 
 
-def build(source, wolf, output):
+def read_soft_wolf(wolf):
     with zipfile.ZipFile(wolf) as archive:
         resource = archive.read(RESOURCE)
     base = resource[68:]
-    if hashlib.sha256(base).hexdigest() != SOFT_SHA:
+    if hashlib.sha256(base).hexdigest() not in (SOFT_SHA, SOFT_GLOW_SHA):
         raise ValueError("expected the softer-eye TP candidate")
+    return resource
+
+
+def build(source, wolf, output):
+    resource = read_soft_wolf(wolf)
+    base = resource[68:]
     h = list(struct.unpack_from("<20I", base, 12))
     assert h[2:4] == [40, 144] and h[18] == len(base)
     p, n, uv = read_link(source)
@@ -233,7 +240,7 @@ def build(source, wolf, output):
     (output / "wolf_link_hd.bin").write_bytes(out)
     serialized = resource[:64] + struct.pack("<I", len(out)) + out
     (output / "gWolfLinkHDData").write_bytes(serialized)
-    report = {"input_payload_sha256": SOFT_SHA, "payload_sha256": hashlib.sha256(out).hexdigest(),
+    report = {"input_payload_sha256": hashlib.sha256(base).hexdigest(), "payload_sha256": hashlib.sha256(out).hexdigest(),
               "source_dae_sha256": hashlib.sha256((source / "chain.DAE").read_bytes()).hexdigest(),
               "source_texture_sha256": hashlib.sha256((source / "kusari.png").read_bytes()).hexdigest(),
               "resource_path": HD_RESOURCE, "chain_links": LINKS, "attachment_bone": CUFF_BONE,

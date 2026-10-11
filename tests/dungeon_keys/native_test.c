@@ -1,19 +1,21 @@
 #include "fixture_api.h"
 #include "combo/menu/ComboFairyBottle.h"
+#include "combo/menu/ComboItemDrawABI.h"
 static const char gGiEmptyBottleCorkDL[] =
     "__OTR__objects/object_gi_bottle/gGiEmptyBottleCorkDL";
 static const char gGiEmptyBottleGlassDL[] =
     "__OTR__objects/object_gi_bottle/gGiEmptyBottleGlassDL";
 static int ResourceMgr_IsModAsset(const char *path) {
-  assert(false && "Dungeon-item draws must not resolve bottle ownership");
-  return 0;
+  assert(!strcmp(path, gGiEmptyBottleCorkDL) || !strcmp(path, gGiEmptyBottleGlassDL));
+  return (testAlt || testFairyEmptyMod) && !strcmp(path, gGiEmptyBottleGlassDL);
 }
 static int ResourceMgr_FileExists(const char *path) {
-  assert(false && "Dungeon-item draws must not resolve bundled bottle assets");
-  return 0;
+  assert(strstr(path, "combo_bottle_gi/Empty"));
+  return 1;
 }
 int testSpinRed = 17;
 bool testAlt = true;
+bool testFairyEmptyMod = false;
 int testColors = 1, testChanged = 0, testEmblemChanged = 0, testMissing = 0,
     testLoadFail = 0;
 int testCount = 0, testDepth = 0, testScales = 0, testSetup5 = 0;
@@ -114,7 +116,7 @@ void GetItem_DrawOpa0Xlu1(PlayState *, s16);
 void GetItem_DrawCompass(PlayState *, s16);
 typedef struct {
   void (*drawFunc)(PlayState *, s16);
-  void *drawResources[2];
+  void *drawResources[8];
 } Draw;
 static Draw sDrawItemTable[] = {
     {GetItem_DrawOpa0, {"__OTR__objects/object_gi_key/gGiSmallKeyDL", NULL}},
@@ -125,9 +127,24 @@ static Draw sDrawItemTable[] = {
     {GetItem_DrawCompass,
      {"__OTR__objects/object_gi_compass/gGiCompassDL",
       "__OTR__objects/object_gi_compass/gGiCompassGlassDL"}},
+    {GetItem_DrawOpa0Xlu1, {(void *)gGiEmptyBottleCorkDL, (void *)gGiEmptyBottleGlassDL}},
 };
+static ComboFairyBottleShell GetItem_FairyBottleShell(s16);
 s32 GetItem_GetDrawTableEntry(s32 id, void **out, s32 max, s32 *xs, f32 *scale,
                               s32 *scroll, s32 *kind) {
+  if (id == GID_FAIRY_CONTAINER) {
+    const ComboFairyBottleShell shell = GetItem_FairyBottleShell(id);
+    assert(max >= 4);
+    out[0] = (void *)shell.opaque;
+    out[1] = (void *)shell.glass;
+    out[2] = (void *)"__OTR__objects/object_gi_fairy/gGiFairyBottleContentsDL";
+    out[3] = (void *)"__OTR__objects/object_gi_fairy/gGiFairyBottleBillboardRotMtx";
+    *xs = 1;
+    *scale = 0;
+    *scroll = 0;
+    *kind = CW_DRAW_KIND_MM_FAIRY_CONTAINER;
+    return 4;
+  }
   if (id < 0 || id > 3) {
     return 0;
   }

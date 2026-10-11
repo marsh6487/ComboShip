@@ -45,7 +45,20 @@ enum class Kind {
     Pokeball,
     MarioMask,
     Gold,
-    GiantsKnife // Append to preserve the existing cross-engine effect IDs.
+    GiantsKnife,
+    // Shimmer-only identities append without changing existing cross-engine IDs.
+    DivineShield,
+    SheikahShield,
+    IkanaShield,
+    MagicCape,
+    SpiritBreastplate,
+    SagesTunic,
+    ChampionsTunic,
+    PegasusAnklet,
+    ClimbBoots,
+    PendantOfMemories,
+    IronKnuckleAxe,
+    Last = IronKnuckleAxe
 };
 constexpr float Tau = 6.28318530718f;
 // The authored Four Sword's high center is lowered in GI space only. Its
@@ -129,6 +142,26 @@ constexpr uint32_t ColorHex(Kind kind) {
             return FourSwordColors[0];
         case Kind::CaneBlue:
             return 0x5A90FF;
+        case Kind::DivineShield:
+            return 0x875FCD;
+        case Kind::SheikahShield:
+            return 0xDC4141;
+        case Kind::IkanaShield:
+            return 0xAFB4DC;
+        case Kind::MagicCape:
+        case Kind::PegasusAnklet:
+        case Kind::PendantOfMemories:
+            return 0xFFD45A;
+        case Kind::SpiritBreastplate:
+            return 0xEB6E14;
+        case Kind::SagesTunic:
+            return 0xF0F4FA;
+        case Kind::ChampionsTunic:
+            return 0x30CAFA;
+        case Kind::ClimbBoots:
+            return 0xCFAC2E;
+        case Kind::IronKnuckleAxe:
+            return 0xCFD9E6;
         default:
             return 0xE6E6EB;
     }
@@ -144,6 +177,28 @@ inline bool IsSlate(Kind k) {
 }
 inline bool IsSword(Kind k) {
     return k == Kind::SwordAura || k == Kind::GiantsKnife || (k >= Kind::KokiriSword && k <= Kind::FourSword);
+}
+inline bool IsEquipment(Kind k) {
+    return (k >= Kind::DivineShield && k <= Kind::Last) || k == Kind::Gold || k == Kind::CaneBlue;
+}
+constexpr uint32_t EquipmentShimmerSecondary(Kind k) {
+    switch (k) {
+        case Kind::DivineShield:
+        case Kind::ClimbBoots:
+            return 0xCFD9E6;
+        case Kind::SheikahShield:
+        case Kind::PendantOfMemories:
+            return 0x4090FF;
+        case Kind::IkanaShield:
+        case Kind::SagesTunic:
+            return 0xFFD45A;
+        case Kind::MagicCape:
+            return 0xB80B0E; // Authored crimson cloth; retain the cape's existing red.
+        case Kind::PegasusAnklet:
+            return 0x16AB94;
+        default:
+            return ColorHex(k);
+    }
 }
 inline bool IsSpecial(Kind k) {
     return (k >= Kind::Sand && k <= Kind::CaneBlue) || IsSlate(k) || IsSword(k);
@@ -528,8 +583,9 @@ inline Mesh SampleShimmer(uint32_t frame, bool enabled, const Basis& camera = {}
                              : kind == Kind::FourSword       ? FourSwordColors[i % FourSwordColors.size()]
                              : kind == Kind::GreatFairySword ? fairyHue
                              : kind == Kind::DarkCrystal     ? (i % 3 == 0 ? ColorHex(kind) : 0xD76B20)
-                             : kind == Kind::Neutral         ? 0xA8E9FF
-                                                             : ColorHex(kind);
+                             : IsEquipment(kind)     ? (i % 2 ? EquipmentShimmerSecondary(kind) : ColorHex(kind))
+                             : kind == Kind::Neutral ? 0xA8E9FF
+                                                     : ColorHex(kind);
         Glow(m, p, 7 * pulse, hue, 140, camera);
         const uint32_t core = kind == Kind::DarkCrystal ? 0xFFD19A : leaf ? 0xB0FFB0 : 0xFFFFFF;
         Star(m, p, 6 * pulse, t * .5f, kind == Kind::Neutral ? 0xE6F8FF : hue, camera, core);

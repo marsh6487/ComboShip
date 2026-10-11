@@ -40,7 +40,11 @@ struct Presentation {
     int32_t identity = 0; // distinct awards sharing one legacy callback
     bool alwaysShimmer = false;
     int32_t nativeGid = -1;
+    Kind shimmer = Kind::Neutral; // A separate palette leaves geometry/energy identity intact.
 };
+Kind PresentationShimmer(const Presentation& item) {
+    return item.shimmer == Kind::Neutral ? item.effect : item.shimmer;
+}
 
 #define GI_PATH(slug) "__OTR__objects/nei_gi_redesign/" slug "/gi_dl"
 #define GI_XLU(slug) "__OTR__objects/nei_gi_redesign/" slug "/gi_xlu_dl"
@@ -212,8 +216,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::DivineShield },
     { Randomizer_DrawExtSheikahShield,
       GI_PATH("sheikah_shield"),
       nullptr,
@@ -222,8 +227,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::SheikahShield },
     { Randomizer_DrawExtShieldOfIkana,
       GI_PATH("shield_of_ikana"),
       nullptr,
@@ -232,8 +238,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::IkanaShield },
     { Randomizer_DrawExtMagicCape,
       GI_PATH("magic_cape"),
       nullptr,
@@ -242,8 +249,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::MagicCape },
     { Randomizer_DrawExtSpiritBreastplate,
       GI_PATH("spirit_breastplate"),
       nullptr,
@@ -252,8 +260,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::SpiritBreastplate },
     { Randomizer_DrawExtSagesTunic,
       GI_PATH("sages_tunic"),
       nullptr,
@@ -262,8 +271,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::SagesTunic },
     { Randomizer_DrawExtChampionsTunic,
       GI_PATH("champions_tunic"),
       nullptr,
@@ -272,8 +282,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::ChampionsTunic },
     { Randomizer_DrawExtPegasusAnklet,
       GI_PATH("pegasus_anklet"),
       nullptr,
@@ -282,8 +293,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::PegasusAnklet },
     { Randomizer_DrawExtTrident,
       GI_PATH("trident"),
       nullptr,
@@ -292,7 +304,7 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
+      true,
       -1 },
     { Randomizer_DrawExtClimbBoots,
       GI_PATH("climb_boots"),
@@ -302,8 +314,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::ClimbBoots },
     { Randomizer_DrawExtRocBoots,
       GI_PATH("roc_boots"),
       nullptr,
@@ -312,7 +325,7 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
+      true,
       -1 },
     { Randomizer_DrawExtCaneOfByrna,
       GI_PATH("cane_of_byrna"),
@@ -322,7 +335,7 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
+      true,
       -1 },
     { Randomizer_DrawExtFourSword,
       GI_PATH("four_sword"),
@@ -332,7 +345,7 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
+      true,
       -1 },
     { Randomizer_DrawExtPendantOfMemories,
       GI_PATH("pendant_of_memories"),
@@ -342,8 +355,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::PendantOfMemories },
     { Randomizer_DrawMmTradeQuest,
       GI_PATH("room_key"),
       nullptr,
@@ -541,7 +555,8 @@ const Presentation kPresentations[] = {
       { .85f, 14.f },
       0,
       true,
-      -1 },
+      -1,
+      Kind::IronKnuckleAxe },
     { nullptr,
       GI_PATH("kokiri_sword"),
       nullptr,
@@ -567,12 +582,27 @@ const Presentation kPresentations[] = {
 const Presentation kMmKokiriPresentation{
     nullptr, GI_PATH("mm_kokiri_sword"), nullptr, 1.f, Kind::MmKokiriSword, {}, { .85f, 14.f }, 0, true, -1
 };
+// The imported catalog alias keeps MM's existing two-pass trade model. It
+// receives only the equipment identity overlay, never an authored replacement.
+const Presentation kMmPendantPresentation{ Randomizer_DrawMmTradeQuest,
+                                           nullptr,
+                                           nullptr,
+                                           1.f,
+                                           Kind::Neutral,
+                                           {},
+                                           { .85f, 14.f },
+                                           RG_MM_PENDANT_OF_MEMORIES,
+                                           true,
+                                           -1,
+                                           Kind::PendantOfMemories };
 #undef GI_PATH
 #undef GI_XLU
 
 const Presentation* FindPresentation(const GetItemEntry* entry) {
     if (!entry)
         return nullptr;
+    if (entry->drawFunc == Randomizer_DrawMmTradeQuest && entry->drawItemId == RG_MM_PENDANT_OF_MEMORIES)
+        return &kMmPendantPresentation;
     // Knife and Biggoron deliberately share the original native GID. Keep
     // their concrete award identity before selecting the generic GID fallback.
     if (entry->gid == GID_SWORD_BGS && ((entry->tableId == TABLE_RANDOMIZER && entry->drawItemId == RG_GIANTS_KNIFE) ||
@@ -883,7 +913,7 @@ static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool up
         Matrix_Pop();
     }
     if (shimmer || item.alwaysShimmer)
-        NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, camera, item.effect));
+        NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, camera, PresentationShimmer(item)));
     Matrix_Pop();
 }
 }
@@ -1099,7 +1129,7 @@ static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* ou
     // Identity belongs to the award, independently of the mesh selected by
     // either archive manager. A declined replacement still supplies shimmer
     // metadata, while leaving authored mesh-local energy unset.
-    out->neiShimmer = static_cast<int32_t>(item.effect) + 1;
+    out->neiShimmer = static_cast<int32_t>(PresentationShimmer(item)) + 1;
     out->itemShimmer = item.alwaysShimmer || CVarGetInteger(CVAR_NEI_GI_EFFECTS, 0);
     out->stateDependent = 2;
     const bool vanillaSword = NeiGi::IsSword(item.effect) && !swordAltAssets;

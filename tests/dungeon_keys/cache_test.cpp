@@ -128,7 +128,7 @@ struct Scope {
   Scope(const char *, int, int, bool) {}
 };
 } // namespace ItemGrantAudit
-extern "C" int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char*, const char*, float*) { return 0; }
+extern "C" int ResourceMgr_GetIkanaShieldGiPoseForGame(const char*, const char*, float*, float*) { return 0; }
 /* PRODUCTION_OPS */
 /* PRODUCTION_CROSS */
 int32_t MM_FillSongDrawInfo(RandoItemId, CwItemDrawInfo *) { return 0; }
@@ -397,6 +397,32 @@ int main() {
     assert(ComboResolveForeignDrawInfo(180) == nullptr);
   }
   malformedSeason = 0;
+  Rando::StaticData::Items[RI_OOT_BOTTLE_FAIRY] = {GID_FAIRY_CONTAINER, "Bottle with Fairy"};
+  foreign.itemName = "Bottle with Fairy";
+  ++generation;
+  const bool fairyPreviousAlt = testAlt;
+  testAlt = testFairyEmptyMod = false;
+  const auto* fairy = ComboResolveForeignDrawInfo(185);
+  assert(fairy && fairy->drawKind == CW_DRAW_KIND_MM_FAIRY_CONTAINER &&
+         fairy->appearanceDependent && fairy->stateDependent);
+  assert(strstr(fairy->dls[0], "@mm:objects/combo_bottle_gi/EmptyOpaque"));
+  ComboLatchForeignDraw(185);
+  for (int selection : {0, 1, 0, 2, 0}) {
+    testAlt = selection == 1;
+    testFairyEmptyMod = selection == 2;
+    fairy = ComboResolveForeignDrawInfo(185);
+    assert(fairy && fairy->appearanceDependent && fairy->stateDependent && fairy->count == 4);
+    assert(strstr(fairy->dls[0], selection ? "@mm:objects/object_gi_bottle/gGiEmptyBottleCorkDL"
+                                         : "@mm:objects/combo_bottle_gi/EmptyOpaque") &&
+           "latched fairy casing must refresh after owner Alt/editor selection changes");
+    assert(strstr(fairy->dls[1], selection ? "@mm:objects/object_gi_bottle/gGiEmptyBottleGlassDL"
+                                         : "@mm:objects/combo_bottle_gi/EmptyXlu"));
+    assert(strstr(fairy->dls[2], "gGiFairyBottleContentsDL") &&
+           strstr(fairy->dls[3], "gGiFairyBottleBillboardRotMtx"));
+  }
+  testAlt = fairyPreviousAlt;
+  testFairyEmptyMod = false;
+  puts("PASS actual fairy empty-shell selector -> MM export -> OoT cache/latch with repeated Alt/editor changes");
   const RandoItemId bottles[] = {
       RI_OOT_BOTTLE_BIG_POE,      RI_OOT_BOTTLE_BLUE_FIRE,
       RI_OOT_BOTTLE_BLUE_POTION,  RI_OOT_BOTTLE_BUGS,

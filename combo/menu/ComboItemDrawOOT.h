@@ -577,6 +577,7 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             out->ops[0] = { CW_OP_ROTATE_Z, 16384.f, 0, 0, {} };
             return 1;
         case RG_EXT_SHIELD_OF_IKANA: {
+            out->stateDependent = 2; // Refresh the selected owner's pose after Alt changes, even during receipts.
             const char* path = "objects/object_link_child/gLinkHumanMirrorShieldDL";
             const bool local = ResourceMgr_IsModAssetForGame("oot", path);
             CwSimple(out,
@@ -584,10 +585,11 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
                            : "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL",
                      false, .035f);
             out->drawKind = CW_DRAW_KIND_CUSTOM_GI;
-            out->opCount = 1;
-            float tilt = 1.5707963267948966f;
-            ResourceMgr_GetIkanaShieldGiTiltXForGame(local ? "oot" : "mm", path, &tilt);
-            out->ops[0] = { CW_OP_ROTATE_X, tilt * (32768.f / 3.14159265358979323846f), 0, 0, {} };
+            out->opCount = 2;
+            float tilt = 1.5707963267948966f, roll = 0.f;
+            ResourceMgr_GetIkanaShieldGiPoseForGame(local ? "oot" : "mm", path, &tilt, &roll);
+            out->ops[0] = { CW_OP_ROTATE_Z, roll * (32768.f / 3.14159265358979323846f), 0, 0, {} };
+            out->ops[1] = { CW_OP_ROTATE_X, tilt * (32768.f / 3.14159265358979323846f), 0, 0, {} };
             return 1;
         }
         case RG_CLAWSHOT:
@@ -603,6 +605,9 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
             out->dlists[1] = "__OTR__@mm:objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL";
             out->dlistCount = 2;
             out->xluStartIndex = 1;
+            out->itemShimmer = 1;
+            out->neiShimmer = static_cast<int32_t>(NeiGi::Kind::PendantOfMemories) + 1;
+            out->stateDependent = 2;
             return 1;
         case RG_EXT_MAGIC_CAPE:
             if (!CwCustomGi(out, "__OTR__objects/object_nei_magic_cape/gNeiMagicCapeDL", .55f,

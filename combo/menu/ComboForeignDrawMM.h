@@ -1095,7 +1095,7 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info, bool sho
     const uint32_t bits = (static_cast<uint32_t>(gPlayState->gameplayFrames) * 2u) & 0xFFFFu;
     const int32_t rotation = bits >= 0x8000u ? static_cast<int32_t>(bits) - 0x10000 : bits;
     Matrix_RotateYF(rotation * .01f, MTXMODE_APPLY);
-    const bool sword = info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1 &&
+    const bool sword = info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Last) + 1 &&
                        NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
     int selectedOpaque = -1;
     bool noCull = false;
@@ -1165,7 +1165,7 @@ inline void MM_DrawForeignCustomGi(const ComboForeignDrawInfoOOT* info, bool sho
     }
     CLOSE_DISPS(gfxCtx);
     if (info->opCount == 1 && info->ops[0].op == CW_OP_ROTATE_Z && info->neiShimmer > 0 &&
-        info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1 &&
+        info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Last) + 1 &&
         NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
         ComboDinSwordGi_DrawLayers(gPlayState, "oot", info->dls[0]);
     Matrix_Pop();
@@ -1267,6 +1267,7 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
         recipe.xluStartIndex = info->xluStart;
         recipe.scale = info->scale;
         recipe.neiEffect = info->neiEffect;
+        recipe.neiShimmer = info->neiShimmer;
         memcpy(recipe.neiEffectCenter, info->neiEffectCenter, sizeof(recipe.neiEffectCenter));
         recipe.neiSomariaUpgrade = info->neiSomariaUpgrade;
         recipe.itemShimmer = info->itemShimmer;
@@ -1274,7 +1275,7 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
         return;
     }
     const bool swordIdentity = info->neiShimmer > 0 &&
-                               info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1 &&
+                               info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Last) + 1 &&
                                NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1));
     const bool fitModel =
         info->count > 0 &&
@@ -1430,7 +1431,7 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
             Matrix_Push();
             ComboSwordGi_ApplyEffectFit(static_cast<NeiGi::Kind>(info->neiShimmer - 1), shop, mmPickup);
         }
-        if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1 &&
+        if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Last) + 1 &&
             NeiGi::IsSword(static_cast<NeiGi::Kind>(info->neiShimmer - 1)))
             NeiGi_DrawMesh(gPlayState, NeiGi::SampleSpecial(
                                            static_cast<NeiGi::Kind>(info->neiShimmer - 1), gPlayState->gameplayFrames,
@@ -1440,7 +1441,7 @@ inline void MM_DrawComboForeign(RandoCheckId randoCheckId, bool shop = false, in
         const bool mmOwner = info->drawKind == CW_DRAW_KIND_MM_MASK || info->drawKind == CW_DRAW_KIND_MM_REMAINS;
         if (info->drawKind == CW_DRAW_KIND_SONG_GI)
             NeiGi_DrawSongOverlay(gPlayState, info->neiEffect, "oot");
-        else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::GiantsKnife) + 1)
+        else if (info->neiShimmer > 0 && info->neiShimmer <= static_cast<int32_t>(NeiGi::Kind::Last) + 1)
             NeiGi_DrawMesh(gPlayState,
                            NeiGi::SampleShimmer(gPlayState->gameplayFrames, true, NeiGi_CameraBasis(gPlayState),
                                                 static_cast<NeiGi::Kind>(info->neiShimmer - 1)));

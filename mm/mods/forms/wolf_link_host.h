@@ -13,6 +13,9 @@ void WolfLinkHost_RestorePlayerInput(Player* player, Input* input);
 void WolfLinkHost_FilterInput(Player* player, Input* input);
 void WolfLinkHost_BeforeAction(PlayState* play, Player* player, Input* input);
 void WolfLinkHost_ApplyCollisionShape(Player* player);
+// Sound follows the visible form even while native ledges/cutscenes own actions.
+u8 WolfLinkHost_PlayFootstep(Player* player);
+u8 WolfLinkHost_PlayClimbVoice(Player* player, u16 sfxId);
 // 0: native player; 1: submitted Wolf; 2: selected Wolf skipped this frame.
 u8 WolfLinkHost_Draw(PlayState* play, Player* player);
 void WolfLinkHost_OnUseItem(PlayState* play, Player* player, s32 item);

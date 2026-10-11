@@ -39,6 +39,7 @@ void* OotAssets_LoadGfx(const char* otrPath);        // Skijer's NEI — resolve
 void* OotAssets_LoadGfxDirect(const char* otrPath);  // Skijer's NEI — archive-scoped load (defeats MM shadowing)
 void* OotAssets_LoadTexOrDList(const char* otrPath); // Skijer's NEI — texture/DL resource (Climb ladder seg-8 tex)
 int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt);
+int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* game, const char* path, float* tilt, float* roll);
 uint16_t Nei_GetOwnedItem(uint8_t slot); // mods/nei_save.cpp — Roc chain level for its draw (u16 store)
 extern Gfx gIKAxeInlineDL[];             // equipment/objects/ikaxe_DL — axe with segments pre-resolved
 }
@@ -3843,9 +3844,10 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
         case RI_SHIELD_MIRROR: {
             // The authored GI returns above. Only the native/pack fallback
             // needs to correct a selected horizontal shield mesh.
-            float tilt = 0.f;
-            ResourceMgr_GetIkanaShieldGiTiltXForGame("mm", "objects/object_gi_shield_3/gGiMirrorShieldDL", &tilt);
+            float tilt = 0.f, roll = 0.f;
+            ResourceMgr_GetIkanaShieldGiPoseForGame("mm", "objects/object_gi_shield_3/gGiMirrorShieldDL", &tilt, &roll);
             Matrix_Push();
+            Matrix_RotateZF(roll, MTXMODE_APPLY);
             Matrix_RotateXF(tilt, MTXMODE_APPLY);
             GetItem_Draw(gPlayState, Rando::StaticData::Items[randoItemId].drawId);
             Matrix_Pop();

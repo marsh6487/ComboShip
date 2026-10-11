@@ -1775,6 +1775,28 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
         int fc = FcCombo_ItemForNative((int)item);
         if (fc != FCI_NO_ITEM && fc >= 0 && fc < FC_COMBO_OBTAINED_FC_SIZE) {
             NeiSaveData* nei = Nei_Save();
+            int fairyCount = -1;
+            switch (item) {
+                case RG_MM_STRAY_FAIRY_WOODFALL:
+                    fairyCount = FC_MM_FAIRIES_WOODFALL;
+                    break;
+                case RG_MM_STRAY_FAIRY_SNOWHEAD:
+                    fairyCount = FC_MM_FAIRIES_SNOWHEAD;
+                    break;
+                case RG_MM_STRAY_FAIRY_GREAT_BAY:
+                    fairyCount = FC_MM_FAIRIES_GREAT_BAY;
+                    break;
+                case RG_MM_STRAY_FAIRY_STONE_TOWER:
+                    fairyCount = FC_MM_FAIRIES_STONE_TOWER;
+                    break;
+                default:
+                    break;
+            }
+            if (fairyCount >= 0) {
+                // MM's native fairy total can predate the FC ledger. Advance the receipt mirror
+                // at the grant boundary; rebasing FC itself would re-grant those older fairies.
+                nei->comboObtained[fairyCount] = std::max(nei->comboObtained[fairyCount], nei->comboObtainedFc[fc]) + 1;
+            }
             nei->comboObtainedFc[fc]++;
             nei->comboAppliedFc[fc]++;
         }

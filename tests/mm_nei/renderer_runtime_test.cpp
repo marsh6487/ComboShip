@@ -38,6 +38,22 @@ OOT_GetNeiGiDrawInfoForAssets(const char* slug, int32_t altAssets, CwItemDrawInf
   assert(bounds);
   out->neiEffect = static_cast<int>(bounds->effect);
   out->neiShimmer = out->neiEffect + 1;
+  // The donor ABI carries palette separately from the protected model/energy
+  // kind. Its real descriptor is exercised by the producer/bridge fixtures.
+  const std::pair<const char*,NeiGi::Kind> equipmentPalettes[] = {
+    {"divine_shield",NeiGi::Kind::DivineShield},
+    {"sheikah_shield",NeiGi::Kind::SheikahShield},
+    {"shield_of_ikana",NeiGi::Kind::IkanaShield},
+    {"magic_cape",NeiGi::Kind::MagicCape},
+    {"spirit_breastplate",NeiGi::Kind::SpiritBreastplate},
+    {"sages_tunic",NeiGi::Kind::SagesTunic},
+    {"champions_tunic",NeiGi::Kind::ChampionsTunic},
+    {"pegasus_anklet",NeiGi::Kind::PegasusAnklet},
+    {"climb_boots",NeiGi::Kind::ClimbBoots},
+    {"pendant_of_memories",NeiGi::Kind::PendantOfMemories}
+  };
+  for (const auto& [name,palette] : equipmentPalettes)
+    if (!strcmp(slug,name)) out->neiShimmer=static_cast<int>(palette)+1;
   if (!altAssets && NeiGi::IsSword(bounds->effect))
     opa=descriptorPaths.insert(std::string("__OTR__@oot-gi-base:")+(opa+7)).first->c_str();
   if(!OOT_NeiResourceExists(opa) || (skin && !OOT_NeiResourceExists(skin))) return 0;
@@ -319,6 +335,13 @@ int main() {
         id == RI_OOT_MASTER_SWORD || id == RI_OOT_TRUE_MASTER_SWORD ||
         id == RI_OOT_BIGGORON_SWORD || id == RI_OOT_IRON_KNUCKLE_AXE ||
         id == RI_OOT_EXT_FOUR_SWORD;
+    bool intrinsic = sword;
+    for (const auto equipment : {RI_OOT_EXT_DIVINE_SHIELD, RI_OOT_EXT_SHEIKAH_SHIELD,
+         RI_SHIELD_MIRROR, RI_OOT_EXT_MAGIC_CAPE, RI_OOT_EXT_SPIRIT_BREASTPLATE,
+         RI_OOT_EXT_WATER_DRAGON_SCALE, RI_OOT_EXT_CHAMPIONS_TUNIC,
+         RI_OOT_EXT_PEGASUS_ANKLET, RI_OOT_EXT_TRIDENT, RI_OOT_EXT_CLIMB_BOOTS,
+         RI_OOT_EXT_ROC_BOOTS, RI_OOT_EXT_CANE_OF_BYRNA, RI_PENDANT_OF_MEMORIES})
+      intrinsic |= id == equipment;
     for (bool enabled : {false,true}) {
       reset(); itemEffects = enabled;
       const auto before = current;
@@ -327,7 +350,7 @@ int main() {
         Matrix_Scale(7,7,7,MTXMODE_APPLY);
         Matrix_Translate(1,2,3,MTXMODE_APPLY);
       }
-      if (enabled || sword) {
+      if (enabled || intrinsic) {
         assert(gfx.polyXlu.p > xlu);
         assert(!memcmp(&current,&before,sizeof(current)));
       } else assert(gfx.polyXlu.p == xlu);

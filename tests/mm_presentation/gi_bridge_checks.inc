@@ -55,7 +55,7 @@ for (const auto& sword : {
     std::pair{RI_OOT_BIGGORON_SWORD, Kind::BiggoronSword},
     std::pair{RI_GREAT_FAIRY_SWORD, Kind::GreatFairySword},
     std::pair{RI_OOT_EXT_FOUR_SWORD, Kind::FourSword},
-    std::pair{RI_OOT_IRON_KNUCKLE_AXE, Kind::Neutral}}) {
+    std::pair{RI_OOT_IRON_KNUCKLE_AXE, Kind::IronKnuckleAxe}}) {
     for (int optionalEffects : {0, 1}) {
         Reset(); enabled = optionalEffects;
         {
@@ -90,8 +90,9 @@ for (const auto& item : {
     for (int optionalEffects : {0, 1}) {
         Reset(); enabled = optionalEffects;
         { MM_NeiGiFallbackShimmer shimmer(item.first); }
-        assert(arena.size() == size_t(optionalEffects));
-        if (optionalEffects) {
+        const bool shimmer=optionalEffects||item.second==Kind::Gold;
+        assert(arena.size() == size_t(shimmer));
+        if (shimmer) {
             const auto got = arena.front();
             arena.clear();
             NeiGi_DrawMesh(&play, NeiGi::SampleShimmer(play.gameplayFrames, true, NeiGi_CameraBasis(&play), item.second));
@@ -178,7 +179,7 @@ for (const auto& item : kPresentations) {
     const auto shown = arena;
     arena.clear();
     NeiGi_DrawMesh(&play, NeiGi::SampleShimmer(play.gameplayFrames, true,
-                       NeiGi_CameraBasis(&play), item.effect));
+                       NeiGi_CameraBasis(&play), PresentationShimmer(item)));
     assert(arena.size() == 1);
     const auto &want = arena.front();
     size_t matching = 0;

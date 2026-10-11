@@ -18,7 +18,7 @@ def native(namespace, game, member, resource_type, revision=None):
     constants='const char* gGiBottleStopperDL="cork"; const char* gGiBottleDL="glass";\n'
     constants+='const char* gGiEmptyBottleCorkDL="cork"; const char* gGiEmptyBottleGlassDL="glass";\n'
     constants+='const char* gGiBlueFireChamberstickDL="bluefire";\n'
-    parts=['namespace '+namespace+' {',constants]
+    parts=['namespace '+namespace+' {',constants,'constexpr int GID_BOTTLE=3;']
     draws=('GetItem_DrawPotion','GetItem_DrawOpa0Xlu1')
     parts += ['void '+n+'(PlayState*,s16)'+(';' if n in draws else ' {}') for n in names]
     rows=[]

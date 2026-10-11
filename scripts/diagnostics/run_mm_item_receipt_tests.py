@@ -377,6 +377,20 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     catalog += 'namespace { const int sFcNative[] = ' + block(glue, 'const int sFcNative[]') + ';\n'
     catalog += 'std::unordered_map<int,int>& ReverseMap() ' + block(glue, 'ReverseMap()') + '\n}\n'
     catalog += 'extern "C" int FcCombo_ItemForNative(int nativeId) ' + block(glue, 'int FcCombo_ItemForNative') + '\n'
+    catalog += 'extern "C" int FcCombo_NativeForItem(int fcId) ' + block(glue, 'int FcCombo_NativeForItem') + '\n'
+    mm_give = (ROOT / 'mm/2s2h/Rando/GiveItem.cpp').read_text()
+    fairy_arms = mm_give[mm_give.index('        case RI_WOODFALL_STRAY_FAIRY:'):
+                         mm_give.index('        case RI_GREAT_SPIN_ATTACK:')]
+    fc_grants = 'int gFcCombo_SuppressRecord = 0;\n'
+    fc_grants += 'void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId) {\n' \
+        'assert(gFcCombo_SuppressRecord > 0);\nswitch (randoItemId) {\n' + fairy_arms + \
+        'default: assert(false && "unexpected non-fairy FC grant");\n}\n}\n'
+    mm_sync = (ROOT / 'mm/2s2h/FleetShipCombo/FleetSync.cpp').read_text()
+    fc_grants += '#pragma push_macro("SPDLOG_WARN")\n#undef SPDLOG_WARN\n#define SPDLOG_WARN(...) ((void)0)\n' \
+        '#define FS_TRACE(...) ((void)0)\nvoid ApplyReceiptFcRegistry() ' + \
+        block(mm_sync, 'void ApplyFcRegistryToNatives()').replace('spdlog::default_logger()->flush();', '(void)0;') + \
+        '\n#undef FS_TRACE\n#pragma pop_macro("SPDLOG_WARN")\n'
+    (tmp / 'receipt_fairy_grants.inc').write_text(fc_grants)
     registry = (ROOT / 'soh/mods/extended_player.c').read_text()
     leaf = re.search(r'RG_DEKU_LEAF,\s*((?:"(?:[^"\\]|\\.)*"\s*)+)', registry).group(1)
     catalog += 'const char* kDekuLeafMessage = ' + leaf + ';\n'
@@ -491,6 +505,8 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
         descriptions += row.group(0) + ',\n'
     for rg in ('RG_CANE_OF_SOMARIA', 'RG_PROGRESSIVE_ROCS', 'RG_CANE_PACCI_FLIP',
                'RG_ROCS_CAPE', 'RG_QUARTZ_OF_MOTION', 'RG_DEKU_LEAF',
+               'RG_MM_STRAY_FAIRY', 'RG_MM_STRAY_FAIRY_WOODFALL', 'RG_MM_STRAY_FAIRY_SNOWHEAD',
+               'RG_MM_STRAY_FAIRY_GREAT_BAY', 'RG_MM_STRAY_FAIRY_STONE_TOWER',
                'RG_MM_REMAINS_GOHT', 'RG_MM_SONG_LULLABY', 'RG_MM_SONG_LULLABY_INTRO', 'RG_MM_SONG_NOVA',
                'RG_MM_SONG_HEALING', 'RG_MM_SONG_STORMS', 'RG_MM_SONG_SOARING'):
         text = re.search(r'\{\s*' + rg + r',.*?,\s*((?:"(?:[^"\\]|\\.)*"\s*)+)',
@@ -520,6 +536,15 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                       'void CustomMessage::EncodeColors(std::string& str) const'):
         actual_formatter += signature + ' ' + block(formatter, signature) + '\n'
     donor = donor.replace('/* ACTUAL_FORMATTER */', actual_formatter)
+    oot_glue = (ROOT / 'soh/soh/FleetShipCombo/FleetComboItemsGlue.cpp').read_text()
+    grant_source = (ROOT / 'soh/soh/Enhancements/randomizer/randomizer.cpp').read_text()
+    grant = block(grant_source, 'u16 Randomizer_Item_Give')
+    grant_record = 'namespace { const int sFcNative[] = ' + block(oot_glue, 'const int sFcNative[]') + ';\n'
+    grant_record += 'std::unordered_map<int,int>& ReverseMap() ' + block(oot_glue, 'ReverseMap()') + '\n}\n'
+    grant_record += 'extern "C" int FcCombo_ItemForNative(int nativeId) ' + block(oot_glue, 'int FcCombo_ItemForNative') + '\n'
+    grant_record += 'void RecordReceiptGrant(RandomizerGet item) { if (!FleetSync_IsApplyingFc()) ' + \
+        block(grant, 'if (!FleetSync_IsApplyingFc())') + '\n}\n'
+    donor = donor.replace('/* NATIVE_GRANT_RECORD */', grant_record)
     exported = (ROOT / 'soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp').read_text()
     if '--compass-baseline' in sys.argv:
         revision = sys.argv[sys.argv.index('--compass-baseline') + 1]
@@ -527,6 +552,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                                            cwd=ROOT, text=True)
     context_builders = 'bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received = true);\n'
     for signature in ('bool BuildDungeonKeyReceiptMessage(RandomizerGet rg, CustomMessage& msg)',
+                      'static bool BuildVanillaEquipmentBottleReceipt(RandomizerGet rg, CustomMessage& msg)',
                       'static bool WandMedallionDescriptionsEnabled()',
                       'static bool DungeonInformationEnabled()',
                       'extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled(void)',

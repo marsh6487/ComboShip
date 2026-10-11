@@ -1807,6 +1807,9 @@ void Player_AnimSfx_PlayVoice(Player* this, u16 sfxId) {
     if (this->currentMask == PLAYER_MASK_GIANT) {
         Audio_PlaySfx_GiantsMask(&this->actor.projectedPos, sfxId);
     } else if (this->actor.id == ACTOR_PLAYER) {
+        if (WolfLinkHost_PlayClimbVoice(this, sfxId)) {
+            return;
+        }
         if (this->currentMask == PLAYER_MASK_SCENTS) {
             sfxOffset = SFX_VOICE_BANK_SIZE * 7;
         } else {
@@ -1858,6 +1861,8 @@ void Player_AnimSfx_PlayFloorWalk(Player* this, f32 freqVolumeLerp) {
 
     if (this->currentMask == PLAYER_MASK_GIANT) {
         sfxId = NA_SE_PL_GIANT_WALK;
+    } else if (WolfLinkHost_PlayFootstep(this)) {
+        return;
     } else if (VanillaTB_IsIronBoots()) {
         // Skijer's NEI: Iron boots — metallic clank underfoot regardless of floor type (OoT plays
         // NA_SE_PL_WALK_HEAVYBOOTS; MM has no walk-heavyboots sfx, so NA_SE_PL_WALK_METAL1 is the 1:1

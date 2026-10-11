@@ -47,7 +47,7 @@ parts = {
     'CACHE': oot[oot.index('namespace {'):oot.index('} // namespace') + len('} // namespace')],
     'HOST': function(oot, 'OOT_DrawForeignOps'),
 }
-native_names = ['GetItem_EmptyBottleShell', 'GetItem_GetDungeonItemTint', 'GetItem_GetDungeonKeyEmblemTint',
+native_names = ['GetItem_EmptyBottleShell', 'GetItem_FairyBottleShell', 'GetItem_GetDungeonItemTint', 'GetItem_GetDungeonKeyEmblemTint',
                 'GetItem_GetDungeonKeyModel', 'GetItem_TryDrawDungeonKey', 'GetItem_DrawDungeonItem', 'GetItem_DrawOpa0',
                 'GetItem_DrawOpa0Xlu1', 'GetItem_DrawCompass']
 fixture = ROOT / 'tests/dungeon_keys'

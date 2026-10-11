@@ -8,7 +8,7 @@
  *
  * OoT layout on MM's mask-page grid (maskVtx, 6 cols x 4 rows). The equipment grid takes the
  * RIGHT FOUR columns (2..5) — exactly OoT's 4x4 equipment cursor space:
- *   col 0 = upgrades column (quiver / bomb bag / strength / scale — OoT rows 1:1)
+ *   col 0 = passive column (Magic Cape / Pendant of Memories; lower two sockets empty)
  *   cols 1..3 = equipment (row 0 swords, row 1 shields, row 2 tunics, row 3 boots)
  * The Link doll fills the LEFT area (player's LIVE skeleton rendered into an isolated
  * framebuffer — gfx_create_framebuffer + gsSPSetFB/gsSPResetFB, the SoH pause-Link technique).
@@ -92,7 +92,7 @@ static s16 sEquipCursorY = 0; // 0..3 — OoT cursorY space
 static s16 sTransformCursor = 0;
 
 // The 4x4 grid lives on the mask page's own vertices: equipment cols 1..3 on maskVtx columns 3..5,
-// and the UPGRADE column (col 0: Cape/Pendant toggles + strength/scale) on maskVtx column 0 — the
+// and the PASSIVE column (col 0: Cape/Pendant toggles) on maskVtx column 0 — the
 // free carved blocks at the far LEFT of the page (columns 1-2 sit under the Link doll panel).
 // Keeping stock grid cells means the shared cursor tables (sItemMaskCursorsX/Y, indexed by
 // cursorXIndex/cursorYIndex) position the drawn cursor for free.
@@ -195,15 +195,11 @@ static void* KaleidoEquip_OotTex(const char* path) {
 
 // ---------------------------------------------------------------------------
 // Left column (col 0) — Skijer 2026-07-29 (kaleido re-layout):
-//   row 0 = MAGIC CAPE          (A toggles the cloth visibility; its half-cost passive is always on)
+//   row 0 = MAGIC CAPE          (A opens Show/Hide cloth choices; its half-cost passive is always on)
 //   row 1 = PENDANT OF MEMORIES (A toggles its whole moveset)
-//   row 2 = RESERVED ext slot 1 } freed when quiver / bomb bag / STRENGTH / SWIM all moved to the
-//   row 3 = RESERVED ext slot 2 } quest page. Placeholder icon, hoverable, A error-beeps.
+//   rows 2/3 = empty. Strength/swim upgrades live on the quest page; these sockets have no items.
 // "Value" here = the cell is populated (drives landability + draw).
 // ---------------------------------------------------------------------------
-#define EQUIP_UPGRADE_ROW_RESERVED_1 2
-#define EQUIP_UPGRADE_ROW_RESERVED_2 3
-
 // Page-2 grid rows. The BOOTS row is NOT C-assignable: all three are real boots (equipped with A),
 // and its middle id (0xEA) belongs to the Pendant of Memories in the inventory/C-button id space.
 #define EQUIP_EXT_ROW_BOOTS 3
@@ -214,9 +210,6 @@ static s16 KaleidoEquip_UpgradeValue(s16 row) {
             return ExtEquip_CapeOwned();
         case 1:
             return ExtEquip_PendantOwned();
-        case EQUIP_UPGRADE_ROW_RESERVED_1:
-        case EQUIP_UPGRADE_ROW_RESERVED_2:
-            return 1; // reserved: always drawn/hoverable until the item that lands here is decided
     }
     return 0;
 }
@@ -231,10 +224,6 @@ static void* KaleidoEquip_UpgradeIcon(s16 row, s16 value) {
             return ExtEquip_GetCapeIcon();
         case 1:
             return ExtEquip_GetPendantIcon();
-        // Rows 2/3 = the two reserved ext slots (see KaleidoEquip_UpgradeValue).
-        case EQUIP_UPGRADE_ROW_RESERVED_1:
-        case EQUIP_UPGRADE_ROW_RESERVED_2:
-            return KaleidoEquip_OotTex("__OTR__textures/icon_item_custom/gItemIconReservedSlotTex");
     }
     return NULL;
 }
@@ -785,6 +774,8 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
                 }
             }
         }
+        pauseCtx->cursorItem[PAUSE_MASK] = PAUSE_ITEM_NONE;
+        gExtEquipGridNameContext = false;
         KaleidoScope_MoveCursorToSpecialPos(play, PAUSE_CURSOR_PAGE_LEFT);
         return;
     EQUIPMENT_CURSOR_VALID:;
@@ -873,17 +864,20 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
     if ((pauseCtx->state == PAUSE_STATE_MAIN) && (pauseCtx->mainState == PAUSE_MAIN_STATE_IDLE)) {
         if (CHECK_BTN_ALL(input->press.button, BTN_A)) {
             if (sEquipCursorX == 0) {
-                // Skijer 2026-07-16 (OoT-rework 1:1): A on upgrade row 0 toggles the Magic Cape's
-                // VISIBILITY (its half-cost passive stays active while owned); A on row 1 toggles the
-                // Pendant of Memories moveset. Solid icon = ON, half-transparent = OFF.
+                // Cape A opens an explicit appearance choice; its half-cost passive stays active.
+                // Pendant A toggles its moveset. Solid icon = ON, half-transparent = OFF.
                 if ((sEquipCursorY == 0) && ExtEquip_CapeOwned()) {
-                    ExtEquip_ToggleCapeVisibility();
-                    Audio_PlaySfx(NA_SE_SY_DECIDE);
+                    if (PauseItemDesc_ShowCapeVisibility(play, 3)) {
+                        pauseCtx->itemDescriptionOn = true;
+                        Audio_PlaySfx(NA_SE_SY_DECIDE);
+                    } else {
+                        Audio_PlaySfx(NA_SE_SY_ERROR);
+                    }
                 } else if ((sEquipCursorY == 1) && ExtEquip_PendantOwned()) {
                     ExtEquip_TogglePendantEffect();
                     Audio_PlaySfx(NA_SE_SY_DECIDE);
                 } else {
-                    Audio_PlaySfx(NA_SE_SY_ERROR); // strength/scale rows: view-only (OoT behavior)
+                    Audio_PlaySfx(NA_SE_SY_ERROR);
                 }
             } else {
                 KaleidoEquip_EquipCell(play, sEquipCursorY, sEquipCursorX);
@@ -1163,7 +1157,7 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
             KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, tex, 32, 32, 0);
         }
     } else {
-        // --- Upgrades column (col 0): Cape / Pendant toggles + strength / scale (OoT-rework 1:1) ---
+        // --- Passive column (col 0): owned Cape / Pendant toggles; lower sockets remain empty ---
         // Own vertices at the page's left-edge sockets (OoT x = -114), not maskVtx column 0.
         KaleidoEquip_BuildUpgradeColVtx(pauseCtx);
         for (row = 0; row < 4; row++) {

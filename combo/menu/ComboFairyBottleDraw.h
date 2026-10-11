@@ -86,7 +86,8 @@ static int ComboFairyBottle_DrawVfx(PlayState* play, const char* shell) {
     gSPEndDisplayList(&material[3]);
     gSPEndDisplayList(&material[4]);
     Matrix_Push();
-    const float scale = ComboFairyBottle_IsBundledShell(shell) ? .008f : .004f;
+    // Enlarge only the GI-local fairy; the casing and actor assets retain their scale.
+    const float scale = (ComboFairyBottle_IsBundledShell(shell) ? .008f : .004f) * 1.5f;
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
     OPEN_DISPS(play->state.gfxCtx);
 #ifdef COMBO_FAIRY_HOST_MM

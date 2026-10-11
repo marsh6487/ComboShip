@@ -63,7 +63,7 @@ source = source.replace('/* PRODUCTION */', production)
 oot_production = '\n'.join(function(oot_draw, name) for name in [
     'Randomizer_DrawProgressiveKokiriSword', 'Randomizer_DrawProgressiveMasterSword', 'Randomizer_DrawProgressiveBGS',
     'Randomizer_DrawExtFourSwordPresentation', 'Randomizer_DrawExtFourSword'])
-oot_production += '\n'+'\n'.join(function(oot, name) for name in ['Spin', 'HasLegacyGiMod', 'NeiGi_DrawEffects', 'NeiGi_DrawImpl'])
+oot_production += '\n'+'\n'.join(function(oot, name) for name in ['Spin', 'HasLegacyGiMod', 'PresentationShimmer', 'NeiGi_DrawEffects', 'NeiGi_DrawImpl'])
 # The full TU declares these private effect helpers before NeiGi_DrawImpl.
 # Keep their exact production signatures, but fail if a sword enters that lane.
 elemental_boundaries = '\n'.join(

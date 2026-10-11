@@ -14,8 +14,8 @@ import tempfile
 from run_mm_scene_randomization_tests import function
 
 ROOT = Path(__file__).resolve().parents[2]
-body = function((ROOT / 'soh/soh/Enhancements/randomizer/NeiGiPresentation.cpp').read_text(),
-                'NeiGi_FillCrossGameInfo')
+owner = (ROOT / 'soh/soh/Enhancements/randomizer/NeiGiPresentation.cpp').read_text()
+body = '\n'.join(function(owner, name) for name in ('PresentationShimmer', 'NeiGi_FillCrossGameInfo'))
 source = r'''
 #include <cassert>
 #include <cstring>
@@ -27,6 +27,7 @@ struct Vec3f {float x,y,z;};
 struct Presentation {
     void (*draw)(); const char* opaque; const char* translucent; float scale;
     Kind effect; Vec3f effectCenter; bool alwaysShimmer;
+    Kind shimmer=Kind::Neutral;
 };
 void Randomizer_DrawCaneSomariaUpgrade() {}
 bool mod, selectedSword, resources; int enabled;
@@ -138,10 +139,12 @@ int main() {
         if(selection==4 && award.first==RI_OOT_EXT_FOUR_SWORD)
             assert(authored && "A generic MM Kokiri GI mod must not own the OoT-authored Four Sword");
         assert(info.neiShimmer==int(award.second)+1);
-        assert(info.itemShimmer==(NeiGi::IsSword(award.second)||effects));
+        const bool intrinsic=NeiGi::IsSword(award.second)||award.first==RI_OOT_EXT_CANE_OF_BYRNA;
+        assert(info.itemShimmer==(intrinsic||effects));
         draws=0; fitCalls=0; sizeCalls=0;
         {MM_NeiGiFallbackShimmer fallback(award.first);}
-        assert(draws==(NeiGi::IsSword(award.second) ? 2 : effects) && "selected sword mesh lost its intrinsic particles");
+        assert(draws==(NeiGi::IsSword(award.second) ? 2 : int(intrinsic||effects)) &&
+               "selected equipment lost intrinsic shimmer or sword energy");
         assert(fitCalls==int(NeiGi::IsSword(award.second)) && "only sword fallbacks enter the model-fit boundary");
         assert(sizeCalls==2*int(NeiGi::IsSword(award.second)) && "only swords size the separate model and effect passes");
         assert(pushes==0);

@@ -404,22 +404,16 @@ static ComboFairyBottleShell GetItem_EmptyBottleShell(s16 drawId) {
     if (shell.opaque != gGiEmptyBottleCorkDL || shell.glass != gGiEmptyBottleGlassDL) {
         return shell; // Other two-pass items retain their native recipe.
     }
-    // Keep this selection separate from the fairy's Blue Fire/mod precedence.
+    // Explicit empty-bottle mods retain their complete casing.
     return ComboFairyBottle_BundledShell(shell, shell.opaque, shell.glass, ResourceMgr_IsModAsset,
                                          ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/EmptyOpaque") &&
                                              ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/EmptyXlu"));
 }
 
 static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
-    ComboFairyBottleShell shell = ComboFairyBottle_SelectShell(
-        (const char*)sDrawItemTable[drawId].drawResources[0], (const char*)sDrawItemTable[drawId].drawResources[1],
-        gGiEmptyBottleCorkDL, gGiEmptyBottleGlassDL, ResourceMgr_IsModAsset,
-        "__OTR__@oot:objects/object_gi_fire/gGiBlueFireChamberstickDL",
-        (ResourceMgr_IsModAssetForGame("oot", "objects/object_gi_fire/gGiBlueFireChamberstickDL") ||
-         ResourceMgr_IsCustomAssetForGame("oot", "objects/object_gi_fire/gGiBlueFireChamberstickDL")));
-    return ComboFairyBottle_BundledShell(shell, (const char*)sDrawItemTable[drawId].drawResources[0],
-                                         (const char*)sDrawItemTable[drawId].drawResources[1], ResourceMgr_IsModAsset,
-                                         ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/EmptyXlu"));
+    // Content models such as Blue Fire can bake a flame into their shell.
+    // Reuse the empty bottle's selected casing without inheriting any content.
+    return GetItem_EmptyBottleShell(GID_BOTTLE);
 }
 
 #define COMBO_FAIRY_HOST_MM

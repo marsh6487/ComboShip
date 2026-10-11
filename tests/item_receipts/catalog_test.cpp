@@ -70,6 +70,7 @@ u8 gItemSlots[77]{};
 u32 gBitFlags[32] = {1, 2, 4};
 u8 Nei_BulletBagLevel() { return std::min<int>(3, neiSave.ootUpgrades & 7); }
 }
+#include "receipt_fairy_grants.inc"
 
 namespace Rando::StaticData {
 
@@ -869,6 +870,160 @@ int main(int argc, char** argv) {
   assert(D_801CFE04[healing] == 255 && D_801CFE1C[healing] == 150 && D_801CFE34[healing] == 230);
   const int time = ITEM_SONG_TIME - ITEM_SONG_SONATA;
   assert(D_801CFE04[time] == 98 && D_801CFE1C[time] == 177 && D_801CFE34[time] == 211);
+  const auto tableBeforeEquipment = play.msgCtx.messageTableNES;
+  const RandoItemId nativeEquipment[] = {RI_SWORD_KOKIRI, RI_SWORD_RAZOR,
+                                         RI_SWORD_GILDED, RI_GREAT_FAIRY_SWORD,
+                                         RI_SHIELD_HERO,  RI_SHIELD_MIRROR};
+  std::vector<std::string> equipmentBodies;
+  std::vector<MessageTableEntry> equipmentMessages;
+  equipmentBodies.reserve(std::size(nativeEquipment));
+  for (const auto id : nativeEquipment) {
+    const auto &item = Rando::StaticData::Items.at(id);
+    const auto text = Player_GetItemReceiptTextId(item.getItemId, item.itemId);
+    assert(text);
+    equipmentBodies.emplace_back(
+        std::string(MESSAGE_HEADER_SIZE, '\0') + "Native MM tutorial: " +
+        (id == RI_SHIELD_MIRROR ? "Mirror Shield" : item.name) +
+        "!\x10"
+        "Equip and press \xB1 or \xB4.\xBF");
+    const auto &body = equipmentBodies.back();
+    equipmentMessages.push_back(
+        {text, 0, body.data(), static_cast<uint32_t>(body.size())});
+  }
+  equipmentMessages.push_back({0xFFFF, 0, nullptr, 0});
+  play.msgCtx.messageTableNES = equipmentMessages.data();
+  for (const auto id : nativeEquipment) {
+    entry = {};
+    entry.icon = 0xE7;
+    const auto before = gSaveContext;
+    assert(Rando::ApplyItemReceiptText(id, entry));
+    assert(entry.msg.find("Native MM tutorial") != std::string::npos &&
+           "MM equipment must keep its own full native tutorial");
+    auto equipmentBody = entry.msg;
+    std::replace(equipmentBody.begin(), equipmentBody.end(), '\x11', ' ');
+    assert(equipmentBody.find(Rando::StaticData::Items.at(id).name) !=
+           std::string::npos);
+    assert(entry.icon == 0xE7 && entry.msg.find('\xB1') != std::string::npos);
+    assert(!entry.autoFormat &&
+           !std::memcmp(&before, &gSaveContext, sizeof(before)));
+  }
+  play.msgCtx.messageTableNES = tableBeforeEquipment;
+  const RandoItemId importedEquipment[] = {
+      RI_OOT_MASTER_SWORD,  RI_OOT_BIGGORON_SWORD, RI_OOT_DEKU_SHIELD,
+      RI_OOT_MIRROR_SHIELD, RI_OOT_BOTTLE_FISH,    RI_OOT_BOTTLE_BUGS,
+      RI_OOT_BOTTLE_POE,    RI_OOT_BOTTLE_BIG_POE};
+  const auto donorBeforeEquipment = donorReady;
+  donorReady = false;
+  for (int language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+    gSaveContext.options.language = language;
+    for (const auto id : importedEquipment) {
+      entry = {};
+      entry.icon = 0xE7;
+      const auto before = gSaveContext;
+      assert(Rando::ApplyItemReceiptText(id, entry));
+      assert(entry.msg.find('\x10') != std::string::npos &&
+             entry.msg.size() < 1269);
+      assert(
+          entry.msg.find(id >= RI_OOT_BOTTLE_BIG_POE && id <= RI_OOT_BOTTLE_POE
+                             ? '\xB2'
+                             : '\xB0') != std::string::npos);
+      assert(entry.icon == 0xE7 && !entry.capeVisibilityChoice &&
+             entry.receiptPresentation.singleBox == 0);
+      assert(!std::memcmp(&before, &gSaveContext, sizeof(before)));
+    }
+  }
+  gSaveContext.options.language = LANGUAGE_ENG;
+  donorReady = donorBeforeEquipment;
+  std::cout
+      << "PASS MM native equipment tutorials and imported sword/shield/bottle "
+         "cold fallback, locales, icons and save isolation\n";
+  // Shuffled fairy receipts use their own dungeon, with the pending grant
+  // included once. The current scene and shared scene index are unrelated.
+  const RandoItemId fairies[] = {
+      RI_WOODFALL_STRAY_FAIRY, RI_SNOWHEAD_STRAY_FAIRY,
+      RI_GREAT_BAY_STRAY_FAIRY, RI_STONE_TOWER_STRAY_FAIRY};
+  const char *fairyTemples[] = {"Woodfall Temple", "Snowhead Temple",
+                                "Great Bay Temple", "Stone Tower Temple"};
+  const char fairyColors[] = {0x06, 0x02, 0x03,
+                              0x04}; // native pink, green, blue, yellow
+  const auto beforeFairyReceipts = gSaveContext;
+  play.sceneId = SCENE_CLOCKTOWER;
+  gSaveContext.dungeonSceneSharedIndex = DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE;
+  for (int d = 0; d < 4; ++d) {
+    for (int current : {0, 7, 14}) {
+      for (int other = 0; other < 4; ++other)
+        gSaveContext.save.saveInfo.inventory.strayFairies[other] =
+            other == d ? current : 3;
+      const auto before = gSaveContext;
+      entry = {};
+      entry.icon = Rando::StaticData::GetIconForZMessage(fairies[d]);
+      assert(entry.icon ==
+             0xF1 + d); // Existing per-dungeon fairy icon sentinel.
+      assert(Rando::ApplyItemReceiptText(fairies[d], entry) &&
+             "MM fairy lost its pickup dialogue");
+      std::string flat = entry.msg;
+      std::replace(flat.begin(), flat.end(), '\x11', ' ');
+      assert(flat.find(Rando::StaticData::Items.at(fairies[d]).name) !=
+             std::string::npos);
+      assert(flat.find(fairyTemples[d]) != std::string::npos);
+      assert(flat.find(std::to_string(current + 1)) != std::string::npos);
+      assert(flat.find(current == 0 ? "stray fairy" : "stray fairies") !=
+             std::string::npos);
+      assert(std::count(entry.msg.begin(), entry.msg.end(), fairyColors[d]) ==
+                 3 &&
+             "fairy name, count and temple need their dungeon color code");
+      assert(flat.find(std::string(1, fairyColors[d]) + fairyTemples[d]) !=
+             std::string::npos);
+      assert(entry.icon == 0xF1 + d && !entry.autoFormat &&
+             entry.nextMessageID == 0xFFFF);
+      assert(!std::memcmp(&before, &gSaveContext, sizeof(before)) &&
+             "receipt granted or changed a fairy");
+    }
+  }
+  entry.msg = "Clock Town pickup";
+  assert(!Rando::ApplyItemReceiptText(RI_CLOCK_TOWN_STRAY_FAIRY, entry));
+  assert(entry.msg ==
+         "Clock Town pickup"); // Its single-fairy dialogue stays separate.
+  const auto beforeFairyGrants = neiSave;
+  for (int d = 0; d < 4; ++d) {
+    const int fc = FcCombo_ItemForNative(fairies[d]);
+    for (auto counts : {std::pair{7, 0}, std::pair{7, 3}, std::pair{3, 7},
+                        std::pair{14, 14}}) {
+      neiSave = {};
+      for (int other = 0; other < 4; ++other)
+        gSaveContext.save.saveInfo.inventory.strayFairies[other] =
+            other == d ? counts.first : 3;
+      neiSave.comboObtainedFc[fc] = counts.second + 2;
+      neiSave.comboAppliedFc[fc] = counts.second;
+      ApplyReceiptFcRegistry();
+      assert(
+          gSaveContext.save.saveInfo.inventory.strayFairies[d] ==
+              counts.first + 2 &&
+          "an older native fairy baseline must not become phantom FC grants");
+      assert(neiSave.comboObtainedFc[fc] == counts.second + 2);
+      assert(neiSave.comboAppliedFc[fc] == counts.second + 2);
+      assert(gFcCombo_SuppressRecord == 0);
+      for (int other = 0; other < 4; ++other)
+        if (other != d)
+          assert(gSaveContext.save.saveInfo.inventory.strayFairies[other] == 3);
+      const auto saveAfterGrant = gSaveContext;
+      const auto fcAfterGrant = neiSave;
+      ApplyReceiptFcRegistry();
+      assert(
+          !std::memcmp(&saveAfterGrant, &gSaveContext, sizeof(gSaveContext)));
+      assert(!std::memcmp(&fcAfterGrant, &neiSave, sizeof(neiSave)));
+    }
+  }
+  neiSave = beforeFairyGrants;
+  gSaveContext = beforeFairyReceipts;
+  std::cout
+      << "MM stray fairy receipts: four native colors/icons, first/8th/15th "
+         "counts, shuffled dungeon identity and save isolation passed\n";
+  std::cout
+      << "MM fairy FC materialization: preserved native baseline, exact copy "
+         "deficits, suppression and repeat reconciliation passed\n";
+  entry = {};
+  entry.icon = 0xF5;
   // Receipt is composed before GiveItem. The token's identity, never the
   // current scene, chooses the spider-house counter.
   play.sceneId = SCENE_CLOCKTOWER;

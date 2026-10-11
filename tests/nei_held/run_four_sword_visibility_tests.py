@@ -83,6 +83,7 @@ struct Vec3f { float x,y,z; };
 struct Presentation {
     void (*draw)(); const char* opaque; const char* translucent;
     float scale; Kind effect; Vec3f effectCenter; bool alwaysShimmer;
+    Kind shimmer=Kind::Neutral;
 };
 static bool altOn, din;
 #define CVAR_ENHANCEMENT(name) name
@@ -107,7 +108,7 @@ int ResourceMgr_IsModAssetForGame(const char* owner, const char* path) {
 bool HasSelectedSword(const Presentation& p,bool alt,bool (*available)(const char*)) {
     return SelectedSwordPath(p,alt,available) != nullptr;
 }
-''' + function(owner, "NeiGi_FillCrossGameInfo") + r'''
+''' + function(owner, "PresentationShimmer") + "\n" + function(owner, "NeiGi_FillCrossGameInfo") + r'''
 int main() {
     for (const char* path : {"objects/object_gi_sword_1/gGiKokiriSwordGuardDL",
                              "objects/object_gi_sword_1/gGiKokiriSwordBladeHiltDL"}) {

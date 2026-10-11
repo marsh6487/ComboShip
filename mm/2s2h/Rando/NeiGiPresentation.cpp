@@ -277,7 +277,7 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop, int mmPickup) {
                                ? info.ops[0].a * (3.14159265358979323846f / 32768.f)
                                : 0.f;
         if (!NeiGi_ValidScale(info.scale) || !NeiGi_Finite(tilt) || info.neiShimmer < 1 ||
-            info.neiShimmer > int(Kind::GiantsKnife) + 1)
+            info.neiShimmer > int(Kind::Last) + 1)
             return;
         const bool flame = tilt != 0.f && info.primColorXlu[3];
         // The native scroll/flame allocates before the shared renderer. Check
@@ -308,10 +308,11 @@ void MM_DrawNeiGi(const CwItemDrawInfo& info, bool shop, int mmPickup) {
     if (info.neiSomariaUpgrade)
         DrawOotSlateRuneFlame(255, 60, 60);
     const char* owner = std::strncmp(info.dlists[0], "__OTR__@oot-gi-base:", 20) == 0 ? "oot-gi-base" : "oot";
-    NeiGi_DrawPresentation(
-        play, info.dlists[0], info.xluStartIndex == 1 && info.dlistCount > 1 ? info.dlists[1] : nullptr, info.scale,
-        info.neiEffect, info.neiEffectCenter,
-        info.itemShimmer || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0), owner, shop, mmPickup);
+    NeiGi_DrawPresentation(play, info.dlists[0],
+                           info.xluStartIndex == 1 && info.dlistCount > 1 ? info.dlists[1] : nullptr, info.scale,
+                           info.neiEffect, info.neiEffectCenter,
+                           info.itemShimmer || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0), owner, shop,
+                           mmPickup, info.neiShimmer - 1);
     Matrix_Pop();
 }
 
@@ -360,6 +361,7 @@ bool MM_DescribeNeiGi(RandoItemId item, CwItemDrawInfo* out) {
         (describeForAssets ? describeForAssets(binding->slug, altAssets, &info) : describe(binding->slug, &info)) == 1;
     out->neiShimmer = info.neiShimmer;
     const bool mandatory = info.neiShimmer > 0 && (NeiGi::IsSword(static_cast<Kind>(info.neiShimmer - 1)) ||
+                                                   NeiGi::IsEquipment(static_cast<Kind>(info.neiShimmer - 1)) ||
                                                    item == RI_OOT_IRON_KNUCKLE_AXE || item == RI_OOT_NEI_MARIO_MASK);
     out->itemShimmer = mandatory || CVarGetInteger("gEnhancements.SkijerNEI.ItemEffects", 0);
     out->stateDependent = 2;
@@ -424,7 +426,7 @@ MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer(RandoItemId item, bool shop, in
         return;
     CwItemDrawInfo info{};
     MM_DescribeNeiGi(item, &info);
-    mEnabled = info.itemShimmer && info.neiShimmer > 0 && info.neiShimmer <= static_cast<int>(Kind::GiantsKnife) + 1;
+    mEnabled = info.itemShimmer && info.neiShimmer > 0 && info.neiShimmer <= static_cast<int>(Kind::Last) + 1;
     if (mEnabled)
         mKind = static_cast<Kind>(info.neiShimmer - 1);
     if (mEnabled) {

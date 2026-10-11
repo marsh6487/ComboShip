@@ -79,7 +79,7 @@ def verify(soh_archive=None, mm_archive=None, tp_baseline=None):
                     assert eye, "emission escaped the irises"
                     emission += 1
                 protected_changes += word != old and not chain
-        assert emission == protected_changes == 522
+        assert emission == protected_changes == 536
     for game, path in (("soh", soh_archive), ("mm", mm_archive)):
         if path:
             with zipfile.ZipFile(path) as archive:

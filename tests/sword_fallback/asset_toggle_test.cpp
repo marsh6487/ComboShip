@@ -29,6 +29,7 @@ int32_t OOT_NeiResourceExists(const char* path){
 struct Presentation {
     const char* opaque;const char* translucent;float scale;Kind effect;
     struct{float x,y,z;}effectCenter{};bool alwaysShimmer=true;void(*draw)()=nullptr;
+    Kind shimmer=Kind::Neutral;
 };
 const Presentation kMmKokiriPresentation={"__OTR__objects/nei_gi_redesign/mm_kokiri_sword/gi_dl",nullptr,1,Kind::KokiriSword};
 const Presentation kPresentations[]={

@@ -99,6 +99,8 @@ int main(int argc, char** argv) {
     const bool transformOnly = std::strcmp(argv[1], "transform") == 0;
     const bool mixerOnly = std::strcmp(argv[1], "mixer") == 0;
     const bool defaultsOnly = std::strcmp(argv[1], "defaults") == 0;
+    const bool dashOnly = std::strcmp(argv[1], "dash") == 0;
+    const bool exertionOnly = std::strcmp(argv[1], "exertion") == 0;
     PlayState play{};
     Player player{};
     Camera camera{};
@@ -163,6 +165,96 @@ int main(int argc, char** argv) {
     ShipInit::InitAll();
 #endif
     publish();
+    if (exertionOnly) {
+#ifdef WOLF_AUDIO_MM
+        WolfLinkForm_PlayTransformSfx(1);
+        const auto* transform = sWolfAudio.voices[0].clip;
+        for (s32 variant = 0; variant < 3; ++variant) {
+            WolfLinkForm_PlayExertionSfx();
+            const auto* huff = &kWolfClips[12 + variant];
+            check(sWolfAudio.voices[1].clip == huff && sWolfAudio.voices[0].clip == transform,
+                  "climb exertion must use authentic Huff_A variants without "
+                  "replacing transform audio");
+            check(huff->rate == 16000 && huff->count >= 5299 && huff->count <= 5780,
+                  "climb exertion must preserve each supplied huff's original rate "
+                  "and duration");
+            std::vector<s16> output(2 * std::ceil(huff->count * kWolfOutputRate / huff->rate), 0);
+            mix(output.data(), output.size() / 2);
+            check(std::any_of(output.begin(), output.end(), [](s16 value) { return value != 0; }),
+                  "authentic exertion PCM must reach the native stereo mixer");
+            s16 tail[4]{};
+            mix(tail, 2);
+            check(!sWolfAudio.voices[1].clip, "each exertion huff must finish without native-loop renewal");
+            publish();
+        }
+        check(playerEvents.empty() && !WolfLinkForm_OwnsPlayerAction(),
+              "exertion audio must not emit a human voice or take over native "
+              "climbing controls");
+        WolfLinkForm_PlayExertionSfx();
+        play.transitionTrigger = TRANS_TRIGGER_START;
+        publish();
+        check(!sWolfAudio.voices[1].clip, "scene fades must stop outstanding exertion playback");
+        std::puts("PASS supplied MM Wolf climb exertion: exact Huff_A variants, original "
+                  "duration, native mixer, independent transform and fade cleanup");
+#else
+        check(false, "exertion dispatch applies to the MM native climb hook");
+#endif
+        return 0;
+    }
+    if (dashOnly) {
+#ifdef WOLF_AUDIO_MM
+        resetMove();
+        player.cylinder.dim.radius = 12;
+        ProcDashInit(&player, &play);
+        check(playerEvents.size() == 1 && playerEvents.back() == NA_SE_PL_ROLL_DUST - SFX_FLAG,
+              "MM dash dust must use the native one-frame cue, which expires without refresh");
+        playerEvents.clear();
+        for (s32 i = 0; i < 3; ++i)
+            tick();
+        check(sWolf.proc == PROC_WOLF_DASH && playerEvents.empty(),
+              "ongoing dash startup must not renew the one-frame dust cue");
+        sWolf.character.curFrame = kADashAnm.cancel + 1;
+        tick();
+        check(sWolf.proc == PROC_WOLF_MOVE && sWolf.dashModeTimer > 0,
+              "dash startup ends before the retained movement speed boost");
+        for (s32 i = 0; i < 80; ++i)
+            tick();
+        check(std::none_of(playerEvents.begin(), playerEvents.end(),
+                           [](u16 id) { return id == NA_SE_PL_ROLL_DUST || id == NA_SE_PL_ROLL_DUST - SFX_FLAG; }),
+              "Wolf locomotion must not renew MM roll-dust audio after dash startup");
+
+        resetMove();
+        for (s32 i = 0; i < 6; ++i) {
+            player.actor.world.pos.x += 6;
+            tick();
+        }
+        check(!requests.empty() && sWolf.chainPlaying, "real movement must start the owned chain before fade interruption");
+        const Request movingChain = requests.back();
+        WolfLinkForm_PlayTransformSfx(1);
+        ProcWaitAttackInit(&player, &play, 0);
+        check(sWolfAudio.voices[0].clip && sWolfAudio.voices[1].clip && WolfLinkForm_OwnsPlayerAction(),
+              "fade interruption must start with live transform and attack voices and action ownership");
+        const size_t beforeFadeStops = stops.size();
+        play.transitionTrigger = TRANS_TRIGGER_START;
+        publish();
+        WolfLinkForm_SuspendAction(&player);
+        check(stops.size() == beforeFadeStops + 1 && stops.back() == std::make_pair(movingChain.pos, movingChain.id),
+              "fade interruption must stop precisely the owned movement sound");
+        check(!sWolfAudio.voices[0].clip && !sWolfAudio.voices[1].clip && !WolfLinkForm_OwnsPlayerAction() &&
+                  WolfLinkForm_IsReady() && WolfLinkForm_IsSelected() && WolfLinkForm_SpeedMultiplier() == 1 &&
+                  player.cylinder.dim.radius == 12,
+              "fade interruption must clear Wolf audio and actions while retaining presentation and native collision");
+        player.cylinder.dim.radius = 17;
+        WolfLinkForm_SuspendAction(&player);
+        WolfLinkForm_ApplyCollisionShape(&player);
+        check(stops.size() == beforeFadeStops + 1 && player.cylinder.dim.radius == 17,
+              "repeated fade suspension must preserve native collision without retriggering audio cleanup");
+        std::puts("PASS production MM dash audio: expiring startup cue, no renewal through DASH/MOVE, fade audio/action release with retained model");
+#else
+        check(false, "dash case applies to the MM native audio bank");
+#endif
+        return 0;
+    }
     if (defaultsOnly) {
         check(audioCvars.empty() && audioIntegerCvars.empty(), "the default-volume check must have no stored CVars");
         check(std::fabs(sWolfAudio.settingsGain - 0.4f) < 0.0001f,

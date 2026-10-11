@@ -41,7 +41,8 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
                                     bool shimmer, const char* owner, bool shop = false, float tilt = 0.f,
                                     bool fit = true, int mmPickup = 0);
 // Owner-aware mesh/effect composition used by both foreign GI directions.
+// A separate shimmer palette never changes the authored bounds or energy identity.
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
-                            const float center[3], bool shimmer, const char* owner, bool shop = false,
-                            int mmPickup = 0);
+                            const float center[3], bool shimmer, const char* owner, bool shop = false, int mmPickup = 0,
+                            int shimmerKind = -1);
 }

@@ -63,7 +63,9 @@ int OotMask_CursorIndex(void) {return maskIndex;} s32 TradeAdult_CursorIndex(voi
 u8 WeaponUpgrade_KokiriLevel(void) {return swordLevel;} u8 WeaponUpgrade_HasTrueMaster(void) {return trueMaster;}
 u8 WeaponUpgrade_HasGreatFairy(void) {return greatFairy;} u8 WeaponUpgrade_HasHammerAxe(void) {return hammerAxe;}
 int ExtEquip_GetPage(void) {return extPage;}
-u8 ExtEquip_CapeOwned(void) {return 1;} u8 ExtEquip_PendantOwned(void) {return 1;}
+static u8 capeOwned=1, capeVisible=1;
+u8 ExtEquip_CapeOwned(void) {return capeOwned;} u8 ExtEquip_CapeVisible(void) {return capeVisible;}
+u8 ExtEquip_PendantOwned(void) {return 1;}
 u8 Sw97_IsBowItem(u16) {return 0;} u8 Sw97_IsSlingItem(u16) {return 0;} u8 Sw97_EffectiveElement(u8) {return 0;}
 #define SW97_MEDALLIONS_ENABLED() true
 static std::string shown;
@@ -91,16 +93,18 @@ def fixture(host):
         code += r'''
 struct MessageTableEntry {u16 textId;};
 struct Font {struct {char schar[1280];} msgBuf;};
-struct MessageContext {Font font; MessageTableEntry* messageTableNES; int msgLength,msgBufPos,textDrawPos,decodedTextLen; u16 currentTextId,nextTextId,unk1206C,unk12070,unk12074; int unk11F18,itemId,textboxY;};
+struct MessageContext {Font font; MessageTableEntry* messageTableNES; int msgLength,msgBufPos,textDrawPos,decodedTextLen; u16 currentTextId,nextTextId,unk1206C,unk12070,unk12074; int unk11F18,itemId,textboxY; u8 choiceIndex;};
 struct PauseContext {s16 cursorX[4],cursorY[4];};
 struct PlayState {MessageContext msgCtx; PauseContext pauseCtx;};
 static PlayState state; static PlayState* gPlayState=&state;
 static struct {int dungeonSceneSharedIndex; struct {int language;} options;} gSaveContext;
 namespace Rando {std::string GetDungeonMapCompassInfo(s32,bool) {return "map";}}
 namespace CustomMessage {
-struct Entry {u8 textboxType,textboxYPos,icon; u16 nextMessageID,firstItemCost,secondItemCost; std::string msg; bool autoFormat=true;};
+static bool shownCapeVisibilityChoice;
+struct Entry {u8 textboxType,textboxYPos,icon; u16 nextMessageID,firstItemCost,secondItemCost; std::string msg; bool autoFormat=true,capeVisibilityChoice=false;};
 void LoadCustomMessageIntoFont(const Entry& entry) {
     shown=entry.msg;
+    shownCapeVisibilityChoice=entry.capeVisibilityChoice;
     char* header=state.msgCtx.font.msgBuf.schar;
     header[0]=entry.textboxType;header[1]=entry.textboxYPos;header[2]=entry.icon;
     for(int i=3;i<11;++i)header[i]=char(0xFF);
@@ -126,6 +130,8 @@ void Message_LoadItemIcon(PlayState*,u8,int) {++iconLoads;}
             code += r'''
 bool PauseItemDesc_ShowItem(PlayState* p,u16 id,s32 page,u8 pos) {const char* t=PauseItemDesc_Get(id,page); if(!t)return false; PauseItemDesc_Show(p,t,pos);return true;}
 '''
+        if "PauseItemDesc_ShowCapeVisibility(" not in source:
+            code += "bool PauseItemDesc_ShowCapeVisibility(PlayState*,u8) {return false;}\n"
         code += r'''
 static std::string describe(u16 id,s32 page=PAUSE_ITEM) {shown.clear(); PauseItemDesc_ShowItem(&state,id,page,1);return shown;}
 int main() {
@@ -165,7 +171,18 @@ for(int row=0;row<4;++row) for(int col=1;col<=3;++col) {
     check(PauseItemDesc_ShowEquipment(&state,1,row,col,1),"MM every extended equipment cell opens");
 }
 shown.clear(); PauseItemDesc_ShowEquipment(&state,1,0,0,1); contains(shown,"Magic Cape","MM passive Cape distinct from Champion grid");
+contains(shown,"Show/Hide", "MM Cape helper teaches the A visibility popup");
+check(!CustomMessage::shownCapeVisibilityChoice,"C-Up Cape help remains a description without choices");
+check(PauseItemDesc_ShowCapeVisibility(&state,3),"MM Cape A popup opens through native pause template");
+check(CustomMessage::shownCapeVisibilityChoice,"MM Cape A popup arms existing Show/Hide choices");
+check(state.msgCtx.choiceIndex==0,"visible Cape initially selects Show cape");
+Message_DecodeHeader(&state);check(state.msgCtx.itemId==0xFE,"Cape visibility popup remains iconless");
+capeVisible=0;check(PauseItemDesc_ShowCapeVisibility(&state,3),"hidden Cape can reopen appearance choices");
+check(state.msgCtx.choiceIndex==1,"hidden Cape initially selects Hide cape");
+capeOwned=0;check(!PauseItemDesc_ShowCapeVisibility(&state,3),"unowned Cape cannot open appearance choices");
+capeOwned=capeVisible=1;
 PauseItemDesc_ShowEquipment(&state,0,2,2,1); contains(shown,"Fireproof","MM Goron tunic teaches actual fireproof effect");
+check(!CustomMessage::shownCapeVisibilityChoice,"ordinary equipment help clears Cape appearance choices");
 PauseItemDesc_ShowEquipment(&state,0,2,3,1); contains(shown,"electric shock","MM Zora tunic teaches actual electric immunity");
 PauseItemDesc_ShowEquipment(&state,0,3,2,1); contains(shown,"knockback","MM Iron Boots teach actual knockback effect");
 PauseItemDesc_ShowEquipment(&state,1,1,0,1); contains(shown,"Pendant","MM passive Pendant distinct from Climb grid");
@@ -177,6 +194,7 @@ contains(describe(ITEM_EXT_SWORD_1,PAUSE_MASK),"Cosmetic", "MM Byrna preserves h
 static MessageTableEntry secondTable[]={{0x1702},{0xFFFF}}; state.msgCtx.messageTableNES=secondTable;
 describe(EXT_ITEM_PHANTOM_HOURGLASS); check(chosenTemplate==0x1702,"MM template refreshes when message table changes");
 state.msgCtx.messageTableNES=nullptr; check(!PauseItemDesc_ShowItem(&state,EXT_ITEM_PHANTOM_HOURGLASS,PAUSE_ITEM,1),"MM no template fails closed");
+check(!PauseItemDesc_ShowCapeVisibility(&state,3),"MM Cape popup fails closed without a native pause template");
 state.msgCtx.messageTableNES=table;
 '''
     else:

@@ -1,6 +1,6 @@
 #include "z_kaleido_scope.h"
 #include "textures/icon_item_static/icon_item_static.h"
-#include "assets/soh_assets.h"          // gItemIconReservedSlotTex (left-column reserved cells)
+#include "assets/soh_assets.h"
 #include "soh/ResourceManagerHelpers.h" // ResourceMgr_LoadTexOrDListByName (missing-icon probe)
 #include "textures/parameter_static/parameter_static.h"
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h"
@@ -13,13 +13,9 @@
 // Left column of the equipment page (Skijer, latest 2026-07-29 — mirror of 2ship):
 //   row 0 = MAGIC CAPE          (A toggles the cloth visibility; its half-cost passive is always on)
 //   row 1 = PENDANT OF MEMORIES (A toggles its whole moveset)
-//   row 2 = RESERVED ext slot 1 } freed when quiver/bullet bag, bomb bag, STRENGTH and SWIM all moved
-//   row 3 = RESERVED ext slot 2 } to the quest page. Placeholder icon, hoverable, A error-beeps.
+//   rows 2/3 = empty. Strength and swim upgrades remain on the quest page.
 // Rows 0/1 draw solid = toggle ON, half-transparent = OFF (the spiritual-stones visual from
 // z_kaleido_collect.c).
-#define EQUIP_UPGRADE_ROW_RESERVED_1 2
-#define EQUIP_UPGRADE_ROW_RESERVED_2 3
-
 static s32 KaleidoEquip_UpgradeCellAvailable(s16 cursorY) {
     if (cursorY == 0) {
         return ExtEquip_CapeOwned();
@@ -27,7 +23,7 @@ static s32 KaleidoEquip_UpgradeCellAvailable(s16 cursorY) {
     if (cursorY == 1) {
         return ExtEquip_PendantOwned();
     }
-    return true; // reserved: always drawn/hoverable until the item that lands here is decided
+    return false;
 }
 
 static u8 sEquipmentItemOffsets[] = {
@@ -369,25 +365,24 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
         // kaleido tab switching (the freed button — see NGCKaleidoSwitcher).
         bool ngcModeEq = CVarGetInteger(CVAR_ENHANCEMENT("NGCKaleidoSwitcher"), 0) != 0;
         s16 freedBtnEq = ngcModeEq ? BTN_Z : BTN_L;
-        // Page cycle with the freed shoulder button: vanilla → ext (if ExtEquip on)
-        // → transform (if Crossover Items on) → vanilla. Works even when ExtEquip is
-        // off (then it's just vanilla ↔ transform). Entering the transform page is
+        // Page cycle with the freed shoulder button: vanilla → ext
+        // → transform (if Crossover Items on) → vanilla. The equipment grid is
+        // reachable independently of the legacy behavior toggle, as in MM.
+        // Entering the transform page is
         // handled here; leaving it is handled in KaleidoEquip_TransformInput.
         if (CHECK_BTN_ALL(input->press.button, freedBtnEq) && ExtEquip_CanSwitch()) {
             bool switched = false;
-            if (ExtEquip_IsEnabled() && ExtEquip_GetPage() == 0) {
+            if (ExtEquip_GetPage() == 0) {
                 ExtEquip_SwitchPage(); // vanilla → ext
                 extEquipPage = (ExtEquip_GetPage() == 1);
                 switched = true;
             } else if (BrokenItems_Enabled()) {
-                if (ExtEquip_IsEnabled()) {
-                    ExtEquip_SwitchPage(); // drop ext back to vanilla underneath the transform page
-                    extEquipPage = (ExtEquip_GetPage() == 1);
-                }
+                ExtEquip_SwitchPage(); // drop ext back to vanilla underneath the transform page
+                extEquipPage = (ExtEquip_GetPage() == 1);
                 sBrokenTransformPage = 1;
                 sTransformCursor = BrokenItems_CurrentForm();
                 switched = true;
-            } else if (ExtEquip_IsEnabled()) {
+            } else {
                 ExtEquip_SwitchPage(); // ext → vanilla (no transform page available)
                 extEquipPage = (ExtEquip_GetPage() == 1);
                 switched = true;
@@ -651,7 +646,7 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
             } else if (pauseCtx->cursorY[PAUSE_EQUIP] == 1 && ExtEquip_PendantOwned()) {
                 cursorItem = ITEM_EXT_BOOTS_2;
             } else {
-                // Unowned passives and reserved slots have no name.
+                // Unowned passives and empty slots have no name.
                 cursorItem = PAUSE_ITEM_NONE;
             }
         } else {
@@ -692,7 +687,7 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
         }
 
         // (The age-based greying for the strength/quiver capacity labels moved to the quest page with
-        // those cells — the left column holds the Cape, the Pendant and 2 reserved slots now.)
+        // those cells — the left column holds the Cape and the Pendant.)
 
         KaleidoScope_SetCursorVtx(pauseCtx, cursorSlot * 4, pauseCtx->equipVtx);
 
@@ -1015,11 +1010,6 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
                 }
             }
-        } else {
-            // Rows 2/3 = the two RESERVED slots (Skijer 2026-07-29). The quiver/bullet-bag, bomb-bag,
-            // strength and swim capacities all live on the quest page now, so nothing here is
-            // age-dependent any more — just the placeholder art.
-            KaleidoScope_DrawQuadTextureRGBA32(play->state.gfxCtx, (void*)gItemIconReservedSlotTex, 32, 32, 0);
         }
         // Draw inventory screen icons
         for (k = 0, bit = rowStart, point = 4; k < 3; k++, point += 4, temp++, bit++) {

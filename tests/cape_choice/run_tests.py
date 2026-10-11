@@ -66,8 +66,16 @@ def main():
                 production += ('\n#include "soh/Enhancements/savestate_serialize.h"\n' +
                                '\n'.join(declarations) + '\n' + serializer)
             fixture = (ROOT / 'tests/cape_choice/native_choice_test.c').read_text()
+            update_prefix = ''
+            if game == 'mm':
+                # Execute the actual pre-switch dispatch, including whether it calls
+                # the Cape handler before reveal/intro modes process their input.
+                update = function(engine, 'Message_Update')
+                update_prefix = update[:update.index('    msgCtx->stickAdjX')]
+                update_prefix = update_prefix.replace('Message_Update(', 'Message_UpdateCapePrefix(', 1) + '}\n'
             test = build / (game + '.c')
-            test.write_text(fixture.replace('/* PRODUCTION_CHOICE */', production))
+            test.write_text(fixture.replace('/* PRODUCTION_CHOICE */', production)
+                            .replace('/* PRODUCTION_UPDATE_PREFIX */', update_prefix))
             binary = build / game
             extra = ['-DCAPE_TEST_MM'] if game == 'mm' else []
             subprocess.run([os.environ.get('CC', 'cc'), '-std=gnu11', *flags(game), *extra, *sanitize,

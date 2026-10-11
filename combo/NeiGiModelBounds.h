@@ -46,6 +46,16 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
         return mDepthHigh - mDepthLow > 2.f * (mHigh - mLow) ? 1.5707963267948966f : 0.f;
     }
 
+    float ShieldRollZ() const {
+        static_assert(TrackDepth);
+        // After standing an arm-local XZ mesh up, its face can still point
+        // sideways. Use spans, not distance from the off-center grip origin.
+        // Bounds cannot identify a sideways face inside a square rim. Leave
+        // ambiguous frames alone; correct only a clearly longer X axis.
+        const float height = ShieldTiltX() != 0.f ? mDepthHigh - mDepthLow : mHigh - mLow;
+        return mWidthHigh - mWidthLow > 1.05f * height ? -1.5707963267948966f : 0.f;
+    }
+
     bool RestoresModelView() const {
         for (int row = 0; row < 4; ++row)
             for (int column = 0; column < 4; ++column)
@@ -107,6 +117,8 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
                 mHigh = std::max(mHigh, y);
                 mRadius = std::max(mRadius, std::hypot(x, transformed[2]));
                 if constexpr (TrackDepth) {
+                    mWidthLow = std::min(mWidthLow, x);
+                    mWidthHigh = std::max(mWidthHigh, x);
                     mDepthLow = std::min(mDepthLow, transformed[2]);
                     mDepthHigh = std::max(mDepthHigh, transformed[2]);
                 }
@@ -270,6 +282,7 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
     Load& mLoad;
     float mSin, mCos, mLow = std::numeric_limits<float>::max(), mHigh = -std::numeric_limits<float>::max();
     float mRadius = 0;
+    float mWidthLow = std::numeric_limits<float>::max(), mWidthHigh = -std::numeric_limits<float>::max();
     float mDepthLow = std::numeric_limits<float>::max(), mDepthHigh = -std::numeric_limits<float>::max();
     size_t mVertices = 0, mCommands = 0;
     Matrix mMatrix{ { { { 1, 0, 0, 0 } }, { { 0, 1, 0, 0 } }, { { 0, 0, 1, 0 } }, { { 0, 0, 0, 1 } } } };

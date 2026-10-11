@@ -58,7 +58,7 @@ int ResourceMgr_IsModAssetForGame(const char* game, const char* path) {
 }
 
 constexpr int MTXMODE_APPLY = 1, G_MTX_MODELVIEW = 2, G_MTX_LOAD = 4, G_TX_RENDERTILE = 0;
-constexpr int GID_FAIRY = 0, GID_SONG_GENERIC = 0x75, kMaxMatEntries = 8;
+constexpr int GID_FAIRY = 0, GID_BOTTLE = 2, GID_SONG_GENERIC = 0x75, kMaxMatEntries = 8;
 MtxF current, initial, loaded[2];
 MtxF nativePlacement{0, 3, 0, .01f, .01f, .01f};
 std::vector<MtxF> stack;
@@ -150,7 +150,7 @@ struct ResourceManagerScope {
 }
 struct ComboForeignDrawInfo {
     int count = 4;
-    const char* dls[4] = {opaque, glass, fairy, "__OTR__@mm:matrix"};
+    const char* dls[4] = {genericOpaque, genericGlass, fairy, "__OTR__@mm:matrix"};
     const char* matAnimPath = "texAnim";
     int drawKind = CW_DRAW_KIND_MM_FAIRY_CONTAINER, xluStart = 1, neiEffect = 0, neiShimmer = 0;
     int opCount = 0;
@@ -289,8 +289,7 @@ void Reset(uint32_t frame) {
 }
 void CheckDraw(float contentsY, bool foreign) {
     assert(draws.size() == 3 && draws[0].stream == 0 && draws[1].stream == 1 && draws[2].stream == 1);
-    assert(draws[0].path == (selectedMods.count(genericGlass) ? genericOpaque : opaque));
-    assert(draws[1].path == (selectedMods.count(genericGlass) ? genericGlass : glass));
+    assert(draws[0].path == genericOpaque && draws[1].path == genericGlass);
     assert(draws[2].path == fairy && Same(draws[0].pose, initial) && Same(draws[1].pose, initial));
     auto expected = ComboFairyBottle_Sample(play.gameplayFrames);
     const auto& content = draws[2].pose;
@@ -306,25 +305,29 @@ int main() {
         selectedMods.clear();
         const char* paths[] = {opaque, glass, genericOpaque, genericGlass};
         for (int i = 0; i < 4; ++i) if (mask & (1 << i)) selectedMods.insert(paths[i]);
-        auto shell = ComboFairyBottle_SelectShell(opaque,glass,genericOpaque,genericGlass,ResourceMgr_IsModAsset,blueFire,mask&16);
-        bool blue = !(mask & 3) && (mask & 16), generic = !(mask & 3) && !blue && (mask & 12);
-        assert(shell.opaque == (blue ? blueFire : generic ? genericOpaque : opaque));
-        assert(shell.glass == (blue ? blueFire : generic ? genericGlass : glass));
+        if (mask & 16) selectedMods.insert(blueFire);
+        for (auto shell : {oot::GetItem_FairyBottleShell(0), mm::GetItem_FairyBottleShell(0)}) {
+            assert(shell.opaque == genericOpaque && shell.glass == genericGlass &&
+                   "bottled fairy must use the empty-bottle casing, even with selected Blue Fire/fairy models");
+        }
     }
-    auto shell = ComboFairyBottle_SelectShell(opaque,glass,genericOpaque,genericGlass,nullptr,blueFire,1);
-    assert(shell.opaque == opaque && shell.glass == glass);
     selectedMods.clear();
     customModels={blueFire};
-    assert(oot::GetItem_FairyBottleShell(0).opaque == blueFire &&
-           "XML TP shell imported in a built-in O2R was rejected as non-mod");
-    assert(ComboFairyBottle_IsBlueFireShell(mm::GetItem_FairyBottleShell(0).opaque));
+    assert(oot::GetItem_FairyBottleShell(0).opaque == genericOpaque &&
+           mm::GetItem_FairyBottleShell(0).opaque == genericOpaque &&
+           "built-in Blue Fire model must not inject its casing or embedded flame into the fairy");
     customModels.clear();
     bundledShell=true;
     assert(strstr(oot::GetItem_FairyBottleShell(0).glass,"combo_bottle_gi/EmptyXlu") &&
            strstr(mm::GetItem_FairyBottleShell(0).glass,"combo_bottle_gi/EmptyXlu") &&
            "fresh build with no optional bottle pack must still use the bundled TP casing");
     selectedMods={glass};
-    assert(oot::GetItem_FairyBottleShell(0).glass==glass && mm::GetItem_FairyBottleShell(0).glass==glass);
+    assert(strstr(oot::GetItem_FairyBottleShell(0).glass,"combo_bottle_gi/EmptyXlu") &&
+           strstr(mm::GetItem_FairyBottleShell(0).glass,"combo_bottle_gi/EmptyXlu"));
+    selectedMods={genericGlass};
+    assert(oot::GetItem_FairyBottleShell(0).glass==genericGlass && mm::GetItem_FairyBottleShell(0).glass==genericGlass);
+    assert(oot::GetItem_FairyBottleShell(0).opaque==oot::GetItem_EmptyBottleShell(GID_BOTTLE).opaque &&
+           mm::GetItem_FairyBottleShell(0).glass==mm::GetItem_EmptyBottleShell(GID_BOTTLE).glass);
     selectedMods.clear();bundledShell=false;
     for (uint32_t frame = 0; frame < 360; ++frame) {
         auto motion = ComboFairyBottle_Sample(frame), repeat = ComboFairyBottle_Sample(frame + 360);
@@ -334,7 +337,7 @@ int main() {
     }
     assert(!Near(ComboFairyBottle_Sample(0).x, ComboFairyBottle_Sample(27).x));
     assert(!Near(ComboFairyBottle_Sample(0).scaleX, ComboFairyBottle_Sample(1).scaleX));
-    puts("PASS fairy/TP BlueFire/generic shell precedence (all 32 selected-mod combinations) and full 360-frame motion envelope");
+    puts("PASS empty casing for all 32 Blue Fire/fairy/empty mod combinations and full 360-frame motion envelope");
     for (uint32_t frame : {0u,1u,27u}) {
         auto motion = ComboFairyBottle_Sample(frame);
         printf("fairy frame=%u offset=(%.5f,%.5f,%.5f) scale=(%.5f,%.5f,%.5f)\n", frame,
@@ -347,12 +350,12 @@ int main() {
         selectedMods.clear(); if (generic) selectedMods.insert(genericGlass);
         assert(oot::GetItem_GetDrawTableEntry(0,resources,8,&xluStart,&scale,&kind,colors) == 3);
         assert(kind == CW_DRAW_KIND_FAIRY && xluStart == 1 && resources[2] == fairy);
-        assert(resources[0] == (generic ? genericOpaque : opaque));
+        assert(resources[0] == genericOpaque);
         for (int capacity = 0; capacity < 3; ++capacity)
             assert(oot::GetItem_GetDrawTableEntry(0,resources,capacity,&xluStart,&scale,&kind,colors) == 0);
         assert(mm::GetItem_GetDrawTableEntry(0,resources,8,&xluStart,&scale,&scroll,&kind) == 4);
         assert(kind == CW_DRAW_KIND_MM_FAIRY_CONTAINER && xluStart == 1 && resources[2] == fairy && resources[3] == matrixPath);
-        assert(resources[0] == (generic ? genericOpaque : opaque));
+        assert(resources[0] == genericOpaque);
         for (int capacity = 0; capacity < 4; ++capacity)
             assert(mm::GetItem_GetDrawTableEntry(0,resources,capacity,&xluStart,&scale,&scroll,&kind) == 0);
         for (uint32_t frame : {0u,27u}) {
@@ -376,37 +379,37 @@ int main() {
     selectedMods = {blueFire};
     for (uint32_t frame : {0u,1u,27u}) {
         Reset(frame); oot::GetItem_DrawFairy(&play,0);
-        assert(draws.size() == 2 && draws[0].path == blueFire && draws[1].path == "fairy-vfx");
+        assert(draws.size() == 3 && draws[0].path == genericOpaque && draws[1].path == genericGlass && draws[2].path == "fairy-vfx");
         assert(skeletonDraws == 1 && animationFrame == (int)frame && Same(current,initial) && stack.empty());
         assert(fairyPrim[0] == 255 && fairyPrim[1] == 160 && fairyPrim[2] == 235);
         assert(fairyEnv[0] == 255 && fairyEnv[1] == 160 && fairyEnv[2] == 235);
         auto motion = ComboFairyBottle_Sample(frame);
-        assert(Near(draws[1].pose.x,initial.x-8+motion.x) && Near(draws[1].pose.y,initial.y-2+motion.y));
-        assert(Near(draws[1].pose.sx,2*motion.scaleX*.004f));
+        assert(Near(draws[2].pose.x,initial.x+motion.x) && Near(draws[2].pose.y,initial.y+motion.y));
+        assert(Near(draws[2].pose.sx,2*motion.scaleX*.006f));
         Reset(frame); mm::GetItem_DrawFairyContainer(&play,0);
-        assert(draws.size() == 2 && ComboFairyBottle_IsBlueFireShell(draws[0].path.c_str()) && draws[1].path == "fairy-vfx");
-        info.dls[0]=info.dls[1]=blueFire;
+        assert(draws.size() == 3 && draws[0].path == genericOpaque && draws[1].path == genericGlass && draws[2].path == "fairy-vfx");
+        info.dls[0]=genericOpaque; info.dls[1]=genericGlass;
         Reset(frame); OOT_DrawForeignFairyContainer(&play,&info);
-        assert(draws.size() == 2 && draws[0].path == blueFire && draws[1].path == "fairy-vfx" && foreignRestores == 1);
+        assert(draws.size() == 3 && draws[0].path == genericOpaque && draws[1].path == genericGlass && draws[2].path == "fairy-vfx" && foreignRestores == 1);
         Reset(frame); MM_DrawForeignFairy(&info);
-        assert(draws.size() == 2 && draws[0].path == blueFire && draws[1].path == "fairy-vfx" && foreignRestores == 1);
+        assert(draws.size() == 3 && draws[0].path == genericOpaque && draws[1].path == genericGlass && draws[2].path == "fairy-vfx" && foreignRestores == 1);
     }
     // The native contents billboard can include its own tiny sprite scale.
     // A real actor-derived fairy needs the bottle GI scale, not that scale twice.
     selectedMods.clear();
     Reset(27); mm::GetItem_DrawFairyContainer(&play,0);
     assert(draws.back().path == "fairy-vfx");
-    assert(Near(draws.back().pose.sx,2*ComboFairyBottle_Sample(27).scaleX*.004f) &&
+    assert(Near(draws.back().pose.sx,2*ComboFairyBottle_Sample(27).scaleX*.006f) &&
            "actor fairy inherited native billboard sprite scale and vanished");
-    info.dls[0]=opaque;info.dls[1]=glass;
+    info.dls[0]=genericOpaque;info.dls[1]=genericGlass;
     Reset(27); OOT_DrawForeignFairyContainer(&play,&info);
-    assert(Near(draws.back().pose.sx,2*ComboFairyBottle_Sample(27).scaleX*.004f));
+    assert(Near(draws.back().pose.sx,2*ComboFairyBottle_Sample(27).scaleX*.006f));
     selectedMods={blueFire};
     fairyResources = false; Reset(27); oot::GetItem_DrawFairy(&play,0);
-    assert(draws.size() == 2 && draws[0].path == blueFire && draws[1].path == fairy && skeletonDraws == 0);
+    assert(draws.size() == 3 && draws[0].path == genericOpaque && draws[1].path == genericGlass && draws[2].path == fairy && skeletonDraws == 0);
     selectedMods = {blueFire,glass};
-    assert(oot::GetItem_FairyBottleShell(0).opaque == opaque && mm::GetItem_FairyBottleShell(0).opaque == opaque);
-    puts("PASS selected TP BlueFire shell once, animated host-local fairy wings/glow in pink, no blue flame, native contents fallback");
+    assert(oot::GetItem_FairyBottleShell(0).opaque == genericOpaque && mm::GetItem_FairyBottleShell(0).opaque == genericOpaque);
+    puts("PASS empty shell despite selected Blue Fire, larger pink animated fairy, native contents fallback");
     selectedMods.clear(); bundledShell=true; fairyResources=true;
     info.dls[0]="__OTR__objects/combo_bottle_gi/EmptyOpaque";
     info.dls[1]="__OTR__objects/combo_bottle_gi/EmptyXlu";
@@ -423,7 +426,9 @@ int main() {
             const auto& pose=draws.back().pose;
             assert(draws.back().path=="fairy-vfx" && skeletonDraws==1);
             assert(moteDraws==1 && "accepted bundled fairy requires four local deterministic motes once at the incoming bottle pose");
-            assert(Near(pose.sx,2*ComboFairyBottle_SampleForShell(frame,info.dls[0]).scaleX*.008f) && "accepted bundled fairy must keep the 2x native skeleton scale");
+            assert(Near(pose.sx,2*ComboFairyBottle_SampleForShell(frame,info.dls[0]).scaleX*.012f) && "bundled fairy must increase its local draw scale by 50 percent");
+            assert(Same(draws[0].pose,initial) && Same(draws[1].pose,initial) &&
+                   "enlarging the fairy must preserve the physical bottle scale");
             assert(pose.y>=initial.y-17.001f && pose.y<=initial.y-2.999f &&
                    "bundled TP casing needs the fairy centered inside its body, without the vanilla sprite anchor");
             assert(std::abs(pose.x-initial.x)<=4.001f && std::abs(pose.z-initial.z)<=2.001f);

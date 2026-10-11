@@ -23,10 +23,13 @@ enum {
   GID_KEY_BOSS,
   GID_DUNGEON_MAP,
   GID_COMPASS,
+  GID_BOTTLE,
+  GID_FAIRY_CONTAINER,
   MTXMODE_APPLY = 1,
   SETUPDL_5 = 5
 };
 extern bool testAlt;
+extern bool testFairyEmptyMod;
 extern int testSpinRed;
 extern int testColors, testChanged, testEmblemChanged, testMissing,
     testLoadFail;

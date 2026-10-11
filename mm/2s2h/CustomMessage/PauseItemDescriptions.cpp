@@ -166,8 +166,7 @@ static const ItemDescEntry sExtEquipDescs[] = {
 };
 
 static const char* kMagicCapeDesc =
-    "Magic Cape. Halves every magic cost\nwhile owned; 1 MP items become free.\nA toggles "
-    "whether it is drawn.";
+    "Magic Cape. Halves every magic cost\nwhile owned; 1 MP items become free.\nA opens Show/Hide Cape.";
 static const char* kPendantDesc =
     "Pendant of Memories. Three extra B\nmoves: Mortal Draw, Ground Pound and\nParry Leap. "
     "A toggles the moveset.";
@@ -326,7 +325,8 @@ static u16 PauseItemDesc_GetTemplateTextId() {
     return 0;
 }
 
-static bool PauseItemDesc_ShowBody(PlayState* play, std::string desc, u8 textBoxPos, bool encoded) {
+static bool PauseItemDesc_ShowBody(PlayState* play, std::string desc, u8 textBoxPos, bool encoded,
+                                   bool capeVisibilityChoice = false) {
     if (play == NULL || desc.empty()) {
         return false;
     }
@@ -352,6 +352,7 @@ static bool PauseItemDesc_ShowBody(PlayState* play, std::string desc, u8 textBox
     entry.secondItemCost = 0xFFFF;
     entry.msg = std::move(desc);
     entry.autoFormat = !encoded;
+    entry.capeVisibilityChoice = capeVisibilityChoice;
     if (encoded) {
         ComboItemReceiptText::Wrap(entry.msg, sNESFontWidths, 160, entry.icon == 0xFE ? 300.0f : 240.0f);
         CustomMessage::EnsureMessageEnd(&entry.msg);
@@ -430,7 +431,8 @@ extern "C" u8 PauseItemDesc_ShowEquipment(PlayState* play, s16 subPage, s16 row,
     std::string tutorial;
     if (col == 0) {
         if ((row == 0 && ExtEquip_CapeOwned()) || (row == 1 && ExtEquip_PendantOwned())) {
-            tutorial = Passive(row);
+            tutorial =
+                row == 0 ? "Magic Cape.&All magic costs are halved while owned.&A opens Show/Hide Cape." : Passive(row);
         }
     } else if (subPage == 0) {
         tutorial = VanillaEquipment(row, col, WeaponUpgrade_KokiriLevel(), WeaponUpgrade_HasTrueMaster(),
@@ -440,6 +442,17 @@ extern "C" u8 PauseItemDesc_ShowEquipment(PlayState* play, s16 subPage, s16 row,
     }
     return !tutorial.empty() &&
            PauseItemDesc_ShowBody(play, ComboItemReceiptText::FromNeiMarkup(tutorial), textBoxPos, true);
+}
+
+extern "C" u8 PauseItemDesc_ShowCapeVisibility(PlayState* play, u8 textBoxPos) {
+    if (!ExtEquip_CapeOwned() ||
+        !PauseItemDesc_ShowBody(play, "Magic Cape. Its magic savings stay active while hidden.", textBoxPos, false,
+                                true)) {
+        return false;
+    }
+    // Show/Hide reflects the saved appearance preference; opening the popup changes no equipment state.
+    play->msgCtx.choiceIndex = ExtEquip_CapeVisible() ? 0 : 1;
+    return true;
 }
 
 extern "C" u8 PauseItemDesc_ShowForm(PlayState* play, s32 form, u8 textBoxPos) {

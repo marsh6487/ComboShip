@@ -75,19 +75,19 @@ for (const auto& sword : kPresentations) {
     assert(!effectSubmitted.empty() && matrix==1 && matrixY==0 && stack.empty());
   }
 }
-// Four Sword keeps intrinsic particles when optional shimmer is disabled.
+// Four Sword keeps intrinsic particles and its four-color equipment shimmer.
 for (const auto& sword : kPresentations) {
   if (sword.effect!=Kind::FourSword) continue;
   Reset(); ownerAlt=false;
   const float center[3]={sword.effectCenter.x,sword.effectCenter.y,sword.effectCenter.z};
   NeiGi_DrawPresentation(&play,sword.opaque,sword.translucent,sword.scale,
-                        int(sword.effect),center,false,"oot-gi-base");
+                        int(sword.effect),center,true,"oot-gi-base");
   const auto intrinsic=effectSubmitted;
   Reset(); ownerAlt=false; files.insert(sword.opaque);
   GetItemEntry custom{};custom.drawFunc=sword.draw;custom.gid=sword.nativeGid;
   assert(NeiGi_Draw(&play,&custom));
   assert(!intrinsic.empty() && effectSubmitted==intrinsic &&
-         "vanilla Four Sword ignored the optional shimmer setting");
+         "vanilla Four Sword lost its intrinsic particles/shimmer");
 }
 Reset();ownerAlt=false;
 std::cout<<"PASS native OoT swords/Four Sword: repeated custom/vanilla transitions use shipped geometry\n";

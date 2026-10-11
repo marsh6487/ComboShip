@@ -11,27 +11,6 @@ typedef struct {
     const char* glass;
 } ComboFairyBottleShell;
 
-// A fairy-specific mod owns its whole shell, including partial OPA/XLU packs.
-// Otherwise prefer the user's selected Blue Fire bottle model, then a selected
-// generic bottle. An unmodified Blue Fire chamberstick is never a bottle fallback.
-static inline ComboFairyBottleShell ComboFairyBottle_SelectShell(const char* opaque, const char* glass,
-                                                                 const char* genericOpaque, const char* genericGlass,
-                                                                 int (*isSelectedMod)(const char*),
-                                                                 const char* blueFire, int blueFireSelected) {
-    ComboFairyBottleShell shell = { opaque, glass };
-    if (isSelectedMod != 0 && !isSelectedMod(opaque) && !isSelectedMod(glass)) {
-        if (blueFire != 0 && blueFireSelected) {
-            // Repeated shell paths encode a single-piece shell across the ABI.
-            // Consumers submit it once; the Blue Fire flame is never selected.
-            shell.opaque = shell.glass = blueFire;
-        } else if (isSelectedMod(genericOpaque) || isSelectedMod(genericGlass)) {
-            shell.opaque = genericOpaque;
-            shell.glass = genericGlass;
-        }
-    }
-    return shell;
-}
-
 static inline int ComboFairyBottle_IsBlueFireShell(const char* path) {
     return path != 0 && strstr(path, "objects/object_gi_fire/gGiBlueFireChamberstickDL") != 0;
 }

@@ -17,6 +17,7 @@ FILES = ['TP_Transform_Wolf.wav', 'TP_Transform_Human.wav']
 FILES += [f'TP_WolfLink_Lunge{i}.wav' for i in range(1, 6)]
 FILES += [f'TP_WolfLink_JumpAttack{i}.wav' for i in range(1, 3)]
 FILES += [f'TP_WolfLink_Charge_Attack_A{i}.wav' for i in range(1, 4)]
+FILES += [f'TP_WolfLink_Huff_A{i}.wav' for i in range(1, 4)]
 
 
 def package(source):

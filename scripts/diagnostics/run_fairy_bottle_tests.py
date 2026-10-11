@@ -38,14 +38,17 @@ def native(namespace, path, draws, member, resource_type, rows, constants):
 def main():
     subprocess.run([sys.executable, '-B', str(ROOT / 'tests/fairy_bottle/run_receipt_tests.py')], check=True)
     bodies = native('oot', 'soh/src/code/z_draw.c', ['GetItem_DrawFairy'], 'dlists', 'Gfx*',
-                    ['{GetItem_DrawFairy,{(Gfx*)opaque,(Gfx*)glass,(Gfx*)fairy}}'],
+                    ['{GetItem_DrawFairy,{(Gfx*)opaque,(Gfx*)glass,(Gfx*)fairy}}',
+                     '{GetItem_DrawOpa0Xlu1,{(Gfx*)genericOpaque,(Gfx*)genericGlass}}',
+                     '{GetItem_DrawOpa0Xlu1,{(Gfx*)genericOpaque,(Gfx*)genericGlass}}'],
                     'const char* gGiBottleStopperDL=genericOpaque; const char* gGiBottleDL=genericGlass;\n'
                     'const char* gGiBlueFireChamberstickDL=blueFire;')
     bodies += 'void GetItem_Draw(PlayState* play,int id) { assert(ownerScope==1); ++hostFallbacks; oot::GetItem_Draw(play,id); }\n'
     bodies += native('mm', 'mm/src/code/z_draw.c', ['GetItem_DrawFairyContainer', 'GetItem_DrawFairyBottle'],
                      'drawResources', 'void*',
                      ['{GetItem_DrawFairyContainer,{opaque,glass,fairy,matrixPath}}',
-                      '{GetItem_DrawFairyBottle,{opaque,glass,fairy}}'],
+                      '{GetItem_DrawFairyBottle,{opaque,glass,fairy}}',
+                      '{GetItem_DrawOpa0Xlu1,{genericOpaque,genericGlass}}'],
                      'const char* gGiEmptyBottleCorkDL=genericOpaque; const char* gGiEmptyBottleGlassDL=genericGlass;\n'
                      'int ResourceMgr_IsModAsset(const char* path) {return ::ResourceMgr_IsModAsset(path);}')
     source = (ROOT / 'combo/menu/ComboForeignDrawOOT.h').read_text()

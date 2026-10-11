@@ -14,7 +14,7 @@ struct WolfAudioClip {
 };
 #include "assets/wolf_link_sfx_pcm.inc"
 
-enum class WolfAudioCue { Enter, Exit, Bite, Jump, Spin };
+enum class WolfAudioCue { Enter, Exit, Bite, Jump, Spin, Exertion };
 struct WolfAudioVoice {
     const WolfAudioClip* clip = nullptr;
     double position = 0;
@@ -23,7 +23,7 @@ struct WolfAudioVoice {
 struct WolfAudioState {
     std::mutex mutex;
     std::array<WolfAudioVoice, 2> voices{}; // transform and attack can overlap
-    std::array<std::uint32_t, 3> variants{};
+    std::array<std::uint32_t, 4> variants{};
     bool live = false;
     bool paused = false;
     float settingsGain = 0;
@@ -72,6 +72,10 @@ static void WolfAudio_Play(WolfAudioCue cue, float gain) {
             break;
         case WolfAudioCue::Spin:
             clip = 9 + (sWolfAudio.variants[2]++ % 3);
+            voice = 1;
+            break;
+        case WolfAudioCue::Exertion:
+            clip = 12 + (sWolfAudio.variants[3]++ % 3);
             voice = 1;
             break;
     }

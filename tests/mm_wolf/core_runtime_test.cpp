@@ -13,6 +13,7 @@
 static std::string assetDirectory;
 static int colliderInitializations, colliderDestructions, attackRegistrations;
 static Collider* lastAttack;
+static std::vector<u16> fixturePlayerSfx;
 static std::map<std::string, int32_t> integerCvars;
 static std::map<std::string, float> floatCvars;
 static std::map<std::string, std::string> locatedFiles;
@@ -94,7 +95,8 @@ s16 Math_Atan2S_XY(f32 x, f32 y) {
 s16 Camera_GetInputDirYaw(Camera*) {
     return 0;
 }
-void Player_PlaySfx(Player*, u16) {
+void Player_PlaySfx(Player*, u16 id) {
+    fixturePlayerSfx.push_back(id);
 }
 void AudioSfx_PlaySfx(u16, Vec3f*, u8, f32*, f32*, s8*) {}
 void AudioSfx_StopByPosAndId(Vec3f*, u16) {}

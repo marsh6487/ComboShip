@@ -107,8 +107,12 @@ static void HGrace_SpawnFairySparkles(Player* p, PlayState* play) {
 
 static void HGrace_SpawnWarpSparkles(PlayState* play, Vec3f* center) {
     Vec3f pos, vel, accel;
-    Color_RGBA8 primColor = { 100, 255, 150, 255 };
-    Color_RGBA8 envColor = { 0, 200, 100, 255 };
+    Color_RGBA8 primColor = { 255, 180, 220, 255 };
+    Color_RGBA8 envColor = { 255, 100, 180, 255 };
+    if (hgForcedBySpell) {
+        primColor = (Color_RGBA8){ 100, 255, 150, 255 };
+        envColor = (Color_RGBA8){ 0, 200, 100, 255 };
+    }
 
     accel.x = accel.y = accel.z = 0.0f;
 
@@ -136,6 +140,21 @@ static void HGrace_SpawnWarpSparkles(PlayState* play, Vec3f* center) {
 // Wings: Vanilla gFairyWing1DL-4DL with segment 0x08 material setup matching
 //        EnElf_Draw (Gfx_SetupDL_27Xlu, G_RM_ZB_CLD_SURF2, pulsating envAlpha).
 // =============================================================================
+
+static s32 HGrace_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, Actor* thisx,
+                                   Gfx** gfx) {
+    if (limbIndex == FAIRY_LIMB_6) {
+        // The glow quad keeps the native fairy's independent orientation while
+        // the wings follow Link's heading. Preserve its animated world center.
+        Vec3f zero = { 0.0f, 0.0f, 0.0f };
+        Vec3f center;
+        Matrix_MultVec3f(&zero, &center);
+        Matrix_Translate(center.x, center.y, center.z, MTXMODE_NEW);
+        f32 scale = 0.008f * ((Math_SinS(play->gameplayFrames * 4096) * 0.1f) + 1.0f);
+        Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+    }
+    return false;
+}
 
 static void HGrace_DrawFairy(Actor* thisx, PlayState* play) {
     Player* p = (Player*)thisx;
@@ -166,12 +185,13 @@ static void HGrace_DrawFairy(Actor* thisx, PlayState* play) {
 
     // Position + scale at fairy location
     Matrix_Translate(p->actor.world.pos.x, p->actor.world.pos.y + 20.0f, p->actor.world.pos.z, MTXMODE_NEW);
+    Matrix_RotateY(BINANG_TO_RAD(p->actor.shape.rot.y), MTXMODE_APPLY);
     f32 pulse = (Math_SinS(play->gameplayFrames * 4096) * 0.1f) + 1.0f;
     f32 s = 0.008f * pulse;
     Matrix_Scale(s, s, s, MTXMODE_APPLY);
 
-    POLY_XLU_DISP =
-        SkelAnime_Draw(play, sPinkFairySkel.skeleton, sPinkFairySkel.jointTable, NULL, NULL, &p->actor, POLY_XLU_DISP);
+    POLY_XLU_DISP = SkelAnime_Draw(play, sPinkFairySkel.skeleton, sPinkFairySkel.jointTable, HGrace_OverrideLimbDraw,
+                                   NULL, &p->actor, POLY_XLU_DISP);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -333,7 +353,7 @@ static void HGrace_StateCasting(Player* p, PlayState* play) {
         }
     }
 
-    // Green sparkles during casting
+    // Pink sparkles during casting
     if (hgTimer > 10 && play->gameplayFrames % 4 == 0) {
         Vec3f sparklePos = p->actor.world.pos;
         sparklePos.y += 30.0f + Rand_ZeroFloat(30.0f);
@@ -341,8 +361,12 @@ static void HGrace_StateCasting(Player* p, PlayState* play) {
         sparklePos.z += Rand_CenteredFloat(20.0f);
         Vec3f vel = { 0.0f, 1.5f, 0.0f };
         Vec3f accel = { 0.0f, 0.0f, 0.0f };
-        Color_RGBA8 primColor = { 150, 255, 150, 255 };
-        Color_RGBA8 envColor = { 50, 200, 50, 255 };
+        Color_RGBA8 primColor = { 255, 180, 220, 255 };
+        Color_RGBA8 envColor = { 255, 100, 180, 255 };
+        if (hgForcedBySpell) {
+            primColor = (Color_RGBA8){ 150, 255, 150, 255 };
+            envColor = (Color_RGBA8){ 50, 200, 50, 255 };
+        }
         EffectSsKiraKira_SpawnFocused(play, &sparklePos, &vel, &accel, &primColor, &envColor, 600, 20);
     }
 }
@@ -370,7 +394,7 @@ static void HGrace_StateWarpEnter(Player* p, PlayState* play) {
         LinkAnimation_Update(play, &p->skelAnime);
     }
 
-    // Blue-green warp sparkles
+    // Pink warp sparkles
     if (hgTimer % 3 == 0) {
         Vec3f sparklePos = p->actor.world.pos;
         sparklePos.y += 40.0f;
@@ -378,8 +402,12 @@ static void HGrace_StateWarpEnter(Player* p, PlayState* play) {
         sparklePos.z += Rand_CenteredFloat(30.0f);
         Vec3f vel = { 0.0f, 2.0f, 0.0f };
         Vec3f accel = { 0.0f, -0.1f, 0.0f };
-        Color_RGBA8 primColor = { 100, 255, 200, 255 };
-        Color_RGBA8 envColor = { 0, 150, 255, 255 };
+        Color_RGBA8 primColor = { 255, 180, 220, 255 };
+        Color_RGBA8 envColor = { 255, 100, 180, 255 };
+        if (hgForcedBySpell) {
+            primColor = (Color_RGBA8){ 100, 255, 200, 255 };
+            envColor = (Color_RGBA8){ 0, 150, 255, 255 };
+        }
         EffectSsKiraKira_SpawnFocused(play, &sparklePos, &vel, &accel, &primColor, &envColor, 600, 20);
     }
 

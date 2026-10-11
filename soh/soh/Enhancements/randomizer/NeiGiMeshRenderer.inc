@@ -505,9 +505,11 @@ void NeiGi_DrawSagesTunicMedallions(PlayState* play, const char* owner) {
 }
 
 void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int effect,
-                            const float center[3], bool shimmer, const char* owner, bool shop, int mmPickup) {
+                            const float center[3], bool shimmer, const char* owner, bool shop, int mmPickup,
+                            int shimmerKind) {
     if (!play || !play->state.gfxCtx || !opa || !center || !NeiGi_ValidScale(scale) || !NeiGi_Finite(center[0]) ||
-        !NeiGi_Finite(center[1]) || !NeiGi_Finite(center[2]) || effect < 0 || effect > int(Kind::GiantsKnife))
+        !NeiGi_Finite(center[1]) || !NeiGi_Finite(center[2]) || effect < 0 || effect > int(Kind::GiantsKnife) ||
+        shimmerKind < -1 || shimmerKind > int(Kind::Last))
         return;
     const Kind kind = static_cast<Kind>(effect);
     const uint32_t bits = (uint32_t(play->gameplayFrames) * 2u) & 0xFFFFu;
@@ -565,7 +567,8 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
         NeiGi_DrawMesh(play, NeiGi::SampleSpecial(kind, play->gameplayFrames, camera, 1.f / fit.scale));
     Matrix_Pop();
     if (shimmer)
-        NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, camera, kind));
+        NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, camera,
+                                                  shimmerKind < 0 ? kind : static_cast<Kind>(shimmerKind)));
     Matrix_Pop();
     if (kind == Kind::SeasonCycle)
         NeiGi_DrawSeasonOverlay(play, 5, nullptr);
@@ -614,7 +617,7 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
 void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char* xlu, float scale, int shimmerKind,
                                     bool shimmer, const char* owner, bool shop, float tilt, bool fit, int mmPickup) {
     if (!play || !play->state.gfxCtx || !opa || !NeiGi_ValidScale(scale) || shimmerKind < 0 ||
-        shimmerKind > int(Kind::GiantsKnife))
+        shimmerKind > int(Kind::Last))
         return;
     NeiGi_ArenaScope arena(play, 2, 16, 16);
     if (!arena)
@@ -681,10 +684,9 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
     // Sword particles belong to the awarded sword, including mod geometry.
     if (sword) {
         ComboSwordGi_ApplyEffectFit(static_cast<Kind>(shimmerKind), shop, mmPickup);
-        NeiGi_DrawMesh(play, NeiGi::SampleSpecial(static_cast<Kind>(shimmerKind), play->gameplayFrames,
-                                                 NeiGi_CameraBasis(play),
-                                                 ComboSwordGi_ParticleScale(static_cast<Kind>(shimmerKind), shop,
-                                                                            mmPickup, fit)));
+        NeiGi_DrawMesh(play, NeiGi::SampleSpecial(
+                                 static_cast<Kind>(shimmerKind), play->gameplayFrames, NeiGi_CameraBasis(play),
+                                 ComboSwordGi_ParticleScale(static_cast<Kind>(shimmerKind), shop, mmPickup, fit)));
     }
     if (shimmer)
         NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play),

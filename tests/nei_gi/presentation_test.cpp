@@ -550,6 +550,9 @@ int main() {
     NeiGi_DrawPresentation(&play,guarded,nullptr,1,int(Kind::Fire),center,true,"oot");untouched();
   }
   Reset(); NeiGi_DrawPresentation(&play,guarded,nullptr,1,int(Kind::Ice),origin,true,"oot");untouched();
+  for(int identity:{-2,int(Kind::Last)+1}) {
+    Reset();NeiGi_DrawPresentation(&play,guarded,nullptr,1,int(Kind::Fire),origin,true,"oot",false,0,identity);untouched();
+  }
   NeiGi_DrawPresentation(&play,"__OTR__objects/arbitrary/gi_dl",nullptr,1,int(Kind::Fire),origin,true,"oot");untouched();
   Reset(); NeiGi::Mesh maximum;
   for(size_t i=0;i<maximum.vertices.size();++i)maximum.vertices[i]={{float(i%32),float(i/32),0},0xC8A0FF,255};
@@ -726,7 +729,8 @@ int main() {
   }
   std::cout << "PASS sword native/shared bindings: approved palettes and intrinsic particles\n";
 
-  // These items retain the shared optional shimmer with a gold halo. A neutral
+#include "tests/nei_gi/equipment_shimmer_checks.inc"
+  // These items retain their gold halo as intrinsic equipment shimmer. A neutral
   // binding would produce blue vertices even though the meshes themselves are gold.
   for (CustomDrawFunc draw : {Randomizer_DrawExtTrident, Randomizer_DrawExtRocBoots}) {
     Reset();
@@ -753,9 +757,9 @@ int main() {
     assert(gold && stack.empty());
     Reset();
     files.insert(binding->opaque);
-    assert(NeiGi_Draw(&play, &entry) && arena.empty());
+    assert(NeiGi_Draw(&play, &entry) && arena.size()==1);
   }
-  std::cout << "PASS Trident/Roc's Boots gold shimmer in native/shared draws and optional-off behavior\n";
+  std::cout << "PASS Trident/Roc's Boots gold shimmer in native/shared draws with either optional setting\n";
 
   // Rune identification survives the shared Slate silhouette and animation.
   std::set<uint32_t> runeHues;
@@ -1121,7 +1125,7 @@ int main() {
             // including alpha/UV/color. Camera and frame are the same.
             arena.clear();
             NeiGi_DrawMesh(&play, NeiGi::SampleShimmer(play.gameplayFrames, true,
-                               NeiGi_CameraBasis(&play), item.effect));
+                               NeiGi_CameraBasis(&play), PresentationShimmer(item)));
             assert(arena.size() == 1);
             const auto &want = arena.front();
             size_t matching = 0;
@@ -1217,7 +1221,7 @@ int main() {
       assert(flameColors.empty() && fallback==0 && vanilla==0 && stack.empty() && matrix==1 && matrixY==0);
 #ifdef COMBO_BUILD
       CwItemDrawInfo modInfo{}; assert(NeiGi_DescribeEntry(&modEntry,&modInfo));
-      assert(modInfo.drawKind==CW_DRAW_KIND_CUSTOM_GI && modInfo.neiEffect==0 && modInfo.neiShimmer==int(model.effect)+1);
+      assert(modInfo.drawKind==CW_DRAW_KIND_CUSTOM_GI && modInfo.neiEffect==0 && modInfo.neiShimmer==int(PresentationShimmer(model))+1);
       assert(!modInfo.neiSomariaUpgrade && !modInfo.primColorOpa[3] && !modInfo.primColorXlu[3]);
       const std::string slug=std::string(model.opaque).substr(std::strlen("__OTR__objects/nei_gi_redesign/"));
       CwItemDrawInfo ownerInfo{}; assert(OOT_GetNeiGiDrawInfo(slug.substr(0,slug.find('/')).c_str(),&ownerInfo));
@@ -1370,7 +1374,7 @@ int main() {
 #ifdef COMBO_BUILD
       CwItemDrawInfo info{};
       assert(OOT_GetNeiGiDrawInfoForAssets(test.slug,selectedAlt,&info)==1 && info.dlistCount==1 &&
-             std::string(info.dlists[0])==authored && info.neiShimmer==int(NeiGi::Kind::Neutral)+1);
+             std::string(info.dlists[0])==authored && info.neiShimmer>int(NeiGi::Kind::GiantsKnife)+1);
       // An MM replacement still needs the donor pass that its native drawer
       // uses. An unusable donor pass cannot be hidden by a host mod marker.
       invalidGiModels.clear();invalidGiModels.insert({"oot",selected[missing]});

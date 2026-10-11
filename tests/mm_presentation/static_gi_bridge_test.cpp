@@ -54,6 +54,7 @@ Item RetrieveItem(RandomizerGet rg) {return {rg};}
 int NeiGi_DescribeEntry(const GetItemEntry*,CwItemDrawInfo*) {return 0;}
 int ResourceMgr_IsModAssetForGame(const char*,const char*);
 int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char*,const char*,float*);
+int ResourceMgr_GetIkanaShieldGiPoseForGame(const char*,const char*,float*,float*);
 bool DrawOwnerActive();
 int GetItem_GetDrawTableEntry(int,void** dls,int,int*,float*,int*,uint8_t*) {
  assert(DrawOwnerActive());
@@ -193,6 +194,7 @@ std::set<std::string> hostResources,hostMods;
 int ResourceMgr_IsModAsset(const char* path) {return hostMods.contains(path);}
 int ResourceMgr_IsModAssetForGame(const char*,const char* path) {return ResourceMgr_IsModAsset(path);}
 int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char*,const char*,float*) {return 0;}
+int ResourceMgr_GetIkanaShieldGiPoseForGame(const char*,const char*,float*,float*) {return 0;}
 uint8_t ResourceMgr_FileExists(const char* path) {return hostResources.contains(path);}
 void* OotAssets_LoadGfx(const char* path) {return hostResources.contains(path)?(void*)path:nullptr;}
 void* OotAssets_LoadGfxDirect(const char* path) {return OotAssets_LoadGfx(path);}
@@ -449,6 +451,7 @@ int main() {
  useExport=true;info={};
  assert(ComboFillForeignDrawInfoOOT(1,info)==ComboForeignResolveOOT::Ok && "the exported Pendant English name must resolve the actual imported MM row");
  assert(info.count==2 && info.xluStart==1);
+ assert(info.itemShimmer && info.neiShimmer==int(NeiGi::Kind::PendantOfMemories)+1 && info.stateDependent && info.appearanceDependent);
  assert(std::string(info.dls[0])=="__OTR__@mm:objects/object_gi_reserve_c_01/gGiPendantOfMemoriesEmptyDL");
  assert(std::string(info.dls[1])=="__OTR__@mm:objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL");
  useExport=false;

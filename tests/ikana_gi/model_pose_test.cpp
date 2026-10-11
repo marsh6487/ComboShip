@@ -47,6 +47,32 @@ void List(Ship::ResourceManager& owner,const char* path,std::initializer_list<st
     for(auto [w0,w1]:words){Gfx cmd{};cmd.words.w0=w0;cmd.words.w1=w1;list->Instructions.push_back(cmd);}
     owner.files[path]=list;
 }
+void VertexPoints(Ship::ResourceManager& owner,const char* path,const std::vector<std::array<int16_t,3>>& points,bool binary){
+    if(binary){
+        auto vertices=std::make_shared<SOH::Array>();vertices->ArrayType=SOH::ArrayResourceType::Vertex;
+        vertices->ArrayCount=points.size();
+        for(auto point:points){Fast::F3DVtx v{};std::copy(point.begin(),point.end(),v.v.ob);vertices->Vertices.push_back(v);}
+        owner.files[path]=vertices;
+    }else{
+        auto vertices=std::make_shared<Fast::Vertex>();
+        for(auto point:points){Vtx v{};std::copy(point.begin(),point.end(),v.v.ob);vertices->VertexList.push_back(v);}
+        owner.files[path]=vertices;
+    }
+}
+void MatrixWords(Ship::ResourceManager& owner,const char* path,const std::array<uint32_t,16>& words){
+    auto matrix=std::make_shared<Fast::Matrix>();std::copy(words.begin(),words.end(),reinterpret_cast<uint32_t*>(&matrix->Matrx));
+    owner.files[path]=matrix;
+}
+struct ActualGeometry {
+    const char* name;
+    std::vector<std::array<int16_t,3>> points;
+    std::array<uint32_t,16> matrix;
+};
+/* ACTUAL_GEOMETRY */
+std::array<float,3> ApplyPose(std::array<float,3> p,float tilt,float roll){
+    const float y=p[1]*std::cos(tilt)-p[2]*std::sin(tilt),z=p[1]*std::sin(tilt)+p[2]*std::cos(tilt);
+    return {p[0]*std::cos(roll)-y*std::sin(roll),p[0]*std::sin(roll)+y*std::cos(roll),z};
+}
 void Vertices(Ship::ResourceManager& owner,const char* path,bool flat,bool binary){
     const int16_t y=flat?0:1000,z=flat?1000:20;
     std::array<std::array<int16_t,3>,4> points={{{-600,int16_t(-y),int16_t(-z)},{600,y,z},{-600,y,z},{600,int16_t(-y),int16_t(-z)}}};
@@ -78,12 +104,49 @@ int main(){
     Vertices(*mm,"vertices",false,false);Vertices(*mm,"alt/vertices",true,true);
     for(bool hostAlt:{false,true})for(bool donorAlt:{false,true}){
         mm->alt=hostAlt;oot->alt=donorAlt;
-        float tilt=-99;
+        float tilt=-99,roll=-99;
+        assert(ResourceMgr_GetIkanaShieldGiPoseForGame("oot",worn,&tilt,&roll)&&roll==0);
         assert(ResourceMgr_GetIkanaShieldGiTiltXForGame("oot",worn,&tilt));
         assert(std::abs(tilt-(donorAlt?0.f:float(M_PI/2)))<.0001f);
+        assert(ResourceMgr_GetIkanaShieldGiPoseForGame("mm",gi,&tilt,&roll)&&roll==0);
         assert(ResourceMgr_GetIkanaShieldGiTiltXForGame("mm",gi,&tilt));
         assert(std::abs(tilt-(hostAlt?float(M_PI/2):0.f))<.0001f);
         assert(Ship::context.active==mm&&mm->alt==hostAlt&&oot->alt==donorAlt);
+    }
+    // Actual repository/O2R vertices and binary scale matrix, with quarter-turn
+    // coordinate conversions. No mesh or matrix is rewritten in the source pack.
+    for(const auto& geometry:actualGeometry)for(bool binary:{false,true}) {
+        auto owner=oot;owner->alt=false;
+        MatrixWords(*owner,"actual_scale",geometry.matrix);
+        List(*owner,"actual_body",{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("actual_vertices")},
+                                  {geometry.points.size(),0},{uintptr_t(G_ENDDL)<<24,0}});
+        List(*owner,"actual_root",{{uintptr_t(G_MTX_OTR_FILEPATH)<<24,uintptr_t("actual_scale")},
+                                  {uintptr_t(G_DL_OTR_FILEPATH)<<24,uintptr_t("actual_body")},
+                                  {uintptr_t(G_POPMTX)<<24,64},{uintptr_t(G_ENDDL)<<24,0}});
+        for(int frame:{0,1,2})for(int originOffset:{0,6000}) {
+            auto points=geometry.points;
+            // Rz(+90) makes the authored chin -Y become +X. The third frame
+            // also puts the front normal in -Y, like an arm-local XZ shield.
+            if(frame)for(auto& p:points){auto q=p;p={int16_t(-q[1]),frame==1?q[0]:int16_t(-q[2]),frame==1?q[2]:q[0]};}
+            for(auto& p:points){p[0]+=originOffset;p[1]-=originOffset/2;p[2]+=originOffset/3;}
+            VertexPoints(*owner,"actual_vertices",points,binary);
+            float tilt=-99,roll=-99,legacyTilt=-99;
+            assert(ResourceMgr_GetIkanaShieldGiPoseForGame("oot","actual_root",&tilt,&roll));
+            assert(std::abs(tilt-(frame==2?float(M_PI/2):0.f))<.00001f);
+            assert(std::abs(roll-(frame?-float(M_PI/2):0.f))<.00001f);
+            assert(ResourceMgr_GetIkanaShieldGiTiltXForGame("oot","actual_root",&legacyTilt)&&legacyTilt==tilt);
+            const auto chin=ApplyPose(frame?std::array<float,3>{1,0,0}:std::array<float,3>{0,-1,0},tilt,roll);
+            assert(chin[1]<-.999f&&std::abs(chin[0])<.00001f&&"face chin must point down, not up");
+        }
+        std::cout<<"PASS selected serialized Ikana vertices/matrix: "<<geometry.name<<(binary?" binary":" XML")<<"; upright, sidewaysXY/XZ, off-center origins and chin-down sign\n";
+    }
+    // The tolerance intentionally leaves ambiguous near-square geometry alone.
+    for(int halfWidth:{1000,1049,1050,1060}) {
+        VertexPoints(*oot,"square_vertices",{{int16_t(-halfWidth),-1000,-20},{int16_t(halfWidth),1000,20}},false);
+        List(*oot,"square_root",{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("square_vertices")},{2,0},{uintptr_t(G_ENDDL)<<24,0}});
+        float tilt=-99,roll=-99;
+        assert(ResourceMgr_GetIkanaShieldGiPoseForGame("oot","square_root",&tilt,&roll)&&tilt==0);
+        assert(roll==(halfWidth>1050?-float(M_PI/2):0.f));
     }
     // Resource matrices contribute before the caller chooses an outer pose.
     auto matrix=std::make_shared<Fast::Matrix>();
@@ -96,10 +159,23 @@ int main(){
     oot->alt=false;oot->files["pose"]=matrix;
     List(*oot,"transformed",{{(uintptr_t(G_MTX_OTR_FILEPATH)<<24)|G_MTX_PUSH,uintptr_t("pose")},
                             {uintptr_t(G_DL_OTR_FILEPATH)<<24,uintptr_t("body")},{uintptr_t(G_ENDDL)<<24,0}});
-    float tilt=-99;
+    float tilt=-99,roll=-99;
+    assert(ResourceMgr_GetIkanaShieldGiPoseForGame("oot","transformed",&tilt,&roll)&&tilt==0&&roll==0);
     assert(ResourceMgr_GetIkanaShieldGiTiltXForGame("oot","transformed",&tilt)&&tilt==0);
+    // A descendant matrix can rotate the same planar geometry in its plane.
+    const float sidewaysMatrix[4][4]={{0,1,0,0},{-1,0,0,0},{0,0,1,0},{0,0,0,1}};
+    for(int row=0;row<4;++row)for(int col=0;col<4;col+=2){
+        const uint32_t a=int32_t(sidewaysMatrix[row][col]*65536),b=int32_t(sidewaysMatrix[row][col+1]*65536);
+        words[row*2+col/2]=(a&0xffff0000u)|(b>>16);words[8+row*2+col/2]=(a<<16)|(b&0xffffu);
+    }
+    Vertices(*oot,"vertices",false,false);
+    assert(ResourceMgr_GetIkanaShieldGiPoseForGame("oot","transformed",&tilt,&roll)&&tilt==0&&roll==-float(M_PI/2));
+    assert(ApplyPose({1,0,0},tilt,roll)[1]<-.999f);
     // Missing/invalid descendants decline the correction and restore Context.
-    oot->files["vertices"]=std::make_shared<Fast::Texture>();tilt=77;
+    oot->files["vertices"]=std::make_shared<Fast::Texture>();tilt=77;roll=88;
+    assert(!ResourceMgr_GetIkanaShieldGiPoseForGame("oot",worn,&tilt,&roll)&&tilt==77&&roll==88);
+    assert(!ResourceMgr_GetIkanaShieldGiPoseForGame("mm",gi,&tilt,nullptr));
+    assert(!ResourceMgr_GetIkanaShieldGiPoseForGame("mm",gi,nullptr,&roll));
     assert(!ResourceMgr_GetIkanaShieldGiTiltXForGame("oot",worn,&tilt)&&tilt==77);
     assert(!ResourceMgr_GetIkanaShieldGiTiltXForGame("unknown",gi,&tilt));
     assert(!ResourceMgr_GetIkanaShieldGiTiltXForGame(nullptr,gi,&tilt));

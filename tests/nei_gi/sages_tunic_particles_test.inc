@@ -66,7 +66,7 @@ int main() {
             SameMedallions(baseline,fit.scale,fit.lift);
             const auto paths=Drawn();
             assert(std::count(paths.begin(),paths.end(),model) == 1);
-            assert(arena.size() == size_t(effects) && "optional shimmer must remain independent of intrinsic medallions");
+            assert(arena.size() == 1 && "intrinsic Sage shimmer must survive either optional-effects setting");
             assert(stack.empty() && matrix==1 && matrixY==0);
 
             // The same shared composition is used by imported MM items and
@@ -76,11 +76,12 @@ int main() {
             info.drawKind=CW_DRAW_KIND_NEI_GI;
             info.dlists[0]="__OTR__@oot:objects/nei_gi_redesign/sages_tunic/gi_dl";
             info.dlistCount=1;info.xluStartIndex=-1;info.scale=1;
-            info.neiEffect=int(NeiGi::Kind::Neutral);info.itemShimmer=effects;
+            info.neiEffect=int(NeiGi::Kind::Neutral);info.itemShimmer=1;
+            info.neiShimmer=int(NeiGi::Kind::SagesTunic)+1;
             MM_DrawNeiGi(info,shop,shop?0:1);
             const auto foreignFit=NeiGi::FrameFit(*bounds,1,shop,shop?0:1);
             SameMedallions(baseline,foreignFit.scale,foreignFit.lift);
-            assert(arena.size()==size_t(effects) && stack.empty() && matrix==1 && matrixY==0);
+            assert(arena.size()==1 && stack.empty() && matrix==1 && matrixY==0);
             for(auto [begin,end]:{std::pair(opa,gfx.polyOpa.p),std::pair(xlu,gfx.polyXlu.p)}) {
                 int ownerDepth=0;
                 for(auto* p=begin;p!=end;++p) {

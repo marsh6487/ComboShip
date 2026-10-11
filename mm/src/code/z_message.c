@@ -30,8 +30,16 @@ void Message_SetCapeVisibilityChoice(int enabled) {
 
 static int Message_HandleCapeVisibilityChoice(PlayState* play) {
     MessageContext* msgCtx = &play->msgCtx;
-    if (!sCapeVisibilityChoice || msgCtx->msgMode != MSGMODE_TEXT_DONE ||
-        msgCtx->textboxEndType != TEXTBOX_ENDTYPE_TWO_CHOICE)
+    if (!sCapeVisibilityChoice)
+        return false;
+    // The equipment popup closes through the ordinary pause-description lifecycle.
+    // Canceling it leaves appearance unchanged; pickup receipts still require A.
+    if (play->pauseCtx.itemDescriptionOn && CHECK_BTN_ANY(play->state.input[0].press.button, BTN_B | BTN_START)) {
+        sCapeVisibilityChoice = false;
+        Message_CloseTextbox(play);
+        return true;
+    }
+    if (msgCtx->msgMode != MSGMODE_TEXT_DONE || msgCtx->textboxEndType != TEXTBOX_ENDTYPE_TWO_CHOICE)
         return false;
     // Fast-text B/C-up presses must never accept the appearance preference.
     if (CHECK_BTN_ALL(play->state.input[0].press.button, BTN_A) && Message_ShouldAdvance(play)) {
@@ -5887,6 +5895,12 @@ void Message_Update(PlayState* play) {
     u16 sp3E;
     s16 var_v1;
     u16 temp;
+
+    // Pause Cape choices can be canceled during reveal, intro, or final selection.
+    if (pauseCtx->itemDescriptionOn && CHECK_BTN_ANY(input->press.button, BTN_B | BTN_START) &&
+        Message_HandleCapeVisibilityChoice(play)) {
+        return;
+    }
 
     msgCtx->stickAdjX = input->rel.stick_x;
     msgCtx->stickAdjY = input->rel.stick_y;

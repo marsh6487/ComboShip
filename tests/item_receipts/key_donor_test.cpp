@@ -3,6 +3,9 @@
 #include "ComboItemReceiptText.h"
 #include "ComboDungeonKeyReceipt.h"
 #include "ComboMagicItemReceiptText.h"
+#if __has_include("ComboVanillaItemReceiptText.h")
+#include "ComboVanillaItemReceiptText.h"
+#endif
 #if __has_include("ComboKeyReceiptText.h")
 #include "ComboKeyReceiptText.h"
 #endif
@@ -23,15 +26,19 @@
 constexpr int ITEM_CATEGORY_JUNK = 0, ITEM_CATEGORY_MAJOR = 1, MF_RAW = 0;
 constexpr int ITEM_KEY_SMALL = 0xAF, ITEM_KEY_BOSS = 0x95, TEXTBOX_TYPE_BLUE = 2;
 constexpr int TEXT_RANDOMIZER_CUSTOM_ITEM = 0x9000;
+using TextBoxType = int;
+using TextBoxPosition = int;
+using ItemID = int;
+constexpr int ITEM_NONE = 0xFF, ITEM_ROCS_FEATHER_SKIJER = 0x9E;
 struct KeyRow { RandomizerGet id; const char* name; const char* article; const char* color; bool boss; };
 /* KEY_CATALOG */
 static int liveResolutions = 0;
-struct GetItemEntry { uint16_t textId = TEXT_RANDOMIZER_CUSTOM_ITEM; };
+struct GetItemEntry { uint16_t textId = TEXT_RANDOMIZER_CUSTOM_ITEM; int itemId = ITEM_NONE; };
 struct CustomMessage {
     std::string english;
     CustomMessage() = default;
     CustomMessage(std::string en, int = 0) : english(std::move(en)) {}
-    CustomMessage(std::string en, std::string, std::string, int = 0) : english(std::move(en)) {}
+    CustomMessage(std::string en, std::string, std::string, int = 0, int = 0) : english(std::move(en)) {}
     void Replace(const char* key, const CustomMessage& value) {
         size_t position = 0;
         while ((position = english.find(key, position)) != std::string::npos) {
@@ -63,6 +70,10 @@ struct CustomMessage {
 };
 namespace Rando::StaticData {
 std::map<std::string, RandomizerGet> itemNameToEnum;
+struct ItemName : std::string {
+    using std::string::string;
+    std::string GetEnglish() const { return *this; }
+};
 struct Item {
     RandomizerGet id;
     const KeyRow& Row() const {
@@ -70,7 +81,9 @@ struct Item {
         assert(false); return keyRows[0];
     }
     int GetCategory() { return ITEM_CATEGORY_MAJOR; }
-    std::string GetName() const { return Row().name; }
+    ItemName GetName() const { return Row().name; }
+    bool HasCustomIcon() const { return false; }
+    int GetItemID() const { return ITEM_NONE; }
     std::string GetArticle() const { return Row().article; }
     std::string GetColor() const { return Row().color; }
     std::shared_ptr<GetItemEntry> GetGIEntryUnresolved() const { return std::make_shared<GetItemEntry>(); }
@@ -87,6 +100,8 @@ static const char chestTutorial[] = "You got a Key!\x01It opens the next door in
 static MessageTableEntry nativeMessages[] = {{0x60, 0, smallTutorial, sizeof(smallTutorial) - 1},
     {0xC7, 0, bossTutorial, sizeof(bossTutorial) - 1}, {0xF3, 0, chestTutorial, sizeof(chestTutorial) - 1}, {0xFFFF, 0, nullptr, 0}};
 MessageTableEntry* sNesMessageEntryTablePtr = nativeMessages;
+MessageTableEntry* sGerMessageEntryTablePtr = nullptr;
+MessageTableEntry* sFraMessageEntryTablePtr = nullptr;
 struct CustomItemMessageEntry { int rgId, itemId; const char* english; const char* german; const char* french; };
 const CustomItemMessageEntry* GetCustomItemMessage(RandomizerGet) { return nullptr; }
 bool DungeonInformationEnabled() { return false; }

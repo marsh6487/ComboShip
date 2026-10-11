@@ -17,12 +17,14 @@
 #include "soh/Enhancements/randomizer/entrance.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance_tracker.h"
 #include "soh/FleetShipCombo/FleetComboIds.h"
+#include "soh/FleetShipCombo/FleetComboItems.h"
 #include "ComboSongDrawOOT.h"
 #include "ComboCapeReceiptChoice.h"
 #include "ComboItemReceiptPresentation.h"
 #include "ComboMagicItemReceiptText.h"
 #include "ComboKeyReceiptText.h"
 #include "ComboDungeonKeyReceipt.h"
+#include "ComboVanillaItemReceiptText.h"
 #include "soh/ShipInit.hpp"
 #include <soh/ResourceManagerHelpers.h>
 #ifdef COMBO_BUILD
@@ -90,6 +92,53 @@ extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled(void) {
 }
 
 extern "C" MessageTableEntry* sNesMessageEntryTablePtr;
+extern "C" MessageTableEntry* sGerMessageEntryTablePtr;
+extern "C" MessageTableEntry* sFraMessageEntryTablePtr;
+
+static bool BuildVanillaEquipmentBottleReceipt(RandomizerGet rg, CustomMessage& msg) {
+    auto item = Rando::StaticData::RetrieveItem(rg);
+    const auto* receipt = ComboVanillaItemReceiptText::Find(item.GetName().GetEnglish());
+    if (!receipt)
+        return false;
+    const auto readBank = [&](const MessageTableEntry* table, std::string& body, uint8_t& typePos) {
+        if (!table || !receipt->textId)
+            return false;
+        for (; table->textId != 0xFFFF; ++table) {
+            if (table->textId == receipt->textId && table->segment && table->msgSize) {
+                body.assign(table->segment, table->msgSize);
+                typePos = table->typePos;
+                return true;
+            }
+        }
+        return false;
+    };
+    std::string english, german, french;
+    uint8_t typePos = 0, localizedTypePos = 0;
+    if (readBank(sNesMessageEntryTablePtr, english, typePos)) {
+        if (!readBank(sGerMessageEntryTablePtr, german, localizedTypePos))
+            german = english;
+        if (!readBank(sFraMessageEntryTablePtr, french, localizedTypePos))
+            french = english;
+        // Native bytes already contain icons, colors, button glyphs and pages.
+        // AutoFormat would interpret them as markup and corrupt control arguments.
+        msg = CustomMessage(english, german, french, static_cast<TextBoxType>(typePos >> 4),
+                            static_cast<TextBoxPosition>(typePos & 0xF));
+        return true;
+    }
+    using ComboVanillaItemReceiptText::Language;
+    msg = CustomMessage(ComboVanillaItemReceiptText::Body(*receipt),
+                        ComboVanillaItemReceiptText::Body(*receipt, Language::German),
+                        ComboVanillaItemReceiptText::Body(*receipt, Language::French), TEXTBOX_TYPE_BLUE);
+    const auto gi = item.GetGIEntryUnresolved();
+    // Keep the existing custom bottle icon loader and ordinary native gear icon.
+    if (item.HasCustomIcon())
+        msg.AutoFormat(static_cast<ItemID>(item.GetItemID()));
+    else if (gi && gi->itemId != ITEM_NONE && gi->itemId < ITEM_ROCS_FEATHER_SKIJER)
+        msg.AutoFormat(static_cast<ItemID>(gi->itemId));
+    else
+        msg.AutoFormat();
+    return true;
+}
 void BuildQuarterHeartMessage(CustomMessage& msg);
 void BuildDefenseUpgradeMessage(CustomMessage& msg);
 void BuildSpeedUpgradeMessage(CustomMessage& msg);
@@ -116,7 +165,10 @@ extern "C" COMBO_EXPORT int32_t OOT_GetItemReceiptText(const char* itemName, cha
         // them here forced the receiving queue into generic name/icon text.
         std::string body;
         CustomMessage keyMessage;
-        if (BuildDungeonKeyReceiptMessage(rg, keyMessage)) {
+        if (BuildVanillaEquipmentBottleReceipt(rg, keyMessage)) {
+            if (!ComboItemReceiptText::FromOotMessage(keyMessage.GetEnglish(MF_RAW), body))
+                return 0;
+        } else if (BuildDungeonKeyReceiptMessage(rg, keyMessage)) {
             keyMessage.AutoFormat();
             if (!ComboItemReceiptText::FromOotMessage(keyMessage.GetEnglish(MF_RAW), body))
                 return 0;
@@ -378,6 +430,10 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
     } else {
         rgid = player->getItemId;
     }
+#ifdef COMBO_BUILD
+    if (BuildVanillaEquipmentBottleReceipt(static_cast<RandomizerGet>(rgid), msg))
+        return;
+#endif
 
     const bool dungeonKey = BuildDungeonKeyReceiptMessage(static_cast<RandomizerGet>(rgid), msg);
     if (!dungeonKey && (BuildDungeonItemReceiptMessage(static_cast<RandomizerGet>(rgid), msg) ||
@@ -590,6 +646,26 @@ void BuildComboForeignMessage(Player* player, CustomMessage& msg) {
                             for (const auto icon : { ITEM_CUSTOM, ITEM_SKULL_TOKEN, ITEM_DUNGEON_MAP, ITEM_COMPASS })
                                 msg.Replace(CustomMessage::ITEM_OBTAINED(icon), "");
                         return;
+                    }
+                    if (BuildVanillaEquipmentBottleReceipt(found->second, msg)) {
+                        // The foreign sentinel has no local item icon. Preserve
+                        // the native lesson without drawing an unrelated texture.
+                        std::string english, german, french;
+                        if (ComboItemReceiptText::WithoutOotItemIcons(msg.GetEnglish(MF_RAW), english) &&
+                            ComboItemReceiptText::WithoutOotItemIcons(msg.GetGerman(MF_RAW), german) &&
+                            ComboItemReceiptText::WithoutOotItemIcons(msg.GetFrench(MF_RAW), french)) {
+                            msg =
+                                CustomMessage(english, german, french, msg.GetTextBoxType(), msg.GetTextBoxPosition());
+                            msg.Replace(receiptName.c_str(), name);
+                            // Native content text can say "Fish" instead of "Bottle
+                            // with Fish". Keep the foreign display label on its own page.
+                            if (msg.GetEnglish(MF_RAW).find(name) == std::string::npos)
+                                msg = CustomMessage(name + '\x04' + msg.GetEnglish(MF_RAW),
+                                                    name + '\x04' + msg.GetGerman(MF_RAW),
+                                                    name + '\x04' + msg.GetFrench(MF_RAW), msg.GetTextBoxType(),
+                                                    msg.GetTextBoxPosition());
+                            return;
+                        }
                     }
                     const auto* custom = GetCustomItemMessage(found->second);
                     if (custom) {
@@ -834,6 +910,8 @@ void BuildItemMessage(u16* textId, bool* loadFromMessageTable) {
 bool BuildTokenReceiptMessage(RandomizerGet rg, CustomMessage& msg) {
     unsigned count;
     CustomMessage place;
+    bool strayFairy = false;
+    const char* color = rg == RG_GOLD_SKULLTULA_TOKEN ? "%r" : "%c";
     switch (rg) {
         case RG_GOLD_SKULLTULA_TOKEN:
             count = gSaveContext.inventory.gsTokens + 1;
@@ -849,19 +927,67 @@ bool BuildTokenReceiptMessage(RandomizerGet rg, CustomMessage& msg) {
             place = CustomMessage(" in the Ocean Spider House", " im Ozean-Spinnenhaus",
                                   " dans la maison des araignées de l'océan");
             break;
+        case RG_MM_STRAY_FAIRY_WOODFALL:
+            count = std::max<unsigned>(Nei_Save()->comboObtained[FC_MM_FAIRIES_WOODFALL],
+                                       Nei_Save()->comboObtainedFc[FCI_MM_STRAY_FAIRY_WOODFALL]) +
+                    1;
+            place = CustomMessage(" in [[color]]Woodfall Temple%w", " im [[color]]Waldfall-Tempel%w",
+                                  " dans le [[color]]Temple des Bois-Cascade%w");
+            strayFairy = true;
+            color = "%p";
+            break;
+        case RG_MM_STRAY_FAIRY_SNOWHEAD:
+            count = std::max<unsigned>(Nei_Save()->comboObtained[FC_MM_FAIRIES_SNOWHEAD],
+                                       Nei_Save()->comboObtainedFc[FCI_MM_STRAY_FAIRY_SNOWHEAD]) +
+                    1;
+            place = CustomMessage(" in [[color]]Snowhead Temple%w", " im [[color]]Schneegipfel-Tempel%w",
+                                  " dans le [[color]]Temple du Mont-Neige%w");
+            strayFairy = true;
+            color = "%g";
+            break;
+        case RG_MM_STRAY_FAIRY_GREAT_BAY:
+            count = std::max<unsigned>(Nei_Save()->comboObtained[FC_MM_FAIRIES_GREAT_BAY],
+                                       Nei_Save()->comboObtainedFc[FCI_MM_STRAY_FAIRY_GREAT_BAY]) +
+                    1;
+            place = CustomMessage(" in [[color]]Great Bay Temple%w", " im [[color]]Tempel der Großen Bucht%w",
+                                  " dans le [[color]]Temple de la Grande Baie%w");
+            strayFairy = true;
+            color = "%b";
+            break;
+        case RG_MM_STRAY_FAIRY_STONE_TOWER:
+            count = std::max<unsigned>(Nei_Save()->comboObtained[FC_MM_FAIRIES_STONE_TOWER],
+                                       Nei_Save()->comboObtainedFc[FCI_MM_STRAY_FAIRY_STONE_TOWER]) +
+                    1;
+            place = CustomMessage(" in [[color]]Stone Tower Temple%w", " im [[color]]Steinturm-Tempel%w",
+                                  " dans le [[color]]Temple de la Forteresse de Pierre%w");
+            strayFairy = true;
+            color = "%y";
+            break;
         default:
             return false;
     }
-    msg = CustomMessage(
-        "You found [[article]][[color]][[name]]%w!^You've collected [[color]][[count]]%w in total[[place]].",
-        "Du hast ein [[color]][[name]]%w gefunden!^Insgesamt [[color]][[count]]%w gesammelt[[place]].",
-        "Vous obtenez un [[color]][[name]]%w!^Vous en avez collecté [[color]][[count]]%w au total[[place]].",
-        TEXTBOX_TYPE_BLUE);
-    msg.Replace("[[color]]", rg == RG_GOLD_SKULLTULA_TOKEN ? "%r" : "%c");
+    // MM hydrates the legacy count on sync; OoT's own fairy grants advance
+    // the FC count immediately. Both describe the same copies, so take max.
+    if (strayFairy) {
+        msg = CustomMessage(
+            "You found [[article]][[color]][[name]]%w!^You've collected [[color]][[count]]%w [[kind]][[place]].",
+            "Du hast eine [[color]][[name]]%w gefunden!^Insgesamt [[color]][[count]]%w [[kind]][[place]] gesammelt.",
+            "Vous obtenez une [[color]][[name]]%w!^Vous avez collecté [[color]][[count]]%w [[kind]][[place]].",
+            TEXTBOX_TYPE_BLUE);
+        msg.Replace("[[kind]]", count == 1 ? CustomMessage("stray fairy", "verirrte Fee", "fée égarée")
+                                           : CustomMessage("stray fairies", "verirrte Feen", "fées égarées"));
+    } else {
+        msg = CustomMessage(
+            "You found [[article]][[color]][[name]]%w!^You've collected [[color]][[count]]%w in total[[place]].",
+            "Du hast ein [[color]][[name]]%w gefunden!^Insgesamt [[color]][[count]]%w gesammelt[[place]].",
+            "Vous obtenez un [[color]][[name]]%w!^Vous en avez collecté [[color]][[count]]%w au total[[place]].",
+            TEXTBOX_TYPE_BLUE);
+    }
     msg.Replace("[[article]]", rg == RG_MM_GS_TOKEN_OCEAN ? "an " : "a ");
     msg.Replace("[[name]]", CustomMessage(Rando::StaticData::RetrieveItem(rg).GetName()));
     msg.Replace("[[count]]", std::to_string(count));
     msg.Replace("[[place]]", place);
+    msg.Replace("[[color]]", color);
     msg.AutoFormat(rg == RG_GOLD_SKULLTULA_TOKEN ? ITEM_SKULL_TOKEN : ITEM_CUSTOM);
     return true;
 }

@@ -188,6 +188,9 @@ const char* PauseItemDesc_Get(u16, int) { return nullptr; }
 void PauseItemDesc_Show(PlayState*, const char*, int) {}
 u8 PauseItemDesc_ShowItem(PlayState*, u16, s32, u8) { return 0; }
 u8 PauseItemDesc_ShowEquipment(PlayState*, s16, s16, s16, u8) { return 0; }
+static int capeVisibilityCalls;
+static bool capeVisibilityAvailable = true;
+u8 PauseItemDesc_ShowCapeVisibility(PlayState*, u8) { ++capeVisibilityCalls; return capeVisibilityAvailable; }
 u8 PauseItemDesc_ShowForm(PlayState*, s32, u8) { return 0; }
 void KaleidoScope_SetCursorVtxPos(PauseContext*, u16, Vtx*) {}
 void KaleidoScope_MoveCursorToSpecialPos(PlayState* play, s16 pos) { play->pauseCtx.cursorSpecialPos = pos; }
@@ -200,23 +203,38 @@ void* KaleidoEquip_OotTex(const char* path) { return (void*)path; }
 void* KaleidoEquip_OotTex(void* path) { return path; }
 void* ExtEquip_GetIcon(s16, u8) { return (void*)"ext icon"; }
 void* ExtInv_GetItemIcon(u16) { return (void*)"native icon"; }
-void* KaleidoEquip_UpgradeIcon(s16, s16) { return nullptr; }
 void KaleidoEquip_BuildUpgradeColVtx(PauseContext*) {}
 static Vtx sUpgradeColVtx[16];
 void KaleidoEquip_RenderDollFB(PlayState*) {}
 void KaleidoEquip_DrawDollImage(PlayState*) {}
 static Gfx* POLY_OPA_DISP;
 static int gEquippedItemOutlineTex, drawSlot = -1, drawCounts[24];
+static int upgradeRow = -1, upgradeDrawCounts[4];
+static u8 primAlpha, upgradeAlphas[4];
+static const char* upgradeIcons[4];
 static Vtx* gridBegin;
 static bool grayscale;
 static void RecordVertex(Vtx* vertex) {
+    upgradeRow = -1;
+    for (int row = 0; row < 4; ++row) {
+        if (vertex == &sUpgradeColVtx[row * 4]) {
+            upgradeRow = row;
+            drawSlot = -1;
+            return;
+        }
+    }
     drawSlot = (vertex >= gridBegin && vertex < gridBegin + 24 * 4) ? (vertex - gridBegin) / 4 : -1;
 }
-void KaleidoScope_DrawTexQuadRGBA32(void*, void*, u16, u16, u16) {
+void KaleidoScope_DrawTexQuadRGBA32(void*, void* icon, u16, u16, u16) {
     if (drawSlot >= 0) ++drawCounts[drawSlot];
+    if (upgradeRow >= 0) {
+        ++upgradeDrawCounts[upgradeRow];
+        upgradeIcons[upgradeRow] = static_cast<const char*>(icon);
+        upgradeAlphas[upgradeRow] = primAlpha;
+    }
 }
 Gfx* Gfx_DrawTexQuadIA8(Gfx* gfx, int, u16, u16, u16) { return gfx; }
-void RecordPrimColor(u8, u8, u8, u8) {}
+void RecordPrimColor(u8, u8, u8, u8 alpha) { primAlpha = alpha; }
 #define OPEN_DISPS(...) ((void)0)
 #define CLOSE_DISPS(...) ((void)0)
 #define Gfx_SetupDL42_Opa(...) ((void)0)
@@ -238,6 +256,9 @@ void RecordPrimColor(u8, u8, u8, u8) {}
         functions.insert(0, "ExtEquip_RecordNativeSwordOwnership")
     for name in functions:
         code += production_function(equipment, name) + "\n"
+    for name in ("ExtEquip_GetCapeIcon", "ExtEquip_GetPendantIcon"):
+        code += selectors.function(equipment, name) + "\n"
+    code += selectors.function(pause, "KaleidoEquip_UpgradeIcon") + "\n"
     code += production_function(sync, "KokiriChainLevel") + "\n"
     # Execute the actual exported kokiri expression too: defining a correct helper
     # without wiring it into ExtractShared must still fail the publishing test.
@@ -285,6 +306,8 @@ static void Reset() {
 }
 static void Draw(PlayState* play) {
     std::memset(drawCounts, 0, sizeof(drawCounts));
+    std::memset(upgradeDrawCounts, 0, sizeof(upgradeDrawCounts));
+    std::memset(upgradeIcons, 0, sizeof(upgradeIcons));
     drawSlot = -1; gridBegin = play->pauseCtx.maskVtx; grayscale = false;
     KaleidoScope_DrawEquipment(play);
 }
@@ -311,6 +334,10 @@ int main() {
         NeiSaveData before = save;
         Draw(&play);
         check(GridDraws() == (subpage == 0 ? 2 : 0), "fresh save draws only owned equipment on each page");
+        for (s16 row = 0; row < 4; ++row) {
+            check(upgradeDrawCounts[row] == 0, "fresh save has no passive or placeholder icon");
+            check(!KaleidoEquip_CursorCanSit(row,0), "unearned passives and retired sockets cannot hold the cursor");
+        }
         for (s16 row = 0; row < 4; ++row) for (s16 col = 1; col <= 3; ++col) {
             EquipCell cell; KaleidoEquip_GetCell(subpage, row, col, &cell);
             const bool owned = KaleidoEquip_CellOwned(&cell);
@@ -332,9 +359,68 @@ int main() {
     }
     // Per-file switch/cursor persistence must not leave a title or cursor over a hidden item.
     sEquipSubPage = 1; sEquipCursorX = 3; sEquipCursorY = 3;
+    play.pauseCtx.cursorItem[PAUSE_MASK] = ITEM_EXT_BOOTS_3;
+    gExtEquipGridNameContext = 1;
     KaleidoScope_UpdateEquipmentCursor(&play);
-    check(KaleidoEquip_CursorCanSit(sEquipCursorY,sEquipCursorX), "stale cursor moves to a populated cell on a fresh file");
+    check(play.pauseCtx.cursorSpecialPos == PAUSE_CURSOR_PAGE_LEFT, "fresh empty equipment page moves the stale cursor to a page arrow");
     check(play.pauseCtx.cursorItem[PAUSE_MASK] == PAUSE_ITEM_NONE, "fresh empty equipment page has no acquired-item title");
+    check(!gExtEquipGridNameContext, "empty equipment page clears the previous grid title context");
+    // The two actual passives retain distinct icons, titles and toggle behavior on both grid pages.
+    for (s16 subpage = 0; subpage <= 1; ++subpage) {
+        Reset(); play = {}; sEquipSubPage = subpage;
+        save.capeOwned = save.pendantOwned = 1;
+        Draw(&play);
+        check(upgradeDrawCounts[0] == 1 && upgradeDrawCounts[1] == 1,
+              "owned Cape and Pendant each draw in their real socket");
+        check(std::strcmp(upgradeIcons[0], "__OTR__textures/icon_item_custom/gItemIconMagicCapePassiveTex") == 0,
+              "Cape socket uses its passive cloth icon rather than a reused tunic");
+        check(std::strcmp(upgradeIcons[1], "__OTR__icon_item_static_yar/gItemIconPendantOfMemoriesTex") == 0,
+              "Pendant socket uses its native MM icon rather than Climb Boots");
+        for (s16 row : { (s16)2, (s16)3 }) {
+            check(upgradeDrawCounts[row] == 0, "retired sockets stay empty when real passives are owned");
+            check(!KaleidoEquip_CursorCanSit(row,0), "retired sockets cannot be selected beside real passives");
+        }
+        for (s16 row = 0; row <= 1; ++row) {
+            sEquipCursorX = 0; sEquipCursorY = row;
+            check(KaleidoEquip_CursorCanSit(row,0), "owned passive remains selectable");
+            Publish(&play.pauseCtx);
+            check(play.pauseCtx.cursorItem[PAUSE_MASK] == (row == 0 ? ITEM_EXT_TUNIC_1 : ITEM_EXT_BOOTS_2) &&
+                  !gExtEquipGridNameContext, "passive publishes its non-grid title context");
+            play.state.input.press.button = BTN_A;
+            const int popupCalls = capeVisibilityCalls;
+            KaleidoScope_UpdateEquipmentCursor(&play);
+            if (row == 0) {
+                check(capeVisibilityCalls == popupCalls + 1 && play.pauseCtx.itemDescriptionOn,
+                      "A on Cape opens the Show/Hide popup");
+                check(!save.capeHidden && save.capeOwned, "opening Cape choices preserves visibility and ownership");
+                const NeiSaveData popupSave = save;
+                KaleidoScope_UpdateEquipmentCursor(&play);
+                play.state.input.press.button = BTN_L;
+                KaleidoScope_UpdateEquipmentCursor(&play);
+                check(capeVisibilityCalls == popupCalls + 1 && sEquipSubPage == subpage &&
+                      std::memcmp(&popupSave,&save,sizeof(save)) == 0,
+                      "Cape popup owns A and L input until the native description closes");
+                play.pauseCtx.itemDescriptionOn = 0; // The native textbox close resumes the equipment cursor.
+            }
+        }
+        check(save.capeOwned && save.pendantOwned && !save.capeHidden && save.pendantEffectOff,
+              "Cape popup leaves its passive owned while Pendant A retains its effect toggle");
+        save.capeHidden = 1; // Confirming Hide in the native message handler changes only this flag.
+        Draw(&play);
+        check(upgradeAlphas[0] == 127 && upgradeAlphas[1] == 127, "disabled passive toggles retain half-transparent icons");
+        play.state.input.press.button = 0; play.pauseCtx.stickAdjY = -40;
+        KaleidoScope_UpdateEquipmentCursor(&play);
+        check(sEquipCursorY == 1, "moving down from Pendant skips the retired lower sockets");
+    }
+    Reset(); play = {}; sEquipSubPage = 0; sEquipCursorX = sEquipCursorY = 0;
+    save.capeOwned = 1; capeVisibilityAvailable = false;
+    const NeiSaveData popupFailureSave = save;
+    play.state.input.press.button = BTN_A;
+    KaleidoScope_UpdateEquipmentCursor(&play);
+    check(errors == 1 && !play.pauseCtx.itemDescriptionOn &&
+          std::memcmp(&popupFailureSave,&save,sizeof(save)) == 0,
+          "unavailable Cape popup refuses without changing visibility or ownership");
+    capeVisibilityAvailable = true;
     // Native starter equipment has no separate MM ownership mask. Its true current
     // slot remains usable, while an imported/NEI piece borrowing that slot owns only itself.
     Reset(); sEquipSubPage = 0;
