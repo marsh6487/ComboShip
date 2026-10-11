@@ -31,7 +31,7 @@ u8 sSeqCmdWritePos;
 u32 sAudioSeqCmds[256];
 static f32 D_808DE5B0;
 static u16 D_808DE340;
-static int snowDraws, rainDraws, spawns, refreshes;
+static int snowDraws, rainDraws, spawns, refreshes, seasonFlashes;
 static int gameplayRandomCalls;
 static unsigned leafPalettes, leafDraws, firstLeafAlpha, nonzeroLeafDraws;
 static u8 submittedLeafAlpha[96];
@@ -112,6 +112,11 @@ void Seasons_UpdateGates() {}
 void ExtInv_RefreshButtonIconsForItem(PlayState*, u16 item) {
     assert(item == EXT_ITEM_ROD_OF_SEASONS);
     ++refreshes;
+}
+// Pulse rendering has its own native selector fixture; retain its callback boundary here.
+void MM_BoxMenu_StartSeasonFlash(PlayState* play) {
+    assert(play == gPlayState && play->pauseCtx.state == PAUSE_STATE_OFF);
+    ++seasonFlashes;
 }
 void Actor_Kill(Actor* actor) { actor->update = actor->draw = nullptr; }
 f32 Rand_ZeroOne() { ++gameplayRandomCalls; return 0.25f; }
@@ -265,6 +270,8 @@ static void Confirm(PlayState* play, u8 season) {
     // Play_Update's paused wheel update precedes Environment_Update, and does
     // not run Player_Update or advance gameplayFrames on the confirm frame.
     const u32 frame = play->gameplayFrames;
+    const int previous = Seasons_GetSeason();
+    const int flashes = seasonFlashes;
     sBoxMOpen = 1;
     sBoxMCursor = season;
     sBoxMCount = 5;
@@ -273,6 +280,7 @@ static void Confirm(PlayState* play, u8 season) {
     play->state.input[0].press.button = BTN_A;
     BoxMenu_Update(play);
     assert(!sBoxMOpen && play->pauseCtx.state == PAUSE_STATE_OFF);
+    assert(seasonFlashes == flashes + (Seasons_GetSeason() != previous));
     EnvironmentFrame(play);
     assert(play->gameplayFrames == frame);
 }

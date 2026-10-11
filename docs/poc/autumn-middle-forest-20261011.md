@@ -159,6 +159,17 @@ reuse. The checkpoint image and archive are not rewritten.
 - Native MM selector C syntax and the actual A/B confirmation/flash fixture pass
   normally and under ASan/UBSan, including reset, unchanged/rejected selection,
   bounded alpha/duration and play/scene/room/transition cleanup.
+- The first platform gate caught two missing selector declarations in the older
+  Rod input fixture. Its engine boundary now records style and flash calls;
+  actual Rod input passes with an accepted Off pulse and no pulse for unowned
+  or repeated selection; all 16 existing season grant/equip/save/shop/particle
+  fixture cases also pass. The separate complete native Rod lifecycle passes
+  normally and under ASan/UBSan/bounds. The native weather fixture independently
+  reproduced its missing flash declaration; its boundary now records one pulse
+  per actual season change after the wheel unpauses. Native scheduling, rain,
+  snow, leaf rendering and Off restoration pass normally and under the same
+  sanitizers. Production behavior is unchanged by these fixture corrections;
+  platform build results must correspond to the corrected candidate head.
 - Texture-address and sanitizer failure-command regressions pass, including
   hash resolution, command position, HD metadata and recovery.
 - The existing native tree/leaf suite passes, including actual C translation-unit

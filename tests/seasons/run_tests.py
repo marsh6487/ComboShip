@@ -131,10 +131,12 @@ u8 Pacci_UltrahandModeActive(){return 0;}
 int32_t CVarGetInteger(const char*,int32_t){return 1;}
 void Interface_LoadItemIconImpl(PlayState*,u8){}
 void Interface_Dpad_LoadItemIconImpl(PlayState*,u8){}
-int menus=0;typedef struct {const char* iconPath;u8 iconSize;u8 enabled;} BoxMenuEntry;
+int menus=0,seasonStyles=0,seasonFlashes=0;typedef struct {const char* iconPath;u8 iconSize;u8 enabled;} BoxMenuEntry;
 typedef void (*BoxMenuConfirmFn)(s32);
 BoxMenuConfirmFn confirmation=nullptr;BoxMenuEntry entries[5];
 u8 BoxMenu_IsOpen(){return 0;}
+void MM_BoxMenu_UseSeasonStyle(){++seasonStyles;}
+void MM_BoxMenu_StartSeasonFlash(PlayState* play){assert(play==gPlayState);++seasonFlashes;}
 u8 BoxMenu_Open(PlayState*,const BoxMenuEntry* values,s32 n,s32,u16 hold,BoxMenuConfirmFn fn){
  assert(n==5&&hold==0);memcpy(entries,values,sizeof(entries));confirmation=fn;++menus;return 1;}
 void ExtInv_RefreshButtonIconsForItem(PlayState*,u16){}
@@ -143,10 +145,11 @@ PlayState play{};Player player{};gPlayState=&play;player.transformation=PLAYER_F
 Seasons_GrantSeason(SEASON_WINTER);ExtButton_SetDpadItem(0,EQUIP_SLOT_D_UP,EXT_ITEM_ROD_OF_SEASONS);
 play.state.input[0].press.button=BTN_DUP;Seasons_TickInput(&play,&player,&play.state.input[0]);
 assert(Seasons_IsDrawn()&&menus==0);
-play.state.input[0].press.button=BTN_DUP;Seasons_TickInput(&play,&player,&play.state.input[0]);assert(menus==1&&confirmation);
+play.state.input[0].press.button=BTN_DUP;Seasons_TickInput(&play,&player,&play.state.input[0]);assert(menus==1&&confirmation&&seasonStyles==1);
 assert(entries[SEASON_WINTER].enabled&&entries[SEASON_OFF].enabled&&!entries[SEASON_SUMMER].enabled);
-confirmation(SEASON_SUMMER);assert(Seasons_GetSeason()==SEASON_WINTER);
-confirmation(SEASON_OFF);assert(Seasons_GetSeason()==SEASON_OFF);
+confirmation(SEASON_SUMMER);assert(Seasons_GetSeason()==SEASON_WINTER&&seasonFlashes==0);
+confirmation(SEASON_OFF);assert(Seasons_GetSeason()==SEASON_OFF&&seasonFlashes==1);
+confirmation(SEASON_OFF);assert(Seasons_GetSeason()==SEASON_OFF&&seasonFlashes==1);
 play.state.input[0].press.button=BTN_B;Seasons_TickInput(&play,&player,&play.state.input[0]);assert(!Seasons_IsDrawn());
 ''')
 
