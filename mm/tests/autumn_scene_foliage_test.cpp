@@ -55,7 +55,8 @@ struct ArchiveManager {
     }
     std::shared_ptr<Archive> GetArchiveFromFile(const std::string& path) {
         archiveLookup = path;
-        return HasFile(path) ? std::make_shared<Archive>() : nullptr;
+        const auto found = files.find(path);
+        return found != files.end() && found->second ? std::make_shared<Archive>() : nullptr;
     }
     std::shared_ptr<std::vector<std::string>> ListFiles(const std::string& mask) {
         auto result = std::make_shared<std::vector<std::string>>();
@@ -89,7 +90,7 @@ struct ResourceManager {
         if (auto r = GetCachedResource(path, exact))
             return r;
         auto i = archive->files.find(path);
-        if (i == archive->files.end())
+        if (i == archive->files.end() || i->second == nullptr)
             i = archive->files.find(path + ".meta");
         return i == archive->files.end() ? nullptr : resources[path] = i->second;
     }
@@ -705,6 +706,8 @@ int main() {
     auto alt = List("alt/scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_021650");
     const auto altOriginal = alt->Instructions;
     // An unloaded Alt .meta must win over an already cached vanilla display list.
+    // A previous failed base lookup does not hide the real meta-only alias.
+    rm->archive->files[std::string("alt/") + path] = nullptr;
     rm->archive->files[std::string("alt/") + path + ".meta"] = alt;
     rm->alt = true;
     season = SEASON_AUTUMN;

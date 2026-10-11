@@ -410,7 +410,13 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
         std::string resolved = path;
         if (rm->IsAltAssetsEnabled()) {
             const std::string altPath = "alt/" + path;
-            if (archives->HasFile(altPath) || archives->HasFile(altPath + ".meta")) {
+            // A failed renderer Alt lookup leaves a null ArchiveManager entry.
+            // HasFile alone sees that key and would abandon the cached native
+            // draw. Only a real archive can supply a replacement or .meta alias.
+            const auto hasArchive = [&](const std::string& candidate) {
+                return archives->HasFile(candidate) && archives->GetArchiveFromFile(candidate) != nullptr;
+            };
+            if (hasArchive(altPath) || hasArchive(altPath + ".meta")) {
                 resolved = altPath;
             }
         }

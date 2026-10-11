@@ -204,6 +204,40 @@ static unsigned ReportCount(const char* prefix) {
 
 static void CheckRenderedForestTransitions() {
     using namespace ForestRendererFixture;
+    // ArchiveManager::LoadFile(hash) inserts a null archive for a missing Alt.
+    // HasFile then reports the key as present, even though native fallback is
+    // the resource that actually rendered. A null .meta entry behaves likewise.
+    for (const char* missingSuffix : { "", ".meta" }) {
+        ClearCache();
+        auto rm = std::make_shared<Ship::ResourceManager>();
+        Ship::Context::GetRawInstance()->rm = rm;
+        rm->alt = manager.alt = true;
+        const std::string path = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKU_room_00DL_0241B0";
+        const std::string missingAlt = "alt/" + path + missingSuffix;
+        auto forest = std::make_shared<Fast::DisplayList>();
+        forest->Instructions = kActualForestCommands;
+        const auto original = forest->Instructions;
+        rm->archive->files[path] = forest;
+        rm->resources[path] = forest;
+        rm->archive->files[missingAlt] = nullptr;
+        assert(rm->archive->HasFile(missingAlt));
+        assert(rm->archive->GetArchiveFromFile(missingAlt) == nullptr);
+        PlayState play{};
+        play.sceneId = SCENE_00KEIKOKU;
+        season = SEASON_AUTUMN;
+        MMAutumnSceneFoliage_Update(&play);
+        CheckDraw(Draw(forest->Instructions), true, std::string("missing-Alt") + missingSuffix);
+        assert(rm->loads == 0); // Do not retry the known missing Alt every frame.
+        season = SEASON_OFF;
+        MMAutumnSceneFoliage_Update(&play);
+        CheckDraw(Draw(forest->Instructions), false);
+        season = SEASON_AUTUMN;
+        MMAutumnSceneFoliage_Update(&play);
+        CheckDraw(Draw(forest->Instructions), true);
+        ClearCache();
+        assert(SameCommand(forest->Instructions[0], original[0]));
+    }
+    std::puts("PASS missing Alt/null archive and .meta entries retain the rendered native forest, without reloads");
     // A list already rendered before its first seasonal snapshot is a useful
     // control: the unpatched code can work when its pointer words stay stable.
     {
