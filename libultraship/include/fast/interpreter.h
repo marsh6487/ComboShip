@@ -227,6 +227,7 @@ struct RawTexMetadata {
     float h_byte_scale = 1, v_pixel_scale = 1;
     std::shared_ptr<Fast::Texture> resource;
     Fast::TextureType type;
+    uint8_t autumnForestLayer = 0; // Requested forest identity survives private .meta payload paths.
 };
 
 #define MAX_LIGHTS 32

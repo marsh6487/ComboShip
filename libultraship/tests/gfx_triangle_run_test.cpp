@@ -80,6 +80,41 @@ void Interpreter::ImportTextureMask(int i, int tile) {
 }
 } // namespace Fast
 
+struct ForestDrawLog {
+    std::string layer, path, archive, backend;
+    int format, width, height, tile, tmem;
+    bool rdpGray, vertexGray, shaderGray;
+    uint32_t rgba;
+    uint64_t shader0, shader1;
+    unsigned sample;
+};
+namespace Fast {
+struct ForestArchiveFixture {
+    std::map<std::string, std::shared_ptr<Ship::Archive>> files;
+    auto GetArchiveFromFile(const std::string& path) {
+        return files[path];
+    }
+};
+struct ForestManagerFixture {
+    ForestArchiveFixture archives;
+    auto GetArchiveManager() {
+        return &archives;
+    }
+};
+static ForestManagerFixture* ActiveResMgr() {
+    static ForestManagerFixture manager;
+    return &manager;
+}
+} // namespace Fast
+static std::vector<ForestDrawLog> forestDrawLogs;
+static void recordForestDraw(const char*, const char* layer, const std::string& path, const std::string& archive,
+                             int format, int width, int height, unsigned tile, unsigned tmem, bool rdpGray,
+                             bool vertexGray, uint32_t rgba, bool shaderGray, uint64_t shader0, uint64_t shader1,
+                             const char* backend, unsigned sample) {
+    forestDrawLogs.push_back({ layer, path, archive, backend ? backend : "<none>", format, width, height, int(tile),
+                               int(tmem), rdpGray, vertexGray, shaderGray, rgba, shader0, shader1, sample });
+}
+#define SPDLOG_INFO(...) recordForestDraw(__VA_ARGS__)
 #include "triangle_production.inc"
 
 using namespace Fast;
@@ -547,6 +582,97 @@ static void commandBenchmark() {
     }
 }
 
+static void forestTintTraceTest() {
+    Fixture f;
+    configure(f, 1);
+    auto& r = *f.gfx.mRdp;
+    f.gfx.GfxDpSetTextureImage(G_IM_FMT_RGBA, G_IM_SIZ_16b, 1, reinterpret_cast<const char*>(uintptr_t{ 1 }), 0, {},
+                               nullptr);
+    require(!r.texture_to_load.raw_tex_metadata.resource,
+            "forest diagnostics must not inspect raw N64 pixel pointers as resource names");
+    r.first_tile_index = 2;
+    r.texture_tile[2] = r.texture_tile[0];
+    r.texture_tile[2].tmem_index = 1;
+    const std::string root = "scenes/nonmq/Z2_00KEIKOKU/";
+    auto texture = std::make_shared<Texture>();
+    texture->init->Path = root + "Z2_00KEIKOKUTex_034098";
+    texture->init->Parent = std::make_shared<Ship::Archive>();
+    texture->init->Parent->path = "./mm.o2r";
+    r.loaded_texture[1].raw_tex_metadata.resource = texture;
+    r.grayscale = true;
+    r.grayscale_color = { 185, 104, 72, 255 };
+    f.gfx.GfxSpTri1(0, 1, 2, false);
+    f.gfx.Flush();
+    require(forestDrawLogs.size() == 1, "forest triangle submission must report the actual prepared shader state");
+    const auto first = forestDrawLogs.back();
+    require(first.layer == "wallpaper" && first.path == texture->init->Path && first.archive == "./mm.o2r",
+            "forest trace must identify the selected wallpaper resource and its actual archive");
+    require(first.tile == 2 && first.tmem == 1 && first.format == 4 && first.width == 64 && first.height == 32,
+            "forest trace must follow the render tile into the correct TMEM slot");
+    require(first.rdpGray && first.vertexGray && first.shaderGray && first.rgba == 0xB96848FF,
+            "forest trace must report the copper palette and both vertex/shader tint flags");
+    bool selectedShader = false;
+    for (const auto& [key, program] : f.backend.programs)
+        selectedShader |=
+            program.id0 == first.shader0 && program.id1 == first.shader1 && program.features.opt_grayscale;
+    require(selectedShader, "forest trace shader IDs must identify the prepared backend shader");
+    float packedRed;
+    std::memcpy(&packedRed, &f.backend.output[6], sizeof(packedRed));
+    require(packedRed == 185.f / 255.f, "reported copper red must reach submitted vertex attributes");
+    for (unsigned i = 0; i < 100; ++i)
+        f.gfx.GfxSpTri1(0, 1, 2, false);
+    require(forestDrawLogs.size() == 1, "unchanged forest draws must not spam the log");
+    r.grayscale = false;
+    f.gfx.GfxSpTri1(0, 1, 2, false);
+    require(forestDrawLogs.size() == 2 && !forestDrawLogs.back().vertexGray && !forestDrawLogs.back().shaderGray,
+            "forest trace must expose a draw that reaches the backend without tint");
+    texture->init->Path = "alt/scenes/nonmq/Z2_00KEIKOKU_scene/Z2_00KEIKOKUTex_037098";
+    texture->init->Parent->path = "mods/2ship/Termina-POC4.o2r";
+    texture->Type = TextureType::RGBA32bpp;
+    texture->Width = 1024;
+    texture->Height = 512;
+    f.gfx.GfxSpTri1(0, 1, 2, false);
+    require(forestDrawLogs.size() == 3 && forestDrawLogs.back().layer == "canopy" &&
+                forestDrawLogs.back().archive == texture->init->Parent->path && forestDrawLogs.back().format == 1 &&
+                forestDrawLogs.back().width == 1024 && forestDrawLogs.back().height == 512,
+            "forest trace must also identify Alt canopy resources in the generated scene namespace");
+    texture->init->Path = "objects/unrelated/Z2_00KEIKOKUTex_034098";
+    f.gfx.GfxSpTri1(0, 1, 2, false);
+    require(forestDrawLogs.size() == 3, "matching filenames outside Termina Field must remain quiet");
+    // A real .meta alias records the payload path, not the requested native name,
+    // and ResourceLoader does not populate ResourceInitData::Parent.
+    texture->init->Path = "foliage/private_forest_wall.png";
+    texture->init->Parent.reset();
+    auto owner = std::make_shared<Ship::Archive>();
+    owner->path = "mods/2ship/Termina-POC4.o2r";
+    ActiveResMgr()->archives.files[texture->init->Path] = owner;
+    const auto requested = root + "Z2_00KEIKOKUTex_034098";
+    f.gfx.GfxDpSetTextureImage(G_IM_FMT_RGBA, G_IM_SIZ_32b, 1024, requested.c_str(), 0,
+                               r.loaded_texture[1].raw_tex_metadata, nullptr);
+    r.loaded_texture[1].raw_tex_metadata = r.texture_to_load.raw_tex_metadata;
+    f.gfx.GfxSpTri1(0, 1, 2, false);
+    require(forestDrawLogs.size() == 4 && forestDrawLogs.back().layer == "wallpaper" &&
+                forestDrawLogs.back().path == texture->init->Path && forestDrawLogs.back().archive == owner->path,
+            "forest trace must follow requested texture identity through a private .meta payload and missing Parent");
+    f.gfx.GfxDpSetTextureImage(G_IM_FMT_RGBA, G_IM_SIZ_32b, 1024, nullptr, 0, r.loaded_texture[1].raw_tex_metadata,
+                               nullptr);
+    r.loaded_texture[1].raw_tex_metadata = r.texture_to_load.raw_tex_metadata;
+    r.grayscale = true;
+    for (const auto* suffix : { "034098", "037098" }) {
+        texture->init->Path = root + "Z2_00KEIKOKUTex_" + suffix;
+        for (unsigned i = 0; i < 64; ++i) {
+            r.grayscale_color.r = uint8_t(i);
+            f.gfx.GfxSpTri1(0, 1, 2, false);
+        }
+    }
+    const auto wallpaper = std::count_if(forestDrawLogs.begin(), forestDrawLogs.end(),
+                                         [](const auto& x) { return x.layer == "wallpaper"; });
+    const auto canopy = forestDrawLogs.size() - wallpaper;
+    require(wallpaper == 16 && canopy == 16, "forest logging must stop independently at 16 samples per layer");
+    std::cout << "PASS actual forest triangle/shader trace: selected TMEM resource, archive, palette, shader flags, "
+                 "Alt and bounded output\n";
+}
+
 int main(int argc, char** argv) {
     bool reference = false, bench = false;
     for (int i = 1; i < argc; ++i) {
@@ -554,6 +680,8 @@ int main(int argc, char** argv) {
         bench |= std::string(argv[i]) == "--benchmark";
     }
     if (bench) { benchmark(); commandBenchmark(); return 0; }
+    if (!reference)
+        forestTintTraceTest();
     if (!reference) { dispatchContextTest(); packedVertexReuseTest(); packedFlushAndBoundaryTest(); }
     if (!reference) reuseTest();
     equivalenceTest();

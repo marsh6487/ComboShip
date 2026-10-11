@@ -12,6 +12,7 @@
 #endif
 
 #include <any>
+#include <array>
 #include <map>
 #include <set>
 #include <unordered_map>
@@ -1914,6 +1915,76 @@ void Interpreter::GfxSpModifyVertex(uint16_t vtx_idx, uint8_t where, uint32_t va
     v->v = t;
 }
 
+static uint8_t AutumnForestLayer(std::string_view path) {
+    if (path.starts_with("__OTR__"))
+        path.remove_prefix(7);
+    if (path.starts_with("@mm:"))
+        path.remove_prefix(4);
+    if (path.starts_with("alt/"))
+        path.remove_prefix(4);
+    constexpr std::string_view base = "scenes/nonmq/Z2_00KEIKOKU/";
+    constexpr std::string_view scene = "scenes/nonmq/Z2_00KEIKOKU_scene/";
+    if (path.starts_with(base))
+        path.remove_prefix(base.size());
+    else if (path.starts_with(scene))
+        path.remove_prefix(scene.size());
+    else
+        return 0;
+    return path == "Z2_00KEIKOKUTex_034098" ? 1 : path == "Z2_00KEIKOKUTex_037098" ? 2 : 0;
+}
+
+// Observe the two Termina forest layers after shader selection, rather than
+// assuming that a bound seasonal display-list wrapper reached the actual draw.
+static void TraceAutumnForestDraw(const RawTexMetadata& metadata, const RDP& rdp, bool vertexGray, uint64_t shader0,
+                                  uint64_t shader1, uint32_t tile, GfxRenderingAPI* backend) {
+    if (!metadata.resource)
+        return;
+    const auto init = metadata.resource->GetInitData();
+    if (!init)
+        return;
+    const auto identity = metadata.autumnForestLayer ? metadata.autumnForestLayer : AutumnForestLayer(init->Path);
+    if (identity == 0 || identity > 2)
+        return;
+    const auto layer = identity - 1;
+    struct Sample {
+        std::string path;
+        std::array<uint64_t, 7> state{};
+        unsigned count = 0;
+    };
+    static std::array<Sample, 2> previous;
+    auto& sample = previous[layer];
+    if (sample.count >= 16)
+        return;
+    const auto& color = rdp.grayscale_color;
+    const uint32_t rgba = uint32_t(color.r) << 24 | uint32_t(color.g) << 16 | uint32_t(color.b) << 8 | color.a;
+    const bool shaderGray = (shader1 & SHADER_OPT(GRAYSCALE)) != 0;
+    const auto& texture = *metadata.resource;
+    const unsigned tmem = rdp.texture_tile[tile].tmem_index;
+    const std::array<uint64_t, 7> state = { uint64_t(rdp.grayscale) | uint64_t(vertexGray) << 1,
+                                            // An unused palette can change during unrelated draws while tint is Off.
+                                            rdp.grayscale || vertexGray || shaderGray ? rgba : 0, shader0, shader1,
+                                            uint64_t(tile) | uint64_t(tmem) << 32,
+                                            uint64_t(texture.Type) | uint64_t(texture.Width) << 16 |
+                                                uint64_t(texture.Height) << 32,
+                                            reinterpret_cast<uintptr_t>(metadata.resource.get()) };
+    if (sample.count && sample.path == init->Path && sample.state == state)
+        return;
+    auto owner = init->Parent;
+    if (!owner)
+        owner = ActiveResMgr()->GetArchiveManager()->GetArchiveFromFile(init->Path);
+    static const std::string noArchive = "<unknown>";
+    const auto& archive = owner ? owner->GetPath() : noArchive;
+    sample.path = init->Path;
+    sample.state = state;
+    ++sample.count;
+    SPDLOG_INFO(
+        "[AutumnForestDraw] layer={} texture={} path_owner_archive={} format={} dimensions={}x{} tile={} tmem={} "
+        "rdp_gray={} vertex_gray={} rgba={:08X} shader_gray={} shader0={:016X} shader1={:016X} "
+        "backend={} sample={}/16",
+        layer == 0 ? "wallpaper" : "canopy", init->Path, archive, int(texture.Type), texture.Width, texture.Height,
+        tile, tmem, rdp.grayscale, vertexGray, rgba, shaderGray, shader0, shader1, backend->GetName(), sample.count);
+}
+
 void Interpreter::GfxSpTri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx, bool is_rect) {
     if (mTriangleStateReuseAllowed) {
         if (!mTriangleState.valid || mTriangleState.reusePackedVertices) {
@@ -2282,6 +2353,13 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
                                reusable && !is_rect && (numInputs > 1 || usedTextures[1]) &&
                                    !(mRdp->other_mode_l & G_TL_LOD) };
         }
+    }
+
+    if (usedTextures[0]) {
+        const auto tile = effective_tile[0];
+        TraceAutumnForestDraw(mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].raw_tex_metadata, *mRdp,
+                              use_grayscale, comb->shader_id0, comb->shader_id1 | tm * SHADER_OPT(TEXEL0_CLAMP_S), tile,
+                              mRapi);
     }
 
     // Within a pure triangle run a loaded vertex's expanded attributes are
@@ -2673,6 +2751,7 @@ void Interpreter::GfxDpSetTextureImage(uint32_t format, uint32_t size, uint32_t 
     mRdp->texture_to_load.siz = size;
     mRdp->texture_to_load.width = width;
     mRdp->texture_to_load.tex_flags = texFlags;
+    rawTexMetdata.autumnForestLayer = rawTexMetdata.resource && texPath ? AutumnForestLayer(texPath) : 0;
     mRdp->texture_to_load.raw_tex_metadata = rawTexMetdata;
 }
 
