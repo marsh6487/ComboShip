@@ -594,28 +594,30 @@ static void grayscaleBrightnessTest() {
         auto ptr = &cmd;
         // Switching mode with the same vertices must invalidate packed reuse,
         // even when the shader and its attribute layout stay the same.
-        for (unsigned mode : { 2u, 1u, 2u }) {
+        constexpr unsigned modes[] = { 3u, 2u, 1u, 3u, 1u, 2u };
+        for (unsigned mode : modes) {
             cmd.words.w1 = mode;
             dispatch(table, 1, &ptr, &f.gfx);
             f.gfx.mTriangleStateReuseAllowed = true;
             f.gfx.GfxSpTri1(0, 1, 2, false);
         }
         f.gfx.Flush();
-        const auto stride = f.backend.output.size() / 9;
+        const auto stride = f.backend.output.size() / 18;
         const unsigned sum = unsigned(color.r) + color.g + color.b;
-        for (unsigned draw = 0; draw < 3; ++draw) {
+        for (unsigned draw = 0; draw < 6; ++draw) {
             float packed[4];
             std::memcpy(packed, f.backend.output.data() + draw * 3 * stride + 6, sizeof(packed));
             require(std::isfinite(packed[0]) && std::isfinite(packed[1]) && std::isfinite(packed[2]),
                     "black normalized tint must produce finite attributes");
             require(packed[3] == color.a / 255.f, "brightness normalization must preserve the interpolation factor");
-            if (draw == 1) {
+            if (modes[draw] == 1) {
                 require(packed[0] == color.r / 255.f && packed[1] == color.g / 255.f && packed[2] == color.b / 255.f,
                         "legacy grayscale mode must retain its exact vertex attributes after normalized tint");
             } else if (sum) {
                 const float mean = (packed[0] + packed[1] + packed[2]) / 3.f;
-                require(std::abs(mean - 1.f) < 0.000001f,
-                        "normalized autumn tint must preserve texture mean intensity instead of darkening it");
+                const float expectedMean = modes[draw] == 3 ? 1.8f : 1.f;
+                require(std::abs(mean - expectedMean) < 0.000001f,
+                        "winter frost must brighten dark texels; returning to autumn must preserve mean intensity");
                 require(std::abs(packed[0] / packed[1] - float(color.r) / color.g) < 0.000001f,
                         "brightness normalization must preserve the chosen warm hue");
             } else {
@@ -627,8 +629,8 @@ static void grayscaleBrightnessTest() {
         dispatch(table, 1, &ptr, &f.gfx);
         require(!f.gfx.mRdp->grayscale, "the scoped Off command must disable normalized tint");
     }
-    std::cout
-        << "PASS brightness-preserving tint: actual vertex submission, legacy mode, black guard and mode barriers\n";
+    std::cout << "PASS winter frost lift/autumn intensity: actual vertex submission, legacy mode, black guard and mode "
+                 "barriers\n";
 }
 
 static void forestTintTraceTest() {

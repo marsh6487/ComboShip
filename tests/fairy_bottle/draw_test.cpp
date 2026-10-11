@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
+#include "glass_commands.h"
 #include "combo/menu/ComboFairyBottle.h"
 #include "combo/menu/ComboBottleContents.h"
 #include "combo/menu/ComboItemDrawABI.h"
@@ -63,7 +64,12 @@ constexpr int GID_FAIRY = 0, GID_BOTTLE = 2, GID_SONG_GENERIC = 0x75, kMaxMatEnt
 MtxF current, initial, loaded[2];
 MtxF nativePlacement{0, 3, 0, .01f, .01f, .01f};
 std::vector<MtxF> stack;
-struct Draw { int stream; std::string path; MtxF pose; };
+struct Draw {
+    int stream;
+    std::string path;
+    MtxF pose;
+    std::string owner;
+};
 std::vector<Draw> draws;
 std::vector<std::string> events;
 Gfx opa[64], xlu[64];
@@ -73,6 +79,7 @@ int foreignRestores = 0, hostFallbacks = 0, ownerScope = 1;
 bool ownerPresent = true, matrixPresent = true, matrixPointerPresent = true, materialPresent = true;
 bool fairyResources = false;
 bool bundledShell = false;
+bool readableGlass = true;
 std::string gpuOwner;
 std::vector<std::string> gpuOwners;
 #ifdef COMBO_FAIRY_HOST_MM
@@ -96,7 +103,7 @@ void Matrix_MtxToMtxF(Mtx* input, MtxF* output) { *output = *input; }
 void LoadMatrix(Gfx* command, MtxF* pose) { loaded[command->stream] = *pose; }
 void DrawList(Gfx* command, const void* path) {
     assert(ownerScope == 1 && "foreign load scope leaked into host drawing");
-    draws.push_back({command->stream, static_cast<const char*>(path), loaded[command->stream]});
+    draws.push_back({ command->stream, static_cast<const char*>(path), loaded[command->stream], gpuOwner });
     events.push_back("draw");
 }
 void Segment(Gfx* command, int segment, uintptr_t) { assert(command->stream == 1 && segment == 8); }
@@ -215,6 +222,8 @@ SkeletonHeader fairySkeleton{14};
 #endif
 AnimationHeader fairyAnimation;
 extern "C" uint8_t ResourceMgr_FileExists(const char* path) {
+    if (strstr(path, "combo_bottle_gi/FairyXlu"))
+        return bundledShell && readableGlass;
     return strstr(path,"combo_bottle_gi") ? bundledShell : fairyResources;
 }
 extern "C" uint8_t ResourceMgr_FileAltExists(const char*) { return 0; }
@@ -319,16 +328,114 @@ int main() {
            "built-in Blue Fire model must not inject its casing or embedded flame into the fairy");
     customModels.clear();
     bundledShell=true;
-    assert(strstr(oot::GetItem_FairyBottleShell(0).glass,"combo_bottle_gi/EmptyXlu") &&
-           strstr(mm::GetItem_FairyBottleShell(0).glass,"combo_bottle_gi/EmptyXlu") &&
+    Reset(27);
+    oot::GetItem_DrawFairy(&play, 0);
+    CheckReadableGlass(draws[1].owner, draws[1].path);
+    assert(strstr(oot::GetItem_FairyBottleShell(0).glass, "combo_bottle_gi/FairyXlu") &&
+           strstr(mm::GetItem_FairyBottleShell(0).glass, "combo_bottle_gi/FairyXlu") &&
            "fresh build with no optional bottle pack must still use the bundled TP casing");
     selectedMods={glass};
-    assert(strstr(oot::GetItem_FairyBottleShell(0).glass,"combo_bottle_gi/EmptyXlu") &&
-           strstr(mm::GetItem_FairyBottleShell(0).glass,"combo_bottle_gi/EmptyXlu"));
+    assert(strstr(oot::GetItem_FairyBottleShell(0).glass, "combo_bottle_gi/FairyXlu") &&
+           strstr(mm::GetItem_FairyBottleShell(0).glass, "combo_bottle_gi/FairyXlu"));
     selectedMods={genericGlass};
     assert(oot::GetItem_FairyBottleShell(0).glass==genericGlass && mm::GetItem_FairyBottleShell(0).glass==genericGlass);
     assert(oot::GetItem_FairyBottleShell(0).opaque==oot::GetItem_EmptyBottleShell(GID_BOTTLE).opaque &&
            mm::GetItem_FairyBottleShell(0).glass==mm::GetItem_EmptyBottleShell(GID_BOTTLE).glass);
+    const char* selectedShells[] = { genericOpaque, genericGlass, "__OTR__objects/combo_bottle_gi/EmptyOpaque",
+                                     "__OTR__objects/combo_bottle_gi/EmptyXlu" };
+    for (const char* selected : selectedShells) {
+        selectedMods = { selected };
+        const auto ootEmpty = oot::GetItem_EmptyBottleShell(GID_BOTTLE),
+                   mmEmpty = mm::GetItem_EmptyBottleShell(GID_BOTTLE);
+        assert(!strcmp(oot::GetItem_FairyBottleShell(0).opaque, ootEmpty.opaque) &&
+               !strcmp(oot::GetItem_FairyBottleShell(0).glass, ootEmpty.glass) &&
+               !strcmp(mm::GetItem_FairyBottleShell(0).opaque, mmEmpty.opaque) &&
+               !strcmp(mm::GetItem_FairyBottleShell(0).glass, mmEmpty.glass) &&
+               "selected casing replacements must keep both passes exact");
+    }
+    const char* selectedMaterials[] = {
+        "__OTR__objects/combo_bottle_gi/shell/mat_gGiBlueFireChamberstickDL_BottleGlassOutside",
+        "__OTR__objects/combo_bottle_gi/BottleShell"
+    };
+    for (const char* selected : selectedMaterials) {
+        printf("SELECTED SHARED ASSET %s\n", selected);
+        fflush(stdout);
+        selectedMods = { selected };
+        AssetOverrideMap overrides;
+        for (const char* owner : { "oot", "mm" }) {
+            const auto key = std::string(owner) + ":" + (selected + 7);
+            auto commands = assetCommandLists.at(key);
+            auto insertion = commands.begin();
+            for (; insertion != commands.end(); ++insertion) {
+                if (insertion->tag == "EndDisplayList" ||
+                    (insertion->tag == "CallDisplayList" &&
+                     insertion->attributes.at("Path").ends_with("gGiBlueFireChamberstickDL_tri_1")))
+                    break;
+            }
+            // Represent an explicitly selected material with a distinct live
+            // color; observe it after the production GPU path resolves the root.
+            const AssetCommand color = {
+                "SetPrimColor",
+                { { "M", "0" }, { "L", "0" }, { "R", "24" }, { "G", "160" }, { "B", "210" }, { "A", "144" } }
+            };
+            insertion = commands.insert(insertion, color);
+            commands.insert(insertion, { "PipeSync", {} });
+            overrides[key] = commands;
+        }
+        for (int route = 0; route < 6; ++route) {
+            const auto shell = route == 4 ? oot::GetItem_FairyBottleShell(0) : mm::GetItem_FairyBottleShell(0);
+            ComboForeignDrawInfo modInfo;
+            modInfo.dls[0] = shell.opaque;
+            modInfo.dls[1] = shell.glass;
+            Reset(27);
+            if (route == 0)
+                oot::GetItem_DrawFairy(&play, 0);
+            else if (route == 1)
+                mm::GetItem_DrawFairyBottle(&play, 1);
+            else if (route == 2)
+                mm::GetItem_DrawFairyContainer(&play, 0);
+            else if (route == 3)
+                OOT_DrawForeignFairyContainer(&play, &modInfo);
+            else if (route == 4)
+                MM_DrawForeignFairy(&modInfo);
+            else
+                OOT_DrawForeignFairyBottle(&play, &modInfo);
+            const auto trace = TraceGlass(draws[1].owner, draws[1].path, &overrides);
+            size_t triangles = 0;
+            for (const auto& triangle : trace.triangles) {
+                if (!triangle.path.ends_with("gGiBlueFireChamberstickDL_tri_1"))
+                    continue;
+                ++triangles;
+                assert(triangle.material.at("SetPrimColor.A") == "144" &&
+                       triangle.material.at("SetPrimColor.R") == "24" &&
+                       triangle.material.at("SetPrimColor.G") == "160" &&
+                       triangle.material.at("SetPrimColor.B") == "210" &&
+                       "fairy wrapper bypassed or recolored the selected shared shell/material");
+            }
+            assert(triangles > 0 && draws[1].path == "__OTR__objects/combo_bottle_gi/EmptyXlu");
+            assert(Same(current, initial) && stack.empty() && gpuOwners.empty());
+        }
+    }
+    const char* selectedChildren[] = { "__OTR__objects/combo_bottle_gi/shell/BottleGlass",
+                                       "__OTR__objects/combo_bottle_gi/shell/MetalPainted_1TestFromSkilar",
+                                       "__OTR__objects/combo_bottle_gi/shell/gGiBlueFireChamberstickDL_vtx_0",
+                                       "__OTR__objects/combo_bottle_gi/shell/gGiBlueFireChamberstickDL_vtx_1" };
+    for (const char* selected : selectedChildren) {
+        selectedMods = { selected };
+        assert(strstr(oot::GetItem_FairyBottleShell(0).glass, "combo_bottle_gi/FairyXlu") &&
+               strstr(mm::GetItem_FairyBottleShell(0).glass, "combo_bottle_gi/FairyXlu") &&
+               "texture and vertex replacements must retain the shared child paths");
+    }
+    puts("PASS selected shared shell/material GPU commands and live mod color in all six routes; texture/vertex-only "
+         "replacements retain fairy glass");
+    selectedMods.clear();
+    readableGlass = false;
+    assert(strstr(oot::GetItem_FairyBottleShell(0).glass, "combo_bottle_gi/EmptyXlu") &&
+           strstr(mm::GetItem_FairyBottleShell(0).glass, "combo_bottle_gi/EmptyXlu") &&
+           "older archives without readable glass need the accepted bundled fallback");
+    readableGlass = true;
+    assert(strstr(oot::GetItem_EmptyBottleShell(GID_BOTTLE).glass, "combo_bottle_gi/EmptyXlu") &&
+           strstr(mm::GetItem_EmptyBottleShell(GID_BOTTLE).glass, "combo_bottle_gi/EmptyXlu"));
     selectedMods.clear();bundledShell=false;
     for (uint32_t frame = 0; frame < 360; ++frame) {
         auto motion = ComboFairyBottle_Sample(frame), repeat = ComboFairyBottle_Sample(frame + 360);
@@ -367,6 +474,28 @@ int main() {
     }
     assert(CwMinDlistsForKind(CW_DRAW_KIND_MM_FAIRY_CONTAINER) == 4);
     puts("PASS native OoT/MM shell exports, complete MM contents+matrix recipe, stable shell and moving fairy command streams");
+
+    bundledShell = true;
+    selectedMods.clear();
+    for (bool available : { true, false }) {
+        readableGlass = available;
+        const char* expected =
+            available ? "__OTR__objects/combo_bottle_gi/FairyXlu" : "__OTR__objects/combo_bottle_gi/EmptyXlu";
+        assert(oot::GetItem_GetDrawTableEntry(0, resources, 8, &xluStart, &scale, &kind, colors) == 3);
+        assert(!strcmp((const char*)resources[1], expected));
+        assert(mm::GetItem_GetDrawTableEntry(0, resources, 8, &xluStart, &scale, &scroll, &kind) == 4);
+        assert(!strcmp((const char*)resources[1], expected));
+        assert(mm::GetItem_GetDrawTableEntry(1, resources, 8, &xluStart, &scale, &scroll, &kind) == 3);
+        assert(!strcmp((const char*)resources[1], expected));
+        assert(oot::GetItem_GetDrawTableEntry(GID_BOTTLE, resources, 8, &xluStart, &scale, &kind, colors) == 2);
+        assert(!strcmp((const char*)resources[1], "__OTR__objects/combo_bottle_gi/EmptyXlu"));
+        assert(mm::GetItem_GetDrawTableEntry(GID_BOTTLE, resources, 8, &xluStart, &scale, &scroll, &kind) == 2);
+        assert(!strcmp((const char*)resources[1], "__OTR__objects/combo_bottle_gi/EmptyXlu"));
+    }
+    readableGlass = true;
+    bundledShell = false;
+    puts("PASS fairy-only glass exports, exact selected shells and missing-new-asset fallback; ordinary empty bottles "
+         "unchanged");
 
     selectedMods.clear(); ComboForeignDrawInfo info;
     for (uint32_t frame : {0u,27u}) {
@@ -412,9 +541,10 @@ int main() {
     assert(oot::GetItem_FairyBottleShell(0).opaque == genericOpaque && mm::GetItem_FairyBottleShell(0).opaque == genericOpaque);
     puts("PASS empty shell despite selected Blue Fire, larger pink animated fairy, native contents fallback");
     selectedMods.clear(); bundledShell=true; fairyResources=true;
-    info.dls[0]="__OTR__objects/combo_bottle_gi/EmptyOpaque";
-    info.dls[1]="__OTR__objects/combo_bottle_gi/EmptyXlu";
     for (int route=0;route<6;++route) {
+        const auto shell = route == 4 ? oot::GetItem_FairyBottleShell(0) : mm::GetItem_FairyBottleShell(0);
+        info.dls[0] = shell.opaque;
+        info.dls[1] = shell.glass;
         MtxF first;
         for(uint32_t frame:{0u,27u}) {
             Reset(frame);
@@ -424,6 +554,9 @@ int main() {
             else if(route==3)OOT_DrawForeignFairyContainer(&play,&info);
             else if(route==4)MM_DrawForeignFairy(&info);
             else OOT_DrawForeignFairyBottle(&play,&info);
+            assert(draws[1].stream == 1 && draws[1].path == shell.glass);
+            assert(draws[1].owner == (route == 3 || route == 5 ? "mm" : route == 4 ? "oot" : fairyHost));
+            CheckReadableGlass(draws[1].owner, draws[1].path);
             const auto& pose=draws.back().pose;
             assert(draws.back().path=="fairy-vfx" && skeletonDraws==1);
             assert(moteDraws==1 && "accepted bundled fairy requires four local deterministic motes once at the incoming bottle pose");
@@ -438,7 +571,8 @@ int main() {
             else assert(std::hypot(pose.x-first.x,pose.y-first.y)>3.f && "bundled fairy bounce is too small to read");
         }
     }
-    puts("PASS bundled fairy casing: centered visible bounce and host resource ownership in all native/foreign routes");
+    puts("PASS bundled fairy casing: readable alpha80 at actual submitted shell triangles, unchanged "
+         "reflection/geometry/cleanup, centered bounce and correct GPU ownership in all native/foreign routes");
     bundledShell=false; fairyResources=false;
     selectedMods.clear(); info.dls[0]=opaque; info.dls[1]=glass;
     selectedForeign = &info; GetItemEntry entry;
@@ -462,8 +596,9 @@ int main() {
     Reset(27); OOT_DrawComboForeign(&play,&entry);
     assert(hostFallbacks==0 && shimmerDraws==1 && draws.size()==3 && stack.empty() && Same(current,initial));
     bundledShell=fairyResources=true;
-    info.dls[0]="__OTR__objects/combo_bottle_gi/EmptyOpaque";
-    info.dls[1]="__OTR__objects/combo_bottle_gi/EmptyXlu";
+    const auto bundledMmShell = mm::GetItem_FairyBottleShell(0);
+    info.dls[0] = bundledMmShell.opaque;
+    info.dls[1] = bundledMmShell.glass;
     for(bool overlay:{true,false}) {
         info.itemShimmer=overlay;Reset(27);OOT_DrawComboForeign(&play,&entry);
         assert(hostFallbacks==0 && skeletonDraws==1 && moteDraws==1 && shimmerDraws==int(overlay));

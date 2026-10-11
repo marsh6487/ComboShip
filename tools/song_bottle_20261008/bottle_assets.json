@@ -7,7 +7,8 @@
     "translucent_liquid": true,
     "live_palette_not_overridden": true,
     "mm_red_color_slots_valid": true,
-    "runtime_visual_acceptance": "untested"
+    "runtime_visual_acceptance": "untested",
+    "fairy_glass_alpha": 80
   },
   "preserved": [
     {
@@ -52,6 +53,8 @@
     "objects/combo_bottle_gi/CleanupXlu": "c057b24ee9f178e96e542e3874589e39168e958c421dbea064b28c66374a9419",
     "objects/combo_bottle_gi/EmptyOpaque": "ad3548a9ebfdd606990b29ef106097b691e355afdca86c048f21b12f2dc65e05",
     "objects/combo_bottle_gi/EmptyXlu": "b314571652f95bb61adcf3fe7fd7f875af80618f366b3dd40a840e1fe12dd5d3",
+    "objects/combo_bottle_gi/FairyGlassMaterial": "e6a9fcfe79b6933394334aa47b84b8a710f2bcfec128c018ab5816ae1a17181f",
+    "objects/combo_bottle_gi/FairyXlu": "34a2586d920d02375336951a6e6ffebdf5fff5a82205b38fe21eb8faef140765",
     "objects/combo_bottle_gi/GoldDustBottle": "b314571652f95bb61adcf3fe7fd7f875af80618f366b3dd40a840e1fe12dd5d3",
     "objects/combo_bottle_gi/Liquid": "ada8b106304f593a4a0a134302dc60d2f36ab83cffcafc5b732f319f83e51df1",
     "objects/combo_bottle_gi/LiquidGlossMaterial": "71cef7bcb9c348197489e0b0cfe6c7f7145bbf67681154d42e34eca4ba61fcf0",

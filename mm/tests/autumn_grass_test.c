@@ -110,17 +110,19 @@ static void Begin(void) {
     gfx.polyOpa.p = opaque;
     gfx.polyXlu.p = translucent;
 }
-static void Check(const Gfx* first, const Gfx* end, const void* leafList, const Gfx* native, size_t count) {
+static void Check(const Gfx* first, const Gfx* end, const void* leafList, const Gfx* native, size_t count,
+                  u32 expectedColor, unsigned expectedMode) {
     int tinted = 0, drawn = 0, colors = 0;
     size_t sourceIndex = 0;
     for (const Gfx* command = first; command < end; ++command) {
         const unsigned op = command->words.w0 >> 24;
         if (op == G_SETGRAYSCALE) {
             tinted = command->words.w1 != 0;
+            assert(!tinted || command->words.w1 == expectedMode);
             continue;
         }
         if (op == G_SETINTENSITY) {
-            assert(command->words.w1 == 0xD99C45FF);
+            assert(command->words.w1 == expectedColor);
             ++colors;
             continue;
         }
@@ -154,7 +156,7 @@ static void Kusa(void) {
                   !bush  ? gKusaSproutDL
                   : fade ? gKusaBushType2DL
                          : gKusaBushType1DL,
-                  native, count);
+                  native, count, 0xD99C45FF, 1);
             eligible = 0;
             Begin();
             draw(&grass.actor, &play);
@@ -190,7 +192,8 @@ static void GroupedGrass(void) {
         season = SEASON_AUTUMN;
         Begin();
         draw(&grass.actor, &play);
-        Check(fade ? translucent : opaque, fade ? gfx.polyXlu.p : gfx.polyOpa.p, gObjGrass_D_809AAAE0, native, count);
+        Check(fade ? translucent : opaque, fade ? gfx.polyXlu.p : gfx.polyOpa.p, gObjGrass_D_809AAAE0, native, count,
+              0xD99C45FF, 1);
         assert(element->alpha == (fade ? 96 : 255));
         allowDraw = 0;
         Begin();
@@ -203,8 +206,63 @@ static void GroupedGrass(void) {
     puts("PASS grouped grass OPA/XLU scoped color, unchanged fade alpha and existing replacement hook routing");
 }
 
+static void Winter(void) {
+    EnKusa grass = { 0 };
+    ObjGrass grouped = { 0 };
+    grouped.activeGrassGroups = 1;
+    grouped.grassGroups[0].count = 1;
+    grouped.grassGroups[0].flags = OBJ_GRASS_GROUP_DRAW;
+    grouped.grassGroups[0].elements[0].flags = OBJ_GRASS_ELEM_DRAW;
+    struct {
+        void (*draw)(Actor*, PlayState*);
+        Actor* actor;
+        const void* list;
+        int fade;
+    } cases[] = {
+        { EnKusa_DrawGrass, &grass.actor, gKusaSproutDL, 0 },
+        { EnKusa_DrawBush, &grass.actor, gKusaBushType1DL, 0 },
+        { EnKusa_DrawBush, &grass.actor, gKusaBushType2DL, 1 },
+        { ObjGrass_DrawOpa, &grouped.actor, gObjGrass_D_809AAAE0, 0 },
+        { ObjGrass_DrawXlu, &grouped.actor, gObjGrass_D_809AAAE0, 1 },
+    };
+    for (unsigned i = 0; i < ARRAY_COUNT(cases); ++i) {
+        grass.actor.projectedPos.z = cases[i].fade ? 1250 : 500;
+        grouped.grassGroups[0].elements[0].alpha = cases[i].fade ? 96 : 255;
+        play.sceneId = SCENE_00KEIKOKU;
+        season = SEASON_OFF;
+        Begin();
+        cases[i].draw(cases[i].actor, &play);
+        const Gfx* start = cases[i].fade ? translucent : opaque;
+        const size_t count = (cases[i].fade ? gfx.polyXlu.p : gfx.polyOpa.p) - start;
+        Gfx native[128];
+        memcpy(native, start, count * sizeof(Gfx));
+        season = SEASON_WINTER;
+        Begin();
+        cases[i].draw(cases[i].actor, &play);
+        Check(cases[i].fade ? translucent : opaque, cases[i].fade ? gfx.polyXlu.p : gfx.polyOpa.p, cases[i].list,
+              native, count, 0xE5EDF3FF, 3);
+        for (unsigned excluded = 0; excluded < 2; ++excluded) {
+            play.sceneId = excluded ? SCENE_00KEIKOKU : SCENE_BACKTOWN;
+            eligible = excluded ? 0 : 1;
+            Begin();
+            cases[i].draw(cases[i].actor, &play);
+            start = cases[i].fade ? translucent : opaque;
+            assert((size_t)((cases[i].fade ? gfx.polyXlu.p : gfx.polyOpa.p) - start) == count);
+            assert(!memcmp(native, start, count * sizeof(Gfx)));
+        }
+        eligible = 1;
+    }
+    play.sceneId = SCENE_00KEIKOKU;
+    grass.isCut = 1;
+    Begin();
+    EnKusa_DrawGrass(&grass.actor, &play);
+    assert(gfx.polyOpa.p - opaque == 1 && opaque[0].words.w1 == (uintptr_t)gKusaStumpDL);
+    puts("PASS Termina winter grass/bush OPA/XLU frost; exact native commands, fade alpha, stumps and Clock Town");
+}
+
 int main(void) {
     play.state.gfxCtx = &gfx;
+    Winter();
     Kusa();
     GroupedGrass();
 }

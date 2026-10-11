@@ -711,7 +711,9 @@ void EnKusa_Update(Actor* thisx, PlayState* play2) {
 void EnKusa_DrawBush(Actor* thisx, PlayState* play2) {
     PlayState* play = play2;
     EnKusa* this = (EnKusa*)thisx;
-    s32 autumn = MMWeather_SeasonForPlay(play) == SEASON_AUTUMN;
+    s32 season = MMWeather_SeasonForPlay(play);
+    s32 frost = season == SEASON_WINTER && play->sceneId == SCENE_00KEIKOKU;
+    s32 seasonal = season == SEASON_AUTUMN || frost;
 
     Ship_ExtendedCullingActorAdjustProjectedZ(&this->actor);
 
@@ -723,12 +725,12 @@ void EnKusa_DrawBush(Actor* thisx, PlayState* play2) {
         }
 
         OPEN_DISPS(play->state.gfxCtx);
-        if (autumn) {
-            gDPSetGrayscaleColor(POLY_OPA_DISP++, 217, 156, 69, 255);
-            gSPGrayscale(POLY_OPA_DISP++, true);
+        if (seasonal) {
+            gDPSetGrayscaleColor(POLY_OPA_DISP++, frost ? 229 : 217, frost ? 237 : 156, frost ? 243 : 69, 255);
+            gSPGrayscale(POLY_OPA_DISP++, frost ? 3 : 1);
         }
         Gfx_DrawDListOpa(play, gKusaBushType1DL);
-        if (autumn) {
+        if (seasonal) {
             gSPGrayscale(POLY_OPA_DISP++, false);
         }
         CLOSE_DISPS(play->state.gfxCtx);
@@ -743,12 +745,12 @@ void EnKusa_DrawBush(Actor* thisx, PlayState* play2) {
 
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
         gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, alpha);
-        if (autumn) {
-            gDPSetGrayscaleColor(POLY_XLU_DISP++, 217, 156, 69, 255);
-            gSPGrayscale(POLY_XLU_DISP++, true);
+        if (seasonal) {
+            gDPSetGrayscaleColor(POLY_XLU_DISP++, frost ? 229 : 217, frost ? 237 : 156, frost ? 243 : 69, 255);
+            gSPGrayscale(POLY_XLU_DISP++, frost ? 3 : 1);
         }
         gSPDisplayList(POLY_XLU_DISP++, gKusaBushType2DL);
-        if (autumn) {
+        if (seasonal) {
             gSPGrayscale(POLY_XLU_DISP++, false);
         }
 
@@ -771,14 +773,16 @@ void EnKusa_DrawGrass(Actor* thisx, PlayState* play) {
         }
         // Scope RGB treatment around the selected grass draw, so texture and
         // model replacements receive it too. Cut stumps keep their material.
-        s32 autumn = MMWeather_SeasonForPlay(play) == SEASON_AUTUMN;
+        s32 season = MMWeather_SeasonForPlay(play);
+        s32 frost = season == SEASON_WINTER && play->sceneId == SCENE_00KEIKOKU;
+        s32 seasonal = season == SEASON_AUTUMN || frost;
         OPEN_DISPS(play->state.gfxCtx);
-        if (autumn) {
-            gDPSetGrayscaleColor(POLY_OPA_DISP++, 217, 156, 69, 255);
-            gSPGrayscale(POLY_OPA_DISP++, true);
+        if (seasonal) {
+            gDPSetGrayscaleColor(POLY_OPA_DISP++, frost ? 229 : 217, frost ? 237 : 156, frost ? 243 : 69, 255);
+            gSPGrayscale(POLY_OPA_DISP++, frost ? 3 : 1);
         }
         Gfx_DrawDListOpa(play, gKusaSproutDL);
-        if (autumn) {
+        if (seasonal) {
             gSPGrayscale(POLY_OPA_DISP++, false);
         }
         CLOSE_DISPS(play->state.gfxCtx);

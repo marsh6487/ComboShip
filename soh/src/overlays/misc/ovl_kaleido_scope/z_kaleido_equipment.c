@@ -994,13 +994,12 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
     for (rowStart = 0, j = 0, temp = 0, i = 0; i < 4; i++, rowStart += 4, j += 16) {
         gSPVertex(POLY_OPA_DISP++, &pauseCtx->equipVtx[j], 16, 0);
         if (i == 0 || i == 1) {
-            // Skijer 2026-07-15: upgrade rows 0/1 = MAGIC CAPE / PENDANT OF MEMORIES (replacing the
-            // quiver/bullet-bag and bomb-bag capacity icons). Solid = toggle ON, half-transparent =
-            // OFF — the spiritual-stones visual (prim alpha halved, z_kaleido_collect.c pattern).
+            // Upgrade rows 0/1 = Magic Cape / Pendant of Memories. The owned Cape's passive stays
+            // active when its cloth is hidden; only the Pendant dims when its moveset is off.
             u8 upgOwned = (i == 0) ? ExtEquip_CapeOwned() : ExtEquip_PendantOwned();
 
             if (upgOwned) {
-                u8 upgOn = (i == 0) ? ExtEquip_CapeVisible() : ExtEquip_PendantActive();
+                u8 upgOn = (i == 0) || ExtEquip_PendantActive();
                 void* upgIcon = (i == 0) ? ExtEquip_GetCapeIcon() : ExtEquip_GetPendantIcon();
 
                 if (upgIcon != NULL) {

@@ -306,7 +306,8 @@ struct RDP {
     uint32_t other_mode_l, other_mode_h;
     uint64_t combine_mode;
     bool grayscale;
-    bool grayscale_normalize; // G_SETGRAYSCALE mode 2 preserves mean RGB intensity.
+    bool grayscale_normalize; // G_SETGRAYSCALE modes 2/3 normalize the palette.
+    bool grayscale_frost;     // Mode 3 lifts mean RGB by 1.8 for scoped winter foliage.
 
     uint8_t prim_lod_fraction;
     uint16_t prim_depth;

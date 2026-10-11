@@ -4,16 +4,51 @@ Uses unchanged production bodies with resource, matrix and stream instrumentatio
 This verifies a bounded transform, not visual containment inside unsupplied mod art.
 """
 import os
+import json
 from pathlib import Path
 import re
 import shlex
 import subprocess
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 
 from run_mm_scene_randomization_tests import function
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def packaged_glass_commands():
+    entries = []
+    for owner, host in (('oot', 'soh'), ('mm', 'mm')):
+        assets = ROOT / host / 'assets/custom'
+        pending = ['objects/combo_bottle_gi/EmptyXlu']
+        if (assets / 'objects/combo_bottle_gi/FairyXlu').is_file():
+            pending.append('objects/combo_bottle_gi/FairyXlu')
+        visited = set()
+        while pending:
+            resource = pending.pop()
+            if resource in visited:
+                continue
+            visited.add(resource)
+            path = assets / resource
+            blob = path.read_bytes()  # Missing nested resources must fail the test.
+            if not blob.startswith(b'<'):
+                continue
+            root = ET.parse(path).getroot()
+            if root.tag != 'DisplayList':
+                continue
+            commands = []
+            for command in root:
+                if 'Path' in command.attrib:
+                    pending.append(command.get('Path'))
+                attributes = ','.join('{' + json.dumps(key) + ',' + json.dumps(value) + '}'
+                                      for key, value in command.attrib.items())
+                commands.append('{' + json.dumps(command.tag) + ',{' + attributes + '}}')
+            key = owner + ':' + path.relative_to(assets).as_posix()
+            entries.append('{' + json.dumps(key) + ',{' + ','.join(commands) + '}}')
+    return ('const std::map<std::string, std::vector<AssetCommand>> assetCommandLists = {\n' +
+            ',\n'.join(entries) + '\n};\n')
 
 
 def native(namespace, path, draws, member, resource_type, rows, constants):
@@ -36,6 +71,7 @@ def native(namespace, path, draws, member, resource_type, rows, constants):
 
 
 def main():
+    subprocess.run([sys.executable, '-B', str(ROOT / 'tests/fairy_bottle/run_glass_asset_tests.py')], check=True)
     subprocess.run([sys.executable, '-B', str(ROOT / 'tests/fairy_bottle/run_glow_pose_tests.py')], check=True)
     subprocess.run([sys.executable, '-B', str(ROOT / 'tests/fairy_bottle/run_receipt_tests.py')], check=True)
     bodies = native('oot', 'soh/src/code/z_draw.c', ['GetItem_DrawFairy'], 'dlists', 'Gfx*',
@@ -68,6 +104,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='fairy-bottle-test-') as temporary:
         build = Path(temporary)
         (build / 'fairy_production.inc').write_text(bodies)
+        (build / 'fairy_asset_commands.inc').write_text(packaged_glass_commands())
         for host in ('oot', 'mm'):
             binary = build / ('test-' + host)
             flags = ['-DCOMBO_FAIRY_HOST_MM'] if host == 'mm' else []

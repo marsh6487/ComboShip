@@ -69,7 +69,9 @@ def main():
                     data = archive.read(case["path"])
                     if hashlib.sha256(data).hexdigest() != case["resource_sha256"]:
                         raise ValueError(f"Native scene fixture hash differs: {case['path']}")
-                    scene_cases.append((case, reference["palette"], reference["winter_palette"], data))
+                    winter_palette = (reference["termina_winter_palette"] if case["scene_id"] == "SCENE_00KEIKOKU"
+                                      else reference["winter_palette"])
+                    scene_cases.append((case, reference["palette"], winter_palette, data))
                 if not scene_cases:
                     raise ValueError("The requested all-scene material reference has no cases")
     source = (ROOT / "mm/2s2h/Enhancements/Graphics/AutumnSceneFoliage.cpp").read_text()

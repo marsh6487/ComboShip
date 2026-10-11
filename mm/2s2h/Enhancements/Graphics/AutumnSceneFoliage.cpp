@@ -47,9 +47,25 @@ constexpr Material kMaterials[] = {
 #include "AutumnSceneMaterials.inc"
 };
 
-uint32_t SeasonPalette(uint32_t autumnColor, int selectedSeason) {
+uint32_t SeasonPalette(uint32_t autumnColor, int selectedSeason, int sceneId = -1) {
     if (selectedSeason != SEASON_WINTER)
         return autumnColor;
+    if (sceneId == SCENE_00KEIKOKU) {
+        // Termina's dark HD foliage needs a full cool-white treatment. Keep the
+        // accepted partial winter blend in Clock Town and every other scene.
+        switch (autumnColor) {
+            case 0xD99C45FF:
+            case 0xFFD078FF:
+                return 0xE5EDF3FF;
+            case 0xB96848FF:
+            case 0xF4B783FF:
+                return 0xCCDCEEFF;
+            case 0xFF9F91FF:
+                return 0xD8E2ECFF;
+            default:
+                return autumnColor;
+        }
+    }
     switch (autumnColor) {
         case 0xD99C45FF:
         case 0xFFD078FF:
@@ -64,6 +80,10 @@ uint32_t SeasonPalette(uint32_t autumnColor, int selectedSeason) {
     }
 }
 
+unsigned SeasonTintMode(int selectedSeason, int sceneId) {
+    return selectedSeason == SEASON_WINTER && sceneId == SCENE_00KEIKOKU ? 3 : 2;
+}
+
 uint32_t ForestListColor(std::string path, int selectedSeason = SEASON_AUTUMN) {
     if (path.starts_with("alt/"))
         path.erase(0, 4);
@@ -76,7 +96,7 @@ uint32_t ForestListColor(std::string path, int selectedSeason = SEASON_AUTUMN) {
         for (const auto* setup : { "", "Set_001200", "Set_001340", "Set_0014C0", "Set_0015D0", "Set_001750",
                                    "Set_0019F0", "Set_001B30", "Set_001C90", "Set_001E60" }) {
             if (path == prefix + setup + "DL_0241B0")
-                return SeasonPalette(0xF4B783FF, selectedSeason);
+                return SeasonPalette(0xF4B783FF, selectedSeason, SCENE_00KEIKOKU);
         }
     }
     return 0;
@@ -91,17 +111,17 @@ uint32_t WholeListColor(std::string path, int selectedSeason = SEASON_AUTUMN) {
         const std::string prefix = "scenes/nonmq/Z2_00KEIKOKU" + std::string(suffix) + "/Z2_00KEIKOKU_room_00DL_";
         for (const auto* top : { "0153A8", "015DF0", "016598" }) {
             if (path == prefix + top)
-                return SeasonPalette(0xFFD078FF, selectedSeason);
+                return SeasonPalette(0xFFD078FF, selectedSeason, SCENE_00KEIKOKU);
         }
         for (const auto* side : { "0158E8", "016180", "016A38" }) {
             if (path == prefix + side)
-                return SeasonPalette(0xF4B783FF, selectedSeason);
+                return SeasonPalette(0xF4B783FF, selectedSeason, SCENE_00KEIKOKU);
         }
     }
     return 0;
 }
 
-uint32_t MaterialColor(uint64_t hash, int selectedSeason = SEASON_AUTUMN) {
+uint32_t MaterialColor(uint64_t hash, int selectedSeason = SEASON_AUTUMN, int sceneId = -1) {
     static const auto colors = [] {
         std::map<uint64_t, uint32_t> result;
         for (const auto& material : kMaterials) {
@@ -119,7 +139,7 @@ uint32_t MaterialColor(uint64_t hash, int selectedSeason = SEASON_AUTUMN) {
         return result;
     }();
     const auto found = colors.find(hash);
-    return found == colors.end() ? 0 : SeasonPalette(found->second, selectedSeason);
+    return found == colors.end() ? 0 : SeasonPalette(found->second, selectedSeason, sceneId);
 }
 
 size_t MaterialCommandLength(uint8_t opcode) {
@@ -187,7 +207,7 @@ std::vector<RendererPointerSlot> RendererPointerSlots(const std::vector<Gfx>& so
     return slots;
 }
 
-std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason = SEASON_AUTUMN) {
+std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason = SEASON_AUTUMN, int sceneId = -1) {
     std::vector<Gfx> result;
     uint32_t imageColor = 0;
     bool tileSlot[8]{};
@@ -202,8 +222,8 @@ std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason
             return {};
         }
         if (opcode == G_SETTIMG_OTR_HASH) {
-            imageColor =
-                MaterialColor((uint64_t(source[i + 1].words.w0) << 32) | source[i + 1].words.w1, selectedSeason);
+            imageColor = MaterialColor((uint64_t(source[i + 1].words.w0) << 32) | source[i + 1].words.w1,
+                                       selectedSeason, sceneId);
         } else if (opcode == G_SETTIMG) {
             imageColor = 0;
         } else if (opcode == G_SETTILE) {
@@ -236,7 +256,7 @@ std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason
                 ++end;
             }
             if (color != 0) {
-                result.push_back(gsSPGrayscale(2)); // Preserve the texture's mean intensity.
+                result.push_back(gsSPGrayscale(SeasonTintMode(selectedSeason, sceneId)));
                 result.push_back(
                     gsDPSetGrayscaleColor(color >> 24, (color >> 16) & 255, (color >> 8) & 255, color & 255));
                 changed = true;
@@ -393,7 +413,7 @@ std::map<std::pair<const Fast::Texture*, uint32_t>, SurfaceTextureVariant> sSurf
 std::vector<SurfaceTextureBinding> sSurfaceBindings;
 
 std::shared_ptr<Fast::Texture> BuildSurfaceTexture(const std::shared_ptr<Fast::Texture>& source,
-                                                   uint32_t color = 0xFFD078FF) {
+                                                   uint32_t color = 0xFFD078FF, float intensityScale = 1.0f) {
     const unsigned red = color >> 24, green = (color >> 16) & 255, blue = (color >> 8) & 255;
     const unsigned colorSum = red + green + blue;
     const unsigned blend = color & 255;
@@ -421,9 +441,15 @@ std::shared_ptr<Fast::Texture> BuildSurfaceTexture(const std::shared_ptr<Fast::T
             // Match the brightness-preserving grass treatment used by the
             // display-list variants, with only byte rounding/highlight clipping.
             const unsigned sum = unsigned(pixel[0]) + pixel[1] + pixel[2];
-            pixel[0] = (unsigned(pixel[0]) * (255 - blend) + std::min(255u, sum * red / colorSum) * blend) / 255;
-            pixel[1] = (unsigned(pixel[1]) * (255 - blend) + std::min(255u, sum * green / colorSum) * blend) / 255;
-            pixel[2] = (unsigned(pixel[2]) * (255 - blend) + std::min(255u, sum * blue / colorSum) * blend) / 255;
+            const auto channel = [&](unsigned value) {
+                const unsigned normalized = intensityScale == 1.0f
+                                                ? sum * value / colorSum
+                                                : unsigned(float(sum * value) * intensityScale / colorSum);
+                return std::min(255u, normalized);
+            };
+            pixel[0] = (unsigned(pixel[0]) * (255 - blend) + channel(red) * blend) / 255;
+            pixel[1] = (unsigned(pixel[1]) * (255 - blend) + channel(green) * blend) / 255;
+            pixel[2] = (unsigned(pixel[2]) * (255 - blend) + channel(blue) * blend) / 255;
             changed = true;
         }
     }
@@ -468,11 +494,11 @@ void UpdateSurfaceTextures(const PlayState* play, const std::shared_ptr<Ship::Re
                 active.push_back(*current);
                 continue;
             }
-            const auto color = SeasonPalette(0xFFD078FF, selectedSeason);
+            const auto color = SeasonPalette(0xFFD078FF, selectedSeason, play->sceneId);
             const auto key = std::pair{ source.get(), color };
             auto it = sSurfaceTextures.find(key);
             if (it == sSurfaceTextures.end()) {
-                auto copy = BuildSurfaceTexture(source, color);
+                auto copy = BuildSurfaceTexture(source, color, selectedSeason == SEASON_WINTER ? 1.8f : 1.0f);
                 if (copy == nullptr) {
                     continue;
                 }
@@ -609,7 +635,8 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
             const auto other = otherVariants.find(resource.get());
             const auto& original = other == otherVariants.end() ? resource->Instructions : other->second.original;
             const auto forestColor = ForestListColor(path, selectedSeason);
-            auto commands = forestColor != 0 ? std::vector<Gfx>{} : BuildVariant(original, selectedSeason);
+            auto commands =
+                forestColor != 0 ? std::vector<Gfx>{} : BuildVariant(original, selectedSeason, play->sceneId);
             const auto wholeColor = forestColor != 0 ? forestColor : WholeListColor(path, selectedSeason);
             if (commands.empty() && wholeColor == 0) {
                 // Ordinary scene materials stay owned by the resource manager;
@@ -638,7 +665,7 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                 // color even when that root ends with a tail branch. Copies
                 // retain all dynamic child calls, geometry and alpha commands.
                 variant.draw = variant.original;
-                variant.commands = { gsSPGrayscale(2), // Preserve intensity; keep legacy effects unchanged.
+                variant.commands = { gsSPGrayscale(SeasonTintMode(selectedSeason, play->sceneId)),
                                      gsDPSetGrayscaleColor(wholeColor >> 24, (wholeColor >> 16) & 255,
                                                            (wholeColor >> 8) & 255, wholeColor & 255),
                                      gsSPDisplayList(variant.draw.data()), gsSPGrayscale(false), gsSPEndDisplayList() };

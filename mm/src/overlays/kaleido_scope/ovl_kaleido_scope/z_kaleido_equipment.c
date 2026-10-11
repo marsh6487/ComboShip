@@ -1167,10 +1167,9 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
             if (icon == NULL) {
                 continue;
             }
-            // Rows 0/1 show their toggle state spiritual-stones style: solid = ON, half = OFF.
-            if (row == 0) {
-                upgAlpha = ExtEquip_CapeVisible() ? pauseCtx->alpha : (pauseCtx->alpha >> 1);
-            } else if (row == 1) {
+            // The owned Cape's passive stays active when its cloth is hidden. Only the Pendant
+            // dims when its moveset is off.
+            if (row == 1) {
                 upgAlpha = ExtEquip_PendantActive() ? pauseCtx->alpha : (pauseCtx->alpha >> 1);
             } else {
                 upgAlpha = pauseCtx->alpha;

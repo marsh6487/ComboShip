@@ -27553,6 +27553,14 @@
       ]
     }
   ],
+  "termina_winter_palette": [
+    "00000000",
+    "E5EDF3FF",
+    "CCDCEEFF",
+    "E5EDF3FF",
+    "CCDCEEFF",
+    "D8E2ECFF"
+  ],
   "winter_palette": [
     "00000000",
     "BED2C2B0",

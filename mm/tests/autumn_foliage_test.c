@@ -403,6 +403,51 @@ static void Materials(void) {
     puts("PASS autumn tree/leaf palette, separate trunk, native alpha and immediate season/eligibility restore");
 }
 
+static void WinterMaterials(void) {
+    Reset();
+    EnWood02 tree;
+    const s16 types[] = { WOOD_TREE_OVAL_GREEN, WOOD_TREE_CONICAL_MEDIUM, WOOD_TREE_KAKARIKO_ADULT };
+    for (unsigned i = 0; i < ARRAY_COUNT(types); ++i) {
+        InitTree(&tree, types[i]);
+        liveSeason = SEASON_OFF;
+        BeginDraw();
+        EnWood02_Draw(&tree.actor, &play);
+        Gfx originalTrunk[64], originalLeaves[64];
+        size_t trunkSize = (gfx.polyOpa.p - opaque) * sizeof(Gfx);
+        size_t leafSize = (gfx.polyXlu.p - translucent) * sizeof(Gfx);
+        memcpy(originalTrunk, opaque, trunkSize);
+        memcpy(originalLeaves, translucent, leafSize);
+        play.sceneId = SCENE_00KEIKOKU;
+        liveSeason = SEASON_WINTER;
+        BeginDraw();
+        EnWood02_Draw(&tree.actor, &play);
+        REQUIRE(Color(translucent, gfx.polyXlu.p, G_SETINTENSITY) == 0xCCDCEEFF);
+        int frost = 0, draws = 0;
+        for (const Gfx* cmd = translucent; cmd < gfx.polyXlu.p; ++cmd) {
+            if ((cmd->words.w0 >> 24) == G_SETGRAYSCALE) {
+                REQUIRE(cmd->words.w1 == 0 || cmd->words.w1 == 3);
+                frost = cmd->words.w1;
+            }
+            if ((cmd->words.w0 >> 24) == G_DL) {
+                REQUIRE(frost == 3 && cmd->words.w1 == (uintptr_t)D_808C4D70[tree.drawType]);
+                ++draws;
+            }
+        }
+        REQUIRE(frost == 0 && draws == 1);
+        REQUIRE((gfx.polyOpa.p - opaque) * sizeof(Gfx) == trunkSize && !memcmp(originalTrunk, opaque, trunkSize));
+        for (unsigned excluded = 0; excluded < 2; ++excluded) {
+            play.sceneId = excluded ? SCENE_00KEIKOKU : SCENE_BACKTOWN;
+            eligible = excluded ? false : true;
+            BeginDraw();
+            EnWood02_Draw(&tree.actor, &play);
+            REQUIRE((gfx.polyXlu.p - translucent) * sizeof(Gfx) == leafSize);
+            REQUIRE(!memcmp(originalLeaves, translucent, leafSize));
+        }
+        eligible = true;
+    }
+    puts("PASS Termina winter native tree canopies; untouched trunks, Clock Town and ineligible play");
+}
+
 static void AssetOwnership(void) {
     Reset();
     EnWood02 tree;
@@ -673,6 +718,7 @@ static void NativeImpact(void) {
 
 int main(int argc, char** argv) {
     if (argc == 1 || !strcmp(argv[1], "materials")) {
+        WinterMaterials();
         Materials();
         AssetOwnership();
         BranchingTreeMaterials();

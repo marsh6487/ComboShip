@@ -35,6 +35,7 @@ struct Palette {
 struct Rdp {
     bool grayscale = false;
     bool grayscale_normalize = false;
+    bool grayscale_frost = false;
     Palette grayscale_color{};
 };
 struct RawTexMetadata {
@@ -47,6 +48,7 @@ struct Stats {
     unsigned triangles = 0, tinted = 0, vertexLoads = 0;
     std::vector<uintptr_t> vertexPointers;
     std::vector<uint32_t> palettes;
+    std::vector<unsigned> tintModes;
     std::vector<std::shared_ptr<Fast::Texture>> textures;
     std::map<std::string, std::pair<unsigned, unsigned>> materials; // total, tinted
 };
@@ -77,6 +79,7 @@ struct Interpreter {
         const auto color = rdp.grayscale_color;
         stats.palettes.push_back(
             rdp.grayscale ? uint32_t(color.r) << 24 | uint32_t(color.g) << 16 | uint32_t(color.b) << 8 | color.a : 0);
+        stats.tintModes.push_back(!rdp.grayscale ? 0 : rdp.grayscale_frost ? 3 : rdp.grayscale_normalize ? 2 : 1);
         if (rdp.grayscale && color.r == 244 && color.g == 183 && color.b == 131 && color.a == 255) {
             ++stats.tinted;
             ++material.second;

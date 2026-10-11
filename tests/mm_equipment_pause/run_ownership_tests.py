@@ -407,7 +407,8 @@ int main() {
               "Cape popup leaves its passive owned while Pendant A retains its effect toggle");
         save.capeHidden = 1; // Confirming Hide in the native message handler changes only this flag.
         Draw(&play);
-        check(upgradeAlphas[0] == 127 && upgradeAlphas[1] == 127, "disabled passive toggles retain half-transparent icons");
+        check(upgradeAlphas[0] == play.pauseCtx.alpha, "hidden Cape retains its active passive icon alpha");
+        check(upgradeAlphas[1] == 127, "inactive Pendant retains its half-transparent icon");
         play.state.input.press.button = 0; play.pauseCtx.stickAdjY = -40;
         KaleidoScope_UpdateEquipmentCursor(&play);
         check(sEquipCursorY == 1, "moving down from Pendant skips the retired lower sockets");

@@ -151,6 +151,11 @@ int main(int argc, char** argv) {
     assert(std::equal(winterExpected.begin(), winterExpected.end(), winterCopy->ImageData));
     assert(std::equal(original.begin(), original.end(), winterSource->ImageData));
     CheckMetadata(*winterSource, *winterCopy);
+    auto frostCopy = BuildSurfaceTexture(winterSource, 0xE5EDF3FF, 1.8f);
+    const std::vector<uint8_t> frostExpected = { 81, 84, 86, 128, 70, 50, 30, 255, 64, 64, 64, 0 };
+    assert(frostCopy != nullptr && std::equal(frostExpected.begin(), frostExpected.end(), frostCopy->ImageData));
+    assert(std::equal(original.begin(), original.end(), winterSource->ImageData));
+    CheckMetadata(*winterSource, *frostCopy);
     assert(BuildSurfaceTexture(winterSource, 0x000000FF) == nullptr);
 
     for (unsigned invalid = 0; invalid < 5; ++invalid) {
@@ -228,7 +233,34 @@ int main(int argc, char** argv) {
                std::pair{ (1460u * 1024 + 100) * 4, std::vector<uint8_t>{ 73, 83, 59, 255 } },
                std::pair{ (1950u * 1024 + 500) * 4, std::vector<uint8_t>{ 62, 76, 48, 255 } } })
             assert(std::equal(pixel.begin(), pixel.end(), winterCopy->ImageData + offset));
+        frostCopy = BuildSurfaceTexture(source, 0xE5EDF3FF, 1.8f);
+        assert(frostCopy != nullptr);
+        CheckMetadata(*source, *frostCopy);
+        for (size_t i = 0; i < pixels.size(); i += 4) {
+            assert(frostCopy->ImageData[i + 3] == pixels[i + 3]);
+            if (pixels[i + 1] <= pixels[i] || pixels[i + 1] <= pixels[i + 2]) {
+                assert(std::memcmp(frostCopy->ImageData + i, pixels.data() + i, 4) == 0);
+            } else {
+                const unsigned originalSum = unsigned(pixels[i]) + pixels[i + 1] + pixels[i + 2];
+                const unsigned frostedSum =
+                    unsigned(frostCopy->ImageData[i]) + frostCopy->ImageData[i + 1] + frostCopy->ImageData[i + 2];
+                if (originalSum <= 400) {
+                    const unsigned liftedSum = originalSum * 9 / 5;
+                    assert(frostedSum <= liftedSum && frostedSum + 3 >= liftedSum);
+                }
+            }
+        }
+        for (const auto& [offset, pixel] :
+             { std::pair{ (50u * 1024 + 25) * 4, std::vector<uint8_t>{ 147, 152, 156, 255 } },
+               std::pair{ (920u * 1024 + 512) * 4, std::vector<uint8_t>{ 189, 196, 201, 255 } },
+               std::pair{ (1460u * 1024 + 100) * 4, std::vector<uint8_t>{ 126, 130, 133, 255 } },
+               std::pair{ (1950u * 1024 + 500) * 4, std::vector<uint8_t>{ 109, 113, 115, 255 } },
+               std::pair{ (500u * 1024 + 500) * 4, std::vector<uint8_t>{ 103, 72, 51, 255 } },
+               std::pair{ (700u * 1024 + 200) * 4, std::vector<uint8_t>{ 105, 84, 45, 255 } } })
+            assert(std::equal(pixel.begin(), pixel.end(), frostCopy->ImageData + offset));
+        assert(std::equal(pixels.begin(), pixels.end(), source->ImageData));
         std::puts("PASS exact 1024x2048 POC4 atlas: four grass regions, preserved mean intensity, every non-green "
                   "pixel and alpha byte, immutable source");
+        std::puts("PASS Termina snow-white grass lift across the real atlas; bark/alpha stay byte-exact");
     }
 }

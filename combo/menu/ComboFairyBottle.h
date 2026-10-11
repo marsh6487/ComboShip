@@ -30,6 +30,19 @@ static inline ComboFairyBottleShell ComboFairyBottle_BundledShell(ComboFairyBott
     return shell;
 }
 
+// Strengthen only the bundled fairy's glass. Empty/general bottles and selected
+// casing/material recipes remain complete, including those in older archives.
+static inline ComboFairyBottleShell ComboFairyBottle_ReadableShell(ComboFairyBottleShell shell,
+                                                                   int (*isSelectedMod)(const char*), int available) {
+    if (available && isSelectedMod && strcmp(shell.opaque, "__OTR__objects/combo_bottle_gi/EmptyOpaque") == 0 &&
+        strcmp(shell.glass, "__OTR__objects/combo_bottle_gi/EmptyXlu") == 0 && !isSelectedMod(shell.opaque) &&
+        !isSelectedMod(shell.glass) && !isSelectedMod("__OTR__objects/combo_bottle_gi/BottleShell") &&
+        !isSelectedMod("__OTR__objects/combo_bottle_gi/shell/mat_gGiBlueFireChamberstickDL_BottleGlassOutside")) {
+        shell.glass = "__OTR__objects/combo_bottle_gi/FairyXlu";
+    }
+    return shell;
+}
+
 typedef struct {
     float x, y, z;
     float scaleX, scaleY, scaleZ;

@@ -98,7 +98,7 @@ static void CheckOotRecipe(const oot::GetItemEntry& entry) {
     assert(entry.gi == entry.gid + 1 && entry.collectable && entry.getItemFrom == oot::ITEM_FROM_NPC);
     assert(entry.drawFunc == nullptr && entry.field == 0x80);
     assert(!strcmp((const char*)resources[0], "__OTR__objects/combo_bottle_gi/EmptyOpaque"));
-    assert(!strcmp((const char*)resources[1], "__OTR__objects/combo_bottle_gi/EmptyXlu"));
+    assert(!strcmp((const char*)resources[1], "__OTR__objects/combo_bottle_gi/FairyXlu"));
     oot::sDrawItemTable[entry.gid].drawFunc(nullptr, entry.gid);
     assert(selectedCallback == "GetItem_DrawFairy" && "native receipt must invoke the contents renderer");
 }
@@ -158,6 +158,8 @@ int main(int argc, char** argv) {
         float scale = 0;
         int count = mm::GetItem_GetDrawTableEntry(receipt.gid, resources, 8, &xlu, &scale, &scroll, &kind);
         assert(xlu == 1 && resources[2] != nullptr);
+        assert(!strcmp((const char*)resources[0], "__OTR__objects/combo_bottle_gi/EmptyOpaque"));
+        assert(!strcmp((const char*)resources[1], "__OTR__objects/combo_bottle_gi/FairyXlu"));
         if (!strcmp(receipt.name, "RI_OOT_BOTTLE_FAIRY")) {
             assert(count == 4 && kind == CW_DRAW_KIND_MM_FAIRY_CONTAINER);
             assert(resources[2] == mm::gGiFairyBottleContentsDL && resources[3] == &mm::gGiFairyBottleBillboardRotMtx);

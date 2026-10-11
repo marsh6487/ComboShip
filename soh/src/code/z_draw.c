@@ -422,7 +422,8 @@ static ComboFairyBottleShell GetItem_EmptyBottleShell(s16 drawId) {
 static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
     // Content models such as Blue Fire can bake a flame into their shell.
     // Reuse the empty bottle's selected casing without inheriting any content.
-    return GetItem_EmptyBottleShell(GID_BOTTLE);
+    return ComboFairyBottle_ReadableShell(GetItem_EmptyBottleShell(GID_BOTTLE), ResourceMgr_IsModAsset,
+                                          ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/FairyXlu"));
 }
 
 #include "ComboFairyBottleDraw.h"

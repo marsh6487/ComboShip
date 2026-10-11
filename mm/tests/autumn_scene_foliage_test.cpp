@@ -216,9 +216,9 @@ static void CheckScopedForestCommands(const Variant& variant, const std::vector<
     assert(Equal(variant.original, original));
     const auto& commands = variant.commands;
     assert(commands.size() == 5);
-    assert(SameCommand(commands[0], gsSPGrayscale(2)));
+    assert(SameCommand(commands[0], gsSPGrayscale(selectedSeason == SEASON_WINTER ? 3 : 2)));
     if (selectedSeason == SEASON_WINTER)
-        assert(SameCommand(commands[1], gsDPSetGrayscaleColor(185, 205, 217, 176)));
+        assert(SameCommand(commands[1], gsDPSetGrayscaleColor(204, 220, 238, 255)));
     else
         assert(SameCommand(commands[1], gsDPSetGrayscaleColor(244, 183, 131, 255)));
     const auto* draw = reinterpret_cast<const Gfx*>(commands[2].words.w1);
@@ -460,7 +460,7 @@ static std::vector<uint32_t> TrianglePalettes(const std::vector<Gfx>& commands) 
 static void CheckActualSceneMaterial(const char* path, int sceneId, const std::vector<Gfx>& original,
                                      const std::vector<uint32_t>& expected, int selectedSeason = SEASON_AUTUMN) {
     const bool selected = std::any_of(expected.begin(), expected.end(), [](uint32_t color) { return color != 0; });
-    const auto transformed = BuildVariant(original, selectedSeason);
+    const auto transformed = BuildVariant(original, selectedSeason, sceneId);
     if (selected && transformed.empty())
         std::fprintf(stderr, "FAIL actual scene material %s: selected grass/forest remains untinted\n", path);
     assert(selected == !transformed.empty());
@@ -661,7 +661,7 @@ static void CheckCrossSeasonVtxFirst() {
                     if (selected != SEASON_OFF || renderOff) {
                         const auto stats = ForestRendererFixture::Draw(forest->Instructions);
                         const uint32_t color = selected == SEASON_AUTUMN   ? 0xF4B783FF
-                                               : selected == SEASON_WINTER ? 0xB9CDD9B0
+                                               : selected == SEASON_WINTER ? 0xCCDCEEFF
                                                                            : 0;
                         const auto expected = std::vector<uint32_t>(22, color);
                         const unsigned selectedCount = std::count_if(stats.palettes.begin(), stats.palettes.end(),
@@ -768,7 +768,7 @@ static void CheckExistingSeasonCacheClear() {
                 ForestRendererFixture::manager.refreshed = true;
                 MMAutumnSceneFoliage_Update(&play);
                 auto stats = ForestRendererFixture::Draw(forest->Instructions);
-                const uint32_t otherColor = other == SEASON_AUTUMN ? 0xF4B783FF : 0xB9CDD9B0;
+                const uint32_t otherColor = other == SEASON_AUTUMN ? 0xF4B783FF : 0xCCDCEEFF;
                 assert(stats.palettes == std::vector<uint32_t>(22, otherColor));
                 season = SEASON_OFF;
                 MMAutumnSceneFoliage_Update(&play);
@@ -777,7 +777,7 @@ static void CheckExistingSeasonCacheClear() {
                 season = initial;
                 MMAutumnSceneFoliage_Update(&play);
                 stats = ForestRendererFixture::Draw(forest->Instructions);
-                const uint32_t initialColor = initial == SEASON_AUTUMN ? 0xF4B783FF : 0xB9CDD9B0;
+                const uint32_t initialColor = initial == SEASON_AUTUMN ? 0xF4B783FF : 0xCCDCEEFF;
                 const unsigned selectedCount = std::count_if(stats.palettes.begin(), stats.palettes.end(),
                                                              [](uint32_t value) { return value != 0; });
                 const uintptr_t expectedVertex =
@@ -841,7 +841,7 @@ static void CheckWinterTransitions() {
                 const bool treated = selected == SEASON_AUTUMN || selected == SEASON_WINTER;
                 const std::vector<uint32_t> colors =
                     selected == SEASON_AUTUMN   ? std::vector<uint32_t>{ 0xFF9F91FF, 0xF4B783FF, 0xFFD078FF }
-                    : selected == SEASON_WINTER ? std::vector<uint32_t>{ 0xC4D2C9B0, 0xB9CDD9B0, 0xBED2C2B0 }
+                    : selected == SEASON_WINTER ? std::vector<uint32_t>{ 0xD8E2ECFF, 0xCCDCEEFF, 0xE5EDF3FF }
                                                 : std::vector<uint32_t>(3, 0);
                 for (size_t i = 0; i < lists.size(); ++i) {
                     const auto stats = ForestRendererFixture::Draw(lists[i]->Instructions);
@@ -851,6 +851,8 @@ static void CheckWinterTransitions() {
                         std::fprintf(stderr,
                                      "FAIL winter middle trees: verified foliage draw still has no frosted tint\n");
                     assert(stats.palettes == std::vector<uint32_t>(count, colors[i]));
+                    const unsigned mode = selected == SEASON_WINTER ? 3 : selected == SEASON_AUTUMN ? 2 : 0;
+                    assert(stats.tintModes == std::vector<unsigned>(count, mode));
                 }
                 if (treated) {
                     const auto pointer = lists[0]->Instructions[0].words.w1;
@@ -867,7 +869,7 @@ static void CheckWinterTransitions() {
                     const std::vector<uint8_t> expected =
                         selected == SEASON_AUTUMN
                             ? std::vector<uint8_t>{ 61, 49, 28, 128, 70, 50, 30, 255, 64, 64, 64, 0 }
-                            : std::vector<uint8_t>{ 39, 61, 37, 128, 70, 50, 30, 255, 64, 64, 64, 0 };
+                            : std::vector<uint8_t>{ 81, 84, 86, 128, 70, 50, 30, 255, 64, 64, 64, 0 };
                     assert(std::equal(expected.begin(), expected.end(), cached->ImageData));
                     if (copies.contains(selected))
                         assert(copies.at(selected) == cached);
@@ -968,6 +970,16 @@ static void CheckOtherSceneGrass() {
             season = SEASON_AUTUMN;
             MMAutumnSceneFoliage_Update(&play);
             assert(resource->Instructions[0].words.w0 >> 24 == G_DL);
+            season = SEASON_WINTER;
+            MMAutumnSceneFoliage_Update(&play);
+            const auto& winter = sWinterVariants.at(resource.get()).commands;
+            const auto colors = TrianglePalettes(winter);
+            assert(std::count(colors.begin(), colors.end(), 0xBED2C2B0) > 0 &&
+                   std::all_of(colors.begin(), colors.end(),
+                               [](uint32_t color) { return color == 0 || color == 0xBED2C2B0; }));
+            for (const auto& cmd : winter)
+                if ((cmd.words.w0 >> 24) == G_SETGRAYSCALE && cmd.words.w1 != 0)
+                    assert(cmd.words.w1 == 2);
             season = SEASON_OFF;
             MMAutumnSceneFoliage_Update(&play);
             assert(Equal(resource->Instructions, original));
