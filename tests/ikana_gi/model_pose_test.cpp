@@ -69,6 +69,7 @@ struct ActualGeometry {
     std::array<uint32_t,16> matrix;
 };
 /* ACTUAL_GEOMETRY */
+/* FADOS_GEOMETRY */
 std::array<float,3> ApplyPose(std::array<float,3> p,float tilt,float roll){
     const float y=p[1]*std::cos(tilt)-p[2]*std::sin(tilt),z=p[1]*std::sin(tilt)+p[2]*std::cos(tilt);
     return {p[0]*std::cos(roll)-y*std::sin(roll),p[0]*std::sin(roll)+y*std::cos(roll),z};
@@ -139,6 +140,51 @@ int main(){
             assert(chin[1]<-.999f&&std::abs(chin[0])<.00001f&&"face chin must point down, not up");
         }
         std::cout<<"PASS selected serialized Ikana vertices/matrix: "<<geometry.name<<(binary?" binary":" XML")<<"; upright, sidewaysXY/XZ, off-center origins and chin-down sign\n";
+    }
+    // The supplied Fados worn mesh has a -X chin inside a nearly round rim.
+    // Its 2545/2460 span ratio is below the generic 5% sideways threshold.
+    // Use the archive's exact 2290 vertices and all 76 load boundaries.
+    if(!fadosPoints.empty())for(auto owner:{oot,mm})for(bool binary:{false,true}) {
+        owner->alt=false;
+        const char* game=owner==oot?"oot":"mm";
+        VertexPoints(*owner,"fados_vertices",fadosPoints,binary);
+        auto body=std::make_shared<Fast::DisplayList>();body->UCode=ucode_f3dex2;
+        for(auto [offset,count]:fadosLoads){
+            Gfx load{},args{};load.words.w0=uintptr_t(G_VTX_OTR_FILEPATH)<<24;
+            load.words.w1=uintptr_t("fados_vertices");args.words.w0=count;args.words.w1=offset;
+            body->Instructions.push_back(load);body->Instructions.push_back(args);
+        }
+        Gfx end{};end.words.w0=uintptr_t(G_ENDDL)<<24;body->Instructions.push_back(end);
+        owner->files["fados_body"]=body;
+        List(*owner,"fados_root",{{uintptr_t(G_DL_OTR_FILEPATH)<<24,uintptr_t("fados_body")},{uintptr_t(G_ENDDL)<<24,0}});
+        float tilt=-99,roll=-99;
+        assert(ResourceMgr_GetIkanaShieldGiPoseForGame(game,"fados_root",&tilt,&roll));
+        assert(tilt==0 && ApplyPose({-1,0,0},tilt,roll)[1]<-.999f && "Fados pickup face must point down");
+        std::cout<<"PASS supplied Fados selected mesh chin-down: "<<game<<(binary?" binary":" XML")<<"\n";
+
+        // Live Alt selection must follow the chosen graph, not its filename.
+        auto upright=fadosPoints;
+        for(auto& p:upright){const auto q=p;p={int16_t(-q[1]),q[0],q[2]};}
+        VertexPoints(*owner,"alt/fados_vertices",upright,binary);
+        owner->alt=true;
+        assert(ResourceMgr_GetIkanaShieldGiPoseForGame(game,"fados_root",&tilt,&roll)&&tilt==0&&roll==0);
+        owner->alt=false;
+        assert(ResourceMgr_GetIkanaShieldGiPoseForGame(game,"fados_root",&tilt,&roll));
+        assert(ApplyPose({-1,0,0},tilt,roll)[1]<-.999f);
+
+        // Identical bounds alone cannot authorize this specific mesh's pose.
+        auto unknown=fadosPoints;unknown[0][0]+=1;
+        VertexPoints(*owner,"fados_vertices",unknown,binary);
+        assert(ResourceMgr_GetIkanaShieldGiPoseForGame(game,"fados_root",&tilt,&roll)&&tilt==0&&roll==0);
+        VertexPoints(*owner,"fados_vertices",fadosPoints,binary);
+
+        // A resource matrix can already stand the same raw mesh upright.
+        MatrixWords(*owner,"fados_upright_matrix",{1,0,0xffff0000,0,0,0x00010000,0,1,0,0,0,0,0,0,0,0});
+        // F3DEX2's encoded push bit is inverted by the resource interpreter.
+        List(*owner,"fados_transformed",{{uintptr_t(G_MTX_OTR_FILEPATH)<<24,uintptr_t("fados_upright_matrix")},
+            {uintptr_t(G_DL_OTR_FILEPATH)<<24,uintptr_t("fados_body")},{uintptr_t(G_POPMTX)<<24,64},{uintptr_t(G_ENDDL)<<24,0}});
+        assert(ResourceMgr_GetIkanaShieldGiPoseForGame(game,"fados_transformed",&tilt,&roll)&&tilt==0&&roll==0);
+        assert(Ship::context.active==mm);
     }
     // MM native worn shield decal, object_link_childVtx_015EE8. Texture T
     // increases toward negative X (2251 at -1195, -144 at 851): chin is -X.

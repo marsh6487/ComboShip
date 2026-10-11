@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Check real Ikana pose producers, both grids and the engine's texture route."""
 from pathlib import Path
-import argparse, os, re, struct, subprocess, tempfile
+import argparse, hashlib, os, re, struct, subprocess, tempfile
 import xml.etree.ElementTree as ET
 from zipfile import ZipFile
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--sanitize",action="store_true")
 parser.add_argument("--archive",type=Path,action="append",default=[],help="optional authored NEI GI O2R geometry proof")
+parser.add_argument("--fados-archive",type=Path,help="local supplied Fados worn-shield O2R; mesh data is not distributed")
 args=parser.parse_args()
 ROOT=Path(__file__).resolve().parents[2]
 def function(source,name):
@@ -112,6 +113,50 @@ with tempfile.TemporaryDirectory(prefix='ikana-oot-cache-') as temp:
 
 pose=read('tests/ikana_gi/model_pose_test.cpp')
 pose=pose.replace('/* ACTUAL_GEOMETRY */','const std::vector<ActualGeometry> actualGeometry={'+','.join(geometry)+'};')
+def local_fados_geometry(archive):
+    # Keep the user's mesh local. Reproduce vertex load order from the supplied
+    # XML graph rather than distributing a baked vertex stream in the repo.
+    assert hashlib.sha256(archive.read_bytes()).hexdigest()==\
+        'a5239d0186b22e53d6a5797c8a406fe4903f830a97c6004c191b432976a43051', 'Unexpected Fados archive'
+    points,batches=[],[]
+    with ZipFile(archive) as selected:
+        names=set(selected.namelist())
+        def resource(path):
+            key='alt/'+path if 'alt/'+path in names else path
+            return key,ET.fromstring(selected.read(key))
+        def walk(path,parents):
+            key,root=resource(path)
+            assert root.tag=='DisplayList' and key not in parents and len(parents)<32
+            for command in root:
+                if command.tag=='CallDisplayList':
+                    walk(command.attrib['Path'],parents|{key})
+                elif command.tag=='LoadVertices':
+                    _,vertices=resource(command.attrib['Path'])
+                    assert vertices.tag=='Vertex'
+                    offset,count=int(command.attrib['VertexOffset']),int(command.attrib['Count'])
+                    loaded=list(vertices)[offset:offset+count]
+                    assert 0<=offset and 0<count<=32 and len(loaded)==count
+                    batches.append((len(points),count))
+                    points.extend(tuple(int(v.attrib[a]) for a in ('X','Y','Z')) for v in loaded)
+                elif 'Matrix' in command.tag:
+                    raise AssertionError('The supplied Fados graph must not contain model matrices')
+                elif command.tag=='EndDisplayList':
+                    break
+        walk('objects/object_link_child/gLinkHumanMirrorShieldDL',set())
+    raw=b''.join(struct.pack('<hhh',*point) for point in points)
+    assert len(points)==2290 and len(batches)==76
+    assert hashlib.sha256(raw).hexdigest()==\
+        'ffd72b3eb8f13e9c70938e99dfa0d3130e11286e3b26ee221eaef3913b24f328', 'Fados traversal mismatch'
+    print('Local Fados archive: exact 2290 vertices / 76 load batches verified',flush=True)
+    return points,batches
+fados_points,fados_loads=local_fados_geometry(args.fados_archive) if args.fados_archive else ([],[])
+if not args.fados_archive:
+    print('SKIP private Fados mesh regression; supply --fados-archive to run it locally',flush=True)
+pose=pose.replace('/* FADOS_GEOMETRY */',
+    'const std::vector<std::array<int16_t,3>> fadosPoints={'+
+    ','.join('{'+','.join(map(str,p))+'}' for p in fados_points)+'};\n'+
+    'const std::vector<std::array<size_t,2>> fadosLoads={'+
+    ','.join('{'+','.join(map(str,p))+'}' for p in fados_loads)+'};')
 scope=read('libultraship/include/ship/resource/ResourceManagerScope.h')
 pose=pose.replace('/* RESOURCE_SCOPE */',scope[scope.index('namespace Ship {'):])
 pose=pose.replace('/* POSE_QUERY */','\n'.join(function(read('combo/NeiAssetPriorityResource.h'),name) for name in

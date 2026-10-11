@@ -48,6 +48,12 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
 
     float ShieldRollZ() const {
         static_assert(TrackDepth);
+        // Fados' worn Ikana mesh has a -X chin inside a nearly round rim.
+        // Match its selected vertex stream, not a shared filename or relaxed
+        // span threshold. Resource transforms and edited meshes stay generic.
+        if (!mHasModelMatrix && mShieldVertexHashValid && mVertices == 2290 &&
+            mShieldVertexHash == 0x015b5334888c6583ull)
+            return 1.5707963267948966f;
         // After standing an arm-local XZ mesh up, its face can still point
         // sideways. Use spans, not distance from the off-center grip origin.
         // Bounds cannot identify a sideways face inside a square rim. Leave
@@ -118,6 +124,18 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
                 mHigh = std::max(mHigh, y);
                 mRadius = std::max(mRadius, std::hypot(x, transformed[2]));
                 if constexpr (TrackDepth) {
+                    if (mShieldVertexHashValid) {
+                        for (int axis = 0; axis < 3; ++axis) {
+                            const float coordinate = p[axis];
+                            if (coordinate < -32768.f || coordinate > 32767.f || std::trunc(coordinate) != coordinate) {
+                                mShieldVertexHashValid = false;
+                                break;
+                            }
+                            const uint16_t word = static_cast<uint16_t>(static_cast<int16_t>(coordinate));
+                            mShieldVertexHash = (mShieldVertexHash ^ (word & 0xffu)) * 0x100000001b3ull;
+                            mShieldVertexHash = (mShieldVertexHash ^ (word >> 8)) * 0x100000001b3ull;
+                        }
+                    }
                     mWidthLow = std::min(mWidthLow, x);
                     mWidthHigh = std::max(mWidthHigh, x);
                     mDepthLow = std::min(mDepthLow, transformed[2]);
@@ -141,6 +159,7 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
         // cannot reliably contain such geometry without changing the asset.
         if (!matrix || (flags & ~(uint32_t)G_MTX_PUSH) || mStack.size() >= 32)
             return false;
+        mHasModelMatrix = true;
         Matrix decoded{};
 #ifdef GBI_FLOATS
         for (int row = 0; row < 4; ++row)
@@ -286,6 +305,8 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
     float mWidthLow = std::numeric_limits<float>::max(), mWidthHigh = -std::numeric_limits<float>::max();
     float mDepthLow = std::numeric_limits<float>::max(), mDepthHigh = -std::numeric_limits<float>::max();
     size_t mVertices = 0, mCommands = 0;
+    uint64_t mShieldVertexHash = 0xcbf29ce484222325ull;
+    bool mShieldVertexHashValid = true, mHasModelMatrix = false;
     Matrix mMatrix{ { { { 1, 0, 0, 0 } }, { { 0, 1, 0, 0 } }, { { 0, 0, 1, 0 } }, { { 0, 0, 0, 1 } } } };
     std::vector<Matrix> mStack;
 };
