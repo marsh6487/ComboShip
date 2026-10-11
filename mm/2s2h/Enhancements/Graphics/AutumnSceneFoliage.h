@@ -2,6 +2,7 @@
 
 struct PlayState;
 
-// Reversible material-only variants of the loaded Termina/Woodfall scene lists.
+// Reversible autumn/winter variants of loaded foliage draws and the exact
+// mixed stump/arch grass atlas. The existing update/reset entry points are shared.
 void MMAutumnSceneFoliage_Update(const PlayState* play);
 void MMAutumnSceneFoliage_Reset();

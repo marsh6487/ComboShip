@@ -45,6 +45,8 @@ python3 -B tests/seasons/run_generated_leaf_texture_tests.py
 python3 -B tests/seasons/run_leaf_combiner_tests.py
 python3 -B scripts/diagnostics/run_mm_autumn_foliage_tests.py
 python3 -B scripts/diagnostics/run_mm_autumn_scene_foliage_tests.py
+python3 -B scripts/diagnostics/run_mm_autumn_surface_texture_tests.py
+python3 -B scripts/diagnostics/run_mm_season_selector_tests.py
 python3 -B tests/seasons/run_rod_lifecycle_tests.py
 python3 -B tests/seasons/run_oot_shop_tests.py
 python3 -B scripts/diagnostics/run_mm_mask_bridge_tests.py --sanitize

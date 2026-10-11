@@ -69,7 +69,7 @@ def main():
                     data = archive.read(case["path"])
                     if hashlib.sha256(data).hexdigest() != case["resource_sha256"]:
                         raise ValueError(f"Native scene fixture hash differs: {case['path']}")
-                    scene_cases.append((case, reference["palette"], data))
+                    scene_cases.append((case, reference["palette"], reference["winter_palette"], data))
                 if not scene_cases:
                     raise ValueError("The requested all-scene material reference has no cases")
     source = (ROOT / "mm/2s2h/Enhancements/Graphics/AutumnSceneFoliage.cpp").read_text()
@@ -113,13 +113,15 @@ def main():
             fixtures += '{ const std::vector<Gfx> source = {\n'
             fixtures += ",\n".join(f"Command(0x{a:08X}, 0x{b:08X})" for a, b in struct.iter_unpack("<II", data[72:]))
             fixtures += f'}}; CheckActualMaterial({json.dumps(path)}, source, {json.dumps(texture)}, {triangles}); }}\n'
-        for case, palette, data in scene_cases:
+        for case, palette, winter_palette, data in scene_cases:
             if len(data) < 72 or data[4:8] != b"TLDO" or (len(data) - 72) % 8:
                 raise ValueError(f"Invalid serialized scene display list: {case['path']}")
             fixtures += '{ const std::vector<Gfx> source = {\n'
             fixtures += ",\n".join(f"Command(0x{a:08X}, 0x{b:08X})" for a, b in struct.iter_unpack("<II", data[72:]))
             expected = ', '.join('0x' + palette[i] for i in case['triangle_palettes'])
+            winter_expected = ', '.join('0x' + winter_palette[i] for i in case['triangle_palettes'])
             fixtures += f'}}; CheckActualSceneMaterial({json.dumps(case["path"])}, {case["scene_id"]}, source, {{{expected}}});\n'
+            fixtures += f'CheckActualSceneMaterial({json.dumps(case["path"])}, {case["scene_id"]}, source, {{{winter_expected}}}, SEASON_WINTER);\n'
             if case['path'] in (
                     'scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKU_room_00DL_005EC8',
                     'scenes/nonmq/Z2_BACKTOWN/Z2_BACKTOWN_room_00DL_004BE0',
@@ -130,10 +132,11 @@ def main():
                 folder = '/'.join(case['path'].split('/')[:3]) + '/'
                 textures = ', '.join(json.dumps(p) for p in texture_paths
                                      if p.startswith(folder) or p.startswith('misc/scene_texture_'))
-                fixtures += f'CheckActualGrassRenderer({json.dumps(case["path"])}, {case["scene_id"]}, source, {{{expected}}}, {{{textures}}});\n'
+                fixtures += f'CheckActualSceneRenderer({json.dumps(case["path"])}, {case["scene_id"]}, source, {{{expected}}}, {{{textures}}});\n'
+                fixtures += f'CheckActualSceneRenderer({json.dumps(case["path"])}, {case["scene_id"]}, source, {{{winter_expected}}}, {{{textures}}}, SEASON_WINTER);\n'
             fixtures += '}\n'
         if scene_cases:
-            fixtures += f'std::puts("PASS {len(scene_cases)} frozen native scene materials: exact triangle palettes, native/Alt, both namespaces and Off restoration");\n'
+            fixtures += f'std::puts("PASS {len(scene_cases)} frozen native scene materials in autumn and winter: exact triangle palettes, native/Alt, both namespaces and Off restoration");\n'
         fixtures += "}\n"
         (build / "autumn_scene_foliage_fixtures.inc").write_text(fixtures)
         binary = build / "test"

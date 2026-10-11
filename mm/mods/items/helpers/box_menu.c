@@ -30,6 +30,8 @@
 #include "macros.h"
 #include "functions.h"
 #include "variables.h"
+#include "BenPort.h"
+#include <string.h>
 
 #define BOX_MENU_MAX_ENTRIES 10
 
@@ -50,6 +52,8 @@ u8 BoxMenu_Open(PlayState* play, const BoxMenuEntry* entries, s32 count, s32 sel
 // The z_play.c custom-pause pair (Minish Kaleido idiom).
 void BoxMenu_Update(PlayState* play);
 void BoxMenu_Draw(PlayState* play);
+void MM_BoxMenu_UseSeasonStyle(void);
+void MM_BoxMenu_StartSeasonFlash(PlayState* play);
 
 // ── Layout (screen pixels, 320x240 virtual) ─────────────────────────────────
 // Uniform boxes, BotW-style: the icon FILLS its box and state is shown by colour, never by size.
@@ -71,6 +75,51 @@ static BoxMenuConfirmFn sBoxMOnConfirm = NULL;
 static u8 sBoxMStickHeld = 0;
 static u8 sBoxMHoldSeen = 0; // the hold button has been observed down at least once
 static s16 sBoxMPulse = 0;
+static u8 sBoxMSeasonStyle;
+static s16 sBoxMIconOffsetX[BOX_MENU_MAX_ENTRIES];
+static s16 sBoxMIconOffsetY[BOX_MENU_MAX_ENTRIES];
+static PlayState* sBoxMFlashPlay;
+static s32 sBoxMFlashScene;
+static s32 sBoxMFlashRoom;
+static u32 sBoxMFlashFrame;
+
+#define BOXM_SEASON_ICON 26
+
+void MM_BoxMenu_UseSeasonStyle(void) {
+    sBoxMSeasonStyle = 1;
+    for (s32 i = 0; i < sBoxMCount - 1; ++i) {
+        float centerX = 0.5f, centerY = 0.5f;
+        MM_GetTextureVisibleCenter(sBoxMEntries[i].iconPath, &centerX, &centerY);
+        float dx = (0.5f - centerX) * BOXM_SEASON_ICON * 4;
+        float dy = (0.5f - centerY) * BOXM_SEASON_ICON * 4;
+        sBoxMIconOffsetX[i] = (s16)(dx + (dx < 0 ? -0.5f : 0.5f));
+        sBoxMIconOffsetY[i] = (s16)(dy + (dy < 0 ? -0.5f : 0.5f));
+    }
+}
+
+void MM_BoxMenu_StartSeasonFlash(PlayState* play) {
+    if (play != NULL) {
+        sBoxMFlashPlay = play;
+        sBoxMFlashScene = play->sceneId;
+        sBoxMFlashRoom = play->roomCtx.curRoom.num;
+        sBoxMFlashFrame = play->gameplayFrames;
+    }
+}
+
+static void BoxMenu_DrawSeasonFlash(PlayState* play) {
+    static const u8 alpha[] = { 48, 96, 128, 104, 72, 44, 20, 0 };
+    if (sBoxMFlashPlay == NULL) {
+        return;
+    }
+    if (sBoxMFlashPlay != play || sBoxMFlashScene != play->sceneId || sBoxMFlashRoom != play->roomCtx.curRoom.num ||
+        play->gameplayFrames < sBoxMFlashFrame || play->gameplayFrames - sBoxMFlashFrame >= ARRAY_COUNT(alpha) ||
+        play->pauseCtx.state != PAUSE_STATE_OFF || play->csCtx.state != CS_STATE_IDLE ||
+        play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF) {
+        sBoxMFlashPlay = NULL;
+        return;
+    }
+    Environment_DrawLightningFlash(play, 255, 245, 225, alpha[play->gameplayFrames - sBoxMFlashFrame]);
+}
 
 u8 BoxMenu_IsOpen(void) {
     return sBoxMOpen;
@@ -128,6 +177,10 @@ u8 BoxMenu_Open(PlayState* play, const BoxMenuEntry* entries, s32 count, s32 sel
     sBoxMStickHeld = 0;
     sBoxMHoldSeen = 0;
     sBoxMPulse = 0;
+    sBoxMSeasonStyle = 0;
+    sBoxMFlashPlay = NULL;
+    memset(sBoxMIconOffsetX, 0, sizeof(sBoxMIconOffsetX));
+    memset(sBoxMIconOffsetY, 0, sizeof(sBoxMIconOffsetY));
     sBoxMOpen = 1;
 
     play->pauseCtx.state = PAUSE_STATE_MAIN; // freezes Play_Update; drawing continues
@@ -219,12 +272,25 @@ void BoxMenu_Update(PlayState* play) {
 
 static void BoxMenu_DrawArrow(GraphicsContext* gfxCtx, s32 tipX, s32 cy, s32 dir, u8 r, u8 g, u8 b, u8 a) {
     OPEN_DISPS(gfxCtx);
-    for (s32 i = 0; i < BOXM_ARROW_W; i++) {
-        s32 half = (BOXM_ARROW_H / 2) - (BOXM_ARROW_H / 2) * i / BOXM_ARROW_W;
-        s32 x = tipX + dir * i;
-        s32 x1 = (dir > 0) ? x : x - 1;
+    if (sBoxMSeasonStyle) {
+        const char* texture = dir < 0 ? "__OTR__misc/title_static/gFileSelArrowLeftTex"
+                                      : "__OTR__misc/title_static/gFileSelArrowRightTex";
+        s32 left = dir < 0 ? tipX - 7 : tipX - 3;
+        Gfx_SetupDL39_Overlay(gfxCtx);
+        gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, r, g, b, a);
+        gDPLoadTextureBlock(OVERLAY_DISP++, texture, G_IM_FMT_IA, G_IM_SIZ_8b, 16, 16, 0, G_TX_NOMIRROR | G_TX_CLAMP,
+                            G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
+        gSPWideTextureRectangle(OVERLAY_DISP++, left << 2, (cy - 5) << 2, (left + 10) << 2, (cy + 5) << 2,
+                                G_TX_RENDERTILE, 0, 0, (16 << 10) / 10, (16 << 10) / 10);
+    } else {
+        for (s32 i = 0; i < BOXM_ARROW_W; i++) {
+            s32 half = (BOXM_ARROW_H / 2) - (BOXM_ARROW_H / 2) * i / BOXM_ARROW_W;
+            s32 x = tipX + dir * i;
+            s32 x1 = (dir > 0) ? x : x - 1;
 
-        BOXM_RECT(x1, cy - half, x1 + 1, cy + half + 1, r, g, b, a);
+            BOXM_RECT(x1, cy - half, x1 + 1, cy + half + 1, r, g, b, a);
+        }
     }
     CLOSE_DISPS(gfxCtx);
 }
@@ -242,6 +308,7 @@ void BoxMenu_Draw(PlayState* play) {
     u8 curG;
     u8 curB;
 
+    BoxMenu_DrawSeasonFlash(play);
     if (!sBoxMOpen || sBoxMCount <= 0) {
         return;
     }
@@ -291,23 +358,25 @@ void BoxMenu_Draw(PlayState* play) {
     gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
     bx = x;
     for (s32 i = 0; i < sBoxMCount; i++) {
-        s32 y1 = BOXM_CY - BOXM_BOX / 2;
+        s32 dest = sBoxMSeasonStyle ? BOXM_SEASON_ICON : BOXM_BOX;
+        s32 ix = (bx + (BOXM_BOX - dest) / 2) * 4 + sBoxMIconOffsetX[i];
+        s32 iy = (BOXM_CY - dest / 2) * 4 + sBoxMIconOffsetY[i];
         s32 src = (sBoxMEntries[i].iconSize != 0) ? sBoxMEntries[i].iconSize : 32;
         // Texel step for a src -> BOXM_BOX scale. NOT doubled: dsdx is (source << 10) / dest, and
         // shifting it once more samples the texture twice as fast — which drew each icon at half
         // size in the corner of its box.
-        s32 dd = (src << 10) / BOXM_BOX;
+        s32 dd = (src << 10) / dest;
         u8 a = sBoxMEntries[i].enabled ? 255 : 100;
         u8 tint = sBoxMEntries[i].enabled ? 255 : 130; // locked entries read as grayed art
 
-        if (sBoxMEntries[i].iconPath != NULL) {
+        if (sBoxMEntries[i].iconPath != NULL && !(sBoxMSeasonStyle && i == sBoxMCount - 1)) {
             gDPPipeSync(OVERLAY_DISP++);
             gDPSetPrimColor(OVERLAY_DISP++, 0, 0, tint, tint, tint, a);
             gDPLoadTextureBlock(OVERLAY_DISP++, sBoxMEntries[i].iconPath, G_IM_FMT_RGBA, G_IM_SIZ_32b, src, src, 0,
                                 G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK,
                                 G_TX_NOLOD, G_TX_NOLOD);
-            gSPWideTextureRectangle(OVERLAY_DISP++, bx << 2, y1 << 2, (bx + BOXM_BOX) << 2, (y1 + BOXM_BOX) << 2,
-                                    G_TX_RENDERTILE, 0, 0, dd, dd);
+            gSPWideTextureRectangle(OVERLAY_DISP++, ix, iy, ix + dest * 4, iy + dest * 4, G_TX_RENDERTILE, 0, 0, dd,
+                                    dd);
         }
 
         bx += BOXM_BOX + BOXM_GAP;
@@ -322,6 +391,21 @@ void BoxMenu_Draw(PlayState* play) {
                     G_AD_DISABLE | G_CD_DISABLE | G_CK_NONE | G_TC_FILT | G_TF_BILERP | G_TT_NONE | G_TL_TILE |
                         G_TD_CLAMP | G_TP_NONE | G_CYC_1CYCLE | G_PM_NPRIMITIVE,
                     G_AC_NONE | G_ZS_PRIM | G_RM_CLD_SURF | G_RM_CLD_SURF2);
+
+    if (sBoxMSeasonStyle) {
+        s32 mid = x + (sBoxMCount - 1) * (BOXM_BOX + BOXM_GAP) + BOXM_BOX / 2;
+        // A small beveled X clearly marks the native-weather reset.
+        for (s32 shadow = 1; shadow >= 0; --shadow) {
+            for (s32 dy = -6; dy <= 6; ++dy) {
+                s32 yy = BOXM_CY + dy + shadow;
+                u8 shade = shadow ? 55 : dy < 0 ? 255 : 210;
+                BOXM_RECT(mid + dy - 1 + shadow, yy, mid + dy + 1 + shadow, yy + 1, shade, shade, shade,
+                          shadow ? 180 : 255);
+                BOXM_RECT(mid - dy - 1 + shadow, yy, mid - dy + 1 + shadow, yy + 1, shade, shade, shade,
+                          shadow ? 180 : 255);
+            }
+        }
+    }
 
     cx1 = x + sBoxMCursor * (BOXM_BOX + BOXM_GAP) - 2;
     cx2 = cx1 + BOXM_BOX + 4;

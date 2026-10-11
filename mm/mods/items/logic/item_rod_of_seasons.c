@@ -72,8 +72,12 @@ static u16 Seasons_EquippedButtonMask(void) {
 }
 
 static void Seasons_OnWheelConfirm(s32 index) {
+    const u8 previous = Seasons_GetSeason();
     Seasons_SetSeason((u8)index);
     if (gPlayState != NULL) {
+        if (Seasons_GetSeason() != previous) {
+            MM_BoxMenu_StartSeasonFlash(gPlayState);
+        }
         ExtInv_RefreshButtonIconsForItem(gPlayState, EXT_ITEM_ROD_OF_SEASONS);
     }
 }
@@ -158,7 +162,10 @@ void Seasons_TickInput(PlayState* play, Player* player, Input* input) {
                 Seasons_TryFinishDraw(play, player);
             }
         } else {
-            BoxMenu_Open(play, entries, Seasons_BuildWheel(entries), Seasons_GetSeason(), 0, Seasons_OnWheelConfirm);
+            if (BoxMenu_Open(play, entries, Seasons_BuildWheel(entries), Seasons_GetSeason(), 0,
+                             Seasons_OnWheelConfirm)) {
+                MM_BoxMenu_UseSeasonStyle();
+            }
         }
     }
 }

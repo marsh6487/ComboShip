@@ -56,6 +56,8 @@ s32 Player_UpperAction_ChangeHeldItem(Player* p,PlayState* play){return 0;}
 typedef struct {const char* iconPath;u8 iconSize;u8 enabled;} BoxMenuEntry;
 typedef void (*BoxMenuConfirmFn)(s32);
 u8 BoxMenu_IsOpen(void){return menuOpen;}
+void MM_BoxMenu_UseSeasonStyle(void){}
+void MM_BoxMenu_StartSeasonFlash(PlayState* play){}
 u8 BoxMenu_Open(PlayState* play,const BoxMenuEntry* entries,s32 count,s32 chosen,u16 hold,BoxMenuConfirmFn fn){++menus;return 1;}
 void ExtInv_RefreshButtonIconsForItem(PlayState* play,u16 item){}
 '''

@@ -77,6 +77,10 @@ struct ResourceManager {
     bool IsAltAssetsEnabled() {
         return alt;
     }
+    void CacheExternalResource(const std::string& path, std::shared_ptr<IResource> resource) {
+        assert(activeGame == "mm");
+        resources[path] = std::move(resource);
+    }
     auto GetArchiveManager() {
         return archive;
     }
@@ -107,6 +111,18 @@ struct Context {
 };
 } // namespace Ship
 namespace Fast {
+enum class TextureType { Error = 0, RGBA32bpp = 1, RGBA16bpp = 2 };
+struct Texture : Ship::IResource {
+    explicit Texture(std::shared_ptr<Ship::ResourceInitData> data = nullptr) {
+        initData = std::move(data);
+    }
+    TextureType Type = TextureType::RGBA32bpp;
+    uint16_t Width = 1024, Height = 512;
+    uint32_t Flags = 0, ImageDataSize = 0;
+    float HByteScale = 1, VPixelScale = 1;
+    uint8_t* ImageData = nullptr;
+    std::shared_ptr<std::vector<char>> mImageBuffer;
+};
 struct DisplayList : Ship::IResource {
     std::vector<Gfx> Instructions;
 };
@@ -195,12 +211,16 @@ static unsigned CountMaterialTriangles(const std::vector<Gfx>& commands, const c
     assert(!tint); // Seasonal state must not leak past a tinted batch.
     return count;
 }
-static void CheckScopedForestCommands(const Variant& variant, const std::vector<Gfx>& original) {
+static void CheckScopedForestCommands(const Variant& variant, const std::vector<Gfx>& original,
+                                      int selectedSeason = SEASON_AUTUMN) {
     assert(Equal(variant.original, original));
     const auto& commands = variant.commands;
     assert(commands.size() == 5);
-    assert(SameCommand(commands[0], gsSPGrayscale(true)));
-    assert(SameCommand(commands[1], gsDPSetGrayscaleColor(185, 104, 72, 255)));
+    assert(SameCommand(commands[0], gsSPGrayscale(2)));
+    if (selectedSeason == SEASON_WINTER)
+        assert(SameCommand(commands[1], gsDPSetGrayscaleColor(185, 205, 217, 176)));
+    else
+        assert(SameCommand(commands[1], gsDPSetGrayscaleColor(244, 183, 131, 255)));
     const auto* draw = reinterpret_cast<const Gfx*>(commands[2].words.w1);
     assert(draw != variant.original.data()); // The renderer writes resolved texture pointers into executed lists.
     assert(Equal(std::vector<Gfx>(draw, draw + original.size()), original));
@@ -210,6 +230,7 @@ static void CheckScopedForestCommands(const Variant& variant, const std::vector<
 }
 
 #include "autumn_scene_forest_fixture.h"
+#include "autumn_scene_middle_forest_fixture.h"
 #include "autumn_scene_renderer_fixture.h"
 static void CheckForestDrawOwners() {
     constexpr const char* wallpaper = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_034098";
@@ -315,7 +336,7 @@ static void CheckActualMaterial(const char* path, const std::vector<Gfx>& origin
     const auto variant = BuildVariant(original);
     assert(!variant.empty() && Equal(RemoveTint(variant), original));
     assert(CountMaterialTriangles(original, texture) == expectedTriangles);
-    const auto tinted = CountMaterialTriangles(variant, texture, 0xB96848FF);
+    const auto tinted = CountMaterialTriangles(variant, texture, 0xF4B783FF);
     if (tinted != expectedTriangles)
         std::fprintf(stderr, "%s: copper-red tint covers %u/%u triangles\n", path, tinted, expectedTriangles);
     assert(tinted == expectedTriangles);
@@ -373,20 +394,20 @@ static void CheckPrivateBrushMaterials() {
             original.push_back(gsSPEndDisplayList());
             const auto variant = BuildVariant(original);
             assert(!variant.empty() && Equal(RemoveTint(variant), original));
-            assert(CountMaterialTriangles(variant, terrain.c_str(), 0xD99C45FF) == 1);
-            assert(CountMaterialTriangles(variant, leaves.c_str(), 0xB96848FF) == 1);
-            assert(CountMaterialTriangles(variant, stems.c_str(), 0xB96848FF) == 1);
+            assert(CountMaterialTriangles(variant, terrain.c_str(), 0xFFD078FF) == 1);
+            assert(CountMaterialTriangles(variant, leaves.c_str(), 0xF4B783FF) == 1);
+            assert(CountMaterialTriangles(variant, stems.c_str(), 0xF4B783FF) == 1);
             assert(CountMaterialTriangles(variant, unrelated.c_str()) == 1);
-            assert(CountMaterialTriangles(variant, unrelated.c_str(), 0xB96848FF) == 0);
-            assert(CountMaterialTriangles(variant, unrelated.c_str(), 0xD99C45FF) == 0);
+            assert(CountMaterialTriangles(variant, unrelated.c_str(), 0xF4B783FF) == 0);
+            assert(CountMaterialTriangles(variant, unrelated.c_str(), 0xFFD078FF) == 0);
         }
     }
     std::puts(
         "PASS mixed terrain/private brush materials in both namespaces and Alt hashes; unrelated draws preserved");
 }
-static void CheckActualGrassRenderer(const char* path, int sceneId, const std::vector<Gfx>& original,
+static void CheckActualSceneRenderer(const char* path, int sceneId, const std::vector<Gfx>& original,
                                      const std::vector<uint32_t>& expected,
-                                     const std::vector<std::string>& texturePaths) {
+                                     const std::vector<std::string>& texturePaths, int selectedSeason = SEASON_AUTUMN) {
     for (const auto& texture : texturePaths)
         ForestRendererFixture::manager.paths[CRC64(texture.c_str())] = texture;
     for (const bool alt : { false, true }) {
@@ -403,15 +424,16 @@ static void CheckActualGrassRenderer(const char* path, int sceneId, const std::v
         ForestRendererFixture::manager.refreshed = false;
         PlayState play{};
         play.sceneId = sceneId;
-        for (const int phase : { SEASON_AUTUMN, SEASON_OFF, SEASON_AUTUMN, SEASON_OFF, SEASON_AUTUMN }) {
+        for (const int phase : { selectedSeason, SEASON_OFF, selectedSeason, SEASON_OFF, selectedSeason }) {
             season = phase;
             MMAutumnSceneFoliage_Update(&play);
             const auto stats = ForestRendererFixture::Draw(resource->Instructions);
-            assert(stats.palettes == (phase == SEASON_AUTUMN ? expected : std::vector<uint32_t>(expected.size(), 0)));
+            assert(stats.palettes == (phase == selectedSeason ? expected : std::vector<uint32_t>(expected.size(), 0)));
         }
     }
     ClearCache();
-    std::printf("PASS actual grass renderer %s: native/Alt tint survives rendered Off frames and pointer writebacks\n",
+    season = SEASON_AUTUMN;
+    std::printf("PASS actual scene renderer %s: native/Alt tint survives rendered Off frames and pointer writebacks\n",
                 path);
 }
 
@@ -436,9 +458,9 @@ static std::vector<uint32_t> TrianglePalettes(const std::vector<Gfx>& commands) 
 }
 
 static void CheckActualSceneMaterial(const char* path, int sceneId, const std::vector<Gfx>& original,
-                                     const std::vector<uint32_t>& expected) {
+                                     const std::vector<uint32_t>& expected, int selectedSeason = SEASON_AUTUMN) {
     const bool selected = std::any_of(expected.begin(), expected.end(), [](uint32_t color) { return color != 0; });
-    const auto transformed = BuildVariant(original);
+    const auto transformed = BuildVariant(original, selectedSeason);
     if (selected && transformed.empty())
         std::fprintf(stderr, "FAIL actual scene material %s: selected grass/forest remains untinted\n", path);
     assert(selected == !transformed.empty());
@@ -462,22 +484,22 @@ static void CheckActualSceneMaterial(const char* path, int sceneId, const std::v
             rm->alt = alt;
             PlayState play{};
             play.sceneId = sceneId;
-            season = SEASON_AUTUMN;
+            season = selectedSeason;
             MMAutumnSceneFoliage_Update(&play);
             if (selected) {
                 assert(resource->Instructions[0].words.w0 >> 24 == G_DL);
-                const auto& variant = sVariants.at(resource.get());
+                const auto& variant = CurrentVariants().at(resource.get());
                 if (ForestListColor(path))
-                    CheckScopedForestCommands(variant, original);
+                    CheckScopedForestCommands(variant, original, selectedSeason);
                 else
                     assert(TrianglePalettes(variant.commands) == expected);
             } else {
-                assert(Equal(resource->Instructions, original) && sVariants.empty());
+                assert(Equal(resource->Instructions, original) && CurrentVariants().empty());
             }
             season = SEASON_OFF;
             MMAutumnSceneFoliage_Update(&play);
             assert(Equal(resource->Instructions, original));
-            season = SEASON_AUTUMN;
+            season = selectedSeason;
             MMAutumnSceneFoliage_Update(&play);
             if (selected)
                 assert(resource->Instructions[0].words.w0 >> 24 == G_DL);
@@ -486,6 +508,386 @@ static void CheckActualSceneMaterial(const char* path, int sceneId, const std::v
         }
     }
     ClearCache();
+    season = SEASON_AUTUMN;
+}
+static void CheckMiddleForestMaterial() {
+    constexpr const char* path = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKU_room_00DL_003928";
+    constexpr const char* color = "misc/scene_texture_08/scene_texture_08_Tex_005800";
+    constexpr const char* mask = "misc/scene_texture_08/scene_texture_08_Tex_005000";
+    const std::vector<uint32_t> expected(32, 0xFF9F91FF);
+    assert(CountMaterialTriangles(kActualMiddleForestCommands, mask) == 32);
+    for (const bool explicitAlt : { false, true }) {
+        auto original = kActualMiddleForestCommands;
+        const std::string colorPath = (explicitAlt ? "alt/" : "") + std::string(color);
+        const std::string maskPath = (explicitAlt ? "alt/" : "") + std::string(mask);
+        for (const auto& [index, texture] : { std::pair{ 12u, colorPath }, std::pair{ 20u, maskPath } }) {
+            const auto hash = CRC64(texture.c_str());
+            original[index] = Command(hash >> 32, hash & 0xFFFFFFFF);
+        }
+        // This real two-texture draw must be selected by the primary color
+        // image, while preserving the secondary image, combine and alpha words.
+        CheckActualSceneMaterial(path, SCENE_00KEIKOKU, original, expected);
+        CheckActualSceneRenderer(path, SCENE_00KEIKOKU, original, expected, { colorPath, maskPath });
+        const auto unselected = CRC64("scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_02B050");
+        original[12] = Command(unselected >> 32, unselected & 0xFFFFFFFF);
+        assert(BuildVariant(original).empty()); // A selected secondary mask alone cannot tint other surfaces.
+    }
+    std::puts(
+        "PASS exact 32-face middle forest: primary RGBA plus secondary IA, native/Alt identities and Off restoration");
+}
+static void CheckBackwallGrassMaterial() {
+    constexpr const char* path = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKU_room_00DL_027238";
+    const std::vector<uint32_t> expected(26, 0xFFD078FF);
+    for (const bool explicitAlt : { false, true }) {
+        auto original = kActualBackwallGrassCommands;
+        std::vector<std::string> textures;
+        for (const auto& [index, suffix] : { std::pair{ 12u, "007800" }, std::pair{ 20u, "006800" } }) {
+            const std::string texture =
+                (explicitAlt ? "alt/" : "") + std::string("misc/scene_texture_08/scene_texture_08_Tex_") + suffix;
+            const auto hash = CRC64(texture.c_str());
+            original[index] = Command(hash >> 32, hash & 0xFFFFFFFF);
+            textures.push_back(texture);
+        }
+        CheckActualSceneMaterial(path, SCENE_00KEIKOKU, original, expected);
+        CheckActualSceneRenderer(path, SCENE_00KEIKOKU, original, expected, textures);
+    }
+    std::puts("PASS exact 26-face backwall grass: both texture layers preserved, native/Alt and Off restoration");
+}
+static std::shared_ptr<Fast::Texture> SurfaceTexture() {
+    auto texture = std::make_shared<Fast::Texture>();
+    texture->Width = 3;
+    texture->Height = 1;
+    texture->ImageDataSize = 12;
+    texture->Flags = 2;
+    texture->HByteScale = 2;
+    texture->VPixelScale = 4;
+    texture->mImageBuffer = std::make_shared<std::vector<char>>();
+    for (const uint8_t byte : { 30, 90, 20, 128, 70, 50, 30, 255, 64, 64, 64, 0 })
+        texture->mImageBuffer->push_back(static_cast<char>(byte));
+    texture->ImageData = reinterpret_cast<uint8_t*>(texture->mImageBuffer->data());
+    return texture;
+}
+static void CheckStumpGrassAtlas() {
+    for (const auto* suffix : { "", "_scene" }) {
+        for (const auto* prefix : { "", "alt/" }) {
+            ClearCache();
+            auto rm = std::make_shared<Ship::ResourceManager>();
+            Ship::Context::GetRawInstance()->rm = rm;
+            rm->alt = true;
+            const auto path =
+                std::string(prefix) + "scenes/nonmq/Z2_00KEIKOKU" + suffix + "/mm3d_field_poc4/textures/tl_ki_02";
+            auto source = SurfaceTexture();
+            const auto original = *source->mImageBuffer;
+            rm->resources[path] = source;
+            auto unrelated = SurfaceTexture();
+            rm->resources[path + "_unrelated"] = unrelated;
+            PlayState play{};
+            play.sceneId = SCENE_00KEIKOKU;
+            season = SEASON_AUTUMN;
+            MMAutumnSceneFoliage_Update(&play);
+            auto tinted = std::dynamic_pointer_cast<Fast::Texture>(rm->resources.at(path));
+            if (tinted == source)
+                std::fprintf(stderr,
+                             "FAIL stump/arch grass: mixed atlas still resolves to its original green pixels\n");
+            assert(tinted != source && tinted->ImageData != source->ImageData);
+            const std::vector<uint8_t> expected = { 61, 49, 28, 128, 70, 50, 30, 255, 64, 64, 64, 0 };
+            assert(std::equal(expected.begin(), expected.end(), tinted->ImageData));
+            assert(*source->mImageBuffer == original);
+            assert(tinted->Width == source->Width && tinted->Height == source->Height &&
+                   tinted->ImageDataSize == source->ImageDataSize && tinted->Type == source->Type &&
+                   tinted->Flags == source->Flags && tinted->HByteScale == source->HByteScale &&
+                   tinted->VPixelScale == source->VPixelScale);
+            ForestRendererFixture::manager.paths[CRC64(path.c_str())] = path;
+            auto bind = MakeMaterial(path.c_str());
+            bind.push_back(gsSPEndDisplayList());
+            const auto stats = ForestRendererFixture::Draw(bind);
+            assert(stats.textures.size() == 1 && stats.textures.front() == tinted);
+            assert(bind[0].words.w1 == reinterpret_cast<uintptr_t>(tinted->ImageData));
+            assert(rm->resources.at(path + "_unrelated") == unrelated && *unrelated->mImageBuffer == original);
+            MMAutumnSceneFoliage_Update(&play);
+            assert(rm->resources.at(path) == tinted && rm->loads == 0);
+            for (unsigned phase = 0; phase < 3; ++phase) {
+                if (phase == 0)
+                    season = SEASON_OFF;
+                if (phase == 1)
+                    rm->alt = false;
+                if (phase == 2)
+                    play.sceneId = SCENE_BACKTOWN;
+                MMAutumnSceneFoliage_Update(&play);
+                assert(rm->resources.at(path) == source && *source->mImageBuffer == original);
+                const auto restored = ForestRendererFixture::Draw(bind);
+                assert(restored.textures.size() == 1 && restored.textures.front() == source);
+                assert(bind[0].words.w1 == reinterpret_cast<uintptr_t>(source->ImageData));
+                season = SEASON_AUTUMN;
+                rm->alt = true;
+                play.sceneId = SCENE_00KEIKOKU;
+                MMAutumnSceneFoliage_Update(&play);
+                assert(rm->resources.at(path) == tinted); // Reuse the immutable copy across transitions.
+            }
+            auto replacement = SurfaceTexture();
+            rm->resources[path] = replacement;
+            season = SEASON_OFF;
+            MMAutumnSceneFoliage_Update(&play);
+            assert(rm->resources.at(path) == replacement); // An outside cache edit must win.
+        }
+    }
+    ClearCache();
+    season = SEASON_AUTUMN;
+    std::puts(
+        "PASS private stump/arch grass-only atlas: immutable originals, exact bark/alpha/metadata and restoration");
+}
+static void CheckCrossSeasonVtxFirst() {
+    unsigned failures = 0;
+    for (const char* drawName : { "0241B0", "0241B1" }) {
+        for (const int initial : { SEASON_AUTUMN, SEASON_WINTER }) {
+            for (const bool renderOff : { false, true }) {
+                ClearCache();
+                auto rm = std::make_shared<Ship::ResourceManager>();
+                Ship::Context::GetRawInstance()->rm = rm;
+                const std::string path = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKU_room_00DL_" + std::string(drawName);
+                auto forest = std::make_shared<Fast::DisplayList>();
+                forest->Instructions = kActualForestCommands;
+                forest->Instructions.erase(forest->Instructions.begin(), forest->Instructions.begin() + 2);
+                assert((forest->Instructions[0].words.w0 >> 24) == G_VTX_OTR_HASH);
+                rm->archive->files[path] = rm->resources[path] = forest;
+                PlayState play{};
+                play.sceneId = SCENE_00KEIKOKU;
+                ForestRendererFixture::manager.refreshed = false;
+                const int other = initial == SEASON_AUTUMN ? SEASON_WINTER : SEASON_AUTUMN;
+                unsigned stage = 0;
+                for (const int selected : { initial, SEASON_OFF, other, initial, other }) {
+                    season = selected;
+                    MMAutumnSceneFoliage_Update(&play);
+                    if (selected != SEASON_OFF || renderOff) {
+                        const auto stats = ForestRendererFixture::Draw(forest->Instructions);
+                        const uint32_t color = selected == SEASON_AUTUMN   ? 0xF4B783FF
+                                               : selected == SEASON_WINTER ? 0xB9CDD9B0
+                                                                           : 0;
+                        const auto expected = std::vector<uint32_t>(22, color);
+                        const unsigned selectedCount = std::count_if(stats.palettes.begin(), stats.palettes.end(),
+                                                                     [](uint32_t value) { return value != 0; });
+                        if (stats.palettes != expected)
+                            std::fprintf(stderr,
+                                         "FAIL draw=%s initial=%d renderedOff=%d stage=%u season=%d tint=%u/%u\n",
+                                         drawName, initial, int(renderOff), stage, selected, selectedCount,
+                                         selected == SEASON_OFF ? 0u : 22u);
+                        if (stats.palettes != expected)
+                            ++failures;
+                    }
+                    ++stage;
+                }
+                ClearCache();
+            }
+        }
+    }
+
+    // Resolve and observe the first-command pointer before intentionally changing
+    // it. The known restoration offset must not authorize unrelated later edits.
+    alignas(16) Vtx alternateVertices[128]{};
+    for (const char* drawName : { "0241B0", "0241B1" }) {
+        for (const int initial : { SEASON_AUTUMN, SEASON_WINTER }) {
+            for (const bool pointerEdit : { false, true }) {
+                ClearCache();
+                auto rm = std::make_shared<Ship::ResourceManager>();
+                Ship::Context::GetRawInstance()->rm = rm;
+                const std::string path = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKU_room_00DL_" + std::string(drawName);
+                auto forest = std::make_shared<Fast::DisplayList>();
+                forest->Instructions = kActualForestCommands;
+                forest->Instructions.erase(forest->Instructions.begin(), forest->Instructions.begin() + 2);
+                const auto originalFirst = forest->Instructions[0];
+                rm->archive->files[path] = rm->resources[path] = forest;
+                PlayState play{};
+                play.sceneId = SCENE_00KEIKOKU;
+                ForestRendererFixture::manager.refreshed = false;
+                const int other = initial == SEASON_AUTUMN ? SEASON_WINTER : SEASON_AUTUMN;
+                for (const int selected : { initial, SEASON_OFF, other, SEASON_OFF, initial }) {
+                    season = selected;
+                    MMAutumnSceneFoliage_Update(&play);
+                    ForestRendererFixture::Draw(forest->Instructions);
+                }
+                auto intentional = originalFirst;
+                intentional.words.w1 = pointerEdit ? reinterpret_cast<uintptr_t>(alternateVertices) : 16;
+                forest->Instructions[0] = intentional;
+                MMAutumnSceneFoliage_Update(&play);
+                const bool preserved = SameCommand(forest->Instructions[0], intentional) && sActive.empty();
+                const auto stats = ForestRendererFixture::Draw(forest->Instructions);
+                const bool untreated = stats.palettes == std::vector<uint32_t>(22, 0);
+                const auto expectedPointer =
+                    pointerEdit
+                        ? reinterpret_cast<uintptr_t>(alternateVertices)
+                        : reinterpret_cast<uintptr_t>(ForestRendererFixture::manager.GetResourceRawPointer(0)) + 16;
+                const bool followsEdit = !stats.vertexPointers.empty() && stats.vertexPointers[0] == expectedPointer;
+                if (!preserved || !untreated || !followsEdit)
+                    std::fprintf(
+                        stderr,
+                        "FAIL edit guard draw=%s initial=%d pointerEdit=%d preserved=%d untreated=%d followsEdit=%d\n",
+                        drawName, initial, int(pointerEdit), int(preserved), int(untreated), int(followsEdit));
+                if (!preserved || !untreated || !followsEdit)
+                    ++failures;
+                ClearCache();
+            }
+        }
+    }
+    ForestRendererFixture::manager.refreshed = false;
+    season = SEASON_AUTUMN;
+    if (failures)
+        std::fprintf(stderr, "FAIL cross-season VTX-first failures=%u\n", failures);
+    else
+        std::puts("PASS both-season VTX-first transitions: rendered/no-draw Off, whole/material variants and outside "
+                  "edit guards");
+    assert(failures == 0);
+}
+static void CheckExistingSeasonCacheClear() {
+    unsigned failures = 0;
+    for (const char* drawName : { "0241B0", "0241B1" }) {
+        for (const int initial : { SEASON_AUTUMN, SEASON_WINTER }) {
+            for (const bool renderOff : { false, true }) {
+                ClearCache();
+                auto rm = std::make_shared<Ship::ResourceManager>();
+                Ship::Context::GetRawInstance()->rm = rm;
+                const std::string path = "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKU_room_00DL_" + std::string(drawName);
+                auto forest = std::make_shared<Fast::DisplayList>();
+                forest->Instructions = kActualForestCommands;
+                rm->archive->files[path] = rm->resources[path] = forest;
+                PlayState play{};
+                play.sceneId = SCENE_00KEIKOKU;
+                ForestRendererFixture::manager.refreshed = false;
+                const int other = initial == SEASON_AUTUMN ? SEASON_WINTER : SEASON_AUTUMN;
+                // Create both seasonal caches and validate the source's resolved
+                // non-first vertex pointers in each cache.
+                for (const int selected : { initial, SEASON_OFF, initial, other }) {
+                    season = selected;
+                    MMAutumnSceneFoliage_Update(&play);
+                    ForestRendererFixture::Draw(forest->Instructions);
+                }
+                assert(sVariants.contains(forest.get()) && sWinterVariants.contains(forest.get()));
+                assert((forest->Instructions[28].words.w0 >> 24) == G_VTX_OTR_HASH);
+                // The active season observes the exact known cache-clear offset;
+                // the inactive season must inherit that validated observation.
+                forest->Instructions[28].words.w1 = kActualForestCommands[28].words.w1;
+                ForestRendererFixture::manager.refreshed = true;
+                MMAutumnSceneFoliage_Update(&play);
+                auto stats = ForestRendererFixture::Draw(forest->Instructions);
+                const uint32_t otherColor = other == SEASON_AUTUMN ? 0xF4B783FF : 0xB9CDD9B0;
+                assert(stats.palettes == std::vector<uint32_t>(22, otherColor));
+                season = SEASON_OFF;
+                MMAutumnSceneFoliage_Update(&play);
+                if (renderOff)
+                    ForestRendererFixture::Draw(forest->Instructions);
+                season = initial;
+                MMAutumnSceneFoliage_Update(&play);
+                stats = ForestRendererFixture::Draw(forest->Instructions);
+                const uint32_t initialColor = initial == SEASON_AUTUMN ? 0xF4B783FF : 0xB9CDD9B0;
+                const unsigned selectedCount = std::count_if(stats.palettes.begin(), stats.palettes.end(),
+                                                             [](uint32_t value) { return value != 0; });
+                const uintptr_t expectedVertex =
+                    reinterpret_cast<uintptr_t>(ForestRendererFixture::manager.GetResourceRawPointer(0)) +
+                    kActualForestCommands[28].words.w1;
+                const bool followsReload = stats.vertexPointers.size() > 1 && stats.vertexPointers[1] == expectedVertex;
+                if (stats.palettes != std::vector<uint32_t>(22, initialColor) || !followsReload) {
+                    std::fprintf(
+                        stderr,
+                        "FAIL existing cache clear draw=%s initial=%d renderedOff=%d tint=%u/22 followsReload=%d\n",
+                        drawName, initial, int(renderOff), selectedCount, int(followsReload));
+                    ++failures;
+                }
+                ClearCache();
+            }
+        }
+    }
+    ForestRendererFixture::manager.refreshed = false;
+    season = SEASON_AUTUMN;
+    if (failures)
+        std::fprintf(stderr, "FAIL existing-season cache-clear failures=%u\n", failures);
+    else
+        std::puts(
+            "PASS existing autumn/winter caches share validated vertex reloads across rendered/no-draw Off frames");
+    assert(failures == 0);
+}
+static void CheckWinterTransitions() {
+    for (const auto* suffix : { "", "_scene" }) {
+        for (const bool alt : { false, true }) {
+            ClearCache();
+            auto rm = std::make_shared<Ship::ResourceManager>();
+            Ship::Context::GetRawInstance()->rm = rm;
+            rm->alt = alt;
+            const auto prefix = (alt ? "alt/" : "") + std::string("scenes/nonmq/Z2_00KEIKOKU") + suffix + "/";
+            std::vector<std::shared_ptr<Fast::DisplayList>> lists;
+            for (const auto& [name, commands] :
+                 { std::pair{ "003928", kActualMiddleForestCommands }, std::pair{ "0241B0", kActualForestCommands },
+                   std::pair{ "027238", kActualBackwallGrassCommands } }) {
+                auto list = std::make_shared<Fast::DisplayList>();
+                list->Instructions = commands;
+                const auto path = prefix + "Z2_00KEIKOKU_room_00DL_" + name;
+                rm->resources[path] = rm->archive->files[path] = list;
+                lists.push_back(list);
+            }
+            for (const auto* id : { "005800", "005000", "007800", "006800" }) {
+                const auto path = std::string("misc/scene_texture_08/scene_texture_08_Tex_") + id;
+                ForestRendererFixture::manager.paths[CRC64(path.c_str())] = path;
+            }
+            const auto atlasPath = prefix + "mm3d_field_poc4/textures/tl_ki_02";
+            auto atlas = SurfaceTexture();
+            const auto originalPixels = *atlas->mImageBuffer;
+            rm->resources[atlasPath] = atlas;
+            std::map<int, std::shared_ptr<Fast::Texture>> copies;
+            std::map<int, uintptr_t> branches;
+            PlayState play{};
+            play.sceneId = SCENE_00KEIKOKU;
+            for (const int selected : { SEASON_AUTUMN, SEASON_WINTER, SEASON_AUTUMN, SEASON_WINTER, SEASON_OFF,
+                                        SEASON_WINTER, SEASON_SPRING, SEASON_SUMMER, -1, SEASON_AUTUMN }) {
+                season = selected;
+                MMAutumnSceneFoliage_Update(&play);
+                const bool treated = selected == SEASON_AUTUMN || selected == SEASON_WINTER;
+                const std::vector<uint32_t> colors =
+                    selected == SEASON_AUTUMN   ? std::vector<uint32_t>{ 0xFF9F91FF, 0xF4B783FF, 0xFFD078FF }
+                    : selected == SEASON_WINTER ? std::vector<uint32_t>{ 0xC4D2C9B0, 0xB9CDD9B0, 0xBED2C2B0 }
+                                                : std::vector<uint32_t>(3, 0);
+                for (size_t i = 0; i < lists.size(); ++i) {
+                    const auto stats = ForestRendererFixture::Draw(lists[i]->Instructions);
+                    const unsigned count = i == 0 ? 32 : i == 1 ? 22 : 26;
+                    if (selected == SEASON_WINTER && i == 0 &&
+                        stats.palettes != std::vector<uint32_t>(count, colors[i]))
+                        std::fprintf(stderr,
+                                     "FAIL winter middle trees: verified foliage draw still has no frosted tint\n");
+                    assert(stats.palettes == std::vector<uint32_t>(count, colors[i]));
+                }
+                if (treated) {
+                    const auto pointer = lists[0]->Instructions[0].words.w1;
+                    if (branches.contains(selected))
+                        assert(branches.at(selected) == pointer);
+                    else
+                        branches[selected] = pointer;
+                    if (branches.size() == 2)
+                        assert(branches.at(SEASON_AUTUMN) != branches.at(SEASON_WINTER));
+                }
+                auto cached = std::dynamic_pointer_cast<Fast::Texture>(rm->resources.at(atlasPath));
+                if (treated && alt) {
+                    assert(cached != atlas);
+                    const std::vector<uint8_t> expected =
+                        selected == SEASON_AUTUMN
+                            ? std::vector<uint8_t>{ 61, 49, 28, 128, 70, 50, 30, 255, 64, 64, 64, 0 }
+                            : std::vector<uint8_t>{ 39, 61, 37, 128, 70, 50, 30, 255, 64, 64, 64, 0 };
+                    assert(std::equal(expected.begin(), expected.end(), cached->ImageData));
+                    if (copies.contains(selected))
+                        assert(copies.at(selected) == cached);
+                    else
+                        copies[selected] = cached;
+                    if (copies.size() == 2)
+                        assert(copies.at(SEASON_AUTUMN)->ImageData != copies.at(SEASON_WINTER)->ImageData);
+                } else {
+                    assert(cached == atlas);
+                }
+                assert(*atlas->mImageBuffer == originalPixels && rm->loads == 0);
+            }
+            ClearCache();
+            assert(rm->resources.at(atlasPath) == atlas);
+            assert(sVariants.empty() && sWinterVariants.empty() && sSurfaceTextures.empty());
+        }
+    }
+    season = SEASON_AUTUMN;
+    std::puts("PASS autumn/winter transitions: distinct tree layers, exact grass, immutable separate copies, "
+              "native/Alt and Off/spring/summer/ineligible cleanup");
 }
 #include "autumn_scene_foliage_fixtures.inc"
 static void CheckVariant(const std::shared_ptr<Fast::DisplayList>& list, const std::vector<Gfx>& original) {
@@ -498,11 +900,13 @@ static void CheckVariant(const std::shared_ptr<Fast::DisplayList>& list, const s
         auto command = commands[i];
         const auto op = command.words.w0 >> 24;
         if (op == G_SETGRAYSCALE) {
+            assert(command.words.w1 == 0 || command.words.w1 == 2);
             tint = command.words.w1 != 0;
             continue;
         }
         if (op == G_SETINTENSITY) {
-            assert(command.words.w1 == 0xD99C45FF || command.words.w1 == 0xB96848FF);
+            assert(command.words.w1 == 0xFFD078FF || command.words.w1 == 0xF4B783FF || command.words.w1 == 0xD99C45FF ||
+                   command.words.w1 == 0xB96848FF);
             continue;
         }
         if (op == G_TRI1 && tint)
@@ -535,7 +939,7 @@ static void CheckPrimaryGrassTile() {
             assert(!variant.empty()); // The detail image cannot hide primary ground grass.
             assert(Equal(RemoveTint(variant), original));
             assert(std::count_if(variant.begin(), variant.end(), [](const Gfx& c) {
-                       return c.words.w0 >> 24 == G_SETINTENSITY && c.words.w1 == 0xD99C45FF;
+                       return c.words.w0 >> 24 == G_SETINTENSITY && c.words.w1 == 0xFFD078FF;
                    }) == 1);
         } else {
             assert(variant.empty()); // Grass in an unused secondary tile cannot tint primary dirt.
@@ -598,12 +1002,18 @@ static void CheckRendererTextureSlots() {
     original.push_back(gsSPEndDisplayList());
     const auto variant = BuildVariant(original);
     assert(!variant.empty() && Equal(RemoveTint(variant), original));
-    assert(CountMaterialTriangles(variant, "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_01C650", 0xD99C45FF) == 1);
-    assert(CountMaterialTriangles(variant, "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_01F650", 0xD99C45FF) == 0);
+    assert(CountMaterialTriangles(variant, "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_01C650", 0xFFD078FF) == 1);
+    assert(CountMaterialTriangles(variant, "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_01F650", 0xFFD078FF) == 0);
     std::puts("PASS renderer texture slots, nonzero render tile and detail-slot replacement");
 }
 
 int main() {
+    CheckWinterTransitions();
+    CheckCrossSeasonVtxFirst();
+    CheckExistingSeasonCacheClear();
+    CheckStumpGrassAtlas();
+    CheckBackwallGrassMaterial();
+    CheckMiddleForestMaterial();
     CheckPrimaryGrassTile();
     CheckOtherSceneGrass();
     CheckRendererTextureSlots();
@@ -648,8 +1058,8 @@ int main() {
         MMAutumnSceneFoliage_Update(&play);
         assert((bed->Instructions[0].words.w0 >> 24) == G_DL);
         const auto* wrapped = (const Gfx*)bed->Instructions[0].words.w1;
-        assert((wrapped[0].words.w0 >> 24) == G_SETGRAYSCALE && wrapped[0].words.w1 == 1);
-        assert(wrapped[1].words.w1 == 0xD99C45FF);
+        assert((wrapped[0].words.w0 >> 24) == G_SETGRAYSCALE && wrapped[0].words.w1 == 2);
+        assert(wrapped[1].words.w1 == 0xFFD078FF);
         assert((wrapped[2].words.w0 >> 24) == G_DL);
         const auto* preserved = (const Gfx*)wrapped[2].words.w1;
         for (size_t i = 0; i < original.size(); ++i)
@@ -754,6 +1164,7 @@ int main() {
     MMAutumnSceneFoliage_Update(&play);
     assert(Ship::CrossRMRegistry::teardown != nullptr);
     Ship::CrossRMRegistry::teardown();
-    assert(Equal(wall->Instructions, wallOriginal) && sVariants.empty());
+    assert(Equal(wall->Instructions, wallOriginal) && sVariants.empty() && sWinterVariants.empty() &&
+           sSurfaceTextures.empty());
     std::puts("PASS loaded-list scope and safe teardown cache release");
 }

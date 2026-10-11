@@ -93,7 +93,8 @@ struct ResourceInitData { std::string Path; std::shared_ptr<Archive> Parent; };
                  "gfx_tri1_handler_f3dex", "gfx_tri1_handler_f3d", "gfx_tri2_handler_f3dex",
                  "gfx_quad_handler_f3dex2", "gfx_quad_handler_f3dex", "Interpreter::SpReset",
                  "Interpreter::NormalizeVector", "Interpreter::TransposedMatrixMul", "Interpreter::CalculateNormalDir",
-                 "gfx_set_prim_depth_handler_rdp", "gfx_set_key_r_handler_rdp", "gfx_set_key_gb_handler_rdp"]
+                 "gfx_set_prim_depth_handler_rdp", "gfx_set_key_r_handler_rdp", "gfx_set_key_gb_handler_rdp",
+                 "gfx_set_grayscale_handler_custom"]
         if "Interpreter::PrepareTriangleState(" in source:
             names.insert(names.index("Interpreter::GfxSpTri1"), "Interpreter::PrepareTriangleState")
         if "Interpreter::GfxSpTri1Impl(" in source:

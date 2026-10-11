@@ -120,6 +120,8 @@ uint16_t ResourceMgr_LoadTexHeightByName(char* texPath);
 CollisionHeader* ResourceMgr_LoadColByName(const char* path);
 AnimatedMaterial* ResourceMgr_LoadAnimatedMatByName(const char* path);
 char* ResourceMgr_LoadTexOrDListByName(const char* filePath);
+// Normalized center of visible RGBA artwork; transparent padding is excluded.
+uint8_t MM_GetTextureVisibleCenter(const char* filePath, float* x, float* y);
 char* ResourceMgr_LoadIfDListByName(const char* filePath);
 char* ResourceMgr_LoadPlayerAnimByName(const char* animPath);
 // Wraps a raw SOH_PlayerAnimation payload in a real header (cached). Skijer's NEI

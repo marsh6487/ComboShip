@@ -1,6 +1,7 @@
 #include "AutumnSceneFoliage.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
 #include <fast/resource/type/DisplayList.h>
+#include <fast/resource/type/Texture.h>
 #include <ship/Context.h>
 #include <ship/resource/ResourceManager.h>
 #include <ship/resource/archive/Archive.h>
@@ -46,10 +47,28 @@ constexpr Material kMaterials[] = {
 #include "AutumnSceneMaterials.inc"
 };
 
-uint32_t ForestListColor(std::string path) {
+uint32_t SeasonPalette(uint32_t autumnColor, int selectedSeason) {
+    if (selectedSeason != SEASON_WINTER)
+        return autumnColor;
+    switch (autumnColor) {
+        case 0xD99C45FF:
+        case 0xFFD078FF:
+            return 0xBED2C2B0; // Soft frost; retain 31% of the original color variation.
+        case 0xB96848FF:
+        case 0xF4B783FF:
+            return 0xB9CDD9B0; // Cool gray-blue upper/distant foliage.
+        case 0xFF9F91FF:
+            return 0xC4D2C9B0; // Neutral gray-green middle trees stay distinct.
+        default:
+            return autumnColor;
+    }
+}
+
+uint32_t ForestListColor(std::string path, int selectedSeason = SEASON_AUTUMN) {
     if (path.starts_with("alt/"))
         path.erase(0, 4);
-    // This exact draw owns only the lower forest wallpaper and upper canopy.
+    // This exact draw owns the distant forest wallpaper and upper canopy.
+    // The middle trees use shared textures in DL_003928, selected by MaterialColor.
     // Scope both together even when a replacement exposes private or mixed
     // texture identities. Do not recolor adjacent terrain or architecture.
     for (const auto* suffix : { "", "_scene" }) {
@@ -57,13 +76,13 @@ uint32_t ForestListColor(std::string path) {
         for (const auto* setup : { "", "Set_001200", "Set_001340", "Set_0014C0", "Set_0015D0", "Set_001750",
                                    "Set_0019F0", "Set_001B30", "Set_001C90", "Set_001E60" }) {
             if (path == prefix + setup + "DL_0241B0")
-                return 0xB96848FF;
+                return SeasonPalette(0xF4B783FF, selectedSeason);
         }
     }
     return 0;
 }
 
-uint32_t WholeListColor(std::string path) {
+uint32_t WholeListColor(std::string path, int selectedSeason = SEASON_AUTUMN) {
     if (path.starts_with("alt/"))
         path.erase(0, 4);
     // The accepted POC3 foliage roots call private child materials. Follow
@@ -72,17 +91,17 @@ uint32_t WholeListColor(std::string path) {
         const std::string prefix = "scenes/nonmq/Z2_00KEIKOKU" + std::string(suffix) + "/Z2_00KEIKOKU_room_00DL_";
         for (const auto* top : { "0153A8", "015DF0", "016598" }) {
             if (path == prefix + top)
-                return 0xD99C45FF;
+                return SeasonPalette(0xFFD078FF, selectedSeason);
         }
         for (const auto* side : { "0158E8", "016180", "016A38" }) {
             if (path == prefix + side)
-                return 0xB96848FF;
+                return SeasonPalette(0xF4B783FF, selectedSeason);
         }
     }
     return 0;
 }
 
-uint32_t MaterialColor(uint64_t hash) {
+uint32_t MaterialColor(uint64_t hash, int selectedSeason = SEASON_AUTUMN) {
     static const auto colors = [] {
         std::map<uint64_t, uint32_t> result;
         for (const auto& material : kMaterials) {
@@ -100,7 +119,7 @@ uint32_t MaterialColor(uint64_t hash) {
         return result;
     }();
     const auto found = colors.find(hash);
-    return found == colors.end() ? 0 : found->second;
+    return found == colors.end() ? 0 : SeasonPalette(found->second, selectedSeason);
 }
 
 size_t MaterialCommandLength(uint8_t opcode) {
@@ -168,7 +187,7 @@ std::vector<RendererPointerSlot> RendererPointerSlots(const std::vector<Gfx>& so
     return slots;
 }
 
-std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source) {
+std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason = SEASON_AUTUMN) {
     std::vector<Gfx> result;
     uint32_t imageColor = 0;
     bool tileSlot[8]{};
@@ -183,7 +202,8 @@ std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source) {
             return {};
         }
         if (opcode == G_SETTIMG_OTR_HASH) {
-            imageColor = MaterialColor((uint64_t(source[i + 1].words.w0) << 32) | source[i + 1].words.w1);
+            imageColor =
+                MaterialColor((uint64_t(source[i + 1].words.w0) << 32) | source[i + 1].words.w1, selectedSeason);
         } else if (opcode == G_SETTIMG) {
             imageColor = 0;
         } else if (opcode == G_SETTILE) {
@@ -216,8 +236,9 @@ std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source) {
                 ++end;
             }
             if (color != 0) {
-                result.push_back(gsSPGrayscale(true));
-                result.push_back(gsDPSetGrayscaleColor(color >> 24, (color >> 16) & 255, (color >> 8) & 255, 255));
+                result.push_back(gsSPGrayscale(2)); // Preserve the texture's mean intensity.
+                result.push_back(
+                    gsDPSetGrayscaleColor(color >> 24, (color >> 16) & 255, (color >> 8) & 255, color & 255));
                 changed = true;
             }
             result.insert(result.end(), source.begin() + i, source.begin() + end);
@@ -250,6 +271,8 @@ struct Variant {
     // A scoped child must not mutate the immutable source comparison above.
     std::vector<Gfx> draw;
     std::vector<RendererPointerSlot> pointerSlots = RendererPointerSlots(original);
+    // Observations belong to the source, not its season's immutable draw copy.
+    std::shared_ptr<std::map<size_t, uintptr_t>> observedPointers = std::make_shared<std::map<size_t, uintptr_t>>();
     std::string forestPath;
     bool reportedPointerWrites = false;
     bool reportedConflict = false;
@@ -264,6 +287,7 @@ struct Variant {
                 // Our branch covered this cache field. Restoring its original
                 // offset means the next renderer resolution is a fresh write.
                 pointerSlots[0].observed = original[0].words.w1;
+                (*observedPointers)[0] = original[0].words.w1;
             }
         }
     }
@@ -279,6 +303,12 @@ struct Variant {
         size_t nextSlot = 0;
         unsigned pointerWrites = 0;
         const bool redirected = SameCommand(source->Instructions[0], Branch());
+        for (auto& slot : pointerSlots) {
+            const auto observed = observedPointers->find(slot.index);
+            if (observed != observedPointers->end()) {
+                slot.observed = observed->second;
+            }
+        }
         for (size_t i = 0; i < original.size(); ++i) {
             auto* pointerSlot =
                 nextSlot < pointerSlots.size() && pointerSlots[nextSlot].index == i ? &pointerSlots[nextSlot] : nullptr;
@@ -323,6 +353,7 @@ struct Variant {
                 copied[slot.copyIndex].words.w1 = current;
             }
             slot.observed = current;
+            (*observedPointers)[slot.index] = current;
         }
         if (!forestPath.empty() && pointerWrites != 0 && !reportedPointerWrites) {
             SPDLOG_INFO("[AutumnForest] accepted {} renderer pointer writes; tint remains active path={}",
@@ -335,15 +366,136 @@ struct Variant {
 };
 
 std::map<const Fast::DisplayList*, Variant> sVariants;
+std::map<const Fast::DisplayList*, Variant> sWinterVariants;
 std::map<const Fast::DisplayList*, std::weak_ptr<Fast::DisplayList>> sIgnored;
 std::set<const Fast::DisplayList*> sActive;
 std::vector<std::string> sPaths;
 const Ship::ArchiveManager* sArchives = nullptr;
 int sScene = -1;
+int sFoliageSeason = -1;
+
+auto& CurrentVariants() {
+    return sFoliageSeason == SEASON_WINTER ? sWinterVariants : sVariants;
+}
+
+struct SurfaceTextureVariant {
+    std::shared_ptr<Fast::Texture> source;
+    std::shared_ptr<Fast::Texture> copy;
+};
+struct SurfaceTextureBinding {
+    std::weak_ptr<Ship::ResourceManager> owner;
+    std::string path;
+    SurfaceTextureVariant texture;
+};
+// Retain immutable originals and copies until renderer teardown, as with the
+// display-list variants. A new pixel address also gives the GPU a new cache key.
+std::map<std::pair<const Fast::Texture*, uint32_t>, SurfaceTextureVariant> sSurfaceTextures;
+std::vector<SurfaceTextureBinding> sSurfaceBindings;
+
+std::shared_ptr<Fast::Texture> BuildSurfaceTexture(const std::shared_ptr<Fast::Texture>& source,
+                                                   uint32_t color = 0xFFD078FF) {
+    const unsigned red = color >> 24, green = (color >> 16) & 255, blue = (color >> 8) & 255;
+    const unsigned colorSum = red + green + blue;
+    const unsigned blend = color & 255;
+    if (source->Type != Fast::TextureType::RGBA32bpp || source->ImageData == nullptr || source->Width == 0 ||
+        source->Height == 0 || size_t(source->Width) * source->Height * 4 != source->ImageDataSize || colorSum == 0) {
+        return nullptr;
+    }
+    auto copy = std::make_shared<Fast::Texture>(source->GetInitData());
+    copy->Type = source->Type;
+    copy->Width = source->Width;
+    copy->Height = source->Height;
+    copy->Flags = source->Flags;
+    copy->HByteScale = source->HByteScale;
+    copy->VPixelScale = source->VPixelScale;
+    copy->ImageDataSize = source->ImageDataSize;
+    const auto* first = reinterpret_cast<const char*>(source->ImageData);
+    copy->mImageBuffer = std::make_shared<std::vector<char>>(first, first + source->ImageDataSize);
+    copy->ImageData = reinterpret_cast<uint8_t*>(copy->mImageBuffer->data());
+    bool changed = false;
+    for (size_t i = 0; i < copy->ImageDataSize; i += 4) {
+        auto* pixel = copy->ImageData + i;
+        // This exact mixed atlas has green grass beside brown bark. Preserve
+        // wood, neutral pixels and every alpha byte rather than tinting its draw.
+        if (pixel[1] > pixel[0] && pixel[1] > pixel[2]) {
+            // Match the brightness-preserving grass treatment used by the
+            // display-list variants, with only byte rounding/highlight clipping.
+            const unsigned sum = unsigned(pixel[0]) + pixel[1] + pixel[2];
+            pixel[0] = (unsigned(pixel[0]) * (255 - blend) + std::min(255u, sum * red / colorSum) * blend) / 255;
+            pixel[1] = (unsigned(pixel[1]) * (255 - blend) + std::min(255u, sum * green / colorSum) * blend) / 255;
+            pixel[2] = (unsigned(pixel[2]) * (255 - blend) + std::min(255u, sum * blue / colorSum) * blend) / 255;
+            changed = true;
+        }
+    }
+    return changed ? copy : nullptr;
+}
+
+void RestoreSurfaceBinding(const SurfaceTextureBinding& binding) {
+#ifdef COMBO_BUILD
+    Ship::OwnRMScope rmScope("mm");
+#endif
+    if (auto rm = binding.owner.lock(); rm && rm->GetCachedResource(binding.path, true) == binding.texture.copy) {
+        rm->CacheExternalResource(binding.path, binding.texture.source);
+    }
+}
+
+void RestoreSurfaceTextures() {
+    for (const auto& binding : sSurfaceBindings) {
+        RestoreSurfaceBinding(binding);
+    }
+    sSurfaceBindings.clear();
+}
+
+void UpdateSurfaceTextures(const PlayState* play, const std::shared_ptr<Ship::ResourceManager>& rm,
+                           int selectedSeason) {
+    if (play->sceneId != SCENE_00KEIKOKU || !rm->IsAltAssetsEnabled()) {
+        RestoreSurfaceTextures();
+        return;
+    }
+    std::vector<SurfaceTextureBinding> active;
+    for (const auto* suffix : { "", "_scene" }) {
+        for (const auto* prefix : { "", "alt/" }) {
+            const std::string path =
+                std::string(prefix) + "scenes/nonmq/Z2_00KEIKOKU" + suffix + "/mm3d_field_poc4/textures/tl_ki_02";
+            auto source = std::dynamic_pointer_cast<Fast::Texture>(rm->GetCachedResource(path, true));
+            if (source == nullptr) {
+                continue; // Leave cold assets to the normal renderer load path.
+            }
+            auto current = std::find_if(sSurfaceBindings.begin(), sSurfaceBindings.end(), [&](const auto& binding) {
+                return binding.owner.lock() == rm && binding.path == path && binding.texture.copy == source;
+            });
+            if (current != sSurfaceBindings.end()) {
+                active.push_back(*current);
+                continue;
+            }
+            const auto color = SeasonPalette(0xFFD078FF, selectedSeason);
+            const auto key = std::pair{ source.get(), color };
+            auto it = sSurfaceTextures.find(key);
+            if (it == sSurfaceTextures.end()) {
+                auto copy = BuildSurfaceTexture(source, color);
+                if (copy == nullptr) {
+                    continue;
+                }
+                it = sSurfaceTextures.emplace(key, SurfaceTextureVariant{ source, std::move(copy) }).first;
+            }
+            rm->CacheExternalResource(path, it->second.copy);
+            active.push_back({ rm, path, it->second });
+        }
+    }
+    for (const auto& binding : sSurfaceBindings) {
+        if (std::none_of(active.begin(), active.end(), [&](const auto& next) {
+                return next.owner.lock() == binding.owner.lock() && next.path == binding.path &&
+                       next.texture.copy == binding.texture.copy;
+            })) {
+            RestoreSurfaceBinding(binding); // Respect outside cache edits and reloads.
+        }
+    }
+    sSurfaceBindings = std::move(active);
+}
 
 void RestoreActive() {
     for (const auto* source : sActive) {
-        sVariants.at(source).Restore();
+        CurrentVariants().at(source).Restore();
     }
     sActive.clear();
 }
@@ -353,12 +505,15 @@ void ClearCache() {
     // unloaded, so queued copies can be released at this boundary.
     MMAutumnSceneFoliage_Reset();
     sVariants.clear();
+    sWinterVariants.clear();
+    sSurfaceTextures.clear();
 }
 } // namespace
 
 void MMAutumnSceneFoliage_Update(const PlayState* play) {
     const char* scene = play ? SceneResourceName(play->sceneId) : nullptr;
-    if (scene == nullptr || MMWeather_SeasonForPlay(play) != SEASON_AUTUMN) {
+    const int selectedSeason = MMWeather_SeasonForPlay(play);
+    if (scene == nullptr || (selectedSeason != SEASON_AUTUMN && selectedSeason != SEASON_WINTER)) {
         MMAutumnSceneFoliage_Reset();
         return;
     }
@@ -377,6 +532,14 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
         MMAutumnSceneFoliage_Reset();
         return;
     }
+    if (sFoliageSeason != selectedSeason) {
+        // Restore before selecting another immutable cache. Both seasons retain
+        // their queued command/pixel buffers, without tinting a tinted copy.
+        RestoreActive();
+        RestoreSurfaceTextures();
+        sFoliageSeason = selectedSeason;
+    }
+    UpdateSurfaceTextures(play, rm, selectedSeason);
     if (sScene != play->sceneId || sArchives != archives.get()) {
         RestoreActive();
         sScene = play->sceneId;
@@ -406,6 +569,7 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
         sPaths.assign(paths.begin(), paths.end());
     }
     std::set<const Fast::DisplayList*> active;
+    auto& variants = CurrentVariants();
     for (const auto& path : sPaths) {
         std::string resolved = path;
         if (rm->IsAltAssetsEnabled()) {
@@ -430,22 +594,33 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
         if (resource == nullptr || resource->Instructions.empty()) {
             continue;
         }
-        auto it = sVariants.find(resource.get());
-        if (it == sVariants.end()) {
+        auto it = variants.find(resource.get());
+        if (it == variants.end()) {
             const auto ignored = sIgnored.find(resource.get());
             if (ignored != sIgnored.end() && ignored->second.lock() == resource) {
                 continue;
             }
-            const auto forestColor = ForestListColor(path);
-            auto commands = forestColor != 0 ? std::vector<Gfx>{} : BuildVariant(resource->Instructions);
-            const auto wholeColor = forestColor != 0 ? forestColor : WholeListColor(path);
+            // Both seasons compare against the same intact source snapshot.
+            // An Off draw may have resolved a first-command vertex offset since
+            // the first season was cached; that season still restores its known
+            // offset when removing the branch. Preserve that identity and the
+            // observed pointer guards rather than snapshotting a different base.
+            const auto& otherVariants = selectedSeason == SEASON_WINTER ? sVariants : sWinterVariants;
+            const auto other = otherVariants.find(resource.get());
+            const auto& original = other == otherVariants.end() ? resource->Instructions : other->second.original;
+            const auto forestColor = ForestListColor(path, selectedSeason);
+            auto commands = forestColor != 0 ? std::vector<Gfx>{} : BuildVariant(original, selectedSeason);
+            const auto wholeColor = forestColor != 0 ? forestColor : WholeListColor(path, selectedSeason);
             if (commands.empty() && wholeColor == 0) {
                 // Ordinary scene materials stay owned by the resource manager;
                 // don't retain or duplicate every non-foliage list in the scene.
                 sIgnored[resource.get()] = resource;
                 continue;
             }
-            Variant variant{ resource, resource->Instructions, std::move(commands), {} };
+            Variant variant{ resource, original, std::move(commands), {} };
+            if (other != otherVariants.end()) {
+                variant.observedPointers = other->second.observedPointers;
+            }
             if (forestColor != 0) {
                 variant.forestPath = resolved;
                 const auto initData = resource->GetInitData();
@@ -463,9 +638,9 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                 // color even when that root ends with a tail branch. Copies
                 // retain all dynamic child calls, geometry and alpha commands.
                 variant.draw = variant.original;
-                variant.commands = { gsSPGrayscale(true),
+                variant.commands = { gsSPGrayscale(2), // Preserve intensity; keep legacy effects unchanged.
                                      gsDPSetGrayscaleColor(wholeColor >> 24, (wholeColor >> 16) & 255,
-                                                           (wholeColor >> 8) & 255, 255),
+                                                           (wholeColor >> 8) & 255, wholeColor & 255),
                                      gsSPDisplayList(variant.draw.data()), gsSPGrayscale(false), gsSPEndDisplayList() };
             }
             if (!variant.pointerSlots.empty()) {
@@ -479,7 +654,7 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                     }
                 }
             }
-            it = sVariants.emplace(resource.get(), std::move(variant)).first;
+            it = variants.emplace(resource.get(), std::move(variant)).first;
         }
         if (it->second.Apply()) {
             active.insert(resource.get());
@@ -487,7 +662,7 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
     }
     for (const auto* source : sActive) {
         if (!active.contains(source)) {
-            sVariants.at(source).Restore();
+            variants.at(source).Restore();
         }
     }
     sActive = std::move(active);
@@ -495,8 +670,10 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
 
 void MMAutumnSceneFoliage_Reset() {
     RestoreActive();
+    RestoreSurfaceTextures();
     sPaths.clear();
     sIgnored.clear();
     sArchives = nullptr;
     sScene = -1;
+    sFoliageSeason = -1;
 }

@@ -2454,9 +2454,15 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
         }
 
         if (use_grayscale) {
-            mBufVbo[mBufVboLen++] = mRdp->grayscale_color.r / 255.0f;
-            mBufVbo[mBufVboLen++] = mRdp->grayscale_color.g / 255.0f;
-            mBufVbo[mBufVboLen++] = mRdp->grayscale_color.b / 255.0f;
+            const auto color = mRdp->grayscale_color;
+            const unsigned sum = unsigned(color.r) + color.g + color.b;
+            // All backends multiply mean texel RGB by these float attributes.
+            // Opt-in normalization retains that mean instead of multiplying it
+            // by a second dark palette. Preserve legacy mode's exact arithmetic.
+            const float scale = sum != 0 ? 3.0f / sum : 0.0f;
+            mBufVbo[mBufVboLen++] = mRdp->grayscale_normalize ? color.r * scale : color.r / 255.0f;
+            mBufVbo[mBufVboLen++] = mRdp->grayscale_normalize ? color.g * scale : color.g / 255.0f;
+            mBufVbo[mBufVboLen++] = mRdp->grayscale_normalize ? color.b * scale : color.b / 255.0f;
             mBufVbo[mBufVboLen++] = mRdp->grayscale_color.a / 255.0f; // lerp interpolation factor (not alpha)
         }
 
@@ -4756,6 +4762,9 @@ bool gfx_set_grayscale_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
     F3DGfx* cmd = *cmd0;
 
     gfx->mRdp->grayscale = cmd->words.w1;
+    // 0 disables, 1 keeps the existing multiply treatment, 2 preserves intensity.
+    // A subsequent legacy or Off command also clears the normalized treatment.
+    gfx->mRdp->grayscale_normalize = cmd->words.w1 == 2;
     return false;
 }
 

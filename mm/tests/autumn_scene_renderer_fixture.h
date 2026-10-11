@@ -9,15 +9,6 @@
 namespace Ship {
 #include "autumn_scene_renderer_signature.inc"
 }
-namespace Fast {
-struct Texture : Ship::IResource {
-    uint32_t Flags = 0;
-    unsigned Width = 1024, Height = 512;
-    float HByteScale = 1.0f, VPixelScale = 1.0f;
-    int Type = 0;
-    uint8_t* ImageData = nullptr;
-};
-} // namespace Fast
 namespace ForestRendererFixture {
 using F3DGfx = Gfx;
 using F3DVtx = Vtx;
@@ -43,18 +34,20 @@ struct Palette {
 };
 struct Rdp {
     bool grayscale = false;
+    bool grayscale_normalize = false;
     Palette grayscale_color{};
 };
 struct RawTexMetadata {
     unsigned width, height;
     float h_byte_scale, v_pixel_scale;
-    int type;
+    Fast::TextureType type;
     std::shared_ptr<Fast::Texture> resource;
 };
 struct Stats {
     unsigned triangles = 0, tinted = 0, vertexLoads = 0;
     std::vector<uintptr_t> vertexPointers;
     std::vector<uint32_t> palettes;
+    std::vector<std::shared_ptr<Fast::Texture>> textures;
     std::map<std::string, std::pair<unsigned, unsigned>> materials; // total, tinted
 };
 struct Interpreter {
@@ -70,17 +63,21 @@ struct Interpreter {
         ++stats.vertexLoads;
         stats.vertexPointers.push_back(reinterpret_cast<uintptr_t>(vertices));
     }
-    void GfxDpSetTextureImage(unsigned, unsigned, unsigned, const char* name, uint32_t, RawTexMetadata, void*) {
+    void GfxDpSetTextureImage(unsigned, unsigned, unsigned, const char* name, uint32_t, RawTexMetadata metadata,
+                              void* pixels) {
         texture = name;
+        assert(pixels == metadata.resource->ImageData);
+        stats.textures.push_back(metadata.resource);
     }
     void GfxSpTri1(unsigned, unsigned, unsigned, bool) {
+        assert(!rdp.grayscale || rdp.grayscale_normalize);
         ++stats.triangles;
         auto& material = stats.materials[texture];
         ++material.first;
         const auto color = rdp.grayscale_color;
         stats.palettes.push_back(
             rdp.grayscale ? uint32_t(color.r) << 24 | uint32_t(color.g) << 16 | uint32_t(color.b) << 8 | color.a : 0);
-        if (rdp.grayscale && color.r == 185 && color.g == 104 && color.b == 72 && color.a == 255) {
+        if (rdp.grayscale && color.r == 244 && color.g == 183 && color.b == 131 && color.a == 255) {
             ++stats.tinted;
             ++material.second;
         }
@@ -112,7 +109,13 @@ struct Manager {
     void* GetResourceRawPointer(uint64_t) {
         return refreshed ? refreshedVertices : vertices;
     }
-    std::shared_ptr<Ship::IResource> LoadResourceProcess(const char*) {
+    std::shared_ptr<Ship::IResource> LoadResourceProcess(const char* path) {
+        const auto rm = Ship::Context::GetRawInstance()->rm;
+        for (const auto& name : { (rm->alt ? "alt/" : "") + std::string(path), std::string(path) }) {
+            const auto it = rm->resources.find(name);
+            if (it != rm->resources.end())
+                return it->second;
+        }
         auto texture = std::make_shared<Fast::Texture>();
         texture->ImageData = pixels[alt];
         return texture;
@@ -169,7 +172,7 @@ static Stats Draw(std::vector<Gfx>& root) {
         if (!jumped)
             ++cmd;
     }
-    assert(!gfx.rdp.grayscale);
+    assert(!gfx.rdp.grayscale && !gfx.rdp.grayscale_normalize);
     return gfx.stats;
 }
 static void CheckDraw(const Stats& stats, bool tinted, const std::string& phase = {}) {

@@ -8,6 +8,7 @@
 #endif
 #include <iostream>
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <chrono>
@@ -2121,6 +2122,53 @@ extern "C" char* ResourceMgr_LoadTexOrDListByName(const char* filePath) {
     else {
         return (char*)ResourceGetDataByName(filePath);
     }
+}
+
+extern "C" uint8_t MM_GetTextureVisibleCenter(const char* filePath, float* x, float* y) {
+    if (filePath == nullptr || x == nullptr || y == nullptr) {
+        return false;
+    }
+    auto* context = Ship::Context::GetRawInstance();
+    auto rm = context != nullptr ? context->GetResourceManager() : nullptr;
+    std::string resolved = filePath;
+    // Match the renderer's explicit owner routing: these season icons belong
+    // to OoT even while the selector is drawn from the MM resource manager.
+    if (std::strncmp(filePath, "__OTR__@", 8) == 0) {
+        const char* owner = filePath + 8;
+        const char* colon = std::strchr(owner, ':');
+        if (colon == nullptr || colon == owner) {
+            return false;
+        }
+        rm = Ship::CrossRMRegistry::Get(std::string(owner, colon - owner));
+        resolved = std::string("__OTR__") + (colon + 1);
+    }
+    if (rm == nullptr) {
+        return false;
+    }
+    auto texture = std::dynamic_pointer_cast<Fast::Texture>(rm->LoadResourceProcess(resolved.c_str()));
+    if (texture == nullptr || texture->Type != Fast::TextureType::RGBA32bpp || texture->ImageData == nullptr ||
+        texture->Width == 0 || texture->Height == 0 ||
+        uint64_t(texture->Width) * texture->Height * 4 != texture->ImageDataSize) {
+        return false;
+    }
+    unsigned minX = texture->Width, minY = texture->Height, maxX = 0, maxY = 0;
+    for (unsigned py = 0; py < texture->Height; ++py) {
+        for (unsigned px = 0; px < texture->Width; ++px) {
+            // Ignore barely visible glow around the solid artwork.
+            if (texture->ImageData[(size_t(py) * texture->Width + px) * 4 + 3] >= 32) {
+                minX = std::min(minX, px);
+                minY = std::min(minY, py);
+                maxX = std::max(maxX, px);
+                maxY = std::max(maxY, py);
+            }
+        }
+    }
+    if (minX > maxX || minY > maxY) {
+        return false;
+    }
+    *x = float(minX + maxX + 1) / (2 * texture->Width);
+    *y = float(minY + maxY + 1) / (2 * texture->Height);
+    return true;
 }
 
 extern "C" char* ResourceMgr_LoadIfDListByName(const char* filePath) {
