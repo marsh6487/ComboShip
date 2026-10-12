@@ -87,6 +87,7 @@ extern "C" {
 // this native seasonal-particle fixture's draw/update boundary.
 void MMSummerAtmosphere_Update(PlayState *) {}
 void MMSummerAtmosphere_Reset() {}
+void MMWinterAtmosphere_Reset() {}
 int32_t CVarGetInteger(const char *name, int32_t fallback) {
   if (!std::strcmp(name, "gAudioEditor.MMWeather.Spring.Blossoms"))
     return springBlossoms;

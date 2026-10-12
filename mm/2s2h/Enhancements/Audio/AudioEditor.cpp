@@ -39,7 +39,7 @@ static WidgetInfo randoMusicOnSceneChange;
 static WidgetInfo randomAudioOnSeedGen;
 static WidgetInfo useSongCategories;
 static std::array<WidgetInfo, 8> weatherWidgets;
-static std::array<WidgetInfo, 11> seasonWeatherWidgets;
+static std::array<WidgetInfo, 13> seasonWeatherWidgets;
 
 namespace AudioPreview {
 
@@ -725,7 +725,7 @@ void AudioEditor::DrawElement() {
                                    "Native restores original game weather. Seasonal effects defer to story scenes.");
                 static const char* seasonNames[] = { "Spring", "Summer", "Autumn", "Winter" };
                 static const size_t seasonStarts[] = { 1, 3, 7, 9 };
-                static const size_t seasonEnds[] = { 3, 7, 9, 11 };
+                static const size_t seasonEnds[] = { 3, 7, 9, 13 };
                 for (size_t season = 0; season < 4; ++season) {
                     if (ImGui::CollapsingHeader(seasonNames[season])) {
                         for (size_t widget = seasonStarts[season]; widget < seasonEnds[season]; ++widget) {
@@ -1108,13 +1108,13 @@ void RegisterAudioWidgets() {
                      .Tooltip("Season Default keeps Spring rain on Days 1 and 3, plus native Day 2 weather. "
                               "Off, Persistent and Intermittent replace native rain while Spring is active. "
                               "The separate Outdoor Rain override still takes priority."));
-    seasonWeatherWidgets[2] = { .name = "Spring Cherry Blossoms", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    seasonWeatherWidgets[2] = { .name = "Spring Falling Petals", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
     seasonWeatherWidgets[2]
         .CVar(MM_WEATHER_CVAR("Spring.Blossoms"))
         .Options(CheckboxOptions()
                      .DefaultValue(true)
                      .Color(THEME_COLOR)
-                     .Tooltip("Drifting cherry blossom petals outdoors during Spring."));
+                     .Tooltip("Falling pink petals outdoors during Spring."));
     seasonWeatherWidgets[3] = { .name = "Summer Atmosphere", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
     seasonWeatherWidgets[3]
         .CVar(MM_SUMMER_CVAR("Enabled"))
@@ -1171,6 +1171,21 @@ void RegisterAudioWidgets() {
                      .DefaultValue(false)
                      .Color(THEME_COLOR)
                      .Tooltip("Adds gusts of windblown snow when Winter Snow is enabled."));
+    seasonWeatherWidgets[11] = { .name = "Winter Freezing Mist", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    seasonWeatherWidgets[11]
+        .CVar(MM_WEATHER_CVAR("Winter.Mist"))
+        .Options(CheckboxOptions()
+                     .DefaultValue(true)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Soft ground mist outdoors during Winter, independent of Winter Snow."));
+    seasonWeatherWidgets[12] = { .name = "Winter Nighttime Aurora", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    seasonWeatherWidgets[12]
+        .CVar(MM_WEATHER_CVAR("Winter.Aurora"))
+        .Options(CheckboxOptions()
+                     .DefaultValue(true)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Blue and green ribbons in the normal outdoor sky during Winter nights. "
+                              "Fades in at dusk and out at dawn, independent of Winter Snow and Mist."));
     for (auto& widget : seasonWeatherWidgets) {
         AddAudioSearchWidget(widget);
     }

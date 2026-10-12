@@ -3,6 +3,7 @@
 #include "MMWeatherState.h"
 #include "2s2h/Enhancements/Graphics/AutumnSceneFoliage.h"
 #include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
+#include "2s2h/Enhancements/Graphics/MMWinterAtmosphere.h"
 
 #include <algorithm>
 #include "global.h"
@@ -83,6 +84,7 @@ void ApplyStormAmbience(uint8_t rain, uint8_t thunder) {
 
 extern "C" void MMWeather_Reset() {
     MMSummerAtmosphere_Reset();
+    MMWinterAtmosphere_Reset();
     MMAutumnSceneFoliage_Reset();
     if (sNativeStormAmbienceMuted) {
         ApplyStormAmbience(sNativeRainAmbience, sNativeThunderAmbience);

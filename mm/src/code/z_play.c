@@ -1,6 +1,7 @@
 #include "z64.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
 #include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
+#include "2s2h/Enhancements/Graphics/MMWinterAtmosphere.h"
 #include <libultraship/log/luslog.h> // 2S2H [Port] LUSLOG_ERROR (transition guard)
 #include "regs.h"
 #include "functions.h"
@@ -1148,6 +1149,7 @@ void Play_UpdateMain(PlayState* this) {
 
     Environment_Update(this, &this->envCtx, &this->lightCtx, &this->pauseCtx, &this->msgCtx, &this->gameOverCtx,
                        this->state.gfxCtx);
+    MMWinterAtmosphere_Update(this);
 
     if (this->sramCtx.status != 0) {
         if (GameInteractor_Should(VB_SAVE_USE_OWL_SAVE_TIMING, gSaveContext.save.isOwlSave)) {
@@ -1479,6 +1481,7 @@ void Play_DrawMain(PlayState* this) {
                     Environment_DrawRain(this, &this->view, gfxCtx);
                 }
                 MMSummerAtmosphere_Draw(this);
+                MMWinterAtmosphere_Draw(this);
             }
 
             if (1) {
@@ -2283,6 +2286,8 @@ void Play_Init(GameState* thisx) {
     s32 scene;
     u8 sceneLayer;
     s32 pad2;
+
+    MMWinterAtmosphere_Reset();
 
     if ((gSaveContext.respawnFlag == -4) || (gSaveContext.respawnFlag == -0x63)) {
         if (CHECK_EVENTINF(EVENTINF_TRIGGER_DAYTELOP)) {
