@@ -272,7 +272,7 @@ void CheckRendered(const ComboForeignDrawInfo *info, int owner, int kind,
   assert(testDepth == 0 && !testGray[0] && !testGray[1]);
   if (custom) {
     assert(testCount == 2 && testScales == 1 &&
-           strstr(testPaths[0], "@mm:alt/objects/cor_mm_keys_poc2/"));
+           strstr(testPaths[0], "@mm:objects/combo_dungeon_keys/"));
     assert(testColorAtDraw[0].r == (testColors && testChanged ? 10 + owner
                                     : kind == 1               ? 233
                                                               : 213));
@@ -282,7 +282,7 @@ void CheckRendered(const ComboForeignDrawInfo *info, int owner, int kind,
   } else {
     assert(testCount == (kind == 1 || kind == 3 ? 2 : 1) && testScales == 0);
     assert(strstr(testPaths[0], "@mm:objects/") &&
-           !strstr(testPaths[0], "cor_mm_keys_poc2"));
+           !strstr(testPaths[0], "combo_dungeon_keys"));
     assert(testTint[0] == (bool)testColors);
     if (testColors)
       assert(testColorAtDraw[0].r == 10 + owner &&
@@ -325,7 +325,7 @@ int main() {
       testColors = 1;
       testChanged = 1;
       testEmblemChanged = 1;
-      CheckRendered(ComboResolveForeignDrawInfo(rc), d, k, false);
+      CheckRendered(ComboResolveForeignDrawInfo(rc), d, k, k < 2);
       ComboLatchForeignDraw(rc);
       assert(ComboForeignDrawCacheGet().map.at(rc).appearanceDependent);
       // Editing or Tab switching after the GI latch must immediately
@@ -343,13 +343,16 @@ int main() {
       testColors = 0;
       testEmblemChanged = 0;
       const auto *plain = ComboResolveForeignDrawInfo(rc);
-      assert(plain && plain->drawKind == CW_DRAW_KIND_SIMPLE &&
-             plain->appearanceDependent);
-      assert(!strstr(plain->dls[0], "cor_mm_keys_poc2"));
+      assert(plain && plain->appearanceDependent);
+      if (k < 2)
+        CheckRendered(plain, d, k, true);
+      else
+        assert(plain->drawKind == CW_DRAW_KIND_SIMPLE &&
+               !strstr(plain->dls[0], "combo_dungeon_keys"));
       ComboLatchForeignDraw(rc);
       testColors = 1;
       testEmblemChanged = 1;
-      CheckRendered(ComboResolveForeignDrawInfo(rc), d, k, false);
+      CheckRendered(ComboResolveForeignDrawInfo(rc), d, k, k < 2);
       testAlt = true;
       for (int missing : {1, 2}) {
         testMissing = missing;
@@ -359,6 +362,7 @@ int main() {
       CheckRendered(ComboResolveForeignDrawInfo(rc), d, k, k < 2);
       if (k == 1) {
         testAlt = false;
+        testMissing = 1;
         testColors = 0;
         testEmblemChanged = 1;
         CheckRendered(ComboResolveForeignDrawInfo(rc), d, k, false);
@@ -416,13 +420,29 @@ int main() {
                                          : "@mm:objects/combo_bottle_gi/EmptyOpaque") &&
            "latched fairy casing must refresh after owner Alt/editor selection changes");
     assert(strstr(fairy->dls[1], selection ? "@mm:objects/object_gi_bottle/gGiEmptyBottleGlassDL"
-                                         : "@mm:objects/combo_bottle_gi/EmptyXlu"));
+                                         : "@mm:objects/combo_bottle_gi/FairyXlu"));
     assert(strstr(fairy->dls[2], "gGiFairyBottleContentsDL") &&
            strstr(fairy->dls[3], "gGiFairyBottleBillboardRotMtx"));
   }
+  testAlt = testFairyEmptyMod = false;
+  for (bool missing : {false, true})
+    for (int selected : {0, 1, 2, 4, 8}) {
+      testFairyGlassMissing = missing;
+      testFairyBundledMod = selected;
+      fairy = ComboResolveForeignDrawInfo(185);
+      assert(fairy && fairy->count == 4 && fairy->appearanceDependent && fairy->stateDependent);
+      assert(strstr(fairy->dls[0], "@mm:objects/combo_bottle_gi/EmptyOpaque"));
+      assert(strstr(fairy->dls[1], !missing && !selected
+                                     ? "@mm:objects/combo_bottle_gi/FairyXlu"
+                                     : "@mm:objects/combo_bottle_gi/EmptyXlu"));
+      assert(strstr(fairy->dls[2], "gGiFairyBottleContentsDL") &&
+             strstr(fairy->dls[3], "gGiFairyBottleBillboardRotMtx"));
+    }
+  testFairyGlassMissing = false;
+  testFairyBundledMod = 0;
   testAlt = fairyPreviousAlt;
   testFairyEmptyMod = false;
-  puts("PASS actual fairy empty-shell selector -> MM export -> OoT cache/latch with repeated Alt/editor changes");
+  puts("PASS fairy readable-shell selector -> MM export -> OoT cache/latch with Alt/editor changes, missing glass and selected casing/materials");
   const RandoItemId bottles[] = {
       RI_OOT_BOTTLE_BIG_POE,      RI_OOT_BOTTLE_BLUE_FIRE,
       RI_OOT_BOTTLE_BLUE_POTION,  RI_OOT_BOTTLE_BUGS,

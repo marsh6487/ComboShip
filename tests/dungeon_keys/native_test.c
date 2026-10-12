@@ -6,16 +6,37 @@ static const char gGiEmptyBottleCorkDL[] =
 static const char gGiEmptyBottleGlassDL[] =
     "__OTR__objects/object_gi_bottle/gGiEmptyBottleGlassDL";
 static int ResourceMgr_IsModAsset(const char *path) {
-  assert(!strcmp(path, gGiEmptyBottleCorkDL) || !strcmp(path, gGiEmptyBottleGlassDL));
-  return (testAlt || testFairyEmptyMod) && !strcmp(path, gGiEmptyBottleGlassDL);
+  if (!strcmp(path, gGiEmptyBottleCorkDL) || !strcmp(path, gGiEmptyBottleGlassDL))
+    return (testAlt || testFairyEmptyMod) && !strcmp(path, gGiEmptyBottleGlassDL);
+  const char *bundled[] = {
+      "__OTR__objects/combo_bottle_gi/EmptyOpaque",
+      "__OTR__objects/combo_bottle_gi/EmptyXlu",
+      "__OTR__objects/combo_bottle_gi/BottleShell",
+      "__OTR__objects/combo_bottle_gi/shell/mat_gGiBlueFireChamberstickDL_BottleGlassOutside"};
+  for (int i = 0; i < 4; ++i)
+    if (!strcmp(path, bundled[i]))
+      return (testFairyBundledMod & (1 << i)) != 0;
+  assert(!"Unexpected selected bottle resource");
+  return 0;
 }
 static int ResourceMgr_FileExists(const char *path) {
-  assert(strstr(path, "combo_bottle_gi/Empty"));
-  return 1;
+  if (strstr(path, "objects/combo_dungeon_keys/")) {
+    assert(strncmp(path, "__OTR__objects/combo_dungeon_keys/",
+                   strlen("__OTR__objects/combo_dungeon_keys/")) == 0);
+    return !testMissing || (testMissing == 2 && strstr(path, "MetalDL")) ||
+           (testMissing == 3 && strstr(path, "EmblemDL"));
+  }
+  if (!strcmp(path, "__OTR__objects/combo_bottle_gi/EmptyOpaque") ||
+      !strcmp(path, "__OTR__objects/combo_bottle_gi/EmptyXlu"))
+    return 1;
+  assert(!strcmp(path, "__OTR__objects/combo_bottle_gi/FairyXlu"));
+  return !testFairyGlassMissing;
 }
 int testSpinRed = 17;
 bool testAlt = true;
 bool testFairyEmptyMod = false;
+bool testFairyGlassMissing = false;
+int testFairyBundledMod = 0, testKeyAltMask = 0;
 int testColors = 1, testChanged = 0, testEmblemChanged = 0, testMissing = 0,
     testLoadFail = 0;
 int testCount = 0, testDepth = 0, testScales = 0, testSetup5 = 0;
@@ -54,12 +75,12 @@ void TestGrayColor(Gfx *p, u8 r, u8 g, u8 b, u8 a) {
 }
 bool ResourceMgr_IsAltAssetsEnabled(void) { return testAlt; }
 u8 ResourceMgr_FileAltExists(const char *p) {
-  assert(strncmp(p, "__OTR__alt/objects/cor_mm_keys_poc2/",
-                 strlen("__OTR__alt/objects/cor_mm_keys_poc2/")) == 0);
-  return !testMissing || (testMissing == 2 && !strstr(p, "EmblemDL"));
+  assert(strncmp(p, "__OTR__objects/combo_dungeon_keys/",
+                 strlen("__OTR__objects/combo_dungeon_keys/")) == 0);
+  return (testKeyAltMask & (strstr(p, "EmblemDL") ? 2 : 1)) != 0;
 }
 Gfx *ResourceMgr_LoadGfxByName(const char *p) {
-  return testLoadFail && strstr(p, "cor_mm_keys_poc2") ? NULL : (Gfx *)p;
+  return testLoadFail && strstr(p, "combo_dungeon_keys") ? NULL : (Gfx *)p;
 }
 int CVarGetInteger(const char *p, int fallback) {
   if (strcmp(p, "gEnhancements.DungeonItemColors") == 0)
@@ -169,6 +190,33 @@ int main(void) {
   const char *p, *e;
   Color_RGBA8 m, c;
   PlayState play = {0};
+  // Bundled MM models are available without a mod and with Alt Assets off.
+  testAlt = false;
+  for (int owner = 0; owner < 4; owner++)
+    for (int kind = 0; kind < 2; kind++) {
+      assert(GetItem_GetDungeonKeyModel(kind, owner, &p, &e, &m, &c));
+      assert(strstr(p, "__OTR__objects/combo_dungeon_keys/") &&
+             strstr(e, "__OTR__objects/combo_dungeon_keys/"));
+    }
+  testAlt = true;
+  // Each canonical root can resolve from the bundle or an enabled Alt pack.
+  for (int alt = 0; alt < 2; ++alt)
+    for (int missing = 0; missing < 4; ++missing)
+      for (int replacements = 0; replacements < 4; ++replacements) {
+        testAlt = alt;
+        testMissing = missing;
+        testKeyAltMask = replacements;
+        const bool metal = missing == 0 || missing == 2 ||
+                           (alt && (replacements & 1));
+        const bool emblem = missing == 0 || missing == 3 ||
+                            (alt && (replacements & 2));
+        for (int owner = 0; owner < 4; ++owner)
+          for (int kind = 0; kind < 2; ++kind)
+            assert((bool)GetItem_GetDungeonKeyModel(kind, owner, &p, &e, &m, &c) ==
+                   (metal && emblem));
+      }
+  testAlt = true;
+  testMissing = testKeyAltMask = 0;
   for (int owner = 0; owner < 4; owner++)
     for (int kind = 0; kind < 4; kind++) {
       testColors = 1;
@@ -234,7 +282,7 @@ int main(void) {
         for (int colors = 0; colors < 2; colors++)
           for (int crest = 0; crest < 2; crest++) {
             testAlt = config != 0;
-            testMissing = config == 1 ? 1 : config == 2 ? 2 : 0;
+            testMissing = config == 2 ? 2 : 1;
             testColors = colors;
             testChanged = 1;
             testEmblemChanged = crest;
@@ -247,7 +295,7 @@ int main(void) {
             }
             assert(testCount == (kind == 1 || kind == 3 ? 2 : 1) &&
                    testScales == 0);
-            assert(!strstr(testPaths[0], "cor_mm_keys_poc2") &&
+            assert(!strstr(testPaths[0], "combo_dungeon_keys") &&
                    testTint[0] == (bool)colors);
             if (colors)
               assert(testColorAtDraw[0].r == 10 + owner &&
@@ -270,7 +318,7 @@ int main(void) {
   testColors = 1;
   testEmblemChanged = 0;
   testAlt = false;
-  assert(!GetItem_GetDungeonKeyModel(0, 0, &p, &e, &m, &c));
+  assert(GetItem_GetDungeonKeyModel(0, 0, &p, &e, &m, &c));
   testAlt = true;
   testMissing = 2;
   assert(!GetItem_GetDungeonKeyModel(0, 0, &p, &e, &m, &c));
@@ -281,8 +329,8 @@ int main(void) {
   assert(GetItem_DrawDungeonItem(&play, 0, 0));
   assert(testCount == 1 && strstr(testPaths[0], "object_gi_key/"));
   testLoadFail = 0;
-  puts("Native C: custom keys and every vanilla GI family pass with Alt off, "
-       "missing and partial key packs; palette bodies, independent boss gems, "
+  puts("Native C: bundled keys work with Alt off/on; every vanilla GI family "
+       "passes missing and partial-resource fallbacks; palette bodies, independent boss gems, "
        "clear compass glass and cleanup pass.");
   return 0;
 }

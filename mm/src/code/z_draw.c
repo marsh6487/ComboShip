@@ -485,7 +485,8 @@ s32 GetItem_GetDungeonKeyEmblemTint(s32 owner, Color_RGBA8* color) {
     return true;
 }
 
-// Replacement-model selection is a separate, optional path.
+// The repaired key models belong to MM's bundled assets. Canonical paths also
+// allow normal Alt replacements without requiring the retired POC3 archive.
 extern bool ResourceMgr_IsAltAssetsEnabled(void);
 extern u8 ResourceMgr_FileAltExists(const char* path);
 
@@ -502,26 +503,26 @@ s32 GetItem_GetDungeonKeyModel(s16 drawId, s32 owner, const char** metalPath, co
     static const char* emblemIds[4] = { "Items.WoodfallEmblem", "Items.SnowheadEmblem", "Items.GreatBayEmblem",
                                         "Items.StoneTowerEmblem" };
     static const char* paths[4][2][2] = {
-        { { "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallSmallKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallSmallKeyEmblemDL" },
-          { "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallBossKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallBossKeyEmblemDL" } },
-        { { "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadSmallKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadSmallKeyEmblemDL" },
-          { "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadBossKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadBossKeyEmblemDL" } },
-        { { "__OTR__alt/objects/cor_mm_keys_poc2/GreatBaySmallKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/GreatBaySmallKeyEmblemDL" },
-          { "__OTR__alt/objects/cor_mm_keys_poc2/GreatBayBossKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/GreatBayBossKeyEmblemDL" } },
-        { { "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerSmallKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerSmallKeyEmblemDL" },
-          { "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerBossKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerBossKeyEmblemDL" } },
+        { { "__OTR__objects/combo_dungeon_keys/WoodfallSmallKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/WoodfallSmallKeyEmblemDL" },
+          { "__OTR__objects/combo_dungeon_keys/WoodfallBossKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/WoodfallBossKeyEmblemDL" } },
+        { { "__OTR__objects/combo_dungeon_keys/SnowheadSmallKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/SnowheadSmallKeyEmblemDL" },
+          { "__OTR__objects/combo_dungeon_keys/SnowheadBossKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/SnowheadBossKeyEmblemDL" } },
+        { { "__OTR__objects/combo_dungeon_keys/GreatBaySmallKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/GreatBaySmallKeyEmblemDL" },
+          { "__OTR__objects/combo_dungeon_keys/GreatBayBossKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/GreatBayBossKeyEmblemDL" } },
+        { { "__OTR__objects/combo_dungeon_keys/StoneTowerSmallKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/StoneTowerSmallKeyEmblemDL" },
+          { "__OTR__objects/combo_dungeon_keys/StoneTowerBossKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/StoneTowerBossKeyEmblemDL" } },
     };
     s32 kind;
     if (owner < 0 || owner >= 4 || metalPath == NULL || emblemPath == NULL || metalColor == NULL ||
-        emblemColor == NULL || !ResourceMgr_IsAltAssetsEnabled()) {
+        emblemColor == NULL) {
         return false;
     }
     if (drawId == GID_KEY_SMALL) {
@@ -533,7 +534,9 @@ s32 GetItem_GetDungeonKeyModel(s16 drawId, s32 owner, const char** metalPath, co
     }
     *metalPath = paths[owner][kind][0];
     *emblemPath = paths[owner][kind][1];
-    if (!ResourceMgr_FileAltExists(*metalPath) || !ResourceMgr_FileAltExists(*emblemPath)) {
+    const bool altEnabled = ResourceMgr_IsAltAssetsEnabled();
+    if ((!ResourceMgr_FileExists(*metalPath) && !(altEnabled && ResourceMgr_FileAltExists(*metalPath))) ||
+        (!ResourceMgr_FileExists(*emblemPath) && !(altEnabled && ResourceMgr_FileAltExists(*emblemPath)))) {
         return false;
     }
     *metalColor = metalDefaults[kind];

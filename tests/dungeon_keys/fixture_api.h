@@ -30,6 +30,8 @@ enum {
 };
 extern bool testAlt;
 extern bool testFairyEmptyMod;
+extern bool testFairyGlassMissing;
+extern int testFairyBundledMod, testKeyAltMask;
 extern int testSpinRed;
 extern int testColors, testChanged, testEmblemChanged, testMissing,
     testLoadFail;
