@@ -1,4 +1,6 @@
 #include <cassert>
+#include <atomic>
+#define SPDLOG_WARN(...) ((void)0)
 #include <cstdint>
 #include <cstring>
 #include <iostream>

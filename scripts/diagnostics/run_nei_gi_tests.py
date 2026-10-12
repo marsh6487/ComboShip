@@ -277,9 +277,9 @@ void DrawOotNeiCaneOfSomaria(RandoItemId) {assert(false);}
 """ + mm_foreign_info + """
 const ComboForeignDrawInfoOOT* selectedForeignInfoMM=nullptr;
 const ComboForeignDrawInfoOOT* ComboResolveForeignDrawInfoOOT(RandoCheckId) {return selectedForeignInfoMM;}
-""" + "\n".join("void "+name+"(const ComboForeignDrawInfoOOT*" +
+""" + "\n".join(("bool " if name == "MM_DrawForeignSilverRupee" else "void ")+name+"(const ComboForeignDrawInfoOOT*" +
                     (", bool" if name in {"MM_DrawForeignCustomGi", "MM_DrawForeignMasterSword"} else "") +
-                    ") {assert(false);}" for name in mm_handlers
+                    ") {assert(false);" + ("return false;" if name == "MM_DrawForeignSilverRupee" else "") + "}" for name in mm_handlers
                     if name not in {"MM_DrawForeignMusicNote", "MM_DrawForeignSimple", "MM_DrawForeignCustomGi"})
             mm_pin = mm_foreign_source[mm_foreign_source.index("#define MM_FOREIGN_PIN_OPA()"):
                                        mm_foreign_source.index("// Restore the segments a handler bound")]

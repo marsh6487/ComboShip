@@ -45,7 +45,7 @@ struct SohMenu {
     std::map<int, Disable> disabledMap;
     int drawn = 0;
     int GetMenuThemeColor() { return 0; }
-    void MenuDrawItem(Widget&, uint32_t, int) { ++drawn; }
+    void MenuDrawItem(Widget&, int) { ++drawn; }
     int32_t DrawWidgetByIndex(int32_t, int32_t);
 };
 '''
@@ -95,5 +95,5 @@ with tempfile.TemporaryDirectory(prefix='combo-pak-visibility-') as directory:
     cpp.write_text(prefix + function[0] + suffix)
     exe = build / 'test'
     subprocess.run([*shlex.split(os.environ.get('CXX', 'c++')), '-std=c++20',
-                    '-Wall', '-Wextra', '-Werror', str(cpp), '-o', str(exe)], check=True)
+                    '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', str(cpp), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)

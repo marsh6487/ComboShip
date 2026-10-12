@@ -4,6 +4,20 @@
 #include "tests/test_require.h"
 #include <cstdio>
 #include <cstring>
+#include <cctype>
+#include <algorithm>
+#include <array>
+#include <memory>
+#include <sstream>
+// Only the native settings key enum is shared with this MM-side fixture.
+#define RANDO_ENUM_BEGIN(name) enum name {
+#define RANDO_ENUM_ITEM(name) name,
+#define RANDO_ENUM_END(name) };
+#include "soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerSettingKey.h"
+#undef RANDO_ENUM_BEGIN
+#undef RANDO_ENUM_ITEM
+#undef RANDO_ENUM_END
+#define SPDLOG_WARN(...) ((void)0)
 
 #define COMBO_EXPORT
 #define CVAR_RANDOMIZER_SETTING(s) "gRandoSettings." s
@@ -14,8 +28,26 @@ extern "C" {
 int32_t CVarGetInteger(const char* key, int32_t fallback) { return config.value(key, fallback); }
 void CVarSetInteger(const char* key, int32_t value) { config[key] = value; }
 void CVarSetString(const char* key, const char* value) { config[key] = value; }
+void CVarClear(const char* key) { config.erase(key); }
+const char* CVarGetString(const char* key, const char* fallback) {
+    return config.contains(key) && config[key].is_string()
+               ? config[key].get_ref<const std::string&>().c_str() : fallback;
+}
 }
 namespace Rando {
+// Native option metadata and shared CVar storage are the input/service seam.
+// GetInstance/GetAllOptions/GetCVarName below are copied from production.
+struct Option {
+    std::string cvarName;
+    const std::string& GetCVarName() const;
+};
+struct Settings {
+    static std::shared_ptr<Settings> mInstance;
+    std::array<Option, RSK_MAX> mOptions{};
+    static std::shared_ptr<Settings> GetInstance();
+    const std::array<Option, RSK_MAX>& GetAllOptions() const;
+};
+std::shared_ptr<Settings> Settings::mInstance;
 void SetExcludedChecksInConfig(std::vector<RandoCheckId>&) {}
 void SetStartingItemsInConfig(std::vector<RandoItemId>&) {}
 namespace StaticData {
@@ -68,6 +100,20 @@ static void SeedApplication() {
 }
 
 int main(int argc, char** argv) {
+    auto settings = Rando::Settings::GetInstance();
+    settings->mOptions[RSK_NO_LOGIC].cvarName = "gRandoSettings.NoLogic";
+    settings->mOptions[RSK_ROD_OF_SEASONS].cvarName = "gRandoSettings.RodOfSeasons";
+    settings->mOptions[RSK_HYLIAS_GRACE].cvarName = "gRandoSettings.HyliasGrace";
+    config["gRandoSettings.NoLogic"] = 7;
+    config["gUnrelatedSetting"] = 9;
+    SOH_RestoreRandoSettings("{}");
+    REQUIRE(!config.contains("gRandoSettings.NoLogic"));
+    REQUIRE(config["gUnrelatedSetting"] == 9);
+    SOH_RestoreRandoSettings("{\"gRandoSettings.LogicRules\":2,\"gRandoSettings.ExcludedLocations\":\"42\"}");
+    REQUIRE(config["gRandoSettings.NoLogic"] == 2);
+    REQUIRE(config["gRandoSettings.ExcludedLocations"] == "");
+    SOH_RestoreRandoSettings("{\"gRandoSettings.ExcludedLocations\":\"Kokiri Sword Chest\"}");
+    REQUIRE(config["gRandoSettings.ExcludedLocations"] == "Kokiri Sword Chest");
     if (argc > 1 && !std::strcmp(argv[1], "--apply-later")) { SeedApplication(); return 0; }
     for (int mode = NEI_GRACE_ON; mode <= NEI_GRACE_GATED; ++mode) {
         config["gCombo.Sync.Enabled"] = 0;

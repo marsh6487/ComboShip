@@ -84,7 +84,7 @@ struct ResourceInitData { std::string Path; std::shared_ptr<Archive> Parent; };
             defaults.append(method.strip() + " override {" + ("" if method.strip().startswith("void ") else "return {};") + "}")
         (build / "backend_defaults.inc").write_text("\n".join(defaults))
         helpers = source[source.index("static UcodeHandlers ucode_handler_index"):source.index("static std::string GetPathWithoutFileName")]
-        names = ["Interpreter::AdjXForAspectRatio", "Interpreter::GfxSpVertex", "Interpreter::Interpreter", "Interpreter::~Interpreter", "Interpreter::Flush",
+        names = ["IsPyramidLike", "Interpreter::AdjXForAspectRatio", "Interpreter::GfxSpVertex", "Interpreter::Interpreter", "Interpreter::~Interpreter", "Interpreter::Flush",
                  "Interpreter::LookupOrCreateShaderProgram", "Interpreter::GenerateCC",
                  "Interpreter::LookupOrCreateColorCombiner", "GetTileSizeFromCoordinates",
                  "Interpreter::GfxSpTri1", "gfx_tri1_otr_handler_f3dex2", "gfx_tri1_handler_f3dex2",

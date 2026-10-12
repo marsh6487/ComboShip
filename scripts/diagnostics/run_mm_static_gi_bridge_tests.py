@@ -22,6 +22,10 @@ if '// Static custom GI bridge recipes.' in owner:
     b = owner.index('extern "C" int32_t OOT_DescribeMmMaskDraw', a)
     helpers += '\n' + owner[a:b]
 fixture = (ROOT/'tests/mm_presentation/static_gi_bridge_test.cpp').read_text()
+# The production resolver uses a once-only warning and the native song-note asset.
+# Logging is outside this draw-submission fixture, as in the mask bridge fixture.
+fixture = ('#include <atomic>\n#define SPDLOG_WARN(...) ((void)0)\n'
+           '#include "objects/object_gi_melody/object_gi_melody.h"\n' + fixture)
 fixture = fixture.replace('/* OWNER_HELPERS */', helpers)
 fixture = fixture.replace('/* OWNER_ALT_QUERY */', function((ROOT/'soh/soh/ResourceManagerHelpers.cpp').read_text(), 'OOT_NeiAltAssetsEnabled'))
 fixture = fixture.replace('/* OWNER_RESOURCE_QUERY */', function((ROOT/'soh/soh/ResourceManagerHelpers.cpp').read_text(), 'OOT_NeiResourceExists'))
@@ -55,5 +59,5 @@ with tempfile.TemporaryDirectory(prefix='mm-static-gi-') as td:
     path=Path(td)/'test.cpp';path.write_text(fixture);binary=Path(td)/'test'
     flags=['-std=c++20','-DCOMBO_BUILD','-Wall','-Wextra','-Wno-unused-parameter']
     if '--sanitize' in sys.argv: flags+=['-g','-fsanitize=address,undefined','-fno-omit-frame-pointer','-fno-pie','-no-pie']
-    subprocess.run([os.environ.get('CXX','c++'),*flags,'-I'+str(ROOT),'-I'+str(ROOT/'soh/include'),str(path),'-o',str(binary)],check=True)
+    subprocess.run([os.environ.get('CXX','c++'),*flags,'-I'+str(ROOT),'-I'+str(ROOT/'soh/include'),'-I'+str(ROOT/'soh/assets'),str(path),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=0'})

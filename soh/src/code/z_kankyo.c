@@ -11,6 +11,8 @@
 #include "concurrent_weather_audio.h"
 #include "soh/Enhancements/audio/WeatherSamplePlayer.h"
 #include "soh/Enhancements/audio/GlobalOutdoorRainBridge.h"
+#include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 
 typedef enum {
     /* 0 */ LENS_FLARE_CIRCLE0,
@@ -2599,6 +2601,9 @@ void Environment_WarpSongLeave(PlayState* play) {
     play->transitionTrigger = TRANS_TRIGGER_START;
     play->transitionType = TRANS_TYPE_FADE_WHITE;
     gSaveContext.nextTransitionType = TRANS_TYPE_FADE_WHITE;
+
+    // Where entrance rando redirects the warp: every warp song path decides its destination here.
+    GameInteractor_ExecuteOnWarpSongLeave();
 
     switch (play->nextEntranceIndex) {
         case ENTR_DEATH_MOUNTAIN_CRATER_UPPER_EXIT:

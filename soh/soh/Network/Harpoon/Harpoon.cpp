@@ -16,6 +16,7 @@
 #include "soh/Enhancements/item-tables/ItemTableManager.h"
 
 extern "C" {
+#include "macros.h"
 #include "variables.h"
 #include "functions.h"
 #include "mods/transformation_masks/transformation_masks.h"

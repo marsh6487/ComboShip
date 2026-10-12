@@ -14,6 +14,7 @@ extern "C" {
 // Runtime sentinel, outside the non-negative host soundfont-map index space.
 // Do not use the bytecode/sample-bank 0xFF sentinel for runtime font IDs.
 #define AUDIO_FONT_NONE (-1)
+#define FONT_ID_NONE AUDIO_FONT_NONE
 
 #define IS_SEQUENCE_CHANNEL_VALID(ptr) ((uintptr_t)(ptr) != (uintptr_t)&gAudioContext.sequenceChannelNone)
 
@@ -501,7 +502,7 @@ typedef struct {
     /* 0x00F0 */ s16 dummyResampleState[0x10];
 } NoteSynthesisBuffers; // size = 0x110
 
-struct OggOpusFile;
+struct OpusDecState;
 
 typedef struct {
     /* 0x00 */ u8 restart;
@@ -521,7 +522,7 @@ typedef struct {
     /* 0x1A */ u8 unk_1A;
     /* 0x1C */ u16 unk_1C;
     /* 0x1E */ u16 unk_1E;
-    struct OggOpusFile* opusFile; // Only for streamed opus audio
+    struct OpusDecState* opusFile; // Only for streamed opus audio
 } NoteSynthesisState; // size = 0x20
 
 typedef struct {

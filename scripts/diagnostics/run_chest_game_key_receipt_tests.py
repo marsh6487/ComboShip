@@ -23,9 +23,11 @@ def function(source, signature):
 source = (ROOT / 'soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp').read_text()
 catalog = (ROOT / 'soh/soh/Enhancements/randomizer/item_list.cpp').read_text()
 row = re.search(r'itemTable\[RG_TREASURE_GAME_SMALL_KEY\]\s*=\s*Item\(([^\n]+)', catalog)[1]
-entry = re.search(r'ITEMTYPE_SMALLKEY,\s*(\w+),.*?RHT_TREASURE_GAME_SMALL_KEY,\s*(\w+),\s*(\w+),\s*\w+,\s*(0x[0-9A-Fa-f]+),.*?ITEM_CATEGORY_SMALL_KEY,\s*(\w+)', row)
+entry = re.search(r'ITEMTYPE_SMALLKEY,\s*(\w+),.*?RHT_TREASURE_GAME_SMALL_KEY,\s*(\w+),\s*(\w+),\s*\w+,\s*(\w+),.*?ITEM_CATEGORY_SMALL_KEY,\s*(\w+)', row)
 assert entry, 'Cannot recover the production Chest Game get-item entry'
 gi, item, obj, text, mod = entry.groups()
+assert (item, text, mod) == ('RG_TREASURE_GAME_SMALL_KEY', 'TEXT_RANDOMIZER_CUSTOM_ITEM', 'MOD_RANDOMIZER')
+assert '.CustomIcon(gQuestIconSmallKeyTex, ICON_SIZE_24)' in row
 fixture = r'''
 #include <cassert>
 #include <cstdint>
@@ -45,11 +47,10 @@ constexpr int TEXTBOX_TYPE_BLUE=2, ITEM_KEY_SMALL=0x77, GI_DOOR_KEY=0x71,
 enum RandomizerGet { RG_NONE, RG_TREASURE_GAME_SMALL_KEY };
 enum { RSK_SHUFFLE_CHEST_MINIGAME, RSK_GERUDO_KEYS, RSK_SHUFFLE_MAPANDCOMPASS,
     RSK_BOSS_KEYSANITY, RSK_GANONS_BOSS_KEY, RSK_KEYSANITY };
-enum { RO_CHEST_GAME_OFF, RO_CHEST_GAME_SINGLE_KEYS, RO_CHEST_GAME_PACK,
-    RO_GERUDO_KEYS_VANILLA };
+enum { RO_GENERIC_OFF, RO_GENERIC_ON, RO_GERUDO_KEYS_VANILLA };
 struct Option { int value; bool Is(int x)const{return value==x;}
-    bool IsNot(int x)const{return value!=x;} };
-struct Context { int chest=RO_CHEST_GAME_SINGLE_KEYS;
+    bool IsNot(int x)const{return value!=x;} explicit operator bool()const{return value!=0;} };
+struct Context { int chest=RO_GENERIC_ON;
     Option GetOption(int key)const{return {key==RSK_SHUFFLE_CHEST_MINIGAME ? chest : RO_GERUDO_KEYS_VANILLA};} } context;
 struct Globals { Context* gRandoContext=&context; static Globals* Instance; } globals;
 Globals* Globals::Instance=&globals;
@@ -96,10 +97,17 @@ void BuildBossKeyMessage(uint16_t*,bool*){}
 void BuildSmallKeyMessage(uint16_t*,bool*){}
 /* BUILDERS */
 int main(){
-    const GetItemEntry native={/* GI */,/* ITEM */,/* OBJECT */,/* MOD */};
-    const uint16_t nativeText=/* TEXT */;
+    const GetItemEntry shuffled={/* GI */,/* ITEM */,/* OBJECT */,/* MOD */};
+    const uint16_t shuffledText=/* TEXT */;
+    // 9.3 shuffled keys use the custom-item table and its registered builder.
+    const GetItemEntry native={GI_DOOR_KEY,ITEM_KEY_SMALL,OBJECT_GI_KEY,MOD_NONE};
+    const uint16_t nativeText=0xF3;
     receiptPlayer={native,native.getItemId};
     RegisterItemMessages();
+    assert(handlers.at(shuffledText)==BuildItemMessage);
+    CustomMessage shuffledMessage;
+    assert(BuildDungeonKeyReceiptMessage(static_cast<RandomizerGet>(shuffled.itemId),shuffledMessage));
+    assert(shuffledMessage.text=="You found a %gChest Game Small Key%w!");
     for(uint16_t id=0x3C; id<=0x41; ++id)
         assert(handlers.at(id)==BuildWandMedallionMessage && "native medallion tutorial hook is missing");
     assert(handlers.count(nativeText) && "Shuffled Chest Game key bypasses its dungeon receipt");
@@ -120,8 +128,8 @@ int main(){
         callback(&id,&fromTable);
         assert(fromTable && id==nativeText && loaded=="native receipt" && loadedIcon==-1);
     };
-    for(int mode : {RO_CHEST_GAME_OFF,RO_CHEST_GAME_PACK}){context.chest=mode;unchanged();}
-    context.chest=RO_CHEST_GAME_SINGLE_KEYS;
+    context.chest=RO_GENERIC_OFF;unchanged();
+    context.chest=RO_GENERIC_ON;
     randoActive=false;unchanged();randoActive=true;
     receiptPlayer.getItemEntry.objectId=OBJECT_INVALID;unchanged();receiptPlayer.getItemEntry=native;
     receiptPlayer.getItemEntry.modIndex=MOD_RANDOMIZER;unchanged();receiptPlayer.getItemEntry=native;
@@ -129,7 +137,7 @@ int main(){
     receiptPlayer.getItemEntry.getItemId=0;unchanged();receiptPlayer.getItemEntry=native;
     receiptPlayer.getItemId=0;unchanged();receiptPlayer.getItemId=native.getItemId;
     gPlayState=nullptr;unchanged();
-    std::cout<<"Shuffled Chest Game key uses the registered native textbox with its name/color/icon; vanilla, pack, non-rando and invalid/stale entries stay unchanged\n";
+    std::cout<<"9.3 shuffled Chest Game keys register the custom receipt and retain the 24px key icon; legacy native text, shuffle-off, non-rando and invalid/stale entries remain covered\n";
 }
 '''
 builders = function(source, 'bool BuildDungeonKeyReceiptMessage(RandomizerGet rg, CustomMessage& msg) {')

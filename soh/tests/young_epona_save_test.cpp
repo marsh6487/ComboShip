@@ -106,7 +106,7 @@ static void TestSnapshotAndRoundTrip(SaveManager& manager, const char* path) {
     gSaveContext.ship.youngHorseDataValid = 0;
     json data;
     manager.currentJsonContext = &data;
-    SaveManager::SaveBase(&snapshot, SECTION_ID_BASE, true);
+    SaveManager::SaveBase(snapshot, SECTION_ID_BASE, true);
     const json expectedAdult = { { "scene", 81 },
                                  { "pos", { { "x", -1234 }, { "y", 456 }, { "z", 7890 } } },
                                  { "angle", -2345 } };

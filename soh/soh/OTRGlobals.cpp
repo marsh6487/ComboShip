@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -20,6 +21,7 @@
 #include <vector>
 #include <chrono>
 #include <optional>
+#include <spdlog/common.h>
 #include <imgui.h>
 
 #include "ResourceManagerHelpers.h"
@@ -34,7 +36,6 @@
 #include <ship/resource/File.h>
 #include <ship/window/Window.h>
 #include <soh/GameVersions.h>
-#include <spdlog/sinks/rotating_file_sink.h>
 
 #include "Enhancements/gameconsole.h"
 #ifdef _WIN32
@@ -77,6 +78,7 @@
 #include "soh/Enhancements/TimeDisplay/TimeDisplay.h" // ComboShip: NAVI_* phase bounds for SOH_GetOverlayTimers
 #endif
 #include "soh/Enhancements/savestates.h"
+#include "soh/Enhancements/speedrun/Speedrun.h"
 #include "frame_interpolation.h"
 #include "SohGui/SohMenu.h"
 #include "SohGui/SohGui.hpp"
@@ -134,15 +136,14 @@
 #include "soh/FleetShipCombo/FleetSharedItems.h"
 #include "soh/FleetShipCombo/FleetRpgStats.h"
 #include "Enhancements/game-interactor/GameInteractor.h"
+#include "Enhancements/game-interactor/GameInteractor_Hooks.h" // ComboShip: OnExitGame on reset-to-title
 #include "Enhancements/randomizer/draw.h"
 #include "mods/broken_items/broken_items.h"
 #include <libultraship/controller/controldeck/ControlDeck.h>
 #include <fast/resource/ResourceType.h>
 
 // Resource Types/Factories
-#include <fast/resource/type/Matrix.h>
 #include "soh/resource/type/SohResourceType.h"
-#include "soh/resource/type/Animation.h"
 #include "soh/resource/type/Skeleton.h"
 #include <ship/resource/factory/BlobFactory.h>
 #include <fast/resource/factory/DisplayListFactory.h>
@@ -168,28 +169,13 @@
 
 #include "soh/config/ConfigUpdaters.h"
 #include "soh/ShipInit.hpp"
+#include "soh/SohGui/SohModals.h"
 #ifdef COMBO_BUILD
 #include "ComboMenuSharedContext.h" // ComboShip: shared per-DLL ImGui context helper (combo-owned)
 #include "rando/CrossForeign.h"     // ComboShip (#164): g_comboForeignJson for the hint-key map replay
 #include "rando/SharedItems.h"      // ComboShip: Shared Items family table
 #include "soh/Enhancements/randomizer/hook_handlers.h" // ComboShip (#164): OOT_ForeignMapGen
 #include <functional>                                  // ComboShip (#164): shared hint-resolution callbacks
-#endif
-
-#ifdef _MSC_VER
-#define strdup _strdup
-#endif
-
-#ifdef _MSC_VER
-#define strdup _strdup
-#endif
-
-#ifdef _MSC_VER
-#define strdup _strdup
-#endif
-
-#ifdef _MSC_VER
-#define strdup _strdup
 #endif
 
 #ifdef _MSC_VER
@@ -539,6 +525,19 @@ namespace SohGui {
 extern std::shared_ptr<SohGui::SohMenu> mSohMenu;
 }
 
+static bool RemoveArchiveAcrossAppDirs(const std::string& fileName) {
+    for (const std::string& path : { Ship::Context::GetPathRelativeToAppDirectory(fileName, appShortName),
+                                     Ship::Context::GetPathRelativeToAppBundle(fileName), "./" + fileName }) {
+        std::error_code err;
+        if (std::filesystem::remove(path, err)) {
+            SPDLOG_INFO("Removed outdated archive {}", path);
+        } else if (err) {
+            SPDLOG_ERROR("Failed to remove outdated archive {}: {}", path, err.message());
+        }
+    }
+    return !std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs(fileName, appShortName));
+}
+
 void OTRGlobals::RunExtract(int argc, char* argv[]) {
     bool extractDone = false;
     ExtractSteps extractStep = ES_PORT_ARCHIVE;
@@ -568,8 +567,8 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
     bool generatedIsMQ = false;
     std::atomic<size_t> extractCount = 0, totalExtract = 0;
 
-    std::string installPath = Ship::Context::GetAppBundlePath();
-    std::string dataPath = Ship::Context::GetAppDirectoryPath(appShortName);
+    std::string installPath = std::filesystem::absolute(Ship::Context::GetAppBundlePath()).string();
+    std::string dataPath = std::filesystem::absolute(Ship::Context::GetAppDirectoryPath(appShortName)).string();
     std::string file;
 
 #if defined(__SWITCH__)
@@ -593,11 +592,18 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                               "re-extract them from the download or.\n\nExiting...",
                               "OK", "", [&]() { exit(1); });
     } else if (shouldRegen) {
-        SohGui::RegisterPopup("Outdated ROM Archives",
-                              "Your oot.o2r or oot-mq.o2r were created with incompatible versions of SoH.\nYou will "
-                              "now be redirected to re-extract them.");
-        std::filesystem::remove("oot.o2r");
-        std::filesystem::remove("oot-mq.o2r");
+        if (RemoveArchiveAcrossAppDirs("oot.o2r") && RemoveArchiveAcrossAppDirs("oot-mq.o2r")) {
+            SohGui::RegisterPopup(
+                "Outdated ROM Archives",
+                "Your oot.o2r or oot-mq.o2r were created with incompatible versions of SoH.\nYou will "
+                "now be redirected to re-extract them.");
+        } else {
+            SohGui::RegisterPopup(
+                "Outdated ROM Archives",
+                "Your oot.o2r or oot-mq.o2r were created with incompatible\nversions of SoH, but they"
+                "could not be removed\nautomatically. Please delete them now and re-launch.\nExiting...",
+                "OK", "", [&]() { exit(1); });
+        }
     }
 
     std::shared_ptr<BS::thread_pool> threadPool = std::make_shared<BS::thread_pool>(1);
@@ -742,15 +748,15 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                         std::string msg = "Archive for current ROM, " + archive + ", already exists.\nExtract again?";
                         SohGui::RegisterPopup("Confirm Re-extract", msg.c_str(), "Yes", "No", [&]() {
                             extractionTask = threadPool->submit_task([&]() -> void {
-                                extract.CallZapd(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
-                                                 &extractCount, &totalExtract);
+                                extract.CallTorch(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
+                                                  &extractCount, &totalExtract);
                                 extractCount = totalExtract = 0;
                             });
                         });
                     } else {
                         extractionTask = threadPool->submit_task([&]() -> void {
-                            extract.CallZapd(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
-                                             &extractCount, &totalExtract);
+                            extract.CallTorch(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
+                                              &extractCount, &totalExtract);
                             extractCount = totalExtract = 0;
                         });
                     }
@@ -785,8 +791,10 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                         extract = Extractor();
                         extract.SetSearchPath(installPath);
                         extract.GetRoms(args);
-                        extract.SetSearchPath(dataPath);
-                        extract.GetRoms(args);
+                        if (installPath != dataPath) {
+                            extract.SetSearchPath(dataPath);
+                            extract.GetRoms(args);
+                        }
                         if (!args.empty()) {
                             promptStep = PS_WAIT;
                             SohGui::RegisterPopup(
@@ -804,8 +812,8 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                             continue;
                         }
                         extractionTask = threadPool->submit_task([&]() -> void {
-                            extract.CallZapd(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
-                                             &extractCount, &totalExtract);
+                            extract.CallTorch(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
+                                              &extractCount, &totalExtract);
                             generatedIsMQ = extract.IsMasterQuest();
                             promptStep = PS_SECOND;
                             extractCount = 0;
@@ -822,8 +830,8 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                                     extractStep = ES_VERIFY;
                                 } else {
                                     extractionTask = threadPool->submit_task([&]() -> void {
-                                        extract.CallZapd(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
-                                                         &extractCount, &totalExtract);
+                                        extract.CallTorch(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
+                                                          &extractCount, &totalExtract);
                                         extractStep = ES_VERIFY;
                                         extractCount = 0;
                                         totalExtract = 0;
@@ -900,7 +908,8 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                     auto filename = std::filesystem::path(file).filename().string();
                     ImGui::Text("Extracting %s...%s", filename.c_str(),
                                 roundf(progress) == 100.0f ? " Done. Finishing up." : "");
-                    std::string overlay = extractCount > 0 ? fmt::format("{:.0f}%", progress) : "Starting Up";
+                    std::string overlay =
+                        extractCount > 0 ? spdlog::fmt_lib::format("{:.0f}%", progress) : "Starting Up";
                     ImGui::ProgressBar(progress / 100.0f, ImVec2(600.0f, 50.0f), overlay.c_str());
                     ImGui::EndPopup();
                 }
@@ -1069,11 +1078,7 @@ void OTRGlobals::Initialize() {
                                               CVarGetInteger(CVAR_SETTING("AutoCaptureMouse"), 1));
     context->GetWindow()->SetForceCursorVisibility(CVarGetInteger(CVAR_SETTING("CursorVisibility"), 0));
 
-    context->InitAudio({ .SampleRate = 32000,
-                         .SampleLength = 1024,
-                         // 4096 frames at 32 kHz (~128 ms) gives enough reservoir for frame
-                         // jitter and slow-frame spikes without perceptible audio latency.
-                         .DesiredBuffered = 4096 });
+    context->InitAudio({ .SampleRate = 32000, .SampleLength = 1024, .DesiredBuffered = 4096 });
 
     // The menu is set up before audio is initialized, so its list of available audio backends has to be
     // populated here rather than in Menu::InitElement (where the window backends are handled).
@@ -1937,8 +1942,45 @@ extern "C" void (*gComboSharedTick)(void);
 // ImGui + SohGui::SetupMenu). Combo_FinishInit() = everything that needs the ROM archives. The
 // non-combo InitOTR keeps the original ctor -> RunExtract -> finish ordering. See docs/UPSTREAM_MERGES.md.
 static void Combo_FinishInit();
+static bool Combo_ClearNumericExclusions();
+#ifdef __linux__
+// When run as an AppImage, keep user data in ~/.local/share/soh instead of the launch folder.
+// Keep using the launch folder if it already has data from older versions.
+static void SetAppImageHome() {
+    if (getenv("APPIMAGE") == nullptr || getenv("SHIP_HOME") != nullptr) {
+        return;
+    }
+
+    for (const char* file : { "shipofharkinian.json", "oot.o2r", "oot-mq.o2r" }) {
+        if (std::filesystem::exists(file)) {
+            return;
+        }
+    }
+
+    std::filesystem::path home;
+    const char* dataHome = getenv("XDG_DATA_HOME");
+    const char* userHome = getenv("HOME");
+    if (dataHome != nullptr && std::filesystem::path(dataHome).is_absolute()) {
+        home = dataHome;
+    } else if (userHome != nullptr && userHome[0] != '\0') {
+        home = std::filesystem::path(userHome) / ".local" / "share";
+    } else {
+        return;
+    }
+    home /= appShortName;
+
+    std::error_code ec;
+    std::filesystem::create_directories(home, ec);
+    if (!ec) {
+        setenv("SHIP_HOME", home.c_str(), 0);
+    }
+}
+#endif
 
 extern "C" void InitOTR(int argc, char* argv[]) {
+#ifdef __linux__
+    SetAppImageHome();
+#endif
     OTRGlobals::Instance = new OTRGlobals();
     FleetShipCombo_ProvisionO2rBothDirs(); // pull a sibling-extracted o2r in BEFORE the presence check
     // MM archive gate FIRST: with no mm.o2r matching the 2ship build, run 2ship's extractor visibly
@@ -1999,10 +2041,14 @@ extern "C" COMBO_EXPORT void SOH_InitRandoHeadless() {
     Rando::StaticData::RegisterBeggarLocations();
     Rando::StaticData::RegisterIcicleLocations();
     Rando::StaticData::RegisterRedIceLocations();
+    Rando::StaticData::RegisterSilverLocations();
+    Rando::StaticData::InitHashMaps(); // ComboShip: name lookups for excluded locations
     // Build the option/trick tables (normally the rando menu's job, which headless lacks) so a spoiler's
     // settings can reach the Context. Option/trick display names route through Lang::Translate, which
     // returns the raw key headless (via gComboHeadlessRando) — no assets needed.
     Rando::Settings::GetInstance()->CreateOptions();
+    // ComboShip: lists every location so FinalizeSettings can mark excluded ones (as full boot does).
+    OTRGlobals::Instance->gRandoContext->AddExcludedOptions();
 }
 
 // ComboShip (issue 24): apply a launcher-merged config (JSON object) to the live Config and reload the
@@ -2052,13 +2098,7 @@ static void Combo_FinishInit() {
     SaveManager::Instance = new SaveManager();
 
     std::shared_ptr<Ship::Config> conf = OTRGlobals::Instance->context->GetConfig();
-    conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion1Updater>());
-    conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion2Updater>());
-    conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion3Updater>());
-    conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion4Updater>());
-    conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion5Updater>());
-    conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion6Updater>());
-    conf->RegisterVersionUpdater(std::make_shared<SOH::ConfigVersion7Updater>());
+    SOH::RegisterVersionUpdaters(conf.get());
     conf->RunVersionUpdates();
 
 #ifdef COMBO_BUILD
@@ -2072,6 +2112,10 @@ static void Combo_FinishInit() {
         if (oldPitch > 0.0f) {
             CVarSetFloat(CVAR_LINK_VOICE_FREQ_MULTIPLIER, oldPitch);
         }
+        CVarSave();
+    }
+    // ComboShip: drop old numeric exclusions before the rando menu reads them.
+    if (Combo_ClearNumericExclusions()) {
         CVarSave();
     }
 #endif
@@ -2118,11 +2162,16 @@ static void Combo_FinishInit() {
     // #region SOH [Randomizer] TODO: Remove these and refactor spoiler file handling for randomizer
     CVarClear(CVAR_GENERAL("RandomizerNewFileDropped"));
     CVarClear(CVAR_GENERAL("RandomizerDroppedFile"));
+#ifdef COMBO_BUILD
+    // ComboShip: forget a native spoiler remembered by an older build; combo seeds never use it.
+    CVarClear(CVAR_GENERAL("SpoilerLog"));
+#endif
     // #endregion
 
     Ship::Context::GetRawInstance()->GetFileDropMgr()->RegisterDropHandler(SoH_HandleConfigDrop);
 
 #ifdef COMBO_BUILD
+    void Combo_FlushDormantAccumulators(void);
     // Flag set when we want to switch to MM. Acted on at the start of the next clean frame.
     static bool sComboSwitchPending = false;
     static int sComboSwitchFileNum = -1;
@@ -2143,6 +2192,7 @@ static void Combo_FinishInit() {
             sComboSwitchFileNum = sComboFwSwitchSlot;
         sComboFwSwitchSlot = -1;
         sComboSwitchPending = false;
+        Combo_FlushDormantAccumulators(); // Bank pending fills before saving either switch path.
         if (isFwReturn && gPlayState)
             Play_PerformSave(gPlayState); // Capture live scene flags and native save/equipment bookkeeping.
         else
@@ -2205,6 +2255,8 @@ static void Combo_FinishInit() {
     if (CVarGetInteger(CVAR_REMOTE_ANCHOR("Enabled"), 0)) {
         Anchor::Instance->Enable();
     }
+    // Restores settings left over from a run that never exited cleanly, so it must come after other setup.
+    Speedrun_Register();
     ShipInit::InitAll();
     Rando::StaticData::InitHashMaps();
     OTRGlobals::Instance->gRandoContext->AddExcludedOptions();
@@ -2216,6 +2268,7 @@ extern "C" void SaveManager_ThreadPoolWait() {
 
 extern "C" void DeinitOTR() {
     SaveManager_ThreadPoolWait();
+    WaitForRandoGeneration();
     OTRAudio_Exit();
     if (CVarGetInteger(CVAR_REMOTE_CROWD_CONTROL("Enabled"), 0)) {
         CrowdControl::Instance->Disable();
@@ -2413,6 +2466,7 @@ extern "C" void Graph_StartFrame() {
         gPlayState ? gPlayState->roomCtx.prevRoom.num : -1, gPlayState ? gPlayState->gameplayFrames : 0,
         CVarGetInteger(CVAR_SETTING("AltAssets"), 1) != 0,
         CVarGetInteger(CVAR_DEVELOPER_TOOLS("PreludeLoadProbe"), 1) != 0);
+    auto gui = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui());
 #ifndef __WIIU__
     using Ship::KbScancode;
 
@@ -2422,9 +2476,8 @@ extern "C" void Graph_StartFrame() {
 
     switch (dwScancode) {
         case KbScancode::LUS_KB_F1: {
-            std::shared_ptr<SohModalWindow> modal = static_pointer_cast<SohModalWindow>(
-                std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                    ->GetGuiWindow("Modal Window"));
+            std::shared_ptr<SohModalWindow> modal =
+                static_pointer_cast<SohModalWindow>(gui->GetGuiWindow("Modal Window"));
             if (modal->IsPopupOpen("Menu Moved")) {
                 modal->DismissPopup();
             } else {
@@ -2437,9 +2490,7 @@ extern "C" void Graph_StartFrame() {
         }
         case KbScancode::LUS_KB_F5: {
             if (CVarGetInteger(CVAR_CHEAT("SaveStatesEnabled"), 0) == 0) {
-                std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                    ->GetGameOverlay()
-                    ->TextDrawNotification(6.0f, true, "Save states not enabled. Check Cheats Menu.");
+                gui->GetGameOverlay()->TextDrawNotification(6.0f, true, "Save states not enabled. Check Cheats Menu.");
                 return;
             }
             const unsigned int slot = OTRGlobals::Instance->gSaveStateMgr->GetCurrentSlot();
@@ -2459,9 +2510,7 @@ extern "C" void Graph_StartFrame() {
         }
         case KbScancode::LUS_KB_F6: {
             if (CVarGetInteger(CVAR_CHEAT("SaveStatesEnabled"), 0) == 0) {
-                std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                    ->GetGameOverlay()
-                    ->TextDrawNotification(6.0f, true, "Save states not enabled. Check Cheats Menu.");
+                gui->GetGameOverlay()->TextDrawNotification(6.0f, true, "Save states not enabled. Check Cheats Menu.");
                 return;
             }
             unsigned int slot = OTRGlobals::Instance->gSaveStateMgr->GetCurrentSlot();
@@ -2475,9 +2524,7 @@ extern "C" void Graph_StartFrame() {
         }
         case KbScancode::LUS_KB_F7: {
             if (CVarGetInteger(CVAR_CHEAT("SaveStatesEnabled"), 0) == 0) {
-                std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                    ->GetGameOverlay()
-                    ->TextDrawNotification(6.0f, true, "Save states not enabled. Check Cheats Menu.");
+                gui->GetGameOverlay()->TextDrawNotification(6.0f, true, "Save states not enabled. Check Cheats Menu.");
                 return;
             }
             const unsigned int slot = OTRGlobals::Instance->gSaveStateMgr->GetCurrentSlot();
@@ -2502,7 +2549,7 @@ extern "C" void Graph_StartFrame() {
 
             break;
         }
-#if defined(_WIN32) || defined(__APPLE__)
+#if defined(_WIN32) || defined(__APPLE__) || defined(ESPEAK)
         case KbScancode::LUS_KB_F9: {
             // Toggle TTS
             CVarSetInteger(CVAR_SETTING("A11yTTS"), !CVarGetInteger(CVAR_SETTING("A11yTTS"), 0));
@@ -2757,6 +2804,13 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
     last_fps = fps;
     last_update_rate = R_UPDATE_RATE;
 
+    {
+        std::unique_lock<std::mutex> Lock(audio.mutex);
+        while (audio.processing) {
+            audio.cv_from_thread.wait(Lock);
+        }
+    }
+
     // ComboShip: AltAssets default OFF (upstream defaults ON). We ship no HD/alt asset pack, so ON
     // makes the ResourceManager probe alt/<path> for every resource every frame.
     bool curAltAssets = CVarGetInteger(CVAR_SETTING("AltAssets"), 0);
@@ -2875,7 +2929,7 @@ std::wstring StringToU16(const std::string& s) {
     size_t i = 0;
 
     while (i < s.size()) {
-        unsigned long uni;
+        unsigned long uni = '\1'; // skipped unless a valid encoding is matched below
         size_t nbytes = 0;
         bool error = false;
         unsigned char c = s[i++];
@@ -3091,9 +3145,9 @@ extern "C" void OTRControllerCallback(uint8_t rumble) {
 
     static std::shared_ptr<SohInputEditorWindow> controllerConfigWindow = nullptr;
     if (controllerConfigWindow == nullptr) {
-        controllerConfigWindow = std::dynamic_pointer_cast<SohInputEditorWindow>(
-            std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                ->GetGuiWindow("Controller Configuration"));
+        auto gui = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui());
+        controllerConfigWindow =
+            std::dynamic_pointer_cast<SohInputEditorWindow>(gui->GetGuiWindow("Controller Configuration"));
     } else if (controllerConfigWindow->TestingRumble()) {
         return;
     }
@@ -3316,6 +3370,14 @@ extern "C" void Randomizer_SetSpoilerLoaded(bool spoilerLoaded) {
 
 extern "C" uint8_t Randomizer_GenerateRandomizer() {
     return GenerateRandomizer() ? 1 : 0;
+}
+
+extern "C" bool Randomizer_IsGenerating() {
+    return IsRandoGenerating();
+}
+
+extern "C" void Randomizer_WaitForGeneration() {
+    WaitForRandoGeneration();
 }
 
 extern "C" void Randomizer_ShowRandomizerMenu() {
@@ -3583,6 +3645,22 @@ extern "C" COMBO_EXPORT void SOH_SetOnLoadSaveCallback(void (*cb)(int fileNum)) 
 }
 
 #ifdef COMBO_BUILD
+extern "C" void (*gComboSaveExitCallback)(int fileNum) = nullptr;
+
+// ComboShip: fires when OOT leaves a loaded save (quit, reset, reset from MM). Launcher blanks the Hint Tracker.
+extern "C" COMBO_EXPORT void SOH_SetOnExitSaveCallback(void (*cb)(int fileNum)) {
+    gComboSaveExitCallback = cb;
+    static bool sHooked = false;
+    if (!sHooked && GameInteractor::Instance) {
+        sHooked = true;
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::OnExitGame>([](int32_t fileNum) {
+            if (gComboSaveExitCallback) {
+                gComboSaveExitCallback((int)fileNum);
+            }
+        });
+    }
+}
+
 // ComboShip: launcher registers its release-eviction poll; OOT drains it each frame (main thread).
 extern "C" int (*gComboOutdatedSaveNotice)() = nullptr;
 extern "C" COMBO_EXPORT void SOH_SetOutdatedSaveNotice(int (*fn)()) {
@@ -3745,9 +3823,9 @@ extern "C" COMBO_EXPORT void SOH_Anchor_RequestTeleport(uint32_t clientId) {
 // item belongs to OOT, the launcher calls SOH_GrantCrossItem to grant it straight into OOT's
 // resident save — even when OOT is the dormant (frozen) game. We use Randomizer_Item_Give, which
 // writes gSaveContext directly and is play-state-independent (Magic_Fill ignores `play`,
-// Rupees_ChangeBy null-guards gPlayState), so it is safe against a frozen gPlayState. The save is
-// persisted immediately so the item survives quitting before ever switching into OOT. See
-// docs/UPSTREAM_MERGES.md.
+// Rupees_ChangeBy null-guards gPlayState and clamps to the wallet), so it is safe against a frozen
+// gPlayState. The save is persisted immediately so the item survives quitting before ever switching
+// into OOT. See docs/UPSTREAM_MERGES.md.
 // ComboShip: save-only side effects RandomizerOnItemReceiveHandler applies on a normal pickup
 // (hook_handlers.cpp); grants that bypass the receive hook must mirror them or they're lost.
 void Combo_ApplyItemReceiveSideEffects(const GetItemEntry& gie) {
@@ -3786,6 +3864,23 @@ void Combo_ApplyItemReceiveSideEffects(const GetItemEntry& gie) {
         AMMO(ITEM_BEAN) = 0;
     }
 }
+
+// ComboShip (#214): a dormant OOT never drains the rupee accumulator or a pending magic fill, and
+// saves skip both. Bank them into the saved fields before any dormant/switch save.
+void Combo_FlushDormantAccumulators(void) {
+    if (gSaveContext.rupeeAccumulator != 0) {
+        s32 total = (s32)gSaveContext.rupees + gSaveContext.rupeeAccumulator;
+        gSaveContext.rupees = (s16)std::clamp<s32>(total, 0, CUR_CAPACITY(UPG_WALLET));
+        gSaveContext.rupeeAccumulator = 0;
+    }
+    if (gSaveContext.magicState == MAGIC_STATE_FILL) {
+        gSaveContext.magic = (s8)gSaveContext.magicFillTarget;
+        gSaveContext.magicState = gSaveContext.prevMagicState;
+        gSaveContext.prevMagicState = 0;
+    }
+}
+
+bool Combo_OotIsForeground(void);
 
 // ComboShip: save-direct grant of a resolved OOT item. Shared by SOH_GrantCrossItem and Anchor's
 // team-state backfill so both apply identical dispatch + side effects + persist.
@@ -3826,6 +3921,10 @@ void Combo_GrantResolvedOOT(const GetItemEntry& gie) {
         gSaveContext.healthCapacity += 0x10 * (heartPieces / 4);
         gSaveContext.health += 0x10 * (heartPieces / 4);
     }
+    // ComboShip (#214): foreground keeps the live count-up / meter fill.
+    if (!Combo_OotIsForeground()) {
+        Combo_FlushDormantAccumulators();
+    }
     if (SaveManager::Instance && gSaveContext.fileNum != 0xFF) {
         SaveManager::Instance->SaveFile(gSaveContext.fileNum); // persist NOW
     }
@@ -3857,7 +3956,10 @@ static bool GrantOotItemByName(const char* itemName, RandomizerGet* granted) {
         }
         rg = it->second;
     }
-    GetItemEntry gie = Rando::StaticData::RetrieveItem(rg).GetGIEntry_Copy();
+    // Convert unobtainable items to a blue rupee while preserving shared-item receive suppression.
+    GetItemEntry gie = OTRGlobals::Instance->gRandomizer->GetItemObtainabilityFromRandomizerGet(rg) != CAN_OBTAIN
+                           ? ItemTableManager::Instance->RetrieveItemEntry(MOD_NONE, GI_RUPEE_BLUE)
+                           : Rando::StaticData::RetrieveItem(rg).GetGIEntry_Copy();
     FleetSharedReceiveGuard receiveGuard;
     Combo_GrantResolvedOOT(gie);
     if (granted)
@@ -4453,6 +4555,10 @@ extern "C" COMBO_EXPORT void SOH_ResumeGame(void) {
     //    The save itself is loaded by TitleSetup via Sram_OpenSave, exactly like normal file select.
     // ComboShip: on a reset return, leave gComboReturnFileNum < 0 so TitleSetup boots to the title
     // sequence (first-boot) instead of jumping straight back into Play on the saved slot.
+    // ComboShip: reset/owl-quit from MM skipped ResetHandler's exit hooks; tear trackers down before the next load.
+    if (sComboResetPending && gSaveContext.fileNum != 0xFF) {
+        GameInteractor_ExecuteOnExitGame(gSaveContext.fileNum);
+    }
     gComboReturnFileNum = sComboResetPending ? -1 : (s32)gSaveContext.fileNum;
     sComboResetPending = false;
     SOH_ResetFrameLoopForResume();
@@ -4484,10 +4590,8 @@ extern "C" COMBO_EXPORT bool SOH_Extract(const char* searchPath) {
     if (!extract.Run(path)) {
         return false;
     }
-    // Upstream merge: CallZapd gained two atomic progress counters (extracted / total).
     std::atomic<size_t> extractCount = 0, totalExtract = 0;
-    extract.CallZapd(installPath, path, &extractCount, &totalExtract);
-    return true;
+    return extract.CallTorch(installPath, path, &extractCount, &totalExtract);
 }
 
 // ComboShip: UI-less extraction primitives. The launcher's combo-owned extraction screen (comboui)
@@ -4518,7 +4622,7 @@ extern "C" COMBO_EXPORT int SOH_ClassifyRom(const char* romPath) {
     return extract.ClassifyRom(romPath) ? 1 : 0;
 }
 
-// Kicks ZAPD extraction of romPath on a background task. Non-blocking; returns 0 if a job is already
+// Kicks Torch extraction of romPath on a background task. Non-blocking; returns 0 if a job is already
 // running or the arg is null. Poll SOH_GetExtractionProgress for completion.
 extern "C" COMBO_EXPORT int SOH_StartExtraction(const char* romPath) {
     if (!romPath) {
@@ -4535,15 +4639,25 @@ extern "C" COMBO_EXPORT int SOH_StartExtraction(const char* romPath) {
     gComboExtractSuccess = false;
     gComboExtractFuture = std::async(std::launch::async, []() {
         bool ok = false;
+        std::string why = "not a recognized OoT ROM";
         try {
             Extractor extract;
             if (extract.RunFileStandalone(gComboExtractRomPath)) {
                 std::string installPath = Ship::Context::GetAppBundlePath();
                 std::string exportPath = Ship::Context::GetAppDirectoryPath(appShortName);
-                ok = extract.CallZapd(installPath, exportPath, &gComboExtractCount, &gComboExtractTotal);
+                ok = extract.CallTorch(installPath, exportPath, &gComboExtractCount, &gComboExtractTotal);
+                why = "Torch produced no archive (see the log)";
             }
-        } catch (...) {
-            ok = false; // a ZAPD failure surfaces as done && !success, never crashes the launcher
+        } catch (const std::exception& e) {
+            ok = false; // a Torch failure surfaces as done && !success, never crashes the launcher
+            why = e.what();
+        } catch (...) { ok = false; }
+        // ComboShip: Torch logs before InitLogging are invisible in Release; leave a note beside the exe.
+        if (!ok) {
+            if (FILE* ef = fopen((std::filesystem::current_path().string() + "/soh_extract_error.log").c_str(), "w")) {
+                fprintf(ef, "OoT extraction failed for %s: %s\n", gComboExtractRomPath.c_str(), why.c_str());
+                fclose(ef);
+            }
         }
         gComboExtractSuccess = ok;
         gComboExtractDone = true;
@@ -4766,6 +4880,20 @@ extern "C" COMBO_EXPORT void SOH_SetComboRandoSeed(uint64_t seed) {
 }
 #endif
 
+// ComboShip: old builds stored exclusions as check numbers that no longer match; drop them once.
+static bool Combo_ClearNumericExclusions() {
+    std::stringstream ss(CVarGetString(CVAR_RANDOMIZER_SETTING("ExcludedLocations"), ""));
+    std::string tok;
+    while (std::getline(ss, tok, ',')) {
+        if (!tok.empty() && std::all_of(tok.begin(), tok.end(), [](unsigned char c) { return std::isdigit(c); })) {
+            SPDLOG_WARN("[ComboShip] Excluded locations use an old format; cleared them");
+            CVarSetString(CVAR_RANDOMIZER_SETTING("ExcludedLocations"), "");
+            return true;
+        }
+    }
+    return false;
+}
+
 // ComboShip: snapshot every OOT rando option as {cvarName: value}. The combo orchestrator stores
 // this in the consolidated spoiler so a dropped/reloaded seed reproduces the exact settings on any
 // machine (OOT options are CVar-backed; SOH_RestoreRandoSettings writes them back).
@@ -4812,8 +4940,46 @@ extern "C" COMBO_EXPORT void SOH_RestoreRandoSettings(const char* json) {
         return;
     try {
         auto j = nlohmann::json::parse(json);
-        // Snapshot is authoritative: pre-clear so a spoiler without the key (pre-GAP-7, generated
-        // with no exclusions applied) doesn't inherit this machine's local exclusions.
+        // Upstream appended these renames to the already-run ConfigVersion7 updater, so older snapshots
+        // still carry the old keys; rename them here (same table, values unchanged).
+        static const std::pair<const char*, const char*> kRenamed[] = {
+            { "gRandoSettings.LogicRules", "gRandoSettings.NoLogic" },
+            { "gRandoSettings.AllLocationsReachable", "gRandoSettings.AllChecksReachable" },
+            { "gRandoSettings.SkipScarecrowsSong", "gRandoSettings.StartingScarecrowsSong" },
+            { "gRandoSettings.LacsStoneCount", "gRandoSettings.GbkStoneCount" },
+            { "gRandoSettings.LacsMedallionCount", "gRandoSettings.GbkMedallionCount" },
+            { "gRandoSettings.LacsRewardCount", "gRandoSettings.GbkRewardCount" },
+            { "gRandoSettings.LacsDungeonCount", "gRandoSettings.GbkDungeonCount" },
+            { "gRandoSettings.LacsTokenCount", "gRandoSettings.GbkTokenCount" },
+            { "gRandoSettings.LacsRewardOptions", "gRandoSettings.GbkRewardOptions" },
+        };
+        for (const auto& [from, to] : kRenamed) {
+            if (j.contains(from) && !j.contains(to)) {
+                j[to] = j[from];
+            }
+            j.erase(from);
+        }
+        // Mask Quest (1 = Completed, 2 = Shuffle) became Shuffle Masks + starting masks.
+        if (j.contains("gRandoSettings.CompleteMaskQuest") && j["gRandoSettings.CompleteMaskQuest"].is_number()) {
+            const int mq = j["gRandoSettings.CompleteMaskQuest"].get<int>();
+            if (mq == 1) {
+                for (const char* m : { "Keaton", "Skull", "Spooky", "Goron", "Zora", "Gerudo" }) {
+                    j[std::string("gRandoSettings.Starting") + m + "Mask"] = 1;
+                }
+                j["gRandoSettings.StartingBunnyHood"] = 1;
+                j["gRandoSettings.StartingMaskOfTruth"] = 1;
+            }
+            if (mq == 1 || mq == 2) {
+                j["gRandoSettings.ShuffleMasks"] = 1;
+            }
+        }
+        j.erase("gRandoSettings.CompleteMaskQuest");
+        // Snapshot is authoritative: pre-clear so a key missing from an older spoiler reads as the
+        // default, not this machine's local value (options, then exclusions).
+        for (const auto& opt : Rando::Settings::GetInstance()->GetAllOptions()) {
+            if (!opt.GetCVarName().empty())
+                CVarClear(opt.GetCVarName().c_str());
+        }
         CVarSetString(CVAR_RANDOMIZER_SETTING("ExcludedLocations"), "");
         // Older seed snapshots predate this information option. They must not
         // inherit a local menu choice when loaded on a newer build.
@@ -4829,6 +4995,7 @@ extern "C" COMBO_EXPORT void SOH_RestoreRandoSettings(const char* json) {
             else
                 CVarSetInteger(it.key().c_str(), it.value().get<int>());
         }
+        Combo_ClearNumericExclusions();
     } catch (...) {}
 }
 
@@ -4857,18 +5024,11 @@ static void Combo_ApplyEnabledTricks() {
     }
 }
 
-// The ExcludedLocations CSV (check IDs) is only parsed on SoH's GUI generate path
-// (randomizer.cpp:930); the combo prep paths must parse it too or exclusions never apply headless.
+// The ExcludedLocations CSV is only parsed on SoH's GUI generate path; the combo prep paths must parse
+// it too or exclusions never apply headless.
 static std::set<RandomizerCheck> Combo_ParseExcludedLocations() {
-    std::set<RandomizerCheck> excluded;
-    std::stringstream ss(CVarGetString(CVAR_RANDOMIZER_SETTING("ExcludedLocations"), ""));
-    std::string tok;
-    while (std::getline(ss, tok, ',')) {
-        try {
-            excluded.insert(static_cast<RandomizerCheck>(std::stoi(tok)));
-        } catch (...) {}
-    }
-    return excluded;
+    Combo_ClearNumericExclusions();
+    return Rando::StaticData::ParseExcludedLocations(CVarGetString(CVAR_RANDOMIZER_SETTING("ExcludedLocations"), ""));
 }
 
 extern "C" COMBO_EXPORT void SOH_PrepRandoContext(void) {
@@ -5138,11 +5298,13 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoStaticData(void) {
         }
 
         // ComboShip: accessibility settings the combo fill maps to an OotAccess mode (per-game relax).
-        accessibility["noLogic"] = ctx->GetOption(RSK_LOGIC_RULES).Is(RO_LOGIC_NO_LOGIC);
-        accessibility["allLocationsReachable"] = static_cast<bool>(ctx->GetOption(RSK_ALL_LOCATIONS_REACHABLE));
+        accessibility["noLogic"] = ctx->GetOption(RSK_NO_LOGIC).Is(RO_GENERIC_ON);
+        accessibility["allLocationsReachable"] = static_cast<bool>(ctx->GetOption(RSK_ALL_CHECKS_REACHABLE));
         accessibility["lockOverworldDoors"] = static_cast<bool>(ctx->GetOption(RSK_LOCK_OVERWORLD_DOORS));
         // ComboShip: Shared Items masks need OOT's masks to be real rando items.
-        accessibility["maskQuestShuffle"] = ctx->GetOption(RSK_MASK_QUEST).Is(RO_MASK_QUEST_SHUFFLE);
+        accessibility["maskQuestShuffle"] = static_cast<bool>(ctx->GetOption(RSK_SHUFFLE_MASKS));
+        // ComboShip: read by AssignTrapDisguises to name every foreign trap.
+        accessibility["iceTrapNames"] = static_cast<int>(ctx->GetOption(RSK_ICE_TRAP_NAMES).Get());
 
         usedPool = true;
 #else
@@ -5542,9 +5704,9 @@ extern "C" COMBO_EXPORT const char* SOH_DumpRandoHintData(void) {
         for (int k = 0; k < RHT_MAX; ++k) {
             auto key = static_cast<RandomizerHintTextKey>(k);
             auto name = EnumToString(key);
-            if (!name.has_value() || !Combo_IsUsedHintTemplate(std::string(*name)))
+            if (name.empty() || !Combo_IsUsedHintTemplate(std::string(name)))
                 continue;
-            templates[std::string(*name)] = Combo_HintTextToJson(Rando::StaticData::hintTextTable[key]);
+            templates[std::string(name)] = Combo_HintTextToJson(Rando::StaticData::hintTextTable[key]);
         }
         out["hintTextTable"] = std::move(templates);
 
@@ -6010,7 +6172,11 @@ extern "C" COMBO_EXPORT void SOH_SetOnComboFinalizeCallback(int (*cb)()) {
 // Called every frame on the main thread from the file-select loop. Runs the launcher's pending
 // main-thread apply; returns nonzero once generation is fully resolved (finalized or failed).
 extern "C" COMBO_EXPORT int SOH_PollComboFinalize(void) {
-    return gComboFinalizeCallback ? gComboFinalizeCallback() : 1;
+    const int resolved = gComboFinalizeCallback ? gComboFinalizeCallback() : 1;
+    if (resolved) {
+        SetComboRandoGenerating(false); // finalized or failed: the file-select loop plays the result sfx
+    }
+    return resolved;
 }
 
 // ComboShip: reload a consolidated seed file so it's playable without regenerating (remember-seed +
@@ -6112,16 +6278,16 @@ extern "C" COMBO_EXPORT const char* Combo_SOH_GetObtainedChecks(void) {
     return cached.c_str();
 }
 
-// Trigger combo generation. Gated on RandoGenerating so a second press during generation is a no-op;
-// reads the seed from the shared CVar (written by the comboui seed field). Sets RandoGenerating=1 so
-// the file-select loop swaps to gallop music + shows progress; the finalize poll clears it.
+// Trigger combo generation. Gated on IsRandoGenerating so a second press during generation is a no-op;
+// reads the seed from the shared CVar (written by the comboui seed field). Marks combo generation so
+// the file-select loop swaps to gallop music + shows progress; SOH_PollComboFinalize clears it.
 extern "C" COMBO_EXPORT void SOH_TriggerComboGenerate(void) {
-    if (CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) != 0)
+    if (IsRandoGenerating())
         return; // already generating
     if (!gComboGenerateRequestCallback)
         return;
     const char* seed = CVarGetString(CVAR_GENERAL("ComboSeed"), "");
-    CVarSetInteger(CVAR_GENERAL("RandoGenerating"), 1);
+    SetComboRandoGenerating(true);
     gComboGenerateRequestCallback(seed);
 }
 
@@ -6145,8 +6311,13 @@ extern "C" COMBO_EXPORT void SOH_ParkForComboMMResume(void) {
 }
 
 extern "C" COMBO_EXPORT void SOH_SetSeedGenerated(uint8_t g) {
-    if (OTRGlobals::Instance && OTRGlobals::Instance->gRandoContext)
+    if (OTRGlobals::Instance && OTRGlobals::Instance->gRandoContext) {
         OTRGlobals::Instance->gRandoContext->SetSeedGenerated(g != 0);
+        // ComboShip: a failed generate also drops the old loaded seed, like native generation does.
+        if (g == 0) {
+            OTRGlobals::Instance->gRandoContext->SetSpoilerLoaded(false);
+        }
+    }
 }
 
 // ComboShip: OOT combo-logic exports — thin wrappers around the existing logic engine. The
@@ -6330,6 +6501,7 @@ bool SoH_HandleConfigDrop(char* filePath) {
         return false;
     }
     try {
+        auto gui = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui());
         std::ifstream configStream(filePath);
         if (!configStream) {
             return false;
@@ -6341,6 +6513,8 @@ bool SoH_HandleConfigDrop(char* filePath) {
         if (!configJson.contains("CVars")) {
             return false;
         }
+
+        uint32_t configVersion = SOH::GetConfigVersion(configJson, 0);
 
         CVarClearBlock(CVAR_PREFIX_ENHANCEMENT);
         CVarClearBlock(CVAR_PREFIX_CHEAT);
@@ -6367,17 +6541,20 @@ bool SoH_HandleConfigDrop(char* filePath) {
             }
         }
 
-        auto gui = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui());
+        // Migrate configs from older versions
+        SOH::RunVersionUpdatesFrom(configVersion);
+#ifdef COMBO_BUILD
+        // ComboShip: a dropped old config can carry numeric exclusions too.
+        Combo_ClearNumericExclusions();
+#endif
+
         gui->GetGuiWindow("Console")->Hide();
         gui->GetGuiWindow("Actor Viewer")->Hide();
         gui->GetGuiWindow("Collision Viewer")->Hide();
         gui->GetGuiWindow("Save Editor")->Hide();
         gui->GetGuiWindow("Display List Viewer")->Hide();
         gui->GetGuiWindow("Stats")->Hide();
-        std::dynamic_pointer_cast<Ship::ConsoleWindow>(
-            std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                ->GetGuiWindow("Console"))
-            ->ClearBindings();
+        std::dynamic_pointer_cast<Ship::ConsoleWindow>(gui->GetGuiWindow("Console"))->ClearBindings();
 
         Rando::Settings::GetInstance()->UpdateAllOptions();
         SohGui::MarkRandomizerMenusDirty();

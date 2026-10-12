@@ -18,6 +18,6 @@ class AudioSequence : public Ship::Resource<Sequence> {
     Sequence* GetPointer();
     size_t GetPointerSize();
 
-    Sequence sequence;
+    Sequence sequence{};
 };
 }; // namespace SOH

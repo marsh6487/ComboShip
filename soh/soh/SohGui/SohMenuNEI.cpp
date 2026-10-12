@@ -13,6 +13,8 @@
 #include "soh/FleetShipCombo/FleetShipCombo.h"
 #include <ship/resource/ResourceManager.h>
 #include <ship/resource/archive/ArchiveManager.h>
+#include <ship/Context.h>
+#include <ship/window/Window.h>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <algorithm>

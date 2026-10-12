@@ -29,17 +29,19 @@
 #include "objects/object_gi_melody/object_gi_melody.h"
 #include "ComboItemEffectColors.h"
 #include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
-#include "libultraship/bridge.h" // CVarGetInteger / CVarGetColor24 (cosmetic key/nut colors)
-#include "libultraship/color.h"  // Color_RGB8
+#include "soh/Enhancements/randomizer/dungeon.h" // concrete normal/MQ keyring indices
+#include "libultraship/bridge.h"                 // CVarGetInteger / CVarGetColor24 (cosmetic key/nut colors)
+#include "libultraship/color.h"                  // Color_RGB8
 #include "soh/cvar_prefixes.h"
 #include "soh/Enhancements/cosmetics/cosmeticsTypes.h" // COLORSCHEME_*
 #include "variables.h"
 #include "soh/OTRGlobals.h"             // rando-context null guards (MM calls us while OOT is dormant)
 #include "soh/ResourceManagerHelpers.h" // owner-specific model queries used by Ikana recipes
 #include <string>
-#include "soh/Enhancements/randomizer/dungeon.h"   // Rando::DungeonKey / GetDungeon()->IsMQ() (key-ring MQ variants)
-#include "objects/object_gi_fire/object_gi_fire.h" // gGiBlueFireFlameDL (boss-soul flame)
-#include "objects/object_gi_key/object_gi_key.h"   // gGiSmallKeyDL
+#include <atomic>
+#include <spdlog/spdlog.h>
+#include "objects/object_gi_fire/object_gi_fire.h"           // gGiBlueFireFlameDL (boss-soul flame)
+#include "objects/object_gi_key/object_gi_key.h"             // gGiSmallKeyDL
 #include "objects/object_gi_bosskey/object_gi_bosskey.h"     // gGiBossKeyDL / gGiBossKeyGemDL
 #include "objects/object_gi_map/object_gi_map.h"             // gGiDungeonMapDL
 #include "objects/object_gi_compass/object_gi_compass.h"     // gGiCompassDL / gGiCompassGlassDL
@@ -48,6 +50,11 @@
 #include "objects/object_gi_bomb_2/object_gi_bomb_2.h"       // gGiBombchuDL
 #include "objects/object_mamenoki/object_mamenoki.h"         // gMagicBeanSeedlingDL
 #include "objects/object_toki_objects/object_toki_objects.h" // Master Sword model
+#include "objects/object_gi_rupy/object_gi_rupy.h"           // gGiRupeeInnerDL / gGiRupeeOuterDL
+#include "objects/object_gi_melody/object_gi_melody.h"       // gGiSongNoteDL
+#include "objects/gameplay_keep/gameplay_keep.h"             // gRupeeDL / gRupeeSilverTex
+#include <atomic>
+#include <spdlog/spdlog.h>
 // Boss-soul skeletons/animations/textures for the animated cross-game class (issue #86).
 #include "objects/object_goma/object_goma.h"
 #include "objects/object_kingdodongo/object_kingdodongo.h"
@@ -351,7 +358,7 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
     }
 
     // Small keys: custom body (env keyColor, OPA) + dungeon emblem (env emblemColor, XLU).
-    if (rg >= RG_FOREST_TEMPLE_SMALL_KEY && rg <= RG_GANONS_CASTLE_SMALL_KEY) {
+    if (rg >= RG_FOREST_TEMPLE_SMALL_KEY && rg <= RG_TREASURE_GAME_SMALL_KEY) {
         static const char* icons[10] = {
             gSmallKeyIconForestTempleDL,         gSmallKeyIconFireTempleDL,     gSmallKeyIconWaterTempleDL,
             gSmallKeyIconSpiritTempleDL,         gSmallKeyIconShadowTempleDL,   gSmallKeyIconBottomoftheWellDL,
@@ -376,7 +383,8 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
         return 1;
     }
 
-    // Key rings: key bunch + ring + emblem, each with its own env color, all OPA.
+    // Key rings retain the accepted concrete normal/MQ cluster recipes. Native
+    // 9.3 repeats individual keys with matrix changes that the layer ABI cannot replay.
     if (rg >= RG_FOREST_TEMPLE_KEY_RING && rg <= RG_TREASURE_GAME_KEY_RING) {
         static const char* icons[10] = {
             gKeyringIconForestTempleDL,         gKeyringIconFireTempleDL,     gKeyringIconWaterTempleDL,
@@ -527,7 +535,67 @@ static int32_t OOT_DescribeCustomDraw(RandomizerGet rg, CwItemDrawInfo* out) {
         return 1;
     }
 
+    // Silver rupees: inner/outer rupee (NewDrops) or the textured drop rupee (Randomizer_DrawSilverRupee).
+    if (rg >= RG_SHADOW_SILVER_BLADES && rg <= RG_GANONS_CASTLE_MQ_SILVER_SHADOW) {
+        Color_RGB8 c = CwLiveCosmeticColor(CVAR_COSMETIC("Consumable.SilverRupee.Value"), { 255, 255, 255 });
+        out->stateDependent = 2; // Keep palette / NewDrops selection live after the receipt is latched.
+        if (CVarGetInteger("gEnhancements.NewDrops", 0) != 0) {
+            out->drawKind = CW_DRAW_KIND_COLOR_LAYERS;
+            out->dlistCount = 2;
+            out->xluStartIndex = 1;
+            out->dlists[0] = gGiRupeeInnerDL;
+            out->dlists[1] = gGiRupeeOuterDL;
+            CwLayerPrim(out, 0, c);
+            CwLayerEnv(out, 0, Color_RGB8{ (uint8_t)(c.r / 5), (uint8_t)(c.g / 5), (uint8_t)(c.b / 5) });
+            CwLayerPrim(out, 1, { 255, 255, 255 });
+            CwLayerEnv(out, 1, Color_RGB8{ (uint8_t)(c.r * 0.75f), (uint8_t)(c.g * 0.75f), (uint8_t)(c.b * 0.75f) });
+            return 1;
+        }
+        out->drawKind = CW_DRAW_KIND_SILVER_RUPEE;
+        out->dlistCount = 1;
+        out->xluStartIndex = -1;
+        out->scale = 0.05f;
+        out->dlists[0] = gRupeeDL;
+        out->segTexPath = gRupeeSilverTex;
+        if (CVarGetInteger(CVAR_COSMETIC("Consumable.SilverRupee.Changed"), 0)) {
+            out->primColorOpa[0] = c.r;
+            out->primColorOpa[1] = c.g;
+            out->primColorOpa[2] = c.b;
+            out->primColorOpa[3] = 255;
+        }
+        return 1;
+    }
+
+    // Nut bag: the Deku Nuts seg8 scroll under 26 Opa (Randomizer_DrawNutBag).
+    if (rg == RG_DEKU_NUT_BAG || rg == RG_NUT_UPGRADE_INF || rg == RG_DEKU_NUT_CAPACITY_30 ||
+        rg == RG_DEKU_NUT_CAPACITY_40) {
+        out->setupDlOpa = GetItem_GetSetupDL(SETUPDL_26);
+        out->drawKind = CW_DRAW_KIND_DEKU_NUTS;
+        out->dlistCount = 1;
+        out->xluStartIndex = -1;
+        out->dlists[0] = gGiNutBagDL;
+        return 1;
+    }
+
+    // Stick bag: plain model under 26 Opa (Randomizer_DrawStickBag).
+    if (rg == RG_DEKU_STICK_BAG || rg == RG_STICK_UPGRADE_INF || rg == RG_DEKU_STICK_CAPACITY_20 ||
+        rg == RG_DEKU_STICK_CAPACITY_30) {
+        CwSimple(out, gGiStickBagDL, false, 0.0f);
+        out->setupDlOpa = GetItem_GetSetupDL(SETUPDL_26);
+        return 1;
+    }
+
     switch (rg) {
+        case RG_SCARECROWS_SONG: // dark green grayscale note (Randomizer_DrawScarecrowsSong)
+            out->drawKind = CW_DRAW_KIND_GRAYSCALE_XLU;
+            out->dlistCount = 1;
+            out->xluStartIndex = 0;
+            out->dlists[0] = gGiSongNoteDL;
+            out->primColorXlu[0] = 40;
+            out->primColorXlu[1] = 160;
+            out->primColorXlu[2] = 40;
+            out->primColorXlu[3] = 255;
+            return 1;
         case RG_BOMB_ARROWS:
             if (!CwCustomGi(out, "__OTR__objects/object_nei_bombarrows/gBombarrowsGiveDL", .5f))
                 return 0;
@@ -991,6 +1059,13 @@ static int32_t OOT_FillItemDrawInfo(RandomizerGet rg, CwItemDrawInfo* out) {
         return 1;
     if (gi.drawFunc != nullptr) {
         return 0; // A custom callback has no native gid row; gid 0 would masquerade as a bottle.
+    }
+    // ComboShip: a bespoke draw func with no row above falls back to the gid model; say so once.
+    if (gi.drawFunc != nullptr && effRg >= 0 && effRg < RG_MAX) {
+        static std::atomic<bool> sWarned[RG_MAX];
+        if (!sWarned[effRg].exchange(true)) {
+            SPDLOG_WARN("[combo] OOT item {} has a custom draw func but no cross-game draw row", (int)effRg);
+        }
     }
     void* dls[CW_DRAW_MAX_DLISTS] = {};
     int32_t xluStart = -1;

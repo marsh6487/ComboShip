@@ -6,7 +6,6 @@
 
 #include "z_en_cow.h"
 #include "objects/object_cow/object_cow.h"
-#include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/item-tables/ItemTableTypes.h"
 #include "soh/Enhancements/randomizer/draw.h"
@@ -189,8 +188,6 @@ void EnCow_Destroy(Actor* thisx, PlayState* play) {
         Collider_DestroyCylinder(play, &this->colliders[0]);
         Collider_DestroyCylinder(play, &this->colliders[1]);
     }
-
-    ResourceMgr_UnregisterSkeleton(&this->skelAnime);
 }
 
 void EnCow_UpdateAnimation(EnCow* this, PlayState* play) {

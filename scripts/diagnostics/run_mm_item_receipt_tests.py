@@ -585,8 +585,25 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     tu = tmp / 'donor.cpp'
     tu.write_text(donor)
     exe = tmp / 'donor'
+    # Text's native RNG moved to ShipUtils in 9.3. Keep its real implementation
+    # and native headers in separate TUs, away from the donor engine fixtures.
+    ship_utils = (ROOT / 'soh/soh/ShipUtils.cpp').read_text()
+    rng = tmp / 'ship_rng.cpp'
+    rng.write_text('#include <bit>\n#include <random>\n#include <cassert>\n'
+                   '#include "soh/ShipUtils.h"\n' +
+                   ship_utils[ship_utils.index('static bool default_init = false;'):
+                              ship_utils.index('// Returns a random floating point number')])
+    native_flags = ['-DF3DEX_GBI_2', '-I', str(ROOT / 'soh'),
+                    '-I', str(ROOT / 'soh/include'), '-I', str(ROOT / 'libultraship/include')]
+    native_objects = []
+    for native_source in (ROOT / 'soh/soh/Enhancements/custom-message/text.cpp', rng):
+        native_object = tmp / (native_source.stem + '.o')
+        subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror',
+                        '-Wno-unused-parameter', '-fPIC', *native_flags, *extra,
+                        '-c', str(native_source), '-o', str(native_object)], check=True)
+        native_objects.append(str(native_object))
     subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-I', str(ROOT), *extra,
-                    str(tu), str(ROOT / 'soh/soh/Enhancements/custom-message/text.cpp'), '-o', str(exe)], check=True)
+                    str(tu), *native_objects, '-o', str(exe)], check=True)
     generated_routes = tmp / 'native-entrance-routes.json'
     subprocess.run([sys.executable, str(ROOT / 'tests/item_receipts/run_seed_settings_tests.py'),
                     '--dump-entrance-fixture', str(generated_routes),
@@ -604,7 +621,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
                     '-fPIC', '-shared', '-fvisibility=hidden',
                     *donor_private, *extra, '-I', str(ROOT), str(tu),
-                    str(ROOT / 'soh/soh/Enhancements/custom-message/text.cpp'), '-o', str(donor_library)], check=True)
+                    *native_objects, '-o', str(donor_library)], check=True)
     integrated = tmp / 'compass_receiver'
     result = subprocess.run([compiler, '-std=c++20', *mmflags, *extra, '-DCOMPASS_DONOR_INTEGRATION', '-I' + str(tmp),
                     str(ROOT / 'tests/item_receipts/catalog_test.cpp'),
@@ -624,6 +641,8 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
         'const CustomMessage Hint::GetHintMessage(MessageFormat format,size_t id) const ' + block(hint, 'const CustomMessage Hint::GetHintMessage'))
     information = information.replace('/* SETTINGS_RESTORE */',
         'extern "C" void SOH_RestoreRandoSettings(const char* json) ' + block(otr, 'void SOH_RestoreRandoSettings'))
+    information = information.replace('/* CLEAR_NUMERIC_EXCLUSIONS */',
+        'static bool Combo_ClearNumericExclusions() ' + block(otr, 'static bool Combo_ClearNumericExclusions() {'))
     information = information.replace('/* ALTAR_EXPORT */',
         'extern "C" const char* SOH_DumpAltarHintMessages(void) ' + block(otr, 'const char* SOH_DumpAltarHintMessages'))
     information = information.replace('/* LOAD_DATA */', block(
@@ -633,6 +652,14 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     information = information.replace('/* LOAD_SETTINGS */',
         'SaveManager::Instance->LoadArray("randoSettings",RSK_MAX,[&](size_t i) ' + block(save, 'SaveManager::Instance->LoadArray("randoSettings"') + ');')
     settings = (ROOT / 'soh/soh/Enhancements/randomizer/settings.cpp').read_text()
+    option = (ROOT / 'soh/soh/Enhancements/randomizer/option.cpp').read_text()
+    metadata = ''
+    for signature, text in (
+            ('std::shared_ptr<Settings> Settings::GetInstance()', settings),
+            ('const std::array<Option, RSK_MAX>& Settings::GetAllOptions() const', settings),
+            ('const std::string& Option::GetCVarName() const', option)):
+        metadata += signature + ' ' + block(text, signature) + '\n'
+    information = information.replace('/* OPTION_METADATA */', metadata)
     information = information.replace('/* SPOILER_SETTINGS */',
         block(settings, 'void Settings::ParseJson')[1:].split('    nlohmann::json jsonExcludedLocations')[0])
     tu = tmp / 'information.cpp'

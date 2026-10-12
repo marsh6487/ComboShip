@@ -117,7 +117,7 @@ static json SaveBlob() {
 #else
     auto* manager = SaveManager::Instance;
     manager->currentJsonContext = &section;
-    NeiSave_Save(&gSaveContext, 0, true);
+    NeiSave_Save(gSaveContext, 0, true);
     Check(manager->currentJsonContext == &section, "SaveManager restored the NEI section after array traversal");
     manager->currentJsonContext = nullptr;
 #endif

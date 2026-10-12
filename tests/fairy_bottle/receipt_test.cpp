@@ -69,13 +69,12 @@ struct Item {
     GetItemCategory category{};
     Text article;
     std::string color;
-    bool progressive{};
     uint16_t price{};
     std::shared_ptr<GetItemEntry> giEntry;
     Item() = default;
     Item(RandomizerGet, Text, ItemType, int16_t, bool, LogicVal, RandomizerHintTextKey, uint16_t, uint16_t,
          uint16_t, uint16_t, uint16_t, int16_t, GetItemCategory, uint16_t, Text = {}, std::string = "%g",
-         bool = false, uint16_t = 0);
+         uint16_t = 0);
 };
 std::map<RandomizerGet, Item> itemTable;
 /* PRODUCTION_CATALOG */

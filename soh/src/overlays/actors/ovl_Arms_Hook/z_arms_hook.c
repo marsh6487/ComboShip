@@ -9,6 +9,7 @@
 
 extern u8 TransformMasks_IsTransformed(void);
 extern u8 TransformMasks_IsTransformedAny(void);
+#include <libultraship/bridge/consolevariablebridge.h>
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED)
 
@@ -276,8 +277,8 @@ void ArmsHook_Wait(ArmsHook* this, PlayState* play) {
                 // Should not be reached (func_808350A4 blocks the launch player-side first), but if
                 // it is: restore the FULL held state — parent alone leaves player->heldActor NULL
                 // ("hook in flight" forever = softlock).
-                Audio_PlaySoundGeneral(NA_SE_SY_ERROR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                       &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+                Audio_PlaySfxGeneral(NA_SE_SY_ERROR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                     &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
                 this->actor.parent = &player->actor;
                 player->heldActor = &this->actor;
                 player->actor.child = &this->actor;
@@ -451,8 +452,8 @@ static void ArmsHook_StartSwap(ArmsHook* this, PlayState* play, Player* player, 
     // Fire one with the flag on and never ask again and it parks in PLAYING forever — that
     // is the sound that kept ringing after every swap. The sample is picked by sfxId & 0x1FF,
     // so clearing 0x800 changes the lifetime, never which sound you hear.
-    Audio_PlaySoundGeneral(NA_SE_IT_HOOKSHOT_STICK_OBJ - SFX_FLAG, &this->actor.projectedPos, 4,
-                           &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+    Audio_PlaySfxGeneral(NA_SE_IT_HOOKSHOT_STICK_OBJ - SFX_FLAG, &this->actor.projectedPos, 4,
+                         &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
     ArmsHook_SetupAction(this, ArmsHook_SwitchSwap);
 }
 
@@ -523,8 +524,8 @@ void ArmsHook_Shoot(ArmsHook* this, PlayState* play) {
             }
         }
         this->timer = 0;
-        Audio_PlaySoundGeneral(NA_SE_IT_ARROW_STICK_CRE, &this->actor.projectedPos, 4, &gSfxDefaultFreqAndVolScale,
-                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+        Audio_PlaySfxGeneral(NA_SE_IT_ARROW_STICK_CRE, &this->actor.projectedPos, 4, &gSfxDefaultFreqAndVolScale,
+                             &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
     } else if (DECR(this->timer) == 0) {
         grabbed = this->grabbed;
         if (grabbed != NULL) {
@@ -675,12 +676,12 @@ void ArmsHook_Shoot(ArmsHook* this, PlayState* play) {
                     }
                 }
                 ArmsHook_PullPlayer(this);
-                Audio_PlaySoundGeneral(NA_SE_IT_HOOKSHOT_STICK_OBJ, &this->actor.projectedPos, 4,
-                                       &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+                Audio_PlaySfxGeneral(NA_SE_IT_HOOKSHOT_STICK_OBJ, &this->actor.projectedPos, 4,
+                                     &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
             } else {
                 CollisionCheck_SpawnShieldParticlesMetal(play, &this->actor.world.pos);
-                Audio_PlaySoundGeneral(NA_SE_IT_HOOKSHOT_REFLECT, &this->actor.projectedPos, 4,
-                                       &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+                Audio_PlaySfxGeneral(NA_SE_IT_HOOKSHOT_REFLECT, &this->actor.projectedPos, 4,
+                                     &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
             }
         } else if (CHECK_BTN_ANY(play->state.input[0].press.button, (buttonsToCheck))) {
             this->timer = 0;
@@ -752,8 +753,8 @@ void ArmsHook_SwitchSwap(ArmsHook* this, PlayState* play) {
 
     if (++sSwapTimer >= ARMSHOOK_SWAP_HOLD_FRAMES) {
         // One-shot: clear the continuous flag (see ArmsHook_StartSwap).
-        Audio_PlaySoundGeneral(NA_SE_EV_ROLL_STAND - SFX_FLAG, &player->actor.projectedPos, 4,
-                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+        Audio_PlaySfxGeneral(NA_SE_EV_ROLL_STAND - SFX_FLAG, &player->actor.projectedPos, 4,
+                             &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         ArmsHook_ReleaseAfterSwap(this, player);
     }
 }

@@ -453,6 +453,7 @@ inline void to_json(json& j, const ShipSaveInfo& shipSaveInfo) {
         { "dpadEquips", shipSaveInfo.dpadEquips },
         { "extButtons", shipSaveInfo.extButtons },
         { "pauseSaveEntrance", shipSaveInfo.pauseSaveEntrance },
+        { "persistentBunnyHood", shipSaveInfo.persistentBunnyHood },
         { "saveType", shipSaveInfo.saveType },
         { "fileCreatedAt", shipSaveInfo.fileCreatedAt },
         { "fileCompletedAt", shipSaveInfo.fileCompletedAt },
@@ -477,6 +478,7 @@ inline void from_json(const json& j, ShipSaveInfo& shipSaveInfo) {
         memset(&shipSaveInfo.extButtons, 0, sizeof(shipSaveInfo.extButtons));
     }
     j.at("pauseSaveEntrance").get_to(shipSaveInfo.pauseSaveEntrance);
+    j.at("persistentBunnyHood").get_to(shipSaveInfo.persistentBunnyHood);
     j.at("saveType").get_to(shipSaveInfo.saveType);
     j.at("fileCreatedAt").get_to(shipSaveInfo.fileCreatedAt);
     j.at("fileCompletedAt").get_to(shipSaveInfo.fileCompletedAt);

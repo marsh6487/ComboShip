@@ -4,6 +4,7 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -14,6 +15,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -28,6 +30,8 @@
 #include "soh/Enhancements/randomizer/trial.h"
 #include "soh/Enhancements/randomizer/fishsanity.h"
 #include "soh/Enhancements/randomizer/rng.h"
+#include "soh/Enhancements/randomizer/randomizerEnumStrings.h"
+#include "soh/Enhancements/Lang/Lang.h"
 #include "rando/SharedItems.h"
 #include "ComboExport.h"
 #include "NeiGracePolicy.h"
@@ -40,6 +44,17 @@
 #undef private
 
 using json = nlohmann::json;
+// Language loading belongs to the GUI; retain stable references for the native
+// metadata dispatch while testing the authored integration settings below.
+namespace Lang {
+const std::string& Translate(const char* path) {
+    static std::map<std::string, std::string> values;
+    return values.try_emplace(path, path).first->second;
+}
+std::variant<std::reference_wrapper<const std::string>, Lang::Error> TryTranslate(const char* path) {
+    return std::cref(Translate(path));
+}
+}
 extern "C" {
 SaveContext gSaveContext{};
 int gComboGoalHunt = 0, gComboGoalRequired = 0, gComboGoalPieces = 0;
@@ -60,6 +75,10 @@ extern "C" const char* CVarGetString(const char* key, const char* fallback) {
     return found == stringCVars.end() ? fallback : found->second.c_str();
 }
 extern "C" void CVarSetString(const char* key, const char* value) { stringCVars[key] = value; }
+extern "C" void CVarClear(const char* key) {
+    integerCVars.erase(key);
+    stringCVars.erase(key);
+}
 
 // Pack availability is a fixture input to the complete native finalizer.
 struct OTRGlobals {

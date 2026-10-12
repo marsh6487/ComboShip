@@ -1,11 +1,14 @@
 // Execute production altar routing and saved-setting restore. Requirement
 // builders and final font formatting are boundaries; seed flags/JSON are real.
 #include <array>
+#include <algorithm>
 #include <cassert>
 #include <functional>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <nlohmann/json.hpp>
+#include <sstream>
 #include <string>
 #include <vector>
 #define COMBO_BUILD
@@ -59,6 +62,9 @@ struct HintText {
 namespace Rando {
 struct Option {
   int value = 0;
+  std::string cvarName;
+  const std::string &GetCVarName() const;
+  int GetValueFromText(const nlohmann::json &text) { return text == "On"; }
   bool Is(int target) const { return value == target; }
   operator bool() const { return value != 0; }
   void Set(int target) { value = target; }
@@ -119,14 +125,16 @@ struct Hint {
 /* ALTAR_BUILDER */
 struct Settings {
   Context *mContext = Context::GetInstance();
-  struct JsonOption {
-    int GetValueFromText(const nlohmann::json &value) { return value == "On"; }
-  };
-  std::array<JsonOption, RSK_MAX> mOptions{};
+  static std::shared_ptr<Settings> mInstance;
+  std::array<Option, RSK_MAX> mOptions{};
+  static std::shared_ptr<Settings> GetInstance();
+  const std::array<Option, RSK_MAX>& GetAllOptions() const;
   void LoadSpoilerSettings(const nlohmann::json &spoilerFileJson) {
     /* SPOILER_SETTINGS */
   }
 };
+std::shared_ptr<Settings> Settings::mInstance;
+/* OPTION_METADATA */
 } // namespace Rando
 
 std::map<std::string, int> intCvars;
@@ -142,6 +150,17 @@ void CVarSetInteger(const char *name, int value) { intCvars[name] = value; }
 void CVarSetString(const char *name, const char *value) {
   stringCvars[name] = value;
 }
+void CVarClear(const char *name) {
+  intCvars.erase(name);
+  stringCvars.erase(name);
+}
+const char *CVarGetString(const char *name, const char *fallback) {
+  const auto value = stringCvars.find(name);
+  return value == stringCvars.end() ? fallback : value->second.c_str();
+}
+int exclusionWarnings = 0;
+#define SPDLOG_WARN(...) (++exclusionWarnings)
+/* CLEAR_NUMERIC_EXCLUSIONS */
 /* SETTINGS_RESTORE */
 
 struct SaveManager {
@@ -239,11 +258,26 @@ int main() {
 
   // Replay an old consolidated snapshot after a locally enabled menu option.
   const auto *key = CVAR_RANDOMIZER_SETTING("MapsCompassesGiveInformation");
+  Settings::GetInstance()->mOptions[RSK_MAPS_COMPASSES_GIVE_INFORMATION].cvarName = key;
+  Settings::GetInstance()->mOptions[RSK_NO_LOGIC].cvarName = "gRandoSettings.NoLogic";
   intCvars[key] = 1;
+  intCvars["gRandoSettings.NoLogic"] = 7;
+  intCvars["unrelated.setting"] = 9;
   SOH_RestoreRandoSettings("{}");
   assert(intCvars.at(key) == 0);
+  assert(!intCvars.contains("gRandoSettings.NoLogic"));
+  assert(intCvars.at("unrelated.setting") == 9);
   SOH_RestoreRandoSettings(nlohmann::json{{key, 1}}.dump().c_str());
   assert(intCvars.at(key) == 1);
+  SOH_RestoreRandoSettings(nlohmann::json{{"gRandoSettings.LogicRules", 2},
+      {CVAR_RANDOMIZER_SETTING("ExcludedLocations"), "42"}}.dump().c_str());
+  assert(intCvars.at("gRandoSettings.NoLogic") == 2);
+  assert(stringCvars.at(CVAR_RANDOMIZER_SETTING("ExcludedLocations")).empty());
+  assert(exclusionWarnings == 1);
+  SOH_RestoreRandoSettings(nlohmann::json{{CVAR_RANDOMIZER_SETTING("ExcludedLocations"),
+      "Kokiri Sword Chest"}}.dump().c_str());
+  assert(stringCvars.at(CVAR_RANDOMIZER_SETTING("ExcludedLocations")) == "Kokiri Sword Chest");
+  assert(exclusionWarnings == 1);
   Settings settings;
   nlohmann::json spoiler{{"seed", "fixture"}, {"finalSeed", 123}};
   ctx->GetOption(RSK_MAPS_COMPASSES_GIVE_INFORMATION).Set(1);

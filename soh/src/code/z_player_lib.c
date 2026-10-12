@@ -52,8 +52,7 @@ extern u8 FourSword_IsEquipped(void);
 
 #include <stdlib.h>
 #include <string.h>
-
-// SW97: Forward declaration - defined in sw97_player_hooks.c (compiled in z_player.c TU)
+#include <libultraship/bridge/consolevariablebridge.h>
 
 typedef struct {
     /* 0x00 */ u8 flag;
@@ -847,8 +846,8 @@ void Player_SetAutoLockOnActor(PlayState* play, Actor* actor) {
     this->focusActor = actor;
     this->autoLockOnActor = actor;
     this->stateFlags1 |= PLAYER_STATE1_FRIENDLY_ACTOR_FOCUS;
-    Camera_SetParam(Play_GetCamera(play, 0), 8, actor);
-    Camera_ChangeMode(Play_GetCamera(play, 0), 2);
+    Camera_SetParam(Play_GetCamera(play, CAM_ID_MAIN), 8, actor);
+    Camera_RequestMode(Play_GetCamera(play, CAM_ID_MAIN), 2);
 }
 
 s32 func_8008EF30(PlayState* play) {
@@ -899,7 +898,7 @@ s32 Player_GetStrength(void) {
         return PLAYER_STR_GOLD_G;
     }
 
-    if (CVarGetInteger(CVAR_CHEAT("TimelessEquipment"), 0) || LINK_IS_ADULT) {
+    if (GameInteractor_Should(VB_PLAYER_MEETS_AGE_REQ, LINK_IS_ADULT, LINK_AGE_ADULT)) {
         return strengthUpgrade;
     } else if (strengthUpgrade != 0) {
         return PLAYER_STR_BRACELET;
@@ -2495,7 +2494,7 @@ void Player_FDMeleeWeaponPostLimb(PlayState* play, Player* this) {
 
     D_80126080.x = 5500.0f; // FD sword reach (from MM z_player_lib.c)
     // FD always uses BGS trail type (Player_GetMeleeWeaponHeld returns 3 for FD)
-    EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex), TRAIL_TYPE_BIGGORON_SWORD);
+    EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex), TRAIL_TYPE_BIGGORON_SWORD);
     func_80090A28(this, tipPos);
     func_800906D4(play, this, tipPos);
 }
@@ -2646,7 +2645,7 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
                 D_80126080.x = this->unk_85C * 5000.0f;
                 func_80090A28(this, sp124);
                 if (this->meleeWeaponState != 0) {
-                    EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex), TRAIL_TYPE_STICK);
+                    EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex), TRAIL_TYPE_STICK);
                     func_800906D4(play, this, sp124);
                 } else {
                     Math_Vec3f_Copy(&this->meleeWeaponInfo[0].tip, &sp124[0]);
@@ -2682,8 +2681,8 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
                 Vec3f spE4_trident[3];
                 D_80126080.x = ExtEquip_TridentTrailLength();
                 if (this->meleeWeaponState != 0) {
-                    EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
-                                           sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
+                    EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
+                                               sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
                     func_80090A28(this, spE4_trident);
                     func_800906D4(play, this, spE4_trident);
                 } else {
@@ -2699,8 +2698,8 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
                 Vec3f spE4_byrnaCane[3];
                 D_80126080.x = ExtEquip_ByrnaTrailLength();
                 if (this->meleeWeaponState != 0) {
-                    EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
-                                           sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
+                    EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
+                                               sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
                     func_80090A28(this, spE4_byrnaCane);
                     func_800906D4(play, this, spE4_byrnaCane);
                 } else {
@@ -2718,8 +2717,8 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
                     D_80126080.x = 8000.0f; // 2x normal hammer reach (~4000)
                 }
 
-                EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
-                                       sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
+                EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
+                                           sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
                 func_80090A28(this, spE4_byrna);
                 func_800906D4(play, this, spE4_byrna);
             }
@@ -2753,14 +2752,14 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
                 // Fierce Deity sword reach: 5500 units (from MM z_player_lib.c)
                 // Player_GetMeleeWeaponHeld returns BGS index (3) for FD
                 D_80126080.x = 5500.0f;
-                EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
-                                       sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
+                EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
+                                           sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
             } else if (Player_HoldsBrokenKnife(this)) {
                 D_80126080.x = 1500.0f;
             } else {
                 D_80126080.x = sMeleeWeaponLengths[Player_GetMeleeWeaponHeld(this)];
-                EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
-                                       sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
+                EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
+                                           sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
             }
 
             func_80090A28(this, spE4);

@@ -323,6 +323,12 @@ static const ALIGN_ASSET(2) char gBombchuBagBodyDL[] = dgBombchuBagBodyDL;
 #define dgBombchuBagMaskDL "__OTR__objects/object_bombchubag/gBombchuBagMaskDL"
 static const ALIGN_ASSET(2) char gBombchuBagMaskDL[] = dgBombchuBagMaskDL;
 
+#define dgGiNutBagDL "__OTR__objects/object_nutbag/gGiNutBagDL"
+static const ALIGN_ASSET(2) char gGiNutBagDL[] = dgGiNutBagDL;
+
+#define dgGiStickBagDL "__OTR__objects/object_stickbag/gGiStickBagDL"
+static const ALIGN_ASSET(2) char gGiStickBagDL[] = dgGiStickBagDL;
+
 #define dgLargeMajorCrateDL "__OTR__objects/object_kibako2/gLargeMajorCrateDL"
 static const ALIGN_ASSET(2) char gLargeMajorCrateDL[] = dgLargeMajorCrateDL;
 
@@ -465,6 +471,7 @@ static const ALIGN_ASSET(2) char gKeyringIconGanonsCastleDL[] = dgKeyringIconGan
 #define dgKeyringIconTreasureChestGameDL "__OTR__objects/object_keyring/gKeyringIconTreasureChestGameDL"
 static const ALIGN_ASSET(2) char gKeyringIconTreasureChestGameDL[] = dgKeyringIconTreasureChestGameDL;
 
+// Compatibility resources retained for the NEI model/catalog headers.
 #define dgKeyringKeysForestTempleDL "__OTR__objects/object_keyring/gKeyringKeysForestTempleDL"
 static const ALIGN_ASSET(2) char gKeyringKeysForestTempleDL[] = dgKeyringKeysForestTempleDL;
 
@@ -519,6 +526,15 @@ static const ALIGN_ASSET(2) char gKeyringKeysShadowTempleMQDL[] = dgKeyringKeysS
 #define dgKeyringKeysGanonsCastleMQDL "__OTR__objects/object_keyring/gKeyringKeysGanonsCastleMQDL"
 static const ALIGN_ASSET(2) char gKeyringKeysGanonsCastleMQDL[] = dgKeyringKeysGanonsCastleMQDL;
 
+#define dgFileSelMQButtonTex "__OTR__textures/title_static/gFileSelMQButtonTex"
+static const ALIGN_ASSET(2) char gFileSelMQButtonTex[] = dgFileSelMQButtonTex;
+
+#define dgFileSelRANDButtonTex "__OTR__textures/title_static/gFileSelRANDButtonTex"
+static const ALIGN_ASSET(2) char gFileSelRANDButtonTex[] = dgFileSelRANDButtonTex;
+
+#define dgKeyringKeyDL "__OTR__objects/object_keyring/gKeyringKeyDL"
+static const ALIGN_ASSET(2) char gKeyringKeyDL[] = dgKeyringKeyDL;
+
 #define dgHouseKeyDL "__OTR__objects/object_housekey/gHouseKeyDL"
 static const ALIGN_ASSET(2) char gHouseKeyDL[] = dgHouseKeyDL;
 
@@ -560,9 +576,6 @@ static const ALIGN_ASSET(2) char gSunIconTex[] = dgSunIcon;
 #define dgNaviIcon "__OTR__textures/parameter_static/gNavi"
 static const ALIGN_ASSET(2) char gNaviIconTex[] = dgNaviIcon;
 
-#define dgFileSelMQButtonTex "__OTR__textures/title_static/gFileSelMQButtonTex"
-static const ALIGN_ASSET(2) char gFileSelMQButtonTex[] = dgFileSelMQButtonTex;
-
 #define dgFileSelPleaseChooseAQuestENGTex "__OTR__textures/title_static/gFileSelPleaseChooseAQuestENGTex"
 static const ALIGN_ASSET(2) char gFileSelPleaseChooseAQuestENGTex[] = dgFileSelPleaseChooseAQuestENGTex;
 
@@ -586,9 +599,6 @@ static const ALIGN_ASSET(2) char gFileSelBossRushSettingsGERText[] = dgFileSelBo
 
 #define dgFileSelBossRushSettingsJPNTex "__OTR__textures/title_static/gFileSelBossRushSettingsJPNTex"
 static const ALIGN_ASSET(2) char gFileSelBossRushSettingsJPNText[] = dgFileSelBossRushSettingsJPNTex;
-
-#define dgFileSelRANDButtonTex "__OTR__textures/title_static/gFileSelRANDButtonTex"
-static const ALIGN_ASSET(2) char gFileSelRANDButtonTex[] = dgFileSelRANDButtonTex;
 
 #define dgFileSelLangEnglishENGTex "__OTR__textures/title_static/gFileSelLangEnglishENGTex"
 static const ALIGN_ASSET(2) char gFileSelLangEnglishENGTex[] = dgFileSelLangEnglishENGTex;

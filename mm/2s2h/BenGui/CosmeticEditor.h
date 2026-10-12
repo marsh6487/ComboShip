@@ -6,6 +6,7 @@
 #include <map>
 #include <string>
 #include <imgui.h>
+#include <ship/window/gui/GuiWindow.h>
 
 class CosmeticEditorWindow : public Ship::GuiWindow {
   public:
@@ -45,6 +46,20 @@ Color_RGBA8 CosmeticEditor_GetChangedColor(u8 r, u8 g, u8 b, u8 a, const char* c
 // the frame's display list is already built, and an unbound segment 0x07 crashes Fast3D.
 void PlayerTunic_BindLocalColor(struct PlayState* play);
 void PlayerTunic_BindColor(struct PlayState* play, u8 r, u8 g, u8 b);
+const char* CosmeticEditor_GetDungeonCosmeticId(s32 dungeon);
+
+Color_RGBA8 CosmeticEditor_GetPauseCursorGlow(s16 r, s16 g, s16 b, const s16* targetA, const s16* targetB);
+
+void CosmeticEditor_SetStrayFairyMaterial(s32 area);
+const char* CosmeticEditor_MatAnimPrimId(s32 segment);
+const char* CosmeticEditor_MatAnimEnvId(void);
+void CosmeticEditor_ClearMatAnimCosmetics(void);
+
+void CosmeticEditor_ApplySillyMoonScale(void);
+void CosmeticEditor_ApplySillyLimbScale(const char* cvar, Vec3f* jointPos);
+void CosmeticEditor_SplitHeldItem(Gfx** dList, const char* cvar);
+void CosmeticEditor_DrawSplitHeldItem(struct PlayState* play);
+void CosmeticEditor_DrawBackShield(struct PlayState* play, Gfx* dList);
 
 typedef enum {
     COSMETIC_COLOR_MODE_DEFAULT,
@@ -64,6 +79,9 @@ typedef enum {
     COSMETICS_GROUP_MENUS,
     COSMETICS_GROUP_ITEMS,
     COSMETICS_GROUP_EPONA,
+    COSMETICS_GROUP_COLLECTIBLES,
+    COSMETICS_GROUP_DUNGEONS,
+    COSMETICS_GROUP_WORLD,
     COSMETICS_GROUP_MAX,
 } CosmeticGroup;
 
@@ -74,6 +92,7 @@ typedef enum {
 #define CVAR_COSMETIC_RAINBOW(id) CVAR_COSMETIC(id ".Rainbow")
 #define CVAR_COSMETIC_LOCKED(id) CVAR_COSMETIC(id ".Locked")
 #define CVAR_COSMETIC_CHANGED(id) CVAR_COSMETIC(id ".Changed")
+#define CVAR_SILLY_FLAT_SHADING CVAR_COSMETIC("Silly.FlatShading")
 
 #ifdef __cplusplus
 
@@ -158,6 +177,7 @@ bool IsCustomHumanModelActive();
 bool IsCustomDekuModelActive();
 bool IsCustomGoronModelActive();
 bool IsCustomZoraModelActive();
+bool IsCustomFierceDeityModelActive();
 bool IsCustomKafeiModelActive();
 
 // Hands the tunic over to the per-player tint (Harpoon rooms) and back. While handed over, the

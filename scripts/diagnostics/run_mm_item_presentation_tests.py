@@ -22,6 +22,8 @@ src = (ROOT / 'combo/menu/ComboItemDrawOOT.h').read_text()
 song_body = function(src, 'OOT_FillSongDrawInfo')
 body = function(src, 'OOT_FillItemDrawInfo')
 preamble = r'''
+#include <atomic>
+#define SPDLOG_WARN(...) ((void)0)
 #include <cassert>
 #include <cstdint>
 #include <memory>
@@ -165,6 +167,7 @@ with tempfile.TemporaryDirectory(prefix='mm-presentation-') as td:
 message = (ROOT / 'mm/src/code/z_message.c').read_text()
 consumer = (ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text()
 fixture = (ROOT / 'tests/mm_presentation/icon_bridge_test.cpp').read_text()
+fixture = "#include <atomic>\n#define SPDLOG_WARN(...) ((void)0)\n" + fixture
 bindings = re.findall(r'itemTable\[(?:RG_BOTTLE_WITH_[A-Z_]+|RG_MAGIC_BEAN_PACK)\]\.CustomIcon\([^;]+;',
                       (ROOT / 'soh/soh/Enhancements/randomizer/item_list.cpp').read_text())
 fixture = fixture.replace('/* BOTTLE_ICON_BINDINGS */', '\n'.join(bindings))

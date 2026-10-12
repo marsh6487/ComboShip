@@ -95,6 +95,11 @@ struct ResourceInitData { std::string Path; std::shared_ptr<Archive> Parent; };
                  "Interpreter::NormalizeVector", "Interpreter::TransposedMatrixMul", "Interpreter::CalculateNormalDir",
                  "gfx_set_prim_depth_handler_rdp", "gfx_set_key_r_handler_rdp", "gfx_set_key_gb_handler_rdp",
                  "gfx_set_grayscale_handler_custom"]
+        if "gfx_scroll_texture_handler_custom(" in source:
+            for helper in ("GetRepeatPeriodFromTile", "WrapScrollCoordinate", "gfx_scroll_texture_handler_custom"):
+                names.insert(names.index("Interpreter::GfxSpTri1"), helper)
+        if "IsPyramidLike(" in source:
+            names.insert(names.index("Interpreter::GfxSpTri1"), "IsPyramidLike")
         if "Interpreter::PrepareTriangleState(" in source:
             names.insert(names.index("Interpreter::GfxSpTri1"), "Interpreter::PrepareTriangleState")
         if "Interpreter::GfxSpTri1Impl(" in source:

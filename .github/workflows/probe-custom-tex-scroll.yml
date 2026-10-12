@@ -1,14 +1,13 @@
 name: Probe Custom Texture Scroll (Windows)
 
-# Probe-only compile gate for the libultraship custom texture scrolling experiment.
-# The current ComboShip NEI base fails its pre-build clang-format gate before Windows compilation,
-# so this workflow intentionally leaves the existing gate untouched and tests only whether the
-# exact e3cd6591 patch configures and compiles in the real ComboShip Windows environment.
+# Compile the integrated custom texture scrolling feature in the real Windows
+# environment. CMake verifies the complete rebased patch before configuring LUS.
 
 on:
   pull_request:
     paths:
       - 'CMake/**'
+      - 'libultraship/**'
       - 'patches/**'
       - '.github/workflows/probe-custom-tex-scroll.yml'
 
@@ -35,7 +34,7 @@ jobs:
           key: probe-custom-scroll-x64-${{ hashFiles('CMakeLists.txt', 'CMake/**', 'libultraship/cmake/**', 'patches/libultraship-custom-tex-scroll-e3cd6591.patch') }}
           restore-keys: probe-custom-scroll-x64-
 
-      - name: Configure with custom scroll patch
+      - name: Configure with verified custom scroll feature
         env:
           VCPKG_ROOT: ${{ github.workspace }}/build/x64/vcpkg
         run: cmake -B build/x64 -S . -G "Visual Studio 17 2022" -A x64

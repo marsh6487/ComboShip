@@ -27,7 +27,8 @@ def main():
     audio = (ROOT / "mm/2s2h/Enhancements/Audio/AudioEditor.cpp").read_text()
     play = (ROOT / "mm/src/code/z_play.c").read_text()
     constants = re.findall(r'^const char\* kCosmetic\w+Cvar = .*?;', cosmetics, re.M)
-    bodies = constants + [function(cosmetics, "CosmeticEditorWindow::InitElement")]
+    bodies = constants + [function(cosmetics, "CosmeticEditorApplyLinkSize"),
+                          function(cosmetics, "CosmeticEditorWindow::InitElement")]
     if "AudioEditor_RandomizeOnSceneLoad()" in audio:
         bodies.append(function(audio, "AudioEditor_RandomizeOnSceneLoad"))
     # Execute the actual scene-audio initialization statements in their actual

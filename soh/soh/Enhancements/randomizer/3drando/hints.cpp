@@ -27,7 +27,8 @@ static std::unordered_map<std::string, std::string> sComboItemAreas;
 void Combo_SetHintItemAreas(const std::string& json) {
     sComboItemAreas.clear();
     try {
-        for (auto& [name, area] : nlohmann::json::parse(json).items()) {
+        auto parsed = nlohmann::json::parse(json);
+        for (auto& [name, area] : parsed.items()) {
             if (area.is_string()) {
                 sComboItemAreas.emplace(name, area.get<std::string>());
             }
@@ -350,7 +351,7 @@ struct ConditionalAlwaysHint {
 std::vector<ConditionalAlwaysHint> conditionalAlwaysHints = {
     // clang-format off
     { RC_MARKET_10_BIG_POES,            RSK_BIG_POES_HINT,       []() { return Rando::Context::GetInstance()->GetOption(RSK_BIG_POE_COUNT).Get() > 3; } },
-    { RC_DEKU_THEATER_MASK_OF_TRUTH,    RSK_MASK_SHOP_HINT,      []() { return !Rando::Context::GetInstance()->GetOption(RSK_MASK_QUEST); } },
+    { RC_DEKU_THEATER_MASK_OF_TRUTH,    RSK_MASK_SHOP_HINT,      []() { return !Rando::Context::GetInstance()->GetOption(RSK_SHUFFLE_MASKS); } },
     { RC_SONG_FROM_OCARINA_OF_TIME,     RSK_OOT_HINT,            []() { return StonesRequiredBySettings() < 2; } },
     { RC_HF_OCARINA_OF_TIME_ITEM,       RSK_OOT_HINT,            []() { return StonesRequiredBySettings() < 2; } },
     { RC_SHEIK_IN_KAKARIKO,             RSK_NONE,                []() { return MedallionsRequiredBySettings() < 5; } },
@@ -887,7 +888,7 @@ void CreateStaticHintFromData(RandomizerHint hint, StaticHintInfo staticData) {
                     // something went wrong elsewhere.
                     if (foreign.empty()) {
                         SPDLOG_DEBUG("Attempted to hint location with no areas: ");
-                        SPDLOG_DEBUG(Rando::StaticData::GetLocation(loc)->GetName());
+                        SPDLOG_DEBUG("{}", Rando::StaticData::GetLocation(loc)->GetName());
                     }
                     // assert(false);
                     areas.push_back(RA_NONE);

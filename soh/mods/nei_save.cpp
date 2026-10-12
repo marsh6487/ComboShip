@@ -7,6 +7,7 @@
 #include <filesystem> // Save directory path
 
 #include "nei_save.h"
+#include "z64item.h"              // Equipment bits used by the const-reference save callback.
 #include "items/custom_bottles.h" // Bottle_WheelResetTracking (wheel session trackers)
 #include "soh/SaveManager.h"
 #include "soh/ShipInit.hpp"
@@ -269,8 +270,8 @@ void NeiSave_Init(bool isDebug) {
     Bottle_WheelResetTracking();
 }
 
-void NeiSave_Save(SaveContext* saveContext, int sectionID, bool fullSave) {
-    if (saveContext->inventory.equipment & (1U << EQUIP_INV_SWORD_MASTER)) {
+void NeiSave_Save(const SaveContext& saveContext, int sectionID, bool fullSave) {
+    if (saveContext.inventory.equipment & (1U << EQUIP_INV_SWORD_MASTER)) {
         gNeiSave.timePedestalNoMasterSwordRepair = 0;
     }
     SaveManager::Instance->SaveData("timePedestalNoMasterSwordRepair", gNeiSave.timePedestalNoMasterSwordRepair);

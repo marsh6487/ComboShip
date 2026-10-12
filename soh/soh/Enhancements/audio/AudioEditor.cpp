@@ -1,23 +1,26 @@
-#include "AudioEditor.h"
-#include "sequence.h"
-
 #include <map>
 #include <set>
 #include <string>
-#include <functions.h>
+
+#include <ship/Context.h>
+
+#include "AudioEditor.h"
 #include "soh/ShipUtils.h"
 #include "soh/OTRGlobals.h"
 #include "soh/cvar_prefixes.h"
-#include <ship/utils/StringHelper.h>
 #include "soh/SohGui/SohMenu.h"
 #include "soh/SohGui/SohGui.hpp"
 #include "AudioCollection.h"
+#include "OotrsArchive.h"
 #include "soh/Enhancements/enhancementTypes.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include "../../../src/code/concurrent_weather_audio.h"
+#include "soh/SohGui/UIWidgets.hpp"
 
 extern "C" {
+#include "sequence.h"
+#include <functions.h>
 #include "z64save.h"
 extern SaveContext gSaveContext;
 }
@@ -301,7 +304,7 @@ void DrawPreviewButton(uint16_t sequenceId, std::string sfxKey, SeqType sequence
                 CVarSetInteger(CVAR_AUDIO("Playing"), 0);
             } else {
                 if (sequenceType == SEQ_SFX || sequenceType == SEQ_VOICE) {
-                    Audio_PlaySoundGeneral(sequenceId, &pos, 4, &freqScale, &freqScale, &reverbAdd);
+                    Audio_PlaySfxGeneral(sequenceId, &pos, 4, &freqScale, &freqScale, &reverbAdd);
                 } else if (sequenceType == SEQ_INSTRUMENT) {
                     AudioOcarina_SetInstrument(sequenceId - INSTRUMENT_OFFSET);
                     AudioOcarina_SetPlaybackSong(9, 1);
@@ -637,6 +640,22 @@ void AudioEditor::DrawElement() {
                                                    .Tooltip("Unlocks all music and sound effects across tab groups"))) {
         AudioEditor_UnlockAll();
     }
+
+    const std::vector<std::string>& skippedMusic = SOH::GetOotrsSkippedForCustomBank();
+    if (!skippedMusic.empty()) {
+        UIWidgets::Separator();
+        ImGui::TextColored(UIWidgets::ColorValues.at(UIWidgets::Colors::Yellow),
+                           "%zu custom music file(s) were skipped: custom soundbanks are not supported yet.",
+                           skippedMusic.size());
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            for (const std::string& file : skippedMusic) {
+                ImGui::BulletText("%s", file.c_str());
+            }
+            ImGui::EndTooltip();
+        }
+    }
+
     UIWidgets::Separator();
 
     UIWidgets::PushStyleTabs(THEME_COLOR);
@@ -650,24 +669,16 @@ void AudioEditor::DrawElement() {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             if (ImGui::BeginChild("SfxOptions", ImVec2(0, -8))) {
-                SohGui::mSohMenu->MenuDrawItem(lowHpAlarm, static_cast<uint32_t>(ImGui::GetContentRegionAvail().x),
-                                               THEME_COLOR);
-                SohGui::mSohMenu->MenuDrawItem(naviCall, static_cast<uint32_t>(ImGui::GetContentRegionAvail().x),
-                                               THEME_COLOR);
-                SohGui::mSohMenu->MenuDrawItem(enemyProx, static_cast<uint32_t>(ImGui::GetContentRegionAvail().x),
-                                               THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(lowHpAlarm, THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(naviCall, THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(enemyProx, THEME_COLOR);
                 if (!CVarGetInteger(CVAR_AUDIO("EnemyBGMDisable"), 0)) {
-                    SohGui::mSohMenu->MenuDrawItem(leeverProx, static_cast<uint32_t>(ImGui::GetContentRegionAvail().x),
-                                                   THEME_COLOR);
+                    SohGui::mSohMenu->MenuDrawItem(leeverProx, THEME_COLOR);
                 }
-                SohGui::mSohMenu->MenuDrawItem(leadingMusic, static_cast<uint32_t>(ImGui::GetContentRegionAvail().x),
-                                               THEME_COLOR);
-                SohGui::mSohMenu->MenuDrawItem(displaySeqName, static_cast<uint32_t>(ImGui::GetContentRegionAvail().x),
-                                               THEME_COLOR);
-                SohGui::mSohMenu->MenuDrawItem(ovlDuration, static_cast<uint32_t>(ImGui::GetContentRegionAvail().x),
-                                               THEME_COLOR);
-                SohGui::mSohMenu->MenuDrawItem(voicePitch, static_cast<uint32_t>(ImGui::GetContentRegionAvail().x),
-                                               THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(leadingMusic, THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(displaySeqName, THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(ovlDuration, THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(voicePitch, THEME_COLOR);
                 ImGui::SameLine();
                 ImGui::SetCursorPosY(ImGui::GetCursorPos().y + 40.f);
                 if (UIWidgets::Button("Reset##linkVoiceFreqMultiplier",
@@ -675,35 +686,22 @@ void AudioEditor::DrawElement() {
                     CVarSetFloat(CVAR_LINK_VOICE_FREQ_MULTIPLIER, 1.0f);
                 }
                 ImGui::SeparatorText("Weather");
-                SohGui::mSohMenu->MenuDrawItem(hyruleFieldNightMusic,
-                                               static_cast<uint32_t>(ImGui::GetContentRegionAvail().x), THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(hyruleFieldNightMusic, THEME_COLOR);
                 DrawHyruleFieldNightTrack();
-                SohGui::mSohMenu->MenuDrawItem(globalOutdoorRain,
-                                               static_cast<uint32_t>(ImGui::GetContentRegionAvail().x), THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(globalOutdoorRain, THEME_COLOR);
                 if (CVarGetInteger(CVAR_AUDIO("GlobalOutdoorRain"), 0)) {
-                    SohGui::mSohMenu->MenuDrawItem(
-                        globalOutdoorRainMode, static_cast<uint32_t>(ImGui::GetContentRegionAvail().x), THEME_COLOR);
-                    SohGui::mSohMenu->MenuDrawItem(
-                        globalOutdoorRainColor, static_cast<uint32_t>(ImGui::GetContentRegionAvail().x), THEME_COLOR);
+                    SohGui::mSohMenu->MenuDrawItem(globalOutdoorRainMode, THEME_COLOR);
+                    SohGui::mSohMenu->MenuDrawItem(globalOutdoorRainColor, THEME_COLOR);
                 }
-                SohGui::mSohMenu->MenuDrawItem(globalOutdoorRainOvercast,
-                                               static_cast<uint32_t>(ImGui::GetContentRegionAvail().x), THEME_COLOR);
-                SohGui::mSohMenu->MenuDrawItem(proximityWeatherThunder,
-                                               static_cast<uint32_t>(ImGui::GetContentRegionAvail().x), THEME_COLOR);
-                SohGui::mSohMenu->MenuDrawItem(proximityWeatherThunderStyle,
-                                               static_cast<uint32_t>(ImGui::GetContentRegionAvail().x), THEME_COLOR);
-                SohGui::mSohMenu->MenuDrawItem(proximityWeatherRainVolume,
-                                               static_cast<uint32_t>(ImGui::GetContentRegionAvail().x), THEME_COLOR);
-                SohGui::mSohMenu->MenuDrawItem(proximityWeatherThunderVolume,
-                                               static_cast<uint32_t>(ImGui::GetContentRegionAvail().x), THEME_COLOR);
-                SohGui::mSohMenu->MenuDrawItem(proximityWeatherThunderFrequency,
-                                               static_cast<uint32_t>(ImGui::GetContentRegionAvail().x), THEME_COLOR);
-                SohGui::mSohMenu->MenuDrawItem(weatherAudioDiagnostics,
-                                               static_cast<uint32_t>(ImGui::GetContentRegionAvail().x), THEME_COLOR);
-                SohGui::mSohMenu->MenuDrawItem(randomAudioGenModes,
-                                               static_cast<uint32_t>(ImGui::GetContentRegionAvail().x), THEME_COLOR);
-                SohGui::mSohMenu->MenuDrawItem(lowerOctaves, static_cast<uint32_t>(ImGui::GetContentRegionAvail().x),
-                                               THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(globalOutdoorRainOvercast, THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(proximityWeatherThunder, THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(proximityWeatherThunderStyle, THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(proximityWeatherRainVolume, THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(proximityWeatherThunderVolume, THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(proximityWeatherThunderFrequency, THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(weatherAudioDiagnostics, THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(randomAudioGenModes, THEME_COLOR);
+                SohGui::mSohMenu->MenuDrawItem(lowerOctaves, THEME_COLOR);
             }
             ImGui::EndChild();
             ImGui::EndTable();

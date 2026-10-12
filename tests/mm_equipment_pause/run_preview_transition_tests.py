@@ -259,6 +259,15 @@ static void RecordPreviewRectangle(Gfx* gfx,int x0,int y0,int,int,int x1,int y1,
 #define GRAPH_ALLOC(ctx,size) (previewStorage)
 ''' + code[position:]
     code = code.replace("// GPU_PRODUCTION_BOUNDARY", gpu_fixture())
+    # The external cosmetic draw receiver now wraps the primitive GPU command.
+    # Preserve the exact native macro/declaration while recording its RGBA at
+    # the same boundary as the fixture's other primitive-color submissions.
+    cosmetic = (ROOT / "mm/2s2h/BenGui/CosmeticEditor.h").read_text()
+    cosmetic_id = re.search(r"^#define COSMETIC_ID[^\n]*", cosmetic, re.M).group(0)
+    declaration = re.search(r"void gDPSetPrimColorOverride\([^;]+;", cosmetic, re.S).group(0)
+    receiver = declaration[:-1] + " { (void)m; (void)l; (void)cosmeticId; gDPSetPrimColor(pkt,m,l,r,g,b,a); }\n"
+    position = code.index("void KaleidoScope_DrawEquipment(")
+    code = code[:position] + cosmetic_id + "\n" + receiver + code[position:]
     for prefix in ("EQUIP_DOLL_",):
         code += ownership.selectors.defines(pause, prefix)
     code += ownership.production_function(pause, "KaleidoEquip_DrawDollImage") + "\n"

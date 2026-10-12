@@ -12,6 +12,7 @@
 
 SaveContext gSaveContext;
 static int matchSize, matchTexture, requireAgony;
+static bool shuffleChestMinigame;
 static bool skeletonKey, missingCustomModels;
 static const char* missingCustomPart;
 static int lightSpawns, fanfares;
@@ -29,13 +30,17 @@ int32_t CVarGetInteger(const char* name, int32_t fallback) {
 s32 Flags_GetRandomizerInf(RandomizerInf flag) {
     return flag == RAND_INF_HAS_SKELETON_KEY && skeletonKey;
 }
+u8 Randomizer_GetSettingValue(RandomizerSettingKey key) {
+    REQUIRE(key == RSK_SHUFFLE_CHEST_MINIGAME);
+    return shuffleChestMinigame;
+}
 Gfx* ResourceMgr_LoadGfxByName(const char* name) {
     if ((missingCustomModels && strstr(name, "gChest")) || (missingCustomPart && strstr(name, missingCustomPart)))
         return NULL;
     return (Gfx*)name;
 }
 bool GameInteractor_Should(GIVanillaBehavior flag, uint32_t result, ...) {
-    return false;
+    return result;
 }
 void EnBox_Open(EnBox* chest, PlayState* play) {
 }
@@ -247,6 +252,18 @@ int main(void) {
     chest.dyna.actor.room = 6;
     ExpectSize(&chest, play, 0.01f, 40);
     puts("PASS: Treasure Chest Game guessing rooms stay concealed; final reward resizes");
+
+    // Shuffled checks expose their contents, including combo randomizer saves.
+    shuffleChestMinigame = true;
+    for (int quest = 0; quest < 3; ++quest) {
+        gSaveContext.ship.quest.id = quest == 0 ? QUEST_NORMAL : quest == 1 ? QUEST_RANDOMIZER : QUEST_OOTXMM;
+        for (int room = 0; room < 6; ++room) {
+            chest.dyna.actor.room = room;
+            ExpectSize(&chest, play, quest == 0 ? 0.005f : 0.01f, quest == 0 ? 20 : 40);
+        }
+    }
+    shuffleChestMinigame = false;
+    puts("PASS: shuffled randomizer/combo guessing rooms resize; vanilla contents remain concealed");
 
     // Native placement corrections must toggle reversibly, never accumulate,
     // and must not pull a placement moved off the affected native coordinates back.

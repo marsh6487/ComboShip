@@ -11,6 +11,7 @@
 #include "soh/Enhancements/custom-message/CustomMessageManager.h"
 #include "soh/ShipInit.hpp"
 #include "ComboPauseTutorialText.h"
+#include "expansions/sw97/sw97_config.h"
 
 extern "C" {
 #include "z64.h"
@@ -18,7 +19,6 @@ extern "C" {
 #include "macros.h"
 #include "variables.h"
 #include "mods/extended_equipment.h"
-#include "expansions/sw97/sw97_config.h"
 #include "mods/extended_inventory.h" // Sw97_EffectiveElement / Wand_GetMode (Skijer's NEI)
 #include "mods/items/logic/weapon_upgrades.h"
 u8 Cane_GetType(void);

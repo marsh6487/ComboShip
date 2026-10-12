@@ -27,7 +27,7 @@ def extract(source, name):
 def main():
     source = (ROOT / "soh/soh/SaveManager.cpp").read_text()
     names = (
-        "ResetYoungHorseSaveData", "SaveManager::InitFile", "SaveManager::InitFileImpl",
+        "ResetYoungHorseSaveData", "SetDebugRandoAbilities", "InitDebugSave", "SaveManager::InitFile", "SaveManager::InitFileImpl",
         "SaveManager::InitFileNormal", "SaveManager::InitFileDebug", "SaveManager::InitFileMaxed",
         "SaveManager::LoadBaseVersion1", "SaveManager::LoadBaseVersion2",
         "SaveManager::LoadBaseVersion3", "SaveManager::LoadBaseVersion4", "SaveManager::SaveBase",

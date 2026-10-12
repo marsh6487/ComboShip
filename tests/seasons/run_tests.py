@@ -14,6 +14,11 @@ def run(name,prefix,parts,checks):
   parts.insert(0, body('mm/mods/extended_inventory.c', 'Seasons_HasRod'))
   prefix += '\nu16 Nei_GetOwnedItem(u8 slot){return Nei_Save()->ownedItems[slot-24];}\n'
   prefix += 'u8 Seasons_RandoMode(){return NEI_SEASONS_INDIVIDUAL;}\nvoid Seasons_UpdateGates(){}\n'
+ if any('MMSeasonParticles_' in part for part in parts):
+  # Extracted native snow/leaf bodies now share the real editor particle policy.
+  prefix = '#include "mods/items/helpers/season_particles.h"\n' + prefix
+  if not re.search(r'\bCVarGetInteger\([^;]*\)\s*\{',prefix):
+   prefix += '\nextern "C" int32_t CVarGetInteger(const char*,int32_t fallback){return fallback;}\n'
  with tempfile.TemporaryDirectory(prefix='seasons-') as td:
   p=Path(td)/'test.cpp'
   p.write_text('#include "mods/extended_inventory.h"\n#include "mods/ext_buttons/ext_buttons.h"\n#include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"\n#include <cassert>\n#include <cstring>\n#include <iostream>\n'+prefix+'\n'+'\n'.join(parts)+'\nint main(){'+checks+'\nstd::cout<<"PASS '+name+'\\n";}')
@@ -27,7 +32,7 @@ p='mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_item.c'
 # This first assertion reproduces the reported rod->mushroom conversion using the real equip body.
 run('dpad',r'''
 SaveContext gSaveContext{};
-int32_t CVarGetInteger(const char*,int32_t){return 1;}
+extern "C" int32_t CVarGetInteger(const char*,int32_t){return 1;}
 void Interface_LoadItemIcon(PlayState*,u8){}
 void Interface_LoadItemIconImpl(PlayState*,u8){}
 void Interface_Dpad_LoadItemIcon(PlayState*,u8){}
@@ -128,7 +133,7 @@ u8 ItemInput_IsBlocked(Player*,PlayState*){return 0;}
 u8 ItemInput_CheckDamage(Player*,s8*){return 0;}
 u8 MasterCycle_IsRiding(){return 0;}
 u8 Pacci_UltrahandModeActive(){return 0;}
-int32_t CVarGetInteger(const char*,int32_t){return 1;}
+extern "C" int32_t CVarGetInteger(const char*,int32_t){return 1;}
 void Interface_LoadItemIconImpl(PlayState*,u8){}
 void Interface_Dpad_LoadItemIconImpl(PlayState*,u8){}
 int menus=0,seasonStyles=0,seasonFlashes=0;typedef struct {const char* iconPath;u8 iconSize;u8 enabled;} BoxMenuEntry;
@@ -183,7 +188,7 @@ assert(gSaveContext.save.shipSaveInfo.dpadEquips.extItems[0][EQUIP_SLOT_D_DOWN]=
 run('icon',r'''
 #include "2s2h_assets.h"
 SaveContext gSaveContext{};TexturePtr gItemIcons[131]{};
-int32_t CVarGetInteger(const char*,int32_t){return 0;}
+extern "C" int32_t CVarGetInteger(const char*,int32_t){return 0;}
 int GameInteractor_Should(int,int result,...){return result;}
 #define VB_INTERFACE_LOAD_DPAD_ITEM_ICON 0
 void* ExtInv_GetItemIcon(u16 item){return item==EXT_ITEM_ROD_OF_SEASONS?(void*)0x1000:nullptr;}
@@ -219,7 +224,12 @@ assert(restored.seasonsOwned==0&&restored.season==SEASON_SPRING);
 ''')
 
 run('snow',r'''
+#include "mods/items/helpers/season_particles.h"
 int activeSeason=SEASON_WINTER,spawns=0;
+int snowEnabled=1;
+extern "C" int32_t CVarGetInteger(const char* key,int32_t fallback){
+ return !strcmp(key,"gAudioEditor.MMWeather.Winter.Snow") ? snowEnabled : fallback;
+}
 u8 D_801F4E30;
 int MMWeather_Season(){return activeSeason;}
 int MMWeather_SeasonForPlay(PlayState*){return activeSeason;}
@@ -237,6 +247,12 @@ play.roomCtx.curRoom.num=1;activeSeason=-1;Seasons_UpdateWeather(&play);
 assert(play.envCtx.precipitation[PRECIP_SNOW_MAX]==12);
 activeSeason=SEASON_WINTER;Seasons_UpdateWeather(&play);
 play.envCtx.precipitation[PRECIP_SNOW_MAX]=20;activeSeason=-1;Seasons_UpdateWeather(&play);
+assert(play.envCtx.precipitation[PRECIP_SNOW_MAX]==20);
+// Exercise the production presentation switch without replacing its policy.
+activeSeason=SEASON_WINTER;snowEnabled=0;
+int before=spawns;Seasons_UpdateWeather(&play);
+assert(spawns==before&&play.envCtx.precipitation[PRECIP_SNOW_MAX]==20);
+snowEnabled=1;Seasons_UpdateWeather(&play);
 assert(play.envCtx.precipitation[PRECIP_SNOW_MAX]==20);
 ''')
 
@@ -366,7 +382,7 @@ int MMWeather_Season(){return activeSeason;}
 int MMWeather_SeasonForPlay(const PlayState*){return activeSeason;}
 void Actor_Kill(Actor* actor){actor->update=nullptr;actor->draw=nullptr;}
 f32 Rand_ZeroOne(){return .25f;}
-f32 MMWeather_RandomFloat(){assert(activeSeason==SEASON_AUTUMN);return .25f;}
+f32 MMWeather_RandomFloat(){assert(MMSeasonParticles_IsFallingSeason(activeSeason));return .25f;}
 // Window aspect is an external boundary; use the native 4:3 fixture viewport.
 f32 OTRGetAspectRatio(){return 4.0f/3.0f;}
 s16 Camera_GetCamDirPitch(Camera*){return 0;}

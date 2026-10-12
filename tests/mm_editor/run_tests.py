@@ -108,6 +108,10 @@ def main():
         subprocess.run([str(binary)], check=True, env=environment)
         bindings = source("mm/2s2h/Rando/NeiGiPresentation.cpp")
         pool_binding = item_data + "\nnamespace Rando::Logic {\n"
+        constraints = source("mm/2s2h/Rando/Logic/PlacementConstraints.cpp")
+        pool_binding += "\n".join(function(constraints, name) for name in
+                                  ("DungeonItemToDungeon", "DungeonItemPlacementOption", "StaysAtVanillaCheck",
+                                   "IsSongLocationItem")) + "\n"
         pool_binding += function(source("mm/2s2h/Rando/Logic/GeneratePools.cpp"), "GeneratePools") + "\n}\n"
         pool_binding += bindings[bindings.index("struct Binding {"):bindings.index("// Only roots that differ")]
         pool_binding += function(bindings, "HasMmLegacyGiMod") + "\n"
