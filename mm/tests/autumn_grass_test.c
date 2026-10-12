@@ -206,6 +206,82 @@ static void GroupedGrass(void) {
     puts("PASS grouped grass OPA/XLU scoped color, unchanged fade alpha and existing replacement hook routing");
 }
 
+static void Spring(void) {
+    EnKusa grass = { 0 };
+    ObjGrass grouped = { 0 };
+    grouped.activeGrassGroups = 1;
+    grouped.grassGroups[0].count = 1;
+    grouped.grassGroups[0].flags = OBJ_GRASS_GROUP_DRAW;
+    grouped.grassGroups[0].elements[0].flags = OBJ_GRASS_ELEM_DRAW;
+    struct {
+        void (*draw)(Actor*, PlayState*);
+        Actor* actor;
+        const void* list;
+        int fade;
+    } cases[] = {
+        { EnKusa_DrawGrass, &grass.actor, gKusaSproutDL, 0 },
+        { EnKusa_DrawBush, &grass.actor, gKusaBushType1DL, 0 },
+        { EnKusa_DrawBush, &grass.actor, gKusaBushType2DL, 1 },
+        { ObjGrass_DrawOpa, &grouped.actor, gObjGrass_D_809AAAE0, 0 },
+        { ObjGrass_DrawXlu, &grouped.actor, gObjGrass_D_809AAAE0, 1 },
+    };
+    for (unsigned i = 0; i < ARRAY_COUNT(cases); ++i) {
+        grass.actor.projectedPos.z = cases[i].fade ? 1250 : 500;
+        grouped.grassGroups[0].elements[0].alpha = cases[i].fade ? 96 : 255;
+        for (unsigned scene = 0; scene < 2; ++scene) {
+            play.sceneId = scene ? SCENE_00KEIKOKU : SCENE_BACKTOWN;
+            season = SEASON_OFF;
+            Begin();
+            cases[i].draw(cases[i].actor, &play);
+            const Gfx* start = cases[i].fade ? translucent : opaque;
+            const size_t count = (cases[i].fade ? gfx.polyXlu.p : gfx.polyOpa.p) - start;
+            Gfx native[128];
+            memcpy(native, start, count * sizeof(Gfx));
+            season = SEASON_SPRING;
+            Begin();
+            cases[i].draw(cases[i].actor, &play);
+            Check(cases[i].fade ? translucent : opaque, cases[i].fade ? gfx.polyXlu.p : gfx.polyOpa.p, cases[i].list,
+                  native, count, 0xF6C1D920, 2);
+            assert(grouped.grassGroups[0].elements[0].alpha == (cases[i].fade ? 96 : 255));
+            for (int restore = 0; restore < 3; ++restore) {
+                season = restore == 0 ? SEASON_SUMMER : restore == 1 ? SEASON_OFF : SEASON_SPRING;
+                eligible = restore != 2;
+                Begin();
+                cases[i].draw(cases[i].actor, &play);
+                start = cases[i].fade ? translucent : opaque;
+                assert((size_t)((cases[i].fade ? gfx.polyXlu.p : gfx.polyOpa.p) - start) == count);
+                assert(!memcmp(native, start, count * sizeof(Gfx)));
+            }
+            eligible = 1;
+        }
+    }
+    grass.isCut = 1;
+    season = SEASON_SPRING;
+    Begin();
+    EnKusa_DrawGrass(&grass.actor, &play);
+    assert(gfx.polyOpa.p - opaque == 1 && opaque[0].words.w1 == (uintptr_t)gKusaStumpDL);
+    // Replacements can suppress both grouped draw paths. Seasonal state must
+    // still be disabled before the next actor, with the original hook intact.
+    allowDraw = 0;
+    for (int fade = 0; fade <= 1; ++fade) {
+        grouped.grassGroups[0].elements[0].alpha = fade ? 96 : 255;
+        Begin();
+        (fade ? ObjGrass_DrawXlu : ObjGrass_DrawOpa)(&grouped.actor, &play);
+        const Gfx* start = fade ? translucent : opaque;
+        const Gfx* end = fade ? gfx.polyXlu.p : gfx.polyOpa.p;
+        unsigned mode = 0;
+        for (const Gfx* cmd = start; cmd < end; ++cmd) {
+            if ((cmd->words.w0 >> 24) == G_SETGRAYSCALE)
+                mode = cmd->words.w1;
+            assert(cmd->words.w1 != (uintptr_t)gObjGrass_D_809AAAE0);
+        }
+        assert(mode == 0);
+    }
+    allowDraw = 1;
+    puts("PASS spring grass/bush OPA/XLU subtle mode 2 tint, exact native fade alpha, replacement hooks, stumps and "
+         "summer/Off/eligibility cleanup");
+}
+
 static void Winter(void) {
     EnKusa grass = { 0 };
     ObjGrass grouped = { 0 };
@@ -262,6 +338,7 @@ static void Winter(void) {
 
 int main(void) {
     play.state.gfxCtx = &gfx;
+    Spring();
     Winter();
     Kusa();
     GroupedGrass();

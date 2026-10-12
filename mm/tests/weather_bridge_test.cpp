@@ -625,6 +625,164 @@ static void GatedSeasonWeatherRegression() {
     std::puts("PASS gated Rod weather uses real completion unlocks, persisted gates, Off and Rod ownership");
 }
 
+static void ManualSeasonWeatherRegression() {
+    R_UPDATE_RATE = 3;
+    static PlayState play{};
+    Camera camera{};
+    play.sceneId = SCENE_TOWN;
+    play.skyboxId = SKYBOX_NORMAL_SKY;
+    play.cameraPtrs[0] = &camera;
+    play.envCtx.lightSettingOverride = LIGHT_SETTING_OVERRIDE_NONE;
+    settings.clear();
+    MMWeather_Reset();
+    gSaveContext = {};
+    gSaveContext.save.day = 2;
+    gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+    gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_ROD_OF_SEASONS] = NEI_SEASONS_GATED;
+    auto& nei = *Nei_Save();
+    nei.season = SEASON_OFF;
+    const auto progress = nei;
+    const auto native = play.envCtx;
+    assert(MMWeather_SeasonForPlay(&play) == -1); // Follow requires the Rod.
+    for (int season : { SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN, SEASON_WINTER }) {
+        settings[MM_WEATHER_CVAR("Season")] = season;
+        assert(MMWeather_SeasonForPlay(&play) == season);
+        MMWeather_Update(&play);
+        assert(MMWeather_Season() == season);
+        assert(std::memcmp(&progress, &nei, sizeof(nei)) == 0);
+        assert(std::memcmp(&native, &play.envCtx, sizeof(native)) == 0);
+    }
+    settings[MM_WEATHER_CVAR("Season")] = SEASON_SPRING;
+    settings[MM_WEATHER_CVAR("Spring.RainMode")] = 1;
+    AdvanceRain(&play);
+    assert(MMWeather_RainDensity() == 30 && rainGain == 1.0f); // Even on Day 2.
+    play.pauseCtx.state = PAUSE_STATE_MAIN;
+    for (int i = 0; i < 100; ++i)
+        MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 30);
+    settings[MM_WEATHER_CVAR("Spring.RainMode")] = 0;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0 && rainGain == 0 && MMWeather_Overcast() == 0);
+    settings[MM_WEATHER_CVAR("Spring.RainMode")] = 1;
+    MMWeather_Update(&play);
+    assert(MMWeather_RainDensity() == 0); // Paused controls do not advance the simulation.
+    play.pauseCtx.state = PAUSE_STATE_OFF;
+    AdvanceRain(&play);
+    assert(MMWeather_RainDensity() == 30);
+    play.pauseCtx.state = PAUSE_STATE_MAIN;
+    settings[MM_WEATHER_CVAR("Season")] = -1;
+    MMWeather_Update(&play);
+    assert(MMWeather_Season() == -1 && MMWeather_RainDensity() == 0 && rainGain == 0);
+    settings[MM_WEATHER_CVAR("Season")] = SEASON_AUTUMN;
+    settings[MM_WEATHER_CVAR("Autumn.RainMode")] = 1;
+    play.pauseCtx.state = PAUSE_STATE_OFF;
+    AdvanceRain(&play);
+    assert(MMWeather_RainDensity() == 15 && rainGain == 0.6f && MMWeather_Overcast() == 0.5f);
+    settings[MM_WEATHER_CVAR("Season")] = SEASON_SPRING;
+    AdvanceRain(&play);
+    assert(MMWeather_RainDensity() == 30); // Each season retains its own rain setting.
+    settings[MM_WEATHER_CVAR("Spring.RainMode")] = 2;
+    bool wet = false, dryAfterWet = false;
+    for (int frame = 0; frame < 2500; ++frame) {
+        MMWeather_Update(&play);
+        const int density = MMWeather_RainDensity();
+        assert(density >= 0 && density <= 30);
+        wet |= density > 0;
+        dryAfterWet |= wet && density == 0;
+    }
+    assert(wet && dryAfterWet);
+    for (int condition = 0; condition < 6; ++condition) {
+        play.envCtx = native;
+        play.csCtx.state = CS_STATE_IDLE;
+        camera.stateFlags = 0;
+        play.skyboxId = SKYBOX_NORMAL_SKY;
+        switch (condition) {
+            case 0:
+                play.csCtx.state = 1;
+                break;
+            case 1:
+                play.envCtx.lightSettingOverride = 1;
+                break;
+            case 2:
+                play.envCtx.customSkyboxFilter = true;
+                break;
+            case 3:
+                camera.stateFlags = CAM_STATE_UNDERWATER;
+                break;
+            case 4:
+                play.skyboxId = SKYBOX_NONE;
+                break;
+            case 5:
+                play.envCtx.skyboxDisabled = true;
+                break;
+        }
+        assert(MMWeather_SeasonForPlay(&play) == -1);
+        MMWeather_Update(&play);
+        assert(MMWeather_RainDensity() == 0 && rainGain == 0);
+    }
+    play.envCtx = native;
+    play.csCtx.state = CS_STATE_IDLE;
+    camera.stateFlags = 0;
+    play.skyboxId = SKYBOX_NORMAL_SKY;
+    settings[MM_WEATHER_CVAR("Season")] = -2;
+    assert(MMWeather_SeasonForPlay(&play) == -1);
+    // Native bypasses the Rod resolver even when a gated Rod is available.
+    nei.seasonsRodOwned = 1;
+    nei.season = SEASON_SUMMER;
+    const auto beforeNative = nei;
+    settings[MM_WEATHER_CVAR("Season")] = -1;
+    MMWeather_Update(&play);
+    assert(MMWeather_Season() == -1 && std::memcmp(&beforeNative, &nei, sizeof(nei)) == 0);
+    settings[MM_WEATHER_CVAR("Season")] = SEASON_SUMMER;
+    Audio_SetAmbienceChannelIO(AMBIENCE_CHANNEL_RAIN, CHANNEL_IO_PORT_1, 1);
+    Audio_SetAmbienceChannelIO(AMBIENCE_CHANNEL_LIGHTNING, CHANNEL_IO_PORT_1, 1);
+    MMWeather_Update(&play);
+    assert(nativeRainAmbience == 0 && nativeThunderAmbience == 0);
+    play.pauseCtx.state = PAUSE_STATE_MAIN;
+    settings[MM_WEATHER_CVAR("Season")] = -1;
+    MMWeather_Update(&play);
+    assert(nativeRainAmbience == 1 && nativeThunderAmbience == 1 && !MMWeather_SeasonClearsRain());
+    // Explicit seasonal modes suppress actual native rain without changing its source.
+    for (int selected : { SEASON_SPRING, SEASON_AUTUMN }) {
+        settings[MM_WEATHER_CVAR("Season")] = selected;
+        settings[selected == SEASON_SPRING ? MM_WEATHER_CVAR("Spring.RainMode") : MM_WEATHER_CVAR("Autumn.RainMode")] =
+            0;
+        play.envCtx.stormState = STORM_STATE_ON;
+        play.envCtx.precipitation[PRECIP_RAIN_CUR] = play.envCtx.precipitation[PRECIP_RAIN_MAX] = 60;
+        gWeatherMode = WEATHER_MODE_RAIN;
+        const auto storm = play.envCtx;
+        MMWeather_Update(&play);
+        assert(MMWeather_SeasonClearsRain() && nativeRainAmbience == 0 && nativeThunderAmbience == 0);
+        const int beforeDraws = rainDraws;
+        DrawWeatherFromPlay(&play);
+        assert(rainDraws == beforeDraws && MMWeather_RainDensity() == 0 && rainGain == 0);
+        uint8_t first = 1, second = 1, blend = 255;
+        MMWeather_ApplySky(&first, &second, &blend);
+        assert(first == 0 && second == 0 && blend == 0);
+        assert(std::memcmp(&storm, &play.envCtx, sizeof(storm)) == 0 && gWeatherMode == WEATHER_MODE_RAIN);
+        play.csCtx.state = 1;
+        MMWeather_Update(&play);
+        assert(MMWeather_Season() == -1 && !MMWeather_SeasonClearsRain());
+        assert(nativeRainAmbience == 1 && nativeThunderAmbience == 1);
+        DrawWeatherFromPlay(&play);
+        assert(rainDraws == beforeDraws + 1); // Story/native weather resumes, even while paused.
+        play.csCtx.state = CS_STATE_IDLE;
+    }
+    play.envCtx = native;
+    gWeatherMode = WEATHER_MODE_CLEAR;
+    settings[MM_WEATHER_CVAR("Season")] = -1;
+    // The independent global override still works with Native selected.
+    play.pauseCtx.state = PAUSE_STATE_OFF;
+    settings[MM_WEATHER_CVAR("Enabled")] = 1;
+    AdvanceRain(&play);
+    assert(MMWeather_RainDensity() == 25 && rainGain == 1.0f);
+    settings.clear();
+    gSaveContext = {};
+    MMWeather_Reset();
+    std::puts("PASS manual seasons without progression, per-season rain, paused selectors, eligibility and Native "
+              "restoration");
+}
+
 int main() {
     AutumnShowerRegression();
     static PlayState play{};
@@ -713,4 +871,5 @@ int main() {
     MayorsResidenceRegression();
     SeasonWeatherRegression();
     GatedSeasonWeatherRegression();
+    ManualSeasonWeatherRegression();
 }

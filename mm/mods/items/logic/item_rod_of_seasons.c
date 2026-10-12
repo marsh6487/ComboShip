@@ -4,6 +4,7 @@
 #include "mods/ext_buttons/ext_buttons.h"
 #include "mods/items/helpers/equip_helper.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
+#include "mods/items/helpers/season_particles.h"
 
 static u8 sRodDrawn;
 static u8 sRodPendingDraw;
@@ -210,7 +211,7 @@ void Seasons_UpdateWeather(PlayState* play) {
     }
     sSeasonWeatherFrame = play->gameplayFrames;
     const int season = MMWeather_SeasonForPlay(play);
-    if (season != SEASON_WINTER && season != SEASON_AUTUMN) {
+    if (!MMSeasonParticles_IsEnabled(season)) {
         Seasons_RemoveSnowActor(play);
         return;
     }

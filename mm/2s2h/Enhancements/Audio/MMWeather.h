@@ -10,11 +10,14 @@ extern "C" {
 struct PlayState;
 void MMWeather_Update(struct PlayState* play);
 void MMWeather_Reset(void);
-// Eligible owned season, or -1 for Off/unowned/interior. Does not change native weather flags.
+// Eligible presentation season, or -1 for Native/Off/unowned/interior/story.
+// Season cvar: -2 follows the game/Rod (default), -1 is Native, 0..3 are manual.
+// Manual presentation never grants ownership or changes the saved gameplay season.
 int MMWeather_Season(void);
 // Resolve current eligibility before the environment update (actors and HUD confirmations).
 int MMWeather_SeasonForPlay(const struct PlayState* play);
-// Summer clears the native second-day rain presentation while its source stays live.
+// Summer and explicit Spring/Autumn rain modes suppress native rain presentation
+// while its source stays live. The independent global rain override still composes.
 int MMWeather_SeasonClearsRain(void);
 // Observe native storm channel requests before composing Summer's ambience mute.
 uint32_t MMWeather_ResolveAmbienceSeqCmd(uint32_t cmd);

@@ -13,7 +13,7 @@
 SaveContext gSaveContext;
 RegEditor editor;
 RegEditor* gRegEditor = &editor;
-static int season = SEASON_SUMMER, enabled = 1, shafts = 0, rain = 0;
+static int season = SEASON_SUMMER, enabled = 1, shafts = 0, rain = 0, fluffEnabled = 1, firefliesEnabled = 1;
 static int matrices = 0, stack = 0, children = 0, scopes = 0, vertexLoads = 0;
 static Gfx xlu[1024], opa[512];
 static Mtx matrix;
@@ -27,6 +27,10 @@ extern "C" int32_t CVarGetInteger(const char* key, int32_t fallback) {
         return enabled;
     if (std::strcmp(key, MM_SUMMER_CVAR("Sunbeams")) == 0)
         return shafts;
+    if (std::strcmp(key, MM_SUMMER_CVAR("Fluff")) == 0)
+        return fluffEnabled;
+    if (std::strcmp(key, MM_SUMMER_CVAR("Fireflies")) == 0)
+        return firefliesEnabled;
     return fallback;
 }
 extern "C" int MMWeather_SeasonForPlay(const PlayState*) {
@@ -210,6 +214,41 @@ int main() {
     MMSummerAtmosphere_Update(&play);
     Draw(play);
     assert(textures.size() == 2 && textures[0] == fluff && textures[1] == glow);
+    shafts = 0;
+    MMSummerAtmosphere_Update(&play);
+    Draw(play);
+    const int duskParticles = matrices;
+    // Independent live controls apply immediately, including while paused.
+    play.pauseCtx.state = PAUSE_STATE_MAIN;
+    fluffEnabled = 0;
+    MMSummerAtmosphere_Update(&play);
+    Draw(play);
+    assert(textures.size() == 1 && textures[0] == glow && matrices > 0 && matrices <= 56);
+    const int duskFireflies = matrices;
+    firefliesEnabled = 0;
+    MMSummerAtmosphere_Update(&play);
+    Draw(play);
+    assert(textures.empty() && matrices == 0);
+    fluffEnabled = 1;
+    MMSummerAtmosphere_Update(&play);
+    Draw(play);
+    assert(textures.size() == 1 && textures[0] == fluff && matrices > 0 && matrices <= 32);
+    assert(matrices + duskFireflies == duskParticles);
+    firefliesEnabled = 1;
+    play.pauseCtx.state = PAUSE_STATE_OFF;
+    // Shafts remain independent of both particle controls.
+    gSaveContext.save.time = CLOCK_TIME(12, 0);
+    fluffEnabled = firefliesEnabled = 0;
+    shafts = 1;
+    MMSummerAtmosphere_Update(&play);
+    Draw(play, false);
+    assert(textures.empty() && matrices == 1 && vertexLoads == 3);
+    shafts = 0;
+    MMSummerAtmosphere_Update(&play);
+    Draw(play, false);
+    assert(matrices == 0 && vertexLoads == 0);
+    shafts = 1;
+    fluffEnabled = firefliesEnabled = 1;
     gSaveContext.save.time = CLOCK_TIME(12, 0);
     rain = 30;
     MMSummerAtmosphere_Update(&play);

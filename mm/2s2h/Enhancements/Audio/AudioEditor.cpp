@@ -38,7 +38,8 @@ static WidgetInfo voicePitchEnable;
 static WidgetInfo randoMusicOnSceneChange;
 static WidgetInfo randomAudioOnSeedGen;
 static WidgetInfo useSongCategories;
-static std::array<WidgetInfo, 10> weatherWidgets;
+static std::array<WidgetInfo, 8> weatherWidgets;
+static std::array<WidgetInfo, 11> seasonWeatherWidgets;
 
 namespace AudioPreview {
 
@@ -718,11 +719,29 @@ void AudioEditor::DrawElement() {
                 BenGui::mBenMenu->MenuDrawItem(voicePitchEnable, ImGui::GetContentRegionAvail().x, THEME_COLOR);
                 BenGui::mBenMenu->MenuDrawItem(voicePitch, ImGui::GetContentRegionAvail().x, THEME_COLOR);
                 ImGui::Separator();
+                ImGui::TextUnformatted("MM Seasonal Weather");
+                BenGui::mBenMenu->MenuDrawItem(seasonWeatherWidgets[0], ImGui::GetContentRegionAvail().x, THEME_COLOR);
+                ImGui::TextWrapped("Manual seasons affect outdoor presentation without unlocking the Rod or seasons. "
+                                   "Native restores original game weather. Seasonal effects defer to story scenes.");
+                static const char* seasonNames[] = { "Spring", "Summer", "Autumn", "Winter" };
+                static const size_t seasonStarts[] = { 1, 3, 7, 9 };
+                static const size_t seasonEnds[] = { 3, 7, 9, 11 };
+                for (size_t season = 0; season < 4; ++season) {
+                    if (ImGui::CollapsingHeader(seasonNames[season])) {
+                        for (size_t widget = seasonStarts[season]; widget < seasonEnds[season]; ++widget) {
+                            BenGui::mBenMenu->MenuDrawItem(seasonWeatherWidgets[widget],
+                                                           ImGui::GetContentRegionAvail().x, THEME_COLOR);
+                        }
+                    }
+                }
+                ImGui::Separator();
                 ImGui::TextUnformatted("MM Outdoor Weather");
                 for (auto& widget : weatherWidgets) {
                     BenGui::mBenMenu->MenuDrawItem(widget, ImGui::GetContentRegionAvail().x, THEME_COLOR);
                 }
-                ImGui::TextWrapped("Enabled rain overrides outdoor story and weather restrictions.");
+                ImGui::TextWrapped("Outdoor Rain is an independent override: when enabled, it takes priority over "
+                                   "Native weather and seasonal rain choices, including Off. It also overrides outdoor "
+                                   "story weather restrictions. Indoor and underwater views are excluded.");
             }
             ImGui::EndChild();
             ImGui::EndTable();
@@ -1057,23 +1076,102 @@ void RegisterAudioWidgets() {
                      .DefaultValue(100)
                      .Color(THEME_COLOR)
                      .Tooltip("Higher values produce thunder more often during added rain."));
-    weatherWidgets[8] = { .name = "Summer Day/Night Atmosphere", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
-    weatherWidgets[8]
+    for (auto& widget : weatherWidgets) {
+        AddAudioSearchWidget(widget);
+    }
+
+    static const std::unordered_map<int32_t, const char*> seasonChoices = {
+        { -2, "Follow Game / Rod" }, { -1, "Native" },
+        { SEASON_SPRING, "Spring" }, { SEASON_SUMMER, "Summer" },
+        { SEASON_AUTUMN, "Autumn" }, { SEASON_WINTER, "Winter" }
+    };
+    seasonWeatherWidgets[0] = { .name = "Native Weather", .type = WidgetType::WIDGET_CVAR_COMBOBOX };
+    seasonWeatherWidgets[0]
+        .CVar(MM_WEATHER_CVAR("Season"))
+        .Options(ComboboxOptions()
+                     .ComboMap(&seasonChoices)
+                     .DefaultIndex(-2)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Follow Game / Rod uses your current gameplay season. Native restores the original game "
+                              "presentation. Manual Spring, Summer, Autumn and Winter affect outdoor visuals only, "
+                              "without granting the Rod, unlocking seasons or changing seed progress."));
+    static const std::unordered_map<int32_t, const char*> seasonRainModes = {
+        { -1, "Season Default" }, { 0, "Off" }, { 1, "Persistent" }, { 2, "Intermittent" }
+    };
+    seasonWeatherWidgets[1] = { .name = "Spring Rain", .type = WidgetType::WIDGET_CVAR_COMBOBOX };
+    seasonWeatherWidgets[1]
+        .CVar(MM_WEATHER_CVAR("Spring.RainMode"))
+        .Options(ComboboxOptions()
+                     .ComboMap(&seasonRainModes)
+                     .DefaultIndex(-1)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Season Default keeps Spring rain on Days 1 and 3, plus native Day 2 weather. "
+                              "Off, Persistent and Intermittent replace native rain while Spring is active. "
+                              "The separate Outdoor Rain override still takes priority."));
+    seasonWeatherWidgets[2] = { .name = "Spring Cherry Blossoms", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    seasonWeatherWidgets[2]
+        .CVar(MM_WEATHER_CVAR("Spring.Blossoms"))
+        .Options(CheckboxOptions()
+                     .DefaultValue(true)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Drifting cherry blossom petals outdoors during Spring."));
+    seasonWeatherWidgets[3] = { .name = "Summer Atmosphere", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    seasonWeatherWidgets[3]
         .CVar(MM_SUMMER_CVAR("Enabled"))
         .Options(CheckboxOptions()
                      .DefaultValue(true)
                      .Color(THEME_COLOR)
-                     .Tooltip("While the Rod of Seasons selects Summer outdoors, adds drifting dandelion fluff by day "
-                              "and softly pulsing fireflies after dusk."));
-    weatherWidgets[9] = { .name = "Soft Summer Sunbeams (Preview Option)", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
-    weatherWidgets[9]
+                     .Tooltip("Enables Summer fluff, nighttime fireflies and optional sunbeams. "
+                              "Each effect also has its own setting below."));
+    seasonWeatherWidgets[4] = { .name = "Summer Drifting Fluff", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    seasonWeatherWidgets[4]
+        .CVar(MM_SUMMER_CVAR("Fluff"))
+        .Options(CheckboxOptions()
+                     .DefaultValue(true)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Drifting dandelion fluff during clear Summer days."));
+    seasonWeatherWidgets[5] = { .name = "Summer Nighttime Fireflies", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    seasonWeatherWidgets[5]
+        .CVar(MM_SUMMER_CVAR("Fireflies"))
+        .Options(CheckboxOptions()
+                     .DefaultValue(true)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Keeps the existing softly pulsing Summer fireflies after dusk."));
+    seasonWeatherWidgets[6] = { .name = "Soft Summer Sunbeams", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    seasonWeatherWidgets[6]
         .CVar(MM_SUMMER_CVAR("Sunbeams"))
         .Options(CheckboxOptions()
                      .DefaultValue(false)
                      .Color(THEME_COLOR)
-                     .Tooltip("Adds three soft shafts of sunlight during clear Summer days. "
-                              "Experimental option; disabled by default for review."));
-    for (auto& widget : weatherWidgets) {
+                     .Tooltip("Three soft shafts of sunlight during clear Summer days. Disabled by default."));
+    seasonWeatherWidgets[7] = { .name = "Autumn Rain", .type = WidgetType::WIDGET_CVAR_COMBOBOX };
+    seasonWeatherWidgets[7]
+        .CVar(MM_WEATHER_CVAR("Autumn.RainMode"))
+        .Options(ComboboxOptions()
+                     .ComboMap(&seasonRainModes)
+                     .DefaultIndex(-1)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Season Default keeps gentle intermittent Autumn showers and native weather. "
+                              "Off, Persistent and Intermittent replace native rain while Autumn is active. "
+                              "The separate Outdoor Rain override still takes priority."));
+    seasonWeatherWidgets[8] = { .name = "Autumn Falling Leaves", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    seasonWeatherWidgets[8]
+        .CVar(MM_WEATHER_CVAR("Autumn.Leaves"))
+        .Options(
+            CheckboxOptions().DefaultValue(true).Color(THEME_COLOR).Tooltip("Falling leaves outdoors during Autumn."));
+    seasonWeatherWidgets[9] = { .name = "Winter Snow", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    seasonWeatherWidgets[9]
+        .CVar(MM_WEATHER_CVAR("Winter.Snow"))
+        .Options(
+            CheckboxOptions().DefaultValue(true).Color(THEME_COLOR).Tooltip("Falling snow outdoors during Winter."));
+    seasonWeatherWidgets[10] = { .name = "Winter Windblown Flurries", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
+    seasonWeatherWidgets[10]
+        .CVar(MM_WEATHER_CVAR("Winter.Flurries"))
+        .Options(CheckboxOptions()
+                     .DefaultValue(false)
+                     .Color(THEME_COLOR)
+                     .Tooltip("Adds gusts of windblown snow when Winter Snow is enabled."));
+    for (auto& widget : seasonWeatherWidgets) {
         AddAudioSearchWidget(widget);
     }
 

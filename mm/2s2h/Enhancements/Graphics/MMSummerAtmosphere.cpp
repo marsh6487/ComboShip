@@ -108,6 +108,10 @@ extern "C" void MMSummerAtmosphere_Draw(PlayState* play) {
         if (p.alpha < 1.0f / 255)
             continue;
         const bool firefly = p.kind == MMSummer::Kind::Firefly;
+        // Read live controls at draw time so paused changes take effect without
+        // restarting particle motion or changing the independent sunbeams.
+        if (!CVarGetInteger(firefly ? MM_SUMMER_CVAR("Fireflies") : MM_SUMMER_CVAR("Fluff"), 1))
+            continue;
         const auto* texture = firefly ? MMSummer::kGlowTexture.data() : MMSummer::kDandelionTexture.data();
         if (texture != activeTexture) {
             gDPPipeSync(POLY_XLU_DISP++);

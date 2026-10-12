@@ -472,7 +472,9 @@ void ObjGrass_DrawOpa(Actor* thisx, PlayState* play2) {
     ObjGrassElement* grassElem;
     s32 season = MMWeather_SeasonForPlay(play);
     s32 frost = season == SEASON_WINTER && play->sceneId == SCENE_00KEIKOKU;
-    s32 seasonal = season == SEASON_AUTUMN || frost;
+    // Spring is a subtle warmth on liftable blades, preserving native green and fade alpha.
+    s32 spring = season == SEASON_SPRING;
+    s32 seasonal = spring || season == SEASON_AUTUMN || frost;
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -481,8 +483,18 @@ void ObjGrass_DrawOpa(Actor* thisx, PlayState* play2) {
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
     gSPDisplayList(POLY_OPA_DISP++, gObjGrass_D_809AA9F0);
     if (seasonal) {
-        gDPSetGrayscaleColor(POLY_OPA_DISP++, frost ? 229 : 217, frost ? 237 : 156, frost ? 243 : 69, 255);
-        gSPGrayscale(POLY_OPA_DISP++, frost ? 3 : 1);
+        gDPSetGrayscaleColor(POLY_OPA_DISP++,
+                             spring  ? 246
+                             : frost ? 229
+                                     : 217,
+                             spring  ? 193
+                             : frost ? 237
+                                     : 156,
+                             spring  ? 217
+                             : frost ? 243
+                                     : 69,
+                             spring ? 32 : 255);
+        gSPGrayscale(POLY_OPA_DISP++, spring ? 2 : frost ? 3 : 1);
     }
 
     for (i = 0; i < this->activeGrassGroups; i++) {
@@ -530,7 +542,8 @@ void ObjGrass_DrawXlu(Actor* thisx, PlayState* play) {
     Vec3s rot = { 0, 0, 0 };
     s32 season = MMWeather_SeasonForPlay(play);
     s32 frost = season == SEASON_WINTER && play->sceneId == SCENE_00KEIKOKU;
-    s32 seasonal = season == SEASON_AUTUMN || frost;
+    s32 spring = season == SEASON_SPRING;
+    s32 seasonal = spring || season == SEASON_AUTUMN || frost;
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -538,8 +551,18 @@ void ObjGrass_DrawXlu(Actor* thisx, PlayState* play) {
 
     gSPDisplayList(POLY_XLU_DISP++, gObjGrass_D_809AAA68);
     if (seasonal) {
-        gDPSetGrayscaleColor(POLY_XLU_DISP++, frost ? 229 : 217, frost ? 237 : 156, frost ? 243 : 69, 255);
-        gSPGrayscale(POLY_XLU_DISP++, frost ? 3 : 1);
+        gDPSetGrayscaleColor(POLY_XLU_DISP++,
+                             spring  ? 246
+                             : frost ? 229
+                                     : 217,
+                             spring  ? 193
+                             : frost ? 237
+                                     : 156,
+                             spring  ? 217
+                             : frost ? 243
+                                     : 69,
+                             spring ? 32 : 255);
+        gSPGrayscale(POLY_XLU_DISP++, spring ? 2 : frost ? 3 : 1);
     }
 
     for (i = 0; i < this->activeGrassGroups; i++) {

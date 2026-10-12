@@ -12,6 +12,16 @@ from run_mm_nei_tests import flags
 from run_mm_weather_tests import production_function
 
 
+def weather_flags():
+    # These weather/selector bodies use real MM symbols and do not need the
+    # generated OoT item redirect header used by the broader NEI fixture.
+    result = flags()
+    redirect = str(ROOT / 'mm/soh/_nei_compat_core.h')
+    index = result.index(redirect)
+    del result[index - 1:index + 1]
+    return result
+
+
 def source(path):
     baseline = next((arg.split('=', 1)[1] for arg in sys.argv if arg.startswith('--preview-baseline=')), None)
     if baseline and path.endswith('/z_object_kankyo.c'):
@@ -28,6 +38,11 @@ with tempfile.TemporaryDirectory(prefix='native-season-weather-') as temporary:
     snow = 'mm/src/overlays/actors/ovl_Object_Kankyo/z_object_kankyo.c'
     environment = 'mm/src/code/z_kankyo.c'
     rod = 'mm/mods/items/logic/item_rod_of_seasons.c'
+    rcp = (ROOT / 'mm/src/code/z_rcp.c').read_text()
+    setup = re.search(r'\{\s*/\* SETUPDL_0 \*/[\s\S]+?\n    \},', rcp)
+    if setup is None:
+        raise RuntimeError('Cannot find production SETUPDL_0 material commands')
+    (build / 'native_particle_setup.inc').write_text('static Gfx sNativeParticleSetup[] = ' + setup[0][:-1] + ';\n')
     parts = [body('mm/src/audio/sequence.c', 'AudioSeq_QueueSeqCmd')]
     parts += [body('mm/2s2h/gu_pc.c', 'guMtxIdentF'), body('mm/src/libultra/gu/lookat.c', 'guLookAtF')]
     parts += [body(snow, name) for name in (
@@ -38,7 +53,20 @@ with tempfile.TemporaryDirectory(prefix='native-season-weather-') as temporary:
         'func_808DBEB0', 'func_808DBFB0', 'ObjectKankyo_Init', 'ObjectKankyo_Update', 'func_808DD3C8')
         if name in source(snow)]
     rod_source = (ROOT / rod).read_text()
-    parts.append('// Seasonal particles' + rod_source.split('// Seasonal particles')[1].split('#include "../objects')[0])
+    owner = '// Seasonal particles' + rod_source.split('// Seasonal particles')[1].split('#include "../objects')[0]
+    parts.append(owner)
+    owner_c = build / 'native_season_owner.c'
+    owner_c.write_text('#include "z64.h"\n#include "2s2h/Enhancements/Audio/MMWeather.h"\n'
+                       '#include "mods/items/helpers/season_particles.h"\n' + owner)
+    for source_path in (ROOT / snow, owner_c):
+        syntax = subprocess.run([os.environ.get('CC', 'cc'), '-std=gnu17', '-fsyntax-only',
+                                 '-DNDEBUG', '-DCOMBO_BUILD', '-DMM_BUILD_DLL',
+                                 '-DCONTROLLERBUTTONS_T=uint32_t', '-DNON_EQUIVALENT', '-DNON_MATCHING',
+                                 '-Wno-int-conversion', '-Wno-incompatible-pointer-types',
+                                 *weather_flags(), str(source_path)], capture_output=True, text=True)
+        if syntax.returncode:
+            raise RuntimeError(syntax.stdout + syntax.stderr)
+        print('PASS real-header seasonal C syntax:', source_path.name, flush=True)
     parts += [body('mm/mods/extended_inventory.c', name) for name in
               ('Seasons_HasRod', 'Seasons_SeasonOwned', 'Seasons_SeasonAt', 'Seasons_GetSeason', 'Seasons_SetSeason')]
     parts.append(body(rod, 'Seasons_OnWheelConfirm'))
@@ -68,7 +96,7 @@ with tempfile.TemporaryDirectory(prefix='native-season-weather-') as temporary:
     binary = build / 'native-weather'
     sanitizer = ['-fsanitize=address,undefined,bounds', '-fno-sanitize-recover=all'] if '--sanitize' in sys.argv else []
     result = subprocess.run([
-        os.environ.get('CXX', 'c++'), '-std=c++20', '-O2', '-w', *sanitizer, *flags(),
+        os.environ.get('CXX', 'c++'), '-std=c++20', '-O2', '-w', *sanitizer, *weather_flags(),
         '-I' + str(build), str(ROOT / 'tests/seasons/native_weather_test.cpp'),
         str(ROOT / 'mm/2s2h/Enhancements/Audio/MMWeather.cpp'),
         str(ROOT / 'mm/2s2h/Enhancements/Audio/MMWeatherState.cpp'), '-o', str(binary)
