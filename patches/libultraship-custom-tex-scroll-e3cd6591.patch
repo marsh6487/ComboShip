@@ -6,7 +6,7 @@ diff --git a/include/fast/lus_gbi.h b/include/fast/lus_gbi.h
  constexpr int8_t RDP_G_TRI1_WIDE = OPCODE(0x49);
  constexpr int8_t RDP_G_SETTILESIZE_LERP = OPCODE(0x4a);
 +constexpr int8_t OTR_G_SCROLL_TEXTURE = OPCODE(0x4b);
-
+ 
  /*
   * The following commands are the "generated" RDP commands; the user
 diff --git a/include/libultraship/libultra/gbi.h b/include/libultraship/libultra/gbi.h
@@ -17,13 +17,13 @@ diff --git a/include/libultraship/libultra/gbi.h b/include/libultraship/libultra
  #define G_SETTARGETINTERPINDEX 0x46
  #define G_SETTILESIZE_LERP 0x4a
 +#define G_SCROLL_TEXTURE 0x4b
-
+ 
  /*
   * The following commands are the "generated" RDP commands; the user
 @@ -1941,6 +1942,20 @@
  #define gsImmp3(c, p0, p1, p2) \
      { _SHIFTL((c), 24, 8), (_SHIFTL((p0), 16, 16) | _SHIFTL((p1), 8, 8) | _SHIFTL((p2), 0, 8)) }
-
+ 
 +#define gSPScrollTexture(pkt, tile, speedX, speedY)                                              \
 +    _DW({                                                                                        \
 +        Gfx* _g = (Gfx*)(pkt);                                                                   \
@@ -46,7 +46,7 @@ diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
 +++ b/src/fast/interpreter.cpp
 @@ -678,6 +678,48 @@
  }
-
+ 
  // Loaded size is HD-scaled but the tile region is raw N64 texels; normalize before comparing.
 +static int32_t GetRepeatPeriodFromTile(const RDP* rdp, uint8_t tile, bool isS, uint32_t tileSize) {
 +    const auto& textureTile = rdp->texture_tile[tile];
@@ -96,7 +96,7 @@ diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
 @@ -4852,6 +4894,44 @@
      return false;
  }
-
+ 
 +bool gfx_scroll_texture_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
 +    F3DGfx* cmd = *cmd0;
 +
@@ -137,7 +137,7 @@ diff --git a/src/fast/interpreter.cpp b/src/fast/interpreter.cpp
 +
  bool gfx_set_interpolation_index_target(Interpreter* gfx, F3DGfx** cmd0) {
      F3DGfx* cmd = *cmd0;
-
+ 
 @@ -5237,6 +5317,7 @@
      { OTR_G_MOVEMEM_HASH, { "OTR_G_MOVEMEM_HASH", gfx_movemem_handler_otr } },      // OTR_G_MOVEMEM_HASH
      { OTR_G_PUSH_SHADER, { "G_PUSH_SHADER", gfx_push_shader } },
@@ -151,7 +151,7 @@ diff --git a/src/fast/resource/factory/DisplayListFactory.cpp b/src/fast/resourc
 +++ b/src/fast/resource/factory/DisplayListFactory.cpp
 @@ -650,6 +650,12 @@
              uint32_t lrt = child->IntAttribute("Lrt");
-
+ 
              g = gsDPSetTileSize(t, uls, ult, lrs, lrt);
 +        } else if (childName == "ScrollTexture") {
 +            uint32_t tile = child->UnsignedAttribute("Tile");
