@@ -139,9 +139,10 @@ static void DrawFalling(PlayState* play, int season, const SoHSeasonParticles::V
         if (season != 3) {
             const float distance = Length(p.position - view.eye);
             const Actor* player = play->actorCtx.actorLists[ACTORCAT_PLAYER].head;
-            const float near = player ? std::min(distance, Length(p.position - Vector(player->world.pos))) : distance;
+            const float nearestDistance =
+                player ? std::min(distance, Length(p.position - Vector(player->world.pos))) : distance;
             alpha = 220 * std::clamp((8000 - distance) / 2000, 0.0f, 1.0f) *
-                    std::clamp((near - 150) / 200, 0.0f, 1.0f) * std::min(p.age / 24, 1.0f) *
+                    std::clamp((nearestDistance - 150) / 200, 0.0f, 1.0f) * std::min(p.age / 24, 1.0f) *
                     std::clamp((1 - std::abs(screen.x)) / 0.2f, 0.0f, 1.0f) *
                     std::clamp((1 - std::abs(screen.y)) / 0.2f, 0.0f, 1.0f);
         }

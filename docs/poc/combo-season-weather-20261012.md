@@ -107,6 +107,20 @@ configured CTest entry points (3/3). Full combined Release rebuild and
 deployment checks continue separately from this source publication.
 See [command and source-hash evidence](combo-season-weather-verification-20261012.json).
 
+### Windows compiler compatibility follow-up
+
+The complete hosted regression gate passed on `13cbdaf9`; its Windows build
+then failed in the SoH compile step. The particle renderer used `near` as a
+local distance variable. Windows headers define `near` and `far` as empty
+macros; compiling the actual renderer with those definitions reproduces a
+missing identifier and invalid clamp expression at that declaration/use.
+The variable is now `nearestDistance`, with the same fade calculation.
+The existing native renderer regression always compiles with both macros,
+so the Linux gate also detects this Windows compatibility boundary.
+Production object compilation with normal and Windows-macro flags, and
+the complete renderer/state ASan/UBSan suite, pass after the rename.
+The corrected hosted Windows build remains a separate verification step.
+
 ## Acceptance boundary
 
 Implementation, static review, native compilation and fixture evidence are

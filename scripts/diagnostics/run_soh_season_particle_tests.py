@@ -59,8 +59,10 @@ def main():
             line = contents.count("\n", 0, match.start()) + 1
             predicates.append(f'#line {line} "{controller}"\n' + contents[match.start():end])
         (build / "season_particles_controller.inc").write_text("\n".join(predicates))
+        # Windows headers reserve near/far as empty macros. Exercise that
+        # production renderer compile boundary even in the Linux regression gate.
         # The existing GameInteractor header has2 unused predicate parameters.
-        engine_flags = ["-DF3DEX_GBI_2", "-Wno-unused-parameter", "-I" + str(build)]
+        engine_flags = ["-DF3DEX_GBI_2", "-Dnear=", "-Dfar=", "-Wno-unused-parameter", "-I" + str(build)]
         for directory in ("soh/include", "soh", "soh/assets", "libultraship/include", "libultraship/src"):
             engine_flags += ["-I" + str(ROOT / directory)]
         engine_flags += shlex.split(os.environ.get("SOH_SEASON_PARTICLE_CXXFLAGS", ""))
