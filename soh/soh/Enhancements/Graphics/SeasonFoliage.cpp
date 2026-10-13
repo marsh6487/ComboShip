@@ -8,7 +8,7 @@
 #include <string>
 #include <tuple>
 
-extern PlayState* gPlayState;
+extern "C" PlayState* gPlayState;
 extern "C" void gfx_texture_cache_clear();
 
 namespace {

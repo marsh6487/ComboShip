@@ -4,7 +4,11 @@
 
 Ship::Context* Ship::Context::current = nullptr;
 GameInteractor* GameInteractor::Instance = nullptr;
+// z_play.c owns this C symbol. A C++ declaration in the included production
+// source must fail here instead of passing an ELF-only fixture.
+extern "C" {
 PlayState* gPlayState = nullptr;
+}
 static int season = -1;
 static size_t evicted = 0;
 extern "C" int32_t SeasonWeather_SeasonForPlay(const PlayState*) {
