@@ -1424,6 +1424,9 @@ void OTRAudio_Thread() {
                 produce_next_batch();
                 audio.processing = false;
             }
+            // SoH 9.3's graphics loop waits on this request, including when
+            // the reservoir is full and synthesis was skipped.
+            audio.cv_from_thread.notify_one();
         }
 
         // Pre-buffer: fill the reservoir while the backend can accept more,
@@ -1438,6 +1441,12 @@ void OTRAudio_Thread() {
             produce_next_batch();
         }
     }
+
+    {
+        std::lock_guard<std::mutex> lock(audio.mutex);
+        audio.processing = false;
+    }
+    audio.cv_from_thread.notify_all();
 }
 
 void OTRAudio_Init() {

@@ -182,6 +182,8 @@ jobs:
           NATIVE_AUDIO_CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie" python3 scripts/diagnostics/run_native_audio_mixer_tests.py
           python3 scripts/diagnostics/run_mm_audio_worker_tests.py
           MM_AUDIO_WORKER_CXXFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie" python3 scripts/diagnostics/run_mm_audio_worker_tests.py
+          python3 -B scripts/diagnostics/run_soh_audio_worker_tests.py
+          python3 -B scripts/diagnostics/run_soh_audio_worker_tests.py --sanitize
           python3 scripts/diagnostics/run_mm_weather_tests.py
           python3 scripts/diagnostics/run_mm_custom_item_color_tests.py
           python3 scripts/diagnostics/run_mm_hud_cosmetics_tests.py
