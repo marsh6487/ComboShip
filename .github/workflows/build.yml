@@ -41,6 +41,9 @@ jobs:
       - name: Verify native NEI bridge DLL declarations
         run: python tests/nei_asset_priority/run_abi_tests.py --msvc --compiler cl
 
+      - name: Verify Windows launcher icon and version resources
+        run: python -B scripts/diagnostics/run_windows_launcher_resource_tests.py
+
       # Shared with the compile gate: caches the expensive vcpkg build + CMake tree.
       - name: Cache build dir (vcpkg + CMake)
         uses: actions/cache@v5

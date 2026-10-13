@@ -84,12 +84,6 @@ set(COMBO_SOURCES
     ComboShip.cpp
 )
 
-# Fleet.rc carries the application icon (FLEET.ico, 16-256px). Windows-only: MSVC compiles .rc, other
-# toolchains would choke on it.
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    list(APPEND COMBO_SOURCES Fleet.rc)
-endif()
-
 # Create executable
 add_executable(ComboShip ${COMBO_SOURCES})
 
@@ -146,12 +140,14 @@ endif()
 
 # Windows-specific settings
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    # Icon + version info for ComboShip.exe; the version is COMBO_RELEASE_VERSION padded to 4 parts.
+    # One resource file owns both the Fleet icon and version info. Adding Fleet.rc
+    # as well produces duplicate ICON resources and CVT1100 at the MSVC link step.
+    # The version is COMBO_RELEASE_VERSION padded to 4 parts.
     string(REGEX MATCHALL "[0-9]+" COMBO_RC_VERSION_PARTS "${COMBO_RELEASE_VERSION}")
     list(APPEND COMBO_RC_VERSION_PARTS 0 0 0 0)
     list(SUBLIST COMBO_RC_VERSION_PARTS 0 4 COMBO_RC_VERSION_PARTS)
     list(JOIN COMBO_RC_VERSION_PARTS "," COMBO_RC_VERSION_COMMAS)
-    set(COMBO_RC_ICON "${CMAKE_CURRENT_SOURCE_DIR}/windows/ComboShip.ico")
+    set(COMBO_RC_ICON "${CMAKE_CURRENT_SOURCE_DIR}/FLEET.ico")
     configure_file(windows/ComboShip.rc.in ${CMAKE_CURRENT_BINARY_DIR}/ComboShip.rc @ONLY)
     target_sources(ComboShip PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/ComboShip.rc)
 
