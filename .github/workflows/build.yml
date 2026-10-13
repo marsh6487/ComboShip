@@ -116,7 +116,25 @@ jobs:
       - name: Build comboui
         run: cmake --build build/x64 --target comboui --config Release
       - name: Build ComboShip
-        run: cmake --build build/x64 --target ComboShip --config Release
+        shell: pwsh
+        run: |
+          # Keep the normal build command, but surface the useful linker lines as
+          # a check annotation when GitHub's large job-log download is unavailable.
+          $PSNativeCommandUseErrorActionPreference = $false
+          $comboShipBuildLog = Join-Path $env:RUNNER_TEMP "comboship-build.log"
+          cmake --build build/x64 --target ComboShip --config Release 2>&1 | Tee-Object -FilePath $comboShipBuildLog
+          $comboShipBuildExitCode = $LASTEXITCODE
+          if ($comboShipBuildExitCode -ne 0) {
+            $diagnosticLines = Get-Content $comboShipBuildLog |
+              Where-Object { $_ -match '(?i)(error C[0-9]{4}|fatal error|LNK[0-9]{4}|MSB[0-9]{4}|: error )' } |
+              Select-Object -Last 40
+            if (-not $diagnosticLines) {
+              $diagnosticLines = Get-Content $comboShipBuildLog | Select-Object -Last 40
+            }
+            $diagnostic = ($diagnosticLines -join "`n").Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Host "::error title=Windows ComboShip build diagnostic::$diagnostic"
+            exit $comboShipBuildExitCode
+          }
 
       # Port asset archives (--norom). GenerateSohOtr builds Torch's soh-o2r-packer and
       # Generate2ShipOtr builds ZAPD on demand. They must run before cpack — the ship/2s2h ZIP components install
