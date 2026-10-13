@@ -118,6 +118,8 @@ jobs:
 
       - name: SoH 9.3 compatibility regressions
         run: |
+          python3 -B scripts/diagnostics/run_actor_db_registration_tests.py
+          python3 -B scripts/diagnostics/run_actor_db_registration_tests.py --sanitize
           python3 -B scripts/diagnostics/run_combo_save_compat_tests.py --json-include /usr/include
           python3 -B tests/oot_equipment_pause/run_age_requirement_tests.py
           python3 -B scripts/diagnostics/run_silver_rupee_cosmetic_tests.py

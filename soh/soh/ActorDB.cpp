@@ -599,6 +599,7 @@ void ActorDB::Entry::SetDesc(const std::string& newDesc) {
 static ActorDBInit EnPartnerInit = {
     "En_Partner",
     "Ivan",
+    -1, // Preserve dynamic registration for gEnPartnerId.
     ACTORCAT_ITEMACTION,
     (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_HOOKSHOT_PULLS_PLAYER |
      ACTOR_FLAG_CAN_PRESS_SWITCHES),
