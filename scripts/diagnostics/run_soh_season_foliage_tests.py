@@ -9,6 +9,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("output", type=Path)
 parser.add_argument("--spdlog-include", type=Path)
 parser.add_argument("--sanitize", action="store_true")
+parser.add_argument("--texture-fixtures", type=Path, help="Optional JSON array of [serialized OTEX path, surface] pairs")
 args = parser.parse_args()
 assert (root / "soh/soh/Enhancements/Graphics/SeasonFoliageTint.h").exists(), "Seasonal foliage implementation is missing"
 args.output.mkdir(parents=True, exist_ok=True)
@@ -27,3 +28,11 @@ for test in ["season_foliage_test", "season_foliage_binding_test"]:
                     str(root / "libultraship/src/fast/resource/type/Texture.cpp"),
                     str(root / "libultraship/src/ship/resource/Resource.cpp"), "-o", str(exe)], check=True)
     subprocess.run([str(exe)], check=True)
+if args.texture_fixtures:
+    import json
+    fixtures = json.loads(args.texture_fixtures.read_text())
+    exe = args.output / "season_foliage_archive_test"
+    subprocess.run(["c++", *flags, str(root / "soh/tests/season_foliage_archive_test.cpp"),
+                    str(root / "libultraship/src/fast/resource/type/Texture.cpp"),
+                    str(root / "libultraship/src/ship/resource/Resource.cpp"), "-o", str(exe)], check=True)
+    subprocess.run([str(exe), *[str(value) for pair in fixtures for value in pair]], check=True)

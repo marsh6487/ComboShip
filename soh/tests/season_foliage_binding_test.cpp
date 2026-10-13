@@ -35,7 +35,53 @@ int main() {
     Ship::Context context;
     context.rm = std::make_shared<Ship::ResourceManager>();
     Ship::Context::current = &context;
-    const std::string canopy = "alt/objects/object_wood02/tree03_model_01_0";
+    // Authored field terrain and shuffled actor greenery must resolve through
+    // both resource namespaces without affecting colored reward markers.
+    for (const char* target : { "scenes/shared/spot00_scene/s00_yuka_01_78B00___Copie",
+                                "scenes/shared/spot04_scene/s04_02_en_01_0",
+                                "scenes/shared/spot04_scene/s04_ie_01r_D100",
+                                "scenes/shared/spot04_scene/s04_ie_01x_17900",
+                                "scenes/shared/spot04_scene/s04_ie_01x_17900___Copie",
+                                "scenes/shared/spot04_scene/s04_tuta_02_41800",
+                                "scenes/shared/spot04_scene/s04_kusa_05_44900",
+                                "scenes/shared/spot04_scene/s04_yuka_01r_46800___Copie",
+                                "scenes/shared/spot04_scene/spot04_room_0Tex_011F08_rgba16_png",
+                                "scenes/shared/spot04_scene/spot04_room_0Tex_01B090_rgba16_png",
+                                "scenes/shared/spot04_scene/spot04_room_1Tex_0056A8_rgba16_png",
+                                "scenes/shared/spot04_scene/spot04_sceneTex_00FE18_rgba16_png",
+                                "scenes/shared/spot04_scene/spot04_sceneTex_010618_rgba16_png",
+                                "scenes/shared/spot10_scene/s04_kusa_05_2A00",
+                                "scenes/shared/spot10_scene/sp10_ki_02_2CF00",
+                                "scenes/shared/spot10_scene/sp10_ki_02c_4E100",
+                                "scenes/shared/spot10_scene/sp10_mon_01_3CB00",
+                                "scenes/shared/spot10_scene/sp10_mon_02_3F500",
+                                "objects/gameplay_field_keep/BushTex.rgba16",
+                                "objects/gameplay_field_keep/LeafTex.rgba16",
+                                "objects/gameplay_keep/gGrassBunchTex.rgba16",
+                                "objects/gameplay_keep/LeafTex.rgba16" }) {
+        for (const char* prefix : { "", "alt/" }) {
+            const std::string path = std::string(prefix) + target;
+            const auto source = Make(path);
+            const auto original = *source->mImageBuffer;
+            const std::string marker = "objects/gameplay_keep/reward_marker";
+            const auto reward = Make(marker);
+            context.rm->cache[path] = source;
+            context.rm->cache[marker] = reward;
+            for (int selected : { 2, 3 }) {
+                season = selected;
+                Update(nullptr);
+                REQUIRE(context.rm->cache[path] != source && "target greenery did not receive the selected tint");
+                REQUIRE(context.rm->cache[marker] == reward);
+                REQUIRE(*source->mImageBuffer == original);
+            }
+            season = 1;
+            Update(nullptr);
+            REQUIRE(context.rm->cache[path] == source);
+            Retire();
+            context.rm->cache.clear();
+        }
+    }
+    const std::string canopy = "alt/scenes/shared/spot04_scene/s04_ha_03_38800";
     const std::string grass = "alt/scenes/shared/spot04_scene/s04_yuka_01r_46800";
     const auto tree = Make(canopy), ground = Make(grass);
     context.rm->cache[canopy] = tree;

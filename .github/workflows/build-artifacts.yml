@@ -198,6 +198,7 @@ jobs:
           python3 -B scripts/diagnostics/run_soh_season_weather_tests.py
           python3 -B scripts/diagnostics/run_soh_season_particle_tests.py --sanitize
           python3 -B scripts/diagnostics/run_soh_season_foliage_tests.py "$RUNNER_TEMP/soh-season-foliage" --sanitize
+          python3 -B scripts/diagnostics/run_soh_season_actor_tests.py --sanitize
           python3 -B scripts/diagnostics/run_mm_winter_atmosphere_tests.py --sanitize
 
       - name: Foreign soul replacement skeletons and limb matrices

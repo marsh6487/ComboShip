@@ -7,6 +7,7 @@
 #include "z_en_wood02.h"
 #include "objects/object_wood02/object_wood02.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include "soh/Enhancements/Graphics/SeasonFoliageActor.h"
 #include "mods/transformation_masks/mm_mask_wear.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
@@ -473,11 +474,17 @@ void EnWood02_Draw(Actor* thisx, PlayState* play) {
         Gfx_DrawDListOpa(play, D_80B3BF54[this->drawType & 0xF]);
         gDPSetEnvColor(POLY_XLU_DISP++, red, green, blue, 0);
         gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        s32 seasonal = SeasonFoliage_ActorBegin(&POLY_XLU_DISP, play, true);
         gSPDisplayList(POLY_XLU_DISP++, D_80B3BF70[this->drawType & 0xF]);
+        SeasonFoliage_ActorEnd(&POLY_XLU_DISP, seasonal);
     } else {
         Gfx_SetupDL_25Xlu(gfxCtx);
         gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(gfxCtx), G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        s32 seasonal = (this->drawType & 0xF) == WOOD_DRAW_BUSH_GREEN
+                           ? SeasonFoliage_ActorBegin(&POLY_XLU_DISP, play, false)
+                           : false;
         gSPDisplayList(POLY_XLU_DISP++, D_80B3BF54[this->drawType & 0xF]);
+        SeasonFoliage_ActorEnd(&POLY_XLU_DISP, seasonal);
     }
 
     CLOSE_DISPS(gfxCtx);

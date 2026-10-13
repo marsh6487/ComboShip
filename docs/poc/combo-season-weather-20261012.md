@@ -35,10 +35,13 @@ textures retain their original metadata. Native and Alt cache bindings
 restore only the copies they own, retain queued texture allocations, and
 clear the GPU texture cache before retiring scene cohorts.
 
-The exact foliage material list contains 92 mapped resource paths, primarily
-Djipi materials and shared native foliage. This does not claim comprehensive
-vanilla scene coverage: the referenced pack does not expose a mapped Hyrule
-Field ground material. Unmapped resources remain on their original path.
+The original exact foliage material list contained 92 mapped resource paths.
+The [OoT actor bridge](oot-actor-tints-bridge-20261013.md) adds the supplied
+Hyrule Field ground identity and missing Kokiri Forest / Lost Woods grass and
+trim, and scopes ordinary actor foliage at draw time. The current texture table
+contains 103 paths, including separate shuffled-grass greenery. This does not
+claim comprehensive vanilla scene coverage; unmapped scene resources retain
+their original path.
 
 Native rain requests and scripted weather retain precedence in OoT. Seasonal
 sky presentation yields to living native weather tags and the original
