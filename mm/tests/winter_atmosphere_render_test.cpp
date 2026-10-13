@@ -172,6 +172,9 @@ static size_t Draw(PlayState& play) {
         return commands;
     }
     bool textured = true, depthTest = false;
+    uint32_t geometry = G_LIGHTING | G_FOG | G_CULL_BACK | G_CULL_FRONT;
+    uint32_t otherHigh = 0, otherLow = 0;
+    const Gfx shade = gsDPSetCombineMode(G_CC_SHADE, G_CC_SHADE);
     Gfx lastCombine{};
     auto inspect = [&](auto&& self, const Gfx* command) -> void {
         const auto opcode = command->words.w0 >> 24;
@@ -183,9 +186,33 @@ static size_t Draw(PlayState& play) {
             textured = (command->words.w0 & 0xFF) != 0;
         if (opcode == G_SETCOMBINE)
             lastCombine = *command;
+        if (opcode == G_GEOMETRYMODE)
+            geometry = (geometry & (command->words.w0 & 0xFFFFFF)) | command->words.w1;
+        if (opcode == G_RDPSETOTHERMODE) {
+            otherHigh = command->words.w0 & 0xFFFFFF;
+            otherLow = command->words.w1;
+        }
+        if (opcode == G_SETOTHERMODE_H || opcode == G_SETOTHERMODE_L) {
+            const unsigned bits = (command->words.w0 & 0xFF) + 1;
+            const unsigned shift = 32 - ((command->words.w0 >> 8) & 0xFF) - bits;
+            const uint32_t mask = (0xFFFFFFFFu >> (32 - bits)) << shift;
+            auto& mode = opcode == G_SETOTHERMODE_H ? otherHigh : otherLow;
+            mode = (mode & ~mask) | (command->words.w1 & mask);
+        }
         if (opcode == G_SETOTHERMODE_L && (command->words.w1 & Z_CMP)) {
             depthTest = true;
             assert(!(command->words.w1 & Z_UPD)); // Terrain/buildings occlude, sheets never hide later actors.
+        }
+        if (opcode == G_VTX || opcode == G_TRI2) {
+            // Match the native Fast3D alpha, fog, clip and blend prerequisites
+            // at submitted geometry, rather than only inspecting cleanup.
+            assert(!textured && !(geometry & (G_LIGHTING | G_FOG | G_CULL_BACK | G_CULL_FRONT)));
+            assert((geometry & (G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH)) == (G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH));
+            assert(lastCombine.words.w0 == shade.words.w0 && lastCombine.words.w1 == shade.words.w1);
+            assert((otherHigh & (3u << G_MDSFT_CYCLETYPE)) == G_CYC_1CYCLE);
+            assert((otherLow & (G_AC_DITHER | G_ZS_PRIM | Z_UPD | CVG_X_ALPHA)) == 0);
+            assert((otherLow & Z_CMP) && ((otherLow & (3u << 20)) == (G_BL_CLR_MEM << 20)) &&
+                   ((otherLow & (3u << 16)) == (G_BL_1MA << 16)));
         }
     };
     for (const Gfx* command = xlu; command != gfx.polyXlu.p; ++command)
@@ -211,6 +238,75 @@ static unsigned PeakAurora() {
             for (const auto& vertex : mesh.vertices)
                 peak = std::max(peak, unsigned(vertex.v.cn[3]));
     return peak;
+}
+static MMWinter::View NativeCamera(PlayState& play, float pitch, int yaw) {
+    const float p = pitch * 0.0174532925f, y = yaw * 0.0174532925f;
+    MMWinter::View view{ { 0, 100, 0 },
+                         { std::sin(y) * std::cos(p), -std::sin(p), std::cos(y) * std::cos(p) },
+                         { -std::cos(y), 0, std::sin(y) },
+                         { std::sin(y) * std::sin(p), std::cos(p), std::cos(y) * std::sin(p) },
+                         0.5773503f,
+                         aspect };
+    auto* camera = GET_ACTIVE_CAM(&play);
+    const auto at = view.eye + view.forward * 1000;
+    play.view.eye = camera->eye = { view.eye.x, view.eye.y, view.eye.z };
+    play.view.at = camera->at = { at.x, at.y, at.z };
+    play.view.up = { view.up.x, view.up.y, view.up.z };
+    play.view.fovy = camera->fov = 60;
+    return view;
+}
+static MMWinter::Vec3 WorldVertex(const Mesh& mesh, size_t index) {
+    const auto* p = mesh.vertices[index].v.ob;
+    return { mesh.origin.x + p[0], mesh.origin.y + p[1], mesh.origin.z + p[2] };
+}
+static bool SubmittedCoreInView(const MMWinter::View& view) {
+    for (const auto& mesh : meshes)
+        if (mesh.vertices.size() == 24)
+            for (size_t i = 0; i < mesh.vertices.size(); ++i) {
+                const auto relative = WorldVertex(mesh, i) - view.eye;
+                const float depth = MMSummer::Dot(relative, view.forward);
+                if (mesh.vertices[i].v.cn[3] > 25 && depth > 0 &&
+                    std::abs(MMSummer::Dot(relative, view.right)) < depth * view.tanHalfFov * view.aspect * 0.95f &&
+                    std::abs(MMSummer::Dot(relative, view.up)) < depth * view.tanHalfFov * 0.95f)
+                    return true;
+            }
+    return false;
+}
+static void MistReadableAgainstFrost(const MMWinter::View& view) {
+    // Termina's accepted full frost colors are canopy CCDCEE and grass E5EDF3.
+    // Model the native source-over blend from the actual submitted vertex
+    // colors/alpha, and project the mesh into a 240-line native camera view.
+    const unsigned frost[2][3] = { { 204, 220, 238 }, { 229, 237, 243 } };
+    float peakContrast[2]{};
+    float minHeight = 1000;
+    size_t count = 0;
+    for (const auto& mesh : meshes) {
+        if (mesh.vertices.size() != 15)
+            continue;
+        ++count;
+        const auto projectedY = [&](size_t index) {
+            const auto relative = WorldVertex(mesh, index) - view.eye;
+            return MMSummer::Dot(relative, view.up) / (MMSummer::Dot(relative, view.forward) * view.tanHalfFov);
+        };
+        const float height = 120 * std::abs(projectedY(12) - projectedY(2));
+        minHeight = std::min(minHeight, height);
+        assert(height >= 9 && "far ground mist must span more than a few native scanlines");
+        const auto& color = mesh.vertices[7].v.cn;
+        for (size_t palette = 0; palette < 2; ++palette) {
+            float contrast = 0;
+            for (size_t channel = 0; channel < 3; ++channel)
+                contrast += std::abs(float(color[channel]) - frost[palette][channel]) * color[3] / (255 * 3);
+            peakContrast[palette] = std::max(peakContrast[palette], contrast);
+        }
+        const auto bottom = WorldVertex(mesh, 2);
+        assert(std::abs(bottom.y - Terrain({ bottom.x, bottom.y, bottom.z }) - 2) <= 0.6f);
+    }
+    assert(count >= 8);
+    for (const float contrast : peakContrast)
+        assert(contrast >= 6 && "ice-blue mist must remain distinguishable against full winter frost");
+    std::printf("PASS MM mist projection/blend model: minimum %.2f native pixels, peak canopy/grass contrast %.2f/%.2f "
+                "RGB levels\n",
+                minHeight, peakContrast[0], peakContrast[1]);
 }
 static void SameMeshes(const std::vector<Mesh>& before) {
     assert(before.size() == meshes.size());
@@ -255,7 +351,7 @@ int main() {
     assert(Count(15) >= 8 && Count(24) == 0 && matrices == static_cast<int>(Count(15)) && floorQueries > 0);
     for (const auto& mesh : meshes) {
         const float clearance = mesh.origin.y - Terrain(mesh.origin);
-        assert(clearance >= 5 && clearance <= 40);
+        assert(clearance >= 17 && clearance <= 51); // Cached terrain can move by a fraction between samples.
         for (size_t i = 0; i < mesh.vertices.size(); ++i) {
             const auto alpha = mesh.vertices[i].v.cn[3];
             assert(alpha <= 62);
@@ -264,6 +360,15 @@ int main() {
         }
     }
     const auto mist = meshes;
+    MistReadableAgainstFrost(NativeCamera(play, 0, 0));
+    for (float pitch : { 10.0f, 15.0f }) {
+        const auto view = NativeCamera(play, pitch, 0);
+        Draw(play);
+        MistReadableAgainstFrost(view);
+    }
+    NativeCamera(play, 0, 0);
+    Draw(play);
+    SameMeshes(mist);
     const int queries = floorQueries;
     for (int i = 0; i < 20; ++i) {
         UpdateFromPlay(&play);
@@ -316,6 +421,19 @@ int main() {
     assert(blue && green);
     const auto aurora = meshes;
     const unsigned fullNight = PeakAurora();
+    for (const float nativeAspect : { 4.0f / 3.0f, 16.0f / 9.0f }) {
+        aspect = nativeAspect;
+        for (float pitch : { 10.0f, 15.0f })
+            for (int yaw = 0; yaw < 360; yaw += 30) {
+                const auto view = NativeCamera(play, pitch, yaw);
+                Draw(play);
+                assert(Count(24) == 3 && SubmittedCoreInView(view));
+                assert(PeakAurora() == fullNight);
+            }
+    }
+    aspect = 16.0f / 9.0f;
+    NativeCamera(play, 0, 0);
+    Draw(play);
     for (int hour : { 18, 6 }) {
         gSaveContext.save.time = CLOCK_TIME(hour, 0);
         assert(Draw(play) == 0);
@@ -325,7 +443,7 @@ int main() {
         Draw(play);
         assert(PeakAurora() * 2 >= fullNight - 2 && PeakAurora() * 2 <= fullNight + 2);
     }
-    for (int hour : { 20, 4 }) {
+    for (int hour : { 20, 21, 22, 23, 0, 1, 2, 3, 4 }) {
         gSaveContext.save.time = CLOCK_TIME(hour, 0);
         Draw(play);
         assert(PeakAurora() == fullNight);
@@ -469,7 +587,8 @@ int main() {
     MMWinterAtmosphere_Draw(&play);
     std::puts("PASS MM winter renderer/controller: terrain feathering, snow independence, actual story/interior/Rod "
               "gates, pause/live controls, frame/scene/room/game lifetimes, blue/green night ribbons, far clip, "
-              "depth test, native texture restoration and actor/save/environment immutability");
+              "native camera frustum, frost contrast/footprint, full alpha/depth material, native texture restoration "
+              "and actor/save/environment immutability");
 }
 #else
 #include <cstdio>

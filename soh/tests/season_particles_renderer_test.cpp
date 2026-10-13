@@ -164,6 +164,9 @@ static size_t Draw(PlayState& play) {
     assert(stack == 0 && children == 0 && scopes == 0);
     assert(matrices <= 96);
     bool texture = true, depthTest = false;
+    uint32_t geometry = G_LIGHTING | G_FOG | G_CULL_BACK | G_CULL_FRONT;
+    uint32_t otherHigh = 0, otherLow = 0;
+    const Gfx shade = gsDPSetCombineMode(G_CC_SHADE, G_CC_SHADE);
     Gfx lastCombine{};
     auto inspect = [&](auto&& self, const Gfx* p) -> void {
         const unsigned opcode = p->words.w0 >> 24;
@@ -177,8 +180,31 @@ static size_t Draw(PlayState& play) {
             texture = (p->words.w0 & 0xFF) != 0;
         if (opcode == G_SETPRIMCOLOR)
             alphas.push_back(p->words.w1 & 0xFF);
+        if (opcode == G_GEOMETRYMODE)
+            geometry = (geometry & (p->words.w0 & 0xFFFFFF)) | p->words.w1;
+        if (opcode == G_RDPSETOTHERMODE) {
+            otherHigh = p->words.w0 & 0xFFFFFF;
+            otherLow = p->words.w1;
+        }
+        if (opcode == G_SETOTHERMODE_H || opcode == G_SETOTHERMODE_L) {
+            const unsigned bits = (p->words.w0 & 0xFF) + 1;
+            const unsigned shift = 32 - ((p->words.w0 >> 8) & 0xFF) - bits;
+            const uint32_t mask = (0xFFFFFFFFu >> (32 - bits)) << shift;
+            auto& mode = opcode == G_SETOTHERMODE_H ? otherHigh : otherLow;
+            mode = (mode & ~mask) | (p->words.w1 & mask);
+        }
         if (opcode == G_SETOTHERMODE_L && (p->words.w1 & Z_CMP))
             depthTest = true;
+        const auto vertexCount = (p->words.w0 >> 12) & 0xFF;
+        if (season == 3 && opcode == G_VTX && (vertexCount == 15 || vertexCount == 24)) {
+            assert(!texture && !(geometry & (G_LIGHTING | G_FOG | G_CULL_BACK | G_CULL_FRONT)));
+            assert((geometry & (G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH)) == (G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH));
+            assert(lastCombine.words.w0 == shade.words.w0 && lastCombine.words.w1 == shade.words.w1);
+            assert((otherHigh & (3u << G_MDSFT_CYCLETYPE)) == G_CYC_1CYCLE);
+            assert((otherLow & (G_AC_DITHER | G_ZS_PRIM | Z_UPD | CVG_X_ALPHA)) == 0);
+            assert((otherLow & Z_CMP) && ((otherLow & (3u << 20)) == (G_BL_CLR_MEM << 20)) &&
+                   ((otherLow & (3u << 16)) == (G_BL_1MA << 16)));
+        }
     };
     for (auto* p = xlu; p < gfx.polyXlu.p; ++p)
         inspect(inspect, p);
@@ -200,6 +226,35 @@ static void Advance(PlayState& play, int frames) {
         ++play.gameplayFrames;
         Draw(play);
     }
+}
+static SoHSeasonParticles::View NativeAuroraCamera(PlayState& play, float pitch, int yaw) {
+    const float p = pitch * 0.0174532925f, y = yaw * 0.0174532925f;
+    SoHSeasonParticles::View view{ { 0, 100, 0 },
+                                   { std::sin(y) * std::cos(p), -std::sin(p), std::cos(y) * std::cos(p) },
+                                   { -std::cos(y), 0, std::sin(y) },
+                                   { std::sin(y) * std::sin(p), std::cos(p), std::cos(y) * std::sin(p) },
+                                   0.5773503f,
+                                   aspect };
+    auto* camera = GET_ACTIVE_CAM(&play);
+    const auto at = view.eye + view.forward * 1000;
+    play.view.eye = camera->eye = { view.eye.x, view.eye.y, view.eye.z };
+    play.view.lookAt = camera->at = { at.x, at.y, at.z };
+    play.view.up = { view.up.x, view.up.y, view.up.z };
+    play.view.fovy = camera->fov = 60;
+    return view;
+}
+static bool SubmittedAuroraCoreInView(const SoHSeasonParticles::View& view) {
+    assert(allocatedVertices == 72 && meshOrigins.size() == 3);
+    for (size_t i = 0; i < allocatedVertices; ++i) {
+        const auto& vertex = dynamicVertices[i];
+        const auto& origin = meshOrigins[i / 24];
+        const auto* p = vertex.v.ob;
+        const auto projected = SoHSeasonParticles::Project({ origin.x + p[0], origin.y + p[1], origin.z + p[2] }, view);
+        if (vertex.v.cn[3] > 25 && projected.depth > 0 && std::abs(projected.x) < 0.95f &&
+            std::abs(projected.y) < 0.95f)
+            return true;
+    }
+    return false;
 }
 int main() {
     static PlayState play{};
@@ -443,6 +498,26 @@ int main() {
         green |= vertex.v.cn[1] > vertex.v.cn[2] && vertex.v.cn[3] > 0;
     }
     assert(blue && green);
+    for (const float nativeAspect : { 4.0f / 3.0f, 16.0f / 9.0f }) {
+        aspect = nativeAspect;
+        for (float pitch : { 10.0f, 15.0f })
+            for (int yaw = 0; yaw < 360; yaw += 30) {
+                const auto view = NativeAuroraCamera(play, pitch, yaw);
+                Draw(play);
+                assert(matrices == 1 && SubmittedAuroraCoreInView(view));
+            }
+    }
+    aspect = 16.0f / 9.0f;
+    NativeAuroraCamera(play, 0, 0);
+    Draw(play);
+    const auto nightAurora = std::vector<Vtx>(dynamicVertices, dynamicVertices + allocatedVertices);
+    for (int hour : { 20, 21, 22, 23, 0, 1, 2, 3, 4 }) {
+        gSaveContext.dayTime = CLOCK_TIME(hour, 0);
+        Draw(play);
+        assert(allocatedVertices == nightAurora.size());
+        assert(std::memcmp(dynamicVertices, nightAurora.data(), allocatedVertices * sizeof(Vtx)) == 0);
+    }
+    gSaveContext.dayTime = CLOCK_TIME(23, 0);
     play.view.zFar = 2000;
     Draw(play);
     for (size_t i = 0; i < allocatedVertices; ++i) {
@@ -475,7 +550,8 @@ int main() {
         assert(Draw(play) == 0);
     }
     std::puts("PASS winter renderer: snow-independent terrain mist and night-only blue/green aurora, pause/toggles, "
-              "clipping, native snow coexistence, gates and ownership");
+              "native camera frustum, full-night timing, alpha/depth material, clipping, native snow coexistence, "
+              "gates and ownership");
     std::puts("PASS native renderer:96leaf/petal,64snow,32seed/56firefly/3beam; command/matrix budget, texture "
               "restoration, pause/toggle/gates/reset, native actor/save/environment ownership");
 }

@@ -12,12 +12,17 @@ struct Tint {
     uint32_t color = 0;
     unsigned lightScale = 256;
 };
+// Atlas bounds in sixteenths, independent of native/HD texture dimensions.
+// Defaults select the whole texture; authored exceptions protect nearby bark/stone.
+struct Region {
+    unsigned left = 0, top = 0, right = 16, bottom = 16;
+};
 
 inline Tint Palette(int season, Surface surface) {
     switch (season) {
         case 0:
-            return surface == Surface::Canopy       ? Tint{ 0xF6C1D9E0, 256 }
-                   : surface == Surface::Understory ? Tint{ 0xF6C1D920, 256 }
+            return surface == Surface::Canopy       ? Tint{ 0xF6C1D9E0, 461 }
+                   : surface == Surface::Understory ? Tint{ 0xF6C1D9E0, 461 }
                                                     : Tint{};
         case 2:
             return { surface == Surface::Canopy ? 0xF4B783FFu : 0xFFD078FFu, 256 };
@@ -30,8 +35,11 @@ inline Tint Palette(int season, Surface surface) {
 
 // Tint copies are made from the original texture, never the preceding season.
 // Djipi's RGBA16 resources with LOAD_AS_RAW carry four RGBA bytes per pixel.
-inline std::shared_ptr<Fast::Texture> BuildTexture(const std::shared_ptr<Fast::Texture>& source, Tint tint) {
+inline std::shared_ptr<Fast::Texture> BuildTexture(const std::shared_ptr<Fast::Texture>& source, Tint tint,
+                                                   Region region = {}) {
     if (!source || !tint.color || !source->ImageData || !source->Width || !source->Height)
+        return nullptr;
+    if (region.left >= region.right || region.top >= region.bottom || region.right > 16 || region.bottom > 16)
         return nullptr;
     const bool packed = source->Type == Fast::TextureType::RGBA16bpp && source->Flags == 0;
     const bool raw = (source->Flags & TEX_FLAG_LOAD_AS_RAW) != 0;
@@ -60,7 +68,15 @@ inline std::shared_ptr<Fast::Texture> BuildTexture(const std::shared_ptr<Fast::T
     copy->mImageBuffer = std::make_shared<std::vector<char>>(first, first + source->ImageDataSize);
     copy->ImageData = reinterpret_cast<uint8_t*>(copy->mImageBuffer->data());
     bool changed = false;
+    const bool wholeTexture = region.left == 0 && region.top == 0 && region.right == 16 && region.bottom == 16;
     for (size_t i = 0; i < copy->ImageDataSize; i += stride) {
+        if (!wholeTexture) {
+            const size_t pixelIndex = i / stride;
+            const unsigned x = pixelIndex % source->Width, y = pixelIndex / source->Width;
+            if (x * 16 < source->Width * region.left || x * 16 >= source->Width * region.right ||
+                y * 16 < source->Height * region.top || y * 16 >= source->Height * region.bottom)
+                continue;
+        }
         auto* pixel = copy->ImageData + i;
         const unsigned native = packed ? (unsigned(pixel[0]) << 8) | pixel[1] : 0;
         const unsigned r = packed ? native >> 11 : pixel[0];

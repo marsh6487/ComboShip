@@ -171,9 +171,11 @@ extern "C" void MMWinterAtmosphere_Draw(PlayState* play) {
                 relative.y += (row - 1) * wisp.height * (1 - 0.3f * std::abs(x));
                 const float alpha =
                     row == 1 && column > 0 && column < 4 ? wisp.alpha * edge * (column == 2 ? 1 : 0.68f) : 0;
+                // Keep the same soft alpha while separating the ice blue mist
+                // from Termina's nearly white frost palette.
                 const Vtx vertex =
                     VTX(static_cast<s16>(std::lround(relative.x)), static_cast<s16>(std::lround(relative.y)),
-                        static_cast<s16>(std::lround(relative.z)), 0, 0, 192, 222, 245,
+                        static_cast<s16>(std::lround(relative.z)), 0, 0, 150, 190, 225,
                         static_cast<u8>(std::lround(alpha * 255)));
                 vertices[row * 5 + column] = vertex;
             }

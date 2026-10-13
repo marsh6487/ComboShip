@@ -1,5 +1,6 @@
 #include "soh/Enhancements/Graphics/SeasonFoliage.cpp"
 #include "test_require.h"
+#include <cstring>
 #include <iostream>
 
 Ship::Context* Ship::Context::current = nullptr;
@@ -35,9 +36,105 @@ int main() {
     Ship::Context context;
     context.rm = std::make_shared<Ship::ResourceManager>();
     Ship::Context::current = &context;
+    // The same cached image can be reached by different authored atlas paths.
+    // Recolor only each path's foliage region, even when stone/bark is greenish.
+    const auto atlas = Make("fixture/shared-atlas");
+    atlas->Width = atlas->Height = 16;
+    atlas->ImageDataSize = 16 * 16 * 4;
+    atlas->mImageBuffer = std::make_shared<std::vector<char>>(atlas->ImageDataSize);
+    for (size_t at = 0; at < atlas->ImageDataSize; at += 4) {
+        (*atlas->mImageBuffer)[at] = 60;
+        (*atlas->mImageBuffer)[at + 1] = 110;
+        (*atlas->mImageBuffer)[at + 2] = 70;
+        (*atlas->mImageBuffer)[at + 3] = 83;
+    }
+    atlas->ImageData = reinterpret_cast<uint8_t*>(atlas->mImageBuffer->data());
+    const auto atlasOriginal = *atlas->mImageBuffer;
+    struct AtlasCase {
+        const char* path;
+        unsigned left, top, right, bottom;
+    };
+    const AtlasCase atlasCases[] = {
+        { "scenes/shared/spot00_scene/s00_yama_01_76B00", 0, 8, 16, 16 },
+        { "custom/prelude/spot00_scene/recipe252_tex0", 0, 8, 8, 16 },
+        { "scenes/shared/spot00_scene/s00_ki_02_22000", 0, 0, 16, 12 },
+        { "scenes/shared/spot00_scene/s00_ki_03_2C800", 0, 0, 16, 15 },
+    };
+    for (const char* prefix : { "", "alt/" }) {
+        for (const auto& item : atlasCases)
+            context.rm->cache[std::string(prefix) + item.path] = atlas;
+        season = 3;
+        Update(nullptr);
+        for (const auto& item : atlasCases) {
+            const auto copy =
+                std::dynamic_pointer_cast<Fast::Texture>(context.rm->cache.at(std::string(prefix) + item.path));
+            REQUIRE(copy && copy != atlas && "authored foliage region was not tinted");
+            for (unsigned y = 0; y < 16; ++y)
+                for (unsigned x = 0; x < 16; ++x) {
+                    const size_t at = (y * 16 + x) * 4;
+                    const bool foliage = x >= item.left && x < item.right && y >= item.top && y < item.bottom;
+                    REQUIRE((std::memcmp(atlas->ImageData + at, copy->ImageData + at, 3) != 0) == foliage);
+                    REQUIRE(copy->ImageData[at + 3] == 83);
+                }
+        }
+        REQUIRE(*atlas->mImageBuffer == atlasOriginal);
+        season = 1;
+        Update(nullptr);
+        for (const auto& item : atlasCases)
+            REQUIRE(context.rm->cache.at(std::string(prefix) + item.path) == atlas);
+        Retire();
+        context.rm->cache.clear();
+    }
     // Authored field terrain and shuffled actor greenery must resolve through
     // both resource namespaces without affecting colored reward markers.
     for (const char* target : { "scenes/shared/spot00_scene/s00_yuka_01_78B00___Copie",
+                                "custom/prelude/spot00_scene/s00_yuka_04_85D00",
+                                "scenes/shared/spot00_scene/s00_kabe_01_11300",
+                                "scenes/shared/spot00_scene/s00_kabe_05_1C700",
+                                "custom/prelude/spot00_scene/recipe222_tex0",
+                                "custom/prelude/spot00_scene/recipe232_tex0",
+                                "custom/prelude/spot00_scene/recipe242_tex0",
+                                "custom/prelude/spot00_scene/recipe282_tex0",
+                                "custom/prelude/spot00_scene/recipe292_tex0",
+                                "custom/prelude/spot00_scene/recipe302_tex0",
+                                "custom/prelude/spot00_scene/recipe312_tex0",
+                                "custom/prelude/spot00_scene/recipe322_tex0",
+                                "scenes/shared/spot00_scene/s00_yuka_04_85D00",
+                                "custom/prelude/spot00_scene/recipe223_tex0",
+                                "custom/prelude/spot00_scene/recipe233_tex0",
+                                "custom/prelude/spot00_scene/recipe243_tex0",
+                                "custom/prelude/spot00_scene/recipe283_tex0",
+                                "custom/prelude/spot00_scene/recipe293_tex0",
+                                "custom/prelude/spot00_scene/recipe303_tex0",
+                                "custom/prelude/spot00_scene/recipe313_tex0",
+                                "custom/prelude/spot00_scene/recipe323_tex0",
+                                "custom/prelude/spot00_scene/recipe229_tex0",
+                                "custom/prelude/spot00_scene/recipe239_tex0",
+                                "custom/prelude/spot00_scene/recipe249_tex0",
+                                "custom/prelude/spot00_scene/recipe281_tex0",
+                                "custom/prelude/spot00_scene/recipe289_tex0",
+                                "custom/prelude/spot00_scene/recipe299_tex0",
+                                "custom/prelude/spot00_scene/recipe309_tex0",
+                                "custom/prelude/spot00_scene/recipe319_tex0",
+                                "custom/prelude/spot00_scene/recipe329_tex0",
+                                "custom/prelude/spot00_scene/recipe221_tex0",
+                                "custom/prelude/spot00_scene/recipe225_tex0",
+                                "custom/prelude/spot00_scene/recipe235_tex0",
+                                "custom/prelude/spot00_scene/recipe245_tex0",
+                                "custom/prelude/spot00_scene/recipe285_tex0",
+                                "custom/prelude/spot00_scene/recipe295_tex0",
+                                "custom/prelude/spot00_scene/recipe305_tex0",
+                                "custom/prelude/spot00_scene/recipe315_tex0",
+                                "custom/prelude/spot00_scene/recipe325_tex0",
+                                "custom/prelude/spot00_scene/recipe226_tex0",
+                                "custom/prelude/spot00_scene/recipe236_tex0",
+                                "custom/prelude/spot00_scene/recipe246_tex0",
+                                "custom/prelude/spot00_scene/recipe286_tex0",
+                                "custom/prelude/spot00_scene/recipe296_tex0",
+                                "custom/prelude/spot00_scene/recipe306_tex0",
+                                "custom/prelude/spot00_scene/recipe316_tex0",
+                                "custom/prelude/spot00_scene/recipe326_tex0",
+                                "scenes/shared/spot00_scene/s00_hana_02_5500",
                                 "scenes/shared/spot04_scene/s04_02_en_01_0",
                                 "scenes/shared/spot04_scene/s04_ie_01r_D100",
                                 "scenes/shared/spot04_scene/s04_ie_01x_17900",
@@ -67,11 +164,15 @@ int main() {
             const auto reward = Make(marker);
             context.rm->cache[path] = source;
             context.rm->cache[marker] = reward;
+            const std::string pavers = "alt/scenes/shared/spot00_scene/s00_road_01_41180";
+            const auto stone = Make(pavers);
+            context.rm->cache[pavers] = stone;
             for (int selected : { 2, 3 }) {
                 season = selected;
                 Update(nullptr);
                 REQUIRE(context.rm->cache[path] != source && "target greenery did not receive the selected tint");
                 REQUIRE(context.rm->cache[marker] == reward);
+                REQUIRE(context.rm->cache[pavers] == stone && "greenish stone paving must stay native");
                 REQUIRE(*source->mImageBuffer == original);
             }
             season = 1;

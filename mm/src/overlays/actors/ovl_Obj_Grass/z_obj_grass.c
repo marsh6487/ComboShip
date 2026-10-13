@@ -471,7 +471,7 @@ void ObjGrass_DrawOpa(Actor* thisx, PlayState* play2) {
     Vec3s rot = { 0, 0, 0 };
     ObjGrassElement* grassElem;
     s32 season = MMWeather_SeasonForPlay(play);
-    s32 frost = season == SEASON_WINTER && play->sceneId == SCENE_00KEIKOKU;
+    s32 frost = season == SEASON_WINTER;
     // Spring is a subtle warmth on liftable blades, preserving native green and fade alpha.
     s32 spring = season == SEASON_SPRING;
     s32 seasonal = spring || season == SEASON_AUTUMN || frost;
@@ -493,8 +493,8 @@ void ObjGrass_DrawOpa(Actor* thisx, PlayState* play2) {
                              spring  ? 217
                              : frost ? 243
                                      : 69,
-                             spring ? 32 : 255);
-        gSPGrayscale(POLY_OPA_DISP++, spring ? 2 : frost ? 3 : 1);
+                             spring ? 224 : 255);
+        gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 1);
     }
 
     for (i = 0; i < this->activeGrassGroups; i++) {
@@ -541,7 +541,7 @@ void ObjGrass_DrawXlu(Actor* thisx, PlayState* play) {
     s32 j;
     Vec3s rot = { 0, 0, 0 };
     s32 season = MMWeather_SeasonForPlay(play);
-    s32 frost = season == SEASON_WINTER && play->sceneId == SCENE_00KEIKOKU;
+    s32 frost = season == SEASON_WINTER;
     s32 spring = season == SEASON_SPRING;
     s32 seasonal = spring || season == SEASON_AUTUMN || frost;
 
@@ -561,8 +561,8 @@ void ObjGrass_DrawXlu(Actor* thisx, PlayState* play) {
                              spring  ? 217
                              : frost ? 243
                                      : 69,
-                             spring ? 32 : 255);
-        gSPGrayscale(POLY_XLU_DISP++, spring ? 2 : frost ? 3 : 1);
+                             spring ? 224 : 255);
+        gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 1);
     }
 
     for (i = 0; i < this->activeGrassGroups; i++) {

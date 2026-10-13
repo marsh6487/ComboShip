@@ -373,7 +373,7 @@ static void Materials(void) {
         REQUIRE((gfx.polyOpa.p - opaque) * sizeof(Gfx) == trunkSize);
         REQUIRE(!memcmp(originalTrunk, opaque, trunkSize));
         for (int season = SEASON_SPRING; season <= SEASON_OFF; ++season) {
-            if (season == SEASON_AUTUMN || season == SEASON_SPRING) {
+            if (season == SEASON_AUTUMN || season == SEASON_SPRING || season == SEASON_WINTER) {
                 continue;
             }
             liveSeason = season;
@@ -412,7 +412,7 @@ static void RequireSpringCommands(const Gfx* first, const Gfx* end, const Gfx* n
     for (const Gfx* cmd = first; cmd < end; ++cmd) {
         unsigned op = cmd->words.w0 >> 24;
         if (op == G_SETGRAYSCALE) {
-            REQUIRE(cmd->words.w1 == 0 || cmd->words.w1 == 2);
+            REQUIRE(cmd->words.w1 == 0 || cmd->words.w1 == 3);
             mode = cmd->words.w1;
             if (mode)
                 ++enables;
@@ -421,12 +421,12 @@ static void RequireSpringCommands(const Gfx* first, const Gfx* end, const Gfx* n
             continue;
         }
         if (op == G_SETINTENSITY) {
-            REQUIRE(cmd->words.w1 == 0xF6C1D9E0);
+            REQUIRE(cmd->words.w1 == 0xF6C1D9FF);
             ++colors;
             continue;
         }
         if (op == G_DL) {
-            REQUIRE(mode == (cmd->words.w1 == (uintptr_t)canopy ? 2 : 0));
+            REQUIRE(mode == (cmd->words.w1 == (uintptr_t)canopy ? 3 : 0));
             canopies += cmd->words.w1 == (uintptr_t)canopy;
         }
         REQUIRE(source < count && !memcmp(cmd, native + source++, sizeof(Gfx)));
@@ -511,7 +511,7 @@ static void SpringMaterials(void) {
         REQUIRE((size_t)(gfx.polyOpa.p - opaque) == opaCount && !memcmp(opa, opaque, opaCount * sizeof(Gfx)));
         REQUIRE((size_t)(gfx.polyXlu.p - translucent) == xluCount && !memcmp(xlu, translucent, xluCount * sizeof(Gfx)));
     }
-    puts("PASS spring all tree canopies/Alt ownership, mode 2 partial blossom tint, native trunks/leaves/bushes and "
+    puts("PASS spring all tree canopies/Alt ownership, lifted full blossom tint, native trunks/leaves/bushes and "
          "exact summer/Off/eligibility cleanup");
 }
 
@@ -529,35 +529,71 @@ static void WinterMaterials(void) {
         size_t leafSize = (gfx.polyXlu.p - translucent) * sizeof(Gfx);
         memcpy(originalTrunk, opaque, trunkSize);
         memcpy(originalLeaves, translucent, leafSize);
-        play.sceneId = SCENE_00KEIKOKU;
-        liveSeason = SEASON_WINTER;
-        BeginDraw();
-        EnWood02_Draw(&tree.actor, &play);
-        REQUIRE(Color(translucent, gfx.polyXlu.p, G_SETINTENSITY) == 0xCCDCEEFF);
-        int frost = 0, draws = 0;
-        for (const Gfx* cmd = translucent; cmd < gfx.polyXlu.p; ++cmd) {
-            if ((cmd->words.w0 >> 24) == G_SETGRAYSCALE) {
-                REQUIRE(cmd->words.w1 == 0 || cmd->words.w1 == 3);
-                frost = cmd->words.w1;
+        const s16 scenes[] = { SCENE_00KEIKOKU,  SCENE_BACKTOWN,    SCENE_24KEMONOMITI,
+                               SCENE_20SICHITAI, SCENE_20SICHITAI2, SCENE_21MITURINMAE };
+        for (unsigned scene = 0; scene < ARRAY_COUNT(scenes); ++scene) {
+            play.sceneId = scenes[scene];
+            liveSeason = SEASON_WINTER;
+            BeginDraw();
+            EnWood02_Draw(&tree.actor, &play);
+            REQUIRE(Color(translucent, gfx.polyXlu.p, G_SETINTENSITY) == 0xCCDCEEFF);
+            int frost = 0, draws = 0;
+            for (const Gfx* cmd = translucent; cmd < gfx.polyXlu.p; ++cmd) {
+                if ((cmd->words.w0 >> 24) == G_SETGRAYSCALE) {
+                    REQUIRE(cmd->words.w1 == 0 || cmd->words.w1 == 3);
+                    frost = cmd->words.w1;
+                }
+                if ((cmd->words.w0 >> 24) == G_DL) {
+                    REQUIRE(frost == 3 && cmd->words.w1 == (uintptr_t)D_808C4D70[tree.drawType]);
+                    ++draws;
+                }
             }
-            if ((cmd->words.w0 >> 24) == G_DL) {
-                REQUIRE(frost == 3 && cmd->words.w1 == (uintptr_t)D_808C4D70[tree.drawType]);
-                ++draws;
-            }
-        }
-        REQUIRE(frost == 0 && draws == 1);
-        REQUIRE((gfx.polyOpa.p - opaque) * sizeof(Gfx) == trunkSize && !memcmp(originalTrunk, opaque, trunkSize));
-        for (unsigned excluded = 0; excluded < 2; ++excluded) {
-            play.sceneId = excluded ? SCENE_00KEIKOKU : SCENE_BACKTOWN;
-            eligible = excluded ? false : true;
+            REQUIRE(frost == 0 && draws == 1);
+            REQUIRE((gfx.polyOpa.p - opaque) * sizeof(Gfx) == trunkSize && !memcmp(originalTrunk, opaque, trunkSize));
+            eligible = false;
             BeginDraw();
             EnWood02_Draw(&tree.actor, &play);
             REQUIRE((gfx.polyXlu.p - translucent) * sizeof(Gfx) == leafSize);
             REQUIRE(!memcmp(originalLeaves, translucent, leafSize));
+            eligible = true;
         }
+    }
+    ObjTree branching = { 0 };
+    for (int ownership = 0; ownership < 3; ++ownership) {
+        alt = ownership != 0;
+        altList = ownership == 2 ? gTreeLeavesDL : NULL;
+        liveSeason = SEASON_OFF;
+        BeginDraw();
+        ObjTree_Draw(&branching.dyna.actor, &play);
+        Gfx native[64];
+        const size_t count = gfx.polyOpa.p - opaque;
+        memcpy(native, opaque, count * sizeof(Gfx));
+        liveSeason = SEASON_WINTER;
+        BeginDraw();
+        ObjTree_Draw(&branching.dyna.actor, &play);
+        unsigned mode = 0, tinted = 0, untinted = 0;
+        for (const Gfx* cmd = opaque; cmd < gfx.polyOpa.p; ++cmd) {
+            if ((cmd->words.w0 >> 24) == G_SETGRAYSCALE)
+                mode = cmd->words.w1;
+            if ((cmd->words.w0 >> 24) == G_SETINTENSITY)
+                REQUIRE(cmd->words.w1 == 0xCCDCEEFF);
+            if ((cmd->words.w0 >> 24) == G_DL) {
+                REQUIRE(mode == (cmd->words.w1 == (uintptr_t)gTreeLeavesDL ? 3 : 0));
+                if (mode)
+                    ++tinted;
+                else
+                    ++untinted;
+            }
+        }
+        REQUIRE(mode == 0 && tinted == 1 && untinted == 1);
+        eligible = false;
+        BeginDraw();
+        ObjTree_Draw(&branching.dyna.actor, &play);
+        REQUIRE((size_t)(gfx.polyOpa.p - opaque) == count && !memcmp(native, opaque, count * sizeof(Gfx)));
         eligible = true;
     }
-    puts("PASS Termina winter native tree canopies; untouched trunks, Clock Town and ineligible play");
+    puts("PASS winter tree canopies across adjacent outdoors and branching trees; native/Alt, untouched trunks and "
+         "ineligible play");
 }
 
 static void AssetOwnership(void) {
@@ -626,7 +662,7 @@ static void BranchingTreeMaterials(void) {
         REQUIRE(!memcmp(native, opaque, 2 * sizeof(Gfx)));
         RequireTintScoped(opaque + 2, gfx.polyOpa.p, gTreeLeavesDL);
         for (int season = SEASON_SPRING; season <= SEASON_OFF; ++season) {
-            if (season == SEASON_AUTUMN || season == SEASON_SPRING)
+            if (season == SEASON_AUTUMN || season == SEASON_SPRING || season == SEASON_WINTER)
                 continue;
             liveSeason = season;
             BeginDraw();

@@ -49,7 +49,9 @@ void State::Spawn(size_t index, const Input& input, const View& view) {
     wisp.anchor = wisp.anchor + forward * depth + right * lateral;
     wisp.position = wisp.anchor;
     wisp.width = 180 + Random() * 190;
-    wisp.height = 10 + Random() * 10;
+    // A fixed 10-20 unit half-height shrinks distant wisps to 4-6 native
+    // scanlines. Preserve a readable low fog layer through all depth bands.
+    wisp.height = std::clamp(depth * view.tanHalfFov * 0.05f * (0.9f + Random() * 0.2f), 16.0f, 48.0f);
     wisp.phase = Random() * 6.2831853f;
     wisp.age = wisp.alpha = 0;
     ++wisp.generation;
@@ -70,7 +72,10 @@ void State::BuildAurora(const Input& input, const View& view) {
             const float u = column / float(kRibbonColumns - 1);
             const float angle = band * 2.0943951f - 1.20f + u * 2.40f;
             const float wave = std::sin(angle * 2.1f + elapsed * 0.12f + band);
-            const float center = radius * (0.38f + wave * 0.09f);
+            // Native third-person cameras look down by 10-15 degrees with a
+            // 60-degree FOV. Keep the colored core in their visible sky;
+            // the former 16-25 degree elevation clipped it above the frame.
+            const float center = radius * (0.18f + wave * 0.045f);
             const float height = radius * (0.12f + 0.04f * std::sin(u * 4.5f + elapsed * 0.08f + band));
             const float hue = 0.5f + 0.5f * std::sin(angle * 2 + band + elapsed * 0.025f);
             const float edge = std::sin(u * 3.14159265f);

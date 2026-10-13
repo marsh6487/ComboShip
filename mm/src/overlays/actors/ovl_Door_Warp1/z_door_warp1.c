@@ -181,6 +181,7 @@ void DoorWarp1_Destroy(Actor* thisx, PlayState* play) {
     LightContext_RemoveLight(play, &play->lightCtx, this->unk_1DC);
     LightContext_RemoveLight(play, &play->lightCtx, this->unk_1F0);
 
+    Environment_ClearNativeLightningAmbient();
     for (i = 0; i < ARRAY_COUNT(play->envCtx.adjLightSettings.light1Color); i++) {
         play->envCtx.adjLightSettings.ambientColor[i] = play->envCtx.adjLightSettings.fogColor[i] =
             play->envCtx.adjLightSettings.light1Color[i] = 0;
@@ -872,6 +873,7 @@ void func_808BA550(DoorWarp1* this, PlayState* play) {
     if (1) {}
     temp_f0 = 1.0f - ((f32)(D_808BC000 - this->unk_1D0) / ((D_808BC000 - tempS) + 100));
     if (temp_f0 > 0.0f) {
+        Environment_ClearNativeLightningAmbient();
         for (i = 0; i < ARRAY_COUNT(play->envCtx.adjLightSettings.light1Color); i++) {
             play->envCtx.adjLightSettings.ambientColor[i] = play->envCtx.adjLightSettings.fogColor[i] =
                 play->envCtx.adjLightSettings.light1Color[i] = -255.0f * temp_f0;

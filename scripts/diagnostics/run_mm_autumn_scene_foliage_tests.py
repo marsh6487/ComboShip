@@ -33,11 +33,15 @@ def main():
     parser.add_argument("--materials", type=Path, help="Optional serialized Termina foliage material directory")
     parser.add_argument("--poc4", type=Path, help="Optional supplied POC4 archive for exact private brush coverage")
     parser.add_argument("--mm", type=Path, help="Optional native MM archive for both forest-layer controls")
+    parser.add_argument("--woodfall-pack", type=Path,
+                        help="Optional supplied Woodfall pack for actual HD gradient/detail pixel controls")
     parser.add_argument("--all-scene-materials", action="store_true",
                         help="Check frozen grass/forest and negative material cases from the full --mm archive")
     args = parser.parse_args()
     if args.all_scene_materials and not args.mm:
         parser.error("--all-scene-materials requires --mm")
+    if args.woodfall_pack and not args.mm:
+        parser.error("--woodfall-pack requires --mm for the actual native owner display list")
     material_paths = sorted(args.materials.glob("*DL_*")) if args.materials else []
     if args.materials and not material_paths:
         parser.error("--materials must contain serialized *DL_* fixtures")
@@ -100,6 +104,8 @@ def main():
             "\n".join(production_function(renderer, name) for name in renderer_functions))
         (build / "autumn_scene_renderer_signature.inc").write_text(
             production_function(manager, "ResourceManager::OtrSignatureCheck"))
+        (build / "autumn_scene_palette_production.inc").write_text(
+            production_function(renderer, "Interpreter::GfxDpLoadTlut"))
         fixtures = "static void CheckActualMaterials() {\n"
         if args.materials:
             for path in material_paths:
@@ -137,6 +143,69 @@ def main():
                 fixtures += f'CheckActualSceneRenderer({json.dumps(case["path"])}, {case["scene_id"]}, source, {{{expected}}}, {{{textures}}});\n'
                 fixtures += f'CheckActualSceneRenderer({json.dumps(case["path"])}, {case["scene_id"]}, source, {{{winter_expected}}}, {{{textures}}}, SEASON_WINTER);\n'
             fixtures += '}\n'
+        if args.mm:
+            def texture_fixture(archive, path, label):
+                data = archive.read(path)
+                version = struct.unpack_from('<I', data, 8)[0]
+                kind, width, height = struct.unpack_from('<III', data, 64)
+                if version == 0:
+                    flags, h_scale, v_scale = 0, 1.0, 1.0
+                    size = struct.unpack_from('<I', data, 76)[0]
+                    pixels = data[80:]
+                elif version == 1:
+                    flags, h_scale, v_scale, size = struct.unpack_from('<IffI', data, 76)
+                    pixels = data[92:]
+                else:
+                    raise ValueError(f"Unsupported actual texture version {version}: {path}")
+                if len(pixels) != size:
+                    raise ValueError(f"Actual texture payload size differs: {path}")
+                target = build / (label + '.pixels')
+                target.write_bytes(pixels)
+                return (f'ReadActualTexture({json.dumps(str(target))}, {kind}, {width}, {height}, '
+                        f'{flags}, {h_scale}f, {v_scale}f)')
+
+            surface_cases = (
+                ("objects/object_mtoride/gWoodfallSceneryPurifiedWallsDL", "SCENE_21MITURINMAE",
+                 "objects/object_mtoride/gWoodfallSceneryPurifiedWalls2Tex",
+                 "objects/object_mtoride/gWoodfallSceneryPurifiedWalls1Tex", 79, True),
+                ("scenes/nonmq/Z2_21MITURINMAE/Z2_21MITURINMAE_room_00DL_001C48", "SCENE_21MITURINMAE",
+                 "scenes/nonmq/Z2_21MITURINMAE/Z2_21MITURINMAETex_005190",
+                 "scenes/nonmq/Z2_21MITURINMAE/Z2_21MITURINMAETex_004990", 58, False),
+                ("scenes/nonmq/Z2_24KEMONOMITI/Z2_24KEMONOMITI_room_00DL_004F78", "SCENE_24KEMONOMITI",
+                 "misc/scene_texture_08/scene_texture_08_Tex_006000",
+                 "misc/scene_texture_08/scene_texture_08_Tex_005000", 70, False),
+            )
+            with zipfile.ZipFile(args.mm) as archive:
+                branch = "objects/object_mtoride/gWoodfallSceneryBranchAndLeaves"
+                fixtures += (f'CheckWoodfallMixedLeaves({texture_fixture(archive, branch + "TLUT", "branch-tlut")}, '
+                             '{' + ','.join(str(byte) for byte in archive.read(branch + "Tex")[80:]) + '});\n')
+                for index, (owner, scene, surface, companion, triangles, first) in enumerate(surface_cases):
+                    data = archive.read(owner)
+                    if len(data) < 72 or data[4:8] != b"TLDO" or (len(data) - 72) % 8:
+                        raise ValueError(f"Invalid actual surface owner: {owner}")
+                    fixtures += '{ const std::vector<Gfx> source = {\n'
+                    fixtures += ',\n'.join(f'Command(0x{a:08X}, 0x{b:08X})'
+                                          for a, b in struct.iter_unpack('<II', data[72:]))
+                    fixtures += '};\n'
+                    fixtures += f'auto surface = {texture_fixture(archive, surface, str(index) + "-surface")};\n'
+                    fixtures += f'auto companion = {texture_fixture(archive, companion, str(index) + "-companion")};\n'
+                    fixtures += (f'CheckWoodfallSurface({json.dumps(surface)}, surface, {scene}, '
+                                 f'{json.dumps(owner)}, &source);\n')
+                    fixtures += (f'CheckActualSurfaceDraw({json.dumps(owner)}, {scene}, source, '
+                                 f'{json.dumps(surface)}, surface, {json.dumps(companion)}, companion, '
+                                 f'{triangles}, {str(first).lower()});\n')
+                    if args.woodfall_pack and index == 1:
+                        with zipfile.ZipFile(args.woodfall_pack) as pack:
+                            actual_surface = 'alt/' + surface
+                            actual_companion = 'alt/' + companion
+                            fixtures += f'auto hdSurface = {texture_fixture(pack, actual_surface, "hd-surface")};\n'
+                            fixtures += f'auto hdCompanion = {texture_fixture(pack, actual_companion, "hd-companion")};\n'
+                        fixtures += (f'CheckWoodfallSurface({json.dumps(surface)}, hdSurface, {scene}, '
+                                     f'{json.dumps(owner)}, &source);\n')
+                        fixtures += (f'CheckActualSurfaceDraw({json.dumps(owner)}, {scene}, source, '
+                                     f'{json.dumps(surface)}, hdSurface, {json.dumps(companion)}, hdCompanion, '
+                                     f'{triangles}, false);\n')
+                    fixtures += '}\n'
         if scene_cases:
             fixtures += f'std::puts("PASS {len(scene_cases)} frozen native scene materials in autumn and winter: exact triangle palettes, native/Alt, both namespaces and Off restoration");\n'
         fixtures += "}\n"

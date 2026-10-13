@@ -184,6 +184,7 @@ void ObjTree_Draw(Actor* thisx, PlayState* play) {
     s16 zRot = (f32)thisx->shape.rot.z;
     s32 season = MMWeather_SeasonForPlay(play);
     s32 spring = season == SEASON_SPRING;
+    s32 frost = season == SEASON_WINTER;
     s32 autumn = season == SEASON_AUTUMN;
 
     OPEN_DISPS(play->state.gfxCtx);
@@ -194,27 +195,30 @@ void ObjTree_Draw(Actor* thisx, PlayState* play) {
 
     Matrix_RotateZYX(xRot, 0, zRot, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-    if (spring || autumn) {
+    if (spring || autumn || frost) {
         // This tree has its own canopy draw, outside En_Wood02. Tint only the
         // selected canopy, including Alt leaves; preserve trunk, sway and collision.
         u32 variant = ((u32)(s32)thisx->home.pos.x ^ (u32)(s32)thisx->home.pos.z) & 1;
-        // A partial, mean-preserving spring tint keeps canopy brightness and
-        // native fragment alpha while the body draw above keeps its bark.
+        // Full spring/winter color with the existing brightness lift makes
+        // dark leaves readable while the body draw above keeps its bark.
         gDPSetGrayscaleColor(POLY_OPA_DISP++,
                              spring    ? 246
+                             : frost   ? 204
                              : variant ? 220
                                        : 205,
                              spring    ? 193
+                             : frost   ? 220
                              : variant ? 145
                                        : 65,
                              spring    ? 217
+                             : frost   ? 238
                              : variant ? 35
                                        : 40,
-                             spring ? 224 : 255);
-        gSPGrayscale(POLY_OPA_DISP++, spring ? 2 : 1);
+                             255);
+        gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 1);
     }
     gSPDisplayList(POLY_OPA_DISP++, gTreeLeavesDL);
-    if (spring || autumn) {
+    if (spring || autumn || frost) {
         gSPGrayscale(POLY_OPA_DISP++, false);
     }
 

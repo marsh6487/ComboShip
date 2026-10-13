@@ -63,8 +63,12 @@ def main():
         destroy = production_function(play, "Play_Destroy")
         if "MMWeather_Reset();" not in destroy:
             raise RuntimeError("Missing MM Play destruction reset integration")
+        environment = production_function((ROOT / "mm/src/code/z_kankyo.c").read_text(), "Environment_Update")
+        if "MMWeather_Update(play);" not in environment:
+            raise RuntimeError("Missing native Environment winter eligibility/lifecycle refresh")
         (build / "winter_play_hooks.inc").write_text(
-            "static void UpdateFromPlay(PlayState* play) { " + update[1].replace("this", "play") + " }\n" +
+            "static void UpdateFromPlay(PlayState* play) { MMWeather_Update(play); " +
+            update[1].replace("this", "play") + " }\n" +
             "static void DrawFromPlay(PlayState* play) { " + draw[1].replace("this", "play") + " }\n" +
             "static void InitFromPlay() { MMWinterAtmosphere_Reset(); }\n" +
             "static void DestroyFromPlay() { MMWeather_Reset(); }\n")

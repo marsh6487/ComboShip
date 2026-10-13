@@ -41,8 +41,11 @@ int main() {
     const auto canopy = Make(Fast::TextureType::RGBA16bpp, TEX_FLAG_LOAD_AS_RAW, { 60, 110, 70, 83, 95, 85, 70, 255 });
     const auto spring = BuildTexture(canopy, Palette(0, Surface::Canopy));
     REQUIRE(spring && spring->ImageData[0] > spring->ImageData[1] && spring->ImageData[2] > spring->ImageData[1]);
-    const auto subtle = BuildTexture(hd, Palette(0, Surface::Understory));
-    REQUIRE(subtle && subtle->ImageData[1] > subtle->ImageData[0]);
+    REQUIRE(unsigned(spring->ImageData[0]) + spring->ImageData[1] + spring->ImageData[2] > (60 + 110 + 70) * 15 / 10);
+    const auto blush = BuildTexture(hd, Palette(0, Surface::Understory));
+    REQUIRE(blush && blush->ImageData[0] > blush->ImageData[1] && "spring grass must show a readable blush");
+    REQUIRE(unsigned(blush->ImageData[0]) + blush->ImageData[1] + blush->ImageData[2] > (40 + 110 + 25) * 14 / 10);
+    REQUIRE(blush->ImageData[3] == hd->ImageData[3]);
     // Packed RGBA5551 retains both opaque and transparent alpha bits and rock texels.
     const auto native = Make(Fast::TextureType::RGBA16bpp, 0, { 0x26, 0x87, 0x7B, 0xD0 });
     const auto nativeBefore = *native->mImageBuffer;

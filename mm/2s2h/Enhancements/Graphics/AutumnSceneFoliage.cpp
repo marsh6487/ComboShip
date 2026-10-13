@@ -15,6 +15,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <tuple>
 #include <vector>
 
 extern "C" {
@@ -46,8 +47,9 @@ struct Material {
 constexpr Material kMaterials[] = {
 #include "AutumnSceneMaterials.inc"
 };
+constexpr const char* kWoodfallTempleDL = "objects/object_mtoride/gWoodfallSceneryTempleDL";
 
-uint32_t SeasonPalette(uint32_t autumnColor, int selectedSeason, int sceneId = -1) {
+uint32_t SeasonPalette(uint32_t autumnColor, int selectedSeason, int /*sceneId*/ = -1) {
     if (selectedSeason == SEASON_SPRING) {
         switch (autumnColor) {
             case 0xB96848FF:
@@ -61,38 +63,24 @@ uint32_t SeasonPalette(uint32_t autumnColor, int selectedSeason, int sceneId = -
     }
     if (selectedSeason != SEASON_WINTER)
         return autumnColor;
-    if (sceneId == SCENE_00KEIKOKU) {
-        // Termina's dark HD foliage needs a full cool-white treatment. Keep the
-        // accepted partial winter blend in Clock Town and every other scene.
-        switch (autumnColor) {
-            case 0xD99C45FF:
-            case 0xFFD078FF:
-                return 0xE5EDF3FF;
-            case 0xB96848FF:
-            case 0xF4B783FF:
-                return 0xCCDCEEFF;
-            case 0xFF9F91FF:
-                return 0xD8E2ECFF;
-            default:
-                return autumnColor;
-        }
-    }
+    // Use Termina's accepted full frost palette wherever this foliage is drawn.
+    // Shared materials must not lose their white lift across outdoor entrances.
     switch (autumnColor) {
         case 0xD99C45FF:
         case 0xFFD078FF:
-            return 0xBED2C2B0; // Soft frost; retain 31% of the original color variation.
+            return 0xE5EDF3FF;
         case 0xB96848FF:
         case 0xF4B783FF:
-            return 0xB9CDD9B0; // Cool gray-blue upper/distant foliage.
+            return 0xCCDCEEFF;
         case 0xFF9F91FF:
-            return 0xC4D2C9B0; // Neutral gray-green middle trees stay distinct.
+            return 0xD8E2ECFF;
         default:
             return autumnColor;
     }
 }
 
-unsigned SeasonTintMode(int selectedSeason, int sceneId) {
-    return selectedSeason == SEASON_WINTER && sceneId == SCENE_00KEIKOKU ? 3 : 2;
+unsigned SeasonTintMode(int selectedSeason, int /*sceneId*/) {
+    return selectedSeason == SEASON_WINTER || selectedSeason == SEASON_SPRING ? 3 : 2;
 }
 
 uint32_t ForestListColor(std::string path, int selectedSeason = SEASON_AUTUMN) {
@@ -218,14 +206,29 @@ std::vector<RendererPointerSlot> RendererPointerSlots(const std::vector<Gfx>& so
     return slots;
 }
 
-std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason = SEASON_AUTUMN, int sceneId = -1) {
+bool IsRoadForestPair(uint64_t primary, uint64_t secondary) {
+    static const uint64_t mask = CRC64("misc/scene_texture_08/scene_texture_08_Tex_005000");
+    static const uint64_t altMask = CRC64("alt/misc/scene_texture_08/scene_texture_08_Tex_005000");
+    static const uint64_t color = CRC64("misc/scene_texture_08/scene_texture_08_Tex_006000");
+    static const uint64_t altColor = CRC64("alt/misc/scene_texture_08/scene_texture_08_Tex_006000");
+    return (primary == mask || primary == altMask) && (secondary == color || secondary == altColor);
+}
+
+std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason = SEASON_AUTUMN, int sceneId = -1,
+                              bool* onlyRoadForest = nullptr) {
     std::vector<Gfx> result;
     uint32_t imageColor = 0;
+    uint64_t imageHash = 0;
     bool tileSlot[8]{};
     uint32_t loadedColors[2]{};
+    uint64_t loadedImages[2]{};
     unsigned renderTile = G_TX_RENDERTILE;
     bool explicitLoads = false;
     bool changed = false;
+    bool roadTriangles = false, otherTriangles = false;
+    bool roadCombine = false;
+    if (onlyRoadForest != nullptr)
+        *onlyRoadForest = false;
     for (size_t i = 0; i < source.size();) {
         const auto opcode = static_cast<uint8_t>(source[i].words.w0 >> 24);
         const auto length = MaterialCommandLength(opcode);
@@ -233,10 +236,11 @@ std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason
             return {};
         }
         if (opcode == G_SETTIMG_OTR_HASH) {
-            imageColor = MaterialColor((uint64_t(source[i + 1].words.w0) << 32) | source[i + 1].words.w1,
-                                       selectedSeason, sceneId);
+            imageHash = (uint64_t(source[i + 1].words.w0) << 32) | source[i + 1].words.w1;
+            imageColor = MaterialColor(imageHash, selectedSeason, sceneId);
         } else if (opcode == G_SETTIMG) {
             imageColor = 0;
+            imageHash = 0;
         } else if (opcode == G_SETTILE) {
             // Match Interpreter::GfxDpSetTile: address 0 owns texture slot 0;
             // every nonzero TMEM address owns texture slot 1.
@@ -246,18 +250,29 @@ std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason
             // grass in the primary render tile. Follow TMEM ownership, not the
             // last image command (which may also be a palette load).
             loadedColors[tileSlot[(source[i].words.w1 >> 24) & 7]] = imageColor;
+            loadedImages[tileSlot[(source[i].words.w1 >> 24) & 7]] = imageHash;
             explicitLoads = true;
         } else if (opcode == G_TEXTURE) {
             renderTile = (source[i].words.w0 >> 8) & 7;
+        } else if (opcode == G_SETCOMBINE) {
+            roadCombine = source[i].words.w0 == 0xFC20AC04 && source[i].words.w1 == 0xFF0F93FF;
         } else if (opcode == G_DL || opcode == G_DL_OTR_HASH) {
             // A child list can change texture state. Require a subsequent
             // explicit selected texture load before recoloring more triangles.
             imageColor = 0;
+            imageHash = 0;
             loadedColors[0] = loadedColors[1] = 0;
+            loadedImages[0] = loadedImages[1] = 0;
             explicitLoads = false;
         }
         if (opcode == G_TRI1 || opcode == G_TRI2) {
-            const uint32_t color = explicitLoads ? loadedColors[tileSlot[renderTile]] : imageColor;
+            const bool roadPair = sceneId == SCENE_24KEMONOMITI && explicitLoads && roadCombine &&
+                                  !tileSlot[renderTile] && IsRoadForestPair(loadedImages[0], loadedImages[1]);
+            roadTriangles |= roadPair;
+            otherTriangles |= !roadPair;
+            // The primary IA mask also serves other forests. Only this exact
+            // Road binding uses a selective color copy, preserving its trunks.
+            const uint32_t color = roadPair ? 0 : explicitLoads ? loadedColors[tileSlot[renderTile]] : imageColor;
             size_t end = i + 1;
             while (end < source.size()) {
                 const auto next = source[end].words.w0 >> 24;
@@ -281,6 +296,8 @@ std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason
         }
         result.insert(result.end(), source.begin() + i, source.begin() + i + length);
         if (opcode == G_ENDDL) {
+            if (onlyRoadForest != nullptr && i + 1 == source.size())
+                *onlyRoadForest = roadTriangles && !otherTriangles;
             return changed && i + 1 == source.size() ? result : std::vector<Gfx>{};
         }
         i += length;
@@ -421,9 +438,33 @@ struct SurfaceTextureBinding {
     std::string path;
     SurfaceTextureVariant texture;
 };
+struct SurfaceMaterial {
+    const char* path;
+    uint32_t color;
+    int scene = -1;
+    bool altOnly = false;
+    bool roadPairOnly = false;
+    bool blossomLift = false;
+};
+constexpr SurfaceMaterial kSurfaceMaterials[] = {
+    { "scenes/nonmq/Z2_00KEIKOKU/mm3d_field_poc4/textures/tl_ki_02", 0xFFD078FF, SCENE_00KEIKOKU, true },
+    { "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_027050", 0xFFD078FF },
+    // Keep the wall's secondary gradient intact: tint only green primary
+    // texels so brown/stone samples retain both original combine inputs.
+    { "objects/object_mtoride/gWoodfallSceneryPurifiedWalls2Tex", 0xB96848FF, SCENE_21MITURINMAE },
+    // Native I4 and supplied HD grayscale detail preserve the gradient's
+    // original green/non-green boundary without a whole-triangle treatment.
+    { "scenes/nonmq/Z2_21MITURINMAE/Z2_21MITURINMAETex_005190", 0xB96848FF, SCENE_21MITURINMAE },
+    { "misc/scene_texture_08/scene_texture_08_Tex_006000", 0xB96848FF, SCENE_24KEMONOMITI, false, true },
+    // The CI4 image includes a brown stem. Recolor only green palette entries;
+    // RGBA replacements use the same green-only copy, without a triangle tint.
+    { "objects/object_mtoride/gWoodfallSceneryBranchAndLeavesTLUT", 0xB96848FF, SCENE_21MITURINMAE, false, false,
+      true },
+    { "objects/object_mtoride/gWoodfallSceneryBranchAndLeavesTex", 0xB96848FF, SCENE_21MITURINMAE, false, false, true },
+};
 // Retain immutable originals and copies until renderer teardown, as with the
 // display-list variants. A new pixel address also gives the GPU a new cache key.
-std::map<std::pair<const Fast::Texture*, uint32_t>, SurfaceTextureVariant> sSurfaceTextures;
+std::map<std::tuple<const Fast::Texture*, uint32_t, bool>, SurfaceTextureVariant> sSurfaceTextures;
 std::vector<SurfaceTextureBinding> sSurfaceBindings;
 
 std::shared_ptr<Fast::Texture> BuildSurfaceTexture(const std::shared_ptr<Fast::Texture>& source,
@@ -432,8 +473,9 @@ std::shared_ptr<Fast::Texture> BuildSurfaceTexture(const std::shared_ptr<Fast::T
     const unsigned colorSum = red + green + blue;
     const unsigned blend = color & 255;
     const bool packed16 = source->Type == Fast::TextureType::RGBA16bpp && source->Flags == 0;
+    const bool raw = (source->Flags & TEX_FLAG_LOAD_AS_RAW) != 0;
     const unsigned pixelBytes = packed16 ? 2 : 4;
-    if ((!packed16 && source->Type != Fast::TextureType::RGBA32bpp) || source->ImageData == nullptr ||
+    if ((!packed16 && !raw && source->Type != Fast::TextureType::RGBA32bpp) || source->ImageData == nullptr ||
         source->Width == 0 || source->Height == 0 ||
         size_t(source->Width) * source->Height * pixelBytes != source->ImageDataSize || colorSum == 0) {
         return nullptr;
@@ -505,19 +547,43 @@ void RestoreSurfaceTextures() {
 void UpdateSurfaceTextures(const PlayState* play, const std::shared_ptr<Ship::ResourceManager>& rm,
                            int selectedSeason) {
     std::vector<SurfaceTextureBinding> active;
-    for (const auto* logicalPath : { "scenes/nonmq/Z2_00KEIKOKU/mm3d_field_poc4/textures/tl_ki_02",
-                                     "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_027050" }) {
-        const bool privateAtlas = std::string(logicalPath).ends_with("/tl_ki_02");
-        if (privateAtlas && (play->sceneId != SCENE_00KEIKOKU || !rm->IsAltAssetsEnabled())) {
-            continue; // Preserve the accepted private atlas's original scope.
+    bool roadPair = false;
+    if (play->sceneId == SCENE_24KEMONOMITI) {
+        bool found = false, allPaired = true;
+        for (const auto* suffix : { "", "_scene" }) {
+            std::string path =
+                "scenes/nonmq/Z2_24KEMONOMITI" + std::string(suffix) + "/Z2_24KEMONOMITI_room_00DL_004F78";
+            if (rm->IsAltAssetsEnabled()) {
+                const auto archives = rm->GetArchiveManager();
+                const std::string altPath = "alt/" + path;
+                if ((archives->HasFile(altPath) && archives->GetArchiveFromFile(altPath) != nullptr) ||
+                    (archives->HasFile(altPath + ".meta") &&
+                     archives->GetArchiveFromFile(altPath + ".meta") != nullptr))
+                    path = altPath;
+            }
+            if (auto root = std::dynamic_pointer_cast<Fast::DisplayList>(rm->GetCachedResource(path, true))) {
+                bool paired = false;
+                BuildVariant(root->Instructions, selectedSeason, play->sceneId, &paired);
+                found = true;
+                allPaired &= paired;
+            }
         }
+        roadPair = found && allPaired;
+    }
+    for (const auto& material : kSurfaceMaterials) {
+        if ((material.scene != -1 && play->sceneId != material.scene) ||
+            (material.altOnly && !rm->IsAltAssetsEnabled()) || (material.roadPairOnly && !roadPair))
+            continue;
         for (const auto* suffix : { "", "_scene" }) {
             for (const auto* prefix : { "", "alt/" }) {
                 if (*prefix != '\0' && !rm->IsAltAssetsEnabled()) {
                     continue;
                 }
-                std::string path = logicalPath;
-                path.insert(path.find('/', 13), suffix);
+                std::string path = material.path;
+                if (path.starts_with("scenes/nonmq/"))
+                    path.insert(path.find('/', 13), suffix);
+                else if (*suffix != '\0')
+                    continue; // Object textures have no generated scene namespace.
                 path.insert(0, prefix);
                 auto source = std::dynamic_pointer_cast<Fast::Texture>(rm->GetCachedResource(path, true));
                 if (source == nullptr) {
@@ -527,15 +593,15 @@ void UpdateSurfaceTextures(const PlayState* play, const std::shared_ptr<Ship::Re
                     return binding.owner.lock() == rm && binding.path == path && binding.texture.copy == source;
                 });
                 if (current != sSurfaceBindings.end()) {
-                    source = current->texture.source; // Recolor the original when scene-specific frost changes.
+                    source = current->texture.source; // Always recolor the intact source.
                 }
-                const auto color = SeasonPalette(0xFFD078FF, selectedSeason, play->sceneId);
-                const auto key = std::pair{ source.get(), color };
+                const auto color = SeasonPalette(material.color, selectedSeason, play->sceneId);
+                const bool lift =
+                    selectedSeason == SEASON_WINTER || (selectedSeason == SEASON_SPRING && material.blossomLift);
+                const auto key = std::tuple{ source.get(), color, lift };
                 auto it = sSurfaceTextures.find(key);
                 if (it == sSurfaceTextures.end()) {
-                    auto copy = BuildSurfaceTexture(
-                        source, color,
-                        selectedSeason == SEASON_WINTER && play->sceneId == SCENE_00KEIKOKU ? 1.8f : 1.0f);
+                    auto copy = BuildSurfaceTexture(source, color, lift ? 1.8f : 1.0f);
                     if (copy == nullptr) {
                         continue;
                     }
@@ -633,6 +699,15 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                     }
                     paths.insert(path);
                 }
+            }
+        }
+        if (play->sceneId == SCENE_21MITURINMAE) {
+            // Dm_Char01 owns the upper leaves in this loaded object root,
+            // independently of the room display lists discovered above.
+            for (const auto* assetPrefix : { "", "alt/" }) {
+                const std::string path = assetPrefix + std::string(kWoodfallTempleDL);
+                if (archives->HasFile(path) || archives->HasFile(path + ".meta"))
+                    paths.insert(kWoodfallTempleDL);
             }
         }
         sPaths.assign(paths.begin(), paths.end());

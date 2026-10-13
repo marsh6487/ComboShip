@@ -202,6 +202,10 @@ jobs:
           python3 -B scripts/diagnostics/run_soh_season_foliage_tests.py "$RUNNER_TEMP/soh-season-foliage" --sanitize
           python3 -B scripts/diagnostics/run_soh_season_actor_tests.py --sanitize
           python3 -B scripts/diagnostics/run_mm_winter_atmosphere_tests.py --sanitize
+          MM_FOLIAGE_TEST_CFLAGS='-fsanitize=address,undefined,bounds -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie' python3 -B scripts/diagnostics/run_mm_autumn_foliage_tests.py
+          MM_FOLIAGE_TEST_CFLAGS='-fsanitize=address,undefined,bounds -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie' python3 -B scripts/diagnostics/run_mm_autumn_grass_tests.py
+          MM_FOLIAGE_TEST_CXXFLAGS='-O1 -g -fsanitize=address,undefined,bounds -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie' ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_mm_autumn_scene_foliage_tests.py
+          MM_FOLIAGE_TEST_CXXFLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie' ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_mm_autumn_surface_texture_tests.py
 
       - name: Foreign soul replacement skeletons and limb matrices
         run: |

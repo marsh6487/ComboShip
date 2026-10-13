@@ -10,6 +10,7 @@
 #include <cstring>
 #include <map>
 #include <string>
+#include <vector>
 
 // Weak declarations let the first run fail on the absent behavior, before the
 // new presentation controller is implemented.
@@ -21,6 +22,7 @@ int32_t SeasonWeather_SummerEffectEnabled(int32_t) __attribute__((weak));
 int32_t SeasonWeather_LightOffset(const PlayState*, int32_t, int32_t) __attribute__((weak));
 void SeasonWeather_Update(PlayState*) __attribute__((weak));
 void SeasonWeather_Reset(void) __attribute__((weak));
+void SeasonWeather_RecordLighting(PlayState*) __attribute__((weak));
 void SeasonWeather_TestRodBridge(PlayState*, u8);
 void Seasons_PrecipTint(u8*, u8*, u8*);
 void func_800766C4(PlayState*);
@@ -28,7 +30,9 @@ void func_8006FB94(EnvironmentContext*, u16);
 void SeasonWeather_TestBombFade(PlayState*);
 void SeasonWeather_TestBombFlash(PlayState*);
 void SeasonWeather_TestNativeLighting(PlayState*);
+void SeasonWeather_TestNativeOutdoorLighting(PlayState*);
 void SeasonWeather_TestNativeSkyBlend(EnvironmentContext*);
+void Environment_UpdateLightningStrike(PlayState*);
 void EnWeatherTag_Init(Actor*, PlayState*);
 void EnWeatherTag_Destroy(Actor*, PlayState*);
 void EnWeatherTag_Update(Actor*, PlayState*);
@@ -43,6 +47,8 @@ extern "C" {
 SaveContext gSaveContext = {};
 PlayState* gPlayState = nullptr;
 LightningStrike gLightningStrike = {};
+s16 sLightningFlashAlpha = 0;
+s32 sLightningBolts[3]; // the real flash handler only consumes this array's count
 u8 gWeatherMode = 0, gSkyboxBlendingEnabled = 0, D_8011FB34 = 0, D_8011FB38 = 0;
 u16 gTimeSpeed = 0;
 static GameInfo sGameInfo = {};
@@ -83,6 +89,7 @@ static std::map<std::string, int32_t> sSettings;
 static float sLoopGain;
 static int sNatureWrites;
 static int sNativeRandomCalls;
+static std::vector<std::string> sDiagnosticLogs;
 int32_t CVarGetInteger(const char* key, int32_t fallback) {
     auto found = sSettings.find(key);
     return found == sSettings.end() ? fallback : found->second;
@@ -97,13 +104,27 @@ s16 Rand_S16Offset(s16 base, s16) {
 u8 Audio_IsNatureRainEnabled(void) {
     return 0;
 }
+u8 Audio_IsNatureLightningEnabled(void) {
+    return 0;
+}
+f32 Rand_ZeroOne(void) {
+    return 0.5f;
+}
+bool WeatherSamplePlayer_Play(const char*, float) {
+    return true;
+}
+void Environment_AddLightningBolts(PlayState*, u8) {
+}
+void Environment_DrawLightningFlash(PlayState*, u8, u8, u8, u8) {
+}
 void Audio_SetNatureAmbienceChannelIO(u8, u8, u8) {
     ++sNatureWrites;
 }
 void WeatherSamplePlayer_SetLoop(const char* path, float gain) {
     sLoopGain = path ? gain : 0.0f;
 }
-void GlobalOutdoorRain_Log(const char*) {
+void GlobalOutdoorRain_Log(const char* message) {
+    sDiagnosticLogs.emplace_back(message);
 }
 }
 
@@ -119,7 +140,9 @@ struct Fixture {
         sSave = {};
         gSaveContext = {};
         gSaveContext.gameMode = GAMEMODE_NORMAL;
+        gSaveContext.dayTime = gSaveContext.skyboxTime = 0x8000;
         gLightningStrike = {};
+        sLightningFlashAlpha = 0;
         gWeatherMode = gSkyboxBlendingEnabled = D_8011FB34 = D_8011FB38 = 0;
         gTimeSpeed = 0;
         sGameInfo = {};
@@ -131,6 +154,7 @@ struct Fixture {
         sLoopGain = 0;
         sNatureWrites = 0;
         sNativeRandomCalls = 0;
+        sDiagnosticLogs.clear();
     }
     ~Fixture() {
         SeasonWeather_Reset();
@@ -150,6 +174,275 @@ struct Fixture {
         sSettings["gAudioEditor.SeasonWeather.Season"] = season;
     }
 };
+
+// First twelve actual native lighting rows preserved by the supplied Hyrule
+// Field archive, normal and alt: !Hyrule Field - FINAL(1).o2r, SHA256
+// 6a3c2662e03598a1b3aa4eaa6d421466dac9d0a295f121af0d5c7d864b5d49ad.
+// The production time table chooses row3 at03:00/21:16, or row11 after native
+// gloomy-sky interpolation. This is not evidence about Kakariko's asset rows.
+static EnvLightSettings sFieldLights[] = {
+    { { 70, 45, 57 },
+      { 73, 73, 73 },
+      { 180, 154, 138 },
+      { -73, -73, -73 },
+      { 20, 20, 60 },
+      { 140, 120, 110 },
+      -31,
+      12800 },
+    { { 80, 80, 80 }, { 0, 0, 0 }, { 255, 255, 255 }, { 0, 0, 0 }, { 70, 70, 90 }, { 100, 100, 120 }, -28, 12800 },
+    { { 120, 90, 0 }, { 0, 0, 0 }, { 250, 135, 50 }, { 0, 0, 0 }, { 30, 30, 60 }, { 120, 70, 50 }, -29, 12800 },
+    { { 40, 40, 70 }, { 0, 0, 0 }, { 20, 20, 35 }, { 0, 0, 0 }, { 50, 50, 100 }, { 0, 0, 30 }, -32, 12800 },
+    { { 60, 40, 70 }, { 73, 73, 73 }, { 80, 30, 60 }, { -73, -73, -73 }, { 80, 50, 150 }, { 70, 43, 45 }, -46, 12800 },
+    { { 75, 90, 100 },
+      { 73, 73, 73 },
+      { 55, 255, 240 },
+      { -73, -73, -73 },
+      { 10, 150, 190 },
+      { 20, 90, 110 },
+      -46,
+      12800 },
+    { { 60, 40, 80 }, { 73, 73, 73 }, { 60, 75, 150 }, { -73, -73, -73 }, { 60, 55, 150 }, { 50, 30, 30 }, -46, 12800 },
+    { { 0, 40, 80 }, { 73, 73, 73 }, { 20, 50, 75 }, { -73, -73, -73 }, { 50, 100, 150 }, { 0, 10, 20 }, -46, 12800 },
+    { { 92, 92, 92 },
+      { 73, 73, 73 },
+      { 160, 134, 118 },
+      { -73, -73, -73 },
+      { 30, 10, 10 },
+      { 30, 10, 10 },
+      2010,
+      12800 },
+    { { 95, 80, 80 },
+      { 73, 73, 73 },
+      { 145, 145, 130 },
+      { -73, -73, -73 },
+      { 40, 40, 80 },
+      { 95, 95, 85 },
+      2010,
+      12800 },
+    { { 80, 70, 70 }, { 73, 73, 73 }, { 150, 70, 35 }, { -73, -73, -73 }, { 10, 10, 25 }, { 35, 10, 10 }, 2012, 12800 },
+    { { 70, 70, 90 }, { 73, 73, 73 }, { 0, 0, 15 }, { -73, -73, -73 }, { 30, 30, 80 }, { 0, 0, 10 }, 2012, 12800 },
+};
+
+static void NightShadeRetainsAvailableNativeLight() {
+    for (int season : { SEASON_AUTUMN, SEASON_WINTER }) {
+        for (u16 time : { u16(0x2000), u16(21 * 65536 / 24 + 16 * 65536 / 1440) }) {
+            Fixture f;
+            f.Select(season);
+            gSaveContext.dayTime = gSaveContext.skyboxTime = time;
+            f.play.envCtx.lightSettingsList = sFieldLights;
+            f.play.envCtx.numLightSettings = 12;
+            SeasonWeather_TestNativeOutdoorLighting(&f.play);
+            REQUIRE(f.play.envCtx.lightSettings.ambientColor[0] == 40);
+            REQUIRE(f.play.envCtx.lightSettings.ambientColor[1] == 40);
+            SeasonWeather_TestNativeLighting(&f.play);
+            // A shade may cool/dim native night light, but may not consume its
+            // entire ambient channels or the moon's usable red/green light.
+            for (int i = 0; i < 3; ++i) {
+                REQUIRE(f.play.lightCtx.ambientColor[i] >= sFieldLights[3].ambientColor[i] / 2);
+                REQUIRE(f.play.envCtx.dirLight2.params.dir.color[i] >= sFieldLights[3].light2Color[i] / 2);
+                REQUIRE(f.play.envCtx.adjAmbientColor[i] == 0);
+                REQUIRE(f.play.envCtx.adjLight1Color[i] == 0);
+            }
+            REQUIRE(f.play.lightCtx.ambientColor[2] > f.play.lightCtx.ambientColor[0]);
+        }
+    }
+}
+
+static void RealPaletteWeatherMatrixRestoresNativeLighting() {
+    for (int season : { -1, SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN, SEASON_WINTER }) {
+        for (bool followRod : { false, true }) {
+            for (u16 time : { u16(0x2000), u16(0x8000), u16(21 * 65536 / 24 + 16 * 65536 / 1440) }) {
+                for (int globalRain : { 0, 1 }) {
+                    for (int rainMode : { -1, 0, 1, 2 }) {
+                        Fixture f;
+                        sSave.seasonsOwned = 0xF;
+                        sSave.seasonsRodOwned = 1;
+                        sSave.season = season < 0 ? SEASON_OFF : season;
+                        const auto saved = sSave;
+                        f.Select(followRod ? -2 : season);
+                        sSettings["gAudioEditor.SeasonWeather.Spring.RainMode"] = rainMode;
+                        sSettings["gAudioEditor.SeasonWeather.Autumn.RainMode"] = rainMode;
+                        sSettings["gAudioEditor.GlobalOutdoorRain"] = globalRain;
+                        sSettings["gAudioEditor.GlobalOutdoorRainOvercast"] = 1;
+                        gSaveContext.dayTime = gSaveContext.skyboxTime = time;
+                        f.play.envCtx.lightSettingsList = sFieldLights;
+                        f.play.envCtx.numLightSettings = 12;
+                        const auto frameLights = [&]() {
+                            f.Frame();
+                            func_8006FB94(&f.play.envCtx, 0);
+                            SeasonWeather_TestNativeOutdoorLighting(&f.play);
+                            SeasonWeather_TestNativeLighting(&f.play);
+                        };
+                        for (int frame = 0; frame < 140; ++frame)
+                            frameLights();
+                        REQUIRE(SeasonWeather_SeasonForPlay(&f.play) == season);
+                        REQUIRE(std::memcmp(&saved, &sSave, sizeof(saved)) == 0);
+                        REQUIRE(gSaveContext.dayTime == time && gSaveContext.skyboxTime == time);
+                        for (int i = 0; i < 3; ++i) {
+                            REQUIRE(f.play.envCtx.adjAmbientColor[i] == 0);
+                            REQUIRE(f.play.envCtx.adjLight1Color[i] == 0);
+                            if (season == -1 || season == SEASON_SPRING || season == SEASON_SUMMER) {
+                                REQUIRE(f.play.lightCtx.ambientColor[i] == f.play.envCtx.lightSettings.ambientColor[i]);
+                                REQUIRE(f.play.envCtx.dirLight1.params.dir.color[i] ==
+                                        f.play.envCtx.lightSettings.light1Color[i]);
+                                REQUIRE(f.play.envCtx.dirLight2.params.dir.color[i] ==
+                                        f.play.envCtx.lightSettings.light2Color[i]);
+                            } else if (time != 0x8000) {
+                                REQUIRE(f.play.lightCtx.ambientColor[i] >=
+                                        f.play.envCtx.lightSettings.ambientColor[i] / 2);
+                                REQUIRE(f.play.envCtx.dirLight2.params.dir.color[i] >=
+                                        f.play.envCtx.lightSettings.light2Color[i] / 2);
+                            }
+                        }
+                        // Actually apply and finish the native sky restoration,
+                        // including releases after manual and saved seasons.
+                        f.Select(-1);
+                        sSettings["gAudioEditor.GlobalOutdoorRain"] = 0;
+                        for (int frame = 0; frame < 140; ++frame)
+                            frameLights();
+                        REQUIRE(f.play.envCtx.gloomySkyMode == 0 && f.play.envCtx.unk_21 == 0);
+                        REQUIRE(f.play.envCtx.unk_1F == 0 && f.play.envCtx.unk_20 == 0);
+                        for (int i = 0; i < 3; ++i) {
+                            REQUIRE(f.play.lightCtx.ambientColor[i] == f.play.envCtx.lightSettings.ambientColor[i]);
+                            REQUIRE(f.play.envCtx.dirLight1.params.dir.color[i] ==
+                                    f.play.envCtx.lightSettings.light1Color[i]);
+                            REQUIRE(f.play.envCtx.dirLight2.params.dir.color[i] ==
+                                    f.play.envCtx.lightSettings.light2Color[i]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+static void NightShadeEasesWithoutRaisingNativeDarkness() {
+    for (int season : { SEASON_AUTUMN, SEASON_WINTER }) {
+        Fixture f;
+        f.Select(season);
+        f.play.envCtx.lightSettings = sFieldLights[3];
+        for (int dawn : { 0, 1 }) {
+            int previous = 0;
+            for (int minute = dawn ? 240 : 960; minute <= (dawn ? 480 : 1200); ++minute) {
+                gSaveContext.dayTime = gSaveContext.skyboxTime = minute * 65536 / 1440;
+                const int offset = SeasonWeather_LightOffset(&f.play, 0, 1);
+                if (minute != (dawn ? 240 : 960))
+                    REQUIRE(std::abs(offset - previous) <= 1);
+                previous = offset;
+            }
+        }
+        gSaveContext.dayTime = gSaveContext.skyboxTime = 0x2000;
+        for (int i = 0; i < 3; ++i) {
+            f.play.envCtx.adjAmbientColor[i] = -sFieldLights[3].ambientColor[i];
+            f.play.envCtx.adjLight1Color[i] = -sFieldLights[3].light2Color[i];
+        }
+        SeasonWeather_TestNativeLighting(&f.play);
+        for (int i = 0; i < 3; ++i) {
+            REQUIRE(f.play.lightCtx.ambientColor[i] == 0);
+            REQUIRE(f.play.envCtx.dirLight1.params.dir.color[i] == 0);
+            REQUIRE(f.play.envCtx.dirLight2.params.dir.color[i] == 0);
+        }
+    }
+}
+
+static void RealLightningFlashAndReleaseKeepNativeAmbientOwnership() {
+    for (int season : { -1, SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN, SEASON_WINTER }) {
+        for (bool followRod : { false, true }) {
+            for (int globalRain : { 0, 1 }) {
+                for (u16 time : { u16(0x2000), u16(0x8000) }) {
+                    Fixture f;
+                    sSave.seasonsOwned = 0xF;
+                    sSave.seasonsRodOwned = 1;
+                    sSave.season = season < 0 ? SEASON_OFF : season;
+                    f.Select(followRod ? -2 : season);
+                    gSaveContext.dayTime = gSaveContext.skyboxTime = time;
+                    f.play.envCtx.lightSettingsList = sFieldLights;
+                    f.play.envCtx.numLightSettings = 12;
+                    int owner;
+                    if (globalRain)
+                        sSettings["gAudioEditor.GlobalOutdoorRain"] = 1;
+                    else
+                        GlobalOutdoorRain_SetNativeRequest(&f.play, &owner, 25, true);
+                    f.Frame();
+                    REQUIRE(f.play.envCtx.lightningMode == LIGHTNING_MODE_ON);
+                    SeasonWeather_TestNativeOutdoorLighting(&f.play);
+                    gLightningStrike.state = LIGHTNING_STRIKE_START;
+                    gLightningStrike.flashAlphaTarget = 200;
+                    for (int frame = 0; frame < 2; ++frame) {
+                        Environment_UpdateLightningStrike(&f.play);
+                        SeasonWeather_TestNativeLighting(&f.play);
+                        for (int i = 0; i < 3; ++i) {
+                            REQUIRE(SeasonWeather_LightOffset(&f.play, i, 1) == 0);
+                            const int expected = std::min(255, f.play.envCtx.lightSettings.ambientColor[i] +
+                                                                   f.play.envCtx.adjAmbientColor[i]);
+                            REQUIRE(f.play.lightCtx.ambientColor[i] == expected);
+                            REQUIRE(f.play.envCtx.dirLight1.params.dir.color[i] ==
+                                    f.play.envCtx.lightSettings.light1Color[i]);
+                            REQUIRE(f.play.envCtx.dirLight2.params.dir.color[i] ==
+                                    f.play.envCtx.lightSettings.light2Color[i]);
+                        }
+                    }
+                    REQUIRE(gLightningStrike.state == LIGHTNING_STRIKE_END);
+                    if (globalRain)
+                        sSettings["gAudioEditor.GlobalOutdoorRain"] = 0;
+                    else
+                        GlobalOutdoorRain_SetNativeRequest(&f.play, &owner, 0, false);
+                    // Disabling either thunder owner during an active native
+                    // flash must let its END phase drain the actual adj fields.
+                    for (int frame = 0; frame < 80; ++frame) {
+                        f.Frame();
+                        Environment_UpdateLightningStrike(&f.play);
+                        SeasonWeather_TestNativeLighting(&f.play);
+                    }
+                    REQUIRE(gLightningStrike.state == LIGHTNING_STRIKE_WAIT);
+                    REQUIRE(f.play.envCtx.lightningMode == LIGHTNING_MODE_OFF);
+                    for (int i = 0; i < 3; ++i) {
+                        REQUIRE(f.play.envCtx.adjAmbientColor[i] == 0);
+                        REQUIRE(f.play.envCtx.adjLight1Color[i] == 0);
+                    }
+                }
+            }
+        }
+    }
+}
+
+static void LightingDiagnosticIsReadOnlyAndBounded() {
+    REQUIRE(SeasonWeather_RecordLighting != nullptr);
+    Fixture f;
+    f.Select(-2);
+    sSave.seasonsOwned = 1 << SEASON_WINTER;
+    sSave.season = SEASON_AUTUMN; // calling the saved gameplay getter would heal/write this
+    const auto saved = sSave;
+    const auto saveContext = gSaveContext;
+    f.play.envCtx.lightSettings = sFieldLights[3];
+    f.play.lightCtx.ambientColor[2] = 50;
+    const auto play = f.play;
+    SeasonWeather_RecordLighting(&f.play);
+    REQUIRE(sDiagnosticLogs.empty());
+    sSettings["gAudioEditor.WeatherAudioDiagnostics"] = 1;
+    SeasonWeather_RecordLighting(&f.play);
+    REQUIRE(sDiagnosticLogs.size() == 1);
+    REQUIRE(sDiagnosticLogs.back().find("[light-probe]") != std::string::npos);
+    REQUIRE(sDiagnosticLogs.back().find("selection=-2") != std::string::npos);
+    REQUIRE(sDiagnosticLogs.back().find("saved=2") != std::string::npos);
+    REQUIRE(sDiagnosticLogs.back().find("actualAmbient=0,0,50") != std::string::npos);
+    REQUIRE(sDiagnosticLogs.back().find("rawAmbient=40,40,70") != std::string::npos);
+    for (int frame = 0; frame < 200; ++frame)
+        SeasonWeather_RecordLighting(&f.play);
+    REQUIRE(sDiagnosticLogs.size() == 1);
+    REQUIRE(std::memcmp(&saved, &sSave, sizeof(saved)) == 0);
+    REQUIRE(std::memcmp(&saveContext, &gSaveContext, sizeof(saveContext)) == 0);
+    REQUIRE(std::memcmp(&play, &f.play, sizeof(play)) == 0);
+    gLightningStrike.state = LIGHTNING_STRIKE_START;
+    SeasonWeather_RecordLighting(&f.play);
+    REQUIRE(sDiagnosticLogs.size() == 2);
+    f.play.sceneNum++;
+    SeasonWeather_RecordLighting(&f.play);
+    REQUIRE(sDiagnosticLogs.size() == 3);
+    sSettings["gAudioEditor.WeatherAudioDiagnostics"] = 0;
+    SeasonWeather_RecordLighting(&f.play);
+    REQUIRE(sDiagnosticLogs.size() == 3);
+}
 
 struct NativeSkyFixture : Fixture {
     Player player = {};
@@ -762,6 +1055,11 @@ int main() {
     DuplicateUpdatesAndSceneReuseDoNotLeakOwnership();
     NativeBombFadeNeverConsumesSeasonalShade();
     NativeLightingClampPreservesClassicColorsAndBothDirectionalShades();
+    NightShadeRetainsAvailableNativeLight();
+    RealPaletteWeatherMatrixRestoresNativeLighting();
+    NightShadeEasesWithoutRaisingNativeDarkness();
+    RealLightningFlashAndReleaseKeepNativeAmbientOwnership();
+    LightingDiagnosticIsReadOnlyAndBounded();
     LightOffsetKeepsNativeLightningAndBounds();
     ScriptedRainRetainsItsExistingSkyOwnership();
     NativeSkyTagsKeepTheirRangeActivationAndRestoration();
@@ -770,6 +1068,6 @@ int main() {
     RetiredNativeTagsDoNotOverrideSavedRodWeather();
     SeasonalSkyYieldPreservesScriptOwnershipAndThenNativeTags();
     puts("PASS SoH seasonal presentation: saved Rod state, independent controls, native particle slots, actual "
-         "weather-tag entry/exit, queued/applied/scripted sky handoffs, private cadence, native lighting clamp and "
-         "bomb decay");
+         "weather-tag entry/exit, queued/applied/scripted sky handoffs, private cadence, real night/overcast palette "
+         "setup, bounded night shade, native flash/release, read-only lighting snapshots and bomb decay");
 }

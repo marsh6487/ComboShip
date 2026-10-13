@@ -6,6 +6,7 @@
 #include "assets/misc/skyboxes/d2_fine_static.h"
 #include "assets/misc/skyboxes/d2_fine_pal_static.h"
 #include "assets/2s2h_assets.h"
+#include "2s2h/Enhancements/Audio/MMWeather.h"
 
 typedef struct SkyboxFaceParams {
     /* 0x00 */ s32 xStart;
@@ -163,7 +164,7 @@ u8 Skybox_GetOotCloudBlend(SkyboxContext* skyboxCtx, s16 blend) {
     s32 firstCloudy = skyboxCtx->staticSegments[0][0] == sSkyboxTextures[SKYBOX_TEXTURES_CLOUD][0];
     s32 secondCloudy = skyboxCtx->staticSegments[1][0] == sSkyboxTextures[SKYBOX_TEXTURES_CLOUD][0];
     blend = CLAMP(blend, 0, 255);
-    return firstCloudy * (255 - blend) + secondCloudy * blend;
+    return MMWeather_ResolveOotCloudBlend(firstCloudy * (255 - blend) + secondCloudy * blend);
 }
 
 /**

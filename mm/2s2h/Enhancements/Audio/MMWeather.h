@@ -16,14 +16,16 @@ void MMWeather_Reset(void);
 int MMWeather_Season(void);
 // Resolve current eligibility before the environment update (actors and HUD confirmations).
 int MMWeather_SeasonForPlay(const struct PlayState* play);
-// Summer and explicit Spring/Autumn rain modes suppress native rain presentation
-// while its source stays live. The independent global rain override still composes.
+// Eligible seasons suppress native rain presentation while its source stays live.
+// The independent global rain override still composes.
 int MMWeather_SeasonClearsRain(void);
 // Observe native storm channel requests before composing Summer's ambience mute.
 uint32_t MMWeather_ResolveAmbienceSeqCmd(uint32_t cmd);
 int MMWeather_RainDensity(void);
 float MMWeather_Overcast(void);
 uint8_t MMWeather_Shade(uint8_t value);
+// Normalize ordinary dry MM clouds only when sampling the selected OoT artwork.
+uint8_t MMWeather_ResolveOotCloudBlend(uint8_t nativeBlend);
 void MMWeather_ApplySky(uint8_t* first, uint8_t* second, uint8_t* blend);
 void MMWeather_RainColor(uint8_t* red, uint8_t* green, uint8_t* blue);
 void MMWeather_DrawLightning(struct PlayState* play);

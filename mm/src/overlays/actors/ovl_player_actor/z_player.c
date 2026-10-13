@@ -568,7 +568,8 @@ Input* sPlayerControlInput;
 s32 sPlayerUseHeldItem;              // When true, the current held item is used. Is reset to false every frame.
 s32 sPlayerHeldItemButtonIsHeldDown; // Indicates if the button for the current held item is held down.
 AdjLightSettings D_80862B50;         // backup of lay->envCtx.adjLightSettings
-s32 D_80862B6C;                      // this->skelAnime.movementFlags // sPlayerSkelMoveFlags?
+static s16 sPlayerNativeLightningAmbient[3];
+s32 D_80862B6C; // this->skelAnime.movementFlags // sPlayerSkelMoveFlags?
 
 bool func_8082DA90(PlayState* play) {
     return (play->transitionTrigger != TRANS_TRIGGER_OFF) || (play->transitionMode != TRANS_MODE_OFF);
@@ -8434,6 +8435,7 @@ void func_808388B8(PlayState* play, Player* this, PlayerTransformation playerFor
     this->stateFlags1 |= PLAYER_STATE1_2;
 
     D_80862B50 = play->envCtx.adjLightSettings;
+    Environment_GetNativeLightningAmbient(sPlayerNativeLightningAmbient);
     this->actor.velocity.y = 0.0f;
     Actor_DeactivateLens(play);
 }
@@ -20435,6 +20437,7 @@ void func_80854EFC(PlayState* play, f32 arg1, struct_8085D848_unk_00* arg2) {
         (TRUNCF_BINANG((var_v1->fogNear - var_t0->fogNear) * arg1) + var_t0->fogNear) -
         play->envCtx.lightSettings.fogNear;
 
+    Environment_ClearNativeLightningAmbient();
     func_80854CD0(arg1, play->envCtx.adjLightSettings.fogColor, var_v1->fogColor, var_t0->fogColor,
                   play->envCtx.lightSettings.fogColor, play->envCtx.adjLightSettings.ambientColor, var_v1->ambientColor,
                   var_t0->ambientColor, play->envCtx.lightSettings.ambientColor,
@@ -20674,6 +20677,7 @@ void Player_Action_87(Player* this, PlayState* play) {
                 this->csId = play->playerCsIds[PLAYER_CS_ID_MASK_TRANSFORMATION];
                 Player_StopCutscene(this);
                 play->envCtx.adjLightSettings = D_80862B50;
+                Environment_RestoreNativeLightningAmbient(sPlayerNativeLightningAmbient);
                 func_8085B384(this, play);
                 return;
             }

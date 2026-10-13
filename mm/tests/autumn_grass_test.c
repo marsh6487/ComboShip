@@ -241,7 +241,7 @@ static void Spring(void) {
             Begin();
             cases[i].draw(cases[i].actor, &play);
             Check(cases[i].fade ? translucent : opaque, cases[i].fade ? gfx.polyXlu.p : gfx.polyOpa.p, cases[i].list,
-                  native, count, 0xF6C1D920, 2);
+                  native, count, 0xF6C1D9E0, 3);
             assert(grouped.grassGroups[0].elements[0].alpha == (cases[i].fade ? 96 : 255));
             for (int restore = 0; restore < 3; ++restore) {
                 season = restore == 0 ? SEASON_SUMMER : restore == 1 ? SEASON_OFF : SEASON_SPRING;
@@ -278,8 +278,9 @@ static void Spring(void) {
         assert(mode == 0);
     }
     allowDraw = 1;
-    puts("PASS spring grass/bush OPA/XLU subtle mode 2 tint, exact native fade alpha, replacement hooks, stumps and "
-         "summer/Off/eligibility cleanup");
+    puts(
+        "PASS spring grass/bush OPA/XLU readable blossom blush, exact native fade alpha, replacement hooks, stumps and "
+        "summer/Off/eligibility cleanup");
 }
 
 static void Winter(void) {
@@ -312,28 +313,30 @@ static void Winter(void) {
         const size_t count = (cases[i].fade ? gfx.polyXlu.p : gfx.polyOpa.p) - start;
         Gfx native[128];
         memcpy(native, start, count * sizeof(Gfx));
-        season = SEASON_WINTER;
-        Begin();
-        cases[i].draw(cases[i].actor, &play);
-        Check(cases[i].fade ? translucent : opaque, cases[i].fade ? gfx.polyXlu.p : gfx.polyOpa.p, cases[i].list,
-              native, count, 0xE5EDF3FF, 3);
-        for (unsigned excluded = 0; excluded < 2; ++excluded) {
-            play.sceneId = excluded ? SCENE_00KEIKOKU : SCENE_BACKTOWN;
-            eligible = excluded ? 0 : 1;
+        const s16 scenes[] = { SCENE_00KEIKOKU,  SCENE_BACKTOWN,    SCENE_24KEMONOMITI,
+                               SCENE_20SICHITAI, SCENE_20SICHITAI2, SCENE_21MITURINMAE };
+        for (unsigned scene = 0; scene < ARRAY_COUNT(scenes); ++scene) {
+            play.sceneId = scenes[scene];
+            season = SEASON_WINTER;
+            Begin();
+            cases[i].draw(cases[i].actor, &play);
+            Check(cases[i].fade ? translucent : opaque, cases[i].fade ? gfx.polyXlu.p : gfx.polyOpa.p, cases[i].list,
+                  native, count, 0xE5EDF3FF, 3);
+            eligible = 0;
             Begin();
             cases[i].draw(cases[i].actor, &play);
             start = cases[i].fade ? translucent : opaque;
             assert((size_t)((cases[i].fade ? gfx.polyXlu.p : gfx.polyOpa.p) - start) == count);
             assert(!memcmp(native, start, count * sizeof(Gfx)));
+            eligible = 1;
         }
-        eligible = 1;
     }
     play.sceneId = SCENE_00KEIKOKU;
     grass.isCut = 1;
     Begin();
     EnKusa_DrawGrass(&grass.actor, &play);
     assert(gfx.polyOpa.p - opaque == 1 && opaque[0].words.w1 == (uintptr_t)gKusaStumpDL);
-    puts("PASS Termina winter grass/bush OPA/XLU frost; exact native commands, fade alpha, stumps and Clock Town");
+    puts("PASS winter grass/bush OPA/XLU frost across adjacent outdoors; exact native commands, fade alpha and stumps");
 }
 
 int main(void) {

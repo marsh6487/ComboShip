@@ -12,8 +12,8 @@ static inline int SeasonFoliage_ActorBegin(Gfx** display, const PlayState* play,
             red = 246;
             green = 193;
             blue = 217;
-            blend = canopy ? 224 : 32;
-            mode = 2; // Mean-preserving partial blossom blend, as in MM.
+            blend = canopy ? 255 : 224;
+            mode = 3; // Readable blossom canopies and grass blush; summer restores native color.
             break;
         case 2:
             red = canopy ? 244 : 217;

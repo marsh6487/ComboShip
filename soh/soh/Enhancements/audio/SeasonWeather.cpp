@@ -8,6 +8,10 @@
 #include "macros.h"
 #include "mods/extended_inventory.h"
 #include "overlays/actors/ovl_En_Weather_Tag/z_en_weather_tag.h"
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdio>
 #include <cstdint>
 
 extern "C" {
@@ -35,6 +39,21 @@ struct Shade {
 };
 constexpr Shade kAutumnShade = { { -34, -32, -26 }, { -42, -40, -34 } };
 constexpr Shade kWinterShade = { { -46, -34, -14 }, { -54, -42, -20 } };
+PlayState* sLightingDiagnosticPlay = nullptr;
+std::array<int, 26> sLightingDiagnosticKey{};
+
+float NightShadeWeight() {
+    // Follow the clock that actually selects the native outdoor palette. Keep
+    // the accepted daytime shade and ease protection through dawn and dusk.
+    const float hour = gSaveContext.skyboxTime * (24.0f / 65536.0f);
+    if (hour < 4.0f || hour >= 20.0f)
+        return 1.0f;
+    if (hour < 8.0f)
+        return (8.0f - hour) / 4.0f;
+    if (hour > 16.0f)
+        return (hour - 16.0f) / 4.0f;
+    return 0.0f;
+}
 
 int RandomFrames(int base, int range) {
     sRandom = sRandom * 1664525u + 1013904223u;
@@ -92,7 +111,22 @@ extern "C" int32_t SeasonWeather_LightOffset(const PlayState* play, int32_t chan
     }
     const int season = SeasonWeather_SeasonForPlay(play);
     const Shade* shade = season == SEASON_AUTUMN ? &kAutumnShade : season == SEASON_WINTER ? &kWinterShade : nullptr;
-    return shade == nullptr ? 0 : (ambient ? shade->ambient[channel] : shade->light[channel]);
+    if (shade == nullptr)
+        return 0;
+    const int offset = ambient ? shade->ambient[channel] : shade->light[channel];
+    const auto& env = play->envCtx;
+    const int available =
+        std::clamp(ambient ? env.lightSettings.ambientColor[channel] + env.adjAmbientColor[channel]
+                           : std::max(env.lightSettings.light1Color[channel], env.lightSettings.light2Color[channel]) +
+                                 env.adjLight1Color[channel],
+                   0, 255);
+    // Fixed daytime offsets can consume every red/green ambient channel of a
+    // native night palette. Preserve at least half its available night light;
+    // never brighten the native palette or take ownership of shared adj fields.
+    // Both directional lights share this offset, so protect the usable moon/sun
+    // contribution rather than weakening it because the opposite light is off.
+    const int protectedOffset = std::max(offset, -available / 2);
+    return static_cast<int32_t>(std::lround(offset + (protectedOffset - offset) * NightShadeWeight()));
 }
 
 extern "C" int32_t SeasonWeather_ParticlesEnabled(int32_t season) {
@@ -147,7 +181,90 @@ extern "C" void SeasonWeather_Reset() {
     sLastFrame = UINT32_MAX;
     sRandom = 0x534F4857;
     sRain = { GlobalOutdoorRainPhase::Dry, 0, 0.0f };
+    sLightingDiagnosticPlay = nullptr;
     GlobalOutdoorRain_SetSeasonRequest(nullptr, 0, 0.0f, false);
+}
+
+extern "C" void SeasonWeather_RecordLighting(PlayState* play) {
+    if (play == nullptr || !CVarGetInteger(CVAR_AUDIO("WeatherAudioDiagnostics"), 0)) {
+        sLightingDiagnosticPlay = nullptr;
+        return;
+    }
+    // Read the raw save, not the self-healing gameplay getter. A diagnostic
+    // must not grant Rod ownership or repair an unowned saved season.
+    const auto* saved = Nei_Save();
+    const int savedSeason = saved ? saved->season : -1;
+    const int selection = CVarGetInteger(SOH_SEASON_WEATHER_CVAR("Season"), -2);
+    const auto& env = play->envCtx;
+    const auto& light = play->lightCtx;
+    const Camera* camera = play->activeCamera >= 0 && play->activeCamera < 4 ? GET_ACTIVE_CAM(play) : nullptr;
+    const int cameraFlags = camera ? camera->unk_14C : -1;
+    const int ambientCollapsed = light.ambientColor[0] <= 1 && light.ambientColor[1] <= 1 &&
+                                 (env.lightSettings.ambientColor[0] > 1 || env.lightSettings.ambientColor[1] > 1);
+    // One snapshot per scene/room/season, 45-minute native time bucket, state
+    // handoff, or ambient-collapse transition. Do no per-frame string work.
+    const std::array<int, 26> key = {
+        play->sceneNum,
+        play->roomCtx.curRoom.num,
+        selection,
+        sSeason,
+        savedSeason,
+        gSaveContext.dayTime >> 11,
+        gSaveContext.skyboxTime >> 11,
+        env.unk_1F,
+        env.unk_20,
+        env.unk_21,
+        env.gloomySkyMode,
+        env.unk_DE,
+        env.lightningMode,
+        gLightningStrike.state,
+        gWeatherMode,
+        env.indoors,
+        play->activeCamera,
+        cameraFlags,
+        env.unk_BF,
+        R_ENV_DISABLE_DBG,
+        env.skyboxDisabled,
+        play->csCtx.state,
+        ambientCollapsed,
+        env.customSkyboxFilter,
+        gSaveContext.gameMode,
+        play->gameOverCtx.state,
+    };
+    if (sLightingDiagnosticPlay == play && sLightingDiagnosticKey == key)
+        return;
+    sLightingDiagnosticPlay = play;
+    sLightingDiagnosticKey = key;
+    const int minutes = gSaveContext.dayTime * 1440 / 65536;
+    const int skyMinutes = gSaveContext.skyboxTime * 1440 / 65536;
+    char message[1400];
+    std::snprintf(
+        message, sizeof(message),
+        "[light-probe] scene=%d room=%d hour=%02d:%02d skyHour=%02d:%02d selection=%d saved=%d resolved=%d "
+        "actualAmbient=%u,%u,%u actualSun=%u,%u,%u actualMoon=%u,%u,%u "
+        "rawAmbient=%u,%u,%u rawSun=%u,%u,%u rawMoon=%u,%u,%u adjAmbient=%d,%d,%d adjDirectional=%d,%d,%d "
+        "fog=%u,%u,%u/%d/%d rawFog=%u,%u,%u/%d/%d adjFog=%d,%d,%d/%d/%d "
+        "sunDir=%d,%d,%d moonDir=%d,%d,%d nativeIndex=%u,%u blend=%u/%u/%u gloomy=%u/%u lightning=%u/%u weather=%u "
+        "rawCount=%u indoorOverride=%u debugDisabled=%d camera=%d/%d indoors=%u skyDisabled=%u story=%u "
+        "skyFilter=%u gameMode=%d gameOver=%d ambientCollapsed=%d",
+        play->sceneNum, play->roomCtx.curRoom.num, minutes / 60, minutes % 60, skyMinutes / 60, skyMinutes % 60,
+        selection, savedSeason, sSeason, light.ambientColor[0], light.ambientColor[1], light.ambientColor[2],
+        env.dirLight1.params.dir.color[0], env.dirLight1.params.dir.color[1], env.dirLight1.params.dir.color[2],
+        env.dirLight2.params.dir.color[0], env.dirLight2.params.dir.color[1], env.dirLight2.params.dir.color[2],
+        env.lightSettings.ambientColor[0], env.lightSettings.ambientColor[1], env.lightSettings.ambientColor[2],
+        env.lightSettings.light1Color[0], env.lightSettings.light1Color[1], env.lightSettings.light1Color[2],
+        env.lightSettings.light2Color[0], env.lightSettings.light2Color[1], env.lightSettings.light2Color[2],
+        env.adjAmbientColor[0], env.adjAmbientColor[1], env.adjAmbientColor[2], env.adjLight1Color[0],
+        env.adjLight1Color[1], env.adjLight1Color[2], light.fogColor[0], light.fogColor[1], light.fogColor[2],
+        light.fogNear, light.fogFar, env.lightSettings.fogColor[0], env.lightSettings.fogColor[1],
+        env.lightSettings.fogColor[2], env.lightSettings.fogNear, env.lightSettings.fogFar, env.adjFogColor[0],
+        env.adjFogColor[1], env.adjFogColor[2], env.adjFogNear, env.adjFogFar, env.dirLight1.params.dir.x,
+        env.dirLight1.params.dir.y, env.dirLight1.params.dir.z, env.dirLight2.params.dir.x, env.dirLight2.params.dir.y,
+        env.dirLight2.params.dir.z, env.unk_1F, env.unk_20, env.unk_21, env.unk_22, env.unk_24, env.gloomySkyMode,
+        env.unk_DE, env.lightningMode, gLightningStrike.state, gWeatherMode, env.numLightSettings, env.unk_BF,
+        R_ENV_DISABLE_DBG, play->activeCamera, cameraFlags, env.indoors, env.skyboxDisabled, play->csCtx.state,
+        env.customSkyboxFilter, gSaveContext.gameMode, play->gameOverCtx.state, ambientCollapsed);
+    GlobalOutdoorRain_Log(message);
 }
 
 extern "C" void SeasonWeather_Update(PlayState* play) {
@@ -200,6 +317,8 @@ extern "C" void SeasonWeather_Update(PlayState* play) {
 static void RegisterSeasonWeather() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameFrameUpdate>(
         []() { SeasonWeather_Update(gPlayState); });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawEnd>(
+        []() { SeasonWeather_RecordLighting(gPlayState); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>([]() { SeasonWeather_Reset(); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnExitGame>([](int32_t) { SeasonWeather_Reset(); });
 }

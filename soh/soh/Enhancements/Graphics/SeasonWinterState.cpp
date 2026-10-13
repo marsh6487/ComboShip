@@ -69,7 +69,10 @@ void State::BuildAurora(const Input& input, const View& view) {
             const float u = column / float(kRibbonColumns - 1);
             const float angle = band * 2.0943951f - 1.20f + u * 2.40f;
             const float wave = std::sin(angle * 2.1f + elapsed * 0.12f + band);
-            const float center = radius * (0.38f + wave * 0.09f);
+            // Native third-person cameras look down by 10-15 degrees with a
+            // 60-degree FOV. Keep the colored core in their visible sky;
+            // the former 16-25 degree elevation clipped it above the frame.
+            const float center = radius * (0.18f + wave * 0.045f);
             const float height = radius * (0.12f + 0.04f * std::sin(u * 4.5f + elapsed * 0.08f + band));
             const float hue = 0.5f + 0.5f * std::sin(angle * 2 + band + elapsed * 0.025f);
             const float edge = std::sin(u * 3.14159265f);

@@ -50,9 +50,16 @@ def main():
         game_flags = ["-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DMM_BUILD_DLL",
                       "-DCONTROLLERBUTTONS_T=uint32_t", "-DNON_EQUIVALENT", "-DNON_MATCHING"]
         game_flags += ["-I" + str(ROOT / path) for path in
-                       ("mm/include", "mm/include/PR", "mm/src", "mm/2s2h", "mm/assets",
+                       ("mm/include", "mm/include/PR", "mm/src", "mm/2s2h", "mm/assets", "mm/mods",
                         "libultraship/include", "libultraship/src", "combo")]
-        for source in ("mm/src/code/z_kankyo.c", "mm/src/code/z_play.c"):
+        for source in ("mm/src/code/z_kankyo.c", "mm/src/code/z_play.c", "mm/src/code/z_vr_box.c",
+                       "mm/src/overlays/actors/ovl_En_Bom/z_en_bom.c",
+                       "mm/src/overlays/actors/ovl_En_Bombf/z_en_bombf.c",
+                       "mm/src/overlays/actors/ovl_En_Test6/z_en_test6.c",
+                       "mm/src/overlays/actors/ovl_En_Wiz_Fire/z_en_wiz_fire.c",
+                       "mm/src/overlays/actors/ovl_Door_Warp1/z_door_warp1.c",
+                       "mm/src/overlays/actors/ovl_Dm_Hina/z_dm_hina.c",
+                       "mm/src/overlays/actors/ovl_player_actor/z_player.c"):
             result = subprocess.run([*shlex.split(os.environ.get("CC", "cc")), "-std=gnu17",
                                      "-fsyntax-only", "-DNDEBUG", "-Wno-int-conversion",
                                      "-Wno-incompatible-pointer-types", "-I" + str(ROOT / "mm"),
@@ -69,13 +76,59 @@ def main():
         environment = (ROOT / "mm/src/code/z_kankyo.c").read_text()
         play = (ROOT / "mm/src/code/z_play.c").read_text()
         spin = (ROOT / "mm/src/overlays/actors/ovl_En_M_Thunder/z_en_m_thunder.c").read_text()
-        environment_functions = []
-        for source, name in ((environment, "Environment_AdjustLights"),
+        environment_functions = [re.search(r"^static s16 sNativeLightningAmbient\[3\];", environment, re.M)[0]]
+        library = (ROOT / "mm/src/code/z_lib.c").read_text()
+        for source, name in ((environment, "Environment_ClearNativeLightningAmbient"),
+                             (environment, "Environment_GetNativeLightningAmbient"),
+                             (environment, "Environment_RestoreNativeLightningAmbient"),
+                             (environment, "Environment_GetAmbientAdjustment"),
+                             (environment, "Environment_AdjustLights"),
+                             (library, "Color_RGB8_Lerp"),
+                             (environment, "Environment_LerpRGB8"),
+                             (environment, "Environment_LerpAmbientColor"),
                              (environment, "Environment_GetStormState"),
                              (environment, "Environment_DrawRain"),
                              (spin, "EnMThunder_AdjustLights")):
             environment_functions.append(production_function(source, name))
+        # Execute the actual final ambient composition without the unrelated
+        # scene-light interpolation setup. Full translation-unit syntax is checked above.
+        update_lights = production_function(environment, "Environment_UpdateLights")
+        ambient_start = update_lights.index("        adjustment = Environment_GetAmbientAdjustment")
+        ambient_end = update_lights.index("        if ((s16)(envCtx->lightSettings.light1Color", ambient_start)
+        environment_functions.append(
+            "void DisplayAmbientFromEnvironment(PlayState* play) {\n"
+            "EnvironmentContext* envCtx = &play->envCtx; LightContext* lightCtx = &play->lightCtx;\n"
+            "s32 i, adjustment; for (i = 0; i < 3; i++) {\n" + update_lights[ambient_start:ambient_end] +
+            "lightCtx->ambientColor[i] = MMWeather_Shade(lightCtx->ambientColor[i]);\n}\n}\n")
         (build / "weather_environment.inc").write_text("\n".join(environment_functions))
+        player = (ROOT / "mm/src/overlays/actors/ovl_player_actor/z_player.c").read_text()
+        transformation = production_function(player, "func_808388B8")
+        snapshot = transformation[transformation.index("    D_80862B50 ="):transformation.index("    this->actor.velocity")]
+        action87 = production_function(player, "Player_Action_87")
+        restore = action87[action87.index("                play->envCtx.adjLightSettings ="):action87.index(
+            "                func_8085B384", action87.index("                play->envCtx.adjLightSettings ="))]
+        player_type = re.search(r"typedef struct struct_8085D848_unk_00 \{.*?\} struct_8085D848_unk_00;",
+                                player, re.S)[0]
+        (build / "weather_player.inc").write_text(
+            player_type + "\nAdjLightSettings D_80862B50;\nstatic s16 sPlayerNativeLightningAmbient[3];\n" +
+            re.search(r"^u8 D_8085D844\[\].*;$", player, re.M)[0] + "\n" +
+            production_function(player, "func_80854CD0") + "\n" +
+            production_function(player, "func_80854EFC") + "\n" +
+            "void SnapshotPlayerAmbient(PlayState* play) {\n" + snapshot + "\n}\n" +
+            "void RestorePlayerAmbient(PlayState* play) {\n" + restore + "\n}\n")
+        bomb_sections = []
+        for actor, suffix in (("En_Bom", "Bom"), ("En_Bombf", "Bombf")):
+            bomb = (ROOT / f"mm/src/overlays/actors/ovl_{actor}/z_{actor.lower()}.c").read_text()
+            replacement = re.search(
+                r"(?:Environment_ClearNativeLightningAmbient\(\);\s*)?"
+                r"play->envCtx.adjLightSettings.ambientColor\[0\] = "
+                r"play->envCtx.adjLightSettings.ambientColor\[1\] =\s*"
+                r"play->envCtx.adjLightSettings.ambientColor\[2\] = 250;", bomb)[0]
+            fade_start = bomb.index("    if (play->envCtx.adjLightSettings.ambientColor[0] != 0)")
+            fade_end = bomb.index("    if (this->timer == 0)", fade_start)
+            bomb_sections.append(f"void Replace{suffix}Ambient(PlayState* play) {{\n{replacement}\n}}\n")
+            bomb_sections.append(f"void Fade{suffix}Ambient(PlayState* play) {{\n{bomb[fade_start:fade_end]}\n}}\n")
+        (build / "weather_bombs.inc").write_text("\n".join(bomb_sections))
         skybox = (ROOT / "mm/src/code/z_vr_box.c").read_text()
         skybox_draw = (ROOT / "mm/src/code/z_vr_box_draw.c").read_text()
         entry_end = environment.index("} TimeBasedSkyboxEntry;") + len("} TimeBasedSkyboxEntry;")
@@ -88,6 +141,7 @@ def main():
         sky.append(re.sub(r"\bgSkybox(?:Clear|Cloudy)\dTex\b", r"(TexturePtr)\g<0>",
                           array_declaration(skybox, "sSkyboxTextures")))
         for source, name in ((skybox, "Skybox_IsOotSkyActive"),
+                             (skybox, "Skybox_GetOotCloudBlend"),
                              (environment, "Environment_LerpWeight"),
                              (skybox_draw, "Skybox_SetColors"),
                              (environment, "Environment_UpdateSkybox"),
@@ -104,14 +158,18 @@ def main():
             gate[0].replace("this", "play") + "\n}\n")
         structs = environment[environment.index("typedef enum {"):environment.index("// Variables are put")]
         functions = []
-        for name in ("Environment_AddLightningBolts", "MMWeather_StartBolt", "MMWeather_ClearBolts"):
-            if re.search(r"^void " + name + r"\(", environment, re.M):
-                start, end = function_body(environment, name)
-                functions.append(environment[start:end])
+        for name in ("Environment_AddLightningBolts", "MMWeather_StartBolt", "MMWeather_ClearBolts",
+                     "Environment_UpdateLightningStrike", "Environment_DrawLightningImpl",
+                     "Environment_DrawLightning", "Environment_Draw"):
+            functions.append(production_function(environment, name))
         (build / "weather_bolts.inc").write_text(
             structs + "\nLightningBolt sLightningBolts[3];\n"
             "static LightningBolt sMMWeatherLightningBolt = { .state = LIGHTNING_BOLT_INACTIVE };\n" +
+            "s16 sLightningFlashAlpha;\n" +
+            re.sub(r"\bgEffLightning\dTex\b", r"(TexturePtr)\g<0>",
+                   array_declaration(environment, "sLightningTextures")) + "\n" +
             "\n".join(functions))
+        (build / "weather_random.inc").write_text((ROOT / "mm/src/boot/O2/rand.c").read_text())
         # The real sky-star helper includes its normal spdlog call; use the same
         # standalone fmt mode as the other production-header fixtures.
         result = subprocess.run([*compiler, *flags, *game_flags, "-Wno-error", "-DFMT_HEADER_ONLY",
@@ -123,7 +181,8 @@ def main():
                         "-o", str(executable)], capture_output=True, text=True)
         if result.returncode:
             raise RuntimeError(result.stdout + result.stderr)
-        subprocess.run([str(executable)], check=True)
+        case = os.environ.get("MM_WEATHER_TEST_CASE")
+        subprocess.run([str(executable), *([case] if case else [])], check=True)
         executable = build / "weather_audio_test"
         port = (ROOT / "mm/2s2h/BenPort.cpp").read_text()
         start = port.index("            MMWeatherAudio_Mix(audio_buffer,")

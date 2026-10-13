@@ -24,6 +24,34 @@ static bool VisibleAurora(const State& state) {
 static bool Same(Vec3 a, Vec3 b) {
     return a.x == b.x && a.y == b.y && a.z == b.z;
 }
+static void AuroraInNativeCamera(const State& state) {
+    // Camera_Normal1 loads these 10/15 degree downward pitches and 60 degree
+    // FOV from z_camera_data.inc's Normal0/Normal1 normal modes. Issuing a
+    // ribbon mesh is insufficient if its entire colored core is above the sky
+    // visible during ordinary third-person play.
+    for (float aspect : { 4.0f / 3.0f, 16.0f / 9.0f })
+        for (float pitch : { 10.0f, 15.0f })
+            for (int yaw = 0; yaw < 360; yaw += 30) {
+                const float p = pitch * 0.0174532925f, y = yaw * 0.0174532925f;
+                View view{ { 0, 100, 0 },
+                           { std::sin(y) * std::cos(p), -std::sin(p), std::cos(y) * std::cos(p) },
+                           { -std::cos(y), 0, std::sin(y) },
+                           { std::sin(y) * std::sin(p), std::cos(p), std::cos(y) * std::sin(p) },
+                           0.5773503f,
+                           aspect };
+                bool coreInView = false;
+                for (const auto& ribbon : state.Ribbons())
+                    for (const auto& vertex : ribbon.vertices) {
+                        const auto relative = vertex.position - view.eye;
+                        const float depth = MMSummer::Dot(relative, view.forward);
+                        coreInView |= vertex.alpha > 0.1f && depth > 0 &&
+                                      std::abs(MMSummer::Dot(relative, view.right)) <
+                                          depth * view.tanHalfFov * view.aspect * 0.95f &&
+                                      std::abs(MMSummer::Dot(relative, view.up)) < depth * view.tanHalfFov * 0.95f;
+                    }
+                assert(coreInView && "night aurora core must reach the native third-person sky frustum");
+            }
+}
 
 int main() {
     View view{ { 0, 100, 0 }, { 0, 0, 1 }, { -1, 0, 0 }, { 0, 1, 0 }, 0.5773503f, 16.0f / 9.0f };
@@ -51,6 +79,13 @@ int main() {
     input.hour = 23;
     state.Step(input, view);
     assert(VisibleMist(state) == kMistCount && VisibleAurora(state));
+    AuroraInNativeCamera(state);
+    auto evolvingSky = state;
+    for (int frame = 0; frame < 3000; ++frame) {
+        evolvingSky.Step(input, view);
+        if (frame % 20 == 0)
+            AuroraInNativeCamera(evolvingSky); // Entire slow wave cycle, not only the initial arc placement.
+    }
     const auto wisps = state.Wisps();
     const auto ribbons = state.Ribbons();
     input.paused = true;
@@ -115,7 +150,7 @@ int main() {
         for (size_t i = 0; i < before.size(); ++i) {
             const auto& now = state.Wisps()[i];
             assert(std::isfinite(now.position.x) && std::isfinite(now.position.y) && std::isfinite(now.position.z));
-            assert(now.width >= 180 && now.width <= 370 && now.height >= 10 && now.height <= 20);
+            assert(now.width >= 180 && now.width <= 370 && now.height >= 16 && now.height <= 48);
             assert(now.alpha >= 0 && now.alpha <= 0.24f);
             if (now.generation == before[i].generation)
                 assert(MMSummer::Length(now.position - before[i].position) < 2);

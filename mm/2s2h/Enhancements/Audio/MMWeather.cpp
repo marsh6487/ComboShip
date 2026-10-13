@@ -51,7 +51,7 @@ int SeasonRainDensity() {
     if (sSeason != SEASON_SPRING) {
         return 0;
     }
-    return sSpringRainMode == -1 ? (CURRENT_DAY == 1 || CURRENT_DAY == 3 ? 30 : 0) : (sSpringState.Density() * 6) / 5;
+    return sSpringRainMode == -1 ? 30 : (sSpringState.Density() * 6) / 5;
 }
 
 float SeasonRainIntensity() {
@@ -184,10 +184,9 @@ extern "C" int MMWeather_SeasonForPlay(const PlayState* play) {
 }
 
 extern "C" int MMWeather_SeasonClearsRain() {
-    // Explicit seasonal rain modes own their wet/dry cycle. Season Default
-    // preserves the original Spring day schedule and Autumn/native rain mix.
-    return sSeason == SEASON_SUMMER || (sSeason == SEASON_SPRING && sSpringRainMode != -1) ||
-           (sSeason == SEASON_AUTUMN && sAutumnRainMode != -1);
+    // Every eligible season owns its rain presentation, including the default
+    // Spring rain and Autumn wet/dry cycle. Native targets and timers stay live.
+    return sSeason >= SEASON_SPRING && sSeason < SEASON_COUNT;
 }
 
 extern "C" uint32_t MMWeather_ResolveAmbienceSeqCmd(uint32_t cmd) {
@@ -229,21 +228,32 @@ extern "C" uint8_t MMWeather_Shade(uint8_t value) {
     return static_cast<uint8_t>(value * (1.0f - 0.35f * MMWeather_Overcast()));
 }
 
+extern "C" uint8_t MMWeather_ResolveOotCloudBlend(uint8_t nativeBlend) {
+    // Ordinary MM CLOUD geometry is blue in the native renderer. Only the OoT
+    // artwork getter normalizes that dry baseline; keep MM bindings untouched.
+    if (sSeason >= 0 || !OutdoorEligible(sPlay) || sPlay->skyboxId != SKYBOX_NORMAL_SKY ||
+        sPlay->csCtx.state != CS_STATE_IDLE || sPlay->envCtx.lightSettingOverride != LIGHT_SETTING_OVERRIDE_NONE ||
+        sPlay->envCtx.customSkyboxFilter) {
+        return nativeBlend;
+    }
+    const auto& env = sPlay->envCtx;
+    const bool nativeWeather = env.stormState == STORM_STATE_ON || gWeatherMode == WEATHER_MODE_RAIN ||
+                               gWeatherMode == WEATHER_MODE_SNOW || env.precipitation[PRECIP_RAIN_CUR] > 0 ||
+                               env.precipitation[PRECIP_RAIN_MAX] > 0 || env.precipitation[PRECIP_SOS_MAX] > 0 ||
+                               env.precipitation[PRECIP_SNOW_CUR] > 0 || env.precipitation[PRECIP_SNOW_MAX] > 0;
+    return nativeWeather ? nativeBlend : static_cast<uint8_t>(255.0f * MMWeather_Overcast());
+}
+
 extern "C" void MMWeather_ApplySky(uint8_t* first, uint8_t* second, uint8_t* blend) {
     // Native CLOUD also describes ordinary daytime cloud geometry. Start the
     // active season's presentation from its requested baseline instead of
     // inheriting that texture as an already-overcast OoT sky. Explicit outdoor
     // weather still composes afterward; SeasonForPlay retains story/interior gates.
-    const bool nativeStorm =
-        sPlay != nullptr &&
-        (sPlay->envCtx.stormState == STORM_STATE_ON || gWeatherMode == WEATHER_MODE_RAIN ||
-         sPlay->envCtx.precipitation[PRECIP_RAIN_CUR] > 0 || sPlay->envCtx.precipitation[PRECIP_RAIN_MAX] > 0);
-    if (MMWeather_SeasonClearsRain() || (sSeason == SEASON_AUTUMN && !nativeStorm) ||
-        (sSeason == SEASON_SPRING && SeasonRainDensity() > 0)) {
-        *first = *second = *blend = 0;
-    } else if (sSeason == SEASON_WINTER) {
+    if (sSeason == SEASON_WINTER) {
         *first = *second = 1;
         *blend = 0;
+    } else if (MMWeather_SeasonClearsRain()) {
+        *first = *second = *blend = 0;
     }
     const float amount = MMWeather_Overcast();
     if (amount > 0.0f) {

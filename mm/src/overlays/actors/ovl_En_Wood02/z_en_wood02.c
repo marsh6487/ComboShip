@@ -567,7 +567,7 @@ void EnWood02_Draw(Actor* thisx, PlayState* play) {
     u8 blue;
     s32 season = MMWeather_SeasonForPlay(play);
     s32 spring = EnWood02_IsTree(this) && season == SEASON_SPRING;
-    s32 frost = EnWood02_IsTree(this) && season == SEASON_WINTER && play->sceneId == SCENE_00KEIKOKU;
+    s32 frost = EnWood02_IsTree(this) && season == SEASON_WINTER;
     s32 autumn = (EnWood02_IsTree(this) || ((thisx->params == WOOD_LEAF_GREEN || thisx->params == WOOD_LEAF_YELLOW) &&
                                             EnWood02_UsesNativeFoliage(this))) &&
                  season == SEASON_AUTUMN;
@@ -632,11 +632,10 @@ void EnWood02_Draw(Actor* thisx, PlayState* play) {
         if (spring || autumn || frost) {
             // Some native canopies bake green into their own commands. Scope
             // the renderer tint to the canopy so those trees change as well.
-            // Spring blends blossom pink while retaining native mean brightness
-            // and environment colors; opaque bark and native impact leaves stay native.
-            gDPSetGrayscaleColor(POLY_XLU_DISP++, spring ? 246 : red, spring ? 193 : green, spring ? 217 : blue,
-                                 spring ? 224 : 255);
-            gSPGrayscale(POLY_XLU_DISP++, spring ? 2 : frost ? 3 : 1);
+            // Lift the dark actor canopies into readable blossom pink without
+            // retaining a green blend; opaque bark and native impact leaves stay native.
+            gDPSetGrayscaleColor(POLY_XLU_DISP++, spring ? 246 : red, spring ? 193 : green, spring ? 217 : blue, 255);
+            gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 1);
         }
         gSPDisplayList(POLY_XLU_DISP++, D_808C4D70[this->drawType & 0xF]);
         if (spring || autumn || frost) {

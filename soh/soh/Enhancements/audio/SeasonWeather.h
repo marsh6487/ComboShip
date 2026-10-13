@@ -24,6 +24,9 @@ int32_t SeasonWeather_SummerEffectEnabled(int32_t effect);
 // 0: freezing mist, 1: nighttime aurora. Independent of falling snow.
 int32_t SeasonWeather_WinterEffectEnabled(int32_t effect);
 void SeasonWeather_Update(struct PlayState* play);
+// Read-only final/native light snapshot under the existing weather diagnostics
+// checkbox. Called after environment setup and world draw; logging is bounded.
+void SeasonWeather_RecordLighting(struct PlayState* play);
 // Discards scene-owned presentation without dereferencing an outgoing PlayState.
 void SeasonWeather_Reset(void);
 

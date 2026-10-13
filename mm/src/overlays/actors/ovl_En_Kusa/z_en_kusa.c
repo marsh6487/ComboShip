@@ -712,7 +712,7 @@ void EnKusa_DrawBush(Actor* thisx, PlayState* play2) {
     PlayState* play = play2;
     EnKusa* this = (EnKusa*)thisx;
     s32 season = MMWeather_SeasonForPlay(play);
-    s32 frost = season == SEASON_WINTER && play->sceneId == SCENE_00KEIKOKU;
+    s32 frost = season == SEASON_WINTER;
     // The partial spring blend barely warms the native green and preserves brightness.
     s32 spring = season == SEASON_SPRING;
     s32 seasonal = spring || season == SEASON_AUTUMN || frost;
@@ -738,8 +738,8 @@ void EnKusa_DrawBush(Actor* thisx, PlayState* play2) {
                                  spring  ? 217
                                  : frost ? 243
                                          : 69,
-                                 spring ? 32 : 255);
-            gSPGrayscale(POLY_OPA_DISP++, spring ? 2 : frost ? 3 : 1);
+                                 spring ? 224 : 255);
+            gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 1);
         }
         Gfx_DrawDListOpa(play, gKusaBushType1DL);
         if (seasonal) {
@@ -768,8 +768,8 @@ void EnKusa_DrawBush(Actor* thisx, PlayState* play2) {
                                  spring  ? 217
                                  : frost ? 243
                                          : 69,
-                                 spring ? 32 : 255);
-            gSPGrayscale(POLY_XLU_DISP++, spring ? 2 : frost ? 3 : 1);
+                                 spring ? 224 : 255);
+            gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 1);
         }
         gSPDisplayList(POLY_XLU_DISP++, gKusaBushType2DL);
         if (seasonal) {
@@ -796,7 +796,7 @@ void EnKusa_DrawGrass(Actor* thisx, PlayState* play) {
         // Scope RGB treatment around the selected grass draw, so texture and
         // model replacements receive it too. Cut stumps keep their material.
         s32 season = MMWeather_SeasonForPlay(play);
-        s32 frost = season == SEASON_WINTER && play->sceneId == SCENE_00KEIKOKU;
+        s32 frost = season == SEASON_WINTER;
         s32 spring = season == SEASON_SPRING;
         s32 seasonal = spring || season == SEASON_AUTUMN || frost;
         OPEN_DISPS(play->state.gfxCtx);
@@ -811,8 +811,8 @@ void EnKusa_DrawGrass(Actor* thisx, PlayState* play) {
                                  spring  ? 217
                                  : frost ? 243
                                          : 69,
-                                 spring ? 32 : 255);
-            gSPGrayscale(POLY_OPA_DISP++, spring ? 2 : frost ? 3 : 1);
+                                 spring ? 224 : 255);
+            gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 1);
         }
         Gfx_DrawDListOpa(play, gKusaSproutDL);
         if (seasonal) {

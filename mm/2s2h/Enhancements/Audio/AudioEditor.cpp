@@ -1105,7 +1105,7 @@ void RegisterAudioWidgets() {
                      .ComboMap(&seasonRainModes)
                      .DefaultIndex(-1)
                      .Color(THEME_COLOR)
-                     .Tooltip("Season Default keeps Spring rain on Days 1 and 3, plus native Day 2 weather. "
+                     .Tooltip("Season Default keeps persistent Spring rain and soft overcast on all three days. "
                               "Off, Persistent and Intermittent replace native rain while Spring is active. "
                               "The separate Outdoor Rain override still takes priority."));
     seasonWeatherWidgets[2] = { .name = "Spring Falling Petals", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
@@ -1151,7 +1151,7 @@ void RegisterAudioWidgets() {
                      .ComboMap(&seasonRainModes)
                      .DefaultIndex(-1)
                      .Color(THEME_COLOR)
-                     .Tooltip("Season Default keeps gentle intermittent Autumn showers and native weather. "
+                     .Tooltip("Season Default keeps gentle intermittent Autumn showers with clear skies between them. "
                               "Off, Persistent and Intermittent replace native rain while Autumn is active. "
                               "The separate Outdoor Rain override still takes priority."));
     seasonWeatherWidgets[8] = { .name = "Autumn Falling Leaves", .type = WidgetType::WIDGET_CVAR_CHECKBOX };

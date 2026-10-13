@@ -7,6 +7,10 @@
     { "misc/scene_texture_06/scene_texture_06_Tex_002460", 0xD99C45FF },
     { "misc/scene_texture_06/scene_texture_06_Tex_004460", 0xD99C45FF },
     { "misc/scene_texture_06/scene_texture_06_Tex_004C60", 0xD99C45FF },
+    // Forest billboards and detached fronds shared by swamp, Palace and Woods.
+    { "misc/scene_texture_06/scene_texture_06_Tex_000C20", 0xB96848FF },
+    { "misc/scene_texture_06/scene_texture_06_Tex_001440", 0xB96848FF },
+    { "misc/scene_texture_06/scene_texture_06_Tex_000400", 0xB96848FF },
     { "misc/scene_texture_08/scene_texture_08_Tex_001000", 0xD99C45FF },
     { "misc/scene_texture_08/scene_texture_08_Tex_004800", 0xD99C45FF },
     { "misc/scene_texture_08/scene_texture_08_Tex_005000", 0xB96848FF },

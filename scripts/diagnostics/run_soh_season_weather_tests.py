@@ -37,12 +37,42 @@ def run(out, cc, cxx):
     bridge += extract(root / 'soh/src/code/code_8006C3A0.c', ['Flags_SetEnv'])
     # The environment functions are unchanged production code, not a second
     # implementation of density interpolation or sky-restoration behavior.
-    bridge += '#include "macros.h"\n#include "variables.h"\n'
+    bridge += '#include "macros.h"\n#include "variables.h"\n#include "vt.h"\n#include "libc/math.h"\n'
     bridge += '#include "soh/Enhancements/audio/GlobalOutdoorRainBridge.h"\n'
+    bridge += '#include "soh/Enhancements/audio/WeatherSamplePlayer.h"\n#include "code/concurrent_weather_audio.h"\n'
+    bridge += '#include "libultraship/bridge/consolevariablebridge.h"\n'
+    bridge += 'extern s16 sLightningFlashAlpha; extern s32 sLightningBolts[3];\n'
+    bridge += 'void Environment_DrawLightningFlash(PlayState*, u8, u8, u8, u8);\n'
     environment = root / 'soh/src/code/z_kankyo.c'
-    bridge += extract(environment, ['func_800766C4', 'func_8006FB94'])
+    bridge += extract(environment, ['func_800766C4', 'func_8006FB94', 'Environment_UpdateLightningStrike'])
     bridge += extract(root / 'soh/src/code/z_actor.c', ['Flags_GetEventChkInf'])
     environment_source = environment.read_text()
+    # Exercise the real outdoor time/overcast palette setup before the final
+    # clamp, rather than assigning bright synthetic colors straight to it.
+    time_type = re.search(r'typedef struct \{[^{}]*\} struct_8011FB48;', environment_source, re.S)
+    time_table = re.search(r'struct_8011FB48 D_8011FB48\[\]\[7\] = \{.*?^};',
+                           environment_source, re.M | re.S)
+    assert time_type and time_table
+    bridge += time_type[0] + '\n' + time_table[0] + '\n'
+    bridge += 'u8 D_8011FDCC, D_8011FDD0; f32 D_8011FDD4;\n'
+    bridge += extract(environment, ['Environment_LerpWeight'])
+    bridge += extract(root / 'soh/src/code/z_lib.c', ['Math_CosS', 'Math_SinS'])
+    bridge += '#define TIME_ENTRY_1F (D_8011FB48[envCtx->unk_1F][i])\n'
+    bridge += '#define TIME_ENTRY_20 (D_8011FB48[envCtx->unk_20][i])\n'
+    outdoor_start = environment_source.index('                for (i = 0; i < ARRAY_COUNT(D_8011FB48')
+    outdoor_end = outdoor_start
+    depth = 0
+    for index in range(environment_source.index('{', outdoor_start), len(environment_source)):
+        depth += (environment_source[index] == '{') - (environment_source[index] == '}')
+        if depth == 0:
+            outdoor_end = index + 1
+            break
+    bridge += '\nvoid SeasonWeather_TestNativeOutdoorLighting(PlayState* play) {\n'
+    bridge += ('EnvironmentContext* envCtx = &play->envCtx; '
+               'EnvLightSettings* lightSettingsList = envCtx->lightSettingsList; '
+               'f32 sp8C, sp88 = 0; u16 i, j;\n')
+    bridge += f'#line {environment_source.count(chr(10), 0, outdoor_start) + 1} "{environment}"\n'
+    bridge += environment_source[outdoor_start:outdoor_end] + '\n}\n'
     lighting_start = environment_source.index('        for (i = 0; i < 3; i++) {',
                                                environment_source.index('// Apply lighting adjustments'))
     lighting_end = environment_source.index('        // Set both directional light directions', lighting_start)
@@ -77,6 +107,8 @@ def run(out, cc, cxx):
     sources = [root / 'soh/tests/season_weather_runtime_test.cpp',
                root / 'soh/soh/Enhancements/audio/GlobalOutdoorRain.cpp',
                root / 'soh/src/code/concurrent_weather_audio.c',
+               root / 'soh/src/libultra/gu/sins.c',
+               root / 'soh/src/libultra/gu/coss.c',
                root / 'soh/src/overlays/actors/ovl_En_Weather_Tag/z_en_weather_tag.c',
                out / 'season_weather_saved_getters.c',
                out / 'season_weather_rod_bridge.c']

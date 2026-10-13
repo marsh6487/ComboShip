@@ -35,4 +35,11 @@ if args.texture_fixtures:
     subprocess.run(["c++", *flags, str(root / "soh/tests/season_foliage_archive_test.cpp"),
                     str(root / "libultraship/src/fast/resource/type/Texture.cpp"),
                     str(root / "libultraship/src/ship/resource/Resource.cpp"), "-o", str(exe)], check=True)
-    subprocess.run([str(exe), *[str(value) for pair in fixtures for value in pair]], check=True)
+    arguments = []
+    for fixture in fixtures:
+        if len(fixture) not in (2, 6):
+            raise ValueError("Texture fixtures require [path, surface] or [path, surface, left, top, right, bottom]")
+        arguments += [str(fixture[0]), str(fixture[1])]
+        if len(fixture) == 6:
+            arguments += ["--region", *map(str, fixture[2:])]
+    subprocess.run([str(exe), *arguments], check=True)
