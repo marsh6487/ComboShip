@@ -325,9 +325,12 @@ ResourceManager::CheckCache(const ResourceIdentifier& identifier, bool loadExact
         const auto altPath = IResource::gAltAssetPrefix + identifier.Path;
         auto altCacheResult = CheckCache({ altPath, identifier.Owner, identifier.Parent }, loadExact);
 
-        // If the type held at this cache index is a resource, then we return it.
-        // Else we attempt to load standard definition assets.
-        if (std::holds_alternative<std::shared_ptr<IResource>>(altCacheResult)) {
+        // A cold Alt entry is unresolved, not an absent override. Scene teardown
+        // unloads alt/* while native cache entries can survive. Let the loader
+        // probe Alt before a retained native resource can satisfy this request.
+        // Warm Alt hits and known Alt failures keep their existing fast paths.
+        if (std::holds_alternative<std::shared_ptr<IResource>>(altCacheResult) ||
+            std::get<ResourceLoadError>(altCacheResult) == ResourceLoadError::NotCached) {
             return altCacheResult;
         }
     }
