@@ -36,7 +36,7 @@ static int gameplayRandomCalls;
 static int springBlossoms = 1, autumnLeaves = 1, winterSnow = 1,
            winterFlurries = 0;
 static unsigned leafPalettes, leafDraws, firstLeafAlpha, nonzeroLeafDraws,
-    petalDraws;
+    petalDraws, blossomDraws;
 static u8 submittedLeafAlpha[96];
 static float rainGain;
 static u8 nativeRainAmbience, nativeThunderAmbience;
@@ -271,8 +271,10 @@ float OTRGetDimensionFromRightEdge(float value) {
 #include "mods/items/objects/object_spring_petals.h"
 
 static void TraceParticleDisplayList(const Gfx *list) {
-  if (list == sSpringPetalGeometry)
+  if (list == sSpringPetalGeometry || list == sSpringBlossomGeometry)
     ++petalDraws;
+  if (list == sSpringBlossomGeometry)
+    ++blossomDraws;
 }
 
 static void TracePreviewLeaf(const Gfx *list) {
@@ -393,7 +395,7 @@ static int DrawSnow(PlayState *play) {
   previewCommandsBegin = commands;
   play->state.gfxCtx->polyXlu.p = commands;
   int before = snowDraws;
-  leafPalettes = leafDraws = nonzeroLeafDraws = petalDraws = 0;
+  leafPalettes = leafDraws = nonzeroLeafDraws = petalDraws = blossomDraws = 0;
   std::memset(submittedLeafAlpha, 0, sizeof(submittedLeafAlpha));
   firstLeafAlpha = 0;
   for (Actor *actor = play->actorCtx.actorLists[ACTORCAT_ITEMACTION].first;
@@ -832,7 +834,8 @@ static void SpringXluMaterialRegression() {
       } else if (command->words.w1 == (uintptr_t)sNativeParticleSetup &&
                  command != commands) {
         ++layerSetups;
-      } else if (command->words.w1 == (uintptr_t)sSpringPetalGeometry) {
+      } else if (command->words.w1 == (uintptr_t)sSpringPetalGeometry ||
+                 command->words.w1 == (uintptr_t)sSpringBlossomGeometry) {
         assert(!state.TextureOn() && !state.SameMaterial(standard));
         ++petalMeshes;
       }
@@ -863,7 +866,7 @@ static void SpringVisibleParticleRegression() {
     Confirm(&play, SEASON_SPRING);
     for (int i = 0; i < 180; ++i) {
       Frame(&play);
-      assert(DrawSnow(&play) == 96 && petalDraws == 96 && leafDraws == 0);
+      assert(DrawSnow(&play) == 96 && petalDraws == 96 && blossomDraws == 24 && leafDraws == 0);
       assert(ActiveSeasonParticleOwners(&play) == 1);
       assert(gameplayRandomCalls == beforeRandom);
     }

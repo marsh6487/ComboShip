@@ -313,12 +313,28 @@ int main() {
     play.view.lookAt.x -= 50000;
     Draw(play);
     assert(matrices == 96);
-    // The submitted spring mesh must retain the donor13 vertices and12
-    // curved triangles; a tinted snow quad cannot satisfy this contract.
+    // Reference blossoms have five rounded petals. The former two-lobed,
+    // pointed silhouette reads as a heart and must fail this shape check.
     assert((petalList[0].words.w0 >> 24) == G_VTX);
     const auto* petalVertices = reinterpret_cast<const Vtx*>(petalList[0].words.w1);
+    const unsigned petalVertexCount = (petalList[0].words.w0 >> 12) & 0xFF;
+    assert(petalVertexCount > 5 && petalVertexCount <= 32);
+    auto radiusSquared = [&](unsigned index) {
+        const auto& vertex = petalVertices[index].v.ob;
+        return vertex[0] * vertex[0] + vertex[1] * vertex[1];
+    };
+    unsigned lobes = 0;
+    for (unsigned i = 1; i < petalVertexCount; ++i) {
+        const unsigned previous = i == 1 ? petalVertexCount - 1 : i - 1;
+        const unsigned next = i == petalVertexCount - 1 ? 1 : i + 1;
+        lobes += radiusSquared(i) > radiusSquared(previous) && radiusSquared(i) > radiusSquared(next);
+    }
+    assert(lobes == 5);
+    // A smaller detached petal accompanies each intact blossom, using the
+    // same bounded owner and its existing motion and interpolation epochs.
+    assert(displayLists[0] != displayLists[1]);
     bool curved = false;
-    for (int i = 0; i < 13; ++i)
+    for (unsigned i = 0; i < petalVertexCount; ++i)
         curved |= petalVertices[i].v.ob[2] != 0;
     assert(curved);
     play.pauseCtx.state = 0;

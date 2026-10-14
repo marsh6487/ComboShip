@@ -12,6 +12,7 @@ extern "C" {
 #include "macros.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 }
+#include "../../../../combo/NeiSpringBlossoms.h"
 
 #include <algorithm>
 #include <cmath>
@@ -67,7 +68,7 @@ static bool CompactScene(int scene) {
            scene == SCENE_MARKET_ENTRANCE_RUINS || scene == SCENE_BACK_ALLEY_DAY || scene == SCENE_BACK_ALLEY_NIGHT;
 }
 
-// Exact native ComboShip980e6fe09 quad and curved cherry-petal meshes.
+// Preserve the exact native ComboShip980e6fe09 autumn quad and artwork.
 static Vtx sLeafQuad[] = {
     VTX(-160, -160, 0, 0, 1024, 255, 255, 255, 255),
     VTX(160, -160, 0, 1024, 1024, 255, 255, 255, 255),
@@ -81,21 +82,6 @@ static const ALIGN_ASSET(2) char sLeafOrange[] = "__OTR__objects/nei_autumn/leav
 static const ALIGN_ASSET(2) char sLeafGold[] = "__OTR__objects/nei_autumn/leaves/gold_tex";
 static const ALIGN_ASSET(2) char sLeafCopper[] = "__OTR__objects/nei_autumn/leaves/copper_tex";
 static const char* sLeafTextures[] = { sLeafCrimson, sLeafOrange, sLeafGold, sLeafCopper };
-static Vtx sPetalVertices[] = {
-    VTX(0, 0, 12, 0, 0, 255, 255, 255, 255),     VTX(0, -160, 0, 0, 0, 225, 210, 215, 255),
-    VTX(72, -112, 2, 0, 0, 242, 233, 236, 255),  VTX(124, -24, 5, 0, 0, 255, 246, 249, 255),
-    VTX(130, 74, 1, 0, 0, 255, 252, 253, 255),   VTX(86, 145, -4, 0, 0, 255, 255, 255, 255),
-    VTX(34, 151, -7, 0, 0, 255, 255, 255, 255),  VTX(0, 116, -5, 0, 0, 250, 241, 245, 255),
-    VTX(-34, 151, -7, 0, 0, 255, 255, 255, 255), VTX(-86, 145, -4, 0, 0, 255, 255, 255, 255),
-    VTX(-130, 74, 1, 0, 0, 255, 252, 253, 255),  VTX(-124, -24, 5, 0, 0, 255, 246, 249, 255),
-    VTX(-72, -112, 2, 0, 0, 242, 233, 236, 255),
-};
-static Gfx sPetalGeometry[] = {
-    gsSPVertex(sPetalVertices, 13, 0),         gsSP2Triangles(0, 1, 2, 0, 0, 2, 3, 0),
-    gsSP2Triangles(0, 3, 4, 0, 0, 4, 5, 0),    gsSP2Triangles(0, 5, 6, 0, 0, 6, 7, 0),
-    gsSP2Triangles(0, 7, 8, 0, 0, 8, 9, 0),    gsSP2Triangles(0, 9, 10, 0, 0, 10, 11, 0),
-    gsSP2Triangles(0, 11, 12, 0, 0, 12, 1, 0), gsSPEndDisplayList(),
-};
 static Vtx sSummerQuad[] = {
     VTX(-100, -100, 0, 0, 512, 255, 255, 255, 255),
     VTX(100, -100, 0, 512, 512, 255, 255, 255, 255),
@@ -171,10 +157,7 @@ static void DrawFalling(PlayState* play, int season, const SoHSeasonParticles::V
             const float scale = (0.035f + (i & 7) * 0.002f) * (1 + p.band * 0.7f);
             Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
             if (season == 0) {
-                constexpr uint8_t colors[][3] = {
-                    { 255, 184, 205 }, { 255, 224, 232 }, { 255, 244, 220 }, { 255, 202, 219 }
-                };
-                const auto* color = colors[i & 3];
+                const auto* color = NeiSpringBlossoms_Color(static_cast<unsigned>(i));
                 const float motionFrame = (p.rotation - i * 1300) / 180;
                 const float flutter = 0.65f + std::sin(motionFrame * 0.045f + i * 2.4f) * 0.25f;
                 Matrix_Scale(flutter, 1, 1, MTXMODE_APPLY);
@@ -189,7 +172,7 @@ static void DrawFalling(PlayState* play, int season, const SoHSeasonParticles::V
             }
         }
         gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
-        gSPDisplayList(POLY_XLU_DISP++, season == 0   ? sPetalGeometry
+        gSPDisplayList(POLY_XLU_DISP++, season == 0   ? NeiSpringBlossoms_Geometry(static_cast<unsigned>(i))
                                         : season == 2 ? sLeafGeometry
                                                       : reinterpret_cast<Gfx*>(const_cast<char*>(gEffDustDL)));
         Matrix_Pop();
