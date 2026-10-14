@@ -224,7 +224,7 @@ static EnvLightSettings sFieldLights[] = {
     { { 70, 70, 90 }, { 73, 73, 73 }, { 0, 0, 15 }, { -73, -73, -73 }, { 30, 30, 80 }, { 0, 0, 10 }, 2012, 12800 },
 };
 
-static void NightShadeRetainsAvailableNativeLight() {
+static void NightLightingRetainsNativeWeatherPalette() {
     for (int season : { SEASON_AUTUMN, SEASON_WINTER }) {
         for (u16 time : { u16(0x2000), u16(21 * 65536 / 24 + 16 * 65536 / 1440) }) {
             Fixture f;
@@ -236,11 +236,10 @@ static void NightShadeRetainsAvailableNativeLight() {
             REQUIRE(f.play.envCtx.lightSettings.ambientColor[0] == 40);
             REQUIRE(f.play.envCtx.lightSettings.ambientColor[1] == 40);
             SeasonWeather_TestNativeLighting(&f.play);
-            // A shade may cool/dim native night light, but may not consume its
-            // entire ambient channels or the moon's usable red/green light.
+            // Preserve the actual native night light, without a second RGB subtraction.
             for (int i = 0; i < 3; ++i) {
-                REQUIRE(f.play.lightCtx.ambientColor[i] >= sFieldLights[3].ambientColor[i] / 2);
-                REQUIRE(f.play.envCtx.dirLight2.params.dir.color[i] >= sFieldLights[3].light2Color[i] / 2);
+                REQUIRE(f.play.lightCtx.ambientColor[i] == sFieldLights[3].ambientColor[i]);
+                REQUIRE(f.play.envCtx.dirLight2.params.dir.color[i] == sFieldLights[3].light2Color[i]);
                 REQUIRE(f.play.envCtx.adjAmbientColor[i] == 0);
                 REQUIRE(f.play.envCtx.adjLight1Color[i] == 0);
             }
@@ -249,10 +248,11 @@ static void NightShadeRetainsAvailableNativeLight() {
     }
 }
 
-static void RealPaletteWeatherMatrixRestoresNativeLighting() {
+static void AllSeasonsPreserveNativeWeatherLighting() {
     for (int season : { -1, SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN, SEASON_WINTER }) {
         for (bool followRod : { false, true }) {
-            for (u16 time : { u16(0x2000), u16(0x8000), u16(21 * 65536 / 24 + 16 * 65536 / 1440) }) {
+            for (u16 time : { u16(0x2000), u16(6 * 65536 / 24), u16(0x8000), u16(18 * 65536 / 24),
+                              u16(21 * 65536 / 24 + 16 * 65536 / 1440) }) {
                 for (int globalRain : { 0, 1 }) {
                     for (int rainMode : { -1, 0, 1, 2 }) {
                         Fixture f;
@@ -282,18 +282,13 @@ static void RealPaletteWeatherMatrixRestoresNativeLighting() {
                         for (int i = 0; i < 3; ++i) {
                             REQUIRE(f.play.envCtx.adjAmbientColor[i] == 0);
                             REQUIRE(f.play.envCtx.adjLight1Color[i] == 0);
-                            if (season == -1 || season == SEASON_SPRING || season == SEASON_SUMMER) {
-                                REQUIRE(f.play.lightCtx.ambientColor[i] == f.play.envCtx.lightSettings.ambientColor[i]);
-                                REQUIRE(f.play.envCtx.dirLight1.params.dir.color[i] ==
-                                        f.play.envCtx.lightSettings.light1Color[i]);
-                                REQUIRE(f.play.envCtx.dirLight2.params.dir.color[i] ==
-                                        f.play.envCtx.lightSettings.light2Color[i]);
-                            } else if (time != 0x8000) {
-                                REQUIRE(f.play.lightCtx.ambientColor[i] >=
-                                        f.play.envCtx.lightSettings.ambientColor[i] / 2);
-                                REQUIRE(f.play.envCtx.dirLight2.params.dir.color[i] >=
-                                        f.play.envCtx.lightSettings.light2Color[i] / 2);
-                            }
+                            // The scene's native clear/cloudy palette owns world lighting.
+                            // Seasonal surface colors must not subtract from that palette again.
+                            REQUIRE(f.play.lightCtx.ambientColor[i] == f.play.envCtx.lightSettings.ambientColor[i]);
+                            REQUIRE(f.play.envCtx.dirLight1.params.dir.color[i] ==
+                                    f.play.envCtx.lightSettings.light1Color[i]);
+                            REQUIRE(f.play.envCtx.dirLight2.params.dir.color[i] ==
+                                    f.play.envCtx.lightSettings.light2Color[i]);
                         }
                         // Actually apply and finish the native sky restoration,
                         // including releases after manual and saved seasons.
@@ -317,7 +312,7 @@ static void RealPaletteWeatherMatrixRestoresNativeLighting() {
     }
 }
 
-static void NightShadeEasesWithoutRaisingNativeDarkness() {
+static void SeasonLightingDoesNotOverrideNativeDarkness() {
     for (int season : { SEASON_AUTUMN, SEASON_WINTER }) {
         Fixture f;
         f.Select(season);
@@ -327,8 +322,9 @@ static void NightShadeEasesWithoutRaisingNativeDarkness() {
             for (int minute = dawn ? 240 : 960; minute <= (dawn ? 480 : 1200); ++minute) {
                 gSaveContext.dayTime = gSaveContext.skyboxTime = minute * 65536 / 1440;
                 const int offset = SeasonWeather_LightOffset(&f.play, 0, 1);
+                REQUIRE(offset == 0);
                 if (minute != (dawn ? 240 : 960))
-                    REQUIRE(std::abs(offset - previous) <= 1);
+                    REQUIRE(offset == previous);
                 previous = offset;
             }
         }
@@ -875,7 +871,7 @@ static void DuplicateUpdatesAndSceneReuseDoNotLeakOwnership() {
     REQUIRE(f.play.envCtx.adjLight1Color[0] == 0 && f.play.envCtx.adjAmbientColor[0] == 0);
 }
 
-static void EligibilityAndShadeRestoreRespectSceneState() {
+static void EligibilityAndLightingRespectSceneState() {
     Fixture f;
     f.Select(SEASON_WINTER);
     f.play.envCtx.adjLight1Color[0] = 9;
@@ -883,8 +879,8 @@ static void EligibilityAndShadeRestoreRespectSceneState() {
     f.Frame();
     REQUIRE(f.play.envCtx.adjLight1Color[0] == 9);
     REQUIRE(f.play.envCtx.adjAmbientColor[0] == 12);
-    REQUIRE(SeasonWeather_LightOffset(&f.play, 0, 0) == -46);
-    REQUIRE(SeasonWeather_LightOffset(&f.play, 0, 1) == -54);
+    REQUIRE(SeasonWeather_LightOffset(&f.play, 0, 0) == 0);
+    REQUIRE(SeasonWeather_LightOffset(&f.play, 0, 1) == 0);
     REQUIRE(f.play.envCtx.gloomySkyMode == 1);
     f.Frame();
     REQUIRE(f.play.envCtx.adjAmbientColor[0] == 12); // no shared-field writes
@@ -958,7 +954,7 @@ static void ParticleEligibilityDoesNotTakeOwnershipOfTheSky() {
     REQUIRE(SeasonWeather_ParticleSeasonForPlay(nullptr) == -1);
 }
 
-static void NativeBombFadeNeverConsumesSeasonalShade() {
+static void NativeBombFadeKeepsNativeLightingOwnership() {
     for (int season : { SEASON_AUTUMN, SEASON_WINTER }) {
         Fixture f;
         f.Select(season);
@@ -996,7 +992,7 @@ static void NativeBombFadeNeverConsumesSeasonalShade() {
     }
 }
 
-static void NativeLightingClampPreservesClassicColorsAndBothDirectionalShades() {
+static void NativeLightingClampPreservesColorsInEverySeason() {
     Fixture f;
     const u8 ambient[] = { 20, 90, 200 }, light1[] = { 80, 140, 220 }, light2[] = { 70, 60, 190 };
     const u8 fog[] = { 20, 150, 230 };
@@ -1024,16 +1020,10 @@ static void NativeLightingClampPreservesClassicColorsAndBothDirectionalShades() 
                 f.play.lightCtx.fogColor[2] == 255);
     };
     const u8 nativeAmbient[] = { 0, 110, 255 }, nativeLight1[] = { 60, 150, 240 }, nativeLight2[] = { 50, 70, 210 };
-    for (int season : { -1, -2, SEASON_SPRING, SEASON_SUMMER }) {
+    for (int season : { -1, -2, SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN, SEASON_WINTER }) {
         f.Select(season);
         requireColors(nativeAmbient, nativeLight1, nativeLight2);
     }
-    const u8 winterAmbient[] = { 0, 68, 240 }, winterLight1[] = { 14, 116, 226 }, winterLight2[] = { 4, 36, 196 };
-    f.Select(SEASON_WINTER);
-    requireColors(winterAmbient, winterLight1, winterLight2);
-    const u8 autumnAmbient[] = { 0, 70, 226 }, autumnLight1[] = { 26, 118, 214 }, autumnLight2[] = { 16, 38, 184 };
-    f.Select(SEASON_AUTUMN);
-    requireColors(autumnAmbient, autumnLight1, autumnLight2);
     gLightningStrike.state = LIGHTNING_STRIKE_START;
     requireColors(nativeAmbient, nativeLight1, nativeLight2);
     gLightningStrike.state = LIGHTNING_STRIKE_WAIT;
@@ -1042,8 +1032,8 @@ static void NativeLightingClampPreservesClassicColorsAndBothDirectionalShades() 
 static void LightOffsetKeepsNativeLightningAndBounds() {
     Fixture f;
     f.Select(SEASON_WINTER);
-    REQUIRE(SeasonWeather_LightOffset(&f.play, 0, 0) == -46);
-    REQUIRE(SeasonWeather_LightOffset(&f.play, 2, 1) == -20);
+    REQUIRE(SeasonWeather_LightOffset(&f.play, 0, 0) == 0);
+    REQUIRE(SeasonWeather_LightOffset(&f.play, 2, 1) == 0);
     REQUIRE(SeasonWeather_LightOffset(&f.play, -1, 1) == 0);
     REQUIRE(SeasonWeather_LightOffset(&f.play, 3, 0) == 0);
     gLightningStrike.state = LIGHTNING_STRIKE_START;
@@ -1051,8 +1041,8 @@ static void LightOffsetKeepsNativeLightningAndBounds() {
     REQUIRE(SeasonWeather_LightOffset(&f.play, 2, 1) == 0);
     gLightningStrike.state = LIGHTNING_STRIKE_WAIT;
     f.Select(SEASON_AUTUMN);
-    REQUIRE(SeasonWeather_LightOffset(&f.play, 0, 0) == -34);
-    REQUIRE(SeasonWeather_LightOffset(&f.play, 2, 1) == -34);
+    REQUIRE(SeasonWeather_LightOffset(&f.play, 0, 0) == 0);
+    REQUIRE(SeasonWeather_LightOffset(&f.play, 2, 1) == 0);
     f.Select(SEASON_SPRING);
     REQUIRE(SeasonWeather_LightOffset(&f.play, 0, 0) == 0);
 }
@@ -1079,6 +1069,7 @@ int main() {
     REQUIRE(SeasonWeather_FlurriesEnabled != nullptr);
     REQUIRE(SeasonWeather_SummerEffectEnabled != nullptr);
     REQUIRE(SeasonWeather_LightOffset != nullptr);
+    AllSeasonsPreserveNativeWeatherLighting();
     ManualPresentationDoesNotChangeSavedRodState();
     ParticleSwitchesAreIndependentAndPreserveNativeSlots();
     DefaultSpringIsDryAndDefaultAutumnIsThirtyDrops();
@@ -1086,16 +1077,15 @@ int main() {
     GlobalRainComposesAboveSeasonalRain();
     SpringShowersUseTheSharedOvercastSetting();
     IntermittentSeasonRainHasPrivatePausedCadence();
-    EligibilityAndShadeRestoreRespectSceneState();
+    EligibilityAndLightingRespectSceneState();
     ParticleEligibilityDoesNotTakeOwnershipOfTheSky();
     SavedRodGameplayAndNativeParticleColorStaySeparate();
     RealEnvironmentRainAndSkyRestoreComposeWithSeason();
     DuplicateUpdatesAndSceneReuseDoNotLeakOwnership();
-    NativeBombFadeNeverConsumesSeasonalShade();
-    NativeLightingClampPreservesClassicColorsAndBothDirectionalShades();
-    NightShadeRetainsAvailableNativeLight();
-    RealPaletteWeatherMatrixRestoresNativeLighting();
-    NightShadeEasesWithoutRaisingNativeDarkness();
+    NativeBombFadeKeepsNativeLightingOwnership();
+    NativeLightingClampPreservesColorsInEverySeason();
+    NightLightingRetainsNativeWeatherPalette();
+    SeasonLightingDoesNotOverrideNativeDarkness();
     RealLightningFlashAndReleaseKeepNativeAmbientOwnership();
     LightingDiagnosticIsReadOnlyAndBounded();
     LightOffsetKeepsNativeLightningAndBounds();
@@ -1107,5 +1097,6 @@ int main() {
     SeasonalSkyYieldPreservesScriptOwnershipAndThenNativeTags();
     puts("PASS SoH seasonal presentation: saved Rod state, independent controls, native particle slots, actual "
          "weather-tag entry/exit, queued/applied/scripted sky handoffs, private cadence, real night/overcast palette "
-         "setup, bounded night shade, native flash/release, read-only lighting snapshots and bomb decay");
+         "setup, unmodified world light in all seasons, native flash/release, read-only lighting snapshots and bomb "
+         "decay");
 }

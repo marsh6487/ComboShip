@@ -10,7 +10,6 @@
 #include "overlays/actors/ovl_En_Weather_Tag/z_en_weather_tag.h"
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstdio>
 #include <cstdint>
 
@@ -33,27 +32,8 @@ uint32_t sLastFrame = UINT32_MAX;
 uint32_t sRandom = 0x534F4857;
 GlobalOutdoorRainCycle sRain = { GlobalOutdoorRainPhase::Dry, 0, 0.0f };
 
-struct Shade {
-    s16 light[3];
-    s16 ambient[3];
-};
-constexpr Shade kAutumnShade = { { -34, -32, -26 }, { -42, -40, -34 } };
-constexpr Shade kWinterShade = { { -46, -34, -14 }, { -54, -42, -20 } };
 PlayState* sLightingDiagnosticPlay = nullptr;
 std::array<int, 26> sLightingDiagnosticKey{};
-
-float NightShadeWeight() {
-    // Follow the clock that actually selects the native outdoor palette. Keep
-    // the accepted daytime shade and ease protection through dawn and dusk.
-    const float hour = gSaveContext.skyboxTime * (24.0f / 65536.0f);
-    if (hour < 4.0f || hour >= 20.0f)
-        return 1.0f;
-    if (hour < 8.0f)
-        return (8.0f - hour) / 4.0f;
-    if (hour > 16.0f)
-        return (hour - 16.0f) / 4.0f;
-    return 0.0f;
-}
 
 int RandomFrames(int base, int range) {
     sRandom = sRandom * 1664525u + 1013904223u;
@@ -113,28 +93,12 @@ extern "C" int32_t SeasonWeather_ParticleSeasonForPlay(const PlayState* play) {
     return ResolveSeasonForPlay(play, false);
 }
 
-extern "C" int32_t SeasonWeather_LightOffset(const PlayState* play, int32_t channel, int32_t ambient) {
-    if (channel < 0 || channel >= 3 || gLightningStrike.state != LIGHTNING_STRIKE_WAIT) {
-        return 0;
-    }
-    const int season = SeasonWeather_SeasonForPlay(play);
-    const Shade* shade = season == SEASON_AUTUMN ? &kAutumnShade : season == SEASON_WINTER ? &kWinterShade : nullptr;
-    if (shade == nullptr)
-        return 0;
-    const int offset = ambient ? shade->ambient[channel] : shade->light[channel];
-    const auto& env = play->envCtx;
-    const int available =
-        std::clamp(ambient ? env.lightSettings.ambientColor[channel] + env.adjAmbientColor[channel]
-                           : std::max(env.lightSettings.light1Color[channel], env.lightSettings.light2Color[channel]) +
-                                 env.adjLight1Color[channel],
-                   0, 255);
-    // Fixed daytime offsets can consume every red/green ambient channel of a
-    // native night palette. Preserve at least half its available night light;
-    // never brighten the native palette or take ownership of shared adj fields.
-    // Both directional lights share this offset, so protect the usable moon/sun
-    // contribution rather than weakening it because the opposite light is off.
-    const int protectedOffset = std::max(offset, -available / 2);
-    return static_cast<int32_t>(std::lround(offset + (protectedOffset - offset) * NightShadeWeight()));
+extern "C" int32_t SeasonWeather_LightOffset(const PlayState*, int32_t, int32_t) {
+    // Keep the native C lighting bridge neutral. Clear/overcast palettes already
+    // supply weather lighting; subtracting seasonal RGB here dimmed both the
+    // scene and Link a second time, independently of the surface tint/effects.
+    // Native lightning, bombs and room actors retain their own adj* fields.
+    return 0;
 }
 
 extern "C" int32_t SeasonWeather_ParticlesEnabled(int32_t season) {

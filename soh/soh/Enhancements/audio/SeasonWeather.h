@@ -17,9 +17,9 @@ int32_t SeasonWeather_SeasonForPlay(const struct PlayState* play);
 // whose scene disables the skybox. Retains every other presentation guard.
 // Sky-dependent effects must additionally check their own visible-sky flag.
 int32_t SeasonWeather_ParticleSeasonForPlay(const struct PlayState* play);
-// Add at the native lighting clamp, without changing shared adj* fields that
-// bomb flashes, lightning and room actors modify. channel=0..2; ambient=0/1.
-// Ineligible presentation and active native lightning return zero.
+// Compatibility hook for the native lighting clamp. Returns zero: clear/cloudy
+// scene palettes own world lighting without an additional seasonal RGB shade.
+// Native lightning, bombs and room actors retain their shared adj* fields.
 int32_t SeasonWeather_LightOffset(const struct PlayState* play, int32_t channel, int32_t ambient);
 int32_t SeasonWeather_ParticlesEnabled(int32_t season);
 int32_t SeasonWeather_FlurriesEnabled(void);
