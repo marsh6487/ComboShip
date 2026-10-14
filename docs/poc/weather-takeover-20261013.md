@@ -77,3 +77,21 @@ Native MM control archive: SHA256
 Supplied Woodfall pack: SHA256
 `fde399add585ebaffa2524d8965b8b2351034c740cef98a0faa844a469e42e06`.
 No scene/archive, geometry, collision, UV, scrolling or save bytes are changed.
+
+## Hosted gate follow-up
+
+Build run `38485534667` on `61d86c35` stopped in the accepted NEI/MM pickup
+step before either platform build. Its complete native-season fixture still
+expected Spring to use enhanced rain only on Days 1/3 and Autumn to borrow
+native Day 2 rain. The first obsolete assertion at line 1193 was reproduced
+locally. Those expectations predated the recovered controller's current
+three-day Spring default and independent Autumn wet/dry presentation.
+
+The correction changes only that test and this record. The same real native
+actor/environment/audio paths now verify Spring density, rain gain and
+overcast on all three days; raw Day 2 storm/precipitation targets continue;
+Autumn's dry phase masks native rain/ambience/darkening; and Off restores the
+native rain, ambience and lighting. The complete fixture passes normally and
+with ASan/UBSan, including its particle projection, native snow/fog, paused
+wheel, actor reuse, lifecycle and scene/story/underwater controls. Existing
+assertions remain active; no production weather or visual code is changed.

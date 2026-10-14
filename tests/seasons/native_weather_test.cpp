@@ -1190,10 +1190,12 @@ int main(int argc, char **argv) {
     if (day == 2) {
       assert(gWeatherMode == WEATHER_MODE_RAIN &&
              play.envCtx.precipitation[PRECIP_RAIN_MAX] == 60);
-      assert(MMWeather_RainDensity() == 0 && rainGain == 0);
-    } else {
-      assert(MMWeather_RainDensity() == 30 && rainGain == 1);
     }
+    // Spring owns presentation on all three days while the native Day 2
+    // schedule still advances its raw storm and precipitation targets.
+    assert(MMWeather_RainDensity() == 30 && rainGain == 1 &&
+           MMWeather_Overcast() > 0 && MMWeather_SeasonClearsRain());
+    assert(nativeRainAmbience == 0 && nativeThunderAmbience == 0);
   }
   gSaveContext.save.day = 2;
   play.envCtx.precipitation[PRECIP_RAIN_MAX] =
@@ -1217,9 +1219,16 @@ int main(int argc, char **argv) {
   assert(gWeatherMode == WEATHER_MODE_RAIN &&
          play.envCtx.precipitation[PRECIP_RAIN_MAX] == 60);
   Confirm(&play, SEASON_AUTUMN);
-  assert(nativeRainAmbience == 1 && nativeThunderAmbience == 1 &&
-         MMWeather_RainDensity() == 0);
+  assert(nativeRainAmbience == 0 && nativeThunderAmbience == 0 &&
+         MMWeather_RainDensity() == 0 && MMWeather_SeasonClearsRain());
+  assert(gWeatherMode == WEATHER_MODE_RAIN &&
+         play.envCtx.precipitation[PRECIP_RAIN_MAX] == 60);
   draws = rainDraws;
+  DrawRainFromPlay(&play);
+  assert(rainDraws == draws); // Autumn's own dry phase masks native rain.
+  Confirm(&play, SEASON_OFF);
+  assert(nativeRainAmbience == 1 && nativeThunderAmbience == 1 &&
+         !MMWeather_SeasonClearsRain());
   DrawRainFromPlay(&play);
   assert(rainDraws == draws + 1);
   Confirm(&play, SEASON_SUMMER);
@@ -1241,6 +1250,9 @@ int main(int argc, char **argv) {
   func_800F6CEC(&play, 4, &light, settings);
   gWeatherMode = WEATHER_MODE_RAIN;
   func_800F6CEC(&play, 4, &light, settings);
+  assert(light.ambientColor[0] == 0 && light.light1Color[0] == 0);
+  Confirm(&play, SEASON_OFF);
+  func_800F6CEC(&play, 4, &light, settings);
   assert(light.ambientColor[0] == -50 && light.light1Color[0] == -100);
   gSaveContext.save.day = 3;
   Confirm(&play, SEASON_SUMMER);
@@ -1249,8 +1261,9 @@ int main(int argc, char **argv) {
   DrawRainFromPlay(&play);
   assert(rainDraws ==
          draws); // Summer's clear policy applies on all three days.
-  std::puts("PASS real native schedule: Spring Days 1/3, Summer all-day clear "
-            "sky/light/rain/ambience, Autumn/native and Off");
+  std::puts("PASS real native schedule: Spring all three days, Summer clear, "
+            "Autumn dry presentation, preserved raw Day 2 storm and exact "
+            "native rain/ambience/light restoration when Off");
 
   // A direct actor query must respect the current scene/story/camera state
   // even while the cached rendering bridge still contains last frame's season.
