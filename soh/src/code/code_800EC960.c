@@ -8,6 +8,7 @@
 #include "soh/Enhancements/savestate_serialize.h"
 #include "concurrent_weather_audio.h"
 #include "night_bgm_bridge.h"
+#include "mods/transformation_masks/assets/mm_asset_loader.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 // TODO: can these macros be shared between files? code_800F9280 seems to use
@@ -4120,6 +4121,7 @@ void Audio_UpdateFanfare(void);
  */
 void Audio_Update(void) {
     if (func_800FAD34() == 0) {
+        MmSfx_UpdateGameFrame();
         sAudioUpdateTaskStart = gAudioContext.totalTaskCnt;
         sAudioUpdateStartTime = osGetTime();
         AudioOcarina_Update();

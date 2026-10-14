@@ -228,6 +228,7 @@ struct RawTexMetadata {
     std::shared_ptr<Fast::Texture> resource;
     Fast::TextureType type;
     uint8_t autumnForestLayer = 0; // Requested forest identity survives private .meta payload paths.
+    uint8_t zoraCosmeticLayer = 0;
 };
 
 #define MAX_LIGHTS 32

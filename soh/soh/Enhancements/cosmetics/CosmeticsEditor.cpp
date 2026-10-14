@@ -439,6 +439,7 @@ std::map<std::string, CosmeticOption> cosmeticOptions = {
     COSMETIC_OPTION("Trails.BiggoronSword",         "Biggoron Sword",           COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, true),
     COSMETIC_OPTION("Trails.Stick",                 "Stick",                    COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, true),
     COSMETIC_OPTION("Trails.Hammer",                "Hammer",                   COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, true),
+    COSMETIC_OPTION("Trails.ZoraFinTrail",          "Zora Fin Trail",           COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
 
     COSMETIC_OPTION("World.BlockOfTime",            "Block of Time",            COSMETICS_GROUP_WORLD,        ColorRGBA8(255, 255, 255, 255), false, true, true),
     COSMETIC_OPTION("World.Moon",                   "Moon",                     COSMETICS_GROUP_WORLD,        ColorRGBA8(240, 255, 180, 255), false, true, true),

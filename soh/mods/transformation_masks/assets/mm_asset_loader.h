@@ -422,6 +422,9 @@ s32 MmSfx_PlayEx(u16 sfxId, Vec3f* pos, u8 token, f32* freqScale, f32* vol, s8* 
  */
 void MmSfx_Stop(u16 sfxId);
 
+// Once per native graph-frame Audio_Update, serialized with the PCM mixer.
+void MmSfx_UpdateGameFrame(void);
+
 /**
  * Play Goron roll sound with MM's synced freq/vol mapping.
  * @param speed XZ speed param (matches MM's sp54/unk_B08 inputs).

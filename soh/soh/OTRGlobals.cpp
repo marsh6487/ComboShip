@@ -1435,6 +1435,10 @@ void OTRAudio_Thread() {
         // The producer guard (same as above) prevents advancing the audio engine
         // when the backend ring is already at capacity.
         while (audio.running && AudioPlayer_Buffered() < AudioPlayer_GetDesiredBuffered()) {
+            std::lock_guard<std::mutex> prefillLock(audio.mutex);
+            if (!audio.running) {
+                break;
+            }
             if (AudioPlayer_Buffered() + SAMPLES_MID * AUDIO_FRAMES_PER_UPDATE > AudioPlayer_GetDesiredBuffered()) {
                 break;
             }

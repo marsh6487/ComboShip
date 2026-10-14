@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline-ref")
-    parser.add_argument("--case", choices=("synthesis", "capacity", "shutdown", "preservation"))
+    parser.add_argument("--case", choices=("synthesis", "capacity", "shutdown", "preservation", "serialization"))
     parser.add_argument("--sanitize", action="store_true")
     args = parser.parse_args()
     path = "soh/soh/OTRGlobals.cpp"
@@ -44,7 +44,7 @@ def main():
                         *shlex.split(os.environ.get("SOH_AUDIO_WORKER_CXXFLAGS", "")),
                         "-I" + str(build), str(ROOT / "tests/audio_mixer/soh_worker_test.cpp"),
                         "-o", str(binary)], check=True)
-        for case in [args.case] if args.case else ("synthesis", "capacity", "shutdown", "preservation"):
+        for case in [args.case] if args.case else ("synthesis", "capacity", "shutdown", "preservation", "serialization"):
             subprocess.run([str(binary), case], check=True, timeout=15)
 
 

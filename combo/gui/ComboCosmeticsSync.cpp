@@ -97,6 +97,7 @@ const CosmeticPair kPairs[] = {
     { "Trails.KokiriSword", false, { "Trails.KokiriSwordTrail" } },
     { "Trails.Stick", true, { "Trails.DekuStickTrail" } },
     { "Trails.Boomerang", true, { "Trails.ZoraBoomerangTrail" } },
+    { "Trails.ZoraFinTrail", false, { "Trails.ZoraFinTrail" } },
 };
 
 // MM's live apply (ShipInit re-run). ComboMenuModel already caches it and retries until 2ship.dll

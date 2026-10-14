@@ -123,6 +123,7 @@ std::map<std::string, CosmeticOption> cosmeticOptions = {
     COSMETIC_OPTION("Trails.DekuStickTrail",        "Deku Stick Trail",         COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
     COSMETIC_OPTION("Trails.DekuSpinTrail",         "Deku Spin Trail",          COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
     COSMETIC_OPTION("Trails.ZoraPunchTrail",        "Zora Punch Trail",         COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
+    COSMETIC_OPTION("Trails.ZoraFinTrail",          "Zora Fin Trail",           COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
     COSMETIC_OPTION("Trails.ZoraKickTrail",         "Zora Kick Trail",          COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 255, 255), false, true, false),
     COSMETIC_OPTION("Trails.ZoraBoomerangTrail",    "Zora Boomerang Trail",     COSMETICS_GROUP_TRAILS,       ColorRGBA8(255, 255, 100, 255), false, true, false),
     COSMETIC_OPTION("Buttons.B",                    "B",                        COSMETICS_GROUP_BUTTONS,      ColorRGBA8(100, 255, 120, 255), false, true, false),

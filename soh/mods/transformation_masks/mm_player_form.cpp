@@ -3309,8 +3309,8 @@ static void MmForm_RestoreOotState(Player* player) {
     // leak into human-Link state.
     MmForm_StopGoronRollSfx();
     if (MmSfx_IsAvailable()) {
-        MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER);
-        MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV);
+        MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG);
+        MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
         MmSfx_Stop(MM_NA_SE_PL_DEKUNUTS_BUBLE_BREATH);
         // (no FLOWER_ROLL stop — MM never starts it; see glide block in MmForm_Action_DekuFly)
     }
@@ -10040,15 +10040,35 @@ static void MmForm_UpdateBarrier(Player* player, PlayState* play) {
         play->envCtx.adjFogNear = 0;
     }
 
-    // Looping SFX (from 2Ship z_player.c:2979: NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG).
-    // MM's `- SFX_FLAG` variant auto-stops via sequence engine when the call
-    // stops refreshing; our MmDirectAudio path treats 0x09AF as continuous and
-    // never times out, so the hum loops forever after the barrier turns off.
-    // Explicitly stop when intensity has dropped to 0.
+    // Match MM's refresh-driven loop ID. Keeping SFX_FLAG on would queue a
+    // fresh note every frame instead of refreshing the existing shield hum.
     if (gFormState.barrierIntensity > 0) {
-        MmForm_PlaySfx(player, 0x09AF, NA_SE_PL_BODY_HIT); // ZORA_SPARK_BARRIER (0x09AF), NOT 0x08F3
-    } else if (MmSfx_IsAvailable()) {
-        MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER);
+        MmForm_PlaySfx(player, MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG, NA_SE_PL_BODY_HIT);
+    } else {
+        MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG);
+    }
+}
+
+// Runs after the action dispatch, including its early-return paths. Fast swim
+// keeps its visual state during a dolphin jump, so that flag alone cannot own
+// the underwater loop. Native OoT's filter also owns the bubbling ambience.
+static void MmForm_UpdateZoraSwimSfx(Player* player) {
+    if (!MMFORM_IS_ZORA_SWIM()) {
+        return;
+    }
+    const bool active =
+        gFormState.swimState > 0 && gFormState.fastSwimActive && gFormState.swimPhaseCounter == 0 &&
+        gFormState.swimExitFlag == 0 && player->actor.yDistToWater > 0.0f &&
+        (gFormState.goronAction == MMFORM_ACT_SWIM_FAST || gFormState.goronAction == MMFORM_ACT_SWIM_DASH);
+    if (active) {
+        MmForm_PlaySfx(player, MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG, NA_SE_PL_SWIM);
+    } else {
+        MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
+    }
+    if (player->actor.yDistToWater <= 0.0f) {
+        player->stateFlags2 &= ~(PLAYER_STATE2_UNDERWATER | PLAYER_STATE2_DIVING);
+        player->underwaterTimer = 0;
+        Audio_SetBaseFilter(0);
     }
 }
 
@@ -11271,16 +11291,8 @@ static void MmForm_Action_SwimFast(Player* player, PlayState* play) {
                 LinkAnimation_Change(play, &gFormState.formSkelAnime, gFormState.swimToWait, 1.0f, 0.0f,
                                      Animation_GetLastFrame(gFormState.swimToWait), ANIMMODE_ONCE, -6.0f);
             }
-            // Stop the fast-swim loop the instant we leave fast-swim — MM's
-            // `- SFX_FLAG` variant self-stops via seq engine refresh; ours
-            // doesn't, so without this the hum continues into idle/surface.
-            if (MmSfx_IsAvailable()) {
-                MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV);
-            }
         } else {
             speedTarget = 9.0f;
-            // Looping swim SFX (from 2Ship line 16978: NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG)
-            MmForm_PlaySfx(player, MM_NA_SE_PL_ZORA_SWIM_LV, NA_SE_PL_SWIM);
         }
 
         // Pitch from stick Y (from 2Ship line 16982-16991)
@@ -15268,7 +15280,7 @@ static void MmForm_UpdateZoraSwimTrails(PlayState* play) {
     // an unintended strip between them and overwrites the combat trail.
     EffectBlureInit2 blure = {
         0, 8, 0, { 255, 255, 255, 255 }, { 255, 255, 255, 255 }, { 255, 255, 255, 0 }, { 255, 255, 255, 0 }, 4,
-        0, 2, 0, { 0, 0, 0, 0 },         { 0, 0, 0, 0 }
+        0, 2, 0, { 0, 0, 0, 0 },         { 0, 0, 0, 0 },         TRAIL_TYPE_ZORA_FIN
     };
     for (s32 i = 0; i < 2; ++i) {
         if (!gFormState.zoraSwimTrailActive[i]) {
@@ -16407,6 +16419,8 @@ static u8 MmForm_SoftReload(PlayState* play, Player* player, MmPlayerTransformat
 extern "C" {
 
 void MmForm_Init(PlayState* play, Player* player) {
+    MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
+    MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG);
     // The previous scene's effect context was destroyed before this Init.
     MmForm_ClearZoraSwimTrails(NULL);
     gFormState.zoraMeleeActive = 0;
@@ -16787,12 +16801,15 @@ void MmForm_DragonScaleSwimUpdate(PlayState* play, Player* player) {
 
 // Dragon Scale: exit swim and clean up
 void MmForm_DragonScaleExitSwim(Player* player) {
+    MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
+    MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG);
+    gFormState.fastSwimActive = 0;
+    MmForm_UpdateZoraSwimSfx(player);
     gFormState.zoraSwimEnabled = 0;
     gFormState.swimState = 0;
     gFormState.swimPitch = 0;
     gFormState.swimRoll = 0;
     gFormState.swimRollSmoothed = 0;
-    gFormState.fastSwimActive = 0;
     gFormState.zoraBoots = 0;
     gFormState.swimSpeedB48 = 0.0f;
     gFormState.swimYawRate = 0;
@@ -18102,6 +18119,7 @@ void MmForm_Update(PlayState* play, Player* player) {
 
     MmForm_UpdateZoraMelee(player, play);
     MmForm_UpdateZoraSwimTrails(play);
+    MmForm_UpdateZoraSwimSfx(player);
 
     // Ground pound crack timer (decrement regardless of action state, persists across roll resume)
     if (gFormState.groundPoundCrackTimer > 0) {
@@ -18887,6 +18905,8 @@ void MmForm_OnDeath(void) {
 }
 
 void MmForm_Reset(void) {
+    MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
+    MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG);
     MmForm_ClearZoraSwimTrails(gPlayState);
     if (gFormState.zoraMeleeActive && gPlayState != NULL) {
         Player* player = GET_PLAYER(gPlayState);

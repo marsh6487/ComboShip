@@ -5144,6 +5144,15 @@ extern "C" short* MmSfxDecode_Sample(void* sample, unsigned int* outLen) {
 extern "C" void MmSfxSynth_RenderInto(short* outBuf, unsigned int numSamples);
 extern "C" int MmSfx_IsGamePaused(void); // mm_player_form.cpp
 
+void MmSfx_UpdateGameFrame(void) {
+    if (MmSfx_IsGamePaused()) {
+        return;
+    }
+    MmAudioScopedLock audioLock;
+    AudioMmSfx_ProcessRequests();
+    AudioMmSfx_ProcessActiveSfx();
+}
+
 void MmDirectAudio_MixInto(s16* outBuf, u32 numSamples) {
     // Silence ALL MM SFX (old MmDirectAudio bank + new mmsfx engine) while the
     // pause/kaleido screen is up — they kept playing because they don't run on a
@@ -5154,12 +5163,10 @@ void MmDirectAudio_MixInto(s16* outBuf, u32 numSamples) {
 
     sMmAudioFrame++;
 
-    // Drive the MM SFX bank engine each audio callback. Equivalent to 2Ship's
-    // per-frame AudioSfx_ProcessRequests + AudioSfx_ProcessActiveSfx call pair.
-    // Runs at ~audio-callback rate which is close enough to MM's 20-30 fps
-    // tick for freshness/eviction timing.
-    AudioMmSfx_ProcessRequests();
-    AudioMmSfx_ProcessActiveSfx();
+    // The graph-thread audio update owns bank freshness and request dispatch.
+    // This callback runs three times per gameplay update (and during reservoir
+    // prefill); advancing the bank here would expire refresh-driven loops
+    // between gameplay requests. Synthesis still advances every callback.
 
     // Ruta B: render the isolated MM SFX sequence engine on top of the output.
     // No-op until MmSfxSynth_Init() has loaded Sequence_0/Soundfont_0/1 (lazy,

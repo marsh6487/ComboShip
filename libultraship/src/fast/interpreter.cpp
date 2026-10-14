@@ -2020,6 +2020,71 @@ static void TraceAutumnForestDraw(const RawTexMetadata& metadata, const RDP& rdp
         tile, tmem, rdp.grayscale, vertexGray, rgba, shaderGray, shader0, shader1, backend->GetName(), sample.count);
 }
 
+static uint8_t ZoraCosmeticLayer(std::string_view path) {
+    if (path.find("objects/object_link_zora") == std::string_view::npos)
+        return 0;
+    return path.find("Eyes") != std::string_view::npos ? 1 : 2;
+}
+
+// Bounded runtime evidence for the Zora pack's cosmetic targets. Only drawn
+// Zora textures reach this probe; shader IDs/colors and the selected archive
+// distinguish a correct source overlay from a different runtime resource.
+static void TraceZoraCosmeticDraw(const RawTexMetadata& metadata, const RDP& rdp, bool vertexGray,
+                                  uint64_t shader0, uint64_t shader1, uint32_t tile) {
+    if (!metadata.zoraCosmeticLayer || !metadata.resource)
+        return;
+    const auto init = metadata.resource->GetInitData();
+    if (!init)
+        return;
+    struct Sample {
+        std::string path;
+        std::array<uint64_t, 7> state{};
+        unsigned count = 0, zeroAlpha = 0, partialAlpha = 0, pixels = 0;
+    };
+    static std::array<Sample, 2> previous;
+    static std::set<std::pair<std::string, std::array<uint64_t, 7>>> seen;
+    auto& sample = previous[metadata.zoraCosmeticLayer - 1];
+    if (sample.count >= 64)
+        return;
+    const auto rgba = [](const auto& color) {
+        return uint32_t(color.r) << 24 | uint32_t(color.g) << 16 | uint32_t(color.b) << 8 | color.a;
+    };
+    const auto pointer = reinterpret_cast<uintptr_t>(metadata.resource.get());
+    const std::array<uint64_t, 7> state = { shader0, shader1, rgba(rdp.prim_color), rgba(rdp.env_color), pointer,
+                                            uint64_t(tile) | uint64_t(rdp.texture_tile[tile].tmem_index) << 32,
+                                            uint64_t(rdp.grayscale) | uint64_t(vertexGray) << 1 |
+                                                uint64_t(ActiveResMgr()->IsAltAssetsEnabled()) << 2 };
+    if (!seen.emplace(init->Path, state).second)
+        return;
+    const auto& texture = *metadata.resource;
+    if (!sample.count || sample.path != init->Path || sample.state[4] != pointer) {
+        sample.zeroAlpha = sample.partialAlpha = sample.pixels = 0;
+        if (texture.Type == TextureType::RGBA32bpp && texture.ImageData) {
+            sample.pixels = texture.ImageDataSize / 4;
+            for (size_t i = 3; i < texture.ImageDataSize; i += 4) {
+                sample.zeroAlpha += texture.ImageData[i] == 0;
+                sample.partialAlpha += texture.ImageData[i] > 0 && texture.ImageData[i] < 255;
+            }
+        }
+    }
+    auto owner = init->Parent;
+    auto archives = ActiveResMgr()->GetArchiveManager();
+    if (!owner && archives->HasFile(init->Path))
+        owner = archives->GetArchiveFromFile(init->Path);
+    sample.path = init->Path;
+    sample.state = state;
+    ++sample.count;
+    SPDLOG_INFO(
+        "[ZoraCosmeticDraw] layer={} texture={} archive={} pointer={:X} alt={} format={} dimensions={}x{} "
+        "scale={}x{} flags={} alpha_zero={} alpha_partial={} pixels={} prim={:08X} env={:08X} "
+        "gray={} vertex_gray={} shader0={:016X} shader1={:016X} tile={} sample={}/64",
+        metadata.zoraCosmeticLayer == 1 ? "eyes" : "model", init->Path,
+        owner ? owner->GetPath() : "<unknown>", pointer, ActiveResMgr()->IsAltAssetsEnabled(), int(texture.Type),
+        texture.Width, texture.Height, texture.HByteScale, texture.VPixelScale, texture.Flags, sample.zeroAlpha,
+        sample.partialAlpha, sample.pixels, rgba(rdp.prim_color), rgba(rdp.env_color), rdp.grayscale, vertexGray,
+        shader0, shader1, tile, sample.count);
+}
+
 void Interpreter::GfxSpTri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx, bool is_rect) {
     if (mTriangleStateReuseAllowed) {
         if (!mTriangleState.valid || mTriangleState.reusePackedVertices) {
@@ -2393,6 +2458,8 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
         TraceAutumnForestDraw(mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].raw_tex_metadata, *mRdp,
                               use_grayscale, comb->shader_id0, comb->shader_id1 | tm * SHADER_OPT(TEXEL0_CLAMP_S), tile,
                               mRapi);
+        TraceZoraCosmeticDraw(mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].raw_tex_metadata, *mRdp,
+                              use_grayscale, comb->shader_id0, comb->shader_id1 | tm * SHADER_OPT(TEXEL0_CLAMP_S), tile);
     }
 
     // Within a pure triangle run a loaded vertex's expanded attributes are
@@ -2791,6 +2858,7 @@ void Interpreter::GfxDpSetTextureImage(uint32_t format, uint32_t size, uint32_t 
     mRdp->texture_to_load.width = width;
     mRdp->texture_to_load.tex_flags = texFlags;
     rawTexMetdata.autumnForestLayer = rawTexMetdata.resource && texPath ? AutumnForestLayer(texPath) : 0;
+    rawTexMetdata.zoraCosmeticLayer = rawTexMetdata.resource && texPath ? ZoraCosmeticLayer(texPath) : 0;
     mRdp->texture_to_load.raw_tex_metadata = rawTexMetdata;
 }
 
