@@ -28,7 +28,12 @@ static Player player;
 static GraphicsContext gfx;
 static Camera camera;
 static EffectSs particles[100]; // MM Play_Init allocates 100 native particle slots.
-static Gfx commands[64];
+static Gfx commands[1024];
+static Vtx ownedVertices[384 * 4];
+static union {
+    long double align;
+    u8 data[65536];
+} ownedArena;
 static Mtx matrices[4];
 static MtxF renderedMatrix;
 static LinkAnimationHeader animation;
@@ -201,6 +206,20 @@ void FrameInterpolation_RecordSkinMatrixMtxFToMtx(MtxF* source, Mtx* destination
 void guMtxF2L(float source[4][4], Mtx* destination) {
 }
 
+void Gfx_SetupDL25_Xlu(GraphicsContext* context) {
+    gDPPipeSync(context->polyXlu.p++);
+}
+void Play_GetFloorSurface(PlayState* context, MtxF* matrix, Vec3f* origin) {
+    SkinMatrix_SetTranslate(matrix, origin->x, origin->y - 20.0f, origin->z);
+}
+u8 IsItemEquipped(u8 item) {
+    REQUIRE(item == ITEM_DEMISE_DESTRUCTION);
+    return input.wasEquipped;
+}
+void gSPVertex(Gfx* command, uintptr_t address, int n, int first) {
+    __gSPVertex(command, address, n, first);
+}
+
 static void reset(void) {
     memset(&play, 0, sizeof(play));
     memset(&player, 0, sizeof(player));
@@ -208,11 +227,15 @@ static void reset(void) {
     memset(&camera, 0, sizeof(camera));
     memset(&gCustomItemState, 0, sizeof(gCustomItemState));
     play.state.gfxCtx = &gfx;
-    gfx.polyOpa.d = (Gfx*)(matrices + ARRAY_COUNT(matrices));
+    gfx.polyXlu.d = commands + ARRAY_COUNT(commands);
+    gfx.polyOpa.p = (Gfx*)ownedArena.data;
+    gfx.polyOpa.d = (Gfx*)(ownedArena.data + sizeof(ownedArena.data));
+    DemiseFx_Clear();
     play.cameraPtrs[0] = &camera;
     SkinMatrix_SetScale(&play.billboardMtxF, 1.0f, 1.0f, 1.0f);
     player.actor.world.pos = (Vec3f){ 100.0f, 200.0f, -300.0f };
     player.actor.bgCheckFlags = BGCHECKFLAG_GROUND;
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
     ddCollider.base.shape = COLSHAPE_CYLINDER;
     input = (ItemInputState){ .wasEquipped = 1 };
     sEffectSsInfo.table = particles;
@@ -324,7 +347,7 @@ static void testCastTimeline(void) {
         }
         if (tick == 70) {
             REQUIRE(ddState == DEMISE_STATE_FINISH && ddTimer == 0);
-            REQUIRE(bombCount == 13 && smallBombCount == 0);
+            REQUIRE(bombCount == 0 && smallBombCount == 0);
             REQUIRE(collisionCalls == 0);
             REQUIRE(!(player.stateFlags1 & (PLAYER_STATE1_IN_ITEM_CS | PLAYER_STATE1_INPUT_DISABLED)));
         }
@@ -349,8 +372,9 @@ static void testCastTimeline(void) {
         EffectSs_UpdateAll(&play);
     }
     REQUIRE(rootCount == endedRoots && countParticles() == 0);
-    printf("PASS MM Demise timeline: %d roots, peak %d native lightning slots, 13 final explosions, 5 damage ticks\n",
-           rootCount, maxParticles);
+    printf(
+        "PASS MM Demise timeline: %d roots, peak %d native lightning slots, zero explosion sprites, 5 damage ticks\n",
+        rootCount, maxParticles);
 }
 
 static void testInterruptedAndUnavailableEffects(void) {
@@ -387,7 +411,7 @@ static void testInterruptedAndUnavailableEffects(void) {
     Handle_DemiseDestruction(&player, &play);
     for (int i = 0; i < 5; ++i)
         Handle_DemiseDestruction(&player, &play);
-    REQUIRE(rootCount == 0 && bombCount == 13 && collisionCalls == 5 && !ddActive);
+    REQUIRE(rootCount == 0 && bombCount == 0 && collisionCalls == 5 && !ddActive);
     for (size_t i = 0; i < ARRAY_COUNT(particles); ++i)
         REQUIRE(particles[i].life == 100 && particles[i].priority == 0);
 }
@@ -407,14 +431,44 @@ static void testStartRestrictionsAndFallbackAnimation(void) {
     for (int i = 0; i < 72; ++i)
         Demise_StateWindup(&player, &play);
     REQUIRE(animationChanges == 0 && animationUpdates == 71 && ddState == DEMISE_STATE_FINISH);
-    REQUIRE(magicSpent == 12 && bombCount == 13);
+    REQUIRE(magicSpent == 12 && bombCount == 0);
 }
 
+static void testOwnedChargeDraw(void) {
+    reset();
+    play.gameplayFrames = 100;
+    Demise_Start(&player, &play);
+    ddTimer = 35;
+    gfx.polyXlu.p = commands;
+    CustomItems_DrawDemiseDestruction(&player, &play);
+    REQUIRE(gfx.polyXlu.p > commands);
+    REQUIRE(bombCount == 0 && collisionCalls == 0);
+}
+
+#define DEMISE_TEST_MM
+int Sm64Mario_HasMesh(void) {
+    return 1;
+}
+void Sm64Mario_Draw(PlayState* context, Player* owner) {
+}
+int Sm64Mario_ShouldHideLink(void) {
+    return 1;
+}
+#include "demise_player_draw_prefix.inc"
+#include "../../tests/demise_fx_contract.h"
+
 int main(void) {
+    testOwnedFxArenaMarkerHeadroom();
+    testWorldFxBeforeModelFork();
+    testOwnedFxForeignPlayerAndCommandSpace();
+    testOwnedFxInvalidationAndAllocation();
+    testOwnedFxGeometryAndLifetime();
+    testOwnedChargeDraw();
     testChargeAndDraw();
     testCastTimeline();
     testInterruptedAndUnavailableEffects();
     testStartRestrictionsAndFallbackAnimation();
+    exportOwnedFx();
     puts("PASS MM Demise native draw, palette, scheduling, stop, allocation fallback, and gameplay invariants");
     return 0;
 }

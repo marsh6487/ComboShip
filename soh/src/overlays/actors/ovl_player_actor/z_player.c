@@ -14586,6 +14586,9 @@ void Player_Draw(Actor* thisx, PlayState* play2) {
     Vec3s rot;
     f32 scale;
 
+    // Spell-owned world FX must survive custom-model/Mario draw forks.
+    CustomItems_DrawDemiseDestruction(this, play);
+
     // Skijer's NEI: custom-model draw fork (RegisterPlayerDrawForkNEI). false = custom
     // model drawn / Link hidden, skip vanilla draw. Pak/O2r skeleton swap stays inline below.
     if (!GameInteractor_Should(VB_PLAYER_DRAW_BEGIN, true, play, this)) {
