@@ -8,12 +8,13 @@ from run_mm_weather_tests import production_function
 
 ROOT = Path(__file__).resolve().parents[2]
 sources = [ROOT / "mm/src/overlays/actors/ovl_En_Kusa/z_en_kusa.c",
-           ROOT / "mm/src/overlays/actors/ovl_Obj_Grass/z_obj_grass.c"]
+           ROOT / "mm/src/overlays/actors/ovl_Obj_Grass/z_obj_grass.c",
+           ROOT / "mm/src/overlays/actors/ovl_Obj_Grass_Carry/z_obj_grass_carry.c"]
 with tempfile.TemporaryDirectory(prefix="mm-autumn-grass-") as temporary:
     build = Path(temporary)
     bodies = []
     for path, names in zip(sources, [("EnKusa_DrawBush", "EnKusa_DrawGrass"),
-                                    ("ObjGrass_DrawOpa", "ObjGrass_DrawXlu")]):
+                                    ("ObjGrass_DrawOpa", "ObjGrass_DrawXlu"), ("ObjGrassCarry_Draw",)]):
         text = path.read_text()
         bodies.extend(production_function(text, name) for name in names)
     (build / "autumn_grass_production.inc").write_text("\n".join(bodies))

@@ -66,10 +66,21 @@ def main():
         environment = production_function((ROOT / "mm/src/code/z_kankyo.c").read_text(), "Environment_Update")
         if "MMWeather_Update(play);" not in environment:
             raise RuntimeError("Missing native Environment winter eligibility/lifecycle refresh")
+        main = production_function(play, "Play_Main")
+        native_update = re.search(
+            r"\{\s*GraphicsContext\* gfxCtx = this->state.gfxCtx;[\s\S]*?"
+            r"Play_Update\(this\);\s*this->state.gfxCtx = gfxCtx;\s*\}", main)
+        native_draw = re.search(r"Play_Draw\(this\);", main)
+        if (native_update is None or "this->state.gfxCtx = NULL;" not in native_update[0] or
+                native_draw is None or native_draw.start() < native_update.end()):
+            raise RuntimeError("Cannot find native Play_Main null-graphics update/restore/draw envelope")
         (build / "winter_play_hooks.inc").write_text(
             "static void UpdateFromPlay(PlayState* play) { MMWeather_Update(play); " +
             update[1].replace("this", "play") + " }\n" +
             "static void DrawFromPlay(PlayState* play) { " + draw[1].replace("this", "play") + " }\n" +
+            "static size_t FrameFromNativePlayMain(PlayState* play) {\n" +
+            native_update[0].replace("this", "play").replace("Play_Update(play)", "UpdateFromPlay(play)") +
+            "\n" + native_draw[0].replace("Play_Draw(this);", "return Draw(*play);") + "\n}\n" +
             "static void InitFromPlay() { MMWinterAtmosphere_Reset(); }\n" +
             "static void DestroyFromPlay() { MMWeather_Reset(); }\n")
         game_flags = ["-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DMM_BUILD_DLL",

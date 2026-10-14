@@ -72,7 +72,7 @@ struct Interpreter {
         stats.textures.push_back(metadata.resource);
     }
     void GfxSpTri1(unsigned, unsigned, unsigned, bool) {
-        assert(!rdp.grayscale || rdp.grayscale_normalize);
+        assert(!rdp.grayscale_frost || rdp.grayscale_normalize);
         ++stats.triangles;
         auto& material = stats.materials[texture];
         ++material.first;

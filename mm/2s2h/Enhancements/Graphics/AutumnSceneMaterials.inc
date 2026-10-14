@@ -17,6 +17,8 @@
     // Middle-tree color tile; 005000 is its secondary intensity/alpha tile.
     { "misc/scene_texture_08/scene_texture_08_Tex_005800", 0xFF9F91FF },
     { "misc/scene_texture_08/scene_texture_08_Tex_006800", 0xD99C45FF },
+    // Road decorative grass strip, distinct from the surrounding spring ground.
+    { "misc/scene_texture_08/scene_texture_08_Tex_007000", 0xD99C45FF, true, SCENE_24KEMONOMITI },
     // Backwall grass color tile; 006800 supplies its secondary intensity/alpha.
     { "misc/scene_texture_08/scene_texture_08_Tex_007800", 0xFFD078FF },
     { "scenes/nonmq/KAKUSIANA/KAKUSIANATex_00C8D0", 0xD99C45FF },

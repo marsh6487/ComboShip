@@ -10,6 +10,7 @@ import struct
 import subprocess
 import tempfile
 import zipfile
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -106,7 +107,53 @@ def main():
             production_function(manager, "ResourceManager::OtrSignatureCheck"))
         (build / "autumn_scene_palette_production.inc").write_text(
             production_function(renderer, "Interpreter::GfxDpLoadTlut"))
+        (build / "autumn_road_vine_upload_production.inc").write_text(
+            production_function(renderer, "Interpreter::GfxDpLoadBlock") + "\n" +
+            production_function(renderer, "Interpreter::ImportTextureRaw"))
         fixtures = "static void CheckActualMaterials() {\n"
+        # The actual bundled randomizer models split shrubbery/leaves from the
+        # reward flower and brown stem. Keep that material ownership explicit.
+        for folder, family in (("gameplay_field_keep", "gFieldBush"), ("gameplay_keep", "gRandoCuttableGrass")):
+            for label in ("Random", "Minor", "Major", "Mask", "Token", "SmallKey", "Fairy", "BossKey", "Heart", "Junk"):
+                asset = f"objects/{folder}/{family}{label}DL"
+                root = ET.fromstring((ROOT / "mm/assets/custom" / asset).read_text())
+                material = None
+                for call in root.findall("CallDisplayList"):
+                    path = call.attrib["Path"]
+                    if "/mat_" in path:
+                        material = path.rsplit("_f3dlite_", 1)[-1]
+                        continue
+                    if "_tri_" not in path:
+                        continue
+                    foliage = material in ("Grass", "shrubbery", "leaf")
+                    expected = path.endswith(("_tri_0", "_tri_1"))
+                    if foliage != expected:
+                        raise ValueError(f"Randomizer material ownership changed: {path} ({material})")
+                    tri_source = ET.fromstring((ROOT / "mm/assets/custom" / path).read_text())
+                    fixtures += '{ const std::vector<Gfx> source = {\n'
+                    count = 0
+                    for command in tri_source:
+                        attrs = command.attrib
+                        if command.tag == "LoadVertices":
+                            vertices, offset = int(attrs["Count"]), int(attrs["VertexOffset"]) * 16
+                            word = (0x32 << 24) | (vertices << 12) | (vertices << 1)
+                            resource = json.dumps(attrs["Path"])
+                            fixtures += (f'Command(0x{word:08X}, {offset}), '
+                                         f'Command(CRC64({resource}) >> 32, CRC64({resource}) & 0xFFFFFFFF),\n')
+                        elif command.tag == "Triangles2":
+                            values = [attrs[key] for key in ("V00", "V01", "V02", "Flag0", "V10", "V11", "V12", "Flag1")]
+                            fixtures += 'gsSP2Triangles(' + ', '.join(values) + '),\n'
+                            count += 2
+                        elif command.tag == "Triangle1":
+                            values = [attrs[key] for key in ("V00", "V01", "V02")] + [attrs.get("Flag", "0")]
+                            fixtures += 'gsSP1Triangle(' + ', '.join(values) + '),\n'
+                            count += 1
+                        elif command.tag == "EndDisplayList":
+                            fixtures += 'gsSPEndDisplayList(),\n'
+                        else:
+                            raise ValueError(f"Unsupported actual grass triangle command {command.tag}: {path}")
+                    fixtures += f'}}; CheckRoadRandoGrassTarget({json.dumps(path)}, source, {count}, {str(foliage).lower()}); }}\n'
+        fixtures += 'std::puts("PASS actual bundled randomizer grass/bush XML: all selected leaves and protected flower/stem children");\n'
         if args.materials:
             for path in material_paths:
                 data = path.read_bytes()
@@ -176,6 +223,26 @@ def main():
                  "misc/scene_texture_08/scene_texture_08_Tex_005000", 70, False),
             )
             with zipfile.ZipFile(args.mm) as archive:
+                vine = "scenes/nonmq/Z2_24KEMONOMITI/Z2_24KEMONOMITITex_005730"
+                vine_palette = "scenes/nonmq/Z2_24KEMONOMITI/Z2_24KEMONOMITITLUT_007950"
+                fixtures += '{\n'
+                fixtures += f'auto vines = {texture_fixture(archive, vine, "road-vines")};\n'
+                fixtures += f'auto palette = {texture_fixture(archive, vine_palette, "road-vine-palette")};\n'
+                fixtures += 'CheckRoadVines(vines, palette);\nconst std::vector<Gfx> source = {\n'
+                vine_draw = "scenes/nonmq/Z2_24KEMONOMITI/Z2_24KEMONOMITI_room_00DL_003CE0"
+                fixtures += ',\n'.join(f'Command(0x{a:08X}, 0x{b:08X})'
+                                      for a, b in struct.iter_unpack('<II', archive.read(vine_draw)[72:]))
+                fixtures += '}; CheckActualRoadVineDraw(vines, palette, source); }\n'
+                trim = "scenes/nonmq/Z2_24KEMONOMITI/Z2_24KEMONOMITI_room_00DL_005FF0"
+                fixtures += '{ const std::vector<Gfx> source = {\n'
+                fixtures += ',\n'.join(f'Command(0x{a:08X}, 0x{b:08X})'
+                                      for a, b in struct.iter_unpack('<II', archive.read(trim)[72:]))
+                fixtures += '};\n'
+                for selected, color in (("SEASON_AUTUMN", "D99C45FF"), ("SEASON_WINTER", "E5EDF3FF"),
+                                         ("SEASON_SPRING", "F6C1D9FF")):
+                    expected = ','.join('0x' + color for _ in range(52))
+                    fixtures += f'CheckActualSceneMaterial({json.dumps(trim)}, SCENE_24KEMONOMITI, source, {{{expected}}}, {selected});\n'
+                fixtures += '}\n'
                 branch = "objects/object_mtoride/gWoodfallSceneryBranchAndLeaves"
                 fixtures += (f'CheckWoodfallMixedLeaves({texture_fixture(archive, branch + "TLUT", "branch-tlut")}, '
                              '{' + ','.join(str(byte) for byte in archive.read(branch + "Tex")[80:]) + '});\n')

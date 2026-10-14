@@ -6064,13 +6064,19 @@ void func_808332A0(PlayState* play, Player* this, s32 magicCost, s32 isSwordBeam
         // sits OUTSIDE the contiguous sword block, so the raw (heldItemAction - PLAYER_IA_SWORD_KOKIRI)
         // type param would be 0x58 and index EnMThunder's sDamages[8] out of bounds. Remap Master to
         // the Gilded sword type inline (its spin-attack / sword-beam behavior mirrors Gilded).
+        // Rods retain their Deku Stick melee classification, but EnMThunder only accepts sword
+        // types 0..3. Their custom actions must use the valid two-handed sword spin type here.
+        s32 spinItemAction = this->heldItemAction;
+        if (spinItemAction == PLAYER_IA_SWORD_MASTER) {
+            spinItemAction = PLAYER_IA_SWORD_GILDED;
+        } else if ((spinItemAction == PLAYER_IA_ROD_FIRE) || (spinItemAction == PLAYER_IA_ROD_ICE) ||
+                   (spinItemAction == PLAYER_IA_ROD_LIGHT)) {
+            spinItemAction = PLAYER_IA_SWORD_TWO_HANDED;
+        }
         gNeiMasterBeamFree = isMasterBeam; // let EnMThunder_Init skip the magic gate for the free beam
-        thunder = Actor_Spawn(
-            &play->actorCtx, play, ACTOR_EN_M_THUNDER, this->bodyPartsPos[PLAYER_BODYPART_WAIST].x,
-            this->bodyPartsPos[PLAYER_BODYPART_WAIST].y, this->bodyPartsPos[PLAYER_BODYPART_WAIST].z, pitch, 0, 0,
-            (((this->heldItemAction == PLAYER_IA_SWORD_MASTER) ? PLAYER_IA_SWORD_GILDED : this->heldItemAction) -
-             PLAYER_IA_SWORD_KOKIRI) |
-                magicCost);
+        thunder = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_M_THUNDER, this->bodyPartsPos[PLAYER_BODYPART_WAIST].x,
+                              this->bodyPartsPos[PLAYER_BODYPART_WAIST].y, this->bodyPartsPos[PLAYER_BODYPART_WAIST].z,
+                              pitch, 0, 0, (spinItemAction - PLAYER_IA_SWORD_KOKIRI) | magicCost);
         gNeiMasterBeamFree = false;
 
         if ((thunder != NULL) && isSwordBeam && !isMasterBeam) {
@@ -9283,6 +9289,12 @@ void func_8083A548(Player* this) {
 }
 
 s32 Player_ActionHandler_8(Player* this, PlayState* play) {
+    // Rods own their held-button threshold and charged release in item_rod_*.c. A short tap
+    // during the native sword recovery window must not install the vanilla charge action.
+    if ((this->heldItemAction == PLAYER_IA_ROD_FIRE) || (this->heldItemAction == PLAYER_IA_ROD_ICE) ||
+        (this->heldItemAction == PLAYER_IA_ROD_LIGHT)) {
+        return false;
+    }
     if (GameInteractor_Should(VB_CHECK_HELD_ITEM_BUTTON_PRESS, CHECK_BTN_ALL(sPlayerControlInput->cur.button, BTN_B),
                               sDpadItemButtons, sPlayerItemButtons)) {
         if (!(this->stateFlags1 & PLAYER_STATE1_400000) &&

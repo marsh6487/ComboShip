@@ -12,6 +12,7 @@
 #endif
 #include <algorithm>
 #include <map>
+#include <limits>
 #include <memory>
 #include <set>
 #include <string>
@@ -43,14 +44,18 @@ const char* SceneResourceName(int sceneId) {
 struct Material {
     const char* path;
     uint32_t color;
+    bool springGrass = false;
+    int scene = -1;
 };
 constexpr Material kMaterials[] = {
 #include "AutumnSceneMaterials.inc"
 };
 constexpr const char* kWoodfallTempleDL = "objects/object_mtoride/gWoodfallSceneryTempleDL";
 
-uint32_t SeasonPalette(uint32_t autumnColor, int selectedSeason, int /*sceneId*/ = -1) {
+uint32_t SeasonPalette(uint32_t autumnColor, int selectedSeason, int /*sceneId*/ = -1, bool springGrass = false) {
     if (selectedSeason == SEASON_SPRING) {
+        if (springGrass)
+            return 0xF6C1D9FF; // Full existing blush on explicit grass; keep tree/ground palettes separate.
         switch (autumnColor) {
             case 0xB96848FF:
             case 0xF4B783FF:
@@ -101,7 +106,39 @@ uint32_t ForestListColor(std::string path, int selectedSeason = SEASON_AUTUMN) {
     return 0;
 }
 
-uint32_t WholeListColor(std::string path, int selectedSeason = SEASON_AUTUMN) {
+const std::vector<std::string>& RoadRandoGrassPaths() {
+    static const auto paths = [] {
+        std::vector<std::string> result;
+        // Bundled model materials explicitly split grass/leaves (0/1) from
+        // reward flowers and brown stems (2/3). OPA and XLU roots share them.
+        for (const auto* family :
+             { "objects/gameplay_field_keep/gFieldBush", "objects/gameplay_keep/gRandoCuttableGrass" }) {
+            for (const auto* kind :
+                 { "Random", "Minor", "Major", "Mask", "Token", "SmallKey", "Fairy", "BossKey", "Heart", "Junk" }) {
+                result.push_back(std::string(family) + kind + "DL_tri_0");
+                if (std::string(kind) != "Junk")
+                    result.push_back(std::string(family) + kind + "DL_tri_1");
+            }
+        }
+        return result;
+    }();
+    return paths;
+}
+
+uint32_t RoadRandoGrassColor(std::string path, int selectedSeason, int sceneId) {
+    if (sceneId != SCENE_24KEMONOMITI)
+        return 0;
+    if (path.starts_with("alt/"))
+        path.erase(0, 4);
+    const auto& paths = RoadRandoGrassPaths();
+    return std::find(paths.begin(), paths.end(), path) == paths.end()
+               ? 0
+               : SeasonPalette(0xD99C45FF, selectedSeason, sceneId, true);
+}
+
+uint32_t WholeListColor(std::string path, int selectedSeason = SEASON_AUTUMN, int sceneId = -1) {
+    if (const auto color = RoadRandoGrassColor(path, selectedSeason, sceneId))
+        return color;
     if (path.starts_with("alt/"))
         path.erase(0, 4);
     // The accepted POC3 foliage roots call private child materials. Follow
@@ -122,7 +159,7 @@ uint32_t WholeListColor(std::string path, int selectedSeason = SEASON_AUTUMN) {
 
 uint32_t MaterialColor(uint64_t hash, int selectedSeason = SEASON_AUTUMN, int sceneId = -1) {
     static const auto colors = [] {
-        std::map<uint64_t, uint32_t> result;
+        std::map<uint64_t, const Material*> result;
         for (const auto& material : kMaterials) {
             for (const auto* suffix : { "", "_scene" }) {
                 std::string path = material.path;
@@ -131,14 +168,16 @@ uint32_t MaterialColor(uint64_t hash, int selectedSeason = SEASON_AUTUMN, int sc
                 } else if (*suffix != '\0') {
                     continue; // Shared misc texture paths have no generated scene namespace.
                 }
-                result[CRC64(path.c_str())] = material.color;
-                result[CRC64(("alt/" + path).c_str())] = material.color;
+                result[CRC64(path.c_str())] = &material;
+                result[CRC64(("alt/" + path).c_str())] = &material;
             }
         }
         return result;
     }();
     const auto found = colors.find(hash);
-    return found == colors.end() ? 0 : SeasonPalette(found->second, selectedSeason, sceneId);
+    return found == colors.end() || (found->second->scene != -1 && found->second->scene != sceneId)
+               ? 0
+               : SeasonPalette(found->second->color, selectedSeason, sceneId, found->second->springGrass);
 }
 
 size_t MaterialCommandLength(uint8_t opcode) {
@@ -432,6 +471,7 @@ auto& CurrentVariants() {
 struct SurfaceTextureVariant {
     std::shared_ptr<Fast::Texture> source;
     std::shared_ptr<Fast::Texture> copy;
+    std::shared_ptr<Fast::Texture> palette; // Retain an indexed image's exact palette through queued draws.
 };
 struct SurfaceTextureBinding {
     std::weak_ptr<Ship::ResourceManager> owner;
@@ -445,6 +485,8 @@ struct SurfaceMaterial {
     bool altOnly = false;
     bool roadPairOnly = false;
     bool blossomLift = false;
+    bool springGrass = false;
+    const char* palette = nullptr;
 };
 constexpr SurfaceMaterial kSurfaceMaterials[] = {
     { "scenes/nonmq/Z2_00KEIKOKU/mm3d_field_poc4/textures/tl_ki_02", 0xFFD078FF, SCENE_00KEIKOKU, true },
@@ -456,6 +498,10 @@ constexpr SurfaceMaterial kSurfaceMaterials[] = {
     // original green/non-green boundary without a whole-triangle treatment.
     { "scenes/nonmq/Z2_21MITURINMAE/Z2_21MITURINMAETex_005190", 0xB96848FF, SCENE_21MITURINMAE },
     { "misc/scene_texture_08/scene_texture_08_Tex_006000", 0xB96848FF, SCENE_24KEMONOMITI, false, true },
+    // The climbing vines are a scene image, not the nearby tree actors. Their
+    // CI8 palette is shared with shop/bark materials and must never be recolored.
+    { "scenes/nonmq/Z2_24KEMONOMITI/Z2_24KEMONOMITITex_005730", 0xD99C45FF, SCENE_24KEMONOMITI, false, false, true,
+      true, "scenes/nonmq/Z2_24KEMONOMITI/Z2_24KEMONOMITITLUT_007950" },
     // The CI4 image includes a brown stem. Recolor only green palette entries;
     // RGBA replacements use the same green-only copy, without a triangle tint.
     { "objects/object_mtoride/gWoodfallSceneryBranchAndLeavesTLUT", 0xB96848FF, SCENE_21MITURINMAE, false, false,
@@ -464,8 +510,42 @@ constexpr SurfaceMaterial kSurfaceMaterials[] = {
 };
 // Retain immutable originals and copies until renderer teardown, as with the
 // display-list variants. A new pixel address also gives the GPU a new cache key.
-std::map<std::tuple<const Fast::Texture*, uint32_t, bool>, SurfaceTextureVariant> sSurfaceTextures;
+std::map<std::tuple<const Fast::Texture*, uint32_t, bool, const Fast::Texture*>, SurfaceTextureVariant>
+    sSurfaceTextures;
 std::vector<SurfaceTextureBinding> sSurfaceBindings;
+
+std::shared_ptr<Fast::Texture> ExpandIndexedSurface(const std::shared_ptr<Fast::Texture>& source,
+                                                    const std::shared_ptr<Fast::Texture>& palette) {
+    const size_t pixels = size_t(source->Width) * source->Height;
+    if (source->Type != Fast::TextureType::Palette8bpp || source->Flags != 0 || source->ImageData == nullptr ||
+        pixels == 0 || pixels != source->ImageDataSize || pixels > std::numeric_limits<uint32_t>::max() / 4 ||
+        palette == nullptr || palette->Type != Fast::TextureType::RGBA16bpp || palette->Flags != 0 ||
+        palette->ImageData == nullptr || palette->ImageDataSize != 512 ||
+        size_t(palette->Width) * palette->Height != 256) {
+        return nullptr;
+    }
+    auto copy = std::make_shared<Fast::Texture>(source->GetInitData());
+    copy->Type = Fast::TextureType::RGBA32bpp;
+    copy->Width = source->Width;
+    copy->Height = source->Height;
+    copy->Flags = TEX_FLAG_LOAD_AS_RAW;
+    // The intact CI8 load/tile commands address one byte per original texel.
+    // Raw replacement bytes have four channels while UV dimensions stay exact.
+    copy->HByteScale = source->HByteScale * 4;
+    copy->VPixelScale = source->VPixelScale;
+    copy->ImageDataSize = pixels * 4;
+    copy->mImageBuffer = std::make_shared<std::vector<char>>(copy->ImageDataSize);
+    copy->ImageData = reinterpret_cast<uint8_t*>(copy->mImageBuffer->data());
+    for (size_t i = 0; i < pixels; ++i) {
+        const size_t index = size_t(source->ImageData[i]) * 2;
+        const uint16_t color = (unsigned(palette->ImageData[index]) << 8) | palette->ImageData[index + 1];
+        copy->ImageData[i * 4] = (color >> 11) * 255 / 31;
+        copy->ImageData[i * 4 + 1] = ((color >> 6) & 31) * 255 / 31;
+        copy->ImageData[i * 4 + 2] = ((color >> 1) & 31) * 255 / 31;
+        copy->ImageData[i * 4 + 3] = (color & 1) * 255;
+    }
+    return copy;
+}
 
 std::shared_ptr<Fast::Texture> BuildSurfaceTexture(const std::shared_ptr<Fast::Texture>& source,
                                                    uint32_t color = 0xFFD078FF, float intensityScale = 1.0f) {
@@ -595,17 +675,37 @@ void UpdateSurfaceTextures(const PlayState* play, const std::shared_ptr<Ship::Re
                 if (current != sSurfaceBindings.end()) {
                     source = current->texture.source; // Always recolor the intact source.
                 }
-                const auto color = SeasonPalette(material.color, selectedSeason, play->sceneId);
+                std::shared_ptr<Fast::Texture> palette;
+                if (source->Type == Fast::TextureType::Palette8bpp && source->Flags == 0 &&
+                    material.palette != nullptr) {
+                    std::string palettePath = material.palette;
+                    palettePath.insert(palettePath.find('/', 13), suffix);
+                    if (rm->IsAltAssetsEnabled()) {
+                        const auto altPalette = "alt/" + palettePath;
+                        const auto archives = rm->GetArchiveManager();
+                        const auto hasArchive = [&](const std::string& name) {
+                            return archives->HasFile(name) && archives->GetArchiveFromFile(name) != nullptr;
+                        };
+                        if (rm->GetCachedResource(altPalette, true) != nullptr || hasArchive(altPalette) ||
+                            hasArchive(altPalette + ".meta"))
+                            palettePath = altPalette;
+                    }
+                    palette = std::dynamic_pointer_cast<Fast::Texture>(rm->GetCachedResource(palettePath, true));
+                    if (palette == nullptr)
+                        continue; // Load the active palette normally; never borrow a different cold Alt palette.
+                }
+                const auto color = SeasonPalette(material.color, selectedSeason, play->sceneId, material.springGrass);
                 const bool lift =
                     selectedSeason == SEASON_WINTER || (selectedSeason == SEASON_SPRING && material.blossomLift);
-                const auto key = std::tuple{ source.get(), color, lift };
+                const auto key = std::tuple{ source.get(), color, lift, palette.get() };
                 auto it = sSurfaceTextures.find(key);
                 if (it == sSurfaceTextures.end()) {
-                    auto copy = BuildSurfaceTexture(source, color, lift ? 1.8f : 1.0f);
+                    auto decoded = palette != nullptr ? ExpandIndexedSurface(source, palette) : source;
+                    auto copy = decoded != nullptr ? BuildSurfaceTexture(decoded, color, lift ? 1.8f : 1.0f) : nullptr;
                     if (copy == nullptr) {
                         continue;
                     }
-                    it = sSurfaceTextures.emplace(key, SurfaceTextureVariant{ source, std::move(copy) }).first;
+                    it = sSurfaceTextures.emplace(key, SurfaceTextureVariant{ source, std::move(copy), palette }).first;
                 }
                 if (current == sSurfaceBindings.end() || current->texture.copy != it->second.copy) {
                     rm->CacheExternalResource(path, it->second.copy);
@@ -710,6 +810,14 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                     paths.insert(kWoodfallTempleDL);
             }
         }
+        if (play->sceneId == SCENE_24KEMONOMITI) {
+            for (const auto& path : RoadRandoGrassPaths())
+                for (const auto* assetPrefix : { "", "alt/" }) {
+                    const auto resolved = assetPrefix + path;
+                    if (archives->HasFile(resolved) || archives->HasFile(resolved + ".meta"))
+                        paths.insert(path);
+                }
+        }
         sPaths.assign(paths.begin(), paths.end());
     }
     std::set<const Fast::DisplayList*> active;
@@ -729,6 +837,11 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
             }
         }
         auto loaded = rm->GetCachedResource(resolved, true);
+        if (loaded == nullptr && RoadRandoGrassColor(path, selectedSeason, play->sceneId) != 0) {
+            // Prepare only the explicit foliage children before the first actor
+            // draw; an outer grouped-grass tint must not reach a cold flower.
+            loaded = rm->LoadResource(resolved, true);
+        }
         if (loaded == nullptr && resolved != path && rm->GetCachedResource(path, true) != nullptr) {
             // Preload a cold Alt only when replacing an already-loaded scene
             // list. Leave unrelated/unloaded rooms to the normal render path.
@@ -763,7 +876,8 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
             const auto forestColor = ForestListColor(path, selectedSeason);
             auto commands =
                 forestColor != 0 ? std::vector<Gfx>{} : BuildVariant(original, selectedSeason, play->sceneId);
-            const auto wholeColor = forestColor != 0 ? forestColor : WholeListColor(path, selectedSeason);
+            const auto wholeColor =
+                forestColor != 0 ? forestColor : WholeListColor(path, selectedSeason, play->sceneId);
             if (commands.empty() && wholeColor == 0) {
                 // Ordinary scene materials stay owned by the resource manager;
                 // don't retain or duplicate every non-foliage list in the scene.
@@ -791,7 +905,10 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                 // color even when that root ends with a tail branch. Copies
                 // retain all dynamic child calls, geometry and alpha commands.
                 variant.draw = variant.original;
-                variant.commands = { gsSPGrayscale(SeasonTintMode(selectedSeason, play->sceneId)),
+                const unsigned mode = RoadRandoGrassColor(path, selectedSeason, play->sceneId) != 0
+                                          ? (selectedSeason == SEASON_AUTUMN ? 1 : 3)
+                                          : SeasonTintMode(selectedSeason, play->sceneId);
+                variant.commands = { gsSPGrayscale(mode),
                                      gsDPSetGrayscaleColor(wholeColor >> 24, (wholeColor >> 16) & 255,
                                                            (wholeColor >> 8) & 255, wholeColor & 255),
                                      gsSPDisplayList(variant.draw.data()), gsSPGrayscale(false), gsSPEndDisplayList() };

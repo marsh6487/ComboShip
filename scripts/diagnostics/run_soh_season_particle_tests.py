@@ -2,11 +2,14 @@
 import argparse
 import hashlib
 import os
-import re
 from pathlib import Path
 import shlex
 import subprocess
+import sys
 import tempfile
+
+sys.dont_write_bytecode = True
+from run_soh_season_weather_tests import extract
 
 ROOT = Path(__file__).resolve().parents[2]
 GRAPHICS = ROOT / "soh/soh/Enhancements/Graphics"
@@ -19,8 +22,10 @@ def main():
     args = parser.parse_args()
     compiler = shlex.split(os.environ.get("CXX", "c++"))
     flags = ["-std=c++20", "-g", "-Wall", "-Wextra", "-Werror", "-I" + str(ROOT / "soh")]
+    sanitizers = []
     if args.sanitize:
-        flags += ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"]
+        sanitizers = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"]
+        flags += sanitizers
     with tempfile.TemporaryDirectory(prefix="soh-season-particles-") as temp:
         build = Path(temp)
         for name, source in (("state", "SeasonParticleState.cpp"), ("summer", "SeasonSummerState.cpp"),
@@ -43,35 +48,33 @@ def main():
         begin = source.index("Gfx sSetupDL[SETUPDL_MAX][6] = {")
         end = source.index("\n};", begin) + 3
         (build / "season_particles_native_setup.inc").write_text(source[begin:end])
-        controller = ROOT / "soh/soh/Enhancements/audio/SeasonWeather.cpp"
-        contents = controller.read_text()
-        predicates = []
-        for name in ("SeasonWeather_SeasonForPlay", "SeasonWeather_ParticlesEnabled",
-                     "SeasonWeather_FlurriesEnabled", "SeasonWeather_SummerEffectEnabled",
-                     "SeasonWeather_WinterEffectEnabled"):
-            match = re.search(r'^extern "C" int32_t ' + name + r'\([^;]*?\)\s*\{', contents, re.M)
-            assert match, name
-            end = match.end()
-            depth = 1
-            while depth:
-                depth += (contents[end] == "{") - (contents[end] == "}")
-                end += 1
-            line = contents.count("\n", 0, match.start()) + 1
-            predicates.append(f'#line {line} "{controller}"\n' + contents[match.start():end])
-        (build / "season_particles_controller.inc").write_text("\n".join(predicates))
+        (build / "season_particles_rain.inc").write_text(
+            extract(ROOT / "soh/src/code/z_actor.c", ["Flags_GetEventChkInf"]) +
+            extract(ROOT / "soh/src/code/z_kankyo.c", ["func_800766C4"]))
         # Windows headers reserve near/far as empty macros. Exercise that
         # production renderer compile boundary even in the Linux regression gate.
         # The existing GameInteractor header has2 unused predicate parameters.
-        engine_flags = ["-DF3DEX_GBI_2", "-Dnear=", "-Dfar=", "-Wno-unused-parameter", "-I" + str(build)]
-        for directory in ("soh/include", "soh", "soh/assets", "libultraship/include", "libultraship/src"):
+        engine_flags = ["-DF3DEX_GBI_2", '-DCVAR_PREFIX_AUDIO="gAudioEditor"', '-DCVAR_PREFIX_SETTING="gSettings"',
+                        "-Dnear=", "-Dfar=", "-Wno-unused-parameter", "-I" + str(build)]
+        for directory in ("soh/include", "soh", "soh/src", "soh/assets", "libultraship/include", "libultraship/src"):
             engine_flags += ["-I" + str(ROOT / directory)]
+        c_flags = [*sanitizers, *engine_flags]
         engine_flags += shlex.split(os.environ.get("SOH_SEASON_PARTICLE_CXXFLAGS", ""))
+        rain_objects = []
+        for relative in ("soh/src/code/concurrent_weather_audio.c",
+                         "soh/src/overlays/actors/ovl_En_Weather_Tag/z_en_weather_tag.c"):
+            obj = build / (Path(relative).name + ".o")
+            subprocess.run([*shlex.split(os.environ.get("CC", "cc")), "-std=gnu17", "-DLOG_LEVEL_GAME_PRINTS=0",
+                            "-Wno-unused-variable", *c_flags, "-c", str(ROOT / relative), "-o", str(obj)], check=True)
+            rain_objects.append(str(obj))
         sources = [str(ROOT / "soh/tests/season_particles_renderer_test.cpp")]
         if (GRAPHICS / "SeasonParticles.cpp").exists():
             sources += [str(GRAPHICS / name) for name in
                         ("SeasonParticles.cpp", "SeasonParticlesHooks.cpp", "SeasonParticleState.cpp",
                          "SeasonSummerState.cpp", "SeasonWinterState.cpp")]
-        result = subprocess.run([*compiler, *flags, *engine_flags, *sources, "-o", str(executable)],
+        sources += [str(ROOT / "soh/soh/Enhancements/audio" / name) for name in
+                    ("SeasonWeather.cpp", "GlobalOutdoorRain.cpp")]
+        result = subprocess.run([*compiler, *flags, *engine_flags, *sources, *rain_objects, "-o", str(executable)],
                                 text=True, capture_output=True)
         if result.returncode:
             raise RuntimeError(result.stdout + result.stderr)

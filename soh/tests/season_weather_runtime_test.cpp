@@ -16,6 +16,7 @@
 // new presentation controller is implemented.
 extern "C" {
 int32_t SeasonWeather_SeasonForPlay(const PlayState*) __attribute__((weak));
+int32_t SeasonWeather_ParticleSeasonForPlay(const PlayState*) __attribute__((weak));
 int32_t SeasonWeather_ParticlesEnabled(int32_t) __attribute__((weak));
 int32_t SeasonWeather_FlurriesEnabled(void) __attribute__((weak));
 int32_t SeasonWeather_SummerEffectEnabled(int32_t) __attribute__((weak));
@@ -921,6 +922,42 @@ static void EligibilityAndShadeRestoreRespectSceneState() {
     REQUIRE(SeasonWeather_SeasonForPlay(&f.play) == SEASON_WINTER);
 }
 
+static void ParticleEligibilityDoesNotTakeOwnershipOfTheSky() {
+    Fixture f;
+    REQUIRE(SeasonWeather_ParticleSeasonForPlay != nullptr);
+    f.play.envCtx.skyboxDisabled = true;
+    for (int season : { SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN, SEASON_WINTER }) {
+        f.Select(season);
+        const auto before = sSave;
+        REQUIRE(SeasonWeather_SeasonForPlay(&f.play) == -1);
+        REQUIRE(SeasonWeather_ParticleSeasonForPlay(&f.play) == season);
+        REQUIRE(std::memcmp(&before, &sSave, sizeof(before)) == 0);
+    }
+    f.Select(-2);
+    sSave.season = SEASON_WINTER;
+    REQUIRE(SeasonWeather_ParticleSeasonForPlay(&f.play) == -1);
+    REQUIRE(sSave.season == SEASON_WINTER); // Unowned follows neither weather nor the self-healing getter.
+    sSave.seasonsRodOwned = 1;
+    sSave.seasonsOwned = 1 << SEASON_AUTUMN;
+    sSave.season = SEASON_AUTUMN;
+    REQUIRE(SeasonWeather_ParticleSeasonForPlay(&f.play) == SEASON_AUTUMN);
+    for (int selection : { -1, 9 }) {
+        f.Select(selection);
+        REQUIRE(SeasonWeather_ParticleSeasonForPlay(&f.play) == -1);
+    }
+    f.Select(SEASON_AUTUMN);
+    for (int gate = 0; gate < 6; ++gate) {
+        f.play.envCtx.indoors = gate == 0;
+        f.play.envCtx.customSkyboxFilter = gate == 1;
+        f.play.csCtx.state = gate == 2 ? 1 : CS_STATE_IDLE;
+        f.play.gameOverCtx.state = gate == 3 ? GAMEOVER_DEATH_START : GAMEOVER_INACTIVE;
+        f.camera.unk_14C = gate == 4 ? 0x100 : 0;
+        gSaveContext.gameMode = gate == 5 ? GAMEMODE_FILE_SELECT : GAMEMODE_NORMAL;
+        REQUIRE(SeasonWeather_ParticleSeasonForPlay(&f.play) == -1);
+    }
+    REQUIRE(SeasonWeather_ParticleSeasonForPlay(nullptr) == -1);
+}
+
 static void NativeBombFadeNeverConsumesSeasonalShade() {
     for (int season : { SEASON_AUTUMN, SEASON_WINTER }) {
         Fixture f;
@@ -1050,6 +1087,7 @@ int main() {
     SpringShowersUseTheSharedOvercastSetting();
     IntermittentSeasonRainHasPrivatePausedCadence();
     EligibilityAndShadeRestoreRespectSceneState();
+    ParticleEligibilityDoesNotTakeOwnershipOfTheSky();
     SavedRodGameplayAndNativeParticleColorStaySeparate();
     RealEnvironmentRainAndSkyRestoreComposeWithSeason();
     DuplicateUpdatesAndSceneReuseDoNotLeakOwnership();

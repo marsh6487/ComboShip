@@ -5069,9 +5069,16 @@ void func_80837530(PlayState* play, Player* this, s32 arg2) {
     this->stateFlags1 |= PLAYER_STATE1_CHARGING_SPIN_ATTACK;
 
     if (this->actor.category == ACTORCAT_PLAYER) {
+        // Rods use Deku Stick melee reach/damage, but the native spin actor's sword tables
+        // only contain the three swords. Give rods a valid Biggoron spin identity here.
+        s32 meleeWeapon = Player_GetMeleeWeaponHeld(this);
+        if ((this->heldItemAction == PLAYER_IA_ROD_FIRE) || (this->heldItemAction == PLAYER_IA_ROD_ICE) ||
+            (this->heldItemAction == PLAYER_IA_ROD_LIGHT)) {
+            meleeWeapon = Player_ActionToMeleeWeapon(PLAYER_IA_SWORD_BIGGORON);
+        }
         Actor_Spawn(&play->actorCtx, play, ACTOR_EN_M_THUNDER, this->bodyPartsPos[PLAYER_BODYPART_WAIST].x,
                     this->bodyPartsPos[PLAYER_BODYPART_WAIST].y, this->bodyPartsPos[PLAYER_BODYPART_WAIST].z, 0, 0, 0,
-                    Player_GetMeleeWeaponHeld(this) | arg2);
+                    meleeWeapon | arg2);
     }
 }
 

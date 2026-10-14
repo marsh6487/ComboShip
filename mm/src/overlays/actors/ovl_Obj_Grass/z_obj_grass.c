@@ -472,7 +472,7 @@ void ObjGrass_DrawOpa(Actor* thisx, PlayState* play2) {
     ObjGrassElement* grassElem;
     s32 season = MMWeather_SeasonForPlay(play);
     s32 frost = season == SEASON_WINTER;
-    // Spring is a subtle warmth on liftable blades, preserving native green and fade alpha.
+    // Spring grass uses full blossom blush; the native fade alpha remains separate.
     s32 spring = season == SEASON_SPRING;
     s32 seasonal = spring || season == SEASON_AUTUMN || frost;
 
@@ -493,7 +493,7 @@ void ObjGrass_DrawOpa(Actor* thisx, PlayState* play2) {
                              spring  ? 217
                              : frost ? 243
                                      : 69,
-                             spring ? 224 : 255);
+                             255);
         gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 1);
     }
 
@@ -510,6 +510,11 @@ void ObjGrass_DrawOpa(Actor* thisx, PlayState* play2) {
 
                 if ((grassElem->flags & OBJ_GRASS_ELEM_DRAW) && (grassElem->alpha == 255)) {
                     FrameInterpolation_RecordOpenChild(grassElem, 0);
+                    if (seasonal && play->sceneId == SCENE_24KEMONOMITI) {
+                        // Road randomizer leaf children release tint before their
+                        // flowers. Re-enable it for a later native grass element.
+                        gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 1);
+                    }
                     if (GameInteractor_Should(VB_OBJGRASS_OPA_DRAW_BE_OVERRIDDEN, true, this, grassElem, j)) {
                         rot.y = grassElem->rotY;
                         Matrix_SetTranslateRotateYXZ(grassElem->pos.x, grassElem->pos.y, grassElem->pos.z, &rot);
@@ -561,7 +566,7 @@ void ObjGrass_DrawXlu(Actor* thisx, PlayState* play) {
                              spring  ? 217
                              : frost ? 243
                                      : 69,
-                             spring ? 224 : 255);
+                             255);
         gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 1);
     }
 
@@ -574,6 +579,9 @@ void ObjGrass_DrawXlu(Actor* thisx, PlayState* play) {
 
                 if ((grassElem->flags & OBJ_GRASS_ELEM_DRAW) && (grassElem->alpha > 0) && (grassElem->alpha < 255)) {
                     FrameInterpolation_RecordOpenChild(grassElem, 0);
+                    if (seasonal && play->sceneId == SCENE_24KEMONOMITI) {
+                        gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 1);
+                    }
                     if (GameInteractor_Should(VB_OBJGRASS_XLU_DRAW_BE_OVERRIDDEN, true, this, grassElem)) {
                         rot.y = grassElem->rotY;
                         Matrix_SetTranslateRotateYXZ(grassElem->pos.x, grassElem->pos.y, grassElem->pos.z, &rot);

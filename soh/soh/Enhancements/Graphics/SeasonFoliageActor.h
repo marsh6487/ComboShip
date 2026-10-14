@@ -12,7 +12,7 @@ static inline int SeasonFoliage_ActorBegin(Gfx** display, const PlayState* play,
             red = 246;
             green = 193;
             blue = 217;
-            blend = canopy ? 255 : 224;
+            blend = 255;
             mode = 3; // Readable blossom canopies and grass blush; summer restores native color.
             break;
         case 2:

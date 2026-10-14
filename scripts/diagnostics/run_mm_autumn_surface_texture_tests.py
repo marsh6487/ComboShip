@@ -22,7 +22,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix="mm-autumn-surface-") as temporary:
         build = Path(temporary)
         (build / "autumn_surface_texture_production.inc").write_text(
-            function(source, "BuildSurfaceTexture") + "\n" + function(bridge, "MM_GetTextureVisibleCenter"))
+            function(source, "ExpandIndexedSurface") + "\n" + function(source, "BuildSurfaceTexture") + "\n" +
+            function(bridge, "MM_GetTextureVisibleCenter"))
         (build / "spdlog").mkdir()
         (build / "spdlog/spdlog.h").write_text("#pragma once\n#define SPDLOG_TRACE(...) ((void)0)\n")
         binary = build / "test"

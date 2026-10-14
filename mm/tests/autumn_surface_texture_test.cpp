@@ -7,6 +7,7 @@
 #include <cstring>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <map>
 #include <string>
@@ -131,7 +132,46 @@ static void CheckVisibleCenter() {
         "PASS native/HD visible icon centers, exact cross-game routing, untouched pixels and malformed/empty guards");
 }
 
+static void CheckIndexedVineOwnership() {
+    auto source = Texture({ 1, 2 }, 2, 1);
+    source->Type = Fast::TextureType::Palette8bpp;
+    source->Flags = 0;
+    source->HByteScale = source->VPixelScale = 1;
+    std::vector<uint8_t> colors(512, 0);
+    const uint16_t leaf = (5 << 11) | (18 << 6) | (5 << 1) | 1;
+    const uint16_t wood = (9 << 11) | (6 << 6) | (3 << 1);
+    colors[2] = leaf >> 8;
+    colors[3] = leaf & 255;
+    colors[4] = wood >> 8;
+    colors[5] = wood & 255;
+    auto palette = Texture(colors, 16, 16);
+    palette->Type = Fast::TextureType::RGBA16bpp;
+    palette->Flags = 0;
+    auto decoded = ExpandIndexedSurface(source, palette);
+    assert(decoded && decoded->mImageBuffer && decoded->Type == Fast::TextureType::RGBA32bpp &&
+           decoded->Flags == TEX_FLAG_LOAD_AS_RAW && decoded->HByteScale == 4 && decoded->VPixelScale == 1 &&
+           decoded->Width == 2 && decoded->Height == 1 && decoded->GetInitData() == source->GetInitData());
+    const std::vector<uint8_t> expected{ 41, 148, 41, 255, 74, 49, 24, 0 };
+    assert(std::equal(expected.begin(), expected.end(), decoded->ImageData));
+    auto tinted = BuildSurfaceTexture(decoded, 0xE5EDF3FF, 1.8f);
+    assert(tinted && tinted->mImageBuffer && std::memcmp(tinted->ImageData, decoded->ImageData, 3) != 0);
+    assert(tinted->ImageData[3] == 255 && std::memcmp(tinted->ImageData + 4, decoded->ImageData + 4, 4) == 0);
+    decoded.reset(); // The recolored copy must retain its own expanded bytes.
+    assert(tinted->ImageData[7] == 0 && source->ImageData[0] == 1 && source->ImageData[1] == 2 &&
+           std::equal(colors.begin(), colors.end(), palette->ImageData));
+    palette->ImageDataSize = 511;
+    assert(ExpandIndexedSurface(source, palette) == nullptr);
+    palette->ImageDataSize = 512;
+    source->ImageDataSize = 1;
+    assert(ExpandIndexedSurface(source, palette) == nullptr);
+    source->ImageDataSize = 2;
+    palette->Flags = TEX_FLAG_LOAD_AS_RAW;
+    assert(ExpandIndexedSurface(source, palette) == nullptr);
+    puts("PASS real indexed-vine ownership, exact decoded wood/alpha, shared palette and malformed input guards");
+}
+
 int main(int argc, char** argv) {
+    CheckIndexedVineOwnership();
     CheckVisibleCenter();
     const std::vector<uint8_t> original = { 30, 90, 20, 128, 70, 50, 30, 255, 64, 64, 64, 0 };
     auto source = Texture(original, 3, 1);

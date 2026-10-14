@@ -22,7 +22,7 @@ inline Tint Palette(int season, Surface surface) {
     switch (season) {
         case 0:
             return surface == Surface::Canopy       ? Tint{ 0xF6C1D9E0, 461 }
-                   : surface == Surface::Understory ? Tint{ 0xF6C1D9E0, 461 }
+                   : surface == Surface::Understory ? Tint{ 0xF6C1D9FF, 461 }
                                                     : Tint{};
         case 2:
             return { surface == Surface::Canopy ? 0xF4B783FFu : 0xFFD078FFu, 256 };

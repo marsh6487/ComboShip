@@ -36,6 +36,7 @@ struct Mesh {
     float age;
 };
 static std::vector<Mesh> meshes;
+static size_t Draw(PlayState& play);
 #include "winter_native_setup.inc"
 #include "winter_play_hooks.inc"
 
@@ -224,8 +225,7 @@ static size_t Draw(PlayState& play) {
 static void Advance(PlayState& play, int frames) {
     for (int i = 0; i < frames; ++i) {
         ++play.gameplayFrames;
-        UpdateFromPlay(&play);
-        Draw(play);
+        FrameFromNativePlayMain(&play);
     }
 }
 static size_t Count(size_t size) {
@@ -319,6 +319,46 @@ static void SameMeshes(const std::vector<Mesh>& before) {
     }
 }
 
+static void NativePlayMainLifetime(PlayState& play) {
+    const auto savedTime = gSaveContext.save.time;
+    const auto savedRate = R_UPDATE_RATE;
+    gSaveContext.save.time = CLOCK_TIME(23, 0);
+    for (int rate : { 1, 2, 3 }) {
+        R_UPDATE_RATE = rate;
+        InitFromPlay();
+        Advance(play, 90);
+        std::printf("MM winter native Play_Main R_UPDATE_RATE=%d: mist meshes=%zu, aurora meshes=%zu, "
+                    "aurora alpha=%u\n",
+                    rate, Count(15), Count(24), PeakAurora());
+        std::fflush(stdout);
+        assert(Count(15) >= 8 && Count(24) == 3 && PeakAurora() > 25);
+        for (const auto& mesh : meshes)
+            if (mesh.vertices.size() == 15)
+                assert(std::abs(mesh.age - 89 * rate / 60.0f) < 0.0002f);
+        const auto before = meshes;
+        const int queries = floorQueries;
+        for (int i = 0; i < 10; ++i) {
+            Draw(play);
+            SameMeshes(before);
+        }
+        assert(floorQueries == queries);
+
+        auto* gfx = play.state.gfxCtx;
+        const auto xluEnd = gfx->polyXlu.p;
+        const auto opaEnd = gfx->polyOpa.d;
+        play.state.gfxCtx = nullptr;
+        MMWinterAtmosphere_Draw(&play);
+        assert(gfx->polyXlu.p == xluEnd && gfx->polyOpa.d == opaEnd && floorQueries == queries);
+        play.state.gfxCtx = gfx;
+        Draw(play);
+        SameMeshes(before); // An unavailable draw context cannot reset the simulation.
+    }
+    gSaveContext.save.time = savedTime;
+    R_UPDATE_RATE = savedRate;
+    std::puts("PASS MM winter native Play_Main null-graphics update/restore/draw: mist ageing, night fade, "
+              "all update rates, repeated draws and missing draw context preserve simulation");
+}
+
 int main() {
     static PlayState play{};
     static Camera camera{};
@@ -346,6 +386,7 @@ int main() {
     R_UPDATE_RATE = 3;
     const auto playerBefore = player, snowBefore = nativeSnow;
     const auto saveBefore = gSaveContext;
+    NativePlayMainLifetime(play);
     InitFromPlay();
     Advance(play, 30);
     assert(Count(15) >= 8 && Count(24) == 0 && matrices == static_cast<int>(Count(15)) && floorQueries > 0);

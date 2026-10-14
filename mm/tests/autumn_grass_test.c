@@ -23,6 +23,7 @@ static PlayState play;
 static GraphicsContext gfx;
 static Gfx opaque[128], translucent[128];
 static int season = SEASON_AUTUMN, eligible = 1, allowDraw = 1, sway;
+static int replaceFirstDraw = 0, groupedDrawCalls = 0;
 static Mtx matrix;
 static MtxF D_80936AD8[8];
 
@@ -74,6 +75,16 @@ void Ship_ExtendedCullingActorRestoreProjectedPos(PlayState* current, Actor* act
 bool GameInteractor_Should(GIVanillaBehavior flag, uint32_t result, ...) {
     assert(flag == VB_OBJGRASS_OPA_DRAW_BE_OVERRIDDEN || flag == VB_OBJGRASS_XLU_DRAW_BE_OVERRIDDEN);
     assert(result);
+    if (replaceFirstDraw && groupedDrawCalls++ == 0) {
+        // The production Road randomizer leaf wrappers disable tint before
+        // their flower. Record that hook boundary, then draw a native neighbor.
+        if (flag == VB_OBJGRASS_OPA_DRAW_BE_OVERRIDDEN) {
+            gSPGrayscale(gfx.polyOpa.p++, false);
+        } else {
+            gSPGrayscale(gfx.polyXlu.p++, false);
+        }
+        return false;
+    }
     return allowDraw;
 }
 Lights* LightContext_NewLights(LightContext* context, GraphicsContext* current) {
@@ -241,7 +252,7 @@ static void Spring(void) {
             Begin();
             cases[i].draw(cases[i].actor, &play);
             Check(cases[i].fade ? translucent : opaque, cases[i].fade ? gfx.polyXlu.p : gfx.polyOpa.p, cases[i].list,
-                  native, count, 0xF6C1D9E0, 3);
+                  native, count, 0xF6C1D9FF, 3);
             assert(grouped.grassGroups[0].elements[0].alpha == (cases[i].fade ? 96 : 255));
             for (int restore = 0; restore < 3; ++restore) {
                 season = restore == 0 ? SEASON_SUMMER : restore == 1 ? SEASON_OFF : SEASON_SPRING;
@@ -339,8 +350,83 @@ static void Winter(void) {
     puts("PASS winter grass/bush OPA/XLU frost across adjacent outdoors; exact native commands, fade alpha and stumps");
 }
 
+static void CarriedGrass(void) {
+    Actor actor = { 0 };
+    play.sceneId = SCENE_24KEMONOMITI;
+    season = SEASON_OFF;
+    Begin();
+    ObjGrassCarry_Draw(&actor, &play);
+    Gfx native[128];
+    const size_t count = gfx.polyOpa.p - opaque;
+    memcpy(native, opaque, count * sizeof(Gfx));
+    for (int selected = SEASON_SPRING; selected <= SEASON_WINTER; ++selected) {
+        season = selected;
+        Begin();
+        ObjGrassCarry_Draw(&actor, &play);
+        if (selected == SEASON_SUMMER) {
+            assert((size_t)(gfx.polyOpa.p - opaque) == count && !memcmp(native, opaque, count * sizeof(Gfx)));
+        } else {
+            Check(opaque, gfx.polyOpa.p, gKusaBushType1DL, native, count,
+                  selected == SEASON_SPRING   ? 0xF6C1D9FF
+                  : selected == SEASON_WINTER ? 0xE5EDF3FF
+                                              : 0xD99C45FF,
+                  selected == SEASON_AUTUMN ? 1 : 3);
+        }
+    }
+    eligible = 0;
+    Begin();
+    ObjGrassCarry_Draw(&actor, &play);
+    assert((size_t)(gfx.polyOpa.p - opaque) == count && !memcmp(native, opaque, count * sizeof(Gfx)));
+    eligible = 1;
+    play.sceneId = SCENE_00KEIKOKU;
+    Begin();
+    ObjGrassCarry_Draw(&actor, &play);
+    assert((size_t)(gfx.polyOpa.p - opaque) == count && !memcmp(native, opaque, count * sizeof(Gfx)));
+    puts("PASS Road carried grass retains native/Alt draw identity and actor palettes; Summer/Off/story exact");
+}
+
+static void MixedGroupedGrass(void) {
+    ObjGrass grass = { 0 };
+    grass.activeGrassGroups = 1;
+    grass.grassGroups[0].count = 2;
+    grass.grassGroups[0].flags = OBJ_GRASS_GROUP_DRAW;
+    play.sceneId = SCENE_24KEMONOMITI;
+    for (int fade = 0; fade <= 1; ++fade) {
+        for (int i = 0; i < 2; ++i) {
+            grass.grassGroups[0].elements[i].flags = OBJ_GRASS_ELEM_DRAW;
+            grass.grassGroups[0].elements[i].alpha = fade ? 96 : 255;
+        }
+        for (int selected = SEASON_SPRING; selected <= SEASON_WINTER; ++selected) {
+            if (selected == SEASON_SUMMER)
+                continue;
+            season = selected;
+            replaceFirstDraw = 1;
+            groupedDrawCalls = 0;
+            Begin();
+            (fade ? ObjGrass_DrawXlu : ObjGrass_DrawOpa)(&grass.actor, &play);
+            const Gfx* start = fade ? translucent : opaque;
+            const Gfx* end = fade ? gfx.polyXlu.p : gfx.polyOpa.p;
+            int tinted = 0, nativeDraws = 0;
+            for (const Gfx* cmd = start; cmd < end; ++cmd) {
+                const unsigned op = cmd->words.w0 >> 24;
+                if (op == G_SETGRAYSCALE)
+                    tinted = cmd->words.w1;
+                if (op == G_DL && cmd->words.w1 == (uintptr_t)gObjGrass_D_809AAAE0) {
+                    assert(tinted == (selected == SEASON_AUTUMN ? 1 : 3));
+                    ++nativeDraws;
+                }
+            }
+            assert(groupedDrawCalls == 2 && nativeDraws == 1 && !tinted);
+        }
+    }
+    replaceFirstDraw = 0;
+    puts("PASS Road mixed randomizer/native grass batches: leaf tint returns before the next OPA/XLU element");
+}
+
 int main(void) {
     play.state.gfxCtx = &gfx;
+    MixedGroupedGrass();
+    CarriedGrass();
     Spring();
     Winter();
     Kusa();

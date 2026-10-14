@@ -9,6 +9,9 @@ extern "C" {
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/ShipInit.hpp"
 #include "soh/Enhancements/audio/SeasonWeather.h"
+#include "soh/Enhancements/audio/GlobalOutdoorRain.h"
+#include "soh/Enhancements/audio/GlobalOutdoorRainBridge.h"
+#include "overlays/actors/ovl_En_Weather_Tag/z_en_weather_tag.h"
 #include "mods/extended_inventory.h"
 #include "soh/Enhancements/Graphics/SeasonParticleState.h"
 #include "soh/Enhancements/Graphics/SeasonSummerState.h"
@@ -23,6 +26,12 @@ SaveContext gSaveContext{};
 GameInteractor* GameInteractor::Instance = nullptr;
 extern "C" {
 PlayState* gPlayState = nullptr;
+LightningStrike gLightningStrike{};
+u8 gWeatherMode, gSkyboxBlendingEnabled, D_8011FB34, D_8011FB38;
+u16 gTimeSpeed;
+u32 gBitFlags[32];
+void EnWeatherTag_Init(Actor*, PlayState*);
+void EnWeatherTag_Update(Actor*, PlayState*);
 }
 static GameInfo gameInfo{};
 GameInfo* gGameInfo = &gameInfo;
@@ -43,6 +52,9 @@ static std::vector<Vec3f> meshOrigins;
 static std::vector<Gfx*> displayLists;
 static std::vector<unsigned> alphas;
 static float aspect = 16.0f / 9.0f;
+static float rainGain = 0;
+static int natureWrites = 0;
+static NeiSaveData neiSave{};
 #include "season_particles_native_setup.inc"
 extern "C" int32_t CVarGetInteger(const char* key, int32_t fallback) {
     if (std::strcmp(key, SOH_SEASON_WEATHER_CVAR("Season")) == 0)
@@ -75,8 +87,44 @@ extern "C" uint8_t Seasons_GetSeason() {
     assert(false);
     return 0;
 }
-// Verbatim controller predicates from production drive the complete renderer.
-#include "season_particles_controller.inc"
+extern "C" NeiSaveData* Nei_Save() {
+    return &neiSave;
+}
+extern "C" Color_RGB8 CVarGetColor24(const char*, Color_RGB8 fallback) {
+    return fallback;
+}
+extern "C" s16 Rand_S16Offset(s16 base, s16) {
+    return base;
+}
+extern "C" u8 Audio_IsNatureRainEnabled() {
+    return 0;
+}
+extern "C" void Audio_SetNatureAmbienceChannelIO(u8, u8, u8) {
+    ++natureWrites;
+}
+extern "C" void WeatherSamplePlayer_SetLoop(const char* path, float gain) {
+    rainGain = path ? gain : 0;
+}
+extern "C" void GlobalOutdoorRain_Log(const char*) {
+}
+extern "C" f32 Actor_WorldDistXZToActor(Actor* a, Actor* b) {
+    return std::hypot(a->world.pos.x - b->world.pos.x, a->world.pos.z - b->world.pos.z);
+}
+extern "C" void Actor_Kill(Actor* actor) {
+    actor->update = nullptr;
+}
+extern "C" s16 Math_SmoothStepToS(s16*, s16, s16, s16, s16) {
+    return 0;
+}
+extern "C" DebugDispObject* DebugDisplay_AddObject(f32, f32, f32, s16, s16, s16, f32, f32, f32, u8, u8, u8, u8, s16,
+                                                   GraphicsContext*) {
+    return nullptr;
+}
+extern "C" void lusprintf(const char*, int32_t, int32_t, const char*, ...) {
+}
+extern "C" {
+#include "season_particles_rain.inc"
+}
 extern "C" float OTRGetAspectRatio() {
     return aspect;
 }
@@ -256,6 +304,146 @@ static bool SubmittedAuroraCoreInView(const SoHSeasonParticles::View& view) {
     }
     return false;
 }
+
+static void RainWithDisabledSkyPreservesParticles() {
+    static PlayState play{};
+    static Camera camera{};
+    static GraphicsContext gfx{};
+    static Actor player{}, nativeSnow{};
+    static EnWeatherTag tag{};
+    auto* previousPlay = gPlayState;
+    const auto saved = gSaveContext;
+    gPlayState = &play;
+    play.state.gfxCtx = &gfx;
+    play.sceneNum = SCENE_LOST_WOODS;
+    play.cameraPtrs[0] = &camera;
+    play.skyboxId = SKYBOX_NORMAL_SKY;
+    play.view.eye = camera.eye = { 0, 100, 0 };
+    play.view.lookAt = camera.at = { 0, 100, 1000 };
+    play.view.up = { 0, 1, 0 };
+    play.view.fovy = camera.fov = 60;
+    play.view.zFar = 12800;
+    player.world.pos = { 0, 100, -300 };
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player;
+    R_UPDATE_RATE = 3;
+    for (int selected : { SEASON_SPRING, SEASON_AUTUMN, SEASON_WINTER }) {
+        season = selected;
+        enabled = 1;
+        winterEffects[0] = winterEffects[1] = 1;
+        gSaveContext.dayTime = selected == SEASON_WINTER ? CLOCK_TIME(23, 0) : CLOCK_TIME(12, 0);
+        for (int source : std::array<int, 3>{ -1, EN_WEATHER_TAG_TYPE_RAIN_LAKE_HYLIA,
+                                              EN_WEATHER_TAG_TYPE_THUNDERSTORM_GRAVEYARD }) {
+            SeasonParticles_Reset();
+            SeasonWeather_Reset();
+            GlobalOutdoorRain_Reset();
+            play.envCtx = {};
+            play.envCtx.skyboxDisabled = true;
+            play.envCtx.unk_EE[2] = 11;
+            play.envCtx.unk_EE[3] = 31;
+            play.actorCtx.actorLists[ACTORCAT_PROP].head = nullptr;
+            play.actorCtx.actorLists[ACTORCAT_ITEMACTION].head = nullptr;
+            gWeatherMode = gSkyboxBlendingEnabled = 0;
+            GlobalOutdoorRain_BeginScene(&play, source < 0 ? 40 : 0, source < 0, 0);
+            if (source >= 0) {
+                tag = {};
+                tag.actor.id = ACTOR_EN_WEATHER_TAG;
+                tag.actor.params = 0x0A00 | source;
+                tag.actor.update = EnWeatherTag_Update;
+                play.actorCtx.actorLists[ACTORCAT_PROP].head = &tag.actor;
+                EnWeatherTag_Init(&tag.actor, &play);
+                assert(tag.actor.update != nullptr);
+            }
+            for (int frame = 0; frame < 64; ++frame) {
+                ++play.state.frames;
+                ++play.gameplayFrames;
+                if (source >= 0)
+                    EnWeatherTag_Update(&tag.actor, &play);
+                SeasonWeather_Update(&play);
+                GlobalOutdoorRain_Update(&play);
+                func_800766C4(&play);
+                const auto environment = play.envCtx;
+                const auto light = play.lightCtx;
+                const auto save = gSaveContext;
+                const float gain = rainGain;
+                const int writes = natureWrites;
+                Draw(play);
+                assert(std::memcmp(&environment, &play.envCtx, sizeof(environment)) == 0);
+                assert(std::memcmp(&light, &play.lightCtx, sizeof(light)) == 0);
+                assert(std::memcmp(&save, &gSaveContext, sizeof(save)) == 0);
+                assert(rainGain == gain && natureWrites == writes);
+            }
+            std::printf("SoH sky-disabled rain coexistence season=%d source=%d: falling=%zu mist vertices=%zu\n",
+                        selected, source, displayLists.size(), allocatedVertices);
+            std::fflush(stdout);
+            assert(SeasonWeather_SeasonForPlay(&play) == -1); // Sky/light/rain eligibility retains its native gate.
+            assert(play.envCtx.unk_EE[0] == (source < 0 ? 40 : 25) && play.envCtx.unk_EE[1] > 0);
+            assert(play.envCtx.unk_EE[2] == 11 && play.envCtx.unk_EE[3] == 31);
+            assert(rainGain == 0.5f && GlobalOutdoorRain_HasRainIntent());
+            assert(displayLists.size() == (selected == SEASON_WINTER ? 64 : 96));
+            assert(selected != SEASON_WINTER || (allocatedVertices >= 15 && allocatedVertices % 15 == 0));
+            if (selected == SEASON_WINTER) {
+                nativeSnow.id = ACTOR_OBJECT_KANKYO;
+                nativeSnow.params = 3;
+                nativeSnow.update = reinterpret_cast<ActorFunc>(1);
+                play.actorCtx.actorLists[ACTORCAT_ITEMACTION].head = &nativeSnow;
+                Draw(play);
+                assert(displayLists.empty() && allocatedVertices >= 15 && allocatedVertices % 15 == 0);
+                play.actorCtx.actorLists[ACTORCAT_ITEMACTION].head = nullptr;
+            }
+            for (int gate = 0; gate < 6; ++gate) {
+                play.envCtx.indoors = gate == 0;
+                play.envCtx.customSkyboxFilter = gate == 1;
+                play.csCtx.state = gate == 2 ? 1 : CS_STATE_IDLE;
+                play.gameOverCtx.state = gate == 3 ? GAMEOVER_DEATH_START : GAMEOVER_INACTIVE;
+                camera.unk_14C = gate == 4 ? 0x100 : 0;
+                gSaveContext.gameMode = gate == 5 ? GAMEMODE_FILE_SELECT : GAMEMODE_NORMAL;
+                assert(Draw(play) == 0);
+            }
+            play.envCtx.indoors = play.envCtx.customSkyboxFilter = 0;
+            play.csCtx.state = CS_STATE_IDLE;
+            play.gameOverCtx.state = GAMEOVER_INACTIVE;
+            camera.unk_14C = 0;
+            gSaveContext.gameMode = GAMEMODE_NORMAL;
+        }
+    }
+    play.actorCtx.actorLists[ACTORCAT_PROP].head = nullptr;
+    play.envCtx = {};
+    play.envCtx.skyboxDisabled = true;
+    play.envCtx.sunPos = { 450, 800, -250 };
+    season = SEASON_SUMMER;
+    summerEffects[0] = summerEffects[2] = 1;
+    summerEffects[1] = 0;
+    gSaveContext.dayTime = CLOCK_TIME(12, 0);
+    SeasonParticles_Reset();
+    Advance(play, 30);
+    assert(matrices == 32 && beamVertices == 0); // Drifting fluff survives; hidden sky cannot make sunbeams.
+    summerEffects[0] = 0;
+    summerEffects[1] = 1;
+    gSaveContext.dayTime = CLOCK_TIME(23, 0);
+    Advance(play, 30);
+    assert(matrices == 56 && beamVertices == 0); // Fireflies also need no visible sky.
+    season = SEASON_WINTER;
+    enabled = 0;
+    winterEffects[0] = 0;
+    winterEffects[1] = 1;
+    gSaveContext.dayTime = CLOCK_TIME(23, 0);
+    SeasonParticles_Reset();
+    Advance(play, 30);
+    assert(Draw(play) == 0); // Aurora also requires a visible normal sky.
+    SeasonParticles_Reset();
+    SeasonWeather_Reset();
+    GlobalOutdoorRain_Reset();
+    gSaveContext = saved;
+    gPlayState = previousPlay;
+    enabled = 1;
+    season = SEASON_AUTUMN;
+    winterEffects[0] = winterEffects[1] = 0;
+    summerEffects[0] = summerEffects[1] = 1;
+    summerEffects[2] = 0;
+    std::puts("PASS authored/native rain with sky-disabled outdoor particles: separate sky eligibility, native "
+              "rain/audio/counters/lighting preservation, actual weather tags, story/interior/underwater gates");
+}
+
 int main() {
     static PlayState play{};
     static Camera camera{};
@@ -266,8 +454,10 @@ int main() {
     static GameInteractor interactor;
     GameInteractor::Instance = &interactor;
     ShipInit::InitAll();
-    assert(GameInteractor::RegisteredGameHooks<GameInteractor::OnPlayDrawEnd>::functions.size() == 1);
+    assert(GameInteractor::RegisteredGameHooks<GameInteractor::OnPlayDrawEnd>::functions.size() == 2);
+    RainWithDisabledSkyPreservesParticles();
     play.sceneNum = SCENE_HYRULE_FIELD;
+    play.skyboxId = SKYBOX_NORMAL_SKY;
     play.roomCtx.curRoom.num = 0;
     play.cameraPtrs[0] = &camera;
     play.view.eye = camera.eye = { 0, 100, 0 };
@@ -375,11 +565,10 @@ int main() {
         camera.unk_14C = 0;
     }
     season = 2;
-    for (int gate = 0; gate < 4; ++gate) {
+    for (int gate = 0; gate < 3; ++gate) {
         play.envCtx.indoors = gate == 0;
-        play.envCtx.skyboxDisabled = gate == 1;
-        play.csCtx.state = gate == 2 ? 1 : CS_STATE_IDLE;
-        play.gameOverCtx.state = gate == 3 ? GAMEOVER_DEATH_START : GAMEOVER_INACTIVE;
+        play.csCtx.state = gate == 1 ? 1 : CS_STATE_IDLE;
+        play.gameOverCtx.state = gate == 2 ? GAMEOVER_DEATH_START : GAMEOVER_INACTIVE;
         assert(Draw(play) == 0);
     }
     play.envCtx.indoors = play.envCtx.skyboxDisabled = 0;
@@ -558,11 +747,10 @@ int main() {
     assert(std::memcmp(&play.envCtx, &winterEnvironment, sizeof(winterEnvironment)) == 0);
     gSaveContext.dayTime = winterSave.dayTime;
     assert(std::memcmp(&gSaveContext, &winterSave, sizeof(winterSave)) == 0);
-    for (int gate = 0; gate < 4; ++gate) {
+    for (int gate = 0; gate < 3; ++gate) {
         play.envCtx.indoors = gate == 0;
-        play.envCtx.skyboxDisabled = gate == 1;
-        play.csCtx.state = gate == 2 ? 1 : CS_STATE_IDLE;
-        camera.unk_14C = gate == 3 ? 0x100 : 0;
+        play.csCtx.state = gate == 1 ? 1 : CS_STATE_IDLE;
+        camera.unk_14C = gate == 2 ? 0x100 : 0;
         assert(Draw(play) == 0);
     }
     std::puts("PASS winter renderer: snow-independent terrain mist and night-only blue/green aurora, pause/toggles, "

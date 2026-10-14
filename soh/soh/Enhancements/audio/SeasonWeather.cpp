@@ -80,12 +80,10 @@ bool HasNativeSkyWeather(const PlayState* play) {
     return false;
 }
 
-} // namespace
-
-extern "C" int32_t SeasonWeather_SeasonForPlay(const PlayState* play) {
-    if (play == nullptr || play->envCtx.indoors || play->envCtx.skyboxDisabled || play->envCtx.customSkyboxFilter ||
-        play->csCtx.state != CS_STATE_IDLE || play->gameOverCtx.state != GAMEOVER_INACTIVE ||
-        gSaveContext.gameMode != GAMEMODE_NORMAL) {
+int32_t ResolveSeasonForPlay(const PlayState* play, bool requiresSky) {
+    if (play == nullptr || play->envCtx.indoors || (requiresSky && play->envCtx.skyboxDisabled) ||
+        play->envCtx.customSkyboxFilter || play->csCtx.state != CS_STATE_IDLE ||
+        play->gameOverCtx.state != GAMEOVER_INACTIVE || gSaveContext.gameMode != GAMEMODE_NORMAL) {
         return -1;
     }
     const Camera* camera = GET_ACTIVE_CAM(play);
@@ -103,6 +101,16 @@ extern "C" int32_t SeasonWeather_SeasonForPlay(const PlayState* play) {
     }
     const uint8_t season = Seasons_GetSeason();
     return season < SEASON_COUNT ? season : -1;
+}
+
+} // namespace
+
+extern "C" int32_t SeasonWeather_SeasonForPlay(const PlayState* play) {
+    return ResolveSeasonForPlay(play, true);
+}
+
+extern "C" int32_t SeasonWeather_ParticleSeasonForPlay(const PlayState* play) {
+    return ResolveSeasonForPlay(play, false);
 }
 
 extern "C" int32_t SeasonWeather_LightOffset(const PlayState* play, int32_t channel, int32_t ambient) {

@@ -13,6 +13,10 @@ struct PlayState;
 // 0..3 select Spring/Summer/Autumn/Winter presentation without changing gameplay.
 // Returns -1 for Native/Off/unowned, interiors, underwater and story presentation.
 int32_t SeasonWeather_SeasonForPlay(const struct PlayState* play);
+// Ground particles can coexist with authored rain beneath an outdoor canopy
+// whose scene disables the skybox. Retains every other presentation guard.
+// Sky-dependent effects must additionally check their own visible-sky flag.
+int32_t SeasonWeather_ParticleSeasonForPlay(const struct PlayState* play);
 // Add at the native lighting clamp, without changing shared adj* fields that
 // bomb flashes, lightning and room actors modify. channel=0..2; ambient=0/1.
 // Ineligible presentation and active native lightning return zero.

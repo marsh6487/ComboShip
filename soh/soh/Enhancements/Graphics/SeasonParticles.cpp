@@ -200,7 +200,8 @@ static void DrawSummer(PlayState* play, const SoHSeasonParticles::View& view) {
     input.seconds = std::clamp<int>(R_UPDATE_RATE, 1, 3) / 60.0f;
     input.hour = gSaveContext.dayTime * (24.0f / 65536);
     input.dayVisibility = play->envCtx.unk_EE[1] > 0 ? 0 : 1;
-    input.sunbeams = !play->envCtx.sunMoonDisabled && SeasonWeather_SummerEffectEnabled(2);
+    input.sunbeams = play->skyboxId == SKYBOX_NORMAL_SKY && !play->envCtx.skyboxDisabled &&
+                     !play->envCtx.sunMoonDisabled && SeasonWeather_SummerEffectEnabled(2);
     input.sunDirection = { play->envCtx.sunPos.x, play->envCtx.sunPos.y, play->envCtx.sunPos.z };
     sSummer.Step(input, summerView);
     sSummerInitialized = true;
@@ -284,7 +285,7 @@ static void DrawWinter(PlayState* play, const SoHSeasonParticles::View& view) {
     input.hour = gSaveContext.dayTime * (24.0f / 65536);
     input.mist = player && SeasonWeather_WinterEffectEnabled(0);
     input.aurora = SeasonWeather_WinterEffectEnabled(1);
-    input.skyVisible = play->skyboxId == SKYBOX_NORMAL_SKY;
+    input.skyVisible = play->skyboxId == SKYBOX_NORMAL_SKY && !play->envCtx.skyboxDisabled;
     input.clipFar = play->view.zFar > 200 ? play->view.zFar : 12800;
     input.origin = player ? Vector(player->world.pos) : view.eye;
     sWinter.Step(input, view);
@@ -408,7 +409,7 @@ extern "C" void SeasonParticles_Reset(void) {
     sWinterInitialized = false;
 }
 extern "C" void SeasonParticles_Draw(PlayState* play) {
-    const int season = SeasonWeather_SeasonForPlay(play);
+    const int season = SeasonWeather_ParticleSeasonForPlay(play);
     // Summer has its own master and3 independent effects; the falling-particle
     // predicate intentionally recognizes only spring, autumn, and winter.
     const bool enabled =

@@ -43,6 +43,8 @@ int main() {
     REQUIRE(spring && spring->ImageData[0] > spring->ImageData[1] && spring->ImageData[2] > spring->ImageData[1]);
     REQUIRE(unsigned(spring->ImageData[0]) + spring->ImageData[1] + spring->ImageData[2] > (60 + 110 + 70) * 15 / 10);
     const auto blush = BuildTexture(hd, Palette(0, Surface::Understory));
+    REQUIRE(blush && blush->ImageData[0] == 118 && blush->ImageData[1] == 92 && blush->ImageData[2] == 104 &&
+            "spring understory must show full blush without a residual green blend");
     REQUIRE(blush && blush->ImageData[0] > blush->ImageData[1] && "spring grass must show a readable blush");
     REQUIRE(unsigned(blush->ImageData[0]) + blush->ImageData[1] + blush->ImageData[2] > (40 + 110 + 25) * 14 / 10);
     REQUIRE(blush->ImageData[3] == hd->ImageData[3]);

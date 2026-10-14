@@ -5,12 +5,15 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <ship/utils/StrHash64.h>
 #include "2s2h/Enhancements/Graphics/AutumnSceneFoliage.h"
@@ -115,7 +118,7 @@ struct Context {
 } // namespace Ship
 namespace Fast {
 #define TEX_FLAG_LOAD_AS_RAW (1 << 0)
-enum class TextureType { Error = 0, RGBA32bpp = 1, RGBA16bpp = 2 };
+enum class TextureType { Error = 0, RGBA32bpp = 1, RGBA16bpp = 2, Palette4bpp = 3, Palette8bpp = 4 };
 struct Texture : Ship::IResource {
     explicit Texture(std::shared_ptr<Ship::ResourceInitData> data = nullptr) {
         initData = std::move(data);
@@ -977,6 +980,293 @@ static void CheckWoodfallSurfaces() {
                               "scenes/nonmq/Z2_21MITURINMAE/Z2_21MITURINMAETex_005190" })
         CheckWoodfallSurface(path, SurfaceTexture());
 }
+static void CheckRoadTrim() {
+    const char* owner = "scenes/nonmq/Z2_24KEMONOMITI/Z2_24KEMONOMITI_room_00DL_005FF0";
+    for (const char* prefix : { "", "alt/" }) {
+        auto original =
+            MakeMaterial((std::string(prefix) + "misc/scene_texture_08/scene_texture_08_Tex_007000").c_str());
+        original.push_back(gsSPEndDisplayList());
+        for (const auto& [selected, color] :
+             { std::pair{ SEASON_AUTUMN, 0xD99C45FFu }, std::pair{ SEASON_WINTER, 0xE5EDF3FFu },
+               std::pair{ SEASON_SPRING, 0xF6C1D9FFu } })
+            CheckActualSceneMaterial(owner, SCENE_24KEMONOMITI, original, { color }, selected);
+    }
+    assert(MaterialColor(CRC64("misc/scene_texture_08/scene_texture_08_Tex_001000"), SEASON_SPRING,
+                         SCENE_24KEMONOMITI) == 0); // The surrounding ground stays native in spring.
+    assert(MaterialColor(CRC64("misc/scene_texture_08/scene_texture_08_Tex_007000"), SEASON_AUTUMN,
+                         SCENE_ROMANYMAE) == 0); // This POC does not reclassify Milk Road's shared material.
+    std::puts("PASS Road decorative grass trim: three palettes, native/Alt and both scene namespaces");
+}
+
+static std::vector<TestPixel> IndexedPixels(const std::shared_ptr<Fast::Texture>& source,
+                                            const std::shared_ptr<Fast::Texture>& palette) {
+    const auto colors = TexturePixels(palette);
+    std::vector<TestPixel> pixels;
+    for (unsigned i = 0; i < source->ImageDataSize; ++i)
+        pixels.push_back(colors.at(source->ImageData[i]));
+    return pixels;
+}
+
+static void CheckRoadVines(const std::shared_ptr<Fast::Texture>& source,
+                           const std::shared_ptr<Fast::Texture>& palette) {
+    const auto decoded = IndexedPixels(source, palette);
+    const auto imageBytes = *source->mImageBuffer, paletteBytes = *palette->mImageBuffer;
+    for (const char* suffix : { "", "_scene" })
+        for (bool alt : { false, true }) {
+            ClearCache();
+            auto rm = std::make_shared<Ship::ResourceManager>();
+            Ship::Context::GetRawInstance()->rm = rm;
+            rm->alt = alt;
+            const std::string folder = std::string(alt ? "alt/" : "") + "scenes/nonmq/Z2_24KEMONOMITI" + suffix + "/";
+            const auto path = folder + "Z2_24KEMONOMITITex_005730";
+            const auto palettePath = folder + "Z2_24KEMONOMITITLUT_007950";
+            rm->resources[path] = source;
+            rm->resources[palettePath] = palette;
+            PlayState play{};
+            play.sceneId = SCENE_24KEMONOMITI;
+            for (int selected : { SEASON_AUTUMN, SEASON_WINTER, SEASON_SPRING, SEASON_SUMMER, SEASON_OFF, -1 }) {
+                season = selected;
+                MMAutumnSceneFoliage_Update(&play);
+                const auto copy = std::dynamic_pointer_cast<Fast::Texture>(rm->resources.at(path));
+                const bool active = selected == SEASON_AUTUMN || selected == SEASON_WINTER || selected == SEASON_SPRING;
+                if (active) {
+                    if (copy == source)
+                        std::fprintf(stderr, "FAIL Road climbing vines %s: native green image is unchanged\n",
+                                     path.c_str());
+                    assert(copy != source && copy->Type == Fast::TextureType::RGBA32bpp);
+                    assert(copy->Flags == TEX_FLAG_LOAD_AS_RAW && copy->Width == source->Width &&
+                           copy->Height == source->Height && copy->HByteScale == source->HByteScale * 4 &&
+                           copy->VPixelScale == source->VPixelScale);
+                    const auto shown = TexturePixels(copy);
+                    assert(shown.size() == decoded.size());
+                    unsigned green = 0, protectedPixels = 0;
+                    for (size_t i = 0; i < decoded.size(); ++i) {
+                        const auto& before = decoded[i];
+                        assert(shown[i][3] == before[3]);
+                        if (before[1] > before[0] && before[1] > before[2]) {
+                            ++green;
+                            assert(shown[i] != before);
+                            if (selected == SEASON_SPRING && before == TestPixel{ 41, 148, 41, 255 })
+                                assert((shown[i] == TestPixel{ 155, 121, 136, 255 }));
+                        } else {
+                            ++protectedPixels;
+                            assert(shown[i] == before);
+                        }
+                    }
+                    assert(green && protectedPixels);
+                    MMAutumnSceneFoliage_Update(&play);
+                    assert(rm->resources.at(path) == copy); // One immutable copy, no repeated conversion.
+                } else {
+                    assert(copy == source);
+                }
+                assert(rm->resources.at(palettePath) == palette && *palette->mImageBuffer == paletteBytes &&
+                       *source->mImageBuffer == imageBytes); // Shop/bark also use this shared palette.
+            }
+            // A palette replacement must invalidate the image's converted copy.
+            season = SEASON_WINTER;
+            MMAutumnSceneFoliage_Update(&play);
+            const auto oldCopy = rm->resources.at(path);
+            auto replacement = std::make_shared<Fast::Texture>(*palette);
+            replacement->mImageBuffer = std::make_shared<std::vector<char>>(paletteBytes);
+            replacement->ImageData = reinterpret_cast<uint8_t*>(replacement->mImageBuffer->data());
+            rm->resources[palettePath] = replacement;
+            MMAutumnSceneFoliage_Update(&play);
+            assert(rm->resources.at(path) != oldCopy && rm->resources.at(palettePath) == replacement);
+            play.sceneId = SCENE_00KEIKOKU;
+            MMAutumnSceneFoliage_Update(&play);
+            assert(rm->resources.at(path) == source);
+        }
+    ClearCache();
+    season = SEASON_AUTUMN;
+    std::puts("PASS Road CI8 vines: exact decoded wood/alpha, unchanged shared palette, aliases and palette reload");
+}
+
+static void CheckRoadVines() {
+    auto source = std::make_shared<Fast::Texture>();
+    source->Type = Fast::TextureType::Palette8bpp;
+    source->Width = 2;
+    source->Height = 1;
+    source->ImageDataSize = 2;
+    source->mImageBuffer = std::make_shared<std::vector<char>>(std::initializer_list<char>{ 1, 2 });
+    source->ImageData = reinterpret_cast<uint8_t*>(source->mImageBuffer->data());
+    auto palette = std::make_shared<Fast::Texture>();
+    palette->Type = Fast::TextureType::RGBA16bpp;
+    palette->Width = palette->Height = 16;
+    palette->ImageDataSize = 512;
+    palette->mImageBuffer = std::make_shared<std::vector<char>>(512, 0);
+    for (const auto& [index, value] :
+         { std::pair{ 1, (5 << 11) | (18 << 6) | (5 << 1) | 1 }, std::pair{ 2, (9 << 11) | (6 << 6) | (3 << 1) } }) {
+        (*palette->mImageBuffer)[index * 2] = value >> 8;
+        (*palette->mImageBuffer)[index * 2 + 1] = value & 255;
+    }
+    palette->ImageData = reinterpret_cast<uint8_t*>(palette->mImageBuffer->data());
+    CheckRoadVines(source, palette);
+    CheckWoodfallSurface("scenes/nonmq/Z2_24KEMONOMITI/Z2_24KEMONOMITITex_005730", SurfaceTexture(),
+                         SCENE_24KEMONOMITI);
+    ClearCache();
+    auto rm = std::make_shared<Ship::ResourceManager>();
+    Ship::Context::GetRawInstance()->rm = rm;
+    const std::string imagePath = "scenes/nonmq/Z2_24KEMONOMITI/Z2_24KEMONOMITITex_005730";
+    const std::string palettePath = "scenes/nonmq/Z2_24KEMONOMITI/Z2_24KEMONOMITITLUT_007950";
+    rm->resources[imagePath] = source;
+    rm->resources[palettePath] = palette;
+    rm->alt = true;
+    rm->archive->files["alt/" + palettePath] = palette;
+    PlayState play{};
+    play.sceneId = SCENE_24KEMONOMITI;
+    season = SEASON_WINTER;
+    MMAutumnSceneFoliage_Update(&play);
+    assert(rm->resources.at(imagePath) == source); // The cold Alt palette must win over native fallback.
+    rm->resources["alt/" + palettePath] = palette;
+    MMAutumnSceneFoliage_Update(&play);
+    assert(rm->resources.at(imagePath) != source && rm->resources.at(palettePath) == palette);
+    auto outside = SurfaceTexture();
+    rm->resources[imagePath] = outside;
+    MMAutumnSceneFoliage_Reset();
+    assert(rm->resources.at(imagePath) == outside);
+    rm->alt = false;
+    // Dark HD-style green: the full existing blush produces a clear red/blue
+    // separation, while the brown/neutral controls and every alpha stay exact.
+    outside->ImageData[0] = 20;
+    outside->ImageData[1] = 65;
+    outside->ImageData[2] = 12;
+    season = SEASON_SPRING;
+    MMAutumnSceneFoliage_Update(&play);
+    const auto blush = std::dynamic_pointer_cast<Fast::Texture>(rm->resources.at(imagePath));
+    assert(blush->ImageData[0] == 65 && blush->ImageData[1] == 51 && blush->ImageData[2] == 57 &&
+           blush->ImageData[3] == 128);
+    season = SEASON_SUMMER;
+    MMAutumnSceneFoliage_Update(&play);
+    assert(rm->resources.at(imagePath) == outside);
+    ClearCache();
+    season = SEASON_AUTUMN;
+}
+
+static void CheckRoadRandoGrassTarget(const char* path, const std::vector<Gfx>& original, unsigned triangles,
+                                      bool foliage, bool cold = false) {
+    const int previousSeason = season;
+    for (bool alt : { false, true }) {
+        ClearCache();
+        auto rm = std::make_shared<Ship::ResourceManager>();
+        Ship::Context::GetRawInstance()->rm = rm;
+        rm->alt = alt;
+        const auto resolved = std::string(alt ? "alt/" : "") + path;
+        auto resource = std::make_shared<Fast::DisplayList>();
+        resource->Instructions = original;
+        rm->archive->files[resolved] = resource;
+        if (!cold)
+            rm->resources[resolved] = resource;
+        PlayState play{};
+        play.sceneId = SCENE_24KEMONOMITI;
+        for (const auto& [selected, color] :
+             { std::pair{ SEASON_AUTUMN, 0xD99C45FFu }, std::pair{ SEASON_WINTER, 0xE5EDF3FFu },
+               std::pair{ SEASON_SPRING, 0xF6C1D9FFu } }) {
+            season = selected;
+            MMAutumnSceneFoliage_Update(&play);
+            if (foliage) {
+                if (Equal(resource->Instructions, original))
+                    std::fprintf(stderr, "FAIL Road randomizer grass %s: selected foliage draw is unchanged\n", path);
+                assert(!Equal(resource->Instructions, original));
+                const auto& variant = CurrentVariants().at(resource.get());
+                assert(Equal(variant.draw, original));
+                assert(variant.commands[0].words.w1 == (selected == SEASON_AUTUMN ? 1 : 3));
+                // Grouped-grass hooks enter with an outer actor tint; the leaf
+                // wrapper must set one palette and leave the reward flower native.
+                std::vector<Gfx> parent{ gsDPSetGrayscaleColor(color >> 24, color >> 16 & 255, color >> 8 & 255,
+                                                               color & 255),
+                                         gsSPGrayscale(selected == SEASON_AUTUMN ? 1 : 3),
+                                         gsSPDisplayList(resource->Instructions.data()),
+                                         gsSP1Triangle(0, 1, 2, 0),
+                                         gsSPGrayscale(false),
+                                         gsSPEndDisplayList() };
+                const auto stats = ForestRendererFixture::Draw(parent);
+                assert(stats.triangles == triangles + 1 && stats.palettes.back() == 0);
+                assert(std::all_of(stats.palettes.begin(), stats.palettes.end() - 1,
+                                   [&](uint32_t seen) { return seen == color; }));
+            } else {
+                assert(Equal(resource->Instructions, original));
+            }
+            for (int inactive : { SEASON_OFF, SEASON_SUMMER, -1 }) {
+                season = inactive;
+                MMAutumnSceneFoliage_Update(&play);
+                assert(Equal(resource->Instructions, original));
+            }
+        }
+        season = SEASON_WINTER;
+        play.sceneId = SCENE_00KEIKOKU;
+        MMAutumnSceneFoliage_Update(&play);
+        assert(Equal(resource->Instructions, original));
+        assert(rm->loads == (cold && foliage ? 1u : 0u));
+    }
+    ClearCache();
+    season = previousSeason;
+}
+
+static void CheckRoadRandoGrass() {
+    const std::vector<Gfx> triangles{ gsSP2Triangles(0, 1, 2, 0, 0, 2, 3, 0), gsSPEndDisplayList() };
+    for (const char* path : { "objects/gameplay_field_keep/gFieldBushRandomDL_tri_0",
+                              "objects/gameplay_field_keep/gFieldBushRandomDL_tri_1",
+                              "objects/gameplay_keep/gRandoCuttableGrassRandomDL_tri_0",
+                              "objects/gameplay_keep/gRandoCuttableGrassRandomDL_tri_1" })
+        for (bool cold : { false, true })
+            CheckRoadRandoGrassTarget(path, triangles, 2, true, cold);
+    for (const char* path : { "objects/gameplay_field_keep/gFieldBushRandomDL_tri_2",
+                              "objects/gameplay_keep/gRandoCuttableGrassRandomDL_tri_2",
+                              "objects/gameplay_keep/gRandoCuttableGrassRandomDL_tri_3",
+                              "objects/gameplay_keep/gRandoCuttableGrassPrivateDL_tri_0" })
+        for (bool cold : { false, true })
+            CheckRoadRandoGrassTarget(path, triangles, 2, false, cold);
+    std::puts("PASS Road randomizer foliage-only children: three actor palettes, one tint and native flower/stem");
+}
+
+#include "autumn_road_vine_upload_fixture.h"
+static void CheckActualRoadVineDraw(const std::shared_ptr<Fast::Texture>& source,
+                                    const std::shared_ptr<Fast::Texture>& palette, const std::vector<Gfx>& original) {
+    const std::string folder = "scenes/nonmq/Z2_24KEMONOMITI/";
+    const auto path = folder + "Z2_24KEMONOMITITex_005730";
+    const auto palettePath = folder + "Z2_24KEMONOMITITLUT_007950";
+    const auto owner = folder + "Z2_24KEMONOMITI_room_00DL_003CE0";
+    source->initData = std::make_shared<Ship::ResourceInitData>();
+    source->initData->Path = path;
+    const auto paletteBytes = *palette->mImageBuffer;
+    for (bool alt : { false, true }) {
+        ClearCache();
+        auto rm = std::make_shared<Ship::ResourceManager>();
+        Ship::Context::GetRawInstance()->rm = rm;
+        rm->alt = alt;
+        const std::string prefix = alt ? "alt/" : "";
+        auto root = std::make_shared<Fast::DisplayList>();
+        root->Instructions = original;
+        rm->resources[prefix + owner] = root;
+        rm->archive->files[prefix + owner] = root;
+        rm->resources[prefix + path] = source;
+        rm->resources[prefix + palettePath] = palette;
+        ForestRendererFixture::manager.paths[CRC64(path.c_str())] = path;
+        ForestRendererFixture::manager.paths[CRC64(palettePath.c_str())] = palettePath;
+        PlayState play{};
+        play.sceneId = SCENE_24KEMONOMITI;
+        for (int selected : { SEASON_OFF, SEASON_AUTUMN, SEASON_WINTER, SEASON_SPRING, SEASON_SUMMER, -1 }) {
+            season = selected;
+            MMAutumnSceneFoliage_Update(&play);
+            const auto stats = ForestRendererFixture::Draw(root->Instructions);
+            assert(stats.triangles == 6 && stats.palettes == std::vector<uint32_t>(6, 0));
+            assert(stats.textures.size() == 2 && stats.textures[0] == palette);
+            if (selected == SEASON_AUTUMN || selected == SEASON_WINTER || selected == SEASON_SPRING)
+                RoadVineUploadFixture::CheckUpload(stats.textures[1], original);
+            else
+                assert(stats.textures[1] == source);
+            assert(*palette->mImageBuffer == paletteBytes);
+            auto observed = root->Instructions;
+            for (const auto& slot : RendererPointerSlots(original))
+                observed[slot.index].words.w1 = original[slot.index].words.w1;
+            assert(Equal(observed, original));
+        }
+    }
+    ClearCache();
+    std::puts("PASS exact six-triangle Road vine draw: production CI8 load/raw upload dimensions, source GBI and "
+              "shared palette");
+}
+
 static void CheckRoadForestPair() {
     for (const auto* prefix : { "", "alt/" }) {
         const auto shared = std::string(prefix) + "misc/scene_texture_08/scene_texture_08_Tex_";
@@ -1679,6 +1969,18 @@ static void CheckSharedListOutdoorTransition() {
 }
 
 int main() {
+    if (const char* selected = std::getenv("MM_ROAD_TARGET_TEST")) {
+        if (std::string(selected) == "vines")
+            CheckRoadVines();
+        else if (std::string(selected) == "rando")
+            CheckRoadRandoGrass();
+        else
+            CheckRoadTrim();
+        return 0;
+    }
+    CheckRoadTrim();
+    CheckRoadVines();
+    CheckRoadRandoGrass();
     CheckWoodfallMixedLeaves();
     CheckRecoveredLeafMaterials();
     CheckWoodfallSurfaces();

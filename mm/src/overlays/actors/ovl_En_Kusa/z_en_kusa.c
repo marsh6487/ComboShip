@@ -713,7 +713,7 @@ void EnKusa_DrawBush(Actor* thisx, PlayState* play2) {
     EnKusa* this = (EnKusa*)thisx;
     s32 season = MMWeather_SeasonForPlay(play);
     s32 frost = season == SEASON_WINTER;
-    // The partial spring blend barely warms the native green and preserves brightness.
+    // Full blossom blush separates spring grass from summer while retaining source shading.
     s32 spring = season == SEASON_SPRING;
     s32 seasonal = spring || season == SEASON_AUTUMN || frost;
 
@@ -738,7 +738,7 @@ void EnKusa_DrawBush(Actor* thisx, PlayState* play2) {
                                  spring  ? 217
                                  : frost ? 243
                                          : 69,
-                                 spring ? 224 : 255);
+                                 255);
             gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 1);
         }
         Gfx_DrawDListOpa(play, gKusaBushType1DL);
@@ -768,7 +768,7 @@ void EnKusa_DrawBush(Actor* thisx, PlayState* play2) {
                                  spring  ? 217
                                  : frost ? 243
                                          : 69,
-                                 spring ? 224 : 255);
+                                 255);
             gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 1);
         }
         gSPDisplayList(POLY_XLU_DISP++, gKusaBushType2DL);
@@ -811,7 +811,7 @@ void EnKusa_DrawGrass(Actor* thisx, PlayState* play) {
                                  spring  ? 217
                                  : frost ? 243
                                          : 69,
-                                 spring ? 224 : 255);
+                                 255);
             gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 1);
         }
         Gfx_DrawDListOpa(play, gKusaSproutDL);

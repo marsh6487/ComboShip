@@ -63,11 +63,13 @@ extern "C" void MMWinterAtmosphere_Reset() {
     sFrameValid = false;
 }
 extern "C" void MMWinterAtmosphere_Update(PlayState* play) {
+    // Play_Main clears gfxCtx during Play_Update. Simulation and terrain queries
+    // must continue there; only Draw needs the restored graphics context.
     // Check camera indices before the shared weather eligibility resolver uses
     // GET_ACTIVE_CAM. No native precipitation or actor slots belong to this layer.
-    if (!play || !play->state.gfxCtx || play->activeCamId < 0 || play->activeCamId >= NUM_CAMS ||
-        !GET_ACTIVE_CAM(play) || play->transitionTrigger != TRANS_TRIGGER_OFF ||
-        play->transitionMode != TRANS_MODE_OFF || MMWeather_SeasonForPlay(play) != SEASON_WINTER) {
+    if (!play || play->activeCamId < 0 || play->activeCamId >= NUM_CAMS || !GET_ACTIVE_CAM(play) ||
+        play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF ||
+        MMWeather_SeasonForPlay(play) != SEASON_WINTER) {
         MMWinterAtmosphere_Reset();
         return;
     }
@@ -113,7 +115,7 @@ extern "C" void MMWinterAtmosphere_Draw(PlayState* play) {
     // Paused menu changes take effect immediately without ageing or respawning
     // the frozen wisps. This also refreshes the draw's final view far clip.
     MMWinterAtmosphere_Update(play);
-    if (!play || sPlay != play)
+    if (!play || !play->state.gfxCtx || sPlay != play)
         return;
 
     auto right = MMWinter::Vec3{ sView.right.x, 0, sView.right.z };
