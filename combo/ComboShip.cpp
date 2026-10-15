@@ -3130,7 +3130,7 @@ static void Combo_ResumeMMIfLastSavedThere(int fileNum) {
 }
 
 static void Combo_OnOOTSceneSwitch(int fileNum) {
-    std::cout << "[ComboShip] Mask Shop entered — switching to MM, slot " << fileNum << std::endl;
+    std::cout << "[ComboShip] OOT portal entered — switching to MM, slot " << fileNum << std::endl;
     if (MM_SetComboEntryIsResume)
         MM_SetComboEntryIsResume(0); // portal entry: always arrives in South Clock Town
     g_PendingMMFileNum = fileNum;

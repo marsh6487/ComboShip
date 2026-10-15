@@ -1,4 +1,4 @@
-﻿#include "../../combo/menu/ItemGrantAuditBridge.h"
+#include "../../combo/menu/ItemGrantAuditBridge.h"
 #include "OTRGlobals.h"
 #include "OTRAudio.h"
 #include "CrashHandlerExt.h"
@@ -6,6 +6,7 @@
 #include "Enhancements/debugger/FrameTimingProbe.h"
 #include "ComboExport.h"
 #include "ComboResolve.h"
+#include "../../combo/entrances/LostWoodsEntrance.h"
 #include "../../combo/NeiGracePolicy.h"
 #include "../../combo/NeiSeasonsPolicy.h"
 #include <algorithm>
@@ -2192,20 +2193,74 @@ static void Combo_FinishInit() {
     // Flag set when we want to switch to MM. Acted on at the start of the next clean frame.
     static bool sComboSwitchPending = false;
     static int sComboSwitchFileNum = -1;
+    static int sComboSwitchPortalRoute = COMBO_PORTAL_MARKET;
+    static int sComboPassageFade = 0;
+    static void (*sComboSetMmPortalRoute)(int) = nullptr;
+    static const auto cancelComboPassage = []() {
+        if (sComboPassageFade && gPlayState && gGameState == &gPlayState->state)
+            gPlayState->envCtx.fillScreen = false;
+        sComboPassageFade = 0;
+        sComboSwitchPending = false;
+        sComboSwitchFileNum = -1;
+        sComboSwitchPortalRoute = COMBO_PORTAL_MARKET;
+    };
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(cancelComboPassage);
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnExitGame>([](int32_t) { cancelComboPassage(); });
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](int16_t sceneNum) {
         ComboCrossOotRuntime::ObserveScene(sceneNum);
         // Cross-game OOT->MM trigger: entering the Happy Mask Shop.
         if (sceneNum == SCENE_HAPPY_MASK_SHOP) {
+            sComboSwitchPortalRoute = COMBO_PORTAL_MARKET;
             sComboSwitchFileNum = (int)gSaveContext.fileNum;
             sComboSwitchPending = true;
         }
     });
 
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerUpdate>([]() {
+        if (sComboPassageFade || sComboSwitchPending || !gPlayState || !gComboSceneSwitchCallback ||
+            gSaveContext.gameMode != GAMEMODE_NORMAL || !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) ||
+            gPlayState->pauseCtx.state != 0 || gPlayState->transitionMode != TRANS_MODE_OFF ||
+            gPlayState->transitionTrigger != TRANS_TRIGGER_OFF || Player_InCsMode(gPlayState))
+            return;
+        Player* player = GET_PLAYER(gPlayState);
+        const Vec3f& pos = player->actor.world.pos;
+        if (!ComboLostWoods_InOotTunnel(gPlayState->sceneNum, gPlayState->roomCtx.curRoom.num, pos.x, pos.y, pos.z))
+            return;
+        if (!sComboSetMmPortalRoute)
+            sComboSetMmPortalRoute = (void (*)(int))Combo_ResolveSym("2ship", "MM_SetComboPortalRoute");
+        if (!sComboSetMmPortalRoute)
+            return;
+        sComboSwitchFileNum = (int)gSaveContext.fileNum;
+        sComboSwitchPortalRoute = COMBO_PORTAL_LOST_WOODS;
+        sComboPassageFade = 1;
+    });
+
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameFrameUpdate>([]() {
         if (ComboCrossOotRuntime::PrepareSwitch()) {
+            cancelComboPassage();
             sComboSwitchFileNum = (int)gSaveContext.fileNum;
             sComboSwitchPending = true;
+        }
+        if (sComboFwSwitchSlot >= 0 && sComboPassageFade)
+            cancelComboPassage();
+        // Ctrl+R can end Play between arming the fade and its clean-frame handoff.
+        // Never persist an attract demo or a different slot into the captured source slot.
+        if ((sComboPassageFade || sComboSwitchPending) &&
+            (!gPlayState || gGameState != &gPlayState->state || !gGameState->running ||
+             gSaveContext.gameMode != GAMEMODE_NORMAL || !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) ||
+             sComboSwitchFileNum != (int)gSaveContext.fileNum)) {
+            cancelComboPassage();
+            return;
+        }
+        if (sComboPassageFade && gPlayState) {
+            sComboPassageFade = std::min(sComboPassageFade + 24, 255);
+            gPlayState->envCtx.fillScreen = true;
+            gPlayState->envCtx.screenFillColor[0] = gPlayState->envCtx.screenFillColor[1] =
+                gPlayState->envCtx.screenFillColor[2] = 0;
+            gPlayState->envCtx.screenFillColor[3] = sComboPassageFade;
+            if (sComboPassageFade == 255)
+                sComboSwitchPending = true;
         }
         if (!sComboSwitchPending && sComboFwSwitchSlot < 0)
             return;
@@ -2214,6 +2269,7 @@ static void Combo_FinishInit() {
             sComboSwitchFileNum = sComboFwSwitchSlot;
         sComboFwSwitchSlot = -1;
         sComboSwitchPending = false;
+        sComboPassageFade = 0;
         if (ComboCrossOotRuntime::state.Enabled()) {
             SaveManager::Instance->ThreadPoolWait();
             Combo_SOH_CapturePendingChecks();
@@ -2227,6 +2283,10 @@ static void Combo_FinishInit() {
         if (!isFwReturn && gComboSceneSwitchCallback) {
             gComboSceneSwitchCallback(sComboSwitchFileNum);
         }
+        // The callback selects ordinary portal entry first; apply this route afterwards.
+        if (sComboSetMmPortalRoute)
+            sComboSetMmPortalRoute(sComboSwitchPortalRoute);
+        sComboSwitchPortalRoute = COMBO_PORTAL_MARKET;
         if (gGameState) {
             gGameState->running = false;
         }
@@ -4357,6 +4417,30 @@ extern "C" void OTRMessage_ResetForResume(void);
 // Consumed by TitleSetup_InitImpl (soh/src/code/title_setup.c): >= 0 => skip title/file-select, load
 // this slot, and jump straight to Play at the Mido's-House door.
 extern "C" s32 gComboReturnFileNum = -1;
+static int sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
+
+extern "C" COMBO_EXPORT void SOH_SetComboPortalReturnRoute(int route) {
+    sComboReturnPortalRoute = route == COMBO_PORTAL_LOST_WOODS ? route : COMBO_PORTAL_MARKET;
+}
+
+extern "C" void SOH_ApplyComboPortalArrival(int allowPlacement) {
+    if (sComboReturnPortalRoute != COMBO_PORTAL_LOST_WOODS)
+        return;
+    sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
+    if (!allowPlacement)
+        return; // Consume a stale forest route without replacing a composed arrival's respawn.
+    gSaveContext.entranceIndex = ENTR_LOST_WOODS_SOUTH_EXIT;
+    gSaveContext.cutsceneIndex = 0;
+    RespawnData* arrival = &gSaveContext.respawn[RESPAWN_MODE_RETURN];
+    *arrival = {};
+    arrival->entranceIndex = gSaveContext.entranceIndex;
+    arrival->roomIndex = 0;
+    arrival->pos = { 0.0f, 0.0f, -280.0f };
+    arrival->yaw = 0;               // southwards into the clearing, away from the MM trigger
+    arrival->playerParams = 0x0EFF; // native slow walk out, no fixed background camera
+    arrival->data = 1;
+    gSaveContext.respawnFlag = 2;
+}
 
 // Re-activate OOT's resources and re-init the pieces SOH_PrepareForTransition tore down.
 static void SOH_ReinitForResume() {

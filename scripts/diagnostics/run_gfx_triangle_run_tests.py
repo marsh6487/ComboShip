@@ -108,6 +108,8 @@ struct ResourceInitData { std::string Path; std::shared_ptr<Archive> Parent; };
             if "AutumnForestLayer(" in source:
                 names.insert(names.index("Interpreter::GfxSpTri1Impl"), "AutumnForestLayer")
             names.insert(names.index("Interpreter::GfxSpTri1Impl"), "TraceAutumnForestDraw")
+        if "ZoraCosmeticLayer(" in source:
+            names.insert(names.index("Interpreter::GfxSpTri1"), "ZoraCosmeticLayer")
         names.insert(names.index("Interpreter::GfxSpTri1"), "Interpreter::GfxDpSetTextureImage")
         # Destructor name needs the same parser, with its tilde included.
         generated = "namespace Fast {\nconstexpr size_t MAX_TRI_BUFFER = 256;\nstatic constexpr float N64_PRIM_DEPTH_MAX = 32767.0f;\n" + helpers

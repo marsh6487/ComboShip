@@ -56,7 +56,7 @@ def main():
         # The existing GameInteractor header has2 unused predicate parameters.
         engine_flags = ["-DF3DEX_GBI_2", '-DCVAR_PREFIX_AUDIO="gAudioEditor"', '-DCVAR_PREFIX_SETTING="gSettings"',
                         "-Dnear=", "-Dfar=", "-Wno-unused-parameter", "-I" + str(build)]
-        for directory in ("soh/include", "soh", "soh/src", "soh/assets", "libultraship/include", "libultraship/src"):
+        for directory in ("soh/include", "soh", "soh/src", "soh/assets", "libultraship/include", "libultraship/src", "combo"):
             engine_flags += ["-I" + str(ROOT / directory)]
         c_flags = [*sanitizers, *engine_flags]
         engine_flags += shlex.split(os.environ.get("SOH_SEASON_PARTICLE_CXXFLAGS", ""))

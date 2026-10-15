@@ -10,6 +10,7 @@
 extern s32 gComboReturnFileNum;
 extern int32_t Combo_SOH_ConsumeCrossDungeonArrival(void);
 extern int32_t Combo_SOH_ConsumeCrossBossRecoveryResume(void);
+void SOH_ApplyComboPortalArrival(int allowPlacement);
 #endif
 
 void TitleSetup_InitImpl(GameState* gameState) {
@@ -35,12 +36,12 @@ void TitleSetup_InitImpl(GameState* gameState) {
         GameInteractor_ExecuteOnLoadGame(gSaveContext.fileNum);
         // Must follow OnLoadGame: the rando handler's Entrance_SetSavewarpEntrance() recomputes from
         // savedSceneNum (never set by the portal handoff) and would clobber this with Link's House.
+        gSaveContext.entranceIndex = Entrance_OverrideNextIndex(ENTR_MARKET_DAY_OUTSIDE_HAPPY_MASK_SHOP);
         s32 crossDungeonArrival = Combo_SOH_ConsumeCrossDungeonArrival();
         s32 crossBossRecovery = Combo_SOH_ConsumeCrossBossRecoveryResume();
-        gSaveContext.entranceIndex = crossDungeonArrival >= 0 ? crossDungeonArrival
-                                     : crossBossRecovery >= 0
-                                         ? crossBossRecovery
-                                         : Entrance_OverrideNextIndex(ENTR_MARKET_DAY_OUTSIDE_HAPPY_MASK_SHOP);
+        if (crossDungeonArrival >= 0 || crossBossRecovery >= 0)
+            gSaveContext.entranceIndex = crossDungeonArrival >= 0 ? crossDungeonArrival : crossBossRecovery;
+        SOH_ApplyComboPortalArrival(crossDungeonArrival < 0 && crossBossRecovery < 0);
         // A portal return is never a cutscene arrival: a never-played MM-start save still holds the
         // pending intro (0xFFF1), which would shift Play_Init's entrance lookup onto a garbage layer.
         gSaveContext.cutsceneIndex = 0;

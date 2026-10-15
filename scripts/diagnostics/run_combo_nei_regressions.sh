@@ -120,3 +120,6 @@ python3 -B tools/nei_icons/build.py --verify
 python3 -B tools/nei_icons/verify_routes.py
 python3 -B tests/optional_assets/run_tests.py
 python3 -B tests/build_inputs/run_mod_discovery_tests.py
+python3 -B tests/lost_woods_entrance/run_tests.py
+python3 -B tests/cross_dungeon/run_tests.py
+python3 -B tests/farores_wind/run_tests.py

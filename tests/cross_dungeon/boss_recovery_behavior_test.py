@@ -8,6 +8,8 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'scripts/diagnostics'))
+from run_time_pedestal_tests import block_from
 parser = argparse.ArgumentParser()
 parser.add_argument('--sanitize', action='store_true')
 args = parser.parse_args()
@@ -38,6 +40,9 @@ void* Combo_ResolveSym(const char*,const char* name) {
 }
 ''')
 oot_title = (ROOT / 'soh/src/code/title_setup.c').read_text()
+oot_host = (ROOT / 'soh/soh/OTRGlobals.cpp').read_text(encoding='utf-8-sig')
+oot += '\n#include "combo/entrances/LostWoodsEntrance.h"\nstatic int sComboReturnPortalRoute = COMBO_PORTAL_MARKET;\n'
+oot += block_from(oot_host, oot_host.index('extern "C" void SOH_ApplyComboPortalArrival(')) + '\n'
 oot_title = oot_title[oot_title.index('        s32 crossDungeonArrival ='):oot_title.index('        // A portal return')]
 oot += '\nint16_t Entrance_OverrideNextIndex(int16_t index) { return index; }\nvoid NativeTitleArrival() {\n' + oot_title + '\n}\n'
 oot += r'''
@@ -92,7 +97,11 @@ int main() {
     assert(SOH_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
     assert(SOH_QueueCrossBossRecovery(1,mm.entrance.index));
     Combo_SOH_LoadCrossDungeonCheckpoint(nativeMixed.returnTo.index);
+    sComboReturnPortalRoute=COMBO_PORTAL_LOST_WOODS;
+    gSaveContext.respawnFlag=0;
     NativeTitleArrival();
+    assert(sComboReturnPortalRoute==COMBO_PORTAL_MARKET && gSaveContext.respawnFlag==0 &&
+           "real forest placement must not override source-owned boss recovery");
     assert(gSaveContext.entranceIndex==ENTR_FIRE_TEMPLE_ENTRANCE &&
            "foreign death must physically resume at the incoming Fire source, not the Water reverse");
     assert(Combo_SOH_SaveCrossDungeonCheckpoint()==ENTR_FIRE_TEMPLE_ENTRANCE);

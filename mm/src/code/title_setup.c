@@ -114,6 +114,7 @@ void Setup_InitImpl(SetupState* this) {
         // and re-runs ShipInit::Init("IS_RANDO"). COND_* macros are unregister-then-register, so it's
         // idempotent. Without it the combo force-spawn loads a rando save whose behaviors never activate.
         GameInteractor_ExecuteOnSaveLoad(gSaveContext.fileNum);
+        MM_ApplyComboPortalArrival();
         // These entrances are already composed. Apply after native save/load hooks and never send
         // them through transition permutation a second time. Preserve the loaded MM day/time.
         s32 crossDungeonArrival = Combo_MM_ConsumeCrossDungeonArrival();
