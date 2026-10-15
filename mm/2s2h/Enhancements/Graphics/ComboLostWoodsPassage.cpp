@@ -1,6 +1,7 @@
 // A separate tree passage between the entry clearing's maze corridors.
 // Drawn in the active MM resource manager, so the native bark can resolve through Alt Assets.
 #ifdef COMBO_BUILD
+#include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
 #include "../../../../combo/entrances/LostWoodsEntrance.h"
@@ -49,8 +50,9 @@ void BuildPassage() {
     // Black mouth, behind the frame. The native wall/collision beyond stays intact.
     quad(-44, 0, -2, 44, 0, -2, 44, 110, -2, -44, 110, -2, 0);
 }
+} // namespace
 
-void DrawPassage() {
+static void DrawPassage() {
     if (!gPlayState || gSaveContext.gameMode != GAMEMODE_NORMAL || gPlayState->sceneId != SCENE_26SARUNOMORI ||
         gPlayState->roomCtx.curRoom.num != 1)
         return;
@@ -77,6 +79,7 @@ void DrawPassage() {
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 
+namespace {
 void RegisterPassage() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldEnd>(DrawPassage);
 }

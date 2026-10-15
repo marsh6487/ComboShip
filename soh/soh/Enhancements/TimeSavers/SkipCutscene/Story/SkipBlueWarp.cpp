@@ -20,6 +20,15 @@ static bool sEnteredBlueWarp = false;
 extern "C" int Combo_SOH_CrossDungeonRuntimeEnabled(void);
 #endif
 
+static bool ShouldOverrideBlueWarpDestinations() {
+    bool overrideDestinations =
+        IS_RANDO && (RAND_GET_OPTION(RSK_SHUFFLE_DUNGEON_ENTRANCES) || RAND_GET_OPTION(RSK_SHUFFLE_BOSS_ENTRANCES));
+#ifdef COMBO_BUILD
+    overrideDestinations = overrideDestinations || (IS_RANDO && Combo_SOH_CrossDungeonRuntimeEnabled());
+#endif
+    return overrideDestinations;
+}
+
 extern void TimeSaverQueueItem(RandomizerGet randoGet);
 
 // Todo: Move item queueing here
@@ -98,13 +107,7 @@ void RegisterShouldPlayBlueWarp() {
             return;
         }
 
-        bool overrideBlueWarpDestinations =
-            IS_RANDO && (RAND_GET_OPTION(RSK_SHUFFLE_DUNGEON_ENTRANCES) || RAND_GET_OPTION(RSK_SHUFFLE_BOSS_ENTRANCES));
-
-#ifdef COMBO_BUILD
-        overrideBlueWarpDestinations =
-            overrideBlueWarpDestinations || (IS_RANDO && Combo_SOH_CrossDungeonRuntimeEnabled());
-#endif
+        bool overrideBlueWarpDestinations = ShouldOverrideBlueWarpDestinations();
         // Force blue warp skip on when ER needs to place Link somewhere else.
         // This is preferred over having story cutscenes play in the overworld and then reloading Link somewhere else
         // after.

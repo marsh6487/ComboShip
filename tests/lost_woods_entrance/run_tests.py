@@ -93,3 +93,5 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-arrival-") as directory:
     if result.returncode:
         sys.exit(result.stderr[:6000])
     subprocess.run([str(binary)], check=True)
+
+subprocess.run([sys.executable, str(ROOT / "tests/lost_woods_entrance/renderer_linkage_test.py")], check=True)
