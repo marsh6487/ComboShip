@@ -1,10 +1,15 @@
 """Execute production Farore's Wind scene policy and cross-game save/bridge bodies."""
+import argparse
 import os
 import re
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--sanitize", action="store_true")
+args = parser.parse_args()
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
@@ -25,8 +30,9 @@ def run(name, source, flags=()):
         source_path = Path(directory) / "test.cpp"
         source_path.write_text(source)
         binary = Path(directory) / "test"
+        sanitizer = ["-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-g"] if args.sanitize else []
         subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-O1", "-I" + str(ROOT / "combo"),
-                        *flags, str(source_path), "-o", str(binary)], check=True)
+                        *flags, *sanitizer, str(source_path), "-o", str(binary)], check=True)
         subprocess.run([str(binary)], check=True, cwd=directory)
         print("PASS " + name, flush=True)
 

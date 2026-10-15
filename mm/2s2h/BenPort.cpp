@@ -214,6 +214,10 @@ static void Combo_ClearReturnRequests(void) {
 static std::shared_ptr<Ship::ResourceManager> sMMResourceManager;
 #endif
 
+#ifdef COMBO_BUILD
+#include "rando/CrossDungeonMmRuntime.inc.h"
+#endif
+
 extern "C" char** cameraStrings;
 bool prevAltAssets = false;
 std::vector<std::shared_ptr<std::string>> cameraStdStrings;
@@ -1404,6 +1408,7 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     // Reverse MM->OOT trigger: the Clock Tower interior's South-Clock-Town door (spawn 1 only —
     // cycle resets respawn in this scene at spawns 0/2/3/6 and must stay in MM).
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s8 sceneId, s8 spawnNum) {
+        ComboCrossMmRuntime::ObserveScene(sceneId);
         // GAMEMODE_NORMAL only: MM's attract demo (GAMEMODE_TITLE_SCREEN, after Sram_InitNewSave wiped
         // the save) scene-hops through here, and would both teleport the player to OOT and persist the
         // wiped save over the slot.
@@ -1412,6 +1417,8 @@ extern "C" void InitOTR(int argc, char* argv[]) {
         }
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>([]() {
+        if (ComboCrossMmRuntime::PrepareSwitch())
+            sComboReturnPending = true;
         if (!sComboReturnPending && !sComboFwReturnPending && !sComboResetReturnPending && !sComboOwlSaveQuitPending)
             return;
         const bool isFwReturn = sComboFwReturnPending;
@@ -5143,11 +5150,38 @@ extern "C" COMBO_EXPORT void MM_TriggerTriforceCredits(int dormant) try {
     SPDLOG_ERROR("[ComboShip] MM_TriggerTriforceCredits threw: {}", e.what());
 } catch (...) { SPDLOG_ERROR("[ComboShip] MM_TriggerTriforceCredits threw a non-std exception"); }
 
+#include "rando/CrossDungeonMm.inc.h"
+
 extern "C" COMBO_EXPORT const char* Combo_MM_Rando_GetReachableChecks(void) {
     static std::string buf;
 
-    std::set<RandoRegionId> reachable = { RR_MAX };
-    auto timeStates = Rando::Logic::InitializeRegionTimeStates(RR_MAX);
+    struct SearchGuard {
+        SearchGuard() {
+            ComboCrossMm::searching = true;
+        }
+        ~SearchGuard() {
+            ComboCrossMm::searching = false;
+        }
+    } crossGuard;
+    std::set<RandoRegionId> reachable;
+    std::unordered_map<RandoRegionId, Rando::Logic::RegionTimeState> timeStates;
+    if (ComboCrossMm::state.routes.empty() || ComboCrossMm::state.overworld) {
+        reachable.insert(RR_MAX);
+        timeStates = Rando::Logic::InitializeRegionTimeStates(RR_MAX);
+    }
+    for (int index : ComboCrossMm::state.arrivals) {
+        auto region = Rando::Logic::GetRegionIdFromEntrance(index);
+        reachable.insert(region);
+        auto states = Rando::Logic::InitializeRegionTimeStates(region);
+        // InitializeRegionTimeStates is also used for the synthetic start root, which cannot
+        // wait. A physical cross arrival inherits its native region's waiting restrictions.
+        for (auto& [arrivalRegion, incoming] : states) {
+            incoming.canStayOverTime = Rando::Logic::Regions.at(arrivalRegion).canStayOverTime;
+            const auto [it, inserted] = timeStates.emplace(arrivalRegion, incoming);
+            if (!inserted)
+                it->second = Rando::Logic::MergeTimeStates(it->second, incoming);
+        }
+    }
 
     // ComboShip: mirror GlitchlessLogic's reachability fixpoint (Rando/Logic/GlitchlessLogic.cpp).
     // Crawling region connections alone isn't enough — MM's logic is event-gated (raising Woodfall,
@@ -5200,6 +5234,8 @@ extern "C" COMBO_EXPORT const char* Combo_MM_Rando_GetReachableChecks(void) {
         }
     }
 
+    ComboCrossMm::reachable = reachable;
+    ComboCrossMm::timeStates = timeStates;
     buf = out.dump();
     return buf.c_str();
 }

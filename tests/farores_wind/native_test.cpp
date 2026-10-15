@@ -3,6 +3,13 @@
 #include <cassert>
 #include <cstring>
 #include <iostream>
+#include "gameplay/ComboFaroresWindJson.h"
+static int32_t activeCheckpoint = -1;
+static int checkpointRestores = 0;
+extern "C" int32_t Combo_SOH_SaveCrossDungeonCheckpoint(void) { return activeCheckpoint; }
+extern "C" int32_t Combo_MM_SaveCrossDungeonCheckpoint(void) { return activeCheckpoint; }
+extern "C" void Combo_SOH_RestoreCrossDungeonCheckpoint(int32_t index) { activeCheckpoint = index; ++checkpointRestores; }
+extern "C" void Combo_MM_RestoreCrossDungeonCheckpoint(int32_t index) { activeCheckpoint = index; ++checkpointRestores; }
 // NATIVE_FLAG_CAPTURE
 #ifdef TEST_MM
 #include "mods/nei_save.h"
@@ -83,10 +90,17 @@ int main() {
     ComboFwCallbacks callbacks{readPoint, writePoint, request};
     SET_CALLBACKS(&callbacks);
     assert(!ComboFw_HasPoint(0) && states[1] == -1); // Don't erase the other game's legacy point.
+    activeCheckpoint = 0x456; // Old point belongs elsewhere: migration must not capture this.
     setNativePoint();
     assert(ComboFw_HasPoint(1) && states[1] == 1 && points[1].game == ownGame);
     assert(states[0] == -1 && states[2] == -1);
     assert(points[1].x == 111 && points[1].z == -333 && points[1].room == 3);
+    assert(ComboFw_EncodePoint(points[1])["dungeonCheckpoint"] == -1);
+    assert(checkpointRestores == 0);
+    // An actual new cast captures the active dungeon and persists independently of movement.
+    activeCheckpoint = 0x123;
+    ComboFw_PublishPoint();
+    assert(ComboFw_EncodePoint(points[1])["dungeonCheckpoint"] == 0x123);
     auto own = points[1];
     own.tempSwitchFlags = 55;
     own.tempCollectFlags = 77;
@@ -96,10 +110,12 @@ int main() {
     foreign.age = foreign.game == 0 ? 1 : -1;
     writePoint(1, &foreign);
     ComboFw_SyncPoint();
+    assert(checkpointRestores == 0); // Merely syncing a point is not recall.
     assert(!nativeSet() && ComboFw_HasPoint(0)); // Foreign point opens menu without a false local pillar.
     assert(ComboFw_RequestReturn() == 1 && queued == 1);
     available = false;
     assert(ComboFw_RequestReturn() == -1 && queued == 1 && states[1] == 1);
+    assert(checkpointRestores == 0 && activeCheckpoint == 0x123); // Handoff failure is non-mutating.
     assert(!SET_ARRIVAL(1, &foreign));
     assert(!SET_ARRIVAL(255, &own));
     auto invalid = own;
@@ -128,7 +144,14 @@ int main() {
 #ifndef TEST_MM
     gSaveContext.linkAge = 1; // The point is no authority to transform Link or grant age-dependent gear.
 #endif
+#ifdef TEST_MM
+    gSaveContext.save.day = 2;
+    gSaveContext.save.time = 0x7788;
+    gSaveContext.save.playerForm = PLAYER_FORM_ZORA;
+#endif
+    activeCheckpoint = 0x456; // Loaded recovery for B must be superseded by the point in A.
     assert(ComboFw_ApplyArrival() && !ComboFw_ApplyArrival());
+    assert(activeCheckpoint == 0x123 && checkpointRestores == 1);
     auto& top = gSaveContext.respawn[RESPAWN_MODE_TOP];
     ComboFw_ValidateArrivalRoom(4);
     assert(top.pos.x == 111 && top.pos.y == 222 && top.pos.z == -333 && top.yaw == -300);
@@ -143,6 +166,21 @@ int main() {
     assert(top.entranceIndex == own.entrance && gSaveContext.entranceIndex == own.entrance);
     assert(top.tempSwchFlags == 55);
     assert(gSaveContext.linkAge == 1 && top.playerParams == 0x6FF);
+#endif
+    activeCheckpoint = 0x456;
+    assert(ComboFw_RequestReturn() == 0); // Local recall restores the identical checkpoint.
+    assert(activeCheckpoint == 0x123 && checkpointRestores == 2);
+    auto legacy = ComboFw_EncodePoint(own);
+    legacy.erase("dungeonCheckpoint");
+    ComboFwPoint oldPoint{};
+    assert(ComboFw_DecodePoint(legacy, oldPoint));
+    writePoint(1, &oldPoint);
+    activeCheckpoint = 0x456;
+    assert(ComboFw_RequestReturn() == 0);
+    assert(activeCheckpoint == -1 && checkpointRestores == 3);
+#ifdef TEST_MM
+    assert(gSaveContext.save.day == 2 && gSaveContext.save.time == 0x7788);
+    assert(gSaveContext.save.playerForm == PLAYER_FORM_ZORA);
 #endif
     ComboFw_ClearPoint();
     setNativePoint(); // Stale native copy must not resurrect a dispelled shared point.

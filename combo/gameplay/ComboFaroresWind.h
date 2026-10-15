@@ -13,13 +13,19 @@ typedef struct ComboFwPoint {
     uint32_t tempSwitchFlags;
     uint32_t tempCollectFlags;
     uint32_t tempCollectFlagsLow; // MM respawn.unk_18
+    // Owning-game cross-dungeon entrance captured with the point, or -1 for no ownership.
+#ifdef __cplusplus
+    int32_t dungeonCheckpoint = -1;
+#else
+    int32_t dungeonCheckpoint;
+#endif
 } ComboFwPoint;
 
 static inline int ComboFw_PointValid(const ComboFwPoint* p) {
-    return p && (p->game == 0 || p->game == 1) && p->entrance >= 0 && p->entrance <= 0xFFFF && p->room >= 0 &&
-           p->room <= 255 && p->yaw >= -32768 && p->yaw <= 32767 &&
-           ((p->game == 0 && (p->age == 0 || p->age == 1)) || (p->game == 1 && p->age == -1)) && isfinite(p->x) &&
-           isfinite(p->y) && isfinite(p->z) && fabsf(p->x) <= 1000000 && fabsf(p->y) <= 1000000 &&
+    return p && p->dungeonCheckpoint >= -1 && p->dungeonCheckpoint <= 0xFFFF && (p->game == 0 || p->game == 1) &&
+           p->entrance >= 0 && p->entrance <= 0xFFFF && p->room >= 0 && p->room <= 255 && p->yaw >= -32768 &&
+           p->yaw <= 32767 && ((p->game == 0 && (p->age == 0 || p->age == 1)) || (p->game == 1 && p->age == -1)) &&
+           isfinite(p->x) && isfinite(p->y) && isfinite(p->z) && fabsf(p->x) <= 1000000 && fabsf(p->y) <= 1000000 &&
            fabsf(p->z) <= 1000000;
 }
 

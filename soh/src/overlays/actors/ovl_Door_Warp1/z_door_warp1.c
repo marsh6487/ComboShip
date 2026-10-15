@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 #include "z_door_warp1.h"
 #include "objects/object_warp1/object_warp1.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance.h"
@@ -517,6 +518,7 @@ void DoorWarp1_ChildWarpOut(DoorWarp1* this, PlayState* play) {
     this->warpTimer++;
 
     if (sWarpTimerTarget < this->warpTimer && gSaveContext.nextCutsceneIndex == 0xFFEF) {
+        const int crossBoss = Combo_SOH_CrossBossWarp(play->sceneNum);
         osSyncPrintf("\n\n\nじかんがきたからおーしまい fade_direction=[%d]", play->transitionTrigger,
                      TRANS_TRIGGER_START);
 
@@ -536,9 +538,12 @@ void DoorWarp1_ChildWarpOut(DoorWarp1* this, PlayState* play) {
             }
         } else if (play->sceneNum == SCENE_DEKU_TREE_BOSS) {
             if (GameInteractor_Should(VB_PLAY_BLUE_WARP_CS,
-                                      !Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD),
+                                      !Flags_GetEventChkInf(crossBoss
+                                                                ? EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP
+                                                                : EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD),
                                       EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD)) {
-                Flags_SetEventChkInf(EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD);
+                if (!crossBoss)
+                    Flags_SetEventChkInf(EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD);
                 Flags_SetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP);
                 if (GameInteractor_Should(VB_GIVE_ITEM_FROM_BLUE_WARP, true, ITEM_KOKIRI_EMERALD)) {
                     Item_Give(play, ITEM_KOKIRI_EMERALD);
@@ -639,6 +644,7 @@ void DoorWarp1_RutoWarpOut(DoorWarp1* this, PlayState* play) {
     this->warpTimer++;
 
     if (this->warpTimer > sWarpTimerTarget && gSaveContext.nextCutsceneIndex == 0xFFEF) {
+        Combo_SOH_CrossBossWarp(play->sceneNum);
         if (GameInteractor_Should(VB_PLAY_BLUE_WARP_CS, true, EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
             Flags_SetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP);
             if (GameInteractor_Should(VB_GIVE_ITEM_FROM_BLUE_WARP, true, ITEM_ZORA_SAPPHIRE)) {
@@ -744,6 +750,7 @@ void DoorWarp1_AdultWarpOut(DoorWarp1* this, PlayState* play) {
     this->warpTimer++;
 
     if (this->warpTimer > sWarpTimerTarget && gSaveContext.nextCutsceneIndex == 0xFFEF) {
+        Combo_SOH_CrossBossWarp(play->sceneNum);
         if (play->sceneNum == SCENE_FOREST_TEMPLE_BOSS) {
             if (GameInteractor_Should(VB_PLAY_BLUE_WARP_CS,
                                       !Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP),

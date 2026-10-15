@@ -103,11 +103,19 @@ bool Entrance::CheckConditionAtAgeTime(bool& age, bool& time, bool passAnyway) c
     time = true;
     age = true;
 
-    return GetConditionsMet() && (connectedRegion != RR_NONE || passAnyway);
+    return GetConditionsMet() && (GetConnectedRegionKey() != RR_NONE || passAnyway);
 }
 
+#ifdef COMBO_BUILD
+extern "C" int Combo_SOH_CrossDungeonRegion(int index, int resolved, int fallback);
+#endif
 RandomizerRegion Entrance::GetConnectedRegionKey() const {
+#ifdef COMBO_BUILD
+    return static_cast<RandomizerRegion>(
+        Combo_SOH_CrossDungeonRegion(index, replacement ? replacement->GetIndex() : index, connectedRegion));
+#else
     return connectedRegion;
+#endif
 }
 
 RandomizerRegion Entrance::GetOriginalConnectedRegionKey() const {
@@ -115,7 +123,7 @@ RandomizerRegion Entrance::GetOriginalConnectedRegionKey() const {
 }
 
 Region* Entrance::GetConnectedRegion() const {
-    return RegionTable(connectedRegion);
+    return RegionTable(GetConnectedRegionKey());
 }
 
 void Entrance::SetParentRegion(RandomizerRegion newParent) {
@@ -264,8 +272,8 @@ std::string EntranceNameByRegions(RandomizerRegion parentRegion, RandomizerRegio
 
 std::unordered_map<int16_t, Entrance*> entranceMap;
 
-void SetAllEntrancesData() {
-    std::vector<EntranceInfoPair> entranceShuffleTable = {
+const std::vector<EntranceInfoPair>& GetEntranceShuffleTable() {
+    static const std::vector<EntranceInfoPair> entranceShuffleTable = {
         // clang-format off
         // Type                         Parent Region                        Connected Region                      Index
         { { EntranceType::Dungeon,      RR_KF_OUTSIDE_DEKU_TREE,             RR_DEKU_TREE_ENTRYWAY,                ENTR_DEKU_TREE_ENTRANCE },
@@ -607,8 +615,12 @@ void SetAllEntrancesData() {
         // clang-format on
     };
 
+    return entranceShuffleTable;
+}
+
+void SetAllEntrancesData() {
     auto ctx = Rando::Context::GetInstance();
-    for (auto& entrancePair : entranceShuffleTable) {
+    for (const auto& entrancePair : GetEntranceShuffleTable()) {
         auto& forwardEntry = entrancePair.first;
         auto& returnEntry = entrancePair.second;
 

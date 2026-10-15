@@ -38,6 +38,9 @@ extern SaveContext gSaveContext;
 const std::filesystem::path savesFolderPath(Ship::Context::GetPathRelativeToAppDirectory("saves", appShortName));
 
 #ifdef COMBO_BUILD
+#include "rando/CrossDungeonRuntime.h"
+extern "C" int32_t Combo_MM_SaveCrossDungeonCheckpoint(void);
+extern "C" void Combo_MM_LoadCrossDungeonCheckpoint(int32_t index);
 #include "ComboExport.h"        // ComboShip: COMBO_EXPORT for MM_InvalidateOwlBlobSlot
 #include "rando/CrossForeign.h" // ComboShip: merged-save IO callback typedefs + GameId
 
@@ -161,6 +164,7 @@ void SaveManager_WriteSaveFile(const std::filesystem::path& fileName, nlohmann::
         if (isBackup)
             return; // container's atomic write makes MM's per-slot backup redundant
         if (n > 0 && !isGlobal) {
+            j["crossDungeonCheckpoint"] = Combo_MM_SaveCrossDungeonCheckpoint();
             gComboWriteGameSave(ComboRando::GAME_MM, n - 1, j.dump().c_str());
             return;
         }
@@ -204,6 +208,7 @@ extern "C" int gComboOwlBlobSlot = -1;
 
 #ifdef COMBO_BUILD
 void SaveManager_BuildComboBaseline(const unsigned char* ootName8) {
+    Combo_MM_LoadCrossDungeonCheckpoint(-1);
     Sram_InitNewSave();
     // ComboShip: carry the OOT-entered file name over (same font codes in both games; anything
     // outside the shared 0x00-0x3F range, e.g. JP glyphs, becomes a space).
@@ -365,6 +370,7 @@ int SaveManager_LoadSaveFile(int mmFileNum) {
     nlohmann::json j;
     int result = SaveManager_ReadSaveFile(fileName, j);
 #ifdef COMBO_BUILD
+    Combo_MM_LoadCrossDungeonCheckpoint(result == 0 ? ComboRando::CrossDungeon::ReadCheckpoint(j) : -1);
     // ComboShip: the read routes through the launcher into the .combosav container, not saves/file{N}.json.
     SPDLOG_INFO("[ComboShip] LoadSaveFile slot {} <- .combosav container (read result={})", mmFileNum, result);
 #else

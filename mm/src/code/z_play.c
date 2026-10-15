@@ -626,6 +626,18 @@ void Play_UpdateTransition(PlayState* this) {
 
     switch (this->transitionMode) {
         case TRANS_MODE_SETUP: {
+#ifdef COMBO_BUILD
+            extern int Combo_MM_CrossDungeonTransition(int32_t * index);
+            if (this->transitionTrigger != TRANS_TRIGGER_END) {
+                int32_t composedEntrance = this->nextEntrance;
+                if (Combo_MM_CrossDungeonTransition(&composedEntrance)) {
+                    this->transitionTrigger = TRANS_TRIGGER_OFF;
+                    this->transitionMode = TRANS_MODE_OFF;
+                    break;
+                }
+                this->nextEntrance = composedEntrance;
+            }
+#endif
             // 2S2H [Port] Fleet Ship Combo: a STALE/GARBAGE nextEntrance (e.g. a hole-fall warp
             // that completed while this game was combo-frozen) walks Entrance_GetTableEntry's
             // unbounded pointers below and crashes (0xc0000005). Validate scene + spawn against
@@ -2275,6 +2287,21 @@ void Play_FillScreen(PlayState* this, s16 fillScreenOn, u8 red, u8 green, u8 blu
     R_PLAY_FILL_SCREEN_ALPHA = alpha;
 }
 
+#ifdef COMBO_BUILD
+extern int Combo_MM_CrossDungeonRuntimeEnabled(void);
+
+static void Combo_NormalizeStoneTowerArrival(PlayState* play) {
+    if (!Combo_MM_CrossDungeonRuntimeEnabled())
+        return;
+    // Both exterior orientations share cycle switch flags. Match the chosen scene before
+    // room actors initialize, so the native inverter does not immediately undo this arrival.
+    if (play->sceneId == SCENE_F41)
+        Flags_SetSwitch(play, 0x14);
+    else if (play->sceneId == SCENE_F40)
+        Flags_UnsetSwitch(play, 0x14);
+}
+#endif
+
 void Play_Init(GameState* thisx) {
     PlayState* this = (PlayState*)thisx;
     GraphicsContext* gfxCtx = this->state.gfxCtx;
@@ -2527,6 +2554,9 @@ void Play_Init(GameState* thisx) {
     ZeldaArena_Init((void*)((zAlloc + 8) & ~0xF), (zAllocSize - ((zAlloc + 8) & ~0xF)) + zAlloc);
 
     Actor_InitContext(this, &this->actorCtx, this->linkActorEntry);
+#ifdef COMBO_BUILD
+    Combo_NormalizeStoneTowerArrival(this);
+#endif
 
     // Busyloop until the room loads
     while (!Room_ProcessRoomRequest(this, &this->roomCtx)) {}

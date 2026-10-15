@@ -4151,6 +4151,10 @@ void KaleidoScope_Update(PlayState* play) {
 
                     if (pauseCtx->promptChoice == PAUSE_PROMPT_YES) {
                         func_80169FDC(play);
+#ifdef COMBO_BUILD
+                        extern void Combo_MM_RequestCrossBossDeathRecovery(void);
+                        Combo_MM_RequestCrossBossDeathRecovery();
+#endif
                         gSaveContext.respawnFlag = -2;
                         gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
                         gSaveContext.save.saveInfo.playerData.health = 0x30;

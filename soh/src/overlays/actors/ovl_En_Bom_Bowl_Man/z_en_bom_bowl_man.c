@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 #include "z_en_bom_bowl_man.h"
 #include "vt.h"
 #include "overlays/actors/ovl_En_Syateki_Niw/z_en_syateki_niw.h"
@@ -143,8 +144,11 @@ void EnBomBowMan_BlinkAwake(EnBomBowlMan* this, PlayState* play) {
     if (frameCount == 30.0f) {
         this->dialogState = TEXT_STATE_EVENT;
 
-        if (GameInteractor_Should(VB_BE_ABLE_TO_PLAY_BOMBCHU_BOWLING,
-                                  (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) || BREG(2))) {
+        if (GameInteractor_Should(
+                VB_BE_ABLE_TO_PLAY_BOMBCHU_BOWLING,
+                (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                 Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) ||
+                    BREG(2))) {
             this->actor.textId = 0xBF;
         } else {
             this->actor.textId = 0x7058;
@@ -175,8 +179,11 @@ void EnBomBowMan_CheckBeatenDC(EnBomBowlMan* this, PlayState* play) {
         this->blinkTimer = (s16)Rand_ZeroFloat(60.0f) + 20;
 
         // Check for beaten Dodongo's Cavern
-        if (!GameInteractor_Should(VB_BE_ABLE_TO_PLAY_BOMBCHU_BOWLING,
-                                   (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) || BREG(2))) {
+        if (!GameInteractor_Should(
+                VB_BE_ABLE_TO_PLAY_BOMBCHU_BOWLING,
+                (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                 Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) ||
+                    BREG(2))) {
             this->actionFunc = EnBomBowMan_WaitNotBeatenDC;
         } else {
             this->actor.textId = 0x18;

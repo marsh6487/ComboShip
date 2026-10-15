@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 #include <spdlog/spdlog.h>
 
 #include "logic.h"
@@ -2003,18 +2004,31 @@ uint16_t Logic::EffectiveHealth() {
 
 uint8_t Logic::DungeonCount() {
     if (CalculatingAvailableChecks) {
-        return CheckEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP) +
-               CheckEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP) +
-               CheckEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP) +
-               CheckEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP) +
-               CheckEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP) +
-               CheckEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP) +
-               CheckRandoInf(RAND_INF_DUNGEONS_DONE_SPIRIT_TEMPLE) +
-               CheckRandoInf(RAND_INF_DUNGEONS_DONE_SHADOW_TEMPLE);
+        return Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                               CheckEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) +
+               Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                               CheckEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) +
+               Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                               CheckEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) +
+               Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_PHANTOM_GANON,
+                                               CheckEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP)) +
+               Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_VOLVAGIA,
+                                               CheckEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP)) +
+               Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_MORPHA,
+                                               CheckEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP)) +
+               Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_TWINROVA,
+                                               CheckRandoInf(RAND_INF_DUNGEONS_DONE_SPIRIT_TEMPLE)) +
+               Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BONGO_BONGO,
+                                               CheckRandoInf(RAND_INF_DUNGEONS_DONE_SHADOW_TEMPLE));
     } else {
-        return Get(LOGIC_DEKU_TREE_CLEAR) + Get(LOGIC_DODONGOS_CAVERN_CLEAR) + Get(LOGIC_JABU_JABUS_BELLY_CLEAR) +
-               Get(LOGIC_FOREST_TEMPLE_CLEAR) + Get(LOGIC_FIRE_TEMPLE_CLEAR) + Get(LOGIC_WATER_TEMPLE_CLEAR) +
-               Get(LOGIC_SPIRIT_TEMPLE_CLEAR) + Get(LOGIC_SHADOW_TEMPLE_CLEAR);
+        return Combo_SOH_CrossBossLogicalClear(0, Get(LOGIC_DEKU_TREE_CLEAR)) +
+               Combo_SOH_CrossBossLogicalClear(1, Get(LOGIC_DODONGOS_CAVERN_CLEAR)) +
+               Combo_SOH_CrossBossLogicalClear(2, Get(LOGIC_JABU_JABUS_BELLY_CLEAR)) +
+               Combo_SOH_CrossBossLogicalClear(3, Get(LOGIC_FOREST_TEMPLE_CLEAR)) +
+               Combo_SOH_CrossBossLogicalClear(4, Get(LOGIC_FIRE_TEMPLE_CLEAR)) +
+               Combo_SOH_CrossBossLogicalClear(5, Get(LOGIC_WATER_TEMPLE_CLEAR)) +
+               Combo_SOH_CrossBossLogicalClear(6, Get(LOGIC_SPIRIT_TEMPLE_CLEAR)) +
+               Combo_SOH_CrossBossLogicalClear(7, Get(LOGIC_SHADOW_TEMPLE_CLEAR));
     }
 }
 

@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 #include "global.h"
 #include "vt.h"
 
@@ -317,35 +318,42 @@ u8 CheckMedallionCount() {
 u8 CheckDungeonCount() {
     u8 dungeonCount = 0;
 
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA, Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
         dungeonCount++;
     }
 
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                        Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) {
         dungeonCount++;
     }
 
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                        Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
         dungeonCount++;
     }
 
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_PHANTOM_GANON,
+                                        Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP))) {
         dungeonCount++;
     }
 
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_VOLVAGIA,
+                                        Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP))) {
         dungeonCount++;
     }
 
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_MORPHA,
+                                        Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP))) {
         dungeonCount++;
     }
 
-    if (Flags_GetRandomizerInf(RAND_INF_DUNGEONS_DONE_SPIRIT_TEMPLE)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_TWINROVA,
+                                        Flags_GetRandomizerInf(RAND_INF_DUNGEONS_DONE_SPIRIT_TEMPLE))) {
         dungeonCount++;
     }
 
-    if (Flags_GetRandomizerInf(RAND_INF_DUNGEONS_DONE_SHADOW_TEMPLE)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BONGO_BONGO,
+                                        Flags_GetRandomizerInf(RAND_INF_DUNGEONS_DONE_SHADOW_TEMPLE))) {
         dungeonCount++;
     }
 
@@ -492,7 +500,11 @@ void Play_Init(GameState* thisx) {
         }
     } else if ((gEntranceTable[((void)0, gSaveContext.entranceIndex)].scene == SCENE_KOKIRI_FOREST) && LINK_IS_ADULT &&
                !IS_CUTSCENE_LAYER) {
-        gSaveContext.sceneLayer = (Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP)) ? 3 : 2;
+        gSaveContext.sceneLayer =
+            (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_PHANTOM_GANON,
+                                             Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP)))
+                ? 3
+                : 2;
     }
 
     Play_SpawnScene(play,

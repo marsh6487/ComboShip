@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -15,6 +16,9 @@ extern "C" {
 
 extern "C" PlayState* gPlayState;
 static bool sEnteredBlueWarp = false;
+#ifdef COMBO_BUILD
+extern "C" int Combo_SOH_CrossDungeonRuntimeEnabled(void);
+#endif
 
 extern void TimeSaverQueueItem(RandomizerGet randoGet);
 
@@ -59,7 +63,9 @@ void RegisterSkipBlueWarp() {
                    CVarGetInteger(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.Story"), IS_RANDO), {
                        if (gSaveContext.entranceIndex == ENTR_KOKIRI_FOREST_DEKU_TREE_BLUE_WARP &&
                            gSaveContext.cutsceneIndex == 0xFFF1) {
-                           *should = Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP);
+                           *should = Combo_SOH_CrossBossLogicalClear(
+                               COMBO_BOSS_PHANTOM_GANON,
+                               Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP));
                        }
                    });
 
@@ -95,6 +101,10 @@ void RegisterShouldPlayBlueWarp() {
         bool overrideBlueWarpDestinations =
             IS_RANDO && (RAND_GET_OPTION(RSK_SHUFFLE_DUNGEON_ENTRANCES) || RAND_GET_OPTION(RSK_SHUFFLE_BOSS_ENTRANCES));
 
+#ifdef COMBO_BUILD
+        overrideBlueWarpDestinations =
+            overrideBlueWarpDestinations || (IS_RANDO && Combo_SOH_CrossDungeonRuntimeEnabled());
+#endif
         // Force blue warp skip on when ER needs to place Link somewhere else.
         // This is preferred over having story cutscenes play in the overworld and then reloading Link somewhere else
         // after.
@@ -119,7 +129,8 @@ void RegisterShouldPlayBlueWarp() {
             } else if (gSaveContext.entranceIndex == ENTR_CHAMBER_OF_THE_SAGES_0 && gSaveContext.cutsceneIndex == 0x0 &&
                        gSaveContext.chamberCutsceneNum == CHAMBER_CS_FOREST) {
                 // Normally set in the blue warp cutscene
-                Flags_SetEventChkInf(EVENTCHKINF_SPOKE_TO_DEKU_TREE_SPROUT);
+                if (!Combo_SOH_CrossBossEnabled())
+                    Flags_SetEventChkInf(EVENTCHKINF_SPOKE_TO_DEKU_TREE_SPROUT);
 
                 if (IS_RANDO) {
                     gSaveContext.entranceIndex = ENTR_SACRED_FOREST_MEADOW_FOREST_TEMPLE_BLUE_WARP;
@@ -132,7 +143,8 @@ void RegisterShouldPlayBlueWarp() {
             } else if (gSaveContext.entranceIndex == ENTR_KAKARIKO_VILLAGE_FRONT_GATE &&
                        gSaveContext.cutsceneIndex == 0xFFF3) {
                 // Normally set in the blue warp cutscene
-                Flags_SetEventChkInf(EVENTCHKINF_DEATH_MOUNTAIN_ERUPTED);
+                if (!Combo_SOH_CrossBossEnabled())
+                    Flags_SetEventChkInf(EVENTCHKINF_DEATH_MOUNTAIN_ERUPTED);
 
                 gSaveContext.entranceIndex = ENTR_DEATH_MOUNTAIN_CRATER_FIRE_TEMPLE_BLUE_WARP;
                 isBlueWarpCutscene = true;
@@ -142,7 +154,8 @@ void RegisterShouldPlayBlueWarp() {
                 // Normally set in the blue warp cutscene
                 gSaveContext.dayTime = gSaveContext.skyboxTime = 0x4800;
                 gSaveContext.nightFlag = 0;
-                Flags_SetEventChkInf(EVENTCHKINF_RAISED_LAKE_HYLIA_WATER);
+                if (!Combo_SOH_CrossBossEnabled())
+                    Flags_SetEventChkInf(EVENTCHKINF_RAISED_LAKE_HYLIA_WATER);
 
                 gSaveContext.entranceIndex = ENTR_LAKE_HYLIA_WATER_TEMPLE_BLUE_WARP;
                 isBlueWarpCutscene = true;

@@ -1,15 +1,21 @@
-﻿#include "soh/OTRGlobals.h"
+#include "rando/CrossEntranceBoss.h"
+#include "soh/OTRGlobals.h"
 
 #include <ship/window/Window.h>
 
 #include "soh/ResourceManagerHelpers.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
+#include "rando/CrossDungeonPendingChecks.h"
+extern "C" int Combo_SOH_CrossDungeonRuntimeEnabled(void);
+extern "C" int32_t Combo_SOH_CrossDungeonRoute(int32_t index, int beforeNative);
 #endif
 #include "soh/Enhancements/enhancementTypes.h"
 #include "soh/Enhancements/custom-message/CustomMessageTypes.h"
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
 #include "soh/Enhancements/randomizer/bean_patches.h"
+// Use the gameplay C accessor for entrance safety reads; Context options stay native for generation.
+extern "C" u8 Randomizer_GetSettingValue(RandomizerSettingKey randoSettingKey);
 #include "soh/Enhancements/randomizer/dungeon.h"
 #include "soh/Enhancements/randomizer/fishsanity.h"
 #include "soh/Enhancements/randomizer/static_data.h"
@@ -282,6 +288,47 @@ bool MeetsRainbowBridgeRequirements() {
 static std::queue<RandomizerCheck> randomizerQueuedChecks;
 static RandomizerCheck randomizerQueuedCheck = RC_UNKNOWN_CHECK;
 static GetItemEntry randomizerQueuedItemEntry = GET_ITEM_NONE;
+#ifdef COMBO_BUILD
+static ComboRando::CrossDungeon::PendingChecks sCrossDungeonPendingChecks;
+void Combo_SOH_CapturePendingChecks() {
+    std::vector<std::string> pending;
+    auto add = [&](RandomizerCheck rc) {
+        if (rc > RC_UNKNOWN_CHECK && rc < RC_MAX)
+            pending.push_back(Rando::StaticData::GetLocation(rc)->GetName());
+    };
+    add(randomizerQueuedCheck);
+    auto queue = randomizerQueuedChecks;
+    while (!queue.empty()) {
+        add(queue.front());
+        queue.pop();
+    }
+    sCrossDungeonPendingChecks.Capture(pending);
+}
+nlohmann::json Combo_SOH_SavePendingChecks() {
+    return sCrossDungeonPendingChecks.Save();
+}
+void Combo_SOH_LoadPendingChecks(const nlohmann::json& payload) {
+    sCrossDungeonPendingChecks.Load(payload);
+}
+void Combo_SOH_RestorePendingChecks() {
+    // Native OnLoadGame has recreated the seed Context and cleared both native queue stages.
+    for (const auto& name : sCrossDungeonPendingChecks.RestoreOnce()) {
+        RandomizerCheck found = RC_UNKNOWN_CHECK;
+        for (int i = 1; i < RC_MAX; ++i) {
+            auto rc = static_cast<RandomizerCheck>(i);
+            if (Rando::StaticData::GetLocation(rc)->GetName() == name) {
+                found = rc;
+                break;
+            }
+        }
+        if (found == RC_UNKNOWN_CHECK || Rando::Context::GetInstance()->GetItemLocation(found)->HasObtained()) {
+            sCrossDungeonPendingChecks.Acknowledge(name);
+            continue;
+        }
+        randomizerQueuedChecks.push(found);
+    }
+}
+#endif
 
 void CheckTriggers() {
 #ifdef COMBO_BUILD
@@ -361,7 +408,7 @@ void RandomizerOnSceneFlagSetHandler(int16_t sceneNum, int16_t flagType, int16_t
 
         switch (sceneNum) {
             case SCENE_GERUDOS_FORTRESS:
-                if (RAND_GET_OPTION(RSK_SHUFFLE_DUNGEON_ENTRANCES).IsNot(RO_DUNGEON_ENTRANCE_SHUFFLE_OFF) &&
+                if (Randomizer_GetSettingValue(RSK_SHUFFLE_DUNGEON_ENTRANCES) != RO_DUNGEON_ENTRANCE_SHUFFLE_OFF &&
                     flag == 0x3A) {
                     Flags_SetRandomizerInf(RAND_INF_GF_GTG_GATE_PERMANENTLY_OPEN);
                 }
@@ -635,6 +682,9 @@ void RandomizerOnPlayerUpdateForRCQueueHandler() {
 #endif
 
     if (loc->HasObtained()) {
+#ifdef COMBO_BUILD
+        sCrossDungeonPendingChecks.Acknowledge(Rando::StaticData::GetLocation(rc)->GetName());
+#endif
         SPDLOG_INFO("RC {} already obtained, skipping", static_cast<uint32_t>(rc));
     } else {
         iceTrapScale = 0.0f;
@@ -727,6 +777,9 @@ void RandomizerOnItemReceiveHandler(GetItemEntry receivedItemEntry) {
         SPDLOG_INFO("Item received mod {} item {} from RC {}", receivedItemEntry.modIndex, receivedItemEntry.itemId,
                     static_cast<uint32_t>(randomizerQueuedCheck));
         loc->SetCheckStatus(RCSHOW_COLLECTED);
+#ifdef COMBO_BUILD
+        sCrossDungeonPendingChecks.Acknowledge(Rando::StaticData::GetLocation(randomizerQueuedCheck)->GetName());
+#endif
         CheckTracker::SpoilAreaFromCheck(randomizerQueuedCheck);
         CheckTracker::RecalculateAllAreaTotals();
         CheckTracker::RecalculateAvailableChecks();
@@ -1335,7 +1388,8 @@ void RandomizerOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_l
             *should = Flags_GetRandomizerInf(RAND_INF_TALON_SENT_MALON_HOME);
             break;
         case VB_MIDO_CONSIDER_DEKU_TREE_DEAD:
-            *should = Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD);
+            *should = Combo_SOH_CrossBossLogicalClear(
+                COMBO_BOSS_GOHMA, Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD));
             break;
         case VB_OPEN_CHEST: {
             EnBox* chest = va_arg(args, EnBox*);
@@ -1348,7 +1402,8 @@ void RandomizerOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_l
             break;
         }
         case VB_OPEN_KOKIRI_FOREST:
-            *should = Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD) ||
+            *should = Combo_SOH_CrossBossLogicalClear(
+                          COMBO_BOSS_GOHMA, Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD)) ||
                       RAND_GET_OPTION(RSK_FOREST).IsNot(RO_CLOSED_FOREST_ON);
             break;
         case VB_BE_ELIGIBLE_FOR_DARUNIAS_JOY_REWARD:
@@ -1455,7 +1510,8 @@ void RandomizerOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_l
             if (!Flags_GetEventChkInf(EVENTCHKINF_KING_ZORA_MOVED)) {
                 GET_PLAYER(gPlayState)->exchangeItemId = EXCH_ITEM_LETTER_RUTO;
             }
-            *should = Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP);
+            *should = Combo_SOH_CrossBossLogicalClear(
+                COMBO_BOSS_BARINADE, Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP));
             break;
         }
         case VB_BE_ABLE_TO_EXCHANGE_RUTOS_LETTER: {
@@ -1519,11 +1575,13 @@ void RandomizerOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_l
             break;
         }
         case VB_GORONS_CONSIDER_FIRE_TEMPLE_FINISHED: {
-            *should = Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP);
+            *should = Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_VOLVAGIA,
+                                                      Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP));
             break;
         }
         case VB_GORONS_CONSIDER_DODONGOS_CAVERN_FINISHED: {
-            *should = Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP);
+            *should = Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                      Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP));
             break;
         }
         case VB_GORONS_CONSIDER_TUNIC_COLLECTED: {
@@ -2136,6 +2194,13 @@ void RandomizerOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_l
                     // or Termina would never learn that Ganon is already down.
                     SaveManager::Instance->SaveFile(gSaveContext.fileNum);
                     gPlayState->nextEntranceIndex = ENTR_OUTSIDE_GANONS_CASTLE_1_2;
+#ifdef COMBO_BUILD
+                    if (Combo_SOH_CrossDungeonRuntimeEnabled()) {
+                        const int32_t composed = Combo_SOH_CrossDungeonRoute(gPlayState->nextEntranceIndex, true);
+                        if (composed >= 0)
+                            gPlayState->nextEntranceIndex = Grotto_OverrideSpecialEntrance(composed);
+                    }
+#endif
                     gPlayState->transitionTrigger = TRANS_TRIGGER_START;
                     gPlayState->transitionType = TRANS_TYPE_FADE_WHITE;
                     gSaveContext.nextTransitionType = TRANS_TYPE_FADE_WHITE_SLOW;
@@ -2149,6 +2214,13 @@ void RandomizerOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_l
                 randomizerQueuedChecks.push(RC_GANON);
                 CheckTriggers();
                 gPlayState->nextEntranceIndex = ENTR_OUTSIDE_GANONS_CASTLE_1_2;
+#ifdef COMBO_BUILD
+                if (Combo_SOH_CrossDungeonRuntimeEnabled()) {
+                    const int32_t composed = Combo_SOH_CrossDungeonRoute(gPlayState->nextEntranceIndex, true);
+                    if (composed >= 0)
+                        gPlayState->nextEntranceIndex = Grotto_OverrideSpecialEntrance(composed);
+                }
+#endif
                 gPlayState->transitionTrigger = TRANS_TRIGGER_START;
                 gPlayState->transitionType = TRANS_TYPE_FADE_WHITE;
                 gSaveContext.nextTransitionType = TRANS_TYPE_FADE_WHITE_SLOW;
@@ -2355,7 +2427,7 @@ void RandomizerOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_l
             s16 originalEntrance = (s16)va_arg(args, int);
 
             // In Entrance rando, if our respawnFlag is set for a grotto return, we don't want the void out to happen
-            if (*should == true && RAND_GET_OPTION(RSK_SHUFFLE_ENTRANCES)) {
+            if (*should == true && Randomizer_GetSettingValue(RSK_SHUFFLE_ENTRANCES)) {
                 // Check for dungeon special entrances that are randomized to a new location
                 if (std::find(entrPersistTempFlags.begin(), entrPersistTempFlags.end(), originalEntrance) !=
                         entrPersistTempFlags.end() &&
@@ -2429,7 +2501,7 @@ void RandomizerOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_l
 
 void RandomizerOnSceneInitHandler(int16_t sceneNum) {
     // ENTRTODO: Move all entrance rando handling to a dedicated file
-    if (RAND_GET_OPTION(RSK_SHUFFLE_ENTRANCES)) {
+    if (Randomizer_GetSettingValue(RSK_SHUFFLE_ENTRANCES)) {
         // In ER, override roomNum to load based on scene and spawn during scene init
         if (gSaveContext.respawnFlag <= 0) {
             s8 origRoom = gPlayState->roomCtx.curRoom.num;
@@ -2490,7 +2562,7 @@ void RandomizerOnSceneInitHandler(int16_t sceneNum) {
 
 void RandomizerAfterSceneCommandsHandler(int16_t sceneNum) {
     // ENTRTODO: Move all entrance rando handling to a dedicated file
-    if (RAND_GET_OPTION(RSK_SHUFFLE_ENTRANCES)) {
+    if (Randomizer_GetSettingValue(RSK_SHUFFLE_ENTRANCES)) {
         Entrance_OverrideWeatherState();
     }
 }
@@ -2736,7 +2808,7 @@ void RandomizerOnActorInitHandler(void* actorRef) {
     }
 
     if (actor->id == ACTOR_BG_TREEMOUTH && LINK_IS_ADULT &&
-        RAND_GET_OPTION(RSK_SHUFFLE_DUNGEON_ENTRANCES).IsNot(RO_DUNGEON_ENTRANCE_SHUFFLE_OFF) &&
+        Randomizer_GetSettingValue(RSK_SHUFFLE_DUNGEON_ENTRANCES) != RO_DUNGEON_ENTRANCE_SHUFFLE_OFF &&
         (RAND_GET_OPTION(RSK_FOREST).Is(RO_CLOSED_FOREST_OFF) ||
          Flags_GetEventChkInf(EVENTCHKINF_SHOWED_MIDO_SWORD_SHIELD))) {
         BgTreemouth* bgTreemouth = static_cast<BgTreemouth*>(actorRef);
@@ -2862,7 +2934,7 @@ void RandomizerOnActorInitHandler(void* actorRef) {
     }
 
     // In ER, once Link has spawned we know the scene has loaded, so we can sanitize the last known entrance type
-    if (actor->id == ACTOR_PLAYER && RAND_GET_OPTION(RSK_SHUFFLE_ENTRANCES)) {
+    if (actor->id == ACTOR_PLAYER && Randomizer_GetSettingValue(RSK_SHUFFLE_ENTRANCES)) {
         Grotto_SanitizeEntranceType();
     }
 }
@@ -2940,7 +3012,7 @@ void RandomizerOnActorUpdateHandler(void* refActor) {
 // In ER, warp songs lead to their shuffled entrance rather than their warp pad. Every warp path commits its
 // destination through Environment_WarpSongLeave, so that is the one place the override has to happen.
 void RandomizerOnWarpSongLeaveHandler() {
-    if (RAND_GET_OPTION(RSK_SHUFFLE_ENTRANCES)) {
+    if (Randomizer_GetSettingValue(RSK_SHUFFLE_ENTRANCES)) {
         Entrance_SetWarpSongEntrance();
     }
 }
@@ -3081,7 +3153,7 @@ void RandomizerOnKaleidoscopeUpdateHandler(int16_t inDungeonScene) {
     static uint16_t prevKaleidoState = 0;
 
     // In ER, handle overriding the game over respawn entrance and dealing with death warp to from grottos
-    if (RAND_GET_OPTION(RSK_SHUFFLE_ENTRANCES)) {
+    if (Randomizer_GetSettingValue(RSK_SHUFFLE_ENTRANCES)) {
         if (prevKaleidoState == 0x10 && gPlayState->pauseCtx.state == 0x11 && gPlayState->pauseCtx.promptChoice == 0) {
             // Needs to be called before Play_TriggerRespawn when transitioning from state 0x10 to 0x11
             Entrance_SetGameOverEntrance();
@@ -3175,7 +3247,7 @@ static void RandomizerRegisterHooks() {
         Entrance_Init();
 
         // Handle randomized spawn positions after the save context has been setup from load
-        if (RAND_GET_OPTION(RSK_SHUFFLE_ENTRANCES)) {
+        if (Randomizer_GetSettingValue(RSK_SHUFFLE_ENTRANCES)) {
             Entrance_SetSavewarpEntrance();
         }
 

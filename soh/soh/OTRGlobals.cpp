@@ -1949,6 +1949,10 @@ extern "C" int (*gComboOutdatedSaveNotice)();
 extern "C" void (*gComboSharedChanged)(int game, int fileNum);
 extern "C" void (*gComboSharedTick)(void);
 
+#ifdef COMBO_BUILD
+#include "rando/CrossDungeonOotRuntime.inc.h"
+#endif
+
 // ComboShip: InitOTR is split so the launcher can create the shared window (which needs only the
 // bundled soh.o2r, not a ROM) BEFORE the ROM archives exist, run its own unified extraction screen,
 // then finish init once oot.o2r is present. SOH_InitWindowOnly() = the OTRGlobals ctor (window +
@@ -2190,6 +2194,7 @@ static void Combo_FinishInit() {
     static int sComboSwitchFileNum = -1;
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](int16_t sceneNum) {
+        ComboCrossOotRuntime::ObserveScene(sceneNum);
         // Cross-game OOT->MM trigger: entering the Happy Mask Shop.
         if (sceneNum == SCENE_HAPPY_MASK_SHOP) {
             sComboSwitchFileNum = (int)gSaveContext.fileNum;
@@ -2198,6 +2203,10 @@ static void Combo_FinishInit() {
     });
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameFrameUpdate>([]() {
+        if (ComboCrossOotRuntime::PrepareSwitch()) {
+            sComboSwitchFileNum = (int)gSaveContext.fileNum;
+            sComboSwitchPending = true;
+        }
         if (!sComboSwitchPending && sComboFwSwitchSlot < 0)
             return;
         bool isFwReturn = sComboFwSwitchSlot >= 0;
@@ -2205,6 +2214,10 @@ static void Combo_FinishInit() {
             sComboSwitchFileNum = sComboFwSwitchSlot;
         sComboFwSwitchSlot = -1;
         sComboSwitchPending = false;
+        if (ComboCrossOotRuntime::state.Enabled()) {
+            SaveManager::Instance->ThreadPoolWait();
+            Combo_SOH_CapturePendingChecks();
+        }
         Combo_FlushDormantAccumulators(); // Bank pending fills before saving either switch path.
         if (isFwReturn && gPlayState)
             Play_PerformSave(gPlayState); // Capture live scene flags and native save/equipment bookkeeping.
@@ -3320,7 +3333,17 @@ extern "C" u32 SpoilerFileExists(const char* spoilerFileName) {
 }
 
 extern "C" u8 Randomizer_GetSettingValue(RandomizerSettingKey randoSettingKey) {
-    return OTRGlobals::Instance->gRandoContext->GetOption(randoSettingKey).Get();
+    const u8 nativeValue = OTRGlobals::Instance->gRandoContext->GetOption(randoSettingKey).Get();
+#ifdef COMBO_BUILD
+    // The native C actors use these flags for wrong-age mouths, bluewarps and entrance respawn
+    // safety. A bound cross map needs those rules without changing native generation/settings.
+    static_assert(RO_DUNGEON_ENTRANCE_SHUFFLE_OFF == 0 && RO_DUNGEON_ENTRANCE_SHUFFLE_ON == 1);
+    return ComboRando::CrossDungeon::EffectiveEntranceSetting(
+        nativeValue, ComboCrossOotRuntime::state.Enabled() && !ComboCrossOotRuntime::nativeLoadDispatch,
+        randoSettingKey == RSK_SHUFFLE_DUNGEON_ENTRANCES || randoSettingKey == RSK_SHUFFLE_ENTRANCES);
+#else
+    return nativeValue;
+#endif
 }
 
 extern "C" RandomizerCheck Randomizer_GetCheckFromActor(s16 actorId, s16 sceneNum, s16 actorParams) {
@@ -6393,7 +6416,10 @@ extern "C" COMBO_EXPORT void Combo_SOH_Rando_SetOwnedItems(const char* itemNames
 static bool sComboPortalOpen = false;
 #endif
 
+#include "rando/CrossDungeonOot.inc.h"
+
 extern "C" COMBO_EXPORT const char* Combo_SOH_Rando_GetReachableChecks(void) {
+    ComboCrossOot::SearchScope crossScope;
     static std::string buf;
     auto ctx = OTRGlobals::Instance->gRandoContext;
     auto reachable = ReachabilitySearch(ctx->allLocations);

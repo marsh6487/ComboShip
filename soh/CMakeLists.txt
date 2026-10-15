@@ -69,6 +69,7 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}/assets
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${CMAKE_CURRENT_SOURCE_DIR}/../libultraship/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../combo
         )
         target_compile_definitions(static_story_viewer_talk_test PRIVATE LOG_LEVEL_GAME_PRINTS=0)
         target_compile_options(static_story_viewer_talk_test PRIVATE -ffunction-sections -fdata-sections)

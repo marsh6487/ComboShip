@@ -21,6 +21,7 @@
 #include "gui/ComboGenProgress.h"
 #include "CrossForeign.h" // for ComboRando::GameId
 #include "SharedItems.h"
+#include "CrossDungeonReachability.h"
 
 namespace ComboRando {
 
@@ -69,6 +70,11 @@ struct OracleFns {
     // OOT only (null for MM): is the OOT->MM portal region reachable? Valid only immediately after a
     // GetReachableChecks call, whose owned-set it describes (the DLL piggybacks on that search).
     uint8_t (*GetPortalOpen)(void) = nullptr;
+    void (*SetDungeonAccess)(const char*) = nullptr;
+    const char* (*GetDungeonExits)(void) = nullptr;
+    uint16_t (*GetBossDefeated)(void) = nullptr;
+    int (*CanEnterArrival)(int32_t) = nullptr;
+    CrossDungeon::BossSourceMap CrossBossSources = CrossDungeon::EmptyBossSources();
 };
 
 // ---------- Data types ----------
@@ -255,7 +261,9 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
 
     // Portal gate: NO_LOGIC deliberately skips it (an impossible seed is that mode's point). Any other
     // mode without the export would silently fill MM as sphere-0 reachable — the bug this gate fixes.
-    const bool portalGated = ootAccess != OotAccess::NO_LOGIC;
+    const bool crossDungeon = ootOracle.SetDungeonAccess && mmOracle.SetDungeonAccess && ootOracle.GetDungeonExits &&
+                              mmOracle.GetDungeonExits;
+    const bool portalGated = ootAccess != OotAccess::NO_LOGIC && !crossDungeon;
     const bool mmStart = startingGame == GAME_MM;
     if (portalGated && ootOracle.GetPortalOpen == nullptr) {
         result.error = "OOT oracle is missing Combo_SOH_Rando_GetPortalOpen — rebuild soh.dll (the OOT->MM "
@@ -771,12 +779,19 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         std::vector<std::string> ootSeen, mmSeen;
         for (;;) {
             SharedOwnedViews(sharedGroups, ootOwned, mmOwned, ootSeen, mmSeen);
-            ootReachable = queryReachable(ootOracle, ootSeen);
-            // Read the portal off THIS OOT query, before any MM check is credited below — that ordering
-            // is what stops the fill proving the portal with an item that lives behind it.
-            if (!portalOpen)
-                portalOpen = ootOracle.GetPortalOpen() != 0;
-            mmReachable = portalOpen ? queryReachable(mmOracle, mmSeen) : std::unordered_set<std::string>{};
+            if (crossDungeon) {
+                auto joint = CrossDungeon::QueryJoint(ootOracle, mmOracle, ootSeen, mmSeen,
+                                                      mmStart || ootAccess == OotAccess::NO_LOGIC, queryReachable);
+                ootReachable = std::move(joint.oot);
+                mmReachable = std::move(joint.mm);
+            } else {
+                ootReachable = queryReachable(ootOracle, ootSeen);
+                // Read the portal off THIS OOT query, before any MM check is credited below — that ordering
+                // is what stops the fill proving the portal with an item that lives behind it.
+                if (!portalOpen)
+                    portalOpen = ootOracle.GetPortalOpen() != 0;
+                mmReachable = portalOpen ? queryReachable(mmOracle, mmSeen) : std::unordered_set<std::string>{};
+            }
             bool changed = false;
             for (size_t i = 0; i < placements.size(); ++i) {
                 if (credited[i])

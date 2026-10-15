@@ -4,6 +4,9 @@
 #include "ComboExport.h"
 #include "gameplay/ComboFaroresWind.h"
 
+extern "C" int32_t Combo_MM_SaveCrossDungeonCheckpoint(void);
+extern "C" void Combo_MM_RestoreCrossDungeonCheckpoint(int32_t index);
+
 static ComboFwCallbacks sFwCallbacks{};
 static ComboFwPoint sFwArrival{};
 static int sFwArrivalSlot = -1;
@@ -46,7 +49,7 @@ extern "C" COMBO_EXPORT void MM_SetFwCallbacks(const ComboFwCallbacks* callbacks
     sFwCallbacks = callbacks ? *callbacks : ComboFwCallbacks{};
 }
 
-extern "C" void ComboFw_PublishPoint(void) {
+static void PublishNativePoint(bool captureCheckpoint) {
     const auto* fw = Nei_Save();
     if (!sFwCallbacks.write || !fw->fwSet)
         return;
@@ -60,8 +63,13 @@ extern "C" void ComboFw_PublishPoint(void) {
                     fw->fwPosZ,
                     fw->fwTempSwitchFlags,
                     fw->fwTempCollectFlags,
-                    gSaveContext.respawn[RESPAWN_MODE_DOWN].unk_18 };
+                    gSaveContext.respawn[RESPAWN_MODE_DOWN].unk_18,
+                    captureCheckpoint ? Combo_MM_SaveCrossDungeonCheckpoint() : -1 };
     sFwCallbacks.write(gSaveContext.fileNum, &p);
+}
+
+extern "C" void ComboFw_PublishPoint(void) {
+    PublishNativePoint(true);
 }
 
 static int ReadPoint(ComboFwPoint* p) {
@@ -70,7 +78,7 @@ static int ReadPoint(ComboFwPoint* p) {
     int result = sFwCallbacks.read(gSaveContext.fileNum, p);
     if (result < 0 && gSaveContext.fileNum >= 0 && gSaveContext.fileNum <= 2 && sFwCallbacks.write) {
         if (Nei_Save()->fwSet) {
-            ComboFw_PublishPoint();
+            PublishNativePoint(false); // A legacy point has no reliable cast-time checkpoint.
             result = sFwCallbacks.read(gSaveContext.fileNum, p);
         } else {
             return 0; // Leave metadata absent so the other game's legacy point can still migrate.
@@ -124,6 +132,7 @@ extern "C" int ComboFw_RequestReturn(void) {
         return -1;
     if (p.game == 1) {
         AdoptNativePoint(p);
+        Combo_MM_RestoreCrossDungeonCheckpoint(p.dungeonCheckpoint);
         sFwValidateRoom = true;
         return 0;
     }
@@ -173,6 +182,7 @@ extern "C" int ComboFw_ApplyArrival(void) {
     if (slot < 0 || slot != gSaveContext.fileNum)
         return 0;
     AdoptNativePoint(sFwArrival);
+    Combo_MM_RestoreCrossDungeonCheckpoint(sFwArrival.dungeonCheckpoint);
     auto& top = gSaveContext.respawn[RESPAWN_MODE_TOP];
     top.pos = { sFwArrival.x, sFwArrival.y, sFwArrival.z };
     top.yaw = (int16_t)sFwArrival.yaw;

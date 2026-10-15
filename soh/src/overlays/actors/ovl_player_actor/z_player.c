@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 /*
  * File: z_player.c
  * Overlay: ovl_player_actor
@@ -12499,7 +12500,8 @@ void Player_Init(Actor* thisx, PlayState* play2) {
                 ((play->sceneNum != SCENE_DODONGOS_CAVERN) ||
                  (Flags_GetEventChkInf(EVENTCHKINF_ENTERED_DODONGOS_CAVERN))) &&
                 ((play->sceneNum != SCENE_BOMBCHU_SHOP) ||
-                 (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)))) {
+                 (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                  Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))))) {
                 TitleCard_InitPlaceName(play, &play->actorCtx.titleCtx, this->giObjectSegment, 160, 120, 144, 24, 20);
             }
         }

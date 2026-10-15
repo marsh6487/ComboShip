@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 /*
  * File: z_en_md.c
  * Overlay: ovl_En_Md
@@ -410,7 +411,8 @@ u16 EnMd_GetTextLostWoods(PlayState* play, EnMd* this) {
     this->messageEntry = 0;
     this->messageState = TEXT_STATE_NONE;
 
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_PHANTOM_GANON,
+                                        Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP))) {
         if (Flags_GetInfTable(INFTABLE_19)) {
             return 0x1071;
         }
