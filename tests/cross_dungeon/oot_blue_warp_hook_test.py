@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 """Compile the real blue-warp hook portably and exercise both build modes."""
+import argparse
 import os
 from pathlib import Path
 import re
 import subprocess
-import sys
 import tempfile
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--compiler', default=os.environ.get('CXX', 'g++'))
+parser.add_argument('--msvc', action='store_true')
+parser.add_argument('--sanitize', action='store_true')
+args = parser.parse_args()
+if args.msvc and args.sanitize:
+    parser.error('--sanitize requires the GCC/Clang build mode')
 
 ROOT = Path(__file__).resolve().parents[2]
 production = (ROOT / 'soh/soh/Enhancements/TimeSavers/SkipCutscene/Story/SkipBlueWarp.cpp').read_text()
@@ -63,10 +71,10 @@ main = r'''
 int main() {
     RegisterShouldPlayBlueWarp();
     for (int mask = 0; mask < 32; ++mask) {
-        isRando = mask & 1;
-        settings[RSK_SHUFFLE_DUNGEON_ENTRANCES] = mask & 2;
-        settings[RSK_SHUFFLE_BOSS_ENTRANCES] = mask & 4;
-        crossEnabled = mask & 8;
+        isRando = bool(mask & 1);
+        settings[RSK_SHUFFLE_DUNGEON_ENTRANCES] = bool(mask & 2);
+        settings[RSK_SHUFFLE_BOSS_ENTRANCES] = bool(mask & 4);
+        crossEnabled = bool(mask & 8);
         storySkip = bool(mask & 16);
         bool nativeShuffle = bool(mask & 6);
 #ifdef COMBO_BUILD
@@ -115,7 +123,7 @@ int main() {
 }
 '''
 
-sanitize = ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-g'] if '--sanitize' in sys.argv else []
+sanitize = ['-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-g'] if args.sanitize else []
 if sanitize:
     os.environ['ASAN_OPTIONS'] = 'detect_leaks=0'
 with tempfile.TemporaryDirectory(prefix='oot-blue-warp-hook-') as temporary:
@@ -123,9 +131,16 @@ with tempfile.TemporaryDirectory(prefix='oot-blue-warp-hook-') as temporary:
     source = directory / 'hook.cpp'
     source.write_text(prefix + macro + '\n' + policy + hooks + main)
     for combo in [False, True]:
-        binary = directory / ('combo' if combo else 'standalone')
-        subprocess.run(['g++', '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wpedantic',
-                        '-Wno-unused-parameter', *sanitize, *(['-DCOMBO_BUILD'] if combo else []),
-                        str(source), '-o', str(binary)], check=True)
+        name = 'combo' if combo else 'standalone'
+        binary = directory / (name + ('.exe' if args.msvc else ''))
+        if args.msvc:
+            command = [args.compiler, '/nologo', '/std:c++20', '/EHsc', '/W3', '/WX', '/wd4100',
+                       *(['/DCOMBO_BUILD'] if combo else []), str(source),
+                       '/Fo' + str(directory / (name + '.obj')), '/Fe' + str(binary)]
+        else:
+            command = [args.compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wpedantic',
+                       '-Wno-unused-parameter', *sanitize, *(['-DCOMBO_BUILD'] if combo else []),
+                       str(source), '-o', str(binary)]
+        subprocess.run(command, cwd=directory, check=True)
         subprocess.run([str(binary)], check=True)
         print(f'PASS: {binary.name} production blue-warp hook portability and 34 routing cases')

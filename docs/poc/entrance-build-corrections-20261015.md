@@ -56,3 +56,14 @@ Hosted Windows/Linux package results belong to the follow-up run. In-game
 forest appearance/accessibility and the installed Native/Alt Field pack-stack
 checks remain pending. This is a build-verified candidate, not runtime acceptance
 or develop/master promotion.
+
+## Fail early in later runs
+
+The artifact gate runs the production-hook portability/behavior and MM
+passage-object ABI checks immediately after checkout, before installing
+dependencies or running the long regression suites. Both checks run with the
+runner's compiler, Python and repository headers; no configured game build is
+required. The Windows pipeline also compiles and executes the same standalone
+and ComboShip hook cases with MSVC before CMake configuration or dependency
+builds, including release calls of the reusable workflow. Existing regression,
+full-build and seed-generation checks remain enabled.

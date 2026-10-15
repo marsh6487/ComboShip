@@ -38,6 +38,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Verify blue-warp hook with MSVC before configuring
+        run: python -B tests/cross_dungeon/oot_blue_warp_hook_test.py --msvc --compiler cl
+
       - name: Verify native NEI bridge DLL declarations
         run: python tests/nei_asset_priority/run_abi_tests.py --msvc --compiler cl
 

@@ -44,6 +44,13 @@ jobs:
         with:
           fetch-depth: 2   # the pin gate diffs the PR merge commit against its base parent
 
+      # These compile only the production hook and one renderer object. Keep them
+      # ahead of dependency installation and the long regression/build stages.
+      - name: Fast entrance compile and linkage preflight
+        run: |
+          python3 -B tests/cross_dungeon/oot_blue_warp_hook_test.py
+          python3 -B tests/lost_woods_entrance/renderer_linkage_test.py
+
       - name: Scan for conflict markers
         shell: bash
         run: |
