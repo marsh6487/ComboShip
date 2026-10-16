@@ -51,6 +51,12 @@ jobs:
           python3 -B tests/cross_dungeon/oot_blue_warp_hook_test.py
           python3 -B tests/lost_woods_entrance/renderer_linkage_test.py
 
+      - name: Fast Goron lifetime and Somaria GI regressions
+        run: |
+          python3 -B tests/goron_audio/run_tests.py
+          python3 -B tests/goron_field_collision/run_tests.py --sanitize
+          python3 -B tests/nei_quest_held/mm_cane_gi_test.py
+
       - name: Scan for conflict markers
         shell: bash
         run: |

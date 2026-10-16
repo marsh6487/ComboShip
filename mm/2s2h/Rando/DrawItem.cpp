@@ -2146,7 +2146,18 @@ void DrawOotNeiCaneOfSomaria(RandoItemId skill) {
 
     static Gfx* real = NULL;
     static u8 tried = 0;
-    Gfx* dl = LoadNeiRealGfx("__OTR__objects/object_somaria/g_somaria_cane_give_dl", &real, &tried);
+    const char* path = "__OTR__objects/object_somaria/g_somaria_cane_give_dl";
+    Gfx* dl = NULL;
+#ifdef COMBO_BUILD
+    // The authored GI declines when either owner supplies a legacy cane mod.
+    // Keep MM's own override first, then preserve an OoT-only replacement and
+    // all of its nested resources instead of silently drawing MM's stock cane.
+    if (!ResourceMgr_IsModAsset(path) && NeiResource_IsMod(path)) {
+        if (NeiResource_Available(path))
+            dl = (Gfx*)NeiResource_Route(path);
+    } else
+#endif
+        dl = LoadNeiRealGfx(path, &real, &tried);
     if (dl == NULL) {
         static Gfx* c = NULL;
         DrawOotRodStandIn(&c, isPacci ? 235 : 220, isPacci ? 200 : 60, isPacci ? 70 : 50);
@@ -2157,6 +2168,11 @@ void DrawOotNeiCaneOfSomaria(RandoItemId skill) {
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
     Matrix_Scale(0.25f, 0.25f, 0.25f, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+#ifdef COMBO_BUILD
+    // Raw MM roots retain MM's children under an outer foreign draw span.
+    // An explicitly routed donor root temporarily selects its own owner.
+    gSPComboRMPush(POLY_OPA_DISP++, "mm");
+#endif
     if (isPacci) {
         // Same mesh, gold: the Pacci cane has no model of its own (SoH tints it identically).
         gDPSetGrayscaleColor(POLY_OPA_DISP++, 255, 215, 70, 255);
@@ -2166,6 +2182,9 @@ void DrawOotNeiCaneOfSomaria(RandoItemId skill) {
     } else {
         gSPDisplayList(POLY_OPA_DISP++, dl);
     }
+#ifdef COMBO_BUILD
+    gSPComboRMPop(POLY_OPA_DISP++);
+#endif
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 // Ultrahand — the one Pacci skill that has a mesh of its own instead of the tinted cane: the glowing
