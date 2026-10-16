@@ -49,6 +49,8 @@ jobs:
       - name: Fast entrance compile and linkage preflight
         run: |
           python3 -B tests/cross_dungeon/oot_blue_warp_hook_test.py
+          python3 -B tests/cross_dungeon/oot_entrance_metadata_test.py
+          python3 -B tests/cross_dungeon/generation_reset_behavior_test.py
           python3 -B tests/lost_woods_entrance/renderer_linkage_test.py
 
       - name: Scan for conflict markers

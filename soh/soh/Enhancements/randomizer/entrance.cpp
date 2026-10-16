@@ -13,6 +13,7 @@
 #include "z64scene.h"
 
 #include <spdlog/spdlog.h>
+#include <stdexcept>
 
 extern "C" {
 #include "variables.h"
@@ -620,12 +621,26 @@ const std::vector<EntranceInfoPair>& GetEntranceShuffleTable() {
 
 void SetAllEntrancesData() {
     auto ctx = Rando::Context::GetInstance();
+    const auto nativeEntrance = [](const EntranceLinkInfo& entry) {
+        // Metadata belongs to the original edge, including when a native replay or cross
+        // search currently resolves that edge elsewhere. GetExit looks up its live destination.
+        auto* entrance = GetEntrance(entry.parentRegion, entry.connectedRegion);
+        if (!entrance) {
+            throw std::runtime_error("native entrance metadata missing edge " + std::to_string(entry.index) +
+                                     " (region " + std::to_string(entry.parentRegion) + " -> " +
+                                     std::to_string(entry.connectedRegion) + ")");
+        }
+        return entrance;
+    };
     for (const auto& entrancePair : GetEntranceShuffleTable()) {
         auto& forwardEntry = entrancePair.first;
         auto& returnEntry = entrancePair.second;
 
+        // Resolve both halves before publishing the pair. A reset/incomplete graph must
+        // become a checked generation failure, not a null write through the return edge.
+        Entrance* forwardEntrance = nativeEntrance(forwardEntry);
+        Entrance* returnEntrance = returnEntry.parentRegion != RR_NONE ? nativeEntrance(returnEntry) : nullptr;
         // set data
-        Entrance* forwardEntrance = RegionTable(forwardEntry.parentRegion)->GetExit(forwardEntry.connectedRegion);
         forwardEntrance->SetIndex(forwardEntry.index);
         forwardEntrance->SetType(forwardEntry.type);
         forwardEntrance->SetAsPrimary();
@@ -636,8 +651,7 @@ void SetAllEntrancesData() {
             forwardEntrance->SetDecoupled();
         }
 
-        if (returnEntry.parentRegion != RR_NONE) {
-            Entrance* returnEntrance = RegionTable(returnEntry.parentRegion)->GetExit(returnEntry.connectedRegion);
+        if (returnEntrance) {
             returnEntrance->SetIndex(returnEntry.index);
             returnEntrance->SetType(returnEntry.type);
             forwardEntrance->BindTwoWay(returnEntrance);

@@ -4570,6 +4570,11 @@ extern "C" COMBO_EXPORT int SOH_IsPausedForCombo(void) {
 // ComboShip: Ctrl+R reset. Set when a reset should return the whole session to first-boot; read by
 // SOH_ResumeGame so OOT boots to the title sequence instead of resuming the dormant save.
 static bool sComboResetPending = false;
+static void (*gComboCancelGenerationCallback)() = nullptr;
+
+extern "C" COMBO_EXPORT void SOH_SetOnComboCancelCallback(void (*cb)()) {
+    gComboCancelGenerationCallback = cb;
+}
 
 // ComboShip (#89): MM-initiated equivalent of the reset flag — an owl save quits to OOT's title
 // rather than MM's own file select, which combo has no path to.
@@ -4581,6 +4586,15 @@ extern "C" COMBO_EXPORT void SOH_SetComboBootToTitle(void) {
 // goes dormant) and flag OOT to boot to the title sequence on resume. Returns true if it took over the
 // reset; false lets the caller run OOT's normal reset (which already lands on the boot sequence).
 bool Combo_HandleReset(void) {
+    if (IsRandoGenerating()) {
+        // The file-select generation worker also owns native oracle state. Stop it before
+        // exit hooks/title/file-select initialization can reuse that state.
+        if (!gComboCancelGenerationCallback)
+            return true; // An older launcher cannot safely cancel the shared-state worker.
+        gComboCancelGenerationCallback();
+        WaitForRandoGeneration();
+        SetComboRandoGenerating(false);
+    }
     if (Combo_OotIsForeground())
         return false;
     sComboResetPending = true;

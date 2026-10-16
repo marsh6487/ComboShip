@@ -793,10 +793,12 @@ typedef void (*FnSetGenReqCb)(void (*)(const char*));
 typedef void (*FnSetSeedGenerated)(uint8_t);
 typedef void (*FnSetComboProgressPtr)(const ComboRando::ComboGenProgress*);
 typedef void (*FnSetComboFinalizeCb)(int (*)());
+typedef void (*FnSetComboCancelCb)(void (*)());
 static FnSetGenReqCb SOH_SetOnComboGenerateRequestCallback = nullptr;
 static FnSetSeedGenerated SOH_SetSeedGenerated = nullptr;
 static FnSetComboProgressPtr SOH_SetComboProgressPtr = nullptr;
 static FnSetComboFinalizeCb SOH_SetOnComboFinalizeCallback = nullptr;
+static FnSetComboCancelCb SOH_SetOnComboCancelCallback = nullptr;
 
 static std::atomic<bool> g_GenerateBusy{ false };
 
@@ -1774,7 +1776,7 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
             return false;
         if (Combo_MM_Rando_Restore)
             Combo_MM_Rando_Restore();
-        fail("generation cancelled (window closed)");
+        fail("generation cancelled");
         return true;
     };
 
@@ -1942,7 +1944,8 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
                                            Combo_MM_Rando_GetReachableChecks, Combo_MM_Rando_PlaceItem };
         try {
             crossDungeonSeed = ComboRando::CrossDungeon::GenerateValidatedSeed(
-                g_CrossDungeons, crossDungeonEnabled, masterSeed, sohDump, mmDump, ootOracle, mmOracle, mmStart);
+                g_CrossDungeons, crossDungeonEnabled, masterSeed, sohDump, mmDump, ootOracle, mmOracle, mmStart,
+                ComboRando::CrossDungeon::kStructuralLayoutAttempts, progress);
         } catch (const ComboRando::CrossDungeon::StructureExhausted& e) {
             lastFillError = e.what();
             std::cout << "[ComboShip] RunComboFill: " << lastFillError << "\n";
@@ -1951,9 +1954,11 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
             Combo_MM_Rando_Restore();
             continue;
         } catch (const std::exception& e) {
-            fail(e.what());
+            if (cancelled())
+                return;
             if (Combo_MM_Rando_Restore)
                 Combo_MM_Rando_Restore();
+            fail(e.what());
             return;
         }
 
@@ -2509,6 +2514,22 @@ static void Combo_OnGenerateRequest(const char* inputSeed, ComboRando::ComboGenP
     RunComboFill(std::string(inputSeed ? inputSeed : ""), progress);
 }
 
+static void Combo_CancelGenerate() {
+    g_ComboProgress.cancel.store(true);
+    // The worker owns the temporary oracle graph until its scope destructors finish.
+    // Reset must not rebuild native state or consume a just-published finalize before then.
+    if (g_GenerateThread.joinable())
+        g_GenerateThread.join();
+    g_ComboPendingFinalize.store(false);
+    g_ComboProgress.success.store(false);
+    g_ComboProgress.running.store(false);
+    g_ComboProgress.done.store(true);
+    g_ComboProgress.SetError("generation cancelled (reset requested)");
+    g_GenerateBusy.store(false);
+    if (SOH_SetSeedGenerated)
+        SOH_SetSeedGenerated(0);
+}
+
 // ComboShip: UI-driven (non-blocking) generate — registered as the generate-request callback and
 // invoked on the main thread from SOH_TriggerComboGenerate. Spawns the worker so the main loop keeps
 // rendering + playing music + animating progress. The previous worker is always finished by now
@@ -2578,13 +2599,16 @@ static void Combo_FinalizeGenerate() {
 // pending finalize (apply) when the worker has succeeded. Returns 1 once generation is fully
 // resolved (finalized or failed) so soh clears its generating flag; 0 while still working.
 static int Combo_PollFinalize() {
+    if (g_GenerateBusy.load() || (!g_ComboPendingFinalize.load() && !g_ComboProgress.done.load()))
+        return 0;
+    // done/busy are published inside the worker body; join also covers scope cleanup
+    // after both success and failure before the file-select regains access to native state.
+    if (g_GenerateThread.joinable())
+        g_GenerateThread.join();
     if (g_ComboPendingFinalize.exchange(false)) {
         Combo_FinalizeGenerate();
         return 1;
     }
-    // No pending finalize: resolved iff the worker is done and not still running.
-    if (!g_ComboProgress.done.load() || g_GenerateBusy.load())
-        return 0;
     // A failed gen must not leave an earlier seed's "generated" state (success fanfare + Start).
     if (!g_ComboProgress.success.load() && SOH_SetSeedGenerated)
         SOH_SetSeedGenerated(0);
@@ -3334,6 +3358,7 @@ int main(int argc, char** argv) {
     SOH_SetSeedGenerated = (FnSetSeedGenerated)GetSym(sohModule, "SOH_SetSeedGenerated");
     SOH_SetComboProgressPtr = (FnSetComboProgressPtr)GetSym(sohModule, "SOH_SetComboProgressPtr");
     SOH_SetOnComboFinalizeCallback = (FnSetComboFinalizeCb)GetSym(sohModule, "SOH_SetOnComboFinalizeCallback");
+    SOH_SetOnComboCancelCallback = (FnSetComboCancelCb)GetSym(sohModule, "SOH_SetOnComboCancelCallback");
     MM_BootForCombo = (FnVoidArgless)GetSym(mmModule, "MM_BootForCombo");
     MM_Deinit = (FnVoidArgless)GetSym(mmModule, "MM_Deinit");
     SOH_ResumeForeground = (FnVoidArgless)GetSym(sohModule, "SOH_ResumeForeground");
@@ -3755,6 +3780,8 @@ int main(int argc, char** argv) {
         SOH_SetComboProgressPtr(&g_ComboProgress);
     if (SOH_SetOnComboFinalizeCallback)
         SOH_SetOnComboFinalizeCallback(Combo_PollFinalize);
+    if (SOH_SetOnComboCancelCallback)
+        SOH_SetOnComboCancelCallback(Combo_CancelGenerate);
     if (SOH_SetOnComboReloadCallback)
         SOH_SetOnComboReloadCallback(Combo_OnReloadRequest);
 
