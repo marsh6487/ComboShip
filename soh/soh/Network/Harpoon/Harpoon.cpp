@@ -622,7 +622,10 @@ void Harpoon::SendPacket_PlayerUpdate() {
 
     Vec3s emoteJoints[24]{};
     const bool emoting = modelType == 0 && ComboEmotes_CopyPose(emoteJoints, sizeof(emoteJoints));
-    if (emoting) { srcJointTable = emoteJoints; srcJointCount = 24; }
+    if (emoting) {
+        srcJointTable = emoteJoints;
+        srcJointCount = 24;
+    }
     for (s32 i = 0; i < 24; i++) {
         if (i < srcJointCount && srcJointTable != NULL) {
             jointArray.push_back(srcJointTable[i].x);
@@ -3299,7 +3302,10 @@ void Harpoon::SendPacket_PlayerSkeleton() {
     std::vector<int> jointArray;
     Vec3s emoteJoints[24]{};
     const bool emoting = modelType == 0 && ComboEmotes_CopyPose(emoteJoints, sizeof(emoteJoints));
-    if (emoting) { srcJointTable = emoteJoints; srcJointCount = 24; }
+    if (emoting) {
+        srcJointTable = emoteJoints;
+        srcJointCount = 24;
+    }
     for (s32 i = 0; i < 24; i++) {
         if (i < srcJointCount && srcJointTable != NULL) {
             jointArray.push_back(srcJointTable[i].x);

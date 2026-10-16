@@ -470,7 +470,8 @@ void MMAnchor::SendPlayerUpdate() {
         std::memcpy(upper.data(), player->jointTableUpperBuffer, upper.size());
         // These buffers include alignment slack; jointTable points into them.
         const size_t jointOffset = reinterpret_cast<u8*>(player->skelAnime.jointTable) - player->jointTableBuffer;
-        const size_t upperOffset = reinterpret_cast<u8*>(player->skelAnimeUpper.jointTable) - player->jointTableUpperBuffer;
+        const size_t upperOffset =
+            reinterpret_cast<u8*>(player->skelAnimeUpper.jointTable) - player->jointTableUpperBuffer;
         ComboEmotes_CopyRawBuffer(joints.data(), joints.size(), jointOffset);
         ComboEmotes_CopyRawBuffer(upper.data(), upper.size(), upperOffset);
         const u8* jt = joints.data();

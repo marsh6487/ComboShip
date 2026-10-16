@@ -1963,7 +1963,8 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
         audio.processing = true;
         // Set the combo audio-mute flag BEFORE waking the worker so THIS frame's buffer is
         // (un)muted correctly; storing it after the notify would race the worker by a frame.
-        if (!FleetShipCombo_IsThisGameActive()) ComboEmotes_Reset();
+        if (!FleetShipCombo_IsThisGameActive())
+            ComboEmotes_Reset();
         gFscAudioMuted.store(!FleetShipCombo_IsThisGameActive(), std::memory_order_relaxed);
     }
 
