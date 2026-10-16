@@ -3276,6 +3276,14 @@ static void MmForm_StopGoronRollSfx(void);
 // Declared here, above MmForm_RestoreOotState, because that is the first user.
 static u8 sRollOwnsPause = 0;
 
+static void MmForm_RestoreBodyCollider(Player* player) {
+    player->cylinder.base.atFlags = AT_NONE;
+    player->cylinder.base.ocFlags1 = OC1_ON | OC1_TYPE_ALL;
+    player->cylinder.base.acFlags = AC_ON | AC_TYPE_ENEMY;
+    player->cylinder.info.toucherFlags = TOUCH_NONE;
+    player->cylinder.info.toucher.dmgFlags = 0;
+}
+
 // Form combat temporarily disables OOT's persistent sword colliders. Human
 // swings update damage and vertices, but do not re-enable AT_ON themselves.
 static void MmForm_RestoreMeleeColliders(Player* player) {
@@ -3367,6 +3375,8 @@ static void MmForm_RestoreOotState(Player* player) {
                                     (gFormState.savedTunicEquip << gEquipShifts[EQUIP_TYPE_TUNIC]);
 
     // Restore default OOT Link collider
+    // A form can exit during the pound's OC-disabled attack window.
+    MmForm_RestoreBodyCollider(player);
     player->cylinder.dim.radius = 12;
     player->cylinder.dim.height = 50;
     player->cylinder.dim.yShift = 0;
@@ -5928,14 +5938,47 @@ static void MmForm_PlaySfx(Player* player, u16 mmSfxId, u16 ootSfxId) {
 // doesn't — so the loops would play forever. Called from every roll-exit
 // path (uncurl, transform-out, water/hazard void, damage).
 static void MmForm_StopGoronRollSfx(void) {
-    if (!MmSfx_IsAvailable())
-        return;
+    // Playback availability can change while a loop is alive. Stopping must
+    // still drain the bank and mixer when MM audio has just been disabled.
     MmSfx_Stop(MM_NA_SE_PL_GORON_ROLL);
     MmSfx_Stop(MM_NA_SE_PL_GORON_ROLL_ICE);
     MmSfx_Stop(MM_NA_SE_PL_GORON_CHG_ROLL);
     MmSfx_Stop(MM_NA_SE_PL_GORON_CHG_ROLL_ICE);
     MmSfx_Stop(MM_NA_SE_PL_GORON_BALL_CHARGE);
     MmSfx_Stop(MM_NA_SE_PL_GORON_SLIP);
+}
+
+static void MmForm_UpdateGoronRollSfx(Player* player, PlayState* play) {
+    static PlayState* sLastPlay = NULL;
+    static s8 sLastRoom = -1;
+    u8 inBallState =
+        gFormState.state == MMFORM_STATE_ACTIVE && gFormState.currentForm == MM_PLAYER_FORM_GORON &&
+        (gFormState.goronAction == GORON_ACT_GORON_ROLL || gFormState.goronAction == GORON_ACT_GORON_ROLL_JUMP ||
+         gFormState.goronAction == GORON_ACT_GORON_ROLL_POUND);
+
+    // The MM bank/mixer outlives the player and its room. A charged-roll entry
+    // keeps refreshing itself there after OoT replaces the action or scene.
+    // Run after dispatch so even the last request from an interrupted roll is
+    // removed. Airborne roll and pound states retain their normal audio.
+    if (!inBallState || play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF ||
+        (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_LOADING)) || sLastPlay != play ||
+        sLastRoom != play->roomCtx.curRoom.num) {
+        MmForm_StopGoronRollSfx();
+    }
+    sLastPlay = play;
+    sLastRoom = play->roomCtx.curRoom.num;
+}
+
+static void MmForm_RegisterGoronRollSfxCleanup(void) {
+    static bool sRegistered = false;
+    if (sRegistered) {
+        return;
+    }
+    sRegistered = true;
+    // ShouldActorDestroy also runs when Actor_Destroy precedes Actor_Delete.
+    // Do not reset the form: scene arrivals preserve it through SoftReload.
+    GameInteractor::Instance->RegisterGameHookForID<GameInteractor::ShouldActorDestroy>(
+        ACTOR_PLAYER, [](void*, bool*) { MmForm_StopGoronRollSfx(); });
 }
 
 // MM z_player.c:3649-3672 (func_8082FA5C) picks SWORD_N vs SWORD_L based on:
@@ -7242,16 +7285,12 @@ static void MmForm_SetRollAttack(Player* player, u32 dmgFlags, s32 damage, s16 r
 
 // Helper: Clear roll attack flags, restore normal collider state
 static void MmForm_ClearRollAttack(Player* player) {
-    player->cylinder.base.atFlags = AT_NONE;
-    player->cylinder.base.ocFlags1 = OC1_ON | OC1_TYPE_ALL;
-    player->cylinder.base.acFlags = AC_ON | AC_TYPE_ENEMY;
-    player->cylinder.info.toucherFlags = TOUCH_NONE;
     // Wipe dmgFlags too — otherwise Goron roll's DMG_HAMMER_SWING stays cached on
     // the cylinder. If any later code re-arms cylinder.atFlags (form change, OOT
     // path, etc.) the cylinder would hit with hammer damage. Reported as: Zora
     // combo (master sword damage) breaking Obj_Hamishi rocks that should only
     // respond to hammer flags (0x40000040).
-    player->cylinder.info.toucher.dmgFlags = 0;
+    MmForm_RestoreBodyCollider(player);
     // Restore normal cylinder radius from form properties
     const MmFormProperties* props = &sFormProps[gFormState.currentForm];
     player->cylinder.dim.radius = (s16)props->cylinderRadius;
@@ -7259,6 +7298,21 @@ static void MmForm_ClearRollAttack(Player* player) {
     // damage-exit cleanup block (freeze, electric, strong knockback, weak
     // knockback), so this one line covers all four roll→damage transitions.
     MmForm_StopGoronRollSfx();
+}
+
+static void MmForm_LeaveGoronBall(Player* player) {
+    player->actor.shape.rot.x = 0;
+    player->actor.shape.rot.z = 0;
+    player->actor.gravity = MmForm_GetGravity(MMFORM_GRAVITY_NORMAL);
+    player->actor.shape.shadowScale = gFormState.savedShadowScale;
+    player->stateFlags2 &= ~(PLAYER_STATE2_DISABLE_ROTATION_Z_TARGET | PLAYER_STATE2_DISABLE_ROTATION_ALWAYS);
+    player->actor.bgCheckFlags &= ~0x800;
+    player->stateFlags1 &= ~PLAYER_STATE1_INPUT_DISABLED;
+    if (sRollOwnsPause) {
+        player->stateFlags3 &= ~PLAYER_STATE3_PAUSE_ACTION_FUNC;
+        sRollOwnsPause = 0;
+    }
+    MmForm_ClearRollAttack(player);
 }
 
 /**
@@ -7474,10 +7528,9 @@ static void MmForm_Action_GoronRoll(Player* player, PlayState* play) {
             gFormState.rollBallSpeed = 0.0f;
             gFormState.rollSpinRate = 0;
 
-            // Attack: damage=4, radius=60. MM uses DMG_GORON_POUND (its own bit). The
-            // closest OOT semantic equivalent for a jumping ground-smash is
-            // DMG_HAMMER_JUMP (hammer being slammed from a jump). Was DMG_HAMMER_SWING.
-            MmForm_SetRollAttack(player, DMG_HAMMER_JUMP, 4, 60);
+            // OoT's hammer/bomb grotto accepts HAMMER_SWING, while some actors
+            // distinguish HAMMER_JUMP. A Goron pound is a hammer impact for both.
+            MmForm_SetRollAttack(player, DMG_HAMMER, 4, 60);
             CollisionCheck_SetAT(play, &play->colChkCtx, &player->cylinder.base);
         }
 
@@ -7496,9 +7549,9 @@ static void MmForm_Action_GoronRoll(Player* player, PlayState* play) {
             player->linearVelocity = 0.0f;
 
             // Keep attack active on first frame only.
-            // MM = DMG_GORON_POUND. Semantic OOT match = DMG_HAMMER_JUMP.
+            // Keep the same native hammer compatibility during the impact window.
             if (gFormState.actionTimer == 0) {
-                MmForm_SetRollAttack(player, DMG_HAMMER_JUMP, 4, 60);
+                MmForm_SetRollAttack(player, DMG_HAMMER, 4, 60);
                 CollisionCheck_SetAT(play, &play->colChkCtx, &player->cylinder.base);
                 gFormState.actionTimer = 1;
             } else {
@@ -12662,6 +12715,13 @@ static void MmForm_UpdateActive(Player* player, PlayState* play) {
     // Freeze form during ANY textbox (NPC talk, signs, narration, item pickup text).
     // PLAYER_STATE1_TALKING only covers NPC talk; Message_GetState covers all textboxes.
     if ((player->stateFlags1 & PLAYER_STATE1_TALKING) || (Message_GetState(&play->msgCtx) != TEXT_STATE_NONE)) {
+        // This return bypasses the later OOT-yield cleanup. Release the ball's
+        // attack before replacing its action, including the pound's OC1_NONE.
+        if (gFormState.currentForm == MM_PLAYER_FORM_GORON &&
+            (gFormState.goronAction == GORON_ACT_GORON_ROLL || gFormState.goronAction == GORON_ACT_GORON_ROLL_JUMP ||
+             gFormState.goronAction == GORON_ACT_GORON_ROLL_POUND)) {
+            MmForm_LeaveGoronBall(player);
+        }
         if (gFormState.goronAction != GORON_ACT_IDLE || gFormState.formSkelAnime.animation != gFormState.idleAnim) {
             MmForm_SetAction(GORON_ACT_IDLE, play, gFormState.idleAnim, 1.0f, ANIMMODE_LOOP);
             player->linearVelocity = 0.0f;
@@ -13176,15 +13236,7 @@ static void MmForm_UpdateActive(Player* player, PlayState* play) {
                 if (gFormState.goronAction == GORON_ACT_GORON_ROLL ||
                     gFormState.goronAction == GORON_ACT_GORON_ROLL_JUMP ||
                     gFormState.goronAction == GORON_ACT_GORON_ROLL_POUND) {
-                    player->actor.shape.rot.x = 0;
-                    player->actor.shape.rot.z = 0;
-                    player->actor.gravity = MmForm_GetGravity(MMFORM_GRAVITY_NORMAL);
-                    player->actor.shape.shadowScale = gFormState.savedShadowScale;
-                    player->stateFlags2 &=
-                        ~(PLAYER_STATE2_DISABLE_ROTATION_Z_TARGET | PLAYER_STATE2_DISABLE_ROTATION_ALWAYS);
-                    player->actor.bgCheckFlags &= ~0x800;
-                    player->stateFlags1 &= ~PLAYER_STATE1_INPUT_DISABLED;
-                    MmForm_ClearRollAttack(player);
+                    MmForm_LeaveGoronBall(player);
                 }
 
                 // Clean up swim state (pitch/roll, speed)
@@ -16419,6 +16471,8 @@ static u8 MmForm_SoftReload(PlayState* play, Player* player, MmPlayerTransformat
 extern "C" {
 
 void MmForm_Init(PlayState* play, Player* player) {
+    MmForm_StopGoronRollSfx();
+    MmForm_RegisterGoronRollSfxCleanup();
     MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
     MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG);
     // The previous scene's effect context was destroyed before this Init.
@@ -18117,6 +18171,7 @@ void MmForm_Update(PlayState* play, Player* player) {
             break;
     }
 
+    MmForm_UpdateGoronRollSfx(player, play);
     MmForm_UpdateZoraMelee(player, play);
     MmForm_UpdateZoraSwimTrails(play);
     MmForm_UpdateZoraSwimSfx(player);
@@ -18865,6 +18920,7 @@ void MmForm_Draw(PlayState* play, Player* player) {
 // re-applied, so the player respawns with no Ext sword/shield/tunic/boots and with
 // the form's strength override (Goron=3, Zora=1, Deku=0) baked into the save.
 void MmForm_OnDeath(void) {
+    MmForm_StopGoronRollSfx();
     // 1. Restore extended equipment from the transform backup. Must run BEFORE
     //    MmForm_Reset (which would otherwise clear the backup unconditionally).
     ExtEquip_RestoreFromTransform();
@@ -18905,6 +18961,7 @@ void MmForm_OnDeath(void) {
 }
 
 void MmForm_Reset(void) {
+    MmForm_StopGoronRollSfx();
     MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
     MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG);
     MmForm_ClearZoraSwimTrails(gPlayState);

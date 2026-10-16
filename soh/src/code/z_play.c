@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 #include "global.h"
 #include "vt.h"
 
@@ -26,6 +27,11 @@
 
 #include <time.h>
 #include <assert.h>
+
+#ifdef COMBO_BUILD
+extern int Combo_SOH_CompleteCrossDungeonTransition(void);
+extern void Combo_SOH_CancelCrossDungeonTransition(void);
+#endif
 
 // SM64 Mario: snapshot actor OC colliders into libsm64's surface set. Defined in
 // expansions/sm64/sm64_mario_surfaces.c (#included into z_player.c), so it has
@@ -213,6 +219,9 @@ Gfx* Play_SetFog(PlayState* play, Gfx* gfx) {
 }
 
 void Play_Destroy(GameState* thisx) {
+#ifdef COMBO_BUILD
+    Combo_SOH_CancelCrossDungeonTransition();
+#endif
     PlayState* play = (PlayState*)thisx;
     Player* player = GET_PLAYER(play);
 
@@ -317,35 +326,42 @@ u8 CheckMedallionCount() {
 u8 CheckDungeonCount() {
     u8 dungeonCount = 0;
 
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA, Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
         dungeonCount++;
     }
 
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                        Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) {
         dungeonCount++;
     }
 
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                        Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
         dungeonCount++;
     }
 
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_PHANTOM_GANON,
+                                        Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP))) {
         dungeonCount++;
     }
 
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_VOLVAGIA,
+                                        Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP))) {
         dungeonCount++;
     }
 
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_MORPHA,
+                                        Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP))) {
         dungeonCount++;
     }
 
-    if (Flags_GetRandomizerInf(RAND_INF_DUNGEONS_DONE_SPIRIT_TEMPLE)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_TWINROVA,
+                                        Flags_GetRandomizerInf(RAND_INF_DUNGEONS_DONE_SPIRIT_TEMPLE))) {
         dungeonCount++;
     }
 
-    if (Flags_GetRandomizerInf(RAND_INF_DUNGEONS_DONE_SHADOW_TEMPLE)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BONGO_BONGO,
+                                        Flags_GetRandomizerInf(RAND_INF_DUNGEONS_DONE_SHADOW_TEMPLE))) {
         dungeonCount++;
     }
 
@@ -492,7 +508,11 @@ void Play_Init(GameState* thisx) {
         }
     } else if ((gEntranceTable[((void)0, gSaveContext.entranceIndex)].scene == SCENE_KOKIRI_FOREST) && LINK_IS_ADULT &&
                !IS_CUTSCENE_LAYER) {
-        gSaveContext.sceneLayer = (Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP)) ? 3 : 2;
+        gSaveContext.sceneLayer =
+            (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_PHANTOM_GANON,
+                                             Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP)))
+                ? 3
+                : 2;
     }
 
     Play_SpawnScene(play,
@@ -919,6 +939,12 @@ void Play_Update(PlayState* play) {
                                 play->transitionMode = TRANS_MODE_OFF;
                             }
                         } else if (play->transitionTrigger != TRANS_TRIGGER_END) {
+#ifdef COMBO_BUILD
+                            // Retain the completed native effect until the clean-frame peer handoff.
+                            if (Combo_SOH_CompleteCrossDungeonTransition()) {
+                                break;
+                            }
+#endif
                             play->state.running = false;
 
                             if (gSaveContext.gameMode != GAMEMODE_FILE_SELECT) {
@@ -975,6 +1001,11 @@ void Play_Update(PlayState* play) {
                     play->envCtx.screenFillColor[3] = (sTransitionFillTimer / 20.0f) * 255.0f;
 
                     if (sTransitionFillTimer >= 20) {
+#ifdef COMBO_BUILD
+                        if (Combo_SOH_CompleteCrossDungeonTransition()) {
+                            break;
+                        }
+#endif
                         play->state.running = false;
                         SET_NEXT_GAMESTATE(&play->state, Play_Init, PlayState);
                         gSaveContext.entranceIndex = play->nextEntranceIndex;
@@ -1017,6 +1048,11 @@ void Play_Update(PlayState* play) {
 
                 case TRANS_MODE_INSTANT:
                     if (play->transitionTrigger != TRANS_TRIGGER_END) {
+#ifdef COMBO_BUILD
+                        if (Combo_SOH_CompleteCrossDungeonTransition()) {
+                            break;
+                        }
+#endif
                         play->state.running = 0;
                         SET_NEXT_GAMESTATE(&play->state, Play_Init, PlayState);
                         gSaveContext.entranceIndex = play->nextEntranceIndex;
@@ -1064,6 +1100,11 @@ void Play_Update(PlayState* play) {
                         }
                     } else {
                         if (play->envCtx.sandstormEnvA == 255) {
+#ifdef COMBO_BUILD
+                            if (Combo_SOH_CompleteCrossDungeonTransition()) {
+                                break;
+                            }
+#endif
                             play->state.running = false;
                             SET_NEXT_GAMESTATE(&play->state, Play_Init, PlayState);
                             gSaveContext.entranceIndex = play->nextEntranceIndex;

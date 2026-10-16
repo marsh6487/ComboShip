@@ -3,6 +3,9 @@
 #include "ComboExport.h"
 #include "gameplay/ComboFaroresWind.h"
 
+extern "C" int32_t Combo_SOH_SaveCrossDungeonCheckpoint(void);
+extern "C" void Combo_SOH_RestoreCrossDungeonCheckpoint(int32_t index);
+
 static ComboFwCallbacks sFwCallbacks{};
 static ComboFwPoint sFwArrival{};
 static int sFwArrivalSlot = -1;
@@ -25,7 +28,7 @@ extern "C" COMBO_EXPORT void SOH_SetFwCallbacks(const ComboFwCallbacks* callback
     sFwCallbacks = callbacks ? *callbacks : ComboFwCallbacks{};
 }
 
-extern "C" void ComboFw_PublishPoint(void) {
+static void PublishNativePoint(bool captureCheckpoint) {
     if (!sFwCallbacks.write || !gSaveContext.fw.set)
         return;
     const auto& fw = gSaveContext.fw;
@@ -39,8 +42,13 @@ extern "C" void ComboFw_PublishPoint(void) {
                     (float)fw.pos.z,
                     (uint32_t)fw.tempSwchFlags,
                     (uint32_t)fw.tempCollectFlags,
-                    0 };
+                    0,
+                    captureCheckpoint ? Combo_SOH_SaveCrossDungeonCheckpoint() : -1 };
     sFwCallbacks.write(gSaveContext.fileNum, &p);
+}
+
+extern "C" void ComboFw_PublishPoint(void) {
+    PublishNativePoint(true);
 }
 
 static int ReadPoint(ComboFwPoint* p) {
@@ -49,7 +57,7 @@ static int ReadPoint(ComboFwPoint* p) {
     int result = sFwCallbacks.read(gSaveContext.fileNum, p);
     if (result < 0 && gSaveContext.fileNum <= 2 && sFwCallbacks.write) {
         if (gSaveContext.fw.set) {
-            ComboFw_PublishPoint();
+            PublishNativePoint(false); // A legacy point has no reliable cast-time checkpoint.
             result = sFwCallbacks.read(gSaveContext.fileNum, p);
         } else {
             return 0; // Leave metadata absent so the other game's legacy point can still migrate.
@@ -96,6 +104,7 @@ extern "C" void ComboFw_ClearPoint(void) {
 
 static void PrepareNativeReturn(const ComboFwPoint& p) {
     AdoptNativePoint(p);
+    Combo_SOH_RestoreCrossDungeonCheckpoint(p.dungeonCheckpoint);
     auto& top = gSaveContext.respawn[RESPAWN_MODE_TOP];
     top.pos = { p.x, p.y, p.z };
     top.yaw = (int16_t)p.yaw;

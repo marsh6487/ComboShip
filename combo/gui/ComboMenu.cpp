@@ -1733,6 +1733,49 @@ void ComboMenu::DrawComboPanel() {
                         "and the Mask Shop key/entrance exclusions, so Ocarina of Time stays enterable from nothing.");
     ImGui::Separator();
 
+    ImGui::SeparatorText("Entrances");
+    bool crossDungeonEntrances = CVarGetInteger("gCombo.Rando.CrossDungeonEntrances", 0) != 0;
+    ComboRando::ComboMenu_PushCheckbox(goalTheme);
+    if (ImGui::Checkbox("Cross-Game Dungeon Entrances", &crossDungeonEntrances))
+        CVarSetInteger("gCombo.Rando.CrossDungeonEntrances", crossDungeonEntrances ? 1 : 0);
+    ComboRando::ComboMenu_PopCheckbox();
+    ImGui::SetItemTooltip("Shuffle eligible Ocarina of Time and Majora's Mask dungeons together. "
+                          "Uses Ocarina of Time's native entrance settings and saves the layout with the seed.");
+    auto crossPoolCheckbox = [&](const char* label, const char* cvar, const char* help) {
+        bool enabled = CVarGetInteger(cvar, 0) != 0;
+        ComboRando::ComboMenu_PushCheckbox(goalTheme);
+        if (ImGui::Checkbox(label, &enabled))
+            CVarSetInteger(cvar, enabled ? 1 : 0);
+        ComboRando::ComboMenu_PopCheckbox();
+        ImGui::SetItemTooltip("%s", help);
+    };
+    ImGui::BeginDisabled(!crossDungeonEntrances);
+    crossPoolCheckbox(
+        "Expanded Dungeon Pool", "gCombo.Rando.ExpandedDungeonPool",
+        "Add Majora's Mask's Spider Houses, Ikana Castle, Secret Shrine, Beneath the Well's two entrances, "
+        "and Pirates' Fortress to the dungeon pool.");
+    ImGui::EndDisabled();
+    crossPoolCheckbox("Cross-Game Boss Entrances", "gCombo.Rando.CrossBossEntrances",
+                      "Shuffle the eight Ocarina of Time and four Majora's Mask bosses together. "
+                      "Rewards belong to the arena; completion and the blue warp follow the shuffled boss door.");
+    crossPoolCheckbox(
+        "Cross-Game Interiors", "gCombo.Rando.CrossInteriorEntrances",
+        "Shuffle all eligible houses, shops and other interiors between games, including open passageways. "
+        "Overrides the two door-only choices below. The original game portal stays available.");
+    const bool broadInteriors = CVarGetInteger("gCombo.Rando.CrossInteriorEntrances", 0) != 0;
+    ImGui::BeginDisabled(broadInteriors);
+    crossPoolCheckbox("Cross-Game Shops (Doors Only)", "gCombo.Rando.CrossShopEntrances",
+                      "Shuffle retail shop entrances with other shops between games, using only doors you open. "
+                      "Open shop entrances stay in place. Applied to newly generated seeds.");
+    crossPoolCheckbox(
+        "Cross-Game Door Interiors", "gCombo.Rando.CrossDoorInteriorEntrances",
+        "Shuffle other interiors with doors you open between games. Shops use their separate checkbox. "
+        "Open houses, caves, tunnels and other passageways stay in place. Applied to newly generated seeds.");
+    ImGui::EndDisabled();
+    crossPoolCheckbox("Cross-Game Grottos and Graves", "gCombo.Rando.CrossGrottoEntrances",
+                      "Shuffle grotto and grave entrances between games, including their return and void positions.");
+    ImGui::Separator();
+
     // Shared Items (OoTMM-style): one item counts for both games, applied at generation. Deferred
     // families (Ocarina, Song of Time, Shields, Bottles, Health) are not drawn — see the plan doc.
     ImGui::SeparatorText("Shared Items");

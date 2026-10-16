@@ -1,6 +1,11 @@
 #include "GameInteractor_Hooks.h"
 #include "soh/Enhancements/debugger/FrameTimingProbe.h"
 
+#ifdef COMBO_BUILD
+extern "C" void Combo_SOH_BeforeNativeLoadGame(void);
+extern "C" void Combo_SOH_AfterNativeLoadGame(void);
+#endif
+
 // MARK: - Gameplay
 
 void GameInteractor_ExecuteOnZTitleInit(void* gameState) {
@@ -12,7 +17,13 @@ void GameInteractor_ExecuteOnZTitleUpdate(void* gameState) {
 }
 
 void GameInteractor_ExecuteOnLoadGame(int32_t fileNum) {
+#ifdef COMBO_BUILD
+    Combo_SOH_BeforeNativeLoadGame();
+#endif
     GameInteractor::Instance->ExecuteHooks<GameInteractor::OnLoadGame>(fileNum);
+#ifdef COMBO_BUILD
+    Combo_SOH_AfterNativeLoadGame();
+#endif
 }
 
 void GameInteractor_ExecuteOnExitGame(int32_t fileNum) {

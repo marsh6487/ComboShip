@@ -17,6 +17,11 @@
 #include "SaveManager.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
+#include "rando/CrossDungeonRuntime.h"
+extern "C" int32_t Combo_SOH_SaveCrossDungeonCheckpoint(void);
+nlohmann::json Combo_SOH_SavePendingChecks();
+void Combo_SOH_LoadPendingChecks(const nlohmann::json& payload);
+extern "C" void Combo_SOH_LoadCrossDungeonCheckpoint(int32_t index);
 #endif
 #include "OTRGlobals.h"
 #include "Enhancements/game-interactor/GameInteractor.h"
@@ -978,6 +983,10 @@ void SaveManager::InitMeta(int fileNum) {
 
 void SaveManager::InitFile(bool isDebug) {
     ItemGrantAudit::Scope itemGrantAuditScope("OOT save-init");
+#ifdef COMBO_BUILD
+    Combo_SOH_LoadCrossDungeonCheckpoint(-1);
+    Combo_SOH_LoadPendingChecks(nullptr);
+#endif
     for (InitFunc& func : initFuncs) {
         func(isDebug);
     }
@@ -1464,6 +1473,8 @@ void SaveManager::SaveFileThreaded(int fileNum, const SaveContext& saveContext, 
     }
 
 #ifdef COMBO_BUILD
+    saveBlock["crossDungeonCheckpoint"] = Combo_SOH_SaveCrossDungeonCheckpoint();
+    saveBlock["crossDungeonPendingChecks"] = Combo_SOH_SavePendingChecks();
     if (gComboWriteGameSave) {
         // ComboShip: route this slot's OOT block into the merged .combosav container (launcher RMW).
         gComboWriteGameSave(ComboRando::GAME_OOT, fileNum, saveBlock.dump().c_str());
@@ -1539,6 +1550,10 @@ nlohmann::json SaveManager::SaveToJsonObject() {
         currentJsonContext = &sectionBlock["data"];
         sectionHandlerPair.second.func(saveContext, SECTION_ID_BASE, true);
     }
+#ifdef COMBO_BUILD
+    block["crossDungeonCheckpoint"] = Combo_SOH_SaveCrossDungeonCheckpoint();
+    block["crossDungeonPendingChecks"] = Combo_SOH_SavePendingChecks();
+#endif
     return block;
 }
 
@@ -1579,6 +1594,10 @@ void SaveManager::LoadFromJsonObject(nlohmann::json& saveBlockJson) {
             handler[sectionVersion]();
         }
     }
+#ifdef COMBO_BUILD
+    Combo_SOH_LoadCrossDungeonCheckpoint(ComboRando::CrossDungeon::ReadCheckpoint(saveBlockJson));
+    Combo_SOH_LoadPendingChecks(saveBlockJson.value("crossDungeonPendingChecks", nlohmann::json{}));
+#endif
 }
 
 void SaveManager::SaveGlobal() {
@@ -1598,6 +1617,10 @@ void SaveManager::LoadFile(int fileNum) {
     ItemGrantAudit::Scope itemGrantAuditScope("OOT save-load");
     std::lock_guard<std::mutex> guard(saveMtx);
     SPDLOG_INFO("Load File - fileNum: {}", fileNum);
+#ifdef COMBO_BUILD
+    Combo_SOH_LoadCrossDungeonCheckpoint(-1);
+    Combo_SOH_LoadPendingChecks(nullptr);
+#endif
     std::filesystem::path fileName = GetFileName(fileNum);
 #ifdef COMBO_BUILD
     // ComboShip: source the OOT block from the merged container; empty => no save present.
@@ -1677,6 +1700,10 @@ void SaveManager::LoadFile(int fileNum) {
                 break;
         }
         InitMeta(fileNum);
+#ifdef COMBO_BUILD
+        Combo_SOH_LoadCrossDungeonCheckpoint(ComboRando::CrossDungeon::ReadCheckpoint(saveBlock));
+        Combo_SOH_LoadPendingChecks(saveBlock.value("crossDungeonPendingChecks", nlohmann::json{}));
+#endif
         GameInteractor::Instance->ExecuteHooks<GameInteractor::OnLoadFile>(fileNum);
     } catch ([[maybe_unused]] const std::exception& e) {
         input.close();

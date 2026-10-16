@@ -103,7 +103,7 @@ def run(out, cc, cxx):
     common = ['-g', '-O1', '-ffunction-sections', '-fdata-sections', '-DLOG_LEVEL_GAME_PRINTS=0',
               '-DCVAR_PREFIX_AUDIO="gAudioEditor"', '-DCVAR_PREFIX_SETTING="gSettings"',
               '-Isoh/tests/rain_engine_stubs', '-Isoh/tests', '-Isoh/include', '-Isoh/src',
-              '-Isoh/assets', '-Isoh', '-Ilibultraship/include']
+              '-Isoh/assets', '-Isoh', '-Ilibultraship/include', '-Icombo']
     sources = [root / 'soh/tests/season_weather_runtime_test.cpp',
                root / 'soh/soh/Enhancements/audio/GlobalOutdoorRain.cpp',
                root / 'soh/src/code/concurrent_weather_audio.c',

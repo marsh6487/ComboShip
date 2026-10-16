@@ -5,6 +5,8 @@
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
 #include "ComboResolve.h"
+#include "../../combo/entrances/LostWoodsEntrance.h"
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #endif
 #include <iostream>
 #include <algorithm>
@@ -184,6 +186,50 @@ extern "C" void MM_CaptureFwDeparture(void);
 extern "C" void MM_QueueFwHandoff(void) {
     sComboFwReturnPending = true;
 }
+static int sComboPortalRoute = COMBO_PORTAL_MARKET;
+static bool sComboPortalArrivalPending = false;
+static int sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
+static int sComboPassageFade = 0;
+static int sComboPassageFileNum = -1;
+static bool sComboOpeningReturnArmed = false;
+static void (*sComboSetOotReturnRoute)(int) = nullptr;
+
+extern "C" COMBO_EXPORT void MM_SetComboPortalRoute(int route) {
+    sComboPortalRoute = ComboLostWoods_IsForestRoute(route) ? route : COMBO_PORTAL_MARKET;
+    sComboPortalArrivalPending = ComboLostWoods_IsForestRoute(sComboPortalRoute);
+}
+
+// Called AFTER native save loading and OnSaveLoad, so neither can overwrite the destination.
+extern "C" void MM_ApplyComboPortalArrival(void) {
+    if (!sComboPortalArrivalPending || !ComboLostWoods_IsForestRoute(sComboPortalRoute))
+        return;
+    sComboPortalArrivalPending = false;
+    if (sComboPortalRoute == COMBO_PORTAL_OPENING_FOREST) {
+        gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
+        gSaveContext.save.cutsceneIndex = 0;
+        gSaveContext.nextCutsceneIndex = 0xFFEF;
+        gSaveContext.cutsceneTrigger = 0;
+        gSaveContext.save.isOwlSave = false;
+        gSaveContext.respawnFlag = 0;
+        return;
+    }
+    gSaveContext.save.entrance = ENTRANCE(WOODS_OF_MYSTERY, 0);
+    gSaveContext.save.cutsceneIndex = 0;
+    gSaveContext.save.isOwlSave = false;
+    // RETURN is the disposable grotto returnpoint; TOP belongs to Farore's Wind.
+    RespawnData* arrival = &gSaveContext.respawn[RESPAWN_MODE_RETURN];
+    *arrival = {};
+    arrival->entrance = gSaveContext.save.entrance;
+    arrival->roomIndex = 1;
+    // Keep the native 180-unit trailing camera in front of the passage mouth.
+    // The old wall-side placement put it behind the opaque black quad until
+    // Link walked farther into the clearing, including stationary save arrivals.
+    arrival->pos = { 0.0f, 0.0f, 0.0f };
+    arrival->yaw = -8192; // towards the clearing, away from the north-east passage
+    arrival->playerParams = PLAYER_PARAMS(0xFF, PLAYER_START_MODE_E);
+    arrival->data = 1;
+    gSaveContext.respawnFlag = 2;
+}
 // ComboShip: Ctrl+R reset while MM is foreground. Like the portal return, but only persists MM if
 // autosave is enabled (an authentic reset otherwise discards unsaved progress). Set via the export.
 static bool sComboResetReturnPending = false;
@@ -200,11 +246,22 @@ extern "C" void Combo_RequestOwlSaveQuit(void) {
 }
 // Drop any unconsumed return request. Called as MM is entered: one left over from the previous session
 // would immediately quit the new one.
+static void Combo_CancelLostWoodsPassage(void) {
+    if (sComboPassageFade && gPlayState && gGameState == &gPlayState->state)
+        gPlayState->envCtx.fillScreen = false;
+    if (ComboLostWoods_IsForestRoute(sComboReturnPortalRoute))
+        sComboReturnPending = false;
+    sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
+    sComboPassageFade = 0;
+    sComboPassageFileNum = -1;
+    sComboOpeningReturnArmed = false;
+}
 static void Combo_ClearReturnRequests(void) {
     sComboReturnPending = false;
     sComboFwReturnPending = false;
     sComboResetReturnPending = false;
     sComboOwlSaveQuitPending = false;
+    Combo_CancelLostWoodsPassage();
 }
 // MM's own ResourceManager, created at first boot and kept alive for the whole process. A combo
 // transition swaps the Context's active RM between MM's and OOT's, so each game keeps its archives +
@@ -212,6 +269,10 @@ static void Combo_ClearReturnRequests(void) {
 // (Upstream merge: the old RegisterMMResourceFactories factoring was dropped — Initialize() now owns
 // the inline factory registration and it runs against whichever RM is active. See docs/UPSTREAM_MERGES.md.)
 static std::shared_ptr<Ship::ResourceManager> sMMResourceManager;
+#endif
+
+#ifdef COMBO_BUILD
+#include "rando/CrossDungeonMmRuntime.inc.h"
 #endif
 
 extern "C" char** cameraStrings;
@@ -1403,15 +1464,84 @@ extern "C" void InitOTR(int argc, char* argv[]) {
 #ifdef COMBO_BUILD
     // Reverse MM->OOT trigger: the Clock Tower interior's South-Clock-Town door (spawn 1 only —
     // cycle resets respawn in this scene at spawns 0/2/3/6 and must stay in MM).
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(Combo_CancelLostWoodsPassage);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s8 sceneId, s8 spawnNum) {
+        ComboCrossMmRuntime::ObserveScene(sceneId);
+        sComboOpeningReturnArmed = false;
         // GAMEMODE_NORMAL only: MM's attract demo (GAMEMODE_TITLE_SCREEN, after Sram_InitNewSave wiped
         // the save) scene-hops through here, and would both teleport the player to OOT and persist the
         // wiped save over the slot.
         if (sceneId == SCENE_INSIDETOWER && spawnNum == 1 && gSaveContext.gameMode == GAMEMODE_NORMAL) {
+            sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
             sComboReturnPending = true;
         }
     });
+    GameInteractor::Instance->RegisterGameHookForID<GameInteractor::OnActorUpdate>(ACTOR_PLAYER, [](Actor* actor) {
+        if (sComboPassageFade || !gPlayState || gGameState != &gPlayState->state || !gGameState->running ||
+            !gComboReturnCallback || gSaveContext.gameMode != GAMEMODE_NORMAL ||
+            !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) || gPlayState->pauseCtx.state != 0 ||
+            gPlayState->transitionMode != TRANS_MODE_OFF || gPlayState->transitionTrigger != TRANS_TRIGGER_OFF ||
+            gPlayState->csCtx.state != CS_STATE_IDLE)
+            return;
+        const Vec3f& pos = actor->world.pos;
+        if (ComboOpeningForest_IsExploration(gPlayState) && gPlayState->linkActorEntry) {
+            const float dx = pos.x - gPlayState->linkActorEntry->pos.x;
+            const float dz = pos.z - gPlayState->linkActorEntry->pos.z;
+            if (dx * dx + dz * dz > 14400.0f)
+                sComboOpeningReturnArmed = true;
+        }
+        const bool openingReturn = sComboOpeningReturnArmed && ComboOpeningForest_AtReturn(gPlayState, &pos);
+        if (!openingReturn &&
+            !ComboLostWoods_InMmPassage(gPlayState->sceneId, gPlayState->roomCtx.curRoom.num, pos.x, pos.y, pos.z))
+            return;
+        if (!sComboSetOotReturnRoute)
+            sComboSetOotReturnRoute = (void (*)(int))Combo_ResolveSym("soh", "SOH_SetComboPortalReturnRoute");
+        if (!sComboSetOotReturnRoute)
+            return;
+        sComboReturnPortalRoute = openingReturn ? COMBO_PORTAL_OPENING_FOREST : COMBO_PORTAL_LOST_WOODS;
+        sComboPassageFileNum = (int)gSaveContext.fileNum;
+        sComboPassageFade = 1;
+    });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>([]() {
+        if (sComboFwReturnPending || sComboResetReturnPending || sComboOwlSaveQuitPending)
+            Combo_MM_CancelCrossDungeonTransition();
+    });
+    // Play_Main has now built the final native transition display list. Commit
+    // after it, so the outgoing frame stays covered while the launcher loads.
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainFinish>([]() {
+        if (sComboFwReturnPending || sComboResetReturnPending || sComboOwlSaveQuitPending)
+            Combo_MM_CancelCrossDungeonTransition();
+        if (ComboCrossMmRuntime::PrepareSwitch()) {
+            if (gPlayState) {
+                gPlayState->transitionTrigger = TRANS_TRIGGER_OFF;
+                gPlayState->transitionMode = TRANS_MODE_OFF;
+            }
+            Combo_CancelLostWoodsPassage();
+            sComboReturnPending = true;
+        }
+        if (Combo_MM_CrossDungeonTransitionPending() && sComboPassageFade)
+            Combo_CancelLostWoodsPassage();
+        if (sComboPassageFade &&
+            (!gPlayState || gGameState != &gPlayState->state || !gGameState->running ||
+             gSaveContext.gameMode != GAMEMODE_NORMAL || !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) ||
+             sComboPassageFileNum != (int)gSaveContext.fileNum))
+            Combo_CancelLostWoodsPassage();
+        if (sComboPassageFade && gPlayState && !sComboFwReturnPending && !sComboResetReturnPending &&
+            !sComboOwlSaveQuitPending) {
+            if (sComboPassageFade < 255) {
+                sComboPassageFade = std::min(sComboPassageFade + 24, 255);
+                gPlayState->envCtx.fillScreen = true;
+                gPlayState->envCtx.screenFillColor[0] = gPlayState->envCtx.screenFillColor[1] =
+                    gPlayState->envCtx.screenFillColor[2] = 0;
+                gPlayState->envCtx.screenFillColor[3] = sComboPassageFade;
+                return; // Let a full-alpha frame render before the next handoff tick.
+            }
+            gPlayState->envCtx.fillScreen = true;
+            gPlayState->envCtx.screenFillColor[0] = gPlayState->envCtx.screenFillColor[1] =
+                gPlayState->envCtx.screenFillColor[2] = 0;
+            gPlayState->envCtx.screenFillColor[3] = sComboPassageFade;
+            sComboReturnPending = true;
+        }
         if (!sComboReturnPending && !sComboFwReturnPending && !sComboResetReturnPending && !sComboOwlSaveQuitPending)
             return;
         const bool isFwReturn = sComboFwReturnPending;
@@ -1421,6 +1551,15 @@ extern "C" void InitOTR(int argc, char* argv[]) {
         sComboFwReturnPending = false;
         sComboResetReturnPending = false;
         sComboOwlSaveQuitPending = false;
+        sComboPassageFade = 0;
+        sComboPassageFileNum = -1;
+        // Route the next OOT boot before its title-setup/save-load sequence begins.
+        if (!sComboSetOotReturnRoute)
+            sComboSetOotReturnRoute = (void (*)(int))Combo_ResolveSym("soh", "SOH_SetComboPortalReturnRoute");
+        if (sComboSetOotReturnRoute)
+            sComboSetOotReturnRoute(isFwReturn || isReset || isOwlSaveQuit ? COMBO_PORTAL_MARKET
+                                                                           : sComboReturnPortalRoute);
+        sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
         // An owl save quit lands on OOT's title, like Ctrl+R, rather than resuming OOT gameplay.
         if (isOwlSaveQuit) {
             static void (*sFn)(void) = nullptr;
@@ -1441,7 +1580,7 @@ extern "C" void InitOTR(int argc, char* argv[]) {
                 MM_CaptureFwDeparture();
             void Combo_MM_FlushAccumulators(void);
             Combo_MM_FlushAccumulators(); // ComboShip (#214): bank a count-up still running at the portal
-            SaveManager_SaveCurrentForCombo();
+            SaveManager_SaveCurrentForCombo(!isReset && !isFwReturn);
         }
         if (gComboReturnCallback)
             gComboReturnCallback(isOwlSaveQuit ? 2 : (isReset ? 1 : (isFwReturn ? 3 : 0)));
@@ -3314,6 +3453,8 @@ extern "C" int gComboEntryIsResume = 0;
 extern "C" COMBO_EXPORT void MM_SetComboEntryIsResume(int isResume) {
     gComboEntryIsResume = isResume ? 1 : 0;
     Combo_ClearReturnRequests(); // a stale request would quit the session we're about to start
+    sComboPortalRoute = COMBO_PORTAL_MARKET;
+    sComboPortalArrivalPending = false;
 }
 
 // ComboShip (#83): adopt OOT's targeting/audio. MM normally reads these from global.json, which combo
@@ -5143,11 +5284,38 @@ extern "C" COMBO_EXPORT void MM_TriggerTriforceCredits(int dormant) try {
     SPDLOG_ERROR("[ComboShip] MM_TriggerTriforceCredits threw: {}", e.what());
 } catch (...) { SPDLOG_ERROR("[ComboShip] MM_TriggerTriforceCredits threw a non-std exception"); }
 
+#include "rando/CrossDungeonMm.inc.h"
+
 extern "C" COMBO_EXPORT const char* Combo_MM_Rando_GetReachableChecks(void) {
     static std::string buf;
 
-    std::set<RandoRegionId> reachable = { RR_MAX };
-    auto timeStates = Rando::Logic::InitializeRegionTimeStates(RR_MAX);
+    struct SearchGuard {
+        SearchGuard() {
+            ComboCrossMm::searching = true;
+        }
+        ~SearchGuard() {
+            ComboCrossMm::searching = false;
+        }
+    } crossGuard;
+    std::set<RandoRegionId> reachable;
+    std::unordered_map<RandoRegionId, Rando::Logic::RegionTimeState> timeStates;
+    if (ComboCrossMm::state.routes.empty() || ComboCrossMm::state.overworld) {
+        reachable.insert(RR_MAX);
+        timeStates = Rando::Logic::InitializeRegionTimeStates(RR_MAX);
+    }
+    for (int index : ComboCrossMm::state.arrivals) {
+        auto region = Rando::Logic::GetRegionIdFromEntrance(index);
+        reachable.insert(region);
+        auto states = Rando::Logic::InitializeRegionTimeStates(region);
+        // InitializeRegionTimeStates is also used for the synthetic start root, which cannot
+        // wait. A physical cross arrival inherits its native region's waiting restrictions.
+        for (auto& [arrivalRegion, incoming] : states) {
+            incoming.canStayOverTime = Rando::Logic::Regions.at(arrivalRegion).canStayOverTime;
+            const auto [it, inserted] = timeStates.emplace(arrivalRegion, incoming);
+            if (!inserted)
+                it->second = Rando::Logic::MergeTimeStates(it->second, incoming);
+        }
+    }
 
     // ComboShip: mirror GlitchlessLogic's reachability fixpoint (Rando/Logic/GlitchlessLogic.cpp).
     // Crawling region connections alone isn't enough — MM's logic is event-gated (raising Woodfall,
@@ -5200,6 +5368,8 @@ extern "C" COMBO_EXPORT const char* Combo_MM_Rando_GetReachableChecks(void) {
         }
     }
 
+    ComboCrossMm::reachable = reachable;
+    ComboCrossMm::timeStates = timeStates;
     buf = out.dump();
     return buf.c_str();
 }

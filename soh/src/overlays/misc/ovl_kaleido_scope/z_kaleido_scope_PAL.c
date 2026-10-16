@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 #include "z_kaleido_scope.h"
 #include <stdlib.h>
 #include <string.h>
@@ -3866,7 +3867,8 @@ void KaleidoScope_Update(PlayState* play) {
                 pauseCtx->worldMapPoints[3] = 1;
             }
 
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                 pauseCtx->worldMapPoints[4] = 1;
             }
 
@@ -3886,7 +3888,8 @@ void KaleidoScope_Update(PlayState* play) {
                 pauseCtx->worldMapPoints[4] = 1;
             }
 
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                 pauseCtx->worldMapPoints[5] = 2;
             }
 
@@ -3906,7 +3909,8 @@ void KaleidoScope_Update(PlayState* play) {
                 pauseCtx->worldMapPoints[5] = 2;
             }
 
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                 pauseCtx->worldMapPoints[6] = 1;
             }
 
@@ -3914,7 +3918,8 @@ void KaleidoScope_Update(PlayState* play) {
                 pauseCtx->worldMapPoints[7] = 2;
             }
 
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) {
                 pauseCtx->worldMapPoints[7] = 1;
             }
 
@@ -3922,7 +3927,8 @@ void KaleidoScope_Update(PlayState* play) {
                 pauseCtx->worldMapPoints[7] = 2;
             }
 
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_VOLVAGIA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP))) {
                 pauseCtx->worldMapPoints[7] = 1;
             }
 
@@ -3978,13 +3984,15 @@ void KaleidoScope_Update(PlayState* play) {
                 pauseCtx->worldMapPoints[9] = 2;
             }
 
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_PHANTOM_GANON,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP))) {
                 pauseCtx->worldMapPoints[9] = 1;
             }
 
             pauseCtx->worldMapPoints[10] = 2;
 
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                 pauseCtx->worldMapPoints[10] = 1;
             }
 
@@ -4000,11 +4008,13 @@ void KaleidoScope_Update(PlayState* play) {
                 pauseCtx->worldMapPoints[11] = 1;
             }
 
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) {
                 pauseCtx->worldMapPoints[11] = 2;
             }
 
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 pauseCtx->worldMapPoints[11] = 1;
             }
 

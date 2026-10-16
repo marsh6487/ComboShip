@@ -35,7 +35,7 @@ def gpu_fixture():
 #define G_MDSFT_TEXTFILT 12
 #define SUPPORT_CHECK(x) check(x,"production load-tile contract")
 struct ResourceStub { struct Init { std::string Path; }; Init* GetInitData() { return nullptr; } };
-struct RawTexMetadata { float h_byte_scale=1,v_pixel_scale=1;std::shared_ptr<ResourceStub> resource;uint8_t autumnForestLayer=0; };
+struct RawTexMetadata { float h_byte_scale=1,v_pixel_scale=1;std::shared_ptr<ResourceStub> resource;uint8_t autumnForestLayer=0,zoraCosmeticLayer=0; };
 struct TextureTile { uint32_t palette=0,fmt=0,siz=2,cms=0,cmt=0,masks=0,maskt=0,shifts=0,shiftt=0,line_size_bytes=64,tmem=0,tmem_index=0,uls=0,ult=0,lrs=124,lrt=124; };
 struct LoadedTexture { uint32_t line_size_bytes=64,size_bytes=2048,full_image_line_size_bytes=64,orig_size_bytes=2048,tex_flags=0;RawTexMetadata raw_tex_metadata;const uint8_t* addr=nullptr;bool masked=false,blended=false; };
 struct Rdp { TextureTile texture_tile[8];LoadedTexture loaded_texture[2];struct { const uint8_t* addr=nullptr;uint32_t siz=2,width=32,tex_flags=0;RawTexMetadata raw_tex_metadata; } texture_to_load;bool textures_changed[2]={true,true};uint32_t other_mode_h=0; };
@@ -53,7 +53,7 @@ class Interpreter {
 };
 static std::string_view GetBaseTexturePath(const std::string& path) { return path; }
 '''
-    for name in ("AutumnForestLayer", "Interpreter::GfxDpSetTextureImage", "Interpreter::GfxDpSetTile", "Interpreter::GfxDpLoadTile",
+    for name in ("AutumnForestLayer", "ZoraCosmeticLayer", "Interpreter::GfxDpSetTextureImage", "Interpreter::GfxDpSetTile", "Interpreter::GfxDpLoadTile",
                  "gfx_set_timg_fb_handler_custom"):
         code += ownership.production_function(source, name) + "\n"
     dimension_start = source.index("uint32_t loaded_line_size =")

@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 /*
  * File: z_en_viewer.c
  * Overlay: ovl_En_Viewer
@@ -948,7 +949,8 @@ static StaticStoryProgression EnViewerStatic_ReadProgression(void) {
     StaticStoryProgression progression = {
         .metZelda = Flags_GetEventChkInf(EVENTCHKINF_ZELDA_FLED_HYRULE_CASTLE),
         .forestComplete = CHECK_QUEST_ITEM(QUEST_SONG_SARIA),
-        .waterComplete = Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP),
+        .waterComplete = Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_MORPHA,
+                                                         Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP)),
         .eponaComplete = Flags_GetEventChkInf(EVENTCHKINF_EPONA_OBTAINED),
     };
 

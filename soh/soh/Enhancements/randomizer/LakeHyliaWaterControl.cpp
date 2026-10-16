@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 #include <libultraship/bridge/resourcebridge.h>
 
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -27,7 +28,8 @@ static void SpawnSwitches(PlayState* play) {
 
     // If Water Temple cleared, spawn normal switches and sync current water level with switch status.
     // Else, spawn frozen rusty switch that is glitched and can't be pressed + spawn Navi check spots
-    if (Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP)) {
+    if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_MORPHA,
+                                        Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP))) {
         // This eventchkinf flag is set and unset on switch press - the permanent flag of water level
         if (!Flags_GetEventChkInf(EVENTCHKINF_RAISED_LAKE_HYLIA_WATER)) {
             Flags_SetSwitch(play, 0x3E); // Temp switch flag set = lowered water level

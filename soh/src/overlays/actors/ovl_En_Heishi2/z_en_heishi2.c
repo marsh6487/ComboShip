@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 /*
  * File: z_en_heishi2.c
  * Overlay: ovl_En_Heishi2
@@ -197,9 +198,12 @@ void func_80A53278(EnHeishi2* this, PlayState* play) {
             this->unk_30B = 1;
             this->unk_300 = TEXT_STATE_DONE;
             this->actionFunc = func_80A5475C;
-        } else if ((Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) &&
-                   (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) &&
-                   (Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
+        } else if ((Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) &&
+                   (Combo_SOH_CrossBossLogicalClear(
+                       COMBO_BOSS_DODONGO, Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) &&
+                   (Combo_SOH_CrossBossLogicalClear(
+                       COMBO_BOSS_BARINADE, Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)))) {
             // "Get all spiritual stones!"
             osSyncPrintf(VT_FGCOL(GREEN) " ☆☆☆☆☆ 全部の精霊石GET！ ☆☆☆☆☆ \n" VT_RST);
             this->unk_300 = TEXT_STATE_DONE;

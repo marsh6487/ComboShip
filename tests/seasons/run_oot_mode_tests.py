@@ -33,11 +33,17 @@ parts.append("void StartingRod() {\n" + start + "}\n")
 prefix = r'''
 #include "z64.h"
 #include "mods/extended_inventory.h"
+#include "rando/CrossEntranceBoss.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
 SaveContext gSaveContext{};
+ComboRando::CrossDungeon::BossCompletionState bossCompletion;
+bool crossBossEnabled = false;
+extern "C" int Combo_SOH_CrossBossLogicalClear(int id, int nativeValue) {
+    return bossCompletion.LogicalClear(id, nativeValue, crossBossEnabled);
+}
 NeiSaveData state{};
 NeiSaveData* Nei_Save() { return &state; }
 uint16_t Nei_GetOwnedItem(uint8_t slot) { return state.ownedItems[slot - 24]; }
@@ -76,6 +82,32 @@ int main() {
         1u << (EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP & 15);
     Seasons_UpdateGates();
     assert(state.seasonsGates == 2 && !Seasons_HasRod());
+    // Native arena flags must not unlock the wrong source dungeon's season.
+    crossBossEnabled = true;
+    for (int flag : {EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP,
+                     EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP,
+                     EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP,
+                     EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP}) {
+        gSaveContext.eventChkInf[flag >> 4] |= 1u << (flag & 15);
+    }
+    state = {};
+    Seasons_UpdateGates();
+    assert(state.seasonsGates == 0);
+    memset(gSaveContext.eventChkInf, 0, sizeof(gSaveContext.eventChkInf));
+    struct BossGate { int boss; uint8_t season; } bossGates[] = {
+        {COMBO_BOSS_BARINADE, SEASON_SPRING}, {COMBO_BOSS_MORPHA, SEASON_SPRING},
+        {COMBO_BOSS_VOLVAGIA, SEASON_SUMMER}, {COMBO_BOSS_PHANTOM_GANON, SEASON_AUTUMN},
+    };
+    for (auto gate : bossGates) {
+        state = {};
+        bossCompletion.SetCompletedMask(1u << gate.boss);
+        Seasons_UpdateGates();
+        assert(state.seasonsGates == (1u << gate.season));
+        bossCompletion.SetCompletedMask(0);
+        Seasons_UpdateGates();
+        assert(state.seasonsGates == (1u << gate.season)); // completion remains latched
+    }
+    crossBossEnabled = false;
     mode = NEI_SEASONS_INDIVIDUAL;
     Pickup(RG_SEASON_WINTER);
     assert(!Seasons_SeasonOwned(SEASON_SUMMER)); // gates are inactive
@@ -95,7 +127,7 @@ int main() {
         assert(state.seasonsOwned == (rule == NEI_SEASONS_ROD ? 15 : 0));
         assert(rule == NEI_SEASONS_ROD || state.season == SEASON_OFF);
     }
-    puts("PASS OoT native check gates: three independent Spring alternatives, Forest/Fire/Ice and inactive ungated rules");
+    puts("PASS OoT season gates: native and shuffled source clears, persistent gates and inactive ungated rules");
 }
 '''
 with tempfile.TemporaryDirectory(prefix="seasons-oot-modes-") as td:

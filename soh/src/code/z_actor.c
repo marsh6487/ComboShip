@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 #include "global.h"
 #include "gameplay/ComboFaroresWind.h"
 #include "soh/Enhancements/debugger/FrameTimingProbe.h"
@@ -5417,7 +5418,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
 
     switch (arg1) {
         case 0:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                 if (Flags_GetInfTable(INFTABLE_05)) {
                     retTextId = 0x1048;
                 } else {
@@ -5445,7 +5447,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 1:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                     if (Flags_GetInfTable(INFTABLE_10)) {
                         retTextId = 0x1046;
                     } else {
@@ -5492,7 +5495,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 2:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                     retTextId = 0x1042;
                 } else {
                     retTextId = 0x1004;
@@ -5509,7 +5513,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 3:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                     retTextId = 0x1043;
                 } else {
                     if (Flags_GetInfTable(INFTABLE_1E)) {
@@ -5528,7 +5533,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 4:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                     retTextId = 0x1042;
                 } else {
                     retTextId = 0x1007;
@@ -5545,7 +5551,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 5:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                     retTextId = 0x1044;
                 } else if (Flags_GetInfTable(INFTABLE_22)) {
                     retTextId = 0x1009;
@@ -5562,7 +5569,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 6:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                     retTextId = 0x1042;
                 } else if (Flags_GetInfTable(INFTABLE_24)) {
                     retTextId = 0x100B;
@@ -5579,7 +5587,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 7:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                     retTextId = 0x1043;
                 } else if (Flags_GetInfTable(INFTABLE_26)) {
                     retTextId = 0x100D;
@@ -5596,7 +5605,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 8:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                     retTextId = 0x1043;
                 } else if (Flags_GetInfTable(INFTABLE_28)) {
                     retTextId = 0x1019;
@@ -5615,7 +5625,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 9:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                     retTextId = 0x1049;
                 } else {
                     retTextId = 0x1035;
@@ -5630,7 +5641,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 10:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                     retTextId = 0x104A;
                 } else {
                     retTextId = 0x1038;
@@ -5647,7 +5659,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 11:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                     retTextId = 0x104B;
                 } else {
                     retTextId = 0x103C;
@@ -5662,7 +5675,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 12:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                     retTextId = 0x104C;
                 } else {
                     retTextId = 0x103D;
@@ -5677,7 +5691,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 13:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP))) {
                     retTextId = 0x104D;
                 } else {
                     retTextId = 0x103E;
@@ -5713,9 +5728,12 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 17:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 if (Flags_GetInfTable(INFTABLE_6C)) {
                     retTextId = 0x7008;
                 } else {
@@ -5729,9 +5747,12 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             retTextId = 0x702D;
             break;
         case 18:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x7006;
             } else {
                 if (Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_POCKET_EGG)) {
@@ -5762,18 +5783,24 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 24:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x7044;
             } else {
                 retTextId = 0x7015;
             }
             break;
         case 25:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x7045;
             } else {
                 Flags_GetInfTable(INFTABLE_C2);
@@ -5781,9 +5808,12 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 26:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x7046;
             } else {
                 Flags_GetInfTable(INFTABLE_C2);
@@ -5791,9 +5821,12 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 27:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x7047;
             } else if (Flags_GetEventChkInf(EVENTCHKINF_TALON_RETURNED_FROM_CASTLE)) {
                 retTextId = 0x701A;
@@ -5808,9 +5841,12 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 28:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x7048;
             } else {
                 Flags_GetInfTable(INFTABLE_CA);
@@ -5818,9 +5854,12 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 29:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x7049;
             } else {
                 Flags_GetInfTable(INFTABLE_CC);
@@ -5828,9 +5867,12 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 30:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x704A;
             } else {
                 Flags_GetInfTable(INFTABLE_CE);
@@ -5838,9 +5880,12 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 31:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x704B;
             } else {
                 Flags_GetInfTable(INFTABLE_D0);
@@ -5848,9 +5893,12 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 32:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x704C;
             } else {
                 Flags_GetInfTable(INFTABLE_D2);
@@ -5858,9 +5906,12 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 33:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP) &&
-                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DEKU_TREE_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) &&
+                Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x704D;
             } else {
                 Flags_GetInfTable(INFTABLE_D4);
@@ -5883,7 +5934,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 38:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) {
                     retTextId = 0x3027;
                 } else if (Flags_GetEventChkInf(EVENTCHKINF_BOMBED_DODONGOS_CAVERN_ENTRANCE)) {
                     retTextId = 0x3021;
@@ -5902,7 +5954,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 39:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) {
                     retTextId = 0x3027;
                 } else if (Flags_GetEventChkInf(EVENTCHKINF_BOMBED_DODONGOS_CAVERN_ENTRANCE)) {
                     retTextId = 0x3026;
@@ -5919,7 +5972,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 40:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) {
                     retTextId = 0x3027;
                 } else if (Flags_GetEventChkInf(EVENTCHKINF_BOMBED_DODONGOS_CAVERN_ENTRANCE)) {
                     retTextId = 0x3026;
@@ -5938,7 +5992,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 41:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) {
                     retTextId = 0x3027;
                 } else if (Flags_GetInfTable(INFTABLE_F0)) {
                     retTextId = 0x3015;
@@ -5955,7 +6010,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 42:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) {
                     retTextId = 0x3027;
                 } else if (Flags_GetInfTable(INFTABLE_F4)) {
                     retTextId = 0x3017;
@@ -5972,7 +6028,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 43:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                    Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) {
                     retTextId = 0x3027;
                 } else if (Flags_GetInfTable(INFTABLE_F8)) {
                     retTextId = 0x3019;
@@ -5988,7 +6045,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 48:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_DODONGO,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_DODONGOS_CAVERN_BLUE_WARP))) {
                 retTextId = 0x3029;
             } else if (Flags_GetEventChkInf(EVENTCHKINF_20) && Flags_GetEventChkInf(EVENTCHKINF_21)) {
                 retTextId = 0x301B;
@@ -5997,7 +6055,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 49:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x402D;
             } else if (Flags_GetEventChkInf(EVENTCHKINF_SPOKE_TO_A_ZORA)) {
                 retTextId = 0x4007;
@@ -6006,7 +6065,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 50:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x402E;
             } else if (Flags_GetEventChkInf(EVENTCHKINF_SPOKE_TO_A_ZORA)) {
                 if (Flags_GetInfTable(INFTABLE_124)) {
@@ -6019,7 +6079,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 51:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x402D;
             } else if (Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_RUTOS_LETTER)) {
                 if (Flags_GetInfTable(INFTABLE_12A)) {
@@ -6034,7 +6095,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 52:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x402E;
             } else if (Flags_GetEventChkInf(EVENTCHKINF_SPOKE_TO_A_ZORA)) {
                 retTextId = 0x400C;
@@ -6043,7 +6105,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 53:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x402D;
             } else if (Flags_GetEventChkInf(EVENTCHKINF_KING_ZORA_MOVED)) {
                 retTextId = 0x4010;
@@ -6054,7 +6117,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             }
             break;
         case 54:
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_BARINADE,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                 retTextId = 0x402E;
             } else if (Flags_GetEventChkInf(EVENTCHKINF_SPOKE_TO_A_ZORA)) {
                 retTextId = 0x4011;
@@ -6064,7 +6128,8 @@ u32 func_80035BFC(PlayState* play, s16 arg1) {
             break;
         case 55:
             if (!LINK_IS_ADULT) {
-                if (Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP)) {
+                if (Combo_SOH_CrossBossLogicalClear(
+                        COMBO_BOSS_BARINADE, Flags_GetEventChkInf(EVENTCHKINF_USED_JABU_JABUS_BELLY_BLUE_WARP))) {
                     retTextId = 0x402B;
                 } else if (Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_RUTOS_LETTER)) {
                     if (Flags_GetInfTable(INFTABLE_138)) {

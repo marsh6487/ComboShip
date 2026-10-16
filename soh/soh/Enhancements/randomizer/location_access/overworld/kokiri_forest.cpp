@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 #include "soh/Enhancements/randomizer/location_access.h"
 #include "soh/Enhancements/randomizer/entrance.h"
 
@@ -103,16 +104,16 @@ void RegionTable_Init_KokiriForest() {
         ENTRANCE(RR_KF_BOULDER_LOOP,       logic->CanUse(RG_CRAWL)),
         //The Deku Baba blocks the setup as Adult, and stunning doesn't last long enough to perform it.
         ENTRANCE(RR_KF_LINKS_PORCH,        logic->HasItem(RG_CLIMB) || logic->CanUse(RG_HOVER_BOOTS) ||
-                                           ((logic->IsChild || logic->CanKillEnemy(RE_DEKU_BABA) || logic->Get(LOGIC_FOREST_TEMPLE_CLEAR)) && logic->CanClimbLadder())),
+                                           ((logic->IsChild || logic->CanKillEnemy(RE_DEKU_BABA) || Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_PHANTOM_GANON, logic->Get(LOGIC_FOREST_TEMPLE_CLEAR))) && logic->CanClimbLadder())),
         ENTRANCE(RR_KF_MIDOS_HOUSE,        true),
         ENTRANCE(RR_KF_SARIAS_HOUSE,       true),
         ENTRANCE(RR_KF_HOUSE_OF_TWINS,     true),
         ENTRANCE(RR_KF_KNOW_IT_ALL_HOUSE,  true),
         ENTRANCE(RR_KF_KOKIRI_SHOP,        true),
-        ENTRANCE(RR_KF_OUTSIDE_DEKU_TREE,  (logic->IsAdult && (logic->CanPassEnemy(RE_BIG_SKULLTULA) || logic->Get(LOGIC_FOREST_TEMPLE_CLEAR))) || logic->Get(LOGIC_SHOWED_MIDO_SWORD_AND_SHIELD)),
+        ENTRANCE(RR_KF_OUTSIDE_DEKU_TREE,  (logic->IsAdult && (logic->CanPassEnemy(RE_BIG_SKULLTULA) || Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_PHANTOM_GANON, logic->Get(LOGIC_FOREST_TEMPLE_CLEAR)))) || logic->Get(LOGIC_SHOWED_MIDO_SWORD_AND_SHIELD)),
         ENTRANCE(RR_KF_OUTSIDE_LOST_WOODS, logic->HasItem(RG_CLIMB) || logic->CanUse(RG_HOOKSHOT) || (logic->IsAdult && (logic->BeanPlanted(LOGIC_PLANT_KOKIRI_FOREST_BEAN) || ctx->GetTrickOption(RT_UNINTUITIVE_JUMPS)))),
         ENTRANCE(RR_KF_RUPEE_ALCOVE,       logic->IsAdult && logic->BeanPlanted(LOGIC_PLANT_KOKIRI_FOREST_BEAN)),
-        ENTRANCE(RR_LW_BRIDGE_FROM_FOREST, logic->IsAdult || ctx->GetOption(RSK_FOREST).IsNot(RO_CLOSED_FOREST_ON) || logic->Get(LOGIC_DEKU_TREE_CLEAR)),
+        ENTRANCE(RR_LW_BRIDGE_FROM_FOREST, logic->IsAdult || ctx->GetOption(RSK_FOREST).IsNot(RO_CLOSED_FOREST_ON) || Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA, logic->Get(LOGIC_DEKU_TREE_CLEAR))),
     });
 
     areaTable[RR_KF_OUTSIDE_LOST_WOODS] = Region("KF Outside Lost Woods", SCENE_KOKIRI_FOREST, {
@@ -185,7 +186,7 @@ void RegionTable_Init_KokiriForest() {
     }, {
         //Exits
         ENTRANCE(RR_DEKU_TREE_ENTRYWAY, logic->IsChild || (ctx->GetOption(RSK_SHUFFLE_DUNGEON_ENTRANCES).IsNot(RO_DUNGEON_ENTRANCE_SHUFFLE_OFF) && (ctx->GetOption(RSK_FOREST).Is(RO_CLOSED_FOREST_OFF) || logic->Get(LOGIC_SHOWED_MIDO_SWORD_AND_SHIELD)))),
-        ENTRANCE(RR_KOKIRI_FOREST,      (logic->IsAdult && (logic->CanPassEnemy(RE_BIG_SKULLTULA) || logic->Get(LOGIC_DEKU_TREE_CLEAR))) || ctx->GetOption(RSK_FOREST).Is(RO_CLOSED_FOREST_OFF) || logic->Get(LOGIC_SHOWED_MIDO_SWORD_AND_SHIELD)),
+        ENTRANCE(RR_KOKIRI_FOREST,      (logic->IsAdult && (logic->CanPassEnemy(RE_BIG_SKULLTULA) || Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA, logic->Get(LOGIC_DEKU_TREE_CLEAR)))) || ctx->GetOption(RSK_FOREST).Is(RO_CLOSED_FOREST_OFF) || logic->Get(LOGIC_SHOWED_MIDO_SWORD_AND_SHIELD)),
     });
 
     areaTable[RR_KF_LINKS_PORCH] = Region("KF Link's Porch", SCENE_KOKIRI_FOREST, {}, {}, {

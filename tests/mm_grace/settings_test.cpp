@@ -73,6 +73,12 @@ static int MM_InitRandoSaveFile(int, const char*, const unsigned char*) {
     appliedRewards = CVarGetInteger("gRando.Options.RO_HYLIAS_GRACE_REWARDS", 4);
     return creationResult;
 }
+// Runtime seed binding is a launcher service; the dedicated cross-entrance
+// fixtures execute its production host binding and rollback paths.
+static bool runtimeBindingAccepted = true;
+static bool Combo_BindCrossDungeonRuntime(const nlohmann::json&) {
+    return runtimeBindingAccepted;
+}
 
 #include "settings_production.inc"
 
@@ -82,6 +88,11 @@ static void SeedApplication() {
     nlohmann::json seed = {{"mm", {{"placements", nlohmann::json::object()},
         {"settings", {{"gRando.Options.RO_HYLIAS_GRACE", NEI_GRACE_GATED},
                       {"gRando.Options.RO_HYLIAS_GRACE_REWARDS", 7}}}}}};
+    runtimeBindingAccepted = false;
+    appliedMode = -99;
+    REQUIRE(!Combo_WriteMMSaveForSlot(2, seed) && appliedMode == -99);
+    REQUIRE(CVarGetInteger("gRando.Options.RO_HYLIAS_GRACE", -1) == NEI_GRACE_ON);
+    runtimeBindingAccepted = true;
     REQUIRE(Combo_WriteMMSaveForSlot(2, seed));
     REQUIRE(appliedMode == NEI_GRACE_GATED && appliedRewards == 7 && g_MmSaveInMemorySlot == 2);
     REQUIRE(CVarGetInteger("gRando.Options.RO_HYLIAS_GRACE", -1) == NEI_GRACE_ON);

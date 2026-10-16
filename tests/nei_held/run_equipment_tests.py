@@ -5,6 +5,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 from run_articulated_tests import ROOT,flags as oot_flags
 sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
 from run_mm_nei_tests import flags as mm_flags
+subprocess.run([sys.executable, '-B', str(ROOT/'tests/nei_held/run_equipment_regression_tests.py')], check=True)
 header=ROOT/'soh/mods/equipment/nei_equipment_presentation.h'
 assert header.exists(),'Rigid equipment has no authored gameplay model selection'
 with tempfile.TemporaryDirectory(prefix='nei-equipment-') as td:

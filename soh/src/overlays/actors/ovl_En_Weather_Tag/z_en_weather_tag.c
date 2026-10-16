@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 /*
  * File: z_en_weather_tag.c
  * Overlay: ovl_En_Weather_Tag
@@ -99,7 +100,8 @@ void EnWeatherTag_Init(Actor* thisx, PlayState* play) {
             // "☆☆☆☆☆ Yukigafuru You won't come (._.) ☆☆☆☆☆"
             osSyncPrintf(VT_FGCOL(YELLOW) "☆☆☆☆☆ ゆきがふるー あなたはこないー (._.) ☆☆☆☆☆ \n" VT_RST);
 
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_MORPHA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP))) {
                 Actor_Kill(&this->actor);
             }
             EnWeatherTag_SetupAction(this, EnWeatherTag_DisabledCloudySnow);
@@ -109,7 +111,8 @@ void EnWeatherTag_Init(Actor* thisx, PlayState* play) {
             // "☆☆☆☆☆ Wow wa wa na wa saa ki ha (^o^) ☆☆☆☆☆"
             osSyncPrintf(VT_FGCOL(YELLOW) "☆☆☆☆☆ わわわわー なーがーさーきーはー (^o^) ☆☆☆☆☆ \n" VT_RST);
 
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_MORPHA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP))) {
                 Actor_Kill(&this->actor);
             }
             EnWeatherTag_SetupAction(this, EnWeatherTag_DisabledRainLakeHylia);
@@ -118,7 +121,8 @@ void EnWeatherTag_Init(Actor* thisx, PlayState* play) {
             osSyncPrintf("\n\n");
             // "☆☆☆☆☆ Cloudy (._.) Ah Melancholy ☆☆☆☆☆"
             osSyncPrintf(VT_FGCOL(YELLOW) "☆☆☆☆☆ くもり (._.) あーあ 憂鬱 ☆☆☆☆☆ \n" VT_RST);
-            if (Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP)) {
+            if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_VOLVAGIA,
+                                                Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP))) {
                 Actor_Kill(&this->actor);
             }
             EnWeatherTag_SetupAction(this, EnWeatherTag_DisabledCloudyDeathMountain);
@@ -128,9 +132,12 @@ void EnWeatherTag_Init(Actor* thisx, PlayState* play) {
             // "☆☆☆☆☆ Cloudy Rain Thunder (;O;) Uo Melancholy ☆☆☆☆☆"
             osSyncPrintf(VT_FGCOL(YELLOW) "☆☆☆☆☆ くもり雨雷 (;O;) うおお 憂鬱 ☆☆☆☆☆ \n" VT_RST);
 
-            if (!Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP) ||
-                !Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP) ||
-                !Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP) ||
+            if (!Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_PHANTOM_GANON,
+                                                 Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP)) ||
+                !Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_VOLVAGIA,
+                                                 Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP)) ||
+                !Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_MORPHA,
+                                                 Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP)) ||
                 CHECK_QUEST_ITEM(QUEST_MEDALLION_SHADOW)) {
                 Actor_Kill(&this->actor);
             }

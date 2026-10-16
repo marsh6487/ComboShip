@@ -2,6 +2,7 @@
 #include "2s2h/ShipInit.hpp"
 
 #include "2s2h/Rando/Logic/Logic.h"
+#include "rando/CrossEntranceBoss.h"
 
 using namespace Rando::Logic;
 
@@ -49,7 +50,7 @@ static RegisterShipInitFunc initFunc([]() {
             CHECK(RC_GIANTS_CHAMBER_OATH_TO_ORDER,          CanKillEnemy(ACTOR_BOSS_HAKUGIN)),
         },
         .exits = { //     TO                                         FROM
-            EXIT(ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7),               ONE_WAY_EXIT, true),
+            EXIT(ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7),               ONE_WAY_EXIT, !Combo_MM_CrossBossLogicEnabled() || CanKillEnemy(ACTOR_BOSS_HAKUGIN)),
         },
         .events = {
             EVENT(RE_CLEARED_SNOWHEAD_TEMPLE, CanKillEnemy(ACTOR_BOSS_HAKUGIN)),

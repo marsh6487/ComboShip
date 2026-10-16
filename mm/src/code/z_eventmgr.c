@@ -8,6 +8,7 @@
 #include "z64shrink_window.h"
 #include "libc/string.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 
 ActorCutscene sGlobalCutsceneList[] = {
     // CS_ID_GLOBAL_78
@@ -379,6 +380,11 @@ s16 CutsceneManager_StartWithPlayerCsAndSetFlag(s16 csId, Actor* actor) {
 }
 
 s16 CutsceneManager_Start(s16 csId, Actor* actor) {
+#ifdef COMBO_BUILD
+    if (ComboOpeningForest_IsExploration(gPlayState) && csId > CS_ID_NONE &&
+        CutsceneManager_GetCutsceneScriptIndex(csId) != CS_SCRIPT_ID_NONE)
+        return CS_ID_NONE; // Includes scene scripts triggered after arrival, not global player actions.
+#endif
     if (!GameInteractor_Should(VB_START_CUTSCENE, true, &csId, actor)) {
         return CS_ID_NONE;
     }

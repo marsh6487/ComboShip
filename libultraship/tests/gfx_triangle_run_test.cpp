@@ -105,6 +105,10 @@ static ForestManagerFixture* ActiveResMgr() {
     static ForestManagerFixture manager;
     return &manager;
 }
+// Archive traversal and read-only Zora logging are outside the triangle/vertex
+// fixtures. Production submission, sampler state and metadata classification run.
+static void TraceZoraCosmeticDraw(const RawTexMetadata&, const RDP&, bool, uint64_t, uint64_t, uint32_t) {
+}
 } // namespace Fast
 static std::vector<ForestDrawLog> forestDrawLogs;
 static void recordForestDraw(const char*, const char* layer, const std::string& path, const std::string& archive,

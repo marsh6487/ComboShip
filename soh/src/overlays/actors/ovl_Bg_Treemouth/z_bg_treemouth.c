@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 /*
  * File: z_bg_treemouth.c
  * Overlay: ovl_Bg_Treemouth
@@ -237,7 +238,8 @@ void BgTreemouth_Draw(Actor* thisx, PlayState* play) {
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
 
     if ((gSaveContext.sceneLayer < 4) || LINK_IS_ADULT) {
-        if (Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD)) {
+        if (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_GOHMA,
+                                            Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD))) {
             alpha = 2150;
         }
     } else { // neeeded to match

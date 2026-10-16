@@ -81,7 +81,7 @@ def build(output):
             (folder / "held_dl").write_text(
                 '<DisplayList Version="0">\n'
                 f'<Matrix Path="{prefix}grip_mtx" Param="G_MTX_PUSH"/>\n'
-                f'<DisplayList Path="{source_dl}"/>\n'
+                f'<CallDisplayList Path="{source_dl}"/>\n'
                 '<PopMatrix Param="G_MTX_MODELVIEW"/>\n'
                 '<EndDisplayList/>\n</DisplayList>\n')
             frame_paths.append((prefix + "held_dl", prefix + "grip_mtx"))

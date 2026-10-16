@@ -41,4 +41,4 @@ def run_mm():
 
 if __name__=='__main__':
     run_oot();run_mm()
-    for source in ['geometry_test.py','mm_dispatch_test.py','mm_gi_loader_test.py','mm_gi_boot_mod_test.py']:subprocess.run([sys.executable,str(ROOT/'tests/nei_quest_held'/source)],check=True)
+    for source in ['geometry_test.py','mm_dispatch_test.py','mm_gi_loader_test.py','mm_gi_boot_mod_test.py','mm_cane_gi_test.py']:subprocess.run([sys.executable,str(ROOT/'tests/nei_quest_held'/source)],check=True)

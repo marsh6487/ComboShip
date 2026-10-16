@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 /*
  * File: z_en_xc.c
  * Overlay: ovl_En_Xc
@@ -2199,7 +2200,9 @@ void EnXc_InitTempleOfTime(EnXc* this, PlayState* play) {
             func_80B3EBF0(this, play);
         } else if (GameInteractor_Should(VB_BE_ELIGIBLE_FOR_PRELUDE_OF_LIGHT,
                                          !Flags_GetEventChkInf(EVENTCHKINF_LEARNED_PRELUDE_OF_LIGHT) &&
-                                             Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP))) {
+                                             Combo_SOH_CrossBossLogicalClear(
+                                                 COMBO_BOSS_PHANTOM_GANON,
+                                                 Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP)))) {
             Flags_SetEventChkInf(EVENTCHKINF_LEARNED_PRELUDE_OF_LIGHT);
             if (GameInteractor_Should(VB_GIVE_ITEM_SONG, true, ITEM_SONG_PRELUDE)) {
                 Item_Give(play, ITEM_SONG_PRELUDE);

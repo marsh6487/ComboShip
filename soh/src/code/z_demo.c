@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 #include "global.h"
 #include "z64camera.h"
 #include "soh/Enhancements/audio/GlobalOutdoorRainBridge.h"
@@ -1092,9 +1093,12 @@ void Cutscene_Command_Terminator(PlayState* play, CutsceneContext* csCtx, CsCmdB
                 play->transitionType = TRANS_TYPE_FADE_WHITE;
                 break;
             case 95:
-                if ((Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP)) &&
-                    (Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP)) &&
-                    (Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP))) {
+                if ((Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_PHANTOM_GANON,
+                                                     Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP))) &&
+                    (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_VOLVAGIA,
+                                                     Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP))) &&
+                    (Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_MORPHA,
+                                                     Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP)))) {
                     play->nextEntranceIndex = ENTR_TEMPLE_OF_TIME_ENTRANCE;
                     play->transitionTrigger = TRANS_TRIGGER_START;
                     gSaveContext.cutsceneIndex = 0xFFF3;
@@ -2231,13 +2235,16 @@ void Cutscene_HandleConditionalTriggers(PlayState* play) {
             Flags_SetEventChkInf(EVENTCHKINF_LEARNED_REQUIEM_OF_SPIRIT);
             gSaveContext.entranceIndex = ENTR_DESERT_COLOSSUS_EAST_EXIT;
             gSaveContext.cutsceneIndex = 0xFFF0;
-        } else if (GameInteractor_Should(VB_BE_ELIGIBLE_FOR_NOCTURNE_OF_SHADOW,
-                                         ((gSaveContext.entranceIndex == ENTR_KAKARIKO_VILLAGE_FRONT_GATE) &&
-                                          LINK_IS_ADULT &&
-                                          Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP) &&
-                                          Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP) &&
-                                          Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP) &&
-                                          !Flags_GetEventChkInf(EVENTCHKINF_BONGO_BONGO_ESCAPED_FROM_WELL)))) {
+        } else if (GameInteractor_Should(
+                       VB_BE_ELIGIBLE_FOR_NOCTURNE_OF_SHADOW,
+                       ((gSaveContext.entranceIndex == ENTR_KAKARIKO_VILLAGE_FRONT_GATE) && LINK_IS_ADULT &&
+                        Combo_SOH_CrossBossLogicalClear(
+                            COMBO_BOSS_PHANTOM_GANON, Flags_GetEventChkInf(EVENTCHKINF_USED_FOREST_TEMPLE_BLUE_WARP)) &&
+                        Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_VOLVAGIA,
+                                                        Flags_GetEventChkInf(EVENTCHKINF_USED_FIRE_TEMPLE_BLUE_WARP)) &&
+                        Combo_SOH_CrossBossLogicalClear(
+                            COMBO_BOSS_MORPHA, Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP)) &&
+                        !Flags_GetEventChkInf(EVENTCHKINF_BONGO_BONGO_ESCAPED_FROM_WELL)))) {
             Flags_SetEventChkInf(EVENTCHKINF_BONGO_BONGO_ESCAPED_FROM_WELL);
             gSaveContext.cutsceneIndex = 0xFFF0;
         } else if ((gSaveContext.entranceIndex == ENTR_LOST_WOODS_BRIDGE_EAST_EXIT) &&

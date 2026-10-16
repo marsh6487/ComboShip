@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 /*
  * File: z_door_warp1.c
  * Overlay: ovl_Door_Warp1
@@ -643,6 +644,30 @@ void func_808BA10C(DoorWarp1* this, PlayState* play) {
     s32 phi_v0_2;
     u8 phi_a0;
     s32 phi_v0_3;
+
+    // First reward use preserves the queued Giant/Oath bookkeeping. Repeats have no
+    // Giant transition and complete directly, independent of the target's world-clear flag.
+    if (this->unk_202 == 0 && Combo_MM_CrossBossWarp(play->sceneId)) {
+        switch (play->sceneId) {
+            case SCENE_MITURIN_BS:
+                play->nextEntrance = ENTRANCE(WOODFALL_TEMPLE, 1);
+                break;
+            case SCENE_HAKUGIN_BS:
+                play->nextEntrance = ENTRANCE(MOUNTAIN_VILLAGE_SPRING, 7);
+                break;
+            case SCENE_SEA_BS:
+                play->nextEntrance = ENTRANCE(ZORA_CAPE, 9);
+                break;
+            case SCENE_INISIE_BS:
+                play->nextEntrance = ENTRANCE(IKANA_CANYON, 15);
+                break;
+        }
+        gSaveContext.nextCutsceneIndex = 0xFFEF;
+        play->transitionTrigger = TRANS_TRIGGER_START;
+        play->transitionType = TRANS_TYPE_FADE_WHITE;
+        gSaveContext.nextTransitionType = TRANS_TYPE_FADE_WHITE;
+        return;
+    }
 
     if ((play->sceneId == SCENE_MITURIN_BS) || (play->sceneId == SCENE_HAKUGIN_BS) ||
         (play->sceneId == SCENE_INISIE_BS) || (play->sceneId == SCENE_SEA_BS)) {

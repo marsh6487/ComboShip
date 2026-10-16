@@ -15,7 +15,8 @@ inline nlohmann::json ComboFw_EncodePoint(const ComboFwPoint& p) {
              { "z", p.z },
              { "tempSwitchFlags", p.tempSwitchFlags },
              { "tempCollectFlags", p.tempCollectFlags },
-             { "tempCollectFlagsLow", p.tempCollectFlagsLow } };
+             { "tempCollectFlagsLow", p.tempCollectFlagsLow },
+             { "dungeonCheckpoint", p.dungeonCheckpoint } };
 }
 
 inline bool ComboFw_DecodePoint(const nlohmann::json& j, ComboFwPoint& p) {
@@ -48,7 +49,8 @@ inline bool ComboFw_DecodePoint(const nlohmann::json& j, ComboFwPoint& p) {
                               j.at("z").get<float>(),
                               flags("tempSwitchFlags"),
                               flags("tempCollectFlags"),
-                              flags("tempCollectFlagsLow") };
+                              flags("tempCollectFlagsLow"),
+                              j.contains("dungeonCheckpoint") ? integer("dungeonCheckpoint") : -1 };
         if (!ComboFw_PointValid(&decoded))
             return false;
         p = decoded;
