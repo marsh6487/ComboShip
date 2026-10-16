@@ -11,6 +11,11 @@ class StructureExhausted : public std::runtime_error {
     using std::runtime_error::runtime_error;
 };
 
+inline void CheckStructuralCancellation(const ComboGenProgress* progress) {
+    if (GenCancelled(progress))
+        throw std::runtime_error("generation cancelled during entrance validation");
+}
+
 // Preserve counts: two Hookshots or several dungeon keys are not the same inventory as one.
 inline std::vector<std::string> StructuralOwned(const nlohmann::json& dump) {
     std::vector<std::string> owned;
@@ -41,9 +46,11 @@ struct StructureProbe {
     std::vector<Fixed> ootFixed, mmFixed;
     std::unordered_set<std::string> ootRequired, mmRequired;
     bool mmInitiallyOpen = false;
+    const ComboGenProgress* progress = nullptr;
 
     StructureProbe(const std::string& ootDump, const std::string& mmDump, const OracleFns& oot, const OracleFns& mm,
-                   bool mmStart) {
+                   bool mmStart, const ComboGenProgress* progress = nullptr)
+        : progress(progress) {
         const auto od = nlohmann::json::parse(ootDump), md = nlohmann::json::parse(mmDump);
         ootOwned = StructuralOwned(od);
         mmOwned = StructuralOwned(md);
@@ -81,9 +88,15 @@ struct StructureProbe {
         auto oo = ootOwned, mo = mmOwned;
         std::vector<bool> ootCredited(ootFixed.size(), false), mmCredited(mmFixed.size(), false);
         const size_t maxQueries = ootFixed.size() + mmFixed.size() + 1;
+        const auto query = [&](const OracleFns& oracle, const std::vector<std::string>& owned) {
+            CheckStructuralCancellation(progress);
+            auto reached = StructuralQuery(oracle, owned);
+            CheckStructuralCancellation(progress);
+            return reached;
+        };
         for (size_t pass = 0; pass < maxQueries; ++pass) {
-            auto reach = joint ? QueryJoint(oot, mm, oo, mo, mmInitiallyOpen, StructuralQuery)
-                               : JointReach{ StructuralQuery(oot, oo), StructuralQuery(mm, mo) };
+            auto reach = joint ? QueryJoint(oot, mm, oo, mo, mmInitiallyOpen, query)
+                               : JointReach{ query(oot, oo), query(mm, mo) };
             auto collect = [](const auto& fixed, auto& credited, const auto& reached, auto& owned) {
                 bool changed = false;
                 for (size_t i = 0; i < fixed.size(); ++i)
@@ -184,8 +197,9 @@ std::optional<nlohmann::json> GenerateConstrainedSeed(const std::vector<Dungeon>
 // RNG, item-fill RNG, settings or gameplay routing is changed by this layout validation.
 inline nlohmann::json GenerateValidatedSeed(Coordinator& coordinator, bool enabled, uint64_t masterSeed,
                                             const std::string& ootDump, const std::string& mmDump, OracleFns& oot,
-                                            OracleFns& mm, bool mmStart,
-                                            size_t maxAttempts = kStructuralLayoutAttempts) {
+                                            OracleFns& mm, bool mmStart, size_t maxAttempts = kStructuralLayoutAttempts,
+                                            const ComboGenProgress* progress = nullptr) {
+    CheckStructuralCancellation(progress);
     if (!enabled) {
         auto seed = coordinator.GenerateAndInstall(false, masterSeed);
         coordinator.ConfigureOracles(oot, mm);
@@ -196,7 +210,7 @@ inline nlohmann::json GenerateValidatedSeed(Coordinator& coordinator, bool enabl
         const auto dungeons = coordinator.Catalogue();
         coordinator.InstallLogic(nullptr);
         coordinator.ConfigureOracles(oot, mm);
-        const StructureProbe probe(ootDump, mmDump, oot, mm, mmStart);
+        const StructureProbe probe(ootDump, mmDump, oot, mm, mmStart, progress);
         std::string missing;
         for (size_t attempt = 0; attempt < maxAttempts; ++attempt) {
             const uint64_t layoutSeed = masterSeed + static_cast<uint64_t>(attempt) * 0x9E3779B97F4A7C15ULL;

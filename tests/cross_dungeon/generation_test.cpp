@@ -13,6 +13,8 @@ static Json rejected;
 static bool rejectEveryMap = false;
 static int hostCalls = 0, queries = 0, runtimeCalls = 0;
 static int lastQueryGame = 0;
+static ComboGenProgress cancelledProgress;
+static bool cancelOnQuery = false;
 static const char *Catalogue(int game) {
   static std::string raw[2];
   ++hostCalls;
@@ -31,7 +33,10 @@ static const char *Exits() {
   return lastQueryGame == 0 ? "[{\"game\":1,\"index\":4}]"
                             : "[{\"game\":0,\"index\":1}]";
 }
-static void Reset() {}
+static void Reset() {
+  if (cancelOnQuery)
+    cancelledProgress.cancel = true;
+}
 static void Owned(int game, const char *raw) {
   lastOwned[game] = Json::parse(raw).get<std::vector<std::string>>();
 }
@@ -75,6 +80,26 @@ static Json Dump() {
                 {{"check", "Confined key chest 01"}, {"item", "Small Key"}},
                 {{"check", "Confined key chest 02"}, {"item", "Small Key"}}})}};
 }
+static void CheckCancellation(Coordinator &coordinator, OracleFns &oot,
+                              OracleFns &mm, const std::string &dump) {
+  const auto previous = coordinator.LogicSeed();
+  cancelledProgress.Reset();
+  cancelOnQuery = true;
+  bool cancelled = false;
+  try {
+    GenerateValidatedSeed(coordinator, true, 123, dump, dump, oot, mm, false, 4,
+                          &cancelledProgress);
+  } catch (const std::runtime_error &error) {
+    cancelled =
+        std::string(error.what()).find("cancelled") != std::string::npos;
+  }
+  cancelOnQuery = false;
+  assert(cancelled && "Reset must cancel during a structural oracle query");
+  assert(coordinator.LogicSeed() == previous && installed[0] == previous &&
+         installed[1] == previous);
+  assert(accesses[0]["arrivals"].empty() && accesses[1]["arrivals"].empty());
+}
+
 int main() {
   Coordinator coordinator;
   auto oot = Oracle(0), mm = Oracle(1);
@@ -158,5 +183,7 @@ int main() {
   assert(exhausted && coordinator.LogicSeed() == accepted);
   assert(installed[0] == accepted && installed[1] == accepted &&
          runtimeCalls == 0);
-  std::cout << "cross-dungeon structural generation: PASS\n";
+  rejectEveryMap = false;
+  CheckCancellation(coordinator, oot, mm, dump);
+  std::cout << "cross-dungeon structural generation and cancellation: PASS\n";
 }

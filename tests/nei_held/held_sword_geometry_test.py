@@ -62,7 +62,7 @@ def execute(path, wrist):
                     counts[0] += 1
                 transform = matrix(ASSETS / command.get("Path"))
                 current = transform if "G_MTX_LOAD" in flags else transform @ current
-            elif command.tag == "DisplayList":
+            elif command.tag == "CallDisplayList":
                 draw(command.get("Path"), ancestors)
             elif command.tag == "PopMatrix":
                 assert stack and command.get("Param") == "G_MTX_MODELVIEW"
@@ -93,7 +93,7 @@ class HeldSwordGeometry(unittest.TestCase):
                     wrapper_path = ASSETS / prefix / "held_dl"
                     self.assertTrue(wrapper_path.exists(), "Exact GI sword has no native held attachment")
                     wrapper = ET.parse(wrapper_path).getroot()
-                    self.assertEqual([n.tag for n in wrapper], ["Matrix", "DisplayList", "PopMatrix", "EndDisplayList"])
+                    self.assertEqual([n.tag for n in wrapper], ["Matrix", "CallDisplayList", "PopMatrix", "EndDisplayList"])
                     self.assertEqual(wrapper[1].get("Path"), source)
                     self.assertEqual(wrapper[0].get("Param"), "G_MTX_PUSH")
                     self.assertEqual(wrapper[2].get("Param"), "G_MTX_MODELVIEW")

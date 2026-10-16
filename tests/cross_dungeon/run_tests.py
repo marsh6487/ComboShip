@@ -29,6 +29,7 @@ for name in ['mm_boss_warp_behavior_test.py', 'cross_boss_host_behavior_test.py'
              'mm_boss_escape_logic_behavior_test.py', 'mm_arrival_time_behavior_test.py',
              'oot_cross_boss_spawn_behavior_test.py',
              'oot_blue_warp_hook_test.py',
+             'oot_entrance_metadata_test.py', 'generation_reset_behavior_test.py',
              'boss_recovery_behavior_test.py']:
     subprocess.run([sys.executable, str(root / 'tests/cross_dungeon' / name)] +
                    (['--sanitize'] if args.sanitize else []), check=True)
