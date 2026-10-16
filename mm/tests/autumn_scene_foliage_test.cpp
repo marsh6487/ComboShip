@@ -138,6 +138,9 @@ static int season = SEASON_AUTUMN;
 extern "C" int MMWeather_SeasonForPlay(const PlayState*) {
     return season;
 }
+extern "C" int MMWeather_FoliageSeasonForPlay(const PlayState*) {
+    return season;
+}
 
 static std::map<std::string, unsigned> sForestReports;
 template <class... Args> static void ForestReport(const char* format, Args&&...) {
@@ -1968,6 +1971,55 @@ static void CheckSharedListOutdoorTransition() {
     season = SEASON_AUTUMN;
 }
 
+static void CheckMm3dLostWoodsSurfaces() {
+    ClearCache();
+    auto rm = std::make_shared<Ship::ResourceManager>();
+    Ship::Context::GetRawInstance()->rm = rm;
+    rm->alt = true;
+    const std::string prefix = "alt/custom/cor_mm3d/lost_woods_poc1/textures/";
+    std::map<std::string, std::shared_ptr<Fast::Texture>> originals;
+    for (const char* name : { "lw_enkei_01_0", "lw_kabe_01_5400", "lw_kusa_01_12600", "lw_wood_02_2CA00",
+                              "lw_wood_03_31E00", "lw_wood_04_37200", "lw_yuka_02_39C00", "lw_yuka_03_44400",
+                              "lw_kinoko_01_FC00", "lw_nenrin_01_27600", "lw_tutu_01_2A000", "portal_bark" }) {
+        auto texture = SurfaceTexture();
+        originals[prefix + name] = texture;
+        rm->resources[prefix + name] = texture;
+    }
+    PlayState play{};
+    play.sceneId = SCENE_LOST_WOODS;
+    for (int selected : { SEASON_AUTUMN, SEASON_WINTER, SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN, SEASON_OFF }) {
+        season = selected;
+        MMAutumnSceneFoliage_Update(&play);
+        for (const auto& [path, original] : originals) {
+            const bool protectedMaterial = path.ends_with("lw_kinoko_01_FC00") ||
+                                           path.ends_with("lw_nenrin_01_27600") || path.ends_with("lw_tutu_01_2A000") ||
+                                           path.ends_with("portal_bark");
+            const bool ground = path.ends_with("lw_kabe_01_5400") || path.ends_with("lw_yuka_02_39C00") ||
+                                path.ends_with("lw_yuka_03_44400");
+            const bool tinted = !protectedMaterial && selected != SEASON_SUMMER && selected != SEASON_OFF &&
+                                !(selected == SEASON_SPRING && ground);
+            const auto shown = std::dynamic_pointer_cast<Fast::Texture>(rm->resources.at(path));
+            assert((shown != original) == tinted);
+            if (tinted)
+                CheckSurfacePixels(original, shown);
+        }
+    }
+    season = SEASON_AUTUMN;
+    MMAutumnSceneFoliage_Update(&play);
+    play.sceneId = SCENE_26SARUNOMORI;
+    MMAutumnSceneFoliage_Update(&play);
+    for (const auto& [path, original] : originals)
+        assert(rm->resources.at(path) == original);
+    play.sceneId = SCENE_LOST_WOODS;
+    rm->alt = false;
+    MMAutumnSceneFoliage_Update(&play);
+    for (const auto& [path, original] : originals)
+        assert(rm->resources.at(path) == original);
+    ClearCache();
+    std::puts("PASS MM3D opening woods: exact private foliage surfaces, protected bark/mushrooms, season/Alt/scene "
+              "restoration");
+}
+
 int main() {
     if (const char* selected = std::getenv("MM_ROAD_TARGET_TEST")) {
         if (std::string(selected) == "vines")
@@ -1978,6 +2030,7 @@ int main() {
             CheckRoadTrim();
         return 0;
     }
+    CheckMm3dLostWoodsSurfaces();
     CheckRoadTrim();
     CheckRoadVines();
     CheckRoadRandoGrass();

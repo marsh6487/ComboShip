@@ -3,6 +3,7 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
 #include "2s2h/CustomMessage/CustomMessage.h"
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 
 extern "C" {
 #include <variables.h>
@@ -110,8 +111,12 @@ extern "C" bool SavingEnhancements_CanSave() {
         return false;
     }
 
-    // Hasn't gotten to clock town yet
-    if (gPlayState->sceneId == SCENE_SPOT00 || gPlayState->sceneId == SCENE_LOST_WOODS ||
+    // The original prologue cannot save. A playable ComboShip forest visit can.
+    bool openingForestVisit = false;
+#ifdef COMBO_BUILD
+    openingForestVisit = ComboOpeningForest_IsExploration(gPlayState);
+#endif
+    if (gPlayState->sceneId == SCENE_SPOT00 || (gPlayState->sceneId == SCENE_LOST_WOODS && !openingForestVisit) ||
         gPlayState->sceneId == SCENE_OPENINGDAN) {
         return false;
     }

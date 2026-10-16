@@ -15,6 +15,7 @@ static int sComboPortalRoute = COMBO_PORTAL_MARKET;
 static bool sComboPortalArrivalPending = false;
 static bool sComboReturnPending, sComboFwReturnPending, sComboResetReturnPending, sComboOwlSaveQuitPending;
 static int sComboReturnPortalRoute, sComboPassageFade, sComboPassageFileNum;
+static bool sComboOpeningReturnArmed;
 PlayState* gPlayState;
 GameState* gGameState;
 static bool sRememberLocation;
@@ -76,8 +77,8 @@ int main() {
             "Lost Woods crossing must arrive in Woods of Mystery, not Clock Town");
     require(gSaveContext.respawnFlag == 2 && gSaveContext.respawn[RESPAWN_MODE_RETURN].roomIndex == 1,
             "arrival must use the first clearing and the native return respawn");
-    require(gSaveContext.respawn[RESPAWN_MODE_RETURN].pos.x == 90 &&
-            gSaveContext.respawn[RESPAWN_MODE_RETURN].pos.z == -90,
+    require(gSaveContext.respawn[RESPAWN_MODE_RETURN].pos.x == 0 &&
+            gSaveContext.respawn[RESPAWN_MODE_RETURN].pos.z == 0,
             "arrival must face out of the side passage, outside its return trigger");
     require(gSaveContext.respawn[RESPAWN_MODE_TOP].pos.y == 222,
             "portal arrival must preserve Farore's Wind's TOP respawn slot");

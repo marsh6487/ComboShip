@@ -9,6 +9,7 @@
 #include "overlays/actors/ovl_En_Elf/z_en_elf.h"
 #include <string.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include <libultraship/log/luslog.h>
 
 s16 sCutsceneQuakeIndex;
@@ -1551,6 +1552,10 @@ void Cutscene_HandleEntranceTriggers(PlayState* play) {
     SceneTableEntry* scene;
     s32 scriptIndex;
 
+#ifdef COMBO_BUILD
+    if (ComboOpeningForest_IsExploration(play))
+        return; // Do not start the prologue or mark its story/cutscene flags as completed.
+#endif
     if (((gSaveContext.gameMode == GAMEMODE_NORMAL) || (gSaveContext.gameMode == GAMEMODE_TITLE_SCREEN)) &&
         (gSaveContext.respawnFlag <= 0)) {
         // Try to find an actor cutscene that's triggered by the current spawn

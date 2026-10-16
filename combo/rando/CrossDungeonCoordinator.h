@@ -54,7 +54,8 @@ class Coordinator {
         for (int game = 0; game < 2; ++game) {
             if (!hosts[game].DumpCatalogue)
                 throw std::runtime_error("cross-dungeon catalogue export missing; rebuild both game modules");
-            if ((options.bosses || options.interiors || options.grottos || options.expanded) &&
+            if ((options.bosses || options.interiors || options.grottos || options.expanded || options.shops ||
+                 options.doorInteriors) &&
                 !hosts[game].DumpCatalogueForOptions)
                 throw std::runtime_error("cross-entrance pool export missing; rebuild both game modules");
             const auto* catalogue = hosts[game].DumpCatalogueForOptions

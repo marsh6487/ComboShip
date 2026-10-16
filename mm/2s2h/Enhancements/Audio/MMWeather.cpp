@@ -4,6 +4,7 @@
 #include "2s2h/Enhancements/Graphics/AutumnSceneFoliage.h"
 #include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
 #include "2s2h/Enhancements/Graphics/MMWinterAtmosphere.h"
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 
 #include <algorithm>
 #include "global.h"
@@ -36,6 +37,16 @@ bool OutdoorEligible(const PlayState* play) {
         play->sceneId != SCENE_SONCHONOIE && (play->skyboxId == SKYBOX_NORMAL_SKY || play->skyboxId == SKYBOX_3);
     return gSaveContext.gameMode == GAMEMODE_NORMAL && play->gameOverCtx.state == GAMEOVER_INACTIVE && outdoorSky &&
            !play->envCtx.skyboxDisabled && camera != nullptr && !(camera->stateFlags & CAM_STATE_UNDERWATER);
+}
+
+int SelectedSeason() {
+    const int selection = CVarGetInteger(MM_WEATHER_CVAR("Season"), -2);
+    if (selection != -2) {
+        // Manual presentation never changes Rod ownership or the saved season.
+        return selection >= 0 && selection < SEASON_COUNT ? selection : -1;
+    }
+    const uint8_t season = Seasons_GetSeason();
+    return season < SEASON_COUNT ? season : -1;
 }
 
 int RainMode(int season) {
@@ -173,14 +184,23 @@ extern "C" int MMWeather_SeasonForPlay(const PlayState* play) {
         play->envCtx.lightSettingOverride != LIGHT_SETTING_OVERRIDE_NONE || play->envCtx.customSkyboxFilter) {
         return -1;
     }
-    const int selection = CVarGetInteger(MM_WEATHER_CVAR("Season"), -2);
-    if (selection != -2) {
-        // Presentation selection never queries or changes Rod ownership, gates,
-        // unlocks or the saved gameplay season. Native bypasses the Rod entirely.
-        return selection >= 0 && selection < SEASON_COUNT ? selection : -1;
+    return SelectedSeason();
+}
+
+extern "C" int MMWeather_FoliageSeasonForPlay(const PlayState* play) {
+#ifdef COMBO_BUILD
+    // The playable opening forest retains its native SKYBOX_2 and indoor
+    // lighting. Allow its scene foliage to follow the Rod/manual palette
+    // without enrolling that skybox in outdoor rain or sky overrides.
+    if (ComboOpeningForest_IsExploration(play)) {
+        const Camera* camera = GET_ACTIVE_CAM(play);
+        if (play->gameOverCtx.state == GAMEOVER_INACTIVE && !play->envCtx.skyboxDisabled && camera != nullptr &&
+            !(camera->stateFlags & CAM_STATE_UNDERWATER) && play->csCtx.state == CS_STATE_IDLE &&
+            play->envCtx.lightSettingOverride == LIGHT_SETTING_OVERRIDE_NONE && !play->envCtx.customSkyboxFilter)
+            return SelectedSeason();
     }
-    const uint8_t season = Seasons_GetSeason();
-    return season < SEASON_COUNT ? season : -1;
+#endif
+    return MMWeather_SeasonForPlay(play);
 }
 
 extern "C" int MMWeather_SeasonClearsRain() {

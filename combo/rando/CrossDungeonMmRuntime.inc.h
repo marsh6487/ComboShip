@@ -6,6 +6,7 @@ namespace ComboCrossMmRuntime {
 using namespace ComboRando::CrossDungeon;
 static RuntimeState state(1);
 static std::optional<RuntimeState::Transition> pending;
+static bool departureFadeComplete = false;
 static std::optional<Endpoint> pendingBossRecovery;
 static bool bossDeathRecoveryRequested = false;
 static CheckpointState checkpoint;
@@ -67,10 +68,11 @@ static bool PrepareSwitch() {
         pending.reset();
         return true;
     }
-    if (!pending)
+    if (!pending || !departureFadeComplete)
         return false;
     const auto transition = *pending;
     pending.reset();
+    departureFadeComplete = false;
     auto queue = reinterpret_cast<int (*)(int32_t)>(Combo_ResolveSym("soh", "SOH_QueueCrossDungeonArrival"));
     if (!queue || !gComboReturnCallback || !queue(transition.to.index)) {
         SPDLOG_ERROR("[CrossDungeon] MM handoff rejected; peer arrival was not queued");
@@ -85,6 +87,19 @@ static bool PrepareSwitch() {
     return true;
 }
 } // namespace ComboCrossMmRuntime
+extern "C" int Combo_MM_CrossDungeonTransitionPending(void) {
+    return ComboCrossMmRuntime::pending.has_value();
+}
+extern "C" int Combo_MM_CompleteCrossDungeonTransition(void) {
+    if (!ComboCrossMmRuntime::pending)
+        return 0;
+    ComboCrossMmRuntime::departureFadeComplete = true;
+    return 1;
+}
+extern "C" void Combo_MM_CancelCrossDungeonTransition(void) {
+    ComboCrossMmRuntime::pending.reset();
+    ComboCrossMmRuntime::departureFadeComplete = false;
+}
 extern "C" COMBO_EXPORT int MM_SetCrossDungeonRuntimeSeed(const char* raw) try {
     auto seed = nlohmann::json::parse(raw ? raw : "null");
     const auto routes = ComboRando::CrossDungeon::Decode(seed);
@@ -102,7 +117,7 @@ extern "C" COMBO_EXPORT int MM_SetCrossDungeonRuntimeSeed(const char* raw) try {
                 throw std::invalid_argument("unknown MM boss source recovery entrance");
         }
     ComboCrossMmRuntime::state.Install(seed);
-    ComboCrossMmRuntime::pending.reset();
+    Combo_MM_CancelCrossDungeonTransition();
     ComboCrossMmRuntime::pendingBossRecovery.reset();
     ComboCrossMmRuntime::bossDeathRecoveryRequested = false;
     ComboCrossMmRuntime::localDungeonArrival = -1;
@@ -228,6 +243,7 @@ extern "C" int Combo_MM_CrossDungeonTransition(int32_t* index) {
         return 0;
     }
     pending = transition;
+    departureFadeComplete = false;
     return 1;
 }
 extern "C" int32_t Combo_MM_SaveCrossDungeonCheckpoint(void) {

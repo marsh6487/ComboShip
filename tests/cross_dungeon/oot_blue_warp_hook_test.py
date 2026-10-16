@@ -35,7 +35,7 @@ using GIVanillaBehavior = int;
 ''' + 'enum { ' + ','.join(names) + ' };\n' + r'''
 static bool isRando = false, isBossRush = false, crossEnabled = false;
 static bool settings[1000]{};
-static int storySkip = 0, warpOverrides = 0;
+static int storySkip = 0, warpOverrides = 0, completeNotifications = 0;
 static struct {
     int gameMode = 0, entranceIndex = 0, cutsceneIndex = 0, chamberCutsceneNum = 0;
     int timerState = 0, dayTime = 0, skyboxTime = 0, nightFlag = 0;
@@ -59,6 +59,7 @@ static GameInteractor interactor;
 GameInteractor* GameInteractor::Instance = &interactor;
 #ifdef COMBO_BUILD
 extern "C" int Combo_SOH_CrossDungeonRuntimeEnabled() { return crossEnabled; }
+extern "C" int Combo_SOH_CompleteCrossDungeonTransition() { ++completeNotifications; return 0; }
 #endif
 static void Invoke(int id, bool* should, ...) {
     va_list args;
@@ -91,10 +92,16 @@ int main() {
         gSaveContext.nightFlag = 1;
         bool should = true;
         warpOverrides = 0;
+        completeNotifications = 0;
         Invoke(VB_PLAY_BLUE_WARP_CS, &should);
         Invoke(VB_PLAY_TRANSITION_CS, &should);
         assert(should == !skip && "native and cross-game shuffles must force the blue-warp skip");
         assert(warpOverrides == int(routeOverride) && "only active randomizer routing overrides the exit");
+#ifdef COMBO_BUILD
+        assert(completeNotifications == int(routeOverride) && "native-init redirects acknowledge the completed source sequence");
+#else
+        assert(completeNotifications == 0);
+#endif
         assert(!sEnteredBlueWarp && "transition must consume the blue-warp observation");
         if (skip) {
             assert(gSaveContext.entranceIndex == ENTR_KOKIRI_FOREST_DEKU_TREE_BLUE_WARP);
@@ -117,8 +124,10 @@ int main() {
         gSaveContext.cutsceneIndex = 0xFFF1;
         bool should = true;
         warpOverrides = 0;
+        completeNotifications = 0;
         Invoke(VB_PLAY_TRANSITION_CS, &should);
         assert(should && warpOverrides == 0 && gSaveContext.cutsceneIndex == 0xFFF1);
+        assert(completeNotifications == 0);
     }
 }
 '''

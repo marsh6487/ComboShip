@@ -56,7 +56,7 @@ body = expected_native + (ROOT / 'tests/cross_dungeon/mm_catalogue_boundary_case
 
 with tempfile.TemporaryDirectory(prefix='mm-catalogue-') as tmp:
     source = pathlib.Path(tmp) / 'test.cpp'
-    source.write_text('#include <cassert>\n#include <cstdint>\n#include <iostream>\n#include <set>\n'+constants+native_tables+'\n#include "combo/rando/CrossEntranceMmCatalogue.h"\n#include "combo/rando/CrossEntranceMmGrottos.inc.h"\n'+body)
+    source.write_text('#include <cassert>\n#include <cstdint>\n#include <iostream>\n#include <set>\n'+constants+native_tables+'\n#include "combo/rando/CrossDungeonSeed.h"\n#include "combo/rando/CrossEntranceMmCatalogue.h"\n#include "combo/rando/CrossEntranceMmGrottos.inc.h"\n'+body)
     binary = pathlib.Path(tmp) / 'test'
     cmd = ['g++','-std=c++20','-Wall','-Wextra','-Werror','-I',str(ROOT),str(source),'-o',str(binary)]
     if args.sanitize:

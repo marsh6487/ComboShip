@@ -489,6 +489,17 @@ struct SurfaceMaterial {
     const char* palette = nullptr;
 };
 constexpr SurfaceMaterial kSurfaceMaterials[] = {
+    // MM3D opening woods POC1: XML draws use private FILEPATH images, not
+    // native texture hashes. Recolor green texels in their exact cached images;
+    // keep the mixed bark/stone pixels, UVs, alpha and pink return light intact.
+    { "custom/cor_mm3d/lost_woods_poc1/textures/lw_enkei_01_0", 0xB96848FF, SCENE_LOST_WOODS, true },
+    { "custom/cor_mm3d/lost_woods_poc1/textures/lw_kabe_01_5400", 0xD99C45FF, SCENE_LOST_WOODS, true },
+    { "custom/cor_mm3d/lost_woods_poc1/textures/lw_kusa_01_12600", 0xB96848FF, SCENE_LOST_WOODS, true, false, true },
+    { "custom/cor_mm3d/lost_woods_poc1/textures/lw_wood_02_2CA00", 0xB96848FF, SCENE_LOST_WOODS, true },
+    { "custom/cor_mm3d/lost_woods_poc1/textures/lw_wood_03_31E00", 0xB96848FF, SCENE_LOST_WOODS, true },
+    { "custom/cor_mm3d/lost_woods_poc1/textures/lw_wood_04_37200", 0xB96848FF, SCENE_LOST_WOODS, true },
+    { "custom/cor_mm3d/lost_woods_poc1/textures/lw_yuka_02_39C00", 0xD99C45FF, SCENE_LOST_WOODS, true },
+    { "custom/cor_mm3d/lost_woods_poc1/textures/lw_yuka_03_44400", 0xD99C45FF, SCENE_LOST_WOODS, true },
     { "scenes/nonmq/Z2_00KEIKOKU/mm3d_field_poc4/textures/tl_ki_02", 0xFFD078FF, SCENE_00KEIKOKU, true },
     { "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_027050", 0xFFD078FF },
     // Keep the wall's secondary gradient intact: tint only green primary
@@ -745,7 +756,7 @@ void ClearCache() {
 
 void MMAutumnSceneFoliage_Update(const PlayState* play) {
     const char* scene = play ? SceneResourceName(play->sceneId) : nullptr;
-    const int selectedSeason = MMWeather_SeasonForPlay(play);
+    const int selectedSeason = MMWeather_FoliageSeasonForPlay(play);
     if (scene == nullptr ||
         (selectedSeason != SEASON_AUTUMN && selectedSeason != SEASON_WINTER && selectedSeason != SEASON_SPRING)) {
         MMAutumnSceneFoliage_Reset();

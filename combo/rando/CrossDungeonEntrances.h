@@ -34,13 +34,27 @@ struct Endpoint {
 };
 
 enum class Phase { BeforeNative, AfterNative };
-enum class Pool { Dungeon = 0, Boss = 1, Interior = 2, Grotto = 3 };
+enum class Pool { Dungeon = 0, Boss = 1, Interior = 2, Grotto = 3, Shop = 4, DoorInterior = 5 };
+inline bool IsInteriorPool(Pool pool) {
+    return pool == Pool::Interior || pool == Pool::Shop || pool == Pool::DoorInterior;
+}
 struct PoolOptions {
     bool dungeons = true, bosses = false, interiors = false, grottos = false, expanded = false;
+    bool shops = false, doorInteriors = false;
     bool Any() const {
-        return dungeons || bosses || interiors || grottos;
+        return dungeons || bosses || interiors || grottos || shops || doorInteriors;
     }
 };
+enum class InteriorKind { Passage, Door, ShopDoor };
+inline std::optional<Pool> InteriorPool(InteriorKind kind, const PoolOptions& options) {
+    if (options.interiors)
+        return Pool::Interior; // Preserve the complete legacy catalogue and permutation.
+    if (kind == InteriorKind::ShopDoor && options.shops)
+        return Pool::Shop;
+    if (kind == InteriorKind::Door && options.doorInteriors)
+        return Pool::DoorInterior;
+    return std::nullopt;
+}
 
 struct Dungeon {
     std::string id;
@@ -89,7 +103,7 @@ inline void Validate(const std::vector<Dungeon>& dungeons) {
     for (const auto& d : dungeons) {
         if (d.id.empty() || !ids.insert(d.id).second || !Valid(d.entrance) || !Valid(d.exit) || !Valid(d.returnTo) ||
             d.entrance.game != d.exit.game || d.exit.game != d.returnTo.game || !entries.insert(d.entrance).second ||
-            static_cast<int>(d.pool) < 0 || static_cast<int>(d.pool) > 3) {
+            static_cast<int>(d.pool) < 0 || static_cast<int>(d.pool) > 5) {
             throw std::invalid_argument("invalid or duplicate cross-dungeon endpoint");
         }
         if (d.hasReverse)

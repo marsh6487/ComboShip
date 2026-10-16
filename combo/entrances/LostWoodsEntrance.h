@@ -2,7 +2,11 @@
 
 // Local passage coordinates, shared by the trigger, arrival and MM doorway.
 // These are scene coordinates, never entrance-shuffle destinations.
-enum { COMBO_PORTAL_MARKET = 0, COMBO_PORTAL_LOST_WOODS = 1 };
+enum { COMBO_PORTAL_MARKET = 0, COMBO_PORTAL_LOST_WOODS = 1, COMBO_PORTAL_OPENING_FOREST = 2 };
+
+static inline int ComboLostWoods_IsForestRoute(int route) {
+    return route == COMBO_PORTAL_LOST_WOODS || route == COMBO_PORTAL_OPENING_FOREST;
+}
 
 static inline int ComboLostWoods_IsPlayableSlot(int fileNum) {
     return fileNum >= 0 && fileNum < 3;
@@ -11,6 +15,12 @@ static inline int ComboLostWoods_IsPlayableSlot(int fileNum) {
 static inline int ComboLostWoods_InOotTunnel(int scene, int room, float x, float y, float z) {
     return scene == 0x5B && room == 0 && x > -65.0f && x < 65.0f && y > -30.0f && y < 120.0f && z < -360.0f &&
            z > -560.0f;
+}
+
+static inline int ComboLostWoods_InOotFairyTunnel(int scene, int room, float x, float y, float z) {
+    // Authored pink tunnel. Arm before its slot-11 Fairy exit floor at Z=360..400.
+    return scene == 0x5B && room == 1 && x > 750.0f && x < 850.0f && y > -20.0f && y < 120.0f && z > 320.0f &&
+           z < 400.0f;
 }
 
 static inline int ComboLostWoods_InMmPassage(int scene, int room, float x, float y, float z) {

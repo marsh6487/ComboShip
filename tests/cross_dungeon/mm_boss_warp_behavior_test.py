@@ -95,6 +95,7 @@ static void Matrix_Scale(float,float,float,int) {}
 namespace Rando { static void DrawItem(int) {} }
 using namespace ComboRando::CrossDungeon;
 namespace ComboCrossMmRuntime { static RuntimeState state(1); static std::optional<RuntimeState::Transition> pending;
+    static bool departureFadeComplete=false;
     static std::optional<Endpoint> pendingBossRecovery; static bool bossDeathRecoveryRequested=false;
     static CheckpointState checkpoint; static int32_t localDungeonArrival=-1; }
 static int queuedTarget=-1;
@@ -121,8 +122,9 @@ functions += '\nvoid FirstBossOffer(bool* should, ...) { va_list args; va_start(
 functions += '\nvoid NativeSkipLoadHook() {\n' + skip_hook + '\n}\n'
 functions += '\n' + block(door, 'void func_808BA10C(DoorWarp1* this, PlayState* play) {').replace('this', 'self')
 functions += '\nnamespace ComboCrossMmRuntime {\n' + block(runtime, 'static int32_t RecoverBoss(') + '\n}\n'
-functions += '\n' + block(runtime, 'extern "C" int Combo_MM_CrossDungeonTransition')
+functions += '\n' + block(runtime, 'extern "C" int Combo_MM_CrossDungeonTransition(')
 functions += '\nnamespace ComboCrossMmRuntime {\n' + block(runtime, 'static bool PrepareSwitch()') + '\n}\n'
+functions += '\n' + block(runtime, 'extern "C" int Combo_MM_CompleteCrossDungeonTransition')
 main = r'''
 static void Reset() {
     play={}; gSaveContext={}; nativePlayer={}; gi.events.clear(); std::fill(std::begin(week),std::end(week),false);
@@ -173,7 +175,8 @@ int main() {
         } else CheckFirstBookkeeping(boss);
         assert(foreign==(game==0)); assert(gSaveContext.nextCutsceneIndex==0xFFEF && gSaveContext.save.cutsceneIndex==0);
         if(game==0) {
-            assert(ComboCrossMmRuntime::pending); assert(ComboCrossMmRuntime::PrepareSwitch());
+            assert(ComboCrossMmRuntime::pending); assert(!ComboCrossMmRuntime::PrepareSwitch());
+            assert(Combo_MM_CompleteCrossDungeonTransition()); assert(ComboCrossMmRuntime::PrepareSwitch());
             assert(queuedTarget==ENTRANCE(STONE_TOWER,2));
             assert(ComboCrossMmRuntime::checkpoint.Saved()==bossEntries[boss]);
         } else {
@@ -195,7 +198,10 @@ int main() {
         assert(gSaveContext.nextCutsceneIndex==0xFFEF && gSaveContext.save.cutsceneIndex==0);
         assert(gi.events.empty() && gSaveContext.save.saveInfo.unk_EA8[0]==0xAABBCCDD && gSaveContext.save.saveInfo.unk_EA8[1]==3);
         assert(!checks[boss].eligible && !checks[RC_GIANTS_CHAMBER_OATH_TO_ORDER].eligible);
-        if(game==0) assert(ComboCrossMmRuntime::PrepareSwitch()); else assert(index==ENTRANCE(STONE_TOWER,2));
+        if(game==0) {
+            assert(!ComboCrossMmRuntime::PrepareSwitch());
+            assert(Combo_MM_CompleteCrossDungeonTransition()); assert(ComboCrossMmRuntime::PrepareSwitch());
+        } else assert(index==ENTRANCE(STONE_TOWER,2));
     }
     // Disabled first-warps remain native; unchanged-index routes retain source staging.
     for(int boss=0;boss<4;++boss) {

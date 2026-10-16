@@ -128,10 +128,11 @@ int main(int argc, char** argv) {
     int triforceTotalArg = -1;
     // #135: starting game. Absent (-1) => read the menu CVar, same as in-game.
     int startingGameArg = -1;
-    std::array<int, 5> crossPoolArgs = { -1, -1, -1, -1, -1 };
-    const std::array<std::string, 5> crossPoolFlags = { "--cross-dungeon-entrances", "--cross-boss-entrances",
-                                                        "--expanded-dungeon-pool", "--cross-interior-entrances",
-                                                        "--cross-grotto-entrances" };
+    std::array<int, 7> crossPoolArgs = { -1, -1, -1, -1, -1, -1, -1 };
+    const std::array<std::string, 7> crossPoolFlags = { "--cross-dungeon-entrances",      "--cross-boss-entrances",
+                                                        "--expanded-dungeon-pool",        "--cross-interior-entrances",
+                                                        "--cross-grotto-entrances",       "--cross-shop-entrances",
+                                                        "--cross-door-interior-entrances" };
     // Shared Items: "all", "none", or a comma-separated key list (see SharedItems.h). Empty => menu CVars.
     std::string sharedItemsArg;
     for (int i = 1; i < argc; ++i) {
@@ -622,8 +623,8 @@ int main(int argc, char** argv) {
         crossOptions = ComboRando::CrossDungeon::ParseOptions(nlohmann::json::parse(SOH_ReadCrossEntranceOptions()));
     else
         crossOptions.dungeons = SOH_ReadCrossDungeonCVar && SOH_ReadCrossDungeonCVar();
-    bool* flags[] = { &crossOptions.dungeons, &crossOptions.bosses, &crossOptions.expanded, &crossOptions.interiors,
-                      &crossOptions.grottos };
+    bool* flags[] = { &crossOptions.dungeons, &crossOptions.bosses, &crossOptions.expanded,     &crossOptions.interiors,
+                      &crossOptions.grottos,  &crossOptions.shops,  &crossOptions.doorInteriors };
     for (size_t i = 0; i < crossPoolArgs.size(); ++i)
         if (crossPoolArgs[i] >= 0)
             *flags[i] = crossPoolArgs[i] != 0;

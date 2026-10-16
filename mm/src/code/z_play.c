@@ -45,6 +45,7 @@ u8 sMotionBlurStatus;
 #include "overlays/gamestates/ovl_file_choose/z_file_select.h"
 #include "debug.h"
 #include "BenPort.h"
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/Audio/AudioEditor.h"
 #include "2s2h/FleetShipCombo/FleetShipCombo.h"
@@ -415,6 +416,10 @@ Gfx* Play_SetFog(PlayState* this, Gfx* gfx) {
 }
 
 void Play_Destroy(GameState* thisx) {
+#ifdef COMBO_BUILD
+    extern void Combo_MM_CancelCrossDungeonTransition(void);
+    Combo_MM_CancelCrossDungeonTransition();
+#endif
     PlayState* this = (PlayState*)thisx;
     GraphicsContext* gfxCtx = this->state.gfxCtx;
 
@@ -630,12 +635,10 @@ void Play_UpdateTransition(PlayState* this) {
             extern int Combo_MM_CrossDungeonTransition(int32_t * index);
             if (this->transitionTrigger != TRANS_TRIGGER_END) {
                 int32_t composedEntrance = this->nextEntrance;
-                if (Combo_MM_CrossDungeonTransition(&composedEntrance)) {
-                    this->transitionTrigger = TRANS_TRIGGER_OFF;
-                    this->transitionMode = TRANS_MODE_OFF;
-                    break;
+                // A foreign route keeps its native movement/camera/effect until completion.
+                if (!Combo_MM_CrossDungeonTransition(&composedEntrance)) {
+                    this->nextEntrance = composedEntrance;
                 }
-                this->nextEntrance = composedEntrance;
             }
 #endif
             // 2S2H [Port] Fleet Ship Combo: a STALE/GARBAGE nextEntrance (e.g. a hole-fall warp
@@ -791,6 +794,12 @@ void Play_UpdateTransition(PlayState* this) {
         case TRANS_MODE_INSTANCE_RUNNING:
             if (this->transitionCtx.isDone(&this->transitionCtx.instanceData)) {
                 if (this->transitionTrigger != TRANS_TRIGGER_END) {
+#ifdef COMBO_BUILD
+                    extern int Combo_MM_CompleteCrossDungeonTransition(void);
+                    if (Combo_MM_CompleteCrossDungeonTransition()) {
+                        break; // Retain the native effect without replacing the source Play state.
+                    }
+#endif
                     if (this->transitionCtx.transitionType == TRANS_TYPE_CIRCLE) {
                         D_801D0D54 = false;
                     }
@@ -861,6 +870,12 @@ void Play_UpdateTransition(PlayState* this) {
             this->envCtx.screenFillColor[3] = (sTransitionFillTimer / 20.0f) * 255.0f;
 
             if (sTransitionFillTimer >= 20) {
+#ifdef COMBO_BUILD
+                extern int Combo_MM_CompleteCrossDungeonTransition(void);
+                if (Combo_MM_CompleteCrossDungeonTransition()) {
+                    break;
+                }
+#endif
                 STOP_GAMESTATE(&this->state);
                 SET_NEXT_GAMESTATE(&this->state, Play_Init, sizeof(PlayState));
                 gSaveContext.save.entrance = this->nextEntrance;
@@ -903,6 +918,12 @@ void Play_UpdateTransition(PlayState* this) {
 
         case TRANS_MODE_INSTANT:
             if (this->transitionTrigger != TRANS_TRIGGER_END) {
+#ifdef COMBO_BUILD
+                extern int Combo_MM_CompleteCrossDungeonTransition(void);
+                if (Combo_MM_CompleteCrossDungeonTransition()) {
+                    break;
+                }
+#endif
                 STOP_GAMESTATE(&this->state);
                 SET_NEXT_GAMESTATE(&this->state, Play_Init, sizeof(PlayState));
                 gSaveContext.save.entrance = this->nextEntrance;
@@ -945,6 +966,12 @@ void Play_UpdateTransition(PlayState* this) {
                 }
             } else {
                 if (this->envCtx.sandstormEnvA == 255) {
+#ifdef COMBO_BUILD
+                    extern int Combo_MM_CompleteCrossDungeonTransition(void);
+                    if (Combo_MM_CompleteCrossDungeonTransition()) {
+                        break;
+                    }
+#endif
                     STOP_GAMESTATE(&this->state);
                     SET_NEXT_GAMESTATE(&this->state, Play_Init, sizeof(PlayState));
                     gSaveContext.save.entrance = this->nextEntrance;
@@ -2314,6 +2341,9 @@ void Play_Init(GameState* thisx) {
     u8 sceneLayer;
     s32 pad2;
 
+#ifdef COMBO_BUILD
+    ComboOpeningForest_NormalizeEntry();
+#endif
     MMWinterAtmosphere_Reset();
 
     if ((gSaveContext.respawnFlag == -4) || (gSaveContext.respawnFlag == -0x63)) {

@@ -116,8 +116,65 @@ extern "C" int Combo_SOH_CrossDungeonRegion(int index, int resolved, int fallbac
 }
 
 namespace ComboCrossOot {
-static std::vector<Dungeon> BaseCatalogue(bool includeGanon, const PoolOptions& options) {
+// Native ingress identities, not destination scene names: alternate doors remain separate.
+// Open Kokiri houses/shops, mountain shops, tents, fairy caves and the Temple of Time
+// deliberately fall through. The existing Mask Shop portal is excluded by BaseCatalogue.
+static InteriorKind InteriorKindForEntrance(int32_t entrance) {
+    switch (entrance) {
+        case ENTR_BAZAAR_0:
+        case ENTR_BAZAAR_1:
+        case ENTR_POTION_SHOP_MARKET_0:
+        case ENTR_BOMBCHU_SHOP_1:
+        case ENTR_POTION_SHOP_GRANNY_0:
+        case ENTR_POTION_SHOP_KAKARIKO_FRONT:
+        case ENTR_POTION_SHOP_KAKARIKO_BACK:
+            return InteriorKind::ShopDoor;
+        case ENTR_LAKESIDE_LABORATORY_0:
+        case ENTR_FISHING_POND_0:
+        case ENTR_MARKET_GUARD_HOUSE_0:
+        case ENTR_BOMBCHU_BOWLING_ALLEY_0:
+        case ENTR_TREASURE_BOX_SHOP_0:
+        case ENTR_BACK_ALLEY_MAN_IN_GREEN_HOUSE:
+        case ENTR_KAKARIKO_CENTER_GUEST_HOUSE_0:
+        case ENTR_HOUSE_OF_SKULLTULA_0:
+        case ENTR_IMPAS_HOUSE_FRONT:
+        case ENTR_IMPAS_HOUSE_BACK:
+        case ENTR_GRAVEKEEPERS_HUT_0:
+        case ENTR_LON_LON_BUILDINGS_TALONS_HOUSE:
+        case ENTR_STABLE_0:
+        case ENTR_LON_LON_BUILDINGS_TOWER:
+        case ENTR_SHOOTING_GALLERY_0:
+        case ENTR_SHOOTING_GALLERY_1:
+        case ENTR_WINDMILL_AND_DAMPES_GRAVE_WINDMILL:
+            return InteriorKind::Door;
+        default:
+            return InteriorKind::Passage;
+    }
+}
+static std::vector<Dungeon> BaseCatalogue(bool includeGanon, const PoolOptions& options,
+                                          const std::map<int32_t, int32_t>& overrides) {
     std::vector<Dungeon> base;
+    std::map<int32_t, InteriorKind> physicalKinds;
+    if (!options.interiors && (options.shops || options.doorInteriors)) {
+        const auto record = [&](int32_t source, InteriorKind kind) {
+            if (source < 0)
+                return;
+            const int32_t resolved = ResolveNativeIndex(source, source, overrides);
+            auto [it, inserted] = physicalKinds.emplace(resolved, kind);
+            if (!inserted && it->second != kind)
+                it->second = InteriorKind::Passage; // Never grant an open/ambiguous source a narrow leg.
+        };
+        // Routing runs after native ER. Classify the physical source that now leads
+        // to each interior, including non-interior and reverse sources in mixed ER.
+        for (const auto& pair : Rando::GetEntranceShuffleTable()) {
+            const auto& source = pair.first;
+            const bool ingress =
+                pair.second.index >= 0 && source.index != ENTR_HAPPY_MASK_SHOP_0 &&
+                (source.type == Rando::EntranceType::Interior || source.type == Rando::EntranceType::SpecialInterior);
+            record(source.index, ingress ? InteriorKindForEntrance(source.index) : InteriorKind::Passage);
+            record(pair.second.index, InteriorKind::Passage);
+        }
+    }
     for (const auto& pair : Rando::GetEntranceShuffleTable()) {
         const auto& entry = pair.first;
         if (entry.index == ENTR_HAPPY_MASK_SHOP_0 || pair.second.index < 0)
@@ -126,9 +183,13 @@ static std::vector<Dungeon> BaseCatalogue(bool includeGanon, const PoolOptions& 
         if (options.dungeons && (entry.type == Rando::EntranceType::Dungeon ||
                                  (includeGanon && entry.type == Rando::EntranceType::GanonDungeon))) {
             pool = Pool::Dungeon;
-        } else if (options.interiors && (entry.type == Rando::EntranceType::Interior ||
-                                         entry.type == Rando::EntranceType::SpecialInterior)) {
-            pool = Pool::Interior;
+        } else if (entry.type == Rando::EntranceType::Interior || entry.type == Rando::EntranceType::SpecialInterior) {
+            const auto physical = physicalKinds.find(entry.index);
+            const auto selected =
+                InteriorPool(physical == physicalKinds.end() ? InteriorKind::Passage : physical->second, options);
+            if (!selected)
+                continue;
+            pool = *selected;
         } else if (options.grottos && entry.type == Rando::EntranceType::GrottoGrave) {
             pool = Pool::Grotto;
         } else {
@@ -160,7 +221,7 @@ static std::string CatalogueJson(bool includeGanon, const std::map<int32_t, int3
                                  const PoolOptions& options) {
     // Compose the native layout first. Boss records have distinct reverse/warp ownership and
     // must retain the metadata appended by their adapter rather than generic bluewarp inference.
-    auto catalogue = BaseCatalogue(includeGanon, options);
+    auto catalogue = BaseCatalogue(includeGanon, options, overrides);
     std::vector<Dungeon> dungeons;
     for (const auto& entry : catalogue)
         if (entry.pool == Pool::Dungeon)
@@ -320,6 +381,8 @@ extern "C" COMBO_EXPORT const char* SOH_ReadCrossEntranceOptions(void) {
     options.dungeons = CVarGetInteger("gCombo.Rando.CrossDungeonEntrances", 0) != 0;
     options.bosses = CVarGetInteger("gCombo.Rando.CrossBossEntrances", 0) != 0;
     options.interiors = CVarGetInteger("gCombo.Rando.CrossInteriorEntrances", 0) != 0;
+    options.shops = CVarGetInteger("gCombo.Rando.CrossShopEntrances", 0) != 0;
+    options.doorInteriors = CVarGetInteger("gCombo.Rando.CrossDoorInteriorEntrances", 0) != 0;
     options.grottos = CVarGetInteger("gCombo.Rando.CrossGrottoEntrances", 0) != 0;
     options.expanded = options.dungeons && CVarGetInteger("gCombo.Rando.ExpandedDungeonPool", 0) != 0;
     result = OptionsJson(options).dump();

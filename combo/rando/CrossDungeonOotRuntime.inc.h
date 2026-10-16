@@ -10,6 +10,7 @@ namespace ComboCrossOotRuntime {
 using namespace ComboRando::CrossDungeon;
 static RuntimeState state(0);
 static std::optional<RuntimeState::Transition> pending;
+static bool departureFadeComplete = false;
 static std::optional<Endpoint> pendingBossRecovery;
 static CheckpointState checkpoint;
 static int32_t localDungeonArrival = -1;
@@ -40,7 +41,7 @@ static void ObserveScene(int scene) {
         localDungeonArrival = localArrivalCheckpoint = -1;
     }
     const auto* owner = state.FindEntrance(checkpoint.Saved());
-    if (owner && (owner->pool == Pool::Interior || owner->pool == Pool::Grotto)) {
+    if (owner && (IsInteriorPool(owner->pool) || owner->pool == Pool::Grotto)) {
         // The logical checkpoint also survives native Farore/death transitions, which may
         // clear the transient grotto ID while retaining this exact scene/room respawn.
         checkpoint.ObserveScene(SceneMatchesEntrance(owner->entrance.index, scene));
@@ -79,10 +80,11 @@ static bool PrepareSwitch() {
         }
         return true;
     }
-    if (!pending)
+    if (!pending || !departureFadeComplete)
         return false;
     const auto transition = *pending;
     pending.reset();
+    departureFadeComplete = false;
     auto queue = reinterpret_cast<int (*)(int32_t)>(Combo_ResolveSym("2ship", "MM_QueueCrossDungeonArrival"));
     if (!queue || !gComboSceneSwitchCallback || !queue(transition.to.index)) {
         SPDLOG_ERROR("[CrossDungeon] OoT handoff rejected; peer arrival was not queued");
@@ -105,6 +107,20 @@ static bool PrepareSwitch() {
     return true;
 }
 } // namespace ComboCrossOotRuntime
+// Native Play keeps drawing its entrance effect until completion.
+extern "C" int Combo_SOH_CrossDungeonTransitionPending(void) {
+    return ComboCrossOotRuntime::pending.has_value();
+}
+extern "C" int Combo_SOH_CompleteCrossDungeonTransition(void) {
+    if (!ComboCrossOotRuntime::pending)
+        return 0;
+    ComboCrossOotRuntime::departureFadeComplete = true;
+    return 1;
+}
+extern "C" void Combo_SOH_CancelCrossDungeonTransition(void) {
+    ComboCrossOotRuntime::pending.reset();
+    ComboCrossOotRuntime::departureFadeComplete = false;
+}
 extern "C" int32_t Combo_SOH_CrossDungeonGrottoId(void) {
     using namespace ComboCrossOotRuntime;
     if (!gPlayState || !state.Enabled())
@@ -134,7 +150,7 @@ extern "C" COMBO_EXPORT int SOH_SetCrossDungeonRuntimeSeed(const char* raw) try 
                 throw std::invalid_argument("unknown OoT boss source recovery entrance");
         }
     ComboCrossOotRuntime::state.Install(seed);
-    ComboCrossOotRuntime::pending.reset();
+    Combo_SOH_CancelCrossDungeonTransition();
     ComboCrossOotRuntime::pendingBossRecovery.reset();
     ComboCrossOotRuntime::localDungeonArrival = ComboCrossOotRuntime::localArrivalCheckpoint = -1;
     return 1;
@@ -212,6 +228,7 @@ extern "C" int32_t Combo_SOH_CrossDungeonRoute(int32_t index, int beforeNative) 
         return transition->to.index;
     }
     pending = transition;
+    departureFadeComplete = false;
     return index; // A native host index until the clean-frame handoff; never return a foreign index.
 }
 extern "C" int32_t Combo_SOH_SaveCrossDungeonCheckpoint(void) {

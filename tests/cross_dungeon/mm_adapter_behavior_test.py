@@ -29,7 +29,10 @@ base=ROOT/'tests/cross_dungeon/mm_catalogue_behavior_test.py'
 env={'__file__':str(base)}
 exec(compile(base.read_text().split('# Compile the native respawn table')[0],str(base),'exec'),env)
 constants=env['constants']
-constants=constants.replace('int respawnFlag=0;', 'int gameMode=0,fileNum=0,nextCutsceneIndex=0xFFEF; int respawnFlag=0;')
+constants=constants.replace('int respawnFlag=0;', 'int gameMode=0,fileNum=0,nextCutsceneIndex=0xFFEF,nextTransitionType=0; int respawnFlag=0;')
+transitions=(ROOT/'mm/include/z64transition.h').read_text()
+fade_black=re.search(r'/\*\s*(\d+)\s*\*/\s*TRANS_TYPE_FADE_BLACK,',transitions).group(1)
+constants+='\nconstexpr int TRANS_TYPE_FADE_BLACK='+fade_black+';\n'
 constants=constants.replace('struct { int entrance=0; } save;', 'struct { int entrance=0,cutsceneIndex=0; struct { int pauseSaveEntrance=-1; } shipSaveInfo; } save;')
 scenes=(ROOT/'mm/include/tables/scene_table.h').read_text()
 for value,name in re.findall(r'/\*\s*(0x[0-9a-fA-F]+)\s*\*/\s*DEFINE_SCENE\([^,]+,\s*(SCENE_\w+)',scenes):

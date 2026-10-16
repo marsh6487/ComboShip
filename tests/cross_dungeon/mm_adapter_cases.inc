@@ -82,6 +82,8 @@ int main() {
     gSaveContext={};play.sceneId=1000;gSaveContext.respawn[3].data=0x9A;
     int32_t index=ENTRANCE(GROTTOS,4);
     assert(Combo_MM_CrossDungeonTransition(&index)==1 && ComboCrossMmRuntime::pending);
+    assert(!ComboCrossMmRuntime::PrepareSwitch());
+    assert(Combo_MM_CompleteCrossDungeonTransition());
     assert(ComboCrossMmRuntime::PrepareSwitch() && queued==100);
     assert(gSaveContext.save.entrance==g->hole.entrance);
     assert(Combo_MM_SaveCrossDungeonCheckpoint()==g->Exit());

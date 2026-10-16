@@ -120,6 +120,27 @@ jobs:
           ./run-clang-format.sh
           git diff --exit-code
 
+      # Runtime entrance fixtures need the JSON headers installed above, but
+      # still run before the large regression groups and platform builds.
+      - name: Native cross-game entrance sequencing and forest arrival
+        run: |
+          C_INCLUDE_PATH=/usr/include/SDL2 python3 -B scripts/diagnostics/run_receipt_syntax_tests.py mm/src/code/z_play.c soh/src/code/z_play.c
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/transition_fade_behavior_test.py --sanitize
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/oot_cold_blue_warp_behavior_test.py --sanitize
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/run_mm_camera_arrival_test.py --sanitize
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/opening_forest_test.py --sanitize
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/portal_save_test.py --sanitize
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/mm3d_pack_test.py --sanitize
+
+      - name: Door-only shop and interior entrance regressions
+        run: |
+          g++ -std=c++20 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/cross_dungeon/narrow_pools_test.cpp -o /tmp/narrow-pools
+          ASAN_OPTIONS=detect_leaks=0 /tmp/narrow-pools
+          python3 -B tests/cross_dungeon/interior_settings_behavior_test.py
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/oot_catalogue_behavior_test.py --sanitize
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/mm_catalogue_behavior_test.py --sanitize
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/oot_pool_runtime_behavior_test.py --sanitize
+
       - name: PAK menu visibility and voice discovery
         run: |
           python3 scripts/diagnostics/run_combo_pak_visibility_tests.py

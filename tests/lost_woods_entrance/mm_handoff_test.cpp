@@ -1,17 +1,19 @@
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "entrances/LostWoodsEntrance.h"
+#include "global.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
 #include <memory>
 #include <vector>
-#include "global.h"
-#include "entrances/LostWoodsEntrance.h"
 #define COMBO_EXPORT
 
 struct GameInteractor {
     struct OnSceneInit { using Function = std::function<void(s8, s8)>; };
     struct OnActorUpdate { using Function = std::function<void(Actor*)>; };
     struct OnGameStateMainStart { using Function = std::function<void()>; };
+    struct OnGameStateMainFinish { using Function = std::function<void()>; };
     struct OnPlayDestroy { using Function = std::function<void()>; };
     static GameInteractor* Instance;
     template<class Hook> static auto& Hooks() {
@@ -48,6 +50,8 @@ namespace ComboCrossMmRuntime {
     static bool PrepareSwitch() { bool value = pending; pending = false; return value; }
     static void ObserveScene(int) {}
 }
+extern "C" int Combo_MM_CrossDungeonTransitionPending(void) { return ComboCrossMmRuntime::pending; }
+extern "C" void Combo_MM_CancelCrossDungeonTransition(void) { ComboCrossMmRuntime::pending = false; }
 static void Return(int value) { ++switches; kind = value; }
 static void (*gComboReturnCallback)(int) = Return;
 static void SetOotRoute(int route) { recordedRoute = route; }
@@ -55,7 +59,7 @@ static void* Combo_ResolveSym(const char*, const char*) { return (void*)SetOotRo
 extern "C" s32 CVarGetInteger(const char*, s32) { return 0; }
 extern "C" void MM_CaptureFwDeparture(void) { ++fwCaptures; }
 void Combo_MM_FlushAccumulators() {}
-void SaveManager_SaveCurrentForCombo() { ++saves; }
+void SaveManager_SaveCurrentForCombo(bool = false) { ++saves; }
 
 /* RETURN_STATE */
 void RegisterCandidate() {
@@ -75,7 +79,10 @@ static void EnterPassage(int slot) {
     GameInteractor::Fire<GameInteractor::OnActorUpdate>(&player.actor);
 }
 static void Frames() {
-    for (int i = 0; i < 12; ++i) GameInteractor::Fire<GameInteractor::OnGameStateMainStart>();
+    for (int i = 0; i < 12; ++i) {
+        GameInteractor::Fire<GameInteractor::OnGameStateMainStart>();
+        GameInteractor::Fire<GameInteractor::OnGameStateMainFinish>();
+    }
 }
 int main() {
     RegisterCandidate();
@@ -115,5 +122,33 @@ int main() {
     Frames();
     require(saves == 3 && switches == 4 && kind == 1 && recordedRoute == COMBO_PORTAL_MARKET,
             "reset must cancel the forest handoff and preserve the autosave policy");
+    Combo_ClearReturnRequests();
+    play = {};
+    play.state.running = true;
+    gPlayState = &play;
+    gGameState = &play.state;
+    play.sceneId = SCENE_LOST_WOODS;
+    play.roomCtx.curRoom.num = 0;
+    ActorEntry openingSpawn{};
+    play.linkActorEntry = &openingSpawn;
+    gSaveContext.fileNum = 0;
+    gSaveContext.gameMode = GAMEMODE_NORMAL;
+    gSaveContext.sceneLayer = 0;
+    gSaveContext.save.cutsceneIndex = 0;
+    gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
+    player.actor.world.pos = {0, 0, 0};
+    GameInteractor::Fire<GameInteractor::OnActorUpdate>(&player.actor);
+    Frames();
+    require(saves == 3 && switches == 4,
+            "opening arrival must not immediately return through its arch");
+    player.actor.world.pos.x = 130;
+    GameInteractor::Fire<GameInteractor::OnActorUpdate>(&player.actor);
+    player.actor.world.pos.x = 0;
+    GameInteractor::Fire<GameInteractor::OnActorUpdate>(&player.actor);
+    Frames();
+    require(saves == 4 && switches == 5 &&
+                recordedRoute == COMBO_PORTAL_OPENING_FOREST,
+            "leaving and re-entering the opening arch must return to the pink "
+            "Fairy tunnel once");
     std::puts("PASS: production MM forest handoff, Play/slot lifetime, reset, shuffled arrivals and Farore ownership");
 }

@@ -85,6 +85,15 @@ jobs:
         working-directory: build-cmake/combo
         run: ./comborando --seed ci-linux-smoke --count 1
 
+      - name: Smoke-test door-only cross-game entrance generation
+        working-directory: build-cmake/combo
+        timeout-minutes: 10
+        run: >
+          ./comborando --seed ci-door-interiors --count 1
+          --cross-dungeon-entrances=0 --cross-boss-entrances=0
+          --cross-interior-entrances=0 --cross-grotto-entrances=0
+          --cross-shop-entrances=1 --cross-door-interior-entrances=1
+
       # Stages the runnable tree (binaries + assets + port o2rs; game archives oot.o2r / mm.o2r
       # are ROM-extracted by the user and never built or shipped here) and packages it as a
       # self-contained AppImage — linuxdeploy bundles the system .so deps and combo/linux/AppRun

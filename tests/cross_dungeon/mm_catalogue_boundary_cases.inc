@@ -26,6 +26,33 @@ void AssertNativeDescriptor(const RespawnDescriptor& actual, const BetterMapSele
 }
 int main() {
     CheckNativePortals();
+    // Retail shops are separate from minigames, services and the back hideout.
+    const std::set<int> shopDoors={ENTRANCE(MAGIC_HAGS_POTION_SHOP,0),ENTRANCE(ZORA_HALL_ROOMS,5),
+        ENTRANCE(CURIOSITY_SHOP,0),ENTRANCE(TRADING_POST,0),ENTRANCE(BOMB_SHOP,0),ENTRANCE(MILK_BAR,0)};
+    const std::set<int> otherDoors={ENTRANCE(MARINE_RESEARCH_LAB,0),ENTRANCE(ZORA_HALL_ROOMS,2),
+        ENTRANCE(ZORA_HALL_ROOMS,3),ENTRANCE(ZORA_HALL_ROOMS,1),ENTRANCE(ZORA_HALL_ROOMS,0),
+        ENTRANCE(SWAMP_SHOOTING_GALLERY,0),ENTRANCE(TOURIST_INFORMATION,0),
+        ENTRANCE(MUSIC_BOX_HOUSE,0),ENTRANCE(RANCH_HOUSE,0),ENTRANCE(RANCH_HOUSE,1),
+        ENTRANCE(CUCCO_SHACK,0),ENTRANCE(DOGGY_RACETRACK,0),ENTRANCE(ASTRAL_OBSERVATORY,1),
+        ENTRANCE(TREASURE_CHEST_SHOP,0),ENTRANCE(HONEY_AND_DARLINGS_SHOP,0),
+        ENTRANCE(MAYORS_RESIDENCE,0),ENTRANCE(TOWN_SHOOTING_GALLERY,0),ENTRANCE(STOCK_POT_INN,0),
+        ENTRANCE(STOCK_POT_INN,1),ENTRANCE(CURIOSITY_SHOP,1),ENTRANCE(SWORDMANS_SCHOOL,0),
+        ENTRANCE(POST_OFFICE,0),ENTRANCE(LOTTERY_SHOP,0),ENTRANCE(MOUNTAIN_SMITHY,0)};
+    auto narrowOptions=ParseOptions({{"dungeons",false},{"shops",true},{"doorInteriors",true}});
+    std::vector<Dungeon> narrow;Append(narrow,narrowOptions);
+    assert(narrow.size()==shopDoors.size()+otherDoors.size());
+    for(const auto& d:narrow) {
+        assert(static_cast<int>(d.pool)==(shopDoors.count(d.entrance.index)?4:5));
+        assert(shopDoors.count(d.entrance.index)||otherDoors.count(d.entrance.index));
+    }
+    for(int open:{ENTRANCE(DEKU_SCRUB_PLAYGROUND,0),ENTRANCE(FISHERMANS_HUT,0),ENTRANCE(GHOST_HUT,0),ENTRANCE(GORON_SHOP,0),
+        ENTRANCE(GORON_SHRINE,0),ENTRANCE(GORON_GRAVERYARD,0),ENTRANCE(ASTRAL_OBSERVATORY,0),
+        ENTRANCE(FAIRY_FOUNTAIN,0),ENTRANCE(FAIRY_FOUNTAIN,1),ENTRANCE(FAIRY_FOUNTAIN,2),
+        ENTRANCE(FAIRY_FOUNTAIN,3),ENTRANCE(FAIRY_FOUNTAIN,4),ENTRANCE(CLOCK_TOWER_INTERIOR,1)})
+        for(const auto& d:narrow)assert(d.entrance.index!=open);
+    auto broadOptions=narrowOptions;broadOptions.interiors=true;
+    std::vector<Dungeon> broad;Append(broad,broadOptions);assert(broad.size()==42);
+    for(const auto& d:broad)assert(d.pool==Pool::Interior);
     PoolOptions options;
     std::vector<Dungeon> catalog;
     Append(catalog,options);

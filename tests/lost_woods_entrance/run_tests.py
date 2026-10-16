@@ -95,3 +95,7 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-arrival-") as directory:
     subprocess.run([str(binary)], check=True)
 
 subprocess.run([sys.executable, str(ROOT / "tests/lost_woods_entrance/renderer_linkage_test.py")], check=True)
+subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_mm_camera_arrival_test.py")], check=True)
+subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/opening_forest_test.py")], check=True)
+subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/portal_save_test.py")], check=True)
+subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/mm3d_pack_test.py")], check=True)

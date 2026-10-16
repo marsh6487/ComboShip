@@ -4,11 +4,10 @@
 
 namespace ComboRando::CrossDungeon {
 inline nlohmann::json OptionsJson(const PoolOptions& p) {
-    return { { "dungeons", p.dungeons },
-             { "bosses", p.bosses },
-             { "interiors", p.interiors },
-             { "grottos", p.grottos },
-             { "expanded", p.expanded } };
+    return { { "dungeons", p.dungeons },          { "bosses", p.bosses },
+             { "interiors", p.interiors },        { "grottos", p.grottos },
+             { "expanded", p.expanded },          { "shops", p.shops },
+             { "doorInteriors", p.doorInteriors } };
 }
 inline PoolOptions ParseOptions(const nlohmann::json& j) {
     PoolOptions p;
@@ -27,6 +26,8 @@ inline PoolOptions ParseOptions(const nlohmann::json& j) {
     p.interiors = flag("interiors", false);
     p.grottos = flag("grottos", false);
     p.expanded = flag("expanded", false);
+    p.shops = flag("shops", false);
+    p.doorInteriors = flag("doorInteriors", false);
     return p;
 }
 inline PoolOptions OptionsFromSeed(const nlohmann::json& seed) {
@@ -42,6 +43,10 @@ inline bool Selected(const Dungeon& d, const PoolOptions& p) {
             return p.interiors;
         case Pool::Grotto:
             return p.grottos;
+        case Pool::Shop:
+            return p.shops && !p.interiors;
+        case Pool::DoorInterior:
+            return p.doorInteriors && !p.interiors;
     }
     return false;
 }
@@ -94,7 +99,7 @@ inline Dungeon ParseDungeon(const nlohmann::json& j) {
         d.escapeExits.push_back(ParseEndpoint(e));
     if (j.contains("pool")) {
         const auto& p = j.at("pool");
-        if (!p.is_number_integer() || p.get<int64_t>() < 0 || p.get<int64_t>() > 3)
+        if (!p.is_number_integer() || p.get<int64_t>() < 0 || p.get<int64_t>() > 5)
             throw std::invalid_argument("invalid cross-entrance category");
         d.pool = static_cast<Pool>(p.get<int>());
     }
@@ -139,9 +144,14 @@ inline nlohmann::json Encode(const std::vector<Dungeon>& dungeons, const std::ve
             options.interiors = true;
         if (d.pool == Pool::Grotto)
             options.grottos = true;
+        if (d.pool == Pool::Shop)
+            options.shops = true;
+        if (d.pool == Pool::DoorInterior)
+            options.doorInteriors = true;
     }
-    if (options.bosses || options.interiors || options.grottos || options.expanded) {
-        result["version"] = 2;
+    if (options.bosses || options.interiors || options.grottos || options.expanded || options.shops ||
+        options.doorInteriors) {
+        result["version"] = options.shops || options.doorInteriors ? 3 : 2;
         result["options"] = OptionsJson(options);
     }
     return result;
@@ -154,9 +164,10 @@ inline std::vector<Route> Decode(const nlohmann::json& j) {
     if (!j.at("enabled").get<bool>())
         return {};
     if (!j.at("version").is_number_integer() ||
-        (j.at("version").get<int64_t>() != 1 && j.at("version").get<int64_t>() != 2))
+        (j.at("version").get<int64_t>() < 1 || j.at("version").get<int64_t>() > 3))
         throw std::invalid_argument("unsupported cross-dungeon seed version");
-    const bool expandedCodec = j.at("version").get<int>() == 2;
+    const int version = j.at("version").get<int>();
+    const bool expandedCodec = version >= 2;
     if (expandedCodec && !j.contains("options"))
         throw std::invalid_argument("cross-entrance v2 options missing");
     const auto options = OptionsFromSeed(j);
@@ -168,7 +179,8 @@ inline std::vector<Route> Decode(const nlohmann::json& j) {
     std::vector<size_t> permutation;
     for (const auto& entry : entries) {
         auto d = ParseDungeon(entry);
-        if (!Selected(d, options) || (!expandedCodec && (d.pool != Pool::Dungeon || d.expanded)))
+        if (!Selected(d, options) || (!expandedCodec && (d.pool != Pool::Dungeon || d.expanded)) ||
+            (version < 3 && (d.pool == Pool::Shop || d.pool == Pool::DoorInterior)))
             throw std::invalid_argument("cross-entrance category disabled in recorded options");
         dungeons.push_back(std::move(d));
     }

@@ -28,6 +28,11 @@
 #include <time.h>
 #include <assert.h>
 
+#ifdef COMBO_BUILD
+extern int Combo_SOH_CompleteCrossDungeonTransition(void);
+extern void Combo_SOH_CancelCrossDungeonTransition(void);
+#endif
+
 // SM64 Mario: snapshot actor OC colliders into libsm64's surface set. Defined in
 // expansions/sm64/sm64_mario_surfaces.c (#included into z_player.c), so it has
 // external linkage and is callable here. Must run AFTER Actor_UpdateAll.
@@ -214,6 +219,9 @@ Gfx* Play_SetFog(PlayState* play, Gfx* gfx) {
 }
 
 void Play_Destroy(GameState* thisx) {
+#ifdef COMBO_BUILD
+    Combo_SOH_CancelCrossDungeonTransition();
+#endif
     PlayState* play = (PlayState*)thisx;
     Player* player = GET_PLAYER(play);
 
@@ -931,6 +939,12 @@ void Play_Update(PlayState* play) {
                                 play->transitionMode = TRANS_MODE_OFF;
                             }
                         } else if (play->transitionTrigger != TRANS_TRIGGER_END) {
+#ifdef COMBO_BUILD
+                            // Retain the completed native effect until the clean-frame peer handoff.
+                            if (Combo_SOH_CompleteCrossDungeonTransition()) {
+                                break;
+                            }
+#endif
                             play->state.running = false;
 
                             if (gSaveContext.gameMode != GAMEMODE_FILE_SELECT) {
@@ -987,6 +1001,11 @@ void Play_Update(PlayState* play) {
                     play->envCtx.screenFillColor[3] = (sTransitionFillTimer / 20.0f) * 255.0f;
 
                     if (sTransitionFillTimer >= 20) {
+#ifdef COMBO_BUILD
+                        if (Combo_SOH_CompleteCrossDungeonTransition()) {
+                            break;
+                        }
+#endif
                         play->state.running = false;
                         SET_NEXT_GAMESTATE(&play->state, Play_Init, PlayState);
                         gSaveContext.entranceIndex = play->nextEntranceIndex;
@@ -1029,6 +1048,11 @@ void Play_Update(PlayState* play) {
 
                 case TRANS_MODE_INSTANT:
                     if (play->transitionTrigger != TRANS_TRIGGER_END) {
+#ifdef COMBO_BUILD
+                        if (Combo_SOH_CompleteCrossDungeonTransition()) {
+                            break;
+                        }
+#endif
                         play->state.running = 0;
                         SET_NEXT_GAMESTATE(&play->state, Play_Init, PlayState);
                         gSaveContext.entranceIndex = play->nextEntranceIndex;
@@ -1076,6 +1100,11 @@ void Play_Update(PlayState* play) {
                         }
                     } else {
                         if (play->envCtx.sandstormEnvA == 255) {
+#ifdef COMBO_BUILD
+                            if (Combo_SOH_CompleteCrossDungeonTransition()) {
+                                break;
+                            }
+#endif
                             play->state.running = false;
                             SET_NEXT_GAMESTATE(&play->state, Play_Init, PlayState);
                             gSaveContext.entranceIndex = play->nextEntranceIndex;

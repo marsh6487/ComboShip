@@ -18,6 +18,14 @@ int main() {
     require(!ComboLostWoods_InOotTunnel(0x5B, 8, 0, 0, -410), "another OoT room must not cross");
     require(!ComboLostWoods_InOotTunnel(0x55, 0, 0, 0, -410), "another OoT scene must not cross");
     require(!ComboLostWoods_InOotTunnel(0x5B, 0, 90, 0, -410), "OoT tunnel side wall must not cross");
+    require(ComboLostWoods_InOotFairyTunnel(0x5B, 1, 800, 0, 340),
+            "pink Fairy tunnel must enter the opening forest");
+    require(!ComboLostWoods_InOotFairyTunnel(0x5B, 0, 800, 0, 340),
+            "other rooms cannot use the Fairy route");
+    require(!ComboLostWoods_InOotFairyTunnel(0x5B, 1, 800, 0, 160),
+            "return from the opening must not bounce");
+    require(!ComboLostWoods_InOotFairyTunnel(0x5B, 1, 800, 150, 340),
+            "flying above the Fairy tunnel cannot cross");
     require(ComboLostWoods_InMmPassage(0x64, 1, 160, 0, -160), "MM side passage must return");
     require(!ComboLostWoods_InMmPassage(0x64, 1, 90, 0, -90), "MM arrival must not bounce back");
     require(!ComboLostWoods_InMmPassage(0x64, 0, 160, 0, -160), "another maze room must not return");

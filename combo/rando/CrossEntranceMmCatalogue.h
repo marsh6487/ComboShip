@@ -7,6 +7,8 @@
 // virtual grotto returns must pass through ComboMmMaterializeGrotto before native scene loading.
 namespace ComboCrossMmCatalogue {
 using ComboRando::CrossDungeon::Dungeon;
+using ComboRando::CrossDungeon::InteriorKind;
+using ComboRando::CrossDungeon::InteriorPool;
 using ComboRando::CrossDungeon::Pool;
 using ComboRando::CrossDungeon::PoolOptions;
 
@@ -317,95 +319,101 @@ struct PortalDescriptor {
     const char* id;
     int32_t entrance, exit;
     RandoRegionId region, sourceRegion;
+    InteriorKind kind = InteriorKind::Passage;
 };
 inline const std::array<PortalDescriptor, 42>& Interiors() {
     // Explicit native reversible ingress set; source conditions stay in the native graph.
     // Clock Tower Interior remains owned by the original cross-game link.
+    // Kinds describe the physical ingress: native En_Door transitions and their
+    // retail use. Open tunnels/caves remain Passage, including Observatory spawn 0.
+    // Zora Hall rooms and Observatory spawn 1 have actual opening doors.
     static const std::array<PortalDescriptor, 42> interiors = { {
         { "mm:interior:fishermans_hut:0", ENTRANCE(FISHERMANS_HUT, 0), ENTRANCE(GREAT_BAY_COAST, 4), RR_FISHERMANS_HUT,
-          RR_GREAT_BAY_COAST },
+          RR_GREAT_BAY_COAST, InteriorKind::Passage },
         { "mm:interior:marine_research_lab:0", ENTRANCE(MARINE_RESEARCH_LAB, 0), ENTRANCE(GREAT_BAY_COAST, 7),
-          RR_MARINE_RESEARCH_LAB, RR_GREAT_BAY_COAST_MARINE_LAB_EXTERIOR },
+          RR_MARINE_RESEARCH_LAB, RR_GREAT_BAY_COAST_MARINE_LAB_EXTERIOR, InteriorKind::Door },
         { "mm:interior:fairy_fountain:3", ENTRANCE(FAIRY_FOUNTAIN, 3), ENTRANCE(ZORA_CAPE, 5),
-          RR_GREAT_BAY_GREAT_FAIRY_FOUNTAIN, RR_ZORA_CAPE_OUTSIDE_FAIRY_FOUNTAIN },
+          RR_GREAT_BAY_GREAT_FAIRY_FOUNTAIN, RR_ZORA_CAPE_OUTSIDE_FAIRY_FOUNTAIN, InteriorKind::Passage },
         { "mm:interior:zora_hall_rooms:5", ENTRANCE(ZORA_HALL_ROOMS, 5), ENTRANCE(ZORA_HALL, 2), RR_ZORA_HALL_SHOP,
-          RR_ZORA_HALL },
+          RR_ZORA_HALL, InteriorKind::ShopDoor },
         { "mm:interior:zora_hall_rooms:2", ENTRANCE(ZORA_HALL_ROOMS, 2), ENTRANCE(ZORA_HALL, 3),
-          RR_ZORA_HALL_LULUS_ROOM, RR_ZORA_HALL },
+          RR_ZORA_HALL_LULUS_ROOM, RR_ZORA_HALL, InteriorKind::Door },
         { "mm:interior:zora_hall_rooms:3", ENTRANCE(ZORA_HALL_ROOMS, 3), ENTRANCE(ZORA_HALL, 4),
-          RR_ZORA_HALL_EVANS_ROOM, RR_ZORA_HALL },
+          RR_ZORA_HALL_EVANS_ROOM, RR_ZORA_HALL, InteriorKind::Door },
         { "mm:interior:zora_hall_rooms:1", ENTRANCE(ZORA_HALL_ROOMS, 1), ENTRANCE(ZORA_HALL, 5),
-          RR_ZORA_HALL_JAPAS_ROOM, RR_ZORA_HALL },
+          RR_ZORA_HALL_JAPAS_ROOM, RR_ZORA_HALL, InteriorKind::Door },
         { "mm:interior:zora_hall_rooms:0", ENTRANCE(ZORA_HALL_ROOMS, 0), ENTRANCE(ZORA_HALL, 6),
-          RR_ZORA_HALL_MIKAUS_ROOM, RR_ZORA_HALL },
+          RR_ZORA_HALL_MIKAUS_ROOM, RR_ZORA_HALL, InteriorKind::Door },
         { "mm:interior:swamp_shooting_gallery:0", ENTRANCE(SWAMP_SHOOTING_GALLERY, 0),
-          ENTRANCE(ROAD_TO_SOUTHERN_SWAMP, 2), RR_SWAMP_SHOOTING_GALLERY, RR_ROAD_TO_SOUTHERN_SWAMP },
+          ENTRANCE(ROAD_TO_SOUTHERN_SWAMP, 2), RR_SWAMP_SHOOTING_GALLERY, RR_ROAD_TO_SOUTHERN_SWAMP,
+          InteriorKind::Door },
         { "mm:interior:tourist_information:0", ENTRANCE(TOURIST_INFORMATION, 0), ENTRANCE(SOUTHERN_SWAMP_POISONED, 1),
-          RR_TOURIST_INFORMATION, RR_SOUTHERN_SWAMP_NORTH },
+          RR_TOURIST_INFORMATION, RR_SOUTHERN_SWAMP_NORTH, InteriorKind::Door },
         { "mm:interior:magic_hags_potion_shop:0", ENTRANCE(MAGIC_HAGS_POTION_SHOP, 0),
-          ENTRANCE(SOUTHERN_SWAMP_POISONED, 5), RR_MAGIC_HAGS_POTION_SHOP, RR_SOUTHERN_SWAMP_NEAR_WOODS },
+          ENTRANCE(SOUTHERN_SWAMP_POISONED, 5), RR_MAGIC_HAGS_POTION_SHOP, RR_SOUTHERN_SWAMP_NEAR_WOODS,
+          InteriorKind::ShopDoor },
         { "mm:interior:fairy_fountain:1", ENTRANCE(FAIRY_FOUNTAIN, 1), ENTRANCE(WOODFALL, 2),
-          RR_WOODFALL_GREAT_FAIRY_FOUNTAIN, RR_WOODFALL },
+          RR_WOODFALL_GREAT_FAIRY_FOUNTAIN, RR_WOODFALL, InteriorKind::Passage },
         { "mm:interior:ghost_hut:0", ENTRANCE(GHOST_HUT, 0), ENTRANCE(IKANA_CANYON, 1), RR_GHOST_HUT,
-          RR_IKANA_CANYON_UPPER },
+          RR_IKANA_CANYON_UPPER, InteriorKind::Passage },
         { "mm:interior:music_box_house:0", ENTRANCE(MUSIC_BOX_HOUSE, 0), ENTRANCE(IKANA_CANYON, 2), RR_MUSIC_BOX_HOUSE,
-          RR_IKANA_CANYON_UPPER },
+          RR_IKANA_CANYON_UPPER, InteriorKind::Door },
         { "mm:interior:fairy_fountain:4", ENTRANCE(FAIRY_FOUNTAIN, 4), ENTRANCE(IKANA_CANYON, 11),
-          RR_IKANA_GREAT_FAIRY_FOUNTAIN, RR_IKANA_CANYON_UPPER },
+          RR_IKANA_GREAT_FAIRY_FOUNTAIN, RR_IKANA_CANYON_UPPER, InteriorKind::Passage },
         { "mm:interior:ranch_house:0", ENTRANCE(RANCH_HOUSE, 0), ENTRANCE(ROMANI_RANCH, 2), RR_RANCH_BARN,
-          RR_ROMANI_RANCH },
+          RR_ROMANI_RANCH, InteriorKind::Door },
         { "mm:interior:ranch_house:1", ENTRANCE(RANCH_HOUSE, 1), ENTRANCE(ROMANI_RANCH, 3), RR_RANCH_HOUSE,
-          RR_ROMANI_RANCH },
+          RR_ROMANI_RANCH, InteriorKind::Door },
         { "mm:interior:cucco_shack:0", ENTRANCE(CUCCO_SHACK, 0), ENTRANCE(ROMANI_RANCH, 4), RR_CUCCO_SHACK,
-          RR_ROMANI_RANCH },
+          RR_ROMANI_RANCH, InteriorKind::Door },
         { "mm:interior:doggy_racetrack:0", ENTRANCE(DOGGY_RACETRACK, 0), ENTRANCE(ROMANI_RANCH, 5), RR_DOGGY_RACETRACK,
-          RR_ROMANI_RANCH },
+          RR_ROMANI_RANCH, InteriorKind::Door },
         { "mm:interior:astral_observatory:1", ENTRANCE(ASTRAL_OBSERVATORY, 1), ENTRANCE(TERMINA_FIELD, 9),
-          RR_ASTRAL_OBSERVATORY, RR_ASTRAL_OBSERVATORY_OUTSIDE },
+          RR_ASTRAL_OBSERVATORY, RR_ASTRAL_OBSERVATORY_OUTSIDE, InteriorKind::Door },
         { "mm:interior:astral_observatory:0", ENTRANCE(ASTRAL_OBSERVATORY, 0), ENTRANCE(EAST_CLOCK_TOWN, 2),
-          RR_ASTRAL_OBSERVATORY_PASSAGE, RR_CLOCK_TOWN_EAST },
+          RR_ASTRAL_OBSERVATORY_PASSAGE, RR_CLOCK_TOWN_EAST, InteriorKind::Passage },
         { "mm:interior:treasure_chest_shop:0", ENTRANCE(TREASURE_CHEST_SHOP, 0), ENTRANCE(EAST_CLOCK_TOWN, 4),
-          RR_TREASURE_SHOP, RR_CLOCK_TOWN_EAST },
+          RR_TREASURE_SHOP, RR_CLOCK_TOWN_EAST, InteriorKind::Door },
         { "mm:interior:honey_and_darlings_shop:0", ENTRANCE(HONEY_AND_DARLINGS_SHOP, 0), ENTRANCE(EAST_CLOCK_TOWN, 6),
-          RR_HONEY_AND_DARLING, RR_CLOCK_TOWN_EAST },
+          RR_HONEY_AND_DARLING, RR_CLOCK_TOWN_EAST, InteriorKind::Door },
         { "mm:interior:mayors_residence:0", ENTRANCE(MAYORS_RESIDENCE, 0), ENTRANCE(EAST_CLOCK_TOWN, 7),
-          RR_MAYOR_RESIDENCE, RR_CLOCK_TOWN_EAST },
+          RR_MAYOR_RESIDENCE, RR_CLOCK_TOWN_EAST, InteriorKind::Door },
         { "mm:interior:town_shooting_gallery:0", ENTRANCE(TOWN_SHOOTING_GALLERY, 0), ENTRANCE(EAST_CLOCK_TOWN, 8),
-          RR_TOWN_SHOOTING_GALLERY, RR_CLOCK_TOWN_EAST },
+          RR_TOWN_SHOOTING_GALLERY, RR_CLOCK_TOWN_EAST, InteriorKind::Door },
         { "mm:interior:stock_pot_inn:0", ENTRANCE(STOCK_POT_INN, 0), ENTRANCE(EAST_CLOCK_TOWN, 9), RR_INN,
-          RR_CLOCK_TOWN_EAST },
+          RR_CLOCK_TOWN_EAST, InteriorKind::Door },
         { "mm:interior:stock_pot_inn:1", ENTRANCE(STOCK_POT_INN, 1), ENTRANCE(EAST_CLOCK_TOWN, 10), RR_INN,
-          RR_CLOCK_TOWN_EAST },
+          RR_CLOCK_TOWN_EAST, InteriorKind::Door },
         { "mm:interior:milk_bar:0", ENTRANCE(MILK_BAR, 0), ENTRANCE(EAST_CLOCK_TOWN, 11), RR_MILK_BAR,
-          RR_CLOCK_TOWN_EAST },
+          RR_CLOCK_TOWN_EAST, InteriorKind::ShopDoor },
         { "mm:interior:curiosity_shop:1", ENTRANCE(CURIOSITY_SHOP, 1), ENTRANCE(LAUNDRY_POOL, 1),
-          RR_CURIOSITY_SHOP_BACK, RR_CLOCK_TOWN_LAUNDRY },
+          RR_CURIOSITY_SHOP_BACK, RR_CLOCK_TOWN_LAUNDRY, InteriorKind::Door },
         { "mm:interior:fairy_fountain:0", ENTRANCE(FAIRY_FOUNTAIN, 0), ENTRANCE(NORTH_CLOCK_TOWN, 3),
-          RR_CLOCK_TOWN_GREAT_FAIRY_FOUNTAIN, RR_CLOCK_TOWN_NORTH },
+          RR_CLOCK_TOWN_GREAT_FAIRY_FOUNTAIN, RR_CLOCK_TOWN_NORTH, InteriorKind::Passage },
         { "mm:interior:deku_scrub_playground:0", ENTRANCE(DEKU_SCRUB_PLAYGROUND, 0), ENTRANCE(NORTH_CLOCK_TOWN, 4),
-          RR_TOWN_DEKU_PLAYGROUND, RR_CLOCK_TOWN_NORTH },
+          RR_TOWN_DEKU_PLAYGROUND, RR_CLOCK_TOWN_NORTH, InteriorKind::Passage },
         { "mm:interior:swordmans_school:0", ENTRANCE(SWORDMANS_SCHOOL, 0), ENTRANCE(WEST_CLOCK_TOWN, 3),
-          RR_SWORDSMAN_SCHOOL, RR_CLOCK_TOWN_WEST },
+          RR_SWORDSMAN_SCHOOL, RR_CLOCK_TOWN_WEST, InteriorKind::Door },
         { "mm:interior:curiosity_shop:0", ENTRANCE(CURIOSITY_SHOP, 0), ENTRANCE(WEST_CLOCK_TOWN, 4),
-          RR_CURIOSITY_SHOP_FRONT, RR_CLOCK_TOWN_WEST },
+          RR_CURIOSITY_SHOP_FRONT, RR_CLOCK_TOWN_WEST, InteriorKind::ShopDoor },
         { "mm:interior:trading_post:0", ENTRANCE(TRADING_POST, 0), ENTRANCE(WEST_CLOCK_TOWN, 5), RR_TRADING_POST,
-          RR_CLOCK_TOWN_WEST },
+          RR_CLOCK_TOWN_WEST, InteriorKind::ShopDoor },
         { "mm:interior:bomb_shop:0", ENTRANCE(BOMB_SHOP, 0), ENTRANCE(WEST_CLOCK_TOWN, 6), RR_BOMB_SHOP,
-          RR_CLOCK_TOWN_WEST },
+          RR_CLOCK_TOWN_WEST, InteriorKind::ShopDoor },
         { "mm:interior:post_office:0", ENTRANCE(POST_OFFICE, 0), ENTRANCE(WEST_CLOCK_TOWN, 7), RR_POST_OFFICE,
-          RR_CLOCK_TOWN_WEST },
+          RR_CLOCK_TOWN_WEST, InteriorKind::Door },
         { "mm:interior:lottery_shop:0", ENTRANCE(LOTTERY_SHOP, 0), ENTRANCE(WEST_CLOCK_TOWN, 8), RR_LOTTERY_SHOP,
-          RR_CLOCK_TOWN_WEST },
+          RR_CLOCK_TOWN_WEST, InteriorKind::Door },
         { "mm:interior:goron_shop:0", ENTRANCE(GORON_SHOP, 0), ENTRANCE(GORON_SHRINE, 1), RR_GORON_SHOP,
-          RR_GORON_SHRINE },
+          RR_GORON_SHRINE, InteriorKind::Passage },
         { "mm:interior:goron_shrine:0", ENTRANCE(GORON_SHRINE, 0), ENTRANCE(GORON_VILLAGE_WINTER, 2), RR_GORON_SHRINE,
-          RR_GORON_VILLAGE },
+          RR_GORON_VILLAGE, InteriorKind::Passage },
         { "mm:interior:mountain_smithy:0", ENTRANCE(MOUNTAIN_SMITHY, 0), ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 1),
-          RR_MOUNTAIN_SMITHY, RR_MOUNTAIN_VILLAGE },
+          RR_MOUNTAIN_SMITHY, RR_MOUNTAIN_VILLAGE, InteriorKind::Door },
         { "mm:interior:goron_graveryard:0", ENTRANCE(GORON_GRAVERYARD, 0), ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 3),
-          RR_GORON_GRAVEYARD, RR_MOUNTAIN_VILLAGE },
+          RR_GORON_GRAVEYARD, RR_MOUNTAIN_VILLAGE, InteriorKind::Passage },
         { "mm:interior:fairy_fountain:2", ENTRANCE(FAIRY_FOUNTAIN, 2), ENTRANCE(SNOWHEAD, 2),
-          RR_SNOWHEAD_GREAT_FAIRY_FOUNTAIN, RR_SNOWHEAD_OUTSIDE_FOUNTAIN },
+          RR_SNOWHEAD_GREAT_FAIRY_FOUNTAIN, RR_SNOWHEAD_OUTSIDE_FOUNTAIN, InteriorKind::Passage },
     } };
     return interiors;
 }
@@ -441,9 +449,9 @@ inline void Append(std::vector<Dungeon>& out, const PoolOptions& options) {
     if (options.dungeons && options.expanded)
         for (const auto& portal : ExpandedDungeons())
             appendPortal(portal, Pool::Dungeon, true);
-    if (options.interiors)
-        for (const auto& portal : Interiors())
-            appendPortal(portal, Pool::Interior, false);
+    for (const auto& portal : Interiors())
+        if (const auto pool = InteriorPool(portal.kind, options))
+            appendPortal(portal, *pool, false);
     if (options.grottos)
         for (const auto& grotto : Grottos()) {
             Dungeon dungeon;

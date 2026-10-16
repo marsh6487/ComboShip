@@ -6,6 +6,7 @@
 #include "ComboExport.h"
 #include "ComboResolve.h"
 #include "../../combo/entrances/LostWoodsEntrance.h"
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #endif
 #include <iostream>
 #include <algorithm>
@@ -190,18 +191,28 @@ static bool sComboPortalArrivalPending = false;
 static int sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
 static int sComboPassageFade = 0;
 static int sComboPassageFileNum = -1;
+static bool sComboOpeningReturnArmed = false;
 static void (*sComboSetOotReturnRoute)(int) = nullptr;
 
 extern "C" COMBO_EXPORT void MM_SetComboPortalRoute(int route) {
-    sComboPortalRoute = route == COMBO_PORTAL_LOST_WOODS ? route : COMBO_PORTAL_MARKET;
-    sComboPortalArrivalPending = sComboPortalRoute == COMBO_PORTAL_LOST_WOODS;
+    sComboPortalRoute = ComboLostWoods_IsForestRoute(route) ? route : COMBO_PORTAL_MARKET;
+    sComboPortalArrivalPending = ComboLostWoods_IsForestRoute(sComboPortalRoute);
 }
 
 // Called AFTER native save loading and OnSaveLoad, so neither can overwrite the destination.
 extern "C" void MM_ApplyComboPortalArrival(void) {
-    if (!sComboPortalArrivalPending || sComboPortalRoute != COMBO_PORTAL_LOST_WOODS)
+    if (!sComboPortalArrivalPending || !ComboLostWoods_IsForestRoute(sComboPortalRoute))
         return;
     sComboPortalArrivalPending = false;
+    if (sComboPortalRoute == COMBO_PORTAL_OPENING_FOREST) {
+        gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
+        gSaveContext.save.cutsceneIndex = 0;
+        gSaveContext.nextCutsceneIndex = 0xFFEF;
+        gSaveContext.cutsceneTrigger = 0;
+        gSaveContext.save.isOwlSave = false;
+        gSaveContext.respawnFlag = 0;
+        return;
+    }
     gSaveContext.save.entrance = ENTRANCE(WOODS_OF_MYSTERY, 0);
     gSaveContext.save.cutsceneIndex = 0;
     gSaveContext.save.isOwlSave = false;
@@ -210,7 +221,10 @@ extern "C" void MM_ApplyComboPortalArrival(void) {
     *arrival = {};
     arrival->entrance = gSaveContext.save.entrance;
     arrival->roomIndex = 1;
-    arrival->pos = { 90.0f, 0.0f, -90.0f };
+    // Keep the native 180-unit trailing camera in front of the passage mouth.
+    // The old wall-side placement put it behind the opaque black quad until
+    // Link walked farther into the clearing, including stationary save arrivals.
+    arrival->pos = { 0.0f, 0.0f, 0.0f };
     arrival->yaw = -8192; // towards the clearing, away from the north-east passage
     arrival->playerParams = PLAYER_PARAMS(0xFF, PLAYER_START_MODE_E);
     arrival->data = 1;
@@ -235,11 +249,12 @@ extern "C" void Combo_RequestOwlSaveQuit(void) {
 static void Combo_CancelLostWoodsPassage(void) {
     if (sComboPassageFade && gPlayState && gGameState == &gPlayState->state)
         gPlayState->envCtx.fillScreen = false;
-    if (sComboReturnPortalRoute == COMBO_PORTAL_LOST_WOODS)
+    if (ComboLostWoods_IsForestRoute(sComboReturnPortalRoute))
         sComboReturnPending = false;
     sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
     sComboPassageFade = 0;
     sComboPassageFileNum = -1;
+    sComboOpeningReturnArmed = false;
 }
 static void Combo_ClearReturnRequests(void) {
     sComboReturnPending = false;
@@ -1452,6 +1467,7 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(Combo_CancelLostWoodsPassage);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s8 sceneId, s8 spawnNum) {
         ComboCrossMmRuntime::ObserveScene(sceneId);
+        sComboOpeningReturnArmed = false;
         // GAMEMODE_NORMAL only: MM's attract demo (GAMEMODE_TITLE_SCREEN, after Sram_InitNewSave wiped
         // the save) scene-hops through here, and would both teleport the player to OOT and persist the
         // wiped save over the slot.
@@ -1468,21 +1484,43 @@ extern "C" void InitOTR(int argc, char* argv[]) {
             gPlayState->csCtx.state != CS_STATE_IDLE)
             return;
         const Vec3f& pos = actor->world.pos;
-        if (!ComboLostWoods_InMmPassage(gPlayState->sceneId, gPlayState->roomCtx.curRoom.num, pos.x, pos.y, pos.z))
+        if (ComboOpeningForest_IsExploration(gPlayState) && gPlayState->linkActorEntry) {
+            const float dx = pos.x - gPlayState->linkActorEntry->pos.x;
+            const float dz = pos.z - gPlayState->linkActorEntry->pos.z;
+            if (dx * dx + dz * dz > 14400.0f)
+                sComboOpeningReturnArmed = true;
+        }
+        const bool openingReturn = sComboOpeningReturnArmed && ComboOpeningForest_AtReturn(gPlayState, &pos);
+        if (!openingReturn &&
+            !ComboLostWoods_InMmPassage(gPlayState->sceneId, gPlayState->roomCtx.curRoom.num, pos.x, pos.y, pos.z))
             return;
         if (!sComboSetOotReturnRoute)
             sComboSetOotReturnRoute = (void (*)(int))Combo_ResolveSym("soh", "SOH_SetComboPortalReturnRoute");
         if (!sComboSetOotReturnRoute)
             return;
-        sComboReturnPortalRoute = COMBO_PORTAL_LOST_WOODS;
+        sComboReturnPortalRoute = openingReturn ? COMBO_PORTAL_OPENING_FOREST : COMBO_PORTAL_LOST_WOODS;
         sComboPassageFileNum = (int)gSaveContext.fileNum;
         sComboPassageFade = 1;
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>([]() {
+        if (sComboFwReturnPending || sComboResetReturnPending || sComboOwlSaveQuitPending)
+            Combo_MM_CancelCrossDungeonTransition();
+    });
+    // Play_Main has now built the final native transition display list. Commit
+    // after it, so the outgoing frame stays covered while the launcher loads.
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainFinish>([]() {
+        if (sComboFwReturnPending || sComboResetReturnPending || sComboOwlSaveQuitPending)
+            Combo_MM_CancelCrossDungeonTransition();
         if (ComboCrossMmRuntime::PrepareSwitch()) {
+            if (gPlayState) {
+                gPlayState->transitionTrigger = TRANS_TRIGGER_OFF;
+                gPlayState->transitionMode = TRANS_MODE_OFF;
+            }
             Combo_CancelLostWoodsPassage();
             sComboReturnPending = true;
         }
+        if (Combo_MM_CrossDungeonTransitionPending() && sComboPassageFade)
+            Combo_CancelLostWoodsPassage();
         if (sComboPassageFade &&
             (!gPlayState || gGameState != &gPlayState->state || !gGameState->running ||
              gSaveContext.gameMode != GAMEMODE_NORMAL || !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) ||
@@ -1490,13 +1528,19 @@ extern "C" void InitOTR(int argc, char* argv[]) {
             Combo_CancelLostWoodsPassage();
         if (sComboPassageFade && gPlayState && !sComboFwReturnPending && !sComboResetReturnPending &&
             !sComboOwlSaveQuitPending) {
-            sComboPassageFade = std::min(sComboPassageFade + 24, 255);
+            if (sComboPassageFade < 255) {
+                sComboPassageFade = std::min(sComboPassageFade + 24, 255);
+                gPlayState->envCtx.fillScreen = true;
+                gPlayState->envCtx.screenFillColor[0] = gPlayState->envCtx.screenFillColor[1] =
+                    gPlayState->envCtx.screenFillColor[2] = 0;
+                gPlayState->envCtx.screenFillColor[3] = sComboPassageFade;
+                return; // Let a full-alpha frame render before the next handoff tick.
+            }
             gPlayState->envCtx.fillScreen = true;
             gPlayState->envCtx.screenFillColor[0] = gPlayState->envCtx.screenFillColor[1] =
                 gPlayState->envCtx.screenFillColor[2] = 0;
             gPlayState->envCtx.screenFillColor[3] = sComboPassageFade;
-            if (sComboPassageFade == 255)
-                sComboReturnPending = true;
+            sComboReturnPending = true;
         }
         if (!sComboReturnPending && !sComboFwReturnPending && !sComboResetReturnPending && !sComboOwlSaveQuitPending)
             return;
@@ -1536,7 +1580,7 @@ extern "C" void InitOTR(int argc, char* argv[]) {
                 MM_CaptureFwDeparture();
             void Combo_MM_FlushAccumulators(void);
             Combo_MM_FlushAccumulators(); // ComboShip (#214): bank a count-up still running at the portal
-            SaveManager_SaveCurrentForCombo();
+            SaveManager_SaveCurrentForCombo(!isReset && !isFwReturn);
         }
         if (gComboReturnCallback)
             gComboReturnCallback(isOwlSaveQuit ? 2 : (isReset ? 1 : (isFwReturn ? 3 : 0)));

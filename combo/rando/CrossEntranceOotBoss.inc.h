@@ -64,8 +64,7 @@ static void AppendBossCatalogue(std::vector<Dungeon>& out, const std::map<int32_
         // Exact catalogue identities retain interior/grotto ownership. An arbitrary
         // alternate interior spawn has no durable owner in the runtime catalogue.
         for (const auto& owned : out)
-            if (owned.entrance == Endpoint{ 0, resolved } &&
-                (owned.pool == Pool::Interior || owned.pool == Pool::Grotto))
+            if (owned.entrance == Endpoint{ 0, resolved } && (IsInteriorPool(owned.pool) || owned.pool == Pool::Grotto))
                 return owned.entrance;
         const int scene = OriginalEntranceScene(resolved);
         if (scene < 0)

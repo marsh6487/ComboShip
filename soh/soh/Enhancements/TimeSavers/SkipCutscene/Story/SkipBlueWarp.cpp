@@ -18,6 +18,7 @@ extern "C" PlayState* gPlayState;
 static bool sEnteredBlueWarp = false;
 #ifdef COMBO_BUILD
 extern "C" int Combo_SOH_CrossDungeonRuntimeEnabled(void);
+extern "C" int Combo_SOH_CompleteCrossDungeonTransition(void);
 #endif
 
 static bool ShouldOverrideBlueWarpDestinations() {
@@ -27,6 +28,13 @@ static bool ShouldOverrideBlueWarpDestinations() {
     overrideDestinations = overrideDestinations || (IS_RANDO && Combo_SOH_CrossDungeonRuntimeEnabled());
 #endif
     return overrideDestinations;
+}
+
+static void CompleteBlueWarpRedirect() {
+#ifdef COMBO_BUILD
+    // Play_Init runs after the source blue-warp sequence has finished.
+    Combo_SOH_CompleteCrossDungeonTransition();
+#endif
 }
 
 extern void TimeSaverQueueItem(RandomizerGet randoGet);
@@ -194,6 +202,7 @@ void RegisterShouldPlayBlueWarp() {
             // warp. Jabu's blue warp doesn't call VB_PLAY_BLUE_WARP_CS without Ruto
             if (sEnteredBlueWarp && overrideBlueWarpDestinations) {
                 Entrance_OverrideBlueWarp();
+                CompleteBlueWarpRedirect();
             }
         }
 

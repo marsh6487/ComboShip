@@ -16,6 +16,8 @@ void MMWeather_Reset(void);
 int MMWeather_Season(void);
 // Resolve current eligibility before the environment update (actors and HUD confirmations).
 int MMWeather_SeasonForPlay(const struct PlayState* play);
+// Scene foliage also supports safe ComboShip visits to the opening forest's special skybox.
+int MMWeather_FoliageSeasonForPlay(const struct PlayState* play);
 // Eligible seasons suppress native rain presentation while its source stays live.
 // The independent global rain override still composes.
 int MMWeather_SeasonClearsRain(void);

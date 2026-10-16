@@ -38,6 +38,8 @@ namespace ComboCrossOotRuntime {
     static bool PrepareSwitch() { bool value = pending; pending = false; return value; }
     static void ObserveScene(int) {}
 }
+extern "C" int Combo_SOH_CrossDungeonTransitionPending(void) { return ComboCrossOotRuntime::pending; }
+extern "C" void Combo_SOH_CancelCrossDungeonTransition(void) { ComboCrossOotRuntime::pending = false; }
 void Combo_SOH_CapturePendingChecks() {}
 void Combo_FlushDormantAccumulators() {}
 extern "C" void Play_PerformSave(PlayState*) { ++saves; savedSlot = gSaveContext.fileNum; }
@@ -61,17 +63,18 @@ void RegisterCandidate() {
     /* HANDOFF_HOOKS */
 }
 
-static void EnterTunnel(int slot) {
-    gPlayState = &play;
-    gGameState = &play.state;
-    play.state.running = true;
-    play.sceneNum = SCENE_LOST_WOODS;
-    play.roomCtx.curRoom.num = 0;
-    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
-    player.actor.world.pos = { 0, 0, -375 };
-    gSaveContext.fileNum = slot;
-    gSaveContext.gameMode = GAMEMODE_NORMAL;
-    GameInteractor::Fire<GameInteractor::OnPlayerUpdate>();
+static void EnterTunnel(int slot, bool openingForest = false) {
+  gPlayState = &play;
+  gGameState = &play.state;
+  play.state.running = true;
+  play.sceneNum = SCENE_LOST_WOODS;
+  play.roomCtx.curRoom.num = openingForest ? 1 : 0;
+  play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
+  player.actor.world.pos =
+      openingForest ? Vec3f{800, 0, 340} : Vec3f{0, 0, -375};
+  gSaveContext.fileNum = slot;
+  gSaveContext.gameMode = GAMEMODE_NORMAL;
+  GameInteractor::Fire<GameInteractor::OnPlayerUpdate>();
 }
 static void Frames() {
     for (int i = 0; i < 12; ++i) GameInteractor::Fire<GameInteractor::OnGameFrameUpdate>();
@@ -125,5 +128,19 @@ int main() {
     Frames();
     require(saves == 4 && switches == 3 && recordedRoute == COMBO_PORTAL_MARKET && !play.envCtx.fillScreen,
             "Farore recall must cancel a forest fade and keep its own handoff ownership");
+    GameInteractor::Fire<GameInteractor::OnPlayDestroy>();
+    EnterTunnel(0, true);
+    Frames();
+    require(saves == 5 && switches == 4 &&
+                recordedRoute == COMBO_PORTAL_OPENING_FOREST,
+            "the pink Fairy tunnel must save and queue the separate "
+            "opening-forest route exactly once");
+    GameInteractor::Fire<GameInteractor::OnPlayDestroy>();
+    EnterTunnel(0, true);
+    GameInteractor::Fire<GameInteractor::OnExitGame>(0);
+    Frames();
+    require(saves == 5 && switches == 4,
+            "reset during the pink tunnel's fade must never save or launch a "
+            "new session");
     std::puts("PASS: production OoT fade/handoff, reset cancellation, source-slot safety and ordinary portal routing");
 }

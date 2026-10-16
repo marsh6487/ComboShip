@@ -36,7 +36,7 @@ namespace Rando {
 '''+entrance_enum+'\n'+link_info+'''
 using EntranceInfoPair=std::pair<EntranceLinkInfo,EntranceLinkInfo>;
 EntranceLinkInfo NO_RETURN_ENTRANCE = { EntranceType::None, RR_NONE, RR_NONE, -1 };
-'''+body(native,'GetEntranceShuffleTable')+'\n}\nnamespace ComboCrossOot {\nusing namespace ComboRando::CrossDungeon;\nstatic HostState state(0);\n'+constants+'\n'+body(boss,'OriginalEntranceScene')+'\n'+body(boss,'AppendBossCatalogue')+'\n'+body(adapter,'BaseCatalogue')+'\n'+body(adapter,'BlueWarpExits')+'\n'+body(adapter,'CatalogueJson')+'''
+'''+body(native,'GetEntranceShuffleTable')+'\n}\nnamespace ComboCrossOot {\nusing namespace ComboRando::CrossDungeon;\nstatic HostState state(0);\n'+constants+'\n'+body(boss,'OriginalEntranceScene')+'\n'+body(boss,'AppendBossCatalogue')+'\n'+body(adapter,'InteriorKindForEntrance')+'\n'+body(adapter,'BaseCatalogue')+'\n'+body(adapter,'BlueWarpExits')+'\n'+body(adapter,'CatalogueJson')+'''
 }
 #define COMBO_EXPORT
 static std::map<std::string,int> liveSettings;
@@ -46,12 +46,82 @@ using namespace ComboCrossOot;
 using namespace ComboRando::CrossDungeon;
 int main() {
     PoolOptions options;
+    // Both narrow controls alone must select only real doors, not open passages.
+    auto narrowOptions=ParseOptions({{"dungeons",false},{"shops",true},{"doorInteriors",true}});
+    auto narrow=nlohmann::json::parse(CatalogueJson(false,{},narrowOptions));
+    const std::set<int> shopDoors={ENTR_BAZAAR_0,ENTR_BAZAAR_1,ENTR_POTION_SHOP_MARKET_0,
+        ENTR_BOMBCHU_SHOP_1,ENTR_POTION_SHOP_GRANNY_0,ENTR_POTION_SHOP_KAKARIKO_FRONT,
+        ENTR_POTION_SHOP_KAKARIKO_BACK};
+    const std::set<int> otherDoors={ENTR_LAKESIDE_LABORATORY_0,ENTR_FISHING_POND_0,
+        ENTR_MARKET_GUARD_HOUSE_0,ENTR_BOMBCHU_BOWLING_ALLEY_0,ENTR_TREASURE_BOX_SHOP_0,
+        ENTR_BACK_ALLEY_MAN_IN_GREEN_HOUSE,ENTR_KAKARIKO_CENTER_GUEST_HOUSE_0,
+        ENTR_HOUSE_OF_SKULLTULA_0,ENTR_IMPAS_HOUSE_FRONT,ENTR_IMPAS_HOUSE_BACK,
+        ENTR_GRAVEKEEPERS_HUT_0,ENTR_LON_LON_BUILDINGS_TALONS_HOUSE,ENTR_STABLE_0,
+        ENTR_LON_LON_BUILDINGS_TOWER,ENTR_SHOOTING_GALLERY_0,ENTR_SHOOTING_GALLERY_1,
+        ENTR_WINDMILL_AND_DAMPES_GRAVE_WINDMILL};
+    assert(narrow.size()==shopDoors.size()+otherDoors.size());
+    for(const auto& d:narrow) {
+        const auto index=d.at("entrance").at("index").get<int>();
+        assert(d.at("pool")== (shopDoors.count(index)?4:5));
+        assert(shopDoors.count(index)||otherDoors.count(index));
+    }
+    for(int open:{ENTR_KOKIRI_SHOP_0,ENTR_GORON_SHOP_0,ENTR_ZORA_SHOP_0,
+        ENTR_LINKS_HOUSE_1,ENTR_MIDOS_HOUSE_0,ENTR_SARIAS_HOUSE_0,ENTR_TWINS_HOUSE_0,
+        ENTR_KNOW_IT_ALL_BROS_HOUSE_0,ENTR_CARPENTERS_TENT_0,ENTR_TEMPLE_OF_TIME_ENTRANCE,
+        ENTR_GREAT_FAIRYS_FOUNTAIN_MAGIC_DMT,ENTR_HAPPY_MASK_SHOP_0})
+        for(const auto& d:narrow)assert(d.at("entrance").at("index")!=open);
+    auto shopOptions=ParseOptions({{"dungeons",false},{"shops",true}});
+    auto shopOnly=nlohmann::json::parse(CatalogueJson(false,{},shopOptions));
+    assert(shopOnly.size()==shopDoors.size());
+    auto doorOptions=ParseOptions({{"dungeons",false},{"doorInteriors",true}});
+    assert(nlohmann::json::parse(CatalogueJson(false,{},doorOptions)).size()==otherDoors.size());
+    // Compose with the native permutation before classifying physical ingress.
+    // The open Kokiri passage leads natively to Bazaar; the Bazaar door leads to
+    // Kokiri Shop. Only that physical Bazaar door can acquire a cross-game leg.
+    const std::map<int32_t,int32_t> nativeSwap={
+        {ENTR_KOKIRI_SHOP_0,ENTR_BAZAAR_0},{ENTR_BAZAAR_0,ENTR_KOKIRI_SHOP_0},
+        {ENTR_KAKARIKO_VILLAGE_OUTSIDE_BAZAAR,ENTR_KOKIRI_FOREST_OUTSIDE_SHOP},
+        {ENTR_KOKIRI_FOREST_OUTSIDE_SHOP,ENTR_KAKARIKO_VILLAGE_OUTSIDE_BAZAAR}};
+    auto composedShops=nlohmann::json::parse(CatalogueJson(false,nativeSwap,shopOptions));
+    std::vector<Dungeon> nativeDoors;
+    size_t kokiri=0;
+    for(const auto& raw:composedShops){
+        auto d=ParseDungeon(raw);
+        assert(d.entrance.index!=ENTR_BAZAAR_0 && "an open native source cannot inherit the narrow overlay");
+        if(d.entrance.index==ENTR_KOKIRI_SHOP_0){kokiri=nativeDoors.size();
+            assert(d.returnTo.index==ENTR_KAKARIKO_VILLAGE_OUTSIDE_BAZAAR);}
+        nativeDoors.push_back(d);
+    }
+    assert(nativeDoors.size()==shopDoors.size());
+    Dungeon peer{"mm:shop",{1,0x1230},{1,0x1240},{1,0x1240}};peer.pool=static_cast<Pool>(4);
+    const auto mm=nativeDoors.size();nativeDoors.push_back(peer);
+    std::vector<size_t> nativePermutation;for(size_t i=0;i<nativeDoors.size();++i)nativePermutation.push_back(i);
+    std::swap(nativePermutation[kokiri],nativePermutation[mm]);
+    const auto nativeSeed=Encode(nativeDoors,nativePermutation);
+    HostState nativeOracle(0);nativeOracle.Install(nativeSeed);
+    RuntimeState nativeRuntime(0);nativeRuntime.Install(nativeSeed);
+    assert(!nativeOracle.Lookup(ENTR_KOKIRI_SHOP_0,ENTR_BAZAAR_0));
+    assert(!nativeRuntime.Lookup(Phase::AfterNative,ENTR_BAZAAR_0));
+    assert(nativeOracle.Lookup(ENTR_BAZAAR_0,ENTR_KOKIRI_SHOP_0)->to==peer.entrance);
+    assert(nativeRuntime.Lookup(Phase::AfterNative,ENTR_KOKIRI_SHOP_0)->to==peer.entrance);
+    assert(nativeRuntime.Lookup(Phase::BeforeNative,ENTR_KOKIRI_FOREST_OUTSIDE_SHOP)->to==peer.returnTo);
+    RuntimeState peerRuntime(1);peerRuntime.Install(nativeSeed);
+    assert(peerRuntime.Lookup(Phase::BeforeNative,peer.exit.index)->to==
+        Endpoint({0,ENTR_KAKARIKO_VILLAGE_OUTSIDE_BAZAAR}));
+    // Conflicting native sources cannot make an open ingress accidentally cross.
+    auto ambiguous=nlohmann::json::parse(CatalogueJson(false,{{ENTR_KOKIRI_SHOP_0,ENTR_BAZAAR_0}},shopOptions));
+    for(const auto& raw:ambiguous)assert(raw.at("entrance").at("index")!=ENTR_BAZAAR_0);
+    auto broadOptions=narrowOptions;broadOptions.interiors=true;
+    PoolOptions legacyBroad;legacyBroad.dungeons=false;legacyBroad.interiors=true;
+    assert(CatalogueJson(false,{},broadOptions)==CatalogueJson(false,{},legacyBroad));
     liveSettings["gCombo.Rando.CrossBossEntrances"]=1;
     liveSettings["gCombo.Rando.CrossInteriorEntrances"]=1;
+    liveSettings["gCombo.Rando.CrossShopEntrances"]=1;
+    liveSettings["gCombo.Rando.CrossDoorInteriorEntrances"]=1;
     liveSettings["gCombo.Rando.CrossGrottoEntrances"]=1;
     liveSettings["gCombo.Rando.ExpandedDungeonPool"]=1;
     auto live=ParseOptions(nlohmann::json::parse(SOH_ReadCrossEntranceOptions()));
-    assert(!live.dungeons && live.bosses && live.interiors && live.grottos && !live.expanded);
+    assert(!live.dungeons && live.bosses && live.interiors && live.grottos && !live.expanded && live.shops && live.doorInteriors);
     liveSettings["gCombo.Rando.CrossDungeonEntrances"]=1;
     live=ParseOptions(nlohmann::json::parse(SOH_ReadCrossEntranceOptions()));
     assert(live.dungeons && live.expanded);
@@ -86,6 +156,27 @@ int main() {
     for(const auto& raw:mixed)if(raw.value("pool",0)==static_cast<int>(Pool::Boss)) {
         const auto d=ParseDungeon(raw);
         assert(d.reverseCheckpoint && !d.warpCheckpoint && d.warpReturn && d.escapeExits.size()==1);
+    }
+    // A boss reverse composed into a narrow interior retains its real interior checkpoint.
+    for(const auto& narrowChoice:{shopOptions,doorOptions}) {
+        auto withBoss=narrowChoice;withBoss.bosses=true;
+        const auto narrowCatalogue=nlohmann::json::parse(CatalogueJson(false,{},narrowChoice));
+        const int destination=narrowCatalogue.at(0).at("entrance").at("index");
+        // The catalogue conservatively excludes a target that also has a non-door
+        // native source. Test checkpoint ownership independently with an explicit
+        // owned narrow catalogue, the contract consumed by this adapter.
+        std::vector<Dungeon> owned;
+        for(const auto& raw:narrowCatalogue)owned.push_back(ParseDungeon(raw));
+        AppendBossCatalogue(owned,{{ENTR_DEKU_TREE_BOSS_DOOR,destination}});
+        bool checked=false;
+        for(const auto& boss:owned)if(boss.boss==0) {
+            assert(boss.reverseCheckpoint==std::optional<Endpoint>({0,destination}));checked=true;
+        }
+        assert(checked);
+        const auto conservative=nlohmann::json::parse(CatalogueJson(false,
+            {{ENTR_DEKU_TREE_BOSS_DOOR,destination}},withBoss));
+        for(const auto& raw:conservative)
+            if(raw.at("entrance").at("index")==destination)assert(raw.value("boss",-1)>=0);
     }
     // Native decoupled ingress owns death independently of the shuffled reverse.
     PoolOptions bossOptions;bossOptions.dungeons=false;bossOptions.bosses=true;

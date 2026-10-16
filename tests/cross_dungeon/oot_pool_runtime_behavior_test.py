@@ -102,7 +102,8 @@ int main() {
     // Interior ownership lasts only inside that interior, even if other scenes are visited.
     Dungeon a{"a",{0,ENTR_MIDOS_HOUSE_0},{0,ENTR_KOKIRI_FOREST_OUTSIDE_MIDOS_HOUSE},{0,ENTR_KOKIRI_FOREST_OUTSIDE_MIDOS_HOUSE}};
     Dungeon b{"b",{0,ENTR_LINKS_HOUSE_1},{0,ENTR_KOKIRI_FOREST_OUTSIDE_LINKS_HOUSE},{0,ENTR_KOKIRI_FOREST_OUTSIDE_LINKS_HOUSE}};
-    a.pool=b.pool=Pool::Interior;
+    for (auto pool : {Pool::Interior,static_cast<Pool>(4),static_cast<Pool>(5)}) {
+    a.pool=b.pool=pool;
     gEntranceTable[a.entrance.index].scene=SCENE_MIDOS_HOUSE;
     gEntranceTable[b.entrance.index].scene=SCENE_LINKS_HOUSE;
     seed=Encode({a,b},{1,0});assert(SOH_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
@@ -116,6 +117,7 @@ int main() {
     Combo_SOH_RestoreCrossDungeonCheckpoint(a.entrance.index);
     ObserveScene(SCENE_MIDOS_HOUSE);
     assert(Combo_SOH_SaveCrossDungeonCheckpoint()==a.entrance.index);
+    }
     // An active unrelated pool must preserve vanilla physical grotto return data on no route.
     Grotto_InitExitAndLoadLists();
     play.sceneNum=grottoLoadTable[0].scene;play.nextEntranceIndex=ENTR_LOAD_OPENING;
