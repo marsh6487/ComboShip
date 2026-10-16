@@ -82,3 +82,17 @@ The final full suite is rerun after that correction. CI adds a focused narrow-po
 full Linux generation/validation smoke using both narrow choices with all broad
 cross-game categories off. Platform packaging and configured in-game traversal
 remain separate evidence; preview approval establishes visual preference only.
+
+
+## Hosted fixture correction
+
+The first hosted run passed the new entrance/forest checks and stopped in the
+older complete file-select panel fixture. Its ImGui observer incremented a scalar
+only for BeginDisabled(true), then decremented it for every EndDisabled. The new
+valid BeginDisabled(false) group exposed that mismatch. The pinned ImGui
+implementation pushes and pops an item-flags scope for both true and false.
+The fixture now uses a stack with inherited disabled state. The actual full
+production panels reproduce the old failure and pass after the fixture correction
+under ASan/UBSan, including MM-first parking, return to file select, busy generation
+and missing exports. The dedicated entrance menu fixture also remains green.
+No production menu or generation policy changed in this correction.
