@@ -1,3 +1,4 @@
+#include "../../../../../combo/ComboGameMode.h"
 /*
  * File: z_en_mag.c
  * Overlay: ovl_En_Mag
@@ -544,7 +545,7 @@ void EnMag_DrawInner(Actor* thisx, PlayState* play, Gfx** gfxP) {
 #ifdef COMBO_BUILD
     // ComboShip: draw dual-game logos + flame effects (OOT left, MM right) instead of the original
     // block below, which is kept untouched for upstream merges. See combo/title/ComboTitleLogos.h
-    if (ComboTitle_DrawLogos(&gfx, this, isMQ)) {
+    if (Combo_IsCombinedGame() && ComboTitle_DrawLogos(&gfx, this, isMQ)) {
         goto comboSkipOriginalLogoBlock;
     }
 #endif

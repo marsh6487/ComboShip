@@ -24,6 +24,9 @@ poll = block_from(launcher, launcher.index('static int Combo_PollFinalize()'))
 marker = 'static void Combo_CancelGenerate()'
 cancel = block_from(launcher, launcher.index(marker))
 source = r'''
+#define COMBO_BUILD 1
+#include "ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include "gui/ComboGenProgress.h"
 #include <atomic>
 #include <cassert>

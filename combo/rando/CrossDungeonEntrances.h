@@ -41,16 +41,23 @@ inline bool IsInteriorPool(Pool pool) {
 struct PoolOptions {
     bool dungeons = true, bosses = false, interiors = false, grottos = false, expanded = false;
     bool shops = false, doorInteriors = false;
+    bool legacyInteriors = false; // Catalogue policy for exact replay of schema v1-v3 seeds.
     bool Any() const {
         return dungeons || bosses || interiors || grottos || shops || doorInteriors;
     }
 };
-enum class InteriorKind { Passage, Door, ShopDoor };
+enum class InteriorKind { Passage, Door, ShopDoor, ShopPassage };
 inline std::optional<Pool> InteriorPool(InteriorKind kind, const PoolOptions& options) {
-    if (options.interiors)
-        return Pool::Interior; // Preserve the complete legacy catalogue and permutation.
-    if (kind == InteriorKind::ShopDoor && options.shops)
-        return Pool::Shop;
+    if (options.legacyInteriors) {
+        if (options.interiors)
+            return Pool::Interior;
+        if (kind == InteriorKind::ShopDoor && options.shops)
+            return Pool::Shop;
+    } else if (kind == InteriorKind::ShopDoor || kind == InteriorKind::ShopPassage) {
+        return options.shops ? std::optional<Pool>(Pool::Shop) : std::nullopt;
+    } else if (options.interiors) {
+        return Pool::Interior;
+    }
     if (kind == InteriorKind::Door && options.doorInteriors)
         return Pool::DoorInterior;
     return std::nullopt;

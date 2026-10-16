@@ -8,9 +8,10 @@
 #include "ComboTrackerBridge.h"
 #include "ComboTrackerCommon.h" // kKinds (HideBackground CVars for the tracker panels)
 #include "ComboTrackerSwap.h"
-#include "ComboAnchorRoomWindow.h"  // combo-native floating Anchor room window
-#include "ComboNotesWindow.h"       // combo-owned cross-game Personal Notes window
-#include "ComboHintTracker.h"       // combo-owned unified Hint Tracker (#164)
+#include "ComboAnchorRoomWindow.h" // combo-native floating Anchor room window
+#include "ComboNotesWindow.h"      // combo-owned cross-game Personal Notes window
+#include "ComboHintTracker.h"      // combo-owned unified Hint Tracker (#164)
+#include "ComboEmoteSettings.h"
 #include "ComboTimersWindow.h"      // combo-owned overlay timers (#173)
 #include "ComboSettingsSync.h"      // combo-owned cross-game settings sync
 #include "rando/ComboPlaythrough.h" // plando: ParseSpoilerPlacements + Suffix/BuildForeignArray + slot paths
@@ -452,12 +453,14 @@ struct HubEntry {
         ENGINE,
         OOT_RANDO,
         MM_RANDO,
+        SHARED_SEED_INFORMATION,
         COMBO_GEN,
         COMBO_PLANDO,
         COMBO_TRACKER,
         COMBO_CHECK_TRACKER,
         COMBO_HINT_TRACKER,
         COMBO_TIMERS,
+        COMBO_EMOTES,
         COMBO_SYNC,
         COMBO_NETWORK
     } kind;
@@ -508,6 +511,25 @@ void AppendSectionEntries(std::vector<HubEntry>& out, const char* groupLabel, Hu
         }
         break; // first matching section only
     }
+}
+
+constexpr const char* kMapCompassInformation = "gRandoSettings.MapsCompassesGiveInformation";
+
+const CwWidget* FindWidgetByCvar(const ComboRando::GameMenu& game, const char* cvar) {
+    if (!game.loaded || !game.menu)
+        return nullptr;
+    for (int s = 0; s < game.menu->sectionCount; ++s) {
+        const CwSection& section = game.menu->sections[s];
+        for (int sb = 0; sb < section.sidebarCount; ++sb) {
+            const CwSidebar& side = section.sidebars[sb];
+            for (int w = 0; w < side.widgetCount; ++w) {
+                const CwWidget& widget = side.widgets[w];
+                if (widget.cvar && std::strcmp(widget.cvar, cvar) == 0)
+                    return &widget;
+            }
+        }
+    }
+    return nullptr;
 }
 // Render one game's tracker sidebar inline (linear; the tracker sidebars are single-column).
 // Structural skips: the sidebar's main-window toggle (identified by its CVar — the combo master
@@ -1340,6 +1362,11 @@ void ComboMenu::DrawSharedPanel() {
         tmr.group = "Settings";
         tmr.kind = HubEntry::COMBO_TIMERS;
         e.push_back(std::move(tmr));
+        HubEntry emotes;
+        emotes.label = "Emotes";
+        emotes.group = "Settings";
+        emotes.kind = HubEntry::COMBO_EMOTES;
+        e.push_back(std::move(emotes));
         // Combo-owned settings sync: the options both games have under different CVar names.
         HubEntry syn;
         syn.label = "Sync";
@@ -1367,11 +1394,31 @@ void ComboMenu::DrawSharedPanel() {
         }
     } else {
         {
-            std::vector<HubEntry> e;
-            // Trackers live in the Ship of Harkinian tab, not here.
-            AppendSectionEntries(e, "OOT Randomizer", HubEntry::OOT_RANDO, model.Oot(), "Randomizer", {}, true);
-            if (!e.empty())
-                groups.push_back({ "OOT Randomizer", std::move(e) });
+            std::vector<HubEntry> oot, shared;
+            AppendSectionEntries(oot, "OOT Randomizer", HubEntry::OOT_RANDO, model.Oot(), "Randomizer", {}, true);
+            // These saved seed rules affect both games. Reuse the original native
+            // widgets so option callbacks, amounts and generation guards stay intact.
+            for (auto it = oot.begin(); it != oot.end();) {
+                if (it->label == "Stat Upgrades") {
+                    it->group = "Shared Seed Settings";
+                    shared.push_back(std::move(*it));
+                    it = oot.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+            if (FindWidgetByCvar(model.Oot(), kMapCompassInformation)) {
+                HubEntry information;
+                information.label = "Map & Compass Information";
+                information.group = "Shared Seed Settings";
+                information.kind = HubEntry::SHARED_SEED_INFORMATION;
+                information.game = &model.Oot();
+                shared.push_back(std::move(information));
+            }
+            if (!shared.empty())
+                groups.push_back({ "Shared Seed Settings", std::move(shared) });
+            if (!oot.empty())
+                groups.push_back({ "OOT Randomizer", std::move(oot) });
         }
         {
             std::vector<HubEntry> e;
@@ -1480,13 +1527,33 @@ void ComboMenu::DrawSharedPanel() {
         DrawHintTrackerSharedPanel();
     } else if (active->kind == HubEntry::COMBO_TIMERS) {
         DrawTimersSharedPanel();
+    } else if (active->kind == HubEntry::COMBO_EMOTES) {
+        ComboEmotes::DrawSettings();
     } else if (active->kind == HubEntry::COMBO_SYNC) {
         ComboSync::DrawSyncSharedPanel();
     } else if (active->kind == HubEntry::COMBO_NETWORK) {
         DrawNetworkSharedPanel();
+    } else if (active->kind == HubEntry::SHARED_SEED_INFORMATION) {
+        if (const auto* widget = FindWidgetByCvar(*active->game, kMapCompassInformation)) {
+            RenderWidget(*widget, *active->game);
+        }
     } else {
         const CwSidebar& side = active->game->menu->sections[active->sectionIndex].sidebars[active->sidebarIndex];
-        RenderSidebarWidgets(side, *active->game);
+        if (active->kind == HubEntry::OOT_RANDO) {
+            // Hide only the relocated control; never mutate the game's exported model.
+            std::vector<CwWidget> widgets;
+            for (int w = 0; w < side.widgetCount; ++w) {
+                const auto& widget = side.widgets[w];
+                if (!widget.cvar || std::strcmp(widget.cvar, kMapCompassInformation) != 0)
+                    widgets.push_back(widget);
+            }
+            CwSidebar filtered = side;
+            filtered.widgets = widgets.data();
+            filtered.widgetCount = static_cast<int32_t>(widgets.size());
+            RenderSidebarWidgets(filtered, *active->game);
+        } else {
+            RenderSidebarWidgets(side, *active->game);
+        }
     }
     ImGui::EndChild();
 }
@@ -1760,13 +1827,13 @@ void ComboMenu::DrawComboPanel() {
                       "Rewards belong to the arena; completion and the blue warp follow the shuffled boss door.");
     crossPoolCheckbox(
         "Cross-Game Interiors", "gCombo.Rando.CrossInteriorEntrances",
-        "Shuffle all eligible houses, shops and other interiors between games, including open passageways. "
-        "Overrides the two door-only choices below. The original game portal stays available.");
+        "Shuffle eligible houses and other nonretail interiors between games, including open passageways. "
+        "Includes Door Interiors below. Shops use their own checkbox. The original game portal stays available.");
     const bool broadInteriors = CVarGetInteger("gCombo.Rando.CrossInteriorEntrances", 0) != 0;
+    crossPoolCheckbox("Cross-Game Shops", "gCombo.Rando.CrossShopEntrances",
+                      "Shuffle all retail shop entrances with other shops between games, including open entrances. "
+                      "Only this checkbox includes shops. Applied to newly generated seeds.");
     ImGui::BeginDisabled(broadInteriors);
-    crossPoolCheckbox("Cross-Game Shops (Doors Only)", "gCombo.Rando.CrossShopEntrances",
-                      "Shuffle retail shop entrances with other shops between games, using only doors you open. "
-                      "Open shop entrances stay in place. Applied to newly generated seeds.");
     crossPoolCheckbox(
         "Cross-Game Door Interiors", "gCombo.Rando.CrossDoorInteriorEntrances",
         "Shuffle other interiors with doors you open between games. Shops use their separate checkbox. "

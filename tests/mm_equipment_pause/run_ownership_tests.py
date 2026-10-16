@@ -281,6 +281,8 @@ void RecordPrimColor(u8, u8, u8, u8 alpha) { primAlpha = alpha; }
                                  '    // Upgrade-column equipment')
     code += ("void ApplyIncomingShields(const nlohmann::json& sh) {\n"
              "NeiSaveData* nei = Nei_Save();\n" + incoming + "}\n")
+    if "static u8 KaleidoEquip_UsesLegacyFreeEquipment(" in pause:
+        code += production_function(pause, "KaleidoEquip_UsesLegacyFreeEquipment") + "\n"
     for name in ("KaleidoEquip_UpgradeValue", "KaleidoEquip_UpgradeNameItem", "KaleidoEquip_GetCell",
                  "KaleidoEquip_CellOwned", "KaleidoEquip_CellEquipped", "KaleidoEquip_CursorCanSit",
                  "KaleidoEquip_EquipCell", "KaleidoEquip_AssignCButton", "KaleidoEquip_CycleSubPage",

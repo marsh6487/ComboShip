@@ -32,6 +32,10 @@ extern SaveContext gSaveContext;
 
 // Beat Both Bosses is goal mode 0; Triforce Hunt (1) keeps its own counter and is not gated here.
 static bool BeatBothBosses() {
+#ifdef COMBO_BUILD
+    if (!Combo_IsCombinedGame())
+        return false;
+#endif
     return CVAR_COMBO != 0 && CVarGetInteger("gFleetCombo.GoalMode", 0) == 0;
 }
 

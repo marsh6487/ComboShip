@@ -1,6 +1,7 @@
 #include "rando/CrossDungeonCoordinator.h"
 #include "rando/CrossWorldRando.h"
 #include "rando/CrossForeign.h"
+#include "rando/OotDungeonLayouts.h"
 #include <atomic>
 #include <cstring>
 #include <filesystem>
@@ -91,6 +92,15 @@ static void StubSOH_SetComboRandoSeed(uint64_t seed) {
 static void StubMM_SetComboRandoSeed(uint64_t seed) {
     native["mmSeed"] = seed;
 }
+static int StubSOH_ValidateDungeonLayoutsForCombo(const char* raw) {
+    return !raw || std::string(raw).find("unknown") == std::string::npos;
+}
+static int StubSOH_SetDungeonLayoutsForCombo(const char* raw) {
+    if (!StubSOH_ValidateDungeonLayoutsForCombo(raw))
+        return 0;
+    native["layouts"] = raw ? Json::parse(raw) : Json();
+    return 1;
+}
 static void StubSOH_PrepRandoContext() {
     native["context"] = { native["ootSettings"], native["ootGoal"], native["start"], native["shared"],
                           native["ootSeed"] };
@@ -166,6 +176,8 @@ static auto SOH_RestoreRandoSettings = StubSOH_RestoreRandoSettings;
 static auto MM_RestoreRandoSettings = StubMM_RestoreRandoSettings;
 static auto SOH_SetComboRandoSeed = StubSOH_SetComboRandoSeed;
 static auto MM_SetComboRandoSeed = StubMM_SetComboRandoSeed;
+static auto SOH_SetDungeonLayoutsForCombo = StubSOH_SetDungeonLayoutsForCombo;
+[[maybe_unused]] static auto SOH_ValidateDungeonLayoutsForCombo = StubSOH_ValidateDungeonLayoutsForCombo;
 static auto SOH_PrepRandoContext = StubSOH_PrepRandoContext;
 static auto SOH_ApplyEntranceOverridesForCombo = StubSOH_ApplyEntranceOverridesForCombo;
 static auto SOH_ShuffleEntrancesForCombo = StubSOH_ShuffleEntrancesForCombo;
@@ -233,6 +245,16 @@ int main() {
           "native route-setter rejection must happen before native seed state changes");
     Check(installed[0].is_null() && installed[1].is_null(), "failed preflight must restore both oracle hosts");
     rejectMm = false;
+    for (bool cross : { false, true }) {
+        files["badLayouts"] = Seed(2);
+        if (!cross)
+            files["badLayouts"].erase("crossDungeonEntrances");
+        files["badLayouts"]["oot"]["masterQuestDungeons"] = Json::array({ "unknown" });
+        Check(Combo_OnReloadRequest("badLayouts") == 0 && native == acceptedNative &&
+                  g_ConsolidatedJson == acceptedJson && g_PendingMMSettingsJson == acceptedMm &&
+                  g_FinalizeDisplaySeed == acceptedDisplay,
+              "layout rejection must preserve accepted seed A before changing any native or pending state");
+    }
     Check(Combo_OnReloadRequest("B") == 1 && g_ConsolidatedJson != acceptedJson, "valid B must commit after preflight");
     auto legacy = Seed(3);
     legacy.erase("crossDungeonEntrances");

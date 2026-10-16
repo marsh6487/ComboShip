@@ -31,7 +31,10 @@ offer = offer[offer.index('{') + 1:-1]
 skip_hook = block(skip, 'COND_VB_SHOULD(VB_PLAY_TRANSITION_CS, CVAR || IS_RANDO, {')
 skip_hook = skip_hook[skip_hook.index('{') + 1:-1]
 prefix = r'''
+#define COMBO_BUILD 1
+#include "combo/ComboGameMode.h"
 #include "combo/rando/CrossDungeonRuntime.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include <cassert>
 #include <cstdarg>
 #include <functional>

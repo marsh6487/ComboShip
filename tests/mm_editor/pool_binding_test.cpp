@@ -3,6 +3,7 @@
 #include "2s2h/FleetShipCombo/FleetShipCombo.h"
 #include "2s2h/Rando/NeiGiPresentation.h"
 #include "ComboResolve.h"
+#include "ComboGameMode.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "tests/test_require.h"
 #include "NeiGracePolicy.h"
@@ -10,6 +11,7 @@
 #include <cstring>
 
 using NeiGi::Kind;
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 extern "C" int32_t CVarGetInteger(const char *, int32_t defaultValue) { return defaultValue; }
 
 SaveContext gSaveContext{};

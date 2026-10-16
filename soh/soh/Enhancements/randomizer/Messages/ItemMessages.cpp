@@ -1,3 +1,4 @@
+#include "../../../../../combo/ComboGameMode.h"
 /**
  * This file handles custom messages relating to Items,
  * such as Get Item messages for non-vanilla items,
@@ -299,7 +300,7 @@ void BuildTriforcePieceMessage(CustomMessage& msg) {
 #ifdef COMBO_BUILD
     // ComboShip (#136): the goal counts BOTH games' pieces, so the native per-trigger thresholds below
     // would show the wrong numbers — report combined progress instead.
-    if (gComboGoalRequired > 0) {
+    if (Combo_IsCombinedGame() && gComboGoalRequired > 0) {
         const int combined = gSaveContext.ship.quest.data.randomizer.triforcePiecesCollected + 1 +
                              (gComboOtherTriforceCount != NULL ? gComboOtherTriforceCount() : 0);
         if (combined >= gComboGoalRequired) {
@@ -1068,6 +1069,16 @@ static int16_t DungeonEntranceDestination(int16_t entrance) {
 }
 
 static int DungeonBossDestination(int dungeon) {
+#ifdef COMBO_BUILD
+    using ResolveBoss = int32_t (*)(int32_t);
+    const auto resolveBoss =
+        reinterpret_cast<ResolveBoss>(Combo_ResolveSym("2ship", "MM_GetInformationBossDestination"));
+    if (resolveBoss) {
+        const int resolved = resolveBoss(dungeon);
+        if (resolved != -2) // Solo OoT retains its own native shuffle resolver.
+            return resolved;
+    }
+#endif
     constexpr int entries[] = { ENTR_DEKU_TREE_ENTRANCE,     ENTR_DODONGOS_CAVERN_ENTRANCE, ENTR_JABU_JABU_ENTRANCE,
                                 ENTR_FOREST_TEMPLE_ENTRANCE, ENTR_FIRE_TEMPLE_ENTRANCE,     ENTR_WATER_TEMPLE_ENTRANCE,
                                 ENTR_SPIRIT_TEMPLE_ENTRANCE, ENTR_SHADOW_TEMPLE_ENTRANCE };
@@ -1165,6 +1176,100 @@ static void AddDungeonRewardIcon(CustomMessage& msg, RandomizerCheck check) {
 #endif
 }
 
+#ifdef COMBO_BUILD
+static RandomizerCheck PhysicalBossRewardCheck(int32_t boss) {
+    constexpr RandomizerCheck checks[] = { RC_QUEEN_GOHMA, RC_KING_DODONGO, RC_BARINADE, RC_PHANTOM_GANON,
+                                           RC_VOLVAGIA,    RC_MORPHA,       RC_TWINROVA, RC_BONGO_BONGO };
+    return boss >= 0 && boss < 8 ? checks[boss] : RC_MAX;
+}
+
+extern "C" COMBO_EXPORT int32_t OOT_GetDungeonBossIndex(int32_t entrance) {
+    constexpr int entries[] = { ENTR_DEKU_TREE_ENTRANCE,     ENTR_DODONGOS_CAVERN_ENTRANCE, ENTR_JABU_JABU_ENTRANCE,
+                                ENTR_FOREST_TEMPLE_ENTRANCE, ENTR_FIRE_TEMPLE_ENTRANCE,     ENTR_WATER_TEMPLE_ENTRANCE,
+                                ENTR_SPIRIT_TEMPLE_ENTRANCE, ENTR_SHADOW_TEMPLE_ENTRANCE };
+    for (int i = 0; i < 8; ++i)
+        if (entrance == entries[i])
+            return i;
+    return -1;
+}
+
+extern "C" COMBO_EXPORT int32_t OOT_GetNativeBossHintTarget(int32_t dungeon, int32_t* entrance, int32_t* nextDungeon) {
+    if (!entrance || !nextDungeon)
+        return -1;
+    *entrance = *nextDungeon = -1;
+    try {
+        if (dungeon < 0 || dungeon >= 8 || !OTRGlobals::Instance || !OTRGlobals::Instance->gRandoContext)
+            return -1;
+        constexpr int doors[] = { ENTR_DEKU_TREE_BOSS_ENTRANCE,     ENTR_DODONGOS_CAVERN_BOSS_ENTRANCE,
+                                  ENTR_JABU_JABU_BOSS_ENTRANCE,     ENTR_FOREST_TEMPLE_BOSS_ENTRANCE,
+                                  ENTR_FIRE_TEMPLE_BOSS_ENTRANCE,   ENTR_WATER_TEMPLE_BOSS_ENTRANCE,
+                                  ENTR_SPIRIT_TEMPLE_BOSS_ENTRANCE, ENTR_SHADOW_TEMPLE_BOSS_ENTRANCE };
+        const auto ctx = OTRGlobals::Instance->gRandoContext;
+        *entrance = ctx->GetOption(RSK_SHUFFLE_BOSS_ENTRANCES).Is(RO_BOSS_ROOM_ENTRANCE_SHUFFLE_OFF)
+                        ? doors[dungeon]
+                        : DungeonEntranceDestination(doors[dungeon]);
+        for (int i = 0; i < 8; ++i)
+            if (*entrance == doors[i])
+                return i;
+        *nextDungeon = OOT_GetDungeonBossIndex(*entrance);
+        return -1;
+    } catch (...) { return -1; }
+}
+
+extern "C" COMBO_EXPORT int32_t OOT_GetDungeonEntranceSourceName(int32_t entrance, char* buffer, uint32_t capacity) {
+    if (!buffer || !capacity)
+        return 0;
+    buffer[0] = '\0';
+    try {
+        if (entrance < 0 || entrance > 0x7FFF || !OTRGlobals::Instance || !OTRGlobals::Instance->gRandoContext)
+            return 0;
+        // This is the physical source BEFORE native OoT shuffle. Cross routes
+        // are applied afterwards by the caller; never invert that order.
+        const auto source = DungeonEntranceSource(static_cast<int16_t>(entrance));
+        if (source.empty() || source.size() >= capacity)
+            return 0;
+        std::memcpy(buffer, source.c_str(), source.size() + 1);
+        return static_cast<int32_t>(source.size());
+    } catch (...) { return 0; }
+}
+
+extern "C" COMBO_EXPORT int32_t OOT_GetPhysicalBossRewardName(int32_t boss, char* buffer, uint32_t capacity) {
+    if (!buffer || !capacity)
+        return 0;
+    buffer[0] = '\0';
+    try {
+        if (boss < 0 || boss >= 8 || !OTRGlobals::Instance || !OTRGlobals::Instance->gRandoContext)
+            return 0;
+        const auto check = PhysicalBossRewardCheck(boss);
+        const auto* location = OTRGlobals::Instance->gRandoContext->GetItemLocation(check);
+        if (!location || location->GetPlacedRandomizerGet() == RG_NONE ||
+            location->GetPlacedRandomizerGet() == RG_HINT || location->GetPlacedRandomizerGet() == RG_SOLD_OUT)
+            return 0;
+        const auto name = DungeonRewardName(check).GetEnglish(MF_RAW);
+        if (name.empty() || name.size() >= capacity)
+            return 0;
+        std::memcpy(buffer, name.c_str(), name.size() + 1);
+        return static_cast<int32_t>(name.size());
+    } catch (...) { return 0; }
+}
+
+extern "C" COMBO_EXPORT int32_t OOT_GetPhysicalBossRewardPresentation(int32_t boss, CwItemReceiptPresentation* out) {
+    if (!out)
+        return 0;
+    *out = {};
+    try {
+        if (boss < 0 || boss >= 8 || !OTRGlobals::Instance || !OTRGlobals::Instance->gRandoContext)
+            return 0;
+        CustomMessage message;
+        message.receiptPresentation.singleBox = 1;
+        message.receiptPresentation.rewardLine = 1;
+        AddDungeonRewardIcon(message, PhysicalBossRewardCheck(boss));
+        *out = message.receiptPresentation;
+        return ComboReceipt_HasIcon(out);
+    } catch (...) { return 0; }
+}
+#endif
+
 bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received) {
     const bool ootMap = rg >= RG_DEKU_TREE_MAP && rg <= RG_ICE_CAVERN_MAP;
     const bool ootCompass = rg >= RG_DEKU_TREE_COMPASS && rg <= RG_ICE_CAVERN_COMPASS;
@@ -1195,6 +1300,7 @@ bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool r
     msg.receiptPresentation.singleBox = information;
     msg.receiptPresentation.rewardLine = 2;
     const char* boss = nullptr;
+    std::string assignedMmBoss;
     if (ootMap || ootCompass) {
         const int dungeon = rg - (ootMap ? RG_DEKU_TREE_MAP : RG_DEKU_TREE_COMPASS);
         constexpr int scenes[] = { SCENE_DEKU_TREE,     SCENE_DODONGOS_CAVERN, SCENE_JABU_JABU,
@@ -1215,13 +1321,26 @@ bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool r
             typeHint = Rando::StaticData::hintTextTable[masterQuest ? RHT_DUNGEON_MASTERFUL : RHT_DUNGEON_ORDINARY]
                            .GetHintMessage();
         }
-        if (information && ootMap && !ctx->GetOption(RSK_SHUFFLE_DUNGEON_ENTRANCES).Is(0)) {
+        if (information && ootMap) {
             constexpr int entrances[] = { ENTR_DEKU_TREE_ENTRANCE,          ENTR_DODONGOS_CAVERN_ENTRANCE,
                                           ENTR_JABU_JABU_ENTRANCE,          ENTR_FOREST_TEMPLE_ENTRANCE,
                                           ENTR_FIRE_TEMPLE_ENTRANCE,        ENTR_WATER_TEMPLE_ENTRANCE,
                                           ENTR_SPIRIT_TEMPLE_ENTRANCE,      ENTR_SHADOW_TEMPLE_ENTRANCE,
                                           ENTR_BOTTOM_OF_THE_WELL_ENTRANCE, ENTR_ICE_CAVERN_ENTRANCE };
-            const auto source = DungeonEntranceSource(entrances[dungeon]);
+            std::string source;
+            bool crossSelected = false;
+#ifdef COMBO_BUILD
+            using SourceFn = int32_t (*)(int32_t, int32_t, char*, uint32_t);
+            const auto getSource =
+                reinterpret_cast<SourceFn>(Combo_ResolveSym("2ship", "MM_GetCrossDungeonEntranceSourceName"));
+            char name[512]{};
+            const int32_t size = getSource ? getSource(0, entrances[dungeon], name, sizeof(name)) : 0;
+            crossSelected = size != 0;
+            if (size > 0 && static_cast<size_t>(size) < sizeof(name))
+                source.assign(name, size);
+#endif
+            if (!crossSelected && !ctx->GetOption(RSK_SHUFFLE_DUNGEON_ENTRANCES).Is(0))
+                source = DungeonEntranceSource(entrances[dungeon]);
             if (!source.empty()) {
                 entranceHint = CustomMessage("&It seems the entrance is at %c[[source]]%w.",
                                              "&Der Eingang scheint bei %c[[source]]%w zu liegen.",
@@ -1231,15 +1350,37 @@ bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool r
         }
         if (information && ootCompass && dungeon < 8) {
             constexpr const char* bosses[] = { "Queen Gohma", "King Dodongo", "Barinade", "Phantom Ganon",
-                                               "Volvagia",    "Morpha",       "Twinrova", "Bongo Bongo" };
+                                               "Volvagia",    "Morpha",       "Twinrova", "Bongo Bongo",
+                                               "Odolwa",      "Goht",         "Gyorg",    "Twinmold" };
             constexpr RandomizerCheck rewards[] = { RC_QUEEN_GOHMA, RC_KING_DODONGO, RC_BARINADE, RC_PHANTOM_GANON,
                                                     RC_VOLVAGIA,    RC_MORPHA,       RC_TWINROVA, RC_BONGO_BONGO };
             const int assignedBoss = DungeonBossDestination(dungeon);
-            if (assignedBoss >= 0) {
+            if (assignedBoss >= 0 && assignedBoss < 12) {
                 boss = bosses[assignedBoss];
-                rewardName = DungeonRewardName(rewards[assignedBoss]);
-                hasReward = true;
-                AddDungeonRewardIcon(msg, rewards[assignedBoss]);
+                if (assignedBoss < 8) {
+                    rewardName = DungeonRewardName(rewards[assignedBoss]);
+                    hasReward = true;
+                    AddDungeonRewardIcon(msg, rewards[assignedBoss]);
+                }
+#ifdef COMBO_BUILD
+                else {
+                    using NameFn = int32_t (*)(int32_t, char*, uint32_t);
+                    using IconFn = int32_t (*)(int32_t, CwItemIconInfo*);
+                    const auto getName =
+                        reinterpret_cast<NameFn>(Combo_ResolveSym("2ship", "MM_GetPhysicalBossRewardName"));
+                    const auto getIcon =
+                        reinterpret_cast<IconFn>(Combo_ResolveSym("2ship", "MM_GetPhysicalBossRewardIconInfo"));
+                    char name[512]{};
+                    const int32_t size = getName ? getName(assignedBoss, name, sizeof(name)) : 0;
+                    if (size > 0 && static_cast<size_t>(size) < sizeof(name)) {
+                        rewardName = CustomMessage(std::string(name, size));
+                        hasReward = true;
+                        CwItemIconInfo icon{};
+                        if (getIcon && getIcon(assignedBoss, &icon) == 1)
+                            ComboReceipt_CopyIcon(&msg.receiptPresentation, &icon, "mm");
+                    }
+                }
+#endif
             } else {
                 bossHint = CustomMessage("&Its boss door does not lead to a known boss room.",
                                          "&Die Bosstür führt zu keinem bekannten Bossraum.",
@@ -1247,18 +1388,34 @@ bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool r
             }
         }
     } else if (information && mmMap) {
-        // Match MM's known native entrances; this port has no MM entrance graph.
-        constexpr const char* entrances[] = { "Woodfall", "Snowhead", "Zora Cape's turtle", "Stone Tower" };
-        entranceHint = CustomMessage("&It seems the entrance is at %c[[source]]%w.",
-                                     "&Der Eingang scheint bei %c[[source]]%w zu liegen.",
-                                     "&L'entrée semble se trouver à %c[[source]]%w.");
-        entranceHint.Replace("[[source]]", entrances[rg - RG_MM_MAP_WOODFALL]);
-    } else if (information && mmCompass) {
-        // This port has no MM boss-entrance shuffle; Combo seeds currently
-        // serialize only the OoT entrance graph.
-        constexpr const char* bosses[] = { "Odolwa", "Goht", "Gyorg", "Twinmold" };
-        boss = bosses[rg - RG_MM_COMPASS_WOODFALL];
+        std::string source;
 #ifdef COMBO_BUILD
+        using NameFn = int32_t (*)(int32_t, char*, uint32_t);
+        const auto getSource = reinterpret_cast<NameFn>(Combo_ResolveSym("2ship", "MM_GetDungeonEntranceName"));
+        char name[512]{};
+        const int32_t size = getSource ? getSource(rg - RG_MM_MAP_WOODFALL, name, sizeof(name)) : 0;
+        if (size > 0 && static_cast<size_t>(size) < sizeof(name))
+            source.assign(name, size);
+#else
+        constexpr const char* entrances[] = { "Woodfall", "Snowhead", "Zora Cape's turtle", "Stone Tower" };
+        source = entrances[rg - RG_MM_MAP_WOODFALL];
+#endif
+        if (!source.empty()) {
+            entranceHint = CustomMessage("&It seems the entrance is at %c[[source]]%w.",
+                                         "&Der Eingang scheint bei %c[[source]]%w zu liegen.",
+                                         "&L'entrée semble se trouver à %c[[source]]%w.");
+            entranceHint.Replace("[[source]]", source);
+        }
+    } else if (information && mmCompass) {
+#ifdef COMBO_BUILD
+        using NameFn = int32_t (*)(int32_t, char*, uint32_t);
+        const auto getBoss = reinterpret_cast<NameFn>(Combo_ResolveSym("2ship", "MM_GetDungeonBossName"));
+        char bossName[64]{};
+        const int32_t bossSize = getBoss ? getBoss(rg - RG_MM_COMPASS_WOODFALL, bossName, sizeof(bossName)) : 0;
+        if (bossSize > 0 && static_cast<size_t>(bossSize) < sizeof(bossName)) {
+            assignedMmBoss.assign(bossName, bossSize);
+            boss = assignedMmBoss.c_str();
+        }
         using RewardNameFn = int32_t (*)(int32_t, char*, uint32_t);
         auto getRewardName = reinterpret_cast<RewardNameFn>(Combo_ResolveSym("2ship", "MM_GetDungeonRewardName"));
         char name[512];
@@ -1274,6 +1431,9 @@ bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool r
                     ComboReceipt_CopyIcon(&msg.receiptPresentation, &icon, "mm");
             }
         }
+#else
+        constexpr const char* bosses[] = { "Odolwa", "Goht", "Gyorg", "Twinmold" };
+        boss = bosses[rg - RG_MM_COMPASS_WOODFALL];
 #endif
     }
     const bool bossLineReward = received && information && (ootCompass || mmCompass);

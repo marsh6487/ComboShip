@@ -1,3 +1,4 @@
+#include "../../../combo/emotes/EmoteBridge.h"
 #include "rando/CrossEntranceBoss.h"
 #include "global.h"
 #include "vt.h"
@@ -219,6 +220,7 @@ Gfx* Play_SetFog(PlayState* play, Gfx* gfx) {
 }
 
 void Play_Destroy(GameState* thisx) {
+    ComboEmotes_Reset();
 #ifdef COMBO_BUILD
     Combo_SOH_CancelCrossDungeonTransition();
 #endif
@@ -701,6 +703,7 @@ void BoxMenu_Update(PlayState* play);
 void BoxMenu_Draw(PlayState* play);
 
 void Play_Update(PlayState* play) {
+    ComboEmotes_BeginUpdate(play);
     Input* input = play->state.input;
     s32 isPaused;
     s32 pad1;
@@ -1344,6 +1347,7 @@ void Play_Update(PlayState* play) {
 
             PLAY_LOG(3765);
             AnimationContext_Update(play, &play->animationCtx);
+            ComboEmotes_ApplyPose(play);
 
             PLAY_LOG(3771);
             SoundSource_UpdateAll(play);

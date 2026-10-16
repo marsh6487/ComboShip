@@ -1,3 +1,4 @@
+#include "../../../combo/ComboGameMode.h"
 #include "SohMenu.h"
 #include "../../../combo/NeiGracePolicy.h"
 #include "../../../combo/NeiSeasonsPolicy.h"
@@ -498,8 +499,10 @@ void RegisterNEIMenu() {
     path.sidebarName = "Modes";
     path.column = SECTION_COLUMN_1;
 #ifdef COMBO_BUILD
-    static constexpr const char* seasonsModeCvar = "gRando.Options.RO_ROD_OF_SEASONS";
-    static constexpr const char* startingRodCvar = "gRando.Options.RO_STARTING_ROD_OF_SEASONS";
+    static const char* seasonsModeCvar =
+        Combo_IsCombinedGame() ? "gRando.Options.RO_ROD_OF_SEASONS" : CVAR_RANDOMIZER_SETTING("RodOfSeasons");
+    static const char* startingRodCvar = Combo_IsCombinedGame() ? "gRando.Options.RO_STARTING_ROD_OF_SEASONS"
+                                                                : CVAR_RANDOMIZER_SETTING("StartingRodOfSeasons");
 #else
     static constexpr const char* seasonsModeCvar = CVAR_RANDOMIZER_SETTING("RodOfSeasons");
     static constexpr const char* startingRodCvar = CVAR_RANDOMIZER_SETTING("StartingRodOfSeasons");
@@ -1426,8 +1429,10 @@ void RegisterNEIMenu() {
     // Combo uses one MM-backed choice for both source pools, even with general
     // settings sync disabled. Standalone SoH uses its own saved rando option.
 #ifdef COMBO_BUILD
-    static constexpr const char* graceModeCvar = "gRando.Options.RO_HYLIAS_GRACE";
-    static constexpr const char* graceRewardsCvar = "gRando.Options.RO_HYLIAS_GRACE_REWARDS";
+    static const char* graceModeCvar =
+        Combo_IsCombinedGame() ? "gRando.Options.RO_HYLIAS_GRACE" : CVAR_RANDOMIZER_SETTING("HyliasGrace");
+    static const char* graceRewardsCvar = Combo_IsCombinedGame() ? "gRando.Options.RO_HYLIAS_GRACE_REWARDS"
+                                                                 : CVAR_RANDOMIZER_SETTING("HyliasGraceRewards");
 #else
     static constexpr const char* graceModeCvar = CVAR_RANDOMIZER_SETTING("HyliasGrace");
     static constexpr const char* graceRewardsCvar = CVAR_RANDOMIZER_SETTING("HyliasGraceRewards");

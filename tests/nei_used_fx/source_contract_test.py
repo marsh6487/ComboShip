@@ -4,8 +4,9 @@ import re, subprocess, sys
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
 from run_time_pedestal_tests import functions
+from baseline_sources import read_source
 BASE='cec63fce86b1f582f6e61ad6a98eca6c3cca784b'
-def baseline(p):return subprocess.check_output(['git','show',f'{BASE}:{p}'],cwd=ROOT,text=True)
+def baseline(p):return read_source(BASE,p)
 def tokens(s):return re.sub(r'\s+','',re.sub(r'//[^\n]*|/\*.*?\*/','',s,flags=re.S))
 def gameplay(s):
  s=re.sub(r'    set->drawEpoch = \+\+s(?:Fire|Ice)DrawEpoch;\n', '', s)
@@ -61,7 +62,7 @@ assert current==baseline(path),(path,'changes beyond the tested audio cleanup')
 # Accepted Fire dispatch retains the GI17 center-history path. Ice now has
 # independently tested per-head reconstructed trails, without gameplay edits.
 fire=(ROOT/'soh/mods/items/objects/object_firerod.c').read_text()
-ice=subprocess.check_output(['git','show','c77c18587a976f6d6cb5c8f91f27593286469218:soh/mods/items/objects/object_icerod.c'],cwd=ROOT,text=True)
+ice=read_source('c77c18587a976f6d6cb5c8f91f27593286469218','soh/mods/items/objects/object_icerod.c')
 marker='    // Item-local USED meshes.'
 expected=ice.split(marker,1)[1].replace('IceRod','FireRod').replace('iceRod','fireRod')
 expected=expected.replace('DrawTrail(play, 1,','DrawTrail(play, 0,').replace('DrawProjectile(play, 1,','DrawProjectile(play, 0,')

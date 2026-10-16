@@ -49,6 +49,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Verify all bundled emotes and shared playback
+        run: python3 -B tests/emotes/run_tests.py
+
       - name: Configure
         run: >
           cmake -B build-cmake -S . -G Ninja -DCMAKE_BUILD_TYPE=Release

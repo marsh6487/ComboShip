@@ -1,3 +1,4 @@
+#include "../../combo/ComboGameMode.h"
 #ifdef COMBO_BUILD
 #include "global.h"
 #include "ComboExport.h"
@@ -29,7 +30,7 @@ extern "C" COMBO_EXPORT void SOH_SetFwCallbacks(const ComboFwCallbacks* callback
 }
 
 static void PublishNativePoint(bool captureCheckpoint) {
-    if (!sFwCallbacks.write || !gSaveContext.fw.set)
+    if (!Combo_IsCombinedGame() || !sFwCallbacks.write || !gSaveContext.fw.set)
         return;
     const auto& fw = gSaveContext.fw;
     ComboFwPoint p{ 0,
@@ -52,7 +53,7 @@ extern "C" void ComboFw_PublishPoint(void) {
 }
 
 static int ReadPoint(ComboFwPoint* p) {
-    if (!sFwCallbacks.read)
+    if (!Combo_IsCombinedGame() || !sFwCallbacks.read)
         return -1;
     int result = sFwCallbacks.read(gSaveContext.fileNum, p);
     if (result < 0 && gSaveContext.fileNum <= 2 && sFwCallbacks.write) {
@@ -98,7 +99,7 @@ extern "C" void ComboFw_SyncPoint(void) {
 }
 
 extern "C" void ComboFw_ClearPoint(void) {
-    if (sFwCallbacks.write)
+    if (Combo_IsCombinedGame() && sFwCallbacks.write)
         sFwCallbacks.write(gSaveContext.fileNum, nullptr);
 }
 

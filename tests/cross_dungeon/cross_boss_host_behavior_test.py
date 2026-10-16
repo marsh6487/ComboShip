@@ -8,6 +8,8 @@ if sanitize_flags:
 root=pathlib.Path(__file__).resolve().parents[2]
 common=r'''
 #define COMBO_BUILD 1
+#include "combo/ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #define COMBO_EXPORT
 #include "combo/rando/CrossDungeonState.h"
 #include "combo/rando/CrossDungeonRuntime.h"

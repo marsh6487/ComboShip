@@ -1,3 +1,4 @@
+#include "../../../../combo/ComboGameMode.h"
 #include "SeedContext.h"
 #include "static_data.h"
 #include "soh/OTRGlobals.h"
@@ -439,6 +440,11 @@ void Context::ParseSpoiler(const char* spoilerFileName) {
         nlohmann::json spoilerFileJson;
         spoilerFileStream >> spoilerFileJson;
         spoilerFileStream.close();
+        // Validate at the parser boundary too: a remembered path bypasses file-drop routing.
+        if (Combo_IsCombinedGame() || spoilerFileJson.value("fileType", std::string()) == "ComboShipRandomizer" ||
+            !spoilerFileJson.contains("version") || !spoilerFileJson.contains("finalSeed")) {
+            return;
+        }
         ParseHashIconIndexesJson(spoilerFileJson);
         Rando::Settings::GetInstance()->ParseJson(spoilerFileJson);
         ParseItemLocationsJson(spoilerFileJson);

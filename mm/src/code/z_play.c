@@ -1,3 +1,4 @@
+#include "../../../combo/emotes/EmoteBridge.h"
 #include "z64.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
 #include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
@@ -416,6 +417,7 @@ Gfx* Play_SetFog(PlayState* this, Gfx* gfx) {
 }
 
 void Play_Destroy(GameState* thisx) {
+    ComboEmotes_Reset();
 #ifdef COMBO_BUILD
     extern void Combo_MM_CancelCrossDungeonTransition(void);
     Combo_MM_CancelCrossDungeonTransition();
@@ -809,12 +811,15 @@ void Play_UpdateTransition(PlayState* this) {
                         // ComboShip: quit to OOT's title; MM's own file select is unreachable here. Play
                         // must keep running (the return hook drives the handoff), so end the transition
                         // instead of the gamestate — otherwise this branch re-fires every frame.
-                        this->transitionMode = TRANS_MODE_OFF;
-                        Combo_RequestOwlSaveQuit();
-#else
-                        STOP_GAMESTATE(&this->state);
-                        SET_NEXT_GAMESTATE(&this->state, TitleSetup_Init, sizeof(TitleSetupState));
+                        if (Combo_IsCombinedGame()) {
+                            this->transitionMode = TRANS_MODE_OFF;
+                            Combo_RequestOwlSaveQuit();
+                        } else
 #endif
+                        {
+                            STOP_GAMESTATE(&this->state);
+                            SET_NEXT_GAMESTATE(&this->state, TitleSetup_Init, sizeof(TitleSetupState));
+                        }
                     } else if (gSaveContext.gameMode != GAMEMODE_FILE_SELECT) {
                         STOP_GAMESTATE(&this->state);
                         SET_NEXT_GAMESTATE(&this->state, Play_Init, sizeof(PlayState));
@@ -1163,6 +1168,7 @@ void Play_UpdateMain(PlayState* this) {
             Message_Update(this);
             Interface_Update(this);
             AnimTaskQueue_Update(this, &this->animTaskQueue);
+            ComboEmotes_ApplyPose(this);
             SoundSource_UpdateAll(this);
             ShrinkWindow_Update(this->state.framerateDivisor);
             TransitionFade_Update(&this->unk_18E48, this->state.framerateDivisor);
@@ -1200,6 +1206,7 @@ void Play_UpdateMain(PlayState* this) {
 }
 
 void Play_Update(PlayState* this) {
+    ComboEmotes_BeginUpdate(this);
     if (!sBombersNotebookOpen) {
         if (this->pauseCtx.bombersNotebookOpen) {
             sBombersNotebookOpen = true;

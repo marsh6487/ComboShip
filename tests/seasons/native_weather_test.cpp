@@ -12,6 +12,9 @@
 #include <cstdio>
 #include <cstring>
 
+#include "ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
+
 void MMAutumnSceneFoliage_Update(const PlayState *) {}
 void MMAutumnSceneFoliage_Reset() {}
 
@@ -35,6 +38,7 @@ static int snowDraws, rainDraws, spawns, refreshes, seasonFlashes;
 static int gameplayRandomCalls;
 static int springBlossoms = 1, autumnLeaves = 1, winterSnow = 1,
            winterFlurries = 0;
+static int independentRain = 0;
 static unsigned leafPalettes, leafDraws, firstLeafAlpha, nonzeroLeafDraws,
     petalDraws, blossomDraws;
 static u8 submittedLeafAlpha[96];
@@ -89,6 +93,8 @@ void MMSummerAtmosphere_Update(PlayState *) {}
 void MMSummerAtmosphere_Reset() {}
 void MMWinterAtmosphere_Reset() {}
 int32_t CVarGetInteger(const char *name, int32_t fallback) {
+  if (!std::strcmp(name, "gAudioEditor.MMWeather.Enabled"))
+    return independentRain;
   if (!std::strcmp(name, "gAudioEditor.MMWeather.Spring.Blossoms"))
     return springBlossoms;
   if (!std::strcmp(name, "gAudioEditor.MMWeather.Autumn.Leaves"))
@@ -978,11 +984,84 @@ static void SeasonalParticleToggleRegression() {
             "and Off restoration");
 }
 
+static void OpeningForestSeasonRegression() {
+  static PlayState play;
+  Camera camera{};
+  GraphicsContext gfx{};
+  for (int room : {0, 1}) {
+    Reset(&play, &camera, &gfx);
+    play.sceneId = SCENE_LOST_WOODS;
+    play.skyboxId = SKYBOX_2;
+    play.roomCtx.curRoom.num = room;
+    gSaveContext.fileNum = 0;
+    gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
+    gSaveContext.save.day = 3;
+    gSaveContext.save.time = CLOCK_TIME(21, 0);
+    // The playable forest keeps its native room lighting and covered sky.
+    play.envCtx.stormState = STORM_STATE_OFF;
+    play.envCtx.lightMode = LIGHT_MODE_SETTINGS;
+    const auto progress = gSaveContext.save.saveInfo;
+    for (u8 season : {SEASON_SPRING, SEASON_WINTER, SEASON_AUTUMN,
+                      SEASON_SUMMER, SEASON_OFF, SEASON_WINTER}) {
+      Confirm(&play, season);
+      Frame(&play);
+      assert(MMWeather_Season() == (season == SEASON_OFF ? -1 : season));
+      assert(MMWeather_FoliageSeasonForPlay(&play) == MMWeather_Season());
+      assert(DrawSnow(&play) == (season == SEASON_WINTER ? 64 :
+             (season == SEASON_SPRING || season == SEASON_AUTUMN) ? 96 : 0));
+      if (season == SEASON_SPRING) {
+        assert(petalDraws == 96 && blossomDraws == 24 && MMWeather_RainDensity() == 30 && rainGain == 1);
+        const int before = rainDraws;
+        DrawRainFromPlay(&play);
+        assert(rainDraws == before + 1);
+      } else if (season == SEASON_AUTUMN) {
+        assert(leafDraws == 96);
+      } else {
+        assert(MMWeather_RainDensity() == 0 && rainGain == 0);
+      }
+      if (season == SEASON_WINTER)
+        assert(MMWeather_Overcast() > 0);
+      if (season == SEASON_SUMMER || season == SEASON_OFF)
+        assert(MMWeather_Overcast() == 0 && ActiveSeasonParticleOwners(&play) == 0);
+      assert(play.skyboxId == SKYBOX_2 && play.envCtx.lightMode == LIGHT_MODE_SETTINGS);
+      assert(play.envCtx.precipitation[PRECIP_SNOW_CUR] == 0 &&
+             play.envCtx.precipitation[PRECIP_SNOW_MAX] == 0 &&
+             play.envCtx.precipitation[PRECIP_RAIN_CUR] == 0 &&
+             play.envCtx.precipitation[PRECIP_RAIN_MAX] == 0);
+      assert(std::memcmp(&progress, &gSaveContext.save.saveInfo, sizeof(progress)) == 0);
+      assert(gSaveContext.save.day == 3 && gSaveContext.save.time == CLOCK_TIME(21, 0));
+    }
+    // The independent weather override also works with no Rod/season owned.
+    Confirm(&play, SEASON_OFF);
+    gSaveContext.save.shipSaveInfo.nei = {};
+    gSaveContext.save.shipSaveInfo.nei.season = SEASON_OFF;
+    const auto unowned = gSaveContext.save;
+    independentRain = 1;
+    for (int i = 0; i < 120; ++i)
+      Frame(&play);
+    assert(!Seasons_HasRod() && MMWeather_Season() == -1 &&
+           MMWeather_RainDensity() > 0 && rainGain > 0 && MMWeather_Overcast() > 0);
+    const int before = rainDraws;
+    DrawRainFromPlay(&play);
+    assert(rainDraws == before + 1 &&
+           std::memcmp(&unowned, &gSaveContext.save, sizeof(unowned)) == 0);
+    // Leaving for a real interior releases independent rain and audio too.
+    play.sceneId = SCENE_SONCHONOIE;
+    EnvironmentFrame(&play);
+    assert(MMWeather_Season() == -1 && MMWeather_RainDensity() == 0 && rainGain == 0 && DrawSnow(&play) == 0);
+    independentRain = 0;
+  }
+  std::puts("PASS opening Lost Woods SKYBOX_2: real Rod confirmation, rain draw/audio, "
+            "96 petals/leaves, 64 snow, independent weather without a Rod, "
+            "Off/re-entry and unchanged native save/sky/precipitation");
+}
+
 int main(int argc, char **argv) {
   if (argc == 2) {
     ExportAutumnPreview(argv[1]);
     return 0;
   }
+  OpeningForestSeasonRegression();
   SpringXluMaterialRegression();
   SpringVisibleParticleRegression();
   SeasonalParticleToggleRegression();

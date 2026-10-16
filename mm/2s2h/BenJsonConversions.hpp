@@ -2,6 +2,7 @@
 #define BenJsonConversions_hpp
 
 #include <nlohmann/json.hpp>
+#include "../../combo/ComboGameMode.h"
 #include <spdlog/spdlog.h>
 #include "build.h"
 #include <cstring> // memset for NEI save defaults (Skijer's NEI)
@@ -497,13 +498,12 @@ inline void from_json(const json& j, ShipSaveInfo& shipSaveInfo) {
     }
 
     if (shipSaveInfo.saveType == SAVETYPE_RANDO) {
-#ifndef COMBO_BUILD
-        // ComboShip: tolerate cross-build rando saves on the combosave path (mirrors SoH's !comboSrc exemption).
-        if (strcmp(shipSaveInfo.commitHash, gGitCommitHash) != 0) {
+        // Combined containers keep their existing compatibility policy; native
+        // randomizer saves retain MM's version check.
+        if (!Combo_IsCombinedGame() && strcmp(shipSaveInfo.commitHash, gGitCommitHash) != 0) {
             SPDLOG_ERROR("Randomizer saves cannot be loaded from a different version.");
-            throw new std::runtime_error("Randomizer saves cannot be loaded from a different version.");
+            throw std::runtime_error("Randomizer saves cannot be loaded from a different version.");
         }
-#endif
 
         j.at("rando").get_to(shipSaveInfo.rando);
     }

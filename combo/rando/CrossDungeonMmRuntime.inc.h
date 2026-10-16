@@ -1,5 +1,6 @@
 // Gameplay route ownership is deliberately separate from CrossDungeonMm.inc.h's oracle state.
 #include "rando/CrossDungeonRuntime.h"
+#include "ComboGameMode.h"
 #include "rando/CrossEntranceMmGrottos.inc.h"
 extern "C" int Combo_MM_GiantsEscape(int32_t* entrance, int32_t* cutscene, int consume);
 namespace ComboCrossMmRuntime {
@@ -91,6 +92,8 @@ extern "C" int Combo_MM_CrossDungeonTransitionPending(void) {
     return ComboCrossMmRuntime::pending.has_value();
 }
 extern "C" int Combo_MM_CompleteCrossDungeonTransition(void) {
+    if (!Combo_IsCombinedGame())
+        return 0;
     if (!ComboCrossMmRuntime::pending)
         return 0;
     ComboCrossMmRuntime::departureFadeComplete = true;
@@ -101,6 +104,8 @@ extern "C" void Combo_MM_CancelCrossDungeonTransition(void) {
     ComboCrossMmRuntime::departureFadeComplete = false;
 }
 extern "C" COMBO_EXPORT int MM_SetCrossDungeonRuntimeSeed(const char* raw) try {
+    if (!Combo_IsCombinedGame())
+        return 0;
     auto seed = nlohmann::json::parse(raw ? raw : "null");
     const auto routes = ComboRando::CrossDungeon::Decode(seed);
     for (const auto& route : routes)
@@ -127,6 +132,8 @@ extern "C" COMBO_EXPORT int MM_SetCrossDungeonRuntimeSeed(const char* raw) try {
     return 0;
 }
 extern "C" COMBO_EXPORT int MM_QueueCrossDungeonArrival(int32_t index) {
+    if (!Combo_IsCombinedGame())
+        return 0;
     if (!ComboCrossMmRuntime::state.QueueArrival(index))
         return 0;
     ComboCrossMmRuntime::pendingBossRecovery.reset();
@@ -134,6 +141,8 @@ extern "C" COMBO_EXPORT int MM_QueueCrossDungeonArrival(int32_t index) {
     return 1;
 }
 extern "C" COMBO_EXPORT int MM_QueueCrossBossRecovery(int game, int32_t index) {
+    if (!Combo_IsCombinedGame())
+        return 0;
     using namespace ComboCrossMmRuntime;
     const auto recovery = state.RecoveryForBoss({ game, index });
     if (!recovery || recovery->source.game != 1 || !ValidEntrance(recovery->parent.index) ||
@@ -144,6 +153,8 @@ extern "C" COMBO_EXPORT int MM_QueueCrossBossRecovery(int game, int32_t index) {
     return 1;
 }
 extern "C" int32_t Combo_MM_ConsumeCrossBossRecoveryResume(void) {
+    if (!Combo_IsCombinedGame())
+        return -1;
     using namespace ComboCrossMmRuntime;
     const auto recovery = state.ConsumeBossRecovery();
     if (!recovery)
@@ -154,11 +165,11 @@ extern "C" int32_t Combo_MM_ConsumeCrossBossRecoveryResume(void) {
     return ComboMmMaterializeGrotto(recovery->parent.index);
 }
 extern "C" int Combo_MM_CrossDungeonRuntimeEnabled(void) {
-    return ComboCrossMmRuntime::state.Enabled();
+    return Combo_IsCombinedGame() && ComboCrossMmRuntime::state.Enabled();
 }
 extern "C" int Combo_MM_CrossBossEnabled(void) {
-    return gSaveContext.gameMode == GAMEMODE_NORMAL && gSaveContext.fileNum >= 0 && gSaveContext.fileNum <= 2 &&
-           ComboCrossMmRuntime::state.HasPool(ComboRando::CrossDungeon::Pool::Boss);
+    return Combo_IsCombinedGame() && gSaveContext.gameMode == GAMEMODE_NORMAL && gSaveContext.fileNum >= 0 &&
+           gSaveContext.fileNum <= 2 && ComboCrossMmRuntime::state.HasPool(ComboRando::CrossDungeon::Pool::Boss);
 }
 extern "C" void Combo_MM_RestoreCrossDungeonCheckpoint(int32_t index) {
     using namespace ComboCrossMmRuntime;
@@ -170,6 +181,8 @@ extern "C" void Combo_MM_RestoreCrossDungeonCheckpoint(int32_t index) {
     localDungeonArrival = -1;
 }
 extern "C" int32_t Combo_MM_ConsumeCrossDungeonArrival(void) {
+    if (!Combo_IsCombinedGame())
+        return -1;
     using namespace ComboCrossMmRuntime;
     const int32_t logical = state.ConsumeArrival();
     if (logical < 0)
@@ -188,6 +201,8 @@ extern "C" void Combo_MM_RequestCrossBossDeathRecovery(void) {
 }
 // MM has no native entrance permutation; the central transition boundary takes one composed leg.
 extern "C" int Combo_MM_CrossDungeonTransition(int32_t* index) {
+    if (!Combo_IsCombinedGame())
+        return 0;
     using namespace ComboCrossMmRuntime;
     if (!index || gSaveContext.gameMode != GAMEMODE_NORMAL || gSaveContext.fileNum < 0 || gSaveContext.fileNum > 2 ||
         !state.Enabled())

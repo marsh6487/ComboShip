@@ -28,6 +28,10 @@ def extract(source, signature):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sanitizers", action="store_true")
+    parser.add_argument("--mq-layouts", action="store_true",
+                        help="exercise native vanilla/MQ selection, Combo prep, oracle reuse and save/reload")
+    parser.add_argument("--ignore-recorded-quest-assets", action="store_true",
+                        help="negative control: normalize replay against newly installed archives")
     parser.add_argument("--drop-appended-option", action="store_true",
                         help="negative control: omit the information option during Context copy")
     parser.add_argument("--dump-entrance-fixture", type=Path,
@@ -69,6 +73,10 @@ def main():
         if signature == "Settings::Settings()" and signature not in settings:
             continue  # 9.3 deliberately defers CreateOptions until service initialization.
         body = extract(settings, signature)
+        if args.ignore_recorded_quest_assets and signature == "void Context::FinalizeSettings":
+            body = body.replace("Combo_SOH_GenerationQuestAssets()",
+                                "((OTRGlobals::Instance->HasOriginal() ? 1 : 0) | "
+                                "(OTRGlobals::Instance->HasMasterQuest() ? 2 : 0))")
         if args.drop_appended_option and signature == "void Settings::SetAllToContext()":
             body = body.replace("mContext->GetOption(static_cast<RandomizerSettingKey>(i)).Set",
                                 "if (i != RSK_MAPS_COMPASSES_GIVE_INFORMATION) mContext->GetOption(static_cast<RandomizerSettingKey>(i)).Set", 1)
@@ -88,6 +96,20 @@ def main():
                      "#define OPT_U8(rsk, ...) settings.mOptions[rsk] = Option::U8(rsk, __VA_ARGS__)\n"
                      "#define OPT_BOOL(rsk, ...) settings.mOptions[rsk] = Option::Bool(rsk, __VA_ARGS__)\n" +
                      seasons_registration + "\n#undef OPT_U8\n#undef OPT_BOOL\n}")
+    if args.mq_layouts:
+        for signature in ("Option Option::Bool(RandomizerSettingKey key_, std::vector",
+                          "Option Option::U8(RandomizerSettingKey key_, std::vector"):
+            functions.append(extract(option, signature))
+        # Its default parameters contain {}, before the function body's brace.
+        functions.append(settings[settings.index("std::vector<std::string> NumOpts("):
+                                  settings.index("std::vector<std::string> MultiVecOpts(")])
+        mq_registration = "\n".join(re.findall(
+            r"^\s*OPT_(?:U8|BOOL)\(RSK_(?:MQ_[A-Z_]+|GANONS_TRIALS|TRIAL_COUNT|KEYRINGS(?:_[A-Z_]+)?),[^\n]*;",
+            settings, re.M))
+        functions.append("void RegisterMqOptions(Settings& settings) {\n"
+                         "#define OPT_U8(rsk, ...) settings.mOptions[rsk] = Option::U8(rsk, __VA_ARGS__)\n"
+                         "#define OPT_BOOL(rsk, ...) settings.mOptions[rsk] = Option::Bool(rsk, __VA_ARGS__)\n" +
+                         mq_registration + "\n#undef OPT_U8\n#undef OPT_BOOL\n}")
     for signature in ("Context::Context()", "std::shared_ptr<Context> Context::CreateInstance()",
                       "std::shared_ptr<Context> Context::GetInstance()", "ItemLocation* Context::GetItemLocation(size_t",
                       "ItemLocation* Context::GetItemLocation(const RandomizerCheck", "OptionValue& Context::GetOption",
@@ -99,6 +121,8 @@ def main():
         functions.append(extract(context, signature))
     for signature in ("void Context::SetSeedString", "void Context::SetSeed("):
         functions.append(extract(context, signature))
+    if args.mq_layouts:
+        functions.append(extract(context, "DungeonInfo* Context::GetDungeonFromScene"))
     for signature in ("ItemLocation::ItemLocation()", "ItemLocation::ItemLocation(const RandomizerCheck",
                       "RandomizerCheck ItemLocation::GetRandomizerCheck() const", "void ItemLocation::SetExcludedOption"):
         functions.append(extract(item, signature))
@@ -123,6 +147,26 @@ def main():
     functions.extend(re.findall(r'^[^\n]*Fishsanity::(?:fishsanityHelpersInit|pondFishAgeMap|childPondFish|adultPondFish)[^\n]*;',
                                 fish, re.M))
     functions = "namespace Rando {\n" + "\n\n".join(functions) + "\n}\n"
+    if args.mq_layouts:
+        seed_start = otr.index("static uint64_t sComboRandoSeed =")
+        seed_end = otr.index("static const PriceSettingsStruct", seed_start)
+        seed_state = otr[seed_start:seed_end]
+        for state in ("sOracleInitialized", "sComboContextPrepared", "sComboRecordedMqDungeons",
+                      "sComboRecordedQuestAssets", "sComboFinalizingQuestAssets", "sComboPreparedQuestAssets"):
+            if state not in seed_state:
+                seed_state += re.search(r"^static [^\n]*\b" + state + r"\b[^\n]*;", otr, re.M).group(0) + "\n"
+        functions += seed_state
+        for signature in ('static uint8_t Combo_InstalledQuestAssets',
+                          'extern "C" int Combo_SOH_GenerationQuestAssets',
+                          'extern "C" COMBO_EXPORT void SOH_SetComboRandoSeed',
+                          'extern "C" COMBO_EXPORT const char* SOH_DumpDungeonLayouts',
+                          'static bool Combo_DecodeDungeonLayouts',
+                          'extern "C" COMBO_EXPORT int SOH_ValidateDungeonLayoutsForCombo',
+                          'extern "C" COMBO_EXPORT int SOH_SetDungeonLayoutsForCombo',
+                          'extern "C" COMBO_EXPORT void SOH_PrepRandoContext', 'static void EnsureOracleInit()'):
+            # The file has a forward declaration of EnsureOracleInit as well.
+            position = otr.index(signature + " {") if signature.endswith("()") else otr.index(signature)
+            functions += block_from(otr, position) + "\n"
     if 'static bool Combo_ClearNumericExclusions() {' in otr:
         functions += extract(otr, 'static bool Combo_ClearNumericExclusions() {') + "\n"
     for signature in ('extern "C" COMBO_EXPORT const char* SOH_DumpRandoSettings',
@@ -137,6 +181,13 @@ def main():
     load_block = manager[load_start:manager.index("});", load_start) + 3]
     functions += "void SaveNativeSettings() { auto randoContext = Rando::Context::GetInstance();\n" + save_block + "\n}\n"
     functions += "void LoadNativeSettings() { auto randoContext = Rando::Context::GetInstance();\n" + load_block + "\n}\n"
+    if args.mq_layouts:
+        mq_save_start = manager.index('    SaveManager::Instance->SaveData("masterQuestDungeonCount"')
+        mq_save_end = manager.index('    SaveManager::Instance->SaveArray("requiredTrials"', mq_save_start)
+        mq_load_start = manager.index('    size_t mqDungeonCount;')
+        mq_load_end = manager.index('    randoContext->GetTrials()->SkipAll();', mq_load_start)
+        functions += "void SaveMqDungeons() { auto randoContext = Rando::Context::GetInstance();\n" + manager[mq_save_start:mq_save_end] + "\n}\n"
+        functions += "void LoadMqDungeons() { auto randoContext = Rando::Context::GetInstance();\n" + manager[mq_load_start:mq_load_end] + "\n}\n"
     functions += extract(read("soh/soh/Enhancements/randomizer/NeiSeasons.cpp"),
                          'extern "C" uint8_t Seasons_RandoMode') + "\n"
     # Execute the complete native item-count helper and complete NEI source pool
@@ -159,6 +210,9 @@ def main():
         flags = ["-std=c++20", "-O1", "-g", "-ffunction-sections", "-fdata-sections",
                  "-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DIMGUI_DEFINE_MATH_OPERATORS=", "-DLOG_LEVEL_GAME_PRINTS=0",
                  "-DFMT_HEADER_ONLY"]
+        if args.mq_layouts:
+            flags += ["-DCOMBO_MQ_LAYOUT_TESTS"]
+            flags[flags.index("-O1")] = "-O0"
         # Use the actual configured CVar prefixes from the production CMake file.
         prefixes = read("CMake/soh-cvars.cmake")
         flags += ['-D' + key + '="' + value + '"' for key, value in

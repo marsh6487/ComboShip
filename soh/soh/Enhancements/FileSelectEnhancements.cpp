@@ -1,4 +1,5 @@
-﻿#include "FileSelectEnhancements.h"
+#include "../../../combo/ComboGameMode.h"
+#include "FileSelectEnhancements.h"
 
 #include <ship/Context.h>
 
@@ -82,7 +83,13 @@ std::array<std::string, LANGUAGE_MAX> RandomizerSettingsMenuText[RSM_MAX] = {
 // Quests are hidden when their O2R is missing or their File Select "Hide" option is on
 bool SohFileSelect_IsQuestHidden(u8 quest) {
 #ifdef COMBO_BUILD
-    return quest != QUEST_RANDOMIZER; // ComboShip: Randomizer-only, so the Hide options never apply
+    if (Combo_IsCombinedGame()) {
+        return quest != QUEST_RANDOMIZER;
+    }
+    // The legacy paired quest lies between Boss Rush and Speedrun in the native enum.
+    if (quest == QUEST_OOTXMM) {
+        return true;
+    }
 #endif
     switch (quest) {
         case QUEST_NORMAL:

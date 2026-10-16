@@ -43,6 +43,7 @@
 #include "rando/CrossForeign.h" // BuildForeignArray (foreign enrichment parity with RunComboFill)
 #include "rando/CrossHints.h"
 #include "rando/CrossDungeonCoordinator.h"
+#include "rando/OotDungeonLayouts.h"
 #include "rando/CrossDungeonGeneration.h"
 
 namespace {
@@ -199,6 +200,8 @@ int main(int argc, char** argv) {
     // layout for the same seed, which is the parity the validator exists to prove.
     auto SOH_DumpSharedPairs = Sym<FnDump>(soh, "SOH_DumpSharedItemPairs");
     auto SOH_DumpSettings = Sym<FnDump>(soh, "SOH_DumpRandoSettings");
+    auto SOH_DumpDungeonLayouts = Sym<ComboRando::OotLayoutDumper>(soh, "SOH_DumpDungeonLayouts");
+    auto SOH_SetDungeonLayouts = Sym<ComboRando::OotLayoutSetter>(soh, "SOH_SetDungeonLayoutsForCombo");
     auto MM_DumpSettings = Sym<FnDump>(mm, "MM_DumpRandoSettings");
     auto SOH_RestoreSettings = Sym<FnTakeStr>(soh, "SOH_RestoreRandoSettings");
     auto SOH_PrepContext = Sym<FnVoidV>(soh, "SOH_PrepRandoContext");
@@ -356,6 +359,12 @@ int main(int argc, char** argv) {
             }
             if (SOH_SetSeed)
                 SOH_SetSeed(masterSeed);
+            if (!ComboRando::RestoreOotDungeonLayouts(spoiler.value("oot", nlohmann::json::object()),
+                                                      SOH_SetDungeonLayouts)) {
+                std::cerr << "[playthrough] invalid dungeon layouts or required OoT quest assets missing\n";
+                entranceRestoreFailed = true;
+                return ComboRando::PlaythroughResult{};
+            }
             if (MM_SetSeed)
                 MM_SetSeed(masterSeed);
             if (SOH_SetComboGoal)
@@ -565,6 +574,7 @@ int main(int argc, char** argv) {
     std::optional<uint32_t> settingsSharedMask;
     std::optional<nlohmann::json> settingsCrossSeed;
     std::optional<nlohmann::json> settingsOotEntrances;
+    nlohmann::json settingsOotLayouts = nlohmann::json::object();
     if (!settingsFile.empty()) {
         if (!SOH_RestoreSettings || !MM_RestoreSettings) {
             std::cerr << "[comborando] --settings needs the settings-restore exports — rebuild soh.dll / 2ship.dll\n";
@@ -580,6 +590,7 @@ int main(int argc, char** argv) {
                 settingsSharedMask = ComboRando::SharedMaskFromKeys(sj["sharedItems"]);
             const auto& oot = sj.contains("oot") ? sj["oot"] : sj;
             const auto& mm = sj.contains("mm") ? sj["mm"] : sj;
+            settingsOotLayouts = ComboRando::OotDungeonLayoutSnapshot(oot);
             if (oot.contains("settings"))
                 SOH_RestoreSettings(oot["settings"].dump().c_str());
             if (mm.contains("settings"))
@@ -629,12 +640,15 @@ int main(int argc, char** argv) {
         if (crossPoolArgs[i] >= 0)
             *flags[i] = crossPoolArgs[i] != 0;
     crossOptions.expanded = crossOptions.dungeons && crossOptions.expanded;
-    crossDungeons.SetOptions(crossOptions);
     const bool crossDungeonEnabled = crossOptions.Any();
     const bool replayCrossMap =
         recordedCrossMap && crossDungeonEnabled &&
         ComboRando::CrossDungeon::OptionsJson(crossOptions) ==
             ComboRando::CrossDungeon::OptionsJson(ComboRando::CrossDungeon::OptionsFromSeed(*settingsCrossSeed));
+    // Fresh generation uses today's policy even when settings came from an older map.
+    if (!replayCrossMap)
+        crossOptions.legacyInteriors = false;
+    crossDungeons.SetOptions(crossOptions);
     // Shared Items: --shared-items wins ("all"/"none"/comma-separated keys); else the menu CVars.
     uint32_t sharedMask = 0;
     if (sharedItemsArg == "all") {
@@ -681,6 +695,10 @@ int main(int argc, char** argv) {
                                  ResolveStartingGameMM(startCfg, masterSeed);
             if (SOH_SetSeed)
                 SOH_SetSeed(masterSeed);
+            if (!ComboRando::RestoreOotDungeonLayouts(settingsOotLayouts, SOH_SetDungeonLayouts)) {
+                std::cerr << "[comborando] invalid dungeon layouts or required OoT quest assets missing\n";
+                return 2;
+            }
             if (MM_SetSeed)
                 MM_SetSeed(masterSeed);
             // Before the dumps: the goal shapes OOT's wincon placement and MM's hunt pool.
@@ -838,6 +856,7 @@ int main(int argc, char** argv) {
                                             { "placements", ootPl },
                                             { "prices", pricesOf(sohDump) },
                                             { "iceTrapModels", iceTrapModelsOf(sohDump) } };
+                    ComboRando::RecordOotDungeonLayouts(consolidated["oot"], SOH_DumpDungeonLayouts);
                     consolidated["mm"] = { { "settings", nlohmann::json::parse(MM_DumpSettings()) },
                                            { "placements", mmPl },
                                            { "prices", pricesOf(mmDump) } };

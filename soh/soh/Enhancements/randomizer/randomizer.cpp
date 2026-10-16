@@ -1,3 +1,4 @@
+#include "../../../../combo/ComboGameMode.h"
 #include "../../../../combo/menu/ItemGrantAuditBridge.h"
 #include "../../../../combo/menu/ComboToolReceiptText.h"
 #include "../../../../combo/menu/ComboMaskReceiptText.h"
@@ -587,18 +588,19 @@ bool Rando_HandleSpoilerDrop(char* filePath) {
         // ComboShip: a dropped consolidated combo spoiler — route it to the combo reload path (see
         // FileChoose_UpdateRandomizer) rather than SoH's ParseSpoiler. Only flag it here.
         if (json.value("fileType", std::string()) == "ComboShipRandomizer") {
+            if (!Combo_IsCombinedGame()) {
+                return false;
+            }
             CVarSetString(CVAR_GENERAL("ComboDroppedFile"), filePath);
             return true;
         }
 #endif
 
-#ifndef COMBO_BUILD // ComboShip: a native soh spoiler has no MM half; only combo seed files load here
-        if (json.contains("version") && json.contains("finalSeed")) {
+        if (!Combo_IsCombinedGame() && json.contains("version") && json.contains("finalSeed")) {
             CVarSetString(CVAR_GENERAL("RandomizerDroppedFile"), filePath);
             CVarSetInteger(CVAR_GENERAL("RandomizerNewFileDropped"), 1);
             return true;
         }
-#endif
     } catch ([[maybe_unused]] std::exception& e) {}
     return false;
 }
@@ -1595,7 +1597,7 @@ void SetComboRandoGenerating(bool on) {
 
 bool IsRandoGenerating() {
 #ifdef COMBO_BUILD
-    if (sComboGenerating) {
+    if (Combo_IsCombinedGame() && sComboGenerating) {
         return true;
     }
 #endif
@@ -2132,7 +2134,7 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
 #ifdef COMBO_BUILD
             // ComboShip (#136): combo owns the goal — the launcher sums both games' counts. Covers
             // dormant grants too (they also route through Randomizer_Item_Give).
-            if (gComboTriforceProgress != NULL) {
+            if (Combo_IsCombinedGame() && gComboTriforceProgress != NULL) {
                 gComboTriforceProgress(0, gSaveContext.fileNum);
             }
 #endif
@@ -2583,6 +2585,9 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
         case RG_MM_SOUL_WART:
         case RG_MM_SOUL_WIZROBE:
         case RG_MM_SOUL_WOLFOS:
+            // Their FC receipt is already recorded above. These have no OoT inventory item;
+            // falling through would also grant Moon's Tear (including for MM starting souls).
+            break;
         // MM trade / quest-chain items — grant the REAL NEI inventory item, same APIs the give-all
         // debug menu path uses: adult-trade wheel (pause kaleido slots 4/5, trade_items.c),
         // pictobox (picto_box.c), powder keg (power_keg.c), Bombers' Notebook (mmQuestItems bit).

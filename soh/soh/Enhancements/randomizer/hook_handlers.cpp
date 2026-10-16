@@ -1,3 +1,4 @@
+#include "../../../../combo/ComboGameMode.h"
 #include "rando/CrossEntranceBoss.h"
 #include "soh/OTRGlobals.h"
 
@@ -347,14 +348,11 @@ void CheckTriggers() {
         randomizerQueuedChecks.push(RC_GANON_SOUL);
     }
 
-#ifndef COMBO_BUILD
-    // ComboShip (#136): the launcher owns the win condition (combined Triforce goal across both
-    // games), so OOT must not trigger its own ungated win here.
-    if (MeetsWinconRequirements()) {
+    // Solo sessions retain the native goal, including Triforce Hunt.
+    if (!Combo_IsCombinedGame() && MeetsWinconRequirements()) {
         SPDLOG_INFO("Queuing RC: RC_WINCON");
         randomizerQueuedChecks.push(RC_WINCON);
     }
-#endif
 }
 
 void RandomizerOnFlagSetHandler(int16_t flagType, int16_t flag) {
@@ -486,6 +484,8 @@ uint64_t OOT_ForeignMapGen() {
 
 // ComboShip: also used by MerchantMessages/check tracker to show the real foreign item name.
 const ComboRando::ForeignItem* OOT_LookupForeign(int slot, const std::string& checkName) {
+    if (!Combo_IsCombinedGame())
+        return nullptr;
     (void)slot;
     // Lazily build from the in-memory blob if a lookup races the load-time push.
     if (g_ootForeignMap.empty()) {

@@ -4,6 +4,8 @@
 #include <cstring>
 #include <iostream>
 #include "gameplay/ComboFaroresWindJson.h"
+#include "ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 static int32_t activeCheckpoint = -1;
 static int checkpointRestores = 0;
 extern "C" int32_t Combo_SOH_SaveCrossDungeonCheckpoint(void) { return activeCheckpoint; }

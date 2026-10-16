@@ -19,7 +19,7 @@ def weather_flags():
     redirect = str(ROOT / 'mm/soh/_nei_compat_core.h')
     index = result.index(redirect)
     del result[index - 1:index + 1]
-    return result
+    return [*result, '-DCOMBO_BUILD']
 
 
 def source(path):

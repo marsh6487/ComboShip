@@ -33,8 +33,15 @@ bool OutdoorEligible(const PlayState* play) {
         return false;
     }
     const Camera* camera = GET_ACTIVE_CAM(play);
-    const bool outdoorSky =
+    bool outdoorSky =
         play->sceneId != SCENE_SONCHONOIE && (play->skyboxId == SKYBOX_NORMAL_SKY || play->skyboxId == SKYBOX_3);
+#ifdef COMBO_BUILD
+    // Playable Lost Woods keeps the prologue's covered SKYBOX_2. Its two
+    // exploration rooms support the shared weather controls and all seasons;
+    // other special-sky interiors and the real intro/title layers stay native.
+    outdoorSky |= play->skyboxId == SKYBOX_2 && ComboOpeningForest_IsExploration(play) &&
+                  (play->roomCtx.curRoom.num == 0 || play->roomCtx.curRoom.num == 1);
+#endif
     return gSaveContext.gameMode == GAMEMODE_NORMAL && play->gameOverCtx.state == GAMEOVER_INACTIVE && outdoorSky &&
            !play->envCtx.skyboxDisabled && camera != nullptr && !(camera->stateFlags & CAM_STATE_UNDERWATER);
 }
@@ -189,9 +196,8 @@ extern "C" int MMWeather_SeasonForPlay(const PlayState* play) {
 
 extern "C" int MMWeather_FoliageSeasonForPlay(const PlayState* play) {
 #ifdef COMBO_BUILD
-    // The playable opening forest retains its native SKYBOX_2 and indoor
-    // lighting. Allow its scene foliage to follow the Rod/manual palette
-    // without enrolling that skybox in outdoor rain or sky overrides.
+    // Preserve the established opening-forest foliage selection independently
+    // of the shared weather controls and without changing its native lighting.
     if (ComboOpeningForest_IsExploration(play)) {
         const Camera* camera = GET_ACTIVE_CAM(play);
         if (play->gameOverCtx.state == GAMEOVER_INACTIVE && !play->envCtx.skyboxDisabled && camera != nullptr &&

@@ -1,3 +1,4 @@
+#include "../../../../combo/ComboGameMode.h"
 #include <spdlog/spdlog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <ship/Context.h>
@@ -25,7 +26,7 @@ extern "C" int gComboGoalPieces;
 extern "C" int gComboStartingGameMM;
 // ComboShip: Shared Items bitmask (combo/rando/SharedItems.h), pushed by SOH_SetComboSharedItems.
 extern "C" int gComboSharedMask;
-static constexpr bool kComboOwnsWincon = true;
+extern "C" int Combo_SOH_GenerationQuestAssets(void);
 // ComboShip (#136): OOT's half of the combo-owned pool, for the menu-side dependent-count ranges.
 // Mirrors CwOotPieces in combo/rando/CrossWorldRando.h — the two splits must stay identical.
 static uint8_t ComboOotTriforceTotal() {
@@ -37,9 +38,8 @@ static uint8_t ComboOotTriforceTotal() {
     return static_cast<uint8_t>(total - total / 2);      // OOT takes the odd piece
 }
 #else
-static constexpr bool kComboOwnsWincon = false;
 static uint8_t ComboOotTriforceTotal() {
-    return 0; // never reached (kComboOwnsWincon is false), but the call site is a runtime if
+    return 0; // never reached (Combo_IsCombinedGame() is false), but the call site is a runtime if
 }
 #endif
 
@@ -213,7 +213,7 @@ void Settings::HandleStartingAgeUI() {
     }
 #ifdef COMBO_BUILD
     // ComboShip (#135): an explicit MM start forces Child, so that disable outranks the rule above.
-    if (CVarGetInteger("gCombo.Rando.StartingGame", 0) == 1) {
+    if (Combo_IsCombinedGame() && CVarGetInteger("gCombo.Rando.StartingGame", 0) == 1) {
         mOptions[RSK_STARTING_AGE].Disable("Starting Game is Majora's Mask");
     }
 #endif
@@ -485,14 +485,14 @@ void Settings::CreateOptions() {
     OPT_CALLBACK(RSK_TRIFORCE_HUNT_PIECES_TOTAL, {
         uint8_t triforceTotal = CVarGetInteger(CVAR_RANDOMIZER_SETTING("TriforceHuntTotalPieces"), 0);
         // ComboShip: the cross-world fill can't honor a dungeon/overworld restriction — forced Anywhere.
-        if (triforceTotal == 0 || kComboOwnsWincon) {
+        if (triforceTotal == 0 || Combo_IsCombinedGame()) {
             mOptions[RSK_TRIFORCE_HUNT_PIECES_LOCATION].Hide();
         } else {
             mOptions[RSK_TRIFORCE_HUNT_PIECES_LOCATION].Unhide();
         }
         // ComboShip (#136): the combo menu owns the total, so hide this slider and range the dependent
         // counts below against OOT's forced share instead of this (now dead) CVar.
-        if (kComboOwnsWincon) {
+        if (Combo_IsCombinedGame()) {
             mOptions[RSK_TRIFORCE_HUNT_PIECES_TOTAL].Hide();
             triforceTotal = ComboOotTriforceTotal();
         }
@@ -1301,7 +1301,7 @@ void Settings::CreateOptions() {
         mOptions[RSK_WINCON_TOKEN_COUNT].Hide();
         mOptions[RSK_WINCON_TRIFORCE_COUNT].Hide();
         // ComboShip: combo forces the wincon, so no sub-option is ever offered.
-        if (kComboOwnsWincon) {
+        if (Combo_IsCombinedGame()) {
             mOptions[RSK_WINCON].Hide();
             return;
         }
@@ -1467,7 +1467,8 @@ void Settings::CreateOptions() {
     OPT_BOOL(RSK_MAPS_COMPASSES_GIVE_INFORMATION, "Maps and Compasses Give Information", CVAR_RANDOMIZER_SETTING("MapsCompassesGiveInformation"), mOptionDescriptions[RSK_MAPS_COMPASSES_GIVE_INFORMATION], IMFLAG_NONE, WIDGET_CVAR_CHECKBOX, RO_GENERIC_OFF);
 #ifdef COMBO_BUILD
     // ComboShip: unreadable (portal scene) and force-disabled in FinalizeSettings — don't offer the toggle.
-    mOptions[RSK_MASK_SHOP_HINT].Hide();
+    if (Combo_IsCombinedGame())
+        mOptions[RSK_MASK_SHOP_HINT].Hide();
 #endif
     // TODO: Compasses show rewards/woth, maps show dungeon mode
     OPT_BOOL(RSK_BLUE_FIRE_ARROWS, CVAR_RANDOMIZER_SETTING("BlueFireArrows"));
@@ -3095,43 +3096,45 @@ void Settings::UpdateAllOptions() {
 void Context::FinalizeSettings(const std::set<RandomizerCheck>& excludedLocations,
                                const std::set<RandomizerTrick>& enabledTricks) {
 #ifdef COMBO_BUILD
-    // ComboShip: the Happy Mask Shop scene is the OOT->MM portal and never runs, so its hint can never
-    // be read — leaving it on would silently burn a hint.
-    mOptions[RSK_MASK_SHOP_HINT].Set(RO_GENERIC_OFF);
-    // ComboShip (#136): the launcher owns the goal. Hunt maps to the native Triforce wincon (keeps the
-    // Ganon-skip and parks RG_TRIFORCE on the dump-excluded RC_WINCON); pieces must go anywhere.
-    mOptions[RSK_WINCON].Set(gComboGoalHunt ? RO_WINCON_TRIFORCE_PIECES : RO_WINCON_DEFEAT_GANON);
-    mOptions[RSK_TRIFORCE_HUNT_PIECES_LOCATION].Set(RO_TRIFORCE_HUNT_LOCATION_ANYWHERE);
-    // ComboShip (#136): the goal is combined, so the per-game triforce UI (kaleido, item tracker,
-    // altar hint) must show the COMBINED required count, not OOT's share. Safe to force: the native
-    // win trigger is COMBO_BUILD'd out (hook_handlers.cpp) and this only otherwise gates RC_WINCON,
-    // which the combo dump excludes.
-    mOptions[RSK_WINCON_TRIFORCE_COUNT].Set((uint8_t)gComboGoalRequired);
-    // OOT's half of the combined total (0 when the hunt is off, so a stale slider value can't leak
-    // pieces into a both-bosses pool). -1 = old seed, leave the slider alone.
-    if (gComboGoalPieces >= 0) {
-        const uint8_t ootPieces = gComboGoalHunt ? (uint8_t)gComboGoalPieces : (uint8_t)0;
-        mOptions[RSK_TRIFORCE_HUNT_PIECES_TOTAL].Set(ootPieces);
-        // The forced total bypasses RSK_TRIFORCE_HUNT_PIECES_TOTAL's callback, so mirror its clamp:
-        // these triggers count OOT-LOCAL pieces, and asking for more than OOT's pool holds is unwinnable.
-        for (const RandomizerSettingKey key :
-             { RSK_RAINBOW_BRIDGE_TRIFORCE_COUNT, RSK_GBK_TRIFORCE_COUNT, RSK_GANONS_SOUL_TRIFORCE_COUNT }) {
-            if (mOptions[key].Get() > ootPieces) {
-                mOptions[key].Set(ootPieces);
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: the Happy Mask Shop scene is the OOT->MM portal and never runs, so its hint can never
+        // be read — leaving it on would silently burn a hint.
+        mOptions[RSK_MASK_SHOP_HINT].Set(RO_GENERIC_OFF);
+        // ComboShip (#136): the launcher owns the goal. Hunt maps to the native Triforce wincon (keeps the
+        // Ganon-skip and parks RG_TRIFORCE on the dump-excluded RC_WINCON); pieces must go anywhere.
+        mOptions[RSK_WINCON].Set(gComboGoalHunt ? RO_WINCON_TRIFORCE_PIECES : RO_WINCON_DEFEAT_GANON);
+        mOptions[RSK_TRIFORCE_HUNT_PIECES_LOCATION].Set(RO_TRIFORCE_HUNT_LOCATION_ANYWHERE);
+        // ComboShip (#136): the goal is combined, so the per-game triforce UI (kaleido, item tracker,
+        // altar hint) must show the COMBINED required count, not OOT's share. Safe to force: the native
+        // win trigger is COMBO_BUILD'd out (hook_handlers.cpp) and this only otherwise gates RC_WINCON,
+        // which the combo dump excludes.
+        mOptions[RSK_WINCON_TRIFORCE_COUNT].Set((uint8_t)gComboGoalRequired);
+        // OOT's half of the combined total (0 when the hunt is off, so a stale slider value can't leak
+        // pieces into a both-bosses pool). -1 = old seed, leave the slider alone.
+        if (gComboGoalPieces >= 0) {
+            const uint8_t ootPieces = gComboGoalHunt ? (uint8_t)gComboGoalPieces : (uint8_t)0;
+            mOptions[RSK_TRIFORCE_HUNT_PIECES_TOTAL].Set(ootPieces);
+            // The forced total bypasses RSK_TRIFORCE_HUNT_PIECES_TOTAL's callback, so mirror its clamp:
+            // these triggers count OOT-LOCAL pieces, and asking for more than OOT's pool holds is unwinnable.
+            for (const RandomizerSettingKey key :
+                 { RSK_RAINBOW_BRIDGE_TRIFORCE_COUNT, RSK_GBK_TRIFORCE_COUNT, RSK_GANONS_SOUL_TRIFORCE_COUNT }) {
+                if (mOptions[key].Get() > ootPieces) {
+                    mOptions[key].Set(ootPieces);
+                }
             }
         }
-    }
-    // ComboShip (#135): an MM start must leave OOT enterable from nothing — the Clock Tower door lands
-    // an itemless child outside the Mask Shop, and an itemless child must be able to leave the forest.
-    if (gComboStartingGameMM) {
-        mOptions[RSK_STARTING_AGE].Set(RO_AGE_CHILD);
-        if (mOptions[RSK_FOREST].Is(RO_CLOSED_FOREST_ON)) {
-            mOptions[RSK_FOREST].Set(RO_CLOSED_FOREST_DEKU_ONLY);
+        // ComboShip (#135): an MM start must leave OOT enterable from nothing — the Clock Tower door lands
+        // an itemless child outside the Mask Shop, and an itemless child must be able to leave the forest.
+        if (gComboStartingGameMM) {
+            mOptions[RSK_STARTING_AGE].Set(RO_AGE_CHILD);
+            if (mOptions[RSK_FOREST].Is(RO_CLOSED_FOREST_ON)) {
+                mOptions[RSK_FOREST].Set(RO_CLOSED_FOREST_DEKU_ONLY);
+            }
         }
-    }
-    // ComboShip: Shared Wallets has no MM equivalent for Child Wallet, so force it off (see deviations/rando.md).
-    if (gComboSharedMask & (1 << ComboRando::SF_WALLET)) {
-        mOptions[RSK_SHUFFLE_CHILD_WALLET].Set(RO_GENERIC_OFF);
+        // ComboShip: Shared Wallets has no MM equivalent for Child Wallet, so force it off (see deviations/rando.md).
+        if (gComboSharedMask & (1 << ComboRando::SF_WALLET)) {
+            mOptions[RSK_SHUFFLE_CHILD_WALLET].Set(RO_GENERIC_OFF);
+        }
     }
 #endif
     // ComboShip: (#133/#134) sub-options are meaningless without their parents
@@ -3140,7 +3143,7 @@ void Context::FinalizeSettings(const std::set<RandomizerCheck>& excludedLocation
     }
 #ifdef COMBO_BUILD
     // ComboShip (#135): an MM start must not leave the portal's own key behind the portal.
-    else if (gComboStartingGameMM) {
+    else if (Combo_IsCombinedGame() && gComboStartingGameMM) {
         mOptions[RSK_EXCLUDE_MASK_SHOP_KEY].Set(RO_GENERIC_ON);
     }
 #endif
@@ -3149,7 +3152,7 @@ void Context::FinalizeSettings(const std::set<RandomizerCheck>& excludedLocation
     }
 #ifdef COMBO_BUILD
     // ComboShip (#135): keep the Mask Shop entrance where the MM-start return route expects it.
-    else if (gComboStartingGameMM) {
+    else if (Combo_IsCombinedGame() && gComboStartingGameMM) {
         mOptions[RSK_EXCLUDE_MASK_SHOP_ENTRANCE].Set(RO_GENERIC_ON);
     }
 #endif
@@ -3164,15 +3167,28 @@ void Context::FinalizeSettings(const std::set<RandomizerCheck>& excludedLocation
         mOptions[RSK_STARTING_AGE].Set(RO_AGE_CHILD);
     }
 
+    // Replaying a Combo seed retains the archive capabilities it originally
+    // normalized against, including the RNG consumed before trials/keyrings.
+#ifdef COMBO_BUILD
+    const int questAssets =
+        Combo_IsCombinedGame()
+            ? Combo_SOH_GenerationQuestAssets()
+            : ((OTRGlobals::Instance->HasOriginal() ? 1 : 0) | (OTRGlobals::Instance->HasMasterQuest() ? 2 : 0));
+    const bool hasOriginal = (questAssets & 1) != 0;
+    const bool hasMasterQuest = (questAssets & 2) != 0;
+#else
+    const bool hasOriginal = OTRGlobals::Instance->HasOriginal();
+    const bool hasMasterQuest = OTRGlobals::Instance->HasMasterQuest();
+#endif
     // If we only have MQ, set all dungeons to MQ
-    if (OTRGlobals::Instance->HasMasterQuest() && !OTRGlobals::Instance->HasOriginal()) {
+    if (hasMasterQuest && !hasOriginal) {
         mOptions[RSK_MQ_DUNGEON_RANDOM].Set(RO_MQ_DUNGEONS_SET_NUMBER);
         mOptions[RSK_MQ_DUNGEON_COUNT].Set(MAX_MQ_DUNGEON_COUNT);
         mOptions[RSK_MQ_DUNGEON_SET].Set(RO_GENERIC_OFF);
     }
 
     // If we don't have MQ, set all dungeons to Vanilla
-    if (OTRGlobals::Instance->HasOriginal() && !OTRGlobals::Instance->HasMasterQuest()) {
+    if (hasOriginal && !hasMasterQuest) {
         mOptions[RSK_MQ_DUNGEON_RANDOM].Set(RO_MQ_DUNGEONS_NONE);
     }
 

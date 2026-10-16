@@ -227,9 +227,11 @@ void FindReachableRegions(RandoRegionId currentRegion, std::set<RandoRegionId>& 
 
         s32 destination = exitId;
 #ifdef COMBO_BUILD
-        destination = Combo_MM_CrossDungeonEntranceFromRegion(exitId, currentRegion);
-        if (destination < 0)
-            continue;
+        if (Combo_IsCombinedGame()) {
+            destination = Combo_MM_CrossDungeonEntranceFromRegion(exitId, currentRegion);
+            if (destination < 0)
+                continue;
+        }
 #endif
         RandoRegionId connectedRegionId = GetRegionIdFromEntrance(destination);
         if (connectedRegionId != RR_MAX && regionExit.condition()) {

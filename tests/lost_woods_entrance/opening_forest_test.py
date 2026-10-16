@@ -31,7 +31,7 @@ def build(game, source, name):
     with tempfile.TemporaryDirectory(prefix='opening-forest-' + name + '-') as directory:
         cpp = Path(directory) / 'test.cpp'
         binary = Path(directory) / 'test'
-        cpp.write_text(source)
+        cpp.write_text('#include "ComboGameMode.h"\nextern "C" { int gComboGameMode = COMBO_GAME_BOTH; }\n' + source)
         includes = [game, game + ('/2s2h' if game == 'mm' else '/soh'), game + '/include',
                     game + '/include/PR', game + '/src', game + '/assets', 'libultraship/include', 'combo']
         command = [os.environ.get('CXX', 'c++'), '-std=c++20', '-w', '-DF3DEX_GBI_2',
@@ -66,6 +66,8 @@ int main() {
         MM_SetComboEntryIsResume(0);
         MM_SetComboPortalRoute(2);
         Setup_InitImpl(&state);
+        require(queuedCameraRoute == COMBO_PORTAL_OPENING_FOREST && queuedCameraCount == slot + 1,
+                "opening forest must queue one camera presentation after the matching save load");
         require(gSaveContext.save.entrance == ENTRANCE(LOST_WOODS, 0),
                 "Fairy tunnel must load the playable opening forest, never the title or first-cycle intro");
         require(gSaveContext.fileNum == slot && gSaveContext.save.day == 2 &&
@@ -305,26 +307,49 @@ int main() {
     gSaveContext.gameMode=GAMEMODE_NORMAL; gSaveContext.fileNum=0;
     gSaveContext.save.entrance=ENTRANCE(LOST_WOODS,0);
     const auto progress=gSaveContext.save;
-    require(MMWeather_SeasonForPlay(&play)==-1,"the native prologue skybox must retain its weather policy");
+    require(MMWeather_SeasonForPlay(&play)==SEASON_WINTER,
+            "playable Lost Woods must receive Rod weather with its actual SKYBOX_2");
     require(MMWeather_FoliageSeasonForPlay(&play)==SEASON_WINTER,
             "playable intro forest foliage must receive the selected season with its actual SKYBOX_2");
+    play.roomCtx.curRoom.num=2;
+    require(MMWeather_SeasonForPlay(&play)==-1,"the title-only room must retain native weather");
     for (int room : {0,1}) for (int selected=0;selected<SEASON_COUNT;++selected) {
         play.roomCtx.curRoom.num=room; manual=selected;
         require(MMWeather_FoliageSeasonForPlay(&play)==selected,"both playable rooms must follow manual seasons");
-        require(MMWeather_SeasonForPlay(&play)==-1,"foliage eligibility must not enable an outdoor weather override");
+        require(MMWeather_SeasonForPlay(&play)==selected,"both playable rooms must receive seasonal weather");
     }
+    play.roomCtx.curRoom.num=0;
     manual=-1;
+    require(MMWeather_SeasonForPlay(&play)==-1,"Native/Off must bypass seasonal weather");
     require(MMWeather_FoliageSeasonForPlay(&play)==-1,"Native/Off must bypass the foliage treatment");
     manual=-2; gSaveContext.sceneLayer=1;
+    require(MMWeather_SeasonForPlay(&play)==-1,"the real intro/flashback weather must remain native");
     require(MMWeather_FoliageSeasonForPlay(&play)==-1,"the real intro/flashback layer must remain native");
     gSaveContext.sceneLayer=0; play.csCtx.state=1;
+    require(MMWeather_SeasonForPlay(&play)==-1,"cutscenes must retain native weather");
     require(MMWeather_FoliageSeasonForPlay(&play)==-1,"cutscene presentation must retain priority");
     play.csCtx.state=0; camera.stateFlags=CAM_STATE_UNDERWATER;
+    require(MMWeather_SeasonForPlay(&play)==-1,"underwater weather must remain native");
     require(MMWeather_FoliageSeasonForPlay(&play)==-1,"underwater presentation must retain priority");
-    camera.stateFlags=0; play.sceneId=SCENE_SONCHONOIE;
+    camera.stateFlags=0; play.envCtx.lightSettingOverride=1;
+    require(MMWeather_SeasonForPlay(&play)==-1,"story lighting must retain priority");
+    play.envCtx.lightSettingOverride=LIGHT_SETTING_OVERRIDE_NONE; play.envCtx.customSkyboxFilter=true;
+    require(MMWeather_SeasonForPlay(&play)==-1,"story sky filters must retain priority");
+    play.envCtx.customSkyboxFilter=false; play.envCtx.skyboxDisabled=true;
+    require(MMWeather_SeasonForPlay(&play)==-1,"disabled skies must retain priority");
+    play.envCtx.skyboxDisabled=false; play.gameOverCtx.state=GAMEOVER_DEATH_START;
+    require(MMWeather_SeasonForPlay(&play)==-1,"game-over must retain priority");
+    play.gameOverCtx.state=GAMEOVER_INACTIVE; gSaveContext.fileNum=0xFF;
+    require(MMWeather_SeasonForPlay(&play)==-1,"non-gameplay slots must retain native weather");
+    gSaveContext.fileNum=0; gSaveContext.save.entrance=ENTRANCE(LOST_WOODS,1);
+    require(MMWeather_SeasonForPlay(&play)==-1,"native prologue spawns must retain native weather");
+    gSaveContext.save.entrance=ENTRANCE(LOST_WOODS,0); gSaveContext.save.cutsceneIndex=1;
+    require(MMWeather_SeasonForPlay(&play)==-1,"saved cutscenes must retain native weather");
+    gSaveContext.save.cutsceneIndex=0; play.sceneId=SCENE_SONCHONOIE;
+    require(MMWeather_SeasonForPlay(&play)==-1,"other SKYBOX_2 interiors must remain ineligible");
     require(MMWeather_FoliageSeasonForPlay(&play)==-1,"other interiors must remain ineligible");
     require(memcmp(&progress,&gSaveContext.save,sizeof(progress))==0,"presentation selection must not mutate progression");
-    std::puts("PASS opening forest: actual prologue skybox receives foliage seasons; weather/story/interior/save policy preserved");
+    std::puts("PASS opening forest: Rod/manual weather and foliage in both rooms; story/interior/save policy preserved");
 }
 '''
     source = source.replace('#include <cstdio>', '#include <cstdio>\n#include <initializer_list>')

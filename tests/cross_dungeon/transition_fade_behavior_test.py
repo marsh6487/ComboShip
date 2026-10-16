@@ -417,6 +417,8 @@ static void* Combo_ResolveSym(const char*,const char* name) {
     runtime = (ROOT / 'combo/rando' / ('CrossDungeonOotRuntime.inc.h' if is_oot else
                                       'CrossDungeonMmRuntime.inc.h')).read_text()
     body = r'''
+#include "ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include "rando/CrossDungeonRuntime.h"
 #define SPDLOG_ERROR(...) ((void)0)
 #define SPDLOG_INFO(...) ((void)0)
@@ -481,7 +483,7 @@ FRAME_ORDER
     else:
         host = (ROOT / 'mm/2s2h/BenPort.cpp').read_text()
         begin = host.index('    // Reverse MM->OOT trigger:')
-        end = host.index('    // Shared Items: per-frame drain seam.', begin)
+        end = host.index('    } // Combo-only handoff hooks:', begin)
         state_begin = host.index('static bool sComboReturnPending = false;')
         state_end = host.index('// MM\'s own ResourceManager', state_begin)
         text = text.replace('/* RETURN_STATE */', host[state_begin:state_end])

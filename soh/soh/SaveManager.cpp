@@ -1,3 +1,4 @@
+#include "../../combo/ComboGameMode.h"
 #include "../../combo/menu/ItemGrantAuditBridge.h"
 #include <ship/Context.h>
 #include <fstream>
@@ -158,8 +159,17 @@ void SaveManager::ReadSaveFile(std::filesystem::path savePath, uintptr_t addr, v
     saveFile.close();
 }
 
+static std::filesystem::path GetNativeSaveDirectory() {
+#ifdef COMBO_BUILD
+    if (!Combo_IsCombinedGame()) {
+        return Ship::Context::GetPathRelativeToAppDirectory("saves/oot");
+    }
+#endif
+    return Ship::Context::GetPathRelativeToAppDirectory("Save");
+}
+
 std::filesystem::path SaveManager::GetFileName(int fileNum) {
-    const std::filesystem::path sSavePath(Ship::Context::GetPathRelativeToAppDirectory("Save"));
+    const std::filesystem::path sSavePath = GetNativeSaveDirectory();
     return sSavePath / ("file" + std::to_string(fileNum + 1) + ".sav");
 }
 
@@ -650,18 +660,22 @@ void SaveManager::SaveRandomizer(const SaveContext& saveContext, int sectionID, 
 void SaveManager::Init() {
     // Wait on saves that snuck through the Wait in OnExitGame
     ThreadPoolWait();
-    const std::filesystem::path sSavePath(Ship::Context::GetPathRelativeToAppDirectory("Save"));
+    const std::filesystem::path sSavePath = GetNativeSaveDirectory();
     const std::filesystem::path sGlobalPath = sSavePath / std::string("global.sav");
     auto sOldSavePath = Ship::Context::GetPathRelativeToAppDirectory("oot_save.sav");
     auto sOldBackupSavePath = Ship::Context::GetPathRelativeToAppDirectory("oot_save.bak");
 
     // If the save directory does not exist, create it
     if (!std::filesystem::exists(sSavePath)) {
-        std::filesystem::create_directory(sSavePath);
+        std::filesystem::create_directories(sSavePath);
     }
 
     // If there is a lingering unversioned save, convert it
-    if (std::filesystem::exists(sOldSavePath)) {
+    if (
+#ifdef COMBO_BUILD
+        Combo_IsCombinedGame() &&
+#endif
+        std::filesystem::exists(sOldSavePath)) {
         ConvertFromUnversioned();
         std::filesystem::rename(sOldSavePath, sOldBackupSavePath);
     }
@@ -699,7 +713,7 @@ void SaveManager::Init() {
     for (int fileNum = 0; fileNum < MaxFiles; fileNum++) {
 #ifdef COMBO_BUILD
         // ComboShip: a slot exists when the container has a non-empty OOT section.
-        if (gComboReadGameSave) {
+        if (Combo_IsCombinedGame() && gComboReadGameSave) {
             if (gComboReadGameSave(ComboRando::GAME_OOT, fileNum)[0] != '\0') {
                 StartupCheckAndInitMeta(fileNum);
             }
@@ -725,7 +739,7 @@ void SaveManager::StartupCheckAndInitMeta(int fileNum) {
     std::filesystem::path fileName = GetFileName(fileNum);
 #ifdef COMBO_BUILD
     // ComboShip: metadata comes from the container's OOT section, not file{N}.sav.
-    const bool comboSrc = (gComboReadGameSave != nullptr);
+    const bool comboSrc = (Combo_IsCombinedGame() && gComboReadGameSave != nullptr);
     std::string comboMeta;
     if (comboSrc) {
         std::lock_guard<std::mutex> guard(saveMtx);
@@ -812,7 +826,7 @@ void SaveManager::StartupCheckAndInitMeta(int fileNum) {
 #endif
             ) {
                 std::string newFileName =
-                    Ship::Context::GetPathRelativeToAppDirectory("Save") +
+                    GetNativeSaveDirectory().string() +
                     ("/file" + std::to_string(fileNum + 1) + "-" + std::to_string(GetUnixTimestamp()) + ".bak");
 #if defined(__SWITCH__) || defined(__WIIU__)
                 copy_file(fileName.c_str(), newFileName.c_str());
@@ -1475,7 +1489,7 @@ void SaveManager::SaveFileThreaded(int fileNum, const SaveContext& saveContext, 
 #ifdef COMBO_BUILD
     saveBlock["crossDungeonCheckpoint"] = Combo_SOH_SaveCrossDungeonCheckpoint();
     saveBlock["crossDungeonPendingChecks"] = Combo_SOH_SavePendingChecks();
-    if (gComboWriteGameSave) {
+    if (Combo_IsCombinedGame() && gComboWriteGameSave) {
         // ComboShip: route this slot's OOT block into the merged .combosav container (launcher RMW).
         gComboWriteGameSave(ComboRando::GAME_OOT, fileNum, saveBlock.dump().c_str());
     } else
@@ -1607,7 +1621,7 @@ void SaveManager::SaveGlobal() {
     globalBlock["zTargetSetting"] = gSaveContext.zTargetSetting;
     globalBlock["language"] = gSaveContext.language;
 
-    const std::filesystem::path sSavePath(Ship::Context::GetPathRelativeToAppDirectory("Save"));
+    const std::filesystem::path sSavePath = GetNativeSaveDirectory();
     const std::filesystem::path sGlobalPath = sSavePath / std::string("global.sav");
 
     WriteFileSafely(sGlobalPath, globalBlock.dump(1));
@@ -1625,7 +1639,7 @@ void SaveManager::LoadFile(int fileNum) {
 #ifdef COMBO_BUILD
     // ComboShip: source the OOT block from the merged container; empty => no save present.
     std::string comboJson;
-    if (gComboReadGameSave) {
+    if (Combo_IsCombinedGame() && gComboReadGameSave) {
         comboJson = gComboReadGameSave(ComboRando::GAME_OOT, fileNum);
         if (comboJson.empty()) {
             return;
@@ -1640,7 +1654,7 @@ void SaveManager::LoadFile(int fileNum) {
     try {
         saveBlock = nlohmann::json::object();
 #ifdef COMBO_BUILD
-        if (gComboReadGameSave) {
+        if (Combo_IsCombinedGame() && gComboReadGameSave) {
             saveBlock = nlohmann::json::parse(comboJson);
         } else
 #endif
@@ -1707,9 +1721,8 @@ void SaveManager::LoadFile(int fileNum) {
         GameInteractor::Instance->ExecuteHooks<GameInteractor::OnLoadFile>(fileNum);
     } catch ([[maybe_unused]] const std::exception& e) {
         input.close();
-        std::string newFileName =
-            Ship::Context::GetPathRelativeToAppDirectory("Save") +
-            ("/file" + std::to_string(fileNum + 1) + "-" + std::to_string(GetUnixTimestamp()) + ".bak");
+        std::string newFileName = GetNativeSaveDirectory().string() + ("/file" + std::to_string(fileNum + 1) + "-" +
+                                                                       std::to_string(GetUnixTimestamp()) + ".bak");
         // ComboShip: on the container path there is no file{N}.sav to evict; skip the rename.
         if (std::filesystem::exists(fileName)) {
 #if defined(__SWITCH__) || defined(__WIIU__)
@@ -2824,7 +2837,7 @@ void SaveManager::LoadStruct(const std::string& name, LoadStructFunc func) {
 void SaveManager::CopyZeldaFile(int from, int to) {
 #ifdef COMBO_BUILD
     // ComboShip: a slot is one .combosav (both games + rando); the launcher copies the whole container.
-    if (gComboCopyContainer) {
+    if (Combo_IsCombinedGame() && gComboCopyContainer) {
         gComboCopyContainer(from, to);
         fileMetaInfo[to] = fileMetaInfo[from];
         return;
@@ -3235,7 +3248,7 @@ extern "C" void Save_LoadFile(void) {
     SaveManager::Instance->ThreadPoolWait();
     // Missing OOT block: LoadFile would return early AFTER the reset, leaving an all-unchecked
     // context that the next save persists. Keep the current context instead.
-    if (gComboReadGameSave) {
+    if (Combo_IsCombinedGame() && gComboReadGameSave) {
         const char* comboJson = gComboReadGameSave(ComboRando::GAME_OOT, gSaveContext.fileNum);
         if (comboJson == nullptr || comboJson[0] == '\0') {
             SPDLOG_ERROR("Save_LoadFile: no OOT save block for slot {} - keeping current rando context",
@@ -3298,7 +3311,7 @@ extern "C" void Save_DeleteFile(int fileNum) {
 #ifdef COMBO_BUILD
     // ComboShip (issue #1): erasing this OOT slot also wipes MM's save for the slot. Sole caller is
     // the erase menu (z_file_copy_erase.c), NOT CopyZeldaFile, so copy never triggers a cross-delete.
-    if (gComboDeleteForeignSave) {
+    if (Combo_IsCombinedGame() && gComboDeleteForeignSave) {
         gComboDeleteForeignSave(fileNum);
     }
 #endif

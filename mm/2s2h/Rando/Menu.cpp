@@ -594,34 +594,34 @@ static void DrawGeneralTab() {
         "Explore the menus for various enhancements and time savers; most are not enabled by default in Rando.");
     ImGui::PopStyleColor();
 
-#ifndef COMBO_BUILD // ComboShip: combo drives generation, so hide the per-game Seed Generation section.
-    ImGui::SeparatorText("Seed Generation");
-    UIWidgets::CVarCheckbox("Enable Rando (Randomizes new files upon creation)", "gRando.Enabled");
+    if (!Combo_IsCombinedGame()) {
+        ImGui::SeparatorText("Seed Generation");
+        UIWidgets::CVarCheckbox("Enable Rando (Randomizes new files upon creation)", "gRando.Enabled");
 
-    if (UIWidgets::CVarCombobox("Seed", "gRando.SpoilerFileIndex", Rando::Spoiler::spoilerOptions)) {
-        Rando::Spoiler::SelectSpoiler(CVarGetInteger("gRando.SpoilerFileIndex", 0));
-    }
-
-    if (CVarGetInteger("gRando.SpoilerFileIndex", 0) == 0) {
-        UIWidgets::PushStyleSlider();
-        static char seed[256];
-        std::string stringSeed = CVarGetString("gRando.InputSeed", "");
-        strcpy(seed, stringSeed.c_str());
-        ImGui::InputText("##Seed", seed, sizeof(seed), ImGuiInputTextFlags_CallbackAlways,
-                         [](ImGuiInputTextCallbackData* data) {
-                             CVarSetString("gRando.InputSeed", data->Buf);
-                             return 0;
-                         });
-        if (stringSeed.length() < 1) {
-            ImGui::SameLine(17.0f);
-            ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.4f), "Leave blank for random seed");
+        if (UIWidgets::CVarCombobox("Seed", "gRando.SpoilerFileIndex", Rando::Spoiler::spoilerOptions)) {
+            Rando::Spoiler::SelectSpoiler(CVarGetInteger("gRando.SpoilerFileIndex", 0));
         }
-        UIWidgets::PopStyleSlider();
 
-        UIWidgets::CVarCheckbox("Generate Spoiler File", "gRando.GenerateSpoiler",
-                                CheckboxOptions().DefaultValue(true));
+        if (CVarGetInteger("gRando.SpoilerFileIndex", 0) == 0) {
+            UIWidgets::PushStyleSlider();
+            static char seed[256];
+            std::string stringSeed = CVarGetString("gRando.InputSeed", "");
+            strcpy(seed, stringSeed.c_str());
+            ImGui::InputText("##Seed", seed, sizeof(seed), ImGuiInputTextFlags_CallbackAlways,
+                             [](ImGuiInputTextCallbackData* data) {
+                                 CVarSetString("gRando.InputSeed", data->Buf);
+                                 return 0;
+                             });
+            if (stringSeed.length() < 1) {
+                ImGui::SameLine(17.0f);
+                ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.4f), "Leave blank for random seed");
+            }
+            UIWidgets::PopStyleSlider();
+
+            UIWidgets::CVarCheckbox("Generate Spoiler File", "gRando.GenerateSpoiler",
+                                    CheckboxOptions().DefaultValue(true));
+        }
     }
-#endif
 
     ImGui::SeparatorText("Seed Health");
     DrawSeedHealthStrip();
@@ -1179,35 +1179,36 @@ static void DrawItemPoolTab() {
     }
     UIWidgets::EndCard();
 
-#ifndef COMBO_BUILD // ComboShip (#136): combo owns the hunt toggle plus the combined required/total counts.
-    UIWidgets::BeginCard("itemPoolGoals");
-    ImGui::SeparatorText("Goals & Collectibles");
-    CVarCheckbox("Triforce Hunt", Rando::StaticData::Options[RO_SHUFFLE_TRIFORCE_PIECES].cvar,
-                 CheckboxOptions({ { .tooltip = "Scatters Triforce pieces into the item pool. Collect the required "
-                                                "amount to complete the hunt." } }));
-    if (CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_TRIFORCE_PIECES].cvar, RO_GENERIC_OFF)) {
-        CVarSliderInt("Required Triforce Pieces", Rando::StaticData::Options[RO_TRIFORCE_PIECES_REQUIRED].cvar,
-                      IntSliderOptions()
-                          .Format("%d Pieces Required")
-                          .LabelPosition(UIWidgets::LabelPosition::None)
-                          .Min(1)
-                          .Max(CVarGetInteger(Rando::StaticData::Options[RO_TRIFORCE_PIECES_MAX].cvar,
-                                              DEFAULT_TRIFORCE_PIECES_MAX))
-                          .DefaultValue(DEFAULT_TRIFORCE_PIECES_MAX));
-        if (CVarSliderInt("Shuffled Triforce Pieces", Rando::StaticData::Options[RO_TRIFORCE_PIECES_MAX].cvar,
+    if (!Combo_IsCombinedGame()) {
+        UIWidgets::BeginCard("itemPoolGoals");
+        ImGui::SeparatorText("Goals & Collectibles");
+        CVarCheckbox("Triforce Hunt", Rando::StaticData::Options[RO_SHUFFLE_TRIFORCE_PIECES].cvar,
+                     CheckboxOptions({ { .tooltip = "Scatters Triforce pieces into the item pool. Collect the required "
+                                                    "amount to complete the hunt." } }));
+        if (CVarGetInteger(Rando::StaticData::Options[RO_SHUFFLE_TRIFORCE_PIECES].cvar, RO_GENERIC_OFF)) {
+            CVarSliderInt("Required Triforce Pieces", Rando::StaticData::Options[RO_TRIFORCE_PIECES_REQUIRED].cvar,
                           IntSliderOptions()
-                              .Format("%d Pieces in Pool")
+                              .Format("%d Pieces Required")
                               .LabelPosition(UIWidgets::LabelPosition::None)
                               .Min(1)
-                              .Max(1000)
-                              .DefaultValue(DEFAULT_TRIFORCE_PIECES_MAX)
-                              .Tooltip("If the maximum amount of placeable pieces exceeds what will allow the seed to "
-                                       "generate, the amount will be adjusted automatically."))) {
-            ClampRequiredToMax(RO_TRIFORCE_PIECES_REQUIRED, RO_TRIFORCE_PIECES_MAX, DEFAULT_TRIFORCE_PIECES_MAX);
+                              .Max(CVarGetInteger(Rando::StaticData::Options[RO_TRIFORCE_PIECES_MAX].cvar,
+                                                  DEFAULT_TRIFORCE_PIECES_MAX))
+                              .DefaultValue(DEFAULT_TRIFORCE_PIECES_MAX));
+            if (CVarSliderInt(
+                    "Shuffled Triforce Pieces", Rando::StaticData::Options[RO_TRIFORCE_PIECES_MAX].cvar,
+                    IntSliderOptions()
+                        .Format("%d Pieces in Pool")
+                        .LabelPosition(UIWidgets::LabelPosition::None)
+                        .Min(1)
+                        .Max(1000)
+                        .DefaultValue(DEFAULT_TRIFORCE_PIECES_MAX)
+                        .Tooltip("If the maximum amount of placeable pieces exceeds what will allow the seed to "
+                                 "generate, the amount will be adjusted automatically."))) {
+                ClampRequiredToMax(RO_TRIFORCE_PIECES_REQUIRED, RO_TRIFORCE_PIECES_MAX, DEFAULT_TRIFORCE_PIECES_MAX);
+            }
         }
+        UIWidgets::EndCard();
     }
-    UIWidgets::EndCard();
-#endif
 
     UIWidgets::BeginCard("itemPoolDungeonItems");
     ImGui::SeparatorText("Dungeon Items");
@@ -1841,6 +1842,14 @@ static void DrawHintsTab() {
     f32 columnWidth = ImGui::GetContentRegionAvail().x / 3 - (ImGui::GetStyle().ItemSpacing.x * 2);
     f32 halfHeight = ImGui::GetContentRegionAvail().y / 2 - (ImGui::GetStyle().ItemSpacing.y * 2);
     ImGui::BeginChild("randoHintsColumn1", ImVec2(columnWidth, 0));
+    if (!Combo_IsCombinedGame()) {
+        CVarCheckbox("Maps and Compasses Give Information",
+                     Rando::StaticData::Options[RO_MAPS_COMPASSES_GIVE_INFORMATION].cvar,
+                     CheckboxOptions(
+                         { { .tooltip = "Compasses reveal the saved boss reward. Maps describe the dungeon entrance. "
+                                        "Read the information on collection or with C-Up on an owned Map or Compass. "
+                                        "This rule is saved with the next generated seed." } }));
+    }
     CVarCheckbox(
         "Spider House", Rando::StaticData::Options[RO_HINTS_SPIDER_HOUSES].cvar,
         CheckboxOptions(

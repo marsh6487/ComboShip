@@ -25,9 +25,12 @@ types=(ROOT/'soh/soh/Enhancements/randomizer/entrance.h').read_text()
 entrance_enum=re.search(r'enum class EntranceType \{.*?\};',types,re.S).group()
 link_info=re.search(r'typedef struct \{\n    EntranceType type;.*?\} EntranceLinkInfo;',types,re.S).group()
 source='''
+#include "ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include "global.h"
 #include "soh/Enhancements/randomizer/randomizerTypes.h"
 #include "rando/CrossDungeonCatalogue.h"
+#include "rando/CrossEntranceOotShops.h"
 #include "rando/CrossDungeonState.h"
 #include "rando/CrossDungeonRuntime.h"
 #include <cassert>
@@ -45,9 +48,10 @@ int CVarGetInteger(const char* key,int fallback) { auto it=liveSettings.find(key
 using namespace ComboCrossOot;
 using namespace ComboRando::CrossDungeon;
 int main() {
-    PoolOptions options;
-    // Both narrow controls alone must select only real doors, not open passages.
+    PoolOptions options;options.legacyInteriors=true;
+    // Legacy v3 catalogue replay: both narrow controls alone must select only real doors, not open passages.
     auto narrowOptions=ParseOptions({{"dungeons",false},{"shops",true},{"doorInteriors",true}});
+    narrowOptions.legacyInteriors=true;
     auto narrow=nlohmann::json::parse(CatalogueJson(false,{},narrowOptions));
     const std::set<int> shopDoors={ENTR_BAZAAR_0,ENTR_BAZAAR_1,ENTR_POTION_SHOP_MARKET_0,
         ENTR_BOMBCHU_SHOP_1,ENTR_POTION_SHOP_GRANNY_0,ENTR_POTION_SHOP_KAKARIKO_FRONT,
@@ -71,9 +75,11 @@ int main() {
         ENTR_GREAT_FAIRYS_FOUNTAIN_MAGIC_DMT,ENTR_HAPPY_MASK_SHOP_0})
         for(const auto& d:narrow)assert(d.at("entrance").at("index")!=open);
     auto shopOptions=ParseOptions({{"dungeons",false},{"shops",true}});
+    shopOptions.legacyInteriors=true;
     auto shopOnly=nlohmann::json::parse(CatalogueJson(false,{},shopOptions));
     assert(shopOnly.size()==shopDoors.size());
     auto doorOptions=ParseOptions({{"dungeons",false},{"doorInteriors",true}});
+    doorOptions.legacyInteriors=true;
     assert(nlohmann::json::parse(CatalogueJson(false,{},doorOptions)).size()==otherDoors.size());
     // Compose with the native permutation before classifying physical ingress.
     // The open Kokiri passage leads natively to Bazaar; the Bazaar door leads to
@@ -112,7 +118,7 @@ int main() {
     auto ambiguous=nlohmann::json::parse(CatalogueJson(false,{{ENTR_KOKIRI_SHOP_0,ENTR_BAZAAR_0}},shopOptions));
     for(const auto& raw:ambiguous)assert(raw.at("entrance").at("index")!=ENTR_BAZAAR_0);
     auto broadOptions=narrowOptions;broadOptions.interiors=true;
-    PoolOptions legacyBroad;legacyBroad.dungeons=false;legacyBroad.interiors=true;
+    PoolOptions legacyBroad;legacyBroad.dungeons=false;legacyBroad.interiors=true;legacyBroad.legacyInteriors=true;
     assert(CatalogueJson(false,{},broadOptions)==CatalogueJson(false,{},legacyBroad));
     liveSettings["gCombo.Rando.CrossBossEntrances"]=1;
     liveSettings["gCombo.Rando.CrossInteriorEntrances"]=1;
@@ -204,7 +210,7 @@ int main() {
                    {ENTR_SHADOW_TEMPLE_BOSS_DOOR,ENTR_WATER_TEMPLE_BOSS_DOOR}},
                   7,4,ENTR_DEKU_TREE_ENTRANCE,ENTR_WATER_TEMPLE_BOSS_DOOR);
     // Native mixed/decoupled exits may resolve to the existing portal even though it is not a pool member.
-    options={};options.dungeons=false;options.interiors=true;
+    options={};options.legacyInteriors=true;options.dungeons=false;options.interiors=true;
     auto portalReturn=nlohmann::json::parse(CatalogueJson(false,{{first.exit.index,ENTR_HAPPY_MASK_SHOP_0}},options));
     std::vector<Dungeon> entries;std::vector<size_t> identity;
     bool resolvedPortal=false;

@@ -43,6 +43,8 @@ concrete_names = set(re.findall(r'"([^"\n]*)"',
     block((ROOT / 'mm/2s2h/Rando/ItemReceiptText.cpp').read_text(), 'const char* ConcreteReceiptName')))
 assert concrete_names <= donor_names, f'Unknown exact donor keys: {concrete_names - donor_names}'
 preamble = r'''
+#include "combo/ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -336,6 +338,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     subprocess.run([compiler, '-std=c++20', '-DCOMBO_BUILD', '-I', str(ROOT), *extra, str(tu), '-o', str(exe)], check=True)
     native_fallback, foreign_fallback = tmp / 'native-cape.bin', tmp / 'foreign-cape.bin'
     subprocess.run([str(exe), str(native_fallback), str(foreign_fallback)], check=True)
+
     subprocess.run([sys.executable, '-B', str(ROOT / 'tests/cape_choice/run_tests.py'),
                     '--queued-fallback', str(native_fallback), '--queued-fallback', str(foreign_fallback),
                     *(['--sanitize'] if '--sanitizers' in sys.argv else [])], check=True)
@@ -446,6 +449,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                                              block(pause_desc, 'const char* PauseItemDesc_GetMapInfo'))
     mmflags = ['-DCOMBO_BUILD', '-DMM_BUILD_DLL', '-DF3DEX_GBI_2', '-DCONTROLLERBUTTONS_T=uint32_t',
                '-DNON_EQUIVALENT', '-DNON_MATCHING']
+    mmflags += ['-I' + str(ROOT)]
     mmflags += ['-I' + str(ROOT / p) for p in ('mm/include', 'mm/include/PR', 'mm/src', 'mm', 'mm/2s2h',
                  'mm/assets', 'libultraship/include', 'libultraship/src', 'combo', 'combo/menu')]
     linked = tmp / 'catalog'
@@ -456,6 +460,8 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     if result.returncode:
         raise RuntimeError(result.stdout + result.stderr)
     subprocess.run([str(linked)], check=True)
+    if '--catalog-only' in sys.argv:
+        raise SystemExit(0)
 
     # Execute the actual exported donor builder, with the authored descriptions.
     donor = (ROOT / 'tests/item_receipts/donor_test.cpp').read_text()
@@ -563,6 +569,13 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                       'static std::string DungeonPhysicalEntranceName(int16_t entrance)',
                       'static std::string DungeonEntranceSource(int16_t dungeonEntrance)',
                       'static void AddDungeonRewardIcon(CustomMessage& msg, RandomizerCheck check)',
+                      *(['static RandomizerCheck PhysicalBossRewardCheck(int32_t boss)',
+                         'extern "C" COMBO_EXPORT int32_t OOT_GetDungeonBossIndex(int32_t entrance)',
+                         'extern "C" COMBO_EXPORT int32_t OOT_GetNativeBossHintTarget(int32_t dungeon, int32_t* entrance, int32_t* nextDungeon)',
+                         'extern "C" COMBO_EXPORT int32_t OOT_GetDungeonEntranceSourceName(int32_t entrance, char* buffer, uint32_t capacity)',
+                         'extern "C" COMBO_EXPORT int32_t OOT_GetPhysicalBossRewardName(int32_t boss, char* buffer, uint32_t capacity)',
+                         'extern "C" COMBO_EXPORT int32_t OOT_GetPhysicalBossRewardPresentation(int32_t boss, CwItemReceiptPresentation* out)']
+                        if 'PhysicalBossRewardCheck' in exported else []),
                       'bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received)',
                       'bool BuildTokenReceiptMessage(RandomizerGet rg, CustomMessage& msg)',
                       'extern "C" COMBO_EXPORT int32_t OOT_GetDungeonItemReceiptPresentation(const char* itemName, CwItemReceiptPresentation* out)',
@@ -613,7 +626,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     # Link the real donor export to the real MM native/foreign receipt routes.
     # Private engine fixtures remain separate, as the two DLLs are in-game.
     donor_library = tmp / 'libcompass_donor.so'
-    donor_private = ['-Dmain=OotFixtureTestMain', '-DgSaveContext=ootFixtureSaveContext',
+    donor_private = ['-DCOMPASS_DONOR_BRIDGE', '-Dmain=OotFixtureTestMain', '-DgSaveContext=ootFixtureSaveContext',
                      '-DgPlayState=ootFixturePlayState', '-DNei_Save=ootFixtureNeiSave',
                      '-DRando=OotFixtureRando', '-DCustomMessage=OotFixtureCustomMessage',
                      '-DComboRando=OotFixtureComboRando', '-DCombo_ResolveSym=OotFixtureResolveSym',

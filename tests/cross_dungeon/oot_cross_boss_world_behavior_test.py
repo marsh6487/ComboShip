@@ -18,6 +18,8 @@ names=sorted(set(re.findall(r'\b(?:ENTR_|SCENE_|RSK_|RO_|LOGIC_|RAND_INF_|EVENTC
 prefix='''#include <cassert>
 #include <cstdint>
 #define COMBO_BUILD 1
+#include "combo/ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include "combo/rando/CrossEntranceBoss.h"
 using u8=uint8_t;using s16=int16_t;
 '''+ 'enum {'+','.join(names)+'};\n'+r'''

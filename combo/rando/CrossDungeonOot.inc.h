@@ -1,6 +1,8 @@
 // Included by OTRGlobals.cpp after native oracle initialization helpers.
 #include "rando/CrossDungeonState.h"
+#include "ComboGameMode.h"
 #include "rando/CrossDungeonCatalogue.h"
+#include "rando/CrossEntranceOotShops.h"
 
 namespace ComboCrossOot {
 using namespace ComboRando::CrossDungeon;
@@ -104,7 +106,7 @@ struct SearchScope {
 
 extern "C" int Combo_SOH_CrossDungeonRegion(int index, int resolved, int fallback) {
     using namespace ComboCrossOot;
-    if (!searching)
+    if (!Combo_IsCombinedGame() || !searching)
         return fallback;
     const auto* route = state.Lookup(index, ResolveNativeIndex(index, resolved, nativeOverrides));
     if (!route)
@@ -117,18 +119,17 @@ extern "C" int Combo_SOH_CrossDungeonRegion(int index, int resolved, int fallbac
 
 namespace ComboCrossOot {
 // Native ingress identities, not destination scene names: alternate doors remain separate.
-// Open Kokiri houses/shops, mountain shops, tents, fairy caves and the Temple of Time
-// deliberately fall through. The existing Mask Shop portal is excluded by BaseCatalogue.
+// Retail membership is independent of the physical opening. Ordinary open houses,
+// tents, fairy caves and the Temple of Time remain Passage. The Mask Shop stays the portal.
 static InteriorKind InteriorKindForEntrance(int32_t entrance) {
+    if (IsOotRetailShopEntrance(entrance) && entrance != ENTR_KOKIRI_SHOP_0 && entrance != ENTR_GORON_SHOP_0 &&
+        entrance != ENTR_ZORA_SHOP_0)
+        return InteriorKind::ShopDoor;
     switch (entrance) {
-        case ENTR_BAZAAR_0:
-        case ENTR_BAZAAR_1:
-        case ENTR_POTION_SHOP_MARKET_0:
-        case ENTR_BOMBCHU_SHOP_1:
-        case ENTR_POTION_SHOP_GRANNY_0:
-        case ENTR_POTION_SHOP_KAKARIKO_FRONT:
-        case ENTR_POTION_SHOP_KAKARIKO_BACK:
-            return InteriorKind::ShopDoor;
+        case ENTR_KOKIRI_SHOP_0:
+        case ENTR_GORON_SHOP_0:
+        case ENTR_ZORA_SHOP_0:
+            return InteriorKind::ShopPassage;
         case ENTR_LAKESIDE_LABORATORY_0:
         case ENTR_FISHING_POND_0:
         case ENTR_MARKET_GUARD_HOUSE_0:
@@ -155,7 +156,7 @@ static std::vector<Dungeon> BaseCatalogue(bool includeGanon, const PoolOptions& 
                                           const std::map<int32_t, int32_t>& overrides) {
     std::vector<Dungeon> base;
     std::map<int32_t, InteriorKind> physicalKinds;
-    if (!options.interiors && (options.shops || options.doorInteriors)) {
+    if (!options.interiors && (options.doorInteriors || (options.legacyInteriors && options.shops))) {
         const auto record = [&](int32_t source, InteriorKind kind) {
             if (source < 0)
                 return;
@@ -171,7 +172,9 @@ static std::vector<Dungeon> BaseCatalogue(bool includeGanon, const PoolOptions& 
             const bool ingress =
                 pair.second.index >= 0 && source.index != ENTR_HAPPY_MASK_SHOP_0 &&
                 (source.type == Rando::EntranceType::Interior || source.type == Rando::EntranceType::SpecialInterior);
-            record(source.index, ingress ? InteriorKindForEntrance(source.index) : InteriorKind::Passage);
+            const auto kind = ingress ? InteriorKindForEntrance(source.index) : InteriorKind::Passage;
+            record(source.index,
+                   options.legacyInteriors && kind == InteriorKind::ShopPassage ? InteriorKind::Passage : kind);
             record(pair.second.index, InteriorKind::Passage);
         }
     }
@@ -185,8 +188,14 @@ static std::vector<Dungeon> BaseCatalogue(bool includeGanon, const PoolOptions& 
             pool = Pool::Dungeon;
         } else if (entry.type == Rando::EntranceType::Interior || entry.type == Rando::EntranceType::SpecialInterior) {
             const auto physical = physicalKinds.find(entry.index);
-            const auto selected =
-                InteriorPool(physical == physicalKinds.end() ? InteriorKind::Passage : physical->second, options);
+            auto kind = physical == physicalKinds.end() ? InteriorKind::Passage : physical->second;
+            if (!options.legacyInteriors) {
+                if (IsOotRetailShopEntrance(entry.index))
+                    kind = InteriorKindForEntrance(entry.index);
+                else if (kind == InteriorKind::ShopDoor || kind == InteriorKind::ShopPassage)
+                    kind = InteriorKind::Passage; // A recorded native shop source cannot make a house retail.
+            }
+            const auto selected = InteriorPool(kind, options);
             if (!selected)
                 continue;
             pool = *selected;
@@ -305,6 +314,8 @@ extern "C" COMBO_EXPORT const char* SOH_DumpCrossDungeonCatalogueForSeed(const c
 }
 
 extern "C" COMBO_EXPORT int SOH_SetCrossDungeonSeed(const char* raw) {
+    if (!Combo_IsCombinedGame())
+        return 0;
     using namespace ComboCrossOot;
     try {
         auto seed = nlohmann::json::parse(raw ? raw : "null");
@@ -371,19 +382,20 @@ extern "C" COMBO_EXPORT const char* SOH_GetCrossDungeonExits(void) {
 }
 
 extern "C" COMBO_EXPORT int SOH_ReadCrossDungeonCVar(void) {
-    return CVarGetInteger("gCombo.Rando.CrossDungeonEntrances", 0) != 0;
+    return Combo_IsCombinedGame() && CVarGetInteger("gCombo.Rando.CrossDungeonEntrances", 0) != 0;
 }
 
 extern "C" COMBO_EXPORT const char* SOH_ReadCrossEntranceOptions(void) {
     using namespace ComboRando::CrossDungeon;
     static std::string result;
     PoolOptions options;
-    options.dungeons = CVarGetInteger("gCombo.Rando.CrossDungeonEntrances", 0) != 0;
-    options.bosses = CVarGetInteger("gCombo.Rando.CrossBossEntrances", 0) != 0;
-    options.interiors = CVarGetInteger("gCombo.Rando.CrossInteriorEntrances", 0) != 0;
-    options.shops = CVarGetInteger("gCombo.Rando.CrossShopEntrances", 0) != 0;
-    options.doorInteriors = CVarGetInteger("gCombo.Rando.CrossDoorInteriorEntrances", 0) != 0;
-    options.grottos = CVarGetInteger("gCombo.Rando.CrossGrottoEntrances", 0) != 0;
+    const bool enabled = Combo_IsCombinedGame();
+    options.dungeons = enabled && CVarGetInteger("gCombo.Rando.CrossDungeonEntrances", 0) != 0;
+    options.bosses = enabled && CVarGetInteger("gCombo.Rando.CrossBossEntrances", 0) != 0;
+    options.interiors = enabled && CVarGetInteger("gCombo.Rando.CrossInteriorEntrances", 0) != 0;
+    options.shops = enabled && CVarGetInteger("gCombo.Rando.CrossShopEntrances", 0) != 0;
+    options.doorInteriors = enabled && CVarGetInteger("gCombo.Rando.CrossDoorInteriorEntrances", 0) != 0;
+    options.grottos = enabled && CVarGetInteger("gCombo.Rando.CrossGrottoEntrances", 0) != 0;
     options.expanded = options.dungeons && CVarGetInteger("gCombo.Rando.ExpandedDungeonPool", 0) != 0;
     result = OptionsJson(options).dump();
     return result.c_str();

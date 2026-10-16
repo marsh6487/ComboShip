@@ -58,6 +58,9 @@ for _, _, actor in regions:
 defeat = 'static bool CanKillEnemy(int EnemyId) {' + guard + 'switch (EnemyId) {' + ''.join(cases) + 'default:return false;}}\n'
 
 prefix = r'''
+#define COMBO_BUILD 1
+#include "combo/ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #define COMBO_EXPORT
 #include "combo/rando/CrossDungeonState.h"
 #include <cassert>

@@ -1,6 +1,8 @@
 // Execute production shield pose selectors and icon routes at graphics/loader seams.
 #include "combo/menu/ComboItemDrawABI.h"
 #include "combo/menu/ComboItemIconOwnership.h"
+#include "combo/ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include <algorithm>
 #include <cassert>
 #include <cmath>

@@ -8,7 +8,9 @@
 #include "2s2h/Rando/StaticData/StaticData.h"
 #include "rando/CrossForeign.h"
 #include "ComboItemReceiptText.h"
+#include "ComboGameMode.h"
 extern "C" {
+int gComboGameMode = COMBO_GAME_BOTH;
 #include "mods/extended_inventory.h"
 }
 #include <array>

@@ -1,3 +1,4 @@
+#include "../../../../combo/ComboGameMode.h"
 /*
  * Much of the code here was borrowed from https://github.com/gamestabled/OoT3D_Randomizer/blob/main/code/src/grotto.c
  * It's been adapted for SoH to use our gPlayState vs their gGlobalContext and slightly different named properties.
@@ -135,7 +136,7 @@ int32_t Combo_SOH_GrottoScene(int32_t index) {
 
 static bool Grotto_CrossRoutingEnabled(void) {
 #ifdef COMBO_BUILD
-    return Combo_SOH_CrossDungeonRuntimeEnabled() != 0;
+    return Combo_IsCombinedGame() && Combo_SOH_CrossDungeonRuntimeEnabled() != 0;
 #else
     return false;
 #endif
@@ -190,7 +191,7 @@ s16 Grotto_GetEntranceValueHandlingGrottoRando(s16 nextEntranceIndex) {
     if (nextEntranceIndex == ENTR_RETURN_GROTTO) {
 #ifdef COMBO_BUILD
         if (grottoId < 0 || grottoId >= NUM_GROTTOS)
-            grottoId = Combo_SOH_CrossDungeonGrottoId();
+            grottoId = Combo_IsCombinedGame() ? Combo_SOH_CrossDungeonGrottoId() : -1;
 #endif
         if (grottoId < 0 || grottoId >= NUM_GROTTOS)
             return nextEntranceIndex;
@@ -245,7 +246,7 @@ s16 Grotto_OverrideSpecialEntrance(s16 nextEntranceIndex) {
     if (grottoExit) {
 #ifdef COMBO_BUILD
         if (grottoId < 0 || grottoId >= NUM_GROTTOS)
-            grottoId = Combo_SOH_CrossDungeonGrottoId();
+            grottoId = Combo_IsCombinedGame() ? Combo_SOH_CrossDungeonGrottoId() : -1;
 #endif
         if (grottoId < 0 || grottoId >= NUM_GROTTOS)
             return nextEntranceIndex;
@@ -255,7 +256,7 @@ s16 Grotto_OverrideSpecialEntrance(s16 nextEntranceIndex) {
 #ifdef COMBO_BUILD
         // A physical exit is a before-native endpoint. If composed here, its target is
         // already final and must not pass through the native exit list or another cross leg.
-        int32_t composed = Combo_SOH_CrossDungeonRoute(originalExit, true);
+        int32_t composed = Combo_IsCombinedGame() ? Combo_SOH_CrossDungeonRoute(originalExit, true) : -1;
         if (composed >= 0) {
             nextEntranceIndex = composed;
             crossRoutedExit = true;
@@ -265,7 +266,7 @@ s16 Grotto_OverrideSpecialEntrance(s16 nextEntranceIndex) {
             nextEntranceIndex = grottoExitList[grottoId];
 #ifdef COMBO_BUILD
             // Native mixed pools may resolve this exit to a different selected pool's mouth.
-            int32_t composed = Combo_SOH_CrossDungeonRoute(nextEntranceIndex, false);
+            int32_t composed = Combo_IsCombinedGame() ? Combo_SOH_CrossDungeonRoute(nextEntranceIndex, false) : -1;
             if (composed >= 0) {
                 nextEntranceIndex = composed;
                 crossRoutedExit = true;
@@ -358,7 +359,7 @@ void Grotto_OverrideActorEntrance(Actor* thisx) {
             index = grottoLoadList[index];
 #ifdef COMBO_BUILD
             // This native list lookup bypasses Entrance_OverrideNextIndex. Compose once here.
-            int32_t composed = Combo_SOH_CrossDungeonRoute(index, false);
+            int32_t composed = Combo_IsCombinedGame() ? Combo_SOH_CrossDungeonRoute(index, false) : -1;
             if (composed >= 0)
                 index = composed;
 #endif

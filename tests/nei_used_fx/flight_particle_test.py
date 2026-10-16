@@ -4,6 +4,7 @@ import sys,subprocess,tempfile
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
 from run_time_pedestal_tests import functions
+from baseline_sources import read_source
 src='''#include <cassert>
 #include <cstring>
 #include <vector>
@@ -20,7 +21,7 @@ for kind in ('FIRE','ICE'):
   for channel in 'RGBA':src+=f'#define {kind}_ROD_{group}_{channel} 200\n'
 for kind in ('Fire','Ice'):
  path=f'soh/mods/items/logic/item_rod_{kind.lower()}.c';name=f'{kind}Rod_Spawn{kind}Sparks'
- old=subprocess.check_output(['git','show','cec63fce86b1f582f6e61ad6a98eca6c3cca784b:'+path],cwd=ROOT,text=True)
+ old=read_source('cec63fce86b1f582f6e61ad6a98eca6c3cca784b',path)
  src+=functions(old)[name].replace(name,'Old'+name)+'\n'+functions((ROOT/path).read_text())[name]+'\n'
 src+='''int main(){PlayState play;Vec3f p{1,2,3};
 for(int kind=0;kind<2;++kind){

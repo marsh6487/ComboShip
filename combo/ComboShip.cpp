@@ -1,13 +1,8 @@
 // ComboShip - Unified Launcher for OOT (soh.dll) + MM (2ship.dll)
 //
-// Boot flow:
-//   1. Load soh.dll + 2ship.dll and resolve exported functions
-//   2. Ensure OOT archives exist (extract via SOH_Extract if missing)
-//   3. Ensure MM archives exist (extract via MM_Extract if missing)
-//   4. SOH_Init()    — OOT context + resource manager + window
-//   5. SOH_RunMain() — blocks until OOT exits
-//   6. MM_RunGame()  — MM reuses context/window via sComboTransitionActive (if triggered)
-//   7. Cleanup
+// Select Combo/OoT/MM before ROM setup. Solo sessions enter the selected
+// game's native vanilla/randomizer file select and native save directory.
+// Combo sessions initialize both games and retain bidirectional transitions.
 
 #include <iostream>
 #include <filesystem>
@@ -40,10 +35,14 @@
 #include "rando/CrossHints.h"
 #include "rando/CrossDungeonCoordinator.h"
 #include "rando/CrossDungeonGeneration.h"
+#include "rando/OotDungeonLayouts.h"
 #include "gui/ComboGenProgress.h"
 #include "ComboExtract.h"
+#include "ComboLaunchOptions.h"
+#include "ComboLaunchPreferences.h"
 #include "ComboSettingsImport.h"
 #include "gameplay/ComboFaroresWindJson.h"
+#include "ComboSettingsImportConfig.h"
 
 // Surfaces the real exception behind a silent terminate()/exit(3). With the shared dynamic
 // CRT, exceptions thrown in soh.dll/2ship.dll propagate across the DLL boundary to here.
@@ -245,7 +244,10 @@ static FnSetFwArrival MM_SetFwArrival = nullptr;
 typedef const char* (*FnDumpData)(void);
 static FnDumpData SOH_DumpRandoStaticData = nullptr;
 static FnDumpData MM_DumpRandoStaticData = nullptr;
-static FnDumpData SOH_DumpRandoSettings = nullptr;     // {cvar:value} OOT rando settings snapshot
+static FnDumpData SOH_DumpRandoSettings = nullptr; // {cvar:value} OOT rando settings snapshot
+static ComboRando::OotLayoutDumper SOH_DumpDungeonLayouts = nullptr;
+static ComboRando::OotLayoutSetter SOH_SetDungeonLayoutsForCombo = nullptr;
+static ComboRando::OotLayoutSetter SOH_ValidateDungeonLayoutsForCombo = nullptr;
 static FnDumpData SOH_DumpSharedItemPairs = nullptr;   // NEI shared items: one copy per pair, cross-credited logic
 static FnDumpData SOH_DumpEnabledTricks = nullptr;     // [NameTag,...] the player's enabled OOT tricks
 static FnDumpData MM_DumpRandoSettings = nullptr;      // {cvar:value} MM rando settings snapshot
@@ -359,6 +361,7 @@ static FnVoid SOH_InitWindowOnly = nullptr;
 static FnVoid SOH_FinishInit = nullptr;
 static ComboFnValidateRom SOH_ValidateRom = nullptr;
 static ComboFnValidateRom SOH_ClassifyRom = nullptr;
+static ComboFnValidateRom SOH_ClassifyRomKind = nullptr;
 static ComboFnStartExtraction SOH_StartExtraction = nullptr;
 static ComboFnGetProgress SOH_GetExtractionProgress = nullptr;
 static ComboFnValidateRom MM_ValidateRom = nullptr;
@@ -2193,6 +2196,7 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
                                 { "placements", ootSpoiler },
                                 { "prices", pricesOf(sohDump) },
                                 { "iceTrapModels", ootIceTrapModels } };
+        ComboRando::RecordOotDungeonLayouts(consolidated["oot"], SOH_DumpDungeonLayouts);
         consolidated["mm"] = { { "settings", parseOrEmpty(MM_DumpRandoSettings) },
                                { "placements", mmSpoiler },
                                { "prices", pricesOf(mmDump) } };
@@ -2739,6 +2743,11 @@ static int Combo_OnReloadRequest(const char* path) {
     }
     try {
         // Reject malformed feature data before changing native settings or pending seed state.
+        if (!ComboRando::ValidateOotDungeonLayouts(j.value("oot", nlohmann::json::object()),
+                                                   SOH_ValidateDungeonLayoutsForCombo)) {
+            std::cerr << "[ComboShip] reload: invalid dungeon layouts or required OoT quest assets missing\n";
+            return 0;
+        }
         const auto crossSeed = ComboRando::CrossDungeon::Coordinator::SeedOf(j);
         const bool crossEnabled = ComboRando::CrossDungeon::Coordinator::Enabled(crossSeed);
         // The pure seed catalogue and both oracle setters validate B while the accepted native
@@ -2824,6 +2833,12 @@ static int Combo_OnReloadRequest(const char* path) {
         // the combo seed — without this a reloaded seed gets finalSeed=0 and diverges from the author.
         if (MM_SetComboRandoSeed)
             MM_SetComboRandoSeed(masterSeed);
+        if (!ComboRando::RestoreOotDungeonLayouts(oot, SOH_SetDungeonLayoutsForCombo)) {
+            std::cerr << "[ComboShip] reload: invalid dungeon layouts or required OoT quest assets missing\n";
+            if (isSilentAutoLoad && SOH_RestoreRandoSettings)
+                SOH_RestoreRandoSettings(userOotSnapshot.c_str());
+            return 0;
+        }
         if (SOH_PrepRandoContext)
             SOH_PrepRandoContext();
         // Enabled cross-dungeon seeds require the recorded native layout, because return routing
@@ -3214,23 +3229,6 @@ static bool LoadJsonObject(const std::string& path, nlohmann::json& out) {
     } catch (...) { return false; }
 }
 
-// Per-leaf merge: objects recurse; on a leaf collision (scalar/array) the overlay wins. Keys unique
-// to either side are kept. Used with 2Ship as base + SoH as overlay so SoH wins.
-static void DeepMerge(nlohmann::json& base, const nlohmann::json& overlay) {
-    if (!base.is_object() || !overlay.is_object()) {
-        base = overlay;
-        return;
-    }
-    for (auto it = overlay.begin(); it != overlay.end(); ++it) {
-        auto found = base.find(it.key());
-        if (found != base.end() && found->is_object() && it->is_object()) {
-            DeepMerge(*found, *it);
-        } else {
-            base[it.key()] = it.value();
-        }
-    }
-}
-
 // Soft validator (non-blocking hint): a Ship config is a JSON object with a CVars block.
 static int LauncherValidateShipConfig(const char* path) {
     nlohmann::json j;
@@ -3241,6 +3239,16 @@ static int LauncherValidateShipConfig(const char* path) {
 
 int main(int argc, char** argv) {
     std::cout << "ComboShip Launcher - Starting..." << std::endl;
+
+    // Launcher-only option: allow adding the complementary OoT ROM to an
+    // existing install. Do not pass it to SoH's own command-line parser.
+    bool romSetupRequested = false;
+    const auto launchOptions = ComboLaunch::ParseOptions(argc, argv);
+    romSetupRequested = launchOptions.romSetup;
+    if (!launchOptions.error.empty()) {
+        std::cerr << "[ComboShip] " << launchOptions.error << std::endl;
+        return 2;
+    }
 
 #ifdef _WIN32
     // Match SoH's DPI awareness (its SHIPOFHARKINIAN.manifest declares permonitorv2). ComboShip.exe
@@ -3326,6 +3334,10 @@ int main(int argc, char** argv) {
     SOH_DumpRandoStaticData = (FnDumpData)GetSym(sohModule, "SOH_DumpRandoStaticData");
     MM_DumpRandoStaticData = (FnDumpData)GetSym(mmModule, "MM_DumpRandoStaticData");
     SOH_DumpRandoSettings = (FnDumpData)GetSym(sohModule, "SOH_DumpRandoSettings");
+    SOH_DumpDungeonLayouts = (ComboRando::OotLayoutDumper)GetSym(sohModule, "SOH_DumpDungeonLayouts");
+    SOH_SetDungeonLayoutsForCombo = (ComboRando::OotLayoutSetter)GetSym(sohModule, "SOH_SetDungeonLayoutsForCombo");
+    SOH_ValidateDungeonLayoutsForCombo =
+        (ComboRando::OotLayoutSetter)GetSym(sohModule, "SOH_ValidateDungeonLayoutsForCombo");
     SOH_DumpSharedItemPairs = (FnDumpData)GetSym(sohModule, "SOH_DumpSharedItemPairs");
     SOH_DumpEnabledTricks = (FnDumpData)GetSym(sohModule, "SOH_DumpEnabledTricks");
     MM_DumpRandoSettings = (FnDumpData)GetSym(mmModule, "MM_DumpRandoSettings");
@@ -3368,6 +3380,7 @@ int main(int argc, char** argv) {
     SOH_FinishInit = (FnVoid)GetSym(sohModule, "SOH_FinishInit");
     SOH_ValidateRom = (ComboFnValidateRom)GetSym(sohModule, "SOH_ValidateRom");
     SOH_ClassifyRom = (ComboFnValidateRom)GetSym(sohModule, "SOH_ClassifyRom");
+    SOH_ClassifyRomKind = (ComboFnValidateRom)GetSym(sohModule, "SOH_ClassifyRomKind");
     SOH_StartExtraction = (ComboFnStartExtraction)GetSym(sohModule, "SOH_StartExtraction");
     SOH_GetExtractionProgress = (ComboFnGetProgress)GetSym(sohModule, "SOH_GetExtractionProgress");
     MM_ValidateRom = (ComboFnValidateRom)GetSym(mmModule, "MM_ValidateRom");
@@ -3375,6 +3388,54 @@ int main(int argc, char** argv) {
     MM_StartExtraction = (ComboFnStartExtraction)GetSym(mmModule, "MM_StartExtraction");
     MM_GetExtractionProgress = (ComboFnGetProgress)GetSym(mmModule, "MM_GetExtractionProgress");
     SOH_ApplyImportedConfig = (ComboFnApplyImportedConfig)GetSym(sohModule, "SOH_ApplyImportedConfig");
+
+    // Select before ROM setup. The shared window requires only the bundled
+    // port archive; neither game's ROM data is initialized at this stage.
+    ComboGameMode gameMode =
+        launchOptions.explicitGame ? launchOptions.game : ComboLaunch::LoadGame("combo-launcher.json");
+    auto setOotMode = (void (*)(int))GetSym(sohModule, "SOH_SetGameMode");
+    auto setMmMode = (void (*)(int))GetSym(mmModule, "MM_SetGameMode");
+    auto deinitWindowOnly = (FnVoid)GetSym(sohModule, "SOH_DeinitWindowOnly");
+    auto runMmSolo = (FnVoid)GetSym(mmModule, "MM_RunSolo");
+    if (!setOotMode || !setMmMode || !SOH_InitWindowOnly || !SOH_FinishInit || !deinitWindowOnly || !runMmSolo ||
+        !SOH_Deinit || !MM_Deinit) {
+        std::cerr << "ERROR: game modules lack solo-game exports; rebuild the complete candidate." << std::endl;
+        FreeDll(mmModule);
+        FreeDll(sohModule);
+        return 1;
+    }
+    setOotMode(gameMode);
+    setMmMode(gameMode);
+    bool selectionWindowInitialized = false;
+    if (!launchOptions.explicitGame || launchOptions.chooseGame) {
+        SOH_InitWindowOnly();
+        selectionWindowInitialized = true;
+        comboUIModule = LoadDll(comboUiDll);
+        auto selectGame = comboUIModule ? (ComboFnSelectGame)GetSym(comboUIModule, "ComboUI_SelectGame") : nullptr;
+        if (!selectGame) {
+            std::cerr << "ERROR: game selection screen unavailable; rebuild comboui." << std::endl;
+            deinitWindowOnly();
+            if (comboUIModule)
+                FreeDll(comboUIModule);
+            FreeDll(mmModule);
+            FreeDll(sohModule);
+            return 1;
+        }
+        const int selected = selectGame(gameMode);
+        if (selected < COMBO_GAME_BOTH || selected > COMBO_GAME_MM) {
+            deinitWindowOnly();
+            FreeDll(comboUIModule);
+            FreeDll(mmModule);
+            FreeDll(sohModule);
+            return 0;
+        }
+        gameMode = static_cast<ComboGameMode>(selected);
+        setOotMode(gameMode);
+        setMmMode(gameMode);
+    }
+    if (!ComboLaunch::SaveGame("combo-launcher.json", gameMode)) {
+        std::cerr << "[ComboShip] Could not remember game selection; this session will still start." << std::endl;
+    }
 
     // Anchor transport seam exports (Phase 1)
     SOH_SetAnchorSend = (FnSetAnchorSend)GetSym(sohModule, "SOH_SetAnchorSend");
@@ -3484,7 +3545,7 @@ int main(int argc, char** argv) {
         g_SetCrossBossMask[game] = (void (*)(uint16_t))GetSym(module, (prefix + "_SetCrossBossCompletedMask").c_str());
         g_ApplyCrossBossClear[game] = (void (*)(int, int))GetSym(module, (prefix + "_ApplyCrossBossClear").c_str());
         g_SetCrossBossNotify[game] = (void (*)(void (*)(int)))GetSym(module, (prefix + "_SetCrossBossNotify").c_str());
-        if (g_SetCrossBossNotify[game])
+        if (gameMode == COMBO_GAME_BOTH && g_SetCrossBossNotify[game])
             g_SetCrossBossNotify[game](&Combo_OnCrossBossDefeated);
     }
     g_CrossDungeons.hosts[1].CanEnterArrival = (int (*)(int32_t))GetSym(mmModule, "MM_CanEnterCrossEntrance");
@@ -3504,6 +3565,10 @@ int main(int argc, char** argv) {
     if (!MM_InitArchives) {
         std::cerr << "ERROR: 2ship.dll is missing required ComboShip exports (MM_InitArchives)." << std::endl;
         std::cerr << "       Rebuild 2ship.dll from this ComboShip branch." << std::endl;
+        if (selectionWindowInitialized)
+            deinitWindowOnly();
+        if (comboUIModule)
+            FreeDll(comboUIModule);
         FreeDll(mmModule);
         FreeDll(sohModule);
         return 1;
@@ -3512,28 +3577,35 @@ int main(int argc, char** argv) {
     // --- 2/3. Ensure BOTH ROM archives exist (ComboShip-owned unified extraction) ---
     // ComboShip needs an OoT ROM and an MM ROM. If either ROM archive is missing, create the shared
     // window from the bundled soh.o2r (SOH_InitWindowOnly — no ROM needed), then run comboui's
-    // combo-owned extraction screen, which gathers BOTH ROMs and extracts them with progress bars.
+    // combo-owned extraction screen: first OoT, optional complementary OoT, then MM.
     // It returns false if the player quits or extraction fails -> we exit. When the archives are
     // present we skip this entirely and use the monolithic SOH_Init() fast path below.
-    bool windowInitialized = false;
+    bool windowInitialized = selectionWindowInitialized;
     // Capture BEFORE any window/config init: a fresh install (no comboship.json) gets the settings
     // import offer. (The Config ctor doesn't create the file, but capturing early stays robust.)
     const bool freshInstall = !ComboConfigExists();
-    const bool needOot = !OOTArchivesExist();
-    const bool needMm = !MMRomArchiveExists();
-    if (needOot || needMm) {
+    const bool needOot = gameMode != COMBO_GAME_MM && !OOTArchivesExist();
+    const bool needMm = gameMode != COMBO_GAME_OOT && !MMRomArchiveExists();
+    if (needOot || needMm || romSetupRequested) {
         if (!SOH_InitWindowOnly || !SOH_FinishInit || !SOH_ValidateRom || !SOH_StartExtraction ||
-            !SOH_GetExtractionProgress || !MM_ValidateRom || !MM_StartExtraction || !MM_GetExtractionProgress) {
+            !SOH_ClassifyRomKind || !SOH_GetExtractionProgress || !MM_ValidateRom || !MM_StartExtraction ||
+            !MM_GetExtractionProgress) {
             std::cerr << "ERROR: game DLLs missing the ComboShip extraction primitives (rebuild required)."
                       << std::endl;
+            if (windowInitialized)
+                deinitWindowOnly();
+            if (comboUIModule)
+                FreeDll(comboUIModule);
             FreeDll(mmModule);
             FreeDll(sohModule);
             return 1;
         }
-        std::cout << "[ComboShip] ROM archive(s) missing (OoT=" << needOot << " MM=" << needMm
-                  << ") — opening extraction screen." << std::endl;
-        SOH_InitWindowOnly(); // shared window + ImGui from soh.o2r; no ROM required
-        windowInitialized = true;
+        std::cout << "[ComboShip] Opening ROM setup (OoT missing=" << needOot << " MM missing=" << needMm
+                  << ", requested=" << romSetupRequested << ")." << std::endl;
+        if (!windowInitialized) {
+            SOH_InitWindowOnly(); // shared window + ImGui from soh.o2r; no ROM required
+            windowInitialized = true;
+        }
 
         if (!comboUIModule) {
             comboUIModule = LoadDll(comboUiDll);
@@ -3543,6 +3615,7 @@ int main(int argc, char** argv) {
         }
         if (!ComboUI_RunExtraction) {
             std::cerr << "ERROR: comboui module missing ComboUI_RunExtraction (rebuild required)." << std::endl;
+            deinitWindowOnly();
             if (comboUIModule)
                 FreeDll(comboUIModule);
             FreeDll(mmModule);
@@ -3561,17 +3634,24 @@ int main(int argc, char** argv) {
         cb.mmStart = MM_StartExtraction;
         cb.mmProgress = MM_GetExtractionProgress;
         cb.mmNeeded = needMm ? 1 : 0;
+        cb.sohClassifyKind = SOH_ClassifyRomKind;
+        cb.sohVanillaPresent = std::filesystem::exists("oot.o2r") ? 1 : 0;
+        cb.sohMqPresent = std::filesystem::exists("oot-mq.o2r") ? 1 : 0;
+        cb.gameMode = gameMode;
 
         if (!ComboUI_RunExtraction(&cb)) {
             std::cerr << "[ComboShip] Extraction cancelled or failed — exiting." << std::endl;
+            deinitWindowOnly();
             if (comboUIModule)
                 FreeDll(comboUIModule);
             FreeDll(mmModule);
             FreeDll(sohModule);
             return 1;
         }
-        if (!OOTArchivesExist() || !MMRomArchiveExists()) {
+        if ((gameMode != COMBO_GAME_MM && !OOTArchivesExist()) ||
+            (gameMode != COMBO_GAME_OOT && !MMRomArchiveExists())) {
             std::cerr << "ERROR: ROM archives still missing after extraction — exiting." << std::endl;
+            deinitWindowOnly();
             if (comboUIModule)
                 FreeDll(comboUIModule);
             FreeDll(mmModule);
@@ -3602,28 +3682,50 @@ int main(int argc, char** argv) {
             cb.mmValidate = LauncherValidateShipConfig;
             ComboSettingsImportResult res = {};
             if (ComboUI_RunSettingsImport(&cb, &res) && res.action == 1) {
-                nlohmann::json merged = nlohmann::json::object(), sohJson, mmJson;
+                nlohmann::json sohJson, mmJson;
                 const bool haveMm = LoadJsonObject(res.mmPath, mmJson);
                 const bool haveSoh = LoadJsonObject(res.sohPath, sohJson);
-                if (haveMm) {
-                    merged = mmJson; // 2Ship is the base (lower priority)
-                }
-                if (haveSoh) {
-                    DeepMerge(merged, sohJson); // SoH overlays and wins on collisions
-                }
                 if (haveSoh || haveMm) {
-                    merged.erase("Window"); // machine-specific
-                    // ConfigVersion drives OOT's updaters; keep it only when it actually came from the
-                    // SoH source (a 2Ship version, or none, would misdirect them).
-                    if (!haveSoh || !sohJson.contains("ConfigVersion")) {
-                        merged.erase("ConfigVersion");
+                    const auto merged = ComboSettingsImport::Merge(sohJson, mmJson);
+                    if (SOH_ApplyImportedConfig(merged.dump().c_str())) {
+                        std::cout << "[ComboShip] Settings and per-game mod orders imported (SoH=" << haveSoh
+                                  << " MM=" << haveMm << ")." << std::endl;
+                    } else {
+                        std::cerr << "[ComboShip] Failed to apply imported settings." << std::endl;
                     }
-                    SOH_ApplyImportedConfig(merged.dump().c_str());
-                    std::cout << "[ComboShip] Settings imported (SoH=" << haveSoh << " MM=" << haveMm << ")."
-                              << std::endl;
                 }
             }
         }
+    }
+
+    // Solo games own their native file select, vanilla/rando saves, generation,
+    // and menus. Branch before installing any cross-game callback or save IO.
+    if (gameMode != COMBO_GAME_BOTH) {
+        if (gameMode == COMBO_GAME_OOT) {
+            // The monolithic legacy InitOTR path can provision a sibling MM
+            // install. Solo always finishes the ROM-independent bootstrap.
+            if (!windowInitialized)
+                SOH_InitWindowOnly();
+            SOH_FinishInit();
+            SOH_RunMain(argc, argv);
+            if (SOH_Deinit)
+                SOH_Deinit();
+        } else {
+            if (!windowInitialized)
+                SOH_InitWindowOnly();
+            runMmSolo();
+            if (MM_Deinit)
+                MM_Deinit();
+            deinitWindowOnly();
+        }
+#ifdef _WIN32
+        SetUnhandledExceptionFilter(ComboLateCrashFilter);
+#endif
+        if (comboUIModule)
+            FreeDll(comboUIModule);
+        FreeDll(mmModule);
+        FreeDll(sohModule);
+        return 0;
     }
 
     // Wire the Anchor transport to the launcher-owned connection BEFORE SOH_Init(): OOT auto-enables

@@ -29,7 +29,7 @@ static int BossFromScene(int scene) {
     }
 }
 static bool BossLogicEnabled() {
-    return state.HasPool(Pool::Boss);
+    return Combo_IsCombinedGame() && state.HasPool(Pool::Boss);
 }
 // Immutable native descriptors: seed preflight must not inspect a live shuffled entrance table.
 static int OriginalEntranceScene(int32_t index) {

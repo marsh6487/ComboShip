@@ -23,12 +23,14 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
 #ifdef COMBO_BUILD
     // ComboShip (#136): the launcher owns the goal, so the hunt toggle follows it (the Majora soul-lock
     // applies even at 0 MM pieces). REQUIRED is combined and display-only here — the win is combo's.
-    saveInfo.randoSaveOptions[RO_SHUFFLE_TRIFORCE_PIECES] = gMMComboGoalHunt ? RO_GENERIC_YES : RO_GENERIC_NO;
-    if (gMMComboGoalHunt) {
-        saveInfo.randoSaveOptions[RO_TRIFORCE_PIECES_REQUIRED] = (uint32_t)gMMComboGoalRequired;
-        // #136: MM's half of the combined total; -1 = old seed, keep the CVar.
-        if (gMMComboGoalPieces >= 0) {
-            saveInfo.randoSaveOptions[RO_TRIFORCE_PIECES_MAX] = (uint32_t)gMMComboGoalPieces;
+    if (Combo_IsCombinedGame()) {
+        saveInfo.randoSaveOptions[RO_SHUFFLE_TRIFORCE_PIECES] = gMMComboGoalHunt ? RO_GENERIC_YES : RO_GENERIC_NO;
+        if (gMMComboGoalHunt) {
+            saveInfo.randoSaveOptions[RO_TRIFORCE_PIECES_REQUIRED] = (uint32_t)gMMComboGoalRequired;
+            // #136: MM's half of the combined total; -1 = old seed, keep the CVar.
+            if (gMMComboGoalPieces >= 0) {
+                saveInfo.randoSaveOptions[RO_TRIFORCE_PIECES_MAX] = (uint32_t)gMMComboGoalPieces;
+            }
         }
     }
 #endif
@@ -357,22 +359,22 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             itemPool.push_back(RI_OOT_PROGRESSIVE_ROC); // L2 Cape
         }
         if (saveInfo.randoSaveOptions[RO_SHUFFLE_OOT_QUEST] == RO_GENERIC_YES) {
-#ifndef COMBO_BUILD
-            // ComboShip gets OoT's rewards from the OoT dump, after its native
-            // reward-placement rules run. Adding MM copies here bypasses those
-            // restrictions (and duplicates rewards already fixed to bosses).
-            // UnifiedPoolActive is intentionally false in the launcher build;
-            // keep these extra rewards exclusive to standalone MM.
-            itemPool.push_back(RI_OOT_MEDALLION_FOREST);
-            itemPool.push_back(RI_OOT_MEDALLION_FIRE);
-            itemPool.push_back(RI_OOT_MEDALLION_WATER);
-            itemPool.push_back(RI_OOT_MEDALLION_SPIRIT);
-            itemPool.push_back(RI_OOT_MEDALLION_SHADOW);
-            itemPool.push_back(RI_OOT_MEDALLION_LIGHT);
-            itemPool.push_back(RI_OOT_STONE_KOKIRI_EMERALD);
-            itemPool.push_back(RI_OOT_STONE_GORON_RUBY);
-            itemPool.push_back(RI_OOT_STONE_ZORA_SAPPHIRE);
-#endif
+            if (!Combo_IsCombinedGame()) {
+                // ComboShip gets OoT's rewards from the OoT dump, after its native
+                // reward-placement rules run. Adding MM copies here bypasses those
+                // restrictions (and duplicates rewards already fixed to bosses).
+                // UnifiedPoolActive is intentionally false in the launcher build;
+                // keep these extra rewards exclusive to standalone MM.
+                itemPool.push_back(RI_OOT_MEDALLION_FOREST);
+                itemPool.push_back(RI_OOT_MEDALLION_FIRE);
+                itemPool.push_back(RI_OOT_MEDALLION_WATER);
+                itemPool.push_back(RI_OOT_MEDALLION_SPIRIT);
+                itemPool.push_back(RI_OOT_MEDALLION_SHADOW);
+                itemPool.push_back(RI_OOT_MEDALLION_LIGHT);
+                itemPool.push_back(RI_OOT_STONE_KOKIRI_EMERALD);
+                itemPool.push_back(RI_OOT_STONE_GORON_RUBY);
+                itemPool.push_back(RI_OOT_STONE_ZORA_SAPPHIRE);
+            }
             itemPool.push_back(RI_OOT_STONE_OF_AGONY);
             itemPool.push_back(RI_OOT_SONG_ZELDAS_LULLABY);
             itemPool.push_back(RI_OOT_SONG_MINUET_OF_FOREST);

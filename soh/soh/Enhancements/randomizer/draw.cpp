@@ -1,6 +1,8 @@
+#include "../../../../combo/ComboGameMode.h"
 #include "draw.h"
 #include "soh/frame_interpolation.h"
 #ifdef COMBO_BUILD
+#include <ship/resource/CrossRMRegistry.h>
 #include "ComboItemDrawABI.h"
 extern "C" int32_t OOT_MagicJarUsesCustomAsset(const char* path);
 #endif
@@ -2081,28 +2083,30 @@ void Randomizer_DrawExtShieldOfIkana(PlayState* play, GetItemEntry* getItemEntry
     // mm.o2r — using object_gi_shield_3/gGiMirrorShieldDL crashed because its vertex hashes
     // didn't resolve in the OTR pack, and the unresolved bytes were executed as gsSPVertex.
     Gfx* mod = NeiGi_ModOverrideDL("objects/object_link_child/gLinkHumanMirrorShieldDL", true);
-#ifdef COMBO_BUILD
-    // The pose probe and deferred draw must select the same MM-owned graph.
-    // The legacy companion loads through the active host and retains a raw
-    // pointer, which can disagree with MM after an owner/Alt selection change.
-    static Gfx sMmShieldDL[2];
     Gfx* selected = mod;
-    if (!selected &&
-        ResourceMgr_IsGiModelAvailableForGame("mm", "objects/object_link_child/gLinkHumanMirrorShieldDL")) {
-        gDma1p(&sMmShieldDL[0], G_DL_OTR_FILEPATH, "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL", 0,
-               G_DL_PUSH);
-        gSPEndDisplayList(&sMmShieldDL[1]);
-        selected = sMmShieldDL;
-    }
-#else
-    static Gfx* sCachedMmShieldDL = NULL;
-    static u8 sLoadAttempted = 0;
-    if (!mod && !sLoadAttempted) {
-        sLoadAttempted = 1;
-        sCachedMmShieldDL = (Gfx*)TransformMasks_LoadMmDL("objects/object_link_child/gLinkHumanMirrorShieldDL");
-    }
-    Gfx* selected = mod ? mod : sCachedMmShieldDL;
+#ifdef COMBO_BUILD
+    if (Combo_IsCombinedGame()) {
+        // The pose probe and deferred draw must select the same MM-owned graph.
+        static Gfx sMmShieldDL[2];
+        if (!selected &&
+            ResourceMgr_IsGiModelAvailableForGame("mm", "objects/object_link_child/gLinkHumanMirrorShieldDL")) {
+            gDma1p(&sMmShieldDL[0], G_DL_OTR_FILEPATH, "__OTR__@mm:objects/object_link_child/gLinkHumanMirrorShieldDL",
+                   0, G_DL_PUSH);
+            gSPEndDisplayList(&sMmShieldDL[1]);
+            selected = sMmShieldDL;
+        }
+    } else
 #endif
+    {
+        // Solo keeps the native optional archive loader; it does not initialize an MM resource manager.
+        static Gfx* sCachedMmShieldDL = NULL;
+        static u8 sLoadAttempted = 0;
+        if (!mod && !sLoadAttempted) {
+            sLoadAttempted = 1;
+            sCachedMmShieldDL = (Gfx*)TransformMasks_LoadMmDL("objects/object_link_child/gLinkHumanMirrorShieldDL");
+        }
+        selected = mod ? mod : sCachedMmShieldDL;
+    }
     if (selected == NULL) {
         return; // mm.o2r not present — silent skip instead of crashing on a NULL DL
     }
@@ -2753,7 +2757,7 @@ extern "C" int32_t OOT_DescribeMmSpinAttackDraw(CwItemDrawInfo* out) {
 extern "C" void Randomizer_DrawMmGreatSpinAttack(PlayState* play, GetItemEntry* getItemEntry) {
 #ifdef COMBO_BUILD
     CwItemDrawInfo recipe{};
-    if (OOT_DescribeMmSpinAttackDraw(&recipe) == 1) {
+    if (Ship::CrossRMRegistry::Get("mm") && OOT_DescribeMmSpinAttackDraw(&recipe) == 1) {
         const char* disk = ComboInternRoutedPath(std::string("__OTR__@mm:") + (recipe.dlists[0] + 7));
         const char* cylinder = ComboInternRoutedPath(std::string("__OTR__@mm:") + (recipe.dlists[1] + 7));
         ComboDrawSpinAttackGi(play, disk, cylinder, recipe.scale, recipe.primColorXlu, "mm");

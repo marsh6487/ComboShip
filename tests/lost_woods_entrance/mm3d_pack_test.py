@@ -56,6 +56,8 @@ source = r'''
 #include <fast/resource/type/Texture.h>
 #include "global.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 SaveContext gSaveContext{};
 PlayState* gPlayState;
 static int draws;

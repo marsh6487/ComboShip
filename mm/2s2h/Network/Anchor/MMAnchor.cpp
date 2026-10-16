@@ -1,3 +1,6 @@
+#include "../../../../combo/emotes/EmoteBridge.h"
+#include <cstring>
+#include <array>
 #include "MMAnchor.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
@@ -462,8 +465,16 @@ void MMAnchor::SendPlayerUpdate() {
     // for its binary type, so a u8 array/vector round-trip fails to compile). Wire shape is an
     // array of numbers either way.
     {
-        const u8* jt = (const u8*)&player->jointTableBuffer;
-        const u8* ujt = (const u8*)&player->jointTableUpperBuffer;
+        std::array<u8, sizeof(player->jointTableBuffer)> joints, upper;
+        std::memcpy(joints.data(), player->jointTableBuffer, joints.size());
+        std::memcpy(upper.data(), player->jointTableUpperBuffer, upper.size());
+        // These buffers include alignment slack; jointTable points into them.
+        const size_t jointOffset = reinterpret_cast<u8*>(player->skelAnime.jointTable) - player->jointTableBuffer;
+        const size_t upperOffset = reinterpret_cast<u8*>(player->skelAnimeUpper.jointTable) - player->jointTableUpperBuffer;
+        ComboEmotes_CopyRawBuffer(joints.data(), joints.size(), jointOffset);
+        ComboEmotes_CopyRawBuffer(upper.data(), upper.size(), upperOffset);
+        const u8* jt = joints.data();
+        const u8* ujt = upper.data();
         nlohmann::json jtArr = nlohmann::json::array();
         nlohmann::json ujtArr = nlohmann::json::array();
         for (int i = 0; i < 159; i++) {

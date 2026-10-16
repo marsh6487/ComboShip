@@ -3,6 +3,7 @@
 #ifdef COMBO_BUILD
 #include "global.h"
 #include "BenPort.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 extern int32_t Combo_MM_ConsumeCrossDungeonArrival(void);
 extern int32_t Combo_MM_ConsumeCrossDungeonRecovery(void);
@@ -66,7 +67,7 @@ void Setup_InitImpl(SetupState* this) {
 #ifdef COMBO_BUILD
     s32 loadedOwlSave;
 
-    if (gComboStartFileNum >= 0) {
+    if (Combo_IsCombinedGame() && gComboStartFileNum >= 0) {
         // Sram_LoadGlobalOptions above found no global.json in combo, so take OOT's settings.
         Combo_AdoptOOTGlobalOptions();
         // Set flashSaveAvailable so Sram_Alloc allocates saveBuf (normally set by the title screen).

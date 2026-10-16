@@ -21,6 +21,9 @@
 #include <nlohmann/json.hpp>
 #include <unordered_map>
 #include <vector>
+#ifdef COMPASS_DONOR_BRIDGE
+#include <dlfcn.h>
+#endif
 using namespace std::literals::string_literals;
 #define SPDLOG_DEBUG(...) ((void)0)
 #define COMBO_BUILD
@@ -608,8 +611,35 @@ static int32_t FixtureSeedIcon(const char* name, CwItemIconInfo* out) {
   out->width = 16; out->height = 24; out->isIA8 = 1;
   return 1;
 }
+#ifndef COMPASS_DONOR_BRIDGE
+static int32_t FixtureMmInformationName(int32_t dungeon,char* buffer,uint32_t capacity,bool compass) {
+  if(dungeon<0 || dungeon>=4 || !buffer || !capacity)return 0;
+  const char* entrances[]={"Woodfall","Snowhead","Zora Cape's turtle","Stone Tower"};
+  const char* bosses[]={"Odolwa","Goht","Gyorg","Twinmold"};
+  const std::string text=compass?bosses[dungeon]:entrances[dungeon];
+  if(text.size()>=capacity)return 0;
+  std::memcpy(buffer,text.c_str(),text.size()+1);return text.size();
+}
+static int32_t FixtureMmEntranceName(int32_t d,char* b,uint32_t c){return FixtureMmInformationName(d,b,c,false);}
+static int32_t FixtureMmBossName(int32_t d,char* b,uint32_t c){return FixtureMmInformationName(d,b,c,true);}
+#endif
 void *Combo_ResolveSym(const char *module, const char *symbol) {
   assert(std::string(module) == "2ship");
+#ifdef COMPASS_DONOR_BRIDGE
+  if(std::string(symbol)=="MM_GetDungeonRewardName" || std::string(symbol)=="MM_GetDungeonRewardIconInfo" ||
+     std::string(symbol)=="MM_GetSeedItemIconInfo")return dlsym(RTLD_DEFAULT,symbol);
+#endif
+  if(std::string(symbol)=="MM_GetDungeonEntranceName" || std::string(symbol)=="MM_GetDungeonBossName" ||
+     std::string(symbol)=="MM_GetCrossDungeonEntranceSourceName" || std::string(symbol)=="MM_GetInformationBossDestination" ||
+     std::string(symbol)=="MM_GetPhysicalBossRewardName" || std::string(symbol)=="MM_GetPhysicalBossRewardIconInfo") {
+#ifdef COMPASS_DONOR_BRIDGE
+    return dlsym(RTLD_DEFAULT,symbol);
+#else
+    if(std::string(symbol)=="MM_GetDungeonEntranceName")return reinterpret_cast<void*>(FixtureMmEntranceName);
+    if(std::string(symbol)=="MM_GetDungeonBossName")return reinterpret_cast<void*>(FixtureMmBossName);
+    return nullptr;
+#endif
+  }
   if (std::string(symbol) == "MM_GetDungeonRewardName")
     return mmRewardAvailable ? reinterpret_cast<void *>(FixtureMmReward) : nullptr;
   if (std::string(symbol) == "MM_GetSeedItemIconInfo")
@@ -660,6 +690,21 @@ extern "C" COMBO_EXPORT void FixtureConfigureForestCompassReceipt(int informatio
   receiptContext.placements[RC_PHANTOM_GANON] = {RG_DEKU_LEAF, "Deku Leaf"};
   randoActive = false;
   gPlayState = nullptr;
+}
+
+extern "C" COMBO_EXPORT void FixtureConfigurePhysicalBossHints(int nativeSwap) {
+  FixtureConfigureForestCompassReceipt(1);
+  receiptContext.placements[RC_QUEEN_GOHMA]={RG_DEKU_LEAF,"Deku Leaf"};
+  std::fill(std::begin(entranceOverrides),std::end(entranceOverrides),EntranceOverride{});
+  receiptContext.dungeonShuffle=0;
+  if(nativeSwap==1) {
+    entranceOverrides[0]={ENTR_FOREST_TEMPLE_ENTRANCE,1,ENTR_DEKU_TREE_ENTRANCE,1};
+    entranceOverrides[1]={ENTR_DEKU_TREE_ENTRANCE,1,ENTR_FOREST_TEMPLE_ENTRANCE,1};
+  } else if(nativeSwap==2 || nativeSwap==3) {
+    receiptContext.bossShuffle=1;
+    entranceOverrides[0]={ENTR_FOREST_TEMPLE_BOSS_ENTRANCE,1,
+        nativeSwap==2 ? ENTR_DEKU_TREE_BOSS_ENTRANCE : ENTR_DEKU_TREE_ENTRANCE,1};
+  }
 }
 
 static void CheckForestCompassReceiptInformation() {

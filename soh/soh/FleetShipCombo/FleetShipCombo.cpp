@@ -1,3 +1,4 @@
+#include "../../../combo/ComboGameMode.h"
 #include "FleetShipCombo.h"
 #include "FleetComboRando.h"               // FleetCombo_IsRunning: a generating guest is busy, not hung
 #include "soh/Notification/Notification.h" // tell the player WHY the combo is closing
@@ -490,6 +491,10 @@ pid_t sGuestExtractPid = 0;
 } // namespace
 
 void FleetShipCombo_ProvisionO2rBothDirs(void) {
+#ifdef COMBO_BUILD
+    if (!Combo_IsCombinedGame())
+        return;
+#endif
     // Combo layout: <root>/soh.exe + <root>/2ship/2ship.exe. Both mm.o2r and oot.o2r should sit next to
     // BOTH exes, so mirror whichever exists into the dir missing it — an extraction done by EITHER game
     // (soh -> oot.o2r, 2ship -> mm.o2r) then provisions both. No-op when there's no sibling (standalone).
@@ -513,6 +518,10 @@ bool FleetShipCombo_HaveValidMmArchive(void) {
 }
 
 bool FleetShipCombo_GuestExtractStart(void) {
+#ifdef COMBO_BUILD
+    if (!Combo_IsCombinedGame())
+        return false;
+#endif
     if (!CVarGetInteger("isFleetShipCombo.Enabled", 0)) {
         return false;
     }
@@ -688,6 +697,10 @@ void FleetShipCombo_SharedInit(unsigned long instanceKey) {
 }
 
 int FleetCombo_BeatBothBosses(void) {
+#ifdef COMBO_BUILD
+    if (!Combo_IsCombinedGame())
+        return 0;
+#endif
     return CVarGetInteger("isFleetShipCombo.Enabled", 0) != 0 && CVarGetInteger("gFleetCombo.GoalMode", 0) == 0;
 }
 
@@ -698,7 +711,7 @@ int FleetCombo_BeatBothBosses(void) {
 bool Combo_OotIsForeground(void);
 
 int FleetShipCombo_GetActiveGame(void) {
-    return Combo_OotIsForeground() ? 0 : 1;
+    return Combo_IsCombinedGame() ? (Combo_OotIsForeground() ? 0 : 1) : -1;
 }
 
 void FleetShipCombo_SetActiveGame(int game) {
@@ -947,6 +960,10 @@ int FleetShipCombo_GetUiFocus(void) {
 }
 
 bool FleetShipCombo_ShowMenuUi(void) {
+#ifdef COMBO_BUILD
+    if (!Combo_IsCombinedGame())
+        return false;
+#endif
     return CVarGetInteger("isFleetShipCombo.DevUi", 0) != 0;
 }
 

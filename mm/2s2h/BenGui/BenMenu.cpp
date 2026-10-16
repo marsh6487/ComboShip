@@ -1,4 +1,8 @@
 #include "BenMenu.h"
+#ifdef COMBO_BUILD
+#include "../../../combo/ComboGameMode.h"
+#include "../../../combo/emotes/EmoteSettings.h"
+#endif
 #include <fast/Fast3dWindow.h>
 #include <fast/Fast3dGui.h>
 #include "2s2h/ShipUtils.h"
@@ -851,39 +855,38 @@ void BenMenu::AddSettings() {
             });
         })
         .Options(ButtonOptions().Tooltip("Displays a test notification."));
-#ifndef COMBO_BUILD
-    // ComboShip (#173): combo owns the timer overlay. The menu search ignores the sidebar allow-list,
-    // so leaving these here would let a search for "timer" re-open the native window.
-    path.column = SECTION_COLUMN_2;
-    AddWidget(path, "In-Game Timer", WIDGET_SEPARATOR_TEXT);
-    AddWidget(path, "Display", WIDGET_CVAR_COMBOBOX)
-        .CVar(CVAR_DISPLAY_OVERLAY_MODE)
-        .WindowName("Display Overlay")
-        .Callback([](WidgetInfo& info) {
-            int mode = CVarGetInteger(CVAR_DISPLAY_OVERLAY_MODE, TIMER_DISPLAY_NONE);
-            SetDisplayOverlayVisibility(mode != TIMER_DISPLAY_NONE);
-        })
-        .Options(
-            ComboboxOptions()
-                .Tooltip(
-                    "How the timer should be displayed in the overlay.\n\n"
-                    "- Off: Do not display a timer\n"
-                    "- Real-Time: Display the time that has elapsed since creating the save file, regardless of play.\n"
-                    "- In-Game Time: Display the time spent playing the save file")
-                .ComboVec(&timerDisplayOptions));
-    AddWidget(path, "Hide Window Background", WIDGET_CVAR_CHECKBOX)
-        .CVar("gDisplayOverlay.Background")
-        .Options(CheckboxOptions().Tooltip("Hides the background of the Display Overlay window."));
-    AddWidget(path, "Scale: %.1fx", WIDGET_CVAR_SLIDER_FLOAT)
-        .CVar("gDisplayOverlay.Scale")
-        .Options(FloatSliderOptions()
-                     .Tooltip("Adjust the Scale for the Display Overlay window.")
-                     .Min(1.0f)
-                     .Max(5.0f)
-                     .DefaultValue(1.0f)
-                     .Format("%.1f")
-                     .Step(0.1f));
-#endif
+    if (!Combo_IsCombinedGame()) {
+        // ComboShip (#173): combo owns the timer overlay. The menu search ignores the sidebar allow-list,
+        // so leaving these here would let a search for "timer" re-open the native window.
+        path.column = SECTION_COLUMN_2;
+        AddWidget(path, "In-Game Timer", WIDGET_SEPARATOR_TEXT);
+        AddWidget(path, "Display", WIDGET_CVAR_COMBOBOX)
+            .CVar(CVAR_DISPLAY_OVERLAY_MODE)
+            .WindowName("Display Overlay")
+            .Callback([](WidgetInfo& info) {
+                int mode = CVarGetInteger(CVAR_DISPLAY_OVERLAY_MODE, TIMER_DISPLAY_NONE);
+                SetDisplayOverlayVisibility(mode != TIMER_DISPLAY_NONE);
+            })
+            .Options(ComboboxOptions()
+                         .Tooltip("How the timer should be displayed in the overlay.\n\n"
+                                  "- Off: Do not display a timer\n"
+                                  "- Real-Time: Display the time that has elapsed since creating the save file, "
+                                  "regardless of play.\n"
+                                  "- In-Game Time: Display the time spent playing the save file")
+                         .ComboVec(&timerDisplayOptions));
+        AddWidget(path, "Hide Window Background", WIDGET_CVAR_CHECKBOX)
+            .CVar("gDisplayOverlay.Background")
+            .Options(CheckboxOptions().Tooltip("Hides the background of the Display Overlay window."));
+        AddWidget(path, "Scale: %.1fx", WIDGET_CVAR_SLIDER_FLOAT)
+            .CVar("gDisplayOverlay.Scale")
+            .Options(FloatSliderOptions()
+                         .Tooltip("Adjust the Scale for the Display Overlay window.")
+                         .Min(1.0f)
+                         .Max(5.0f)
+                         .DefaultValue(1.0f)
+                         .Format("%.1f")
+                         .Step(0.1f));
+    }
 
     path.column = SECTION_COLUMN_1;
     path.sidebarName = "Presets";
@@ -920,6 +923,13 @@ void BenMenu::AddSettings() {
     AddWidget(path, "Mod Menu Inline", WIDGET_CUSTOM).CustomFunction([](WidgetInfo&) {
         ComboInlineWindow("Mod Menu" COMBO_MM_WINDOW_SUFFIX, /*requiresForeground=*/false);
     });
+#endif
+#ifdef COMBO_BUILD
+    if (!Combo_IsCombinedGame()) {
+        path = { "Settings", "Emotes", SECTION_COLUMN_1 };
+        AddSidebarEntry("Settings", path.sidebarName, 1);
+        AddWidget(path, "Emotes", WIDGET_CUSTOM).CustomFunction([](WidgetInfo&) { ComboEmotes::DrawSettings(); });
+    }
 #endif
 }
 int32_t motionBlurStrength;

@@ -101,6 +101,7 @@ std::map<RandoOptionId, RandoStaticOption> Options = {
     RO(RO_HYLIAS_GRACE_REWARDS,        4),
     RO(RO_ROD_OF_SEASONS,             NEI_SEASONS_INDIVIDUAL),
     RO(RO_STARTING_ROD_OF_SEASONS,    RO_GENERIC_OFF),
+    RO(RO_MAPS_COMPASSES_GIVE_INFORMATION, RO_GENERIC_OFF),
 };
 // clang-format on
 

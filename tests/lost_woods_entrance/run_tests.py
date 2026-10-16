@@ -8,6 +8,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+MODE_PREAMBLE = '#include "ComboGameMode.h"\nextern "C" { int gComboGameMode = COMBO_GAME_BOTH; }\n'
 sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
 from run_time_pedestal_tests import block_from
 
@@ -25,7 +26,7 @@ routes = "\n".join(block_from(port, port.index(signature)) for signature in (
 
 with tempfile.TemporaryDirectory(prefix="lost-woods-arrival-") as directory:
     source = Path(directory) / "arrival.cpp"
-    source.write_text((ROOT / "tests/lost_woods_entrance/mm_arrival_test.cpp").read_text()
+    source.write_text(MODE_PREAMBLE + (ROOT / "tests/lost_woods_entrance/mm_arrival_test.cpp").read_text()
                       .replace("/* ARRIVAL_BODY */", arrival)
                       .replace("/* ROUTE_BODY */", routes)
                       .replace("/* BOOT_BODY */", body))
@@ -40,10 +41,10 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-arrival-") as directory:
     subprocess.run([str(binary)], check=True)
 
     begin = port.index("    // Reverse MM->OOT trigger:")
-    end = port.index("    // Shared Items: per-frame drain seam.", begin)
+    end = port.index("    } // Combo-only handoff hooks:", begin)
     state_begin = port.index("static bool sComboReturnPending = false;")
     state_end = port.index("// MM's own ResourceManager", state_begin)
-    source.write_text((ROOT / "tests/lost_woods_entrance/mm_handoff_test.cpp").read_text()
+    source.write_text(MODE_PREAMBLE + (ROOT / "tests/lost_woods_entrance/mm_handoff_test.cpp").read_text()
                       .replace("/* RETURN_STATE */", port[state_begin:state_end])
                       .replace("/* HANDOFF_HOOKS */", port[begin:end]))
     result = subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-w", "-fmax-errors=5",
@@ -59,7 +60,7 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-arrival-") as directory:
 
     oot = (ROOT / "soh/soh/OTRGlobals.cpp").read_text(encoding="utf-8-sig")
     oot_title = (ROOT / "soh/src/code/title_setup.c").read_text()
-    source.write_text((ROOT / "tests/lost_woods_entrance/oot_arrival_test.cpp").read_text()
+    source.write_text(MODE_PREAMBLE + (ROOT / "tests/lost_woods_entrance/oot_arrival_test.cpp").read_text()
                       .replace("/* ARRIVAL_BODY */", block_from(oot, oot.index(
                           'extern "C" void SOH_ApplyComboPortalArrival(')))
                       .replace("/* BOOT_BODY */", block_from(oot_title, oot_title.index(
@@ -81,7 +82,7 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-arrival-") as directory:
 
     begin = oot.index("    // Flag set when we want to switch to MM.")
     end = oot.index("    // ComboShip release gate:", begin)
-    source.write_text((ROOT / "tests/lost_woods_entrance/oot_handoff_test.cpp").read_text()
+    source.write_text(MODE_PREAMBLE + (ROOT / "tests/lost_woods_entrance/oot_handoff_test.cpp").read_text()
                       .replace("/* HANDOFF_HOOKS */", oot[begin:end]))
     result = subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-w", "-fmax-errors=5",
                     "-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DFMT_HEADER_ONLY",
@@ -99,3 +100,7 @@ subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/opening_forest_test.py")], check=True)
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/portal_save_test.py")], check=True)
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/mm3d_pack_test.py")], check=True)
+subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_title_card_tests.py")], check=True)
+subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/stump_return_test.py"), "--sanitize"], check=True)
+subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/stump_tool_safety_test.py")], check=True)
+subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_portal_camera_tests.py")], check=True)

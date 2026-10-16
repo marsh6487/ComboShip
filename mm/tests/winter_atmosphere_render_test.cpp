@@ -613,6 +613,20 @@ int main() {
     assert(std::memcmp(&unowned, &gSaveContext.save.shipSaveInfo.nei, sizeof(unowned)) == 0);
     assert(std::memcmp(&playerBefore, &player, sizeof(player)) == 0);
     assert(std::memcmp(&snowBefore, &nativeSnow, sizeof(nativeSnow)) == 0);
+    // Manual winter weather reaches the playable covered forest without
+    // changing its sky or inventing an aurora behind the canopy.
+    const auto forestControlSave = gSaveContext;
+    play.sceneId = SCENE_LOST_WOODS;
+    play.roomCtx.curRoom.num = 0;
+    play.skyboxId = SKYBOX_2;
+    gSaveContext.fileNum = 0;
+    gSaveContext.sceneLayer = 0;
+    gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
+    gSaveContext.save.cutsceneIndex = 0;
+    Advance(play, 30);
+    assert(Count(15) >= 8 && Count(24) == 0 && play.skyboxId == SKYBOX_2);
+    std::puts("PASS manual winter in opening Lost Woods: visible mist with the authored covered sky");
+    gSaveContext = forestControlSave;
     gSaveContext.save.time = saveBefore.save.time;
     gSaveContext.save.shipSaveInfo.nei = saveBefore.save.shipSaveInfo.nei;
     assert(std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)) == 0);

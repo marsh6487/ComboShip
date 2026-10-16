@@ -40,6 +40,7 @@ set(COMBOUI_SOURCES
     gui/ComboNotesWindow.cpp
     gui/ComboHintTracker.cpp
     gui/ComboTimersWindow.cpp
+    gui/ComboEmoteSettings.cpp
     gui/ComboCosmeticsSync.cpp
     gui/ComboSettingsSync.cpp
 )

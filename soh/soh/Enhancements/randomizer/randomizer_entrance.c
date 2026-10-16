@@ -1,3 +1,4 @@
+#include "../../../../combo/ComboGameMode.h"
 #include "rando/CrossEntranceBoss.h"
 /*
  * Much of the code here was borrowed from https://github.com/gamestabled/OoT3D_Randomizer/blob/main/code/src/entrance.c
@@ -308,13 +309,13 @@ s16 Entrance_OverrideNextIndex(s16 nextEntranceIndex) {
     Entrance_SetEntranceDiscovered(nextEntranceIndex, false);
     EntranceTracker_SetLastEntranceOverride(nextEntranceIndex);
 #ifdef COMBO_BUILD
-    int32_t composed = Combo_SOH_CrossDungeonRoute(nextEntranceIndex, true);
+    int32_t composed = Combo_IsCombinedGame() ? Combo_SOH_CrossDungeonRoute(nextEntranceIndex, true) : -1;
     if (composed >= 0)
         return Grotto_OverrideSpecialEntrance(composed);
 #endif
     s16 resolved = Entrance_GetOverride(nextEntranceIndex);
 #ifdef COMBO_BUILD
-    composed = Combo_SOH_CrossDungeonRoute(resolved, false);
+    composed = Combo_IsCombinedGame() ? Combo_SOH_CrossDungeonRoute(resolved, false) : -1;
     if (composed >= 0)
         resolved = composed;
 #endif
@@ -325,13 +326,14 @@ s16 Entrance_OverrideDynamicExit(s16 dynamicExitIndex) {
     Entrance_SetEntranceDiscovered(dynamicExitList[dynamicExitIndex], false);
     EntranceTracker_SetLastEntranceOverride(dynamicExitList[dynamicExitIndex]);
 #ifdef COMBO_BUILD
-    int32_t composed = Combo_SOH_CrossDungeonRoute(dynamicExitList[dynamicExitIndex], true);
+    int32_t composed =
+        Combo_IsCombinedGame() ? Combo_SOH_CrossDungeonRoute(dynamicExitList[dynamicExitIndex], true) : -1;
     if (composed >= 0)
         return Grotto_OverrideSpecialEntrance(composed);
 #endif
     s16 resolved = Entrance_GetOverride(dynamicExitList[dynamicExitIndex]);
 #ifdef COMBO_BUILD
-    composed = Combo_SOH_CrossDungeonRoute(resolved, false);
+    composed = Combo_IsCombinedGame() ? Combo_SOH_CrossDungeonRoute(resolved, false) : -1;
     if (composed >= 0)
         resolved = composed;
 #endif
@@ -365,7 +367,8 @@ void Entrance_SetGameOverEntrance(void) {
     s16 scene = gPlayState->sceneNum;
 
 #ifdef COMBO_BUILD
-    if (Combo_SOH_CrossBossEnabled() && scene >= SCENE_DEKU_TREE_BOSS && scene <= SCENE_SHADOW_TEMPLE_BOSS) {
+    if (Combo_IsCombinedGame() && Combo_SOH_CrossBossEnabled() && scene >= SCENE_DEKU_TREE_BOSS &&
+        scene <= SCENE_SHADOW_TEMPLE_BOSS) {
         const int32_t checkpoint = Combo_SOH_CrossDungeonDeathCheckpoint();
         if (checkpoint >= 0) {
             gSaveContext.entranceIndex = Grotto_OverrideSpecialEntrance(checkpoint);

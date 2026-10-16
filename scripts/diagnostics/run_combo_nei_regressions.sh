@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+python3 -B tests/solo_games/run_tests.py
+python3 -B tests/emotes/run_tests.py
+python3 -B tests/emotes/run_native_tests.py
+python3 -B tests/emotes/run_menu_tests.py
 python3 -B scripts/diagnostics/run_hint_item_name_tests.py
 python3 -B scripts/diagnostics/run_combo_crash_owner_tests.py
 python3 -B tools/nei_gi/test_tunic_clearance.py
@@ -22,6 +26,7 @@ python3 -B tests/cape_choice/run_tests.py --sanitize
 python3 -B scripts/diagnostics/run_anklet_icon_tests.py
 python3 -B scripts/diagnostics/run_native_heart_receipt_icon_tests.py
 python3 -B tests/item_receipts/run_seed_settings_tests.py --sanitizers
+python3 -B tests/shared_seed_settings/run_tests.py --sanitize
 python3 -B tests/item_receipts/run_mm_first_seed_gate_test.py --sanitizers
 python3 -B scripts/diagnostics/run_receipt_syntax_tests.py
 python3 -B scripts/diagnostics/run_song_gi_tests.py
@@ -60,6 +65,7 @@ python3 -B tests/mm_cape/run_texture_tests.py
 python3 -B scripts/diagnostics/run_mm_nei_tests.py
 python3 -B tests/mm_wallet/run_tests.py
 python3 -B tests/mm_editor/run_tests.py
+python3 -B tests/oot_editor/run_tests.py
 python3 -B tests/mm_grace/run_flight_tests.py
 python3 -B tests/mm_grace/run_particle_tests.py
 python3 -B tests/mm_grace/run_orientation_tests.py
@@ -70,6 +76,7 @@ python3 -B tests/nei_shared_slot/run_tests.py
 python3 -B tests/nei_shared_slot/run_ui_tests.py
 python3 -B tests/nei_shared_slot/run_sync_tests.py
 python3 -B tests/nei_shared_slot/run_save_tests.py
+python3 -B tests/moons_tear/run_tests.py
 python3 -B tests/mm_wolf/run_skin_tests.py
 python3 -B tests/mm_wolf/run_core_tests.py
 python3 -B tests/mm_wolf/run_material_glow_tests.py

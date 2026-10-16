@@ -13,6 +13,7 @@
 #include "ComboItemIconOwnership.h"
 #include "key_receipt_fixtures.h"
 #include "rando/CrossForeign.h"
+#include "rando/CrossDungeonSeed.h"
 extern "C" {
 #include "message_data_static.h"
 #include "mods/extended_inventory.h"
@@ -30,8 +31,17 @@ extern "C" {
 #include <iostream>
 #include <unordered_map>
 
+namespace OotNative {
+enum {
+#define DEFINE_ENTRANCE(entrance, ...) entrance,
+#include "soh/include/tables/entrance_table.h"
+#undef DEFINE_ENTRANCE
+};
+}
+
 extern "C" {
 PlayState *gPlayState = nullptr;
+int gComboGameMode = COMBO_GAME_BOTH;
 
 const NeiItem *Nei_FindByItem(int32_t item) {
   for (const auto &nei : sReceiptNeiItems)
@@ -146,6 +156,24 @@ const ComboRando::ForeignItem* MM_LookupForeign(RandoCheckId check) {
 }
 } // namespace Rando::MiscBehavior
 #ifndef COMPASS_DONOR_INTEGRATION
+static bool nativeHintEntranceSwap;
+extern "C" COMBO_EXPORT int32_t OOT_GetDungeonEntranceSourceName(int32_t index,char* buffer,uint32_t capacity) {
+  assert(index == OotNative::ENTR_DEKU_TREE_ENTRANCE);
+  const std::string name = nativeHintEntranceSwap ? "Forest Temple" : "Deku Tree";
+  if (!buffer || name.size() >= capacity) return 0;
+  std::memcpy(buffer,name.c_str(),name.size()+1);return name.size();
+}
+extern "C" COMBO_EXPORT int32_t OOT_GetPhysicalBossRewardName(int32_t boss,char* buffer,uint32_t capacity) {
+  assert(boss == 0);
+  const std::string name = "Deku Leaf";
+  if (!buffer || name.size() >= capacity) return 0;
+  std::memcpy(buffer,name.c_str(),name.size()+1);return name.size();
+}
+extern "C" COMBO_EXPORT int32_t OOT_GetPhysicalBossRewardPresentation(int32_t boss,CwItemReceiptPresentation* out) {
+  assert(boss == 0);*out={};out->singleBox=1;out->rewardLine=1;
+  std::strcpy(out->iconPath,"__OTR__@oot:textures/icon_item_custom/gItemIconDekuLeafTex");
+  out->iconWidth=out->iconHeight=32;return 1;
+}
 extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled() { return mapCompassInfo; }
 extern "C" COMBO_EXPORT int32_t OOT_GetSeedItemIconInfo(const char* name, CwItemIconInfo* out) {
   assert(std::string(name) == "Progressive Hookshot");
@@ -206,6 +234,9 @@ static std::string FlattenReceiptLines(const std::string& body) {
 #ifdef COMPASS_DONOR_INTEGRATION
 extern "C" void FixtureConfigureForestCompassReceipt(int information);
 extern "C" void FixtureConfigureGeneratedCompassRoute(const char* fixturePath, const char* route);
+extern "C" void FixtureConfigurePhysicalBossHints(int nativeSwap);
+extern "C" int32_t OOT_GetItemReceiptText(const char*,char*,uint32_t);
+extern "C" int32_t OOT_GetDungeonItemReceiptPresentation(const char*,CwItemReceiptPresentation*);
 
 static void CheckForestCompassReceiveRoutes(const char* fixturePath) {
   gSaveContext.fileNum = 0;
@@ -458,6 +489,211 @@ static void CheckMapCompassInformation() {
   gSaveContext = saved;
   mapCompassInfo = false;
   std::cout << "MM map/compass information: four placed rewards, foreign owner names, native entrances, owned pause/Start With, gates and no save writes passed\n";
+}
+
+static void CheckShuffledDungeonInformation() {
+  using namespace ComboRando::CrossDungeon;
+  const auto saved = gSaveContext;
+  const auto seedBefore = ComboRando::g_comboForeignJson;
+  gSaveContext.fileNum = 0;
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+  mapCompassInfo = true;
+#ifdef COMPASS_DONOR_INTEGRATION
+  FixtureConfigurePhysicalBossHints(0);
+#endif
+  std::vector<Dungeon> dungeons = {
+    {"mm:woodfall", {1, ENTRANCE(WOODFALL_TEMPLE,0)}, {1, ENTRANCE(WOODFALL,1)}, {1, ENTRANCE(WOODFALL,1)}},
+    {"mm:snowhead", {1, ENTRANCE(SNOWHEAD_TEMPLE,0)}, {1, ENTRANCE(SNOWHEAD,1)}, {1, ENTRANCE(SNOWHEAD,1)}}
+  };
+  nlohmann::json seed = {{"crossDungeonEntrances", Encode(dungeons,{1,0})}};
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());
+  ++generation;
+  for (int dungeon : {0,1}) {
+    const std::string source = dungeon == 0 ? "Snowhead" : "Woodfall";
+    const auto before = gSaveContext;
+    const auto text = Rando::GetDungeonMapCompassInfo(dungeon,false);
+    assert(text.find("at " + source) != std::string::npos && "MM map must name saved shuffled entrance");
+    assert(!std::memcmp(&before,&gSaveContext,sizeof(before)));
+    gSaveContext.save.saveInfo.inventory.dungeonItems[dungeon] |= 1 << DUNGEON_MAP;
+    const auto owned = gSaveContext;
+    assert(PauseItemDesc_GetMapInfo(dungeon,ITEM_DUNGEON_MAP) == text);
+    CustomMessage::Entry receipt;
+    assert(Rando::ApplyItemReceiptText(dungeon == 0 ? RI_WOODFALL_MAP : RI_SNOWHEAD_MAP,receipt));
+    assert(FlattenReceiptLines(receipt.msg).find(source) != std::string::npos);
+    assert(!std::memcmp(&owned,&gSaveContext,sizeof(owned)));
+    gSaveContext = before;
+  }
+  dungeons.push_back({"oot:" + std::to_string(OotNative::ENTR_DEKU_TREE_ENTRANCE),
+                     {0,OotNative::ENTR_DEKU_TREE_ENTRANCE}, {0,0x209}, {0,0x209}});
+  seed["crossDungeonEntrances"] = Encode(dungeons,{1,2,0});
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  assert(Rando::GetDungeonMapCompassInfo(0,false).find("at Deku Tree") != std::string::npos);
+#ifdef COMPASS_DONOR_INTEGRATION
+  FixtureConfigurePhysicalBossHints(1);
+#else
+  nativeHintEntranceSwap = true;
+#endif
+  assert(Rando::GetDungeonMapCompassInfo(0,false).find("at Forest Temple") != std::string::npos &&
+         "physical source composes native OoT shuffle before the saved cross route");
+#ifdef COMPASS_DONOR_INTEGRATION
+  char importedMap[2048];
+  const int importedMapSize=OOT_GetItemReceiptText("Woodfall Map",importedMap,sizeof(importedMap));
+  assert(importedMapSize>0 && std::string(importedMap,importedMapSize).find("Forest Temple")!=std::string::npos);
+  CustomMessage::Entry foreignMap;
+  assert(Rando::ApplyForeignItemReceiptText("Great Deku Tree Map",foreignMap));
+  assert(FlattenReceiptLines(foreignMap.msg).find("Snowhead")!=std::string::npos &&
+         "OoT map received in MM must invert the recorded cross route even with native shuffle Off");
+#endif
+#ifdef COMPASS_DONOR_INTEGRATION
+  FixtureConfigurePhysicalBossHints(0);
+#else
+  nativeHintEntranceSwap = false;
+#endif
+
+  const int entries[] = {ENTRANCE(WOODFALL_TEMPLE,0),ENTRANCE(SNOWHEAD_TEMPLE,0),
+                         ENTRANCE(GREAT_BAY_TEMPLE,0),ENTRANCE(STONE_TOWER_TEMPLE_INVERTED,0)};
+  const int arenas[] = {ENTRANCE(ODOLWAS_LAIR,0),ENTRANCE(GOHTS_LAIR,0),
+                        ENTRANCE(GYORGS_LAIR,0),ENTRANCE(TWINMOLDS_LAIR,0)};
+  const char* owners[] = {"mm:woodfall","mm:snowhead","mm:greatbay","mm:inverted"};
+  const char* checks[] = {"Woodfall Temple Boss Warp","Snowhead Temple Boss Warp",
+                         "Great Bay Temple Boss Warp","Stone Tower Temple Inverted Boss Warp"};
+  std::vector<Dungeon> bosses;
+  for(int i=0;i<4;++i) {
+    Dungeon b{"mm:boss:"+std::to_string(i+8),{1,arenas[i]},{1,entries[i]},{1,entries[i]}};
+    b.pool=Pool::Boss;b.boss=i+8;b.owner=owners[i];b.hasReverse=false;b.warpReturn=Endpoint{1,entries[i]};
+    bosses.push_back(b);
+    seed["mm"]["placements"][checks[i]]=Rando::StaticData::Items.at(RI_PROGRESSIVE_MAGIC).name;
+  }
+  Dungeon gohma{"oot:boss:0",{0,OotNative::ENTR_DEKU_TREE_BOSS_ENTRANCE},
+                 {0,OotNative::ENTR_DEKU_TREE_BOSS_DOOR},{0,OotNative::ENTR_DEKU_TREE_ENTRANCE}};
+  gohma.pool=Pool::Boss;gohma.boss=0;gohma.owner="oot:"+std::to_string(OotNative::ENTR_DEKU_TREE_ENTRANCE);
+  gohma.warpReturn=Endpoint{0,OotNative::ENTR_KOKIRI_FOREST_DEKU_TREE_BLUE_WARP};bosses.push_back(gohma);
+  seed["crossDungeonEntrances"]=Encode(bosses,{3,4,2,0,1});
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  const auto compass = Rando::GetDungeonMapCompassInfo(0,true);
+  assert(compass.find("Twinmold") != std::string::npos && compass.find("Odolwa") == std::string::npos);
+  assert(compass.find(Rando::StaticData::Items.at(RI_PROGRESSIVE_MAGIC).name) != std::string::npos);
+  gSaveContext.save.saveInfo.inventory.dungeonItems[0] |= 1 << DUNGEON_COMPASS;
+  assert(PauseItemDesc_GetMapInfo(0,ITEM_COMPASS) == compass);
+  const auto other = Rando::GetDungeonMapCompassInfo(1,true);
+  assert(other.find("Queen Gohma") != std::string::npos && other.find("Deku Leaf") != std::string::npos);
+  CustomMessage::Entry receipt;
+  assert(Rando::ApplyItemReceiptText(RI_SNOWHEAD_COMPASS,receipt));
+  assert(FlattenReceiptLines(receipt.msg).find("Queen Gohma") != std::string::npos);
+  assert(std::string(receipt.receiptPresentation.iconPath)=="__OTR__@oot:textures/icon_item_custom/gItemIconDekuLeafTex");
+  assert(receipt.receiptPresentation.rewardLine==1);
+#ifdef COMPASS_DONOR_INTEGRATION
+  char importedCompass[2048];
+  const int importedCompassSize=OOT_GetItemReceiptText("Snowhead Compass",importedCompass,sizeof(importedCompass));
+  assert(importedCompassSize>0 && std::string(importedCompass,importedCompassSize).find("Queen Gohma")!=std::string::npos);
+  CwItemReceiptPresentation importedPresentation{};
+  assert(OOT_GetDungeonItemReceiptPresentation("Snowhead Compass",&importedPresentation)==1);
+  assert(!std::strcmp(importedPresentation.iconPath,receipt.receiptPresentation.iconPath));
+  CustomMessage::Entry foreignCompass;
+  assert(Rando::ApplyForeignItemReceiptText("Great Deku Tree Compass",foreignCompass));
+  assert(FlattenReceiptLines(foreignCompass.msg).find("Goht")!=std::string::npos &&
+         "OoT compass received in MM must name the assigned cross-game physical boss");
+  assert(std::strstr(foreignCompass.receiptPresentation.iconPath,"gQuestIconSmallMagicJarTex"));
+  FixtureConfigurePhysicalBossHints(2);
+  ++generation;
+  assert(Rando::ApplyForeignItemReceiptText("Forest Temple Compass",foreignCompass));
+  assert(FlattenReceiptLines(foreignCompass.msg).find("Goht")!=std::string::npos &&
+         "native boss override must compose before the cross-game boss permutation");
+  gComboGameMode=COMBO_GAME_OOT;
+  const int soloSize=OOT_GetItemReceiptText("Forest Temple Compass",importedCompass,sizeof(importedCompass));
+  assert(soloSize>0 && std::string(importedCompass,soloSize).find("Queen Gohma")!=std::string::npos &&
+         "solo OoT keeps its native boss override while ignoring dormant combined seed data");
+  gComboGameMode=COMBO_GAME_BOTH;
+  auto mixed=dungeons;
+  mixed.insert(mixed.end(),bosses.begin(),bosses.end());
+  seed["crossDungeonEntrances"]=Encode(mixed,{1,2,0,6,7,5,3,4});
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  FixtureConfigurePhysicalBossHints(3);
+  assert(Rando::ApplyForeignItemReceiptText("Forest Temple Compass",foreignCompass));
+  assert(FlattenReceiptLines(foreignCompass.msg).find("Twinmold")!=std::string::npos &&
+         "a native mixed route into a dungeon must cross to its assigned temple before following that boss door");
+  FixtureConfigurePhysicalBossHints(0);
+#endif
+  std::vector<Dungeon> expanded=dungeons;
+  expanded.push_back({"mm:stonetower",{1,ENTRANCE(STONE_TOWER_TEMPLE,0)},
+                       {1,ENTRANCE(STONE_TOWER,2)},{1,ENTRANCE(STONE_TOWER,2)}});
+  expanded.push_back({"mm:inverted",{1,ENTRANCE(STONE_TOWER_TEMPLE_INVERTED,0)},
+                       {1,ENTRANCE(STONE_TOWER_INVERTED,1)},{1,ENTRANCE(STONE_TOWER_INVERTED,1)}});
+  expanded.push_back({"mm:swamp-spider-house",{1,ENTRANCE(SWAMP_SPIDER_HOUSE,0)},
+                       {1,ENTRANCE(SOUTHERN_SWAMP_POISONED,8)},{1,ENTRANCE(SOUTHERN_SWAMP_POISONED,8)}});
+  expanded.back().expanded=true;
+  seed["crossDungeonEntrances"]=Encode(expanded,{5,3,2,0,1,4});
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  const auto tower=Rando::GetDungeonMapCompassInfo(3,false);
+  assert(tower.find("normal: Snowhead; inverted: Southern Swamp's Spider House")!=std::string::npos);
+  CustomMessage::Entry towerReceipt;
+  assert(Rando::ApplyItemReceiptText(RI_STONE_TOWER_MAP,towerReceipt));
+  const auto flatTower=FlattenReceiptLines(towerReceipt.msg);
+  assert(flatTower.find("normal: Snowhead")!=std::string::npos && flatTower.find("inverted: Southern Swamp's Spider House")!=std::string::npos);
+  char exportedSource[512], exportedBoss[64];
+  assert(MM_GetDungeonEntranceName(3,exportedSource,sizeof(exportedSource))>0);
+  assert(tower.find(exportedSource)!=std::string::npos);
+  assert(MM_GetDungeonBossName(3,exportedBoss,sizeof(exportedBoss))==8 && !std::strcmp(exportedBoss,"Twinmold"));
+  char tooShort[2]={'x','x'};
+  assert(MM_GetDungeonEntranceName(3,tooShort,sizeof(tooShort))==0 && !tooShort[0]);
+  assert(MM_GetDungeonBossName(-1,tooShort,sizeof(tooShort))==0 && !tooShort[0]);
+  assert(MM_GetDungeonEntranceName(0,nullptr,0)==0);
+  seed.erase("crossDungeonEntrances");
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  assert(Rando::GetDungeonMapCompassInfo(3,false).find("at Stone Tower")!=std::string::npos);
+  // A new seed resets descriptors even if no scene, slot, or inventory changes.
+  seed["crossDungeonEntrances"]=Encode(dungeons,{0,1,2});
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  assert(Rando::GetDungeonMapCompassInfo(0,false).find("at Woodfall") != std::string::npos);
+  assert(Rando::GetDungeonMapCompassInfo(0,true).find("Odolwa") != std::string::npos);
+  seed["crossDungeonEntrances"]["permutation"]={0,0,0};
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  assert(Rando::GetDungeonMapCompassInfo(0,false).empty());
+  assert(Rando::GetDungeonMapCompassInfo(0,true).empty());
+  gComboGameMode=COMBO_GAME_MM;
+  gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_MAPS_COMPASSES_GIVE_INFORMATION]=1;
+  gSaveContext.save.shipSaveInfo.rando.randoSaveChecks[RC_WOODFALL_TEMPLE_BOSS_WARP].randoItemId=RI_PROGRESSIVE_SWORD;
+  assert(Rando::GetDungeonMapCompassInfo(0,false).find("at Woodfall") != std::string::npos);
+  assert(Rando::GetDungeonMapCompassInfo(0,true).find(Rando::StaticData::Items.at(RI_PROGRESSIVE_SWORD).name) != std::string::npos);
+  const RandoItemId nativeMaps[]={RI_WOODFALL_MAP,RI_SNOWHEAD_MAP,RI_GREAT_BAY_MAP,RI_STONE_TOWER_MAP};
+  const RandoItemId nativeCompasses[]={RI_WOODFALL_COMPASS,RI_SNOWHEAD_COMPASS,RI_GREAT_BAY_COMPASS,RI_STONE_TOWER_COMPASS};
+  const RandoCheckId nativeRewards[]={RC_WOODFALL_TEMPLE_BOSS_WARP,RC_SNOWHEAD_TEMPLE_BOSS_WARP,
+      RC_GREAT_BAY_TEMPLE_BOSS_WARP,RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_WARP};
+  for(int enabled:{0,1,0}) {
+    gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_MAPS_COMPASSES_GIVE_INFORMATION]=enabled;
+    for(int d=0;d<4;++d) {
+      gSaveContext.save.shipSaveInfo.rando.randoSaveChecks[nativeRewards[d]].randoItemId=RI_PROGRESSIVE_SWORD;
+      gSaveContext.save.saveInfo.inventory.dungeonItems[d]=(1<<DUNGEON_MAP)|(1<<DUNGEON_COMPASS);
+      const auto before=gSaveContext;
+      const auto map=Rando::GetDungeonMapCompassInfo(d,false);
+      const auto compass=Rando::GetDungeonMapCompassInfo(d,true);
+      assert(map.empty()==!enabled && compass.empty()==!enabled);
+      assert(bool(PauseItemDesc_GetMapInfo(d,ITEM_DUNGEON_MAP))==bool(enabled));
+      assert(bool(PauseItemDesc_GetMapInfo(d,ITEM_COMPASS))==bool(enabled));
+      CustomMessage::Entry mapReceipt,compassReceipt;
+      const bool mapHandled=Rando::ApplyItemReceiptText(nativeMaps[d],mapReceipt);
+      const bool compassHandled=Rando::ApplyItemReceiptText(nativeCompasses[d],compassReceipt);
+      if(enabled) {
+        assert(mapHandled && compassHandled);
+        assert(mapReceipt.msg.find("entrance")!=std::string::npos);
+        assert(compassReceipt.msg.find("It points to")!=std::string::npos);
+        assert(std::strstr(compassReceipt.receiptPresentation.iconPath,"KokiriSword"));
+        assert(compass.find("Progressive Sword")!=std::string::npos);
+      } else {
+        assert(!mapReceipt.receiptPresentation.singleBox && !compassReceipt.receiptPresentation.singleBox);
+        assert(mapReceipt.msg.find("It seems the entrance") == std::string::npos);
+        assert(compassReceipt.msg.find("It points to") == std::string::npos);
+      }
+      assert(!std::memcmp(&before,&gSaveContext,sizeof(before)));
+    }
+  }
+  std::cout<<"PASS solo 2Ship: all four native map/compass collection and owned-pause paths, saved Off/On/Off, physical rewards, stale combined seed ignored and save isolation\n";
+  gComboGameMode=COMBO_GAME_BOTH;
+  ComboRando::Combo_SetForeignJson(seedBefore.c_str());
+  ++generation;
+  gSaveContext = saved;
+  mapCompassInfo = false;
+  std::cout << "PASS MM information: saved map/boss permutations, native composition, physical rewards/icons, collection/C-Up, reload, malformed and solo ownership\n";
 }
 
 static void CheckRandomRupeeReceipts() {
@@ -798,6 +1034,7 @@ int main(int argc, char** argv) {
   assert(!std::memcmp(&capeNeiBefore, &neiSave, sizeof(capeNeiBefore)));
 #ifdef COMPASS_DONOR_INTEGRATION
   CheckForestCompassReceiveRoutes(argc > 1 ? argv[1] : nullptr);
+  CheckShuffledDungeonInformation();
   return 0;
 #else
   // Header is deliberately a story entry with a different icon and next ID.
@@ -828,6 +1065,7 @@ int main(int argc, char** argv) {
   entry.icon = 0xF5;
   CheckDungeonKeyReceipts();
   CheckMapCompassInformation();
+  CheckShuffledDungeonInformation();
   // Native MM receipt and exported icon both retain MM's own shield artwork.
   stagedIconPath = nullptr;
   assert(Rando::StaticData::GetIconForZMessage(RI_SHIELD_MIRROR) == 0xF5);

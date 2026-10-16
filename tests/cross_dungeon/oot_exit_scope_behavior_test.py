@@ -20,6 +20,8 @@ def body(source,name):
     assert match,name+' production function is missing'
     return block_from(source,match.start())
 source=r'''
+#include "ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include "rando/CrossDungeonState.h"
 #include "rando/CrossEntranceBoss.h"
 #include <cassert>

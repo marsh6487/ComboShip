@@ -1,5 +1,6 @@
 // Included by BenPort.cpp next to the native MM reachability oracle.
 #include "rando/CrossDungeonState.h"
+#include "ComboGameMode.h"
 #include "rando/CrossEntranceMmCatalogue.h"
 #include "rando/CrossEntranceTime.h"
 namespace ComboCrossMm {
@@ -48,7 +49,7 @@ static std::vector<Dungeon> Catalogue(const PoolOptions& options) {
 } // namespace ComboCrossMm
 extern "C" int Combo_MM_CrossDungeonEntranceFromRegion(int index, int region) {
     using namespace ComboCrossMm;
-    if (!searching)
+    if (!Combo_IsCombinedGame() || !searching)
         return index;
     const int grottoExit = ComboCrossMmCatalogue::GrottoExitForRegion(static_cast<RandoRegionId>(region));
     const int original = grottoExit >= 0 ? grottoExit : index;
@@ -103,9 +104,11 @@ extern "C" COMBO_EXPORT int MM_CanEnterCrossEntrance(int32_t index) {
                                                              false);
 }
 extern "C" int Combo_MM_CrossBossLogicEnabled(void) {
-    return ComboCrossMm::state.HasPool(ComboRando::CrossDungeon::Pool::Boss);
+    return Combo_IsCombinedGame() && ComboCrossMm::state.HasPool(ComboRando::CrossDungeon::Pool::Boss);
 }
 extern "C" COMBO_EXPORT int MM_SetCrossDungeonSeed(const char* raw) {
+    if (!Combo_IsCombinedGame())
+        return 0;
     using namespace ComboCrossMm;
     try {
         auto seed = nlohmann::json::parse(raw ? raw : "null");

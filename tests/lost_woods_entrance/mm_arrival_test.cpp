@@ -20,6 +20,8 @@ PlayState* gPlayState;
 GameState* gGameState;
 static bool sRememberLocation;
 static int hookCount = 0;
+static int queuedCameraRoute = -1, queuedCameraCount = 0;
+extern "C" void ComboForestArrivalCamera_Queue(int route) { queuedCameraRoute = route; ++queuedCameraCount; }
 static int crossArrival = -1, bossRecovery = -1, savedRecovery = -1, fwArrival = -1;
 extern "C" int32_t Combo_MM_ConsumeCrossDungeonArrival(void) {
     if (crossArrival >= 0) gSaveContext.respawnFlag = 0;
@@ -77,6 +79,8 @@ int main() {
             "Lost Woods crossing must arrive in Woods of Mystery, not Clock Town");
     require(gSaveContext.respawnFlag == 2 && gSaveContext.respawn[RESPAWN_MODE_RETURN].roomIndex == 1,
             "arrival must use the first clearing and the native return respawn");
+    require(queuedCameraRoute == COMBO_PORTAL_LOST_WOODS && queuedCameraCount == 1,
+            "the real portal arrival must queue its camera exactly once after loading the destination");
     require(gSaveContext.respawn[RESPAWN_MODE_RETURN].pos.x == 0 &&
             gSaveContext.respawn[RESPAWN_MODE_RETURN].pos.z == 0,
             "arrival must face out of the side passage, outside its return trigger");

@@ -49,7 +49,7 @@ void Rando::MiscBehavior::InvalidateComboForeignCache() {
 // RI_COMBO_FOREIGN. Returns nullptr when the check isn't foreign. Keyed by Checks[].name (RC_*).
 const ComboRando::ForeignItem* Rando::MiscBehavior::MM_LookupForeign(RandoCheckId rc) {
     int slot = gSaveContext.fileNum;
-    if (slot == 0xFF)
+    if (!Combo_IsCombinedGame() || slot == 0xFF)
         return nullptr; // no real save loaded (title screen sentinel)
     if (g_mmForeignGen != g_comboRandoGen) {
         g_mmForeignMap = ComboRando::LoadForeignForGame(slot, ComboRando::GAME_MM);
@@ -62,6 +62,8 @@ const ComboRando::ForeignItem* Rando::MiscBehavior::MM_LookupForeign(RandoCheckI
 // ComboShip: deliver a foreign-marked check's real item to its home game, toast, and persist the
 // save (caller sets the obtained flags). Exposed so the shop buy path can reuse it.
 void Rando::MiscBehavior::SendForeignCheck(RandoCheckId rc) {
+    if (!Combo_IsCombinedGame())
+        return;
     int slot = gSaveContext.fileNum;
     if (g_mmForeignGen != g_comboRandoGen) {
         g_mmForeignMap = ComboRando::LoadForeignForGame(slot, ComboRando::GAME_MM);
@@ -237,20 +239,21 @@ void Rando::MiscBehavior::CheckQueue() {
                         if (randoItemId == RI_TRIFORCE_PIECE) {
 #ifdef COMBO_BUILD
                             // ComboShip (#136): the goal counts BOTH games' pieces.
-                            const int comboPieces =
-                                gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces + 1 +
-                                (gMMComboOtherTriforceCount != NULL ? gMMComboOtherTriforceCount() : 0);
-                            if (gMMComboGoalRequired > 0 && comboPieces >= gMMComboGoalRequired) {
-                                prefix = "You";
-                                message = "completed the Triforce";
-                            }
-#else
-                            if (gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces + 1 >=
-                                RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED]) {
-                                prefix = "You";
-                                message = "completed the Triforce";
-                            }
+                            if (Combo_IsCombinedGame()) {
+                                const int comboPieces =
+                                    gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces + 1 +
+                                    (gMMComboOtherTriforceCount != NULL ? gMMComboOtherTriforceCount() : 0);
+                                if (gMMComboGoalRequired > 0 && comboPieces >= gMMComboGoalRequired) {
+                                    prefix = "You";
+                                    message = "completed the Triforce";
+                                }
+                            } else
 #endif
+                                if (gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces + 1 >=
+                                    RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED]) {
+                                prefix = "You";
+                                message = "completed the Triforce";
+                            }
                             randoItemId = RI_TRIFORCE_PIECE_PREVIOUS;
                         }
 

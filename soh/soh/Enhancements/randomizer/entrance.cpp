@@ -1,3 +1,4 @@
+#include "../../../../combo/ComboGameMode.h"
 #include "entrance.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 
@@ -11,6 +12,9 @@
 #include "soh/ShipInit.hpp"
 #include "z64camera.h"
 #include "z64scene.h"
+#ifdef COMBO_BUILD
+#include "rando/CrossEntranceOotShops.h"
+#endif
 
 #include <spdlog/spdlog.h>
 #include <stdexcept>
@@ -112,11 +116,12 @@ extern "C" int Combo_SOH_CrossDungeonRegion(int index, int resolved, int fallbac
 #endif
 RandomizerRegion Entrance::GetConnectedRegionKey() const {
 #ifdef COMBO_BUILD
-    return static_cast<RandomizerRegion>(
-        Combo_SOH_CrossDungeonRegion(index, replacement ? replacement->GetIndex() : index, connectedRegion));
-#else
-    return connectedRegion;
+    if (Combo_IsCombinedGame()) {
+        return static_cast<RandomizerRegion>(
+            Combo_SOH_CrossDungeonRegion(index, replacement ? replacement->GetIndex() : index, connectedRegion));
+    }
 #endif
+    return connectedRegion;
 }
 
 RandomizerRegion Entrance::GetOriginalConnectedRegionKey() const {
@@ -676,6 +681,16 @@ static void SetShuffledEntrances(EntrancePools entrancePools) {
     }
 }
 
+#ifdef COMBO_BUILD
+static bool IsComboRetailShopEndpoint(const Entrance* entrance) {
+    for (const auto& pair : GetEntranceShuffleTable())
+        if (ComboRando::CrossDungeon::IsOotRetailShopEntrance(pair.first.index) &&
+            (entrance->GetIndex() == pair.first.index || entrance->GetIndex() == pair.second.index))
+            return true;
+    return false;
+}
+#endif
+
 static std::vector<Entrance*>
 BuildOneWayTargets(std::vector<EntranceType> typesToInclude,
                    std::vector<std::pair<RandomizerRegion, RandomizerRegion>> exclude = {} /*, target_region_names*/) {
@@ -684,6 +699,10 @@ BuildOneWayTargets(std::vector<EntranceType> typesToInclude,
     for (EntranceType poolType : typesToInclude) {
         SohUtils::AppendVector(oneWayEntrances, GetShuffleableEntrances(poolType, false));
     }
+#ifdef COMBO_BUILD
+    // Shops belong solely to the cross-game Shop pool, including one-way native targets.
+    std::erase_if(oneWayEntrances, IsComboRetailShopEndpoint);
+#endif
     // Filter out any that are passed in the exclusion list
     std::erase_if(oneWayEntrances, [&exclude](Entrance* entrance) {
         std::pair<RandomizerRegion, RandomizerRegion> entranceBeingChecked(entrance->GetParentRegionKey(),
@@ -1326,6 +1345,11 @@ int EntranceShuffler::ShuffleAllEntrances() {
             SohUtils::AppendVector(entrancePools[EntranceType::Interior],
                                    GetShuffleableEntrances(EntranceType::SpecialInterior));
         }
+#ifdef COMBO_BUILD
+        // Remove both directions before decoupling or mixing with another native category.
+        // Recorded native entrance maps are replayed separately and remain unchanged.
+        std::erase_if(entrancePools[EntranceType::Interior], IsComboRetailShopEndpoint);
+#endif
         // ComboShip: (#134) keep the Happy Mask Shop (OOT->MM portal) entrance vanilla
         if (ctx->GetOption(RSK_EXCLUDE_MASK_SHOP_ENTRANCE)) {
             std::erase_if(entrancePools[EntranceType::Interior], [](const Entrance* entrance) {

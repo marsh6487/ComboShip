@@ -1,3 +1,4 @@
+#include "../../../../../combo/ComboGameMode.h"
 #include "rando/CrossEntranceBoss.h"
 /*
  * File: z_player.c
@@ -4173,7 +4174,7 @@ void Player_UseItem(PlayState* play, Player* this, s32 item) {
                 // Handle magic spells
                 s32 isMedallionSpell = SW97_MEDALLIONS_ENABLED() && Sw97_IsMedallionItem(item);
 #ifdef COMBO_BUILD
-                if (itemAction == PLAYER_IA_FARORES_WIND && !isMedallionSpell &&
+                if (Combo_IsCombinedGame() && itemAction == PLAYER_IA_FARORES_WIND && !isMedallionSpell &&
                     !ComboFw_HasPoint(gSaveContext.respawn[RESPAWN_MODE_TOP].data > 0) &&
                     (play->sceneNum == SCENE_GROTTOS || play->sceneNum == SCENE_FAIRYS_FOUNTAIN)) {
                     // DOWN is the parent entrance here; don't silently set a point outside.

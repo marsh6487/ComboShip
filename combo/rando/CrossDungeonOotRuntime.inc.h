@@ -1,5 +1,6 @@
 // Gameplay route ownership is deliberately separate from CrossDungeonOot.inc.h's oracle state.
 #include "rando/CrossDungeonRuntime.h"
+#include "ComboGameMode.h"
 #include "soh/Enhancements/randomizer/randomizer_grotto.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance.h"
 void Combo_SOH_CapturePendingChecks();
@@ -112,6 +113,8 @@ extern "C" int Combo_SOH_CrossDungeonTransitionPending(void) {
     return ComboCrossOotRuntime::pending.has_value();
 }
 extern "C" int Combo_SOH_CompleteCrossDungeonTransition(void) {
+    if (!Combo_IsCombinedGame())
+        return 0;
     if (!ComboCrossOotRuntime::pending)
         return 0;
     ComboCrossOotRuntime::departureFadeComplete = true;
@@ -133,6 +136,8 @@ extern "C" int32_t Combo_SOH_CrossDungeonGrottoId(void) {
     return owner->entrance.index - ENTRANCE_GROTTO_LOAD_START;
 }
 extern "C" COMBO_EXPORT int SOH_SetCrossDungeonRuntimeSeed(const char* raw) try {
+    if (!Combo_IsCombinedGame())
+        return 0;
     auto seed = nlohmann::json::parse(raw ? raw : "null");
     const auto routes = ComboRando::CrossDungeon::Decode(seed);
     for (const auto& route : routes)
@@ -159,10 +164,10 @@ extern "C" COMBO_EXPORT int SOH_SetCrossDungeonRuntimeSeed(const char* raw) try 
     return 0;
 }
 extern "C" COMBO_EXPORT int Combo_SOH_CrossDungeonRuntimeEnabled(void) {
-    return ComboCrossOotRuntime::state.Enabled() ? 1 : 0;
+    return Combo_IsCombinedGame() && ComboCrossOotRuntime::state.Enabled();
 }
 extern "C" int Combo_SOH_CrossBossEnabled(void) {
-    return gSaveContext.gameMode == GAMEMODE_NORMAL && gSaveContext.fileNum <= 2 &&
+    return Combo_IsCombinedGame() && gSaveContext.gameMode == GAMEMODE_NORMAL && gSaveContext.fileNum <= 2 &&
            ComboCrossOotRuntime::state.HasPool(ComboRando::CrossDungeon::Pool::Boss);
 }
 extern "C" int32_t Combo_SOH_CrossDungeonDeathCheckpoint(void) {
@@ -178,12 +183,16 @@ extern "C" void Combo_SOH_RestoreCrossDungeonCheckpoint(int32_t index) {
     localDungeonArrival = localArrivalCheckpoint = -1;
 }
 extern "C" COMBO_EXPORT int SOH_QueueCrossDungeonArrival(int32_t index) {
+    if (!Combo_IsCombinedGame())
+        return 0;
     if (!ComboCrossOotRuntime::state.QueueArrival(index))
         return 0;
     ComboCrossOotRuntime::pendingBossRecovery.reset();
     return 1;
 }
 extern "C" COMBO_EXPORT int SOH_QueueCrossBossRecovery(int game, int32_t index) {
+    if (!Combo_IsCombinedGame())
+        return 0;
     using namespace ComboCrossOotRuntime;
     const auto recovery = state.RecoveryForBoss({ game, index });
     if (!recovery || recovery->source.game != 0 || !ValidEntrance(recovery->parent.index) ||
@@ -193,6 +202,8 @@ extern "C" COMBO_EXPORT int SOH_QueueCrossBossRecovery(int game, int32_t index) 
     return 1;
 }
 extern "C" int32_t Combo_SOH_ConsumeCrossBossRecoveryResume(void) {
+    if (!Combo_IsCombinedGame())
+        return -1;
     using namespace ComboCrossOotRuntime;
     const auto recovery = state.ConsumeBossRecovery();
     if (!recovery)
@@ -202,6 +213,8 @@ extern "C" int32_t Combo_SOH_ConsumeCrossBossRecoveryResume(void) {
     return Materialize(recovery->parent.index);
 }
 extern "C" int32_t Combo_SOH_ConsumeCrossDungeonArrival(void) {
+    if (!Combo_IsCombinedGame())
+        return -1;
     const int32_t index = ComboCrossOotRuntime::state.ConsumeArrival();
     if (index >= 0) {
         const int32_t recovery = ComboCrossOotRuntime::state.RecoveryForArrival(index);
@@ -212,6 +225,8 @@ extern "C" int32_t Combo_SOH_ConsumeCrossDungeonArrival(void) {
 }
 // Called on each side of native lookup, never on a composed/queued arrival or death/save respawn.
 extern "C" int32_t Combo_SOH_CrossDungeonRoute(int32_t index, int beforeNative) {
+    if (!Combo_IsCombinedGame())
+        return -1;
     using namespace ComboCrossOotRuntime;
     if (!gPlayState || gSaveContext.gameMode != GAMEMODE_NORMAL || gSaveContext.fileNum > 2)
         return -1;

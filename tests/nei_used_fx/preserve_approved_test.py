@@ -1,7 +1,8 @@
-# Approved GI17 policy blob, shared by the published baseline and local mirror. Requires baseline git history.
+# Approved GI17 policy blob, pinned with its original Git identity.
 import subprocess,tempfile,pathlib
+from baseline_sources import read_source
 root=pathlib.Path(__file__).resolve().parents[2]
-old=subprocess.check_output(['git','cat-file','blob','abbaeb809c01db6684b021db46c8a5e0095dd3db'],cwd=root,text=True).replace('namespace NeiUsedMagic {','namespace Before {').replace('#include "NeiGiEffectPolicy.h"','#include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"')
+old=read_source('c77c18587a976f6d6cb5c8f91f27593286469218','soh/soh/Enhancements/randomizer/NeiUsedMagicPolicy.h').replace('namespace NeiUsedMagic {','namespace Before {').replace('#include "NeiGiEffectPolicy.h"','#include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"')
 source='''#include "soh/Enhancements/randomizer/NeiUsedMagicPolicy.h"
 #include "old.h"
 #include <cassert>

@@ -14,6 +14,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
@@ -33,7 +34,9 @@
 #include "soh/Enhancements/randomizer/randomizerEnumStrings.h"
 #include "soh/Enhancements/Lang/Lang.h"
 #include "rando/SharedItems.h"
+#include "rando/OotDungeonLayouts.h"
 #include "ComboExport.h"
+#include "ComboGameMode.h"
 #include "NeiGracePolicy.h"
 #include "NeiSeasonsPolicy.h"
 // Expose only native registration/section state to this synchronous fixture.
@@ -57,6 +60,7 @@ std::variant<std::reference_wrapper<const std::string>, Lang::Error> TryTranslat
 }
 extern "C" {
 SaveContext gSaveContext{};
+int gComboGameMode = COMBO_GAME_BOTH;
 int gComboGoalHunt = 0, gComboGoalRequired = 0, gComboGoalPieces = 0;
 int gComboStartingGameMM = 1, gComboSharedMask = 0;
 }
@@ -84,11 +88,19 @@ extern "C" void CVarClear(const char* key) {
 struct OTRGlobals {
     static OTRGlobals* Instance;
     std::shared_ptr<Rando::Context> gRandoContext;
-    bool HasOriginal() const { return true; }
-    bool HasMasterQuest() const { return true; }
+    bool original = true, masterQuest = true;
+    bool HasOriginal() const { return original; }
+    bool HasMasterQuest() const { return masterQuest; }
 };
 static OTRGlobals globals;
 OTRGlobals* OTRGlobals::Instance = &globals;
+#ifdef COMBO_MQ_LAYOUT_TESTS
+extern "C" int Combo_SOH_GenerationQuestAssets(void);
+#else
+extern "C" int Combo_SOH_GenerationQuestAssets(void) {
+    return (globals.original ? 1 : 0) | (globals.masterQuest ? 2 : 0);
+}
+#endif
 
 namespace Rando {
 // The graph pool is a fixture boundary; every edge below is a native Entrance.
@@ -99,7 +111,10 @@ std::weak_ptr<Context> Context::mContext;
 std::shared_ptr<Settings> Settings::mInstance;
 std::array<Location, RC_MAX> StaticData::locationTable;
 Location* StaticData::GetLocation(RandomizerCheck rc) { return &locationTable[rc]; }
-std::unordered_map<uint32_t, RandomizerHintTextKey> StaticData::trialData;
+std::unordered_map<uint32_t, RandomizerHintTextKey> StaticData::trialData = {
+    { TK_LIGHT_TRIAL, RHT_LIGHT_TRIAL }, { TK_FOREST_TRIAL, RHT_FOREST_TRIAL }, { TK_FIRE_TRIAL, RHT_FIRE_TRIAL },
+    { TK_WATER_TRIAL, RHT_WATER_TRIAL }, { TK_SHADOW_TRIAL, RHT_SHADOW_TRIAL }, { TK_SPIRIT_TRIAL, RHT_SPIRIT_TRIAL },
+};
 std::unordered_map<std::string, RandomizerSettingKey> StaticData::optionNameToEnum;
 std::unordered_map<std::string, RandomizerCheck> StaticData::locationNameToEnum;
 std::array<std::pair<RandomizerCheck, RandomizerCheck>, 17> StaticData::randomizerFishingPondFish{};
@@ -107,6 +122,16 @@ std::array<std::pair<RandomizerCheck, RandomizerCheck>, 17> StaticData::randomiz
 
 SaveManager* SaveManager::Instance = nullptr;
 SaveManager::SaveManager() {}
+#ifdef COMBO_MQ_LAYOUT_TESTS
+// Graph/inventory construction is outside this layout-state boundary. Keep the
+// actual Context, Settings, Dungeons, RNG, Combo prep/oracle and save code.
+void RegionTable_Init() {}
+void GenerateStartingInventory() {}
+static void Combo_ApplyEnabledTricks() {}
+static std::set<RandomizerCheck> Combo_ParseExcludedLocations() { return {}; }
+void Rando::Logic::Reset(bool) {}
+void Rando::Context::GenerateLocationPool() {}
+#endif
 #include "seed_settings_production.inc"
 
 static void Check(bool condition, const char* message) {
@@ -123,6 +148,10 @@ static void ResetContext(std::shared_ptr<Rando::Context>& context) {
     context = Rando::Context::CreateInstance();
     Rando::Settings::GetInstance()->AssignContext(context);
 }
+
+#ifdef COMBO_MQ_LAYOUT_TESTS
+#include "../rom_setup/layout_cases.inc"
+#endif
 
 static void DumpReceiptEntranceFixtures(const std::shared_ptr<Rando::Context>& context, const char* filename) {
     using namespace Rando;
@@ -186,6 +215,9 @@ static void DumpReceiptEntranceFixtures(const std::shared_ptr<Rando::Context>& c
 }
 
 int main(int argc, char** argv) {
+#ifdef COMBO_MQ_LAYOUT_TESTS
+    return RunMqLayoutTests();
+#endif
     SaveManager storage;
     SaveManager::Instance = &storage;
     auto settings = Rando::Settings::GetInstance();

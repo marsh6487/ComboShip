@@ -9,6 +9,7 @@
 #include <ship/Context.h>
 
 #include "debugSaveEditor.h"
+#include "NeiEditorItems.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/static_data.h"
 #include "soh/Enhancements/randomizer/item.h"
@@ -142,6 +143,63 @@ static const char* GetItemDisplayName(int32_t item) {
         return unknownName;
     }
     return SohUtils::GetItemName(item).c_str();
+}
+
+// Use current item identities and the game's icon resolver for the widened NEI
+// cells. The old ImGui mapping only describes the pre-Slate byte inventory.
+static const char* NeiEditor_ItemName(uint16_t item) {
+    RandomizerGet rg = RG_NONE;
+    switch (item) {
+        case ITEM_NONE:
+            return "None";
+        case ITEM_ROCS_FEATHER_SKIJER:
+            return "Roc's Feather";
+        case ITEM_ELEMENTAL_WAND:
+            rg = RG_ELEMENTAL_WAND;
+            break;
+        case EXT_ITEM_SHEIKAH_SLATE:
+            rg = RG_SHEIKAH_SLATE;
+            break;
+        case EXT_ITEM_PHANTOM_HOURGLASS:
+            rg = RG_PHANTOM_HOURGLASS;
+            break;
+        case EXT_ITEM_SHADOW_CRYSTAL:
+            rg = RG_SHADOW_CRYSTAL;
+            break;
+        case EXT_ITEM_ROD_OF_SEASONS:
+            rg = RG_ROD_OF_SEASONS;
+            break;
+        default:
+            if (const auto* entry = Nei_FindByItem(item); entry && entry->rg != NEI_NO_RG) {
+                rg = static_cast<RandomizerGet>(entry->rg);
+            }
+            break;
+    }
+    if (rg > RG_NONE && rg < RG_MAX) {
+        return Rando::StaticData::RetrieveItem(rg).GetName().GetForLanguage(gSaveContext.language).c_str();
+    }
+    static char unknownName[32];
+    snprintf(unknownName, sizeof(unknownName), "Item 0x%04X", item);
+    return unknownName;
+}
+
+static bool NeiEditor_ItemButton(uint16_t item) {
+    auto gui = std::dynamic_pointer_cast<Fast::Fast3dGui>(Ship::Context::GetRawInstance()->GetWindow()->GetGui());
+    const auto* icon = item == ITEM_NONE ? nullptr : static_cast<const char*>(ExtInv_GetItemIcon(item));
+    if (icon && !gui->HasTextureByName(icon)) {
+        if (Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(icon, true)) {
+            gui->LoadGuiTexture(icon, icon, "", ImVec4(1, 1, 1, 1));
+        }
+    }
+    if (icon && gui->HasTextureByName(icon)) {
+        return ImGui::ImageButton("##neiItem", gui->GetTextureByName(icon), ImVec2(IMAGE_SIZE, IMAGE_SIZE),
+                                  ImVec2(0, 0), ImVec2(1, 1));
+    }
+    PushStyleButton(Colors::DarkGray);
+    const bool clicked = ImGui::Button(item == ITEM_NONE ? "##neiItem" : NeiEditor_ItemName(item),
+                                       ImVec2(IMAGE_SIZE, IMAGE_SIZE) + ImGui::GetStyle().FramePadding * 2);
+    PopStyleButton();
+    return clicked;
 }
 
 IntSliderOptions intSliderOptionsBase;
@@ -1838,18 +1896,11 @@ void DrawInventoryTab() {
     if (ImGui::CollapsingHeader("Custom Items Inventory (Page 2)", ImGuiTreeNodeFlags_DefaultOpen)) {
         // Quick action buttons
         if (ImGui::Button("Give All Custom Items (Max)")) {
-            for (int i = 0; i < 24; i++) {
-                // Give max upgrade for progressive items
-                if (i == 0) {
-                    // Slot 24: Give Roc's Cape (max upgrade) instead of Roc's Feather
-                    Nei_SetOwnedItem((uint8_t)(24 + i), ITEM_ROCS_CAPE); // Skijer's NEI
-                } else if (gPage2Items[i] != ITEM_NONE) {
-                    // A hole here is a cell owned by an EXT (u16) item this u8 table cannot hold —
-                    // writing it would CLEAR that cell instead of filling it. Skijer's NEI
-                    Nei_SetOwnedItem((uint8_t)(24 + i), gPage2Items[i]); // Skijer's NEI
-                }
-            }
+            OotNeiEditor::GrantAll();
+            Nei_Save()->pokeballOwned = 1;
+            Flags_SetRandomizerInf(RAND_INF_OBTAINED_MARIO_MASK);
         }
+        UIWidgets::Tooltip("All current Page 2 items and powers, including wand medallions when required.");
         ImGui::SameLine();
         if (ImGui::Button("Clear All Custom Items")) {
             for (int i = 24; i < 48; i++) {
@@ -1875,37 +1926,7 @@ void DrawInventoryTab() {
 
                 uint16_t item = ExtInv_GetSlotItem(slotIndex); // Skijer's NEI
 
-                bool clicked = false;
-                if (item != ITEM_NONE) {
-                    auto it = customItemMapping.find(item);
-                    if (it != customItemMapping.end()) {
-                        const ItemMapEntry& slotEntry = it->second;
-                        auto tex = std::dynamic_pointer_cast<Fast::Fast3dGui>(
-                                       Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                                       ->GetTextureByName(slotEntry.name);
-                        if (tex) {
-                            clicked = ImGui::ImageButton(slotEntry.name.c_str(), tex, ImVec2(IMAGE_SIZE, IMAGE_SIZE),
-                                                         ImVec2(0, 0), ImVec2(1, 1));
-                        } else {
-                            PushStyleButton(Colors::DarkGray);
-                            clicked = ImGui::Button(slotEntry.name.c_str(), ImVec2(IMAGE_SIZE, IMAGE_SIZE) +
-                                                                                ImGui::GetStyle().FramePadding * 2);
-                            PopStyleButton();
-                        }
-                    } else {
-                        char buttonLabel[64];
-                        snprintf(buttonLabel, sizeof(buttonLabel), "0x%02X##customslot%d", item, slotIndex);
-                        PushStyleButton(Colors::DarkGray);
-                        clicked = ImGui::Button(buttonLabel,
-                                                ImVec2(IMAGE_SIZE, IMAGE_SIZE) + ImGui::GetStyle().FramePadding * 2);
-                        PopStyleButton();
-                    }
-                } else {
-                    PushStyleButton(Colors::DarkGray);
-                    clicked = ImGui::Button("##customItemNone",
-                                            ImVec2(IMAGE_SIZE, IMAGE_SIZE) + ImGui::GetStyle().FramePadding * 2);
-                    PopStyleButton();
-                }
+                bool clicked = NeiEditor_ItemButton(item);
                 if (clicked) {
                     selectedCustomIndex = slotIndex;
                     ImGui::OpenPopup(customItemPopupPicker);
@@ -1914,9 +1935,10 @@ void DrawInventoryTab() {
                 // Tooltip showing slot number and item ID
                 if (ImGui::IsItemHovered()) {
                     ImGui::BeginTooltip();
+                    ImGui::TextUnformatted(NeiEditor_ItemName(item));
                     ImGui::Text("Slot %d", slotIndex);
                     if (item != ITEM_NONE) {
-                        ImGui::Text("Item ID: 0x%02X", item);
+                        ImGui::Text("Item ID: 0x%04X", item);
                     }
                     ImGui::EndTooltip();
                 }
@@ -1934,38 +1956,17 @@ void DrawInventoryTab() {
                     PopStyleButton();
                     UIWidgets::Tooltip("None");
 
-                    // Show all 24 custom items from gPage2Items
+                    // Current u16 cell owners, including Slate, Crystal and Seasons.
                     for (int32_t pickerIndex = 0; pickerIndex < 24; pickerIndex++) {
                         if (((pickerIndex + 1) % 8) != 0) {
                             ImGui::SameLine();
                         }
 
-                        uint8_t customItemId = gPage2Items[pickerIndex];
-                        auto it = customItemMapping.find(customItemId);
-
-                        bool ret = false;
-                        if (it != customItemMapping.end()) {
-                            const ItemMapEntry& entry = it->second;
-                            auto tex = std::dynamic_pointer_cast<Fast::Fast3dGui>(
-                                           Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                                           ->GetTextureByName(entry.name);
-                            if (tex) {
-                                ret = ImGui::ImageButton(entry.name.c_str(), tex, ImVec2(IMAGE_SIZE, IMAGE_SIZE),
-                                                         ImVec2(0, 0), ImVec2(1, 1));
-                            } else {
-                                PushStyleButton(Colors::DarkGray);
-                                ret = ImGui::Button(entry.name.c_str(), ImVec2(IMAGE_SIZE, IMAGE_SIZE) +
-                                                                            ImGui::GetStyle().FramePadding * 2);
-                                PopStyleButton();
-                            }
-                            UIWidgets::Tooltip(entry.name.c_str());
-                        } else {
-                            char pickerLabel[64];
-                            snprintf(pickerLabel, sizeof(pickerLabel), "0x%02X##picker%d", customItemId, pickerIndex);
-                            PushStyleButton(Colors::DarkGray);
-                            ret = ImGui::Button(pickerLabel, ImVec2(IMAGE_SIZE, IMAGE_SIZE));
-                            PopStyleButton();
-                        }
+                        uint16_t customItemId = OotNeiEditor::Page2Item(pickerIndex);
+                        ImGui::PushID(pickerIndex);
+                        const bool ret = NeiEditor_ItemButton(customItemId);
+                        UIWidgets::Tooltip(NeiEditor_ItemName(customItemId));
+                        ImGui::PopID();
 
                         if (ret) {
                             ExtInv_SetSlotItem(selectedCustomIndex, customItemId); // Skijer's NEI
@@ -1973,40 +1974,25 @@ void DrawInventoryTab() {
                         }
                     }
 
-                    // Upgrade items (share slots with base items)
+                    // Shared-cell alternatives absent from the main 24-cell layout.
                     ImGui::Spacing();
-                    ImGui::Text("Upgrades:");
-                    {
-                        auto it = customItemMapping.find(ITEM_ROCS_CAPE);
-                        bool ret = false;
-                        if (it != customItemMapping.end()) {
-                            const ItemMapEntry& entry = it->second;
-                            auto tex = std::dynamic_pointer_cast<Fast::Fast3dGui>(
-                                           Ship::Context::GetRawInstance()->GetWindow()->GetGui())
-                                           ->GetTextureByName(entry.name);
-                            if (tex) {
-                                ret = ImGui::ImageButton(entry.name.c_str(), tex, ImVec2(IMAGE_SIZE, IMAGE_SIZE),
-                                                         ImVec2(0, 0), ImVec2(1, 1));
-                            } else {
-                                PushStyleButton(Colors::DarkGray);
-                                ret =
-                                    ImGui::Button("ITEM_ROCS_CAPE##pickerCape",
-                                                  ImVec2(IMAGE_SIZE, IMAGE_SIZE) + ImGui::GetStyle().FramePadding * 2);
-                                PopStyleButton();
+                    ImGui::Text("Shared items / upgrades:");
+                    for (const uint16_t alternative : { uint16_t(ITEM_ROCS_CAPE), uint16_t(EXT_ITEM_PHANTOM_HOURGLASS),
+                                                        uint16_t(ITEM_DOMINION_ROD) }) {
+                        ImGui::PushID(alternative);
+                        if (NeiEditor_ItemButton(alternative)) {
+                            if (selectedCustomIndex == SLOT_PHANTOM_HOURGLASS &&
+                                alternative == EXT_ITEM_PHANTOM_HOURGLASS) {
+                                GraceHourglass_Grant(alternative);
                             }
-                        } else {
-                            PushStyleButton(Colors::DarkGray);
-                            ret = ImGui::Button("ITEM_ROCS_CAPE##pickerCape",
-                                                ImVec2(IMAGE_SIZE, IMAGE_SIZE) + ImGui::GetStyle().FramePadding * 2);
-                            PopStyleButton();
-                        }
-
-                        if (ret) {
-                            ExtInv_SetSlotItem(selectedCustomIndex, ITEM_ROCS_CAPE); // Skijer's NEI
+                            ExtInv_SetSlotItem(selectedCustomIndex, alternative);
                             ImGui::CloseCurrentPopup();
                         }
-                        UIWidgets::Tooltip("Roc's Cape (upgrade)\nShares slot 24 with Roc's Feather");
+                        UIWidgets::Tooltip(NeiEditor_ItemName(alternative));
+                        ImGui::PopID();
+                        ImGui::SameLine();
                     }
+                    ImGui::NewLine();
 
                     ImGui::EndPopup();
                 }
@@ -2014,6 +2000,48 @@ void DrawInventoryTab() {
 
                 ImGui::PopID();
             }
+        }
+    }
+
+    if (ImGui::CollapsingHeader("Sheikah Slate Runes and Seasons")) {
+        static const char* runeNames[SLATE_RUNE_COUNT] = {
+            "Remote Bombs", "Stasis", "Cryonis", "Master Cycle", "Desire Sensor",
+        };
+        for (uint8_t rune = 0; rune < SLATE_RUNE_COUNT; ++rune) {
+            ImGui::BeginDisabled(Slate_RuneOwned(rune) &&
+                                 Nei_GetOwnedItem(SLOT_SHEIKAH_SLATE) == EXT_ITEM_SHEIKAH_SLATE);
+            if (ImGui::Button(runeNames[rune])) {
+                Slate_GrantRune(rune);
+            }
+            ImGui::EndDisabled();
+        }
+        ImGui::Separator();
+        static const char* seasonNames[SEASON_COUNT] = { "Spring", "Summer", "Autumn", "Winter" };
+        for (uint8_t season = 0; season < SEASON_COUNT; ++season) {
+            ImGui::BeginDisabled(Seasons_SeasonOwned(season) &&
+                                 Nei_GetOwnedItem(SLOT_ROD_OF_SEASONS) == EXT_ITEM_ROD_OF_SEASONS);
+            if (ImGui::Button(seasonNames[season])) {
+                OotNeiEditor::GrantSeason(season);
+            }
+            ImGui::EndDisabled();
+        }
+    }
+    if (ImGui::CollapsingHeader("Crossover Item Ownership")) {
+        bool pokeball = Nei_Save()->pokeballOwned != 0;
+        if (ImGui::Checkbox("Poké Ball", &pokeball)) {
+            Nei_Save()->pokeballOwned = pokeball;
+        }
+        bool marioMask = Flags_GetRandomizerInf(RAND_INF_OBTAINED_MARIO_MASK);
+        if (ImGui::Checkbox("Mario Mask", &marioMask)) {
+            if (marioMask) {
+                Flags_SetRandomizerInf(RAND_INF_OBTAINED_MARIO_MASK);
+            } else {
+                Flags_UnsetRandomizerInf(RAND_INF_OBTAINED_MARIO_MASK);
+            }
+        }
+        bool bombArrows = Nei_Save()->bombArrowsOwned != 0;
+        if (ImGui::Checkbox("Bomb Arrows", &bombArrows)) {
+            Nei_Save()->bombArrowsOwned = bombArrows;
         }
     }
 

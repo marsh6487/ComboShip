@@ -1,3 +1,4 @@
+#include "../../../combo/ComboGameMode.h"
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "global.h"
 #include "gameplay/ComboFaroresWind.h"
@@ -1256,10 +1257,12 @@ void func_80083108(PlayState* play) {
                 }
 #ifdef COMBO_BUILD
                 // Recall stays available; creating a new point requires a scene with its own DOWN.
-                interfaceCtx->restrictions.farores =
-                    !CVarGetInteger("gSm64Mario", 0) &&
-                    (play->sceneNum == SCENE_GROTTOS || play->sceneNum == SCENE_FAIRYS_FOUNTAIN) &&
-                    !ComboFw_HasPoint(gSaveContext.respawn[RESPAWN_MODE_TOP].data > 0);
+                if (Combo_IsCombinedGame()) {
+                    interfaceCtx->restrictions.farores =
+                        !CVarGetInteger("gSm64Mario", 0) &&
+                        (play->sceneNum == SCENE_GROTTOS || play->sceneNum == SCENE_FAIRYS_FOUNTAIN) &&
+                        !ComboFw_HasPoint(gSaveContext.respawn[RESPAWN_MODE_TOP].data > 0);
+                }
 #endif
                 if (interfaceCtx->restrictions.farores != 0) {
                     for (i = 1; i < ARRAY_COUNT(gSaveContext.equips.buttonItems); i++) {

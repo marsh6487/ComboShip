@@ -19,7 +19,7 @@ static int BossFromScene(int scene) {
     }
 }
 static bool BossLogicEnabled() {
-    return state.HasPool(Pool::Boss);
+    return Combo_IsCombinedGame() && state.HasPool(Pool::Boss);
 }
 static void AppendBossCatalogue(std::vector<Dungeon>& out) {
     const int32_t dungeon[] = { ENTRANCE(WOODFALL_TEMPLE, 0), ENTRANCE(SNOWHEAD_TEMPLE, 0),

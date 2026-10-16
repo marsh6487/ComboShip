@@ -28,7 +28,7 @@ int main() {
     CheckNativePortals();
     // Retail shops are separate from minigames, services and the back hideout.
     const std::set<int> shopDoors={ENTRANCE(MAGIC_HAGS_POTION_SHOP,0),ENTRANCE(ZORA_HALL_ROOMS,5),
-        ENTRANCE(CURIOSITY_SHOP,0),ENTRANCE(TRADING_POST,0),ENTRANCE(BOMB_SHOP,0),ENTRANCE(MILK_BAR,0)};
+        ENTRANCE(CURIOSITY_SHOP,0),ENTRANCE(TRADING_POST,0),ENTRANCE(BOMB_SHOP,0),ENTRANCE(MILK_BAR,0),ENTRANCE(GORON_SHOP,0)};
     const std::set<int> otherDoors={ENTRANCE(MARINE_RESEARCH_LAB,0),ENTRANCE(ZORA_HALL_ROOMS,2),
         ENTRANCE(ZORA_HALL_ROOMS,3),ENTRANCE(ZORA_HALL_ROOMS,1),ENTRANCE(ZORA_HALL_ROOMS,0),
         ENTRANCE(SWAMP_SHOOTING_GALLERY,0),ENTRANCE(TOURIST_INFORMATION,0),
@@ -45,14 +45,34 @@ int main() {
         assert(static_cast<int>(d.pool)==(shopDoors.count(d.entrance.index)?4:5));
         assert(shopDoors.count(d.entrance.index)||otherDoors.count(d.entrance.index));
     }
-    for(int open:{ENTRANCE(DEKU_SCRUB_PLAYGROUND,0),ENTRANCE(FISHERMANS_HUT,0),ENTRANCE(GHOST_HUT,0),ENTRANCE(GORON_SHOP,0),
+    for(int open:{ENTRANCE(DEKU_SCRUB_PLAYGROUND,0),ENTRANCE(FISHERMANS_HUT,0),ENTRANCE(GHOST_HUT,0),
         ENTRANCE(GORON_SHRINE,0),ENTRANCE(GORON_GRAVERYARD,0),ENTRANCE(ASTRAL_OBSERVATORY,0),
         ENTRANCE(FAIRY_FOUNTAIN,0),ENTRANCE(FAIRY_FOUNTAIN,1),ENTRANCE(FAIRY_FOUNTAIN,2),
         ENTRANCE(FAIRY_FOUNTAIN,3),ENTRANCE(FAIRY_FOUNTAIN,4),ENTRANCE(CLOCK_TOWER_INTERIOR,1)})
         for(const auto& d:narrow)assert(d.entrance.index!=open);
     auto broadOptions=narrowOptions;broadOptions.interiors=true;
     std::vector<Dungeon> broad;Append(broad,broadOptions);assert(broad.size()==42);
-    for(const auto& d:broad)assert(d.pool==Pool::Interior);
+    for(const auto& d:broad)assert(d.pool==(shopDoors.count(d.entrance.index)?Pool::Shop:Pool::Interior));
+    auto withoutShops=broadOptions;withoutShops.shops=false;
+    std::vector<Dungeon> nonretail;Append(nonretail,withoutShops);
+    assert(nonretail.size()==42-shopDoors.size());
+    for(const auto& d:nonretail)assert(!shopDoors.count(d.entrance.index));
+    for(bool broadChoice:{false,true})for(bool doorChoice:{false,true})for(bool shopChoice:{false,true}) {
+        auto choice=ParseOptions({{"dungeons",false},{"interiors",broadChoice},{"doorInteriors",doorChoice},{"shops",shopChoice}});
+        std::vector<Dungeon> selected;Append(selected,choice);size_t retail=0;
+        for(const auto& d:selected)if(shopDoors.count(d.entrance.index)) {
+            ++retail;assert(shopChoice && d.pool==Pool::Shop);
+        }
+        assert(retail==(shopChoice?shopDoors.size():0));
+    }
+    for(int version:{2,3}) {
+        const auto oldBroad=OptionsFromSeed({{"version",version},{"options",{{"dungeons",false},{"interiors",true}}}});
+        std::vector<Dungeon> selected;Append(selected,oldBroad);assert(selected.size()==42);
+        for(const auto& d:selected)assert(d.pool==Pool::Interior);
+    }
+    const auto oldShops=OptionsFromSeed({{"version",3},{"options",{{"dungeons",false},{"shops",true}}}});
+    std::vector<Dungeon> oldRetail;Append(oldRetail,oldShops);assert(oldRetail.size()==6);
+    for(const auto& d:oldRetail)assert(d.entrance.index!=ENTRANCE(GORON_SHOP,0));
     PoolOptions options;
     std::vector<Dungeon> catalog;
     Append(catalog,options);
@@ -65,7 +85,7 @@ int main() {
     assert(catalog[5].entrance.index==ENTRANCE(BENEATH_THE_WELL,1));
     catalog.clear(); options={};options.interiors=true;options.grottos=true;
     Append(catalog,options);
-    assert(catalog.size()==68);
+    assert(catalog.size()==61);
     for(const auto& d:catalog)
         assert(d.entrance.index!=ENTRANCE(CLOCK_TOWER_INTERIOR,1));
     Validate(catalog);

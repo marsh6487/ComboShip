@@ -721,16 +721,16 @@ comboSkipSaveGate:;
 }
 
 void SettingsWindow::DrawElement() {
-#ifndef COMBO_BUILD
-    // ComboShip: gWindows.CheckTracker is derived from the combo master toggle — hide this button.
-    if (CVarGetInteger("gWindows.CheckTracker", 0)) {
-        UIWidgets::WindowButton("Disable Check Tracker", "gWindows.CheckTracker", BenGui::mRandoCheckTrackerWindow,
-                                { .size = UIWidgets::Sizes::Inline, .color = UIWidgets::Colors::Red });
-    } else {
-        UIWidgets::WindowButton("Enable Check Tracker", "gWindows.CheckTracker", BenGui::mRandoCheckTrackerWindow,
-                                { .size = UIWidgets::Sizes::Inline, .color = UIWidgets::Colors::Green });
+    if (!Combo_IsCombinedGame()) {
+        // ComboShip: gWindows.CheckTracker is derived from the combo master toggle — hide this button.
+        if (CVarGetInteger("gWindows.CheckTracker", 0)) {
+            UIWidgets::WindowButton("Disable Check Tracker", "gWindows.CheckTracker", BenGui::mRandoCheckTrackerWindow,
+                                    { .size = UIWidgets::Sizes::Inline, .color = UIWidgets::Colors::Red });
+        } else {
+            UIWidgets::WindowButton("Enable Check Tracker", "gWindows.CheckTracker", BenGui::mRandoCheckTrackerWindow,
+                                    { .size = UIWidgets::Sizes::Inline, .color = UIWidgets::Colors::Green });
+        }
     }
-#endif
     if (ImGui::BeginTable("Settings Table", 2)) {
         ImGui::TableSetupColumn("col1", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableSetupColumn("col2", ImGuiTableColumnFlags_WidthStretch);

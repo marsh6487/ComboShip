@@ -1,3 +1,4 @@
+#include "../../../combo/ComboGameMode.h"
 #include "global.h"
 #include "soh/Enhancements/game-interactor/vanilla-behavior/GIVanillaBehavior.h"
 #include "vt.h"
@@ -237,6 +238,12 @@ void Sram_OpenSave() {
 }
 
 void Sram_InitSave(FileChooseContext* fileChooseCtx) {
+#ifdef COMBO_BUILD
+    // Reject a stale paired selection before resetting or writing any native save state.
+    if (!Combo_IsCombinedGame() && fileChooseCtx->questType[fileChooseCtx->buttonIndex] == QUEST_OOTXMM) {
+        return;
+    }
+#endif
     u16 offset;
     u16 j;
     u16* ptr;
@@ -274,7 +281,9 @@ void Sram_InitSave(FileChooseContext* fileChooseCtx) {
 #ifdef COMBO_BUILD
     // ComboShip: generation is window-driven now; only force the rando quest type here.
     // The combined fill runs on a worker thread before save creation (triggered from the UI).
-    fileChooseCtx->questType[fileChooseCtx->buttonIndex] = QUEST_RANDOMIZER;
+    if (Combo_IsCombinedGame()) {
+        fileChooseCtx->questType[fileChooseCtx->buttonIndex] = QUEST_RANDOMIZER;
+    }
     (void)gComboGenerateCallback; // retained symbol; no longer invoked
 #endif
 
@@ -304,7 +313,7 @@ void Sram_InitSave(FileChooseContext* fileChooseCtx) {
     SaveManager_ThreadPoolWait();
 
 #ifdef COMBO_BUILD
-    if (gComboSaveInitCallback != NULL) {
+    if (Combo_IsCombinedGame() && gComboSaveInitCallback != NULL) {
         gComboSaveInitCallback((int)gSaveContext.fileNum);
     }
 #endif

@@ -362,15 +362,22 @@ static void KaleidoEquip_GetCell(s16 subPage, s16 row, s16 col, EquipCell* out) 
     }
 }
 
+static u8 KaleidoEquip_UsesLegacyFreeEquipment(void) {
+#ifdef COMBO_BUILD
+    return false; // Solo must not unlock unearned gear when the cross-game bridge is inactive.
+#else
+    return FleetShipCombo_GetActiveGame() < 0;
+#endif
+}
+
 static u8 KaleidoEquip_CellOwned(EquipCell* cell) {
     switch (cell->equipType) {
         case CELL_EMPTY:
             return false;
-        // Swords/shields: standalone keeps "always available" (no native owned-bitmask -> the
-        // chicken-and-egg the comments warned about). In COMBO the ownership is synced before the
-        // page opens (weaponUpgrades / comboObtained / shieldOwned), so gate on real ownership.
+        // Native solo and combined sessions both use the saved ownership records.
+        // Only the legacy standalone build keeps its free-equipment policy.
         case CELL_SWORD: // Kokiri line: owns at least the base Kokiri sword
-            if (FleetShipCombo_GetActiveGame() < 0) {
+            if (KaleidoEquip_UsesLegacyFreeEquipment()) {
                 return true;
             }
             return Nei_Save()->comboObtainedFc[FCI_KOKIRI_SWORD] != 0 || WeaponUpgrade_KokiriLevel() > 0 ||
@@ -380,27 +387,27 @@ static u8 KaleidoEquip_CellOwned(EquipCell* cell) {
                     BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_B) ==
                         ITEM_SWORD_KOKIRI + GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) - EQUIP_VALUE_SWORD_KOKIRI);
         case CELL_SWORD_MASTER:
-            if (FleetShipCombo_GetActiveGame() < 0) {
+            if (KaleidoEquip_UsesLegacyFreeEquipment()) {
                 return true;
             }
             return Nei_Save()->comboObtained[FC_OOT_SWORD_MASTER] != 0;
         case CELL_SWORD_BGS: // Biggoron line OR the Great Fairy's Sword upgrade
-            if (FleetShipCombo_GetActiveGame() < 0) {
+            if (KaleidoEquip_UsesLegacyFreeEquipment()) {
                 return true;
             }
             return (Nei_Save()->comboObtained[FC_OOT_SWORD_BIGGORON] != 0) || WeaponUpgrade_HasGreatFairy();
         case CELL_SHIELD_DEKU:
-            if (FleetShipCombo_GetActiveGame() < 0) {
+            if (KaleidoEquip_UsesLegacyFreeEquipment()) {
                 return true;
             }
             return (Nei_Save()->shieldOwned & FC_SHIELD_DEKU) != 0;
         case CELL_SHIELD_OOT_MIRROR:
-            if (FleetShipCombo_GetActiveGame() < 0) {
+            if (KaleidoEquip_UsesLegacyFreeEquipment()) {
                 return true;
             }
             return (Nei_Save()->shieldOwned & FC_SHIELD_MIRROR_OOT) != 0;
         case CELL_SHIELD: // Hero (index 1) / MM Mirror = Ikana (index 2)
-            if (FleetShipCombo_GetActiveGame() < 0) {
+            if (KaleidoEquip_UsesLegacyFreeEquipment()) {
                 return true;
             }
             return (Nei_Save()->shieldOwned & (cell->index == 1 ? FC_SHIELD_HYLIAN : FC_SHIELD_IKANA)) != 0 ||
@@ -408,12 +415,12 @@ static u8 KaleidoEquip_CellOwned(EquipCell* cell) {
                     GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) == cell->index);
         case CELL_TUNIC: // Kokiri (idx 0) always; in COMBO, Goron/Zora require synced ownership
                          // (comboObtained via FleetSync). Standalone keeps "always available".
-            if (cell->index == 0 || FleetShipCombo_GetActiveGame() < 0) {
+            if (cell->index == 0 || KaleidoEquip_UsesLegacyFreeEquipment()) {
                 return true;
             }
             return Nei_Save()->comboObtained[cell->index == 1 ? FC_OOT_TUNIC_GORON : FC_OOT_TUNIC_ZORA] != 0;
         case CELL_BOOTS: // Kokiri (idx 0) always; in COMBO, Iron/Hover require synced ownership.
-            if (cell->index == 0 || FleetShipCombo_GetActiveGame() < 0) {
+            if (cell->index == 0 || KaleidoEquip_UsesLegacyFreeEquipment()) {
                 return true;
             }
             return Nei_Save()->comboObtained[cell->index == 1 ? FC_OOT_BOOTS_IRON : FC_OOT_BOOTS_HOVER] != 0;

@@ -1,3 +1,4 @@
+#include "../../../combo/ComboGameMode.h"
 //
 //  SohGui.cpp
 //  soh
@@ -174,8 +175,9 @@ void SetupMenu() {
     auto gui = Ship::Context::GetRawInstance()->GetWindow()->GetGui();
     mSohMenu = std::make_shared<SohMenu>(CVAR_WINDOW("Menu"), "Port Menu");
 #ifndef COMBO_BUILD
-    gui->SetMenu(mSohMenu); // ComboShip: comboui owns the menu; SoH only builds its tree.
+    gui->SetMenu(mSohMenu);
 #endif
+    // DLL bootstrap is ROM-independent. SOH_FinishInit installs the solo menu once its tree is ready.
 
     mModalWindow = std::make_shared<SohModalWindow>(CVAR_WINDOW("ModalWindow"), "Modal Window");
     gui->AddGuiWindow(mModalWindow);
@@ -288,11 +290,11 @@ void SetupGuiElements() {
     mNotificationWindow->Show();
     mTimeDisplayWindow = std::make_shared<TimeDisplayWindow>(CVAR_WINDOW("TimeDisplayEnabled"), "Additional Timers");
     gui->AddGuiWindow(mTimeDisplayWindow);
-#ifndef COMBO_BUILD
-    // ComboShip: the Anchor room window is combo-native (comboui) in combo builds; don't register soh's.
-    mAnchorRoomWindow = std::make_shared<AnchorRoomWindow>(CVAR_WINDOW("AnchorRoom"), "Anchor Room");
-    gui->AddGuiWindow(mAnchorRoomWindow);
-#endif
+    if (!Combo_IsCombinedGame()) {
+        // ComboShip: the Anchor room window is combo-native (comboui) in combo builds; don't register soh's.
+        mAnchorRoomWindow = std::make_shared<AnchorRoomWindow>(CVAR_WINDOW("AnchorRoom"), "Anchor Room");
+        gui->AddGuiWindow(mAnchorRoomWindow);
+    }
     mHarpoonRemoteSaveEditorWindow = std::make_shared<HarpoonRemoteSaveEditor::RemoteSaveEditorWindow>(
         CVAR_WINDOW("HarpoonRemoteSaveEditor"), "Remote Save Editor", ImVec2(620, 700));
     gui->AddGuiWindow(mHarpoonRemoteSaveEditorWindow);
@@ -301,6 +303,9 @@ void SetupGuiElements() {
 void Destroy() {
     auto gui = Ship::Context::GetRawInstance()->GetWindow()->GetGui();
     gui->RemoveAllGuiWindows();
+    gui->SetMenu(nullptr);
+    mSohMenu = nullptr;
+    mModalWindow = nullptr;
 
     mNotificationWindow = nullptr;
     mModalWindow = nullptr;

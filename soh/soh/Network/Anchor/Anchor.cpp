@@ -1,3 +1,4 @@
+#include "../../../../combo/ComboGameMode.h"
 #include <nlohmann/json.hpp>
 
 #include "Anchor.h"
@@ -34,7 +35,7 @@ extern "C" void (*gComboMarkForeignObtained)(int srcGame, const char* checkName)
 // Broadcast a locally-collected foreign item to teammates (called from hook_handlers.cpp). No-op
 // when Anchor is disconnected or item sync is off.
 extern "C" void Anchor_BroadcastCrossItem(int targetGame, const char* itemName, const char* srcCheckName) {
-    if (!Anchor::Instance || !Anchor::Instance->isConnected || !itemName || !srcCheckName) {
+    if (!Combo_IsCombinedGame() || !Anchor::Instance || !Anchor::Instance->isConnected || !itemName || !srcCheckName) {
         return;
     }
     if (!Anchor::Instance->roomState.syncItemsAndFlags) {
@@ -115,11 +116,9 @@ void Anchor::OnConnected() {
     SendPacket_Handshake();
     RegisterHooks();
 
-#ifndef COMBO_BUILD
-    if (IsSaveLoaded()) {
+    if (!Combo_IsCombinedGame() && IsSaveLoaded()) {
         SendPacket_RequestTeamState();
     }
-#endif
     // ComboShip: the launcher's on-connect resync (sResyncPending -> RequestResyncDormantSafe) is the
     // sole on-connect resync source; this call would duplicate it (see docs/UPSTREAM_MERGES.md).
 }
@@ -159,14 +158,16 @@ void Anchor::SendJsonToRemote(nlohmann::json payload) {
     }
 
 #ifdef COMBO_BUILD
-    // ComboShip: the launcher owns the socket and its own thread-safe outgoing queue, so hand every
-    // packet straight to it. There is no game-side network thread to drain a local queue under the
-    // combo build (ProcessOutgoingPackets is never pumped). See docs/UPSTREAM_MERGES.md.
-    // Routing tag for the shared socket; NOT the cross-item "srcGame" int field (don't clobber it).
-    payload["originGame"] = "oot";
-    Network::SendJsonToRemote(payload);
-    return;
-#else
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: the launcher owns the socket and its own thread-safe outgoing queue, so hand every
+        // packet straight to it. There is no game-side network thread to drain a local queue under the
+        // combo build (ProcessOutgoingPackets is never pumped). See docs/UPSTREAM_MERGES.md.
+        // Routing tag for the shared socket; NOT the cross-item "srcGame" int field (don't clobber it).
+        payload["originGame"] = "oot";
+        Network::SendJsonToRemote(payload);
+        return;
+    }
+#endif
     if (payload["type"] == HANDSHAKE) {
         Network::SendJsonToRemote(payload);
         return;
@@ -175,7 +176,6 @@ void Anchor::SendJsonToRemote(nlohmann::json payload) {
     // Queue the packet to be sent on the network thread
     std::lock_guard<std::mutex> lock(outgoingPacketQueueMutex);
     outgoingPacketQueue.push(payload);
-#endif
 }
 
 void Anchor::OnIncomingJson(nlohmann::json payload) {

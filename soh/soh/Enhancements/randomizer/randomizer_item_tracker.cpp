@@ -1,3 +1,4 @@
+#include "../../../../combo/ComboGameMode.h"
 #include <algorithm>
 #include <map>
 #include <string>
@@ -1983,13 +1984,9 @@ void ItemTrackerInitFile(bool isDebug) {
 }
 
 void ItemTrackerSaveFile(const SaveContext& saveContext, int sectionID, bool fullSave) {
-#ifdef COMBO_BUILD
-    // ComboShip (#165): notes live in combo.notes; scrub the legacy field so stale text stops round-tripping.
-    SaveManager::Instance->SaveData("personalNotes", "");
-#else
-    SaveManager::Instance->SaveData("personalNotes",
-                                    std::string(std::begin(itemTrackerNotes), std::end(itemTrackerNotes)).c_str());
-#endif
+    SaveManager::Instance->SaveData(
+        "personalNotes",
+        Combo_IsCombinedGame() ? "" : std::string(std::begin(itemTrackerNotes), std::end(itemTrackerNotes)).c_str());
 }
 
 void ItemTrackerLoadFile() {
@@ -2070,22 +2067,19 @@ void ItemTrackerWindow::DrawElement() {
             (FishingPoleDisplay() == SECTION_DISPLAY_EXTENDED_MAIN_WINDOW) ||
             (!statUpgradeItems.empty() && CVarGetInteger(CVAR_TRACKER_ITEM("DisplayType.StatUpgrades"),
                                                          SECTION_DISPLAY_HIDDEN) == SECTION_DISPLAY_MAIN_WINDOW)
-// ComboShip (#165): native notes replaced by the combo-owned cross-game Personal Notes window.
-#ifndef COMBO_BUILD
-            || (CVarGetInteger(CVAR_TRACKER_ITEM("DisplayType.Notes"), SECTION_DISPLAY_HIDDEN) ==
-                SECTION_DISPLAY_MAIN_WINDOW)
-#endif
-        ) {
+            // ComboShip (#165): native notes replaced by the combo-owned cross-game Personal Notes window.
+            || (!Combo_IsCombinedGame() && CVarGetInteger(CVAR_TRACKER_ITEM("DisplayType.Notes"),
+                                                          SECTION_DISPLAY_HIDDEN) == SECTION_DISPLAY_MAIN_WINDOW)) {
             BeginFloatingWindows("Item Tracker");
             DrawItemsInRows(mainWindowItems, 6);
 
-// ComboShip (#165): native notes replaced by the combo-owned cross-game Personal Notes window.
-#ifndef COMBO_BUILD
-            if (CVarGetInteger(CVAR_TRACKER_ITEM("DisplayType.Notes"), SECTION_DISPLAY_HIDDEN) ==
-                SECTION_DISPLAY_MAIN_WINDOW) {
-                DrawNotes();
+            // ComboShip (#165): native notes replaced by the combo-owned cross-game Personal Notes window.
+            if (!Combo_IsCombinedGame()) {
+                if (CVarGetInteger(CVAR_TRACKER_ITEM("DisplayType.Notes"), SECTION_DISPLAY_HIDDEN) ==
+                    SECTION_DISPLAY_MAIN_WINDOW) {
+                    DrawNotes();
+                }
             }
-#endif
             Trackers::EndFloatWindows();
         }
 
@@ -2213,20 +2207,20 @@ void ItemTrackerWindow::DrawElement() {
             Trackers::EndFloatWindows();
         }
 
-// ComboShip (#165): native notes replaced by the combo-owned cross-game Personal Notes window.
-#ifndef COMBO_BUILD
-        if (CVarGetInteger(CVAR_TRACKER_ITEM("DisplayType.Notes"), SECTION_DISPLAY_HIDDEN) ==
-                SECTION_DISPLAY_SEPARATE &&
-            (CVarGetInteger(CVAR_TRACKER_ITEM("WindowType"), TRACKER_WINDOW_FLOATING) == TRACKER_WINDOW_WINDOW ||
-             (CVarGetInteger(CVAR_TRACKER_ITEM("WindowType"), TRACKER_WINDOW_FLOATING) == TRACKER_WINDOW_FLOATING &&
-              CVarGetInteger(CVAR_TRACKER_ITEM("DisplayType.Main"), TRACKER_DISPLAY_ALWAYS) !=
-                  TRACKER_DISPLAY_COMBO_BUTTON))) {
-            ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
-            BeginFloatingWindows("Personal Notes", ImGuiWindowFlags_NoFocusOnAppearing);
-            DrawNotes(true);
-            Trackers::EndFloatWindows();
+        // ComboShip (#165): native notes replaced by the combo-owned cross-game Personal Notes window.
+        if (!Combo_IsCombinedGame()) {
+            if (CVarGetInteger(CVAR_TRACKER_ITEM("DisplayType.Notes"), SECTION_DISPLAY_HIDDEN) ==
+                    SECTION_DISPLAY_SEPARATE &&
+                (CVarGetInteger(CVAR_TRACKER_ITEM("WindowType"), TRACKER_WINDOW_FLOATING) == TRACKER_WINDOW_WINDOW ||
+                 (CVarGetInteger(CVAR_TRACKER_ITEM("WindowType"), TRACKER_WINDOW_FLOATING) == TRACKER_WINDOW_FLOATING &&
+                  CVarGetInteger(CVAR_TRACKER_ITEM("DisplayType.Main"), TRACKER_DISPLAY_ALWAYS) !=
+                      TRACKER_DISPLAY_COMBO_BUTTON))) {
+                ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+                BeginFloatingWindows("Personal Notes", ImGuiWindowFlags_NoFocusOnAppearing);
+                DrawNotes(true);
+                Trackers::EndFloatWindows();
+            }
         }
-#endif
 
         if (CVarGetInteger("gTrackers.ItemTracker.TotalChecks.DisplayType", SECTION_DISPLAY_MINIMAL_HIDDEN) ==
             SECTION_DISPLAY_MINIMAL_SEPARATE) {
@@ -2293,13 +2287,13 @@ void ItemTrackerSettingsWindow::DrawElement() {
             if (CVarCheckbox("Enable Dragging", CVAR_TRACKER_ITEM("Draggable"), CheckboxOptions().Color(THEME_COLOR))) {
                 RefreshItemTrackerMainWindow();
             }
-#ifndef COMBO_BUILD
-            // ComboShip: derived from the shared "Only enable while paused" toggle — hide this editor.
-            if (CVarCheckbox("Only Enable While Paused", CVAR_TRACKER_ITEM("ShowOnlyPaused"),
-                             CheckboxOptions().Color(THEME_COLOR))) {
-                RefreshItemTrackerMainWindow();
+            if (!Combo_IsCombinedGame()) {
+                // ComboShip: derived from the shared "Only enable while paused" toggle — hide this editor.
+                if (CVarCheckbox("Only Enable While Paused", CVAR_TRACKER_ITEM("ShowOnlyPaused"),
+                                 CheckboxOptions().Color(THEME_COLOR))) {
+                    RefreshItemTrackerMainWindow();
+                }
             }
-#endif
             if (CVarCombobox("Display Mode", CVAR_TRACKER_ITEM("DisplayType.Main"), showMode,
                              ComboboxOptions()
                                  .DefaultIndex(TRACKER_DISPLAY_ALWAYS)
@@ -2329,13 +2323,13 @@ void ItemTrackerSettingsWindow::DrawElement() {
             }
         }
         ImGui::Separator();
-#ifndef COMBO_BUILD
-        // ComboShip: both are derived from the shared icon size/spacing sliders — hide these editors.
-        CVarSliderInt("Icon size : %dpx", CVAR_TRACKER_ITEM("IconSize"),
-                      IntSliderOptions().Min(25).Max(128).DefaultValue(36).Color(THEME_COLOR));
-        CVarSliderInt("Icon margins : %dpx", CVAR_TRACKER_ITEM("IconSpacing"),
-                      IntSliderOptions().Min(-5).Max(50).DefaultValue(12).Color(THEME_COLOR));
-#endif
+        if (!Combo_IsCombinedGame()) {
+            // ComboShip: both are derived from the shared icon size/spacing sliders — hide these editors.
+            CVarSliderInt("Icon size : %dpx", CVAR_TRACKER_ITEM("IconSize"),
+                          IntSliderOptions().Min(25).Max(128).DefaultValue(36).Color(THEME_COLOR));
+            CVarSliderInt("Icon margins : %dpx", CVAR_TRACKER_ITEM("IconSpacing"),
+                          IntSliderOptions().Min(-5).Max(50).DefaultValue(12).Color(THEME_COLOR));
+        }
         CVarSliderInt("Text size : %dpx", CVAR_TRACKER_ITEM("TextSize"),
                       IntSliderOptions().Min(1).Max(30).DefaultValue(13).Color(THEME_COLOR));
 
@@ -2439,10 +2433,10 @@ void ItemTrackerSettingsWindow::DrawElement() {
             RefreshItemTrackerMainWindow();
         }
 
-// ComboShip (#165): native notes replaced by the combo-owned cross-game Personal Notes window.
-#ifndef COMBO_BUILD
-        SohGui::mSohMenu->MenuDrawItem(personalNotesWiget, THEME_COLOR);
-#endif
+        // ComboShip (#165): native notes replaced by the combo-owned cross-game Personal Notes window.
+        if (!Combo_IsCombinedGame()) {
+            SohGui::mSohMenu->MenuDrawItem(personalNotesWiget, THEME_COLOR);
+        }
         SohGui::mSohMenu->MenuDrawItem(hookshotIdentWidget, THEME_COLOR);
         SohGui::mSohMenu->MenuDrawItem(openChestIdentWidget, THEME_COLOR);
 
@@ -2662,22 +2656,22 @@ void RegisterItemTrackerWidgets() {
                      .ComboMap(itemTrackerStatUpgradeCountOptions));
     SohGui::mSohMenu->AddSearchWidget({ statUpgradeCount, "Randomizer", "Item Tracker", "General Settings" });
 
-// ComboShip (#165): native notes replaced by the combo-owned cross-game Personal Notes window.
-#ifndef COMBO_BUILD
-    personalNotesWiget = { .name = "Personal notes", .type = WidgetType::WIDGET_CVAR_COMBOBOX };
-    static const char* notesDisabledTooltip =
-        "Disabled because tracker is set to floating and display combo is enabled.";
-    personalNotesWiget.CVar(CVAR_TRACKER_ITEM("DisplayType.Notes"))
-        .Options(ComboboxOptions()
-                     .DefaultIndex(SECTION_DISPLAY_HIDDEN)
-                     .ComponentAlignment(ComponentAlignments::Right)
-                     .LabelPosition(LabelPositions::Far)
-                     .Color(THEME_COLOR)
-                     .ComboMap(displayTypes))
-        .Callback([](WidgetInfo& info) { RefreshItemTrackerMainWindow(); });
-    ;
-    SohGui::mSohMenu->AddSearchWidget({ personalNotesWiget, "Randomizer", "Item Tracker", "General Settings" });
-#endif
+    // ComboShip (#165): native notes replaced by the combo-owned cross-game Personal Notes window.
+    if (!Combo_IsCombinedGame()) {
+        personalNotesWiget = { .name = "Personal notes", .type = WidgetType::WIDGET_CVAR_COMBOBOX };
+        static const char* notesDisabledTooltip =
+            "Disabled because tracker is set to floating and display combo is enabled.";
+        personalNotesWiget.CVar(CVAR_TRACKER_ITEM("DisplayType.Notes"))
+            .Options(ComboboxOptions()
+                         .DefaultIndex(SECTION_DISPLAY_HIDDEN)
+                         .ComponentAlignment(ComponentAlignments::Right)
+                         .LabelPosition(LabelPositions::Far)
+                         .Color(THEME_COLOR)
+                         .ComboMap(displayTypes))
+            .Callback([](WidgetInfo& info) { RefreshItemTrackerMainWindow(); });
+        ;
+        SohGui::mSohMenu->AddSearchWidget({ personalNotesWiget, "Randomizer", "Item Tracker", "General Settings" });
+    }
 
     hookshotIdentWidget = { .name = "Show Hookshot Identifiers", .type = WidgetType::WIDGET_CVAR_CHECKBOX };
     hookshotIdentWidget.CVar(CVAR_TRACKER_ITEM("HookshotIdentifier"))

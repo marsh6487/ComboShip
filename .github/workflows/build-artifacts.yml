@@ -62,6 +62,15 @@ jobs:
       - name: Fast held equipment XML and action regressions
         run: ASAN_OPTIONS=detect_leaks=0 python3 -B tests/nei_held/run_equipment_regression_tests.py --sanitize
 
+      - name: Fast vanilla and Master Quest ROM setup regressions
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+        run: |
+          python3 -B tests/rom_setup/screen_behavior_test.py --sanitize
+          python3 -B tests/rom_setup/launcher_behavior_test.py --sanitize
+          python3 -B tests/rom_setup/classifier_behavior_test.py --sanitize
+          python3 -B tests/rom_setup/async_progress_test.py --sanitize
+
       - name: Scan for conflict markers
         shell: bash
         run: |
@@ -116,7 +125,7 @@ jobs:
 
       - name: clang-format (clang-format-14)
         run: |
-          sudo apt-get update && sudo apt-get install -y clang-format-14 cmake ninja-build nlohmann-json3-dev libspdlog-dev libsdl2-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-pil
+          sudo apt-get update && sudo apt-get install -y clang-format-14 cmake ninja-build nlohmann-json3-dev libspdlog-dev libsdl2-dev libsdl2-net-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-pil
           ./run-clang-format.sh
           git diff --exit-code
 
@@ -132,10 +141,16 @@ jobs:
           ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/portal_save_test.py --sanitize
           ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/mm3d_pack_test.py --sanitize
 
-      - name: Door-only shop and interior entrance regressions
+      - name: Retail shops and nonretail interior entrance regressions
         run: |
           g++ -std=c++20 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/cross_dungeon/narrow_pools_test.cpp -o /tmp/narrow-pools
           ASAN_OPTIONS=detect_leaks=0 /tmp/narrow-pools
+          g++ -std=c++20 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/cross_dungeon/shop_pool_test.cpp -o /tmp/shop-pools
+          ASAN_OPTIONS=detect_leaks=0 /tmp/shop-pools
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/shop_catalogue_behavior_test.py --sanitize
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/shop_native_pool_behavior_test.py --sanitize
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/shop_return_behavior_test.py --sanitize
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/shop_cli_options_behavior_test.py --sanitize
           python3 -B tests/cross_dungeon/interior_settings_behavior_test.py
           ASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/oot_catalogue_behavior_test.py --sanitize
           ASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/mm_catalogue_behavior_test.py --sanitize
@@ -145,6 +160,9 @@ jobs:
         run: |
           python3 scripts/diagnostics/run_combo_pak_visibility_tests.py
           python3 scripts/diagnostics/run_voice_pack_discovery_tests.py
+
+      - name: Settings import and per-game mod load order
+        run: python3 tests/settings_import/run_tests.py --json-include /usr/include
 
       - name: Shared-item integration regressions
         run: |

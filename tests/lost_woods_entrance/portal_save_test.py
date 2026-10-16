@@ -35,6 +35,11 @@ source = r'''
 #include <type_traits>
 #include "global.h"
 #include "BenJsonConversions.hpp"
+#include "ComboGameMode.h"
+extern "C" {
+int gComboGameMode = COMBO_GAME_BOTH;
+char gGitCommitHash[] = "portal-save-fixture";
+}
 #define SPDLOG_INFO(...) ((void)0)
 #define SPDLOG_ERROR(...) ((void)0)
 SaveContext gSaveContext{};

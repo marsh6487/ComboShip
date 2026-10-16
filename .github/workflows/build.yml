@@ -38,6 +38,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Verify all bundled emotes and shared playback
+        run: python -B tests/emotes/run_tests.py --msvc --compiler cl
+
       - name: Verify blue-warp hook with MSVC before configuring
         run: python -B tests/cross_dungeon/oot_blue_warp_hook_test.py --msvc --compiler cl
 

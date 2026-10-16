@@ -29,7 +29,7 @@ int main() {
     entries.push_back(d);
   }
   const auto seed = Encode(entries, {1, 0, 3, 2});
-  assert(seed.at("version") == 3);
+  assert(seed.at("version") == 4);
   assert(Decode(json::parse(seed.dump())) ==
          FromPermutation(entries, {1, 0, 3, 2}));
   for (uint64_t i = 0; i < 50; ++i) {
@@ -60,6 +60,6 @@ int main() {
     badFlag = true;
   }
   assert(badFlag);
-  std::cout << "narrow pools: options, isolated permutations, v3 replay and "
+  std::cout << "narrow pools: options, isolated permutations, v4 replay and "
                "old-version rejection PASS\n";
 }

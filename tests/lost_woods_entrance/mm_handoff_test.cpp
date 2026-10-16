@@ -31,6 +31,7 @@ GameInteractor* GameInteractor::Instance = &interactor;
 SaveContext gSaveContext{};
 PlayState* gPlayState;
 GameState* gGameState;
+extern "C" void ComboForestArrivalCamera_Queue(int) {}
 static PlayState play{};
 static Player player{};
 static int saves, switches, recordedRoute, kind, fwCaptures;
@@ -130,25 +131,25 @@ int main() {
     play.sceneId = SCENE_LOST_WOODS;
     play.roomCtx.curRoom.num = 0;
     ActorEntry openingSpawn{};
+    openingSpawn.pos = {-417, 0, -122};
+    openingSpawn.rot.y = 11520;
     play.linkActorEntry = &openingSpawn;
     gSaveContext.fileNum = 0;
     gSaveContext.gameMode = GAMEMODE_NORMAL;
     gSaveContext.sceneLayer = 0;
     gSaveContext.save.cutsceneIndex = 0;
     gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
-    player.actor.world.pos = {0, 0, 0};
+    player.actor.world.pos = {-417, 0, -122};
     GameInteractor::Fire<GameInteractor::OnActorUpdate>(&player.actor);
     Frames();
     require(saves == 3 && switches == 4,
             "opening arrival must not immediately return through its arch");
-    player.actor.world.pos.x = 130;
-    GameInteractor::Fire<GameInteractor::OnActorUpdate>(&player.actor);
-    player.actor.world.pos.x = 0;
+    player.actor.world.pos = {120, 0, 240};
     GameInteractor::Fire<GameInteractor::OnActorUpdate>(&player.actor);
     Frames();
     require(saves == 4 && switches == 5 &&
                 recordedRoute == COMBO_PORTAL_OPENING_FOREST,
-            "leaving and re-entering the opening arch must return to the pink "
+            "walking from the native arrival to the stump must return to the pink "
             "Fairy tunnel once");
     std::puts("PASS: production MM forest handoff, Play/slot lifetime, reset, shuffled arrivals and Farore ownership");
 }

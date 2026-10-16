@@ -609,6 +609,7 @@ bool Extractor::IsMasterQuest() const {
         case OOT_PAL_11:
         case OOT_PAL_GC:
         case OOT_PAL_GC_DBG1:
+        case OOT_PAL_GC_DBG2:
             return false;
         default:
             UNREACHABLE;

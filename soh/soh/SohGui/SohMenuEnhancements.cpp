@@ -1,4 +1,5 @@
-﻿#include "SohMenu.h"
+#include "../../../combo/ComboGameMode.h"
+#include "SohMenu.h"
 #include <soh/Enhancements/enhancementTypes.h>
 #include "soh/Enhancements/SwitchAge.h"
 #include "soh/Enhancements/AdultMasks.h"
@@ -248,7 +249,6 @@ static const std::map<int32_t, const char*> mirroredWorldModes = {
     { MIRRORED_WORLD_DUNGEONS_RANDOM_SEEDED, "Dungeons Random (Seeded)" },
 };
 
-#ifndef COMBO_BUILD // ComboShip: only the Hide widgets use this, and combo compiles them out
 // Disables a File Select "Hide" checkbox when its O2R is missing, or when it would hide the last visible quest
 static WidgetFunc HideQuestPreFunc(Quest quest) {
     return [quest](WidgetInfo& info) {
@@ -264,7 +264,6 @@ static WidgetFunc HideQuestPreFunc(Quest quest) {
         }
     };
 }
-#endif
 
 void SohMenu::AddMenuEnhancements() {
     // Add Enhancements Menu
@@ -949,44 +948,44 @@ void SohMenu::AddMenuEnhancements() {
         .Options(CheckboxOptions().Tooltip("The skybox in the background of the File Select screen will go through the "
                                            "day and night cycle over time."));
 
-#ifndef COMBO_BUILD // ComboShip: the quest select is Randomizer-only, so these do nothing
-    AddWidget(path, "Hide Original", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FileSelect.HideNormalQuest"))
-        .RaceDisable(false)
-        .PreFunc(HideQuestPreFunc(QUEST_NORMAL))
-        .Options(CheckboxOptions().Tooltip(
-            "Hides the original game when selecting a quest type on the File Select screen."));
-    AddWidget(path, "Hide Master Quest", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FileSelect.HideMasterQuest"))
-        .RaceDisable(false)
-        .PreFunc(HideQuestPreFunc(QUEST_MASTER))
-        .Options(CheckboxOptions().Tooltip(
-            "Hides the Master Quest option when selecting a quest type on the File Select screen."));
-    AddWidget(path, "Hide Randomizer", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FileSelect.HideRandomizerQuest"))
-        .RaceDisable(false)
-        .PreFunc(HideQuestPreFunc(QUEST_RANDOMIZER))
-        .Options(CheckboxOptions().Tooltip(
-            "Hides the Randomizer option when selecting a quest type on the File Select screen."));
-    AddWidget(path, "Hide Boss Rush", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FileSelect.HideBossRushQuest"))
-        .RaceDisable(false)
-        .PreFunc(HideQuestPreFunc(QUEST_BOSSRUSH))
-        .Options(CheckboxOptions().Tooltip(
-            "Hides the Boss Rush option when selecting a quest type on the File Select screen."));
-    AddWidget(path, "Hide Speedrun", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FileSelect.HideSpeedrunQuest"))
-        .RaceDisable(false)
-        .PreFunc(HideQuestPreFunc(QUEST_SPEEDRUN))
-        .Options(CheckboxOptions().Tooltip(
-            "Hides the Speedrun option when selecting a quest type on the File Select screen."));
-    AddWidget(path, "Hide Speedrun Master Quest", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FileSelect.HideSpeedrunMasterQuest"))
-        .RaceDisable(false)
-        .PreFunc(HideQuestPreFunc(QUEST_SPEEDRUN_MASTER))
-        .Options(CheckboxOptions().Tooltip(
-            "Hides the Speedrun Master Quest option when selecting a quest type on the File Select screen."));
-#endif
+    if (!Combo_IsCombinedGame()) {
+        AddWidget(path, "Hide Original", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_ENHANCEMENT("FileSelect.HideNormalQuest"))
+            .RaceDisable(false)
+            .PreFunc(HideQuestPreFunc(QUEST_NORMAL))
+            .Options(CheckboxOptions().Tooltip(
+                "Hides the original game when selecting a quest type on the File Select screen."));
+        AddWidget(path, "Hide Master Quest", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_ENHANCEMENT("FileSelect.HideMasterQuest"))
+            .RaceDisable(false)
+            .PreFunc(HideQuestPreFunc(QUEST_MASTER))
+            .Options(CheckboxOptions().Tooltip(
+                "Hides the Master Quest option when selecting a quest type on the File Select screen."));
+        AddWidget(path, "Hide Randomizer", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_ENHANCEMENT("FileSelect.HideRandomizerQuest"))
+            .RaceDisable(false)
+            .PreFunc(HideQuestPreFunc(QUEST_RANDOMIZER))
+            .Options(CheckboxOptions().Tooltip(
+                "Hides the Randomizer option when selecting a quest type on the File Select screen."));
+        AddWidget(path, "Hide Boss Rush", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_ENHANCEMENT("FileSelect.HideBossRushQuest"))
+            .RaceDisable(false)
+            .PreFunc(HideQuestPreFunc(QUEST_BOSSRUSH))
+            .Options(CheckboxOptions().Tooltip(
+                "Hides the Boss Rush option when selecting a quest type on the File Select screen."));
+        AddWidget(path, "Hide Speedrun", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_ENHANCEMENT("FileSelect.HideSpeedrunQuest"))
+            .RaceDisable(false)
+            .PreFunc(HideQuestPreFunc(QUEST_SPEEDRUN))
+            .Options(CheckboxOptions().Tooltip(
+                "Hides the Speedrun option when selecting a quest type on the File Select screen."));
+        AddWidget(path, "Hide Speedrun Master Quest", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_ENHANCEMENT("FileSelect.HideSpeedrunMasterQuest"))
+            .RaceDisable(false)
+            .PreFunc(HideQuestPreFunc(QUEST_SPEEDRUN_MASTER))
+            .Options(CheckboxOptions().Tooltip(
+                "Hides the Speedrun Master Quest option when selecting a quest type on the File Select screen."));
+    }
 
     path.column = SECTION_COLUMN_3;
     AddWidget(path, "Misc.", WIDGET_SEPARATOR_TEXT);
@@ -2310,21 +2309,23 @@ void SohMenu::AddMenuEnhancements() {
         .HideInSearch(true)
         .Options(WindowButtonOptions().Tooltip("Enables the separate Cosmetics Editor Window."));
 #ifdef COMBO_BUILD
-    // ComboShip: draw the editor inline (SoH embeds it via the window button's EmbedWindow; comboui's
-    // flat model doesn't carry that flag). Mirrors "Controller Bindings Inline"; skipped when popped out.
-    AddWidget(path, "Cosmetics Editor Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
-                return;
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Cosmetics Editor");
-            if (!win || win->IsVisible())
-                return;
-            win->Update();
-            win->DrawElement();
-        });
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: draw the editor inline (SoH embeds it via the window button's EmbedWindow; comboui's
+        // flat model doesn't carry that flag). Mirrors "Controller Bindings Inline"; skipped when popped out.
+        AddWidget(path, "Cosmetics Editor Inline", WIDGET_CUSTOM)
+            .RaceDisable(false)
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
+                    return;
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Cosmetics Editor");
+                if (!win || win->IsVisible())
+                    return;
+                win->Update();
+                win->DrawElement();
+            });
+    }
 #endif
 
     // Audio Editor
@@ -2337,20 +2338,22 @@ void SohMenu::AddMenuEnhancements() {
         .HideInSearch(true)
         .Options(WindowButtonOptions().Tooltip("Enables the separate Audio Editor Window."));
 #ifdef COMBO_BUILD
-    // ComboShip: draw the editor inline (see "Cosmetics Editor Inline"); skipped when popped out.
-    AddWidget(path, "Audio Editor Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
-                return;
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Audio Editor");
-            if (!win || win->IsVisible())
-                return;
-            win->Update();
-            win->DrawElement();
-        });
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: draw the editor inline (see "Cosmetics Editor Inline"); skipped when popped out.
+        AddWidget(path, "Audio Editor Inline", WIDGET_CUSTOM)
+            .RaceDisable(false)
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
+                    return;
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Audio Editor");
+                if (!win || win->IsVisible())
+                    return;
+                win->Update();
+                win->DrawElement();
+            });
+    }
 #endif
 
     // Gameplay Stats
@@ -2363,20 +2366,22 @@ void SohMenu::AddMenuEnhancements() {
         .HideInSearch(true)
         .Options(WindowButtonOptions().Tooltip("Enables the separate Gameplay Stats Window."));
 #ifdef COMBO_BUILD
-    // ComboShip: draw the window inline (see "Cosmetics Editor Inline"); skipped when popped out.
-    AddWidget(path, "Gameplay Stats Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
-                return;
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Gameplay Stats");
-            if (!win || win->IsVisible())
-                return;
-            win->Update();
-            win->DrawElement();
-        });
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: draw the window inline (see "Cosmetics Editor Inline"); skipped when popped out.
+        AddWidget(path, "Gameplay Stats Inline", WIDGET_CUSTOM)
+            .RaceDisable(false)
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
+                    return;
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Gameplay Stats");
+                if (!win || win->IsVisible())
+                    return;
+                win->Update();
+                win->DrawElement();
+            });
+    }
 #endif
 
     // Time Splits
@@ -2391,49 +2396,51 @@ void SohMenu::AddMenuEnhancements() {
 #endif
         .WindowName("Time Splits Settings Window");
 #ifdef COMBO_BUILD
-    // ComboShip: draw the settings window inline (see "Cosmetics Editor Inline"); skipped when popped out.
-    AddWidget(path, "Time Splits Settings Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
-                return;
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Time Splits Settings Window");
-            if (!win || win->IsVisible())
-                return;
-            win->Update();
-            win->DrawElement();
-        });
-#endif
-
-#ifndef COMBO_BUILD
-    // ComboShip (#173): combo owns the timer overlay, so this section is gone. The menu search
-    // ignores the sidebar allow-list, so leaving it here would let "timer" re-open the native window.
-    // Timers
-    path.sidebarName = "Timers";
-    AddSidebarEntry("Enhancements", path.sidebarName, 3);
-    AddWidget(path, "Toggle Timers Window", WIDGET_WINDOW_BUTTON)
-        .CVar(CVAR_WINDOW("TimeDisplayEnabled"))
-        .RaceDisable(false)
-        .WindowName("Additional Timers")
-        .Options(WindowButtonOptions().Tooltip("Enables the separate Additional Timers Window."));
-    AddWidget(path, "Font Scale: %.2fx", WIDGET_CVAR_SLIDER_FLOAT)
-        .CVar(CVAR_TIME_DISPLAY("FontScale"))
-        .RaceDisable(false)
-        .Callback([](WidgetInfo& info) { TimeDisplayInitSettings(); })
-        .Options(FloatSliderOptions().Min(1.0f).Max(5.0f).DefaultValue(1.0f).Format("%.2fx"));
-    AddWidget(path, "Hide Background", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_TIME_DISPLAY("ShowWindowBG"))
-        .RaceDisable(false)
-        .Callback([](WidgetInfo& info) { TimeDisplayInitSettings(); });
-    for (auto& timer : timeDisplayList) {
-        AddWidget(path, timer.timeLabel, WIDGET_CVAR_CHECKBOX)
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: draw the settings window inline (see "Cosmetics Editor Inline"); skipped when popped out.
+        AddWidget(path, "Time Splits Settings Inline", WIDGET_CUSTOM)
             .RaceDisable(false)
-            .CVar(timer.timeEnable)
-            .Callback([](WidgetInfo& info) { TimeDisplayUpdateDisplayOptions(); });
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
+                    return;
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Time Splits Settings Window");
+                if (!win || win->IsVisible())
+                    return;
+                win->Update();
+                win->DrawElement();
+            });
     }
 #endif
+
+    if (!Combo_IsCombinedGame()) {
+        // ComboShip (#173): combo owns the timer overlay, so this section is gone. The menu search
+        // ignores the sidebar allow-list, so leaving it here would let "timer" re-open the native window.
+        // Timers
+        path.sidebarName = "Timers";
+        AddSidebarEntry("Enhancements", path.sidebarName, 3);
+        AddWidget(path, "Toggle Timers Window", WIDGET_WINDOW_BUTTON)
+            .CVar(CVAR_WINDOW("TimeDisplayEnabled"))
+            .RaceDisable(false)
+            .WindowName("Additional Timers")
+            .Options(WindowButtonOptions().Tooltip("Enables the separate Additional Timers Window."));
+        AddWidget(path, "Font Scale: %.2fx", WIDGET_CVAR_SLIDER_FLOAT)
+            .CVar(CVAR_TIME_DISPLAY("FontScale"))
+            .RaceDisable(false)
+            .Callback([](WidgetInfo& info) { TimeDisplayInitSettings(); })
+            .Options(FloatSliderOptions().Min(1.0f).Max(5.0f).DefaultValue(1.0f).Format("%.2fx"));
+        AddWidget(path, "Hide Background", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_TIME_DISPLAY("ShowWindowBG"))
+            .RaceDisable(false)
+            .Callback([](WidgetInfo& info) { TimeDisplayInitSettings(); });
+        for (auto& timer : timeDisplayList) {
+            AddWidget(path, timer.timeLabel, WIDGET_CVAR_CHECKBOX)
+                .RaceDisable(false)
+                .CVar(timer.timeEnable)
+                .Callback([](WidgetInfo& info) { TimeDisplayUpdateDisplayOptions(); });
+        }
+    }
 }
 
 } // namespace SohGui

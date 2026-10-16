@@ -63,15 +63,15 @@ std::string Rando::GetHintLocationText(RandoItemId randoItemId, RandoCheckId ran
 #ifdef COMBO_BUILD
     // ComboShip owns the foreign-placement map and marks the hint read in the tracker, so defer to it
     // rather than reading the NEI sidecar, which a ComboShip-generated seed never writes.
-    return Rando::GetItemLocationHintName(randoItemId, exact);
-#else
+    if (Combo_IsCombinedGame())
+        return Rando::GetItemLocationHintName(randoItemId, exact);
+#endif
     std::string ootArea = Rando::Spoiler::GetOotAreaForItem(Rando::StaticData::Items[randoItemId].spoilerName);
     if (!ootArea.empty()) {
         return "in " + ootArea;
     }
 
     return Rando::StaticData::GetLocationNameForHint(randoCheckId, exact);
-#endif
 }
 
 std::vector<RandoCheckId> Rando::FindMultiItemPlacement(RandoItemId randoItemId) {
@@ -94,7 +94,7 @@ std::string Rando::GetItemLocationHintName(RandoItemId randoItemId, bool exact) 
     // pre-rendered region text first; fall back to Phase 1's raw check-name string for seeds
     // generated before hints.mm.itemLocations existed.
     int slot = gSaveContext.fileNum;
-    if (slot != 0xFF) {
+    if (Combo_IsCombinedGame() && slot != 0xFF) {
         // ComboShip: the consolidated file keys foreign items by the friendly combo-spoiler name.
         const std::string& friendlyName = Rando::StaticData::GetItemDisplayName(randoItemId);
         if (!friendlyName.empty()) {

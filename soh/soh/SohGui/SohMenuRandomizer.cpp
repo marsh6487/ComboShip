@@ -1,3 +1,4 @@
+#include "../../../combo/ComboGameMode.h"
 #include <unordered_set>
 
 #include <ship/Context.h>
@@ -666,70 +667,72 @@ void SohMenu::AddMenuRandomizer() {
               "Be sure to explore the Presets and Enhancements Menus for various Speedups and Quality of Life changes!",
               WIDGET_TEXT)
         .Options(TextOptions().Color(UIWidgets::Colors::Gray));
-#ifndef COMBO_BUILD // ComboShip: combo drives generation, so hide the per-game Seed Entry section.
-    AddWidget(path, "Seed Entry", WIDGET_SEPARATOR_TEXT);
-    AddWidget(path, "Manual seed entry", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_RANDOMIZER_SETTING("ManualSeedEntry"))
-        .Options(CheckboxOptions().DefaultValue(true));
-    AddWidget(path, "Seed", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) {
-        if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("ManualSeedEntry"), 0)) {
-            UIWidgets::PushStyleInput(THEME_COLOR);
-            ImGui::InputText("##RandomizerSeed", seedString, MAX_SEED_STRING_SIZE,
-                             ImGuiInputTextFlags_CallbackCharFilter, UIWidgets::TextFilters::FilterAlphaNum);
-            UIWidgets::Tooltip("Characters from a-z, A-Z, and 0-9 are supported.\n"
-                               "Character limit is 1023, after which the seed will be truncated.");
-            ImGui::SameLine();
-            if (UIWidgets::Button(
-                    ICON_FA_RANDOM,
-                    UIWidgets::ButtonOptions()
-                        .Size(UIWidgets::Sizes::Inline)
-                        .Color(THEME_COLOR)
-                        .Padding(ImVec2(10.f, 6.f))
-                        .Tooltip("Creates a new random seed value to be used when generating a randomizer"))) {
-                for (size_t i = 0; i < 10; i++) {
-                    seedString[i] = '0' + ShipUtils::Random(0, 10);
+    if (!Combo_IsCombinedGame()) {
+        AddWidget(path, "Seed Entry", WIDGET_SEPARATOR_TEXT);
+        AddWidget(path, "Manual seed entry", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_RANDOMIZER_SETTING("ManualSeedEntry"))
+            .Options(CheckboxOptions().DefaultValue(true));
+        AddWidget(path, "Seed", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) {
+            if (CVarGetInteger(CVAR_RANDOMIZER_SETTING("ManualSeedEntry"), 0)) {
+                UIWidgets::PushStyleInput(THEME_COLOR);
+                ImGui::InputText("##RandomizerSeed", seedString, MAX_SEED_STRING_SIZE,
+                                 ImGuiInputTextFlags_CallbackCharFilter, UIWidgets::TextFilters::FilterAlphaNum);
+                UIWidgets::Tooltip("Characters from a-z, A-Z, and 0-9 are supported.\n"
+                                   "Character limit is 1023, after which the seed will be truncated.");
+                ImGui::SameLine();
+                if (UIWidgets::Button(
+                        ICON_FA_RANDOM,
+                        UIWidgets::ButtonOptions()
+                            .Size(UIWidgets::Sizes::Inline)
+                            .Color(THEME_COLOR)
+                            .Padding(ImVec2(10.f, 6.f))
+                            .Tooltip("Creates a new random seed value to be used when generating a randomizer"))) {
+                    for (size_t i = 0; i < 10; i++) {
+                        seedString[i] = '0' + ShipUtils::Random(0, 10);
+                    }
+                    seedString[10] = '\0';
                 }
-                seedString[10] = '\0';
+                ImGui::SameLine();
+                if (UIWidgets::Button(ICON_FA_ERASER, UIWidgets::ButtonOptions()
+                                                          .Size(UIWidgets::Sizes::Inline)
+                                                          .Color(THEME_COLOR)
+                                                          .Padding(ImVec2(10.f, 6.f)))) {
+                    seedString[0] = 0;
+                }
+                if (seedString[0] == 0) {
+                    ImGui::SameLine(17.0f);
+                    ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.4f), "Leave blank for random seed");
+                }
+                UIWidgets::PopStyleInput();
             }
-            ImGui::SameLine();
-            if (UIWidgets::Button(ICON_FA_ERASER, UIWidgets::ButtonOptions()
-                                                      .Size(UIWidgets::Sizes::Inline)
-                                                      .Color(THEME_COLOR)
-                                                      .Padding(ImVec2(10.f, 6.f)))) {
-                seedString[0] = 0;
+        });
+        AddWidget(path, "Generate Randomizer", WIDGET_BUTTON)
+            .Callback([](WidgetInfo& info) {
+                GenerateRandomizer(CVarGetInteger(CVAR_RANDOMIZER_SETTING("ManualSeedEntry"), 0) ? seedString : "");
+            })
+            .PreFunc([](WidgetInfo& info) {
+                info.options->disabled =
+                    (gSaveContext.gameMode != GAMEMODE_FILE_SELECT) || GameInteractor::IsSaveLoaded();
+            })
+            .Options(ButtonOptions()
+                         .Size(ImVec2(250.f, 0.f))
+                         .DisabledTooltip("Must be on File Select to generate a randomizer seed."));
+        AddWidget(path, "Randomize All Settings", WIDGET_BUTTON)
+            .Callback([](WidgetInfo& info) { Rando::Settings::GetInstance()->RandomizeAllSettings(); })
+            .PreFunc([](WidgetInfo& info) {
+                info.options->disabled =
+                    IsRandoGenerating() || CVarGetInteger(CVAR_GENERAL("OnFileSelectNameEntry"), 0);
+            })
+            .Options(ButtonOptions()
+                         .Size(ImVec2(250.f, 0.f))
+                         .Tooltip("Randomizes all randomizer settings to random valid values (excludes tricks)."))
+            .SameLine(true);
+        AddWidget(path, "Spoiler File", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) {
+            if (!CVarGetInteger(CVAR_RANDOMIZER_SETTING("DontGenerateSpoiler"), 0)) {
+                ImGui::Text("Spoiler File: %s", CVarGetString(CVAR_GENERAL("SpoilerLog"), ""));
             }
-            if (seedString[0] == 0) {
-                ImGui::SameLine(17.0f);
-                ImGui::TextColored(ImVec4(1.0f, 1.0f, 1.0f, 0.4f), "Leave blank for random seed");
-            }
-            UIWidgets::PopStyleInput();
-        }
-    });
-    AddWidget(path, "Generate Randomizer", WIDGET_BUTTON)
-        .Callback([](WidgetInfo& info) {
-            GenerateRandomizer(CVarGetInteger(CVAR_RANDOMIZER_SETTING("ManualSeedEntry"), 0) ? seedString : "");
-        })
-        .PreFunc([](WidgetInfo& info) {
-            info.options->disabled = (gSaveContext.gameMode != GAMEMODE_FILE_SELECT) || GameInteractor::IsSaveLoaded();
-        })
-        .Options(ButtonOptions()
-                     .Size(ImVec2(250.f, 0.f))
-                     .DisabledTooltip("Must be on File Select to generate a randomizer seed."));
-    AddWidget(path, "Randomize All Settings", WIDGET_BUTTON)
-        .Callback([](WidgetInfo& info) { Rando::Settings::GetInstance()->RandomizeAllSettings(); })
-        .PreFunc([](WidgetInfo& info) {
-            info.options->disabled = IsRandoGenerating() || CVarGetInteger(CVAR_GENERAL("OnFileSelectNameEntry"), 0);
-        })
-        .Options(ButtonOptions()
-                     .Size(ImVec2(250.f, 0.f))
-                     .Tooltip("Randomizes all randomizer settings to random valid values (excludes tricks)."))
-        .SameLine(true);
-    AddWidget(path, "Spoiler File", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) {
-        if (!CVarGetInteger(CVAR_RANDOMIZER_SETTING("DontGenerateSpoiler"), 0)) {
-            ImGui::Text("Spoiler File: %s", CVarGetString(CVAR_GENERAL("SpoilerLog"), ""));
-        }
-    });
-#endif
+        });
+    }
 
     // Enhancements
     AddWidget(path, "Enhancements", WIDGET_SEPARATOR_TEXT);
@@ -817,18 +820,18 @@ void SohMenu::AddMenuRandomizer() {
     AddSidebarEntry("Randomizer", path.sidebarName, 1);
     AddWidget(path, "Tricks/Glitches", WIDGET_CUSTOM).CustomFunction(DrawTricksMenu);
 
-#ifndef COMBO_BUILD
-    // Plandomizer. ComboShip: the OOT-only plando can't parse combo consolidated spoilers; the
-    // combo-aware plandomizer lives in the Combo menu instead, so hide this one in combo builds.
-    path.sidebarName = "Plandomizer";
-    AddSidebarEntry("Randomizer", path.sidebarName, 1);
-    AddWidget(path, "Popout Plandomizer Window", WIDGET_WINDOW_BUTTON)
-        .CVar(CVAR_WINDOW("PlandomizerEditor"))
-        .RaceDisable(false)
-        .WindowName("Plandomizer Editor")
-        .HideInSearch(true)
-        .Options(WindowButtonOptions().Tooltip("Enables the separate Randomizer Settings Window."));
-#endif
+    if (!Combo_IsCombinedGame()) {
+        // Plandomizer. ComboShip: the OOT-only plando can't parse combo consolidated spoilers; the
+        // combo-aware plandomizer lives in the Combo menu instead, so hide this one in combo builds.
+        path.sidebarName = "Plandomizer";
+        AddSidebarEntry("Randomizer", path.sidebarName, 1);
+        AddWidget(path, "Popout Plandomizer Window", WIDGET_WINDOW_BUTTON)
+            .CVar(CVAR_WINDOW("PlandomizerEditor"))
+            .RaceDisable(false)
+            .WindowName("Plandomizer Editor")
+            .HideInSearch(true)
+            .Options(WindowButtonOptions().Tooltip("Enables the separate Randomizer Settings Window."));
+    }
 
     // Item Tracker
     path.sidebarName = "Item Tracker";
@@ -850,20 +853,22 @@ void SohMenu::AddMenuRandomizer() {
         .HideInSearch(true)
         .Options(WindowButtonOptions().Tooltip("Enables the separate Item Tracker Settings Window."));
 #ifdef COMBO_BUILD
-    // ComboShip: embed the settings inline (see "Plandomizer Inline"); skipped while popped out.
-    AddWidget(path, "Item Tracker Settings Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
-                return;
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Item Tracker Settings");
-            if (!win || win->IsVisible())
-                return;
-            win->Update();
-            win->DrawElement();
-        });
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: embed the settings inline (see "Plandomizer Inline"); skipped while popped out.
+        AddWidget(path, "Item Tracker Settings Inline", WIDGET_CUSTOM)
+            .RaceDisable(false)
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
+                    return;
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Item Tracker Settings");
+                if (!win || win->IsVisible())
+                    return;
+                win->Update();
+                win->DrawElement();
+            });
+    }
 #endif
 
     // Entrance Tracker
@@ -886,20 +891,22 @@ void SohMenu::AddMenuRandomizer() {
         .HideInSearch(true)
         .Options(WindowButtonOptions().Tooltip("Enables the separate Entrance Tracker Settings Window."));
 #ifdef COMBO_BUILD
-    // ComboShip: embed the settings inline (see "Plandomizer Inline"); skipped while popped out.
-    AddWidget(path, "Entrance Tracker Settings Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
-                return;
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Entrance Tracker Settings");
-            if (!win || win->IsVisible())
-                return;
-            win->Update();
-            win->DrawElement();
-        });
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: embed the settings inline (see "Plandomizer Inline"); skipped while popped out.
+        AddWidget(path, "Entrance Tracker Settings Inline", WIDGET_CUSTOM)
+            .RaceDisable(false)
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
+                    return;
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Entrance Tracker Settings");
+                if (!win || win->IsVisible())
+                    return;
+                win->Update();
+                win->DrawElement();
+            });
+    }
 #endif
 
     // Check Tracker
@@ -922,20 +929,22 @@ void SohMenu::AddMenuRandomizer() {
         .HideInSearch(true)
         .Options(WindowButtonOptions().Tooltip("Enables the separate Check Tracker Settings Window."));
 #ifdef COMBO_BUILD
-    // ComboShip: embed the settings inline (see "Plandomizer Inline"); skipped while popped out.
-    AddWidget(path, "Check Tracker Settings Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
-                return;
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Check Tracker Settings");
-            if (!win || win->IsVisible())
-                return;
-            win->Update();
-            win->DrawElement();
-        });
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: embed the settings inline (see "Plandomizer Inline"); skipped while popped out.
+        AddWidget(path, "Check Tracker Settings Inline", WIDGET_CUSTOM)
+            .RaceDisable(false)
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
+                    return;
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Check Tracker Settings");
+                if (!win || win->IsVisible())
+                    return;
+                win->Update();
+                win->DrawElement();
+            });
+    }
 #endif
 
     // Hint Tracker

@@ -12,6 +12,8 @@ grotto=grotto[grotto.index('static const GrottoLoadInfo'):]
 runtime=(ROOT/'combo/rando/CrossDungeonOotRuntime.inc.h').read_text()
 runtime=runtime[runtime.index('namespace ComboCrossOotRuntime {'):runtime.index('extern "C" void Combo_SOH_AfterNativeLoadGame')]
 source=r'''
+#include "ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include "global.h"
 #include "variables.h"
 #include "soh/Enhancements/randomizer/randomizerTypes.h"

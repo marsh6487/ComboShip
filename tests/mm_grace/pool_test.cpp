@@ -4,7 +4,9 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "tests/test_require.h"
 #include "NeiGracePolicy.h"
+#include "ComboGameMode.h"
 #include <algorithm>
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 SaveContext gSaveContext{};
 int gMMComboGoalHunt = 0, gMMComboGoalRequired = 0, gMMComboGoalPieces = -1;
 int unified;

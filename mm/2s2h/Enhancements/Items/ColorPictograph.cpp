@@ -25,7 +25,7 @@ static std::filesystem::path PictoDir() {
 #ifdef COMBO_BUILD
     // ComboShip: photos live beside the merged save. Combo never creates the vendored "saves/" dir,
     // because per-slot writes divert into the .combosav container before create_directories runs.
-    return Ship::Context::GetPathRelativeToAppDirectory("Save", appShortName);
+    return Ship::Context::GetPathRelativeToAppDirectory(Combo_IsCombinedGame() ? "Save" : "saves/mm", appShortName);
 #else
     return Ship::Context::GetPathRelativeToAppDirectory("saves", appShortName);
 #endif
