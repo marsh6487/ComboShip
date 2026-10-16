@@ -7,6 +7,9 @@
 #include <memory>
 
 extern "C" {
+#ifdef COMBO_BUILD
+int gComboGameMode = COMBO_GAME_BOTH;
+#endif
 int gMMComboGoalHunt = 0;
 int gMMComboGoalRequired = 0;
 int gMMComboGoalPieces = -1;
