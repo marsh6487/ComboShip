@@ -1760,13 +1760,13 @@ void ComboMenu::DrawComboPanel() {
                       "Rewards belong to the arena; completion and the blue warp follow the shuffled boss door.");
     crossPoolCheckbox(
         "Cross-Game Interiors", "gCombo.Rando.CrossInteriorEntrances",
-        "Shuffle all eligible houses, shops and other interiors between games, including open passageways. "
-        "Overrides the two door-only choices below. The original game portal stays available.");
+        "Shuffle eligible houses and other nonretail interiors between games, including open passageways. "
+        "Includes Door Interiors below. Shops use their own checkbox. The original game portal stays available.");
     const bool broadInteriors = CVarGetInteger("gCombo.Rando.CrossInteriorEntrances", 0) != 0;
+    crossPoolCheckbox("Cross-Game Shops", "gCombo.Rando.CrossShopEntrances",
+                      "Shuffle all retail shop entrances with other shops between games, including open entrances. "
+                      "Only this checkbox includes shops. Applied to newly generated seeds.");
     ImGui::BeginDisabled(broadInteriors);
-    crossPoolCheckbox("Cross-Game Shops (Doors Only)", "gCombo.Rando.CrossShopEntrances",
-                      "Shuffle retail shop entrances with other shops between games, using only doors you open. "
-                      "Open shop entrances stay in place. Applied to newly generated seeds.");
     crossPoolCheckbox(
         "Cross-Game Door Interiors", "gCombo.Rando.CrossDoorInteriorEntrances",
         "Shuffle other interiors with doors you open between games. Shops use their separate checkbox. "

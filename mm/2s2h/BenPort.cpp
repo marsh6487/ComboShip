@@ -7,6 +7,7 @@
 #include "ComboResolve.h"
 #include "../../combo/entrances/LostWoodsEntrance.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "2s2h/Enhancements/Camera/ComboForestArrivalCamera.h"
 #endif
 #include <iostream>
 #include <algorithm>
@@ -211,6 +212,7 @@ extern "C" void MM_ApplyComboPortalArrival(void) {
         gSaveContext.cutsceneTrigger = 0;
         gSaveContext.save.isOwlSave = false;
         gSaveContext.respawnFlag = 0;
+        ComboForestArrivalCamera_Queue(sComboPortalRoute);
         return;
     }
     gSaveContext.save.entrance = ENTRANCE(WOODS_OF_MYSTERY, 0);
@@ -229,6 +231,7 @@ extern "C" void MM_ApplyComboPortalArrival(void) {
     arrival->playerParams = PLAYER_PARAMS(0xFF, PLAYER_START_MODE_E);
     arrival->data = 1;
     gSaveContext.respawnFlag = 2;
+    ComboForestArrivalCamera_Queue(sComboPortalRoute);
 }
 // ComboShip: Ctrl+R reset while MM is foreground. Like the portal return, but only persists MM if
 // autosave is enabled (an authentic reset otherwise discards unsaved progress). Set via the export.

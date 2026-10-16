@@ -67,9 +67,8 @@ static void DrawPassage() {
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
     Matrix_Push();
     if (openingForest) {
-        const ActorEntry& spawn = *gPlayState->linkActorEntry;
-        Matrix_Translate(spawn.pos.x, spawn.pos.y, spawn.pos.z, MTXMODE_NEW);
-        Matrix_RotateYS(spawn.rot.y, MTXMODE_APPLY);
+        Matrix_Translate(COMBO_OPENING_FOREST_STUMP_X, 0.0f, COMBO_OPENING_FOREST_STUMP_Z, MTXMODE_NEW);
+        Matrix_RotateYS(COMBO_OPENING_FOREST_STUMP_YAW, MTXMODE_APPLY);
     } else {
         Matrix_Translate(160.0f, 0.0f, -160.0f, MTXMODE_NEW);
         Matrix_RotateYS(-8192, MTXMODE_APPLY);
@@ -80,9 +79,8 @@ static void DrawPassage() {
     gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEI, G_CC_MODULATEI);
     gDPLoadTextureBlock(POLY_OPA_DISP++, "__OTR__scenes/nonmq/Z2_26SARUNOMORI/Z2_26SARUNOMORITex_00BAC0", G_IM_FMT_RGBA,
                         G_IM_SIZ_16b, 32, 32, 0, G_TX_WRAP, G_TX_WRAP, 5, 5, G_TX_NOLOD, G_TX_NOLOD);
-    // The opening visit begins inside this return arch. Omit its black back
-    // plane so the trailing arrival camera cannot be covered by the doorway.
-    for (int i = 0; i < kQuadCount - (openingForest ? 1 : 0); ++i) {
+    // Arrival remains in the clearing, away from the stump's black mouth.
+    for (int i = 0; i < kQuadCount; ++i) {
         gSPVertex(POLY_OPA_DISP++, (uintptr_t)&sVertices[i * 4], 4, 0);
         gSP2Triangles(POLY_OPA_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
     }

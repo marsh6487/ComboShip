@@ -27,7 +27,7 @@ int main() {
     assert(nlohmann::json::parse(MM_DumpCrossDungeonCatalogueForOptions("{\"dungeons\":false,\"bosses\":true}")).size()==4);
     assert(nlohmann::json::parse(MM_DumpCrossDungeonCatalogueForOptions("{\"bosses\":true}")).size()==9);
     auto all=nlohmann::json::parse(MM_DumpCrossDungeonCatalogueForOptions("{\"expanded\":true,\"interiors\":true,\"grottos\":true}"));
-    assert(all.size()==80);
+    assert(all.size()==73);
     assert(nlohmann::json::parse(MM_DumpCrossDungeonCatalogueForOptions("{\"dungeons\":false,\"grottos\":true}")).size()==26);
     assert(nlohmann::json::parse(MM_DumpCrossDungeonCatalogueForSeed(
         "{\"crossDungeonEntrances\":{\"version\":2,\"options\":{\"dungeons\":false,\"interiors\":true}}}")).size()==42);
@@ -135,5 +135,29 @@ int main() {
     NativeTitleArrival();
     assert(gSaveContext.save.entrance==g->PhysicalEntry() && gSaveContext.respawnFlag==0);
     assert(gSaveContext.respawn[3].data==0x9A);
+    // The real Bomb Shop portal pairs with the actual OoT potion rear doorway.
+    PoolOptions shopOptions;shopOptions.dungeons=false;shopOptions.shops=true;
+    std::vector<Dungeon> shopCatalogue;Append(shopCatalogue,shopOptions);
+    const auto bomb=std::find_if(shopCatalogue.begin(),shopCatalogue.end(),[](const Dungeon& d){
+        return d.entrance.index==ENTRANCE(BOMB_SHOP,0);
+    });
+    assert(bomb!=shopCatalogue.end() && bomb->exit.index==ENTRANCE(WEST_CLOCK_TOWN,6));
+    Dungeon potion{"oot:potion-back",{0,OOT_ENTR_POTION_SHOP_KAKARIKO_BACK},
+        {0,OOT_ENTR_KAKARIKO_VILLAGE_OUTSIDE_POTION_SHOP_BACK},{0,OOT_ENTR_KAKARIKO_VILLAGE_OUTSIDE_POTION_SHOP_BACK}};
+    potion.pool=Pool::Shop;
+    const auto shopSeed=Encode({potion,*bomb},{1,0});
+    assert(MM_SetCrossDungeonRuntimeSeed(shopSeed.dump().c_str()));
+    gSaveContext={};play.sceneId=Rando::Logic::Regions[RR_BOMB_SHOP].sceneId;
+    assert(MM_QueueCrossDungeonArrival(bomb->entrance.index));
+    assert(Combo_MM_ConsumeCrossDungeonArrival()==bomb->entrance.index);
+    index=bomb->exit.index;
+    assert(Combo_MM_CrossDungeonTransition(&index)==1 && ComboCrossMmRuntime::pending);
+    assert(ComboCrossMmRuntime::pending->to==potion.returnTo);
+    assert(Combo_MM_CompleteCrossDungeonTransition());
+    assert(ComboCrossMmRuntime::PrepareSwitch() && queued==potion.returnTo.index);
+    assert(gSaveContext.save.entrance==bomb->entrance.index);
+    index=bomb->entrance.index;
+    assert(Combo_MM_CrossDungeonTransition(&index)==1 && ComboCrossMmRuntime::pending->to==potion.entrance);
+    Combo_MM_CancelCrossDungeonTransition();
     std::cout<<"MM adapters: options, logical region/source identity, raw clocks, one-leg runtime, native saves and recovery PASS\n";
 }

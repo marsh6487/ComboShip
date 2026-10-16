@@ -70,6 +70,7 @@ python3 -B tests/nei_shared_slot/run_tests.py
 python3 -B tests/nei_shared_slot/run_ui_tests.py
 python3 -B tests/nei_shared_slot/run_sync_tests.py
 python3 -B tests/nei_shared_slot/run_save_tests.py
+python3 -B tests/moons_tear/run_tests.py
 python3 -B tests/mm_wolf/run_skin_tests.py
 python3 -B tests/mm_wolf/run_core_tests.py
 python3 -B tests/mm_wolf/run_material_glow_tests.py

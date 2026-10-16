@@ -629,12 +629,15 @@ int main(int argc, char** argv) {
         if (crossPoolArgs[i] >= 0)
             *flags[i] = crossPoolArgs[i] != 0;
     crossOptions.expanded = crossOptions.dungeons && crossOptions.expanded;
-    crossDungeons.SetOptions(crossOptions);
     const bool crossDungeonEnabled = crossOptions.Any();
     const bool replayCrossMap =
         recordedCrossMap && crossDungeonEnabled &&
         ComboRando::CrossDungeon::OptionsJson(crossOptions) ==
             ComboRando::CrossDungeon::OptionsJson(ComboRando::CrossDungeon::OptionsFromSeed(*settingsCrossSeed));
+    // Fresh generation uses today's policy even when settings came from an older map.
+    if (!replayCrossMap)
+        crossOptions.legacyInteriors = false;
+    crossDungeons.SetOptions(crossOptions);
     // Shared Items: --shared-items wins ("all"/"none"/comma-separated keys); else the menu CVars.
     uint32_t sharedMask = 0;
     if (sharedItemsArg == "all") {

@@ -2583,6 +2583,9 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
         case RG_MM_SOUL_WART:
         case RG_MM_SOUL_WIZROBE:
         case RG_MM_SOUL_WOLFOS:
+            // Their FC receipt is already recorded above. These have no OoT inventory item;
+            // falling through would also grant Moon's Tear (including for MM starting souls).
+            break;
         // MM trade / quest-chain items — grant the REAL NEI inventory item, same APIs the give-all
         // debug menu path uses: adult-trade wheel (pause kaleido slots 4/5, trade_items.c),
         // pictobox (picto_box.c), powder keg (power_keg.c), Bombers' Notebook (mmQuestItems bit).

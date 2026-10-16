@@ -10,6 +10,13 @@
 // this wrapper. Inspect the active mesh, so another pack winning load order
 // cannot hide the fallback arch merely because this archive is mounted.
 #define COMBO_OPENING_FOREST_PACK_ROOT "__OTR__custom/cor_mm3d/lost_woods_poc1/room_0/opa_combo_return_v1"
+#define COMBO_OPENING_FOREST_STUMP_PACK_ROOT "__OTR__custom/cor_mm3d/lost_woods_poc1/room_0/opa_combo_return_stump_v2"
+
+// West face of the large broken stump in the opening clearing. The native
+// ground is walkable here; the fade starts in front of its solid collision.
+#define COMBO_OPENING_FOREST_STUMP_X 120.0f
+#define COMBO_OPENING_FOREST_STUMP_Z 240.0f
+#define COMBO_OPENING_FOREST_STUMP_YAW (-16384)
 
 // A playable visit uses spawn zero/layer zero. Song of Time flashbacks use
 // other spawns/layers and retain their native behavior. No story flag marks a visit.
@@ -42,7 +49,7 @@ static inline void ComboOpeningForest_NormalizeEntry(void) {
     gSaveContext.respawnFlag = 0;
 }
 
-static inline int ComboOpeningForest_UsesPackTunnel(const PlayState* play) {
+static inline int ComboOpeningForest_ReturnPackVersion(const PlayState* play) {
     if (!ComboOpeningForest_IsExploration(play) || play->roomCtx.curRoom.num != 0)
         return 0;
     const RoomShape* shape = play->roomCtx.curRoom.roomShape;
@@ -50,23 +57,32 @@ static inline int ComboOpeningForest_UsesPackTunnel(const PlayState* play) {
         !shape->normal.entries || !shape->normal.entries[0].opa)
         return 0;
     const char* path = (const char*)shape->normal.entries[0].opa;
-    return strcmp(path, COMBO_OPENING_FOREST_PACK_ROOT) == 0;
+    if (strcmp(path, COMBO_OPENING_FOREST_STUMP_PACK_ROOT) == 0)
+        return 2;
+    return strcmp(path, COMBO_OPENING_FOREST_PACK_ROOT) == 0 ? 1 : 0;
+}
+
+static inline int ComboOpeningForest_UsesPackTunnel(const PlayState* play) {
+    return ComboOpeningForest_ReturnPackVersion(play) != 0;
 }
 
 static inline int ComboOpeningForest_AtReturn(const PlayState* play, const Vec3f* position) {
     if (!ComboOpeningForest_IsExploration(play) || play->roomCtx.curRoom.num != 0 || !play->linkActorEntry)
         return 0;
-    const float dx = position->x - play->linkActorEntry->pos.x;
-    const float dz = position->z - play->linkActorEntry->pos.z;
-    const float dy = position->y - play->linkActorEntry->pos.y;
-    if (ComboOpeningForest_UsesPackTunnel(play)) {
-        const float angle = play->linkActorEntry->rot.y * (6.28318530718f / 65536.0f);
-        const float lateral = dx * cosf(angle) - dz * sinf(angle);
-        const float depth = dx * sinf(angle) + dz * cosf(angle);
-        // Inside the authored 68-wide inner arch, ahead of its black face at
-        // depth -24. Entry remains disarmed until the player leaves the arch.
-        return lateral > -58.0f && lateral < 58.0f && depth > -62.0f && depth < 12.0f && dy > -40.0f && dy < 130.0f;
-    }
-    return dx * dx + dz * dz < 3600.0f && dy > -40.0f && dy < 130.0f;
+    const int version = ComboOpeningForest_ReturnPackVersion(play);
+    // Keep the visible doorway and trigger together when an older pack wins
+    // load order. Native assets use the temporary arch at the new stump.
+    const float x = version == 1 ? play->linkActorEntry->pos.x : COMBO_OPENING_FOREST_STUMP_X;
+    const float z = version == 1 ? play->linkActorEntry->pos.z : COMBO_OPENING_FOREST_STUMP_Z;
+    const float y = version == 1 ? play->linkActorEntry->pos.y : 0.0f;
+    const s16 yaw = version == 1 ? play->linkActorEntry->rot.y : COMBO_OPENING_FOREST_STUMP_YAW;
+    const float dx = position->x - x, dz = position->z - z, dy = position->y - y;
+    const float angle = yaw * (6.28318530718f / 65536.0f);
+    const float lateral = dx * cosf(angle) - dz * sinf(angle);
+    const float depth = dx * sinf(angle) + dz * cosf(angle);
+    const float halfWidth = version ? 58.0f : 42.0f;
+    // Trigger ahead of the black face (depth -24), before the existing stump
+    // wall. The retained native arrival is well outside these bounds.
+    return lateral > -halfWidth && lateral < halfWidth && depth > -62.0f && depth < 12.0f && dy > -40.0f && dy < 130.0f;
 }
 #endif

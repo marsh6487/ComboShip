@@ -66,6 +66,8 @@ int main() {
         MM_SetComboEntryIsResume(0);
         MM_SetComboPortalRoute(2);
         Setup_InitImpl(&state);
+        require(queuedCameraRoute == COMBO_PORTAL_OPENING_FOREST && queuedCameraCount == slot + 1,
+                "opening forest must queue one camera presentation after the matching save load");
         require(gSaveContext.save.entrance == ENTRANCE(LOST_WOODS, 0),
                 "Fairy tunnel must load the playable opening forest, never the title or first-cycle intro");
         require(gSaveContext.fileNum == slot && gSaveContext.save.day == 2 &&

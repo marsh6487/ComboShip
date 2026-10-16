@@ -17,6 +17,7 @@ static int sComboPortalRoute = COMBO_PORTAL_LOST_WOODS;
 static MtxF sMatrix;
 MtxF* sCurrentMatrix = &sMatrix;
 static s16 sCameraInterfaceFlags;
+extern "C" void ComboForestArrivalCamera_Queue(int) {}
 
 void FrameInterpolation_RecordMatrixTranslate(f32, f32, f32, MatrixMode) {
 }

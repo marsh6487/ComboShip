@@ -34,7 +34,7 @@ void Draw(){int goalTheme=0;
 }
 int main(){
     Draw();
-    const char* shops="Cross-Game Shops (Doors Only)";
+    const char* shops="Cross-Game Shops";
     const char* doors="Cross-Game Door Interiors";
     assert(disabled.count(shops)&&disabled.count(doors)&&"both narrow controls must be visible");
     assert(!disabled.at(shops)&&!disabled.at(doors));
@@ -42,15 +42,15 @@ int main(){
     assert(settings["gCombo.Rando.CrossDoorInteriorEntrances"]==0);
     click=doors;Draw();assert(settings["gCombo.Rando.CrossDoorInteriorEntrances"]==1);
     click="Cross-Game Interiors";Draw();assert(settings["gCombo.Rando.CrossInteriorEntrances"]==1);
-    assert(disabled.at(shops)&&disabled.at(doors));
-    click=shops;Draw();assert(settings["gCombo.Rando.CrossShopEntrances"]==1);
+    assert(!disabled.at(shops)&&disabled.at(doors));
+    click=shops;Draw();assert(settings["gCombo.Rando.CrossShopEntrances"]==0);
     click=doors;Draw();assert(settings["gCombo.Rando.CrossDoorInteriorEntrances"]==1);
     click="Cross-Game Interiors";Draw();assert(!disabled.at(shops)&&!disabled.at(doors));
-    assert(settings["gCombo.Rando.CrossShopEntrances"]&&settings["gCombo.Rando.CrossDoorInteriorEntrances"]);
+    assert(!settings["gCombo.Rando.CrossShopEntrances"]&&settings["gCombo.Rando.CrossDoorInteriorEntrances"]);
 }
 '''
 with tempfile.TemporaryDirectory(prefix='interior-menu-') as tmp:
     cpp=Path(tmp)/'test.cpp';binary=Path(tmp)/'test';cpp.write_text(source)
     subprocess.run(['g++','-std=c++20','-Wall','-Wextra','-Werror',str(cpp),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True)
-print('entrance menu: independent controls, broad precedence and stored narrow preferences PASS')
+print('entrance menu: independent shops, broad nonretail precedence and stored door preference PASS')

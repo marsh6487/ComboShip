@@ -4,10 +4,13 @@
 
 namespace ComboRando::CrossDungeon {
 inline nlohmann::json OptionsJson(const PoolOptions& p) {
-    return { { "dungeons", p.dungeons },          { "bosses", p.bosses },
-             { "interiors", p.interiors },        { "grottos", p.grottos },
-             { "expanded", p.expanded },          { "shops", p.shops },
-             { "doorInteriors", p.doorInteriors } };
+    nlohmann::json options = { { "dungeons", p.dungeons },          { "bosses", p.bosses },
+                               { "interiors", p.interiors },        { "grottos", p.grottos },
+                               { "expanded", p.expanded },          { "shops", p.shops },
+                               { "doorInteriors", p.doorInteriors } };
+    if (p.legacyInteriors)
+        options["legacyInteriors"] = true;
+    return options;
 }
 inline PoolOptions ParseOptions(const nlohmann::json& j) {
     PoolOptions p;
@@ -28,10 +31,14 @@ inline PoolOptions ParseOptions(const nlohmann::json& j) {
     p.expanded = flag("expanded", false);
     p.shops = flag("shops", false);
     p.doorInteriors = flag("doorInteriors", false);
+    p.legacyInteriors = flag("legacyInteriors", false);
     return p;
 }
 inline PoolOptions OptionsFromSeed(const nlohmann::json& seed) {
-    return seed.is_object() && seed.contains("options") ? ParseOptions(seed.at("options")) : PoolOptions{};
+    auto options = seed.is_object() && seed.contains("options") ? ParseOptions(seed.at("options")) : PoolOptions{};
+    // The recorded seed version, never today's menu choices, owns membership on reload.
+    options.legacyInteriors = seed.is_object() && seed.value("version", 4) < 4;
+    return options;
 }
 inline bool Selected(const Dungeon& d, const PoolOptions& p) {
     switch (d.pool) {
@@ -44,7 +51,7 @@ inline bool Selected(const Dungeon& d, const PoolOptions& p) {
         case Pool::Grotto:
             return p.grottos;
         case Pool::Shop:
-            return p.shops && !p.interiors;
+            return p.shops && (!p.interiors || !p.legacyInteriors);
         case Pool::DoorInterior:
             return p.doorInteriors && !p.interiors;
     }
@@ -151,7 +158,7 @@ inline nlohmann::json Encode(const std::vector<Dungeon>& dungeons, const std::ve
     }
     if (options.bosses || options.interiors || options.grottos || options.expanded || options.shops ||
         options.doorInteriors) {
-        result["version"] = options.shops || options.doorInteriors ? 3 : 2;
+        result["version"] = 4;
         result["options"] = OptionsJson(options);
     }
     return result;
@@ -164,7 +171,7 @@ inline std::vector<Route> Decode(const nlohmann::json& j) {
     if (!j.at("enabled").get<bool>())
         return {};
     if (!j.at("version").is_number_integer() ||
-        (j.at("version").get<int64_t>() < 1 || j.at("version").get<int64_t>() > 3))
+        (j.at("version").get<int64_t>() < 1 || j.at("version").get<int64_t>() > 4))
         throw std::invalid_argument("unsupported cross-dungeon seed version");
     const int version = j.at("version").get<int>();
     const bool expandedCodec = version >= 2;

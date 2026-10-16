@@ -405,7 +405,7 @@ inline const std::array<PortalDescriptor, 42>& Interiors() {
         { "mm:interior:lottery_shop:0", ENTRANCE(LOTTERY_SHOP, 0), ENTRANCE(WEST_CLOCK_TOWN, 8), RR_LOTTERY_SHOP,
           RR_CLOCK_TOWN_WEST, InteriorKind::Door },
         { "mm:interior:goron_shop:0", ENTRANCE(GORON_SHOP, 0), ENTRANCE(GORON_SHRINE, 1), RR_GORON_SHOP,
-          RR_GORON_SHRINE, InteriorKind::Passage },
+          RR_GORON_SHRINE, InteriorKind::ShopPassage },
         { "mm:interior:goron_shrine:0", ENTRANCE(GORON_SHRINE, 0), ENTRANCE(GORON_VILLAGE_WINTER, 2), RR_GORON_SHRINE,
           RR_GORON_VILLAGE, InteriorKind::Passage },
         { "mm:interior:mountain_smithy:0", ENTRANCE(MOUNTAIN_SMITHY, 0), ENTRANCE(MOUNTAIN_VILLAGE_WINTER, 1),

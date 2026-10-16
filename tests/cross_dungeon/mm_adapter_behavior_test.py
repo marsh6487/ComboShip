@@ -29,6 +29,13 @@ base=ROOT/'tests/cross_dungeon/mm_catalogue_behavior_test.py'
 env={'__file__':str(base)}
 exec(compile(base.read_text().split('# Compile the native respawn table')[0],str(base),'exec'),env)
 constants=env['constants']
+oot_entrances=(ROOT/'soh/include/tables/entrance_table.h').read_text()
+for value,name in re.findall(r'/\*\s*(0x[0-9A-Fa-f]+)\s*\*/\s*DEFINE_ENTRANCE\((ENTR_\w+)',oot_entrances):
+    if name in {'ENTR_BAZAAR_1','ENTR_MARKET_DAY_OUTSIDE_BAZAAR','ENTR_POTION_SHOP_KAKARIKO_FRONT',
+                'ENTR_KAKARIKO_VILLAGE_OUTSIDE_POTION_SHOP_FRONT','ENTR_POTION_SHOP_KAKARIKO_BACK',
+                'ENTR_KAKARIKO_VILLAGE_OUTSIDE_POTION_SHOP_BACK'}:
+        constants+=f'\nconstexpr int OOT_{name}={value};'
+
 constants=constants.replace('int respawnFlag=0;', 'int gameMode=0,fileNum=0,nextCutsceneIndex=0xFFEF,nextTransitionType=0; int respawnFlag=0;')
 transitions=(ROOT/'mm/include/z64transition.h').read_text()
 fade_black=re.search(r'/\*\s*(\d+)\s*\*/\s*TRANS_TYPE_FADE_BLACK,',transitions).group(1)
