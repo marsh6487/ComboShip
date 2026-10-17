@@ -41,6 +41,9 @@ jobs:
       - name: Verify all bundled emotes and shared playback
         run: python -B tests/emotes/run_tests.py --msvc --compiler cl
 
+      - name: Verify game picker with Windows SDK before configuring
+        run: python -B tests/solo_games/selection_test.py --msvc --compiler cl
+
       - name: Verify blue-warp hook with MSVC before configuring
         run: python -B tests/cross_dungeon/oot_blue_warp_hook_test.py --msvc --compiler cl
 
@@ -78,8 +81,8 @@ jobs:
             Start-Sleep -Seconds $configureDelaySeconds
           }
 
-      # Order matters: libultraship -> soh -> 2ship (2ship builds ZAPD/OTRExporter; soh builds Torch).
-      # comboui + ComboShip pull the rest of the runtime in as dependencies.
+      # Only libultraship is needed by comboui. Compile/link the UI and generate
+      # both archives before spending time compiling either game engine.
       - name: Build libultraship
         run: cmake --build build/x64 --target libultraship --config Release
       # Validate the actual Windows DLL logging boundary before spending time
@@ -94,6 +97,32 @@ jobs:
           $env:PATH = "$PWD/x64/Release;$env:PATH"
           & ./build/x64/frame-timing-check/Release/frame_timing_output_check.exe "$env:RUNNER_TEMP/frame-timing-output"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build comboui
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $comboUiBuildLog = Join-Path $env:RUNNER_TEMP "comboui-build.log"
+          cmake --build build/x64 --target comboui --config Release 2>&1 | Tee-Object -FilePath $comboUiBuildLog
+          $comboUiBuildExitCode = $LASTEXITCODE
+          if ($comboUiBuildExitCode -ne 0) {
+            $diagnosticLines = Get-Content $comboUiBuildLog |
+              Where-Object { $_ -match '(?i)(error C[0-9]{4}|fatal error|LNK[0-9]{4}|MSB[0-9]{4}|: error )' } |
+              Select-Object -Last 40
+            if (-not $diagnosticLines) {
+              $diagnosticLines = Get-Content $comboUiBuildLog | Select-Object -Last 40
+            }
+            $diagnostic = ($diagnosticLines -join "`n").Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Host "::error title=Windows UI build diagnostic::$diagnostic"
+            exit $comboUiBuildExitCode
+          }
+
+      # These targets depend on their packers and the asset-collision check,
+      # not on soh.dll/2ship.dll. Catch tool/path/archive failures early too.
+      - name: Generate soh.o2r
+        run: cmake --build build/x64 --target GenerateSohOtr --config Release
+      - name: Generate 2ship.o2r
+        run: cmake --build build/x64 --target Generate2ShipOtr --config Release
+
       - name: Build soh
         shell: pwsh
         run: |
@@ -122,8 +151,6 @@ jobs:
       - name: Build comborando
         if: inputs.validator
         run: cmake --build build/x64 --target comborando --config Release
-      - name: Build comboui
-        run: cmake --build build/x64 --target comboui --config Release
       - name: Build ComboShip
         shell: pwsh
         run: |
@@ -144,14 +171,6 @@ jobs:
             Write-Host "::error title=Windows ComboShip build diagnostic::$diagnostic"
             exit $comboShipBuildExitCode
           }
-
-      # Port asset archives (--norom). GenerateSohOtr builds Torch's soh-o2r-packer and
-      # Generate2ShipOtr builds ZAPD on demand. They must run before cpack — the ship/2s2h ZIP components install
-      # ${CMAKE_BINARY_DIR}/soh/soh.o2r and .../mm/2ship.o2r.
-      - name: Generate soh.o2r
-        run: cmake --build build/x64 --target GenerateSohOtr --config Release
-      - name: Generate 2ship.o2r
-        run: cmake --build build/x64 --target Generate2ShipOtr --config Release
 
       # cpack -G ZIP merges the combo/ship/2s2h components into one archive under _packages/.
       # Call cpack directly with -C Release so the multi-config generator can't package Debug by

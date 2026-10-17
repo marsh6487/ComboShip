@@ -100,12 +100,14 @@ inline void ComboMenu_PushButton(ImVec4){}
 inline void ComboMenu_PopButton(){}
 inline ImVec4 ComboMenu_ThemeColor(){return {};}
 }
+#ifndef COMBO_TEST_NATIVE_PICKER
 namespace ComboFilePicker {
 inline bool Available(){return Test::picker;}
 inline std::string PickFile(const char*,const char*,std::initializer_list<const char*>) {
     return Test::pickPaths.at(Test::visits++);
 }
 }
+#endif
 namespace Ship {
 class Gui { public: void* GetImGuiContext(){return nullptr;} void StartDraw(){} void EndDraw(){} };
 class Window {
