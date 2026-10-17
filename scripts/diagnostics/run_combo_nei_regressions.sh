@@ -3,6 +3,10 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 python3 -B scripts/diagnostics/run_hint_item_name_tests.py
 python3 -B scripts/diagnostics/run_combo_crash_owner_tests.py
+python3 -B scripts/diagnostics/run_demise_lightning_tests.py
+ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_demise_lightning_tests.py --sanitize
+python3 -B scripts/diagnostics/run_mm_demise_lightning_tests.py
+ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_mm_demise_lightning_tests.py --sanitize
 python3 -B tools/nei_gi/test_tunic_clearance.py
 python3 -B tools/nei_gi/SOURCE/mario_sm64_poc3.py --verify
 python3 -B scripts/diagnostics/run_nei_gi_tests.py --held --combo

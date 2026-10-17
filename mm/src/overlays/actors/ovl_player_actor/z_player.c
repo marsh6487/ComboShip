@@ -14501,6 +14501,9 @@ void Player_Draw(Actor* thisx, PlayState* play) {
     s32 spEC = false;
     s32 wolfDrawn;
 
+    // Spell-owned world FX must survive custom-model/Mario draw forks.
+    CustomItems_DrawDemiseDestruction(this, play);
+
     // SM64 Mario draw — submit Mario's mesh into the OPA/XLU display lists
     // first, then ShouldHideLink short-circuits the entire vanilla Link
     // draw chain. User decision: Mario replaces Link in ALL forms (Human /

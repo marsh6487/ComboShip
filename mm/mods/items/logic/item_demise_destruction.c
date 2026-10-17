@@ -5,7 +5,7 @@
  *   C Button: Perform devastating magic attack (high MP cost)
  *
  * Features:
- *   - Large area explosion with lightning effects
+ *   - Medallion seal, branching ground electricity and a fading shockwave
  *   - Heavy damage to all enemies in radius
  *   - Ground only (cannot use in water or air)
  *   - Custom superhero landing animation
@@ -21,9 +21,24 @@
 #include "variables.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "../anim/nei_anims.h" // animation now loads from 2ship.o2r — Skijer's NEI
+#include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
+
+static void* Demise_AllocDraw(GraphicsContext* gfx, size_t size) {
+    // Reserve the following matrix too; GRAPH_ALLOC itself doesn't check its tail.
+    uintptr_t end = (uintptr_t)gfx->polyOpa.d & ~(uintptr_t)15;
+    uintptr_t head = (uintptr_t)gfx->polyOpa.p;
+    if (end < head || end - head < ALIGN16(size) + ALIGN16(sizeof(Mtx)) + 2 * sizeof(Gfx)) {
+        return NULL;
+    }
+    return GRAPH_ALLOC(gfx, size);
+}
+
+#define DEMISE_FX_ALLOC(gfx, size) Demise_AllocDraw(gfx, size)
+#define DEMISE_FX_FLOOR(play, matrix, pos) Play_GetFloorSurface(play, matrix, pos)
+#define DEMISE_FX_SETUP(gfx) Gfx_SetupDL25_Xlu(gfx)
+#include "../../../../combo/demise_spell_fx.h"
 
 static s8 sDemisePrevInvinc = 0;
-static FX_Color sDemiseDustColor = { 60, 0, 0, 255 };
 static Color_RGBA8 sDemiseLightningPrim = { 185, 65, 255, 255 };
 static Color_RGBA8 sDemiseLightningEnv = { 14, 0, 24, 255 };
 
@@ -50,6 +65,9 @@ static void Demise_SpawnGroundLightning(PlayState* play, Vec3f* center, s16 wave
 }
 
 static void Demise_Stop(Player* p, PlayState* play) {
+    if (ddState != DEMISE_STATE_FINISH || ddTimer < DEMISE_FINISH_DURATION) {
+        DemiseFx_Clear();
+    }
     if (!ddActive)
         return;
     ddCollider.base.atFlags &= ~(AT_ON | AT_HIT);
@@ -72,13 +90,13 @@ static void Demise_Start(Player* p, PlayState* play) {
     ddActive = 1;
     ddState = DEMISE_STATE_WINDUP;
     ddTimer = -2;
+    DemiseFx_Begin(play, play->sceneId, &p->actor.world.pos);
     ItemMagic_Consume(play, DEMISE_MAGIC_COST);
 }
 
-static void Demise_FinalExplosion(PlayState* play, Player* p) {
-    // Ring of explosions + center explosion
-    FX_SpawnRadialExplosion(play, &p->actor.world.pos, 400.0f, 12, 1.0f);
-    FX_SpawnExplosion(play, &p->actor.world.pos, 1.0f);
+static void Demise_FinalDischarge(PlayState* play, Player* p) {
+    // Repurpose the thirteen visual bursts; damage still comes solely from ddCollider.
+    DemiseFx_Release(play, play->sceneId, &p->actor.world.pos);
     Demise_SpawnGroundLightning(play, &p->actor.world.pos, 0);
 
     Audio_PlaySoundGeneral(NA_SE_IT_HAMMER_HIT, &p->actor.world.pos, 4, &gSfxDefaultFreqAndVolScale,
@@ -129,8 +147,6 @@ static void Demise_StateWindup(Player* p, PlayState* play) {
             Demise_SpawnLightningRing(play, &p->actor.world.pos, 80.0f + (ddTimer - 20) * 1.5f, ddTimer * 0x1300, 2,
                                       130, 1);
         }
-        if (play->gameplayFrames % 4 == 0)
-            FX_SpawnRadialDust(play, &p->actor.world.pos, 80.0f, 320.0f, 4, &sDemiseDustColor);
     }
 
     if (ddTimer > 50) {
@@ -138,8 +154,6 @@ static void Demise_StateWindup(Player* p, PlayState* play) {
             Audio_PlaySoundGeneral(NA_SE_EV_LIGHTNING, &p->actor.world.pos, 4, &gSfxDefaultFreqAndVolScale,
                                    &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         }
-        if (play->gameplayFrames % 3 == 0)
-            FX_SpawnRadialDust(play, &p->actor.world.pos, 80.0f, 320.0f, 8, &sDemiseDustColor);
         if (ddTimer % 8 == 0) {
             Audio_PlaySoundGeneral(NA_SE_EV_EARTHQUAKE, &p->actor.world.pos, 4, &gSfxDefaultFreqAndVolScale,
                                    &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
@@ -149,7 +163,7 @@ static void Demise_StateWindup(Player* p, PlayState* play) {
     }
 
     if (ddTimer == DEMISE_WINDUP_DURATION) {
-        Demise_FinalExplosion(play, p);
+        Demise_FinalDischarge(play, p);
         p->stateFlags1 &= ~(PLAYER_STATE1_IN_ITEM_CS | PLAYER_STATE1_INPUT_DISABLED);
         func_8005B1A4(Play_GetCamera(play, 0));
         ddState = DEMISE_STATE_FINISH;
@@ -193,6 +207,7 @@ void Handle_DemiseDestruction(Player* p, PlayState* play) {
     ItemInput_Update(&in, ITEM_DEMISE_DESTRUCTION, p, play);
 
     if (!in.wasEquipped) {
+        DemiseFx_Clear();
         if (ddActive)
             Demise_Stop(p, play);
         return;
@@ -232,6 +247,12 @@ void Handle_DemiseDestruction(Player* p, PlayState* play) {
 }
 
 void CustomItems_DrawDemiseDestruction(Player* p, PlayState* play) {
+    if (p != GET_PLAYER(play) || !sDemiseFx.phase || play->pauseCtx.state != 0) {
+        return;
+    }
+    ItemInputState in;
+    ItemInput_Update(&in, ITEM_DEMISE_DESTRUCTION, p, play);
+    DemiseFx_Draw(play, play->sceneId, ddTimer, ddActive, in.wasEquipped);
 }
 
 s32 Player_UpperAction_DemiseDestruction(Player* p, PlayState* play) {
