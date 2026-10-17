@@ -600,8 +600,9 @@ int8_t ExtPlayer_GetItemAction(int32_t item) {
             return PLAYER_IA_SWORD_MASTER;
         case ITEM_SWORD_BGS:
             return PLAYER_IA_SWORD_BIGGORON;
-        // Four Sword / Trident sit on B as themselves (ExtEquip_SetSlot) and swing as a one-hand
+        // Extended swords sit on B as themselves (ExtEquip_SetSlot) and swing as a one-hand
         // sword; their behaviors supply the model — no Kokiri Sword is ever written to the save.
+        case ITEM_EXT_SWORD_1:
         case ITEM_EXT_SWORD_2:
         case ITEM_EXT_SWORD_3:
             return PLAYER_IA_SWORD_KOKIRI;

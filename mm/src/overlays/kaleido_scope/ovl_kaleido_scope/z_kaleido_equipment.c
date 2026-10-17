@@ -8,7 +8,7 @@
  *
  * OoT layout on MM's mask-page grid (maskVtx, 6 cols x 4 rows). The equipment grid takes the
  * RIGHT FOUR columns (2..5) — exactly OoT's 4x4 equipment cursor space:
- *   col 0 = upgrades column (quiver / bomb bag / strength / scale — OoT rows 1:1)
+ *   col 0 = passive column (Magic Cape / Pendant of Memories; lower two sockets empty)
  *   cols 1..3 = equipment (row 0 swords, row 1 shields, row 2 tunics, row 3 boots)
  * The Link doll fills the LEFT area (player's LIVE skeleton rendered into an isolated
  * framebuffer — gfx_create_framebuffer + gsSPSetFB/gsSPResetFB, the SoH pause-Link technique).
@@ -29,6 +29,7 @@
 #include "2s2h/CustomMessage/PauseItemDescriptions.h" // NEI: C-Up descriptions for ext equipment
 #include "2s2h/BenGui/CosmeticEditor.h"               // PlayerTunic_BindLocalColor (per-player tunic tint)
 #include "2s2h/FleetShipCombo/FleetComboIds.h"        // FC_SHIELD_* / FC_OOT_TUNIC/BOOTS ownership bits
+#include "2s2h/FleetShipCombo/FleetComboItems.h"      // FCI_KOKIRI_SWORD acquisition receipt
 #include "2s2h/FleetShipCombo/FleetShipCombo.h"       // FleetShipCombo_GetActiveGame (combo ownership gate)
 #include "2s2h/Rando/NeiResourceRouting.h"
 #include "../../../../../combo/menu/ComboItemIconOwnership.h"
@@ -91,7 +92,7 @@ static s16 sEquipCursorY = 0; // 0..3 — OoT cursorY space
 static s16 sTransformCursor = 0;
 
 // The 4x4 grid lives on the mask page's own vertices: equipment cols 1..3 on maskVtx columns 3..5,
-// and the UPGRADE column (col 0: Cape/Pendant toggles + strength/scale) on maskVtx column 0 — the
+// and the PASSIVE column (col 0: Cape/Pendant toggles) on maskVtx column 0 — the
 // free carved blocks at the far LEFT of the page (columns 1-2 sit under the Link doll panel).
 // Keeping stock grid cells means the shared cursor tables (sItemMaskCursorsX/Y, indexed by
 // cursorXIndex/cursorYIndex) position the drawn cursor for free.
@@ -194,15 +195,11 @@ static void* KaleidoEquip_OotTex(const char* path) {
 
 // ---------------------------------------------------------------------------
 // Left column (col 0) — Skijer 2026-07-29 (kaleido re-layout):
-//   row 0 = MAGIC CAPE          (A toggles the cloth visibility; its half-cost passive is always on)
+//   row 0 = MAGIC CAPE          (A opens Show/Hide cloth choices; its half-cost passive is always on)
 //   row 1 = PENDANT OF MEMORIES (A toggles its whole moveset)
-//   row 2 = RESERVED ext slot 1 } freed when quiver / bomb bag / STRENGTH / SWIM all moved to the
-//   row 3 = RESERVED ext slot 2 } quest page. Placeholder icon, hoverable, A error-beeps.
+//   rows 2/3 = empty. Strength/swim upgrades live on the quest page; these sockets have no items.
 // "Value" here = the cell is populated (drives landability + draw).
 // ---------------------------------------------------------------------------
-#define EQUIP_UPGRADE_ROW_RESERVED_1 2
-#define EQUIP_UPGRADE_ROW_RESERVED_2 3
-
 // Page-2 grid rows. The BOOTS row is NOT C-assignable: all three are real boots (equipped with A),
 // and its middle id (0xEA) belongs to the Pendant of Memories in the inventory/C-button id space.
 #define EQUIP_EXT_ROW_BOOTS 3
@@ -213,9 +210,6 @@ static s16 KaleidoEquip_UpgradeValue(s16 row) {
             return ExtEquip_CapeOwned();
         case 1:
             return ExtEquip_PendantOwned();
-        case EQUIP_UPGRADE_ROW_RESERVED_1:
-        case EQUIP_UPGRADE_ROW_RESERVED_2:
-            return 1; // reserved: always drawn/hoverable until the item that lands here is decided
     }
     return 0;
 }
@@ -230,10 +224,6 @@ static void* KaleidoEquip_UpgradeIcon(s16 row, s16 value) {
             return ExtEquip_GetCapeIcon();
         case 1:
             return ExtEquip_GetPendantIcon();
-        // Rows 2/3 = the two reserved ext slots (see KaleidoEquip_UpgradeValue).
-        case EQUIP_UPGRADE_ROW_RESERVED_1:
-        case EQUIP_UPGRADE_ROW_RESERVED_2:
-            return KaleidoEquip_OotTex("__OTR__textures/icon_item_custom/gItemIconReservedSlotTex");
     }
     return NULL;
 }
@@ -383,8 +373,12 @@ static u8 KaleidoEquip_CellOwned(EquipCell* cell) {
             if (FleetShipCombo_GetActiveGame() < 0) {
                 return true;
             }
-            return (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) >= EQUIP_VALUE_SWORD_KOKIRI) ||
-                   (WeaponUpgrade_KokiriLevel() > 0);
+            return Nei_Save()->comboObtainedFc[FCI_KOKIRI_SWORD] != 0 || WeaponUpgrade_KokiriLevel() > 0 ||
+                   (ExtEquip_GetCurrent(EQUIP_TYPE_SWORD) == 0 &&
+                    GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) >= EQUIP_VALUE_SWORD_KOKIRI &&
+                    GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) <= EQUIP_VALUE_SWORD_GILDED &&
+                    BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_B) ==
+                        ITEM_SWORD_KOKIRI + GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) - EQUIP_VALUE_SWORD_KOKIRI);
         case CELL_SWORD_MASTER:
             if (FleetShipCombo_GetActiveGame() < 0) {
                 return true;
@@ -409,7 +403,9 @@ static u8 KaleidoEquip_CellOwned(EquipCell* cell) {
             if (FleetShipCombo_GetActiveGame() < 0) {
                 return true;
             }
-            return (Nei_Save()->shieldOwned & (cell->index == 1 ? FC_SHIELD_HYLIAN : FC_SHIELD_IKANA)) != 0;
+            return (Nei_Save()->shieldOwned & (cell->index == 1 ? FC_SHIELD_HYLIAN : FC_SHIELD_IKANA)) != 0 ||
+                   (ExtEquip_GetCurrent(EQUIP_TYPE_SHIELD) == 0 && Nei_Save()->vanillaShieldSkin == 0 &&
+                    GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD) == cell->index);
         case CELL_TUNIC: // Kokiri (idx 0) always; in COMBO, Goron/Zora require synced ownership
                          // (comboObtained via FleetSync). Standalone keeps "always available".
             if (cell->index == 0 || FleetShipCombo_GetActiveGame() < 0) {
@@ -462,22 +458,8 @@ static u8 KaleidoEquip_CellEquipped(EquipCell* cell) {
     }
 }
 
-// Can the cursor land on this grid position?
-//
-// Skijer 2026-07-31 FIX — this is why page 2 "no dejaba equipar nada". The old comment claimed SoH
-// only lets the cursor sit on OWNED ext cells; it does the opposite. soh z_kaleido_equipment.c:398:
-//
-//     // On extended page, cursor can land on any equipment slot (all owned)
-//     if (extEquipPage) { pauseAnyCursor = true; }
-//
-// and the entry scans at :569 / :610 read `(gBitFlags[...] & equipment) || extEquipPage`. So in OoT
-// the whole 4x3 ext grid is always hoverable; ownership only gates the ACTION (ExtEquip_Equip
-// silently refuses) and the DRAW (unowned cells render greyscaled — which KaleidoScope_DrawEquipment
-// here already does). Requiring ownership to LAND meant that with no extEquipOwnedBits set — the
-// normal state, since nothing in 2ship grants them outside the save editor — not one of the 12 cells
-// was reachable: the page showed 12 greyed icons and the cursor refused to enter. And because
-// ExtEquip_Equip is what flips CVAR_EXT_EQUIP_ENABLED on, ExtEquip_UpdateBehavior kept early-returning
-// too, so none of the 12 behaviors ever ran either. Now 1:1 with OoT.
+// Equipment cells represent acquired inventory, like the item and OoT equipment pages.
+// Keep cursor eligibility consistent with the draw and action ownership checks.
 static u8 KaleidoEquip_CursorCanSit(s16 row, s16 col) {
     EquipCell cell;
 
@@ -487,12 +469,6 @@ static u8 KaleidoEquip_CursorCanSit(s16 row, s16 col) {
     KaleidoEquip_GetCell(sEquipSubPage, row, col, &cell);
     if (cell.equipType == CELL_EMPTY) {
         return false;
-    }
-    if (cell.equipType == CELL_DISPLAY) {
-        return true; // hoverable for the name/preview, A just error-beeps
-    }
-    if (sEquipSubPage == EQUIP_SUBPAGE_EXT) {
-        return true; // soh parity: every populated ext cell is hoverable, owned or not
     }
     return KaleidoEquip_CellOwned(&cell);
 }
@@ -514,6 +490,9 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
     // leaves the slot bare/Kokiri), then the vanilla value goes on top. The old order — vanilla
     // write, then a deferred cleanup restoring the ext piece's snapshot — is what overwrote a freshly
     // equipped Master Sword with the Kokiri Sword.
+    if (cell.equipType == CELL_SWORD || cell.equipType == CELL_SWORD_MASTER || cell.equipType == CELL_SWORD_BGS) {
+        ExtEquip_RecordNativeSwordOwnership();
+    }
     if (cell.equipType == CELL_SWORD) {
         // Kokiri line: equip the highest owned progressive tier (Kokiri/Razor/Gilded).
         u8 level = WeaponUpgrade_KokiriLevel(); // 0/1/2
@@ -562,17 +541,10 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
             Audio_PlaySfx(NA_SE_SY_ERROR);
             return;
         }
+        ExtEquip_RecordNativeShieldOwnership();
     }
 
     if (cell.equipType == CELL_SHIELD) {
-        // Remember the shield being swapped out stays owned (MM has no owned-shield bitmask;
-        // the NEI/FleetCombo shieldOwned store is exactly for this).
-        u16 curShield = GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD);
-        if (curShield == 1) {
-            Nei_Save()->shieldOwned |= FC_SHIELD_HYLIAN;
-        } else if (curShield == 2) {
-            Nei_Save()->shieldOwned |= FC_SHIELD_IKANA;
-        }
         Nei_Save()->shieldOwned |= (cell.index == 1) ? FC_SHIELD_HYLIAN : FC_SHIELD_IKANA;
         ExtEquip_Unequip(EQUIP_TYPE_SHIELD);
         SET_EQUIP_VALUE(EQUIP_TYPE_SHIELD, cell.index);
@@ -585,7 +557,7 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
     if (cell.equipType == CELL_SHIELD_DEKU) {
         // Deku shield: equip AS Hero (same IA / raise gate / collider), then flag the Deku skin so
         // the draw shows OoT's smaller Deku model instead of the Hylian/Hero one.
-        Nei_Save()->shieldOwned |= FC_SHIELD_DEKU | FC_SHIELD_HYLIAN;
+        Nei_Save()->shieldOwned |= FC_SHIELD_DEKU;
         ExtEquip_Unequip(EQUIP_TYPE_SHIELD);
         SET_EQUIP_VALUE(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_HERO);
         Nei_Save()->vanillaShieldSkin = 1;
@@ -719,7 +691,7 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
 
     pauseCtx->cursorColorSet = PAUSE_CURSOR_COLOR_SET_WHITE;
 
-    if (pauseCtx->pageIndex != PAUSE_MASK) {
+    if (pauseCtx->pageIndex != PAUSE_MASK || pauseCtx->itemDescriptionOn) {
         return;
     }
 
@@ -768,6 +740,11 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
             CHECK_BTN_ALL(input->press.button, BTN_A)) {
             BrokenItems_EquipForm(play, sTransformCursor);
             Audio_PlaySfx(NA_SE_SY_DECIDE);
+        } else if ((pauseCtx->state == PAUSE_STATE_MAIN) && (pauseCtx->mainState == PAUSE_MAIN_STATE_IDLE) &&
+                   pauseCtx->cursorSpecialPos == 0 && CHECK_BTN_ALL(input->press.button, BTN_CUP)) {
+            if (PauseItemDesc_ShowForm(play, sTransformCursor, 3)) {
+                pauseCtx->itemDescriptionOn = true;
+            }
         }
 
         // Name-panel guard: custom ids (>= 0xE0) would index past the name-texture tables.
@@ -784,6 +761,25 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
     }
 
     // --- Grid sub-pages (vanilla / ext): OoT 4x4 cursor space ---
+
+    // A sub-page or save-file change can leave the persistent cursor on an unowned cell.
+    // Find a populated cell before accepting input or publishing its title.
+    if (pauseCtx->cursorSpecialPos == 0 && !KaleidoEquip_CursorCanSit(sEquipCursorY, sEquipCursorX)) {
+        for (col = 0; col <= 3; col++) {
+            for (row = 0; row < 4; row++) {
+                if (KaleidoEquip_CursorCanSit(row, col)) {
+                    sEquipCursorX = col;
+                    sEquipCursorY = row;
+                    goto EQUIPMENT_CURSOR_VALID;
+                }
+            }
+        }
+        pauseCtx->cursorItem[PAUSE_MASK] = PAUSE_ITEM_NONE;
+        gExtEquipGridNameContext = false;
+        KaleidoScope_MoveCursorToSpecialPos(play, PAUSE_CURSOR_PAGE_LEFT);
+        return;
+    EQUIPMENT_CURSOR_VALID:;
+    }
 
     // Entering the grid from the page-switch special position (vanilla-cursor behavior):
     // scan for the first cell the cursor can sit on, nearest the entered side.
@@ -868,17 +864,20 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
     if ((pauseCtx->state == PAUSE_STATE_MAIN) && (pauseCtx->mainState == PAUSE_MAIN_STATE_IDLE)) {
         if (CHECK_BTN_ALL(input->press.button, BTN_A)) {
             if (sEquipCursorX == 0) {
-                // Skijer 2026-07-16 (OoT-rework 1:1): A on upgrade row 0 toggles the Magic Cape's
-                // VISIBILITY (its half-cost passive stays active while owned); A on row 1 toggles the
-                // Pendant of Memories moveset. Solid icon = ON, half-transparent = OFF.
+                // Cape A opens an explicit appearance choice; its half-cost passive stays active.
+                // Pendant A toggles its moveset. Solid icon = ON, half-transparent = OFF.
                 if ((sEquipCursorY == 0) && ExtEquip_CapeOwned()) {
-                    ExtEquip_ToggleCapeVisibility();
-                    Audio_PlaySfx(NA_SE_SY_DECIDE);
+                    if (PauseItemDesc_ShowCapeVisibility(play, 3)) {
+                        pauseCtx->itemDescriptionOn = true;
+                        Audio_PlaySfx(NA_SE_SY_DECIDE);
+                    } else {
+                        Audio_PlaySfx(NA_SE_SY_ERROR);
+                    }
                 } else if ((sEquipCursorY == 1) && ExtEquip_PendantOwned()) {
                     ExtEquip_TogglePendantEffect();
                     Audio_PlaySfx(NA_SE_SY_DECIDE);
                 } else {
-                    Audio_PlaySfx(NA_SE_SY_ERROR); // strength/scale rows: view-only (OoT behavior)
+                    Audio_PlaySfx(NA_SE_SY_ERROR);
                 }
             } else {
                 KaleidoEquip_EquipCell(play, sEquipCursorY, sEquipCursorX);
@@ -889,22 +888,11 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
             KaleidoEquip_AssignCButton(play, sEquipCursorY, sEquipCursorX,
                                        input->press.button & (BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT));
         } else if (CHECK_BTN_ALL(input->press.button, BTN_CUP)) {
-            // C-Up reads the cell out, the way it does on the item page. Only ext equipment and the
-            // upgrade column (Magic Cape / Pendant) have a description; the vanilla cells fall through
-            // to the error cue. Skijer's NEI
-            const char* desc = NULL;
-
-            if (sEquipCursorX == 0) {
-                desc = PauseItemDesc_GetEquipUpgrade(sEquipCursorY);
-            } else {
-                EquipCell descCell;
-
-                KaleidoEquip_GetCell(sEquipSubPage, sEquipCursorY, sEquipCursorX, &descCell);
-                desc = (descCell.item >= 0) ? PauseItemDesc_Get((u16)descCell.item, PAUSE_MASK) : NULL;
-            }
-            if (desc != NULL) {
+            // Cell coordinates distinguish shields, tunics and boots that share
+            // fallback icons, and separate passive Cape/Pendant from grid items.
+            if (PauseItemDesc_ShowEquipment(play, sEquipSubPage, sEquipCursorY, sEquipCursorX,
+                                            (sEquipCursorY < 2) ? 3 : 1)) {
                 pauseCtx->itemDescriptionOn = true;
-                PauseItemDesc_Show(play, desc, (sEquipCursorY < 2) ? 3 : 1);
             } else {
                 Audio_PlaySfx(NA_SE_SY_ERROR);
             }
@@ -926,7 +914,8 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
         pauseCtx->cursorItem[PAUSE_MASK] = (nameItem >= 0) ? (u16)nameItem : PAUSE_ITEM_NONE;
     } else {
         KaleidoEquip_GetCell(sEquipSubPage, sEquipCursorY, sEquipCursorX, &cell);
-        pauseCtx->cursorItem[PAUSE_MASK] = (cell.item >= 0) ? (u16)cell.item : PAUSE_ITEM_NONE;
+        pauseCtx->cursorItem[PAUSE_MASK] =
+            (cell.item >= 0 && KaleidoEquip_CellOwned(&cell)) ? (u16)cell.item : PAUSE_ITEM_NONE;
     }
     pauseCtx->cursorSlot[PAUSE_MASK] = EQUIP_CELL(sEquipCursorY, sEquipCursorX);
     // Keep the shared cursor machinery in sync — the kaleido re-derives the drawn cursor from
@@ -939,8 +928,8 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
 
 // ---------------------------------------------------------------------------
 // Link doll: render the player's LIVE skeleton into the isolated framebuffer.
-// SoH technique: gsSPSetFB redirects the OPA stream into the doll FB, so none of
-// the pause pages' RDP state/segments are affected. Composite happens later as a
+// Replay both player streams into the doll FB, so translucent equipment cannot
+// escape into the pause pages. Composite happens later as a
 // page-space quad (see KaleidoScope_DrawEquipment).
 // ---------------------------------------------------------------------------
 static void KaleidoEquip_RenderDollFB(PlayState* play) {
@@ -958,8 +947,7 @@ static void KaleidoEquip_RenderDollFB(PlayState* play) {
     }
 
     if (gPauseLinkFrameBuffer == -1) {
-        // upscale=false → the FB is exactly 64x112 pixels, so the ImageRectangle composite
-        // below can sample it with deterministic texel coords.
+        // Keep the supersampled framebuffer at its exact native dimensions.
         gPauseLinkFrameBuffer =
             gfx_create_framebuffer(EQUIP_DOLL_FBW, EQUIP_DOLL_FBH, EQUIP_DOLL_FBW, EQUIP_DOLL_FBH, false);
     }
@@ -975,14 +963,17 @@ static void KaleidoEquip_RenderDollFB(PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
 
     // SoH structure: the doll renders during the WORK pass (before the main scene), inside the
-    // isolated FB. The doll's commands are written into the OPA stream but EXECUTED from WORK
-    // via a display-list call; the main OPA pass BRANCHES OVER them (opaRef patch below), so
-    // the page's own drawing is completely untouched. (Doing SetFB mid-OPA killed the page.)
+    // isolated FB. Replay OPA then XLU from WORK and branch over both captured
+    // lists in their main passes. Player callbacks draw translucent shields and
+    // replacement-model effects on XLU as well as the opaque skeleton on OPA.
     Gfx* opaRef = POLY_OPA_DISP;
     POLY_OPA_DISP++;
+    Gfx* xluRef = POLY_XLU_DISP;
+    POLY_XLU_DISP++;
 
     gsSPSetFB(WORK_DISP++, gPauseLinkFrameBuffer);
     gSPDisplayList(WORK_DISP++, POLY_OPA_DISP);
+    gSPDisplayList(WORK_DISP++, POLY_XLU_DISP);
 
     // Clear the doll FB to transparent black so the page shows through around Link.
     gDPPipeSync(POLY_OPA_DISP++);
@@ -993,19 +984,33 @@ static void KaleidoEquip_RenderDollFB(PlayState* play) {
     gDPFillRectangle(POLY_OPA_DISP++, 0, 0, EQUIP_DOLL_FBW - 1, EQUIP_DOLL_FBH - 1);
     gDPPipeSync(POLY_OPA_DISP++);
 
-    // 3D state for the doll
+    // Player_DrawImpl expects the caller's render/combine setup. Restore the
+    // native no-fog player state after the clear; cycle/geometry alone leaves
+    // NOOP, and the gameplay fog blender would misread vertex alpha as fog.
+    POLY_OPA_DISP = Gfx_SetupDL26(POLY_OPA_DISP);
     gDPSetCycleType(POLY_OPA_DISP++, G_CYC_2CYCLE);
     gSPLoadGeometryMode(POLY_OPA_DISP++, G_ZBUFFER | G_SHADE | G_CULL_BACK | G_LIGHTING | G_SHADING_SMOOTH);
     gSPTexture(POLY_OPA_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
     gSPViewport(POLY_OPA_DISP++, &sDollViewport);
+    gDPPipeSync(POLY_XLU_DISP++);
+    POLY_XLU_DISP = Gfx_SetupDL26(POLY_XLU_DISP);
+    gDPSetScissor(POLY_XLU_DISP++, G_SC_NON_INTERLACE, 0, 0, EQUIP_DOLL_FBW, EQUIP_DOLL_FBH);
+    gDPSetCycleType(POLY_XLU_DISP++, G_CYC_2CYCLE);
+    gSPLoadGeometryMode(POLY_XLU_DISP++, G_ZBUFFER | G_SHADE | G_CULL_BACK | G_LIGHTING | G_SHADING_SMOOTH);
+    gSPTexture(POLY_XLU_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
+    gSPViewport(POLY_XLU_DISP++, &sDollViewport);
 
     guPerspective(perspMtx, &perspNorm, 60.0f, (f32)EQUIP_DOLL_FBW / (f32)EQUIP_DOLL_FBH, 10.0f, 4000.0f, 1.0f);
     gSPPerspNormalize(POLY_OPA_DISP++, perspNorm);
     gSPMatrix(POLY_OPA_DISP++, perspMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
+    gSPPerspNormalize(POLY_XLU_DISP++, perspNorm);
+    gSPMatrix(POLY_XLU_DISP++, perspMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
     guLookAt(lookAtMtx, 0.0f, 0.0f, -100.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
     gSPMatrix(POLY_OPA_DISP++, lookAtMtx, G_MTX_NOPUSH | G_MTX_MUL | G_MTX_PROJECTION);
+    gSPMatrix(POLY_XLU_DISP++, lookAtMtx, G_MTX_NOPUSH | G_MTX_MUL | G_MTX_PROJECTION);
 
     gSPSetLights1(POLY_OPA_DISP++, sDollLights);
+    gSPSetLights1(POLY_XLU_DISP++, sDollLights);
 
     // CRITICAL: the player limb DLs reference segment 0x0C for the cull display list (set by
     // Player_DrawGameplay before Player_DrawImpl). Without it, segment 0x0C is garbage and the
@@ -1053,53 +1058,64 @@ static void KaleidoEquip_RenderDollFB(PlayState* play) {
 
     gDPPipeSync(POLY_OPA_DISP++);
 
-    // Terminate the WORK-executed sublist, patch the reserved slot so the main OPA pass
-    // jumps over the doll commands, and restore the main framebuffer for the WORK stream.
+    // Terminate both WORK-executed sublists and skip them in the main passes.
+    // Restore the main framebuffer only after translucent preview draws finish.
     gSPEndDisplayList(POLY_OPA_DISP++);
     gSPBranchList(opaRef, POLY_OPA_DISP);
+    gDPPipeSync(POLY_XLU_DISP++);
+    gSPEndDisplayList(POLY_XLU_DISP++);
+    gSPBranchList(xluRef, POLY_XLU_DISP);
     gsSPResetFB(WORK_DISP++);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Composite the doll FB on the OVERLAY stream via gDPImageRectangle — the exact pattern
-// 2ship's own framebuffer_effects.c uses (FB_DrawFromFramebuffer), guaranteed to sample FBs.
-// Screen-space (doesn't tilt with the page cube during transitions — acceptable v1).
+// Like OoT's equipment image, the framebuffer quad belongs to the page's modelview.
+// Keep the cached image on incoming/off-axis pages so it moves with the cube throughout
+// a transition rather than staying in a fixed screen rectangle until pageIndex changes.
 static void KaleidoEquip_DrawDollImage(PlayState* play) {
+    static u64 sDollTextureDimensions[2] = { 0, 0 };
     PauseContext* pauseCtx = &play->pauseCtx;
-    extern Mtx gIdentityMtx;
-    // Screen rect (320x240 space) — OoT equipment layout order: [upgrade column | Link | grid].
-    // The upgrade column lives on maskVtx column 0 (page x -96..-68 ≈ screen 64..92), the equipment
-    // grid on maskVtx columns 3..5 (page x 0.. ≈ screen 160..). The doll fills the gap between them
-    // (screen 96..160) so it no longer covers the upgrade cells (Skijer 2026-07-16 position fix).
-    s32 x0 = 86; // centered in the upgrades(-112..-84)..grid(0..) gap, like OoT's Link at page ~-36
-    s32 y0 = 68;
-    s32 x1 = x0 + EQUIP_DOLL_WIDTH;
-    s32 y1 = y0 + EQUIP_DOLL_HEIGHT;
+    Vtx* vertices;
+    s32 i;
 
-    if (gPauseLinkFrameBuffer == -1 || pauseCtx->pageIndex != PAUSE_MASK) {
+    if (gPauseLinkFrameBuffer == -1) {
         return;
+    }
+
+    // The settled pause projection maps these page coordinates to the former
+    // (86,68)..(150,180) screen rectangle within one pixel, preserving its placement.
+    vertices = GRAPH_ALLOC(play->state.gfxCtx, 4 * sizeof(Vtx));
+    for (i = 0; i < 4; i++) {
+        vertices[i].v.ob[0] = (i & 1) ? -10 : -72;
+        vertices[i].v.ob[1] = (i & 2) ? -58 : 50;
+        vertices[i].v.ob[2] = 0;
+        vertices[i].v.flag = 0;
+        vertices[i].v.tc[0] = (i & 1) ? EQUIP_DOLL_FBW << 5 : 0;
+        vertices[i].v.tc[1] = (i & 2) ? EQUIP_DOLL_FBH << 5 : 0;
+        vertices[i].v.cn[0] = vertices[i].v.cn[1] = vertices[i].v.cn[2] = vertices[i].v.cn[3] = 255;
     }
 
     OPEN_DISPS(play->state.gfxCtx);
 
-    gSPMatrix(OVERLAY_DISP++, &gIdentityMtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    gDPSetEnvColor(OVERLAY_DISP++, 255, 255, 255, pauseCtx->alpha);
-    gDPSetOtherMode(OVERLAY_DISP++,
-                    G_AD_NOISE | G_CD_NOISE | G_CK_NONE | G_TC_FILT | G_TF_POINT | G_TT_NONE | G_TL_TILE | G_TD_CLAMP |
-                        G_TP_NONE | G_CYC_1CYCLE | G_PM_NPRIMITIVE,
-                    G_AC_NONE | G_ZS_PRIM | G_RM_CLD_SURF | G_RM_CLD_SURF2);
-    gSPClearGeometryMode(OVERLAY_DISP++, G_CULL_BOTH | G_FOG | G_LIGHTING | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR);
-    gSPSetGeometryMode(OVERLAY_DISP++, G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH);
-    // clang-format off
-    gDPSetCombineLERP(OVERLAY_DISP++, TEXEL0, 0, ENVIRONMENT, 0, 0, 0, 0, ENVIRONMENT, TEXEL0, 0, ENVIRONMENT, 0, 0, 0, 0, ENVIRONMENT);
-    // clang-format on
+    gDPPipeSync(POLY_OPA_DISP++);
+    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+    gDPSetTextureFilter(POLY_OPA_DISP++, G_TF_POINT);
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, pauseCtx->alpha);
+    gDPSetTileCustom(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, EQUIP_DOLL_FBW, EQUIP_DOLL_FBH, 0,
+                     G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD,
+                     G_TX_NOLOD);
+    // Like OoT's equipment image, seed the loaded dimensions before binding the FB.
+    // LoadTile only records metadata here; the immediate FB bind prevents a CPU upload
+    // of this aligned, signature-safe placeholder before the quad is submitted.
+    gDPSetTextureImage(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, EQUIP_DOLL_FBW, sDollTextureDimensions);
+    gDPLoadSync(POLY_OPA_DISP++);
+    gDPLoadTile(POLY_OPA_DISP++, G_TX_LOADTILE, 0, 0, (EQUIP_DOLL_FBW - 1) << 2, (EQUIP_DOLL_FBH - 1) << 2);
+    gSPVertex(POLY_OPA_DISP++, vertices, 4, 0);
+    gDPSetTextureImageFB(POLY_OPA_DISP++, G_IM_FMT_RGBA, G_IM_SIZ_16b, EQUIP_DOLL_FBW, gPauseLinkFrameBuffer);
+    gSP1Quadrangle(POLY_OPA_DISP++, 0, 2, 3, 1, 0);
 
-    gDPSetTextureImageFB(OVERLAY_DISP++, 0, 0, 0, gPauseLinkFrameBuffer);
-    gDPImageRectangle(OVERLAY_DISP++, x0 << 2, y0 << 2, 0, 0, x1 << 2, y1 << 2, EQUIP_DOLL_FBW, EQUIP_DOLL_FBH,
-                      G_TX_RENDERTILE, EQUIP_DOLL_FBW, EQUIP_DOLL_FBH);
-
-    gDPPipeSync(OVERLAY_DISP++);
+    gDPPipeSync(POLY_OPA_DISP++);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -1141,7 +1157,7 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
             KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, tex, 32, 32, 0);
         }
     } else {
-        // --- Upgrades column (col 0): Cape / Pendant toggles + strength / scale (OoT-rework 1:1) ---
+        // --- Passive column (col 0): owned Cape / Pendant toggles; lower sockets remain empty ---
         // Own vertices at the page's left-edge sockets (OoT x = -114), not maskVtx column 0.
         KaleidoEquip_BuildUpgradeColVtx(pauseCtx);
         for (row = 0; row < 4; row++) {
@@ -1151,10 +1167,9 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
             if (icon == NULL) {
                 continue;
             }
-            // Rows 0/1 show their toggle state spiritual-stones style: solid = ON, half = OFF.
-            if (row == 0) {
-                upgAlpha = ExtEquip_CapeVisible() ? pauseCtx->alpha : (pauseCtx->alpha >> 1);
-            } else if (row == 1) {
+            // The owned Cape's passive stays active when its cloth is hidden. Only the Pendant
+            // dims when its moveset is off.
+            if (row == 1) {
                 upgAlpha = ExtEquip_PendantActive() ? pauseCtx->alpha : (pauseCtx->alpha >> 1);
             } else {
                 upgAlpha = pauseCtx->alpha;
@@ -1181,6 +1196,9 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                 }
 
                 owned = KaleidoEquip_CellOwned(&cell);
+                if (!owned) {
+                    continue;
+                }
                 equipped = KaleidoEquip_CellEquipped(&cell);
 
                 // OoT icon first (visual 1:1 when the OoT archive is in mods/), then the
@@ -1208,17 +1226,10 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                     gSPVertex(POLY_OPA_DISP++, &pauseCtx->maskVtx[EQUIP_CELL(row, col) * 4], 4, 0);
                     POLY_OPA_DISP = Gfx_DrawTexQuadIA8(POLY_OPA_DISP, gEquippedItemOutlineTex, 32, 32, 0);
                 }
-                if (!owned) {
-                    gDPSetGrayscaleColor(POLY_OPA_DISP++, 109, 109, 109, 255);
-                    gSPGrayscale(POLY_OPA_DISP++, true);
-                }
                 gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255,
                                 equipped ? pauseCtx->alpha : (pauseCtx->alpha * 3) / 4);
                 gSPVertex(POLY_OPA_DISP++, &pauseCtx->maskVtx[EQUIP_CELL(row, col) * 4], 4, 0);
                 KaleidoScope_DrawTexQuadRGBA32(play->state.gfxCtx, icon, 32, 32, 0);
-                if (!owned) {
-                    gSPGrayscale(POLY_OPA_DISP++, false);
-                }
             }
         }
     }

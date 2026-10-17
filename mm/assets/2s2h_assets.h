@@ -684,3 +684,20 @@ static const ALIGN_ASSET(2) char gItemIconPropHuntNpcTex[]    = dgItemIconPropHu
 static const ALIGN_ASSET(2) char gItemIconPropHuntPotTex[]    = dgItemIconPropHuntPotTex;
 #define dgItemIconPropHuntPrevTex   "__OTR__textures/icon_item_custom/gItemIconPropHuntPrevTex"
 static const ALIGN_ASSET(2) char gItemIconPropHuntPrevTex[]   = dgItemIconPropHuntPrevTex;
+#define dgGiDungeonSmallKeyDL "__OTR__objects/object_gi_key/gGiDungeonSmallKeyDL"
+static const ALIGN_ASSET(2) char gGiDungeonSmallKeyDL[] = dgGiDungeonSmallKeyDL;
+
+#define dgGiDungeonBossKeyDL "__OTR__objects/object_gi_key/gGiDungeonBossKeyDL"
+static const ALIGN_ASSET(2) char gGiDungeonBossKeyDL[] = dgGiDungeonBossKeyDL;
+
+#define dgGiWoodfallKeyEmblemDL "__OTR__objects/object_gi_key/gGiWoodfallKeyEmblemDL"
+static const ALIGN_ASSET(2) char gGiWoodfallKeyEmblemDL[] = dgGiWoodfallKeyEmblemDL;
+
+#define dgGiSnowheadKeyEmblemDL "__OTR__objects/object_gi_key/gGiSnowheadKeyEmblemDL"
+static const ALIGN_ASSET(2) char gGiSnowheadKeyEmblemDL[] = dgGiSnowheadKeyEmblemDL;
+
+#define dgGiGreatBayKeyEmblemDL "__OTR__objects/object_gi_key/gGiGreatBayKeyEmblemDL"
+static const ALIGN_ASSET(2) char gGiGreatBayKeyEmblemDL[] = dgGiGreatBayKeyEmblemDL;
+
+#define dgGiStoneTowerKeyEmblemDL "__OTR__objects/object_gi_key/gGiStoneTowerKeyEmblemDL"
+static const ALIGN_ASSET(2) char gGiStoneTowerKeyEmblemDL[] = dgGiStoneTowerKeyEmblemDL;

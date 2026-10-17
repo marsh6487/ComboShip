@@ -48,6 +48,10 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-host-') as td:
                               'extern Input* sPlayerControlInput;\n'
                               'extern f32 sControlStickMagnitude;\n'
                               'extern s16 sControlStickAngle;\n'
+                              'u8 VanillaTB_IsIronBoots(void);\n'
+                              'void Player_AnimReplace_SetupLedgeClimb(Player*, s32);\n'
+                              'void func_80839E74(Player*, PlayState*);\n'
+                              'void func_8084C124(PlayState*, Player*);\n'
                               's32 Player_InflictDamage(PlayState*, s32);\n'
                               'void func_80836988(Player*, PlayState*);\n'
                               'void func_808339B4(Player*, s32);\n'
@@ -55,6 +59,12 @@ with tempfile.TemporaryDirectory(prefix='mm-wolf-host-') as td:
                               native_body('s32 func_8082DE88(Player* this, s32 arg1, s32 arg2) {')+'\n'+
                               native_body('void Player_Action_82(Player* this, PlayState* play) {')+'\n'+
                               native_body('bool func_8082DA90(PlayState* play) {')+'\n'+
+                              native_body('u16 Player_GetFloorSfxByAge(Player* this, u16 sfxId) {')+'\n'+
+                              native_body('void Player_AnimSfx_PlayFloorWalk(Player* this, f32 freqVolumeLerp) {')+'\n'+
+                              native_body('void Player_AnimSfx_PlayFloorJump(Player* this) {')+'\n'+
+                              native_body('void Player_AnimSfx_PlayFloorLand(Player* this) {')+'\n'+
+                              native_body('void Player_AnimSfx_PlayVoice(Player* this, u16 sfxId) {')+'\n'+
+                              native_body('void Player_Action_49(Player* this, PlayState* play) {')+'\n'+
                               'void WolfFixture_SelectNativeInput(PlayState* play, Player* this, Input* out) {\n'
                               'Input input;\n'+input_body+'\n'
                               'GameInteractor_ExecuteOnPassPlayerInputs(&input);\n*out=input;\n}\n'+

@@ -94,6 +94,7 @@ int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
 // Selected root type check for complete legacy tunic recipes; no retained pointers.
 int ResourceMgr_IsGiModelAvailableForGame(const char* game, const char* path);
 int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt);
+int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* game, const char* path, float* tilt, float* roll);
 SkeletonHeader* ResourceMgr_LoadSkeletonByName(const char* path, SkelAnime* skelAnime);
 void ResourceMgr_UnregisterSkeleton(SkelAnime* skelAnime);
 void ResourceMgr_ClearSkeletons();

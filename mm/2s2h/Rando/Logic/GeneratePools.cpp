@@ -80,6 +80,12 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
                 continue;
             }
 
+            // dungeon items
+            if (StaysAtVanillaCheck(randoStaticCheck.randoItemId, saveInfo)) {
+                saveInfo.randoSaveChecks[randoCheckId].shuffled = true;
+                continue;
+            }
+
             if (randoStaticCheck.randoCheckType == RCTYPE_SKULL_TOKEN) {
                 if (saveInfo.randoSaveOptions[RO_SHUFFLE_GOLD_SKULLTULAS] == RO_GENERIC_NO) {
                     continue;
@@ -89,6 +95,11 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
                     saveInfo.randoSaveChecks[randoCheckId].shuffled = true;
                     continue;
                 }
+            }
+
+            if (randoStaticCheck.randoCheckType == RCTYPE_SONG &&
+                saveInfo.randoSaveOptions[RO_SHUFFLE_SONGS] == RO_SONG_SHUFFLE_VANILLA) {
+                continue;
             }
 
             if (randoStaticCheck.randoCheckType == RCTYPE_OWL &&
@@ -147,7 +158,7 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             }
 
             if (randoStaticCheck.randoCheckType == RCTYPE_REMAINS &&
-                saveInfo.randoSaveOptions[RO_SHUFFLE_BOSS_REMAINS] == RO_GENERIC_NO) {
+                saveInfo.randoSaveOptions[RO_SHUFFLE_BOSS_REMAINS] == RO_REMAINS_SHUFFLE_VANILLA) {
                 continue;
             }
 
@@ -196,6 +207,11 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             // place. That leaves an inbalance in the pools that will get sorted automatically if there is enough space.
             if (saveInfo.randoSaveOptions[RO_LOGIC] != RO_LOGIC_VANILLA) {
                 if (std::binary_search(excludedChecks.begin(), excludedChecks.end(), randoCheckId)) {
+                    if (saveInfo.randoSaveOptions[RO_SHUFFLE_SONGS] == RO_SONG_SHUFFLE_SONG_LOCATIONS &&
+                        randoStaticCheck.randoCheckType == RCTYPE_SONG) {
+                        continue;
+                    }
+
                     if (Rando::StaticData::Items[randoStaticCheck.randoItemId].randoItemType != RITYPE_JUNK) {
                         itemPool.push_back(randoStaticCheck.randoItemId);
 
@@ -536,6 +552,10 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             if (itemPool[i] == RI_SKELETON_KEY) {
                 continue;
             }
+            if (saveInfo.randoSaveOptions[RO_SHUFFLE_SONGS] == RO_SONG_SHUFFLE_SONG_LOCATIONS &&
+                IsSongLocationItem(itemPool[i])) {
+                continue;
+            }
 
             switch (Rando::StaticData::Items[itemPool[i]].randoItemType) {
                 case RITYPE_BOSS_KEY:
@@ -604,10 +624,6 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
             RI_OOT_NEI_ZONAI_PERMAFROST,
             RI_OOT_NEI_PHANTOM_HOURGLASS,
             RI_OOT_NEI_SHADOW_CRYSTAL,
-            RI_OOT_NEI_SEASON_SPRING,
-            RI_OOT_NEI_SEASON_SUMMER,
-            RI_OOT_NEI_SEASON_AUTUMN,
-            RI_OOT_NEI_SEASON_WINTER,
             // Sheikah Slate: the pool item is gone — the FOUR RUNES are the placeable siblings now
             // (wand idiom: any order, each with its own textbox; the first found hands over the slate).
             RI_OOT_NEI_SLATE_RUNE_BOMB,
@@ -617,6 +633,15 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
         };
         for (RandoItemId neiItem : sNeiPoolItems) {
             itemPool.push_back(neiItem);
+        }
+        const auto seasonMode = NeiSeasons_SeedMode(saveInfo.randoSaveOptions[RO_ROD_OF_SEASONS]);
+        if (seasonMode == NEI_SEASONS_INDIVIDUAL) {
+            itemPool.push_back(RI_OOT_NEI_SEASON_SPRING);
+            itemPool.push_back(RI_OOT_NEI_SEASON_SUMMER);
+            itemPool.push_back(RI_OOT_NEI_SEASON_AUTUMN);
+            itemPool.push_back(RI_OOT_NEI_SEASON_WINTER);
+        } else if (!saveInfo.randoSaveOptions[RO_STARTING_ROD_OF_SEASONS]) {
+            itemPool.push_back(RI_OOT_NEI_ROD_OF_SEASONS);
         }
         if (NeiGrace_InPool(saveInfo.randoSaveOptions[RO_HYLIAS_GRACE])) {
             itemPool.push_back(RI_OOT_NEI_HYLIAS_GRACE);
@@ -682,6 +707,36 @@ void GeneratePools(RandoSaveInfo& saveInfo, std::vector<RandoCheckId>& checkPool
     }
     if (saveInfo.randoSaveOptions[RO_CROSSOVER_MARIO_MASK] == RO_GENERIC_YES) {
         itemPool.push_back(RI_OOT_NEI_MARIO_MASK);
+    }
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_SONGS] == RO_SONG_SHUFFLE_SONG_LOCATIONS) {
+        size_t songItems = std::count_if(itemPool.begin(), itemPool.end(), IsSongLocationItem);
+
+        std::vector<RandoCheckId> songChecks;
+        for (RandoCheckId checkId : checkPool) {
+            if (Rando::StaticData::Checks[checkId].randoCheckType == RCTYPE_SONG) {
+                songChecks.push_back(checkId);
+            }
+        }
+
+        for (size_t i = 0; i < songChecks.size(); i++) {
+            std::swap(songChecks[i], songChecks[Ship_Random(0, songChecks.size())]);
+        }
+
+        // we want to junk the song of healing check first, people normally start with SoT so we don't want
+        // them getting two free songs at the start of every seed.
+        auto healing = std::find(songChecks.begin(), songChecks.end(), RC_STARTING_ITEM_SONG_OF_HEALING);
+        if (healing != songChecks.end()) {
+            std::swap(songChecks[0], *healing);
+        }
+
+        size_t surplusLocations = songChecks.size() - songItems;
+        for (size_t i = 0; i < surplusLocations; i++) {
+            auto& randoSaveCheck = saveInfo.randoSaveChecks[songChecks[i]];
+            randoSaveCheck.shuffled = true;
+            randoSaveCheck.randoItemId = RI_JUNK;
+            randoSaveCheck.skipped = true;
+            checkPool.erase(std::find(checkPool.begin(), checkPool.end(), songChecks[i]));
+        }
     }
 }
 

@@ -423,6 +423,7 @@ typedef struct ShipSaveInfo {
     u8 bombArrowsEquipped;
     NeiSaveData nei; // Skijer's NEI custom-item / ext-equip / bottle / wheel state
     SpiritualStonesSaveData spiritualStones; // Spiritual Stones passive + per-stone warp state
+    u8 persistentBunnyHood;
 } ShipSaveInfo;
 // #endregion
 

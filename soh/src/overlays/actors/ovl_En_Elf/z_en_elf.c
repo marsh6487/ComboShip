@@ -11,6 +11,7 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/audio/MidnaAudio.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_UPDATE_DURING_OCARINA)
 
@@ -483,7 +484,6 @@ void EnElf_Destroy(Actor* thisx, PlayState* play) {
     if (this->actor.params == FAIRY_NAVI) {
         MidnaAudio_Reset();
     }
-    ResourceMgr_UnregisterSkeleton(&this->skelAnime);
 }
 
 void func_80A02A20(EnElf* this, PlayState* play) {

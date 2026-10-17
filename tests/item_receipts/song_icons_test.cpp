@@ -57,7 +57,7 @@ Color_RGB8 color{};
 #define gSPTextureRectangle(p, x1, y1, x2, y2, ...) \
     ((void)(p), rectangleWidth = ((x2) - (x1)) / 4, rectangleHeight = ((y2) - (y1)) / 4)
 int gSfxDefaultPos, gSfxDefaultFreqAndVolScale, gSfxDefaultReverb;
-void Audio_PlaySoundGeneral(int, int*, int, int*, int*, int*) {}
+void Audio_PlaySfxGeneral(int, int*, int, int*, int*, int*) {}
 constexpr int VB_DRAW_ITEM_ICON = 0;
 void DrawCustomItemIcon(Gfx**);
 bool GameInteractor_Should(int, bool, Gfx** gfx) { DrawCustomItemIcon(gfx); return false; }

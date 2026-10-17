@@ -21,6 +21,19 @@ static Color_RGB8 sPlayerBodyEnvColor;
 void* DinFireSword_HandDL(PlayState* play, Player* player, void* hand, u8 r, u8 g, u8 b) {
     return NULL; // No progressive fire resources in this lantern fixture.
 }
+// The real final limb stage also references Four Sword. This fixture owns only
+// the lantern; any sword application or compound allocation is a regression.
+u8 FourSword_IsEquipped(void) {
+    return 0;
+}
+u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* hand, Player* player, u8 r, u8 g, u8 b) {
+    assert(0 && "Lantern grip must not apply a Four Sword model");
+    return 0;
+}
+void* Graph_Alloc(GraphicsContext* gfxCtx, size_t size) {
+    assert(0 && "Lantern grip must not allocate a sword compound");
+    return NULL;
+}
 #define VB_PLAYER_OVERRIDE_LIMB_DRAW 0
 static s32 GameInteractor_Should(int flag,int value,...) { return value; }
 static s32 GameInteractor_InvisibleLinkActive(void) { return 0; }

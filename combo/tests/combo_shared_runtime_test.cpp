@@ -1,5 +1,6 @@
 #include "rando/SharedItems.h"
 #include "rando/CrossWorldRando.h"
+#include "rando/CrossDungeonCoordinator.h"
 #include <mutex>
 #include <atomic>
 #include <iostream>
@@ -44,11 +45,25 @@ static void restoreSettings(const char* settings) {
 static auto MM_DumpRandoSettings = dumpSettings;
 static auto MM_RestoreRandoSettings = restoreSettings;
 static int saveResult = -1;
+static int saveCalls = 0;
 static int initSave(int, const char*, const unsigned char*) {
+    ++saveCalls;
     settingsAtSave = mmSettings;
     return saveResult;
 }
 static auto MM_InitRandoSaveFile = initSave;
+// Exercise the real launcher's new save-binding dependency with the production coordinator.
+// This fixture owns no graph/oracle host; only the seed-bound runtime setter is needed here.
+static ComboRando::CrossDungeon::Coordinator g_CrossDungeons;
+static nlohmann::json runtimeSeeds[2];
+static int runtimeCalls = 0;
+static int setRuntimeSeed(int game, const char* raw) {
+    auto seed = nlohmann::json::parse(raw);
+    ComboRando::CrossDungeon::Decode(seed);
+    runtimeSeeds[game] = std::move(seed);
+    ++runtimeCalls;
+    return 1;
+}
 static int crossGrants = 0;
 static void grantOot(const char*) {
     ++crossGrants;
@@ -120,6 +135,26 @@ int main() {
     check(Combo_WriteMMSaveForSlot(1, seed) && g_MmSaveInMemorySlot == 1, "successful MM creation binds the real slot");
     check(settingsAtSave == seed["mm"]["settings"] && mmSettings == userSettings,
           "successful MM creation must use seed settings and restore the user's menu");
+    check(runtimeCalls == 0, "legacy MM creation must require no cross-dungeon host exports");
+    g_CrossDungeons.hosts[0].SetRuntimeSeed = [](const char* raw) { return setRuntimeSeed(0, raw); };
+    g_CrossDungeons.hosts[1].SetRuntimeSeed = [](const char* raw) { return setRuntimeSeed(1, raw); };
+    auto routedSeed = seed;
+    routedSeed["crossDungeonEntrances"] = ComboRando::CrossDungeon::GenerateSeed(
+        { { "oot:test", { 0, 1 }, { 0, 2 }, { 0, 3 } }, { "mm:test", { 1, 4 }, { 1, 5 }, { 1, 6 } } }, 42);
+    check(Combo_WriteMMSaveForSlot(1, routedSeed), "cross-dungeon seed must remain usable by MM save creation");
+    check(runtimeSeeds[0] == routedSeed["crossDungeonEntrances"] && runtimeSeeds[1] == runtimeSeeds[0],
+          "MM creation binds both runtime hosts to the seed passed to the real writer");
+    auto malformedSeed = routedSeed;
+    malformedSeed["crossDungeonEntrances"]["version"] = 999;
+    const int savesBeforeRejection = saveCalls;
+    check(!Combo_WriteMMSaveForSlot(1, malformedSeed) && saveCalls == savesBeforeRejection,
+          "invalid bound routing must reject MM creation before native save mutation");
+    check(runtimeSeeds[0].is_null() && runtimeSeeds[1].is_null(),
+          "rejected slot binding clears the previous slot's routing in both hosts");
+    check(Combo_WriteMMSaveForSlot(1, routedSeed) && Combo_WriteMMSaveForSlot(1, seed),
+          "valid routed and legacy seeds remain usable after a rejected bind");
+    check(runtimeSeeds[0].is_null() && runtimeSeeds[1].is_null(),
+          "legacy MM creation clears a previously enabled slot's routing");
     g_sharedMask = 1u << ComboRando::SF_GORON_MASK;
     g_sharedReconcilePending = false;
     ResetCrossItemDedupForSeed(42);

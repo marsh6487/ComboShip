@@ -1604,6 +1604,10 @@ int8_t ExtPlayer_GetItemAction(int32_t item) {
             return PLAYER_IA_SWORD_MASTER;
         case ITEM_SWORD_BGS:
             return PLAYER_IA_SWORD_BIGGORON;
+        // Byrna keeps its own item identity and ordinary sword melee. Its separate
+        // two-handed hook supplies the stance without borrowing Giant's Knife durability.
+        case ITEM_EXT_SWORD_1:
+            return PLAYER_IA_SWORD_MASTER;
         // Four Sword / Trident sit on B as themselves (ExtEquip_SetSlot) and swing as a one-hand
         // sword; their behaviors supply the model — no Kokiri Sword is ever written to the save.
         case ITEM_EXT_SWORD_2:

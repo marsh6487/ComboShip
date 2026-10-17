@@ -3,6 +3,7 @@
 #define NEI_SAVE_H
 
 #include <stdint.h>
+#include "../../combo/NeiSeasonsPolicy.h"
 #include "soh/FleetShipCombo/FleetComboIds.h" // FC_COMBO_OBTAINED_FC_SIZE (fcId-indexed store size)
 
 #ifdef __cplusplus
@@ -240,13 +241,17 @@ typedef struct NeiSaveData {
     // everywhere, so it is save state and not per-scene. Appended at the END so older blobs stay
     // readable.
     uint8_t season;       // SEASON_* — the season the cell shows / the world is currently in
-    uint8_t seasonsOwned; // SEASON_* bitmask (four bits) — 0 = rod not owned at all
+    uint8_t seasonsOwned; // earned season pickup mask; the Rod can be owned with no season pickups
     // Local time-pedestal travel can create a legitimate adult save without the
     // story sword. This opts out of its load-time repair; it is not ownership.
     uint8_t timePedestalNoMasterSwordRepair;
     // Independent items sharing inventory cell 41; append for existing saves.
     uint8_t hyliasGraceOwned;
     uint8_t phantomHourglassOwned;
+    // Independent Rod ownership and persistent completion gates (not reward possession).
+    // Appended so existing saves retain their season pickups and inventory cells.
+    uint8_t seasonsRodOwned;
+    uint8_t seasonsGates;
 } NeiSaveData;
 
 #define RITO_FLAG_MASK_OWNED (1 << 0)

@@ -644,24 +644,22 @@
         16.0
       ],
       "png": "tools/nei_icons/PNGS/gItemIconMarioMaskTex.png",
-      "png_sha256": "a33b8dcae7be51aea2978acfa759d94913cc38871553015709adfdbb8469bbaa",
-      "resource_sha256": "aa5523f9cebb181e0be886dd6f28bac5721ed79a928ceacc0183501f95b70973",
+      "png_sha256": "05afc225212bda2600fefbc01b5a4a0628a2416a7f016ae104462c9576acfd6b",
+      "resource_sha256": "ceb99f4bd8eaef1781212c7f43de1182aa250d1bb2114e598aa30e17221a0c67",
       "source": {
-        "approximations": [],
-        "camera": {
-          "azimuth": 14,
-          "elevation": 8,
-          "roll": 0
-        },
+        "approximations": [
+          "Original icon camera/lighting and procedural authoring recipe unavailable; pixels preserved exactly."
+        ],
+        "camera": null,
         "dependencies": {
-          "tools/nei_gi/CHECKPOINTS/mario_mask/mario_mask.glb": "aa5915a6adbb045524c473039d151befb09669b2a0bdfad1e1b7190c2bd82596",
-          "tools/nei_icons/SOURCE/render_driver_20261004.py": "77d354f7878381448e0938459204dee464ece5041aef4790754da1d8b126fa80",
-          "tools/nei_icons/render.py": "afdd89b78da881911cfbe06424d9f8136e097c9a1248e077363c3b6e14d4d476"
+          "tools/nei_gi/SOURCE/mario_sm64_poc3.py": "a96bbe095e993b9f6b1a38129f3f8cc344201a50d8bb03cba8e796a3f78719a4",
+          "tools/nei_gi/SOURCE/mario_sm64_poc3/serialized_source.o2r": "9980d41450bcaa741d2f86cee3658606eec76f558b4d73c5d26d7eccc6f7e52f",
+          "tools/nei_gi/SOURCE/mario_sm64_poc3/source.json": "ab7cbced182f564a912fa17df75f2f6d83f17aefadc82f4456059b542b3d541b"
         },
-        "method": "native GI checkpoint GLB triangles and materials",
-        "source": "mario_mask",
+        "method": "lossless pixels from retained Mario SM64 POC3 OTEX1 source",
+        "source": "ComboShip_Mario_SM64_POC3",
         "title": "Mario Mask",
-        "triangles": 11188
+        "triangles": 13112
       }
     },
     {

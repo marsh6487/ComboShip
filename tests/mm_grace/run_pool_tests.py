@@ -11,9 +11,14 @@ from run_mm_nei_tests import flags
 from run_time_pedestal_tests import functions
 
 source = (ROOT / "mm/2s2h/Rando/Logic/GeneratePools.cpp").read_text()
+constraints = functions((ROOT / "mm/2s2h/Rando/Logic/PlacementConstraints.cpp").read_text())
 with tempfile.TemporaryDirectory(prefix="mm-grace-pool-") as temporary:
     build = Path(temporary)
-    (build / "pool.inc").write_text("namespace Rando::Logic {\n" + functions(source)["GeneratePools"] + "\n}")
+    helpers = "\n".join(constraints[name] for name in
+                        ("DungeonItemToDungeon", "DungeonItemPlacementOption", "StaysAtVanillaCheck",
+                         "IsSongLocationItem"))
+    (build / "pool.inc").write_text("namespace Rando::Logic {\n" + helpers + "\n" +
+                                  functions(source)["GeneratePools"] + "\n}")
     binary = build / "pool"
     # Ubuntu's spdlog uses external fmt. This standalone harness does not link
     # the game's library targets, so compile fmt inline as the save harness does.

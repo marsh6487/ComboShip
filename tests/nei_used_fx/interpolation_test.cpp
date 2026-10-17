@@ -129,6 +129,11 @@ struct Snapshot {
     std::vector<std::string> textures;
 };
 Snapshot effectDraw(bool baseline, bool release, float value, bool big, int element = 2) {
+    // Disabled debug command macros can reserve untouched slots. Never read
+    // stale texture commands from the preceding element's fixture draw.
+    std::memset(opa, 0, sizeof(opa));
+    std::memset(xlu, 0, sizeof(xlu));
+    std::memset(overlay, 0, sizeof(overlay));
     graphics.polyOpa.p = opa;
     graphics.polyOpa.d = std::end(opa);
     graphics.polyXlu.p = xlu;
@@ -141,8 +146,8 @@ Snapshot effectDraw(bool baseline, bool release, float value, bool big, int elem
     if (release) {
         (baseline ? Baseline_DrawSpin : NeiUsedMagic_DrawSpin)(&play, &player, element, value, big);
     } else {
-        gCustomItemState.fireRodCharging = gCustomItemState.lightRodCharging = 1;
-        gCustomItemState.fireRodChargeLevel = gCustomItemState.lightRodChargeLevel = value;
+        gCustomItemState.fireRodCharging = gCustomItemState.iceRodCharging = gCustomItemState.lightRodCharging = 1;
+        gCustomItemState.fireRodChargeLevel = gCustomItemState.iceRodChargeLevel = gCustomItemState.lightRodChargeLevel = value;
         (baseline ? Baseline_DrawCharge : NeiUsedMagic_DrawCharge)(&play, &player, element, value);
         (baseline ? Baseline_DrawChargeFocus : NeiUsedMagic_DrawChargeFocus)(&play, element);
     }
@@ -233,20 +238,13 @@ int main() {
     for (unsigned frame = 0; frame < 180; ++frame) {
         play.gameplayFrames = frame;
         for (float charge : {.2f, .5f, 1.f}) {
-            auto light = effectDraw(true, false, charge, false);
+            sameLight(effectDraw(true, false, charge, false, 1), effectDraw(false, false, charge, false, 1));
             const auto fire = effectDraw(false, false, charge, false, 0);
-            assert(!light.textures.empty());
-            unsigned replaced = 0;
-            for (auto& texture : light.textures) {
-                if (texture == "__OTR__objects/nei_used_magic/light_rays") {
-                    texture = "__OTR__objects/nei_rod_attack/fire_release_crest";
-                    ++replaced;
-                }
-            }
-            assert(replaced > 0);
-            sameLight(light, fire);
+            assert(fire.textures.size() == 1 && fire.textures[0] ==
+                   "__OTR__objects/nei_rod_cast_poc6/fire_natural");
+            sameLight(fire, effectDraw(false, false, charge, false, 0));
         }
     }
-    std::puts("PASS Fire charge equals accepted Light graphics with only the private fire texture substituted");
+    std::puts("PASS Ice charge/focus packed vertices and commands exact; Fire uses private natural material without accumulated state");
     for (void* p : allocations) std::free(p);
 }

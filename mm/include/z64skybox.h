@@ -53,6 +53,7 @@ void Skybox_Draw(SkyboxContext* skyboxCtx, struct GraphicsContext* gfxCtx, s16 s
                  f32 z);
 void Skybox_Update(SkyboxContext* skyboxCtx);
 void Skybox_Calculate128(SkyboxContext* skyboxCtx, s32 nFaces);
+s32 Skybox_IsOotSkyActive(const SkyboxContext* skyboxCtx, s16 skyboxId);
 s32 Skybox_PrepareOot(SkyboxContext* skyboxCtx, s16 skyboxId, u16 time, u8* timeBlend);
 u8 Skybox_GetOotCloudBlend(SkyboxContext* skyboxCtx, s16 blend);
 

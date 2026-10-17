@@ -39,6 +39,13 @@ int main() {
   assert(body == std::string("\x00White", 6));
   assert(!FromOotMessage("Choose\x1B", body));
   assert(!FromOotMessage("Follow\x07\x10\x20", body));
+  const char iconInArguments[] = "\x12\x13\x13\x05\x00\x13\x20Native lesson.\x02";
+  const char iconlessArguments[] = "\x12\x13\x13\x05\x00Native lesson.\x02";
+  assert(WithoutOotItemIcons(std::string_view(iconInArguments, sizeof(iconInArguments) - 1), body));
+  assert(
+      body == std::string(iconlessArguments, sizeof(iconlessArguments) - 1) &&
+      "icon removal must preserve zero colors and icon-like control arguments");
+  assert(!WithoutOotItemIcons("\x13", body));
 
   const char mm[] =
       "\x17You got the Bow!\x18\x10Press \xB2 to aim.\x1E\xBF\x01\x19\xBF";

@@ -24,6 +24,7 @@ extern "C" {
 #include "ComboSwordGiLegacyFit.h"
 #ifdef COMBO_BUILD
 #include "ComboItemDrawABI.h"
+#include "ComboResolve.h"
 #endif
 
 namespace {
@@ -39,7 +40,11 @@ struct Presentation {
     int32_t identity = 0; // distinct awards sharing one legacy callback
     bool alwaysShimmer = false;
     int32_t nativeGid = -1;
+    Kind shimmer = Kind::Neutral; // A separate palette leaves geometry/energy identity intact.
 };
+Kind PresentationShimmer(const Presentation& item) {
+    return item.shimmer == Kind::Neutral ? item.effect : item.shimmer;
+}
 
 #define GI_PATH(slug) "__OTR__objects/nei_gi_redesign/" slug "/gi_dl"
 #define GI_XLU(slug) "__OTR__objects/nei_gi_redesign/" slug "/gi_xlu_dl"
@@ -211,8 +216,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::DivineShield },
     { Randomizer_DrawExtSheikahShield,
       GI_PATH("sheikah_shield"),
       nullptr,
@@ -221,8 +227,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::SheikahShield },
     { Randomizer_DrawExtShieldOfIkana,
       GI_PATH("shield_of_ikana"),
       nullptr,
@@ -231,8 +238,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::IkanaShield },
     { Randomizer_DrawExtMagicCape,
       GI_PATH("magic_cape"),
       nullptr,
@@ -241,8 +249,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::MagicCape },
     { Randomizer_DrawExtSpiritBreastplate,
       GI_PATH("spirit_breastplate"),
       nullptr,
@@ -251,8 +260,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::SpiritBreastplate },
     { Randomizer_DrawExtSagesTunic,
       GI_PATH("sages_tunic"),
       nullptr,
@@ -261,8 +271,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::SagesTunic },
     { Randomizer_DrawExtChampionsTunic,
       GI_PATH("champions_tunic"),
       nullptr,
@@ -271,8 +282,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::ChampionsTunic },
     { Randomizer_DrawExtPegasusAnklet,
       GI_PATH("pegasus_anklet"),
       nullptr,
@@ -281,8 +293,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::PegasusAnklet },
     { Randomizer_DrawExtTrident,
       GI_PATH("trident"),
       nullptr,
@@ -291,7 +304,7 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
+      true,
       -1 },
     { Randomizer_DrawExtClimbBoots,
       GI_PATH("climb_boots"),
@@ -301,8 +314,9 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::ClimbBoots },
     { Randomizer_DrawExtRocBoots,
       GI_PATH("roc_boots"),
       nullptr,
@@ -311,7 +325,7 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
+      true,
       -1 },
     { Randomizer_DrawExtCaneOfByrna,
       GI_PATH("cane_of_byrna"),
@@ -321,7 +335,7 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
+      true,
       -1 },
     { Randomizer_DrawExtFourSword,
       GI_PATH("four_sword"),
@@ -331,7 +345,7 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
+      true,
       -1 },
     { Randomizer_DrawExtPendantOfMemories,
       GI_PATH("pendant_of_memories"),
@@ -341,8 +355,17 @@ const Presentation kPresentations[] = {
       { 0.0000f, 0.0000f, 0.0000f },
       { .85f, 14.f },
       0,
-      false,
-      -1 },
+      true,
+      -1,
+      Kind::PendantOfMemories },
+    { Randomizer_DrawMmTradeQuest,
+      GI_PATH("room_key"),
+      nullptr,
+      1.f,
+      Kind::Neutral,
+      {},
+      { .65f, 8.f },
+      RG_MM_ROOM_KEY },
     { Randomizer_DrawNeiSheikahSlate,
       GI_PATH("sheikah_slate"),
       nullptr,
@@ -463,6 +486,16 @@ const Presentation kPresentations[] = {
       0,
       true,
       -1 },
+    { Randomizer_DrawGiantsKnife,
+      GI_PATH("giants_knife"),
+      nullptr,
+      1.f,
+      Kind::GiantsKnife,
+      { 0.0000f, 0.0000f, 0.0000f },
+      NeiGi::kBiggoronSwordShopFit,
+      0,
+      true,
+      -1 },
     { Randomizer_DrawProgressiveBGS,
       GI_PATH("biggoron_sword"),
       nullptr,
@@ -522,7 +555,8 @@ const Presentation kPresentations[] = {
       { .85f, 14.f },
       0,
       true,
-      -1 },
+      -1,
+      Kind::IronKnuckleAxe },
     { nullptr,
       GI_PATH("kokiri_sword"),
       nullptr,
@@ -548,12 +582,35 @@ const Presentation kPresentations[] = {
 const Presentation kMmKokiriPresentation{
     nullptr, GI_PATH("mm_kokiri_sword"), nullptr, 1.f, Kind::MmKokiriSword, {}, { .85f, 14.f }, 0, true, -1
 };
+// The imported catalog alias keeps MM's existing two-pass trade model. It
+// receives only the equipment identity overlay, never an authored replacement.
+const Presentation kMmPendantPresentation{ Randomizer_DrawMmTradeQuest,
+                                           nullptr,
+                                           nullptr,
+                                           1.f,
+                                           Kind::Neutral,
+                                           {},
+                                           { .85f, 14.f },
+                                           RG_MM_PENDANT_OF_MEMORIES,
+                                           true,
+                                           -1,
+                                           Kind::PendantOfMemories };
 #undef GI_PATH
 #undef GI_XLU
 
 const Presentation* FindPresentation(const GetItemEntry* entry) {
     if (!entry)
         return nullptr;
+    if (entry->drawFunc == Randomizer_DrawMmTradeQuest && entry->drawItemId == RG_MM_PENDANT_OF_MEMORIES)
+        return &kMmPendantPresentation;
+    // Knife and Biggoron deliberately share the original native GID. Keep
+    // their concrete award identity before selecting the generic GID fallback.
+    if (entry->gid == GID_SWORD_BGS && ((entry->tableId == TABLE_RANDOMIZER && entry->drawItemId == RG_GIANTS_KNIFE) ||
+                                        (!entry->drawFunc && entry->getItemId == GI_SWORD_KNIFE))) {
+        for (const auto& candidate : kPresentations)
+            if (candidate.draw == Randomizer_DrawGiantsKnife)
+                return &candidate;
+    }
     const Presentation* fallback = nullptr;
     for (const auto& candidate : kPresentations) {
         if (!entry->drawFunc && !candidate.draw && candidate.nativeGid == entry->gid)
@@ -643,6 +700,8 @@ bool HasResource(const char* path) {
 // Only resource-backed legacy GI routes participate. In particular, the
 // wand's old GI is an inline stand-in: a held-only wand mod must retain the new
 // GI while its held wrapper independently preserves that mod's model.
+// The Lantern's old Poe actor mesh is also a stand-in. Generic Poe replacements
+// must not suppress its authored cage/glass; dedicated GI overrides stay live.
 bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
     // This progressive callback draws a Kokiri placeholder. The real Master
     // callback and MM foreign recipe use Temple geometry instead.
@@ -669,7 +728,6 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
         { "gust_jar", "oot", "objects/object_nei_gust_jar/jar_model_dl" },
         { "time_gate", "oot", "objects/object_nei_time_gate/g_timegate_dl" },
         { "minish_cap", "oot", "objects/object_nei_minish_cap/Cylinder_opaque_dl" },
-        { "lantern", "oot", "objects/object_poh/gPoeLanternDL" },
         { "mario_mask", "oot", "objects/object_nei_mario_mask/g_mario_mask_dl" },
         { "cojiro", "oot", "objects/object_gi_niwatori/gGiChickenDL", "objects/object_gi_niwatori/gGiCojiroColorDL",
           "objects/object_gi_niwatori/gGiChickenEyesDL" },
@@ -678,11 +736,9 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
         { "shield_of_ikana", "mm", "objects/object_link_child/gLinkHumanMirrorShieldDL" },
         { "magic_cape", "oot", "objects/object_nei_magic_cape/gNeiMagicCapeDL",
           "objects/object_nei_magic_cape/gNeiMagicCapeWaveDL" },
-        { "spirit_breastplate", "oot", "objects/object_gi_clothes/gGiTunicCollarDL",
-          "objects/object_gi_clothes/gGiTunicDL" },
-        { "sages_tunic", "oot", "objects/object_gi_clothes/gGiTunicCollarDL", "objects/object_gi_clothes/gGiTunicDL" },
-        { "champions_tunic", "oot", "objects/object_gi_clothes/gGiTunicCollarDL",
-          "objects/object_gi_clothes/gGiTunicDL" },
+        // Shared vanilla clothes packs replace the Goron/Zora tunic recipes,
+        // not the three distinct authored equipment GIs. Their replacements
+        // are selected at each item's own path by HasRedesignGiMod instead.
         { "pegasus_anklet", "oot", "objects/object_gi_hoverboots/gGiHoverBootsDL" },
         { "trident", "oot", "objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298" },
         { "climb_boots", "oot", "objects/object_gi_boots_2/gGiIronBootsDL",
@@ -693,6 +749,8 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
         { "four_sword", "oot", "objects/object_nei_four_sword/gNeiFourSwordBladeDL",
           "objects/object_nei_four_sword/gNeiFourSwordHiltDL" },
         { "pendant_of_memories", "mm", "objects/object_gi_reserve_c_01/gGiPendantOfMemoriesDL" },
+        { "room_key", "mm", "objects/object_gi_reserve_b_00/gGiRoomKeyDL",
+          "objects/object_gi_reserve_b_00/gGiRoomKeyEmptyDL" },
         { "sheikah_slate", "oot", "objects/object_nei_sheikah_slate/gNeiSheikahSlateDL" },
         { "slate_bomb", "oot", "objects/object_nei_sheikah_slate/gNeiSheikahSlateDL" },
         { "slate_master_cycle", "oot", "objects/object_nei_sheikah_slate/gNeiSheikahSlateDL" },
@@ -707,6 +765,7 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
         { "master_sword", "oot", "objects/object_toki_objects/object_toki_objects_DL_001BD0" },
         { "true_master_sword", "oot", "objects/object_toki_objects/object_toki_objects_DL_001BD0" },
         { "biggoron_sword", "oot", "objects/object_gi_longsword/gGiBiggoronSwordDL" },
+        { "giants_knife", "oot", "objects/object_gi_longsword/gGiBiggoronSwordDL" },
         { "razor_sword", "mm", "objects/object_gi_sword_2/gGiRazorSwordDL",
           "objects/object_gi_sword_2/gGiRazorSwordEmptyDL" },
         { "gilded_sword", "mm", "objects/object_gi_sword_3/gGiGildedSwordDL",
@@ -733,18 +792,6 @@ bool HasLegacyGiMod(const Presentation& item, bool includeMmHost = false) {
                         ResourceMgr_IsModAssetForGame("mm", path));
             };
             const bool replaced = selectedMod(model.opaque) || selectedMod(model.second) || selectedMod(model.third);
-            if (replaced &&
-                (item.draw == Randomizer_DrawExtSpiritBreastplate || item.draw == Randomizer_DrawExtSagesTunic ||
-                 item.draw == Randomizer_DrawExtChampionsTunic)) {
-                // All three legacy tunics share a collar/body recipe. A pack
-                // with only one pass (or a non-DL/empty pass) must not suppress
-                // a complete authored GI and leave its shimmer drawing alone.
-                for (const auto* path : { model.opaque, model.second }) {
-                    const bool mmOverride = includeMmHost && ResourceMgr_IsModAssetForGame("mm", path);
-                    if (!ResourceMgr_IsGiModelAvailableForGame(mmOverride ? "mm" : "oot", path))
-                        return false;
-                }
-            }
             return replaced;
         }
     }
@@ -763,7 +810,8 @@ const char* SelectedSwordPath(const Presentation& item, bool altAssets, bool (*a
     } else if (std::strstr(item.opaque, "/master_sword/") || std::strstr(item.opaque, "/true_master_sword/")) {
         selected = "__OTR__alt/objects/object_custom_equip/gCustomMasterSwordDL";
         fire = "__OTR__objects/din_fire_sword/progressive/adult/SwordDL";
-    } else if (std::strstr(item.opaque, "/biggoron_sword/") || std::strstr(item.opaque, "/great_fairy_sword/")) {
+    } else if (std::strstr(item.opaque, "/biggoron_sword/") || std::strstr(item.opaque, "/great_fairy_sword/") ||
+               std::strstr(item.opaque, "/giants_knife/")) {
         selected = "__OTR__alt/objects/object_custom_equip/gCustomLongswordDL";
         fire = "__OTR__objects/din_fire_sword/progressive/bgs/SwordDL";
     }
@@ -791,12 +839,14 @@ bool HasSelectedSword(const Presentation& item, bool altAssets, bool (*available
 
 static void NeiGi_DrawSelectedSword(PlayState* play, const char* path, bool shop = false, bool fit = true) {
     OPEN_DISPS(play->state.gfxCtx);
-    if (fit)
-        ComboSwordGi_ApplyFit("oot", path, .04f, 1.8f, shop);
+    if (fit) {
+        ComboSwordGi_ApplyPresentationSize(shop);
+        ComboSwordGi_ApplyFit("oot", path, .04f, ComboSwordGi_SelectedTilt(1.5707963267948966f, shop), shop);
+    }
     Matrix_RotateY(Spin(play), MTXMODE_APPLY);
     // Standalone donor blades point along +X. Z alone turns that axis into
     // upright +Y; an extra X quarter turn would lay it flat in XZ.
-    Matrix_RotateZ(1.8f, MTXMODE_APPLY);
+    Matrix_RotateZ(ComboSwordGi_SelectedTilt(1.5707963267948966f, shop), MTXMODE_APPLY);
     Matrix_Scale(.04f, .04f, .04f, MTXMODE_APPLY);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     gSPGrayscale(POLY_OPA_DISP++, false);
@@ -839,7 +889,8 @@ static void NeiGi_DrawSong(PlayState* play, int song) {
         NeiGi_DrawSongOverlay(play, song, nullptr);
 }
 
-static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool upgraded, bool legacy) {
+static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool upgraded, bool legacy,
+                              float particleScale = 1.f) {
     if (legacy && item.draw == Randomizer_DrawMarioMask)
         return; // The legacy callback already draws its mask overlay.
     if (upgraded && item.effect == Kind::SeasonCycle)
@@ -858,11 +909,11 @@ static void NeiGi_DrawEffects(PlayState* play, const Presentation& item, bool up
         NeiGi_DrawMesh(play, NeiGi::SampleOrb(item.effect, camera), item.effect);
         NeiGi_DrawMesh(play, NeiGi::SampleEnergy(item.effect, play->gameplayFrames, camera));
         if (NeiGi::IsSpecial(item.effect))
-            NeiGi_DrawMesh(play, NeiGi::SampleSpecial(item.effect, play->gameplayFrames, camera));
+            NeiGi_DrawMesh(play, NeiGi::SampleSpecial(item.effect, play->gameplayFrames, camera, particleScale));
         Matrix_Pop();
     }
     if (shimmer || item.alwaysShimmer)
-        NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, camera, item.effect));
+        NeiGi_DrawMesh(play, NeiGi::SampleShimmer(play->gameplayFrames, true, camera, PresentationShimmer(item)));
     Matrix_Pop();
 }
 }
@@ -918,6 +969,7 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     // the model. Include their native setup/debug commands in the same scope.
     const bool flame = (authored && item->draw == Randomizer_DrawCaneSomariaUpgrade) ||
                        (selectedSword && item->effect == Kind::SwordAura);
+    const bool crystalSheen = authored && item->translucent && NeiGi::IsSpell(item->effect);
     const size_t modelMatrices = selectedSword ? 1 : upgraded ? (item->translucent ? 2 : 1) : 0;
     NeiGi_ArenaScope arena(play, modelMatrices + (flame ? 1 : 0), flame ? 20 : 16, flame ? 32 : 16,
                            flame ? 12 * sizeof(Gfx) : 0);
@@ -925,9 +977,14 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         return true;
     Matrix_Push();
     MtxF callerMatrix;
+    float particleScale = 1.f;
+    if (!authored && NeiGi::IsSword(item->effect))
+        ComboSwordGi_ApplyPresentationSize(shop);
+    if (!authored && NeiGi::IsSword(item->effect))
+        particleScale = ComboSwordGi_ParticleScale(item->effect, shop);
     Matrix_Get(&callerMatrix);
     if (selectedSword) {
-        ComboSwordGi_ApplyFit("oot", selectedSword, .04f, 1.8f, shop);
+        ComboSwordGi_ApplyFit("oot", selectedSword, .04f, ComboSwordGi_SelectedTilt(1.5707963267948966f, shop), shop);
     } else if (upgraded && !authored && NeiGi::IsSword(item->effect)) {
         const char* paths[] = { item->opaque, item->translucent };
         ComboSwordGi_ApplyModelsFit("oot", paths, item->translucent ? 2 : 1, item->scale, 0.f, shop);
@@ -945,10 +1002,13 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
     } else if (authored) {
         if (const auto* bounds = NeiGi::FindFrameBounds(item->opaque)) {
             const auto fit = NeiGi::FrameFit(*bounds, item->scale, shop);
+            particleScale = 1.f / fit.scale;
             Matrix_Translate(0, fit.lift, 0, MTXMODE_APPLY);
             Matrix_Scale(fit.scale, fit.scale, fit.scale, MTXMODE_APPLY);
         }
     }
+    if (authored && item->draw == Randomizer_DrawExtSagesTunic)
+        NeiGi_DrawSagesTunicMedallions(play);
     if (authored && item->draw == Randomizer_DrawCaneSomariaUpgrade) {
         // Retain the original red skill-upgrade flame with the authored cane.
         Randomizer_DrawCaneSomariaUpgradeFlame(play);
@@ -975,6 +1035,8 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
                   G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
         gDma1p(POLY_OPA_DISP++, G_DL_OTR_FILEPATH, item->opaque, 0, G_DL_PUSH);
         CLOSE_DISPS(play->state.gfxCtx);
+    } else if (entry->drawFunc == Randomizer_DrawExtFourSword) {
+        Randomizer_DrawExtFourSwordPresentation(play, entry, shop);
     } else if (entry->drawFunc) {
         entry->drawFunc(play, entry);
     } else {
@@ -986,7 +1048,7 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         Matrix_Put(&callerMatrix);
         ComboSwordGi_ApplyEffectFit(item->effect, shop);
     }
-    NeiGi_DrawEffects(play, *item, authored, !upgraded && !selectedSword);
+    NeiGi_DrawEffects(play, *item, authored, !upgraded && !selectedSword, particleScale);
     Matrix_Pop();
     if (upgraded && item->translucent != nullptr) {
         // Composite the crystal skin over its contained energy, using the same pose.
@@ -1004,6 +1066,19 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         Matrix_Pop();
         CLOSE_DISPS(play->state.gfxCtx);
     }
+    if (crystalSheen) {
+        // Optional polish must not displace the intact core/shell on a short
+        // arena. Reserve its restore before admitting any highlight vertices.
+        NeiGi_ArenaScope sheenArena(play, 1, 2, 20);
+        if (sheenArena) {
+            Matrix_Push();
+            Matrix_RotateY(Spin(play), MTXMODE_APPLY);
+            const auto sheen = NeiGi::SampleCrystalSheen(play->gameplayFrames, NeiGi_CameraBasis(play));
+            if (NeiGi_DrawMeshMaterial(play, sheen, Kind::Neutral, nullptr))
+                NeiGi_RestoreElemental(play);
+            Matrix_Pop();
+        }
+    }
     Matrix_Pop();
     return true;
 }
@@ -1017,6 +1092,14 @@ extern "C" bool OOT_DrawComboForeignShop(PlayState* play, GetItemEntry* entry);
 #endif
 
 extern "C" bool NeiGi_DrawShop(PlayState* play, GetItemEntry* entry) {
+    if (entry && !entry->drawFunc) {
+        const int arrow = NeiArrowGi_ProfileForDrawId(entry->gid, GID_ARROW_FIRE, GID_ARROW_ICE, GID_ARROW_LIGHT);
+        if (arrow && NeiGi_DrawElementalArrowShop(play, arrow))
+            return true;
+        const int profile = NeiArrowGi_ProfileForDrawId(entry->gid, GID_DINS_FIRE, GID_FARORES_WIND, GID_NAYRUS_LOVE);
+        if (profile && NeiGi_DrawElementalSpell(play, profile, 0, 1))
+            return true;
+    }
     if (NeiGi_DrawImpl(play, entry, true))
         return true;
 #ifdef COMBO_BUILD
@@ -1046,7 +1129,7 @@ static bool NeiGi_FillCrossGameInfo(const Presentation& item, CwItemDrawInfo* ou
     // Identity belongs to the award, independently of the mesh selected by
     // either archive manager. A declined replacement still supplies shimmer
     // metadata, while leaving authored mesh-local energy unset.
-    out->neiShimmer = static_cast<int32_t>(item.effect) + 1;
+    out->neiShimmer = static_cast<int32_t>(PresentationShimmer(item)) + 1;
     out->itemShimmer = item.alwaysShimmer || CVarGetInteger(CVAR_NEI_GI_EFFECTS, 0);
     out->stateDependent = 2;
     const bool vanillaSword = NeiGi::IsSword(item.effect) && !swordAltAssets;

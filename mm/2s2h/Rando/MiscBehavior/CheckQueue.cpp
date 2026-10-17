@@ -6,6 +6,7 @@
 #include "2s2h/BenGui/Notification.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
 #include "2s2h/Rando/ItemReceiptText.h"
+#include "ComboDungeonPickup.h"
 #include "2s2h/ShipUtils.h"
 #include "Traps.h"
 #ifdef COMBO_BUILD
@@ -110,7 +111,11 @@ bool Rando::MiscBehavior::ShouldShowForeignCutscene(RandoCheckId rc) {
     if (lvl == 0) {
         return true;
     }
-    return advancement ? (lvl < 3) : (lvl < 1);
+    if (advancement)
+        return lvl < 3;
+    if (fi && ComboDungeonPickup::IsMapOrCompass(fi->itemName))
+        return lvl < 2;
+    return lvl < 1;
 }
 #endif
 

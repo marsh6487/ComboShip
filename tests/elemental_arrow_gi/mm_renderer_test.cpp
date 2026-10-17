@@ -1,7 +1,7 @@
 #define main BaselineRendererMain
 #include "../mm_nei/renderer_runtime_test.cpp"
 #undef main
-#include "../../soh/soh/Enhancements/randomizer/NeiElementalArrowGi.h"
+#include "../../soh/soh/Enhancements/randomizer/NeiElementalSpellGi.h"
 
 int main() {
     PlayState play{};
@@ -52,7 +52,35 @@ int main() {
         NeiGi_DrawElementalArrow(&play,1);
         assert(gfx.polyOpa.p==opa && gfx.polyOpa.d==tail && gfx.polyXlu.p==xlu && matrices.empty());
         assert(!memcmp(&saved,&current,sizeof(saved)));
+        assert(!NeiGi_DrawElementalArrowShop(&play,1));
+        assert(gfx.polyOpa.p==opa && gfx.polyOpa.d==tail && gfx.polyXlu.p==xlu && matrices.empty());
+        assert(!memcmp(&saved,&current,sizeof(saved)));
     }
+    for (int profile=1;profile<=3;++profile) for (bool shop:{false,true}) {
+        reset(); const auto saved=current;
+        assert(NeiGi_DrawElementalSpell(&play,profile,1,shop));
+        assert(matrices.empty() && !memcmp(&saved,&current,sizeof(saved)));
+        unsigned loaded=0; int depth=0;
+        for(Gfx* cmd=xlu;cmd<gfx.polyXlu.p;++cmd) {
+            const auto op=cmd->words.w0>>24;
+            loaded+=op==G_MTX;
+            if(op==G_COMBO_RM_PUSH) ++depth;
+            if(op==G_COMBO_RM_POP) --depth;
+        }
+        assert(loaded==6 && depth==0 && gfx.polyOpa.p<=gfx.polyOpa.d && gfx.polyXlu.p<=gfx.polyXlu.d);
+    }
+    reset(); gfx.polyXlu.d=xlu+1;
+    assert(!NeiGi_DrawElementalSpell(&play,1,1,0) && gfx.polyOpa.p==opa && gfx.polyXlu.p==xlu && matrices.empty());
+    reset();
+    const size_t fallbackBytes=20*sizeof(Gfx)+sizeof(Mtx)+12*sizeof(Gfx);
+    gfx.polyOpa.d=opa+(fallbackBytes/sizeof(Gfx))-1;
+    assert(!NeiGi_CanDrawElementalSpellFallback(&play));
+    gfx.polyOpa.d=opa+(fallbackBytes/sizeof(Gfx));
+    assert(NeiGi_CanDrawElementalSpellFallback(&play));
+    reset();
+    for(int p:{1,2,3,1,2,3}) assert(NeiGi_DrawElementalSpell(&play,p,1,1));
+    assert(gfx.polyOpa.p<=gfx.polyOpa.d && gfx.polyXlu.p<=gfx.polyXlu.d && matrices.empty());
+    std::cout << "PASS native MM spell render passes, held/shelf matrix restore, admission, six-crystal shelf\n";
     std::cout << "PASS native MM elemental renderer: all profiles, texture/fallback, Alt/toggle, owner/matrix restore, arena decline; peak "
               << maxBytes << " OPA bytes / " << maxCommands << " XLU commands\n";
 }

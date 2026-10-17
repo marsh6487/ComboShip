@@ -4,12 +4,15 @@
 #include "din_fire_sword.h"
 #include "din_fire_shield.h"
 #include "mods/items/logic/adult_link_render.h"
+#include "mods/items/logic/weapon_upgrades.h"
+#include "mods/forms/custom_forms.h"
 /**
  * File: z_player_lib.c
  * Description: Set of library functions to interact with the Player system
  */
 
 #include "global.h"
+#include <string.h>
 #include <libultraship/log/luslog.h> // 2S2H [Port] lusprintf (LUS 464 exports it via API_EXPORT)
 #include "2s2h/GameInteractor/GameInteractor.h"
 
@@ -57,6 +60,7 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
+#include "2s2h/BenGui/CosmeticEditor.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <libultraship/bridge/resourcebridge.h>
 
@@ -67,6 +71,7 @@
 // Skijer's NEI: extended-equipment / weapon-upgrade draw hooks (Iron Knuckle's Axe model
 // replacement — hide the hammer head, draw the axe DL following the left-hand limb matrix).
 extern u8 ExtEquip_ShouldHideSwordDL(void);
+extern u8 FourSword_IsEquipped(void);
 extern void ExtEquip_DrawSwordDL(void* play);
 // Extended-equipment SHIELD draw hooks: GetShieldDLOverride returns "HIDE" when an ext shield
 // (Divine/Kite/Ikana) is equipped so the native Hero/Mirror model is suppressed; the custom model
@@ -2705,6 +2710,8 @@ s32 Player_OverrideLimbDrawGameplayCommon(PlayState* play, s32 limbIndex, Gfx** 
         }
 
         if (limbIndex == PLAYER_LIMB_HEAD) {
+            CosmeticEditor_ApplySillyLimbScale(CVAR_COSMETIC("Silly.LinkHeadScale"), pos);
+
             rot->x += player->headLimbRot.z;
             rot->y -= player->headLimbRot.y;
             rot->z += player->headLimbRot.x;
@@ -3040,33 +3047,26 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
 
             u8 handIsSpokenFor = extOwnsSwordDL || BossRemains_IsOdolwaWorn() || BossRemains_IsGohtWorn();
 
-            // Skijer's NEI Four Sword (ext sword 2): blade+hilt from 2ship.o2r over Link's fist. The
-            // HAND GOES LAST — the blade DL leaves G_TEXTURE_GEN on and G_LIGHTING off (env-map
-            // shine) and the torso would inherit it.
-            // It goes in the limb override, not in ExtEquip_DrawSwordDL, because the clones draw
-            // with postLimbDraw == NULL and only this path reaches them.
-            if (!handIsSpokenFor && (player->transformation == PLAYER_FORM_HUMAN) &&
-                (player->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD)) {
-                extern u8 FourSword_HeldSwordDL(void** blade, void** handle);
-                static Gfx sFourSwordHandDL[6];
-                void* fourSwordBlade = NULL;
-                void* fourSwordHilt = NULL;
-
-                if (FourSword_HeldSwordDL(&fourSwordBlade, &fourSwordHilt)) {
-                    Gfx closedHandInstr = gsSPDisplayListOTRFilePath(gLinkHumanLeftHandClosedDL);
-                    Gfx* d = sFourSwordHandDL;
-
-                    gSPDisplayList(d++, (Gfx*)fourSwordBlade);
-                    if (fourSwordHilt != NULL) {
-                        gSPDisplayList(d++, (Gfx*)fourSwordHilt);
+            // Keep the native human fist and reuse the reviewed GI sword mesh in its held frame.
+            // This limb path also reaches clones drawn without a post-limb callback. Each draw
+            // owns its compound: later players must not overwrite a deferred blade/hand list.
+            if (!handIsSpokenFor && *dList != NULL && !AdultLink_UsesAdultPresentation(player) &&
+                (!Player_IsCustomLinkModel(player) || FourSword_IsEquipped()) && player->actor.scale.y >= 0.0f &&
+                !(player == GET_PLAYER(play) && CustomForms_ActiveForm() != CUSTOM_FORM_NONE) &&
+                player->transformation == PLAYER_FORM_HUMAN &&
+                (player->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD ||
+                 player->leftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD)) {
+                const char* handPath = (const char*)gPlayerLeftHandClosedDLs[PLAYER_FORM_HUMAN * 2 + sPlayerLod];
+                if (handPath != NULL && ResourceMgr_FileExists(handPath)) {
+                    Gfx* hand = ResourceMgr_LoadGfxByName(handPath);
+                    Gfx* heldSword = *dList;
+                    u8 goldenArmor = Trident_GoldenArmor();
+                    if (WeaponUpgrade_ApplyHeldSwordDL(&heldSword, hand, player, goldenArmor ? 255 : 0,
+                                                       goldenArmor ? 205 : 0, goldenArmor ? 40 : 0)) {
+                        Gfx* frameSword = GRAPH_ALLOC(play->state.gfxCtx, 8 * sizeof(Gfx));
+                        memcpy(frameSword, heldSword, 8 * sizeof(Gfx));
+                        *dList = frameSword;
                     }
-                    *d++ = closedHandInstr;
-                    gDPPipeSync(d++);
-                    gSPLoadGeometryMode(d++, G_ZBUFFER | G_SHADE | G_CULL_BACK | G_LIGHTING | G_SHADING_SMOOTH);
-                    gSPEndDisplayList(d);
-
-                    *dList = sFourSwordHandDL;
-                    sPlayerLeftHandType = PLAYER_MODELTYPE_LH_CLOSED;
                 }
             }
 
@@ -3358,6 +3358,12 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
 
     Player_ApplyBackEquipmentVisibility(limbIndex, dList);
     Player_ApplyNeiHeldHand(play, player, limbIndex, dList);
+    // Split only the final native equipment choice, after NEI has selected its hand/model.
+    if (limbIndex == PLAYER_LIMB_LEFT_HAND) {
+        CosmeticEditor_SplitHeldItem(dList, CVAR_COSMETIC("Silly.LinkSwordScale"));
+    } else if (limbIndex == PLAYER_LIMB_RIGHT_HAND) {
+        CosmeticEditor_SplitHeldItem(dList, CVAR_COSMETIC("Silly.LinkShieldScale"));
+    }
     return false;
 }
 
@@ -4121,17 +4127,20 @@ void Player_DrawBunnyHood(PlayState* play) {
 
     Matrix_Push();
 
+    f32 earLength = CVarGetFloat(CVAR_COSMETIC("Silly.BunnyHoodEarLength"), 0.0f);
+    f32 earSpread = CVarGetFloat(CVAR_COSMETIC("Silly.BunnyHoodEarSpread"), 0.0f);
+
     earRot.x = sBunnyEarKinematics.rot.y + 0x3E2;
     earRot.y = sBunnyEarKinematics.rot.z + 0xDBE;
     earRot.z = sBunnyEarKinematics.rot.x - 0x348A;
-    Matrix_SetTranslateRotateYXZ(97.0f, -1203.0f, -240.0f, &earRot);
+    Matrix_SetTranslateRotateYXZ(97.0f, -1203.0f - earLength, -240.0f - earSpread, &earRot);
 
     Matrix_ToMtx(mtx++);
 
     earRot.x = sBunnyEarKinematics.rot.y - 0x3E2;
     earRot.y = -sBunnyEarKinematics.rot.z - 0xDBE;
     earRot.z = sBunnyEarKinematics.rot.x - 0x348A;
-    Matrix_SetTranslateRotateYXZ(97.0f, -1203.0f, 240.0f, &earRot);
+    Matrix_SetTranslateRotateYXZ(97.0f, -1203.0f - earLength, 240.0f + earSpread, &earRot);
 
     Matrix_ToMtx(mtx);
 
@@ -4299,7 +4308,7 @@ void func_80128388(struct_801F58B0 arg0[], struct_80128388_arg1 arg1[], s32 arg2
     sp50.x = 0;
 
     for (i = 1; i < arg2; i++) {
-        sp58.x = arg1->unk_00 * 100.0f;
+        sp58.x = arg1->unk_00 * 100.0f * CVarGetFloat(CVAR_COSMETIC("Silly.GreatFairyMaskHairLength"), 1.0f);
         sp50.z = arg1->unk_06 + (s16)(phi_s1->unk_1A - arg0->unk_1A);
         sp50.y = arg1->unk_04 + (s16)(phi_s1->unk_18 - arg0->unk_18);
         Matrix_TranslateRotateZYX(&sp58, &sp50);
@@ -4337,7 +4346,8 @@ void Player_DrawGreatFairysMask(PlayState* play, Player* player) {
         sp6C += 11;
 
         Matrix_Push();
-        Matrix_Translate(iter->x, iter->y, iter->z, MTXMODE_APPLY);
+        Matrix_Translate(iter->x, iter->y,
+                         iter->z * CVarGetFloat(CVAR_COSMETIC("Silly.GreatFairyMaskHairSpread"), 1.0f), MTXMODE_APPLY);
         func_80128388(D_801F58B0[i], D_801C0C54, 3, &mtx);
         Matrix_Pop();
         iter++;
@@ -4538,6 +4548,7 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList1, G
     }
 
     // (Magic Cape shoulder capture removed — the cloth anchors on player->bodyPartsPos natively.)
+    CosmeticEditor_DrawSplitHeldItem(play);
 
     if (limbIndex == PLAYER_LIMB_LEFT_HAND) {
         if (*dList1 != NULL && player->transformation == PLAYER_FORM_HUMAN) {
@@ -5242,11 +5253,7 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList1, G
             } else if (ExtEquip_GetShieldDLOverride() != NULL) {
                 ExtEquip_DrawShieldBackDL(play);
             } else {
-                OPEN_DISPS(play->state.gfxCtx);
-
-                gSPDisplayList(POLY_OPA_DISP++, gPlayerShields[2 * ((player->currentShield - 1) ^ 0)]);
-
-                CLOSE_DISPS(play->state.gfxCtx);
+                CosmeticEditor_DrawBackShield(play, gPlayerShields[2 * ((player->currentShield - 1) ^ 0)]);
             }
         }
 

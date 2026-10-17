@@ -59,6 +59,7 @@ typedef struct {
 } RespawnData;
 typedef struct {
     s32 entranceIndex, linkAge, sceneLayer, respawnFlag;
+    f32 entranceSpeed;
     u16 cutsceneIndex;
     u8 cutsceneTrigger, nextTransitionType, cutsceneTransitionControl;
     u8 buttonStatus[9];
@@ -395,7 +396,9 @@ u8 Fixture_GiveSword(PlayState*, u8);
 u8 Return_Item(u8, int, u8);
 u8 Inventory_DeleteEquipment(PlayState*, s16);
 void GameInteractor_ExecuteOnEquipmentDelete(s16, u16);
-void NeiSave_Save(SaveContext*, int, bool);
+#ifdef __cplusplus
+void NeiSave_Save(const SaveContext&, int, bool);
+#endif
 void NeiSave_Load(void);
 void TradeItems_SyncWrite(void);
 void TradeItems_SyncRead(void);

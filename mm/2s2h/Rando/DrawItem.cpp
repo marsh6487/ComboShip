@@ -6,20 +6,21 @@
 #include "2s2h/Rando/DrawFuncs.h"
 #include "2s2h_assets.h"
 #include "Rando/SpinAttackGi.h"
+#include "Rando/NeiResourceRouting.h"
 #include "2s2h/CustomItem/CustomItem.h"
 #include "ComboSongDrawMM.h"
+#include "ComboRewardGi.h"
 #include "ComboItemIconOwnership.h"
 #include "../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "mods/nei_save.h"                     // NeiSaveData chain tiers for progressive get-item draws
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_OOT_SWORD_* registry indices (chain tiers)
+#include "2s2h/BenGui/CosmeticEditor.h"
 
 extern "C" {
 #include "variables.h"
 #include "functions.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/object_gi_melody/object_gi_melody.h"
-#include "assets/objects/object_gi_key/object_gi_key.h"
-#include "assets/objects/object_gi_bosskey/object_gi_bosskey.h"
 #include "objects/object_gi_hearts/object_gi_hearts.h"
 #include "objects/object_gi_liquid/object_gi_liquid.h"
 #include "objects/object_sek/object_sek.h"
@@ -27,6 +28,8 @@ extern "C" {
 
 #include "assets/overlays/ovl_Arrow_Ice/ovl_Arrow_Ice.h"
 #include "assets/objects/object_gi_purse/object_gi_purse.h"
+
+#include "overlays/actors/ovl_En_Elforg/z_en_elforg.h"
 
 Gfx* ResourceMgr_LoadGfxByName(const char* path);
 u8 ResourceMgr_FileExists(const char* resName);
@@ -37,6 +40,7 @@ void* OotAssets_LoadGfx(const char* otrPath);        // Skijer's NEI — resolve
 void* OotAssets_LoadGfxDirect(const char* otrPath);  // Skijer's NEI — archive-scoped load (defeats MM shadowing)
 void* OotAssets_LoadTexOrDList(const char* otrPath); // Skijer's NEI — texture/DL resource (Climb ladder seg-8 tex)
 int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt);
+int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* game, const char* path, float* tilt, float* roll);
 uint16_t Nei_GetOwnedItem(uint8_t slot); // mods/nei_save.cpp — Roc chain level for its draw (u16 store)
 extern Gfx gIKAxeInlineDL[];             // equipment/objects/ikaxe_DL — axe with segments pre-resolved
 }
@@ -61,6 +65,9 @@ extern Gfx gIKAxeInlineDL[];             // equipment/objects/ikaxe_DL — axe w
 void DrawOotNeiCaneOfSomaria(RandoItemId skill);
 void DrawOotNeiUltrahand();
 #include "ComboForeignDrawMM.h"
+#define COMBO_BOTTLE_HOST_MM
+#include "ComboBottleContentsDraw.h"
+#undef COMBO_BOTTLE_HOST_MM
 
 extern "C" int32_t MM_GetItemAnimDrawInfo(const char* itemName, CwItemAnimDrawInfo* out);
 
@@ -140,27 +147,38 @@ s32 StrayFairyOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3
 }
 
 void DrawStrayFairy(RandoItemId randoItemId) {
+    AnimatedMaterial* texAnim;
+    s32 area;
+
+    switch (randoItemId) {
+        case RI_WOODFALL_STRAY_FAIRY:
+            texAnim = (AnimatedMaterial*)&gStrayFairyWoodfallTexAnim;
+            area = STRAY_FAIRY_AREA_WOODFALL;
+            break;
+        case RI_SNOWHEAD_STRAY_FAIRY:
+            texAnim = (AnimatedMaterial*)&gStrayFairySnowheadTexAnim;
+            area = STRAY_FAIRY_AREA_SNOWHEAD;
+            break;
+        case RI_GREAT_BAY_STRAY_FAIRY:
+            texAnim = (AnimatedMaterial*)&gStrayFairyGreatBayTexAnim;
+            area = STRAY_FAIRY_AREA_GREAT_BAY;
+            break;
+        case RI_STONE_TOWER_STRAY_FAIRY:
+            texAnim = (AnimatedMaterial*)&gStrayFairyStoneTowerTexAnim;
+            area = STRAY_FAIRY_AREA_STONE_TOWER;
+            break;
+        default:
+            texAnim = (AnimatedMaterial*)&gStrayFairyClockTownTexAnim;
+            area = STRAY_FAIRY_AREA_CLOCK_TOWN;
+            break;
+    }
+
     OPEN_DISPS(gPlayState->state.gfxCtx);
 
     Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
 
-    switch (randoItemId) {
-        case RI_WOODFALL_STRAY_FAIRY:
-            AnimatedMat_Draw(gPlayState, (AnimatedMaterial*)&gStrayFairyWoodfallTexAnim);
-            break;
-        case RI_SNOWHEAD_STRAY_FAIRY:
-            AnimatedMat_Draw(gPlayState, (AnimatedMaterial*)&gStrayFairySnowheadTexAnim);
-            break;
-        case RI_GREAT_BAY_STRAY_FAIRY:
-            AnimatedMat_Draw(gPlayState, (AnimatedMaterial*)&gStrayFairyGreatBayTexAnim);
-            break;
-        case RI_STONE_TOWER_STRAY_FAIRY:
-            AnimatedMat_Draw(gPlayState, (AnimatedMaterial*)&gStrayFairyStoneTowerTexAnim);
-            break;
-        default: // STRAY_FAIRY_AREA_CLOCK_TOWN
-            AnimatedMat_Draw(gPlayState, (AnimatedMaterial*)&gStrayFairyClockTownTexAnim);
-            break;
-    }
+    CosmeticEditor_SetStrayFairyMaterial(area);
+    AnimatedMat_Draw(gPlayState, texAnim);
 
     Matrix_ReplaceRotation(&gPlayState->billboardMtxF);
     Matrix_Scale(0.03f, 0.03f, 0.03f, MTXMODE_APPLY);
@@ -281,73 +299,100 @@ void DrawOwlStatue() {
     Gfx_DrawDListOpa(gPlayState, (Gfx*)gOwlStatueOpenedDL);
 }
 
-static Gfx gGiSmallKeyCopyDL[75];
+Color_RGBA8 DefaultKeyColors[10] = {
+    { 255, 170, 246, 255 }, // Woodfall Primitive
+    { 116, 226, 61, 255 },  // Snowhead Primitive
+    { 143, 103, 226, 255 }, // Great Bay Primitive
+    { 226, 221, 0, 255 },   // Stone Tower Primitive
+
+    { 143, 45, 129, 255 }, // Woodfall Accent
+    { 0, 98, 56, 255 },    // Snowhead Accent
+    { 52, 0, 61, 255 },    // Great Bay Accent
+    { 119, 65, 0, 255 },   // Stone Tower Accent
+
+    { 255, 244, 204, 255 }, // Boss Key Primitive
+    { 143, 107, 0, 255 }    // Boss Key Accent
+};
+
+Gfx* emblemDLs[4] = { (Gfx*)gGiWoodfallKeyEmblemDL, (Gfx*)gGiSnowheadKeyEmblemDL, (Gfx*)gGiGreatBayKeyEmblemDL,
+                      (Gfx*)gGiStoneTowerKeyEmblemDL };
 
 void DrawSmallKey(RandoItemId randoItemId) {
+    int slot;
+    switch (randoItemId) {
+        case RI_WOODFALL_SMALL_KEY:
+            slot = 0;
+            break;
+        case RI_SNOWHEAD_SMALL_KEY:
+            slot = 1;
+            break;
+        case RI_GREAT_BAY_SMALL_KEY:
+            slot = 2;
+            break;
+        case RI_STONE_TOWER_SMALL_KEY:
+            slot = 3;
+            break;
+        default:
+            return;
+    }
+
+    const char* cosmeticId = CosmeticEditor_GetDungeonCosmeticId(slot);
+    Color_RGBA8 prim = DefaultKeyColors[slot];
+    Color_RGBA8 env = DefaultKeyColors[slot + 4];
+
     OPEN_DISPS(gPlayState->state.gfxCtx);
 
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
-    switch (randoItemId) {
-        case RI_WOODFALL_SMALL_KEY:
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, 255, 255, 255, 255);
-            gDPSetEnvColor(POLY_OPA_DISP++, 236, 120, 186, 255);
-            break;
-        case RI_SNOWHEAD_SMALL_KEY:
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, 255, 255, 255, 255);
-            gDPSetEnvColor(POLY_OPA_DISP++, 129, 173, 70, 255);
-            break;
-        case RI_GREAT_BAY_SMALL_KEY:
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, 255, 255, 255, 255);
-            gDPSetEnvColor(POLY_OPA_DISP++, 99, 90, 183, 255);
-            break;
-        case RI_STONE_TOWER_SMALL_KEY:
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, 255, 255, 255, 255);
-            gDPSetEnvColor(POLY_OPA_DISP++, 177, 165, 83, 255);
-            break;
-        default:
-            break;
-    }
+
+    gDPSetPrimColorOverride(POLY_OPA_DISP++, 0, 0x80, prim.r, prim.g, prim.b, 255, cosmeticId);
+    gDPSetEnvColorOverrideEx(POLY_OPA_DISP++, env.r, env.g, env.b, 255, cosmeticId, COSMETIC_COLOR_MODE_DIVIDE, 2.0f);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, gGiSmallKeyCopyDL);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gGiDungeonSmallKeyDL);
+    gSPDisplayList(POLY_OPA_DISP++, emblemDLs[slot]);
 
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 
-static Gfx gGiBossKeyCopyDL[87];
-
 void DrawBossKey(RandoItemId randoItemId) {
+    int slot;
+    switch (randoItemId) {
+        case RI_WOODFALL_BOSS_KEY:
+            slot = 0;
+            break;
+        case RI_SNOWHEAD_BOSS_KEY:
+            slot = 1;
+            break;
+        case RI_GREAT_BAY_BOSS_KEY:
+            slot = 2;
+            break;
+        case RI_STONE_TOWER_BOSS_KEY:
+            slot = 3;
+            break;
+        default:
+            return;
+    }
+
+    const char* cosmeticId = CosmeticEditor_GetDungeonCosmeticId(slot);
+    Color_RGBA8 prim = DefaultKeyColors[slot];
+    Color_RGBA8 env = DefaultKeyColors[slot + 4];
+
     OPEN_DISPS(gPlayState->state.gfxCtx);
 
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
-    switch (randoItemId) {
-        case RI_WOODFALL_BOSS_KEY:
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, 255, 255, 255, 255);
-            gDPSetEnvColor(POLY_OPA_DISP++, 236, 120, 186, 255);
-            break;
-        case RI_SNOWHEAD_BOSS_KEY:
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, 255, 255, 255, 255);
-            gDPSetEnvColor(POLY_OPA_DISP++, 129, 173, 70, 255);
-            break;
-        case RI_GREAT_BAY_BOSS_KEY:
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, 255, 255, 255, 255);
-            gDPSetEnvColor(POLY_OPA_DISP++, 99, 90, 183, 255);
-            break;
-        case RI_STONE_TOWER_BOSS_KEY:
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, 255, 255, 255, 255);
-            gDPSetEnvColor(POLY_OPA_DISP++, 177, 165, 83, 255);
-            break;
-        default:
-            break;
-    }
+
+    // Draw Body
+    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0x80, DefaultKeyColors[8].r, DefaultKeyColors[8].g, DefaultKeyColors[8].b, 255);
+    gDPSetEnvColor(POLY_OPA_DISP++, DefaultKeyColors[9].r, DefaultKeyColors[9].g, DefaultKeyColors[9].b, 255);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, gGiBossKeyCopyDL);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gGiDungeonBossKeyDL);
 
-    Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
+    // Draw Emblem
+    gDPSetPrimColorOverride(POLY_OPA_DISP++, 0, 0x80, prim.r, prim.g, prim.b, 255, cosmeticId);
+    gDPSetEnvColorOverrideEx(POLY_OPA_DISP++, env.r, env.g, env.b, 255, cosmeticId, COSMETIC_COLOR_MODE_DIVIDE, 2.0f);
 
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gPlayState->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)gGiBossKeyGemDL);
+    gSPDisplayList(POLY_OPA_DISP++, emblemDLs[slot]);
 
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
@@ -898,14 +943,12 @@ void DrawOotClaimCheck() {
 // the colored face DL then the shared gold ring (gGiMedallionDL), both opaque. All six share the one ring.
 // Exact vanilla recipe: the medallion DLs need the SETUPDL_26 state — under the generic 25 helper they
 // render NOTHING (same lesson as the SoH side of the Sage's Tunic medallion ring).
-static void DrawOotMedallion(const char* faceOtrPath, Gfx** faceCache) {
+static void DrawOotMedallion(const char* faceOtrPath, Gfx** faceCache, bool rewardMaterial = true) {
     static Gfx* sRingCache = NULL;
-    if (*faceCache == NULL) {
-        *faceCache = (Gfx*)OotAssets_LoadGfx(faceOtrPath);
-    }
-    if (sRingCache == NULL) {
-        sRingCache = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_gi_medal/gGiMedallionDL");
-    }
+    // Resolve through MM every draw so a local/Alt replacement and its surface
+    // pass use the same selection. The resource manager caches the actual data.
+    *faceCache = (Gfx*)OotAssets_LoadGfx(faceOtrPath);
+    sRingCache = (Gfx*)OotAssets_LoadGfx("__OTR__objects/object_gi_medal/gGiMedallionDL");
     if (*faceCache == NULL || sRingCache == NULL) {
         return; // oot.o2r not mounted yet — try again next frame
     }
@@ -915,6 +958,9 @@ static void DrawOotMedallion(const char* faceOtrPath, Gfx** faceCache) {
     gSPDisplayList(POLY_OPA_DISP++, *faceCache);
     gSPDisplayList(POLY_OPA_DISP++, sRingCache);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
+    if (rewardMaterial)
+        NeiGi_DrawRewardMaterial(gPlayState, RewardGi_ProfileForPaths(faceOtrPath, nullptr), faceOtrPath,
+                                 "__OTR__objects/object_gi_medal/gGiMedallionDL", "mm");
 }
 void DrawOotMedallionFire() {
     static Gfx* c = NULL;
@@ -946,12 +992,8 @@ void DrawOotMedallionWater() {
 // GetItem_DrawJewel{Kokiri,Goron,Zora}). The animated shine lives on tex-scroll segments 8/9.
 static void DrawOotStone(const char* gemPath, Gfx** gemCache, const char* settingPath, Gfx** settingCache, u8 pxR,
                          u8 pxG, u8 pxB, u8 exR, u8 exG, u8 exB, u8 poR, u8 poG, u8 poB, u8 eoR, u8 eoG, u8 eoB) {
-    if (*gemCache == NULL) {
-        *gemCache = (Gfx*)OotAssets_LoadGfx(gemPath);
-    }
-    if (*settingCache == NULL) {
-        *settingCache = (Gfx*)OotAssets_LoadGfx(settingPath);
-    }
+    *gemCache = (Gfx*)OotAssets_LoadGfx(gemPath);
+    *settingCache = (Gfx*)OotAssets_LoadGfx(settingPath);
     if (*gemCache == NULL || *settingCache == NULL) {
         return; // oot.o2r not mounted yet — try again next frame
     }
@@ -972,6 +1014,7 @@ static void DrawOotStone(const char* gemPath, Gfx** gemCache, const char* settin
     gDPSetEnvColor(POLY_OPA_DISP++, eoR, eoG, eoB, 255);
     gSPDisplayList(POLY_OPA_DISP++, *settingCache);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
+    NeiGi_DrawRewardMaterial(gPlayState, RewardGi_ProfileForPaths(gemPath, nullptr), gemPath, settingPath, "mm");
 }
 void DrawOotStoneKokiriEmerald() {
     static Gfx* gemCache = NULL;
@@ -1517,6 +1560,18 @@ void DrawOotSpookyMask() { // object_gi_redead_mask (OoT-unique)
     DrawOotMaskShimmer(2);
 }
 void DrawOotGerudoMask() { // object_gi_gerudomask (OoT-unique)
+    // Query the registered OoT owner and keep every deferred child/texture
+    // lookup on that owner. MM's local archive scanner cannot see soh.o2r.
+    constexpr const char* warrior = "__OTR__objects/object_gi_gerudo_warrior/gGiGerudoWarriorMaskDL";
+    if (NeiResource_Available(warrior)) {
+        OPEN_DISPS(gPlayState->state.gfxCtx);
+        Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+        MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)NeiResource_Route(warrior));
+        CLOSE_DISPS(gPlayState->state.gfxCtx);
+        DrawOotMaskShimmer(6);
+        return;
+    }
     // Same as the Spooky Mask above — and this one is CI (it ships a TLUT,
     // object_gi_gerudomaskTLUT_000000), so an unresolved palette is exactly the "right model, wrong
     // colours" symptom. Direct load inlines them. Skijer's NEI
@@ -1710,7 +1765,17 @@ void DrawOotZoraTunic() {
 
 // Grayscale-tinted plain tunic (collar + tunic, no color DLs) — SoH's DrawCustomItemDiamondTint recolor
 // used for the "clothing" ext equipment (Magic Cape / Spirit Breastplate / Champion's Tunic) and stand-ins.
-static void DrawOotTunicTint(u8 r, u8 g, u8 b) {
+static void DrawOotTunicTint(u8 r, u8 g, u8 b, bool initializeMaterial = false) {
+    // The bare clothes lists normally follow native collar/tunic color lists.
+    // Grayscale supplies the identity tint but does not initialize material
+    // color or alpha. Do not inherit a previous item's transparent material.
+    if (initializeMaterial) {
+        OPEN_DISPS(gPlayState->state.gfxCtx);
+        gDPPipeSync(POLY_OPA_DISP++);
+        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
+        gDPSetEnvColor(POLY_OPA_DISP++, 80, 80, 80, 255);
+        CLOSE_DISPS(gPlayState->state.gfxCtx);
+    }
 #ifdef COMBO_BUILD
     const char* paths[] = { "__OTR__objects/object_gi_clothes/gGiTunicCollarDL",
                             "__OTR__objects/object_gi_clothes/gGiTunicDL" };
@@ -1768,6 +1833,8 @@ static bool LoadOotMagicSpellDiamondOrb(Gfx** diamond, Gfx** orb) {
 static void DrawOotMagicSpell(const char* colorPath, Gfx** colorCache) {
     Gfx* diamond;
     Gfx* orb;
+    if (!NeiGi_CanDrawElementalSpellFallback(gPlayState))
+        return;
     if (*colorCache == NULL) {
         *colorCache = (Gfx*)OotAssets_LoadGfx(colorPath);
     }
@@ -1782,14 +1849,20 @@ static void DrawOotMagicSpell(const char* colorPath, Gfx** colorCache) {
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 void DrawOotDinsFire() {
+    if (NeiGi_DrawElementalSpell(gPlayState, 1, 1, 0))
+        return;
     static Gfx* c = NULL;
     DrawOotMagicSpell("__OTR__objects/object_gi_goddess/gGiDinsFireColorDL", &c);
 }
 void DrawOotFaroresWind() {
+    if (NeiGi_DrawElementalSpell(gPlayState, 2, 1, 0))
+        return;
     static Gfx* c = NULL;
     DrawOotMagicSpell("__OTR__objects/object_gi_goddess/gGiFaroresWindColorDL", &c);
 }
 void DrawOotNayrusLove() {
+    if (NeiGi_DrawElementalSpell(gPlayState, 3, 1, 0))
+        return;
     static Gfx* c = NULL;
     DrawOotMagicSpell("__OTR__objects/object_gi_goddess/gGiNayrusLoveColorDL", &c);
 }
@@ -2073,7 +2146,18 @@ void DrawOotNeiCaneOfSomaria(RandoItemId skill) {
 
     static Gfx* real = NULL;
     static u8 tried = 0;
-    Gfx* dl = LoadNeiRealGfx("__OTR__objects/object_somaria/g_somaria_cane_give_dl", &real, &tried);
+    const char* path = "__OTR__objects/object_somaria/g_somaria_cane_give_dl";
+    Gfx* dl = NULL;
+#ifdef COMBO_BUILD
+    // The authored GI declines when either owner supplies a legacy cane mod.
+    // Keep MM's own override first, then preserve an OoT-only replacement and
+    // all of its nested resources instead of silently drawing MM's stock cane.
+    if (!ResourceMgr_IsModAsset(path) && NeiResource_IsMod(path)) {
+        if (NeiResource_Available(path))
+            dl = (Gfx*)NeiResource_Route(path);
+    } else
+#endif
+        dl = LoadNeiRealGfx(path, &real, &tried);
     if (dl == NULL) {
         static Gfx* c = NULL;
         DrawOotRodStandIn(&c, isPacci ? 235 : 220, isPacci ? 200 : 60, isPacci ? 70 : 50);
@@ -2084,6 +2168,11 @@ void DrawOotNeiCaneOfSomaria(RandoItemId skill) {
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
     Matrix_Scale(0.25f, 0.25f, 0.25f, MTXMODE_APPLY);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
+#ifdef COMBO_BUILD
+    // Raw MM roots retain MM's children under an outer foreign draw span.
+    // An explicitly routed donor root temporarily selects its own owner.
+    gSPComboRMPush(POLY_OPA_DISP++, "mm");
+#endif
     if (isPacci) {
         // Same mesh, gold: the Pacci cane has no model of its own (SoH tints it identically).
         gDPSetGrayscaleColor(POLY_OPA_DISP++, 255, 215, 70, 255);
@@ -2093,6 +2182,9 @@ void DrawOotNeiCaneOfSomaria(RandoItemId skill) {
     } else {
         gSPDisplayList(POLY_OPA_DISP++, dl);
     }
+#ifdef COMBO_BUILD
+    gSPComboRMPop(POLY_OPA_DISP++);
+#endif
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 // Ultrahand — the one Pacci skill that has a mesh of its own instead of the tinted cane: the glowing
@@ -2536,9 +2628,10 @@ void DrawOotBottleWithShimmer(s16 drawId, const uint8_t color[4]) {
     Matrix_Push();
     GetItem_Draw(gPlayState, drawId);
     Matrix_Pop();
-    if (drawId != GID_FAIRY && drawId != GID_FAIRY_2) {
+    uint8_t nativeColor[4];
+    if (!GetItem_GetShimmerColor(drawId, nativeColor)) {
         ComboDrawMaskShimmer(gPlayState, nullptr, color, "mm");
-    } // native fairy draw already owns its matching pink hex shimmer
+    } // Intrinsic bottle shimmer is already submitted by the native drawer.
 }
 
 // Ruto's Letter — OoT bottle-with-letter (object_gi_bottle_letter, OoT-unique folder): contents Opa +
@@ -2590,19 +2683,24 @@ void DrawOotExtMagicCape() { // SoH parity: tunic tinted red/purple
     DrawOotTunicTint(180, 40, 120);
 }
 void DrawOotExtSpiritBreastplate() { // SoH parity: tunic tinted orange
-    DrawOotTunicTint(235, 110, 20);
+    DrawOotTunicTint(235, 110, 20, true);
 }
 void DrawOotExtChampionsTunic() { // SoH parity: tunic tinted BotW champion blue
-    DrawOotTunicTint(0, 120, 215);
+    DrawOotTunicTint(0, 120, 215, true);
 }
 void DrawOotExtSagesTunic() { // Legacy RI_WATER_DRAGON_SCALE identity, now Sage's
     // Tunic in the middle, with the 6 medallions that feed it launching out of it in angled
     // ballistic arcs — the Triforce Thief drop-launch look (angled velocity + gravity + spin
     // while airborne), staggered into a continuous fountain. Pop-in/shrink-out masks the loop.
-    static void (*const sMedallionDraws[6])() = {
-        DrawOotMedallionForest, DrawOotMedallionFire,   DrawOotMedallionWater,
-        DrawOotMedallionSpirit, DrawOotMedallionShadow, DrawOotMedallionLight,
+    static const char* const sMedallionFaces[6] = {
+        "__OTR__objects/object_gi_medal/gGiForestMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiFireMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiWaterMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiSpiritMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiShadowMedallionFaceDL",
+        "__OTR__objects/object_gi_medal/gGiLightMedallionFaceDL",
     };
+    static Gfx* sMedallionCaches[6]{};
     const f32 kV0 = 1.5f;       // outward launch speed (model units/frame)
     const f32 kUpBias = 1.5f;   // added to every launch's vertical speed (fountain lift)
     const f32 kGravity = 0.07f; // per-frame² pull on the arcs
@@ -2631,10 +2729,11 @@ void DrawOotExtSagesTunic() { // Legacy RI_WATER_DRAGON_SCALE identity, now Sage
         Matrix_Translate(vx * t, vy * t - 0.5f * kGravity * t * t, kZOffset, MTXMODE_APPLY);
         Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
         Matrix_RotateYF((f32)gPlayState->state.frames * 0.09f + i, MTXMODE_APPLY); // spin while flying
-        sMedallionDraws[i]();
+        // The accepted tunic fountain keeps its miniature base medallions.
+        DrawOotMedallion(sMedallionFaces[i], &sMedallionCaches[i], false);
         Matrix_Pop();
     }
-    DrawOotTunicTint(235, 240, 245);
+    DrawOotTunicTint(235, 240, 245, true);
 }
 // The hover-boots GI colors its i4 textures through per-section prim/env colors (brown leather:
 // cloth prim 80,40,0 / env 40,20,0 ≈ 22% luminance), so a multiplicative grayscale tint can only
@@ -3803,9 +3902,10 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
         case RI_SHIELD_MIRROR: {
             // The authored GI returns above. Only the native/pack fallback
             // needs to correct a selected horizontal shield mesh.
-            float tilt = 0.f;
-            ResourceMgr_GetIkanaShieldGiTiltXForGame("mm", "objects/object_gi_shield_3/gGiMirrorShieldDL", &tilt);
+            float tilt = 0.f, roll = 0.f;
+            ResourceMgr_GetIkanaShieldGiPoseForGame("mm", "objects/object_gi_shield_3/gGiMirrorShieldDL", &tilt, &roll);
             Matrix_Push();
+            Matrix_RotateZF(roll, MTXMODE_APPLY);
             Matrix_RotateXF(tilt, MTXMODE_APPLY);
             GetItem_Draw(gPlayState, Rando::StaticData::Items[randoItemId].drawId);
             Matrix_Pop();
@@ -3832,20 +3932,8 @@ void Rando::DrawResolvedItem(RandoItemId randoItemId, RandoCheckId randoCheckId,
 
 static RegisterShipInitFunc initializeGICopyDLs(
     []() {
-        // Small keys
-        Gfx* baseDL = ResourceMgr_LoadGfxByName(gGiSmallKeyDL);
-        memcpy(gGiSmallKeyCopyDL, baseDL, sizeof(gGiSmallKeyCopyDL));
-        gGiSmallKeyCopyDL[5] = gsDPNoOp();
-        gGiSmallKeyCopyDL[6] = gsDPNoOp();
-
-        // Boss keys
-        baseDL = ResourceMgr_LoadGfxByName(gGiBossKeyDL);
-        memcpy(gGiBossKeyCopyDL, baseDL, sizeof(gGiBossKeyCopyDL));
-        gGiBossKeyCopyDL[5] = gsDPNoOp();
-        gGiBossKeyCopyDL[6] = gsDPNoOp();
-
         // Token Flame
-        baseDL = ResourceMgr_LoadGfxByName(gSkulltulaTokenFlameDL);
+        Gfx* baseDL = ResourceMgr_LoadGfxByName(gSkulltulaTokenFlameDL);
         memcpy(gSkulltulaTokenFlameCopyDL, baseDL, sizeof(gSkulltulaTokenFlameCopyDL));
         gSkulltulaTokenFlameCopyDL[5] = gsDPNoOp();
         gSkulltulaTokenFlameCopyDL[6] = gsDPNoOp();

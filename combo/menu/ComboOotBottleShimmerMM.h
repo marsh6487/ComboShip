@@ -1,6 +1,7 @@
 #ifndef COMBO_OOT_BOTTLE_SHIMMER_MM_H
 #define COMBO_OOT_BOTTLE_SHIMMER_MM_H
 #include <stdint.h>
+#include "ComboBottleShimmer.h"
 // MM's imported OoT bottles use native MM models, but keep the OoT NEI
 // shimmer palette. Include after MM's RandoItemId declaration.
 static inline int MM_OotBottleShimmerColor(RandoItemId id, uint8_t color[4]) {
@@ -18,10 +19,9 @@ static inline int MM_OotBottleShimmerColor(RandoItemId id, uint8_t color[4]) {
             b = 255;
             break;
         case RI_OOT_BOTTLE_FAIRY:
-            r = 255;
-            g = 160;
-            b = 235;
-            break;
+            return ComboBottleShimmer_Color(CW_SHIMMER_FAIRY, color);
+        case RI_OOT_BOTTLE_MAGIC_MUSHROOM:
+            return ComboBottleShimmer_Color(CW_SHIMMER_MUSHROOM, color);
         case RI_OOT_BOTTLE_GREEN_POTION:
             r = 0;
             g = 200;
@@ -34,7 +34,6 @@ static inline int MM_OotBottleShimmerColor(RandoItemId id, uint8_t color[4]) {
             break;
         case RI_OOT_BOTTLE_BUGS:
         case RI_OOT_BOTTLE_FISH:
-        case RI_OOT_BOTTLE_MAGIC_MUSHROOM:
         case RI_OOT_RUTOS_LETTER:
             break;
         default:

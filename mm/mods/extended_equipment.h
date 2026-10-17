@@ -118,6 +118,10 @@ void ExtEquip_Unequip(s16 equipType);
  * the player. Equip/Unequip/C-button/kaleido/FleetSync all end here.
  */
 void ExtEquip_SetSlot(s16 equipType, u8 index);
+// Before replacing a native shield, retain its earned ownership. Borrowed ext/skin slots do not count.
+void ExtEquip_RecordNativeShieldOwnership(void);
+// Before replacing a matching native sword/B slot, retain its already-applied Kokiri-chain receipt.
+void ExtEquip_RecordNativeSwordOwnership(void);
 void ExtEquip_RefreshPlayer(void);  // Player_SetEquipmentData on the live player, if any
 void ExtEquip_ResyncFromSave(void); // Nei_Save()->extEquip* -> RAM copy (after a FleetSync apply)
 u8 ExtEquip_TridentAllowsShield(u8 extIndex, u16 vanillaValue); // Divine or a Mirror only

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def main():
     flags = ["-std=gnu2x", "-O1", "-g", "-DNDEBUG", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0",
              "-ffunction-sections", "-fdata-sections", "-w", "-Werror=implicit-function-declaration"]
-    for path in ("soh/include", "soh/src", "soh/assets", "soh", "libultraship/include"):
+    for path in ("soh/include", "soh/src", "soh/assets", "soh", "libultraship/include", "combo"):
         flags.append("-I" + str(ROOT / path))
     for path in ("CMake/soh-cvars.cmake", "CMake/lus-cvars.cmake"):
         for key, value in re.findall(r'set\((CVAR_PREFIX_\w+)\s+"?([^\s"\)]+)', (ROOT / path).read_text()):

@@ -22,7 +22,7 @@ static inline int ComboMmMaskShimmerColor(int index, uint8_t color[4]) {
     // Inventory order. Ordinary masks follow their dominant authored palette;
     // transformations retain their established effect identities.
     static const uint8_t colors[24][4] = {
-        { 220, 65, 65, 255 },   { 95, 70, 140, 255 },   { 235, 170, 55, 255 }, { 165, 175, 170, 255 },
+        { 220, 65, 65, 255 },   { 95, 70, 140, 255 },   { 64, 144, 255, 255 }, { 135, 95, 205, 255 },
         { 245, 145, 205, 255 }, { 50, 220, 90, 255 },   { 255, 200, 55, 255 }, { 220, 225, 240, 255 },
         { 255, 220, 80, 255 },  { 90, 205, 95, 255 },   { 205, 125, 80, 255 }, { 240, 64, 64, 255 },
         { 220, 185, 145, 255 }, { 175, 180, 220, 255 }, { 135, 95, 205, 255 }, { 245, 165, 205, 255 },

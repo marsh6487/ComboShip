@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 #include "global.h"
 
 #include "scenes/overworld/spot00/spot00_scene.h"
@@ -1149,7 +1150,8 @@ void func_8009E0B8(PlayState* play) {
     } else if (gSaveContext.sceneLayer == 6) {
         spA0 = play->roomCtx.unk_74[0] + 500;
     } else if (((gSaveContext.sceneLayer < 4) || LINK_IS_ADULT) &&
-               (Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD))) {
+               (Combo_SOH_CrossBossLogicalClear(
+                   COMBO_BOSS_GOHMA, Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD)))) {
         spA0 = 2150;
     }
 

@@ -11,6 +11,7 @@
 #include "BenPort.h"
 #include "ComboItemReceiptRender.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/BenGui/CosmeticEditor.h"
 #include "assets/archives/schedule_dma_static/schedule_dma_static_yar.h"
 #include "assets/archives/icon_item_static/icon_item_static_yar.h"
 #include "assets/archives/icon_item_24_static/icon_item_24_static_yar.h"
@@ -30,8 +31,16 @@ void Message_SetCapeVisibilityChoice(int enabled) {
 
 static int Message_HandleCapeVisibilityChoice(PlayState* play) {
     MessageContext* msgCtx = &play->msgCtx;
-    if (!sCapeVisibilityChoice || msgCtx->msgMode != MSGMODE_TEXT_DONE ||
-        msgCtx->textboxEndType != TEXTBOX_ENDTYPE_TWO_CHOICE)
+    if (!sCapeVisibilityChoice)
+        return false;
+    // The equipment popup closes through the ordinary pause-description lifecycle.
+    // Canceling it leaves appearance unchanged; pickup receipts still require A.
+    if (play->pauseCtx.itemDescriptionOn && CHECK_BTN_ANY(play->state.input[0].press.button, BTN_B | BTN_START)) {
+        sCapeVisibilityChoice = false;
+        Message_CloseTextbox(play);
+        return true;
+    }
+    if (msgCtx->msgMode != MSGMODE_TEXT_DONE || msgCtx->textboxEndType != TEXTBOX_ENDTYPE_TWO_CHOICE)
         return false;
     // Fast-text B/C-up presses must never accept the appearance preference.
     if (CHECK_BTN_ALL(play->state.input[0].press.button, BTN_A) && Message_ShouldAdvance(play)) {
@@ -4631,7 +4640,7 @@ void Message_DrawSceneTitleCard(PlayState* play, Gfx** gfxP) {
     gDPSetTextureFilter(gfx++, G_TF_BILERP);
     gDPSetAlphaDither(gfx++, G_AD_NOTPATTERN);
     gDPSetPrimColor(gfx++, 0, 0, 0, 0, 0, msgCtx->textboxColorAlphaCurrent);
-    gDPSetEnvColor(gfx++, 140, 40, 160, 255);
+    gDPSetEnvColorOverride(gfx++, 140, 40, 160, 255, COSMETIC_ID("Menus.SceneTitleCard"));
     gDPLoadTextureBlock(gfx++, gSceneTitleCardGradientTex, G_IM_FMT_I, G_IM_SIZ_8b, 64, 1, 0, G_TX_NOMIRROR | G_TX_WRAP,
                         G_TX_NOMIRROR | G_TX_WRAP, 6, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
     // #region 2S2H [Cosmetic] Account for different aspect ratios than 4:3 for title card
@@ -5887,6 +5896,12 @@ void Message_Update(PlayState* play) {
     u16 sp3E;
     s16 var_v1;
     u16 temp;
+
+    // Pause Cape choices can be canceled during reveal, intro, or final selection.
+    if (pauseCtx->itemDescriptionOn && CHECK_BTN_ANY(input->press.button, BTN_B | BTN_START) &&
+        Message_HandleCapeVisibilityChoice(play)) {
+        return;
+    }
 
     msgCtx->stickAdjX = input->rel.stick_x;
     msgCtx->stickAdjY = input->rel.stick_y;

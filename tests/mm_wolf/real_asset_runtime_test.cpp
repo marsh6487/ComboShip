@@ -11,31 +11,70 @@ static std::vector<u8> readRealAsset(const char* path) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 3);
-    assetDirectory = argv[1];
-    captureWolfLogs();
-    const auto real = readRealAsset(argv[2]);
-    assert(NeiWolfAsset::Validate(real));
-    assert(load(real));
-    assert(sSkin.vertexCount == field(real, 0) && sSkin.boneCount == field(real, 2));
-    assert(sAnimations.size() == field(real, 3));
-    for (const char* name : kAnimNames)
-        assert(FindAnim(name) >= 0);
+  assert(argc == 3 || argc == 4);
+  assetDirectory = argv[1];
+  captureWolfLogs();
+  const auto real = readRealAsset(argv[2]);
+  assert(NeiWolfAsset::Validate(real));
+  assert(load(real));
+  assert(sSkin.vertexCount == field(real, 0) &&
+         sSkin.boneCount == field(real, 2));
+  assert(sAnimations.size() == field(real, 3));
+  for (const char *name : kAnimNames)
+    assert(FindAnim(name) >= 0);
 
-    // The archive-selected resource wins over the loose file. LUS adds 16 zero
-    // bytes; the production payload-size check must not include them in totalSize.
+  // The archive-selected resource wins over the loose file. LUS adds 16 zero
+  // bytes; the production payload-size check must not include them in
+  // totalSize.
+  resourceBlob = real;
+  resourceBlob.resize(real.size() + 16, 0);
+  resourceBlobOwner = "oot";
+  sAssetsLoaded = 0;
+  assert(LoadAssets() &&
+         sAssetPath == "@oot:objects/forms/wolf_link/gWolfLinkData");
+  assert(sBlob == real &&
+         "the model must own its exact payload after the resource copy");
+  resourceBlob.back() = 1;
+  sAssetsLoaded = 0;
+  assert(!LoadAssets() && !sAssetsLoaded && logged("reason=resource-blob"));
+  resourceBlob.back() = 0;
+  assert(LoadAssets() && "fixing a rejected resource permits retry");
+  resourceBlob.clear();
+
+  if (argc == 4) {
+    const auto hd = readRealAsset(argv[3]);
+    assert(NeiWolfAsset::Validate(hd));
+    integerCvars["gMods.WolfLink.UseHDModel"] = 0;
     resourceBlob = real;
-    resourceBlob.resize(real.size() + 16, 0);
-    resourceBlobOwner = "oot";
     sAssetsLoaded = 0;
-    assert(LoadAssets() && sAssetPath == "@oot:objects/forms/wolf_link/gWolfLinkData");
-    assert(sBlob == real && "the model must own its exact payload after the resource copy");
-    resourceBlob.back() = 1;
-    sAssetsLoaded = 0;
-    assert(!LoadAssets() && !sAssetsLoaded && logged("reason=resource-blob"));
-    resourceBlob.back() = 0;
-    assert(LoadAssets() && "fixing a rejected resource permits retry");
+    assert(LoadAssets() && sSkin.vertexCount == field(real, 0));
+    const s32 registration = sDefIndex;
+    const auto *owned = sBlob.data();
+    sWolf.initialized = 1;
+    integerCvars["gMods.WolfLink.UseHDModel"] = 1;
+    resourceBlob = hd;
+    resourceBlobPath = NeiWolfAsset::kHDResourcePath;
+    assert(LoadAssets() && sBlob.data() == owned &&
+           sSkin.vertexCount == field(real, 0));
+    sWolf.initialized = 0;
+    assert(LoadAssets() && sSkin.vertexCount == field(hd, 0) &&
+           sDefIndex == registration);
+    for (int change = 0; change < 20; ++change) {
+      const bool useHD = change % 2;
+      integerCvars["gMods.WolfLink.UseHDModel"] = useHD;
+      resourceBlob = useHD ? hd : real;
+      resourceBlobPath =
+          useHD ? NeiWolfAsset::kHDResourcePath : NeiWolfAsset::kResourcePath;
+      assert(LoadAssets() && sBlob == resourceBlob &&
+             sDefIndex == registration);
+    }
     resourceBlob.clear();
+    resourceBlobPath = NeiWolfAsset::kResourcePath;
+    integerCvars.erase("gMods.WolfLink.UseHDModel");
+    assert(load(real));
+    std::puts("PASS MM model change defers during an active transform; 20 "
+              "switches reuse one registration");
+  }
 
     // Corruptions of the actual v2 export, including its additional audio table,
     // must be rejected before registration, and a corrected file must reload.
@@ -97,9 +136,25 @@ int main(int argc, char** argv) {
     };
     size_t submissions = 0;
     for (int cycle = 0; cycle < 4; ++cycle) {
+      std::vector<u8> current = real;
+      if (argc == 4) {
+        const bool useHD = cycle % 2;
+        integerCvars[NeiWolfAsset::kHDModelCVar] = useHD;
+        current = useHD ? readRealAsset(argv[3]) : real;
+        resourceBlob = current;
+        resourceBlobPath =
+            useHD ? NeiWolfAsset::kHDResourcePath : NeiWolfAsset::kResourcePath;
+      }
         WolfLinkForm_Select(1);
         assert(WolfLinkForm_LoadSkeleton(&play));
         assert(sWolf.initialized && sSkin.vtxBuf[0] && sSkin.vtxBuf[1]);
+        assert(sSkin.vertexCount == field(current, 0) &&
+               sSkin.boneCount == field(current, 2));
+        if (argc == 4) {
+          const auto *owned = sBlob.data();
+          integerCvars[NeiWolfAsset::kHDModelCVar] = !(cycle % 2);
+          assert(WolfLinkForm_LoadSkeleton(&play) && sBlob.data() == owned);
+        }
         for (const auto& clip : sAnimations) {
             sWolf.character.ssbbAnim = &clip;
             for (const float frame : { 0.0f, std::min(0.5f, (float)clip.numFrames - 1), (float)clip.numFrames - 1 }) {

@@ -10,6 +10,8 @@
 #include <tinyxml2.h>
 #include <fast/resource/type/DisplayList.h>
 #include <ship/resource/archive/Archive.h>
+#include <ship/Context.h>
+#include <spdlog/spdlog.h>
 
 #include "soh/SohGui/UIWidgets.hpp"
 #include "soh/SohGui/SohGui.hpp"
@@ -235,6 +237,27 @@ void ApplyCustomCosmetics() {
             } else {
                 material->Instructions[binding.commandIndex] =
                     gsDPSetEnvColor(color.r, color.g, color.b, binding.defaultA);
+            }
+            if (entry.form == CustomCosmeticForm::Zora &&
+                (entry.baseCvar.ends_with("ZoraEyes") || entry.baseCvar.ends_with("ZoraTattoos"))) {
+                using State = std::pair<Gfx*, uintptr_t>;
+                static std::unordered_map<std::string, State> previous;
+                static unsigned samples = 0;
+                const auto& command = material->Instructions[binding.commandIndex];
+                const State state = { material->Instructions.data(), command.words.w1 };
+                const std::string key = entry.baseCvar + binding.materialPath + std::to_string(binding.commandIndex);
+                auto found = previous.find(key);
+                if (samples < 64 && (found == previous.end() || found->second != state)) {
+                    previous[key] = state;
+                    ++samples;
+                    const auto owner = GetCustomMaterialArchive(archiveManager.get(), binding.materialPath);
+                    SPDLOG_INFO("[ZoraCosmeticBinding] key={} changed={} rgba={:08X} material={} mapped_archive={} "
+                                "gfx={:X} index={} prim={} sample={}/64",
+                                entry.valuesCvar, CVarGetInteger(entry.changedCvar.c_str(), 0), command.words.w1,
+                                binding.materialPath, owner ? owner->GetPath() : "<unknown>",
+                                reinterpret_cast<uintptr_t>(material->Instructions.data()), binding.commandIndex,
+                                binding.isPrimColor, samples);
+                }
             }
         }
     }

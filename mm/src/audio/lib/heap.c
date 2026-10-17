@@ -1148,7 +1148,8 @@ void* AudioHeap_AllocPermanent(s32 tableType, s32 id, size_t size) {
     void* addr;
     s32 index = gAudioCtx.permanentPool.count;
 
-    if (index < 0 || (size_t)index >= ARRAY_COUNT(gAudioCtx.permanentEntries)) {
+    // The host cache grows with the loaded sequence/font maps.
+    if (index < 0 || index >= gAudioCtx.permanentEntriesCapacity || gAudioCtx.permanentEntries == NULL) {
         return NULL;
     }
 

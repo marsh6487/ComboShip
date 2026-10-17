@@ -2,6 +2,7 @@
 from pathlib import Path
 import os, re, subprocess, sys, tempfile
 ROOT=Path(__file__).resolve().parents[2]
+subprocess.run([sys.executable,'-B',str(ROOT/'tests/elemental_arrow_gi/rainbow_test.py')],check=True)
 sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
 from run_time_pedestal_tests import functions
 from run_mm_nei_tests import flags as mm_flags, write_graph_helpers
@@ -16,7 +17,7 @@ with tempfile.TemporaryDirectory(prefix='arrow-gi-') as folder:
     for config in ('CMake/soh-cvars.cmake','CMake/lus-cvars.cmake'):
         for key,value in re.findall(r'set\((CVAR_PREFIX_\w+)\s+"?([^\s"\)]+)',(ROOT/config).read_text()):
             flags.append(f'-D{key}="{value}"')
-    for test in ('policy','renderer'):
+    for test in ('policy','polish','colors','renderer'):
         binary=temp/test
         subprocess.run([os.environ.get('CXX','c++'),*flags,'-O2','-ffunction-sections','-fdata-sections',str(ROOT/'tests/elemental_arrow_gi'/f'{test}_test.cpp'),'-Wl,--gc-sections','-o',str(binary)],check=True)
         subprocess.run([str(binary)],check=True)

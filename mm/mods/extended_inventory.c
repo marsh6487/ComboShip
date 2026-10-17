@@ -1828,23 +1828,48 @@ uint8_t Slate_RuneNeighbor(uint8_t rune, int32_t dir) {
 }
 
 // Rod of Seasons: four sibling pickups share one rod; ownership crosses hosts unchanged.
-uint8_t Seasons_SeasonOwned(uint8_t season) {
-    if (season == SEASON_OFF) {
-        return 1; // the blank coin comes with the rod
+uint8_t Seasons_HasRod(void) {
+    NeiSaveData* nei = Nei_Save();
+    // Heal existing saves through their original ownership stores.
+    if ((nei->seasonsOwned & NEI_SEASONS_MASK) || Nei_GetOwnedItem(SLOT_ROD_OF_SEASONS) == EXT_ITEM_ROD_OF_SEASONS) {
+        nei->seasonsRodOwned = 1;
     }
-    if (season >= SEASON_COUNT) {
+    return nei->seasonsRodOwned != 0;
+}
+
+void Seasons_GrantRod(void) {
+    NeiSaveData* nei = Nei_Save();
+    nei->seasonsRodOwned = 1;
+    ExtInv_GiveItem(SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS);
+    if (Seasons_RandoMode() == NEI_SEASONS_ROD) {
+        nei->seasonsOwned = NEI_SEASONS_MASK;
+    } else if (!(nei->seasonsOwned & NEI_SEASONS_MASK)) {
+        nei->season = SEASON_OFF;
+    }
+}
+
+uint8_t Seasons_SeasonOwned(uint8_t season) {
+    if (season > SEASON_OFF || !Seasons_HasRod()) {
         return 0;
     }
-    return (Nei_Save()->seasonsOwned & (1 << season)) != 0;
+    if (season == SEASON_OFF) {
+        return 1; // even a gated/starting rod with no seasons can open the wheel
+    }
+    if (Seasons_RandoMode() == NEI_SEASONS_GATED) {
+        Seasons_UpdateGates();
+        return (Nei_Save()->seasonsGates & (1u << season)) != 0;
+    }
+    return (Nei_Save()->seasonsOwned & (1u << season)) != 0;
 }
 
 void Seasons_GrantSeason(uint8_t season) {
     if (season >= SEASON_COUNT) {
         return;
     }
-    Nei_Save()->seasonsOwned |= (1 << season);
+    Nei_Save()->seasonsOwned |= (1u << season);
     Nei_Save()->season = season;
-    // Obtaining ANY season hands over the rod itself if it isn't there yet.
+    Nei_Save()->seasonsRodOwned = 1;
+    // Every individual season pickup hands over the Rod, without unlocking its siblings.
     ExtInv_GiveItem(SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS);
 }
 
@@ -1868,7 +1893,7 @@ uint8_t Seasons_SeasonAt(uint8_t index) {
             n++;
         }
     }
-    return SEASON_SPRING;
+    return SEASON_OFF;
 }
 
 uint8_t Seasons_GetSeason(void) {

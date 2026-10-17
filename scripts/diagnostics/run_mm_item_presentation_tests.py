@@ -22,6 +22,8 @@ src = (ROOT / 'combo/menu/ComboItemDrawOOT.h').read_text()
 song_body = function(src, 'OOT_FillSongDrawInfo')
 body = function(src, 'OOT_FillItemDrawInfo')
 preamble = r'''
+#include <atomic>
+#define SPDLOG_WARN(...) ((void)0)
 #include <cassert>
 #include <cstdint>
 #include <memory>
@@ -30,6 +32,7 @@ preamble = r'''
 #include <cstring>
 #include "combo/menu/ComboItemDrawABI.h"
 #include "combo/menu/ComboItemEffectColors.h"
+#include "combo/menu/ComboBottleContents.h"
 using s16=int16_t; using s32=int32_t; using f32=float;
 namespace Ship {
 static bool ownerActive=false;
@@ -126,7 +129,8 @@ int main() {
  for(auto id : {RG_MM_SONG_SONATA,RG_MM_SONG_TIME}) {
    info={};
    assert(OOT_FillItemDrawInfo(id,&info)==1);
-   assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.dlistCount==1 && !info.itemShimmer);
+   assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.dlistCount==1);
+   assert(bool(info.itemShimmer)==(id==RG_MM_SONG_SONATA)); // Accepted POC2 intrinsic Sonata leaves.
    const uint8_t expected[4]={98,static_cast<uint8_t>(id==RG_MM_SONG_SONATA?255:177),
                              static_cast<uint8_t>(id==RG_MM_SONG_SONATA?98:211),255};
    assert(!std::memcmp(info.itemShimmerColor,expected,4));
@@ -163,6 +167,7 @@ with tempfile.TemporaryDirectory(prefix='mm-presentation-') as td:
 message = (ROOT / 'mm/src/code/z_message.c').read_text()
 consumer = (ROOT / 'mm/2s2h/Rando/DrawItem.cpp').read_text()
 fixture = (ROOT / 'tests/mm_presentation/icon_bridge_test.cpp').read_text()
+fixture = "#include <atomic>\n#define SPDLOG_WARN(...) ((void)0)\n" + fixture
 bindings = re.findall(r'itemTable\[(?:RG_BOTTLE_WITH_[A-Z_]+|RG_MAGIC_BEAN_PACK)\]\.CustomIcon\([^;]+;',
                       (ROOT / 'soh/soh/Enhancements/randomizer/item_list.cpp').read_text())
 fixture = fixture.replace('/* BOTTLE_ICON_BINDINGS */', '\n'.join(bindings))

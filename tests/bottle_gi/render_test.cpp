@@ -30,9 +30,19 @@ Gfx* ResourceMgr_LoadGfxByName(const char* path) {
     root[slot].words.w1 = reinterpret_cast<uintptr_t>(otherMod || (partial&(1<<slot)) ? another : targets[slot]);
     return missing ? nullptr : &root[slot];
 }
-int ResourceMgr_IsModAsset(const char*) { return 0; }
+static const char* selectedEmptyPath = nullptr;
+static bool emptyOpaqueAvailable = true, emptyGlassAvailable = true;
+int ResourceMgr_IsModAsset(const char* path) {
+    return selectedEmptyPath && (!std::strcmp(path, selectedEmptyPath) ||
+        (!std::strcmp(selectedEmptyPath,"whole") && (!std::strcmp(path,"cork") || !std::strcmp(path,"glass"))));
+}
 int ResourceMgr_IsModAssetForGame(const char*,const char*) { return 0; }
 int ResourceMgr_IsCustomAssetForGame(const char*,const char*) { return 0; }
+int ResourceMgr_FileExists(const char* path) {
+    if (!std::strcmp(path,"__OTR__objects/combo_bottle_gi/EmptyOpaque")) return emptyOpaqueAvailable;
+    if (!std::strcmp(path,"__OTR__objects/combo_bottle_gi/EmptyXlu")) return emptyGlassAvailable;
+    return 0;
+}
 static GraphicsContext gfx;
 static PlayState play{{&gfx, 37}};
 static Gfx opa[64], xlu[64];
@@ -67,7 +77,33 @@ static void Reset() {
     for (auto& cmd:opa) cmd.stream=0;
     for (auto& cmd:xlu) cmd.stream=1;
 }
+static void TestEmptyBottles() {
+    for (int host=0;host<2;++host) for(int availability:{3,0,1,2})
+        for(int replacement=0;replacement<4;++replacement) {
+            emptyOpaqueAvailable=availability&1; emptyGlassAvailable=availability&2;
+            selectedEmptyPath=replacement==1?"cork":replacement==2?"glass":replacement==3?"whole":nullptr;
+            const bool bundled=availability==3 && !replacement;
+            const std::vector<std::pair<int,std::string>> expected={
+                {0,bundled?"__OTR__objects/combo_bottle_gi/EmptyOpaque":"cork"},
+                {1,bundled?"__OTR__objects/combo_bottle_gi/EmptyXlu":"glass"}};
+            Reset();
+            if(host)mm::GetItem_DrawOpa0Xlu1(&play,3); else oot::GetItem_DrawOpa0Xlu1(&play,3);
+            assert(draws==expected && "empty bottle bypassed authored casing or selected replacement");
+            assert(scrolls==0 && matrices==2);
+            void* resources[8]{};s32 xs=-1,kind=-1,scroll=-1;float scale=-1;u8 colors[16]{};
+            int count=host?mm::GetItem_GetDrawTableEntry(3,resources,8,&xs,&scale,&scroll,&kind):
+                           oot::GetItem_GetDrawTableEntry(3,resources,8,&xs,&scale,&kind,colors);
+            assert(count==2 && xs==1 && kind==0 && scale==0);
+            for(int i=0;i<2;++i)assert(expected[i].second==(const char*)resources[i]);
+            for(int capacity=0;capacity<2;++capacity)
+                assert((host?mm::GetItem_GetDrawTableEntry(3,resources,capacity,&xs,&scale,&scroll,&kind):
+                             oot::GetItem_GetDrawTableEntry(3,resources,capacity,&xs,&scale,&kind,colors))==0);
+        }
+    selectedEmptyPath=nullptr;
+    puts("PASS both native empty drawers and foreign exports: direct private casing despite ROM roots; selected whole/partial mod priority; missing-resource fallback; complete two-pass recipe");
+}
 int main() {
+    TestEmptyBottles();
     for (int host=0;host<2;++host) {
         for (bool alternate:{false,true}) for (bool competing:{false,true}) for(int mask=0;mask<8;++mask) {
             selected=alternate; otherMod=competing; missing=false; partial=mask;

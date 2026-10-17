@@ -385,6 +385,22 @@ static inline uint8_t FcEquip_MmToOot(uint8_t mmId) {
     return 0xFF; // unmappable
 }
 
+// Shared page-2 EXT items use the same full IDs in both games. Quest-only EXT
+// items have no inventory route and stay local. Never truncate an unknown u16 ID.
+static inline uint16_t FcEquip_OotToMm16(uint16_t ootId) {
+    if (ootId >= 0x0220 && ootId <= 0x0223) {
+        return ootId;
+    }
+    return ootId > 0xFF ? 0xFF : FcEquip_OotToMm((uint8_t)ootId);
+}
+
+static inline uint16_t FcEquip_MmToOot16(uint16_t mmId) {
+    if (mmId >= 0x0220 && mmId <= 0x0223) {
+        return mmId;
+    }
+    return mmId > 0xFF ? 0xFF : FcEquip_MmToOot((uint8_t)mmId);
+}
+
 #ifdef __cplusplus
 }
 #endif

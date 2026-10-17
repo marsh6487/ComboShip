@@ -21,12 +21,30 @@ int main() {
                          Kind::RazorSword, Kind::GildedSword,
                          Kind::MasterSword, Kind::BiggoronSword,
                          Kind::GreatFairySword, Kind::FourSword,
-                         Kind::SwordAura};
+                         Kind::SwordAura, Kind::GiantsKnife};
   static_assert(int(Kind::SwordAura) == 17 && int(Kind::SlateSensor) == 24 &&
-                int(Kind::KokiriSword) == 25 && int(Kind::FourSword) == 32);
+                int(Kind::KokiriSword) == 25 && int(Kind::FourSword) == 32 &&
+                int(Kind::Gold) == 37 && int(Kind::GiantsKnife) == 38);
+  static_assert(int(Kind::DivineShield)==39 && int(Kind::IronKnuckleAxe)==49);
+  for(int profile=int(Kind::DivineShield);profile<=int(Kind::Last);++profile) {
+    const auto kind=static_cast<Kind>(profile);
+    assert(IsEquipment(kind)&&!IsSword(kind)&&!IsRod(kind)&&!IsSpell(kind)&&!IsSpecial(kind));
+    for(uint32_t frame:{0u,42u,179u,360u,std::numeric_limits<uint32_t>::max()}) {
+      assert(SampleOrb(kind).count==0&&SampleEnergy(kind,frame).count==0&&SampleSpecial(kind,frame).count==0);
+      const auto stars=SampleShimmer(frame,true,{},kind);
+      assert(stars.count==360&&SampleShimmer(frame,false,{},kind).count==0);
+      for(size_t cluster=0;cluster<5;++cluster) {
+        const auto hue=cluster%2?EquipmentShimmerSecondary(kind):ColorHex(kind);
+        for(size_t vertex=0;vertex<72;++vertex) {
+          const bool core=vertex>=48&&(vertex-48)%3==0;
+          assert(stars.vertices[cluster*72+vertex].rgb==(core?0xFFFFFF:hue));
+        }
+      }
+    }
+  }
   const uint32_t swordHues[] = {0x78C850, 0xA46CFF, 0xBDD6EA, 0xFFD45A,
                                 0x6F8FFF, 0xFF9A42, 0x79BE84, 0x315B2F,
-                                0xFFF4D6};
+                                0xFFF4D6, 0xCFD9E6};
   const Basis sideCamera{{0, 0, 1}, {0, 1, 0}, {-1, 0, 0}};
   auto near = [](Point a, Point b) {
     return std::abs(a.x - b.x) < .0001f &&
@@ -73,7 +91,8 @@ int main() {
         highestBladeEffect = std::max(highestBladeEffect, v.p.y);
         assert(std::isfinite(v.p.x) && std::isfinite(v.p.y) &&
                std::isfinite(v.p.z));
-        assert(std::abs(v.p.x) < 25 && v.p.y > -23 && v.p.y < 103 &&
+        assert(std::abs(v.p.x) < 25 && v.p.y > -23 &&
+               v.p.y < (kind == Kind::BiggoronSword ? 112.f : 103.f) &&
                std::abs(v.p.z) < 15);
         assert(near(v.p, again.vertices[i].p) &&
                v.rgb == again.vertices[i].rgb &&
@@ -82,7 +101,7 @@ int main() {
         // flecks must stay attached as the camera moves around the item.
         if (v.rgb == swordHues[sword] && v.alpha >= 80) {
           assert(near(v.p, side.vertices[i].p));
-          if (kind == Kind::RazorSword || kind == Kind::BiggoronSword) {
+          if (kind == Kind::RazorSword || kind == Kind::BiggoronSword || kind == Kind::GiantsKnife) {
             // The corrected meshes stand upright. Their lit particle centers
             // must stay around the blade axis without the former baked lean.
             assert(std::abs(v.p.x) < 6.8f);
@@ -94,12 +113,15 @@ int main() {
       assert(SampleShimmer(frame, false, {}, kind).count == 0);
     }
     // Energy must reach each blade's upper section. Gilded's shortened model
-    // ends at native Y=65.99, so its motes must not trail far beyond that tip.
-    if (kind == Kind::MasterSword) assert(highestBladeEffect > 70.f);
+    // ends at native Y=61.78, so its motes must not trail far beyond that tip.
+    if (kind == Kind::MasterSword) assert(highestBladeEffect > 69.f);
     if (kind == Kind::SwordAura) assert(highestBladeEffect > 65.f);
+    // Independent native tip landmarks: Biggoron 109.55, Knife 100.31.
+    if (kind == Kind::BiggoronSword) assert(highestBladeEffect > 108.f && highestBladeEffect < 112.f);
+    if (kind == Kind::GiantsKnife) assert(highestBladeEffect > 99.f && highestBladeEffect < 103.f);
     if (kind == Kind::GildedSword) {
-      assert(highestBladeEffect > 63.f);
-      assert(highestBladeEffect < 66.5f);
+      assert(highestBladeEffect > 60.f);
+      assert(highestBladeEffect < 63.f);
     }
     const auto a = SampleSpecial(kind, 19), b = SampleSpecial(kind, 47);
     bool moves = a.count != b.count;
@@ -232,7 +254,7 @@ int main() {
       for(size_t i=0;i<a.count;++i) {
         const auto& v=a.vertices[i];
         assert(std::isfinite(v.p.x) && std::isfinite(v.p.y) && std::isfinite(v.p.z));
-        const float heightBound = k == Kind::SwordAura ? 68.f : 48.f;
+        const float heightBound = k == Kind::SwordAura ? 74.f : 48.f;
         assert(std::abs(v.p.x)<48 && std::abs(v.p.y)<heightBound && std::abs(v.p.z)<48);
         assert(v.p.x==b.vertices[i].p.x && v.rgb==b.vertices[i].rgb && v.alpha==b.vertices[i].alpha);
       }

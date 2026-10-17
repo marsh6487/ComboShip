@@ -365,12 +365,9 @@ s32 AudioLoad_IsSeqLoadComplete(s32 seqId) {
         return false;
     } else if (gAudioContext.seqLoadStatus[seqId] >= 2) {
         return true;
+    } else {
+        return false;
     }
-    s32 realId = (s32)AudioLoad_GetRealTableIndex(SEQUENCE_TABLE, seqId);
-    if ((size_t)realId < sequenceMapSize && gAudioContext.seqLoadStatus[realId] >= 2) {
-        return true;
-    }
-    return false;
 }
 
 s32 AudioLoad_IsSampleLoadComplete(s32 sampleBankId) {
@@ -698,7 +695,12 @@ u8* AudioLoad_SyncLoadSeq(s32 seqId) {
     s32 pad;
     s32 didAllocate;
 
-    if ((size_t)seqId < sequenceMapSize && gAudioContext.seqLoadStatus[seqId] == 1) {
+    if (seqId < 0 || (size_t)seqId >= sequenceMapSize + 0xF || sequenceMap[seqId] == NULL) {
+        return NULL;
+    }
+    u32 realId = AudioLoad_GetRealTableIndex(SEQUENCE_TABLE, seqId);
+    if ((size_t)realId >= sequenceMapSize + 0xF || sequenceMap[realId] == NULL ||
+        gAudioContext.seqLoadStatus[realId] == 1) {
         return NULL;
     }
 
@@ -1078,6 +1080,7 @@ void* AudioLoad_AsyncLoadInner(s32 tableType, s32 id, s32 nChunks, s32 retData, 
     u32 temp_v0;
     u32 realId;
 
+    realId = AudioLoad_GetRealTableIndex(tableType, id);
     switch (tableType) {
         case SEQUENCE_TABLE:
             if (gAudioContext.seqLoadStatus[realId] == 1) {
@@ -1511,6 +1514,11 @@ void AudioLoad_Init(void* heap, size_t heapSize) {
                 continue;
             }
             SoundFont* sf = ResourceMgr_LoadAudioSoundFontByName(res);
+            if (sf == NULL || sf->fntIndex < 0 || (size_t)sf->fntIndex >= fontMapSize ||
+                fontMap[sf->fntIndex] == NULL) {
+                LUSLOG_ERROR("Invalid sound font for sequence \"%s\"; sequence skipped.", customSeqList[j]);
+                continue;
+            }
             memset(&sDat->fonts[0], 0, sizeof(sDat->fonts));
             sDat->fonts[0] = sf->fntIndex;
             // Preserve the resolved default as well as the full-width bank list.

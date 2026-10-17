@@ -31,21 +31,28 @@ jobs:
         with:
           arch: x64
 
-      # The GenerateSohOtr / Generate2ShipOtr targets run OTRExporter/extract_assets.py via Python3.
+      # Python3: Generate2ShipOtr (OTRExporter/extract_assets.py) and the asset-collision gate. soh packs
+      # with Torch (soh-o2r-packer), whose configure step fetches tinyxml2/zlib/yaml-cpp (needs network).
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
+      - name: Verify blue-warp hook with MSVC before configuring
+        run: python -B tests/cross_dungeon/oot_blue_warp_hook_test.py --msvc --compiler cl
+
       - name: Verify native NEI bridge DLL declarations
         run: python tests/nei_asset_priority/run_abi_tests.py --msvc --compiler cl
+
+      - name: Verify Windows launcher icon and version resources
+        run: python -B scripts/diagnostics/run_windows_launcher_resource_tests.py
 
       # Shared with the compile gate: caches the expensive vcpkg build + CMake tree.
       - name: Cache build dir (vcpkg + CMake)
         uses: actions/cache@v5
         with:
           path: build/x64
-          key: build-x64-${{ hashFiles('CMakeLists.txt', 'CMake/**', 'libultraship/cmake/**') }}
+          key: build-x64-${{ hashFiles('CMakeLists.txt', 'CMake/**', 'libultraship/cmake/**', 'torch/CMakeLists.txt') }}
           restore-keys: build-x64-
 
       - name: Configure
@@ -68,7 +75,7 @@ jobs:
             Start-Sleep -Seconds $configureDelaySeconds
           }
 
-      # Order matters: libultraship -> soh -> 2ship (soh before 2ship; they share OTRExporter/ZAPD).
+      # Order matters: libultraship -> soh -> 2ship (2ship builds ZAPD/OTRExporter; soh builds Torch).
       # comboui + ComboShip pull the rest of the runtime in as dependencies.
       - name: Build libultraship
         run: cmake --build build/x64 --target libultraship --config Release
@@ -85,7 +92,25 @@ jobs:
           & ./build/x64/frame-timing-check/Release/frame_timing_output_check.exe "$env:RUNNER_TEMP/frame-timing-output"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build soh
-        run: cmake --build build/x64 --target soh --config Release
+        shell: pwsh
+        run: |
+          # Keep the normal build command, but surface the useful MSVC lines as a
+          # check annotation when GitHub's large job-log download is unavailable.
+          $PSNativeCommandUseErrorActionPreference = $false
+          $sohBuildLog = Join-Path $env:RUNNER_TEMP "soh-build.log"
+          cmake --build build/x64 --target soh --config Release 2>&1 | Tee-Object -FilePath $sohBuildLog
+          $sohBuildExitCode = $LASTEXITCODE
+          if ($sohBuildExitCode -ne 0) {
+            $diagnosticLines = Get-Content $sohBuildLog |
+              Where-Object { $_ -match '(?i)(error C[0-9]{4}|fatal error|LNK[0-9]{4}|MSB[0-9]{4}|: error )' } |
+              Select-Object -Last 40
+            if (-not $diagnosticLines) {
+              $diagnosticLines = Get-Content $sohBuildLog | Select-Object -Last 40
+            }
+            $diagnostic = ($diagnosticLines -join "`n").Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Host "::error title=Windows SoH build diagnostic::$diagnostic"
+            exit $sohBuildExitCode
+          }
       - name: Build 2ship
         run: cmake --build build/x64 --target 2ship --config Release
       # Headless seed validator (pulls libultraship/soh/2ship as deps, already built above). Uploaded
@@ -97,10 +122,28 @@ jobs:
       - name: Build comboui
         run: cmake --build build/x64 --target comboui --config Release
       - name: Build ComboShip
-        run: cmake --build build/x64 --target ComboShip --config Release
+        shell: pwsh
+        run: |
+          # Keep the normal build command, but surface the useful linker lines as
+          # a check annotation when GitHub's large job-log download is unavailable.
+          $PSNativeCommandUseErrorActionPreference = $false
+          $comboShipBuildLog = Join-Path $env:RUNNER_TEMP "comboship-build.log"
+          cmake --build build/x64 --target ComboShip --config Release 2>&1 | Tee-Object -FilePath $comboShipBuildLog
+          $comboShipBuildExitCode = $LASTEXITCODE
+          if ($comboShipBuildExitCode -ne 0) {
+            $diagnosticLines = Get-Content $comboShipBuildLog |
+              Where-Object { $_ -match '(?i)(error C[0-9]{4}|fatal error|LNK[0-9]{4}|MSB[0-9]{4}|: error )' } |
+              Select-Object -Last 40
+            if (-not $diagnosticLines) {
+              $diagnosticLines = Get-Content $comboShipBuildLog | Select-Object -Last 40
+            }
+            $diagnostic = ($diagnosticLines -join "`n").Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Host "::error title=Windows ComboShip build diagnostic::$diagnostic"
+            exit $comboShipBuildExitCode
+          }
 
-      # Port asset archives (--norom). GenerateSohOtr/Generate2ShipOtr DEPEND on ZAPD, which these
-      # steps build on demand. They must run before cpack — the ship/2s2h ZIP components install
+      # Port asset archives (--norom). GenerateSohOtr builds Torch's soh-o2r-packer and
+      # Generate2ShipOtr builds ZAPD on demand. They must run before cpack — the ship/2s2h ZIP components install
       # ${CMAKE_BINARY_DIR}/soh/soh.o2r and .../mm/2ship.o2r.
       - name: Generate soh.o2r
         run: cmake --build build/x64 --target GenerateSohOtr --config Release

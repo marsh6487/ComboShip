@@ -14,18 +14,20 @@ import tempfile
 from run_mm_scene_randomization_tests import function
 
 ROOT = Path(__file__).resolve().parents[2]
-body = function((ROOT / 'soh/soh/Enhancements/randomizer/NeiGiPresentation.cpp').read_text(),
-                'NeiGi_FillCrossGameInfo')
+owner = (ROOT / 'soh/soh/Enhancements/randomizer/NeiGiPresentation.cpp').read_text()
+body = '\n'.join(function(owner, name) for name in ('PresentationShimmer', 'NeiGi_FillCrossGameInfo'))
 source = r'''
 #include <cassert>
 #include <cstring>
 #include "combo/menu/ComboItemDrawABI.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
+#include "soh/soh/Enhancements/randomizer/NeiGiFrameFit.h"
 using NeiGi::Kind;
 struct Vec3f {float x,y,z;};
 struct Presentation {
     void (*draw)(); const char* opaque; const char* translucent; float scale;
     Kind effect; Vec3f effectCenter; bool alwaysShimmer;
+    Kind shimmer=Kind::Neutral;
 };
 void Randomizer_DrawCaneSomariaUpgrade() {}
 bool mod, selectedSword, resources; int enabled;
@@ -74,14 +76,26 @@ mm = (ROOT/'mm/2s2h/Rando/NeiGiPresentation.cpp').read_text()
 bindings = re.search(r'struct Binding \{.*?const Binding kBindings\[\] = \{.*?\n\};', mm, re.S)[0]
 header = (ROOT/'mm/2s2h/Rando/NeiGiPresentation.h').read_text()
 fallback = mm[mm.index('MM_NeiGiFallbackShimmer::MM_NeiGiFallbackShimmer'):]
+# Instrument the real sizing helper so the model/effect call counts still
+# protect sword-only sizing while its actual transform body also executes.
+presentation_size = function((ROOT/'combo/menu/ComboSwordGiEffectFit.h').read_text(),
+                             'ComboSwordGi_ApplyPresentationSize')
+presentation_size = presentation_size.replace('{', '''{
+    assert(NeiGi::IsSword(awardKind) && !shop && !mmPickup);
+    ++sizeCalls;''', 1)
+particle_scale = function((ROOT/'combo/menu/ComboSwordGiEffectFit.h').read_text(),
+                          'ComboSwordGi_ParticleScale')
 source = source[:source.index('int main() {')] + r'''
 #include <algorithm>
 #include "mm/2s2h/Rando/Types.h"
 struct PlayState {uint32_t gameplayFrames=47;};
 PlayState play; PlayState* gPlayState=&play;
-Kind awardKind=Kind::Fire; bool mmMod; int pushes, draws, fitCalls;
+Kind awardKind=Kind::Fire; bool mmMod; int pushes, draws, fitCalls, sizeCalls;
 NeiGi::Mesh captured;
 void Matrix_Push() {++pushes;} void Matrix_Pop() {assert(pushes>0);--pushes;}
+constexpr int MTXMODE_APPLY=1;
+void Matrix_Translate(float,float,float,int) {}
+void Matrix_Scale(float,float,float,int) {}
 NeiGi::Basis NeiGi_CameraBasis(PlayState*) {return {};}
 void NeiGi_DrawMesh(PlayState*,const NeiGi::Mesh& mesh) {captured=mesh;++draws;}
 int Describe(const char*,CwItemDrawInfo* out) {
@@ -101,7 +115,7 @@ void ComboSwordGi_ApplyLegacyFit(const char* owner,Kind kind,bool shop=false,int
 void ComboSwordGi_ApplyEffectFit(Kind kind,bool shop=false,int pickup=0) {
     assert(kind==awardKind && NeiGi::IsSword(kind) && !shop && !pickup);
 }
-''' + bindings + '\n' + header[header.index('class MM_NeiGiFallbackShimmer'):] + '\n'
+''' + presentation_size + '\n' + particle_scale + '\n' + bindings + '\n' + header[header.index('class MM_NeiGiFallbackShimmer'):] + '\n'
 source += function(mm,'HasMmLegacyGiMod')+'\n'+function(mm,'GetSelectedOwnerGi')+'\n'+function(mm,'MM_DescribeNeiGi')+'\n'+fallback
 source += r'''
 int main() {
@@ -121,14 +135,18 @@ int main() {
         mod=selection==1; selectedSword=selection==2; mmMod=selection==4;
         CwItemDrawInfo info{};
         const bool authored=MM_DescribeNeiGi(award.first,&info);
-        if(selection!=4 || award.first==RI_OOT_NEI_FIRE_ROD || award.first==RI_SWORD_KOKIRI ||
-           award.first==RI_OOT_EXT_FOUR_SWORD) assert(!authored);
+        if(selection!=4 || award.first==RI_OOT_NEI_FIRE_ROD || award.first==RI_SWORD_KOKIRI) assert(!authored);
+        if(selection==4 && award.first==RI_OOT_EXT_FOUR_SWORD)
+            assert(authored && "A generic MM Kokiri GI mod must not own the OoT-authored Four Sword");
         assert(info.neiShimmer==int(award.second)+1);
-        assert(info.itemShimmer==(NeiGi::IsSword(award.second)||effects));
-        draws=0; fitCalls=0;
+        const bool intrinsic=NeiGi::IsSword(award.second)||award.first==RI_OOT_EXT_CANE_OF_BYRNA;
+        assert(info.itemShimmer==(intrinsic||effects));
+        draws=0; fitCalls=0; sizeCalls=0;
         {MM_NeiGiFallbackShimmer fallback(award.first);}
-        assert(draws==(NeiGi::IsSword(award.second) ? 2 : effects) && "selected sword mesh lost its intrinsic particles");
+        assert(draws==(NeiGi::IsSword(award.second) ? 2 : int(intrinsic||effects)) &&
+               "selected equipment lost intrinsic shimmer or sword energy");
         assert(fitCalls==int(NeiGi::IsSword(award.second)) && "only sword fallbacks enter the model-fit boundary");
+        assert(sizeCalls==2*int(NeiGi::IsSword(award.second)) && "only swords size the separate model and effect passes");
         assert(pushes==0);
         if(draws) {
             const auto expected=NeiGi::SampleShimmer(play.gameplayFrames,true,{},award.second);

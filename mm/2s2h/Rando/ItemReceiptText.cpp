@@ -5,11 +5,19 @@
 #include "ComboItemReceiptText.h"
 #include "ComboDungeonKeyReceipt.h"
 #include "ComboCapeReceiptChoice.h"
+#include "ComboVanillaItemReceiptText.h"
 #include "ComboSongReceiptText.h"
+#include "ComboMagicItemReceiptText.h"
+#include "ComboToolReceiptText.h"
+#include "ComboMaskReceiptText.h"
 #include "ComboSongDrawMM.h"
+#include "ComboRupeeNames.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <iterator>
+#include <random>
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
 #include "ComboResolve.h"
@@ -285,7 +293,52 @@ void SetReceiptBody(CustomMessage::Entry& entry, std::string body) {
     entry.autoFormat = false;
 }
 
-bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry) {
+bool RandomRupeeReceipt(const char* name, CustomMessage::Entry& entry) {
+    if (!name || gSaveContext.fileNum == 0xFF || gSaveContext.save.shipSaveInfo.saveType != SAVETYPE_RANDO ||
+        !CVarGetInteger("gRandoEnhancements.RandomizeRupeeNames", 1))
+        return false;
+    struct Currency {
+        const char* name;
+        const char* amount;
+        const char* color;
+    };
+    static constexpr Currency currencies[] = {
+        { "Green Rupee", "1", "%g" },  { "Blue Rupee", "5", "%b" },    { "10 Rupees", "10", "%b" },
+        { "Red Rupee", "20", "%r" },   { "Purple Rupee", "50", "%p" }, { "Silver Rupee", "100", "%w" },
+        { "Huge Rupee", "200", "%y" },
+    };
+    for (const auto& currency : currencies) {
+        if (std::strcmp(name, currency.name))
+            continue;
+        const char* const* names = ComboRupeeNames::englishRupeeNames;
+        size_t count = std::size(ComboRupeeNames::englishRupeeNames);
+        std::string prefix = "You found ";
+        std::string suffix = "%w!";
+        if (gSaveContext.options.language == LANGUAGE_GER) {
+            names = ComboRupeeNames::germanRupeeNames;
+            count = std::size(ComboRupeeNames::germanRupeeNames);
+            prefix = "Du hast ";
+            suffix = "%w gefunden!";
+        } else if (gSaveContext.options.language == LANGUAGE_FRE) {
+            names = ComboRupeeNames::frenchRupeeNames;
+            count = std::size(ComboRupeeNames::frenchRupeeNames);
+            prefix = "Vous obtenez ";
+        }
+        // Cosmetic randomness stays independent of the gameplay/seed generators.
+        static std::mt19937 random(std::random_device{}());
+        const size_t choice = std::uniform_int_distribution<size_t>(0, count - 1)(random);
+        std::string nickname = names[choice];
+        if (nickname == "[P]")
+            nickname.assign(1, '\x16'); // MM's player-name command.
+        entry.receiptPresentation = {};
+        SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(prefix + currency.color + currency.amount + " " +
+                                                                  nickname + suffix));
+        return true;
+    }
+    return false;
+}
+
+bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry, const char* shieldName = nullptr) {
     if (!gPlayState || !gPlayState->msgCtx.messageTableNES)
         return false;
     const u16 textId = Player_GetItemReceiptTextId(gi, itemId);
@@ -301,12 +354,111 @@ bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry) {
                 std::string_view(text->segment + MESSAGE_HEADER_SIZE, text->msgSize - MESSAGE_HEADER_SIZE), body)) {
             return false;
         }
+        if (shieldName) {
+            const auto name = body.find("Mirror Shield");
+            if (name != std::string::npos)
+                body.replace(name, std::strlen("Mirror Shield"), shieldName);
+        }
         SetReceiptBody(entry, std::move(body));
         return true;
     }
     return false;
 }
 } // namespace
+
+static bool MaskItemReceipt(const char* itemName, CustomMessage::Entry& entry) {
+    if (!itemName)
+        return false;
+    const auto* mask = ComboMaskReceiptText::Find(itemName);
+    if (!mask)
+        return false;
+    const char* body = gSaveContext.options.language == LANGUAGE_GER   ? mask->german
+                       : gSaveContext.options.language == LANGUAGE_FRE ? mask->french
+                                                                       : mask->english;
+    entry.receiptPresentation = {};
+    SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(body));
+    return true;
+}
+
+static bool VanillaItemFallback(const char* itemName, CustomMessage::Entry& entry) {
+    const auto* receipt = itemName ? ComboVanillaItemReceiptText::Find(itemName) : nullptr;
+    if (!receipt)
+        return false;
+    entry.receiptPresentation = {};
+    using ComboVanillaItemReceiptText::Language;
+    const auto language = gSaveContext.options.language == LANGUAGE_GER   ? Language::German
+                          : gSaveContext.options.language == LANGUAGE_FRE ? Language::French
+                                                                          : Language::English;
+    SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(ComboVanillaItemReceiptText::Body(*receipt, language)));
+    return true;
+}
+
+static bool ToolItemReceipt(const char* itemName, CustomMessage::Entry& entry) {
+    if (!itemName)
+        return false;
+    const auto* tool = ComboToolReceiptText::Find(itemName);
+    if (!tool)
+        return false;
+    const char* body = gSaveContext.options.language == LANGUAGE_GER   ? tool->german
+                       : gSaveContext.options.language == LANGUAGE_FRE ? tool->french
+                                                                       : tool->english;
+    entry.receiptPresentation = {};
+    SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(body));
+    return true;
+}
+
+static bool MagicItemReceipt(const char* itemName, CustomMessage::Entry& entry) {
+    if (!itemName)
+        return false;
+    const auto* magic = ComboMagicItemReceiptText::Find(itemName, Wand_RandoMode());
+    const auto* medallion = CVarGetInteger("gRando.Options.RO_SHUFFLE_NEI_ITEMS", 0)
+                                ? ComboMagicItemReceiptText::FindMedallion(itemName, Wand_RandoMode())
+                                : nullptr;
+    if (!magic && !medallion)
+        return false;
+    using ComboMagicItemReceiptText::Language;
+    const auto language = gSaveContext.options.language == LANGUAGE_GER   ? Language::German
+                          : gSaveContext.options.language == LANGUAGE_FRE ? Language::French
+                                                                          : Language::English;
+    entry.receiptPresentation = {};
+    const auto body = medallion ? ComboMagicItemReceiptText::MedallionReceipt(*medallion, language)
+                                : ComboMagicItemReceiptText::Body(*magic, language);
+    SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(body));
+    return true;
+}
+
+bool Rando::ApplyNativeRandomRupeeReceipt(uint16_t textId, CustomMessage::Entry& entry) {
+    const char* name;
+    switch (textId) {
+        case 0xC4:
+            name = "Green Rupee";
+            break;
+        case 0x2:
+            name = "Blue Rupee";
+            break;
+        case 0x3:
+            name = "10 Rupees";
+            break;
+        case 0x4:
+            name = "Red Rupee";
+            break;
+        case 0x5:
+            name = "Purple Rupee";
+            break;
+        case 0x6:
+            name = "Silver Rupee";
+            break;
+        case 0x7:
+            name = "Huge Rupee";
+            break;
+        default:
+            return false;
+    }
+    if (!RandomRupeeReceipt(name, entry))
+        return false;
+    entry.msg += '\xBF'; // Direct native boxes do not use the queued finalizer.
+    return true;
+}
 
 bool Rando::MapCompassInfoEnabled() {
 #ifdef COMBO_BUILD
@@ -429,6 +581,17 @@ bool Rando::ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Ent
     entry.capeVisibilityChoice = ComboCapeReceiptChoice::IsCape(itemName);
     if (!itemName || !*itemName)
         return false;
+    if (MaskItemReceipt(itemName, entry) || ToolItemReceipt(itemName, entry) || MagicItemReceipt(itemName, entry))
+        return true;
+    if (RandomRupeeReceipt(itemName, entry))
+        return true;
+    // The donor ABI exports English bytes only. Native MM bottles are handled
+    // before this route; imported/cold-bank bottle lessons use MM's locale.
+    if (gSaveContext.options.language != LANGUAGE_ENG) {
+        const auto* receipt = ComboVanillaItemReceiptText::Find(itemName);
+        if (receipt && receipt->kind >= ComboVanillaItemReceiptText::Kind::Fish)
+            return VanillaItemFallback(itemName, entry);
+    }
     const auto keyBody = ComboDungeonKeyReceipt::Markup(itemName);
     if (!keyBody.empty()) {
         entry.receiptPresentation = {};
@@ -462,11 +625,11 @@ bool Rando::ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Ent
     if (!getText)
         getText = reinterpret_cast<Fn_OOT_GetItemReceiptText>(Combo_ResolveSym("soh", "OOT_GetItemReceiptText"));
     if (!getText || !itemName || !*itemName)
-        return false;
+        return VanillaItemFallback(itemName, entry);
     char buffer[BUFFER_SIZE - MESSAGE_HEADER_SIZE]{};
     const int32_t size = getText(itemName, buffer, sizeof(buffer));
     if (size <= 0 || static_cast<size_t>(size) > sizeof(buffer))
-        return false;
+        return VanillaItemFallback(itemName, entry);
     std::string body(buffer, size); // explicit length retains color byte 0
     entry.receiptPresentation = {};
     static Fn_GetDungeonItemReceiptPresentation getPresentation = nullptr;
@@ -491,6 +654,10 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     if (it == StaticData::Items.end())
         return false;
     const auto& item = it->second;
+    if (MaskItemReceipt(item.name, entry) || ToolItemReceipt(item.name, entry) || MagicItemReceipt(item.name, entry))
+        return true;
+    if (RandomRupeeReceipt(item.name, entry))
+        return true;
     const auto keyBody = item.name ? ComboDungeonKeyReceipt::Markup(item.name) : std::string{};
     if (!keyBody.empty()) {
         SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(keyBody));
@@ -517,6 +684,37 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
             SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(body));
             return true;
         }
+    }
+    if (item.randoItemType == RITYPE_STRAY_FAIRY) {
+        // The actor's native textbox is suppressed in rando. As with skull
+        // tokens, CheckQueue builds this before GiveItem increments the count.
+        // Use the shuffled item's dungeon, independently of the pickup scene.
+        int fairyDungeon;
+        switch (id) {
+            case RI_WOODFALL_STRAY_FAIRY:
+                fairyDungeon = DUNGEON_SCENE_INDEX_WOODFALL_TEMPLE;
+                break;
+            case RI_SNOWHEAD_STRAY_FAIRY:
+                fairyDungeon = DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE;
+                break;
+            case RI_GREAT_BAY_STRAY_FAIRY:
+                fairyDungeon = DUNGEON_SCENE_INDEX_GREAT_BAY_TEMPLE;
+                break;
+            case RI_STONE_TOWER_STRAY_FAIRY:
+                fairyDungeon = DUNGEON_SCENE_INDEX_STONE_TOWER_TEMPLE;
+                break;
+            default:
+                return false; // Clock Town has one fairy and its own dialogue.
+        }
+        const unsigned count = gSaveContext.save.saveInfo.inventory.strayFairies[fairyDungeon] + 1;
+        // Standard native message colors match the fairy's dungeon palette.
+        constexpr const char* colors[] = { "%p", "%g", "%b", "%y" };
+        const std::string color = colors[fairyDungeon];
+        SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(
+                                  "You found a " + color + item.name + "%w!^You've collected " + color +
+                                  std::to_string(count) + "%w " + (count == 1 ? "stray fairy" : "stray fairies") +
+                                  " in " + color + kDungeonInformation[fairyDungeon].temple + "%w."));
+        return true;
     }
     if (item.randoItemType == RITYPE_SKULLTULA_TOKEN) {
         // CheckQueue composes this before GiveItem. Native MESSAGE_TOKENS
@@ -553,6 +751,39 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     // use their donor or local registry when MM has no matching native GI.
     if (item.randoItemType == RITYPE_JUNK && NativeReceipt(item.getItemId, item.itemId, entry))
         return true;
+    switch (id) {
+        case RI_BOTTLE_RED_POTION:
+            // GI_POTION_RED_BOTTLE is a model-only alias with ITEM_LONGSHOT.
+            if (NativeReceipt(GI_POTION_RED, ITEM_POTION_RED, entry))
+                return true;
+            break;
+        case RI_BOTTLE_CHATEAU_ROMANI:
+            // GI_CHATEAU describes the refill (ITEM_CHATEAU_2), not this bottle.
+            if (NativeReceipt(GI_CHATEAU_BOTTLE, ITEM_CHATEAU, entry))
+                return true;
+            break;
+        case RI_SWORD_KOKIRI:
+        case RI_SWORD_RAZOR:
+        case RI_SWORD_GILDED:
+        case RI_GREAT_FAIRY_SWORD:
+        case RI_SHIELD_HERO:
+        case RI_SHIELD_MIRROR:
+        case RI_BOTTLE_EMPTY:
+        case RI_BOTTLE_MILK:
+        case RI_BOTTLE_GOLD_DUST:
+        case RI_GOLD_DUST_REFILL:
+        case RI_MUSHROOM:
+            // MM owns these equipment and bottle tutorials. Shared OoT names
+            // must not replace their native lessons or content mechanics.
+            if (NativeReceipt(item.getItemId, item.itemId, entry,
+                              id == RI_SHIELD_MIRROR && gSaveContext.options.language == LANGUAGE_ENG ? item.name
+                                                                                                      : nullptr)) {
+                return true;
+            }
+            break;
+        default:
+            break;
+    }
     if (item.randoItemType != RITYPE_MAJOR && item.randoItemType != RITYPE_MASK &&
         item.randoItemType != RITYPE_LESSER && item.randoItemType != RITYPE_HEALTH && item.randoItemType != RITYPE_JUNK)
         return false;
@@ -578,6 +809,8 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
         *gFcComboItems[fc].ootName && ApplyForeignItemReceiptText(gFcComboItems[fc].ootName, entry))
         return true;
 #endif
+    if (VanillaItemFallback(concrete ? concrete : item.name, entry))
+        return true;
     // MM's registry uses RI IDs in its rg column, including rows with ITEM_NONE
     // in StaticData. This lookup also works in standalone 2Ship without OoT.
     const NeiItem* nei = id == RI_OOT_NEI_ROCS_CAPE ? Nei_FindByItem(ITEM_ROCS_CAPE) : Nei_FindByRg(id);

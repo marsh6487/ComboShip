@@ -65,7 +65,8 @@ void SetActiveCustomMessage(std::string text, Entry entry) {
 void StartTextbox(std::string text, Entry entry) { SetActiveCustomMessage(std::move(text), std::move(entry)); }
 std::string RemoveColorCodes(const std::string& text) { return text; }
 }
-int CVarGetInteger(const char*, int fallback) { return fallback; }
+extern "C" int32_t CVarGetInteger(const char*, int32_t fallback) { return fallback; }
+extern "C" uint8_t Wand_RandoMode(void) { return 0; }
 namespace Notification { struct Info { const char* itemIcon; std::string message, suffix; }; void Emit(Info) { assert(false); } }
 namespace CustomItem { constexpr int GIVE_ITEM_CUTSCENE = 1; }
 static int flags = 1, param = RC_UNKNOWN, param2 = 0;

@@ -28,7 +28,7 @@ def icon_fallback():
     # Keep the actual entry type and registration body; replace only the GUI
     # service receiver with a recorder at the texture-loading boundary.
     registration, receivers = re.subn(
-        r"std::dynamic_pointer_cast<Fast::Fast3dGui>\(Ship::Context::GetRawInstance\(\)->GetWindow\(\)->GetGui\(\)\)\s*->",
+        r"(?:std::dynamic_pointer_cast<Fast::Fast3dGui>\(Ship::Context::GetRawInstance\(\)->GetWindow\(\)->GetGui\(\)\)|gui)\s*->",
         "recorder.", registration)
     assert receivers == 2
     helper = ROOT / "soh/soh/Enhancements/randomizer/OptionalNeiIcons.h"

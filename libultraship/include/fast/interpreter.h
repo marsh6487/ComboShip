@@ -227,6 +227,8 @@ struct RawTexMetadata {
     float h_byte_scale = 1, v_pixel_scale = 1;
     std::shared_ptr<Fast::Texture> resource;
     Fast::TextureType type;
+    uint8_t autumnForestLayer = 0; // Requested forest identity survives private .meta payload paths.
+    uint8_t zoraCosmeticLayer = 0;
 };
 
 #define MAX_LIGHTS 32
@@ -305,6 +307,8 @@ struct RDP {
     uint32_t other_mode_l, other_mode_h;
     uint64_t combine_mode;
     bool grayscale;
+    bool grayscale_normalize; // G_SETGRAYSCALE modes 2/3 normalize the palette.
+    bool grayscale_frost;     // Mode 3 lifts mean RGB by 1.8 for scoped winter foliage.
 
     uint8_t prim_lod_fraction;
     uint16_t prim_depth;

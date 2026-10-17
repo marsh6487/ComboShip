@@ -2,19 +2,26 @@
 #include "MMWeatherAudio.h"
 #include "MMWeatherState.h"
 #include "2s2h/Enhancements/Graphics/AutumnSceneFoliage.h"
+#include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
+#include "2s2h/Enhancements/Graphics/MMWinterAtmosphere.h"
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 
 #include <algorithm>
 #include "global.h"
+#include "mods/extended_inventory.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 namespace {
 MMWeather::State sState;
+MMWeather::State sSpringState;
 MMWeather::State sAutumnState;
 MMWeather::Settings sSettings;
 PlayState* sPlay = nullptr;
 int sScene = -1;
 int sRoom = -1;
 int sSeason = -1;
+int sSpringRainMode = -1;
+int sAutumnRainMode = -1;
 bool sNativeStormAmbienceMuted = false;
 bool sWritingSeasonAmbience = false;
 uint8_t sNativeRainAmbience = 0;
@@ -32,15 +39,49 @@ bool OutdoorEligible(const PlayState* play) {
            !play->envCtx.skyboxDisabled && camera != nullptr && !(camera->stateFlags & CAM_STATE_UNDERWATER);
 }
 
+int SelectedSeason() {
+    const int selection = CVarGetInteger(MM_WEATHER_CVAR("Season"), -2);
+    if (selection != -2) {
+        // Manual presentation never changes Rod ownership or the saved season.
+        return selection >= 0 && selection < SEASON_COUNT ? selection : -1;
+    }
+    const uint8_t season = Seasons_GetSeason();
+    return season < SEASON_COUNT ? season : -1;
+}
+
+int RainMode(int season) {
+    const int mode = season == SEASON_SPRING ? CVarGetInteger(MM_WEATHER_CVAR("Spring.RainMode"), -1)
+                                             : CVarGetInteger(MM_WEATHER_CVAR("Autumn.RainMode"), -1);
+    return mode >= -1 && mode <= 2 ? mode : -1;
+}
+
 int SeasonRainDensity() {
     if (sSeason == SEASON_AUTUMN) {
         return (sAutumnState.Density() * 3) / 5;
     }
-    return sSeason == SEASON_SPRING && (CURRENT_DAY == 1 || CURRENT_DAY == 3) ? 30 : 0;
+    if (sSeason != SEASON_SPRING) {
+        return 0;
+    }
+    return sSpringRainMode == -1 ? 30 : (sSpringState.Density() * 6) / 5;
 }
 
 float SeasonRainIntensity() {
-    return sSeason == SEASON_AUTUMN ? sAutumnState.Intensity() * 0.6f : SeasonRainDensity() > 0 ? 1.0f : 0.0f;
+    if (sSeason == SEASON_AUTUMN) {
+        return sAutumnState.Intensity() * 0.6f;
+    }
+    if (sSeason != SEASON_SPRING) {
+        return 0.0f;
+    }
+    return sSpringRainMode == -1 ? (SeasonRainDensity() > 0 ? 1.0f : 0.0f) : sSpringState.Intensity();
+}
+
+void StepSeasonRain(MMWeather::State& state, int mode, bool active, int ticks) {
+    MMWeather::Settings rain;
+    rain.enabled = active && mode != 0;
+    rain.intermittent = mode != 1;
+    rain.thunder = false;
+    // A deselected effect clears immediately, including while paused.
+    state.Step(rain, rain.enabled, ticks);
 }
 
 void ApplyStormAmbience(uint8_t rain, uint8_t thunder) {
@@ -53,16 +94,20 @@ void ApplyStormAmbience(uint8_t rain, uint8_t thunder) {
 } // namespace
 
 extern "C" void MMWeather_Reset() {
+    MMSummerAtmosphere_Reset();
+    MMWinterAtmosphere_Reset();
     MMAutumnSceneFoliage_Reset();
     if (sNativeStormAmbienceMuted) {
         ApplyStormAmbience(sNativeRainAmbience, sNativeThunderAmbience);
     }
     sNativeStormAmbienceMuted = false;
     sState.Reset();
+    sSpringState.Reset();
     sAutumnState.Reset();
     sPlay = nullptr;
     sScene = sRoom = -1;
     sSeason = -1;
+    sSpringRainMode = sAutumnRainMode = -1;
     sPresentationRandom = 0x4D4D5646;
     MMWeather_ClearBolts();
     MMWeatherAudio_Reset();
@@ -90,9 +135,20 @@ extern "C" void MMWeather_Update(PlayState* play) {
     // The Mayor's Residence is an interior (scene_table.h), even when its
     // room exposes an outdoor skybox. Keep all of its rooms out of global rain.
     const bool eligible = OutdoorEligible(play);
-    // The rod defers to story presentation; the user's explicit weather override
-    // continues to follow its existing independent eligibility/settings above.
-    sSeason = MMWeather_SeasonForPlay(play);
+    // Both the Rod and manual seasons defer to story presentation. The separate
+    // global rain override keeps its existing independent eligibility above.
+    const int season = MMWeather_SeasonForPlay(play);
+    const int springMode = RainMode(SEASON_SPRING);
+    const int autumnMode = RainMode(SEASON_AUTUMN);
+    if (season != sSeason || springMode != sSpringRainMode) {
+        sSpringState.Reset();
+    }
+    if (season != sSeason || autumnMode != sAutumnRainMode) {
+        sAutumnState.Reset();
+    }
+    sSeason = season;
+    sSpringRainMode = springMode;
+    sAutumnRainMode = autumnMode;
     MMAutumnSceneFoliage_Update(play);
     if (MMWeather_SeasonClearsRain() || sNativeStormAmbienceMuted) {
         // Native channels stop before precipitation reaches zero. Preserve their
@@ -103,11 +159,8 @@ extern "C" void MMWeather_Update(PlayState* play) {
     }
     const int ticks = play->pauseCtx.state == PAUSE_STATE_OFF ? std::clamp<int>(R_UPDATE_RATE, 1, 3) : 0;
     const bool strike = sState.Step(sSettings, eligible, ticks);
-    MMWeather::Settings autumn;
-    autumn.enabled = sSeason == SEASON_AUTUMN;
-    autumn.intermittent = true;
-    autumn.thunder = false;
-    sAutumnState.Step(autumn, autumn.enabled, ticks);
+    StepSeasonRain(sSpringState, sSpringRainMode, sSeason == SEASON_SPRING && sSpringRainMode != -1, ticks);
+    StepSeasonRain(sAutumnState, sAutumnRainMode, sSeason == SEASON_AUTUMN, ticks);
     if (!eligible) {
         MMWeather_ClearBolts();
         MMWeatherAudio_Reset();
@@ -131,23 +184,29 @@ extern "C" int MMWeather_SeasonForPlay(const PlayState* play) {
         play->envCtx.lightSettingOverride != LIGHT_SETTING_OVERRIDE_NONE || play->envCtx.customSkyboxFilter) {
         return -1;
     }
-    const auto& nei = gSaveContext.save.shipSaveInfo.nei;
-    if (!nei.seasonsOwned || nei.season == SEASON_OFF) {
-        return -1;
+    return SelectedSeason();
+}
+
+extern "C" int MMWeather_FoliageSeasonForPlay(const PlayState* play) {
+#ifdef COMBO_BUILD
+    // The playable opening forest retains its native SKYBOX_2 and indoor
+    // lighting. Allow its scene foliage to follow the Rod/manual palette
+    // without enrolling that skybox in outdoor rain or sky overrides.
+    if (ComboOpeningForest_IsExploration(play)) {
+        const Camera* camera = GET_ACTIVE_CAM(play);
+        if (play->gameOverCtx.state == GAMEOVER_INACTIVE && !play->envCtx.skyboxDisabled && camera != nullptr &&
+            !(camera->stateFlags & CAM_STATE_UNDERWATER) && play->csCtx.state == CS_STATE_IDLE &&
+            play->envCtx.lightSettingOverride == LIGHT_SETTING_OVERRIDE_NONE && !play->envCtx.customSkyboxFilter)
+            return SelectedSeason();
     }
-    if (nei.season < SEASON_COUNT && (nei.seasonsOwned & (1 << nei.season))) {
-        return nei.season;
-    }
-    for (int season = 0; season < SEASON_COUNT; ++season) {
-        if (nei.seasonsOwned & (1 << season)) {
-            return season;
-        }
-    }
-    return -1;
+#endif
+    return MMWeather_SeasonForPlay(play);
 }
 
 extern "C" int MMWeather_SeasonClearsRain() {
-    return sSeason == SEASON_SUMMER && CURRENT_DAY == 2;
+    // Every eligible season owns its rain presentation, including the default
+    // Spring rain and Autumn wet/dry cycle. Native targets and timers stay live.
+    return sSeason >= SEASON_SPRING && sSeason < SEASON_COUNT;
 }
 
 extern "C" uint32_t MMWeather_ResolveAmbienceSeqCmd(uint32_t cmd) {
@@ -179,7 +238,7 @@ extern "C" int MMWeather_RainDensity() {
 
 extern "C" float MMWeather_Overcast() {
     const float seasonal = sSeason == SEASON_AUTUMN   ? sAutumnState.Intensity() * 0.5f
-                           : SeasonRainDensity() > 0  ? 0.75f
+                           : sSeason == SEASON_SPRING ? SeasonRainIntensity() * 0.75f
                            : sSeason == SEASON_WINTER ? 0.65f
                                                       : 0.0f;
     return std::max(sState.Overcast(sSettings), seasonal);
@@ -189,8 +248,31 @@ extern "C" uint8_t MMWeather_Shade(uint8_t value) {
     return static_cast<uint8_t>(value * (1.0f - 0.35f * MMWeather_Overcast()));
 }
 
+extern "C" uint8_t MMWeather_ResolveOotCloudBlend(uint8_t nativeBlend) {
+    // Ordinary MM CLOUD geometry is blue in the native renderer. Only the OoT
+    // artwork getter normalizes that dry baseline; keep MM bindings untouched.
+    if (sSeason >= 0 || !OutdoorEligible(sPlay) || sPlay->skyboxId != SKYBOX_NORMAL_SKY ||
+        sPlay->csCtx.state != CS_STATE_IDLE || sPlay->envCtx.lightSettingOverride != LIGHT_SETTING_OVERRIDE_NONE ||
+        sPlay->envCtx.customSkyboxFilter) {
+        return nativeBlend;
+    }
+    const auto& env = sPlay->envCtx;
+    const bool nativeWeather = env.stormState == STORM_STATE_ON || gWeatherMode == WEATHER_MODE_RAIN ||
+                               gWeatherMode == WEATHER_MODE_SNOW || env.precipitation[PRECIP_RAIN_CUR] > 0 ||
+                               env.precipitation[PRECIP_RAIN_MAX] > 0 || env.precipitation[PRECIP_SOS_MAX] > 0 ||
+                               env.precipitation[PRECIP_SNOW_CUR] > 0 || env.precipitation[PRECIP_SNOW_MAX] > 0;
+    return nativeWeather ? nativeBlend : static_cast<uint8_t>(255.0f * MMWeather_Overcast());
+}
+
 extern "C" void MMWeather_ApplySky(uint8_t* first, uint8_t* second, uint8_t* blend) {
-    if (MMWeather_SeasonClearsRain()) {
+    // Native CLOUD also describes ordinary daytime cloud geometry. Start the
+    // active season's presentation from its requested baseline instead of
+    // inheriting that texture as an already-overcast OoT sky. Explicit outdoor
+    // weather still composes afterward; SeasonForPlay retains story/interior gates.
+    if (sSeason == SEASON_WINTER) {
+        *first = *second = 1;
+        *blend = 0;
+    } else if (MMWeather_SeasonClearsRain()) {
         *first = *second = *blend = 0;
     }
     const float amount = MMWeather_Overcast();

@@ -59,7 +59,12 @@ extern "C" void CrashHandler_PrintSohData(char*, size_t*) {}
 static int sMMResourceManager, gComboStartFileNum, gComboReturnFileNum;
 static bool sComboResetPending;
 static struct { int fileNum; } gSaveContext = { 2 };
-static int mmLoops, ootLoops;
+static int mmLoops, ootLoops, exitCalls, exitedSlot = -1;
+void GameInteractor_ExecuteOnExitGame(int slot) {
+    assert(activeCallback == CrashHandler_PrintSohData);
+    ++exitCalls;
+    exitedSlot = slot;
+}
 void OTRAudio_Init() { assert(activeCallback == CrashHandler_PrintExt); }
 void MM_ResetSystemHeapForResume() {}
 void MM_ResetFrameLoopForResume() {}
@@ -86,7 +91,15 @@ int main() {
         SOH_ResumeGame();
         assert(gComboReturnFileNum == gSaveContext.fileNum);
     }
-    assert(mmLoops == 4 && ootLoops == 4);
+    assert(mmLoops == 4 && ootLoops == 4 && exitCalls == 0);
+    sComboResetPending = true;
+    SOH_ResumeGame();
+    assert(exitCalls == 1 && exitedSlot == 2 && gComboReturnFileNum == -1 && !sComboResetPending);
+    sComboResetPending = true;
+    gSaveContext.fileNum = 0xFF;
+    SOH_ResumeGame();
+    assert(exitCalls == 1 && gComboReturnFileNum == -1 && !sComboResetPending);
+    assert(mmLoops == 4 && ootLoops == 6);
 }
 ''')
         subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-O1",

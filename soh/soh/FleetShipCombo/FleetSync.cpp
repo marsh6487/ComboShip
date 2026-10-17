@@ -57,6 +57,7 @@ extern "C" {
 #include "functions.h"
 #include "variables.h"
 #include "mods/nei_save.h"
+#include "mods/ext_buttons/ext_buttons.h"
 extern SaveContext gSaveContext;
 extern PlayState* gPlayState;
 // Transformation-mask form bridge (mm_player_form.cpp): current MM form (0 FD..4 Human, >4 custom)
@@ -94,6 +95,9 @@ void Bottle_WheelRecordActive(unsigned char wheel, unsigned short slotItem);
 void Wand_GrantMode(unsigned char mode);
 void Slate_GrantRune(unsigned char rune);
 void Seasons_GrantSeason(unsigned char season);
+void Seasons_GrantRod(void);
+unsigned char Seasons_HasRod(void);
+void Seasons_UpdateGates(void);
 }
 
 // Cross-game restart: the raw reset of THIS game (defined in debugconsole.cpp), called by the
@@ -421,7 +425,8 @@ static void RepairFlagOwnedCells(NeiSaveData* nei) {
     if (nei->slateRunesOwned != 0 && Nei_GetOwnedItem(kSlotSlate) != kExtSheikahSlate) {
         Nei_SetOwnedItem(kSlotSlate, kExtSheikahSlate);
     }
-    if (nei->seasonsOwned != 0 && Nei_GetOwnedItem(kSlotRod) != kExtRodOfSeasons) {
+    if ((nei->seasonsRodOwned || (nei->seasonsOwned & NEI_SEASONS_MASK)) &&
+        Nei_GetOwnedItem(kSlotRod) != kExtRodOfSeasons) {
         Nei_SetOwnedItem(kSlotRod, kExtRodOfSeasons);
     }
     if (nei->shovelOwned || nei->dominionOwned) {
@@ -547,7 +552,10 @@ void ExtractShared(nlohmann::json& sh) {
     // natively, this just guarantees the bits arrive even if a grant is missed.
     sh["wandRodsOwned"] = (int)nei->wandRodsOwned;
     sh["slateRunesOwned"] = (int)nei->slateRunesOwned;
-    sh["seasonsOwned"] = (int)nei->seasonsOwned;
+    sh["seasonsOwned"] = (int)(nei->seasonsOwned & NEI_SEASONS_MASK);
+    Seasons_UpdateGates();
+    sh["seasonsRodOwned"] = (int)Seasons_HasRod();
+    sh["seasonsGates"] = (int)(nei->seasonsGates & NEI_SEASONS_MASK);
     FleetRpg::Extract(sh);
     RepairFlagOwnedCells(nei);
     // Shared NEI options/flags (FleetComboOptions.h). Table-driven so a future
@@ -839,7 +847,7 @@ void ApplyShared(const nlohmann::json& sh) {
         nei->slateRunesOwned |= incoming;
     }
     if (sh.contains("seasonsOwned") && sh["seasonsOwned"].is_number_integer()) {
-        const uint8_t incoming = (uint8_t)sh["seasonsOwned"].get<int>();
+        const uint8_t incoming = (uint8_t)(sh["seasonsOwned"].get<int>() & NEI_SEASONS_MASK);
         const uint8_t gained = (uint8_t)(incoming & ~nei->seasonsOwned);
         for (uint8_t s = 0; s < 4 && gained != 0; s++) {
             if (gained & (1 << s)) {
@@ -847,6 +855,14 @@ void ApplyShared(const nlohmann::json& sh) {
             }
         }
         nei->seasonsOwned |= incoming;
+    }
+    // Empty starting/gated Rods have no season pickup bits; ownership crosses independently.
+    if (sh.contains("seasonsRodOwned") && sh["seasonsRodOwned"].is_number_integer() &&
+        sh["seasonsRodOwned"].get<int>() == 1 && !Seasons_HasRod()) {
+        Seasons_GrantRod();
+    }
+    if (sh.contains("seasonsGates") && sh["seasonsGates"].is_number_integer()) {
+        nei->seasonsGates |= (uint8_t)(sh["seasonsGates"].get<int>() & NEI_SEASONS_MASK);
     }
 
     RepairFlagOwnedCells(nei);
@@ -936,7 +952,7 @@ void ApplyShared(const nlohmann::json& sh) {
 // C / D-pad equips used to be ordinary shared state: published by BOTH games ~3x a second and re-sent
 // whole on every resync. That made them a one-way ratchet in OoT's favour, and it is exactly what the
 // "no matter what I equip in MM, it forces an OoT item onto the button" report was. The loop:
-//   - MM publishes 0xFF for anything OoT cannot represent (any ITEM_EXT_BUTTON custom, the pictobox,
+//   - MM used to publish 0xFF for any ITEM_EXT_BUTTON item, the pictobox,
 //     the Great Fairy's Sword, and even its Ocarina of Time, whose id is 0x00).
 //   - OoT reads 0xFF as "keep mine", so it never changes — and keeps publishing its own id.
 //   - MM obeys that id and stamps it over the button the player had just set.
@@ -953,60 +969,78 @@ void ApplyShared(const nlohmann::json& sh) {
 //      An id without its slot is a phantom button the rest of the game cannot resolve.
 void ExtractEquips(nlohmann::json& sh) {
     // Publish 0xFF for anything MM has no relative for, so the peer's rule 1 keeps its own button.
-    auto pub = [](uint8_t id) -> uint8_t {
-        return (id == ITEM_NONE || FcEquip_OotToMm(id) == 0xFF) ? (uint8_t)0xFF : id;
+    auto pub = [](uint16_t id) -> uint16_t {
+        return (id == ITEM_NONE || FcEquip_OotToMm16(id) == 0xFF) ? (uint16_t)0xFF : id;
     };
     nlohmann::json c = nlohmann::json::array();
     for (int b = 1; b <= 3; b++) {
-        c.push_back(pub(gSaveContext.equips.buttonItems[b]));
+        c.push_back(pub(ExtButton_GetItem(b)));
     }
     sh["cEquips"] = c;
     nlohmann::json d = nlohmann::json::array();
     for (int b = 4; b <= 7; b++) {
-        d.push_back(pub(gSaveContext.equips.buttonItems[b]));
+        d.push_back(pub(ExtButton_GetItem(b)));
     }
     sh["dEquips"] = d;
 }
 
 // Inventory slot holding `item`, or -1 if this save does not have it.
-int FindInvSlot(uint8_t item) {
-    for (int s = 0; s < (int)ARRAY_COUNT(gSaveContext.inventory.items); s++) {
-        if (gSaveContext.inventory.items[s] == item) {
-            return s;
+int FindInvSlot(uint16_t item) {
+    if (item < 0xFF) {
+        for (int s = 0; s < (int)ARRAY_COUNT(gSaveContext.inventory.items); s++) {
+            if (gSaveContext.inventory.items[s] == item) {
+                return s;
+            }
+        }
+    }
+    for (int i = 0; i < 48; i++) {
+        if (Nei_Save()->ownedItems[i] == item) {
+            return i + 24;
         }
     }
     return -1;
 }
 
 // btn: 1-3 C, 4-7 D-pad. cButtonSlots is indexed btn-1 in the SOH layout (see z_parameter.c).
-void ApplyOneButton(int btn, uint8_t canon) {
+void ApplyOneButton(int btn, uint16_t canon) {
     if (canon == 0xFF) {
         return; // rule 1
     }
-    const uint8_t cur = gSaveContext.equips.buttonItems[btn];
-    if (cur != ITEM_NONE && FcEquip_OotToMm(cur) == 0xFF) {
+    if (FcEquip_OotToMm16(canon) == 0xFF) {
+        return;
+    }
+    const uint16_t cur = ExtButton_GetItem(btn);
+    if (cur != ITEM_NONE && FcEquip_OotToMm16(cur) == 0xFF) {
         return; // rule 2: the player put something MM cannot hold here — don't take it away
     }
     const int slot = FindInvSlot(canon);
     if (slot < 0) {
         return; // rule 3: we don't own it
     }
-    gSaveContext.equips.buttonItems[btn] = canon;
-    gSaveContext.equips.cButtonSlots[btn - 1] = (uint8_t)slot;
+    if (canon >= 0x0200) {
+        ExtButton_SetItem(btn, canon);
+        gSaveContext.equips.cButtonSlots[btn - 1] = SLOT_NONE;
+    } else {
+        ExtButton_ClearItem(btn);
+        gSaveContext.equips.buttonItems[btn] = (uint8_t)canon;
+        gSaveContext.equips.cButtonSlots[btn - 1] = (uint8_t)slot;
+    }
 }
 
 void ApplyEquips(const nlohmann::json& sh) {
     if (sh.contains("cEquips") && sh["cEquips"].is_array()) {
         for (int i = 0; i < 3 && i < (int)sh["cEquips"].size(); i++) {
-            if (sh["cEquips"][i].is_number_integer()) {
-                ApplyOneButton(1 + i, (uint8_t)sh["cEquips"][i].get<int>());
+            const auto& item = sh["cEquips"][i];
+            if (item.is_number_integer() && item >= 0 && item <= 0xFFFF) {
+                ApplyOneButton(1 + i, item.get<uint16_t>());
             }
         }
     }
     if (sh.contains("dEquips") && sh["dEquips"].is_array()) {
         for (int i = 0; i < 4 && i < (int)sh["dEquips"].size(); i++) {
-            if (sh["dEquips"][i].is_number_integer()) {
-                ApplyOneButton(4 + i, (uint8_t)sh["dEquips"][i].get<int>());
+            const auto& item = sh["dEquips"][i];
+            if (item.is_number_integer() && item >= 0 && item <= 0xFFFF) {
+                ApplyOneButton(4 + i, item.get<uint16_t>());
             }
         }
     }
@@ -2000,6 +2034,8 @@ static ItemGrantAudit::Snapshot CaptureItemGrantAudit() {
     snapshot.Add("nei.wandRodsOwned", nei->wandRodsOwned);
     snapshot.Add("nei.slateRunesOwned", nei->slateRunesOwned);
     snapshot.Add("nei.seasonsOwned", nei->seasonsOwned);
+    snapshot.Add("nei.seasonsRodOwned", nei->seasonsRodOwned);
+    snapshot.Add("nei.seasonsGates", nei->seasonsGates);
     snapshot.Add("nei.hyliasGraceOwned", nei->hyliasGraceOwned);
     snapshot.Add("nei.phantomHourglassOwned", nei->phantomHourglassOwned);
     snapshot.Add("nei.shovelOwned", nei->shovelOwned);

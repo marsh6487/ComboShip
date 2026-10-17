@@ -4,8 +4,8 @@
  * Core system: page switching, equip/unequip, icon/name lookup, behavior dispatch.
  * Follows the same pattern as extended_inventory.c.
  *
- * When the cheat CVar is enabled, pressing L on the equipment page toggles
- * to a second page showing 12 new equipment pieces (3 per category).
+ * The pause equipment page is always accessible. Equipping an owned piece
+ * enables its gameplay behavior; browsing does not grant equipment.
  * Equipped state is persisted via CVars.
  */
 
@@ -272,6 +272,13 @@ void ExtEquip_Init(void) {
     if (gExtEquipState.currentExtBoots > 3)
         gExtEquipState.currentExtBoots = 0;
 
+    // Match MM: a saved extended loadout remains usable after an engine/scene
+    // change even when the legacy behavior CVar was not restored.
+    if (gExtEquipState.currentExtSword != 0 || gExtEquipState.currentExtShield != 0 ||
+        gExtEquipState.currentExtTunic != 0 || gExtEquipState.currentExtBoots != 0) {
+        CVarSetInteger(CVAR_EXT_EQUIP_ENABLED, 1);
+    }
+
     // Generate placeholder icons
     ExtEquip_GenerateIcons();
     sExtEquipInitInProgress = 0;
@@ -306,16 +313,10 @@ void ExtEquip_Update(void) {
 }
 
 int ExtEquip_GetPage(void) {
-    if (!ExtEquip_IsEnabled()) {
-        return 0;
-    }
     return gExtEquipState.equipPage;
 }
 
 void ExtEquip_SwitchPage(void) {
-    if (!ExtEquip_IsEnabled())
-        return;
-
     gExtEquipState.equipPage = (gExtEquipState.equipPage == 0) ? 1 : 0;
     gExtEquipState.pageSwitchTimer = EXT_EQUIP_PAGE_SWITCH_COOLDOWN;
 
@@ -757,6 +758,12 @@ void ExtEquip_Equip(s16 equipType, u8 index) {
     if (equipType == EQUIP_TYPE_SHIELD && ExtEquip_GetCurrent(EQUIP_TYPE_SWORD) == 3 &&
         !ExtEquip_TridentAllowsShield(index, 0))
         return;
+
+    // Match MM's core equipment page: an explicit, valid owned-item equip is
+    // the opt-in for the behavior/draw path. Browsing leaves this toggle alone.
+    if (!ExtEquip_IsEnabled()) {
+        CVarSetInteger(CVAR_EXT_EQUIP_ENABLED, 1);
+    }
 
     // Equipping the piece already worn toggles it off.
     ExtEquip_SetSlot(equipType, (ExtEquip_GetCurrent(equipType) == index) ? 0 : index);

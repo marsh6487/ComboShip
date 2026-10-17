@@ -186,7 +186,9 @@ void EnItem00_CustomItemsParticles(Actor* Parent, PlayState* play, GetItemEntry 
 void EnItem00_SetupAction(EnItem00* this, EnItem00ActionFunc actionFunc);
 void func_8001E5C8(EnItem00* this, PlayState* play);
 void Item_DropCollectibleRandom(PlayState* play, Actor* fromActor, Vec3f* spawnPos, s16 params);
-void EffectBlure_ChangeType(EffectBlure* this, int type);
+void EffectBlureShip_ChangeType(EffectBlure* this, int type);
+// Compatibility for preserved cor mods using the pre-9.3 API name.
+#define EffectBlure_ChangeType EffectBlureShip_ChangeType
 void EffectBlure_AddVertex(EffectBlure* this, Vec3f* p1, Vec3f* p2);
 void EffectBlure_AddSpace(EffectBlure* this);
 void EffectBlure_Init1(void* thisx, void* initParamsx);
@@ -674,10 +676,14 @@ void CollisionHeader_GetVirtual(void* colHeader, CollisionHeader** dest);
 void func_800418D0(CollisionContext* colCtx, PlayState* play);
 void BgCheck_ResetPolyCheckTbl(SSNodeList* nodeList, s32 numPolys);
 u32 SurfaceType_GetCamDataIndex(CollisionContext* colCtx, CollisionPoly* poly, s32 bgId);
-u16 func_80041A4C(CollisionContext* colCtx, u32 camId, s32 bgId);
+u16 BgCheck_GetBgCamSettingImpl(CollisionContext* colCtx, u32 bgCamIndex, s32 bgId);
+// Compatibility for preserved cor mods using the pre-9.3 API name.
+#define func_80041A4C BgCheck_GetBgCamSettingImpl
 u16 SurfaceType_GetCameraSType(CollisionContext* colCtx, CollisionPoly* poly, s32 bgId);
 u16 SurfaceType_GetNumCameras(CollisionContext* colCtx, CollisionPoly* poly, s32 bgId);
-Vec3s* func_80041C10(CollisionContext* colCtx, s32 camId, s32 bgId);
+Vec3s* BgCheck_GetBgCamFuncDataImpl(CollisionContext* colCtx, s32 bgCamIndex, s32 bgId);
+// Compatibility for preserved cor mods using the pre-9.3 API name.
+#define func_80041C10 BgCheck_GetBgCamFuncDataImpl
 Vec3s* SurfaceType_GetCamPosData(CollisionContext* colCtx, CollisionPoly* poly, s32 bgId);
 u32 SurfaceType_GetSceneExitIndex(CollisionContext* colCtx, CollisionPoly* poly, s32 bgId);
 u32 SurfaceType_GetFloorType(CollisionContext* colCtx, CollisionPoly* poly, s32 bgId);
@@ -734,7 +740,9 @@ void Camera_InitPlayerSettings(Camera* camera, Player* player);
 s16 Camera_ChangeStatus(Camera* camera, s16 status);
 Vec3s Camera_Update(Camera* camera);
 void Camera_Finish(Camera* camera);
-s32 Camera_ChangeMode(Camera* camera, s16 mode);
+s32 Camera_RequestMode(Camera* camera, s16 mode);
+// Compatibility for preserved cor mods using the pre-9.3 API name.
+#define Camera_ChangeMode Camera_RequestMode
 s32 Camera_CheckValidMode(Camera* camera, s16 mode);
 s32 Camera_RequestSetting(Camera* camera, s16 setting);
 s32 Camera_ChangeDataIdx(Camera* camera, s32 camDataIdx);
@@ -1546,6 +1554,7 @@ void KaleidoScopeCall_Init(PlayState* play);
 void KaleidoScopeCall_Destroy(PlayState* play);
 void KaleidoScopeCall_Update(PlayState* play);
 void KaleidoScopeCall_Draw(PlayState* play);
+void KaleidoScope_InitVertices(PlayState* play, GraphicsContext* gfxCtx);
 void Play_SetViewpoint(PlayState* play, s16 viewpoint);
 s32 Play_CheckViewpoint(PlayState* play, s16 viewpoint);
 void Play_SetShopBrowsingViewpoint(PlayState* play);
@@ -2140,7 +2149,9 @@ void Audio_SetSoundOutputMode(s8 outputMode);
 void Audio_SetBaseFilter(u8);
 void Audio_SetExtraFilter(u8);
 void Audio_SetCutsceneFlag(s8 flag);
-void Audio_PlaySoundIfNotInCutscene(u16 sfxId);
+void Audio_PlaySfxIfNotInCutscene(u16 sfxId);
+// Compatibility for preserved cor mods using the pre-9.3 API name.
+#define Audio_PlaySoundIfNotInCutscene Audio_PlaySfxIfNotInCutscene
 void func_800F6964(u16);
 void Audio_StopBgmAndFanfare(u16);
 // ? Audio_DisableAllSeq(?);
@@ -2158,7 +2169,9 @@ void func_800F71BC(s32 arg0);
 void Audio_SetSfxBanksMute(u16 muteMask);
 void Audio_QueueSeqCmdMute(u8 channelIdx);
 void Audio_ClearBGMMute(u8 channelIdx);
-void Audio_PlaySoundGeneral(u16 sfxId, Vec3f* pos, u8 token, f32* freqScale, f32* a4, s8* reverbAdd);
+void Audio_PlaySfxGeneral(u16 sfxId, Vec3f* pos, u8 token, f32* freqScale, f32* a4, s8* reverbAdd);
+// Compatibility for preserved cor mods using the pre-9.3 API name.
+#define Audio_PlaySoundGeneral Audio_PlaySfxGeneral
 void Audio_ProcessSoundRequest(void);
 void Audio_ChooseActiveSounds(u8 bankId);
 void Audio_PlayActiveSounds(u8 bankId);

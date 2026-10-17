@@ -44,13 +44,20 @@ def main():
     # Native option storage/construction only. Unexecuted AddWidget callbacks
     # belong to the GUI library and are outside this settings boundary.
     option = read("soh/soh/Enhancements/randomizer/option.cpp")
-    functions = [extract(option, signature) for signature in (
+    # Native translated metadata remains outside this seed-storage boundary.
+    # Include its production dispatch helpers; the fixture supplies the language service.
+    metadata = option[option.index('const static std::string namePostfix'):
+                      option.index('#pragma endregion')]
+    functions = [metadata] + [extract(option, signature) for signature in (
         "Option Option::Bool(RandomizerSettingKey key_, std::string name_, std::string cvarName_",
+        "Option Option::U8(RandomizerSettingKey key_, std::string name_, std::vector<std::string> options_",
         "Option::Option(size_t key_", "void Option::PopulateTextToNum()",
         "OptionValue::OptionValue(uint8_t val)", "uint8_t OptionValue::Get()",
         "void OptionValue::Set(uint8_t val)", "OptionValue::operator bool() const",
         "uint8_t Option::GetValueFromText", "void Option::SetContextIndex",
-        "const std::string& Option::GetName() const", "uint8_t Option::GetOptionIndex() const",
+        "const std::string& Option::GetName() const", "const std::string& Option::GetDescription() const",
+        "OptionCategory Option::GetCategory() const",
+        "uint8_t Option::GetOptionIndex() const",
         "size_t Option::GetOptionCount() const",
         "uint8_t Option::GetMenuOptionDefault() const", "const std::string& Option::GetCVarName() const")]
     for signature in ("Settings::Settings()", "std::shared_ptr<Settings> Settings::GetInstance()",
@@ -59,6 +66,8 @@ def main():
                       "TrickSetting& Settings::GetTrickSetting", "void Settings::ParseJson",
                       "void Settings::AssignContext", "void Settings::ClearContext", "void Settings::SetAllToContext()",
                       "void Context::ResetTrickOptions()", "void Context::FinalizeSettings"):
+        if signature == "Settings::Settings()" and signature not in settings:
+            continue  # 9.3 deliberately defers CreateOptions until service initialization.
         body = extract(settings, signature)
         if args.drop_appended_option and signature == "void Settings::SetAllToContext()":
             body = body.replace("mContext->GetOption(static_cast<RandomizerSettingKey>(i)).Set",
@@ -73,6 +82,12 @@ def main():
     functions.append("void RegisterInformationOption(Settings& settings) {\n"
                      "#define OPT_BOOL(rsk, ...) settings.mOptions[rsk] = Option::Bool(rsk, __VA_ARGS__)\n"
                      "    auto& mOptionDescriptions = settings.mOptionDescriptions;\n" + registration + "\n#undef OPT_BOOL\n}")
+    seasons_registration = settings[settings.index("    OPT_U8(RSK_ROD_OF_SEASONS,"):
+                                    settings.index("    OPT_U8(RSK_HYLIAS_GRACE,")]
+    functions.append("void RegisterSeasonsOptions(Settings& settings) {\n"
+                     "#define OPT_U8(rsk, ...) settings.mOptions[rsk] = Option::U8(rsk, __VA_ARGS__)\n"
+                     "#define OPT_BOOL(rsk, ...) settings.mOptions[rsk] = Option::Bool(rsk, __VA_ARGS__)\n" +
+                     seasons_registration + "\n#undef OPT_U8\n#undef OPT_BOOL\n}")
     for signature in ("Context::Context()", "std::shared_ptr<Context> Context::CreateInstance()",
                       "std::shared_ptr<Context> Context::GetInstance()", "ItemLocation* Context::GetItemLocation(size_t",
                       "ItemLocation* Context::GetItemLocation(const RandomizerCheck", "OptionValue& Context::GetOption",
@@ -103,10 +118,13 @@ def main():
         functions.append(extract(logic, signature))
     fish = read("soh/soh/Enhancements/randomizer/fishsanity.cpp")
     for signature in ("Fishsanity::Fishsanity()", "Fishsanity::~Fishsanity()", "void Fishsanity::InitializeHelpers()"):
-        functions.append(extract(fish, signature))
+        if signature in fish:
+            functions.append(extract(fish, signature))
     functions.extend(re.findall(r'^[^\n]*Fishsanity::(?:fishsanityHelpersInit|pondFishAgeMap|childPondFish|adultPondFish)[^\n]*;',
                                 fish, re.M))
     functions = "namespace Rando {\n" + "\n\n".join(functions) + "\n}\n"
+    if 'static bool Combo_ClearNumericExclusions() {' in otr:
+        functions += extract(otr, 'static bool Combo_ClearNumericExclusions() {') + "\n"
     for signature in ('extern "C" COMBO_EXPORT const char* SOH_DumpRandoSettings',
                       'extern "C" COMBO_EXPORT void SOH_RestoreRandoSettings',
                       'extern "C" COMBO_EXPORT const char* SOH_DumpEntranceOverrides'):
@@ -119,6 +137,22 @@ def main():
     load_block = manager[load_start:manager.index("});", load_start) + 3]
     functions += "void SaveNativeSettings() { auto randoContext = Rando::Context::GetInstance();\n" + save_block + "\n}\n"
     functions += "void LoadNativeSettings() { auto randoContext = Rando::Context::GetInstance();\n" + load_block + "\n}\n"
+    functions += extract(read("soh/soh/Enhancements/randomizer/NeiSeasons.cpp"),
+                         'extern "C" uint8_t Seasons_RandoMode') + "\n"
+    # Execute the complete native item-count helper and complete NEI source pool
+    # block against the real saved Context, including pool-density behavior.
+    pool = read("soh/soh/Enhancements/randomizer/3drando/item_pool.cpp")
+    functions += "Rando::Context* ctx;\n"
+    functions += pool[pool.index("std::vector<RandomizerGet> itemPool"):
+                      pool.index("void AddItemToPool(")]
+    functions += extract(pool, "void AddItemToPool(") + "\n"
+    functions += "void GenerateNativeNeiPool() {\n" + extract(pool, "if (ctx->GetOption(RSK_SKIJER_CUSTOM_ITEMS)) {") + "\n}\n"
+    starting = read("soh/soh/Enhancements/randomizer/3drando/starting_inventory.cpp")
+    functions += "std::vector<RandomizerGet> StartingInventory;\n"
+    functions += extract(starting, "static void AddItemToInventory(") + "\n"
+    start_prefix = starting[starting.index("    auto ctx =", starting.index("void GenerateStartingInventory")):
+                            starting.index("    if (ctx->GetOption(RSK_SHUFFLE_MAPANDCOMPASS)")]
+    functions += "void GenerateNativeStartingRod() {\n" + start_prefix + "\n}\n"
     with tempfile.TemporaryDirectory(prefix="compass-seed-settings-") as directory:
         build = Path(directory)
         (build / "seed_settings_production.inc").write_text(functions)
@@ -137,6 +171,7 @@ def main():
                    ROOT / "soh/soh/Enhancements/randomizer/dungeon.cpp",
                    ROOT / "soh/soh/Enhancements/randomizer/trial.cpp",
                    ROOT / "soh/soh/Enhancements/randomizer/location.cpp",
+                   ROOT / "soh/soh/Enhancements/randomizer/randomizerEnumStrings.cpp",
                    ROOT / "soh/soh/ShipUtils.cpp"]
         binary = build / "seed_settings_test"
         subprocess.run([os.environ.get("CXX", "c++"), *flags, *includes, *map(str, sources),

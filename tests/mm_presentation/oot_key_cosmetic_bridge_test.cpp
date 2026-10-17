@@ -47,6 +47,10 @@ Color_RGB8 CVarGetColor24(const char *key, Color_RGB8 fallback) {
              ? fallback
              : Color_RGB8{it->second.r, it->second.g, it->second.b};
 }
+Color_RGBA8 CVarGetColor(const char *key, Color_RGBA8 fallback) {
+  auto it = colors.find(key);
+  return it == colors.end() ? fallback : it->second;
+}
 void CVarSetColor(const char *key, Color_RGBA8 color) { colors[key] = color; }
 /* EDITOR_DECLARATIONS */
 /* EDITOR_OPTIONS */

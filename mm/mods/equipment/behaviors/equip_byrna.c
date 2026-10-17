@@ -1,12 +1,9 @@
 /**
  * equip_byrna.c - Cane of Byrna (Extended Sword Slot 1)
  *
- * Behavior: Biggoron Sword IA (long range, two-handed) + HP & MP recovery on hit.
- * - Forces PLAYER_IA_SWORD_BIGGORON for long reach
- * - Forces swordHealth > 0 so charge/spin attacks work
- * - Draws Somaria cane mesh with BLUE materials at 1.15x scale
- * - Follows left hand rotation (sword hand)
- * - On melee hit: recover HP + MP
+ * Uses the native one-hand sword action and the existing blue cane hand model.
+ * The former two-hand reach and HP/MP recovery belong to the Great Fairy's Sword.
+ * Additional Byrna gameplay behavior remains reserved.
  *
  * Included by ext_equip_behavior.c (unity build).
  */
@@ -51,7 +48,8 @@ static void GreatFairySword_RecoverOnHit(Player* player, PlayState* play) {
 // Cane of Byrna — DUMMY (Skijer 2026-07-29). Its whole gameplay behavior (two-handed reach + HP/MP
 // recovery on melee hit) belongs to the progressive double-hand sword line now: the Great Fairy's
 // Sword owns it below, where it is the player's REAL sword instead of a sword-slot hijack. The grid
-// slot, icon, name and hand model stay so the slot is visible; it is reserved for a future behavior.
+// slot uses the native one-hand sword carrier for its existing model and swings. Additional
+// gameplay behavior remains reserved; the Great Fairy's Sword keeps its recovery perks.
 // ---------------------------------------------------------------------------
 static void Byrna_Behavior(Player* player, PlayState* play) {
     (void)player;
@@ -59,7 +57,7 @@ static void Byrna_Behavior(Player* player, PlayState* play) {
 }
 
 static void Byrna_Cleanup(void) {
-    // Nothing to restore: the slot no longer touches the sword equip / swordHealth / B button.
+    // Slot/B ownership belongs to ExtEquip_SetSlot; no behavior state needs restoring here.
     gExtEquipBehavior.byrnaActive = 0;
 }
 

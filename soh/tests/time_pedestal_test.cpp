@@ -914,7 +914,7 @@ static void CheckSavedAdultWithoutSword() {
             gSaveContext.linkAge = play.linkAgeOnLoad;
             const auto before = gSaveContext;
             REQUIRE(neiSave.timePedestalNoMasterSwordRepair == 1);
-            NeiSave_Save(&gSaveContext, 0, true);
+            NeiSave_Save(gSaveContext, 0, true);
             neiSave = {};
             NeiSave_Load();
             REQUIRE(neiSave.timePedestalNoMasterSwordRepair == 1);
@@ -940,7 +940,7 @@ static void CheckSavedAdultWithoutSword() {
 
             gSaveContext.inventory.equipment |= OWNED_EQUIP_FLAG(EQUIP_TYPE_SWORD, EQUIP_INV_SWORD_MASTER);
             neiSave.timePedestalNoMasterSwordRepair = 1;
-            NeiSave_Save(&gSaveContext, 0, true);
+            NeiSave_Save(gSaveContext, 0, true);
             REQUIRE(neiSave.timePedestalNoMasterSwordRepair == 0);
             neiSave.timePedestalNoMasterSwordRepair = 1;
             Fixture_AdultLoadRepair();

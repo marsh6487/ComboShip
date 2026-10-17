@@ -10,6 +10,8 @@
 #include "BenPort.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "mods/items/objects/object_autumn_leaves.h"
+#include "mods/items/objects/object_spring_petals.h"
+#include "mods/items/helpers/season_particles.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED | ACTOR_FLAG_UPDATE_DURING_OCARINA)
 
@@ -53,7 +55,8 @@ void func_808DBE8C(ObjectKankyo* this) {
 
 void func_808DBEB0(ObjectKankyo* this, PlayState* play) {
     s32 i;
-    f32 (*particleRandom)(void) = MMWeather_SeasonForPlay(play) == SEASON_AUTUMN ? MMWeather_RandomFloat : Rand_ZeroOne;
+    f32 (*particleRandom)(void) =
+        MMSeasonParticles_IsFallingSeason(MMWeather_SeasonForPlay(play)) ? MMWeather_RandomFloat : Rand_ZeroOne;
 
     D_808DE5B0 = 0.0f;
     this->unk_144 = particleRandom() * 360.0f;
@@ -72,7 +75,8 @@ void func_808DBEB0(ObjectKankyo* this, PlayState* play) {
 }
 
 void func_808DBFB0(ObjectKankyo* this, PlayState* play) {
-    f32 (*particleRandom)(void) = MMWeather_SeasonForPlay(play) == SEASON_AUTUMN ? MMWeather_RandomFloat : Rand_ZeroOne;
+    f32 (*particleRandom)(void) =
+        MMSeasonParticles_IsFallingSeason(MMWeather_SeasonForPlay(play)) ? MMWeather_RandomFloat : Rand_ZeroOne;
     D_808DE5B0 = 0.0f;
     this->unk_114E = 0;
     this->unk_144 = particleRandom() * 360.0f;
@@ -206,20 +210,70 @@ static s32 ObjectKankyo_AutumnBand(s32 index) {
                                                                                          : 2;
 }
 
+static s32 ObjectKankyo_IsCompactAutumnScene(PlayState* play) {
+    return play->sceneId == SCENE_TOWN || play->sceneId == SCENE_ICHIBA || play->sceneId == SCENE_BACKTOWN ||
+           play->sceneId == SCENE_CLOCKTOWER || play->sceneId == SCENE_ALLEY;
+}
+
+static void ObjectKankyo_AutumnViewBasis(PlayState* play, Vec3f* forward, Vec3f* right, Vec3f* up) {
+    *forward = (Vec3f){ play->view.at.x - play->view.eye.x, play->view.at.y - play->view.eye.y,
+                        play->view.at.z - play->view.eye.z };
+    f32 length = sqrtf(SQ(forward->x) + SQ(forward->y) + SQ(forward->z));
+    if (length < 0.001f) {
+        *forward = (Vec3f){ 0.0f, 0.0f, 1.0f };
+    } else {
+        forward->x /= length;
+        forward->y /= length;
+        forward->z /= length;
+    }
+    Vec3f viewUp = play->view.up;
+    if (SQ(viewUp.x) + SQ(viewUp.y) + SQ(viewUp.z) < 0.001f)
+        viewUp = (Vec3f){ 0.0f, 1.0f, 0.0f };
+    *right = (Vec3f){ viewUp.y * forward->z - viewUp.z * forward->y, viewUp.z * forward->x - viewUp.x * forward->z,
+                      viewUp.x * forward->y - viewUp.y * forward->x };
+    length = sqrtf(SQ(right->x) + SQ(right->y) + SQ(right->z));
+    if (length < 0.001f) {
+        *right = (Vec3f){ 1.0f, 0.0f, 0.0f };
+    } else {
+        right->x /= length;
+        right->y /= length;
+        right->z /= length;
+    }
+    *up = (Vec3f){ forward->y * right->z - forward->z * right->y, forward->z * right->x - forward->x * right->z,
+                   forward->x * right->y - forward->y * right->x };
+}
+
 static void ObjectKankyo_InitAutumnParticle(ObjectKankyo* this, PlayState* play, s32 index) {
-    static const f32 minimum[] = { 250.0f, 1200.0f, 3200.0f };
+    static const f32 minimum[] = { 700.0f, 1200.0f, 3200.0f };
     static const f32 maximum[] = { 1000.0f, 2800.0f, 6000.0f };
     const s32 band = ObjectKankyo_AutumnBand(index);
     ObjectKankyoStruct* particle = &this->unk_14C[index];
-    const f32 angle = MMWeather_RandomFloat() * 6.2831853f;
-    const f32 radius = minimum[band] + MMWeather_RandomFloat() * (maximum[band] - minimum[band]);
-    // Turning the view reveals existing world-space leaves. Camera motion does
-    // not move their origins; recycling is limited to distant/below-view leaves.
-    particle->unk_00 = play->view.eye.x + sinf(angle) * radius;
-    particle->unk_04 = play->view.eye.y + (MMWeather_RandomFloat() - 0.25f) * (350.0f + band * 650.0f);
-    particle->unk_08 = play->view.eye.z + cosf(angle) * radius;
+    Vec3f forward, right, up;
+    ObjectKankyo_AutumnViewBasis(play, &forward, &right, &up);
+    const Camera* camera = GET_ACTIVE_CAM(play);
+    const f32 fov = play->view.fovy > 0.0f                 ? play->view.fovy
+                    : camera != NULL && camera->fov > 0.0f ? camera->fov
+                                                           : 60.0f;
+    const f32 halfHeight = tanf(CLAMP(fov, 5.0f, 150.0f) * 0.00872665f);
+    const f32 aspect = MAX(OTRGetAspectRatio(), 4.0f / 3.0f);
+    // Permute a jittered 12x8 layout so every depth band covers the whole view.
+    // The small near leaves stay farther from the camera; no budget sits behind it.
+    const s32 cell = (index * 37) % OBJECT_KANKYO_AUTUMN_COUNT;
+    const f32 x = (((cell % 12 + 0.15f + MMWeather_RandomFloat() * 0.7f) / 12.0f) * 2.0f - 1.0f) * 0.85f;
+    const f32 y = (((cell / 12 + 0.15f + MMWeather_RandomFloat() * 0.7f) / 8.0f) * 2.0f - 1.0f) * 0.85f;
+    f32 radius = minimum[band] + MMWeather_RandomFloat() * (maximum[band] - minimum[band]);
+    if (band != 0 && ObjectKankyo_IsCompactAutumnScene(play)) {
+        radius = MAX(radius * 0.3f, 600.0f);
+    }
+    Vec3f ray = { forward.x + right.x * x * halfHeight * aspect + up.x * y * halfHeight,
+                  forward.y + right.y * x * halfHeight * aspect + up.y * y * halfHeight,
+                  forward.z + right.z * x * halfHeight * aspect + up.z * y * halfHeight };
+    radius /= sqrtf(SQ(ray.x) + SQ(ray.y) + SQ(ray.z));
+    particle->unk_00 = play->view.eye.x + ray.x * radius;
+    particle->unk_04 = play->view.eye.y + ray.y * radius;
+    particle->unk_08 = play->view.eye.z + ray.z * radius;
     particle->unk_0C = particle->unk_10 = particle->unk_14 = 0.0f;
-    particle->unk_18 = 0.0f; // Fade-in age; native snow uses this as fall speed.
+    particle->unk_18 = 1.0f; // Begin faintly, then fade in; every slot is submitted in view.
     particle->unk_1C = 2;
     particle->epoch++;
 }
@@ -233,20 +287,18 @@ static void ObjectKankyo_UpdateAutumnParticles(ObjectKankyo* this, PlayState* pl
     for (s32 i = 0; i < OBJECT_KANKYO_AUTUMN_COUNT; ++i) {
         ObjectKankyoStruct* particle = &this->unk_14C[i];
         const s32 band = ObjectKankyo_AutumnBand(i);
-        Vec3f position = { particle->unk_00 + particle->unk_0C, particle->unk_04 + particle->unk_10,
-                           particle->unk_08 + particle->unk_14 };
-        if (particle->unk_1C != 2 || Math_Vec3f_DistXZ(&position, &play->view.eye) > 1600.0f + band * 3200.0f ||
-            position.y < play->view.eye.y - 450.0f - band * 450.0f) {
+        if (particle->unk_1C != 2) {
             ObjectKankyo_InitAutumnParticle(this, play, i);
         }
-        const f32 phase = play->gameplayFrames * 0.025f + i * 2.4f;
-        particle->unk_0C += sinf(phase) * 0.45f;
-        particle->unk_14 += cosf(phase * 0.7f) * 0.45f;
+        const f32 phase = play->gameplayFrames * 0.055f + i * 2.4f;
+        const f32 flutter = 0.9f + band * 0.45f;
+        particle->unk_0C += sinf(phase) * flutter;
+        particle->unk_14 += cosf(phase * 0.7f) * flutter;
         if (windLength > 0.001f) {
-            particle->unk_0C -= play->envCtx.windDirection.x / windLength * wind * 2.0f;
-            particle->unk_14 -= play->envCtx.windDirection.z / windLength * wind * 2.0f;
+            particle->unk_0C -= play->envCtx.windDirection.x / windLength * wind * (3.0f + band);
+            particle->unk_14 -= play->envCtx.windDirection.z / windLength * wind * (3.0f + band);
         }
-        particle->unk_10 -= 0.7f + (i & 7) * 0.12f;
+        particle->unk_10 -= 2.6f + band * 0.8f + (i & 7) * 0.24f;
         particle->unk_18 = MIN(particle->unk_18 + 1.0f, 24.0f);
     }
 }
@@ -297,7 +349,8 @@ void func_808DC454(ObjectKankyo* this, PlayState* play) {
     spCC = y / magnitude;
     spC8 = z / magnitude;
 
-    f32 (*particleRandom)(void) = MMWeather_SeasonForPlay(play) == SEASON_AUTUMN ? MMWeather_RandomFloat : Rand_ZeroOne;
+    f32 (*particleRandom)(void) =
+        MMSeasonParticles_IsFallingSeason(MMWeather_SeasonForPlay(play)) ? MMWeather_RandomFloat : Rand_ZeroOne;
     for (i = 0; i < play->envCtx.precipitation[PRECIP_SNOW_CUR]; i++) {
         if (this->unk_14C[i].unk_1C == 2) {
             // Distant positions and fade age cannot become native snow speed.
@@ -429,16 +482,32 @@ static void ObjectKankyo_UpdateSnowTarget(PlayState* play) {
 static void ObjectKankyo_UpdateSeasonSnowParticles(ObjectKankyo* this, PlayState* play) {
     const int season = MMWeather_SeasonForPlay(play);
     const u8 nativeCount = play->envCtx.precipitation[PRECIP_SNOW_CUR];
-    if (season == SEASON_AUTUMN) {
-        ObjectKankyo_UpdateAutumnParticles(this, play);
+    if (MMSeasonParticles_IsFallingSeason(season)) {
+        if (MMSeasonParticles_IsEnabled(season)) {
+            ObjectKankyo_UpdateAutumnParticles(this, play);
+        }
         return;
     }
-    if (season == SEASON_WINTER || season == SEASON_SPRING || season == SEASON_SUMMER) {
+    if (season == SEASON_WINTER || season == SEASON_SUMMER) {
         // Particle positions are native actor state. Compose their count only
         // during motion; weather tags and the next actor see the live native count.
-        play->envCtx.precipitation[PRECIP_SNOW_CUR] = season == SEASON_WINTER ? 64 : 0;
+        play->envCtx.precipitation[PRECIP_SNOW_CUR] =
+            season == SEASON_WINTER && MMSeasonParticles_IsEnabled(season) ? 64 : 0;
     }
     func_808DC454(this, play);
+    if (MMSeasonParticles_HasFlurries(season)) {
+        // Optional windblown motion reuses the same 64 native snow slots and
+        // texture. Deterministic gusts never consume gameplay RNG or weather state.
+        const f32 windLength = sqrtf(SQ((f32)play->envCtx.windDirection.x) + SQ((f32)play->envCtx.windDirection.z));
+        const f32 windX = windLength > 0.001f ? -play->envCtx.windDirection.x / windLength : 1.0f;
+        const f32 windZ = windLength > 0.001f ? -play->envCtx.windDirection.z / windLength : 0.0f;
+        const f32 gust = 1.8f + sinf(play->gameplayFrames * 0.03f) * 0.8f;
+        for (s32 i = 0; i < 64; ++i) {
+            const f32 drift = gust + sinf(play->gameplayFrames * 0.07f + i * 1.7f) * 0.4f;
+            this->unk_14C[i].unk_0C += windX * drift;
+            this->unk_14C[i].unk_14 += windZ * drift;
+        }
+    }
     play->envCtx.precipitation[PRECIP_SNOW_CUR] = nativeCount;
 }
 
@@ -638,24 +707,26 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
     f32 tempf;
 
     const int season = MMWeather_SeasonForPlay(play);
-    const u8 snowCount = season == SEASON_WINTER   ? 64
-                         : season == SEASON_AUTUMN ? OBJECT_KANKYO_AUTUMN_COUNT
-                                                   : play->envCtx.precipitation[PRECIP_SNOW_CUR];
-    if ((play->cameraPtrs[CAM_ID_MAIN]->stateFlags & CAM_STATE_UNDERWATER) ||
-        (season == SEASON_SPRING || season == SEASON_SUMMER) ||
-        ((u8)play->envCtx.stormState == STORM_STATE_OFF && season != SEASON_WINTER && season != SEASON_AUTUMN)) {
+    const s32 fallingSeason = MMSeasonParticles_IsFallingSeason(season);
+    const f32 autumnFadeDistance = 8000.0f;
+    const u8 snowCount = season == SEASON_WINTER ? 64
+                         : fallingSeason         ? OBJECT_KANKYO_AUTUMN_COUNT
+                                                 : play->envCtx.precipitation[PRECIP_SNOW_CUR];
+    if ((play->cameraPtrs[CAM_ID_MAIN]->stateFlags & CAM_STATE_UNDERWATER) || (season == SEASON_SUMMER) ||
+        ((fallingSeason || season == SEASON_WINTER) && !MMSeasonParticles_IsEnabled(season)) ||
+        ((u8)play->envCtx.stormState == STORM_STATE_OFF && season != SEASON_WINTER && !fallingSeason)) {
         return;
     }
 
-    if (season == SEASON_AUTUMN && !ObjectKankyo_IsAutumnOwner(this, play)) {
-        return; // Multiple native blizzard actors share one bounded autumn layer.
+    if (fallingSeason && !ObjectKankyo_IsAutumnOwner(this, play)) {
+        return; // Multiple native blizzard actors share one bounded leaf/petal layer.
     }
 
     OPEN_DISPS(play->state.gfxCtx);
 
     spB4 = false;
 
-    if (this->actor.params == 3 && season != SEASON_AUTUMN) {
+    if (this->actor.params == 3 && !fallingSeason) {
         temp_f0 = func_80173B48(&play->state) / 1.4e7f;
         temp_f0 = CLAMP(temp_f0, 0.0f, 1.0f);
         Math_SmoothStepToF(&D_808DE5B0, temp_f0, 0.2f, 0.1f, 0.001f);
@@ -671,10 +742,10 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
     }
 
     for (i = 0; i < sp68; i++) {
-        if (season == SEASON_AUTUMN && this->unk_14C[i].unk_1C != 2) {
+        if (fallingSeason && this->unk_14C[i].unk_1C != 2) {
             // Paused confirmation can draw before the next actor update.
             ObjectKankyo_InitAutumnParticle(this, play, i);
-        } else if (season != SEASON_AUTUMN && this->unk_14C[i].unk_1C == 2) {
+        } else if (!fallingSeason && this->unk_14C[i].unk_1C == 2) {
             ObjectKankyo_RestoreAutumnParticle(this, play, i);
         }
         worldPos.x = this->unk_14C[i].unk_00 + this->unk_14C[i].unk_0C;
@@ -691,6 +762,18 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
             xMax = OTRGetDimensionFromRightEdge(xMax);
         }
         // #endregion
+
+        if (fallingSeason &&
+            (screenPos.z <= 0.0f || screenPos.x < xMin || screenPos.x >= xMax || screenPos.y < 0.0f ||
+             screenPos.y >= SCREEN_HEIGHT || Math_Vec3f_DistXYZ(&worldPos, &play->view.eye) >= autumnFadeDistance)) {
+            // Recycle only offscreen or fully distance-faded leaves. A steep
+            // downward view can keep falling leaves onscreen past the fade range.
+            // The new epoch skips interpolation; each replacement fades in alone.
+            // Visible opaque leaves retain their world-space trajectories.
+            ObjectKankyo_InitAutumnParticle(this, play, i);
+            worldPos = (Vec3f){ this->unk_14C[i].unk_00, this->unk_14C[i].unk_04, this->unk_14C[i].unk_08 };
+            Play_GetScreenPos(play, &worldPos, &screenPos);
+        }
 
         if ((screenPos.x >= xMin) && (screenPos.x < xMax) && (screenPos.y >= 0.0f) && (screenPos.y < SCREEN_HEIGHT)) {
             FrameInterpolation_RecordOpenChild(&this->unk_14C[i], this->unk_14C[i].epoch);
@@ -709,7 +792,7 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
             }
 
             Matrix_Translate(worldPos.x, worldPos.y, worldPos.z, MTXMODE_NEW);
-            if (season == SEASON_AUTUMN) {
+            if (fallingSeason) {
                 const s32 band = ObjectKankyo_AutumnBand(i);
                 f32 leafScale = (0.035f + (i & 7) * 0.002f) * (1.0f + band * 0.7f);
                 Matrix_Mult(&play->billboardMtxF, MTXMODE_APPLY);
@@ -719,10 +802,26 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
                 Actor* player = play->actorCtx.actorLists[ACTORCAT_PLAYER].first;
                 const f32 nearDistance =
                     player != NULL ? MIN(distance, Math_Vec3f_DistXYZ(&worldPos, &player->world.pos)) : distance;
-                temp_f2 = CLAMP((8000.0f - distance) / 2000.0f, 0.0f, 1.0f) *
+                temp_f2 = CLAMP((autumnFadeDistance - distance) / 2000.0f, 0.0f, 1.0f) *
                           CLAMP((nearDistance - 150.0f) / 200.0f, 0.0f, 1.0f) *
                           MIN(this->unk_14C[i].unk_18 / 24.0f, 1.0f);
-                AutumnLeaves_Draw(play, i, (u8)(220.0f * temp_f2));
+                const f32 edgeFade =
+                    CLAMP(MIN(screenPos.x - xMin, xMax - screenPos.x) / ((xMax - xMin) * 0.1f), 0.0f, 1.0f) *
+                    CLAMP(MIN(screenPos.y, SCREEN_HEIGHT - screenPos.y) / (SCREEN_HEIGHT * 0.1f), 0.0f, 1.0f);
+                u8 alpha = (u8)(220.0f * temp_f2 * edgeFade);
+                // Keep edge-fading slots faintly present; the camera/Link clear
+                // pocket and far-distance fade still suppress them completely.
+                if (alpha == 0 && temp_f2 > 0.0f)
+                    alpha = 1;
+                if (season == SEASON_SPRING) {
+                    // Petals rock about their own axis, while keeping the accepted
+                    // density, clear pocket, lifetime and recycling volume.
+                    const f32 flutter = 0.65f + sinf(play->gameplayFrames * 0.045f + i * 2.4f) * 0.25f;
+                    Matrix_Scale(flutter, 1.0f, 1.0f, MTXMODE_APPLY);
+                    SpringPetals_Draw(play, i, alpha);
+                } else {
+                    AutumnLeaves_Draw(play, i, alpha);
+                }
                 FrameInterpolation_RecordCloseChild();
                 continue;
             }
@@ -740,6 +839,12 @@ void func_808DD3C8(Actor* thisx, PlayState* play2) {
             gSPDisplayList(POLY_XLU_DISP++, gEffDustDL);
             FrameInterpolation_RecordCloseChild();
         }
+    }
+
+    if (season == SEASON_SPRING && spB4) {
+        // Petals use an untextured material. Restore the standard textured XLU
+        // setup once for the next consumer; empty/culled layers change no state.
+        POLY_XLU_DISP = Gfx_SetupDL(POLY_XLU_DISP, SETUPDL_0);
     }
 
     CLOSE_DISPS(play->state.gfxCtx);

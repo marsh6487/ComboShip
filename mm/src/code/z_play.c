@@ -1,5 +1,7 @@
 #include "z64.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
+#include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
+#include "2s2h/Enhancements/Graphics/MMWinterAtmosphere.h"
 #include <libultraship/log/luslog.h> // 2S2H [Port] LUSLOG_ERROR (transition guard)
 #include "regs.h"
 #include "functions.h"
@@ -43,6 +45,7 @@ u8 sMotionBlurStatus;
 #include "overlays/gamestates/ovl_file_choose/z_file_select.h"
 #include "debug.h"
 #include "BenPort.h"
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/Audio/AudioEditor.h"
 #include "2s2h/FleetShipCombo/FleetShipCombo.h"
@@ -413,6 +416,10 @@ Gfx* Play_SetFog(PlayState* this, Gfx* gfx) {
 }
 
 void Play_Destroy(GameState* thisx) {
+#ifdef COMBO_BUILD
+    extern void Combo_MM_CancelCrossDungeonTransition(void);
+    Combo_MM_CancelCrossDungeonTransition();
+#endif
     PlayState* this = (PlayState*)thisx;
     GraphicsContext* gfxCtx = this->state.gfxCtx;
 
@@ -624,6 +631,16 @@ void Play_UpdateTransition(PlayState* this) {
 
     switch (this->transitionMode) {
         case TRANS_MODE_SETUP: {
+#ifdef COMBO_BUILD
+            extern int Combo_MM_CrossDungeonTransition(int32_t * index);
+            if (this->transitionTrigger != TRANS_TRIGGER_END) {
+                int32_t composedEntrance = this->nextEntrance;
+                // A foreign route keeps its native movement/camera/effect until completion.
+                if (!Combo_MM_CrossDungeonTransition(&composedEntrance)) {
+                    this->nextEntrance = composedEntrance;
+                }
+            }
+#endif
             // 2S2H [Port] Fleet Ship Combo: a STALE/GARBAGE nextEntrance (e.g. a hole-fall warp
             // that completed while this game was combo-frozen) walks Entrance_GetTableEntry's
             // unbounded pointers below and crashes (0xc0000005). Validate scene + spawn against
@@ -777,6 +794,12 @@ void Play_UpdateTransition(PlayState* this) {
         case TRANS_MODE_INSTANCE_RUNNING:
             if (this->transitionCtx.isDone(&this->transitionCtx.instanceData)) {
                 if (this->transitionTrigger != TRANS_TRIGGER_END) {
+#ifdef COMBO_BUILD
+                    extern int Combo_MM_CompleteCrossDungeonTransition(void);
+                    if (Combo_MM_CompleteCrossDungeonTransition()) {
+                        break; // Retain the native effect without replacing the source Play state.
+                    }
+#endif
                     if (this->transitionCtx.transitionType == TRANS_TYPE_CIRCLE) {
                         D_801D0D54 = false;
                     }
@@ -847,6 +870,12 @@ void Play_UpdateTransition(PlayState* this) {
             this->envCtx.screenFillColor[3] = (sTransitionFillTimer / 20.0f) * 255.0f;
 
             if (sTransitionFillTimer >= 20) {
+#ifdef COMBO_BUILD
+                extern int Combo_MM_CompleteCrossDungeonTransition(void);
+                if (Combo_MM_CompleteCrossDungeonTransition()) {
+                    break;
+                }
+#endif
                 STOP_GAMESTATE(&this->state);
                 SET_NEXT_GAMESTATE(&this->state, Play_Init, sizeof(PlayState));
                 gSaveContext.save.entrance = this->nextEntrance;
@@ -889,6 +918,12 @@ void Play_UpdateTransition(PlayState* this) {
 
         case TRANS_MODE_INSTANT:
             if (this->transitionTrigger != TRANS_TRIGGER_END) {
+#ifdef COMBO_BUILD
+                extern int Combo_MM_CompleteCrossDungeonTransition(void);
+                if (Combo_MM_CompleteCrossDungeonTransition()) {
+                    break;
+                }
+#endif
                 STOP_GAMESTATE(&this->state);
                 SET_NEXT_GAMESTATE(&this->state, Play_Init, sizeof(PlayState));
                 gSaveContext.save.entrance = this->nextEntrance;
@@ -931,6 +966,12 @@ void Play_UpdateTransition(PlayState* this) {
                 }
             } else {
                 if (this->envCtx.sandstormEnvA == 255) {
+#ifdef COMBO_BUILD
+                    extern int Combo_MM_CompleteCrossDungeonTransition(void);
+                    if (Combo_MM_CompleteCrossDungeonTransition()) {
+                        break;
+                    }
+#endif
                     STOP_GAMESTATE(&this->state);
                     SET_NEXT_GAMESTATE(&this->state, Play_Init, sizeof(PlayState));
                     gSaveContext.save.entrance = this->nextEntrance;
@@ -1147,6 +1188,7 @@ void Play_UpdateMain(PlayState* this) {
 
     Environment_Update(this, &this->envCtx, &this->lightCtx, &this->pauseCtx, &this->msgCtx, &this->gameOverCtx,
                        this->state.gfxCtx);
+    MMWinterAtmosphere_Update(this);
 
     if (this->sramCtx.status != 0) {
         if (GameInteractor_Should(VB_SAVE_USE_OWL_SAVE_TIMING, gSaveContext.save.isOwlSave)) {
@@ -1416,6 +1458,8 @@ void Play_DrawMain(PlayState* this) {
                 goto PostWorldDraw;
             }
 
+            GameInteractor_ExecuteOnPlayDrawWorldStart();
+
             if (!this->soaringCsOrSoTCsPlaying) {
                 if (1) {
                     if (((u32)this->skyboxId != SKYBOX_NONE) && !this->envCtx.skyboxDisabled) {
@@ -1475,6 +1519,8 @@ void Play_DrawMain(PlayState* this) {
                 if ((this->envCtx.precipitation[PRECIP_RAIN_CUR] != 0) || (MMWeather_RainDensity() > 0)) {
                     Environment_DrawRain(this, &this->view, gfxCtx);
                 }
+                MMSummerAtmosphere_Draw(this);
+                MMWinterAtmosphere_Draw(this);
             }
 
             if (1) {
@@ -2268,6 +2314,21 @@ void Play_FillScreen(PlayState* this, s16 fillScreenOn, u8 red, u8 green, u8 blu
     R_PLAY_FILL_SCREEN_ALPHA = alpha;
 }
 
+#ifdef COMBO_BUILD
+extern int Combo_MM_CrossDungeonRuntimeEnabled(void);
+
+static void Combo_NormalizeStoneTowerArrival(PlayState* play) {
+    if (!Combo_MM_CrossDungeonRuntimeEnabled())
+        return;
+    // Both exterior orientations share cycle switch flags. Match the chosen scene before
+    // room actors initialize, so the native inverter does not immediately undo this arrival.
+    if (play->sceneId == SCENE_F41)
+        Flags_SetSwitch(play, 0x14);
+    else if (play->sceneId == SCENE_F40)
+        Flags_UnsetSwitch(play, 0x14);
+}
+#endif
+
 void Play_Init(GameState* thisx) {
     PlayState* this = (PlayState*)thisx;
     GraphicsContext* gfxCtx = this->state.gfxCtx;
@@ -2279,6 +2340,11 @@ void Play_Init(GameState* thisx) {
     s32 scene;
     u8 sceneLayer;
     s32 pad2;
+
+#ifdef COMBO_BUILD
+    ComboOpeningForest_NormalizeEntry();
+#endif
+    MMWinterAtmosphere_Reset();
 
     if ((gSaveContext.respawnFlag == -4) || (gSaveContext.respawnFlag == -0x63)) {
         if (CHECK_EVENTINF(EVENTINF_TRIGGER_DAYTELOP)) {
@@ -2518,6 +2584,9 @@ void Play_Init(GameState* thisx) {
     ZeldaArena_Init((void*)((zAlloc + 8) & ~0xF), (zAllocSize - ((zAlloc + 8) & ~0xF)) + zAlloc);
 
     Actor_InitContext(this, &this->actorCtx, this->linkActorEntry);
+#ifdef COMBO_BUILD
+    Combo_NormalizeStoneTowerArrival(this);
+#endif
 
     // Busyloop until the room loads
     while (!Room_ProcessRoomRequest(this, &this->roomCtx)) {}

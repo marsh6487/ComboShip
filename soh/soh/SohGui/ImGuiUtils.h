@@ -1,6 +1,3 @@
-#ifndef IM_GUI_UTILS_H
-#define IM_GUI_UTILS_H
-
 #pragma once
 
 #include <imgui.h>
@@ -73,5 +70,3 @@ extern std::map<QuestItem, SongMapEntry> songMapping;
 
 // Maps song ids to info for use in ImGui
 extern std::array<SongMapEntry, 12> vanillaSongMapping;
-
-#endif // IM_GUI_UTILS_H

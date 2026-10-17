@@ -73,7 +73,12 @@ extern "C" int32_t CVarGetInteger(const char*, int32_t) {
 }
 struct ItemTrackerItem {
     uint32_t id;
+    enum Kind { ITEM, RANDOMIZER } kind = ITEM;
 };
+static constexpr auto ITEM_KIND_ITEM = ItemTrackerItem::ITEM;
+static bool TrackerHasSave() {
+    return true;
+}
 namespace GameInteractor {
 bool IsSaveLoaded() {
     return true;
@@ -102,10 +107,14 @@ static bool Dispatch(int id, ...) {
 }
 
 int main() {
-    // These IDs are already stored in integration saves and seed data.
-    CHECK(RG_SEASON_WINTER == 554);
-    CHECK(RSK_CROSSOVER_MARIO_MASK == 306);
-    CHECK(RHT_GANONS_CASTLE_RED_ICE == 1638);
+    // Native 9.3 IDs precede appended integration keys in the new save schema.
+    CHECK(RG_ROCS_FEATHER == 324);
+    CHECK(RG_COMBO_FOREIGN == 327);
+    CHECK(RSK_PROGRESSIVE_GORON_SWORD == 307);
+    CHECK(RSK_SW97_SPELLS == RSK_EXCLUDE_MASK_SHOP_ENTRANCE + 1);
+    CHECK(RG_SEASON_WINTER == 577);
+    CHECK(RSK_CROSSOVER_MARIO_MASK == 320);
+    CHECK(RHT_GANONS_CASTLE_RED_ICE == 1656);
     RegisterRandoStatUpgradeHooks();
     auto& options = Rando::Context::GetInstance()->options;
     options[RSK_SPEED_UPGRADE].value = 1;
@@ -216,8 +225,8 @@ int main() {
     ApplyHealthStat(&logicSave, RG_QUARTER_HEART, false);
     CHECK(logicSave.healthCapacity == 48);
     for (uint32_t id = RG_QUARTER_HEART; id <= RG_PUSH_SPEED_UPGRADE; ++id) {
-        CHECK(DrawItemInventory({ id }) == ITEM_NONE);
-        CHECK(DrawItemCountInventory({ id }) == ITEM_NONE);
+        CHECK(DrawItemInventory({ id, ItemTrackerItem::RANDOMIZER }) == ITEM_NONE);
+        CHECK(DrawItemCountInventory({ id, ItemTrackerItem::RANDOMIZER }) == ITEM_NONE);
     }
     gSaveContext.inventory.items[SLOT_BOW] = ITEM_BOW;
     CHECK(DrawItemInventory({ ITEM_BOW }) == ITEM_BOW);
@@ -272,5 +281,5 @@ int main() {
     if (failures)
         return 1;
     std::puts("PASS: stat pickups, caps, saved-seed settings, damage, movement guards, magic, quarter hearts, and "
-              "existing IDs");
+              "native 9.3 IDs");
 }

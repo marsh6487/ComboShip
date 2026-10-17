@@ -565,8 +565,12 @@ void EnWood02_Draw(Actor* thisx, PlayState* play) {
     u8 red;
     u8 green;
     u8 blue;
-    s32 autumn = (EnWood02_IsTree(this) || thisx->params == WOOD_LEAF_GREEN || thisx->params == WOOD_LEAF_YELLOW) &&
-                 MMWeather_SeasonForPlay(play) == SEASON_AUTUMN && EnWood02_UsesNativeFoliage(this);
+    s32 season = MMWeather_SeasonForPlay(play);
+    s32 spring = EnWood02_IsTree(this) && season == SEASON_SPRING;
+    s32 frost = EnWood02_IsTree(this) && season == SEASON_WINTER;
+    s32 autumn = (EnWood02_IsTree(this) || ((thisx->params == WOOD_LEAF_GREEN || thisx->params == WOOD_LEAF_YELLOW) &&
+                                            EnWood02_UsesNativeFoliage(this))) &&
+                 season == SEASON_AUTUMN;
 
     if (autumn && this->unk_144 == WOOD_AUTUMN_LEAF_MARKER) {
         // Ambient leaves use the generated art too. Native impact leaves keep
@@ -599,6 +603,10 @@ void EnWood02_Draw(Actor* thisx, PlayState* play) {
         red = variant ? 220 : 195;
         green = variant ? 145 : 90;
         blue = variant ? 35 : 25;
+    } else if (frost) {
+        red = 204;
+        green = 220;
+        blue = 238;
     }
 
     Gfx_SetupDL25_Xlu(gfxCtx);
@@ -621,14 +629,16 @@ void EnWood02_Draw(Actor* thisx, PlayState* play) {
 
         gDPSetEnvColor(POLY_XLU_DISP++, red, green, blue, 0);
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gfxCtx);
-        if (autumn) {
+        if (spring || autumn || frost) {
             // Some native canopies bake green into their own commands. Scope
             // the renderer tint to the canopy so those trees change as well.
-            gDPSetGrayscaleColor(POLY_XLU_DISP++, red, green, blue, 255);
-            gSPGrayscale(POLY_XLU_DISP++, true);
+            // Lift the dark actor canopies into readable blossom pink without
+            // retaining a green blend; opaque bark and native impact leaves stay native.
+            gDPSetGrayscaleColor(POLY_XLU_DISP++, spring ? 246 : red, spring ? 193 : green, spring ? 217 : blue, 255);
+            gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 1);
         }
         gSPDisplayList(POLY_XLU_DISP++, D_808C4D70[this->drawType & 0xF]);
-        if (autumn) {
+        if (spring || autumn || frost) {
             gSPGrayscale(POLY_XLU_DISP++, false);
         }
     } else {
