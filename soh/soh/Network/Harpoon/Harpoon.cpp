@@ -1,3 +1,6 @@
+#include "../../../../combo/emotes/EmoteBridge.h"
+#include <cstring>
+#include <array>
 #include "Harpoon.h"
 #include "HarpoonBridge.h"
 #include <nlohmann/json.hpp>
@@ -16,6 +19,7 @@
 #include "soh/Enhancements/item-tables/ItemTableManager.h"
 
 extern "C" {
+#include "macros.h"
 #include "variables.h"
 #include "functions.h"
 #include "mods/transformation_masks/transformation_masks.h"
@@ -616,6 +620,12 @@ void Harpoon::SendPacket_PlayerUpdate() {
         }
     }
 
+    Vec3s emoteJoints[24]{};
+    const bool emoting = modelType == 0 && ComboEmotes_CopyPose(emoteJoints, sizeof(emoteJoints));
+    if (emoting) {
+        srcJointTable = emoteJoints;
+        srcJointCount = 24;
+    }
     for (s32 i = 0; i < 24; i++) {
         if (i < srcJointCount && srcJointTable != NULL) {
             jointArray.push_back(srcJointTable[i].x);
@@ -631,10 +641,10 @@ void Harpoon::SendPacket_PlayerUpdate() {
     payload["prevTransl"] = { { "x", player->skelAnime.prevTransl.x },
                               { "y", player->skelAnime.prevTransl.y },
                               { "z", player->skelAnime.prevTransl.z } };
-    payload["movementFlags"] = player->skelAnime.movementFlags;
-    payload["upperLimbRot"] = { { "x", player->upperLimbRot.x },
-                                { "y", player->upperLimbRot.y },
-                                { "z", player->upperLimbRot.z } };
+    payload["movementFlags"] = emoting ? 0 : player->skelAnime.movementFlags;
+    payload["upperLimbRot"] = { { "x", emoting ? 0 : player->upperLimbRot.x },
+                                { "y", emoting ? 0 : player->upperLimbRot.y },
+                                { "z", emoting ? 0 : player->upperLimbRot.z } };
     payload["currentBoots"] = player->currentBoots;
     payload["currentShield"] = player->currentShield;
     payload["currentTunic"] = player->currentTunic;
@@ -3254,6 +3264,7 @@ void Harpoon::SendPacket_PlayerTransform() {
     if (!IsSaveLoaded())
         return;
     Player* player = GET_PLAYER(gPlayState);
+    const bool emoting = ComboEmotes_IsActive();
     nlohmann::json payload;
     payload["type"] = HPN_PLAYER_TRANSFORM;
     payload["posRot"]["pos"] = { { "x", player->actor.world.pos.x },
@@ -3265,7 +3276,7 @@ void Harpoon::SendPacket_PlayerTransform() {
     payload["prevTransl"] = { { "x", player->skelAnime.prevTransl.x },
                               { "y", player->skelAnime.prevTransl.y },
                               { "z", player->skelAnime.prevTransl.z } };
-    payload["movementFlags"] = player->skelAnime.movementFlags;
+    payload["movementFlags"] = emoting ? 0 : player->skelAnime.movementFlags;
     payload["quiet"] = true;
     SendJsonToRemote(payload);
 }
@@ -3289,6 +3300,12 @@ void Harpoon::SendPacket_PlayerSkeleton() {
         }
     }
     std::vector<int> jointArray;
+    Vec3s emoteJoints[24]{};
+    const bool emoting = modelType == 0 && ComboEmotes_CopyPose(emoteJoints, sizeof(emoteJoints));
+    if (emoting) {
+        srcJointTable = emoteJoints;
+        srcJointCount = 24;
+    }
     for (s32 i = 0; i < 24; i++) {
         if (i < srcJointCount && srcJointTable != NULL) {
             jointArray.push_back(srcJointTable[i].x);
@@ -3301,7 +3318,7 @@ void Harpoon::SendPacket_PlayerSkeleton() {
         }
     }
     payload["jointTable"] = jointArray;
-    payload["movementFlags"] = player->skelAnime.movementFlags;
+    payload["movementFlags"] = emoting ? 0 : player->skelAnime.movementFlags;
     payload["quiet"] = true;
     SendJsonToRemote(payload);
 }
@@ -3310,15 +3327,16 @@ void Harpoon::SendPacket_PlayerLimbRotations() {
     if (!IsSaveLoaded())
         return;
     Player* player = GET_PLAYER(gPlayState);
+    const bool emoting = ComboEmotes_IsActive();
     nlohmann::json payload;
     payload["type"] = HPN_PLAYER_LIMB_ROT;
-    payload["upperLimbRot"] = { { "x", player->upperLimbRot.x },
-                                { "y", player->upperLimbRot.y },
-                                { "z", player->upperLimbRot.z } };
-    payload["headLimbRotX"] = player->headLimbRot.x;
-    payload["headLimbRotY"] = player->headLimbRot.y;
-    payload["headLimbRotZ"] = player->headLimbRot.z;
-    payload["upperLimbYawSecondary"] = player->upperLimbYawSecondary;
+    payload["upperLimbRot"] = { { "x", (emoting ? 0 : player->upperLimbRot.x) },
+                                { "y", (emoting ? 0 : player->upperLimbRot.y) },
+                                { "z", (emoting ? 0 : player->upperLimbRot.z) } };
+    payload["headLimbRotX"] = (emoting ? 0 : player->headLimbRot.x);
+    payload["headLimbRotY"] = (emoting ? 0 : player->headLimbRot.y);
+    payload["headLimbRotZ"] = (emoting ? 0 : player->headLimbRot.z);
+    payload["upperLimbYawSecondary"] = (emoting ? 0 : player->upperLimbYawSecondary);
     payload["quiet"] = true;
     SendJsonToRemote(payload);
 }

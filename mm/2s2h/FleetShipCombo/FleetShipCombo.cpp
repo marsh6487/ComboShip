@@ -563,6 +563,8 @@ void FleetShipCombo_SharedInit(unsigned long instanceKey) {
 bool Combo_MmIsForeground(void);
 
 int FleetShipCombo_GetActiveGame(void) {
+    if (!Combo_IsCombinedGame())
+        return -1;
     return Combo_MmIsForeground() ? 1 : 0;
 }
 

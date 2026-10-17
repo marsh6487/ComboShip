@@ -9,6 +9,25 @@
 using Fn_OOT_GetItemReceiptText = int32_t (*)(const char*, char*, uint32_t);
 
 namespace ComboItemReceiptText {
+inline bool WithoutOotItemIcons(std::string_view src, std::string& out) {
+    out.clear();
+    for (size_t offset = 0; offset < src.size();) {
+        const uint8_t code = src[offset];
+        const size_t parameters =
+            code == 0x05 || code == 0x06 || code == 0x0C || code == 0x0E || code == 0x13 || code == 0x14 || code == 0x1E
+                ? 1
+            : code == 0x07 || code == 0x11 || code == 0x12 ? 2
+            : code == 0x15                                 ? 3
+                                                           : 0;
+        if (src.size() - offset <= parameters)
+            return false;
+        if (code != 0x13)
+            out.append(src.substr(offset, parameters + 1));
+        offset += parameters + 1;
+    }
+    return true;
+}
+
 inline uint8_t OotButtonToMM(uint8_t c) {
     return c >= 0x9F && c <= 0xAA ? c + (0xB0 - 0x9F) : c;
 }

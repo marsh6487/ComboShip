@@ -113,9 +113,12 @@ def main():
         rows.append("{" + fields[0] + ", Item(" + ", ".join(
             [*fields[:3], "0", "false", "LOGIC_NONE", fields[6], "ITEM_CATEGORY_MAJOR", article]) + ")},")
 
-    flags = ["-std=c++20", "-O0", "-g", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0"]
+    flags = ["-std=c++20", "-O0", "-g", "-ffunction-sections", "-fdata-sections", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0"]
     flags += ["-I" + str(root / p) for p in ("soh", "soh/include", "soh/src", "soh/assets",
                                               "libultraship/include")]
+    for config in ("CMake/soh-cvars.cmake", "CMake/lus-cvars.cmake"):
+        for key, value in re.findall(r'set\((CVAR_PREFIX_\w+)\s+"?([^\s"\)]+)', (root / config).read_text()):
+            flags.append(f'-D{key}="{value}"')
     if (root / "combo").is_dir():
         flags += ["-DCOMBO_BUILD", "-I" + str(root / "combo/menu")]
     if args.sanitize:
@@ -127,6 +130,7 @@ def main():
         binary = folder / "test"
         subprocess.run([os.environ.get("CXX", "c++"), *flags, "-I" + temp,
                         str(ROOT / "soh/tests/hint_item_name_test.cpp"), str(custom / "text.cpp"),
+                        str(root / "soh/soh/ShipUtils.cpp"), "-Wl,--gc-sections",
                         "-o", str(binary)], check=True)
         subprocess.run([str(binary)], check=True)
 

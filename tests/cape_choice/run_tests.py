@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute the cape receipt loader and native confirmation with actual engine/save headers."""
+"""Execute cape receipt, confirmation and icon drawing with actual engine/save headers."""
 from pathlib import Path
 import argparse
 import os
@@ -12,6 +12,42 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/diagnostics'))
 sys.path.insert(0, str(ROOT / 'tests/mm_presentation'))
 from run_foreign_scale_tests import function
+
+
+def block(source, marker):
+    """Copy an actual production function or draw block, including its braces."""
+    start = source.index(marker)
+    cursor = source.index('{', start) + 1
+    depth = 1
+    while depth:
+        depth += (source[cursor] == '{') - (source[cursor] == '}')
+        cursor += 1
+    return source[start:cursor]
+
+
+def icon_fixture(game):
+    equipment = (ROOT / game / 'mods/extended_equipment.c').read_text()
+    folder = ('mm/src/overlays/kaleido_scope/ovl_kaleido_scope' if game == 'mm'
+              else 'soh/src/overlays/misc/ovl_kaleido_scope')
+    pause = (ROOT / folder / 'z_kaleido_equipment.c').read_text()
+    accessors = '\n'.join(block(equipment, signature) for signature in (
+        'u8 ExtEquip_CapeOwned(', 'u8 ExtEquip_CapeVisible(', 'void ExtEquip_GivePendant(',
+        'u8 ExtEquip_PendantOwned(', 'u8 ExtEquip_PendantActive('))
+    accessors = (re.search(r'^#define TRADE_ADULT_PENDANT[^\n]*', equipment, re.M).group(0) +
+                 '\n' + accessors)
+    draw = function(pause, 'KaleidoScope_DrawEquipment')
+    if game == 'mm':
+        accessors += '\n' + block(pause, 'static s16 KaleidoEquip_UpgradeValue(')
+        accessors += '\n' + block(pause, 'static void* KaleidoEquip_UpgradeIcon(')
+        passive = block(draw, '        for (row = 0; row < 4; row++)')
+        passive = 's16 row;\n' + passive
+    else:
+        # Keep the real row loop, ownership gate, texture dispatch and primitive-alpha reset.
+        start = draw.index('    for (rowStart = 0, j = 0, temp = 0, i = 0;')
+        passive = draw[start:draw.index('        // Draw inventory screen icons', start)] + '\n    }\n'
+        passive = 's16 rowStart, j, temp, i;\n' + passive
+    fixture = (ROOT / 'tests/cape_choice/native_icon_test.c').read_text()
+    return fixture.replace('/* PRODUCTION_ACCESSORS */', accessors).replace('/* PRODUCTION_DRAW */', passive)
 
 
 def flags(game):
@@ -66,13 +102,32 @@ def main():
                 production += ('\n#include "soh/Enhancements/savestate_serialize.h"\n' +
                                '\n'.join(declarations) + '\n' + serializer)
             fixture = (ROOT / 'tests/cape_choice/native_choice_test.c').read_text()
+            update_prefix = ''
+            if game == 'mm':
+                # Execute the actual pre-switch dispatch, including whether it calls
+                # the Cape handler before reveal/intro modes process their input.
+                update = function(engine, 'Message_Update')
+                update_prefix = update[:update.index('    msgCtx->stickAdjX')]
+                update_prefix = update_prefix.replace('Message_Update(', 'Message_UpdateCapePrefix(', 1) + '}\n'
             test = build / (game + '.c')
-            test.write_text(fixture.replace('/* PRODUCTION_CHOICE */', production))
+            test.write_text(fixture.replace('/* PRODUCTION_CHOICE */', production)
+                            .replace('/* PRODUCTION_UPDATE_PREFIX */', update_prefix))
             binary = build / game
             extra = ['-DCAPE_TEST_MM'] if game == 'mm' else []
             subprocess.run([os.environ.get('CC', 'cc'), '-std=gnu11', *flags(game), *extra, *sanitize,
                             str(test), '-o', str(binary)], check=True, capture_output=True, text=True)
             subprocess.run([str(binary)], check=True)
+        icon_result = 0
+        for game in ('mm', 'soh'):
+            test = build / (game + '_icon.c')
+            test.write_text(icon_fixture(game))
+            binary = build / (game + '_icon')
+            extra = ['-DCAPE_TEST_MM'] if game == 'mm' else []
+            subprocess.run([os.environ.get('CC', 'cc'), '-std=gnu11', *flags(game), *extra, *sanitize,
+                            str(test), '-o', str(binary)], check=True, capture_output=True, text=True)
+            icon_result |= subprocess.run([str(binary)]).returncode
+        if icon_result:
+            raise subprocess.CalledProcessError(icon_result, 'native cape icon tests')
 
 
 if __name__ == '__main__':

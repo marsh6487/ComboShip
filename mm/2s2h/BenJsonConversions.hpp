@@ -2,6 +2,7 @@
 #define BenJsonConversions_hpp
 
 #include <nlohmann/json.hpp>
+#include "../../combo/ComboGameMode.h"
 #include <spdlog/spdlog.h>
 #include "build.h"
 #include <cstring> // memset for NEI save defaults (Skijer's NEI)
@@ -148,6 +149,8 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "slateRunesOwned", n.slateRunesOwned },
         { "season", n.season },
         { "seasonsOwned", n.seasonsOwned },
+        { "seasonsRodOwned", n.seasonsRodOwned },
+        { "seasonsGates", n.seasonsGates },
         { "ootCanGrab", n.ootCanGrab },
         { "activeCustomForm", n.activeCustomForm },
         { "marioMaskOwned", n.marioMaskOwned },
@@ -282,6 +285,8 @@ inline void from_json(const json& j, NeiSaveData& n) {
     n.slateRunesOwned = j.value("slateRunesOwned", (uint8_t)0);
     n.season = j.value("season", (uint8_t)0);
     n.seasonsOwned = j.value("seasonsOwned", (uint8_t)0);
+    n.seasonsRodOwned = j.value("seasonsRodOwned", (uint8_t)0);
+    n.seasonsGates = j.value("seasonsGates", (uint8_t)0);
     n.ootCanGrab = j.value("ootCanGrab", (uint8_t)0);
     n.activeCustomForm = j.value("activeCustomForm", (uint8_t)0);
     n.marioMaskOwned = j.value("marioMaskOwned", (uint8_t)0);
@@ -449,6 +454,7 @@ inline void to_json(json& j, const ShipSaveInfo& shipSaveInfo) {
         { "dpadEquips", shipSaveInfo.dpadEquips },
         { "extButtons", shipSaveInfo.extButtons },
         { "pauseSaveEntrance", shipSaveInfo.pauseSaveEntrance },
+        { "persistentBunnyHood", shipSaveInfo.persistentBunnyHood },
         { "saveType", shipSaveInfo.saveType },
         { "fileCreatedAt", shipSaveInfo.fileCreatedAt },
         { "fileCompletedAt", shipSaveInfo.fileCompletedAt },
@@ -473,6 +479,7 @@ inline void from_json(const json& j, ShipSaveInfo& shipSaveInfo) {
         memset(&shipSaveInfo.extButtons, 0, sizeof(shipSaveInfo.extButtons));
     }
     j.at("pauseSaveEntrance").get_to(shipSaveInfo.pauseSaveEntrance);
+    j.at("persistentBunnyHood").get_to(shipSaveInfo.persistentBunnyHood);
     j.at("saveType").get_to(shipSaveInfo.saveType);
     j.at("fileCreatedAt").get_to(shipSaveInfo.fileCreatedAt);
     j.at("fileCompletedAt").get_to(shipSaveInfo.fileCompletedAt);
@@ -491,13 +498,12 @@ inline void from_json(const json& j, ShipSaveInfo& shipSaveInfo) {
     }
 
     if (shipSaveInfo.saveType == SAVETYPE_RANDO) {
-#ifndef COMBO_BUILD
-        // ComboShip: tolerate cross-build rando saves on the combosave path (mirrors SoH's !comboSrc exemption).
-        if (strcmp(shipSaveInfo.commitHash, gGitCommitHash) != 0) {
+        // Combined containers keep their existing compatibility policy; native
+        // randomizer saves retain MM's version check.
+        if (!Combo_IsCombinedGame() && strcmp(shipSaveInfo.commitHash, gGitCommitHash) != 0) {
             SPDLOG_ERROR("Randomizer saves cannot be loaded from a different version.");
-            throw new std::runtime_error("Randomizer saves cannot be loaded from a different version.");
+            throw std::runtime_error("Randomizer saves cannot be loaded from a different version.");
         }
-#endif
 
         j.at("rando").get_to(shipSaveInfo.rando);
     }

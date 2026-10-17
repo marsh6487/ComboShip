@@ -40,6 +40,7 @@
 
 #include "expansions/sw97/sw97_config.h" // SW97_MEDALLIONS_ENABLED
 #include "../../extended_equipment.h"    // MAGIC_REQ (Magic Cape halves spell cost)
+#include "gameplay/ComboFaroresWind.h"
 
 // ---------------------------------------------------------------------------
 // z_player.c internals (defined later in this TU) — forward declarations
@@ -78,6 +79,10 @@ extern void OotFw_NotifyArrived(void);
 // overworld scene with the farores bit and dungeons are simply absent (default = allowed).
 // MM mirror: the four temples, their boss lairs, and the Moon trials.
 static s32 OotSpells_SceneAllowsFarores(PlayState* play) {
+#ifdef COMBO_BUILD
+    // DOWN deliberately remains in the parent scene inside grottos. Recall is gated separately.
+    return Play_GetOriginalSceneId(play->sceneId) != SCENE_KAKUSIANA;
+#else
     switch (Play_GetOriginalSceneId(play->sceneId)) {
         case SCENE_MITURIN:    // Woodfall Temple
         case SCENE_MITURIN_BS: // Odolwa's Lair
@@ -97,6 +102,7 @@ static s32 OotSpells_SceneAllowsFarores(PlayState* play) {
         default:
             return false;
     }
+#endif
 }
 
 // One-shot latch read by Sw97 MagicWind_Init: vanilla Farore's Wind cast → no Forest tornado.
@@ -303,15 +309,18 @@ s32 OotSpells_TryUseItem(PlayState* play, Player* this, s32 itemAction, s32 item
         // medallion spell; SW97_MEDALLIONS_ENABLED keeps gating the arrows/bullets/equip UI only.
         s32 isMedallionSpell = Sw97_IsMedallionItem(item);
 
-        // OoT: Farore's Wind is dungeon-only — overworld scenes grey it out via
-        // interfaceCtx->restrictions.farores (soh z_parameter.c:1227). MM mirror: error beep.
-        if ((itemAction == PLAYER_IA_FARORES_WIND) && !isMedallionSpell && !OotSpells_SceneAllowsFarores(play)) {
+        // Combo's existing shared point can be recalled even where a new native point cannot be set.
+        if ((itemAction == PLAYER_IA_FARORES_WIND) && !isMedallionSpell &&
+#ifdef COMBO_BUILD
+            !ComboFw_HasPoint(Nei_Save()->fwSet != 0) &&
+#endif
+            !OotSpells_SceneAllowsFarores(play)) {
             Audio_PlaySfx(NA_SE_SY_ERROR);
             return true;
         }
 
         // Farore's Wind with an existing warp point bypasses the magic check (opens the menu).
-        if (((itemAction == PLAYER_IA_FARORES_WIND) && (Nei_Save()->fwSet != 0) && !isMedallionSpell) ||
+        if (((itemAction == PLAYER_IA_FARORES_WIND) && ComboFw_HasPoint(Nei_Save()->fwSet != 0) && !isMedallionSpell) ||
             ((gSaveContext.magicCapacity != 0) && (gSaveContext.magicState == MAGIC_STATE_IDLE) &&
              (gSaveContext.save.saveInfo.playerData.magic >= MAGIC_REQ(sOotMagicSpellCosts[magicSpell])))) {
             this->itemAction = itemAction;
@@ -370,7 +379,7 @@ s32 OotSpells_HandleCsItem(Player* this, PlayState* play) {
         return false;
     }
 
-    if ((magicSpell != 3) || (Nei_Save()->fwSet == 0) || sOotSw97SpellActive) {
+    if ((magicSpell != 3) || !ComboFw_HasPoint(Nei_Save()->fwSet != 0) || sOotSw97SpellActive) {
         OotSpells_SetupCast(play, this, magicSpell);
     } else {
         // Farore's Wind with a warp point set → Return/Leave menu (OoT Player_Action_8085063C).
@@ -454,6 +463,7 @@ void Player_Action_OotMagicSpell(Player* this, PlayState* play) {
                 nei->fwRoomIndex = down->roomIndex;
                 nei->fwTempSwitchFlags = down->tempSwitchFlags;
                 nei->fwTempCollectFlags = down->tempCollectFlags;
+                ComboFw_PublishPoint();
 
                 // Start the pillar: grow at Link's cast spot + sparkle-fly to the stored point
                 // (OoT respawn[TOP].data = 1 + Play_SetupRespawnPoint(TOP, 0x6FF)).
@@ -520,28 +530,36 @@ void Player_Action_OotFwMenu(Player* this, PlayState* play) {
         Message_CloseTextbox(play);
 
         if (choice == 0) { // Return to the warp point
-            RespawnData* top = &gSaveContext.respawn[RESPAWN_MODE_TOP];
+            s32 result = ComboFw_RequestReturn();
+            if (result > 0)
+                return;
+            if (result < 0) {
+                Audio_PlaySfx(NA_SE_SY_ERROR);
+                // Failed handoff keeps the point and releases Link below.
+            } else {
+                RespawnData* top = &gSaveContext.respawn[RESPAWN_MODE_TOP];
 
-            // Materialize the persisted warp point into respawn[TOP]; respawnFlag = 3 makes MM's
-            // Player_Init place Link there (respawnIndex = respawnFlag - 1 = RESPAWN_MODE_TOP).
-            top->pos.x = nei->fwPosX;
-            top->pos.y = nei->fwPosY;
-            top->pos.z = nei->fwPosZ;
-            top->yaw = nei->fwYaw;
-            top->playerParams = PLAYER_PARAMS(0xFF, PLAYER_START_MODE_D); // stationary; arrival is ours
-            top->entrance = nei->fwEntrance;
-            top->roomIndex = nei->fwRoomIndex;
-            top->data = 1;
-            top->tempSwitchFlags = nei->fwTempSwitchFlags;
-            top->unk_18 = 0;
-            top->tempCollectFlags = nei->fwTempCollectFlags;
+                // Materialize the persisted warp point into respawn[TOP]; respawnFlag = 3 makes MM's
+                // Player_Init place Link there (respawnIndex = respawnFlag - 1 = RESPAWN_MODE_TOP).
+                top->pos.x = nei->fwPosX;
+                top->pos.y = nei->fwPosY;
+                top->pos.z = nei->fwPosZ;
+                top->yaw = nei->fwYaw;
+                top->playerParams = PLAYER_PARAMS(0xFF, PLAYER_START_MODE_D); // stationary; arrival is ours
+                top->entrance = nei->fwEntrance;
+                top->roomIndex = nei->fwRoomIndex;
+                top->data = 1;
+                top->tempSwitchFlags = nei->fwTempSwitchFlags;
+                top->unk_18 = 0;
+                top->tempCollectFlags = nei->fwTempCollectFlags;
 
-            sOotFwReturnPending = true;
-            gSaveContext.respawnFlag = 3;
-            play->nextEntrance = nei->fwEntrance;
-            play->transitionTrigger = TRANS_TRIGGER_START;
-            play->transitionType = TRANS_TYPE_FADE_WHITE; // OoT TRANS_TYPE_FADE_WHITE_FAST
-            return;
+                sOotFwReturnPending = true;
+                gSaveContext.respawnFlag = 3;
+                play->nextEntrance = nei->fwEntrance;
+                play->transitionTrigger = TRANS_TRIGGER_START;
+                play->transitionType = TRANS_TYPE_FADE_WHITE; // OoT TRANS_TYPE_FADE_WHITE_FAST
+                return;
+            }
         }
 
         if (choice == 1) { // Dispel the warp point
@@ -551,6 +569,7 @@ void Player_Action_OotFwMenu(Player* this, PlayState* play) {
             fwPos.y = nei->fwPosY;
             fwPos.z = nei->fwPosZ;
             nei->fwSet = 0;
+            ComboFw_ClearPoint();
             Audio_PlaySfx_AtPos(&fwPos, NA_SE_PL_MAGIC_WIND_VANISH);
             OotFw_NotifyDispelled(); // pillar shrinks back to nothing (OoT data = -data)
         }
@@ -578,6 +597,7 @@ void Player_Action_OotFwArrive(Player* this, PlayState* play) {
         // The point is consumed on arrival: the pillar fades into the camera and clears fwSet
         // when fully transparent (OoT Player_Action_8085076C bumping respawn[TOP].data past 40).
         OotFw_NotifyArrived();
+        ComboFw_ClearPoint();
     }
 
     if (this->av2.actionVar2 > 20) {
@@ -594,8 +614,10 @@ void Player_Action_OotFwArrive(Player* this, PlayState* play) {
 // ---------------------------------------------------------------------------
 void OotSpells_OnPlayerInit(PlayState* play, Player* this) {
     // Farore's Wind return arrival (OoT PLAYER_START_MODE_FARORES_WIND).
-    if (sOotFwReturnPending) {
-        sOotFwReturnPending = false;
+    s32 crossGameArrival = ComboFw_ConsumeArrivalAnimation();
+    s32 localArrival = sOotFwReturnPending;
+    sOotFwReturnPending = false;
+    if ((localArrival || crossGameArrival) && Nei_Save()->fwSet) {
         this->actor.draw = NULL; // invisible while warping in
         this->stateFlags1 |= PLAYER_STATE1_20000000;
         Player_SetAction(play, this, Player_Action_OotFwArrive, 0);

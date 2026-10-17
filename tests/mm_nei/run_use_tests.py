@@ -6,14 +6,24 @@ sys.path.insert(0,str(ROOT/'scripts/diagnostics'))
 from run_mm_nei_tests import flags
 from run_time_pedestal_tests import functions
 
-def source(path): return (ROOT/path).read_text()
+SOURCE_REF=None
+SANITIZE='--sanitize' in sys.argv
+if SANITIZE:sys.argv.remove('--sanitize')
+SANITIZER_FLAGS=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g'] if SANITIZE else []
+if '--source-ref' in sys.argv:
+ index=sys.argv.index('--source-ref');SOURCE_REF=sys.argv[index+1]
+ del sys.argv[index:index+2]
+
+def source(path):
+ if SOURCE_REF:return subprocess.check_output(['git','show',SOURCE_REF+':'+path],cwd=ROOT,text=True)
+ return (ROOT/path).read_text()
 def body(path,name): return functions(source(path))[name]
 def run(name,prefix,parts,checks):
  if len(sys.argv)>1 and sys.argv[1]!=name: return
  with tempfile.TemporaryDirectory(prefix='mm-nei-use-') as td:
   path=Path(td)/(name+'.cpp');path.write_text('#include "mods/items/custom_items.h"\n#include "mods/items/helpers/equip_helper.h"\n#include "mods/extended_player.h"\n#include <cassert>\n#include <iostream>\n'+prefix+'\n'+ '\n'.join(parts)+'\nint main(){'+checks+'\nstd::cout<<"PASS '+name+'\\n";}')
   binary=Path(td)/name
-  subprocess.run(['c++','-std=c++20',*flags(),'-ffunction-sections','-fdata-sections',str(path),'-Wl,--gc-sections','-o',str(binary)],check=True)
+  subprocess.run(['c++','-std=c++20',*flags(),*SANITIZER_FLAGS,'-ffunction-sections','-fdata-sections',str(path),'-Wl,--gc-sections','-o',str(binary)],check=True)
   subprocess.run([str(binary)],check=True)
 
 bc='mm/mods/items/logic/item_ballchain.c'
@@ -324,6 +334,7 @@ caller_prefix=r'''
 #include "mods/items/custom_items.h"
 #include "mods/items/helpers/equip_helper.h"
 #include "mods/extended_player.h"
+#include "mods/extended_equipment.h"
 #include "mods/items/logic/item_spinner.h"
 #include "variables.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -341,6 +352,8 @@ static u16 sPlayerItemButtons[]={BTN_B,BTN_CLEFT,BTN_CDOWN,BTN_CRIGHT};
 static u16 sDpadItemButtons[]={BTN_DRIGHT,BTN_DLEFT,BTN_DDOWN,BTN_DUP};
 static ItemInputState netInput;
 static int transitions,initializations;static u8 animationDestination;
+static int equipmentToggles;static u16 toggledEquipment;
+void ExtEquip_ToggleFromCButton(u16 item){++equipmentToggles;toggledEquipment=item;}
 static int dpadEnabled;
 f32 gSfxDefaultFreqAndVolScale=1;s8 gSfxDefaultReverb=0;
 u8 gItemSlots[77];
@@ -417,7 +430,8 @@ void ResetCaller(Player* p,PlayState* play,u8 held,u16 press){
  gSaveContext.save.saveInfo.equips.buttonItems[0][EQUIP_SLOT_C_LEFT]=ITEM_NET;
  netInput=(ItemInputState){.wasEquipped=1,.otherButtonPressed=1,.equippedButton=BTN_CLEFT};
  sNetActive=1;sNetEquipState=(ItemEquipState){.isEquipped=1};
- transitions=initializations=dpadEnabled=0;sPlayerUseHeldItem=sPlayerHeldItemButtonIsHeldDown=0;
+ transitions=initializations=dpadEnabled=equipmentToggles=0;toggledEquipment=ITEM_NONE;
+ sPlayerUseHeldItem=sPlayerHeldItemButtonIsHeldDown=0;
 }
 '''
 def native_decl(text,start):
@@ -439,7 +453,7 @@ def run_caller(name,checks):
  with tempfile.TemporaryDirectory(prefix='mm-nei-caller-') as td:
   src=Path(td)/'caller.c';binary=Path(td)/'caller'
   src.write_text(caller_prefix+'\n'.join(caller_parts)+'\nint main(void){'+checks+'\nputs("PASS '+name+'");}')
-  subprocess.run(['cc','-std=gnu17',*flags(),'-Werror=implicit-function-declaration','-ffunction-sections','-fdata-sections',str(src),'-Wl,--gc-sections','-lm','-o',str(binary)],check=True)
+  subprocess.run(['cc','-std=gnu17',*flags(),*SANITIZER_FLAGS,'-Werror=implicit-function-declaration','-ffunction-sections','-fdata-sections',str(src),'-Wl,--gc-sections','-lm','-o',str(binary)],check=True)
   subprocess.run([str(binary)],check=True)
 run_caller('net_native_replacement',r'''
  Player p;PlayState play;ResetCaller(&p,&play,ITEM_NET,BTN_B);
@@ -488,6 +502,207 @@ run_caller('spinner_native_stow',r'''
  assert(p.heldItemAction==PLAYER_IA_NONE&&p.nextModelGroup==PLAYER_MODELGROUP_DEFAULT&&initializations==1);
  assert(!(p.stateFlags3&PLAYER_STATE3_START_CHANGING_HELD_ITEM));
 ''')
+
+# Extended swords share a native action but retain distinct held/model identities.
+# Use the complete production resolver and native button/use/acceptance pipeline.
+equipment_prefix = caller_prefix.replace('#include "mods/extended_player.h"',
+    '#include "mods/extended_player.h"\n#include "mods/extended_equipment.h"\n#include "mods/extended_inventory.h"')
+equipment_prefix = re.sub(r's8 ExtPlayer_GetItemAction\(s32 item\)\{.*?\n\}', '', equipment_prefix, flags=re.S)
+equipment_prefix = equipment_prefix.replace('static int dpadEnabled;',
+    'static int dpadEnabled;static u8 requestedB,requestedC,requestedD;')
+equipment_prefix = equipment_prefix.replace('return ITEM_SWORD_KOKIRI;}', 'return requestedB;}')
+equipment_prefix = equipment_prefix.replace('if(slot==EQUIP_SLOT_B)return ITEM_SWORD_KOKIRI;',
+    'if(slot==EQUIP_SLOT_B)return requestedB;')
+equipment_prefix = equipment_prefix.replace('if(slot==EQUIP_SLOT_C_LEFT)return ITEM_NET;',
+    'if(slot==EQUIP_SLOT_C_LEFT)return requestedC;')
+equipment_prefix = equipment_prefix.replace('slot==EQUIP_SLOT_D_DOWN?ITEM_BOW:ITEM_NONE;',
+    'slot==EQUIP_SLOT_D_DOWN?requestedD:ITEM_NONE;')
+equipment_prefix += r'''
+uint8_t Sw97_EffectiveElement(uint8_t carrier){return 0;}
+const NeiItem* Nei_FindByItem(int32_t item){return NULL;}
+'''
+equipment_parts = [native_decl(caller_player, 's8 sItemItemActions['),
+    body('mm/mods/extended_player.c', 'ExtPlayer_GetItemAction'), *caller_parts]
+
+def run_equipment_caller(name, checks):
+ global caller_prefix,caller_parts
+ original_prefix,original_parts=caller_prefix,caller_parts
+ caller_prefix,caller_parts=equipment_prefix,equipment_parts
+ try: run_caller(name, checks)
+ finally: caller_prefix,caller_parts=original_prefix,original_parts
+
+run_equipment_caller('extended_sword_native_identity',r'''
+ Player p;PlayState play;
+ const u8 swords[]={ITEM_EXT_SWORD_2,ITEM_EXT_SWORD_3,ITEM_EXT_SWORD_1};
+ for(unsigned a=0;a<3;a++)for(unsigned b=0;b<3;b++){
+  ResetCaller(&p,&play,swords[a],BTN_B);requestedB=swords[b];
+  assert(ExtPlayer_GetItemAction(requestedB)==PLAYER_IA_SWORD_KOKIRI);
+  Player_UpdateItems(&p,&play);
+  assert(p.heldItemId==requestedB&&"B sword selection retained the previous sword identity");
+  assert(!equipmentToggles&&p.heldItemAction==PLAYER_IA_SWORD_KOKIRI);
+  if(a==b)assert(sPlayerUseHeldItem&&!initializations&&!transitions);
+  else assert(initializations==1&&!transitions);
+ }
+ for(unsigned a=0;a<3;a++){
+  ResetCaller(&p,&play,ITEM_SWORD_KOKIRI,BTN_B);requestedB=swords[a];Player_UpdateItems(&p,&play);
+  assert(p.heldItemId==requestedB&&initializations==1);
+  ResetCaller(&p,&play,swords[a],BTN_B);requestedB=ITEM_SWORD_KOKIRI;Player_UpdateItems(&p,&play);
+  assert(p.heldItemId==ITEM_SWORD_KOKIRI&&initializations==1);
+ }
+ ResetCaller(&p,&play,ITEM_EXT_SWORD_3,BTN_B);requestedB=ITEM_EXT_SWORD_2;
+ p.stateFlags1|=PLAYER_STATE1_8000000;Player_UpdateItems(&p,&play);
+ assert(p.heldItemId==ITEM_EXT_SWORD_3&&!initializations&&!transitions);
+ ResetCaller(&p,&play,ITEM_EXT_SWORD_3,BTN_B);requestedB=ITEM_EXT_SWORD_2;p.itemAction=PLAYER_IA_BOW;
+ Player_UseItem(&play,&p,requestedB);assert(p.heldItemId==ITEM_EXT_SWORD_3&&!initializations&&!transitions);
+''')
+run_equipment_caller('extended_equipment_native_toggle',r'''
+ Player p;PlayState play;
+ for(u8 item=ITEM_EXT_SWORD_1;item<=ITEM_EXT_BOOTS_3;item++){
+  ResetCaller(&p,&play,ITEM_SWORD_KOKIRI,BTN_CLEFT);requestedB=ITEM_SWORD_KOKIRI;requestedC=item;
+  Player_UpdateItems(&p,&play);
+  assert(equipmentToggles==1&&toggledEquipment==item&&"C equipment press never reached its toggle");
+  assert(p.heldItemId==ITEM_SWORD_KOKIRI&&!transitions&&!initializations);
+  ResetCaller(&p,&play,ITEM_SWORD_KOKIRI,BTN_DDOWN);requestedD=item;dpadEnabled=1;
+  Player_UpdateItems(&p,&play);assert(equipmentToggles==1&&toggledEquipment==item);
+  assert(p.heldItemId==ITEM_SWORD_KOKIRI&&!transitions&&!initializations);
+ }
+ ResetCaller(&p,&play,ITEM_SWORD_KOKIRI,BTN_CLEFT);requestedC=ITEM_EXT_TUNIC_2;
+ p.stateFlags1|=PLAYER_STATE1_CARRYING_ACTOR;Player_UpdateItems(&p,&play);
+ assert(!equipmentToggles&&p.heldItemId==ITEM_SWORD_KOKIRI);
+ ResetCaller(&p,&play,ITEM_SWORD_KOKIRI,0);requestedC=ITEM_EXT_TUNIC_2;
+ play.state.input[0].cur.button=BTN_CLEFT;Player_UpdateItems(&p,&play);assert(!equipmentToggles);
+''')
+
+# Custom tools see raw presses before the native button dispatcher. Run the complete
+# Gust Jar handler and its real unequip path around that production update boundary.
+gust_path='mm/mods/items/logic/item_gustjar.c'
+gust_prefix=equipment_prefix.replace('const NeiItem* Nei_FindByItem(int32_t item){return NULL;}',
+    'const NeiItem* Nei_FindByItem(int32_t item){static NeiItem gust={.ia=PLAYER_IA_GUST_JAR};return item==ITEM_GUST_JAR?&gust:NULL;}')
+gust_prefix=gust_prefix.replace('static int dpadEnabled;', 'static int buttonQueries;static int dpadEnabled;')
+gust_prefix=gust_prefix.replace('ItemId Player_GetItemOnButton(PlayState* play,Player* p,EquipSlot slot){',
+    'ItemId Player_GetItemOnButton(PlayState* play,Player* p,EquipSlot slot){++buttonQueries;')
+gust_prefix=gust_prefix.replace('ItemId Player_Dpad_GetItemOnButton(PlayState* play,Player* p,DpadEquipSlot slot){',
+    'ItemId Player_Dpad_GetItemOnButton(PlayState* play,Player* p,DpadEquipSlot slot){++buttonQueries;')
+gust_prefix+='\n#include "mods/items/logic/item_gustjar.h"\n#include "mods/transformation_masks/transformation_masks.h"\n#include "mods/transformation_masks/assets/mm_asset_loader.h"\nstatic u8 sGustTornadoOn;\n'
+def service_stub(path,name):
+ signature=body(path,name).split('{',1)[0]
+ return signature+'{'+('' if re.search(r'\bvoid\s+'+name+r'\(',signature) else 'return 0;')+'}\n'
+for name in ['GustJar_ClearScaleCache','GustJar_TornadoStop','GustJar_GetElement','GustJar_ElementCount',
+             'GustJar_ElementNeighbor','GustJar_SetElement','GustJar_ApplyCarryPose','GustJar_GetAimYaw',
+             'GustJar_Absorb','GustJar_Blow','Player_InitGustJarIA']:
+ gust_prefix+=service_stub(gust_path,name)
+for name in ['FirstPerson_Init','FirstPerson_Exit','FirstPerson_Update','FirstPerson_GetAimPitch']:
+ gust_prefix+=service_stub('mm/mods/items/helpers/camera_helper.c',name)
+gust_prefix+=r'''
+static u8 equipmentOwned=1,equipmentAgeAllowed=1,currentEquipment,pikachu;
+static int genericOtherButtons,consumeR;
+void SetGustAssignments(void){
+ BUTTON_ITEM_EQUIP(0,EQUIP_SLOT_C_LEFT)=requestedC;
+ DPAD_BUTTON_ITEM_EQUIP(0,EQUIP_SLOT_D_DOWN)=requestedD;
+ gSaveContext.buttonStatus[EQUIP_SLOT_C_LEFT]=BTN_ENABLED;
+ gSaveContext.shipSaveContext.dpad.status[EQUIP_SLOT_D_DOWN]=BTN_ENABLED;
+ buttonQueries=0;
+}
+u8 ExtEquip_HasItem(s16 type,u8 index){return equipmentOwned;}
+u8 ExtEquip_CheckAgeReq(s16 type,u8 index){return equipmentAgeAllowed;}
+u8 ExtEquip_GetCurrent(s16 type){return currentEquipment;}
+u8 ExtEquip_SlotRetired(s16 type,u8 index){return 0;}
+u8 ExtEquip_TridentAllowsShield(u8 index,u16 native){return index==1||index==3;}
+u8 TransformMasks_IsTransformedAny(void){return pikachu;}
+MmPlayerTransformation MmForm_GetCurrentForm(void){return pikachu?MM_PLAYER_FORM_PIKACHU:MM_PLAYER_FORM_HUMAN;}
+u8 ItemInput_IsBlocked(Player* p,PlayState* play){return 0;}
+void ItemEquip_PlayEquipSFXForAction(PlayState* play,Player* p,s32 a){}
+void ItemEquip_PlayUnequipSFXForAction(PlayState* play,Player* p,s32 a){}
+void Audio_StopSfxById(u32 id){}
+bool Player_IsZTargeting(Player* p){return 0;}
+void Player_PlaySfx(Player* p,u16 id){}
+f32 Math_SinS(s16 a){return 0;}
+f32 Math_CosS(s16 a){return 0;}
+s32 Math_ScaledStepToS(s16* a,s16 b,s16 c){return 0;}
+s16 Math_Vec3f_Yaw(Vec3f* a,Vec3f* b){return 0;}
+'''
+gust_parts=[body('mm/mods/items/helpers/equip_helper.c','ItemInput_CheckOtherButtons'),
+    *[body(gust_path,n) for n in ['GustJar_Equip','GustJar_Unequip','Handle_GustJar']]]
+gust_parts+=[r'''
+void CustomItems_Update(Player* p,PlayState* play){
+ genericOtherButtons=ItemInput_CheckOtherButtons(BTN_CRIGHT,&play->state.input[0]);
+ Handle_GustJar(p,play);
+ if(consumeR)play->state.input[0].press.button&=~BTN_R;
+}
+''']
+player_functions=functions(source(player))
+if 'Player_UpdateCustomItems' in player_functions:
+ assert 'Player_UpdateCustomItems(this, play);' in player_functions['Player_Update']
+ gust_parts.append(player_functions['Player_UpdateCustomItems'])
+else:
+ # Preserve the baseline's actual call as the control, without changing HEAD.
+ old_call=re.search(r'CustomItems_Update\(this, play\);',player_functions['Player_Update'])[0]
+ gust_parts.append('static void Player_UpdateCustomItems(Player* this,PlayState* play){'+old_call+'}')
+gust_parts+=equipment_parts
+original_prefix,original_parts=caller_prefix,caller_parts
+caller_prefix,caller_parts=gust_prefix,gust_parts
+run_caller('extended_equipment_held_tool',r'''
+ Player p;PlayState play;
+ for(int dpad=0;dpad<2;dpad++)for(u8 item=ITEM_EXT_SWORD_1;item<=ITEM_EXT_BOOTS_3;item++){
+  ResetCaller(&p,&play,ITEM_GUST_JAR,dpad?BTN_DDOWN:BTN_CLEFT);
+  p.heldItemAction=p.itemAction=PLAYER_IA_GUST_JAR;p.modelGroup=PLAYER_MODELGROUP_DEFAULT;
+  requestedB=ITEM_SWORD_KOKIRI;requestedC=item;requestedD=item;dpadEnabled=dpad;
+  SetGustAssignments();
+  gSaveContext.save.saveInfo.equips.buttonItems[0][EQUIP_SLOT_C_RIGHT]=ITEM_GUST_JAR;
+  netInput=(ItemInputState){.wasEquipped=1,.equippedButton=BTN_CRIGHT};
+  gjEquipped=1;gjFirstPerson=0;gjCollider.base.shape=COLSHAPE_CYLINDER;sGustTornadoOn=1;
+  Player_UpdateCustomItems(&p,&play);Player_UpdateItems(&p,&play);
+  assert(gjEquipped&&"equipment toggle stowed the held Gust Jar before native dispatch");
+  assert(!genericOtherButtons&&equipmentToggles==1&&toggledEquipment==item);
+  assert(p.heldItemId==ITEM_GUST_JAR&&p.heldItemAction==PLAYER_IA_GUST_JAR);
+ }
+ const u16 unrelated[]={BTN_A,BTN_B,BTN_START,BTN_CDOWN};
+ for(unsigned i=0;i<sizeof(unrelated)/sizeof(unrelated[0]);i++){
+  ResetCaller(&p,&play,ITEM_GUST_JAR,unrelated[i]);requestedC=ITEM_EXT_TUNIC_2;
+  SetGustAssignments();
+  gjEquipped=1;Player_UpdateCustomItems(&p,&play);assert(!gjEquipped&&genericOtherButtons);
+ }
+ ResetCaller(&p,&play,ITEM_GUST_JAR,BTN_CUP);gjEquipped=1;gjFirstPerson=0;
+ Player_UpdateCustomItems(&p,&play);assert(gjEquipped&&gjFirstPerson&&!genericOtherButtons);
+ // Ownership, age, transformation and disabled D-pad slots do not reserve presses.
+ for(int blocked=0;blocked<5;blocked++){
+  ResetCaller(&p,&play,ITEM_GUST_JAR,blocked==3?BTN_DDOWN:BTN_CLEFT);
+  netInput=(ItemInputState){.wasEquipped=1,.equippedButton=BTN_CRIGHT};
+  requestedC=requestedD=ITEM_EXT_TUNIC_2;equipmentOwned=blocked!=0;
+  SetGustAssignments();
+  if(blocked==4)gSaveContext.buttonStatus[EQUIP_SLOT_C_LEFT]=BTN_DISABLED;
+  equipmentAgeAllowed=blocked!=1;pikachu=blocked==2;dpadEnabled=0;gjEquipped=1;
+  Player_UpdateCustomItems(&p,&play);assert(!gjEquipped&&genericOtherButtons);
+ }
+ equipmentOwned=equipmentAgeAllowed=1;pikachu=0;
+ // B and C retain their native priority over an equipment press on a lower-priority button.
+ ResetCaller(&p,&play,ITEM_GUST_JAR,BTN_B|BTN_CLEFT);requestedC=ITEM_EXT_TUNIC_2;
+ SetGustAssignments();
+ netInput=(ItemInputState){.wasEquipped=1,.equippedButton=BTN_CRIGHT};gjEquipped=1;
+ Player_UpdateCustomItems(&p,&play);assert(!gjEquipped&&genericOtherButtons);
+ ResetCaller(&p,&play,ITEM_GUST_JAR,BTN_CLEFT|BTN_DDOWN);requestedC=ITEM_BOW;
+ requestedD=ITEM_EXT_TUNIC_2;dpadEnabled=1;
+ SetGustAssignments();
+ netInput=(ItemInputState){.wasEquipped=1,.equippedButton=BTN_CRIGHT};gjEquipped=1;
+ Player_UpdateCustomItems(&p,&play);assert(!gjEquipped&&genericOtherButtons);
+ // An age-restricted selected piece can still be removed, matching the existing toggle path.
+ ResetCaller(&p,&play,ITEM_GUST_JAR,BTN_CLEFT);requestedC=ITEM_EXT_TUNIC_2;
+ SetGustAssignments();
+ equipmentAgeAllowed=0;currentEquipment=2;
+ netInput=(ItemInputState){.wasEquipped=1,.equippedButton=BTN_CRIGHT};gjEquipped=1;
+ Player_UpdateCustomItems(&p,&play);assert(gjEquipped&&!genericOtherButtons);
+ equipmentAgeAllowed=1;currentEquipment=3;requestedC=ITEM_EXT_SHIELD_2;gjEquipped=1;
+ SetGustAssignments();
+ Player_UpdateCustomItems(&p,&play);assert(!gjEquipped&&genericOtherButtons);currentEquipment=0;
+ ResetCaller(&p,&play,ITEM_GUST_JAR,BTN_CLEFT|BTN_R);requestedC=ITEM_EXT_TUNIC_2;
+ SetGustAssignments();
+ gjEquipped=1;gjFirstPerson=0;consumeR=1;Player_UpdateCustomItems(&p,&play);
+ assert(gjEquipped&&play.state.input[0].press.button==BTN_CLEFT);
+ // Unrelated item getters can have authored side effects: never call them before native gates.
+ ResetCaller(&p,&play,ITEM_GUST_JAR,BTN_CLEFT);requestedC=ITEM_OCARINA_OF_TIME;
+ SetGustAssignments();Player_UpdateCustomItems(&p,&play);assert(!buttonQueries);
+''')
+caller_prefix,caller_parts=original_prefix,original_parts
 
 # Regression: the tool handler starts before Player_Update selects input. Execute that
 # selection and the real native button/use pipeline; the transition-animation boundary

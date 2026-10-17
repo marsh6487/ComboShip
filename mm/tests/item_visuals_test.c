@@ -8,6 +8,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include "ComboBottleContents.h"
 #define COMBO_MASK_SHIMMER_HOST_MM
 #include "ComboMaskShimmer.h"
 #undef COMBO_MASK_SHIMMER_HOST_MM
@@ -63,10 +64,14 @@ Color_RGBA8 CosmeticEditor_GetChangedColor(u8 r, u8 g, u8 b, u8 a, const char* i
     return edited ? (Color_RGBA8){ 17, 123, 241, a } : (Color_RGBA8){ r, g, b, a };
 }
 bool ResourceMgr_IsAltAssetsEnabled(void) {
-    return false; // This suite deliberately uses vanilla GI resources.
+    return false; // This suite deliberately verifies the vanilla fallback.
+}
+u8 ResourceMgr_FileExists(const char* p) {
+    assert(strstr(p, "__OTR__objects/combo_dungeon_keys/") == p);
+    return false; // Bundled key roots are absent in this fallback fixture.
 }
 u8 ResourceMgr_FileAltExists(const char* p) {
-    return false; // No custom key archive is available.
+    return false; // No replacement assets are available either.
 }
 Gfx* ResourceMgr_LoadGfxByName(const char* p) {
     return sMissing ? NULL : &sResource;

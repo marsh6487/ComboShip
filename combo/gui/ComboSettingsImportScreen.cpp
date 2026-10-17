@@ -135,6 +135,7 @@ extern "C" COMBO_EXPORT int ComboUI_RunSettingsImport(const ComboSettingsImportC
 
             ImGui::TextWrapped("Optional: bring over your settings from an existing Ship of Harkinian and/or "
                                "2 Ship 2 Harkinian install. Pick one or both files, or Skip to start fresh. "
+                               "Saved mod load orders are imported separately for each game. "
                                "Where both set the same option (e.g. graphics or controls), OoT wins.");
             if (!ComboFilePicker::Available()) {
                 // Wrapped text in the disabled color (TextDisabled doesn't wrap), ASCII only —

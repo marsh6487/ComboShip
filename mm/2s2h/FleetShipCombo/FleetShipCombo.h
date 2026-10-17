@@ -1,6 +1,8 @@
 #ifndef FLEET_SHIP_COMBO_H
 #define FLEET_SHIP_COMBO_H
 
+#include "../../../combo/ComboGameMode.h"
+
 #ifndef __cplusplus
 #include <stdbool.h>
 #endif

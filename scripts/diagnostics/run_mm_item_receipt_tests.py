@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+subprocess.run([sys.executable, '-B', str(ROOT / 'tests/item_receipts/run_bottle_contents_tests.py')], check=True)
 
 
 def verify_windows_reward_export_contract():
@@ -42,6 +43,8 @@ concrete_names = set(re.findall(r'"([^"\n]*)"',
     block((ROOT / 'mm/2s2h/Rando/ItemReceiptText.cpp').read_text(), 'const char* ConcreteReceiptName')))
 assert concrete_names <= donor_names, f'Unknown exact donor keys: {concrete_names - donor_names}'
 preamble = r'''
+#include "combo/ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -280,7 +283,8 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     glyph = re.search(r'msgCtx->textPosX \+= \(s32\)\(sNESFontWidths\[\(u8\)character - \' \'\] \* msgCtx->textCharScale\);', nes_draw)[0]
     dispatch += ('\nint NativeLineWidth(const std::string& line) {\n'
                  'MessageContext* msgCtx = &play.msgCtx; msgCtx->textPosX = 0;\n'
-                 'for (uint8_t character : line) { if (character == \' \') {\n' + space +
+                 # MM's color commands do not index the native glyph table.
+                 'for (uint8_t character : line) { if (character <= 8) continue; if (character == \' \') {\n' + space +
                  '} else {\n' + glyph.replace('(s32)', '(int)').replace('(u8)', '(uint8_t)') +
                  '} } return msgCtx->textPosX; }\n')
     layout = layout.replace('/* MM_TEXT_DISPATCH */', dispatch)
@@ -334,6 +338,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     subprocess.run([compiler, '-std=c++20', '-DCOMBO_BUILD', '-I', str(ROOT), *extra, str(tu), '-o', str(exe)], check=True)
     native_fallback, foreign_fallback = tmp / 'native-cape.bin', tmp / 'foreign-cape.bin'
     subprocess.run([str(exe), str(native_fallback), str(foreign_fallback)], check=True)
+
     subprocess.run([sys.executable, '-B', str(ROOT / 'tests/cape_choice/run_tests.py'),
                     '--queued-fallback', str(native_fallback), '--queued-fallback', str(foreign_fallback),
                     *(['--sanitize'] if '--sanitizers' in sys.argv else [])], check=True)
@@ -376,6 +381,20 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     catalog += 'namespace { const int sFcNative[] = ' + block(glue, 'const int sFcNative[]') + ';\n'
     catalog += 'std::unordered_map<int,int>& ReverseMap() ' + block(glue, 'ReverseMap()') + '\n}\n'
     catalog += 'extern "C" int FcCombo_ItemForNative(int nativeId) ' + block(glue, 'int FcCombo_ItemForNative') + '\n'
+    catalog += 'extern "C" int FcCombo_NativeForItem(int fcId) ' + block(glue, 'int FcCombo_NativeForItem') + '\n'
+    mm_give = (ROOT / 'mm/2s2h/Rando/GiveItem.cpp').read_text()
+    fairy_arms = mm_give[mm_give.index('        case RI_WOODFALL_STRAY_FAIRY:'):
+                         mm_give.index('        case RI_GREAT_SPIN_ATTACK:')]
+    fc_grants = 'int gFcCombo_SuppressRecord = 0;\n'
+    fc_grants += 'void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId) {\n' \
+        'assert(gFcCombo_SuppressRecord > 0);\nswitch (randoItemId) {\n' + fairy_arms + \
+        'default: assert(false && "unexpected non-fairy FC grant");\n}\n}\n'
+    mm_sync = (ROOT / 'mm/2s2h/FleetShipCombo/FleetSync.cpp').read_text()
+    fc_grants += '#pragma push_macro("SPDLOG_WARN")\n#undef SPDLOG_WARN\n#define SPDLOG_WARN(...) ((void)0)\n' \
+        '#define FS_TRACE(...) ((void)0)\nvoid ApplyReceiptFcRegistry() ' + \
+        block(mm_sync, 'void ApplyFcRegistryToNatives()').replace('spdlog::default_logger()->flush();', '(void)0;') + \
+        '\n#undef FS_TRACE\n#pragma pop_macro("SPDLOG_WARN")\n'
+    (tmp / 'receipt_fairy_grants.inc').write_text(fc_grants)
     registry = (ROOT / 'soh/mods/extended_player.c').read_text()
     leaf = re.search(r'RG_DEKU_LEAF,\s*((?:"(?:[^"\\]|\\.)*"\s*)+)', registry).group(1)
     catalog += 'const char* kDekuLeafMessage = ' + leaf + ';\n'
@@ -417,11 +436,20 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     grants += 'gSaveContext.options.language=LANGUAGE_ENG; }\n'
     (tmp / 'receipt_song_grants.inc').write_text(grants)
     (tmp / 'receipt_catalogs.inc').write_text(catalog)
+    rupee_hooks = ROOT / 'mm/2s2h/Enhancements/Dialogue/RandomRupeeNames.cpp'
+    rupee_code = 'void RegisterNativeRandomRupeeNames() {}\n'
+    if rupee_hooks.exists():
+        rupee_source = rupee_hooks.read_text()
+        rupee_code = 'void BuildNativeRandomRupeeName(u16* textId,bool* loadFromMessageTable) ' + \
+            block(rupee_source,'void BuildNativeRandomRupeeName') + '\n'
+        rupee_code += 'void RegisterNativeRandomRupeeNames() ' + block(rupee_source,'void RegisterNativeRandomRupeeNames')
+    (tmp / 'receipt_rupee_hooks.inc').write_text(rupee_code)
     pause_desc = (ROOT / 'mm/2s2h/CustomMessage/PauseItemDescriptions.cpp').read_text()
     (tmp / 'receipt_map_pause.inc').write_text('extern "C" const char* PauseItemDesc_GetMapInfo(s32 dungeon,u16 itemId) ' +
                                              block(pause_desc, 'const char* PauseItemDesc_GetMapInfo'))
     mmflags = ['-DCOMBO_BUILD', '-DMM_BUILD_DLL', '-DF3DEX_GBI_2', '-DCONTROLLERBUTTONS_T=uint32_t',
                '-DNON_EQUIVALENT', '-DNON_MATCHING']
+    mmflags += ['-I' + str(ROOT)]
     mmflags += ['-I' + str(ROOT / p) for p in ('mm/include', 'mm/include/PR', 'mm/src', 'mm', 'mm/2s2h',
                  'mm/assets', 'libultraship/include', 'libultraship/src', 'combo', 'combo/menu')]
     linked = tmp / 'catalog'
@@ -432,6 +460,8 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     if result.returncode:
         raise RuntimeError(result.stdout + result.stderr)
     subprocess.run([str(linked)], check=True)
+    if '--catalog-only' in sys.argv:
+        raise SystemExit(0)
 
     # Execute the actual exported donor builder, with the authored descriptions.
     donor = (ROOT / 'tests/item_receipts/donor_test.cpp').read_text()
@@ -467,12 +497,27 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     keys += '};\n'
     donor = donor.replace('/* KEY_CATALOG */', keys)
     descriptions = 'const CustomItemMessageEntry receiptMessages[] = {\n'
+    randomizer_messages = (ROOT / 'soh/soh/Enhancements/randomizer/randomizer.cpp').read_text()
+    # Copy the real shared-tool rows, including their icon and all locales.
+    for rg in ('RG_PHANTOM_HOURGLASS', 'RG_SHADOW_CRYSTAL'):
+        row = re.search(r'\{\s*' + rg + r',\s*[^,]+,\s*ComboToolReceiptText::.*?\}',
+                        randomizer_messages, re.S)
+        assert row, f'Missing shared tool receipt: {rg}'
+        descriptions += row.group(0) + ',\n'
+    for rg in ('RG_SKULL_MASK', 'RG_SPOOKY_MASK', 'RG_MASK_OF_TRUTH', 'RG_MM_MASK_TRUTH', 'RG_GERUDO_MASK',
+               'RG_KEATON_MASK', 'RG_MM_MASK_KEATON'):
+        row = re.search(r'\{\s*' + rg + r',\s*[^,]+,\s*ComboMaskReceiptText::.*?\}',
+                        randomizer_messages, re.S)
+        assert row, f'Missing shared mask receipt: {rg}'
+        descriptions += row.group(0) + ',\n'
     for rg in ('RG_CANE_OF_SOMARIA', 'RG_PROGRESSIVE_ROCS', 'RG_CANE_PACCI_FLIP',
                'RG_ROCS_CAPE', 'RG_QUARTZ_OF_MOTION', 'RG_DEKU_LEAF',
+               'RG_MM_STRAY_FAIRY', 'RG_MM_STRAY_FAIRY_WOODFALL', 'RG_MM_STRAY_FAIRY_SNOWHEAD',
+               'RG_MM_STRAY_FAIRY_GREAT_BAY', 'RG_MM_STRAY_FAIRY_STONE_TOWER',
                'RG_MM_REMAINS_GOHT', 'RG_MM_SONG_LULLABY', 'RG_MM_SONG_LULLABY_INTRO', 'RG_MM_SONG_NOVA',
                'RG_MM_SONG_HEALING', 'RG_MM_SONG_STORMS', 'RG_MM_SONG_SOARING'):
         text = re.search(r'\{\s*' + rg + r',.*?,\s*((?:"(?:[^"\\]|\\.)*"\s*)+)',
-                         (ROOT / 'soh/soh/Enhancements/randomizer/randomizer.cpp').read_text(), re.S)
+                         randomizer_messages, re.S)
         if not text:
             text = re.search(r'\b' + rg + r',\s*((?:"(?:[^"\\]|\\.)*"\s*)+)', registry)
         descriptions += '{' + rg + ', 0, ' + text.group(1) + ', nullptr, nullptr},\n'
@@ -498,6 +543,15 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                       'void CustomMessage::EncodeColors(std::string& str) const'):
         actual_formatter += signature + ' ' + block(formatter, signature) + '\n'
     donor = donor.replace('/* ACTUAL_FORMATTER */', actual_formatter)
+    oot_glue = (ROOT / 'soh/soh/FleetShipCombo/FleetComboItemsGlue.cpp').read_text()
+    grant_source = (ROOT / 'soh/soh/Enhancements/randomizer/randomizer.cpp').read_text()
+    grant = block(grant_source, 'u16 Randomizer_Item_Give')
+    grant_record = 'namespace { const int sFcNative[] = ' + block(oot_glue, 'const int sFcNative[]') + ';\n'
+    grant_record += 'std::unordered_map<int,int>& ReverseMap() ' + block(oot_glue, 'ReverseMap()') + '\n}\n'
+    grant_record += 'extern "C" int FcCombo_ItemForNative(int nativeId) ' + block(oot_glue, 'int FcCombo_ItemForNative') + '\n'
+    grant_record += 'void RecordReceiptGrant(RandomizerGet item) { if (!FleetSync_IsApplyingFc()) ' + \
+        block(grant, 'if (!FleetSync_IsApplyingFc())') + '\n}\n'
+    donor = donor.replace('/* NATIVE_GRANT_RECORD */', grant_record)
     exported = (ROOT / 'soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp').read_text()
     if '--compass-baseline' in sys.argv:
         revision = sys.argv[sys.argv.index('--compass-baseline') + 1]
@@ -505,6 +559,8 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                                            cwd=ROOT, text=True)
     context_builders = 'bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received = true);\n'
     for signature in ('bool BuildDungeonKeyReceiptMessage(RandomizerGet rg, CustomMessage& msg)',
+                      'static bool BuildVanillaEquipmentBottleReceipt(RandomizerGet rg, CustomMessage& msg)',
+                      'static bool WandMedallionDescriptionsEnabled()',
                       'static bool DungeonInformationEnabled()',
                       'extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled(void)',
                       'static CustomMessage DungeonRewardName(RandomizerCheck check)',
@@ -513,12 +569,21 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
                       'static std::string DungeonPhysicalEntranceName(int16_t entrance)',
                       'static std::string DungeonEntranceSource(int16_t dungeonEntrance)',
                       'static void AddDungeonRewardIcon(CustomMessage& msg, RandomizerCheck check)',
+                      *(['static RandomizerCheck PhysicalBossRewardCheck(int32_t boss)',
+                         'extern "C" COMBO_EXPORT int32_t OOT_GetDungeonBossIndex(int32_t entrance)',
+                         'extern "C" COMBO_EXPORT int32_t OOT_GetNativeBossHintTarget(int32_t dungeon, int32_t* entrance, int32_t* nextDungeon)',
+                         'extern "C" COMBO_EXPORT int32_t OOT_GetDungeonEntranceSourceName(int32_t entrance, char* buffer, uint32_t capacity)',
+                         'extern "C" COMBO_EXPORT int32_t OOT_GetPhysicalBossRewardName(int32_t boss, char* buffer, uint32_t capacity)',
+                         'extern "C" COMBO_EXPORT int32_t OOT_GetPhysicalBossRewardPresentation(int32_t boss, CwItemReceiptPresentation* out)']
+                        if 'PhysicalBossRewardCheck' in exported else []),
                       'bool BuildDungeonItemReceiptMessage(RandomizerGet rg, CustomMessage& msg, bool received)',
                       'bool BuildTokenReceiptMessage(RandomizerGet rg, CustomMessage& msg)',
                       'extern "C" COMBO_EXPORT int32_t OOT_GetDungeonItemReceiptPresentation(const char* itemName, CwItemReceiptPresentation* out)',
                       'extern "C" uint16_t Randomizer_GetDungeonItemInfoTextId(uint16_t cursorItem)',
                       'void BuildDungeonPauseInfoMessage(uint16_t* textId, bool* loadFromMessageTable)',
-                      'void BuildMapMessage(uint16_t* textId, bool* loadFromMessageTable)'):
+                      'void BuildMapMessage(uint16_t* textId, bool* loadFromMessageTable)',
+                      'static bool SplitWandMedallionMessage(std::string& prefix, std::string& ending, int& icon)',
+                      'void BuildWandMedallionMessage(uint16_t* textId, bool* loadFromMessageTable)'):
         context_builders += signature + ' ' + block(exported, 'int32_t OOT_GetDungeonItemReceiptPresentation' if 'OOT_GetDungeonItemReceiptPresentation' in signature else signature + ' {') + '\n'
     donor = donor.replace('/* CONTEXT_BUILDERS */', context_builders)
     donor = donor.replace('/* NATIVE_ITEM_BUILDER */',
@@ -533,8 +598,25 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     tu = tmp / 'donor.cpp'
     tu.write_text(donor)
     exe = tmp / 'donor'
+    # Text's native RNG moved to ShipUtils in 9.3. Keep its real implementation
+    # and native headers in separate TUs, away from the donor engine fixtures.
+    ship_utils = (ROOT / 'soh/soh/ShipUtils.cpp').read_text()
+    rng = tmp / 'ship_rng.cpp'
+    rng.write_text('#include <bit>\n#include <random>\n#include <cassert>\n'
+                   '#include "soh/ShipUtils.h"\n' +
+                   ship_utils[ship_utils.index('static bool default_init = false;'):
+                              ship_utils.index('// Returns a random floating point number')])
+    native_flags = ['-DF3DEX_GBI_2', '-I', str(ROOT / 'soh'),
+                    '-I', str(ROOT / 'soh/include'), '-I', str(ROOT / 'libultraship/include')]
+    native_objects = []
+    for native_source in (ROOT / 'soh/soh/Enhancements/custom-message/text.cpp', rng):
+        native_object = tmp / (native_source.stem + '.o')
+        subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror',
+                        '-Wno-unused-parameter', '-fPIC', *native_flags, *extra,
+                        '-c', str(native_source), '-o', str(native_object)], check=True)
+        native_objects.append(str(native_object))
     subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-I', str(ROOT), *extra,
-                    str(tu), str(ROOT / 'soh/soh/Enhancements/custom-message/text.cpp'), '-o', str(exe)], check=True)
+                    str(tu), *native_objects, '-o', str(exe)], check=True)
     generated_routes = tmp / 'native-entrance-routes.json'
     subprocess.run([sys.executable, str(ROOT / 'tests/item_receipts/run_seed_settings_tests.py'),
                     '--dump-entrance-fixture', str(generated_routes),
@@ -544,7 +626,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     # Link the real donor export to the real MM native/foreign receipt routes.
     # Private engine fixtures remain separate, as the two DLLs are in-game.
     donor_library = tmp / 'libcompass_donor.so'
-    donor_private = ['-Dmain=OotFixtureTestMain', '-DgSaveContext=ootFixtureSaveContext',
+    donor_private = ['-DCOMPASS_DONOR_BRIDGE', '-Dmain=OotFixtureTestMain', '-DgSaveContext=ootFixtureSaveContext',
                      '-DgPlayState=ootFixturePlayState', '-DNei_Save=ootFixtureNeiSave',
                      '-DRando=OotFixtureRando', '-DCustomMessage=OotFixtureCustomMessage',
                      '-DComboRando=OotFixtureComboRando', '-DCombo_ResolveSym=OotFixtureResolveSym',
@@ -552,7 +634,7 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
                     '-fPIC', '-shared', '-fvisibility=hidden',
                     *donor_private, *extra, '-I', str(ROOT), str(tu),
-                    str(ROOT / 'soh/soh/Enhancements/custom-message/text.cpp'), '-o', str(donor_library)], check=True)
+                    *native_objects, '-o', str(donor_library)], check=True)
     integrated = tmp / 'compass_receiver'
     result = subprocess.run([compiler, '-std=c++20', *mmflags, *extra, '-DCOMPASS_DONOR_INTEGRATION', '-I' + str(tmp),
                     str(ROOT / 'tests/item_receipts/catalog_test.cpp'),
@@ -572,6 +654,8 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
         'const CustomMessage Hint::GetHintMessage(MessageFormat format,size_t id) const ' + block(hint, 'const CustomMessage Hint::GetHintMessage'))
     information = information.replace('/* SETTINGS_RESTORE */',
         'extern "C" void SOH_RestoreRandoSettings(const char* json) ' + block(otr, 'void SOH_RestoreRandoSettings'))
+    information = information.replace('/* CLEAR_NUMERIC_EXCLUSIONS */',
+        'static bool Combo_ClearNumericExclusions() ' + block(otr, 'static bool Combo_ClearNumericExclusions() {'))
     information = information.replace('/* ALTAR_EXPORT */',
         'extern "C" const char* SOH_DumpAltarHintMessages(void) ' + block(otr, 'const char* SOH_DumpAltarHintMessages'))
     information = information.replace('/* LOAD_DATA */', block(
@@ -581,6 +665,14 @@ with tempfile.TemporaryDirectory(prefix='mm-item-receipts-') as tmp:
     information = information.replace('/* LOAD_SETTINGS */',
         'SaveManager::Instance->LoadArray("randoSettings",RSK_MAX,[&](size_t i) ' + block(save, 'SaveManager::Instance->LoadArray("randoSettings"') + ');')
     settings = (ROOT / 'soh/soh/Enhancements/randomizer/settings.cpp').read_text()
+    option = (ROOT / 'soh/soh/Enhancements/randomizer/option.cpp').read_text()
+    metadata = ''
+    for signature, text in (
+            ('std::shared_ptr<Settings> Settings::GetInstance()', settings),
+            ('const std::array<Option, RSK_MAX>& Settings::GetAllOptions() const', settings),
+            ('const std::string& Option::GetCVarName() const', option)):
+        metadata += signature + ' ' + block(text, signature) + '\n'
+    information = information.replace('/* OPTION_METADATA */', metadata)
     information = information.replace('/* SPOILER_SETTINGS */',
         block(settings, 'void Settings::ParseJson')[1:].split('    nlohmann::json jsonExcludedLocations')[0])
     tu = tmp / 'information.cpp'

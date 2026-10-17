@@ -19,6 +19,7 @@
 #include "soh/util.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "../../combo/menu/ItemGrantAuditBridge.h"
+#include "rando/CrossDungeonRuntime.h"
 
 // Expose fixture setup and direct section entry points without adding test-only
 // methods to the production class. Standard library headers are already loaded.
@@ -29,6 +30,22 @@
 using json = nlohmann::json;
 SaveContext gSaveContext{};
 SaveManager* SaveManager::Instance = nullptr;
+// Cross-entrance runtime is another save consumer. Retain the production JSON
+// serialization calls while keeping this fixture focused on horse persistence.
+static int32_t crossDungeonCheckpoint = -1;
+static json crossDungeonPendingChecks;
+extern "C" int32_t Combo_SOH_SaveCrossDungeonCheckpoint(void) {
+    return crossDungeonCheckpoint;
+}
+extern "C" void Combo_SOH_LoadCrossDungeonCheckpoint(int32_t index) {
+    crossDungeonCheckpoint = index;
+}
+json Combo_SOH_SavePendingChecks() {
+    return crossDungeonPendingChecks;
+}
+void Combo_SOH_LoadPendingChecks(const json& payload) {
+    crossDungeonPendingChecks = payload;
+}
 
 // Engine boundaries unrelated to horse persistence or JSON. New-file routines
 // still execute in full, including debug/maxed branching and base initialization.
@@ -106,7 +123,7 @@ static void TestSnapshotAndRoundTrip(SaveManager& manager, const char* path) {
     gSaveContext.ship.youngHorseDataValid = 0;
     json data;
     manager.currentJsonContext = &data;
-    SaveManager::SaveBase(&snapshot, SECTION_ID_BASE, true);
+    SaveManager::SaveBase(snapshot, SECTION_ID_BASE, true);
     const json expectedAdult = { { "scene", 81 },
                                  { "pos", { { "x", -1234 }, { "y", 456 }, { "z", 7890 } } },
                                  { "angle", -2345 } };

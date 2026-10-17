@@ -249,11 +249,13 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
 #ifdef COMBO_BUILD
             // ComboShip (#136): combo owns the goal — the launcher sums both games' counts and decides.
             // Works for dormant grants too; it dispatches the silent finalize instead of the ending.
-            if (gMMComboTriforceProgress != NULL) {
-                gMMComboTriforceProgress(1, gSaveContext.fileNum);
+            if (Combo_IsCombinedGame()) {
+                if (gMMComboTriforceProgress != NULL) {
+                    gMMComboTriforceProgress(1, gSaveContext.fileNum);
+                }
+                break;
             }
-            break;
-#else
+#endif
             if (gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces ==
                 RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED]) {
                 // Blocks the ability to beat the game through killing Majora until all Triforce Pieces are found.
@@ -268,7 +270,6 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
                                        .transitionType = TRANS_TYPE_FADE_BLACK });
             }
             break;
-#endif
         // Technically these should never be used, but leaving them here just in case
         case RI_PROGRESSIVE_MAGIC:
         case RI_PROGRESSIVE_BOW:
@@ -1247,7 +1248,7 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
             ExtInv_GiveItem(SLOT_SHADOW_CRYSTAL, EXT_ITEM_SHADOW_CRYSTAL);
             break;
         case RI_OOT_NEI_ROD_OF_SEASONS:
-            ExtInv_GiveItem(SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS);
+            Seasons_GrantRod();
             break;
         // Rod of Seasons — sibling items over the rod's cell (slate idiom). Each lights its own
         // season, and the first one obtained hands over the rod itself.
@@ -1426,7 +1427,7 @@ void Rando::GiveItem(RandoItemId randoItemId, RandoCheckId randoCheckId) {
     }
 #ifdef COMBO_BUILD
     // ComboShip: Shared Items — single exit poke, mirrors the #136 Triforce poke above.
-    if (gMMComboSharedChanged != NULL) {
+    if (Combo_IsCombinedGame() && gMMComboSharedChanged != NULL) {
         gMMComboSharedChanged(1, gSaveContext.fileNum);
     }
 #endif

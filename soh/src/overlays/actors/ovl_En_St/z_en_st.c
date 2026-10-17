@@ -8,7 +8,6 @@
 #include "din_fire_sword.h"
 #include "objects/object_st/object_st.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
-#include "soh/ResourceManagerHelpers.h"
 
 #define FLAGS                                                                                 \
     (ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_HOSTILE | ACTOR_FLAG_UPDATE_CULLING_DISABLED | \
@@ -816,8 +815,6 @@ void EnSt_Destroy(Actor* thisx, PlayState* play) {
         Collider_DestroyCylinder(play, &this->colCylinder[i]);
     }
     Collider_DestroyJntSph(play, &this->colSph);
-
-    ResourceMgr_UnregisterSkeleton(&this->skelAnime);
 }
 
 void EnSt_WaitOnCeiling(EnSt* this, PlayState* play) {

@@ -30,6 +30,7 @@
         { Kind::GildedSword, "gilded_sword", 0xFFD45A },
         { Kind::MasterSword, "master_sword", 0x6F8FFF },
         { Kind::BiggoronSword, "biggoron_sword", 0xFF9A42 },
+        { Kind::GiantsKnife, "giants_knife", 0xCFD9E6 },
         { Kind::GreatFairySword, "great_fairy_sword", 0x79BE84 },
         { Kind::FourSword, "four_sword", 0x315B2F },
         { Kind::SwordAura, "true_master_sword", 0xFFF4D6 },
@@ -64,7 +65,8 @@
             play.gameplayFrames = frame;
             const auto camera = NeiGi_CameraBasis(&play);
             const auto sampledShimmer = NeiGi::SampleShimmer(frame, true, camera, sword.kind);
-            NeiGi_DrawMesh(&play, NeiGi::SampleSpecial(sword.kind, frame, camera));
+            const auto fit = NeiGi::FrameFit(*NeiGi::FindSwordFrameBounds(sword.kind), 1.f, false);
+            NeiGi_DrawMesh(&play, NeiGi::SampleSpecial(sword.kind, frame, camera, 1.f / fit.scale));
             NeiGi_DrawMesh(&play, sampledShimmer);
             assert(arena.size() == 2);
             const auto intrinsic = arena[0];
@@ -174,7 +176,7 @@
     selectedForeignInfo = nullptr;
     foreignFallbackCalls = 0;
     Reset();
-    std::cout << "PASS real MM-to-OoT foreign sword dispatch: nine palettes, intrinsic particles, one shared shimmer, optional toggle and mask overlays\n";
+    std::cout << "PASS real MM-to-OoT foreign sword dispatch: ten palettes, intrinsic particles, one shared shimmer, optional toggle and mask overlays\n";
 }
 
 // Exercise the real sentinel callback through EnGirlA, using the native MM
@@ -250,8 +252,10 @@
                 assert(!submitted.empty() && submitted.front() == std::pair(worldFit.scale*b.drawScale, worldFit.lift));
                 const auto worldMatrices = submitted;
                 const auto worldMeshes = arena;
+                const auto worldEffectMatrices = effectSubmitted;
                 submitted.clear();
                 arena.clear();
+                effectSubmitted.clear();
                 gfx.polyOpa.p = opa;
                 gfx.polyXlu.p = xlu;
                 matrix = .25f;
@@ -266,7 +270,9 @@
                 std::cout << "foreign " << b.slug << ": shelf bottom=" << y + scale * b.minimum[1]
                           << ", height=" << height << '\n' << std::flush;
                 assert(height <= 19.f);
-                assert(y + scale * b.minimum[1] >= .5f);
+                // Float32 parent/local composition can lose one ULP at the
+                // exact .5 shelf floor; retain a two-millionth-unit allowance.
+                assert(y + scale * b.minimum[1] >= .5f - .000002f);
                 assert(scale * b.spinningWidth <= 19.f);
                 assert(submitted.size() == worldMatrices.size() && arena.size() == worldMeshes.size());
                 for (size_t i = 0; i < submitted.size(); ++i) {
@@ -274,9 +280,35 @@
                     assert(std::abs(submitted[i].second - (6.f + .25f * fit.lift +
                         (worldMatrices[i].second-worldFit.lift) * .25f * fit.scale/worldFit.scale)) < .000001f);
                 }
-                for (size_t i = 0; i < arena.size(); ++i)
-                    assert(arena[i].size() == worldMeshes[i].size() &&
-                           !std::memcmp(arena[i].data(), worldMeshes[i].data(), arena[i].size() * sizeof(Vtx)));
+                assert(arena.size() == 2 && effectSubmitted.size() == 2 && worldEffectMatrices.size() == 2);
+                // Quantized vertex-cache deduplication can pack a different
+                // number of intrinsic vertices when glyph dimensions change.
+                const auto sameAttributes = [](const Vtx& a, const Vtx& b) {
+                    return !std::memcmp(a.v.cn, b.v.cn, 4) &&
+                           !std::memcmp(a.v.tc, b.v.tc, 2 * sizeof(int16_t));
+                };
+                for (const auto& v : arena[0])
+                    assert(std::any_of(worldMeshes[0].begin(), worldMeshes[0].end(),
+                                       [&](const Vtx& w) { return sameAttributes(v, w); }));
+                for (const auto& v : worldMeshes[0])
+                    assert(std::any_of(arena[0].begin(), arena[0].end(),
+                                       [&](const Vtx& w) { return sameAttributes(v, w); }));
+                // The hex shimmer keeps its exact packed geometry. Intrinsic
+                // glyphs cancel shelf framing while the caller's .25 scale remains.
+                assert(arena[1].size() == worldMeshes[1].size() &&
+                       !std::memcmp(arena[1].data(), worldMeshes[1].data(), arena[1].size() * sizeof(Vtx)));
+                const size_t tip = native.neiEffect == int(Kind::GreatFairySword) ? 2 : 1;
+                const auto span = [tip](const auto& mesh) {
+                    float squared = 0.f;
+                    for (int axis = 0; axis < 3; ++axis) {
+                        const float d = float(mesh[0].v.ob[axis] - mesh[tip].v.ob[axis]);
+                        squared += d * d;
+                    }
+                    return std::sqrt(squared);
+                };
+                const float worldSpan = span(worldMeshes[0]) * worldEffectMatrices[0].first;
+                const float shelfSpan = span(arena[0]) * effectSubmitted[0].first / .25f;
+                assert(std::abs(worldSpan - shelfSpan) < .1f && "foreign shelf framing shrank sword particles");
                 assert(foreignFallbackCalls == 0 && vanilla == 0);
                 assert(stack.empty() && interpolation == 0 && matrix == .25f && matrixY == 6);
             }

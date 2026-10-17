@@ -17,6 +17,7 @@
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
 #include "ComboSongDrawMM.h"
+#include "ComboBottleContents.h"
 #include "ComboOotBottleShimmerMM.h"
 #include "2s2h/Rando/NeiGiPresentation.h"
 #include "2s2h/Rando/NeiResourceRouting.h"
@@ -87,6 +88,7 @@ extern "C" s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDl
 // Which setup DL the row's func emits (NULL = plain 25). The consumer must submit the same one.
 extern "C" void GetItem_GetDrawSetupDLs(s32 drawId, void** outOpa, void** outXlu);
 extern "C" int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt);
+extern "C" int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* game, const char* path, float* tilt, float* roll);
 
 // --- CW_DRAW_KIND_OPS emitters. Bounds-checked; an overflowing recipe is truncated, never written
 // out of range (the consumer just draws fewer layers).
@@ -1022,6 +1024,26 @@ static bool MM_IsSwordAppearanceDependent(RandoItemId id) {
     }
 }
 
+static int32_t MM_FillElementalSpellDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
+    const int profile = NeiArrowGi_ProfileForDrawId(id, RI_OOT_DINS_FIRE, RI_OOT_FARORES_WIND, RI_OOT_NAYRUS_LOVE);
+    if (!out || !profile)
+        return 0;
+    out->drawKind = CW_DRAW_KIND_MAGIC_SPELL;
+    out->neiEffect = profile;
+    out->opCount = 0;
+    out->dlistCount = 3;
+    out->xluStartIndex = 0;
+    out->scale = 1.f;
+    // Keep the established three-list recipe contract for both resolvers.
+    // The procedural GI uses MM's editor palette; these assets belong to OoT.
+    out->dlists[0] = "__OTR__@oot:objects/object_gi_goddess/gGiMagicSpellDiamondDL";
+    out->dlists[1] = profile == 1   ? "__OTR__@oot:objects/object_gi_goddess/gGiDinsFireColorDL"
+                     : profile == 2 ? "__OTR__@oot:objects/object_gi_goddess/gGiFaroresWindColorDL"
+                                    : "__OTR__@oot:objects/object_gi_goddess/gGiNayrusLoveColorDL";
+    out->dlists[2] = "__OTR__@oot:objects/object_gi_goddess/gGiMagicSpellOrbDL";
+    return 1;
+}
+
 static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     bool progressiveConverted = false;
     // ComboShip (#88): a progressive item's model is the tier the player is owed, not the static base
@@ -1055,6 +1077,8 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
         return 0;
     }
     CwItemDrawInfo nei{};
+    if (MM_FillElementalSpellDrawInfo(id, out))
+        return 1;
     if (MM_DescribeNeiGi(id, &nei)) {
         const char* resolvedName = out->resolvedName;
         *out = nei;
@@ -1144,7 +1168,8 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     out->drawKind = drawKind;
     if (drawKind == CW_DRAW_KIND_ELEMENTAL_ARROW)
         out->neiEffect = NeiArrowGi_ProfileForDrawId(id, RI_ARROW_FIRE, RI_ARROW_ICE, RI_ARROW_LIGHT);
-    if (drawKind == CW_DRAW_KIND_MM_FAIRY_BOTTLE || drawKind == CW_DRAW_KIND_MM_FAIRY_CONTAINER)
+    if (drawKind == CW_DRAW_KIND_MM_FAIRY_BOTTLE || drawKind == CW_DRAW_KIND_MM_FAIRY_CONTAINER ||
+        id == RI_BOTTLE_EMPTY)
         out->stateDependent = 2; // selected shell follows live MM owner Alt/mod state
     for (int32_t i = 0; i < n; i++) {
         out->dlists[i] = (const char*)dls[i];
@@ -1174,10 +1199,11 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     }
     if (id == RI_SHIELD_MIRROR) {
         out->stateDependent = 2; // The selected owner's Alt geometry can change its pose.
-        float tilt = 0.f;
+        float tilt = 0.f, roll = 0.f;
         if (drawKind == CW_DRAW_KIND_SIMPLE && n == 2 && xluStart == 1 &&
-            ResourceMgr_GetIkanaShieldGiTiltXForGame("mm", "objects/object_gi_shield_3/gGiMirrorShieldDL", &tilt) &&
-            tilt != 0.f) {
+            ResourceMgr_GetIkanaShieldGiPoseForGame("mm", "objects/object_gi_shield_3/gGiMirrorShieldDL", &tilt,
+                                                    &roll) &&
+            (tilt != 0.f || roll != 0.f)) {
             // Preserve the native split passes and caller spin. CUSTOM_GI
             // would add another spin; OPS carries only this pose correction.
             out->drawKind = CW_DRAW_KIND_OPS;
@@ -1185,7 +1211,10 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
             MM_Op(out, CW_OP_PUSH);
             if (scale > 0.f)
                 MM_OpV(out, CW_OP_SCALE, scale, scale, scale);
-            MM_OpV(out, CW_OP_ROTATE_X, tilt * (32768.f / 3.14159265358979323846f), 0.f, 0.f);
+            if (roll != 0.f)
+                MM_OpV(out, CW_OP_ROTATE_Z, roll * (32768.f / 3.14159265358979323846f), 0.f, 0.f);
+            if (tilt != 0.f)
+                MM_OpV(out, CW_OP_ROTATE_X, tilt * (32768.f / 3.14159265358979323846f), 0.f, 0.f);
             MM_Op(out, CW_OP_SETUP_OPA);
             MM_Op(out, CW_OP_LOAD_MATRIX);
             MM_OpV(out, CW_OP_DLIST, 0.f, 0.f, 0.f);

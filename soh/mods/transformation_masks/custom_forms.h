@@ -91,6 +91,7 @@ u8 CustomForms_TrySkinItem(PlayState* play, Player* player, s32 itemId);
 // gone and no redirect is possible.
 void* CustomForms_ResolveVanillaResource(const char* vanillaPath);  // display lists
 void* CustomForms_ResolveVanillaTexture(const char* vanillaSymbol); // eyes / mouth
+u8 CustomForms_PreferFaceTextures(void);                            // Gerudo's segmented eyes belong to the active form
 
 // Rito Mask sharing the Farore's Wind cell, the way Roc's Feather shares the
 // Nayru's Love one. OtherItem is what the cell can flip to (ITEM_NONE = nothing);

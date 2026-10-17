@@ -8,6 +8,7 @@
 #include "objects/object_mori_objects/object_mori_objects.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/randomizer/randostatupgrade.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 
 #define FLAGS 0
 

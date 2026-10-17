@@ -30,6 +30,11 @@ uint8_t ResourceMgr_FileExists(const char* name) {
 uint8_t MMWeather_Shade(uint8_t value) {
     return (unsigned)value * sShade / 255;
 }
+// Renderer fixture supplies cloud policy explicitly. The weather bridge fixture
+// exercises the real policy through this same production sky getter.
+uint8_t MMWeather_ResolveOotCloudBlend(uint8_t nativeBlend) {
+    return nativeBlend;
+}
 void* THA_AllocTailAlign16(TwoHeadArena* arena, size_t size) {
     size = (size + 15) & ~15;
     if (sArenaUsed + size > sizeof(sArena))

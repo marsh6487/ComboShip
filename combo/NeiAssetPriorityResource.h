@@ -155,8 +155,8 @@ inline bool GetGiModelFit(const char* nativeGame, const char* game, const char* 
     fit[1] = correction.lift;
     return true;
 }
-inline bool GetIkanaShieldGiTiltX(const char* nativeGame, const char* game, const char* path, float* tilt) {
-    if (!game || !path || !tilt || (std::strcmp(game, "oot") && std::strcmp(game, "mm")))
+inline bool GetIkanaShieldGiPose(const char* nativeGame, const char* game, const char* path, float* tilt, float* roll) {
+    if (!game || !path || !tilt || !roll || (std::strcmp(game, "oot") && std::strcmp(game, "mm")))
         return false;
     auto owner = Ship::CrossRMRegistry::Get(game);
 #ifndef COMBO_BUILD
@@ -175,7 +175,12 @@ inline bool GetIkanaShieldGiTiltX(const char* nativeGame, const char* game, cons
     if (!reader.Read(path, bounds))
         return false;
     *tilt = reader.ShieldTiltX();
+    *roll = reader.ShieldRollZ();
     return true;
+}
+inline bool GetIkanaShieldGiTiltX(const char* nativeGame, const char* game, const char* path, float* tilt) {
+    float roll = 0.f;
+    return GetIkanaShieldGiPose(nativeGame, game, path, tilt, &roll);
 }
 
 inline int GetDinSwordGiProfile(const char* nativeGame, const char* game, const char* path, bool enabled) {

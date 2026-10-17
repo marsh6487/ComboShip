@@ -122,6 +122,9 @@ def fixture(host):
 static s16 sEquipSubPage, sEquipCursorX, sEquipCursorY;
 static bool sInDungeonScene;
 typedef struct { s16 item, equipType, index; const char* ootIcon; } EquipCell;
+// These title/resource fixtures browse acquired equipment. The production ownership,
+// draw, cursor and action paths are exercised separately by run_ownership_tests.py.
+u8 KaleidoEquip_CellOwned(EquipCell*) { return true; }
 typedef struct {
     u16 cursorItem[4], cursorSlot[4], namedItem, pageIndex;
     void* nameSegment;

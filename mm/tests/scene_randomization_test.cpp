@@ -15,6 +15,7 @@
     } while (0)
 
 using s8 = int8_t;
+using f32 = float;
 constexpr int GAMEMODE_NORMAL = 0;
 constexpr int GAMEMODE_TITLE_SCREEN = 1;
 constexpr int GAMEMODE_END_CREDITS = 2;
@@ -29,6 +30,26 @@ int CVarGetInteger(const char* key, int fallback) {
 }
 #define CVAR_AUDIO(name) "gAudioEditor." name
 
+constexpr int ACTOR_PLAYER = 0;
+constexpr int PLAYER_FORM_HUMAN = 4;
+constexpr int PLAYER_FORM_FIERCE_DEITY = 0;
+struct Actor {
+    int id;
+    float scale;
+};
+struct Player {
+    Actor actor;
+    int transformation;
+};
+static float linkSizeMultiplier = 1.0f;
+float CVarGetFloat(const char* key, float fallback) {
+    return std::string(key) == "gCosmetic.Silly.LinkSize" ? linkSizeMultiplier : fallback;
+}
+void Actor_SetScale(Actor* actor, float scale) {
+    actor->scale = scale;
+}
+static const char* kSillyLinkSizeCvar = "gCosmetic.Silly.LinkSize";
+
 // Headless event boundary: retain the real callback signatures and execute the
 // production callbacks. Rendering and platform initialization are not needed.
 struct GameInteractor {
@@ -41,12 +62,22 @@ struct GameInteractor {
     struct OnGameStateUpdate {
         using Callback = std::function<void()>;
     };
+    struct OnActorUpdate {
+        using Callback = std::function<void(Actor*)>;
+    };
     template <class Hook> static auto& Callbacks() {
         static std::vector<typename Hook::Callback> callbacks;
         return callbacks;
     }
     template <class Hook> void RegisterGameHook(typename Hook::Callback callback) {
         Callbacks<Hook>().push_back(callback);
+    }
+    template <class Hook> void RegisterGameHookForID(int id, typename Hook::Callback callback) {
+        Callbacks<Hook>().push_back([id, callback](Actor* actor) {
+            if (actor->id == id) {
+                callback(actor);
+            }
+        });
     }
     static GameInteractor* Instance;
 };
@@ -123,6 +154,21 @@ int main() {
     window.InitElement();
     window.InitElement(); // GUI initialization must not duplicate the reload hook.
     CHECK(cosmeticRefreshes == 1);
+    CHECK(GameInteractor::Callbacks<GameInteractor::OnActorUpdate>().size() == 1);
+    Player player{ { ACTOR_PLAYER, 0.01f }, PLAYER_FORM_HUMAN };
+    Actor other{ 1, 0.75f };
+    linkSizeMultiplier = 2.0f;
+    for (const auto& callback : GameInteractor::Callbacks<GameInteractor::OnActorUpdate>()) {
+        callback(&player.actor);
+        callback(&other);
+    }
+    CHECK(player.actor.scale == 0.02f && other.scale == 0.75f);
+    player.transformation = PLAYER_FORM_FIERCE_DEITY;
+    GameInteractor::Callbacks<GameInteractor::OnActorUpdate>()[0](&player.actor);
+    CHECK(player.actor.scale == 0.03f);
+    linkSizeMultiplier = 1.0f;
+    GameInteractor::Callbacks<GameInteractor::OnActorUpdate>()[0](&player.actor);
+    CHECK(player.actor.scale == 0.015f);
 
     ReloadScene();
     CHECK(cosmeticRandomizations == 0);

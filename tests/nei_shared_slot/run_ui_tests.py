@@ -32,12 +32,16 @@ SaveContext gSaveContext{};
 static NeiSaveData state{};
 static int icons[8]{};
 static int page = 1;
+static int wandRule = WAND_RANDO_MEDALLIONS;
 static s16 gCurrentItemCyclingSlot = -1;
 extern "C" NeiSaveData* Nei_Save() { return &state; }
 extern "C" uint16_t Nei_GetOwnedItem(uint8_t slot) { return state.ownedItems[slot - 24]; }
 extern "C" void Nei_SetOwnedItem(uint8_t slot, uint16_t item) { state.ownedItems[slot - 24] = item; }
 int ExtInv_GetCurrentPage() { return page; }
-extern "C" int32_t CVarGetInteger(const char*, int32_t fallback) { return fallback; }
+extern "C" int32_t CVarGetInteger(const char* name, int32_t fallback) {
+    return std::strcmp(name, "gRando.Options.RO_ELEMENTAL_WAND_SHUFFLE") == 0 ||
+           std::strcmp(name, "gRandoSettings.ElementalWandShuffle") == 0 ? wandRule : fallback;
+}
 extern "C" void ItemGrantAudit_Begin(const char*, int, int, int) {}
 extern "C" void ItemGrantAudit_End() {}
 extern "C" s32 TradeAdult_OwnedCount() { return 0; }
@@ -48,6 +52,7 @@ extern "C" u8 TradeAdult_CellItem() { return ITEM_NONE; }
 #include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"
 #define GRACE_HOURGLASS_KALEIDO_CELL (SLOT_PHANTOM_HOURGLASS - 24)
 #define SLATE_KALEIDO_CELL (SLOT_SHEIKAH_SLATE - 24)
+#define WAND_KALEIDO_CELL (SLOT_ELEMENTAL_WAND - 24)
 typedef void (*KaleidoWheelCycleFunc)(PlayState*, s32);
 extern "C" void Audio_PlaySfx(u16) {}
 extern "C" void Interface_LoadItemIconImpl(PlayState*, u8 btn) { ++icons[btn]; }
@@ -59,10 +64,13 @@ void ExtInv_SetOotSlotItem(int, uint8_t) {}
             button_names = ("ExtButton_GetItem", "ExtButton_SetItem", "ExtButton_ClearItem",
                             "ExtButton_GetDpadItem", "ExtButton_SetDpadItem")
             slate_names = ("Slate_KaleidoHandle", "KaleidoScope_ResetItemCycling")
+            wand_names = ("Wand_KaleidoHandle",)
         else:
             prefix += r'''
 static u8 sGraceHourglassSelectorActive = 0;
 static u8 sSlateSelectorActive = 0;
+static u8 sWandSelectorActive = 0;
+u32 gBitFlags[32]{};
 extern "C" uint8_t Picto_IsOwned() { return 0; }
 extern "C" uint8_t PowerKeg_IsOwned() { return 0; }
 Vec3f gSfxDefaultPos{};
@@ -73,19 +81,26 @@ extern "C" void Interface_LoadItemIcon1(PlayState*, u16 btn) { ++icons[btn]; }
 '''
             button_names = ("ExtButton_GetItem", "ExtButton_SetItem", "ExtButton_ClearItem")
             slate_names = ("Slate_KaleidoCycle", "Slate_HandleKaleidoSelector", "KaleidoScope_ResetItemCycling")
-        production = "\n".join(function(inv, n) for n in (
+            wand_names = ("Wand_KaleidoCycle", "Wand_HandleKaleidoSelector")
+        start = inv.rfind("\n", 0, inv.index("sWandQuest["))
+        production = inv[start:inv.index(";", start) + 1] + "\n"
+        production += "\n".join(function(inv, n) for n in (
             "GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant",
             "Slate_RuneOwned", "Slate_GrantRune", "Slate_RuneCount", "Slate_RuneAt", "Slate_GetRune", "Slate_SetRune",
-            "Slate_RuneNeighbor"))
+            "Slate_RuneNeighbor", "Wand_RandoMode", "Wand_ModeOwned", "Wand_GrantMode", "Wand_ModeCount",
+            "Wand_ModeAt", "Wand_GetMode", "Wand_SetMode", "Wand_ModeNeighbor"))
         production += "\n" + "\n".join(function(buttons, n) for n in button_names)
         production += "\n" + function(ui, "KaleidoScope_ResetItemCycling")
         production += "\n" + function(ui, "Slate_KaleidoSyncTitle")
+        if "static void Wand_KaleidoSyncTitle(" in ui:
+            production += "\n" + function(ui, "Wand_KaleidoSyncTitle")
         production += "\n" + "\n".join(function(ui, n) for n in (
             "KaleidoWheel_Run", "GraceHourglass_KaleidoCycle", "GraceHourglass_KaleidoHandle",
-            *(n for n in slate_names if n != "KaleidoScope_ResetItemCycling")))
+            *(n for n in slate_names if n != "KaleidoScope_ResetItemCycling"), *wand_names))
         checks = r'''
 int main() {
     PlayState play{};
+    /* BIT_FLAGS */
     for (u16 first : {u16(ITEM_HYLIAS_GRACE), u16(EXT_ITEM_PHANTOM_HOURGLASS)}) {
         state = {};
         for (auto& item : state.ownedItems) item = ITEM_NONE;
@@ -146,7 +161,66 @@ int main() {
     /* SLATE_HANDLE */
     assert(Slate_GetRune() == 3 && play.pauseCtx.namedItem == PAUSE_ITEM_NONE);
     /* RESET_CHECK */
-    puts("PASS native pause wheels: A, both directions, u16 C/Dpad items, slot metadata and all Slate title refreshes");
+    for (int rule : {WAND_RANDO_MEDALLIONS, WAND_RANDO_SINGLE, WAND_RANDO_ELEMENTAL}) {
+        wandRule = rule;
+        state = {};
+        gSaveContext = {};
+        for (auto& item : state.ownedItems) item = ITEM_NONE;
+        play = {};
+        KaleidoScope_ResetItemCycling();
+        Wand_GrantMode(WAND_MODE_TORNADO);
+        assert(ExtInv_GetSlotItem(SLOT_ELEMENTAL_WAND) == ITEM_ELEMENTAL_WAND);
+        if (rule == WAND_RANDO_MEDALLIONS) {
+            assert(Wand_ModeCount() == 0 && "wand pickup must not invent medallion rewards");
+            /* MEDALLIONS */
+        } else if (rule == WAND_RANDO_ELEMENTAL) {
+            assert(Wand_ModeCount() == 1 && Wand_GetMode() == WAND_MODE_TORNADO);
+            Wand_GrantMode(WAND_MODE_SCEPTER);
+        } else {
+            assert(state.wandRodsOwned == 0x3F);
+        }
+        const u8 sparse[] = {WAND_MODE_TORNADO, WAND_MODE_SCEPTER};
+        const u8 all[] = {0, 1, 2, 3, 4, 5};
+        const u8* expected = rule == WAND_RANDO_SINGLE ? all : sparse;
+        const int count = rule == WAND_RANDO_SINGLE ? 6 : 2;
+        assert(Wand_ModeCount() == count);
+        Wand_SetMode(expected[0]);
+        play.pauseCtx.cursorSlot[PAUSE_ITEM] = SLOT_ELEMENTAL_WAND - 24;
+        play.pauseCtx.cursorItem[PAUSE_ITEM] = ITEM_ELEMENTAL_WAND;
+        play.pauseCtx.namedItem = ITEM_ELEMENTAL_WAND;
+        play.state.input[0].press.button = BTN_A;
+        /* WAND_HANDLE */
+        play.state.input[0].press.button = 0;
+        /* STICK_RIGHT */
+        for (int index = 1; index <= count; ++index) {
+            play.pauseCtx.namedItem = ITEM_ELEMENTAL_WAND;
+            /* WAND_HANDLE */
+            assert(Wand_GetMode() == expected[index % count]);
+            assert(play.pauseCtx.namedItem == PAUSE_ITEM_NONE && "wand title stayed cached while cycling right");
+        }
+        /* STICK_LEFT */
+        for (int index = 1; index <= count; ++index) {
+            play.pauseCtx.namedItem = ITEM_ELEMENTAL_WAND;
+            /* WAND_HANDLE */
+            assert(Wand_GetMode() == expected[(count - index) % count]);
+            assert(play.pauseCtx.namedItem == PAUSE_ITEM_NONE && "wand title stayed cached while cycling left");
+        }
+        /* STICK_ZERO */
+        play.pauseCtx.namedItem = ITEM_ELEMENTAL_WAND;
+        /* WAND_HANDLE */
+        play.pauseCtx.namedItem = ITEM_ELEMENTAL_WAND;
+        /* WAND_HANDLE */
+        assert(play.pauseCtx.namedItem == ITEM_ELEMENTAL_WAND && "unchanged mode must retain title timer");
+        Wand_SetMode(expected[1]);
+        /* WAND_HANDLE */
+        assert(play.pauseCtx.namedItem == PAUSE_ITEM_NONE && "live wand grants/selections must refresh the hovered title");
+        play.pauseCtx.namedItem = ITEM_BOW;
+        play.pauseCtx.cursorItem[PAUSE_ITEM] = ITEM_BOW;
+        Wand_SetMode(expected[0]);
+        /* WAND_HANDLE */
+        assert(play.pauseCtx.namedItem == ITEM_BOW && "wand refresh must not overwrite another item's title");
+    }
+    puts("PASS native pause wheels: A, both directions, u16 C/Dpad items, Slate titles and all three wand grant/title rules");
 }
 '''
         if host == "mm":
@@ -170,6 +244,9 @@ int main() {
             checks = checks.replace("/* STICK_LEFT */", "play.pauseCtx.stickAdjX = -40;")
             checks = checks.replace("/* STICK_ZERO */", "play.pauseCtx.stickAdjX = 0;")
             checks = checks.replace("/* SLATE_HANDLE */", "Slate_KaleidoHandle(&play);")
+            checks = checks.replace("/* WAND_HANDLE */", "Wand_KaleidoHandle(&play);")
+            checks = checks.replace("/* BIT_FLAGS */", "")
+            checks = checks.replace("/* MEDALLIONS */", "state.ootQuestItems = (1u << OOT_QUEST_MEDALLION_FOREST) | (1u << OOT_QUEST_MEDALLION_SHADOW);")
             checks = checks.replace("/* RESET_CHECK */", r'''
     KaleidoScope_ResetItemCycling();
     assert(gCurrentItemCyclingSlot == -1);
@@ -193,6 +270,9 @@ int main() {
             checks = checks.replace("/* STICK_RIGHT */", "play.pauseCtx.stickRelX = 40;")
             checks = checks.replace("/* STICK_LEFT */", "play.pauseCtx.stickRelX = -40;")
             checks = checks.replace("/* STICK_ZERO */", "play.pauseCtx.stickRelX = 0;")
+            checks = checks.replace("/* WAND_HANDLE */", "Wand_HandleKaleidoSelector(&play);")
+            checks = checks.replace("/* BIT_FLAGS */", "for (int bit = 0; bit < 32; ++bit) gBitFlags[bit] = 1u << bit;")
+            checks = checks.replace("/* MEDALLIONS */", "gSaveContext.inventory.questItems = (1u << QUEST_MEDALLION_FOREST) | (1u << QUEST_MEDALLION_SHADOW);")
             checks = checks.replace("/* SLATE_HANDLE */", "Slate_HandleKaleidoSelector(&play);")
             checks = checks.replace("/* RESET_CHECK */", r'''
     play.pauseCtx.cursorItem[PAUSE_ITEM] = ExtInv_GetSlotItem(41);

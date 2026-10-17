@@ -32,8 +32,9 @@ int main() {
                 for (size_t i = 0; i < mesh->count; ++i) {
                     const auto& v = mesh->vertices[i];
                     assert(std::isfinite(v.p.x) && std::isfinite(v.p.y) && std::isfinite(v.p.z));
-                    assert(std::fabs(v.p.x) <= 26 && std::fabs(v.p.z) <= 26);
-                    assert(v.p.y >= -32 && v.p.y <= 36);
+                    // Measured native diagonal core plus the old tip envelope.
+                    assert(v.p.x >= -28 && v.p.x <= 33 && std::fabs(v.p.z) <= 21);
+                    assert(v.p.y >= -32 && v.p.y <= 38);
                     assert(std::isfinite(v.u) && std::isfinite(v.v));
                     assert(v.u >= 0 && v.u <= 1 && v.v >= 0 && v.v <= 1);
                     visible += v.alpha > 0;

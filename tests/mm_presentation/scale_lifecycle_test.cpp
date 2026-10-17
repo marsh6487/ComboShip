@@ -12,7 +12,10 @@
 #include <map>
 #include <nlohmann/json.hpp>
 #include <string>
+#include "combo/rando/CrossDungeonRuntime.h"
 #define COMBO_BUILD
+#include "combo/ComboGameMode.h"
+extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 #define SPDLOG_INFO(...) ((void)0)
 #define SPDLOG_WARN(...) ((void)0)
 #define SPDLOG_ERROR(...) ((void)0)
@@ -86,6 +89,10 @@ struct PlayState {
 };
 PlayState *gPlayState = nullptr;
 int gComboOwlBlobSlot = -1, mmWrites = 0;
+static int32_t restoredCrossDungeonCheckpoint = -1;
+extern "C" void Combo_MM_LoadCrossDungeonCheckpoint(int32_t index) {
+  restoredCrossDungeonCheckpoint = index;
+}
 std::map<std::string, nlohmann::json> mmDisk;
 std::string SaveManager_GetFileName(int slot) { return std::to_string(slot); }
 int SaveManager_ReadSaveFile(const std::string &path, nlohmann::json &j) {
@@ -259,7 +266,7 @@ int main() {
   assert(CustomMessage::shown == "You found Silver Scale!");
   assert(RANDO_SAVE_CHECKS[0].obtained && mmWrites == 1);
   ReloadWithoutManualSave();
-  assert(RANDO_SAVE_CHECKS[0].obtained && targetScale == 1);
+  assert(RANDO_SAVE_CHECKS[0].obtained && targetScale == 1 && restoredCrossDungeonCheckpoint == -1);
   CollectForeign(0);
   assert(targetGrants == 1 && latches == 1 && broadcasts == 1 && mmWrites == 1);
   assert(

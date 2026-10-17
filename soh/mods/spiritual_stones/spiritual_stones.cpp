@@ -302,7 +302,7 @@ void OpenWarpPrompt(PlayState* play, int stone) {
 
 constexpr const char* kSaveSectionName = "spiritualStonesData";
 
-void SaveSection(SaveContext* saveContext, int sectionID, bool fullSave) {
+void SaveSection(const SaveContext& saveContext, int sectionID, bool fullSave) {
     for (int i = 0; i < SPIRITUAL_STONE_COUNT; ++i) {
         const std::string base = std::string("stone") + std::to_string(i);
         SaveManager::Instance->SaveData(base + "_passive", gState.passive[i]);

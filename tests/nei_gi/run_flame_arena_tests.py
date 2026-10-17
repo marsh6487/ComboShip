@@ -75,7 +75,7 @@ int main() {
   selected.neiShimmer = static_cast<int>(NeiGi::Kind::SwordAura) + 1;
   selected.itemShimmer = true;
   selected.opCount = 1;
-  selected.ops[0] = {CW_OP_ROTATE_Z, 18774.682f, 0, 0, {}};
+  selected.ops[0] = {CW_OP_ROTATE_Z, 16384.f, 0, 0, {}};
   selected.primColorXlu[0] = 120;
   selected.primColorXlu[1] = 180;
   selected.primColorXlu[2] = 255;
@@ -96,16 +96,17 @@ int main() {
     assert(allocations == 0 && gfx.polyOpa.p == opa && gfx.polyXlu.p == xlu);
     prepare(); MM_DrawNeiGi(selected, shop);
     const float fitScale = shop ? .4f : .5f, fitLift = shop ? -10.f : -20.f;
+    const float size = shop ? 1.f : 1.15f, sizeLift = (1.f - size) * (shop ? 15.f : -2.f);
     const auto effectFit = NeiGi::FrameFit(*NeiGi::FindSwordFrameBounds(NeiGi::Kind::SwordAura), 1.f, shop);
     assert(submitted.size() >= 4 && Drawn() == std::vector<std::string>{selected.dlists[0]});
-    assert(std::fabs(submitted[0].first - effectFit.scale * 5) < .00001f &&
-           std::fabs(submitted[0].second - (effectFit.lift - 70 * effectFit.scale)) < .00001f &&
+    assert(std::fabs(submitted[0].first - size * effectFit.scale * 5) < .00001f &&
+           std::fabs(submitted[0].second - (sizeLift + size * (effectFit.lift - 70 * effectFit.scale))) < .00001f &&
            "selected True Master blue flame inherited binary model units");
-    assert(std::fabs(submitted[1].first - fitScale * selected.scale) < .00001f &&
-           std::fabs(submitted[1].second - fitLift) < .00001f);
+    assert(std::fabs(submitted[1].first - size * fitScale * selected.scale) < .00001f &&
+           std::fabs(submitted[1].second - (sizeLift + size * fitLift)) < .00001f);
     for (size_t pass : {2u, 3u})
-      assert(std::fabs(submitted[pass].first - effectFit.scale / 16) < .00001f &&
-             std::fabs(submitted[pass].second - effectFit.lift) < .00001f);
+      assert(std::fabs(submitted[pass].first - size * effectFit.scale / 16) < .00001f &&
+             std::fabs(submitted[pass].second - (sizeLift + size * effectFit.lift)) < .00001f);
     assert(gfx.polyOpa.p <= gfx.polyOpa.d && gfx.polyXlu.p <= gfx.polyXlu.d);
     assert(stack.empty() && matrix == 1 && matrixY == 0);
     for (float bad : {0.f, -1.f, 2049.f, std::numeric_limits<float>::quiet_NaN(),

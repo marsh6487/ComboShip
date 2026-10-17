@@ -1,5 +1,7 @@
 # Elemental Arrow GI POC1
 
+The final-polish candidate, live cosmetic routing, real native-core preview and spell crystals are documented in [the elemental spell GI polish README](../elemental_spell_gi/README.md). The POC1 representative-core preview below is historical.
+
 Fire, Ice and Light arrow receipt effects share the mod's medallion artwork and
 NEI shimmer. Fire uses curling flame sheets, spiralling heat and rising embers.
 Ice uses frost sheets, a pale spiral, a blue glow and tumbling faceted crystals.

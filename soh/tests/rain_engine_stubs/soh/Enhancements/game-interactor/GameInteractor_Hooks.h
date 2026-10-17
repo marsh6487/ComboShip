@@ -1,6 +1,7 @@
 #pragma once
 struct GameInteractor {
     struct OnGameFrameUpdate {};
+    struct OnPlayDrawEnd {};
     struct OnPlayDestroy {};
     struct OnExitGame {};
     static GameInteractor* Instance;

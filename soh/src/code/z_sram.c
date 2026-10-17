@@ -1,4 +1,6 @@
+#include "../../../combo/ComboGameMode.h"
 #include "global.h"
+#include "soh/Enhancements/game-interactor/vanilla-behavior/GIVanillaBehavior.h"
 #include "vt.h"
 
 #include <string.h>
@@ -7,9 +9,11 @@
 #include "soh/Enhancements/randomizer/savefile.h"
 #include "soh/OTRGlobals.h"
 #include "soh/SaveManager.h"
+#include "soh/Enhancements/speedrun/Speedrun.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/FleetShipCombo/FleetShipCombo.h"
 #include "mods/nei_save.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 
 #define NUM_DUNGEONS 8
 #define NUM_COWS 10
@@ -152,16 +156,11 @@ void Sram_OpenSave() {
             break;
     }
 
-    if (!CVarGetInteger(CVAR_ENHANCEMENT("PersistentMasks"), 0)) {
-        gSaveContext.ship.maskMemory = PLAYER_MASK_NONE;
-    }
-
     osSyncPrintf("scene_no = %d\n", gSaveContext.entranceIndex);
     osSyncPrintf(VT_RST);
 
-    if (gSaveContext.health < STARTING_HEALTH) {
-        gSaveContext.health =
-            CVarGetInteger(CVAR_ENHANCEMENT("FullHealthSpawn"), 0) ? gSaveContext.healthCapacity : STARTING_HEALTH;
+    if (GameInteractor_Should(VB_FULL_HEALTH_SPAWN, gSaveContext.health < STARTING_HEALTH)) {
+        gSaveContext.health = STARTING_HEALTH;
     }
 
     if (gSaveContext.scarecrowLongSongSet) {
@@ -239,12 +238,19 @@ void Sram_OpenSave() {
 }
 
 void Sram_InitSave(FileChooseContext* fileChooseCtx) {
+#ifdef COMBO_BUILD
+    // Reject a stale paired selection before resetting or writing any native save state.
+    if (!Combo_IsCombinedGame() && fileChooseCtx->questType[fileChooseCtx->buttonIndex] == QUEST_OOTXMM) {
+        return;
+    }
+#endif
     u16 offset;
     u16 j;
     u16* ptr;
     u16 checksum;
 
-    if (fileChooseCtx->buttonIndex != 0 || !CVarGetInteger(CVAR_DEVELOPER_TOOLS("DebugEnabled"), 0)) {
+    if (fileChooseCtx->buttonIndex != 0 ||
+        !Ship_QuestDebugEnabled(fileChooseCtx->questType[fileChooseCtx->buttonIndex])) {
         Sram_InitNewSave();
     } else {
         Sram_InitDebugSave();
@@ -261,7 +267,8 @@ void Sram_InitSave(FileChooseContext* fileChooseCtx) {
             (gSaveContext.language == LANGUAGE_JPN) ? NAME_LANGUAGE_NTSC_JPN : NAME_LANGUAGE_NTSC_ENG;
     }
 
-    if ((fileChooseCtx->buttonIndex == 0 && CVarGetInteger(CVAR_DEVELOPER_TOOLS("DebugEnabled"), 0))) {
+    if ((fileChooseCtx->buttonIndex == 0 &&
+         Ship_QuestDebugEnabled(fileChooseCtx->questType[fileChooseCtx->buttonIndex]))) {
         gSaveContext.cutsceneIndex = 0;
     }
 
@@ -274,7 +281,9 @@ void Sram_InitSave(FileChooseContext* fileChooseCtx) {
 #ifdef COMBO_BUILD
     // ComboShip: generation is window-driven now; only force the rando quest type here.
     // The combined fill runs on a worker thread before save creation (triggered from the UI).
-    fileChooseCtx->questType[fileChooseCtx->buttonIndex] = QUEST_RANDOMIZER;
+    if (Combo_IsCombinedGame()) {
+        fileChooseCtx->questType[fileChooseCtx->buttonIndex] = QUEST_RANDOMIZER;
+    }
     (void)gComboGenerateCallback; // retained symbol; no longer invoked
 #endif
 
@@ -296,11 +305,15 @@ void Sram_InitSave(FileChooseContext* fileChooseCtx) {
         gSaveContext.ship.quest.id = currentQuest;
     }
 
+    if (IS_SPEEDRUN) {
+        Speedrun_InitSaveFile(fileChooseCtx->speedrunIndex);
+    }
+
     Save_SaveFile();
     SaveManager_ThreadPoolWait();
 
 #ifdef COMBO_BUILD
-    if (gComboSaveInitCallback != NULL) {
+    if (Combo_IsCombinedGame() && gComboSaveInitCallback != NULL) {
         gComboSaveInitCallback((int)gSaveContext.fileNum);
     }
 #endif

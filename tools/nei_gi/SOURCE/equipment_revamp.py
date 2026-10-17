@@ -383,13 +383,63 @@ def _collar(m,cloth,trim):
                 np.array([(2.4,37.6),(8.9,40.8),(13.9,32),(7.0,22)])*[sign,1],12.45,.28,4)
 
 
-def _belt(m,mat='belt',trim='gold_edge',y=-13):
-    start=len(m.parts)
-    m.lathe('Fitted waist belt',mat,[(y-3.2,19.8),(y+3.2,19.8)],40,cap=False)
-    for yy in [y-3.1,y+3.1]:m.ring('Waist belt sewn piping',trim,[0,yy,0],20,.32,'y',40,5)
-    m.transform(scale=[1,1,.59],start=start)
-    m.ring('Square waist buckle rim',trim,[0,y,12.1],[3.8,3.0],.68,'z',4,6)
-    m.tube('Waist buckle cross pin',trim,[[0,y-2.9,12.2],[0,y+2.9,12.2]],.48,5)
+def _garment_surface(grid,y,angle,clearance=.70):
+    """Sample the actual folded garment rather than an ideal fixed ellipse."""
+    columns=grid.shape[1]-1
+    column=(angle%TAU)/TAU*columns
+    j=int(column);mix=column-j
+    samples=grid[:,j]*(1-mix)+grid[:,j+1]*mix
+    p=np.array([np.interp(y,samples[:,1],samples[:,axis]) for axis in range(3)])
+    p[1]=y
+    return p+unit(p*np.array([1,0,1]))*clearance
+
+
+def _belt(m,body,mat='belt',trim='gold_edge',y=-13):
+    # Closely sample all folds and the vertical body profile; no buried belt
+    # vertices or long straight chords crossing the garment remain.
+    angles=np.linspace(0,TAU,97)
+    band=np.array([[_garment_surface(body,yy,a,.80) for a in angles]
+                   for yy in np.linspace(y-3.2,y+3.2,7)])
+    _sheet(m,'Fitted waist belt',mat,band)
+    part=m.parts[-1]
+    if np.mean(np.sum(part['n']*part['p']*np.array([1,0,1]),axis=1))<0:
+        _inside(part)
+    for edge in [band[0],band[-1]]:
+        radial=unit(edge*np.array([1,0,1]))
+        m.tube('Waist belt sewn piping',trim,edge+radial*.16,.24,5)
+    # Cloth folds under the buckle can project beyond the belt centerline.
+    # Fit its complete 4.5-by-3.7 half-extents, including rim thickness.
+    buckle_skin=np.array([_garment_surface(body,yy,a,0)
+                          for yy in np.linspace(y-3.7,y+3.7,17)
+                          for a in np.linspace(-math.pi/2,math.pi/2,97)])
+    front=buckle_skin[np.abs(buckle_skin[:,0])<=4.5,2].max()+1.05
+    m.ring('Square waist buckle rim',trim,[0,y,front],[3.8,3.0],.68,'z',4,6)
+    m.tube('Waist buckle cross pin',trim,[[0,y-2.9,front+.1],[0,y+2.9,front+.1]],.48,5)
+
+
+def _rear_harness(m,body):
+    ys=np.linspace(30,-14,45)
+    xs=np.interp(-ys,[-30,-14,5,14],[-14,-9,-2,5])
+    rows=[]
+    for x,y in zip(xs,ys):
+        # A fitted leather ribbon is naturally flat against cloth. Its full
+        # width follows the torso, including the underside at the back fold.
+        row=[]
+        for lateral in np.linspace(-1.2,1.2,5):
+            xx=x+lateral
+            left,right=math.pi*.5,math.pi*1.5
+            for _ in range(25):
+                mid=(left+right)/2
+                if _garment_surface(body,y,mid,0)[0]>xx:left=mid
+                else:right=mid
+            row.append(_garment_surface(body,y,(left+right)/2,.72))
+        rows.append(row)
+    grid=np.array(rows)
+    _sheet(m,'Champion rear leather seam strap','belt',grid,True)
+    for column in [0,-1]:
+        p=grid[:,column]
+        m.tube('Champion rear harness stitched edge','deep_blue',
+               p+unit(p*np.array([1,0,1]))*.1,.13,4)
 
 
 def spirit_breastplate():
@@ -418,7 +468,7 @@ def spirit_breastplate():
     for y in [22,16,10,4,-2]:
         m.tube('Crossed orange chest fastening','gold_edge',[[-3.0,y+1.7,13.7],[3,y-1.7,13.7]],.48,6)
         m.tube('Crossed orange chest fastening','orange_leather',[[3.0,y+1.7,13.4],[-3,y-1.7,13.4]],.47,6)
-    _belt(m,y=-17)
+    _belt(m,body,y=-17)
     # A restrained Spirit medallion engraved in the leather below the lacing.
     _stroke(m,'Spirit breastplate sun engraving','gold',[(0,-27),(4,-30),(0,-36),(-4,-30),(0,-27)],12.1,.44,5)
     for j in range(8):
@@ -442,7 +492,7 @@ def sages_tunic():
     body=_ellipse_body(m,'White woven sage robe','white_cloth',rings,48,1.15)
     m.tube('Sage robe gold hem seam','gold',body[0],.7,7)
     _sleeve(m,-1,'white_cloth','gold');_sleeve(m,1,'white_cloth','gold')
-    _collar(m,'warm_white','gold_edge');_belt(m,'belt','gold_edge',-15)
+    _collar(m,'warm_white','gold_edge');_belt(m,body,'belt','gold_edge',-15)
     # A real six-medallion chain reinforces the identity without depending on
     # externally launched particle geometry to make the white robe recognizable.
     chain=bezier([-14,30,13.3],[-12,4,14],[12,4,14],[14,30,13.3],35)
@@ -478,7 +528,7 @@ def champions_tunic():
     body=_ellipse_body(m,'Blue woven Champion tunic','champion_blue',rings,48,.9)
     m.tube('Blue rolled Champion hem','deep_blue',body[0],.7,7)
     _sleeve(m,-1,'champion_blue','white_thread');_sleeve(m,1,'champion_blue','white_thread')
-    _collar(m,'champion_blue','white_thread');_belt(m,y=-15)
+    _collar(m,'champion_blue','white_thread');_belt(m,body,y=-15)
     # BotW Champion shirt's unmistakable white sword and angular chest flourishes.
     _poly(m,'White embroidered chest sword blade','white_thread',
           [(0,29),(1.15,18),(1.05,3),(0,-1),(-1.05,3),(-1.15,18)],14.2,.45,.12)
@@ -497,7 +547,7 @@ def champions_tunic():
             _stroke(m,'Champion small white hem diamonds','white_thread',
                     np.array([(x,-37),(x+1.3,-35),(x,-33),(x-1.3,-35),(x,-37)])*[sign,1],13.4,.26,4)
     # A single diagonal leather baldric visible around the rear gives depth.
-    m.tube('Champion rear leather seam strap','belt',[[-14,30,-11],[-9,14,-14],[-2,-5,-12],[5,-14,-11]],1.2,7)
+    _rear_harness(m,body)
     m.notes=["Canonical Champion's Tunic icon: cyan-blue woven shirt with white chest embroidery and warm belt.",
              'New short tunic, open collar/cuffs, cloth folds, modeled white sword/flourish stitching, patterned hem and rear leather strap.']
     return _finish(m)

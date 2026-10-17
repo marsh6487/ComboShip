@@ -53,6 +53,7 @@ extern "C" {
 #include "functions.h"
 #include "variables.h"
 #include "mods/nei_save.h"
+#include "mods/ext_buttons/ext_buttons.h"
 extern PlayState* gPlayState;
 extern SaveContext gSaveContext;
 // The combo's single shared pictograph (FleetPicto.cpp) — pulled in on arrival.
@@ -78,6 +79,7 @@ void ExtEquip_GivePendant(void);
 unsigned char ExtEquip_HasItem(short equipType, unsigned char index);
 // The single writer of an equipped ext slot + the RAM re-read after an apply (extended_equipment.h).
 void ExtEquip_SetSlot(short equipType, unsigned char index);
+void ExtEquip_RecordNativeShieldOwnership(void);
 void ExtEquip_ResyncFromSave(void);
 // Bottle wheel fold (custom_bottles.cpp) — declared HERE, in the extern "C" block: a declaration
 // inside an anonymous namespace mangles as a local C++ symbol and fails to link (bit soh first).
@@ -88,6 +90,9 @@ void Bottle_WheelRecordActive(unsigned char wheel, unsigned short slotItem);
 void Wand_GrantMode(unsigned char mode);
 void Slate_GrantRune(unsigned char rune);
 void Seasons_GrantSeason(unsigned char season);
+void Seasons_GrantRod(void);
+unsigned char Seasons_HasRod(void);
+void Seasons_UpdateGates(void);
 }
 
 // Cross-game restart: the raw reset of THIS game (defined in DebugConsole.cpp), called by the
@@ -192,14 +197,30 @@ int KokiriChainLevel() {
     return 0;
 }
 
+bool NativeKokiriOwned() {
+    NeiSaveData* nei = Nei_Save();
+    if (nei->comboObtainedFc[FCI_KOKIRI_SWORD] != 0 || KokiriChainLevel() > 0) {
+        return true;
+    }
+    const int nibble = MM_EQ.equipment & 0xF;
+    // Master borrows Gilded's model slot; only an exact native B/tier match
+    // without an extended sword owner can prove an unrecorded native starter.
+    return nei->extEquipSword == 0 && nibble >= EQUIP_VALUE_SWORD_KOKIRI && nibble <= EQUIP_VALUE_SWORD_GILDED &&
+           MM_EQ.buttonItems[0][0] == ITEM_SWORD_KOKIRI + nibble - EQUIP_VALUE_SWORD_KOKIRI;
+}
+
 uint16_t ComputeShieldOwned() {
     NeiSaveData* nei = Nei_Save();
     uint16_t sh = nei->shieldOwned;
     int nibble = (MM_EQ.equipment >> 4) & 0xF; // 1 Hero, 2 Mirror(-MM)
-    if (nibble >= 1)
-        sh |= FC_SHIELD_HYLIAN; // MM Hero == OoT Hylian
-    if (nibble == 2)
-        sh |= FC_SHIELD_IKANA; // MM Mirror == OoT Shield of Ikana
+    // Extended shields and imported skins borrow these model values. They
+    // cannot manufacture native ownership when the shared state is published.
+    if (nei->extEquipShield == 0 && nei->vanillaShieldSkin == 0) {
+        if (nibble == 1)
+            sh |= FC_SHIELD_HYLIAN; // MM Hero == OoT Hylian
+        if (nibble == 2)
+            sh |= FC_SHIELD_IKANA; // MM Mirror == OoT Shield of Ikana
+    }
     if (nei->extEquipOwnedBits & (1u << 19))
         sh |= FC_SHIELD_DIVINE;
     if (nei->extEquipOwnedBits & (1u << 20))
@@ -216,6 +237,15 @@ int GetEquippedShieldCanonical() {
         return 3 + nei->extEquipShield;
     }
     int nibble = (MM_EQ.equipment >> 4) & 0xF;
+    if (nei->extEquipShield != 0) {
+        return 0;
+    }
+    if (nei->vanillaShieldSkin == 1)
+        return nibble == 1 ? 1 : 0; // Deku over the Hero model
+    if (nei->vanillaShieldSkin == 2)
+        return nibble == 2 ? 3 : 0; // OoT Mirror over the MM Mirror model
+    if (nei->vanillaShieldSkin != 0)
+        return 0;
     if (nibble == 1)
         return 2; // Hero -> Hylian
     if (nibble == 2)
@@ -228,20 +258,27 @@ int GetEquippedShieldCanonical() {
 // until the next scene load).
 void SetEquippedShieldCanonical(int canon) {
     switch (canon) {
+        case 1: // Deku skin over Hero
         case 2: // Hylian -> Hero
+            ExtEquip_RecordNativeShieldOwnership();
             ExtEquip_SetSlot(EQUIP_TYPE_SHIELD, 0);
             MM_EQ.equipment = (uint16_t)((MM_EQ.equipment & ~0xF0) | (1 << 4));
+            Nei_Save()->vanillaShieldSkin = canon == 1 ? 1 : 0;
             break;
+        case 3: // OoT Mirror skin over MM Mirror
         case 6: // Ikana -> native MM Mirror
+            ExtEquip_RecordNativeShieldOwnership();
             ExtEquip_SetSlot(EQUIP_TYPE_SHIELD, 0);
             MM_EQ.equipment = (uint16_t)((MM_EQ.equipment & ~0xF0) | (2 << 4));
+            Nei_Save()->vanillaShieldSkin = canon == 3 ? 2 : 0;
             break;
         case 4: // Divine (NEI ext 1 over Hero base)
         case 5: // Kite (NEI ext 2)
             ExtEquip_SetSlot(EQUIP_TYPE_SHIELD, (unsigned char)(canon - 3));
+            Nei_Save()->vanillaShieldSkin = 0;
             break;
         default:
-            break; // deku / mirror-OoT / none: no MM relative -> keep current
+            break; // none/unknown: keep current
     }
 }
 
@@ -518,7 +555,8 @@ static void RepairFlagOwnedCells(NeiSaveData* nei) {
     if (nei->slateRunesOwned != 0 && Nei_GetOwnedItem(kSlotSlate) != kExtSheikahSlate) {
         Nei_SetOwnedItem(kSlotSlate, kExtSheikahSlate);
     }
-    if (nei->seasonsOwned != 0 && Nei_GetOwnedItem(kSlotRod) != kExtRodOfSeasons) {
+    if ((nei->seasonsRodOwned || (nei->seasonsOwned & NEI_SEASONS_MASK)) &&
+        Nei_GetOwnedItem(kSlotRod) != kExtRodOfSeasons) {
         Nei_SetOwnedItem(kSlotRod, kExtRodOfSeasons);
     }
     if (nei->shovelOwned || nei->dominionOwned) {
@@ -575,7 +613,7 @@ void ExtractShared(nlohmann::json& sh) {
     sh["pendantOwned"] = ExtEquip_PendantOwned() != 0;
     // Sword flags: kokiri chain is native; master/bgs base ownership rides the registry.
     int swordNibble = MM_EQ.equipment & 0xF; // 1 kokiri, 2 razor, 3 gilded, 4 deity
-    sh["swordFlags"] = { { "kokiri", swordNibble >= 1 || KokiriChainLevel() > 0 },
+    sh["swordFlags"] = { { "kokiri", NativeKokiriOwned() },
                          { "master", nei->comboObtained[FC_OOT_SWORD_MASTER] != 0 },
                          { "biggoron", nei->comboObtained[FC_OOT_SWORD_BIGGORON] != 0 } };
     sh["equippedSword"] = (swordNibble >= 1 && swordNibble <= 3) ? 1 : (swordNibble == 4 ? 4 : 0);
@@ -686,7 +724,10 @@ void ExtractShared(nlohmann::json& sh) {
     // natively, this just guarantees the bits arrive even if a grant is missed.
     sh["wandRodsOwned"] = (int)nei->wandRodsOwned;
     sh["slateRunesOwned"] = (int)nei->slateRunesOwned;
-    sh["seasonsOwned"] = (int)nei->seasonsOwned;
+    sh["seasonsOwned"] = (int)(nei->seasonsOwned & NEI_SEASONS_MASK);
+    Seasons_UpdateGates();
+    sh["seasonsRodOwned"] = (int)Seasons_HasRod();
+    sh["seasonsGates"] = (int)(nei->seasonsGates & NEI_SEASONS_MASK);
     sh["rpgStats"] = ComboRpg::ToJson(nei->comboRpg);
     sh["speedUpgrades"] = nei->comboRpg.level[COMBO_RPG_SPEED];
     sh["speedUpgradeRequired"] = ComboRpgState_Required(&nei->comboRpg, COMBO_RPG_SPEED);
@@ -818,10 +859,15 @@ void ApplyShared(const nlohmann::json& sh) {
         if (owned & FC_SHIELD_IKANA)
             nei->extEquipOwnedBits |= (1u << 21);
         int nibble = (MM_EQ.equipment >> 4) & 0xF;
-        if ((owned & FC_SHIELD_IKANA) && nibble < 2) {
-            MM_EQ.equipment = (uint16_t)((MM_EQ.equipment & ~0xF0) | (2 << 4)); // own MM Mirror
-        } else if ((owned & FC_SHIELD_HYLIAN) && nibble < 1) {
-            MM_EQ.equipment = (uint16_t)((MM_EQ.equipment & ~0xF0) | (1 << 4)); // own Hero
+        // Ownership alone cannot change a borrowed model slot. An explicit
+        // equippedShield below selects another shield and its matching skin/base.
+        if (nei->extEquipShield == 0 && nei->vanillaShieldSkin == 0) {
+            if ((owned & FC_SHIELD_IKANA) && nibble < 2) {
+                ExtEquip_RecordNativeShieldOwnership();
+                MM_EQ.equipment = (uint16_t)((MM_EQ.equipment & ~0xF0) | (2 << 4)); // own MM Mirror
+            } else if ((owned & FC_SHIELD_HYLIAN) && nibble < 1) {
+                MM_EQ.equipment = (uint16_t)((MM_EQ.equipment & ~0xF0) | (1 << 4)); // own Hero
+            }
         }
     }
     if (sh.contains("equippedShield")) {
@@ -1067,7 +1113,7 @@ void ApplyShared(const nlohmann::json& sh) {
         nei->slateRunesOwned |= incoming;
     }
     if (sh.contains("seasonsOwned") && sh["seasonsOwned"].is_number_integer()) {
-        const uint8_t incoming = (uint8_t)sh["seasonsOwned"].get<int>();
+        const uint8_t incoming = (uint8_t)(sh["seasonsOwned"].get<int>() & NEI_SEASONS_MASK);
         const uint8_t gained = (uint8_t)(incoming & ~nei->seasonsOwned);
         for (uint8_t s = 0; s < 4 && gained != 0; s++) {
             if (gained & (1 << s)) {
@@ -1075,6 +1121,14 @@ void ApplyShared(const nlohmann::json& sh) {
             }
         }
         nei->seasonsOwned |= incoming;
+    }
+    // Empty starting/gated Rods have no season pickup bits; ownership crosses independently.
+    if (sh.contains("seasonsRodOwned") && sh["seasonsRodOwned"].is_number_integer() &&
+        sh["seasonsRodOwned"].get<int>() == 1 && !Seasons_HasRod()) {
+        Seasons_GrantRod();
+    }
+    if (sh.contains("seasonsGates") && sh["seasonsGates"].is_number_integer()) {
+        nei->seasonsGates |= (uint8_t)(sh["seasonsGates"].get<int>() & NEI_SEASONS_MASK);
     }
 
     RepairFlagOwnedCells(nei);
@@ -1222,8 +1276,8 @@ void ApplyShared(const nlohmann::json& sh) {
 // C / D-pad equips used to be ordinary shared state: published by BOTH games ~3x a second and re-sent
 // whole on every resync. That made them a one-way ratchet in OoT's favour, and it is exactly what the
 // "no matter what I equip in MM, it forces an OoT item onto the button" report was. The loop:
-//   - We publish 0xFF for anything OoT cannot represent — any ITEM_EXT_BUTTON custom (0xFB, i.e. every
-//     NEI item), the pictobox, the Great Fairy's Sword, and even the Ocarina of Time, whose MM id is
+//   - We used to publish 0xFF for any ITEM_EXT_BUTTON item, the pictobox, the Great Fairy's Sword,
+//     and even the Ocarina of Time, whose MM id is
 //     the 0x00 that the old extract had to treat as "empty" because it could not tell it from a zeroed
 //     byte.
 //   - OoT reads that 0xFF as "keep mine", so it never changes — and keeps publishing its own id.
@@ -1241,36 +1295,37 @@ void ApplyShared(const nlohmann::json& sh) {
 //      An id without its cButtonSlots/dpadSlots entry is a phantom button the rest of the game reads
 //      inconsistently — that mismatch is the other half of "it changed the item I had equipped".
 
-// Canonical (OoT) id for one MM button, or 0xFF when OoT has no way to hold what is on it.
+// Canonical (OoT) full id for one MM button, or 0xFF for an unsupported local item.
 // 0x00 is BOTH MM's Ocarina of Time and the value any zeroed byte reads as, so the button's SLOT is
 // what disambiguates it: a real ocarina equip points at kSlotOcarina and that slot is filled.
-uint8_t MmButtonCanonical(uint8_t item, uint8_t slot) {
+uint16_t MmButtonCanonical(uint16_t item, uint8_t slot) {
     if (item == 0xFF || item == ITEM_EXT_BUTTON) {
-        return 0xFF; // empty, or a custom (u16) item that only exists on this side
+        return 0xFF; // empty, or an unresolved marker instead of its full id
     }
     if (item == ITEM_OCARINA_OF_TIME) { // 0x00
         return (slot == kSlotOcarina && MM_INV.items[kSlotOcarina] != 0xFF) ? FcEquip_MmToOot(item) : 0xFF;
     }
-    return FcEquip_MmToOot(item);
+    return FcEquip_MmToOot16(item);
 }
 
 void ExtractEquips(nlohmann::json& sh) {
+    // Native MM uses form 0 for shared C/D buttons; only B is form-specific.
     nlohmann::json c = nlohmann::json::array();
     for (int b = 1; b <= 3; b++) {
-        c.push_back(MmButtonCanonical(MM_EQ.buttonItems[CUR_FORM][b], MM_EQ.cButtonSlots[CUR_FORM][b]));
+        c.push_back(MmButtonCanonical(ExtButton_GetItem(0, b), MM_EQ.cButtonSlots[0][b]));
     }
     sh["cEquips"] = c;
     nlohmann::json d = nlohmann::json::array();
     for (int b = 0; b < 4; b++) {
-        d.push_back(MmButtonCanonical(gSaveContext.save.shipSaveInfo.dpadEquips.dpadItems[CUR_FORM][b],
-                                      gSaveContext.save.shipSaveInfo.dpadEquips.dpadSlots[CUR_FORM][b]));
+        d.push_back(
+            MmButtonCanonical(ExtButton_GetDpadItem(0, b), gSaveContext.save.shipSaveInfo.dpadEquips.dpadSlots[0][b]));
     }
     sh["dEquips"] = d;
 }
 
 // Inventory slot holding `item`, or -1 if this save does not have it. The ocarina is looked up by its
 // own slot rather than by scanning: its id is 0x00, so a scan would match the first zeroed byte.
-int FindInvSlot(uint8_t item) {
+int FindInvSlot(uint16_t item) {
     if (item == ITEM_OCARINA_OF_TIME) {
         return (MM_INV.items[kSlotOcarina] != 0xFF) ? (int)kSlotOcarina : -1;
     }
@@ -1279,13 +1334,19 @@ int FindInvSlot(uint8_t item) {
             return s;
         }
     }
+    // Custom page cells occupy 72..95 in button slot space to avoid native masks.
+    for (int i = 0; i < 24; i++) {
+        if (Nei_Save()->ownedItems[i] == item) {
+            return i + 72;
+        }
+    }
     return -1;
 }
 
 // itemDst / slotDst: the button's id byte and its inventory-slot byte (vanilla C or Ship D-pad).
-// extDst: the parallel u16 that only means anything while itemDst holds ITEM_EXT_BUTTON (NULL for the
-// D-pad, which has no such shadow).
-void ApplyOneButton(uint8_t* itemDst, uint8_t* slotDst, uint16_t* extDst, uint8_t canon) {
+// extDst: the matching C-button or D-pad u16 shadow. C EXT equips use SLOT_NONE;
+// D-pad EXT equips retain their unique 72..95 inventory-slot band.
+void ApplyOneButton(uint8_t* itemDst, uint8_t* slotDst, uint16_t* extDst, uint16_t canon, bool dpad) {
     if (canon == 0xFF) {
         return; // rule 1
     }
@@ -1293,10 +1354,11 @@ void ApplyOneButton(uint8_t* itemDst, uint8_t* slotDst, uint16_t* extDst, uint8_
     // A raw 0x00 sitting on a button that does NOT point at the ocarina slot is a zeroed byte, not an
     // equip — treat it as empty so it can be replaced instead of being protected as if it were loot.
     const bool curEmpty = (cur == 0xFF) || (cur == ITEM_OCARINA_OF_TIME && *slotDst != kSlotOcarina);
-    if (!curEmpty && MmButtonCanonical(cur, *slotDst) == 0xFF) {
+    const uint16_t curItem = (cur == ITEM_EXT_BUTTON && extDst != NULL) ? *extDst : cur;
+    if (!curEmpty && MmButtonCanonical(curItem, *slotDst) == 0xFF) {
         return; // rule 2: the player put something OoT cannot hold here — don't take it away
     }
-    const uint8_t mm = FcEquip_OotToMm(canon);
+    const uint16_t mm = FcEquip_OotToMm16(canon);
     if (mm == 0xFF) {
         return; // no MM relative for what they had
     }
@@ -1304,33 +1366,37 @@ void ApplyOneButton(uint8_t* itemDst, uint8_t* slotDst, uint16_t* extDst, uint8_
     if (slot < 0) {
         return; // rule 3: we don't own it
     }
-    *itemDst = mm;
-    *slotDst = (uint8_t)slot;
+    if (mm >= 0x0200 && extDst == NULL) {
+        return;
+    }
+    *itemDst = mm >= 0x0200 ? ITEM_EXT_BUTTON : (uint8_t)mm;
+    *slotDst = mm >= 0x0200 && !dpad ? SLOT_NONE : (uint8_t)slot;
     if (extDst != NULL) {
-        *extDst = 0; // the u16 shadow is meaningless now that this button holds a plain u8 id
+        *extDst = mm >= 0x0200 ? mm : 0;
     }
 }
 
 void ApplyEquips(const nlohmann::json& sh) {
     if (sh.contains("cEquips") && sh["cEquips"].is_array()) {
         for (int i = 0; i < 3 && i < (int)sh["cEquips"].size(); i++) {
-            if (!sh["cEquips"][i].is_number_integer()) {
+            const auto& item = sh["cEquips"][i];
+            if (!item.is_number_integer() || item < 0 || item > 0xFFFF) {
                 continue;
             }
             const int b = 1 + i;
-            ApplyOneButton(&MM_EQ.buttonItems[CUR_FORM][b], &MM_EQ.cButtonSlots[CUR_FORM][b],
-                           &gSaveContext.save.shipSaveInfo.extButtons.items[CUR_FORM][b],
-                           (uint8_t)sh["cEquips"][i].get<int>());
+            ApplyOneButton(&MM_EQ.buttonItems[0][b], &MM_EQ.cButtonSlots[0][b],
+                           &gSaveContext.save.shipSaveInfo.extButtons.items[0][b], item.get<uint16_t>(), false);
         }
     }
     if (sh.contains("dEquips") && sh["dEquips"].is_array()) {
         for (int i = 0; i < 4 && i < (int)sh["dEquips"].size(); i++) {
-            if (!sh["dEquips"][i].is_number_integer()) {
+            const auto& item = sh["dEquips"][i];
+            if (!item.is_number_integer() || item < 0 || item > 0xFFFF) {
                 continue;
             }
-            ApplyOneButton(&gSaveContext.save.shipSaveInfo.dpadEquips.dpadItems[CUR_FORM][i],
-                           &gSaveContext.save.shipSaveInfo.dpadEquips.dpadSlots[CUR_FORM][i], NULL,
-                           (uint8_t)sh["dEquips"][i].get<int>());
+            ApplyOneButton(&gSaveContext.save.shipSaveInfo.dpadEquips.dpadItems[0][i],
+                           &gSaveContext.save.shipSaveInfo.dpadEquips.dpadSlots[0][i],
+                           &gSaveContext.save.shipSaveInfo.dpadEquips.extItems[0][i], item.get<uint16_t>(), true);
         }
     }
 }
@@ -2356,6 +2422,8 @@ static ItemGrantAudit::Snapshot CaptureItemGrantAudit() {
     snapshot.Add("nei.wandRodsOwned", nei->wandRodsOwned);
     snapshot.Add("nei.slateRunesOwned", nei->slateRunesOwned);
     snapshot.Add("nei.seasonsOwned", nei->seasonsOwned);
+    snapshot.Add("nei.seasonsRodOwned", nei->seasonsRodOwned);
+    snapshot.Add("nei.seasonsGates", nei->seasonsGates);
     snapshot.Add("nei.hyliasGraceOwned", nei->hyliasGraceOwned);
     snapshot.Add("nei.phantomHourglassOwned", nei->phantomHourglassOwned);
     snapshot.Add("nei.shovelOwned", nei->shovelOwned);

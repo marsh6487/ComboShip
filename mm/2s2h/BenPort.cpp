@@ -1,3 +1,4 @@
+#include "../../combo/emotes/EmoteBridge.h"
 #include "../../combo/NeiAssetPriorityResource.h"
 #include "../../combo/NeiWolfAssetResource.h"
 #include "../../combo/menu/ItemGrantAuditBridge.h"
@@ -5,9 +6,13 @@
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
 #include "ComboResolve.h"
+#include "../../combo/entrances/LostWoodsEntrance.h"
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "2s2h/Enhancements/Camera/ComboForestArrivalCamera.h"
 #endif
 #include <iostream>
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <chrono>
@@ -94,6 +99,7 @@ CrowdControl* CrowdControl::Instance;
 #include "2s2h/Rando/Rando.h"
 #include "2s2h/Rando/Spoiler/Spoiler.h"
 #include "2s2h/Rando/Logic/Logic.h"
+#include "2s2h/Rando/CheckTracker/CheckTracker.h" // ComboShip: rebuild peek map on dormant load
 #include "2s2h/Rando/MiscBehavior/ClockShuffle.h"
 #include "2s2h/SaveManager/SaveManager.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
@@ -162,6 +168,16 @@ AudioCollection* AudioCollection::Instance;
 // Context::mContext is the same instance in every DLL, so GetInstance() already returns it.
 static bool sComboTransitionActive = false;
 
+// Session-owned, hidden in this DLL: the launcher sets it before MM initialization.
+extern "C" {
+int gComboGameMode = COMBO_GAME_BOTH;
+}
+extern "C" COMBO_EXPORT void MM_SetGameMode(int mode) {
+    if (OTRGlobals::Instance != nullptr)
+        return; // A running module owns one immutable session mode.
+    gComboGameMode = mode == COMBO_GAME_OOT || mode == COMBO_GAME_MM ? mode : COMBO_GAME_BOTH;
+}
+
 extern "C" COMBO_EXPORT void MM_NotifyComboTransition(void) {
     ItemGrantAudit::Scope itemGrantAuditScope("MM_NotifyComboTransition");
     sComboTransitionActive = true;
@@ -177,6 +193,57 @@ extern "C" COMBO_EXPORT void MM_SetOnComboReturnCallback(void (*cb)(int kind)) {
     gComboReturnCallback = cb;
 }
 static bool sComboReturnPending = false;
+static bool sComboFwReturnPending = false;
+extern "C" void MM_CaptureFwDeparture(void);
+extern "C" void MM_QueueFwHandoff(void) {
+    sComboFwReturnPending = true;
+}
+static int sComboPortalRoute = COMBO_PORTAL_MARKET;
+static bool sComboPortalArrivalPending = false;
+static int sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
+static int sComboPassageFade = 0;
+static int sComboPassageFileNum = -1;
+static bool sComboOpeningReturnArmed = false;
+static void (*sComboSetOotReturnRoute)(int) = nullptr;
+
+extern "C" COMBO_EXPORT void MM_SetComboPortalRoute(int route) {
+    sComboPortalRoute = ComboLostWoods_IsForestRoute(route) ? route : COMBO_PORTAL_MARKET;
+    sComboPortalArrivalPending = ComboLostWoods_IsForestRoute(sComboPortalRoute);
+}
+
+// Called AFTER native save loading and OnSaveLoad, so neither can overwrite the destination.
+extern "C" void MM_ApplyComboPortalArrival(void) {
+    if (!sComboPortalArrivalPending || !ComboLostWoods_IsForestRoute(sComboPortalRoute))
+        return;
+    sComboPortalArrivalPending = false;
+    if (sComboPortalRoute == COMBO_PORTAL_OPENING_FOREST) {
+        gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
+        gSaveContext.save.cutsceneIndex = 0;
+        gSaveContext.nextCutsceneIndex = 0xFFEF;
+        gSaveContext.cutsceneTrigger = 0;
+        gSaveContext.save.isOwlSave = false;
+        gSaveContext.respawnFlag = 0;
+        ComboForestArrivalCamera_Queue(sComboPortalRoute);
+        return;
+    }
+    gSaveContext.save.entrance = ENTRANCE(WOODS_OF_MYSTERY, 0);
+    gSaveContext.save.cutsceneIndex = 0;
+    gSaveContext.save.isOwlSave = false;
+    // RETURN is the disposable grotto returnpoint; TOP belongs to Farore's Wind.
+    RespawnData* arrival = &gSaveContext.respawn[RESPAWN_MODE_RETURN];
+    *arrival = {};
+    arrival->entrance = gSaveContext.save.entrance;
+    arrival->roomIndex = 1;
+    // Keep the native 180-unit trailing camera in front of the passage mouth.
+    // The old wall-side placement put it behind the opaque black quad until
+    // Link walked farther into the clearing, including stationary save arrivals.
+    arrival->pos = { 0.0f, 0.0f, 0.0f };
+    arrival->yaw = -8192; // towards the clearing, away from the north-east passage
+    arrival->playerParams = PLAYER_PARAMS(0xFF, PLAYER_START_MODE_E);
+    arrival->data = 1;
+    gSaveContext.respawnFlag = 2;
+    ComboForestArrivalCamera_Queue(sComboPortalRoute);
+}
 // ComboShip: Ctrl+R reset while MM is foreground. Like the portal return, but only persists MM if
 // autosave is enabled (an authentic reset otherwise discards unsaved progress). Set via the export.
 static bool sComboResetReturnPending = false;
@@ -193,10 +260,22 @@ extern "C" void Combo_RequestOwlSaveQuit(void) {
 }
 // Drop any unconsumed return request. Called as MM is entered: one left over from the previous session
 // would immediately quit the new one.
+static void Combo_CancelLostWoodsPassage(void) {
+    if (sComboPassageFade && gPlayState && gGameState == &gPlayState->state)
+        gPlayState->envCtx.fillScreen = false;
+    if (ComboLostWoods_IsForestRoute(sComboReturnPortalRoute))
+        sComboReturnPending = false;
+    sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
+    sComboPassageFade = 0;
+    sComboPassageFileNum = -1;
+    sComboOpeningReturnArmed = false;
+}
 static void Combo_ClearReturnRequests(void) {
     sComboReturnPending = false;
+    sComboFwReturnPending = false;
     sComboResetReturnPending = false;
     sComboOwlSaveQuitPending = false;
+    Combo_CancelLostWoodsPassage();
 }
 // MM's own ResourceManager, created at first boot and kept alive for the whole process. A combo
 // transition swaps the Context's active RM between MM's and OOT's, so each game keeps its archives +
@@ -204,6 +283,10 @@ static void Combo_ClearReturnRequests(void) {
 // (Upstream merge: the old RegisterMMResourceFactories factoring was dropped — Initialize() now owns
 // the inline factory registration and it runs against whichever RM is active. See docs/UPSTREAM_MERGES.md.)
 static std::shared_ptr<Ship::ResourceManager> sMMResourceManager;
+#endif
+
+#ifdef COMBO_BUILD
+#include "rando/CrossDungeonMmRuntime.inc.h"
 #endif
 
 extern "C" char** cameraStrings;
@@ -313,7 +396,11 @@ OTRGlobals::OTRGlobals() {
     // the shared Gui's single menu slot still holds OOT's SohMenu. Build MM's menu now that the
     // ImGui context is current (widgets populate lazily via BenMenu::InitElement).
     if (usingExistingCtx) {
-        BenGui::ActivateMenu(); // ComboShip: no-op under COMBO_BUILD (comboui owns the menu)
+        BenGui::ActivateMenu();
+        if (!Combo_IsCombinedGame()) {
+            context->GetWindow()->GetGui()->AddGuiWindow(
+                std::make_shared<BenInputEditorWindow>("gWindows.BenInputEditor", "2S2H Input Editor"));
+        }
     }
 #endif
 
@@ -398,6 +485,19 @@ extern "C" const char* Nei_AssetDir(void) {
 #endif
 }
 
+static bool RemoveArchiveAcrossAppDirs(const std::string& fileName) {
+    for (const std::string& path : { Ship::Context::GetPathRelativeToAppDirectory(fileName, appShortName),
+                                     Ship::Context::GetPathRelativeToAppBundle(fileName), "./" + fileName }) {
+        std::error_code err;
+        if (std::filesystem::remove(path, err)) {
+            SPDLOG_INFO("Removed outdated archive {}", path);
+        } else if (err) {
+            SPDLOG_ERROR("Failed to remove outdated archive {}: {}", path, err.message());
+        }
+    }
+    return !std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs(fileName, appShortName));
+}
+
 void CheckAndCreateModFolder() {
     try {
         std::string modsPath = Ship::Context::LocateFileAcrossAppDirs("mods/" + appShortName, appShortName);
@@ -442,10 +542,11 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
     }
     Extractor extract;
     PromptSteps promptStep = PS_FILE_CHECK;
+    bool romsFromSearch = false;
     std::atomic<size_t> extractCount = 0, totalExtract = 0;
 
-    std::string installPath = Ship::Context::GetAppBundlePath();
-    std::string dataPath = Ship::Context::GetAppDirectoryPath(appShortName);
+    std::string installPath = std::filesystem::absolute(Ship::Context::GetAppBundlePath()).string();
+    std::string dataPath = std::filesystem::absolute(Ship::Context::GetAppDirectoryPath(appShortName)).string();
     std::string file;
 
 #if defined(__SWITCH__)
@@ -469,10 +570,16 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                               "re-extract them from the download or.\n\nExiting...",
                               "OK", "", [&]() { exit(1); });
     } else if (shouldRegen) {
-        BenGui::RegisterPopup("Outdated ROM Archives",
-                              "Your mm.o2r was created with incompatible versions of 2Ship.\nYou will "
-                              "now be redirected to re-extract them.");
-        std::filesystem::remove("mm.o2r");
+        if (RemoveArchiveAcrossAppDirs("mm.o2r")) {
+            BenGui::RegisterPopup("Outdated ROM Archive",
+                                  "Your mm.o2r was created with incompatible versions of 2Ship.\nYou will "
+                                  "now be redirected to re-extract them.");
+        } else {
+            BenGui::RegisterPopup("Outdated ROM Archive",
+                                  "Your mm.o2r was created with incompatible versions of 2Ship, but it\n"
+                                  "could not be removed automatically. Please delete it and relaunch.\n\nExiting...",
+                                  "OK", "", [&]() { exit(1); });
+        }
     }
 
     std::shared_ptr<BS::thread_pool> threadPool = std::make_shared<BS::thread_pool>(1);
@@ -592,41 +699,29 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
             case ES_EXTRACT_ARGS: {
 #if !defined(__SWITCH__) && !defined(__WIIU__)
                 if (args.empty()) {
-                    BenGui::RegisterPopup(
-                        "Run 2 Ship 2 Harkinian", "All files have been processed. Run 2S2H?", "Yes", "No",
-                        [&]() {
-                            if (!std::filesystem::exists(Ship::Context::GetAppDirectoryPath(appShortName) +
-                                                         "/mm.o2r")) {
-                                extractStep = ES_EXTRACT;
-                                promptStep = PS_FILE_CHECK;
-                            } else {
-                                extractStep = ES_VERIFY;
-                            }
-                        },
-                        [&]() { exit(0); });
-                    break;
+                    if (!std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("mm.o2r", appShortName))) {
+                        extractStep = ES_EXTRACT;
+                        promptStep = PS_FILE_CHECK;
+                    } else {
+                        extractStep = ES_VERIFY;
+                    }
+                    continue;
+                }
+                if (romsFromSearch &&
+                    std::filesystem::exists(Ship::Context::LocateFileAcrossAppDirs("mm.o2r", appShortName))) {
+                    SPDLOG_INFO("mm.o2r generated, skipping {} other ROM(s) found in the app folder", args.size());
+                    args.clear();
+                    continue;
                 }
                 file = args.at(0);
                 args.erase(args.begin());
                 extract = Extractor();
                 if (extract.RunFileStandalone(file)) {
-                    bool doExtract = true;
-                    if (std::filesystem::exists(Ship::Context::GetAppDirectoryPath(appShortName) + "/mm.o2r")) {
-                        std::string msg = "Archive for current ROM, mm.o2r, already exists.\nExtract again?";
-                        BenGui::RegisterPopup("Confirm Re-extract", msg.c_str(), "Yes", "No", [&]() {
-                            extractionTask = threadPool->submit_task([&]() -> void {
-                                extract.CallZapd(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
-                                                 &extractCount, &totalExtract);
-                                extractCount = totalExtract = 0;
-                            });
-                        });
-                    } else {
-                        extractionTask = threadPool->submit_task([&]() -> void {
-                            extract.CallZapd(installPath, Ship::Context::GetAppDirectoryPath(appShortName),
-                                             &extractCount, &totalExtract);
-                            extractCount = totalExtract = 0;
-                        });
-                    }
+                    extractionTask = threadPool->submit_task([&]() -> void {
+                        extract.CallZapd(installPath, Ship::Context::GetAppDirectoryPath(appShortName), &extractCount,
+                                         &totalExtract);
+                        extractCount = totalExtract = 0;
+                    });
                 } else {
                     bool open = true;
                     std::string msg = "File\n" + std::string(file) + "\nis not a ROM or does not match supported ROMs.";
@@ -653,8 +748,11 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                         extract = Extractor();
                         extract.SetSearchPath(installPath);
                         extract.GetRoms(args);
-                        extract.SetSearchPath(dataPath);
-                        extract.GetRoms(args);
+                        if (installPath != dataPath) {
+                            extract.SetSearchPath(dataPath);
+                            extract.GetRoms(args);
+                        }
+                        romsFromSearch = !args.empty();
                         if (!args.empty()) {
                             promptStep = PS_WAIT;
                             BenGui::RegisterPopup(
@@ -1066,8 +1164,8 @@ ImFont* OTRGlobals::CreateDefaultFontWithSize(float size) {
 uint32_t OTRGlobals::GetInterpolationFPS() {
 #ifdef COMBO_BUILD
     // ComboShip: the shared Graphics tab is OOT-rendered and writes the gSettings.* names.
-    const char* matchRefreshCvar = "gSettings.MatchRefreshRate";
-    const char* interpFpsCvar = "gSettings.InterpolationFPS";
+    const char* matchRefreshCvar = Combo_IsCombinedGame() ? "gSettings.MatchRefreshRate" : "gMatchRefreshRate";
+    const char* interpFpsCvar = Combo_IsCombinedGame() ? "gSettings.InterpolationFPS" : "gInterpolationFPS";
 #else
     const char* matchRefreshCvar = "gMatchRefreshRate";
     const char* interpFpsCvar = "gInterpolationFPS";
@@ -1171,6 +1269,7 @@ void OTRAudio_Thread() {
 #endif
             MMWeatherAudio_Mix(audio_buffer, totalFrames);
             MMMidnaAudio_Mix(audio_buffer, totalFrames);
+            ComboEmotes_MixAudio(audio_buffer, totalFrames);
 
             // Preserve final-output ownership: every native and private voice is muted
             // together while MM is inactive; no sequence or user volume is changed.
@@ -1333,14 +1432,17 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     sFleetArgv = argv;
     OTRGlobals::Instance = new OTRGlobals();
 
-    FleetShipCombo_ProvisionO2rBothDirs(); // pull a sibling-extracted o2r in BEFORE the presence check
+#ifdef COMBO_BUILD
+    if (Combo_IsCombinedGame())
+#endif
+        FleetShipCombo_ProvisionO2rBothDirs(); // legacy combo archive mirroring
 
-    // Fleet Ship Combo child: hide our window NOW (right after it was created in the ctor),
-    // before the extractor/boot run, so only Ship's single window is ever visible — BUT ONLY when
-    // mm.o2r is already there and matches this build. Otherwise RunExtract is about to ask "No O2R
-    // Files - Generate one now?" (or "outdated -> re-extract"), and hiding first parks that popup at
-    // -32000,-32000 where nobody can see or click it: MM never comes up, the combo looks dead. So the
-    // extractor stays visible and we hide right after it (below).
+        // Fleet Ship Combo child: hide our window NOW (right after it was created in the ctor),
+        // before the extractor/boot run, so only Ship's single window is ever visible — BUT ONLY when
+        // mm.o2r is already there and matches this build. Otherwise RunExtract is about to ask "No O2R
+        // Files - Generate one now?" (or "outdated -> re-extract"), and hiding first parks that popup at
+        // -32000,-32000 where nobody can see or click it: MM never comes up, the combo looks dead. So the
+        // extractor stays visible and we hide right after it (below).
 #ifdef COMBO_BUILD
     // ComboShip owns extraction (combo/ComboExtract.h) and there is no guest window to hide.
     OTRGlobals::Instance->RunExtract(argc, argv);
@@ -1382,53 +1484,142 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     BenGui::SetupGuiElements();
     ShipInit::InitAll();
 #ifdef COMBO_BUILD
-    // Reverse MM->OOT trigger: the Clock Tower interior's South-Clock-Town door (spawn 1 only —
-    // cycle resets respawn in this scene at spawns 0/2/3/6 and must stay in MM).
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s8 sceneId, s8 spawnNum) {
-        // GAMEMODE_NORMAL only: MM's attract demo (GAMEMODE_TITLE_SCREEN, after Sram_InitNewSave wiped
-        // the save) scene-hops through here, and would both teleport the player to OOT and persist the
-        // wiped save over the slot.
-        if (sceneId == SCENE_INSIDETOWER && spawnNum == 1 && gSaveContext.gameMode == GAMEMODE_NORMAL) {
-            sComboReturnPending = true;
-        }
-    });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>([]() {
-        if (!sComboReturnPending && !sComboResetReturnPending && !sComboOwlSaveQuitPending)
-            return;
-        const bool isReset = sComboResetReturnPending;
-        const bool isOwlSaveQuit = sComboOwlSaveQuitPending;
-        sComboReturnPending = false;
-        sComboResetReturnPending = false;
-        sComboOwlSaveQuitPending = false;
-        // An owl save quit lands on OOT's title, like Ctrl+R, rather than resuming OOT gameplay.
-        if (isOwlSaveQuit) {
-            static void (*sFn)(void) = nullptr;
-            static bool sTried = false;
-            if (!sTried) {
-                sTried = true;
-                sFn = (void (*)(void))Combo_ResolveSym("soh", "SOH_SetComboBootToTitle");
+    if (Combo_IsCombinedGame()) {
+        // Reverse MM->OOT trigger: the Clock Tower interior's South-Clock-Town door (spawn 1 only —
+        // cycle resets respawn in this scene at spawns 0/2/3/6 and must stay in MM).
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(Combo_CancelLostWoodsPassage);
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s8 sceneId, s8 spawnNum) {
+            ComboCrossMmRuntime::ObserveScene(sceneId);
+            sComboOpeningReturnArmed = false;
+            // GAMEMODE_NORMAL only: MM's attract demo (GAMEMODE_TITLE_SCREEN, after Sram_InitNewSave wiped
+            // the save) scene-hops through here, and would both teleport the player to OOT and persist the
+            // wiped save over the slot.
+            if (sceneId == SCENE_INSIDETOWER && spawnNum == 1 && gSaveContext.gameMode == GAMEMODE_NORMAL) {
+                sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
+                sComboReturnPending = true;
             }
-            if (sFn)
-                sFn();
-        }
-        // Portal return always persists MM; a reset persists only when autosave is enabled. Never
-        // persist outside gameplay: the title/attract path wipes save first (Sram_InitNewSave). An owl
-        // save has already written itself through the flashrom seam.
-        if (!isOwlSaveQuit && (!isReset || CVarGetInteger("gEnhancements.Saving.Autosave", 0)) &&
-            gSaveContext.gameMode == GAMEMODE_NORMAL)
-            SaveManager_SaveCurrentForCombo();
-        if (gComboReturnCallback)
-            gComboReturnCallback(isOwlSaveQuit ? 2 : (isReset ? 1 : 0));
-        if (auto fast3d = std::dynamic_pointer_cast<Fast::Fast3dWindow>(Ship::Context::GetRawInstance()->GetWindow())) {
-            fast3d->SetIsRunning(false);
-        }
-    });
-    // Shared Items: per-frame drain seam. Always-on (not Anchor-gated) so it also runs solo.
+        });
+        GameInteractor::Instance->RegisterGameHookForID<GameInteractor::OnActorUpdate>(ACTOR_PLAYER, [](Actor* actor) {
+            if (sComboPassageFade || !gPlayState || gGameState != &gPlayState->state || !gGameState->running ||
+                !gComboReturnCallback || gSaveContext.gameMode != GAMEMODE_NORMAL ||
+                !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) || gPlayState->pauseCtx.state != 0 ||
+                gPlayState->transitionMode != TRANS_MODE_OFF || gPlayState->transitionTrigger != TRANS_TRIGGER_OFF ||
+                gPlayState->csCtx.state != CS_STATE_IDLE)
+                return;
+            const Vec3f& pos = actor->world.pos;
+            if (ComboOpeningForest_IsExploration(gPlayState) && gPlayState->linkActorEntry) {
+                const float dx = pos.x - gPlayState->linkActorEntry->pos.x;
+                const float dz = pos.z - gPlayState->linkActorEntry->pos.z;
+                if (dx * dx + dz * dz > 14400.0f)
+                    sComboOpeningReturnArmed = true;
+            }
+            const bool openingReturn = sComboOpeningReturnArmed && ComboOpeningForest_AtReturn(gPlayState, &pos);
+            if (!openingReturn &&
+                !ComboLostWoods_InMmPassage(gPlayState->sceneId, gPlayState->roomCtx.curRoom.num, pos.x, pos.y, pos.z))
+                return;
+            if (!sComboSetOotReturnRoute)
+                sComboSetOotReturnRoute = (void (*)(int))Combo_ResolveSym("soh", "SOH_SetComboPortalReturnRoute");
+            if (!sComboSetOotReturnRoute)
+                return;
+            sComboReturnPortalRoute = openingReturn ? COMBO_PORTAL_OPENING_FOREST : COMBO_PORTAL_LOST_WOODS;
+            sComboPassageFileNum = (int)gSaveContext.fileNum;
+            sComboPassageFade = 1;
+        });
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>([]() {
+            if (sComboFwReturnPending || sComboResetReturnPending || sComboOwlSaveQuitPending)
+                Combo_MM_CancelCrossDungeonTransition();
+        });
+        // Play_Main has now built the final native transition display list. Commit
+        // after it, so the outgoing frame stays covered while the launcher loads.
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainFinish>([]() {
+            if (sComboFwReturnPending || sComboResetReturnPending || sComboOwlSaveQuitPending)
+                Combo_MM_CancelCrossDungeonTransition();
+            if (ComboCrossMmRuntime::PrepareSwitch()) {
+                if (gPlayState) {
+                    gPlayState->transitionTrigger = TRANS_TRIGGER_OFF;
+                    gPlayState->transitionMode = TRANS_MODE_OFF;
+                }
+                Combo_CancelLostWoodsPassage();
+                sComboReturnPending = true;
+            }
+            if (Combo_MM_CrossDungeonTransitionPending() && sComboPassageFade)
+                Combo_CancelLostWoodsPassage();
+            if (sComboPassageFade &&
+                (!gPlayState || gGameState != &gPlayState->state || !gGameState->running ||
+                 gSaveContext.gameMode != GAMEMODE_NORMAL || !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) ||
+                 sComboPassageFileNum != (int)gSaveContext.fileNum))
+                Combo_CancelLostWoodsPassage();
+            if (sComboPassageFade && gPlayState && !sComboFwReturnPending && !sComboResetReturnPending &&
+                !sComboOwlSaveQuitPending) {
+                if (sComboPassageFade < 255) {
+                    sComboPassageFade = std::min(sComboPassageFade + 24, 255);
+                    gPlayState->envCtx.fillScreen = true;
+                    gPlayState->envCtx.screenFillColor[0] = gPlayState->envCtx.screenFillColor[1] =
+                        gPlayState->envCtx.screenFillColor[2] = 0;
+                    gPlayState->envCtx.screenFillColor[3] = sComboPassageFade;
+                    return; // Let a full-alpha frame render before the next handoff tick.
+                }
+                gPlayState->envCtx.fillScreen = true;
+                gPlayState->envCtx.screenFillColor[0] = gPlayState->envCtx.screenFillColor[1] =
+                    gPlayState->envCtx.screenFillColor[2] = 0;
+                gPlayState->envCtx.screenFillColor[3] = sComboPassageFade;
+                sComboReturnPending = true;
+            }
+            if (!sComboReturnPending && !sComboFwReturnPending && !sComboResetReturnPending &&
+                !sComboOwlSaveQuitPending)
+                return;
+            const bool isFwReturn = sComboFwReturnPending;
+            const bool isReset = sComboResetReturnPending;
+            const bool isOwlSaveQuit = sComboOwlSaveQuitPending;
+            sComboReturnPending = false;
+            sComboFwReturnPending = false;
+            sComboResetReturnPending = false;
+            sComboOwlSaveQuitPending = false;
+            sComboPassageFade = 0;
+            sComboPassageFileNum = -1;
+            // Route the next OOT boot before its title-setup/save-load sequence begins.
+            if (!sComboSetOotReturnRoute)
+                sComboSetOotReturnRoute = (void (*)(int))Combo_ResolveSym("soh", "SOH_SetComboPortalReturnRoute");
+            if (sComboSetOotReturnRoute)
+                sComboSetOotReturnRoute(isFwReturn || isReset || isOwlSaveQuit ? COMBO_PORTAL_MARKET
+                                                                               : sComboReturnPortalRoute);
+            sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
+            // An owl save quit lands on OOT's title, like Ctrl+R, rather than resuming OOT gameplay.
+            if (isOwlSaveQuit) {
+                static void (*sFn)(void) = nullptr;
+                static bool sTried = false;
+                if (!sTried) {
+                    sTried = true;
+                    sFn = (void (*)(void))Combo_ResolveSym("soh", "SOH_SetComboBootToTitle");
+                }
+                if (sFn)
+                    sFn();
+            }
+            // Portal return always persists MM; a reset persists only when autosave is enabled. Never
+            // persist outside gameplay: the title/attract path wipes save first (Sram_InitNewSave). An owl
+            // save has already written itself through the flashrom seam.
+            if (!isOwlSaveQuit && (!isReset || CVarGetInteger("gEnhancements.Saving.Autosave", 0)) &&
+                gSaveContext.gameMode == GAMEMODE_NORMAL) {
+                if (isFwReturn)
+                    MM_CaptureFwDeparture();
+                void Combo_MM_FlushAccumulators(void);
+                Combo_MM_FlushAccumulators(); // ComboShip (#214): bank a count-up still running at the portal
+                SaveManager_SaveCurrentForCombo(!isReset && !isFwReturn);
+            }
+            if (gComboReturnCallback)
+                gComboReturnCallback(isOwlSaveQuit ? 2 : (isReset ? 1 : (isFwReturn ? 3 : 0)));
+            if (auto fast3d =
+                    std::dynamic_pointer_cast<Fast::Fast3dWindow>(Ship::Context::GetRawInstance()->GetWindow())) {
+                fast3d->SetIsRunning(false);
+            }
+        });
+    } // Combo-only handoff hooks: native title/reset/owl-save stay inside MM.
+    // Audio diagnostics remain available in native MM sessions.
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateUpdate>([]() {
         MMAudioTrace::scene.store(gPlayState ? gPlayState->sceneId : -1);
         MMAudioTrace::room.store(gPlayState ? gPlayState->roomCtx.curRoom.num : -1);
         MMAudioTrace::mode.store(gSaveContext.gameMode);
-        if (gMMComboSharedTick) {
+        if (Combo_IsCombinedGame() && gMMComboSharedTick) {
             gMMComboSharedTick();
         }
     });
@@ -1499,6 +1690,10 @@ extern "C" void DeinitOTR() {
 #endif
 
     OTRGlobals::Instance->context = nullptr;
+#ifndef COMBO_BUILD
+    // ComboShip: the Context is shared; soh's DeinitOTR runs after this and destroys it.
+    Ship::Context::DestroyInstance();
+#endif
     delete AudioCollection::Instance;
 #ifdef COMBO_BUILD
     // ComboShip: this DLL's module-local GImGui still points at the shared ImGui context, which is
@@ -1768,6 +1963,8 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
         audio.processing = true;
         // Set the combo audio-mute flag BEFORE waking the worker so THIS frame's buffer is
         // (un)muted correctly; storing it after the notify would race the worker by a frame.
+        if (!FleetShipCombo_IsThisGameActive())
+            ComboEmotes_Reset();
         gFscAudioMuted.store(!FleetShipCombo_IsThisGameActive(), std::memory_order_relaxed);
     }
 
@@ -2110,6 +2307,53 @@ extern "C" char* ResourceMgr_LoadTexOrDListByName(const char* filePath) {
     else {
         return (char*)ResourceGetDataByName(filePath);
     }
+}
+
+extern "C" uint8_t MM_GetTextureVisibleCenter(const char* filePath, float* x, float* y) {
+    if (filePath == nullptr || x == nullptr || y == nullptr) {
+        return false;
+    }
+    auto* context = Ship::Context::GetRawInstance();
+    auto rm = context != nullptr ? context->GetResourceManager() : nullptr;
+    std::string resolved = filePath;
+    // Match the renderer's explicit owner routing: these season icons belong
+    // to OoT even while the selector is drawn from the MM resource manager.
+    if (std::strncmp(filePath, "__OTR__@", 8) == 0) {
+        const char* owner = filePath + 8;
+        const char* colon = std::strchr(owner, ':');
+        if (colon == nullptr || colon == owner) {
+            return false;
+        }
+        rm = Ship::CrossRMRegistry::Get(std::string(owner, colon - owner));
+        resolved = std::string("__OTR__") + (colon + 1);
+    }
+    if (rm == nullptr) {
+        return false;
+    }
+    auto texture = std::dynamic_pointer_cast<Fast::Texture>(rm->LoadResourceProcess(resolved.c_str()));
+    if (texture == nullptr || texture->Type != Fast::TextureType::RGBA32bpp || texture->ImageData == nullptr ||
+        texture->Width == 0 || texture->Height == 0 ||
+        uint64_t(texture->Width) * texture->Height * 4 != texture->ImageDataSize) {
+        return false;
+    }
+    unsigned minX = texture->Width, minY = texture->Height, maxX = 0, maxY = 0;
+    for (unsigned py = 0; py < texture->Height; ++py) {
+        for (unsigned px = 0; px < texture->Width; ++px) {
+            // Ignore barely visible glow around the solid artwork.
+            if (texture->ImageData[(size_t(py) * texture->Width + px) * 4 + 3] >= 32) {
+                minX = std::min(minX, px);
+                minY = std::min(minY, py);
+                maxX = std::max(maxX, px);
+                maxY = std::max(maxY, py);
+            }
+        }
+    }
+    if (minX > maxX || minY > maxY) {
+        return false;
+    }
+    *x = float(minX + maxX + 1) / (2 * texture->Width);
+    *y = float(minY + maxY + 1) / (2 * texture->Height);
+    return true;
 }
 
 extern "C" char* ResourceMgr_LoadIfDListByName(const char* filePath) {
@@ -2775,7 +3019,12 @@ ImFont* OTRGlobals::CreateFontWithSize(float size, std::string fontPath) {
 
 std::filesystem::path GetSaveFile(std::shared_ptr<Ship::Config> Conf) {
     const std::string fileName =
-        Conf->GetString("Game.SaveName", Ship::Context::GetPathRelativeToAppDirectory("oot_save.sav"));
+#ifdef COMBO_BUILD
+        !Combo_IsCombinedGame()
+            ? Ship::Context::GetPathRelativeToAppDirectory("saves/mm/mm_save.sav", appShortName)
+            :
+#endif
+            Conf->GetString("Game.SaveName", Ship::Context::GetPathRelativeToAppDirectory("oot_save.sav"));
     std::filesystem::path saveFile = std::filesystem::absolute(fileName);
 
     if (!exists(saveFile.parent_path())) {
@@ -3237,6 +3486,8 @@ extern "C" int gComboEntryIsResume = 0;
 extern "C" COMBO_EXPORT void MM_SetComboEntryIsResume(int isResume) {
     gComboEntryIsResume = isResume ? 1 : 0;
     Combo_ClearReturnRequests(); // a stale request would quit the session we're about to start
+    sComboPortalRoute = COMBO_PORTAL_MARKET;
+    sComboPortalArrivalPending = false;
 }
 
 // ComboShip (#83): adopt OOT's targeting/audio. MM normally reads these from global.json, which combo
@@ -3314,6 +3565,15 @@ extern "C" void Combo_RepairMMSaveForSlot(int fileNum) try {
 
 extern "C" void MM_RunMain(void);
 
+// Native MM boot on the ROM-independent shared window.
+extern "C" COMBO_EXPORT void MM_RunSolo(void) {
+    // SOH_InitWindowOnly supplied a ROM-independent shared window. MM owns all
+    // subsequent resources, audio, menus and native title/file-select state.
+    sComboTransitionActive = true;
+    gComboStartFileNum = -1;
+    MM_RunMain();
+}
+
 // Full MM initialization + game loop, entered after OOT has exited.
 // fileNum is the OOT 0-indexed slot; we map it to the same MM slot.
 extern "C" COMBO_EXPORT void MM_RunGame(int fileNum) {
@@ -3370,6 +3630,7 @@ extern "C" void OTRMessage_ResetForResume(void);
 // ComboShip: OOT->MM forward transition. Stop MM audio without destroying the shared
 // context/window/resource-manager (OOT reuses them). Mirrors SOH_PrepareForTransition.
 extern "C" COMBO_EXPORT void MM_PrepareForTransition(void) {
+    ComboEmotes_Reset();
     ItemGrantAudit::Scope itemGrantAuditScope("MM_PrepareForTransition");
     SaveManager_ThreadPoolWait();
     OTRAudio_Exit();
@@ -3440,7 +3701,11 @@ extern "C" COMBO_EXPORT void MM_ResumeGame(int fileNum) {
 // title_setup.c runs on resume (no gPlayState needed). Nonzero = nothing usable was loaded.
 extern "C" COMBO_EXPORT int MM_LoadSaveForCombo(int fileNum) {
     ItemGrantAudit::Scope itemGrantAuditScope("MM_LoadSaveForCombo");
-    return Combo_LoadMMSaveFile(fileNum + 1); // shares the saveType tripwire
+    int rc = Combo_LoadMMSaveFile(fileNum + 1); // shares the saveType tripwire
+    if (rc == 0) {
+        Rando::CheckTracker::OnFileLoad(); // rebuild the peek map; the peek never refreshes a filled one
+    }
+    return rc;
 }
 
 static void Combo_MM_ApplyCheckPrices();
@@ -3580,7 +3845,7 @@ extern "C" COMBO_EXPORT int MM_InitRandoSaveFile(int fileNum, const char* placem
 
         // ComboShip: the apply stamps shuffled=true on every payload check incl. non-shuffled Remains;
         // restore native state (delivery reads randoItemId, not shuffled) so stones/tracker skip them.
-        if (RANDO_SAVE_OPTIONS[RO_SHUFFLE_BOSS_REMAINS] == RO_GENERIC_NO) {
+        if (RANDO_SAVE_OPTIONS[RO_SHUFFLE_BOSS_REMAINS] == RO_REMAINS_SHUFFLE_VANILLA) {
             for (auto& [id, chk] : Rando::StaticData::Checks) {
                 if (chk.randoCheckType == RCTYPE_REMAINS)
                     RANDO_SAVE_CHECKS[id].shuffled = false;
@@ -3831,6 +4096,8 @@ extern "C" COMBO_EXPORT void MM_RestoreRandoSettings(const char* json) {
         // snapshot wins outright, so an absent list clears local exclusions (pre-GAP-7 spoilers).
         CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE", RO_GRACE_ON);
         CVarSetInteger("gRando.Options.RO_HYLIAS_GRACE_REWARDS", 4);
+        CVarSetInteger("gRando.Options.RO_ROD_OF_SEASONS", NEI_SEASONS_INDIVIDUAL);
+        CVarSetInteger("gRando.Options.RO_STARTING_ROD_OF_SEASONS", 0);
         std::vector<RandoCheckId> excluded;
         if (j.contains("gRando.ExcludedChecks") && j["gRando.ExcludedChecks"].is_array()) {
             for (auto& n : j["gRando.ExcludedChecks"]) {
@@ -4003,7 +4270,7 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
     // (GeneratePools.cpp), so the Remains never reach the oracle — yet Moon/Majora access gates on
     // RemainsCount(). Emit each as a fixed placement of its vanilla remains so the fill/oracle credit it
     // once the boss-warp check is reachable (i.e. the temple is beaten). Mirrors the OOT vanilla-shop fix.
-    if (saveInfo.randoSaveOptions[RO_SHUFFLE_BOSS_REMAINS] == RO_GENERIC_NO) {
+    if (saveInfo.randoSaveOptions[RO_SHUFFLE_BOSS_REMAINS] == RO_REMAINS_SHUFFLE_VANILLA) {
         for (auto& [id, chk] : Rando::StaticData::Checks) {
             if (chk.randoCheckType != RCTYPE_REMAINS || !chk.name || chk.name[0] == '\0')
                 continue;
@@ -4019,23 +4286,20 @@ extern "C" COMBO_EXPORT const char* MM_DumpRandoStaticData(void) {
         }
     }
 
-    // ComboShip: 5.0.0's per-house skulltula shuffle keeps 30-N tokens vanilla: GeneratePools marks
-    // them shuffled=true with their own token in the (discarded) local saveInfo and drops them from
-    // checkPool. Emit them as fixed so the oracle credits the tokens and the apply stamps them like
-    // native (shuffled=true, so they stay hintable, mirroring native).
-    if (saveInfo.randoSaveOptions[RO_SHUFFLE_GOLD_SKULLTULAS] == RO_GENERIC_YES) {
-        for (auto& [id, chk] : Rando::StaticData::Checks) {
-            if (chk.randoCheckType != RCTYPE_SKULL_TOKEN || !saveInfo.randoSaveChecks[id].shuffled ||
-                stillFillable.count(id))
-                continue;
-            auto iit = Rando::StaticData::Items.find(chk.randoItemId);
-            if (iit == Rando::StaticData::Items.end() || !iit->second.spoilerName || iit->second.spoilerName[0] == '\0')
-                continue;
-            fixed.push_back({ { "check", Rando::StaticData::GetCheckDisplayName(id) },
-                              { "item", Rando::StaticData::GetItemDisplayName(iit->first) },
-                              { "advancement", isAdvancement(iit->second) },
-                              { "hintable", true } });
-        }
+    // ComboShip: GeneratePools also stamps shuffled=true in the discarded saveInfo and drops from checkPool
+    // (vanilla skulltulas, vanilla dungeon items, song-location surplus, exclusions). Emit them like native.
+    std::set<RandoCheckId> alreadyFixed(checkPoolBefore.begin(), checkPoolBefore.end());
+    for (auto& [id, chk] : Rando::StaticData::Checks) {
+        if (!saveInfo.randoSaveChecks[id].shuffled || stillFillable.count(id) || alreadyFixed.count(id) || !chk.name ||
+            chk.name[0] == '\0')
+            continue;
+        auto iit = Rando::StaticData::Items.find(saveInfo.randoSaveChecks[id].randoItemId);
+        if (iit == Rando::StaticData::Items.end() || !iit->second.spoilerName || iit->second.spoilerName[0] == '\0')
+            continue;
+        fixed.push_back({ { "check", Rando::StaticData::GetCheckDisplayName(id) },
+                          { "item", Rando::StaticData::GetItemDisplayName(iit->first) },
+                          { "advancement", isAdvancement(iit->second) },
+                          { "hintable", true } });
     }
 
     // Fillable checks -> checks[] (name only; pool[] feeds the items).
@@ -4688,6 +4952,22 @@ static bool Combo_IsBottleRefill(RandoItemId rid) {
     }
 }
 
+// ComboShip (#214): rupees/magic refills land in transient accumulators outside gSaveContext.save.
+// Bank them before a paused/dormant save so they survive quitting from the other game.
+void Combo_MM_FlushAccumulators(void) {
+    if (gSaveContext.rupeeAccumulator != 0) {
+        s16 total = gSaveContext.save.saveInfo.playerData.rupees + gSaveContext.rupeeAccumulator;
+        gSaveContext.save.saveInfo.playerData.rupees = CLAMP(total, 0, (s16)CUR_CAPACITY(UPG_WALLET));
+        gSaveContext.rupeeAccumulator = 0;
+    }
+    if (gSaveContext.magicToAdd != 0) {
+        s16 total = gSaveContext.save.saveInfo.playerData.magic + gSaveContext.magicToAdd;
+        gSaveContext.save.saveInfo.playerData.magic = CLAMP(total, 0, (s16)gSaveContext.magicCapacity);
+        gSaveContext.magicToAdd = 0;
+        gSaveContext.isMagicRequested = false;
+    }
+}
+
 void Combo_MM_GiveDormantResolved(RandoItemId rid) {
     ItemGrantAudit::Scope itemGrantAuditScope("MM dormant-resolved");
     // ComboShip (#84): drop a bottle refill when no bottle is free. Callers convert first, so this is
@@ -4706,19 +4986,7 @@ void Combo_MM_GiveDormantResolved(RandoItemId rid) {
         Rando::gComboDormantGive = true;
         Rando::GiveItem(rid);
     }
-    // ComboShip: rupees/magic land in transient accumulators (not in gSaveContext.save, applied on
-    // the interface tick); flush them into the save so a dormant grant survives quitting before MM.
-    if (gSaveContext.rupeeAccumulator != 0) {
-        s16 total = gSaveContext.save.saveInfo.playerData.rupees + gSaveContext.rupeeAccumulator;
-        gSaveContext.save.saveInfo.playerData.rupees = CLAMP(total, 0, (s16)CUR_CAPACITY(UPG_WALLET));
-        gSaveContext.rupeeAccumulator = 0;
-    }
-    if (gSaveContext.magicToAdd != 0) {
-        s16 total = gSaveContext.save.saveInfo.playerData.magic + gSaveContext.magicToAdd;
-        gSaveContext.save.saveInfo.playerData.magic = CLAMP(total, 0, (s16)gSaveContext.magicCapacity);
-        gSaveContext.magicToAdd = 0;
-        gSaveContext.isMagicRequested = false;
-    }
+    Combo_MM_FlushAccumulators();
     if (gSaveContext.fileNum != 0xFF) {
         SaveManager_SaveCurrentForCombo(); // persist NOW
     }
@@ -4909,6 +5177,8 @@ extern "C" COMBO_EXPORT int MM_GetSharedTier(int family) try {
     return 0;
 }
 
+bool Combo_MmIsForeground(void);
+
 extern "C" COMBO_EXPORT void MM_RaiseSharedTier(int family, int tier) try {
     ItemGrantAudit::Scope itemGrantAuditScope("MM_RaiseSharedTier");
     // The cleared quit/title save is neither a source nor a destination for shared grants.
@@ -4994,6 +5264,10 @@ extern "C" COMBO_EXPORT void MM_RaiseSharedTier(int family, int tier) try {
                 Combo_MM_GiveDormantResolved(rid);
             } else {
                 Rando::GiveItem(rid);
+                // A parked MM still has a frozen play state; bank its wallet fill.
+                if (!Combo_MmIsForeground()) {
+                    Combo_MM_FlushAccumulators();
+                }
                 SaveManager_SaveCurrentForCombo();
             }
         }
@@ -5053,11 +5327,38 @@ extern "C" COMBO_EXPORT void MM_TriggerTriforceCredits(int dormant) try {
     SPDLOG_ERROR("[ComboShip] MM_TriggerTriforceCredits threw: {}", e.what());
 } catch (...) { SPDLOG_ERROR("[ComboShip] MM_TriggerTriforceCredits threw a non-std exception"); }
 
+#include "rando/CrossDungeonMm.inc.h"
+
 extern "C" COMBO_EXPORT const char* Combo_MM_Rando_GetReachableChecks(void) {
     static std::string buf;
 
-    std::set<RandoRegionId> reachable = { RR_MAX };
-    auto timeStates = Rando::Logic::InitializeRegionTimeStates(RR_MAX);
+    struct SearchGuard {
+        SearchGuard() {
+            ComboCrossMm::searching = true;
+        }
+        ~SearchGuard() {
+            ComboCrossMm::searching = false;
+        }
+    } crossGuard;
+    std::set<RandoRegionId> reachable;
+    std::unordered_map<RandoRegionId, Rando::Logic::RegionTimeState> timeStates;
+    if (ComboCrossMm::state.routes.empty() || ComboCrossMm::state.overworld) {
+        reachable.insert(RR_MAX);
+        timeStates = Rando::Logic::InitializeRegionTimeStates(RR_MAX);
+    }
+    for (int index : ComboCrossMm::state.arrivals) {
+        auto region = Rando::Logic::GetRegionIdFromEntrance(index);
+        reachable.insert(region);
+        auto states = Rando::Logic::InitializeRegionTimeStates(region);
+        // InitializeRegionTimeStates is also used for the synthetic start root, which cannot
+        // wait. A physical cross arrival inherits its native region's waiting restrictions.
+        for (auto& [arrivalRegion, incoming] : states) {
+            incoming.canStayOverTime = Rando::Logic::Regions.at(arrivalRegion).canStayOverTime;
+            const auto [it, inserted] = timeStates.emplace(arrivalRegion, incoming);
+            if (!inserted)
+                it->second = Rando::Logic::MergeTimeStates(it->second, incoming);
+        }
+    }
 
     // ComboShip: mirror GlitchlessLogic's reachability fixpoint (Rando/Logic/GlitchlessLogic.cpp).
     // Crawling region connections alone isn't enough — MM's logic is event-gated (raising Woodfall,
@@ -5110,6 +5411,8 @@ extern "C" COMBO_EXPORT const char* Combo_MM_Rando_GetReachableChecks(void) {
         }
     }
 
+    ComboCrossMm::reachable = reachable;
+    ComboCrossMm::timeStates = timeStates;
     buf = out.dump();
     return buf.c_str();
 }
@@ -5229,6 +5532,8 @@ extern "C" COMBO_EXPORT void MM_ReloadControls(void) {
 // must not draw against MM's dormant/swapped play state. comboui is always loaded under ComboShip; if it
 // somehow isn't, default to true (draw) rather than hiding the tools.
 bool Combo_MmIsForeground(void) {
+    if (!Combo_IsCombinedGame())
+        return true;
     static int (*sFn)(void) = nullptr;
     static bool sTried = false;
     if (!sTried) {
@@ -5337,6 +5642,11 @@ extern "C" bool Ship_HandleConsoleCrashAsReset() {
     return true;
 }
 
+#include "../../combo/NeiRewardGiResource.h"
+extern "C" int ResourceMgr_GetRewardSurfaceForGame(const char* game, const char* path, NeiGi::Mesh* mesh) {
+    return NeiGi::GetRewardSurface("mm", game, path, mesh);
+}
+
 extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* path, float scale, float tilt, int shop,
                                                 float fit[2]) {
     const int din =
@@ -5369,6 +5679,10 @@ extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* pa
     return NeiAssetPriority::IsCustomAsset("mm", game, path);
 }
 
+extern "C" int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* game, const char* path, float* tilt, float* roll) {
+    return NeiAssetPriority::GetIkanaShieldGiPose("mm", game, path, tilt, roll);
+}
+
 extern "C" int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt) {
     return NeiAssetPriority::GetIkanaShieldGiTiltX("mm", game, path, tilt);
 }
@@ -5388,4 +5702,14 @@ extern "C"
     int
     MM_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner) {
     return NeiWolfAsset::CopyResource("mm", destination, capacity, size, owner);
+}
+
+extern "C"
+#ifdef COMBO_BUILD
+    COMBO_EXPORT
+#endif
+    int
+    MM_CopyWolfLinkModelResource(int useHD, uint8_t* destination, size_t capacity, size_t* size, const char** owner,
+                                 const char** path) {
+    return NeiWolfAsset::CopyResource("mm", destination, capacity, size, owner, useHD != 0, path);
 }

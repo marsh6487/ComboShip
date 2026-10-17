@@ -1218,6 +1218,7 @@ void AudioLoad_Init(void* heap, size_t heapSize) {
     gAudioCtx.resetTimer = 0;
     gAudioCtx.unk_29B8 = false;
 
+    free(gAudioCtx.permanentEntries);
     memset(&gAudioCtx, 0, sizeof(gAudioCtx));
 
     switch (osTvType) {
@@ -1406,6 +1407,19 @@ void AudioLoad_Init(void* heap, size_t heapSize) {
     }
 
     free(customSeqList);
+
+    // Permanent cache entries must cover custom audio as well as the base game.
+    size_t permanentEntriesCapacity = gFontMapSize + gSequenceMapSize + 0xF;
+    if (permanentEntriesCapacity > INT32_MAX || permanentEntriesCapacity > SIZE_MAX / sizeof(AudioCacheEntry)) {
+        LUSLOG_ERROR("Too many audio resources for the permanent cache.");
+        return;
+    }
+    gAudioCtx.permanentEntries = calloc(permanentEntriesCapacity, sizeof(AudioCacheEntry));
+    if (gAudioCtx.permanentEntries == NULL) {
+        LUSLOG_ERROR("Could not allocate %zu permanent audio cache entries.", permanentEntriesCapacity);
+        return;
+    }
+    gAudioCtx.permanentEntriesCapacity = permanentEntriesCapacity;
 
     // #end region
     if (!AudioLoad_InitFontMetadata(gFontMapSize)) {

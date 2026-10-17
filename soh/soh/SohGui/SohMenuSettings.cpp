@@ -1,4 +1,8 @@
+#include "../../../combo/ComboGameMode.h"
 #include "SohMenu.h"
+#ifdef COMBO_BUILD
+#include "../../../combo/emotes/EmoteSettings.h"
+#endif
 #include "soh/Notification/Notification.h"
 #include "soh/Enhancements/enhancementTypes.h"
 #include "SohModals.h"
@@ -7,6 +11,7 @@
 #include "soh/ResourceManagerHelpers.h"
 #include "UIWidgets.hpp"
 #include <ship/controller/controldeck/ControlDeck.h>
+#include <ship/Context.h>
 
 extern "C" {
 #include "include/z64audio.h"
@@ -463,26 +468,28 @@ void SohMenu::AddMenuSettings() {
         .HideInSearch(true)
         .Options(WindowButtonOptions().Tooltip("Enables the separate Bindings Window."));
 #ifdef COMBO_BUILD
-    // ComboShip: draw the bindings inline in the combo menu (native SoH is popout-only, so the combo
-    // overlay otherwise showed only the button). Mirrors the dev-tool inline pattern
-    // (SohMenuDevTools.cpp ComboInlineWindow): skipped while popped out so the shared Gui loop's
-    // floating copy isn't double-drawn. No foreground gate — the editor only touches the shared
-    // ControlDeck, never OOT play state, so it's safe regardless of which game is foreground.
-    AddWidget(path, "Controller Bindings Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
-                return;
-            }
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Configure Controller");
-            if (!win || win->IsVisible()) { // not registered, or popped out — don't double-draw
-                return;
-            }
-            win->Update(); // Gui loop only Updates visible windows; we draw it hidden, so Update first
-            win->DrawElement();
-        });
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: draw the bindings inline in the combo menu (native SoH is popout-only, so the combo
+        // overlay otherwise showed only the button). Mirrors the dev-tool inline pattern
+        // (SohMenuDevTools.cpp ComboInlineWindow): skipped while popped out so the shared Gui loop's
+        // floating copy isn't double-drawn. No foreground gate — the editor only touches the shared
+        // ControlDeck, never OOT play state, so it's safe regardless of which game is foreground.
+        AddWidget(path, "Controller Bindings Inline", WIDGET_CUSTOM)
+            .RaceDisable(false)
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
+                    return;
+                }
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Configure Controller");
+                if (!win || win->IsVisible()) { // not registered, or popped out — don't double-draw
+                    return;
+                }
+                win->Update(); // Gui loop only Updates visible windows; we draw it hidden, so Update first
+                win->DrawElement();
+            });
+    }
 #endif
 
     // Input Viewer
@@ -504,24 +511,26 @@ void SohMenu::AddMenuSettings() {
         .HideInSearch(true)
         .Options(WindowButtonOptions().Tooltip("Enables the separate Input Viewer Settings Window."));
 #ifdef COMBO_BUILD
-    // ComboShip: draw the Input Viewer Settings inline (SoH embeds it via the window button's
-    // EmbedWindow; comboui's flat model doesn't carry that flag). Mirrors "Controller Bindings
-    // Inline" above; skipped while popped out so the Gui loop's floating copy isn't double-drawn.
-    AddWidget(path, "Input Viewer Settings Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
-                return;
-            }
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Input Viewer Settings");
-            if (!win || win->IsVisible()) { // not registered, or popped out — don't double-draw
-                return;
-            }
-            win->Update(); // Gui loop only Updates visible windows; we draw it hidden, so Update first
-            win->DrawElement();
-        });
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: draw the Input Viewer Settings inline (SoH embeds it via the window button's
+        // EmbedWindow; comboui's flat model doesn't carry that flag). Mirrors "Controller Bindings
+        // Inline" above; skipped while popped out so the Gui loop's floating copy isn't double-drawn.
+        AddWidget(path, "Input Viewer Settings Inline", WIDGET_CUSTOM)
+            .RaceDisable(false)
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
+                    return;
+                }
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Input Viewer Settings");
+                if (!win || win->IsVisible()) { // not registered, or popped out — don't double-draw
+                    return;
+                }
+                win->Update(); // Gui loop only Updates visible windows; we draw it hidden, so Update first
+                win->DrawElement();
+            });
+    }
 #endif
 
     // Notifications
@@ -587,24 +596,35 @@ void SohMenu::AddMenuSettings() {
         .HideInSearch(true)
         .Options(WindowButtonOptions().Tooltip("Enables the separate Mod Menu Window."));
 #ifdef COMBO_BUILD
-    // ComboShip: draw the Mod Menu inline (SoH embeds it via the window button's EmbedWindow;
-    // comboui's flat model doesn't carry that flag). Mirrors "Controller Bindings Inline"; skipped
-    // while popped out so the Gui loop's floating copy isn't double-drawn.
-    AddWidget(path, "Mod Menu Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
-                return;
-            }
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Mod Menu");
-            if (!win || win->IsVisible()) { // not registered, or popped out — don't double-draw
-                return;
-            }
-            win->Update(); // Gui loop only Updates visible windows; we draw it hidden, so Update first
-            win->DrawElement();
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: draw the Mod Menu inline (SoH embeds it via the window button's EmbedWindow;
+        // comboui's flat model doesn't carry that flag). Mirrors "Controller Bindings Inline"; skipped
+        // while popped out so the Gui loop's floating copy isn't double-drawn.
+        AddWidget(path, "Mod Menu Inline", WIDGET_CUSTOM)
+            .RaceDisable(false)
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui()) {
+                    return;
+                }
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Mod Menu");
+                if (!win || win->IsVisible()) { // not registered, or popped out — don't double-draw
+                    return;
+                }
+                win->Update(); // Gui loop only Updates visible windows; we draw it hidden, so Update first
+                win->DrawElement();
+            });
+    }
+#endif
+#ifdef COMBO_BUILD
+    if (!Combo_IsCombinedGame()) {
+        path = { "Settings", "Emotes", SECTION_COLUMN_1 };
+        AddSidebarEntry("Settings", path.sidebarName, 1);
+        AddWidget(path, "Emotes", WIDGET_CUSTOM).RaceDisable(false).CustomFunction([](WidgetInfo&) {
+            ComboEmotes::DrawSettings();
         });
+    }
 #endif
 }
 

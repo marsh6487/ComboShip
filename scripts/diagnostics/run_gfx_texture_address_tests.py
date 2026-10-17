@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def function(source, name):
-    match = re.search(r"^(?:static )?(?:void\*|void|bool|int32_t|std::shared_ptr<Fast::Texture>)\s+" + re.escape(name) +
+    match = re.search(r'^(?:static )?(?:extern "C" )?(?:void\*|void|bool|uint8_t|int32_t|std::shared_ptr<Fast::Texture>)\s+' + re.escape(name) +
                       r"\([^;{}]*\)\s*\{", source, re.M)
     if not match:
         raise RuntimeError(f"Missing production function: {name}")

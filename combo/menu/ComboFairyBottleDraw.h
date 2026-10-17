@@ -29,14 +29,18 @@ static s32 ComboFairyBottle_GlowLimb(PlayState* play, s32 limb, Gfx** dList, Vec
 #endif
     if (limb == glowLimb) {
         const float pulse = 1.5f + .15f * sinf((float)(play->gameplayFrames % 16u) * .3926990817f);
-        // Actor glow-to-wing scale ratio, while retaining the GI's incoming scale.
-        Matrix_ReplaceRotation(&play->billboardMtxF);
+        // The native core DL multiplies segment 01 by the camera billboard.
+        // Remove the limb's rotation here, as EnElf does, so that rotation is
+        // applied once. Preserve the GI position and incoming scale.
+        MtxF identity = { 0 };
+        identity.xx = identity.yy = identity.zz = identity.ww = 1.0f;
+        Matrix_ReplaceRotation(&identity);
         Matrix_Scale(pulse, pulse, pulse, MTXMODE_APPLY);
     }
     return 0;
 }
 
-static int ComboFairyBottle_DrawVfx(PlayState* play) {
+static int ComboFairyBottle_DrawVfx(PlayState* play, const char* shell) {
 #ifdef COMBO_FAIRY_HOST_MM
     const char* skeletonPath = "__OTR__objects/gameplay_keep/gameplay_keep_Skel_02AF58";
     const char* animationPath = "__OTR__objects/gameplay_keep/gameplay_keep_Anim_029140";
@@ -86,12 +90,23 @@ static int ComboFairyBottle_DrawVfx(PlayState* play) {
     gSPEndDisplayList(&material[3]);
     gSPEndDisplayList(&material[4]);
     Matrix_Push();
-    Matrix_Scale(.004f, .004f, .004f, MTXMODE_APPLY);
+    // Enlarge only the GI-local fairy; the casing and actor assets retain their scale.
+    const float scale = (ComboFairyBottle_IsBundledShell(shell) ? .008f : .004f) * 1.5f;
+    Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
     OPEN_DISPS(play->state.gfxCtx);
 #ifdef COMBO_FAIRY_HOST_MM
     Gfx_SetupDL27_Xlu(play->state.gfxCtx);
 #else
     Gfx_SetupDL_27Xlu(play->state.gfxCtx);
+#endif
+#ifdef COMBO_BUILD
+    // The shell may have pinned the other game's RM on the GPU stream. These
+    // limbs belong to the active host, including their nested textures/DLs.
+#ifdef COMBO_FAIRY_HOST_MM
+    gSPComboRMPush(POLY_XLU_DISP++, "mm");
+#else
+    gSPComboRMPush(POLY_XLU_DISP++, "oot");
+#endif
 #endif
     gSPSegment(POLY_XLU_DISP++, 0x08, (uintptr_t)material);
     gDPSetEnvColor(POLY_XLU_DISP++, 255, 160, 235, 192);
@@ -109,6 +124,9 @@ static int ComboFairyBottle_DrawVfx(PlayState* play) {
     }
 #endif
     gSPSegment(POLY_XLU_DISP++, 0x08, (uintptr_t)&material[4]);
+#ifdef COMBO_BUILD
+    gSPComboRMPop(POLY_XLU_DISP++);
+#endif
     CLOSE_DISPS(play->state.gfxCtx);
     Matrix_Pop();
     return 1;

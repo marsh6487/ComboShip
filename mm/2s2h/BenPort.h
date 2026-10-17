@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "../../combo/ComboGameMode.h"
+
 #define BTN_CUSTOM_MODIFIER1 0x0040
 #define BTN_CUSTOM_MODIFIER2 0x0080
 
@@ -120,6 +122,8 @@ uint16_t ResourceMgr_LoadTexHeightByName(char* texPath);
 CollisionHeader* ResourceMgr_LoadColByName(const char* path);
 AnimatedMaterial* ResourceMgr_LoadAnimatedMatByName(const char* path);
 char* ResourceMgr_LoadTexOrDListByName(const char* filePath);
+// Normalized center of visible RGBA artwork; transparent padding is excluded.
+uint8_t MM_GetTextureVisibleCenter(const char* filePath, float* x, float* y);
 char* ResourceMgr_LoadIfDListByName(const char* filePath);
 char* ResourceMgr_LoadPlayerAnimByName(const char* animPath);
 // Wraps a raw SOH_PlayerAnimation payload in a real header (cached). Skijer's NEI
@@ -234,6 +238,7 @@ uint64_t GetUnixTimestamp();
 COMBO_EXPORT void MM_SetOnComboReturnCallback(void (*cb)(int kind));
 // Ctrl+R reset while MM is foreground: bounce back to OOT (saves if autosave on) + go dormant.
 COMBO_EXPORT void MM_RequestComboReturn(void);
+void MM_ApplyComboPortalArrival(void);
 COMBO_EXPORT void MM_PrepareForTransition(void);
 COMBO_EXPORT void MM_ResumeGame(int fileNum);
 #endif

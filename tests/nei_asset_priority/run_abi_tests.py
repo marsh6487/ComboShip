@@ -15,6 +15,8 @@ args = parser.parse_args()
 sources = {
     'OOT_SetGiCosmeticFrame': 'soh/soh/Enhancements/cosmetics/CosmeticsEditor.cpp',
     'OOT_SampleGiCosmeticColor': 'soh/soh/Enhancements/cosmetics/CosmeticsEditor.cpp',
+    'MM_SetGiCosmeticFrame': 'mm/2s2h/BenGui/CosmeticEditor.cpp',
+    'MM_SampleGiCosmeticColor': 'mm/2s2h/BenGui/CosmeticEditor.cpp',
     'OOT_NeiResourceExists': 'soh/soh/ResourceManagerHelpers.cpp',
     'OOT_NeiEnsureGiBaseOwner': 'soh/soh/ResourceManagerHelpers.cpp',
     'OOT_GetNeiGiDrawInfo': 'soh/soh/Enhancements/randomizer/NeiGiPresentation.cpp',

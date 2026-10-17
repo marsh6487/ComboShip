@@ -1,4 +1,5 @@
 #include "global.h"
+#include "gameplay/ComboFaroresWind.h"
 
 #ifdef COMBO_BUILD
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
@@ -7,6 +8,9 @@
 // file-select screens, load this save slot, and spawn straight into Play in the Market outside the
 // Happy Mask Shop (the fixed arrival point for the cross-game portal return).
 extern s32 gComboReturnFileNum;
+extern int32_t Combo_SOH_ConsumeCrossDungeonArrival(void);
+extern int32_t Combo_SOH_ConsumeCrossBossRecoveryResume(void);
+void SOH_ApplyComboPortalArrival(int allowPlacement);
 #endif
 
 void TitleSetup_InitImpl(GameState* gameState) {
@@ -33,9 +37,15 @@ void TitleSetup_InitImpl(GameState* gameState) {
         // Must follow OnLoadGame: the rando handler's Entrance_SetSavewarpEntrance() recomputes from
         // savedSceneNum (never set by the portal handoff) and would clobber this with Link's House.
         gSaveContext.entranceIndex = Entrance_OverrideNextIndex(ENTR_MARKET_DAY_OUTSIDE_HAPPY_MASK_SHOP);
+        s32 crossDungeonArrival = Combo_SOH_ConsumeCrossDungeonArrival();
+        s32 crossBossRecovery = Combo_SOH_ConsumeCrossBossRecoveryResume();
+        if (crossDungeonArrival >= 0 || crossBossRecovery >= 0)
+            gSaveContext.entranceIndex = crossDungeonArrival >= 0 ? crossDungeonArrival : crossBossRecovery;
+        SOH_ApplyComboPortalArrival(crossDungeonArrival < 0 && crossBossRecovery < 0);
         // A portal return is never a cutscene arrival: a never-played MM-start save still holds the
         // pending intro (0xFFF1), which would shift Play_Init's entrance lookup onto a garbage layer.
         gSaveContext.cutsceneIndex = 0;
+        ComboFw_ApplyArrival(); // Queued Farore recall overrides the fixed portal arrival.
         gComboReturnFileNum = -1;
         gameState->running = false;
         SET_NEXT_GAMESTATE(gameState, Play_Init, PlayState);

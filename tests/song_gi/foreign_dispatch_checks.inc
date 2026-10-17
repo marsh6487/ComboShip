@@ -64,12 +64,12 @@
     // restores the incoming pose before rendering the matching song overlay.
     struct MmSong {int profile;uint32_t hue;bool overlay;};
     const MmSong mmSongs[]={
-        {CW_SONG_DOUBLE_TIME,0x80D8F0,false}, {CW_SONG_ELEGY,0xFF6200,false},
-        {CW_SONG_EPONA,0xD96E30,true}, {CW_SONG_HEALING,0xFF96E6,false},
-        {CW_SONG_INVERTED_TIME,0x4A70CA,false}, {CW_SONG_LULLABY_INTRO,0xFF6464,false},
-        {CW_SONG_LULLABY,0xFF1414,false}, {CW_SONG_NOVA,0x1414FF,false},
-        {CW_SONG_OATH,0x620062,false}, {CW_SONG_SARIA,0x6ACB62,true},
-        {CW_SONG_SOARING,0xC8A0FF,true}, {CW_SONG_SONATA,0x62FF62,false},
+        {CW_SONG_DOUBLE_TIME,0x80D8F0,true}, {CW_SONG_ELEGY,0xFF6200,true},
+        {CW_SONG_EPONA,0xD96E30,true}, {CW_SONG_HEALING,0xFF96E6,true},
+        {CW_SONG_INVERTED_TIME,0x4A70CA,true}, {CW_SONG_LULLABY_INTRO,0xFF6464,true},
+        {CW_SONG_LULLABY,0xFF1414,true}, {CW_SONG_NOVA,0x1414FF,true},
+        {CW_SONG_OATH,0x620062,true}, {CW_SONG_SARIA,0x6ACB62,true},
+        {CW_SONG_SOARING,0xC8A0FF,true}, {CW_SONG_SONATA,0x62FF62,true},
         {CW_SONG_STORMS,0x929292,true}, {CW_SONG_SUN,0xEDE73E,true},
         {CW_SONG_TIME,0x62B1D3,false},
         {CW_SONG_OOT_MINUET,0x62FF62,true}, {CW_SONG_OOT_BOLERO,0xFF3C00,true},

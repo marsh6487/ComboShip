@@ -39,7 +39,7 @@ fixture=fixture.replace('/* HOST_SIMPLE_DRAW */',function(host,'MM_DrawForeignSi
 fixture=fixture.replace('/* HOST_SPIN_DRAW */',function(host,'MM_DrawForeignSpinAttack'))
 foreign=function(host,'MM_DrawComboForeign')
 handlers=set(re.findall(r'\b(MM_DrawForeign\w+)\(',foreign))
-fixture=fixture.replace('/* OTHER_DRAW_HANDLERS */','\n'.join('template<class...T>void '+n+'(T...) { assert(0); }' for n in sorted(handlers) if n not in {'MM_DrawForeignSimple','MM_DrawForeignSpinAttack','MM_DrawForeignCustomGi'}))
+fixture=fixture.replace('/* OTHER_DRAW_HANDLERS */','\n'.join('template<class...T>'+('bool ' if n=='MM_DrawForeignSilverRupee' else 'void ')+n+'(T...) { assert(0); '+('return false;' if n=='MM_DrawForeignSilverRupee' else '')+' }' for n in sorted(handlers) if n not in {'MM_DrawForeignSimple','MM_DrawForeignSpinAttack','MM_DrawForeignCustomGi'}))
 fixture=fixture.replace('/* HOST_DISPATCH */',foreign)
 # Named RG and ITEM ordering must match the real registrations and native table.
 ids=re.findall(r'RANDO_ENUM_ITEM\((RG_MM_MASK_\w+)\)',(ROOT/'soh/soh/Enhancements/randomizer/randomizerEnums/RandomizerGet.h').read_text())

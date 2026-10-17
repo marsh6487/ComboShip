@@ -1,7 +1,6 @@
-#ifndef FILE_SELECT_ENHANCEMENTS_H
-#define FILE_SELECT_ENHANCEMENTS_H
+#pragma once
 
-#include "z64.h"
+#include <libultraship/libultra/types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,6 +10,8 @@ const char* SohFileSelect_GetSettingText(u8 optionIndex, u8 language);
 // when the selected quest is QUEST_OOTXMM so the reused rando sub-screen reads as the OoT x MM combo.
 const char* SohFileSelect_GetComboSettingText(u8 optionIndex, u8 language);
 void SohFileSelect_ShowPresetModal();
+bool SohFileSelect_IsQuestHidden(u8 quest);
+u8 SohFileSelect_CountVisibleQuests();
 #ifdef __cplusplus
 };
 #endif
@@ -39,5 +40,3 @@ typedef enum {
     CBO_NO_SEED,       // 5  hint
     CBO_MAX,
 } ComboSettingsMenuEnums;
-
-#endif

@@ -25,8 +25,9 @@ with tempfile.TemporaryDirectory(prefix='song-gi-') as temp:
 #include <string.h>
 #include "soh/include/z64item.h"
 #include "combo/menu/ComboSongDraw.h"
+#include "combo/menu/ComboBottleShimmer.h"
 typedef int16_t s16; typedef int32_t s32; typedef uint8_t u8;
-typedef struct { struct {void* gfxCtx;} state; } PlayState;
+typedef struct PlayState { struct {void* gfxCtx;} state; } PlayState;
 typedef struct {uint8_t r,g,b;} Color_RGB8;
 static int notes, stormOverlay;
 #define CVAR_COSMETIC(x) x
@@ -85,9 +86,11 @@ int main() {
         CwItemDrawInfo info{};
         assert(MM_FillSongDrawInfo(static_cast<RandoItemId>(id),&info)==1);
         const bool overlay=(song>=CW_SONG_OOT_MINUET && song<=CW_SONG_OOT_SARIA) ||
-                           song==CW_SONG_EPONA || song==CW_SONG_SARIA || song==CW_SONG_STORMS || song==CW_SONG_SUN || song==CW_SONG_SOARING;
+                           song==CW_SONG_EPONA || song==CW_SONG_SARIA || song==CW_SONG_STORMS || song==CW_SONG_SUN || song==CW_SONG_SOARING ||
+                           song==CW_SONG_HEALING || song==CW_SONG_SONATA || song==CW_SONG_LULLABY_INTRO || song==CW_SONG_LULLABY ||
+                           song==CW_SONG_NOVA || song==CW_SONG_ELEGY || song==CW_SONG_OATH || song==CW_SONG_INVERTED_TIME || song==CW_SONG_DOUBLE_TIME;
         assert(info.drawKind==CW_DRAW_KIND_SONG_GI && info.neiEffect==song && info.dlistCount==1 && info.hasEnvColor);
-        assert(bool(info.itemShimmer)==overlay && "ordinary MM songs must keep their native note without new effects");
+        assert(bool(info.itemShimmer)==overlay && "song shimmer eligibility must follow its intrinsic profile");
         assert(!memcmp(info.itemShimmerColor,info.envColor,4));
         if(song==CW_SONG_EPONA)assert(info.envColor[0]==217 && info.envColor[1]==110 && info.envColor[2]==48);
     }
@@ -107,6 +110,7 @@ int main() {
 #include "mm/2s2h/Rando/Types.h"
 #include "combo/menu/ComboSongDrawMM.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiSongEffectPolicy.h"
+#include "combo/menu/ComboElementalArrowGi.h"
 using NeiGi::Kind;
 bool ResourceMgr_IsAltAssetsEnabled() {return false;}
 struct PlayState { struct {void* gfxCtx;} state; uint32_t gameplayFrames; } play{};
@@ -128,6 +132,12 @@ void NeiGi_DrawSongOverlay(PlayState*,int song,const char*) {overlay=song;}
 void ComboDrawMaskShimmer(PlayState*,void*,const uint8_t*,const char*) {++genericShimmer;}
 bool MM_DescribeNeiGi(RandoItemId,CwItemDrawInfo*) {++descriptions;return false;}
 void MM_DrawNeiGi(const CwItemDrawInfo&,bool=false,int=0) {assert(false);}
+extern "C" int NeiGi_DrawElementalArrowShop(PlayState*,int) {
+    assert(false && "song fixture must not dispatch elemental arrows");return 0;
+}
+extern "C" int NeiGi_DrawElementalSpell(PlayState*,int,int,int) {
+    assert(false && "song fixture must not dispatch elemental spells");return 0;
+}
 bool MM_TryDrawNeiGi(RandoItemId,bool shop=false,int mmPickup=0);
 ''' + draw_song + '\n' + dispatcher + r'''
 // Hand-recorded accepted samples from 9eff802c, quantized exactly as the
@@ -153,7 +163,9 @@ int main() {
                "early NEI dispatcher must claim every native/imported song before shared GI table IDs");
         assert(descriptions==0);
         const bool hasOverlay=(song>=CW_SONG_OOT_MINUET && song<=CW_SONG_OOT_SARIA) ||
-                              song==CW_SONG_EPONA || song==CW_SONG_SARIA || song==CW_SONG_STORMS || song==CW_SONG_SUN || song==CW_SONG_SOARING;
+                              song==CW_SONG_EPONA || song==CW_SONG_SARIA || song==CW_SONG_STORMS || song==CW_SONG_SUN || song==CW_SONG_SOARING ||
+                              song==CW_SONG_HEALING || song==CW_SONG_SONATA || song==CW_SONG_LULLABY_INTRO || song==CW_SONG_LULLABY ||
+                              song==CW_SONG_NOVA || song==CW_SONG_ELEGY || song==CW_SONG_OATH || song==CW_SONG_INVERTED_TIME || song==CW_SONG_DOUBLE_TIME;
         uint8_t color[4];assert(ComboSongShimmerColor(song,color));
         assert(notes==1 && overlay==(hasOverlay?song:-1) && genericShimmer==0 && season==-1);
         assert(!grayAtNote && "native MM notes must clear inherited grayscale before their native color is submitted");
@@ -178,9 +190,11 @@ int main() {
             const auto mesh=NeiGi::SampleSong(song,frame);
             assert(mesh.count<=mesh.vertices.size() && mesh.count%3==0);
             const bool themed=((song>=CW_SONG_OOT_MINUET && song<=CW_SONG_OOT_ZELDA) &&
-                              song!=CW_SONG_OOT_SERENADE && song!=CW_SONG_OOT_BOLERO) || song==CW_SONG_SARIA || song==CW_SONG_OOT_SARIA || song==CW_SONG_SOARING;
+                              song!=CW_SONG_OOT_SERENADE && song!=CW_SONG_OOT_BOLERO) || song==CW_SONG_SARIA || song==CW_SONG_OOT_SARIA || song==CW_SONG_SOARING ||
+                              song==CW_SONG_HEALING || song==CW_SONG_SONATA || song==CW_SONG_LULLABY_INTRO || song==CW_SONG_LULLABY ||
+                              song==CW_SONG_NOVA || song==CW_SONG_ELEGY || song==CW_SONG_OATH || song==CW_SONG_INVERTED_TIME || song==CW_SONG_DOUBLE_TIME;
             if(song==CW_SONG_OOT_SERENADE)assert(mesh.count==0 && "Serenade must keep its note/shimmer without a circle ring");
-            if(!themed)assert(mesh.count==0 && "unapproved normal songs, Epona and Sun must lose their themed shapes");
+            if(!themed)assert(mesh.count==0 && "plain and shimmer-only songs must not submit themed shapes");
             else {
                 assert(mesh.count>0);
                 bool hue=false;
@@ -193,6 +207,46 @@ int main() {
                 assert(hue);
             }
         }
+    }
+    const int newSongs[]={CW_SONG_HEALING,CW_SONG_SONATA,CW_SONG_LULLABY_INTRO,CW_SONG_LULLABY,CW_SONG_NOVA,
+                          CW_SONG_ELEGY,CW_SONG_OATH,CW_SONG_INVERTED_TIME,CW_SONG_DOUBLE_TIME};
+    uint64_t silhouettes[9]{};
+    for(size_t i=0;i<9;++i) {
+        const int song=newSongs[i];
+        assert(ComboSongAlwaysShimmers(song) && "requested MM song shimmer must not depend on the generic item-effects toggle");
+        const auto a=NeiGi::SampleSong(song,42), b=NeiGi::SampleSong(song,57);
+        assert(a.count<a.vertices.size() && b.count<b.vertices.size() && "song geometry silently exhausted the arena before all particles were emitted");
+        if(song==CW_SONG_ELEGY || song==CW_SONG_OATH) {
+            uint8_t color[4];assert(ComboSongShimmerColor(song,color));
+            const uint32_t hue=song==CW_SONG_ELEGY?0xFF6200:0x620062;
+            assert(color[0]==(hue>>16) && color[1]==((hue>>8)&255) && color[2]==(hue&255) && color[3]==255);
+        }
+        assert(a.count && b.count && ApprovedParticleHash(a)!=ApprovedParticleHash(b) && "song particles must animate on the active host clock");
+        silhouettes[i]=ApprovedParticleHash(a);
+        for(size_t j=0;j<i;++j)assert(silhouettes[i]!=silhouettes[j] && "requested songs need distinct particle presentations");
+    }
+    const auto elegy40=NeiGi::SampleSong(CW_SONG_ELEGY,40), elegy80=NeiGi::SampleSong(CW_SONG_ELEGY,80);
+    assert(elegy40.count && elegy80.count && elegy40.vertices[0].p.y>elegy80.vertices[0].p.y &&
+           "Elegy's dust must fall slowly rather than form an effigy");
+    for(uint32_t frame:{479u,719u,1439u}) {
+        const auto a=NeiGi::SampleSong(CW_SONG_ELEGY,frame), b=NeiGi::SampleSong(CW_SONG_ELEGY,frame+1);
+        assert(a.count==b.count);
+        for(size_t i=0;i<a.count;++i)if(a.vertices[i].alpha>32 && b.vertices[i].alpha>32) {
+            const auto delta=b.vertices[i].p-a.vertices[i].p;
+            assert(delta.x*delta.x+delta.y*delta.y+delta.z*delta.z<1.f &&
+                   "Elegy dust jumped visibly across an animation clock wrap");
+        }
+    }
+    const auto oath40=NeiGi::SampleSong(CW_SONG_OATH,40), oath80=NeiGi::SampleSong(CW_SONG_OATH,80);
+    assert(oath40.count && oath80.count && oath40.vertices[0].alpha!=oath80.vertices[0].alpha &&
+           "Oath's sparse glints must twinkle");
+    const auto clock0=NeiGi::SampleSong(CW_SONG_INVERTED_TIME,0);
+    const auto clock1=NeiGi::SampleSong(CW_SONG_INVERTED_TIME,1);
+    assert(clock1.vertices[0].p.y>clock0.vertices[0].p.y && "inverted dial must move counterclockwise from right toward up");
+    for(uint32_t frame:{719u,1439u}) {
+        const auto a=NeiGi::SampleSong(CW_SONG_INVERTED_TIME,frame), b=NeiGi::SampleSong(CW_SONG_INVERTED_TIME,frame+1);
+        const auto delta=b.vertices[0].p-a.vertices[0].p;
+        assert(std::sqrt(delta.x*delta.x+delta.y*delta.y+delta.z*delta.z)<.2f && "inverted dial jumped at a clock wrap");
     }
     struct AcceptedSample {int song;uint32_t frame;size_t count;uint64_t hash;};
     const AcceptedSample approved[]={
@@ -211,4 +265,4 @@ int main() {
     path=temp/'dispatch.cpp';path.write_text(source)
     subprocess.run([os.environ.get('CXX','c++'),'-std=c++20','-I'+str(ROOT),'-I'+str(ROOT/'combo/menu'),str(path),'-o',str(temp/'dispatch')],check=True)
     subprocess.run([str(temp/'dispatch')],check=True)
-print('PASS native OoT notes/shimmer, MM exports/dispatcher, shimmer-only Bolero, rising Prelude light motes and restored Soaring feathers')
+print('PASS native notes/shimmer and MM exports/dispatcher; nine animated MM particle profiles fit the mesh budget; Elegy falling dust and Oath twinkling glints retain icon hues; counterclockwise continuous time dial; accepted Zelda/Saria hashes, Prelude motes, Bolero shimmer and Soaring feathers preserved')

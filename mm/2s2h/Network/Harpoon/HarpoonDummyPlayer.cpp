@@ -1,3 +1,4 @@
+#include "../../../../combo/emotes/EmotePlayer.h"
 // =============================================================================
 // HarpoonDummyPlayer — remote players: an invisible collider actor + a Link draw.
 //
@@ -596,6 +597,9 @@ static void HarpoonFx_ReleaseDeparted(PlayState* play, Harpoon* h) {
 //  2. Sword-trail effect indices (see above).
 // -----------------------------------------------------------------------------
 static void SanitizePeerDraw(Player& dp, HarpoonClient& c, Actor* peerActor) {
+    // The form template belongs to the viewer. Its look offsets are not part
+    // of the peer's wire pose and must not twist the peer's emote or body.
+    ComboEmotes::ClearDrawOffsets(dp);
     Actor* owner = peerActor != nullptr ? peerActor : &dp.actor;
     dp.cylinder.base.actor = owner;
     dp.shieldCylinder.base.actor = owner;

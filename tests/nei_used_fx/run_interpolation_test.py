@@ -5,6 +5,13 @@ from pathlib import Path
 import subprocess
 import tempfile
 from run_tests import ROOT, flags
+from baseline_sources import read_source
+
+# Exact published Shipwright c77 sources, with original Git blob identities.
+# Keep the control reproducible in shallow clones without fetching old history.
+def baseline_source(name):
+    return read_source("c77c18587a976f6d6cb5c8f91f27593286469218",
+                       "soh/soh/Enhancements/randomizer/" + name)
 
 with tempfile.TemporaryDirectory(prefix="nei-rod-interpolation-") as temporary:
     common = ["-I" + str(ROOT / "tests/nei_used_fx/stubs"), *flags(), "-O1", "-g",
@@ -23,15 +30,11 @@ with tempfile.TemporaryDirectory(prefix="nei-rod-interpolation-") as temporary:
     objects = []
     # Compile the published baseline under distinct names, avoiding inline ODR
     # collisions. Compare its complete real-renderer output with the candidate.
-    base = "c77c18587a976f6d6cb5c8f91f27593286469218"
-    prefix = "soh/soh/Enhancements/randomizer/"
-    policy = subprocess.check_output(["git", "show", f"{base}:{prefix}NeiUsedMagicPolicy.h"],
-                                     cwd=ROOT, text=True)
+    policy = baseline_source("NeiUsedMagicPolicy.h")
     policy = policy.replace('"NeiGiEffectPolicy.h"', '"soh/Enhancements/randomizer/NeiGiEffectPolicy.h"')
     policy = policy.replace("namespace NeiUsedMagic {", "namespace BaselineMagic {")
     (Path(temporary) / "baseline_policy.h").write_text(policy)
-    source = subprocess.check_output(["git", "show", f"{base}:{prefix}NeiUsedMagicPresentation.cpp"],
-                                     cwd=ROOT, text=True)
+    source = baseline_source("NeiUsedMagicPresentation.cpp")
     source = source.replace('"NeiUsedMagicPolicy.h"', '"baseline_policy.h"')
     for header in ("NeiUsedMagicPresentation.h", "NeiGiRender.h"):
         source = source.replace(f'"{header}"', f'"soh/Enhancements/randomizer/{header}"')

@@ -14,11 +14,26 @@ extern "C" {
 #include "z64.h"
 }
 #include "ComboItemDrawABI.h"
+#include "combo/menu/ComboBottleContents.h"
+#include "combo/menu/ComboElementalArrowGi.h"
+#include "combo/menu/ComboRewardGi.h"
 #include "soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include "soh/Enhancements/randomizer/NeiGiFrameFit.h"
 #include "combo/DinSwordGiResources.h"
 extern "C" void NeiGi_DrawElementalArrow(PlayState*, int) {
   assert(false && "sword fixture must not dispatch elemental arrows");
+}
+extern "C" void NeiGi_DrawElementalArrowForOwner(PlayState*, int, int, int) {
+  assert(false && "sword fixture must not dispatch elemental arrows");
+}
+extern "C" void NeiGi_DrawRewardMaterial(PlayState*, int, const char*, const char*, const char*) {
+  assert(false && "sword fixture must not dispatch reward materials");
+}
+extern "C" int NeiGi_DrawElementalSpell(PlayState*, int, int, int) {
+  assert(false && "sword fixture must not dispatch elemental spells");return 0;
+}
+extern "C" int ComboBottleContents_Draw(PlayState*, int) {
+  assert(false && "sword fixture must not dispatch bottle contents");return 0;
 }
 #include <libultraship/bridge/consolevariablebridge.h>
 /* PRODUCTION_INFO */
@@ -41,10 +56,12 @@ static std::vector<std::vector<int32_t>> scrollParams;
 static bool flameAvailable = true;
 static bool dinLayers;
 static bool fitModel;
+static bool shelfDraw;
 static int fittedRoots;
 static float fittedDrawScale, fittedTilt;
 static int interpolation, shimmers, sentinels, identityDraws;
 static NeiGi::Mesh identityMesh;
+static float identityParticleSpan;
 static ComboForeignDrawInfo recipe;
 void FrameInterpolation_RecordOpenChild(const void *, int) { ++interpolation; }
 void FrameInterpolation_RecordCloseChild() {
@@ -67,9 +84,9 @@ void Matrix_Scale(float x, float y, float z, u8) {
   pose.scale *= x;
 }
 void Matrix_Translate(float x, float y, float z, u8) {
-  pose.x += x;
-  pose.y += y;
-  pose.z += z;
+  pose.x += x * pose.scale;
+  pose.y += y * pose.scale;
+  pose.z += z * pose.scale;
 }
 void Matrix_RotateX(float r, u8) { pose.rx += r; }
 void Matrix_RotateY(float r, u8) { pose.ry += r; }
@@ -168,6 +185,7 @@ UNUSED_HANDLER(OOT_DrawForeignPotion)
 UNUSED_HANDLER(OOT_DrawForeignBlueFire)
 UNUSED_HANDLER(OOT_DrawForeignPoes)
 UNUSED_HANDLER(OOT_DrawForeignFairyBottle)
+UNUSED_HANDLER(OOT_DrawForeignMagicSpell)
 UNUSED_HANDLER(OOT_DrawForeignSoulFlame)
 UNUSED_HANDLER(OOT_DrawForeignOps)
 static constexpr int kMaxMatEntries=8;
@@ -183,16 +201,27 @@ static NeiGi::Basis NeiGi_CameraBasis(PlayState*) {return {};}
 static void NeiGi_DrawMesh(PlayState*,const NeiGi::Mesh& mesh) {
   Pose expected{};
   if(recipe.neiShimmer>0 && NeiGi::IsSword(static_cast<NeiGi::Kind>(recipe.neiShimmer-1))) {
+    expected.scale=shelfDraw?2.f:2.3f;
+    expected.y=shelfDraw?17.f:17.6f;
     // Master Sword's authored world fit shifts its tip below the 48-unit edge,
     // regardless of the arbitrary .5/-20 model correction used by this fixture.
-    if(recipe.neiShimmer==int(NeiGi::Kind::MasterSword)+1)
-      expected.y+=(48.f-72.590332031f);
-    else if(recipe.neiShimmer==int(NeiGi::Kind::SwordAura)+1)
-      expected.y+=(48.f-67.970947266f);
+    if(shelfDraw) {
+      const auto fit=NeiGi::FrameFit(*NeiGi::FindSwordFrameBounds(
+          static_cast<NeiGi::Kind>(recipe.neiShimmer-1)),1.f,true);
+      expected.y+=2.f*fit.lift;
+      expected.scale*=fit.scale;
+    } else if(recipe.neiShimmer==int(NeiGi::Kind::MasterSword)+1 ||
+              recipe.neiShimmer==int(NeiGi::Kind::SwordAura)+1)
+      // Independent quantized TP blade tip and serialized source scale.
+      expected.y+=2.3f*(48.f-106.375f*.659912109375f);
     else expected=pose; // The full production renderer gate checks every other award.
   }
   assert(std::abs(pose.scale-expected.scale)<.00001f && std::abs(pose.y-expected.y)<.0001f &&
          "foreign binary sword particles/shimmer inherited model coordinate fitting");
+  if(identityDraws==0 && recipe.neiShimmer==int(NeiGi::Kind::KokiriSword)+1) {
+    const auto d=mesh.vertices[0].p-mesh.vertices[2].p;
+    identityParticleSpan=std::sqrt(d.x*d.x+d.y*d.y+d.z*d.z)*pose.scale;
+  }
   identityMesh=mesh;++identityDraws;
 }
 #ifdef HOST_MM_ROUTE
@@ -248,8 +277,13 @@ static std::vector<Draw> CheckStream(Gfx *begin, Gfx *end, bool restore) {
   assert(owner == 0 && !gray);
   if (!draws.empty()) {
 #ifndef HOST_MM_ROUTE
-    Pose expected{};if(fitModel){expected.scale*=.5f;expected.y-=20;}
-    assert(gpu == expected);
+    Pose expected{};
+    if(recipe.neiShimmer>0 && NeiGi::IsSword(static_cast<NeiGi::Kind>(recipe.neiShimmer-1))) {
+      expected.scale=shelfDraw?2.f:2.3f;expected.y=shelfDraw?17.f:17.6f;
+    }
+    if(fitModel){expected.y-=20*expected.scale;expected.scale*=.5f;}
+    assert(std::abs(gpu.scale-expected.scale)<.00001f && std::abs(gpu.y-expected.y)<.0001f &&
+           gpu.x==expected.x && gpu.z==expected.z && gpu.rx==0 && gpu.ry==0 && gpu.rz==0);
 #endif
   }
   if (restore && segment8)
@@ -273,9 +307,10 @@ static void Reset(int kind, bool trueTier, bool shimmer) {
   arena.clear();
   scrollParams.clear();
   interpolation = shimmers = sentinels = identityDraws = 0;
+  identityParticleSpan=0.f;
   flameAvailable = true;
   dinLayers = false;
-  fitModel = false;
+  fitModel = shelfDraw = false;
   fittedRoots=0;fittedDrawScale=fittedTilt=0;
   recipe = {};
   recipe.count = 1;
@@ -303,10 +338,11 @@ static void Reset(int kind, bool trueTier, bool shimmer) {
     }
   }
 }
-static void Dispatch() {
+static void Dispatch(bool shop=false) {
+  shelfDraw=shop;
   GetItemEntry entry{};
   entry.comboForeignCheck = 1;
-  OOT_DrawComboForeign(&play, &entry);
+  OOT_DrawComboForeign(&play, &entry, shop);
   assert(pose == Pose{} && stack.empty() && interpolation == 0 && !sentinels);
 }
 int main() {
@@ -337,7 +373,7 @@ int main() {
         if (trueTier) {
           assert(flame[0].gray && flame[0].color == 0x78B4FFFFu &&
                  flame[0].owner == 1);
-          assert(flame[0].pose.billboard && flame[0].pose.y == -53.f &&
+          assert(flame[0].pose.billboard && flame[0].pose.y == -123.f &&
                  flame[0].pose.scale == 10.f);
           assert(scrollParams[0] ==
                  std::vector<int32_t>(
@@ -349,9 +385,12 @@ int main() {
               std::vector<int32_t>({47, 0, 32, 32, 0, 0, 32, 32, 1, 0, 0, 0}));
       }
   for(auto kind:{NeiGi::Kind::KokiriSword,NeiGi::Kind::RazorSword,NeiGi::Kind::GildedSword,
-                 NeiGi::Kind::MasterSword,NeiGi::Kind::SwordAura,NeiGi::Kind::BiggoronSword,NeiGi::Kind::GreatFairySword}) {
+                 NeiGi::Kind::MasterSword,NeiGi::Kind::SwordAura,NeiGi::Kind::BiggoronSword,NeiGi::Kind::GreatFairySword,
+                 NeiGi::Kind::GiantsKnife}) {
     Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);recipe.neiShimmer=int(kind)+1;
     Dispatch();assert(identityDraws==2 && shimmers==0);
+    assert(std::abs(CheckStream(opa,gfx.polyOpa.p,false)[0].pose.rz-1.5707963267948966f)<.0001f &&
+           "older selected sword descriptor retained its slanted pose");
     const auto wanted=NeiGi::SampleShimmer(play.gameplayFrames,true,{},kind);
     assert(identityMesh.count==wanted.count);
     for(size_t i=0;i<wanted.count;++i)assert(identityMesh.vertices[i].rgb==wanted.vertices[i].rgb &&
@@ -362,7 +401,7 @@ int main() {
   recipe.neiShimmer=int(NeiGi::Kind::SwordAura)+1;fitModel=true;
   Dispatch();
   const auto presentationFlame=CheckStream(xlu,gfx.polyXlu.p,false);
-  assert(!presentationFlame.empty() && presentationFlame.front().pose.scale==10.f &&
+  assert(!presentationFlame.empty() && std::abs(presentationFlame.front().pose.scale-11.5f)<.00001f &&
          "True Master presentation flame inherited the binary geometry scale");
   Reset(CW_DRAW_KIND_CUSTOM_GI, false, true);
   recipe.neiShimmer = int(NeiGi::Kind::MasterSword) + 1;
@@ -384,7 +423,7 @@ int main() {
   const auto fittedBody=CheckStream(opa,gfx.polyOpa.p,false);
   const auto fittedFlame=CheckStream(xlu,gfx.polyXlu.p,false);
   assert(fittedBody[0].pose==fittedBody[1].pose && fittedBody[0].pose==fittedFlame[0].pose);
-  assert(std::abs(fittedBody[0].pose.scale-.04f)<.00001f && fittedBody[0].pose.y==-3.f);
+  assert(std::abs(fittedBody[0].pose.scale-.046f)<.00001f && std::abs(fittedBody[0].pose.y+28.4f)<.0001f);
   Reset(CW_DRAW_KIND_CUSTOM_GI, true, true);
   flameAvailable = false;
   Dispatch();
@@ -415,6 +454,53 @@ int main() {
   const auto nativeBody=CheckStream(opa,gfx.polyOpa.p,false);
   assert(nativeBody.size()==2&&nativeBody[0].path==recipe.dls[0]&&nativeBody[1].path==recipe.dls[1]);
   assert(identityDraws==2&&nativeBody[0].pose==nativeBody[1].pose);
+  for(int rotation:{CW_OP_ROTATE_X,CW_OP_ROTATE_Z}) {
+    Reset(CW_DRAW_KIND_CUSTOM_GI,false,false);
+    recipe.ops[0]={rotation,16384.f,0,0,{}};
+    recipe.dls[0]="__OTR__@mm:objects/non_sword/quarter_turn_model";
+    Dispatch(true);
+    const auto genericShelf=CheckStream(opa,gfx.polyOpa.p,false);
+    assert(genericShelf.size()==1 && std::abs(genericShelf[0].pose.scale-.08f)<.000001f);
+    const float angle=rotation==CW_OP_ROTATE_X ? genericShelf[0].pose.rx : genericShelf[0].pose.rz;
+    assert(std::abs(angle-1.5707963267948966f)<.000001f &&
+           "sword shelf correction changed a non-sword quarter turn, including Ikana shield");
+  }
+#ifdef HOST_MM_ROUTE
+  Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);
+  recipe.neiShimmer=int(NeiGi::Kind::KokiriSword)+1;
+  Dispatch();
+  const float fittedParticleSpan=identityParticleSpan;
+  Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);
+  recipe.neiShimmer=int(NeiGi::Kind::KokiriSword)+1;
+  recipe.opCount=2;
+  recipe.ops[1]={CW_OP_TRANSLATE,0,0,0,{}};
+  Dispatch();
+  assert(std::abs(identityParticleSpan-fittedParticleSpan)<.0001f &&
+         "custom sword particles compensated for a presentation scale that was never applied");
+  Reset(CW_DRAW_KIND_CUSTOM_GI,false,false);
+  fitModel=true;
+  recipe.dls[0]="__OTR__@oot:objects/non_sword/slanted_receipt_model";
+  MM_DrawComboForeign(1,false,1);
+  const auto genericReceipt=CheckStream(opa,gfx.polyOpa.p,false);
+  assert(genericReceipt.size()==1 && std::abs(genericReceipt[0].pose.rz-1.8f)<.0001f);
+  assert(std::abs(fittedTilt-genericReceipt[0].pose.rz)<.0001f &&
+         "MM receipt fit changed a non-sword model's selected pose");
+  assert(pose==Pose{} && stack.empty() && interpolation==0);
+#endif
+  // Exercise both real foreign dispatchers with the pickup descriptor. Shops
+  // use the upright selected model pose and retain matching Din layers.
+  Reset(CW_DRAW_KIND_CUSTOM_GI,false,true);
+  recipe.neiShimmer=int(NeiGi::Kind::MasterSword)+1;
+  recipe.ops[0].a=16384.f;fitModel=true;dinLayers=true;
+  Dispatch(true);
+  const auto shelfBody=CheckStream(opa,gfx.polyOpa.p,false);
+  const auto shelfFlame=CheckStream(xlu,gfx.polyXlu.p,false);
+  assert(std::abs(fittedTilt-1.5707963267948966f)<.00001f);
+  assert(shelfBody.size()==2 && shelfFlame.size()==1);
+  assert(shelfBody[0].pose==shelfBody[1].pose && shelfBody[0].pose==shelfFlame[0].pose);
+  assert(std::abs(shelfBody[0].pose.scale-.04f)<.00001f && shelfBody[0].pose.y==-23.f &&
+         std::abs(shelfBody[0].pose.rz-1.5707963267948966f)<.00001f &&
+         "selected sword shelf lost its upright pose, framing or Din layer placement");
   std::cout << "PASS actual OoT sword fallback dispatch: owner scopes, signed "
                "transforms, independent blade/flame, shimmer pose, stream "
                "cursors and segment cleanup\n";

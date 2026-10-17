@@ -1,3 +1,4 @@
+#include <libultraship/bridge/consolevariablebridge.h>
 #include "HyruleFieldNightMusicInternal.h"
 
 HyruleFieldNightMusicDecision HyruleFieldNightMusic_Select(const HyruleFieldNightMusicState& state) {

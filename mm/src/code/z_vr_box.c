@@ -6,6 +6,7 @@
 #include "assets/misc/skyboxes/d2_fine_static.h"
 #include "assets/misc/skyboxes/d2_fine_pal_static.h"
 #include "assets/2s2h_assets.h"
+#include "2s2h/Enhancements/Audio/MMWeather.h"
 
 typedef struct SkyboxFaceParams {
     /* 0x00 */ s32 xStart;
@@ -94,15 +95,19 @@ static s32 Skybox_HasOotTextures(void) {
     return true;
 }
 
+s32 Skybox_IsOotSkyActive(const SkyboxContext* skyboxCtx, s16 skyboxId) {
+    return ((skyboxId == SKYBOX_NORMAL_SKY) || (skyboxId == SKYBOX_3)) && skyboxCtx->ootSkyDLists[0] &&
+           skyboxCtx->ootSkyDLists[1] && CVarGetInteger("gEnhancements.Graphics.UseOotSkyTextures", 0) &&
+           ResourceMgr_IsAltAssetsEnabled();
+}
+
 s32 Skybox_PrepareOot(SkyboxContext* skyboxCtx, s16 skyboxId, u16 time, u8* timeBlend) {
     u8 first = 3;
     u8 second = 3;
     u16 start = 0;
     u16 end = 0;
 
-    if (((skyboxId != SKYBOX_NORMAL_SKY) && (skyboxId != SKYBOX_3)) || !skyboxCtx->ootSkyDLists[0] ||
-        !skyboxCtx->ootSkyDLists[1] || !CVarGetInteger("gEnhancements.Graphics.UseOotSkyTextures", 0) ||
-        !ResourceMgr_IsAltAssetsEnabled()) {
+    if (!Skybox_IsOotSkyActive(skyboxCtx, skyboxId)) {
         return false;
     }
 
@@ -159,7 +164,7 @@ u8 Skybox_GetOotCloudBlend(SkyboxContext* skyboxCtx, s16 blend) {
     s32 firstCloudy = skyboxCtx->staticSegments[0][0] == sSkyboxTextures[SKYBOX_TEXTURES_CLOUD][0];
     s32 secondCloudy = skyboxCtx->staticSegments[1][0] == sSkyboxTextures[SKYBOX_TEXTURES_CLOUD][0];
     blend = CLAMP(blend, 0, 255);
-    return firstCloudy * (255 - blend) + secondCloudy * blend;
+    return MMWeather_ResolveOotCloudBlend(firstCloudy * (255 - blend) + secondCloudy * blend);
 }
 
 /**
