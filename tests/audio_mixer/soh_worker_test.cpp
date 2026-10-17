@@ -21,7 +21,7 @@ static constexpr int desired = 4096;
 static std::atomic<bool> gFscAudioMuted{false};
 static std::atomic<int> buffered{0};
 static std::atomic<unsigned> synthUpdates{0}, synthFrames{0}, batches{0},
-    midnaResets{0};
+    midnaResets{0}, emoteCalls{0};
 static std::atomic<bool> inspectPrefill{false}, prefillEntered{false},
     releasePrefill{false};
 
@@ -52,10 +52,20 @@ static void MidnaAudio_Mix(s16 *buffer, size_t frames) {
   }
 }
 static void MidnaAudio_Reset() { ++midnaResets; }
+#if TEST_AUDIO_WORKER_EMOTES
+static void ComboEmotes_MixAudio(s16 *buffer, size_t frames) {
+  for (size_t i = 0; i < frames * 2; ++i) {
+    assert(buffer[i] == 1500);
+    buffer[i] += 400;
+  }
+  ++emoteCalls;
+}
+#endif
 static void AudioPlayer_Play(const u8 *buffer, size_t bytes) {
   const auto *pcm = reinterpret_cast<const s16 *>(buffer);
+  assert(emoteCalls == (TEST_AUDIO_WORKER_EMOTES ? batches + 1 : 0));
   for (size_t i = 0; i < bytes / sizeof(s16); ++i) {
-    assert(pcm[i] == (gFscAudioMuted ? 0 : 1500));
+    assert(pcm[i] == (gFscAudioMuted ? 0 : (TEST_AUDIO_WORKER_EMOTES ? 1900 : 1500)));
   }
   buffered += bytes / (sizeof(s16) * 2);
   assert(buffered <= desired);
@@ -70,7 +80,7 @@ static void start(int rate, int queued = 0) {
   audio.running = true;
   audio.processing = false;
   buffered = queued;
-  synthUpdates = synthFrames = batches = midnaResets = 0;
+  synthUpdates = synthFrames = batches = midnaResets = emoteCalls = 0;
   audio.thread = std::thread(OTRAudio_Thread);
 }
 static void stop() {

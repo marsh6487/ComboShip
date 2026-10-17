@@ -46,6 +46,13 @@ jobs:
 
       # These compile small production slices and one renderer object. Keep them
       # ahead of dependency installation and the long regression/build stages.
+      - name: Fast audio-worker compile and mixer regressions
+        run: |
+          python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py
+          MM_AUDIO_WORKER_CXXFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie" python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py
+          python3 -B scripts/diagnostics/run_soh_audio_worker_tests.py
+          python3 -B scripts/diagnostics/run_soh_audio_worker_tests.py --sanitize
+
       - name: Fast entrance compile and linkage preflight
         run: |
           python3 -B tests/cross_dungeon/oot_blue_warp_hook_test.py
@@ -128,6 +135,16 @@ jobs:
           sudo apt-get update && sudo apt-get install -y clang-format-14 cmake ninja-build nlohmann-json3-dev libspdlog-dev libsdl2-dev libsdl2-net-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-pil
           ./run-clang-format.sh
           git diff --exit-code
+
+      - name: Native MM weather and winter bridge preflight
+        run: |
+          python3 -B scripts/diagnostics/run_mm_weather_tests.py
+          python3 -B scripts/diagnostics/run_mm_winter_atmosphere_tests.py --sanitize
+
+      - name: Foreign Great Spin GI preflight
+        run: |
+          python3 -B scripts/diagnostics/run_spin_gi_tests.py
+          python3 -B scripts/diagnostics/run_spin_gi_tests.py --sanitize
 
       # Runtime entrance fixtures need the JSON headers installed above, but
       # still run before the large regression groups and platform builds.
@@ -237,11 +254,6 @@ jobs:
           python3 scripts/diagnostics/run_native_audio_mixer_tests.py
           python3 tests/audio_mixer/run_pcm_diagnostics_tests.py
           NATIVE_AUDIO_CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie" python3 scripts/diagnostics/run_native_audio_mixer_tests.py
-          python3 scripts/diagnostics/run_mm_audio_worker_tests.py
-          MM_AUDIO_WORKER_CXXFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie" python3 scripts/diagnostics/run_mm_audio_worker_tests.py
-          python3 -B scripts/diagnostics/run_soh_audio_worker_tests.py
-          python3 -B scripts/diagnostics/run_soh_audio_worker_tests.py --sanitize
-          python3 scripts/diagnostics/run_mm_weather_tests.py
           python3 scripts/diagnostics/run_mm_custom_item_color_tests.py
           python3 scripts/diagnostics/run_mm_hud_cosmetics_tests.py
           python3 scripts/diagnostics/run_mm_drop_lifetime_tests.py
@@ -259,7 +271,6 @@ jobs:
           python3 -B scripts/diagnostics/run_soh_season_particle_tests.py --sanitize
           python3 -B scripts/diagnostics/run_soh_season_foliage_tests.py "$RUNNER_TEMP/soh-season-foliage" --sanitize
           python3 -B scripts/diagnostics/run_soh_season_actor_tests.py --sanitize
-          python3 -B scripts/diagnostics/run_mm_winter_atmosphere_tests.py --sanitize
           MM_FOLIAGE_TEST_CFLAGS='-fsanitize=address,undefined,bounds -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie' python3 -B scripts/diagnostics/run_mm_autumn_foliage_tests.py
           MM_FOLIAGE_TEST_CFLAGS='-fsanitize=address,undefined,bounds -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie' python3 -B scripts/diagnostics/run_mm_autumn_grass_tests.py
           MM_FOLIAGE_TEST_CXXFLAGS='-O1 -g -fsanitize=address,undefined,bounds -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie' ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_mm_autumn_scene_foliage_tests.py
@@ -295,11 +306,6 @@ jobs:
           ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_oot_key_cosmetic_bridge_tests.py --sanitize
           python3 -B scripts/diagnostics/run_foreign_heart_cosmetic_tests.py
           ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_foreign_heart_cosmetic_tests.py --sanitize
-
-      - name: Great Spin GI presentation in both engines
-        run: |
-          python3 -B scripts/diagnostics/run_spin_gi_tests.py
-          python3 -B scripts/diagnostics/run_spin_gi_tests.py --sanitize
 
       - name: Mask and remains shimmer in both engines
         run: |

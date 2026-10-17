@@ -2,6 +2,7 @@
 #include "2s2h/Enhancements/Audio/MMWeatherAudio.h"
 #include "global.h"
 #include "BenPort.h"
+#include "ComboGameMode.h"
 #include "mods/extended_inventory.h"
 #include "2s2h/Rando/Rando.h"
 #include "assets/misc/skyboxes/d2_cloud_static.h"
@@ -17,6 +18,10 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+extern "C" {
+int gComboGameMode = COMBO_GAME_BOTH;
+}
 
 SaveContext gSaveContext;
 u8 gWeatherMode;

@@ -1,5 +1,6 @@
 #if __has_include("2s2h/Enhancements/Graphics/MMWinterAtmosphere.h")
 #include "global.h"
+#include "ComboGameMode.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
 #include "2s2h/Enhancements/Audio/MMWeatherAudio.h"
 #include "2s2h/Enhancements/Graphics/MMWinterAtmosphere.h"
@@ -14,6 +15,10 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+extern "C" {
+int gComboGameMode = COMBO_GAME_BOTH;
+}
 
 SaveContext gSaveContext{};
 u8 gWeatherMode;

@@ -39,6 +39,8 @@ def main():
         binary = build / "worker_test"
         flags = ["-fsanitize=address,undefined", "-fno-sanitize-recover=all",
                  "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"] if args.sanitize else []
+        emotes = not args.baseline_ref or "ComboEmotes_MixAudio" in source[start:end]
+        flags += ["-DTEST_AUDIO_WORKER_EMOTES=" + str(int(emotes))]
         subprocess.run([*shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", "-O2", "-g",
                         "-pthread", "-Wall", "-Wextra", "-Werror", *flags,
                         *shlex.split(os.environ.get("SOH_AUDIO_WORKER_CXXFLAGS", "")),

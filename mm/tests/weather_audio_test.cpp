@@ -49,6 +49,7 @@ static std::atomic<bool> gFscAudioMuted{ false };
 static bool midnaVoicePending = true;
 static int midnaMixCalls;
 static int midnaResetCalls;
+static int emoteMixCalls;
 static void MMMidnaAudio_Mix(int16_t* buffer, size_t frames) {
     ++midnaMixCalls;
     if (midnaVoicePending) {
@@ -60,6 +61,12 @@ static void MMMidnaAudio_Mix(int16_t* buffer, size_t frames) {
 static void MMMidnaAudio_Reset() {
     ++midnaResetCalls;
     midnaVoicePending = false;
+}
+static void ComboEmotes_MixAudio(int16_t* buffer, size_t frames) {
+    ++emoteMixCalls;
+    for (size_t i = 0; i < frames * 2; ++i) {
+        buffer[i] += 200;
+    }
 }
 static int16_t played[2];
 static void AudioPlayer_Play(uint8_t* buffer, size_t size) {
@@ -109,6 +116,7 @@ int main() {
     assert(captured.size() == 2 && captured[0] == 0 && captured[1] == 0);
 #endif
     assert(midnaMixCalls == 1 && midnaResetCalls == 1 && !midnaVoicePending);
+    assert(emoteMixCalls == 1);
     gFscAudioMuted = false;
     for (int channel = 0; channel < 2; ++channel) {
         master = channel == 0 ? 0.0f : 1.0f;
@@ -120,6 +128,9 @@ int main() {
     }
     master = sfx = 1;
     MMWeatherAudio_Reset();
+    int16_t active[] = { 21, -21 };
+    SubmitWeatherAudio(active, 1);
+    assert(played[0] == 221 && played[1] == 179 && emoteMixCalls == 2);
     MMWeatherAudio_Thunder(1);
     thunderVolume = 0; // A live slider change must also mute an already playing shot.
     int16_t quietThunder[] = { 19, -19 };
