@@ -40,7 +40,7 @@ constants=constants.replace('int respawnFlag=0;', 'int gameMode=0,fileNum=0,next
 transitions=(ROOT/'mm/include/z64transition.h').read_text()
 fade_black=re.search(r'/\*\s*(\d+)\s*\*/\s*TRANS_TYPE_FADE_BLACK,',transitions).group(1)
 constants+='\nconstexpr int TRANS_TYPE_FADE_BLACK='+fade_black+';\n'
-constants=constants.replace('struct { int entrance=0; } save;', 'struct { int entrance=0,cutsceneIndex=0; struct { int pauseSaveEntrance=-1; } shipSaveInfo; } save;')
+constants=constants.replace('struct { int entrance=0; } save;', 'struct { int entrance=0,cutsceneIndex=0; bool isOwlSave=false; struct { int pauseSaveEntrance=-1; } shipSaveInfo; } save;')
 scenes=(ROOT/'mm/include/tables/scene_table.h').read_text()
 for value,name in re.findall(r'/\*\s*(0x[0-9a-fA-F]+)\s*\*/\s*DEFINE_SCENE\([^,]+,\s*(SCENE_\w+)',scenes):
     if name!='SCENE_KAKUSIANA':constants+=f'\nconstexpr int {name}={value};'
@@ -111,6 +111,12 @@ program+='\n'+block(boss,'extern "C" int Combo_MM_CrossBossLogicalClear')+'\n'
 title=(ROOT/'mm/src/code/title_setup.c').read_text()
 title_block=title[title.index('        s32 crossDungeonArrival ='):title.index('        ComboFw_ApplyArrival();')]
 program+='\nstatic bool gComboEntryIsResume=false;\nvoid NativeTitleArrival() {\n'+title_block+'\n}\n'
+# Execute the actual late native player-start override after title materialization.
+# Routing/respawn assertions alone cannot detect a saved-location marker replacing
+# the grotto jump with a stationary spawn over the same hole.
+player=(ROOT/'mm/src/overlays/actors/ovl_player_actor/z_player.c').read_text()
+pause_start=block(player,'    if (gSaveContext.save.shipSaveInfo.pauseSaveEntrance != -1)')
+program+='\nint NativePlayerStartMode(int startMode) {\n'+pause_start+'\nreturn startMode;\n}\n'
 # Seed validation must use the native one-way arrival declarations too: boss
 # completion aliases can be absent from the ordinary paired EXIT index.
 native_oneways=[]

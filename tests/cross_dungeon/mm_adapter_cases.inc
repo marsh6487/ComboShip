@@ -21,8 +21,54 @@ nlohmann::json ForeignGrottoSeed(int logical) {
     Dungeon mm{"mm",{1,g->Entry()},{1,g->Exit()},{1,g->Exit()}};mm.pool=Pool::Grotto;
     return Encode({foreign,mm},{1,0});
 }
+void CheckGrottoReturnPlayerStartModes() {
+    int checked=0;
+    for(const auto& hole:Grottos()) {
+        if(!hole.holeReturn)continue;
+        const auto seed=ForeignGrottoSeed(hole.logicalSpawn);
+        assert(MM_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
+        gSaveContext={};play.sceneId=1000;
+        gSaveContext.respawn[RESPAWN_MODE_UNK_3].data=hole.hole.data;
+        int32_t entry=hole.PhysicalEntry();
+        assert(Combo_MM_CrossDungeonTransition(&entry));
+        assert(Combo_MM_CompleteCrossDungeonTransition());
+        assert(ComboCrossMmRuntime::PrepareSwitch());
+        assert(gSaveContext.save.shipSaveInfo.pauseSaveEntrance>=0);
+        // A foreign grave/interior now returns to this MM hole. Real save-load
+        // state must not replace its native jump with a stationary start.
+        gSaveContext.save.isOwlSave=true;
+        gComboEntryIsResume=(checked%2)==0;
+        assert(MM_QueueCrossDungeonArrival(hole.Exit()));
+        NativeTitleArrival();
+        assert(gSaveContext.respawnFlag==4);
+        const int params=gSaveContext.respawn[RESPAWN_MODE_UNK_3].playerParams;
+        assert(params==PLAYER_PARAMS(0xFF,PLAYER_START_MODE_GROTTO));
+        assert(NativePlayerStartMode((params>>8)&0xF)==PLAYER_START_MODE_GROTTO &&
+               "cross-game return must keep the native jump out of the hole");
+        assert(gSaveContext.save.shipSaveInfo.pauseSaveEntrance==-1);
+        assert(!gSaveContext.save.isOwlSave);
+        ++checked;
+    }
+    assert(checked>0);
+    assert(MM_SetCrossDungeonRuntimeSeed("null"));
+    Combo_MM_LoadCrossDungeonCheckpoint(-1);
+    gSaveContext={};
+    gSaveContext.save.shipSaveInfo.pauseSaveEntrance=123;
+    gSaveContext.save.isOwlSave=true;
+    gComboEntryIsResume=true;
+    assert(!MM_QueueCrossDungeonArrival(0xFFFF));
+    NativeTitleArrival();
+    assert(gSaveContext.save.shipSaveInfo.pauseSaveEntrance==123);
+    assert(gSaveContext.save.isOwlSave);
+    assert(NativePlayerStartMode(PLAYER_START_MODE_GROTTO)==PLAYER_START_MODE_D);
+    assert(gSaveContext.save.shipSaveInfo.pauseSaveEntrance==-1);
+    assert(!gSaveContext.save.isOwlSave);
+    gSaveContext={};gComboEntryIsResume=false;
+    std::cout<<"MM native player startup: "<<checked<<" grotto returns and native resume controls PASS\n";
+}
 int main() {
     InitRegions();
+    CheckGrottoReturnPlayerStartModes();
     assert(nlohmann::json::parse(MM_DumpCrossDungeonCatalogue()).size()==5);
     assert(nlohmann::json::parse(MM_DumpCrossDungeonCatalogueForOptions("{\"dungeons\":false,\"bosses\":true}")).size()==4);
     assert(nlohmann::json::parse(MM_DumpCrossDungeonCatalogueForOptions("{\"bosses\":true}")).size()==9);

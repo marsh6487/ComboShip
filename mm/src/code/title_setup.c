@@ -128,6 +128,10 @@ void Setup_InitImpl(SetupState* this) {
                                          : crossBossRecovery >= 0 ? crossBossRecovery
                                                                   : crossDungeonRecovery;
             // The consumed arrival owns respawn mode, including a positioned grotto-hole return.
+            // A departure checkpoint may carry a pause-save marker. Player_Init would
+            // turn its grotto jump into a stationary spawn over the hole if retained.
+            gSaveContext.save.shipSaveInfo.pauseSaveEntrance = -1;
+            gSaveContext.save.isOwlSave = false;
             gSaveContext.save.cutsceneIndex = 0;
         }
         ComboFw_ApplyArrival(); // Explicit recall takes precedence over ordinary save recovery.
