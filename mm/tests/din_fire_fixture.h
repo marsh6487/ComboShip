@@ -13,6 +13,7 @@
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "test_require.h"
 #include <string.h>
+#include "../../tests/fixtures/din_shield_vertices.h"
 
 static GraphicsContext gfx;
 static PlayState play;
@@ -80,7 +81,14 @@ Gfx* ResourceMgr_LoadGfxByName(const char* path) {
     return NULL;
 }
 void* ResourceGetDataByName(const char* path) {
+    if (!loadFailure && ResourceMgr_FileExists(path) && strstr(path, "/SurfaceVertices"))
+        return shieldSurfaceVertices;
+    if (!loadFailure && ResourceMgr_FileExists(path) && strstr(path, "/RimVertices"))
+        return shieldRimVertices;
     return loadFailure || !ResourceMgr_FileExists(path) ? NULL : pixels;
+}
+size_t ResourceGetSizeByName(const char* path) {
+    return strstr(path, "/RimVertices") ? sizeof(shieldRimVertices) : sizeof(shieldSurfaceVertices);
 }
 NeiSaveData* Nei_Save(void) {
     return &nei;
@@ -161,15 +169,27 @@ void Matrix_Pop(void) {
 }
 void Matrix_Translate(f32 x, f32 y, f32 z, MatrixMode mode) {
     (void)mode;
-    currentMatrix.xw += x;
-    currentMatrix.yw += y;
-    currentMatrix.zw += z;
+    currentMatrix.xw += currentMatrix.xx * x + currentMatrix.xy * y + currentMatrix.xz * z;
+    currentMatrix.yw += currentMatrix.yx * x + currentMatrix.yy * y + currentMatrix.yz * z;
+    currentMatrix.zw += currentMatrix.zx * x + currentMatrix.zy * y + currentMatrix.zz * z;
 }
 void Matrix_Scale(f32 x, f32 y, f32 z, MatrixMode mode) {
     (void)mode;
     currentMatrix.xx *= x;
+    currentMatrix.yx *= x;
+    currentMatrix.zx *= x;
+    currentMatrix.xy *= y;
     currentMatrix.yy *= y;
+    currentMatrix.zy *= y;
+    currentMatrix.xz *= z;
+    currentMatrix.yz *= z;
     currentMatrix.zz *= z;
+}
+void Matrix_Get(MtxF* dest) {
+    *dest = currentMatrix;
+}
+void Matrix_Put(MtxF* src) {
+    currentMatrix = *src;
 }
 Mtx* Matrix_Finalize(GraphicsContext* context) {
     (void)context;

@@ -1,4 +1,5 @@
 #include "din_fire_fixture.h"
+#include <math.h>
 
 static void Tick(void) {
     ++play.gameplayFrames;
@@ -282,7 +283,64 @@ static void TestProgressiveSwords(void) {
     }
     puts("PASS MM progressive swords: both ages, NEI/native upgrades, fitted blade, toggle and old-pack fallbacks");
 }
+static void TestShieldGroundClearance(void) {
+    for (int age = 0; age < 2; ++age) {
+        for (int pose = 0; pose < 6; ++pose) {
+            SetupEnabled();
+            adult = age;
+            player.actor.bgCheckFlags = BGCHECKFLAG_GROUND;
+            player.actor.floorHeight = 125.0f;
+            currentMatrix.xx = currentMatrix.yy = currentMatrix.zz = .01f;
+            currentMatrix.yw = 137.0f;
+            if (pose == 1)
+                currentMatrix.yw = 165.0f;
+            if (pose == 2 || pose == 3) {
+                currentMatrix.xx = currentMatrix.yy = 0.0f;
+                currentMatrix.xy = pose == 2 ? -.01f : .01f;
+                currentMatrix.yx = -currentMatrix.xy;
+            }
+            if (pose == 4) {
+                currentMatrix.yy = currentMatrix.zz = 0.0f;
+                currentMatrix.yz = .01f;
+                currentMatrix.zy = -.01f;
+                currentMatrix.yw = 132.0f;
+            }
+            if (pose == 5)
+                player.actor.bgCheckFlags = 0;
+            for (int i = 0; i < 4; ++i)
+                Tick();
+            MtxF hand = currentMatrix;
+            REQUIRE(DrawShield() > 0);
+            REQUIRE(!memcmp(&hand, &currentMatrix, sizeof(hand)));
+            REQUIRE(matrixCount == 1);
+            MtxF drawn = captured[0];
+            REQUIRE(fabsf(drawn.xx - hand.xx * 2.4f) < .00001f);
+            REQUIRE(fabsf(drawn.xy - hand.xy * 2.7f) < .00001f);
+            REQUIRE(fabsf(drawn.zz - hand.zz) < .00001f);
+            REQUIRE(fabsf(drawn.xw - (hand.xw - 1500 * hand.xx - 850 * hand.xz)) < .0001f);
+            REQUIRE(fabsf(drawn.zw - (hand.zw - 1500 * hand.zx - 850 * hand.zz)) < .0001f);
+            if (pose == 5) {
+                REQUIRE(fabsf(drawn.yw - 137.0f) < .0001f);
+            } else {
+                Vtx* sets[] = { shieldSurfaceVertices, shieldRimVertices };
+                for (size_t s = 0; s < ARRAY_COUNT(sets); ++s) {
+                    for (int v = 0; v < 4; ++v) {
+                        f32 y = drawn.yw + drawn.yx * sets[s][v].v.ob[0] + drawn.yy * sets[s][v].v.ob[1] +
+                                drawn.yz * sets[s][v].v.ob[2];
+                        REQUIRE(y >= player.actor.floorHeight + .99f);
+                    }
+                }
+                if (pose == 0)
+                    REQUIRE(fabsf(drawn.yw - 155.7f) < .0001f);
+                if (pose == 1)
+                    REQUIRE(fabsf(drawn.yw - 165.0f) < .0001f);
+            }
+        }
+    }
+    puts("PASS MM Din shield: child/adult ground clearance, rotated aiming, full size and caller matrices preserved");
+}
 int main(void) {
+    TestShieldGroundClearance();
     TestProgressiveSwords();
     TestOwnership();
     TestProfilesAndHandCapture();
