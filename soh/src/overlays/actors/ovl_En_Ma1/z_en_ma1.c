@@ -1,3 +1,4 @@
+#include "soh/Enhancements/cosmetics/NativeNpcModels.h"
 /*
  * File: z_en_ma1.c
  * Overlay: En_Ma1
@@ -283,7 +284,9 @@ void EnMa1_Init(Actor* thisx, PlayState* play) {
     s32 pad;
 
     ActorShape_Init(&this->actor.shape, 0.0f, ActorShadow_DrawCircle, 18.0f);
-    SkelAnime_InitFlex(play, &this->skelAnime, &gMalonChildSkel, NULL, NULL, NULL, 0);
+    SkelAnime_InitFlex(play, &this->skelAnime,
+                       (FlexSkeletonHeader*)NativeNpcModel_SelectSkeleton(&sChildMalonNpcModel, gMalonChildSkel), NULL,
+                       NULL, NULL, 0);
     Collider_InitCylinder(play, &this->collider);
     Collider_SetCylinder(play, &this->collider, &this->actor, &sCylinderInit);
     CollisionCheck_SetInfo2(&this->actor.colChkInfo, DamageTable_Get(22), &sColChkInfoInit);
@@ -465,10 +468,12 @@ s32 EnMa1_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* p
     EnMa1* this = (EnMa1*)thisx;
     Vec3s vec;
 
-    if ((limbIndex == 2) || (limbIndex == 5)) {
+    if (((limbIndex == 2) || (limbIndex == 5)) && !NativeNpcModel_IsActive(&sChildMalonNpcModel)) {
         *dList = NULL;
     }
     if (limbIndex == 15) {
+        s32 mouth = this->mouthIndex == 2 ? 3 : this->mouthIndex;
+        *dList = NativeNpcModel_SelectHead(&sChildMalonNpcModel, *dList, this->eyeIndex, mouth);
         Matrix_Translate(1400.0f, 0.0f, 0.0f, MTXMODE_APPLY);
         vec = this->interactInfo.headRot;
         Matrix_RotateX((vec.y / 32768.0f) * M_PI, MTXMODE_APPLY);
@@ -480,6 +485,7 @@ s32 EnMa1_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* p
         Matrix_RotateX((-vec.y / 32768.0f) * M_PI, MTXMODE_APPLY);
         Matrix_RotateZ((-vec.x / 32768.0f) * M_PI, MTXMODE_APPLY);
     }
+    *dList = NativeNpcPose_SelectLimb(&this->skelAnime, limbIndex, *dList);
     return false;
 }
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+python3 -B scripts/diagnostics/run_native_npc_model_tests.py
 python3 -B scripts/diagnostics/run_hint_item_name_tests.py
 python3 -B scripts/diagnostics/run_combo_crash_owner_tests.py
 python3 -B scripts/diagnostics/run_nei_gi_tests.py --held --combo

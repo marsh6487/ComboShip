@@ -5,6 +5,7 @@
  */
 
 #include "z_en_viewer.h"
+#include "soh/Enhancements/cosmetics/NativeNpcModels.h"
 #include "overlays/actors/ovl_Bg_Toki_Swd/z_bg_toki_swd.h"
 #include "overlays/actors/ovl_En_Ganon_Mant/z_en_ganon_mant.h"
 #include "objects/object_zl4/object_zl4.h"
@@ -335,10 +336,15 @@ static void EnViewerStatic_InitSkeleton(EnViewer* this, PlayState* play,
             SkelAnime_InitFlex(play, &this->skin.skelAnime, &gImpaSkel, NULL, NULL, NULL, 0);
             break;
         case STATIC_SKELETON_MALON_CHILD:
-            SkelAnime_InitFlex(play, &this->skin.skelAnime, &gMalonChildSkel, NULL, NULL, NULL, 0);
+            SkelAnime_InitFlex(
+                play, &this->skin.skelAnime,
+                (FlexSkeletonHeader*)NativeNpcModel_SelectSkeleton(&sChildMalonNpcModel, gMalonChildSkel), NULL, NULL,
+                NULL, 0);
             break;
         case STATIC_SKELETON_SARIA:
-            SkelAnime_InitFlex(play, &this->skin.skelAnime, &gSariaSkel, NULL, NULL, NULL, 0);
+            SkelAnime_InitFlex(play, &this->skin.skelAnime,
+                               (FlexSkeletonHeader*)NativeNpcModel_SelectSkeleton(&sSariaNpcModel, gSariaSkel), NULL,
+                               NULL, NULL, 0);
             break;
         case STATIC_SKELETON_SHEIK:
             SkelAnime_InitFlex(play, &this->skin.skelAnime, &gSheikSkel, NULL, NULL, NULL, 0);
@@ -350,7 +356,10 @@ static void EnViewerStatic_InitSkeleton(EnViewer* this, PlayState* play,
             SkelAnime_InitFlex(play, &this->skin.skelAnime, &gRutoChildSkel, NULL, NULL, NULL, 0);
             break;
         case STATIC_SKELETON_MALON_ADULT:
-            SkelAnime_InitFlex(play, &this->skin.skelAnime, &gMalonAdultSkel, NULL, NULL, NULL, 0);
+            SkelAnime_InitFlex(
+                play, &this->skin.skelAnime,
+                (FlexSkeletonHeader*)NativeNpcModel_SelectSkeleton(&sAdultMalonNpcModel, gMalonAdultSkel), NULL, NULL,
+                NULL, 0);
             break;
         case STATIC_SKELETON_ADULT_ZELDA:
             SkelAnime_InitFlex(play, &this->skin.skelAnime, &gZelda2Skel, NULL, NULL, NULL, 0);
@@ -1598,8 +1607,11 @@ static s32 EnViewer_StaticChildMalonOverrideLimbDraw(PlayState* play, s32 limbIn
                                                      Vec3s* rot, void* thisx) {
     EnViewer* this = (EnViewer*)thisx;
 
-    if (limbIndex == 2 || limbIndex == 5) {
+    if ((limbIndex == 2 || limbIndex == 5) && !NativeNpcModel_IsActive(&sChildMalonNpcModel)) {
         *dList = NULL;
+    }
+    if (limbIndex == 15) {
+        *dList = NativeNpcModel_SelectHead(&sChildMalonNpcModel, *dList, this->staticState.eyeIndex, 0);
     }
     if (StaticStoryActor_CanTrack(STATIC_STORY_ACTOR_CHILD_MALON, this->staticState.pose)) {
         if (limbIndex == 15) {
@@ -1612,6 +1624,7 @@ static s32 EnViewer_StaticChildMalonOverrideLimbDraw(PlayState* play, s32 limbIn
             Matrix_RotateZ(BINANG_TO_RAD(-this->staticState.interactInfo.torsoRot.x), MTXMODE_APPLY);
         }
     }
+    *dList = NativeNpcPose_SelectLimb(&this->skin.skelAnime, limbIndex, *dList);
     return false;
 }
 
@@ -1627,11 +1640,14 @@ void EnViewer_DrawStaticChildMalon(EnViewer* this, PlayState* play) {
 static s32 EnViewer_StaticSariaOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
                                                 void* thisx) {
     EnViewer* this = (EnViewer*)thisx;
+    if (limbIndex == 16) {
+        *dList = NativeNpcModel_SelectHead(&sSariaNpcModel, *dList, this->staticState.eyeIndex, 0);
+    }
 
     if (limbIndex == 15 &&
         (StaticStoryActor_ResolvePose((StaticStoryActorType)this->staticState.type, this->staticState.pose)->flags &
          STATIC_POSE_FLAG_OCARINA)) {
-        *dList = gSariaRightHandAndOcarinaDL;
+        *dList = NativeNpcModel_SariaOcarina((Gfx*)gSariaRightHandAndOcarinaDL);
     }
     if (StaticStoryActor_CanTrack(STATIC_STORY_ACTOR_SARIA, this->staticState.pose)) {
         if (limbIndex == 16) {
@@ -1644,6 +1660,7 @@ static s32 EnViewer_StaticSariaOverrideLimbDraw(PlayState* play, s32 limbIndex, 
             Matrix_RotateX(BINANG_TO_RAD(this->staticState.interactInfo.torsoRot.x), MTXMODE_APPLY);
         }
     }
+    *dList = NativeNpcPose_SelectLimb(&this->skin.skelAnime, limbIndex, *dList);
     return false;
 }
 
@@ -1800,9 +1817,14 @@ void EnViewer_DrawStaticChildRuto(EnViewer* this, PlayState* play) {
 static s32 EnViewer_StaticAdultMalonOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos,
                                                      Vec3s* rot, void* thisx) {
     EnViewer* this = (EnViewer*)thisx;
+    if (limbIndex == 18) {
+        *dList = NativeNpcModel_SelectHead(&sAdultMalonNpcModel, *dList, this->staticState.eyeIndex, 0);
+    }
 
     if (limbIndex == 3 || limbIndex == 6) {
-        *dList = NULL;
+        if (!NativeNpcModel_IsActive(&sAdultMalonNpcModel)) {
+            *dList = NULL;
+        }
     }
     if (StaticStoryActor_CanTrack(STATIC_STORY_ACTOR_ADULT_MALON, this->staticState.pose)) {
         if (limbIndex == 18) {
@@ -1815,6 +1837,7 @@ static s32 EnViewer_StaticAdultMalonOverrideLimbDraw(PlayState* play, s32 limbIn
             Matrix_RotateX(BINANG_TO_RAD(-this->staticState.interactInfo.torsoRot.x), MTXMODE_APPLY);
         }
     }
+    *dList = NativeNpcPose_SelectLimb(&this->skin.skelAnime, limbIndex, *dList);
     return false;
 }
 
@@ -1826,7 +1849,8 @@ static void EnViewer_StaticAdultMalonPostLimbDraw(PlayState* play, s32 limbIndex
         (StaticStoryActor_ResolvePose((StaticStoryActorType)this->staticState.type, this->staticState.pose)->flags &
          STATIC_POSE_FLAG_BASKET)) {
         OPEN_DISPS(play->state.gfxCtx);
-        gSPDisplayList(POLY_OPA_DISP++, gMalonAdultBasketDL);
+        gSPDisplayList(POLY_OPA_DISP++,
+                       NativeNpcPose_SelectProp(&this->skin.skelAnime, "Basket", (Gfx*)gMalonAdultBasketDL));
         CLOSE_DISPS(play->state.gfxCtx);
     }
 }

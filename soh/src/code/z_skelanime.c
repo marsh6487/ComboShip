@@ -1,3 +1,4 @@
+#include "soh/Enhancements/cosmetics/NativeNpcPose.h"
 #include "global.h"
 #include "vt.h"
 #include <string.h>
@@ -1631,7 +1632,8 @@ s32 SkelAnime_MorphTaper(SkelAnime* skelAnime) {
 void SkelAnime_AnimateFrame(SkelAnime* skelAnime) {
     Vec3s nextjointTable[100];
 
-    SkelAnime_GetFrameData(skelAnime->animation, skelAnime->curFrame, skelAnime->limbCount, skelAnime->jointTable);
+    SkelAnime_GetFrameData(NativeNpcPose_ResolveAnimation(skelAnime, skelAnime->animation), skelAnime->curFrame,
+                           skelAnime->limbCount, skelAnime->jointTable);
     if (skelAnime->mode & ANIM_INTERP) {
         s32 frame = skelAnime->curFrame;
         f32 partialFrame = skelAnime->curFrame - frame;
@@ -1639,7 +1641,8 @@ void SkelAnime_AnimateFrame(SkelAnime* skelAnime) {
         if (++frame >= (s32)skelAnime->animLength) {
             frame = 0;
         }
-        SkelAnime_GetFrameData(skelAnime->animation, frame, skelAnime->limbCount, nextjointTable);
+        SkelAnime_GetFrameData(NativeNpcPose_ResolveAnimation(skelAnime, skelAnime->animation), frame,
+                               skelAnime->limbCount, nextjointTable);
         SkelAnime_InterpFrameTable(skelAnime->limbCount, skelAnime->jointTable, skelAnime->jointTable, nextjointTable,
                                    partialFrame);
     }
@@ -1696,8 +1699,8 @@ s32 SkelAnime_Once(SkelAnime* skelAnime) {
     f32 updateRate = R_UPDATE_RATE * (1.0f / 3.0f);
 
     if (skelAnime->curFrame == skelAnime->endFrame) {
-        SkelAnime_GetFrameData(skelAnime->animation, (s32)skelAnime->curFrame, skelAnime->limbCount,
-                               skelAnime->jointTable);
+        SkelAnime_GetFrameData(NativeNpcPose_ResolveAnimation(skelAnime, skelAnime->animation),
+                               (s32)skelAnime->curFrame, skelAnime->limbCount, skelAnime->jointTable);
         SkelAnime_AnimateFrame(skelAnime);
         return 1;
     }
@@ -1725,10 +1728,11 @@ void Animation_ChangeImpl(SkelAnime* skelAnime, AnimationHeader* animation, f32 
                           u8 mode, f32 morphFrames, s8 taper) {
     LinkAnimationHeader* ogAnim = animation;
 
+    animation = NativeNpcPose_ResolveAnimation(skelAnime, animation);
     if (ResourceMgr_OTRSigCheck(animation) != 0)
         animation = ResourceMgr_LoadAnimByName(animation);
 
-    AnimationHeader* currentAnimation = (AnimationHeader*)skelAnime->animation;
+    AnimationHeader* currentAnimation = NativeNpcPose_ResolveAnimation(skelAnime, skelAnime->animation);
     if (ResourceMgr_OTRSigCheck(currentAnimation) != 0)
         currentAnimation = ResourceMgr_LoadAnimByName(currentAnimation);
 
@@ -1779,9 +1783,6 @@ void Animation_ChangeImpl(SkelAnime* skelAnime, AnimationHeader* animation, f32 
 void Animation_Change(SkelAnime* skelAnime, AnimationHeader* animation, f32 playSpeed, f32 startFrame, f32 endFrame,
                       u8 mode, f32 morphFrames) {
     AnimationHeader* ogAnim = animation;
-
-    if (ResourceMgr_OTRSigCheck(animation) != 0)
-        animation = ResourceMgr_LoadAnimByName(animation);
 
     Animation_ChangeImpl(skelAnime, animation, playSpeed, startFrame, endFrame, mode, morphFrames, ANIMTAPER_NONE);
     skelAnime->animation = ogAnim;

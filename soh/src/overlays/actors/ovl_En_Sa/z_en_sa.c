@@ -1,4 +1,5 @@
 #include "z_en_sa.h"
+#include "soh/Enhancements/cosmetics/NativeNpcModels.h"
 #include "overlays/actors/ovl_En_Elf/z_en_elf.h"
 #include "objects/object_sa/object_sa.h"
 #include "scenes/overworld/spot04/spot04_scene.h"
@@ -487,7 +488,9 @@ void EnSa_Init(Actor* thisx, PlayState* play) {
     s32 initMode;
 
     ActorShape_Init(&this->actor.shape, 0.0f, ActorShadow_DrawCircle, 12.0f);
-    SkelAnime_InitFlex(play, &this->skelAnime, &gSariaSkel, NULL, this->jointTable, this->morphTable, 17);
+    SkelAnime_InitFlex(play, &this->skelAnime,
+                       (FlexSkeletonHeader*)NativeNpcModel_SelectSkeleton(&sSariaNpcModel, gSariaSkel), NULL,
+                       this->jointTable, this->morphTable, 17);
     Collider_InitCylinder(play, &this->collider);
     Collider_SetCylinder(play, &this->collider, &this->actor, &sCylinderInit);
     CollisionCheck_SetInfo2(&this->actor.colChkInfo, NULL, &sColChkInfoInit);
@@ -790,6 +793,8 @@ s32 EnSa_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* po
     Vec3s sp18;
 
     if (limbIndex == 16) {
+        *dList = NativeNpcModel_SelectEyes(&sSariaNpcModel, *dList, this->leftEyeIndex, this->rightEyeIndex,
+                                           this->mouthIndex);
         Matrix_Translate(900.0f, 0.0f, 0.0f, MTXMODE_APPLY);
         sp18 = this->interactInfo.headRot;
         Matrix_RotateX(BINANG_TO_RAD(sp18.y), MTXMODE_APPLY);
@@ -804,9 +809,10 @@ s32 EnSa_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* po
     }
 
     if (play->sceneNum == SCENE_SACRED_FOREST_MEADOW && limbIndex == 15) {
-        *dList = gSariaRightHandAndOcarinaDL;
+        *dList = NativeNpcModel_SariaOcarina((Gfx*)gSariaRightHandAndOcarinaDL);
     }
 
+    *dList = NativeNpcPose_SelectLimb(&this->skelAnime, limbIndex, *dList);
     return 0;
 }
 

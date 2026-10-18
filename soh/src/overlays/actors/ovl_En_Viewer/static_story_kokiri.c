@@ -1,4 +1,5 @@
 #include "static_story_kokiri.h"
+#include "soh/Enhancements/cosmetics/NativeNpcModels.h"
 
 #include <math.h>
 
@@ -55,7 +56,11 @@ void StaticStoryKokiri_Init(EnViewer* this, PlayState* play) {
         StaticStoryActor_ResolvePose((StaticStoryActorType)this->staticState.type, this->staticState.pose);
 
     gSegments[6] = VIRTUAL_TO_PHYSICAL(play->objectCtx.status[this->staticState.objectSlots[3]].segment);
-    SkelAnime_InitFlex(play, &this->skin.skelAnime, (FlexSkeletonHeader*)gKw1Skel, NULL, NULL, NULL, 0);
+    SkelAnime_InitFlex(
+        play, &this->skin.skelAnime,
+        (FlexSkeletonHeader*)NativeNpcModel_SelectSkeleton(
+            this->staticState.type == STATIC_STORY_ACTOR_KOKIRI_GIRL ? &sKokiriGirlNpcModel : NULL, gKw1Skel),
+        NULL, NULL, NULL, 0);
     Animation_PlayLoopSetSpeed(&this->skin.skelAnime, StaticStoryKokiri_GetAnimation(pose->animation),
                                pose->playbackSpeed);
     this->staticState.kokiriLegFrame = 0.0f;
@@ -68,6 +73,12 @@ void StaticStoryKokiri_UpdatePose(EnViewer* this, f32 step) {
     if ((this->staticState.type != STATIC_STORY_ACTOR_KOKIRI_GIRL &&
          this->staticState.type != STATIC_STORY_ACTOR_FADO) ||
         this->staticState.pose != 4 || joints == NULL || this->skin.skelAnime.limbCount < 16) {
+        return;
+    }
+
+    /* A fitted archive clip owns the complete seated pose, including legs. */
+    if (NativeNpcPose_ResolveAnimation(&this->skin.skelAnime, this->skin.skelAnime.animation) !=
+        this->skin.skelAnime.animation) {
         return;
     }
 
@@ -109,6 +120,9 @@ static s32 StaticStoryKokiri_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gf
         gSPSegment((*gfx)++, 0x06, play->objectCtx.status[this->staticState.objectSlots[0]].segment);
         gSegments[6] = VIRTUAL_TO_PHYSICAL(play->objectCtx.status[this->staticState.objectSlots[0]].segment);
         *dList = this->staticState.type == STATIC_STORY_ACTOR_FADO ? (Gfx*)gFaDL : (Gfx*)object_kw1_DL_002C10;
+        if (this->staticState.type == STATIC_STORY_ACTOR_KOKIRI_GIRL) {
+            *dList = NativeNpcModel_SelectHead(&sKokiriGirlNpcModel, *dList, this->staticState.eyeIndex, 0);
+        }
         gSPSegment((*gfx)++, 0x0A,
                    SEGMENTED_TO_VIRTUAL(this->staticState.type == STATIC_STORY_ACTOR_FADO
                                             ? sFadoEyes[this->staticState.eyeIndex]
@@ -127,6 +141,7 @@ static s32 StaticStoryKokiri_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gf
             Matrix_Translate(-1200.0f, 0.0f, 0.0f, MTXMODE_APPLY);
         }
     }
+    *dList = NativeNpcPose_SelectLimb(&this->skin.skelAnime, limbIndex, *dList);
     return false;
 }
 
