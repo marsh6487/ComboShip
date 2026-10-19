@@ -91,9 +91,12 @@ void MmForm_FireDekuBubble(Player* player, PlayState* play);
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/frame_interpolation.h"
 
-// framebuffer_effects.h has no __cplusplus guards — declare the one function we need
-// with explicit C linkage so the linker finds the C-mangled symbol.
-extern "C" void FB_WriteFramebufferSliceToCPU(Gfx** gfxp, void* buffer, u8 byteSwap);
+// The framebuffer C API has no __cplusplus guards.
+extern "C" {
+#include "soh/framebuffer_effects.h"
+uint32_t OTRGetGameRenderWidth(void);
+uint32_t OTRGetGameRenderHeight(void);
+}
 
 #include <libultraship/bridge.h>
 #include <libultraship/log/luslog.h>
@@ -14386,15 +14389,18 @@ static void MmForm_UpdateActive(Player* player, PlayState* play) {
 // Transformation Cutscene
 // =============================================================================
 
+#include "mm_native_transform.inc.h"
+
 static void MmForm_UpdateTransforming(Player* player, PlayState* play) {
-    // Garo + Gerudo bundle their own .o2r (soh.o2r / soh.o2r) and don't
-    // ship the maskOff/maskOn animations that the full cutscene plays from
-    // mm.o2r — force the instant 5-frame flash transform for them. Other
-    // forms honor the user's CVar preference.
+    if (MmForm_UpdateNativeMaskCutscene(player, play, 0))
+        return;
+    // Garo/Gerudo use local packs. A native form reaches this fallback only
+    // when its sequence was unavailable or an instant transition was requested.
     u8 forceInstantForLocalForm =
-        (gFormState.targetForm == MM_PLAYER_FORM_GARO || gFormState.targetForm == MM_PLAYER_FORM_GERUDO);
-    u8 instantTransform = CVarGetInteger("gMods.TransformMasks.InstantTransform", 0) || sForceInstantTransform ||
-                          forceInstantForLocalForm;
+        (gFormState.targetForm == MM_PLAYER_FORM_GARO || gFormState.targetForm == MM_PLAYER_FORM_GERUDO ||
+         MmForm_IsNativeMaskForm(gFormState.targetForm));
+    u8 instantTransform = CVarGetInteger("gMods.TransformMasks.InstantTransform", 0) || sNativeMaskInstantFallback ||
+                          sForceInstantTransform || forceInstantForLocalForm;
 
     if (instantTransform) {
         // Instant transform: 5-frame flash
@@ -14410,6 +14416,7 @@ static void MmForm_UpdateTransforming(Player* player, PlayState* play) {
             gFormState.formSkelAnime.playSpeed = 1.0f;
 
             if (!MmForm_LoadFormSkeleton(play, gFormState.targetForm)) {
+                sNativeMaskInstantFallback = 0;
                 MMFORM_LOG("[MmForm] Skeleton load failed, aborting transform");
                 player->stateFlags1 &= ~PLAYER_STATE1_INPUT_DISABLED;
                 gFormState.state = MMFORM_STATE_INACTIVE;
@@ -14446,6 +14453,7 @@ static void MmForm_UpdateTransforming(Player* player, PlayState* play) {
 
         // Done after 5 frames
         if (gFormState.cutsceneTimer >= 5) {
+            sNativeMaskInstantFallback = 0;
             gFormState.flashAlpha = 0;
             player->stateFlags1 &= ~PLAYER_STATE1_INPUT_DISABLED;
             sForceInstantTransform = 0;
@@ -14616,12 +14624,15 @@ static void MmForm_UpdateTransforming(Player* player, PlayState* play) {
 }
 
 static void MmForm_UpdateDetransforming(Player* player, PlayState* play) {
+    if (MmForm_UpdateNativeMaskCutscene(player, play, 1))
+        return;
     u8 wasWolf = gFormState.currentForm == MM_PLAYER_FORM_PIKACHU && WolfLinkForm_IsSelected();
-    // Garo + Gerudo bundle their own .o2r and don't ship the maskOff/maskOn
-    // cutscene anims; force instant de-transform for them.
+    // Keep local-pack and unavailable-native sequences on the instant path.
     u8 forceInstantForLocalForm =
-        (gFormState.currentForm == MM_PLAYER_FORM_GARO || gFormState.currentForm == MM_PLAYER_FORM_GERUDO);
-    u8 instantTransform = CVarGetInteger("gMods.TransformMasks.InstantTransform", 0) || forceInstantForLocalForm;
+        (gFormState.currentForm == MM_PLAYER_FORM_GARO || gFormState.currentForm == MM_PLAYER_FORM_GERUDO ||
+         MmForm_IsNativeMaskForm(gFormState.currentForm));
+    u8 instantTransform = CVarGetInteger("gMods.TransformMasks.InstantTransform", 0) || sNativeMaskInstantFallback ||
+                          forceInstantForLocalForm;
 
     if (instantTransform) {
         // Instant de-transform: 5-frame flash
@@ -14662,6 +14673,7 @@ static void MmForm_UpdateDetransforming(Player* player, PlayState* play) {
         }
 
         if (gFormState.cutsceneTimer >= 5) {
+            sNativeMaskInstantFallback = 0;
             gFormState.flashAlpha = 0;
             player->stateFlags1 &= ~PLAYER_STATE1_INPUT_DISABLED;
             gFormState.state = MMFORM_STATE_INACTIVE;
@@ -15069,7 +15081,7 @@ static s32 MmForm_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, 
     if (gFormState.currentForm == MM_PLAYER_FORM_FIERCE_DEITY) {
         if (limbIndex == PLAYER_LIMB_L_HAND) {
             Gfx* fdDL = NULL;
-            switch (player->leftHandType) {
+            switch (sNativeMaskCs.active ? PLAYER_MODELTYPE_LH_OPEN : player->leftHandType) {
                 case PLAYER_MODELTYPE_LH_SWORD:
                 case PLAYER_MODELTYPE_LH_SWORD_2:
                 case PLAYER_MODELTYPE_LH_BGS:
@@ -15096,7 +15108,7 @@ static s32 MmForm_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, 
         } else if (limbIndex == PLAYER_LIMB_R_HAND) {
             // Right hand: show FD empty hand when in sword stance (no shield for FD).
             // For other items (hammer etc.), let OOT's right hand DL through.
-            if (player->leftHandType == PLAYER_MODELTYPE_LH_SWORD ||
+            if (sNativeMaskCs.active || player->leftHandType == PLAYER_MODELTYPE_LH_SWORD ||
                 player->leftHandType == PLAYER_MODELTYPE_LH_SWORD_2 ||
                 player->leftHandType == PLAYER_MODELTYPE_LH_BGS || player->leftHandType == PLAYER_MODELTYPE_LH_OPEN) {
                 Gfx* fdDL = MmForm_GetFDHandDL(play, FD_DL_RIGHT_HAND_EMPTY);
@@ -15433,6 +15445,7 @@ extern "C" u8 MmForm_RitoShieldIsDrawn(void) {
 
 static void MmForm_PostLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx) {
     Player* player = (Player*)thisx;
+    MmForm_DrawNativeTransformationLimb(play, player, limbIndex);
     Vec3f zeroVec = { 0.0f, 0.0f, 0.0f };
     // Outside the fin-DL block: the third combo hit and jump kick use R_SHIN,
     // and combat must still work when a cosmetic fin display list is absent.
@@ -16471,6 +16484,7 @@ static u8 MmForm_SoftReload(PlayState* play, Player* player, MmPlayerTransformat
 extern "C" {
 
 void MmForm_Init(PlayState* play, Player* player) {
+    MmForm_InterruptNativeMaskForScene(player, play, 1);
     MmForm_StopGoronRollSfx();
     MmForm_RegisterGoronRollSfxCleanup();
     MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
@@ -18680,6 +18694,7 @@ void MmForm_Draw(PlayState* play, Player* player) {
             // the copy still happened through forceOotCopy and Link's pose overwrote the
             // instrument animation — the "entran en pose de ocarina" bug.
             u8 willCopyOoT =
+                !sNativeMaskCs.active &&
                 (MmForm_UsesOotAnim() || forceOotCopy || gFormState.currentForm == MM_PLAYER_FORM_FIERCE_DEITY) &&
                 // Gakki blocks the copy only for a form that HAS its own instrument clip
                 // (Goron/Zora/Deku). One that plays on Link's animations declares none, and
@@ -18920,6 +18935,7 @@ void MmForm_Draw(PlayState* play, Player* player) {
 // re-applied, so the player respawns with no Ext sword/shield/tunic/boots and with
 // the form's strength override (Goron=3, Zora=1, Deku=0) baked into the save.
 void MmForm_OnDeath(void) {
+    MmForm_CancelNativeMaskCutscene(1);
     MmForm_StopGoronRollSfx();
     // 1. Restore extended equipment from the transform backup. Must run BEFORE
     //    MmForm_Reset (which would otherwise clear the backup unconditionally).
@@ -18961,6 +18977,7 @@ void MmForm_OnDeath(void) {
 }
 
 void MmForm_Reset(void) {
+    MmForm_CancelNativeMaskCutscene(0);
     MmForm_StopGoronRollSfx();
     MmSfx_Stop(MM_NA_SE_PL_ZORA_SWIM_LV - SFX_FLAG);
     MmSfx_Stop(MM_NA_SE_PL_ZORA_SPARK_BARRIER - SFX_FLAG);

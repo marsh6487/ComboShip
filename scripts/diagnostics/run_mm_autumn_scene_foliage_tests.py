@@ -223,6 +223,21 @@ def main():
                  "misc/scene_texture_08/scene_texture_08_Tex_005000", 70, False),
             )
             with zipfile.ZipFile(args.mm) as archive:
+                indexed_ground = {
+                    "Z2_22DEKUCITY/Z2_22DEKUCITY_room_00Tex_0100F0": "Z2_22DEKUCITYTLUT_00D020",
+                    "Z2_DANPEI2TEST/Z2_DANPEI2TEST_room_00Tex_014210": "Z2_DANPEI2TESTTLUT_005A50",
+                    "Z2_DANPEI2TEST/Z2_DANPEI2TEST_room_00Tex_014710": "Z2_DANPEI2TESTTLUT_005A50",
+                    "Z2_DEKUTES/Z2_DEKUTESTex_006490": "Z2_DEKUTESTLUT_008C90",
+                    "Z2_KOEPONARACE/Z2_KOEPONARACETex_005D70": "Z2_KOEPONARACETLUT_00A270",
+                    "Z2_LAST_DEKU/Z2_LAST_DEKU_room_00Tex_00A240": "Z2_LAST_DEKU_room_00TLUT_00DA60",
+                    "Z2_OPENINGDAN/Z2_OPENINGDANTex_009C20": "Z2_OPENINGDANTLUT_00AC60",
+                }
+                for index, (image, palette_name) in enumerate(indexed_ground.items()):
+                    image = 'scenes/nonmq/' + image
+                    palette = image.rsplit('/', 1)[0] + '/' + palette_name
+                    fixtures += ('CheckSpringIndexedGround(' + json.dumps(image) + ', ' + json.dumps(palette) + ', ' +
+                                 texture_fixture(archive, image, f'spring-ground-{index}') + ', ' +
+                                 texture_fixture(archive, palette, f'spring-ground-palette-{index}') + ');\n')
                 vine = "scenes/nonmq/Z2_24KEMONOMITI/Z2_24KEMONOMITITex_005730"
                 vine_palette = "scenes/nonmq/Z2_24KEMONOMITI/Z2_24KEMONOMITITLUT_007950"
                 fixtures += '{\n'

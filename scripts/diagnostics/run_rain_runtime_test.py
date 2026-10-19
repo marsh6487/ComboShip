@@ -21,7 +21,7 @@ for name in ['func_8006FB94','func_800766C4','Environment_UpdateLightningStrike'
 common=['-g','-O1','-ffunction-sections','-fdata-sections','-DLOG_LEVEL_GAME_PRINTS=0',
         '-DCVAR_PREFIX_AUDIO="gAudioEditor"','-DCVAR_PREFIX_SETTING="gSettings"',
         '-Isoh/tests/rain_engine_stubs','-Isoh/include','-Isoh/src','-Isoh/assets','-Isoh',
-        '-Ilibultraship/include','-I'+str(out)]
+        '-Ilibultraship/include','-Icombo','-I'+str(out)]
 objects=[]
 for source in ['soh/tests/rain_engine_test.c','soh/src/overlays/actors/ovl_En_Weather_Tag/z_en_weather_tag.c',
                'soh/src/code/concurrent_weather_audio.c','soh/tests/rain_engine_boundary.cpp',

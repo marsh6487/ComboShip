@@ -95,6 +95,12 @@ u8 FourSword_IsEquipped(void) {
 void* DinFireSword_HandDL(PlayState*, Player*, void*) {
     return nullptr;
 }
+void DinFireSword_SetHandModel(Player*, void*, int) {
+}
+void DinFireSword_CopyHandModel(Player*, void*, void*) {
+}
+void DinFireSword_DrawHand(PlayState*, Player*, void*) {
+}
 
 void* DinFireShield_HandDL(PlayState*, Player*, void*) {
     return nullptr;

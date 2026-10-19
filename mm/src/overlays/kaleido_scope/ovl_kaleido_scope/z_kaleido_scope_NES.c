@@ -5,6 +5,7 @@
  */
 
 #include "z_kaleido_scope.h"
+#include "sword_element_kaleido.h"
 #include "z64map.h"
 #include "z64skybox.h"
 #include "z64view.h"
@@ -3514,6 +3515,8 @@ void KaleidoScope_Update(PlayState* play) {
     s16 stepB;
     s16 stepA;
     s16 stickAdjX = input->rel.stick_x;
+
+    KaleidoEquip_UpdateSwordElement(play);
 
     if (pauseCtx->state != PAUSE_STATE_MAIN || pauseCtx->pageIndex != PAUSE_ITEM ||
         pauseCtx->mainState != PAUSE_MAIN_STATE_IDLE) {

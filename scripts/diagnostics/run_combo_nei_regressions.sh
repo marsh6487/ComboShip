@@ -5,6 +5,20 @@ python3 -B tests/solo_games/run_tests.py
 python3 -B tests/emotes/run_tests.py
 python3 -B tests/emotes/run_native_tests.py
 python3 -B tests/emotes/run_menu_tests.py
+python3 -B scripts/diagnostics/run_native_npc_model_tests.py
+python3 -B scripts/diagnostics/run_forest_actor_tests.py
+python3 -B scripts/diagnostics/run_solo_forest_actors_tests.py
+ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_mm_placed_saria_resources_test.py --sanitize
+python3 -B tests/black_market/run_solo_forest_tests.py
+python3 -B tests/lost_woods_entrance/run_arrival_fade_tests.py
+python3 -B tests/black_market/run_native_tests.py
+python3 -B tests/black_market/run_oot_native_tests.py
+python3 -B tests/black_market/run_shelves_native_tests.py
+python3 -B tests/black_market/run_browsing_native_tests.py
+python3 -B tests/black_market/run_granny_native_tests.py
+python3 -B tests/black_market/run_scene_music_tests.py
+python3 -B tests/black_market/run_music_shuffle_tests.py
+python3 -B scripts/diagnostics/run_din_fire_shield_tests.py
 python3 -B scripts/diagnostics/run_hint_item_name_tests.py
 python3 -B scripts/diagnostics/run_combo_crash_owner_tests.py
 python3 -B tools/nei_gi/test_tunic_clearance.py
@@ -20,6 +34,8 @@ python3 -B scripts/diagnostics/run_mm_item_presentation_tests.py
 python3 -B scripts/diagnostics/run_mm_static_gi_bridge_tests.py --sanitize
 python3 -B scripts/diagnostics/run_tunic_material_tests.py --sanitize
 python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py
+python3 -B tests/item_receipts/run_pickup_catalog_tests.py
+ASAN_OPTIONS=detect_leaks=0 python3 -B tests/item_receipts/run_pickup_catalog_tests.py --sanitize
 python3 -B tests/item_receipts/run_key_receipt_tests.py --sanitizers
 python3 -B tests/cape_choice/run_tests.py
 python3 -B tests/cape_choice/run_tests.py --sanitize
@@ -40,7 +56,9 @@ python3 -B scripts/diagnostics/run_fairy_bottle_tests.py
 python3 -B scripts/diagnostics/run_bottle_polish_tests.py
 python3 -B scripts/diagnostics/run_bottle_contents_tests.py
 python3 -B scripts/diagnostics/run_bottle_gi_tests.py
+python3 -B tools/chateau_romani_3ds/run_tests.py
 python3 -B tests/seasons/run_tests.py
+python3 -B scripts/diagnostics/run_zoras_domain_thaw_tests.py --sanitize
 python3 -B tests/seasons/run_mode_tests.py
 python3 -B tests/seasons/run_oot_mode_tests.py
 python3 -B tests/seasons/run_mode_pool_tests.py
@@ -56,6 +74,7 @@ python3 -B tests/seasons/run_rod_lifecycle_tests.py
 python3 -B tests/seasons/run_oot_shop_tests.py
 python3 -B scripts/diagnostics/run_mm_mask_bridge_tests.py --sanitize
 python3 -B scripts/diagnostics/run_mask_transformation_tests.py
+python3 -B scripts/diagnostics/run_oot_native_transformation_tests.py
 python3 -B scripts/diagnostics/run_mask_progression_tests.py
 python3 -B scripts/diagnostics/run_gerudo_mask_tests.py
 python3 -B tests/great_fairy_facial/run_tests.py
@@ -130,3 +149,4 @@ python3 -B tests/build_inputs/run_mod_discovery_tests.py
 python3 -B tests/lost_woods_entrance/run_tests.py
 python3 -B tests/cross_dungeon/run_tests.py
 python3 -B tests/farores_wind/run_tests.py
+bash scripts/diagnostics/run_elemental_sword_regressions.sh

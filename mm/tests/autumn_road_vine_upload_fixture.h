@@ -1,5 +1,5 @@
 // Execute the production native load-block and raw-image upload paths. GPU
-// submission records bytes; native CI8 GBI format/stride remains unchanged.
+// submission records bytes; native CI4/CI8 GBI format/stride remains unchanged.
 namespace RoadVineUploadFixture {
 struct Metadata {
     unsigned width = 0, height = 0;
@@ -63,6 +63,26 @@ using RawTexMetadata = Metadata;
 #define SUPPORT_CHECK(condition) assert(condition)
 #include "autumn_road_vine_upload_production.inc"
 #undef SUPPORT_CHECK
+
+static void CheckIndexedGroundUpload(const std::shared_ptr<Fast::Texture>& image, bool ci4) {
+    Interpreter renderer;
+    const unsigned rowBytes = image->Width / (ci4 ? 2 : 1);
+    const unsigned renderLine = ((rowBytes + 7) / 8) * 8;
+    const unsigned loadPixels = image->Width * image->Height / (ci4 ? 4 : 2) - 1;
+    renderer.state.texture_to_load = { image->ImageData,
+                                       G_IM_SIZ_16b,
+                                       1,
+                                       image->Flags,
+                                       { image->Width, image->Height, image->HByteScale, image->VPixelScale,
+                                         image->Type, image } };
+    renderer.state.texture_tile[0].line_size_bytes = renderLine;
+    renderer.state.texture_tile[0].siz = ci4 ? G_IM_SIZ_4b : G_IM_SIZ_8b;
+    renderer.GfxDpLoadBlock(7, 0, 0, loadPixels, 0);
+    renderer.ImportTextureRaw(0, false);
+    assert(renderer.uploadedWidth == image->Width && renderer.uploadedHeight == image->Height);
+    assert(renderer.uploaded.size() == image->ImageDataSize &&
+           std::equal(renderer.uploaded.begin(), renderer.uploaded.end(), image->ImageData));
+}
 
 static void CheckUpload(const std::shared_ptr<Fast::Texture>& image, const std::vector<Gfx>& native) {
     Interpreter renderer;

@@ -5,6 +5,7 @@
  */
 
 #include "z_en_rr.h"
+#include "din_fire_sword.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "z64rumble.h"
 #include "overlays/actors/ovl_En_Clear_Tag/z_en_clear_tag.h"
@@ -460,7 +461,7 @@ s32 func_808FAA94(EnRr* this, PlayState* play) {
         this->collider2.base.acFlags &= ~AC_HIT;
 
         if ((this->drawDmgEffType == ACTOR_DRAW_DMGEFF_FROZEN_NO_SFX) &&
-            (sp2C->elem.acHitElem->atDmgInfo.dmgFlags & 0xDB0B3)) {
+            (DinFireSword_OriginalDamageFlags(play, sp2C->elem.acHitElem) & 0xDB0B3)) {
             return false;
         }
 

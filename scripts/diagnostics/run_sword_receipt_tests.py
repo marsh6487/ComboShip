@@ -10,6 +10,8 @@ import re
 import subprocess
 import sys
 import tempfile
+import json
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from run_mm_scene_randomization_tests import function
 
@@ -52,12 +54,13 @@ if 'struct GiFitResourceLoader' in resources:
     start=resources.index('struct GiFitResourceLoader')
     resource_fit=resources[start:resources.index('inline bool GetGiModelsFit',start)]+resource_fit
 source = source.replace('/* RESOURCE_FIT */', 'namespace NeiAssetPriority {\n'+resource_fit+'\n}\n')
-source = source.replace('/* RESOURCE_API */', function(bridge,'ResourceMgr_GetGiModelsFitForGame'))
+source = source.replace('/* RESOURCE_API */', function(bridge,'ResourceMgr_GetGiModelsFitForGame')+'\n'+
+                        function(bridge,'ResourceMgr_GetGiModelBoundsForGame'))
 companion_fit = ''
 if 'class OotGiResourceLoader' in companion:
     begin=companion.index('class OotGiResourceLoader')
     end=companion.index('extern "C" int MmAssets_GetOotGiModelFit',begin)
-    companion_fit=companion[begin:end]+function(companion,'MmAssets_GetOotGiModelFit')
+    companion_fit=companion[begin:end]+function(companion,'MmAssets_GetOotGiModelFit')+'\n'+function(companion,'MmAssets_GetOotGiModelBounds')
 source = source.replace('/* COMPANION_FIT */',companion_fit)
 source = source.replace('/* PRODUCTION */', production)
 oot_production = '\n'.join(function(oot_draw, name) for name in [
@@ -76,6 +79,56 @@ sages_boundary = sages_declaration + '\n' + function(renderer, 'NeiGi_DrawSagesT
     '{ assert(false && "sword receipt must not enter Sage medallion fountain"); }'
 oot_production = elemental_boundaries + '\n' + sages_boundary + '\n' + oot_production
 source = source.replace('/* OOT_PRODUCTION */', oot_production)
+
+# The real source XML graph and vertices must succeed through the production
+# query, including all child calls; reject unknown control/geometry commands.
+def spell_bounds_checks():
+    base = 'objects/object_nei_magic_spell/'
+    assets = ROOT / 'mm/assets/custom'
+    visited, definitions, points = set(), [], {}
+    material = {'PipeSync', 'SetRenderMode', 'SetCombineLERP', 'SetPrimColor', 'SetEnvColor',
+                'SetTextureLUT', 'Texture', 'LoadTextureBlock', 'ClearGeometryMode', 'SetGeometryMode',
+                'TileSync', 'SetTextureImage', 'SetTile', 'LoadSync', 'LoadBlock', 'SetTileSize',
+                'Triangle1', 'Triangles2', 'EndDisplayList'}
+    def visit(path):
+        if path in visited: return
+        visited.add(path)
+        data = (assets / path).read_bytes()
+        assert data == (ROOT / 'soh/assets/custom' / path).read_bytes(), path
+        tree = ET.fromstring(data)
+        if tree.tag == 'Vertex':
+            coords = [tuple(int(v.attrib[axis]) for axis in ('X', 'Y', 'Z')) for v in tree]
+            points[path] = coords
+            definitions.append('Vertex('+json.dumps(path)+','+str(1000+len(definitions))+',{' +
+                               ','.join('{'+','.join(map(str,p))+'}' for p in coords)+'});')
+            return
+        assert tree.tag == 'DisplayList', path
+        commands=[]
+        for node in tree:
+            if node.tag == 'CallDisplayList':
+                child=node.attrib['Path'];visit(child)
+                commands.append('{uintptr_t(G_DL_OTR_FILEPATH)<<24,uintptr_t('+json.dumps('__OTR__'+child)+')}')
+            elif node.tag == 'LoadVertices':
+                child=node.attrib['Path'];visit(child)
+                count=int(node.attrib['Count']);offset=int(node.attrib.get('VertexOffset','0'))
+                commands += ['{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t('+json.dumps('__OTR__'+child)+')}',
+                             '{'+str(count)+','+str(offset)+'}']
+            else:
+                assert node.tag in material, (path, node.tag)
+        commands.append('{uintptr_t(G_ENDDL)<<24,0}')
+        definitions.append('List('+json.dumps(path)+','+str(1000+len(definitions))+',{' +','.join(commands)+'});')
+    roots=[base+name for name in ('gHyliaGraceGiveDL','gZonaiPermafrostGiveDL','gDemiseDestructionGiveDL')]
+    for root in roots: visit(root)
+    all_points=[p for resource in points.values() for p in resource]
+    low=[min(p[a] for p in all_points) for a in range(3)]
+    high=[max(p[a] for p in all_points) for a in range(3)]
+    for root in roots:
+        definitions.append('{ const char* root='+json.dumps('__OTR__'+root)+'; float low[3]{},high[3]{};'
+                           'assert(ResourceMgr_GetGiModelBoundsForGame("mm",&root,1,low,high));'+
+                           ''.join('assert(low['+str(a)+']=='+str(low[a])+'&&high['+str(a)+']=='+str(high[a])+');' for a in range(3))+'}')
+    definitions.append('std::cout<<"PASS actual spell XML bounds: Hylia, Zonai, Demise child lists and exact vertex XYZ\\n";')
+    return '\n'.join(definitions)
+source = source.replace('/* REAL_SPELL_BOUNDS */', spell_bounds_checks())
 flags = ['-std=c++20', '-DF3DEX_GBI_2', '-DCOMBO_BUILD', '-I'+str(ROOT), '-I'+str(ROOT/'combo/menu'),
          '-I'+str(ROOT/'libultraship/include')]
 if '--sanitize' in sys.argv:

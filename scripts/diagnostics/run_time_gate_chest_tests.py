@@ -62,7 +62,7 @@ def main():
         registration = first_call(messages["RegisterItemMessages"], "COND_ID_HOOK")
         (build / "time_gate_message_production.inc").write_text(
             message_body + "\nvoid Fixture_RegisterItemMessage() {\n" + registration + "\n}\n")
-        includes = ["-Isoh/include", "-Isoh/src", "-Isoh/assets", "-Isoh", "-Ilibultraship/include", "-I" + str(build)]
+        includes = ["-Isoh/include", "-Isoh/src", "-Isoh/assets", "-Isoh", "-Ilibultraship/include", "-Icombo/menu", "-I" + str(build)]
         common = ["-O1", "-g", "-ffunction-sections", "-fdata-sections", "-DLOG_LEVEL_GAME_PRINTS=0",
                   '-DCVAR_PREFIX_ENHANCEMENT="gEnhancements"', '-DCVAR_PREFIX_CHEAT="gCheats"',
                   *includes, "-Wl,--gc-sections"]

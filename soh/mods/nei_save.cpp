@@ -367,6 +367,9 @@ void NeiSave_Save(const SaveContext& saveContext, int sectionID, bool fullSave) 
     SaveManager::Instance->SaveData("slateMode", gNeiSave.slateMode);
     SaveManager::Instance->SaveData("slateRunesOwned", gNeiSave.slateRunesOwned);
     SaveManager::Instance->SaveData("ritoMaskFlags", gNeiSave.ritoMaskFlags);
+    SaveManager::Instance->SaveArray("swordElements", 8,
+                                     [](size_t i) { SaveManager::Instance->SaveData("", gNeiSave.swordElements[i]); });
+    SaveManager::Instance->SaveData("swordElementSet", gNeiSave.swordElementSet);
     TradeItems_SyncWrite(); // standalone legacy bridge; ComboShip uses the combined save + FleetSync
 }
 
@@ -488,6 +491,25 @@ void NeiSave_Load() {
     SaveManager::Instance->LoadData("slateMode", gNeiSave.slateMode, (uint8_t)0);
     SaveManager::Instance->LoadData("slateRunesOwned", gNeiSave.slateRunesOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("ritoMaskFlags", gNeiSave.ritoMaskFlags, (uint8_t)0);
+    // Read as JSON before narrowing: malformed values and out-of-range enums must
+    // not wrap into another valid element. Missing/short old arrays retain zeroes.
+    nlohmann::json swordElements;
+    SaveManager::Instance->LoadData("swordElements", swordElements, nlohmann::json::array());
+    if (swordElements.is_array()) {
+        for (size_t i = 0; i < 8 && i < swordElements.size(); ++i) {
+            const auto& value = swordElements[i];
+            if (value.is_number_integer() && (value.is_number_unsigned() || value.get<int64_t>() >= 0) &&
+                value.get<uint64_t>() < 4) {
+                gNeiSave.swordElements[i] = value.get<uint8_t>();
+            }
+        }
+    }
+    nlohmann::json swordElementSet;
+    SaveManager::Instance->LoadData("swordElementSet", swordElementSet, nlohmann::json(0));
+    if (swordElementSet.is_number_integer() &&
+        (swordElementSet.is_number_unsigned() || swordElementSet.get<int64_t>() >= 0)) {
+        gNeiSave.swordElementSet = (uint8_t)(swordElementSet.get<uint64_t>() & 0xFFu);
+    }
     // Cross-game: a pictograph synced from 2Ship (shared sidecar) wins over the SOH save copy.
     Picto_SyncRead();
     TradeItems_SyncRead(); // standalone legacy bridge; never overrides a ComboShip playthrough

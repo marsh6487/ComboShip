@@ -8,6 +8,7 @@
  */
 
 #include "global.h"
+#include "sword_element_message.h"
 #include <libultraship/log/luslog.h> // 2S2H [Port] lusprintf (LUS 464 exports it via API_EXPORT)
 #include "z64horse.h"
 #include "z64malloc.h"
@@ -15404,8 +15405,10 @@ s32 func_808482E0(PlayState* play, Player* this) {
         GetItemEntry* giEntry = &sGetItemTable[this->getItemId - 1];
 
         this->av1.actionVar1 = 1;
+        const u8 swordElementTutorial = SwordElement_MessageElementForPickup(giEntry->itemId);
         Message_StartTextbox(play, giEntry->textId, &this->actor);
         Item_Give(play, giEntry->itemId);
+        SwordElement_MessageAppend(play, swordElementTutorial);
 
         if ((this->getItemId >= GI_MASK_DEKU) && (this->getItemId <= GI_MASK_KAFEIS_MASK)) {
             Audio_PlayFanfare(NA_BGM_GET_NEW_MASK);

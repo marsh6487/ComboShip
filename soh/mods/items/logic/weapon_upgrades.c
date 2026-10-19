@@ -12,6 +12,7 @@
 #include "../../nei_save.h" // Skijer's NEI
 #include "../../extended_equipment.h"
 #include "../../../../combo/NeiHeldSword.h"
+#include "din_fire_sword.h"
 
 u8 WeaponUpgrade_HasHammerAxe(void) {
     return (Nei_Save()->weaponUpgrades & WEAPON_UPGRADE_HAMMER_AXE) != 0;
@@ -168,6 +169,7 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     void* blade = NULL;
     void* handle = NULL;
     int model = -1;
+    int auraModel = -1;
     if (player->heldItemAction == PLAYER_IA_SWORD_KOKIRI) {
         model = WeaponUpgrade_KokiriLevel() == 0 ? NEI_HELD_SWORD_KOKIRI
                 : WeaponUpgrade_HasGilded() && CVarGetInteger("gEnhancements.SkijerNEI.GildedUsesGildedLook", 1)
@@ -189,6 +191,8 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     // Sword has its own authored model and legacy override pair, even on a skin.
     if (!fourEquipped && NeiHeldSword_EquipmentSelected(model, gSaveContext.linkAge))
         return 0;
+    if (!fourEquipped && model >= 0 && model < NEI_HELD_SWORD_FOUR)
+        auraModel = model;
 
     // Four Sword first: it replaces whichever sword is in hand while equipped, so it outranks the
     // per-sword upgrade blades below. Its DLs come from soh.o2r (converted out of the old pak), not
@@ -202,6 +206,7 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
         // The complete reviewed blade and hilt share one unchanged GI resource.
     } else if (player->heldItemAction == PLAYER_IA_SWORD_KOKIRI && WeaponUpgrade_KokiriLevel() >= 1) {
         u8 gilded = WeaponUpgrade_HasGilded() && CVarGetInteger("gEnhancements.SkijerNEI.GildedUsesGildedLook", 1);
+        auraModel = gilded ? SWORD_AURA_NATIVE_MM_GILDED : SWORD_AURA_NATIVE_MM_RAZOR;
         if (gilded) {
             if (!sGildedTried) {
                 sGildedTried = 1;
@@ -221,6 +226,7 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
         }
     } else if (player->heldItemAction == PLAYER_IA_SWORD_BIGGORON && WeaponUpgrade_HasGreatFairy() &&
                CVarGetInteger("gEnhancements.SkijerNEI.BgsUsesGfsLook", 1)) {
+        auraModel = SWORD_AURA_NATIVE_MM_FAIRY;
         if (!sGfsTried) {
             sGfsTried = 1;
             sGfs = MmAssets_LoadResource("__OTR__objects/object_link_child/gLinkHumanGreatFairysSwordDL");
@@ -254,6 +260,7 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* ootHand, Player* player, u8
     gSPLoadGeometryMode(d++, G_ZBUFFER | G_SHADE | G_CULL_BACK | G_LIGHTING | G_SHADING_SMOOTH);
     gSPEndDisplayList(d);
     *dList = sCompound;
+    DinFireSword_SetHandModel(player, sCompound, auraModel);
     return 1;
 }
 

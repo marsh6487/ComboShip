@@ -23,6 +23,8 @@
  */
 
 #include "z_kaleido_scope.h"
+#include "sword_element.h"
+#include "sword_element_kaleido.h"
 #include "interface/parameter_static/parameter_static.h"
 #include "archives/icon_item_static/icon_item_static_yar.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -615,6 +617,111 @@ static void KaleidoEquip_EquipCell(PlayState* play, s16 row, s16 col) {
     Audio_PlaySfx(NA_SE_SY_DECIDE);
 }
 
+static SwordElementMenu sSwordElementMenu;
+static s16 sSwordElementPage;
+static s16 sSwordElementRow;
+static s16 sSwordElementCol;
+
+static u8 KaleidoEquip_ElementUsable(EquipCell* cell) {
+    u8 owned;
+    if (sEquipSubPage == EQUIP_SUBPAGE_TRANSFORM || sEquipCursorY != EQUIP_TYPE_SWORD || sEquipCursorX < 1 ||
+        sEquipCursorX > 3) {
+        return false;
+    }
+    /* Standalone's native free-equipment display policy is not acquisition. Enchant only
+     * saved-owned sword lines; ordinary A still uses the untouched legacy equip policy. */
+    switch (cell->equipType) {
+        case CELL_SWORD:
+            owned = Nei_Save()->comboObtainedFc[FCI_KOKIRI_SWORD] != 0 || WeaponUpgrade_KokiriLevel() > 0 ||
+                    (ExtEquip_GetCurrent(EQUIP_TYPE_SWORD) == 0 &&
+                     GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) >= EQUIP_VALUE_SWORD_KOKIRI &&
+                     GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) <= EQUIP_VALUE_SWORD_GILDED &&
+                     BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_B) ==
+                         ITEM_SWORD_KOKIRI + GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) - EQUIP_VALUE_SWORD_KOKIRI);
+            break;
+        case CELL_SWORD_MASTER:
+            owned = Nei_Save()->comboObtained[FC_OOT_SWORD_MASTER] != 0;
+            break;
+        case CELL_SWORD_BGS:
+            owned = Nei_Save()->comboObtained[FC_OOT_SWORD_BIGGORON] != 0 || WeaponUpgrade_HasGreatFairy();
+            break;
+        default:
+            owned = KaleidoEquip_CellOwned(cell);
+            break;
+    }
+    return owned && (cell->equipType < 0 || ExtEquip_CheckAgeReq(cell->equipType, cell->index));
+}
+
+static u8 KaleidoEquip_OpenSwordElement(PlayState* play) {
+    PauseContext* pauseCtx = &play->pauseCtx;
+    EquipCell cell;
+    s16 vtxIndex = EQUIP_CELL(sEquipCursorY, sEquipCursorX) * 4;
+    KaleidoEquip_GetCell(sEquipSubPage, sEquipCursorY, sEquipCursorX, &cell);
+    if (!SwordElementKaleido_Open(&sSwordElementMenu, cell.item, KaleidoEquip_ElementUsable(&cell),
+                                  pauseCtx->maskVtx[vtxIndex].v.ob[0] * 10, pauseCtx->maskVtx[vtxIndex].v.ob[1] * 10)) {
+        return false;
+    }
+    sSwordElementPage = sEquipSubPage;
+    sSwordElementRow = sEquipCursorY;
+    sSwordElementCol = sEquipCursorX;
+    Audio_PlaySfx(NA_SE_SY_DECIDE);
+    return true;
+}
+
+void KaleidoEquip_UpdateSwordElement(PlayState* play) {
+    PauseContext* pauseCtx = &play->pauseCtx;
+    Input* input = CONTROLLER1(&play->state);
+    EquipCell cell;
+    s8 direction = 0;
+    u8 events;
+    u8 element;
+    if (!sSwordElementMenu.phase) {
+        return;
+    }
+    KaleidoEquip_GetCell(sEquipSubPage, sEquipCursorY, sEquipCursorX, &cell);
+    /* Keep native shoulders / Start available and reset on every departure from this menu. */
+    if (pauseCtx->state != PAUSE_STATE_MAIN || pauseCtx->mainState != PAUSE_MAIN_STATE_IDLE ||
+        pauseCtx->pageIndex != PAUSE_MASK || pauseCtx->itemDescriptionOn || pauseCtx->cursorSpecialPos ||
+        sEquipSubPage != sSwordElementPage || sEquipCursorY != sSwordElementRow || sEquipCursorX != sSwordElementCol ||
+        cell.item != sSwordElementMenu.item || !KaleidoEquip_ElementUsable(&cell) ||
+        CHECK_BTN_ANY(input->press.button, BTN_START | BTN_L | BTN_R | BTN_Z)) {
+        SwordElementKaleido_Reset(&sSwordElementMenu);
+        return;
+    }
+    if (input->rel.stick_x < -30 || input->rel.stick_y > 30 ||
+        CHECK_BTN_ANY(input->press.button, BTN_DLEFT | BTN_DUP)) {
+        direction = -1;
+    } else if (input->rel.stick_x > 30 || input->rel.stick_y < -30 ||
+               CHECK_BTN_ANY(input->press.button, BTN_DRIGHT | BTN_DDOWN)) {
+        direction = 1;
+    }
+    element = sSwordElementMenu.selection;
+    events = SwordElementKaleido_Update(&sSwordElementMenu, true, direction, CHECK_BTN_ALL(input->press.button, BTN_A),
+                                        CHECK_BTN_ALL(input->press.button, BTN_B));
+    if (events & SWORD_ELEMENT_MENU_EVENT_ARROW) {
+        element = sSwordElementMenu.selection;
+    }
+    if (events & SWORD_ELEMENT_MENU_EVENT_APPLY) {
+        KaleidoEquip_EquipCell(play, sSwordElementRow, sSwordElementCol);
+    }
+    if (events & SWORD_ELEMENT_MENU_EVENT_CURSOR) {
+        Audio_PlaySfx(NA_SE_SY_CURSOR);
+    }
+    if (events & (SWORD_ELEMENT_MENU_EVENT_ERROR | SWORD_ELEMENT_MENU_EVENT_CANCEL | SWORD_ELEMENT_MENU_EVENT_ARROW |
+                  SWORD_ELEMENT_MENU_EVENT_FUSE)) {
+        u16 sfx = (events & SWORD_ELEMENT_MENU_EVENT_ERROR)    ? NA_SE_SY_ERROR
+                  : (events & SWORD_ELEMENT_MENU_EVENT_CANCEL) ? NA_SE_SY_CANCEL
+                  : (events & SWORD_ELEMENT_MENU_EVENT_ARROW)  ? NA_SE_SY_SET_FIRE_ARROW + element - SWORD_ELEMENT_FIRE
+                                                               : NA_SE_SY_SYNTH_MAGIC_ARROW;
+        Audio_PlaySfx(sfx);
+    }
+    input->press.button &=
+        ~(BTN_A | BTN_B | BTN_CUP | BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT | BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT);
+    input->cur.button &= ~(BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT);
+    input->rel.stick_x = input->rel.stick_y = 0;
+    pauseCtx->stickAdjX = pauseCtx->stickAdjY = 0;
+}
+
 // Ext page: C-left/down/right assigns the ext item to that C button for gameplay
 // toggling (SoH's extended-page C-assign, on MM's button tables).
 static void KaleidoEquip_AssignCButton(PlayState* play, s16 row, s16 col, u16 pressed) {
@@ -698,7 +805,7 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
 
     pauseCtx->cursorColorSet = PAUSE_CURSOR_COLOR_SET_WHITE;
 
-    if (pauseCtx->pageIndex != PAUSE_MASK || pauseCtx->itemDescriptionOn) {
+    if (pauseCtx->pageIndex != PAUSE_MASK || pauseCtx->itemDescriptionOn || sSwordElementMenu.phase) {
         return;
     }
 
@@ -887,7 +994,9 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play) {
                     Audio_PlaySfx(NA_SE_SY_ERROR);
                 }
             } else {
-                KaleidoEquip_EquipCell(play, sEquipCursorY, sEquipCursorX);
+                if (!KaleidoEquip_OpenSwordElement(play)) {
+                    KaleidoEquip_EquipCell(play, sEquipCursorY, sEquipCursorX);
+                }
             }
         } else if ((sEquipSubPage == EQUIP_SUBPAGE_EXT) && (sEquipCursorX != 0) &&
                    (sEquipCursorY != EQUIP_EXT_ROW_BOOTS) &&
@@ -1243,6 +1352,15 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
 
     // Composite the Link doll framebuffer on the left (OoT layout).
     KaleidoEquip_DrawDollImage(play);
+    if (pauseCtx->pageIndex == PAUSE_MASK && sSwordElementMenu.phase) {
+        void* swordIcon;
+        KaleidoEquip_GetCell(sSwordElementPage, sSwordElementRow, sSwordElementCol, &cell);
+        swordIcon = KaleidoEquip_OotTex(cell.ootIcon);
+        if (swordIcon == NULL) {
+            swordIcon = ExtInv_GetItemIcon(cell.item);
+        }
+        SwordElementKaleido_Draw(play, &sSwordElementMenu, swordIcon);
+    }
 
     CLOSE_DISPS(play->state.gfxCtx);
 

@@ -160,8 +160,8 @@ static void Strike(int weapon, int strong) {
     func_8083375C(&player, strong ? PLAYER_MWA_JUMPSLASH_START : PLAYER_MWA_FORWARD_SLASH_1H);
 }
 
-static void RequireHit(s16 actorId, DamageTable* table, ColliderElement* attack, u32 receiverFlags, int damage,
-                       int effect) {
+static Actor RequireHit(s16 actorId, DamageTable* table, ColliderElement* attack, u32 receiverFlags, int damage,
+                        int effect) {
     Actor target = { 0 };
     Collider receiver = { 0 };
     ColliderElement element = { 0 };
@@ -182,6 +182,7 @@ static void RequireHit(s16 actorId, DamageTable* table, ColliderElement* attack,
     }
     REQUIRE(target.colChkInfo.damage == damage);
     REQUIRE(target.colChkInfo.damageEffect == effect);
+    return target;
 }
 
 static void NativeDamageAndReactions(void) {
@@ -521,6 +522,7 @@ static void NativeSoulAdmission(void) {
     Test_SetSoulState(0, 0);
 }
 
+#ifndef ELEMENTAL_SWORD_DAMAGE_FIXTURE
 int main(void) {
     NativeSoulAdmission();
     puts("PASS MM Din: native soul hook gates Chuchu/Deku Baba, permits Kusa/Grass, both fire checkboxes off/on");
@@ -541,3 +543,4 @@ int main(void) {
          "fallback");
     return 0;
 }
+#endif

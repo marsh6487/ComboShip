@@ -23,6 +23,7 @@
 #include "mods/extended_inventory.h"
 #include "mods/items/helpers/equip_helper.h"
 #include "soh/Enhancements/audio/SeasonWeather.h"
+#include "soh/Enhancements/Graphics/ZorasDomain.h"
 // box_menu.c is unity-included just before this file in custom_items.c, so its BoxMenu_*
 // declarations are already in scope — it has no header (see the note at its top).
 
@@ -47,6 +48,9 @@ u8 Seasons_IsDrawn(void) {
 // Its own conditions keep the water swimmable underneath: the pin only takes while Link is NOT
 // already in the water and is not moving up.
 u8 Seasons_WalksOnWater(void) {
+    if (ZorasDomain_IsAlwaysThawed(gPlayState)) {
+        return false;
+    }
     return (Seasons_SeasonCount() != 0) && (Seasons_GetSeason() == SEASON_WINTER);
 }
 

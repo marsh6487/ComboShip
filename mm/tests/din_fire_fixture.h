@@ -13,6 +13,7 @@
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "test_require.h"
 #include <string.h>
+#include "../../tests/fixtures/din_shield_vertices.h"
 
 static GraphicsContext gfx;
 static PlayState play;
@@ -31,8 +32,26 @@ static u16 lastSound;
 static const char* missing;
 static const char* lastCorePath;
 static Actor* soundActor;
+// Isolate the selection-state boundary; core tests cover its inventory gates.
+static int elementalSelection = -1;
+static u8 elementalActive;
+static u8 elementalAvailable = 1;
+static int auraTrueMaster, resourceQueries;
 SaveContext gSaveContext;
 PlayState* gPlayState = &play;
+
+uint8_t SwordElement_Get(uint16_t item) {
+    return elementalSelection < 0 ? 0 : elementalSelection;
+}
+uint8_t SwordElement_HasSelection(uint16_t item) {
+    return elementalSelection >= 0;
+}
+uint8_t SwordElement_Active(PlayState* state, Player* owner) {
+    return elementalActive;
+}
+uint8_t SwordElement_IsAvailable(uint8_t element) {
+    return elementalAvailable;
+}
 
 int32_t CVarGetInteger(const char* key, int32_t fallback) {
     int value = -1;
@@ -57,9 +76,11 @@ bool ResourceMgr_IsAltAssetsEnabled(void) {
     return alt;
 }
 uint8_t ResourceMgr_FileExists(const char* path) {
+    ++resourceQueries;
     return assets && !(missing && strstr(path, missing));
 }
 Gfx* ResourceMgr_LoadGfxByName(const char* path) {
+    ++resourceQueries;
     if (!ResourceMgr_FileExists(path) || loadFailure)
         return NULL;
     if (strstr(path, "CoreDL")) {
@@ -80,7 +101,15 @@ Gfx* ResourceMgr_LoadGfxByName(const char* path) {
     return NULL;
 }
 void* ResourceGetDataByName(const char* path) {
+    ++resourceQueries;
+    if (!loadFailure && ResourceMgr_FileExists(path) && strstr(path, "/SurfaceVertices"))
+        return shieldSurfaceVertices;
+    if (!loadFailure && ResourceMgr_FileExists(path) && strstr(path, "/RimVertices"))
+        return shieldRimVertices;
     return loadFailure || !ResourceMgr_FileExists(path) ? NULL : pixels;
+}
+size_t ResourceGetSizeByName(const char* path) {
+    return strstr(path, "/RimVertices") ? sizeof(shieldRimVertices) : sizeof(shieldSurfaceVertices);
 }
 NeiSaveData* Nei_Save(void) {
     return &nei;
@@ -91,6 +120,9 @@ s32 CustomForms_ActiveForm(void) {
     return customForm;
 }
 s32 AdultLink_IsActive(void) {
+    return adult;
+}
+s32 AdultLink_UsesAdultPresentation(const Player* owner) {
     return adult;
 }
 u8 ExtEquip_ShouldHideSwordDL(void) {
@@ -113,6 +145,9 @@ u8 WeaponUpgrade_KokiriLevel(void) {
 }
 u8 WeaponUpgrade_HasGreatFairy(void) {
     return fairyUpgrade;
+}
+u8 WeaponUpgrade_HasTrueMaster(void) {
+    return auraTrueMaster;
 }
 u8 WeaponUpgrade_HasHammerAxe(void) {
     return 0;
@@ -161,15 +196,27 @@ void Matrix_Pop(void) {
 }
 void Matrix_Translate(f32 x, f32 y, f32 z, MatrixMode mode) {
     (void)mode;
-    currentMatrix.xw += x;
-    currentMatrix.yw += y;
-    currentMatrix.zw += z;
+    currentMatrix.xw += currentMatrix.xx * x + currentMatrix.xy * y + currentMatrix.xz * z;
+    currentMatrix.yw += currentMatrix.yx * x + currentMatrix.yy * y + currentMatrix.yz * z;
+    currentMatrix.zw += currentMatrix.zx * x + currentMatrix.zy * y + currentMatrix.zz * z;
 }
 void Matrix_Scale(f32 x, f32 y, f32 z, MatrixMode mode) {
     (void)mode;
     currentMatrix.xx *= x;
+    currentMatrix.yx *= x;
+    currentMatrix.zx *= x;
+    currentMatrix.xy *= y;
     currentMatrix.yy *= y;
+    currentMatrix.zy *= y;
+    currentMatrix.xz *= z;
+    currentMatrix.yz *= z;
     currentMatrix.zz *= z;
+}
+void Matrix_Get(MtxF* dest) {
+    *dest = currentMatrix;
+}
+void Matrix_Put(MtxF* src) {
+    currentMatrix = *src;
 }
 Mtx* Matrix_Finalize(GraphicsContext* context) {
     (void)context;
@@ -211,6 +258,10 @@ static void Setup(void) {
     alt = assets = 1;
     loadFailure = adult = hideSword = hideShield = bossOwner = kokiriUpgrade = fairyUpgrade = 0;
     fourSwordOwner = 0;
+    elementalSelection = -1;
+    elementalActive = 0;
+    elementalAvailable = 1;
+    auraTrueMaster = resourceQueries = 0;
     customForm = CUSTOM_FORM_NONE;
     customColors = audioRequests = 0;
     soundActor = NULL;

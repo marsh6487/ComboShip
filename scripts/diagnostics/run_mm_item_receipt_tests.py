@@ -68,13 +68,17 @@ struct { struct { struct { struct { int foundTriforcePieces=0; } rando; } shipSa
 int gMMComboGoalRequired=0;
 int (*gMMComboOtherTriforceCount)()=nullptr;
 int CVarGetInteger(const char*,int fallback) { return fallback; }
+// This legacy receipt fixture has every enhancement off. The elemental-arrow
+// suite exercises these pickup adapters with real game headers and inventories.
+uint8_t SwordElement_MessageElementForPickup(int) { return 0; }
+void SwordElement_MessageAppend(PlayState*,uint8_t) {}
 int granted=0,delivered=0;
 bool showCutscene=true;
 bool donorAvailable=true;
 const char* latchedName="Deku Leaf";
 bool queued=true;
 namespace CustomMessage {
-struct Entry { uint8_t textboxType=0,textboxYPos=0,icon=0xFE; uint16_t nextMessageID=0xFFFF,firstItemCost=0xFFFF,secondItemCost=0xFFFF; bool autoFormat=true; std::string msg; bool capeVisibilityChoice=false; };
+struct Entry { uint8_t textboxType=0,textboxYPos=0,icon=0xFE; uint16_t nextMessageID=0xFFFF,firstItemCost=0xFFFF,secondItemCost=0xFFFF; bool autoFormat=true; std::string msg; bool capeVisibilityChoice=false; uint8_t swordElementTutorial=0; };
 Entry shown;
 int shownCount=0;
 void SetActiveCustomMessage(std::string msg,Entry e) { e.msg=msg;shown=e;++shownCount; }
@@ -92,7 +96,7 @@ void SaveManager_SaveCurrentForCombo() {}
 namespace Rando {
 void AppendReceiptSource(CustomMessage::Entry&,const std::string&);
 namespace StaticData {
-struct Item {RandoItemType randoItemType=RITYPE_MAJOR;};
+struct Item {RandoItemType randoItemType=RITYPE_MAJOR; int itemId=0;};
 std::map<RandoItemId,Item> Items;
 std::string GetItemName(RandoItemId id,bool=true,RandoCheckId=RC_UNKNOWN) {return id==RI_OOT_EXT_MAGIC_CAPE ? "the Magic Cape" : "the Deku Leaf";}
 uint8_t GetIconForZMessage(RandoItemId) {return 0xF5;}

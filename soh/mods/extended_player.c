@@ -628,9 +628,9 @@ static const NeiItem sNeiItems[] = {
       "You got %yDon Gero's Mask%w!&The conductor's mask of the&frog choir.^Equip from the mask page.&Approach the "
       "%glog at Zora's River%w&and press %y\xA0%w to %ccollect every&unclaimed Frog Song reward%w at once.^Frog flags "
       "0-4 = purple rupee&each, flags 5-6 = heart piece.",
-      "Vous obtenez le %yMasque de Don Gero%w!&Le masque du chef d'orchestre&du chœur des grenouilles.^Équipez depuis "
+      "Vous obtenez le %yMasque de Don Gero%w!&Le masque du chef d'orchestre&du choeur des grenouilles.^Équipez depuis "
       "la page des masques.&Approchez la %gbûche à la Rivière Zora%w&et appuyez sur %y\xA0%w pour %crécupérer&toutes "
-      "les récompenses non-réclamées%w.^Drapeaux 0-4 = rubis violet chacun,&drapeaux 5-6 = pièce de cœur.",
+      "les récompenses non-réclamées%w.^Drapeaux 0-4 = rubis violet chacun,&drapeaux 5-6 = pièce de coeur.",
       "Du hast %yDon Geros Maske%w!&Die Dirigentenmaske des&Froschchors.^Aufsetzen auf der Maskenseite.&Geh zum "
       "%gBaumstamm an Zoras Fluss%w&und drücke %y\xA0%w um %calle ungeholten&Froschlied-Belohnungen%w zu "
       "sammeln.^Flags 0-4 = je lila Rupie,&Flags 5-6 = Herzteil." },
@@ -682,7 +682,7 @@ static const NeiItem sNeiItems[] = {
       "Vous obtenez le %yMasque du Chef de Cirque%w!&Porté, vous devenez le %cCollecteur&d'Impôts%w de Ganondorf. Les "
       "PNJ&se soumettent à votre vue.^Parler à un PNJ de mini-jeu et le&%cmini-jeu entier est sauté%w -&sa récompense "
       "est donnée directement:^%gStand de Tir%w (sac à billes/carquois),&%gBombchu Bowling%w (sac de bombes -> "
-      "cœur),&%gIngo%w (Épona + transition Plaine d'Hyrule),&%gTalon%w (Bouteille de Lait, Lon Lon enfant),&%gMalon "
+      "coeur),&%gIngo%w (Épona + transition Plaine d'Hyrule),&%gTalon%w (Bouteille de Lait, Lon Lon enfant),&%gMalon "
       "adulte%w (vend vache, %p100 Rubis%w),&%gHBA%w, %gPêche%w, %gJeu de Coffres%w,&%gJeu de Plongée Zora%w (Écaille "
       "d'Argent).^Visites répétées donnent un pourboire.&Conscient du rando: livre les items shufflés.",
       "Du hast die %yZirkusleitermaske%w!&Beim Tragen wirst du zu Ganondorfs&%cSteuereintreiber%w. NPCs zahlen&Tribut "
@@ -706,7 +706,8 @@ static const NeiItem sNeiItems[] = {
       "%g+1 MP every 7 frames%w&(full magic in ~32s).",
       "Vous obtenez le %yMasque des Amoureux%w!&Le masque des retrouvailles de deux&amants à jamais "
       "entrelacés.^Équipez depuis la page des masques.^%cRégénération passive%w pendant le port:&%rJour%w -> %g+1 PV "
-      "toutes les 4 frames%w&(cœurs pleins en ~32s).&%bNuit%w -> %g+1 PM toutes les 7 frames%w&(magie pleine en ~32s).",
+      "toutes les 4 frames%w&(coeurs pleins en ~32s).&%bNuit%w -> %g+1 PM toutes les 7 frames%w&(magie pleine en "
+      "~32s).",
       "Du hast die %yPaarmaske%w!&Die Wiedervereinigungsmaske zweier&für immer verbundener Liebender.^Aufsetzen auf "
       "der Maskenseite.^%cPassive Regeneration%w beim Tragen:&%rTag%w -> %g+1 HP alle 4 Frames%w&(volle Herzen in "
       "~32s).&%bNacht%w -> %g+1 MP alle 7 Frames%w&(volle Magie in ~32s)." },
@@ -715,7 +716,7 @@ static const NeiItem sNeiItems[] = {
       "You got the %yMask of Truth%w (MM)!&The all-seeing eye that hears the&voices of beasts and stones.^Equip from "
       "the mask page.&%rNo gameplay effect yet%w -&currently cosmetic only.&(OOT's vanilla Mask of Truth is&a separate "
       "item.)",
-      "Vous obtenez le %yMasque de Vérité%w (MM)!&L'œil omniscient qui entend les&voix des bêtes et des "
+      "Vous obtenez le %yMasque de Vérité%w (MM)!&L'oeil omniscient qui entend les&voix des bêtes et des "
       "pierres.^Équipez depuis la page des masques.&%rPas d'effet de jeu%w -&actuellement cosmétique seulement.&(Le "
       "Masque de Vérité OOT est&un objet distinct.)",
       "Du hast die %yMaske der Wahrheit%w (MM)!&Das allsehende Auge, das die Stimmen&der Tiere und Steine "
@@ -1366,7 +1367,7 @@ static const NeiItem sNeiItems[] = {
     { NEI_NO_ITEM, PLAYER_IA_NONE, PLAYER_MODELGROUP_DEFAULT, NEI_NO_SLOT, AGE_REQ_NONE, NULL, func_8083485C,
       Player_InitDefaultIA, Randomizer_DrawMmOwlStatue, RG_MM_OWL_CLOCK_TOWN_SOUTH,
       "You reached the %gClock Town Owl Statue%w!&A soaring waypoint in the&heart of Termina.",
-      "Vous atteignez la %gStatue-Chouette de Bourg-Clock%w!&Un point d'envol au cœur&de Termina.",
+      "Vous atteignez la %gStatue-Chouette de Bourg-Clock%w!&Un point d'envol au coeur&de Termina.",
       "Du erreichst die %gEulenstatue (Unruhstadt)%w!&Ein Flugpunkt im Herzen&Terminas." },
     { NEI_NO_ITEM, PLAYER_IA_NONE, PLAYER_MODELGROUP_DEFAULT, NEI_NO_SLOT, AGE_REQ_NONE, NULL, func_8083485C,
       Player_InitDefaultIA, Randomizer_DrawMmOwlStatue, RG_MM_OWL_GREAT_BAY_COAST,

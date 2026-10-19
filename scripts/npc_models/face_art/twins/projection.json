@@ -1,0 +1,15 @@
+{
+  "variant": "twins",
+  "bounds": [
+    -0.095,
+    0.763,
+    0.095,
+    0.905
+  ],
+  "source_sha256": "1e02c29c4af7920b2c518f9f63f18858920709f1406d8c00a7e24f5f81f1102e",
+  "panels": [
+    "half",
+    "closed"
+  ],
+  "art_method": "Source face projection; imagegen eyelid edits; source pixels preserved outside feathered eye masks"
+}
