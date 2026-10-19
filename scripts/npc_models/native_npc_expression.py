@@ -14,7 +14,7 @@ def _lift(points):
     x, y, z = np.asarray(points, float).T
     # The closed mouth and cheek immediately around each corner move together.
     # The central lip, nose, eye region, silhouette and all back surfaces stay.
-    return (.0018*_smooth((abs(x)-.005)/.012)*_smooth((.037-abs(x))/.014)*
+    return (.0045*_smooth((abs(x)-.005)/.012)*_smooth((.037-abs(x))/.014)*
             _smooth((.017-abs(y-.815))/.011)*_smooth((z-.025)/.015))
 
 

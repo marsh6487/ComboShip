@@ -16,8 +16,8 @@ class SmileTests(unittest.TestCase):
         original = points.copy()
         revised, normal = expression.smile_warp(points, normals)
         for i in (0, 1):
-            self.assertGreater(revised[i, 1]-points[i, 1], .001)
-            self.assertLessEqual(revised[i, 1]-points[i, 1], .002)
+            self.assertGreater(revised[i, 1]-points[i, 1], .0035)
+            self.assertLessEqual(revised[i, 1]-points[i, 1], .0046)
         np.testing.assert_array_equal(revised[2:], points[2:])
         np.testing.assert_array_equal(revised[:, [0, 2]], points[:, [0, 2]])
         np.testing.assert_array_equal(points, original)

@@ -30,6 +30,43 @@ def hand_grip(source, variant):
     return spec['hands']
 
 
+def waiting_hand_profile(source, variant):
+    path = Path(__file__).with_name('pose_art')/(variant+'-waiting.json')
+    if not path.exists():
+        return None
+    spec = json.loads(path.read_text())
+    if spec['source_sha256'] != hashlib.sha256(source.raw).hexdigest():
+        raise ValueError('Waiting hand profile belongs to a different source model')
+    return spec
+
+
+def apply_waiting_hand_fit(rig, frame, spec, amount=1.):
+    """Seat the complete left arm; roll its thumb away from the other sleeve."""
+    side = spec['hand']
+    hand = rig.profile[side][-1]
+    rig.pose(frame)
+    target = rig.limbs[hand].T+body_frame(rig)[0]@np.asarray(spec['body_offset'])*amount
+    rotation = Rotation.from_euler('xyz', np.asarray(spec['local_rotation_degrees'])*amount, degrees=True).as_matrix()
+    matrix = rig.limbs[hand].M@rotation
+    parent = parents(rig)
+    error = solve_arm(rig, frame, side, target, matrix, parent)
+    angle = float(spec.get('elbow_swivel_degrees', 0.))*amount
+    if angle:
+        arm, fore, hand = rig.profile[side][-3:]
+        shoulder, elbow, wrist = [rig.limbs[i].T.copy() for i in (arm, fore, hand)]
+        # The wrist stays seated while the two-link elbow circle routes the
+        # sleeve around the opposite hand instead of sweeping through it.
+        turn = Rotation.from_rotvec(unit(wrist-shoulder)*np.radians(angle)).as_matrix()
+        seated_elbow = shoulder+turn@(elbow-shoulder)
+        set_global(rig, frame, arm, align(elbow-shoulder, seated_elbow-shoulder)@rig.limbs[arm].M, parent)
+        elbow, current = [rig.limbs[i].T.copy() for i in (fore, hand)]
+        set_global(rig, frame, fore, align(current-elbow, wrist-elbow)@rig.limbs[fore].M, parent)
+        set_global(rig, frame, hand, matrix, parent)
+        error = float(np.linalg.norm(rig.limbs[hand].T-target))
+    return error
+
+
+
 def seat_wrist_targets(targets, matrices, hands, mouth_blend=1.):
     """Move each complete arm to the authored hand-local grip seat.
 
@@ -238,6 +275,7 @@ def export_poses(archive, native, source, model, rig, variant):
     mouth_local = bind_m[head].T@(mouth_bind-bind_t[head])
     ob = rig.profile.get("animation_object", rig.profile["object"])
     result = {}
+    waiting_fit = waiting_hand_profile(source, variant) if source is not None else None
     native_palms, custom_palms = {}, {}
     hand_vertices = {}
     if source is not None:
@@ -379,6 +417,9 @@ def export_poses(archive, native, source, model, rig, variant):
                     poles=clear_arm_targets(source,model,rig,reference,name,bind_m,bind_t,targets,matrices,active_hand_vertices,idle_profile)
                 for side in ("left", "right"):
                     errors.append(solve_arm(rig, frame, side, targets[side], matrices[side], parent,pole=poles.get(side)))
+            if waiting_fit and name in ('gSariaHandsBehindBackWaitAnim', 'gSariaTransitionHandsSideToBackAnim'):
+                t = 1. if name == 'gSariaHandsBehindBackWaitAnim' else index/max(len(fitted)-1, 1)
+                errors.append(apply_waiting_hand_fit(rig, frame, waiting_fit, t*t*(3-2*t)))
             if name=='gMalonAdultStandStillAnim':
                 from native_npc_malon import plant_basket_feet
                 stance.append(plant_basket_feet(model,rig,frame,parent,bind_m,bind_t))
