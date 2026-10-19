@@ -77,48 +77,35 @@ class Builder {
     Mesh& mesh;
 };
 
-inline Color Gold(float angle, int profile) {
-    // Baked upper-left light keeps the antique bevel readable without native lights.
-    constexpr Color colors[] = { { 126, 73, 25, 255 }, { 255, 225, 131, 255 }, { 224, 165, 61, 255 },
-                                 { 148, 87, 26, 255 }, { 188, 124, 42, 255 },  { 110, 60, 22, 255 } };
+inline Color RimColor(float angle, int profile) {
+    // ALTTP's gold inner lip and blue outer casing use separate bevel bands.
+    constexpr Color colors[] = { { 126, 84, 31, 255 },  { 255, 235, 160, 255 }, { 220, 169, 72, 255 },
+                                 { 48, 104, 158, 255 }, { 137, 181, 219, 255 }, { 39, 84, 137, 255 },
+                                 { 23, 57, 98, 255 },   { 28, 66, 109, 255 } };
     const float light = 0.73f + 0.27f * (0.5f + 0.5f * (-0.65f * std::cos(angle) + 0.76f * std::sin(angle)));
     const auto color = colors[profile];
     return { Channel(color.r * light), Channel(color.g * light), Channel(color.b * light), 255 };
-}
-
-inline void Diamond(Builder& builder, float x, float y, float rx, float ry, float z, float rise, bool emerald) {
-    builder.Begin();
-    const Color light = emerald ? Color{ 117, 235, 173, 255 } : Color{ 255, 231, 144, 255 };
-    const Color dark = emerald ? Color{ 13, 86, 73, 255 } : Color{ 128, 72, 26, 255 };
-    builder.Add(Point(x, y, z + rise, emerald ? Color{ 45, 165, 125, 255 } : Color{ 225, 165, 64, 255 }));
-    builder.Add(Point(x - rx, y, z, light));
-    builder.Add(Point(x, y + ry, z, light));
-    builder.Add(Point(x + rx, y, z, dark));
-    builder.Add(Point(x, y - ry, z, dark));
-    for (int i = 0; i < 4; ++i)
-        builder.Tri(0, i + 1, (i + 1) % 4 + 1);
 }
 
 inline Vertex HandlePoint(float width, float y, int index) {
     const float angle = index * (2.0f * kPi / 8.0f);
     const float light = 0.66f + 0.34f * (0.5f + 0.5f * (-0.45f * std::cos(angle) + 0.89f * std::sin(angle)));
     return Point(width * std::cos(angle), y, 0.9f * std::sin(angle),
-                 { Channel(246 * light), Channel(183 * light), Channel(72 * light), 255 });
+                 { Channel(78 * light), Channel(130 * light), Channel(181 * light), 255 });
 }
 
 inline Vertex GlassPoint(float radius, float angle, float phase) {
     const float nx = radius * std::cos(angle), ny = radius * std::sin(angle);
-    const float ripple =
-        0.5f + 0.5f * std::sin(ny * 10.0f + nx * 3.0f + phase * 2.0f + 0.7f * std::sin(nx * 4.0f - phase));
-    const float violet = 0.5f + 0.5f * std::sin(ny * 6.0f - nx * 4.0f - phase);
-    const float purple = violet * violet * (0.25f + 0.5f * (1.0f - ny) * 0.5f);
-    Color color = Mix({ 43, 143, 111, 242 }, { 103, 213, 210, 242 }, ripple);
-    color = Mix(color, { 113, 76, 163, 242 }, purple);
-    // A broad reflected highlight, independent of the animated waves, reads as glass.
-    const float reflection = std::fmax(0.0f, 1.0f - std::fabs(nx + ny * 0.38f + 0.22f) * 3.2f) * 0.28f;
-    color = Mix(color, { 200, 247, 228, 242 }, reflection);
-    const float z = 0.15f + 0.22f * (1.0f - radius * radius) + 0.025f * std::sin(nx * 4 + ny * 7 - phase * 2);
-    return Point(nx * 10.15f, 3.0f + ny * 14.6f, z, color);
+    const float ripple = 0.5f + 0.5f * std::sin(ny * 4 + nx * 2 + phase);
+    Color color = Mix({ 111, 163, 190, 246 }, { 186, 220, 236, 246 }, 0.46f + ny * 0.2f + ripple * 0.12f);
+    // Broad diagonal reflections read as ordinary polished glass while idle.
+    // The proposed TP activation sigil belongs to a later use-sequence effect.
+    const float diagonal = nx - ny * 0.38f;
+    const float reflection = std::fmax(0.0f, 1.0f - std::fabs(diagonal + 0.12f) * 2.25f);
+    const float second = std::fmax(0.0f, 1.0f - std::fabs(diagonal - 0.72f) * 7.0f) * 0.5f;
+    color = Mix(color, { 249, 254, 255, 246 }, std::fmax(reflection * 0.88f, second));
+    const float z = 0.15f + 0.22f * (1.0f - radius * radius) + 0.015f * std::sin(nx * 4 + ny * 7 - phase * 2);
+    return Point(nx * 12.5f, 6.0f + ny * 12.5f, z, color);
 }
 
 // Geometry and color are pure functions of the bounded animation phase. No RNG,
@@ -126,22 +113,22 @@ inline Vertex GlassPoint(float radius, float angle, float phase) {
 inline void Build(uint32_t frame, Mesh& mesh) {
     Builder builder(mesh);
     const float phase = (frame % kAnimationFrames) * (2.0f * kPi / kAnimationFrames);
-    constexpr float rimX[] = { 10.25f, 10.78f, 12.05f, 12.70f, 12.05f, 10.25f };
-    constexpr float rimY[] = { 14.80f, 15.45f, 16.65f, 17.20f, 16.65f, 14.80f };
-    constexpr float rimZ[] = { 1.15f, 1.75f, 1.15f, 0.0f, -1.20f, -1.20f };
-    // Each closed profile forms one smooth oval-frame segment, front and back.
+    constexpr float rimRadius[] = { 12.5f, 12.85f, 13.55f, 13.7f, 15.55f, 16.2f, 15.55f, 12.5f };
+    constexpr float rimZ[] = { 1.05f, 1.7f, 1.3f, 1.25f, 1.45f, 0.0f, -1.2f, -1.2f };
+    // The circular face and short rounded grip preserve ALTTP's silhouette.
     for (int segment = 0; segment < kRimSegments; ++segment) {
         builder.Begin();
         for (int end = 0; end < 2; ++end) {
             const float angle = ((segment + end) % kRimSegments) * (2 * kPi / kRimSegments);
-            for (int p = 0; p < 6; ++p)
-                builder.Add(Point(rimX[p] * std::cos(angle), 3 + rimY[p] * std::sin(angle), rimZ[p], Gold(angle, p)));
+            for (int p = 0; p < 8; ++p)
+                builder.Add(Point(rimRadius[p] * std::cos(angle), 6 + rimRadius[p] * std::sin(angle), rimZ[p],
+                                  RimColor(angle, p)));
         }
-        for (int p = 0; p < 6; ++p)
-            builder.Quad(p, (p + 1) % 6, 6 + (p + 1) % 6, 6 + p);
+        for (int p = 0; p < 8; ++p)
+            builder.Quad(p, (p + 1) % 8, 8 + (p + 1) % 8, 8 + p);
     }
-    constexpr float handleY[] = { -12.8f, -14.4f, -16.0f, -17.0f, -23.0f, -24.0f, -25.0f, -27.0f, -27.8f };
-    constexpr float handleX[] = { 1.75f, 2.65f, 2.1f, 1.55f, 1.35f, 2.2f, 2.7f, 1.8f, 0.7f };
+    constexpr float handleY[] = { -7.8f, -9.2f, -10.6f, -11.6f, -14.2f, -15.5f, -17.0f, -18.6f, -19.0f };
+    constexpr float handleX[] = { 1.6f, 2.4f, 2.0f, 1.35f, 1.45f, 1.85f, 2.05f, 1.45f, 0.65f };
     for (int level = 0; level < 8; ++level) {
         builder.Begin();
         for (int end = 0; end < 2; ++end)
@@ -151,24 +138,15 @@ inline void Build(uint32_t frame, Mesh& mesh) {
             builder.Quad(side, (side + 1) % 8, 8 + (side + 1) % 8, 8 + side);
     }
     builder.Begin();
-    builder.Add(Point(0, -27.8f, 0, { 147, 87, 26, 255 }));
+    builder.Add(Point(0, -19.0f, 0, { 30, 70, 115, 255 }));
     for (int i = 0; i < 8; ++i)
-        builder.Add(HandlePoint(0.7f, -27.8f, i));
+        builder.Add(HandlePoint(0.65f, -19.0f, i));
     for (int i = 0; i < 8; ++i)
         builder.Tri(0, i + 1, (i + 1) % 8 + 1);
-    // Small chased ornaments and emeralds keep the silhouette close to the
-    // handheld Magic Mirror, including when viewed in a 32-pixel inventory cell.
-    Diamond(builder, 0, 19.5f, 2.3f, 2.0f, 1.35f, 0.35f, false);
-    Diamond(builder, 0, 19.3f, 0.85f, 1.25f, 1.8f, 0.25f, true);
-    for (int side : { -1, 1 }) {
-        Diamond(builder, side * 11.2f, 10.0f, 1.15f, 2.6f, 1.2f, 0.35f, false);
-        Diamond(builder, side * 6.6f, -11.4f, 1.2f, 2.0f, 1.2f, 0.35f, false);
-    }
-    Diamond(builder, 0, -25.5f, 1.0f, 1.35f, 0.95f, 0.45f, true);
     mesh.opaqueBatchCount = mesh.batchCount;
 
     // One double-sided, nearly opaque reflecting pane. It is recessed inside
-    // the gold rim; the colored ripple never grows into a portal or outer aura.
+    // the gold inner rim; all highlights stay on the glass and casing.
     for (int segment = 0; segment < kRimSegments; ++segment) {
         builder.Begin();
         builder.Add(GlassPoint(0, 0, phase));
@@ -192,14 +170,14 @@ inline void Build(uint32_t frame, Mesh& mesh) {
             const float fade = std::sin((segment + end) * (kPi / 8.0f));
             for (int edge = 0; edge < 2; ++edge) {
                 const float radius = edge ? 0.81f : 0.77f;
-                builder.Add(Point(std::cos(angle) * 10.15f * radius, 3 + std::sin(angle) * 14.6f * radius, 0.55f,
-                                  { 207, 255, 238, Channel(fade * (55 + 15 * std::sin(phase))) }));
+                builder.Add(Point(std::cos(angle) * 12.5f * radius, 6 + std::sin(angle) * 12.5f * radius, 0.55f,
+                                  { 222, 246, 255, Channel(fade * (42 + 10 * std::sin(phase))) }));
             }
         }
         builder.Quad(0, 1, 3, 2);
     }
     for (int glint = 0; glint < 2; ++glint) {
-        const float x = glint ? 8.2f : -7.6f, y = glint ? -9.0f : 15.7f;
+        const float x = glint ? 11.4f : -9.8f, y = glint ? -2.6f : 17.5f;
         const float pulse = 0.5f + 0.5f * std::sin(phase * 2 + glint * kPi);
         builder.Begin();
         builder.Add(Point(x, y, 1.95f, { 255, 248, 196, Channel(45 + pulse * 100) }));

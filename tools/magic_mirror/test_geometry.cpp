@@ -38,14 +38,20 @@ int main() {
         Build(frame, mesh);
         assert(mesh.vertexCount == first.vertexCount && mesh.triangleCount == first.triangleCount);
         float minX = 100, maxX = -100, minY = 100, maxY = -100;
+        bool blueFrame = false, goldRim = false;
         for (int i = 0; i < mesh.vertexCount; ++i) {
             const auto& v = mesh.vertices[i];
             assert(std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z));
-            assert(std::abs(v.x) <= 13.25f && v.y >= -28.1f && v.y <= 21.6f && std::abs(v.z) <= 2.1f);
+            assert(std::abs(v.x) <= 16.25f && v.y >= -19.1f && v.y <= 22.3f && std::abs(v.z) <= 2.1f);
+            if (v.a == 255) {
+                blueFrame |= v.b > v.r * 1.2f && v.b > v.g * 1.1f;
+                goldRim |= v.r > v.b * 1.5f && v.r > v.g + 15;
+            }
             minX = std::min(minX, v.x); maxX = std::max(maxX, v.x);
             minY = std::min(minY, v.y); maxY = std::max(maxY, v.y);
         }
-        assert(minX < -12 && maxX > 12 && minY < -27 && maxY > 20);
+        assert(minX < -16 && maxX > 16 && minY < -18 && maxY > 22);
+        assert(blueFrame && goldRim);
         bool translucent = false, feathered = false;
         int vertices = 0, triangles = 0;
         for (int b = 0; b < mesh.batchCount; ++b) {

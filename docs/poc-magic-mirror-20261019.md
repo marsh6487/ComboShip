@@ -40,11 +40,18 @@ equipment or reaching the inaccessible top.
   under their existing systems.
 - Pickup callbacks are bound to slot, seed, scene, and mode. Reset/scene teardown
   clears pending pickup events and releases only the Mirror's private prompt.
-- The same generated gold/emerald mesh supplies the world reward and get-item
+- The same generated blue/gold round mesh supplies the world reward and get-item
   presentation. The renderer reserves native arena capacity before writing.
   Inventory/name PNGs are identical in both games and use the existing custom
   asset collection. Rebuild recipes and native renderer checks are in
   `tools/magic_mirror/README.md`.
+
+The approved ALTTP visual revision is isolated on
+`poc/magic-mirror-alttp-20261019`, based on published checkpoint
+`65c34dba7c73b43909946963486dc06d075ddb08`. It replaces the first gold-oval draft
+with the reference's round blue casing, gold inner rim, short grip and pale
+mirror glass. A dedicated character-use animation and TP activation sigil remain
+design work; this checkpoint does not claim either is present.
 
 ## Verification and limits
 

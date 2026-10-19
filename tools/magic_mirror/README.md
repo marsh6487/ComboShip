@@ -1,8 +1,10 @@
 # Native Magic Mirror visuals
 
-The gold oval handheld mirror is generated from `combo/gameplay/MagicMirrorGeometry.h`.
-Both engines and the software preview use this geometry. There are no downloaded
-images, Time Gate models, actor resources, texture lookups, or external art inputs.
+The round ALTTP-style handheld mirror is generated from
+`combo/gameplay/MagicMirrorGeometry.h`: blue casing and short grip, gold inner
+rim, and pale reflecting glass. The silhouette and palette follow cor's supplied
+reference images. Both engines and the software preview use the same generated
+geometry; no reference image pixels or external model are bundled.
 
 ## Native interface
 
@@ -15,16 +17,20 @@ allocation it verifies space for the complete draw: aligned data, opaque and
 translucent commands, and the overlay scratch cells used by native debug brackets.
 Insufficient room queues nothing and leaves native arena cursors untouched.
 
-The object is approximately **25.4 units wide × 49.3 units tall × 3.25 units deep**:
-X −12.7..12.7, Y −27.8..21.5, Z −1.2..2.05. The oval center is at Y=3. Caller
+The object is approximately **32.4 units wide × 41.2 units tall × 3.15 units deep**:
+X −16.2..16.2, Y −19..22.2, Z −1.2..1.95. The round face is centered at Y=6. Caller
 scale 1 uses these ordinary game units; the draw function internally uses a
 1/16-unit vertex precision to retain slender bevels and highlights.
 
-The mesh has 950 vertices, 860 triangles, and 90 vertex batches (at most 16
-vertices per batch). The gold rim, handle, and emerald accents use the opaque
+The mesh has 1043 vertices, 960 triangles, and 83 vertex batches (at most 16
+vertices per batch). The blue casing/grip and gold inner rim use the opaque
 pass. The recessed double-sided reflecting pane and confined shimmer use the
-translucent pass. The 960-frame color/depth ripple is deterministic and wraps
+translucent pass. The restrained 960-frame reflection shimmer is deterministic and wraps
 exactly; there is no positional bobbing or rotation inside the visual renderer.
+
+This visual revision changes the GI, stump reward, and inventory icon. Use still
+opens the confirmation prompt and travels through the native fade. A separate
+character-use animation and the proposed TP green sigil have not been implemented.
 
 ## Rebuild the native texture files
 
@@ -67,7 +73,7 @@ both real native `GraphicsContext`/GBI headers and executes verbatim production
 allocator, setup, and debug bracket bodies. Guarded storage proves rejection
 before any mutation when data, OPA commands, XLU commands, or overlay scratch are
 short, and proves the exact accepted boundary stays in all three arenas. The
-current draw needs 15,328 aligned data bytes, 336 opaque commands, 229 translucent
+current draw needs 16,816 aligned data bytes, 379 opaque commands, 229 translucent
 commands, and two overlay scratch commands. Optional sanitizer flags can be
 passed with `MIRROR_TEST_CXXFLAGS`; the draw fixture also links the real C-named
 interpolation boundary, so namespace/linkage regressions fail at link time.

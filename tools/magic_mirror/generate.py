@@ -126,8 +126,8 @@ def generate_preview(executable, icon, directory):
     canvas = Image.new("RGBA", (1240, 880), (17, 31, 30, 255))
     draw = ImageDraw.Draw(canvas)
     draw.text((52, 35), "MAGIC MIRROR", font=font(34, True), fill=(240, 222, 162))
-    draw.text((53, 85), "Shared native geometry • antique gold frame • green / cyan / violet reflecting glass", font=font(17), fill=(157, 185, 172))
-    for index, (frame, yaw, roll, title) in enumerate(((0, -0.13, -0.1, "Front · frame 0"), (240, -0.13, -0.1, "Ripple · frame 240"), (480, 0.72, 0.04, "Turned · frame 480"))):
+    draw.text((53, 85), "ALTTP direction • blue casing / gold inner rim • round reflecting face / short grip", font=font(17), fill=(157, 185, 172))
+    for index, (frame, yaw, roll, title) in enumerate(((0, -0.13, -0.1, "Front · frame 0"), (240, -0.13, -0.1, "Reflection · frame 240"), (480, 0.72, 0.04, "Turned · frame 480"))):
         x = 45 + index * 395
         draw.rounded_rectangle((x, 133, x+365, 738), radius=18, fill=(22, 41, 39), outline=(50, 73, 61), width=1)
         rendered = render(load_mesh(executable, frame), (660, 1020), border=25, roll=roll, yaw=yaw).resize((330, 510), Image.Resampling.LANCZOS)
