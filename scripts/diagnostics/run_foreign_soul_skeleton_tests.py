@@ -85,6 +85,8 @@ with tempfile.TemporaryDirectory(prefix='foreign-soul-') as td:
     for host in ['mm', 'oot']:
         engine = (ROOT / ('mm/src/code/z_skelanime.c' if host == 'mm' else 'soh/src/code/z_skelanime.c')).read_text()
         draw_names = ['SkelAnime_DrawLimbOpa', 'SkelAnime_DrawOpa', 'SkelAnime_DrawFlexLimbOpa']
+        if 'static void SkelAnime_ApplyNpcSkin(' in engine:
+            draw_names.insert(0, 'SkelAnime_ApplyNpcSkin')
         if 'static void SkelAnime_DrawFlexOpaImpl(' in engine:
             draw_names += ['SkelAnime_DrawFlexOpaImpl']
         draw_names += ['SkelAnime_DrawFlexOpa']

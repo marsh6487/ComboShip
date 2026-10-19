@@ -1,0 +1,14 @@
+{
+  "baseline_remote_commit": "9f3b7f32fde49c33b957ee55e9e8186f45fa74ff",
+  "baseline_tree": "bd906e0ee433a5b2665397db8e5d0aa794d21b9a",
+  "scope": "test fixture dependencies and explicit Woods bridge-only release boundary",
+  "game_and_asset_bytes_changed": false,
+  "payload_sha256": {
+    "tests/mm_presentation/oot_key_cosmetic_bridge_test.cpp": "300e67f160ce58ec4efdd4b8c46de24d8bdbd590de7c2fa9b3ee879b8cf71e12",
+    "tests/foreign_soul/skeleton_test.cpp": "7f9501564a050bc99affe787f9f5a7aba1031c736f07c6d7af07a876c687b0b6",
+    "scripts/diagnostics/run_foreign_soul_skeleton_tests.py": "0ec4fd09efa885993c3a2fbf417dfa63092db0cf711e13df37cca239076b7373",
+    "soh/tests/young_epona_actor_test.c": "9581133c403deef2dd377f7fb16b80378e280df505bb1ffa12ae90f600d5594b",
+    "scripts/diagnostics/run_young_epona_player_tests.py": "fd4d57d1031622b035d1251587fb61692225f6601c3640415962ee7bebca8122",
+    "docs/poc/final-gate-followup-20261019.md": "645589a576a7409cc17e439c792b292da816e5c162e0f44c49739575bc909be9"
+  }
+}

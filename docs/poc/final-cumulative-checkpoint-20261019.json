@@ -9,7 +9,7 @@
   "runtime_proven": false,
   "external_master_promoted": false,
   "payload_sha256": {
-    "docs/poc/final-cumulative-merge-20261019.md": "4c7f6a6cf12f942b74cf24e5df5070102d7e9b1ec0c5e86b0d230a8f70ca8ab7",
+    "docs/poc/final-cumulative-merge-20261019.md": "e6fbc7af896130ef218f1cc2daa6cb9762c0a0365487e4afcdbea684cf2c144a",
     "docs/superpowers/plans/2026-10-19-cumulative-final.md": "937668d78ea4e80571a66ffce5cf7bfda52cb1e8c0142883b0f1cdff8f8407c0",
     "mm/2s2h/Enhancements/Graphics/AutumnSceneFoliage.cpp": "aa7fc4dbb224694077ada7953957028659204c1d597392e690386357e6b4da4e",
     "mm/2s2h/Enhancements/Graphics/ComboLostWoodsPassage.cpp": "8c77918af698fd2e18e1e3a01b1b737f9bd13eb49a041c3a2d41f85de7df17e0",
@@ -55,5 +55,7 @@
     "tools/woods_mystery/build_native_bridge.py": "3a7e168f1883598bcd861433c94502b2184aa9cfe25f1cf28214dfb3abf0a403",
     "tools/woods_mystery/native_bridge_manifest.json": "c9cac1b34cfbc3e5e793c9d11c83dd66eef727e0171afb86c1e4382ae962c691",
     "tools/woods_mystery/rebuild_repair.py": "e42d120684011bab561c602d55b4c69ff1d881bbbb0deff3a00a4752e353018e"
-  }
+  },
+  "monkey_audio_checkpoint": "113eb4d779e0f4eeba844e32caf6b49a27a57a5c",
+  "gate_fixture_checkpoint": "eca7dd9f24323fc0be3f2defe779f15bba97ae39"
 }

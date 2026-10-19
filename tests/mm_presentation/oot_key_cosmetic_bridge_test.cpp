@@ -1,4 +1,5 @@
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/BlackMarketShelves.h"
 #include "objects/object_gi_bosskey/object_gi_bosskey.h"
 #include "objects/object_gi_key/object_gi_key.h"
 #include "soh/assets/soh_assets.h"
