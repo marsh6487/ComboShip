@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "scene": "Z2_LOST_WOODS",
+  "room": 0,
+  "source_edit": {
+    "path": "LostWoods-MirrorStump.prelude.o2r",
+    "original_name": "1 - lost woods 2ship granny shop and stump moved.prelude.o2r",
+    "sha256": "7fde769411d21792f6bc6cde62ee934fb17b8e24d7a01b8d74f30069cce49a83",
+    "library_file_id": "libfile_a3e443bfc51c8191b986cbfbf44f5d35",
+    "version": 0,
+    "role": "unchanged original editable stump and Granny shop source; not a replacement for the newer full scene"
+  },
+  "compiled_scene": {
+    "name": "zzzz_MM3D_Lost_Woods_Black_Market_POC14.prelude.o2r",
+    "sha256": "7b8f2b820ba0bf4441889693f820d280f8dace6f4664387f847bf0fdeecbdce9",
+    "library_file_id": "libfile_65b0089ba44c8191aeee53f6753a8d7f",
+    "version": 0,
+    "size": 121101985,
+    "collision_sha256": "c00ee0ac86c0829aa981b284d251442ffd4212b6aa802e57d2f8db317529bb85"
+  },
+  "source_collision_sha256": "f59a49b42b88f90c64b20f2129cb686c66753720edcfa02ca79adeeba307b98a",
+  "cap_snapshot": {
+    "center": [
+      -377,
+      80,
+      416
+    ],
+    "size": [
+      110,
+      112
+    ],
+    "triangles": 12,
+    "vertices": 13,
+    "note": "verification snapshot only; runtime derives pickup and arrival from loaded collision"
+  },
+  "current_clear_landing": [
+    -377,
+    0,
+    296
+  ],
+  "runtime": "unverified configured gameplay; source geometry and native fixtures only"
+}

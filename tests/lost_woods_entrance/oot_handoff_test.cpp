@@ -156,8 +156,8 @@ int main() {
     require(SOH_QueueMagicMirrorHandoff() == 1, "a live combined slot can queue the Mirror crossing");
     Frames();
     require(saves == 6 && switches == 5 && savedSlot == 1 &&
-                recordedRoute == COMBO_PORTAL_OPENING_FOREST && !play.state.running,
-            "Mirror recall must save its source slot and hand off once to the opening forest");
+                recordedRoute == COMBO_PORTAL_MAGIC_MIRROR && !play.state.running,
+            "Mirror recall must save its source slot and select the stump arrival without the tunnel camera");
     GameInteractor::Fire<GameInteractor::OnPlayDestroy>();
     play.state.running = true;
     gComboGameMode = COMBO_GAME_OOT;

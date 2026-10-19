@@ -2,6 +2,9 @@
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
 #include "2s2h/Enhancements/Gameplay/ComboSoloForest.h"
 #include "z64.h"
+#ifdef COMBO_BUILD
+#include "gameplay/MagicMirrorArrival.h"
+#endif
 #include "2s2h/Enhancements/Audio/MMWeather.h"
 #include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
 #include "2s2h/Enhancements/Graphics/MMWinterAtmosphere.h"
@@ -2594,8 +2597,12 @@ void Play_Init(GameState* thisx) {
     //! @bug: Incorrect ALIGN16s
     ZeldaArena_Init((void*)((zAlloc + 8) & ~0xF), (zAllocSize - ((zAlloc + 8) & ~0xF)) + zAlloc);
 
+#ifdef COMBO_BUILD
+    MagicMirror_PrepareArrival(this);
+#endif
     Actor_InitContext(this, &this->actorCtx, this->linkActorEntry);
 #ifdef COMBO_BUILD
+    MagicMirror_FinishArrival(this);
     Combo_NormalizeStoneTowerArrival(this);
 #endif
 

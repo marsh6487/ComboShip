@@ -1,7 +1,7 @@
 # Magic Mirror candidate — 2026-10-19
 
 The Magic Mirror is a permanent, fixed Lost Woods reward outside the shuffled
-item pool. It returns the player to the opening-forest crossing from safe outdoor
+item pool. It returns the player to the Mirror stump from safe outdoor
 areas. The elevated stump displays the spinning mirror; approaching its base
 starts the native item presentation, so obtaining it does not require a seed's
 equipment or reaching the inaccessible top.
@@ -115,6 +115,62 @@ save/reload, both cross-game directions, solo forest visits, and blocked-use
 states. Include Time Gate ownership/selection and Farore recall in that session.
 For the placeholder cast, check the visible morph and hand/head placement on the
 selected age/form, the overhead Mirror at the last beat, and the fade/handoff.
+
+## Stump-relative recall revision
+
+Candidate `poc/magic-mirror-stump-recall-20261019` builds on local cast checkpoint
+`4f48cf77911ee8519f190e6a9cef20c3a933ebc0`, whose tree is identical to published
+`b4e035fbbc0db175574a68b04cf1e91a20bf4ac3`:
+`3d44cf535e82a8b2faca85c81bdf7898152e1739`.
+
+Recall now resolves the same loaded collision cap as the pickup. The cap's
+12-triangle radial-fan shape identifies it independently of world position or
+height; duplicate matching caps fail closed. Prelude translation/rotation carries
+the pickup and destination together when visual and collision edits are exported
+together. Resizing or duplicating that authored stump requires a locator update.
+
+At the currently retained placement, the reward is above cap `(-377, 80, 416)`;
+recall lands at `(-377, 0, 296)` facing the stump, within the ground-pickup radius.
+The runtime tries eight cap-relative directions for static floor support, a
+40-unit supported footprint, wall clearance and 100-unit headroom. Missing cap,
+ambiguous cap or no clear base retains the scene's ordinary entrance spawn.
+
+Native transitions queue a slot/seed/mode-bound one-shot arrival. Combined OoT
+uses a distinct Mirror handoff route; MM queues the arrival after destination save
+loading and does not queue the tunnel portal camera. Immediately before native
+player initialization, recall substitutes a copied spawn entry. Native player
+and Mario controller therefore initialize at the destination. Immediately after
+actor initialization, the original scene spawn pointer is restored (preserving
+legacy doorway anchors) and the arriving player leaves the native doorway walk
+before camera setup. Cached scene bytes and Farore/grotto respawn data are not
+written by the Mirror arrival.
+
+The unchanged original editable Prelude export is now bundled under
+`tools/magic_mirror/scene/`, with an exact-byte identity manifest. The current
+complete POC14 scene is separately retained and identified there, including its
+durable file identity and SHA-256. It contains the same visual/collision stump
+and newer Black Market work. Use the complete scene for combined gameplay; do not
+overlay the older editable source's whole collision onto POC14. Solo modes retain
+their existing private forest addon and resolve its loaded stump in the same way.
+
+Additional checks:
+
+```sh
+python3 -B tests/magic_mirror/check_scene.py
+python3 -B tests/magic_mirror/check_scene.py --compiled /absolute/path/to/zzzz_MM3D_Lost_Woods_Black_Market_POC14.prelude.o2r
+python3 -B tests/lost_woods_entrance/run_tests.py
+```
+
+Both actual Mirror adapters compile to native C++ objects. Both full native player
+and Play initialization translation units pass their engine's C syntax probe.
+Sanitized fixtures exercise moved loaded collision, cached-address reuse, pending
+arrival lifetime, context mismatch, physical-query rejection, exact-once use,
+cached-spawn restoration and native handoff/fade paths. Scene checks validate all
+13 cap vertices against the Prelude edits and POC14's actual rendered cap, execute
+the production locator across all horizontal scene faces before/after translation,
+and inspect static collision support/clearance at the current base landing.
+Configured gameplay, archive priority, runtime camera/Mario presentation and a
+complete linked executable remain unverified.
 
 ## Recovery
 

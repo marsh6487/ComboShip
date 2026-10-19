@@ -37,6 +37,12 @@ spell actor or sparkle mesh is spawned. The native player bridge is isolated in
 `combo/gameplay/MagicMirrorPlayer.inc.c` so this placeholder motion can be replaced.
 The proposed TP green activation sigil remains unimplemented.
 
+Recall and the fixed pickup share the stump cap in the loaded scene collision.
+Arrival initializes the native player beside its base, facing the stump, before
+the camera starts. The exact original editable Prelude input and complete scene
+identity are preserved in [scene/README.md](scene/README.md). Moving that stump
+in Prelude moves both anchors when geometry and collision are exported together.
+
 ## Rebuild the native texture files
 
 Requirements: a C++17 compiler, Python, NumPy, Pillow, and the existing bundled

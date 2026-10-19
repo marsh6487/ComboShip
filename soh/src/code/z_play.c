@@ -31,6 +31,7 @@
 #include <assert.h>
 
 #ifdef COMBO_BUILD
+#include "gameplay/MagicMirrorArrival.h"
 #include "soh/Enhancements/audio/AudioEditor.h"
 #include "soh/Enhancements/Gameplay/ComboBlackMarketNative.h"
 #include "soh/Enhancements/Gameplay/ComboSoloForest.h"
@@ -616,7 +617,13 @@ void Play_Init(GameState* thisx) {
     gItemAgeReqs[ITEM_ROCS_FEATHER] = AGE_REQ_NONE;
     gSlotAgeReqs[SLOT_NAYRUS_LOVE] = AGE_REQ_NONE;
 
+#ifdef COMBO_BUILD
+    MagicMirror_PrepareArrival(play);
+#endif
     Actor_InitContext(play, &play->actorCtx, play->linkActorEntry);
+#ifdef COMBO_BUILD
+    MagicMirror_FinishArrival(play);
+#endif
 
     while (!func_800973FC(play, &play->roomCtx)) {
         ; // Empty Loop

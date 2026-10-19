@@ -22,6 +22,8 @@ GameState* gGameState;
 static bool sRememberLocation;
 static int hookCount = 0;
 static int queuedCameraRoute = -1, queuedCameraCount = 0;
+static int mirrorArrivalCount = 0;
+extern "C" void MagicMirror_QueueArrival(void) { ++mirrorArrivalCount; }
 extern "C" void ComboForestArrivalCamera_Queue(int route) { queuedCameraRoute = route; ++queuedCameraCount; }
 static int crossArrival = -1, bossRecovery = -1, savedRecovery = -1, fwArrival = -1;
 extern "C" int32_t Combo_MM_ConsumeCrossDungeonArrival(void) {
@@ -92,6 +94,17 @@ int main() {
             "crossing must preserve the loaded cycle, time and health");
     require(!sComboPortalArrivalPending && hookCount == 1 && gComboStartFileNum == -1,
             "arrival must consume its request and run the save-load hook once");
+
+    const int oldCameraCount = queuedCameraCount;
+    gComboStartFileNum = 1;
+    MM_SetComboEntryIsResume(0);
+    MM_SetComboPortalRoute(COMBO_PORTAL_MAGIC_MIRROR);
+    Setup_InitImpl(&state);
+    require(gSaveContext.save.entrance == ENTRANCE(LOST_WOODS, 0) && gSaveContext.respawnFlag == 0 &&
+            mirrorArrivalCount == 1 && queuedCameraCount == oldCameraCount,
+            "Mirror must queue its stump spawn after save loading and leave the tunnel camera unqueued");
+    MM_ApplyComboPortalArrival();
+    require(mirrorArrivalCount == 1, "a cross-game Mirror request must be consumed once");
 
     gComboStartFileNum = 0;
     MM_SetComboEntryIsResume(0);

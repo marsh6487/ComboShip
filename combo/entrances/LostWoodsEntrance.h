@@ -2,10 +2,19 @@
 
 // Local passage coordinates, shared by the trigger, arrival and MM doorway.
 // These are scene coordinates, never entrance-shuffle destinations.
-enum { COMBO_PORTAL_MARKET = 0, COMBO_PORTAL_LOST_WOODS = 1, COMBO_PORTAL_OPENING_FOREST = 2 };
+enum {
+    COMBO_PORTAL_MARKET = 0,
+    COMBO_PORTAL_LOST_WOODS = 1,
+    COMBO_PORTAL_OPENING_FOREST = 2,
+    COMBO_PORTAL_MAGIC_MIRROR = 3,
+};
+
+static inline int ComboLostWoods_IsOpeningForestRoute(int route) {
+    return route == COMBO_PORTAL_OPENING_FOREST || route == COMBO_PORTAL_MAGIC_MIRROR;
+}
 
 static inline int ComboLostWoods_IsForestRoute(int route) {
-    return route == COMBO_PORTAL_LOST_WOODS || route == COMBO_PORTAL_OPENING_FOREST;
+    return route == COMBO_PORTAL_LOST_WOODS || ComboLostWoods_IsOpeningForestRoute(route);
 }
 
 static inline int ComboLostWoods_IsPlayableSlot(int fileNum) {

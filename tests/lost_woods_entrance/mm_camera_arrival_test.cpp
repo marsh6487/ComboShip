@@ -18,6 +18,7 @@ static MtxF sMatrix;
 MtxF* sCurrentMatrix = &sMatrix;
 static s16 sCameraInterfaceFlags;
 extern "C" void ComboForestArrivalCamera_Queue(int) {}
+extern "C" void MagicMirror_QueueArrival(void) {}
 
 void FrameInterpolation_RecordMatrixTranslate(f32, f32, f32, MatrixMode) {
 }

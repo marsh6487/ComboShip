@@ -6,6 +6,7 @@
 #include "entrances/SoloForestResources.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "gameplay/MagicMirrorAnchor.h"
+#include "gameplay/MagicMirrorArrival.h"
 #include "gameplay/MagicMirrorItem.h"
 #include "gameplay/MagicMirrorPlayer.h"
 #include "mods/extended_inventory.h"

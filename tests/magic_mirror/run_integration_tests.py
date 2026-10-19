@@ -7,6 +7,19 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 
 class Integration(unittest.TestCase):
+    def test_arrival_precedes_native_player_and_camera(self):
+        for host in ("soh", "mm"):
+            with self.subTest(host=host):
+                source = (ROOT / host / "src/code/z_play.c").read_text()
+                start = source.index("void Play_Init(")
+                prepare = source.index("MagicMirror_PrepareArrival(", start)
+                spawn = source.index("Actor_InitContext(", start)
+                finish = source.index("MagicMirror_FinishArrival(", start)
+                camera = source.index("Camera_Init", spawn)
+                self.assertLess(prepare, spawn)
+                self.assertLess(spawn, finish)
+                self.assertLess(finish, camera)
+
     def test_prompt_uses_normal_mm_decoder(self):
         source = (ROOT / "combo/gameplay/MagicMirrorRuntime.inc.h").read_text()
         prompt = int(re.search(r"kPromptText = (0x[\dA-Fa-f]+)", source)[1], 16)

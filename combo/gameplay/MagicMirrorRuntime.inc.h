@@ -18,6 +18,16 @@ static PlayState* sCastPlay = nullptr;
 static Player* sCastPlayer = nullptr;
 static bool sDeparted = false;
 static unsigned sCastTicks = 0;
+// Arrival owns no old PlayState/player pointer and survives departure teardown.
+static Context sArrivalContext;
+static bool sArrivalPending = false;
+static PlayState* sArrivalPlay = nullptr;
+static ActorEntry* sArrivalOriginal = nullptr;
+static ActorEntry sArrivalSpawn;
+void QueueArrival() {
+    sArrivalContext = { gSaveContext.fileNum, -1, gComboGameMode, MirrorHost::Seed() };
+    sArrivalPending = true;
+}
 #ifdef COMBO_MAGIC_MIRROR_MM
 constexpr u32 kPromptFreeze = PLAYER_STATE1_20000000;
 #else
@@ -186,8 +196,9 @@ bool Travel(PlayState* play, bool casting = false) {
     play->nextEntrance = Combo_IsCombinedGame() ? ENTRANCE(LOST_WOODS, 0) : COMBO_SOLO_FOREST_MM_ENTRANCE;
     gSaveContext.save.cutsceneIndex = 0;
 #endif
-    // Use the ordinary safe forest spawn; TOP/Farore and RETURN/grotto data
-    // retain their owning systems' contents. Native age/form and clock stay put.
+    QueueArrival();
+    // Resolve the placed stump in the destination's loaded collision. TOP/Farore
+    // and RETURN/grotto retain their owning systems' contents.
     gSaveContext.respawnFlag = 0;
     gSaveContext.nextCutsceneIndex = 0xFFEF;
     play->transitionType = gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
@@ -240,6 +251,114 @@ bool Locate(PlayState* play) {
     }
     sAnchorValid = MagicMirrorAnchor::Find(triangles, sAnchor);
     return sAnchorValid;
+}
+
+bool ArrivalDestination(const PlayState* play) {
+    if (!play || !Mode() || gSaveContext.gameMode != GAMEMODE_NORMAL ||
+        !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) || gSaveContext.respawnFlag != 0 ||
+        gSaveContext.cutsceneTrigger)
+        return false;
+#ifdef COMBO_MAGIC_MIRROR_MM
+    return ComboOpeningForest_IsExploration(play) ||
+           (ComboSoloForest_IsMmVisit(play->sceneId, 0, gSaveContext.gameMode, gSaveContext.fileNum,
+                                      gSaveContext.sceneLayer, gSaveContext.save.cutsceneIndex) &&
+            gSaveContext.save.entrance == COMBO_SOLO_FOREST_MM_ENTRANCE);
+#else
+    return ComboSoloForest_IsOotVisit(play->sceneNum, 0, gSaveContext.gameMode, gSaveContext.fileNum,
+                                      gSaveContext.sceneLayer, gSaveContext.cutsceneIndex) &&
+           gSaveContext.entranceIndex == COMBO_SOLO_FOREST_OOT_ENTRANCE;
+#endif
+}
+
+bool Landing(PlayState* play, Vec3s& position, s16& yaw) {
+    // Inside the ground-pickup radius, outside the stump and even Goron's body.
+    // Prefer the south side; try the other sides if Prelude moved it near a wall.
+    constexpr int offsets[][2] = { { 0, -120 }, { 85, -85 }, { 120, 0 },  { 85, 85 },
+                                   { 0, 120 },  { -85, 85 }, { -120, 0 }, { -85, -85 } };
+    for (const auto& offset : offsets) {
+        Vec3f point{ std::round(sAnchor.x) + offset[0], sAnchor.y + 1, std::round(sAnchor.z) + offset[1] };
+        CollisionPoly* floor = nullptr;
+        s32 bgId = BGCHECK_SCENE;
+        const float height = BgCheck_EntityRaycastFloor3(&play->colCtx, &floor, &bgId, &point);
+        if (!std::isfinite(height) || !floor || bgId != BGCHECK_SCENE || floor->normal.y < 30000 ||
+            height > sAnchor.y - 1 || height < sAnchor.y - 220 || height <= BGCHECK_Y_MIN)
+            continue;
+        point.y = std::ceil(height);
+        if (std::abs(point.x) > 32700 || std::abs(point.y) > 32700 || std::abs(point.z) > 32700)
+            continue;
+        bool clear = true;
+        // Support the complete footprint and reject nearby walls/low ceilings.
+        for (const auto& side : offsets) {
+            Vec3f edge{ point.x + side[0] / 3.0f, point.y + 5, point.z + side[1] / 3.0f };
+            CollisionPoly* support = nullptr;
+            const float supportY = BgCheck_EntityRaycastFloor3(&play->colCtx, &support, &bgId, &edge);
+            if (!support || bgId != BGCHECK_SCENE || support->normal.y < 30000 || !std::isfinite(supportY) ||
+                std::abs(supportY - point.y) > 5) {
+                clear = false;
+                break;
+            }
+            for (float elevation : { 10.0f, 55.0f, 100.0f }) {
+                Vec3f from{ point.x, point.y + elevation, point.z };
+                Vec3f to{ edge.x, point.y + elevation, edge.z }, hit{};
+                if (BgCheck_EntityLineTest1(&play->colCtx, &from, &to, &hit, &support, true, true, true, true, &bgId))
+                    clear = false;
+            }
+            Vec3f bottom{ edge.x, point.y + 5, edge.z }, top{ edge.x, point.y + 100, edge.z }, hit{};
+            if (BgCheck_EntityLineTest1(&play->colCtx, &bottom, &top, &hit, &support, true, true, true, true, &bgId))
+                clear = false;
+            if (!clear)
+                break;
+        }
+        if (!clear)
+            continue;
+        position = { static_cast<s16>(point.x), static_cast<s16>(point.y), static_cast<s16>(point.z) };
+        const float angle = std::atan2(sAnchor.x - point.x, sAnchor.z - point.z);
+#ifdef COMBO_MAGIC_MIRROR_MM
+        const int degrees = (static_cast<int>(std::round(angle * (180.0f / 3.14159265359f))) + 360) % 360;
+        yaw = static_cast<s16>((degrees << 7) | 127); // native packed yaw + no actor cutscene
+#else
+        yaw = static_cast<s16>(static_cast<int>(std::round(angle * (32768.0f / 3.14159265359f))));
+#endif
+        return true;
+    }
+    return false;
+}
+
+void PrepareArrival(PlayState* play) {
+    const bool pending = sArrivalPending;
+    sArrivalPending = false; // The very next scene consumes it, including mismatches.
+    sArrivalPlay = nullptr;
+    sArrivalOriginal = nullptr;
+    if (!pending || sArrivalContext.slot != gSaveContext.fileNum || sArrivalContext.seed != MirrorHost::Seed() ||
+        sArrivalContext.mode != gComboGameMode || !ArrivalDestination(play) || !play->linkActorEntry)
+        return;
+    sCollision = nullptr; // Fresh collision may reuse the departed scene's address.
+    Vec3s position;
+    s16 yaw;
+    if (!Locate(play) || !Landing(play, position, yaw))
+        return; // Missing/ambiguous geometry keeps the scene's ordinary safe spawn.
+    sArrivalOriginal = play->linkActorEntry;
+    sArrivalSpawn = *sArrivalOriginal; // Never mutate the cached Prelude resource.
+    sArrivalSpawn.pos = position;
+    sArrivalSpawn.rot.y = yaw;
+#ifdef COMBO_MAGIC_MIRROR_MM
+    sArrivalSpawn.id &= ~0x8000; // Actor_SpawnEntry must decode packed degrees.
+    sArrivalSpawn.params = PLAYER_PARAMS(0xFF, PLAYER_START_MODE_D);
+#else
+    sArrivalSpawn.params = 0x0DFF; // native stationary start, camera selected by floor
+#endif
+    play->linkActorEntry = &sArrivalSpawn;
+    sArrivalPlay = play;
+}
+void FinishArrival(PlayState* play) {
+    if (sArrivalPlay != play)
+        return;
+    sArrivalPlay = nullptr;
+    if (play->linkActorEntry == &sArrivalSpawn)
+        play->linkActorEntry = sArrivalOriginal;
+    sArrivalOriginal = nullptr; // Legacy doorway anchors must keep the real scene spawn.
+    if (auto* player = GET_PLAYER(play))
+        MagicMirrorPlayer_Arrive(play, player);
 }
 u16 PressedButton(PlayState* play) {
     static constexpr u16 buttons[] = { 0, BTN_CLEFT, BTN_CDOWN, BTN_CRIGHT, BTN_DUP, BTN_DDOWN, BTN_DLEFT, BTN_DRIGHT };
@@ -355,3 +474,13 @@ void DrawWorld() {
     Matrix_Pop();
 }
 } // namespace MirrorRuntime
+
+extern "C" void MagicMirror_QueueArrival(void) {
+    MirrorRuntime::QueueArrival();
+}
+extern "C" void MagicMirror_PrepareArrival(PlayState* play) {
+    MirrorRuntime::PrepareArrival(play);
+}
+extern "C" void MagicMirror_FinishArrival(PlayState* play) {
+    MirrorRuntime::FinishArrival(play);
+}

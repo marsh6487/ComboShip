@@ -88,3 +88,15 @@ void MagicMirrorPlayer_End(PlayState* play, Player* player) {
     Player_AnimChangeOnceMorph(play, player, Player_GetIdleAnim(player));
 #endif
 }
+
+void MagicMirrorPlayer_Arrive(PlayState* play, Player* player) {
+    // The copied spawn already placed the native player (and Mario controller).
+    // Leave the native doorway walk before its first update/camera setup.
+    MagicMirrorPlayer_StopMotion(player);
+#ifdef COMBO_MAGIC_MIRROR_MM
+    func_80839E74(player, play);
+#else
+    func_80839FFC(player, play);
+    Player_AnimChangeOnceMorph(play, player, Player_GetIdleAnim(player));
+#endif
+}

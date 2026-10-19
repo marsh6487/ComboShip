@@ -2323,7 +2323,7 @@ static void Combo_FinishInit() {
                         sComboSetMmPortalRoute = (void (*)(int))Combo_ResolveSym("2ship", "MM_SetComboPortalRoute");
                     if (sComboSetMmPortalRoute) {
                         sComboSwitchFileNum = slot;
-                        sComboSwitchPortalRoute = COMBO_PORTAL_OPENING_FOREST;
+                        sComboSwitchPortalRoute = COMBO_PORTAL_MAGIC_MIRROR;
                         sComboPassageFade = 1;
                     }
                 }
@@ -2366,7 +2366,7 @@ static void Combo_FinishInit() {
                 Combo_SOH_CapturePendingChecks();
             }
             Combo_FlushDormantAccumulators(); // Bank pending fills before saving either switch path.
-            if ((isFwReturn || sComboSwitchPortalRoute == COMBO_PORTAL_OPENING_FOREST) && gPlayState)
+            if ((isFwReturn || ComboLostWoods_IsOpeningForestRoute(sComboSwitchPortalRoute)) && gPlayState)
                 Play_PerformSave(gPlayState); // Capture live scene flags and native save/equipment bookkeeping.
             else
                 SaveManager::Instance->SaveFile(sComboSwitchFileNum);

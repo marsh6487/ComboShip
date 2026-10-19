@@ -150,14 +150,14 @@ extern "C" s32 Entrance_GetTransitionFlags(u16 entrance) {
         source += function(market, "void Transition(") + "\n" + function(forest, "void ForestTransition(")
         source += r'''
 int main() {
-    for (int route : {COMBO_PORTAL_LOST_WOODS, COMBO_PORTAL_OPENING_FOREST}) {
+    for (int route : {COMBO_PORTAL_LOST_WOODS, COMBO_PORTAL_OPENING_FOREST, MIRROR_ROUTE}) {
         for (int slot = 0; slot < 3; ++slot) {
 BOOT
             CheckArrivalFade();
         }
     }
     // A fresh route must replace a stale/instant effect from a previous load.
-    for (int route : {COMBO_PORTAL_LOST_WOODS, COMBO_PORTAL_OPENING_FOREST}) {
+    for (int route : {COMBO_PORTAL_LOST_WOODS, COMBO_PORTAL_OPENING_FOREST, MIRROR_ROUTE}) {
         gSaveContext.nextTransitionType = TRANS_TYPE_INSTANT;
 STALE_EFFECT
         CheckArrivalFade();
@@ -174,7 +174,7 @@ GUARDS
     }
     std::puts("PASS: native portal/save-load and shop/solo-forest arrivals start black, reveal gradually, consume once and preserve other arrivals");
 }
-'''.replace("BOOT", r'''
+'''.replace("MIRROR_ROUTE", "COMBO_PORTAL_MAGIC_MIRROR" if mm else "COMBO_PORTAL_OPENING_FOREST").replace("BOOT", r'''
             SetupState state{};
             gComboStartFileNum = slot;
             MM_SetComboEntryIsResume(0);

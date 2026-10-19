@@ -2,6 +2,7 @@
 #include "combo/entrances/LostWoodsEntrance.h"
 #include "combo/entrances/SoloForest.h"
 #include "combo/gameplay/MagicMirrorAnchor.h"
+#include "combo/gameplay/MagicMirrorArrival.h"
 #include "combo/gameplay/MagicMirrorItem.h"
 #include "combo/gameplay/MagicMirrorPlayer.h"
 #include "global.h"
@@ -35,6 +36,16 @@ static u16 buttonItem;
 static u8 textState;
 static bool advance;
 static int closed;
+static bool noFloor, obstructed;
+static float floorY;
+static CollisionPoly landingFloor;
+extern "C" f32 BgCheck_EntityRaycastFloor3(CollisionContext*, CollisionPoly** poly, s32* bg, Vec3f*) {
+    *poly = noFloor ? nullptr : &landingFloor;
+    *bg = BGCHECK_SCENE;
+    return noFloor ? BGCHECK_Y_MIN : floorY;
+}
+extern "C" s32 BgCheck_EntityLineTest1(CollisionContext*, Vec3f*, Vec3f*, Vec3f*, CollisionPoly**,
+                                       s32, s32, s32, s32, s32*) { return obstructed; }
 void SetText(u16 text) {
 #ifdef MIRROR_OOT
     play.msgCtx.textId = text;
@@ -212,6 +223,12 @@ void Reset() {
     handoffs = prompts = pickups = errors = saves = 0;
     closed = 0; advance = false; textState = TEXT_STATE_NONE;
     buttonItem = EXT_ITEM_MAGIC_MIRROR;
+    noFloor = obstructed = false;
+    floorY = 0;
+    landingFloor = {};
+    landingFloor.normal.y = 32767;
+    MirrorRuntime::sArrivalPending = false;
+    MirrorRuntime::sArrivalPlay = nullptr;
 #ifdef MIRROR_OOT
     gComboGameMode = COMBO_GAME_OOT;
     Scene(SCENE_HYRULE_FIELD);
@@ -240,7 +257,109 @@ void ConfirmCast() {
   play.state.input[0].press.button = 0;
 }
 
+void LoadForest(float x, float y, float z) {
+    static Vec3s vertices[13];
+    static CollisionPoly polys[12];
+    static CollisionHeader collision;
+    vertices[0] = {static_cast<s16>(x), static_cast<s16>(y), static_cast<s16>(z)};
+    for (int i = 0; i < 12; ++i) {
+        const float angle = i * 3.14159265359f / 6;
+        vertices[i + 1] = {static_cast<s16>(std::round(x + 55 * std::cos(angle))), static_cast<s16>(y),
+                           static_cast<s16>(std::round(z + 56 * std::sin(angle)))};
+        polys[i] = {};
+        polys[i].vtxData[0] = 0;
+        polys[i].vtxData[1] = i + 1;
+        polys[i].vtxData[2] = (i + 1) % 12 + 1;
+        polys[i].normal.y = 32767;
+    }
+    collision = {};
+    collision.numVertices = 13; collision.vtxList = vertices;
+    collision.numPolygons = 12; collision.polyList = polys;
+    play.colCtx.colHeader = &collision;
+    play.roomCtx.curRoom.num = 0;
+    play.transitionTrigger = TRANS_TRIGGER_END;
+    gSaveContext.sceneLayer = 0;
+    gSaveContext.respawnFlag = 0;
+    floorY = y - 80;
+#ifdef MIRROR_OOT
+    Scene(COMBO_SOLO_FOREST_OOT_SCENE);
+    gSaveContext.entranceIndex = COMBO_SOLO_FOREST_OOT_ENTRANCE;
+    gSaveContext.cutsceneIndex = 0;
+#else
+    Scene(Combo_IsCombinedGame() ? SCENE_LOST_WOODS : COMBO_SOLO_FOREST_MM_SCENE);
+    gSaveContext.save.entrance = Combo_IsCombinedGame() ? ENTRANCE(LOST_WOODS, 0) : COMBO_SOLO_FOREST_MM_ENTRANCE;
+    gSaveContext.save.cutsceneIndex = 0;
+#endif
+}
+
+void TestArrival() {
+    // Queue in an outdoor departure, then resolve from the destination resource.
+    for (bool combined : {false, true}) {
+#ifdef MIRROR_OOT
+        if (combined) continue; // Combined OoT queues on the destination MM side.
+#endif
+        Reset();
+        if (combined) gComboGameMode = COMBO_GAME_BOTH;
+        assert(MirrorRuntime::Travel(&play));
+        MirrorRuntime::Destroy(); // The request survives scene arena destruction.
+        LoadForest(1500, 320, -1300);
+        ActorEntry original{};
+        original.pos = {11, 22, 33}; original.rot.y = 123;
+        const auto copy = original;
+        const auto respawns = gSaveContext;
+        play.linkActorEntry = &original;
+        MagicMirror_PrepareArrival(&play);
+        assert(play.linkActorEntry != &original);
+        assert(std::memcmp(&original, &copy, sizeof(original)) == 0);
+        assert(play.linkActorEntry->pos.x == 1500 && play.linkActorEntry->pos.y == 240 &&
+               play.linkActorEntry->pos.z == -1420);
+        assert(MagicMirrorAnchor::CanClaim({1500, 240, -1420}, {1500, 320, -1300}));
+#ifdef MIRROR_OOT
+        assert(play.linkActorEntry->rot.y == 0);
+#else
+        assert(((play.linkActorEntry->rot.y >> 7) & 0x1FF) == 0 && (play.linkActorEntry->rot.y & 127) == 127);
+#endif
+        assert(std::memcmp(&gSaveContext.respawn, &respawns.respawn, sizeof(respawns.respawn)) == 0);
+        MagicMirror_FinishArrival(&play);
+        assert(player.actionFunc == NativeIdle && idleRestores == 1);
+        assert(play.linkActorEntry == &original); // Preserve legacy scene-derived doorway anchors.
+        MagicMirror_FinishArrival(&play);
+        assert(idleRestores == 1);
+        play.linkActorEntry = &original;
+        MagicMirror_PrepareArrival(&play);
+        assert(play.linkActorEntry == &original); // Consumed exactly once.
+    }
+    // Moved geometry replaces the previous scene's cached anchor at the same address.
+    Reset(); LoadForest(-377, 80, 416); assert(MirrorRuntime::Locate(&play));
+    MagicMirror_QueueArrival(); LoadForest(-1500, 400, 1500);
+    ActorEntry original{}; play.linkActorEntry = &original;
+    MagicMirror_PrepareArrival(&play);
+    assert(play.linkActorEntry != &original && play.linkActorEntry->pos.x == -1500 &&
+           play.linkActorEntry->pos.z == 1380);
+    // Slot/seed/mode/scene mismatches, cutscenes, absent floor and walls fail closed.
+    for (int reason = 0; reason < 8; ++reason) {
+        Reset(); MagicMirror_QueueArrival(); LoadForest(-377, 80, 416);
+        play.linkActorEntry = &original;
+        switch (reason) {
+        case 0: ++gSaveContext.fileNum; break;
+        case 1: ++seed; break;
+        case 2: gComboGameMode = COMBO_GAME_OOT == gComboGameMode ? COMBO_GAME_MM : COMBO_GAME_OOT; break;
+        case 3: Scene(0xFFFF); break;
+        case 4: gSaveContext.cutsceneTrigger = 1; break;
+        case 5: noFloor = true; break;
+        case 6: obstructed = true; break;
+        case 7: play.colCtx.colHeader = nullptr; break;
+        }
+        MagicMirror_PrepareArrival(&play);
+        assert(play.linkActorEntry == &original && !MirrorRuntime::sArrivalPending);
+        MagicMirror_FinishArrival(&play);
+        assert(idleRestores == 0);
+    }
+    puts("PASS native stump-relative arrival, scene moves, safe fallback, cached-resource/respawn preservation and one-shot context");
+}
+
 int main() {
+    TestArrival();
     assert(FcEquip_OotToMm16(EXT_ITEM_MAGIC_MIRROR) == EXT_ITEM_MAGIC_MIRROR);
     assert(FcEquip_MmToOot16(EXT_ITEM_MAGIC_MIRROR) == EXT_ITEM_MAGIC_MIRROR);
     assert(FcEquip_OotToMm16(EXT_ITEM_MAGIC_MIRROR + 1) == 0xFF);

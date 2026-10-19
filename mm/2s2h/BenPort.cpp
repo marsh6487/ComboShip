@@ -8,6 +8,7 @@
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
 #include "ComboResolve.h"
 #include "../../combo/entrances/LostWoodsEntrance.h"
+#include "../../combo/gameplay/MagicMirrorArrival.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "2s2h/Enhancements/Camera/ComboForestArrivalCamera.h"
 #endif
@@ -221,14 +222,17 @@ extern "C" void MM_ApplyComboPortalArrival(void) {
     // Stage the exploration arrival after save loading; Play_Init consumes it
     // once and the existing title-card hook waits for the native fade to end.
     gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
-    if (sComboPortalRoute == COMBO_PORTAL_OPENING_FOREST) {
+    if (ComboLostWoods_IsOpeningForestRoute(sComboPortalRoute)) {
         gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
         gSaveContext.save.cutsceneIndex = 0;
         gSaveContext.nextCutsceneIndex = 0xFFEF;
         gSaveContext.cutsceneTrigger = 0;
         gSaveContext.save.isOwlSave = false;
         gSaveContext.respawnFlag = 0;
-        ComboForestArrivalCamera_Queue(sComboPortalRoute);
+        if (sComboPortalRoute == COMBO_PORTAL_MAGIC_MIRROR)
+            MagicMirror_QueueArrival();
+        else
+            ComboForestArrivalCamera_Queue(sComboPortalRoute);
         return;
     }
     gSaveContext.save.entrance = ENTRANCE(WOODS_OF_MYSTERY, 0);

@@ -1,5 +1,6 @@
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "entrances/LostWoodsEntrance.h"
+#include "gameplay/MagicMirrorArrival.h"
 #include "global.h"
 #include <algorithm>
 #include <cstdio>

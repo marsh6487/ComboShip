@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <limits>
 #include <vector>
 
 // Find the compact horizontal cap in the loaded collision, so Prelude can move
@@ -35,8 +34,7 @@ inline float Area(const Triangle& t) {
 }
 inline bool Candidate(const Triangle& triangle) {
     for (const auto& p : triangle.p)
-        if (!Finite(p) || std::abs(p.x) > 1100 || std::abs(p.z) > 1100 || p.y < 60 || p.y > 200 ||
-            std::abs(p.y - triangle.p[0].y) >= 1)
+        if (!Finite(p) || std::abs(p.y - triangle.p[0].y) >= 1)
             return false;
     return Area(triangle) > 1;
 }
@@ -49,7 +47,6 @@ inline bool Find(const std::vector<Triangle>& source, Point& result) {
             return false;
     }
     std::vector<bool> visited(triangles.size());
-    float best = std::numeric_limits<float>::infinity();
     bool found = false;
     for (size_t first = 0; first < triangles.size(); ++first) {
         if (visited[first])
@@ -73,15 +70,30 @@ inline bool Find(const std::vector<Triangle>& source, Point& result) {
                 }
         }
         const float width = maxX - minX, depth = maxZ - minZ;
-        if (component.size() < 4 || width < 70 || width > 260 || depth < 70 || depth > 260 ||
-            area < width * depth * 0.5f)
+        // The authored stump is a 12-triangle radial fan, with 12 rim vertices
+        // and a shared central hub. Its footprint survives Prelude translation
+        // and rotation; height and distance from the origin are not identities.
+        if (component.size() != 12 || width < 100 || width > 122 || depth < 100 || depth > 122 ||
+            area < width * depth * 0.65f || area > width * depth * 0.9f)
             continue;
-        const float rank = std::abs(width - 110) + std::abs(depth - 112);
-        if (rank < best) {
-            best = rank;
-            result = { (minX + maxX) * 0.5f, triangles[first].p[0].y, (minZ + maxZ) * 0.5f };
-            found = true;
+        const Point center{ (minX + maxX) * 0.5f, triangles[first].p[0].y, (minZ + maxZ) * 0.5f };
+        std::vector<Point> vertices;
+        bool radial = true;
+        for (const auto index : component) {
+            bool hub = false;
+            for (const auto& p : triangles[index].p) {
+                hub |= Near(p, center);
+                if (std::none_of(vertices.begin(), vertices.end(), [&](const Point& q) { return Near(p, q); }))
+                    vertices.push_back(p);
+            }
+            radial &= hub;
         }
+        if (!radial || vertices.size() != 13)
+            continue;
+        if (found)
+            return false; // An ambiguous duplicate must not steal the reward/arrival.
+        result = center;
+        found = true;
     }
     return found;
 }

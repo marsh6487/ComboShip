@@ -25,14 +25,18 @@ int main() {
     cap.push_back({ { Point{1067, 134, -34}, Point{1080, 134, 34}, Point{1067, 134, 34} } });
     assert(Find(cap, anchor));
     assert(std::abs(anchor.x + 377) < 1 && std::abs(anchor.y - 80) < 1 && std::abs(anchor.z - 416) < 1);
-    auto moved = Cap(200, 120, -300);
+    auto moved = Cap(1500, 320, -1300);
     assert(Find(moved, anchor));
-    assert(std::abs(anchor.x - 200) < 1 && std::abs(anchor.y - 120) < 1 && std::abs(anchor.z + 300) < 1);
-    auto roof = Cap(-850, 300, 220);
-    auto scene = roof;
-    scene.insert(scene.end(), moved.begin(), moved.end());
-    assert(Find(scene, anchor) && std::abs(anchor.y - 120) < 1);
-    assert(!Find(roof, anchor));
+    assert(std::abs(anchor.x - 1500) < 1 && std::abs(anchor.y - 320) < 1 && std::abs(anchor.z + 1300) < 1);
+    auto ambiguous = cap;
+    ambiguous.insert(ambiguous.end(), moved.begin(), moved.end());
+    assert(!Find(ambiguous, anchor)); // Never guess between two matching stumps.
+    auto roof = moved;
+    roof.resize(6);
+    assert(!Find(roof, anchor)); // Similar footprint, different topology.
+    auto duplicates = moved;
+    for (auto& triangle : duplicates) triangle = moved[0];
+    assert(!Find(duplicates, anchor));
     auto slope = moved;
     for (auto& triangle : slope) triangle.p[0].y += 20;
     assert(!Find(slope, anchor));
