@@ -8,6 +8,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+subprocess.run([sys.executable, '-B', str(ROOT / 'scripts/assets/prepare_chateau_romani.py')], check=True)
 
 
 def run(*args):

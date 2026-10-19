@@ -30,6 +30,7 @@ python3 -B tests/black_market/run_shelves_native_tests.py
 python3 -B tests/black_market/run_browsing_native_tests.py
 python3 -B tests/black_market/run_granny_native_tests.py
 python3 -B tests/black_market/run_granny_header_tests.py
+python3 -B tests/chateau_romani_3ds/run_bundling_tests.py
 python3 -B tests/woods_mystery/run_hex_test.py
 python3 -B tests/woods_mystery/run_active_pack_test.py
 python3 -B tests/black_market/run_scene_music_tests.py

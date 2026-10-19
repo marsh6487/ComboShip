@@ -101,3 +101,9 @@ x64/
 # scratch + backup dirs of the local NEI port tooling
 .nei-port-tmp/
 .nei-port-backup/
+
+# Expanded from the checked-in compressed Chateau resource before packaging.
+/soh/assets/custom/objects/combo_chateau_romani_3ds/AtlasTex
+/mm/assets/custom/objects/combo_chateau_romani_3ds/AtlasTex
+/tools/chateau_romani_3ds/hd/Atlas-4K.png
+/tools/chateau_romani_3ds/bundled/AtlasTex.zlib

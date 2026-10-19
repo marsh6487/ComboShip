@@ -435,6 +435,8 @@ add_custom_target(
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-asset-collisions.py
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Checking custom asset trees for new path collisions...")
+include(CMake/ChateauRomaniAssets.cmake)
+add_dependencies(CheckAssetCollisions PrepareChateauRomaniAssets)
 add_dependencies(combo CheckAssetCollisions)
 include(CMake/NeiRewardGiAssets.cmake)
 

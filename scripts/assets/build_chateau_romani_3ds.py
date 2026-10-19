@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Convert cor's supplied MM3D Chateau GI to both ports' native resources.
+"""Convert Chateau MM3D with its packed 4K atlas and clear glass materials.
 
-No ROM, Blender, image generation, or runtime archive extraction is needed.
-The authored mesh, diffuse atlas and reflection-map RGB pixels are retained.
+The preserved original ZIP supplies the unmodified mesh/UVs and gold reflection.
+The checked-in reconstructed atlas supplies the label and cork detail.
 """
 from __future__ import annotations
 
@@ -94,6 +94,22 @@ def texture(image, reflection=False):
     return o2r._header(o2r.T_OTEX) + struct.pack('<IIII', 1, width, height, pixels.nbytes) + pixels.tobytes()
 
 
+def hd_texture(image, reflection=False):
+    expected, native = (512, 32) if reflection else (4096, 64)
+    if image.size != (expected, expected):
+        raise ValueError(f'The packed HD texture must be {expected} x {expected}')
+    pixels = np.array(image.convert('RGBA'))
+    if reflection:
+        pixels[:, :, 3] = np.max(pixels[:, :, :3], axis=2)
+    # Texture V1 / LOAD_AS_RAW. The display-list tile remains 64 x 64, keeping
+    # all signed vertex UVs and 12-bit tile coordinates unchanged. Scaling is
+    # explicit metadata rather than overflowing native GBI fields with 4K.
+    return (o2r._header(o2r.T_OTEX, 1)
+            + struct.pack('<IIIIffI', 1, expected, expected, 1,
+                          float(expected/native), float(expected/native), pixels.nbytes)
+            + pixels.tobytes())
+
+
 def combine(lit):
     # (TEXEL0 - 0) * SHADE/PRIMITIVE + 0; alpha TEXEL0 * PRIMITIVE.
     c = 4 if lit else 3
@@ -151,7 +167,7 @@ def wrapper(files, path, children):
     files[path] = d.to_resource()
 
 
-def build(source):
+def build(source, hd=True):
     source_bytes = source.read_bytes()
     if hashlib.sha256(source_bytes).hexdigest() != SOURCE_SHA256:
         raise ValueError('Input differs from the preserved user-supplied MM3D ZIP')
@@ -164,11 +180,20 @@ def build(source):
         files[PREFIX + 'AtlasTex'] = texture(atlas)
         files[PREFIX + 'GlassReflectionTex'] = texture(glass_map, True)
         files[PREFIX + 'GoldReflectionTex'] = texture(gold_map, True)
+    if hd:
+        from prepare_chateau_romani import prepare_source_art
+        prepare_source_art()
+        hd_atlas = ROOT / 'tools/chateau_romani_3ds/hd/Atlas-4K.png'
+        with Image.open(hd_atlas) as image:
+            files[PREFIX + 'AtlasTex'] = hd_texture(image)
+        hd_reflection = ROOT / 'tools/chateau_romani_3ds/hd/Glass-Reflection.png'
+        with Image.open(hd_reflection) as image:
+            files[PREFIX + 'GlassReflectionTex'] = hd_texture(image, reflection=True)
     for role in ('Milk', 'Cork', 'Glass', 'Label'):
         emit_material(files, 'GlassSurface' if role == 'Glass' else role, mesh[role],
-                      'AtlasTex', atlas.size, 128 if role == 'Glass' else 255)
-    emit_material(files, 'GlassReflection', mesh['Glass'], 'GlassReflectionTex', glass_map.size, 100, True)
-    emit_material(files, 'LabelReflection', mesh['Label'], 'GoldReflectionTex', gold_map.size, 55, True)
+                      'AtlasTex', atlas.size, (46 if hd else 128) if role == 'Glass' else 255)
+    emit_material(files, 'GlassReflection', mesh['Glass'], 'GlassReflectionTex', glass_map.size, 110 if hd else 100, True)
+    emit_material(files, 'LabelReflection', mesh['Label'], 'GoldReflectionTex', gold_map.size, 40 if hd else 55, True)
     wrapper(files, PREFIX + 'OpaqueDL', ['Milk', 'Cork'])
     # Label after glass preserves the rich burgundy; glass cannot wash it out.
     wrapper(files, PREFIX + 'GlassDL', ['GlassSurface', 'GlassReflection', 'Label', 'LabelReflection'])
@@ -177,7 +202,7 @@ def build(source):
     label_pixels = np.array(atlas)[17:63, 1:63, :3].reshape(-1, 3)
     label_colors = Counter(tuple(map(int, p)) for p in label_pixels if p[0] > p[1] * 1.6 and p[2] > p[1] * 1.6)
     label_rgb = label_colors.most_common(1)[0][0]
-    manifest = {'candidate': 'Chateau Romani MM3D POC1', 'source_sha256': SOURCE_SHA256,
+    manifest = {'candidate': 'Chateau Romani MM3D 4K clear glass POC2' if hd else 'Chateau Romani MM3D POC1', 'source_sha256': SOURCE_SHA256,
                 'source_credit': 'Nintendo / Grezzo; model ripped by Guy for The Models Resource',
                 'source_triangles': {role: len(v['position']) // 3 for role, v in mesh.items()},
                 'draw_triangles': {'opaque': 96, 'translucent_including_reflections': 376},
@@ -185,6 +210,15 @@ def build(source):
                 'shimmer': {'label_hex': '#4A0C41', 'gold_hex': '#FFD45A'},
                 'alternate_assets': True, 'runtime_tested': False,
                 'resources': {k: hashlib.sha256(v).hexdigest() for k, v in sorted(files.items())}}
+    if hd:
+        manifest['hd_atlas'] = {'file': 'tools/chateau_romani_3ds/hd/Atlas-4K.png',
+                                'size': [4096, 4096], 'native_tile': [64, 64],
+                                'flags': 1, 'h_byte_scale': 64., 'v_pixel_scale': 64.,
+                                'sha256': hashlib.sha256(hd_atlas.read_bytes()).hexdigest(),
+                                'artwork': 'AI reconstructed from original 64x64 atlas; generated 1254x1254, UV packed and resampled to 4K'}
+        manifest['hd_reflection'] = {'file': 'tools/chateau_romani_3ds/hd/Glass-Reflection.png',
+                                     'size': [512,512], 'native_tile': [32,32],
+                                     'sha256': hashlib.sha256(hd_reflection.read_bytes()).hexdigest()}
     return files, manifest
 
 
@@ -203,8 +237,9 @@ def main():
     parser.add_argument('--source', type=Path, default=ROOT / 'tools/chateau_romani_3ds/source.zip')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--write-custom', action='store_true')
+    parser.add_argument('--native-textures', action='store_true', help='Explicit POC1 recovery build')
     args = parser.parse_args()
-    files, manifest = build(args.source)
+    files, manifest = build(args.source, hd=not args.native_textures)
     if args.write_custom:
         for game in ('soh', 'mm'):
             for path, content in files.items():
@@ -212,6 +247,9 @@ def main():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(content)
         (ROOT / 'tools/chateau_romani_3ds/manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+        if not args.native_textures:
+            from prepare_chateau_romani import write_bundle
+            write_bundle(files[PREFIX + 'AtlasTex'])
     if args.output:
         write_archive(files, args.output)
     print(json.dumps({'resources': len(files), 'label_hex': manifest['label_hex'],

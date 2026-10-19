@@ -11,7 +11,7 @@ import sys
 import zipfile
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts/npc_models'))
@@ -89,8 +89,23 @@ class Graph:
 
 def preview(graph, opaque, glass, output):
     angles = [0, 45, 180]
-    sheet = Image.new('RGB', (1200, 460), '#111622')
+    size = 800
+    sheet = Image.new('RGB', (size * 3, 920), '#111622')
     canvas = ImageDraw.Draw(sheet)
+    try:
+        font = ImageFont.truetype('DejaVuSans.ttf', 21)
+    except OSError:
+        font = ImageFont.load_default()
+    textures = {}
+    for _, material in opaque + glass:
+        path = material['texture']
+        if path not in textures:
+            raw = graph.files[path]
+            _, w, h, pixels = read_texture(raw)
+            tex = Tex(np.frombuffer(pixels, np.uint8).reshape(h, w, 4), 2, 2)
+            if struct.unpack_from('<I', raw, 8)[0] == 1:
+                tex.scale_s, tex.scale_t = struct.unpack_from('<ff', raw, 80)
+            textures[path] = tex
     for view, angle in enumerate(angles):
         a = np.radians(angle)
         camera = np.array([[np.cos(a), 0, np.sin(a)], [0, 1, 0], [-np.sin(a), 0, np.cos(a)]])
@@ -102,18 +117,17 @@ def preview(graph, opaque, glass, output):
             st = np.array([v[4:6] for v in vertices], float)
             if material['geom'] & 0x40000:
                 st = (normals[:, :2] + 1) / 4 * material['scale']
-            _, w, h, pixels = read_texture(graph.files[material['texture']])
-            tex = Tex(np.frombuffer(pixels, np.uint8).reshape(h, w, 4), 2, 2)
+            tex = textures[material['texture']]
             tile = TileState(cms=2, cmt=2, prim=(255, 255, 255, material['prim']),
                              othermode_l=(0, 0x4000), combine_alpha_uses_prim=True)
             shade = (.6 + .4 * np.maximum(normals @ np.array([.35, .75, .55]), 0)
                      if material['lit'] else np.ones(3))
             vv = tuple(Vertex(0, 0, 0, int(uv[0]), int(uv[1]), 255, 255, 255, 255) for uv in st)
             triangles.append((Triangle(vv, tile), xyz, [(float(c),) * 3 for c in shade], tex))
-        image = render(triangles, {}, size=400, bg=(17, 22, 34, 255), supersample=2, cull=1)
-        sheet.paste(image.convert('RGB'), (view * 400, 25))
-        canvas.text((view * 400 + 15, 13), f'{angle} degrees', fill='white')
-    canvas.text((20, 430), 'Exported-resource render - static material review; not an in-game capture', fill='#AAB8CF')
+        image = render(triangles, {}, size=size, bg=(17, 22, 34, 255), supersample=2, cull=1)
+        sheet.paste(image.convert('RGB'), (view * size, 50))
+        canvas.text((view * size + 28, 18), f'{angle} degrees', fill='white', font=font)
+    canvas.text((28, 875), '4K label / detailed cork / clear glass - exported-resource render; in-game review pending', fill='#AAB8CF', font=font)
     output.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(output)
 
@@ -152,13 +166,27 @@ def main():
         for target, source in [('AtlasTex', '0'), ('GlassReflectionTex', '2100'), ('GoldReflectionTex', '2000')]:
             _, w, h, raw = read_texture(files[PREFIX + target])
             actual = np.frombuffer(raw, np.uint8).reshape(h, w, 4)
-            expected = np.array(Image.open(io.BytesIO(original.read('zelda_gi_superm_' + source + '.png'))).convert('RGBA'))
+            if target == 'AtlasTex' and manifest.get('hd_atlas'):
+                expected = np.array(Image.open(ROOT / manifest['hd_atlas']['file']).convert('RGBA'))
+            elif target == 'GlassReflectionTex' and manifest.get('hd_reflection'):
+                expected = np.array(Image.open(ROOT / manifest['hd_reflection']['file']).convert('RGBA'))
+                assert np.array_equal(actual[:,:,3], actual[:,:,:3].max(axis=2))
+            else:
+                expected = np.array(Image.open(io.BytesIO(original.read('zelda_gi_superm_' + source + '.png'))).convert('RGBA'))
             assert np.array_equal(actual[:, :, :3], expected[:, :, :3])
+    if manifest.get('hd_atlas'):
+        sys.path.insert(0, str(ROOT / 'scripts/assets'))
+        import build_chateau_romani_3ds as builder
+        from verify_hd import verify_hd
+        baseline, _ = builder.build(ROOT / 'tools/chateau_romani_3ds/source.zip', hd=False)
+        verify_hd(files, baseline)
     if args.preview:
         preview(graph, opaque, glass, args.preview)
     print(json.dumps({'result': 'PASS', 'resources': len(files), 'triangles': len(opaque) + len(glass),
                       'unresolved_references': 0, 'cycles': 0, 'degenerate_triangles': 0,
-                      'native_height': 60, 'both_port_copies_match': True, 'source_texture_rgb_preserved': True}))
+                      'native_height': 60, 'both_port_copies_match': True,
+                      'packed_texture_pixels_verified': True, 'original_gold_reflection_rgb_preserved': True,
+                      'hd_atlas': manifest.get('hd_atlas', {}).get('size'), 'runtime_proven': False}))
 
 
 if __name__ == '__main__':
