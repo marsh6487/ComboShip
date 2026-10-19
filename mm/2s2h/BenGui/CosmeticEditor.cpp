@@ -8,6 +8,7 @@
 #include <fast/Fast3dWindow.h>
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
+#include "BlackMarketShelves.h"
 #include <ship/resource/CrossRMRegistry.h>
 #include <ship/resource/ResourceManagerScope.h>
 #endif
@@ -160,6 +161,10 @@ std::map<std::string, CosmeticOption> cosmeticOptions = {
     COSMETIC_OPTION("Collectibles.RupeePurple",     "Purple Rupee",                     COSMETICS_GROUP_COLLECTIBLES,       ColorRGBA8(255,  99, 231, 255), false, true, false),
     COSMETIC_OPTION("Collectibles.RupeeOrange",     "Orange Rupee",                     COSMETICS_GROUP_COLLECTIBLES,       ColorRGBA8(247, 148,  33, 255), false, true, false),
     COSMETIC_OPTION("Collectibles.RupeeSilver",     "Silver Rupee",                     COSMETICS_GROUP_COLLECTIBLES,       ColorRGBA8(189, 189, 198, 255), false, true, false),
+#ifdef COMBO_BUILD
+    COSMETIC_OPTION("World.BlackMarketShelves", "Black Market Shelves", COSMETICS_GROUP_WORLD,
+        ColorRGBA8(BlackMarketShelves::kDefaultTint[0],BlackMarketShelves::kDefaultTint[1],BlackMarketShelves::kDefaultTint[2],255), false, true, false),
+#endif
     COSMETIC_OPTION("World.TatlInner",              "Tatl Inner",                       COSMETICS_GROUP_WORLD,              ColorRGBA8(255, 255, 230, 255), false, true, false),
     COSMETIC_OPTION("World.TatlOuter",              "Tatl Outer",                       COSMETICS_GROUP_WORLD,              ColorRGBA8(220, 160,  80, 255), false, true, false),
     COSMETIC_OPTION("World.RaceDogBlue",            "Blue Racedog",                     COSMETICS_GROUP_WORLD,              ColorRGBA8( 79,  79, 143, 255), false, true, false),

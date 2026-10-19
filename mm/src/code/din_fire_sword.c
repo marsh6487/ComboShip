@@ -1,6 +1,7 @@
 #include "global.h"
 #include "align_asset_macro.h"
 #include "din_fire_sword.h"
+#include "sword_element.h"
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "mods/nei_save.h"
@@ -11,6 +12,8 @@
 #include <libultraship/bridge/resourcebridge.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <math.h>
+#include "../../../combo/render/sword_element_aura.h"
+#include "../../../combo/render/sword_element_aura_identity.h"
 #include "mods/items/logic/weapon_upgrades.h"
 extern s32 BossRemains_IsOdolwaWorn(void);
 extern s32 BossRemains_IsGohtWorn(void);
@@ -57,12 +60,32 @@ static struct {
     PlayState* play;
     Player* player;
     Mtx* handMatrix;
+    u32 frame;
+    s32 model, rig, logicalModel;
+    void* fittedHand;
+    s32 fittedModel;
+    u8 element;
 } sDraw;
 
 void DinFireSword_BeginPlayerDraw(PlayState* play, Player* player) {
     sDraw.play = play != NULL && player == GET_PLAYER(play) ? play : NULL;
     sDraw.player = sDraw.play != NULL ? player : NULL;
     sDraw.handMatrix = NULL;
+    sDraw.fittedHand = NULL;
+    sDraw.fittedModel = -1;
+}
+
+void DinFireSword_SetHandModel(Player* player, void* handDL, int model) {
+    if (sDraw.play == NULL || sDraw.player == NULL || (player != NULL && player != sDraw.player) || handDL == NULL ||
+        model < 0 || model >= SWORD_AURA_MODEL_COUNT)
+        return;
+    sDraw.fittedHand = handDL;
+    sDraw.fittedModel = model;
+}
+
+void DinFireSword_CopyHandModel(Player* player, void* sourceDL, void* destinationDL) {
+    if (sDraw.play != NULL && sDraw.player == player && sourceDL == sDraw.fittedHand && destinationDL != NULL)
+        sDraw.fittedHand = destinationDL;
 }
 
 static s32 DinFireSword_Profile(Player* player) {
@@ -85,6 +108,7 @@ static s32 DinFireSword_Profile(Player* player) {
 
 static s32 DinFireSword_Eligible(PlayState* play, Player* player) {
     if (play == NULL || player == NULL || player != GET_PLAYER(play) ||
+        (SwordElement_HasSelection(player->heldItemId) && SwordElement_Get(player->heldItemId) != SWORD_ELEMENT_FIRE) ||
         !CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0) || !ResourceMgr_IsAltAssetsEnabled() ||
         (player->transformation != PLAYER_FORM_HUMAN || CustomForms_ActiveForm() != CUSTOM_FORM_NONE) ||
         BossRemains_IsOdolwaWorn() || BossRemains_IsGohtWorn() || player->actor.scale.y <= 0.0f ||
@@ -99,6 +123,64 @@ static s32 DinFireSword_Eligible(PlayState* play, Player* player) {
             return false;
     }
     return ResourceMgr_FileExists(sEquipment[(AdultLink_IsActive() ? 0 : 1)]);
+}
+
+static s32 DinFireSword_AuraModel(Player* player) {
+    if (player->heldItemId != ITEM_SWORD_KOKIRI && player->heldItemId != ITEM_SWORD_MASTER &&
+        player->heldItemId != ITEM_SWORD_BGS && player->heldItemId != ITEM_SWORD_KNIFE &&
+        player->heldItemId != ITEM_SWORD_RAZOR && player->heldItemId != ITEM_SWORD_GILDED &&
+        player->heldItemId != ITEM_SWORD_GREAT_FAIRY)
+        return -1;
+    if (player->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD) {
+        if (player->heldItemId == ITEM_SWORD_RAZOR && player->heldItemAction == PLAYER_IA_SWORD_RAZOR)
+            return SWORD_AURA_RAZOR_SWORD;
+        if (player->heldItemId == ITEM_SWORD_GILDED && player->heldItemAction == PLAYER_IA_SWORD_GILDED)
+            return SWORD_AURA_GILDED_SWORD;
+        if (player->heldItemId == ITEM_SWORD_KOKIRI && player->heldItemAction == PLAYER_IA_SWORD_KOKIRI) {
+            u8 level = WeaponUpgrade_KokiriLevel();
+            return level >= 2 && CVarGetInteger("gEnhancements.SkijerNEI.GildedUsesGildedLook", 1)
+                       ? SWORD_AURA_GILDED_SWORD
+                   : level ? SWORD_AURA_RAZOR_SWORD
+                           : SWORD_AURA_MM_KOKIRI_SWORD;
+        }
+        if (player->heldItemId == ITEM_SWORD_MASTER && player->heldItemAction == PLAYER_IA_SWORD_MASTER)
+            return WeaponUpgrade_HasTrueMaster() ? SWORD_AURA_TRUE_MASTER_SWORD : SWORD_AURA_MASTER_SWORD;
+    }
+    if (player->heldItemAction == PLAYER_IA_SWORD_TWO_HANDED &&
+        player->leftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD) {
+        if (player->heldItemId == ITEM_SWORD_GREAT_FAIRY ||
+            (WeaponUpgrade_HasGreatFairy() && CVarGetInteger("gEnhancements.SkijerNEI.BgsUsesGfsLook", 1)))
+            return SWORD_AURA_GREAT_FAIRY_SWORD;
+        if (player->heldItemId == ITEM_SWORD_KNIFE)
+            return SWORD_AURA_BROKEN_KNIFE;
+        if (player->heldItemId == ITEM_SWORD_BGS)
+            return SWORD_AURA_BIGGORON_SWORD;
+    }
+    return -1;
+}
+
+static s32 DinFireSword_AuraRig(Player* player) {
+    return AdultLink_UsesAdultPresentation(player) ? 0 : 2;
+}
+
+static u8 DinFireSword_SelectedAura(PlayState* play, Player* player) {
+    if (play == NULL || player == NULL || player != GET_PLAYER(play) ||
+        (player->transformation != PLAYER_FORM_HUMAN || CustomForms_ActiveForm() != CUSTOM_FORM_NONE) ||
+        BossRemains_IsOdolwaWorn() || BossRemains_IsGohtWorn() || ExtEquip_ShouldHideSwordDL() ||
+        FourSword_IsEquipped() || player->actor.scale.y <= 0.0f || player->csAction != 0 ||
+        (player->stateFlags1 & (PLAYER_STATE1_DEAD | PLAYER_STATE1_8000000)) ||
+        (player->stateFlags2 & PLAYER_STATE2_20000000) || play->transitionTrigger != TRANS_TRIGGER_OFF ||
+        DinFireSword_AuraModel(player) < 0)
+        return SWORD_ELEMENT_NONE;
+    return SwordElement_Active(play, player);
+}
+
+static s32 DinFireSword_ShouldDraw(PlayState* play, Player* player) {
+    if (play == NULL || player == NULL || player != GET_PLAYER(play))
+        return false;
+    if (SwordElement_HasSelection(player->heldItemId))
+        return DinFireSword_SelectedAura(play, player) != SWORD_ELEMENT_NONE;
+    return DinFireSword_Eligible(play, player);
 }
 
 static s32 DinFireSword_SameContext(PlayState* play, Player* player) {
@@ -117,7 +199,7 @@ void DinFireSword_Reset(void) {
 void DinFireSword_Update(PlayState* play, Player* player) {
     if (play == NULL || player == NULL || player != GET_PLAYER(play))
         return;
-    if (!DinFireSword_Eligible(play, player)) {
+    if (!DinFireSword_ShouldDraw(play, player)) {
         DinFireSword_Reset();
         return;
     }
@@ -150,7 +232,8 @@ static s32 DinFireSword_Load(s32 age, Gfx** core, Gfx** flame) {
 }
 
 void* DinFireSword_HandDL(PlayState* play, Player* player, void* closedHand) {
-    if (closedHand == NULL || !DinFireSword_Eligible(play, player))
+    if (closedHand == NULL || (player != NULL && SwordElement_HasSelection(player->heldItemId)) ||
+        !DinFireSword_Eligible(play, player))
         return NULL;
     s32 profile = DinFireSword_Profile(player);
     s32 upgraded = DinFireSword_IsUpgrade(player);
@@ -175,8 +258,19 @@ void* DinFireSword_HandDL(PlayState* play, Player* player, void* closedHand) {
 }
 
 uint32_t DinFireSword_DamageFlags(PlayState* play, Player* player, uint32_t original) {
-    if (!CVarGetInteger(CVAR_ENHANCEMENT("DinFireSwordDamage"), 0) || !(original & DMG_SWORD) ||
-        (original & ~((u32)DMG_SWORD)) || !DinFireSword_Eligible(play, player))
+    if (!(original & DMG_SWORD) || (original & ~((u32)DMG_SWORD)))
+        return original;
+    switch (SwordElement_Active(play, player)) {
+        case SWORD_ELEMENT_FIRE:
+            return original | DMG_FIRE_ARROW;
+        case SWORD_ELEMENT_ICE:
+            return original | DMG_ICE_ARROW;
+        case SWORD_ELEMENT_LIGHT:
+            return original | DMG_LIGHT_ARROW;
+    }
+    if ((player != NULL && SwordElement_HasSelection(player->heldItemId)) ||
+        !SwordElement_IsAvailable(SWORD_ELEMENT_FIRE) || !CVarGetInteger(CVAR_ENHANCEMENT("DinFireSwordDamage"), 0) ||
+        !DinFireSword_Eligible(play, player))
         return original;
     Gfx *core, *flame;
     if (!DinFireSword_Load(DinFireSword_Profile(player), &core, &flame))
@@ -249,7 +343,9 @@ uint32_t DinFireSword_OriginalDamageFlags(PlayState* play, const ColliderElement
         return flags;
     for (int quad = 0; quad < 2; ++quad) {
         if (hitInfo == &sDamage.player->meleeWeaponQuads[quad].elem && sDamage.known[quad] &&
-            flags == sDamage.applied[quad] && flags == (sDamage.original[quad] | DMG_FIRE_ARROW))
+            flags == sDamage.applied[quad] &&
+            (flags == (sDamage.original[quad] | DMG_FIRE_ARROW) || flags == (sDamage.original[quad] | DMG_ICE_ARROW) ||
+             flags == (sDamage.original[quad] | DMG_LIGHT_ARROW)))
             return sDamage.original[quad];
     }
     return flags;
@@ -264,17 +360,44 @@ uint8_t DinFireSword_DamageEntry(PlayState* play, Actor* target, const ColliderE
         return vanillaEntry;
 
     DamageTable* table = target->colChkInfo.damageTable;
-    u8 fireEntry = table->attack[0x0B];
-    // This receiver admitted only the added fire bit (e.g. a fire-only target).
+    u32 elementFlag = hitInfo->atDmgInfo.dmgFlags ^ original;
+    int elementIndex = elementFlag == DMG_FIRE_ARROW ? 0x0B : elementFlag == DMG_ICE_ARROW ? 0x0C : 0x0D;
+    u8 elementEntry = table->attack[elementIndex];
     if (!(original & receiverFlags))
-        return (receiverFlags & DMG_FIRE_ARROW) ? fireEntry : vanillaEntry;
+        return (receiverFlags & elementFlag) ? elementEntry : vanillaEntry;
 
     int index = 0;
     for (u32 flags = original; flags > 1; flags >>= 1)
         ++index;
     u8 swordEntry = table->attack[index];
-    if (!(receiverFlags & DMG_FIRE_ARROW))
+    if (!(receiverFlags & elementFlag))
         return swordEntry;
+
+    if (elementFlag != DMG_FIRE_ARROW) {
+        // Preserve the native sword multiplier. Element multipliers belong to
+        // projectiles; only these actors' audited visual/state effect is added.
+        // Baba's cut/stick route and inert/immune element rows stay native.
+        if (!(elementEntry & 0xF))
+            return swordEntry;
+        switch (target->id) {
+            case ACTOR_EN_WF:
+            case ACTOR_EN_WALLMAS:
+            case ACTOR_EN_FLOORMAS:
+            case ACTOR_EN_CROW:
+            case ACTOR_EN_DEKUNUTS:
+            case ACTOR_EN_PEEHAT:
+            case ACTOR_EN_FIREFLY:
+            case ACTOR_EN_DINOFOS:
+                return (swordEntry & 0xF) | (elementEntry & 0xF0);
+            case ACTOR_EN_RD:
+            case ACTOR_EN_FZ:
+                if (elementFlag == DMG_LIGHT_ARROW)
+                    return (swordEntry & 0xF) | (elementEntry & 0xF0);
+                break;
+        }
+        return swordEntry;
+    }
+    u8 fireEntry = elementEntry;
 
     // A fire-vulnerable target can still accept a sword with an inert sword row.
     if (swordEntry == 0 && (fireEntry & 0xF))
@@ -300,8 +423,11 @@ uint8_t DinFireSword_DamageEntry(PlayState* play, Actor* target, const ColliderE
 }
 
 int DinFireSword_IsFireHit(PlayState* play, const ColliderElement* hitInfo) {
-    return hitInfo != NULL && (hitInfo->atDmgInfo.dmgFlags == DMG_FIRE_ARROW ||
-                               DinFireSword_OriginalDamageFlags(play, hitInfo) != hitInfo->atDmgInfo.dmgFlags);
+    if (hitInfo == NULL)
+        return false;
+    u32 flags = hitInfo->atDmgInfo.dmgFlags;
+    return flags == DMG_FIRE_ARROW ||
+           (DinFireSword_OriginalDamageFlags(play, hitInfo) != flags && (flags & DMG_FIRE_ARROW));
 }
 
 static void DinFireSword_Material(Gfx** display, s32 flame, Color_RGB8 core, Color_RGB8 outer, u16 phase) {
@@ -358,12 +484,48 @@ static void DinFireSword_DrawLayers(PlayState* play, s32 profile, u16 phase, Mtx
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-void DinFireSword_Draw(PlayState* play, Player* player) {
+static void DinFireSword_DrawSelectedAura(PlayState* play, u8 element, s32 model, s32 rig, Mtx* matrix) {
+    const SwordAuraGeometry* geometry = &sSwordAuraGeometry[model][rig];
+    Color_RGB8 core = { 210, 245, 255 }, outer = { 54, 168, 255 };
+    if (element == SWORD_ELEMENT_LIGHT) {
+        core = (Color_RGB8){ 255, 255, 235 };
+        outer = (Color_RGB8){ 255, 210, 106 };
+    } else if (element == SWORD_ELEMENT_FIRE) {
+        Color_RGBA8 c = CosmeticEditor_GetChangedColor(255, 225, 122, 255, "Custom.DinFireSwordCore");
+        Color_RGBA8 o = CosmeticEditor_GetChangedColor(255, 43, 3, 255, "Custom.DinFireSwordOuter");
+        core = (Color_RGB8){ c.r, c.g, c.b };
+        outer = (Color_RGB8){ o.r, o.g, o.b };
+    }
+
+    OPEN_DISPS(play->state.gfxCtx);
+    if (element == SWORD_ELEMENT_FIRE) {
+        Gfx_SetupDL25_Opa(play->state.gfxCtx);
+        gSPMatrix(POLY_OPA_DISP++, matrix, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+        SwordAura_Material(&POLY_OPA_DISP, element, false, core, outer, sSword.phase);
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)geometry->core);
+        gDPPipeSync(POLY_OPA_DISP++);
+        Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    }
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    gSPMatrix(POLY_XLU_DISP++, matrix, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
+    if (element != SWORD_ELEMENT_FIRE) {
+        SwordAura_Material(&POLY_XLU_DISP, element, false, core, outer, sSword.phase);
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)geometry->core);
+        gDPPipeSync(POLY_XLU_DISP++);
+    }
+    SwordAura_Material(&POLY_XLU_DISP, element, true, core, outer, sSword.phase);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)(element == SWORD_ELEMENT_FIRE ? geometry->flame : geometry->tight));
+    gDPPipeSync(POLY_XLU_DISP++);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
+static void DinFireSword_CaptureHand(PlayState* play, Player* player, void* finalHandDL) {
     if (play == NULL || player == NULL || player != GET_PLAYER(play))
         return;
     if (player->actor.scale.y < 0.0f)
         return;
-    if (!DinFireSword_Eligible(play, player)) {
+    if (!DinFireSword_ShouldDraw(play, player)) {
         DinFireSword_Reset();
         return;
     }
@@ -373,18 +535,48 @@ void DinFireSword_Draw(PlayState* play, Player* player) {
     // Later mask/boot draws can change the interpolation base as well as the
     // current matrix. Reusing this recorded matrix preserves sword alignment.
     OPEN_DISPS(play->state.gfxCtx);
+    sDraw.frame = play->gameplayFrames;
+    sDraw.element = DinFireSword_SelectedAura(play, player);
+    sDraw.logicalModel = sDraw.model = DinFireSword_AuraModel(player);
+    if (finalHandDL != NULL) {
+        if (finalHandDL == sDraw.fittedHand && sDraw.fittedModel >= 0) {
+            sDraw.model = sDraw.fittedModel;
+        } else if (memcmp(finalHandDL, "__OTR__", 7) == 0) {
+            int native = SwordAura_ResourceModel((const char*)finalHandDL, NULL, 0);
+            if (native >= 0)
+                sDraw.model = native;
+        }
+    }
+    sDraw.rig = DinFireSword_AuraRig(player);
     sDraw.handMatrix = Matrix_Finalize(play->state.gfxCtx);
     CLOSE_DISPS(play->state.gfxCtx);
+}
+
+void DinFireSword_Draw(PlayState* play, Player* player) {
+    DinFireSword_CaptureHand(play, player, NULL);
+}
+
+void DinFireSword_DrawHand(PlayState* play, Player* player, void* finalHandDL) {
+    if (finalHandDL != NULL)
+        DinFireSword_CaptureHand(play, player, finalHandDL);
 }
 
 void DinFireSword_DrawAfterPlayer(PlayState* play, Player* player) {
     if (sDraw.play != play || sDraw.player != player)
         return;
     Mtx* matrix = sDraw.handMatrix;
+    u32 frame = sDraw.frame;
+    u8 element = sDraw.element;
+    s32 model = sDraw.model, rig = sDraw.rig, logical = sDraw.logicalModel;
     DinFireSword_BeginPlayerDraw(NULL, NULL);
-    if (matrix == NULL || !DinFireSword_Eligible(play, player) || !DinFireSword_SameContext(play, player))
+    if (matrix == NULL || frame != play->gameplayFrames || !DinFireSword_ShouldDraw(play, player) ||
+        !DinFireSword_SameContext(play, player) || element != DinFireSword_SelectedAura(play, player))
         return;
-    // Stay in OPA for the core so room transparency still composites over it.
-    // No custom body colors need to be guessed or overwritten at the hand.
-    DinFireSword_DrawLayers(play, DinFireSword_Profile(player), sSword.phase, matrix);
+    if (element != SWORD_ELEMENT_NONE) {
+        if (logical != DinFireSword_AuraModel(player) || rig != DinFireSword_AuraRig(player))
+            return;
+        DinFireSword_DrawSelectedAura(play, element, model, rig, matrix);
+    } else {
+        DinFireSword_DrawLayers(play, DinFireSword_Profile(player), sSword.phase, matrix);
+    }
 }

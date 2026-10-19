@@ -60,6 +60,10 @@ void AudioSeq_StartSequence(u8 seqPlayerIndex, u16 seqId, u16 seqArgs, u16 fadeI
 
     if (!sStartSeqDisabled || (seqPlayerIndex == SEQ_PLAYER_SFX)) {
         resolvedSeqId = AudioSeq_ResolveSequence(seqId);
+#ifdef COMBO_BUILD
+        if (seqPlayerIndex == SEQ_PLAYER_BGM_MAIN)
+            resolvedSeqId = AudioEditor_ResolveSceneSequence(seqId, resolvedSeqId);
+#endif
         seqArgs &= 0x7F;
         if (seqArgs == 0x7F) {
             // `fadeInDuration` interpreted as seconds, 60 is refresh rate and does not account for PAL

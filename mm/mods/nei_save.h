@@ -324,6 +324,14 @@ typedef struct NeiSaveData {
     // Appended so existing saves retain their season pickups and inventory cells.
     uint8_t seasonsRodOwned;
     uint8_t seasonsGates;
+    // Fixed Termina Field Saria gift, independent of consumable hint/song ownership.
+    // Append for old saves; local MM completion state, never mirrored to OoT.
+    uint8_t comboSariaSongClaimed;
+    // Local per-file sword choices, appended to preserve existing field offsets.
+    // Kokiri, Master, Biggoron, Giant's Knife, Razor, Gilded, True Master, Great Fairy.
+    // The set mask distinguishes an explicit None from untouched legacy fire settings.
+    uint8_t swordElements[8]; // 0 None, 1 Fire, 2 Ice, 3 Light; fixed wire order
+    uint8_t swordElementSet;
 } NeiSaveData;
 
 // Hookshot-cell variant ids (which item currently fires from SLOT_HOOKSHOT). Returned by

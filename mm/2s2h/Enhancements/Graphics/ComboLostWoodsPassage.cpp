@@ -6,6 +6,8 @@
 #include "2s2h/ShipInit.hpp"
 #include "../../../../combo/entrances/LostWoodsEntrance.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "2s2h/Enhancements/Gameplay/ComboSoloForest.h"
+#include "ComboForestPortalEffect.h"
 #include <array>
 #include <cmath>
 
@@ -54,10 +56,10 @@ void BuildPassage() {
 } // namespace
 
 static void DrawPassage() {
-    if (!Combo_IsCombinedGame())
+    if (!Combo_IsCombinedGame() && !ComboSoloForestMm_PassageAvailable())
         return;
     if (ComboOpeningForest_UsesPackTunnel(gPlayState))
-        return; // The active MM3D mesh already draws the authored tunnel and pink light.
+        return; // The active MM3D mesh owns the doorway; never draw a second arch.
     const bool openingForest = ComboOpeningForest_IsExploration(gPlayState) && gPlayState->roomCtx.curRoom.num == 0 &&
                                gPlayState->linkActorEntry;
     if (!openingForest && (!gPlayState || gSaveContext.gameMode != GAMEMODE_NORMAL ||
@@ -92,9 +94,63 @@ static void DrawPassage() {
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 
+static void DrawPortalFinish() {
+    PlayState* play = gPlayState;
+    if (!ComboOpeningForest_IsExploration(play) || play->roomCtx.curRoom.num != 0 || !play->linkActorEntry ||
+        play->csCtx.state != CS_STATE_IDLE)
+        return;
+    const int version = ComboOpeningForest_ReturnPackVersion(play);
+    if (version == 1 || version == 2)
+        return; // Older meshes retain their own visible location and treatment.
+    using namespace ComboForestPortalEffect;
+    std::array<ComboForestPortalEffect::Vertex, kVertexCount> shape;
+    Build(play->gameplayFrames, version >= 3, shape);
+    // Each submitted frame owns its vertices until its display lists finish.
+    auto* vertices = static_cast<Vtx*>(GRAPH_ALLOC(play->state.gfxCtx, sizeof(Vtx) * kVertexCount));
+    if (!vertices)
+        return;
+    for (int i = 0; i < kVertexCount; ++i) {
+        vertices[i] = {};
+        vertices[i].v.ob[0] = static_cast<s16>(shape[i].x);
+        vertices[i].v.ob[1] = static_cast<s16>(shape[i].y);
+        vertices[i].v.ob[2] = version >= 3 ? 10 : 1;
+        vertices[i].v.cn[0] = shape[i].r;
+        vertices[i].v.cn[1] = shape[i].g;
+        vertices[i].v.cn[2] = shape[i].b;
+        vertices[i].v.cn[3] = shape[i].a;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    Matrix_Push();
+    const Vec3f anchor = ComboOpeningForest_ReturnAnchor(play);
+    Matrix_Translate(anchor.x, anchor.y, anchor.z, MTXMODE_NEW);
+    Matrix_RotateYS(ComboOpeningForest_ReturnYaw(play), MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_FOG | G_CULL_BOTH);
+    gSPTexture(POLY_XLU_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+    gDPSetRenderMode(POLY_XLU_DISP++, G_RM_PASS, G_RM_AA_ZB_XLU_SURF2);
+    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_SHADE, G_CC_SHADE);
+    for (int i = 0; i < kRimSegments; ++i) {
+        gSPVertex(POLY_XLU_DISP++, reinterpret_cast<uintptr_t>(&vertices[i * 4]), 4, 0);
+        gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
+    }
+    for (int i = 0; i < kGlints; ++i) {
+        gSPVertex(POLY_XLU_DISP++, reinterpret_cast<uintptr_t>(&vertices[kRimSegments * 4 + i * 5]), 5, 0);
+        gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
+        gSP2Triangles(POLY_XLU_DISP++, 0, 3, 4, 0, 0, 4, 1, 0);
+    }
+    Matrix_Pop();
+    gDPPipeSync(POLY_XLU_DISP++);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 namespace {
 void RegisterPassage() {
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldEnd>(DrawPassage);
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldEnd>([] {
+        DrawPassage();
+        DrawPortalFinish();
+    });
 }
 static RegisterShipInitFunc initFunc(RegisterPassage, {});
 } // namespace

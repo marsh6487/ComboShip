@@ -5,6 +5,7 @@
 #include "BenPort.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/Enhancements/Gameplay/BlackMarket.h"
 extern int32_t Combo_MM_ConsumeCrossDungeonArrival(void);
 extern int32_t Combo_MM_ConsumeCrossDungeonRecovery(void);
 extern int32_t Combo_MM_ConsumeCrossBossRecoveryResume(void);
@@ -116,6 +117,7 @@ void Setup_InitImpl(SetupState* this) {
         // idempotent. Without it the combo force-spawn loads a rando save whose behaviors never activate.
         GameInteractor_ExecuteOnSaveLoad(gSaveContext.fileNum);
         MM_ApplyComboPortalArrival();
+        ComboBlackMarket_ApplyResume(gComboEntryIsResume);
         // These entrances are already composed. Apply after native save/load hooks and never send
         // them through transition permutation a second time. Preserve the loaded MM day/time.
         s32 crossDungeonArrival = Combo_MM_ConsumeCrossDungeonArrival();
@@ -128,6 +130,10 @@ void Setup_InitImpl(SetupState* this) {
                                          : crossBossRecovery >= 0 ? crossBossRecovery
                                                                   : crossDungeonRecovery;
             // The consumed arrival owns respawn mode, including a positioned grotto-hole return.
+            // A departure checkpoint may carry a pause-save marker. Player_Init would
+            // turn its grotto jump into a stationary spawn over the hole if retained.
+            gSaveContext.save.shipSaveInfo.pauseSaveEntrance = -1;
+            gSaveContext.save.isOwlSave = false;
             gSaveContext.save.cutsceneIndex = 0;
         }
         ComboFw_ApplyArrival(); // Explicit recall takes precedence over ordinary save recovery.

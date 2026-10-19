@@ -4,6 +4,7 @@
  * @brief Draw get-item models
  */
 #include "global.h"
+void NeiGi_ReportBlackMarketModel(const char* owner, const char* opaque, const char* translucent);
 #include "ComboElementalArrowGi.h"
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "2s2h/Enhancements/ItemVisuals.h"
@@ -623,6 +624,12 @@ s32 GetItem_DrawDungeonItem(PlayState* play, s16 drawId, s32 owner) {
 
 s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]) {
     switch (drawId) {
+        case GID_CHATEAU:
+            color[0] = 0x4A;
+            color[1] = 0x0C;
+            color[2] = 0x41;
+            color[3] = 255;
+            return true;
         case GID_BOTTLE_MUSHROOM:
             return ComboBottleContents_Color(CW_BOTTLE_MUSHROOM, color);
         case GID_BOTTLE_DEKU_PRINCESS:
@@ -827,7 +834,11 @@ void GetItem_Draw(PlayState* play, s16 drawId) {
             GetItem_DrawBottleShimmer(play, drawId);
         }
         if (itemShimmer) {
-            GetItem_DrawShimmer(play, maskColor);
+            if (drawId == GID_CHATEAU) {
+                NeiGi_DrawChateauShimmer(play);
+            } else {
+                GetItem_DrawShimmer(play, maskColor);
+            }
         }
     }
 }
@@ -1255,6 +1266,7 @@ void GetItem_DrawGoronSword(PlayState* play, s16 drawId) {
     gSPSegment(POLY_OPA_DISP++, 0x08,
                Gfx_TwoTexScrollEx(play->state.gfxCtx, G_TX_RENDERTILE, play->state.frames * 1, play->state.frames * 0,
                                   32, 32, 1, play->state.frames * 0, play->state.frames * 0, 32, 32, 1, 0, 0, 0));
+    NeiGi_ReportBlackMarketModel("mm", (const char*)sDrawItemTable[drawId].drawResources[0], NULL);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
 
@@ -1352,6 +1364,7 @@ void GetItem_DrawOpa0(PlayState* play, s16 drawId) {
 
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
+    NeiGi_ReportBlackMarketModel("mm", (const char*)sDrawItemTable[drawId].drawResources[0], NULL);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     POLY_OPA_DISP =
         GetItem_DrawDListWithCosmetics(POLY_OPA_DISP, (const char*)sDrawItemTable[drawId].drawResources[0], drawId);
@@ -1370,6 +1383,7 @@ void GetItem_DrawOpa0Xlu1(PlayState* play, s16 drawId) {
 
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
+    NeiGi_ReportBlackMarketModel("mm", shell.opaque, shell.glass);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)shell.opaque);
 
@@ -1391,6 +1405,8 @@ void GetItem_DrawOpa01(PlayState* play, s16 drawId) {
 
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
+    NeiGi_ReportBlackMarketModel("mm", (const char*)sDrawItemTable[drawId].drawResources[0],
+                                 (const char*)sDrawItemTable[drawId].drawResources[1]);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
     gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[1]);
@@ -1408,6 +1424,8 @@ void GetItem_DrawXlu01(PlayState* play, s16 drawId) {
 
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
 
+    NeiGi_ReportBlackMarketModel("mm", (const char*)sDrawItemTable[drawId].drawResources[0],
+                                 (const char*)sDrawItemTable[drawId].drawResources[1]);
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[0]);
     POLY_XLU_DISP =

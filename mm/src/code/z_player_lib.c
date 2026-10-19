@@ -2936,8 +2936,10 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
 
                 if (sMasterLeftHandDLs[sPlayerLod] != NULL) {
                     *dList = sMasterLeftHandDLs[sPlayerLod];
+                    DinFireSword_SetHandModel(player, *dList, SWORD_AURA_NATIVE_OOT_MASTER);
                 } else if (sMasterLeftHandDLs[0] != NULL) {
                     *dList = sMasterLeftHandDLs[0];
+                    DinFireSword_SetHandModel(player, *dList, SWORD_AURA_NATIVE_OOT_MASTER);
                 }
             }
 
@@ -2972,8 +2974,10 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
 
                 if (sBgsLeftHandDLs[sPlayerLod] != NULL) {
                     *dList = sBgsLeftHandDLs[sPlayerLod];
+                    DinFireSword_SetHandModel(player, *dList, SWORD_AURA_NATIVE_OOT_BGS);
                 } else if (sBgsLeftHandDLs[0] != NULL) {
                     *dList = sBgsLeftHandDLs[0];
+                    DinFireSword_SetHandModel(player, *dList, SWORD_AURA_NATIVE_OOT_BGS);
                 }
             }
 
@@ -3065,6 +3069,7 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
                                                        goldenArmor ? 205 : 0, goldenArmor ? 40 : 0)) {
                         Gfx* frameSword = GRAPH_ALLOC(play->state.gfxCtx, 8 * sizeof(Gfx));
                         memcpy(frameSword, heldSword, 8 * sizeof(Gfx));
+                        DinFireSword_CopyHandModel(player, heldSword, frameSword);
                         *dList = frameSword;
                     }
                 }
@@ -4555,7 +4560,7 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList1, G
             ItemEquip_CaptureLeftHandMatrix();
         }
         if (*dList1 != NULL) {
-            DinFireSword_Draw(play, player);
+            DinFireSword_DrawHand(play, player, *dList1);
         }
         Math_Vec3f_Copy(&player->leftHandWorld.pos, sPlayerCurBodyPartPos);
 

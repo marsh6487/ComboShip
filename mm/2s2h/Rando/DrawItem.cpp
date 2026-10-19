@@ -244,6 +244,7 @@ void DrawDoubleDefense() {
 
     Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
 
+    NeiGi_ReportBlackMarketModel("mm", gGiHeartBorderDL, gGiHeartContainerDL);
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, gPlayState->state.gfxCtx);
     gDPSetGrayscaleColor(POLY_XLU_DISP++, 255, 255, 255, 255);
     gSPGrayscale(POLY_XLU_DISP++, true);
@@ -660,6 +661,9 @@ static void DrawOotGetItemOpa(const char* otrPath, Gfx** cache) {
     }
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    if (BlackMarketVisual::Active()) {
+        NeiGi_ReportBlackMarketModel(ResourceMgr_IsModAsset(otrPath) ? "mm" : "oot-companion", otrPath);
+    }
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, *cache);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
@@ -801,6 +805,10 @@ static void DrawOotGetItemOpaOpa(const char* pathA, Gfx** cacheA, const char* pa
     }
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    if (BlackMarketVisual::Active()) {
+        NeiGi_ReportBlackMarketModel(ResourceMgr_IsModAsset(pathA) ? "mm" : "oot-companion", pathA);
+        NeiGi_ReportBlackMarketModel(ResourceMgr_IsModAsset(pathB) ? "mm" : "oot-companion", pathB);
+    }
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, *cacheA);
     gSPDisplayList(POLY_OPA_DISP++, *cacheB);
@@ -818,6 +826,10 @@ static void DrawOotGetItemOpaXlu(const char* opaPath, Gfx** opaCache, const char
     }
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    if (BlackMarketVisual::Active()) {
+        NeiGi_ReportBlackMarketModel(ResourceMgr_IsModAsset(opaPath) ? "mm" : "oot-companion", opaPath);
+        NeiGi_ReportBlackMarketModel(ResourceMgr_IsModAsset(xluPath) ? "mm" : "oot-companion", xluPath);
+    }
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, *opaCache);
     Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
@@ -1297,6 +1309,7 @@ static void DrawOotGetItemOpaTint(const char* otrPath, Gfx** cache, u8 r, u8 g, 
     }
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    NeiGi_ReportBlackMarketModel("mm", otrPath, nullptr);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gDPSetGrayscaleColor(POLY_OPA_DISP++, r, g, b, 255);
     gSPGrayscale(POLY_OPA_DISP++, true);
@@ -1315,6 +1328,7 @@ static void DrawOotGetItemOpaOpaTint(const char* pathA, Gfx** cacheA, const char
     }
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    NeiGi_ReportBlackMarketModel("mm", pathA, pathB);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gDPSetGrayscaleColor(POLY_OPA_DISP++, r, g, b, 255);
     gSPGrayscale(POLY_OPA_DISP++, true);
@@ -1438,6 +1452,10 @@ static bool DrawOotBiggoronSwordReal(void) {
                (uintptr_t)Gfx_TwoTexScrollEx(gPlayState->state.gfxCtx, G_TX_RENDERTILE, gPlayState->state.frames * 1,
                                              gPlayState->state.frames * 0, 32, 32, 1, gPlayState->state.frames * 0,
                                              gPlayState->state.frames * 0, 32, 32, 1, 0, 0, 0));
+    if (BlackMarketVisual::Active())
+        NeiGi_ReportBlackMarketModel(
+            ResourceMgr_IsModAsset("__OTR__objects/object_gi_longsword/gGiBiggoronSwordDL") ? "mm" : "oot-companion",
+            "__OTR__objects/object_gi_longsword/gGiBiggoronSwordDL");
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, sCache);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
@@ -1790,6 +1808,7 @@ static void DrawOotTunicTint(u8 r, u8 g, u8 b, bool initializeMaterial = false) 
     }
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    NeiGi_ReportBlackMarketModel("mm", paths[0], paths[1]);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gDPSetGrayscaleColor(POLY_OPA_DISP++, r, g, b, 255);
     gSPGrayscale(POLY_OPA_DISP++, true);
@@ -1875,6 +1894,8 @@ static void DrawOotMagicSpellTint(u8 r, u8 g, u8 b) {
         return; // oot.o2r not mounted yet — try again next frame
     }
     DrawOotMagicSpellSetup();
+    NeiGi_ReportBlackMarketModel("mm", "__OTR__objects/object_gi_goddess/gGiMagicSpellDiamondDL",
+                                 "__OTR__objects/object_gi_goddess/gGiMagicSpellOrbDL");
     OPEN_DISPS(gPlayState->state.gfxCtx);
     gDPSetGrayscaleColor(POLY_XLU_DISP++, r, g, b, 255);
     gSPGrayscale(POLY_XLU_DISP++, true);
@@ -1892,6 +1913,7 @@ static void DrawOotNeiSpellReal(const char* path, Gfx** cache, u8* tried, u8 r, 
     Gfx* dl = LoadNeiRealGfx(path, cache, tried);
     if (dl != NULL) {
         DrawOotMagicSpellSetup();
+        NeiGi_ReportBlackMarketModel("mm", path);
         OPEN_DISPS(gPlayState->state.gfxCtx);
         gSPDisplayList(POLY_XLU_DISP++, dl);
         CLOSE_DISPS(gPlayState->state.gfxCtx);
@@ -2018,6 +2040,7 @@ void DrawOotNeiLantern() {
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
     Matrix_Scale(0.025f, 0.025f, 0.025f, MTXMODE_APPLY);
+    NeiGi_ReportBlackMarketModel("mm", "__OTR__objects/object_poh/gPoeLanternDL", nullptr);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, sCache);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
@@ -2058,6 +2081,7 @@ static bool DrawNeiRealOpa(const char* otrPath, Gfx** cache, u8* tried, f32 scal
     if (rotZPi) {
         Matrix_RotateZF(3.14159265f, MTXMODE_APPLY);
     }
+    NeiGi_ReportBlackMarketModel("mm", otrPath, nullptr);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, dl);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
@@ -2078,6 +2102,7 @@ static bool DrawNeiRealOpaXlu(const char* opaPath, Gfx** opaCache, u8* opaTried,
         Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
     }
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    NeiGi_ReportBlackMarketModel("mm", opaPath, xluPath);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, opa);
     Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
@@ -2147,14 +2172,17 @@ void DrawOotNeiCaneOfSomaria(RandoItemId skill) {
     static Gfx* real = NULL;
     static u8 tried = 0;
     const char* path = "__OTR__objects/object_somaria/g_somaria_cane_give_dl";
+    const char* selectedPath = path;
     Gfx* dl = NULL;
 #ifdef COMBO_BUILD
     // The authored GI declines when either owner supplies a legacy cane mod.
     // Keep MM's own override first, then preserve an OoT-only replacement and
     // all of its nested resources instead of silently drawing MM's stock cane.
     if (!ResourceMgr_IsModAsset(path) && NeiResource_IsMod(path)) {
-        if (NeiResource_Available(path))
+        if (NeiResource_Available(path)) {
             dl = (Gfx*)NeiResource_Route(path);
+            selectedPath = (const char*)dl;
+        }
     } else
 #endif
         dl = LoadNeiRealGfx(path, &real, &tried);
@@ -2167,6 +2195,7 @@ void DrawOotNeiCaneOfSomaria(RandoItemId skill) {
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
     Matrix_Scale(0.25f, 0.25f, 0.25f, MTXMODE_APPLY);
+    NeiGi_ReportBlackMarketModel("mm", selectedPath, nullptr);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
 #ifdef COMBO_BUILD
     // Raw MM roots retain MM's children under an outer foreign draw span.
@@ -2293,6 +2322,7 @@ void DrawOotNeiMarioMask() {
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
     Matrix_Scale(0.038f, 0.038f, 0.038f, MTXMODE_APPLY);
     Matrix_RotateXF(-M_PIf / 2.0f, MTXMODE_APPLY);
+    NeiGi_ReportBlackMarketModel("mm", "__OTR__objects/object_nei_mario_mask/g_mario_mask_dl", nullptr);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BOTH);
     gSPDisplayList(POLY_OPA_DISP++, dl);
@@ -2813,6 +2843,7 @@ void DrawOotExtPegasusAnklet() { // Hover Boots GI, prim/env palette recolored t
 
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    NeiGi_ReportBlackMarketModel("mm", "__OTR__objects/object_gi_hoverboots/gGiHoverBootsDL", nullptr);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, dl);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
@@ -2852,6 +2883,10 @@ void DrawOotExtTrident() {
     Matrix_RotateXF(-M_PIf / 2.0f, MTXMODE_APPLY);
     Matrix_Scale(0.00625f, 0.00625f, 0.00625f, MTXMODE_APPLY);
     Matrix_Translate(0.0f, 80.0f, -1485.0f, MTXMODE_APPLY);
+    if (BlackMarketVisual::Active()) {
+        const char* path = "__OTR__objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298";
+        NeiGi_ReportBlackMarketModel(ResourceMgr_IsModAsset(path) ? "mm" : "oot-companion", path);
+    }
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, sTrident);
     CLOSE_DISPS(gPlayState->state.gfxCtx);
@@ -2961,6 +2996,8 @@ void DrawOotExtClimbBoots() { // Iron Boots GI: yellow leather + silver iron (pe
     }
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    NeiGi_ReportBlackMarketModel("mm", "__OTR__objects/object_gi_boots_2/gGiIronBootsDL",
+                                 "__OTR__objects/object_gi_boots_2/gGiIronBootsRivetsDL");
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, mainDL);
     Gfx_SetupDL25_Xlu(gPlayState->state.gfxCtx);
@@ -2980,6 +3017,7 @@ void DrawOotExtRocBoots() { // Hover Boots GI, whole palette in one metallic gol
     }
     OPEN_DISPS(gPlayState->state.gfxCtx);
     Gfx_SetupDL25_Opa(gPlayState->state.gfxCtx);
+    NeiGi_ReportBlackMarketModel("mm", "__OTR__objects/object_gi_hoverboots/gGiHoverBootsDL", nullptr);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, gPlayState->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, dl);
     CLOSE_DISPS(gPlayState->state.gfxCtx);

@@ -5,6 +5,9 @@
 #include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
 #include "2s2h/Enhancements/Graphics/MMWinterAtmosphere.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#ifdef COMBO_BUILD
+#include "entrances/SoloForest.h"
+#endif
 
 #include <algorithm>
 #include "global.h"
@@ -39,8 +42,12 @@ bool OutdoorEligible(const PlayState* play) {
     // Playable Lost Woods keeps the prologue's covered SKYBOX_2. Its two
     // exploration rooms support the shared weather controls and all seasons;
     // other special-sky interiors and the real intro/title layers stay native.
-    outdoorSky |= play->skyboxId == SKYBOX_2 && ComboOpeningForest_IsExploration(play) &&
-                  (play->roomCtx.curRoom.num == 0 || play->roomCtx.curRoom.num == 1);
+    outdoorSky |=
+        play->skyboxId == SKYBOX_2 &&
+        (ComboOpeningForest_IsExploration(play) ||
+         ComboSoloForest_IsMmVisit(play->sceneId, play->roomCtx.curRoom.num, gSaveContext.gameMode,
+                                   gSaveContext.fileNum, gSaveContext.sceneLayer, gSaveContext.save.cutsceneIndex)) &&
+        (play->roomCtx.curRoom.num == 0 || play->roomCtx.curRoom.num == 1);
 #endif
     return gSaveContext.gameMode == GAMEMODE_NORMAL && play->gameOverCtx.state == GAMEOVER_INACTIVE && outdoorSky &&
            !play->envCtx.skyboxDisabled && camera != nullptr && !(camera->stateFlags & CAM_STATE_UNDERWATER);
@@ -198,7 +205,10 @@ extern "C" int MMWeather_FoliageSeasonForPlay(const PlayState* play) {
 #ifdef COMBO_BUILD
     // Preserve the established opening-forest foliage selection independently
     // of the shared weather controls and without changing its native lighting.
-    if (ComboOpeningForest_IsExploration(play)) {
+    if (play &&
+        (ComboOpeningForest_IsExploration(play) ||
+         ComboSoloForest_IsMmVisit(play->sceneId, play->roomCtx.curRoom.num, gSaveContext.gameMode,
+                                   gSaveContext.fileNum, gSaveContext.sceneLayer, gSaveContext.save.cutsceneIndex))) {
         const Camera* camera = GET_ACTIVE_CAM(play);
         if (play->gameOverCtx.state == GAMEOVER_INACTIVE && !play->envCtx.skyboxDisabled && camera != nullptr &&
             !(camera->stateFlags & CAM_STATE_UNDERWATER) && play->csCtx.state == CS_STATE_IDLE &&

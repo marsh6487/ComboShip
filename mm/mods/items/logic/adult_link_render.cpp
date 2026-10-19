@@ -588,8 +588,12 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
             }
             if (p->leftHandType == PLAYER_MODELTYPE_LH_ONE_HAND_SWORD && sDL_LHSword != NULL) {
                 *dList = sDL_LHSword;
+                if (!sIsMod)
+                    DinFireSword_SetHandModel(p, *dList, SWORD_AURA_NATIVE_OOT_MASTER);
             } else if (p->leftHandType == PLAYER_MODELTYPE_LH_TWO_HAND_SWORD && sDL_LHBgs != NULL) {
                 *dList = sDL_LHBgs;
+                if (!sIsMod)
+                    DinFireSword_SetHandModel(p, *dList, SWORD_AURA_NATIVE_OOT_BGS);
             } else if (!sIsMod && p->leftHandType == PLAYER_MODELTYPE_LH_CLOSED && sDL_LHClosed != NULL) {
                 *dList = sDL_LHClosed;
             } else {
@@ -670,6 +674,7 @@ static s32 AdultLink_OverrideLimb(PlayState* play, s32 limbIndex, Gfx** dList, V
             // The helper's staging list is shared; the skeleton's deferred draw owns this copy.
             Gfx* frameSword = static_cast<Gfx*>(GRAPH_ALLOC(play->state.gfxCtx, 8 * sizeof(Gfx)));
             std::memcpy(frameSword, heldSword, 8 * sizeof(Gfx));
+            DinFireSword_CopyHandModel(p, heldSword, frameSword);
             *dList = frameSword;
         }
     }

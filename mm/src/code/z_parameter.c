@@ -57,6 +57,9 @@ u8 MasterCycle_IsRiding(void);
 // so the SW97_ELEM_* constants come from the one place that defines them; only the entry points are
 // forward-declared, keeping to this file's rule of not pulling the whole NEI header in.
 #include "mods/nei_save.h"
+#include "mods/forms/custom_forms.h"
+#include "sword_element.h"
+#include "din_fire_sword.h"
 uint8_t Sw97_EffectiveElement(uint8_t isSling);
 uint8_t Sw97_IsBowItem(uint16_t item);
 uint8_t Sw97_IsSlingItem(uint16_t item);
@@ -6513,6 +6516,53 @@ void Interface_Dpad_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
     (((item) < ITEM_F0) || (((item) >= ITEM_MEDALLION_FOREST) && ((item) <= ITEM_MEDALLION_LIGHT)) || \
      ((item) == ITEM_EXT_BUTTON))
 
+// The rendered B icon's rectangle includes the HUD editor's anchor and scale.
+// A native arrow icon in its corner identifies the sword's active enchantment.
+extern u8 ExtEquip_ShouldHideSwordDL(void);
+extern u8 FourSword_IsEquipped(void);
+extern s32 BossRemains_IsOdolwaWorn(void);
+extern s32 BossRemains_IsGohtWorn(void);
+static void Interface_DrawSwordElementBadge(PlayState* play, u16 item, s16 button, s16 left, s16 top, s16 width,
+                                            s16 height) {
+    InterfaceContext* interfaceCtx = &play->interfaceCtx;
+    Player* player = GET_PLAYER(play);
+    if (button != EQUIP_SLOT_B || width <= 0 || height <= 0 || interfaceCtx->bAlpha <= 0 ||
+        interfaceCtx->bButtonInterfaceDoActionActive || interfaceCtx->bButtonPlayerDoActionActive ||
+        gSaveContext.buttonStatus[EQUIP_SLOT_B] == BTN_DISABLED || player == NULL ||
+        player->transformation != PLAYER_FORM_HUMAN || CustomForms_ActiveForm() != CUSTOM_FORM_NONE ||
+        Sm64Mario_IsActive() || ExtEquip_ShouldHideSwordDL() || FourSword_IsEquipped() || BossRemains_IsOdolwaWorn() ||
+        BossRemains_IsGohtWorn()) {
+        return;
+    }
+    u8 element = SwordElement_ForItem(item);
+    // Untouched legacy files can still use the resource-backed Din effect.
+    // Ask the combat resolver so its arrow, asset and player gates stay exact.
+    if (element == SWORD_ELEMENT_NONE && SwordElement_SlotForItem(item) >= 0 && player->heldItemId == item &&
+        (DinFireSword_DamageFlags(play, player, DMG_SWORD) & DMG_FIRE_ARROW)) {
+        element = SWORD_ELEMENT_FIRE;
+    }
+    if (element <= SWORD_ELEMENT_NONE || element >= SWORD_ELEMENT_COUNT) {
+        return;
+    }
+    static const char* const textures[SWORD_ELEMENT_COUNT] = { NULL, gItemIconFireArrowTex, gItemIconIceArrowTex,
+                                                               gItemIconLightArrowTex };
+    s16 markWidth = MAX(1, width * 2 / 5);
+    s16 markHeight = MAX(1, height * 2 / 5);
+    s16 markLeft = left + width - markWidth + MAX(1, width / 15);
+    s16 markTop = top - MAX(1, height / 15);
+    OPEN_DISPS(play->state.gfxCtx);
+    gDPPipeSync(OVERLAY_DISP++);
+    gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
+    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->bAlpha);
+    gDPLoadTextureBlock(OVERLAY_DISP++, textures[element], G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0,
+                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD,
+                        G_TX_NOLOD);
+    gSPWideTextureRectangle(OVERLAY_DISP++, markLeft * 4, markTop * 4, (markLeft + markWidth) * 4,
+                            (markTop + markHeight) * 4, G_TX_RENDERTILE, 0, 0, 32 * 1024 / markWidth,
+                            32 * 1024 / markHeight);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 void Interface_DrawItemIconTexture(PlayState* play, TexturePtr texture, s16 button) {
     static s16 sItemIconTextureDimensions[] = {
         30, // EQUIP_SLOT_B
@@ -6533,6 +6583,10 @@ void Interface_DrawItemIconTexture(PlayState* play, TexturePtr texture, s16 butt
     s16 btnAlpha = -1;  // -1 = leave the caller's prim color untouched (single vanilla layer)
     s16 grayAlpha = -1; // >= 0: draw the icon GRAY at this alpha (Switch Hook 2-minute depletion)
     s32 layer;
+    s16 swordIconLeft = 0;
+    s16 swordIconTop = 0;
+    s16 swordIconWidth = 0;
+    s16 swordIconHeight = 0;
 
     if ((button >= EQUIP_SLOT_B) && (button <= EQUIP_SLOT_C_RIGHT)) {
         u8 btnItem = GET_CUR_FORM_BTN_ITEM(button);
@@ -6637,11 +6691,19 @@ void Interface_DrawItemIconTexture(PlayState* play, TexturePtr texture, s16 butt
 
                 hudEditorActiveElement = HUD_EDITOR_ELEMENT_NONE;
 
+                swordIconLeft = rectLeft;
+                swordIconTop = rectTop;
+                swordIconWidth = rectWidth;
+                swordIconHeight = rectHeight;
                 gSPWideTextureRectangle(OVERLAY_DISP++, rectLeft << 2, rectTop << 2, (rectLeft + rectWidth) << 2,
                                         (rectTop + rectHeight) << 2, G_TX_RENDERTILE, 0, 0, dsdx << 1, dtdy << 1);
             }
             // #endregion
         } else {
+            swordIconLeft = sBCButtonXPositions[button];
+            swordIconTop = sBCButtonYPositions[button];
+            swordIconWidth = sItemIconTextureDimensions[button];
+            swordIconHeight = sItemIconTextureDimensions[button];
             gSPTextureRectangle(OVERLAY_DISP++, sBCButtonXPositions[button] << 2, sBCButtonYPositions[button] << 2,
                                 (sBCButtonXPositions[button] + sItemIconTextureDimensions[button]) << 2,
                                 (sBCButtonYPositions[button] + sItemIconTextureDimensions[button]) << 2,
@@ -6735,6 +6797,11 @@ void Interface_DrawItemIconTexture(PlayState* play, TexturePtr texture, s16 butt
                                     (markTop + markSize) << 2, G_TX_RENDERTILE, 0, 0, markStep, markStep);
             }
         }
+    }
+
+    if (button == EQUIP_SLOT_B) {
+        Interface_DrawSwordElementBadge(play, GET_CUR_FORM_BTN_ITEM(button), button, swordIconLeft, swordIconTop,
+                                        swordIconWidth, swordIconHeight);
     }
 
     if ((btnAlpha >= 0) || (grayAlpha >= 0)) {

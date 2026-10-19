@@ -81,11 +81,8 @@ void PreparePresentation(s8, s8 spawnNum) {
     CollisionPoly* floor = nullptr;
     s32 floorBg = BGCHECK_SCENE;
     if (route == COMBO_PORTAL_OPENING_FOREST) {
-        const bool legacy = ComboOpeningForest_ReturnPackVersion(play) == 1;
-        const ActorEntry& spawn = *play->linkActorEntry;
-        yaw = legacy ? spawn.rot.y : COMBO_OPENING_FOREST_STUMP_YAW;
-        const Vec3f anchor = legacy ? Vec3f{ (f32)spawn.pos.x, (f32)spawn.pos.y, (f32)spawn.pos.z }
-                                    : Vec3f{ COMBO_OPENING_FOREST_STUMP_X, 0, COMBO_OPENING_FOREST_STUMP_Z };
+        yaw = ComboOpeningForest_ReturnYaw(play);
+        const Vec3f anchor = ComboOpeningForest_ReturnAnchor(play);
         const float angle = yaw * (6.28318530718f / 65536.0f);
         // Match the proven Mystery arrival distance: native rear-camera reset
         // stays clear of the decorative black mouth after presentation ends.

@@ -5,6 +5,7 @@
 #include "2s2h/FleetShipCombo/FleetComboItems.h"
 #include "ComboItemReceiptText.h"
 #include "ComboDungeonKeyReceipt.h"
+#include "ComboBossSoulReceiptText.h"
 #include "ComboCapeReceiptChoice.h"
 #include "ComboVanillaItemReceiptText.h"
 #include "ComboSongReceiptText.h"
@@ -596,6 +597,19 @@ bool NativeReceipt(GetItemId gi, ItemId itemId, CustomMessage::Entry& entry, con
 }
 } // namespace
 
+static bool BossSoulItemReceipt(const char* itemName, CustomMessage::Entry& entry) {
+    const auto* soul = itemName ? ComboBossSoulReceiptText::Find(itemName) : nullptr;
+    if (!soul)
+        return false;
+    using ComboBossSoulReceiptText::Language;
+    const auto language = gSaveContext.options.language == LANGUAGE_GER   ? Language::German
+                          : gSaveContext.options.language == LANGUAGE_FRE ? Language::French
+                                                                          : Language::English;
+    entry.receiptPresentation = {};
+    SetReceiptBody(entry, ComboItemReceiptText::FromNeiMarkup(ComboBossSoulReceiptText::Body(*soul, language)));
+    return true;
+}
+
 static bool MaskItemReceipt(const char* itemName, CustomMessage::Entry& entry) {
     if (!itemName)
         return false;
@@ -892,7 +906,8 @@ bool Rando::ApplyForeignItemReceiptText(const char* itemName, CustomMessage::Ent
     entry.capeVisibilityChoice = ComboCapeReceiptChoice::IsCape(itemName);
     if (!itemName || !*itemName)
         return false;
-    if (MaskItemReceipt(itemName, entry) || ToolItemReceipt(itemName, entry) || MagicItemReceipt(itemName, entry))
+    if (BossSoulItemReceipt(itemName, entry) || MaskItemReceipt(itemName, entry) || ToolItemReceipt(itemName, entry) ||
+        MagicItemReceipt(itemName, entry))
         return true;
     if (RandomRupeeReceipt(itemName, entry))
         return true;
@@ -965,7 +980,8 @@ bool Rando::ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     if (it == StaticData::Items.end())
         return false;
     const auto& item = it->second;
-    if (MaskItemReceipt(item.name, entry) || ToolItemReceipt(item.name, entry) || MagicItemReceipt(item.name, entry))
+    if (BossSoulItemReceipt(item.name, entry) || MaskItemReceipt(item.name, entry) ||
+        ToolItemReceipt(item.name, entry) || MagicItemReceipt(item.name, entry))
         return true;
     if (RandomRupeeReceipt(item.name, entry))
         return true;

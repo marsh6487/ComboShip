@@ -5,6 +5,7 @@
 #include "BenPort.h"
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
+#include "2s2h/Enhancements/Gameplay/BlackMarket.h"
 #include "ComboResolve.h"
 #include "../../combo/entrances/LostWoodsEntrance.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
@@ -216,6 +217,10 @@ extern "C" void MM_ApplyComboPortalArrival(void) {
     if (!sComboPortalArrivalPending || !ComboLostWoods_IsForestRoute(sComboPortalRoute))
         return;
     sComboPortalArrivalPending = false;
+    // Native opening-forest entrances include instant prologue transitions.
+    // Stage the exploration arrival after save loading; Play_Init consumes it
+    // once and the existing title-card hook waits for the native fade to end.
+    gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
     if (sComboPortalRoute == COMBO_PORTAL_OPENING_FOREST) {
         gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
         gSaveContext.save.cutsceneIndex = 0;
@@ -2230,6 +2235,18 @@ std::shared_ptr<Ship::IResource> GetResourceByName(const char* path) {
     return Ship::Context::GetRawInstance()->GetResourceManager()->LoadResource(path);
 }
 
+#ifdef COMBO_BUILD
+// Snapshot validation must keep native/base resources distinct from explicit
+// alt resources. Nested factories also run under MM's owning resource manager.
+std::shared_ptr<Ship::IResource> GetResourceByName(const char* path, bool loadExact) {
+    const auto owner = Ship::CrossRMRegistry::Get("mm");
+    if (!owner)
+        return nullptr;
+    Ship::OwnRMScope scope("mm");
+    return owner->LoadResource(path, loadExact);
+}
+#endif
+
 extern "C" char* ResourceMgr_LoadFileFromDisk(const char* filePath) {
     FILE* file = fopen(filePath, "r");
     fseek(file, 0, SEEK_END);
@@ -3734,6 +3751,7 @@ extern "C" COMBO_EXPORT void MM_SetComboRandoSeed(uint64_t seed) {
 // SAVETYPE_RANDO either way, since a vanilla one disables every IS_RANDO hook.
 extern "C" COMBO_EXPORT int MM_InitRandoSaveFile(int fileNum, const char* placementJson,
                                                  const unsigned char* ootName8) {
+    ComboBlackMarket_ResetState();
     ItemGrantAudit::Scope itemGrantAuditScope("MM_InitRandoSaveFile");
     // Playable combo baseline first (Human Link, South Clock Town, ocarina/songs, etc.).
     SaveManager_InitNewSaveForSlot(fileNum + 1, ootName8);
@@ -5677,6 +5695,18 @@ extern "C" int ResourceMgr_GetGiModelsFitForGame(const char* game, const char* c
 
 extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path) {
     return NeiAssetPriority::IsCustomAsset("mm", game, path);
+}
+
+extern "C" int MmAssets_GetOotGiModelBounds(const char* const* paths, int count, float minimum[3], float maximum[3]);
+extern "C" int ResourceMgr_GetGiModelBoundsForGame(const char* game, const char* const* paths, int count,
+                                                   float minimum[3], float maximum[3]) {
+    if (game && std::strcmp(game, "oot-companion") == 0) {
+        const int result = MmAssets_GetOotGiModelBounds(paths, count, minimum, maximum);
+        if (result)
+            return result > 0;
+        return NeiAssetPriority::GetGiModelBounds("mm", "mm", paths, count, minimum, maximum);
+    }
+    return NeiAssetPriority::GetGiModelBounds("mm", game, paths, count, minimum, maximum);
 }
 
 extern "C" int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* game, const char* path, float* tilt, float* roll) {

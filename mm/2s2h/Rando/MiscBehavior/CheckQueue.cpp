@@ -7,6 +7,7 @@
 #include "2s2h/Rando/StaticData/StaticData.h"
 #include "2s2h/Rando/ItemReceiptText.h"
 #include "ComboDungeonPickup.h"
+#include "sword_element_message.h"
 #include "2s2h/ShipUtils.h"
 #include "Traps.h"
 #ifdef COMBO_BUILD
@@ -274,7 +275,10 @@ void Rando::MiscBehavior::CheckQueue() {
                         };
                         Rando::ApplyItemReceiptText(randoItemId, entry);
                         Rando::AppendReceiptSource(entry, BankRewardSourceSuffix((RandoCheckId)CUSTOM_ITEM_PARAM));
+                        entry.swordElementTutorial =
+                            SwordElement_MessageElementForPickup(Rando::StaticData::Items[randoItemId].itemId);
 
+                        bool overheadReceiptOpened = false;
                         if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
                             CustomMessage::SetActiveCustomMessage(entry.msg, entry);
                         } else if (entry.capeVisibilityChoice ||
@@ -283,6 +287,7 @@ void Rando::MiscBehavior::CheckQueue() {
                                                             ? entry.msg + "\x1C\x02\x10"
                                                             : entry.msg,
                                                         entry);
+                            overheadReceiptOpened = true;
                         } else {
                             if (Rando::StaticData::Items[randoItemId].randoItemType != RITYPE_JUNK) {
                                 Notification::Emit({
@@ -300,6 +305,10 @@ void Rando::MiscBehavior::CheckQueue() {
                         bool wasObtained = randoSaveCheck.obtained;
 #endif
                         Rando::GiveItem(randoItemId, (RandoCheckId)CUSTOM_ITEM_PARAM);
+                        // Overhead receipts opened above precede the grant. Their
+                        // same native buffer can now receive the tutorial page.
+                        if (overheadReceiptOpened)
+                            SwordElement_MessageAppend(play, entry.swordElementTutorial);
                         randoSaveCheck.cycleObtained = true;
                         randoSaveCheck.obtained = true;
                         randoSaveCheck.eligible = false;

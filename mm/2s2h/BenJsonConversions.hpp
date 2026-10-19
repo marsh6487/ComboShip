@@ -151,12 +151,15 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "seasonsOwned", n.seasonsOwned },
         { "seasonsRodOwned", n.seasonsRodOwned },
         { "seasonsGates", n.seasonsGates },
+        { "comboSariaSongClaimed", n.comboSariaSongClaimed },
         { "ootCanGrab", n.ootCanGrab },
         { "activeCustomForm", n.activeCustomForm },
         { "marioMaskOwned", n.marioMaskOwned },
         { "comboSpeedUpgrades", n.comboSpeedUpgrades },
         { "comboSpeedRequired", n.comboSpeedRequired },
         { "comboRpg", ComboRpg::ToJson(n.comboRpg) },
+        { "swordElements", n.swordElements },
+        { "swordElementSet", n.swordElementSet },
     };
 }
 
@@ -287,6 +290,7 @@ inline void from_json(const json& j, NeiSaveData& n) {
     n.seasonsOwned = j.value("seasonsOwned", (uint8_t)0);
     n.seasonsRodOwned = j.value("seasonsRodOwned", (uint8_t)0);
     n.seasonsGates = j.value("seasonsGates", (uint8_t)0);
+    n.comboSariaSongClaimed = j.value("comboSariaSongClaimed", (uint8_t)0);
     n.ootCanGrab = j.value("ootCanGrab", (uint8_t)0);
     n.activeCustomForm = j.value("activeCustomForm", (uint8_t)0);
     n.marioMaskOwned = j.value("marioMaskOwned", (uint8_t)0);
@@ -295,6 +299,23 @@ inline void from_json(const json& j, NeiSaveData& n) {
     if (j.contains("comboRpg"))
         ComboRpg::MergeJson(n.comboRpg, j["comboRpg"]);
     ComboRpg::MigrateLegacySpeed(n.comboRpg, n.comboSpeedUpgrades, n.comboSpeedRequired);
+    // Keep all eight stable slots, including explicit None. Validate before byte
+    // conversion so malformed/short legacy data cannot select another element.
+    auto swordElements = j.find("swordElements");
+    if (swordElements != j.end() && swordElements->is_array()) {
+        for (size_t i = 0; i < 8 && i < swordElements->size(); ++i) {
+            const auto& value = (*swordElements)[i];
+            if (value.is_number_integer() && (value.is_number_unsigned() || value.get<int64_t>() >= 0) &&
+                value.get<uint64_t>() < 4) {
+                n.swordElements[i] = value.get<uint8_t>();
+            }
+        }
+    }
+    auto swordElementSet = j.find("swordElementSet");
+    if (swordElementSet != j.end() && swordElementSet->is_number_integer() &&
+        (swordElementSet->is_number_unsigned() || swordElementSet->get<int64_t>() >= 0)) {
+        n.swordElementSet = (uint8_t)(swordElementSet->get<uint64_t>() & 0xFFu);
+    }
 }
 
 // Spiritual Stones — per-save state (gSaveContext.save.shipSaveInfo.spiritualStones).

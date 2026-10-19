@@ -9,6 +9,23 @@
 #include <ship/resource/ResourceManager.h>
 #include <string>
 
+extern "C" int ComboPlaceTitleCard_Show(PlayState* play, TexturePtr texture, u8 width, u8 height) {
+    if (!play || gGameState != &play->state || !play->state.running || play->transitionTrigger != TRANS_TRIGGER_OFF ||
+        play->transitionMode != TRANS_MODE_OFF || play->pauseCtx.state != PAUSE_STATE_OFF ||
+        play->gameOverCtx.state != GAMEOVER_INACTIVE || play->csCtx.state != CS_STATE_IDLE ||
+        gSaveContext.cutsceneTrigger || play->soaringCsOrSoTCsPlaying || Player_InCsMode(play))
+        return 0;
+    if (!GameInteractor_Should(VB_SHOW_TITLE_CARD, true))
+        return -1;
+    TitleCardContext* card = &play->actorCtx.titleCtx;
+    if (card->durationTimer || card->delayTimer || card->alpha)
+        return 0;
+    TitleCard_InitBossName(&play->state, card, texture, 160, 120, width, height);
+    card->delayTimer = 20;
+    card->alpha = card->intensity = 0;
+    return 1;
+}
+
 namespace {
 constexpr char kLostWoodsCard[] = "textures/g_pn_36/gLostWoodsTitleCardENGTex";
 // Raw texture commands reserve odd addresses for segmented-pointer tags.
@@ -49,17 +66,20 @@ void PresentOpeningTitle() {
         Player_InCsMode(play))
         return;
 
-    sPendingOpeningTitle = false;
     TitleCardContext* card = &play->actorCtx.titleCtx;
-    if (!GameInteractor_Should(VB_SHOW_TITLE_CARD, gSaveContext.showTitleCard) || card->durationTimer ||
-        card->delayTimer || card->alpha || !HasLostWoodsCard())
+    // This custom arrival owns its eligibility. Combo bypasses file select,
+    // and the forest's prologue bypass skips the native transient flag reset.
+    // Consult the user's hide-card hook with an eligible default, without
+    // rewriting showTitleCard or any story/cycle state.
+    if (card->durationTimer || card->delayTimer || card->alpha || !HasLostWoodsCard()) {
+        sPendingOpeningTitle = false;
         return;
+    }
 
     // MM retains the native IA8 title-card renderer and fade. These are OoT's
     // place-card dimensions, position and delay, rather than boss-card layout.
-    TitleCard_InitBossName(&play->state, card, const_cast<char*>(kRoutedLostWoodsCard), 160, 120, 144, 24);
-    card->delayTimer = 20;
-    card->alpha = card->intensity = 0;
+    if (ComboPlaceTitleCard_Show(play, const_cast<char*>(kRoutedLostWoodsCard), 144, 24) != 0)
+        sPendingOpeningTitle = false;
 }
 
 void RegisterOpeningTitleCard() {

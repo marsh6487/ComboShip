@@ -1,5 +1,7 @@
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
 #include "SaveManager.h"
+#include "2s2h/Enhancements/Gameplay/BlackMarket.h"
+#include "2s2h/Enhancements/Gameplay/ComboSoloForest.h"
 
 #include <fstream>
 #include <filesystem>
@@ -164,6 +166,14 @@ int SaveManager_MigrateSave(nlohmann::json& j) {
 
 void SaveManager_WriteSaveFile(const std::filesystem::path& fileName, nlohmann::json j) {
 #ifdef COMBO_BUILD
+    if (gComboGameMode == COMBO_GAME_MM) {
+        bool isBackup, isGlobal;
+        const int n = SaveManager_ClassifySaveFile(fileName, isBackup, isGlobal);
+        if (n > 0 && !isGlobal) {
+            ComboBlackMarket_SaveState(j, n - 1);
+            ComboSoloForestMm_SaveState(j, n - 1);
+        }
+    }
     // ComboShip: route the main per-slot file into the .combosav container; drop the redundant backup.
     if (Combo_IsCombinedGame() && gComboWriteGameSave) {
         bool isBackup, isGlobal;
@@ -172,6 +182,7 @@ void SaveManager_WriteSaveFile(const std::filesystem::path& fileName, nlohmann::
             return; // container's atomic write makes MM's per-slot backup redundant
         if (n > 0 && !isGlobal) {
             j["crossDungeonCheckpoint"] = Combo_MM_SaveCrossDungeonCheckpoint();
+            ComboBlackMarket_SaveState(j, n - 1);
             gComboWriteGameSave(ComboRando::GAME_MM, n - 1, j.dump().c_str());
             return;
         }
@@ -431,6 +442,7 @@ int SaveManager_LoadSaveFile(int mmFileNum) {
     nlohmann::json j;
     int result = SaveManager_ReadSaveFile(fileName, j);
 #ifdef COMBO_BUILD
+    ComboBlackMarket_LoadState(result == 0 ? j : nlohmann::json::object(), mmFileNum - 1);
     Combo_MM_LoadCrossDungeonCheckpoint(result == 0 ? ComboRando::CrossDungeon::ReadCheckpoint(j) : -1);
     // ComboShip: the read routes through the launcher into the .combosav container, not saves/file{N}.json.
     SPDLOG_INFO("[ComboShip] LoadSaveFile slot {} <- .combosav container (read result={})", mmFileNum, result);

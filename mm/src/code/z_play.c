@@ -1,4 +1,6 @@
 #include "../../../combo/emotes/EmoteBridge.h"
+#include "2s2h/Enhancements/Gameplay/BlackMarket.h"
+#include "2s2h/Enhancements/Gameplay/ComboSoloForest.h"
 #include "z64.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
 #include "2s2h/Enhancements/Graphics/MMSummerAtmosphere.h"
@@ -2350,6 +2352,8 @@ void Play_Init(GameState* thisx) {
 
 #ifdef COMBO_BUILD
     ComboOpeningForest_NormalizeEntry();
+    ComboBlackMarket_NormalizeEntry();
+    ComboSoloForestMm_NormalizeEntry();
 #endif
     MMWinterAtmosphere_Reset();
 
@@ -2616,6 +2620,9 @@ void Play_Init(GameState* thisx) {
     Interface_SetSceneRestrictions(this);
     // Shuffle before the destination scene requests its music, including same-scene loads.
     AudioEditor_RandomizeOnSceneLoad();
+#ifdef COMBO_BUILD
+    AudioEditor_ConfigureSceneMusic(this);
+#endif
     Environment_PlaySceneSequence(this);
     gSaveContext.seqId = this->sceneSequences.seqId;
     gSaveContext.ambienceId = this->sceneSequences.ambienceId;

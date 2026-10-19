@@ -16,6 +16,11 @@
 #include "AudioCollection.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include <random>
+#ifdef COMBO_BUILD
+#include "audio/SceneMusic.h"
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+static uint16_t sComboSceneMusicPreviewRow = 0;
+#endif
 
 extern "C" Vec3f gZeroVec3f;
 extern "C" f32 gSfxDefaultFreqAndVolScale;
@@ -56,6 +61,16 @@ static u16 sPreviewRestoreSeqId = NA_BGM_DISABLED;
 static bool sIsBgmPreviewing = false;
 static uint8_t sGraceFrames = 0;
 
+#ifdef COMBO_BUILD
+void CancelForScene() {
+    sComboSceneMusicPreviewRow = 0;
+    sPreviewRestoreSeqId = NA_BGM_DISABLED;
+    sIsBgmPreviewing = false;
+    sGraceFrames = 0;
+    CVarSetInteger(CVAR_AUDIO("Playing"), 0);
+}
+#endif
+
 void Update() {
     if (sGraceFrames > 0) {
         sGraceFrames--;
@@ -83,10 +98,17 @@ void Update() {
     if (!isPlaying) {
         CVarSetInteger(CVAR_AUDIO("Playing"), 0);
         sIsBgmPreviewing = false;
+#ifdef COMBO_BUILD
+        if (sComboSceneMusicPreviewRow)
+            CancelForScene();
+#endif
     }
 }
 
 void Stop() {
+#ifdef COMBO_BUILD
+    sComboSceneMusicPreviewRow = 0;
+#endif
     u16 playingSeqId = CVarGetInteger(CVAR_AUDIO("Playing"), 0);
     if (playingSeqId == 0) {
         return;
@@ -107,6 +129,11 @@ void Stop() {
 }
 
 void Play(u16 sequenceId, SeqType sequenceType) {
+#ifdef COMBO_BUILD
+    sComboSceneMusicPreviewRow = ComboSceneMusic::IsEntry(sequenceId) ? sequenceId : 0;
+    if (sComboSceneMusicPreviewRow)
+        sequenceId = AudioCollection::Instance->GetAllSequences().at(sComboSceneMusicPreviewRow).sequenceId;
+#endif
 
     // Restore original BGM before switching to non-BGM preview (songs/fanfares/ocarina).
     // Prevents the preview BGM from becoming orphaned without a stop button.
@@ -147,6 +174,10 @@ void Play(u16 sequenceId, SeqType sequenceType) {
     }
 }
 } // namespace AudioPreview
+#ifdef COMBO_BUILD
+#define COMBO_SCENE_MUSIC_MM
+#include "audio/SceneMusicNative.h"
+#endif
 
 namespace BenGui {
 extern std::shared_ptr<BenMenu> mBenMenu;
@@ -166,6 +197,15 @@ extern std::shared_ptr<BenMenu> mBenMenu;
 
 size_t AuthenticCountBySequenceType(SeqType type) {
     return AudioCollection::Instance->CountSequencesByType(type);
+}
+
+static uint16_t CurrentBGMReplacement(uint16_t sequenceId) {
+#ifdef COMBO_BUILD
+    const auto row = AudioEditor_GetSceneMusicRow(sequenceId);
+    if (row)
+        return AudioCollection::Instance->GetReplacementSequence(row);
+#endif
+    return AudioCollection::Instance->GetReplacementSequence(sequenceId);
 }
 
 // Grabs the current BGM sequence ID and replays it
@@ -193,7 +233,11 @@ void UpdateCurrentBGM(u16 seqKey, SeqType seqType) {
     }
 
     u16 curSeqId = AudioSeq_GetActiveSeqId(SEQ_PLAYER_BGM_MAIN);
-    if (curSeqId == seqKey) {
+    if (curSeqId == seqKey
+#ifdef COMBO_BUILD
+        || AudioEditor_GetSceneMusicRow(curSeqId) == seqKey
+#endif
+    ) {
         ReplayCurrentBGM();
     }
 }
@@ -390,7 +434,12 @@ void DrawPreviewButton(uint16_t sequenceId, std::string sfxKey, SeqType sequence
     const std::string previewButton = ICON_FA_PLAY + hiddenKey;
 
     UIWidgets::PushStyleButton(THEME_COLOR, ImVec2(10.0f, 6.0f));
-    if (CVarGetInteger(CVAR_AUDIO("Playing"), 0) == sequenceId) {
+    bool isPlaying = CVarGetInteger(CVAR_AUDIO("Playing"), 0) == sequenceId;
+#ifdef COMBO_BUILD
+    if (ComboSceneMusic::IsEntry(sequenceId))
+        isPlaying = sComboSceneMusicPreviewRow == sequenceId && CVarGetInteger(CVAR_AUDIO("Playing"), 0) != 0;
+#endif
+    if (isPlaying) {
         if (ImGui::Button(stopButton.c_str())) {
             AudioPreview::Stop();
         }
@@ -417,10 +466,10 @@ void Draw_SfxTab(const std::string& tabId, SeqType type) {
     UIWidgets::PushStyleButton(THEME_COLOR);
     if (ImGui::Button(resetAllButton.c_str())) {
         auto currentBGM = AudioSeq_GetActiveSeqId(SEQ_PLAYER_BGM_MAIN);
-        auto prevReplacement = AudioCollection::Instance->GetReplacementSequence(currentBGM);
+        auto prevReplacement = CurrentBGMReplacement(currentBGM);
         ResetGroup(map, type);
         Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
-        auto curReplacement = AudioCollection::Instance->GetReplacementSequence(currentBGM);
+        auto curReplacement = CurrentBGMReplacement(currentBGM);
         if (type == SEQ_BGM_WORLD && prevReplacement != curReplacement) {
             ReplayCurrentBGM();
         }
@@ -428,10 +477,10 @@ void Draw_SfxTab(const std::string& tabId, SeqType type) {
     ImGui::SameLine();
     if (ImGui::Button(randomizeAllButton.c_str())) {
         auto currentBGM = AudioSeq_GetActiveSeqId(SEQ_PLAYER_BGM_MAIN);
-        auto prevReplacement = AudioCollection::Instance->GetReplacementSequence(currentBGM);
+        auto prevReplacement = CurrentBGMReplacement(currentBGM);
         RandomizeGroup(type);
         Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
-        auto curReplacement = AudioCollection::Instance->GetReplacementSequence(currentBGM);
+        auto curReplacement = CurrentBGMReplacement(currentBGM);
         if (type == SEQ_BGM_WORLD && prevReplacement != curReplacement) {
             ReplayCurrentBGM();
         }
@@ -439,10 +488,10 @@ void Draw_SfxTab(const std::string& tabId, SeqType type) {
     ImGui::SameLine();
     if (ImGui::Button(lockAllButton.c_str())) {
         auto currentBGM = AudioSeq_GetActiveSeqId(SEQ_PLAYER_BGM_MAIN);
-        auto prevReplacement = AudioCollection::Instance->GetReplacementSequence(currentBGM);
+        auto prevReplacement = CurrentBGMReplacement(currentBGM);
         LockGroup(map, type);
         Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
-        auto curReplacement = AudioCollection::Instance->GetReplacementSequence(currentBGM);
+        auto curReplacement = CurrentBGMReplacement(currentBGM);
         if (type == SEQ_BGM_WORLD && prevReplacement != curReplacement) {
             ReplayCurrentBGM();
         }
@@ -450,10 +499,10 @@ void Draw_SfxTab(const std::string& tabId, SeqType type) {
     ImGui::SameLine();
     if (ImGui::Button(unlockAllButton.c_str())) {
         auto currentBGM = AudioSeq_GetActiveSeqId(SEQ_PLAYER_BGM_MAIN);
-        auto prevReplacement = AudioCollection::Instance->GetReplacementSequence(currentBGM);
+        auto prevReplacement = CurrentBGMReplacement(currentBGM);
         UnlockGroup(map, type);
         Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
-        auto curReplacement = AudioCollection::Instance->GetReplacementSequence(currentBGM);
+        auto curReplacement = CurrentBGMReplacement(currentBGM);
         if (type == SEQ_BGM_WORLD && prevReplacement != curReplacement) {
             ReplayCurrentBGM();
         }
@@ -480,7 +529,10 @@ void Draw_SfxTab(const std::string& tabId, SeqType type) {
         if ((((seqData.type & SEQ_BGM_CUSTOM) || seqData.type == SEQ_BGM_CUSTOM_FANFARE) &&
              defaultValue >= MAX_AUTHENTIC_SEQID) ||
             seqData.canBeReplaced == false) {
-            continue;
+#ifdef COMBO_BUILD
+            if (!ComboSceneMusic::IsEntry(defaultValue))
+#endif
+                continue;
         }
 
         const std::string initialSfxKey = seqData.sfxKey;
@@ -491,7 +543,11 @@ void Draw_SfxTab(const std::string& tabId, SeqType type) {
         const std::string randomizeButton = ICON_FA_RANDOM + hiddenKey;
         const std::string lockedButton = ICON_FA_LOCK + hiddenKey;
         const std::string unlockedButton = ICON_FA_UNLOCK + hiddenKey;
-        const int currentValue = CVarGetInteger(cvarKey.c_str(), defaultValue);
+        const int currentValue =
+#ifdef COMBO_BUILD
+            ComboSceneMusic::IsEntry(defaultValue) ? AudioCollection::Instance->GetReplacementSequence(defaultValue) :
+#endif
+                                                   CVarGetInteger(cvarKey.c_str(), defaultValue);
 
         ImGui::TableNextRow();
         ImGui::TableNextColumn();

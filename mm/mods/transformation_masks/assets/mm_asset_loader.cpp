@@ -994,6 +994,53 @@ extern "C" int MmAssets_GetOotGiModelFit(const char* path, float scale, float ti
     } catch (...) { return -1; }
 }
 
+// Observe the same private, unpatched donor graph used by native deep draws.
+// As with fit, only absence (0) selects a native twin; malformed graphs return -1.
+extern "C" int MmAssets_GetOotGiModelBounds(const char* const* paths, int count, float minimum[3], float maximum[3]) {
+    if (!paths || count < 1 || count > 16 || !minimum || !maximum || !MmAssets_OotArchivesLoaded() ||
+        !OTRGlobals::Instance || !OTRGlobals::Instance->context)
+        return 0;
+    const auto owner = OTRGlobals::Instance->context->GetResourceManager();
+    if (!owner)
+        return 0;
+    try {
+        Ship::ResourceManagerScope scope(owner);
+        NeiGi::Point low{}, high{};
+        bool geometry = false;
+        for (int i = 0; i < count; ++i) {
+            if (!paths[i])
+                return -1;
+            OotGiResourceLoader load(owner);
+            if (!load.Archive(paths[i]))
+                return 0;
+            NeiGi::FrameBounds fitted{};
+            NeiGi::ModelBoundsReader<OotGiResourceLoader, true> reader(load, 0.f);
+            if (!reader.Read(paths[i], fitted, true) || (count > 1 && !reader.RestoresModelView()))
+                return -1;
+            NeiGi::Point partLow{}, partHigh{};
+            if (!reader.ExactBounds(partLow, partHigh))
+                continue;
+            if (!geometry) {
+                low = partLow;
+                high = partHigh;
+                geometry = true;
+            } else {
+                low = { std::min(low.x, partLow.x), std::min(low.y, partLow.y), std::min(low.z, partLow.z) };
+                high = { std::max(high.x, partHigh.x), std::max(high.y, partHigh.y), std::max(high.z, partHigh.z) };
+            }
+        }
+        if (!geometry)
+            return -1;
+        minimum[0] = low.x;
+        minimum[1] = low.y;
+        minimum[2] = low.z;
+        maximum[0] = high.x;
+        maximum[1] = high.y;
+        maximum[2] = high.z;
+        return 1;
+    } catch (...) { return -1; }
+}
+
 /**
  * Check if a specific resource exists in mm.o2r
  * Attempts to load the resource and checks if it succeeded

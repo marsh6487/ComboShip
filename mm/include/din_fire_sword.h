@@ -2,6 +2,7 @@
 #define DIN_FIRE_SWORD_H
 
 #include <stdint.h>
+#include "../../combo/render/sword_element_aura_profiles.h"
 
 struct PlayState;
 struct Player;
@@ -26,6 +27,11 @@ void DinFireSword_BeginPlayerDraw(struct PlayState* play, struct Player* player)
 // Gameplay left-hand matrix must be current. Ordinary sword hand only;
 // other weapon owners and ceremonies keep their own draw path.
 void DinFireSword_Draw(struct PlayState* play, struct Player* player);
+// Final limb compositors register the actual blade and transfer that identity
+// when copying a deferred hand list. NULL owner is the current local draw only.
+void DinFireSword_SetHandModel(struct Player* player, void* handDL, int model);
+void DinFireSword_CopyHandModel(struct Player* player, void* sourceDL, void* destinationDL);
+void DinFireSword_DrawHand(struct PlayState* play, struct Player* player, void* finalHandDL);
 // Submit the captured hand effect after body meshes and accessories, before XLU.
 void DinFireSword_DrawAfterPlayer(struct PlayState* play, struct Player* player);
 // Compose the private Din blade with the renderer's own empty hand.

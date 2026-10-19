@@ -1,3 +1,6 @@
+#ifdef COMBO_BUILD
+#include "../../../combo/gui/BlackMarketAppearance.h"
+#endif
 #include "BenMenu.h"
 #ifdef COMBO_BUILD
 #include "../../../combo/ComboGameMode.h"
@@ -1548,6 +1551,11 @@ void BenMenu::AddEnhancements() {
         .CVar("gEnhancements.Graphics.24HoursClock")
         .Options(CheckboxOptions().Tooltip("Changes from a 12 Hour to a 24 Hour Clock."));
     AddWidget(path, "Mods", WIDGET_SEPARATOR_TEXT);
+#ifdef COMBO_BUILD
+    AddWidget(path, "Black Market Appearance", WIDGET_CUSTOM).CustomFunction([](WidgetInfo&) {
+        BlackMarketUI::DrawAppearance();
+    });
+#endif
     AddWidget(path, "Midna Companion (Tatl)", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.MidnaCompanionMM")
         .Callback([](WidgetInfo&) { MMMidnaAudio_Reset(); })
@@ -1593,11 +1601,19 @@ void BenMenu::AddEnhancements() {
             "unchanged."));
     AddWidget(path, "Fire Damage", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.DinFireSwordDamage")
-        .PreFunc([](WidgetInfo& info) { info.isHidden = !CVarGetInteger("gEnhancements.DinFireSword", 0); })
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
-            "Adds fire interactions to direct sword hits while preserving normal cutting, sword damage, and enemy "
-            "reactions. "
-            "Charged spin waves keep their normal behavior."));
+            "Enables fire enchantments after obtaining Fire Arrows. Press A on a sword in the equipment screen to "
+            "choose its element. Swings cost no magic and retain normal sword damage, cutting, and reach."));
+    AddWidget(path, "Ice Damage", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.IceSwordDamage")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Enables ice enchantments after obtaining Ice Arrows. Select ice on a sword in the equipment screen. "
+            "Adds supported freezing reactions while retaining normal sword damage and cutting. Costs no magic."));
+    AddWidget(path, "Light Damage", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.LightSwordDamage")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Enables light enchantments after obtaining Light Arrows. Select light on a sword in the equipment screen. "
+            "Adds supported light reactions while retaining normal sword damage and cutting. Costs no magic."));
     AddWidget(path, "Use OoT Sky Textures", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Graphics.UseOotSkyTextures")
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
