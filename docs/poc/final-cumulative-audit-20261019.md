@@ -64,13 +64,22 @@ artwork remains protected.
   Kokiri passed, including routing, sampler, credits and four Malon tracking modes.
 - Final NPC Python discovery: 118 tests, 103 passed and 15 external-archive checks
   explicitly skipped. Exact POC12/POC11/POC9 pack hashes were checked locally.
-- Six inherited render/menu/save fixture failures were reproduced, repaired only
+- Seven inherited render/menu/save/export fixture failures were reproduced, repaired only
   at external observer boundaries, and passed focused reruns. Production behavior
   was unchanged for those repairs.
 - clang-format 14.0.6 processed all 1,995 repository-selected code files. Asset
   collision checking passed with no new collisions. Conflict-marker scan is clean.
-- The canonical cumulative gate is running with real pinned dependency headers;
-  final command coverage and verdict will be recorded before this audit closes.
+- All **149 canonical command entries** are covered by successful runs across
+  the ordered serial segments and two independent workers using unique temporary
+  directories. This is recorded command coverage, not a clean uninterrupted serial
+  replay. The first 148 passed on the unchanged production tree; the final Ikana
+  export fixture needed the real native item-enum and GI policy includes after
+  Chateau's producer branch was retained. Its full normal and ASan/UBSan runners
+  then passed, and both real headers compiled independently. The extracted producer
+  body, assertions and all production files remain unchanged by that repair.
+- The private Fados mesh probe inside the Ikana runner remains explicitly skipped
+  because that optional external archive was not supplied. This is separate from
+  the 15 Python NPC skips and does not imply an installed-asset test.
 
 No matching full Windows/Linux application link or regenerated `soh.o2r` and
 `2ship.o2r` is claimed by the native/source checks. Hosted build results must
