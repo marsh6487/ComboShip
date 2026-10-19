@@ -3,6 +3,7 @@
 // One renderer is compiled privately into the shared menu and both native menus.
 // No game DLL needs to import a C++ UI function from comboui.
 #include "EmoteCatalog.h"
+#include "../gui/WhatsNew.h"
 #include <imgui.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <string>
@@ -33,7 +34,11 @@ inline std::string BindingName(uint32_t mask) {
 inline void DrawSettings() {
     using namespace SettingsDetail;
     bool changed = false;
-    ImGui::SeparatorText("Emotes");
+    {
+        WhatsNew::Scope releaseHighlight("gCombo.Emotes.Enabled", "Emotes",
+                                         CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0);
+        ImGui::SeparatorText("Emotes");
+    }
     bool enabled = CVarGetInteger("gCombo.Emotes.Enabled", 1) != 0;
     if (ImGui::Checkbox("Enable emotes", &enabled)) {
         CVarSetInteger("gCombo.Emotes.Enabled", enabled);

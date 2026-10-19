@@ -5,6 +5,7 @@ python3 -B tests/solo_games/run_tests.py
 python3 -B tests/emotes/run_tests.py
 python3 -B tests/emotes/run_native_tests.py
 python3 -B tests/emotes/run_menu_tests.py
+python3 -B tests/whats_new/run_tests.py
 python3 -B scripts/diagnostics/run_native_npc_model_tests.py
 python3 -B scripts/diagnostics/run_forest_actor_tests.py
 python3 -B scripts/diagnostics/run_solo_forest_actors_tests.py

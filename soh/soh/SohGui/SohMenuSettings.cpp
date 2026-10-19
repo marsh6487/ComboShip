@@ -1,3 +1,4 @@
+#include "../../../combo/gui/WhatsNew.h"
 #include "../../../combo/ComboGameMode.h"
 #include "SohMenu.h"
 #ifdef COMBO_BUILD
@@ -140,6 +141,10 @@ void SohMenu::AddMenuSettings() {
 
     // General - Settings
     AddWidget(path, "Menu Settings", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "What's New", WIDGET_CVAR_CHECKBOX)
+        .CVar(WhatsNew::kEnabledCvar)
+        .RaceDisable(false)
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(WhatsNew::kToggleTooltip));
     AddWidget(path, "Menu Theme", WIDGET_CVAR_COMBOBOX)
         .CVar(CVAR_SETTING("Menu.Theme"))
         .RaceDisable(false)

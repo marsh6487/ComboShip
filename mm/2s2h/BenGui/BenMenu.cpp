@@ -1,3 +1,4 @@
+#include "../../../combo/gui/WhatsNew.h"
 #ifdef COMBO_BUILD
 #include "../../../combo/gui/BlackMarketAppearance.h"
 #endif
@@ -520,6 +521,9 @@ void BenMenu::AddSettings() {
     // General Settings
     AddSidebarEntry("Settings", "General", 2);
     WidgetPath path = { "Settings", "General", SECTION_COLUMN_1 };
+    AddWidget(path, "What's New", WIDGET_CVAR_CHECKBOX)
+        .CVar(WhatsNew::kEnabledCvar)
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(WhatsNew::kToggleTooltip));
     AddWidget(path, "Menu Theme", WIDGET_CVAR_COMBOBOX)
         .CVar("gSettings.Menu.Theme")
         .Options(ComboboxOptions()

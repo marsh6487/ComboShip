@@ -1,3 +1,4 @@
+#include "../../../combo/gui/WhatsNew.h"
 #include <variant>
 #include <tuple>
 
@@ -339,6 +340,8 @@ void Menu::MenuDrawItem(WidgetInfo& widget, UIWidgets::Colors menuThemeIndex) {
         ImGui::SameLine();
     }
 
+    WhatsNew::Scope releaseHighlight(widget.cVar, widget.name.c_str(), CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                     widget.options && widget.options->disabled);
     try {
         switch (widget.type) {
             case WIDGET_CHECKBOX: {

@@ -11,6 +11,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 static void Check(bool value, const char *why) {
   if (!value)
@@ -41,7 +42,37 @@ struct UiInput {
   std::string text;
 } ui;
 
+ImGuiStyle::ImGuiStyle() {
+  Colors[ImGuiCol_Text] = ImVec4(1, 1, 1, 1);
+  ItemInnerSpacing = ImVec2(4, 4);
+}
+
 namespace ImGui {
+ImGuiStyle &GetStyle() {
+  static ImGuiStyle style;
+  return style;
+}
+static std::vector<std::pair<ImGuiCol, ImVec4>> colors;
+void PushStyleColor(ImGuiCol index, const ImVec4 &color) {
+  colors.emplace_back(index, GetStyle().Colors[index]);
+  GetStyle().Colors[index] = color;
+}
+void PopStyleColor(int count) {
+  while (count--) {
+    Check(!colors.empty(), "balanced release highlight style");
+    GetStyle().Colors[colors.back().first] = colors.back().second;
+    colors.pop_back();
+  }
+}
+void TextUnformatted(const char *, const char *) {}
+ImVec2 CalcTextSize(const char *text, const char *, bool, float) {
+  return ImVec2(std::string(text).size() * 7, 16);
+}
+ImVec2 GetContentRegionAvail() { return ImVec2(500, 500); }
+float GetFrameHeight() { return 20; }
+float GetTextLineHeight() { return 16; }
+bool IsItemHovered(ImGuiHoveredFlags) { return false; }
+void SetTooltip(const char *, ...) {}
 void SeparatorText(const char *) {}
 void Separator() {}
 void SetNextItemWidth(float) {}
