@@ -1,5 +1,9 @@
 # Final Lost Woods scene and authored Black Market door — bounded candidate
 
+The later solo/poster checkpoint is documented in
+`final-forest-solo-scroll-20261019.md` and supersedes the complete scene filename
+below. Its native address repair remains identical.
+
 This candidate connects cor's final native wooden door to the Black Market and
 repairs native scrolling display-list addresses. It does not promote an accepted
 baseline. The reported first-frame Prelude freeze has not been reproduced here,

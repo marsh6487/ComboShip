@@ -10,6 +10,7 @@
 #include "global.h"
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorPlayer.h"
+#include "soh/Enhancements/Gameplay/ComboBlackMarketNative.h"
 #endif
 #include "gameplay/ComboFaroresWind.h"
 #include "din_fire_shield.h"
@@ -63,6 +64,9 @@ void Player_AnimPlayLoop(PlayState* play, Player* this, LinkAnimationHeader* ani
 void Player_SetIntangibility(Player* this, s32 timer);
 s32 func_80837B18(PlayState* play, Player* this, s32 damage);
 s32 Player_PutAwayHeldItem(PlayState* play, Player* this);
+#ifdef COMBO_BUILD
+void func_8083C0E8(Player* this, PlayState* play);
+#endif
 
 // Fork subsystems this file still calls into directly. Every entry is a coupling left to move
 // behind a hook in PlayerHooks.cpp. The .c files have no translation unit of their own — CMake
@@ -6512,6 +6516,23 @@ s32 Player_ActionHandler_1(Player* this, PlayState* play) {
                 door->playerIsOpening = true;
 
                 if (this->doorType != PLAYER_DOORTYPE_FAKE) {
+#ifdef COMBO_BUILD
+                    s32 marketDoor = ComboBlackMarketOot_TryDoorEntrance(play, doorActor);
+                    if (marketDoor == COMBO_BLACK_MARKET_OOT_DOOR_ENTERED) {
+                        this->stateFlags1 |= PLAYER_STATE1_LOADING | PLAYER_STATE1_IN_CUTSCENE;
+                        gSaveContext.entranceSpeed = 2.0f;
+                        gSaveContext.entranceSound = NA_SE_OC_DOOR_OPEN;
+                        return 1;
+                    }
+                    if (marketDoor == COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED) {
+                        door->playerIsOpening = false;
+                        func_8083C0E8(this, play);
+                        Player_ZeroSpeedXZ(this);
+                        Audio_PlaySfxGeneral(NA_SE_SY_ERROR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                             &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+                        return 1;
+                    }
+#endif
                     this->stateFlags1 |= PLAYER_STATE1_IN_CUTSCENE;
                     Actor_DisableLens(play);
 

@@ -17,6 +17,7 @@ UNITS = ["mm/2s2h/Enhancements/Gameplay/ComboSoloForest.cpp",
          "mm/2s2h/Enhancements/Gameplay/BlackMarket.cpp",
          "soh/soh/Enhancements/Gameplay/ComboBlackMarketNative.cpp",
          "mm/2s2h/SaveManager/SaveManager.cpp", "mm/src/code/z_play.c", "soh/src/code/z_play.c",
+         "soh/src/code/z_scene_table.c",
          "soh/soh/Enhancements/gameplaystats.cpp", "soh/soh/util.cpp"]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--include", type=Path, action="append", default=[])

@@ -254,7 +254,7 @@ void RegisterSoloForest() {
     scene.segment.vromStart = scene.segment.vromEnd = 0;
     scene.segment.fileName = (char*)"skiejer_forest";
     scene.titleTextId = 0;
-    scene.drawConfig = SCENE_DRAW_CFG_DEFAULT;
+    scene.drawConfig = SCENE_DRAW_CFG_MAT_ANIM;
     scene.unk_A = scene.unk_C = scene.unk_D = 0;
     sSceneEntranceTable[ENTR_SCENE_UNSET_0B] = { 1, spawns, (char*)"SKIEJER_FOREST" };
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSaveLoad>([](s16 slot) {

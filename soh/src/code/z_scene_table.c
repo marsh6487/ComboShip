@@ -1,5 +1,8 @@
 #include "rando/CrossEntranceBoss.h"
 #include "global.h"
+#ifdef COMBO_BUILD
+#include "soh/Enhancements/Gameplay/ComboSoloForest.h"
+#endif
 
 #include "scenes/overworld/spot00/spot00_scene.h"
 #include "scenes/overworld/spot00/spot00_room_0.h"
@@ -1732,4 +1735,7 @@ void Scene_Draw(PlayState* play) {
     } else {
         sSceneDrawHandlers[play->sceneConfig](play);
     }
+#ifdef COMBO_BUILD
+    ComboSoloForestOot_DrawMaterials(play);
+#endif
 }

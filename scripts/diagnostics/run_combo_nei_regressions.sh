@@ -10,6 +10,8 @@ python3 -B scripts/diagnostics/run_forest_actor_tests.py
 python3 -B scripts/diagnostics/run_solo_forest_actors_tests.py
 ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_mm_placed_saria_resources_test.py --sanitize
 python3 -B tests/black_market/run_solo_forest_tests.py
+python3 -B tests/black_market/run_final_forest_scroll_tests.py
+python3 -B tests/black_market/run_final_forest_mm_config_test.py
 python3 -B tests/lost_woods_entrance/run_arrival_fade_tests.py
 python3 -B tests/lost_woods_entrance/final_scene_segments_test.py
 python3 -B tests/magic_mirror/run_tests.py

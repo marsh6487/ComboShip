@@ -158,7 +158,7 @@ Additional checks:
 
 ```sh
 python3 -B tests/magic_mirror/check_scene.py
-python3 -B tests/magic_mirror/check_scene.py --compiled /absolute/path/to/zzzz_MM3D_Lost_Woods_FINAL_native_segment_flags_POC18.prelude.o2r
+python3 -B tests/magic_mirror/check_scene.py --compiled /absolute/path/to/zzzz_MM3D_Lost_Woods_FINAL_avatar_POC19.prelude.o2r
 python3 -B tests/lost_woods_entrance/run_tests.py
 ```
 

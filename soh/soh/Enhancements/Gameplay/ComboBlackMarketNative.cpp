@@ -28,6 +28,9 @@ u8 ResourceMgr_FileExists(const char*);
 const char* SOH_ReadBlackMarketOptions();
 }
 #include "BlackMarketShelvesNative.h"
+#include "OotBlackMarketDoorNative.h"
+
+extern "C" void Player_Action_80845EF8(Player*, PlayState*);
 
 namespace {
 using namespace ComboRando::BlackMarket;
@@ -472,6 +475,8 @@ void DrawExterior() {
     auto* play = gPlayState;
     if (!Exterior(play) || !sSession.Active(gSaveContext.fileNum) || !PackAvailable())
         return;
+    if (OotBlackMarketDoorNative::HasDoor(play))
+        return; // The finished forest supplies the building and native door.
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     Matrix_Push();
@@ -496,7 +501,10 @@ void PlayerUpdate() {
     }
     if (sReturnPending && MatchesTravel() && Exterior(play)) {
         sReturnPending = false;
-        Vec3f pos = sReturnPos;
+        OotBlackMarketDoorNative::Pose placed;
+        const bool authoredDoor = OotBlackMarketDoorNative::Find(play, placed);
+        Vec3f pos = authoredDoor ? OotBlackMarketDoorNative::Outside(placed) : sReturnPos;
+        const s16 yaw = authoredDoor ? placed.yaw : sReturnYaw;
         pos.y += 120;
         CollisionPoly* floor = nullptr;
         s32 bg = BGCHECK_SCENE;
@@ -504,12 +512,14 @@ void PlayerUpdate() {
         if (y != BGCHECK_Y_MIN && floor && floor->normal.y >= 23170) {
             pos.y = y;
             player->actor.world.pos = player->actor.prevPos = player->actor.home.pos = pos;
-            player->actor.world.rot.y = player->actor.shape.rot.y = player->yaw = sReturnYaw;
+            player->actor.world.rot.y = player->actor.shape.rot.y = player->yaw = yaw;
             player->actor.velocity = {};
             player->actor.speedXZ = 0;
             player->actor.floorHeight = y;
             player->actor.floorPoly = floor;
             player->actor.floorBgId = bg;
+            if (authoredDoor)
+                Camera_InitPlayerSettings(&play->mainCamera, player);
         }
         sDoorArmed = false;
         return;
@@ -531,6 +541,8 @@ void PlayerUpdate() {
     }
     if (!Exterior(play) || !sSession.Active(gSaveContext.fileNum) || !PackAvailable())
         return;
+    if (OotBlackMarketDoorNative::HasDoor(play))
+        return; // Authored Open owns entry, including ambiguous/unavailable markers.
     const auto pos = player->actor.world.pos;
     Vec3f probe = { COMBO_BLACK_MARKET_DOOR_X, 120, COMBO_BLACK_MARKET_DOOR_Z };
     CollisionPoly* floor = nullptr;
@@ -671,6 +683,29 @@ void RegisterNativeMarket() {
 }
 RegisterShipInitFunc init(RegisterNativeMarket);
 } // namespace
+
+extern "C" int ComboBlackMarketOot_TryDoorEntrance(PlayState* play, Actor* door) {
+    if (play != gPlayState || !Exterior(play) || !OotBlackMarketDoorNative::MarkerActor(play, door))
+        return COMBO_BLACK_MARKET_OOT_DOOR_UNHANDLED;
+    OotBlackMarketDoorNative::Pose placed;
+    const auto* player = GET_PLAYER(play);
+    // Native Open already selected its knob-door action. Do not reject its own
+    // player cutscene state; scene/transition/session gates still apply.
+    if (!OotBlackMarketDoorNative::Find(play, placed) || !Safe(play) || !player || player->doorActor != door ||
+        player->doorType != PLAYER_DOORTYPE_HANDLE || player->actionFunc != Player_Action_80845EF8 ||
+        gSaveContext.health <= 0 || sEntering || !sSession.Active(gSaveContext.fileNum) || !PackAvailable())
+        return COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED;
+    // The native save worker must finish before publishing a new return point.
+    SaveManager::Instance->ThreadPoolWait();
+    sReturnPos = OotBlackMarketDoorNative::Outside(placed);
+    sReturnYaw = placed.yaw;
+    sReturnEntrance = gSaveContext.entranceIndex;
+    sDoorArmed = sReturnPending = false;
+    sEntering = true;
+    RememberTravel();
+    Transition(play, ENTR_SKIEJER_MARKET);
+    return COMBO_BLACK_MARKET_OOT_DOOR_ENTERED;
+}
 
 extern "C" void ComboBlackMarketOot_NormalizeEntry(void) {
     if (gComboGameMode != COMBO_GAME_OOT)

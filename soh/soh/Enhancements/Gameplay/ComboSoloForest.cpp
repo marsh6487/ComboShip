@@ -3,6 +3,7 @@
 #include "entrances/SoloForest.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "entrances/SoloForestResources.h"
+#include "entrances/SoloForestScroll.h"
 #include "global.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/ShipInit.hpp"
@@ -315,5 +316,24 @@ RegisterShipInitFunc init(RegisterSoloForest);
 } // namespace
 extern "C" void ComboSoloForestOot_NormalizeEntry(void) {
     NormalizeForestEntry();
+}
+extern "C" void ComboSoloForestOot_DrawMaterials(PlayState* play) {
+    if (!ForestVisit(play) || !ResourceMgr_FileExists(SoloForestScroll::kMarker))
+        return;
+    const u32 frame = play->gameplayFrames;
+    OPEN_DISPS(play->state.gfxCtx);
+    for (const auto& binding : SoloForestScroll::kBindings) {
+        const auto& first = binding.layers[0];
+        const auto& second = binding.layers[1];
+        Gfx* scroll = binding.count == 1
+                          ? Gfx_TexScrollEx(play->state.gfxCtx, frame * first.x, frame * first.y, first.width,
+                                            first.height, first.x, first.y)
+                          : Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, frame * first.x, frame * first.y, first.width,
+                                               first.height, 1, frame * second.x, frame * second.y, second.width,
+                                               second.height, first.x, first.y, second.x, second.y);
+        gSPSegment(POLY_OPA_DISP++, binding.segment, reinterpret_cast<uintptr_t>(scroll));
+        gSPSegment(POLY_XLU_DISP++, binding.segment, reinterpret_cast<uintptr_t>(scroll));
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 #endif

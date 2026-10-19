@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "scene": "Z2_LOST_WOODS",
   "room": 0,
   "source_edit": {
@@ -11,13 +11,13 @@
     "role": "unchanged original editable stump and Granny shop source; not a replacement for the newer full scene"
   },
   "compiled_scene": {
-    "name": "zzzz_MM3D_Lost_Woods_FINAL_native_segment_flags_POC18.prelude.o2r",
-    "sha256": "4bef56b0b4e3fbe89308c85e29eefbfce19b4f91d21a7ed79fc5c3c519c4a7ef",
-    "size": 121716901,
+    "name": "zzzz_MM3D_Lost_Woods_FINAL_avatar_POC19.prelude.o2r",
+    "sha256": "9097583c896a11c204e4950bd9a80aa8e69fb2a42307f55f50e75d4195f30e42",
+    "size": 124052320,
     "collision_sha256": "c00ee0ac86c0829aa981b284d251442ffd4212b6aa802e57d2f8db317529bb85",
-    "derived_from": "final_source",
-    "recipe": "python3 -B tools/lost_woods_entrance/final_scene_segments.py INPUT --output OUTPUT --receipt RECEIPT",
-    "changes": "12 native G_DL address-flag bytes; all other resource bytes preserved"
+    "derived_from": "native_segment_scene and tools/black_market/poster/skijer-wanted-poster.png",
+    "recipe": "python3 -B tools/black_market/poster_texture.py SEGMENT_FIXED OUTPUT",
+    "changes": "only wanted poster texture replaced, with unchanged native scroll address flags and every other resource"
   },
   "source_collision_sha256": "f59a49b42b88f90c64b20f2129cb686c66753720edcfa02ca79adeeba307b98a",
   "cap_snapshot": {
@@ -69,5 +69,28 @@
     "params": 0,
     "return_distance": 226,
     "runtime": "native Open action; eligible forest door ignores half-day schedule; shop return derives from loaded position and yaw"
+  },
+  "native_segment_scene": {
+    "name": "zzzz_MM3D_Lost_Woods_FINAL_native_segment_flags_POC18.prelude.o2r",
+    "sha256": "4bef56b0b4e3fbe89308c85e29eefbfce19b4f91d21a7ed79fc5c3c519c4a7ef",
+    "size": 121716901,
+    "collision_sha256": "c00ee0ac86c0829aa981b284d251442ffd4212b6aa802e57d2f8db317529bb85",
+    "derived_from": "final_source",
+    "recipe": "python3 -B tools/lost_woods_entrance/final_scene_segments.py INPUT --output OUTPUT --receipt RECEIPT",
+    "changes": "12 native G_DL address-flag bytes; all other resource bytes preserved"
+  },
+  "native_solo_scene": {
+    "name": "zzzz_Skiejer_Native_Solo_Forest_FINAL_avatar_POC4.o2r",
+    "sha256": "65901fcc27453a915be9414c7203e8295fce36ce69b7658653bbcdf978af8d0e",
+    "size": 124069188,
+    "resources": 120,
+    "recipe": "python3 -B tools/black_market/final_forest.py SEGMENT_FIXED LEGACY_SOLO OUTPUT --contract combo/entrances/SoloForestResources.h --scroll-contract combo/entrances/SoloForestScroll.h",
+    "legacy_solo_input": {
+      "name": "zzzz_Skiejer_Native_Solo_Forest_POC2.o2r",
+      "sha256": "3d45015fa43997e2f3a96440e018a6668a2b37d654bc3e32843c0f9100093cfb",
+      "library_file_id": "libfile_d38c8cb30a008191804860127369960b",
+      "version": 0
+    },
+    "scope": "shared final private forest assets and native MM/OoT scene headers; requires matching source for six scroll bindings and native authored shop door"
   }
 }
