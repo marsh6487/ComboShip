@@ -514,7 +514,8 @@ void SceneInit(s8 scene, s8 spawn) {
             return;
         BlackMarketDoorNative::Pose placed;
         const bool authoredDoor = BlackMarketDoorNative::Find(gPlayState, placed);
-        Vec3f pos = authoredDoor ? BlackMarketDoorNative::Outside(placed) : SoloExterior(gPlayState)
+        Vec3f pos = authoredDoor ? BlackMarketDoorNative::Outside(placed)
+                    : SoloExterior(gPlayState)
                         ? sSoloReturn
                         : Vec3f{ COMBO_BLACK_MARKET_DOOR_X - 226.0f, 0, COMBO_BLACK_MARKET_DOOR_Z };
         pos.y += 120.0f;

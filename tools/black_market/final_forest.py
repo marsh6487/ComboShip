@@ -70,14 +70,15 @@ def scroll_header(bindings):
     rows = []
     for binding in bindings:
         layers = binding['layers'] + ([{'x': 0, 'y': 0, 'width': 0, 'height': 0}] if len(binding['layers']) == 1 else [])
+        rows.append(f"    // Segment 0x{binding['segment']:02X}")
         rows.append('    { ' + str(binding['segment']) + ', ' + str(len(binding['layers'])) + ', { ' +
                     ', '.join('{ ' + ', '.join(str(layer[k]) for k in ('x', 'y', 'width', 'height')) + ' }' for layer in layers) + ' } },')
     return ('#pragma once\n#include <stdint.h>\n'
             '// Generated from FINAL TexAnim by tools/black_market/final_forest.py.\n'
             '// Native MM negates serialized Y velocity; these values already match it.\n'
             'namespace SoloForestScroll {\n'
-            'struct Layer { int8_t x, y; uint8_t width, height; };\n'
-            'struct Binding { uint8_t segment, count; Layer layers[2]; };\n'
+            'struct Layer {\n    int8_t x, y;\n    uint8_t width, height;\n};\n'
+            'struct Binding {\n    uint8_t segment, count;\n    Layer layers[2];\n};\n'
             'inline constexpr Binding kBindings[] = {\n' + '\n'.join(rows) + '\n};\n'
             f'inline constexpr const char* kMarker = "{MARKER}";\n'
             '} // namespace SoloForestScroll\n')
