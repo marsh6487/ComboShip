@@ -7,6 +7,7 @@
 #include "entrances/LostWoodsEntrance.h"
 #include "gameplay/MagicMirrorAnchor.h"
 #include "gameplay/MagicMirrorItem.h"
+#include "gameplay/MagicMirrorPlayer.h"
 #include "mods/extended_inventory.h"
 #include "mods/ext_buttons/ext_buttons.h"
 #include "mods/items/helpers/equip_helper.h"
@@ -22,6 +23,7 @@ extern "C" {
 u8 ResourceMgr_FileExists(const char* path);
 int Combo_MM_CrossDungeonTransitionPending(void);
 u8 Pacci_UltrahandModeActive(void);
+u8 Sm64Mario_IsReady(void);
 }
 #define COMBO_MAGIC_MIRROR_MM
 #include "gameplay/MagicMirrorDraw.inc.h"
@@ -39,6 +41,12 @@ bool PackAvailable() {
 }
 bool Busy(PlayState* play) {
     return ItemInput_IsBlocked(GET_PLAYER(play), play) || Combo_MM_CrossDungeonTransitionPending();
+}
+bool TransitionPending() {
+    return Combo_MM_CrossDungeonTransitionPending();
+}
+bool AlternateModel() {
+    return Sm64Mario_IsReady();
 }
 bool TimedActivity() {
     return std::any_of(std::begin(gSaveContext.timerStates), std::end(gSaveContext.timerStates),
@@ -119,7 +127,10 @@ void RegisterMagicMirror() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>(MirrorRuntime::Update);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldEnd>(MirrorRuntime::DrawWorld);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s16, s8) { ResetMirror(); });
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(ResetMirror);
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>([]() {
+        MirrorRuntime::Destroy();
+        MirrorHost::ClearQueuedPickups();
+    });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnOpenText>(OpenMirrorText);
 }
 RegisterShipInitFunc init(RegisterMagicMirror, {});

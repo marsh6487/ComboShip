@@ -50,8 +50,28 @@ The approved ALTTP visual revision is isolated on
 `poc/magic-mirror-alttp-20261019`, based on published checkpoint
 `65c34dba7c73b43909946963486dc06d075ddb08`. It replaces the first gold-oval draft
 with the reference's round blue casing, gold inner rim, short grip and pale
-mirror glass. A dedicated character-use animation and TP activation sigil remain
-design work; this checkpoint does not claim either is present.
+mirror glass.
+
+The temporary casting motion is isolated on `poc/magic-mirror-cast-20261019`,
+based on the ALTTP visual tree `be2d96f9449805696958c56ef3a044560ff3a658`.
+Confirming Yes now commits to the native Farore's Wind main flourish, played
+once at 1.25 speed after normal held-item put-away. As the hands rise, the blue
+Mirror appears above the current head position, facing the camera. Its final
+raised-hands pose and the Mirror remain visible through the existing fade.
+The native clip ending, rather than a wall-clock delay, triggers recall.
+No Farore spell actor/sparkle mesh, magic consumption, warp-point write, or new
+scene asset is involved. The TP activation sigil remains design work.
+
+The cast is bound to the same player and slot/seed/scene/mode context. Losing
+ownership or outdoor safety, a replacement message/action, or a stalled native
+put-away cancels it. Cleanup returns only the Mirror's own action to idle; an
+interrupting native action retains ownership. Destroy discards player pointers
+without dereferencing them, including MM's post-arena-cleanup destroy hook.
+Mario's independent controller explicitly yields for this item action. His
+current mesh stays parked while the overhead Mirror and recall finish; this
+placeholder does not retarget Link's Farore clip onto the libsm64 rig. The
+overhead anchor follows his actor position because Link's hidden head joints
+can be stale. Configured Mario presentation remains a runtime acceptance check.
 
 ## Verification and limits
 
@@ -70,11 +90,16 @@ MIRROR_TEST_CXXFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -no
   ASAN_OPTIONS=detect_leaks=0 python3 -B tools/magic_mirror/run_draw_tests.py
 ```
 
-The tests execute the actual runtime, save/ownership/selector functions, and
+The tests execute the actual runtime, shared native casting action, each engine's
+verbatim once-animation advancement/dispatcher, save/ownership/selector functions, and
 native graphics allocator/setup bodies with real engine types. External system
 boundaries such as disk saves, launcher calls, and GPU rendering are fixtures.
 The recovery archive records exact command results, syntax probes, asset gate,
-source trees, and independent patch-restoration evidence.
+source trees, and independent patch-restoration evidence. Casting fixtures cover
+put-away, completion before travel, repeated-button suppression, overhead draw,
+fade pose retention, safety/context interruption, a stalled cast, and destruction
+after freeing the player. Animation asset I/O and native idle/put-away helpers
+remain fixture boundaries; the actual adapters require native compilation too.
 
 This checkpoint has no configured in-game proof or user acceptance. A complete
 executable/archive build and link was not performed here. The real-header syntax
@@ -88,6 +113,8 @@ load order. Runtime acceptance must cover the moved stump's visible placement
 and ground pickup, get-item scale and sound/text, C/D-pad prompt and cancellation,
 save/reload, both cross-game directions, solo forest visits, and blocked-use
 states. Include Time Gate ownership/selection and Farore recall in that session.
+For the placeholder cast, check the visible morph and hand/head placement on the
+selected age/form, the overhead Mirror at the last beat, and the fade/handoff.
 
 ## Recovery
 

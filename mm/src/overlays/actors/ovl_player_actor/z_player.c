@@ -8,6 +8,9 @@
  */
 
 #include "global.h"
+#ifdef COMBO_BUILD
+#include "gameplay/MagicMirrorPlayer.h"
+#endif
 #include "sword_element_message.h"
 #include <libultraship/log/luslog.h> // 2S2H [Port] lusprintf (LUS 464 exports it via API_EXPORT)
 #include "z64horse.h"
@@ -14303,6 +14306,9 @@ void Player_Update(Actor* thisx, PlayState* play) {
                                                 PLAYER_STATE1_GETTING_ITEM | PLAYER_STATE1_IN_ITEM_CS |
                                                 PLAYER_STATE1_CLIMBING_LEDGE | PLAYER_STATE1_HANGING_OFF_LEDGE)) != 0 ||
                           sm64CButtonHeld;
+#ifdef COMBO_BUILD
+    marioYieldToOot |= MagicMirrorPlayer_State(this) != MAGIC_MIRROR_CAST_NONE;
+#endif
     if (Sm64Mario_IsReady()) {
         if (marioYieldToOot) {
             // PAUSE_ACTION_FUNC persists across frames in MM; clear it explicitly
@@ -23245,3 +23251,9 @@ s32 func_8085B930(PlayState* play, PlayerAnimationHeader* talkAnim, AnimationMod
                            PLAYER_ANIM_ADJUSTED_SPEED, 0.0f, Animation_GetLastFrame(talkAnim), animMode, -6.0f);
     return true;
 }
+
+#ifdef COMBO_BUILD
+#define COMBO_MAGIC_MIRROR_MM
+#include "gameplay/MagicMirrorPlayer.inc.c"
+#undef COMBO_MAGIC_MIRROR_MM
+#endif

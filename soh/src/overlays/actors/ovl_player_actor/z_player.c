@@ -8,6 +8,9 @@
 
 #include <libultraship/libultra.h>
 #include "global.h"
+#ifdef COMBO_BUILD
+#include "gameplay/MagicMirrorPlayer.h"
+#endif
 #include "gameplay/ComboFaroresWind.h"
 #include "din_fire_shield.h"
 #include "din_fire_sword.h"
@@ -14197,7 +14200,11 @@ void Player_Update(Actor* thisx, PlayState* play) {
         // makes doors/void/cutscene/exit COMPLETE instead of freezing (softlock).
         // CARRYING_ACTOR is intentionally NOT yielded: Mario keeps libsm64 control
         // while carrying (Sm64Mario_TryGrabOrThrow pins/throws the held item).
-        if (Sm64Mario_IsReady() && !Sm64Mario_OotIsScriptingPlayer(play, this)) {
+        if (Sm64Mario_IsReady() && !Sm64Mario_OotIsScriptingPlayer(play, this)
+#ifdef COMBO_BUILD
+            && !MagicMirrorPlayer_State(this)
+#endif
+        ) {
             this->stateFlags3 |= PLAYER_STATE3_PAUSE_ACTION_FUNC;
         }
 
@@ -19080,3 +19087,7 @@ void Player_StartTalking(PlayState* play, Actor* actor) {
     F(sHeldItemButtonIsHeldDown)
 
 SHIP_SAVESTATE_DEFINE(Player, PLAYER_SHIP_SAVESTATE_FIELDS)
+
+#ifdef COMBO_BUILD
+#include "gameplay/MagicMirrorPlayer.inc.c"
+#endif

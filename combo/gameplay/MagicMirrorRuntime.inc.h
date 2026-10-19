@@ -14,6 +14,10 @@ static MagicMirrorAnchor::Point sAnchor{};
 static PlayState* sPromptPlay = nullptr;
 static Player* sPromptPlayer = nullptr;
 static u32 sPromptAddedFlags = 0;
+static PlayState* sCastPlay = nullptr;
+static Player* sCastPlayer = nullptr;
+static bool sDeparted = false;
+static unsigned sCastTicks = 0;
 #ifdef COMBO_MAGIC_MIRROR_MM
 constexpr u32 kPromptFreeze = PLAYER_STATE1_20000000;
 #else
@@ -41,6 +45,15 @@ void ReleasePrompt(bool close) {
     sPromptPlayer = nullptr;
     sPromptAddedFlags = 0;
 }
+void ReleaseCast() {
+    if (sCastPlay && gPlayState == sCastPlay && gGameState == &gPlayState->state &&
+        GET_PLAYER(gPlayState) == sCastPlayer)
+        MagicMirrorPlayer_End(gPlayState, sCastPlayer);
+    sCastPlay = nullptr;
+    sCastPlayer = nullptr;
+    sDeparted = false;
+    sCastTicks = 0;
+}
 
 int Scene(const PlayState* play) {
 #ifdef COMBO_MAGIC_MIRROR_MM
@@ -55,10 +68,17 @@ bool Matches(PlayState* play) {
 }
 void Reset() {
     ReleasePrompt(true);
+    ReleaseCast();
     sContext = {};
     sPickupToken = 0;
     sPrompt = sAnchorValid = false;
     sCollision = nullptr;
+}
+void Destroy() {
+    // MM notifies OnPlayDestroy after its arena has been freed.
+    sPromptPlay = nullptr;
+    sCastPlay = nullptr;
+    Reset();
 }
 void Bind(PlayState* play) {
     if (Matches(play))
@@ -134,7 +154,8 @@ bool Safe(PlayState* play, bool ownMessage) {
         gSaveContext.gameMode != GAMEMODE_NORMAL || !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) ||
         play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF ||
         play->pauseCtx.state != 0 || play->gameOverCtx.state != GAMEOVER_INACTIVE ||
-        play->csCtx.state != CS_STATE_IDLE || gSaveContext.cutsceneTrigger || MirrorHost::TimedActivity())
+        play->csCtx.state != CS_STATE_IDLE || gSaveContext.cutsceneTrigger || MirrorHost::TimedActivity() ||
+        MirrorHost::TransitionPending())
         return false;
     const auto* player = GET_PLAYER(play);
     if (!player || player->heldActor || player->rideActor || !(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) ||
@@ -150,8 +171,11 @@ bool Safe(PlayState* play, bool ownMessage) {
 #endif
     return ownMessage || (play->msgCtx.msgMode == MSGMODE_NONE && !Player_InCsMode(play) && !MirrorHost::Busy(play));
 }
-bool Travel(PlayState* play) {
-    if (!MagicMirror_IsOwned() || !Safe(play, false) || !AllowedScene(play) || !MirrorHost::PackAvailable())
+bool Travel(PlayState* play, bool casting = false) {
+    if (casting && (!play || play != sCastPlay || GET_PLAYER(play) != sCastPlayer ||
+                    MagicMirrorPlayer_State(sCastPlayer) != MAGIC_MIRROR_CAST_READY))
+        return false;
+    if (!MagicMirror_IsOwned() || !Safe(play, casting) || !AllowedScene(play) || !MirrorHost::PackAvailable())
         return false;
 #ifndef COMBO_MAGIC_MIRROR_MM
     if (Combo_IsCombinedGame())
@@ -230,6 +254,21 @@ void Update() {
     Bind(play);
     if (!play || !Mode())
         return;
+    if (sCastPlay) {
+        if (play != sCastPlay || GET_PLAYER(play) != sCastPlayer || !MagicMirrorPlayer_State(sCastPlayer) ||
+            ++sCastTicks > 160 ||
+            (!sDeparted && (!MagicMirror_IsOwned() || !Safe(play, true) || play->msgCtx.msgMode != MSGMODE_NONE ||
+                            !AllowedScene(play) || !MirrorHost::PackAvailable()))) {
+            ReleaseCast();
+        } else if (!sDeparted && MagicMirrorPlayer_State(sCastPlayer) == MAGIC_MIRROR_CAST_READY) {
+            sDeparted = Travel(play, true);
+            if (!sDeparted) {
+                ReleaseCast();
+                MirrorHost::Error();
+            }
+        }
+        return;
+    }
     if (sPrompt) {
         const auto text = CurrentText(play);
         if (text != kPromptText || !Safe(play, true) || !MagicMirror_IsOwned()) {
@@ -247,8 +286,13 @@ void Update() {
             // can still report a textbox. Recheck every other safety gate.
             if (yes && Safe(play, true) && AllowedScene(play) && MirrorHost::PackAvailable()) {
                 play->msgCtx.msgMode = MSGMODE_NONE;
-                if (!Travel(play))
+                if (MagicMirrorPlayer_Begin(play, GET_PLAYER(play))) {
+                    sCastPlay = play;
+                    sCastPlayer = GET_PLAYER(play);
+                    sCastTicks = 0;
+                } else {
                     MirrorHost::Error();
+                }
             }
         } else if (Message_GetState(&play->msgCtx) == TEXT_STATE_NONE) {
             ReleasePrompt(false);
@@ -283,6 +327,20 @@ void Update() {
 }
 void DrawWorld() {
     auto* play = gPlayState;
+    if (play && Mode() && Matches(play) && play == sCastPlay && GET_PLAYER(play) == sCastPlayer &&
+        MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PLAYING && sCastPlayer->skelAnime.curFrame >= 40) {
+        auto head = sCastPlayer->bodyPartsPos[PLAYER_BODYPART_HEAD];
+        if (MirrorHost::AlternateModel()) {
+            head = sCastPlayer->actor.world.pos;
+            head.y += 60; // Mario hides Link's skeleton; its head joints can be stale.
+        }
+        Matrix_Push();
+        Matrix_Translate(head.x, head.y + 28, head.z, MTXMODE_NEW);
+        Matrix_ReplaceRotation(&play->billboardMtxF);
+        Matrix_Scale(0.65f, 0.65f, 0.65f, MTXMODE_APPLY);
+        ComboMagicMirrorVisual::Draw(play);
+        Matrix_Pop();
+    }
     if (!play || !Mode() || !Forest(play) || play->roomCtx.curRoom.num != 0 || MagicMirror_IsOwned() || sPickupToken ||
         !Locate(play))
         return;

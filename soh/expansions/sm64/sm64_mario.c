@@ -1037,6 +1037,12 @@ s32 Sm64Mario_OotIsScriptingPlayer(PlayState* play, Player* p) {
 #define SM64_SOUND_MARIO_YAHOO 0x24048081
 
 void Sm64Mario_Update(PlayState* play, Player* player) {
+#ifdef COMBO_BUILD
+    // The Mirror owns the native action until recall or cancellation. Keep the
+    // current Mario mesh parked; raw libsm64 input/writeback must not fight it.
+    if (MagicMirrorPlayer_State(player))
+        return;
+#endif
     Camera* cam;
     float lookX, lookZ, lookMag, waterY;
     Input* input;

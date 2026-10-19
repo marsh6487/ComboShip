@@ -28,9 +28,14 @@ pass. The recessed double-sided reflecting pane and confined shimmer use the
 translucent pass. The restrained 960-frame reflection shimmer is deterministic and wraps
 exactly; there is no positional bobbing or rotation inside the visual renderer.
 
-This visual revision changes the GI, stump reward, and inventory icon. Use still
-opens the confirmation prompt and travels through the native fade. A separate
-character-use animation and the proposed TP green sigil have not been implemented.
+The GI, stump reward, inventory icon and overhead casting item share this mesh.
+After confirming recall, Link puts away his held item and performs the native
+Farore's Wind main casting clip once at 1.25 playback speed, with a short morph
+from his current pose. The Mirror appears above his head as his hands rise and
+remains there in the final pose during the existing departure fade. No Farore
+spell actor or sparkle mesh is spawned. The native player bridge is isolated in
+`combo/gameplay/MagicMirrorPlayer.inc.c` so this placeholder motion can be replaced.
+The proposed TP green activation sigil remains unimplemented.
 
 ## Rebuild the native texture files
 
