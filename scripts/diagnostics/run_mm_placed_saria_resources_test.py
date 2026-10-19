@@ -32,7 +32,7 @@ def method(source, name):
     return source[match.start():end] + '\n'
 def run(*args):
     subprocess.run(list(map(str, args)), cwd=ROOT, check=True)
-flags = ['-std=c++20', '-DCOMBO_BUILD', '-DF3DEX_GBI_2', '-DNDEBUG', '-DCONTROLLERBUTTONS_T=uint32_t',
+flags = ['-std=c++20', '-DCOMBO_BUILD', '-DF3DEX_GBI_2', '-DNDEBUG', '-DFMT_HEADER_ONLY', '-DCONTROLLERBUTTONS_T=uint32_t',
          '-Ilibultraship/include', '-Imm/include', '-Imm/include/PR', '-Imm', '-Icombo']
 if args.sanitize:
     flags += ['-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-fno-omit-frame-pointer', '-fno-pie', '-no-pie']

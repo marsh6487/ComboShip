@@ -35,7 +35,8 @@ def main():
         names = ['EnViewer_SetupAction', 'EnViewer_Init', 'EnViewer_Destroy', 'EnViewer_Update', 'EnViewer_Draw']
         (work/'viewer.c').write_text(fixture.replace('/* PRODUCTION_VIEWER_FUNCTIONS */',
                                                    '\n'.join(function(viewer, name) for name in names)))
-        flags = ['-std=gnu11', '-DCOMBO_BUILD', '-DF3DEX_GBI_2', '-DNDEBUG', '-D_LANGUAGE_C',
+        # Standalone fixtures also support distro spdlog using external fmt.
+        flags = ['-std=gnu11', '-DCOMBO_BUILD', '-DF3DEX_GBI_2', '-DNDEBUG', '-D_LANGUAGE_C', '-DFMT_HEADER_ONLY',
                  '-DCONTROLLERBUTTONS_T=uint32_t', '-DLOG_LEVEL_GAME_PRINTS=6',
                  '-Imm/include', '-Imm/include/PR', '-Imm/src', '-Imm/assets', '-Imm',
                  '-Imm/2s2h', '-Ilibultraship/include', '-Icombo', '-Icombo/menu']
@@ -59,7 +60,7 @@ def main():
                    'soh/soh/resource/type/SkeletonLimb.cpp', 'soh/soh/resource/type/Animation.cpp',
                    'libultraship/src/ship/resource/Resource.cpp', 'libultraship/src/fast/resource/type/Texture.cpp',
                    'libultraship/src/fast/resource/type/DisplayList.cpp']
-        run('c++', '-std=c++20', '-DF3DEX_GBI_2', '-DNDEBUG', '-Ilibultraship/include',
+        run('c++', '-std=c++20', '-DF3DEX_GBI_2', '-DNDEBUG', '-DFMT_HEADER_ONLY', '-Ilibultraship/include',
             '-Isoh/include', '-Isoh', '-Isoh/assets', '-Isoh/mods', '-Icombo', *sources, '-o', work/'resources')
         run(work/'resources')
         runtime = (ROOT/'mm/2s2h/Enhancements/Gameplay/ComboSaria.cpp').read_text()

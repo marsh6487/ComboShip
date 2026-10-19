@@ -9,6 +9,9 @@
     "scripts/diagnostics/run_foreign_soul_skeleton_tests.py": "0ec4fd09efa885993c3a2fbf417dfa63092db0cf711e13df37cca239076b7373",
     "soh/tests/young_epona_actor_test.c": "9581133c403deef2dd377f7fb16b80378e280df505bb1ffa12ae90f600d5594b",
     "scripts/diagnostics/run_young_epona_player_tests.py": "fd4d57d1031622b035d1251587fb61692225f6601c3640415962ee7bebca8122",
-    "docs/poc/final-gate-followup-20261019.md": "645589a576a7409cc17e439c792b292da816e5c162e0f44c49739575bc909be9"
-  }
+    "docs/poc/final-gate-followup-20261019.md": "86baf762951cbe64049aca6d308c74d0f60e41328317606c629c4910dc688b8d",
+    "scripts/diagnostics/run_forest_actor_tests.py": "4e1c4ec1d4ea501b7126a2272772af337fa5beb9762dbc90572a30f9f2aeae87",
+    "scripts/diagnostics/run_mm_placed_saria_resources_test.py": "707e32500e574c43647d27b7db59a3b66ba40ddec7eb4ce363ab6a59f51b41a3"
+  },
+  "fmt_followup_baseline": "a0fd97c155c0c0641fe8b257c5823eaaa2170931"
 }

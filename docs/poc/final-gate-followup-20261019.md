@@ -29,3 +29,11 @@ The broader gate exposed additional fixture maintenance after combining the acce
 - The young-Epona actor fixture supplies the combined-game mode and fails if forest-only presentation services are unexpectedly called in its native young-horse cases. Its player compiler also includes the existing `combo/menu` header path, required by elemental-sword receipts. The complete Epona actor/player/save/cosmetic group passes, including full player/horse translation-unit checks.
 
 Each missing dependency was reproduced before correction. These changes affect test fixtures and their compiler commands only. No game implementation, item behavior, scene resources or asset packaging changes are made in this follow-up. Exact-head hosted full application builds remain a separate gate.
+
+## Standalone resource logging dependency
+
+The combined source checkpoint `a0fd97c155c0c0641fe8b257c5823eaaa2170931` passed the complete Windows renderer/UI/launcher preflight and every preceding hosted regression group. Its [NEI gate](https://github.com/marsh6487/ComboShip/actions/runs/39340883540) then reached the real Saria resource fixture and exposed unresolved external `fmt::v9` symbols. Ubuntu's spdlog headers select an external fmt implementation; the standalone resource and save fixtures did not supply it.
+
+The forest actor runner and MM Saria resource runner now compile their standalone C++ fixtures with `FMT_HEADER_ONLY`, matching existing standalone tests. This retains the actual resource classes and logging implementation. It changes no application compiler settings, game source, resource data, actor behavior or audio integration. The native monkey suite remains the first forest-runner check.
+
+The missing implementation was reproduced with genuine spdlog 1.12.0 and fmt 9.1.0 headers in external-fmt configuration. Verification covers the complete forest runner with both external and bundled fmt configurations, and the MM Saria snapshot/resource suite under ASan/UBSan. Exact-head hosted continuation and full executable/archive builds retain their separately reported status.
