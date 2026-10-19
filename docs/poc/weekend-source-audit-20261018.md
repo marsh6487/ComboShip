@@ -1,5 +1,8 @@
 # Weekend development audit — October 16–18, 2026
 
+Historical checkpoint record. See `final-cumulative-audit-20261019.md` for the
+current cumulative source inventory, selected NPC revisions and verification.
+
 The weekend source is assembled into the isolated branch `integration/weekend-audit-20261018`, based on GitHub PR #44’s exact head `43131342882972eeb4a257599ec8b061c7dc6d43`. It is a prepared source candidate for a later GitHub integration. The full regression gate, linked platform build, configured gameplay acceptance and master promotion remain pending.
 
 The accepted `develop` baseline is still `a82852a3a02c8cabc541cce7c124da71c5755efb`. PR #44 and the earlier PR #41 remain separate remote drafts. This task has made no remote source, PR, deployment or master changes. Final source/tree identities and verification results are recorded in `source-checkpoint.json` in the merge kit.

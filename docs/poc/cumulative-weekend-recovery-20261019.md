@@ -1,5 +1,8 @@
 # Cumulative weekend recovery — 2026-10-19
 
+Historical checkpoint record. See `final-cumulative-audit-20261019.md` for the
+current cumulative source inventory, selected NPC revisions and verification.
+
 Status: recovery record only. The cumulative source upload is not complete, and this checkpoint does not claim a linked build or gameplay acceptance.
 
 Repository: marsh6487/ComboShip. User authorized publication and periodic recovery checkpoints on 2026-10-19.
