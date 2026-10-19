@@ -68,7 +68,7 @@ def main():
                            ['ComboSaria_IsParam', 'ComboSaria_Init', 'ComboSaria_Destroy', 'ComboSaria_Update', 'ComboSaria_Draw'])
         fixture = (ROOT/'mm/tests/placed_saria_lifecycle_test.cpp').read_text()
         (work/'lifecycle.cpp').write_text(fixture.replace('/* PRODUCTION_SARIA_RUNTIME */',
-            'namespace {\n' + core + function(runtime, 'SpawnForestSaria') + function(runtime, 'SpawnForestEpona') + '}\n' + bodies))
+            function(runtime, 'DrawShimmer') + 'namespace {\n' + core + function(runtime, 'SpawnForestSaria') + function(runtime, 'SpawnForestEpona') + '}\n' + bodies))
         run('c++', '-std=c++20', *flags[1:], work/'lifecycle.cpp', '-ldl', '-lm', '-o', work/'lifecycle')
         run(work/'lifecycle')
         run('c++', '-std=c++20', *flags[1:], 'mm/tests/placed_saria_save_test.cpp', '-o', work/'save')

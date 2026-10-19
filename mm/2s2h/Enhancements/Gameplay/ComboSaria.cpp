@@ -6,6 +6,8 @@
 #include "ComboForestEpona.h"
 #include "ComboResolve.h"
 #include "actors/PlacedSariaABI.h"
+#include "actors/SariaHexEffect.h"
+#include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/CustomItem/CustomItem.h"
@@ -19,6 +21,50 @@
 #include <memory>
 #include <unordered_map>
 
+static void DrawShimmer(Actor* actor, PlayState* play, bool seated) {
+    if (play->pauseCtx.state != PAUSE_STATE_OFF || actor->xzDistToPlayer > 700.0f ||
+        std::fabs(actor->playerHeightRel) > 300.0f)
+        return;
+    using namespace SariaHexEffect;
+    std::array<Vertex, kVertexCount> shape;
+    const float facing = std::atan2(play->view.eye.x - actor->world.pos.x, play->view.eye.z - actor->world.pos.z);
+    Build(play->gameplayFrames, seated, facing, shape);
+    auto* vertices = static_cast<Vtx*>(GRAPH_ALLOC(play->state.gfxCtx, sizeof(Vtx) * kVertexCount));
+    if (!vertices)
+        return;
+    for (int i = 0; i < kVertexCount; ++i) {
+        vertices[i] = {};
+        vertices[i].v.ob[0] = static_cast<s16>(std::lround(shape[i].x * 10.0f));
+        vertices[i].v.ob[1] = static_cast<s16>(std::lround(shape[i].y * 10.0f));
+        vertices[i].v.ob[2] = static_cast<s16>(std::lround(shape[i].z * 10.0f));
+        vertices[i].v.cn[0] = shape[i].r;
+        vertices[i].v.cn[1] = shape[i].g;
+        vertices[i].v.cn[2] = shape[i].b;
+        vertices[i].v.cn[3] = shape[i].a;
+    }
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    Matrix_Push();
+    Matrix_Translate(actor->world.pos.x, actor->world.pos.y, actor->world.pos.z, MTXMODE_NEW);
+    Matrix_Scale(0.1f, 0.1f, 0.1f, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
+    gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_FOG | G_CULL_BOTH);
+    gSPTexture(POLY_XLU_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
+    gDPSetRenderMode(POLY_XLU_DISP++, G_RM_PASS, G_RM_AA_ZB_XLU_SURF2);
+    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_SHADE, G_CC_SHADE);
+    for (int h = 0; h < kHexes; ++h) {
+        gSPVertex(POLY_XLU_DISP++, reinterpret_cast<uintptr_t>(&vertices[h * 12]), 12, 0);
+        for (int side = 0; side < 6; ++side) {
+            const int next = (side + 1) % 6;
+            gSP2Triangles(POLY_XLU_DISP++, side, next, next + 6, 0, side, next + 6, side + 6, 0);
+        }
+    }
+    Matrix_Pop();
+    gDPPipeSync(POLY_XLU_DISP++);
+    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 namespace {
 constexpr u16 kText = 0x8F28;
 constexpr u16 kTeachText = 0x8F29;
@@ -31,8 +77,12 @@ bool IsSeated(const Actor* actor) {
     return (((u16)actor->params >> 4) & 15) == 3;
 }
 
+bool IsSongGiftParam(s16 params) {
+    return params == 0x7E13 || params == 0x7E23 || params == kSongGiftParams;
+}
+
 bool IsSongGift(const Actor* actor, const PlayState* play) {
-    return actor->params == kSongGiftParams && ComboForestActors_IsMmGame() && play->sceneId == SCENE_00KEIKOKU &&
+    return IsSongGiftParam(actor->params) && ComboForestActors_IsMmGame() && play->sceneId == SCENE_00KEIKOKU &&
            gSaveContext.gameMode == GAMEMODE_NORMAL && ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) &&
            gSaveContext.save.cutsceneIndex == 0;
 }
@@ -113,8 +163,6 @@ struct State {
     u8 eye = 0;
     bool talking = false;
     bool teaching = false;
-    u8 shimmerTimer = 0;
-    u16 shimmerPhase = 0;
     ~State() {
         if (resources.owner)
             sBridge.release(resources.owner);
@@ -124,24 +172,8 @@ std::unordered_map<Actor*, std::unique_ptr<State>> sStates;
 bool sSpawnAttempted = false;
 bool sHorseSpawnAttempted = false;
 
-void Shimmer(State& state, Actor* actor, PlayState* play) {
-    if (play->pauseCtx.state != PAUSE_STATE_OFF || actor->xzDistToPlayer > 700.0f ||
-        std::fabs(actor->playerHeightRel) > 300.0f)
-        return;
-    if (++state.shimmerTimer < 3)
-        return;
-    state.shimmerTimer = 0;
-    const float angle = state.shimmerPhase * (6.28318530718f / 65536.0f);
-    const float radius = 16.0f + ((state.shimmerPhase >> 8) % 8);
-    Vec3f pos = actor->world.pos;
-    pos.x += std::cos(angle) * radius;
-    pos.z += std::sin(angle) * radius;
-    pos.y += 4.0f + ((state.shimmerPhase >> 5) % (IsSeated(actor) ? 20 : 40));
-    Vec3f velocity = { std::cos(angle) * 0.04f, 0.18f, std::sin(angle) * 0.04f };
-    Vec3f acceleration = { 0.0f, 0.005f, 0.0f };
-    Color_RGBA8 prim = { 160, 255, 190, 200 }, env = { 20, 150, 45, 0 };
-    EffectSsKirakira_SpawnDispersed(play, &pos, &velocity, &acceleration, &prim, &env, 500, 24);
-    state.shimmerPhase += 0x2C31;
+u8 EyeIndex(const State& state, const Actor* actor) {
+    return (((u16)actor->params >> 4) & 15) == 2 ? (state.talking ? 0 : 2) : state.eye;
 }
 
 void ResetSariaResources() {
@@ -173,10 +205,11 @@ bool Bind(State& state, Actor* actor, PlayState* play) {
 
 s32 Override(PlayState*, s32 limb, Gfx** display, Vec3f*, Vec3s*, Actor* actor) {
     auto& state = *sStates.at(actor);
-    if (limb == 16 && state.resources.heads[state.eye])
-        *display = reinterpret_cast<Gfx*>(const_cast<char*>(state.resources.heads[state.eye]));
     if (limb > 0 && limb < 17 && state.resources.poseLimbs[limb])
         *display = reinterpret_cast<Gfx*>(const_cast<char*>(state.resources.poseLimbs[limb]));
+    const u8 eye = EyeIndex(state, actor);
+    if (limb == 16 && state.resources.heads[eye])
+        *display = reinterpret_cast<Gfx*>(const_cast<char*>(state.resources.heads[eye]));
     return false;
 }
 
@@ -196,7 +229,7 @@ void SpawnForestSaria() {
     for (const auto& list : play->actorCtx.actorLists)
         for (Actor* actor = list.first; actor; actor = actor->next)
             if (actor->id == ACTOR_EN_VIEWER &&
-                (field ? actor->params == kSongGiftParams : ComboSaria_IsParam(actor->params))) {
+                (field ? IsSongGiftParam(actor->params) : ComboSaria_IsParam(actor->params))) {
                 sSpawnAttempted = true;
                 return;
             }
@@ -288,7 +321,7 @@ static RegisterShipInitFunc init(RegisterSaria, {});
 } // namespace
 
 extern "C" int ComboSaria_IsParam(s16 params) {
-    return ((u16)params & 0xFF0F) == 0x7F03 || params == kSongGiftParams;
+    return ((u16)params & 0xFF0F) == 0x7F03 || IsSongGiftParam(params);
 }
 
 extern "C" void ComboSaria_Init(Actor* actor, PlayState* play) {
@@ -347,7 +380,6 @@ extern "C" void ComboSaria_Update(Actor* actor, PlayState* play) {
         return;
     }
     SkelAnime_Update(&state.animation);
-    Shimmer(state, actor, play);
     if (IsSeated(actor))
         state.joints[0].y -= kSeatedRootOffset;
     if (state.blinkTimer > 0)
@@ -385,6 +417,7 @@ extern "C" void ComboSaria_Draw(Actor* actor, PlayState* play) {
     if (found == sStates.end())
         return;
     auto& state = *found->second;
+    const u8 eye = EyeIndex(state, actor);
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
     // Native OoT limbs branch through segment C, including the fallback when
@@ -394,11 +427,12 @@ extern "C" void ComboSaria_Draw(Actor* actor, PlayState* play) {
     gDPSetEnvColor(POLY_OPA_DISP++, 0, 0, 0, 255);
     gDPPipeSync(POLY_OPA_DISP++);
     gSPSegment(POLY_OPA_DISP++, 12, reinterpret_cast<uintptr_t>(endDisplayList));
-    gSPSegment(POLY_OPA_DISP++, 8, reinterpret_cast<uintptr_t>(state.resources.eyes[state.eye]));
-    gSPSegment(POLY_OPA_DISP++, 9, reinterpret_cast<uintptr_t>(state.resources.eyes[state.eye]));
+    gSPSegment(POLY_OPA_DISP++, 8, reinterpret_cast<uintptr_t>(state.resources.eyes[eye]));
+    gSPSegment(POLY_OPA_DISP++, 9, reinterpret_cast<uintptr_t>(state.resources.eyes[eye]));
     gSPSegment(POLY_OPA_DISP++, 10, reinterpret_cast<uintptr_t>(state.resources.mouth));
     SkelAnime_DrawFlexOpa(play, state.animation.skeleton, state.animation.jointTable, state.animation.dListCount,
                           Override, nullptr, actor);
     CLOSE_DISPS(play->state.gfxCtx);
+    DrawShimmer(actor, play, IsSeated(actor));
 }
 #endif

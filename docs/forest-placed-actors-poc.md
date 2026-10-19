@@ -1,5 +1,10 @@
 # Forest placed actors candidate — 2026-10-18
 
+**2026-10-19 follow-up:** [Saria pose entries and green hollow hexes](poc/saria-prelude-poses-hex-20261019.md)
+supersedes this document's unsupported MM ocarina pose and native-star shimmer
+details. It adds waiting/playing/seated song-giver variants while retaining the
+same once-per-file claim and authored-placement precedence.
+
 Parent: recovered cumulative ComboShip source `78e44582` (audio regression
 candidate, including the prior Black Market/forest/fade source work). Public
 develop remains `a82852a3a02c8cabc541cce7c124da71c5755efb`. This candidate does

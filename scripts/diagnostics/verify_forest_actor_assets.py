@@ -137,10 +137,10 @@ def main():
                     raise KeyError(name)
                 assert rig(pack.read(ns+'/Skel'), load, 16, 15) == native
                 assert rig(pack.read('alt/'+ns+'/Skel'), load, 16, 15) == native
-                for clip in ['gSariaWaitArmsToSideAnim', 'gSariaHandsBehindBackWaitAnim', 'gSariaSitting3Anim']:
+                for clip in ['gSariaWaitArmsToSideAnim', 'gSariaHandsBehindBackWaitAnim', 'gSariaPlayingOcarinaAnim', 'gSariaSitting3Anim']:
                     original = 'objects/object_sa/'+clip
                     frames, root = animation(oot.read(original), 17)
-                    assert frames == 24
+                    assert frames == (65 if clip == 'gSariaPlayingOcarinaAnim' else 24)
                     fitted = 'alt/'+ns+'/PoseAnimations/'+original
                     if fitted in pack.namelist():
                         count, fittedRoot = animation(pack.read(fitted), 17)

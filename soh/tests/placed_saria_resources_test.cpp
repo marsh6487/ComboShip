@@ -35,14 +35,14 @@ static auto Rig(const char* display) {
     h.dListCount = 15;
     return s;
 }
-static auto Animation() {
+static auto Animation(int frames = 24) {
     auto a = std::make_shared<SOH::Animation>();
     a->type = SOH::AnimationType::Normal;
     a->rotationValues = { 1, 2, 3 };
     for (unsigned i = 0; i < 17; ++i)
         a->rotationIndices.emplace_back(0, 1, 2);
     auto& h = a->animationData.animationHeader;
-    h.common.frameCount = 24;
+    h.common.frameCount = frames;
     h.frameData = reinterpret_cast<s16*>(a->rotationValues.data());
     h.jointIndices = reinterpret_cast<decltype(h.jointIndices)>(a->rotationIndices.data());
     h.staticIndexMax = 3;
@@ -82,7 +82,16 @@ int main() {
     assets["objects/object_sa/gSariaSitting3Anim"] = seated;
     auto sitting = PlacedSaria::Build(load, false, 3);
     CHECK(sitting && sitting->result.animation == seated->GetRawPointer());
-    CHECK(PlacedSaria::Build(load, false, 2)->result.animation == native->result.animation);
+    auto playing = Animation(65);
+    assets["objects/object_sa/gSariaPlayingOcarinaAnim"] = playing;
+    assets["objects/object_sa/gSariaRightHandAndOcarinaDL"] = List();
+    auto performer = PlacedSaria::Build(load, false, 2);
+    CHECK(performer && performer->result.animation == playing->GetRawPointer());
+    CHECK(std::strstr(reinterpret_cast<const char*>(performer->limbs[14].dList),
+                      "__OTR__@oot:objects/object_sa/gSariaRightHandAndOcarinaDL"));
+    assets.erase("objects/object_sa/gSariaRightHandAndOcarinaDL");
+    CHECK(!PlacedSaria::Build(load, false, 2) && PlacedSaria::Build(load, false, 1));
+    assets["objects/object_sa/gSariaRightHandAndOcarinaDL"] = List();
     const std::string ns = PlacedSaria::kNamespace, alt = "alt/" + ns;
     assets[ns + "/Skel"] = Rig("__OTR__objects/object_sa/nativeBody");
     assets[alt + "/Skel"] = Rig("__OTR__objects/object_sa/customBody");
@@ -96,6 +105,13 @@ int main() {
     auto fittedSeated = Animation();
     assets[seatedClip] = fittedSeated;
     CHECK(PlacedSaria::Build(load, true, 3)->result.animation == fittedSeated->GetRawPointer());
+    const std::string playingClip = alt + "/PoseAnimations/objects/object_sa/gSariaPlayingOcarinaAnim";
+    auto fittedPlaying = Animation(65);
+    assets[playingClip] = fittedPlaying;
+    assets[alt + "/Props/RightHandOcarina"] = List();
+    auto customPerformer = PlacedSaria::Build(load, true, 2);
+    CHECK(customPerformer && customPerformer->result.animation == fittedPlaying->GetRawPointer());
+    CHECK(std::strstr(reinterpret_cast<const char*>(customPerformer->limbs[14].dList), "/Props/RightHandOcarina"));
     assets[clip + "/Limbs/Limb12"] = List();
     auto custom = PlacedSaria::Build(load, true, 0);
     CHECK(custom && custom->result.custom && custom->result.animation == fitted->GetRawPointer());

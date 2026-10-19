@@ -3,6 +3,8 @@
 #include "2s2h/Enhancements/Gameplay/ComboForestActors.h"
 #include "2s2h/Enhancements/Gameplay/ComboForestEpona.h"
 #include "actors/PlacedSariaABI.h"
+#include "actors/SariaHexEffect.h"
+#include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "ComboResolve.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/CustomItem/CustomItem.h"
@@ -37,6 +39,7 @@ static unsigned rewards, saves, receipts, hintRegistrations;
 static unsigned sparkles;
 static Vec3f sparklePos;
 static Color_RGBA8 sparklePrim, sparkleEnv;
+static Vec3f shimmerOrigin;
 static GameInteractor interactor;
 GameInteractor* GameInteractor::Instance = &interactor;
 namespace Rando {
@@ -130,6 +133,9 @@ int MM_PlacedSariaAlt() {
 }
 
 extern "C" {
+void gSPVertex(Gfx* command, uintptr_t vertices, int count, int first) {
+    __gSPVertex(command, vertices, count, first);
+}
 void gSPSegment(void* command, int segment, uintptr_t target) {
     __gSPSegment(static_cast<Gfx*>(command), segment, target);
 }
@@ -225,6 +231,20 @@ void Graph_CloseDisps(Gfx**, Gfx*, GraphicsContext*, const char*, s32) {
 }
 void Gfx_SetupDL25_Opa(GraphicsContext*) {
 }
+void Gfx_SetupDL25_Xlu(GraphicsContext*) {
+}
+void Matrix_Push() {
+}
+void Matrix_Pop() {
+}
+void Matrix_Translate(f32 x, f32 y, f32 z, MatrixMode mode) {
+    CHECK(mode == MTXMODE_NEW);
+    shimmerOrigin = { x, y, z };
+}
+Mtx* Matrix_Finalize(GraphicsContext*) {
+    static Mtx matrix;
+    return &matrix;
+}
 void Matrix_Scale(f32, f32, f32, MatrixMode) {
 }
 void EffectSsKirakira_SpawnDispersed(PlayState*, Vec3f* pos, Vec3f*, Vec3f*, Color_RGBA8* prim, Color_RGBA8* env,
@@ -253,6 +273,7 @@ int main() {
     sBridge.release = Release;
     sBridge.alt = Alt;
     CHECK(ComboSaria_IsParam(0x7F03) && ComboSaria_IsParam(0x7F13) && !ComboSaria_IsParam(1));
+    CHECK(ComboSaria_IsParam(0x7E13) && ComboSaria_IsParam(0x7E23) && !ComboSaria_IsParam(0x7E03));
     missing = true;
     ComboSaria_Init(&absent, &play);
     CHECK(kills == 1 && sStates.empty() && releases == 0);
@@ -269,7 +290,11 @@ int main() {
     CHECK(first.floorPoly && first.floorHeight == 42 && first.world.pos.y == 30);
     static GraphicsContext gfx;
     Gfx commands[32]{};
+    Gfx hexCommands[512]{};
+    alignas(16) Vtx hexVertices[144]{};
     gfx.polyOpa.p = commands;
+    gfx.polyOpa.d = reinterpret_cast<Gfx*>(hexVertices + 144);
+    gfx.polyXlu.p = hexCommands;
     play.state.gfxCtx = &gfx;
     ComboSaria_Draw(&first, &play);
     Gfx* segmentC = nullptr;
@@ -417,6 +442,25 @@ int main() {
     talkAndClose(gift);
     CHECK(interactor.events.empty());
     gComboGameMode = COMBO_GAME_BOTH;
+    // Changing the reward NPC's pose keeps the same fixed, one-time song grant.
+    for (s16 params : { 0x7E13, 0x7E23 }) {
+        Actor posed{};
+        posed.params = params;
+        ComboSaria_Init(&posed, &play);
+        CHECK(lastPose == ((params >> 4) & 15));
+        talkAndClose(posed);
+        CHECK(interactor.events.size() == 1 && rewards == 0);
+        interactor.events.clear();
+        const unsigned before = spawns;
+        posed.id = ACTOR_EN_VIEWER;
+        posed.world.pos = { 800, 100, -200 };
+        play.actorCtx.actorLists[ACTORCAT_NPC].first = &posed;
+        sSpawnAttempted = false;
+        SpawnForestSaria();
+        CHECK(sSpawnAttempted && spawns == before && posed.world.pos.x == 800);
+        play.actorCtx.actorLists[ACTORCAT_NPC].first = nullptr;
+        ComboSaria_Destroy(&posed, &play);
+    }
     talkAndClose(gift);
     CHECK(interactor.events.size() == 1 && rewards == 0 && saves == 0);
     talkAndClose(gift);
@@ -445,14 +489,17 @@ int main() {
     gSaveContext.save.shipSaveInfo.rando.sariaHintsAvailable = 0;
     gSaveContext.save.shipSaveInfo.nei.ootQuestItems = 0;
     interactor.currentEvent = GIEventNone{};
-    ComboSaria_Init(&gift, &play);
-    textState = TEXT_STATE_DONE;
-    talkAccepted = true;
-    ComboSaria_Update(&gift, &play);
-    textState = TEXT_STATE_NONE;
-    ComboSaria_Update(&gift, &play);
-    CHECK(interactor.events.empty() && rewards == 1);
-    ComboSaria_Destroy(&gift, &play);
+    for (s16 params : { 0x7E13, 0x7E23, 0x7E33 }) {
+        gift.params = params;
+        ComboSaria_Init(&gift, &play);
+        textState = TEXT_STATE_DONE;
+        talkAccepted = true;
+        ComboSaria_Update(&gift, &play);
+        textState = TEXT_STATE_NONE;
+        ComboSaria_Update(&gift, &play);
+        CHECK(interactor.events.empty() && rewards == 1);
+        ComboSaria_Destroy(&gift, &play);
+    }
     sSpawnAttempted = false;
     SpawnForestSaria();
     CHECK(spawns == 2 && spawned.params == 0x7E33);
@@ -461,35 +508,72 @@ int main() {
     play.actorCtx.actorLists[ACTORCAT_NPC].first = &authored;
     SpawnForestSaria();
     CHECK(spawns == 2 && sSpawnAttempted);
-    // Both placements emit bounded green shimmer at their authored location.
-    for (auto params : { 0x7F13, 0x7E33 }) {
+    // Actual translucent draw commands must contain hollow green hexes and
+    // follow every authored pose, without relying on native star particles.
+    const unsigned beforeSparkles = sparkles;
+    for (auto params : { 0x7F13, 0x7F23, 0x7F33, 0x7E13, 0x7E23, 0x7E33 }) {
         Actor magical{};
         magical.params = params;
         magical.world.pos = { 500, 80, -400 };
         ComboSaria_Init(&magical, &play);
-        const unsigned beforeSparkles = sparkles;
-        for (int tick = 0; tick < 24; ++tick)
-            ComboSaria_Update(&magical, &play);
-        CHECK(sparkles - beforeSparkles == 8);
-        CHECK(sparklePrim.g > sparklePrim.r && sparklePrim.g > sparklePrim.b);
-        CHECK(sparkleEnv.g > sparkleEnv.r && sparkleEnv.g > sparkleEnv.b);
-        CHECK(std::fabs(sparklePos.x - 500) <= 24 && std::fabs(sparklePos.z + 400) <= 24);
-        CHECK(sparklePos.y >= 84 && sparklePos.y < 125);
+        auto draw = [&] {
+            gfx.polyOpa.p = commands;
+            gfx.polyOpa.d = reinterpret_cast<Gfx*>(hexVertices + 144);
+            gfx.polyXlu.p = hexCommands;
+            ComboSaria_Draw(&magical, &play);
+        };
+        draw();
+        unsigned loads = 0, triangles = 0;
+        for (Gfx* command = hexCommands; command != gfx.polyXlu.p; ++command) {
+            loads += (command->words.w0 >> 24) == G_VTX;
+            triangles += (command->words.w0 >> 24) == G_TRI2;
+        }
+        CHECK(loads == 12 && triangles == 72);
+        CHECK(shimmerOrigin.x == 500 && shimmerOrigin.y == 80 && shimmerOrigin.z == -400);
+        for (const auto& vertex : hexVertices) {
+            CHECK(vertex.v.cn[1] > vertex.v.cn[0] && vertex.v.cn[1] > vertex.v.cn[2]);
+            CHECK(std::abs(vertex.v.ob[0]) < 320 && std::abs(vertex.v.ob[2]) < 320);
+            CHECK(vertex.v.ob[1] >= 0 && vertex.v.ob[1] < 530);
+        }
+        for (int h = 0; h < 12; ++h) {
+            float center[3]{};
+            for (int side = 0; side < 6; ++side)
+                for (int axis = 0; axis < 3; ++axis)
+                    center[axis] += hexVertices[h * 12 + side].v.ob[axis] / 6.0f;
+            for (int side = 0; side < 6; ++side) {
+                float outer = 0, inner = 0;
+                for (int axis = 0; axis < 3; ++axis) {
+                    const float a = hexVertices[h * 12 + side].v.ob[axis] - center[axis];
+                    const float b = hexVertices[h * 12 + side + 6].v.ob[axis] - center[axis];
+                    outer += a * a;
+                    inner += b * b;
+                }
+                CHECK(inner > outer * 0.22f && inner < outer * 0.65f);
+            }
+        }
+        if (((params >> 4) & 15) == 2) {
+            Gfx* head = nullptr;
+            Override(&play, 16, &head, nullptr, nullptr, &magical);
+            CHECK(reinterpret_cast<const char*>(head) == sStates.at(&magical)->resources.heads[2]);
+        }
+        Vtx previous[144];
+        std::memcpy(previous, hexVertices, sizeof(previous));
+        ++play.gameplayFrames;
+        draw();
+        CHECK(std::memcmp(previous, hexVertices, sizeof(previous)) != 0);
         magical.world.pos = { -120, 12, 620 };
-        for (int tick = 0; tick < 3; ++tick)
-            ComboSaria_Update(&magical, &play);
-        CHECK(std::fabs(sparklePos.x + 120) <= 24 && std::fabs(sparklePos.z - 620) <= 24);
-        const unsigned visible = sparkles;
+        draw();
+        CHECK(shimmerOrigin.x == -120 && shimmerOrigin.y == 12 && shimmerOrigin.z == 620);
         play.pauseCtx.state = 1;
-        for (int tick = 0; tick < 6; ++tick)
-            ComboSaria_Update(&magical, &play);
+        draw();
+        CHECK(gfx.polyXlu.p == hexCommands);
         play.pauseCtx.state = PAUSE_STATE_OFF;
         magical.xzDistToPlayer = 1000;
-        for (int tick = 0; tick < 6; ++tick)
-            ComboSaria_Update(&magical, &play);
-        CHECK(sparkles == visible);
+        draw();
+        CHECK(gfx.polyXlu.p == hexCommands);
         ComboSaria_Destroy(&magical, &play);
     }
+    CHECK(sparkles == beforeSparkles);
     const unsigned beforeHorse = spawns;
     sHorseSpawnAttempted = false;
     SpawnForestEpona();
@@ -590,7 +674,7 @@ int main() {
     puts("PASS seated fixed song gift: grounded pose, custom blinking, talk/close, deferred existing-item delivery, "
          "queued/active duplicate suppression, file/mode/scene guards, post-consumption permanent claim, authored "
          "field placement");
-    puts("PASS both Saria shimmers: green native particles, bounded emission, follow authored placements, "
+    puts("PASS all Saria poses and song variants: green hollow-hex draw commands, follow authored placements, "
          "pause/distance guards");
     puts("PASS portal Epona placement: opposite Saria in portal coordinates, clear approach, floor probe, authored "
          "override, no duplicate or prologue/solo/other-scene spawn");

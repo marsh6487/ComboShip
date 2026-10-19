@@ -15,9 +15,10 @@ inline constexpr char kNamespace[] = "objects/object_sa/NativeNpcV1";
 inline constexpr const char* kAnimations[] = {
     "objects/object_sa/gSariaWaitArmsToSideAnim",
     "objects/object_sa/gSariaHandsBehindBackWaitAnim",
-    nullptr, // Pose 2 (ocarina playing) is not part of this small MM host.
+    "objects/object_sa/gSariaPlayingOcarinaAnim",
     "objects/object_sa/gSariaSitting3Anim",
 };
+inline constexpr unsigned kAnimationFrames[] = { 24, 24, 65, 24 };
 
 /* Render commands may outlive an actor destroyed during a scene handoff.
  * Keep routed names stable; actual foreign resources are held by each snapshot. */
@@ -65,7 +66,7 @@ inline std::unique_ptr<Snapshot> Build(const Load& load, bool alt, unsigned pose
     pose = pose < std::size(kAnimations) && kAnimations[pose] ? pose : 0;
     auto snapshot = std::make_unique<Snapshot>();
     auto nativeAnimation = load(kAnimations[pose]);
-    if (!MmNormalActor::ValidateAnimation(nativeAnimation, 16, 24))
+    if (!MmNormalActor::ValidateAnimation(nativeAnimation, 16, kAnimationFrames[pose]))
         return nullptr;
     auto animation = nativeAnimation;
     auto skeleton = load("objects/object_sa/gSariaSkel");
@@ -92,7 +93,7 @@ inline std::unique_ptr<Snapshot> Build(const Load& load, bool alt, unsigned pose
     }
     const std::string poseRoot = std::string("alt/") + kNamespace + "/PoseAnimations/" + kAnimations[pose];
     auto fitted = custom ? load(poseRoot) : nullptr;
-    if (MmNormalActor::ValidateAnimation(fitted, 16, 24) &&
+    if (MmNormalActor::ValidateAnimation(fitted, 16, kAnimationFrames[pose]) &&
         SameRoot(*static_cast<AnimationHeader*>(fitted->GetRawPointer()),
                  *static_cast<AnimationHeader*>(nativeAnimation->GetRawPointer())))
         animation = fitted;
@@ -120,6 +121,23 @@ inline std::unique_ptr<Snapshot> Build(const Load& load, bool alt, unsigned pose
                 snapshot->result.poseLimbs[i + 1] = Route(path);
             }
         }
+    }
+    if (pose == 2) {
+        std::string path = "objects/object_sa/gSariaRightHandAndOcarinaDL";
+        auto prop = load(path);
+        if (custom) {
+            const std::string privatePath = std::string("alt/") + kNamespace + "/Props/RightHandOcarina";
+            auto candidate = load(privatePath);
+            if (std::dynamic_pointer_cast<Fast::DisplayList>(candidate) && candidate->GetPointerSize() >= sizeof(Gfx)) {
+                path = privatePath;
+                prop = candidate;
+            }
+        }
+        if (!std::dynamic_pointer_cast<Fast::DisplayList>(prop) || prop->GetPointerSize() < sizeof(Gfx))
+            return nullptr;
+        snapshot->retained.push_back(prop);
+        // A fitted right-hand limb keeps precedence, matching the native OoT adapter.
+        snapshot->limbs[14].dList = reinterpret_cast<Gfx*>(const_cast<char*>(Route(path)));
     }
     snapshot->skeleton = *source;
     snapshot->skeleton.sh.segment = snapshot->pointers.data();
