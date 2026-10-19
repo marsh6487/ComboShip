@@ -48,6 +48,7 @@ bool InputInt(const char*, int*, int, int, ImGuiInputTextFlags) { return false; 
 bool InputTextWithHint(const char*, const char*, char*, size_t, ImGuiInputTextFlags,
                        ImGuiInputTextCallback, void*) { return false; }
 bool BeginCombo(const char*, const char*, ImGuiComboFlags) { return false; }
+bool Combo(const char*, int*, const char* const*, int, int) { return false; }
 void EndCombo() {}
 bool Selectable(const char*, bool, ImGuiSelectableFlags, const ImVec2&) { return false; }
 bool BeginTable(const char*, int, ImGuiTableFlags, const ImVec2&, float) { return false; }
@@ -73,6 +74,11 @@ void EndPopup() {}
 }
 namespace ComboUI {
 int GetForegroundGame() { return foregroundGame; }
+}
+// The appearance panel is rendering only; generation/reload gating is the
+// production behavior under test here.
+namespace BlackMarketUI {
+void DrawAppearance() {}
 }
 extern "C" int ComboUI_GetForegroundGame() { return foregroundGame; }
 int CVarGetInteger(const char*, int fallback) { return fallback; }

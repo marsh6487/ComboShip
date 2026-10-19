@@ -110,6 +110,9 @@ void SaveManager_WriteSaveFile(const std::string &path,
 }
 int SaveManager_LoadFailedForCombo(int rc) { return rc; }
 int Sram_CalcChecksum(const void *, size_t) { return 0; }
+// Shop persistence has its own native fixture; it does not alter foreign-scale
+// delivery or this narrowed save schema.
+void ComboBlackMarket_LoadState(const nlohmann::json &, int) {}
 /* MM_SAVE */
 
 int targetScale = 0, targetDiskScale = 0, targetGrants = 0, latches = 0,

@@ -76,6 +76,9 @@ extern "C" Color_RGB8 CVarGetColor24(const char*,Color_RGB8 value) {return value
 // production fixtures. This native NEI fixture supplies neither resource family.
 extern "C" int ResourceMgr_GetGiModelFitForGame(const char*,const char*,float,float,int,float[2]) {return 0;}
 extern "C" int ResourceMgr_GetGiModelsFitForGame(const char*,const char* const*,int,float,float,int,float[2]) {return 0;}
+// No optional resource graph is installed in this renderer fixture, including
+// the bounds observer used by Black Market displays.
+extern "C" int ResourceMgr_GetGiModelBoundsForGame(const char*,const char* const*,int,float[3],float[3]) {return 0;}
 extern "C" uint8_t MmAssets_IsAvailable() {return 1;}
 extern "C" int ResourceMgr_GetDinSwordGiProfileForGame(const char*,const char*) {return 0;}
 extern "C" Color_RGBA8 CosmeticEditor_GetChangedColor(u8,u8,u8,u8,const char*) {

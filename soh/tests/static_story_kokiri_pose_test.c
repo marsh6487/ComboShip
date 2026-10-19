@@ -210,6 +210,26 @@ int main(void) {
     RequireLevelHead(girlJoints);
     REQUIRE(memcmp(girlJoints + 2, fixtureSeated + 2, sizeof(Vec3s) * 6) == 0);
 
+    /* Every cutscene entry selects the paired girl rig, including the three
+     * entries absent from the old preview sheet. Missing packs stay native. */
+    const char* allAnimations[] = { gKokiriIdleAnim,
+                                    gKokiriStandingArmsBehindBackAnim,
+                                    gKokiriStandingHandsOnHipsAnim,
+                                    gKokiriSittingHeadOnHandAnim,
+                                    gKokiriSittingCrossedLegsAnim,
+                                    gKokiriSittingCrossedArmsLegsAnim };
+    EnViewer entry;
+    Vec3s entryJoints[16];
+    for (int available = 0; available < 2; ++available) {
+        modelPackAvailable = available;
+        expectedSkeleton = available ? sKokiriGirlNpcSkel : gKw1Skel;
+        for (int pose = 0; pose < 6; ++pose) {
+            Pose(&entry, entryJoints, STATIC_STORY_ACTOR_KOKIRI_GIRL, pose);
+            expectedAnimation = allAnimations[pose];
+            StaticStoryKokiri_Init(&entry, play);
+            REQUIRE(strcmp((const char*)entry.skin.skelAnime.animation, allAnimations[pose]) == 0);
+        }
+    }
     free(play);
     puts("PASS both characters: level heads from init, donor leg motion, two loops, fractional seam, independent "
          "restart, unchanged other poses, fitted-clip ownership and missing-donor fallback");

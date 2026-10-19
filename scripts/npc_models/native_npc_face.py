@@ -26,6 +26,71 @@ def face_bounds(variant):
     _, y, _, _, mouth, _ = LANDMARKS[variant]
     return [-.095, mouth-.035, .095, y+.065]
 
+def reproject_face_paint(points,uv,atlas,faces,artwork,mask,bounds,padding=0):
+    """Bake a bounded frontal edit back into the original atlas UV islands."""
+    out=np.asarray(atlas).copy();height,width=out.shape[:2]
+    pixel=np.asarray(uv)*[width-1,height-1];points=np.asarray(points)
+    x0,y0,x1,y1=bounds;artwork=np.asarray(artwork,float);mask=np.asarray(mask,float)/255
+    for face in faces:
+        q=pixel[face];low=np.maximum(np.floor(q.min(0)).astype(int)-padding,0)
+        high=np.minimum(np.ceil(q.max(0)).astype(int)+padding,[width-1,height-1])
+        if np.any(high<low):continue
+        matrix=np.column_stack([q[0]-q[2],q[1]-q[2]])
+        if abs(np.linalg.det(matrix))<1e-10:continue
+        xx,yy=np.meshgrid(np.arange(low[0],high[0]+1),np.arange(low[1],high[1]+1))
+        b=(np.stack([xx,yy],-1)-q[2])@np.linalg.inv(matrix).T
+        bary=np.dstack([b,1-b.sum(-1)])
+        edges=np.linalg.norm(q[[1,2,0]]-q[[2,0,1]],axis=1)
+        altitude=abs(np.linalg.det(matrix))/np.maximum(edges,1e-12)
+        covered=(bary*altitude).min(-1)>=-padding-1e-6
+        source=bary@points[face];s=(source[...,0]-x0)/(x1-x0);t=(y1-source[...,1])/(y1-y0)
+        covered&=(s>=0)&(s<=1)&(t>=0)&(t<=1)
+        coord=[t*(artwork.shape[0]-1),s*(artwork.shape[1]-1)]
+        weight=map_coordinates(mask,coord,order=1,mode='nearest')
+        active=covered&(weight>0)
+        if not active.any():continue
+        paint=np.stack([map_coordinates(artwork[...,c],coord,order=1,mode='nearest') for c in range(4)],-1)
+        mix=weight[active,None];old=out[yy[active],xx[active]].astype(float)
+        out[yy[active],xx[active]]=np.rint(old*(1-mix)+paint[active]*mix).clip(0,255).astype(np.uint8)
+    return out
+
+def export_twin_face_diffuse(archive,source,model,rig,variant,fallback):
+    """Keep the body atlas immutable; the face gets its own UV-identical copy."""
+    if variant!='twins':return fallback
+    directory=Path(__file__).with_name('face_art')/variant
+    if not (directory/'surface-mask.png').exists():return fallback
+    import struct
+    from native_npc_models import asset
+    spec=json.loads((directory/'projection.json').read_text())
+    if spec['source_sha256']!=hashlib.sha256(source.raw).hexdigest():raise ValueError('Face atlas source differs')
+    path=rig.ns+'/Textures/FaceDiffuse'
+    if 'alt/'+path in archive.files:return path
+    p=model['source_positions'];fs=model['faces'];mesh=model['mesh_ids']
+    from native_npc_fit import twin_face_pieces
+    _,pieces=twin_face_pieces(model)
+    pieces|=model.get('twin_band_piece',np.zeros(len(p),bool))
+    faces=fs[pieces[fs].all(1)&(p[fs,2]>.015).all(1)]
+    art=np.asarray(Image.open(directory/'neutral.png').convert('RGBA'))
+    mask=np.asarray(Image.open(directory/'surface-mask.png').convert('L'))
+    # The forehead backing extends above the eye atlas. Continue its top skin
+    # colors into that narrow strip; keep the source UVs and green headband.
+    bounds=list(spec['bounds']);step=(bounds[3]-bounds[1])/(len(art)-1)
+    rows=int(np.ceil((.925-bounds[3])/step))
+    art=np.pad(art,((rows,0),(0,0),(0,0)),mode='edge')
+    mask=np.pad(mask,((rows,0),(0,0)),mode='edge').astype(float)
+    bounds[3]+=rows*step
+    y=np.linspace(bounds[3],bounds[1],len(art))
+    taper=np.clip((.924-y)/.005,0,1);taper=taper*taper*(3-2*taper)
+    mask*=taper[:,None]
+    original=np.asarray(source.image)
+    pixels=reproject_face_paint(p,model['uv'],original,faces,art,mask,bounds,padding=2)
+    rgb=original[:,:,:3].astype(float)
+    green=(rgb[:,:,1]>rgb[:,:,0]*1.05)&(rgb[:,:,1]>rgb[:,:,2]*1.15)
+    pixels[green]=original[green]
+    h,w=pixels.shape[:2]
+    archive.add('alt/'+path,asset._header(asset.T_OTEX,1)+struct.pack('<IIIIffI',1,w,h,1,w/512,h/512,pixels.nbytes)+pixels.tobytes())
+    return path
+
 
 def bake(source, uv, atlas, faces, bounds, size=SIZE, face_labels=None):
     """Reproject source pixels, optionally returning each visible face's label.
@@ -252,6 +317,91 @@ def make_front_lid_surface(model, faces, coef, center, bounds, head):
     return lid, faces[side]
 
 
+def make_aperture_lid(model, faces, main, eyeballs, center, coef, bounds, head):
+    """Fill an eye hole while retaining the surrounding skin's topology.
+
+    Radial rings keep the source aperture's complete perimeter edges. The
+    closed patch shares the original orbital rim, so neither
+    Delaunay cuts nor integer-rounded edge subdivisions can open new seams.
+    """
+    from collections import Counter, defaultdict
+    from native_npc_models import unit
+    p=model['source_positions'];mesh=model['mesh_ids']
+    skin=model['faces'][(mesh[model['faces']]==main).all(1)]
+    _,weld=np.unique(np.round(p,6),axis=0,return_inverse=True)
+    counts=Counter(tuple(sorted((int(weld[a]),int(weld[b])))) for f in skin
+                   for a,b in ((f[0],f[1]),(f[1],f[2]),(f[2],f[0])))
+    graph=defaultdict(set)
+    for (a,b),n in counts.items():
+        if n==1:graph[a].add(b);graph[b].add(a)
+    loops=[];seen=set()
+    for start in graph:
+        if start in seen:continue
+        stack=[start];group=set()
+        while stack:
+            v=stack.pop()
+            if v in group:continue
+            group.add(v);stack.extend(graph[v]-group)
+        seen|=group
+        if all(len(graph[v])==2 for v in group):
+            loop=[start];previous=None;current=start
+            while True:
+                nxt=next(v for v in graph[current] if v!=previous)
+                if nxt==start:break
+                loop.append(nxt);previous,current=current,nxt
+            loops.append(loop)
+    if not loops:raise ValueError('No closed skin aperture boundary')
+    def ids_for(loop):return np.array([np.flatnonzero((weld==v)&(mesh==main))[0] for v in loop])
+    candidates=[ids_for(loop) for loop in loops]
+    # The nearest loop to this eye excludes the outer face and neck openings.
+    rim=min(candidates,key=lambda ids:np.linalg.norm(p[ids,:2].mean(0)-center))
+    kept=faces[~np.isin(mesh[faces[:,0]],eyeballs)]
+    ids=np.union1d(np.unique(kept),rim);lookup=np.full(len(p),-1,int);lookup[ids]=np.arange(len(ids))
+    # Retain every existing skin/brow point. Relaxing even interior orbital
+    # points can unfold a source overlap into a hole in the native head pose.
+    # Only the actual missing aperture receives new geometry.
+    positions=list(model['positions'][ids]);normals=list(model['normals'][ids])
+    source=list(p[ids]);triangles=list(lookup[kept])
+    last=lookup[rim];xy_center=p[rim,:2].mean(0);cx,cy=center
+    transform=model['head_transform']
+    rim_normals=model['normals'][rim];center_normal=unit(rim_normals.mean(0))
+    for fraction in (.75,.5,.25):
+        xy=xy_center+(p[rim,:2]-xy_center)*fraction
+        xx,yy=xy[:,0]-cx,xy[:,1]-cy
+        z=np.column_stack([np.ones(len(xy)),xx,yy,xx*xx,yy*yy,xx*yy])@coef
+        sp=np.column_stack([xy,z]);points=sp@transform[:,:3].T+transform[:,3]
+        # Continue the authored rim field rather than introducing an unrelated
+        # fitted-surface normal at the first generated eyelid ring.
+        normal=unit(rim_normals*fraction+center_normal*(1-fraction))
+        ring=np.arange(len(positions),len(positions)+len(rim))
+        positions.extend(points);normals.extend(normal);source.extend(sp)
+        for j in range(len(rim)):
+            k=(j+1)%len(rim);triangles.extend([(last[j],last[k],ring[k]),(last[j],ring[k],ring[j])])
+        last=ring
+    xx,yy=xy_center-[cx,cy]
+    sp=np.r_[xy_center,np.array([1,xx,yy,xx*xx,yy*yy,xx*yy])@coef];index=len(positions)
+    positions.append(transform[:,:3]@sp+transform[:,3]);source.append(sp)
+    normals.append(unit(np.mean(np.asarray(normals)[last],axis=0)))
+    for j in range(len(rim)):triangles.append((last[j],last[(j+1)%len(rim)],index))
+    if 'twin_surface_normal_coefficients' in model:
+        # New fill uses the same continuous field as every retained layer.
+        q=np.asarray(source)[len(ids):];x=q[:,0]/.08;y=(q[:,1]-.85)/.08
+        design=np.column_stack([np.ones(len(q)),x,y,x*x,y*y,x*y,x*x*x,y*y*y,x*x*y,x*y*y])
+        field=unit(design@model['twin_surface_normal_coefficients'])
+        normals[len(ids):]=unit(field@np.linalg.inv(transform[:,:3]))
+    uv=(np.asarray(source)[:,:2]-bounds[:2])/np.subtract(bounds[2:],bounds[:2]);uv[:,1]=1-uv[:,1]
+    return dict(positions=np.asarray(positions),normals=np.asarray(normals),uv=uv,
+                bones=np.full(len(positions),head),faces=np.asarray(triangles,int))
+
+
+def source_eye_surface(model,faces,bounds,head):
+    """Painted eyes need their existing skin, without a flattening operation."""
+    ids=np.unique(faces);lookup=np.full(len(model['positions']),-1,int);lookup[ids]=np.arange(len(ids))
+    uv=(model['source_positions'][ids,:2]-bounds[:2])/np.subtract(bounds[2:],bounds[:2]);uv[:,1]=1-uv[:,1]
+    return dict(positions=model['positions'][ids].copy(),normals=model['normals'][ids].copy(),
+                uv=uv,bones=np.full(len(ids),head),faces=lookup[faces])
+
+
 def export_eye(archive, source, model, rig, faces, variant, side, texpath):
     """Export original open eye plus authored lids on a seam-matched surface."""
     import struct
@@ -289,11 +439,19 @@ def export_eye(archive, source, model, rig, faces, variant, side, texpath):
         if len(retained):
             side_path = rig.ns+f'/FaceParts/{side}Side'
             emit_mesh(archive, 'alt/'+side_path, model, rig, retained, texpath, head)
+    elif variant == 'twins':
+        from native_npc_fit import twin_face_pieces
+        main, _ = twin_face_pieces(model)
+        names=[m['name'] for m in source.meshes]
+        eyeballs=[names.index(n) for n in ('tripo_part_17','tripo_part_18')]
+        lid = make_aperture_lid(model,faces,main,eyeballs,(cx,cy),coef,spec['bounds'],head)
+    elif variant=='young-malon':
+        lid=source_eye_surface(model,faces,spec['bounds'],head)
     else:
         lid = make_lid_surface(model, faces, coef, (cx, cy), spec['bounds'], head,
                                preserve_topology=variant == 'saria-anime')
     parts = {}
-    joined_open = variant == 'twins'
+    joined_open = False
     neutral_texture = export_neutral_projection(archive,source,model,rig,variant) if joined_open else None
     for state in range(5):
         path = rig.ns+f"/FaceParts/{side}{state}"

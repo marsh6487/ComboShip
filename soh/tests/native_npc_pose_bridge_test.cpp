@@ -172,6 +172,29 @@ int main() {
     skel.animation = original;
     resources["alt/objects/object_kw1/NativeNpcV1/Skin/Limbs/Limb00"] = display;
     assert(NativeNpcPose_SelectLimb(&skel, 1, fallback) == reinterpret_cast<Gfx*>(display->GetRawPointer()));
+    // Shared joint surfaces must work for every static/native/credits pose,
+    // including a new animation that has no fitted clip or pose-specific mesh.
+    for (const char* animation :
+         { "__OTR__objects/object_os_anime/gKokiriIdleAnim",
+           "__OTR__objects/object_os_anime/gKokiriStandingArmsBehindBackAnim",
+           "__OTR__objects/object_os_anime/gKokiriStandingHandsOnHipsAnim",
+           "__OTR__objects/object_os_anime/gKokiriSittingHeadOnHandAnim",
+           "__OTR__objects/object_os_anime/gKokiriSittingCrossedLegsAnim",
+           "__OTR__objects/object_os_anime/gKokiriSittingCrossedArmsLegsAnim",
+           "__OTR__objects/object_os_anime/gKokiriStandUpAnim",
+           "__OTR__objects/object_os_anime/gKokiriStandingHandOnChestAnim",
+           "__OTR__objects/object_os_anime/gKokiriStandingRightArmUpAnim", "__OTR__objects/object_ec/gDemoEcKokiriAnim",
+           "__OTR__objects/object_ec/gDemoEcDancingKokiriAnim",
+           "__OTR__objects/object_os_anime/gFutureKokiriPoseAnim" }) {
+        skel.animation = reinterpret_cast<AnimationHeader*>(const_cast<char*>(animation));
+        assert(NativeNpcPose_SelectLimb(&skel, 1, fallback) == reinterpret_cast<Gfx*>(display->GetRawPointer()));
+        alt = false;
+        assert(NativeNpcPose_SelectLimb(&skel, 1, fallback) == fallback);
+        alt = true;
+    }
+    skel.animation = original;
+    puts("PASS all six static poses, native girl poses, credits and future clips inherit shared skin without a clip "
+         "whitelist.");
     MtxF matrices[2] = {}, blended = {};
     for (auto& m : matrices)
         m.xx = m.yy = m.zz = m.ww = 1.f;

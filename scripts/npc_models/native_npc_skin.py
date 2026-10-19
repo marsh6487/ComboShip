@@ -81,6 +81,10 @@ class Palette:
             normal+=(n@np.linalg.inv(a))*weight
         rest[self.skin_mask]=result[self.skin_mask]
         normals[self.skin_mask]=unit(normal[self.skin_mask])
+        if getattr(self,'rest_space',False):
+            # Standard fitted-rest skinning gives blended and rigid vertices
+            # the same position/normal basis at the 0/16 influence endpoints.
+            canonical=rest.copy();canonical_n=normals.copy()
         return SimpleNamespace(vertex_positions=canonical,vertex_normals=canonical_n,
                                rest_positions=rest,rest_normals=normals)
 
@@ -175,7 +179,11 @@ def prepare(source, model, rig):
     hips=source.world[source.joints[source.names.index('Hips')]][:3,3]
     palette.canonical[:3,3]=rig.limbs[rig.profile['hips']].T-palette.canonical[:3,:3]@hips
     palette.transforms=model['source_bone_transforms']
-    palette.inverse=palette.inverse@palette.transforms[palette.slots]@np.linalg.inv(palette.canonical)
+    import hashlib
+    from native_npc_twins import SOURCE_SHA256
+    palette.rest_space=(rig.name=='twins' and hashlib.sha256(getattr(source,'raw',b'')).hexdigest()==SOURCE_SHA256)
+    if not palette.rest_space:
+        palette.inverse=palette.inverse@palette.transforms[palette.slots]@np.linalg.inv(palette.canonical)
     palette.skin_weights=np.zeros_like(model['weights'])
     for i,slot in enumerate(palette.vertex_slots):
         if slot<len(palette.slots):palette.skin_weights[i,palette.slots[slot]]=1.

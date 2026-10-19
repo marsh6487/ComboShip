@@ -1,6 +1,8 @@
 // Execute the production fallback drawers and inspect real GBI packets.
 // Resource lookup and CPU transforms are seams; setup/color packets are real.
 #include <libultraship/libultra/gbi.h>
+// Black Market reporting is an observer outside this rendering fixture.
+void NeiGi_ReportBlackMarketModel(const char*, const char*, const char*) {}
 #include <cassert>
 #include <cmath>
 #include <cstdint>

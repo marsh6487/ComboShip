@@ -493,8 +493,15 @@ def fit_model(source, rig, hand_curls=0., hand_grip=None):
         for i in np.flatnonzero(authored_faces):
             model['hosts'][i]=Counter(model['bones'][model['faces'][i]]).most_common(1)[0][0]
     if rig.name == 'twins':
+        from native_npc_twins import repair_shoulders
+        shoulder_report=repair_shoulders(source,model,rig)
+        if shoulder_report is not None:model['twin_shoulder_repairs']=shoulder_report
         from native_npc_fit import smooth_twin_face
         smooth_twin_face(model, head, rgb)
+    if rig.name in ('twins','young-malon'):
+        from native_npc_face_shading import repair_model
+        shading_report=repair_model(source,model,rig)
+        if shading_report is not None:model['face_shading_repair']=shading_report
     return model
 
 
@@ -661,6 +668,8 @@ def export_face_parts(archive, source, model, rig, variant, texpath):
     their own skin/line atlas pixels; keep their original surface and normals.
     No floating eyelid caps, diffuse repainting or replacement facial artwork.
     """
+    from native_npc_face import export_twin_face_diffuse
+    texpath=export_twin_face_diffuse(archive,source,model,rig,variant,texpath)
     landmarks = {
         "saria-anime": (0.031, 0.853, 0.025, 0.022, 0.815, 0.023),
         "saria-render": (0.031, 0.864, 0.025, 0.024, 0.826, 0.022),
@@ -707,6 +716,10 @@ def export_face_parts(archive, source, model, rig, variant, texpath):
         inside = (((point[:, :, 0]-cx)/rx)**2+((point[:, :, 1]-cy)/ry)**2 < 1.25**2) & (point[:, :, 2] > 0.015)
         selected = inside.any(1) & remaining
         if variant=='twins':selected &= model['twin_face_piece'][faces[:,0]]
+        if variant=='young-malon' and key in ('L','R'):
+            # Eyes are painted on the continuous face piece. Hair crosses the
+            # projected eye bounds but must never become a flattened eyelid.
+            selected &= model['mesh_ids'][faces[:,0]]==25
         if variant=='saria-render':
             # Hair crosses this projection, but must never become eyelid skin.
             eligible=[6,14,15] if key in ('L','R') else [6]
@@ -729,7 +742,7 @@ def export_face_parts(archive, source, model, rig, variant, texpath):
             continue
         # Subdivide only expression regions; each state has the exact same
         # surface. Triangle-local UV choices cannot interpolate across islands.
-        if variant in ('saria-anime', 'saria-render'):
+        if variant in ('saria-anime', 'saria-render', 'twins'):
             from native_npc_face import expression_subdivision
             bary, source_faces = expression_subdivision(region)
         else:
@@ -818,6 +831,8 @@ def build(source_path, native_path, variant, output):
         model['texture_path']=texpath
         paths = []
         body = {}
+        from native_npc_face import export_twin_face_diffuse
+        head_texpath=export_twin_face_diffuse(archive,source,model,rig,variant,texpath)
         for i, limb in enumerate(rig.limbs):
             limb_path = rig.ns+f"/Rig/Limb{i:02d}"
             paths.append(limb_path)
@@ -827,7 +842,7 @@ def build(source_path, native_path, variant, output):
             archive.add("alt/"+limb_path, asset.build_limb(xyz, limb.child, limb.sibling, target, "", rig.limb_type))
             if target:
                 body[str(i)] = emit_mesh(archive, "alt/"+target, model, rig,
-                                         model["faces"][model["hosts"] == i], texpath, i)
+                                         model["faces"][model["hosts"] == i], head_texpath if i==rig.profile['head'] else texpath, i)
         raw = asset.build_skeleton(paths, rig.limb_type, asset.SKEL_FLEX, rig.dlist_count)
         archive.add(rig.ns+"/Skel", raw)
         archive.add("alt/"+rig.ns+"/Skel", raw)
@@ -843,6 +858,8 @@ def build(source_path, native_path, variant, output):
         if 'cloth_surface_repairs' in model:geometry_repairs['cloth_normals']=model['cloth_surface_repairs']
         if 'rear_shorts_fin' in model:geometry_repairs['rear_shorts_fin']=model['rear_shorts_fin']
         if 'smile_repair' in model:geometry_repairs['smile_repair']=model['smile_repair']
+        if 'twin_shoulder_repairs' in model:geometry_repairs['twin_shoulders']=model['twin_shoulder_repairs']
+        if 'face_shading_repair' in model:geometry_repairs['face_shading']=model['face_shading_repair']
         if 'removed_segment_faces' in model:
             geometry_repairs['detached_source_shard']=dict(source_mesh_id=24,source_mesh_name='tripo_part_9',
                 removed_source_faces=model['removed_segment_faces'].tolist(),reason='disconnected source fragment beside upper arm')
@@ -891,7 +908,8 @@ def build(source_path, native_path, variant, output):
                       geometry_repairs=geometry_repairs,
                       joint_skin=dict(version=1, native_matrices=rig.dlist_count, blend_matrices=len(skin_palette.blends),
                                       blended_vertices=int(np.count_nonzero(skin_palette.vertex_slots >= rig.dlist_count)),
-                                      weight_steps=16, source_retarget_blend=True,
+                                      weight_steps=16, source_retarget_blend=not getattr(skin_palette,'rest_space',False),
+                                      fitted_rest_space_blend=getattr(skin_palette,'rest_space',False),
                                       evaluated='current native transforms including tracking and transitions'),
                       expression_method="authored joined eyelids and private native-indexed wrappers; narrow requested gaze, cheek, mouth and hair repairs",
                       runtime_tested=False, status="IMPLEMENTED_RUNTIME_UNTESTED")

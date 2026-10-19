@@ -1,4 +1,6 @@
 #include <cassert>
+// Black Market reporting is an observer outside this rendering fixture.
+void NeiGi_ReportBlackMarketModel(const char*, const char*, const char*) {}
 #include <cstdint>
 #include <cstdio>
 #include <cstring>

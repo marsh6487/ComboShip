@@ -46,7 +46,13 @@ def main():
                             str(ROOT/"soh/src/overlays/actors/ovl_En_Viewer/static_story_actor.c"),
                             "-Wl,--gc-sections", "-lm", "-o", str(tracking)], check=True)
             subprocess.run([str(tracking)], check=True)
-        for actor in ["En_Sa", "Demo_Sa", "En_Ko", "En_Ma1", "En_Ma2", "En_Ma3", "En_Viewer"]:
+        credits = output/"credits-routing"
+        subprocess.run([*flags,"-ffunction-sections","-fdata-sections",
+                        str(ROOT/"soh/tests/native_npc_credits_routing_test.c"),
+                        str(ROOT/"soh/src/overlays/actors/ovl_Demo_Ec/z_demo_ec.c"),
+                        "-Wl,--gc-sections","-lm","-o",str(credits)],check=True)
+        subprocess.run([str(credits)],check=True)
+        for actor in ["En_Sa", "Demo_Sa", "En_Ko", "En_Ma1", "En_Ma2", "En_Ma3", "En_Viewer", "Demo_Ec"]:
             path = ROOT/f"soh/src/overlays/actors/ovl_{actor}/z_{actor.lower()}.c"
             subprocess.run([*flags, "-c", str(path), "-o", str(output/f"{actor}.o")], check=True)
             print("PASS real actor compilation:", actor, flush=True)

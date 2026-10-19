@@ -134,6 +134,7 @@ class JointSkinTests(unittest.TestCase):
 
     def test_forehead_normals_follow_a_smooth_surface(self):
         from native_npc_fit import smooth_twin_face
+        from native_npc_face_shading import twin_face_normal_field
         xx, yy = np.meshgrid(np.linspace(-.07,.07,12),np.linspace(.875,.905,8))
         p=np.column_stack([xx.ravel(),yy.ravel(),(.08-2*xx*xx-(yy-.89)**2).ravel()])
         count=len(p)
@@ -142,7 +143,13 @@ class JointSkinTests(unittest.TestCase):
         model=dict(source_positions=p,positions=p.copy(),normals=np.tile([1.,0.,0.],(len(p),1)),
                    bones=np.zeros(len(p),int),mesh_ids=np.repeat([0,1],count),
                    head_transform=np.column_stack([np.eye(3),np.zeros(3)]))
+        faces=[]
+        for row in range(7):
+            for col in range(11):
+                a=row*12+col;faces.extend(((a,a+1,a+13),(a,a+13,a+12)))
+        model['faces']=np.asarray(faces)
         smooth_twin_face(model,0,np.tile([210.,175.,125.],(len(p),1)))
+        model['normals']=twin_face_normal_field(model,model['normals'])
         self.assertTrue((model['normals'][:,2]>.9).all())
         np.testing.assert_allclose(model['normals'][:count],model['normals'][count:],atol=1e-8)
         forehead=p[:,1]>.89
@@ -176,6 +183,20 @@ class JointSkinTests(unittest.TestCase):
         encoded=getattr(pal,'vertex_positions',model['positions'])[i]
         actual=pal.matrices(pose)[slot]@np.r_[encoded,1.]
         np.testing.assert_allclose(actual,expected,atol=1e-4)
+
+    def test_rest_space_blends_share_the_rigid_endpoint_normal_basis(self):
+        # Nonuniform source retargeting must not enter the native normal
+        # matrix only for q=1..15 and disappear abruptly at a rigid endpoint.
+        bind=np.tile(np.eye(4),(2,1,1));weights=np.array([[.5,.5]])
+        p=skin.Palette(bind,[0,1],weights);p.rest_space=True
+        p.canonical=np.eye(4);p.seam_groups=[];p.skin_weights=weights;p.skin_mask=np.array([True])
+        p.transforms=bind.copy();p.transforms[1,:3,:3]=np.diag([.4,1.8,1.])
+        model=dict(source_positions=np.array([[1.,2.,3.]]),positions=np.array([[.7,2.8,3.]]),
+                   normals=np.array([[.6,.8,0.]]),posed_source_normals=np.array([[.6,.8,0.]]))
+        out=p.geometry_for(model);matrix=p.matrices(bind)[p.vertex_slots[0]]
+        np.testing.assert_allclose(matrix@np.r_[out.vertex_positions[0],1],np.r_[out.rest_positions[0],1])
+        actual=matrix[:3,:3]@out.vertex_normals[0];actual/=np.linalg.norm(actual)
+        np.testing.assert_allclose(actual,out.rest_normals[0],atol=1e-8)
 
 
 if __name__ == '__main__':

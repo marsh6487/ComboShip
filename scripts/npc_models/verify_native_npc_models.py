@@ -209,7 +209,26 @@ def verify(native, source_dir, candidate, allow_fitted_rig=False):
     if count != revised or expected != report["source_triangles"]:
         raise ValueError("Source triangles were lost or duplicated")
     connection_triangles = report.get('joint_skin',{}).get('connection_triangles',0)
-    if skin and skin_count != count-int(report['body_triangles'][str(rig.profile['head'])])+connection_triangles:
+    expected_skin_count=count-int(report['body_triangles'][str(rig.profile['head'])])+connection_triangles
+    shared=report.get('joint_skin',{}).get('shared_shoulders')
+    if shared:
+        from expand_twins_pose_coverage import shared_shoulders,PARENT_SHA256,HOSTS
+        if variant!='twins' or shared['parent_sha256']!=PARENT_SHA256:
+            raise ValueError('Shared shoulder skin differs from the accepted Twins repair')
+        records={n:archive.candidate.read(n) for n in archive.candidate.namelist()}
+        wrappers=shared_shoulders(records,rig.ns);sources={};counts={}
+        for host in HOSTS:
+            destination=rig.ns+f'/Skin/Limbs/Limb{host:02d}'
+            source_path=rig.ns+'/PoseAnimations/objects/object_os_anime/gKokiriIdleAnim'+f'/Skin/Limbs/Limb{host:02d}'
+            if archive.candidate.read('alt/'+destination)!=wrappers['alt/'+destination]:
+                raise ValueError('Shared shoulder wrapper bypasses the reviewed skin')
+            before=int(report['body_triangles'][str(host)])
+            after=archive.geometry(source_path,rig,host,triangles_only=True)
+            sources[destination]=source_path;counts[str(host)]=dict(previous=before,shared=after)
+            expected_skin_count+=after-before
+        if shared['sources']!=sources or shared['triangle_counts']!=counts:
+            raise ValueError('Shared shoulder topology differs from its recorded source')
+    if skin and skin_count != expected_skin_count:
         raise ValueError('Weighted geometry lost body faces or changed its recorded joint connectors')
     if skin and variant == 'twins':
         for name in ('gKokiriIdleAnim','gKokiriStandingArmsBehindBackAnim'):
@@ -258,6 +277,8 @@ def verify(native, source_dir, candidate, allow_fitted_rig=False):
             if call in archive.read(rig.ns+shared):
                 raise ValueError('A seated prop leaked into shared non-grip poses')
     pose_count = 0
+    torso_pose_count = 0
+    posture = report.get('geometry_repairs', {}).get('pose3_posture')
     arm_joints = {i+1 for side in ("left", "right") for i in rig.profile[side][3:]}
     stance_clips=[]
     for name in archive.candidate.namelist():
@@ -265,7 +286,7 @@ def verify(native, source_dir, candidate, allow_fitted_rig=False):
         if not name.startswith(prefix):
             continue
         relative = name[len(prefix):]
-        if "/Limbs/" in relative or "/Hands/" in relative or "/Props/" in relative:
+        if "/Limbs/" in relative or "/Hands/" in relative or "/Props/" in relative or "/Skin/" in relative:
             continue
         fitted = animation_frames(archive.candidate.read(name))
         original = animation_frames(archive.native.read(relative))
@@ -284,9 +305,20 @@ def verify(native, source_dir, candidate, allow_fitted_rig=False):
                     raise ValueError('Basket skirt differs from the accepted idle alignment')
                 allowed.add(10)
         non_arm=sorted(set(range(len(rig.limbs)+1))-allowed)
-        if fitted.shape != original.shape or not np.array_equal(fitted[:, non_arm], original[:, non_arm]):
+        if fitted.shape != original.shape:
+            raise ValueError("Fitted pose changed native timing or joint count")
+        if posture and variant == 'twins' and relative == 'objects/object_os_anime/gKokiriSittingHeadOnHandAnim':
+            # This reviewed silhouette correction rotates only the complete
+            # torso chain. Validate its exact bounded fit; other clips keep
+            # the original arm-only rule.
+            from refine_twins_seated_posture import validate_posture
+            validate_posture(archive, posture, fitted)
+            torso_pose_count += 1
+        elif not np.array_equal(fitted[:, non_arm], original[:, non_arm]):
             raise ValueError("Fitted pose changed native timing, root motion or a non-arm joint")
         pose_count += 1
+    if posture and torso_pose_count != 1:
+        raise ValueError('Seated posture metadata has no matching bounded pose')
     if brooch:
         donor = SourceModel(Path(source_dir)/VARIANTS["malon"]["file"])
         if brooch["donor_source_sha256"] != hashlib.sha256(donor.raw).hexdigest():
@@ -333,8 +365,10 @@ def verify(native, source_dir, candidate, allow_fitted_rig=False):
     return dict(candidate=Path(candidate).name, sha256=hashlib.sha256(Path(candidate).read_bytes()).hexdigest(),
                 body_triangles=count, limb_count=len(rig.limbs), matrix_count=rig.dlist_count,
                 expression_routes=125, diffuse_pixels_identical=True, native_rig_identical=rig_identical,
-                fitted_pose_clips=pose_count, non_arm_animation_channels_unchanged=not bool(stance_clips),
-                non_adapted_animation_channels_unchanged=True,planted_stance_clips=stance_clips,
+                fitted_pose_clips=pose_count,
+                non_arm_animation_channels_unchanged=not stance_clips and torso_pose_count == 0,
+                non_adapted_animation_channels_unchanged=True, planted_stance_clips=stance_clips,
+                bounded_torso_posture_clips=torso_pose_count,
                 live_joint_blend_matrices=len(skin.blends) if skin else 0,
                 joint_connection_triangles=connection_triangles,
                 native_fallback=True, native_fade_alpha=True, private_resources_only=True,

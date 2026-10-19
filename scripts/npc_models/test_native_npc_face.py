@@ -8,6 +8,20 @@ import native_npc_face as face
 
 
 class ExpressionSeamTests(unittest.TestCase):
+    def test_face_paint_changes_only_covered_atlas_texels(self):
+        self.assertTrue(callable(getattr(face,'reproject_face_paint',None)))
+        p=np.array([[.2,.2,.1],[.8,.2,.1],[.2,.8,.1]])
+        atlas=np.full((16,16,4),[30,40,50,255],np.uint8)
+        art=np.full((8,8,4),[220,170,130,255],np.uint8)
+        mask=np.full((8,8),255,np.uint8)
+        out=face.reproject_face_paint(p,p[:,:2],atlas,np.array([[0,1,2]]),art,mask,[0,0,1,1])
+        np.testing.assert_array_equal(out[5,5],art[0,0])
+        np.testing.assert_array_equal(out[0],atlas[0])
+        np.testing.assert_array_equal(out[14],atlas[14])
+        np.testing.assert_array_equal(atlas,np.full_like(atlas,[30,40,50,255]))
+        unchanged=face.reproject_face_paint(p,p[:,:2],atlas,np.array([[0,1,2]]),art,np.zeros_like(mask),[0,0,1,1])
+        np.testing.assert_array_equal(unchanged,atlas)
+
     def test_mouth_refinement_keeps_native_perimeter_edges_unsplit(self):
         self.assertTrue(callable(getattr(face, 'expression_subdivision', None)),
                         'Mouth detail must not insert rounded vertices into an adjoining unsplit edge')

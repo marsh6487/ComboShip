@@ -85,8 +85,7 @@ def twin_face_pieces(model):
 
 
 def smooth_twin_face(model, head, rgb):
-    """Fit the joined face and its retained boundary to the same skin surface."""
-    from native_npc_models import unit
+    """Fit blink support without rewriting the neutral face's normal field."""
     p = model['source_positions']
     skin = ((model['bones'] == head) & (abs(p[:,0]) < .08) & (p[:,2] > .015) &
             (rgb[:,0] > rgb[:,1]*.94) & (rgb[:,1] > rgb[:,2]*1.08) & (rgb.mean(1) > 85))
@@ -99,20 +98,11 @@ def smooth_twin_face(model, head, rgb):
     design = np.column_stack([np.ones(len(p)),x,y,x*x,y*y,x*y])
     coef = np.linalg.lstsq(design[ring],p[ring,2],rcond=None)[0]
     model['twin_forehead_curve']=coef
-    normal = unit(np.column_stack([-(coef[1]+2*coef[3]*x+coef[5]*y),
-                                  -(coef[2]+2*coef[4]*y+coef[5]*x),np.ones(len(p))]))
-    ht = model['head_transform']
-    normal = unit(normal@np.linalg.inv(ht[:,:3]))
     green=(rgb[:,1]>rgb[:,0]*1.05)&(rgb[:,1]>rgb[:,2]*1.2)
     band=green&(p[:,1]>.915)&(p[:,1]<.94)&(p[:,2]>.015)&(abs(p[:,0])<.085)
     band_piece=(pieces==np.bincount(pieces[band]).argmax()) if band.any() else np.zeros(len(p),bool)
     model['twin_face_piece']=face_piece
     model['twin_band_piece']=band_piece
-    zone=((model['bones']==head)&(abs(p[:,0])<.085)&(p[:,2]>.015)&(p[:,1]>.862)&(p[:,1]<.919)&
-          (face_piece|(band_piece&(p[:,1]>.90))))
-    blend=np.clip((p[:,1]-.862)/.013,0,1)*np.clip((.085-abs(p[:,0]))/.015,0,1)
-    weight=blend[zone,None]
-    model['normals'][zone]=unit(model['normals'][zone]*(1-weight)+normal[zone]*weight)
     for side,cx in [('L',.04),('R',-.04)]:
         x,y=p[:,0]-cx,p[:,1]-.84
         radius=np.sqrt((x/.028)**2+(y/.027)**2)
@@ -121,14 +111,6 @@ def smooth_twin_face(model, head, rgb):
         if ring.sum()<12:continue
         coef=np.linalg.lstsq(design[ring],p[ring,2],rcond=None)[0]
         model['twin_eye_curve_'+side]=coef
-        zone=(model['bones']==head)&face_piece&(p[:,2]>.015)&(radius<2.)&(p[:,1]>.805)&(p[:,1]<.878)
-        weight=np.clip((2.-radius[zone])/.6,0,1)[:,None]
-        revised=p[zone].copy();revised[:,2]=design[zone]@coef
-        target=revised@ht[:,:3].T+ht[:,3]
-        normal=unit(np.column_stack([-(coef[1]+2*coef[3]*x+coef[5]*y),
-                                    -(coef[2]+2*coef[4]*y+coef[5]*x),np.ones(len(p))])@np.linalg.inv(ht[:,:3]))
-        model['positions'][zone]=model['positions'][zone]*(1-weight)+target*weight
-        model['normals'][zone]=unit(model['normals'][zone]*(1-weight)+normal[zone]*weight)
 
 
 def source_hand_pose(source, curls=0., separated=False, grip=None):

@@ -21,6 +21,24 @@ ANIMATIONS = {
     "malon": ["gMalonAdultIdleAnim", "gMalonAdultStandStillAnim", "gMalonAdultSingAnim"],
 }
 
+KOKIRI_STORY_POSES=(
+    'gKokiriIdleAnim','gKokiriStandingArmsBehindBackAnim','gKokiriStandingHandsOnHipsAnim',
+    'gKokiriSittingHeadOnHandAnim','gKokiriSittingCrossedLegsAnim','gKokiriSittingCrossedArmsLegsAnim',
+)
+
+def animation_for_mode(name,animation_object,mode,animation=None):
+    """Keep old review indices stable; expose actual cutscene entry numbers."""
+    story=None
+    if mode.startswith('static'):
+        if name!='twins':raise ValueError('Static Kokiri entries require the Twins rig')
+        story=pose=int(mode[6:]);selected=KOKIRI_STORY_POSES[pose]
+    else:
+        pose=0 if mode.startswith('face') else int(mode[4:])
+        selected=animation or ANIMATIONS[name][pose]
+    selected=selected.removeprefix('__OTR__')
+    if not selected.startswith('objects/'):selected=f'objects/{animation_object}/{selected}'
+    return selected,pose,story
+
 
 def native_shade(normals, matrix, light):
     """Match F3DEX CalculateNormalDir for the review's directional light.
@@ -47,19 +65,26 @@ def preview(task):
     control = options.get("native_control", False)
     rig = NativeRig(archive, settings["profile"], private=not control)
     expression = mode.startswith("face")
+    anim_object = rig.profile.get("animation_object", rig.profile["object"])
+    animation,pose,story=animation_for_mode(rig.name,anim_object,mode,options.get('animation'))
     if expression:
-        pose, eye, mouth = 0, int(mode[-1]), 0
+        eye, mouth = int(mode[4:]), 0
     else:
-        pose, eye, mouth = int(mode[-1]), 0, 0
+        eye, mouth = 0, 0
         if rig.name == "saria" and pose == 1:
             eye = 0 if options.get("talking") else 2
-    anim_object = rig.profile.get("animation_object", rig.profile["object"])
-    animation = f"objects/{anim_object}/{options.get('animation', ANIMATIONS[rig.name][pose])}"
     pose_key = rig.ns+"/PoseAnimations/"+animation
     clip = "alt/"+pose_key
     frames = animation_frames(archive.candidate.read(clip) if not control and clip in archive.candidate.namelist() else archive.native.read(animation))
-    frame = options.get("frame", len(frames)//2 if pose else 0) % len(frames)
-    rig.pose(frames[frame])
+    absolute_frame=options.get("frame",len(frames)//2 if pose else 0)
+    frame=absolute_frame%len(frames);posed=frames[frame].copy()
+    if story==4 and (control or clip not in archive.candidate.namelist()):
+        # Match StaticStoryKokiri_UpdatePose's native head/leg adapter. This is
+        # part of the static actor pose, rather than the raw native clip.
+        posed[15,2]=(-32768-int(posed[1,1])-int(posed[8,2])+32768)%65536-32768
+        donor=animation_frames(archive.native.read('objects/object_dy_obj/gGreatFairySittingAnim'))
+        posed[2:8]=donor[absolute_frame%len(donor),2:8]
+    rig.pose(posed)
     textures, records, head_points = {}, [], []
 
     def texture(path):
