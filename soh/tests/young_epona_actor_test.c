@@ -16,6 +16,7 @@
 static int limbCalls[64];
 static int limbCallCount;
 SaveContext gSaveContext;
+int gComboGameMode = COMBO_GAME_BOTH;
 static GameInfo gameInfo;
 GameInfo* gGameInfo = &gameInfo;
 Vec3f gSfxDefaultPos;
@@ -54,6 +55,18 @@ void Actor_SetScale(Actor* actor, f32 scale) {
     actor->scale = (Vec3f){ scale, scale, scale };
 }
 void ActorShadow_DrawHorse(Actor* actor, Lights* lights, PlayState* play) {
+}
+// These cases exercise the native young horse, outside the forest placement.
+void ActorShadow_DrawCircle(Actor* actor, Lights* lights, PlayState* play) {
+    CHECK(0);
+}
+void Animation_PlayLoop(SkelAnime* skel, AnimationHeader* animation) {
+    CHECK(0);
+}
+f32 BgCheck_EntityRaycastFloor5(PlayState* play, CollisionContext* context, CollisionPoly** floor, s32* bg,
+                                Actor* actor, Vec3f* pos) {
+    CHECK(0);
+    return 0.0f;
 }
 void ActorShape_Init(ActorShape* shape, f32 offset, ActorShadowFunc shadowDraw, f32 scale) {
 }

@@ -49,7 +49,7 @@ def main():
     fixture = (ROOT / "soh/tests/young_epona_player_test.c").read_text()
     fixture = fixture.replace("/* PRODUCTION_TYPES */", types).replace("/* PRODUCTION_TABLES */", tables)
     fixture = fixture.replace("/* PRODUCTION_PLAYER */", production)
-    flags = ["-std=gnu2x", "-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-Icombo", "-DLOG_LEVEL_GAME_PRINTS=0", "-DNDEBUG",
+    flags = ["-std=gnu2x", "-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-Icombo", "-Icombo/menu", "-DLOG_LEVEL_GAME_PRINTS=0", "-DNDEBUG",
              "-Werror=implicit-function-declaration", "-Wno-int-conversion", "-Wno-incompatible-pointer-types",
              "-Wno-discarded-qualifiers", "-Ilibultraship/include", "-Isoh/include", "-Isoh/src",
              "-Isoh/assets", "-Isoh", "-Isoh/mods", "-fsanitize=undefined", "-fno-sanitize-recover=all"]

@@ -19,3 +19,13 @@ The cross-dungeon test exercises native fades and handoff hooks, not that arriva
 The original command failed with the missing Mirror callback before this correction. The focused MM handoff sanitizer command and the complete four-variant transition command pass afterward. The remaining cumulative gate and exact-head full application builds are separate pending checks, not inferred from this fixture result.
 
 Recovery inputs and the complete 45-workstream inclusion remain recorded in `final-cumulative-merge-20261019.md` and `final-cumulative-checkpoint-20261019.json`. This source follow-up does not claim configured gameplay acceptance or promotion of any external scene master.
+
+## Remaining fixture dependencies
+
+The broader gate exposed additional fixture maintenance after combining the accepted workstreams:
+
+- The shared OoT key/silver-rupee cosmetic fixture now includes the actual pure-data `BlackMarketShelves.h` dependency used by the production editor's default shelf tint. Full key/heart and SoH compatibility groups pass, including sanitizer cases.
+- The foreign-soul runner now extracts the actual native `SkelAnime_ApplyNpcSkin` helper along with its draw functions. The fixture explicitly models boss souls with no NPC skin plan, executes the real helper's null-plan path, and rejects unexpected skin blending. The complete foreign-soul/imported-boss group passes in normal and sanitizer configurations; NPC replacement skinning has its own separate coverage.
+- The young-Epona actor fixture supplies the combined-game mode and fails if forest-only presentation services are unexpectedly called in its native young-horse cases. Its player compiler also includes the existing `combo/menu` header path, required by elemental-sword receipts. The complete Epona actor/player/save/cosmetic group passes, including full player/horse translation-unit checks.
+
+Each missing dependency was reproduced before correction. These changes affect test fixtures and their compiler commands only. No game implementation, item behavior, scene resources or asset packaging changes are made in this follow-up. Exact-head hosted full application builds remain a separate gate.
