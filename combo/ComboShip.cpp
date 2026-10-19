@@ -36,6 +36,7 @@
 #include "rando/CrossDungeonCoordinator.h"
 #include "rando/CrossDungeonGeneration.h"
 #include "rando/OotDungeonLayouts.h"
+#include "rando/BlackMarket.h"
 #include "gui/ComboGenProgress.h"
 #include "ComboExtract.h"
 #include "ComboLaunchOptions.h"
@@ -407,6 +408,15 @@ static ComboRando::CrossDungeon::Coordinator g_CrossDungeons;
 static void (*g_SetCrossBossMask[2])(uint16_t) = {};
 static void (*g_ApplyCrossBossClear[2])(int, int) = {};
 static void (*g_SetCrossBossNotify[2])(void (*)(int)) = {};
+static const char* (*SOH_ReadBlackMarketOptions)() = nullptr;
+static void (*MM_SetBlackMarketSeed)(const char*, int, uint16_t) = nullptr;
+static nlohmann::json g_blackMarket;
+static uint16_t g_blackMarketClears = 0;
+
+static void Combo_PushBlackMarket(int slot) {
+    if (MM_SetBlackMarketSeed)
+        MM_SetBlackMarketSeed(g_blackMarket.dump().c_str(), slot, g_blackMarketClears);
+}
 
 static bool Combo_ReadCrossEntranceOptions() {
     ComboRando::CrossDungeon::PoolOptions options;
@@ -1344,6 +1354,8 @@ static void LoadComboCompletion(int slot) {
     g_comboCompletion[0] = g_comboCompletion[1] = false;
     g_comboCompletionSlot = slot;
     g_crossBossClears = 0;
+    g_blackMarket = nullptr;
+    g_blackMarketClears = 0;
     g_comboTriforceDone = false;
     g_goalHunt = false;
     g_goalRequired = 0;
@@ -1366,6 +1378,13 @@ static void LoadComboCompletion(int slot) {
         g_comboTriforceDone = comp.value("triforce", false);
         // The goal is seed-bound: it rides the slot's baked combo.rando, not the live menu CVars.
         auto rando = combo.value("rando", nlohmann::json::object());
+        const auto market = rando.value("blackMarket", nlohmann::json());
+        if (ComboRando::BlackMarket::Validate(market)) {
+            g_blackMarket = market;
+            const auto clears = combo.value("blackMarketClears", nlohmann::json(0));
+            if (ComboRando::BlackMarket::UnsignedInRange(clears, 0xFFF))
+                g_blackMarketClears = clears.get<uint16_t>();
+        }
         auto goal = rando.value("goal", nlohmann::json::object());
         g_goalHunt = goal.value("type", std::string("bosses")) == "triforceHunt";
         g_goalRequired = g_goalHunt ? goal.value("requiredPieces", 0) : 0;
@@ -1376,6 +1395,7 @@ static void LoadComboCompletion(int slot) {
         g_sharedMask = ComboRando::SharedMaskFromKeys(rando.value("sharedItems", nlohmann::json::array()));
     }
     // Push outside the container lock — the DLL setters must never re-enter the sidecar.
+    Combo_PushBlackMarket(slot);
     for (auto setMask : g_SetCrossBossMask)
         if (setMask)
             setMask(g_crossBossClears);
@@ -1392,6 +1412,28 @@ static void LoadComboCompletion(int slot) {
     if (ComboUI_SetComboComplete)
         ComboUI_SetComboComplete((g_comboCompletion[0] && g_comboCompletion[1]) ? 1 : 0);
 }
+
+// Actual defeat notifications, independent of boss shuffle and reward items.
+static void Combo_OnBlackMarketClear(int physicalBoss, int slot) try {
+    if (!ComboIsValidSlot(slot) || slot != g_comboCompletionSlot || g_blackMarket.is_null() || physicalBoss < 0 ||
+        physicalBoss >= 12)
+        return;
+    const auto sources = ComboRando::CrossDungeon::BossSources(g_CrossDungeons.RuntimeSeed());
+    const int dungeon = sources[physicalBoss] >= 0 ? sources[physicalBoss] : physicalBoss;
+    const uint16_t next = g_blackMarketClears | (1u << dungeon);
+    if (next == g_blackMarketClears)
+        return;
+    g_blackMarketClears = next;
+    {
+        std::lock_guard<std::mutex> lock(g_containerMutex);
+        auto& container = LoadOrCreateContainer(slot);
+        container["combo"]["blackMarketClears"] = next;
+        FlushContainer(slot);
+    }
+    Combo_PushBlackMarket(slot);
+} catch (const std::exception& e) {
+    std::cerr << "[BlackMarket] completion failed: " << e.what() << '\n';
+} catch (...) { std::cerr << "[BlackMarket] completion failed\n"; }
 
 // Both first and repeat blue warps report the physical arena. MM's world effects must be
 // reapplied after a cycle reset even when the permanent source completion bit is already set.
@@ -1812,6 +1854,9 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
     // Shared Items: read via soh.dll — the launcher has no CVar access.
     const uint32_t sharedMask = SOH_ReadComboSharedCVars ? SOH_ReadComboSharedCVars() : 0;
     const bool crossDungeonEnabled = Combo_ReadCrossEntranceOptions();
+    const auto blackMarketConfig =
+        SOH_ReadBlackMarketOptions ? nlohmann::json::parse(SOH_ReadBlackMarketOptions()) : nlohmann::json::object();
+    const auto blackMarketOptions = ComboRando::BlackMarket::OptionsFromJson(blackMarketConfig);
     nlohmann::json crossDungeonSeed;
 
     std::string sohDump, mmDump, spoiler, lastFillError, sohHintDump;
@@ -2139,9 +2184,10 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
         // Combo_FinalizeGenerate, which the main-thread file-select poll runs once it sees done.
         // The OOT seed-hash folds in input-seed + both settings dumps so the icons identify seed and
         // settings (same seed+settings -> matching icons across players).
-        uint32_t displaySeed = ComboHash((inputSeed + sohDump + mmDump).c_str());
+        uint32_t displaySeed = ComboHash((inputSeed + sohDump + mmDump + blackMarketConfig.dump()).c_str());
         if (!crossDungeonSeed.is_null())
-            displaySeed = ComboHash((inputSeed + sohDump + mmDump + crossDungeonSeed.dump()).c_str());
+            displaySeed =
+                ComboHash((inputSeed + sohDump + mmDump + crossDungeonSeed.dump() + blackMarketConfig.dump()).c_str());
 
         // ComboShip: file_hash = the 5 icon indexes the file-select shows, derived from displaySeed
         // exactly as OOT's GenerateHash (decimal padded to 10, five 2-digit pairs).
@@ -2180,6 +2226,8 @@ static void RunComboFillBody(std::string inputSeed, ComboRando::ComboGenProgress
         consolidated["version"] = 1;
         consolidated["seed"] = inputSeed;
         consolidated["masterSeed"] = masterSeed;
+        consolidated["blackMarket"] = ComboRando::BlackMarket::Generate(masterSeed, blackMarketOptions);
+        consolidated["blackMarketOptions"] = blackMarketConfig;
         if (!crossDungeonSeed.is_null())
             consolidated["crossDungeonEntrances"] = crossDungeonSeed;
         consolidated["displaySeed"] = displaySeed;
@@ -2743,6 +2791,10 @@ static int Combo_OnReloadRequest(const char* path) {
     }
     try {
         // Reject malformed feature data before changing native settings or pending seed state.
+        if (j.contains("blackMarket") && !ComboRando::BlackMarket::Validate(j["blackMarket"])) {
+            std::cerr << "[ComboShip] reload: invalid black market stock\n";
+            return 0;
+        }
         if (!ComboRando::ValidateOotDungeonLayouts(j.value("oot", nlohmann::json::object()),
                                                    SOH_ValidateDungeonLayoutsForCombo)) {
             std::cerr << "[ComboShip] reload: invalid dungeon layouts or required OoT quest assets missing\n";
@@ -3022,6 +3074,7 @@ static void Combo_OnOOTSaveInit(int fileNum) {
         c["combo"]["notes"] = "";
         c["combo"]["faroresWind"] = nullptr; // Fresh file must not inherit a previous seed's point.
         c["combo"]["crossBossClears"] = 0;
+        c["combo"]["blackMarketClears"] = 0;
         if (c["combo"].contains("hintsRead"))
             c["combo"].erase("hintsRead");
         FlushContainer(fileNum);
@@ -3492,6 +3545,8 @@ int main(int argc, char** argv) {
     // keeps its 2ship defaults, never suppressed).
     MM_SetComboSharedItems = (FnSetComboSharedItems)GetSym(mmModule, "MM_SetComboSharedItems");
     SOH_ReadComboSharedCVars = (FnReadComboSharedCVars)GetSym(sohModule, "SOH_ReadComboSharedCVars");
+    SOH_ReadBlackMarketOptions = (const char* (*)())GetSym(sohModule, "SOH_ReadBlackMarketOptions");
+    MM_SetBlackMarketSeed = (void (*)(const char*, int, uint16_t))GetSym(mmModule, "MM_SetBlackMarketSeed");
     SOH_GetSharedTier = (FnGetSharedTier)GetSym(sohModule, "SOH_GetSharedTier");
     MM_GetSharedTier = (FnGetSharedTier)GetSym(mmModule, "MM_GetSharedTier");
     SOH_RaiseSharedTier = (FnRaiseSharedTier)GetSym(sohModule, "SOH_RaiseSharedTier");
@@ -3545,6 +3600,10 @@ int main(int argc, char** argv) {
         g_SetCrossBossMask[game] = (void (*)(uint16_t))GetSym(module, (prefix + "_SetCrossBossCompletedMask").c_str());
         g_ApplyCrossBossClear[game] = (void (*)(int, int))GetSym(module, (prefix + "_ApplyCrossBossClear").c_str());
         g_SetCrossBossNotify[game] = (void (*)(void (*)(int)))GetSym(module, (prefix + "_SetCrossBossNotify").c_str());
+        auto marketClears =
+            (void (*)(void (*)(int, int)))GetSym(module, (prefix + "_SetBlackMarketClearCallback").c_str());
+        if (gameMode == COMBO_GAME_BOTH && marketClears)
+            marketClears(Combo_OnBlackMarketClear);
         if (gameMode == COMBO_GAME_BOTH && g_SetCrossBossNotify[game])
             g_SetCrossBossNotify[game](&Combo_OnCrossBossDefeated);
     }

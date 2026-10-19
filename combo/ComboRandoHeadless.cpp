@@ -42,6 +42,7 @@
 #include "rando/ComboPlaythrough.h"
 #include "rando/CrossForeign.h" // BuildForeignArray (foreign enrichment parity with RunComboFill)
 #include "rando/CrossHints.h"
+#include "rando/BlackMarket.h"
 #include "rando/CrossDungeonCoordinator.h"
 #include "rando/OotDungeonLayouts.h"
 #include "rando/CrossDungeonGeneration.h"
@@ -231,6 +232,7 @@ int main(int argc, char** argv) {
     // Shared Items: also pushed before every dump (shapes OOT's wallet force + MM's trimmed pool).
     auto SOH_SetComboSharedItems = Sym<void (*)(uint32_t)>(soh, "SOH_SetComboSharedItems");
     auto SOH_ReadComboSharedCVars = Sym<uint32_t (*)(void)>(soh, "SOH_ReadComboSharedCVars");
+    auto SOH_ReadBlackMarketOptions = Sym<FnDump>(soh, "SOH_ReadBlackMarketOptions");
     auto SOH_ReadCrossDungeonCVar = Sym<int (*)()>(soh, "SOH_ReadCrossDungeonCVar");
     auto SOH_ReadCrossEntranceOptions = Sym<FnDump>(soh, "SOH_ReadCrossEntranceOptions");
     ComboRando::CrossDungeon::Coordinator crossDungeons;
@@ -573,6 +575,7 @@ int main(int argc, char** argv) {
     // Restore a reported seed's settings so generation matches it; otherwise live CVar defaults apply.
     std::optional<uint32_t> settingsSharedMask;
     std::optional<nlohmann::json> settingsCrossSeed;
+    std::optional<nlohmann::json> settingsBlackMarket;
     std::optional<nlohmann::json> settingsOotEntrances;
     nlohmann::json settingsOotLayouts = nlohmann::json::object();
     if (!settingsFile.empty()) {
@@ -582,6 +585,10 @@ int main(int argc, char** argv) {
         }
         try {
             auto sj = nlohmann::json::parse(ReadFile(settingsFile));
+            if (sj.contains("blackMarketOptions")) {
+                ComboRando::BlackMarket::OptionsFromJson(sj["blackMarketOptions"]);
+                settingsBlackMarket = sj["blackMarketOptions"];
+            }
             settingsCrossSeed = ComboRando::CrossDungeon::Coordinator::SeedOf(sj);
             ComboRando::CrossDungeon::Coordinator::Enabled(*settingsCrossSeed);
             if (sj.contains("entrances") && sj.at("entrances").contains("oot"))
@@ -829,6 +836,13 @@ int main(int argc, char** argv) {
                     consolidated["fileType"] = "ComboShipRandomizer";
                     consolidated["seed"] = seed;
                     consolidated["masterSeed"] = masterSeed;
+                    const auto marketConfig = settingsBlackMarket ? *settingsBlackMarket
+                                              : SOH_ReadBlackMarketOptions
+                                                  ? nlohmann::json::parse(SOH_ReadBlackMarketOptions())
+                                                  : nlohmann::json::object();
+                    consolidated["blackMarket"] = ComboRando::BlackMarket::Generate(
+                        masterSeed, ComboRando::BlackMarket::OptionsFromJson(marketConfig));
+                    consolidated["blackMarketOptions"] = marketConfig;
                     if (!crossDungeonSeed.is_null())
                         consolidated["crossDungeonEntrances"] = crossDungeonSeed;
                     consolidated["goal"] = { { "type", goal.hunt ? "triforceHunt" : "bosses" },

@@ -12,8 +12,9 @@
 #include "ComboNotesWindow.h"      // combo-owned cross-game Personal Notes window
 #include "ComboHintTracker.h"      // combo-owned unified Hint Tracker (#164)
 #include "ComboEmoteSettings.h"
-#include "ComboTimersWindow.h"      // combo-owned overlay timers (#173)
-#include "ComboSettingsSync.h"      // combo-owned cross-game settings sync
+#include "ComboTimersWindow.h" // combo-owned overlay timers (#173)
+#include "ComboSettingsSync.h" // combo-owned cross-game settings sync
+#include "BlackMarketAppearance.h"
 #include "rando/ComboPlaythrough.h" // plando: ParseSpoilerPlacements + Suffix/BuildForeignArray + slot paths
 #include <imgui.h>
 #include <libultraship/libultraship.h>         // CVar bridge (CVarGet/Set* incl. color) + color.h (Color_RGBA8)
@@ -1841,6 +1842,26 @@ void ComboMenu::DrawComboPanel() {
     ImGui::EndDisabled();
     crossPoolCheckbox("Cross-Game Grottos and Graves", "gCombo.Rando.CrossGrottoEntrances",
                       "Shuffle grotto and grave entrances between games, including their return and void positions.");
+    ImGui::Separator();
+
+    ImGui::SeparatorText("Skiejer Black Market");
+    static constexpr const char* marketPrices[] = { "Tiered", "Follow SoH Pricing" };
+    int marketPricing = std::clamp(CVarGetInteger("gCombo.Rando.BlackMarketPricing", 0), 0, 1);
+    ComboRando::ComboMenu_PushCombobox(goalTheme);
+    if (ImGui::Combo("Pricing##BlackMarket", &marketPricing, marketPrices, 2))
+        CVarSetInteger("gCombo.Rando.BlackMarketPricing", marketPricing);
+    ComboRando::ComboMenu_PopCombobox();
+    ImGui::SetItemTooltip("Tiered prices stay within 30-200 rupees. Follow SoH Pricing uses the shop-price options, "
+                          "including Set By Wallet. Stock and prices are fixed when the seed is generated.");
+    bool marketUnlocks = CVarGetInteger("gCombo.Rando.BlackMarketDungeonUnlocks", 1) != 0;
+    ComboRando::ComboMenu_PushCheckbox(goalTheme);
+    if (ImGui::Checkbox("Dungeon Purchase Unlocks", &marketUnlocks))
+        CVarSetInteger("gCombo.Rando.BlackMarketDungeonUnlocks", marketUnlocks);
+    ComboRando::ComboMenu_PopCheckbox();
+    ImGui::SetItemTooltip("Tier 1 is available immediately. Tiers 2 and 3 require one and two unique dungeon clears "
+                          "across both games. Disable to make all eight offers available immediately.");
+    ImGui::TextDisabled("Eight bonus offers in MM Lost Woods. Never required by progression logic.");
+    BlackMarketUI::DrawAppearance();
     ImGui::Separator();
 
     // Shared Items (OoTMM-style): one item counts for both games, applied at generation. Deferred

@@ -49,6 +49,14 @@ jobs:
       - name: Fast game-picker Windows header regression
         run: python3 -B tests/solo_games/selection_test.py --windows
 
+      - name: Fast pickup text and receipt regressions
+        run: |
+          python3 -B tests/item_receipts/run_message_replace_tests.py
+          python3 -B tests/item_receipts/run_message_replace_tests.py --sanitize
+          python3 -B tests/item_receipts/run_chateau_receipt_tests.py
+          python3 -B tests/item_receipts/run_chateau_receipt_tests.py --sanitize
+          python3 -B scripts/diagnostics/run_mm_item_receipt_tests.py --layout-only --sanitizers
+
       - name: Fast audio-worker compile and mixer regressions
         run: |
           python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py
@@ -66,6 +74,7 @@ jobs:
       - name: Fast Goron lifetime and Somaria GI regressions
         run: |
           python3 -B tests/goron_audio/run_tests.py
+          python3 -B scripts/diagnostics/run_oot_native_transformation_tests.py
           python3 -B tests/goron_field_collision/run_tests.py --sanitize
           python3 -B tests/nei_quest_held/mm_cane_gi_test.py
 

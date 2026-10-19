@@ -3,6 +3,14 @@
 #ifndef COMBO_SPIN_ATTACK_GI_H
 #define COMBO_SPIN_ATTACK_GI_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+void NeiGi_ReportBlackMarketModel(const char* owner, const char* opaque, const char* translucent);
+#ifdef __cplusplus
+}
+#endif
+
 #ifdef COMBO_SPIN_GI_HOST_MM
 #define CSG_SETUP_XLU(ctx) Gfx_SetupDL25_Xlu(ctx)
 #define CSG_LOAD_MTX(pkt, ctx) MATRIX_FINALIZE_AND_LOAD(pkt, ctx)
@@ -17,6 +25,11 @@ static inline void ComboDrawSpinAttackGi(PlayState* play, const char* disk, cons
     Matrix_Push();
     Matrix_RotateZYX(0x1800, (s16)(play->gameplayFrames * 0x180), 0, MTXMODE_APPLY);
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
+#ifdef COMBO_SPIN_GI_HOST_MM
+    NeiGi_ReportBlackMarketModel(owner ? owner : "mm", disk, cylinder);
+#else
+    NeiGi_ReportBlackMarketModel(owner ? owner : "oot", disk, cylinder);
+#endif
     OPEN_DISPS(play->state.gfxCtx);
     CSG_SETUP_XLU(play->state.gfxCtx);
     gSPGrayscale(POLY_XLU_DISP++, false);

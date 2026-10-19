@@ -1182,6 +1182,9 @@ static int32_t MM_FillItemDrawInfo(RandoItemId id, CwItemDrawInfo* out) {
     out->setupDlOpa = setupOpa;
     out->setupDlXlu = setupXlu;
     out->itemShimmer = GetItem_GetShimmerColor((s16)it->second.drawId, out->itemShimmerColor) || out->itemShimmer;
+    if (it->second.drawId == GID_CHATEAU) {
+        out->neiShimmer = static_cast<int32_t>(NeiGi::Kind::ChateauRomani) + 1;
+    }
     if (MM_OotBottleShimmerColor(id, out->itemShimmerColor)) {
         out->itemShimmer = 1;
     }

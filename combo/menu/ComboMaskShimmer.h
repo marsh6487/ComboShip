@@ -65,6 +65,7 @@ static inline int ComboMmRemainsShimmerColor(int index, uint8_t color[4]) {
 extern "C" {
 #endif
 void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner);
+void NeiGi_DrawChateauShimmer(PlayState* play);
 void NeiGi_DrawSongOverlay(PlayState* play, int song, const char* owner);
 #ifdef __cplusplus
 }

@@ -46,6 +46,7 @@ const CosmeticPair kPairs[] = {
     { "Consumable.Hearts", false, { "HUD.Hearts" } },
     { "Consumable.Magic", false, { "HUD.Magic" } },
     { "HUD.Minimap", false, { "HUD.Minimap" } },
+    { "World.BlackMarketShelves", false, { "World.BlackMarketShelves" } },
     // Deliberate: OOT's Kokiri tunic drives all four MM forms. OOT's Goron/Zora tunic rolls are
     // equipment colors with no MM equivalent, so they are intentionally not mirrored.
     { "Link.KokiriTunic", false, { "Player.HumanTunic", "Player.DekuTunic", "Player.GoronTunic", "Player.ZoraTunic" } },

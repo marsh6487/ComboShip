@@ -28,6 +28,7 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
     }
 
     bool Read(const char* path, FrameBounds& out, bool allowEmpty = false) {
+        mComplete = false;
         const auto root = std::dynamic_pointer_cast<Fast::DisplayList>(mLoad(path));
         if (!Walk(root, 0) || !mStack.empty())
             return false;
@@ -36,7 +37,17 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
             return allowEmpty; // Native sword detail/color passes can be geometry-free.
         }
         out = { "selected_sword", { 0, mLow, 0 }, { 0, mHigh, 0 }, 2.f * mRadius, Kind::Neutral, {} };
-        return (mHigh > mLow || (TrackDepth && mDepthHigh > mDepthLow)) && mRadius > 0.f;
+        return mComplete = (mHigh > mLow || (TrackDepth && mDepthHigh > mDepthLow)) && mRadius > 0.f;
+    }
+
+    // Observational XYZ accessor: retain Read's established radial/Y fit output.
+    bool ExactBounds(Point& minimum, Point& maximum) const {
+        static_assert(TrackDepth, "Exact frame queries track all three axes");
+        if (!mComplete || !mVertices)
+            return false;
+        minimum = { mWidthLow, mLow, mDepthLow };
+        maximum = { mWidthHigh, mHigh, mDepthHigh };
+        return true;
     }
 
     float ShieldTiltX() const {
@@ -306,7 +317,7 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
     float mDepthLow = std::numeric_limits<float>::max(), mDepthHigh = -std::numeric_limits<float>::max();
     size_t mVertices = 0, mCommands = 0;
     uint64_t mShieldVertexHash = 0xcbf29ce484222325ull;
-    bool mShieldVertexHashValid = true, mHasModelMatrix = false;
+    bool mShieldVertexHashValid = true, mHasModelMatrix = false, mComplete = false;
     Matrix mMatrix{ { { { 1, 0, 0, 0 } }, { { 0, 1, 0, 0 } }, { { 0, 0, 1, 0 } }, { { 0, 0, 0, 1 } } } };
     std::vector<Matrix> mStack;
 };
