@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_set>
 extern "C" {
+void NeiGi_ReportBlackMarketModel(const char*,const char*,const char*) {}
 #ifdef HOST_MM
 #include "global.h"
 #else

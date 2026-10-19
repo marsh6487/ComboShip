@@ -17,8 +17,55 @@ extern "C" void Audio_SetVolScale(u8, u8, u8, u8);
 #define Audio_SeqCmd1(player, fade) Audio_QueueSeqCmd(0x100000FF | ((player) << 24) | ((fade) << 16))
 #define Audio_SeqCmd7(player, port, value) Audio_QueueSeqCmd(0x70000000 | ((player) << 24) | ((port) << 16) | (value))
 #include "night_sequence_mode.inc"
+#ifdef NIGHT_EDITOR_REFRESH_TEST
+static u16 sPreviewNightBgmSeqId = NA_BGM_DISABLED;
+extern "C" void Audio_QueuePreviewSeqCmd(u16 sequence);
+extern "C" void Audio_CancelPreviewRestore(void);
+#define osSyncPrintf(...) ((void)0)
+#include "night_preview.inc"
+#undef osSyncPrintf
+
+static void TestNightPreviewRestore(PlayState& play) {
+    StartNight(play);
+    // The physical resource is 0x15D; MAIN exposes only the bookkeeping 0x5D.
+    PreviewSequence(0x35);
+    Audio_ProcessSeqCmds();
+    SetPlayer(0, 0x35);
+    commands.clear();
+    func_800F5C2C();
+    Audio_ProcessSeqCmds();
+    REQUIRE((commands == std::vector<u32>{ 0x8200015D }));
+    REQUIRE(Audio_IsNightBgmActive());
+    // A scene boundary cancels both native and exact restore state.
+    StartNight(play);
+    Audio_PreviewSceneSequence(0x35);
+    Audio_ProcessSeqCmds();
+    Audio_CancelPreviewRestore();
+    commands.clear();
+    func_800F5C2C();
+    Audio_ProcessSeqCmds();
+    REQUIRE(commands.empty());
+    // An explicit override with the same low ID does not acquire night's
+    // full bank identity merely because night retains lifecycle ownership.
+    StartNight(play);
+    Audio_QueueResolvedSeqCmd(0, 0x25D, 0);
+    Audio_ProcessSeqCmds();
+    SetPlayer(0, 0x5D);
+    PreviewSequence(0x35);
+    Audio_ProcessSeqCmds();
+    SetPlayer(0, 0x35);
+    commands.clear();
+    func_800F5C2C();
+    Audio_ProcessSeqCmds();
+    REQUIRE((commands == std::vector<u32>{ 0x8200005D }));
+    REQUIRE(!Audio_IsNightBgmActive());
+}
+#endif
 
 static void TestCombat(PlayState& play) {
+#ifdef NIGHT_EDITOR_REFRESH_TEST
+    TestNightPreviewRestore(play);
+#endif
     // Dusk can replace FIELD_LOGIC while its internal enemy mode is already
     // set. That untagged mode is not an active SUB battle overlay.
     StartNight(play);

@@ -303,6 +303,10 @@ int main(void) {
     REQUIRE(StaticStoryActor_GetGreatFairyHoverAmplitude(2) == 5.0f);
     REQUIRE(StaticStoryActor_GetFixedEyeIndex(STATIC_STORY_ACTOR_SHEIK, 2) == 2);
     REQUIRE(StaticStoryActor_GetFixedEyeIndex(STATIC_STORY_ACTOR_SHEIK, 0) == -1);
+    REQUIRE(StaticStoryActor_GetInteractionEyeIndex(STATIC_STORY_ACTOR_SARIA, 2, 1, false) == 2);
+    REQUIRE(StaticStoryActor_GetInteractionEyeIndex(STATIC_STORY_ACTOR_SARIA, 2, 2, true) == 0);
+    REQUIRE(StaticStoryActor_GetInteractionEyeIndex(STATIC_STORY_ACTOR_SARIA, 0, 1, true) == 1);
+    REQUIRE(StaticStoryActor_GetInteractionEyeIndex(STATIC_STORY_ACTOR_SHEIK, 2, 2, true) == 2);
     REQUIRE(StaticStoryActor_GetFaceProfile(STATIC_STORY_ACTOR_IMPA) == STATIC_FACE_PROFILE_IMPA);
     REQUIRE(StaticStoryActor_GetFaceProfile(STATIC_STORY_ACTOR_ADULT_RUTO) == STATIC_FACE_PROFILE_ADULT_RUTO);
     REQUIRE(StaticStoryActor_GetFaceProfile(STATIC_STORY_ACTOR_ADULT_RUTO_WATER) == STATIC_FACE_PROFILE_ADULT_RUTO);

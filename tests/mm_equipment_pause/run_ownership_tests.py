@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Run MM's equipment draw, cursor, actions and sync against saved ownership.
 
-Only the GPU/resource, controller, audio and player-refresh boundaries are fixtures.
+GPU/resource, controller, audio and player-refresh boundaries are fixtures. The
+optional sword-element chooser is explicitly disabled through a typed boundary;
+its production state, native actions and renderer have their own real-header tests.
 The native equipment IDs and NeiSaveData layout, ownership accessors, equipment
 cell selectors, draw loop, cursor update, action guards and sync publishers come
 from production.
@@ -15,6 +17,7 @@ import sys
 import tempfile
 
 import run_tests as selectors
+from sword_element_fixture import enhancement_off_boundary
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -247,6 +250,7 @@ void RecordPrimColor(u8, u8, u8, u8 alpha) { primAlpha = alpha; }
     code += selectors.defines((ROOT / "mm/mods/extended_equipment.h").read_text(), "ITEM_EXT_")
     for prefix in ("EQUIP_SUBPAGE_", "EQUIP_UPGRADE_ROW_", "EQUIP_EXT_ROW_", "CELL_", "OOT_ICON_"):
         code += selectors.defines(pause, prefix)
+    code += enhancement_off_boundary(pause)
     functions = ["ExtEquip_GetBit", "ExtEquip_HasItem", "ExtEquip_GiveItem", "ExtEquip_GetItemId",
                  "ExtEquip_TridentAllowsShield", "ExtEquip_SetCurrentByType", "ExtEquip_ApplyVanillaBase",
                  "ExtEquip_ApplyTridentShieldPolicy", "ExtEquip_SetSlot", "ExtEquip_Equip", "ExtEquip_ToggleFromCButton"]

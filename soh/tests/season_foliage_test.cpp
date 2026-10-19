@@ -36,7 +36,12 @@ int main() {
     REQUIRE(winter && winter->ImageData[2] > winter->ImageData[0]);
     REQUIRE(unsigned(winter->ImageData[0]) + winter->ImageData[1] + winter->ImageData[2] > 40 + 110 + 25);
     REQUIRE(winter->ImageData[3] == hd->ImageData[3]);
-    REQUIRE(!BuildTexture(hd, Palette(0, Surface::Ground)) && "spring ground must stay green");
+    const auto springGround = BuildTexture(hd, Palette(0, Surface::Ground));
+    REQUIRE(springGround && "spring ground grass must receive blush instead of matching summer");
+    REQUIRE(springGround->ImageData[0] > springGround->ImageData[2] &&
+            springGround->ImageData[2] > springGround->ImageData[1]);
+    REQUIRE(springGround->ImageData[3] == 83);
+    REQUIRE(std::equal(springGround->ImageData + 4, springGround->ImageData + 8, hd->ImageData + 4));
     REQUIRE(!BuildTexture(hd, Palette(1, Surface::Canopy)) && "summer must restore source");
     const auto canopy = Make(Fast::TextureType::RGBA16bpp, TEX_FLAG_LOAD_AS_RAW, { 60, 110, 70, 83, 95, 85, 70, 255 });
     const auto spring = BuildTexture(canopy, Palette(0, Surface::Canopy));

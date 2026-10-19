@@ -11,6 +11,7 @@ SaveContext gSaveContext;
 int gComboStartFileNum = 0;
 int gComboEntryIsResume = 0;
 int gComboOwlBlobSlot = -1;
+extern "C" void ComboBlackMarket_ApplyResume(int) {} // separately tested market resume boundary
 static int sComboPortalRoute = COMBO_PORTAL_MARKET;
 static bool sComboPortalArrivalPending = false;
 static bool sComboReturnPending, sComboFwReturnPending, sComboResetReturnPending, sComboOwlSaveQuitPending;

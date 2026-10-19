@@ -13,6 +13,7 @@
 #include <cstring>
 
 #include "ComboGameMode.h"
+#include "entrances/SoloForest.h"
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 
 void MMAutumnSceneFoliage_Update(const PlayState *) {}
@@ -988,13 +989,15 @@ static void OpeningForestSeasonRegression() {
   static PlayState play;
   Camera camera{};
   GraphicsContext gfx{};
+  for (bool solo : {false, true}) {
+  gComboGameMode = solo ? COMBO_GAME_MM : COMBO_GAME_BOTH;
   for (int room : {0, 1}) {
     Reset(&play, &camera, &gfx);
-    play.sceneId = SCENE_LOST_WOODS;
+    play.sceneId = solo ? COMBO_SOLO_FOREST_MM_SCENE : SCENE_LOST_WOODS;
     play.skyboxId = SKYBOX_2;
     play.roomCtx.curRoom.num = room;
     gSaveContext.fileNum = 0;
-    gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
+    gSaveContext.save.entrance = solo ? COMBO_SOLO_FOREST_MM_ENTRANCE : ENTRANCE(LOST_WOODS, 0);
     gSaveContext.save.day = 3;
     gSaveContext.save.time = CLOCK_TIME(21, 0);
     // The playable forest keeps its native room lighting and covered sky.
@@ -1051,9 +1054,56 @@ static void OpeningForestSeasonRegression() {
     assert(MMWeather_Season() == -1 && MMWeather_RainDensity() == 0 && rainGain == 0 && DrawSnow(&play) == 0);
     independentRain = 0;
   }
-  std::puts("PASS opening Lost Woods SKYBOX_2: real Rod confirmation, rain draw/audio, "
+  }
+  gComboGameMode = COMBO_GAME_BOTH;
+  std::puts("PASS combined and solo Lost Woods SKYBOX_2: real Rod confirmation, rain draw/audio, "
             "96 petals/leaves, 64 snow, independent weather without a Rod, "
             "Off/re-entry and unchanged native save/sky/precipitation");
+}
+
+static void SoloForestWeatherGuards() {
+  static PlayState play;
+  Camera camera{};
+  GraphicsContext gfx{};
+  Reset(&play, &camera, &gfx);
+  gComboGameMode = COMBO_GAME_MM;
+  play.sceneId = COMBO_SOLO_FOREST_MM_SCENE;
+  play.skyboxId = SKYBOX_2;
+  play.roomCtx.curRoom.num = 0;
+  gSaveContext.fileNum = 0;
+  gSaveContext.sceneLayer = 0;
+  gSaveContext.save.cutsceneIndex = 0;
+  Confirm(&play, SEASON_WINTER);
+  const auto eligible = [&] {
+    return MMWeather_SeasonForPlay(&play) == SEASON_WINTER &&
+           MMWeather_FoliageSeasonForPlay(&play) == SEASON_WINTER;
+  };
+  assert(eligible());
+  for (int mode : {COMBO_GAME_BOTH, COMBO_GAME_OOT}) {
+    gComboGameMode = mode;
+    assert(!eligible());
+  }
+  gComboGameMode = COMBO_GAME_MM;
+  play.roomCtx.curRoom.num = 2;
+  assert(!eligible());
+  play.roomCtx.curRoom.num = 1;
+  assert(eligible());
+  gSaveContext.sceneLayer = 1;
+  assert(!eligible());
+  gSaveContext.sceneLayer = 0;
+  gSaveContext.save.cutsceneIndex = 0xFFF0;
+  assert(!eligible());
+  gSaveContext.save.cutsceneIndex = 0;
+  gSaveContext.fileNum = 0xFF;
+  assert(!eligible());
+  gSaveContext.fileNum = 2;
+  play.csCtx.state = 1;
+  assert(!eligible());
+  play.csCtx.state = CS_STATE_IDLE;
+  assert(eligible());
+  gComboGameMode = COMBO_GAME_BOTH;
+  MMWeather_Reset();
+  std::puts("PASS private solo forest weather guards: mode, room, layer, file, cutscene and native eligibility");
 }
 
 int main(int argc, char **argv) {
@@ -1062,6 +1112,7 @@ int main(int argc, char **argv) {
     return 0;
   }
   OpeningForestSeasonRegression();
+  SoloForestWeatherGuards();
   SpringXluMaterialRegression();
   SpringVisibleParticleRegression();
   SeasonalParticleToggleRegression();

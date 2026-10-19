@@ -5,6 +5,8 @@ The equipment page's two draw dispatch blocks, input handler, transition update,
 equipment draw/cursor and framebuffer composite are taken from production. GPU
 commands are recorded at their boundary; a small perspective projection observes
 the vertices under the production page matrix and transition eye positions.
+The inherited ownership fixture keeps optional sword enhancements disabled;
+scripts/diagnostics/sword_element_kaleido_tests.py covers the live chooser.
 """
 import argparse
 import os

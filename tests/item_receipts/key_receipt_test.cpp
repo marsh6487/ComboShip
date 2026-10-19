@@ -3,6 +3,7 @@
 #include "2s2h/FleetShipCombo/FleetComboItems.h"
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h"
 #include "2s2h/Rando/ItemReceiptText.h"
+#include "sword_element_message.h"
 #include <nlohmann/json.hpp>
 #include "2s2h/Rando/Rando.h"
 #include "2s2h/Rando/StaticData/StaticData.h"

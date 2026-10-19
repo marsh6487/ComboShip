@@ -22,6 +22,7 @@ void* MmAssets_LoadResource(const char*) { ++loads; return native; }
 void DrawCustomItemDiamond(PlayState*, Gfx* dl, f32) { ++draws; drawn = dl; }
 uint32_t Pegasus_CrimsonRamp(uint32_t color) { return color ^ 0xFF000000u; }
 #define SPDLOG_ERROR(...) ((void)0)
+void NeiGi_ReportBlackMarketModel(const char*,const char*,const char* = nullptr) {}
 #include "oot_gi_fallback.inc"
 std::string pathOf(Gfx* dl) {
     assert(dl && (dl[0].words.w0 >> 24) == G_DL_OTR_FILEPATH);

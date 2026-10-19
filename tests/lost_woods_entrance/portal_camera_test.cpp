@@ -176,10 +176,13 @@ static Player player;
 static ActorEntry spawn;
 static RoomShape shape;
 static RoomShapeDListsEntry entry;
-static const char *mesh[3] = {
+static const char *mesh[] = {
     "__OTR__scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_005788",
-    COMBO_OPENING_FOREST_PACK_ROOT, COMBO_OPENING_FOREST_STUMP_PACK_ROOT};
-static void Reset(int route, int form = PLAYER_FORM_HUMAN, int version = 2) {
+    COMBO_OPENING_FOREST_PACK_ROOT, COMBO_OPENING_FOREST_STUMP_PACK_ROOT,
+    COMBO_OPENING_FOREST_CORNER_PACK_ROOT, COMBO_OPENING_FOREST_EDGE_PACK_ROOT,
+    COMBO_OPENING_FOREST_ALIGNED_PACK_ROOT, COMBO_OPENING_FOREST_CENTERED_PACK_ROOT,
+    COMBO_OPENING_FOREST_RECENTERED_PACK_ROOT, COMBO_OPENING_FOREST_NUDGED_PACK_ROOT};
+static void Reset(int route, int form = PLAYER_FORM_HUMAN, int version = 8) {
   Destroy();
   play = {};
   player = {};
@@ -267,6 +270,12 @@ static void CheckFraming(int route, int version) {
   const float height = Player_GetHeight(&player);
   Vec3f anchor = route == COMBO_PORTAL_LOST_WOODS ? Vec3f{160, 0, -160}
                  : version == 1                   ? Vec3f{-417, 0, -122}
+                 : version == 2                   ? Vec3f{120, 0, 240}
+                 : version == 3                   ? Vec3f{-390, 0, 120}
+                 : version == 4                   ? Vec3f{-660, 0, -350}
+                 : version == 5                   ? Vec3f{-677, 0, -357}
+                 : version == 6                   ? Vec3f{-684, 0, -340}
+                 : version == 7                   ? Vec3f{-698, 0, -306}
                                 : Vec3f{COMBO_OPENING_FOREST_STUMP_X, 0,
                                         COMBO_OPENING_FOREST_STUMP_Z};
   Vec3f feet = Project(player.actor.world.pos, camera),
@@ -310,7 +319,7 @@ int main() {
         va_end(copy);
       });
   for (int route : {COMBO_PORTAL_LOST_WOODS, COMBO_PORTAL_OPENING_FOREST})
-    for (int version = 0; version < 3; ++version)
+    for (int version = 0; version < 9; ++version)
       for (int day = 1; day <= 3; ++day)
         for (int form = 0; form < PLAYER_FORM_MAX; ++form) {
           Reset(route, form, version);
@@ -487,7 +496,7 @@ int main() {
           "safe camera collision shortening must remain available");
   Require(play.mainCamera.dist < 190 * .81f,
           "native solid geometry must shorten the presentation eye");
-  for (int version = 0; version < 3; ++version) {
+  for (int version = 0; version < 9; ++version) {
     Reset(COMBO_PORTAL_OPENING_FOREST, PLAYER_FORM_HUMAN, version);
     Player_StartMode_E(&play, &player);
     const auto saved = gSaveContext;
@@ -542,6 +551,6 @@ int main() {
           "a later custom-camera takeover must end arrival ownership without "
           "reacquiring its old pose");
   std::puts(
-      "PASS portal camera: both routes, native/v1/v2, every day/form, centered "
+      "PASS portal camera: both routes, native/v1-v8, every day/form, centered "
       "projection, collision, bounded release, rollback and lifetime");
 }

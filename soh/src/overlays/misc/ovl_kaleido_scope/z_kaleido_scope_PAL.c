@@ -1,5 +1,6 @@
 #include "rando/CrossEntranceBoss.h"
 #include "z_kaleido_scope.h"
+#include "sword_element_kaleido.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -3661,6 +3662,8 @@ void KaleidoScope_Update(PlayState* play) {
     s16 stepB;
     s16 stepA;
     s32 pad;
+
+    KaleidoEquip_UpdateSwordElement(play);
 
     if ((R_PAUSE_MENU_MODE >= 3) && (((pauseCtx->state >= 4) && (pauseCtx->state <= 7)) ||
                                      ((pauseCtx->state >= 0xA) && (pauseCtx->state <= 0x12)))) {

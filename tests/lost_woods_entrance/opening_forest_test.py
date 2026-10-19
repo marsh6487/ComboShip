@@ -134,6 +134,7 @@ base = r'''
 #include "regs.h"
 #if __has_include("2s2h/Enhancements/Gameplay/ComboOpeningForest.h")
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "entrances/SoloForest.h"
 #endif
 SaveContext gSaveContext{};
 PlayState* gPlayState;
@@ -154,6 +155,7 @@ if args.case in (None, 'scene'):
     source = base + r'''
 RegEditor editor{};
 RegEditor* gRegEditor = &editor;
+extern "C" void ComboBlackMarket_NormalizeEntry() {} // independently covered by black_market/native_test.cpp
 extern "C" f32 Math_SinS(s16) { return 0; }
 extern "C" f32 Math_CosS(s16) { return 1; }
 namespace SOH {
@@ -165,6 +167,11 @@ struct SetStartPositionList : ISceneCommand {
 struct SetTimeSettings : ISceneCommand {
     struct { u8 hour, minute, timeIncrement; } settings;
 };
+}
+// The separately tested native-solo lifecycle controller is a boundary here.
+// This fixture exercises the unchanged combined opening/prologue entry path.
+extern "C" void ComboSoloForestMm_NormalizeEntry() {
+    require(Combo_IsCombinedGame(), "combined scene fixture must keep the solo controller inactive");
 }
 ''' + spawn + time + '\nvoid NativePlayEntry() {\n' + entry + '\n}\n' + r'''
 int main() {

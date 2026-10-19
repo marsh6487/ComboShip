@@ -95,6 +95,7 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-arrival-") as directory:
         sys.exit(result.stderr[:6000])
     subprocess.run([str(binary)], check=True)
 
+subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_arrival_fade_tests.py")], check=True)
 subprocess.run([sys.executable, str(ROOT / "tests/lost_woods_entrance/renderer_linkage_test.py")], check=True)
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_mm_camera_arrival_test.py")], check=True)
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/opening_forest_test.py")], check=True)
@@ -104,3 +105,5 @@ subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/stump_return_test.py"), "--sanitize"], check=True)
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/stump_tool_safety_test.py")], check=True)
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_portal_camera_tests.py")], check=True)
+subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_portal_finish_test.py")], check=True)
+subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/visual_tool_safety_test.py")], check=True)

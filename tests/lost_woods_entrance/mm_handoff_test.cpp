@@ -144,7 +144,7 @@ int main() {
     Frames();
     require(saves == 3 && switches == 4,
             "opening arrival must not immediately return through its arch");
-    player.actor.world.pos = {120, 0, 240};
+    player.actor.world.pos = ComboOpeningForest_ReturnAnchor(&play);
     GameInteractor::Fire<GameInteractor::OnActorUpdate>(&player.actor);
     Frames();
     require(saves == 4 && switches == 5 &&

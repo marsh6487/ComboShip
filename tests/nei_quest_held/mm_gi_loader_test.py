@@ -14,6 +14,7 @@ prefix=r'''
 #include <map>
 #include <string>
 #include <iostream>
+void NeiGi_ReportBlackMarketModel(const char*,const char*,const char* = nullptr) {}
 #include <vector>
 using u8=uint8_t;using f32=float;
 constexpr int MTXMODE_APPLY=1;

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Execute MM's actual equipment cursor; observe only the textbox boundary."""
+"""Execute MM's actual equipment cursor and observe its textbox boundary.
+
+The inherited ownership fixture disables optional sword enhancements through a
+typed boundary; the live chooser has separate real-header production tests.
+"""
 from pathlib import Path
 import argparse
 import os

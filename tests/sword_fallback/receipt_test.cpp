@@ -7,6 +7,8 @@ namespace NeiGi {struct TextureMaterial;}
 using f32=float;using s16=int16_t;
 constexpr int MTXMODE_APPLY=1;
 using Kind=NeiGi::Kind;
+void NeiGi_ReportBlackMarketBounds(const NeiGi::Point&,const NeiGi::Point&) {}
+void NeiGi_ReportBlackMarketModel(const char*,const char*,const char* = nullptr) {}
 struct PlayState {struct {void* gfxCtx;}state;uint32_t gameplayFrames=42;} play;
 PlayState* gPlayState=&play;
 struct Pose {float scale=1,lift=0,ry=0,rz=0;bool operator==(const Pose&)const=default;} pose;
@@ -191,6 +193,22 @@ int main(){
     LegacyVertex("test/bodyVertices",1,{{-200,-600,0},{200,4200,0}});
     LegacyVertex("test/detailVertices",2,{{-300,-900,0},{300,8000,0}});
     List("objects/object_gi_sword_2/gGiRazorSwordDL",3,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/bodyVertices")},{2,0},{uintptr_t(G_ENDDL)<<24,0}});
+    const char* tridentRoot="__OTR__objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298";
+    List(tridentRoot+7,40,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/bodyVertices")},{2,0},
+                         {uintptr_t(G_DL)<<24,0x08000001},{uintptr_t(G_ENDDL)<<24,0}});
+    float frameLow[3]{},frameHigh[3]{};
+    assert(ResourceMgr_GetGiModelBoundsForGame("oot",&tridentRoot,1,frameLow,frameHigh)&&
+           frameLow[1]==-600&&frameHigh[1]==4200);
+    List("test/unknownSegment",41,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/bodyVertices")},{2,0},
+                                  {uintptr_t(G_DL)<<24,0x08000001},{uintptr_t(G_ENDDL)<<24,0}});
+    const char* unknownSegment="__OTR__test/unknownSegment";
+    assert(!ResourceMgr_GetGiModelBoundsForGame("oot",&unknownSegment,1,frameLow,frameHigh));
+    const char* spellOrb="__OTR__objects/object_gi_goddess/gGiMagicSpellOrbDL";
+    List(spellOrb+7,42,{{uintptr_t(G_DL)<<24,0x08000001},
+                       {uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/bodyVertices")},{2,0},
+                       {uintptr_t(G_ENDDL)<<24,0}});
+    assert(ResourceMgr_GetGiModelBoundsForGame("mm",&spellOrb,1,frameLow,frameHigh)&&frameHigh[1]==4200);
+    /* REAL_SPELL_BOUNDS */
     List("objects/object_gi_sword_2/gGiRazorSwordEmptyDL",4,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/detailVertices")},{2,0},{uintptr_t(G_ENDDL)<<24,0}});
     Actor receipt{ACTOR_EN_ITEM00,{{CustomItem::CALLED_ACTION|CustomItem::GIVE_ITEM_CUTSCENE}}};
     for(int playerForm:{PLAYER_FORM_HUMAN,PLAYER_FORM_GORON}){
@@ -241,14 +259,20 @@ int main(){
     const char* roots[]={"__OTR__@mm:objects/object_gi_sword_4/gGiGreatFairysSwordBladeDL",
                          "__OTR__@mm:objects/object_gi_sword_2/gGiRazorSwordEmptyDL"};
     float correction[2]{};assert(ResourceMgr_GetGiModelsFitForGame("oot",roots,2,1,0,2,correction));
+    assert(ResourceMgr_GetGiModelBoundsForGame("oot",roots,2,frameLow,frameHigh)&&
+           frameLow[0]==-300&&frameLow[1]==-900&&frameHigh[0]==300&&frameHigh[1]==32000&&currentOwner==ootOwner);
     assert(correction[1]+32000*correction[0]<=16.001f&&correction[1]-900*correction[0]>=-44.001f);
     const float altFit=correction[0];
     mmOwner->alt=false;assert(ResourceMgr_GetGiModelsFitForGame("oot",roots,2,1,0,2,correction));
+    assert(ResourceMgr_GetGiModelBoundsForGame("oot",roots,2,frameLow,frameHigh)&&frameHigh[1]==8000);
     assert(correction[0]>altFit&&currentOwner==ootOwner&&"fit retained an Alt graph after selection changed");
     // Unsupported second geometry refuses the whole query. Keeping the
     // original draw cannot be described as a partial successful fit.
     List("test/unsupported",12,{{uintptr_t(G_MTX)<<24,0},{uintptr_t(G_ENDDL)<<24,0}});
     roots[1]="__OTR__@mm:test/unsupported";
+    frameLow[0]=-777;frameHigh[0]=888;
+    assert(!ResourceMgr_GetGiModelBoundsForGame("oot",roots,2,frameLow,frameHigh)&&
+           frameLow[0]==-777&&frameHigh[0]==888&&currentOwner==ootOwner);
     assert(!ResourceMgr_GetGiModelsFitForGame("oot",roots,2,1,0,2,correction)&&currentOwner==ootOwner);
     auto scaleMatrix=std::make_shared<Fast::Matrix>();
     const float matrixValues[16]={3,0,0,0, 0,3,0,0, 0,0,3,0, 0,0,0,1};
@@ -258,6 +282,7 @@ int main(){
     loader.files["test/carryMatrix"]=scaleMatrix;
     List("test/carryPass",13,{{uintptr_t(G_MTX_OTR_FILEPATH)<<24|G_MTX_PUSH,uintptr_t("test/carryMatrix")},{uintptr_t(G_ENDDL)<<24,0}});
     roots[0]="__OTR__@mm:test/carryPass";roots[1]="__OTR__@mm:objects/object_gi_sword_2/gGiRazorSwordEmptyDL";
+    assert(!ResourceMgr_GetGiModelBoundsForGame("oot",roots,2,frameLow,frameHigh));
     assert(!ResourceMgr_GetGiModelsFitForGame("oot",roots,2,1,0,2,correction)&&
            "stateful material pass underfits following geometry when independent root readers reset its MUL");
     // A companion root is independent of MM's same-name base remnant. Its
@@ -276,6 +301,8 @@ int main(){
     donor->files[biggoron]=loader("test/archiveRoot");
     mmOwner->overrides["test/donorChild"]=selectedChild;mmOwner->alt=true;
     const char* companionRoots[]={biggoron};
+    assert(ResourceMgr_GetGiModelBoundsForGame("oot-companion",companionRoots,1,frameLow,frameHigh)&&
+           frameLow[1]==-900&&frameHigh[1]==32000&&currentOwner==ootOwner);
     assert(ResourceMgr_GetGiModelsFitForGame("oot-companion",companionRoots,1,1,0,2,correction)&&
            correction[1]+32000*correction[0]<=16.001f&&correction[1]-900*correction[0]>=-44.001f&&
            "companion fit omitted the winning Alt child or read its descendants from donor instead of MM");
@@ -284,17 +311,21 @@ int main(){
     assert(nativePose.lift+32000*nativePose.scale<=55.606f&&
            "native legacy Biggoron callback queried the MM twin instead of its companion's selected Alt child");
     const float modChildFit=correction[0];mmOwner->alt=false;
+    assert(ResourceMgr_GetGiModelBoundsForGame("oot-companion",companionRoots,1,frameLow,frameHigh)&&frameHigh[1]==100);
     assert(ResourceMgr_GetGiModelsFitForGame("oot-companion",companionRoots,1,1,0,2,correction)&&
            correction[0]>modChildFit&&"companion fit used MM's same-name root or stale Alt descendant");
     assert(currentOwner==ootOwner);
     auto unsupportedDonor=std::make_shared<Ship::Archive>();
     unsupportedDonor->files[biggoron]=loader("test/unsupported");sOotArchives={unsupportedDonor};
+    assert(!ResourceMgr_GetGiModelBoundsForGame("oot-companion",companionRoots,1,frameLow,frameHigh)&&currentOwner==ootOwner);
     assert(!ResourceMgr_GetGiModelsFitForGame("oot-companion",companionRoots,1,1,0,2,correction)&&
            "unsupported donor graph incorrectly fitted the native MM fallback");
     sOotArchives={donor};failArchiveParse=true;
+    assert(!ResourceMgr_GetGiModelBoundsForGame("oot-companion",companionRoots,1,frameLow,frameHigh)&&currentOwner==ootOwner);
     assert(!ResourceMgr_GetGiModelsFitForGame("oot-companion",companionRoots,1,1,0,2,correction)&&currentOwner==ootOwner);
     failArchiveParse=false;
     sOotArchives.clear();
+    assert(ResourceMgr_GetGiModelBoundsForGame("oot-companion",companionRoots,1,frameLow,frameHigh)&&frameHigh[1]==8000);
     assert(ResourceMgr_GetGiModelsFitForGame("oot-companion",companionRoots,1,1,0,2,correction)&&
            correction[1]+8000*correction[0]<=16.001f&&currentOwner==ootOwner);
     mmOwner->alt=true;mmOwner->overrides.clear();

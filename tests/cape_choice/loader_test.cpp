@@ -4,6 +4,7 @@
 #include <iostream>
 #include <iterator>
 #include "2s2h/CustomMessage/CustomMessage.h"
+#include "sword_element_message.h"
 #if __has_include("ComboCapeReceiptChoice.h")
 #include "ComboCapeReceiptChoice.h"
 #endif
@@ -12,6 +13,10 @@ extern "C" {
 PlayState* gPlayState;
 SaveContext gSaveContext;
 float sNESFontWidths[160];
+// This fixture exercises cape receipts with optional sword enhancements off.
+int32_t CVarGetInteger(const char*, int32_t fallback) {
+    return fallback;
+}
 void Message_SetItemReceiptPresentation(const CwItemReceiptPresentation*) {
 }
 void Message_SetCapeVisibilityChoice(int) {

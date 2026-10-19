@@ -114,6 +114,7 @@ void ExpectBoleroShimmerOnly() {
 } // namespace Fixture
 
 extern "C" {
+int ResourceMgr_GetGiModelBoundsForGame(const char*,const char* const*,int,float[3],float[3]) { return 0; }
 #ifndef NEI_GI_REWARD_FIXTURE
 int ResourceMgr_GetRewardSurfaceForGame(const char*,const char*,NeiGi::Mesh*) { return 0; }
 #endif
@@ -388,6 +389,7 @@ static void DrawWeaponFlameOverlay(PlayState *, u8 r, u8 g, u8 b) {
 #ifndef NEI_GI_FIXTURE_BOUNDARY_ONLY
 int main() {
   using namespace Fixture;
+#include "tests/black_market/frame_renderer_checks.inc"
   #include "tests/nei_gi/sword_particle_readability_test.inc"
 #include "tests/nei_gi/giants_knife_presentation_test.inc"
 #ifdef COMBO_BUILD

@@ -26,7 +26,7 @@ int main() {
                 int(Kind::KokiriSword) == 25 && int(Kind::FourSword) == 32 &&
                 int(Kind::Gold) == 37 && int(Kind::GiantsKnife) == 38);
   static_assert(int(Kind::DivineShield)==39 && int(Kind::IronKnuckleAxe)==49);
-  for(int profile=int(Kind::DivineShield);profile<=int(Kind::Last);++profile) {
+  for(int profile=int(Kind::DivineShield);profile<=int(Kind::IronKnuckleAxe);++profile) {
     const auto kind=static_cast<Kind>(profile);
     assert(IsEquipment(kind)&&!IsSword(kind)&&!IsRod(kind)&&!IsSpell(kind)&&!IsSpecial(kind));
     for(uint32_t frame:{0u,42u,179u,360u,std::numeric_limits<uint32_t>::max()}) {

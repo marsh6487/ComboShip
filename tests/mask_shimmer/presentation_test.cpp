@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 extern "C" {
+int ResourceMgr_GetGiModelBoundsForGame(const char*,const char* const*,int,float[3],float[3]) { return 0; }
 #ifdef HOST_MM
 #include "global.h"
 #else
@@ -252,11 +253,11 @@ static std::vector<Vtx> ExpandedVertices(bool foreign, const char* owner = "mm")
     return result;
 }
 extern "C" void Fixture_DrawCShimmer(PlayState*, const uint8_t color[4]);
-static std::vector<Vtx> Check(const uint8_t color[4], bool foreign, const char* owner = "mm") {
+static std::vector<Vtx> Check(const uint8_t color[4], bool foreign, const char* owner = "mm", Kind palette = Kind::Neutral) {
     assert(depth == 0 && stack.empty() && transform.scale == 1 && transform.x == 0 && transform.y == 0 && transform.z == 0);
     assert(sparkleTransforms.empty());
     const auto actual = ExpandedVertices(foreign, owner);
-    const auto expected = NeiGi::SampleShimmer(play.gameplayFrames, true, NeiGi_CameraBasis(&play));
+    const auto expected = NeiGi::SampleShimmer(play.gameplayFrames, true, NeiGi_CameraBasis(&play), palette);
     assert(actual.size() == expected.count && actual.size() == 360);
     const bool ordinary = color[0] == 220 && color[1] == 225 && color[2] == 240;
     const bool dark = color[0] == 0 && color[1] == 0 && color[2] == 0;
@@ -267,7 +268,7 @@ static std::vector<Vtx> Check(const uint8_t color[4], bool foreign, const char* 
         assert(actual[i].v.ob[1] == std::lround(vertex.p.y * 16));
         assert(actual[i].v.ob[2] == std::lround(vertex.p.z * 16));
         uint32_t rgb = vertex.rgb;
-        if (!ordinary) rgb = vertex.rgb == 0xFFFFFF ? (dark ? 0x505060 : 0xFFFFFF) : tint;
+        if (palette == Kind::Neutral && !ordinary) rgb = vertex.rgb == 0xFFFFFF ? (dark ? 0x505060 : 0xFFFFFF) : tint;
         assert(actual[i].v.cn[0] == (rgb >> 16));
         assert(actual[i].v.cn[1] == ((rgb >> 8) & 255));
         assert(actual[i].v.cn[2] == (rgb & 255));
@@ -363,14 +364,19 @@ int main() {
     for (int id = 0; id < 256; ++id) {
         uint8_t color[4]{};
         if (!GetItem_GetShimmerColor(id, color)) continue;
+        const auto palette =
+#ifdef HOST_MM
+            id == GID_CHATEAU ? Kind::ChateauRomani :
+#endif
+            Kind::Neutral;
         ++eligible;
-        Reset(47); GetItem_Draw(&play, id); auto first = Check(color, false); assert(paths.size() == 1);
+        Reset(47); GetItem_Draw(&play, id); auto first = Check(color, false, "mm", palette); assert(paths.size() == 1);
         Reset(47); GetItem_Draw(&play, id);
-        auto second = Check(color, false);
+        auto second = Check(color, false, "mm", palette);
         assert(first.size() == second.size());
         for (size_t i = 0; i < first.size(); ++i) assert(!memcmp(&first[i], &second[i], sizeof(Vtx)));
         missingSparkle = true; Reset(47); GetItem_Draw(&play, id);
-        Check(color, false); assert(resourceLoads == 0);
+        Check(color, false, "mm", palette); assert(resourceLoads == 0);
         missingSparkle = false;
         allocationFailure = true; Reset(47); GetItem_Draw(&play, id);
         assert(paths.size() == 1 && vertexLoads.empty() && depth == 0 && stack.empty());
@@ -378,7 +384,7 @@ int main() {
         allocationFailure = false;
     }
 #ifdef HOST_MM
-    assert(eligible == 35); // Masks/remains, two fairies, three receipt contents and Seahorse.
+    assert(eligible == 36); // Masks/remains, fairies, receipt contents, Seahorse and Chateau.
     uint8_t sunMask[4];const uint8_t sunGold[4]={255,205,70,255};
     assert(GetItem_GetShimmerColor(GID_MASK_SUN,sunMask)&&!memcmp(sunMask,sunGold,4));
     for (int id : {GID_FAIRY,GID_FAIRY_2}) {

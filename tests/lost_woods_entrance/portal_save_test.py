@@ -51,6 +51,7 @@ static int writes, failures;
 namespace ItemGrantAudit { struct Scope { explicit Scope(const char*) {} }; }
 namespace ComboRando::CrossDungeon { int ReadCheckpoint(const nlohmann::json&) { return -1; } }
 void Combo_MM_LoadCrossDungeonCheckpoint(int) {}
+void ComboBlackMarket_LoadState(const nlohmann::json&, int) {} // market persistence has its own production fixture
 static std::string SaveManager_GetFileName(int slot) { return "file" + std::to_string(slot) + ".json"; }
 static int SaveManager_ReadSaveFile(const std::filesystem::path&,nlohmann::json& value) { value=disk; return 0; }
 static int SaveManager_MigrateSave(nlohmann::json&) { return 0; }

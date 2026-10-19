@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""Execute the actual two native keeper initializers against their real types."""
+from pathlib import Path
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
+from run_time_pedestal_tests import block_from
+with tempfile.TemporaryDirectory(prefix="market-keeper-native-") as temporary:
+    for host in ("mm", "soh"):
+        source = (ROOT / host / ("2s2h" if host == "mm" else "soh") / "Enhancements/Gameplay" /
+                  ("BlackMarket.cpp" if host == "mm" else "ComboBlackMarketNative.cpp")).read_text()
+        constants = "\n".join(re.findall(r'(?:alignas\(2\) )?constexpr char k(?:Keeper|Idle)\[\] = [^;]+;', source))
+        body = block_from(source, source.index("void InitKeeper(" if host == "mm" else "void KeeperInit("))
+        fixture = (ROOT / "tests/black_market/keeper_native_test.cpp").read_text().replace("/* PRODUCTION */", constants + "\n" + body)
+        cpp = Path(temporary) / (host + ".cpp"); cpp.write_text(fixture)
+        binary = Path(temporary) / host
+        paths = [host, host + "/include", host + "/include/PR", host + "/src", host + "/assets",
+                 host + ("/2s2h" if host == "mm" else "/soh"), "libultraship/include", "combo"]
+        subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-w", "-DCOMBO_BUILD", "-DF3DEX_GBI_2",
+                        *(["-DOOT_KEEPER_TEST"] if host == "soh" else []), "-g", "-fsanitize=address,undefined",
+                        "-fno-sanitize-recover=all", "-no-pie", "-I" + str(ROOT),
+                        *["-I" + str(ROOT / path) for path in paths], str(cpp), "-o", str(binary)], check=True)
+        subprocess.run([str(binary)], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})

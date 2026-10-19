@@ -172,6 +172,16 @@ int main() {
     Tick();
     Require(CardActive(), "a later arrival must get a fresh single title presentation");
 
+    // Combo loads Save directly, bypassing MM file select's transient flag.
+    // The forest prologue bypass also skips the native reset of this flag.
+    Reset();
+    gSaveContext.showTitleCard = false;
+    const SaveContext directLoad = gSaveContext;
+    Arrive(); Tick();
+    Require(CardActive(), "a direct Combo load with a stale native title flag must still show the forest card");
+    Require(!std::memcmp(&directLoad, &gSaveContext, sizeof(directLoad)),
+            "a direct-load title must not rewrite native cutscene/title state");
+
     // The OoT owner retains its own Alt choice. Both modes submit the logical
     // card path, allowing the real ResourceManager's native Alt fallback.
     for (bool alt : {false, true}) {
@@ -226,7 +236,7 @@ int main() {
             case 4: gSaveContext.save.cutsceneIndex = 0xFFF0; break;
             case 5: play.sceneId = SCENE_26SARUNOMORI; break;
             case 6: hideTitleCards = true; break;
-            case 7: gSaveContext.showTitleCard = false; break;
+            case 7: gComboGameMode = COMBO_GAME_MM; break;
             case 8: gSaveContext.cutsceneTrigger = 1; break;
             case 9: play.soaringCsOrSoTCsPlaying = true; break;
         }
@@ -236,6 +246,7 @@ int main() {
         Require(!CardActive(), "flashbacks, title demos, suppressed cards and native story control must stay protected");
         Require(!std::memcmp(&protectedSave, &gSaveContext, sizeof(protectedSave)),
                 "excluded visits must preserve every save and story byte");
+        gComboGameMode = COMBO_GAME_BOTH;
     }
     Reset();
     Arrive();

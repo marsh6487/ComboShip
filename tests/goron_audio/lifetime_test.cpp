@@ -10,6 +10,7 @@
 #include <cstring>
 #include <functional>
 #include <map>
+#include <sanitizer/asan_interface.h>
 
 // Only sound synthesis/output and the hook registry are service boundaries.
 // The bank, dispatcher, stop bodies and lifetime entrypoints are real.
@@ -52,6 +53,10 @@ static u16 dispatchedSfx;
 static bool synthReady;
 static signed char channelIO[16][8];
 static u16 channelSfx[16];
+// Native mask pose/render ownership is exercised by native_transformations;
+// this fixture keeps the real bank/dispatcher and Goron lifetime entrypoints.
+static void MmForm_InterruptNativeMaskForScene(Player*, PlayState*, u8) {}
+static void MmForm_CancelNativeMaskCutscene(u8) {}
 
 extern "C" void Audio_SetVolScale(u8, u8, u8, u8) {
 }
@@ -220,6 +225,37 @@ int main(int argc, char** argv) {
     const char* scenario = argv[1];
     synthReady = !strcmp(argv[2], "sequence");
     MmForm_StopGoronRollSfx(); // cold stop must return before the bank is initialized
+    if (!strcmp(scenario, "transformation-cues")) {
+        const u16 cues[] = { MM_NA_SE_PL_PUT_OUT_ITEM, MM_NA_SE_IT_SET_TRANSFORM_MASK,
+            MM_NA_SE_PL_FREEZE_S, MM_NA_SE_IT_TRANSFORM_MASK_BROKEN, MM_NA_SE_PL_TRANSFORM_VOICE,
+            MM_NA_SE_PL_FACE_CHANGE, MM_NA_SE_EV_LIGHTNING_HARD, MM_NA_SE_SY_TRANSFORM_MASK_FLASH };
+        for (u16 cue : cues) {
+            for (bool active : {false, true}) {
+                reset(); queue(cue);
+                if (active) {
+                    tick();
+                    assert(AudioMmSfx_IsPlaying(cue) && audible(cue) && "native cue must reach the real MM dispatcher");
+                }
+                MmForm_StopNativeMaskSfx();
+                // Play_Destroy frees the player arena after native cleanup.
+                // Neither pending requests nor live voices may read it again.
+                __asan_poison_memory_region(&player.actor.projectedPos, sizeof(player.actor.projectedPos));
+                tick();
+                __asan_unpoison_memory_region(&player.actor.projectedPos, sizeof(player.actor.projectedPos));
+                assert(!AudioMmSfx_IsPlaying(cue) && !audible(cue) && "teardown must stop queued and active native cues");
+            }
+        }
+        reset();
+        queue(MM_NA_SE_PL_TRANSFORM_VOICE);
+        MmForm_StopNativeMaskSfx(false);
+        queue(MM_NA_SE_SY_TRANSFORM_MASK_FLASH);
+        tick();
+        assert(!AudioMmSfx_IsPlaying(MM_NA_SE_PL_TRANSFORM_VOICE));
+        assert(AudioMmSfx_IsPlaying(MM_NA_SE_SY_TRANSFORM_MASK_FLASH) && audible(MM_NA_SE_SY_TRANSFORM_MASK_FLASH) &&
+               "skip cancellation must allow the new same-frame flash cue");
+        printf("PASS transformation SFX bank/%s: 8 cues, queued/active cancellation and freed-position safety\n", argv[2]);
+        return 0;
+    }
     const u16 ids[] = { 0x0980, 0x098F, 0x08EB, 0x09AD, 0x0990, 0x099F };
     constexpr u16 unrelated = MM_NA_SE_IT_DEKUNUTS_FLOWER_CLOSE;
     for (u16 id : ids) {

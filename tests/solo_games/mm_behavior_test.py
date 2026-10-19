@@ -49,6 +49,10 @@ static std::string GetPathRelativeToAppDirectory(const std::string& s,const std:
 }; struct Config {std::string GetString(const char*,const std::string&){return "stale-oot.sav";}}; }
 namespace ComboRando { constexpr int GAME_MM=1; }
 int writes=0,reads=0;
+int marketWrites=0;
+void ComboBlackMarket_SaveState(nlohmann::json&,int){++marketWrites;}
+int forestWrites=0,forestSlot=-1;
+void ComboSoloForestMm_SaveState(nlohmann::json&,int slot){++forestWrites;forestSlot=slot;}
 void WriteCombined(int,int,const char*) {++writes;}
 const char* ReadCombined(int,int) {++reads;return "{\"combo\":true}";}
 auto gComboWriteGameSave=WriteCombined;
@@ -87,6 +91,8 @@ int main(int argc,char** argv) {
     SaveManager_WriteSaveFile("file1backup.json",source);
     SaveManager_WriteSaveFile("global.json",source);
     assert(writes==0);
+    assert(marketWrites==2); // native slot + backup; global options are unrelated
+    assert(forestWrites==2 && forestSlot==0);
     for (const char* name:{"file1.json","file1backup.json","global.json"})
         assert(std::filesystem::exists(std::filesystem::path("saves/mm")/name));
     assert(!std::filesystem::exists("saves/file1.json"));
@@ -94,6 +100,7 @@ int main(int argc,char** argv) {
     assert(SaveManager_ReadSaveFile("file1.json",loaded)==0 && loaded==source && reads==0);
     assert(SaveManager_GetOpenFileSlot()==2);
     SaveManager_WriteSaveFile("file2.json",loaded); // native copy uses these same primitives
+    assert(forestWrites==3 && forestSlot==1);
     SaveManager_DeleteSaveFile("file1.json");
     SaveManager_DeleteSaveFile("file1backup.json");
     assert(SaveManager_GetOpenFileSlot()==1);
@@ -114,6 +121,7 @@ int main(int argc,char** argv) {
     SaveManager_WriteSaveFile("file1.json",source);
     SaveManager_WriteSaveFile("file1backup.json",source);
     assert(writes==1);
+    assert(forestWrites==3); // the private native forest never writes into a combined slot
     assert(SaveManager_ReadSaveFile("file1.json",loaded)==0 && loaded["combo"]==true && reads==1);
     SaveManager_DeleteSaveFile("file1.json");
     assert(writes==2);

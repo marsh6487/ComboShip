@@ -10,6 +10,8 @@ static int gComboReturnFileNum = 1;
 static int sComboReturnPortalRoute = COMBO_PORTAL_LOST_WOODS;
 static int loadHooks, exitHooks;
 static int crossArrival = -1, bossRecovery = -1, fwArrival = -1;
+static int fallbackLookups;
+static bool fallbackMutatesRespawn;
 extern "C" int32_t Combo_SOH_ConsumeCrossDungeonArrival(void) {
     int value = crossArrival; crossArrival = -1; return value;
 }
@@ -35,7 +37,15 @@ extern "C" void GameInteractor_ExecuteOnLoadGame(int32_t) {
     ++loadHooks;
     gSaveContext.entranceIndex = ENTR_LINKS_HOUSE_CHILD_SPAWN;
 }
-extern "C" int16_t Entrance_OverrideNextIndex(int16_t entrance) { return entrance; }
+extern "C" int16_t Entrance_OverrideNextIndex(int16_t entrance) {
+    ++fallbackLookups;
+    if (fallbackMutatesRespawn) {
+        // Native entrance composition can materialize a grotto's positioned return.
+        gSaveContext.respawnFlag = 2;
+        gSaveContext.respawn[RESPAWN_MODE_RETURN].pos = { 765, 432, 123 };
+    }
+    return entrance;
+}
 extern "C" void Play_Init(GameState*) {}
 extern "C" void Title_Init(GameState*) {}
 #undef osSyncPrintf
@@ -63,15 +73,21 @@ int main() {
     TitleSetup_InitImpl(&state);
     require(gSaveContext.entranceIndex == ENTR_MARKET_DAY_OUTSIDE_HAPPY_MASK_SHOP && gSaveContext.respawnFlag == 0,
             "a following ordinary portal return must still reach the Mask Shop");
-    for (bool recoverBoss : {false, true}) {
-        sComboReturnPortalRoute = COMBO_PORTAL_LOST_WOODS;
+    require(fallbackLookups == 2, "ordinary forest and Market returns must retain native fallback composition");
+    for (bool forestRoute : {false, true}) for (bool recoverBoss : {false, true}) {
+        sComboReturnPortalRoute = forestRoute ? COMBO_PORTAL_LOST_WOODS : COMBO_PORTAL_MARKET;
         (recoverBoss ? bossRecovery : crossArrival) = ENTR_DEKU_TREE_ENTRANCE;
         gComboReturnFileNum = 1;
+        const int before = fallbackLookups;
+        fallbackMutatesRespawn = true;
         TitleSetup_InitImpl(&state);
         require(gSaveContext.entranceIndex == ENTR_DEKU_TREE_ENTRANCE &&
                 gSaveContext.respawnFlag == 0 && sComboReturnPortalRoute == COMBO_PORTAL_MARKET,
                 "a composed dungeon/boss arrival must consume and supersede a stale forest route");
+        require(fallbackLookups == before,
+                "queued dungeon/boss arrivals must not compose the ordinary Market fallback");
     }
+    fallbackMutatesRespawn = false;
     sComboReturnPortalRoute = COMBO_PORTAL_LOST_WOODS;
     fwArrival = ENTR_LINKS_HOUSE_CHILD_SPAWN;
     gComboReturnFileNum = 1;

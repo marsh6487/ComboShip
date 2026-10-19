@@ -19,7 +19,26 @@ static int renderKokiriUpgrade, renderFairyUpgrade, fourSwordOwner;
 static Gfx handDL[6], swordBlade[1], hand[1];
 static const char* missing;
 static const char* lastCorePath;
+// The renderer/combat fixtures isolate the selection-state boundary. The real
+// selector's inventory, ownership and checkbox gates have their own core tests.
+static int elementalSelection = -1;
+static u8 elementalActive;
+static u8 elementalAvailable = 1;
+static int auraTrueMaster, resourceQueries;
 SaveContext gSaveContext;
+
+uint8_t SwordElement_Get(uint16_t item) {
+    return elementalSelection < 0 ? 0 : elementalSelection;
+}
+uint8_t SwordElement_HasSelection(uint16_t item) {
+    return elementalSelection >= 0;
+}
+uint8_t SwordElement_Active(PlayState* state, Player* owner) {
+    return elementalActive;
+}
+uint8_t SwordElement_IsAvailable(uint8_t element) {
+    return elementalAvailable;
+}
 
 #define REQUIRE(c)                                               \
     do {                                                         \
@@ -48,9 +67,11 @@ Color_RGB8 CVarGetColor24(const char* name, Color_RGB8 fallback) {
     return fallback;
 }
 uint8_t ResourceMgr_FileExists(const char* path) {
+    ++resourceQueries;
     return assets && !(missing && strstr(path, missing));
 }
 Gfx* ResourceMgr_LoadGfxByName(const char* path) {
+    ++resourceQueries;
     if (loadFailure || (missing && strstr(path, missing)))
         return NULL;
     if (strstr(path, "CoreDL")) {
@@ -66,6 +87,7 @@ void* Graph_Alloc(GraphicsContext* context, size_t size) {
     return handDL;
 }
 void* ResourceGetDataByName(const char* path) {
+    ++resourceQueries;
     return loadFailure || (missing && strstr(path, missing)) ? NULL : pixels;
 }
 u8 PakLoader_HasActiveModel(void) {
@@ -88,6 +110,9 @@ u8 WeaponUpgrade_KokiriLevel(void) {
 }
 u8 WeaponUpgrade_HasGreatFairy(void) {
     return renderFairyUpgrade;
+}
+u8 WeaponUpgrade_HasTrueMaster(void) {
+    return auraTrueMaster;
 }
 u8 TransformMasks_IsTransformedAny(void) {
     return transformed;
@@ -147,6 +172,10 @@ static void setup(void) {
     loadFailure = transformed = invisible = customColors = depth = matrices = 0;
     missing = lastCorePath = NULL;
     fireDamage = otherOwner = pakActive = bossOwner = 0;
+    elementalSelection = -1;
+    elementalActive = 0;
+    elementalAvailable = 1;
+    auraTrueMaster = resourceQueries = 0;
     renderKokiriUpgrade = renderFairyUpgrade = fourSwordOwner = 0;
     DinFireSword_Reset();
 }
@@ -476,6 +505,9 @@ int main(void) {
     setup();
     REQUIRE(DinFireSword_DamageFlags(&play, &player, DMG_SLASH_MASTER) == DMG_SLASH_MASTER);
     fireDamage = 1;
+    elementalAvailable = 0;
+    REQUIRE(DinFireSword_DamageFlags(&play, &player, DMG_SLASH_MASTER) == DMG_SLASH_MASTER);
+    elementalAvailable = 1;
     REQUIRE(DinFireSword_DamageFlags(&play, &player, DMG_SLASH_MASTER) == (DMG_SLASH_MASTER | DMG_ARROW_FIRE));
     REQUIRE(DinFireSword_DamageFlags(&play, &player, DMG_JUMP_MASTER) == (DMG_JUMP_MASTER | DMG_ARROW_FIRE));
     REQUIRE(DinFireSword_DamageFlags(&play, &player, DMG_HAMMER_SWING) == DMG_HAMMER_SWING);

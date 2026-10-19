@@ -3,6 +3,7 @@
 #include "combo/menu/ComboVanillaItemReceiptText.h"
 #include "combo/menu/ComboKeyReceiptText.h"
 #include "combo/menu/ComboDungeonKeyReceipt.h"
+#include "combo/menu/ComboBossSoulReceiptText.h"
 #include "combo/menu/ComboMagicItemReceiptText.h"
 #include "combo/menu/ComboToolReceiptText.h"
 #include "combo/menu/ComboMaskReceiptText.h"
@@ -10,6 +11,7 @@
 #include "combo/menu/ComboItemReceiptText.h"
 #include "soh/soh/Enhancements/custom-message/text.h"
 #include "tests/item_receipts/key_receipt_fixtures.h"
+#include "tests/item_receipts/boss_soul_fixtures.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -308,8 +310,16 @@ struct Item {
         return fixture.article;
     return {}; // Imported MM rows have no localized article in the OoT catalog.
   }
-  bool HasCustomIcon() { return id == RG_BOTTLE_WITH_FISH || id == RG_BOTTLE_WITH_BUGS || id == RG_BOTTLE_WITH_POE || id == RG_BOTTLE_WITH_BIG_POE; }
-  int GetItemID() const { return HasBottleIcon() ? ITEM_CUSTOM : ITEM_NONE; }
+  bool HasCustomIcon() { return HasSoulIcon() || HasBottleIcon(); }
+  bool HasSoulIcon() const {
+    return (id >= RG_GOHMA_SOUL && id <= RG_GANON_SOUL) ||
+           (id >= RG_MM_SOUL_GOHT && id <= RG_MM_SOUL_TWINMOLD);
+  }
+  int GetItemID() const {
+    if (HasSoulIcon())
+      return id <= RG_GANON_SOUL ? 0xE0 + id - RG_GOHMA_SOUL : 0x111 + id - RG_MM_SOUL_GOHT;
+    return HasBottleIcon() ? ITEM_CUSTOM : ITEM_NONE;
+  }
   bool HasBottleIcon() const { return id == RG_BOTTLE_WITH_FISH || id == RG_BOTTLE_WITH_BUGS || id == RG_BOTTLE_WITH_POE || id == RG_BOTTLE_WITH_BIG_POE; }
   std::shared_ptr<GetItemEntry> GetGIEntryUnresolved() const {
     if (throwOnRead)
@@ -833,6 +843,74 @@ static void CheckGeneratedCompassRoutes(const char* fixturePath) {
 }
 
 int main(int argc, char** argv) {
+  const struct {
+    RandomizerGet id;
+    const char *name;
+    int color;
+  } souls[] = {
+#define SOUL_ROW(mm, oot, name, color) {oot, name, color},
+      BOSS_SOUL_RECEIPT_FIXTURES(SOUL_ROW)
+#undef SOUL_ROW
+  };
+  const auto soulPlayer = receiptPlayer;
+  const auto soulForeign = foreign;
+  const auto soulResolved = resolvedForeign;
+  const auto soulLatches = foreignLatches;
+  const auto soulResolutions = liveResolutionCalls;
+  for (const auto &soul : souls) {
+    Rando::StaticData::itemNameToEnum[soul.name] = soul.id;
+    receiptPlayer.getItemEntry.getItemId = soul.id;
+    const auto before = gSaveContext;
+    CustomMessage native;
+    BuildCustomItemMessage(&receiptPlayer, native);
+    for (const auto &text :
+         {native.GetEnglish(MF_RAW), native.GetGerman(MF_RAW),
+          native.GetFrench(MF_RAW)}) {
+      std::string body;
+      const auto item = Rando::StaticData::RetrieveItem(soul.id);
+      const auto icon = CustomMessage::ITEM_OBTAINED(static_cast<uint8_t>(item.GetItemID()));
+      assert(text.find(icon) != std::string::npos && "native soul lost its catalog icon");
+      assert(ComboItemReceiptText::FromOotMessage(text, body));
+      const auto color = body.find(static_cast<char>(soul.color));
+      const auto reset = body.find('\0', color);
+      assert(color != std::string::npos && reset > color + 3 &&
+             reset != std::string::npos);
+    }
+    assert(native.GetGerman(MF_RAW).find("Du hast ") != std::string::npos);
+    assert(native.GetFrench(MF_RAW).find("Vous avez") != std::string::npos);
+    assert(std::memcmp(&before, &gSaveContext, sizeof(before)) == 0);
+    if (soul.id >= RG_MM_SOUL_GOHT && soul.id <= RG_MM_SOUL_TWINMOLD) {
+      foreign.itemGame = ComboRando::GAME_MM;
+      foreign.itemName = soul.name;
+      foreign.displayName = std::string(soul.name) + " (MM)";
+      foreign.trap = false;
+      foreign.fakeTrickName.clear();
+      resolvedForeign = soul.name;
+      CustomMessage imported;
+      BuildComboForeignMessage(&receiptPlayer, imported);
+      for (const auto& texts : {std::pair{native.GetEnglish(MF_RAW), imported.GetEnglish(MF_RAW)},
+                                std::pair{native.GetGerman(MF_RAW), imported.GetGerman(MF_RAW)},
+                                std::pair{native.GetFrench(MF_RAW), imported.GetFrench(MF_RAW)}}) {
+        std::string nativeBody;
+        assert(ComboItemReceiptText::WithoutOotItemIcons(texts.first, nativeBody));
+        assert(texts.second.find('\x13') == std::string::npos && "foreign sentinel must remain iconless");
+        auto flatten = [](std::string body) {
+          // An icon reserves line width, so wrapping (including a trailing
+          // newline after punctuation) can differ without changing the body.
+          body.erase(std::remove_if(body.begin(), body.end(), [](char c) { return c == ' ' || c == '\x01'; }), body.end());
+          return body;
+        };
+        assert(flatten(nativeBody) == flatten(texts.second));
+      }
+    }
+  }
+  receiptPlayer = soulPlayer;
+  foreign = soulForeign;
+  resolvedForeign = soulResolved;
+  foreignLatches = soulLatches;
+  liveResolutionCalls = soulResolutions;
+  std::cout << "OoT native/imported boss soul receipts: localized themed names "
+               "and white body reset passed\n";
   // Item names and unresolved native text IDs come from the real OoT catalog.
   // Message-table ownership is the seam; unique bodies reveal wrong IDs.
   std::vector<std::string> songBodies;

@@ -70,6 +70,6 @@ u32 Audio_NextRandom(void);
 void AudioDebug_ScrPrt(const s8* text, u16 number);
 void osSyncPrintf(const char* format, ...);
 void Audio_ResetSounds(void);
-void Audio_PlaySoundGeneral(u16 id, Vec3f* pos, u8 token, f32* frequency, f32* volume, s8* reverb);
+void Audio_PlaySfxGeneral(u16 id, Vec3f* pos, u8 token, f32* frequency, f32* volume, s8* reverb);
 void Audio_ProcessSoundRequests(void);
 void func_800F8F88(void);

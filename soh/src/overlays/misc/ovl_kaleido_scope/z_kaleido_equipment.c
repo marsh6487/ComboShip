@@ -1,4 +1,6 @@
 #include "z_kaleido_scope.h"
+#include "sword_element.h"
+#include "sword_element_kaleido.h"
 #include "textures/icon_item_static/icon_item_static.h"
 #include "assets/soh_assets.h"
 #include "soh/ResourceManagerHelpers.h" // ResourceMgr_LoadTexOrDListByName (missing-icon probe)
@@ -253,6 +255,194 @@ static void KaleidoEquip_TransformInput(PlayState* play, Input* input) {
     KaleidoScope_SetCursorVtx(pauseCtx, (sTransformCursor + 1) * 4, pauseCtx->equipVtx);
 }
 
+/* Shared native A continuation. Chooser confirmation always equips the highlighted sword;
+ * ordinary A keeps the existing EquipmentCanBeRemoved / SwordToggle behavior. */
+static u8 KaleidoEquip_EquipNative(PlayState* play, u16 cursorItem, u8 allowUnequip) {
+    PauseContext* pauseCtx = &play->pauseCtx;
+    // #Region SoH [Enhancements]
+    // Allow Link to remove his equipment from the equipment subscreen by toggling on/off
+    // Shields will be un-equipped entirely, and tunics/boots will revert to Kokiri Tunic/Kokiri Boots
+    // Only BGS/Giant's Knife is affected, and it will revert to Master Sword.
+
+    // If we have the feature toggled on
+    if (allowUnequip && CVarGetInteger(CVAR_ENHANCEMENT("EquipmentCanBeRemoved"), 0)) {
+
+        if (CVarGetInteger(CVAR_ENHANCEMENT("SwordToggle"), SWORD_TOGGLE_NONE) == SWORD_TOGGLE_BOTH_AGES ||
+            (CVarGetInteger(CVAR_ENHANCEMENT("SwordToggle"), SWORD_TOGGLE_NONE) == SWORD_TOGGLE_CHILD) &&
+                LINK_IS_CHILD) {
+            // If we're on the "swords" section of the equipment screen AND we're on a
+            // currently-equipped sword
+            if (pauseCtx->cursorY[PAUSE_EQUIP] == 0 &&
+                pauseCtx->cursorX[PAUSE_EQUIP] == CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD)) {
+                Inventory_ChangeEquipment(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_NONE);
+                gSaveContext.equips.buttonItems[0] = ITEM_NONE;
+                Flags_SetInfTable(INFTABLE_SWORDLESS);
+                goto RESUME_EQUIPMENT_SWORD; // Skip to here so we don't re-equip it
+            }
+        } else {
+            // If we're on the "swords" section of the equipment screen AND we're on a
+            // currently-equipped BGS/Giant's Knife
+            if (pauseCtx->cursorY[PAUSE_EQUIP] == 0 && pauseCtx->cursorX[PAUSE_EQUIP] == 3 &&
+                CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) == EQUIP_VALUE_SWORD_BIGGORON &&
+                CHECK_OWNED_EQUIP(EQUIP_TYPE_SWORD,
+                                  EQUIP_INV_SWORD_MASTER)) { // And we have the Master Sword
+                Inventory_ChangeEquipment(EQUIP_TYPE_SWORD,
+                                          EQUIP_VALUE_SWORD_MASTER); // "Unequip" it by equipping Master Sword
+                gSaveContext.equips.buttonItems[0] = ITEM_SWORD_MASTER;
+                Flags_UnsetInfTable(INFTABLE_SWORDLESS);
+                goto RESUME_EQUIPMENT_SWORD; // Skip to here so we don't re-equip it
+            }
+        }
+
+        // If we're on the "shields" section of the equipment screen AND we're on a currently-equipped
+        // shield
+        if (pauseCtx->cursorY[PAUSE_EQUIP] == 1 &&
+            pauseCtx->cursorX[PAUSE_EQUIP] == CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD)) {
+            Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_NONE); // Unequip it
+            goto RESUME_EQUIPMENT; // Skip to here so we don't re-equip it
+        }
+
+        // If we're on the "tunics" section of the equipment screen AND we're on a currently-equipped
+        // tunic
+        if (pauseCtx->cursorY[PAUSE_EQUIP] == 2 &&
+            pauseCtx->cursorX[PAUSE_EQUIP] == CUR_EQUIP_VALUE(EQUIP_TYPE_TUNIC)) {
+            Inventory_ChangeEquipment(EQUIP_TYPE_TUNIC,
+                                      EQUIP_VALUE_TUNIC_KOKIRI); // "Unequip" it (by equipping Kokiri Tunic)
+            goto RESUME_EQUIPMENT;                               // Skip to here so we don't re-equip it
+        }
+
+        // If we're on the "boots" section of the equipment screen AND we're on currently-equipped boots
+        if (pauseCtx->cursorY[PAUSE_EQUIP] == 3 &&
+            pauseCtx->cursorX[PAUSE_EQUIP] == CUR_EQUIP_VALUE(EQUIP_TYPE_BOOTS)) {
+            Inventory_ChangeEquipment(EQUIP_TYPE_BOOTS,
+                                      EQUIP_VALUE_BOOTS_KOKIRI); // "Unequip" it (by equipping Kokiri Boots)
+            goto RESUME_EQUIPMENT;                               // Skip to here so we don't re-equip it
+        }
+    }
+
+    if (CHECK_OWNED_EQUIP(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP] - 1)) {
+        // The Trident tolerates only the Divine Shield or the Mirror.
+        if ((pauseCtx->cursorY[PAUSE_EQUIP] == EQUIP_TYPE_SHIELD) && (ExtEquip_GetCurrent(EQUIP_TYPE_SWORD) == 3) &&
+            !ExtEquip_TridentAllowsShield(0, pauseCtx->cursorX[PAUSE_EQUIP])) {
+            return false;
+        }
+        // The ext piece of this type comes off FIRST (synchronous cleanup, slot left
+        // bare/Kokiri), then the vanilla value goes on top — the old order let the
+        // ext piece's deferred cleanup overwrite the sword just equipped. All four
+        // types: the ext boots are real boots now, exclusive with Iron/Hover.
+        ExtEquip_Unequip(pauseCtx->cursorY[PAUSE_EQUIP]);
+        Inventory_ChangeEquipment(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP]);
+    } else {
+        return false;
+    }
+
+RESUME_EQUIPMENT:
+    if (pauseCtx->cursorY[PAUSE_EQUIP] == 0) {
+        gSaveContext.infTable[29] = 0;
+        gSaveContext.equips.buttonItems[0] = cursorItem;
+
+        if ((pauseCtx->cursorX[PAUSE_EQUIP] == 3) && (gSaveContext.bgsFlag != 0)) {
+            gSaveContext.equips.buttonItems[0] = ITEM_SWORD_BGS;
+            gSaveContext.swordHealth = 8;
+        } else {
+            if (gSaveContext.equips.buttonItems[0] == ITEM_HEART_PIECE_2) {
+                gSaveContext.equips.buttonItems[0] = ITEM_SWORD_BGS;
+            }
+            if ((gSaveContext.equips.buttonItems[0] == ITEM_SWORD_BGS) && (gSaveContext.bgsFlag == 0) &&
+                CHECK_OWNED_EQUIP_ALT(EQUIP_TYPE_SWORD, EQUIP_INV_SWORD_BROKENGIANTKNIFE)) {
+                gSaveContext.equips.buttonItems[0] = ITEM_SWORD_KNIFE;
+            }
+        }
+    RESUME_EQUIPMENT_SWORD:
+        Interface_LoadItemIcon1(play, 0);
+    }
+
+    Audio_PlaySfxGeneral(NA_SE_SY_DECIDE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
+                         &gSfxDefaultReverb);
+    pauseCtx->unk_1E4 = 7;
+    sEquipTimer = 10;
+    return true;
+}
+
+static SwordElementMenu sSwordElementMenu;
+static u8 sSwordElementPage;
+static u16 sSwordElementCursorItem;
+static s16 sSwordElementRow;
+static s16 sSwordElementCol;
+
+static u16 KaleidoEquip_ElementItem(u16 item) {
+    /* The equipment page borrows a heart-piece name ID for the unbreakable Biggoron sword. */
+    return item == ITEM_HEART_PIECE_2 ? ITEM_SWORD_BGS : item;
+}
+
+static u8 KaleidoEquip_ElementUsable(PauseContext* pauseCtx, u8 extPage) {
+    s16 row = pauseCtx->cursorY[PAUSE_EQUIP];
+    s16 col = pauseCtx->cursorX[PAUSE_EQUIP];
+    if (sBrokenTransformPage || pauseCtx->cursorSpecialPos || row != EQUIP_TYPE_SWORD || col < 1 || col > 3) {
+        return false;
+    }
+    return extPage ? (ExtEquip_HasItem(row, col) && ExtEquip_CheckAgeReq(row, col))
+                   : (CHECK_OWNED_EQUIP(row, col - 1) && CHECK_AGE_REQ_EQUIP(row, col));
+}
+
+void KaleidoEquip_UpdateSwordElement(PlayState* play) {
+    PauseContext* pauseCtx = &play->pauseCtx;
+    Input* input = &play->state.input[0];
+    u8 events;
+    u8 element;
+    u8 extPage = ExtEquip_GetPage() == 1;
+    s8 direction = 0;
+    u8 contextValid;
+    if (!sSwordElementMenu.phase) {
+        return;
+    }
+    /* Page flips / Start retain their native meaning and discard an uncommitted choice. */
+    contextValid = pauseCtx->state == 6 && pauseCtx->unk_1E4 == 0 && pauseCtx->pageIndex == PAUSE_EQUIP &&
+                   extPage == sSwordElementPage && pauseCtx->cursorY[PAUSE_EQUIP] == sSwordElementRow &&
+                   pauseCtx->cursorX[PAUSE_EQUIP] == sSwordElementCol &&
+                   KaleidoEquip_ElementItem(pauseCtx->cursorItem[PAUSE_EQUIP]) == sSwordElementMenu.item &&
+                   KaleidoEquip_ElementUsable(pauseCtx, extPage);
+    if (!contextValid || CHECK_BTN_ANY(input->press.button, BTN_START | BTN_L | BTN_R | BTN_Z)) {
+        SwordElementKaleido_Reset(&sSwordElementMenu);
+        return;
+    }
+    if (input->rel.stick_x < -30 || input->rel.stick_y > 30 ||
+        CHECK_BTN_ANY(input->press.button, BTN_DLEFT | BTN_DUP)) {
+        direction = -1;
+    } else if (input->rel.stick_x > 30 || input->rel.stick_y < -30 ||
+               CHECK_BTN_ANY(input->press.button, BTN_DRIGHT | BTN_DDOWN)) {
+        direction = 1;
+    }
+    element = sSwordElementMenu.selection;
+    events = SwordElementKaleido_Update(&sSwordElementMenu, true, direction, CHECK_BTN_ALL(input->press.button, BTN_A),
+                                        CHECK_BTN_ALL(input->press.button, BTN_B));
+    if (events & SWORD_ELEMENT_MENU_EVENT_ARROW) {
+        element = sSwordElementMenu.selection;
+    }
+    if (events & SWORD_ELEMENT_MENU_EVENT_APPLY) {
+        KaleidoEquip_EquipNative(play, sSwordElementCursorItem, false);
+    }
+    if (events & SWORD_ELEMENT_MENU_EVENT_CURSOR) {
+        Audio_PlaySfxGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                             &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+    }
+    if (events & (SWORD_ELEMENT_MENU_EVENT_ERROR | SWORD_ELEMENT_MENU_EVENT_CANCEL | SWORD_ELEMENT_MENU_EVENT_ARROW |
+                  SWORD_ELEMENT_MENU_EVENT_FUSE)) {
+        u16 sfx = (events & SWORD_ELEMENT_MENU_EVENT_ERROR)    ? NA_SE_SY_ERROR
+                  : (events & SWORD_ELEMENT_MENU_EVENT_CANCEL) ? NA_SE_SY_CANCEL
+                  : (events & SWORD_ELEMENT_MENU_EVENT_ARROW)  ? NA_SE_SY_SET_FIRE_ARROW + element - SWORD_ELEMENT_FIRE
+                                                               : NA_SE_SY_SYNTH_MAGIC_ARROW;
+        Audio_PlaySfxGeneral(sfx, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
+                             &gSfxDefaultReverb);
+    }
+    /* The chooser owns only its navigation / confirmation input. Never use native item-equip state. */
+    input->press.button &=
+        ~(BTN_A | BTN_B | BTN_CUP | BTN_CLEFT | BTN_CDOWN | BTN_CRIGHT | BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT);
+    input->cur.button &= ~(BTN_DUP | BTN_DDOWN | BTN_DLEFT | BTN_DRIGHT);
+    input->rel.stick_x = input->rel.stick_y = 0;
+    pauseCtx->stickRelX = pauseCtx->stickRelY = 0;
+}
+
 void KaleidoScope_DrawEquipment(PlayState* play) {
     // Suppress ext equipment icon overrides so vanilla sword/shield icons show on equip screen
     gExtEquipSuppressIconOverride = 1;
@@ -351,7 +541,8 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
         }
     }
 
-    if ((pauseCtx->state == 6) && (pauseCtx->unk_1E4 == 0) && (pauseCtx->pageIndex == PAUSE_EQUIP)) {
+    if (!sSwordElementMenu.phase && (pauseCtx->state == 6) && (pauseCtx->unk_1E4 == 0) &&
+        (pauseCtx->pageIndex == PAUSE_EQUIP)) {
         bool dpad = (CVarGetInteger(CVAR_SETTING("DPadOnPause"), 0) && !CHECK_BTN_ALL(input->cur.button, BTN_CUP));
         bool pauseAnyCursor =
             (CVarGetInteger(CVAR_ENHANCEMENT("PauseAnyCursor"), 0) == PAUSE_ANY_CURSOR_RANDO_ONLY && IS_RANDO) ||
@@ -728,8 +919,19 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
             (pauseCtx->unk_1E4 == 0) && CHECK_BTN_ANY(input->press.button, buttonsToCheck) &&
             (pauseCtx->cursorX[PAUSE_EQUIP] != 0)) {
 
-            // Extended equipment page: A = equip on body, C buttons = assign to C button for toggle
-            if (extEquipPage) {
+            // Eligible swords use the bounded chooser; all other A/C equipment behavior stays native.
+            if (CHECK_BTN_ALL(input->press.button, BTN_A) &&
+                SwordElementKaleido_Open(&sSwordElementMenu, KaleidoEquip_ElementItem(cursorItem),
+                                         KaleidoEquip_ElementUsable(pauseCtx, extEquipPage),
+                                         pauseCtx->equipVtx[cursorSlot * 4].v.ob[0] * 10,
+                                         pauseCtx->equipVtx[cursorSlot * 4].v.ob[1] * 10)) {
+                sSwordElementPage = extEquipPage;
+                sSwordElementCursorItem = cursorItem;
+                sSwordElementRow = pauseCtx->cursorY[PAUSE_EQUIP];
+                sSwordElementCol = pauseCtx->cursorX[PAUSE_EQUIP];
+                Audio_PlaySfxGeneral(NA_SE_SY_DECIDE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                     &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            } else if (extEquipPage) {
                 u8 extAgeOk = ExtEquip_CheckAgeReq(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP]);
                 if (!extAgeOk) {
                     Audio_PlaySoundGeneral(NA_SE_SY_ERROR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
@@ -768,113 +970,9 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
                 }
             } else if (CHECK_AGE_REQ_EQUIP(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP])) {
                 if (CHECK_BTN_ALL(input->press.button, BTN_A)) {
-
-                    // #Region SoH [Enhancements]
-                    // Allow Link to remove his equipment from the equipment subscreen by toggling on/off
-                    // Shields will be un-equipped entirely, and tunics/boots will revert to Kokiri Tunic/Kokiri Boots
-                    // Only BGS/Giant's Knife is affected, and it will revert to Master Sword.
-
-                    // If we have the feature toggled on
-                    if (CVarGetInteger(CVAR_ENHANCEMENT("EquipmentCanBeRemoved"), 0)) {
-
-                        if (CVarGetInteger(CVAR_ENHANCEMENT("SwordToggle"), SWORD_TOGGLE_NONE) ==
-                                SWORD_TOGGLE_BOTH_AGES ||
-                            (CVarGetInteger(CVAR_ENHANCEMENT("SwordToggle"), SWORD_TOGGLE_NONE) ==
-                             SWORD_TOGGLE_CHILD) &&
-                                LINK_IS_CHILD) {
-                            // If we're on the "swords" section of the equipment screen AND we're on a
-                            // currently-equipped sword
-                            if (pauseCtx->cursorY[PAUSE_EQUIP] == 0 &&
-                                pauseCtx->cursorX[PAUSE_EQUIP] == CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD)) {
-                                Inventory_ChangeEquipment(EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_NONE);
-                                gSaveContext.equips.buttonItems[0] = ITEM_NONE;
-                                Flags_SetInfTable(INFTABLE_SWORDLESS);
-                                goto RESUME_EQUIPMENT_SWORD; // Skip to here so we don't re-equip it
-                            }
-                        } else {
-                            // If we're on the "swords" section of the equipment screen AND we're on a
-                            // currently-equipped BGS/Giant's Knife
-                            if (pauseCtx->cursorY[PAUSE_EQUIP] == 0 && pauseCtx->cursorX[PAUSE_EQUIP] == 3 &&
-                                CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) == EQUIP_VALUE_SWORD_BIGGORON &&
-                                CHECK_OWNED_EQUIP(EQUIP_TYPE_SWORD,
-                                                  EQUIP_INV_SWORD_MASTER)) { // And we have the Master Sword
-                                Inventory_ChangeEquipment(
-                                    EQUIP_TYPE_SWORD,
-                                    EQUIP_VALUE_SWORD_MASTER); // "Unequip" it by equipping Master Sword
-                                gSaveContext.equips.buttonItems[0] = ITEM_SWORD_MASTER;
-                                Flags_UnsetInfTable(INFTABLE_SWORDLESS);
-                                goto RESUME_EQUIPMENT_SWORD; // Skip to here so we don't re-equip it
-                            }
-                        }
-
-                        // If we're on the "shields" section of the equipment screen AND we're on a currently-equipped
-                        // shield
-                        if (pauseCtx->cursorY[PAUSE_EQUIP] == 1 &&
-                            pauseCtx->cursorX[PAUSE_EQUIP] == CUR_EQUIP_VALUE(EQUIP_TYPE_SHIELD)) {
-                            Inventory_ChangeEquipment(EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_NONE); // Unequip it
-                            goto RESUME_EQUIPMENT; // Skip to here so we don't re-equip it
-                        }
-
-                        // If we're on the "tunics" section of the equipment screen AND we're on a currently-equipped
-                        // tunic
-                        if (pauseCtx->cursorY[PAUSE_EQUIP] == 2 &&
-                            pauseCtx->cursorX[PAUSE_EQUIP] == CUR_EQUIP_VALUE(EQUIP_TYPE_TUNIC)) {
-                            Inventory_ChangeEquipment(
-                                EQUIP_TYPE_TUNIC, EQUIP_VALUE_TUNIC_KOKIRI); // "Unequip" it (by equipping Kokiri Tunic)
-                            goto RESUME_EQUIPMENT;                           // Skip to here so we don't re-equip it
-                        }
-
-                        // If we're on the "boots" section of the equipment screen AND we're on currently-equipped boots
-                        if (pauseCtx->cursorY[PAUSE_EQUIP] == 3 &&
-                            pauseCtx->cursorX[PAUSE_EQUIP] == CUR_EQUIP_VALUE(EQUIP_TYPE_BOOTS)) {
-                            Inventory_ChangeEquipment(
-                                EQUIP_TYPE_BOOTS, EQUIP_VALUE_BOOTS_KOKIRI); // "Unequip" it (by equipping Kokiri Boots)
-                            goto RESUME_EQUIPMENT;                           // Skip to here so we don't re-equip it
-                        }
-                    }
-
-                    if (CHECK_OWNED_EQUIP(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP] - 1)) {
-                        // The Trident tolerates only the Divine Shield or the Mirror.
-                        if ((pauseCtx->cursorY[PAUSE_EQUIP] == EQUIP_TYPE_SHIELD) &&
-                            (ExtEquip_GetCurrent(EQUIP_TYPE_SWORD) == 3) &&
-                            !ExtEquip_TridentAllowsShield(0, pauseCtx->cursorX[PAUSE_EQUIP])) {
-                            goto EQUIP_FAIL;
-                        }
-                        // The ext piece of this type comes off FIRST (synchronous cleanup, slot left
-                        // bare/Kokiri), then the vanilla value goes on top — the old order let the
-                        // ext piece's deferred cleanup overwrite the sword just equipped. All four
-                        // types: the ext boots are real boots now, exclusive with Iron/Hover.
-                        ExtEquip_Unequip(pauseCtx->cursorY[PAUSE_EQUIP]);
-                        Inventory_ChangeEquipment(pauseCtx->cursorY[PAUSE_EQUIP], pauseCtx->cursorX[PAUSE_EQUIP]);
-                    } else {
+                    if (!KaleidoEquip_EquipNative(play, cursorItem, true)) {
                         goto EQUIP_FAIL;
                     }
-
-                RESUME_EQUIPMENT:
-                    if (pauseCtx->cursorY[PAUSE_EQUIP] == 0) {
-                        gSaveContext.infTable[29] = 0;
-                        gSaveContext.equips.buttonItems[0] = cursorItem;
-
-                        if ((pauseCtx->cursorX[PAUSE_EQUIP] == 3) && (gSaveContext.bgsFlag != 0)) {
-                            gSaveContext.equips.buttonItems[0] = ITEM_SWORD_BGS;
-                            gSaveContext.swordHealth = 8;
-                        } else {
-                            if (gSaveContext.equips.buttonItems[0] == ITEM_HEART_PIECE_2) {
-                                gSaveContext.equips.buttonItems[0] = ITEM_SWORD_BGS;
-                            }
-                            if ((gSaveContext.equips.buttonItems[0] == ITEM_SWORD_BGS) && (gSaveContext.bgsFlag == 0) &&
-                                CHECK_OWNED_EQUIP_ALT(EQUIP_TYPE_SWORD, EQUIP_INV_SWORD_BROKENGIANTKNIFE)) {
-                                gSaveContext.equips.buttonItems[0] = ITEM_SWORD_KNIFE;
-                            }
-                        }
-                    RESUME_EQUIPMENT_SWORD:
-                        Interface_LoadItemIcon1(play, 0);
-                    }
-
-                    Audio_PlaySfxGeneral(NA_SE_SY_DECIDE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                         &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
-                    pauseCtx->unk_1E4 = 7;
-                    sEquipTimer = 10;
                 } else if (CVarGetInteger(CVAR_ENHANCEMENT("AssignableTunicsAndBoots"), 0) != 0) {
                     // Only allow assigning shield, tunic and boots to c-buttons
                     if (pauseCtx->cursorY[PAUSE_EQUIP] > 0) {
@@ -1086,6 +1184,10 @@ void KaleidoScope_DrawEquipment(PlayState* play) {
 
     Gfx_SetupDL_42Opa(play->state.gfxCtx);
     KaleidoScope_DrawEquipmentImage(play, pauseCtx->playerSegment, PAUSE_EQUIP_PLAYER_WIDTH, PAUSE_EQUIP_PLAYER_HEIGHT);
+
+    if (pauseCtx->pageIndex == PAUSE_EQUIP && sSwordElementMenu.phase) {
+        SwordElementKaleido_Draw(play, &sSwordElementMenu, ExtInv_GetItemIcon(sSwordElementMenu.item));
+    }
 
     if (gUpgradeMasks[0]) {}
 

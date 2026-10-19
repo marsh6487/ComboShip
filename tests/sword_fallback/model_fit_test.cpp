@@ -104,6 +104,7 @@ void ComboDinSwordGi_DrawLayers(PlayState*,const char*,const char*) {}
 enum RandomizerGet{RG_KOKIRI_SWORD,RG_RAZOR_SWORD,RG_GILDED_SWORD,RG_TRUE_MASTER_SWORD,RG_MASTER_SWORD,RG_BIGGORON_SWORD,RG_GREAT_FAIRY_SWORD,RG_GIANTS_KNIFE};
 int32_t OOT_NeiAltAssetsEnabled(){return 1;}
 int32_t OOT_NeiResourceExists(const char* path){return bool(loader(path));}
+void NeiGi_ReportBlackMarketModel(const char*,const char*,const char* = nullptr) {}
 /* PRODUCTION */
 struct Expected {
     const char* path;
@@ -128,6 +129,12 @@ int main(){
     NeiGi::FrameBounds guard{};
     NeiGi::ModelBoundsReader<Loader> cached(loader,0);
     assert(cached.Read("guard/cached",guard)&&guard.minimum.y==-10&&guard.maximum.y==30);
+    NeiGi::Point exactLow{},exactHigh{};
+    NeiGi::ModelBoundsReader<Loader,true> exact(loader,0);
+    assert(!exact.ExactBounds(exactLow,exactHigh));
+    assert(exact.Read("guard/cached",guard)&&exact.ExactBounds(exactLow,exactHigh));
+    assert(exactLow.x==10&&exactHigh.x==30&&exactLow.y==-10&&exactHigh.y==30&&
+           exactLow.z==0&&exactHigh.z==3&&guard.minimum.x==0&&guard.maximum.z==0);
     // Binary O2R sword vertices use the registered SOH_Array factory, not
     // Fast::Vertex. Preserve that type before and after interpreter caching.
     LegacyVertex("guard/legacyVertices",105,{{10,-10,0},{20,20,2},{30,30,3}});
@@ -187,6 +194,10 @@ int main(){
     NeiGi::ModelBoundsReader<Loader> transformed(loader,0);
     assert(transformed.Read("guard/transformed",guard) && guard.minimum.y==15 && guard.maximum.y==35 &&
            "serialized resource matrices must establish selected model bounds");
+    NeiGi::ModelBoundsReader<Loader,true> exactTransformed(loader,0);
+    assert(exactTransformed.Read("guard/transformed",guard)&&exactTransformed.ExactBounds(exactLow,exactHigh));
+    assert(exactLow.x==5&&exactHigh.x==15&&exactLow.y==15&&exactHigh.y==35&&
+           exactLow.z==0&&exactHigh.z==1.5f&&exactTransformed.RestoresModelView());
     size_t cameraMeshes=0;
     for(const auto& e:expected){
         const int profile=DinSwordGi::SelectedProfile(e.path+7,true,true,[](const char* key){

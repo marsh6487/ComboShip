@@ -36,6 +36,62 @@ int main() {
     Ship::Context context;
     context.rm = std::make_shared<Ship::ResourceManager>();
     Ship::Context::current = &context;
+    // The private forest is shared scenery: its eight greenery identities must
+    // keep MM's darker autumn palette and blush spring grass.
+    const char* forestLeaves[] = { "lw_enkei_01_0", "lw_kusa_01_12600", "lw_wood_02_2CA00", "lw_wood_03_31E00",
+                                   "lw_wood_04_37200" };
+    const char* forestGround[] = { "lw_kabe_01_5400", "lw_yuka_02_39C00", "lw_yuka_03_44400" };
+    for (bool alt : { false, true }) {
+        context.rm->alt = alt;
+        for (const char* prefix : { "", "alt/" }) {
+            for (bool ground : { false, true }) {
+                const auto check = [&](const char* name) {
+                    const std::string path = std::string(prefix) + "custom/skiejer_forest/textures/" + name;
+                    const auto original = Make(path);
+                    const auto bytes = *original->mImageBuffer;
+                    context.rm->cache[path] = original;
+                    for (int selected : { 2, 3, 0, 1, 2, -1 }) {
+                        season = selected;
+                        Update(nullptr);
+                        const bool tinted = (!*prefix || alt) && (selected == 2 || selected == 3 || selected == 0);
+                        const auto shown = std::dynamic_pointer_cast<Fast::Texture>(context.rm->cache.at(path));
+                        REQUIRE((shown != original) == tinted);
+                        if (tinted) {
+                            const uint32_t color = selected == 2   ? (ground ? 0xD99C45FFu : 0xB96848FFu)
+                                                   : selected == 3 ? (ground ? 0xE5EDF3FFu : 0xCCDCEEFFu)
+                                                   : ground        ? 0xF6C1D9FFu
+                                                                   : 0xF6C1D9E0u;
+                            const auto expected = BuildTexture(original, { color, selected == 2 ? 256u : 461u });
+                            REQUIRE(expected && *shown->mImageBuffer == *expected->mImageBuffer);
+                            REQUIRE(shown->ImageData[3] == original->ImageData[3]);
+                        }
+                        REQUIRE(*original->mImageBuffer == bytes);
+                    }
+                    Retire();
+                    context.rm->cache.clear();
+                };
+                if (ground)
+                    for (const char* name : forestGround)
+                        check(name);
+                else
+                    for (const char* name : forestLeaves)
+                        check(name);
+            }
+            for (const char* name : { "lw_kinoko_01_FC00", "lw_nenrin_01_27600", "lw_tutu_01_2A000", "portal_bark" }) {
+                const std::string path = std::string(prefix) + "custom/skiejer_forest/textures/" + name;
+                const auto original = Make(path);
+                context.rm->cache[path] = original;
+                for (int selected : { 0, 2, 3 }) {
+                    season = selected;
+                    Update(nullptr);
+                    REQUIRE(context.rm->cache.at(path) == original);
+                }
+                Retire();
+                context.rm->cache.clear();
+            }
+        }
+    }
+    context.rm->alt = true;
     // The same cached image can be reached by different authored atlas paths.
     // Recolor only each path's foliage region, even when stone/bark is greenish.
     const auto atlas = Make("fixture/shared-atlas");
@@ -167,7 +223,7 @@ int main() {
             const std::string pavers = "alt/scenes/shared/spot00_scene/s00_road_01_41180";
             const auto stone = Make(pavers);
             context.rm->cache[pavers] = stone;
-            for (int selected : { 2, 3 }) {
+            for (int selected : { 0, 2, 3 }) {
                 season = selected;
                 Update(nullptr);
                 REQUIRE(context.rm->cache[path] != source && "target greenery did not receive the selected tint");
@@ -192,7 +248,7 @@ int main() {
     Update(nullptr);
     const auto pink = context.rm->cache.at(canopy);
     REQUIRE(pink != tree);
-    REQUIRE(context.rm->cache.at(grass) == ground);
+    REQUIRE(context.rm->cache.at(grass) != ground && "spring terrain must no longer match summer");
     const auto populated = context.rm->cache.size();
     season = 2;
     Update(nullptr);

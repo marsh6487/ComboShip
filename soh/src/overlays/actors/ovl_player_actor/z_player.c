@@ -11,6 +11,7 @@
 #include "gameplay/ComboFaroresWind.h"
 #include "din_fire_shield.h"
 #include "din_fire_sword.h"
+#include "sword_element_message.h"
 
 #include "overlays/actors/ovl_Bg_Heavy_Block/z_bg_heavy_block.h"
 #include "overlays/actors/ovl_Bg_Toki_Swd/z_bg_toki_swd.h"
@@ -16294,6 +16295,8 @@ s32 func_8084DFF4(PlayState* play, Player* this) {
         equipNow = CVarGetInteger(CVAR_ENHANCEMENT("AskToEquip"), 0) && giEntry.modIndex == MOD_NONE &&
                    equipItem >= ITEM_SWORD_KOKIRI && equipItem <= ITEM_TUNIC_ZORA && CHECK_AGE_REQ_ITEM(equipItem);
 
+        const u8 swordElementTutorial =
+            giEntry.modIndex == MOD_NONE ? SwordElement_MessageElementForPickup(giEntry.itemId) : SWORD_ELEMENT_NONE;
         Message_StartTextbox(play, giEntry.textId, &this->actor);
         // RANDOTODO: Macro this boolean check.
         if (!(giEntry.modIndex == MOD_RANDOMIZER && giEntry.itemId == RG_ICE_TRAP)) {
@@ -16312,6 +16315,7 @@ s32 func_8084DFF4(PlayState* play, Player* this) {
             }
             Player_SetPendingFlag(this, play);
         }
+        SwordElement_MessageAppend(play, swordElementTutorial);
 
         // Use this if we do have a getItemEntry
         if (giEntry.modIndex == MOD_NONE) {

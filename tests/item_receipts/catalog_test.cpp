@@ -12,6 +12,7 @@
 #include "ComboSongDrawMM.h"
 #include "ComboItemIconOwnership.h"
 #include "key_receipt_fixtures.h"
+#include "boss_soul_fixtures.h"
 #include "rando/CrossForeign.h"
 #include "rando/CrossDungeonSeed.h"
 extern "C" {
@@ -795,6 +796,60 @@ int main(int argc, char** argv) {
   (void)argv;
   PlayState play{};
   gPlayState = &play;
+  const struct {
+    RandoItemId id;
+    const char *name;
+    int color;
+  } souls[] = {
+#define SOUL_ROW(mm, oot, name, color) {mm, name, color},
+      BOSS_SOUL_RECEIPT_FIXTURES(SOUL_ROW)
+#undef SOUL_ROW
+  };
+  const auto soulSaveBefore = gSaveContext;
+  const auto soulNeiBefore = neiSave;
+  for (int mode : {COMBO_GAME_MM, COMBO_GAME_BOTH}) {
+    gComboGameMode = mode;
+    for (bool ready : {false, true}) {
+      donorReady = ready;
+      for (int language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+        gSaveContext.options.language = language;
+        for (const auto &soul : souls) {
+          const auto before = gSaveContext;
+          const int reads = donorReads;
+          CustomMessage::Entry native, imported;
+          native.icon = imported.icon = 0xF5;
+          assert(Rando::ApplyItemReceiptText(soul.id, native) &&
+                 "boss soul fell through to white queue text");
+          assert(Rando::ApplyForeignItemReceiptText(soul.name, imported));
+          for (const auto *entry : {&native, &imported}) {
+            const auto body = FlattenReceiptLines(entry->msg);
+            const auto color = body.find(static_cast<char>(soul.color));
+            const auto reset = body.find('\0', color);
+            assert(!entry->autoFormat && entry->icon == 0xF5);
+            assert(color != std::string::npos && reset > color + 3 &&
+                   reset != std::string::npos);
+            if (language == LANGUAGE_ENG)
+              assert(body.find(std::string(1, static_cast<char>(soul.color)) +
+                               soul.name + std::string(1, '\0')) !=
+                     std::string::npos);
+            else
+              assert(body.find(language == LANGUAGE_GER
+                                   ? "Du hast "
+                                   : "Vous avez") != std::string::npos);
+          }
+          assert(native.msg == imported.msg && donorReads == reads &&
+                 "boss soul text depends on the donor module");
+          assert(std::memcmp(&before, &gSaveContext, sizeof(before)) == 0);
+        }
+      }
+    }
+  }
+  assert(std::memcmp(&soulNeiBefore, &neiSave, sizeof(neiSave)) == 0);
+  gSaveContext = soulSaveBefore;
+  gComboGameMode = COMBO_GAME_BOTH;
+  donorReady = true;
+  std::cout << "Boss soul native/foreign receipts: 14 identities, three "
+               "locales, cold/warm donor, solo/combined passed\n";
   // Cosmetic masks retain their OoT descriptions; Gerudo/Keaton teach their forms.
   // MM-first pickups must not depend on a hydrated OoT module or mutate saves.
   const struct { RandoItemId id; const char* name; const char* detail; } masks[] = {

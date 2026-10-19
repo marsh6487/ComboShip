@@ -32,6 +32,7 @@ preamble = r'''
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+void NeiGi_ReportBlackMarketModel(const char*,const char*,const char* = nullptr) {}
 #include <string>
 #include <vector>
 #include "combo/menu/ComboItemDrawABI.h"

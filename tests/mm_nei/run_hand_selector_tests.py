@@ -28,6 +28,7 @@ prefix=r'''
 #include "z64.h"
 #include "variables.h"
 #include "mods/forms/custom_forms.h"
+#include "render/sword_element_aura_profiles.h"
 #include <cassert>
 #include <string>
 #include <iostream>
@@ -82,6 +83,8 @@ u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dl,void* hand,Player* p,u8 r,u8 g,u8 b){
  heldScratch[5].words.w0=G_ENDDL<<24;*dl=heldScratch;return 1;
 }
 void* DinFireSword_HandDL(PlayState*,Player*,Gfx*){return dinSelected?&dinHand:nullptr;}
+void DinFireSword_SetHandModel(Player*,void*,int){}
+void DinFireSword_CopyHandModel(Player*,void*,void*){}
 void* DinFireShield_HandDL(PlayState*,Player*,Gfx*){return nullptr;}
 void Player_ApplyBackEquipmentVisibility(s32,Gfx**){}
 bool NeiLantern_UsesGrip(const Player*){return lantern;}

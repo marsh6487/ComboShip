@@ -36,6 +36,8 @@ def main():
         pieces.append(re.search(r"typedef enum " + enum + r" \{.*?\} " + enum + ";", source, re.S).group(0))
     pieces.append(function(assets, "MmDirectAudio_StopById"))
     pieces.append(function(assets, "MmSfx_Stop"))
+    native = ROOT / "soh/mods/transformation_masks/mm_native_transform.inc.h"
+    if native.exists(): pieces.append(function(native.read_text(), "MmForm_StopNativeMaskSfx"))
     pieces.append(function(source, "MmForm_StopGoronRollSfx"))
     for name in ("MmForm_UpdateGoronRollSfx", "MmForm_RegisterGoronRollSfxCleanup"):
         if re.search(r"^static void " + name + r"\(", source, re.M):
@@ -49,7 +51,7 @@ def main():
 
     cases = sys.argv[1:] or ["scene-init", "reset", "death", "destroy", "void", "transition-trigger",
                            "transition-mode", "room", "action-exit", "form-exit", "unavailable", "queued",
-                           "rolling"]
+                           "rolling", "transformation-cues"]
     with tempfile.TemporaryDirectory(prefix="goron-audio-") as temp:
         directory = Path(temp)
         sound_types = assets[assets.index("#define MM_DIRECT_MAX_SOUNDS"):]

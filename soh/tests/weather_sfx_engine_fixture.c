@@ -65,7 +65,7 @@ void osSyncPrintf(const char* format, ...) {
 }
 
 static void Request(u16 id, Vec3f* pos) {
-    Audio_PlaySoundGeneral(id, pos, 4, &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+    Audio_PlaySfxGeneral(id, pos, 4, &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
 }
 
 void WeatherSfxEngine_Reset(void) {

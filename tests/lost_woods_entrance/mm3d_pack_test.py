@@ -61,6 +61,8 @@ extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 SaveContext gSaveContext{};
 PlayState* gPlayState;
 static int draws;
+static bool soloPassageAvailable;
+extern "C" int ComboSoloForestMm_PassageAvailable(void) { return soloPassageAvailable; }
 '''
 foliage = (ROOT / 'mm/2s2h/Enhancements/Graphics/AutumnSceneFoliage.cpp').read_text()
 source += block_from(foliage, foliage.index('std::shared_ptr<Fast::Texture> BuildSurfaceTexture('))
@@ -125,6 +127,16 @@ int main(int argc,char** argv) {
     assert(!ComboOpeningForest_UsesPackTunnel(&play));
     shape.normal.numEntries=1; play.sceneId=SCENE_26SARUNOMORI; play.roomCtx.curRoom.num=1;
     DrawPassage(); assert(draws==2); // Existing Mystery arch remains available.
+    gComboGameMode=COMBO_GAME_MM;
+    DrawPassage(); assert(draws==2); // A missing native addon must not advertise a route.
+    soloPassageAvailable=true;
+    DrawPassage(); assert(draws==3); // The native solo Mystery route has its visible bark arch.
+    play.roomCtx.curRoom.num=0; DrawPassage(); assert(draws==3);
+    play.sceneId=SCENE_LOST_WOODS; DrawPassage(); assert(draws==3); // Original intro stays guarded.
+    play.sceneId=SCENE_26SARUNOMORI; play.roomCtx.curRoom.num=1;
+    gSaveContext.gameMode=GAMEMODE_TITLE_SCREEN; DrawPassage(); assert(draws==3);
+    gSaveContext.gameMode=GAMEMODE_NORMAL; gComboGameMode=COMBO_GAME_OOT;
+    soloPassageAvailable=false; DrawPassage(); assert(draws==3);
     std::puts("PASS active native room mesh: exact pack selection, oriented return bounds, fallback/Mystery arch and untouched save");
     for (int i=1;i<argc;++i) CheckPackedPixels(argv[i]);
     if (argc>1) std::puts("PASS actual packed HD images: autumn/spring/frost copy, exact alpha/non-green pixels/scales and immutable source");

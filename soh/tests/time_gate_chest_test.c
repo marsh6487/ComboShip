@@ -7,6 +7,7 @@
 #include "src/overlays/misc/ovl_kaleido_scope/z_kaleido_scope.h"
 #include "objects/object_box/object_box.h"
 #include "soh/OTRGlobals.h"
+#include "sword_element_message.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "mods/extended_inventory.h"
 #include "vt.h"
@@ -127,6 +128,9 @@ void Message_StartTextbox(PlayState* play, u16 text, Actor* actor) {
 }
 int32_t CVarGetInteger(const char* name, int32_t fallback) {
     return fallback;
+}
+bool GameInteractor_Should(GIVanillaBehavior flag, uint32_t result, ...) {
+    return result;
 }
 u8 Item_Give(PlayState* play, u8 item) {
     ++vanillaGives;

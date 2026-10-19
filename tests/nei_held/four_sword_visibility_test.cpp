@@ -7,6 +7,7 @@
 #include "mods/extended_equipment.h"
 #include "mods/equipment/nei_equipment_presentation.h"
 #include "../../combo/NeiHeldSword.h"
+#include "../../combo/render/sword_element_aura_profiles.h"
 #ifdef NEI_EQUIPMENT_MM
 #include "mods/forms/custom_forms.h"
 #endif
@@ -15,6 +16,8 @@ static std::set<std::string> local, donor, shipped, selected;
 static bool altOn, equipped = true, customBody, adult;
 static Gfx hand[1]{}, original[1]{}, native[1]{};
 extern "C" {
+void DinFireSword_SetHandModel(Player*, void*, int) {}
+void DinFireSword_CopyHandModel(Player*, void*, void*) {}
 SaveContext gSaveContext{};
 u8 ResourceMgr_FileExists(const char* path) { return local.contains(path); }
 u8 ResourceMgr_FileAltExists(const char*) { return 0; }

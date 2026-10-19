@@ -5,6 +5,7 @@
 #include <string>
 #include "mods/items/logic/weapon_upgrades.h"
 #include "mods/extended_equipment.h"
+#include "../../combo/render/sword_element_aura_profiles.h"
 #ifdef NEI_EQUIPMENT_MM
 #include "mods/forms/custom_forms.h"
 #endif
@@ -16,7 +17,13 @@ static bool adultMode = false, shippedOwnerReady = true;
 static u8 kokiriLevel = 0, trueMaster = 0, greatFairy = 0;
 static bool gildedLook = true, fairyLook = true;
 static Gfx hand[1]{}, nativeBlade[1]{}, nativeHilt[1]{}, original[1]{};
+static int registeredAura = -1;
+static void* registeredHand = nullptr;
 extern "C" {
+void DinFireSword_SetHandModel(Player*, void* handDL, int model) { registeredHand = handDL; registeredAura = model; }
+void DinFireSword_CopyHandModel(Player*, void* sourceDL, void* destinationDL) {
+    if (registeredHand == sourceDL) registeredHand = destinationDL;
+}
 SaveContext gSaveContext{};
 u8 ResourceMgr_FileExists(const char* p) { return local.contains(p); }
 u8 ResourceMgr_FileAltExists(const char* p) { return alternate.contains(p); }
@@ -136,6 +143,7 @@ static void expectAuthored(Player& player, int sword) {
            "Vanilla sword still lacks its redesigned progressive held model");
     assert(std::memcmp(&player, &before, sizeof(player)) == 0);
     assert(selected != original && (selected[0].words.w0 >> 24) == G_DL);
+    assert(registeredHand == selected && registeredAura == (sword == NEI_HELD_SWORD_FOUR ? -1 : sword));
     const Gfx* mesh = reinterpret_cast<const Gfx*>(selected[0].words.w1);
     assert((mesh[0].words.w0 >> 24) == G_DL_OTR_FILEPATH);
     std::string want = sNeiHeldSwordPaths[sword][frame()][0];
