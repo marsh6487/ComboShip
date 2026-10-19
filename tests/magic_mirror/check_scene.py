@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import struct
@@ -91,9 +92,31 @@ def verify(path, compiled=False):
         polys = collision(data)
         if compiled:
             # The full forest converts native vertex edits to its MM3D mesh.
-            resource = "alt/custom/cor_mm3d/lost_woods_poc1/room_0/Geometry4_vtx"
+            resource = "custom/cor_mm3d/lost_woods_poc1/room_0/Geometry4_vtx"
+            if resource not in pack.namelist():
+                resource = "alt/" + resource
             visual = {tuple(int(v.get(axis)) for axis in "XYZ") for v in ET.fromstring(pack.read(resource))
                       if v.tag == "Vtx"}
+            # The final archive supplies a native transition door; no entrance
+            # collision is needed by its Open-action hook. Check its actual data
+            # and the return footprint against retained static collision.
+            scene = pack.read("alt/scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS")
+            expected = MANIFEST["authored_door"]
+            entry = struct.pack("<4bHhhhhH", 0, -1, 0, -1, expected["actor_id"],
+                                *expected["position"], expected["packed_yaw"], expected["params"])
+            assert scene.count(entry) == 1, "authored native transition door changed"
+            yaw = int(((expected["packed_yaw"] >> 7) & 0x1FF) * 65536 / 360) * (2 * math.pi / 65536)
+            door_x, door_y, door_z = expected["position"]
+            return_x = door_x + math.sin(yaw) * expected["return_distance"]
+            return_z = door_z + math.cos(yaw) * expected["return_distance"]
+            for dx, dz in [(0, 0), (40, 0), (-40, 0), (0, 40), (0, -40),
+                           (28, 28), (28, -28), (-28, 28), (-28, -28)]:
+                x, z = return_x + dx, return_z + dz
+                assert abs(floor_at(polys, x, z, door_y + 5) - door_y) <= 5, "unsupported door return"
+                assert not blocked(polys, (x, door_y + 5, z), (x, door_y + 100, z)), "low door-return ceiling"
+                for height in (10, 55, 100):
+                    assert not blocked(polys, (return_x, door_y + height, return_z),
+                                       (x, door_y + height, z)), "wall at door return"
         else:
             project = json.loads(pack.read("prelude/project/edits.json"))
             edits = next(e["data"] for e in project["edits"]["Z2_LOST_WOODS"] if e["kind"] == "geometry")

@@ -10,6 +10,7 @@
 #include "global.h"
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorPlayer.h"
+#include "2s2h/Enhancements/Gameplay/BlackMarket.h"
 #endif
 #include "sword_element_message.h"
 #include <libultraship/log/luslog.h> // 2S2H [Port] lusprintf (LUS 464 exports it via API_EXPORT)
@@ -7441,7 +7442,7 @@ PlayerAnimationHeader* D_8085D124[] = {
  * PLAYER_DOORTYPE_FAKE:
  * PLAYER_DOORTYPE_PROXIMITY: EnDoor
  */
-void Player_Door_Knob(PlayState* play, Player* this, Actor* door) {
+s32 Player_Door_Knob(PlayState* play, Player* this, Actor* door) {
     s32 temp = this->transformation - 1;
     PlayerAnimationHeader* anim;
     f32 temp_fv0; // sp5C
@@ -7493,6 +7494,21 @@ void Player_Door_Knob(PlayState* play, Player* this, Actor* door) {
                                  ANIM_FLAG_200);
     knobDoor->requestOpen = true;
     if (this->doorType != PLAYER_DOORTYPE_FAKE) {
+#ifdef COMBO_BUILD
+        s32 marketDoor = ComboBlackMarket_TryDoorEntrance(play, &knobDoor->dyna.actor);
+        if (marketDoor == COMBO_BLACK_MARKET_DOOR_ENTERED) {
+            this->stateFlags1 |= PLAYER_STATE1_20000000;
+            gSaveContext.entranceSpeed = 2.0f;
+            return true;
+        }
+        if (marketDoor == COMBO_BLACK_MARKET_DOOR_BLOCKED) {
+            knobDoor->requestOpen = false;
+            Player_StopCutscene(this);
+            func_80839E74(this, play);
+            Audio_PlaySfx(NA_SE_SY_ERROR);
+            return false;
+        }
+#endif
         CollisionPoly* poly;
         s32 bgId;
         Vec3f pos;
@@ -7523,6 +7539,7 @@ void Player_Door_Knob(PlayState* play, Player* this, Actor* door) {
             }
         }
     }
+    return true;
 }
 
 // door stuff
@@ -7553,7 +7570,9 @@ s32 Player_ActionHandler_1(Player* this, PlayState* play) {
             } else if (this->doorType == PLAYER_DOORTYPE_SLIDING) {
                 Player_Door_Sliding(play, this, doorActor);
             } else {
-                Player_Door_Knob(play, this, doorActor);
+                if (!Player_Door_Knob(play, this, doorActor)) {
+                    return true; // A rejected custom door must not start the global door cutscene below.
+                }
             }
 
             if (this->actor.category == ACTORCAT_PLAYER) {

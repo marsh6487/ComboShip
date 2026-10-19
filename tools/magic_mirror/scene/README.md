@@ -6,12 +6,19 @@ portable filename. Its Prelude project includes the stump's visual vertex edits
 and the matching collision, alongside the Granny shop work from that export.
 The complete original bytes and their SHA-256 are preserved.
 
-The current complete scene is the separately retained
-`zzzz_MM3D_Lost_Woods_Black_Market_POC14.prelude.o2r` identified in `manifest.json`.
-It already contains the same stump and newer Black Market work. Use that complete
-scene for combined-mode gameplay. Do not layer this older source edit over it:
-the older whole collision would replace later scene improvements. The compiled
-scene's existing Library identity and exact hash are part of the recovery manifest.
+The current complete candidate is
+`zzzz_MM3D_Lost_Woods_FINAL_native_segment_flags_POC18.prelude.o2r`, identified
+in `manifest.json`. It is derived from cor's final export with the bench, shop
+door and scrolling. The original final archive remains unchanged. The bounded
+recipe in `tools/lost_woods_entrance/final_scene_segments.py` fixes exactly twelve
+native scroll-call address flags; every other resource byte is preserved.
+
+Use this complete candidate for combined-mode checks. Do not layer the older
+editable source or POC14 over it. Their whole scene/collision would replace later
+work. The manifest retains both older identities for recovery and distinguishes
+the final input's file identity from the newly derived candidate. See
+`docs/poc/lost-woods-final-door-20261019.md` for the door route, native compatibility
+finding and remaining runtime proof.
 
 The source edit is for recovery/editing against its original forest donor. Future
 Prelude edits should begin with the latest complete scene and export visual and
@@ -28,7 +35,7 @@ supported landing retains the scene's ordinary entrance spawn.
 
 ```sh
 python3 -B tests/magic_mirror/check_scene.py
-python3 -B tests/magic_mirror/check_scene.py --compiled /absolute/path/to/zzzz_MM3D_Lost_Woods_Black_Market_POC14.prelude.o2r
+python3 -B tests/magic_mirror/check_scene.py --compiled /absolute/path/to/zzzz_MM3D_Lost_Woods_FINAL_native_segment_flags_POC18.prelude.o2r
 ```
 
 These checks compare visual and collision placement, execute the production cap

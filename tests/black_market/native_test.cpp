@@ -1,9 +1,12 @@
 #include "global.h"
 #include "ComboGameMode.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "2s2h/Enhancements/Gameplay/BlackMarket.h"
+#include "2s2h/Enhancements/Gameplay/BlackMarketDoorNative.h"
 #include "entrances/BlackMarketEntrance.h"
 #include "entrances/SoloForest.h"
 #include "rando/BlackMarket.h"
+#include "overlays/actors/ovl_En_Door/z_en_door.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -45,6 +48,13 @@ bool Interior();
 bool Active() { return Interior() && sSession.Active(gSaveContext.fileNum); }
 extern "C" bool Player_InCsMode(PlayState*) { return inCs; }
 extern "C" void Player_Action_35(Player*, PlayState*) {}
+extern "C" void Player_Action_36(Player*, PlayState*) {}
+static int vanillaDoors, stoppedDoors, doorErrors, doorCutscenes;
+extern "C" s16 CutsceneManager_Start(s16, Actor*) { ++doorCutscenes; return 1; }
+static void NativeIdle(Player*, PlayState*) {}
+extern "C" void Player_StopCutscene(Player*) { ++stoppedDoors; }
+void func_80839E74(Player* current, PlayState*) { current->actionFunc = NativeIdle; }
+extern "C" void Audio_PlaySfx(u16) { ++doorErrors; }
 CollisionPoly flatFloor;
 bool floorExists = true;
 extern "C" f32 BgCheck_EntityRaycastFloor5_3(PlayState*, CollisionContext*, CollisionPoly** poly,
@@ -74,7 +84,25 @@ void GrannySceneBegin() {}
 void ApplyGrannyInterior() {}
 void EndBrowsing(PlayState*,bool = false) { sTalking = false; }
 struct ShelfFixtureStub { void Reset() {} } sShelfFixture;
+/* NATIVE_HALF_DAY_TABLE */
 /* PRODUCTION */
+
+void NativeOffer(EnDoor* current, PlayState* play) {
+    Player* player = GET_PLAYER(play);
+    player->doorType = PLAYER_DOORTYPE_HANDLE;
+    /* NATIVE_DOOR_OFFER */
+}
+
+s32 NativeOpen(Player* current, PlayState* play, KnobDoorActor* knobDoor) {
+    knobDoor->requestOpen = true;
+    /* NATIVE_DOOR_OPEN */
+    ++vanillaDoors;
+    return true;
+}
+s32 NativeCaller(Player* current, PlayState* play, KnobDoorActor* knobDoor) {
+    /* NATIVE_DOOR_CALLER */
+    return true;
+}
 
 void Reset() {
     gComboGameMode = COMBO_GAME_BOTH;
@@ -82,9 +110,11 @@ void Reset() {
     gPlayState = &play; gGameState = &play.state;
     play.state.running = true;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
+    player.actor.category = ACTORCAT_PLAYER;
     gSaveContext.gameMode = GAMEMODE_NORMAL;
     gSaveContext.fileNum = 0;
     gSaveContext.save.shipSaveInfo.rando.finalSeed = 77;
+    gSaveContext.save.saveInfo.playerData.health = 0x50;
     play.sceneId = COMBO_BLACK_MARKET_SCENE;
     sSession.Bind(Generate(77), 0); sSession.state = {};
     sClears = 3; sEntering = sReturnPending = false;
@@ -96,9 +126,107 @@ void Reset() {
     inCs = false; floorExists = true; flatFloor = {}; flatFloor.normal.y = 32767;
     player.actor.floorPoly = &flatFloor; player.actor.floorHeight = 0;
     grants = writes = 0; gSaveContext.save.saveInfo.playerData.rupees = 500;
+    vanillaDoors = stoppedDoors = doorErrors = doorCutscenes = 0;
     sSelected = 0;
 }
+
+void TestPlacedDoor() {
+    TransitionActorEntry transitions[2]{};
+    KnobDoorActor door{};
+    auto prepare = [&] {
+        Reset();
+        play.sceneId = SCENE_LOST_WOODS;
+        play.roomCtx.curRoom.num = 0;
+        gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
+        transitions[0] = {}; transitions[0].id = -ACTOR_EN_HOLL;
+        transitions[0].sides[0].room = 1; transitions[0].sides[1].room = 0;
+        auto& entry = transitions[1]; entry = {};
+        entry.id = -ACTOR_EN_DOOR; entry.pos = {-680, 0, 72};
+        entry.rotY = (106 << 7) | 127;
+        entry.sides[0].room = entry.sides[1].room = 0;
+        play.transitionActors.count = 2; play.transitionActors.list = transitions;
+        door = {}; door.dyna.actor.id = ACTOR_EN_DOOR;
+        door.dyna.actor.params = TRANSITION_ACTOR_PARAMS(1, 0);
+        door.dyna.actor.world.pos = door.dyna.actor.home.pos = {-680, 0, 72};
+        player.doorActor = &door.dyna.actor; player.actionFunc = Player_Action_36;
+    };
+    const s16 halfDays[] = {HALFDAYBIT_DAY0_DAWN, HALFDAYBIT_DAY0_NIGHT,
+        HALFDAYBIT_DAY1_DAWN, HALFDAYBIT_DAY1_NIGHT, HALFDAYBIT_DAY2_DAWN, HALFDAYBIT_DAY2_NIGHT,
+        HALFDAYBIT_DAY3_DAWN, HALFDAYBIT_DAY3_NIGHT, HALFDAYBIT_DAY4_DAWN, HALFDAYBIT_DAY4_NIGHT};
+    // Execute the native offer branch, not just a manually preselected Open action.
+    for (s16 halfDay : halfDays) {
+        prepare();
+        EnDoor offered{}; offered.knobDoor = door;
+        offered.doorType = ENDOOR_TYPE_WHOLE_DAY; offered.typeVar.halfDayCheck = 0;
+        play.actorCtx.halfDaysBit = halfDay;
+        NativeOffer(&offered, &play);
+        assert(player.doorType == PLAYER_DOORTYPE_HANDLE);
+        // A different scene, transition index, or room pair retains its schedule.
+        for (int other = 0; other < 3; ++other) {
+            prepare(); offered.knobDoor = door;
+            play.actorCtx.halfDaysBit = halfDay;
+            if (other == 0) play.sceneId = SCENE_TOWN;
+            if (other == 1) offered.knobDoor.dyna.actor.params = TRANSITION_ACTOR_PARAMS(0, 0);
+            if (other == 2) transitions[1].sides[1].room = 1;
+            NativeOffer(&offered, &play);
+            const s16 nightBit = ((halfDay & HALFDAYBIT_DAWNS) >> 1) | (halfDay & HALFDAYBIT_NIGHTS);
+            assert(player.doorType == ((nightBit & D_801AED48[0]) ?
+                PLAYER_DOORTYPE_HANDLE : PLAYER_DOORTYPE_TALKING));
+        }
+    }
+    prepare();
+    const auto original = transitions[1];
+    const auto respawn = gSaveContext;
+    NativeCaller(&player, &play, &door);
+    assert(sEntering && sTravelSlot == 0 && sTravelSeed == 77);
+    assert(play.transitionTrigger == TRANS_TRIGGER_START && play.nextEntrance == COMBO_BLACK_MARKET_ENTRANCE);
+    assert(play.transitionType == TRANS_TYPE_FADE_BLACK && door.requestOpen && vanillaDoors == 0);
+    assert(doorCutscenes == 1 && (player.stateFlags1 & PLAYER_STATE1_20000000));
+    assert(std::memcmp(&transitions[1], &original, sizeof(original)) == 0);
+    assert(std::memcmp(&gSaveContext.respawn, &respawn.respawn, sizeof(respawn.respawn)) == 0);
+    // Returning uses the authored door's outward direction, not the old shell.
+    play.transitionTrigger = TRANS_TRIGGER_OFF;
+    sReturnPending = true;
+    SceneInit(SCENE_LOST_WOODS, 0);
+    const float angle = 106 * (3.14159265359f / 180);
+    assert(std::abs(player.actor.world.pos.x - (-680 + std::sin(angle) * 226)) < 0.1f);
+    assert(std::abs(player.actor.world.pos.z - (72 + std::cos(angle) * 226)) < 0.1f);
+    assert(player.actor.shape.rot.y == DEG_TO_BINANG(106));
+    // A future Prelude translation/rotation drives the same native callback.
+    prepare();
+    transitions[1].id = ACTOR_EN_DOOR; // also valid before native spawning
+    transitions[1].pos = {350, 10, -250}; transitions[1].rotY = (270 << 7) | 127;
+    door.dyna.actor.home.pos = door.dyna.actor.world.pos = {350, 10, -250};
+    BlackMarketDoorNative::Pose moved;
+    assert(BlackMarketDoorNative::Find(&play, moved) && moved.yaw == DEG_TO_BINANG(270));
+    NativeCaller(&player, &play, &door);
+    assert(sEntering && vanillaDoors == 0);
+    for (int reason = 0; reason < 5; ++reason) {
+        prepare();
+        if (reason == 0) pack = false;
+        if (reason == 1) sSession.Bind(nullptr, -1);
+        if (reason == 2) gSaveContext.save.saveInfo.playerData.health = 0;
+        if (reason == 3) play.pauseCtx.state = PAUSE_STATE_MAIN;
+        if (reason == 4) player.actionFunc = NativeIdle;
+        NativeCaller(&player, &play, &door);
+        assert(!sEntering && play.transitionTrigger == TRANS_TRIGGER_OFF && !door.requestOpen);
+        assert(vanillaDoors == 0 && stoppedDoors == 1 && doorErrors == 1 && player.actionFunc == NativeIdle);
+        assert(doorCutscenes == 0); // Rejected entry must not restart the infinite global door cutscene.
+    }
+    // Ordinary doors, other scenes and prologue visits retain the native path.
+    for (int reason = 0; reason < 4; ++reason) {
+        prepare();
+        if (reason == 0) play.sceneId = SCENE_TOWN;
+        if (reason == 1) transitions[1].sides[1].room = 1;
+        if (reason == 2) gSaveContext.save.cutsceneIndex = 0xFFF0;
+        if (reason == 3) door.dyna.actor.params = TRANSITION_ACTOR_PARAMS(0, 0);
+        NativeCaller(&player, &play, &door);
+        assert(!sEntering && vanillaDoors == 1 && door.requestOpen && stoppedDoors == 0);
+    }
+    puts("PASS authored native Open action, moved door/return, blocked-shop cleanup, ordinary-door and respawn preservation");
+}
 int main() {
+    TestPlacedDoor();
     Reset();
     u16 textId = kBrowseText; bool fromTable = true;
     MarketText(&textId, &fromTable);
@@ -158,6 +286,23 @@ int main() {
     assert(!ComboBlackMarket_AtExit(-11, 0, 381)); // safe native entry
     assert(!ComboBlackMarket_AtExit(0, 0, -260)); // staff area is not an exit
     assert(!ComboBlackMarket_AtExit(60, 0, 410)); // beside the door
+    // The final authored scene owns the new door. The retired placeholder
+    // trigger on the far side of the clearing must no longer enter the shop.
+    Reset();
+    play.sceneId = SCENE_LOST_WOODS;
+    play.roomCtx.curRoom.num = 0;
+    gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
+    TransitionActorEntry authored{};
+    authored.id = -ACTOR_EN_DOOR; // native spawn marks transition entries negative
+    authored.pos = {-680, 0, 72};
+    authored.rotY = (106 << 7) | 127;
+    authored.sides[0].room = authored.sides[1].room = 0;
+    play.transitionActors.count = 1;
+    play.transitionActors.list = &authored;
+    sDoorArmed = true;
+    player.actor.world.pos = {410, 0, -300};
+    PlayerUpdate(&player.actor);
+    assert(!sEntering && play.transitionTrigger == TRANS_TRIGGER_OFF);
     Reset();
     gSaveContext.save.entrance = COMBO_BLACK_MARKET_ENTRANCE;
     sSession.state.purchased = 0xA5;

@@ -146,18 +146,19 @@ before camera setup. Cached scene bytes and Farore/grotto respawn data are not
 written by the Mirror arrival.
 
 The unchanged original editable Prelude export is now bundled under
-`tools/magic_mirror/scene/`, with an exact-byte identity manifest. The current
+`tools/magic_mirror/scene/`, with an exact-byte identity manifest. The previous
 complete POC14 scene is separately retained and identified there, including its
 durable file identity and SHA-256. It contains the same visual/collision stump
-and newer Black Market work. Use the complete scene for combined gameplay; do not
-overlay the older editable source's whole collision onto POC14. Solo modes retain
+and newer Black Market work. The final complete candidate now supersedes POC14, as described in
+`docs/poc/lost-woods-final-door-20261019.md`. Do not overlay older whole scene
+or collision resources onto that candidate. Solo modes retain
 their existing private forest addon and resolve its loaded stump in the same way.
 
 Additional checks:
 
 ```sh
 python3 -B tests/magic_mirror/check_scene.py
-python3 -B tests/magic_mirror/check_scene.py --compiled /absolute/path/to/zzzz_MM3D_Lost_Woods_Black_Market_POC14.prelude.o2r
+python3 -B tests/magic_mirror/check_scene.py --compiled /absolute/path/to/zzzz_MM3D_Lost_Woods_FINAL_native_segment_flags_POC18.prelude.o2r
 python3 -B tests/lost_woods_entrance/run_tests.py
 ```
 
@@ -166,7 +167,7 @@ and Play initialization translation units pass their engine's C syntax probe.
 Sanitized fixtures exercise moved loaded collision, cached-address reuse, pending
 arrival lifetime, context mismatch, physical-query rejection, exact-once use,
 cached-spawn restoration and native handoff/fade paths. Scene checks validate all
-13 cap vertices against the Prelude edits and POC14's actual rendered cap, execute
+13 cap vertices against the Prelude edits and the final candidate's rendered cap resource, execute
 the production locator across all horizontal scene faces before/after translation,
 and inspect static collision support/clearance at the current base landing.
 Configured gameplay, archive priority, runtime camera/Mario presentation and a

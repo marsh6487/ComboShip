@@ -4,6 +4,7 @@
 #include "BlackMarketResources.h"
 #include "ComboExport.h"
 #include "ComboOpeningForest.h"
+#include "BlackMarketDoorNative.h"
 #include "entrances/BlackMarketEntrance.h"
 #include "entrances/SoloForest.h"
 #include "BlackMarketLock.h"
@@ -29,6 +30,7 @@ extern "C" {
 extern SceneEntranceTableEntry sSceneEntranceTable[ENTR_SCENE_MAX];
 u8 ResourceMgr_FileExists(const char* path);
 void Player_Action_35(Player* player, PlayState* play);
+void Player_Action_36(Player* player, PlayState* play);
 }
 #include "BlackMarketShelvesNative.h"
 
@@ -459,6 +461,8 @@ void PlayerUpdate(Actor* actor) {
     }
     if (!Exterior(play) || !sSession.Active(gSaveContext.fileNum) || !PackAvailable())
         return;
+    if (BlackMarketDoorNative::HasDoor(play))
+        return; // The native Open action owns the authored door, including unavailable/ambiguous markers.
     const auto door = Door();
     Vec3f probe = { door.x, 120.0f, door.z };
     CollisionPoly* floor = nullptr;
@@ -508,7 +512,9 @@ void SceneInit(s8 scene, s8 spawn) {
         Player* player = GET_PLAYER(gPlayState);
         if (!player)
             return;
-        Vec3f pos = SoloExterior(gPlayState)
+        BlackMarketDoorNative::Pose placed;
+        const bool authoredDoor = BlackMarketDoorNative::Find(gPlayState, placed);
+        Vec3f pos = authoredDoor ? BlackMarketDoorNative::Outside(placed) : SoloExterior(gPlayState)
                         ? sSoloReturn
                         : Vec3f{ COMBO_BLACK_MARKET_DOOR_X - 226.0f, 0, COMBO_BLACK_MARKET_DOOR_Z };
         pos.y += 120.0f;
@@ -519,7 +525,7 @@ void SceneInit(s8 scene, s8 spawn) {
         if (y == BGCHECK_Y_MIN || !floor || floor->normal.y < 23170)
             return;
         pos.y = y;
-        const s16 yaw = SoloExterior(gPlayState) ? sSoloReturnYaw : -16384;
+        const s16 yaw = authoredDoor ? placed.yaw : SoloExterior(gPlayState) ? sSoloReturnYaw : -16384;
         if (player->actionFunc == Player_Action_35) {
             const float turn = (s16)(yaw - player->actor.shape.rot.y) * (6.28318530718f / 65536.0f);
             const Vec3f delta = { player->unk_3A0.x - player->actor.world.pos.x,
@@ -544,6 +550,8 @@ void DrawExterior() {
     PlayState* play = gPlayState;
     if (!Exterior(play) || !sSession.Active(gSaveContext.fileNum) || !PackAvailable())
         return;
+    if (BlackMarketDoorNative::HasDoor(play))
+        return; // The finished scene already draws its building and door.
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
     Matrix_Push();
@@ -730,6 +738,33 @@ void ComboBlackMarket_LoadState(const nlohmann::json& save, int slot) {
                         value.value("savedInside", nlohmann::json()) == true;
     if (gComboGameMode == COMBO_GAME_MM && sResumeFromMarket)
         RememberTravel();
+}
+extern "C" int ComboBlackMarket_IsAuthoredDoor(PlayState* play, Actor* door) {
+    BlackMarketDoorNative::Pose placed;
+    return play == gPlayState && Exterior(play) && BlackMarketDoorNative::Find(play, placed) &&
+           BlackMarketDoorNative::Matches(door, placed);
+}
+extern "C" int ComboBlackMarket_TryDoorEntrance(PlayState* play, Actor* door) {
+    BlackMarketDoorNative::Pose placed;
+    if (play != gPlayState || !Exterior(play) || !BlackMarketDoorNative::Find(play, placed) ||
+        !BlackMarketDoorNative::Matches(door, placed))
+        return COMBO_BLACK_MARKET_DOOR_UNHANDLED;
+    const Player* player = GET_PLAYER(play);
+    // Called only after the native knob-door action owns the player. Its own
+    // cutscene flag is expected; other scene/pause/transition gates remain live.
+    if (!Safe(play) || !player || player->doorActor != door || player->actionFunc != Player_Action_36 ||
+        gSaveContext.save.saveInfo.playerData.health <= 0 || !sSession.Active(gSaveContext.fileNum) || !PackAvailable())
+        return COMBO_BLACK_MARKET_DOOR_BLOCKED;
+    if (SoloExterior(play)) {
+        sSoloReturn = BlackMarketDoorNative::Outside(placed);
+        sSoloReturnYaw = placed.yaw;
+        sSoloReturnEntrance = gSaveContext.save.entrance;
+    }
+    sDoorArmed = sReturnPending = false;
+    sEntering = true;
+    RememberTravel();
+    Transition(play, COMBO_BLACK_MARKET_ENTRANCE);
+    return COMBO_BLACK_MARKET_DOOR_ENTERED;
 }
 extern "C" void ComboBlackMarket_ApplyResume(int resume) {
     const bool fromMarket = sResumeFromMarket;

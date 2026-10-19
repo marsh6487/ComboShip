@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "scene": "Z2_LOST_WOODS",
   "room": 0,
   "source_edit": {
@@ -11,12 +11,13 @@
     "role": "unchanged original editable stump and Granny shop source; not a replacement for the newer full scene"
   },
   "compiled_scene": {
-    "name": "zzzz_MM3D_Lost_Woods_Black_Market_POC14.prelude.o2r",
-    "sha256": "7b8f2b820ba0bf4441889693f820d280f8dace6f4664387f847bf0fdeecbdce9",
-    "library_file_id": "libfile_65b0089ba44c8191aeee53f6753a8d7f",
-    "version": 0,
-    "size": 121101985,
-    "collision_sha256": "c00ee0ac86c0829aa981b284d251442ffd4212b6aa802e57d2f8db317529bb85"
+    "name": "zzzz_MM3D_Lost_Woods_FINAL_native_segment_flags_POC18.prelude.o2r",
+    "sha256": "4bef56b0b4e3fbe89308c85e29eefbfce19b4f91d21a7ed79fc5c3c519c4a7ef",
+    "size": 121716901,
+    "collision_sha256": "c00ee0ac86c0829aa981b284d251442ffd4212b6aa802e57d2f8db317529bb85",
+    "derived_from": "final_source",
+    "recipe": "python3 -B tools/lost_woods_entrance/final_scene_segments.py INPUT --output OUTPUT --receipt RECEIPT",
+    "changes": "12 native G_DL address-flag bytes; all other resource bytes preserved"
   },
   "source_collision_sha256": "f59a49b42b88f90c64b20f2129cb686c66753720edcfa02ca79adeeba307b98a",
   "cap_snapshot": {
@@ -38,5 +39,35 @@
     0,
     296
   ],
-  "runtime": "unverified configured gameplay; source geometry and native fixtures only"
+  "runtime": "unverified configured gameplay and Prelude preview; source/resource audits and native fixtures only",
+  "previous_compiled_scene": {
+    "name": "zzzz_MM3D_Lost_Woods_Black_Market_POC14.prelude.o2r",
+    "sha256": "7b8f2b820ba0bf4441889693f820d280f8dace6f4664387f847bf0fdeecbdce9",
+    "library_file_id": "libfile_65b0089ba44c8191aeee53f6753a8d7f",
+    "version": 0,
+    "size": 121101985,
+    "collision_sha256": "c00ee0ac86c0829aa981b284d251442ffd4212b6aa802e57d2f8db317529bb85",
+    "role": "superseded complete POC14 scene; retained recovery identity"
+  },
+  "final_source": {
+    "original_name": "1 - lost woods 2ship, wood bench added. final for merge.prelude.o2r",
+    "sha256": "89bdb0ce3ce2e22ca7e4aed438251a66a167ee8b1d68a7b1b019a05c35ac34f9",
+    "library_file_id": "libfile_7242750a38d48191aebd586af45e34bc",
+    "version": 0,
+    "size": 121116642,
+    "role": "unchanged final editable user input, with authored door and scrolling"
+  },
+  "authored_door": {
+    "transition_index": 1,
+    "actor_id": 5,
+    "position": [
+      -680,
+      0,
+      72
+    ],
+    "packed_yaw": 13695,
+    "params": 0,
+    "return_distance": 226,
+    "runtime": "native Open action; eligible forest door ignores half-day schedule; shop return derives from loaded position and yaw"
+  }
 }
