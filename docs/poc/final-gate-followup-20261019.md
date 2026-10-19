@@ -37,3 +37,9 @@ The combined source checkpoint `a0fd97c155c0c0641fe8b257c5823eaaa2170931` passed
 The forest actor runner and MM Saria resource runner now compile their standalone C++ fixtures with `FMT_HEADER_ONLY`, matching existing standalone tests. This retains the actual resource classes and logging implementation. It changes no application compiler settings, game source, resource data, actor behavior or audio integration. The native monkey suite remains the first forest-runner check.
 
 The missing implementation was reproduced with genuine spdlog 1.12.0 and fmt 9.1.0 headers in external-fmt configuration. Verification covers the complete forest runner with both external and bundled fmt configurations, and the MM Saria snapshot/resource suite under ASan/UBSan. Exact-head hosted continuation and full executable/archive builds retain their separately reported status.
+
+## Editor grant fixture dependencies
+
+The full local NEI continuation reached both native editor grant fixtures and reproduced an unresolved `TravelTools_Grant` dependency from the real inline `ExtInv_GiveItem` path. Both editor runners already copy the Grace/hourglass grant functions; they now also copy the actual `TravelTools_Heal` and `TravelTools_Grant` bodies from their respective engine's production inventory implementation. No replacement grant stub or ownership rule is introduced.
+
+The MM suite exercises real randomizer grant arms, grant-all/individual/repeat behavior, ordinary inventory preservation, pool bindings under ASan/UBSan, and complete SaveEditor/GiveItem header compilation. The OoT suite retains its native inventory, selector, mode and repeated-grant checks. These are fixture dependency repairs only; the source merge still does not establish configured gameplay acceptance.

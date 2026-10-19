@@ -50,7 +50,7 @@ production += "\n" + store[store.index("#define NEI_CANE_SKILL_MAX"):store.index
 production += "\n" + inventory[inventory.index("const uint8_t gPage2Items["):inventory.index("// Age requirements for page 2")]
 production += "\n" + inventory[inventory.index("static const uint8_t sWandQuest"):inventory.index("static void* const sWandNameTex")]
 production += "\n" + "\n".join(function(inventory, name) for name in (
-    "GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant",
+    "TravelTools_Heal", "TravelTools_Grant", "GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant",
     "Wand_ModeOwned", "Wand_GrantMode", "Wand_SetModeOwned", "Wand_ModeCount",
     "Slate_RuneOwned", "Slate_GrantRune", "Seasons_HasRod", "Seasons_GrantRod",
     "Seasons_SeasonOwned", "Seasons_GrantSeason", "Seasons_SetSeason"))
