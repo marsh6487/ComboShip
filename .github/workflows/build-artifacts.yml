@@ -44,8 +44,16 @@ jobs:
         with:
           fetch-depth: 2   # the pin gate diffs the PR merge commit against its base parent
 
-      # These compile small production slices and one renderer object. Keep them
-      # ahead of dependency installation and the long regression/build stages.
+      # The renderer preflight consumes the real solo-forest JSON interface.
+      # Install its headers before compiling any production objects.
+      - name: Install gate dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang-format-14 cmake ninja-build nlohmann-json3-dev libspdlog-dev libsdl2-dev libsdl2-net-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-pil
+
+      # These compile small production slices and one renderer object before
+      # the long regression/build stages.
+      - name: Fast shared Granny UI and engine header regression
+        run: python3 -B tests/black_market/run_granny_header_tests.py
+
       - name: Fast game-picker Windows header regression
         run: python3 -B tests/solo_games/selection_test.py --windows
 
@@ -144,7 +152,6 @@ jobs:
 
       - name: clang-format (clang-format-14)
         run: |
-          sudo apt-get update && sudo apt-get install -y clang-format-14 cmake ninja-build nlohmann-json3-dev libspdlog-dev libsdl2-dev libsdl2-net-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-pil
           ./run-clang-format.sh
           git diff --exit-code
 

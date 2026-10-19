@@ -227,8 +227,10 @@ class Room {
             if (opcode == G_ENDDL && path == Exact(kCounterDraw)) {
                 if (mCounter.size() != 1197)
                     Fail("Missing Djipi counter vertices");
-                Gfx cap[] = { gsSPVertex(mCounter.data() + 1189, 4, 0), gsSP2Triangles(0, 2, 1, 0, 0, 3, 2, 0),
-                              gsSPVertex(mCounter.data() + 1193, 4, 0), gsSP2Triangles(0, 1, 2, 0, 0, 2, 3, 0) };
+                Gfx cap[] = {
+                    gsSPVertex(mCounter.data() + 1189, 4, 0), gsSP1Triangle(0, 2, 1, 0), gsSP1Triangle(0, 3, 2, 0),
+                    gsSPVertex(mCounter.data() + 1193, 4, 0), gsSP1Triangle(0, 1, 2, 0), gsSP1Triangle(0, 2, 3, 0)
+                };
                 list.insert(list.end(), std::begin(cap), std::end(cap));
             }
             list.push_back(command);

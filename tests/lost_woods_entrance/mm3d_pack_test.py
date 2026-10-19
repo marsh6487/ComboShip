@@ -56,12 +56,16 @@ source = r'''
 #include <fast/resource/type/Texture.h>
 #include "global.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "2s2h/Enhancements/Graphics/WoodsMysteryMakeover.h"
 #include "ComboGameMode.h"
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 SaveContext gSaveContext{};
 PlayState* gPlayState;
 static int draws;
 static bool soloPassageAvailable;
+extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return true; }
+extern "C" uint8_t ResourceMgr_FileAltExists(const char*) { return 0; }
+extern "C" uint8_t ResourceMgr_FileExists(const char*) { return 0; }
 extern "C" int ComboSoloForestMm_PassageAvailable(void) { return soloPassageAvailable; }
 '''
 foliage = (ROOT / 'mm/2s2h/Enhancements/Graphics/AutumnSceneFoliage.cpp').read_text()

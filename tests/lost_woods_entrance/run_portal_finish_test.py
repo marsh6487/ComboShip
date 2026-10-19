@@ -61,6 +61,7 @@ with tempfile.TemporaryDirectory(prefix='forest-portal-finish-') as temporary:
     cpp.write_text(r'''
 #include "global.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "2s2h/Enhancements/Graphics/WoodsMysteryMakeover.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -69,6 +70,9 @@ extern "C" { int gComboGameMode=COMBO_GAME_BOTH; }
 SaveContext gSaveContext{};
 PlayState* gPlayState;
 static int finishes, arches;
+extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return true; }
+extern "C" uint8_t ResourceMgr_FileAltExists(const char*) { return 0; }
+extern "C" uint8_t ResourceMgr_FileExists(const char*) { return 0; }
 extern "C" int ComboSoloForestMm_PassageAvailable(void) { return 0; }
 ''' + finish + arch + r'''
 int main() {

@@ -29,6 +29,9 @@ python3 -B tests/black_market/run_oot_native_tests.py
 python3 -B tests/black_market/run_shelves_native_tests.py
 python3 -B tests/black_market/run_browsing_native_tests.py
 python3 -B tests/black_market/run_granny_native_tests.py
+python3 -B tests/black_market/run_granny_header_tests.py
+python3 -B tests/woods_mystery/run_hex_test.py
+python3 -B tests/woods_mystery/run_active_pack_test.py
 python3 -B tests/black_market/run_scene_music_tests.py
 python3 -B tests/black_market/run_music_shuffle_tests.py
 python3 -B scripts/diagnostics/run_din_fire_shield_tests.py
