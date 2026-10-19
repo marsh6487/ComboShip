@@ -600,7 +600,9 @@ with tempfile.TemporaryDirectory(prefix='transition-fade-') as tmp:
             cmd += ['-DCOMBO_BUILD']
         if game == 'mm_handoff':
             # The native MM header set deliberately redefines the libultraship button macros.
-            cmd += ['-w']
+            # The imported host block also contains unrelated arrival entrypoints.
+            # Match the forest fixture's section GC so only exercised paths must link.
+            cmd += ['-w', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections']
         native_game = 'mm' if game == 'mm_handoff' else 'soh'
         for p in ('combo', native_game, native_game + '/include', native_game + '/include/PR', native_game + '/src',
                   native_game + '/assets', native_game + '/mods', native_game + '/soh', native_game + '/2s2h', 'libultraship/include'):
