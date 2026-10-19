@@ -28,6 +28,7 @@
 #include "soh/OTRGlobals.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include "soh/Enhancements/Graphics/ZorasDomain.h"
 
 // Entrance Table definition
 #define DEFINE_ENTRANCE(_0, sceneId, spawn, continueBgm, displayTitleCard, endTransType, startTransType) \
@@ -1213,7 +1214,7 @@ void func_8009E730(PlayState* play) {
 
     gameplayFrames = play->gameplayFrames;
     var = 127 - (gameplayFrames * 1) % 128;
-    if (LINK_IS_ADULT) {
+    if (LINK_IS_ADULT && !ZorasDomain_IsAlwaysThawed(play)) {
         var = 0;
     }
     gSPSegment(POLY_OPA_DISP++, 0x0C,

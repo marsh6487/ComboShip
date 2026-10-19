@@ -1,6 +1,7 @@
 #include "global.h"
 #include "din_fire_shield.h"
 #include "din_fire_sword.h"
+#include "../../../combo/render/sword_element_aura_identity.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/gameplay_field_keep/gameplay_field_keep.h"
 #include "objects/object_link_boy/object_link_boy.h"
@@ -1732,7 +1733,10 @@ static Gfx* Player_ResolveLimbDLForDummyOrLocal(void* dlPathOrPtr) {
     if (formDL != NULL) {
         return formDL;
     }
-    return ResourceMgr_LoadGfxByName(dlPathOrPtr);
+    Gfx* resolved = ResourceMgr_LoadGfxByName(dlPathOrPtr);
+    if (dlPathOrPtr != NULL && memcmp(dlPathOrPtr, "__OTR__", 7) == 0)
+        DinFireSword_SetHandModel(NULL, resolved, SwordAura_ResourceModel((const char*)dlPathOrPtr, NULL, 0));
+    return resolved;
 }
 
 // Apply AFTER equipment and model overrides. The sheath limb carries the
@@ -1979,6 +1983,7 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
                     // body color; the helper's scratch compound is reused.
                     Gfx* compound = (Gfx*)Graph_Alloc(play->state.gfxCtx, 8 * sizeof(Gfx));
                     memcpy(compound, *dList, 8 * sizeof(Gfx));
+                    DinFireSword_CopyHandModel(this, *dList, compound);
                     *dList = compound;
                 } else if (sLeftHandType == PLAYER_MODELTYPE_LH_OPEN) {
                     // No upgraded sword to draw, so ootHand was resolved and then dropped:
@@ -2033,6 +2038,7 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
                                                                      sPlayerBodyEnvColor.g, sPlayerBodyEnvColor.b)) {
             Gfx* compound = (Gfx*)Graph_Alloc(play->state.gfxCtx, 8 * sizeof(Gfx));
             memcpy(compound, *dList, 8 * sizeof(Gfx));
+            DinFireSword_CopyHandModel(this, *dList, compound);
             *dList = compound;
             sLeftHandType = this->leftHandType;
         } else {
@@ -2063,6 +2069,17 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
     // resource resolution still honors alternate assets and the selected pak.
     Player_ApplyTimePedestalSword(play, this, limbIndex, dList, rot);
     Player_ApplyBackEquipmentVisibility(limbIndex, dList);
+
+    // The mask motion owns these palms. Resolve the selected age/skin's empty
+    // hands after equipment hooks, so a drawn sword cannot pass through the face.
+    if (MmForm_IsNativeTransformationPlaying(play, this)) {
+        if (limbIndex == PLAYER_LIMB_L_HAND)
+            *dList =
+                Player_ResolveLimbDLForDummyOrLocal(gPlayerLeftHandOpenDLs[gSaveContext.linkAge + sDListsLodOffset]);
+        else if (limbIndex == PLAYER_LIMB_R_HAND)
+            *dList =
+                Player_ResolveLimbDLForDummyOrLocal(sPlayerRightHandOpenDLs[gSaveContext.linkAge + sDListsLodOffset]);
+    }
 
     if (GameInteractor_InvisibleLinkActive()) {
         this->actor.shape.shadowDraw = NULL;
@@ -2604,6 +2621,7 @@ Vec3f sLeftRightFootLimbModelFootPos[] = {
 
 void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx) {
     Player* this = (Player*)thisx;
+    MmForm_DrawNativeTransformationLimb(play, this, limbIndex);
 
     if (*dList != NULL) {
         Matrix_MultVec3f(&sZeroVec, D_80160000);
@@ -2629,7 +2647,7 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
             // Other weapon owners change sLeftHandType; unrelated PAK slots
             // must not suppress this overlay.
             if (sLeftHandType == PLAYER_MODELTYPE_LH_SWORD || sLeftHandType == PLAYER_MODELTYPE_LH_BGS) {
-                DinFireSword_Draw(play, this);
+                DinFireSword_DrawHand(play, this, *dList);
             }
         }
 

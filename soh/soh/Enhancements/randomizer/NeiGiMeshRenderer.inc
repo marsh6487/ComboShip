@@ -2,6 +2,54 @@
 #include "ComboRewardGi.h"
 extern "C" int ResourceMgr_GetRewardSurfaceForGame(const char* game, const char* path, NeiGi::Mesh* mesh);
 // Shared by the OoT and MM host renderers. The enclosing TU supplies native GBI/matrix APIs.
+void NeiGi_ReportBlackMarketBounds(const NeiGi::Point& minimum, const NeiGi::Point& maximum) {
+    if (!BlackMarketVisual::Active())
+        return;
+    MtxF matrix;
+    Matrix_Get(&matrix);
+    BlackMarketVisual::Report({ minimum.x, minimum.y, minimum.z }, { maximum.x, maximum.y, maximum.z },
+                              [&](BlackMarketVisual::Point point) {
+        return BlackMarketVisual::Point{ point.x * matrix.xx + point.y * matrix.xy + point.z * matrix.xz + matrix.xw,
+                                         point.x * matrix.yx + point.y * matrix.yy + point.z * matrix.yz + matrix.yw,
+                                         point.x * matrix.zx + point.y * matrix.zy + point.z * matrix.zz + matrix.zw };
+    });
+}
+
+void NeiGi_ReportBlackMarketModel(const char* owner, const char* opaque, const char* translucent) {
+    if (!BlackMarketVisual::Active() || !opaque || std::strncmp(opaque, "__OTR__", 7) != 0)
+        return; // Loaded raw Gfx lists need their caller's original selected root.
+    const char* roots[] = { opaque, translucent };
+    float minimum[3], maximum[3];
+    if (ResourceMgr_GetGiModelBoundsForGame(owner, roots, translucent ? 2 : 1, minimum, maximum))
+        NeiGi_ReportBlackMarketBounds({ minimum[0], minimum[1], minimum[2] },
+                                       { maximum[0], maximum[1], maximum[2] });
+}
+
+static void NeiGi_ReportBlackMarketMesh(const NeiGi::Mesh& mesh) {
+    if (!BlackMarketVisual::Active() || !mesh.count || mesh.count > mesh.vertices.size())
+        return;
+    auto minimum = mesh.vertices[0].p, maximum = minimum;
+    for (size_t i = 1; i < mesh.count; ++i) {
+        const auto& point = mesh.vertices[i].p;
+        minimum = { std::min(minimum.x, point.x), std::min(minimum.y, point.y), std::min(minimum.z, point.z) };
+        maximum = { std::max(maximum.x, point.x), std::max(maximum.y, point.y), std::max(maximum.z, point.z) };
+    }
+    NeiGi_ReportBlackMarketBounds(minimum, maximum);
+}
+
+void NeiGi_ReportBlackMarketVertices(const Vtx* vertices, size_t count) {
+    if (!BlackMarketVisual::Active() || !vertices || !count || count > 65536)
+        return;
+    NeiGi::Point minimum{ float(vertices[0].v.ob[0]), float(vertices[0].v.ob[1]), float(vertices[0].v.ob[2]) };
+    auto maximum = minimum;
+    for (size_t i = 1; i < count; ++i) {
+        const NeiGi::Point point{ float(vertices[i].v.ob[0]), float(vertices[i].v.ob[1]), float(vertices[i].v.ob[2]) };
+        minimum = { std::min(minimum.x, point.x), std::min(minimum.y, point.y), std::min(minimum.z, point.z) };
+        maximum = { std::max(maximum.x, point.x), std::max(maximum.y, point.y), std::max(maximum.z, point.z) };
+    }
+    NeiGi_ReportBlackMarketBounds(minimum, maximum);
+}
+
 NeiGi::Basis NeiGi_CameraBasis(PlayState* play) {
     MtxF m;
     Matrix_Get(&m);
@@ -540,6 +588,7 @@ void NeiGi_DrawPresentation(PlayState* play, const char* opa, const char* xlu, f
 #else
     Matrix_RotateY(spin, MTXMODE_APPLY);
 #endif
+    NeiGi_ReportBlackMarketBounds(bounds->minimum, bounds->maximum);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
     gDPSetEnvColor(POLY_OPA_DISP++, 255, 255, 255, 255);
@@ -652,6 +701,7 @@ void NeiGi_DrawExternalPresentation(PlayState* play, const char* opa, const char
         Matrix_RotateZ(tilt, MTXMODE_APPLY);
 #endif
     }
+    NeiGi_ReportBlackMarketModel(owner ? owner : "oot", opa, xlu);
     OPEN_DISPS(play->state.gfxCtx);
     if (owner) {
         gSPComboRMPush(POLY_OPA_DISP++, owner);
@@ -717,9 +767,12 @@ void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner) {
         gSPComboRMPush(POLY_XLU_DISP++, owner);
     CLOSE_DISPS(play->state.gfxCtx);
     NeiGi_DrawMesh(play, mesh, Kind::Neutral);
+    if (profile <= 4)
+        NeiGi_ReportBlackMarketMesh(mesh);
     if (sun) {
         const auto rays = NeiGi::SampleSeasonSunRays(play->gameplayFrames, profile, camera);
-        NeiGi_DrawMeshMaterial(play, rays, Kind::Neutral, nullptr, true);
+        if (NeiGi_DrawMeshMaterial(play, rays, Kind::Neutral, nullptr, true) && profile <= 4)
+            NeiGi_ReportBlackMarketMesh(rays);
         Matrix_Pop();
     }
     OPEN_DISPS(play->state.gfxCtx);
@@ -733,25 +786,11 @@ void NeiGi_DrawSeasonOverlay(PlayState* play, int profile, const char* owner) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Shared by native and foreign mask/remains and progressive sword overlays.
-// Reuse the exact optional NEI shimmer sampler and renderer; only the requested
-// transformation/remains palette changes. Ordinary items retain NEI's palette.
-void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner) {
-    if (!play || !play->state.gfxCtx || !color)
-        return;
+// All shimmer palettes preserve the same owner, grayscale and matrix boundary.
+static void NeiGi_DrawShimmerMesh(PlayState* play, const NeiGi::Mesh& mesh, const char* owner) {
     NeiGi_ArenaScope arena(play, 1, 2, 16);
     if (!arena)
         return;
-    const bool ordinary = color[0] == 220 && color[1] == 225 && color[2] == 240;
-    const bool dark = color[0] == 0 && color[1] == 0 && color[2] == 0;
-    auto mesh = NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play));
-    if (!ordinary) {
-        const uint32_t rgb = uint32_t(color[0]) << 16 | uint32_t(color[1]) << 8 | color[2];
-        for (size_t i = 0; i < mesh.count; ++i) {
-            auto& vertex = mesh.vertices[i];
-            vertex.rgb = vertex.rgb == 0xFFFFFF ? (dark ? 0x505060 : 0xFFFFFF) : rgb;
-        }
-    }
     OPEN_DISPS(play->state.gfxCtx);
     gSPGrayscale(POLY_XLU_DISP++, false);
     if (owner)
@@ -767,6 +806,34 @@ void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const cha
     gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
     CLOSE_DISPS(play->state.gfxCtx);
+}
+
+// A single two-color mesh keeps the Chateau's gold and burgundy motes distinct.
+// Native C and C++ draw paths share the same bounded, frame-derived sampler.
+void NeiGi_DrawChateauShimmer(PlayState* play) {
+    if (!play || !play->state.gfxCtx)
+        return;
+    const auto mesh = NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play), Kind::ChateauRomani);
+    NeiGi_DrawShimmerMesh(play, mesh, nullptr);
+}
+
+// Shared by native and foreign mask/remains and progressive sword overlays.
+// Reuse the exact optional NEI shimmer sampler and renderer; only the requested
+// transformation/remains palette changes. Ordinary items retain NEI's palette.
+void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner) {
+    if (!play || !play->state.gfxCtx || !color)
+        return;
+    const bool ordinary = color[0] == 220 && color[1] == 225 && color[2] == 240;
+    const bool dark = color[0] == 0 && color[1] == 0 && color[2] == 0;
+    auto mesh = NeiGi::SampleShimmer(play->gameplayFrames, true, NeiGi_CameraBasis(play));
+    if (!ordinary) {
+        const uint32_t rgb = uint32_t(color[0]) << 16 | uint32_t(color[1]) << 8 | color[2];
+        for (size_t i = 0; i < mesh.count; ++i) {
+            auto& vertex = mesh.vertices[i];
+            vertex.rgb = vertex.rgb == 0xFFFFFF ? (dark ? 0x505060 : 0xFFFFFF) : rgb;
+        }
+    }
+    NeiGi_DrawShimmerMesh(play, mesh, owner);
 }
 
 // All nine rewards share this material and scroll fragment. Identity selects

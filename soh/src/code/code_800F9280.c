@@ -34,6 +34,10 @@ uint8_t Audio_IsNightBgmActive(void) {
            sResolvedMainBgm == sRegisteredNightBgm;
 }
 
+uint16_t Audio_GetActiveNightBgm(void) {
+    return Audio_IsNightBgmActive() ? sRegisteredNightBgm : NA_BGM_DISABLED;
+}
+
 u8 sSeqCmdWrPos = 0;
 u8 sSeqCmdRdPos = 0;
 // One-shot per-player flag: MmBgm_Play* sets this via Audio_PrimeMmSideChannel
@@ -79,6 +83,10 @@ static void Audio_StartSequenceInternal(u8 playerIdx, u8 seqId, u8 arg2, u16 fad
                 gAudioContext.seqReplaced[playerIdx] = 0;
             } else {
                 resolvedSeqId = AudioEditor_GetReplacementSeq(seqId);
+#ifdef COMBO_BUILD
+                if (playerIdx == SEQ_PLAYER_BGM_MAIN)
+                    resolvedSeqId = AudioEditor_ResolveSceneSequence(seqId, resolvedSeqId);
+#endif
             }
         }
 
@@ -457,6 +465,13 @@ void Audio_QueueResolvedSeqCmd(u8 playerIdx, u16 seqId, u8 fadeTimer) {
     sResolvedSeqCmds[sSeqCmdWrPos].seqId = seqId;
     sResolvedSeqCmds[sSeqCmdWrPos].isResolved = true;
     sAudioSeqCmds[sSeqCmdWrPos++] = ((u32)playerIdx << 24) | ((u32)fadeTimer << 16) | (seqId & 0xFF);
+}
+
+uint8_t Audio_RestoreNightBgm(uint16_t expectedSequence) {
+    if (expectedSequence == NA_BGM_DISABLED || expectedSequence != sRegisteredNightBgm)
+        return false;
+    Audio_QueueResolvedSeqCmd(SEQ_PLAYER_BGM_MAIN, expectedSequence, 0);
+    return true;
 }
 
 void Audio_QueuePreviewSeqCmd(u16 seqId) {

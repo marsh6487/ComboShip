@@ -62,8 +62,10 @@ DecodedSample DecodeSample(const SoundFontSample* sample) {
 
     const size_t frameCount = sample->size / frameSize;
     size_t sampleCount = frameCount * kSamplesPerFrame;
-    if (sample->loop != nullptr && sample->loop->sampleEnd > 0 && sample->loop->sampleEnd < sampleCount) {
-        sampleCount = sample->loop->sampleEnd;
+    // Resource factories populate the native end at offset 4. Offset 0x0C
+    // (named sampleEnd by the engine) is unused resource padding.
+    if (sample->loop != nullptr && sample->loop->loopEnd > 0 && sample->loop->loopEnd < sampleCount) {
+        sampleCount = sample->loop->loopEnd;
     }
 
     DecodedSample decoded;

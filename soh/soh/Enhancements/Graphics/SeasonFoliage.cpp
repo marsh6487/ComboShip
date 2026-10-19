@@ -17,6 +17,7 @@ struct Material {
     const char* path;
     Surface surface;
     Region region{};
+    uint32_t autumnColor = 0;
 };
 constexpr Material kMaterials[] = {
 #include "SeasonFoliageMaterials.inc"
@@ -63,7 +64,7 @@ void Update(const PlayState* play) {
     }
     std::vector<Binding> active;
     for (const auto& material : kMaterials) {
-        const auto tint = Palette(season, material.surface);
+        const auto tint = Palette(season, material.surface, material.autumnColor);
         if (!tint.color)
             continue;
         for (const char* prefix : { "", "alt/" }) {

@@ -125,6 +125,10 @@ std::vector<std::string> sceneNames = {
     "Castle Hedge Maze (Early)",
     "Sasa Test",
     "Treasure Chest Room",
+#ifdef COMBO_BUILD
+    "Skiejer's Black Market",
+    "Lost Woods (Shared Forest)",
+#endif
     "Unknown",
 };
 

@@ -4498,6 +4498,9 @@ extern "C" void SOH_ApplyComboPortalArrival(int allowPlacement) {
     sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
     if (!allowPlacement)
         return; // Consume a stale forest route without replacing a composed arrival's respawn.
+    // Pair the passage's black departure with a native reveal after loading
+    // the destination. Superseding dungeon/Farore arrivals keep their effect.
+    gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
     gSaveContext.entranceIndex = ENTR_LOST_WOODS_SOUTH_EXIT;
     gSaveContext.cutsceneIndex = 0;
     RespawnData* arrival = &gSaveContext.respawn[RESPAWN_MODE_RETURN];

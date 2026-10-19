@@ -10,6 +10,7 @@
 #include "expansions/sw97/sw97_config.h"
 
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include "soh/Enhancements/Items/MmIceArrows.h"
 #include "soh/Network/Harpoon/HarpoonBridge.h"
 #include "mods/transformation_masks/transformation_masks.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -541,6 +542,10 @@ void EnArrow_Update(Actor* thisx, PlayState* play) {
 
     if (this->isCsNut || ((this->actor.params >= ARROW_NORMAL_LIT) && (player->unk_A73 != 0)) ||
         !Player_InBlockingCsMode(play, player)) {
+        if ((this->actionFunc == EnArrow_Fly) && !this->touchedPoly && !(this->collider.base.atFlags & AT_HIT) &&
+            MmIceArrows_TryFreezeWater(play, this)) {
+            return;
+        }
         this->actionFunc(this, play);
     }
 

@@ -8,6 +8,7 @@
 #include "ComboElementalArrowGi.h"
 #include "ComboRewardGi.h"
 #include "z64.h"
+#include "../../../../combo/BlackMarketFrame.h"
 namespace NeiGi {
 // Private RGBA32 resources use a 32x32 logical tile; resource metadata owns
 // the high-resolution scale. Path and material must have static lifetime.
@@ -19,6 +20,14 @@ struct TextureMaterial {
 };
 } // namespace NeiGi
 extern "C" {
+
+// Passive outside an explicit native market capture. Raw Gfx callers report
+// their original selected resource paths or actual procedural vertices.
+void NeiGi_ReportBlackMarketBounds(const NeiGi::Point& minimum, const NeiGi::Point& maximum);
+void NeiGi_ReportBlackMarketModel(const char* owner, const char* opaque, const char* translucent = nullptr);
+void NeiGi_ReportBlackMarketVertices(const Vtx* vertices, size_t count);
+int ResourceMgr_GetGiModelBoundsForGame(const char* game, const char* const* paths, int count, float minimum[3],
+                                        float maximum[3]);
 
 // Shared presentation primitives. The caller owns pose, origin and scale;
 // these functions do not add GI rotation or optional pickup shimmer.

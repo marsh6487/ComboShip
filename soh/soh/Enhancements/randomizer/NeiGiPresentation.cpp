@@ -848,6 +848,7 @@ static void NeiGi_DrawSelectedSword(PlayState* play, const char* path, bool shop
     // upright +Y; an extra X quarter turn would lay it flat in XZ.
     Matrix_RotateZ(ComboSwordGi_SelectedTilt(1.5707963267948966f, shop), MTXMODE_APPLY);
     Matrix_Scale(.04f, .04f, .04f, MTXMODE_APPLY);
+    NeiGi_ReportBlackMarketModel("oot", path);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     gSPGrayscale(POLY_OPA_DISP++, false);
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);
@@ -1027,6 +1028,12 @@ static bool NeiGi_DrawImpl(PlayState* play, GetItemEntry* entry, bool shop) {
         OPEN_DISPS(play->state.gfxCtx);
         Matrix_Scale(item->scale, item->scale, item->scale, MTXMODE_APPLY);
         Matrix_RotateY(Spin(play), MTXMODE_APPLY);
+        if (authored) {
+            if (const auto* bounds = NeiGi::FindFrameBounds(item->opaque))
+                NeiGi_ReportBlackMarketBounds(bounds->minimum, bounds->maximum);
+        } else {
+            NeiGi_ReportBlackMarketModel("oot", item->opaque, item->translucent);
+        }
         Gfx_SetupDL_25Opa(play->state.gfxCtx);
         gSPGrayscale(POLY_OPA_DISP++, false);
         gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, 255);

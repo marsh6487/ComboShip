@@ -36,6 +36,7 @@ typedef enum {
     STATIC_STORY_ACTOR_CHILD_KAFEI,
     STATIC_STORY_ACTOR_LULU,
     STATIC_STORY_ACTOR_ANJU,
+    STATIC_STORY_ACTOR_MONKEY,
     STATIC_STORY_ACTOR_MAX,
 } StaticStoryActorType;
 
@@ -63,6 +64,7 @@ typedef enum {
     STATIC_ADAPTER_MM_LULU,
     STATIC_ADAPTER_MM_KAFEI,
     STATIC_ADAPTER_MM_ANJU,
+    STATIC_ADAPTER_MM_MONKEY,
 } StaticStoryActorAdapter;
 
 typedef enum {
@@ -88,6 +90,7 @@ typedef enum {
     STATIC_SKELETON_LULU,
     STATIC_SKELETON_KAFEI,
     STATIC_SKELETON_ANJU,
+    STATIC_SKELETON_MONKEY,
 } StaticStorySkeletonFamily;
 
 typedef enum {
@@ -211,6 +214,9 @@ typedef enum {
     STATIC_ANIM_KAFEI_GESTURE,
     STATIC_ANIM_ANJU_UMBRELLA_CRY,
     STATIC_ANIM_ANJU_UMBRELLA_IDLE,
+    STATIC_ANIM_MONKEY_IDLE,
+    STATIC_ANIM_MONKEY_SCRATCH,
+    STATIC_ANIM_MONKEY_JUMP,
 } StaticStoryAnimation;
 
 enum {
@@ -286,6 +292,7 @@ StaticStoryGreatFairyTrackingLimb StaticStoryActor_GetGreatFairyTrackingLimb(int
 int16_t StaticStoryActor_ClampGreatFairyHeadRotation(int16_t rotation);
 float StaticStoryActor_GetGreatFairyHoverAmplitude(uint8_t pose);
 int8_t StaticStoryActor_GetFixedEyeIndex(StaticStoryActorType type, uint8_t pose);
+uint8_t StaticStoryActor_GetInteractionEyeIndex(StaticStoryActorType type, uint8_t pose, uint8_t eyeIndex, bool talking);
 StaticStoryFaceProfile StaticStoryActor_GetFaceProfile(StaticStoryActorType type);
 uint8_t StaticStoryActor_ResolveEyeIndex(StaticStoryActorType type, uint8_t requestedEyeIndex, bool hasAlternateHead);
 bool StaticStoryActor_ShouldOverrideImpaHead(bool hasAlternateSkeleton);

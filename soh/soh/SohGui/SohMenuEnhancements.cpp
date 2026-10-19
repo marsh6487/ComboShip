@@ -1,3 +1,6 @@
+#ifdef COMBO_BUILD
+#include "../../../combo/gui/BlackMarketAppearance.h"
+#endif
 #include "../../../combo/ComboGameMode.h"
 #include "SohMenu.h"
 #include <soh/Enhancements/enhancementTypes.h>
@@ -750,6 +753,13 @@ void SohMenu::AddMenuEnhancements() {
     path.column = SECTION_COLUMN_1;
 
     AddWidget(path, "Mods", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Always Thawed Zora's Domain", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("AlwaysThawedZorasDomain"))
+        .RaceDisable(false)
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Keep Zora's Domain's pools and waterfall flowing as adult Link, using the child water and installed "
+            "texture replacements. Seasonal freezing and draining are ignored in the Domain.\n"
+            "King Zora, quest progress, and randomizer logic remain unchanged."));
     AddWidget(path, "Disable Bomb Billboarding", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("DisableBombBillboarding"))
         .RaceDisable(false)
@@ -795,6 +805,11 @@ void SohMenu::AddMenuEnhancements() {
         .Options(IntSliderOptions().Min(4).Max(6).DefaultValue(6).Tooltip(
             "Space between text characters (useful for HD font textures)."));
     AddWidget(path, "Models & Textures", WIDGET_SEPARATOR_TEXT);
+#ifdef COMBO_BUILD
+    AddWidget(path, "Black Market Appearance", WIDGET_CUSTOM).RaceDisable(false).CustomFunction([](WidgetInfo&) {
+        BlackMarketUI::DrawAppearance();
+    });
+#endif
     AddWidget(path, "Midna Companion (Navi)", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("MidnaCompanion"))
         .RaceDisable(false)
@@ -852,10 +867,24 @@ void SohMenu::AddMenuEnhancements() {
             "Normal sword damage and reach are unchanged."));
     AddWidget(path, "Fire Damage", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("DinFireSwordDamage"))
-        .PreFunc([](WidgetInfo& info) { info.isHidden = CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0) == 0; })
         .Options(CheckboxOptions().Tooltip(
-            "Adds fire interactions to direct sword hits while preserving normal sword damage, cutting, and enemy "
-            "reactions. Off by default. Does not change reach. Charged spin waves stay unchanged."));
+            "Enables fire enchantments after obtaining Fire Arrows. Press A on a sword in the equipment screen to "
+            "choose its element. Swings cost no magic and retain normal sword damage, cutting, and reach."));
+    AddWidget(path, "Ice Damage", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("IceSwordDamage"))
+        .Options(CheckboxOptions().Tooltip(
+            "Enables ice enchantments after obtaining Ice Arrows. Select ice on a sword in the equipment screen. "
+            "Adds supported freezing reactions while retaining normal sword damage and cutting. Costs no magic."));
+    AddWidget(path, "Light Damage", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("LightSwordDamage"))
+        .Options(CheckboxOptions().Tooltip(
+            "Enables light enchantments after obtaining Light Arrows. Select light on a sword in the equipment screen. "
+            "Adds supported light reactions while retaining normal sword damage and cutting. Costs no magic."));
+    AddWidget(path, "MM Ice Arrow Behavior", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("MmIceArrows"))
+        .Options(CheckboxOptions().Tooltip(
+            "Ice Arrows create temporary platforms on water and freeze Octoroks into temporary climbable ice blocks. "
+            "Uses Majora's Mask platform timing and limits. Off by default."));
     AddWidget(path, "Hide Back Equipment and Scabbard", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("HideBackEquipment"))
         .RaceDisable(false)

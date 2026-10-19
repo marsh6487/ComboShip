@@ -21,6 +21,7 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/nametag.h"
+#include "soh/Enhancements/Gameplay/ComboForestActors.h"
 
 #include "soh/ActorDB.h"
 #include "soh/OTRGlobals.h"
@@ -3622,7 +3623,17 @@ Actor* Actor_Spawn(ActorContext* actorCtx, PlayState* play, s16 actorId, f32 pos
         return NULL;
     }
 
+#ifdef COMBO_BUILD
+    // The stationary forest horse resolves named resources and needs no scene
+    // OBJECT_HORSE bank, including while authored room actors are loading.
+    objBankIndex = Ship_GetActorSpawnObjectIndex(play,
+                                                 actorId == ACTOR_EN_HORSE && params == COMBO_SOLO_FOREST_EPONA_PARAMS
+                                                     ? OBJECT_GAMEPLAY_KEEP
+                                                     : dbEntry->objectId,
+                                                 actorId);
+#else
     objBankIndex = Ship_GetActorSpawnObjectIndex(play, dbEntry->objectId, actorId);
+#endif
 
     if ((objBankIndex < 0) ||
         ((dbEntry->category == ACTORCAT_ENEMY) && Flags_GetClear(play, play->roomCtx.curRoom.num))) {

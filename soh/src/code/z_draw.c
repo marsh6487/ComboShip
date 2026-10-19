@@ -1,4 +1,5 @@
 #include "global.h"
+void NeiGi_ReportBlackMarketModel(const char* owner, const char* opaque, const char* translucent);
 #include <string.h>
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "din_fire_shield.h"
@@ -984,6 +985,7 @@ void GetItem_DrawMaskOrBombchu(PlayState* play, s16 drawId) {
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL_26Opa(play->state.gfxCtx);
+    NeiGi_ReportBlackMarketModel("oot", (const char*)sDrawItemTable[drawId].dlists[0], NULL);
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].dlists[0]);
 
@@ -1306,6 +1308,7 @@ void GetItem_DrawOpa0(PlayState* play, s16 drawId) {
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    NeiGi_ReportBlackMarketModel("oot", (const char*)sDrawItemTable[drawId].dlists[0], NULL);
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
     POLY_OPA_DISP =
         GetItem_DrawDListWithCosmetics(POLY_OPA_DISP, (const char*)sDrawItemTable[drawId].dlists[0], drawId);
@@ -1320,6 +1323,7 @@ void GetItem_DrawOpa0Xlu1(PlayState* play, s16 drawId) {
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    NeiGi_ReportBlackMarketModel("oot", shell.opaque, shell.glass);
     gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)shell.opaque);
 
@@ -1365,6 +1369,8 @@ void GetItem_DrawXlu01(PlayState* play, s16 drawId) {
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
+    NeiGi_ReportBlackMarketModel("oot", (const char*)sDrawItemTable[drawId].dlists[0],
+                                 (const char*)sDrawItemTable[drawId].dlists[1]);
     gSPMatrix(POLY_XLU_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].dlists[0]);
     POLY_XLU_DISP =

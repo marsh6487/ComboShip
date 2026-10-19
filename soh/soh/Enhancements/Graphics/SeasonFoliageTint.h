@@ -18,14 +18,12 @@ struct Region {
     unsigned left = 0, top = 0, right = 16, bottom = 16;
 };
 
-inline Tint Palette(int season, Surface surface) {
+inline Tint Palette(int season, Surface surface, uint32_t autumnColor = 0) {
     switch (season) {
         case 0:
-            return surface == Surface::Canopy       ? Tint{ 0xF6C1D9E0, 461 }
-                   : surface == Surface::Understory ? Tint{ 0xF6C1D9FF, 461 }
-                                                    : Tint{};
+            return { surface == Surface::Canopy ? 0xF6C1D9E0u : 0xF6C1D9FFu, 461 };
         case 2:
-            return { surface == Surface::Canopy ? 0xF4B783FFu : 0xFFD078FFu, 256 };
+            return { autumnColor ? autumnColor : surface == Surface::Canopy ? 0xF4B783FFu : 0xFFD078FFu, 256 };
         case 3:
             return { surface == Surface::Canopy ? 0xCCDCEEFFu : 0xE5EDF3FFu, 461 };
         default:

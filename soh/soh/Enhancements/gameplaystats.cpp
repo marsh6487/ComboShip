@@ -133,7 +133,12 @@ const char* const sceneMappings[] = {
     "Castle Maze (Broken)",
     "SRD Room",
     "Chest Room",
+#ifdef COMBO_BUILD
+    "Skiejer's Black Market",
+    "Lost Woods (Shared Forest)",
+#endif
 };
+static_assert(ARRAY_COUNT(sceneMappings) == SCENE_ID_MAX, "Every native scene needs a stats name");
 
 const char* const countMappings[] = {
     "Anubis:",             // COUNT_ENEMIES_DEFEATED_ANUBIS
@@ -424,7 +429,7 @@ const char* ResolveSceneID(int sceneID, int roomID) {
     } else if (sceneID == SCENE_WINDMILL_AND_DAMPES_GRAVE) {
         // Only the last room of Dampe's Grave (rm 6) is considered the windmill.
         return roomID == 6 ? "Windmill" : "Dampe's Grave";
-    } else if (sceneID < SCENE_ID_MAX) {
+    } else if (sceneID >= 0 && sceneID < ARRAY_COUNT(sceneMappings)) {
         return sceneMappings[sceneID];
     }
 

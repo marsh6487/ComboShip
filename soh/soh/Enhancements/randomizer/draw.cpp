@@ -1,5 +1,6 @@
 #include "../../../../combo/ComboGameMode.h"
 #include "draw.h"
+#include "NeiGiRender.h"
 #include "soh/frame_interpolation.h"
 #ifdef COMBO_BUILD
 #include <ship/resource/CrossRMRegistry.h>
@@ -341,6 +342,7 @@ extern "C" void Randomizer_DrawDoubleDefense(PlayState* play, GetItemEntry* getI
 
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
 
+    NeiGi_ReportBlackMarketModel("oot", gGiHeartBorderDL, gGiHeartContainerDL);
     gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_MODELVIEW | G_MTX_LOAD);
 
@@ -1521,6 +1523,7 @@ static void DrawCustomItemDiamond(PlayState* play, Gfx* displayList, f32 scale) 
     // Rotating animation
     s16 rotation = play->gameplayFrames * 0x2;
     Matrix_RotateY(rotation * 0.01f, MTXMODE_APPLY);
+    NeiGi_ReportBlackMarketModel("oot", reinterpret_cast<const char*>(displayList), nullptr);
 
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
@@ -1538,6 +1541,7 @@ static void DrawCustomItemDiamondOpaXlu(PlayState* play, Gfx* opaDL, Gfx* xluDL,
     Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
     s16 rotation = play->gameplayFrames * 0x2;
     Matrix_RotateY(rotation * 0.01f, MTXMODE_APPLY);
+    NeiGi_ReportBlackMarketModel("oot", reinterpret_cast<const char*>(opaDL), reinterpret_cast<const char*>(xluDL));
 
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
@@ -1565,6 +1569,7 @@ static void DrawCustomItemDiamondTint(PlayState* play, Gfx* dl1, Gfx* dl2, f32 s
 
     s16 rotation = play->gameplayFrames * 0x2;
     Matrix_RotateY(rotation * 0.01f, MTXMODE_APPLY);
+    NeiGi_ReportBlackMarketModel("oot", reinterpret_cast<const char*>(dl1), reinterpret_cast<const char*>(dl2));
 
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
@@ -1601,6 +1606,7 @@ void Randomizer_DrawSpinner(PlayState* play, GetItemEntry* getItemEntry) {
 // textbox already say which rod it is). Skijer's NEI
 void Randomizer_DrawElementalWand(PlayState* play, GetItemEntry* getItemEntry) {
     DrawCustomItemDiamond(play, gRandoDominionrodDL, 2.5f);
+    NeiGi_ReportBlackMarketVertices(object_rando_DominionrodVtx, ARRAY_COUNT(object_rando_DominionrodVtx));
 }
 
 void Randomizer_DrawBombArrows(PlayState* play, GetItemEntry* getItemEntry) {
@@ -1614,6 +1620,7 @@ void Randomizer_DrawBombArrows(PlayState* play, GetItemEntry* getItemEntry) {
     s16 rotation = play->gameplayFrames * 0x2;
     Matrix_RotateY(rotation * 0.01f, MTXMODE_APPLY);
 
+    NeiGi_ReportBlackMarketModel("oot", gNeiBombarrowsDL);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gNeiBombarrowsDL);
@@ -1693,6 +1700,7 @@ void Randomizer_DrawCanePacciUltrahand(PlayState* play, GetItemEntry* getItemEnt
 
 void Randomizer_DrawDominionRod(PlayState* play, GetItemEntry* getItemEntry) {
     DrawCustomItemDiamond(play, gRandoDominionrodDL, 2.5f);
+    NeiGi_ReportBlackMarketVertices(object_rando_DominionrodVtx, ARRAY_COUNT(object_rando_DominionrodVtx));
 }
 
 void Randomizer_DrawTimeGate(PlayState* play, GetItemEntry* getItemEntry) {
@@ -1767,6 +1775,7 @@ void Randomizer_DrawMarioMask(PlayState* play, GetItemEntry* getItemEntry) {
     Matrix_RotateX(-M_PIf / 2.0f, MTXMODE_APPLY);
     Matrix_RotateY(play->gameplayFrames * 0x2 * 0.01f, MTXMODE_APPLY);
 
+    NeiGi_ReportBlackMarketModel("oot", gNeiMarioMaskDL);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
     gSPClearGeometryMode(POLY_OPA_DISP++, G_CULL_BOTH);
@@ -1832,6 +1841,7 @@ void Randomizer_DrawExtFourSwordPresentation(PlayState* play, GetItemEntry* getI
         return;
     }
     DrawMmWeaponGi(play, blade, hilt, 0.04f, shop != 0);
+    NeiGi_ReportBlackMarketModel("oot", dgNeiFourSwordBladeDL, hilt ? dgNeiFourSwordHiltDL : nullptr);
 }
 
 // NEI Weapon Upgrades — progressive weapons. The get-item model shows the base weapon
@@ -2143,6 +2153,7 @@ void Randomizer_DrawExtMagicCape(PlayState* play, GetItemEntry* getItemEntry) {
     Matrix_RotateY(rotation * 0.01f, MTXMODE_APPLY);
     Matrix_Translate(0.0f, 22.0f, 0.0f, MTXMODE_APPLY); // colgada desde arriba del cilindro GI
     Matrix_Scale(0.55f, 0.55f, 0.55f, MTXMODE_APPLY);
+    NeiGi_ReportBlackMarketModel("oot", dl);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)dl);
@@ -2299,6 +2310,7 @@ void Randomizer_DrawExtPegasusAnklet(PlayState* play, GetItemEntry* getItemEntry
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     s16 rotation = play->gameplayFrames * 0x2;
     Matrix_RotateY(rotation * 0.01f, MTXMODE_APPLY);
+    NeiGi_ReportBlackMarketModel("oot", gGiHoverBootsDL);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, dl);
@@ -2333,6 +2345,7 @@ void Randomizer_DrawExtTrident(PlayState* play, GetItemEntry* getItemEntry) {
     Matrix_RotateX(-M_PI / 2.0f, MTXMODE_APPLY);
     Matrix_Scale(0.00625f, 0.00625f, 0.00625f, MTXMODE_APPLY);
     Matrix_Translate(0.0f, 80.0f, -1485.0f, MTXMODE_APPLY);
+    NeiGi_ReportBlackMarketModel("oot", gPhantomGanonSkelLimbsLimb_00C610DL_009298);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
     gSPDisplayList(POLY_OPA_DISP++, (Gfx*)gPhantomGanonSkelLimbsLimb_00C610DL_009298);
@@ -2435,6 +2448,7 @@ void Randomizer_DrawExtClimbBoots(PlayState* play, GetItemEntry* getItemEntry) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     Matrix_RotateY(rotation * 0.01f, MTXMODE_APPLY);
+    NeiGi_ReportBlackMarketModel("oot", gGiIronBootsDL, gGiIronBootsRivetsDL);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, mainDL);
@@ -2460,6 +2474,7 @@ void Randomizer_DrawExtRocBoots(PlayState* play, GetItemEntry* getItemEntry) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     Matrix_RotateY(rotation * 0.01f, MTXMODE_APPLY);
+    NeiGi_ReportBlackMarketModel("oot", gGiHoverBootsDL);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_MODELVIEW | G_MTX_LOAD);
     gSPDisplayList(POLY_OPA_DISP++, dl);
@@ -2535,6 +2550,7 @@ void Randomizer_DrawBottomlessBottle(PlayState* play, GetItemEntry* getItemEntry
 static void DrawCustomItemDiamondByPath(PlayState* play, const char* path, Gfx** cache, u8* tried, f32 scale) {
     if (Gfx* mod = NeiGi_ModOverrideDL(path, false)) {
         DrawCustomItemDiamond(play, mod, scale);
+        NeiGi_ReportBlackMarketModel("oot", path);
         return;
     }
     if (!*tried) {
@@ -2550,6 +2566,7 @@ static void DrawCustomItemDiamondByPath(PlayState* play, const char* path, Gfx**
         return; // nothing drawn beats crashing on a bad pointer
     }
     DrawCustomItemDiamond(play, *cache, scale);
+    NeiGi_ReportBlackMarketModel("oot", path);
 }
 
 void Randomizer_DrawNeiSheikahSlate(PlayState* play, GetItemEntry* getItemEntry) {
@@ -2879,29 +2896,43 @@ void Randomizer_DrawMmMask(PlayState* play, GetItemEntry* getItemEntry) {
 }
 
 // =============================================================================
-// Chateau Romani Bottle Get-Item Draw (from mm.o2r)
-// Uses GetItem_DrawOpa0Xlu1 pattern: DL1=Opa (empty bottle), DL2=Xlu (liquid fill)
+// Chateau Romani GI: shipped MM3D alternate, native MM donor fallback.
 // =============================================================================
 
 void Randomizer_DrawChateauRomani(PlayState* play, GetItemEntry* getItemEntry) {
-    if (!MmAssets_IsAvailable())
+    static const ALIGN_ASSET(2) char chateau3dsOpaDL[] = "__OTR__objects/combo_chateau_romani_3ds/OpaqueDL";
+    static const ALIGN_ASSET(2) char chateau3dsXluDL[] = "__OTR__objects/combo_chateau_romani_3ds/GlassDL";
+    // This unique host-owned graph is bundled in soh.o2r. The strict MM loader
+    // intentionally ignores alternates, so only this item bypasses it.
+    const bool use3ds = ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileExists(chateau3dsOpaDL) &&
+                        ResourceMgr_FileExists(chateau3dsXluDL);
+    if (!use3ds && !MmAssets_IsAvailable())
         return;
 
     OPEN_DISPS(play->state.gfxCtx);
 
-    // DL1: Opaque (empty bottle shape)
+    // Milk and stopper; native fallback retains its original pass assignment.
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_MODELVIEW | G_MTX_LOAD);
-    GSP_MM_DL(POLY_OPA_DISP++, gGiChateauRomaniBottleEmptyDL);
+    if (use3ds) {
+        gSPDisplayList(POLY_OPA_DISP++, (Gfx*)chateau3dsOpaDL);
+    } else {
+        GSP_MM_DL(POLY_OPA_DISP++, gGiChateauRomaniBottleEmptyDL);
+    }
 
-    // DL2: Translucent (liquid fill + label)
+    // Glass/reflections, then the opaque burgundy label over the glass.
     Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
               G_MTX_MODELVIEW | G_MTX_LOAD);
-    GSP_MM_DL(POLY_XLU_DISP++, gGiChateauRomaniBottleDL);
+    if (use3ds) {
+        gSPDisplayList(POLY_XLU_DISP++, (Gfx*)chateau3dsXluDL);
+    } else {
+        GSP_MM_DL(POLY_XLU_DISP++, gGiChateauRomaniBottleDL);
+    }
 
     CLOSE_DISPS(play->state.gfxCtx);
+    NeiGi_DrawChateauShimmer(play);
 }
 
 // =============================================================================

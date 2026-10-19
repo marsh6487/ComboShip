@@ -60,6 +60,8 @@ static const StaticStoryActorDefinition sDefinitions[STATIC_STORY_ACTOR_MAX] = {
                                   STATIC_TRACKING_LULU, 12, 0.0f },
     [STATIC_STORY_ACTOR_ANJU] = { 1, 1, OBJECT_INVALID, STATIC_ADAPTER_MM_ANJU, 0.01f, 40.0f, 20, 50, 0, 30, 30, 90.0f,
                                   STATIC_TRACKING_NONE, 0, 0.0f },
+    [STATIC_STORY_ACTOR_MONKEY] = { 2, 1, OBJECT_INVALID, STATIC_ADAPTER_MM_MONKEY, 0.012f, 24.0f, 15, 30, 0, 30, 30,
+                                    70.0f, STATIC_TRACKING_NONE, 0, 0.0f },
 };
 
 static const StaticStoryPoseDescriptor sPoses[STATIC_STORY_ACTOR_MAX][STATIC_STORY_ACTOR_POSE_COUNT] = {
@@ -192,6 +194,11 @@ static const StaticStoryPoseDescriptor sPoses[STATIC_STORY_ACTOR_MAX][STATIC_STO
         STATIC_POSE(STATIC_ANIM_LULU_SING, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_LULU),
         STATIC_POSE(STATIC_ANIM_LULU_LOOK_AROUND, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_LULU),
     },
+    [STATIC_STORY_ACTOR_MONKEY] = {
+        STATIC_POSE(STATIC_ANIM_MONKEY_IDLE, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_MONKEY),
+        STATIC_POSE(STATIC_ANIM_MONKEY_SCRATCH, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_MONKEY),
+        STATIC_POSE(STATIC_ANIM_MONKEY_JUMP, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_MONKEY),
+    },
     [STATIC_STORY_ACTOR_ANJU] = {
         /* Keep the native seated root motion; the placement itself never moves. */
         STATIC_POSE(STATIC_ANIM_ANJU_UMBRELLA_CRY, STATIC_POSE_FLAG_NO_TRACKING, STATIC_SKELETON_ANJU),
@@ -203,7 +210,7 @@ _Static_assert(sizeof(sDefinitions) / sizeof(sDefinitions[0]) == STATIC_STORY_AC
                "Every static story actor type needs a definition");
 _Static_assert(sizeof(sPoses) / sizeof(sPoses[0]) == STATIC_STORY_ACTOR_MAX,
                "Every static story actor type needs a pose row");
-enum { STATIC_STORY_DEFINITION_COUNT = 23, STATIC_STORY_POSE_ROW_COUNT = 23 };
+enum { STATIC_STORY_DEFINITION_COUNT = 24, STATIC_STORY_POSE_ROW_COUNT = 24 };
 _Static_assert(STATIC_STORY_DEFINITION_COUNT == STATIC_STORY_ACTOR_MAX - 1,
                "Definition count must change with the actor registry");
 _Static_assert(STATIC_STORY_POSE_ROW_COUNT == STATIC_STORY_ACTOR_MAX - 1,
@@ -248,6 +255,8 @@ StaticStoryActorType StaticStoryActor_GetType(int16_t params) {
                 return STATIC_STORY_ACTOR_LULU;
             case 13:
                 return STATIC_STORY_ACTOR_ANJU;
+            case 14:
+                return STATIC_STORY_ACTOR_MONKEY;
             default:
                 return STATIC_STORY_ACTOR_NONE;
         }
@@ -373,6 +382,8 @@ uint16_t StaticStoryActor_SelectTextId(StaticStoryActorType type, const StaticSt
             return STATIC_STORY_TEXT_LULU;
         case STATIC_STORY_ACTOR_ANJU:
             return STATIC_STORY_TEXT_ANJU;
+        case STATIC_STORY_ACTOR_MONKEY:
+            return STATIC_STORY_TEXT_MONKEY;
         case STATIC_STORY_ACTOR_ADULT_GANONDORF:
             return 0x00DB;
         case STATIC_STORY_ACTOR_PHANTOM_GANON:
@@ -479,6 +490,15 @@ StaticStoryFaceProfile StaticStoryActor_GetFaceProfile(StaticStoryActorType type
     return STATIC_FACE_PROFILE_STANDARD;
 }
 
+uint8_t StaticStoryActor_GetInteractionEyeIndex(StaticStoryActorType type, uint8_t pose, uint8_t eyeIndex,
+                                                bool talking) {
+    const StaticStoryPoseDescriptor* descriptor = StaticStoryActor_ResolvePose(type, pose);
+    if (type == STATIC_STORY_ACTOR_SARIA && descriptor != NULL && (descriptor->flags & STATIC_POSE_FLAG_OCARINA)) {
+        return talking ? 0 : 2;
+    }
+    return eyeIndex;
+}
+
 uint8_t StaticStoryActor_ResolveEyeIndex(StaticStoryActorType type, uint8_t requestedEyeIndex, bool hasAlternateHead) {
     if (requestedEyeIndex >= 3) {
         return 0;
@@ -503,6 +523,7 @@ StaticStoryResourceSource StaticStoryActor_GetResourceSource(StaticStoryActorTyp
         case STATIC_STORY_ACTOR_LULU:
         case STATIC_STORY_ACTOR_CHILD_KAFEI:
         case STATIC_STORY_ACTOR_ANJU:
+        case STATIC_STORY_ACTOR_MONKEY:
             return STATIC_STORY_RESOURCE_MM_ARCHIVE;
         default:
             return STATIC_STORY_RESOURCE_OOT_OBJECT;

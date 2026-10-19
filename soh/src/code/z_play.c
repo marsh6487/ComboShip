@@ -24,12 +24,16 @@
 #include "mods/items/helpers/postman_kaleido.h"
 #include "mods/items/logic/item_postman_hat.h"
 #include "mods/transformation_masks/mm_mask_wear.h"
+#include "mods/transformation_masks/transformation_masks.h"
 #include <libultraship/libultraship.h>
 
 #include <time.h>
 #include <assert.h>
 
 #ifdef COMBO_BUILD
+#include "soh/Enhancements/audio/AudioEditor.h"
+#include "soh/Enhancements/Gameplay/ComboBlackMarketNative.h"
+#include "soh/Enhancements/Gameplay/ComboSoloForest.h"
 extern int Combo_SOH_CompleteCrossDungeonTransition(void);
 extern void Combo_SOH_CancelCrossDungeonTransition(void);
 #endif
@@ -227,6 +231,7 @@ void Play_Destroy(GameState* thisx) {
     PlayState* play = (PlayState*)thisx;
     Player* player = GET_PLAYER(play);
 
+    MmForm_OnPlayDestroy(play, player);
     GameInteractor_ExecuteOnPlayDestroy();
 
     play->state.gfxCtx->callback = NULL;
@@ -404,6 +409,10 @@ void Play_Init(GameState* thisx) {
     u8 baseSceneLayer;
     s32 pad[2];
 
+#ifdef COMBO_BUILD
+    ComboBlackMarketOot_NormalizeEntry();
+    ComboSoloForestOot_NormalizeEntry();
+#endif
     enableBetaQuest();
 
     // Properly initialize the frame counter so it doesn't use garbage data
@@ -645,6 +654,9 @@ void Play_Init(GameState* thisx) {
         play->unk_1242B = 0;
     }
     Interface_SetSceneRestrictions(play);
+#ifdef COMBO_BUILD
+    AudioEditor_ConfigureSceneMusic(play);
+#endif
     Environment_PlaySceneSequence(play);
     gSaveContext.seqId = play->sequenceCtx.seqId;
     gSaveContext.natureAmbienceId = play->sequenceCtx.natureAmbienceId;
@@ -1760,6 +1772,8 @@ void Play_Draw(PlayState* play) {
 
         FrameTiming_EndNamedSpan("play_draw", "debug_objects", drawPhase);
         drawPhase = FrameTiming_BeginSpan();
+
+        MmForm_DrawNativeTransformationPostProcess(play);
 
         if ((R_PAUSE_MENU_MODE == 1) || (gTrnsnUnkState == 1)) {
             Gfx* gfxP = OVERLAY_DISP;

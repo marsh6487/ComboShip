@@ -142,6 +142,7 @@ u8 sPrevSeqMode = 0;
 f32 sAudioEnemyDist = 0.0f;
 s8 sAudioEnemyVol = 127;
 u16 sPrevMainBgmSeqId = NA_BGM_DISABLED;
+static u16 sPreviewNightBgmSeqId = NA_BGM_DISABLED;
 
 #define SEQ_RESUME_POINT_NONE 0xC0
 u8 sSeqResumePoint = 0;
@@ -1497,6 +1498,7 @@ s32 sAudioUpdateTaskEnd;      // decomp: debug only
     F(sAudioEnemyDist)                                 \
     F(sAudioEnemyVol)                                  \
     F(sPrevMainBgmSeqId)                               \
+    F(sPreviewNightBgmSeqId)                           \
     F(sSeqResumePoint)                                 \
     F(sPrevSceneSeqId)                                 \
     F(sNumFramesStill)                                 \
@@ -5144,6 +5146,7 @@ void func_800F5ACC(u16 seqId) {
 
     if ((curSeqId & 0xFF) != NA_BGM_GANON_TOWER && (curSeqId & 0xFF) != NA_BGM_ESCAPE && curSeqId != seqId) {
         Audio_SetSequenceMode(SEQ_MODE_IGNORE);
+        sPreviewNightBgmSeqId = NA_BGM_DISABLED;
         if (curSeqId != NA_BGM_DISABLED) {
             sPrevMainBgmSeqId = curSeqId;
         } else {
@@ -5155,11 +5158,12 @@ void func_800F5ACC(u16 seqId) {
 }
 
 // based on func_800F5ACC
-void PreviewSequence(u16 seqId) {
+static void Audio_PreviewSequenceInternal(u16 seqId, u8 exact) {
     u16 curSeqId = func_800FA0B4(SEQ_PLAYER_BGM_MAIN);
 
-    if ((curSeqId & 0xFF) != NA_BGM_GANON_TOWER && (curSeqId & 0xFF) != NA_BGM_ESCAPE && curSeqId != seqId) {
+    if ((curSeqId & 0xFF) != NA_BGM_GANON_TOWER && (curSeqId & 0xFF) != NA_BGM_ESCAPE && (exact || curSeqId != seqId)) {
         Audio_SetSequenceMode(SEQ_MODE_IGNORE);
+        sPreviewNightBgmSeqId = Audio_GetActiveNightBgm();
         if (curSeqId != NA_BGM_DISABLED) {
             sPrevMainBgmSeqId = curSeqId;
         } else {
@@ -5168,6 +5172,16 @@ void PreviewSequence(u16 seqId) {
 
         Audio_QueuePreviewSeqCmd(seqId);
     }
+}
+
+void PreviewSequence(u16 seqId) {
+    Audio_PreviewSequenceInternal(seqId, false);
+}
+
+void Audio_PreviewSceneSequence(u16 seqId) {
+    // Scene rows select an exact bank even when its native bookkeeping ID
+    // equals the current one, whose ordinary editor replacement may differ.
+    Audio_PreviewSequenceInternal(seqId, true);
 }
 
 /**
@@ -5183,6 +5197,7 @@ void func_800F5B58(void) {
         }
 
         sPrevMainBgmSeqId = NA_BGM_DISABLED;
+        sPreviewNightBgmSeqId = NA_BGM_DISABLED;
     }
 }
 
@@ -5194,6 +5209,7 @@ void func_800F5BF0(u8 natureAmbienceId) {
 
     if (curSeqId != NA_BGM_NATURE_AMBIENCE) {
         sPrevMainBgmSeqId = curSeqId;
+        sPreviewNightBgmSeqId = NA_BGM_DISABLED;
     }
 
     Audio_PlayNatureAmbienceSequence(natureAmbienceId);
@@ -5202,11 +5218,17 @@ void func_800F5BF0(u8 natureAmbienceId) {
 /**
  * Restores the previous sequence to the main bgm player before func_800F5BF0 was called
  */
+void Audio_CancelPreviewRestore(void) {
+    sPrevMainBgmSeqId = NA_BGM_DISABLED;
+    sPreviewNightBgmSeqId = NA_BGM_DISABLED;
+}
+
 void func_800F5C2C(void) {
-    if (sPrevMainBgmSeqId != NA_BGM_DISABLED) {
+    if (sPrevMainBgmSeqId != NA_BGM_DISABLED && !Audio_RestoreNightBgm(sPreviewNightBgmSeqId)) {
         Audio_StartSeq(SEQ_PLAYER_BGM_MAIN, 0, sPrevMainBgmSeqId);
     }
     sPrevMainBgmSeqId = NA_BGM_DISABLED;
+    sPreviewNightBgmSeqId = NA_BGM_DISABLED;
 }
 
 void Audio_PlayFanfare(u16 seqId) {
@@ -5652,6 +5674,7 @@ void func_800F6C34(void) {
     sSpecReverb = sSpecReverbs[gAudioSpecId];
     D_80130608 = 0;
     sPrevMainBgmSeqId = NA_BGM_DISABLED;
+    sPreviewNightBgmSeqId = NA_BGM_DISABLED;
     Audio_QueueCmdS8(0x46 << 24 | SEQ_PLAYER_BGM_MAIN << 16, -1);
     sSariaBgmPtr = NULL;
     sFanfareStartTimer = 0;

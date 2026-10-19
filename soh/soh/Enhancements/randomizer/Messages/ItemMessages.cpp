@@ -28,6 +28,7 @@
 #include "ComboMagicItemReceiptText.h"
 #include "ComboKeyReceiptText.h"
 #include "ComboDungeonKeyReceipt.h"
+#include "ComboBossSoulReceiptText.h"
 #include "ComboVanillaItemReceiptText.h"
 #include "soh/ShipInit.hpp"
 #include <soh/ResourceManagerHelpers.h>
@@ -61,7 +62,7 @@ extern u8 gLanternCatchPending; // item_lantern.c — fire type pending message 
 // Forward declaration for custom item messages from randomizer.cpp
 struct CustomItemMessageEntry {
     s16 rgId;
-    ItemID itemId;
+    int32_t itemId;
     const char* english;
     const char* german;
     const char* french;
@@ -136,7 +137,7 @@ static bool BuildVanillaEquipmentBottleReceipt(RandomizerGet rg, CustomMessage& 
     const auto gi = item.GetGIEntryUnresolved();
     // Keep the existing custom bottle icon loader and ordinary native gear icon.
     if (item.HasCustomIcon())
-        msg.AutoFormat(static_cast<ItemID>(item.GetItemID()));
+        msg.AutoFormat(static_cast<ItemID>(static_cast<uint8_t>(item.GetItemID())));
     else if (gi && gi->itemId != ITEM_NONE && gi->itemId < ITEM_ROCS_FEATHER_SKIJER)
         msg.AutoFormat(static_cast<ItemID>(gi->itemId));
     else
@@ -463,6 +464,18 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
     } else {
         rgid = player->getItemId;
     }
+    auto soulItem = Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid));
+    if (const auto* soul = ComboBossSoulReceiptText::Find(soulItem.GetName().GetEnglish())) {
+        using ComboBossSoulReceiptText::Language;
+        msg = CustomMessage(ComboBossSoulReceiptText::Body(*soul),
+                            ComboBossSoulReceiptText::Body(*soul, Language::German),
+                            ComboBossSoulReceiptText::Body(*soul, Language::French), TEXTBOX_TYPE_BLUE);
+        if (soulItem.HasCustomIcon())
+            msg.AutoFormat(static_cast<ItemID>(static_cast<uint8_t>(soulItem.GetItemID())));
+        else
+            msg.AutoFormat();
+        return;
+    }
 #ifdef COMBO_BUILD
     if (BuildVanillaEquipmentBottleReceipt(static_cast<RandomizerGet>(rgid), msg))
         return;
@@ -481,7 +494,8 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
             msg = CustomMessage(ComboMagicItemReceiptText::Body(*magic),
                                 ComboMagicItemReceiptText::Body(*magic, Language::German),
                                 ComboMagicItemReceiptText::Body(*magic, Language::French), TEXTBOX_TYPE_BLUE);
-            msg.AutoFormat(static_cast<ItemID>(magic->slate ? EXT_ITEM_SHEIKAH_SLATE : ITEM_ELEMENTAL_WAND));
+            msg.AutoFormat(
+                static_cast<ItemID>(static_cast<uint8_t>(magic->slate ? EXT_ITEM_SHEIKAH_SLATE : ITEM_ELEMENTAL_WAND)));
             return;
         }
     }
@@ -502,7 +516,9 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
             msg.AutoFormat(ITEM_CUSTOM);
             msg.Replace(CustomMessage::ITEM_OBTAINED(ITEM_CUSTOM), CustomMessage::ITEM_OBTAINED(customMsg->itemId));
         } else {
-            msg.AutoFormat(customMsg->itemId);
+            // The receipt icon operand is one byte; extended IDs must narrow
+            // before entering ItemID's 0-255 enum range.
+            msg.AutoFormat(static_cast<ItemID>(static_cast<uint8_t>(customMsg->itemId)));
         }
         return;
     }
@@ -532,8 +548,8 @@ void BuildCustomItemMessage(Player* player, CustomMessage& msg) {
     if (Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid)).HasCustomIcon()) {
         // Use the real ItemID from the item table so vanilla's Message_LoadItemIcon picks
         // up the ">= ITEM_ROCS_FEATHER_SKIJER" branch and resolves via ExtInv_GetItemIcon.
-        ItemID itemId =
-            static_cast<ItemID>(Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid)).GetItemID());
+        ItemID itemId = static_cast<ItemID>(
+            static_cast<uint8_t>(Rando::StaticData::RetrieveItem(static_cast<RandomizerGet>(rgid)).GetItemID()));
         msg.AutoFormat(itemId);
     } else {
         // No custom icon: AutoFormat() with no argument inserts no item-icon token, so the textbox
@@ -661,6 +677,14 @@ void BuildComboForeignMessage(Player* player, CustomMessage& msg) {
                 // Use the name frozen by the model latch, never resolve a
                 // progressive against the now-changing MM save a second time.
                 std::string receiptName = resolved ? resolved : fi->itemName;
+                if (const auto* soul = ComboBossSoulReceiptText::Find(receiptName)) {
+                    using ComboBossSoulReceiptText::Language;
+                    msg = CustomMessage(ComboBossSoulReceiptText::Body(*soul),
+                                        ComboBossSoulReceiptText::Body(*soul, Language::German),
+                                        ComboBossSoulReceiptText::Body(*soul, Language::French), TEXTBOX_TYPE_BLUE);
+                    msg.AutoFormat();
+                    return;
+                }
                 if (receiptName == "Saria's Song" || receiptName == "Epona's Song" || receiptName == "Song of Time" ||
                     receiptName == "Song of Storms" || receiptName == "Sun's Song") {
                     receiptName += " (MM)";
@@ -1791,14 +1815,14 @@ void BuildChateauRomaniMessage(uint16_t* textId, bool* loadFromMessageTable) {
                                       "Deine Magie wird nicht leer!%w",
                                       "Vous obtenez le %r\x08"
                                       "Chateau Romani%w!\x04"
-                                      "Votre magie ne s'\xE9puisera pas!%w");
+                                      "Votre magie ne s'épuisera pas!%w");
     msg.Format();
     msg.LoadIntoFont();
     *loadFromMessageTable = false;
 }
 
 void RegisterChateauRomaniMessage() {
-    COND_ID_HOOK(OnOpenText, 0x9214, true, BuildChateauRomaniMessage);
+    COND_ID_HOOK(OnOpenText, TEXT_CHATEAU_ROMANI, true, BuildChateauRomaniMessage);
 }
 
 // (Fleet Ship Combo: the old Happy Mask Shop "Travel to Termina?" prompt (0x9215) was removed —

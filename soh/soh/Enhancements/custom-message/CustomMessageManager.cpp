@@ -297,16 +297,22 @@ void CustomMessage::LoadIntoFont() {
 }
 
 void CustomMessage::Replace(std::string&& oldStr, std::string&& newStr) {
+    if (oldStr.empty()) {
+        return;
+    }
     for (std::string& str : messages) {
         size_t position = str.find(oldStr);
         while (position != std::string::npos) {
             str.replace(position, oldStr.length(), newStr);
-            position = str.find(oldStr, position + 1);
+            position = str.find(oldStr, position + newStr.length());
         }
     }
 }
 
 void CustomMessage::Replace(std::string&& oldStr, CustomMessage newMessage) {
+    if (oldStr.empty()) {
+        return;
+    }
     for (uint8_t language = 0; language < LANGUAGE_MAX - 1; language++) {
         size_t position = messages[language].find(oldStr);
         std::string newMsg = newMessage.messages[language];
@@ -315,7 +321,9 @@ void CustomMessage::Replace(std::string&& oldStr, CustomMessage newMessage) {
         }
         while (position != std::string::npos) {
             messages[language].replace(position, oldStr.length(), newMsg);
-            position = messages[language].find(oldStr);
+            // Foreign receipt labels contain their original name (e.g. Master
+            // Sword -> Master Sword (MM)). Never re-match text just inserted.
+            position = messages[language].find(oldStr, position + newMsg.length());
         }
     }
 }
@@ -351,10 +359,25 @@ void CustomMessage::AutoFormat() {
 
 void CustomMessage::AutoFormat(ItemID iid) {
     for (std::string& str : messages) {
-        str.insert(0, ITEM_OBTAINED(iid));
+        // Raw icon operands may be '#', '&', '^', '@', or '_'. Reserve icon
+        // width with a safe operand, then restore only the leading token so
+        // markup conversion cannot consume it or alter embedded authored icons.
+        str.insert(0, ITEM_OBTAINED(ITEM_CUSTOM));
+        AutoFormatString(str);
+        for (size_t i = 2; i < str.size();) {
+            const uint8_t code = static_cast<uint8_t>(str[i]);
+            const size_t command = code == 0x15 ? 4 : ComboReceipt_CommandSize(code, false);
+            if (command > str.size() - i)
+                break;
+            if (code == 0x04) {
+                str.insert(i + 1, ITEM_OBTAINED(iid));
+                i += 3;
+            } else {
+                i += command;
+            }
+        }
+        str.replace(0, 2, ITEM_OBTAINED(iid));
     }
-    AutoFormat();
-    Replace(WAIT_FOR_INPUT(), WAIT_FOR_INPUT() + ITEM_OBTAINED(iid));
 }
 
 void CustomMessage::Clean() {

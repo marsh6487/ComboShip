@@ -58,7 +58,8 @@ enum class Kind {
     ClimbBoots,
     PendantOfMemories,
     IronKnuckleAxe,
-    Last = IronKnuckleAxe
+    ChateauRomani,
+    Last = ChateauRomani
 };
 constexpr float Tau = 6.28318530718f;
 // The authored Four Sword's high center is lowered in GI space only. Its
@@ -162,6 +163,8 @@ constexpr uint32_t ColorHex(Kind kind) {
             return 0xCFAC2E;
         case Kind::IronKnuckleAxe:
             return 0xCFD9E6;
+        case Kind::ChateauRomani:
+            return 0x4A0C41; // Dominant MM3D label background, sampled from the supplied atlas.
         default:
             return 0xE6E6EB;
     }
@@ -179,7 +182,7 @@ inline bool IsSword(Kind k) {
     return k == Kind::SwordAura || k == Kind::GiantsKnife || (k >= Kind::KokiriSword && k <= Kind::FourSword);
 }
 inline bool IsEquipment(Kind k) {
-    return (k >= Kind::DivineShield && k <= Kind::Last) || k == Kind::Gold || k == Kind::CaneBlue;
+    return (k >= Kind::DivineShield && k <= Kind::IronKnuckleAxe) || k == Kind::Gold || k == Kind::CaneBlue;
 }
 constexpr uint32_t EquipmentShimmerSecondary(Kind k) {
     switch (k) {
@@ -583,6 +586,7 @@ inline Mesh SampleShimmer(uint32_t frame, bool enabled, const Basis& camera = {}
                              : kind == Kind::FourSword       ? FourSwordColors[i % FourSwordColors.size()]
                              : kind == Kind::GreatFairySword ? fairyHue
                              : kind == Kind::DarkCrystal     ? (i % 3 == 0 ? ColorHex(kind) : 0xD76B20)
+                             : kind == Kind::ChateauRomani   ? (i % 2 ? 0xFFD45A : ColorHex(kind))
                              : IsEquipment(kind)     ? (i % 2 ? EquipmentShimmerSecondary(kind) : ColorHex(kind))
                              : kind == Kind::Neutral ? 0xA8E9FF
                                                      : ColorHex(kind);

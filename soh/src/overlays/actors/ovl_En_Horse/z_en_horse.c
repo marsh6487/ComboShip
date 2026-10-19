@@ -14,6 +14,10 @@
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/cosmetics/EponaCosmetics.h"
 #include "young_epona.h"
+#include "z_en_horse_combo_forest.h"
+#ifdef COMBO_BUILD
+#include "entrances/SoloForest.h"
+#endif
 #include <assert.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 
@@ -758,10 +762,61 @@ void EnHorse_ClearDustFlags(u16* dustFlags) {
     *dustFlags = 0;
 }
 
+#ifdef COMBO_BUILD
+/* Reserved model host: no native mount, race, cutscene, summon, save, or sound controllers. */
+static void EnHorse_ForestInit(EnHorse* this, PlayState* play) {
+    this->type = HORSE_EPONA;
+    this->stateFlags = ENHORSE_UNRIDEABLE;
+    this->playerControlled = false;
+    this->actor.flags |= ACTOR_FLAG_UPDATE_CULLING_DISABLED;
+    Actor_SetScale(&this->actor, 0.01f);
+    ActorShape_Init(&this->actor.shape, 0.0f, ActorShadow_DrawCircle, 40.0f);
+    Vec3f probe = this->actor.world.pos;
+    probe.y += 10.0f;
+    s32 bgId = BGCHECK_SCENE;
+    this->actor.floorHeight =
+        BgCheck_EntityRaycastFloor5(play, &play->colCtx, &this->actor.floorPoly, &bgId, &this->actor, &probe);
+    this->actor.floorBgId = bgId;
+    Collider_InitCylinder(play, &this->cyl1);
+    Collider_SetCylinder(play, &this->cyl1, &this->actor, &sCylinderInit2);
+    this->cyl1.dim.radius = 35;
+    this->cyl1.dim.height = 80;
+    this->actor.colChkInfo.mass = MASS_IMMOVABLE;
+    Skin_Init(play, &this->skin, &gEponaSkel, &gEponaIdleAnim);
+    Animation_PlayLoop(&this->skin.skelAnime, &gEponaIdleAnim);
+    this->blinkTimer = 0;
+}
+
+static void EnHorse_ForestUpdate(EnHorse* this, PlayState* play) {
+    this->actor.world = this->actor.home;
+    this->actor.shape.rot = this->actor.home.rot;
+    this->actor.speedXZ = 0.0f;
+    this->actor.velocity = (Vec3f){ 0, 0, 0 };
+    SkelAnime_Update(&this->skin.skelAnime);
+    if (this->blinkTimer > 0)
+        this->blinkTimer = (this->blinkTimer + 1) % 4;
+    else if (Rand_ZeroOne() < 0.025f)
+        this->blinkTimer = 1;
+    Collider_UpdateCylinder(&this->actor, &this->cyl1);
+    CollisionCheck_SetOC(play, &play->colChkCtx, &this->cyl1.base);
+}
+
+#endif
+
 void EnHorse_Init(Actor* thisx, PlayState* play2) {
     EnHorse* this = (EnHorse*)thisx;
     PlayState* play = play2;
 
+#ifdef COMBO_BUILD
+    if (this->actor.params == COMBO_SOLO_FOREST_EPONA_PARAMS) {
+        EnHorse_ForestInit(this, play);
+        if (!ComboSoloForest_IsOotVisit(play->sceneNum, play->roomCtx.curRoom.num, gSaveContext.gameMode,
+                                        gSaveContext.fileNum, gSaveContext.sceneLayer, gSaveContext.cutsceneIndex) ||
+            play->roomCtx.curRoom.num != 0)
+            Actor_Kill(&this->actor);
+        return;
+    }
+#endif
     AREG(6) = 0;
     Actor_ProcessInitChain(&this->actor, sInitChain);
     EnHorse_ClearDustFlags(&this->dustFlags);
@@ -945,6 +1000,13 @@ void EnHorse_Init(Actor* thisx, PlayState* play2) {
 void EnHorse_Destroy(Actor* thisx, PlayState* play) {
     EnHorse* this = (EnHorse*)thisx;
 
+#ifdef COMBO_BUILD
+    if (this->actor.params == COMBO_SOLO_FOREST_EPONA_PARAMS) {
+        Skin_Free(play, &this->skin);
+        Collider_DestroyCylinder(play, &this->cyl1);
+        return;
+    }
+#endif
     if (this->type == HORSE_YOUNG_EPONA && !LINK_IS_ADULT && this->skin.vtxTable != NULL &&
         !(this->stateFlags & ENHORSE_INACTIVE)) {
         Horse_SaveYoungEpona(play, &this->actor);
@@ -3552,6 +3614,12 @@ static s32 EnHorse_ShouldRemoveYoungEpona(EnHorse* this, PlayState* play) {
 void EnHorse_Update(Actor* thisx, PlayState* play2) {
     EnHorse* this = (EnHorse*)thisx;
     PlayState* play = play2;
+#ifdef COMBO_BUILD
+    if (this->actor.params == COMBO_SOLO_FOREST_EPONA_PARAMS) {
+        EnHorse_ForestUpdate(this, play);
+        return;
+    }
+#endif
     Vec3f dustAcc = { 0.0f, 0.0f, 0.0f };
     Vec3f dustVel = { 0.0f, 1.0f, 0.0f };
     Player* player = GET_PLAYER(play);
@@ -3940,6 +4008,15 @@ s32 EnHorse_OverrideLimbDraw(Actor* thisx, PlayState* play, s32 limbIndex, Skin*
 
 void EnHorse_Draw(Actor* thisx, PlayState* play) {
     EnHorse* this = (EnHorse*)thisx;
+#ifdef COMBO_BUILD
+    if (this->actor.params == COMBO_SOLO_FOREST_EPONA_PARAMS) {
+        Gfx_SetupDL_25Opa(play->state.gfxCtx);
+        EponaCosmetics_BeginDraw(play, &this->skin, false);
+        func_800A6360(thisx, play, &this->skin, NULL, EnHorse_OverrideLimbDraw, true);
+        EponaCosmetics_EndDraw(play);
+        return;
+    }
+#endif
 
     if (this->type == HORSE_YOUNG_EPONA && (LINK_IS_ADULT || EnHorse_ShouldRemoveYoungEpona(this, play))) {
         return;

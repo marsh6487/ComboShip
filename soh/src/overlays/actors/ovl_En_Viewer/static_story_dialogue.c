@@ -15,6 +15,7 @@ static const StaticStoryDialogueEntry sDialogue[] = {
     { STATIC_STORY_TEXT_CHILD_KAFEI, "I've made a promise to Anju." },
     { STATIC_STORY_TEXT_LULU, "Pleased to meet you. I'm Lulu." },
     { STATIC_STORY_TEXT_ANJU, "...Kafei... I promised I'd wait for you." },
+    { STATIC_STORY_TEXT_MONKEY, "Ook! Ook! The Woods of Mystery are just ahead!" },
 };
 
 const char* StaticStoryDialogue_GetText(uint16_t textId, uint8_t language) {

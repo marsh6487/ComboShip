@@ -244,6 +244,7 @@ typedef enum {
     TEXT_CONTINUE_OVERWORLD_MSG = 0x9214,
     TEXT_CONTINUE_DUNGEON_MSG = 0x9215,
     TEXT_TIME_GATE_PROMPT = 0x9216,
+    TEXT_CHATEAU_ROMANI = 0x9217,
     // Sheikah Sensor rune: the "costs a Heart Container" prompt and the hint it pays for.
     TEXT_SENSOR_HINT = 0x9300,
     TEXT_SENSOR_PROMPT = 0x9301,

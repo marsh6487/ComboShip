@@ -105,7 +105,7 @@ extern "C" void TwilightUpgrade_SetClawshot(u8 on);
 
 struct CustomItemMessageEntry {
     s16 rgId;
-    ItemID itemId;
+    int32_t itemId;
     const char* english;
     const char* german;
     const char* french;
@@ -132,7 +132,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       ComboMaskReceiptText::kKeaton.french },
     // Movement Items
     // Skijer's progressive Roc's Feather (extended inventory page 2)
-    { RG_PROGRESSIVE_ROCS, static_cast<ItemID>(ITEM_ROCS_FEATHER_SKIJER),
+    { RG_PROGRESSIVE_ROCS, static_cast<int32_t>(ITEM_ROCS_FEATHER_SKIJER),
       "You got %rRoc's Feather%w!&This magical feather lets you&jump higher than normal.^Assign it to %y\xA1%w and "
       "press&to perform a high jump.&It even works in water!",
       "Du hast %rRocs Feder%w erhalten!&Diese magische Feder lässt&dich höher springen.^Weise sie %y\xA1%w zu und "
@@ -142,7 +142,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "appuyez&pour faire un grand saut.&Fonctionne même dans l'eau!" },
 
     // Vanilla rando Roc's Feather (shares the Nayru's Love slot, RSK_ROCS_FEATHER)
-    { RG_ROCS_FEATHER, static_cast<ItemID>(ITEM_ROCS_FEATHER_SKIJER),
+    { RG_ROCS_FEATHER, static_cast<int32_t>(ITEM_ROCS_FEATHER_SKIJER),
       "You got %rRoc's Feather%w!&Assign it to %y\xA1%w and press it&while standing to leap into&the air. It shares "
       "its slot&with Nayru's Love.",
       "Du hast %rRocs Feder%w erhalten!&Weise sie %y\xA1%w zu und drücke,&um in die Luft zu springen.&Sie teilt sich "
@@ -164,7 +164,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
     // ─────────────────────────────────────────────────────────────────────────
     // Extended Equipment (12 items, equipment page 2 - toggled via [L] in pause)
     // ─────────────────────────────────────────────────────────────────────────
-    { RG_EXT_CANE_OF_BYRNA, static_cast<ItemID>(ITEM_EXT_SWORD_1),
+    { RG_EXT_CANE_OF_BYRNA, static_cast<int32_t>(ITEM_EXT_SWORD_1),
       "You got the %cCane of Byrna%w!&A blue cane of legend.^Equip on the %ysword slot%w&(%y\xA2%w toggles equipment "
       "pages).^%y\xA0\xA0\xA0%w chains, %yforward + \xA0%w thrusts,&%y\xA4%w + %y\x9F%w jump-slashes, and %y\xA3%w "
       "sends&the %gKinsect%w - at full charge it&launches you instead.^Airborne: %y\x9F%w dashes, %y\xA0%w spins,&"
@@ -178,7 +178,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "saute, %y\xA3%w lance&le %gKinsect%w - à pleine charge&c'est vous qu'il propulse.^En l'air: %y\x9F%w foncez, "
       "%y\xA0%w tournoyez,&%y\xA3%w écrasez." },
 
-    { RG_EXT_FOUR_SWORD, static_cast<ItemID>(ITEM_EXT_SWORD_2),
+    { RG_EXT_FOUR_SWORD, static_cast<int32_t>(ITEM_EXT_SWORD_2),
       "You got the %gFour Sword%w!&A blade that splits its wielder&into four heroes.^Equip on the %ysword slot%w "
       "(%y\xA2%w toggles).^Hold %y\xA3%w + %y\xA0%w for 15 frames ->&%g3 colored clones%w (Red/Blue/Purple)&spawn "
       "around you in a triangle.^Each clone costs %g12 Magic%w.&Clones %gmirror your swings%w and copy&your "
@@ -192,7 +192,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "(Rouge/Bleu/Violet)&apparaissent en triangle.^Chaque clone coûte %g12 Magie%w.&Les clones %gimitent vos coups%w "
       "et copient&%gflèches%w, %gbombes%w et %gboomerang%w.^Les ennemis les tuent au contact." },
 
-    { RG_PROGRESSIVE_HAMMER, static_cast<ItemID>(ITEM_HAMMER),
+    { RG_PROGRESSIVE_HAMMER, static_cast<int32_t>(ITEM_HAMMER),
       "You got a %rProgressive Hammer%w!&First the %rMegaton Hammer%w, then the&%rIron Knuckle's Axe%w - %gdouble "
       "damage%w,&%gdouble reach%w, and a tomahawk&%rthrow%w that boomerangs back.^%y\xA5%w aims it, the hammer's own "
       "%y\xA1%w&button lets it fly.",
@@ -203,7 +203,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "tomahawk&massif des chevaliers de Ganon.^Coups lourds:&%gdouble dégâts%w, %gdouble portée%w,&marche plus "
       "lente.^%y\xA5%w vise, la touche %y\xA1%w de la masse&%rlance%w la hache - elle revient&en boomerang." },
 
-    { RG_PROGRESSIVE_KOKIRI_SWORD, static_cast<ItemID>(ITEM_SWORD_KOKIRI),
+    { RG_PROGRESSIVE_KOKIRI_SWORD, static_cast<int32_t>(ITEM_SWORD_KOKIRI),
       "You got a %gKokiri Sword Upgrade%w!&Sharpens your %gKokiri Sword%w&into the %gRazor Sword%w, then the&%gGilded "
       "Sword%w.",
       "Du hast ein %gKokiri-Schwert-Upgrade%w!&Schärft dein %gKokiri-Schwert%w&zum %gElfenschwert%w, dann "
@@ -211,13 +211,13 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Vous obtenez une %gAmélioration d'Épée Kokiri%w!&Aiguise votre %gÉpée Kokiri%w&en %gLame Rasoir%w, puis "
       "en&%gExcalibur%w." },
 
-    { RG_PROGRESSIVE_MASTER_SWORD, static_cast<ItemID>(ITEM_SWORD_MASTER),
+    { RG_PROGRESSIVE_MASTER_SWORD, static_cast<int32_t>(ITEM_SWORD_MASTER),
       "You got a %cProgressive Master Sword%w!&First the %cMaster Sword%w, then the&%cReal Master Sword%w - at full "
       "health&a swing fires a thunder beam.",
       "Du hast das %cWahre Master-Schwert%w!&Dein %cMaster-Schwert%w erwacht zu&seiner wahren Kraft.",
       "Vous obtenez la %cVéritable Épée de Légende%w!&Votre %cÉpée de Légende%w révèle&son vrai pouvoir." },
 
-    { RG_PROGRESSIVE_BGS, static_cast<ItemID>(ITEM_SWORD_BGS),
+    { RG_PROGRESSIVE_BGS, static_cast<int32_t>(ITEM_SWORD_BGS),
       "You got a %pProgressive Biggoron's Sword%w!&First the %yBiggoron Sword%w, then the&%pGreat Fairy's Sword%w - "
       "long reach&that restores HP and Magic on hit.",
       "Du hast das %pSchwert der Großen Fee%w!&Dein %yBiggoron-Schwert%w wird zur&legendären Klinge der Großen "
@@ -227,20 +227,20 @@ static const CustomItemMessageEntry customItemMessages[] = {
 
     // Per-level chain identities: the progressive resolution (item.cpp) lands on these, so each
     // give reads as the level actually received. Skijer's NEI
-    { RG_RAZOR_SWORD, static_cast<ItemID>(ITEM_SWORD_KOKIRI),
+    { RG_RAZOR_SWORD, static_cast<int32_t>(ITEM_SWORD_KOKIRI),
       "You got the %gRazor Sword%w!&Your Kokiri Sword has been&sharpened into a keener blade -&%gdouble damage%w on "
       "every slash.",
       "Du hast das %gElfenschwert%w!&Dein Kokiri-Schwert wurde zu&einer schärferen Klinge geschliffen -&%gdoppelter "
       "Schaden%w.",
       "Vous obtenez la %gLame Rasoir%w!&Votre Épée Kokiri a été aiguisée -&%gdégâts doublés%w à chaque coup." },
 
-    { RG_GILDED_SWORD, static_cast<ItemID>(ITEM_SWORD_KOKIRI),
+    { RG_GILDED_SWORD, static_cast<int32_t>(ITEM_SWORD_KOKIRI),
       "You got the %yGilded Sword%w!&Reforged with gold dust, the&final form of your Kokiri blade -&%ydouble damage%w "
       "and it never dulls.",
       "Du hast die %ySchmirgelklinge%w!&Mit Goldstaub neu geschmiedet -&die finale Form deiner Kokiri-Klinge.",
       "Vous obtenez %yExcalibur%w!&Reforgée avec de la poudre d'or -&la forme finale de votre lame Kokiri." },
 
-    { RG_TRUE_MASTER_SWORD, static_cast<ItemID>(ITEM_SWORD_MASTER),
+    { RG_TRUE_MASTER_SWORD, static_cast<int32_t>(ITEM_SWORD_MASTER),
       "The %cMaster Sword%w has awakened as&the %cTrue Master Sword%w!&At full health, a swing fires a&%cthunder "
       "beam%w at your foes.",
       "Das %cMaster-Schwert%w ist als&%cWahres Master-Schwert%w erwacht!&Bei voller Energie feuert jeder&Schwung einen "
@@ -248,7 +248,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "L'%cÉpée de Légende%w s'éveille en&%cVéritable Épée de Légende%w!&Pleine vie: chaque coup tire&un %crayon de "
       "tonnerre%w." },
 
-    { RG_GREAT_FAIRY_SWORD, static_cast<ItemID>(ITEM_SWORD_BGS),
+    { RG_GREAT_FAIRY_SWORD, static_cast<int32_t>(ITEM_SWORD_BGS),
       "You got the %pGreat Fairy's Sword%w!&Your Biggoron Sword reforged into&the fairy blade - hits %prestore&HP and "
       "Magic%w.",
       "Du hast das %pSchwert der Großen Fee%w!&Dein Biggoron-Schwert, neu geschmiedet -&Treffer %pstellen Herzen und "
@@ -256,7 +256,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Vous obtenez l'%pÉpée de la Grande Fée%w!&Votre Épée de Biggoron reforgée -&les coups %prestaurent vie et "
       "magie%w." },
 
-    { RG_IRON_KNUCKLE_AXE, static_cast<ItemID>(ITEM_HAMMER),
+    { RG_IRON_KNUCKLE_AXE, static_cast<int32_t>(ITEM_HAMMER),
       "You got the %rIron Knuckle's Axe%w!&The massive tomahawk of Ganon's&knights - %gdouble damage%w, %gdouble "
       "reach%w.^%y\xA5%w aims the %rthrow%w, the hammer's&own %y\xA1%w button lets it fly.",
       "Du hast die %rEisenknöchel-Axt%w!&Der massive Tomahawk der Ritter&Ganons - %gdoppelter Schaden%w,&%gdoppelte "
@@ -264,14 +264,14 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Vous obtenez la %rHache d'Iron Knuckle%w!&Le tomahawk massif des chevaliers&de Ganon - %gdouble "
       "dégâts%w,&%gdouble portée%w.^%y\xA5%w vise, la touche %y\xA1%w de la&masse la %rlance%w." },
 
-    { RG_ULTRASHOT, static_cast<ItemID>(ITEM_LONGSHOT),
+    { RG_ULTRASHOT, static_cast<int32_t>(ITEM_LONGSHOT),
       "You got the %yUltrashot%w!&Your Longshot surges with light -&%y4x reach%w and %y2x speed%w.&Nothing is out of "
       "range now.",
       "Du hast den %yUltraschot%w!&Dein Enterhaken pulsiert vor Licht -&%y4-fache Reichweite%w, "
       "%y2-fache&Geschwindigkeit%w.",
       "Vous obtenez l'%yUltra-Grappin%w!&Votre grappin déborde de lumière -&%yportée x4%w et %yvitesse x2%w." },
 
-    { RG_QUARTZ_OF_MOTION, static_cast<ItemID>(ITEM_STONE_OF_AGONY),
+    { RG_QUARTZ_OF_MOTION, static_cast<int32_t>(ITEM_STONE_OF_AGONY),
       "Your Stone of Agony crystallized&into the %pQuartz of Motion%w!&Press %yA%w on its pause slot&to attune to "
       "hidden movement.",
       "Dein Stein der Qualen wurde zum&%pBewegungsquarz%w!&Drücke %yA%w auf seinem Menüplatz&um verborgene Bewegung zu "
@@ -279,39 +279,39 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre Pierre de Souffrance devient&le %pQuartz du Mouvement%w!&Appuyez sur %yA%w dans le menu&pour sentir les "
       "mouvements cachés." },
 
-    { RG_ROCS_CAPE, static_cast<ItemID>(ITEM_ROCS_CAPE),
+    { RG_ROCS_CAPE, static_cast<int32_t>(ITEM_ROCS_CAPE),
       "Your feather grew into the&%rRoc's Cape%w!&Jump, then hold the button to&%rglide%w gently to the ground.",
       "Deine Feder wurde zum&%rRocs Umhang%w!&Springe und halte die Taste&um sanft zu %rgleiten%w.",
       "Votre plume devient la&%rCape de Roc%w!&Sautez puis maintenez pour&%rplaner%w doucement." },
 
     // Dual Cane per-skill textboxes (order: Statue keeps RG_CANE_OF_SOMARIA's own message).
-    { RG_CANE_PACCI_FLIP, static_cast<ItemID>(ITEM_CANE_OF_SOMARIA),
+    { RG_CANE_PACCI_FLIP, static_cast<int32_t>(ITEM_CANE_OF_SOMARIA),
       "You got the %yCane of Pacci%w!&Its charge %yflips objects%w and&%ylaunches you%w from holes.&It shares the "
       "cane's slot.",
       "Du hast den %yStab von Pacci%w!&Seine Ladung %ydreht Objekte um%w&und %ykatapultiert dich%w aus Löchern.",
       "Vous obtenez la %yCanne de Pacci%w!&Sa charge %yretourne les objets%w&et vous %ypropulse%w des trous." },
 
-    { RG_CANE_SOMARIA_BLOCK, static_cast<ItemID>(ITEM_CANE_OF_SOMARIA),
+    { RG_CANE_SOMARIA_BLOCK, static_cast<int32_t>(ITEM_CANE_OF_SOMARIA),
       "Your Cane of Somaria learned&%rBlock%w!&Conjure a %rsolid block%w to push,&weigh switches, or climb on.",
       "Dein Stab von Somaria lernte&%rBlock%w!&Beschwöre einen %rfesten Block%w&für Schalter und Kletterei.",
       "Votre Canne de Somaria apprend&%rBloc%w!&Créez un %rbloc solide%w à pousser&ou pour grimper." },
 
-    { RG_CANE_PACCI_STONE, static_cast<ItemID>(ITEM_CANE_OF_SOMARIA),
+    { RG_CANE_PACCI_STONE, static_cast<int32_t>(ITEM_CANE_OF_SOMARIA),
       "Your Cane of Pacci learned&%yStone%w!&%yPetrify enemies%w and use them&as stepping stones.",
       "Dein Stab von Pacci lernte&%yStein%w!&%yVersteinere Gegner%w und nutze&sie als Trittsteine.",
       "Votre Canne de Pacci apprend&%yPierre%w!&%yPétrifiez les ennemis%w et&servez-vous-en de marches." },
 
-    { RG_CANE_SOMARIA_PLATFORM, static_cast<ItemID>(ITEM_CANE_OF_SOMARIA),
+    { RG_CANE_SOMARIA_PLATFORM, static_cast<int32_t>(ITEM_CANE_OF_SOMARIA),
       "Your Cane of Somaria learned&%rPlatform%w!&Conjure a %rfloating platform%w&that carries you across gaps.",
       "Dein Stab von Somaria lernte&%rPlattform%w!&Beschwöre eine %rschwebende&Plattform%w über Abgründe.",
       "Votre Canne de Somaria apprend&%rPlateforme%w!&Créez une %rplateforme flottante%w&pour franchir les vides." },
 
-    { RG_CANE_PACCI_ULTRAHAND, static_cast<ItemID>(ITEM_CANE_OF_SOMARIA),
+    { RG_CANE_PACCI_ULTRAHAND, static_cast<int32_t>(ITEM_CANE_OF_SOMARIA),
       "Your Cane of Pacci learned&%yUltrahand%w!&%yGrab, move and attach%w distant&objects with the glowing hand.",
       "Dein Stab von Pacci lernte&%yUltrahand%w!&%yGreife und bewege%w ferne Objekte&mit der leuchtenden Hand.",
       "Votre Canne de Pacci apprend&%yUltrahand%w!&%ySaisissez et déplacez%w des objets&avec la main lumineuse." },
 
-    { RG_EXT_DIVINE_SHIELD, static_cast<ItemID>(ITEM_EXT_SHIELD_1),
+    { RG_EXT_DIVINE_SHIELD, static_cast<int32_t>(ITEM_EXT_SHIELD_1),
       "You got the %yDivine Shield%w!&A blessed wooden shield said to&repel even the wrath of fire.^Equip on the "
       "%yshield slot%w (%y\xA2%w toggles).^Light wooden shield BUT %rfireproof%w -&fire breath, Dodongo flames "
       "and&torches will not burn it.^%cPerfect Parry%w (%y\xA3%w + block within&10 frames of an attack):&%cfreezes ALL "
@@ -325,7 +325,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "ne le brûlent pas.^%cParade Parfaite%w (%y\xA3%w + bloquer dans&les 10 premières frames d'une attaque):&%cgèle "
       "TOUS les ennemis%w à l'écran!" },
 
-    { RG_EXT_SHEIKAH_SHIELD, static_cast<ItemID>(ITEM_EXT_SHIELD_2),
+    { RG_EXT_SHEIKAH_SHIELD, static_cast<int32_t>(ITEM_EXT_SHIELD_2),
       "You got the %cKite Shield%w!&A rider's shield, made to be&stood on.^Equip on the %yshield slot%w "
       "(%y\xA2%w toggles).^Press %y\xA3%w %rin mid-air%w to drop it&under your feet and %gsurf%w.&Downhill builds "
       "speed with no cap.^%y\x9F%w hops, %y\xA0%w spins,&%y\xA0%w + %y\xA3%w gets off.",
@@ -336,7 +336,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "l'%yemplacement bouclier%w.^%y\xA3%w %ren l'air%w le glisse sous vos&pieds et vous %gsurfez%w.&En descente, "
       "aucune limite de vitesse.^%y\x9F%w saute, %y\xA0%w pivote,&%y\xA0%w + %y\xA3%w descend." },
 
-    { RG_EXT_SHIELD_OF_IKANA, static_cast<ItemID>(ITEM_EXT_SHIELD_3),
+    { RG_EXT_SHIELD_OF_IKANA, static_cast<int32_t>(ITEM_EXT_SHIELD_3),
       "You got the %pShield of Ikana%w!&A cursed mirror shield from the&fallen kingdom of Ikana.^Equip on the %yshield "
       "slot%w (%y\xA2%w toggles).^%cSoul Drain%w (%y\xA3%w + block within&12 frames of an attack):&drains the "
       "attacker's %rHP%w and&heals you for half a heart.^%pDeath Save%w: when struck dead,&%previves once per scene%w "
@@ -347,10 +347,10 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "pro Szene%w mit&3 Herzen und dunkler Aura.",
       "Vous obtenez le %pBouclier d'Ikana%w!&Un bouclier-miroir maudit du&royaume déchu d'Ikana.^Équipez-le dans "
       "l'%yemplacement bouclier%w.^%cVol d'Âme%w (%y\xA3%w + bloquer dans&les 12 premières frames d'une attaque):&vole "
-      "les %rPV%w de l'attaquant et&vous soigne d'un demi-cœur.^%pSauvegarde de Mort%w: ressuscite&%pune fois par "
-      "scène%w avec 3 cœurs&et une aura sombre." },
+      "les %rPV%w de l'attaquant et&vous soigne d'un demi-coeur.^%pSauvegarde de Mort%w: ressuscite&%pune fois par "
+      "scène%w avec 3 coeurs&et une aura sombre." },
 
-    { RG_EXT_TRIDENT, static_cast<ItemID>(ITEM_EXT_SWORD_3),
+    { RG_EXT_TRIDENT, static_cast<int32_t>(ITEM_EXT_SWORD_3),
       "You got the %pTrident%w!&A gunlance in all but name.^Equip on the %ysword slot%w (%y\xA2%w toggles).^%y\xA0%w "
       "chains three slashes, %yforward + \xA0%w&lunges, and %rholding%w %y\xA0%w charges&three levels - the last one "
       "fires.^%y\xA3%w guards, %y\xA3%w + %y\xA0%w dashes with the&lance out front, and %rholding%w %y\xA3%w + "
@@ -365,7 +365,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "le dernier tire.^%y\xA3%w pare, %y\xA3%w + %y\xA0%w charge lance en&avant, %rmaintenir%w %y\xA3%w + %y\x9F%w "
       "fait %gvoler%w.^En vol: le stick dirige, %y\xA3%w monte,&%y\xA2%w descend, %y\xA0%w tire, %y\x9F%w plonge." },
 
-    { RG_EXT_CLIMB_BOOTS, static_cast<ItemID>(ITEM_EXT_BOOTS_2),
+    { RG_EXT_CLIMB_BOOTS, static_cast<int32_t>(ITEM_EXT_BOOTS_2),
       "You got the %yClimb Boots%w!&Equip on the %yboots slot%w (%y\xA2%w toggles).^They grip every floor: %cice%w "
       "stops&being slippery and %csteep slopes%w&stop sliding you away.",
       "Du hast die %yKletterstiefel%w!&Rüste sie am %yStiefel-Platz%w aus.^Sie greifen jeden Boden: %cEis%w ist&nicht "
@@ -373,7 +373,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Vous obtenez les %yBottes d'Escalade%w!&Équipez-les dans l'%yemplacement bottes%w.^Elles agrippent tout sol: "
       "la %cglace%w&ne glisse plus et les %cpentes raides%w&ne vous font plus déraper." },
 
-    { RG_EXT_ROC_BOOTS, static_cast<ItemID>(ITEM_EXT_BOOTS_3),
+    { RG_EXT_ROC_BOOTS, static_cast<int32_t>(ITEM_EXT_BOOTS_3),
       "You got %rRoc's Boots%w!&Equip on the %yboots slot%w (%y\xA2%w toggles).^%cWater and lava%w become solid "
       "ground&under your feet, and you fall at&%chalf gravity%w - so every jump&goes higher.",
       "Du hast %rRocs Stiefel%w!&Rüste sie am %yStiefel-Platz%w aus.^%cWasser und Lava%w werden zu festem&Boden, und "
@@ -383,7 +383,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
 
     // (2026-08-07: texto legacy corregido — la capa ya NO ocupa el slot de túnica; es una pieza
     // propia de la columna de upgrades que se activa sola al poseerla.)
-    { RG_EXT_MAGIC_CAPE, static_cast<ItemID>(ITEM_EXT_TUNIC_1),
+    { RG_EXT_MAGIC_CAPE, static_cast<int32_t>(ITEM_EXT_TUNIC_1),
       "You got the %pMagic Cape%w!&Ganondorf's enchanted cloak,&woven of pure dark mantle cloth.^It %phangs from your "
       "shoulders%w the&moment you own it - real %pcloth&physics%w sway with movement and wind.^All magic %ccosts are "
       "halved%w&(rounded down) while you own it -&cheap items become free.",
@@ -394,7 +394,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "vos épaules%w dès que&vous la possédez - %pphysique de&tissu%w réelle au vent.^Tous les %ccoûts de magie sont "
       "réduits&de moitié%w (arrondi vers le bas)." },
 
-    { RG_EXT_SPIRIT_BREASTPLATE, static_cast<ItemID>(ITEM_EXT_TUNIC_2),
+    { RG_EXT_SPIRIT_BREASTPLATE, static_cast<int32_t>(ITEM_EXT_TUNIC_2),
       "You got the %ySpirit Tunic%w!&The golden ward of the Iron&Knuckle Nabooru.^Equip on the %ytunic slot%w "
       "(%y\xA2%w toggles).^Damage costs %gRupees%w instead&of hearts (1 HP = 1 Rupee), and&some of it spills out as "
       "pickups.^While you hold Rupees the %rheat%w and&%bunderwater%w timers never start.^If your wallet runs "
@@ -403,11 +403,11 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "aus.^Schaden kostet %gRupien%w statt&Herzen (1 HP = 1 Rupie).&%gPassiver Verbrauch%w: 1 Rupie alle&30 Frames im "
       "Tragen.^Wenn dein Beutel %rleer%w ist,&erleidest du Schaden normal und&bewegst dich halb so schnell.",
       "Vous obtenez le %yPlastron Spirituel%w!&L'armure dorée de l'Iron Knuckle&Nabooru.^Équipez-le dans "
-      "l'%yemplacement tunique%w.^Les dégâts coûtent des %gRubis%w au&lieu de cœurs (1 PV = 1 Rubis).&%gDrain "
+      "l'%yemplacement tunique%w.^Les dégâts coûtent des %gRubis%w au&lieu de coeurs (1 PV = 1 Rubis).&%gDrain "
       "passif%w: 1 Rubis toutes&les 30 frames tant que porté.^Si votre bourse est %rvide%w,&vous prenez les dégâts "
       "normalement&et bougez à mi-vitesse." },
 
-    { RG_EXT_CHAMPIONS_TUNIC, static_cast<ItemID>(ITEM_EXT_TUNIC_1),
+    { RG_EXT_CHAMPIONS_TUNIC, static_cast<int32_t>(ITEM_EXT_TUNIC_1),
       "You got the %cChampion's Tunic%w!&The blue garb of Hyrule's chosen,&blessed with battle aura.^Equip on the "
       "%ytunic slot%w (%y\xA2%w toggles).&Dyes your tunic %cchampion blue%w.^%gFlurry Rush%w: sidehop or backflip&past "
       "a nearby attack -> world slows&to 33% with iframes for ~2s or&until you land 7 hits.^%cBullet Time%w: aim while "
@@ -424,7 +424,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "coups.^%cBullet Time%w: visez en l'air avec&arc/lance-pierre/grappin/boomerang&-> le temps ralentit, vous "
       "flottez et&la visée normale reste active." },
 
-    { RG_EXT_PEGASUS_ANKLET, static_cast<ItemID>(ITEM_EXT_BOOTS_1),
+    { RG_EXT_PEGASUS_ANKLET, static_cast<int32_t>(ITEM_EXT_BOOTS_1),
       "You got the %rPegasus Anklet%w!&Winged anklets that grant the&speed of the legendary Pegasus.^Equip on the "
       "%yboots slot%w (%y\xA2%w toggles).^Hold %y\xA0%w after a sword swing&(intercepts the spin attack charge):&Link "
       "%glunges forward%w with sword&extended, dealing damage on contact.^A %gwind cone barrier%w forms in&front while "
@@ -438,7 +438,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "tournoyante):&Link %ss'élance%w l'épée tendue,&infligeant des dégâts au contact.^Un %gcône de vent%w protecteur "
       "se forme&devant tant que vous avez de la Magie&(1 MP toutes les 15 frames).&Les murs causent un %rchoc%w." },
 
-    { RG_EXT_PENDANT_OF_MEMORIES, static_cast<ItemID>(ITEM_EXT_BOOTS_2),
+    { RG_EXT_PENDANT_OF_MEMORIES, static_cast<int32_t>(ITEM_EXT_BOOTS_2),
       "You got the %pPendant of Memories%w!&A pendant carrying the techniques&of heroes past.^Equip on the %yboots "
       "slot%w (%y\xA2%w toggles).^Three combat techniques unlock:^%c#1 Mortal Draw%w (TP): %y\xA0%w near an&enemy + "
       "sheathed + still + NOT&%y\xA4%w-targeting -> devastating draw&slash, often a one-hit kill.^%c#2 Ground Pound%w "
@@ -457,7 +457,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Parry Leap%w (WW): %y\xA4%w-cible +&3 esquives + %y\xA0%w -> arc parabolique&par-dessus l'ennemi, atterrir "
       "derrière." },
 
-    { RG_EXT_WATER_DRAGON_SCALE, static_cast<ItemID>(ITEM_EXT_TUNIC_3),
+    { RG_EXT_WATER_DRAGON_SCALE, static_cast<int32_t>(ITEM_EXT_TUNIC_3),
       "You got the %wSage's Tunic%w!&Equip it on the %ytunic slot%w.^Its passive resistances follow your&owned "
       "medallions: %bice%w, %rfire%w,&%ythunder%w, %pstun%w, fall and wind.",
       "Du hast das %wOrni-Gewand%w!&Rüste es am %yTunika-Platz%w aus.^Seine Resistenzen folgen deinen&Medaillons: "
@@ -467,7 +467,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
 
     // Sheikah Slate runes — one textbox per sibling pickup (wand idiom). The icon is the slate
     // composite with the rune's badge; the flame on the get-item model matches the color named here.
-    { RG_SLATE_RUNE_BOMB, static_cast<ItemID>(EXT_ITEM_SHEIKAH_SLATE),
+    { RG_SLATE_RUNE_BOMB, static_cast<int32_t>(EXT_ITEM_SHEIKAH_SLATE),
       "Your %cSheikah Slate%w learned the&%bRemote Bomb%w rune!&An ancient rune glows cyan on&the slate's face.^Select "
       "it by holding %y\xA2%w for the rune&wheel. %y\xA1%w draws the slate, then&casts the active rune.",
       "Dein %cSheikah-Stein%w hat das&%bFernzündbomben%w-Modul gelernt!&Eine uralte Rune leuchtet cyan&auf dem "
@@ -475,7 +475,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre %cTablette Sheikah%w apprend le&module %bBombe à Distance%w!&Une rune ancienne brille en cyan&sur la "
       "tablette.^Sélectionnez-la en maintenant %y\xA2%w:&la roue des runes. "
       "%y\xA1%w sort la&tablette, puis lance la rune active." },
-    { RG_SLATE_RUNE_MASTER_CYCLE, static_cast<ItemID>(EXT_ITEM_SHEIKAH_SLATE),
+    { RG_SLATE_RUNE_MASTER_CYCLE, static_cast<int32_t>(EXT_ITEM_SHEIKAH_SLATE),
       "Your %cSheikah Slate%w learned the&%gMaster Cycle%w rune!&An ancient rune glows teal on&the slate's "
       "face.^Select it by holding %y\xA2%w for the rune&wheel. %y\xA1%w draws the slate, then&casts the active rune.",
       "Dein %cSheikah-Stein%w hat das&%gMaster Cycle%w-Modul gelernt!&Eine uralte Rune leuchtet türkis&auf dem "
@@ -483,7 +483,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre %cTablette Sheikah%w apprend le&module %gMaster Cycle%w!&Une rune ancienne brille en turquoise&sur la "
       "tablette.^Sélectionnez-la en maintenant %y\xA2%w:&la roue des runes. "
       "%y\xA1%w sort la&tablette, puis lance la rune active." },
-    { RG_SLATE_RUNE_STASIS, static_cast<ItemID>(EXT_ITEM_SHEIKAH_SLATE),
+    { RG_SLATE_RUNE_STASIS, static_cast<int32_t>(EXT_ITEM_SHEIKAH_SLATE),
       "Your %cSheikah Slate%w learned the&%yStasis%w rune!&An ancient rune glows gold on&the slate's face.^Select it "
       "by holding %y\xA2%w for the rune&wheel. %y\xA1%w draws the slate, then&casts the active rune.",
       "Dein %cSheikah-Stein%w hat das&%yStasis%w-Modul gelernt!&Eine uralte Rune leuchtet golden&auf dem Stein.^Wähle "
@@ -491,7 +491,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre %cTablette Sheikah%w apprend le&module %yCinetis%w!&Une rune ancienne brille en or&sur la "
       "tablette.^Sélectionnez-la en maintenant %y\xA2%w:&la roue des runes. "
       "%y\xA1%w sort la&tablette, puis lance la rune active." },
-    { RG_SLATE_RUNE_CRYONIS, static_cast<ItemID>(EXT_ITEM_SHEIKAH_SLATE),
+    { RG_SLATE_RUNE_CRYONIS, static_cast<int32_t>(EXT_ITEM_SHEIKAH_SLATE),
       "Your %cSheikah Slate%w learned the&%bCryonis%w rune!&An ancient rune glows ice-blue on&the slate's face.^Select "
       "it by holding %y\xA2%w for the rune&wheel. %y\xA1%w draws the slate, then&casts the active rune.",
       "Dein %cSheikah-Stein%w hat das&%bCryonis%w-Modul gelernt!&Eine uralte Rune leuchtet eisblau&auf dem "
@@ -500,19 +500,18 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "tablette.^Sélectionnez-la en maintenant %y\xA2%w:&la roue des runes. "
       "%y\xA1%w sort la&tablette, puis lance la rune active." },
 
-    { RG_DESIRE_SENSOR, static_cast<ItemID>(EXT_ITEM_SHEIKAH_SLATE),
+    { RG_DESIRE_SENSOR, static_cast<int32_t>(EXT_ITEM_SHEIKAH_SLATE),
       "Your %cSheikah Slate%w learned the&%pSensor%w rune!&An ancient rune glows violet on&the slate's face.^Cast it "
       "to ask where one of your&%gdesired items%w hides. Each answer&costs a %rHeart Container%w, forever.",
       "Dein %cSheikah-Stein%w hat das&%pSensor%w-Modul gelernt!&Eine uralte Rune leuchtet violett&auf dem "
-      "Stein.^Frage damit, wo eines deiner&%gWunsch-Items%w liegt. Jede Antwort&kostet ein %rHerzteil%w, f\xFCr immer.",
+      "Stein.^Frage damit, wo eines deiner&%gWunsch-Items%w liegt. Jede Antwort&kostet ein %rHerzteil%w, für immer.",
       "Votre %cTablette Sheikah%w apprend le&module %pCapteur%w!&Une rune ancienne brille en violet&sur la "
-      "tablette.^Demandez o\xF9 se cache un de vos&%gobjets d\xE9sir\xE9s%w. Chaque r\xE9ponse&co\xFB"
-      "te un %rC\x9C"
-      "ur%w, pour toujours." },
+      "tablette.^Demandez où se cache un de vos&%gobjets désirés%w. Chaque réponse&coûte un %rCoeur%w, pour "
+      "toujours." },
 
     // Rod of Seasons — one textbox per sibling pickup. The flame on the get-item model matches the
     // colour named here, and hold %y\xA0%w on the rod's button opens the season wheel.
-    { RG_SEASON_SPRING, static_cast<ItemID>(EXT_ITEM_ROD_OF_SEASONS),
+    { RG_SEASON_SPRING, static_cast<int32_t>(EXT_ITEM_ROD_OF_SEASONS),
       "Your %cRod of Seasons%w drew in&%pSpring%w!&Blossom drifts on the wind&wherever you carry it.^%rPress%w the "
       "rod's %y\xA1%w button again to&change season. %y\x9F%w confirms, %y\xA0%w cancels.",
       "Dein %cZepter der Jahreszeiten%w zog&den %pFrühling%w ein!&Blüten treiben im Wind,&wohin du es auch "
@@ -520,7 +519,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre %cSceptre des Saisons%w attire&le %pPrintemps%w!&Les pétales dérivent au vent&où que vous "
       "alliez.^%rAppuyez%w sur la touche %y\xA1%w du sceptre&pour changer de saison." },
 
-    { RG_SEASON_SUMMER, static_cast<ItemID>(EXT_ITEM_ROD_OF_SEASONS),
+    { RG_SEASON_SUMMER, static_cast<int32_t>(EXT_ITEM_ROD_OF_SEASONS),
       "Your %cRod of Seasons%w drew in&%ySummer%w!&The sky stays clear and the sun&stands high.^%rPress%w the rod's "
       "%y\xA1%w button again to&change season. %y\x9F%w confirms, %y\xA0%w cancels.",
       "Dein %cZepter der Jahreszeiten%w zog&den %ySommer%w ein!&Der Himmel bleibt klar und die&Sonne steht "
@@ -528,7 +527,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre %cSceptre des Saisons%w attire&l'%yÉté%w!&Le ciel reste clair et le soleil&est au zénith.^%rMaintenez%w "
       "la touche %y\xA1%w du sceptre&pour changer de saison." },
 
-    { RG_SEASON_AUTUMN, static_cast<ItemID>(EXT_ITEM_ROD_OF_SEASONS),
+    { RG_SEASON_AUTUMN, static_cast<int32_t>(EXT_ITEM_ROD_OF_SEASONS),
       "Your %cRod of Seasons%w drew in&%rAutumn%w!&The sky greys over and the rain&never quite stops.^%rPress%w the "
       "rod's %y\xA1%w button again to&change season. %y\x9F%w confirms, %y\xA0%w cancels.",
       "Dein %cZepter der Jahreszeiten%w zog&den %rHerbst%w ein!&Der Himmel vergraut und der Regen&hört kaum "
@@ -536,7 +535,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre %cSceptre des Saisons%w attire&l'%rAutomne%w!&Le ciel se voile et la pluie&ne cesse "
       "jamais.^%rAppuyez%w sur la touche %y\xA1%w du sceptre&pour changer de saison." },
 
-    { RG_SEASON_WINTER, static_cast<ItemID>(EXT_ITEM_ROD_OF_SEASONS),
+    { RG_SEASON_WINTER, static_cast<int32_t>(EXT_ITEM_ROD_OF_SEASONS),
       "Your %cRod of Seasons%w drew in&%bWinter%w!&Snow falls under every open sky&you walk beneath.^%rPress%w the "
       "rod's %y\xA1%w button again to&change season. %y\x9F%w confirms, %y\xA0%w cancels.",
       "Dein %cZepter der Jahreszeiten%w zog&den %bWinter%w ein!&Unter jedem freien Himmel&fällt nun Schnee.^%rHalte%w "
@@ -559,7 +558,7 @@ const CustomItemMessageEntry* GetCustomItemMessage(s16 rgId) {
     if (nei != nullptr && nei->nameEn != nullptr) {
         static CustomItemMessageEntry neiMsg;
         neiMsg.rgId = rgId;
-        neiMsg.itemId = static_cast<ItemID>(nei->item);
+        neiMsg.itemId = nei->item;
         neiMsg.english = nei->nameEn;
         // Rows may leave FR/DE as NULL — fall back to English so the CustomMessage
         // std::string ctor never receives a null char* (crash on textbox open).

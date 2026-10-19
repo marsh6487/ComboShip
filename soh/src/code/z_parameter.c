@@ -14,6 +14,9 @@
 #include "soh/ShipUtils.h"
 #include "mods/extended_equipment.h"
 #include "mods/nei_save.h"
+#include "sword_element.h"
+#include "din_fire_sword.h"
+#include "expansions/sm64/sm64_mario.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -4709,6 +4712,50 @@ void Interface_DrawItemButtons(PlayState* play) {
 int16_t gItemIconWidth[] = { 30, 24, 24, 24, 16, 16, 16, 16 };
 int16_t gItemIconDD[] = { 550, 680, 680, 680, 1024, 1024, 1024, 1024 };
 
+// The sword stays on B; the arrow texture names the active enchantment. Use the
+// actual icon rectangle so HUD positioning and icon scaling carry the badge.
+extern u8 FourSword_IsEquipped(void);
+extern s32 BossRemains_IsOdolwaWorn(void);
+extern s32 BossRemains_IsGohtWorn(void);
+static void Interface_DrawSwordElementBadge(PlayState* play, u16 item, s16 button, s16 left, s16 top, s16 width,
+                                            s16 height) {
+    InterfaceContext* interfaceCtx = &play->interfaceCtx;
+    Player* player = GET_PLAYER(play);
+    if (button != 0 || width <= 0 || height <= 0 || interfaceCtx->bAlpha <= 0 || interfaceCtx->unk_1FA ||
+        gSaveContext.buttonStatus[0] == BTN_DISABLED || TransformMasks_IsTransformedAny() || Sm64Mario_IsActive() ||
+        ExtEquip_ShouldHideSwordDL() || FourSword_IsEquipped() || BossRemains_IsOdolwaWorn() ||
+        BossRemains_IsGohtWorn()) {
+        return;
+    }
+    u8 element = SwordElement_ForItem(item);
+    // Untouched legacy files can still use the resource-backed Din effect.
+    // Ask the combat resolver so its arrow, asset and player gates stay exact.
+    if (element == SWORD_ELEMENT_NONE && SwordElement_SlotForItem(item) >= 0 && player != NULL &&
+        player->heldItemId == item && (DinFireSword_DamageFlags(play, player, DMG_SLASH_KOKIRI) & DMG_ARROW_FIRE)) {
+        element = SWORD_ELEMENT_FIRE;
+    }
+    if (element <= SWORD_ELEMENT_NONE || element >= SWORD_ELEMENT_COUNT) {
+        return;
+    }
+    static const char* const textures[SWORD_ELEMENT_COUNT] = { NULL, gItemIconArrowFireTex, gItemIconArrowIceTex,
+                                                               gItemIconArrowLightTex };
+    s16 markWidth = MAX(1, width * 2 / 5);
+    s16 markHeight = MAX(1, height * 2 / 5);
+    s16 markLeft = left + width - markWidth + MAX(1, width / 15);
+    s16 markTop = top - MAX(1, height / 15);
+    OPEN_DISPS(play->state.gfxCtx);
+    gDPPipeSync(OVERLAY_DISP++);
+    gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
+    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->bAlpha);
+    gDPLoadTextureBlock(OVERLAY_DISP++, textures[element], G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0,
+                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD,
+                        G_TX_NOLOD);
+    gSPWideTextureRectangle(OVERLAY_DISP++, markLeft * 4, markTop * 4, (markLeft + markWidth) * 4,
+                            (markTop + markHeight) * 4, G_TX_RENDERTILE, 0, 0, 32 * 1024 / markWidth,
+                            32 * 1024 / markHeight);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 void Interface_DrawItemIconTexture(PlayState* play, void* texture, s16 button) {
     OPEN_DISPS(play->state.gfxCtx);
     GraphicsContext* gfxCtx = play->state.gfxCtx;
@@ -5240,6 +5287,11 @@ void Interface_DrawItemIconTexture(PlayState* play, void* texture, s16 button) {
             gSPWideTextureRectangle(OVERLAY_DISP++, markLeft << 2, markTop << 2, (markLeft + markSize) << 2,
                                     (markTop + markSize) << 2, G_TX_RENDERTILE, 0, 0, ddMark, ddMark);
         }
+    }
+
+    if (button == 0 && CVarGetInteger(CVAR_COSMETIC("HUD.BButton.PosType"), 0) != HIDDEN) {
+        Interface_DrawSwordElementBadge(play, effBtnItem, button, ItemIconPos[button][0], ItemIconPos[button][1],
+                                        gItemIconWidth[button], gItemIconWidth[button]);
     }
 
     CLOSE_DISPS(play->state.gfxCtx);

@@ -1,6 +1,16 @@
 // Exact foliage identities inspected in Djipi OoT Scenes Map20 / Textures21.
 // Both native and explicit Alt cache entries are handled by the same table.
-// Ground/mixed atlases change only green pixels; spring leaves ground native.
+// Ground/mixed atlases change only green pixels, including spring's grass blush.
+// Shared native forest copy: retain the MM donor's darker autumn leaf/ground
+// palette. The leaf atlas uses canopy blush/frost; protect bark and mushrooms.
+{ "custom/skiejer_forest/textures/lw_enkei_01_0", Surface::Canopy, {}, 0xB96848FF },
+{ "custom/skiejer_forest/textures/lw_kabe_01_5400", Surface::Ground, {}, 0xD99C45FF },
+{ "custom/skiejer_forest/textures/lw_kusa_01_12600", Surface::Canopy, {}, 0xB96848FF },
+{ "custom/skiejer_forest/textures/lw_wood_02_2CA00", Surface::Canopy, {}, 0xB96848FF },
+{ "custom/skiejer_forest/textures/lw_wood_03_31E00", Surface::Canopy, {}, 0xB96848FF },
+{ "custom/skiejer_forest/textures/lw_wood_04_37200", Surface::Canopy, {}, 0xB96848FF },
+{ "custom/skiejer_forest/textures/lw_yuka_02_39C00", Surface::Ground, {}, 0xD99C45FF },
+{ "custom/skiejer_forest/textures/lw_yuka_03_44400", Surface::Ground, {}, 0xD99C45FF },
 { "scenes/shared/spot00_scene/s00_yuka_01_78B00___Copie", Surface::Ground },
 // Exact additional identities in cor's Hyrule Field FINAL archive.
 { "custom/prelude/spot00_scene/s00_yuka_04_85D00", Surface::Ground },

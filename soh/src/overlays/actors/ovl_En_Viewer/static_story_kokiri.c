@@ -1,4 +1,6 @@
 #include "static_story_kokiri.h"
+#include "soh/Enhancements/cosmetics/NativeNpcModels.h"
+#include "soh/Enhancements/cosmetics/YoungFadoNpc.h"
 
 #include <math.h>
 
@@ -55,9 +57,16 @@ void StaticStoryKokiri_Init(EnViewer* this, PlayState* play) {
         StaticStoryActor_ResolvePose((StaticStoryActorType)this->staticState.type, this->staticState.pose);
 
     gSegments[6] = VIRTUAL_TO_PHYSICAL(play->objectCtx.status[this->staticState.objectSlots[3]].segment);
-    SkelAnime_InitFlex(play, &this->skin.skelAnime, (FlexSkeletonHeader*)gKw1Skel, NULL, NULL, NULL, 0);
-    Animation_PlayLoopSetSpeed(&this->skin.skelAnime, StaticStoryKokiri_GetAnimation(pose->animation),
-                               pose->playbackSpeed);
+    const char* skeleton = NativeNpcModel_SelectSkeleton(
+        this->staticState.type == STATIC_STORY_ACTOR_KOKIRI_GIRL ? &sKokiriGirlNpcModel : NULL, gKw1Skel);
+    AnimationHeader* animation = StaticStoryKokiri_GetAnimation(pose->animation);
+    if (this->staticState.type == STATIC_STORY_ACTOR_FADO) {
+        skeleton = YoungFadoNpc_SelectSkeleton(skeleton);
+        animation =
+            (AnimationHeader*)YoungFadoNpc_SelectStaticAnimation((const char*)animation, this->staticState.pose);
+    }
+    SkelAnime_InitFlex(play, &this->skin.skelAnime, (FlexSkeletonHeader*)skeleton, NULL, NULL, NULL, 0);
+    Animation_PlayLoopSetSpeed(&this->skin.skelAnime, animation, pose->playbackSpeed);
     this->staticState.kokiriLegFrame = 0.0f;
     StaticStoryKokiri_UpdatePose(this, 0.0f);
 }
@@ -68,6 +77,12 @@ void StaticStoryKokiri_UpdatePose(EnViewer* this, f32 step) {
     if ((this->staticState.type != STATIC_STORY_ACTOR_KOKIRI_GIRL &&
          this->staticState.type != STATIC_STORY_ACTOR_FADO) ||
         this->staticState.pose != 4 || joints == NULL || this->skin.skelAnime.limbCount < 16) {
+        return;
+    }
+
+    /* A fitted archive clip owns the complete seated pose, including legs. */
+    if (NativeNpcPose_ResolveAnimation(&this->skin.skelAnime, this->skin.skelAnime.animation) !=
+        this->skin.skelAnime.animation) {
         return;
     }
 
@@ -105,10 +120,18 @@ static s32 StaticStoryKokiri_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gf
                                               void* thisx, Gfx** gfx) {
     EnViewer* this = (EnViewer*)thisx;
 
+    if (this->staticState.type == STATIC_STORY_ACTOR_FADO) {
+        *dList = YoungFadoNpc_SelectSeatedBody(*dList, limbIndex, this->staticState.pose);
+    }
     if (limbIndex == 15) {
         gSPSegment((*gfx)++, 0x06, play->objectCtx.status[this->staticState.objectSlots[0]].segment);
         gSegments[6] = VIRTUAL_TO_PHYSICAL(play->objectCtx.status[this->staticState.objectSlots[0]].segment);
         *dList = this->staticState.type == STATIC_STORY_ACTOR_FADO ? (Gfx*)gFaDL : (Gfx*)object_kw1_DL_002C10;
+        if (this->staticState.type == STATIC_STORY_ACTOR_KOKIRI_GIRL) {
+            *dList = NativeNpcModel_SelectHead(&sKokiriGirlNpcModel, *dList, this->staticState.eyeIndex, 0);
+        } else if (this->staticState.type == STATIC_STORY_ACTOR_FADO) {
+            *dList = YoungFadoNpc_SelectHead(*dList);
+        }
         gSPSegment((*gfx)++, 0x0A,
                    SEGMENTED_TO_VIRTUAL(this->staticState.type == STATIC_STORY_ACTOR_FADO
                                             ? sFadoEyes[this->staticState.eyeIndex]
@@ -127,6 +150,7 @@ static s32 StaticStoryKokiri_OverrideLimbDraw(PlayState* play, s32 limbIndex, Gf
             Matrix_Translate(-1200.0f, 0.0f, 0.0f, MTXMODE_APPLY);
         }
     }
+    *dList = NativeNpcPose_SelectLimb(&this->skin.skelAnime, limbIndex, *dList);
     return false;
 }
 
@@ -150,6 +174,10 @@ static Gfx* StaticStoryKokiri_ColorDL(GraphicsContext* gfxCtx, u8 r, u8 g, u8 b)
 
 void StaticStoryKokiri_Draw(EnViewer* this, PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
+    if (this->staticState.type == STATIC_STORY_ACTOR_FADO && YoungFadoNpc_IsActive()) {
+        Gfx_SetupDL_25Opa(play->state.gfxCtx);
+        gDPSetEnvColor(POLY_OPA_DISP++, 0, 0, 0, 255);
+    }
     gSPSegment(POLY_OPA_DISP++, 0x08, StaticStoryKokiri_ColorDL(play->state.gfxCtx, 70, 190, 60));
     gSPSegment(POLY_OPA_DISP++, 0x09, StaticStoryKokiri_ColorDL(play->state.gfxCtx, 100, 30, 0));
     POLY_OPA_DISP = SkelAnime_DrawFlex(play, this->skin.skelAnime.skeleton, this->skin.skelAnime.jointTable,

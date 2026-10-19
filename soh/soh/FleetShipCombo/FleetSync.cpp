@@ -92,6 +92,7 @@ void Bottle_WheelPersist(unsigned char wheel, unsigned short slotItem);
 void Bottle_WheelRecordActive(unsigned char wheel, unsigned short slotItem);
 // Elemental Wand / Sheikah Slate grants (mods/extended_inventory.c): place the cell item, light the
 // rod/rune bit and pick the active mode -- the same call the native pickup makes.
+unsigned char Cane_GiveSkill(unsigned char skill);
 void Wand_GrantMode(unsigned char mode);
 void Slate_GrantRune(unsigned char rune);
 void Seasons_GrantSeason(unsigned char season);
@@ -550,6 +551,8 @@ void ExtractShared(nlohmann::json& sh) {
     // / runes you own lives in these bitmasks, and nothing carried them -- the peer got an empty
     // wand. OR-merged both ways (one-way unlocks); the fcId deficit path still grants the items
     // natively, this just guarantees the bits arrive even if a grant is missed.
+    // Named cane unlocks are independent bits, not a progressive pickup count.
+    sh["caneSkills"] = (sh.value("caneSkills", 0) | nei->caneSkills) & 0x3F;
     sh["wandRodsOwned"] = (int)nei->wandRodsOwned;
     sh["slateRunesOwned"] = (int)nei->slateRunesOwned;
     sh["seasonsOwned"] = (int)(nei->seasonsOwned & NEI_SEASONS_MASK);
@@ -826,6 +829,14 @@ void ApplyShared(const nlohmann::json& sh) {
 
     // Wand rods / slate runes: OR the bits in, and hand the game every rod/rune it did not have yet
     // through its own grant function (which also places the cell item and picks the active mode).
+    if (sh.contains("caneSkills") && sh["caneSkills"].is_number_integer()) {
+        const uint8_t incoming = (uint8_t)(sh["caneSkills"].get<int>() & 0x3F);
+        const uint8_t gained = (uint8_t)(incoming & ~nei->caneSkills);
+        for (uint8_t skill = 0; skill < 6; ++skill) {
+            if (gained & (1 << skill))
+                Cane_GiveSkill(skill);
+        }
+    }
     if (sh.contains("wandRodsOwned") && sh["wandRodsOwned"].is_number_integer()) {
         const uint8_t incoming = (uint8_t)sh["wandRodsOwned"].get<int>();
         const uint8_t gained = (uint8_t)(incoming & ~nei->wandRodsOwned);
@@ -1085,6 +1096,13 @@ void ApplyFcRegistryToNatives() {
     NeiSaveData* nei = Nei_Save();
     sApplyingFc = true; // suppress the record hook's re-entry for the duration of this pass
     for (int fcId = 0; fcId < FCI_MAX; fcId++) {
+        // Both games publish exact caneSkills. Replaying the old progressive counter
+        // after applying that mask would grant an unrelated extra power. Acknowledge
+        // counts here even when counter and mask arrive in separate FleetNet deltas.
+        if (fcId == FCI_CANE_OF_SOMARIA) {
+            nei->comboAppliedFc[fcId] = nei->comboObtainedFc[fcId];
+            continue;
+        }
         int native = FcCombo_NativeForItem(fcId);
         if (native == FCI_NO_ITEM) {
             continue; // no OoT-native relative for this fcId (info-only / MM-only here)
