@@ -22,6 +22,7 @@ def run(*args):
     subprocess.run([str(x) for x in args], cwd=ROOT, check=True)
 
 def main():
+    run('python3', '-B', 'tests/monkey_audio/run_tests.py')
     with tempfile.TemporaryDirectory(prefix='forest-actors-') as temp:
         work = Path(temp)
         folder = 'soh/src/overlays/actors/ovl_En_Viewer/'

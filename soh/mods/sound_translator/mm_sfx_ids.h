@@ -175,6 +175,7 @@ extern "C" {
 // Environment Bank SFX (environmentbank_table.h)
 // =============================================================================
 
+#define MM_NA_SE_EV_MONKEY_VO_JOY 0x2901  // Native MM monkey call (also used by En_Mnk).
 #define MM_NA_SE_EV_LIGHTNING_HARD 0x2912 // /* 0x2912 */ Lightning/thunder (transform flash)
 
 // =============================================================================

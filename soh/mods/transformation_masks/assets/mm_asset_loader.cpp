@@ -5641,6 +5641,15 @@ s32 MmSfx_PlayEx(u16 sfxId, Vec3f* pos, u8 token, f32* freqScale, f32* vol, s8* 
     return 1;
 }
 
+void MmSfx_StopAtPos(u16 sfxId, Vec3f* pos) {
+    extern void AudioMmSfx_StopByPosAndId(Vec3f * pos, u16 sfxId);
+    // The bank retains the actor's projected-position pointer. Remove both
+    // queued and active references under the same lock as playback/mixing.
+    // Stopping by ID alone would also silence other monkeys in the room.
+    MmAudioScopedLock audioLock;
+    AudioMmSfx_StopByPosAndId(pos, sfxId);
+}
+
 void MmSfx_Stop(u16 sfxId) {
     // FIX: Must stop in BOTH the MmDirectAudio playing-sound array AND the
     // AudioMmSfx bank engine. Without the bank-engine stop, the entry stays

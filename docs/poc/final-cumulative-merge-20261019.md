@@ -48,7 +48,7 @@ The 42-path Woods delta applied without conflicts. Before formatting, all 42 own
 | 26 | Private native solo forests | Private scene copies, local returns, weather/seasons, addon availability checks and save lifecycle in OoT solo and MM solo. |
 | 27 | Saria forest behavior | Prelude-placeable waiting, visible-ocarina playing and seated scenery/song-giver poses; one-time shared song claim, actor-relative green hollow hexes, native/Alt replacement resources and all three mode guards. |
 | 28 | Epona and Skull Kid | Portal-side Epona and second-clearing crossed-leg/reclining Skull Kid placement, actor hosts and authored override guards. Placement still needs installed review. |
-| 29 | MM monkey in OoT | Prelude-placeable native MM monkey: idle, high-jump and scratch poses, blink and stationary dialogue. |
+| 29 | MM monkey in OoT | Prelude-placeable native MM monkey: idle, high-jump and scratch poses, blink, stationary dialogue and repeating native MM calls for all three entries, with per-emitter room/lifetime cleanup. See `monkey-room-audio-20261019.md`. |
 | 30 | Native NPC runtime | Weighted skin/pose sampling, expression/blink/tracking, prop behavior and native actor registration; MM/SoH rendering parity is limited to demonstrated configurations. |
 | 31 | Saria model authoring | Final Anime Saria POC12 and Traditional POC11 source reconciliation. Select one matching Saria asset alternative. |
 | 32 | Kokiri twins | Accepted POC9 posture/model tooling and credits support. The earlier rejected POC4 face is superseded. |

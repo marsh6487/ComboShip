@@ -422,6 +422,9 @@ s32 MmSfx_PlayEx(u16 sfxId, Vec3f* pos, u8 token, f32* freqScale, f32* vol, s8* 
  */
 void MmSfx_Stop(u16 sfxId);
 
+// Release only this emitter's bank entry and queued requests before its position is freed.
+void MmSfx_StopAtPos(u16 sfxId, Vec3f* pos);
+
 // Once per native graph-frame Audio_Update, serialized with the PCM mixer.
 void MmSfx_UpdateGameFrame(void);
 

@@ -38,6 +38,7 @@
 #include "static_story_mm_actor.h"
 #include "static_story_ganon.h"
 #include "mods/transformation_masks/assets/mm_asset_loader.h"
+#include "mods/sound_translator/mm_sfx_ids.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/frame_interpolation.h"
 #include <assert.h>
@@ -171,6 +172,10 @@ void EnViewer_Destroy(Actor* thisx, PlayState* play) {
     EnViewer* this = (EnViewer*)thisx;
 
     if (this->staticState.staticMode) {
+        if (this->staticState.type == STATIC_STORY_ACTOR_MONKEY && this->staticState.monkeySfxActive) {
+            MmSfx_StopAtPos(MM_NA_SE_EV_MONKEY_VO_JOY, &this->actor.projectedPos);
+            this->staticState.monkeySfxActive = false;
+        }
         if (this->staticState.initialized) {
             if (this->staticState.tatlInitialized) {
                 SkelAnime_Free(&this->staticState.tatlSkelAnime, play);
@@ -832,6 +837,26 @@ void EnViewerStatic_Update(EnViewer* this, PlayState* play) {
     }
     bool animationEnded = false;
     bool canInteract = true;
+
+    if (this->staticState.type == STATIC_STORY_ACTOR_MONKEY) {
+        bool canCall = this->actor.room == play->roomCtx.curRoom.num && play->pauseCtx.state == 0 &&
+                       play->csCtx.state == CS_STATE_IDLE && play->transitionTrigger == TRANS_TRIGGER_OFF &&
+                       play->transitionMode == TRANS_MODE_OFF;
+        if (!canCall) {
+            if (this->staticState.monkeySfxActive) {
+                MmSfx_StopAtPos(MM_NA_SE_EV_MONKEY_VO_JOY, &this->actor.projectedPos);
+                this->staticState.monkeySfxActive = false;
+            }
+            this->staticState.monkeySfxTimer = 0;
+        } else if (this->staticState.monkeySfxTimer > 0) {
+            --this->staticState.monkeySfxTimer;
+        } else {
+            this->staticState.monkeySfxActive = MmSfx_PlayAtPos(MM_NA_SE_EV_MONKEY_VO_JOY, &this->actor.projectedPos);
+            // Native MM one-shot through Sequence_0, with a 3–5 second gap
+            // at the native 20 Hz update rate. All poses share this hook.
+            this->staticState.monkeySfxTimer = Rand_S16Offset(60, 41);
+        }
+    }
 
     if (poseDescriptor->skeletonFamily != STATIC_SKELETON_NONE &&
         poseDescriptor->animation != STATIC_ANIM_ADULT_ZELDA_NEUTRAL) {
