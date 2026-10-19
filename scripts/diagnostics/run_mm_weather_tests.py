@@ -51,7 +51,7 @@ def main():
                       "-DCONTROLLERBUTTONS_T=uint32_t", "-DNON_EQUIVALENT", "-DNON_MATCHING"]
         game_flags += ["-I" + str(ROOT / path) for path in
                        ("mm/include", "mm/include/PR", "mm/src", "mm/2s2h", "mm/assets", "mm/mods",
-                        "libultraship/include", "libultraship/src", "combo")]
+                        "libultraship/include", "libultraship/src", "combo", "combo/menu")]
         for source in ("mm/src/code/z_kankyo.c", "mm/src/code/z_play.c", "mm/src/code/z_vr_box.c",
                        "mm/src/overlays/actors/ovl_En_Bom/z_en_bom.c",
                        "mm/src/overlays/actors/ovl_En_Bombf/z_en_bombf.c",

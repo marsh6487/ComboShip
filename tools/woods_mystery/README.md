@@ -1,115 +1,149 @@
-# Woods of Mystery visual POC4 — wall and tunnel fit
+# Woods of Mystery visual POC6 — baked bridge, fitted canopy and detailed grass
 
-This additive candidate changes the nine native Woods of Mystery room meshes.
-All four existing openings in each room receive a donor entrance rim and a
-cropped interior sleeve (36 openings total). It does not choose a daily route.
-The first clearing also receives the separate OoT bridge tunnel, with green
-hollow hex particles supplied by the matching native source change.
+This additive scene candidate fits the existing nine-room Woods of Mystery to
+cor's requested Lost Woods treatment. All four openings in every room use the
+recovered MM3DS external mouth and a cropped interior sleeve (36 mouths).
+The separate OoT/2ship bridge keeps its approved fitted wood shape. Vanilla
+collision, daily maze routing, actor placement/logic, transitions and audio remain unchanged.
 
-The 246-face / 321-source-vertex donor was recovered from the unchanged
+The donor has 246 faces and 321 source vertices, recovered from the unchanged
 `zzzz_MM3D_Lost_Woods_Black_Market_POC14.prelude.o2r`, SHA256
 `7b8f2b820ba0bf4441889693f820d280f8dace6f4664387f847bf0fdeecbdce9`.
-Both donor room halves remain in the reusable GLB. Room passages use only the
-external room-0 mouth and the required length of its interior, with interpolated
-UVs at the cut. The long donor body is not compressed into the short passages.
+The long donor is cropped rather than compressed. Maze mouths start at local
+175 and end at 450; width1.20 and height1.0 are retained. The approved bridge's
+first120 units and its30-unit continuation retain all166 wood triangles and28
+terminal black-cap triangles. The floor correction below changes only their
+lowest serialized Y1/2 vertices to-3/-2; all other attributes remain exact.
 
-The supplied grass, rock, vine and ruin textures are scoped to this scene.
-Recovered donor bark textures cover tunnels and added upper tree/root geometry.
-Both native floor texture stages now use the supplied grass. Original Henriko
-ENVIRONMENT crown and forest-edge RGBA artwork replaces all 36 native overhead
-foliage display lists, including translucent lists and room 2's distinct edge.
-Original alpha, foliage positions and normal bytes are retained; logical UVs
-are adapted to 32×32 or 32×16 tiles with texture-edge coverage.
-Native wall lighting and normal bytes are retained; donor bark uses its original
-unlit vertex colors.
+The supplied grass, rock and vine textures remain scoped to this scene.
+The main floor and added coverage use one detailed grass sampler with a shared
+world UV phase; original floor positions and normals are preserved. Original Henriko ENVIRONMENT canopy
+and forest-edge pixels/alpha and native foliage normal bytes are retained. Only
+the shared bridge-clearance pivot changes position as described below.
+Donor RGB stays unlit; native wall and hidden backing normals stay lit.
+The inward plank-band UV/color seam repair remains unchanged.
 
-## POC4 correction from the play-renderer clip
+## POC6 correction and preservation
 
-cor accepted POC3's sky coverage and previously approved the custom fitted
-OoT bridge shape. The latest clip and interior close-ups show native stone
-walls burying the maze rims and cutting through their wood sleeves, plus a
-thin native-wall lip across the bridge crown. POC4 preserves all 194 POC3
-bridge wood/continuation/cap triangles and attributes exactly. That includes
-the 110 approved bridge positions and its 24 exterior bark-rim triangles.
+cor explicitly accepted the POC5 fitted tunnel geometry, especially the diagonal
+OoT/MM bridge. The floor correction changes only low Y1/2 vertices in the9 room
+wood vertex resources; all9 wood display lists remain byte-identical. This
+protects all36 maze mouths, every donor UV/color, all194 bridge
+wood/continuation/cap triangles and added tree geometry. Henriko foliage and
+private texture bytes remain exact. Vanilla collision and daily routes stay native.
 
-The inward wood uses continuous axial UVs within the plank portion of the donor
-atlas. Shared positions receive a consistent circumferential UV phase and
-baked vertex color, removing the isolated bark samples and bright/dark wedges.
-This correction applies to all 36 maze sleeves and the bridge sleeve. Original
-texture pixels and the donor source resources remain unchanged.
+The new screenshots expose close-camera gaps outside the tunnel shoulders.
+The original fitted wall ends near depth206 while hidden backing started210.
+A horizontal ray from(190,50,100) through(208,50,114.5) passes through the gap.
+Changing only the non-floor backing's near edge to200 overlaps the retained
+wall by at least3.375units on the sides and3.4375units at the roof. Backing
+sides remain±116 and roof145, outside accepted wood by6/10units. The movement
+applies to all72 shoulder sides in all9 rooms, with the far450 joins intact.
+Existing grass underlay and corridor wings remain below/alongside the wood.
+An independent762048-ray control found2430 POC5 local misses and zero with200.
 
-All 36 maze mouths move another 20 units into their clearings (195 → 175),
-with short sleeves cropped to 275 so the far joins stay at 450. Their scale is
-unchanged. Wall cutouts follow the complete projected bark rim, including the
-sloped native shoulders that were hiding the lower wood. Walls above the
-wood remain closed. The long donor remains cropped rather than compressed.
+The grass screenshot shows a different issue: the native main floor still used
+a two-stage distance blend while the added corridor/underlay used a single
+texture sample. POC6 uses the same detailed supplied grass material everywhere.
+All grass UVs use S=-6.4worldX and T=-6.4worldZ. This removes the native per-room
+offsets as well as the material-boundary mismatch; positions, normals and collision
+stay unchanged. Single-stage sampling, equal tile shifts and matching global
+phase are checked at every grass triangle, including all main-room floors.
 
-The opaque native lining becomes hidden backing outside the wood: its sides
-sit at ±116 and its roof at height 145, from 210 to 450. The original eight
-grass floor triangles per room remain exact. Sixteen added grass wing
-triangles join their edges to the widened backing, and eight tail triangles
-extend grass to the end join. The backing feet stay below the grass. An end
-surround shares every quantized wood terminal edge and seals only the space
-outside that opening; the 450 passage remains open. This closes exposed side,
-foot and end strips without changing collision or the original walked floor.
-The expanded lit backing draws through the appended visual entry's 1600-unit
-cull sphere, with the old native lining list empty. Native room bounds stay
-unchanged; separate material state keeps donor RGB unlit and backing normals lit.
+The floor-contact revision keeps grass visible inside the tunnels. The original
+transparent corridor fade rose fromY0 toY10; making it opaque exposed a ramp
+above the native flatY0 collision. Added corridor grass, wings and tails now
+sit atY0. The original main floor staysY0 and the hidden clearing underlay stays
+Y-1. Serialized wood/cap low vertices atY1/2 move down4units toY-3/-2, including
+their matching annulus vertices. Every X/Z/UV/normal/color and higher wood vertex
+is preserved. The same correction is built into the independent native bridge.
+Collision, triggers and daily routing remain native. Tests decode the actual
+collision header and protect the precise19scene/2native vertex-resource delta.
 
-The bridge corner uses the existing wall surface with a fitted aperture cut
-through it. Its stone-panel material is replaced with the neighboring forest
-wall materials. The lower/side bridge cutout retains POC3's coverage; only its
-upper edge gains clearance to remove the crown lip. Clipping preserves UV
-interpolation and signed lighting normals. Verification accounts for integer
-XYZ quantization when recovering original-face attributes from UVs.
-Clipped wall edges share every subdivision before integer serialization, closing
-the tiny rounding cracks visible from oblique approaches. A 30-unit continuation
-is stitched to every vertex of the approved sleeve's end loop, keeping that
-cross-section through depth 150. Its cap shares every terminal edge rather than
-using a rectangle or dropping collinear cut vertices.
-The native effect mouth and gameplay/collision boundaries do not move.
+Curved native shoulder remnants protruded in front of the logs. Only portions
+inside the existing opaque backing volume are trimmed: depth200..450,
+across+/-116 and Y-4..145 in each cardinal direction. The backing remains intact,
+and flat native depth240 fascia are retained. New cuts interpolate signed
+lighting normals and UVs from the original faces. The fin regression checks
+all nine rooms, fascia area and removed-surface rays. A view looking back out
+through a tunnel's intentionally open near face can see the clearing; closed
+side/roof joins must retain a local opaque hit. No new collision is introduced.
+
+The low foliage curtain already overlaps the wall geometry, but the round crown
+artwork has a transparent border that leaves a floating sky band. POC6 maps only
+those16 triangles per room to the existing Henriko forest-edge strip and fits its
+opaque lower band over the walltop. Its logical tile is32x16; T is75% of the
+normal forest-edge mapping (equivalent to37.5% of the previous canopy T).
+S coordinates, normal bytes and vertex alpha remain exact.
+The higher crown and forest-edge lists keep their accepted artwork and mapping.
+An alpha-aware control reproduces187 sky rays around Room1; the fitted mapping
+closes all23328 sampled rays across nine rooms and two texture conventions.
+This verifies sampled cutout coverage, not exact renderer rasterization.
+
+The low curtain's shared Room1 pivot at(213,88,-214) crossed the diagonal
+bridge roof in14 triangle pairs. Raising only that pivot toY119 clears the
+actual wood by at least4units in the sampled roof profile while preserving
+the walltop coverage above. The native bridge has an eighth built asset:
+the original38-vertex canopy resource with only indices0/27 moved toY119.
+Four scoped filepath vertex-load patches preserve native culling, materials
+and all other commands; they verify and restore together with the wall patch.
+
+Seasonal targeting includes these stable scene-local texture paths beneath
+`custom/cor_woods_mystery/poc1/textures/`; the historical namespace is retained:
+
+| Role | Resource suffix |
+| --- | --- |
+| Detailed grass | `grass` |
+| Green trim in wall and ruin tiling | `rock`, `vines`, `ruins` |
+| Walltop curtain and high forest strip | `henriko_forest_edge` |
+| Overhead leaf crowns | `henriko_canopy` |
+
+The matching source targets the four requested groups: ground grass, green
+wall trim, native foliage geometry and grass actors. Private filepath images
+use green-only seasonal pixel variants with their original dimensions, scale
+metadata and alpha. Native seasonal materials and grass palettes are reused.
+Standing, carried and replacement-grass draws include Woods; replacement
+flowers/stems retain their existing material scope. Spring ground/actor grass
+uses the current spring-grass palette. Stone/bark base tones, black masks and
+portal/shimmer colors keep their existing roles. Seasonal behavior requires
+the matching source build, separately from the editable scene archive.
+
+The earlier fitted black boundaries remain at their original440 depth and only
+the12 pre-existing exits. Unfogged black state is restored correctly before lit
+backing. All28 bridge cap perimeter edges remain welded to the forest annulus.
+Aperture-disjoint original wall faces remain intact, preserving the repaired
+upper silhouette. Broad outer-rim probes did not establish a new uncovered
+perimeter. The former protruding wood threshold is now submerged beneath grass.
+
+The native baked bridge integration and its tests are recorded in the final
+source/recovery handoff. It preserves the194 accepted bridge triangles and
+provides its own textures and bridge-only wall cut through built-in resources;
+the complete Woods makeover remains an optional scene pack. Native entrance
+collision and route triggers are not redefined by the visual model.
 
 ## Loading and rollback
 
-Use `zzzzz_Woods_of_Mystery_OoT_Makeover_POC4.prelude.o2r` as an additional mod archive,
-with Alt Assets enabled. It must win load order over another pack replacing
-`Z2_26SARUNOMORI` room headers or display lists. Reload the scene after changing
-packs. Keep the accepted POC14 and other forest/shop packs unchanged.
+Use `zzzzz_Woods_of_Mystery_OoT_Makeover_POC6.prelude.o2r` as the active Woods
+candidate. Remove earlier Woods POC overrides, enable Alt Assets, and let this
+pack win over other `Z2_26SARUNOMORI` room replacements. Reload the scene.
+In Prelude, load native MM plus this override and choose **Continue editing**.
+Open **Woods of Mystery**, **Room1** for the OoT bridge. All nine rooms contain
+four fitted maze mouths. This is an editable baked scene layer. Export as a
+**Prelude project** to retain it; original and bare-path ZIP layouts are supported.
 
-In Prelude, load the native MM archive, add this override, and choose
-**Continue editing**. Open **Woods of Mystery** and select **Room 1** for the
-OoT bridge entrance. All nine rooms contain their four short tunnel mouths.
-The geometry is a baked scene layer and can be inspected in the scene viewport;
-it is not an unplaced recipe waiting to be instantiated. Remove the failed
-POC1/POC2/POC3 overrides before loading POC4. Export as a **Prelude project** to retain the
-editable layer. Canonical project entry names support both the original alt/
-placement and Prelude's bare-path placement for newly introduced resources.
+Animated green hollow hexes still require the matching ComboShip source build.
+The archive alone does not add that effect. Inherited resource-ownership,
+Alt Assets, combined-game and solo-addon availability guards are unchanged.
+The POC6 native integration ships the accepted bridge separately in the built
+2ship asset set. Regenerate `2ship.o2r` through the normal build workflow to include
+the eight committed assets; a previously built executable/archive does not gain
+them by loading the scene pack. The purple intro treatment stays separate.
+Remove this archive and reload to roll back. Earlier candidates remain separate;
+no accepted master is replaced or promoted.
 
-The matching ComboShip source must be built for the animated green hexes and
-suppression of the older temporary bark arch. **The archive alone does not add
-the animated effect.** The effect follows the loaded custom bridge mesh,
-current Alt/resource availability, gameplay/cutscene state and existing
-combined-game / solo-addon availability guards. The existing purple intro
-portal treatment remains separate.
-The POC2 native ownership guard accepts both bare and alt custom resources,
-because Prelude exports newly introduced resources at their bare path. Alt
-Assets and ownership of the loaded bridge room mesh remain required.
+## Rebuild and recovery
 
-To roll back, remove this additive archive and reload the scene. The matching
-source falls back to the older entrance treatment when the custom mesh is
-inactive. To revert source too, revert only this candidate's commit or patch.
-
-## Preservation boundary
-
-The candidate contains no collision resources, actors, paths, scene headers,
-triggers or arrivals. Its nine room headers differ only by one appended visual
-mesh entry. Verification removes that entry and reproduces each native room
-header byte-for-byte. Daily maze data, vanilla collision, audio, unrelated
-forest/shop assets and accepted masters remain input-owned.
-
-## Rebuild
-
-Python 3, NumPy and Pillow are required. From this source root:
+Python3, NumPy, Pillow and Node are required. From the source root:
 
 ```sh
 python -B tools/woods_mystery/build_candidate.py \
@@ -118,55 +152,44 @@ python -B tools/woods_mystery/build_candidate.py \
   --donor-archive-sha256 7b8f2b820ba0bf4441889693f820d280f8dace6f4664387f847bf0fdeecbdce9 \
   --textures /path/textures --foliage /path/foliage --output /path/output
 python -B tests/woods_mystery/verify_candidate.py \
-  /path/output/zzzzz_Woods_of_Mystery_OoT_Makeover_POC4.prelude.o2r \
+  /path/output/zzzzz_Woods_of_Mystery_OoT_Makeover_POC6.prelude.o2r \
   /path/Woods-of-Mystery-Native-Resources.zip
-python -B tests/woods_mystery/test_tunnel_fit.py /path/tunnel-source-resources.zip
-python -B tests/woods_mystery/run_hex_test.py
-python -B tests/woods_mystery/run_active_pack_test.py
-python -B tests/lost_woods_entrance/run_tests.py
 ```
 
-The original full POC can replace the exact donor-resource subset; omit
-`--donor-archive-sha256` in that case. The provenance value records the original
-archive identity; the report also hashes every donor resource actually used.
-Archive entries have fixed timestamps and sorted names for exact rebuilding.
-The recovery package's `rebuild.py` restores a small, complete asset-builder
-snapshot and verifies an exact archive rebuild without the full game checkout.
-Its `--base-recovery` option also restores the full source from the unchanged
-POC1 recovery archive, applies this bounded repair patch, and verifies the exact
-final Git tree. `--native-tests` uses that mode and POC1's header dependencies.
+The original full donor POC can replace the exact donor subset; omit the
+provenance SHA argument in that case. Every used donor resource is separately
+hashed. Sorted archive names and fixed ZIP timestamps support exact rebuilding.
 
-## Verification and remaining proof
+The compact recovery contains the complete asset-source snapshot, all required
+asset inputs, cached Prelude parser reference and cumulative full-source patch.
+Run `python -B rebuild.py` in a fresh extracted folder. Small historical builder
+snapshots reconstruct POC2/3/4/5 and the original POC6 controls from the same inputs and require their
+original archive hashes before running preservation tests. This avoids including
+five nearly identical full texture packs. No network fetch is needed.
 
-Checks cover all nine room layouts, native wall material semantics/normal bytes,
-unlit donor materials, exact header restoration, absence of collision/actor/path
-overrides, retained entrance rims, clipped sleeve lengths, green hollow-hex
-geometry, live Alt changes, scene/room ownership and native/solo fallback guards.
-The existing forest entrance suite compiles the production renderer and checks
-boot, save, arrival, camera and existing forest behavior across days/forms.
+For full game source, independently retain the original
+`Woods-of-Mystery-POC1-Source-Recovery.zip`, SHA256
+`5d450ee7e52599371af204283634a8715b0c541cc7148f8dcfba49a509942925`.
+In another fresh extracted POC6 recovery folder run:
+`python -B rebuild.py --base-recovery /path/Woods-of-Mystery-POC1-Source-Recovery.zip`.
+This restores that full baseline, applies the cumulative patch and requires the
+exact final Git tree recorded in the manifest. `--native-tests` additionally
+runs inherited effect/ownership and forest tests with POC1's saved dependencies.
+The compact asset restore is self-contained; full game restoration depends on
+that separately retained POC1 baseline.
 
-POC2 checks additionally cover exact room-path decoding (without trailing NULs),
-both floor stages, raw RGBA byte strides, all original Henriko pixels/alpha,
-and Prelude's actual manifest validator and layer-restoration code. The latter
-must recover all 162 POC4 payloads byte-for-byte in both original and canonical
-ZIP layouts. POC2's live Prelude import/export was exercised separately.
-POC3 seam tests additionally check solid lining and noncollapsed tiling, all 36
-mouth/far-join placements, the retained upper wall, unchanged approved bridge
-wood positions and exterior rim attributes, continuous interior UV/color joins
-in all 37 sleeves, centered/oblique aperture rays, a closed serialized cap mesh,
-and byte-identical main floor, foliage, textures and room headers compared with POC2.
-POC4's wall-fit tests check all 36 wood interiors and visible lower rims, the
-bridge crown's first visible material, exact POC3 bridge preservation, and
-opaque backing feet with a negative control that removes their grass wings.
-They also check that the far surround keeps the wood passage open and every
-backing vertex lies within the actual appended visual cull sphere.
+## Evidence and remaining proof
 
-POC4 contains no new native C++ changes; native compilation evidence belongs to
-the inherited POC2 effect/ownership implementation. POC4 has fresh static/editor
-checks and an independent archive rebuild. In-game appearance,
-live room culling, performance and traversal of each daily route remain untested
-for POC4. The user accepted POC3's sky coverage; the new wall fit and hidden
-backing still need play-renderer inspection. The cloud browser cannot create a WebGL context, so its Prelude
-viewport could not be visually checked. The earlier POC1 software PNGs omitted
-native two-stage canopy behavior and are not acceptance evidence for this
-repair. No master promotion is included.
+New shoulder and grass tests first fail against POC5 for a close local sky ray
+and the native two-stage grass material. They protect grass XYZ/normals, a common
+UV phase and every accepted wood/cap face. Prior seam/backdrop tests continue
+to protect all36 mouths, upper walls, black silhouettes, serialized cap closure,
+actual room culling bounds and native non-mesh header bytes. The actual Prelude
+manifest validator and layer restorer check original and canonical ZIP layouts.
+
+Reports distinguish the native build integration from the optional scene archive.
+Static geometry, compiler/harness checks and exact asset restoration do not prove
+configured runtime appearance, antialiasing, fog, live resource switching/culling,
+performance or traversal. The accepted POC5 wood remains the preservation baseline;
+new native ownership, shoulder closure, grass and canopy rendering need runtime inspection.
+No accepted master is replaced or promoted by this candidate.

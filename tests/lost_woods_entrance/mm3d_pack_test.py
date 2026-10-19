@@ -67,6 +67,9 @@ extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return true; }
 extern "C" uint8_t ResourceMgr_FileAltExists(const char*) { return 0; }
 extern "C" uint8_t ResourceMgr_FileExists(const char*) { return 0; }
 extern "C" int ComboSoloForestMm_PassageAvailable(void) { return soloPassageAvailable; }
+// These fixtures exercise opening-forest ownership and the legacy fallback;
+// the verified baked-wall lifecycle has its own native resource harness.
+namespace WoodsMysteryNativeBridge { inline bool Active(const PlayState*) { return false; } }
 '''
 foliage = (ROOT / 'mm/2s2h/Enhancements/Graphics/AutumnSceneFoliage.cpp').read_text()
 source += block_from(foliage, foliage.index('std::shared_ptr<Fast::Texture> BuildSurfaceTexture('))

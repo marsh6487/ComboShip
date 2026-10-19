@@ -510,8 +510,8 @@ void ObjGrass_DrawOpa(Actor* thisx, PlayState* play2) {
 
                 if ((grassElem->flags & OBJ_GRASS_ELEM_DRAW) && (grassElem->alpha == 255)) {
                     FrameInterpolation_RecordOpenChild(grassElem, 0);
-                    if (seasonal && play->sceneId == SCENE_24KEMONOMITI) {
-                        // Road randomizer leaf children release tint before their
+                    if (seasonal && (play->sceneId == SCENE_24KEMONOMITI || play->sceneId == SCENE_26SARUNOMORI)) {
+                        // Road/Woods randomizer leaf children release tint before their
                         // flowers. Re-enable it for a later native grass element.
                         gSPGrayscale(POLY_OPA_DISP++, spring || frost ? 3 : 1);
                     }
@@ -579,7 +579,7 @@ void ObjGrass_DrawXlu(Actor* thisx, PlayState* play) {
 
                 if ((grassElem->flags & OBJ_GRASS_ELEM_DRAW) && (grassElem->alpha > 0) && (grassElem->alpha < 255)) {
                     FrameInterpolation_RecordOpenChild(grassElem, 0);
-                    if (seasonal && play->sceneId == SCENE_24KEMONOMITI) {
+                    if (seasonal && (play->sceneId == SCENE_24KEMONOMITI || play->sceneId == SCENE_26SARUNOMORI)) {
                         gSPGrayscale(POLY_XLU_DISP++, spring || frost ? 3 : 1);
                     }
                     if (GameInteractor_Should(VB_OBJGRASS_XLU_DRAW_BE_OVERRIDDEN, true, this, grassElem)) {

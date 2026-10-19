@@ -8,14 +8,18 @@ from run_time_pedestal_tests import block_from
 renderer=(root/'mm/2s2h/Enhancements/Graphics/ComboLostWoodsPassage.cpp').read_text()
 draw=block_from(renderer,renderer.index('static void DrawWoodsMysteryHexes('))
 draw=draw[:draw.index('    using namespace')]+'\n++draws;\n}\n'
+arch=block_from(renderer,renderer.index('static void DrawPassage('))
+arch=arch[:arch.index('    static const bool built')]+'\n++arches;\n}\n'
 source=r'''
 #include "2s2h/Enhancements/Graphics/WoodsMysteryMakeover.h"
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "ComboGameMode.h"
 #include <cassert>
 #include <cstdio>
 static bool altEnabled=true, visualAvailable=true, bareVisualAvailable=false;
 static bool soloAvailable=false;
-static int draws=0;
+static bool nativeReady=false;
+static int draws=0,arches=0;
 SaveContext gSaveContext{};
 PlayState* gPlayState;
 extern "C" { int gComboGameMode=COMBO_GAME_BOTH; }
@@ -23,7 +27,11 @@ extern "C" int ComboSoloForestMm_PassageAvailable(void) { return soloAvailable; 
 extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return altEnabled; }
 extern "C" uint8_t ResourceMgr_FileAltExists(const char*) { return visualAvailable; }
 extern "C" uint8_t ResourceMgr_FileExists(const char*) { return bareVisualAvailable; }
+namespace WoodsMysteryNativeBridge {
+inline bool Active(const PlayState*) { return nativeReady; }
+}
 /* DRAW_GUARD */
+/* ARCH_GUARD */
 int main() {
     using namespace WoodsMysteryMakeover;
     PlayState play{};RoomShape shape{};RoomShapeCullableEntry entries[2]{};
@@ -46,6 +54,7 @@ int main() {
     visualAvailable=true;assert(Active(&play));
     gPlayState=&play;gSaveContext.gameMode=GAMEMODE_NORMAL;
     DrawWoodsMysteryHexes();assert(draws==1);
+    DrawPassage();assert(arches==0);
     gComboGameMode=COMBO_GAME_OOT;DrawWoodsMysteryHexes();assert(draws==1);
     gComboGameMode=COMBO_GAME_MM;DrawWoodsMysteryHexes();assert(draws==1);
     soloAvailable=true;DrawWoodsMysteryHexes();assert(draws==2);
@@ -61,10 +70,23 @@ int main() {
     shape.cullable.numEntries=2;entries[1].opa=nullptr;assert(!Active(&play));
     char binary[16]{};entries[1].opa=(Gfx*)binary;assert(!Active(&play));
     assert(!Active(nullptr));
-    std::puts("PASS: bridge mesh guard follows the active room, namespace, Alt/load-order ownership and native fallback");
+    // The baked entrance owns a verified wall aperture without any archive.
+    entries[1].opa=(Gfx*)"__OTR__scenes/nonmq/Z2_26SARUNOMORI/native";
+    visualAvailable=false;bareVisualAvailable=false;altEnabled=false;
+    gComboGameMode=COMBO_GAME_BOTH;soloAvailable=false;
+    nativeReady=true;DrawWoodsMysteryHexes();assert(draws==3);
+    DrawPassage();assert(arches==0);
+    altEnabled=true;DrawWoodsMysteryHexes();assert(draws==4);
+    gComboGameMode=COMBO_GAME_MM;DrawWoodsMysteryHexes();assert(draws==4);
+    soloAvailable=true;DrawWoodsMysteryHexes();assert(draws==5);
+    nativeReady=false;DrawWoodsMysteryHexes();assert(draws==5);
+    DrawPassage();assert(arches==1); // Missing assets retain the legacy fallback.
+    entries[1].opa=(Gfx*)kBridgeMesh;altEnabled=false;
+    DrawPassage();assert(arches==1); // Stale pack headers cannot double the arch.
+    std::puts("PASS: verified baked entrance draws hexes without any archive in combined/solo modes; native/pack ownership suppresses duplicate arches; missing assets retain fallback");
 }
 '''
-source=source.replace('/* DRAW_GUARD */',draw)
+source=source.replace('/* DRAW_GUARD */',draw).replace('/* ARCH_GUARD */',arch)
 with tempfile.TemporaryDirectory() as td:
     p=Path(td);(p/'test.cpp').write_text(source)
     command=[os.environ.get('CXX','c++'),'-std=c++20','-w','-DCOMBO_BUILD','-DF3DEX_GBI_2','-DFMT_HEADER_ONLY']

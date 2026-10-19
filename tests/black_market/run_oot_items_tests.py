@@ -8,6 +8,13 @@ from run_time_pedestal_tests import block_from
 source = (ROOT / "soh/soh/Enhancements/Gameplay/ComboBlackMarketItems.cpp").read_text()
 body = "\n".join(block_from(source, source.index(signature)) for signature in
                  ("RandomizerGet Id(", "bool Owned(", "bool Available(", "void LatchToolOwnership(", "bool Grant("))
+inventory = (ROOT / "soh/mods/extended_inventory.c").read_text()
+body = "\n".join(block_from(inventory, inventory.index(signature)) for signature in
+                 ("void TravelTools_Heal(", "void TravelTools_Grant(")) + "\n" + body
+for relative, signature in (("soh/mods/items/logic/picto_box.c", "u8 Picto_IsOwned("),
+                            ("soh/mods/items/logic/power_keg.c", "u8 PowerKeg_IsOwned(")):
+    dependency = (ROOT / relative).read_text()
+    body = block_from(dependency, dependency.index(signature)) + "\n" + body
 fixture = (ROOT / "tests/black_market/oot_items_test.cpp").read_text().replace("/* PRODUCTION */", body)
 with tempfile.TemporaryDirectory(prefix="market-oot-items-") as temp:
     path = Path(temp) / "test.cpp"; path.write_text(fixture)

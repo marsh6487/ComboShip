@@ -10,6 +10,8 @@
 #include "ComboForestPortalEffect.h"
 #include "WoodsMysteryHexEffect.h"
 #include "WoodsMysteryMakeover.h"
+#include "WoodsMysteryNativeBridge.h"
+#include "AutumnSceneFoliage.h"
 #include <array>
 #include <cmath>
 
@@ -67,7 +69,8 @@ static void DrawPassage() {
     if (!openingForest && (!gPlayState || gSaveContext.gameMode != GAMEMODE_NORMAL ||
                            gPlayState->sceneId != SCENE_26SARUNOMORI || gPlayState->roomCtx.curRoom.num != 1))
         return;
-    if (!openingForest && WoodsMysteryMakeover::Active(gPlayState))
+    if (!openingForest &&
+        (WoodsMysteryMakeover::OwnsBridgeMesh(gPlayState) || WoodsMysteryNativeBridge::Active(gPlayState)))
         return;
     static const bool built = (BuildPassage(), true);
     (void)built;
@@ -153,8 +156,8 @@ static void DrawWoodsMysteryHexes() {
     if (!Combo_IsCombinedGame() && !ComboSoloForestMm_PassageAvailable())
         return;
     PlayState* play = gPlayState;
-    if (!WoodsMysteryMakeover::Active(play) || gSaveContext.gameMode != GAMEMODE_NORMAL ||
-        play->csCtx.state != CS_STATE_IDLE)
+    if ((!WoodsMysteryMakeover::Active(play) && !WoodsMysteryNativeBridge::Active(play)) ||
+        gSaveContext.gameMode != GAMEMODE_NORMAL || play->csCtx.state != CS_STATE_IDLE)
         return;
     using namespace WoodsMysteryHexEffect;
     std::array<WoodsMysteryHexEffect::Vertex, kVertexCount> shape;
@@ -197,6 +200,18 @@ static void DrawWoodsMysteryHexes() {
 
 namespace {
 void RegisterPassage() {
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldStart>([] {
+        const bool canopyWasPatched = WoodsMysteryNativeBridge::sActive && WoodsMysteryNativeBridge::PatchedCanopy();
+        WoodsMysteryNativeBridge::Update(gPlayState, Combo_IsCombinedGame() || ComboSoloForestMm_PassageAvailable());
+        const bool canopyIsPatched = WoodsMysteryNativeBridge::sActive && WoodsMysteryNativeBridge::PatchedCanopy();
+        if (canopyWasPatched != canopyIsPatched) {
+            // Weather updated before this hook. Rebind its retained copy now
+            // so the first world draw uses the helper's current vertex layout.
+            MMAutumnSceneFoliage_Update(gPlayState);
+        }
+    });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(
+        [] { WoodsMysteryNativeBridge::Reset(); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldEnd>([] {
         DrawPassage();
         DrawPortalFinish();

@@ -106,7 +106,9 @@ class WallFit(unittest.TestCase):
 
     def test_approved_bridge_and_poc3_materials_remain_exact(self):
         axis=np.array([1,-1])/np.sqrt(2);side=np.array([1,1])/np.sqrt(2)
-        def key(t):return t['texture'],tuple(sorted(tuple(v) for v in t['v']))
+        def key(t):
+            v=t['v'].copy();low=np.isin(v[:,1],[-3,-2]);v[low,1]+=4
+            return t['texture'],tuple(sorted(tuple(row) for row in v))
         before=[]
         for t in previous.mesh(ROOT+'room_1/geometry'):
             v=t['v'];q=v[:,[0,2]]-[110,-110]

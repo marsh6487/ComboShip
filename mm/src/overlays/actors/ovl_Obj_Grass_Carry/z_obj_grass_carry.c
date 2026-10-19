@@ -362,7 +362,9 @@ void ObjGrassCarry_Update(Actor* thisx, PlayState* play) {
 }
 
 void ObjGrassCarry_Draw(Actor* this, PlayState* play) {
-    s32 season = play->sceneId == SCENE_24KEMONOMITI ? MMWeather_SeasonForPlay(play) : -1;
+    s32 season = (play->sceneId == SCENE_24KEMONOMITI || play->sceneId == SCENE_26SARUNOMORI)
+                     ? MMWeather_SeasonForPlay(play)
+                     : -1;
     s32 spring = season == SEASON_SPRING;
     s32 frost = season == SEASON_WINTER;
     s32 seasonal = spring || season == SEASON_AUTUMN || frost;

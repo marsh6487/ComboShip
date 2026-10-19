@@ -74,6 +74,8 @@ extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return true; }
 extern "C" uint8_t ResourceMgr_FileAltExists(const char*) { return 0; }
 extern "C" uint8_t ResourceMgr_FileExists(const char*) { return 0; }
 extern "C" int ComboSoloForestMm_PassageAvailable(void) { return 0; }
+// Opening-forest fixtures contain no installed native Mystery wall patch.
+namespace WoodsMysteryNativeBridge { inline bool Active(const PlayState*) { return false; } }
 ''' + finish + arch + r'''
 int main() {
  PlayState play{}; gPlayState=&play; play.sceneId=SCENE_LOST_WOODS;

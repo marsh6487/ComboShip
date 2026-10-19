@@ -16,12 +16,8 @@ constexpr float kMouthX = 110.0f;
 constexpr float kMouthZ = -110.0f;
 constexpr s16 kMouthYaw = -8192;
 
-inline bool Active(const PlayState* play) {
+inline bool OwnsBridgeMesh(const PlayState* play) {
     if (!play || play->sceneId != SCENE_26SARUNOMORI || play->roomCtx.curRoom.num != 1)
-        return false;
-    // Alt can change without a room reload, leaving an old custom mesh pointer.
-    if (!ResourceMgr_IsAltAssetsEnabled() ||
-        (!ResourceMgr_FileExists(kBridgeMesh) && !ResourceMgr_FileAltExists(kBridgeMesh)))
         return false;
     const RoomShape* shape = play->roomCtx.curRoom.roomShape;
     if (!shape || shape->base.type != ROOM_SHAPE_TYPE_CULLABLE || !shape->cullable.entries ||
@@ -31,6 +27,12 @@ inline bool Active(const PlayState* play) {
     const auto* opa = shape->cullable.entries[shape->cullable.numEntries - 1].opa;
     return opa && std::strncmp(reinterpret_cast<const char*>(opa), "__OTR__", 7) == 0 &&
            std::strcmp(reinterpret_cast<const char*>(opa), kBridgeMesh) == 0;
+}
+
+inline bool Active(const PlayState* play) {
+    // Alt can change without a room reload, leaving an old custom mesh pointer.
+    return OwnsBridgeMesh(play) && ResourceMgr_IsAltAssetsEnabled() &&
+           (ResourceMgr_FileExists(kBridgeMesh) || ResourceMgr_FileAltExists(kBridgeMesh));
 }
 } // namespace WoodsMysteryMakeover
 #endif

@@ -23,6 +23,9 @@
 extern "C" {
 #include "global.h"
 }
+#ifdef COMBO_BUILD
+#include "WoodsMysteryNativeBridge.h"
+#endif
 
 namespace {
 const char* SceneResourceName(int sceneId) {
@@ -133,8 +136,8 @@ const std::vector<std::string>& RoadRandoGrassPaths() {
 
 uint32_t RoadRandoGrassColor(std::string path, int selectedSeason, int sceneId) {
     // Spring's grass blush applies throughout eligible outdoors. Retain the
-    // existing Road-only scope for the other seasonal replacement recipes.
-    if (sceneId != SCENE_24KEMONOMITI && selectedSeason != SEASON_SPRING)
+    // reviewed Road/Woods leaf-child scope for the other seasonal recipes.
+    if (sceneId != SCENE_24KEMONOMITI && sceneId != SCENE_26SARUNOMORI && selectedSeason != SEASON_SPRING)
         return 0;
     if (path.starts_with("alt/"))
         path.erase(0, 4);
@@ -192,6 +195,7 @@ size_t MaterialCommandLength(uint8_t opcode) {
     switch (opcode) {
         case G_SETTIMG_OTR_HASH:
         case G_VTX_OTR_HASH:
+        case G_VTX_OTR_FILEPATH: // Native Woods canopy clearance keeps the two-word vertex command.
         case G_MARKER:
         case G_DL_OTR_HASH:
         case G_MTX_OTR:
@@ -386,7 +390,7 @@ struct Variant {
             }
         }
     }
-    bool Apply() {
+    bool MatchesSource(unsigned& pointerWrites, bool canopyLayoutChange = false) {
         if (commands.empty() || original.empty() || source->Instructions.size() != original.size()) {
             return false;
         }
@@ -396,8 +400,6 @@ struct Variant {
         // renderer's pointer fields. Vertex offsets/pointer replacements and
         // all other material/geometry patches still invalidate the variant.
         size_t nextSlot = 0;
-        unsigned pointerWrites = 0;
-        const bool redirected = SameCommand(source->Instructions[0], Branch());
         for (auto& slot : pointerSlots) {
             const auto observed = observedPointers->find(slot.index);
             if (observed != observedPointers->end()) {
@@ -409,6 +411,11 @@ struct Variant {
                 nextSlot < pointerSlots.size() && pointerSlots[nextSlot].index == i ? &pointerSlots[nextSlot] : nullptr;
             if (pointerSlot != nullptr) {
                 ++nextSlot;
+            }
+            // Only SelectNativeCanopyLayout calls this after checking both
+            // exact owned signatures. Every other word keeps the usual guard.
+            if (canopyLayoutChange && (i == 28 || i == 29 || i == 49 || i == 50)) {
+                continue;
             }
             if (i == 0 && SameCommand(source->Instructions[i], Branch())) {
                 continue;
@@ -435,6 +442,14 @@ struct Variant {
                 return false;
             }
         }
+        return true;
+    }
+    bool Apply() {
+        unsigned pointerWrites = 0;
+        if (!MatchesSource(pointerWrites)) {
+            return false;
+        }
+        const bool redirected = SameCommand(source->Instructions[0], Branch());
         auto& copied = draw.empty() ? commands : draw;
         for (auto& slot : pointerSlots) {
             if (slot.index == 0 && redirected) {
@@ -463,6 +478,9 @@ struct Variant {
 std::map<const Fast::DisplayList*, Variant> sVariants;
 std::map<const Fast::DisplayList*, Variant> sWinterVariants;
 std::map<const Fast::DisplayList*, Variant> sSpringVariants;
+// Only the native Woods curtain has two layouts owned by our bridge helper.
+// Keep the inactive layout's buffers alive for display lists already queued.
+std::map<std::pair<const Fast::DisplayList*, int>, Variant> sCanopyLayouts;
 std::map<const Fast::DisplayList*, std::weak_ptr<Fast::DisplayList>> sIgnored;
 std::set<const Fast::DisplayList*> sActive;
 std::vector<std::string> sPaths;
@@ -474,6 +492,72 @@ auto& CurrentVariants() {
     if (sFoliageSeason == SEASON_SPRING)
         return sSpringVariants;
     return sFoliageSeason == SEASON_WINTER ? sWinterVariants : sVariants;
+}
+
+bool SelectNativeCanopyLayout(const std::string& path, const std::shared_ptr<Fast::DisplayList>& resource,
+                              int selectedSeason, std::map<const Fast::DisplayList*, Variant>& variants) {
+#ifdef COMBO_BUILD
+    if (path != WoodsMysteryNativeBridge::kNativeCanopy + 7 || resource->Instructions.size() <= 50)
+        return false;
+    const auto layout = [](const std::vector<Gfx>& words) {
+        if (words.size() <= 50)
+            return 0;
+        if (WoodsMysteryNativeBridge::CanopyPatched(words.data()))
+            return 2;
+        const auto hash = [](const Gfx& word) { return word.words.w0 == 0x6D7AC1D5u && word.words.w1 == 0xC35928A3u; };
+        return words[28].words.w0 == 0x3200C018u && (words[28].words.w1 == 0 || words[28].words.w1 > 0xFFFFFu) &&
+                       words[49].words.w0 == 0x32012024u &&
+                       (words[49].words.w1 == 0xC0 || words[49].words.w1 > 0xFFFFFu) && hash(words[29]) &&
+                       hash(words[50])
+                   ? 1
+                   : 0;
+    };
+    const int desired = layout(resource->Instructions);
+    auto current = variants.find(resource.get());
+    Variant* prior = current == variants.end() ? nullptr : &current->second;
+    if (prior == nullptr) {
+        for (auto* cache : { &sVariants, &sWinterVariants, &sSpringVariants }) {
+            const auto found = cache->find(resource.get());
+            if (found != cache->end()) {
+                prior = &found->second;
+                break;
+            }
+        }
+    }
+    if (prior == nullptr || desired == 0 || layout(prior->original) == 0 || desired == layout(prior->original))
+        return false;
+    if (desired == 1) {
+        for (const size_t index : { 28, 49 }) {
+            const auto observed = prior->observedPointers->find(index);
+            const auto pointer = resource->Instructions[index].words.w1;
+            if (observed != prior->observedPointers->end() && observed->second > 0xFFFFFu && pointer > 0xFFFFFu &&
+                pointer != observed->second) {
+                prior->Restore();
+                return false;
+            }
+        }
+    }
+    unsigned pointerWrites = 0;
+    if (!prior->MatchesSource(pointerWrites, true))
+        return false;
+    prior->Restore();
+    if (current != variants.end()) {
+        const auto key = std::make_pair(resource.get(), selectedSeason);
+        const auto saved = sCanopyLayouts.find(key);
+        if (saved != sCanopyLayouts.end()) {
+            if (layout(saved->second.original) != desired)
+                return false;
+            std::swap(current->second, saved->second);
+        } else {
+            sCanopyLayouts.emplace(key, std::move(current->second));
+            variants.erase(current);
+            sActive.erase(resource.get());
+        }
+    }
+    return true;
+#else
+    return false;
+#endif
 }
 
 struct SurfaceTextureVariant {
@@ -521,6 +605,16 @@ constexpr SurfaceMaterial kSurfaceMaterials[] = {
     { "custom/cor_mm3d/lost_woods_poc1/textures/lw_wood_04_37200", 0xB96848FF, SCENE_LOST_WOODS, true },
     { "custom/cor_mm3d/lost_woods_poc1/textures/lw_yuka_02_39C00", 0xD99C45FF, SCENE_LOST_WOODS, true },
     { "custom/cor_mm3d/lost_woods_poc1/textures/lw_yuka_03_44400", 0xD99C45FF, SCENE_LOST_WOODS, true },
+    // Woods makeover XML resolves these images by FILEPATH on every draw.
+    // Use immutable green-only cache copies instead of recoloring the mixed
+    // wall triangles; stone, bark, leaf gaps and the black portal stay exact.
+    // Canonical copies from Prelude exports and Alt images share this scope.
+    { "custom/cor_woods_mystery/poc1/textures/grass", 0xD99C45FF, SCENE_26SARUNOMORI, true },
+    { "custom/cor_woods_mystery/poc1/textures/rock", 0xD99C45FF, SCENE_26SARUNOMORI, true },
+    { "custom/cor_woods_mystery/poc1/textures/vines", 0xD99C45FF, SCENE_26SARUNOMORI, true },
+    { "custom/cor_woods_mystery/poc1/textures/ruins", 0xD99C45FF, SCENE_26SARUNOMORI, true },
+    { "custom/cor_woods_mystery/poc1/textures/henriko_canopy", 0xB96848FF, SCENE_26SARUNOMORI, true },
+    { "custom/cor_woods_mystery/poc1/textures/henriko_forest_edge", 0xB96848FF, SCENE_26SARUNOMORI, true },
     { "scenes/nonmq/Z2_00KEIKOKU/mm3d_field_poc4/textures/tl_ki_02", 0xFFD078FF, SCENE_00KEIKOKU, true },
     { "scenes/nonmq/Z2_00KEIKOKU/Z2_00KEIKOKUTex_027050", 0xFFD078FF },
     // Keep the wall's secondary gradient intact: tint only green primary
@@ -804,6 +898,7 @@ void ClearCache() {
     sVariants.clear();
     sWinterVariants.clear();
     sSpringVariants.clear();
+    sCanopyLayouts.clear();
     sSurfaceTextures.clear();
 }
 } // namespace
@@ -876,7 +971,8 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                     paths.insert(kWoodfallTempleDL);
             }
         }
-        if (play->sceneId == SCENE_24KEMONOMITI || selectedSeason == SEASON_SPRING) {
+        if (play->sceneId == SCENE_24KEMONOMITI || play->sceneId == SCENE_26SARUNOMORI ||
+            selectedSeason == SEASON_SPRING) {
             for (const auto& path : RoadRandoGrassPaths())
                 for (const auto* assetPrefix : { "", "alt/" }) {
                     const auto resolved = assetPrefix + path;
@@ -917,6 +1013,7 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
         if (resource == nullptr || resource->Instructions.empty()) {
             continue;
         }
+        const bool freshCanopyLayout = SelectNativeCanopyLayout(path, resource, selectedSeason, variants);
         auto it = variants.find(resource.get());
         if (it == variants.end()) {
             const auto ignored = sIgnored.find(resource.get());
@@ -938,7 +1035,12 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
                     break;
                 }
             }
-            const auto& original = other == nullptr ? resource->Instructions : other->original;
+            if (other == nullptr && freshCanopyLayout) {
+                const auto saved = sCanopyLayouts.find(std::make_pair(resource.get(), selectedSeason));
+                if (saved != sCanopyLayouts.end())
+                    other = &saved->second;
+            }
+            const auto& original = other == nullptr || freshCanopyLayout ? resource->Instructions : other->original;
             const auto forestColor = ForestListColor(path, selectedSeason);
             auto commands =
                 forestColor != 0 ? std::vector<Gfx>{} : BuildVariant(original, selectedSeason, play->sceneId);

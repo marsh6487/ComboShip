@@ -76,6 +76,12 @@ def emit_mesh(files,path,triangles,lighting=False,cutout=False):
     for tri in triangles:groups[(tri['texture'],tri['tile'])].append(tri)
     vertex_count=0
     for (texture,tile),tris in groups.items():
+        black=texture==ROOT+'textures/black'
+        if black:
+            # Opaque void masks must not inherit the room's pale fog blend.
+            el('PipeSync');el('ClearGeometryMode',G_FOG=1)
+            el('SetOtherMode',Cmd='G_SETOTHERMODE_L',Sft=0,Length=32,
+               G_AC_NONE=1,G_ZS_PIXEL=1,G_RM_AA_ZB_OPA_SURF=1,G_RM_AA_ZB_OPA_SURF2=1)
         w,h=map(int,tile);line=max(1,w//4)
         el('TileSync');el('SetTextureImage',Path=texture,Format='G_IM_FMT_RGBA',Size='G_IM_SIZ_16b_LOAD_BLOCK',Width=1)
         common=dict(Format='G_IM_FMT_RGBA',TMem=0,Palette=0,Cms0='G_TX_WRAP',Cms1='G_TX_NOMIRROR',
@@ -93,6 +99,9 @@ def emit_mesh(files,path,triangles,lighting=False,cutout=False):
                     assert all(-32768<=x<=32767 for x in values[:5])
                     ET.SubElement(vtx,'Vtx',dict(zip(['X','Y','Z','S','T','R','G','B','A'],map(str,values))))
                 el('Triangle1',V00=i*3,V01=i*3+1,V02=i*3+2,Flag0=0);vertex_count+=3
+        if black:
+            el('PipeSync');el('SetGeometryMode',G_FOG=1)
+            el('SetOtherMode',Cmd='G_SETOTHERMODE_L',Sft=0,Length=32,**mode)
     el('EndDisplayList')
     files['alt/'+path]=ET.tostring(root,encoding='utf-8')
     files['alt/'+path+'_vtx']=ET.tostring(vtx,encoding='utf-8')
@@ -103,6 +112,19 @@ def transformed(tris,fn):
     for tri in tris:
         t={**tri,'v':tri['v'].copy()};t['v'][:,:3]=fn(t['v'][:,:3]);output.append(t)
     return output
+
+
+def lower_floor_vertices(data):
+    """Sink only the serialized 1/2-unit wood floor and its welded low edges.
+
+    Applying this after quantization keeps every shared wood/cap/annulus vertex
+    identical. X/Z, UVs, colors, normals and all higher vertices remain exact.
+    """
+    root=ET.fromstring(data);changed=False
+    for vertex in root:
+        y=int(vertex.get('Y'))
+        if y in (1,2):vertex.set('Y',str(y-4));changed=True
+    return ET.tostring(root,encoding='utf-8') if changed else data
 
 
 def correct_interior(tunnel):
@@ -140,7 +162,10 @@ def solid_lining(tri,center,floor_uv):
     direction=np.zeros(2);direction[int(abs(p[:,[0,2]].mean(0)).argmax())]=1
     along=p[:,[0,2]]@direction;across=p[:,[0,2]]@np.array([-direction[1],direction[0]])
     if v[:,1].max()<=10:
-        material='grass';v[:,3:5]=np.column_stack([v[:,0],v[:,2],np.ones(3)])@floor_uv
+        # The old transparent fade rose to10 at the boundary. Making it opaque
+        # exposed that visual ramp above the native flat collision at0.
+        material='grass';v[:,1]=center[1]
+        v[:,3:5]=np.column_stack([v[:,0],v[:,2],np.ones(3)])@floor_uv
     else:
         material='vines' if direction[0] else 'rock'
         normal=np.cross(p[1]-p[0],p[2]-p[0])
@@ -148,7 +173,7 @@ def solid_lining(tri,center,floor_uv):
         # 70/80-unit sides and 112-unit roof cut through the larger donor tube.
         across=np.where(abs(across)>1,np.sign(across)*116,across)
         near=abs(along)==240
-        along=np.where(near,np.sign(along)*210,along)
+        along=np.where(near,np.sign(along)*200,along)
         along=np.where(abs(along)==440,np.sign(along)*450,along)
         side=np.array([-direction[1],direction[0]])
         v[:,[0,2]]=center[[0,2]]+along[:,None]*direction+across[:,None]*side
@@ -194,7 +219,13 @@ def lining_exit_surround(fitted,center,direction,template):
             key=tuple(sorted(tuple(np.rint(p[:3]).astype(int)) for p in [a,b]))
             if key[0]!=key[1]:edges[key]=key
     assert len(edges)>=12
-    midpoint=np.array([0,65.]);corners=[np.array(p,float) for p in [(-116,-4),(116,-4),(116,145),(-116,145)]]
+    return edge_surround(list(edges.values()),center,direction,450,116,145,template)
+
+
+def edge_surround(edges,center,direction,depth,width,top,template):
+    """Connect actual 3D wood edges to an exterior forest backing rectangle."""
+    side=np.array([-direction[1],direction[0]])
+    midpoint=np.array([0,65.]);corners=[np.array(p,float) for p in [(-width,-4),(width,-4),(width,top),(-width,top)]]
     def cross(a,b):return a[0]*b[1]-a[1]*b[0]
     def point(p):return np.array([(np.asarray(p)[[0,2]]-center[[0,2]])@side,p[1]-center[1]])
     projections={}
@@ -202,26 +233,50 @@ def lining_exit_surround(fitted,center,direction,template):
         key=tuple(p)
         if key in projections:return projections[key]
         d=p-midpoint;limits=[]
-        if abs(d[0])>1e-8:limits.append(((116 if d[0]>0 else -116)-midpoint[0])/d[0])
-        if abs(d[1])>1e-8:limits.append(((145 if d[1]>0 else -4)-midpoint[1])/d[1])
+        if abs(d[0])>1e-8:limits.append(((width if d[0]>0 else -width)-midpoint[0])/d[0])
+        if abs(d[1])>1e-8:limits.append(((top if d[1]>0 else -4)-midpoint[1])/d[1])
         projections[key]=midpoint+min(limits)*d
         return projections[key]
     normal=np.array([-direction[0]*127,0,-direction[1]*127])%256
-    def vertex(p):
-        xz=center[[0,2]]+450*direction+p[0]*side
-        return np.r_[xz[0],center[1]+p[1],xz[1],p[0]*6.4,-p[1]*6.4,normal,255]
+    def vertex(p,xyz=None):
+        xz=center[[0,2]]+depth*direction+p[0]*side
+        if xyz is None:xyz=[xz[0],center[1]+p[1],xz[1]]
+        return np.r_[xyz,p[0]*6.4,-p[1]*6.4,normal,255]
     result=[]
-    for a,b in edges.values():
-        a=point(a);b=point(b)
-        if cross(a-midpoint,b-midpoint)<0:a,b=b,a
+    for xyz_a,xyz_b in edges:
+        a=point(xyz_a);b=point(xyz_b)
+        if cross(a-midpoint,b-midpoint)<0:a,b=b,a;xyz_a,xyz_b=xyz_b,xyz_a
         da=a-midpoint;db=b-midpoint
         between=[p for p in corners if cross(da,p-midpoint)>1e-7 and cross(p-midpoint,db)>1e-7]
         between.sort(key=lambda p:math.atan2(cross(da,p-midpoint),da@(p-midpoint)),reverse=True)
-        polygon=[a,b,outer(b),*between,outer(a)]
+        polygon=[vertex(a,xyz_a),vertex(b,xyz_b),*[vertex(p) for p in [outer(b),*between,outer(a)]]]
         material='vines' if direction[0] else 'rock'
         face={**template,'texture':ROOT+'textures/'+material,'tile':(32,32),'origin':(0,0),'lit':True}
-        result.extend(polygon_triangles([vertex(p) for p in polygon],face))
+        result.extend(polygon_triangles(polygon,face))
     return result
+
+
+def clearing_underlay(center,floor_uv,template):
+    """Back only the clearing footprint exposed by the new wall apertures."""
+    rows=[]
+    for x,z in [(-275,-275),(275,-275),(275,275),(-275,275)]:
+        xyz=center+np.array([x,-1,z]);uv=np.r_[xyz[0],xyz[2],1]@floor_uv
+        rows.append(np.r_[xyz,uv,0,127,0,255])
+    return polygon_triangles(rows,{**template,'texture':ROOT+'textures/grass','tile':(32,32),'origin':(0,0),'lit':True})
+
+
+def fitted_boundary_mask(fitted,center,direction):
+    """Resize an existing black exit at its native depth; never cap a new route."""
+    profile=section_profile(fitted,center[[0,2]],direction,440)
+    # Slightly overlap the wood to cover integer rounding and antialiased edges.
+    profile=np.array([0,60])+(profile-[0,60])*1.02
+    profile[profile[:,1]<1,1]=-2
+    side=np.array([-direction[1],direction[0]])
+    def vertex(point):
+        xz=center[[0,2]]+440*direction+point[0]*side
+        return np.r_[xz[0],point[1],xz[1],0,0,255,255,255,255]
+    return polygon_triangles([vertex(p) for p in profile],dict(
+        texture=ROOT+'textures/black',tile=(4,1),origin=(0,0),lit=False))
 
 
 def clip_polygon(polygon,distance):
@@ -241,6 +296,29 @@ def polygon_triangles(polygon,template):
         if np.linalg.norm(np.cross(v[1,:3]-v[0,:3],v[2,:3]-v[0,:3]))>1e-5:
             output.append({**template,'v':v})
     return output
+
+
+def trim_backed_shoulder(tri,center,direction):
+    """Remove a curved native fin only inside the existing opaque backing.
+
+    Callers retain the flat depth240 fascia. Everything outside this volume
+    stays native; the backing at +/-116 and roof145 owns the removed portion.
+    """
+    axis=np.array([direction[0],0,direction[1]])
+    side=np.array([-direction[1],0,direction[0]])
+    planes=[(axis,-200),(-axis,450),(side,116),(-side,116),
+            (np.array([0,1,0]),4),(np.array([0,-1,0]),145)]
+    if any(max((v[:3]-center)@n+c for v in tri['v'])<-1e-7 for n,c in planes):return [tri]
+    vertices=tri['v'].copy()
+    vertices[:,5:8]=np.where(vertices[:,5:8]>=128,vertices[:,5:8]-256,vertices[:,5:8])
+    remaining=list(vertices);outside=[]
+    for normal,constant in planes:
+        distance=lambda v,n=normal,c=constant:(v[:3]-center)@n+c
+        outside.extend(polygon_triangles(clip_polygon(remaining,lambda v:-distance(v)),tri))
+        remaining=clip_polygon(remaining,distance)
+        if len(remaining)<3:break
+    for piece in outside:piece['v'][:,5:8]=np.rint(piece['v'][:,5:8])%256
+    return outside
 
 
 def convex_profile(points):
@@ -273,6 +351,13 @@ def section_profile(triangles,origin,direction,depth):
 def bridge_surround(tri,profile,origin,direction):
     """Keep only the native corner wall outside the fitted wood aperture."""
     side=np.array([-direction[1],direction[0]]);v=tri['v'].copy()
+    across=(v[:,[0,2]]-origin)@side
+    for i,a in enumerate(profile):
+        edge=profile[(i+1)%len(profile)]-a
+        if np.all(edge[0]*(v[:,1]-a[1])-edge[1]*(across-a[0])<=0):
+            # Disjoint triangles need no subdivisions. Serializing needless
+            # fractional cuts can move an untouched top silhouette by a pixel.
+            return [tri]
     # Lighting normals are signed bytes, unlike unlit donor vertex colors.
     v[:,5:8]=np.where(v[:,5:8]>=128,v[:,5:8]-256,v[:,5:8])
     remaining=list(v);outside=[]
@@ -389,6 +474,7 @@ def main():
     native=Resources(a.native);donor=Resources(a.poc);tunnel=correct_interior(recover(donor));files={};header=donor.get(tunnel[0]['texture'])
     bridge_origin=np.array([110,-110]);bridge_axis=np.array([1,-1])/math.sqrt(2)
     approved_bridge=tunnel_at(tunnel,bridge_origin,bridge_axis,length=120,width=.72,height=.95)
+    bridge_extension=recessed_bridge_end(approved_bridge,bridge_origin,bridge_axis)
     deeper_bridge=tunnel_at(tunnel,bridge_origin,bridge_axis,length=151,width=.72,height=.95)
     aperture=section_profile(deeper_bridge,bridge_origin,bridge_axis,100)
     # Give the inward crown clearance. The closed wood sleeve and cap retain
@@ -422,7 +508,7 @@ def main():
     # A render tile row is at least eight native bytes (four RGBA16 pixels).
     black=Image.new('RGBA',(4,1),(0,0,0,255))
     files['alt/'+ROOT+'textures/black']=texture_resource(black,(4,1),header)
-    report=dict(candidate='Woods of Mystery OoT Makeover POC4 - Wall Fit',donor_faces=246,donor_vertices=321,
+    report=dict(candidate='Woods of Mystery OoT Makeover POC6 - Baked Bridge and Closed Shoulder Joins',donor_faces=246,donor_vertices=321,
       donor_sha256=donor_identity,collision='Vanilla; not overridden',
       donor_resources={n:hashlib.sha256(donor.get(n)).hexdigest() for n in sorted(donor_names)},
       native_sha256=hashlib.sha256(a.native.read_bytes()).hexdigest(),rooms=[],
@@ -430,7 +516,7 @@ def main():
       tunnel_fit='External entrance rim and cropped interior only; no axial compression of the full donor',
       maze_mouth_offset=175,maze_sleeve_length=275,maze_far_join=450,bridge_sleeve_length=150,
       maze_surround='Wall aperture follows the complete projected bark rim, including its lower sides',
-      lining_backing=dict(near_start=210,far_end=450,side_offset=116,roof_minimum=145,
+      lining_backing=dict(near_start=200,far_end=450,side_offset=116,roof_minimum=145,
                          floor_positions='Original floor unchanged; 16 grass wings and 8 tail triangles close backing feet',
                          exit_surround='Annulus welded to every actual wood terminal edge; passage remains open'),
       approved_bridge_faces=110,approved_bridge_sleeve_length=120,
@@ -440,8 +526,20 @@ def main():
       bridge_surround='Native corner wall clipped to wood aperture; original stone pillars removed',
       dark_cap='Every terminal wood edge welded at depth 150, including collinear cuts; no rectangular backdrop',
       wall_material='Native lighting and normal bytes retained; donor bark keeps its unlit vertex colors',
-      foliage=foliage,foliage_display_lists=[],solid_lining_display_lists=[],
-      status='POC3 sky coverage accepted by cor; POC4 wall fit is a separate candidate awaiting play-renderer inspection.')
+      foliage=foliage,foliage_display_lists=[],solid_lining_display_lists=[],boundary_masks=[],
+      canopy_join='Existing low curtain uses Henriko forest-edge opaque lower band; native XYZ, S, normals and vertex alpha retained',
+      grass_material='Single detailed grass sampler and one world UV phase across main floor and added coverage',
+      floor_contact=dict(mode='Grass visible; native collision retained',corridor_grass_height=0,
+                         wood_floor_offset=-4,wood_floor_heights=[-3,-2],clearing_underlay_height=-1,
+                         preservation='Only low serialized Y1/2 wood/cap/annulus vertices and added grass ramp heights change'),
+      wall_fin_cleanup='Trim curved native shoulders only inside backed depth200..450, across+/-116, Y-4..145; retain flat depth240 fascia',
+      bridge_canopy_clearance=dict(native_pivot=[213,88,-214],fitted_height=119,
+                                  preservation='Only this shared low curtain pivot moves; UVs/normals/alpha and every other canopy vertex retained'),
+      gap_repairs=dict(clearing_underlay='Opaque grass at Y=-1 within local +/-275',
+                       black_shading='Opaque unfogged groups; normal fog state restored after each',
+                       bridge_exterior='Annulus welded to actual cap perimeter; outer +/-150, roof170',
+                       upper_wall='Preserve aperture-disjoint native triangles before any fractional clipping'),
+      status='POC6 revision: floor contact, backed shoulder-fin trim and bridge-canopy clearance; native collision/routes retained; seasonal source integration is separate from the scene archive.')
     for room in range(9):
         key=SCENE+f'Z2_26SARUNOMORI_room_{room:02d}';b=native.get(key)
         start,end,entries=read_mesh_header(b)
@@ -451,9 +549,9 @@ def main():
         floor_positions=np.concatenate([t['v'][:,:3] for t in original if t['texture']==FLOOR])
         floor_paths={t['path'] for t in original if t['texture']==FLOOR}
         room_origin=(floor_positions.min(0)+floor_positions.max(0))/2
-        floor_vertices=np.concatenate([t['v'] for t in original if t['texture']==FLOOR])
-        floor_uv=np.linalg.lstsq(np.column_stack([floor_vertices[:,0],floor_vertices[:,2],np.ones(len(floor_vertices))]),
-                                floor_vertices[:,3:5],rcond=None)[0]
+        # One global phase also joins adjacent rooms; the native per-room
+        # offsets differ by half a grass repeat at some daily maze routes.
+        floor_uv=np.array([[-6.4,0],[0,-6.4],[0,0]])
         walls_by_path=collections.defaultdict(list)
         for tri in original:
             if tri['texture']==WALL:walls_by_path[tri['path']].append(tri)
@@ -482,6 +580,9 @@ def main():
                         if np.min(p[:,[0,2]]@direction)<150:continue
                         origin=room_origin[[0,2]]+direction*175
                         pieces=[cut for piece in pieces for cut in bridge_surround(piece,maze_aperture,origin,direction)]
+                if not fascia:
+                    for d in [(1,0),(-1,0),(0,1),(0,-1)]:
+                        pieces=[cut for piece in pieces for cut in trim_backed_shoulder(piece,room_origin,np.asarray(d))]
                 kept.extend(pieces)
             kept=conform_wall_edges(kept)
             tiled=[]
@@ -495,10 +596,16 @@ def main():
             source=[t for t in original if t['path']==path]
             triangles=[solid_lining(t,room_origin,floor_uv) for t in source]
             triangles.extend(lining_floor_wings(source,room_origin,floor_uv))
+            triangles.extend(clearing_underlay(room_origin,floor_uv,source[0]))
             for d in [(1,0),(-1,0),(0,1),(0,-1)]:
                 direction=np.asarray(d)
                 fitted=tunnel_at(tunnel,room_origin[[0,2]]+175*direction,direction,length=275)
                 triangles.extend(lining_exit_surround(fitted,room_origin,direction,source[0]))
+            if room==1:
+                edges=[(t['v'][1,:3],t['v'][2,:3]) for t in bridge_extension
+                       if t['texture']==ROOT+'textures/black']
+                surround=edge_surround(edges,np.array([110,0,-110]),bridge_axis,150,150,170,source[0])
+                emit_mesh(files,ROOT+'room_1/bridge_surround',surround,lighting=True)
             assert len(triangles)>64 and all(t['lit'] for t in triangles)
             backing=ROOT+f'room_{room}/backing'
             emit_mesh(files,backing,triangles,lighting=True)
@@ -507,6 +614,23 @@ def main():
             files['alt/'+path]=b'<DisplayList Version="0"><EndDisplayList /></DisplayList>'
             report['solid_lining_display_lists'].append(dict(room=room,path=backing,native_path=path,
                 triangles=len(triangles),culling='Shares appended visual entry radius 1600'))
+        terminations=[]
+        for path in sorted({t['path'] for t in original if t['texture'] is None}):
+            old=[t for t in original if t['path']==path]
+            assert old and all(t['texture'] is None for t in old)
+            directions=set()
+            for tri in old:
+                p=(tri['v'][:,:3]-room_origin).mean(0)[[0,2]]
+                direction=np.zeros(2,int);axis=int(abs(p).argmax());direction[axis]=int(np.sign(p[axis]))
+                assert np.max(abs((tri['v'][:,[0,2]]-room_origin[[0,2]])@direction-440))<1e-6
+                directions.add(tuple(direction))
+            for d in sorted(directions):
+                direction=np.asarray(d)
+                fitted=tunnel_at(tunnel,room_origin[[0,2]]+175*direction,direction,length=275)
+                terminations.extend(fitted_boundary_mask(fitted,room_origin,direction))
+                report['boundary_masks'].append(dict(room=room,direction=list(map(int,d)),depth=440,native_path=path))
+            files['alt/'+path]=b'<DisplayList Version="0"><EndDisplayList /></DisplayList>'
+        if terminations:emit_mesh(files,ROOT+f'room_{room}/terminations',terminations)
         # Replace the old two-texture leaf tints with original Henriko RGBA.
         # Keep the native foliage mesh and normals; scale UVs with logical tiles
         # so the single RGBA16 stage remains within the 4 KiB texture memory.
@@ -516,25 +640,35 @@ def main():
            'misc/scene_texture_06/scene_texture_06_Tex_001440'}
           and t['v'][:,1].max()>200}
         for path in sorted(foliage_paths):
+            source=[t for t in original if t['path']==path]
+            low_curtain=bool(min(t['v'][:,1].min() for t in source)<200)
             triangles=[]
-            for tri in [t for t in original if t['path']==path]:
-                role='forest_edge' if tri['texture'] in FOREST_EDGE else 'canopy'
+            for tri in source:
+                role='forest_edge' if low_curtain or tri['texture'] in FOREST_EDGE else 'canopy'
                 tile=foliage_tiles[role];t={**tri,'v':tri['v'].copy()}
+                if room==1 and low_curtain:
+                    pivot=np.all(t['v'][:,:3]==[213,88,-214],axis=1)
+                    t['v'][pivot,1]=119
                 t['v'][:,3:5]=(t['v'][:,3:5]-np.asarray(tri['origin'])*32)*np.asarray(tile)/np.asarray(tri['tile'])
+                # The round crown's transparent border floated above the wall.
+                # Keep this curtain's geometry and align the bush strip's opaque
+                # lower band with the irregular native walltop (top0,bottom384).
+                if low_curtain:t['v'][:,4]*=.75
                 t.update(texture=ROOT+'textures/henriko_'+role,tile=tile,origin=(0,0));triangles.append(t)
             assert triangles and all(t['lit'] for t in triangles)
             emit_mesh(files,path,triangles,lighting=True,cutout=True)
-            report['foliage_display_lists'].append(dict(room=room,path=path,triangles=len(triangles)))
-        # Scope the grass replacement to this room's display lists, never the shared scene texture.
-        for name,data in native.files.items():
-            # The same base texture also colors the canopy: patch only the floor list.
-            if name not in floor_paths:continue
-            if data.startswith(b'<'):continue
-            patched=bytearray(data);changed=False
-            for off,op,w0,w1,h,size in commands(data):
-                if op==32 and h in [crc64(FLOOR_BASE),crc64(FLOOR)]:
-                    h=crc64(ROOT+'textures/grass');struct.pack_into('<II',patched,off+8,h>>32,h&0xffffffff);changed=True
-            if changed:files['alt/'+name]=bytes(patched)
+            report['foliage_display_lists'].append(dict(room=room,path=path,triangles=len(triangles),wall_join=low_curtain))
+        # The native two-stage LOD blend softens the supplied fine grass and
+        # visibly changes at the one-stage corridor/underlay boundary. Give
+        # every walked floor the same sampler and affine world UV phase.
+        for path in sorted(floor_paths):
+            floors=[]
+            for tri in [t for t in original if t['path']==path]:
+                assert tri['texture']==FLOOR
+                v=tri['v'].copy()
+                v[:,3:5]=np.column_stack([v[:,0],v[:,2],np.ones(3)])@floor_uv
+                floors.append({**tri,'v':v,'texture':ROOT+'textures/grass','tile':(32,32),'origin':(0,0)})
+            emit_mesh(files,path,floors,lighting=True)
         added=[]
         for direction in [(1,0),(-1,0),(0,1),(0,-1)]:
             added.extend(tunnel_at(tunnel,np.asarray(direction)*175+room_origin[[0,2]],direction,length=275))
@@ -547,9 +681,11 @@ def main():
             added.extend(transformed(source,tree_transform))
         if room==1:
             added.extend(approved_bridge)
-            added.extend(recessed_bridge_end(approved_bridge,bridge_origin,bridge_axis))
+            added.extend(bridge_extension)
         path=ROOT+f'room_{room}/geometry';emit_mesh(files,path,added)
         draw=ET.fromstring(files['alt/'+path])
+        if terminations:draw.insert(len(draw)-1,ET.Element('CallDisplayList',Path=ROOT+f'room_{room}/terminations'))
+        if room==1:draw.insert(len(draw)-1,ET.Element('CallDisplayList',Path=ROOT+'room_1/bridge_surround'))
         draw.insert(len(draw)-1,ET.Element('CallDisplayList',Path=backing))
         draw.insert(len(draw)-1,ET.Element('ClearGeometryMode',G_LIGHTING='1'))
         files['alt/'+path]=ET.tostring(draw,encoding='utf-8')
@@ -557,20 +693,27 @@ def main():
         info.update(room=room,center=room_origin.tolist(),tunnel_count=4,bridge_tunnel=room==1,added_faces=len(added),
                     replaced_hallway_faces=removed,reworked_bridge_corner_faces=corner_faces)
         report['rooms'].append(info)
-    files['woods-mystery-poc4.json']=(json.dumps(report,indent=2)+'\n').encode()
+    assert len(report['boundary_masks'])==12
+    for room in range(9):
+        for name in ['geometry','backing']:
+            path='alt/'+ROOT+f'room_{room}/{name}_vtx'
+            files[path]=lower_floor_vertices(files[path])
+    path='alt/'+ROOT+'room_1/bridge_surround_vtx'
+    files[path]=lower_floor_vertices(files[path])
+    files['woods-mystery-poc6.json']=(json.dumps(report,indent=2)+'\n').encode()
     manifest=dict(prelude=1,game='mm',romVersion='NTSC 1.0',romVersionHash='0x5354631C',
       exportedAt='2026-10-19T18:00:00.000Z',scenes=['Z2_26SARUNOMORI'],imported=[],altAssets=True,
       project=dict(version=1,previewedAgainst=[],layers=[dict(kind='scene-replace',targetScene='Z2_26SARUNOMORI',
-        sceneName='Woods of Mystery OoT Makeover POC4',entries=sorted(canonical(n) for n in files if n.startswith('alt/')))]))
+        sceneName='Woods of Mystery OoT Makeover POC6',entries=sorted(canonical(n) for n in files if n.startswith('alt/')))]))
     files['prelude/manifest.json']=(json.dumps(manifest,indent=2)+'\n').encode()
     files['prelude/project/edits.json']=b'{"codec":2,"blobs":[],"edits":{}}\n'
     files['prelude/project/blobs.bin']=b''
     # A complete additive pack: no other forest/shop scenes or collision resources are present.
-    candidate=a.output/'zzzzz_Woods_of_Mystery_OoT_Makeover_POC4.prelude.o2r'
+    candidate=a.output/'zzzzz_Woods_of_Mystery_OoT_Makeover_POC6.prelude.o2r'
     with zipfile.ZipFile(candidate,'w',zipfile.ZIP_DEFLATED) as z:
         for n,b in sorted(files.items()):
             info=zipfile.ZipInfo(n,(2026,10,19,0,0,0));info.compress_type=zipfile.ZIP_DEFLATED;z.writestr(info,b)
-    (a.output/'woods-mystery-poc4.json').write_bytes(files['woods-mystery-poc4.json'])
+    (a.output/'woods-mystery-poc6.json').write_bytes(files['woods-mystery-poc6.json'])
     if not a.preview:
         print(json.dumps(dict(candidate=str(candidate),bytes=candidate.stat().st_size,resources=len(files),rooms=report['rooms']),indent=2))
         return

@@ -11,7 +11,7 @@ a=p.parse_args()
 with zipfile.ZipFile(a.candidate) as z:
     assert z.testzip() is None
     files={n:z.read(n) for n in z.namelist()}
-report_key=next((n for n in ['woods-mystery-poc4.json','woods-mystery-poc3.json','woods-mystery-poc2.json','woods-mystery-poc1.json'] if n in files),None)
+report_key=next((n for n in ['woods-mystery-poc6.json','woods-mystery-poc5.json','woods-mystery-poc4.json','woods-mystery-poc3.json','woods-mystery-poc2.json','woods-mystery-poc1.json'] if n in files),None)
 assert report_key, 'Woods of Mystery visual candidate is not installed'
 report=json.loads(files[report_key])
 assert report['donor_faces']==246 and report['donor_vertices']==321
@@ -81,6 +81,6 @@ def vertices(room):
 for room in [0,2,3,4,5,6,7,8]:
     local=vertices(room)-np.array(report['rooms'][room]['center'])
     assert np.max(abs(local[:,[0,2]]))<750
-    assert np.min(local[:,1])>=0, 'New geometry drops below native ground'
+    assert np.min(local[:,1])>=-3, 'Geometry extends below the authorized submerged wood floor'
     assert np.array_equal(local,vertices(0)-np.array(report['rooms'][0]['center'])), 'Maze rooms use inconsistent local placements'
 print('PASS: nine room meshes, complete donor, preserved non-mesh header bytes, no collision/actor/path/other-scene overrides')

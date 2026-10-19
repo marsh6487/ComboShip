@@ -92,7 +92,8 @@ def main():
     flags += shlex.split(os.environ.get("MM_FOLIAGE_TEST_CXXFLAGS", ""))
     with tempfile.TemporaryDirectory(prefix="mm-autumn-scene-foliage-") as temporary:
         build = Path(temporary)
-        (build / "autumn_scene_foliage_production.inc").write_text(source[start:])
+        (build / "autumn_scene_foliage_production.inc").write_text(
+            '#ifdef COMBO_BUILD\n#include "WoodsMysteryNativeBridge.h"\n#endif\n' + source[start:])
         renderer_functions = ["GfxExecStack::start", "GfxExecStack::stop", "GfxExecStack::currCmd",
                               "GfxExecStack::branch", "GfxExecStack::call", "GfxExecStack::ret",
                               "Interpreter::SegAddr", "gfx_check_image_signature",
