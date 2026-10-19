@@ -83,6 +83,9 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-arrival-") as directory:
     begin = oot.index("    // Flag set when we want to switch to MM.")
     end = oot.index("    // ComboShip release gate:", begin)
     source.write_text(MODE_PREAMBLE + (ROOT / "tests/lost_woods_entrance/oot_handoff_test.cpp").read_text()
+                      .replace("/* MIRROR_QUEUE */", re.search(
+                          r"static int sComboMirrorSwitchSlot = [^;]+;", oot)[0] + "\n" + block_from(
+                          oot, oot.index('extern "C" int SOH_QueueMagicMirrorHandoff(')))
                       .replace("/* HANDOFF_HOOKS */", oot[begin:end]))
     result = subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-w", "-fmax-errors=5",
                     "-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DFMT_HEADER_ONLY",

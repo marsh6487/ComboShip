@@ -526,6 +526,58 @@ static void Page2Relayout_Heal(void) {
         ExtInv_SetSlotItem(SLOT_SHADOW_CRYSTAL, ITEM_NONE);
     }
     GraceHourglass_Heal();
+    TravelTools_Heal();
+}
+
+// Time Gate and Magic Mirror use distinct u16 identities behind one inventory cell.
+#define TRAVEL_TOOLS_KALEIDO_CELL (SLOT_MAGIC_MIRROR - 24)
+
+static void TravelTools_KaleidoCycle(PlayState* play, s32 dir) {
+    uint16_t oldItem = ExtInv_GetSlotItem(SLOT_MAGIC_MIRROR);
+    uint16_t newItem = oldItem == ITEM_TIME_GATE ? EXT_ITEM_MAGIC_MIRROR : ITEM_TIME_GATE;
+    (void)dir;
+    ExtInv_SetSlotItem(SLOT_MAGIC_MIRROR, newItem);
+    play->pauseCtx.cursorItem[PAUSE_ITEM] = newItem;
+    play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    for (s32 btn = EQUIP_SLOT_C_LEFT; btn <= EQUIP_SLOT_C_RIGHT; ++btn) {
+        if (ExtButton_GetItem(0, btn) == oldItem) {
+            if (newItem > 0xFF) {
+                ExtButton_SetItem(0, btn, newItem);
+            } else {
+                ExtButton_ClearItem(0, btn);
+                BUTTON_ITEM_EQUIP(0, btn) = (u8)newItem;
+            }
+            C_SLOT_EQUIP(0, btn) = newItem > 0xFF ? SLOT_NONE : SLOT_MAGIC_MIRROR + 48;
+            Interface_LoadItemIconImpl(play, (u8)btn);
+        }
+    }
+    for (s32 btn = EQUIP_SLOT_D_RIGHT; btn <= EQUIP_SLOT_D_UP; ++btn) {
+        if (ExtButton_GetDpadItem(0, btn) == oldItem) {
+            ExtButton_SetDpadItem(0, btn, newItem);
+            DPAD_SLOT_EQUIP(0, btn) = SLOT_MAGIC_MIRROR + 48;
+            Interface_Dpad_LoadItemIconImpl(play, (u8)btn);
+        }
+    }
+}
+
+static void TravelTools_KaleidoHandle(PlayState* play) {
+    u8 canToggle = TravelTools_IsOwned(ITEM_TIME_GATE) && TravelTools_IsOwned(EXT_ITEM_MAGIC_MIRROR);
+    if (gCurrentItemCyclingSlot == TRAVEL_TOOLS_KALEIDO_CELL &&
+        (!canToggle || play->pauseCtx.cursorSlot[PAUSE_ITEM] != TRAVEL_TOOLS_KALEIDO_CELL)) {
+        KaleidoScope_ResetItemCycling();
+    }
+    KaleidoWheel_Run(play, TRAVEL_TOOLS_KALEIDO_CELL, canToggle, TravelTools_KaleidoCycle);
+}
+
+static void TravelTools_KaleidoDraw(PlayState* play) {
+    uint16_t current = ExtInv_GetSlotItem(SLOT_MAGIC_MIRROR);
+    uint16_t other = current == ITEM_TIME_GATE ? EXT_ITEM_MAGIC_MIRROR : ITEM_TIME_GATE;
+    void* icon = ExtInv_GetItemIcon(other);
+    // Explicit textures retain the mirror's full-width ID in the byte-based renderer.
+    KaleidoScope_DrawItemCycleExtrasTinted(play, TRAVEL_TOOLS_KALEIDO_CELL,
+                                           TravelTools_IsOwned(ITEM_TIME_GATE) &&
+                                               TravelTools_IsOwned(EXT_ITEM_MAGIC_MIRROR),
+                                           ITEM_TIME_GATE, ITEM_TIME_GATE, true, icon, icon, NULL, NULL);
 }
 
 // Grace and the hourglass use distinct u16 identities behind one inventory cell.
@@ -1161,6 +1213,7 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
         Slate_KaleidoHandle(play);   // Sheikah Slate rune selector (Skijer's NEI)
         Lantern_KaleidoHandle(play); // Lantern fire-type selector (ported from SoH)
         GraceHourglass_KaleidoHandle(play);
+        TravelTools_KaleidoHandle(play);
         Shovel_KaleidoHandle(play); // Shovel <-> Dominion Rod (2026-08-06 re-layout)
         return;
     }
@@ -1312,6 +1365,7 @@ void KaleidoScope_DrawItemCycles(PlayState* play) {
         Slate_KaleidoDraw(play);   // Sheikah Slate rune selector (Skijer's NEI)
         Lantern_KaleidoDraw(play); // Lantern fire-type selector (ported from SoH)
         GraceHourglass_KaleidoDraw(play);
+        TravelTools_KaleidoDraw(play);
         Shovel_KaleidoDraw(play); // Shovel <-> Dominion Rod (2026-08-06 re-layout)
         return;
     }

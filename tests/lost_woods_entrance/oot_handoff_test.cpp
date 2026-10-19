@@ -56,8 +56,13 @@ SaveManager* SaveManager::Instance = &saveManager;
 static void Switch(int) { ++switches; recordedRoute = COMBO_PORTAL_MARKET; }
 static void SetMmRoute(int route) { recordedRoute = route; }
 static void (*gComboSceneSwitchCallback)(int) = Switch;
-static void* Combo_ResolveSym(const char*, const char*) { return (void*)SetMmRoute; }
+static bool mirrorDestinationAvailable = true;
+static void* Combo_ResolveSym(const char*, const char*) {
+    return mirrorDestinationAvailable ? (void*)SetMmRoute : nullptr;
+}
 extern "C" s32 Player_InCsMode(PlayState*) { return 0; }
+
+/* MIRROR_QUEUE */
 
 void RegisterCandidate() {
     /* HANDOFF_HOOKS */
@@ -142,5 +147,36 @@ int main() {
     require(saves == 5 && switches == 4,
             "reset during the pink tunnel's fade must never save or launch a "
             "new session");
-    std::puts("PASS: production OoT fade/handoff, reset cancellation, source-slot safety and ordinary portal routing");
+
+    // The Mirror uses the existing clean-frame fade and save route without
+    // placing Link in either physical passage or borrowing Farore's return.
+    EnterTunnel(1);
+    GameInteractor::Fire<GameInteractor::OnPlayDestroy>();
+    play.sceneNum = SCENE_HYRULE_FIELD;
+    require(SOH_QueueMagicMirrorHandoff() == 1, "a live combined slot can queue the Mirror crossing");
+    Frames();
+    require(saves == 6 && switches == 5 && savedSlot == 1 &&
+                recordedRoute == COMBO_PORTAL_OPENING_FOREST && !play.state.running,
+            "Mirror recall must save its source slot and hand off once to the opening forest");
+    GameInteractor::Fire<GameInteractor::OnPlayDestroy>();
+    play.state.running = true;
+    gComboGameMode = COMBO_GAME_OOT;
+    require(SOH_QueueMagicMirrorHandoff() == 0, "solo mode must use its native local forest route");
+    gComboGameMode = COMBO_GAME_BOTH;
+    mirrorDestinationAvailable = false;
+    require(SOH_QueueMagicMirrorHandoff() == 0, "a missing destination adapter must reject the request");
+    mirrorDestinationAvailable = true;
+    sComboFwSwitchSlot = 1;
+    require(SOH_QueueMagicMirrorHandoff() == 0, "Mirror must not replace a pending Farore return");
+    sComboFwSwitchSlot = -1;
+    require(SOH_QueueMagicMirrorHandoff() == 1, "valid recall can arm again after cancellation");
+    gSaveContext.fileNum = 2;
+    Frames();
+    require(saves == 6 && switches == 5, "Mirror must not save or launch a replacement source slot");
+    gSaveContext.fileNum = 1;
+    require(SOH_QueueMagicMirrorHandoff() == 1, "the original slot can queue a fresh recall");
+    GameInteractor::Fire<GameInteractor::OnExitGame>(0);
+    Frames();
+    require(saves == 6 && switches == 5, "reset must cancel a queued Mirror recall before it saves");
+    std::puts("PASS: production OoT fade/handoff, Mirror recall, reset cancellation, source-slot safety and portal routing");
 }

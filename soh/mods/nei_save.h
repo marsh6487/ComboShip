@@ -257,6 +257,9 @@ typedef struct NeiSaveData {
     // The set mask distinguishes an explicit None from untouched legacy fire settings.
     uint8_t swordElements[8]; // 0 None, 1 Fire, 2 Ice, 3 Light; fixed wire order
     uint8_t swordElementSet;
+    // Independent travel tools sharing cell 31. Append to preserve existing save offsets.
+    uint8_t timeGateOwned;
+    uint8_t magicMirrorOwned;
 } NeiSaveData;
 
 #define RITO_FLAG_MASK_OWNED (1 << 0)

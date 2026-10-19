@@ -1423,6 +1423,10 @@ static GakkiKeyframe sGakkiZoraPlay[] = {
 
 // Check if a slot is allowed for the current form (internal, uses gFormState)
 static u8 MmForm_IsSlotAllowedInternal(u8 slot) {
+    // The neutral travel tool is usable in every form. The sibling Time Gate
+    // keeps this slot's existing per-form restrictions.
+    if (slot == SLOT_MAGIC_MIRROR && ExtInv_GetSlotItem(slot) == EXT_ITEM_MAGIC_MIRROR)
+        return 1;
     if (slot >= 72)
         return 1;
     if (gFormState.state != MMFORM_STATE_ACTIVE && gFormState.state != MMFORM_STATE_TRANSFORMING &&
@@ -17417,6 +17421,8 @@ u8 MmForm_IsDekuSpinning(void) {
 }
 
 u8 MmForm_IsItemAllowed(s32 item) {
+    if (item == EXT_ITEM_MAGIC_MIRROR)
+        return 1;
     if (item == ITEM_NONE || item == ITEM_NONE_FE)
         return 1;
 

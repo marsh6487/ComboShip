@@ -323,6 +323,9 @@ static const NeiItem sNeiItems[] = {
       "Du hast das %cZeittor%w!&Eine tragbare Tür durch die Zeit,&die Macht des Zeitturms in&deinen Händen.^Drücke "
       "%y\xA1%w zum Aktivieren.&Eine Frage erscheint: %g\"Durch&die Zeit reisen?\"%w^Wähle %yJa%w um zwischen&%rKind%w "
       "und %gErwachsenem%w Link&überall zu wechseln!^Kostet %g48 Magie%w pro Nutzung." },
+    // Static forest reward: permanent ownership, no randomizer pool or get-item row.
+    { EXT_ITEM_MAGIC_MIRROR, PLAYER_IA_ELEMENTAL_WAND, PLAYER_MODELGROUP_DEFAULT, SLOT_MAGIC_MIRROR, AGE_REQ_NONE,
+      (void*)MAGIC_MIRROR_ICON_TEX, Nei_SharedIA_UpperAction, Nei_SharedIA_Init, NULL, NEI_NO_RG, NULL, NULL, NULL },
     // Bomb Arrows keeps every column EXCEPT the slot: it is the 7th value of the bow's element flag
     // (SW97_ELEM_BOMB) and owns no inventory cell, so .slot is NEI_NO_SLOT. The IA/upper-action/init
     // are still reached — ExtPlayer_GetItemAction returns PLAYER_IA_BOMB_ARROWS for a bow whose flag
@@ -1577,6 +1580,10 @@ static const NeiItem* ExtPlayer_FindByIA(int32_t itemAction) {
  * Get the PLAYER_IA_xxx value for a given ITEM_xxx value.
  */
 int8_t ExtPlayer_GetItemAction(int32_t item) {
+    // EXT button IDs are wider than the vanilla item range; keep a neutral action.
+    if (item == EXT_ITEM_MAGIC_MIRROR) {
+        return PLAYER_IA_ELEMENTAL_WAND;
+    }
     // Handle special cases first
     if (item >= ITEM_NONE_FE) {
         return PLAYER_IA_NONE;

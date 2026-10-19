@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "z64item.h"
+#include "../../combo/gameplay/MagicMirrorItem.h"
 #include "nei_save.h" // Skijer's NEI — custom-slot storage (24..71)
 #ifdef __cplusplus
 extern "C" {
@@ -360,7 +361,7 @@ extern const uint8_t gPage2ItemAgeReqs[24];
 #define SLOT_FIRE_ROD 28
 #define SLOT_DEMISE_DESTRUCTION 29
 #define SLOT_DEKU_LEAF 30
-#define SLOT_TIME_GATE 31
+#define SLOT_TIME_GATE 31 // shared with Magic Mirror; ownership is independent
 #define SLOT_BEETLE 32
 #define SLOT_SWITCH_HOOK 33
 #define SLOT_ICE_ROD 34
@@ -442,6 +443,8 @@ static inline void ExtInv_InitializePage2Items(void) { // Skijer's NEI
     }
 }
 static inline void ExtInv_ClearPage2Items(void) { // Skijer's NEI
+    Nei_Save()->timeGateOwned = 0;
+    Nei_Save()->magicMirrorOwned = 0;
     for (int i = 24; i < 48; i++) {
         Nei_SetOwnedItem((uint8_t)i, ITEM_NONE);
     }
@@ -449,6 +452,10 @@ static inline void ExtInv_ClearPage2Items(void) { // Skijer's NEI
 // itemId is u16 so a page-2 slot can be given an EXT id (>0xFF); the store behind it is u16 too.
 // Skijer's NEI
 static inline void ExtInv_GiveItem(uint8_t slot, uint16_t itemId) {
+    if (slot == SLOT_MAGIC_MIRROR && (itemId == ITEM_TIME_GATE || itemId == EXT_ITEM_MAGIC_MIRROR)) {
+        TravelTools_Grant(itemId);
+        return;
+    }
     if (slot == SLOT_PHANTOM_HOURGLASS && (itemId == ITEM_HYLIAS_GRACE || itemId == EXT_ITEM_PHANTOM_HOURGLASS)) {
         GraceHourglass_Grant(itemId);
         return;
@@ -458,6 +465,10 @@ static inline void ExtInv_GiveItem(uint8_t slot, uint16_t itemId) {
     }
 }
 static inline void ExtInv_SetItemById(uint16_t itemId) { // Skijer's NEI
+    if (itemId == ITEM_TIME_GATE || itemId == EXT_ITEM_MAGIC_MIRROR) {
+        TravelTools_Grant(itemId);
+        return;
+    }
     uint8_t slot = ExtInv_GetItemSlot(itemId);
     if (slot != 0xFF) {
         ExtInv_SetSlotItem(slot, itemId);

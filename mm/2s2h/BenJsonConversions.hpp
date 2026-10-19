@@ -56,6 +56,8 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "ownedItems", n.ownedItems },
         { "hyliasGraceOwned", n.hyliasGraceOwned },
         { "phantomHourglassOwned", n.phantomHourglassOwned },
+        { "timeGateOwned", n.timeGateOwned },
+        { "magicMirrorOwned", n.magicMirrorOwned },
         { "shovelOwned", n.shovelOwned },
         { "dominionOwned", n.dominionOwned },
         { "pokeballOwned", n.pokeballOwned },
@@ -178,6 +180,8 @@ inline void from_json(const json& j, NeiSaveData& n) {
     }
     n.hyliasGraceOwned = j.value("hyliasGraceOwned", (uint8_t)0);
     n.phantomHourglassOwned = j.value("phantomHourglassOwned", (uint8_t)0);
+    n.timeGateOwned = j.value("timeGateOwned", (uint8_t)0);
+    n.magicMirrorOwned = j.value("magicMirrorOwned", (uint8_t)0);
     n.shovelOwned = j.value("shovelOwned", (uint8_t)0);
     n.dominionOwned = j.value("dominionOwned", (uint8_t)0);
     n.pokeballOwned = j.value("pokeballOwned", (uint8_t)0);

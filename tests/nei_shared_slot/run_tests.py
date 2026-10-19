@@ -20,7 +20,8 @@ for host in ("mm", "soh"):
     name = function(inventory, "ExtInv_GetCustomItemNameTex")
     name = name[:name.index("    // ", name.index("    switch (itemId)"))] + "    return nullptr;\n}"
     parts = []
-    for symbol in ("GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant",
+    for symbol in ("TravelTools_Heal", "TravelTools_IsOwned", "TravelTools_Grant",
+                   "GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant",
                    "Slate_RuneOwned", "Slate_RuneCount", "Slate_RuneAt", "Slate_GetRune", "Slate_SetRune",
                    "Slate_RuneNeighbor", "Slate_RuneNameTex"):
         if symbol + "(" in inventory:
@@ -29,6 +30,7 @@ for host in ("mm", "soh"):
               function(kaleido.read_text(), "Page2Relayout_Heal")]
     prefix = r'''
 #include "mods/nei_save.h"
+#include "gameplay/MagicMirrorItem.h"
 #include "z64item.h"
 #include <cstdint>
 #include <cstring>

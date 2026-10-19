@@ -68,6 +68,7 @@ void ExtInv_SetOotSlotItem(int, uint8_t) {}
         else:
             prefix += r'''
 static u8 sGraceHourglassSelectorActive = 0;
+static u8 sTravelToolsSelectorActive = 0;
 static u8 sSlateSelectorActive = 0;
 static u8 sWandSelectorActive = 0;
 u32 gBitFlags[32]{};
@@ -86,6 +87,7 @@ extern "C" void Interface_LoadItemIcon1(PlayState*, u16 btn) { ++icons[btn]; }
         production = inv[start:inv.index(";", start) + 1] + "\n"
         production += "\n".join(function(inv, n) for n in (
             "GraceHourglass_Heal", "GraceHourglass_IsOwned", "GraceHourglass_Grant",
+            "TravelTools_Heal", "TravelTools_IsOwned", "TravelTools_Grant",
             "Slate_RuneOwned", "Slate_GrantRune", "Slate_RuneCount", "Slate_RuneAt", "Slate_GetRune", "Slate_SetRune",
             "Slate_RuneNeighbor", "Wand_RandoMode", "Wand_ModeOwned", "Wand_GrantMode", "Wand_ModeCount",
             "Wand_ModeAt", "Wand_GetMode", "Wand_SetMode", "Wand_ModeNeighbor"))

@@ -11,6 +11,15 @@ python3 -B scripts/diagnostics/run_solo_forest_actors_tests.py
 ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_mm_placed_saria_resources_test.py --sanitize
 python3 -B tests/black_market/run_solo_forest_tests.py
 python3 -B tests/lost_woods_entrance/run_arrival_fade_tests.py
+python3 -B tests/magic_mirror/run_tests.py
+python3 -B tests/magic_mirror/run_form_tests.py
+python3 -B tests/magic_mirror/run_integration_tests.py
+python3 -B tests/magic_mirror_inventory/run_tests.py
+python3 -B tests/magic_mirror_inventory/run_action_tests.py
+python3 -B tests/magic_mirror_inventory/run_sync_tests.py
+python3 -B tests/magic_mirror_inventory/run_save_tests.py
+python3 -B tools/magic_mirror/test_visuals.py
+MIRROR_TEST_CXXFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -no-pie" ASAN_OPTIONS=detect_leaks=0 python3 -B tools/magic_mirror/run_draw_tests.py
 python3 -B tests/black_market/run_native_tests.py
 python3 -B tests/black_market/run_oot_native_tests.py
 python3 -B tests/black_market/run_shelves_native_tests.py

@@ -1953,8 +1953,18 @@ bool VerifyArchiveVersion(OTRVersion version) {
 // ComboShip: forward declarations — defined further down with the combo exports.
 extern "C" void (*gComboSceneSwitchCallback)(int fileNum);
 static int sComboFwSwitchSlot = -1;
+static int sComboMirrorSwitchSlot = -1;
 extern "C" void SOH_QueueFwHandoff(int slot) {
     sComboFwSwitchSlot = slot;
+}
+extern "C" int SOH_QueueMagicMirrorHandoff(void) {
+    if (!Combo_IsCombinedGame() || !gComboSceneSwitchCallback || !gPlayState || gGameState != &gPlayState->state ||
+        !gPlayState->state.running || gSaveContext.gameMode != GAMEMODE_NORMAL ||
+        !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) || sComboFwSwitchSlot >= 0 ||
+        !Combo_ResolveSym("2ship", "MM_SetComboPortalRoute"))
+        return 0;
+    sComboMirrorSwitchSlot = gSaveContext.fileNum;
+    return 1;
 }
 // Launcher poll: returns the next save slot backed up for a release mismatch, or -1 if none.
 extern "C" int (*gComboOutdatedSaveNotice)();
@@ -2254,6 +2264,7 @@ static void Combo_FinishInit() {
             sComboSwitchPending = false;
             sComboSwitchFileNum = -1;
             sComboSwitchPortalRoute = COMBO_PORTAL_MARKET;
+            sComboMirrorSwitchSlot = -1;
         };
         GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(cancelComboPassage);
         GameInteractor::Instance->RegisterGameHook<GameInteractor::OnExitGame>([](int32_t) {
@@ -2300,6 +2311,22 @@ static void Combo_FinishInit() {
                 cancelComboPassage();
                 sComboSwitchFileNum = (int)gSaveContext.fileNum;
                 sComboSwitchPending = true;
+            }
+            if (sComboMirrorSwitchSlot >= 0) {
+                const int slot = sComboMirrorSwitchSlot;
+                sComboMirrorSwitchSlot = -1;
+                if (!sComboSwitchPending && !sComboPassageFade && sComboFwSwitchSlot < 0 && gPlayState &&
+                    gGameState == &gPlayState->state && gGameState->running &&
+                    gSaveContext.gameMode == GAMEMODE_NORMAL && slot == gSaveContext.fileNum &&
+                    ComboLostWoods_IsPlayableSlot(slot) && !Combo_SOH_CrossDungeonTransitionPending()) {
+                    if (!sComboSetMmPortalRoute)
+                        sComboSetMmPortalRoute = (void (*)(int))Combo_ResolveSym("2ship", "MM_SetComboPortalRoute");
+                    if (sComboSetMmPortalRoute) {
+                        sComboSwitchFileNum = slot;
+                        sComboSwitchPortalRoute = COMBO_PORTAL_OPENING_FOREST;
+                        sComboPassageFade = 1;
+                    }
+                }
             }
             // A shuffled route owns the departure even while its native fade is running.
             if (Combo_SOH_CrossDungeonTransitionPending() && sComboPassageFade)

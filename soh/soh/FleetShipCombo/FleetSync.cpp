@@ -1,5 +1,6 @@
 #include <thread>
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
+#include "../../../combo/gameplay/MagicMirrorItem.h"
 // FleetSync.cpp (OoT side) — cross-game save cache + shared player-state overlay.
 //
 // Temp file: <ShipDir>/fleet_temp_flags.json — { "version", "slot", "oot", "mm", "shared" }.
@@ -417,6 +418,7 @@ extern "C" void GraceHourglass_Grant(uint16_t item);
 
 static void RepairFlagOwnedCells(NeiSaveData* nei) {
     GraceHourglass_Heal();
+    TravelTools_Heal();
     const uint8_t kSlotWand = 27, kSlotSlate = 39, kSlotShovel = 46, kSlotRod = 47;
     const uint16_t kExtSheikahSlate = 0x0220; // EXT_ITEM_SHEIKAH_SLATE (same id in both games)
     const uint16_t kExtRodOfSeasons = 0x0223; // EXT_ITEM_ROD_OF_SEASONS (same id in both games)
@@ -805,6 +807,8 @@ void ApplyShared(const nlohmann::json& sh) {
             if (validPage2 || validMask) {
                 if (i == 41 - 24 && raw == ITEM_HYLIAS_GRACE) {
                     GraceHourglass_Grant((uint16_t)raw);
+                } else if (i == 31 - 24 && raw == ITEM_TIME_GATE) {
+                    TravelTools_Grant((uint16_t)raw);
                 } else {
                     nei->ownedItems[i] = (uint16_t)raw; // additive
                 }
@@ -997,6 +1001,11 @@ void ExtractEquips(nlohmann::json& sh) {
 
 // Inventory slot holding `item`, or -1 if this save does not have it.
 int FindInvSlot(uint16_t item) {
+    // Ownership survives switching the travel cell to the other tool. Restoring
+    // a peer button must not discard an owned item or change the local selection.
+    if (item == ITEM_TIME_GATE || item == EXT_ITEM_MAGIC_MIRROR) {
+        return TravelTools_IsOwned(item) ? SLOT_MAGIC_MIRROR : -1;
+    }
     if (item < 0xFF) {
         for (int s = 0; s < (int)ARRAY_COUNT(gSaveContext.inventory.items); s++) {
             if (gSaveContext.inventory.items[s] == item) {
@@ -2056,6 +2065,8 @@ static ItemGrantAudit::Snapshot CaptureItemGrantAudit() {
     snapshot.Add("nei.seasonsGates", nei->seasonsGates);
     snapshot.Add("nei.hyliasGraceOwned", nei->hyliasGraceOwned);
     snapshot.Add("nei.phantomHourglassOwned", nei->phantomHourglassOwned);
+    snapshot.Add("nei.timeGateOwned", nei->timeGateOwned);
+    snapshot.Add("nei.magicMirrorOwned", nei->magicMirrorOwned);
     snapshot.Add("nei.shovelOwned", nei->shovelOwned);
     snapshot.Add("nei.dominionOwned", nei->dominionOwned);
     snapshot.Add("nei.pokeballOwned", nei->pokeballOwned);

@@ -1073,6 +1073,7 @@ static void Page2Relayout_Heal(void) {
         ExtInv_SetSlotItem(SLOT_SHADOW_CRYSTAL, ITEM_NONE);
     }
     GraceHourglass_Heal();
+    TravelTools_Heal();
 }
 
 static u8 ShovelSel_IsShovelCellItem(s32 item) {
@@ -1085,6 +1086,50 @@ static void Shovel_Cycle(PlayState* play, s32 dir) {
     ExtInv_SetSlotItem(SLOT_SHOVEL, next);
     Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                            &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+}
+
+// Time Gate / Magic Mirror share cell 31; ownership and selected u16 item remain separate.
+static u8 sTravelToolsSelectorActive = 0;
+
+static void TravelTools_KaleidoCycle(PlayState* play, s32 dir) {
+    uint16_t oldItem = ExtInv_GetSlotItem(SLOT_MAGIC_MIRROR);
+    uint16_t newItem = oldItem == ITEM_TIME_GATE ? EXT_ITEM_MAGIC_MIRROR : ITEM_TIME_GATE;
+    (void)dir;
+    ExtInv_SetSlotItem(SLOT_MAGIC_MIRROR, newItem);
+    play->pauseCtx.cursorItem[PAUSE_ITEM] = newItem;
+    play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    for (s32 btn = 1; btn < ARRAY_COUNT(gSaveContext.equips.buttonItems); ++btn) {
+        if (ExtButton_GetItem(btn) == oldItem) {
+            if (newItem > 0xFF) {
+                ExtButton_SetItem(btn, newItem);
+            } else {
+                ExtButton_ClearItem(btn);
+                gSaveContext.equips.buttonItems[btn] = (u8)newItem;
+            }
+            gSaveContext.equips.cButtonSlots[btn - 1] = newItem > 0xFF ? SLOT_NONE : SLOT_MAGIC_MIRROR;
+            Interface_LoadItemIcon1(play, (u16)btn);
+        }
+    }
+}
+
+static void TravelTools_KaleidoHandle(PlayState* play) {
+    uint16_t selected = play->pauseCtx.cursorItem[PAUSE_ITEM];
+    u8 onThisItem = ExtInv_GetCurrentPage() == 1 && (selected == ITEM_TIME_GATE || selected == EXT_ITEM_MAGIC_MIRROR);
+    KaleidoWheel_Run(play, onThisItem,
+                     TravelTools_IsOwned(ITEM_TIME_GATE) && TravelTools_IsOwned(EXT_ITEM_MAGIC_MIRROR),
+                     &sTravelToolsSelectorActive, TravelTools_KaleidoCycle);
+}
+
+static void TravelTools_KaleidoDraw(PlayState* play) {
+    uint16_t selected = play->pauseCtx.cursorItem[PAUSE_ITEM];
+    if (ExtInv_GetCurrentPage() != 1 || (selected != ITEM_TIME_GATE && selected != EXT_ITEM_MAGIC_MIRROR) ||
+        !TravelTools_IsOwned(ITEM_TIME_GATE) || !TravelTools_IsOwned(EXT_ITEM_MAGIC_MIRROR)) {
+        return;
+    }
+    uint16_t other = selected == ITEM_TIME_GATE ? EXT_ITEM_MAGIC_MIRROR : ITEM_TIME_GATE;
+    void* icon = ExtInv_GetItemIcon(other);
+    KaleidoCycle_DrawRocStyle(play, play->pauseCtx.cursorSlot[PAUSE_ITEM], sTravelToolsSelectorActive, 1, 1, icon, icon,
+                              NULL, NULL, 32, 32);
 }
 
 // Grace / hourglass share cell 41; ownership and selected u16 item remain separate.
@@ -2080,6 +2125,7 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
 
     // Shovel <-> Dominion Rod (shared cell 46; also folds pre-re-layout saves). Skijer's NEI
     GraceHourglass_KaleidoHandle(play);
+    TravelTools_KaleidoHandle(play);
     Shovel_HandleKaleidoSelector(play);
 
     // Elemental Wand rod selector (A on the cell) — six rods share the page-2 slot the Bomb Arrows
@@ -2171,6 +2217,7 @@ void KaleidoScope_DrawItemCycles(PlayState* play) {
 
     // Shovel <-> Dominion Rod overlay (shared cell 46). Skijer's NEI
     GraceHourglass_KaleidoDraw(play);
+    TravelTools_KaleidoDraw(play);
     Shovel_DrawKaleidoSelector(play);
 
     // Elemental Wand rod selector overlay. Skijer's NEI
@@ -2203,6 +2250,7 @@ bool IsItemCycling() {
 void KaleidoScope_ResetItemCycling() {
     gCurrentItemCyclingSlot = -1;
     sGraceHourglassSelectorActive = 0;
+    sTravelToolsSelectorActive = 0;
     sSlateSelectorActive = 0;
 }
 

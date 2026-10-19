@@ -404,8 +404,7 @@ def handoff_fixture(game):
     for marker in ['extern "C" int ' + prefix + '_CrossDungeonTransitionPending(',
                    'extern "C" void ' + prefix + '_CancelCrossDungeonTransition(']:
         text = text.replace(function(text, marker), '')
-    text = text.replace('static void* Combo_ResolveSym(const char*, const char*) { return (void*)Set' +
-                        ('MmRoute' if is_oot else 'OotRoute') + '; }', r'''
+    text = text.replace(function(text, 'static void* Combo_ResolveSym('), r'''
 static int queues=0,queued=-1;
 static int QueuePeer(int index) { ++queues;queued=index;return 1; }
 static void* Combo_ResolveSym(const char*,const char* name) {
@@ -458,6 +457,8 @@ static void ObserveScene(int) {}
     text = text.replace(insertion, body + '\n' + insertion)
     if is_oot:
         host = (ROOT / 'soh/soh/OTRGlobals.cpp').read_text(encoding='utf-8-sig')
+        text = text.replace('/* MIRROR_QUEUE */', re.search(
+            r'static int sComboMirrorSwitchSlot = [^;]+;', host)[0])
         begin = host.index('    // Flag set when we want to switch to MM.')
         end = host.index('    // ComboShip release gate:', begin)
         text = text.replace('/* HANDOFF_HOOKS */', host[begin:end])

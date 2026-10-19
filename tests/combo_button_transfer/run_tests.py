@@ -15,6 +15,7 @@ from run_mm_scene_randomization_tests import function
 PREFIX = r'''
 #include "global.h"
 #include "mods/nei_save.h"
+#include "gameplay/MagicMirrorItem.h"
 #include "mods/ext_buttons/ext_buttons.h"
 #include "FleetComboIds.h"
 #include <nlohmann/json.hpp>
@@ -26,6 +27,7 @@ static NeiSaveData nei{};
 extern "C" NeiSaveData* Nei_Save() { return &nei; }
 extern "C" uint16_t Nei_GetOwnedItem(uint8_t slot) { return slot>=24 && slot<72 ? nei.ownedItems[slot-24] : ITEM_NONE; }
 extern "C" void Nei_SetOwnedItem(uint8_t slot, uint16_t item) { nei.ownedItems[slot-24]=item; }
+static uint16_t ExtInv_GetSlotItem(int slot) { return Nei_GetOwnedItem(slot); }
 '''
 
 COMMON_CHECKS = r'''
@@ -56,6 +58,16 @@ int main(int argc, char** argv) {
         assert(getD(1)==0xD0 && slotD(1)==WAND_SLOT);
         checkOtherForm();
         puts("PASS arrival: owned NEI cells, marker/shadow/slot coherence and shared MM buttons");
+    } else if (!strcmp(mode,"mirror")) {
+        nei.timeGateOwned=nei.magicMirrorOwned=1;
+        nei.ownedItems[SLOT_MAGIC_MIRROR-24]=ITEM_TIME_GATE;
+        nlohmann::json sh;
+        sh["cEquips"]=nlohmann::json::array({EXT_ITEM_MAGIC_MIRROR,0xFF,0xFF});
+        sh["dEquips"]=nlohmann::json::array({EXT_ITEM_MAGIC_MIRROR,0xFF,0xFF,0xFF});
+        ApplyEquips(sh);
+        assert(getC(1)==EXT_ITEM_MAGIC_MIRROR && getD(0)==EXT_ITEM_MAGIC_MIRROR);
+        assert(nei.ownedItems[SLOT_MAGIC_MIRROR-24]==ITEM_TIME_GATE);
+        puts("PASS Mirror arrival: full u16 C/D payloads restore behind selected Time Gate");
     } else {
         nlohmann::json sh;
         sh["cEquips"]=nlohmann::json::array({0xD0,0x0223,0xFF});
@@ -155,6 +167,9 @@ def main():
         names=["ExtButton_GetItem","ExtButton_SetItem","ExtButton_ClearItem"]
         if host=="mm": names += ["ExtButton_GetDpadItem","ExtButton_SetDpadItem"]
         production="\n".join(function(buttons,n) for n in names)
+        inventory=read(host+"/mods/extended_inventory.c")
+        if "TravelTools_IsOwned(" in inventory:
+            production += "\n"+function(inventory,"TravelTools_IsOwned")
         if host=="mm": production += "\n"+function(sync,"MmButtonCanonical")
         production += "\n"+"\n".join(function(sync,n) for n in ("ExtractEquips","FindInvSlot","ApplyOneButton","ApplyEquips"))
         code=PREFIX+(MM if host=="mm" else OOT)+production+COMMON_CHECKS
@@ -166,7 +181,7 @@ def main():
             path=Path(td); source=path/"test.cpp"; binary=path/"test"; source.write_text(code)
             subprocess.run([os.environ.get("CXX","c++"),*flags,str(source),"-o",str(binary)],check=True)
             env=dict(os.environ,ASAN_OPTIONS="detect_leaks=0",UBSAN_OPTIONS="halt_on_error=1")
-            for mode in ("extract","apply","policy"):
+            for mode in ("extract","apply","mirror","policy"):
                 result=subprocess.run([str(binary),mode],env=env)
                 failures += bool(result.returncode)
                 print(host,mode,"FAIL" if result.returncode else "PASS",flush=True)
