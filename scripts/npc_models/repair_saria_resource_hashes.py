@@ -1,4 +1,4 @@
-"""Repair Saria private hash references without changing geometry or materials.
+"""Repair confirmed NativeNpcV1 private hash references without changing geometry or materials.
 
 Archive::IndexFile indexes literal paths. A hash of a nonexistent base path
 cannot select an alt-only entry. Rewrite that hash to the actual alt path.
@@ -8,49 +8,13 @@ unchanged. --reference supplies full-pack names when repairing its overlay.
 import argparse
 import hashlib
 import json
-import struct
 import zipfile
 from pathlib import Path
 from native_assets import o2r as asset
 
-NAMESPACE = "objects/object_sa/NativeNpcV1/"
-EXPANDED = {0x20, 0x31, 0x32, 0x33, 0x35, 0x36, 0x42}
-REFERENCES = EXPANDED - {0x33}
-
-
 def repair_records(records, reference_names=()):
-    names = set(records) | set(reference_names)
-    literal = {asset.crc64(name) for name in names}
-    replacements = {asset.crc64(name[4:]): name for name in names
-                    if name.startswith("alt/" + NAMESPACE) and name[4:] not in names}
-    repaired = dict(records)
-    changes = []
-    for name, raw in records.items():
-        if not name.startswith("alt/" + NAMESPACE) or raw[4:8] != b"TLDO":
-            continue
-        if raw[0] != 0 or len(raw) < 72 or raw[64] != asset.UCODE_F3DEX2:
-            raise ValueError("Expected little-endian F3DEX2 display list: " + name)
-        data = bytearray(raw)
-        offset = 72
-        while offset + 8 <= len(data):
-            opcode = struct.unpack_from("<I", data, offset)[0] >> 24
-            size = 16 if opcode in EXPANDED else 8
-            if offset + size > len(data):
-                raise ValueError("Truncated display list: " + name)
-            if opcode in REFERENCES:
-                high, low = struct.unpack_from("<II", data, offset + 8)
-                hashed = high << 32 | low
-                target = replacements.get(hashed) if hashed not in literal else None
-                if target:
-                    actual = asset.crc64(target)
-                    struct.pack_into("<II", data, offset + 8, actual >> 32, actual & 0xffffffff)
-                    changes.append(dict(resource=name, offset=offset + 8, target=target,
-                                        previous_hash=f"{hashed:016x}", actual_hash=f"{actual:016x}"))
-            offset += size
-            if opcode == 0xDF:
-                break
-        repaired[name] = bytes(data)
-    return repaired, changes
+    # Legacy Saria entry point retained for existing reproduction recipes.
+    return asset.repair_native_npc_hashes(records, reference_names)
 
 
 def repair(baseline, output, references=()):

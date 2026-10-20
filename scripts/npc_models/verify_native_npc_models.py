@@ -217,6 +217,7 @@ def verify(native, source_dir, candidate, allow_fitted_rig=False):
             raise ValueError('Shared shoulder skin differs from the accepted Twins repair')
         records={n:archive.candidate.read(n) for n in archive.candidate.namelist()}
         wrappers=shared_shoulders(records,rig.ns);sources={};counts={}
+        wrappers,_=asset.repair_native_npc_hashes(wrappers,records)
         for host in HOSTS:
             destination=rig.ns+f'/Skin/Limbs/Limb{host:02d}'
             source_path=rig.ns+'/PoseAnimations/objects/object_os_anime/gKokiriIdleAnim'+f'/Skin/Limbs/Limb{host:02d}'
@@ -237,7 +238,9 @@ def verify(native, source_dir, candidate, allow_fitted_rig=False):
                 raise ValueError('The twins idle/sway no longer uses the exact native animation')
         neutral=archive.candidate.read('alt/'+rig.ns+'/Faces/L0R0M0')
         for part in ('Base','L0','R0','M0'):
-            hashed=asset.crc64(rig.ns+'/FaceParts/'+part)
+            face_path=rig.ns+'/FaceParts/'+part
+            face_path=face_path if asset.crc64(face_path) in archive.hashes else 'alt/'+face_path
+            hashed=asset.crc64(face_path)
             if struct.pack('<II',hashed>>32,hashed&0xffffffff) not in neutral:
                 raise ValueError('The twins neutral expression bypasses its repaired face surface')
     texture_type, w, h, pixels = archive.texture(rig.ns+"/Textures/Diffuse")

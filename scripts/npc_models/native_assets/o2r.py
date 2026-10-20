@@ -206,6 +206,51 @@ class DLBuilder:
 
 
 # ------------------------------------------------------------------ archive
+NATIVE_NPC_PREFIXES = tuple("objects/" + name + "/NativeNpcV1/" for name in
+                            ("object_sa", "object_kw1", "object_ma1", "object_ma2"))
+_HASH_EXPANDED = {0x20, 0x31, 0x32, 0x33, 0x35, 0x36, 0x42}
+
+
+def repair_native_npc_hashes(records, reference_names=()):
+    """Bind alt-only private NPC references to literal indexed archive names.
+
+    The four supported families are confirmed to use this private contract.
+    Native resource hashes and unrelated model namespaces remain untouched.
+    Return a copy: a writer must not mutate its source model's resource map.
+    """
+    names = set(records) | set(reference_names)
+    literal = {crc64(name) for name in names}
+    replacements = {crc64(name[4:]): name for name in names
+                    if name.startswith("alt/") and name[4:].startswith(NATIVE_NPC_PREFIXES)
+                    and name[4:] not in names}
+    repaired, changes = dict(records), []
+    for name, raw in records.items():
+        if not name.startswith("alt/") or not name[4:].startswith(NATIVE_NPC_PREFIXES) or raw[4:8] != b"TLDO":
+            continue
+        if raw[0] != 0 or len(raw) < 72 or raw[64] != UCODE_F3DEX2:
+            raise ValueError("Expected little-endian F3DEX2 display list: " + name)
+        data, offset = bytearray(raw), 72
+        while offset + 8 <= len(data):
+            opcode = struct.unpack_from("<I", data, offset)[0] >> 24
+            size = 16 if opcode in _HASH_EXPANDED else 8
+            if offset + size > len(data):
+                raise ValueError("Truncated display list: " + name)
+            if opcode in _HASH_EXPANDED and opcode != G_MARKER:
+                high, low = struct.unpack_from("<II", data, offset + 8)
+                hashed = high << 32 | low
+                target = replacements.get(hashed) if hashed not in literal else None
+                if target:
+                    actual = crc64(target)
+                    struct.pack_into("<II", data, offset + 8, actual >> 32, actual & 0xffffffff)
+                    changes.append(dict(resource=name, offset=offset + 8, target=target,
+                                        previous_hash=f"{hashed:016x}", actual_hash=f"{actual:016x}"))
+            offset += size
+            if opcode == G_ENDDL:
+                break
+        repaired[name] = bytes(data)
+    return repaired, changes
+
+
 @dataclass
 class O2R:
     root: str = "objects"
@@ -214,10 +259,14 @@ class O2R:
     def add(self, path: str, data: bytes):
         self.files[path] = data
 
-    def write(self, out_path: str):
-        with zipfile.ZipFile(out_path, "w", zipfile.ZIP_STORED) as z:
-            for path, data in self.files.items():
-                z.writestr(path, data)
+    def write(self, out_path: str, compression=zipfile.ZIP_STORED, timestamp=None):
+        records, _ = repair_native_npc_hashes(self.files)
+        with zipfile.ZipFile(out_path, "w", compression, compresslevel=6 if compression == zipfile.ZIP_DEFLATED else None) as z:
+            for path, data in sorted(records.items()) if timestamp else records.items():
+                entry = zipfile.ZipInfo(path, timestamp) if timestamp else path
+                if timestamp:
+                    entry.compress_type = compression
+                z.writestr(entry, data)
 
 
 # ------------------------------------------------------------------ reader (round-trip / QA)
