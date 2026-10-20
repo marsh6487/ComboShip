@@ -15,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <nlohmann/json.hpp>
 #include <ship/utils/StrHash64.h>
 #include "2s2h/Enhancements/Graphics/AutumnSceneFoliage.h"
 #include "entrances/SoloForest.h"
@@ -49,13 +50,26 @@ struct CrossRMRegistry {
         teardown = listener;
     }
 };
+struct File {
+    std::shared_ptr<std::vector<char>> Buffer;
+    size_t BufferOffset = 0;
+};
 struct Archive {
+    std::map<std::string, std::shared_ptr<File>> rawFiles;
+    std::map<std::string, unsigned> reads;
+    std::shared_ptr<File> LoadFile(const std::string& path) {
+        ++reads[path];
+        auto found = rawFiles.find(path);
+        return found == rawFiles.end() ? nullptr : found->second;
+    }
     std::string GetPath() {
         return "fixture.o2r";
     }
 };
 struct ArchiveManager {
     std::map<std::string, std::shared_ptr<IResource>> files;
+    std::map<std::string, std::shared_ptr<Archive>> owners;
+    std::shared_ptr<Archive> defaultOwner = std::make_shared<Archive>();
     std::string archiveLookup;
     bool HasFile(const std::string& path) {
         return files.contains(path);
@@ -63,7 +77,10 @@ struct ArchiveManager {
     std::shared_ptr<Archive> GetArchiveFromFile(const std::string& path) {
         archiveLookup = path;
         const auto found = files.find(path);
-        return found != files.end() && found->second ? std::make_shared<Archive>() : nullptr;
+        if (found == files.end() || !found->second)
+            return nullptr;
+        const auto owner = owners.find(path);
+        return owner == owners.end() ? defaultOwner : owner->second;
     }
     std::shared_ptr<std::vector<std::string>> ListFiles(const std::string& mask) {
         auto result = std::make_shared<std::vector<std::string>>();
@@ -222,6 +239,8 @@ static unsigned CountMaterialTriangles(const std::vector<Gfx>& commands, const c
     assert(!tint); // Seasonal state must not leak past a tinted batch.
     return count;
 }
+#include "autumn_scene_moon_tree_fixture.h"
+
 static void CheckScopedForestCommands(const Variant& variant, const std::vector<Gfx>& original,
                                       int selectedSeason = SEASON_AUTUMN) {
     assert(Equal(variant.original, original));
@@ -2211,6 +2230,8 @@ static void CheckSoloForestSurfaces() {
 }
 
 int main() {
+    CheckPreludeMoonTreeFoliage();
+    CheckPreludeMoonTreeOwnerOverride();
     if (const char* selected = std::getenv("MM_ROAD_TARGET_TEST")) {
         if (std::string(selected) == "vines")
             CheckRoadVines();
