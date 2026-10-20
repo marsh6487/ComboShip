@@ -53,3 +53,21 @@ container; address and undefined-behavior checks remain enabled.
 UI, kill presentation, Biggoron correction and combined verification are still
 in progress at this checkpoint. No configured gameplay, audio, Windows/full
 application build, user acceptance or master promotion is claimed.
+
+## Selector/HUD milestone
+
+The selector uses a rounded translucent panel, four visual choices, smooth
+Montserrat font strips, active/selected/locked states and A/B control chips.
+Fire/ice/light share dedicated generated art with the B-sword HUD. Preserved
+source PNGs and the generation manifest are in the repository. Icons have
+64x64 physical detail split into native-safe32x32 RGBA32 tiles; font/chrome
+IA8 loads remain <=4096 bytes. No separate archive is needed for this UI.
+
+Fresh selector/input/render/TU checks pass in both hosts and both solo/Combo
+modes. The B-HUD and real MM HUD-editor anchor/scale tests pass under ASan/UBSan.
+The generator --check passes deterministically. Source-menu native objects
+compile in solo and Combo SoH. Both full HUD translation units have real-header
+compile proof from the implementation pass. Offline previews are reconstructed
+from the actual emitted GBI, not engine captures; the offline None sword icon
+is omitted because its game-resource texture is not provided to that helper.
+Configured appearance and full pause-overlay composition remain unproven.

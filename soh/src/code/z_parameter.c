@@ -15,6 +15,7 @@
 #include "mods/extended_equipment.h"
 #include "mods/nei_save.h"
 #include "sword_element.h"
+#include "../../../combo/render/sword_element_ui_art.h"
 #include "din_fire_sword.h"
 #include "expansions/sm64/sm64_mario.h"
 
@@ -4737,22 +4738,13 @@ static void Interface_DrawSwordElementBadge(PlayState* play, u16 item, s16 butto
     if (element <= SWORD_ELEMENT_NONE || element >= SWORD_ELEMENT_COUNT) {
         return;
     }
-    static const char* const textures[SWORD_ELEMENT_COUNT] = { NULL, gItemIconArrowFireTex, gItemIconArrowIceTex,
-                                                               gItemIconArrowLightTex };
     s16 markWidth = MAX(1, width * 2 / 5);
     s16 markHeight = MAX(1, height * 2 / 5);
     s16 markLeft = left + width - markWidth + MAX(1, width / 15);
     s16 markTop = top - MAX(1, height / 15);
     OPEN_DISPS(play->state.gfxCtx);
-    gDPPipeSync(OVERLAY_DISP++);
-    gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATERGBA_PRIM, G_CC_MODULATERGBA_PRIM);
-    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->bAlpha);
-    gDPLoadTextureBlock(OVERLAY_DISP++, textures[element], G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0,
-                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD,
-                        G_TX_NOLOD);
-    gSPWideTextureRectangle(OVERLAY_DISP++, markLeft * 4, markTop * 4, (markLeft + markWidth) * 4,
-                            (markTop + markHeight) * 4, G_TX_RENDERTILE, 0, 0, 32 * 1024 / markWidth,
-                            32 * 1024 / markHeight);
+    SwordElementUi_DrawElement(&OVERLAY_DISP, element, markLeft, markTop, markWidth, markHeight,
+                               interfaceCtx->bAlpha, 0, 1);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 

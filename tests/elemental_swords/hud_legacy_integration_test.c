@@ -4,6 +4,7 @@
 #include "state_test.c"
 #undef main
 #include "sword_element.h"
+#include "../../combo/render/sword_element_ui_art.h"
 #ifdef SWORD_ELEMENT_TEST_MM
 #include "archives/icon_item_static/icon_item_static_yar.h"
 #include "mods/forms/custom_forms.h"
@@ -38,8 +39,8 @@ static void CheckLegacy(int expected) {
         badges += (g->words.w0 >> 24) == G_TEXRECT_WIDE;
         if ((g->words.w0 >> 24) == G_SETTIMG) texture = (const char*)g->words.w1;
     }
-    REQUIRE(badges == expected);
-    if (expected) REQUIRE(texture == FIRE_TEXTURE);
+    REQUIRE(badges == expected * 4);
+    if (expected) REQUIRE((const void*)texture == sSwordElementUiFireArt[3].pixels);
     REQUIRE(MELEE_FLAGS == meleeFlags && nei.swordElementSet == setMask && MAGIC == 37);
 }
 int main(void) {
@@ -48,9 +49,10 @@ int main(void) {
     memset(&play, 0, sizeof(play));
     memset(&player, 0, sizeof(player));
     transformed = NO_CUSTOM_FORM;
-    legacyEnabled = nativeAssets = enabled[1] = 1;
+    legacyEnabled = nativeAssets = 0;
+    enabled[1] = 1;
     MAGIC = 37;
-    INVENTORY.items[SLOT_ARROW_FIRE] = ITEM_ARROW_FIRE;
+    INVENTORY.items[SLOT_ARROW_FIRE] = ITEM_NONE;
     player.actor.scale.y = 1.0f;
     player.heldItemId = ITEM_SWORD_KOKIRI;
     player.heldItemAction = PLAYER_IA_SWORD_KOKIRI;
@@ -64,16 +66,21 @@ int main(void) {
     player.leftHandType = PLAYER_MODELTYPE_LH_SWORD;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
 #endif
-    REQUIRE(SwordElement_ForItem(ITEM_SWORD_KOKIRI) == 0);
-    CheckLegacy(1);
-    nativeAssets = 0; CheckLegacy(0); nativeAssets = 1;
-    INVENTORY.items[SLOT_ARROW_FIRE] = ITEM_NONE; CheckLegacy(0);
+    REQUIRE(SwordElement_ForItem(ITEM_SWORD_KOKIRI) == SWORD_ELEMENT_FIRE);
+    CheckLegacy(1); /* Forced Fire works with no arrow, appearance pack or Alt Assets. */
+    nativeAssets = 1; CheckLegacy(1); nativeAssets = 0;
+    legacyEnabled = 1; CheckLegacy(1); legacyEnabled = 0;
+    enabled[1] = 0; CheckLegacy(0);
     INVENTORY.items[SLOT_ARROW_FIRE] = ITEM_ARROW_FIRE;
-    enabled[1] = 0; CheckLegacy(0); enabled[1] = 1;
-    legacyEnabled = 0; CheckLegacy(0); legacyEnabled = 1;
-    REQUIRE(SwordElement_Set(ITEM_SWORD_KOKIRI, 0));
-    CheckLegacy(0);
-    memset(&nei, 0, sizeof(nei));
+    CheckLegacy(0); /* Acquisition alone does not silently choose an element. */
+    REQUIRE(SwordElement_Set(ITEM_SWORD_KOKIRI, SWORD_ELEMENT_FIRE));
+    CheckLegacy(1); /* Normal saved enchantment works with every override off. */
+    INVENTORY.items[SLOT_ARROW_FIRE] = ITEM_NONE; CheckLegacy(0);
+    enabled[1] = 1; CheckLegacy(1);
+    REQUIRE(SwordElement_Set(ITEM_SWORD_KOKIRI, SWORD_ELEMENT_NONE));
+    CheckLegacy(1); /* Override does not rewrite the saved explicit None. */
+    REQUIRE(SwordElement_Get(ITEM_SWORD_KOKIRI) == SWORD_ELEMENT_NONE);
+    enabled[1] = 0; CheckLegacy(0);
     player.heldItemId = ITEM_NONE; CheckLegacy(0);
-    puts("PASS legacy sword HUD: real core/combat fallback, matching equipped sword, exact arrow/assets/options gates, explicit None and no mutations");
+    puts("PASS sword HUD core/combat: asset-free overrides, independent arrow acquisition, saved choices/None, reversibility and no mutations");
 }

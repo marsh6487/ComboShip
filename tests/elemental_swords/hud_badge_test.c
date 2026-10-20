@@ -2,6 +2,7 @@
 #include "global.h"
 #include "sword_element.h"
 #include "din_fire_sword.h"
+#include "../../combo/render/sword_element_ui_art.h"
 #include "tests/test_require.h"
 #include <string.h>
 #ifdef TEST_MM
@@ -65,21 +66,38 @@ static void Draw(u16 item, s16 button, s16 width, s16 height) {
     Begin();
     Interface_DrawSwordElementBadge(&play, item, button, 200, 20, width, height);
 }
-static void CheckDraw(const char* texture, int left, int top, int width, int height) {
-    REQUIRE(Count(G_TEXRECT_WIDE) == 1);
-    REQUIRE(Count(G_SETTIMG) == 1);
+static void CheckDraw(const SwordElementUiRgbaTile* tiles, int left, int top, int width, int height) {
+    REQUIRE(Count(G_TEXRECT_WIDE) == 4);
+    REQUIRE(Count(G_SETTIMG) == 4);
+    int tile = 0, rectangle = 0;
     for (Gfx* g = commands; g < gfx.overlay.p; ++g) {
-        if ((g->words.w0 >> 24) == G_SETTIMG) REQUIRE(g->words.w1 == (uintptr_t)texture);
+        if ((g->words.w0 >> 24) == G_SETTIMG) {
+            REQUIRE(g->words.w1 == (uintptr_t)tiles[tile].pixels);
+            REQUIRE(tiles[tile].before == SWORD_ELEMENT_UI_CANARY && tiles[tile].after == SWORD_ELEMENT_UI_CANARY);
+            REQUIRE(((g->words.w0 >> 21) & 7) == G_IM_FMT_RGBA);
+            REQUIRE(((g->words.w0 >> 19) & 3) == G_IM_SIZ_32b);
+            ++tile;
+        }
+        if ((g->words.w0 >> 24) == G_LOADBLOCK)
+            REQUIRE((((g->words.w1 >> 12) & 0xfff) + 1) * 4 == sizeof(tiles[0].pixels));
+        if ((g->words.w0 >> 24) == G_SETTILESIZE) {
+            REQUIRE(((g->words.w1 >> 12) & 0xfff) == 31 * 4);
+            REQUIRE((g->words.w1 & 0xfff) == 31 * 4);
+        }
         if ((g->words.w0 >> 24) == G_SETPRIMCOLOR) REQUIRE(g->words.w1 == 0xFFFFFF7B);
         if ((g->words.w0 >> 24) == G_TEXRECT_WIDE) {
-            REQUIRE((g->words.w0 & 0xFFFFFF) == (left + width) * 4);
-            REQUIRE(g->words.w1 == (top + height) * 4);
-            REQUIRE((g[1].words.w0 & 0xFFFFFF) == left * 4);
-            REQUIRE(g[1].words.w1 == top * 4);
-            REQUIRE((g[2].words.w1 >> 16) == 32 * 1024 / width);
-            REQUIRE((g[2].words.w1 & 0xFFFF) == 32 * 1024 / height);
+            int x4 = left * 4 + (rectangle & 1) * width * 2;
+            int y4 = top * 4 + (rectangle >> 1) * height * 2;
+            REQUIRE((g->words.w0 & 0xFFFFFF) == x4 + width * 2);
+            REQUIRE(g->words.w1 == y4 + height * 2);
+            REQUIRE((g[1].words.w0 & 0xFFFFFF) == x4);
+            REQUIRE(g[1].words.w1 == y4);
+            REQUIRE((g[2].words.w1 >> 16) == MIN(65535, 64 * 1024 / width));
+            REQUIRE((g[2].words.w1 & 0xFFFF) == MIN(65535, 64 * 1024 / height));
+            ++rectangle;
         }
     }
+    REQUIRE(tile == 4 && rectangle == 4);
 }
 int main(void) {
     memset(&play, 0, sizeof(play));
@@ -93,12 +111,16 @@ int main(void) {
 #ifdef TEST_MM
     player.transformation = PLAYER_FORM_HUMAN;
 #endif
-    const char* textures[] = { NULL, FIRE_TEXTURE, ICE_TEXTURE, LIGHT_TEXTURE };
+    const SwordElementUiRgbaTile* textures[] = { NULL, sSwordElementUiFireArt, sSwordElementUiIceArt, sSwordElementUiLightArt };
     for (selected = 1; selected < SWORD_ELEMENT_COUNT; ++selected) {
         Draw(SWORD_ITEM, 0, 30, 30);
         CheckDraw(textures[selected], 220, 18, 12, 12);
         Draw(SWORD_ITEM, 0, 60, 60);
         CheckDraw(textures[selected], 240, 16, 24, 24);
+        Draw(SWORD_ITEM, 0, 33, 29);
+        CheckDraw(textures[selected], 222, 19, 13, 11);
+        Draw(SWORD_ITEM, 0, 1, 1);
+        CheckDraw(textures[selected], 201, 19, 1, 1);
     }
     selected = SWORD_ELEMENT_FIRE;
     Draw(ITEM_BOW, 0, 30, 30); REQUIRE(gfx.overlay.p == commands);
@@ -152,5 +174,5 @@ int main(void) {
     Draw(SWORD_ITEM, 0, 30, 30); REQUIRE(gfx.overlay.p == commands);
     selected = 9;
     Draw(SWORD_ITEM, 0, 30, 30); REQUIRE(gfx.overlay.p == commands);
-    puts("PASS sword HUD: native arrow textures, alpha, scaled rectangle/steps and inactive/action/transformation gates");
+    puts("PASS sword HUD: bundled RGBA art/load canaries, alpha, scaled/odd/tiny rectangles and steps and inactive/action/transformation gates");
 }

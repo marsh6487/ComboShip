@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Run the production B-sword badge with real engine structs, textures and GBI."""
+"""Run the production B-sword badge with real engine structs, bundled art and GBI."""
 import argparse
 import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 from run_time_pedestal_tests import functions
 
@@ -15,6 +16,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sanitize', action='store_true')
     args = parser.parse_args()
+    subprocess.run([sys.executable, '-B', str(ROOT / 'scripts/assets/build_sword_element_ui.py'), '--check'],
+                   cwd=ROOT, check=True)
     with tempfile.TemporaryDirectory(prefix='sword-hud-') as directory:
         build = Path(directory)
         for host in ('soh', 'mm'):
