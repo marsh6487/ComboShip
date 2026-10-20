@@ -139,11 +139,44 @@ loose repository XML is not read by this owner. A code-only rebuild therefore
 does not establish that the installed authored blade and grip match this source.
 The exact authored asset source identities are retained in the aura manifests.
 
-## Frozen source recovery checkpoint
+## Final source verification and recovery
 
 The bounded review has no remaining source findings after explicit pause and
 Play_Destroy teardown,32 sound requests per gameplay frame (including repeated
 draws and pause/resume), native graphics budget guards and idle actor guards.
-The Biggoron sanitizer/native/depth matrix passes in all four modes. A fresh
-four-mode finish matrix including the final teardown hook and the combined
-project regression gate are still pending at this recovery checkpoint.
+The Biggoron sanitizer/native/depth matrix passes in all four modes. The final
+teardown-inclusive finish matrix passes in all four modes and compiles38 full
+native objects. The complete16-command elemental gate passes. Its optional
+native C++ ice-arrow resource bridge was then explicitly enabled with --include
+and also passes in solo/Combo builds. Both native source menus compile in solo
+and Combo modes. All44 changed files selected by CI formatting rules pass exact
+clang-format14.0.6; deterministic generators, whitespace and asset-collision
+checks pass.
+
+The full elemental gate initially caught a missing identity-helper include in
+its extracted MM hand fixture; the shared fixture now includes the real helper.
+The broader project gate caught its crash-owner fixture's missing actor-observer
+boundary. That harness now uses typed observer functions and verifies active
+crash snapshots across nested, successful and failed updates; its sanitizer run
+passes. Neither repair changes production gameplay.
+
+The broader run passed37 commands before that crash fixture, then the repaired
+fixture and five continuation commands. It stops at reward-GI asset packaging
+because cmake is unavailable on PATH. Remaining broad commands are not claimed
+to pass. An earlier ImGui discovery failure was resolved using the existing
+pinned ImGui source via IMGUI_DIR. Exact commands, log hashes, passed scopes and
+the dependency blocker are indexed in elemental-swords-verification-20261020.json.
+
+The new finish core has full ASan/UBSan checks. Host fixtures exclude shift-base
+only for the untouched native signed-bit damage-flag idiom; address and remaining
+undefined-behavior checks stay enabled. Leak checking is disabled under the
+container's tracing restriction. No full application or Windows executable was
+built here.
+
+Keep this as an isolated source candidate. The reported authored Biggoron
+coverage, actual selector/full-overlay appearance and enemy visual/audio
+responses still require a configured gameplay pass. In particular compare the
+actual fit diagnostic and installed stock asset graph to the expected source
+identities, then inspect full/broken/progressive blades, all elements, element
+immunity, pause/resume and room/scene teardown. No develop merge or accepted
+master promotion is part of this checkpoint.

@@ -1,6 +1,7 @@
 #ifndef SWORD_AURA_HELD_FIXTURE_H
 #define SWORD_AURA_HELD_FIXTURE_H
 #include "mods/extended_equipment.h"
+#include "../../combo/render/sword_element_aura_identity.h"
 // Resource boundaries only. The runner includes the actual successful held
 // selector and native compositor bodies below; the submitted aura is production.
 static int auraHeldGraph;
