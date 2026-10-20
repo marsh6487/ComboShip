@@ -81,10 +81,6 @@ static Actor* Actor_Spawn(decltype(play.actorCtx)*, PlayState*, int id, float x,
     a->world.pos = { x, y, z };
     return a;
 }
-int sparkles = 0;
-static void EffectSsKiraKira_SpawnDispersed(PlayState*, Vec3f*, Vec3f*, Vec3f*, Color_RGBA8*, Color_RGBA8*, int, int) {
-    ++sparkles;
-}
 struct CustomMessage {
     static inline std::string text;
     CustomMessage(const char* message) {
@@ -127,8 +123,8 @@ int main() {
     assert(!ComboSoloForest_AtStump(spawned[0].world.pos.x, spawned[0].world.pos.y, spawned[0].world.pos.z));
     assert(std::hypot(spawned[0].world.pos.x + 486.0f, spawned[0].world.pos.z + 227.0f) > 250.0f);
     assert(spawned[1].params == 0x7E40 && spawned[1].world.pos.y == 12);
-    assert((spawned[1].world.pos.x + 695.0f) * std::cos(angle) -
-               (spawned[1].world.pos.z + 313.0f) * std::sin(angle) > 140.0f);
+    assert((spawned[1].world.pos.x + 695.0f) * std::cos(angle) - (spawned[1].world.pos.z + 313.0f) * std::sin(angle) >
+           140.0f);
     Update();
     assert(spawned.size() == 2);
     play.roomCtx.curRoom.num = 1;

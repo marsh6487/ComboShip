@@ -115,10 +115,9 @@ bool PackAvailable() {
     // packs remain optional; complete legacy packs retain compatibility.
     return std::all_of(std::begin(kNativeBlackMarketMmResources), std::end(kNativeBlackMarketMmResources),
                        [](const char* path) { return ResourceMgr_FileExists(path); }) ||
-           std::all_of(std::begin(kBlackMarketResources), std::end(kBlackMarketResources),
-                       [](const char* path) {
-                           return BlackMarketEntry::LegacyResourceAvailable(path, ResourceMgr_FileExists);
-                       });
+           std::all_of(std::begin(kBlackMarketResources), std::end(kBlackMarketResources), [](const char* path) {
+               return BlackMarketEntry::LegacyResourceAvailable(path, ResourceMgr_FileExists);
+           });
 }
 bool DestinationAvailable() {
     return std::all_of(BlackMarketEntry::kMmDestination.begin(), BlackMarketEntry::kMmDestination.end(),
@@ -264,8 +263,7 @@ void Purchase() {
 
 bool CustomKeeperAvailable() {
     return BlackMarketKeeperAssets::CustomAvailable(kBlackMarketResources, [](const char* path) {
-        return ResourceMgr_FileExists(path) ||
-               (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path));
+        return ResourceMgr_FileExists(path) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path));
     });
 }
 
@@ -332,12 +330,11 @@ void InitKeeper(Actor* actor) {
     sCustomKeeper = CustomKeeperAvailable();
     ActorShape_Init(&actor->shape, 0, nullptr, 0);
     Actor_SetScale(actor, BlackMarketKeeper::kScale);
-    SkelAnime_InitFlex(gPlayState, &gal->skelAnime,
-                       (FlexSkeletonHeader*)(sCustomKeeper ? kKeeper : BlackMarketKeeperAssets::kNativeSkeleton),
-                       (AnimationHeader*)(sCustomKeeper ? BlackMarketKeeper::kAnimation
-                                                       : BlackMarketKeeperAssets::kNativeAnimation),
-                       gal->jointTable, gal->morphTable,
-                       TREASURE_CHEST_SHOP_GAL_LIMB_MAX);
+    SkelAnime_InitFlex(
+        gPlayState, &gal->skelAnime,
+        (FlexSkeletonHeader*)(sCustomKeeper ? kKeeper : BlackMarketKeeperAssets::kNativeSkeleton),
+        (AnimationHeader*)(sCustomKeeper ? BlackMarketKeeper::kAnimation : BlackMarketKeeperAssets::kNativeAnimation),
+        gal->jointTable, gal->morphTable, TREASURE_CHEST_SHOP_GAL_LIMB_MAX);
     actor->update = KeeperUpdate;
     actor->draw = KeeperDraw;
     actor->destroy = nullptr; // native destructor changes minigame switches and timers
@@ -350,8 +347,7 @@ void InitKeeper(Actor* actor) {
 void PresentTitle() {
     if (!sTitlePending || !Active())
         return;
-    if (!ResourceMgr_FileExists(kCard) &&
-        !(ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(kCard))) {
+    if (!ResourceMgr_FileExists(kCard) && !(ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(kCard))) {
         sTitlePending = false;
         return;
     }
@@ -815,59 +811,80 @@ void LogDoorAttempt(PlayState* play, Actor* door, int result, const char* reason
     const auto* player = GET_PLAYER(play);
     const auto missing = BlackMarketEntry::Missing(BlackMarketEntry::kMmDestination, ResourceMgr_FileExists);
     nlohmann::json record = {
-        { "host", "mm" }, { "result", BlackMarketEntry::ResultName(result) }, { "reason", reason },
-        { "location", { { "mode", gComboGameMode }, { "scene", play->sceneId },
-                          { "room", play->roomCtx.curRoom.num }, { "layer", gSaveContext.sceneLayer },
-                          { "entrance", gSaveContext.save.entrance },
-                          { "cutscene_index", gSaveContext.save.cutsceneIndex } } },
-        { "recognition", { { "current_play", play == gPlayState }, { "exterior", Exterior(play) },
-                             { "marker_found", found },
-                             { "marker_matches", found && BlackMarketDoorNative::Matches(door, placed) },
-                             { "transition_actors", play->transitionActors.count },
-                             { "door_id", door ? door->id : -1 }, { "door_params", door ? door->params : -1 } } },
-        { "gates", { { "transition_idle", play->transitionTrigger == TRANS_TRIGGER_OFF &&
-                                              play->transitionMode == TRANS_MODE_OFF },
-                       { "native_state_ready", Safe(play) && player && player->doorActor == door &&
-                                                   player->actionFunc == Player_Action_36 &&
-                                                   gSaveContext.save.saveInfo.playerData.health > 0 },
-                       { "destination_ready", missing.empty() } } },
-        { "state", { { "current_game_state", gGameState == &play->state }, { "running", play->state.running },
-                       { "game_mode", gSaveContext.gameMode }, { "file", gSaveContext.fileNum },
-                       { "transition_trigger", play->transitionTrigger },
-                       { "transition_mode", play->transitionMode },
-                       { "pause", play->pauseCtx.state }, { "game_over", play->gameOverCtx.state },
-                       { "scene_cutscene", play->csCtx.state }, { "cutscene_trigger", gSaveContext.cutsceneTrigger },
-                       { "soaring_or_time_song", play->soaringCsOrSoTCsPlaying },
-                       { "player_present", player != nullptr },
-                       { "player_owns_door", player && player->doorActor == door },
-                       { "player_action_expected", player && player->actionFunc == Player_Action_36 },
-                       { "player_door_type", player ? player->doorType : -1 },
-                       { "player_form", player ? player->transformation : -1 },
-                       { "health", gSaveContext.save.saveInfo.playerData.health } } },
+        { "host", "mm" },
+        { "result", BlackMarketEntry::ResultName(result) },
+        { "reason", reason },
+        { "location",
+          { { "mode", gComboGameMode },
+            { "scene", play->sceneId },
+            { "room", play->roomCtx.curRoom.num },
+            { "layer", gSaveContext.sceneLayer },
+            { "entrance", gSaveContext.save.entrance },
+            { "cutscene_index", gSaveContext.save.cutsceneIndex } } },
+        { "recognition",
+          { { "current_play", play == gPlayState },
+            { "exterior", Exterior(play) },
+            { "marker_found", found },
+            { "marker_matches", found && BlackMarketDoorNative::Matches(door, placed) },
+            { "transition_actors", play->transitionActors.count },
+            { "door_id", door ? door->id : -1 },
+            { "door_params", door ? door->params : -1 } } },
+        { "gates",
+          { { "transition_idle",
+              play->transitionTrigger == TRANS_TRIGGER_OFF && play->transitionMode == TRANS_MODE_OFF },
+            { "native_state_ready", Safe(play) && player && player->doorActor == door &&
+                                        player->actionFunc == Player_Action_36 &&
+                                        gSaveContext.save.saveInfo.playerData.health > 0 },
+            { "destination_ready", missing.empty() } } },
+        { "state",
+          { { "current_game_state", gGameState == &play->state },
+            { "running", play->state.running },
+            { "game_mode", gSaveContext.gameMode },
+            { "file", gSaveContext.fileNum },
+            { "transition_trigger", play->transitionTrigger },
+            { "transition_mode", play->transitionMode },
+            { "pause", play->pauseCtx.state },
+            { "game_over", play->gameOverCtx.state },
+            { "scene_cutscene", play->csCtx.state },
+            { "cutscene_trigger", gSaveContext.cutsceneTrigger },
+            { "soaring_or_time_song", play->soaringCsOrSoTCsPlaying },
+            { "player_present", player != nullptr },
+            { "player_owns_door", player && player->doorActor == door },
+            { "player_action_expected", player && player->actionFunc == Player_Action_36 },
+            { "player_door_type", player ? player->doorType : -1 },
+            { "player_form", player ? player->transformation : -1 },
+            { "health", gSaveContext.save.saveInfo.playerData.health } } },
         { "market", BlackMarketEntry::MarketState(sSession, gSaveContext.fileNum) },
-        { "travel", { { "entering", sEntering }, { "return_pending", sReturnPending }, { "door_armed", sDoorArmed },
-                        { "slot", sTravelSlot }, { "seed", sTravelSeed },
-                        { "respawn_flag", gSaveContext.respawnFlag } } },
-        { "resources", { { "destination_missing", missing },
-                           { "manifest_raw", ResourceMgr_FileExists(BlackMarketEntry::kManifest) != 0 },
-                           { "manifest_cache_key", ResourceMgr_FileExists(BlackMarketEntry::kManifestKey) != 0 } } }
+        { "travel",
+          { { "entering", sEntering },
+            { "return_pending", sReturnPending },
+            { "door_armed", sDoorArmed },
+            { "slot", sTravelSlot },
+            { "seed", sTravelSeed },
+            { "respawn_flag", gSaveContext.respawnFlag } } },
+        { "resources",
+          { { "destination_missing", missing },
+            { "manifest_raw", ResourceMgr_FileExists(BlackMarketEntry::kManifest) != 0 },
+            { "manifest_cache_key", ResourceMgr_FileExists(BlackMarketEntry::kManifestKey) != 0 } } }
     };
-    record["checks"] = {
-        { "door_recognized",
-          play == gPlayState && Exterior(play) && found && BlackMarketDoorNative::Matches(door, placed) },
-        { "game_state_current", gGameState == &play->state }, { "running", play->state.running != 0 },
-        { "normal_mode", gSaveContext.gameMode == GAMEMODE_NORMAL },
-        { "playable_slot", ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) != 0 },
-        { "transition_idle", play->transitionTrigger == TRANS_TRIGGER_OFF && play->transitionMode == TRANS_MODE_OFF },
-        { "pause_closed", play->pauseCtx.state == PAUSE_STATE_OFF },
-        { "game_over_inactive", play->gameOverCtx.state == GAMEOVER_INACTIVE },
-        { "scene_cutscene_idle", play->csCtx.state == CS_STATE_IDLE },
-        { "cutscene_not_pending", !gSaveContext.cutsceneTrigger },
-        { "time_song_idle", !play->soaringCsOrSoTCsPlaying }, { "player_present", player != nullptr },
-        { "player_owns_door", player && player->doorActor == door },
-        { "player_action_expected", player && player->actionFunc == Player_Action_36 },
-        { "alive", gSaveContext.save.saveInfo.playerData.health > 0 }, { "destination_ready", missing.empty() }
-    };
+    record["checks"] = { { "door_recognized", play == gPlayState && Exterior(play) && found &&
+                                                  BlackMarketDoorNative::Matches(door, placed) },
+                         { "game_state_current", gGameState == &play->state },
+                         { "running", play->state.running != 0 },
+                         { "normal_mode", gSaveContext.gameMode == GAMEMODE_NORMAL },
+                         { "playable_slot", ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) != 0 },
+                         { "transition_idle",
+                           play->transitionTrigger == TRANS_TRIGGER_OFF && play->transitionMode == TRANS_MODE_OFF },
+                         { "pause_closed", play->pauseCtx.state == PAUSE_STATE_OFF },
+                         { "game_over_inactive", play->gameOverCtx.state == GAMEOVER_INACTIVE },
+                         { "scene_cutscene_idle", play->csCtx.state == CS_STATE_IDLE },
+                         { "cutscene_not_pending", !gSaveContext.cutsceneTrigger },
+                         { "time_song_idle", !play->soaringCsOrSoTCsPlaying },
+                         { "player_present", player != nullptr },
+                         { "player_owns_door", player && player->doorActor == door },
+                         { "player_action_expected", player && player->actionFunc == Player_Action_36 },
+                         { "alive", gSaveContext.save.saveInfo.playerData.health > 0 },
+                         { "destination_ready", missing.empty() } };
     record["failed_checks"] = BlackMarketEntry::FailedChecks(record["checks"]);
     if (!missing.empty()) {
         record["resources"]["native_missing"] =
@@ -879,13 +896,16 @@ void LogDoorAttempt(PlayState* play, Actor* door, int result, const char* reason
     SPDLOG_INFO("[BlackMarketDoor] {}", record.dump());
 }
 void LogEntryRecovery() {
-    const nlohmann::json record = {
-        { "host", "mm" }, { "file", gSaveContext.fileNum }, { "entering", sEntering },
-        { "travel_matches", MatchesTravel() }, { "travel_slot", sTravelSlot }, { "travel_seed", sTravelSeed },
-        { "seed", gSaveContext.save.shipSaveInfo.rando.finalSeed }, { "respawn_flag", gSaveContext.respawnFlag },
-        { "destination_ready", DestinationAvailable() },
-        { "market", BlackMarketEntry::MarketState(sSession, gSaveContext.fileNum) }
-    };
+    const nlohmann::json record = { { "host", "mm" },
+                                    { "file", gSaveContext.fileNum },
+                                    { "entering", sEntering },
+                                    { "travel_matches", MatchesTravel() },
+                                    { "travel_slot", sTravelSlot },
+                                    { "travel_seed", sTravelSeed },
+                                    { "seed", gSaveContext.save.shipSaveInfo.rando.finalSeed },
+                                    { "respawn_flag", gSaveContext.respawnFlag },
+                                    { "destination_ready", DestinationAvailable() },
+                                    { "market", BlackMarketEntry::MarketState(sSession, gSaveContext.fileNum) } };
     SPDLOG_INFO("[BlackMarketReturn] {}", record.dump());
 }
 } // namespace

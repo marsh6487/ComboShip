@@ -14307,6 +14307,15 @@ void Player_Update(Actor* thisx, PlayState* play) {
 
     GameInteractor_ExecuteOnPassPlayerInputs(&input);
 
+#ifdef COMBO_BUILD
+    // Keep the raw pad for the choice box; native and custom movement consume
+    // only this local copy, even if an action just cleared the freeze flag.
+    if (MagicMirror_PromptOwnsPlayer(play, this)) {
+        memset(&input, 0, sizeof(input));
+        MagicMirrorPlayer_StopMotion(this);
+    }
+#endif
+
     // SoH z_player.c:13146-13155 — yield gate. PAUSE_ACTION_FUNC tells
     // Player_UpdateCommon to skip the vanilla actionFunc dispatch so Mario
     // takes over movement/animation. Specific interactions (talk, carry,

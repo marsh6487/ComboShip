@@ -14,6 +14,9 @@ static MagicMirrorAnchor::Point sAnchor{};
 static PlayState* sPromptPlay = nullptr;
 static Player* sPromptPlayer = nullptr;
 static u32 sPromptAddedFlags = 0;
+// The menu's closing A/B/stick belongs to the prompt until the next input tick.
+static PlayState* sPromptInputPlay = nullptr;
+static Player* sPromptInputPlayer = nullptr;
 static PlayState* sCastPlay = nullptr;
 static Player* sCastPlayer = nullptr;
 static bool sDeparted = false;
@@ -82,6 +85,8 @@ void Reset() {
     sContext = {};
     sPickupToken = 0;
     sPrompt = sAnchorValid = false;
+    sPromptInputPlay = nullptr;
+    sPromptInputPlayer = nullptr;
     sCollision = nullptr;
 }
 void Destroy() {
@@ -180,6 +185,30 @@ bool Safe(PlayState* play, bool ownMessage) {
         return false;
 #endif
     return ownMessage || (play->msgCtx.msgMode == MSGMODE_NONE && !Player_InCsMode(play) && !MirrorHost::Busy(play));
+}
+void HoldPrompt() {
+    // Native action changes clear this bit. Reacquire only the bits this
+    // prompt now adds, so release still preserves a pre-existing owner.
+    sPromptAddedFlags |= kPromptFreeze & ~sPromptPlayer->stateFlags1;
+    sPromptPlayer->stateFlags1 |= kPromptFreeze;
+    MagicMirrorPlayer_StopMotion(sPromptPlayer);
+}
+bool PromptOwnsPlayer(PlayState* play, const Player* player) {
+    // This independent ownership survives a native action clearing its flags.
+    // Never inspect an old actor after scene/file/player replacement.
+    if (!(sPrompt && play == sPromptPlay && player == sPromptPlayer) &&
+        !(sPromptInputPlay && play == sPromptInputPlay && player == sPromptInputPlayer))
+        return false;
+    if (!play || play != gPlayState || gGameState != &play->state || GET_PLAYER(play) != player || !Matches(play) ||
+        !Safe(play, true) || !MagicMirror_IsOwned())
+        return false;
+    return (play == sPromptInputPlay && player == sPromptInputPlayer) ||
+           (sPrompt && play == sPromptPlay && player == sPromptPlayer && CurrentText(play) == kPromptText &&
+            play->msgCtx.msgMode != MSGMODE_NONE && play->msgCtx.msgMode != MSGMODE_TEXT_CLOSING);
+}
+void ConsumePromptInput(PlayState* play) {
+    sPromptInputPlay = play;
+    sPromptInputPlayer = GET_PLAYER(play);
 }
 bool Travel(PlayState* play, bool casting = false) {
     if (casting && (!play || play != sCastPlay || GET_PLAYER(play) != sCastPlayer ||
@@ -369,6 +398,9 @@ u16 PressedButton(PlayState* play) {
     return 0;
 }
 void Update() {
+    // OnGameStateMainStart runs once before native player/message updates.
+    sPromptInputPlay = nullptr;
+    sPromptInputPlayer = nullptr;
     auto* play = gPlayState;
     Bind(play);
     if (!play || !Mode())
@@ -390,16 +422,20 @@ void Update() {
     }
     if (sPrompt) {
         const auto text = CurrentText(play);
-        if (text != kPromptText || !Safe(play, true) || !MagicMirror_IsOwned()) {
+        if (play != sPromptPlay || GET_PLAYER(play) != sPromptPlayer || text != kPromptText || !Safe(play, true) ||
+            !MagicMirror_IsOwned()) {
             ReleasePrompt(text == kPromptText);
             return;
         }
+        HoldPrompt();
         if (play->state.input[0].press.button & BTN_B) {
+            ConsumePromptInput(play);
             ReleasePrompt(true);
             return;
         }
         if (Message_GetState(&play->msgCtx) == TEXT_STATE_CHOICE && Message_ShouldAdvance(play)) {
             const bool yes = play->msgCtx.choiceIndex == 0;
+            ConsumePromptInput(play);
             ReleasePrompt(true);
             // The message has completed, but its final native closing frame
             // can still report a textbox. Recheck every other safety gate.
@@ -439,8 +475,7 @@ void Update() {
     sPrompt = true;
     sPromptPlay = play;
     sPromptPlayer = GET_PLAYER(play);
-    sPromptAddedFlags = kPromptFreeze & ~sPromptPlayer->stateFlags1;
-    sPromptPlayer->stateFlags1 |= kPromptFreeze;
+    HoldPrompt();
     play->state.input[0].press.button &= ~pressed;
     MirrorHost::OpenPrompt();
 }
@@ -475,6 +510,9 @@ void DrawWorld() {
 }
 } // namespace MirrorRuntime
 
+extern "C" int MagicMirror_PromptOwnsPlayer(PlayState* play, const Player* player) {
+    return MirrorRuntime::PromptOwnsPlayer(play, player);
+}
 extern "C" void MagicMirror_QueueArrival(void) {
     MirrorRuntime::QueueArrival();
 }

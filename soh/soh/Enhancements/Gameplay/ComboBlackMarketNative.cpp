@@ -105,10 +105,9 @@ bool PackAvailable() {
             (CustomKeeperAvailable() || LoadNativeKeeper()))
             return true;
     }
-    return std::all_of(std::begin(kBlackMarketResources), std::end(kBlackMarketResources),
-                       [](const char* path) {
-                           return BlackMarketEntry::LegacyResourceAvailable(path, ResourceMgr_FileExists);
-                       });
+    return std::all_of(std::begin(kBlackMarketResources), std::end(kBlackMarketResources), [](const char* path) {
+        return BlackMarketEntry::LegacyResourceAvailable(path, ResourceMgr_FileExists);
+    });
 }
 bool DestinationAvailable() {
     return std::all_of(BlackMarketEntry::kOotDestination.begin(), BlackMarketEntry::kOotDestination.end(),
@@ -271,16 +270,15 @@ void Purchase() {
 
 bool CustomKeeperAvailable() {
     return BlackMarketKeeperAssets::CustomAvailable(kBlackMarketResources, [](const char* path) {
-        return ResourceMgr_FileExists(path) ||
-               (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path));
+        return ResourceMgr_FileExists(path) || (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path));
     });
 }
 bool LoadNativeKeeper() {
     if (!sNativeKeeperReady) {
         // The archive-scoped importers pin this private model for renderer use.
         // Keep a successful preflight alive and retry only incomplete imports.
-        sNativeKeeperReady = sNativeKeeper.Load(MmAssets_LoadSkeleton, MmAssets_LoadAnimation, MmAssets_LoadResourceStrict,
-                                                MmAssets_LoadDisplayListGraphStrict);
+        sNativeKeeperReady = sNativeKeeper.Load(MmAssets_LoadSkeleton, MmAssets_LoadAnimation,
+                                                MmAssets_LoadResourceStrict, MmAssets_LoadDisplayListGraphStrict);
     }
     return sNativeKeeperReady;
 }
@@ -353,8 +351,7 @@ void KeeperInit(Actor* actor, PlayState* play) {
     ActorShape_Init(&actor->shape, 0, nullptr, 0);
     Actor_SetScale(actor, BlackMarketKeeper::kScale);
     actor->flags = ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY | ACTOR_FLAG_UPDATE_CULLING_DISABLED;
-    SkelAnime_InitFlex(play, &sKeeper.skel,
-                       sCustomKeeper ? (FlexSkeletonHeader*)kKeeper : &sNativeKeeper.skeleton,
+    SkelAnime_InitFlex(play, &sKeeper.skel, sCustomKeeper ? (FlexSkeletonHeader*)kKeeper : &sNativeKeeper.skeleton,
                        sCustomKeeper ? (AnimationHeader*)BlackMarketKeeper::kAnimation : sNativeKeeper.animation,
                        sKeeper.joints, sKeeper.morphs, kLimbCount);
     actor->update = KeeperUpdate;
@@ -479,8 +476,7 @@ void DrawSeal(PlayState* play, const BlackMarketVisual::Frame& frame, bool selec
 }
 
 void PresentTitle() {
-    if (!ResourceMgr_FileExists(kCard) &&
-        !(ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(kCard)))
+    if (!ResourceMgr_FileExists(kCard) && !(ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(kCard)))
         return;
     // TitleCard_InitPlaceName rejects new scene IDs and rewrites language
     // suffixes. Initialize its ordinary native context with our private card;
@@ -773,57 +769,79 @@ void LogDoorAttempt(PlayState* play, Actor* door, int result, const char* reason
     const auto* player = GET_PLAYER(play);
     const auto missing = BlackMarketEntry::Missing(BlackMarketEntry::kOotDestination, ResourceMgr_FileExists);
     nlohmann::json record = {
-        { "host", "oot" }, { "result", BlackMarketEntry::ResultName(result) }, { "reason", reason },
-        { "location", { { "mode", gComboGameMode }, { "scene", play->sceneNum },
-                          { "room", play->roomCtx.curRoom.num }, { "layer", gSaveContext.sceneLayer },
-                          { "entrance", gSaveContext.entranceIndex },
-                          { "cutscene_index", gSaveContext.cutsceneIndex } } },
-        { "recognition", { { "current_play", play == gPlayState }, { "exterior", Exterior(play) },
-                             { "marker_actor", OotBlackMarketDoorNative::MarkerActor(play, door) },
-                             { "marker_found", found },
-                             { "marker_matches", found && OotBlackMarketDoorNative::Matches(door, placed) },
-                             { "transition_actors", play->transiActorCtx.numActors },
-                             { "door_id", door ? door->id : -1 }, { "door_params", door ? door->params : -1 } } },
-        { "gates", { { "transition_idle", play->transitionTrigger == TRANS_TRIGGER_OFF &&
-                                              play->transitionMode == TRANS_MODE_OFF },
-                       { "native_state_ready", found && Safe(play) && player && player->doorActor == door &&
-                                                   player->doorType == PLAYER_DOORTYPE_HANDLE &&
-                                                   player->actionFunc == Player_Action_80845EF8 &&
-                                                   gSaveContext.health > 0 },
-                       { "destination_ready", missing.empty() } } },
-        { "state", { { "running", play->state.running }, { "game_mode", gSaveContext.gameMode },
-                       { "file", gSaveContext.fileNum }, { "transition_trigger", play->transitionTrigger },
-                       { "transition_mode", play->transitionMode }, { "pause", play->pauseCtx.state },
-                       { "game_over", play->gameOverCtx.state }, { "scene_cutscene", play->csCtx.state },
-                       { "cutscene_trigger", gSaveContext.cutsceneTrigger }, { "player_present", player != nullptr },
-                       { "player_owns_door", player && player->doorActor == door },
-                       { "player_action_expected", player && player->actionFunc == Player_Action_80845EF8 },
-                       { "player_door_type", player ? player->doorType : -1 }, { "health", gSaveContext.health },
-                       { "native_keeper_ready", sNativeKeeperReady } } },
+        { "host", "oot" },
+        { "result", BlackMarketEntry::ResultName(result) },
+        { "reason", reason },
+        { "location",
+          { { "mode", gComboGameMode },
+            { "scene", play->sceneNum },
+            { "room", play->roomCtx.curRoom.num },
+            { "layer", gSaveContext.sceneLayer },
+            { "entrance", gSaveContext.entranceIndex },
+            { "cutscene_index", gSaveContext.cutsceneIndex } } },
+        { "recognition",
+          { { "current_play", play == gPlayState },
+            { "exterior", Exterior(play) },
+            { "marker_actor", OotBlackMarketDoorNative::MarkerActor(play, door) },
+            { "marker_found", found },
+            { "marker_matches", found && OotBlackMarketDoorNative::Matches(door, placed) },
+            { "transition_actors", play->transiActorCtx.numActors },
+            { "door_id", door ? door->id : -1 },
+            { "door_params", door ? door->params : -1 } } },
+        { "gates",
+          { { "transition_idle",
+              play->transitionTrigger == TRANS_TRIGGER_OFF && play->transitionMode == TRANS_MODE_OFF },
+            { "native_state_ready", found && Safe(play) && player && player->doorActor == door &&
+                                        player->doorType == PLAYER_DOORTYPE_HANDLE &&
+                                        player->actionFunc == Player_Action_80845EF8 && gSaveContext.health > 0 },
+            { "destination_ready", missing.empty() } } },
+        { "state",
+          { { "running", play->state.running },
+            { "game_mode", gSaveContext.gameMode },
+            { "file", gSaveContext.fileNum },
+            { "transition_trigger", play->transitionTrigger },
+            { "transition_mode", play->transitionMode },
+            { "pause", play->pauseCtx.state },
+            { "game_over", play->gameOverCtx.state },
+            { "scene_cutscene", play->csCtx.state },
+            { "cutscene_trigger", gSaveContext.cutsceneTrigger },
+            { "player_present", player != nullptr },
+            { "player_owns_door", player && player->doorActor == door },
+            { "player_action_expected", player && player->actionFunc == Player_Action_80845EF8 },
+            { "player_door_type", player ? player->doorType : -1 },
+            { "health", gSaveContext.health },
+            { "native_keeper_ready", sNativeKeeperReady } } },
         { "market", BlackMarketEntry::MarketState(sSession, gSaveContext.fileNum) },
-        { "travel", { { "entering", sEntering }, { "return_pending", sReturnPending }, { "door_armed", sDoorArmed },
-                        { "slot", sTravelSlot }, { "seed", sTravelSeed },
-                        { "respawn_flag", gSaveContext.respawnFlag } } },
-        { "resources", { { "destination_missing", missing },
-                           { "manifest_raw", ResourceMgr_FileExists(BlackMarketEntry::kManifest) != 0 },
-                           { "manifest_cache_key", ResourceMgr_FileExists(BlackMarketEntry::kManifestKey) != 0 } } }
+        { "travel",
+          { { "entering", sEntering },
+            { "return_pending", sReturnPending },
+            { "door_armed", sDoorArmed },
+            { "slot", sTravelSlot },
+            { "seed", sTravelSeed },
+            { "respawn_flag", gSaveContext.respawnFlag } } },
+        { "resources",
+          { { "destination_missing", missing },
+            { "manifest_raw", ResourceMgr_FileExists(BlackMarketEntry::kManifest) != 0 },
+            { "manifest_cache_key", ResourceMgr_FileExists(BlackMarketEntry::kManifestKey) != 0 } } }
     };
-    record["checks"] = {
-        { "door_recognized",
-          play == gPlayState && Exterior(play) && OotBlackMarketDoorNative::MarkerActor(play, door) },
-        { "unique_marker", found },
-        { "running", play->state.running != 0 }, { "normal_mode", gSaveContext.gameMode == GAMEMODE_NORMAL },
-        { "playable_slot", ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) != 0 },
-        { "transition_idle", play->transitionTrigger == TRANS_TRIGGER_OFF && play->transitionMode == TRANS_MODE_OFF },
-        { "pause_closed", play->pauseCtx.state == 0 },
-        { "game_over_inactive", play->gameOverCtx.state == GAMEOVER_INACTIVE },
-        { "scene_cutscene_idle", play->csCtx.state == CS_STATE_IDLE },
-        { "cutscene_not_pending", !gSaveContext.cutsceneTrigger }, { "player_present", player != nullptr },
-        { "player_owns_door", player && player->doorActor == door },
-        { "door_type_handle", player && player->doorType == PLAYER_DOORTYPE_HANDLE },
-        { "player_action_expected", player && player->actionFunc == Player_Action_80845EF8 },
-        { "alive", gSaveContext.health > 0 }, { "destination_ready", missing.empty() }
-    };
+    record["checks"] = { { "door_recognized",
+                           play == gPlayState && Exterior(play) && OotBlackMarketDoorNative::MarkerActor(play, door) },
+                         { "unique_marker", found },
+                         { "running", play->state.running != 0 },
+                         { "normal_mode", gSaveContext.gameMode == GAMEMODE_NORMAL },
+                         { "playable_slot", ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) != 0 },
+                         { "transition_idle",
+                           play->transitionTrigger == TRANS_TRIGGER_OFF && play->transitionMode == TRANS_MODE_OFF },
+                         { "pause_closed", play->pauseCtx.state == 0 },
+                         { "game_over_inactive", play->gameOverCtx.state == GAMEOVER_INACTIVE },
+                         { "scene_cutscene_idle", play->csCtx.state == CS_STATE_IDLE },
+                         { "cutscene_not_pending", !gSaveContext.cutsceneTrigger },
+                         { "player_present", player != nullptr },
+                         { "player_owns_door", player && player->doorActor == door },
+                         { "door_type_handle", player && player->doorType == PLAYER_DOORTYPE_HANDLE },
+                         { "player_action_expected", player && player->actionFunc == Player_Action_80845EF8 },
+                         { "alive", gSaveContext.health > 0 },
+                         { "destination_ready", missing.empty() } };
     record["failed_checks"] = BlackMarketEntry::FailedChecks(record["checks"]);
     if (!missing.empty()) {
         record["resources"]["native_missing"] =
@@ -839,13 +857,16 @@ void LogDoorAttempt(PlayState* play, Actor* door, int result, const char* reason
     SPDLOG_INFO("[BlackMarketDoor] {}", record.dump());
 }
 void LogEntryRecovery() {
-    const nlohmann::json record = {
-        { "host", "oot" }, { "file", gSaveContext.fileNum }, { "entering", sEntering },
-        { "travel_matches", MatchesTravel() }, { "travel_slot", sTravelSlot }, { "travel_seed", sTravelSeed },
-        { "seed", Seed() }, { "respawn_flag", gSaveContext.respawnFlag },
-        { "destination_ready", DestinationAvailable() },
-        { "market", BlackMarketEntry::MarketState(sSession, gSaveContext.fileNum) }
-    };
+    const nlohmann::json record = { { "host", "oot" },
+                                    { "file", gSaveContext.fileNum },
+                                    { "entering", sEntering },
+                                    { "travel_matches", MatchesTravel() },
+                                    { "travel_slot", sTravelSlot },
+                                    { "travel_seed", sTravelSeed },
+                                    { "seed", Seed() },
+                                    { "respawn_flag", gSaveContext.respawnFlag },
+                                    { "destination_ready", DestinationAvailable() },
+                                    { "market", BlackMarketEntry::MarketState(sSession, gSaveContext.fileNum) } };
     SPDLOG_INFO("[BlackMarketReturn] {}", record.dump());
 }
 } // namespace

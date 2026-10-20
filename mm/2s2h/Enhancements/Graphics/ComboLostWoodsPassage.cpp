@@ -7,8 +7,8 @@
 #include "../../../../combo/entrances/LostWoodsEntrance.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "2s2h/Enhancements/Gameplay/ComboSoloForest.h"
-#include "ComboForestPortalEffect.h"
-#include "WoodsMysteryHexEffect.h"
+#include "actors/ForestGiParticles.h"
+#include "../../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "WoodsMysteryMakeover.h"
 #include "WoodsMysteryNativeBridge.h"
 #include "AutumnSceneFoliage.h"
@@ -104,99 +104,35 @@ static void DrawPassage() {
 static void DrawPortalFinish() {
     PlayState* play = gPlayState;
     if (!ComboOpeningForest_IsExploration(play) || play->roomCtx.curRoom.num != 0 || !play->linkActorEntry ||
-        play->csCtx.state != CS_STATE_IDLE)
+        play->csCtx.state != CS_STATE_IDLE || play->pauseCtx.state != PAUSE_STATE_OFF)
         return;
     const int version = ComboOpeningForest_ReturnPackVersion(play);
     if (version == 1 || version == 2)
         return; // Older meshes retain their own visible location and treatment.
-    using namespace ComboForestPortalEffect;
-    const bool packed = version >= 3 && version <= 8;
-    std::array<ComboForestPortalEffect::Vertex, kVertexCount> shape;
-    Build(play->gameplayFrames, packed, shape);
-    // Each submitted frame owns its vertices until its display lists finish.
-    auto* vertices = static_cast<Vtx*>(GRAPH_ALLOC(play->state.gfxCtx, sizeof(Vtx) * kVertexCount));
-    if (!vertices)
-        return;
-    for (int i = 0; i < kVertexCount; ++i) {
-        vertices[i] = {};
-        vertices[i].v.ob[0] = static_cast<s16>(shape[i].x);
-        vertices[i].v.ob[1] = static_cast<s16>(shape[i].y);
-        vertices[i].v.ob[2] = packed ? 10 : 1;
-        vertices[i].v.cn[0] = shape[i].r;
-        vertices[i].v.cn[1] = shape[i].g;
-        vertices[i].v.cn[2] = shape[i].b;
-        vertices[i].v.cn[3] = shape[i].a;
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
     Matrix_Push();
     const Vec3f anchor = ComboOpeningForest_ReturnAnchor(play);
     Matrix_Translate(anchor.x, anchor.y, anchor.z, MTXMODE_NEW);
     Matrix_RotateYS(ComboOpeningForest_ReturnYaw(play), MTXMODE_APPLY);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_FOG | G_CULL_BOTH);
-    gSPTexture(POLY_XLU_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
-    gDPSetRenderMode(POLY_XLU_DISP++, G_RM_PASS, G_RM_AA_ZB_XLU_SURF2);
-    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_SHADE, G_CC_SHADE);
-    for (int i = 0; i < kRimSegments; ++i) {
-        gSPVertex(POLY_XLU_DISP++, reinterpret_cast<uintptr_t>(&vertices[i * 4]), 4, 0);
-        gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
-    }
-    for (int i = 0; i < kGlints; ++i) {
-        gSPVertex(POLY_XLU_DISP++, reinterpret_cast<uintptr_t>(&vertices[kRimSegments * 4 + i * 5]), 5, 0);
-        gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
-        gSP2Triangles(POLY_XLU_DISP++, 0, 3, 4, 0, 0, 4, 1, 0);
-    }
+    const bool packed = version >= 3 && version <= 8;
+    const auto mesh = ForestGiParticles::Portal(play->gameplayFrames, packed, NeiGi_CameraBasis(play));
+    NeiGi_DrawWorldParticles(play, mesh);
     Matrix_Pop();
-    gDPPipeSync(POLY_XLU_DISP++);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 static void DrawWoodsMysteryHexes() {
     if (!Combo_IsCombinedGame() && !ComboSoloForestMm_PassageAvailable())
         return;
     PlayState* play = gPlayState;
-    if ((!WoodsMysteryMakeover::Active(play) && !WoodsMysteryNativeBridge::Active(play)) ||
-        gSaveContext.gameMode != GAMEMODE_NORMAL || play->csCtx.state != CS_STATE_IDLE)
+    if (!play || (!WoodsMysteryMakeover::Active(play) && !WoodsMysteryNativeBridge::Active(play)) ||
+        gSaveContext.gameMode != GAMEMODE_NORMAL || play->csCtx.state != CS_STATE_IDLE ||
+        play->pauseCtx.state != PAUSE_STATE_OFF)
         return;
-    using namespace WoodsMysteryHexEffect;
-    std::array<WoodsMysteryHexEffect::Vertex, kVertexCount> shape;
-    Build(play->gameplayFrames, shape);
-    auto* vertices = static_cast<Vtx*>(GRAPH_ALLOC(play->state.gfxCtx, sizeof(Vtx) * kVertexCount));
-    if (!vertices)
-        return;
-    for (int i = 0; i < kVertexCount; ++i) {
-        vertices[i] = {};
-        vertices[i].v.ob[0] = static_cast<s16>(shape[i].x);
-        vertices[i].v.ob[1] = static_cast<s16>(shape[i].y);
-        vertices[i].v.ob[2] = static_cast<s16>(shape[i].z);
-        vertices[i].v.cn[0] = shape[i].r;
-        vertices[i].v.cn[1] = shape[i].g;
-        vertices[i].v.cn[2] = shape[i].b;
-        vertices[i].v.cn[3] = shape[i].a;
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
     Matrix_Push();
     Matrix_Translate(WoodsMysteryMakeover::kMouthX, 0.0f, WoodsMysteryMakeover::kMouthZ, MTXMODE_NEW);
     Matrix_RotateYS(WoodsMysteryMakeover::kMouthYaw, MTXMODE_APPLY);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_FOG | G_CULL_BOTH);
-    gSPTexture(POLY_XLU_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
-    gDPSetRenderMode(POLY_XLU_DISP++, G_RM_PASS, G_RM_AA_ZB_XLU_SURF2);
-    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_SHADE, G_CC_SHADE);
-    for (int h = 0; h < kHexes; ++h) {
-        gSPVertex(POLY_XLU_DISP++, reinterpret_cast<uintptr_t>(&vertices[h * 12]), 12, 0);
-        for (int i = 0; i < 6; ++i) {
-            const int j = (i + 1) % 6;
-            gSP2Triangles(POLY_XLU_DISP++, i, j, j + 6, 0, i, j + 6, i + 6, 0);
-        }
-    }
+    const auto mesh = ForestGiParticles::Mystery(play->gameplayFrames, NeiGi_CameraBasis(play));
+    NeiGi_DrawWorldParticles(play, mesh);
     Matrix_Pop();
-    gDPPipeSync(POLY_XLU_DISP++);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 namespace {

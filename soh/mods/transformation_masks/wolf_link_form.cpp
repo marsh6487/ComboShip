@@ -39,6 +39,9 @@
 #include "macros.h"
 #include "functions.h"
 #include "variables.h"
+#ifdef COMBO_BUILD
+#include "gameplay/MagicMirrorPlayer.h"
+#endif
 #include "mods/transformation_masks/wolf_link_form.h"
 #include "soh/frame_interpolation.h"
 
@@ -781,7 +784,11 @@ static WolfInput ReadInput(Player* player, PlayState* play) {
                     PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_CLIMBING_LEDGE | PLAYER_STATE1_HANGING_OFF_LEDGE |
                     PLAYER_STATE1_FIRST_PERSON | PLAYER_STATE1_CLIMBING_LADDER | PLAYER_STATE1_IN_ITEM_CS |
                     PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_IN_WATER | PLAYER_STATE1_ON_HORSE;
-    if (player->stateFlags1 & blockMask) {
+    if ((player->stateFlags1 & blockMask)
+#ifdef COMBO_BUILD
+        || MagicMirror_PromptOwnsPlayer(play, player)
+#endif
+    ) {
         in.aPress = in.bPress = 0;
         in.blocked = 1;
     }

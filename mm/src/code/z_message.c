@@ -3606,7 +3606,10 @@ void Message_OpenText(PlayState* play, u16 textId) {
             msgCtx->unk11FF8 = 0x32;
             var_fv0 = 1.4;
         }
-    } else if (textId >= 0x4E20) {
+    } else if (loadFromMessageTable && (textId >= 0x4E20)) {
+        // Custom hooks load normal MM-format text even when their private IDs
+        // overlap the native credits range. Only table-backed text uses that
+        // range to select the credits controls and decoder.
         msgCtx->textIsCredits = true;
         msgCtx->textCharScale = 0.85f;
         msgCtx->unk11FFC = 6;

@@ -808,6 +808,12 @@ static void NeiGi_DrawShimmerMesh(PlayState* play, const NeiGi::Mesh& mesh, cons
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+void NeiGi_DrawWorldParticles(PlayState* play, const NeiGi::Mesh& mesh) {
+    if (!play || !play->state.gfxCtx)
+        return;
+    NeiGi_DrawShimmerMesh(play, mesh, nullptr);
+}
+
 // A single two-color mesh keeps the Chateau's gold and burgundy motes distinct.
 // Native C and C++ draw paths share the same bounded, frame-derived sampler.
 void NeiGi_DrawChateauShimmer(PlayState* play) {

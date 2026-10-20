@@ -194,6 +194,22 @@ extern "C" void PlayerAnimation_Change(PlayState *, SkelAnime *skel,
 #include "combo/gameplay/MagicMirrorPlayer.inc.c"
 #include "combo/gameplay/MagicMirrorRuntime.inc.h"
 
+// Compile the actual native local-pad branch and each Wolf input policy. The
+// controller source remains untouched so the message can read Yes/No and B.
+static bool TestCustomItems_BlocksMovement(Player*) { return false; }
+static bool Testfunc_8082DA90(PlayState*) { return false; }
+static bool TestTransformMasks_IsTransformed() { return false; }
+static bool TestMmMaskWear_IsKamaroDancing() { return false; }
+static void TestWolfLinkHost_RestorePlayerInput(Player*, Input*) {}
+static void TestGameInteractor_ExecuteOnPassPlayerInputs(Input*) {}
+static void TestTransformMasks_FilterB(Input*) {}
+static void TestGetStickData(f32* magnitude, s16* yaw, Input* input) {
+    *magnitude = std::hypot(input->cur.stick_x, input->cur.stick_y);
+    *yaw = 0;
+}
+static s16 TestCameraYaw(PlayState*) { return 0; }
+#include "native_prompt_input.inc.h"
+
 void Scene(int scene) {
 #ifdef MIRROR_OOT
     play.sceneNum = scene;
@@ -255,6 +271,173 @@ void ConfirmCast() {
   MirrorRuntime::Update();
   advance = false;
   play.state.input[0].press.button = 0;
+}
+
+void TestPromptMovement() {
+    Reset();
+    play.state.input[0].press.button = BTN_CLEFT;
+    MirrorRuntime::Update();
+    auto& raw = play.state.input[0];
+    raw = {};
+    raw.cur.stick_x = 60;
+    raw.cur.stick_y = -40;
+    raw.cur.button = BTN_R;
+    raw.press.button = BTN_A;
+    const auto menuInput = raw;
+    NativeSetAction(&player, NativeIdle); // Native action cleanup clears the flag.
+    MirrorRuntime::Update();
+    assert(MirrorRuntime::sPrompt && (player.stateFlags1 & MirrorRuntime::kPromptFreeze));
+    // Clear again after the early prompt update: local-pad ownership must not
+    // depend on that native action flag surviving the rest of the frame.
+    NativeSetAction(&player, NativeIdle);
+#ifdef MIRROR_OOT
+    player.linearVelocity = player.actor.speedXZ = 4;
+#else
+    player.speedXZ = player.actor.speed = 4;
+#endif
+    player.actor.velocity.x = player.actor.velocity.z = 3;
+    const auto local = ReadNativePromptInput(&player, &play);
+    const Input empty{};
+    assert(std::memcmp(&local, &empty, sizeof(local)) == 0);
+    assert(player.actor.velocity.x == 0 && player.actor.velocity.z == 0);
+    // Wolf may read after another action change, including its raw-pad OoT
+    // route. The live prompt independently blocks every movement procedure.
+    NativeSetAction(&player, NativeIdle);
+#ifdef MIRROR_OOT
+    const auto wolf = TestWolfReadInput(&player, &play);
+#else
+    const auto wolf = TestWolfReadInput(&player, &play, &raw);
+#endif
+    assert(wolf.blocked && !wolf.aPress && !wolf.bPress);
+    assert(std::memcmp(&raw, &menuInput, sizeof(raw)) == 0);
+    raw.press.button = BTN_B;
+    MirrorRuntime::Update();
+    assert(!MirrorRuntime::sPrompt && !(player.stateFlags1 & MirrorRuntime::kPromptFreeze));
+    const auto closing = ReadNativePromptInput(&player, &play);
+    assert(std::memcmp(&closing, &empty, sizeof(closing)) == 0);
+#ifdef MIRROR_OOT
+    const auto closingWolf = TestWolfReadInput(&player, &play);
+#else
+    const auto closingWolf = TestWolfReadInput(&player, &play, &raw);
+#endif
+    assert(closingWolf.blocked && !closingWolf.aPress && !closingWolf.bPress);
+    assert(raw.cur.stick_x == menuInput.cur.stick_x && raw.press.button == BTN_B);
+    MirrorRuntime::Update(); // The next input frame restores gameplay control.
+    const auto released = ReadNativePromptInput(&player, &play);
+    assert(released.cur.stick_x == menuInput.cur.stick_x && released.press.button == BTN_B);
+#ifdef MIRROR_OOT
+    const auto releasedWolf = TestWolfReadInput(&player, &play);
+#else
+    const auto releasedWolf = TestWolfReadInput(&player, &play, &raw);
+#endif
+    assert(!releasedWolf.blocked && releasedWolf.bPress);
+    puts("PASS prompt owns human/Wolf movement after native action changes; raw choice pad and cancel restore preserved");
+}
+
+void TestChoiceReleaseInput() {
+    for (bool yes : { false, true }) {
+        Reset();
+        play.state.input[0].press.button = BTN_CLEFT;
+        MirrorRuntime::Update();
+        auto& raw = play.state.input[0];
+        raw = {};
+        raw.press.button = BTN_A;
+        raw.cur.stick_x = 60;
+        raw.cur.stick_y = 20;
+        play.msgCtx.choiceIndex = yes ? 0 : 1;
+        advance = true;
+        const auto choiceInput = raw;
+        MirrorRuntime::Update();
+        assert(!MirrorRuntime::sPrompt);
+        const auto local = ReadNativePromptInput(&player, &play);
+        const Input empty{};
+        assert(std::memcmp(&local, &empty, sizeof(local)) == 0);
+#ifdef MIRROR_OOT
+        const auto wolf = TestWolfReadInput(&player, &play);
+#else
+        const auto wolf = TestWolfReadInput(&player, &play, &raw);
+#endif
+        assert(wolf.blocked && !wolf.aPress && !wolf.bPress);
+        assert(std::memcmp(&raw, &choiceInput, sizeof(raw)) == 0);
+        advance = false;
+        MirrorRuntime::Update();
+        if (yes) {
+            assert(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_PLAYING);
+        } else {
+            const auto released = ReadNativePromptInput(&player, &play);
+            assert(released.press.button == BTN_A && released.cur.stick_x == 60);
+        }
+    }
+    puts("PASS No/Yes consume one gameplay input frame without changing raw choice input; No restores and Yes casts");
+}
+
+void TestPromptOwnershipLifetime() {
+    for (int reason = 0; reason < 9; ++reason) {
+        Reset();
+        play.state.input[0].press.button = BTN_CLEFT;
+        MirrorRuntime::Update();
+        assert(MagicMirror_PromptOwnsPlayer(&play, &player));
+        switch (reason) {
+        case 0: SetText(1234); break;
+        case 1: play.msgCtx.msgMode = MSGMODE_TEXT_CLOSING; break;
+        case 2: play.msgCtx.msgMode = MSGMODE_NONE; break;
+        case 3: ++seed; break;
+        case 4: play.pauseCtx.state = 1; break;
+        case 5: owned = false; break;
+        case 6: gGameState = nullptr; break;
+        case 7: gComboGameMode = gComboGameMode == COMBO_GAME_MM ? COMBO_GAME_OOT : COMBO_GAME_MM; break;
+        case 8: gSaveContext.fileNum = 2; break;
+        }
+        assert(!MagicMirror_PromptOwnsPlayer(&play, &player));
+    }
+    Reset();
+    // Preserve a flag already owned before the prompt, but clear one that the
+    // prompt reacquires after the original native owner releases it.
+    player.stateFlags1 |= MirrorRuntime::kPromptFreeze;
+    play.state.input[0].press.button = BTN_CLEFT;
+    MirrorRuntime::Update();
+    MirrorRuntime::ReleasePrompt(true);
+    assert(player.stateFlags1 & MirrorRuntime::kPromptFreeze);
+    Reset();
+    player.stateFlags1 |= MirrorRuntime::kPromptFreeze;
+    play.state.input[0].press.button = BTN_CLEFT;
+    MirrorRuntime::Update();
+    NativeSetAction(&player, NativeIdle);
+    MirrorRuntime::Update();
+    MirrorRuntime::ReleasePrompt(true);
+    assert(!(player.stateFlags1 & MirrorRuntime::kPromptFreeze));
+    Reset();
+    auto* retired = new Player(player);
+#ifdef MIRROR_OOT
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &retired->actor;
+#else
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &retired->actor;
+#endif
+    play.state.input[0].press.button = BTN_CLEFT;
+    MirrorRuntime::Update();
+    assert(MagicMirror_PromptOwnsPlayer(&play, retired));
+    delete retired;
+#ifdef MIRROR_OOT
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
+#else
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
+#endif
+    assert(!MagicMirror_PromptOwnsPlayer(&play, &player));
+    MirrorRuntime::Update(); // Reject the old identity without touching freed memory.
+    assert(!MirrorRuntime::sPrompt);
+    Reset();
+    retired = new Player(player);
+#ifdef MIRROR_OOT
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &retired->actor;
+#else
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &retired->actor;
+#endif
+    play.state.input[0].press.button = BTN_CLEFT;
+    MirrorRuntime::Update();
+    delete retired;
+    MirrorRuntime::Destroy();
+    assert(!MirrorRuntime::sPrompt);
+    puts("PASS prompt identity/flag cleanup across message, file, mode, safety, player replacement and post-arena teardown");
 }
 
 void LoadForest(float x, float y, float z) {
@@ -359,6 +542,9 @@ void TestArrival() {
 }
 
 int main() {
+    TestPromptMovement();
+    TestChoiceReleaseInput();
+    TestPromptOwnershipLifetime();
     TestArrival();
     assert(FcEquip_OotToMm16(EXT_ITEM_MAGIC_MIRROR) == EXT_ITEM_MAGIC_MIRROR);
     assert(FcEquip_MmToOot16(EXT_ITEM_MAGIC_MIRROR) == EXT_ITEM_MAGIC_MIRROR);

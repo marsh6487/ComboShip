@@ -7,7 +7,8 @@
 #include "entrances/ForestActorPlacements.h"
 #include "ComboResolve.h"
 #include "actors/PlacedSariaABI.h"
-#include "actors/SariaHexEffect.h"
+#include "actors/ForestGiParticles.h"
+#include "../../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -23,47 +24,14 @@
 #include <unordered_map>
 
 static void DrawShimmer(Actor* actor, PlayState* play, bool seated) {
-    if (play->pauseCtx.state != PAUSE_STATE_OFF || actor->xzDistToPlayer > 700.0f ||
-        std::fabs(actor->playerHeightRel) > 300.0f)
+    if (!actor || !play || !play->state.gfxCtx || play->pauseCtx.state != PAUSE_STATE_OFF ||
+        actor->xzDistToPlayer > 700.0f || std::fabs(actor->playerHeightRel) > 300.0f)
         return;
-    using namespace SariaHexEffect;
-    std::array<Vertex, kVertexCount> shape;
-    const float facing = std::atan2(play->view.eye.x - actor->world.pos.x, play->view.eye.z - actor->world.pos.z);
-    Build(play->gameplayFrames, seated, facing, shape);
-    auto* vertices = static_cast<Vtx*>(GRAPH_ALLOC(play->state.gfxCtx, sizeof(Vtx) * kVertexCount));
-    if (!vertices)
-        return;
-    for (int i = 0; i < kVertexCount; ++i) {
-        vertices[i] = {};
-        vertices[i].v.ob[0] = static_cast<s16>(std::lround(shape[i].x * 10.0f));
-        vertices[i].v.ob[1] = static_cast<s16>(std::lround(shape[i].y * 10.0f));
-        vertices[i].v.ob[2] = static_cast<s16>(std::lround(shape[i].z * 10.0f));
-        vertices[i].v.cn[0] = shape[i].r;
-        vertices[i].v.cn[1] = shape[i].g;
-        vertices[i].v.cn[2] = shape[i].b;
-        vertices[i].v.cn[3] = shape[i].a;
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
     Matrix_Push();
     Matrix_Translate(actor->world.pos.x, actor->world.pos.y, actor->world.pos.z, MTXMODE_NEW);
-    Matrix_Scale(0.1f, 0.1f, 0.1f, MTXMODE_APPLY);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_FOG | G_CULL_BOTH);
-    gSPTexture(POLY_XLU_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
-    gDPSetRenderMode(POLY_XLU_DISP++, G_RM_PASS, G_RM_AA_ZB_XLU_SURF2);
-    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_SHADE, G_CC_SHADE);
-    for (int h = 0; h < kHexes; ++h) {
-        gSPVertex(POLY_XLU_DISP++, reinterpret_cast<uintptr_t>(&vertices[h * 12]), 12, 0);
-        for (int side = 0; side < 6; ++side) {
-            const int next = (side + 1) % 6;
-            gSP2Triangles(POLY_XLU_DISP++, side, next, next + 6, 0, side, next + 6, side + 6, 0);
-        }
-    }
+    const auto mesh = ForestGiParticles::Saria(play->gameplayFrames, seated, NeiGi_CameraBasis(play));
+    NeiGi_DrawWorldParticles(play, mesh);
     Matrix_Pop();
-    gDPPipeSync(POLY_XLU_DISP++);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 namespace {

@@ -8,6 +8,16 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 
+def block(source, marker):
+    start = source.index(marker)
+    end = source.index("{", start) + 1
+    depth = 1
+    while depth:
+        depth += (source[end] == "{") - (source[end] == "}")
+        end += 1
+    return source[start:end]
+
+
 def main():
     assert (ROOT / "combo/gameplay/MagicMirrorAnchor.h").exists(), "Mirror cannot follow the raised stump yet"
     with tempfile.TemporaryDirectory(prefix="magic-mirror-") as directory:
@@ -33,6 +43,32 @@ def main():
                     end += 1
                 bodies.append(native[start:end])
             (Path(directory) / "native_animation.inc.h").write_text("\n".join(bodies))
+            player = (ROOT / host / "src/overlays/actors/ovl_player_actor/z_player.c").read_text()
+            if host == "mm":
+                start = player.index("    if (play->actorCtx.isOverrideInputOn && (this == GET_PLAYER(play)))")
+                end = player.index("    // SoH z_player.c:", start)
+            else:
+                start = player.index("        if (this->stateFlags1 & (PLAYER_STATE1_INPUT_DISABLED | PLAYER_STATE1_IN_CUTSCENE))")
+                end = player.index("        // Gust jar:", start)
+            pad = re.sub(r"\bthis\b", "current", player[start:end])
+            for name in ("CustomItems_BlocksMovement", "func_8082DA90", "TransformMasks_IsTransformed",
+                         "MmMaskWear_IsKamaroDancing", "WolfLinkHost_RestorePlayerInput",
+                         "GameInteractor_ExecuteOnPassPlayerInputs", "TransformMasks_FilterB"):
+                pad = pad.replace(name, "Test" + name)
+            pad = "Input ReadNativePromptInput(Player* current, PlayState* play) { Input input{};\n" + pad + "\nreturn input; }"
+            wolf = (ROOT / host / "mods/transformation_masks/wolf_link_form.cpp").read_text()
+            read = block(wolf, "static WolfInput ReadInput(").replace("ReadInput(", "TestWolfReadInput(")
+            for name in ("Lib_GetControlStickData", "func_80077D10"):
+                read = read.replace(name, "TestGetStickData")
+            read = read.replace("Camera_GetInputDirYaw(GET_ACTIVE_CAM(play))", "TestCameraYaw(play)")
+            aliases = ""
+            if host == "mm":
+                compat = (ROOT / "mm/mods/nei_oot_compat.h").read_text()
+                for name, value in re.findall(r"^#define\s+(PLAYER_STATE1_\w+)\s+(.+)$", compat, re.M):
+                    if name in read:
+                        aliases += f"#ifndef {name}\n#define {name} {value}\n#endif\n"
+            (Path(directory) / "native_prompt_input.inc.h").write_text(
+                pad + "\n" + aliases + block(wolf, "struct WolfInput {") + ";\n" + read)
             includes = [ROOT, ROOT / host, ROOT / host / "include", ROOT / host / "include/PR",
                         ROOT / host / "src", ROOT / host / "assets", ROOT / host / "mods",
                         ROOT / host / ("soh" if host == "soh" else "2s2h"), ROOT / "libultraship/include",

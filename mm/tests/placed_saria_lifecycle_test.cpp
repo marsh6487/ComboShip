@@ -3,7 +3,8 @@
 #include "2s2h/Enhancements/Gameplay/ComboForestActors.h"
 #include "2s2h/Enhancements/Gameplay/ComboForestEpona.h"
 #include "actors/PlacedSariaABI.h"
-#include "actors/SariaHexEffect.h"
+#include "actors/ForestGiParticles.h"
+#include "../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "entrances/ForestActorPlacements.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "ComboResolve.h"
@@ -42,6 +43,15 @@ static unsigned sparkles;
 static Vec3f sparklePos;
 static Color_RGBA8 sparklePrim, sparkleEnv;
 static Vec3f shimmerOrigin;
+static NeiGi::Mesh shimmerMesh;
+static unsigned shimmerDraws;
+extern "C" NeiGi::Basis NeiGi_CameraBasis(PlayState*) {
+    return {};
+}
+extern "C" void NeiGi_DrawWorldParticles(PlayState*, const NeiGi::Mesh& mesh) {
+    shimmerMesh = mesh;
+    ++shimmerDraws;
+}
 static GameInteractor interactor;
 GameInteractor* GameInteractor::Instance = &interactor;
 namespace Rando {
@@ -527,8 +537,8 @@ int main() {
     play.actorCtx.actorLists[ACTORCAT_NPC].first = &authored;
     SpawnForestSaria();
     CHECK(spawns == 2 && sSpawnAttempted);
-    // Actual translucent draw commands must contain hollow green hexes and
-    // follow every authored pose, without relying on native star particles.
+    // Execute the actual draw body and shared GI particle sampler for every
+    // placed pose. Native renderer allocation/GBI is covered by its own suite.
     const unsigned beforeSparkles = sparkles;
     for (auto params : { 0x7F13, 0x7F23, 0x7F33, 0x7E13, 0x7E23, 0x7E33 }) {
         Actor magical{};
@@ -537,59 +547,39 @@ int main() {
         ComboSaria_Init(&magical, &play);
         auto draw = [&] {
             gfx.polyOpa.p = commands;
-            gfx.polyOpa.d = reinterpret_cast<Gfx*>(hexVertices + 144);
-            gfx.polyXlu.p = hexCommands;
+            shimmerDraws = 0;
             ComboSaria_Draw(&magical, &play);
         };
         draw();
-        unsigned loads = 0, triangles = 0;
-        for (Gfx* command = hexCommands; command != gfx.polyXlu.p; ++command) {
-            loads += (command->words.w0 >> 24) == G_VTX;
-            triangles += (command->words.w0 >> 24) == G_TRI2;
-        }
-        CHECK(loads == 12 && triangles == 72);
+        CHECK(shimmerDraws == 1 &&
+              shimmerMesh.count == ForestGiParticles::kSariaMotes * ForestGiParticles::kHexVertices);
         CHECK(shimmerOrigin.x == 500 && shimmerOrigin.y == 80 && shimmerOrigin.z == -400);
-        for (const auto& vertex : hexVertices) {
-            CHECK(vertex.v.cn[1] > vertex.v.cn[0] && vertex.v.cn[1] > vertex.v.cn[2]);
-            CHECK(std::abs(vertex.v.ob[0]) < 320 && std::abs(vertex.v.ob[2]) < 320);
-            CHECK(vertex.v.ob[1] >= 0 && vertex.v.ob[1] < 530);
-        }
-        for (int h = 0; h < 12; ++h) {
-            float center[3]{};
-            for (int side = 0; side < 6; ++side)
-                for (int axis = 0; axis < 3; ++axis)
-                    center[axis] += hexVertices[h * 12 + side].v.ob[axis] / 6.0f;
-            for (int side = 0; side < 6; ++side) {
-                float outer = 0, inner = 0;
-                for (int axis = 0; axis < 3; ++axis) {
-                    const float a = hexVertices[h * 12 + side].v.ob[axis] - center[axis];
-                    const float b = hexVertices[h * 12 + side + 6].v.ob[axis] - center[axis];
-                    outer += a * a;
-                    inner += b * b;
-                }
-                CHECK(inner > outer * 0.22f && inner < outer * 0.65f);
-            }
+        for (size_t i = 0; i < shimmerMesh.count; ++i) {
+            const auto& vertex = shimmerMesh.vertices[i];
+            CHECK(((vertex.rgb >> 8) & 255) >= (vertex.rgb >> 16));
+            CHECK(((vertex.rgb >> 8) & 255) > (vertex.rgb & 255));
+            CHECK(std::abs(vertex.p.x) < 28 && std::abs(vertex.p.z) < 28);
+            CHECK(vertex.p.y > 1 && vertex.p.y < 52);
         }
         if (((params >> 4) & 15) == 2) {
             Gfx* head = nullptr;
             Override(&play, 16, &head, nullptr, nullptr, &magical);
             CHECK(reinterpret_cast<const char*>(head) == sStates.at(&magical)->resources.heads[2]);
         }
-        Vtx previous[144];
-        std::memcpy(previous, hexVertices, sizeof(previous));
+        const auto previous = shimmerMesh.vertices[0].p;
         ++play.gameplayFrames;
         draw();
-        CHECK(std::memcmp(previous, hexVertices, sizeof(previous)) != 0);
+        CHECK(previous.y != shimmerMesh.vertices[0].p.y);
         magical.world.pos = { -120, 12, 620 };
         draw();
         CHECK(shimmerOrigin.x == -120 && shimmerOrigin.y == 12 && shimmerOrigin.z == 620);
         play.pauseCtx.state = 1;
         draw();
-        CHECK(gfx.polyXlu.p == hexCommands);
+        CHECK(shimmerDraws == 0);
         play.pauseCtx.state = PAUSE_STATE_OFF;
         magical.xzDistToPlayer = 1000;
         draw();
-        CHECK(gfx.polyXlu.p == hexCommands);
+        CHECK(shimmerDraws == 0);
         ComboSaria_Destroy(&magical, &play);
     }
     CHECK(sparkles == beforeSparkles);
@@ -711,7 +701,7 @@ int main() {
     puts("PASS seated fixed song gift: grounded pose, custom blinking, talk/close, deferred existing-item delivery, "
          "queued/active duplicate suppression, file/mode/scene guards, post-consumption permanent claim, authored "
          "field placement");
-    puts("PASS all Saria poses and song variants: green hollow-hex draw commands, follow authored placements, "
+    puts("PASS all Saria poses and song variants: green GI hex particles, follow authored placements, "
          "pause/distance guards");
     puts("PASS portal Epona placement: opposite Saria in portal coordinates, clear approach, floor probe, authored "
          "override, no duplicate or prologue/solo/other-scene spawn");

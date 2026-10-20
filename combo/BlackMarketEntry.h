@@ -57,7 +57,10 @@ template <typename Session> nlohmann::json MarketState(const Session& session, i
     const auto count = market.is_object() && market.contains("stock") && market["stock"].is_array()
                            ? static_cast<int>(market["stock"].size())
                            : -1;
-    return { { "active", session.Active(file) }, { "bound_slot", boundSlot }, { "seed", seed },
-             { "stock_count", count }, { "purchased", session.state.purchased } };
+    return { { "active", session.Active(file) },
+             { "bound_slot", boundSlot },
+             { "seed", seed },
+             { "stock_count", count },
+             { "purchased", session.state.purchased } };
 }
 } // namespace BlackMarketEntry

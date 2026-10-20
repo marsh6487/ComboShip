@@ -33,6 +33,9 @@ int ResourceMgr_GetGiModelBoundsForGame(const char* game, const char* const* pat
 // these functions do not add GI rotation or optional pickup shimmer.
 NeiGi::Basis NeiGi_CameraBasis(PlayState* play);
 void NeiGi_DrawMesh(PlayState* play, const NeiGi::Mesh& mesh, NeiGi::Kind orb = NeiGi::Kind::Neutral);
+// World emitters share the GI shimmer's grayscale/material restore and arena
+// reservation. The caller supplies its world pose, without GI rotation/scale.
+void NeiGi_DrawWorldParticles(PlayState* play, const NeiGi::Mesh& mesh);
 bool NeiGi_CanDrawLayers(PlayState* play, size_t matrices, size_t opa, size_t xlu);
 // Reserve the caller's later casing/restore commands while the child allocates.
 bool NeiGi_DrawMeshWithTail(PlayState* play, const NeiGi::Mesh& mesh, const char* owner, size_t matrices, size_t opa,

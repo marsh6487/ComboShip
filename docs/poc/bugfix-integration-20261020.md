@@ -61,11 +61,47 @@ silently start the long Windows/Linux builds.
 
 ## Verification record
 
-The integration verification results and exact reproduction commands are
-completed after the independent particle, entry and dialogue/input tasks have
-finished. See their focused POC reports as well as the inherited elemental,
-native forest, camera, NPC and Black Market diagnostic records for the
-distinction between source checks, native objects and configured gameplay.
+Production source is frozen at `39c52ee7d` before the final evidence-only
+checkpoint. Additional verified source milestones are:
+
+| Change | Local commit | Result |
+| --- | --- | --- |
+| GI particles for OoT/MM Saria poses and both bridge routes | `498a6e5c7` | Small green filled hexes with the actual GI Glow/Star primitives and grayscale-safe renderer; active ring callers removed; purple tunnel material preserved |
+| MM custom-dialogue decoder and Mirror input ownership | `4fabc710e` | Normal high-ID custom dialogue avoids the credits decoder; bounded font writes; human/Wolf input remains owned during prompts and B/No/Yes handoff frames |
+| Real-resource Black Market controller entry tests and receipts | `ee8898aca` | 66 full-input controller cycles plus 18 bundled-only structural cycles; negative resource/safety cases pass |
+| CI formatting | `bc278c274`, `39c52ee7d` | Required files formatted; non-whitespace source bytes unchanged |
+
+| Verification | Result and boundary |
+| --- | --- |
+| `bash scripts/diagnostics/run_elemental_sword_regressions.sh` | All 16 commands pass on the combined candidate; all 95 elemental input paths still match the completed checkpoint exactly |
+| Optional native MM ice-arrow resource bridge, explicit dependency roots | Solo and Combo sanitizer variants pass; the default gate's optional skip is covered separately |
+| `bash scripts/diagnostics/run_oct20_bugfix_regressions.sh` | All eight commands pass: real message decoders, GI renderers, structural entry/safety, legacy cache, shield lifetime, TLUT and native forest preparation; 31 forest tests include two explicit optional donor-test skips |
+| Final Mirror native and integration checks | Both layouts pass ASan/UBSan, including same-frame closing suppression, raw menu input, identity, cleanup, cast and arrival fixtures |
+| Real-input entry executables | Both final binaries independently replayed successfully; exercised production hashes match the final source |
+| Inherited camera, shield lifetime, Saria TLUT and reward asset-packaging checks | Pass; the earlier missing-CMake environment issue was resolved for packaging |
+| Native compilation supplied by focused workstreams | Ten GI/actor/portal configurations and 16 dialogue/player/Wolf/adapter configurations pass; the final four Mirror adapters were recompiled after the handoff fix |
+| Formatting, whitespace and custom asset collisions | Pass using the repository's exact clang-format-14 selection |
+| Full hosted application/Windows builds | Held; not run for this integration |
+| Configured game entry, mount/load order, rendered particles and user acceptance | Unproven; no runnable candidate in this environment |
+
+`tests/bugfix_integration/evidence/20261020/verification.json` records exact
+commands, source identities, log hashes and the evidence archive. Entry-specific
+receipts and logs are in `tests/black_market/evidence/20261020/`. Receipts may
+record an earlier HEAD while another isolated workstream had uncommitted edits;
+their per-unit SHA-256 values were independently compared with the completed
+source and match. These hashes identify the actually exercised code.
+
+Independent review found and resolved the Mirror cancel-frame leak, the stale
+missing-donor paragraph and three CI formatting omissions. Runtime limits above
+remain separate from source verification. The new regression preflight is wired
+into `build-artifacts.yml` before full platform builds; draft publication keeps
+the requested current build hold with a CI-skip commit.
+
+Repaired NPC model packs remain separate installs, identified in
+`docs/poc/npc-bundle-hash-repair-20261020.md`. Source publication does not replace
+old installed packs. Existing optional full-scene FINAL presentation compatibility
+and the reported built-in Biggoron casing case remain open as recorded in their
+focused reports.
 
 ## Recovery
 

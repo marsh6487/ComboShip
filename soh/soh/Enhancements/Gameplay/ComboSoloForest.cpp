@@ -15,7 +15,8 @@
 #include "soh/SaveManager.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
-#include "../../../../mm/2s2h/Enhancements/Graphics/ComboForestPortalEffect.h"
+#include "actors/ForestGiParticles.h"
+#include "soh/Enhancements/randomizer/NeiGiRender.h"
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
@@ -261,46 +262,12 @@ void DrawForestPortal() {
         }
         sForestTitle = false;
     }
-    using namespace ComboForestPortalEffect;
-    std::array<Vertex, kVertexCount> shape;
-    Build(play->gameplayFrames, !NativePortal(play), shape);
-    auto* vertices = static_cast<Vtx*>(Graph_Alloc(play->state.gfxCtx, sizeof(Vtx) * kVertexCount));
-    if (!vertices)
-        return;
-    for (int i = 0; i < kVertexCount; ++i) {
-        vertices[i] = {};
-        vertices[i].v.ob[0] = shape[i].x;
-        vertices[i].v.ob[1] = shape[i].y;
-        vertices[i].v.ob[2] = 10;
-        vertices[i].v.cn[0] = shape[i].r;
-        vertices[i].v.cn[1] = shape[i].g;
-        vertices[i].v.cn[2] = shape[i].b;
-        vertices[i].v.cn[3] = shape[i].a;
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     Matrix_Push();
     Matrix_Translate(COMBO_SOLO_FOREST_STUMP_X, 0, COMBO_SOLO_FOREST_STUMP_Z, MTXMODE_NEW);
     Matrix_RotateY(COMBO_SOLO_FOREST_STUMP_YAW * (6.28318530718f / 65536.0f), MTXMODE_APPLY);
-    gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, (char*)__FILE__, __LINE__),
-              G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_FOG | G_CULL_BOTH);
-    gSPTexture(POLY_XLU_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
-    gDPSetRenderMode(POLY_XLU_DISP++, G_RM_PASS, G_RM_AA_ZB_XLU_SURF2);
-    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_SHADE, G_CC_SHADE);
-    for (int i = 0; i < kRimSegments; ++i) {
-        gSPVertex(POLY_XLU_DISP++, reinterpret_cast<uintptr_t>(&vertices[i * 4]), 4, 0);
-        gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
-    }
-    for (int i = 0; i < kGlints; ++i) {
-        gSPVertex(POLY_XLU_DISP++, reinterpret_cast<uintptr_t>(&vertices[kRimSegments * 4 + i * 5]), 5, 0);
-        gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
-        gSP2Triangles(POLY_XLU_DISP++, 0, 3, 4, 0, 0, 4, 1, 0);
-    }
+    const auto mesh = ForestGiParticles::Portal(play->gameplayFrames, !NativePortal(play), NeiGi_CameraBasis(play));
+    NeiGi_DrawWorldParticles(play, mesh);
     Matrix_Pop();
-    gDPPipeSync(POLY_XLU_DISP++);
-    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
-    CLOSE_DISPS(play->state.gfxCtx);
 }
 void ResetForestFile() {
     // InitFile also runs under saveMtx. Never wait for a worker that needs

@@ -73,8 +73,12 @@ and no test shims. Exact commands and results accompany the recovery checkpoint.
 Neither unit compilation nor fixtures establish a linked executable or configured
 game entry, sound, drawing, traversal, or user acceptance.
 
-The inherited native-forest candidate still records a missing immutable native
-MM donor in `tools/native_forest/manifest.json`; see its README for generation
-requirements. Native-market source is already bundled and hash checked. This
-task does not repair that separate forest packaging dependency. Optional packs
-must keep their established priority over native fallback resources.
+The integrated native-forest candidate now includes the verified geometry-only
+source in `tools/native_forest/resources.zip`: 39 resources, SHA-256
+`7b21d19512a48b2363247b9276426ff6ba7afa4f10130f98513c22a90d0c6730`.
+Native-market source is also bundled and hash checked. Both preparation paths
+are available to port archive generation; the ordinary extracted game archives
+still supply their declared stock dependencies. Optional packs must retain
+their established priority over native fallback resources. See
+`tools/native_forest/README.md` and the integration report for current packaging
+and runtime boundaries.

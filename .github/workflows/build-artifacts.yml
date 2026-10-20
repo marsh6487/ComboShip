@@ -54,6 +54,9 @@ jobs:
       - name: Fast shared Granny UI and engine header regression
         run: python3 -B tests/black_market/run_granny_header_tests.py
 
+      - name: Verify October 20 bug-fix entry, decoder and particle paths
+        run: bash scripts/diagnostics/run_oct20_bugfix_regressions.sh
+
       - name: Fast game-picker Windows header regression
         run: python3 -B tests/solo_games/selection_test.py --windows
 

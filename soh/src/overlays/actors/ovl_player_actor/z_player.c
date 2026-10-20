@@ -14144,6 +14144,15 @@ void Player_Update(Actor* thisx, PlayState* play) {
             // PLAYER_STATE3_20000000 early-return at z_player.c:3804-3806.
         }
 
+#ifdef COMBO_BUILD
+        // The choice box keeps the raw pad. Prompt ownership also blocks
+        // transformed forms when their native freeze flag has been cleared.
+        if (MagicMirror_PromptOwnsPlayer(play, this)) {
+            memset(&input, 0, sizeof(input));
+            MagicMirrorPlayer_StopMotion(this);
+        }
+#endif
+
         // Gust jar: strip L/R from input BEFORE Player_UpdateCommon so the
         // vanilla shield handler never sees BTN_R while the player is aiming
         // / sucking / holding a stored blow. Handle_GustJar's own L/R cycle

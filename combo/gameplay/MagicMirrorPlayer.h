@@ -18,6 +18,9 @@ int MagicMirrorPlayer_Begin(struct PlayState* play, struct Player* player);
 int MagicMirrorPlayer_State(const struct Player* player);
 void MagicMirrorPlayer_End(struct PlayState* play, struct Player* player);
 void MagicMirrorPlayer_Arrive(struct PlayState* play, struct Player* player);
+void MagicMirrorPlayer_StopMotion(struct Player* player);
+// Includes the input tick that dismisses or confirms the private choice box.
+int MagicMirror_PromptOwnsPlayer(struct PlayState* play, const struct Player* player);
 #ifdef __cplusplus
 }
 #endif
