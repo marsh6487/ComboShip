@@ -77,6 +77,11 @@ void Matrix_RotateYS(s16 angle, MatrixMode mode) {
 }
 void FrameInterpolation_IgnoreActorMtx(void) {
 }
+// Passive capture reporting is outside this color/GBI fixture.
+void NeiGi_ReportBlackMarketModel(const char* owner, const char* opaque, const char* translucent) {
+}
+void GetItem_DrawRecoveryHeart(PlayState* play, s16 drawId);
+void GetItem_DrawOpa0(PlayState* play, s16 drawId);
 void GetItem_Draw(PlayState* play, s16 drawId) {
     // Dispatch boundary for the three production 3D drop entry points below.
     // Their draw bodies and custom/native classification remain production code.

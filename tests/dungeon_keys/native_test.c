@@ -1,6 +1,9 @@
 #include "fixture_api.h"
 #include "combo/menu/ComboFairyBottle.h"
 #include "combo/menu/ComboItemDrawABI.h"
+// Passive Black Market capture is outside the native key/bottle draw fixture.
+void NeiGi_ReportBlackMarketModel(const char *owner, const char *opaque,
+                                const char *translucent) {}
 static const char gGiEmptyBottleCorkDL[] =
     "__OTR__objects/object_gi_bottle/gGiEmptyBottleCorkDL";
 static const char gGiEmptyBottleGlassDL[] =

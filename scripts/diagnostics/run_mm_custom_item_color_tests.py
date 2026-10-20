@@ -58,7 +58,8 @@ def main():
         body = selected[-1]
         cpp = build / "double_defense.cpp"
         cpp.write_text('extern "C" {\n#include "global.h"\n'
-                       '#include "assets/objects/object_gi_hearts/object_gi_hearts.h"\n}\n' + body)
+                       '#include "assets/objects/object_gi_hearts/object_gi_hearts.h"\n'
+                       'void NeiGi_ReportBlackMarketModel(const char*, const char*, const char*);\n}\n' + body)
         subprocess.run([*shlex.split(os.environ.get("CXX", "c++")), "-std=gnu++20",
                         *[f for f in flags if f not in ("-Wno-int-conversion", "-Wno-incompatible-pointer-types")],
                         "-fsyntax-only", str(cpp)], check=True)

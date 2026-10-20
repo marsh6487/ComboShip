@@ -237,16 +237,19 @@ void SpawnForestSaria() {
     if (!sBridge.Resolve())
         return;
     const Vec3f anchor = ComboOpeningForest_ReturnAnchor(play);
-    // Just southwest of Clock Town's south gate. Provisional until live review.
+    // cor's authored Termina Field song-giver export; MM's packed yaw is 272 degrees.
     Vec3f pos =
-        field ? Vec3f{ -720.0f, 300.0f, 2000.0f } : Vec3f{ anchor.x + 100.0f, anchor.y + 120.0f, anchor.z + 70.0f };
+        field ? Vec3f{ 975.0f, -99.0f, 2101.0f } : Vec3f{ anchor.x + 100.0f, anchor.y + 120.0f, anchor.z + 70.0f };
+    Vec3f floorProbe = pos;
+    if (field)
+        floorProbe.y += 120.0f;
     CollisionPoly* poly = nullptr;
     s32 bgId;
-    const float floor = BgCheck_EntityRaycastFloor5(&play->colCtx, &poly, &bgId, nullptr, &pos);
+    const float floor = BgCheck_EntityRaycastFloor5(&play->colCtx, &poly, &bgId, nullptr, &floorProbe);
     if (!poly || !std::isfinite(floor) || floor <= BGCHECK_Y_MIN)
         return;
-    Actor_Spawn(&play->actorCtx, play, ACTOR_EN_VIEWER, pos.x, floor, pos.z, 0, 0, 0,
-                field ? kSongGiftParams : kWaitingParams);
+    Actor_Spawn(&play->actorCtx, play, ACTOR_EN_VIEWER, pos.x, field ? pos.y : floor, pos.z, 0,
+                field ? DEG_TO_BINANG(272) : 0, 0, field ? kSongGiftParams : kWaitingParams);
 }
 
 void SpawnForestEpona() {

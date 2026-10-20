@@ -503,6 +503,10 @@ int main() {
     sSpawnAttempted = false;
     SpawnForestSaria();
     CHECK(spawns == 2 && spawned.params == 0x7E33);
+    // cor's Termina Field export: preserve the seated height and native
+    // MM packed rotation (-30593 decodes to 272 degrees), without floor snap.
+    CHECK(spawned.world.pos.x == 975 && spawned.world.pos.y == -99 && spawned.world.pos.z == 2101);
+    CHECK(spawned.shape.rot.y == static_cast<s16>(0xC16C));
     sSpawnAttempted = false;
     authored.params = 0x7E33;
     play.actorCtx.actorLists[ACTORCAT_NPC].first = &authored;
