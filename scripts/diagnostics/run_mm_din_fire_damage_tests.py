@@ -243,7 +243,8 @@ def main(test_source=None):
             binary = str(build / Path(source).stem)
             run(os.environ.get('CC', 'cc'), *FLAGS, '-I' + directory,
                 '-ffunction-sections', '-fdata-sections', source,
-                'mm/src/code/din_fire_sword.c', 'mm/src/code/sys_math_atan.c',
+                'mm/src/code/din_fire_sword.c', 'mm/src/code/elemental_sword_finish.c',
+                'mm/src/code/sys_math_atan.c',
                 'mm/src/libultra/gu/coss.c',
                 *wrappers, soul_object, '-Wl,--gc-sections', '-lstdc++', '-lm', '-o', binary)
             run(binary)

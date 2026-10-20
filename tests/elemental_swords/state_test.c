@@ -85,7 +85,8 @@ int main(void) {
     transformed = NO_CUSTOM_FORM;
     memset(INVENTORY.items, ITEM_NONE, sizeof(INVENTORY.items));
     MAGIC = 37;
-    for (int e = 1; e < 4; ++e) enabled[e] = 1;
+    // Normal progression is available with every cheat checkbox off.
+    for (int e = 1; e < 4; ++e) enabled[e] = 0;
     REQUIRE(SwordElement_IsAvailable(0));
     REQUIRE(!SwordElement_IsAvailable(1));
     REQUIRE(!SwordElement_IsAvailable(2));
@@ -108,10 +109,8 @@ int main(void) {
     REQUIRE(!SwordElement_Set(ITEM_SWORD_MASTER, 4));
     REQUIRE(!SwordElement_Set(ITEM_SWORD_MASTER, 255));
     REQUIRE(SwordElement_Get(ITEM_SWORD_MASTER) == 2);
-    enabled[2] = 0;
-    REQUIRE(SwordElement_ForItem(ITEM_SWORD_MASTER) == 0);
+    REQUIRE(SwordElement_ForItem(ITEM_SWORD_MASTER) == 2);
     REQUIRE(SwordElement_Get(ITEM_SWORD_MASTER) == 2);
-    enabled[2] = 1;
     INVENTORY.items[SLOT_ARROW_ICE] = ITEM_NONE;
     REQUIRE(SwordElement_ForItem(ITEM_SWORD_MASTER) == 0);
     INVENTORY.items[SLOT_ARROW_ICE] = ITEM_ARROW_ICE;
@@ -149,6 +148,21 @@ int main(void) {
     player.heldItemId = ITEM_SWORD_KOKIRI;
     player.heldItemAction = PLAYER_IA_SWORD_KOKIRI;
     REQUIRE(SwordElement_Active(&play, &player) == 1);
+    // An override works before its arrow is acquired and cannot rewrite the
+    // saved per-sword choice. Disabling it restores that choice immediately.
+    for (int element = 1; element < 4; ++element) {
+        const u8 slots[] = { 0, SLOT_ARROW_FIRE, SLOT_ARROW_ICE, SLOT_ARROW_LIGHT };
+        const u8 arrows[] = { ITEM_NONE, ITEM_ARROW_FIRE, ITEM_ARROW_ICE, ITEM_ARROW_LIGHT };
+        INVENTORY.items[slots[element]] = ITEM_NONE;
+        enabled[element] = 1;
+        REQUIRE(!SwordElement_IsAvailable(element));
+        REQUIRE(SwordElement_Active(&play, &player) == element);
+        REQUIRE(SwordElement_Get(ITEM_SWORD_KOKIRI) == 1);
+        REQUIRE(SwordElement_ForItem(ITEM_BOW) == 0);
+        enabled[element] = 0;
+        INVENTORY.items[slots[element]] = arrows[element];
+        REQUIRE(SwordElement_Active(&play, &player) == 1);
+    }
     Player remote = player;
     REQUIRE(SwordElement_Active(&play, &remote) == 0);
     transformed = 1;
@@ -174,13 +188,17 @@ int main(void) {
     REQUIRE(MELEE_FLAGS == (BASE_STRIKE | LIGHT_STRIKE));
     enabled[3] = 0;
     DinFireSword_RefreshDamage(&play, &player);
+    REQUIRE(MELEE_FLAGS == (BASE_STRIKE | LIGHT_STRIKE));
+    INVENTORY.items[SLOT_ARROW_LIGHT] = ITEM_NONE;
+    DinFireSword_RefreshDamage(&play, &player);
     REQUIRE(MELEE_FLAGS == BASE_STRIKE);
-    enabled[3] = 1;
+    INVENTORY.items[SLOT_ARROW_LIGHT] = ITEM_ARROW_LIGHT;
     REQUIRE(SwordElement_Set(ITEM_SWORD_KOKIRI, 0));
     REQUIRE(DinFireSword_DamageFlags(&play, &player, BASE_STRIKE) == BASE_STRIKE);
-    // The original Din-checkbox path must also respect the new arrow unlock.
+    // Cheat forcing is independent of arrow acquisition, Alt Assets and the
+    // legacy Din appearance. Explicit None remains a saved normal choice.
     memset(&nei, 0, sizeof(nei));
-    legacyEnabled = nativeAssets = 1;
+    legacyEnabled = nativeAssets = 0;
 #ifdef SWORD_ELEMENT_TEST_MM
     player.leftHandType = PLAYER_MODELTYPE_LH_ONE_HAND_SWORD;
 #else
@@ -188,13 +206,20 @@ int main(void) {
     player.leftHandType = PLAYER_MODELTYPE_LH_SWORD;
 #endif
     INVENTORY.items[SLOT_ARROW_FIRE] = ITEM_NONE;
+    enabled[1] = 1;
+    REQUIRE(DinFireSword_DamageFlags(&play, &player, BASE_STRIKE) == (BASE_STRIKE | FIRE_STRIKE));
+    REQUIRE(SwordElement_Get(ITEM_SWORD_KOKIRI) == 0);
+    enabled[1] = 0;
     REQUIRE(DinFireSword_DamageFlags(&play, &player, BASE_STRIKE) == BASE_STRIKE);
     INVENTORY.items[SLOT_ARROW_FIRE] = ITEM_ARROW_FIRE;
-    REQUIRE(DinFireSword_DamageFlags(&play, &player, BASE_STRIKE) == (BASE_STRIKE | FIRE_STRIKE));
+    REQUIRE(DinFireSword_DamageFlags(&play, &player, BASE_STRIKE) == BASE_STRIKE);
     REQUIRE(SwordElement_Set(ITEM_SWORD_KOKIRI, 0));
+    enabled[1] = 1;
+    REQUIRE(DinFireSword_DamageFlags(&play, &player, BASE_STRIKE) == (BASE_STRIKE | FIRE_STRIKE));
+    enabled[1] = 0;
     REQUIRE(DinFireSword_DamageFlags(&play, &player, BASE_STRIKE) == BASE_STRIKE);
     REQUIRE(MAGIC == 37);
-    puts("PASS elemental sword core/combat integration: real arrow gate, assets-off ice/light, atomic element switch, explicit None, legacy gate, no magic");
+    puts("PASS elemental sword core/combat: arrow unlock independent of options, asset-free cheats, saved None, unchanged sword flags, no magic");
 #endif
     puts("PASS elemental sword state: arrow gating, independent swords/upgrades, no stacking, reversibility, owner isolation, zero magic cost");
     return 0;

@@ -1059,6 +1059,7 @@ void CollisionCheck_InitContext(PlayState* play, CollisionCheckContext* colChkCt
 }
 
 void CollisionCheck_DestroyContext(PlayState* play, CollisionCheckContext* colChkCtx) {
+    DinFireSword_FinishTeardown(play);
 }
 
 /**
@@ -3068,6 +3069,7 @@ void CollisionCheck_ApplyDamage(PlayState* play, CollisionCheckContext* colChkCt
         u8 hitDamage = (u8)damage;
         GameInteractor_Should(VB_PLAYER_ATTACK_DAMAGE_MULTIPLIER, true, play, &hitDamage, collider->actor);
         collider->actor->colChkInfo.damage += hitDamage;
+        DinFireSword_FinishAcceptedHit(play, collider, info->acHitInfo, info->bumper.dmgFlags, hitDamage);
     }
 
     if (NEI_PlayerDamageBoostActive()) {

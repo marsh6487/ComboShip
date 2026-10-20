@@ -59,6 +59,7 @@ u8 MasterCycle_IsRiding(void);
 #include "mods/nei_save.h"
 #include "mods/forms/custom_forms.h"
 #include "sword_element.h"
+#include "../../../combo/render/sword_element_ui_art.h"
 #include "din_fire_sword.h"
 uint8_t Sw97_EffectiveElement(uint8_t isSling);
 uint8_t Sw97_IsBowItem(uint16_t item);
@@ -6517,7 +6518,7 @@ void Interface_Dpad_DrawAmmoCount(PlayState* play, s16 button, s16 alpha) {
      ((item) == ITEM_EXT_BUTTON))
 
 // The rendered B icon's rectangle includes the HUD editor's anchor and scale.
-// A native arrow icon in its corner identifies the sword's active enchantment.
+// Bundled elemental artwork identifies the sword's effective enchantment.
 extern u8 ExtEquip_ShouldHideSwordDL(void);
 extern u8 FourSword_IsEquipped(void);
 extern s32 BossRemains_IsOdolwaWorn(void);
@@ -6544,22 +6545,13 @@ static void Interface_DrawSwordElementBadge(PlayState* play, u16 item, s16 butto
     if (element <= SWORD_ELEMENT_NONE || element >= SWORD_ELEMENT_COUNT) {
         return;
     }
-    static const char* const textures[SWORD_ELEMENT_COUNT] = { NULL, gItemIconFireArrowTex, gItemIconIceArrowTex,
-                                                               gItemIconLightArrowTex };
     s16 markWidth = MAX(1, width * 2 / 5);
     s16 markHeight = MAX(1, height * 2 / 5);
     s16 markLeft = left + width - markWidth + MAX(1, width / 15);
     s16 markTop = top - MAX(1, height / 15);
     OPEN_DISPS(play->state.gfxCtx);
-    gDPPipeSync(OVERLAY_DISP++);
-    gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
-    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, interfaceCtx->bAlpha);
-    gDPLoadTextureBlock(OVERLAY_DISP++, textures[element], G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0,
-                        G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD,
-                        G_TX_NOLOD);
-    gSPWideTextureRectangle(OVERLAY_DISP++, markLeft * 4, markTop * 4, (markLeft + markWidth) * 4,
-                            (markTop + markHeight) * 4, G_TX_RENDERTILE, 0, 0, 32 * 1024 / markWidth,
-                            32 * 1024 / markHeight);
+    SwordElementUi_DrawElement(&OVERLAY_DISP, element, markLeft, markTop, markWidth, markHeight, interfaceCtx->bAlpha,
+                               0, 1);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 

@@ -41,6 +41,15 @@ def main():
                 command.append(str(source))
             subprocess.run([*command, "-lm", "-o", binary], cwd=ROOT, check=True)
             subprocess.run([binary], check=True)
+        menu = [os.environ.get("CXX", "c++"), "-std=c++20", "-I" + str(ROOT / "combo"),
+                "-I" + str(ROOT / "libultraship/include")]
+        if "--sanitize" in sys.argv:
+            menu += ["-fsanitize=address,undefined", "-fno-sanitize-recover=all",
+                     "-fno-omit-frame-pointer", "-fno-pie", "-no-pie"]
+        menu += [str(ROOT / "tests/elemental_swords/override_menu_test.cpp"),
+                 "-o", str(Path(directory) / "override-menu")]
+        subprocess.run(menu, cwd=ROOT, check=True)
+        subprocess.run([menu[-1]], check=True)
 
 if __name__ == "__main__":
     main()

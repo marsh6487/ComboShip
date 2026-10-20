@@ -4,6 +4,7 @@
 #define SwordElement_HasSelection AuraBoundaryHasSelection
 #define SwordElement_Active AuraBoundaryActive
 #define SwordElement_IsAvailable AuraBoundaryAvailable
+#define SwordElement_Override AuraBoundaryOverride
 #define CVarGetInteger AuraBoundaryCVar
 #ifdef SWORD_AURA_TEST_MM
 #include "../../mm/tests/din_fire_fixture.h"
@@ -23,6 +24,7 @@ NeiSaveData* Nei_Save(void) { return &nei; }
 #undef SwordElement_HasSelection
 #undef SwordElement_Active
 #undef SwordElement_IsAvailable
+#undef SwordElement_Override
 #undef CVarGetInteger
 #include "sword_element.h"
 
@@ -70,18 +72,20 @@ int main(void) {
     const u8 arrows[] = { ITEM_NONE, ITEM_ARROW_FIRE, ITEM_ARROW_ICE, ITEM_ARROW_LIGHT };
     for (int element = 1; element < 4; ++element) {
         CoreAuraSetup();
-        gate[element] = 1;
         REQUIRE(!SwordElement_Set(ITEM_SWORD_KOKIRI, element));
         REQUIRE(CoreAuraDraw() == 0);
         AURA_INVENTORY.items[slots[element]] = arrows[element];
         REQUIRE(SwordElement_Set(ITEM_SWORD_KOKIRI, element));
         REQUIRE(CoreAuraDraw() > 0);
-        gate[element] = 0;
-        REQUIRE(CoreAuraDraw() == 0);
-        gate[element] = 1;
+        // The arrow grants a normal imbue with the cheat switch off.
+        REQUIRE(CoreAuraDraw() > 0);
         AURA_INVENTORY.items[slots[element]] = ITEM_NONE;
         REQUIRE(CoreAuraDraw() == 0);
         REQUIRE(SwordElement_Get(ITEM_SWORD_KOKIRI) == element);
+        gate[element] = 1;
+        REQUIRE(CoreAuraDraw() > 0);
+        gate[element] = 0;
+        REQUIRE(CoreAuraDraw() == 0);
         AURA_INVENTORY.items[slots[element]] = arrows[element];
         REQUIRE(CoreAuraDraw() > 0);
         REQUIRE(SwordElement_Set(ITEM_SWORD_KOKIRI, SWORD_ELEMENT_NONE));
@@ -91,7 +95,10 @@ int main(void) {
         enabled = alt = assets = 1;
 #endif
         REQUIRE(CoreAuraDraw() == 0);
+        gate[element] = 1;
+        REQUIRE(CoreAuraDraw() > 0);
+        REQUIRE(SwordElement_Get(ITEM_SWORD_KOKIRI) == SWORD_ELEMENT_NONE);
     }
-    puts("PASS real selector/aura integration: all arrow and checkbox gates, explicit None, no pack/Alt dependency or magic cost");
+    puts("PASS real selector/aura: independent arrow unlocks and cheat overrides, saved None, no pack/Alt dependency or magic cost");
     return 0;
 }

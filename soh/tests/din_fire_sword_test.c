@@ -15,6 +15,7 @@ static Mtx matrix;
 static MtxF currentMatrix, matrixStack[8], submittedMatrices[8];
 static int enabled, alt, assets, loadFailure, transformed, invisible, customColors;
 static int depth, matrices, fireDamage, otherOwner, pakActive, bossOwner;
+static int graphFailure;
 static int renderKokiriUpgrade, renderFairyUpgrade, fourSwordOwner;
 static Gfx handDL[6], swordBlade[1], hand[1];
 static const char* missing;
@@ -23,9 +24,13 @@ static const char* lastCorePath;
 // selector's inventory, ownership and checkbox gates have their own core tests.
 static int elementalSelection = -1;
 static u8 elementalActive;
+static u8 elementalOverride;
 static u8 elementalAvailable = 1;
 static int auraTrueMaster, resourceQueries;
 SaveContext gSaveContext;
+
+void lusprintf(const char* file, int32_t line, int32_t level, const char* fmt, ...) {
+}
 
 uint8_t SwordElement_Get(uint16_t item) {
     return elementalSelection < 0 ? 0 : elementalSelection;
@@ -34,7 +39,10 @@ uint8_t SwordElement_HasSelection(uint16_t item) {
     return elementalSelection >= 0;
 }
 uint8_t SwordElement_Active(PlayState* state, Player* owner) {
-    return elementalActive;
+    return elementalOverride ? elementalOverride : elementalActive;
+}
+uint8_t SwordElement_Override(void) {
+    return elementalOverride;
 }
 uint8_t SwordElement_IsAvailable(uint8_t element) {
     return elementalAvailable;
@@ -83,6 +91,8 @@ Gfx* ResourceMgr_LoadGfxByName(const char* path) {
     return flame;
 }
 void* Graph_Alloc(GraphicsContext* context, size_t size) {
+    if (graphFailure)
+        return NULL;
     REQUIRE(size <= sizeof(handDL));
     return handDL;
 }
@@ -155,6 +165,7 @@ Mtx* Matrix_NewMtx(GraphicsContext* context, char* file, s32 line) {
 }
 
 static void setup(void) {
+    graphFailure = 0;
     memset(&play, 0, sizeof(play));
     memset(&player, 0, sizeof(player));
     memset(&gfx, 0, sizeof(gfx));
@@ -174,6 +185,7 @@ static void setup(void) {
     fireDamage = otherOwner = pakActive = bossOwner = 0;
     elementalSelection = -1;
     elementalActive = 0;
+    elementalOverride = 0;
     elementalAvailable = 1;
     auraTrueMaster = resourceQueries = 0;
     renderKokiriUpgrade = renderFairyUpgrade = fourSwordOwner = 0;

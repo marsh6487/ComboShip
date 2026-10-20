@@ -39,17 +39,23 @@ u8 Nei_HookshotLevel(void) { return 0; }
 #include "sword_badge_icon_production.inc"
 
 static void CheckIntegratedBadge(int left, int top, int width) {
-    Gfx* rect = NULL;
-    const char* texture = NULL;
+    int rectangle = 0;
+    const void* texture = NULL;
     for (Gfx* g = commands; g < gfx.overlay.p; ++g) {
-        if ((g->words.w0 >> 24) == G_SETTIMG) texture = (const char*)g->words.w1;
-        if ((g->words.w0 >> 24) == G_TEXRECT_WIDE) rect = g;
+        if ((g->words.w0 >> 24) == G_SETTIMG) texture = (const void*)g->words.w1;
+        if ((g->words.w0 >> 24) != G_TEXRECT_WIDE) continue;
+        /* Movable HUD modes also submit the native sword as a wide rectangle. */
+        if (rectangle == 0 && texture != sSwordElementUiIceArt[0].pixels) continue;
+        REQUIRE(texture == sSwordElementUiIceArt[rectangle].pixels);
+        const int x4 = left * 4 + (rectangle & 1) * width * 2;
+        const int y4 = top * 4 + (rectangle >> 1) * width * 2;
+        REQUIRE((g->words.w0 & 0xFFFFFF) == x4 + width * 2);
+        REQUIRE(g->words.w1 == y4 + width * 2);
+        REQUIRE((g[1].words.w0 & 0xFFFFFF) == x4);
+        REQUIRE(g[1].words.w1 == y4);
+        ++rectangle;
     }
-    REQUIRE(texture == ICE_TEXTURE && rect != NULL);
-    REQUIRE((rect->words.w0 & 0xFFFFFF) == (left + width) * 4);
-    REQUIRE(rect->words.w1 == (top + width) * 4);
-    REQUIRE((rect[1].words.w0 & 0xFFFFFF) == left * 4);
-    REQUIRE(rect[1].words.w1 == top * 4);
+    REQUIRE(rectangle == 4);
 }
 int main(void) {
     memset(&play, 0, sizeof(play));

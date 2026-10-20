@@ -167,11 +167,11 @@ int main() {
                             Rando::MiscBehavior::Receive(nullptr, &play);
                             assert(grants == 1 && notices == 0);
                             assert(RANDO_SAVE_CHECKS[RC_UNKNOWN].obtained && !RANDO_SAVE_CHECKS[RC_UNKNOWN].eligible);
-                            assert(activeCustomMessage.swordElementTutorial == (enabled && !owned ? element : 0));
+                            assert(activeCustomMessage.swordElementTutorial == (!owned ? element : 0));
                             if (!overhead) CustomMessage::LoadCustomMessageIntoFont(activeCustomMessage);
                             assert(opens == (overhead ? 1 : 0));
                             const auto body = Loaded();
-                            assert((body.find("cost no magic.") != std::string::npos) == (enabled && !owned && !denied));
+                            assert((body.find("cost no magic.") != std::string::npos) == (!owned && !denied));
                             auto flat = body;
                             for (char& c : flat) if (c == '\021') c = ' ';
                             assert(flat.find("Bank reward") != std::string::npos);

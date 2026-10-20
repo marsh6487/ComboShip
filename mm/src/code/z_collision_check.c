@@ -1157,6 +1157,7 @@ void CollisionCheck_InitContext(struct PlayState* play, CollisionCheckContext* c
 }
 
 void CollisionCheck_DestroyContext(struct PlayState* play, CollisionCheckContext* colChkCtx) {
+    DinFireSword_FinishTeardown(play);
 }
 
 /**
@@ -3593,6 +3594,8 @@ void CollisionCheck_ApplyDamage(struct PlayState* play, CollisionCheckContext* c
                 ComboRpg_IsEnabled(COMBO_RPG_POWER)) {
                 finalDamage = ComboRpg_ApplyPower((u8)CLAMP(finalDamage, 0.0f, 255.0f), Rand_ZeroOne());
             }
+            DinFireSword_FinishAcceptedHit(play, col, atElem, elem->acDmgInfo.dmgFlags,
+                                           (uint32_t)(finalDamage > 0.0f ? finalDamage : 0.0f));
             if (col->actor->colChkInfo.damage < finalDamage) {
                 col->actor->colChkInfo.damage = finalDamage;
             }

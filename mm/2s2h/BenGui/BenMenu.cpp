@@ -1,3 +1,4 @@
+#include "../../../combo/gameplay/SwordElementOverride.h"
 #include "../../../combo/gui/WhatsNew.h"
 #ifdef COMBO_BUILD
 #include "../../../combo/gui/BlackMarketAppearance.h"
@@ -1605,19 +1606,25 @@ void BenMenu::AddEnhancements() {
             "unchanged."));
     AddWidget(path, "Fire Damage", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.DinFireSwordDamage")
+        .Callback([](WidgetInfo& info) { CwSwordElementOverride_Changed(info.cVar); })
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
-            "Enables fire enchantments after obtaining Fire Arrows. Press A on a sword in the equipment screen to "
-            "choose its element. Swings cost no magic and retain normal sword damage, cutting, and reach."));
+            "Force fire on regular swords, even without Fire Arrows. Only one override is active at a time. "
+            "Turn off to restore each sword's saved imbue. Fire Arrows independently unlock this element in the "
+            "equipment-screen A selector. Sword strikes retain normal damage and cutting, and cost no magic."));
     AddWidget(path, "Ice Damage", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.IceSwordDamage")
+        .Callback([](WidgetInfo& info) { CwSwordElementOverride_Changed(info.cVar); })
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
-            "Enables ice enchantments after obtaining Ice Arrows. Select ice on a sword in the equipment screen. "
-            "Adds supported freezing reactions while retaining normal sword damage and cutting. Costs no magic."));
+            "Force ice on regular swords, even without Ice Arrows. Only one override is active at a time. "
+            "Turn off to restore each sword's saved imbue. Ice Arrows independently unlock this element in the "
+            "equipment-screen A selector. Sword strikes retain normal damage and cutting, and cost no magic."));
     AddWidget(path, "Light Damage", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.LightSwordDamage")
+        .Callback([](WidgetInfo& info) { CwSwordElementOverride_Changed(info.cVar); })
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
-            "Enables light enchantments after obtaining Light Arrows. Select light on a sword in the equipment screen. "
-            "Adds supported light reactions while retaining normal sword damage and cutting. Costs no magic."));
+            "Force light on regular swords, even without Light Arrows. Only one override is active at a time. "
+            "Turn off to restore each sword's saved imbue. Light Arrows independently unlock this element in the "
+            "equipment-screen A selector. Sword strikes retain normal damage and cutting, and cost no magic."));
     AddWidget(path, "Use OoT Sky Textures", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Graphics.UseOotSkyTextures")
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(

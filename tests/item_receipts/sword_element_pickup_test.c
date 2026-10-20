@@ -127,7 +127,7 @@ int main(void) {
                     const size_t header = 0;
 #endif
                     assert(memcmp(Buffer() + header, receipt, prefix) == 0);
-                    const int tutorial = enabled && !owned && !denied;
+                    const int tutorial = !owned && !denied;
                     assert((Buffer()[header + prefix] == (header ? 0x10 : 4)) == tutorial);
                     const size_t length = play.msgCtx.msgLength;
                     NativeReceive(&play, &player);

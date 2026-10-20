@@ -35,10 +35,14 @@ static Actor* soundActor;
 // Isolate the selection-state boundary; core tests cover its inventory gates.
 static int elementalSelection = -1;
 static u8 elementalActive;
+static u8 elementalOverride;
 static u8 elementalAvailable = 1;
 static int auraTrueMaster, resourceQueries;
 SaveContext gSaveContext;
 PlayState* gPlayState = &play;
+
+void lusprintf(const char* file, int32_t line, int32_t level, const char* fmt, ...) {
+}
 
 uint8_t SwordElement_Get(uint16_t item) {
     return elementalSelection < 0 ? 0 : elementalSelection;
@@ -47,7 +51,10 @@ uint8_t SwordElement_HasSelection(uint16_t item) {
     return elementalSelection >= 0;
 }
 uint8_t SwordElement_Active(PlayState* state, Player* owner) {
-    return elementalActive;
+    return elementalOverride ? elementalOverride : elementalActive;
+}
+uint8_t SwordElement_Override(void) {
+    return elementalOverride;
 }
 uint8_t SwordElement_IsAvailable(uint8_t element) {
     return elementalAvailable;
@@ -260,6 +267,7 @@ static void Setup(void) {
     fourSwordOwner = 0;
     elementalSelection = -1;
     elementalActive = 0;
+    elementalOverride = 0;
     elementalAvailable = 1;
     auraTrueMaster = resourceQueries = 0;
     customForm = CUSTOM_FORM_NONE;

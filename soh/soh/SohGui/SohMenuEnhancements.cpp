@@ -1,3 +1,4 @@
+#include "../../../combo/gameplay/SwordElementOverride.h"
 #ifdef COMBO_BUILD
 #include "../../../combo/gui/BlackMarketAppearance.h"
 #endif
@@ -867,19 +868,25 @@ void SohMenu::AddMenuEnhancements() {
             "Normal sword damage and reach are unchanged."));
     AddWidget(path, "Fire Damage", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("DinFireSwordDamage"))
-        .Options(CheckboxOptions().Tooltip(
-            "Enables fire enchantments after obtaining Fire Arrows. Press A on a sword in the equipment screen to "
-            "choose its element. Swings cost no magic and retain normal sword damage, cutting, and reach."));
+        .Callback([](WidgetInfo& info) { CwSwordElementOverride_Changed(info.cVar); })
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Force fire on regular swords, even without Fire Arrows. Only one override is active at a time. "
+            "Turn off to restore each sword's saved imbue. Fire Arrows independently unlock this element in the "
+            "equipment-screen A selector. Sword strikes retain normal damage and cutting, and cost no magic."));
     AddWidget(path, "Ice Damage", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("IceSwordDamage"))
-        .Options(CheckboxOptions().Tooltip(
-            "Enables ice enchantments after obtaining Ice Arrows. Select ice on a sword in the equipment screen. "
-            "Adds supported freezing reactions while retaining normal sword damage and cutting. Costs no magic."));
+        .Callback([](WidgetInfo& info) { CwSwordElementOverride_Changed(info.cVar); })
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Force ice on regular swords, even without Ice Arrows. Only one override is active at a time. "
+            "Turn off to restore each sword's saved imbue. Ice Arrows independently unlock this element in the "
+            "equipment-screen A selector. Sword strikes retain normal damage and cutting, and cost no magic."));
     AddWidget(path, "Light Damage", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("LightSwordDamage"))
-        .Options(CheckboxOptions().Tooltip(
-            "Enables light enchantments after obtaining Light Arrows. Select light on a sword in the equipment screen. "
-            "Adds supported light reactions while retaining normal sword damage and cutting. Costs no magic."));
+        .Callback([](WidgetInfo& info) { CwSwordElementOverride_Changed(info.cVar); })
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Force light on regular swords, even without Light Arrows. Only one override is active at a time. "
+            "Turn off to restore each sword's saved imbue. Light Arrows independently unlock this element in the "
+            "equipment-screen A selector. Sword strikes retain normal damage and cutting, and cost no magic."));
     AddWidget(path, "MM Ice Arrow Behavior", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("MmIceArrows"))
         .Options(CheckboxOptions().Tooltip(

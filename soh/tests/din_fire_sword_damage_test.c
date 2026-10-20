@@ -32,6 +32,8 @@ bool GameInteractor_Should(GIVanillaBehavior flag, uint32_t result, ...) {
 }
 void GameInteractor_ExecuteOnActorKill(void* actor) {
 }
+void MmSfx_StopAtPos(u16 sound, Vec3f* pos) {
+}
 void TimeCtl_NoteAcCollider(Collider* collider) {
 }
 uint8_t GameInteractor_SecondCollisionUpdate(void) {
@@ -39,8 +41,6 @@ uint8_t GameInteractor_SecondCollisionUpdate(void) {
 }
 s32 FrameAdvance_IsEnabled(PlayState* play) {
     return 0;
-}
-void lusprintf(const char* file, int32_t line, int32_t level, const char* fmt, ...) {
 }
 
 DamageTable* Test_DekuBabaTable(void);

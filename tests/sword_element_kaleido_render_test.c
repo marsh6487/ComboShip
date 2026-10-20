@@ -1,28 +1,25 @@
-#ifdef SWORD_KALEIDO_MM
 #include "global.h"
-#else
-#include "global.h"
-#endif
 #include "sword_element.h"
 #include "sword_element_kaleido.h"
+#include "../combo/render/sword_element_ui_art_data.h"
+#include "../combo/render/sword_element_ui_type_data.h"
 #include <assert.h>
-#include <stdarg.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
 static GraphicsContext sGfx;
 static PlayState sPlay;
-static Gfx sOpa[1024], sOverlay[1024], sWork[32], sXlu[32];
+static Gfx sOpa[1024], sOverlay[2048], sWork[32], sXlu[32];
 static Gfx sArena[256];
 static Vtx sVertices[4];
-static char sText[256];
-static size_t sTextLength;
-static u32 sLastPrintColor;
-static u8 sIceLabelGray;
+static const char sSwordIcon[32] = "SwordIcon";
 static u8 sFailAllocation;
+static u8 sActive = SWORD_ELEMENT_FIRE;
 SaveContext gSaveContext;
 void gSPVertex(Gfx* packet, uintptr_t vertices, int count, int first) { __gSPVertex(packet, vertices, count, first); }
 uint8_t SwordElement_IsAvailable(uint8_t element) { return element != SWORD_ELEMENT_ICE; }
+uint8_t SwordElement_ForItem(uint16_t item) { return sActive; }
 void FrameInterpolation_RecordOpenChild(const void* key, int id) {}
 void FrameInterpolation_RecordCloseChild(void) {}
 #ifdef SWORD_KALEIDO_MM
@@ -40,30 +37,11 @@ void* Graph_Alloc(GraphicsContext* context, size_t size) {
     return sFailAllocation ? NULL : sVertices;
 }
 #endif
-/* The native printer boundary records requested text/color. Geometry and texture commands remain real GBI. */
-void GfxPrint_Init(GfxPrint* p) { memset(p, 0, sizeof(*p)); }
-void GfxPrint_Destroy(GfxPrint* p) {}
-void GfxPrint_Open(GfxPrint* p, Gfx* display) { p->dList = display; }
-Gfx* GfxPrint_Close(GfxPrint* p) { return p->dList; }
-void GfxPrint_SetPosPx(GfxPrint* p, s32 x, s32 y) { assert(x >= 80 && x <= 220 && y >= 130 && y <= 208); }
-void GfxPrint_SetColor(GfxPrint* p, u32 r, u32 g, u32 b, u32 a) { sLastPrintColor = r << 16 | g << 8 | b; }
-s32 GfxPrint_Printf(GfxPrint* p, const char* fmt, ...) {
-    char text[64];
-    va_list args;
-    va_start(args, fmt);
-    int n = vsnprintf(text, sizeof(text), fmt, args);
-    va_end(args);
-    if (!strcmp(text, "Ice")) sIceLabelGray = sLastPrintColor == 0x646464;
-    assert(sTextLength + n < sizeof(sText));
-    memcpy(sText + sTextLength, text, n + 1);
-    sTextLength += n;
-    return n;
-}
+/* No GfxPrint fixture is provided: any accidental pixel-printer call fails linking. */
 static void reset_draw(void) {
     memset(&sGfx, 0, sizeof(sGfx));
     memset(sOpa, 0, sizeof(sOpa));
-    memset(sText, 0, sizeof(sText));
-    sTextLength = sIceLabelGray = 0;
+    memset(sOverlay, 0, sizeof(sOverlay));
     sGfx.polyOpa.p = sOpa;
     sGfx.polyOpa.d = sArena + 256;
     sGfx.polyXlu.p = sXlu;
@@ -72,11 +50,14 @@ static void reset_draw(void) {
     sPlay.state.gfxCtx = &sGfx;
     sPlay.pauseCtx.alpha = 255;
 }
-static int texture(const char* fragment) {
+static int resource(const char* fragment) {
     Gfx* starts[] = { sOpa, sOverlay };
     Gfx* ends[] = { sGfx.polyOpa.p, sGfx.overlay.p };
     for (int i = 0; i < 2; ++i) for (Gfx* p = starts[i]; p < ends[i]; ++p) {
-        if ((p->words.w0 >> 24) == G_SETTIMG && strstr((const char*)p->words.w1, fragment)) return 1;
+        if ((p->words.w0 >> 24) == G_SETTIMG) {
+            const char* data = (const char*)p->words.w1;
+            if ((data == sSwordIcon || !memcmp(data, "__OTR__", 7)) && strstr(data, fragment)) return 1;
+        }
     }
     return 0;
 }
@@ -88,6 +69,65 @@ static int command(int opcode, uintptr_t word1) {
     }
     return 0;
 }
+static const SwordElementUiMask* masks[] = {
+    &sSwordElementUiTitle, &sSwordElementUiSubtitle,
+    &sSwordElementUiNone, &sSwordElementUiFire, &sSwordElementUiIce, &sSwordElementUiLight,
+    &sSwordElementUiActive, &sSwordElementUiLocked, &sSwordElementUiSelect, &sSwordElementUiArrows,
+    &sSwordElementUiA, &sSwordElementUiB, &sSwordElementUiApply, &sSwordElementUiBack,
+    &sSwordElementUiSolid, &sSwordElementUiRound, &sSwordElementUiCircle, &sSwordElementUiLock,
+};
+static int mask_count(const SwordElementUiMask* mask) {
+    const u8* pixels = NULL;
+    int format = -1, count = 0;
+    for (Gfx* p = sOverlay; p < sGfx.overlay.p; ++p) {
+        if ((p->words.w0 >> 24) == G_SETTIMG) {
+            pixels = (const u8*)p->words.w1;
+            format = (p->words.w0 >> 21) & 7;
+        }
+        if ((p->words.w0 >> 24) == G_SETTILESIZE && format == G_IM_FMT_IA) {
+            int width = ((p->words.w1 >> 12) & 0xfff) / 4 + 1;
+            int height = (p->words.w1 & 0xfff) / 4 + 1;
+            count += width == mask->width && height == mask->height &&
+                     !memcmp(pixels, mask->pixels, width * height);
+        }
+    }
+    return count;
+}
+static void check_native_load_bounds(void) {
+    const u8* pixels = NULL;
+    int format = -1, loadBytes = 0, artTiles = 0;
+    for (Gfx* p = sOverlay; p < sGfx.overlay.p; ++p) {
+        int op = p->words.w0 >> 24;
+        if (op == G_SETTIMG) {
+            pixels = (const u8*)p->words.w1;
+            format = (p->words.w0 >> 21) & 7;
+        }
+        if (op == G_LOADBLOCK) {
+            int texels = ((p->words.w1 >> 12) & 0xfff) + 1;
+            /* IA8 blocks are transferred through 16-bit load units. */
+            loadBytes = texels * (format == G_IM_FMT_RGBA ? 4 : 2);
+            assert(loadBytes <= 4096);
+        }
+        if (op != G_SETTILESIZE || pixels == (const u8*)sSwordIcon) continue;
+        int width = ((p->words.w1 >> 12) & 0xfff) / 4 + 1;
+        int height = (p->words.w1 & 0xfff) / 4 + 1;
+        if (format == G_IM_FMT_RGBA) {
+            const SwordElementUiRgbaTile* tile = (const void*)(pixels - offsetof(SwordElementUiRgbaTile, pixels));
+            assert(width == 32 && height == 32 && loadBytes == sizeof(tile->pixels));
+            assert(tile->before == SWORD_ELEMENT_UI_CANARY && tile->after == SWORD_ELEMENT_UI_CANARY);
+            ++artTiles;
+        } else {
+            assert(format == G_IM_FMT_IA && loadBytes <= width * height);
+            int matched = 0;
+            for (unsigned i = 0; i < sizeof(masks) / sizeof(*masks); ++i) {
+                matched |= width == masks[i]->width && height == masks[i]->height &&
+                           !memcmp(pixels, masks[i]->pixels, width * height);
+            }
+            assert(matched);
+        }
+    }
+    assert(artTiles == 12);
+}
 static Vtx* vertices(void) {
 #ifdef SWORD_KALEIDO_MM
     return (Vtx*)sGfx.polyOpa.d;
@@ -95,31 +135,51 @@ static Vtx* vertices(void) {
     return sVertices;
 #endif
 }
-int main(void) {
+#include "elemental_ui_dump.h"
+int main(int argc, char** argv) {
     SwordElementMenu menu = { 0 };
     SaveContext saveBefore;
     PauseContext pauseBefore;
     memset(&gSaveContext, 0x5a, sizeof(gSaveContext));
     reset_draw();
-    SwordElementKaleido_Draw(&sPlay, &menu, (void*)"SwordIcon");
-    assert(sGfx.polyOpa.p == sOpa && !sTextLength);
+    SwordElementKaleido_Draw(&sPlay, &menu, (void*)sSwordIcon);
+    assert(sGfx.polyOpa.p == sOpa && sGfx.overlay.p == sOverlay);
     menu.phase = SWORD_ELEMENT_MENU_CHOOSER;
-    menu.selection = SWORD_ELEMENT_FIRE;
+    menu.selection = SWORD_ELEMENT_LIGHT;
     saveBefore = gSaveContext;
     pauseBefore = sPlay.pauseCtx;
-    SwordElementKaleido_Draw(&sPlay, &menu, (void*)"SwordIcon");
-    assert(sGfx.polyOpa.p == sOpa && sGfx.overlay.p > sOverlay); /* fixed-screen chooser */
-    assert(texture("SwordIcon") && texture("EquippedItemOutline"));
-#ifdef SWORD_KALEIDO_MM
-    assert(texture("FireArrow") && texture("IceArrow") && texture("LightArrow"));
-#else
-    assert(texture("ArrowFire") && texture("ArrowIce") && texture("ArrowLight"));
-#endif
-    assert(!texture("MagicArrowEquip"));
+    SwordElementKaleido_Draw(&sPlay, &menu, (void*)sSwordIcon);
+    assert(sGfx.polyOpa.p == sOpa && sGfx.overlay.p > sOverlay);
+    assert(sGfx.overlay.p < sOverlay + 2048);
+    assert(resource("SwordIcon") && !resource("EquippedItemOutline"));
+    assert(!resource("ArrowFire") && !resource("FireArrow") && !resource("ArrowIce") && !resource("IceArrow"));
+    assert(!resource("ArrowLight") && !resource("LightArrow") && !resource("MagicArrowEquip"));
     assert(command(G_SETGRAYSCALE, true) && command(G_SETGRAYSCALE, false));
-    assert(sIceLabelGray && strstr(sText, "NoneFireIceLight") && strstr(sText, "A Confirm  B Cancel"));
+    assert(mask_count(&sSwordElementUiTitle) == 1 && mask_count(&sSwordElementUiSubtitle) == 1);
+    assert(mask_count(&sSwordElementUiNone) == 1 && mask_count(&sSwordElementUiFire) == 1);
+    assert(mask_count(&sSwordElementUiIce) == 1 && mask_count(&sSwordElementUiLight) == 1);
+    assert(mask_count(&sSwordElementUiActive) == 1 && mask_count(&sSwordElementUiLocked) == 1);
+    assert(mask_count(&sSwordElementUiLock) == 1);
+    assert(mask_count(&sSwordElementUiA) == 1 && mask_count(&sSwordElementUiB) == 1);
+    assert(mask_count(&sSwordElementUiApply) == 1 && mask_count(&sSwordElementUiBack) == 1);
+    assert(command(G_SETPRIMCOLOR, 0xf2dc9bd7)); /* Selected Light has its restrained accent. */
+    assert(command(G_SETPRIMCOLOR, 0x768397ff)); /* Unavailable Ice has muted text. */
+    assert(command(G_SETPRIMCOLOR, 0xc5e5d7ff)); /* Effective Fire stays ACTIVE while selection moves. */
+    check_native_load_bounds();
+    if (argc > 1) elemental_ui_dump(argv[1]);
     assert(!memcmp(&pauseBefore, &sPlay.pauseCtx, sizeof(pauseBefore)));
     assert(!memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+
+    reset_draw();
+    sPlay.pauseCtx.alpha = 123;
+    SwordElementKaleido_Draw(&sPlay, &menu, (void*)sSwordIcon);
+    assert(command(G_SETPRIMCOLOR, 0xf2dc9b67));
+    for (Gfx* p = sOverlay; p < sGfx.overlay.p; ++p)
+        if ((p->words.w0 >> 24) == G_SETPRIMCOLOR) assert((p->words.w1 & 255) <= 123);
+    reset_draw();
+    sActive = SWORD_ELEMENT_ICE; /* A forced element can be active while arrow selection stays locked. */
+    SwordElementKaleido_Draw(&sPlay, &menu, (void*)sSwordIcon);
+    assert(mask_count(&sSwordElementUiActive) == 1 && mask_count(&sSwordElementUiLock) == 1);
 
     reset_draw();
     menu.phase = SWORD_ELEMENT_MENU_HOLD_SWORD;
@@ -127,10 +187,10 @@ int main(void) {
     menu.alpha = 254;
     menu.x = 120;
     menu.y = 440;
-    SwordElementKaleido_Draw(&sPlay, &menu, (void*)"SwordIcon");
-    assert(texture("MagicArrowEquipEffectTex"));
+    SwordElementKaleido_Draw(&sPlay, &menu, (void*)sSwordIcon);
+    assert(resource("MagicArrowEquipEffectTex"));
     assert(command(G_SETPRIMCOLOR, 0x6464FFFE));
-    assert(sGfx.overlay.p == sOverlay && !sTextLength); /* picker closed during fusion */
+    assert(sGfx.overlay.p == sOverlay);
     Vtx* v = vertices();
     assert(v[0].v.ob[0] == -3 && v[0].v.ob[1] == 59);
     assert(v[3].v.ob[0] == 59 && v[3].v.ob[1] == -3);
@@ -138,7 +198,7 @@ int main(void) {
     assert(!memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
     reset_draw();
     sPlay.pauseCtx.alpha = 0;
-    SwordElementKaleido_Draw(&sPlay, &menu, (void*)"SwordIcon");
-    assert(sGfx.polyOpa.p == sOpa && !sTextLength);
-    puts("sword elemental Kaleido rendering commands: PASS");
+    SwordElementKaleido_Draw(&sPlay, &menu, (void*)sSwordIcon);
+    assert(sGfx.polyOpa.p == sOpa && sGfx.overlay.p == sOverlay);
+    puts("sword elemental Kaleido render: smooth type, tiled art/load canaries, selected/active/locked, fade and fusion PASS");
 }

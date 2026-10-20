@@ -1,14 +1,12 @@
 #include "z_kaleido_scope.h"
 #include "textures/icon_item_static/icon_item_static.h"
 #include "textures/parameter_static/parameter_static.h"
-#define SWORD_KALEIDO_FIRE_ICON gItemIconArrowFireTex
-#define SWORD_KALEIDO_ICE_ICON gItemIconArrowIceTex
-#define SWORD_KALEIDO_LIGHT_ICON gItemIconArrowLightTex
 #define SWORD_KALEIDO_SETUP_OPA Gfx_SetupDL_42Opa
 #define SWORD_KALEIDO_SETUP_OVERLAY Gfx_SetupDL_39Overlay
 #define SWORD_KALEIDO_ALLOC Graph_Alloc
 #include "sword_element_kaleido.h"
 #include "sword_element.h"
+#include "../../../../../combo/render/sword_element_ui.h"
 #include <string.h>
 
 /* The native elemental-arrow fusion cadence, with its destination changed to the sword.
@@ -132,10 +130,7 @@ uint8_t SwordElementKaleido_Update(SwordElementMenu* menu, uint8_t contextValid,
 }
 
 void SwordElementKaleido_Draw(PlayState* play, const SwordElementMenu* menu, void* swordIcon) {
-    static const char* labels[] = { "None", "Fire", "Ice", "Light" };
     static const u8 color[][3] = { { 255, 255, 255 }, { 255, 0, 0 }, { 100, 100, 255 }, { 255, 255, 100 } };
-    const void* icons[] = { swordIcon, SWORD_KALEIDO_FIRE_ICON, SWORD_KALEIDO_ICE_ICON, SWORD_KALEIDO_LIGHT_ICON };
-    GfxPrint printer;
     u8 element;
     if (!menu->phase || play->pauseCtx.alpha == 0) {
         return;
@@ -169,56 +164,15 @@ void SwordElementKaleido_Draw(PlayState* play, const SwordElementMenu* menu, voi
             gSP1Quadrangle(POLY_OPA_DISP++, 0, 2, 3, 1, 0);
         }
     } else {
-        /* Texture rectangles and the native pause font share the fixed 320x240 overlay canvas.
-         * They do not inherit the equipment page's rotation or overlap its normal name panel. */
-        gDPPipeSync(OVERLAY_DISP++);
-        gDPSetCycleType(OVERLAY_DISP++, G_CYC_FILL);
-        gDPSetRenderMode(OVERLAY_DISP++, G_RM_NOOP, G_RM_NOOP2);
-        gDPSetFillColor(OVERLAY_DISP++, 0x18CB18CB);
-        gDPFillRectangle(OVERLAY_DISP++, 72, 126, 256, 214);
+        uint8_t available = 0;
+        for (element = SWORD_ELEMENT_NONE; element < SWORD_ELEMENT_COUNT; ++element) {
+            available |= (SwordElement_IsAvailable(element) != 0) << element;
+        }
+        /* The controller-driven chooser uses a fixed 320x240 canvas. Its fonts,
+         * rounded chrome and 64x64 tiled artwork are bundled into the executable. */
         SWORD_KALEIDO_SETUP_OVERLAY(play->state.gfxCtx);
-        gDPSetCombineMode(OVERLAY_DISP++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
-        gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 220, 90, play->pauseCtx.alpha);
-        gDPLoadTextureBlock(OVERLAY_DISP++, gEquippedItemOutlineTex, G_IM_FMT_IA, G_IM_SIZ_8b, 32, 32, 0,
-                            G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK,
-                            G_TX_NOLOD, G_TX_NOLOD);
-        gSPTextureRectangle(OVERLAY_DISP++, (80 + menu->selection * 44) << 2, 150 << 2,
-                            (116 + menu->selection * 44) << 2, 186 << 2, G_TX_RENDERTILE, 0, 0, 910, 910);
-        for (element = SWORD_ELEMENT_NONE; element < SWORD_ELEMENT_COUNT; ++element) {
-            u8 available = SwordElement_IsAvailable(element);
-            if (icons[element] == NULL) {
-                continue;
-            }
-            gDPPipeSync(OVERLAY_DISP++);
-            gDPSetPrimColor(OVERLAY_DISP++, 0, 0, available ? 255 : 96, available ? 255 : 96, available ? 255 : 96,
-                            play->pauseCtx.alpha);
-            gDPSetGrayscaleColor(OVERLAY_DISP++, 109, 109, 109, 255);
-            gSPGrayscale(OVERLAY_DISP++, !available);
-            gDPLoadTextureBlock(OVERLAY_DISP++, icons[element], G_IM_FMT_RGBA, G_IM_SIZ_32b, 32, 32, 0,
-                                G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMIRROR | G_TX_CLAMP, G_TX_NOMASK, G_TX_NOMASK,
-                                G_TX_NOLOD, G_TX_NOLOD);
-            gSPTextureRectangle(OVERLAY_DISP++, (82 + element * 44) << 2, 152 << 2, (114 + element * 44) << 2, 184 << 2,
-                                G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
-            gSPGrayscale(OVERLAY_DISP++, false);
-        }
-        GfxPrint_Init(&printer);
-        GfxPrint_Open(&printer, OVERLAY_DISP);
-        GfxPrint_SetColor(&printer, 255, 255, 255, play->pauseCtx.alpha);
-        GfxPrint_SetPosPx(&printer, 88, 132);
-        GfxPrint_Printf(&printer, "Sword element");
-        for (element = SWORD_ELEMENT_NONE; element < SWORD_ELEMENT_COUNT; ++element) {
-            u8 available = SwordElement_IsAvailable(element);
-            u8 selected = element == menu->selection;
-            GfxPrint_SetColor(&printer, available ? 255 : 100, available ? (selected ? 220 : 255) : 100,
-                              available ? (selected ? 90 : 255) : 100, play->pauseCtx.alpha);
-            GfxPrint_SetPosPx(&printer, 82 + element * 44, 188);
-            GfxPrint_Printf(&printer, "%s", labels[element]);
-        }
-        GfxPrint_SetColor(&printer, 220, 220, 220, play->pauseCtx.alpha);
-        GfxPrint_SetPosPx(&printer, 82, 204);
-        GfxPrint_Printf(&printer, "A Confirm  B Cancel");
-        OVERLAY_DISP = GfxPrint_Close(&printer);
-        GfxPrint_Destroy(&printer);
+        SwordElementUi_DrawChooser(&OVERLAY_DISP, swordIcon, menu->selection, SwordElement_ForItem(menu->item),
+                                   available, play->pauseCtx.alpha);
     }
     CLOSE_DISPS(play->state.gfxCtx);
 }

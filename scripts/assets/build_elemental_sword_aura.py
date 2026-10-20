@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 INPUT = ROOT / "tools/elemental_sword_aura"
 OUTPUT = ROOT / "combo/render/sword_element_aura_data.h"
 PACK_SHA = "5f7972b03e494aa3c309860dc2e91d85ab3bbe18c61244c06d063f8205e27306"
+MODERN_DIN_SHA = "ce1b8bfbfe9e1b2cf4a51355ea62c16826f60e8a65f07945d33a628b724cc781"
 ASSETS = ROOT / "soh/assets/custom"
 sys.path.insert(0, str(ROOT / "tools/nei_held"))
 from build_swords import SWORDS, FRAMES, decode_matrix
@@ -58,6 +59,69 @@ NATIVE_SOURCES = {
 }
 
 def sha(data): return hashlib.sha256(data).hexdigest()
+
+def import_modern_din(path):
+    """Retain only the original pack's two actual longsword blade surfaces.
+
+    These leaf DLs already use the held-hand basis, with no matrices. Do not
+    infer their fit from the outer native/CustomEquipment alias or its hilt.
+    """
+    assert sha(path.read_bytes()) == MODERN_DIN_SHA, "Use the preserved original adult Din equipment"
+    result = {}
+    metadata = {"archive_sha256": MODERN_DIN_SHA, "profiles": {}}
+    with zipfile.ZipFile(path) as archive:
+        assert archive.testzip() is None
+        hashes = {crc64(name): name for name in archive.namelist()}
+        for profile, leaf in (("modern_din_bgs", "BLADE"), ("modern_din_broken", "BROKEN")):
+            root = "alt/objects/object_custom_equip/ModernDinPOC2_LONGSWORD_" + leaf
+            data = archive.read(root)
+            dependencies = {root: sha(data)}
+            cache, triangles = {}, []
+            offset = 72
+            while offset < len(data):
+                w0, w1 = struct.unpack_from("<II", data, offset)
+                offset += 8
+                op = w0 >> 24
+                if op in (0x20, 0x31, 0x32, 0x33, 0x36, 0x37, 0x39):
+                    hi, lo = struct.unpack_from("<II", data, offset)
+                    offset += 8
+                    resource = hashes[(hi << 32) | lo]
+                if op == 0x32:
+                    raw = archive.read(resource)
+                    dependencies[resource] = sha(raw)
+                    kind, total = struct.unpack_from("<II", raw, 64)
+                    assert kind == 25 and len(raw) == 72 + total * 16
+                    count = (w0 >> 12) & 255
+                    first = ((w0 >> 1) & 127) - count
+                    assert w1 % 16 == 0 and 0 <= first < first + count <= 32
+                    assert 0 <= w1 // 16 < w1 // 16 + count <= total
+                    for i in range(count):
+                        cache[first + i] = struct.unpack_from("<hhhHhhBBBB", raw, 72 + w1 + i * 16)
+                elif op in (0x05, 0x06):
+                    for packed in ([w0, w1] if op == 0x06 else [w0]):
+                        triangles.extend(cache[((packed >> shift) & 255) // 2] for shift in (16, 8, 0))
+                elif op in (0x31, 0x36, 0xDA, 0xD8):
+                    raise AssertionError(("Unexpected nested ModernDin blade/transform", root, hex(op)))
+                elif op == 0xDF:
+                    break
+            assert len(triangles) == 172 * 3
+            result[profile] = triangles
+            metadata["profiles"][profile] = {"root": root, "root_crc64": "%016X" % crc64(root),
+                "source_sha256": dependencies, "embedded_matrices": 0,
+                "blade_bounds": [[min(v[k] for v in triangles), max(v[k] for v in triangles)] for k in range(3)]}
+        metadata["equipment_aliases"] = {}
+        for name in ("gCustomLongswordDL", "gCustomBreakableLongswordDL", "gCustomBrokenLongswordDL",
+                     "gLinkAdultLeftHandHoldingBgsNearDL", "gLinkAdultLeftHandHoldingBgsFarDL",
+                     "gLinkAdultHandHoldingBrokenGiantsKnifeDL", "gLinkAdultHandHoldingBrokenGiantsKnifeFarDL"):
+            folder = "object_custom_equip" if name.startswith("gCustom") else "object_link_boy"
+            resource = "alt/objects/" + folder + "/" + name
+            data = archive.read(resource)
+            metadata["equipment_aliases"][name] = {"resource": resource, "sha256": sha(data),
+                "commands": [struct.unpack_from("<II", data, i) for i in range(72, len(data), 8)]}
+    encoded = zlib.compress(json.dumps(result, separators=(",", ":")).encode(), 9)
+    (INPUT / "modern_din_blades.json.zlib").write_bytes(encoded)
+    metadata["records_sha256"] = sha(encoded)
+    (INPUT / "modern_din_source.json").write_text(json.dumps(metadata, indent=2) + "\n")
 
 def import_fire(path):
     assert sha(path.read_bytes()) == PACK_SHA, "Use the preserved accepted Din progressive candidate"
@@ -341,8 +405,22 @@ def build():
         text.append(emit_mesh(prefix + "tight", tight_shell(layer["core"])))
         entry = "{ " + ", ".join(prefix + kind for kind in ("core", "flame", "tight")) + " }"
         table.append("    { " + ", ".join([entry] * 3) + " },")
+    modern = json.loads((INPUT / "modern_din_source.json").read_text())
+    assert modern["archive_sha256"] == MODERN_DIN_SHA
+    encoded = (INPUT / "modern_din_blades.json.zlib").read_bytes()
+    assert sha(encoded) == modern["records_sha256"]
+    modern_records = json.loads(zlib.decompress(encoded))
+    assert set(modern_records) == {"modern_din_bgs", "modern_din_broken"}
+    for model in ("modern_din_bgs", "modern_din_broken"):
+        records = modern_records[model]
+        core, flame = sword_meshes(records)
+        prefix = "sSwordAura_" + model
+        for suffix, mesh in (("Core", core), ("Flame", flame), ("Tight", tight_shell(records))):
+            text.append(emit_mesh(prefix + suffix, mesh))
+        entry = "{ " + ", ".join(prefix + suffix for suffix in ("Core", "Flame", "Tight")) + " }"
+        table.append("    { " + ", ".join([entry] * 3) + " },")
     text += ["static const SwordAuraGeometry sSwordAuraGeometry[SWORD_AURA_MODEL_COUNT][3] = {", *table, "};", "#endif", "// clang-format on", ""]
-    return "\n".join(text), json.dumps({"fire_source": meta, "fits": fits, "native": native,
+    return "\n".join(text), json.dumps({"fire_source": meta, "fits": fits, "native": native, "modern_din": modern,
         "fire_geometry_recipe": "build_din_fire_weapons.sword_meshes unchanged", "ice_light": "translucent blade-only cross-section envelope; procedural 64x32 I8 frost/shimmer",
         "runtime_tested": False}, indent=2) + "\n"
 
@@ -351,11 +429,13 @@ def main():
     parser.add_argument("--import-fire", type=Path)
     parser.add_argument("--import-oot", type=Path)
     parser.add_argument("--import-mm", type=Path)
+    parser.add_argument("--import-modern-din", type=Path)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     if args.import_fire: import_fire(args.import_fire)
     if args.import_oot: import_native("oot", args.import_oot)
     if args.import_mm: import_native("mm", args.import_mm)
+    if args.import_modern_din: import_modern_din(args.import_modern_din)
     header, manifest = build()
     if args.check:
         assert OUTPUT.read_text() == header
