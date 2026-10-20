@@ -12,6 +12,7 @@
 #include "soh/SaveManager.h"
 #include "soh/ActorDB.h"
 #include "soh/ShipInit.hpp"
+#include "soh/frame_interpolation.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/custom-message/CustomMessageManager.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
@@ -33,6 +34,9 @@ const char* SOH_ReadBlackMarketOptions();
 extern "C" void Player_Action_80845EF8(Player*, PlayState*);
 
 namespace {
+// Display-list macros redeclare these helpers at block scope in this namespace.
+extern "C" void FrameInterpolation_RecordOpenChild(const void* a, int b);
+extern "C" void FrameInterpolation_RecordCloseChild(void);
 using namespace ComboRando::BlackMarket;
 Session sSession;
 nlohmann::json sPendingSave;

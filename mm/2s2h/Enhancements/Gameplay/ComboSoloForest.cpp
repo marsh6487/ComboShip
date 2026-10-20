@@ -4,6 +4,7 @@
 #include "entrances/LostWoodsEntrance.h"
 #include "entrances/SoloForestResources.h"
 #include "global.h"
+#include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
 #include "2s2h/SaveManager/SaveManager.h"
@@ -20,6 +21,9 @@ u8 ResourceMgr_FileExists(const char* path);
 int SaveManager_ReadSaveFile(const std::filesystem::path&, nlohmann::json&);
 
 namespace {
+// Display-list macros redeclare these helpers at block scope in this namespace.
+extern "C" void FrameInterpolation_RecordOpenChild(const void* a, int b);
+extern "C" void FrameInterpolation_RecordCloseChild(void);
 struct ForestOrigin {
     int entrance;
     Vec3f pos;

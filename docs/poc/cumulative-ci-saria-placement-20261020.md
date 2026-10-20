@@ -89,16 +89,62 @@ the existing Lost Woods automatic placement and its floor snap.
 - Independent review found no Critical or Important issue and independently
   reran item-color, HUD, item-visual and dungeon-key fixtures successfully.
 
-The full hosted gate has not been rerun on this candidate. Complete
-Windows/Linux executable and regenerated port-archive builds, and configured
-in-game visual/interaction acceptance, remain untested. This is a locally
-verified source candidate, not a runtime-master promotion.
+## Platform build follow-up
 
-Initial publication attempts were blocked by automatic approval review,
-which required explicit permission for this payload and destination despite
-the retrieved prior authorization and verified connected-repository
-ownership. No branch update, PR creation or develop merge occurred during
-that blocked stage. cor subsequently authorized this correction set with
-"Yes publish the corrections". Publication proceeds through the connected
-GitHub service; hosted checks and configured runtime acceptance retain the
-separate status described above.
+The first correction was published as PR45 head
+`68a9f901e8149a088931bb8a1f5bd2c7bd5fa340`. Hosted run
+`39353353156` passed the complete gate in 33m03s, then exposed two separate
+platform failures:
+
+- Windows job `118412021255` stopped compiling SoH. The SDK's empty `near`
+  macro erased a native-transformation lighting member/local name, and the
+  forest renderer passed `__FILE__` to the legacy mutable `char*`
+  `Matrix_NewMtx` filename parameter. It never reached the seed tests.
+- Linux job `118412021290` compiled both games and all launcher/port targets,
+  then the seed smoke test failed loading the game libraries. Both native
+  modules reproduced the failure locally: anonymous-namespace
+  `FrameInterpolation_RecordOpenChild` / `RecordCloseChild` imports had no
+  definitions. Display-list macros declare these helpers at block scope;
+  an outer global header alone does not supply linkage in that namespace.
+
+The follow-up renames only `near` identifiers to `fogNear`, uses the existing
+legacy filename cast pattern, and anchors both interpolation helper
+declarations to each host's native C interface in the four affected forest
+and Black Market controllers. Draw behavior, materials, geometry, audio and
+Saria's reference placement are unchanged by this follow-up.
+
+The headless loader now reports the specific module and native loader error.
+Windows captures its last-error value before stream operations can change it.
+Early gate regressions enforce the Windows macro/filename boundaries and
+inspect full production rendering objects for exact native C imports.
+
+Follow-up verification:
+
+- Both Windows compile regressions reproduced RED and then passed. Native
+  transformation checks cover solo/combined hosts with ASan/UBSan and the
+  actual Windows `near` macro expansion; forest draw/routing checks pass.
+- All four affected production rendering objects failed the extended ABI
+  test before correction; all five rendering objects, including the existing
+  passage control, now pass with real native headers/macros.
+- Full native SoH, MM and `comborando` build succeeds. Both corrected game
+  libraries resolve all relocations; both uncorrected libraries fail actual
+  headless loading on the anonymous `RecordCloseChild` symbol.
+- Standard CI seed `ci-linux-smoke` exits 0: 198 cross-game placements,
+  completable as configured. Door/shop-only CI seed `ci-door-interiors` also
+  exits 0 with 200 cross-game placements; 406 advancement candidates and
+  407 oracle replays pass the playthrough/hint pare-down.
+- Real ELF missing-library, unresolved-symbol and successful-load tests pass;
+  Windows last-error preservation reproduces RED then GREEN when stream
+  output overwrites the simulated thread error.
+- Independent final review found no material issue. Changed production files
+  pass clang-format 14 and whitespace checks.
+
+Local game objects used `-O0` after the Release flags to speed diagnosis.
+The scratch dependency build suppresses obsolete duplicate libc prototypes
+in StormLib's C++ objects; no repository or dependency source was changed
+for that workaround. This is local native evidence, not a hosted Release
+or native Windows build result.
+
+A new hosted run, complete Windows build/smoke results and configured in-game
+visual/interaction acceptance remain pending. No develop merge or
+runtime-master promotion is implied.

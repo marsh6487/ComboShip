@@ -14,6 +14,7 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/Enhancements/Graphics/ComboPlaceTitleCard.h"
+#include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Rando/Rando.h"
 #include "2s2h/SaveManager/SaveManager.h"
@@ -35,6 +36,9 @@ void Player_Action_36(Player* player, PlayState* play);
 #include "BlackMarketShelvesNative.h"
 
 namespace {
+// Display-list macros redeclare these helpers at block scope in this namespace.
+extern "C" void FrameInterpolation_RecordOpenChild(const void* a, int b);
+extern "C" void FrameInterpolation_RecordCloseChild(void);
 using namespace ComboRando::BlackMarket;
 Session sSession;
 uint16_t sClears = 0;

@@ -48,7 +48,17 @@ void Triangles(int a, int b, int c, int flagA, int d, int e, int f, int flagB) {
 #undef MATRIX_FINALIZE_AND_LOAD
 #define MATRIX_FINALIZE_AND_LOAD(...) ((void)0)
 #undef gSPMatrix
+#ifdef OOT_FOREST_TEST
+// Evaluate the production call against the real legacy char* declaration.
+Mtx* Matrix_NewMtx(GraphicsContext*, char* file, s32 line) {
+    assert(file && file[0] && line > 0);
+    static Mtx matrix{};
+    return &matrix;
+}
+#define gSPMatrix(packet,matrix,flags) ((void)(matrix))
+#else
 #define gSPMatrix(...) ((void)0)
+#endif
 #undef gSPClearGeometryMode
 #define gSPClearGeometryMode(packet,mask) (clears=(mask))
 #undef gSPTexture

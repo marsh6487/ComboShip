@@ -80,7 +80,12 @@ bool ResolveStartingGameMM(int cfg, uint32_t masterSeed) {
 #ifdef _WIN32
 typedef HMODULE DllHandle;
 DllHandle LoadGameModule(const char* name) {
-    return LoadLibraryA(name);
+    const auto module = LoadLibraryA(name);
+    if (!module) {
+        const auto error = GetLastError();
+        std::cerr << "[comborando] failed to load " << name << ": Windows error " << error << '\n';
+    }
+    return module;
 }
 template <typename T> T Sym(DllHandle m, const char* name) {
     return reinterpret_cast<T>(GetProcAddress(m, name));
@@ -89,7 +94,12 @@ template <typename T> T Sym(DllHandle m, const char* name) {
 typedef void* DllHandle;
 DllHandle LoadGameModule(const char* name) {
     // Bare names search the system library paths; the tool runs from the game dir, so anchor there.
-    return dlopen((std::string("./") + name).c_str(), RTLD_NOW | RTLD_GLOBAL);
+    const auto module = dlopen((std::string("./") + name).c_str(), RTLD_NOW | RTLD_GLOBAL);
+    if (!module) {
+        const char* error = dlerror();
+        std::cerr << "[comborando] failed to load " << name << ": " << (error ? error : "unknown loader error") << '\n';
+    }
+    return module;
 }
 template <typename T> T Sym(DllHandle m, const char* name) {
     return reinterpret_cast<T>(dlsym(m, name));

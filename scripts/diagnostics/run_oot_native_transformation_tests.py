@@ -22,7 +22,10 @@ def main():
     enums = enums[:enums.index("} MmFormStateId;") + len("} MmFormStateId;")]
     source = (ROOT / "tests/native_transformations/sequence_test.cpp").read_text()
     source = source.replace("/* PRODUCTION_STATE_ENUM */", enums)
-    source = source.replace("/* PRODUCTION_NATIVE_SEQUENCE */", native.read_text() if native.exists() else "")
+    # The Windows SDK defines this legacy macro to nothing. Keep that expansion
+    # active while compiling the actual controller on every test host.
+    source = source.replace("/* PRODUCTION_NATIVE_SEQUENCE */",
+                            "#define near\n" + native.read_text() + "\n#undef near\n" if native.exists() else "")
     player = (ROOT / "soh/src/overlays/actors/ovl_player_actor/z_player.c").read_text()
     camera = (ROOT / "soh/mods/items/helpers/camera_helper.c").read_text()
     # These C functions use `this` as an ordinary identifier; compile their
@@ -61,7 +64,8 @@ def main():
                     for age in ages:
                         subprocess.run([str(binary), case], check=True,
                                        env={**environment, "NATIVE_FORM": str(form_id), "NATIVE_AGE": str(age)})
-            print("PASS native transformation sequence: " + ("ComboShip OoT" if combined else "solo SoH"), flush=True)
+            print("PASS native transformation sequence with Windows near macro: " +
+                  ("ComboShip OoT" if combined else "solo SoH"), flush=True)
 
 
 if __name__ == "__main__":

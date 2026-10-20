@@ -150,7 +150,7 @@ static void MmForm_UpdateNativeMaskLighting(Player* player, PlayState* play) {
     // Exact fog/ambient keys from MM D_8085D848. Restore the pre-existing OoT
     // adjustment on exit, including weather effects and indoor lighting.
     static const struct {
-        s16 near;
+        s16 fogNear;
         u8 fog[3], ambient[3];
     } keys[] = {
         { 650, { 0, 0, 0 }, { 10, 0, 30 } },
@@ -181,8 +181,8 @@ static void MmForm_UpdateNativeMaskLighting(Player* player, PlayState* play) {
         play->envCtx.adjFogColor[i] = (s16)(fog + (keys[key].fog[i] - fog) * weight) - base.fogColor[i];
         play->envCtx.adjLight1Color[i] = (s16)(light * (1.0f - weight)) - base.light1Color[i];
     }
-    const f32 near = key ? keys[key - 1].near : base.fogNear;
-    play->envCtx.adjFogNear = (s16)(near + (keys[key].near - near) * weight) - base.fogNear;
+    const f32 fogNear = key ? keys[key - 1].fogNear : base.fogNear;
+    play->envCtx.adjFogNear = (s16)(fogNear + (keys[key].fogNear - fogNear) * weight) - base.fogNear;
     const u8 flash = value > 1.0f && value < 2.0f;
     Lights_PointNoGlowSetInfo(&sNativeMaskCs.lightInfo, player->actor.world.pos.x, player->actor.world.pos.y + 20.0f,
                               player->actor.world.pos.z, flash ? 255 : 120, flash ? 255 : 200, 255,

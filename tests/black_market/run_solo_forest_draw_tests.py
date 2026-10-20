@@ -27,7 +27,8 @@ with tempfile.TemporaryDirectory(prefix="solo-forest-draw-") as temporary:
         binary = Path(temporary) / host
         includes = [host, host + "/include", host + "/include/PR", host + "/src", host + "/assets",
                     host + ("/2s2h" if host == "mm" else "/soh"), "libultraship/include", "combo", "combo/menu"]
-        subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-w", "-DCOMBO_BUILD", "-DF3DEX_GBI_2",
+        warnings = ["-Werror=write-strings"] if host == "soh" else ["-w"]
+        subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", *warnings, "-DCOMBO_BUILD", "-DF3DEX_GBI_2",
                         *(["-DOOT_FOREST_TEST"] if host == "soh" else []), "-g", "-fsanitize=address,undefined",
                         "-fno-sanitize-recover=all", "-no-pie", "-I" + str(ROOT), *["-I" + str(ROOT / p) for p in includes],
                         str(cpp), "-o", str(binary)], check=True)
