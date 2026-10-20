@@ -7,9 +7,8 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 
 static inline int SwordElement_MessageEnabled(uint8_t element) {
-    static const char* options[] = { NULL, "gEnhancements.DinFireSwordDamage", "gEnhancements.IceSwordDamage",
-                                   "gEnhancements.LightSwordDamage" };
-    return element > SWORD_ELEMENT_NONE && element < SWORD_ELEMENT_COUNT && CVarGetInteger(options[element], 0);
+    // Receiving an arrow unlocks its imbue even with all cheat switches off.
+    return element > SWORD_ELEMENT_NONE && element < SWORD_ELEMENT_COUNT;
 }
 
 static inline int SwordElement_MessageOwnsArrow(uint8_t element) {
