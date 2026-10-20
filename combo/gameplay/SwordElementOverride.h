@@ -9,7 +9,7 @@
 // and progression untouched. Called after the checkbox changes its CVar.
 static inline void CwSwordElementOverride_Changed(const char* changed) {
     static const char* keys[] = { "gEnhancements.DinFireSwordDamage", "gEnhancements.IceSwordDamage",
-                                 "gEnhancements.LightSwordDamage" };
+                                  "gEnhancements.LightSwordDamage" };
     if (changed == NULL)
         return;
     for (int selected = 0; selected < 3; ++selected) {

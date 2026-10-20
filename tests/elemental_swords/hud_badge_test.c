@@ -92,8 +92,13 @@ static void CheckDraw(const SwordElementUiRgbaTile* tiles, int left, int top, in
             REQUIRE(g->words.w1 == y4 + height * 2);
             REQUIRE((g[1].words.w0 & 0xFFFFFF) == x4);
             REQUIRE(g[1].words.w1 == y4);
-            REQUIRE((g[2].words.w1 >> 16) == MIN(65535, 64 * 1024 / width));
-            REQUIRE((g[2].words.w1 & 0xFFFF) == MIN(65535, 64 * 1024 / height));
+            // Fast3D decodes these as signed S5.10, not unsigned u16. A tiny
+            // HUD badge must never sample backward or wrap its step to zero.
+            const int16_t stepS = (int16_t)(g[2].words.w1 >> 16);
+            const int16_t stepT = (int16_t)(g[2].words.w1 & 0xFFFF);
+            REQUIRE(stepS > 0 && stepT > 0);
+            if (width >= 3) REQUIRE(stepS == 64 * 1024 / width);
+            if (height >= 3) REQUIRE(stepT == 64 * 1024 / height);
             ++rectangle;
         }
     }
@@ -121,6 +126,8 @@ int main(void) {
         CheckDraw(textures[selected], 222, 19, 13, 11);
         Draw(SWORD_ITEM, 0, 1, 1);
         CheckDraw(textures[selected], 201, 19, 1, 1);
+        Draw(SWORD_ITEM, 0, 5, 5);
+        CheckDraw(textures[selected], 204, 19, 2, 2);
     }
     selected = SWORD_ELEMENT_FIRE;
     Draw(ITEM_BOW, 0, 30, 30); REQUIRE(gfx.overlay.p == commands);

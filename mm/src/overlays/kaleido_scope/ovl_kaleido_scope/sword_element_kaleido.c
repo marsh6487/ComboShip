@@ -171,8 +171,8 @@ void SwordElementKaleido_Draw(PlayState* play, const SwordElementMenu* menu, voi
         /* The controller-driven chooser uses a fixed 320x240 canvas. Its fonts,
          * rounded chrome and 64x64 tiled artwork are bundled into the executable. */
         SWORD_KALEIDO_SETUP_OVERLAY(play->state.gfxCtx);
-        SwordElementUi_DrawChooser(&OVERLAY_DISP, swordIcon, menu->selection,
-                                   SwordElement_ForItem(menu->item), available, play->pauseCtx.alpha);
+        SwordElementUi_DrawChooser(&OVERLAY_DISP, swordIcon, menu->selection, SwordElement_ForItem(menu->item),
+                                   available, play->pauseCtx.alpha);
     }
     CLOSE_DISPS(play->state.gfxCtx);
 }

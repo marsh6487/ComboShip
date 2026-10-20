@@ -6550,8 +6550,8 @@ static void Interface_DrawSwordElementBadge(PlayState* play, u16 item, s16 butto
     s16 markLeft = left + width - markWidth + MAX(1, width / 15);
     s16 markTop = top - MAX(1, height / 15);
     OPEN_DISPS(play->state.gfxCtx);
-    SwordElementUi_DrawElement(&OVERLAY_DISP, element, markLeft, markTop, markWidth, markHeight,
-                               interfaceCtx->bAlpha, 0, 1);
+    SwordElementUi_DrawElement(&OVERLAY_DISP, element, markLeft, markTop, markWidth, markHeight, interfaceCtx->bAlpha,
+                               0, 1);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 

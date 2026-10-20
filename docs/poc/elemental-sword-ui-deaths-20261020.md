@@ -71,3 +71,10 @@ compile proof from the implementation pass. Offline previews are reconstructed
 from the actual emitted GBI, not engine captures; the offline None sword icon
 is omitted because its game-resource texture is not provided to that helper.
 Configured appearance and full pause-overlay composition remain unproven.
+
+The follow-up UI review reproduced backward texture sampling at one- and
+two-pixel badge sizes: Fast3D interprets the step as signed S5.10. The helper
+now clamps to INT16_MAX, and the sanitizer suite decodes and checks the actual
+emitted signed steps. Generated font strips use the cross-platform asset
+alignment macro; generator output stays deterministic under clang-format14.
+The final HUD and four-mode selector checks pass after these corrections.
