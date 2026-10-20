@@ -56,6 +56,7 @@ static bool sDekuBubbleActive;
 static u32 renderWidth = 320, renderHeight = 240;
 static LightNode nativeLight;
 static LinkAnimationHeader* lastStarted;
+static f32 cameraRandom = 0.25f;
 extern "C" SaveContext gSaveContext;
 SaveContext gSaveContext;
 PlayState* gPlayState = &play;
@@ -144,15 +145,38 @@ void Player_DetachHeldActor(PlayState*, Player* p) {
 /* PRODUCTION_ITEM_INIT */
 /* PRODUCTION_BUBBLE_CLEANUP */
 /* PRODUCTION_CAMERA_EXIT */
-s16 Camera_GetCamDirYaw(Camera*) { return 0; }
-s16 Play_CreateSubCamera(PlayState*) { ++cameraCreates; return cameraEnabled ? 1 : SUBCAM_NONE; }
+s16 Camera_GetCamDirYaw(Camera *cam) { return cam->camDir.y; }
+s16 Play_CreateSubCamera(PlayState *p) {
+  ++cameraCreates;
+  if (!cameraEnabled)
+    return SUBCAM_NONE;
+  p->cameraPtrs[1] = &p->subCameras[0];
+  p->cameraPtrs[1]->setting = CAM_SET_FREE0;
+  return 1;
+}
 s16 Play_ChangeCameraStatus(PlayState* p, s16 id, s16 status) {
     if (status == CAM_STAT_ACTIVE) p->activeCamera = id;
     return 1;
 }
-void Play_ClearCamera(PlayState*, s16) { ++cameraClears; }
-s32 Play_CameraSetAtEye(PlayState*, s16 id, Vec3f*, Vec3f*) { assert(id >= 0 && id < NUM_CAMS); return 1; }
-s32 Play_CameraSetFov(PlayState*, s16 id, f32) { assert(id >= 0 && id < NUM_CAMS); return 1; }
+void Play_ClearCamera(PlayState *p, s16 id) {
+  ++cameraClears;
+  p->cameraPtrs[id] = nullptr;
+}
+s32 Play_CameraSetAtEye(PlayState *p, s16 id, Vec3f *at, Vec3f *eye) {
+  assert(id >= 0 && id < NUM_CAMS && p->cameraPtrs[id]);
+  p->cameraPtrs[id]->at = *at;
+  p->cameraPtrs[id]->eye = p->cameraPtrs[id]->eyeNext = *eye;
+  return 1;
+}
+s32 Play_CameraSetFov(PlayState *p, s16 id, f32 fov) {
+  assert(id >= 0 && id < NUM_CAMS && p->cameraPtrs[id]);
+  p->cameraPtrs[id]->fov = fov;
+  return 1;
+}
+s32 Play_SetCameraRoll(PlayState *p, s16 id, s16 roll) {
+  p->cameraPtrs[id]->roll = roll;
+  return 1;
+}
 s32 MmSfx_IsAvailable() { return 1; }
 s32 MmSfx_PlayAtPos(u16 id, Vec3f*) { sounds.emplace_back(id, frame); return 1; }
 void MmSfx_PlayTransformFlash() { MmSfx_PlayAtPos(MM_NA_SE_SY_TRANSFORM_MASK_FLASH, nullptr); }
@@ -163,6 +187,23 @@ void LightContext_RemoveLight(PlayState*, LightContext*, LightNode*) { ++lightCl
 void Lights_PointNoGlowSetInfo(LightInfo*, s16, s16, s16, u8, u8, u8, s16) {}
 f32 Math_SinS(s16 value) { return std::sin(value * (3.14159265358979323846f / 32768.0f)); }
 f32 Math_CosS(s16 value) { return std::cos(value * (3.14159265358979323846f / 32768.0f)); }
+f32 Rand_ZeroOne() { return cameraRandom; }
+VecSph *OLib_Vec3fDiffToVecSphGeo(VecSph *result, Vec3f *at, Vec3f *eye) {
+  const f32 x = eye->x - at->x, y = eye->y - at->y, z = eye->z - at->z;
+  const f32 xz = std::sqrt(x * x + z * z);
+  result->r = std::sqrt(xz * xz + y * y);
+  result->pitch =
+      (s16)(std::atan2(y, xz) * (32768.0f / 3.14159265358979323846f));
+  result->yaw = (s16)(std::atan2(x, z) * (32768.0f / 3.14159265358979323846f));
+  return result;
+}
+Vec3f *OLib_VecSphGeoToVec3f(Vec3f *result, VecSph *offset) {
+  result->x = offset->r * Math_CosS(offset->pitch) * Math_SinS(offset->yaw);
+  result->y = offset->r * Math_SinS(offset->pitch);
+  result->z = offset->r * Math_CosS(offset->pitch) * Math_CosS(offset->yaw);
+  return result;
+}
+/* PRODUCTION_CAMERA_MATH */
 s32 Math_StepToF(f32* value, f32 target, f32 step) {
     *value += std::clamp(target - *value, -step, step);
     return *value == target;
@@ -183,6 +224,8 @@ void FrameInterpolation_RecordOpenChild(const void*, int) {}
 void FrameInterpolation_RecordCloseChild() {}
 void gSPDisplayList(Gfx* packet, Gfx* target) { packet->words.w0 = 0xDE000000; packet->words.w1 = (uintptr_t)target; }
 }
+
+/* DONOR_CAMERA_REFERENCE */
 
 static u8 MmForm_LoadFormSkeleton(PlayState* p, MmPlayerTransformation form) {
     ++loadCount;
@@ -213,6 +256,12 @@ static void Begin(MmPlayerTransformation form, bool removing = false) {
     gSaveContext.linkAge = std::getenv("NATIVE_AGE") ? std::atoi(std::getenv("NATIVE_AGE")) : 1;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
     play.cameraPtrs[0] = &camera;
+    camera = {};
+    camera.at = {0, 35, 0};
+    camera.eye = {0, 55, 140};
+    camera.fov = 65;
+    camera.camDir.y = (s16)0x8000;
+    player.actor.focus.pos.y = LINK_IS_ADULT ? 68.0f : 44.0f;
     gFormState.currentForm = removing ? form : MM_PLAYER_FORM_HUMAN;
     gFormState.targetForm = removing ? MM_PLAYER_FORM_HUMAN : form;
     gFormState.state = removing ? MMFORM_STATE_DETRANSFORMING : MMFORM_STATE_TRANSFORMING;
@@ -239,12 +288,104 @@ static int Count(u16 id) {
     return std::count_if(sounds.begin(), sounds.end(), [id](auto s) { return s.first == id; });
 }
 
+static void AssertCamera(const MmCameraReference::Camera &expected) {
+  const Camera *actual = play.cameraPtrs[play.activeCamera];
+  auto close = [](f32 actual, f32 expected) {
+    if (std::fabs(actual - expected) >= 0.025f)
+      std::fprintf(stderr,
+                   "camera mismatch at frame %d: actual=%f expected=%f\n",
+                   frame, actual, expected);
+    assert(std::fabs(actual - expected) < 0.025f);
+  };
+  close(actual->fov, expected.fov);
+  close(actual->at.x, expected.at.x);
+  close(actual->at.y, expected.at.y);
+  close(actual->at.z, expected.at.z);
+  close(actual->eye.x, expected.eye.x);
+  close(actual->eye.y, expected.eye.y);
+  close(actual->eye.z, expected.eye.z);
+  assert(actual->roll == expected.roll);
+}
+
+static void CameraDonorCase(MmPlayerTransformation form, bool removing,
+                            bool skip) {
+  for (s16 yaw : {0, 0x4000, -0x7000})
+    for (f32 sign : {0.25f, 0.75f}) {
+      cameraEnabled = true;
+      cameraRandom = sign;
+      Begin(form, removing);
+      player.actor.world.pos = {129, 17, -83};
+      player.actor.focus.pos = player.actor.world.pos;
+      player.actor.focus.pos.y += removing ? sFormProps[form].cameraHeight
+                                  : LINK_IS_ADULT ? 68.0f
+                                                  : 44.0f;
+      camera.at = player.actor.world.pos;
+      camera.at.y += 30;
+      camera.eye = camera.at;
+      camera.eye.x += Math_SinS(yaw) * 140;
+      camera.eye.z += Math_CosS(yaw) * 140;
+      camera.eye.y += 20;
+      camera.camDir.y = yaw + (s16)0x8000;
+      const Camera original = camera;
+      MmCameraReference::Camera expected{};
+      expected.at = camera.at;
+      expected.eye = camera.eye;
+      expected.fov = camera.fov;
+      expected.focalActor = &player.actor;
+      // MM follows the face from the previous rendered pose. Feed both real
+      // controllers the same crouch/struggle motion, then the revealed form.
+      for (int tick = 0; sNativeMaskCs.active || tick == 0; ++tick) {
+        assert(tick < 160);
+        const bool revealing = gFormState.cutscenePhase == 2;
+        if (revealing)
+          player.actor.focus.pos.y = player.actor.world.pos.y +
+                                     (removing ? LINK_IS_ADULT ? 68.0f : 44.0f
+                                               : sFormProps[form].cameraHeight);
+        else
+          player.actor.focus.pos.y -= std::sin(tick * 0.13f) * 0.3f;
+        expected.focalActorPosRot = player.actor.world;
+        expected.focalActorPosRot.rot.y = yaw;
+        if (skip && tick == 10)
+          expected.animState = 999;
+        if (revealing)
+          expected.animState = removing ? 3 : 4;
+        play.state.input[0].press.button = skip && tick == 9 ? BTN_A : 0;
+        if (removing)
+          MmCameraReference::Camera_Demo5(&expected);
+        else
+          MmCameraReference::Camera_Demo4(&expected);
+        Tick(removing);
+        if (sNativeMaskCs.active)
+          AssertCamera(expected);
+      }
+      assert(play.activeCamera == 0 && play.cameraPtrs[1] == nullptr);
+      assert(std::memcmp(&original, &camera, sizeof(camera)) == 0 &&
+             "cutscene must preserve the prior gameplay camera");
+    }
+}
+
 int main(int argc, char** argv) {
     assert(argc == 2);
     const std::string test = argv[1];
     const char* formEnv = std::getenv("NATIVE_FORM");
     const auto form = (MmPlayerTransformation)std::stoi(formEnv ? formEnv : "3");
-    if (test == "mask-on") {
+  if (test == "camera-donor-on" || test == "camera-donor-off") {
+    CameraDonorCase(form, test == "camera-donor-off", false);
+  } else if (test == "camera-skip") {
+    CameraDonorCase(form, false, true);
+    CameraDonorCase(form, true, true);
+  } else if (test == "camera-facing") {
+    cameraEnabled = true;
+    Begin(form);
+    Tick();
+    const s16 facing = player.actor.shape.rot.y;
+    player.actor.shape.rot.y += 0x4000;
+    player.yaw += 0x4000;
+    Tick();
+    assert(player.actor.shape.rot.y == facing && player.yaw == facing &&
+           "the native shot owns facing until release");
+    MmForm_OnPlayDestroy(&play, &player);
+  } else if (test == "mask-on") {
         Begin(form); Tick();
         assert(putAwayCount == 1 && player.heldItemAction == PLAYER_IA_NONE);
         assert(lastStarted == &animations[MM_ANIM_CL_SETMASK] && "native mask-on must animate Link");
