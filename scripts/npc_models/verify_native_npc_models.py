@@ -18,8 +18,8 @@ class Archive:
         self.hashes = {}
         for name in [*self.native.namelist(), *self.candidate.namelist()]:
             self.hashes[asset.crc64(name)] = name
-            if name.startswith("alt/"):
-                self.hashes[asset.crc64(name[4:])] = name[4:]
+            # Archive::IndexFile indexes only literal paths. Alt selection happens
+            # after a hash resolves to a name; it cannot rescue an unknown hash.
         self.vertices, self.textures = {}, {}
 
     def read(self, name):
@@ -217,6 +217,7 @@ def verify(native, source_dir, candidate, allow_fitted_rig=False):
             raise ValueError('Shared shoulder skin differs from the accepted Twins repair')
         records={n:archive.candidate.read(n) for n in archive.candidate.namelist()}
         wrappers=shared_shoulders(records,rig.ns);sources={};counts={}
+        wrappers,_=asset.repair_native_npc_hashes(wrappers,records)
         for host in HOSTS:
             destination=rig.ns+f'/Skin/Limbs/Limb{host:02d}'
             source_path=rig.ns+'/PoseAnimations/objects/object_os_anime/gKokiriIdleAnim'+f'/Skin/Limbs/Limb{host:02d}'
@@ -237,7 +238,9 @@ def verify(native, source_dir, candidate, allow_fitted_rig=False):
                 raise ValueError('The twins idle/sway no longer uses the exact native animation')
         neutral=archive.candidate.read('alt/'+rig.ns+'/Faces/L0R0M0')
         for part in ('Base','L0','R0','M0'):
-            hashed=asset.crc64(rig.ns+'/FaceParts/'+part)
+            face_path=rig.ns+'/FaceParts/'+part
+            face_path=face_path if asset.crc64(face_path) in archive.hashes else 'alt/'+face_path
+            hashed=asset.crc64(face_path)
             if struct.pack('<II',hashed>>32,hashed&0xffffffff) not in neutral:
                 raise ValueError('The twins neutral expression bypasses its repaired face surface')
     texture_type, w, h, pixels = archive.texture(rig.ns+"/Textures/Diffuse")
@@ -265,7 +268,11 @@ def verify(native, source_dir, candidate, allow_fitted_rig=False):
             expected_rows=[(*np.rint(xyz).astype(int),*row[3:]) for row,xyz in zip(rows,expected_xyz)]
             if not np.array_equal(np.asarray(actual),np.asarray(expected_rows)):
                 raise ValueError('Shared or seated ocarina vertices differ from the authored grip contract')
-        hashed=asset.crc64(rig.ns+'/Props/OcarinaGrip')
+        grip_path=rig.ns+'/Props/OcarinaGrip'
+        # Both legacy and repaired packs can be inspected, but geometry() above
+        # rejects unresolved legacy hashes using the real literal-name index.
+        grip_path=grip_path if asset.crc64(grip_path) in archive.hashes else 'alt/'+grip_path
+        hashed=asset.crc64(grip_path)
         call=struct.pack('<II',hashed>>32,hashed&0xffffffff)
         for clip in ('gSariaPlayingOcarinaAnim','gSariaOcarinaToMouthAnim',
                      'gSariaStopPlayingOcarinaAnim','gSariaReturnToOcarinaAnim'):
