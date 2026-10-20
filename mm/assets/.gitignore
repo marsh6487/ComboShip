@@ -9,5 +9,14 @@
 !custom/**/*
 !2s2h_assets.h
 
+# Restored from the verified native forest/market source bundles.
+custom/custom/comboship/native_forest/
+custom/custom/skiejer_market/
+custom/scenes/nonmq/comboship_forest/
+custom/scenes/nonmq/skiejer_forest/
+custom/scenes/nonmq/skiejer_market/
+custom/scenes/shared/skiejer_forest_oot/
+custom/scenes/shared/skiejer_market_oot/
+
 # Prepared from the pinned compressed HD Chateau resource before packaging.
 /custom/objects/combo_chateau_romani_3ds/AtlasTex

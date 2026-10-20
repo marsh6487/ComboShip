@@ -63,7 +63,7 @@ static void DrawPassage() {
     if (!Combo_IsCombinedGame() && !ComboSoloForestMm_PassageAvailable())
         return;
     if (ComboOpeningForest_UsesPackTunnel(gPlayState))
-        return; // The active MM3D mesh owns the doorway; never draw a second arch.
+        return; // The active scene mesh owns the doorway; never draw a second arch.
     const bool openingForest = ComboOpeningForest_IsExploration(gPlayState) && gPlayState->roomCtx.curRoom.num == 0 &&
                                gPlayState->linkActorEntry;
     if (!openingForest && (!gPlayState || gSaveContext.gameMode != GAMEMODE_NORMAL ||
@@ -110,8 +110,9 @@ static void DrawPortalFinish() {
     if (version == 1 || version == 2)
         return; // Older meshes retain their own visible location and treatment.
     using namespace ComboForestPortalEffect;
+    const bool packed = version >= 3 && version <= 8;
     std::array<ComboForestPortalEffect::Vertex, kVertexCount> shape;
-    Build(play->gameplayFrames, version >= 3, shape);
+    Build(play->gameplayFrames, packed, shape);
     // Each submitted frame owns its vertices until its display lists finish.
     auto* vertices = static_cast<Vtx*>(GRAPH_ALLOC(play->state.gfxCtx, sizeof(Vtx) * kVertexCount));
     if (!vertices)
@@ -120,7 +121,7 @@ static void DrawPortalFinish() {
         vertices[i] = {};
         vertices[i].v.ob[0] = static_cast<s16>(shape[i].x);
         vertices[i].v.ob[1] = static_cast<s16>(shape[i].y);
-        vertices[i].v.ob[2] = version >= 3 ? 10 : 1;
+        vertices[i].v.ob[2] = packed ? 10 : 1;
         vertices[i].v.cn[0] = shape[i].r;
         vertices[i].v.cn[1] = shape[i].g;
         vertices[i].v.cn[2] = shape[i].b;

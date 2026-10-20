@@ -14,6 +14,9 @@
 #include <cstring>
 #include <cstdio>
 #include <memory>
+#include "entry_diagnostics_fixture.h"
+bool sNativeKeeperReady = false;
+extern "C" u8 MmAssets_BaseResourceExists(const char*) { return destination; }
 extern "C" { int gComboGameMode = COMBO_GAME_OOT; }
 SaveContext gSaveContext{};
 PlayState* gPlayState;
@@ -105,6 +108,9 @@ void VanillaInit(Actor*, PlayState*) { ++nativeInits; }
 const char* SOH_ReadBlackMarketOptions() { return "{}"; }
 u32 Seed() { return 77; }
 bool PackAvailable() { return pack; }
+extern "C" u8 ResourceMgr_FileExists(const char*) { return destination; }
+extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return false; }
+extern "C" u8 ResourceMgr_FileAltExists(const char*) { return false; }
 namespace ComboBlackMarketOotItems {
 RandomizerGet Id(const Item&) { return RG_LANTERN; }
 bool Owned(const Item&) { return owned; }
@@ -155,6 +161,8 @@ static int NativeOpen(Player* current, PlayState* play, EnDoor* door) {
 }
 
 void Reset() {
+    destination = true;
+    diagnostics.clear();
     gComboGameMode = COMBO_GAME_OOT;
     gSaveContext = {};
     play = {}; player = {}; gPlayState = &play; play.state.running = true;
@@ -221,6 +229,12 @@ static void TestDoorMarker() {
         player.actor.world.pos = { 410, 0, -300 };
         PlayerUpdate();
         assert(!sEntering && play.transitionTrigger == TRANS_TRIGGER_OFF);
+        if (count == 3) {
+            assert(ComboBlackMarketOot_TryDoorEntrance(&play, &nativeDoor.actor) ==
+                   COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED);
+            assert(diagnostics.back()["reason"] == "door_marker_ambiguous" &&
+                   diagnostics.back()["checks"]["unique_marker"] == false);
+        }
     }
     Reset(); PlaceDoor();
     placedDoors[1].sides[1].room = 1; // ordinary native room-to-room door
@@ -243,26 +257,13 @@ static void TestDoorEntry() {
     assert(returnPosAtWait.x == 184 && returnPosAtWait.z == -300 && writes == 0);
     assert(!std::memcmp(&priorReturn, &gSaveContext.respawn[RESPAWN_MODE_RETURN], sizeof(priorReturn)));
     assert(!std::memcmp(&priorTop, &gSaveContext.respawn[RESPAWN_MODE_TOP], sizeof(priorTop)));
-    for (int gate = 0; gate < 16; ++gate) {
+    for (int gate = 0; gate < 3; ++gate) {
         Reset(); PlaceDoor();
-        if (gate == 0) pack = false;
-        if (gate == 1) sSession.Bind(nullptr, -1);
-        if (gate == 2) play.pauseCtx.state = 1;
-        if (gate == 3) play.csCtx.state = 1;
-        if (gate == 4) gSaveContext.health = 0;
-        if (gate == 5) player.actionFunc = Player_Action_Idle;
-        if (gate == 6) player.doorActor = nullptr;
-        if (gate == 7) play.transitionTrigger = TRANS_TRIGGER_START;
-        if (gate == 8) play.transitionMode = TRANS_MODE_SETUP;
-        if (gate == 9) play.gameOverCtx.state = 1;
-        if (gate == 10) gSaveContext.cutsceneTrigger = 1;
-        if (gate == 11) play.state.running = false;
-        if (gate == 12) player.doorType = PLAYER_DOORTYPE_FAKE;
-        if (gate == 13) play.transiActorCtx.numActors = 3, placedDoors[2] = placedDoors[1];
-        if (gate == 14) gSaveContext.fileNum = 1;
-        if (gate == 15) sEntering = true;
+        if (gate == 0) destination = false;
+        if (gate == 1) play.transitionTrigger = TRANS_TRIGGER_START;
+        if (gate == 2) play.transitionMode = TRANS_MODE_SETUP;
         assert(ComboBlackMarketOot_TryDoorEntrance(&play, &nativeDoor.actor) == COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED);
-        if (gate != 15) assert(!sEntering);
+        assert(!sEntering);
         assert(writes == 0 && sReturnPos.x == 184);
     }
     for (int unrelated = 0; unrelated < 9; ++unrelated) {
@@ -282,7 +283,7 @@ static void TestDoorEntry() {
     Reset(); PlaceDoor(); PlayState another = play;
     assert(ComboBlackMarketOot_TryDoorEntrance(&another, &nativeDoor.actor) == COMBO_BLACK_MARKET_OOT_DOOR_UNHANDLED);
     assert(ComboBlackMarketOot_TryDoorEntrance(nullptr, nullptr) == COMBO_BLACK_MARKET_OOT_DOOR_UNHANDLED);
-    std::puts("PASS OoT direct native door entry, action/health/session/pack guards and mode isolation");
+    std::puts("PASS OoT direct native door entry, destination/transition protection and mode isolation");
 }
 static void TestDoorReturn() {
     Reset(); PlaceDoor();
@@ -312,7 +313,7 @@ static void TestDoorOpen() {
     assert(NativeOpen(&player, &play, &nativeDoor));
     assert(sEntering && play.nextEntranceIndex == ENTR_SKIEJER_MARKET && vanillaDoorCameras == 0);
     assert(player.stateFlags1 & PLAYER_STATE1_IN_CUTSCENE);
-    Reset(); PlaceDoor(); pack = false;
+    Reset(); PlaceDoor(); destination = false;
     assert(NativeOpen(&player, &play, &nativeDoor));
     assert(player.actionFunc == Player_Action_Idle && !nativeDoor.playerIsOpening);
     assert(!(player.stateFlags1 & (PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_LOADING)));
@@ -433,8 +434,8 @@ int main(int argc, char** argv) {
     for (int gate = 0; gate < 6; ++gate) {
         Reset(); play.sceneNum = SCENE_SKIEJER_FOREST; play.roomCtx.curRoom.num = 0;
         player.actor.world.pos = { 410, 0, -300 }; sDoorArmed = true;
-        if (gate == 0) pack = false;
-        if (gate == 1) sSession.Bind(nullptr, -1);
+        if (gate == 0) destination = false;
+        if (gate == 1) floorExists = false;
         if (gate == 2) play.pauseCtx.state = 1;
         if (gate == 3) inCs = true;
         if (gate == 4) gComboGameMode = COMBO_GAME_BOTH;

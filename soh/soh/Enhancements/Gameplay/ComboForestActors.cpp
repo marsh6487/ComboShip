@@ -1,6 +1,7 @@
 #ifdef COMBO_BUILD
 #include "ComboForestActors.h"
 #include "entrances/SoloForest.h"
+#include "entrances/ForestActorPlacements.h"
 #include "global.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/custom-message/CustomMessageManager.h"
@@ -56,12 +57,13 @@ void Update() {
             [&] { return Spawn(play, id, params, x, z, lift, yaw); });
     };
     if (play->roomCtx.curRoom.num == 0) {
-        ensure(1, kViewer, kSaria, COMBO_SOLO_FOREST_STUMP_X + 100, COMBO_SOLO_FOREST_STUMP_Z + 70, 0, 0);
+        const auto side = ForestActorPlacements::SariaOffset(COMBO_SOLO_FOREST_STUMP_YAW);
+        ensure(1, kViewer, kSaria, COMBO_SOLO_FOREST_STUMP_X + side.x, COMBO_SOLO_FOREST_STUMP_Z + side.z, 0, 0);
         const float angle = COMBO_SOLO_FOREST_STUMP_YAW * (6.28318530718f / 65536.0f);
         const float sine = std::sin(angle), cosine = std::cos(angle);
         auto* beacon = Find(play, kViewer, kSaria);
-        const float dx = beacon ? beacon->world.pos.x - COMBO_SOLO_FOREST_STUMP_X : 100.0f;
-        const float dz = beacon ? beacon->world.pos.z - COMBO_SOLO_FOREST_STUMP_Z : 70.0f;
+        const float dx = beacon ? beacon->world.pos.x - COMBO_SOLO_FOREST_STUMP_X : side.x;
+        const float dz = beacon ? beacon->world.pos.z - COMBO_SOLO_FOREST_STUMP_Z : side.z;
         const float lateral = dx * cosine - dz * sine <= 0 ? 145.0f : -145.0f;
         ensure(2, ACTOR_EN_HORSE, kHorse, COMBO_SOLO_FOREST_STUMP_X + lateral * cosine - 90.0f * sine,
                COMBO_SOLO_FOREST_STUMP_Z - lateral * sine - 90.0f * cosine, 0,

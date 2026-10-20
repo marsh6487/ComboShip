@@ -1,5 +1,6 @@
 #include "global.h"
 #include "entrances/SoloForest.h"
+#include "entrances/NativeForest.h"
 #include "mm/2s2h/Enhancements/Graphics/ComboForestPortalEffect.h"
 #include <array>
 #include <cassert>
@@ -9,7 +10,8 @@
 #include <vector>
 
 PlayState* gPlayState;
-static bool visit = true, safe = true, allocationAvailable = true, sForestTitle;
+static bool visit = true, safe = true, allocationAvailable = true,
+            titleAssetAvailable = true, sForestTitle;
 static char kForestTitle[] = "__OTR__custom/skiejer_forest/title";
 static std::array<Vtx, ComboForestPortalEffect::kVertexCount> arena;
 static std::vector<std::string> events;
@@ -18,6 +20,10 @@ static std::vector<Batch> batches;
 static int clears, renderFirst, renderSecond;
 bool ForestVisit(const PlayState* play) { return play && visit; }
 bool ForestSafe(const PlayState* play) { return play && safe; }
+bool ResourceMgr_FileExists(const char *path) {
+  return titleAssetAvailable &&
+         std::strcmp(path, "custom/skiejer_forest/title") == 0;
+}
 int ComboPlaceTitleCard_Show(PlayState*, void*, int width, int height) {
     assert(width == 144 && height == 24); events.emplace_back("title"); return 1;
 }
@@ -115,6 +121,37 @@ int main(int argc, char** argv) {
 #ifdef OOT_FOREST_TEST
     assert(play.actorCtx.titleCtx.width == 144 && play.actorCtx.titleCtx.height == 24);
     assert(play.actorCtx.titleCtx.durationTimer == 80 && play.actorCtx.titleCtx.delayTimer == 20);
+    play.actorCtx.titleCtx = {};
 #endif
-    std::puts("PASS native forest portal submission: complete animated glints, restored XLU state, guards and local title dimensions");
+    titleAssetAvailable = false;
+    sForestTitle = true;
+    events.clear();
+    DrawForestPortal();
+    assert(!sForestTitle);
+    for (const auto &event : events)
+      assert(event != "title");
+#ifdef OOT_FOREST_TEST
+    assert(!play.actorCtx.titleCtx.texture && !play.actorCtx.titleCtx.width &&
+           !play.actorCtx.titleCtx.durationTimer);
+#endif
+    // The native arch has a 44-unit mouth; use its active mesh to size the rim.
+    alignas(Gfx) static const char nativeRoot[]="__OTR__custom/comboship/native_forest/portal_root";
+#ifdef OOT_FOREST_TEST
+    MeshHeader mesh{}; PolygonDlist2 entries[3]{};
+    mesh.base.type=2; mesh.polygon2.num=3; mesh.polygon2.start=entries;
+    play.roomCtx.curRoom.meshHeader=&mesh;
+#else
+    RoomShape mesh{}; RoomShapeCullableEntry entries[3]{};
+    mesh.base.type=ROOM_SHAPE_TYPE_CULLABLE; mesh.cullable.numEntries=3; mesh.cullable.entries=entries;
+    play.roomCtx.curRoom.roomShape=&mesh;
+#endif
+    entries[2].opa=(Gfx*)nativeRoot;
+    batches.clear(); DrawForestPortal();
+    assert(batches.size()==kRimSegments+kGlints);
+    for(const auto& vertex:arena) {
+        assert(std::abs(vertex.v.ob[0])<=49);
+        assert(vertex.v.ob[1]<=114);
+    }
+    std::puts("PASS native forest portal submission: complete animated glints, "
+              "restored XLU state, guards, optional local title");
 }

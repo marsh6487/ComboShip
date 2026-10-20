@@ -125,6 +125,10 @@ void* MmAssets_LoadResourceWithSize(const char* path, size_t* outSize);
  */
 u8 MmAssets_ResourceExists(const char* path);
 
+// Query the pinned base archive's membership without loading resources,
+// scanning optional overrides, logging, or initializing the owner.
+u8 MmAssets_BaseResourceExists(const char* path);
+
 /**
  * Load an MM skeleton (2Ship OSKL resource) ARCHIVE-SCOPED from mm.o2r.
  *

@@ -1,5 +1,14 @@
 *.zip
 !tools/reward_gi/assets.zip
+!tools/native_forest/resources.zip
+# Native scene/market trees are restored from their verified source bundles.
+/soh/assets/custom/custom/comboship/native_forest/
+/soh/assets/custom/scenes/nonmq/comboship_forest/
+/soh/assets/custom/scenes/nonmq/skiejer_forest/
+/soh/assets/custom/scenes/shared/skiejer_forest_oot/
+/soh/assets/custom/custom/skiejer_market/
+/soh/assets/custom/scenes/nonmq/skiejer_market/
+/soh/assets/custom/scenes/shared/skiejer_market_oot/
 /soh/assets/custom/objects/nei_reward_gi/
 *.otr
 *.o2r

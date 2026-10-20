@@ -4,6 +4,9 @@
 #include "ComboForestActors.h"
 #include "entrances/SoloForest.h"
 #include "entrances/SoloForestResources.h"
+#include "entrances/NativeForest.h"
+#include "entrances/NativeForestResourceData.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 #include "entrances/LostWoodsEntrance.h"
 #include "gameplay/MagicMirrorAnchor.h"
 #include "gameplay/MagicMirrorArrival.h"
@@ -37,8 +40,11 @@ u32 Seed() {
     return gSaveContext.save.shipSaveInfo.rando.finalSeed;
 }
 bool PackAvailable() {
-    return Combo_IsCombinedGame() || std::all_of(std::begin(kSoloForestResources), std::end(kSoloForestResources),
-                                                 [](const char* path) { return ResourceMgr_FileExists(path); });
+    return Combo_IsCombinedGame() ||
+           NativeForest::SceneAvailable(NativeForest::kMmSoloScene, ResourceMgr_FileExists, ResourceMgr_FileExists,
+                                        NativeForest::LoadDependencies) ||
+           std::all_of(std::begin(kSoloForestResources), std::end(kSoloForestResources),
+                       [](const char* path) { return ResourceMgr_FileExists(path); });
 }
 bool Busy(PlayState* play) {
     return ItemInput_IsBlocked(GET_PLAYER(play), play) || Combo_MM_CrossDungeonTransitionPending();

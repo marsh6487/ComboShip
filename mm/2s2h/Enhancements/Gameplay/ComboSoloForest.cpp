@@ -3,6 +3,8 @@
 #include "entrances/SoloForest.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "entrances/SoloForestResources.h"
+#include "entrances/NativeForest.h"
+#include "entrances/NativeForestResourceData.h"
 #include "global.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -43,13 +45,20 @@ u32 ForestSeed() {
     return gSaveContext.save.shipSaveInfo.rando.finalSeed;
 }
 bool ForestPack() {
-    return std::all_of(std::begin(kSoloForestResources), std::end(kSoloForestResources),
+    return NativeForest::SceneAvailable(NativeForest::kMmSoloScene, ResourceMgr_FileExists, ResourceMgr_FileExists,
+                                        NativeForest::LoadDependencies) ||
+           std::all_of(std::begin(kSoloForestResources), std::end(kSoloForestResources),
                        [](const char* path) { return ResourceMgr_FileExists(path); });
 }
 bool ForestVisit(const PlayState* play) {
     return play &&
            ComboSoloForest_IsMmVisit(play->sceneId, play->roomCtx.curRoom.num, gSaveContext.gameMode,
                                      gSaveContext.fileNum, gSaveContext.sceneLayer, gSaveContext.save.cutsceneIndex);
+}
+bool NativePortal(const PlayState* play) {
+    const auto* shape = play ? play->roomCtx.curRoom.roomShape : nullptr;
+    return shape && shape->base.type == ROOM_SHAPE_TYPE_CULLABLE &&
+           NativeForest::PortalEntries(shape->cullable.entries, shape->cullable.numEntries);
 }
 bool OriginScene(const PlayState* play) {
     return play && play->sceneId == SCENE_26SARUNOMORI && play->roomCtx.curRoom.num == 1;
@@ -104,7 +113,7 @@ void ForestPlayerUpdate() {
         const float dx = pos.x - COMBO_SOLO_FOREST_STUMP_X, dz = pos.z - COMBO_SOLO_FOREST_STUMP_Z;
         if (dx * dx + dz * dz > 14400)
             sForestArmed = true;
-        if (sForestArmed && ComboSoloForest_AtStump(pos.x, pos.y, pos.z)) {
+        if (sForestArmed && ComboSoloForest_AtStumpWidth(pos.x, pos.y, pos.z, NativePortal(play) ? 42 : 58)) {
             sForestArmed = false;
             sLocalReturning = true;
             ForestTransition(play, sForestOrigin.entrance);
@@ -204,11 +213,12 @@ void DrawForestPortal() {
     auto* play = gPlayState;
     if (!ForestVisit(play) || play->roomCtx.curRoom.num != 0 || !ForestSafe(play))
         return;
-    if (sForestTitle && ComboPlaceTitleCard_Show(play, const_cast<char*>(kForestTitle), 144, 24) != 0)
+    if (sForestTitle && (!ResourceMgr_FileExists("custom/skiejer_forest/title") ||
+                         ComboPlaceTitleCard_Show(play, const_cast<char*>(kForestTitle), 144, 24) != 0))
         sForestTitle = false;
     using namespace ComboForestPortalEffect;
     std::array<Vertex, kVertexCount> shape;
-    Build(play->gameplayFrames, true, shape);
+    Build(play->gameplayFrames, !NativePortal(play), shape);
     auto* vertices = static_cast<Vtx*>(GRAPH_ALLOC(play->state.gfxCtx, sizeof(Vtx) * kVertexCount));
     if (!vertices)
         return;

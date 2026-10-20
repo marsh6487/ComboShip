@@ -1,0 +1,379 @@
+{
+  "building_material": "untextured native vertex shading",
+  "building_materials": {
+    "custom/prelude/Z2_LOST_WOODS/recipe215851318676066": "custom/comboship/native_forest/building/recipe215851318676066_material",
+    "custom/prelude/Z2_LOST_WOODS/recipe3635031522573470": "custom/comboship/native_forest/building/recipe3635031522573470_material",
+    "custom/prelude/Z2_LOST_WOODS/recipe7624751371212635": "custom/comboship/native_forest/building/recipe7624751371212635_material"
+  },
+  "building_triangles": 190,
+  "bundle": {
+    "bytes": 58372,
+    "name": "resources.zip",
+    "sha256": "7b21d19512a48b2363247b9276426ff6ba7afa4f10130f98513c22a90d0c6730"
+  },
+  "culling_bounds": [
+    {
+      "after": [
+        -462,
+        40,
+        246,
+        298
+      ],
+      "before": [
+        -520,
+        40,
+        120,
+        112
+      ],
+      "entry": 1,
+      "room": 0
+    },
+    {
+      "after": [
+        29,
+        218,
+        305,
+        674
+      ],
+      "before": [
+        20,
+        217,
+        318,
+        648
+      ],
+      "entry": 3,
+      "room": 0
+    }
+  ],
+  "custom_texture_payloads": 0,
+  "dependency_paths": {
+    "combined": "custom/comboship/native_forest/dependencies_combined_v1",
+    "mm": "custom/comboship/native_forest/dependencies_mm_v1",
+    "oot": "custom/comboship/native_forest/dependencies_oot_v1"
+  },
+  "excluded_final_bench_meshes": [
+    "recipe449915211495247",
+    "recipe7187869513033518",
+    "recipe388081030655925"
+  ],
+  "external_owner": "normal mm.o2r; OoT uses the existing MmAssets base archive loader",
+  "external_resources": [
+    "scenes/nonmq/Z2_26SARUNOMORI/Z2_26SARUNOMORITex_00BAC0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODSTex_00B9D0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODSTex_00D9D0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODSTex_00E9D0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_000C40",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_0017A0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_002E00",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_0031A0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_003488",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_003698",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_0038C8",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_0039B0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_003F70",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_004338",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_004898",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_007FE0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_0080C0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00DL_0080D0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_004A18",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_005218",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_005A18",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_006218",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_006A18",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_007218",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_007A18",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Vtx_000210",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Vtx_000F00",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Vtx_002AD0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Vtx_002F50",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Vtx_0032D8",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Vtx_0035C8",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Vtx_0036F8",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Vtx_0039E0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Vtx_004138",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Vtx_004418",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Vtx_007E20",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_000460",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_0009A8",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_000F60",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_0011F0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_0013C8",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_001430",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_0019B0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_0022A0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_002508",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_0036F0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_003F18",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_004AA0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_005120",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_005568",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_009C20",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_009CF0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01DL_009D00",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_005698",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_005E98",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_006698",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_006A98",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_007298",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_007A98",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_008298",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_008A98",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_008E98",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_009698",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Vtx_0001E0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Vtx_000588",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Vtx_000B50",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Vtx_0010F0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Vtx_0012D8",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Vtx_001460",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Vtx_001B90",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Vtx_002520",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Vtx_003AE8",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Vtx_0040D0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Vtx_004D20",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Vtx_0052A8",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Vtx_009AA0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02DL_000530",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02DL_0009E8",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02DL_000D90",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02DL_001068",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02DL_001388",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02Tex_0014B8",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02Tex_001CB8",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02Vtx_000430",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02Vtx_000598",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02Vtx_000B60",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02Vtx_000E68",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02Vtx_001178"
+  ],
+  "external_textures": [
+    "scenes/nonmq/Z2_26SARUNOMORI/Z2_26SARUNOMORITex_00BAC0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODSTex_00B9D0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODSTex_00D9D0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODSTex_00E9D0",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_004A18",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_005218",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_005A18",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_006218",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_006A18",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_007218",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_00Tex_007A18",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_005698",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_005E98",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_006698",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_006A98",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_007298",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_007A98",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_008298",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_008A98",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_008E98",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_01Tex_009698",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02Tex_0014B8",
+    "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02Tex_001CB8"
+  ],
+  "inputs": {
+    "final": {
+      "name": "zzzz_MM3D_Lost_Woods_FINAL_avatar_POC19.prelude.o2r",
+      "sha256": "9097583c896a11c204e4950bd9a80aa8e69fb2a42307f55f50e75d4195f30e42"
+    },
+    "native_mm": {
+      "name": "mm(1).o2r",
+      "sha256": "2f44bafe1a00f44ddaf7eb5e5c99e73a3d23771038529d6d1748819ad575dc80"
+    },
+    "source_edit": {
+      "name": "LostWoods-MirrorStump.prelude.o2r",
+      "sha256": "7fde769411d21792f6bc6cde62ee934fb17b8e24d7a01b8d74f30069cce49a83"
+    }
+  },
+  "marker": "custom/comboship/native_forest/materials_v1",
+  "native_private_geometry": [
+    "custom/comboship/native_forest/geometry/Z2_LOST_WOODS_room_00DL_002548",
+    "custom/comboship/native_forest/geometry/Z2_LOST_WOODS_room_00DL_0029F0",
+    "custom/comboship/native_forest/geometry/Z2_LOST_WOODS_room_00Vtx_0019D8",
+    "custom/comboship/native_forest/geometry/Z2_LOST_WOODS_room_00Vtx_002820"
+  ],
+  "native_stock_rooms": 3,
+  "portal": {
+    "anchor": [
+      -695,
+      0,
+      -313
+    ],
+    "material": "custom/comboship/native_forest/portal_material",
+    "quads": 23,
+    "source": "mm/2s2h/Enhancements/Graphics/ComboLostWoodsPassage.cpp::BuildPassage",
+    "stock_texture": "scenes/nonmq/Z2_26SARUNOMORI/Z2_26SARUNOMORITex_00BAC0",
+    "transform": "native Matrix_RotateYS and guMtxF2L; local vertices retain exact native integer conversion",
+    "triangles": 46,
+    "vertices": 92,
+    "yaw": 12288
+  },
+  "resources": {
+    "custom/comboship/native_forest/building/recipe215851318676066": {
+      "bytes": 4589,
+      "sha256": "3d46d604c8d2ed5e0efa8d723066317616cabf44a347373f7b5b19c314140ac8"
+    },
+    "custom/comboship/native_forest/building/recipe215851318676066_material": {
+      "bytes": 565,
+      "sha256": "caf6c8c746ab7bc24ffb1ef8df88b92e838c4578c1e3c2441548592dfd0df2d8"
+    },
+    "custom/comboship/native_forest/building/recipe215851318676066_vtx": {
+      "bytes": 2600,
+      "sha256": "abdbb81764e80c333258a2c56610c37347940e781cc413d5a392f3f7d8827b2e"
+    },
+    "custom/comboship/native_forest/building/recipe3635031522573470": {
+      "bytes": 5811,
+      "sha256": "c32c818a48b934953e100b93dc55acbb570ba06735c5a6ffd4b43f515b56cff2"
+    },
+    "custom/comboship/native_forest/building/recipe3635031522573470_material": {
+      "bytes": 565,
+      "sha256": "caf6c8c746ab7bc24ffb1ef8df88b92e838c4578c1e3c2441548592dfd0df2d8"
+    },
+    "custom/comboship/native_forest/building/recipe3635031522573470_vtx": {
+      "bytes": 2840,
+      "sha256": "74eebd955803faa3fb5f1e270187564875bdce55e0bb5ef344c2f68086d3e3ad"
+    },
+    "custom/comboship/native_forest/building/recipe7624751371212635": {
+      "bytes": 1675,
+      "sha256": "6bcd357373608bf45e4c30aa6ba0fc80c3b599a4d8421c9a91c028d14041ced3"
+    },
+    "custom/comboship/native_forest/building/recipe7624751371212635_material": {
+      "bytes": 565,
+      "sha256": "caf6c8c746ab7bc24ffb1ef8df88b92e838c4578c1e3c2441548592dfd0df2d8"
+    },
+    "custom/comboship/native_forest/building/recipe7624751371212635_vtx": {
+      "bytes": 904,
+      "sha256": "3dc09307bfd19d0bcaa44ad1c9ab1a6660026638a7af1895f0e4ca37f8e087a9"
+    },
+    "custom/comboship/native_forest/building_root": {
+      "bytes": 323,
+      "sha256": "fd384b417e133ca060055e95e7e29373ed05df3ca7748288662420d43f39dea9"
+    },
+    "custom/comboship/native_forest/dependencies_combined_v1": {
+      "bytes": 6825,
+      "sha256": "e6d555653a033a00ae8b11dbd406c9988fee2ff323d0a1b3d301306a78f6d706"
+    },
+    "custom/comboship/native_forest/dependencies_mm_v1": {
+      "bytes": 6805,
+      "sha256": "9433c2f52b53084a6980e288fbb8f05d9ed5fc44c261c8598e1d0312a76309bc"
+    },
+    "custom/comboship/native_forest/dependencies_oot_v1": {
+      "bytes": 6850,
+      "sha256": "8497571a0d2b0da0609197b7a42b418fd51615eef7f5c504f4e19e3cb19cd057"
+    },
+    "custom/comboship/native_forest/geometry/Z2_LOST_WOODS_room_00DL_002548": {
+      "bytes": 888,
+      "sha256": "8628b2882b767ef45e7282dc4dd1df7c023caa23619293d2ba191894623e4aa8"
+    },
+    "custom/comboship/native_forest/geometry/Z2_LOST_WOODS_room_00DL_0029F0": {
+      "bytes": 336,
+      "sha256": "17241db7c716336bb21a2eed9b07b99afabe94b25c8c317fbe8342bc290f1965"
+    },
+    "custom/comboship/native_forest/geometry/Z2_LOST_WOODS_room_00Vtx_0019D8": {
+      "bytes": 3000,
+      "sha256": "4805a8bcb46b22ec2a0bfe7c149c6351bb0b1e0443f6f4fd5775b22cf9404132"
+    },
+    "custom/comboship/native_forest/geometry/Z2_LOST_WOODS_room_00Vtx_002820": {
+      "bytes": 536,
+      "sha256": "c4718e768ca7f26787d1e50354e755fa32341a41a7d5886ed599372ef3690e9f"
+    },
+    "custom/comboship/native_forest/materials_v1": {
+      "bytes": 33,
+      "sha256": "7c398d523ea627499cf301a3c31e68588433956fa1dc624bbc7ed895ad51e1da"
+    },
+    "custom/comboship/native_forest/portal_material": {
+      "bytes": 667,
+      "sha256": "0e9e1be4db09ebd456ec1acebd06acd6057b722347f20563d50a6bd1f0e92e26"
+    },
+    "custom/comboship/native_forest/portal_root": {
+      "bytes": 5117,
+      "sha256": "04a46c4f9537a577bf6d98a93c58403d50397c424f3f3a193444d8b8b0db3974"
+    },
+    "custom/comboship/native_forest/portal_transform": {
+      "bytes": 128,
+      "sha256": "48aed28c1f07d4a8aaf9089b40d147a35255993ef116d5bc8e06274f2e903eff"
+    },
+    "custom/comboship/native_forest/portal_vtx": {
+      "bytes": 1544,
+      "sha256": "3cfd1008d1887a30d90d9748c55730e7a68597e759bacd20d07b593eaf884697"
+    },
+    "custom/comboship/native_forest/stock_materials": {
+      "bytes": 70,
+      "sha256": "177885389b0646fbc0c3e1d31a4ac9e01fc25201a5abe9345ac9ec14035f7554"
+    },
+    "custom/comboship/native_forest/texanim": {
+      "bytes": 75,
+      "sha256": "174795a08d3a2139b4ceec99f1fa7ee09a0e91666d8d56383c4dbeca15aa607f"
+    },
+    "scenes/nonmq/comboship_forest/comboship_forest": {
+      "bytes": 677,
+      "sha256": "4c7bb769fc2f86661b8ff7a13773c002fe27901c514e8266e98e8822feb87b32"
+    },
+    "scenes/nonmq/comboship_forest/comboship_forest_collision": {
+      "bytes": 19976,
+      "sha256": "d98991a03ff914e651f7f0e276fa86faa6060636716500e25e7f7627dbe807ad"
+    },
+    "scenes/nonmq/comboship_forest/comboship_forest_room_0": {
+      "bytes": 1023,
+      "sha256": "b66a92494da97ed7fc080543c467ea3bedbbba872f3ba85395ea57dc2ea70b65"
+    },
+    "scenes/nonmq/comboship_forest/comboship_forest_room_1": {
+      "bytes": 787,
+      "sha256": "fe060b48f47064da8e661025c10eb5638f9e21e8c1432f1bead019ede6d76506"
+    },
+    "scenes/nonmq/comboship_forest/comboship_forest_room_2": {
+      "bytes": 493,
+      "sha256": "ce67f44d1e0d8b44318727924eea0594d9d27abbca3f149a53c7298c16ae26a2"
+    },
+    "scenes/nonmq/skiejer_forest/skiejer_forest": {
+      "bytes": 659,
+      "sha256": "151f2223b596105960e09dc6d1e0aa8b0209011781b22475b6bccacc223fdfe8"
+    },
+    "scenes/nonmq/skiejer_forest/skiejer_forest_collision": {
+      "bytes": 19976,
+      "sha256": "d98991a03ff914e651f7f0e276fa86faa6060636716500e25e7f7627dbe807ad"
+    },
+    "scenes/nonmq/skiejer_forest/skiejer_forest_room_0": {
+      "bytes": 1023,
+      "sha256": "b66a92494da97ed7fc080543c467ea3bedbbba872f3ba85395ea57dc2ea70b65"
+    },
+    "scenes/nonmq/skiejer_forest/skiejer_forest_room_1": {
+      "bytes": 787,
+      "sha256": "fe060b48f47064da8e661025c10eb5638f9e21e8c1432f1bead019ede6d76506"
+    },
+    "scenes/nonmq/skiejer_forest/skiejer_forest_room_2": {
+      "bytes": 493,
+      "sha256": "ce67f44d1e0d8b44318727924eea0594d9d27abbca3f149a53c7298c16ae26a2"
+    },
+    "scenes/shared/skiejer_forest_oot/skiejer_forest_oot": {
+      "bytes": 649,
+      "sha256": "8e5e0b109119908a22a6e1927c6618f03ee9f4588e36dd1a9f049f1b55dea8c7"
+    },
+    "scenes/shared/skiejer_forest_oot/skiejer_forest_oot_collision": {
+      "bytes": 19976,
+      "sha256": "d98991a03ff914e651f7f0e276fa86faa6060636716500e25e7f7627dbe807ad"
+    },
+    "scenes/shared/skiejer_forest_oot/skiejer_forest_oot_room_0": {
+      "bytes": 1022,
+      "sha256": "5ca529eee7d66e71ba20dc841e0855cde78cca21abf66db5996f3cdc31c0d681"
+    },
+    "scenes/shared/skiejer_forest_oot/skiejer_forest_oot_room_1": {
+      "bytes": 770,
+      "sha256": "0b1508dadff165aac4b171792e9dcb0236f2a13446c35f42faede145bbf89f4e"
+    },
+    "scenes/shared/skiejer_forest_oot/skiejer_forest_oot_room_2": {
+      "bytes": 492,
+      "sha256": "bf8cbb7a35d52affe3c6ec5ad395fcc73e37b65609b5cb93cf3792431d231a6d"
+    }
+  },
+  "runtime": "unverified; source/resource generation does not establish configured gameplay",
+  "scene_paths": {
+    "combined": "scenes/nonmq/comboship_forest/comboship_forest",
+    "mm": "scenes/nonmq/skiejer_forest/skiejer_forest",
+    "oot": "scenes/shared/skiejer_forest_oot/skiejer_forest_oot"
+  },
+  "schema": 1,
+  "scroll_bindings": [],
+  "status": "generated"
+}

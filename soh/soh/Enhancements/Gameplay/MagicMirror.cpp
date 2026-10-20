@@ -3,6 +3,9 @@
 #include "ComboGameMode.h"
 #include "entrances/SoloForest.h"
 #include "entrances/SoloForestResources.h"
+#include "entrances/NativeForest.h"
+#include "entrances/NativeForestResourceData.h"
+#include "mods/transformation_masks/assets/mm_asset_loader.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "gameplay/MagicMirrorAnchor.h"
 #include "gameplay/MagicMirrorArrival.h"
@@ -35,8 +38,17 @@ u32 Seed() {
     return IS_RANDO ? Rando::Context::GetInstance()->GetSeed() : 0;
 }
 bool PackAvailable() {
-    return Combo_IsCombinedGame() || std::all_of(std::begin(kSoloForestResources), std::end(kSoloForestResources),
-                                                 [](const char* path) { return ResourceMgr_FileExists(path); });
+    if (Combo_IsCombinedGame())
+        return true;
+    if (NativeForest::CoreAvailable(NativeForest::kOotSoloScene,
+                                    [](const char* path) { return ResourceMgr_FileExists(path); })) {
+        MmAssets_Init();
+        if (NativeForest::SceneAvailable(NativeForest::kOotSoloScene, ResourceMgr_FileExists,
+                                         MmAssets_BaseResourceExists, NativeForest::LoadDependencies))
+            return true;
+    }
+    return std::all_of(std::begin(kSoloForestResources), std::end(kSoloForestResources),
+                       [](const char* path) { return ResourceMgr_FileExists(path); });
 }
 bool Busy(PlayState* play) {
     return ItemInput_IsBlocked(GET_PLAYER(play), play) || Combo_SOH_CrossDungeonTransitionPending();

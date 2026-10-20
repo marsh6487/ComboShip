@@ -4,6 +4,7 @@
 #include "2s2h/Enhancements/Gameplay/ComboForestEpona.h"
 #include "actors/PlacedSariaABI.h"
 #include "actors/SariaHexEffect.h"
+#include "entrances/ForestActorPlacements.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "ComboResolve.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -30,6 +31,7 @@ static bool missing;
 static int alt;
 static unsigned spawns;
 static bool hasFloor = true;
+static Vec3f lastFloorProbe;
 static Actor spawned;
 static unsigned skeletonDraws;
 static unsigned lastPose;
@@ -146,8 +148,9 @@ int gComboGameMode;
 bool Player_InCsMode(PlayState*) {
     return false;
 }
-f32 BgCheck_EntityRaycastFloor5(CollisionContext*, CollisionPoly** poly, s32*, Actor*, Vec3f*) {
+f32 BgCheck_EntityRaycastFloor5(CollisionContext*, CollisionPoly** poly, s32*, Actor*, Vec3f* probe) {
     static CollisionPoly floor;
+    lastFloorProbe = *probe;
     *poly = hasFloor ? &floor : nullptr;
     return hasFloor ? 42.0f : BGCHECK_Y_MIN;
 }
@@ -401,6 +404,18 @@ int main() {
     SpawnForestSaria();
     SpawnForestSaria();
     CHECK(spawns == 1 && spawned.id == ACTOR_EN_VIEWER && spawned.params == 0x7F13 && spawned.world.pos.y == 42);
+    // The fallback belongs beside the portal, clear of its mouth and arrival.
+    // The previous world offset (+100,+70) put her directly in front instead.
+    CHECK(std::fabs(spawned.world.pos.x - (-763.883f)) < .01f);
+    CHECK(std::fabs(spawned.world.pos.z - (-146.702f)) < .01f);
+    CHECK(lastFloorProbe.x == spawned.world.pos.x && lastFloorProbe.z == spawned.world.pos.z &&
+          lastFloorProbe.y == 120.0f);
+    const float sariaAngle = 12288 * (6.28318530718f / 65536.0f);
+    const float sariaDx = spawned.world.pos.x + 695.0f, sariaDz = spawned.world.pos.z + 313.0f;
+    CHECK(sariaDx * std::cos(sariaAngle) - sariaDz * std::sin(sariaAngle) < -150.0f);
+    CHECK(std::fabs(sariaDx * std::sin(sariaAngle) + sariaDz * std::cos(sariaAngle)) < .01f);
+    CHECK(!ComboOpeningForest_AtReturn(&play, &spawned.world.pos));
+    CHECK(std::hypot(spawned.world.pos.x + 486.0f, spawned.world.pos.z + 227.0f) > 250.0f);
     CHECK(std::memcmp(&before, &gSaveContext, sizeof(before)) == 0);
 
     // Seated scenery never grants; only the dedicated Termina Field gift does.
@@ -643,6 +658,8 @@ int main() {
     sSpawnAttempted = sHorseSpawnAttempted = false;
     SpawnForestSaria();
     CHECK(spawns == soloBefore + 1 && spawned.params == 0x7F13);
+    CHECK(std::fabs(spawned.world.pos.x - (-763.883f)) < .01f);
+    CHECK(std::fabs(spawned.world.pos.z - (-146.702f)) < .01f);
     CHECK(sBridge.load == MM_PlacedSariaLoad && sBridge.release == MM_PlacedSariaRelease &&
           sBridge.alt == MM_PlacedSariaAlt);
     SpawnForestEpona();
@@ -667,6 +684,22 @@ int main() {
     CHECK(rewards == 2 && saves == 2 && hintRegistrations == 2 &&
           gSaveContext.save.shipSaveInfo.nei.comboSariaSongClaimed);
     ComboSaria_Destroy(&gift, &play);
+    // An older active portal has a different anchor and facing. The same
+    // fallback remains at its side rather than at a fixed world-space offset.
+    gComboGameMode = COMBO_GAME_BOTH;
+    play.sceneId = SCENE_LOST_WOODS;
+    gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
+    RoomShape portalShape{};
+    RoomShapeDListsEntry portalMesh{};
+    portalShape.base.type = ROOM_SHAPE_TYPE_NORMAL;
+    portalShape.normal.numEntries = 1;
+    portalShape.normal.entries = &portalMesh;
+    portalMesh.opa = reinterpret_cast<Gfx*>(const_cast<char*>(COMBO_OPENING_FOREST_STUMP_PACK_ROOT));
+    play.roomCtx.curRoom.roomShape = &portalShape;
+    sSpawnAttempted = false;
+    SpawnForestSaria();
+    CHECK(std::fabs(spawned.world.pos.x - 120.0f) < .01f && std::fabs(spawned.world.pos.z - 60.0f) < .01f);
+    CHECK(!ComboOpeningForest_AtReturn(&play, &spawned.world.pos));
     puts("PASS solo MM forest and song routing: own exploration copy, local asset bridge, portal horse, fixed gift "
          "once per native file");
     puts("PASS MM Saria lifecycle: missing donor, independent blink, fixed placement/yaw, collider/talk, Alt "

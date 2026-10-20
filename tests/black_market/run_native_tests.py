@@ -25,6 +25,8 @@ if "void RememberTravel(" in source:
 if 'extern "C" int ComboBlackMarket_IsAuthoredDoor(' in source:
     signatures.append('extern "C" int ComboBlackMarket_IsAuthoredDoor(')
 body = "\n".join(block_from(source, source.index(s)) for s in signatures)
+body += "\n" + "\n".join(block_from(source, source.index(s)) for s in
+                          ("void LogDoorAttempt(", "void LogEntryRecovery("))
 fixture = (ROOT / "tests/black_market/native_test.cpp").read_text().replace("/* PRODUCTION */", body)
 player_source = (ROOT / "mm/src/overlays/actors/ovl_player_actor/z_player.c").read_text()
 hook_start = player_source.index("        s32 marketDoor = ComboBlackMarket_TryDoorEntrance(")
@@ -51,7 +53,7 @@ with tempfile.TemporaryDirectory(prefix="market-native-") as temp:
     path = Path(temp) / "test.cpp"
     path.write_text(fixture)
     binary = Path(temp) / "test"
-    includes = ("mm", "mm/2s2h", "mm/include", "mm/include/PR", "mm/src", "mm/assets",
+    includes = ("tests/black_market", "mm", "mm/2s2h", "mm/include", "mm/include/PR", "mm/src", "mm/assets",
                 "libultraship/include", "combo")
     subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-w", "-DF3DEX_GBI_2", "-DCOMBO_BUILD",
                     "-DFMT_HEADER_ONLY", "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-no-pie",

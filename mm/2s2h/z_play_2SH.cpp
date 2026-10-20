@@ -3,10 +3,16 @@
 #include <ship/utils/StringHelper.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include <ship/resource/ResourceManager.h>
+#ifdef COMBO_BUILD
+#include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "entrances/NativeForest.h"
+#include "entrances/NativeForestResourceData.h"
+#endif
 
 extern "C" {
 #include "global.h"
 extern uintptr_t gSegments[NUM_SEGMENTS];
+u8 ResourceMgr_FileExists(const char* path);
 }
 
 Ship::IResource* OTRPlay_LoadFile(PlayState* play, const char* fileName) {
@@ -46,6 +52,11 @@ extern "C" void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn) {
     play->sceneConfig = scene->drawConfig;
     std::string scenePath =
         StringHelper::Sprintf("scenes/nonmq/%s/%s", scene->segment.fileName, scene->segment.fileName);
+#ifdef COMBO_BUILD
+    if (const char* native = NativeForest::CombinedScene(ComboOpeningForest_IsExploration(play), ResourceMgr_FileExists,
+                                                         NativeForest::LoadDependencies))
+        scenePath = native;
+#endif
     play->sceneSegment = OTRPlay_LoadFile(play, scenePath.c_str());
     scene->unk_D = 0;
     gSegments[2] = (uintptr_t)play->sceneSegment;

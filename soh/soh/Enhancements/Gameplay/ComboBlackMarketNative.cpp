@@ -6,10 +6,13 @@
 #include "entrances/SoloForest.h"
 #include "BlackMarketLock.h"
 #include "BlackMarketKeeper.h"
+#include "BlackMarketNativeResources.h"
+#include "BlackMarketEntry.h"
 #include "BlackMarketGrannyResources.h"
 #include "BlackMarketBrowsing.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "soh/SaveManager.h"
+#include "soh/ResourceManagerHelpers.h"
 #include "soh/ActorDB.h"
 #include "soh/ShipInit.hpp"
 #include "soh/frame_interpolation.h"
@@ -18,17 +21,21 @@
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include "soh/Enhancements/randomizer/static_data.h"
 #include "soh/Enhancements/randomizer/NeiGiPresentation.h"
+#include "mods/transformation_masks/assets/mm_asset_loader.h"
 #include "../../../../mm/2s2h/Enhancements/Gameplay/BlackMarketResources.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstring>
+#include <spdlog/spdlog.h>
 extern "C" {
 #include "global.h"
 u8 ResourceMgr_FileExists(const char*);
 const char* SOH_ReadBlackMarketOptions();
 }
 #include "BlackMarketShelvesNative.h"
+#include "BlackMarketKeeperAssets.h"
 #include "OotBlackMarketDoorNative.h"
 
 extern "C" void Player_Action_80845EF8(Player*, PlayState*);
@@ -45,6 +52,7 @@ u16 sClears = 0;
 bool sEntering = false, sReturnPending = false, sReturnStaged = false, sResumeFromMarket = false;
 bool sDoorArmed = false, sTalking = false, sTitlePending = false;
 bool sKeeperSpawned = false;
+bool sCustomKeeper = false;
 int sTravelSlot = -1, sSelected = 0;
 float sDoorFloor = 0;
 u32 sTravelSeed = 0;
@@ -69,6 +77,8 @@ struct KeeperState {
     Vec3s joints[kLimbCount], morphs[kLimbCount];
     int eye, timer;
 } sKeeper;
+BlackMarketKeeperAssets::NativeModel sNativeKeeper;
+bool sNativeKeeperReady = false;
 BlackMarketShelvesNative::Fixture sShelfFixture;
 constexpr Vec3f kShelves[8] = {
     // Two framed shelf banks; keep all offers on one frontal plane.
@@ -80,8 +90,28 @@ constexpr Vec3f kShelves[8] = {
 u32 Seed() {
     return IS_RANDO ? Rando::Context::GetInstance()->GetSeed() : 0;
 }
+bool CustomKeeperAvailable();
+bool LoadNativeKeeper();
 bool PackAvailable() {
+    if (ResourceMgr_FileExists("custom/skiejer_market/native_geometry_v1")) {
+        MmAssets_Init();
+        if (std::all_of(std::begin(kNativeBlackMarketOotResources), std::end(kNativeBlackMarketOotResources),
+                        [](const char* path) {
+                            const bool native =
+                                std::strncmp(path, "objects/object_bg/", 18) == 0 ||
+                                std::strcmp(path, "scenes/nonmq/Z2_26SARUNOMORI/Z2_26SARUNOMORITex_00BAC0") == 0;
+                            return native ? MmAssets_BaseResourceExists(path) : ResourceMgr_FileExists(path);
+                        }) &&
+            (CustomKeeperAvailable() || LoadNativeKeeper()))
+            return true;
+    }
     return std::all_of(std::begin(kBlackMarketResources), std::end(kBlackMarketResources),
+                       [](const char* path) {
+                           return BlackMarketEntry::LegacyResourceAvailable(path, ResourceMgr_FileExists);
+                       });
+}
+bool DestinationAvailable() {
+    return std::all_of(BlackMarketEntry::kOotDestination.begin(), BlackMarketEntry::kOotDestination.end(),
                        [](const char* path) { return ResourceMgr_FileExists(path); });
 }
 bool Interior() {
@@ -239,6 +269,22 @@ void Purchase() {
 #include "BlackMarketBrowsingNative.h"
 #undef BLACK_MARKET_BROWSING_OOT
 
+bool CustomKeeperAvailable() {
+    return BlackMarketKeeperAssets::CustomAvailable(kBlackMarketResources, [](const char* path) {
+        return ResourceMgr_FileExists(path) ||
+               (ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(path));
+    });
+}
+bool LoadNativeKeeper() {
+    if (!sNativeKeeperReady) {
+        // The archive-scoped importers pin this private model for renderer use.
+        // Keep a successful preflight alive and retry only incomplete imports.
+        sNativeKeeperReady = sNativeKeeper.Load(MmAssets_LoadSkeleton, MmAssets_LoadAnimation, MmAssets_LoadResourceStrict,
+                                                MmAssets_LoadDisplayListGraphStrict);
+    }
+    return sNativeKeeperReady;
+}
+
 void KeeperUpdate(Actor* actor, PlayState* play) {
     SkelAnime_Update(&sKeeper.skel);
     if (sKeeper.timer > 0)
@@ -250,6 +296,11 @@ void KeeperUpdate(Actor* actor, PlayState* play) {
     Actor_SetFocus(actor, 55);
     if (!Active()) {
         EndBrowsing(play);
+        actor->textId = BlackMarketEntry::kUnavailableText;
+        if (Actor_ProcessTalkRequest(actor, play))
+            Message_ContinueTextbox(play, BlackMarketEntry::kUnavailableText);
+        else
+            Actor_OfferTalk(actor, play, 150);
         return;
     }
     if (Actor_ProcessTalkRequest(actor, play)) {
@@ -267,7 +318,7 @@ void KeeperUpdate(Actor* actor, PlayState* play) {
     BrowseInput(play);
 }
 s32 KeeperLimb(PlayState*, s32 limb, Gfx** display, Vec3f*, Vec3s*, void*) {
-    if (limb == kHeadLimb) {
+    if (sCustomKeeper && limb == kHeadLimb) {
         static const char* heads[] = { "__OTR__custom/skiejer_market/keeper/ShopGalMMDBlinkHead0DL",
                                        "__OTR__custom/skiejer_market/keeper/ShopGalMMDBlinkHead1DL",
                                        "__OTR__custom/skiejer_market/keeper/ShopGalMMDBlinkHead2DL",
@@ -277,9 +328,16 @@ s32 KeeperLimb(PlayState*, s32 limb, Gfx** display, Vec3f*, Vec3s*, void*) {
     return false;
 }
 void KeeperDraw(Actor* actor, PlayState* play) {
+    OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
+    if (!sCustomKeeper) {
+        MmAssets_EnsureStrictTextureBindings();
+        constexpr int eyes[] = { 0, 1, 2, 1 };
+        gSPSegment(POLY_OPA_DISP++, 0x08, reinterpret_cast<uintptr_t>(sNativeKeeper.eyes[eyes[sKeeper.eye & 3]]));
+    }
     SkelAnime_DrawFlexOpa(play, sKeeper.skel.skeleton, sKeeper.skel.jointTable, sKeeper.skel.dListCount, KeeperLimb,
                           nullptr, actor);
+    CLOSE_DISPS(play->state.gfxCtx);
 }
 void KeeperInit(Actor* actor, PlayState* play) {
     if (!Interior() || !PackAvailable()) {
@@ -287,11 +345,18 @@ void KeeperInit(Actor* actor, PlayState* play) {
         return;
     }
     sKeeper = {};
+    sCustomKeeper = CustomKeeperAvailable();
+    if (!sCustomKeeper && !LoadNativeKeeper()) {
+        Actor_Kill(actor);
+        return;
+    }
     ActorShape_Init(&actor->shape, 0, nullptr, 0);
     Actor_SetScale(actor, BlackMarketKeeper::kScale);
     actor->flags = ACTOR_FLAG_ATTENTION_ENABLED | ACTOR_FLAG_FRIENDLY | ACTOR_FLAG_UPDATE_CULLING_DISABLED;
-    SkelAnime_InitFlex(play, &sKeeper.skel, (FlexSkeletonHeader*)kKeeper,
-                       (AnimationHeader*)BlackMarketKeeper::kAnimation, sKeeper.joints, sKeeper.morphs, kLimbCount);
+    SkelAnime_InitFlex(play, &sKeeper.skel,
+                       sCustomKeeper ? (FlexSkeletonHeader*)kKeeper : &sNativeKeeper.skeleton,
+                       sCustomKeeper ? (AnimationHeader*)BlackMarketKeeper::kAnimation : sNativeKeeper.animation,
+                       sKeeper.joints, sKeeper.morphs, kLimbCount);
     actor->update = KeeperUpdate;
     actor->draw = KeeperDraw;
     actor->destroy = nullptr;
@@ -314,6 +379,13 @@ void RegisterKeeperActor() {
     sKeeperActorId = ActorDB::Instance->AddEntry(profile).entry.id;
 }
 void MarketText(u16* textId, bool* fromTable) {
+    if (Interior() && *textId == BlackMarketEntry::kUnavailableText) {
+        CustomMessage entry("My wares aren't ready yet.&Come back soon!");
+        entry.Format();
+        entry.LoadIntoFont();
+        *fromTable = false;
+        return;
+    }
     if (!Active() ||
         (*textId != kBrowseText && *textId != kResultText && *textId != kWelcomeText && *textId != kConfirmText))
         return;
@@ -407,6 +479,9 @@ void DrawSeal(PlayState* play, const BlackMarketVisual::Frame& frame, bool selec
 }
 
 void PresentTitle() {
+    if (!ResourceMgr_FileExists(kCard) &&
+        !(ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(kCard)))
+        return;
     // TitleCard_InitPlaceName rejects new scene IDs and rewrites language
     // suffixes. Initialize its ordinary native context with our private card;
     // native timing, HUD cosmetics and OnPresentTitleCard still own display.
@@ -450,9 +525,11 @@ void DrawShelves(PlayState* play) {
 }
 void DrawMarket() {
     auto* play = gPlayState;
-    if (!Active() || !play->state.running)
+    if (!Interior() || !play->state.running)
         return;
     DrawShelves(play);
+    if (!Active())
+        return;
     for (int slot = 0; slot < 8; ++slot) {
         const auto* item = Offer(slot);
         if (!item)
@@ -477,7 +554,7 @@ void DrawMarket() {
 }
 void DrawExterior() {
     auto* play = gPlayState;
-    if (!Exterior(play) || !sSession.Active(gSaveContext.fileNum) || !PackAvailable())
+    if (!Exterior(play) || !PackAvailable())
         return;
     if (OotBlackMarketDoorNative::HasDoor(play))
         return; // The finished forest supplies the building and native door.
@@ -535,15 +612,14 @@ void PlayerUpdate() {
             sKeeperSpawned =
                 Actor_Spawn(&play->actorCtx, play, sKeeperActorId, BlackMarketKeeper::kX, BlackMarketKeeper::kY,
                             BlackMarketKeeper::kZ, 0, BlackMarketKeeper::kYaw, 0, 0) != nullptr;
-        if (!Active() ||
-            ComboBlackMarket_AtExit(player->actor.world.pos.x, player->actor.world.pos.y, player->actor.world.pos.z)) {
+        if (ComboBlackMarket_AtExit(player->actor.world.pos.x, player->actor.world.pos.y, player->actor.world.pos.z)) {
             RememberTravel();
             sReturnPending = true;
             Transition(play, sReturnEntrance);
         }
         return;
     }
-    if (!Exterior(play) || !sSession.Active(gSaveContext.fileNum) || !PackAvailable())
+    if (!Exterior(play) || !DestinationAvailable())
         return;
     if (OotBlackMarketDoorNative::HasDoor(play))
         return; // Authored Open owns entry, including ambiguous/unavailable markers.
@@ -688,17 +764,118 @@ void RegisterNativeMarket() {
 RegisterShipInitFunc init(RegisterNativeMarket);
 } // namespace
 
-extern "C" int ComboBlackMarketOot_TryDoorEntrance(PlayState* play, Actor* door) {
-    if (play != gPlayState || !Exterior(play) || !OotBlackMarketDoorNative::MarkerActor(play, door))
-        return COMBO_BLACK_MARKET_OOT_DOOR_UNHANDLED;
+namespace {
+void LogDoorAttempt(PlayState* play, Actor* door, int result, const char* reason) {
+    if (!play || play->sceneNum != SCENE_SKIEJER_FOREST)
+        return;
     OotBlackMarketDoorNative::Pose placed;
+    const bool found = OotBlackMarketDoorNative::Find(play, placed);
     const auto* player = GET_PLAYER(play);
-    // Native Open already selected its knob-door action. Do not reject its own
-    // player cutscene state; scene/transition/session gates still apply.
-    if (!OotBlackMarketDoorNative::Find(play, placed) || !Safe(play) || !player || player->doorActor != door ||
-        player->doorType != PLAYER_DOORTYPE_HANDLE || player->actionFunc != Player_Action_80845EF8 ||
-        gSaveContext.health <= 0 || sEntering || !sSession.Active(gSaveContext.fileNum) || !PackAvailable())
+    const auto missing = BlackMarketEntry::Missing(BlackMarketEntry::kOotDestination, ResourceMgr_FileExists);
+    nlohmann::json record = {
+        { "host", "oot" }, { "result", BlackMarketEntry::ResultName(result) }, { "reason", reason },
+        { "location", { { "mode", gComboGameMode }, { "scene", play->sceneNum },
+                          { "room", play->roomCtx.curRoom.num }, { "layer", gSaveContext.sceneLayer },
+                          { "entrance", gSaveContext.entranceIndex },
+                          { "cutscene_index", gSaveContext.cutsceneIndex } } },
+        { "recognition", { { "current_play", play == gPlayState }, { "exterior", Exterior(play) },
+                             { "marker_actor", OotBlackMarketDoorNative::MarkerActor(play, door) },
+                             { "marker_found", found },
+                             { "marker_matches", found && OotBlackMarketDoorNative::Matches(door, placed) },
+                             { "transition_actors", play->transiActorCtx.numActors },
+                             { "door_id", door ? door->id : -1 }, { "door_params", door ? door->params : -1 } } },
+        { "gates", { { "transition_idle", play->transitionTrigger == TRANS_TRIGGER_OFF &&
+                                              play->transitionMode == TRANS_MODE_OFF },
+                       { "native_state_ready", found && Safe(play) && player && player->doorActor == door &&
+                                                   player->doorType == PLAYER_DOORTYPE_HANDLE &&
+                                                   player->actionFunc == Player_Action_80845EF8 &&
+                                                   gSaveContext.health > 0 },
+                       { "destination_ready", missing.empty() } } },
+        { "state", { { "running", play->state.running }, { "game_mode", gSaveContext.gameMode },
+                       { "file", gSaveContext.fileNum }, { "transition_trigger", play->transitionTrigger },
+                       { "transition_mode", play->transitionMode }, { "pause", play->pauseCtx.state },
+                       { "game_over", play->gameOverCtx.state }, { "scene_cutscene", play->csCtx.state },
+                       { "cutscene_trigger", gSaveContext.cutsceneTrigger }, { "player_present", player != nullptr },
+                       { "player_owns_door", player && player->doorActor == door },
+                       { "player_action_expected", player && player->actionFunc == Player_Action_80845EF8 },
+                       { "player_door_type", player ? player->doorType : -1 }, { "health", gSaveContext.health },
+                       { "native_keeper_ready", sNativeKeeperReady } } },
+        { "market", BlackMarketEntry::MarketState(sSession, gSaveContext.fileNum) },
+        { "travel", { { "entering", sEntering }, { "return_pending", sReturnPending }, { "door_armed", sDoorArmed },
+                        { "slot", sTravelSlot }, { "seed", sTravelSeed },
+                        { "respawn_flag", gSaveContext.respawnFlag } } },
+        { "resources", { { "destination_missing", missing },
+                           { "manifest_raw", ResourceMgr_FileExists(BlackMarketEntry::kManifest) != 0 },
+                           { "manifest_cache_key", ResourceMgr_FileExists(BlackMarketEntry::kManifestKey) != 0 } } }
+    };
+    record["checks"] = {
+        { "door_recognized",
+          play == gPlayState && Exterior(play) && OotBlackMarketDoorNative::MarkerActor(play, door) },
+        { "unique_marker", found },
+        { "running", play->state.running != 0 }, { "normal_mode", gSaveContext.gameMode == GAMEMODE_NORMAL },
+        { "playable_slot", ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) != 0 },
+        { "transition_idle", play->transitionTrigger == TRANS_TRIGGER_OFF && play->transitionMode == TRANS_MODE_OFF },
+        { "pause_closed", play->pauseCtx.state == 0 },
+        { "game_over_inactive", play->gameOverCtx.state == GAMEOVER_INACTIVE },
+        { "scene_cutscene_idle", play->csCtx.state == CS_STATE_IDLE },
+        { "cutscene_not_pending", !gSaveContext.cutsceneTrigger }, { "player_present", player != nullptr },
+        { "player_owns_door", player && player->doorActor == door },
+        { "door_type_handle", player && player->doorType == PLAYER_DOORTYPE_HANDLE },
+        { "player_action_expected", player && player->actionFunc == Player_Action_80845EF8 },
+        { "alive", gSaveContext.health > 0 }, { "destination_ready", missing.empty() }
+    };
+    record["failed_checks"] = BlackMarketEntry::FailedChecks(record["checks"]);
+    if (!missing.empty()) {
+        record["resources"]["native_missing"] =
+            BlackMarketEntry::Missing(kNativeBlackMarketOotResources, [](const char* path) {
+                const bool native = std::strncmp(path, "objects/object_bg/", 18) == 0 ||
+                                    std::strcmp(path, "scenes/nonmq/Z2_26SARUNOMORI/Z2_26SARUNOMORITex_00BAC0") == 0;
+                return native ? MmAssets_BaseResourceExists(path) != 0 : ResourceMgr_FileExists(path) != 0;
+            });
+        record["resources"]["legacy_missing"] = BlackMarketEntry::Missing(kBlackMarketResources, [](const char* path) {
+            return BlackMarketEntry::LegacyResourceAvailable(path, ResourceMgr_FileExists);
+        });
+    }
+    SPDLOG_INFO("[BlackMarketDoor] {}", record.dump());
+}
+void LogEntryRecovery() {
+    const nlohmann::json record = {
+        { "host", "oot" }, { "file", gSaveContext.fileNum }, { "entering", sEntering },
+        { "travel_matches", MatchesTravel() }, { "travel_slot", sTravelSlot }, { "travel_seed", sTravelSeed },
+        { "seed", Seed() }, { "respawn_flag", gSaveContext.respawnFlag },
+        { "destination_ready", DestinationAvailable() },
+        { "market", BlackMarketEntry::MarketState(sSession, gSaveContext.fileNum) }
+    };
+    SPDLOG_INFO("[BlackMarketReturn] {}", record.dump());
+}
+} // namespace
+extern "C" int ComboBlackMarketOot_TryDoorEntrance(PlayState* play, Actor* door) {
+    OotBlackMarketDoorNative::Pose placed;
+    if (play != gPlayState || !Exterior(play) || !OotBlackMarketDoorNative::MarkerActor(play, door)) {
+        LogDoorAttempt(play, door, COMBO_BLACK_MARKET_OOT_DOOR_UNHANDLED, "door_not_recognized");
+        return COMBO_BLACK_MARKET_OOT_DOOR_UNHANDLED;
+    }
+    if (!OotBlackMarketDoorNative::Find(play, placed)) {
+        LogDoorAttempt(play, door, COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED, "door_marker_ambiguous");
         return COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED;
+    }
+    // Native Open already selected its action. Keep player/transition safety,
+    // while stock, optional art and keeper preflight remain independent of entry.
+    if (play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF) {
+        LogDoorAttempt(play, door, COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED, "transition_active");
+        return COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED;
+    }
+    const auto* player = GET_PLAYER(play);
+    if (!Safe(play) || !player || player->doorActor != door || player->doorType != PLAYER_DOORTYPE_HANDLE ||
+        player->actionFunc != Player_Action_80845EF8 || gSaveContext.health <= 0) {
+        LogDoorAttempt(play, door, COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED, "native_state_not_ready");
+        return COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED;
+    }
+    if (!DestinationAvailable()) {
+        LogDoorAttempt(play, door, COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED, "destination_missing");
+        return COMBO_BLACK_MARKET_OOT_DOOR_BLOCKED;
+    }
+    LogDoorAttempt(play, door, COMBO_BLACK_MARKET_OOT_DOOR_ENTERED, "native_open");
     // The native save worker must finish before publishing a new return point.
     SaveManager::Instance->ThreadPoolWait();
     sReturnPos = OotBlackMarketDoorNative::Outside(placed);
@@ -732,9 +909,9 @@ extern "C" void ComboBlackMarketOot_NormalizeEntry(void) {
     }
     if (gSaveContext.entranceIndex < ENTR_SKIEJER_MARKET || gSaveContext.entranceIndex > ENTR_SKIEJER_MARKET_3)
         return;
-    if (sEntering && MatchesTravel() && sSession.Active(gSaveContext.fileNum) && PackAvailable() &&
-        gSaveContext.respawnFlag == 0)
+    if (sEntering && MatchesTravel() && DestinationAvailable() && gSaveContext.respawnFlag == 0)
         return;
+    LogEntryRecovery();
     sEntering = false;
     sReturnPending = true;
     RememberTravel();

@@ -1,6 +1,7 @@
 #include "global.h"
 #include "ComboGameMode.h"
 #include "entrances/SoloForest.h"
+#include "entrances/NativeForest.h"
 #include "entrances/LostWoodsEntrance.h"
 #include <nlohmann/json.hpp>
 #include <cassert>
@@ -288,5 +289,24 @@ int main() {
         if (gate == 6) sForestSeed = 78;
         Enter(); assert(play.transitionTrigger == TRANS_TRIGGER_OFF);
     }
+    Reset(); SetScene(kForestScene, 0); Entrance()=kForestEntrance; sForestArmed=true;
+    alignas(Gfx) static const char portalRoot[]="__OTR__custom/comboship/native_forest/portal_root";
+#ifdef OOT_FOREST_TEST
+    MeshHeader mesh{}; PolygonDlist2 entry{};
+    mesh.base.type=2; mesh.polygon2.num=1; mesh.polygon2.start=&entry;
+    play.roomCtx.curRoom.meshHeader=&mesh;
+#else
+    RoomShape mesh{}; RoomShapeCullableEntry entry{};
+    mesh.base.type=ROOM_SHAPE_TYPE_CULLABLE; mesh.cullable.numEntries=1; mesh.cullable.entries=&entry;
+    play.roomCtx.curRoom.roomShape=&mesh;
+#endif
+    entry.opa=(Gfx*)portalRoot;
+    const float angle=12288*(6.28318530718f/65536.0f);
+    player.actor.world.pos={-695+52*std::cos(angle)-20*std::sin(angle),0,
+                            -313-52*std::sin(angle)-20*std::cos(angle)};
+    ForestPlayerUpdate();
+    assert(play.transitionTrigger==TRANS_TRIGGER_OFF && "native jamb must not teleport outside its 44-unit mouth");
+    player.actor.world.pos={-695,0,-313}; ForestPlayerUpdate();
+    assert(play.transitionTrigger==TRANS_TRIGGER_START);
     std::puts("PASS native solo forest route, grounded origin, Clock/stump return, reload/void/missing-pack recovery and isolation");
 }

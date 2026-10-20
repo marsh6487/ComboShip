@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cmath>
 #include <string>
+#include "combo/BlackMarketEntry.h"
 #if __has_include("combo/BlackMarketBrowsing.h")
 #include "combo/BlackMarketBrowsing.h"
 BlackMarketBrowsing::State sBrowser;
@@ -199,9 +200,15 @@ int main() {
     MonitorBrowsing();
     assert(!sTalking && closes==closesBeforeForeignMessage && state==TEXT_STATE_EVENT &&
            "shop cleanup must preserve a replacement actor's dialogue");
+    active = false; accepted = true;
+    const int allocationsBeforeEmptyStock = allocations;
+    KeeperUpdate(&keeper, &play);
+    assert(lastText==BlackMarketEntry::kUnavailableText && !sTalking && purchases==1 &&
+           allocations==allocationsBeforeEmptyStock &&
+           "empty stock offers a normal explanation without browsing or purchasing");
     BlackMarketBrowsing::Axis axis;
     assert(axis.Step(30)==0 && axis.Step(60)==1);
     for (int i=0;i<9;++i) assert(axis.Step(60)==0);
     assert(axis.Step(60)==1 && axis.Step(-60)==-1 && axis.Step(0)==0 && axis.Step(-60)==-1);
-    std::puts("PASS native shop: both banks/eight slots, pan, Buy/Cancel, B/back/leave, pause, held B, no camera slot, native return links, UID reuse, foreign dialogue and hide-flag restoration");
+    std::puts("PASS native shop: both banks/eight slots, pan, Buy/Cancel, B/back/leave, pause, held B, no camera slot, native return links, UID reuse, foreign dialogue, hide-flag restoration and empty-stock talk");
 }

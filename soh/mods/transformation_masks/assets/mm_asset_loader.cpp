@@ -1296,6 +1296,15 @@ static void* MmAssets_LoadFromMmArchive(const char* path, size_t* outSize) {
     return resource->GetRawPointer();
 }
 
+// Base membership is cheap and cannot be satisfied by a texture-only mod.
+u8 MmAssets_BaseResourceExists(const char* path) {
+    if (!sMmO2rLoaded || !sMmArchive || !path)
+        return 0;
+    if (std::strncmp(path, "__OTR__", 7) == 0)
+        path += 7;
+    return path[0] && sMmArchive->HasFile(path);
+}
+
 /**
  * Check if a specific resource exists in mm.o2r
  * Attempts to load the resource and checks if it succeeded

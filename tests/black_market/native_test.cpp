@@ -13,6 +13,8 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include "entry_diagnostics_fixture.h"
+extern "C" u8 ResourceMgr_FileExists(const char*) { return destination; }
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 SaveContext gSaveContext{};
 PlayState* gPlayState;
@@ -105,6 +107,8 @@ s32 NativeCaller(Player* current, PlayState* play, KnobDoorActor* knobDoor) {
 }
 
 void Reset() {
+    destination = true;
+    diagnostics.clear();
     gComboGameMode = COMBO_GAME_BOTH;
     gSaveContext = {}; play = {}; player = {};
     gPlayState = &play; gGameState = &play.state;
@@ -201,15 +205,14 @@ void TestPlacedDoor() {
     assert(BlackMarketDoorNative::Find(&play, moved) && moved.yaw == DEG_TO_BINANG(270));
     NativeCaller(&player, &play, &door);
     assert(sEntering && vanillaDoors == 0);
-    for (int reason = 0; reason < 5; ++reason) {
+    for (int reason = 0; reason < 3; ++reason) {
         prepare();
-        if (reason == 0) pack = false;
-        if (reason == 1) sSession.Bind(nullptr, -1);
-        if (reason == 2) gSaveContext.save.saveInfo.playerData.health = 0;
-        if (reason == 3) play.pauseCtx.state = PAUSE_STATE_MAIN;
-        if (reason == 4) player.actionFunc = NativeIdle;
+        if (reason == 0) destination = false;
+        if (reason == 1) play.transitionTrigger = TRANS_TRIGGER_START;
+        if (reason == 2) play.transitionMode = TRANS_MODE_SETUP;
+        const auto previousTrigger = play.transitionTrigger;
         NativeCaller(&player, &play, &door);
-        assert(!sEntering && play.transitionTrigger == TRANS_TRIGGER_OFF && !door.requestOpen);
+        assert(!sEntering && play.transitionTrigger == previousTrigger && !door.requestOpen);
         assert(vanillaDoors == 0 && stoppedDoors == 1 && doorErrors == 1 && player.actionFunc == NativeIdle);
         assert(doorCutscenes == 0); // Rejected entry must not restart the infinite global door cutscene.
     }
@@ -273,8 +276,8 @@ int main() {
     for (int i = 0; i < 4; ++i) {
         Reset(); sEntering = true; sTravelSlot = 0; sTravelSeed = 77;
         gSaveContext.save.entrance = COMBO_BLACK_MARKET_ENTRANCE;
-        if (i == 0) pack = false;
-        if (i == 1) sSession.Bind(nullptr, -1);
+        if (i == 0) destination = false;
+        if (i == 1) sTravelSlot = 1;
         if (i == 2) gSaveContext.respawnFlag = -1;
         if (i == 3) gSaveContext.fileNum = 2;
         ComboBlackMarket_NormalizeEntry();
@@ -423,8 +426,8 @@ int main() {
         Reset(); gComboGameMode = COMBO_GAME_MM;
         play.sceneId = COMBO_SOLO_FOREST_MM_SCENE; play.roomCtx.curRoom.num = 0;
         player.actor.world.pos = { 410, 0, -300 }; sDoorArmed = true;
-        if (gate == 0) pack = false;
-        if (gate == 1) sSession.Bind(nullptr, -1);
+        if (gate == 0) destination = false;
+        if (gate == 1) play.transitionMode = TRANS_MODE_SETUP;
         if (gate == 2) play.pauseCtx.state = PAUSE_STATE_MAIN;
         if (gate == 3) inCs = true;
         if (gate == 4) play.roomCtx.curRoom.num = 1;

@@ -4,6 +4,7 @@
 #include "ComboForestActors.h"
 #include "MmPlacedSariaResources.h"
 #include "ComboForestEpona.h"
+#include "entrances/ForestActorPlacements.h"
 #include "ComboResolve.h"
 #include "actors/PlacedSariaABI.h"
 #include "actors/SariaHexEffect.h"
@@ -237,9 +238,10 @@ void SpawnForestSaria() {
     if (!sBridge.Resolve())
         return;
     const Vec3f anchor = ComboOpeningForest_ReturnAnchor(play);
+    const auto side = ForestActorPlacements::SariaOffset(ComboOpeningForest_ReturnYaw(play));
     // cor's authored Termina Field song-giver export; MM's packed yaw is 272 degrees.
     Vec3f pos =
-        field ? Vec3f{ 975.0f, -99.0f, 2101.0f } : Vec3f{ anchor.x + 100.0f, anchor.y + 120.0f, anchor.z + 70.0f };
+        field ? Vec3f{ 975.0f, -99.0f, 2101.0f } : Vec3f{ anchor.x + side.x, anchor.y + 120.0f, anchor.z + side.z };
     Vec3f floorProbe = pos;
     if (field)
         floorProbe.y += 120.0f;
@@ -265,7 +267,7 @@ void SpawnForestEpona() {
     const s16 yaw = ComboOpeningForest_ReturnYaw(play);
     const float angle = yaw * (6.28318530718f / 65536.0f);
     const float sine = std::sin(angle), cosine = std::cos(angle);
-    float sariaLateral = 100.0f * cosine - 70.0f * sine;
+    float sariaLateral = ForestActorPlacements::kSariaLateral;
     bool foundSaria = false;
     for (const auto& list : play->actorCtx.actorLists) {
         for (Actor* actor = list.first; actor; actor = actor->next) {

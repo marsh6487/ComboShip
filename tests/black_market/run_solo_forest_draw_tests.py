@@ -21,6 +21,8 @@ with tempfile.TemporaryDirectory(prefix="solo-forest-draw-") as temporary:
         path = ROOT / host / ("2s2h" if host == "mm" else "soh") / "Enhancements/Gameplay/ComboSoloForest.cpp"
         source = path.read_text()
         body = block_from(source, source.index("void DrawForestPortal("))
+        if "bool NativePortal(" in source:
+            body=block_from(source,source.index("bool NativePortal("))+"\n"+body
         fixture = (ROOT / "tests/black_market/solo_forest_draw_test.cpp").read_text().replace("/* PRODUCTION */", body)
         cpp = Path(temporary) / (host + ".cpp")
         cpp.write_text(fixture)

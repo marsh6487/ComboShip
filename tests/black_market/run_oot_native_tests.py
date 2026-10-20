@@ -18,6 +18,8 @@ signatures = ["bool Interior(", "bool Exterior(", "bool Active(", "bool Safe(",
               'extern "C" void ComboBlackMarketOot_ReportClear(',
               'extern "C" int ComboBlackMarketOot_TryDoorEntrance(']
 body = "\n".join(block_from(source, source.index(s)) for s in signatures)
+body += "\n" + "\n".join(block_from(source, source.index(s)) for s in
+                          ("void LogDoorAttempt(", "void LogEntryRecovery("))
 fixture = (ROOT / "tests/black_market/oot_native_test.cpp").read_text().replace("/* PRODUCTION */", body)
 player_source = (ROOT / "soh/src/overlays/actors/ovl_player_actor/z_player.c").read_text()
 cleanup_signatures = ["BAD_RETURN(s32) Player_ZeroSpeedXZ(Player* this) {", "void Player_ApplyYawFromAnim(",
@@ -32,7 +34,7 @@ fixture = fixture.replace("/* NATIVE_DOOR_OPEN */", re.sub(r"\bthis\b", "current
 with tempfile.TemporaryDirectory(prefix="market-oot-native-") as temp:
     path = Path(temp) / "test.cpp"; path.write_text(fixture)
     binary = Path(temp) / "test"
-    includes = ("soh/include", "soh/include/PR", "soh", "soh/soh", "soh/src", "soh/assets",
+    includes = ("tests/black_market", "soh/include", "soh/include/PR", "soh", "soh/soh", "soh/src", "soh/assets",
                 "libultraship/include", "combo", "combo/menu")
     subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-w", "-DF3DEX_GBI_2", "-DCOMBO_BUILD",
                     "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-no-pie",

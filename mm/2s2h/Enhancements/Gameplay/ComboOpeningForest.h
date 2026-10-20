@@ -7,9 +7,9 @@
 #include <math.h>
 #include <string.h>
 
-// The archive binder replaces only room zero's opaque mesh reference with
-// this wrapper. Inspect the active mesh, so another pack winning load order
-// cannot hide the fallback arch merely because this archive is mounted.
+// Inspect the active mesh so another pack winning load order cannot hide
+// the fallback arch merely because a resource archive is mounted.
+#define COMBO_OPENING_FOREST_NATIVE_PORTAL_ROOT "__OTR__custom/comboship/native_forest/portal_root"
 #define COMBO_OPENING_FOREST_PACK_ROOT "__OTR__custom/cor_mm3d/lost_woods_poc1/room_0/opa_combo_return_v1"
 #define COMBO_OPENING_FOREST_STUMP_PACK_ROOT "__OTR__custom/cor_mm3d/lost_woods_poc1/room_0/opa_combo_return_stump_v2"
 #define COMBO_OPENING_FOREST_CORNER_PACK_ROOT "__OTR__custom/cor_mm3d/lost_woods_poc1/room_0/opa_combo_return_corner_v3"
@@ -66,8 +66,22 @@ static inline int ComboOpeningForest_ReturnPackVersion(const PlayState* play) {
     if (!ComboOpeningForest_IsExploration(play) || play->roomCtx.curRoom.num != 0)
         return 0;
     const RoomShape* shape = play->roomCtx.curRoom.roomShape;
-    if (!shape || shape->base.type != ROOM_SHAPE_TYPE_NORMAL || shape->normal.numEntries != 1 ||
-        !shape->normal.entries || !shape->normal.entries[0].opa)
+    if (!shape)
+        return 0;
+    // The native scene keeps stock type-two room culling. Its portal is a
+    // separate opaque entry, while legacy visual packs use one wrapper.
+    if (shape->base.type == ROOM_SHAPE_TYPE_CULLABLE) {
+        if (!shape->cullable.entries)
+            return 0;
+        for (unsigned i = 0; i < shape->cullable.numEntries; ++i) {
+            const char* path = (const char*)shape->cullable.entries[i].opa;
+            if (path && strcmp(path, COMBO_OPENING_FOREST_NATIVE_PORTAL_ROOT) == 0)
+                return 9;
+        }
+        return 0;
+    }
+    if (shape->base.type != ROOM_SHAPE_TYPE_NORMAL || shape->normal.numEntries != 1 || !shape->normal.entries ||
+        !shape->normal.entries[0].opa)
         return 0;
     const char* path = (const char*)shape->normal.entries[0].opa;
     if (strcmp(path, COMBO_OPENING_FOREST_NUDGED_PACK_ROOT) == 0)
@@ -142,7 +156,7 @@ static inline int ComboOpeningForest_AtReturn(const PlayState* play, const Vec3f
     const float angle = yaw * (6.28318530718f / 65536.0f);
     const float lateral = dx * cosf(angle) - dz * sinf(angle);
     const float depth = dx * sinf(angle) + dz * cosf(angle);
-    const float halfWidth = version ? 58.0f : 42.0f;
+    const float halfWidth = version >= 1 && version <= 8 ? 58.0f : 42.0f;
     // Trigger ahead of the black face (depth -24), before the existing stump
     // wall. The retained native arrival is well outside these bounds.
     return lateral > -halfWidth && lateral < halfWidth && depth > -62.0f && depth < 12.0f && dy > -40.0f && dy < 130.0f;
