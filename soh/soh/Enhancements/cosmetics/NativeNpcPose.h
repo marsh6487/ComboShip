@@ -10,6 +10,8 @@ AnimationHeader* NativeNpcPose_ResolveAnimation(const SkelAnime* skelAnime, Anim
 /* Optional pose-specific meshes use the same full native-animation key. */
 Gfx* NativeNpcPose_SelectLimb(const SkelAnime* skelAnime, s32 limbIndex, Gfx* original);
 Gfx* NativeNpcPose_SelectProp(const SkelAnime* skelAnime, const char* prop, Gfx* original);
+/* Optional model-owned visual multiplier; vanilla/Alt-off/missing/invalid = 1. */
+float NativeNpcPose_GetDrawScale(void** skeleton);
 /* Optional archive-owned skin palette. Native limb count/order stay unchanged. */
 const void* NativeNpcPose_GetSkinPlan(void** skeleton, s32 matrixCount);
 s32 NativeNpcPose_SkinMatrixCount(const void* plan);

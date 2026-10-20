@@ -230,4 +230,59 @@ int main() {
     assert(NativeNpcPose_SelectLimb(&skel, 15, reinterpret_cast<Gfx*>(const_cast<char*>(held))) ==
            reinterpret_cast<Gfx*>(instrument->GetRawPointer()));
     puts("PASS production joint blending: live two-bone bend, bind pivots, Alt off and invalid-palette fallback.");
+    const auto drawScale = [](float value) {
+        auto data = std::make_shared<SOH::Array>();
+        data->ArrayType = SOH::ArrayResourceType::Scalar;
+        data->ArrayScalarType = SOH::ScalarType::ZSCALAR_U16;
+        uint32_t bits;
+        std::memcpy(&bits, &value, sizeof(bits));
+        for (uint16_t word : { uint16_t(0x4e44), uint16_t(1), uint16_t(bits), uint16_t(bits >> 16) }) {
+            SOH::ScalarData scalar{};
+            scalar.u16 = word;
+            data->Scalars.push_back(scalar);
+        }
+        data->ArrayCount = data->Scalars.size();
+        return data;
+    };
+    for (const char* model : { "objects/object_sa/NativeNpcV1", "objects/object_ma1/NativeNpcV1" }) {
+        const std::string ns = model, scalePath = "alt/" + ns + "/DrawScale", rig = ns + "/Skel";
+        SOH::SkeletonPatcher::skeletons[0].vanillaSkeletonPath = rig;
+        resources["alt/" + rig] = Clip();
+        assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
+        auto scale = drawScale(1.10f);
+        resources[scalePath] = scale;
+        assert(std::abs(NativeNpcPose_GetDrawScale(limbs) - 1.10f) < 1e-6f);
+        alt = false;
+        assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
+        alt = true;
+        resources.erase("alt/" + rig);
+        assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
+        resources["alt/" + rig] = Clip();
+        for (float invalid : { 0.f, -1.f, .49f, 2.01f, INFINITY, -INFINITY, NAN }) {
+            resources[scalePath] = drawScale(invalid);
+            assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
+        }
+        resources[scalePath] = scale;
+        scale->ArrayCount = 3;
+        assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
+        scale->ArrayCount = 4;
+        scale->Scalars[1].u16 = 2;
+        assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
+        scale->Scalars[1].u16 = 1;
+        scale->Scalars[0].u16 = 0;
+        assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
+        scale->Scalars[0].u16 = 0x4e44;
+        scale->ArrayScalarType = SOH::ScalarType::ZSCALAR_S16;
+        assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
+        resources[scalePath] = display;
+        assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
+        resources.erase(scalePath);
+    }
+    for (const char* unrelated : { "objects/object_ma1/gMalonChildSkel", "objects/object_sa/gSariaSkel",
+                                   "objects/object_ma2/NativeNpcV1/Skel", "objects/object_kw1/NativeNpcV1/Skel" }) {
+        SOH::SkeletonPatcher::skeletons[0].vanillaSkeletonPath = unrelated;
+        assert(NativeNpcPose_GetDrawScale(limbs) == 1.f);
+    }
+    assert(NativeNpcPose_GetDrawScale(nullptr) == 1.f);
+    puts("PASS production draw scale: opt-in Malon/Saria only, missing/invalid/Alt-off and unrelated fallback.");
 }

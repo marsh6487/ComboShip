@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include "actors/NativeNpcDrawScale.h"
 
 namespace SOH::NativeNpcPose {
 inline std::string_view Canonical(std::string_view path) {
@@ -10,6 +11,14 @@ inline std::string_view Canonical(std::string_view path) {
         path.remove_prefix(7);
     }
     return path;
+}
+
+inline std::string DrawScalePath(std::string_view skeleton) {
+    skeleton = Canonical(skeleton);
+    if (skeleton != "objects/object_sa/NativeNpcV1/Skel" &&
+        skeleton != "objects/object_ma1/NativeNpcV1/Skel")
+        return {};
+    return std::string(skeleton.substr(0, skeleton.size() - 5)) + "/DrawScale";
 }
 
 inline std::string AnimationPath(std::string_view skeleton, std::string_view animation) {

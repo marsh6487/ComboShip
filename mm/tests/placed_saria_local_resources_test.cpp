@@ -1,7 +1,13 @@
+#include <fast/lus_gbi.h>
+#undef GIMMCMD
 #include "2s2h/Enhancements/Gameplay/MmPlacedSariaResources.h"
 #include <cstdlib>
 #include <unordered_map>
 #include <stdexcept>
+#include "2s2h/resource/type/Array.h"
+#include <limits>
+#include <cmath>
+#include "tests/PlacedSariaABITest.h"
 #define CHECK(x)                                                      \
     do {                                                              \
         if (!(x)) {                                                   \
@@ -15,6 +21,7 @@ using Store = std::unordered_map<std::string, Resource>;
 #ifdef MM_SARIA_PACK_TEST
 #include "2s2h/resource/importer/SkeletonFactory.h"
 #include "2s2h/resource/importer/SkeletonLimbFactory.h"
+#include "2s2h/resource/importer/ArrayFactory.h"
 #include <ship/utils/binarytools/MemoryStream.h>
 #include <filesystem>
 #include <fstream>
@@ -62,6 +69,8 @@ Resource FactoryLoad(const std::string& requested, bool exact) {
         result = SOH::ResourceFactoryBinarySkeletonV0().ReadResource(file, metadata);
     else if (type == "BLSO")
         result = SOH::ResourceFactoryBinarySkeletonLimbV0().ReadResource(file, metadata);
+    else if (type == "RRAO")
+        result = SOH::ResourceFactoryBinaryArrayV0().ReadResource(file, metadata);
     else if (type == "MNAO") {
         auto animation = std::make_shared<SOH::Animation>();
         animation->type = static_cast<SOH::AnimationType>(reader->ReadUInt32());
@@ -109,9 +118,12 @@ int main(int argc, char** argv) {
             cache.clear();
             activeAlt = alt;
             for (unsigned pose : { 0u, 1u, 2u, 3u }) {
-                ComboPlacedSariaResources output{};
-                CHECK(MM_PlacedSariaLoad(pose, &output));
+                ComboPlacedSariaResourcesV2 versioned{};
+                auto& output = versioned.resources;
+                CHECK(MM_PlacedSariaLoadV2(pose, &versioned, sizeof(versioned)));
                 CHECK(output.custom == alt && output.altEnabled == alt);
+                const bool scaled = alt && std::filesystem::exists(DiskPath("alt/objects/object_sa/NativeNpcV1/DrawScale"));
+                CHECK(std::abs(versioned.drawScale - (scaled ? 1.10f : 1.f)) < 1e-6f);
                 if (alt) {
                     for (unsigned eye = 0; eye < 3; ++eye) {
                         auto suffix = "/Faces/L" + std::to_string(eye) + "R" + std::to_string(eye) + "M0";
@@ -216,6 +228,20 @@ static auto List() {
     d->Instructions.resize(1);
     return d;
 }
+static auto DrawScale(float factor) {
+    auto result = std::make_shared<SOH::Array>();
+    result->ArrayType = SOH::ArrayResourceType::Scalar;
+    result->ArrayScalarType = SOH::ScalarType::ZSCALAR_U16;
+    uint32_t bits;
+    std::memcpy(&bits, &factor, sizeof(bits));
+    for (uint16_t word : { uint16_t(0x4e44), uint16_t(1), uint16_t(bits), uint16_t(bits >> 16) }) {
+        SOH::ScalarData data{};
+        data.u16 = word;
+        result->Scalars.push_back(data);
+    }
+    result->ArrayCount = 4;
+    return result;
+}
 
 int main() {
     Store assets;
@@ -235,6 +261,11 @@ int main() {
     };
     assets["objects/object_sa/nativeBody"] = List();
     assets["objects/object_sa/customBody"] = List();
+    PlacedSariaABITest::LegacyCaller oldCaller;
+    CHECK(MM_PlacedSariaLoad(0, reinterpret_cast<ComboPlacedSariaResources*>(&oldCaller.output)));
+    MM_PlacedSariaRelease(oldCaller.output.owner);
+    CHECK(oldCaller.Intact());
+    CHECK(PlacedSariaABITest::CheckV2(MM_PlacedSariaLoadV2, MM_PlacedSariaRelease, 1.f));
     auto native = MmPlacedSaria::Build(load, false, 0);
     CHECK(native && !native->result.custom && !native->result.altEnabled);
     CHECK(std::strstr(reinterpret_cast<const char*>(native->limbs[1].dList), "__OTR__@mm:") != nullptr);
@@ -276,6 +307,25 @@ int main() {
     assets[clip + "/Limbs/Limb12"] = List();
     auto custom = MmPlacedSaria::Build(load, true, 0);
     CHECK(custom && custom->result.custom && custom->result.animation == fitted->GetRawPointer());
+    CHECK(custom->drawScale == 1.f);
+    const std::string scalePath = alt + "/DrawScale";
+    assets[scalePath] = DrawScale(1.10f);
+    activeAlt = true;
+    CHECK(PlacedSariaABITest::CheckV2(MM_PlacedSariaLoadV2, MM_PlacedSariaRelease, 1.10f));
+    activeAlt = false;
+    for (unsigned pose : { 0u, 1u, 2u, 3u }) {
+        auto scaled = MmPlacedSaria::Build(load, true, pose);
+        CHECK(scaled && std::abs(scaled->drawScale - 1.10f) < 1e-6f);
+        CHECK(MmPlacedSaria::Build(load, false, pose)->drawScale == 1.f);
+    }
+    for (float invalid : { 0.f, -1.f, .49f, 2.01f, std::numeric_limits<float>::infinity(),
+                           std::numeric_limits<float>::quiet_NaN() }) {
+        assets[scalePath] = DrawScale(invalid);
+        CHECK(MmPlacedSaria::Build(load, true, 0)->drawScale == 1.f);
+    }
+    assets[scalePath] = List();
+    CHECK(MmPlacedSaria::Build(load, true, 0)->drawScale == 1.f);
+    assets[scalePath] = DrawScale(1.10f);
     CHECK(custom->result.poseLimbs[13] && custom->result.heads[0] != custom->result.heads[2]);
     for (unsigned pose : { 0u, 1u, 3u }) {
         auto blink = MmPlacedSaria::Build(load, true, pose);
@@ -291,6 +341,7 @@ int main() {
     CHECK(MmPlacedSaria::Build(load, true, 0)->result.animation != fitted->GetRawPointer());
     assets[ns + "/Skel"] = Texture();
     CHECK(!MmPlacedSaria::Build(load, true, 0)->result.custom);
+    CHECK(MmPlacedSaria::Build(load, true, 0)->drawScale == 1.f);
     assets[ns + "/Skel"] = assets["objects/object_sa/gSariaSkel"];
     auto malformed = Rig("__OTR__objects/object_sa/customBody");
     Child(malformed, 0)->limbData.standardLimb.child = 2;
@@ -307,6 +358,10 @@ int main() {
     CHECK(!MM_PlacedSariaLoad(0, nullptr));
     throwLoad = true;
     CHECK(!MM_PlacedSariaLoad(0, &output) && !output.owner);
+    ComboPlacedSariaResourcesV2 failed{};
+    failed.drawScale = 123.f;
+    CHECK(!MM_PlacedSariaLoadV2(0, &failed, sizeof(failed)));
+    CHECK(!failed.resources.owner && failed.drawScale == 1.f);
     throwLoad = false;
     for (unsigned iteration = 0; iteration < 6; ++iteration) {
         activeAlt = iteration % 2;
@@ -342,6 +397,7 @@ int main() {
     CHECK(heldLimb.expired());
     puts("PASS MM Saria resource snapshots: native/Alt, fitted clips/limbs/faces, malformed pack fallback, root "
          "protection, missing donors, retained lifetime");
+    puts("PASS MM exports: frozen V1 caller canary, V2 short-size/null rejection before writes and bounded successful output.");
 }
 
 #endif // MM_SARIA_PACK_TEST

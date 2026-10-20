@@ -91,6 +91,24 @@ static float NativeNpcPose_SkinFloat(const SOH::Array* plan, size_t offset) {
     return value;
 }
 
+extern "C" float NativeNpcPose_GetDrawScale(void** skeleton) {
+    if (!skeleton || !ResourceMgr_IsAltAssetsEnabled())
+        return 1.f;
+    for (auto entry = SOH::SkeletonPatcher::skeletons.rbegin(); entry != SOH::SkeletonPatcher::skeletons.rend();
+         ++entry) {
+        if (!entry->skelAnime || entry->skelAnime->skeleton != skeleton)
+            continue;
+        const auto path = SOH::NativeNpcPose::DrawScalePath(entry->vanillaSkeletonPath);
+        if (path.empty() || !ResourceMgr_FileAltExists(entry->vanillaSkeletonPath.c_str()) ||
+            !ResourceMgr_FileAltExists(path.c_str()))
+            return 1.f;
+        const auto resource =
+            std::dynamic_pointer_cast<SOH::Array>(ResourceMgr_GetResourceByNameHandlingMQ(("alt/" + path).c_str()));
+        return NativeNpcDrawScale::Read(resource.get());
+    }
+    return 1.f;
+}
+
 extern "C" const void* NativeNpcPose_GetSkinPlan(void** skeleton, s32 matrixCount) {
     if (!skeleton || matrixCount < 1 || matrixCount > 32 || !ResourceMgr_IsAltAssetsEnabled())
         return nullptr;

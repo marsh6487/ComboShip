@@ -1,5 +1,7 @@
 #pragma once
 #include "actors/PlacedSariaABI.h"
+#include "actors/NativeNpcDrawScale.h"
+#include "2s2h/resource/type/Array.h"
 #include <fast/resource/type/DisplayList.h>
 #include <array>
 #include <cstdio>
@@ -166,6 +168,7 @@ struct Snapshot {
     std::array<void*, 16> pointers;
     SOH::FlexSkeletonHeader skeleton;
     ComboPlacedSariaResources result{};
+    float drawScale = 1.f;
 };
 
 inline bool SameRoot(const SOH::AnimationHeader& a, const SOH::AnimationHeader& b) {
@@ -224,6 +227,9 @@ inline std::unique_ptr<Snapshot> Build(const Load& load, bool alt, unsigned pose
     } else {
         snapshot->retained = std::move(nativeRig);
     }
+    const auto drawScale = custom ? std::dynamic_pointer_cast<SOH::Array>(load(std::string("alt/") + kNamespace + "/DrawScale"))
+                                  : nullptr;
+    snapshot->drawScale = NativeNpcDrawScale::Read(drawScale.get());
     const std::string poseRoot = std::string("alt/") + kNamespace + "/PoseAnimations/" + kAnimations[pose];
     auto fitted = custom ? load(poseRoot) : nullptr;
     if (MmPlacedSaria::ValidateAnimation(fitted, 16, kAnimationFrames[pose]) &&
@@ -309,5 +315,6 @@ inline std::unique_ptr<Snapshot> Build(const Load& load, bool alt, unsigned pose
 
 // Local MM resource ownership; callable without initializing any OoT subsystem.
 int MM_PlacedSariaLoad(unsigned pose, ComboPlacedSariaResources* output);
+int MM_PlacedSariaLoadV2(unsigned pose, ComboPlacedSariaResourcesV2* output, size_t callerSize);
 void MM_PlacedSariaRelease(void* owner);
 int MM_PlacedSariaAlt();

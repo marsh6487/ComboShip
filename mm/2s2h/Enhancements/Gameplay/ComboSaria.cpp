@@ -134,11 +134,13 @@ void QueueSariaSong() {
 }
 struct Bridge {
     ComboPlacedSariaLoadFunc load = nullptr;
+    ComboPlacedSariaLoadV2Func loadV2 = nullptr;
     ComboPlacedSariaReleaseFunc release = nullptr;
     ComboPlacedSariaAltFunc alt = nullptr;
     bool Resolve() {
         if (gComboGameMode == COMBO_GAME_MM) {
             load = MM_PlacedSariaLoad;
+            loadV2 = MM_PlacedSariaLoadV2;
             release = MM_PlacedSariaRelease;
             alt = MM_PlacedSariaAlt;
             return true;
@@ -147,15 +149,23 @@ struct Bridge {
             return false;
         if (!load)
             load = reinterpret_cast<ComboPlacedSariaLoadFunc>(Combo_ResolveSym("soh", "OOT_PlacedSariaLoad"));
+        if (!loadV2)
+            loadV2 = reinterpret_cast<ComboPlacedSariaLoadV2Func>(Combo_ResolveSym("soh", "OOT_PlacedSariaLoadV2"));
         if (!release)
             release = reinterpret_cast<ComboPlacedSariaReleaseFunc>(Combo_ResolveSym("soh", "OOT_PlacedSariaRelease"));
         if (!alt)
             alt = reinterpret_cast<ComboPlacedSariaAltFunc>(Combo_ResolveSym("soh", "OOT_PlacedSariaAltEnabled"));
-        return load && release && alt;
+        return (loadV2 || load) && release && alt;
+    }
+    int Load(unsigned pose, ComboPlacedSariaResourcesV2* output) const {
+        *output = {};
+        output->drawScale = 1.f;
+        return loadV2 ? loadV2(pose, output, sizeof(*output)) : load ? load(pose, &output->resources) : 0;
     }
 } sBridge;
 struct State {
     ComboPlacedSariaResources resources{};
+    float drawScale = 1.f;
     SkelAnime animation{};
     Vec3s joints[17]{}, morph[17]{};
     ColliderCylinder collider{};
@@ -183,16 +193,17 @@ void ResetSariaResources() {
 }
 
 bool Bind(State& state, Actor* actor, PlayState* play) {
-    ComboPlacedSariaResources next{};
-    if (!sBridge.load(((u16)actor->params >> 4) & 15, &next))
+    ComboPlacedSariaResourcesV2 next{};
+    if (!sBridge.Load(((u16)actor->params >> 4) & 15, &next))
         return false;
     const float frame = state.animation.curFrame;
     auto previous = state.resources;
-    state.resources = next;
+    state.resources = next.resources;
+    state.drawScale = next.drawScale;
     // The normal headers share a C layout. MM owns all animation state and
     // fixed joint arrays; no OoT actor, player or animation context is invoked.
-    SkelAnime_InitFlex(play, &state.animation, static_cast<FlexSkeletonHeader*>(next.skeleton),
-                       static_cast<AnimationHeader*>(next.animation), state.joints, state.morph, 17);
+    SkelAnime_InitFlex(play, &state.animation, static_cast<FlexSkeletonHeader*>(next.resources.skeleton),
+                       static_cast<AnimationHeader*>(next.resources.animation), state.joints, state.morph, 17);
     state.animation.curFrame = std::fmod(frame, state.animation.endFrame + 1.0f);
     // This cutscene loop carries an elevated stump position. Ground the small
     // placed NPC, preserving the native breathing motion and authored XYZ.
@@ -433,8 +444,13 @@ extern "C" void ComboSaria_Draw(Actor* actor, PlayState* play) {
     gSPSegment(POLY_OPA_DISP++, 8, reinterpret_cast<uintptr_t>(state.resources.eyes[eye]));
     gSPSegment(POLY_OPA_DISP++, 9, reinterpret_cast<uintptr_t>(state.resources.eyes[eye]));
     gSPSegment(POLY_OPA_DISP++, 10, reinterpret_cast<uintptr_t>(state.resources.mouth));
+    Matrix_Push();
+    const float drawScale = state.drawScale;
+    if (state.resources.custom && std::isfinite(drawScale) && drawScale >= .5f && drawScale <= 2.f && drawScale != 1.f)
+        Matrix_Scale(drawScale, drawScale, drawScale, MTXMODE_APPLY);
     SkelAnime_DrawFlexOpa(play, state.animation.skeleton, state.animation.jointTable, state.animation.dListCount,
                           Override, nullptr, actor);
+    Matrix_Pop();
     CLOSE_DISPS(play->state.gfxCtx);
     DrawShimmer(actor, play, IsSeated(actor));
 }
