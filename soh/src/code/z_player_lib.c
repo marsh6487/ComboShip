@@ -1734,8 +1734,18 @@ static Gfx* Player_ResolveLimbDLForDummyOrLocal(void* dlPathOrPtr) {
         return formDL;
     }
     Gfx* resolved = ResourceMgr_LoadGfxByName(dlPathOrPtr);
-    if (dlPathOrPtr != NULL && memcmp(dlPathOrPtr, "__OTR__", 7) == 0)
-        DinFireSword_SetHandModel(NULL, resolved, SwordAura_ResourceModel((const char*)dlPathOrPtr, NULL, 0));
+    if (dlPathOrPtr != NULL && memcmp(dlPathOrPtr, "__OTR__", 7) == 0) {
+        const char* path = (const char*)dlPathOrPtr;
+        int model = SwordAura_ResourceModel(path, NULL, 0);
+        if (model >= 0) {
+            // A native name can resolve to a selected equipment alias. A
+            // reload/owner change must not size one allocation using another.
+            const size_t bytes = ResourceGetSizeByName(path);
+            const Gfx* source = ResourceGetDataByName(path) == resolved ? resolved : NULL;
+            model = SwordAura_ResourceModel(path, source, bytes % sizeof(Gfx) == 0 ? bytes / sizeof(Gfx) : 0);
+            DinFireSword_SetHandModel(NULL, resolved, model);
+        }
+    }
     return resolved;
 }
 

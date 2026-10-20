@@ -1,3 +1,4 @@
+#include "din_fire_sword.h"
 /*
  * File: z_boss_07.c
  * Overlay: ovl_Boss_07
@@ -5480,6 +5481,7 @@ void Boss07_Mask_SetupDamaged(Boss07* this, PlayState* play, u8 damage, Actor* h
     this->actor.colChkInfo.health -= damage;
 
     if ((s8)this->actor.colChkInfo.health <= 0) {
+        DinFireSword_FinishFatal(play, &this->actor);
         this->timers[0] = 30;
     }
 

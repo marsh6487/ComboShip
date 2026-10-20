@@ -1,3 +1,4 @@
+#include "din_fire_sword.h"
 /*
  * File: z_boss_va.c
  * Overlay: ovl_Boss_Va
@@ -592,6 +593,8 @@ EnBoom* BossVa_FindBoomerang(PlayState* play) {
 }
 
 void BossVa_KillBari(BossVa* this, PlayState* play) {
+    DinFireSword_FinishConfirmedHit(play, &this->colliderSph.base, this->colliderSph.elements[0].info.acHitInfo,
+                                    this->colliderSph.elements[0].info.bumper.dmgFlags);
     s32 i;
     s16 scale;
     Vec3f pos;

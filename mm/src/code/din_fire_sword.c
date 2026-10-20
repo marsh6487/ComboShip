@@ -10,6 +10,7 @@
 #include "mods/boss_remains/boss_remains.h"
 #include "mods/extended_equipment.h"
 #include <libultraship/bridge/resourcebridge.h>
+#include <libultraship/log/luslog.h>
 #include <libultraship/bridge/consolevariablebridge.h>
 #include <math.h>
 #include "../../../combo/render/sword_element_aura.h"
@@ -108,7 +109,8 @@ static s32 DinFireSword_Profile(Player* player) {
 
 static s32 DinFireSword_Eligible(PlayState* play, Player* player) {
     if (play == NULL || player == NULL || player != GET_PLAYER(play) ||
-        (SwordElement_HasSelection(player->heldItemId) && SwordElement_Get(player->heldItemId) != SWORD_ELEMENT_FIRE) ||
+        ((SwordElement_Override() != SWORD_ELEMENT_NONE || SwordElement_HasSelection(player->heldItemId)) &&
+         SwordElement_Active(play, player) != SWORD_ELEMENT_FIRE) ||
         !CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0) || !ResourceMgr_IsAltAssetsEnabled() ||
         (player->transformation != PLAYER_FORM_HUMAN || CustomForms_ActiveForm() != CUSTOM_FORM_NONE) ||
         BossRemains_IsOdolwaWorn() || BossRemains_IsGohtWorn() || player->actor.scale.y <= 0.0f ||
@@ -178,7 +180,7 @@ static u8 DinFireSword_SelectedAura(PlayState* play, Player* player) {
 static s32 DinFireSword_ShouldDraw(PlayState* play, Player* player) {
     if (play == NULL || player == NULL || player != GET_PLAYER(play))
         return false;
-    if (SwordElement_HasSelection(player->heldItemId))
+    if (SwordElement_Override() != SWORD_ELEMENT_NONE || SwordElement_HasSelection(player->heldItemId))
         return DinFireSword_SelectedAura(play, player) != SWORD_ELEMENT_NONE;
     return DinFireSword_Eligible(play, player);
 }
@@ -232,7 +234,9 @@ static s32 DinFireSword_Load(s32 age, Gfx** core, Gfx** flame) {
 }
 
 void* DinFireSword_HandDL(PlayState* play, Player* player, void* closedHand) {
-    if (closedHand == NULL || (player != NULL && SwordElement_HasSelection(player->heldItemId)) ||
+    if (closedHand == NULL ||
+        (player != NULL &&
+         (SwordElement_Override() != SWORD_ELEMENT_NONE || SwordElement_HasSelection(player->heldItemId))) ||
         !DinFireSword_Eligible(play, player))
         return NULL;
     s32 profile = DinFireSword_Profile(player);
@@ -268,7 +272,8 @@ uint32_t DinFireSword_DamageFlags(PlayState* play, Player* player, uint32_t orig
         case SWORD_ELEMENT_LIGHT:
             return original | DMG_LIGHT_ARROW;
     }
-    if ((player != NULL && SwordElement_HasSelection(player->heldItemId)) ||
+    if ((player != NULL &&
+         (SwordElement_Override() != SWORD_ELEMENT_NONE || SwordElement_HasSelection(player->heldItemId))) ||
         !SwordElement_IsAvailable(SWORD_ELEMENT_FIRE) || !CVarGetInteger(CVAR_ENHANCEMENT("DinFireSwordDamage"), 0) ||
         !DinFireSword_Eligible(play, player))
         return original;
@@ -548,6 +553,23 @@ static void DinFireSword_CaptureHand(PlayState* play, Player* player, void* fina
         }
     }
     sDraw.rig = DinFireSword_AuraRig(player);
+    if (sDraw.element != SWORD_ELEMENT_NONE && CVarGetInteger("gDeveloperTools.SwordAuraDiagnostics", 0)) {
+        static u8 reported[SWORD_AURA_MODEL_COUNT][3];
+        const int matched = finalHandDL != NULL && finalHandDL == sDraw.fittedHand && sDraw.fittedModel >= 0;
+        const char* path =
+            finalHandDL != NULL && memcmp(finalHandDL, "__OTR__", 7) == 0 ? (const char*)finalHandDL : NULL;
+        const u8 source = matched ? 1 : path != NULL ? 2 : 0;
+        if (sDraw.model >= 0 && sDraw.model < SWORD_AURA_MODEL_COUNT && sDraw.rig >= 0 && sDraw.rig < 3 &&
+            !(reported[sDraw.model][sDraw.rig] & (1 << source))) {
+            reported[sDraw.model][sDraw.rig] |= 1 << source;
+            lusprintf(__FILE__, __LINE__, LUSLOG_LEVEL_INFO,
+                      "[SwordAura:MM] logical=%d fit=%d rig=%d element=%u matched=%d final=%s", sDraw.logicalModel,
+                      sDraw.model, sDraw.rig, sDraw.element, matched,
+                      path != NULL          ? path
+                      : finalHandDL != NULL ? "<composed>"
+                                            : "<logical fallback>");
+        }
+    }
     sDraw.handMatrix = Matrix_Finalize(play->state.gfxCtx);
     CLOSE_DISPS(play->state.gfxCtx);
 }

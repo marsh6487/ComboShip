@@ -3,6 +3,7 @@
 #include "mods/items/helpers/equip_helper.h"
 #include "din_fire_sword.h"
 #include "din_fire_shield.h"
+#include "../../../combo/render/sword_element_aura_identity.h"
 #include "mods/items/logic/adult_link_render.h"
 #include "mods/items/logic/weapon_upgrades.h"
 #include "mods/forms/custom_forms.h"
@@ -2950,34 +2951,30 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
             // gated → keeps the GFS blade if oot.o2r is absent.
             if ((player->heldItemId == ITEM_SWORD_BGS) && !WeaponUpgrade_HasGreatFairy() &&
                 (player->transformation == PLAYER_FORM_HUMAN)) {
-                static Gfx* sBgsLeftHandDLs[2] = { NULL, NULL }; // [0] = near, [1] = far
-                static u8 sBgsDLsTried = 0;
+                extern u8 ResourceMgr_FileExists(const char* resName);
+                extern Gfx* ResourceMgr_LoadGfxByName(const char* path);
+                extern void ResourceMgr_PatchGfxByName(const char* path, const char* patchName, int index,
+                                                       Gfx instruction);
+                const char* nearPath = "__OTR__objects/object_link_boy/gLinkAdultLeftHandHoldingBgsNearDL";
 
-                if (!sBgsDLsTried) {
-                    extern u8 ResourceMgr_FileExists(const char* resName);
-                    extern Gfx* ResourceMgr_LoadGfxByName(const char* path);
-                    extern void ResourceMgr_PatchGfxByName(const char* path, const char* patchName, int index,
-                                                           Gfx instruction);
-                    const char* nearPath = "__OTR__objects/object_link_boy/gLinkAdultLeftHandHoldingBgsNearDL";
+                if (ResourceMgr_FileExists(nearPath)) {
+                    Gfx childHandInstr = gsSPDisplayListOTRFilePath(gLinkHumanLeftHandClosedDL);
+                    Gfx endInstr = gsSPEndDisplayList();
 
-                    sBgsDLsTried = 1;
-                    if (ResourceMgr_FileExists(nearPath)) {
-                        Gfx childHandInstr = gsSPDisplayListOTRFilePath(gLinkHumanLeftHandClosedDL);
-                        Gfx endInstr = gsSPEndDisplayList();
-
-                        ResourceMgr_PatchGfxByName(nearPath, "neiBgsChildHand1", 79, childHandInstr);
-                        ResourceMgr_PatchGfxByName(nearPath, "neiBgsChildHand2", 80, endInstr);
-                        sBgsLeftHandDLs[0] = ResourceMgr_LoadGfxByName(nearPath);
-                        sBgsLeftHandDLs[1] = sBgsLeftHandDLs[0];
+                    ResourceMgr_PatchGfxByName(nearPath, "neiBgsChildHand1", 79, childHandInstr);
+                    ResourceMgr_PatchGfxByName(nearPath, "neiBgsChildHand2", 80, endInstr);
+                    // The resource manager caches the current Alt/reload owner.
+                    // Do not keep a raw allocation across frames or pair it
+                    // with the byte count of a newly selected resource.
+                    Gfx* bgsDL = ResourceMgr_LoadGfxByName(nearPath);
+                    if (bgsDL != NULL) {
+                        *dList = bgsDL; // The near patch also supplies the far LOD's child fist.
+                        const size_t bytes = ResourceGetSizeByName(nearPath);
+                        const Gfx* source = ResourceGetDataByName(nearPath) == bgsDL ? bgsDL : NULL;
+                        const int model = SwordAura_ResourceModel(nearPath, source,
+                                                                  bytes % sizeof(Gfx) == 0 ? bytes / sizeof(Gfx) : 0);
+                        DinFireSword_SetHandModel(player, *dList, model);
                     }
-                }
-
-                if (sBgsLeftHandDLs[sPlayerLod] != NULL) {
-                    *dList = sBgsLeftHandDLs[sPlayerLod];
-                    DinFireSword_SetHandModel(player, *dList, SWORD_AURA_NATIVE_OOT_BGS);
-                } else if (sBgsLeftHandDLs[0] != NULL) {
-                    *dList = sBgsLeftHandDLs[0];
-                    DinFireSword_SetHandModel(player, *dList, SWORD_AURA_NATIVE_OOT_BGS);
                 }
             }
 

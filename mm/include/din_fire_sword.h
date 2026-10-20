@@ -21,6 +21,24 @@ void DinFireSword_RefreshDamage(struct PlayState* play, struct Player* player);
 uint32_t DinFireSword_OriginalDamageFlags(struct PlayState* play, const struct ColliderElement* hitInfo);
 uint8_t DinFireSword_DamageEntry(struct PlayState* play, struct Actor* target, const struct ColliderElement* hitInfo,
                                  uint32_t receiverFlags, uint8_t vanillaEntry);
+// Accepted-hit/fatal hooks are presentation observers; they never delay actor
+// death or change damage, soul gates, drops or progression. Collider bounds are
+// copied while live and discarded at the end of that actor's update.
+void DinFireSword_FinishAcceptedHit(struct PlayState* play, const void* receiver,
+                                    const struct ColliderElement* hitInfo, uint32_t receiverFlags, uint32_t damage);
+// Narrow native adapters call these only at their own confirmed lethal entry.
+// This also supports flags-only deaths and individual bat receivers.
+void DinFireSword_FinishConfirmedHit(struct PlayState* play, const void* receiver,
+                                     const struct ColliderElement* hitInfo, uint32_t receiverFlags);
+void DinFireSword_FinishConfirmedPart(struct PlayState* play, struct Actor* actor,
+                                      const struct ColliderElement* hitInfo, unsigned part,
+                                      float x, float y, float z, float radius);
+void DinFireSword_FinishBeginActor(struct PlayState* play, struct Actor* actor);
+void DinFireSword_FinishEndActor(struct PlayState* play, struct Actor* actor);
+void DinFireSword_FinishFatal(struct PlayState* play, struct Actor* actor);
+void DinFireSword_FinishForget(struct PlayState* play, struct Actor* actor);
+void DinFireSword_FinishTeardown(struct PlayState* play);
+void DinFireSword_FinishDrawAll(struct PlayState* play);
 void DinFireSword_Reset(void);
 void DinFireSword_Update(struct PlayState* play, struct Player* player);
 void DinFireSword_BeginPlayerDraw(struct PlayState* play, struct Player* player);

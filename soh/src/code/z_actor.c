@@ -1229,6 +1229,7 @@ s32 TitleCard_Clear(PlayState* play, TitleCardContext* titleCtx) {
 }
 
 void Actor_Kill(Actor* actor) {
+    DinFireSword_FinishFatal(gPlayState, actor);
     GameInteractor_ExecuteOnActorKill(actor);
     actor->draw = NULL;
     actor->update = NULL;
@@ -1299,6 +1300,7 @@ void Actor_Init(Actor* actor, PlayState* play) {
 }
 
 void Actor_Destroy(Actor* actor, PlayState* play) {
+    DinFireSword_FinishForget(play, actor);
     if (actor->destroy != NULL) {
         if (GameInteractor_ShouldActorDestroy(actor)) {
             actor->destroy(actor, play);
@@ -2840,7 +2842,9 @@ void Actor_UpdateAll(PlayState* play, ActorContext* actorCtx) {
                                      (unsigned)(u16)actor->id, (unsigned)(u16)actor->params);
                         }
                         actorsUpdated++;
+                        DinFireSword_FinishBeginActor(play, actor);
                         actor->update(actor, play);
+                        DinFireSword_FinishEndActor(play, actor);
                         if (actorSpan.epoch != 0) {
                             FrameTiming_EndNamedSpan("actor_update", actorTimingName, actorSpan);
                         }
@@ -3406,6 +3410,7 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
     FrameTiming_EndNamedSpan("actor_draw_all", "lens_actors", phaseSpan);
     phaseSpan = FrameTiming_BeginSpan();
 
+    DinFireSword_FinishDrawAll(play);
     Actor_DrawFaroresWindPointer(play);
 
     FrameTiming_EndNamedSpan("actor_draw_all", "farores_wind", phaseSpan);
@@ -3978,6 +3983,7 @@ Actor* Actor_Find(ActorContext* actorCtx, s32 actorId, s32 actorCategory) {
 void Trirod_NotifyEnemyDown(PlayState* play, Actor* actor);
 
 void Enemy_StartFinishingBlow(PlayState* play, Actor* actor) {
+    DinFireSword_FinishFatal(play, actor);
     play->actorCtx.freezeFlashTimer = 5;
     SoundSource_PlaySfxAtFixedWorldPos(play, &actor->world.pos, 20, NA_SE_EN_LAST_DAMAGE);
     // Nearly every enemy funnels its death through here, which makes it the one
@@ -5095,12 +5101,15 @@ u8 func_800355E4(PlayState* play, Collider* collider) {
 }
 
 u8 Actor_ApplyDamage(Actor* actor) {
+    u8 swordFinishHealth = actor->colChkInfo.health;
     if (actor->colChkInfo.damage >= actor->colChkInfo.health) {
         actor->colChkInfo.health = 0;
     } else {
         actor->colChkInfo.health -= actor->colChkInfo.damage;
     }
 
+    if (swordFinishHealth != 0 && actor->colChkInfo.health == 0)
+        DinFireSword_FinishFatal(gPlayState, actor);
     return actor->colChkInfo.health;
 }
 

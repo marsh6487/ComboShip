@@ -50,9 +50,9 @@ historical nlohmann include path no longer exists. No production failure was
 inferred from that missing dependency. Leak sanitizer is disabled for this
 container; address and undefined-behavior checks remain enabled.
 
-UI, kill presentation, Biggoron correction and combined verification are still
-in progress at this checkpoint. No configured gameplay, audio, Windows/full
-application build, user acceptance or master promotion is claimed.
+No configured gameplay, audio, Windows/full application build, user acceptance
+or master promotion is claimed. Source, native compilation and offline drawing
+evidence below do not establish those acceptance stages.
 
 ## Selector/HUD milestone
 
@@ -78,3 +78,72 @@ now clamps to INT16_MAX, and the sanitizer suite decodes and checks the actual
 emitted signed steps. Generated font strips use the cross-platform asset
 alignment macro; generator output stays deterministic under clang-format14.
 The final HUD and four-mode selector checks pass after these corrections.
+
+## Elemental finish implementation
+
+Both hosts record accepted hits from the player's exact elemental melee
+collider, then confirm destruction during that actor's update through native
+health/fatal/kill paths. Another attack in the same update cannot inherit stale
+sword credit. Confirmed presentations retain copied collider bounds and world
+positions, never actor/collider pointers after deletion. Scene, room, transition,
+pause, expiry and actor teardown are handled separately from native gameplay.
+
+Audited native elemental deaths retain their own effect. Other confirmed sword
+kills use native fire, ice-fragment envelopes or light-orb rendering. Light uses
+MM's DEADLIGHT held loop with projected stable source positions and the existing
+MM audio bridge in OoT. This adds no health mutation, delayed destruction, extra
+magic charge, drop RNG calls, native death-state replacement or progression
+change. The original damage-table fallback still supplies ordinary sword damage
+against elemental immunity.
+
+Narrow adapters cover flags-only and delayed deaths: OoT Bubble, King Dodongo,
+Barinade's Bari and Flare Dancer fire; MM Bubble, Real Bombchu, Gyorg fry, Gomess
+bats, Majora's Mask, Nejiron and the ranch alien variant. Adult/larva Peahat
+deduplication and signed boss overkill are observed without changing their native
+behavior. The source audit and exact adapter boundaries are retained in
+tests/elemental_swords/finish_coverage_audit.json.
+
+Copied envelopes are a fallback presentation, not an exact skeletal attachment
+for every enemy. The pools hold2048 hits/effects; rendering is bounded to32
+points per frame, checks native graphics-arena room, and rotates between effects
+under load. These limits preserve native rendering work and do not prove that
+every simultaneous kill has a complete envelope in every frame.
+
+## Biggoron investigation and open runtime check
+
+The user's clarification makes Alternate Assets OFF with the built-in authored
+Biggoron model the primary reported case. It remains unreproduced in the current
+source controls. The real authored sword selector, base-resource route,
+per-frame compound copy, exact fit identity and captured transformed hand matrix
+have been checked in both hosts and solo/Combo builds. An offline depth/alpha
+projection of the exact exported core and tight shell covers the upper blade
+as well as the base at eight blade-roll angles. This is not an engine capture
+and does not prove that the user's installed archive has the same resources.
+
+Two independent defects were established and corrected: original ModernDin
+Biggoron aliases require their own exact blade profile; and native imported
+hand inspection must pair the drawn resource pointer with its own bounded
+command count, resolving MM's Biggoron hand each draw after asset switches.
+Neither correction is claimed to resolve the clarified built-in screenshot.
+The first22 published aura profiles and retained original input assets remain
+unchanged; the two original ModernDin profiles are appended.
+
+Set gDeveloperTools.SwordAuraDiagnostics=1 for opt-in fit records. The built-in
+MM human authored Biggoron path should report logical=6, fit=6, rig=2,
+matched=1; the old ModernDin full/broken fits are22/23. The configured runtime
+still needs the actual selected fit, build identity and loaded asset identities
+checked against this candidate before this bug can be marked fixed.
+
+The base-resource owner is cached from the installed stock soh.o2r archive;
+loose repository XML is not read by this owner. A code-only rebuild therefore
+does not establish that the installed authored blade and grip match this source.
+The exact authored asset source identities are retained in the aura manifests.
+
+## Frozen source recovery checkpoint
+
+The bounded review has no remaining source findings after explicit pause and
+Play_Destroy teardown,32 sound requests per gameplay frame (including repeated
+draws and pause/resume), native graphics budget guards and idle actor guards.
+The Biggoron sanitizer/native/depth matrix passes in all four modes. A fresh
+four-mode finish matrix including the final teardown hook and the combined
+project regression gate are still pending at this recovery checkpoint.
