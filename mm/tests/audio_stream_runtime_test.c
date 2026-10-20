@@ -226,14 +226,39 @@ int main(void) {
     REQUIRE(notes[0].playbackState.adsr.action.s.release);
     REQUIRE(!notes[1].playbackState.adsr.action.s.release);
 
-    static u8 pool[1024];
+    // The permanent cache is host allocated and grows beyond the old 32 slots.
+    static u8 pool[600 * 16];
+    static AudioCacheEntry permanentEntries[600];
     gAudioCtx.permanentPool = (AudioAllocPool){ .startAddr = pool, .curAddr = pool, .size = sizeof(pool) };
+    REQUIRE(AudioHeap_AllocPermanent(SEQUENCE_TABLE, 1, 16) == NULL);
+    REQUIRE(gAudioCtx.permanentPool.count == 0 && gAudioCtx.permanentPool.curAddr == pool);
+    gAudioCtx.permanentEntries = permanentEntries;
+    REQUIRE(AudioHeap_AllocPermanent(SEQUENCE_TABLE, 1, 16) == NULL);
+    REQUIRE(gAudioCtx.permanentPool.count == 0 && gAudioCtx.permanentPool.curAddr == pool);
+    gAudioCtx.permanentEntriesCapacity = ARRAY_COUNT(permanentEntries);
+    gAudioCtx.permanentPool.count = -1;
+    REQUIRE(AudioHeap_AllocPermanent(SEQUENCE_TABLE, 1, 16) == NULL);
+    REQUIRE(gAudioCtx.permanentPool.curAddr == pool);
+    gAudioCtx.permanentPool.count = 0;
+    // A failed pool allocation must not publish an entry or consume capacity.
+    REQUIRE(AudioHeap_AllocPermanent(SEQUENCE_TABLE, 1, sizeof(pool) + 16) == NULL);
+    REQUIRE(gAudioCtx.permanentPool.count == 0 && permanentEntries[0].addr == NULL);
     for (size_t i = 0; i < ARRAY_COUNT(ids); ++i) {
         void* cached = AudioHeap_AllocPermanent(SEQUENCE_TABLE, ids[i], 16);
         REQUIRE(cached != NULL);
         REQUIRE(AudioHeap_SearchPermanentCache(SEQUENCE_TABLE, ids[i]) == cached);
     }
     REQUIRE(AudioHeap_SearchPermanentCache(SEQUENCE_TABLE, 0) == NULL);
+    for (size_t i = ARRAY_COUNT(ids); i < ARRAY_COUNT(permanentEntries); ++i) {
+        void* cached = AudioHeap_AllocPermanent(SEQUENCE_TABLE, 1000 + i, 16);
+        REQUIRE(cached != NULL);
+        REQUIRE(AudioHeap_SearchPermanentCache(SEQUENCE_TABLE, 1000 + i) == cached);
+    }
+    REQUIRE(gAudioCtx.permanentPool.count == gAudioCtx.permanentEntriesCapacity);
+    u8* fullPoolAddress = gAudioCtx.permanentPool.curAddr;
+    REQUIRE(AudioHeap_AllocPermanent(SEQUENCE_TABLE, 2000, 16) == NULL);
+    REQUIRE(gAudioCtx.permanentPool.count == gAudioCtx.permanentEntriesCapacity);
+    REQUIRE(gAudioCtx.permanentPool.curAddr == fullPoolAddress);
 
     queuedSeqId = 0;
     AudioSeq_StartSequence(0, 1, 0, 0);

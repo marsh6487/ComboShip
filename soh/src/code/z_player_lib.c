@@ -1,6 +1,7 @@
 #include "global.h"
 #include "din_fire_shield.h"
 #include "din_fire_sword.h"
+#include "../../../combo/render/sword_element_aura_identity.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/gameplay_field_keep/gameplay_field_keep.h"
 #include "objects/object_link_boy/object_link_boy.h"
@@ -48,10 +49,11 @@ extern void ItemEquip_CaptureHandMatrix(void);
 extern void ItemEquip_CaptureLeftHandMatrix(void);
 extern u8 ItemEquip_HoldsClosedFist(void);
 extern u8 ItemEquip_HoldsEmptyHand(void);
+extern u8 FourSword_IsEquipped(void);
 
 #include <stdlib.h>
-
-// SW97: Forward declaration - defined in sw97_player_hooks.c (compiled in z_player.c TU)
+#include <string.h>
+#include <libultraship/bridge/consolevariablebridge.h>
 
 typedef struct {
     /* 0x00 */ u8 flag;
@@ -845,8 +847,8 @@ void Player_SetAutoLockOnActor(PlayState* play, Actor* actor) {
     this->focusActor = actor;
     this->autoLockOnActor = actor;
     this->stateFlags1 |= PLAYER_STATE1_FRIENDLY_ACTOR_FOCUS;
-    Camera_SetParam(Play_GetCamera(play, 0), 8, actor);
-    Camera_ChangeMode(Play_GetCamera(play, 0), 2);
+    Camera_SetParam(Play_GetCamera(play, CAM_ID_MAIN), 8, actor);
+    Camera_RequestMode(Play_GetCamera(play, CAM_ID_MAIN), 2);
 }
 
 s32 func_8008EF30(PlayState* play) {
@@ -897,7 +899,7 @@ s32 Player_GetStrength(void) {
         return PLAYER_STR_GOLD_G;
     }
 
-    if (CVarGetInteger(CVAR_CHEAT("TimelessEquipment"), 0) || LINK_IS_ADULT) {
+    if (GameInteractor_Should(VB_PLAYER_MEETS_AGE_REQ, LINK_IS_ADULT, LINK_AGE_ADULT)) {
         return strengthUpgrade;
     } else if (strengthUpgrade != 0) {
         return PLAYER_STR_BRACELET;
@@ -1255,11 +1257,13 @@ void Player_DrawImpl(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dL
         // A form's face textures ship under the vanilla eye symbol, so the same
         // name-based rule applies. Without this the head renders Link's eyes
         // through the form's own palette — the garbled face bug.
-        void* formEye = pakEye ? NULL : CustomForms_ResolveVanillaTexture(sEyeTextures[gSaveContext.linkAge][eyeIndex]);
-        if (pakEye) {
-            gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)pakEye);
-        } else if (formEye) {
+        void* formEye = (pakEye && !CustomForms_PreferFaceTextures())
+                            ? NULL
+                            : CustomForms_ResolveVanillaTexture(sEyeTextures[gSaveContext.linkAge][eyeIndex]);
+        if (formEye) {
             gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)formEye);
+        } else if (pakEye) {
+            gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)pakEye);
         } else {
             gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sEyeTextures[gSaveContext.linkAge][eyeIndex]));
         }
@@ -1729,7 +1733,10 @@ static Gfx* Player_ResolveLimbDLForDummyOrLocal(void* dlPathOrPtr) {
     if (formDL != NULL) {
         return formDL;
     }
-    return ResourceMgr_LoadGfxByName(dlPathOrPtr);
+    Gfx* resolved = ResourceMgr_LoadGfxByName(dlPathOrPtr);
+    if (dlPathOrPtr != NULL && memcmp(dlPathOrPtr, "__OTR__", 7) == 0)
+        DinFireSword_SetHandModel(NULL, resolved, SwordAura_ResourceModel((const char*)dlPathOrPtr, NULL, 0));
+    return resolved;
 }
 
 // Apply AFTER equipment and model overrides. The sheath limb carries the
@@ -1962,16 +1969,22 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
                 Gfx** openDLs = &gPlayerLeftHandOpenDLs[gSaveContext.linkAge];
                 *dList = Player_ResolveLimbDLForDummyOrLocal(openDLs[sDListsLodOffset]);
                 sLeftHandType = PLAYER_MODELTYPE_LH_OPEN;
-            } else if (!extOwnsWeapon) {
+            } else if (!hideLH && !TransformMasks_IsTransformedAny()) {
                 mayDrawProgressiveFire = !hideLH;
-                // NEI progressive sword upgrades: keep an OOT open hand and draw the MM Razor /
-                // Gilded / Great Fairy's Sword pieces (loaded from o2r) on top — pak_loader-style
-                // (sword then hand), supporting mods. No-op unless the upgraded sword is wielded.
+                // Keep the age/LOD-correct fist and the native sword hand type.
+                // The exact authored mesh changes only this limb's display list.
                 Gfx** openDLs = &gPlayerLeftHandOpenDLs[gSaveContext.linkAge];
-                void* ootHand = Player_ResolveLimbDLForDummyOrLocal(openDLs[sDListsLodOffset]);
-                if (WeaponUpgrade_ApplyHeldSwordDL(dList, ootHand, this, sPlayerBodyEnvColor.r, sPlayerBodyEnvColor.g,
+                Gfx* ootHand = Player_ResolveLimbDLForDummyOrLocal(openDLs[sDListsLodOffset]);
+                Gfx* fist = Player_ResolveLimbDLForDummyOrLocal(
+                    gPlayerLeftHandClosedDLs[gSaveContext.linkAge + sDListsLodOffset]);
+                if (WeaponUpgrade_ApplyHeldSwordDL(dList, fist, this, sPlayerBodyEnvColor.r, sPlayerBodyEnvColor.g,
                                                    sPlayerBodyEnvColor.b)) {
-                    sLeftHandType = PLAYER_MODELTYPE_LH_OPEN;
+                    // Each deferred player/clone draw retains its own hand and
+                    // body color; the helper's scratch compound is reused.
+                    Gfx* compound = (Gfx*)Graph_Alloc(play->state.gfxCtx, 8 * sizeof(Gfx));
+                    memcpy(compound, *dList, 8 * sizeof(Gfx));
+                    DinFireSword_CopyHandModel(this, *dList, compound);
+                    *dList = compound;
                 } else if (sLeftHandType == PLAYER_MODELTYPE_LH_OPEN) {
                     // No upgraded sword to draw, so ootHand was resolved and then dropped:
                     // *dList kept whatever vanilla picked earlier, which is LINK's hand even
@@ -2016,14 +2029,25 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
     // bit even after a Great Fairy upgrade. Select the fitted progressive blade
     // after equipment hooks while the explicit fire option owns this upgrade.
     // Disabling fire/Alt or removing the new assets restores the normal choices.
-    if (mayDrawProgressiveFire && *dList != NULL) {
+    // Four Sword also owns its blade after generic equipment/PAK hooks. Those
+    // hooks can select a native sword or an empty slot for the borrowed action.
+    if (mayDrawProgressiveFire && (*dList != NULL || FourSword_IsEquipped())) {
         void* closedHand =
             Player_ResolveLimbDLForDummyOrLocal(gPlayerLeftHandClosedDLs[gSaveContext.linkAge + sDListsLodOffset]);
-        Gfx* dinHand = DinFireSword_HandDL(play, this, closedHand, sPlayerBodyEnvColor.r, sPlayerBodyEnvColor.g,
-                                           sPlayerBodyEnvColor.b);
-        if (dinHand != NULL) {
-            *dList = dinHand;
+        if (FourSword_IsEquipped() && WeaponUpgrade_ApplyHeldSwordDL(dList, closedHand, this, sPlayerBodyEnvColor.r,
+                                                                     sPlayerBodyEnvColor.g, sPlayerBodyEnvColor.b)) {
+            Gfx* compound = (Gfx*)Graph_Alloc(play->state.gfxCtx, 8 * sizeof(Gfx));
+            memcpy(compound, *dList, 8 * sizeof(Gfx));
+            DinFireSword_CopyHandModel(this, *dList, compound);
+            *dList = compound;
             sLeftHandType = this->leftHandType;
+        } else {
+            Gfx* dinHand = DinFireSword_HandDL(play, this, closedHand, sPlayerBodyEnvColor.r, sPlayerBodyEnvColor.g,
+                                               sPlayerBodyEnvColor.b);
+            if (dinHand != NULL) {
+                *dList = dinHand;
+                sLeftHandType = this->leftHandType;
+            }
         }
     }
 
@@ -2045,6 +2069,17 @@ s32 Player_OverrideLimbDrawGameplayDefault(PlayState* play, s32 limbIndex, Gfx**
     // resource resolution still honors alternate assets and the selected pak.
     Player_ApplyTimePedestalSword(play, this, limbIndex, dList, rot);
     Player_ApplyBackEquipmentVisibility(limbIndex, dList);
+
+    // The mask motion owns these palms. Resolve the selected age/skin's empty
+    // hands after equipment hooks, so a drawn sword cannot pass through the face.
+    if (MmForm_IsNativeTransformationPlaying(play, this)) {
+        if (limbIndex == PLAYER_LIMB_L_HAND)
+            *dList =
+                Player_ResolveLimbDLForDummyOrLocal(gPlayerLeftHandOpenDLs[gSaveContext.linkAge + sDListsLodOffset]);
+        else if (limbIndex == PLAYER_LIMB_R_HAND)
+            *dList =
+                Player_ResolveLimbDLForDummyOrLocal(sPlayerRightHandOpenDLs[gSaveContext.linkAge + sDListsLodOffset]);
+    }
 
     if (GameInteractor_InvisibleLinkActive()) {
         this->actor.shape.shadowDraw = NULL;
@@ -2476,7 +2511,7 @@ void Player_FDMeleeWeaponPostLimb(PlayState* play, Player* this) {
 
     D_80126080.x = 5500.0f; // FD sword reach (from MM z_player_lib.c)
     // FD always uses BGS trail type (Player_GetMeleeWeaponHeld returns 3 for FD)
-    EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex), TRAIL_TYPE_BIGGORON_SWORD);
+    EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex), TRAIL_TYPE_BIGGORON_SWORD);
     func_80090A28(this, tipPos);
     func_800906D4(play, this, tipPos);
 }
@@ -2586,6 +2621,7 @@ Vec3f sLeftRightFootLimbModelFootPos[] = {
 
 void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx) {
     Player* this = (Player*)thisx;
+    MmForm_DrawNativeTransformationLimb(play, this, limbIndex);
 
     if (*dList != NULL) {
         Matrix_MultVec3f(&sZeroVec, D_80160000);
@@ -2611,7 +2647,7 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
             // Other weapon owners change sLeftHandType; unrelated PAK slots
             // must not suppress this overlay.
             if (sLeftHandType == PLAYER_MODELTYPE_LH_SWORD || sLeftHandType == PLAYER_MODELTYPE_LH_BGS) {
-                DinFireSword_Draw(play, this);
+                DinFireSword_DrawHand(play, this, *dList);
             }
         }
 
@@ -2627,7 +2663,7 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
                 D_80126080.x = this->unk_85C * 5000.0f;
                 func_80090A28(this, sp124);
                 if (this->meleeWeaponState != 0) {
-                    EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex), TRAIL_TYPE_STICK);
+                    EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex), TRAIL_TYPE_STICK);
                     func_800906D4(play, this, sp124);
                 } else {
                     Math_Vec3f_Copy(&this->meleeWeaponInfo[0].tip, &sp124[0]);
@@ -2663,8 +2699,8 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
                 Vec3f spE4_trident[3];
                 D_80126080.x = ExtEquip_TridentTrailLength();
                 if (this->meleeWeaponState != 0) {
-                    EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
-                                           sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
+                    EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
+                                               sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
                     func_80090A28(this, spE4_trident);
                     func_800906D4(play, this, spE4_trident);
                 } else {
@@ -2680,8 +2716,8 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
                 Vec3f spE4_byrnaCane[3];
                 D_80126080.x = ExtEquip_ByrnaTrailLength();
                 if (this->meleeWeaponState != 0) {
-                    EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
-                                           sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
+                    EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
+                                               sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
                     func_80090A28(this, spE4_byrnaCane);
                     func_800906D4(play, this, spE4_byrnaCane);
                 } else {
@@ -2699,8 +2735,8 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
                     D_80126080.x = 8000.0f; // 2x normal hammer reach (~4000)
                 }
 
-                EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
-                                       sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
+                EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
+                                           sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
                 func_80090A28(this, spE4_byrna);
                 func_800906D4(play, this, spE4_byrna);
             }
@@ -2734,14 +2770,14 @@ void Player_PostLimbDrawGameplay(PlayState* play, s32 limbIndex, Gfx** dList, Ve
                 // Fierce Deity sword reach: 5500 units (from MM z_player_lib.c)
                 // Player_GetMeleeWeaponHeld returns BGS index (3) for FD
                 D_80126080.x = 5500.0f;
-                EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
-                                       sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
+                EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
+                                           sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
             } else if (Player_HoldsBrokenKnife(this)) {
                 D_80126080.x = 1500.0f;
             } else {
                 D_80126080.x = sMeleeWeaponLengths[Player_GetMeleeWeaponHeld(this)];
-                EffectBlure_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
-                                       sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
+                EffectBlureShip_ChangeType(Effect_GetByIndex(this->meleeWeaponEffectIndex),
+                                           sSwordTypes[Player_GetMeleeWeaponHeld(this)]);
             }
 
             func_80090A28(this, spE4);

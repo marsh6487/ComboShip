@@ -147,7 +147,7 @@ else()
 endif()
 
 # src (decomp) {{{
-file(GLOB_RECURSE src__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/*.c" "src/*.h") # NEI: touched to re-glob (z_kaleido_equipment.c)
+file(GLOB_RECURSE src__ CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/*.c" "src/*.h")
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND src__ ${CMAKE_CURRENT_SOURCE_DIR}/windows/Resource.rc)

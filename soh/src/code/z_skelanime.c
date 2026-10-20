@@ -1,3 +1,4 @@
+#include "soh/Enhancements/cosmetics/NativeNpcPose.h"
 #include "global.h"
 #include "vt.h"
 #include <string.h>
@@ -5,6 +6,7 @@
 #include <assert.h>
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 
 #define ANIM_INTERP 1
 
@@ -188,6 +190,23 @@ void SkelAnime_DrawFlexLimbLod(PlayState* play, s32 limbIndex, void** skeleton, 
  * Limbs in a flexible skeleton have meshes that can stretch to line up with other limbs.
  * An array of matrices is dynamically allocated so each limb can access any transform to ensure its meshes line up.
  */
+static void SkelAnime_ApplyNpcSkin(const void* plan, Mtx* matrices, s32 nativeCount) {
+    MtxF native[32];
+    MtxF blended;
+    s32 i;
+    if (plan == NULL)
+        return;
+    for (i = 0; i < nativeCount; ++i)
+        Matrix_MtxToMtxF(&matrices[i], &native[i]);
+    Matrix_Push();
+    for (i = 0; i < NativeNpcPose_SkinMatrixCount(plan); ++i) {
+        NativeNpcPose_BlendSkinMatrix(plan, i, native, &blended);
+        Matrix_Put(&blended);
+        MATRIX_TOMTX(&matrices[nativeCount + i]);
+    }
+    Matrix_Pop();
+}
+
 void SkelAnime_DrawFlexLod(PlayState* play, void** skeleton, Vec3s* jointTable, s32 dListCount,
                            OverrideLimbDrawOpa overrideLimbDraw, PostLimbDrawOpa postLimbDraw, void* arg, s32 lod) {
     LodLimb* rootLimb;
@@ -196,7 +215,9 @@ void SkelAnime_DrawFlexLod(PlayState* play, void** skeleton, Vec3s* jointTable, 
     Gfx* limbDList;
     Vec3f pos;
     Vec3s rot;
-    Mtx* mtx = Graph_Alloc(play->state.gfxCtx, dListCount * sizeof(Mtx));
+    const void* skin = NativeNpcPose_GetSkinPlan(skeleton, dListCount);
+    Mtx* mtx = Graph_Alloc(play->state.gfxCtx, (dListCount + NativeNpcPose_SkinMatrixCount(skin)) * sizeof(Mtx));
+    Mtx* matrixBase = mtx;
 
     if (CVarGetInteger(CVAR_ENHANCEMENT("DisableLOD"), 0)) {
         lod = 0;
@@ -248,6 +269,7 @@ void SkelAnime_DrawFlexLod(PlayState* play, void** skeleton, Vec3s* jointTable, 
     }
 
     Matrix_Pop();
+    SkelAnime_ApplyNpcSkin(skin, matrixBase, dListCount);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -448,7 +470,9 @@ static void SkelAnime_DrawFlexOpaImpl(PlayState* play, void** skeleton, Vec3s* j
     Gfx* limbDList;
     Vec3f pos;
     Vec3s rot;
-    Mtx* mtx = Graph_Alloc(play->state.gfxCtx, dListCount * sizeof(Mtx));
+    const void* skin = NativeNpcPose_GetSkinPlan(skeleton, dListCount);
+    Mtx* mtx = Graph_Alloc(play->state.gfxCtx, (dListCount + NativeNpcPose_SkinMatrixCount(skin)) * sizeof(Mtx));
+    Mtx* matrixBase = mtx;
 
     if (skeleton == NULL) {
         osSyncPrintf(VT_FGCOL(RED));
@@ -499,6 +523,7 @@ static void SkelAnime_DrawFlexOpaImpl(PlayState* play, void** skeleton, Vec3s* j
     }
 
     Matrix_Pop();
+    SkelAnime_ApplyNpcSkin(skin, matrixBase, dListCount);
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
@@ -731,7 +756,9 @@ Gfx* SkelAnime_DrawFlex(PlayState* play, void** skeleton, Vec3s* jointTable, s32
     Gfx* limbDList;
     Vec3f pos;
     Vec3s rot;
-    Mtx* mtx = Graph_Alloc(play->state.gfxCtx, dListCount * sizeof(*mtx));
+    const void* skin = NativeNpcPose_GetSkinPlan(skeleton, dListCount);
+    Mtx* mtx = Graph_Alloc(play->state.gfxCtx, (dListCount + NativeNpcPose_SkinMatrixCount(skin)) * sizeof(Mtx));
+    Mtx* matrixBase = mtx;
 
     if (skeleton == NULL) {
         osSyncPrintf(VT_FGCOL(RED));
@@ -774,6 +801,7 @@ Gfx* SkelAnime_DrawFlex(PlayState* play, void** skeleton, Vec3s* jointTable, s32
     }
 
     Matrix_Pop();
+    SkelAnime_ApplyNpcSkin(skin, matrixBase, dListCount);
 
     return gfx;
 }
@@ -1631,7 +1659,8 @@ s32 SkelAnime_MorphTaper(SkelAnime* skelAnime) {
 void SkelAnime_AnimateFrame(SkelAnime* skelAnime) {
     Vec3s nextjointTable[100];
 
-    SkelAnime_GetFrameData(skelAnime->animation, skelAnime->curFrame, skelAnime->limbCount, skelAnime->jointTable);
+    SkelAnime_GetFrameData(NativeNpcPose_ResolveAnimation(skelAnime, skelAnime->animation), skelAnime->curFrame,
+                           skelAnime->limbCount, skelAnime->jointTable);
     if (skelAnime->mode & ANIM_INTERP) {
         s32 frame = skelAnime->curFrame;
         f32 partialFrame = skelAnime->curFrame - frame;
@@ -1639,7 +1668,8 @@ void SkelAnime_AnimateFrame(SkelAnime* skelAnime) {
         if (++frame >= (s32)skelAnime->animLength) {
             frame = 0;
         }
-        SkelAnime_GetFrameData(skelAnime->animation, frame, skelAnime->limbCount, nextjointTable);
+        SkelAnime_GetFrameData(NativeNpcPose_ResolveAnimation(skelAnime, skelAnime->animation), frame,
+                               skelAnime->limbCount, nextjointTable);
         SkelAnime_InterpFrameTable(skelAnime->limbCount, skelAnime->jointTable, skelAnime->jointTable, nextjointTable,
                                    partialFrame);
     }
@@ -1696,8 +1726,8 @@ s32 SkelAnime_Once(SkelAnime* skelAnime) {
     f32 updateRate = R_UPDATE_RATE * (1.0f / 3.0f);
 
     if (skelAnime->curFrame == skelAnime->endFrame) {
-        SkelAnime_GetFrameData(skelAnime->animation, (s32)skelAnime->curFrame, skelAnime->limbCount,
-                               skelAnime->jointTable);
+        SkelAnime_GetFrameData(NativeNpcPose_ResolveAnimation(skelAnime, skelAnime->animation),
+                               (s32)skelAnime->curFrame, skelAnime->limbCount, skelAnime->jointTable);
         SkelAnime_AnimateFrame(skelAnime);
         return 1;
     }
@@ -1725,10 +1755,11 @@ void Animation_ChangeImpl(SkelAnime* skelAnime, AnimationHeader* animation, f32 
                           u8 mode, f32 morphFrames, s8 taper) {
     LinkAnimationHeader* ogAnim = animation;
 
+    animation = NativeNpcPose_ResolveAnimation(skelAnime, animation);
     if (ResourceMgr_OTRSigCheck(animation) != 0)
         animation = ResourceMgr_LoadAnimByName(animation);
 
-    AnimationHeader* currentAnimation = (AnimationHeader*)skelAnime->animation;
+    AnimationHeader* currentAnimation = NativeNpcPose_ResolveAnimation(skelAnime, skelAnime->animation);
     if (ResourceMgr_OTRSigCheck(currentAnimation) != 0)
         currentAnimation = ResourceMgr_LoadAnimByName(currentAnimation);
 
@@ -1779,9 +1810,6 @@ void Animation_ChangeImpl(SkelAnime* skelAnime, AnimationHeader* animation, f32 
 void Animation_Change(SkelAnime* skelAnime, AnimationHeader* animation, f32 playSpeed, f32 startFrame, f32 endFrame,
                       u8 mode, f32 morphFrames) {
     AnimationHeader* ogAnim = animation;
-
-    if (ResourceMgr_OTRSigCheck(animation) != 0)
-        animation = ResourceMgr_LoadAnimByName(animation);
 
     Animation_ChangeImpl(skelAnime, animation, playSpeed, startFrame, endFrame, mode, morphFrames, ANIMTAPER_NONE);
     skelAnime->animation = ogAnim;

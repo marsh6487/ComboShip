@@ -8,3 +8,6 @@
 # Unignore our custom assets and header file
 !custom/**/*
 !2s2h_assets.h
+
+# Prepared from the pinned compressed HD Chateau resource before packaging.
+/custom/objects/combo_chateau_romani_3ds/AtlasTex

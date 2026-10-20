@@ -166,9 +166,62 @@ static uintptr_t Bind(const std::string& path, int segment = 8) {
     return command.words.w1;
 }
 
+static void CheckColdAltAfterSceneTravel() {
+    // GameState_Destroy unloads alt/* while native entries can remain cached.
+    // Every loading entry point must resolve the newly cold Alt override before
+    // reusing a native display list or texture. Import/I/O and scheduling are
+    // fixtures; travel is modeled by cache eviction. Cache, sync/async loader
+    // and renderer shortcut decisions are production.
+    for (bool texture : { false, true }) {
+        const std::string name = texture ? "scenes/shared/spot00_scene/s00_yuka_01_78B00___Copie"
+                                         : "scenes/shared/spot00_scene/spot00_room_0DL_002790";
+        const std::string alt = "alt/" + name;
+        const std::string tagged = "__OTR__" + name;
+        for (bool alias : { false, true }) {
+            for (int entry = 0; entry < 4; ++entry) {
+                auto manager = std::make_shared<Ship::ResourceManager>();
+                std::shared_ptr<Ship::IResource> native, authored;
+                if (texture) {
+                    native = Resource<Fast::Texture>(name, Fast::ResourceType::Texture);
+                    authored = Resource<Fast::Texture>(alt, Fast::ResourceType::Texture);
+                } else {
+                    native = Resource<Fast::DisplayList>(name, Fast::ResourceType::DisplayList);
+                    authored = Resource<Fast::DisplayList>(alt, Fast::ResourceType::DisplayList);
+                }
+                manager->loader->resources[name] = native;
+                manager->loader->resources[alt] = authored;
+                manager->mArchiveManager->files = { name, alt + (alias ? ".meta" : "") };
+                REQUIRE(manager->LoadResource(name, true) == native);
+                manager->mAltAssetsEnabled = true;
+                for (int visit = 0; visit < 3; ++visit) {
+                    std::shared_ptr<Ship::IResource> selected;
+                    if (entry == 0)
+                        selected = Fast::LoadRenderResource(*manager, tagged.c_str(), true, nullptr);
+                    else if (entry == 1)
+                        selected = manager->LoadResource(tagged);
+                    else if (entry == 2)
+                        selected = manager->LoadResourceAsync(tagged, false, BS::pr::highest, nullptr).get();
+                    else
+                        selected = manager->LoadResourceProcess(tagged);
+                    REQUIRE(selected == authored && "cold Alt override lost to retained native cache after travel");
+                    REQUIRE(manager->GetCachedResource(name, true) == native);
+                    REQUIRE(manager->GetCachedResource(alt, true) == authored);
+                    manager->mResourceCache.erase({ alt, 0, nullptr });
+                }
+                // Exact and Alt-off requests must still select the native asset.
+                REQUIRE(manager->LoadResource(name, true) == native);
+                manager->mAltAssetsEnabled = false;
+                REQUIRE(manager->LoadResource(tagged) == native);
+                REQUIRE(Fast::LoadRenderResource(*manager, tagged.c_str(), true, nullptr) == native);
+            }
+        }
+    }
+}
+
 int main(int argc, char** argv) {
     // Match the runtime's shared_ptr atomic reference counting, not libc's single-thread shortcut.
     std::thread([] {}).join();
+    CheckColdAltAfterSceneTravel();
     auto rm = Ship::Context::GetRawInstance()->manager;
     const std::string name = "objects/object_link_child/gLinkChildEyesOpenTex";
     const std::string path = "__OTR__" + name;
@@ -337,6 +390,7 @@ int main(int argc, char** argv) {
         return 1;
     std::printf(
         "PASS %s Alt segment binding: cold direct/.meta DL over warm texture, on/off, retained caches, HD texture, "
-        "missing/empty/wrong type; render lookup shortcut, dirty reload, manager and owner switching\n",
+        "missing/empty/wrong type; cold Alt after three visits, render lookup shortcut, dirty reload, manager and "
+        "owner switching\n",
         argc > 1 ? argv[1] : "game");
 }

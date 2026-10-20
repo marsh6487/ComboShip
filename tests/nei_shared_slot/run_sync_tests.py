@@ -35,6 +35,7 @@ def macro(text, name):
 
 PREFIX = r'''
 #include "mods/nei_save.h"
+#include "gameplay/MagicMirrorItem.h"
 #include "z64item.h"
 #include "FleetComboIds.h"
 #include "FleetComboOptions.h"
@@ -187,7 +188,9 @@ def main():
             defines += "\n#ifndef " + name + "\n" + definition.group(0) + "\n#endif\n"
         sync = read(fleet + "/FleetSync.cpp")
         helpers = "\n".join(block(inventory, marker) for marker in (
-            "void GraceHourglass_Heal(", "uint8_t GraceHourglass_IsOwned(", "void GraceHourglass_Grant("))
+            "void GraceHourglass_Heal(", "uint8_t GraceHourglass_IsOwned(", "void GraceHourglass_Grant(",
+            "void TravelTools_Heal(", "uint8_t TravelTools_IsOwned(", "void TravelTools_Grant(")
+            if marker in inventory)
         repair = block(sync, "static void RepairFlagOwnedCells(")
         owned = block(sync, '    if (sh.contains("ownedItems") && sh["ownedItems"].is_array())')
         apply = "void ApplySharedCells(const Shared& sh) { NeiSaveData* nei = Nei_Save();\n" + owned + "\n" + macro(sync, "FCO_APPLY") + "\nRepairFlagOwnedCells(nei);\n}\n"

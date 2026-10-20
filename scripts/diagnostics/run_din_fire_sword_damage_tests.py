@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 import tempfile
+import sys
 
 from run_time_pedestal_tests import functions
 from din_fire_sword_reaction_fixture import build_reactions
@@ -11,10 +12,10 @@ from din_fire_sword_reaction_fixture import build_reactions
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def main():
+def main(test_source=None):
     flags = ["-std=gnu2x", "-O1", "-g", "-DNDEBUG", "-DF3DEX_GBI_2", "-DLOG_LEVEL_GAME_PRINTS=0",
              "-ffunction-sections", "-fdata-sections", "-w", "-Werror=implicit-function-declaration"]
-    for path in ("soh/include", "soh/src", "soh/assets", "soh", "libultraship/include"):
+    for path in ("soh/include", "soh/src", "soh/assets", "soh", "libultraship/include", "combo"):
         flags.append("-I" + str(ROOT / path))
     for path in ("CMake/soh-cvars.cmake", "CMake/lus-cvars.cmake"):
         for key, value in re.findall(r'set\((CVAR_PREFIX_\w+)\s+"?([^\s"\)]+)', (ROOT / path).read_text()):
@@ -61,13 +62,15 @@ def main():
                             'EnKarebaba_SetupUpright(&baba); return baba.bodyCollider.info.bumper.dmgFlags; }\n')
         wrappers.append(str(withered))
         wrappers.extend(build_reactions(temp, flags))
-        binary = temp / "test"
-        subprocess.run([os.environ.get("CC", "cc"), *flags,
-                        "soh/tests/din_fire_sword_damage_test.c", "soh/src/code/din_fire_sword.c",
-                        "soh/src/code/z_collision_check.c", "soh/src/code/z_actor.c", *wrappers,
-                        "-Wl,--gc-sections", "-lm", "-o", str(binary)], cwd=ROOT, check=True)
-        subprocess.run([str(binary)], check=True)
+        for source in ([test_source] if test_source else ["soh/tests/din_fire_sword_damage_test.c",
+                                                         "soh/tests/elemental_sword_damage_test.c"]):
+            binary = temp / Path(source).stem
+            subprocess.run([os.environ.get("CC", "cc"), *flags,
+                            source, "soh/src/code/din_fire_sword.c",
+                            "soh/src/code/z_collision_check.c", "soh/src/code/z_actor.c", *wrappers,
+                            "-Wl,--gc-sections", "-lm", "-o", str(binary)], cwd=ROOT, check=True)
+            subprocess.run([str(binary)], check=True)
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1] if len(sys.argv) > 1 else None)

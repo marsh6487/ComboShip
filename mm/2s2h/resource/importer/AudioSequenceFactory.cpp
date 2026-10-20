@@ -11,6 +11,7 @@
 #endif
 
 #include <type_traits>
+#include <spdlog/spdlog.h>
 #include <tinyxml2.h>
 
 namespace SOH {
@@ -36,15 +37,26 @@ ResourceFactoryBinaryAudioSequenceV2::ReadResource(std::shared_ptr<Ship::File> f
     audioSequence->sequence.cachePolicy = reader->ReadUByte();
 
     audioSequence->sequence.numFonts = reader->ReadUInt32();
-    if (audioSequence->sequence.numFonts < 0 || audioSequence->sequence.numFonts > 16) {
+    if (audioSequence->sequence.numFonts < -1 || audioSequence->sequence.numFonts > 16) {
         SPDLOG_ERROR("Sequence '{}' has an invalid font count", initData->Path);
         return nullptr;
     }
     for (uint32_t i = 0; i < 16; i++) {
         audioSequence->sequence.fonts[i] = 0;
     }
-    for (uint32_t i = 0; i < audioSequence->sequence.numFonts; i++) {
-        audioSequence->sequence.fonts[i] = reader->ReadUByte();
+
+    if (audioSequence->sequence.numFonts == -1) {
+        // Binary streamed records encode the CRC as four u16 components.
+        // Keep the host array byte-valued, like XML streamed font hashes.
+        for (uint32_t i = 0; i < 4; i++) {
+            uint16_t component = reader->ReadUInt16();
+            audioSequence->sequence.fonts[2 * i] = component & 0xFF;
+            audioSequence->sequence.fonts[2 * i + 1] = component >> 8;
+        }
+    } else {
+        for (uint32_t i = 0; i < audioSequence->sequence.numFonts; i++) {
+            audioSequence->sequence.fonts[i] = reader->ReadUByte();
+        }
     }
 
     MM_AudioTraceResource(1, reinterpret_cast<uintptr_t>(audioSequence->sequence.seqData), initData->Path.c_str(),

@@ -1,4 +1,5 @@
 #include "global.h"
+#include "gameplay/ComboFaroresWind.h"
 #include "PR/gs2dex.h"
 #include "debug.h"
 
@@ -534,6 +535,7 @@ size_t Room_SetupFirstRoom(PlayState* play, RoomContext* roomCtx) {
     roomCtx->activeBufPage = 0;
     roomCtx->status = 0;
 
+    ComboFw_ValidateArrivalRoom(play->roomList.count);
     if ((gSaveContext.respawnFlag != 0) && (gSaveContext.respawnFlag != -2) && (gSaveContext.respawnFlag != -7)) {
         s32 respawnMode;
 

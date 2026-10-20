@@ -89,7 +89,8 @@ def cojiro():
     return m
 
 
-def mario_mask():
+def legacy_mario_mask():
+    """Earlier sculpted-mask recipe, retained for historical inspection only."""
     m = Model('mario_mask', 'Mario Mask', 'objects/nei_gi_redesign/mario_mask/gi_dl', 1., .65)
     for name, color in {
         'skin': [1., .65, .39],
@@ -157,7 +158,8 @@ def mario_mask():
     return m
 
 
-BUILDERS = {'cojiro': cojiro, 'mario_mask': mario_mask}
+BUILDERS = {'cojiro': cojiro}
+RETAINED_ITEMS = ('mario_mask',)
 
 
 def main():
@@ -166,13 +168,17 @@ def main():
     parser.add_argument('items', nargs='*')
     parser.add_argument('--install', action='store_true')
     args = parser.parse_args()
-    names = args.items or list(BUILDERS)
+    names = args.items or list(BUILDERS) + list(RETAINED_ITEMS)
     for name in names:
-        if name not in BUILDERS:
+        if name not in BUILDERS and name not in RETAINED_ITEMS:
             parser.error('Unknown GI candidate: ' + name)
     import shutil
     root = Path(__file__).resolve().parents[1]
     for name in names:
+        if name == 'mario_mask':
+            from mario_sm64_poc3 import rebuild
+            rebuild(args.install)
+            continue
         build({name: BUILDERS[name]}, root, args.install and name != 'cojiro')
         if name == 'cojiro':
             relative = Path('objects/nei_gi_redesign/cojiro')

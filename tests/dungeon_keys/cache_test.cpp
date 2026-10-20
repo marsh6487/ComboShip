@@ -1,4 +1,5 @@
 #include "ComboItemDrawABI.h"
+#include "combo/menu/ComboElementalArrowGi.h"
 #include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include <cstdio>
 #include <cstring>
@@ -52,6 +53,9 @@ enum RandoItemId {
   RI_OOT_MASTER_SWORD,
   RI_OOT_TRUE_MASTER_SWORD,
   RI_OOT_BIGGORON_SWORD,
+  RI_OOT_DINS_FIRE,
+  RI_OOT_FARORES_WIND,
+  RI_OOT_NAYRUS_LOVE,
   RI_PROGRESSIVE_BOW,
   RI_PROGRESSIVE_BOMB_BAG,
   RI_PROGRESSIVE_WALLET,
@@ -85,7 +89,8 @@ enum RandoItemId {
   RI_OOT_NEI_MARIO_MASK,
   RI_RED_POTION_REFILL,
   RI_GREEN_POTION_REFILL,
-  RI_BLUE_POTION_REFILL
+  RI_BLUE_POTION_REFILL,
+  RI_BOTTLE_EMPTY
 };
 #include "ComboOotBottleShimmerMM.h"
 /* PRODUCTION_OWNER */
@@ -123,7 +128,7 @@ struct Scope {
   Scope(const char *, int, int, bool) {}
 };
 } // namespace ItemGrantAudit
-extern "C" int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char*, const char*, float*) { return 0; }
+extern "C" int ResourceMgr_GetIkanaShieldGiPoseForGame(const char*, const char*, float*, float*) { return 0; }
 /* PRODUCTION_OPS */
 /* PRODUCTION_CROSS */
 int32_t MM_FillSongDrawInfo(RandoItemId, CwItemDrawInfo *) { return 0; }
@@ -167,6 +172,7 @@ enum RandomizerGet {
   RG_MASTER_SWORD,
   RG_TRUE_MASTER_SWORD,
   RG_BIGGORON_SWORD,
+  RG_GIANTS_KNIFE,
   RG_GREAT_FAIRY_SWORD
 };
 static bool ownerAltEnabled, ownerDin, ownerNotReady, ownerModuleReady;
@@ -266,7 +272,7 @@ void CheckRendered(const ComboForeignDrawInfo *info, int owner, int kind,
   assert(testDepth == 0 && !testGray[0] && !testGray[1]);
   if (custom) {
     assert(testCount == 2 && testScales == 1 &&
-           strstr(testPaths[0], "@mm:alt/objects/cor_mm_keys_poc2/"));
+           strstr(testPaths[0], "@mm:objects/combo_dungeon_keys/"));
     assert(testColorAtDraw[0].r == (testColors && testChanged ? 10 + owner
                                     : kind == 1               ? 233
                                                               : 213));
@@ -276,7 +282,7 @@ void CheckRendered(const ComboForeignDrawInfo *info, int owner, int kind,
   } else {
     assert(testCount == (kind == 1 || kind == 3 ? 2 : 1) && testScales == 0);
     assert(strstr(testPaths[0], "@mm:objects/") &&
-           !strstr(testPaths[0], "cor_mm_keys_poc2"));
+           !strstr(testPaths[0], "combo_dungeon_keys"));
     assert(testTint[0] == (bool)testColors);
     if (testColors)
       assert(testColorAtDraw[0].r == 10 + owner &&
@@ -319,7 +325,7 @@ int main() {
       testColors = 1;
       testChanged = 1;
       testEmblemChanged = 1;
-      CheckRendered(ComboResolveForeignDrawInfo(rc), d, k, false);
+      CheckRendered(ComboResolveForeignDrawInfo(rc), d, k, k < 2);
       ComboLatchForeignDraw(rc);
       assert(ComboForeignDrawCacheGet().map.at(rc).appearanceDependent);
       // Editing or Tab switching after the GI latch must immediately
@@ -337,13 +343,16 @@ int main() {
       testColors = 0;
       testEmblemChanged = 0;
       const auto *plain = ComboResolveForeignDrawInfo(rc);
-      assert(plain && plain->drawKind == CW_DRAW_KIND_SIMPLE &&
-             plain->appearanceDependent);
-      assert(!strstr(plain->dls[0], "cor_mm_keys_poc2"));
+      assert(plain && plain->appearanceDependent);
+      if (k < 2)
+        CheckRendered(plain, d, k, true);
+      else
+        assert(plain->drawKind == CW_DRAW_KIND_SIMPLE &&
+               !strstr(plain->dls[0], "combo_dungeon_keys"));
       ComboLatchForeignDraw(rc);
       testColors = 1;
       testEmblemChanged = 1;
-      CheckRendered(ComboResolveForeignDrawInfo(rc), d, k, false);
+      CheckRendered(ComboResolveForeignDrawInfo(rc), d, k, k < 2);
       testAlt = true;
       for (int missing : {1, 2}) {
         testMissing = missing;
@@ -353,6 +362,7 @@ int main() {
       CheckRendered(ComboResolveForeignDrawInfo(rc), d, k, k < 2);
       if (k == 1) {
         testAlt = false;
+        testMissing = 1;
         testColors = 0;
         testEmblemChanged = 1;
         CheckRendered(ComboResolveForeignDrawInfo(rc), d, k, false);
@@ -391,6 +401,48 @@ int main() {
     assert(ComboResolveForeignDrawInfo(180) == nullptr);
   }
   malformedSeason = 0;
+  Rando::StaticData::Items[RI_OOT_BOTTLE_FAIRY] = {GID_FAIRY_CONTAINER, "Bottle with Fairy"};
+  foreign.itemName = "Bottle with Fairy";
+  ++generation;
+  const bool fairyPreviousAlt = testAlt;
+  testAlt = testFairyEmptyMod = false;
+  const auto* fairy = ComboResolveForeignDrawInfo(185);
+  assert(fairy && fairy->drawKind == CW_DRAW_KIND_MM_FAIRY_CONTAINER &&
+         fairy->appearanceDependent && fairy->stateDependent);
+  assert(strstr(fairy->dls[0], "@mm:objects/combo_bottle_gi/EmptyOpaque"));
+  ComboLatchForeignDraw(185);
+  for (int selection : {0, 1, 0, 2, 0}) {
+    testAlt = selection == 1;
+    testFairyEmptyMod = selection == 2;
+    fairy = ComboResolveForeignDrawInfo(185);
+    assert(fairy && fairy->appearanceDependent && fairy->stateDependent && fairy->count == 4);
+    assert(strstr(fairy->dls[0], selection ? "@mm:objects/object_gi_bottle/gGiEmptyBottleCorkDL"
+                                         : "@mm:objects/combo_bottle_gi/EmptyOpaque") &&
+           "latched fairy casing must refresh after owner Alt/editor selection changes");
+    assert(strstr(fairy->dls[1], selection ? "@mm:objects/object_gi_bottle/gGiEmptyBottleGlassDL"
+                                         : "@mm:objects/combo_bottle_gi/FairyXlu"));
+    assert(strstr(fairy->dls[2], "gGiFairyBottleContentsDL") &&
+           strstr(fairy->dls[3], "gGiFairyBottleBillboardRotMtx"));
+  }
+  testAlt = testFairyEmptyMod = false;
+  for (bool missing : {false, true})
+    for (int selected : {0, 1, 2, 4, 8}) {
+      testFairyGlassMissing = missing;
+      testFairyBundledMod = selected;
+      fairy = ComboResolveForeignDrawInfo(185);
+      assert(fairy && fairy->count == 4 && fairy->appearanceDependent && fairy->stateDependent);
+      assert(strstr(fairy->dls[0], "@mm:objects/combo_bottle_gi/EmptyOpaque"));
+      assert(strstr(fairy->dls[1], !missing && !selected
+                                     ? "@mm:objects/combo_bottle_gi/FairyXlu"
+                                     : "@mm:objects/combo_bottle_gi/EmptyXlu"));
+      assert(strstr(fairy->dls[2], "gGiFairyBottleContentsDL") &&
+             strstr(fairy->dls[3], "gGiFairyBottleBillboardRotMtx"));
+    }
+  testFairyGlassMissing = false;
+  testFairyBundledMod = 0;
+  testAlt = fairyPreviousAlt;
+  testFairyEmptyMod = false;
+  puts("PASS fairy readable-shell selector -> MM export -> OoT cache/latch with Alt/editor changes, missing glass and selected casing/materials");
   const RandoItemId bottles[] = {
       RI_OOT_BOTTLE_BIG_POE,      RI_OOT_BOTTLE_BLUE_FIRE,
       RI_OOT_BOTTLE_BLUE_POTION,  RI_OOT_BOTTLE_BUGS,
@@ -399,7 +451,7 @@ int main() {
       RI_OOT_BOTTLE_POE,          RI_OOT_RUTOS_LETTER};
   const uint8_t bottleColors[][3] = {
       {150, 200, 0},   {100, 160, 255}, {100, 160, 255}, {220, 225, 240},
-      {255, 160, 235}, {220, 225, 240}, {0, 200, 0},     {220, 225, 240},
+      {255, 160, 235}, {220, 225, 240}, {0, 200, 0},     {222, 100, 245},
       {100, 0, 200},   {220, 225, 240}};
   for (int i = 0; i < 10; ++i) {
     Rando::StaticData::Items[bottles[i]] = {(i == 1 || i == 9) ? -1 : 0,
@@ -494,7 +546,8 @@ int main() {
       if (custom) {
         assert(strstr(descriptor.dlists[0],
                       mode == 2 ? "din_fire_sword" : "object_custom_equip"));
-        assert(descriptor.opCount == 1 && descriptor.ops[0].op == CW_OP_ROTATE_Z && descriptor.ops[0].a == 18774.682f &&
+        // Export the pickup's +X blade with one quarter-turn into upright +Y.
+        assert(descriptor.opCount == 1 && descriptor.ops[0].op == CW_OP_ROTATE_Z && descriptor.ops[0].a == 16384.f &&
                descriptor.scale == .04f);
       } else if (id == RI_OOT_TRUE_MASTER_SWORD) {
         const uint8_t gold[4] = {255, 215, 110, 255};

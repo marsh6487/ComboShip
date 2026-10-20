@@ -4,35 +4,43 @@
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
+#include "ComboBottleShimmer.h"
 
 typedef struct {
     const char* opaque;
     const char* glass;
 } ComboFairyBottleShell;
 
-// A fairy-specific mod owns its whole shell, including partial OPA/XLU packs.
-// Otherwise prefer the user's selected Blue Fire bottle model, then a selected
-// generic bottle. An unmodified Blue Fire chamberstick is never a bottle fallback.
-static inline ComboFairyBottleShell ComboFairyBottle_SelectShell(const char* opaque, const char* glass,
-                                                                 const char* genericOpaque, const char* genericGlass,
-                                                                 int (*isSelectedMod)(const char*),
-                                                                 const char* blueFire, int blueFireSelected) {
-    ComboFairyBottleShell shell = { opaque, glass };
-    if (isSelectedMod != 0 && !isSelectedMod(opaque) && !isSelectedMod(glass)) {
-        if (blueFire != 0 && blueFireSelected) {
-            // Repeated shell paths encode a single-piece shell across the ABI.
-            // Consumers submit it once; the Blue Fire flame is never selected.
-            shell.opaque = shell.glass = blueFire;
-        } else if (isSelectedMod(genericOpaque) || isSelectedMod(genericGlass)) {
-            shell.opaque = genericOpaque;
-            shell.glass = genericGlass;
-        }
+static inline int ComboFairyBottle_IsBlueFireShell(const char* path) {
+    return path != 0 && strstr(path, "objects/object_gi_fire/gGiBlueFireChamberstickDL") != 0;
+}
+
+static inline int ComboFairyBottle_IsBundledShell(const char* path) {
+    return path != 0 && strstr(path, "objects/combo_bottle_gi/EmptyOpaque") != 0;
+}
+
+static inline ComboFairyBottleShell ComboFairyBottle_BundledShell(ComboFairyBottleShell shell, const char* opaque,
+                                                                  const char* glass, int (*isSelectedMod)(const char*),
+                                                                  int available) {
+    if (available && isSelectedMod && !isSelectedMod(opaque) && !isSelectedMod(glass) &&
+        strcmp(shell.opaque, opaque) == 0 && strcmp(shell.glass, glass) == 0) {
+        shell.opaque = "__OTR__objects/combo_bottle_gi/EmptyOpaque";
+        shell.glass = "__OTR__objects/combo_bottle_gi/EmptyXlu";
     }
     return shell;
 }
 
-static inline int ComboFairyBottle_IsBlueFireShell(const char* path) {
-    return path != 0 && strstr(path, "objects/object_gi_fire/gGiBlueFireChamberstickDL") != 0;
+// Strengthen only the bundled fairy's glass. Empty/general bottles and selected
+// casing/material recipes remain complete, including those in older archives.
+static inline ComboFairyBottleShell ComboFairyBottle_ReadableShell(ComboFairyBottleShell shell,
+                                                                   int (*isSelectedMod)(const char*), int available) {
+    if (available && isSelectedMod && strcmp(shell.opaque, "__OTR__objects/combo_bottle_gi/EmptyOpaque") == 0 &&
+        strcmp(shell.glass, "__OTR__objects/combo_bottle_gi/EmptyXlu") == 0 && !isSelectedMod(shell.opaque) &&
+        !isSelectedMod(shell.glass) && !isSelectedMod("__OTR__objects/combo_bottle_gi/BottleShell") &&
+        !isSelectedMod("__OTR__objects/combo_bottle_gi/shell/mat_gGiBlueFireChamberstickDL_BottleGlassOutside")) {
+        shell.glass = "__OTR__objects/combo_bottle_gi/FairyXlu";
+    }
+    return shell;
 }
 
 typedef struct {
@@ -52,6 +60,19 @@ static inline ComboFairyBottleMotion ComboFairyBottle_Sample(uint32_t frame) {
                                       .78f + .04f * sinf(phase * 30.0f),
                                       .78f,
                                       .78f };
+    return motion;
+}
+
+// The bundled casing's body spans Y=-30..6. Use its own center and a readable
+// bounce; arbitrary selected mods retain the prior native placement envelope.
+static inline ComboFairyBottleMotion ComboFairyBottle_SampleForShell(uint32_t frame, const char* shell) {
+    ComboFairyBottleMotion motion = ComboFairyBottle_Sample(frame);
+    if (ComboFairyBottle_IsBundledShell(shell)) {
+        const float phase = (float)(frame % 360u) * (6.2831853071795864769f / 180.0f);
+        motion.x = 4.f * sinf(phase);
+        motion.y = -10.f + 7.f * sinf(phase * 1.5f + .4f);
+        motion.z = 2.f * cosf(phase);
+    }
     return motion;
 }
 

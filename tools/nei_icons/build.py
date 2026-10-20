@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import json
 import struct
+import sys
 import zipfile
 from pathlib import Path
 
@@ -92,6 +93,15 @@ def render_icons(only=None):
     provenance = json.loads(provenance_path.read_text()) if provenance_path.exists() else {}
     for name, title, source, azimuth, elevation, roll in ICONS:
         if only and name not in only:
+            continue
+        if name == "MarioMask":
+            # This candidate's exact icon was retained with its runtime archive;
+            # its missing authoring camera is not replaced by an older recipe.
+            sys.path.insert(0, str(ROOT / "tools/nei_gi/SOURCE"))
+            from mario_sm64_poc3 import restore_icon
+            image, provenance[name] = restore_icon()
+            image.save(png_path(name), optimize=True)
+            print("restored", name, "retained POC3 pixels", flush=True)
             continue
         if source == "magic_jar_generated":
             source_path = HERE / "SOURCE/magic_jar_generated.png"

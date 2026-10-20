@@ -1,5 +1,6 @@
 #include <thread>
 #include "../../../combo/menu/ItemGrantAuditBridge.h"
+#include "../../../combo/gameplay/MagicMirrorItem.h"
 // FleetSync.cpp (OoT side) — cross-game save cache + shared player-state overlay.
 //
 // Temp file: <ShipDir>/fleet_temp_flags.json — { "version", "slot", "oot", "mm", "shared" }.
@@ -57,6 +58,7 @@ extern "C" {
 #include "functions.h"
 #include "variables.h"
 #include "mods/nei_save.h"
+#include "mods/ext_buttons/ext_buttons.h"
 extern SaveContext gSaveContext;
 extern PlayState* gPlayState;
 // Transformation-mask form bridge (mm_player_form.cpp): current MM form (0 FD..4 Human, >4 custom)
@@ -91,9 +93,13 @@ void Bottle_WheelPersist(unsigned char wheel, unsigned short slotItem);
 void Bottle_WheelRecordActive(unsigned char wheel, unsigned short slotItem);
 // Elemental Wand / Sheikah Slate grants (mods/extended_inventory.c): place the cell item, light the
 // rod/rune bit and pick the active mode -- the same call the native pickup makes.
+unsigned char Cane_GiveSkill(unsigned char skill);
 void Wand_GrantMode(unsigned char mode);
 void Slate_GrantRune(unsigned char rune);
 void Seasons_GrantSeason(unsigned char season);
+void Seasons_GrantRod(void);
+unsigned char Seasons_HasRod(void);
+void Seasons_UpdateGates(void);
 }
 
 // Cross-game restart: the raw reset of THIS game (defined in debugconsole.cpp), called by the
@@ -412,6 +418,7 @@ extern "C" void GraceHourglass_Grant(uint16_t item);
 
 static void RepairFlagOwnedCells(NeiSaveData* nei) {
     GraceHourglass_Heal();
+    TravelTools_Heal();
     const uint8_t kSlotWand = 27, kSlotSlate = 39, kSlotShovel = 46, kSlotRod = 47;
     const uint16_t kExtSheikahSlate = 0x0220; // EXT_ITEM_SHEIKAH_SLATE (same id in both games)
     const uint16_t kExtRodOfSeasons = 0x0223; // EXT_ITEM_ROD_OF_SEASONS (same id in both games)
@@ -421,7 +428,8 @@ static void RepairFlagOwnedCells(NeiSaveData* nei) {
     if (nei->slateRunesOwned != 0 && Nei_GetOwnedItem(kSlotSlate) != kExtSheikahSlate) {
         Nei_SetOwnedItem(kSlotSlate, kExtSheikahSlate);
     }
-    if (nei->seasonsOwned != 0 && Nei_GetOwnedItem(kSlotRod) != kExtRodOfSeasons) {
+    if ((nei->seasonsRodOwned || (nei->seasonsOwned & NEI_SEASONS_MASK)) &&
+        Nei_GetOwnedItem(kSlotRod) != kExtRodOfSeasons) {
         Nei_SetOwnedItem(kSlotRod, kExtRodOfSeasons);
     }
     if (nei->shovelOwned || nei->dominionOwned) {
@@ -545,9 +553,14 @@ void ExtractShared(nlohmann::json& sh) {
     // / runes you own lives in these bitmasks, and nothing carried them -- the peer got an empty
     // wand. OR-merged both ways (one-way unlocks); the fcId deficit path still grants the items
     // natively, this just guarantees the bits arrive even if a grant is missed.
+    // Named cane unlocks are independent bits, not a progressive pickup count.
+    sh["caneSkills"] = (sh.value("caneSkills", 0) | nei->caneSkills) & 0x3F;
     sh["wandRodsOwned"] = (int)nei->wandRodsOwned;
     sh["slateRunesOwned"] = (int)nei->slateRunesOwned;
-    sh["seasonsOwned"] = (int)nei->seasonsOwned;
+    sh["seasonsOwned"] = (int)(nei->seasonsOwned & NEI_SEASONS_MASK);
+    Seasons_UpdateGates();
+    sh["seasonsRodOwned"] = (int)Seasons_HasRod();
+    sh["seasonsGates"] = (int)(nei->seasonsGates & NEI_SEASONS_MASK);
     FleetRpg::Extract(sh);
     RepairFlagOwnedCells(nei);
     // Shared NEI options/flags (FleetComboOptions.h). Table-driven so a future
@@ -794,6 +807,8 @@ void ApplyShared(const nlohmann::json& sh) {
             if (validPage2 || validMask) {
                 if (i == 41 - 24 && raw == ITEM_HYLIAS_GRACE) {
                     GraceHourglass_Grant((uint16_t)raw);
+                } else if (i == 31 - 24 && raw == ITEM_TIME_GATE) {
+                    TravelTools_Grant((uint16_t)raw);
                 } else {
                     nei->ownedItems[i] = (uint16_t)raw; // additive
                 }
@@ -818,6 +833,14 @@ void ApplyShared(const nlohmann::json& sh) {
 
     // Wand rods / slate runes: OR the bits in, and hand the game every rod/rune it did not have yet
     // through its own grant function (which also places the cell item and picks the active mode).
+    if (sh.contains("caneSkills") && sh["caneSkills"].is_number_integer()) {
+        const uint8_t incoming = (uint8_t)(sh["caneSkills"].get<int>() & 0x3F);
+        const uint8_t gained = (uint8_t)(incoming & ~nei->caneSkills);
+        for (uint8_t skill = 0; skill < 6; ++skill) {
+            if (gained & (1 << skill))
+                Cane_GiveSkill(skill);
+        }
+    }
     if (sh.contains("wandRodsOwned") && sh["wandRodsOwned"].is_number_integer()) {
         const uint8_t incoming = (uint8_t)sh["wandRodsOwned"].get<int>();
         const uint8_t gained = (uint8_t)(incoming & ~nei->wandRodsOwned);
@@ -839,7 +862,7 @@ void ApplyShared(const nlohmann::json& sh) {
         nei->slateRunesOwned |= incoming;
     }
     if (sh.contains("seasonsOwned") && sh["seasonsOwned"].is_number_integer()) {
-        const uint8_t incoming = (uint8_t)sh["seasonsOwned"].get<int>();
+        const uint8_t incoming = (uint8_t)(sh["seasonsOwned"].get<int>() & NEI_SEASONS_MASK);
         const uint8_t gained = (uint8_t)(incoming & ~nei->seasonsOwned);
         for (uint8_t s = 0; s < 4 && gained != 0; s++) {
             if (gained & (1 << s)) {
@@ -847,6 +870,14 @@ void ApplyShared(const nlohmann::json& sh) {
             }
         }
         nei->seasonsOwned |= incoming;
+    }
+    // Empty starting/gated Rods have no season pickup bits; ownership crosses independently.
+    if (sh.contains("seasonsRodOwned") && sh["seasonsRodOwned"].is_number_integer() &&
+        sh["seasonsRodOwned"].get<int>() == 1 && !Seasons_HasRod()) {
+        Seasons_GrantRod();
+    }
+    if (sh.contains("seasonsGates") && sh["seasonsGates"].is_number_integer()) {
+        nei->seasonsGates |= (uint8_t)(sh["seasonsGates"].get<int>() & NEI_SEASONS_MASK);
     }
 
     RepairFlagOwnedCells(nei);
@@ -936,7 +967,7 @@ void ApplyShared(const nlohmann::json& sh) {
 // C / D-pad equips used to be ordinary shared state: published by BOTH games ~3x a second and re-sent
 // whole on every resync. That made them a one-way ratchet in OoT's favour, and it is exactly what the
 // "no matter what I equip in MM, it forces an OoT item onto the button" report was. The loop:
-//   - MM publishes 0xFF for anything OoT cannot represent (any ITEM_EXT_BUTTON custom, the pictobox,
+//   - MM used to publish 0xFF for any ITEM_EXT_BUTTON item, the pictobox,
 //     the Great Fairy's Sword, and even its Ocarina of Time, whose id is 0x00).
 //   - OoT reads 0xFF as "keep mine", so it never changes — and keeps publishing its own id.
 //   - MM obeys that id and stamps it over the button the player had just set.
@@ -953,60 +984,83 @@ void ApplyShared(const nlohmann::json& sh) {
 //      An id without its slot is a phantom button the rest of the game cannot resolve.
 void ExtractEquips(nlohmann::json& sh) {
     // Publish 0xFF for anything MM has no relative for, so the peer's rule 1 keeps its own button.
-    auto pub = [](uint8_t id) -> uint8_t {
-        return (id == ITEM_NONE || FcEquip_OotToMm(id) == 0xFF) ? (uint8_t)0xFF : id;
+    auto pub = [](uint16_t id) -> uint16_t {
+        return (id == ITEM_NONE || FcEquip_OotToMm16(id) == 0xFF) ? (uint16_t)0xFF : id;
     };
     nlohmann::json c = nlohmann::json::array();
     for (int b = 1; b <= 3; b++) {
-        c.push_back(pub(gSaveContext.equips.buttonItems[b]));
+        c.push_back(pub(ExtButton_GetItem(b)));
     }
     sh["cEquips"] = c;
     nlohmann::json d = nlohmann::json::array();
     for (int b = 4; b <= 7; b++) {
-        d.push_back(pub(gSaveContext.equips.buttonItems[b]));
+        d.push_back(pub(ExtButton_GetItem(b)));
     }
     sh["dEquips"] = d;
 }
 
 // Inventory slot holding `item`, or -1 if this save does not have it.
-int FindInvSlot(uint8_t item) {
-    for (int s = 0; s < (int)ARRAY_COUNT(gSaveContext.inventory.items); s++) {
-        if (gSaveContext.inventory.items[s] == item) {
-            return s;
+int FindInvSlot(uint16_t item) {
+    // Ownership survives switching the travel cell to the other tool. Restoring
+    // a peer button must not discard an owned item or change the local selection.
+    if (item == ITEM_TIME_GATE || item == EXT_ITEM_MAGIC_MIRROR) {
+        return TravelTools_IsOwned(item) ? SLOT_MAGIC_MIRROR : -1;
+    }
+    if (item < 0xFF) {
+        for (int s = 0; s < (int)ARRAY_COUNT(gSaveContext.inventory.items); s++) {
+            if (gSaveContext.inventory.items[s] == item) {
+                return s;
+            }
+        }
+    }
+    for (int i = 0; i < 48; i++) {
+        if (Nei_Save()->ownedItems[i] == item) {
+            return i + 24;
         }
     }
     return -1;
 }
 
 // btn: 1-3 C, 4-7 D-pad. cButtonSlots is indexed btn-1 in the SOH layout (see z_parameter.c).
-void ApplyOneButton(int btn, uint8_t canon) {
+void ApplyOneButton(int btn, uint16_t canon) {
     if (canon == 0xFF) {
         return; // rule 1
     }
-    const uint8_t cur = gSaveContext.equips.buttonItems[btn];
-    if (cur != ITEM_NONE && FcEquip_OotToMm(cur) == 0xFF) {
+    if (FcEquip_OotToMm16(canon) == 0xFF) {
+        return;
+    }
+    const uint16_t cur = ExtButton_GetItem(btn);
+    if (cur != ITEM_NONE && FcEquip_OotToMm16(cur) == 0xFF) {
         return; // rule 2: the player put something MM cannot hold here — don't take it away
     }
     const int slot = FindInvSlot(canon);
     if (slot < 0) {
         return; // rule 3: we don't own it
     }
-    gSaveContext.equips.buttonItems[btn] = canon;
-    gSaveContext.equips.cButtonSlots[btn - 1] = (uint8_t)slot;
+    if (canon >= 0x0200) {
+        ExtButton_SetItem(btn, canon);
+        gSaveContext.equips.cButtonSlots[btn - 1] = SLOT_NONE;
+    } else {
+        ExtButton_ClearItem(btn);
+        gSaveContext.equips.buttonItems[btn] = (uint8_t)canon;
+        gSaveContext.equips.cButtonSlots[btn - 1] = (uint8_t)slot;
+    }
 }
 
 void ApplyEquips(const nlohmann::json& sh) {
     if (sh.contains("cEquips") && sh["cEquips"].is_array()) {
         for (int i = 0; i < 3 && i < (int)sh["cEquips"].size(); i++) {
-            if (sh["cEquips"][i].is_number_integer()) {
-                ApplyOneButton(1 + i, (uint8_t)sh["cEquips"][i].get<int>());
+            const auto& item = sh["cEquips"][i];
+            if (item.is_number_integer() && item >= 0 && item <= 0xFFFF) {
+                ApplyOneButton(1 + i, item.get<uint16_t>());
             }
         }
     }
     if (sh.contains("dEquips") && sh["dEquips"].is_array()) {
         for (int i = 0; i < 4 && i < (int)sh["dEquips"].size(); i++) {
-            if (sh["dEquips"][i].is_number_integer()) {
-                ApplyOneButton(4 + i, (uint8_t)sh["dEquips"][i].get<int>());
+            const auto& item = sh["dEquips"][i];
+            if (item.is_number_integer() && item >= 0 && item <= 0xFFFF) {
+                ApplyOneButton(4 + i, item.get<uint16_t>());
             }
         }
     }
@@ -1051,6 +1105,13 @@ void ApplyFcRegistryToNatives() {
     NeiSaveData* nei = Nei_Save();
     sApplyingFc = true; // suppress the record hook's re-entry for the duration of this pass
     for (int fcId = 0; fcId < FCI_MAX; fcId++) {
+        // Both games publish exact caneSkills. Replaying the old progressive counter
+        // after applying that mask would grant an unrelated extra power. Acknowledge
+        // counts here even when counter and mask arrive in separate FleetNet deltas.
+        if (fcId == FCI_CANE_OF_SOMARIA) {
+            nei->comboAppliedFc[fcId] = nei->comboObtainedFc[fcId];
+            continue;
+        }
         int native = FcCombo_NativeForItem(fcId);
         if (native == FCI_NO_ITEM) {
             continue; // no OoT-native relative for this fcId (info-only / MM-only here)
@@ -2000,8 +2061,12 @@ static ItemGrantAudit::Snapshot CaptureItemGrantAudit() {
     snapshot.Add("nei.wandRodsOwned", nei->wandRodsOwned);
     snapshot.Add("nei.slateRunesOwned", nei->slateRunesOwned);
     snapshot.Add("nei.seasonsOwned", nei->seasonsOwned);
+    snapshot.Add("nei.seasonsRodOwned", nei->seasonsRodOwned);
+    snapshot.Add("nei.seasonsGates", nei->seasonsGates);
     snapshot.Add("nei.hyliasGraceOwned", nei->hyliasGraceOwned);
     snapshot.Add("nei.phantomHourglassOwned", nei->phantomHourglassOwned);
+    snapshot.Add("nei.timeGateOwned", nei->timeGateOwned);
+    snapshot.Add("nei.magicMirrorOwned", nei->magicMirrorOwned);
     snapshot.Add("nei.shovelOwned", nei->shovelOwned);
     snapshot.Add("nei.dominionOwned", nei->dominionOwned);
     snapshot.Add("nei.pokeballOwned", nei->pokeballOwned);

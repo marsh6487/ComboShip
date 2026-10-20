@@ -1,4 +1,5 @@
 #include "FleetSharedItems.h"
+#include "../../../combo/ComboGameMode.h"
 #include "FleetComboItems.h"
 #include "FleetComboItemsGlue.h"
 #include "2s2h/Rando/Types.h"
@@ -106,7 +107,7 @@ static FnGrantSharedItem ResolvePeerGrant() {
 }
 
 extern "C" void FleetShared_OnNativeObtained(int nativeId) {
-    if (sReceiveDepth > 0) {
+    if (!Combo_IsCombinedGame() || sReceiveDepth > 0) {
         return;
     }
     // Share the concrete native tier even in RPG mode. Returning without a
@@ -141,7 +142,8 @@ typedef const char* (*FnExtractSharedState)(void);
 // Deferred to a tick with a loaded file: ApplyShared writes the live save, and the switch that
 // requested the pull happens before this game's PlayState exists again.
 static void PullFromPeerWhenReady() {
-    if (!sPullPending || gPlayState == NULL || gSaveContext.fileNum < 0 || gSaveContext.fileNum > 2) {
+    if (!Combo_IsCombinedGame() || !sPullPending || gPlayState == NULL || gSaveContext.fileNum < 0 ||
+        gSaveContext.fileNum > 2) {
         return;
     }
     sPullPending = false;

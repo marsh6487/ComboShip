@@ -427,7 +427,7 @@ void OnSceneSpawnActorsDispatch() {
     }
 }
 
-void SaveSection(SaveContext* saveContext, int sectionID, bool fullSave) {
+void SaveSection(const SaveContext& saveContext, int sectionID, bool fullSave) {
     SaveManager::Instance->SaveData("talkedOnce", gState.talkedOnce);
 }
 

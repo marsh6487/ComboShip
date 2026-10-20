@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 extern "C" {
+int ResourceMgr_GetGiModelBoundsForGame(const char*,const char* const*,int,float[3],float[3]) { return 0; }
 #ifdef HOST_MM
 #include "global.h"
 #else
@@ -19,6 +20,11 @@ extern "C" {
 #include "objects/gameplay_keep/gameplay_keep.h"
 #define CVAR_COSMETIC(x) "gCosmetics." x
 }
+extern "C" s32 GetItem_GetShimmerColor(s16,uint8_t*);
+void* Combo_ResolveSym(const char*,const char*);
+#ifndef HOST_MM
+void* Combo_ResolveSym(const char*,const char*) { assert(false); return nullptr; }
+#endif
 /* PRODUCTION_DRAW_PRELUDE */
 #include "soh/Enhancements/randomizer/NeiGiRender.h"
 #include "soh/Enhancements/randomizer/NeiGiEnergyTexture.h"
@@ -71,6 +77,7 @@ void Matrix_Translate(f32 x, f32 y, f32 z, MatrixMode) {
 Mtx* Matrix_Finalize(GraphicsContext*) { return &matrix; }
 void Gfx_SetupDL25_Xlu(GraphicsContext*) {}
 void Gfx_SetupDL25_Opa(GraphicsContext*) {}
+void Gfx_SetupDL26_Opa(GraphicsContext*) {}
 void Graph_OpenDisps(Gfx**, Gfx*, GraphicsContext*, const char*, s32) {}
 void Graph_CloseDisps(Gfx**, Gfx*, GraphicsContext*, const char*, s32) {}
 #else
@@ -81,6 +88,7 @@ void Matrix_Translate(f32 x, f32 y, f32 z, u8) {
 Mtx* Matrix_NewMtx(GraphicsContext*, char*, s32) { return &matrix; }
 void Gfx_SetupDL_25Xlu(GraphicsContext*) {}
 void Gfx_SetupDL_25Opa(GraphicsContext*) {}
+void Gfx_SetupDL_26Opa(GraphicsContext*) {}
 void Graph_OpenDisps(Gfx**, GraphicsContext*, const char*, s32) {}
 void Graph_CloseDisps(Gfx**, GraphicsContext*, const char*, s32) {}
 #endif
@@ -119,6 +127,9 @@ int DinFireShield_DrawItem(PlayState*, int16_t) { return 0; }
 int ResourceMgr_GetGiModelFitForGame(const char*, const char*, float, float, int, float[2]) { return 0; }
 int ResourceMgr_GetGiModelsFitForGame(const char*, const char* const*, int, float, float, int, float[2]) { return 0; }
 int ResourceMgr_GetDinSwordGiProfileForGame(const char*, const char*) { return 0; }
+int ResourceMgr_GetRewardSurfaceForGame(const char*, const char*, NeiGi::Mesh*) {
+    assert(false && "mask shimmer fixture must not query reward geometry"); return 0;
+}
 #ifdef HOST_MM
 Color_RGBA8 CosmeticEditor_GetChangedColor(u8, u8, u8, u8, const char*) {
     assert(false && "mask fixture unexpectedly selected a Din layer"); return {};
@@ -136,6 +147,7 @@ static void GetItem_DrawBottleShimmer(PlayState*, s16) { assert(false); }
 #endif
 #include "ComboMaskShimmer.h"
 #include "ComboItemEffectColors.h"
+#include "ComboBottleContents.h"
 /* PRODUCTION_FOREIGN_LINKAGE */
 using NeiGi::Kind;
 static bool HasResource(const char*) { return false; }
@@ -152,6 +164,7 @@ extern "C" {
 #define Gfx_SetupDL_25Xlu Gfx_SetupDL25_Xlu
 #define Matrix_NewMtx(ctx, file, line) Matrix_Finalize(ctx)
 #define Gfx_SetupDL_25Opa Gfx_SetupDL25_Opa
+#define Gfx_SetupDL_26Opa Gfx_SetupDL26_Opa
 #define NEI_GI_ROTATE_Y Matrix_RotateYF
 #define Matrix_RotateZ Matrix_RotateZF
 #endif
@@ -160,6 +173,7 @@ extern "C" {
 #undef Gfx_SetupDL_25Xlu
 #undef Matrix_NewMtx
 #undef Gfx_SetupDL_25Opa
+#undef Gfx_SetupDL_26Opa
 #undef NEI_GI_ROTATE_Y
 #undef Matrix_RotateZ
 #endif
@@ -239,11 +253,11 @@ static std::vector<Vtx> ExpandedVertices(bool foreign, const char* owner = "mm")
     return result;
 }
 extern "C" void Fixture_DrawCShimmer(PlayState*, const uint8_t color[4]);
-static std::vector<Vtx> Check(const uint8_t color[4], bool foreign, const char* owner = "mm") {
+static std::vector<Vtx> Check(const uint8_t color[4], bool foreign, const char* owner = "mm", Kind palette = Kind::Neutral) {
     assert(depth == 0 && stack.empty() && transform.scale == 1 && transform.x == 0 && transform.y == 0 && transform.z == 0);
     assert(sparkleTransforms.empty());
     const auto actual = ExpandedVertices(foreign, owner);
-    const auto expected = NeiGi::SampleShimmer(play.gameplayFrames, true, NeiGi_CameraBasis(&play));
+    const auto expected = NeiGi::SampleShimmer(play.gameplayFrames, true, NeiGi_CameraBasis(&play), palette);
     assert(actual.size() == expected.count && actual.size() == 360);
     const bool ordinary = color[0] == 220 && color[1] == 225 && color[2] == 240;
     const bool dark = color[0] == 0 && color[1] == 0 && color[2] == 0;
@@ -254,7 +268,7 @@ static std::vector<Vtx> Check(const uint8_t color[4], bool foreign, const char* 
         assert(actual[i].v.ob[1] == std::lround(vertex.p.y * 16));
         assert(actual[i].v.ob[2] == std::lround(vertex.p.z * 16));
         uint32_t rgb = vertex.rgb;
-        if (!ordinary) rgb = vertex.rgb == 0xFFFFFF ? (dark ? 0x505060 : 0xFFFFFF) : tint;
+        if (palette == Kind::Neutral && !ordinary) rgb = vertex.rgb == 0xFFFFFF ? (dark ? 0x505060 : 0xFFFFFF) : tint;
         assert(actual[i].v.cn[0] == (rgb >> 16));
         assert(actual[i].v.cn[1] == ((rgb >> 8) & 255));
         assert(actual[i].v.cn[2] == (rgb & 255));
@@ -269,6 +283,47 @@ static std::vector<Vtx> Check(const uint8_t color[4], bool foreign, const char* 
     return actual;
 }
 int main() {
+    const uint8_t mmMaskColors[24][3] = {
+        {220,65,65},{95,70,140},{64,144,255},{135,95,205},
+        {245,145,205},{50,220,90},{255,200,55},{220,225,240},
+        {255,220,80},{90,205,95},{205,125,80},{240,64,64},
+        {220,185,145},{175,180,220},{135,95,205},{245,165,205},
+        {235,80,85},{64,144,255},{230,145,85},{225,210,155},
+        {235,190,75},{215,220,200},{205,105,65},{0,0,0}
+    };
+#ifdef HOST_MM
+    const int nativeMasks[24]={GID_MASK_POSTMAN,GID_MASK_ALL_NIGHT,GID_MASK_BLAST,GID_MASK_STONE,
+        GID_MASK_GREAT_FAIRY,GID_MASK_DEKU,GID_MASK_KEATON,GID_MASK_BREMEN,GID_MASK_BUNNY,GID_MASK_DON_GERO,
+        GID_MASK_SCENTS,GID_MASK_GORON,GID_MASK_ROMANI,GID_MASK_CIRCUS_LEADER,GID_MASK_KAFEIS_MASK,GID_MASK_COUPLE,
+        GID_MASK_TRUTH,GID_MASK_ZORA,GID_MASK_KAMARO,GID_MASK_GIBDO,GID_MASK_GARO,GID_MASK_CAPTAIN,GID_MASK_GIANT,
+        GID_MASK_FIERCE_DEITY};
+#endif
+    for(int mask=0;mask<24;++mask) {
+        uint8_t color[4];assert(ComboMmMaskShimmerColor(mask,color));
+        assert(!memcmp(color,mmMaskColors[mask],3)&&color[3]==255);
+#ifdef HOST_MM
+        uint8_t native[4];assert(GetItem_GetShimmerColor(nativeMasks[mask],native));
+        assert(!memcmp(color,native,4));
+#endif
+        Reset(47);ComboDrawMaskShimmer(&play,nullptr,color,"mm");Check(color,true);
+    }
+    const uint8_t ootMaskColors[9][3] = {
+        {255,200,55},{220,215,180},{155,100,70},{255,220,80},{215,150,85},
+        {100,180,230},{230,105,70},{235,80,85},{230,60,60}
+    };
+#ifndef HOST_MM
+    const int nativeMasks[8]={GID_MASK_KEATON,GID_MASK_SKULL,GID_MASK_SPOOKY,GID_MASK_BUNNY,GID_MASK_GORON,
+        GID_MASK_ZORA,GID_MASK_GERUDO,GID_MASK_TRUTH};
+#endif
+    for(int mask=0;mask<9;++mask) {
+        uint8_t color[4];assert(ComboOotMaskShimmerColor(mask,color));
+        assert(!memcmp(color,ootMaskColors[mask],3)&&color[3]==255);
+#ifndef HOST_MM
+        if(mask<8){uint8_t native[4];assert(GetItem_GetShimmerColor(nativeMasks[mask],native));assert(!memcmp(color,native,4));}
+#endif
+        Reset(47);ComboDrawMaskShimmer(&play,nullptr,color,"oot");Check(color,true,"oot");
+    }
+    puts("PASS complete 24 MM/9 OoT mask palettes and foreign emitted vertices, including Blast blue/white and Stone purple");
     for (int season = 1; season <= 4; ++season) {
         Reset(47);
 #ifdef HOST_MM
@@ -309,14 +364,19 @@ int main() {
     for (int id = 0; id < 256; ++id) {
         uint8_t color[4]{};
         if (!GetItem_GetShimmerColor(id, color)) continue;
+        const auto palette =
+#ifdef HOST_MM
+            id == GID_CHATEAU ? Kind::ChateauRomani :
+#endif
+            Kind::Neutral;
         ++eligible;
-        Reset(47); GetItem_Draw(&play, id); auto first = Check(color, false); assert(paths.size() == 1);
+        Reset(47); GetItem_Draw(&play, id); auto first = Check(color, false, "mm", palette); assert(paths.size() == 1);
         Reset(47); GetItem_Draw(&play, id);
-        auto second = Check(color, false);
+        auto second = Check(color, false, "mm", palette);
         assert(first.size() == second.size());
         for (size_t i = 0; i < first.size(); ++i) assert(!memcmp(&first[i], &second[i], sizeof(Vtx)));
         missingSparkle = true; Reset(47); GetItem_Draw(&play, id);
-        Check(color, false); assert(resourceLoads == 0);
+        Check(color, false, "mm", palette); assert(resourceLoads == 0);
         missingSparkle = false;
         allocationFailure = true; Reset(47); GetItem_Draw(&play, id);
         assert(paths.size() == 1 && vertexLoads.empty() && depth == 0 && stack.empty());
@@ -324,7 +384,9 @@ int main() {
         allocationFailure = false;
     }
 #ifdef HOST_MM
-    assert(eligible == 31); // 24 inventory masks, Sun Mask GI, four remains and two bottled-fairy rows.
+    assert(eligible == 36); // Masks/remains, fairies, receipt contents, Seahorse and Chateau.
+    uint8_t sunMask[4];const uint8_t sunGold[4]={255,205,70,255};
+    assert(GetItem_GetShimmerColor(GID_MASK_SUN,sunMask)&&!memcmp(sunMask,sunGold,4));
     for (int id : {GID_FAIRY,GID_FAIRY_2}) {
         uint8_t pink[4]{};
         const uint8_t expectedPink[4]={255,160,235,255};
@@ -345,6 +407,39 @@ int main() {
     assert(blueBottle[0]==100 && blueBottle[1]==160 && blueBottle[2]==255);
     assert(eligible > 8);
 #endif
+    for (int profile : {CW_SHIMMER_MUSHROOM,CW_SHIMMER_PRINCESS,CW_SHIMMER_GOLD_DUST,CW_SHIMMER_FAIRY,CW_SHIMMER_SEAHORSE}) {
+        uint8_t color[4]; assert(ComboBottleShimmer_Color(profile,color));
+        Reset(47); NeiGi_DrawShimmerOverlay(&play,color,nullptr); Check(color,false);
+    }
+    for (int frame : {0,27,719,65535}) {
+        Reset(frame); ComboBottleShimmer_DrawMotes(&play,CW_SHIMMER_FAIRY);
+        const auto actual=ExpandedVertices(false);
+        const auto expected=NeiGi::SampleBottleMotes(CW_SHIMMER_FAIRY,frame,true,NeiGi_CameraBasis(&play));
+        assert(actual.size()==192 && actual.size()==expected.count && resourceLoads==0);
+        for(size_t i=0;i<actual.size();++i) {
+            const auto& v=expected.vertices[i];
+            assert(actual[i].v.ob[0]==std::lround(v.p.x*16) && actual[i].v.ob[1]==std::lround(v.p.y*16) && actual[i].v.ob[2]==std::lround(v.p.z*16));
+            assert(actual[i].v.cn[0]==255 && actual[i].v.cn[1]==160 && actual[i].v.cn[2]==235 && actual[i].v.cn[3]==v.alpha);
+        }
+        assert(depth==0 && stack.empty() && transform.scale==1 && transform.x==0 && transform.y==0 && transform.z==0);
+        uintptr_t prim=0,env=0;
+        for(Gfx* cmd=xlu;cmd<gfx.polyXlu.p;++cmd) {
+            if((cmd->words.w0>>24)==G_SETPRIMCOLOR)prim=cmd->words.w1;
+            if((cmd->words.w0>>24)==G_SETENVCOLOR)env=cmd->words.w1;
+        }
+        assert(prim==0xffffffff && env==0xffffffff);
+    }
+    for(int profile:{0,int(CW_SHIMMER_PRINCESS),int(CW_SHIMMER_SEAHORSE)}) {
+        Reset(47);ComboBottleShimmer_DrawMotes(&play,profile);assert(gfx.polyXlu.p==xlu && vertexLoads.empty());
+    }
+    Reset(47);allocationFailure=true;ComboBottleShimmer_DrawMotes(&play,CW_SHIMMER_FAIRY);
+    assert(ExpandedVertices(false).empty() && depth==0 && stack.empty());allocationFailure=false;
+    for(int remaining=0;remaining<64;++remaining) {
+        Reset(47);gfx.polyOpa.d=opa+remaining;gfx.polyXlu.d=xlu+remaining;
+        ComboBottleShimmer_DrawMotes(&play,CW_SHIMMER_FAIRY);
+        assert(gfx.polyOpa.p<=gfx.polyOpa.d && gfx.polyXlu.p<=gfx.polyXlu.d && depth==0 && stack.empty());
+    }
+    puts("PASS exact bottle five-star colors and real-GBI fairy motes, state/matrix restoration, failed allocation and arena boundaries");
     for (int profile = 0; profile < 9; ++profile) {
         uint8_t color[4]; ComboMaskShimmerColor(profile, color);
         Reset(47); ComboDrawMaskShimmer(&play, "__OTR__@mm:objects/gameplay_keep/gEffSparklesDL", color, "mm"); Check(color, true);

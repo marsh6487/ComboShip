@@ -1,5 +1,6 @@
 #include <initializer_list>
 #include <libultraship/bridge/resourcebridge.h>
+#include <libultraship/bridge/consolevariablebridge.h>
 #include "objects/object_link_boy/object_link_boy.h"
 #include "objects/object_link_child/object_link_child.h"
 #include "objects/object_custom_equip/object_custom_equip.h"
@@ -8,6 +9,8 @@
 #include "soh/ShipInit.hpp"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/customequipment.h"
+#include "din_fire_sword.h"
+#include "../../../combo/render/sword_element_aura_identity.h"
 // Skijer's NEI: needed so OPEN_DISPS/CLOSE_DISPS in the draw handler get C linkage (else LNK2001)
 #include "soh/frame_interpolation.h"
 
@@ -266,6 +269,13 @@ static void BuildHandItemDL(PlayState* play, Gfx** dList, Gfx* hand, Gfx* item, 
     }
 }
 
+static void BuildSwordHandItemDL(PlayState* play, Player* player, Gfx** dList, Gfx* hand, Gfx* item,
+                                 const char* resource, bool counterScaleHand) {
+    BuildHandItemDL(play, dList, hand, item, counterScaleHand);
+    const int model = SwordAura_ResourceModel(resource, item, ResourceGetSizeByName(resource) / sizeof(Gfx));
+    DinFireSword_SetHandModel(player, *dList, model);
+}
+
 static bool IsScalingAdultItemAsChild() {
     return CVarGetInteger(CVAR_ENHANCEMENT("EquipmentAlwaysVisible"), 0) &&
            CVarGetInteger(CVAR_ENHANCEMENT("ScaleAdultEquipmentAsChild"), 0) && !LINK_IS_ADULT;
@@ -428,7 +438,7 @@ static void RegisterCustomEquipment() {
                                                ((gSaveContext.equips.buttonItems[0] != ITEM_SWORD_KOKIRI &&
                                                  lht == PLAYER_MODELTYPE_LH_SWORD) ||
                                                 lht == PLAYER_MODELTYPE_LH_BGS || lht == PLAYER_MODELTYPE_LH_HAMMER);
-                        BuildHandItemDL(play, dList, resolvedHand, resolvedCustom, scaleHand);
+                        BuildSwordHandItemDL(play, player, dList, resolvedHand, resolvedCustom, customDL, scaleHand);
                     }
                 }
                 break;
@@ -718,7 +728,7 @@ static void RegisterCustomEquipment() {
             gSPDisplayList(play->state.gfxCtx->polyXlu.p++, resolvedBottle);
 
             if (player->itemAction >= PLAYER_IA_BOTTLE &&
-                player->itemAction < PLAYER_IA_BOTTLE + std::size(bottleContentDLs)) {
+                player->itemAction < static_cast<int>(PLAYER_IA_BOTTLE + std::size(bottleContentDLs))) {
                 contentDL = bottleContentDLs[player->itemAction - PLAYER_IA_BOTTLE];
             }
 

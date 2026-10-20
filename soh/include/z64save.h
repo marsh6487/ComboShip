@@ -4,7 +4,7 @@
 #include <libultraship/libultra.h>
 #include "z64math.h"
 #include "z64audio.h"
-#include "soh/Enhancements/randomizer/randomizerTypes.h"
+#include "soh/Enhancements/randomizer/randomizerEnums.h"
 #include "soh/Enhancements/gameplaystats.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance.h"
 #include "soh/Enhancements/boss-rush/BossRush.h"
@@ -236,6 +236,28 @@ typedef struct ShipRandomizerSaveContextData {
     u8 climbSpeedUpgrades;
     u8 pushSpeedUpgrades;
     u8 comboNativeMagicLevel; // MM native magic capacity floor in an RPG seed (0/1/2)
+    s8 silverShadowBlades;
+    s8 silverShadowPit;
+    s8 silverShadowSpikes;
+    s8 silverSpiritChild;
+    s8 silverSpiritSun;
+    s8 silverSpiritBoulders;
+    s8 silverBotw;
+    s8 silverIceCavernBlades;
+    s8 silverIceCavernBlock;
+    s8 silverGtgSlope;
+    s8 silverGtgLava;
+    s8 silverGtgWater;
+    s8 silverGanonLight;
+    s8 silverGanonForest;
+    s8 silverGanonFire;
+    s8 silverGanonSpirit;
+    s8 silverMqDodongosCavern;
+    s8 silverMqShadowInvisibleBlades;
+    s8 silverMqSpiritLobby;
+    s8 silverMqSpiritBigWall;
+    s8 silverMqGanonWater;
+    s8 silverMqGanonShadow;
 } ShipRandomizerSaveContextData;
 
 typedef struct ShipBossRushSaveContextData {
@@ -403,19 +425,20 @@ typedef enum {
     /* 01 */ QUEST_MASTER,
     /* 02 */ QUEST_RANDOMIZER,
     /* 03 */ QUEST_BOSSRUSH,
-    /* 04 */ QUEST_OOTXMM, // Fleet Ship Combo (OoT x MM): a randomizer save paired with a MM slot
+    /* 04 */ QUEST_OOTXMM, // Fleet Ship Combo save IDs remain stable
+    /* 05 */ QUEST_SPEEDRUN,
+    /* 06 */ QUEST_SPEEDRUN_MASTER,
 } Quest;
 
-#define IS_VANILLA (gSaveContext.ship.quest.id == QUEST_NORMAL)
-#define IS_MASTER_QUEST (gSaveContext.ship.quest.id == QUEST_MASTER)
-// A COMBO (OoTxMM) save IS a randomizer run (it carries a generated seed) paired with a MM slot, so
-// IS_RANDO is TRUE for it too — every existing rando code path applies unchanged. Use IS_OOTXMM only
-// for the combo-SPECIFIC bits (file-select label, save-pair creation, which game boots). NOTE: code
-// that compares `quest.id == QUEST_RANDOMIZER` DIRECTLY (not via IS_RANDO) won't catch combo — those
-// few spots are the residual audit if combo ever misbehaves like plain rando.
+#define IS_VANILLA (gSaveContext.ship.quest.id == QUEST_NORMAL || gSaveContext.ship.quest.id == QUEST_SPEEDRUN)
+#define IS_MASTER_QUEST \
+    (gSaveContext.ship.quest.id == QUEST_MASTER || gSaveContext.ship.quest.id == QUEST_SPEEDRUN_MASTER)
+// Combo saves carry a generated seed and use every randomizer code path.
 #define IS_OOTXMM (gSaveContext.ship.quest.id == QUEST_OOTXMM)
 #define IS_RANDO (gSaveContext.ship.quest.id == QUEST_RANDOMIZER || IS_OOTXMM)
 #define IS_BOSS_RUSH (gSaveContext.ship.quest.id == QUEST_BOSSRUSH)
+#define IS_SPEEDRUN \
+    (gSaveContext.ship.quest.id == QUEST_SPEEDRUN || gSaveContext.ship.quest.id == QUEST_SPEEDRUN_MASTER)
 
 // Extended-button real (u16) id for a button slot marked ITEM_EXT_BUTTON in equips.buttonItems.
 // `btn` uses the flat buttonItems indexing (0 = B, 1-3 = C, 4-7 = D-pad) — OoT has no form dimension.

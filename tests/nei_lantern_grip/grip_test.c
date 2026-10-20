@@ -3,6 +3,7 @@
 #include "din_fire_sword.h"
 #include "mods/items/custom_items.h"
 #include "mods/pak_loader/pak_loader.h"
+#include "mods/transformation_masks/transformation_masks.h"
 #include "objects/object_link_boy/object_link_boy.h"
 #include "objects/object_link_child/object_link_child.h"
 #include <assert.h>
@@ -16,10 +17,28 @@ static Gfx opened[1], nativeHand[1], pakOpen[1], pakFist[1], altFist[1];
 Gfx* gPlayerLeftHandClosedDLs[] = {(Gfx*)gLinkAdultLeftHandClosedNearDL, (Gfx*)gLinkChildLeftFistNearDL,
                                         (Gfx*)gLinkAdultLeftHandClosedFarDL, (Gfx*)gLinkChildLeftFistFarDL};
 static Gfx* sPlayerRightHandClosedDLs[] = {nativeHand,nativeHand,nativeHand,nativeHand};
+Gfx* gPlayerLeftHandOpenDLs[] = {nativeHand,nativeHand,nativeHand,nativeHand};
+static Gfx* sPlayerRightHandOpenDLs[] = {nativeHand,nativeHand,nativeHand,nativeHand};
 static int sDListsLodOffset, sLeftHandType, sRightHandType, pak, alt, requested;
 static Color_RGB8 sPlayerBodyEnvColor;
 void* DinFireSword_HandDL(PlayState* play, Player* player, void* hand, u8 r, u8 g, u8 b) {
     return NULL; // No progressive fire resources in this lantern fixture.
+}
+void DinFireSword_CopyHandModel(Player* player, void* source, void* destination) {
+    assert(0 && "Lantern grip must not copy a sword compound");
+}
+// The real final limb stage also references Four Sword. This fixture owns only
+// the lantern; any sword application or compound allocation is a regression.
+u8 FourSword_IsEquipped(void) {
+    return 0;
+}
+u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* hand, Player* player, u8 r, u8 g, u8 b) {
+    assert(0 && "Lantern grip must not apply a Four Sword model");
+    return 0;
+}
+void* Graph_Alloc(GraphicsContext* gfxCtx, size_t size) {
+    assert(0 && "Lantern grip must not allocate a sword compound");
+    return NULL;
 }
 #define VB_PLAYER_OVERRIDE_LIMB_DRAW 0
 static s32 GameInteractor_Should(int flag,int value,...) { return value; }
@@ -35,6 +54,7 @@ static Gfx* Player_ResolveLimbDLForDummyOrLocal(void* path) {
     ++requested; return alt ? altFist : nativeHand;
 }
 u8 TransformMasks_IsTransformedAny(void) { return 0; }
+u8 MmForm_IsNativeTransformationPlaying(PlayState* play, Player* player) { return 0; }
 static s32 NeiArticulated_UsesSwitchHook(Player* p) { return 0; }
 static void NeiArticulated_ApplySwitchHookHand(PlayState* c, Player* p, Gfx** dl, Gfx* hand) {}
 static void Player_ApplyTimePedestalSword(PlayState* c, Player* p, s32 limb, Gfx** dl, Vec3s* rot) {}

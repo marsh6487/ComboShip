@@ -8,6 +8,11 @@
  */
 
 #include "global.h"
+#ifdef COMBO_BUILD
+#include "gameplay/MagicMirrorPlayer.h"
+#include "2s2h/Enhancements/Gameplay/BlackMarket.h"
+#endif
+#include "sword_element_message.h"
 #include <libultraship/log/luslog.h> // 2S2H [Port] lusprintf (LUS 464 exports it via API_EXPORT)
 #include "z64horse.h"
 #include "z64malloc.h"
@@ -568,7 +573,8 @@ Input* sPlayerControlInput;
 s32 sPlayerUseHeldItem;              // When true, the current held item is used. Is reset to false every frame.
 s32 sPlayerHeldItemButtonIsHeldDown; // Indicates if the button for the current held item is held down.
 AdjLightSettings D_80862B50;         // backup of lay->envCtx.adjLightSettings
-s32 D_80862B6C;                      // this->skelAnime.movementFlags // sPlayerSkelMoveFlags?
+static s16 sPlayerNativeLightningAmbient[3];
+s32 D_80862B6C; // this->skelAnime.movementFlags // sPlayerSkelMoveFlags?
 
 bool func_8082DA90(PlayState* play) {
     return (play->transitionTrigger != TRANS_TRIGGER_OFF) || (play->transitionMode != TRANS_MODE_OFF);
@@ -1807,6 +1813,9 @@ void Player_AnimSfx_PlayVoice(Player* this, u16 sfxId) {
     if (this->currentMask == PLAYER_MASK_GIANT) {
         Audio_PlaySfx_GiantsMask(&this->actor.projectedPos, sfxId);
     } else if (this->actor.id == ACTOR_PLAYER) {
+        if (WolfLinkHost_PlayClimbVoice(this, sfxId)) {
+            return;
+        }
         if (this->currentMask == PLAYER_MASK_SCENTS) {
             sfxOffset = SFX_VOICE_BANK_SIZE * 7;
         } else {
@@ -1858,6 +1867,8 @@ void Player_AnimSfx_PlayFloorWalk(Player* this, f32 freqVolumeLerp) {
 
     if (this->currentMask == PLAYER_MASK_GIANT) {
         sfxId = NA_SE_PL_GIANT_WALK;
+    } else if (WolfLinkHost_PlayFootstep(this)) {
+        return;
     } else if (VanillaTB_IsIronBoots()) {
         // Skijer's NEI: Iron boots — metallic clank underfoot regardless of floor type (OoT plays
         // NA_SE_PL_WALK_HEAVYBOOTS; MM has no walk-heavyboots sfx, so NA_SE_PL_WALK_METAL1 is the 1:1
@@ -2394,7 +2405,8 @@ GetItemEntry sGetItemTable[GI_MAX - 1] = {
     // GI_FAIRY
     GET_ITEM(ITEM_FAIRY, OBJECT_GI_BOTTLE_04, GID_FAIRY, 0x5E, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0), CHEST_ANIM_LONG),
     // GI_DEKU_PRINCESS
-    GET_ITEM(ITEM_FAIRY, OBJECT_GI_BOTTLE, GID_BOTTLE, 0x5F, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0), CHEST_ANIM_LONG),
+    GET_ITEM(ITEM_FAIRY, OBJECT_GI_BOTTLE, GID_BOTTLE_DEKU_PRINCESS, 0x5F, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0),
+             CHEST_ANIM_LONG),
     // GI_MILK_BOTTLE
     GET_ITEM(ITEM_MILK_BOTTLE, OBJECT_GI_MILK, GID_MILK, 0x60, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0), CHEST_ANIM_LONG),
     // GI_MILK_HALF
@@ -2417,10 +2429,10 @@ GetItemEntry sGetItemTable[GI_MAX - 1] = {
     GET_ITEM(ITEM_ZORA_EGG, OBJECT_GI_BOTTLE_15, GID_ZORA_EGG, 0x69, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0),
              CHEST_ANIM_LONG),
     // GI_GOLD_DUST
-    GET_ITEM(ITEM_GOLD_DUST, OBJECT_GI_BOTTLE_16, GID_SEAHORSE, 0x6A, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0),
+    GET_ITEM(ITEM_GOLD_DUST, OBJECT_GI_BOTTLE_16, GID_BOTTLE_GOLD_DUST, 0x6A, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0),
              CHEST_ANIM_LONG),
     // GI_MUSHROOM
-    GET_ITEM(ITEM_MUSHROOM, OBJECT_GI_MAGICMUSHROOM, GID_MUSHROOM, 0x6B, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0),
+    GET_ITEM(ITEM_MUSHROOM, OBJECT_GI_MAGICMUSHROOM, GID_BOTTLE_MUSHROOM, 0x6B, GIFIELD(GIFIELD_NO_COLLECTIBLE, 0),
              CHEST_ANIM_LONG),
     // GI_6C
     GET_ITEM(ITEM_NONE, OBJECT_UNSET_0, GID_NONE, 0x6C, GIFIELD(0, ITEM00_RUPEE_GREEN), 0),
@@ -4242,6 +4254,10 @@ void Player_ProcessItemButtons(Player* this, PlayState* play) {
                 }
             }
             // #endregion
+        } else if (i != EQUIP_SLOT_B && item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_BOOTS_3) {
+            // C/D equipment presses toggle the slot without replacing the held item.
+            // B carries the equipped extended sword itself and follows normal sword use.
+            ExtEquip_ToggleFromCButton(item);
         } else if (item == ITEM_F0) {
             if (this->blastMaskTimer == 0) {
                 EnBom* bomb = (EnBom*)Actor_Spawn(&play->actorCtx, play, ACTOR_EN_BOM, this->actor.focus.pos.x,
@@ -5006,6 +5022,11 @@ void Player_UseItem(PlayState* play, Player* this, ItemId item) {
     // Net borrows the Kokiri Sword action, but its model/capture identity is heldItemId.
     // An accepted Net <-> sword change must still initialize the requested identity.
     bool netItemChanged = (item != this->heldItemId) && ((item == ITEM_NET) || (this->heldItemId == ITEM_NET));
+    // The extended swords share Kokiri's action, but their render/behavior identity is the item ID.
+    // A same-action B switch must still pass through the accepted native item-change path.
+    bool extSwordItemChanged =
+        (item != this->heldItemId) && ((item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_SWORD_3) ||
+                                       (this->heldItemId >= ITEM_EXT_SWORD_1 && this->heldItemId <= ITEM_EXT_SWORD_3));
 
     // NEI-DBG: mask-wear tracing (remove after diagnosis)
     if (item != ITEM_NONE && item != ITEM_FD) {
@@ -5111,7 +5132,7 @@ void Player_UseItem(PlayState* play, Player* this, ItemId item) {
                 }
                 gSaveContext.save.equippedMask = this->currentMask;
             }
-        } else if ((itemAction != this->heldItemAction) || netItemChanged ||
+        } else if ((itemAction != this->heldItemAction) || netItemChanged || extSwordItemChanged ||
                    ((this->heldActor == NULL) && (Player_ExplosiveFromIA(this, itemAction) > PLAYER_EXPLOSIVE_NONE))) {
             u8 nextAnimType;
 
@@ -5129,7 +5150,7 @@ void Player_UseItem(PlayState* play, Player* this, ItemId item) {
                 this->stateFlags3 |= PLAYER_STATE3_START_CHANGING_HELD_ITEM;
             } else {
                 // Init new held item for use
-                if (netItemChanged) {
+                if (netItemChanged || extSwordItemChanged) {
                     this->heldItemId = item;
                 }
                 Player_DestroyHookshot(this);
@@ -6048,13 +6069,19 @@ void func_808332A0(PlayState* play, Player* this, s32 magicCost, s32 isSwordBeam
         // sits OUTSIDE the contiguous sword block, so the raw (heldItemAction - PLAYER_IA_SWORD_KOKIRI)
         // type param would be 0x58 and index EnMThunder's sDamages[8] out of bounds. Remap Master to
         // the Gilded sword type inline (its spin-attack / sword-beam behavior mirrors Gilded).
+        // Rods retain their Deku Stick melee classification, but EnMThunder only accepts sword
+        // types 0..3. Their custom actions must use the valid two-handed sword spin type here.
+        s32 spinItemAction = this->heldItemAction;
+        if (spinItemAction == PLAYER_IA_SWORD_MASTER) {
+            spinItemAction = PLAYER_IA_SWORD_GILDED;
+        } else if ((spinItemAction == PLAYER_IA_ROD_FIRE) || (spinItemAction == PLAYER_IA_ROD_ICE) ||
+                   (spinItemAction == PLAYER_IA_ROD_LIGHT)) {
+            spinItemAction = PLAYER_IA_SWORD_TWO_HANDED;
+        }
         gNeiMasterBeamFree = isMasterBeam; // let EnMThunder_Init skip the magic gate for the free beam
-        thunder = Actor_Spawn(
-            &play->actorCtx, play, ACTOR_EN_M_THUNDER, this->bodyPartsPos[PLAYER_BODYPART_WAIST].x,
-            this->bodyPartsPos[PLAYER_BODYPART_WAIST].y, this->bodyPartsPos[PLAYER_BODYPART_WAIST].z, pitch, 0, 0,
-            (((this->heldItemAction == PLAYER_IA_SWORD_MASTER) ? PLAYER_IA_SWORD_GILDED : this->heldItemAction) -
-             PLAYER_IA_SWORD_KOKIRI) |
-                magicCost);
+        thunder = Actor_Spawn(&play->actorCtx, play, ACTOR_EN_M_THUNDER, this->bodyPartsPos[PLAYER_BODYPART_WAIST].x,
+                              this->bodyPartsPos[PLAYER_BODYPART_WAIST].y, this->bodyPartsPos[PLAYER_BODYPART_WAIST].z,
+                              pitch, 0, 0, (spinItemAction - PLAYER_IA_SWORD_KOKIRI) | magicCost);
         gNeiMasterBeamFree = false;
 
         if ((thunder != NULL) && isSwordBeam && !isMasterBeam) {
@@ -7415,7 +7442,7 @@ PlayerAnimationHeader* D_8085D124[] = {
  * PLAYER_DOORTYPE_FAKE:
  * PLAYER_DOORTYPE_PROXIMITY: EnDoor
  */
-void Player_Door_Knob(PlayState* play, Player* this, Actor* door) {
+s32 Player_Door_Knob(PlayState* play, Player* this, Actor* door) {
     s32 temp = this->transformation - 1;
     PlayerAnimationHeader* anim;
     f32 temp_fv0; // sp5C
@@ -7467,6 +7494,21 @@ void Player_Door_Knob(PlayState* play, Player* this, Actor* door) {
                                  ANIM_FLAG_200);
     knobDoor->requestOpen = true;
     if (this->doorType != PLAYER_DOORTYPE_FAKE) {
+#ifdef COMBO_BUILD
+        s32 marketDoor = ComboBlackMarket_TryDoorEntrance(play, &knobDoor->dyna.actor);
+        if (marketDoor == COMBO_BLACK_MARKET_DOOR_ENTERED) {
+            this->stateFlags1 |= PLAYER_STATE1_20000000;
+            gSaveContext.entranceSpeed = 2.0f;
+            return true;
+        }
+        if (marketDoor == COMBO_BLACK_MARKET_DOOR_BLOCKED) {
+            knobDoor->requestOpen = false;
+            Player_StopCutscene(this);
+            func_80839E74(this, play);
+            Audio_PlaySfx(NA_SE_SY_ERROR);
+            return false;
+        }
+#endif
         CollisionPoly* poly;
         s32 bgId;
         Vec3f pos;
@@ -7497,6 +7539,7 @@ void Player_Door_Knob(PlayState* play, Player* this, Actor* door) {
             }
         }
     }
+    return true;
 }
 
 // door stuff
@@ -7527,7 +7570,9 @@ s32 Player_ActionHandler_1(Player* this, PlayState* play) {
             } else if (this->doorType == PLAYER_DOORTYPE_SLIDING) {
                 Player_Door_Sliding(play, this, doorActor);
             } else {
-                Player_Door_Knob(play, this, doorActor);
+                if (!Player_Door_Knob(play, this, doorActor)) {
+                    return true; // A rejected custom door must not start the global door cutscene below.
+                }
             }
 
             if (this->actor.category == ACTORCAT_PLAYER) {
@@ -8419,6 +8464,7 @@ void func_808388B8(PlayState* play, Player* this, PlayerTransformation playerFor
     this->stateFlags1 |= PLAYER_STATE1_2;
 
     D_80862B50 = play->envCtx.adjLightSettings;
+    Environment_GetNativeLightningAmbient(sPlayerNativeLightningAmbient);
     this->actor.velocity.y = 0.0f;
     Actor_DeactivateLens(play);
 }
@@ -9266,6 +9312,12 @@ void func_8083A548(Player* this) {
 }
 
 s32 Player_ActionHandler_8(Player* this, PlayState* play) {
+    // Rods own their held-button threshold and charged release in item_rod_*.c. A short tap
+    // during the native sword recovery window must not install the vanilla charge action.
+    if ((this->heldItemAction == PLAYER_IA_ROD_FIRE) || (this->heldItemAction == PLAYER_IA_ROD_ICE) ||
+        (this->heldItemAction == PLAYER_IA_ROD_LIGHT)) {
+        return false;
+    }
     if (GameInteractor_Should(VB_CHECK_HELD_ITEM_BUTTON_PRESS, CHECK_BTN_ALL(sPlayerControlInput->cur.button, BTN_B),
                               sDpadItemButtons, sPlayerItemButtons)) {
         if (!(this->stateFlags1 & PLAYER_STATE1_400000) &&
@@ -9418,6 +9470,7 @@ void func_8083A98C(Actor* thisx, PlayState* play2) {
 
             // Pitch:
             inputY = sPlayerControlInput->rel.stick_y * 4;
+            inputY *= -GameInteractor_InvertControl(GI_INVERT_TELESCOPE_Y);
             // Add input, clamped to prevent turning too fast
             thisx->focus.rot.x += CLAMP(inputY, -0x12C, 0x12C);
             // Prevent looking too far up or down
@@ -14101,6 +14154,59 @@ s32 Player_UpdateNoclip(Player* this, PlayState* play) {
 // mods/equipment/behaviors/equip_kite_shield.c. Mirrors the SoH placement. Skijer's NEI
 #include "mods/equipment/kite_surf.c"
 
+static void Player_UpdateCustomItems(Player* this, PlayState* play) {
+    u16 toggleButton = 0;
+    ItemId item = ITEM_NONE;
+    s32 button;
+
+    // Match native B/C priority before considering D-pad equipment. Custom tools run first
+    // and otherwise treat a clothing/sword selection as an instruction to put themselves away.
+    for (button = EQUIP_SLOT_B; button < ARRAY_COUNT(sPlayerItemButtons); button++) {
+        if (play->state.input[0].press.button & sPlayerItemButtons[button]) {
+            if (button != EQUIP_SLOT_B) {
+                item = C_BTN_ITEM(button);
+                if (item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_BOOTS_3) {
+                    item = Player_GetItemOnButton(play, this, button);
+                    toggleButton = sPlayerItemButtons[button];
+                }
+            }
+            break;
+        }
+    }
+    if (button == ARRAY_COUNT(sPlayerItemButtons) && CVarGetInteger("gEnhancements.Dpad.DpadEquips", 0)) {
+        for (button = EQUIP_SLOT_D_RIGHT; button < ARRAY_COUNT(sDpadItemButtons); button++) {
+            if (play->state.input[0].press.button & sDpadItemButtons[button]) {
+                item = DPAD_BTN_ITEM(button);
+                if (item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_BOOTS_3) {
+                    item = Player_Dpad_GetItemOnButton(play, this, button);
+                    toggleButton = sDpadItemButtons[button];
+                }
+                break;
+            }
+        }
+    }
+
+    if (item >= ITEM_EXT_SWORD_1 && item <= ITEM_EXT_BOOTS_3 &&
+        !(TransformMasks_IsTransformedAny() && MmForm_GetCurrentForm() == MM_PLAYER_FORM_PIKACHU)) {
+        s16 equipType = (item - ITEM_EXT_SWORD_1) / 3;
+        u8 index = ((item - ITEM_EXT_SWORD_1) % 3) + 1;
+        if (!ExtEquip_HasItem(equipType, index) || ExtEquip_SlotRetired(equipType, index) ||
+            (ExtEquip_GetCurrent(equipType) != index &&
+             (!ExtEquip_CheckAgeReq(equipType, index) ||
+              (equipType == EQUIP_TYPE_SHIELD && ExtEquip_GetCurrent(EQUIP_TYPE_SWORD) == 3 &&
+               !ExtEquip_TridentAllowsShield(index, 0))))) {
+            toggleButton = 0;
+        }
+    } else {
+        toggleButton = 0;
+    }
+
+    play->state.input[0].press.button &= ~toggleButton;
+    CustomItems_Update(this, play);
+    // Restore only the reserved equipment edge; keep unrelated tool-consumed presses consumed.
+    play->state.input[0].press.button |= toggleButton;
+}
+
 void Player_Update(Actor* thisx, PlayState* play) {
     static Vec3f sDogSpawnPos;
     Player* this = (Player*)thisx;
@@ -14127,7 +14233,7 @@ void Player_Update(Actor* thisx, PlayState* play) {
     // NEI custom-items dispatch: run the per-frame custom item input/logic here, before the
     // vanilla item update (so item C-button presses are handled). Defined in the item TU
     // (custom_items_common.c), which is #included above at mods/items/logic/custom_items.c.
-    CustomItems_Update(this, play);
+    Player_UpdateCustomItems(this, play);
 
     // Skijer's NEI "Pause Play": after the quest page closes itself for a song, this pulls out the
     // ocarina and auto-plays it in-world (state machine in z_kaleido_collect.c; idle no-op otherwise).
@@ -14219,6 +14325,9 @@ void Player_Update(Actor* thisx, PlayState* play) {
                                                 PLAYER_STATE1_GETTING_ITEM | PLAYER_STATE1_IN_ITEM_CS |
                                                 PLAYER_STATE1_CLIMBING_LEDGE | PLAYER_STATE1_HANGING_OFF_LEDGE)) != 0 ||
                           sm64CButtonHeld;
+#ifdef COMBO_BUILD
+    marioYieldToOot |= MagicMirrorPlayer_State(this) != MAGIC_MIRROR_CAST_NONE;
+#endif
     if (Sm64Mario_IsReady()) {
         if (marioYieldToOot) {
             // PAUSE_ACTION_FUNC persists across frames in MM; clear it explicitly
@@ -15321,8 +15430,10 @@ s32 func_808482E0(PlayState* play, Player* this) {
         GetItemEntry* giEntry = &sGetItemTable[this->getItemId - 1];
 
         this->av1.actionVar1 = 1;
+        const u8 swordElementTutorial = SwordElement_MessageElementForPickup(giEntry->itemId);
         Message_StartTextbox(play, giEntry->textId, &this->actor);
         Item_Give(play, giEntry->itemId);
+        SwordElement_MessageAppend(play, swordElementTutorial);
 
         if ((this->getItemId >= GI_MASK_DEKU) && (this->getItemId <= GI_MASK_KAFEIS_MASK)) {
             Audio_PlayFanfare(NA_BGM_GET_NEW_MASK);
@@ -18693,8 +18804,10 @@ void Player_Action_56(Player* this, PlayState* play) {
     s16 sp3C;
     s16 sp3A;
     s8 stickX = sPlayerControlInput->rel.stick_x;
+    s8 stickY = sPlayerControlInput->rel.stick_y;
 
     stickX *= GameInteractor_InvertControl(GI_INVERT_ZORA_SWIM_X);
+    stickY *= -GameInteractor_InvertControl(GI_INVERT_ZORA_SWIM_Y);
 
     this->stateFlags2 |= PLAYER_STATE2_20;
 
@@ -18772,7 +18885,7 @@ void Player_Action_56(Player* this, PlayState* play) {
         }
 
         // Y
-        sp3E = sPlayerControlInput->rel.stick_y * 0xC8;
+        sp3E = stickY * 0xC8;
         if (this->unk_B8C != 0) {
             this->unk_B8C--;
             sp3E = CLAMP_MAX(sp3E, (s16)(this->floorPitch - 0xFA0));
@@ -20364,6 +20477,7 @@ void func_80854EFC(PlayState* play, f32 arg1, struct_8085D848_unk_00* arg2) {
         (TRUNCF_BINANG((var_v1->fogNear - var_t0->fogNear) * arg1) + var_t0->fogNear) -
         play->envCtx.lightSettings.fogNear;
 
+    Environment_ClearNativeLightningAmbient();
     func_80854CD0(arg1, play->envCtx.adjLightSettings.fogColor, var_v1->fogColor, var_t0->fogColor,
                   play->envCtx.lightSettings.fogColor, play->envCtx.adjLightSettings.ambientColor, var_v1->ambientColor,
                   var_t0->ambientColor, play->envCtx.lightSettings.ambientColor,
@@ -20603,6 +20717,7 @@ void Player_Action_87(Player* this, PlayState* play) {
                 this->csId = play->playerCsIds[PLAYER_CS_ID_MASK_TRANSFORMATION];
                 Player_StopCutscene(this);
                 play->envCtx.adjLightSettings = D_80862B50;
+                Environment_RestoreNativeLightningAmbient(sPlayerNativeLightningAmbient);
                 func_8085B384(this, play);
                 return;
             }
@@ -23155,3 +23270,9 @@ s32 func_8085B930(PlayState* play, PlayerAnimationHeader* talkAnim, AnimationMod
                            PLAYER_ANIM_ADJUSTED_SPEED, 0.0f, Animation_GetLastFrame(talkAnim), animMode, -6.0f);
     return true;
 }
+
+#ifdef COMBO_BUILD
+#define COMBO_MAGIC_MIRROR_MM
+#include "gameplay/MagicMirrorPlayer.inc.c"
+#undef COMBO_MAGIC_MIRROR_MM
+#endif

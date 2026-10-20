@@ -16,6 +16,8 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
+#include <unordered_set>
 
 // The single source of truth for custom forms. Asset namespace for each row
 // with a modelName: objects/forms/<modelName>/ inside soh.o2r.
@@ -245,7 +247,21 @@ extern "C" void* CustomForms_ResolveVanillaTexture(const char* vanillaSymbol) {
 
     char path[256];
     std::snprintf(path, sizeof(path), "objects/forms/%s/%s", model, leaf);
+    if (std::strcmp(model, "gerudo") == 0) {
+        if (!ResourceMgr_FileExists(path) && !ResourceMgr_FileAltExists(path))
+            return nullptr;
+        // A raw pixel pointer discards HD texture scale/format metadata. Bind
+        // an OTR path, like native eyes, so G_SETTIMG resolves the full resource.
+        static std::unordered_set<std::string> eyePaths;
+        const auto& stable = *eyePaths.insert(std::string("__OTR__") + path).first;
+        return const_cast<char*>(stable.c_str());
+    }
     return ResourceMgr_LoadTexOrDListByName(path);
+}
+
+extern "C" u8 CustomForms_PreferFaceTextures(void) {
+    const char* model = O2rLoader_GetForcedName();
+    return model != nullptr && std::strcmp(model, "gerudo") == 0;
 }
 
 extern "C" void CustomForms_SetChainedOverride(void* fn) {

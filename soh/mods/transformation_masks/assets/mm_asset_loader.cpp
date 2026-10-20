@@ -1241,7 +1241,8 @@ static std::shared_ptr<Ship::IResource> MmAssets_LoadResourceObjectFromMmArchive
             return nullptr;
         }
 
-        auto resource = resourceManager->GetResourceLoader()->LoadResource(pathStr, file);
+        // Keep metadata aliases and their targets in the same native archive.
+        auto resource = resourceManager->GetResourceLoader()->LoadResource(pathStr, file, nullptr, sMmArchive);
         if (resource) {
             // Keep resource alive in our cache
             sMmResourceCache[pathStr] = resource;
@@ -2323,6 +2324,10 @@ SoundFont* MmSfx_LoadFont(s32 fontId) {
         MMSFX_LOG("[MmSfx] Exception in LoadFont(%d): %s", fontId, e.what());
     } catch (...) { MMSFX_LOG("[MmSfx] Unknown exception in LoadFont(%d)", fontId); }
     return nullptr;
+}
+
+SequenceData* MmSfx_LoadSequence(void) {
+    return static_cast<SequenceData*>(MmAssets_LoadFromMmArchive("audio/sequences/Sequence_0", nullptr));
 }
 
 SoundFont* MmSfx_GetFontForSfx(u16 sfxId) {
@@ -5139,6 +5144,15 @@ extern "C" short* MmSfxDecode_Sample(void* sample, unsigned int* outLen) {
 extern "C" void MmSfxSynth_RenderInto(short* outBuf, unsigned int numSamples);
 extern "C" int MmSfx_IsGamePaused(void); // mm_player_form.cpp
 
+void MmSfx_UpdateGameFrame(void) {
+    if (MmSfx_IsGamePaused()) {
+        return;
+    }
+    MmAudioScopedLock audioLock;
+    AudioMmSfx_ProcessRequests();
+    AudioMmSfx_ProcessActiveSfx();
+}
+
 void MmDirectAudio_MixInto(s16* outBuf, u32 numSamples) {
     // Silence ALL MM SFX (old MmDirectAudio bank + new mmsfx engine) while the
     // pause/kaleido screen is up — they kept playing because they don't run on a
@@ -5149,12 +5163,10 @@ void MmDirectAudio_MixInto(s16* outBuf, u32 numSamples) {
 
     sMmAudioFrame++;
 
-    // Drive the MM SFX bank engine each audio callback. Equivalent to 2Ship's
-    // per-frame AudioSfx_ProcessRequests + AudioSfx_ProcessActiveSfx call pair.
-    // Runs at ~audio-callback rate which is close enough to MM's 20-30 fps
-    // tick for freshness/eviction timing.
-    AudioMmSfx_ProcessRequests();
-    AudioMmSfx_ProcessActiveSfx();
+    // The graph-thread audio update owns bank freshness and request dispatch.
+    // This callback runs three times per gameplay update (and during reservoir
+    // prefill); advancing the bank here would expire refresh-driven loops
+    // between gameplay requests. Synthesis still advances every callback.
 
     // Ruta B: render the isolated MM SFX sequence engine on top of the output.
     // No-op until MmSfxSynth_Init() has loaded Sequence_0/Soundfont_0/1 (lazy,
@@ -5435,7 +5447,7 @@ s32 MmSfx_PlayEx(u16 sfxId, Vec3f* pos, u8 token, f32* freqScale, f32* vol, s8* 
     }
 
     // Boot the isolated MM SFX engine on the GAME thread (loads Sequence_0 +
-    // Soundfont_0/1 via ResourceMgr — must NOT run on the audio thread).
+    // resident Soundfont_0/1 from mm.o2r — must NOT run on the audio thread).
     // Idempotent; once ready it becomes the sole SFX path (the old MmDirectAudio
     // hand-map is dead). No CVar — the new engine is the default and only path.
     MmSfxSynth_Init();
@@ -5627,6 +5639,15 @@ s32 MmSfx_PlayEx(u16 sfxId, Vec3f* pos, u8 token, f32* freqScale, f32* vol, s8* 
         AudioMmSfx_PlaySfx(sfxId, effectivePos, token, freqScale, vol, reverbAdd);
     }
     return 1;
+}
+
+void MmSfx_StopAtPos(u16 sfxId, Vec3f* pos) {
+    extern void AudioMmSfx_StopByPosAndId(Vec3f * pos, u16 sfxId);
+    // The bank retains the actor's projected-position pointer. Remove both
+    // queued and active references under the same lock as playback/mixing.
+    // Stopping by ID alone would also silence other monkeys in the room.
+    MmAudioScopedLock audioLock;
+    AudioMmSfx_StopByPosAndId(pos, sfxId);
 }
 
 void MmSfx_Stop(u16 sfxId) {

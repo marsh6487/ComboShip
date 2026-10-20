@@ -28,6 +28,7 @@ struct Entry {
     std::string msg = "";
     CwItemReceiptPresentation receiptPresentation{};
     bool capeVisibilityChoice = false;
+    uint8_t swordElementTutorial = 0; // First arrow pickup, captured before the existing grant.
 };
 
 void RegisterHooks();

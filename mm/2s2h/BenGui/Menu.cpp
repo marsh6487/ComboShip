@@ -1,3 +1,4 @@
+#include "../../../combo/gui/WhatsNew.h"
 #include "Menu.h"
 #include <fast/Fast3dWindow.h>
 #include "UIWidgets.hpp"
@@ -303,6 +304,8 @@ void Menu::MenuDrawItem(WidgetInfo& widget, uint32_t width, UIWidgets::Colors me
         ImGui::SameLine();
     }
 
+    WhatsNew::Scope releaseHighlight(widget.cVar, widget.name.c_str(), CVarGetInteger(WhatsNew::kEnabledCvar, 1) != 0,
+                                     widget.options && widget.options->disabled);
     try {
         switch (widget.type) {
             case WIDGET_CHECKBOX: {
@@ -666,6 +669,9 @@ static void FleetMenu_DrawSwitchGameButton(UIWidgets::Colors themeIndex) {
 
 void Menu::DrawElement() {
     if (OTRGlobals::Instance->fontStandardLargest == nullptr) {
+        return;
+    }
+    if (gGameState == nullptr) {
         return;
     }
     for (auto& [reason, info] : disabledMap) {

@@ -49,8 +49,28 @@ def main():
         stubs = {
             "fast/interpreter.h": header,
             "fast/backends/gfx_rendering_api.h": api,
-            "fast/resource/type/Texture.h": "#pragma once\nnamespace Fast { class Texture; enum class TextureType {}; }\n",
-            "ship/resource/Resource.h": "#pragma once\nnamespace Ship { class IResource; }\n",
+            "fast/resource/type/Texture.h": """#pragma once
+#include "ship/resource/Resource.h"
+namespace Fast {
+enum class TextureType { RGBA32bpp = 1, Palette8bpp = 4 };
+class Texture {
+  public:
+    TextureType Type = TextureType::Palette8bpp;
+    uint16_t Width = 64, Height = 32;
+    std::shared_ptr<Ship::ResourceInitData> init = std::make_shared<Ship::ResourceInitData>();
+    std::shared_ptr<Ship::ResourceInitData> GetInitData() { return init; }
+};
+}
+""",
+            "ship/resource/Resource.h": """#pragma once
+#include <memory>
+#include <string>
+namespace Ship {
+class IResource;
+struct Archive { std::string path; const std::string& GetPath() { return path; } };
+struct ResourceInitData { std::string Path; std::shared_ptr<Archive> Parent; };
+}
+""",
             "imconfig.h": "#pragma once\nusing ImTextureID = unsigned long long;\n",
             "nlohmann/json.hpp": "#pragma once\n#include <initializer_list>\nnamespace nlohmann { struct json { json() = default; json(std::initializer_list<json>) {} template<class T> json(const T&) {} static json array() { return {}; } }; }\n",
         }
@@ -73,11 +93,24 @@ def main():
                  "gfx_tri1_handler_f3dex", "gfx_tri1_handler_f3d", "gfx_tri2_handler_f3dex",
                  "gfx_quad_handler_f3dex2", "gfx_quad_handler_f3dex", "Interpreter::SpReset",
                  "Interpreter::NormalizeVector", "Interpreter::TransposedMatrixMul", "Interpreter::CalculateNormalDir",
-                 "gfx_set_prim_depth_handler_rdp", "gfx_set_key_r_handler_rdp", "gfx_set_key_gb_handler_rdp"]
+                 "gfx_set_prim_depth_handler_rdp", "gfx_set_key_r_handler_rdp", "gfx_set_key_gb_handler_rdp",
+                 "gfx_set_grayscale_handler_custom"]
+        if "gfx_scroll_texture_handler_custom(" in source:
+            for helper in ("GetRepeatPeriodFromTile", "WrapScrollCoordinate", "gfx_scroll_texture_handler_custom"):
+                names.insert(names.index("Interpreter::GfxSpTri1"), helper)
+        if "IsPyramidLike(" in source:
+            names.insert(names.index("Interpreter::GfxSpTri1"), "IsPyramidLike")
         if "Interpreter::PrepareTriangleState(" in source:
             names.insert(names.index("Interpreter::GfxSpTri1"), "Interpreter::PrepareTriangleState")
         if "Interpreter::GfxSpTri1Impl(" in source:
             names.insert(names.index("Interpreter::GfxSpTri1"), "Interpreter::GfxSpTri1Impl")
+        if "TraceAutumnForestDraw(" in source:
+            if "AutumnForestLayer(" in source:
+                names.insert(names.index("Interpreter::GfxSpTri1Impl"), "AutumnForestLayer")
+            names.insert(names.index("Interpreter::GfxSpTri1Impl"), "TraceAutumnForestDraw")
+        if "ZoraCosmeticLayer(" in source:
+            names.insert(names.index("Interpreter::GfxSpTri1"), "ZoraCosmeticLayer")
+        names.insert(names.index("Interpreter::GfxSpTri1"), "Interpreter::GfxDpSetTextureImage")
         # Destructor name needs the same parser, with its tilde included.
         generated = "namespace Fast {\nconstexpr size_t MAX_TRI_BUFFER = 256;\nstatic constexpr float N64_PRIM_DEPTH_MAX = 32767.0f;\n" + helpers
         explicit_dispatch = "(*GfxOpcodeHandlerFunc)(Interpreter*" in source

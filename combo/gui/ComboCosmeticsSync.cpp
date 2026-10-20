@@ -46,6 +46,7 @@ const CosmeticPair kPairs[] = {
     { "Consumable.Hearts", false, { "HUD.Hearts" } },
     { "Consumable.Magic", false, { "HUD.Magic" } },
     { "HUD.Minimap", false, { "HUD.Minimap" } },
+    { "World.BlackMarketShelves", false, { "World.BlackMarketShelves" } },
     // Deliberate: OOT's Kokiri tunic drives all four MM forms. OOT's Goron/Zora tunic rolls are
     // equipment colors with no MM equivalent, so they are intentionally not mirrored.
     { "Link.KokiriTunic", false, { "Player.HumanTunic", "Player.DekuTunic", "Player.GoronTunic", "Player.ZoraTunic" } },
@@ -77,6 +78,10 @@ const CosmeticPair kPairs[] = {
     { "Arrows.MedallionSpiritSecondary", false, { "Arrows.MedallionSpiritSecondary" } },
     { "Magic.DinsPrimary", false, { "Magic.DinsPrimary" } },
     { "Magic.DinsSecondary", true, { "Magic.DinsSecondary" } },
+    { "Magic.FaroresPrimary", false, { "Magic.FaroresPrimary" } },
+    { "Magic.FaroresSecondary", true, { "Magic.FaroresSecondary" } },
+    { "Magic.NayrusPrimary", false, { "Magic.NayrusPrimary" } },
+    { "Magic.NayrusSecondary", true, { "Magic.NayrusSecondary" } },
     { "Magic.MedallionFirePrimary", false, { "Magic.MedallionFirePrimary" } },
     { "Magic.MedallionFireSecondary", false, { "Magic.MedallionFireSecondary" } },
     { "Magic.MedallionWaterPrimary", false, { "Magic.MedallionWaterPrimary" } },
@@ -93,6 +98,7 @@ const CosmeticPair kPairs[] = {
     { "Trails.KokiriSword", false, { "Trails.KokiriSwordTrail" } },
     { "Trails.Stick", true, { "Trails.DekuStickTrail" } },
     { "Trails.Boomerang", true, { "Trails.ZoraBoomerangTrail" } },
+    { "Trails.ZoraFinTrail", false, { "Trails.ZoraFinTrail" } },
 };
 
 // MM's live apply (ShipInit re-run). ComboMenuModel already caches it and retries until 2ship.dll

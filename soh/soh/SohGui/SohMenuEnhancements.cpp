@@ -1,21 +1,32 @@
-﻿#include "SohMenu.h"
+#ifdef COMBO_BUILD
+#include "../../../combo/gui/BlackMarketAppearance.h"
+#endif
+#include "../../../combo/ComboGameMode.h"
+#include "SohMenu.h"
 #include <soh/Enhancements/enhancementTypes.h>
 #include "soh/Enhancements/SwitchAge.h"
+#include "soh/Enhancements/AdultMasks.h"
+#include "soh/Enhancements/BunnyHood.h"
+#include "soh/Enhancements/FileSelectEnhancements.h"
 #include <soh/Enhancements/game-interactor/GameInteractor.h>
 #include <soh/OTRGlobals.h>
 #include <soh/Enhancements/cosmetics/authenticGfxPatches.h>
 #include <soh/Enhancements/TimeDisplay/TimeDisplay.h>
-#include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/Restorations/GetItemManipulation.h"
 #include "soh/Enhancements/audio/MidnaAudio.h"
 #include <algorithm>
 #include <cfloat>
 #include <cstring>
+#include "soh/Enhancements/randomizer/SeedContext.h"
 #include <ship/Context.h>
+#include <libultraship/bridge/consolevariablebridge.h>
+#include <soh/ResourceManagerHelpers.h>
+#include "soh/ShipInit.hpp"
 
 extern "C" {
 #include "functions.h"
 #include "variables.h"
+#include "macros.h"
 extern PlayState* gPlayState;
 }
 
@@ -89,6 +100,15 @@ static const std::map<int32_t, const char*> sleepingWaterfallOptions = {
     { WATERFALL_ALWAYS, "Always" },
     { WATERFALL_ONCE, "Once" },
     { WATERFALL_NEVER, "Never" },
+};
+
+static const std::map<int32_t, const char*> bombchuBowlingFirstPrizeOptions = {
+    { BOWLING_FIRST_PRIZE_RANDOM, "Random" },
+    { BOWLING_FIRST_PRIZE_BOMB_BAG, "Bomb Bag" },
+    { BOWLING_FIRST_PRIZE_PURPLE_RUPEE, "Purple Rupee" },
+    { BOWLING_FIRST_PRIZE_BOMBCHUS, "Bombchus" },
+    { BOWLING_FIRST_PRIZE_HEART_PIECE, "Heart Piece" },
+    { BOWLING_FIRST_PRIZE_BOMBS, "Bombs" },
 };
 
 static const std::map<int32_t, const char*> allPowers = {
@@ -208,6 +228,12 @@ static const std::map<int32_t, const char*> zFightingOptions = {
     { ZFIGHT_FIX_NO_VANISH, "No Vanish" },
 };
 
+static const std::map<int32_t, const char*> teleportTrapModes = {
+    { TELEPORT_TRAP_OFF, "Off" },
+    { TELEPORT_TRAP_SIMPLE, "Simple" },
+    { TELEPORT_TRAP_ADVANCED, "Advanced" },
+};
+
 static const std::map<int32_t, const char*> swordToggleModes = {
     { SWORD_TOGGLE_NONE, "None" },
     { SWORD_TOGGLE_CHILD, "Child Toggle" },
@@ -225,6 +251,22 @@ static const std::map<int32_t, const char*> mirroredWorldModes = {
     { MIRRORED_WORLD_DUNGEONS_RANDOM, "Dungeons Random" },
     { MIRRORED_WORLD_DUNGEONS_RANDOM_SEEDED, "Dungeons Random (Seeded)" },
 };
+
+// Disables a File Select "Hide" checkbox when its O2R is missing, or when it would hide the last visible quest
+static WidgetFunc HideQuestPreFunc(Quest quest) {
+    return [quest](WidgetInfo& info) {
+        if ((quest == QUEST_NORMAL || quest == QUEST_SPEEDRUN) && !ResourceMgr_GameHasOriginal()) {
+            info.options->disabled = true;
+            info.options->disabledTooltip = "This option requires a loaded original O2R.";
+        } else if ((quest == QUEST_MASTER || quest == QUEST_SPEEDRUN_MASTER) && !ResourceMgr_GameHasMasterQuest()) {
+            info.options->disabled = true;
+            info.options->disabledTooltip = "This option requires a loaded Master Quest O2R.";
+        } else if (!SohFileSelect_IsQuestHidden(quest) && SohFileSelect_CountVisibleQuests() <= 1) {
+            info.options->disabled = true;
+            info.options->disabledTooltip = "At least one quest type must remain visible.";
+        }
+    };
+}
 
 void SohMenu::AddMenuEnhancements() {
     // Add Enhancements Menu
@@ -418,6 +460,12 @@ void SohMenu::AddMenuEnhancements() {
             "Butterflies will transform into a fairy as soon as you approach them with a Deku Stick, "
             "skipping the need to stand still and let the butterfly land on your stick."));
 
+    AddWidget(path, "Allow Dropping Throw-Only Objects", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("DropThrowOnlyObjects"))
+        .Options(CheckboxOptions().Tooltip("Allows normally throw-only objects (such as Cuccos, pots, grass, and small "
+                                           "rocks) to be dropped by pressing A while standing still. Can be toggled "
+                                           "while holding an object."));
+
     AddWidget(path, "Convenience", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, "Quit Fishing at Door", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("QuitFishingAtDoor"))
@@ -477,6 +525,7 @@ void SohMenu::AddMenuEnhancements() {
             CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.Entrances"), true);
             CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.Story"), true);
             CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.LearnSong"), true);
+            CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("WarpSongSkipAnimation"), true);
             CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.BossIntro"), true);
             CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.QuickBossDeaths"), true);
             CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.OnePoint"), true);
@@ -494,6 +543,7 @@ void SohMenu::AddMenuEnhancements() {
             CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.Entrances"), false);
             CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.Story"), false);
             CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.LearnSong"), false);
+            CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("WarpSongSkipAnimation"), false);
             CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.BossIntro"), false);
             CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.QuickBossDeaths"), false);
             CVAR_INT_SHIP_INIT(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.OnePoint"), false);
@@ -515,6 +565,10 @@ void SohMenu::AddMenuEnhancements() {
     AddWidget(path, "Skip Song Cutscenes", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.LearnSong"))
         .Options(CheckboxOptions().DefaultValue(IS_RANDO));
+    AddWidget(path, "Skip Warp Cutscenes", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("WarpSongSkipAnimation"))
+        .Options(CheckboxOptions().DefaultValue(IS_RANDO).Tooltip(
+            "Warp songs skip the departure and arrival cutscenes, fading immediately to the destination."));
     AddWidget(path, "Skip Boss Introductions", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("TimeSavers.SkipCutscene.BossIntro"))
         .Options(CheckboxOptions().DefaultValue(IS_RANDO));
@@ -634,7 +688,8 @@ void SohMenu::AddMenuEnhancements() {
                                            "Currently it is only the BOTW crawlspace to a locked door."));
     AddWidget(path, "King Zora Speed: %.2fx", WIDGET_CVAR_SLIDER_FLOAT)
         .CVar(CVAR_ENHANCEMENT("MweepSpeed"))
-        .Options(FloatSliderOptions().Min(0.1f).Max(5.0f).DefaultValue(1.0f).Format("%.2fx"));
+        .Options(FloatSliderOptions().Min(0.1f).Max(5.0f).DefaultValue(1.0f).Format("%.2fx").Tooltip(
+            "Increase the speed of King Zora's move animation (\"mweep\")"));
     AddWidget(path, "Faster Pause Menu", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("FasterPauseMenu"))
         .Options(CheckboxOptions().Tooltip("Speeds up animation of the pause menu, similar to Majora's Mask"));
@@ -652,13 +707,15 @@ void SohMenu::AddMenuEnhancements() {
         .CVar(CVAR_ENHANCEMENT("InstantScarecrow"))
         .PreFunc([](WidgetInfo& info) {
             info.options->disabled =
-                IS_RANDO && OTRGlobals::Instance->gRandoContext->GetOption(RSK_SKIP_SCARECROWS_SONG);
-            info.options->disabledTooltip = "This setting is forcefully enabled because a randomized save "
-                                            "file with the option \"Skip Scarecrow's Song\" is currently loaded.";
+                IS_RANDO && (OTRGlobals::Instance->gRandoContext->GetOption(RSK_STARTING_SCARECROWS_SONG) ||
+                             OTRGlobals::Instance->gRandoContext->GetOption(RSK_SHUFFLE_SCARECROWS_SONG));
+            info.options->disabledTooltip =
+                "This setting is controlled by the randomizer because a randomized save file with the option "
+                "\"Start with Scarecrow's Song\" or \"Shuffle Scarecrow's Song\" is currently loaded.";
         })
         .Options(CheckboxOptions().Tooltip(
             "Pierre appears when an Ocarina is pulled out. Requires learning the Scarecrow's Song first.\n"
-            "Without the randomizer option \"Skip Scarecrow's Song\" enabled for a seed, this still requires you "
+            "Without the randomizer option \"Start with Scarecrow's Song\" enabled for a seed, this still requires you "
             "to teach the scarecrow the song as both ages before summoning."));
     AddWidget(path, "Faster Rupee Accumulator", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("FasterRupeeAccumulator"))
@@ -696,6 +753,13 @@ void SohMenu::AddMenuEnhancements() {
     path.column = SECTION_COLUMN_1;
 
     AddWidget(path, "Mods", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Always Thawed Zora's Domain", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("AlwaysThawedZorasDomain"))
+        .RaceDisable(false)
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Keep Zora's Domain's pools and waterfall flowing as adult Link, using the child water and installed "
+            "texture replacements. Seasonal freezing and draining are ignored in the Domain.\n"
+            "King Zora, quest progress, and randomizer logic remain unchanged."));
     AddWidget(path, "Disable Bomb Billboarding", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("DisableBombBillboarding"))
         .RaceDisable(false)
@@ -741,6 +805,11 @@ void SohMenu::AddMenuEnhancements() {
         .Options(IntSliderOptions().Min(4).Max(6).DefaultValue(6).Tooltip(
             "Space between text characters (useful for HD font textures)."));
     AddWidget(path, "Models & Textures", WIDGET_SEPARATOR_TEXT);
+#ifdef COMBO_BUILD
+    AddWidget(path, "Black Market Appearance", WIDGET_CUSTOM).RaceDisable(false).CustomFunction([](WidgetInfo&) {
+        BlackMarketUI::DrawAppearance();
+    });
+#endif
     AddWidget(path, "Midna Companion (Navi)", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("MidnaCompanion"))
         .RaceDisable(false)
@@ -798,10 +867,24 @@ void SohMenu::AddMenuEnhancements() {
             "Normal sword damage and reach are unchanged."));
     AddWidget(path, "Fire Damage", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("DinFireSwordDamage"))
-        .PreFunc([](WidgetInfo& info) { info.isHidden = CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0) == 0; })
         .Options(CheckboxOptions().Tooltip(
-            "Adds fire interactions to direct sword hits while preserving normal sword damage, cutting, and enemy "
-            "reactions. Off by default. Does not change reach. Charged spin waves stay unchanged."));
+            "Enables fire enchantments after obtaining Fire Arrows. Press A on a sword in the equipment screen to "
+            "choose its element. Swings cost no magic and retain normal sword damage, cutting, and reach."));
+    AddWidget(path, "Ice Damage", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("IceSwordDamage"))
+        .Options(CheckboxOptions().Tooltip(
+            "Enables ice enchantments after obtaining Ice Arrows. Select ice on a sword in the equipment screen. "
+            "Adds supported freezing reactions while retaining normal sword damage and cutting. Costs no magic."));
+    AddWidget(path, "Light Damage", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("LightSwordDamage"))
+        .Options(CheckboxOptions().Tooltip(
+            "Enables light enchantments after obtaining Light Arrows. Select light on a sword in the equipment screen. "
+            "Adds supported light reactions while retaining normal sword damage and cutting. Costs no magic."));
+    AddWidget(path, "MM Ice Arrow Behavior", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("MmIceArrows"))
+        .Options(CheckboxOptions().Tooltip(
+            "Ice Arrows create temporary platforms on water and freeze Octoroks into temporary climbable ice blocks. "
+            "Uses Majora's Mask platform timing and limits. Off by default."));
     AddWidget(path, "Hide Back Equipment and Scabbard", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("HideBackEquipment"))
         .RaceDisable(false)
@@ -876,21 +959,62 @@ void SohMenu::AddMenuEnhancements() {
         .CVar(CVAR_ENHANCEMENT("AlwaysShowDungeonMinimapIcon"))
         .RaceDisable(false)
         .Options(CheckboxOptions().Tooltip("Always shows dungeon entrance icons on the Minimap."));
-    AddWidget(path, "More Info in File Select", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("FileSelectMoreInfo"))
-        .RaceDisable(false)
-        .Options(CheckboxOptions().Tooltip(
-            "Shows what items you have collected in the File Select screen, like in N64 Randomizer."));
     AddWidget(path, "Better Ammo Rendering in Pause Menu", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("BetterAmmoRendering"))
         .RaceDisable(false)
         .Options(CheckboxOptions().Tooltip(
             "Ammo counts in the pause menu will work correctly regardless of the position of items in the Inventory."));
-    AddWidget(path, "Enable Passage of Time on File Select", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("TimeFlowFileSelect"))
+
+    AddWidget(path, "File Select", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "More Info", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("FileSelect.MoreInfo"))
+        .RaceDisable(false)
+        .Options(CheckboxOptions().Tooltip(
+            "Shows what items you have collected in the File Select screen, like in N64 Randomizer."));
+    AddWidget(path, "Enable Passage of Time", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("FileSelect.TimeFlow"))
         .RaceDisable(false)
         .Options(CheckboxOptions().Tooltip("The skybox in the background of the File Select screen will go through the "
                                            "day and night cycle over time."));
+
+    if (!Combo_IsCombinedGame()) {
+        AddWidget(path, "Hide Original", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_ENHANCEMENT("FileSelect.HideNormalQuest"))
+            .RaceDisable(false)
+            .PreFunc(HideQuestPreFunc(QUEST_NORMAL))
+            .Options(CheckboxOptions().Tooltip(
+                "Hides the original game when selecting a quest type on the File Select screen."));
+        AddWidget(path, "Hide Master Quest", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_ENHANCEMENT("FileSelect.HideMasterQuest"))
+            .RaceDisable(false)
+            .PreFunc(HideQuestPreFunc(QUEST_MASTER))
+            .Options(CheckboxOptions().Tooltip(
+                "Hides the Master Quest option when selecting a quest type on the File Select screen."));
+        AddWidget(path, "Hide Randomizer", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_ENHANCEMENT("FileSelect.HideRandomizerQuest"))
+            .RaceDisable(false)
+            .PreFunc(HideQuestPreFunc(QUEST_RANDOMIZER))
+            .Options(CheckboxOptions().Tooltip(
+                "Hides the Randomizer option when selecting a quest type on the File Select screen."));
+        AddWidget(path, "Hide Boss Rush", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_ENHANCEMENT("FileSelect.HideBossRushQuest"))
+            .RaceDisable(false)
+            .PreFunc(HideQuestPreFunc(QUEST_BOSSRUSH))
+            .Options(CheckboxOptions().Tooltip(
+                "Hides the Boss Rush option when selecting a quest type on the File Select screen."));
+        AddWidget(path, "Hide Speedrun", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_ENHANCEMENT("FileSelect.HideSpeedrunQuest"))
+            .RaceDisable(false)
+            .PreFunc(HideQuestPreFunc(QUEST_SPEEDRUN))
+            .Options(CheckboxOptions().Tooltip(
+                "Hides the Speedrun option when selecting a quest type on the File Select screen."));
+        AddWidget(path, "Hide Speedrun Master Quest", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_ENHANCEMENT("FileSelect.HideSpeedrunMasterQuest"))
+            .RaceDisable(false)
+            .PreFunc(HideQuestPreFunc(QUEST_SPEEDRUN_MASTER))
+            .Options(CheckboxOptions().Tooltip(
+                "Hides the Speedrun Master Quest option when selecting a quest type on the File Select screen."));
+    }
 
     path.column = SECTION_COLUMN_3;
     AddWidget(path, "Misc.", WIDGET_SEPARATOR_TEXT);
@@ -1027,30 +1151,43 @@ void SohMenu::AddMenuEnhancements() {
 
     AddWidget(path, "Masks", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, "Bunny Hood Effect", WIDGET_CVAR_COMBOBOX)
-        .CVar(CVAR_ENHANCEMENT("MMBunnyHood"))
+        .CVar(CVAR_BUNNY_HOOD_NAME)
         .Options(ComboboxOptions()
                      .ComboMap(bunnyHoodEffectMap)
                      .Tooltip("Wearing the Bunny Hood grants a speed and jump boost like in Majora's Mask.\n"
                               "Can also be limited to only the speed boost.\n"
-                              "The effects of either option are not accounted for in Randomizer logic.\n"
+                              "Randomizer logic only accounts for this when the seed's own \"Bunny Hood Effect\" "
+                              "setting is on.\n"
                               "Also disables NPC's reactions to wearing the Bunny Hood."))
         .PreFunc([](WidgetInfo& info) {
             if (CVarGetInteger("gMods.MmMasks.InventoryEnabled", 1)) {
                 CVarSetInteger(CVAR_ENHANCEMENT("MMBunnyHood"), 2); // Force Fast + Jump
                 info.options->disabled = true;
                 info.options->disabledTooltip = "Automatically set to Fast + Jump by MM Masks Inventory";
+            } else {
+                info.options->disabled =
+                    IS_RANDO && OTRGlobals::Instance->gRandoContext->GetOption(RSK_BUNNY_HOOD).Is(RO_GENERIC_ON);
+                info.options->disabledTooltip = "This setting is forcefully enabled because a randomized savefile with "
+                                                "\"Bunny Hood Effect\" is currently loaded.";
             }
         });
     AddWidget(path, "Masks Equippable as Adult", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_ENHANCEMENT("AdultMasks"))
-        .Options(CheckboxOptions().Tooltip("Allows masks to be equipped normally from the pause menu as adult."))
+        .CVar(CVAR_ADULT_MASKS_NAME)
         .PreFunc([](WidgetInfo& info) {
             if (CVarGetInteger("gMods.MmMasks.InventoryEnabled", 1)) {
-                CVarSetInteger(CVAR_ENHANCEMENT("AdultMasks"), 1); // Force enabled
+                CVarSetInteger(CVAR_ADULT_MASKS_NAME, 1);
                 info.options->disabled = true;
                 info.options->disabledTooltip = "Automatically enabled by MM Masks Inventory";
+            } else {
+                info.options->disabled =
+                    IS_RANDO && OTRGlobals::Instance->gRandoContext->GetOption(RSK_MASKS_AS_ADULT).Is(RO_GENERIC_ON);
+                info.options->disabledTooltip = "This setting is forcefully enabled because a randomized savefile with "
+                                                "\"Masks as Adult\" is currently loaded.";
             }
-        });
+        })
+        .Options(CheckboxOptions().Tooltip("Allows masks to be equipped normally from the pause menu as adult.\n"
+                                           "Randomizer logic only accounts for this when the seed's own "
+                                           "\"Masks as Adult\" setting is on."));
     AddWidget(path, "Persistent Masks", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("PersistentMasks"))
         .Options(
@@ -1073,10 +1210,8 @@ void SohMenu::AddMenuEnhancements() {
     AddWidget(path, "Mask Select in Inventory", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("MaskSelect"))
         .PreFunc([](WidgetInfo& info) {
-            info.options->disabled =
-                OTRGlobals::Instance->gRandoContext->GetOption(RSK_MASK_QUEST).IsNot(RO_MASK_QUEST_VANILLA);
-            info.options->disabledTooltip =
-                "This setting is forcefully enabled when Mask Quest is Completed from the start or Shuffled.";
+            info.options->disabled = IS_RANDO;
+            info.options->disabledTooltip = "This setting is forcefully enabled in randomizer.";
         })
         .Options(CheckboxOptions().Tooltip(
             "After completing the mask trading sub-quest, press A and any direction on the mask "
@@ -1456,6 +1591,9 @@ void SohMenu::AddMenuEnhancements() {
         .Options(CheckboxOptions().Tooltip(
             "Restores a bug from NTSC 1.0/1.1 that allows you to obtain the eyeball frog from King Zora "
             "instead of the Zora Tunic by Holding Shield."));
+    AddWidget(path, "Child Hookshot Softlock", WIDGET_CVAR_CHECKBOX)
+        .CVar(CVAR_ENHANCEMENT("ChildHookshotSoftlock"))
+        .Options(CheckboxOptions().Tooltip("Using the Hookshot as child softlocks."));
     AddWidget(path, "Get Item Manipulation", WIDGET_CVAR_COMBOBOX)
         .CVar(CVAR_ENHANCEMENT("GetItemManipulation"))
         .Options(ComboboxOptions()
@@ -1683,6 +1821,13 @@ void SohMenu::AddMenuEnhancements() {
                      .DefaultValue(10)
                      .Format("%d bombchus")
                      .Tooltip("The number of Bombchus available at the start of the Bombchu Bowling minigame."));
+    AddWidget(path, "First Prize", WIDGET_CVAR_COMBOBOX)
+        .CVar(CVAR_ENHANCEMENT("BombchuBowlingFirstPrize"))
+        .PreFunc(bombchuBowlingDisabledFunc)
+        .Options(ComboboxOptions()
+                     .ComboMap(bombchuBowlingFirstPrizeOptions)
+                     .DefaultIndex(BOWLING_FIRST_PRIZE_RANDOM)
+                     .Tooltip("The prize the cycle starts on."));
     AddWidget(path, "Horseback Archery", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, "Customize Behavior##HBA", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("CustomizeHorsebackArchery"))
@@ -1988,10 +2133,16 @@ void SohMenu::AddMenuEnhancements() {
         .CVar(CVAR_ENHANCEMENT("ExtraTraps.Kill"))
         .PreFunc(
             [](WidgetInfo& info) { info.isHidden = CVarGetInteger(CVAR_ENHANCEMENT("ExtraTraps.Enabled"), 0) == 0; });
-    AddWidget(path, "Teleport Traps", WIDGET_CVAR_CHECKBOX)
+    AddWidget(path, "Teleport Traps", WIDGET_CVAR_COMBOBOX)
         .CVar(CVAR_ENHANCEMENT("ExtraTraps.Teleport"))
         .PreFunc(
-            [](WidgetInfo& info) { info.isHidden = CVarGetInteger(CVAR_ENHANCEMENT("ExtraTraps.Enabled"), 0) == 0; });
+            [](WidgetInfo& info) { info.isHidden = CVarGetInteger(CVAR_ENHANCEMENT("ExtraTraps.Enabled"), 0) == 0; })
+        .Options(ComboboxOptions()
+                     .ComboMap(teleportTrapModes)
+                     .DefaultIndex(TELEPORT_TRAP_OFF)
+                     .Tooltip("Where a Teleport Trap can send you. Off keeps them out of the trap pool.\n\n"
+                              "Simple: Link's House and the six warp song pads.\n"
+                              "Advanced: The same pool the randomizer uses when it shuffles spawns and warp songs."));
 
     // Cheats
     path.sidebarName = "Cheats";
@@ -2187,21 +2338,23 @@ void SohMenu::AddMenuEnhancements() {
         .HideInSearch(true)
         .Options(WindowButtonOptions().Tooltip("Enables the separate Cosmetics Editor Window."));
 #ifdef COMBO_BUILD
-    // ComboShip: draw the editor inline (SoH embeds it via the window button's EmbedWindow; comboui's
-    // flat model doesn't carry that flag). Mirrors "Controller Bindings Inline"; skipped when popped out.
-    AddWidget(path, "Cosmetics Editor Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
-                return;
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Cosmetics Editor");
-            if (!win || win->IsVisible())
-                return;
-            win->Update();
-            win->DrawElement();
-        });
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: draw the editor inline (SoH embeds it via the window button's EmbedWindow; comboui's
+        // flat model doesn't carry that flag). Mirrors "Controller Bindings Inline"; skipped when popped out.
+        AddWidget(path, "Cosmetics Editor Inline", WIDGET_CUSTOM)
+            .RaceDisable(false)
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
+                    return;
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Cosmetics Editor");
+                if (!win || win->IsVisible())
+                    return;
+                win->Update();
+                win->DrawElement();
+            });
+    }
 #endif
 
     // Audio Editor
@@ -2214,20 +2367,22 @@ void SohMenu::AddMenuEnhancements() {
         .HideInSearch(true)
         .Options(WindowButtonOptions().Tooltip("Enables the separate Audio Editor Window."));
 #ifdef COMBO_BUILD
-    // ComboShip: draw the editor inline (see "Cosmetics Editor Inline"); skipped when popped out.
-    AddWidget(path, "Audio Editor Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
-                return;
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Audio Editor");
-            if (!win || win->IsVisible())
-                return;
-            win->Update();
-            win->DrawElement();
-        });
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: draw the editor inline (see "Cosmetics Editor Inline"); skipped when popped out.
+        AddWidget(path, "Audio Editor Inline", WIDGET_CUSTOM)
+            .RaceDisable(false)
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
+                    return;
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Audio Editor");
+                if (!win || win->IsVisible())
+                    return;
+                win->Update();
+                win->DrawElement();
+            });
+    }
 #endif
 
     // Gameplay Stats
@@ -2240,75 +2395,81 @@ void SohMenu::AddMenuEnhancements() {
         .HideInSearch(true)
         .Options(WindowButtonOptions().Tooltip("Enables the separate Gameplay Stats Window."));
 #ifdef COMBO_BUILD
-    // ComboShip: draw the window inline (see "Cosmetics Editor Inline"); skipped when popped out.
-    AddWidget(path, "Gameplay Stats Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
-                return;
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Gameplay Stats");
-            if (!win || win->IsVisible())
-                return;
-            win->Update();
-            win->DrawElement();
-        });
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: draw the window inline (see "Cosmetics Editor Inline"); skipped when popped out.
+        AddWidget(path, "Gameplay Stats Inline", WIDGET_CUSTOM)
+            .RaceDisable(false)
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
+                    return;
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Gameplay Stats");
+                if (!win || win->IsVisible())
+                    return;
+                win->Update();
+                win->DrawElement();
+            });
+    }
 #endif
 
     // Time Splits
     path.sidebarName = "Time Splits";
     AddSidebarEntry("Enhancements", path.sidebarName, 1);
-    AddWidget(path, "Popout Time Splits Window", WIDGET_WINDOW_BUTTON)
-        .CVar(CVAR_WINDOW("TimeSplits"))
-        .RaceDisable(false)
-        .WindowName("Time Splits")
-        .HideInSearch(true)
-        .Options(WindowButtonOptions().Tooltip("Enables the separate Time Splits Window."));
+    AddWidget(path, "Popout Timesplits Settings", WIDGET_WINDOW_BUTTON)
 #ifdef COMBO_BUILD
-    // ComboShip: draw the window inline (see "Cosmetics Editor Inline"); skipped when popped out.
-    AddWidget(path, "Time Splits Inline", WIDGET_CUSTOM)
-        .RaceDisable(false)
-        .HideInSearch(true)
-        .CustomFunction([](WidgetInfo&) {
-            auto ctx = Ship::Context::GetRawInstance();
-            if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
-                return;
-            auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Time Splits");
-            if (!win || win->IsVisible())
-                return;
-            win->Update();
-            win->DrawElement();
-        });
+        // ComboShip: the window's own CVar; upstream's "gWindows.Timesplits.Settings" is MM's subtree key.
+        .CVar(CVAR_WINDOW("TimeSplitSettings"))
+#else
+        .CVar("gWindows.Timesplits.Settings")
 #endif
-
-#ifndef COMBO_BUILD
-    // ComboShip (#173): combo owns the timer overlay, so this section is gone. The menu search
-    // ignores the sidebar allow-list, so leaving it here would let "timer" re-open the native window.
-    // Timers
-    path.sidebarName = "Timers";
-    AddSidebarEntry("Enhancements", path.sidebarName, 3);
-    AddWidget(path, "Toggle Timers Window", WIDGET_WINDOW_BUTTON)
-        .CVar(CVAR_WINDOW("TimeDisplayEnabled"))
-        .RaceDisable(false)
-        .WindowName("Additional Timers")
-        .Options(WindowButtonOptions().Tooltip("Enables the separate Additional Timers Window."));
-    AddWidget(path, "Font Scale: %.2fx", WIDGET_CVAR_SLIDER_FLOAT)
-        .CVar(CVAR_TIME_DISPLAY("FontScale"))
-        .RaceDisable(false)
-        .Callback([](WidgetInfo& info) { TimeDisplayInitSettings(); })
-        .Options(FloatSliderOptions().Min(1.0f).Max(5.0f).DefaultValue(1.0f).Format("%.2fx"));
-    AddWidget(path, "Hide Background", WIDGET_CVAR_CHECKBOX)
-        .CVar(CVAR_TIME_DISPLAY("ShowWindowBG"))
-        .RaceDisable(false)
-        .Callback([](WidgetInfo& info) { TimeDisplayInitSettings(); });
-    for (auto& timer : timeDisplayList) {
-        AddWidget(path, timer.timeLabel, WIDGET_CVAR_CHECKBOX)
+        .WindowName("Time Splits Settings Window");
+#ifdef COMBO_BUILD
+    if (Combo_IsCombinedGame()) {
+        // ComboShip: draw the settings window inline (see "Cosmetics Editor Inline"); skipped when popped out.
+        AddWidget(path, "Time Splits Settings Inline", WIDGET_CUSTOM)
             .RaceDisable(false)
-            .CVar(timer.timeEnable)
-            .Callback([](WidgetInfo& info) { TimeDisplayUpdateDisplayOptions(); });
+            .HideInSearch(true)
+            .CustomFunction([](WidgetInfo&) {
+                auto ctx = Ship::Context::GetRawInstance();
+                if (!ctx || !ctx->GetWindow() || !ctx->GetWindow()->GetGui())
+                    return;
+                auto win = ctx->GetWindow()->GetGui()->GetGuiWindow("Time Splits Settings Window");
+                if (!win || win->IsVisible())
+                    return;
+                win->Update();
+                win->DrawElement();
+            });
     }
 #endif
+
+    if (!Combo_IsCombinedGame()) {
+        // ComboShip (#173): combo owns the timer overlay, so this section is gone. The menu search
+        // ignores the sidebar allow-list, so leaving it here would let "timer" re-open the native window.
+        // Timers
+        path.sidebarName = "Timers";
+        AddSidebarEntry("Enhancements", path.sidebarName, 3);
+        AddWidget(path, "Toggle Timers Window", WIDGET_WINDOW_BUTTON)
+            .CVar(CVAR_WINDOW("TimeDisplayEnabled"))
+            .RaceDisable(false)
+            .WindowName("Additional Timers")
+            .Options(WindowButtonOptions().Tooltip("Enables the separate Additional Timers Window."));
+        AddWidget(path, "Font Scale: %.2fx", WIDGET_CVAR_SLIDER_FLOAT)
+            .CVar(CVAR_TIME_DISPLAY("FontScale"))
+            .RaceDisable(false)
+            .Callback([](WidgetInfo& info) { TimeDisplayInitSettings(); })
+            .Options(FloatSliderOptions().Min(1.0f).Max(5.0f).DefaultValue(1.0f).Format("%.2fx"));
+        AddWidget(path, "Hide Background", WIDGET_CVAR_CHECKBOX)
+            .CVar(CVAR_TIME_DISPLAY("ShowWindowBG"))
+            .RaceDisable(false)
+            .Callback([](WidgetInfo& info) { TimeDisplayInitSettings(); });
+        for (auto& timer : timeDisplayList) {
+            AddWidget(path, timer.timeLabel, WIDGET_CVAR_CHECKBOX)
+                .RaceDisable(false)
+                .CVar(timer.timeEnable)
+                .Callback([](WidgetInfo& info) { TimeDisplayUpdateDisplayOptions(); });
+        }
+    }
 }
 
 } // namespace SohGui

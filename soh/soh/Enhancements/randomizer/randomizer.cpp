@@ -1,27 +1,34 @@
+#include "../../../../combo/ComboGameMode.h"
 #include "../../../../combo/menu/ItemGrantAuditBridge.h"
+#include "../../../../combo/menu/ComboToolReceiptText.h"
+#include "../../../../combo/menu/ComboMaskReceiptText.h"
 #include "randomizer.h"
 #include <nlohmann/json.hpp>
+#include <atomic>
 #include <fstream>
-#include <variables.h>
-#include <macros.h>
-#include <functions.h>
+#include <sstream>
+#include <tuple>
+
+#include <nlohmann/json.hpp>
+#include <ship/window/FileDropMgr.h>
+#include <spdlog/spdlog.h>
+#include <ship/Context.h>
+
+#include "randomizer.h"
 #include "3drando/menu.hpp"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/SohGui/SohGui.hpp"
 #include <imgui.h>
-#include "../../../src/overlays/actors/ovl_En_GirlA/z_en_girla.h"
 #include <algorithm>
 #include "randostatupgrade.h"
 #include "randomizer_check_objects.h"
-#include <sstream>
-#include <tuple>
 #include "soh/OTRGlobals.h"
-#include <ship/window/FileDropMgr.h>
 #include "static_data.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "settings.h"
 #include "soh/util.h"
 #include "randomizerTypes.h"
+#include "randomizerEnumStrings.h"
 #include "soh/ObjectExtension/ObjectExtension.h"
 #include "soh/Enhancements/randomizer/RCToRandInf.h"
 #include "dungeon.h"
@@ -29,6 +36,9 @@
 #include "hook_handlers.h" // ComboShip: OOT_DeliverForeign for RG_COMBO_FOREIGN grant divert
 extern "C" void (*gComboTriforceProgress)(int game, int fileNum);
 #endif
+#include "logic.h"
+#include "soh/SohGui/UIWidgets.hpp"
+#include "soh/Enhancements/randomizer/trial.h"
 
 // Extended Inventory for Custom Items (Page 2)
 extern "C" {
@@ -43,6 +53,10 @@ extern "C" {
 #include "soh/FleetShipCombo/FleetComboItems.h"     // FCI_NO_ITEM sentinel
 #include "soh/FleetShipCombo/FleetComboIds.h"       // FC_MM_SKULLS_* registry counters (MM GS tokens)
 
+#include <variables.h>
+#include <macros.h>
+#include <functions.h>
+#include "../../../src/overlays/actors/ovl_En_GirlA/z_en_girla.h"
 extern void func_80B8FE00(ObjBean*); // trigger planting
 // MM trade/quest grant APIs (Skijer's NEI) — same calls the debug/give-all menu uses (SohMenuNEI.cpp):
 // trade_items.c (adult-trade wheel bitmask), picto_box.c (pictoboxOwned), power_keg.c (kegOwned+count).
@@ -75,7 +89,7 @@ std::unordered_map<std::string, HintType> SpoilerfileHintTypeNameToEnum;
 std::set<RandomizerCheck> excludedLocations;
 std::set<RandomizerCheck> spoilerExcludedLocations;
 
-bool generated;
+static std::atomic<bool> randoGenerating;
 
 // ============================================================================
 // CUSTOM ITEMS RANDOMIZER MESSAGES
@@ -91,7 +105,7 @@ extern "C" void TwilightUpgrade_SetClawshot(u8 on);
 
 struct CustomItemMessageEntry {
     s16 rgId;
-    ItemID itemId;
+    int32_t itemId;
     const char* english;
     const char* german;
     const char* french;
@@ -102,9 +116,23 @@ struct CustomItemMessageEntry {
  * Descriptions, Lore, and Translations provided by Gemini 3.0
  */
 static const CustomItemMessageEntry customItemMessages[] = {
+    { RG_SKULL_MASK, ITEM_MASK_SKULL, ComboMaskReceiptText::kSkull.english, ComboMaskReceiptText::kSkull.german,
+      ComboMaskReceiptText::kSkull.french },
+    { RG_SPOOKY_MASK, ITEM_MASK_SPOOKY, ComboMaskReceiptText::kSpooky.english, ComboMaskReceiptText::kSpooky.german,
+      ComboMaskReceiptText::kSpooky.french },
+    { RG_MASK_OF_TRUTH, ITEM_MASK_TRUTH, ComboMaskReceiptText::kTruth.english, ComboMaskReceiptText::kTruth.german,
+      ComboMaskReceiptText::kTruth.french },
+    { RG_MM_MASK_TRUTH, ITEM_CUSTOM, ComboMaskReceiptText::kTruth.english, ComboMaskReceiptText::kTruth.german,
+      ComboMaskReceiptText::kTruth.french },
+    { RG_GERUDO_MASK, ITEM_MASK_GERUDO, ComboMaskReceiptText::kGerudo.english, ComboMaskReceiptText::kGerudo.german,
+      ComboMaskReceiptText::kGerudo.french },
+    { RG_KEATON_MASK, ITEM_MASK_KEATON, ComboMaskReceiptText::kKeaton.english, ComboMaskReceiptText::kKeaton.german,
+      ComboMaskReceiptText::kKeaton.french },
+    { RG_MM_MASK_KEATON, ITEM_CUSTOM, ComboMaskReceiptText::kKeaton.english, ComboMaskReceiptText::kKeaton.german,
+      ComboMaskReceiptText::kKeaton.french },
     // Movement Items
     // Skijer's progressive Roc's Feather (extended inventory page 2)
-    { RG_PROGRESSIVE_ROCS, static_cast<ItemID>(ITEM_ROCS_FEATHER_SKIJER),
+    { RG_PROGRESSIVE_ROCS, static_cast<int32_t>(ITEM_ROCS_FEATHER_SKIJER),
       "You got %rRoc's Feather%w!&This magical feather lets you&jump higher than normal.^Assign it to %y\xA1%w and "
       "press&to perform a high jump.&It even works in water!",
       "Du hast %rRocs Feder%w erhalten!&Diese magische Feder lässt&dich höher springen.^Weise sie %y\xA1%w zu und "
@@ -114,7 +142,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "appuyez&pour faire un grand saut.&Fonctionne même dans l'eau!" },
 
     // Vanilla rando Roc's Feather (shares the Nayru's Love slot, RSK_ROCS_FEATHER)
-    { RG_ROCS_FEATHER, static_cast<ItemID>(ITEM_ROCS_FEATHER_SKIJER),
+    { RG_ROCS_FEATHER, static_cast<int32_t>(ITEM_ROCS_FEATHER_SKIJER),
       "You got %rRoc's Feather%w!&Assign it to %y\xA1%w and press it&while standing to leap into&the air. It shares "
       "its slot&with Nayru's Love.",
       "Du hast %rRocs Feder%w erhalten!&Weise sie %y\xA1%w zu und drücke,&um in die Luft zu springen.&Sie teilt sich "
@@ -126,10 +154,17 @@ static const CustomItemMessageEntry customItemMessages[] = {
     // messages into the unified registry (sNeiItems[] in extended_player.c). GetCustomItemMessage
     // falls back to those rows via Nei_FindByRg. Only items NOT in that registry remain below.
 
+    // ITEM_CUSTOM stages the catalog's custom icon. Extended item IDs would
+    // truncate in the one-byte pickup icon command.
+    { RG_PHANTOM_HOURGLASS, ITEM_CUSTOM, ComboToolReceiptText::kPhantomHourglass.english,
+      ComboToolReceiptText::kPhantomHourglass.german, ComboToolReceiptText::kPhantomHourglass.french },
+    { RG_SHADOW_CRYSTAL, ITEM_CUSTOM, ComboToolReceiptText::kShadowCrystal.english,
+      ComboToolReceiptText::kShadowCrystal.german, ComboToolReceiptText::kShadowCrystal.french },
+
     // ─────────────────────────────────────────────────────────────────────────
     // Extended Equipment (12 items, equipment page 2 - toggled via [L] in pause)
     // ─────────────────────────────────────────────────────────────────────────
-    { RG_EXT_CANE_OF_BYRNA, static_cast<ItemID>(ITEM_EXT_SWORD_1),
+    { RG_EXT_CANE_OF_BYRNA, static_cast<int32_t>(ITEM_EXT_SWORD_1),
       "You got the %cCane of Byrna%w!&A blue cane of legend.^Equip on the %ysword slot%w&(%y\xA2%w toggles equipment "
       "pages).^%y\xA0\xA0\xA0%w chains, %yforward + \xA0%w thrusts,&%y\xA4%w + %y\x9F%w jump-slashes, and %y\xA3%w "
       "sends&the %gKinsect%w - at full charge it&launches you instead.^Airborne: %y\x9F%w dashes, %y\xA0%w spins,&"
@@ -143,7 +178,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "saute, %y\xA3%w lance&le %gKinsect%w - à pleine charge&c'est vous qu'il propulse.^En l'air: %y\x9F%w foncez, "
       "%y\xA0%w tournoyez,&%y\xA3%w écrasez." },
 
-    { RG_EXT_FOUR_SWORD, static_cast<ItemID>(ITEM_EXT_SWORD_2),
+    { RG_EXT_FOUR_SWORD, static_cast<int32_t>(ITEM_EXT_SWORD_2),
       "You got the %gFour Sword%w!&A blade that splits its wielder&into four heroes.^Equip on the %ysword slot%w "
       "(%y\xA2%w toggles).^Hold %y\xA3%w + %y\xA0%w for 15 frames ->&%g3 colored clones%w (Red/Blue/Purple)&spawn "
       "around you in a triangle.^Each clone costs %g12 Magic%w.&Clones %gmirror your swings%w and copy&your "
@@ -157,7 +192,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "(Rouge/Bleu/Violet)&apparaissent en triangle.^Chaque clone coûte %g12 Magie%w.&Les clones %gimitent vos coups%w "
       "et copient&%gflèches%w, %gbombes%w et %gboomerang%w.^Les ennemis les tuent au contact." },
 
-    { RG_PROGRESSIVE_HAMMER, static_cast<ItemID>(ITEM_HAMMER),
+    { RG_PROGRESSIVE_HAMMER, static_cast<int32_t>(ITEM_HAMMER),
       "You got a %rProgressive Hammer%w!&First the %rMegaton Hammer%w, then the&%rIron Knuckle's Axe%w - %gdouble "
       "damage%w,&%gdouble reach%w, and a tomahawk&%rthrow%w that boomerangs back.^%y\xA5%w aims it, the hammer's own "
       "%y\xA1%w&button lets it fly.",
@@ -168,7 +203,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "tomahawk&massif des chevaliers de Ganon.^Coups lourds:&%gdouble dégâts%w, %gdouble portée%w,&marche plus "
       "lente.^%y\xA5%w vise, la touche %y\xA1%w de la masse&%rlance%w la hache - elle revient&en boomerang." },
 
-    { RG_PROGRESSIVE_KOKIRI_SWORD, static_cast<ItemID>(ITEM_SWORD_KOKIRI),
+    { RG_PROGRESSIVE_KOKIRI_SWORD, static_cast<int32_t>(ITEM_SWORD_KOKIRI),
       "You got a %gKokiri Sword Upgrade%w!&Sharpens your %gKokiri Sword%w&into the %gRazor Sword%w, then the&%gGilded "
       "Sword%w.",
       "Du hast ein %gKokiri-Schwert-Upgrade%w!&Schärft dein %gKokiri-Schwert%w&zum %gElfenschwert%w, dann "
@@ -176,13 +211,13 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Vous obtenez une %gAmélioration d'Épée Kokiri%w!&Aiguise votre %gÉpée Kokiri%w&en %gLame Rasoir%w, puis "
       "en&%gExcalibur%w." },
 
-    { RG_PROGRESSIVE_MASTER_SWORD, static_cast<ItemID>(ITEM_SWORD_MASTER),
+    { RG_PROGRESSIVE_MASTER_SWORD, static_cast<int32_t>(ITEM_SWORD_MASTER),
       "You got a %cProgressive Master Sword%w!&First the %cMaster Sword%w, then the&%cReal Master Sword%w - at full "
       "health&a swing fires a thunder beam.",
       "Du hast das %cWahre Master-Schwert%w!&Dein %cMaster-Schwert%w erwacht zu&seiner wahren Kraft.",
       "Vous obtenez la %cVéritable Épée de Légende%w!&Votre %cÉpée de Légende%w révèle&son vrai pouvoir." },
 
-    { RG_PROGRESSIVE_BGS, static_cast<ItemID>(ITEM_SWORD_BGS),
+    { RG_PROGRESSIVE_BGS, static_cast<int32_t>(ITEM_SWORD_BGS),
       "You got a %pProgressive Biggoron's Sword%w!&First the %yBiggoron Sword%w, then the&%pGreat Fairy's Sword%w - "
       "long reach&that restores HP and Magic on hit.",
       "Du hast das %pSchwert der Großen Fee%w!&Dein %yBiggoron-Schwert%w wird zur&legendären Klinge der Großen "
@@ -192,20 +227,20 @@ static const CustomItemMessageEntry customItemMessages[] = {
 
     // Per-level chain identities: the progressive resolution (item.cpp) lands on these, so each
     // give reads as the level actually received. Skijer's NEI
-    { RG_RAZOR_SWORD, static_cast<ItemID>(ITEM_SWORD_KOKIRI),
+    { RG_RAZOR_SWORD, static_cast<int32_t>(ITEM_SWORD_KOKIRI),
       "You got the %gRazor Sword%w!&Your Kokiri Sword has been&sharpened into a keener blade -&%gdouble damage%w on "
       "every slash.",
       "Du hast das %gElfenschwert%w!&Dein Kokiri-Schwert wurde zu&einer schärferen Klinge geschliffen -&%gdoppelter "
       "Schaden%w.",
       "Vous obtenez la %gLame Rasoir%w!&Votre Épée Kokiri a été aiguisée -&%gdégâts doublés%w à chaque coup." },
 
-    { RG_GILDED_SWORD, static_cast<ItemID>(ITEM_SWORD_KOKIRI),
+    { RG_GILDED_SWORD, static_cast<int32_t>(ITEM_SWORD_KOKIRI),
       "You got the %yGilded Sword%w!&Reforged with gold dust, the&final form of your Kokiri blade -&%ydouble damage%w "
       "and it never dulls.",
       "Du hast die %ySchmirgelklinge%w!&Mit Goldstaub neu geschmiedet -&die finale Form deiner Kokiri-Klinge.",
       "Vous obtenez %yExcalibur%w!&Reforgée avec de la poudre d'or -&la forme finale de votre lame Kokiri." },
 
-    { RG_TRUE_MASTER_SWORD, static_cast<ItemID>(ITEM_SWORD_MASTER),
+    { RG_TRUE_MASTER_SWORD, static_cast<int32_t>(ITEM_SWORD_MASTER),
       "The %cMaster Sword%w has awakened as&the %cTrue Master Sword%w!&At full health, a swing fires a&%cthunder "
       "beam%w at your foes.",
       "Das %cMaster-Schwert%w ist als&%cWahres Master-Schwert%w erwacht!&Bei voller Energie feuert jeder&Schwung einen "
@@ -213,7 +248,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "L'%cÉpée de Légende%w s'éveille en&%cVéritable Épée de Légende%w!&Pleine vie: chaque coup tire&un %crayon de "
       "tonnerre%w." },
 
-    { RG_GREAT_FAIRY_SWORD, static_cast<ItemID>(ITEM_SWORD_BGS),
+    { RG_GREAT_FAIRY_SWORD, static_cast<int32_t>(ITEM_SWORD_BGS),
       "You got the %pGreat Fairy's Sword%w!&Your Biggoron Sword reforged into&the fairy blade - hits %prestore&HP and "
       "Magic%w.",
       "Du hast das %pSchwert der Großen Fee%w!&Dein Biggoron-Schwert, neu geschmiedet -&Treffer %pstellen Herzen und "
@@ -221,7 +256,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Vous obtenez l'%pÉpée de la Grande Fée%w!&Votre Épée de Biggoron reforgée -&les coups %prestaurent vie et "
       "magie%w." },
 
-    { RG_IRON_KNUCKLE_AXE, static_cast<ItemID>(ITEM_HAMMER),
+    { RG_IRON_KNUCKLE_AXE, static_cast<int32_t>(ITEM_HAMMER),
       "You got the %rIron Knuckle's Axe%w!&The massive tomahawk of Ganon's&knights - %gdouble damage%w, %gdouble "
       "reach%w.^%y\xA5%w aims the %rthrow%w, the hammer's&own %y\xA1%w button lets it fly.",
       "Du hast die %rEisenknöchel-Axt%w!&Der massive Tomahawk der Ritter&Ganons - %gdoppelter Schaden%w,&%gdoppelte "
@@ -229,14 +264,14 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Vous obtenez la %rHache d'Iron Knuckle%w!&Le tomahawk massif des chevaliers&de Ganon - %gdouble "
       "dégâts%w,&%gdouble portée%w.^%y\xA5%w vise, la touche %y\xA1%w de la&masse la %rlance%w." },
 
-    { RG_ULTRASHOT, static_cast<ItemID>(ITEM_LONGSHOT),
+    { RG_ULTRASHOT, static_cast<int32_t>(ITEM_LONGSHOT),
       "You got the %yUltrashot%w!&Your Longshot surges with light -&%y4x reach%w and %y2x speed%w.&Nothing is out of "
       "range now.",
       "Du hast den %yUltraschot%w!&Dein Enterhaken pulsiert vor Licht -&%y4-fache Reichweite%w, "
       "%y2-fache&Geschwindigkeit%w.",
       "Vous obtenez l'%yUltra-Grappin%w!&Votre grappin déborde de lumière -&%yportée x4%w et %yvitesse x2%w." },
 
-    { RG_QUARTZ_OF_MOTION, static_cast<ItemID>(ITEM_STONE_OF_AGONY),
+    { RG_QUARTZ_OF_MOTION, static_cast<int32_t>(ITEM_STONE_OF_AGONY),
       "Your Stone of Agony crystallized&into the %pQuartz of Motion%w!&Press %yA%w on its pause slot&to attune to "
       "hidden movement.",
       "Dein Stein der Qualen wurde zum&%pBewegungsquarz%w!&Drücke %yA%w auf seinem Menüplatz&um verborgene Bewegung zu "
@@ -244,39 +279,39 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre Pierre de Souffrance devient&le %pQuartz du Mouvement%w!&Appuyez sur %yA%w dans le menu&pour sentir les "
       "mouvements cachés." },
 
-    { RG_ROCS_CAPE, static_cast<ItemID>(ITEM_ROCS_CAPE),
+    { RG_ROCS_CAPE, static_cast<int32_t>(ITEM_ROCS_CAPE),
       "Your feather grew into the&%rRoc's Cape%w!&Jump, then hold the button to&%rglide%w gently to the ground.",
       "Deine Feder wurde zum&%rRocs Umhang%w!&Springe und halte die Taste&um sanft zu %rgleiten%w.",
       "Votre plume devient la&%rCape de Roc%w!&Sautez puis maintenez pour&%rplaner%w doucement." },
 
     // Dual Cane per-skill textboxes (order: Statue keeps RG_CANE_OF_SOMARIA's own message).
-    { RG_CANE_PACCI_FLIP, static_cast<ItemID>(ITEM_CANE_OF_SOMARIA),
+    { RG_CANE_PACCI_FLIP, static_cast<int32_t>(ITEM_CANE_OF_SOMARIA),
       "You got the %yCane of Pacci%w!&Its charge %yflips objects%w and&%ylaunches you%w from holes.&It shares the "
       "cane's slot.",
       "Du hast den %yStab von Pacci%w!&Seine Ladung %ydreht Objekte um%w&und %ykatapultiert dich%w aus Löchern.",
       "Vous obtenez la %yCanne de Pacci%w!&Sa charge %yretourne les objets%w&et vous %ypropulse%w des trous." },
 
-    { RG_CANE_SOMARIA_BLOCK, static_cast<ItemID>(ITEM_CANE_OF_SOMARIA),
+    { RG_CANE_SOMARIA_BLOCK, static_cast<int32_t>(ITEM_CANE_OF_SOMARIA),
       "Your Cane of Somaria learned&%rBlock%w!&Conjure a %rsolid block%w to push,&weigh switches, or climb on.",
       "Dein Stab von Somaria lernte&%rBlock%w!&Beschwöre einen %rfesten Block%w&für Schalter und Kletterei.",
       "Votre Canne de Somaria apprend&%rBloc%w!&Créez un %rbloc solide%w à pousser&ou pour grimper." },
 
-    { RG_CANE_PACCI_STONE, static_cast<ItemID>(ITEM_CANE_OF_SOMARIA),
+    { RG_CANE_PACCI_STONE, static_cast<int32_t>(ITEM_CANE_OF_SOMARIA),
       "Your Cane of Pacci learned&%yStone%w!&%yPetrify enemies%w and use them&as stepping stones.",
       "Dein Stab von Pacci lernte&%yStein%w!&%yVersteinere Gegner%w und nutze&sie als Trittsteine.",
       "Votre Canne de Pacci apprend&%yPierre%w!&%yPétrifiez les ennemis%w et&servez-vous-en de marches." },
 
-    { RG_CANE_SOMARIA_PLATFORM, static_cast<ItemID>(ITEM_CANE_OF_SOMARIA),
+    { RG_CANE_SOMARIA_PLATFORM, static_cast<int32_t>(ITEM_CANE_OF_SOMARIA),
       "Your Cane of Somaria learned&%rPlatform%w!&Conjure a %rfloating platform%w&that carries you across gaps.",
       "Dein Stab von Somaria lernte&%rPlattform%w!&Beschwöre eine %rschwebende&Plattform%w über Abgründe.",
       "Votre Canne de Somaria apprend&%rPlateforme%w!&Créez une %rplateforme flottante%w&pour franchir les vides." },
 
-    { RG_CANE_PACCI_ULTRAHAND, static_cast<ItemID>(ITEM_CANE_OF_SOMARIA),
+    { RG_CANE_PACCI_ULTRAHAND, static_cast<int32_t>(ITEM_CANE_OF_SOMARIA),
       "Your Cane of Pacci learned&%yUltrahand%w!&%yGrab, move and attach%w distant&objects with the glowing hand.",
       "Dein Stab von Pacci lernte&%yUltrahand%w!&%yGreife und bewege%w ferne Objekte&mit der leuchtenden Hand.",
       "Votre Canne de Pacci apprend&%yUltrahand%w!&%ySaisissez et déplacez%w des objets&avec la main lumineuse." },
 
-    { RG_EXT_DIVINE_SHIELD, static_cast<ItemID>(ITEM_EXT_SHIELD_1),
+    { RG_EXT_DIVINE_SHIELD, static_cast<int32_t>(ITEM_EXT_SHIELD_1),
       "You got the %yDivine Shield%w!&A blessed wooden shield said to&repel even the wrath of fire.^Equip on the "
       "%yshield slot%w (%y\xA2%w toggles).^Light wooden shield BUT %rfireproof%w -&fire breath, Dodongo flames "
       "and&torches will not burn it.^%cPerfect Parry%w (%y\xA3%w + block within&10 frames of an attack):&%cfreezes ALL "
@@ -290,7 +325,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "ne le brûlent pas.^%cParade Parfaite%w (%y\xA3%w + bloquer dans&les 10 premières frames d'une attaque):&%cgèle "
       "TOUS les ennemis%w à l'écran!" },
 
-    { RG_EXT_SHEIKAH_SHIELD, static_cast<ItemID>(ITEM_EXT_SHIELD_2),
+    { RG_EXT_SHEIKAH_SHIELD, static_cast<int32_t>(ITEM_EXT_SHIELD_2),
       "You got the %cKite Shield%w!&A rider's shield, made to be&stood on.^Equip on the %yshield slot%w "
       "(%y\xA2%w toggles).^Press %y\xA3%w %rin mid-air%w to drop it&under your feet and %gsurf%w.&Downhill builds "
       "speed with no cap.^%y\x9F%w hops, %y\xA0%w spins,&%y\xA0%w + %y\xA3%w gets off.",
@@ -301,7 +336,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "l'%yemplacement bouclier%w.^%y\xA3%w %ren l'air%w le glisse sous vos&pieds et vous %gsurfez%w.&En descente, "
       "aucune limite de vitesse.^%y\x9F%w saute, %y\xA0%w pivote,&%y\xA0%w + %y\xA3%w descend." },
 
-    { RG_EXT_SHIELD_OF_IKANA, static_cast<ItemID>(ITEM_EXT_SHIELD_3),
+    { RG_EXT_SHIELD_OF_IKANA, static_cast<int32_t>(ITEM_EXT_SHIELD_3),
       "You got the %pShield of Ikana%w!&A cursed mirror shield from the&fallen kingdom of Ikana.^Equip on the %yshield "
       "slot%w (%y\xA2%w toggles).^%cSoul Drain%w (%y\xA3%w + block within&12 frames of an attack):&drains the "
       "attacker's %rHP%w and&heals you for half a heart.^%pDeath Save%w: when struck dead,&%previves once per scene%w "
@@ -312,10 +347,10 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "pro Szene%w mit&3 Herzen und dunkler Aura.",
       "Vous obtenez le %pBouclier d'Ikana%w!&Un bouclier-miroir maudit du&royaume déchu d'Ikana.^Équipez-le dans "
       "l'%yemplacement bouclier%w.^%cVol d'Âme%w (%y\xA3%w + bloquer dans&les 12 premières frames d'une attaque):&vole "
-      "les %rPV%w de l'attaquant et&vous soigne d'un demi-cœur.^%pSauvegarde de Mort%w: ressuscite&%pune fois par "
-      "scène%w avec 3 cœurs&et une aura sombre." },
+      "les %rPV%w de l'attaquant et&vous soigne d'un demi-coeur.^%pSauvegarde de Mort%w: ressuscite&%pune fois par "
+      "scène%w avec 3 coeurs&et une aura sombre." },
 
-    { RG_EXT_TRIDENT, static_cast<ItemID>(ITEM_EXT_SWORD_3),
+    { RG_EXT_TRIDENT, static_cast<int32_t>(ITEM_EXT_SWORD_3),
       "You got the %pTrident%w!&A gunlance in all but name.^Equip on the %ysword slot%w (%y\xA2%w toggles).^%y\xA0%w "
       "chains three slashes, %yforward + \xA0%w&lunges, and %rholding%w %y\xA0%w charges&three levels - the last one "
       "fires.^%y\xA3%w guards, %y\xA3%w + %y\xA0%w dashes with the&lance out front, and %rholding%w %y\xA3%w + "
@@ -330,7 +365,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "le dernier tire.^%y\xA3%w pare, %y\xA3%w + %y\xA0%w charge lance en&avant, %rmaintenir%w %y\xA3%w + %y\x9F%w "
       "fait %gvoler%w.^En vol: le stick dirige, %y\xA3%w monte,&%y\xA2%w descend, %y\xA0%w tire, %y\x9F%w plonge." },
 
-    { RG_EXT_CLIMB_BOOTS, static_cast<ItemID>(ITEM_EXT_BOOTS_2),
+    { RG_EXT_CLIMB_BOOTS, static_cast<int32_t>(ITEM_EXT_BOOTS_2),
       "You got the %yClimb Boots%w!&Equip on the %yboots slot%w (%y\xA2%w toggles).^They grip every floor: %cice%w "
       "stops&being slippery and %csteep slopes%w&stop sliding you away.",
       "Du hast die %yKletterstiefel%w!&Rüste sie am %yStiefel-Platz%w aus.^Sie greifen jeden Boden: %cEis%w ist&nicht "
@@ -338,7 +373,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Vous obtenez les %yBottes d'Escalade%w!&Équipez-les dans l'%yemplacement bottes%w.^Elles agrippent tout sol: "
       "la %cglace%w&ne glisse plus et les %cpentes raides%w&ne vous font plus déraper." },
 
-    { RG_EXT_ROC_BOOTS, static_cast<ItemID>(ITEM_EXT_BOOTS_3),
+    { RG_EXT_ROC_BOOTS, static_cast<int32_t>(ITEM_EXT_BOOTS_3),
       "You got %rRoc's Boots%w!&Equip on the %yboots slot%w (%y\xA2%w toggles).^%cWater and lava%w become solid "
       "ground&under your feet, and you fall at&%chalf gravity%w - so every jump&goes higher.",
       "Du hast %rRocs Stiefel%w!&Rüste sie am %yStiefel-Platz%w aus.^%cWasser und Lava%w werden zu festem&Boden, und "
@@ -348,7 +383,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
 
     // (2026-08-07: texto legacy corregido — la capa ya NO ocupa el slot de túnica; es una pieza
     // propia de la columna de upgrades que se activa sola al poseerla.)
-    { RG_EXT_MAGIC_CAPE, static_cast<ItemID>(ITEM_EXT_TUNIC_1),
+    { RG_EXT_MAGIC_CAPE, static_cast<int32_t>(ITEM_EXT_TUNIC_1),
       "You got the %pMagic Cape%w!&Ganondorf's enchanted cloak,&woven of pure dark mantle cloth.^It %phangs from your "
       "shoulders%w the&moment you own it - real %pcloth&physics%w sway with movement and wind.^All magic %ccosts are "
       "halved%w&(rounded down) while you own it -&cheap items become free.",
@@ -359,7 +394,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "vos épaules%w dès que&vous la possédez - %pphysique de&tissu%w réelle au vent.^Tous les %ccoûts de magie sont "
       "réduits&de moitié%w (arrondi vers le bas)." },
 
-    { RG_EXT_SPIRIT_BREASTPLATE, static_cast<ItemID>(ITEM_EXT_TUNIC_2),
+    { RG_EXT_SPIRIT_BREASTPLATE, static_cast<int32_t>(ITEM_EXT_TUNIC_2),
       "You got the %ySpirit Tunic%w!&The golden ward of the Iron&Knuckle Nabooru.^Equip on the %ytunic slot%w "
       "(%y\xA2%w toggles).^Damage costs %gRupees%w instead&of hearts (1 HP = 1 Rupee), and&some of it spills out as "
       "pickups.^While you hold Rupees the %rheat%w and&%bunderwater%w timers never start.^If your wallet runs "
@@ -368,11 +403,11 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "aus.^Schaden kostet %gRupien%w statt&Herzen (1 HP = 1 Rupie).&%gPassiver Verbrauch%w: 1 Rupie alle&30 Frames im "
       "Tragen.^Wenn dein Beutel %rleer%w ist,&erleidest du Schaden normal und&bewegst dich halb so schnell.",
       "Vous obtenez le %yPlastron Spirituel%w!&L'armure dorée de l'Iron Knuckle&Nabooru.^Équipez-le dans "
-      "l'%yemplacement tunique%w.^Les dégâts coûtent des %gRubis%w au&lieu de cœurs (1 PV = 1 Rubis).&%gDrain "
+      "l'%yemplacement tunique%w.^Les dégâts coûtent des %gRubis%w au&lieu de coeurs (1 PV = 1 Rubis).&%gDrain "
       "passif%w: 1 Rubis toutes&les 30 frames tant que porté.^Si votre bourse est %rvide%w,&vous prenez les dégâts "
       "normalement&et bougez à mi-vitesse." },
 
-    { RG_EXT_CHAMPIONS_TUNIC, static_cast<ItemID>(ITEM_EXT_TUNIC_1),
+    { RG_EXT_CHAMPIONS_TUNIC, static_cast<int32_t>(ITEM_EXT_TUNIC_1),
       "You got the %cChampion's Tunic%w!&The blue garb of Hyrule's chosen,&blessed with battle aura.^Equip on the "
       "%ytunic slot%w (%y\xA2%w toggles).&Dyes your tunic %cchampion blue%w.^%gFlurry Rush%w: sidehop or backflip&past "
       "a nearby attack -> world slows&to 33% with iframes for ~2s or&until you land 7 hits.^%cBullet Time%w: aim while "
@@ -389,7 +424,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "coups.^%cBullet Time%w: visez en l'air avec&arc/lance-pierre/grappin/boomerang&-> le temps ralentit, vous "
       "flottez et&la visée normale reste active." },
 
-    { RG_EXT_PEGASUS_ANKLET, static_cast<ItemID>(ITEM_EXT_BOOTS_1),
+    { RG_EXT_PEGASUS_ANKLET, static_cast<int32_t>(ITEM_EXT_BOOTS_1),
       "You got the %rPegasus Anklet%w!&Winged anklets that grant the&speed of the legendary Pegasus.^Equip on the "
       "%yboots slot%w (%y\xA2%w toggles).^Hold %y\xA0%w after a sword swing&(intercepts the spin attack charge):&Link "
       "%glunges forward%w with sword&extended, dealing damage on contact.^A %gwind cone barrier%w forms in&front while "
@@ -403,7 +438,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "tournoyante):&Link %ss'élance%w l'épée tendue,&infligeant des dégâts au contact.^Un %gcône de vent%w protecteur "
       "se forme&devant tant que vous avez de la Magie&(1 MP toutes les 15 frames).&Les murs causent un %rchoc%w." },
 
-    { RG_EXT_PENDANT_OF_MEMORIES, static_cast<ItemID>(ITEM_EXT_BOOTS_2),
+    { RG_EXT_PENDANT_OF_MEMORIES, static_cast<int32_t>(ITEM_EXT_BOOTS_2),
       "You got the %pPendant of Memories%w!&A pendant carrying the techniques&of heroes past.^Equip on the %yboots "
       "slot%w (%y\xA2%w toggles).^Three combat techniques unlock:^%c#1 Mortal Draw%w (TP): %y\xA0%w near an&enemy + "
       "sheathed + still + NOT&%y\xA4%w-targeting -> devastating draw&slash, often a one-hit kill.^%c#2 Ground Pound%w "
@@ -422,7 +457,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Parry Leap%w (WW): %y\xA4%w-cible +&3 esquives + %y\xA0%w -> arc parabolique&par-dessus l'ennemi, atterrir "
       "derrière." },
 
-    { RG_EXT_WATER_DRAGON_SCALE, static_cast<ItemID>(ITEM_EXT_TUNIC_3),
+    { RG_EXT_WATER_DRAGON_SCALE, static_cast<int32_t>(ITEM_EXT_TUNIC_3),
       "You got the %wSage's Tunic%w!&Equip it on the %ytunic slot%w.^Its passive resistances follow your&owned "
       "medallions: %bice%w, %rfire%w,&%ythunder%w, %pstun%w, fall and wind.",
       "Du hast das %wOrni-Gewand%w!&Rüste es am %yTunika-Platz%w aus.^Seine Resistenzen folgen deinen&Medaillons: "
@@ -432,7 +467,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
 
     // Sheikah Slate runes — one textbox per sibling pickup (wand idiom). The icon is the slate
     // composite with the rune's badge; the flame on the get-item model matches the color named here.
-    { RG_SLATE_RUNE_BOMB, static_cast<ItemID>(EXT_ITEM_SHEIKAH_SLATE),
+    { RG_SLATE_RUNE_BOMB, static_cast<int32_t>(EXT_ITEM_SHEIKAH_SLATE),
       "Your %cSheikah Slate%w learned the&%bRemote Bomb%w rune!&An ancient rune glows cyan on&the slate's face.^Select "
       "it by holding %y\xA2%w for the rune&wheel. %y\xA1%w draws the slate, then&casts the active rune.",
       "Dein %cSheikah-Stein%w hat das&%bFernzündbomben%w-Modul gelernt!&Eine uralte Rune leuchtet cyan&auf dem "
@@ -440,7 +475,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre %cTablette Sheikah%w apprend le&module %bBombe à Distance%w!&Une rune ancienne brille en cyan&sur la "
       "tablette.^Sélectionnez-la en maintenant %y\xA2%w:&la roue des runes. "
       "%y\xA1%w sort la&tablette, puis lance la rune active." },
-    { RG_SLATE_RUNE_MASTER_CYCLE, static_cast<ItemID>(EXT_ITEM_SHEIKAH_SLATE),
+    { RG_SLATE_RUNE_MASTER_CYCLE, static_cast<int32_t>(EXT_ITEM_SHEIKAH_SLATE),
       "Your %cSheikah Slate%w learned the&%gMaster Cycle%w rune!&An ancient rune glows teal on&the slate's "
       "face.^Select it by holding %y\xA2%w for the rune&wheel. %y\xA1%w draws the slate, then&casts the active rune.",
       "Dein %cSheikah-Stein%w hat das&%gMaster Cycle%w-Modul gelernt!&Eine uralte Rune leuchtet türkis&auf dem "
@@ -448,7 +483,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre %cTablette Sheikah%w apprend le&module %gMaster Cycle%w!&Une rune ancienne brille en turquoise&sur la "
       "tablette.^Sélectionnez-la en maintenant %y\xA2%w:&la roue des runes. "
       "%y\xA1%w sort la&tablette, puis lance la rune active." },
-    { RG_SLATE_RUNE_STASIS, static_cast<ItemID>(EXT_ITEM_SHEIKAH_SLATE),
+    { RG_SLATE_RUNE_STASIS, static_cast<int32_t>(EXT_ITEM_SHEIKAH_SLATE),
       "Your %cSheikah Slate%w learned the&%yStasis%w rune!&An ancient rune glows gold on&the slate's face.^Select it "
       "by holding %y\xA2%w for the rune&wheel. %y\xA1%w draws the slate, then&casts the active rune.",
       "Dein %cSheikah-Stein%w hat das&%yStasis%w-Modul gelernt!&Eine uralte Rune leuchtet golden&auf dem Stein.^Wähle "
@@ -456,7 +491,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre %cTablette Sheikah%w apprend le&module %yCinetis%w!&Une rune ancienne brille en or&sur la "
       "tablette.^Sélectionnez-la en maintenant %y\xA2%w:&la roue des runes. "
       "%y\xA1%w sort la&tablette, puis lance la rune active." },
-    { RG_SLATE_RUNE_CRYONIS, static_cast<ItemID>(EXT_ITEM_SHEIKAH_SLATE),
+    { RG_SLATE_RUNE_CRYONIS, static_cast<int32_t>(EXT_ITEM_SHEIKAH_SLATE),
       "Your %cSheikah Slate%w learned the&%bCryonis%w rune!&An ancient rune glows ice-blue on&the slate's face.^Select "
       "it by holding %y\xA2%w for the rune&wheel. %y\xA1%w draws the slate, then&casts the active rune.",
       "Dein %cSheikah-Stein%w hat das&%bCryonis%w-Modul gelernt!&Eine uralte Rune leuchtet eisblau&auf dem "
@@ -465,19 +500,18 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "tablette.^Sélectionnez-la en maintenant %y\xA2%w:&la roue des runes. "
       "%y\xA1%w sort la&tablette, puis lance la rune active." },
 
-    { RG_DESIRE_SENSOR, static_cast<ItemID>(EXT_ITEM_SHEIKAH_SLATE),
+    { RG_DESIRE_SENSOR, static_cast<int32_t>(EXT_ITEM_SHEIKAH_SLATE),
       "Your %cSheikah Slate%w learned the&%pSensor%w rune!&An ancient rune glows violet on&the slate's face.^Cast it "
       "to ask where one of your&%gdesired items%w hides. Each answer&costs a %rHeart Container%w, forever.",
       "Dein %cSheikah-Stein%w hat das&%pSensor%w-Modul gelernt!&Eine uralte Rune leuchtet violett&auf dem "
-      "Stein.^Frage damit, wo eines deiner&%gWunsch-Items%w liegt. Jede Antwort&kostet ein %rHerzteil%w, f\xFCr immer.",
+      "Stein.^Frage damit, wo eines deiner&%gWunsch-Items%w liegt. Jede Antwort&kostet ein %rHerzteil%w, für immer.",
       "Votre %cTablette Sheikah%w apprend le&module %pCapteur%w!&Une rune ancienne brille en violet&sur la "
-      "tablette.^Demandez o\xF9 se cache un de vos&%gobjets d\xE9sir\xE9s%w. Chaque r\xE9ponse&co\xFB"
-      "te un %rC\x9C"
-      "ur%w, pour toujours." },
+      "tablette.^Demandez où se cache un de vos&%gobjets désirés%w. Chaque réponse&coûte un %rCoeur%w, pour "
+      "toujours." },
 
     // Rod of Seasons — one textbox per sibling pickup. The flame on the get-item model matches the
     // colour named here, and hold %y\xA0%w on the rod's button opens the season wheel.
-    { RG_SEASON_SPRING, static_cast<ItemID>(EXT_ITEM_ROD_OF_SEASONS),
+    { RG_SEASON_SPRING, static_cast<int32_t>(EXT_ITEM_ROD_OF_SEASONS),
       "Your %cRod of Seasons%w drew in&%pSpring%w!&Blossom drifts on the wind&wherever you carry it.^%rPress%w the "
       "rod's %y\xA1%w button again to&change season. %y\x9F%w confirms, %y\xA0%w cancels.",
       "Dein %cZepter der Jahreszeiten%w zog&den %pFrühling%w ein!&Blüten treiben im Wind,&wohin du es auch "
@@ -485,7 +519,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre %cSceptre des Saisons%w attire&le %pPrintemps%w!&Les pétales dérivent au vent&où que vous "
       "alliez.^%rAppuyez%w sur la touche %y\xA1%w du sceptre&pour changer de saison." },
 
-    { RG_SEASON_SUMMER, static_cast<ItemID>(EXT_ITEM_ROD_OF_SEASONS),
+    { RG_SEASON_SUMMER, static_cast<int32_t>(EXT_ITEM_ROD_OF_SEASONS),
       "Your %cRod of Seasons%w drew in&%ySummer%w!&The sky stays clear and the sun&stands high.^%rPress%w the rod's "
       "%y\xA1%w button again to&change season. %y\x9F%w confirms, %y\xA0%w cancels.",
       "Dein %cZepter der Jahreszeiten%w zog&den %ySommer%w ein!&Der Himmel bleibt klar und die&Sonne steht "
@@ -493,7 +527,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre %cSceptre des Saisons%w attire&l'%yÉté%w!&Le ciel reste clair et le soleil&est au zénith.^%rMaintenez%w "
       "la touche %y\xA1%w du sceptre&pour changer de saison." },
 
-    { RG_SEASON_AUTUMN, static_cast<ItemID>(EXT_ITEM_ROD_OF_SEASONS),
+    { RG_SEASON_AUTUMN, static_cast<int32_t>(EXT_ITEM_ROD_OF_SEASONS),
       "Your %cRod of Seasons%w drew in&%rAutumn%w!&The sky greys over and the rain&never quite stops.^%rPress%w the "
       "rod's %y\xA1%w button again to&change season. %y\x9F%w confirms, %y\xA0%w cancels.",
       "Dein %cZepter der Jahreszeiten%w zog&den %rHerbst%w ein!&Der Himmel vergraut und der Regen&hört kaum "
@@ -501,7 +535,7 @@ static const CustomItemMessageEntry customItemMessages[] = {
       "Votre %cSceptre des Saisons%w attire&l'%rAutomne%w!&Le ciel se voile et la pluie&ne cesse "
       "jamais.^%rAppuyez%w sur la touche %y\xA1%w du sceptre&pour changer de saison." },
 
-    { RG_SEASON_WINTER, static_cast<ItemID>(EXT_ITEM_ROD_OF_SEASONS),
+    { RG_SEASON_WINTER, static_cast<int32_t>(EXT_ITEM_ROD_OF_SEASONS),
       "Your %cRod of Seasons%w drew in&%bWinter%w!&Snow falls under every open sky&you walk beneath.^%rPress%w the "
       "rod's %y\xA1%w button again to&change season. %y\x9F%w confirms, %y\xA0%w cancels.",
       "Dein %cZepter der Jahreszeiten%w zog&den %bWinter%w ein!&Unter jedem freien Himmel&fällt nun Schnee.^%rHalte%w "
@@ -524,7 +558,7 @@ const CustomItemMessageEntry* GetCustomItemMessage(s16 rgId) {
     if (nei != nullptr && nei->nameEn != nullptr) {
         static CustomItemMessageEntry neiMsg;
         neiMsg.rgId = rgId;
-        neiMsg.itemId = static_cast<ItemID>(nei->item);
+        neiMsg.itemId = nei->item;
         neiMsg.english = nei->nameEn;
         // Rows may leave FR/DE as NULL — fall back to English so the CustomMessage
         // std::string ctor never receives a null char* (crash on textbox open).
@@ -553,12 +587,15 @@ bool Rando_HandleSpoilerDrop(char* filePath) {
         // ComboShip: a dropped consolidated combo spoiler — route it to the combo reload path (see
         // FileChoose_UpdateRandomizer) rather than SoH's ParseSpoiler. Only flag it here.
         if (json.value("fileType", std::string()) == "ComboShipRandomizer") {
+            if (!Combo_IsCombinedGame()) {
+                return false;
+            }
             CVarSetString(CVAR_GENERAL("ComboDroppedFile"), filePath);
             return true;
         }
 #endif
 
-        if (json.contains("version") && json.contains("finalSeed")) {
+        if (!Combo_IsCombinedGame() && json.contains("version") && json.contains("finalSeed")) {
             CVarSetString(CVAR_GENERAL("RandomizerDroppedFile"), filePath);
             CVarSetInteger(CVAR_GENERAL("RandomizerNewFileDropped"), 1);
             return true;
@@ -607,7 +644,7 @@ std::unordered_map<std::string, SceneID> spoilerFileDungeonToScene = {
 
 #ifdef _MSC_VER
 #pragma optimize("", off)
-#else
+#elif defined(__GNUC__) && !defined(__clang__)
 #pragma GCC push_options
 #pragma GCC optimize("O0")
 #endif
@@ -683,7 +720,7 @@ bool Randomizer::SpoilerFileExists(const char* spoilerFileName) {
 }
 #ifdef _MSC_VER
 #pragma optimize("", on)
-#else
+#elif defined(__GNUC__) && !defined(__clang__)
 #pragma GCC pop_options
 #endif
 
@@ -982,8 +1019,6 @@ ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerGet(RandomizerGe
             } else {
                 return Flags_GetRandomizerInf(RAND_INF_OBTAINED_NAYRUS_LOVE) ? CANT_OBTAIN_ALREADY_HAVE : CAN_OBTAIN;
             }
-        case RG_ROCS_FEATHER:
-            return Flags_GetRandomizerInf(RAND_INF_OBTAINED_ROCS_FEATHER) ? CANT_OBTAIN_ALREADY_HAVE : CAN_OBTAIN;
 
         // Bottles
         case RG_EMPTY_BOTTLE:
@@ -1021,7 +1056,10 @@ ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerGet(RandomizerGe
             return Inventory_HasEmptyBottle() ? CAN_OBTAIN : CANT_OBTAIN_NEED_EMPTY_BOTTLE;
 
         // Trade Items
-        // case RG_PROGRESSIVE_GORONSWORD:
+        // Giant's Knife and Biggoron's Sword share a slot, bgsFlag marks the final upgrade.
+        // Giant's Knife itself stays obtainable, Medigoron replaces broken ones.
+        case RG_PROGRESSIVE_GORONSWORD:
+            return !gSaveContext.bgsFlag ? CAN_OBTAIN : CANT_OBTAIN_ALREADY_HAVE;
         // case RG_GIANTS_KNIFE:
 
         // Misc Items
@@ -1090,6 +1128,8 @@ ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerGet(RandomizerGe
                 default:
                     return CANT_OBTAIN_ALREADY_HAVE;
             }
+        case RG_SCARECROWS_SONG:
+            return !Flags_GetRandomizerInf(RAND_INF_HAS_SCARECROWS_SONG) ? CAN_OBTAIN : CANT_OBTAIN_ALREADY_HAVE;
 
         // Songs
         case RG_ZELDAS_LULLABY:
@@ -1172,57 +1212,20 @@ ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerGet(RandomizerGe
         case RG_GANONS_CASTLE_BOSS_KEY:
             return !CHECK_DUNGEON_ITEM(DUNGEON_KEY_BOSS, SCENE_GANONS_TOWER) ? CAN_OBTAIN : CANT_OBTAIN_ALREADY_HAVE;
         case RG_FOREST_TEMPLE_SMALL_KEY:
-            return OTRGlobals::Instance->gRandoContext->GetDungeon(Rando::FOREST_TEMPLE)
-                               ->GetTotalSmallKeys(&gSaveContext) < FOREST_TEMPLE_SMALL_KEY_MAX
-                       ? CAN_OBTAIN
-                       : CANT_OBTAIN_ALREADY_HAVE;
         case RG_FIRE_TEMPLE_SMALL_KEY:
-            return OTRGlobals::Instance->gRandoContext->GetDungeon(Rando::FIRE_TEMPLE)
-                               ->GetTotalSmallKeys(&gSaveContext) < FIRE_TEMPLE_SMALL_KEY_MAX
-                       ? CAN_OBTAIN
-                       : CANT_OBTAIN_ALREADY_HAVE;
         case RG_WATER_TEMPLE_SMALL_KEY:
-            return OTRGlobals::Instance->gRandoContext->GetDungeon(Rando::WATER_TEMPLE)
-                               ->GetTotalSmallKeys(&gSaveContext) < WATER_TEMPLE_SMALL_KEY_MAX
-                       ? CAN_OBTAIN
-                       : CANT_OBTAIN_ALREADY_HAVE;
         case RG_SPIRIT_TEMPLE_SMALL_KEY:
-            return OTRGlobals::Instance->gRandoContext->GetDungeon(Rando::SPIRIT_TEMPLE)
-                               ->GetTotalSmallKeys(&gSaveContext) < SPIRIT_TEMPLE_SMALL_KEY_MAX
-                       ? CAN_OBTAIN
-                       : CANT_OBTAIN_ALREADY_HAVE;
         case RG_SHADOW_TEMPLE_SMALL_KEY:
-            return OTRGlobals::Instance->gRandoContext->GetDungeon(Rando::SHADOW_TEMPLE)
-                               ->GetTotalSmallKeys(&gSaveContext) < SHADOW_TEMPLE_SMALL_KEY_MAX
-                       ? CAN_OBTAIN
-                       : CANT_OBTAIN_ALREADY_HAVE;
         case RG_BOTTOM_OF_THE_WELL_SMALL_KEY:
-            return OTRGlobals::Instance->gRandoContext->GetDungeon(Rando::BOTTOM_OF_THE_WELL)
-                               ->GetTotalSmallKeys(&gSaveContext) < BOTTOM_OF_THE_WELL_SMALL_KEY_MAX
-                       ? CAN_OBTAIN
-                       : CANT_OBTAIN_ALREADY_HAVE;
         case RG_GERUDO_TRAINING_GROUND_SMALL_KEY:
-            return OTRGlobals::Instance->gRandoContext->GetDungeon(Rando::GERUDO_TRAINING_GROUND)
-                               ->GetTotalSmallKeys(&gSaveContext) < GERUDO_TRAINING_GROUND_SMALL_KEY_MAX
-                       ? CAN_OBTAIN
-                       : CANT_OBTAIN_ALREADY_HAVE;
-        case RG_GERUDO_FORTRESS_SMALL_KEY: {
-            std::vector<uint8_t> DoorFlags = THIEVES_HIDEOUT_DOOR_FLAGS;
-            return Rando::FindTotalSmallKeys(&gSaveContext, SCENE_THIEVES_HIDEOUT, &DoorFlags) <
-                           GERUDO_FORTRESS_SMALL_KEY_MAX
+        case RG_GERUDO_FORTRESS_SMALL_KEY:
+        case RG_GANONS_CASTLE_SMALL_KEY:
+        case RG_TREASURE_GAME_SMALL_KEY: {
+            SceneID scene = Rando::Logic::RandoGetToDungeonScene.find(randoGet)->second;
+            return Rando::GetSceneTotalSmallKeys(&gSaveContext, scene) < Rando::GetSceneSmallKeyMax(scene)
                        ? CAN_OBTAIN
                        : CANT_OBTAIN_ALREADY_HAVE;
         }
-        case RG_GANONS_CASTLE_SMALL_KEY:
-            return OTRGlobals::Instance->gRandoContext->GetDungeon(Rando::GANONS_CASTLE)
-                               ->GetTotalSmallKeys(&gSaveContext) < GANONS_CASTLE_SMALL_KEY_MAX
-                       ? CAN_OBTAIN
-                       : CANT_OBTAIN_ALREADY_HAVE;
-        case RG_TREASURE_GAME_SMALL_KEY:
-            // I assume this cannot be easily manipulated?
-            return gSaveContext.inventory.dungeonKeys[SCENE_TREASURE_BOX_SHOP] < TREASURE_GAME_SMALL_KEY_MAX
-                       ? CAN_OBTAIN
-                       : CANT_OBTAIN_ALREADY_HAVE;
 
         // Dungeon Rewards
         case RG_KOKIRI_EMERALD:
@@ -1243,6 +1246,33 @@ ItemObtainability Randomizer::GetItemObtainabilityFromRandomizerGet(RandomizerGe
             return !CHECK_QUEST_ITEM(QUEST_MEDALLION_SHADOW) ? CAN_OBTAIN : CANT_OBTAIN_ALREADY_HAVE;
         case RG_LIGHT_MEDALLION:
             return !CHECK_QUEST_ITEM(QUEST_MEDALLION_LIGHT) ? CAN_OBTAIN : CANT_OBTAIN_ALREADY_HAVE;
+
+        // silver rupees
+        case RG_SHADOW_SILVER_BLADES:
+        case RG_SHADOW_SILVER_PIT:
+        case RG_SHADOW_SILVER_SPIKES:
+        case RG_SPIRIT_SILVER_CHILD:
+        case RG_SPIRIT_SILVER_SUN:
+        case RG_SPIRIT_SILVER_BOULDERS:
+        case RG_BOTW_SILVER:
+        case RG_ICE_CAVERN_SILVER_BLADES:
+        case RG_ICE_CAVERN_SILVER_BLOCK:
+        case RG_GTG_SILVER_SLOPE:
+        case RG_GTG_SILVER_LAVA:
+        case RG_GTG_SILVER_WATER:
+        case RG_GANONS_CASTLE_SILVER_LIGHT:
+        case RG_GANONS_CASTLE_SILVER_FOREST:
+        case RG_GANONS_CASTLE_SILVER_FIRE:
+        case RG_GANONS_CASTLE_SILVER_SPIRIT:
+        case RG_DODONGOS_CAVERN_MQ_SILVER:
+        case RG_SHADOW_MQ_SILVER_INVISIBLE_BLADES:
+        case RG_SPIRIT_MQ_SILVER_LOBBY:
+        case RG_SPIRIT_MQ_SILVER_BIG_WALL:
+        case RG_GANONS_CASTLE_MQ_SILVER_WATER:
+        case RG_GANONS_CASTLE_MQ_SILVER_SHADOW:
+            return *Randomizer::SilverFieldFromSaveContext(&gSaveContext, randoGet) < Randomizer::SilverTotal(randoGet)
+                       ? CAN_OBTAIN
+                       : CANT_OBTAIN_ALREADY_HAVE;
 
         case RG_RECOVERY_HEART:
         case RG_GREEN_RUPEE:
@@ -1274,7 +1304,7 @@ Rando::Location* Randomizer::GetCheckObjectFromActor(s16 actorId, s16 sceneNum, 
                 specialRc = RC_MARKET_TREASURE_CHEST_GAME_REWARD;
             }
 
-            // todo: handle the itemetc part of this so drawing works when we implement shuffle
+            // the low bits of a game chest's params are its treasure flag, odd for the key chest
             if (actorId == ACTOR_EN_BOX) {
                 bool isAKey = (actorParams & 0x60) == 0x20;
                 if ((actorParams & 0xF) < 2) {
@@ -1431,8 +1461,7 @@ ShopItemIdentity Randomizer::IdentifyShopItem(s32 sceneNum, u8 slotIndex) {
         slotIndex - 1);
 
     if (location->GetRandomizerCheck() != RC_UNKNOWN_CHECK) {
-        shopItemIdentity.identity.randomizerInf = rcToRandomizerInf[location->GetRandomizerCheck()];
-        shopItemIdentity.identity.randomizerCheck = location->GetRandomizerCheck();
+        IdentifyCheck(&shopItemIdentity.identity, location);
         shopItemIdentity.ogItemId = (GetItemID)Rando::StaticData::RetrieveItem(location->GetVanillaItem()).GetItemID();
 
         RandomizerGet randoGet = Rando::Context::GetInstance()
@@ -1447,6 +1476,27 @@ ShopItemIdentity Randomizer::IdentifyShopItem(s32 sceneNum, u8 slotIndex) {
     }
 
     return shopItemIdentity;
+}
+
+CheckIdentity Randomizer::IdentifySilver(s32 sceneNum, Vec3f pos) {
+    struct CheckIdentity silverIdentity;
+
+    silverIdentity.randomizerInf = RAND_INF_MAX;
+    silverIdentity.randomizerCheck = RC_UNKNOWN_CHECK;
+
+    s32 actorParams = TWO_ACTOR_PARAMS((s16)pos.x, (s16)pos.z);
+    if (sceneNum == SCENE_SHADOW_TEMPLE && actorParams == TWO_ACTOR_PARAMS(2110, 3372)) {
+        actorParams = TWO_ACTOR_PARAMS((s16)pos.x, (s16)pos.y);
+    }
+
+    Rando::Location* location = GetCheckObjectFromActor(ACTOR_EN_G_SWITCH, sceneNum, actorParams);
+
+    if (location->GetRandomizerCheck() != RC_UNKNOWN_CHECK) {
+        silverIdentity.randomizerInf = rcToRandomizerInf[location->GetRandomizerCheck()];
+        silverIdentity.randomizerCheck = location->GetRandomizerCheck();
+    }
+
+    return silverIdentity;
 }
 
 u8 Randomizer::GetRandoSettingValue(RandomizerSettingKey randoSettingKey) {
@@ -1499,19 +1549,12 @@ RandomizerCheck Randomizer::GetCheckFromRandomizerInf(RandomizerInf randomizerIn
 std::thread randoThread;
 
 void GenerateRandomizerImgui(std::string seed = "") {
-    CVarSetInteger(CVAR_GENERAL("RandoGenerating"), 1);
-    Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
     auto ctx = Rando::Context::GetInstance();
     // RANDOTODO proper UI for selecting if a spoiler loaded should be used for settings
     Rando::Settings::GetInstance()->SetAllToContext();
 
-    // todo: this efficiently when we build out cvar array support
-    std::set<RandomizerCheck> excludedLocations;
-    std::stringstream excludedLocationStringStream(CVarGetString(CVAR_RANDOMIZER_SETTING("ExcludedLocations"), ""));
-    std::string excludedLocationString;
-    while (getline(excludedLocationStringStream, excludedLocationString, ',')) {
-        excludedLocations.insert((RandomizerCheck)std::stoi(excludedLocationString));
-    }
+    std::set<RandomizerCheck> excludedLocations =
+        Rando::StaticData::ParseExcludedLocations(CVarGetString(CVAR_RANDOMIZER_SETTING("ExcludedLocations"), ""));
 
     // todo: better way to sort out linking tricks rather than name
 
@@ -1536,46 +1579,61 @@ void GenerateRandomizerImgui(std::string seed = "") {
     }
 
     Rando::Context::GetInstance()->SetSeedGenerated(GenerateRandomizer(excludedLocations, enabledTricks, seed));
-    CVarSetInteger(CVAR_GENERAL("RandoGenerating"), 0);
     Ship::Context::GetRawInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
 
-    generated = true;
-
     GameInteractor::Instance->ExecuteHooks<GameInteractor::OnGenerationCompletion>();
+
+    randoGenerating = false;
+}
+
+#ifdef COMBO_BUILD
+// ComboShip: the launcher's combo worker generates outside GenerateRandomizer; count it as generating.
+static std::atomic<bool> sComboGenerating{ false };
+void SetComboRandoGenerating(bool on) {
+    sComboGenerating = on;
+}
+#endif
+
+bool IsRandoGenerating() {
+#ifdef COMBO_BUILD
+    if (Combo_IsCombinedGame() && sComboGenerating) {
+        return true;
+    }
+#endif
+    return randoGenerating;
 }
 
 bool GenerateRandomizer(std::string seed /*= ""*/) {
-    if (generated) {
-        generated = false;
-        randoThread.join();
+    if (randoGenerating) {
+        return false;
     }
-    if (CVarGetInteger(CVAR_GENERAL("RandoGenerating"), 0) == 0) {
-        randoThread = std::thread(&GenerateRandomizerImgui, seed);
-        return true;
-    }
-    return false;
+    WaitForRandoGeneration();
+    randoGenerating = true;
+    randoThread = std::thread(&GenerateRandomizerImgui, seed);
+    return true;
 }
 
 static bool locationsTabOpen = false;
 static bool tricksTabOpen = false;
 
-void JoinRandoGenerationThread() {
-    if (generated) {
-        generated = false;
+void WaitForRandoGeneration() {
+    if (randoThread.joinable()) {
         randoThread.join();
     }
 }
 
 class ExtendedVanillaTableInvalidItemIdException : public std::exception {
   private:
-    s16 itemID;
+    std::string message;
 
   public:
-    ExtendedVanillaTableInvalidItemIdException(s16 itemID) : itemID(itemID) {
+    ExtendedVanillaTableInvalidItemIdException(s16 itemID)
+        : message(std::to_string(itemID) +
+                  " is not a valid ItemID for the extendedVanillaGetItemTable. If you are adding a new "
+                  "item, try adding it to randoGetItemTable instead.") {
     }
-    std::string what() {
-        return itemID + " is not a valid ItemID for the extendedVanillaGetItemTable. If you are adding a new"
-                        "item, try adding it to randoGetItemTable instead.";
+    const char* what() const noexcept override {
+        return message.c_str();
     }
 };
 
@@ -1659,6 +1717,8 @@ static std::unordered_map<RandomizerGet, GameplayStatTimestamp> randomizerGetToS
     { RG_SKELETON_KEY, TIMESTAMP_FOUND_SKELETON_KEY },
 
     { RG_ROCS_FEATHER, TIMESTAMP_FOUND_ROCS_FEATHER },
+
+    { RG_SCARECROWS_SONG, TIMESTAMP_FOUND_SCARECROWS_SONG },
 };
 
 // Gameplay stat tracking: Update time the item was acquired
@@ -1718,8 +1778,8 @@ static bool ChildTradeSlotOccupied() {
 extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
     ItemGrantAudit::Scope itemGrantAuditScope("OOT randomizer-grant", (int)giEntry.getItemId);
     if (giEntry.modIndex != MOD_RANDOMIZER) {
-        LUSLOG_WARN(
-            "Randomizer_Item_Give was called with a GetItemEntry with a mod index different from MOD_RANDOMIZER (%d)",
+        SPDLOG_WARN(
+            "Randomizer_Item_Give was called with a GetItemEntry with a mod index different from MOD_RANDOMIZER ({})",
             giEntry.modIndex);
         assert(false);
         return -1;
@@ -1752,6 +1812,28 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
         int fc = FcCombo_ItemForNative((int)item);
         if (fc != FCI_NO_ITEM && fc >= 0 && fc < FC_COMBO_OBTAINED_FC_SIZE) {
             NeiSaveData* nei = Nei_Save();
+            int fairyCount = -1;
+            switch (item) {
+                case RG_MM_STRAY_FAIRY_WOODFALL:
+                    fairyCount = FC_MM_FAIRIES_WOODFALL;
+                    break;
+                case RG_MM_STRAY_FAIRY_SNOWHEAD:
+                    fairyCount = FC_MM_FAIRIES_SNOWHEAD;
+                    break;
+                case RG_MM_STRAY_FAIRY_GREAT_BAY:
+                    fairyCount = FC_MM_FAIRIES_GREAT_BAY;
+                    break;
+                case RG_MM_STRAY_FAIRY_STONE_TOWER:
+                    fairyCount = FC_MM_FAIRIES_STONE_TOWER;
+                    break;
+                default:
+                    break;
+            }
+            if (fairyCount >= 0) {
+                // MM's native fairy total can predate the FC ledger. Advance the receipt mirror
+                // at the grant boundary; rebasing FC itself would re-grant those older fairies.
+                nei->comboObtained[fairyCount] = std::max(nei->comboObtained[fairyCount], nei->comboObtainedFc[fc]) + 1;
+            }
             nei->comboObtainedFc[fc]++;
             nei->comboAppliedFc[fc]++;
         }
@@ -1772,18 +1854,16 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
     if (Rando::StaticData::RandoGetToRandInf.find(item) != Rando::StaticData::RandoGetToRandInf.end()) {
         Flags_SetRandomizerInf((RandomizerInf)Rando::StaticData::RandoGetToRandInf.find(item)->second);
         if (item == RG_SKELETON_KEY) {
-            Flags_SetRandomizerInf(RAND_INF_HAS_SKELETON_KEY);
             // This isn't technically necessary, because keys will no longer be consumed,
             // but for the player's sanity we display that they _have_ keys.
-            gSaveContext.inventory.dungeonKeys[SCENE_FOREST_TEMPLE] = FOREST_TEMPLE_SMALL_KEY_MAX;
-            gSaveContext.inventory.dungeonKeys[SCENE_FIRE_TEMPLE] = FIRE_TEMPLE_SMALL_KEY_MAX;
-            gSaveContext.inventory.dungeonKeys[SCENE_WATER_TEMPLE] = WATER_TEMPLE_SMALL_KEY_MAX;
-            gSaveContext.inventory.dungeonKeys[SCENE_SPIRIT_TEMPLE] = SPIRIT_TEMPLE_SMALL_KEY_MAX;
-            gSaveContext.inventory.dungeonKeys[SCENE_SHADOW_TEMPLE] = SHADOW_TEMPLE_SMALL_KEY_MAX;
-            gSaveContext.inventory.dungeonKeys[SCENE_BOTTOM_OF_THE_WELL] = BOTTOM_OF_THE_WELL_SMALL_KEY_MAX;
-            gSaveContext.inventory.dungeonKeys[SCENE_GERUDO_TRAINING_GROUND] = GERUDO_TRAINING_GROUND_SMALL_KEY_MAX;
-            gSaveContext.inventory.dungeonKeys[SCENE_THIEVES_HIDEOUT] = GERUDO_FORTRESS_SMALL_KEY_MAX;
-            gSaveContext.inventory.dungeonKeys[SCENE_INSIDE_GANONS_CASTLE] = GANONS_CASTLE_SMALL_KEY_MAX;
+            for (Rando::DungeonInfo* dungeon : Rando::Context::GetInstance()->GetDungeons()->GetDungeonList()) {
+                uint8_t keys = Rando::GetSceneSmallKeyMax(dungeon->GetScene());
+                if (keys > 0) {
+                    gSaveContext.inventory.dungeonKeys[dungeon->GetScene()] = keys;
+                }
+            }
+            gSaveContext.inventory.dungeonKeys[SCENE_THIEVES_HIDEOUT] =
+                Rando::GetSceneSmallKeyMax(SCENE_THIEVES_HIDEOUT);
         } else if (item >= RG_KEATON_MASK && item <= RG_MASK_OF_TRUTH) {
             if (!ChildTradeSlotOccupied()) {
                 INV_CONTENT(ITEM_TRADE_CHILD) = (int)ITEM_MASK_KEATON + (item - RG_KEATON_MASK);
@@ -1797,6 +1877,10 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             Flags_SetRandomizerInf(RAND_INF_CHILD_TRADES_HAS_LETTER_ZELDA);
             if (!ChildTradeSlotOccupied()) {
                 INV_CONTENT(ITEM_TRADE_CHILD) = ITEM_LETTER_ZELDA;
+            }
+        } else if (item == RG_ROCS_FEATHER) {
+            if (INV_CONTENT(ITEM_NAYRUS_LOVE) == ITEM_NONE) {
+                INV_CONTENT(ITEM_NAYRUS_LOVE) = ITEM_ROCS_FEATHER;
             }
         } else if (item == RG_CHILD_WALLET &&
                    OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_FULL_WALLETS)) {
@@ -1888,13 +1972,12 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
     }
 
     // dungeon items
-    if ((item >= RG_FOREST_TEMPLE_SMALL_KEY && item <= RG_GANONS_CASTLE_SMALL_KEY) ||
-        (item >= RG_FOREST_TEMPLE_KEY_RING && item <= RG_GANONS_CASTLE_KEY_RING) ||
+    if ((item >= RG_FOREST_TEMPLE_SMALL_KEY && item <= RG_TREASURE_GAME_SMALL_KEY) ||
+        (item >= RG_FOREST_TEMPLE_KEY_RING && item <= RG_TREASURE_GAME_KEY_RING) ||
         (item >= RG_FOREST_TEMPLE_BOSS_KEY && item <= RG_GANONS_CASTLE_BOSS_KEY) ||
         (item >= RG_DEKU_TREE_MAP && item <= RG_ICE_CAVERN_MAP) ||
         (item >= RG_DEKU_TREE_COMPASS && item <= RG_ICE_CAVERN_COMPASS)) {
         u16 mapIndex = gSaveContext.mapIndex;
-        u8 numOfKeysOnKeyring = 0;
         switch (item) {
             case RG_DEKU_TREE_MAP:
             case RG_DEKU_TREE_COMPASS:
@@ -1914,7 +1997,6 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             case RG_FOREST_TEMPLE_KEY_RING:
             case RG_FOREST_TEMPLE_BOSS_KEY:
                 mapIndex = SCENE_FOREST_TEMPLE;
-                numOfKeysOnKeyring = FOREST_TEMPLE_SMALL_KEY_MAX;
                 break;
             case RG_FIRE_TEMPLE_MAP:
             case RG_FIRE_TEMPLE_COMPASS:
@@ -1922,7 +2004,6 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             case RG_FIRE_TEMPLE_KEY_RING:
             case RG_FIRE_TEMPLE_BOSS_KEY:
                 mapIndex = SCENE_FIRE_TEMPLE;
-                numOfKeysOnKeyring = FIRE_TEMPLE_SMALL_KEY_MAX;
                 break;
             case RG_WATER_TEMPLE_MAP:
             case RG_WATER_TEMPLE_COMPASS:
@@ -1930,7 +2011,6 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             case RG_WATER_TEMPLE_KEY_RING:
             case RG_WATER_TEMPLE_BOSS_KEY:
                 mapIndex = SCENE_WATER_TEMPLE;
-                numOfKeysOnKeyring = WATER_TEMPLE_SMALL_KEY_MAX;
                 break;
             case RG_SPIRIT_TEMPLE_MAP:
             case RG_SPIRIT_TEMPLE_COMPASS:
@@ -1938,7 +2018,6 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             case RG_SPIRIT_TEMPLE_KEY_RING:
             case RG_SPIRIT_TEMPLE_BOSS_KEY:
                 mapIndex = SCENE_SPIRIT_TEMPLE;
-                numOfKeysOnKeyring = SPIRIT_TEMPLE_SMALL_KEY_MAX;
                 break;
             case RG_SHADOW_TEMPLE_MAP:
             case RG_SHADOW_TEMPLE_COMPASS:
@@ -1946,14 +2025,12 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             case RG_SHADOW_TEMPLE_KEY_RING:
             case RG_SHADOW_TEMPLE_BOSS_KEY:
                 mapIndex = SCENE_SHADOW_TEMPLE;
-                numOfKeysOnKeyring = SHADOW_TEMPLE_SMALL_KEY_MAX;
                 break;
             case RG_BOTTOM_OF_THE_WELL_MAP:
             case RG_BOTTOM_OF_THE_WELL_COMPASS:
             case RG_BOTTOM_OF_THE_WELL_SMALL_KEY:
             case RG_BOTTOM_OF_THE_WELL_KEY_RING:
                 mapIndex = SCENE_BOTTOM_OF_THE_WELL;
-                numOfKeysOnKeyring = BOTTOM_OF_THE_WELL_SMALL_KEY_MAX;
                 break;
             case RG_ICE_CAVERN_MAP:
             case RG_ICE_CAVERN_COMPASS:
@@ -1965,23 +2042,24 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             case RG_GERUDO_TRAINING_GROUND_SMALL_KEY:
             case RG_GERUDO_TRAINING_GROUND_KEY_RING:
                 mapIndex = SCENE_GERUDO_TRAINING_GROUND;
-                numOfKeysOnKeyring = GERUDO_TRAINING_GROUND_SMALL_KEY_MAX;
                 break;
             case RG_GERUDO_FORTRESS_SMALL_KEY:
             case RG_GERUDO_FORTRESS_KEY_RING:
                 mapIndex = SCENE_THIEVES_HIDEOUT;
-                numOfKeysOnKeyring = GERUDO_FORTRESS_SMALL_KEY_MAX;
                 break;
             case RG_GANONS_CASTLE_SMALL_KEY:
             case RG_GANONS_CASTLE_KEY_RING:
                 mapIndex = SCENE_INSIDE_GANONS_CASTLE;
-                numOfKeysOnKeyring = GANONS_CASTLE_SMALL_KEY_MAX;
+                break;
+            case RG_TREASURE_GAME_SMALL_KEY:
+            case RG_TREASURE_GAME_KEY_RING:
+                mapIndex = SCENE_TREASURE_BOX_SHOP;
                 break;
             default:
                 break;
         }
 
-        if ((item >= RG_FOREST_TEMPLE_SMALL_KEY) && (item <= RG_GANONS_CASTLE_SMALL_KEY)) {
+        if ((item >= RG_FOREST_TEMPLE_SMALL_KEY) && (item <= RG_TREASURE_GAME_SMALL_KEY)) {
             gSaveContext.ship.stats.dungeonKeys[mapIndex]++;
             if (gSaveContext.inventory.dungeonKeys[mapIndex] < 0) {
                 gSaveContext.inventory.dungeonKeys[mapIndex] = 1;
@@ -1991,9 +2069,10 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             return Return_Item_Entry(giEntry, RG_NONE);
         }
 
-        if ((item >= RG_FOREST_TEMPLE_KEY_RING) && (item <= RG_GANONS_CASTLE_KEY_RING)) {
-            gSaveContext.ship.stats.dungeonKeys[mapIndex] = numOfKeysOnKeyring;
-            gSaveContext.inventory.dungeonKeys[mapIndex] = numOfKeysOnKeyring;
+        if ((item >= RG_FOREST_TEMPLE_KEY_RING) && (item <= RG_TREASURE_GAME_KEY_RING)) {
+            u8 keysOnRing = Rando::GetSceneSmallKeyMax((SceneID)mapIndex);
+            gSaveContext.ship.stats.dungeonKeys[mapIndex] = keysOnRing;
+            gSaveContext.inventory.dungeonKeys[mapIndex] = keysOnRing;
             return Return_Item_Entry(giEntry, RG_NONE);
         }
 
@@ -2054,7 +2133,7 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
 #ifdef COMBO_BUILD
             // ComboShip (#136): combo owns the goal — the launcher sums both games' counts. Covers
             // dormant grants too (they also route through Randomizer_Item_Give).
-            if (gComboTriforceProgress != NULL) {
+            if (Combo_IsCombinedGame() && gComboTriforceProgress != NULL) {
                 gComboTriforceProgress(0, gSaveContext.fileNum);
             }
 #endif
@@ -2079,6 +2158,41 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             INV_CONTENT(ITEM_NUT) = ITEM_NUT;
             AMMO(ITEM_NUT) = static_cast<int8_t>(CUR_CAPACITY(UPG_NUTS));
             break;
+        case RG_SHADOW_SILVER_BLADES:
+        case RG_SHADOW_SILVER_PIT:
+        case RG_SHADOW_SILVER_SPIKES:
+        case RG_SPIRIT_SILVER_CHILD:
+        case RG_SPIRIT_SILVER_SUN:
+        case RG_SPIRIT_SILVER_BOULDERS:
+        case RG_BOTW_SILVER:
+        case RG_ICE_CAVERN_SILVER_BLADES:
+        case RG_ICE_CAVERN_SILVER_BLOCK:
+        case RG_GTG_SILVER_SLOPE:
+        case RG_GTG_SILVER_LAVA:
+        case RG_GTG_SILVER_WATER:
+        case RG_GANONS_CASTLE_SILVER_LIGHT:
+        case RG_GANONS_CASTLE_SILVER_FOREST:
+        case RG_GANONS_CASTLE_SILVER_FIRE:
+        case RG_GANONS_CASTLE_SILVER_SPIRIT:
+        case RG_DODONGOS_CAVERN_MQ_SILVER:
+        case RG_SHADOW_MQ_SILVER_INVISIBLE_BLADES:
+        case RG_SPIRIT_MQ_SILVER_LOBBY:
+        case RG_SPIRIT_MQ_SILVER_BIG_WALL:
+        case RG_GANONS_CASTLE_MQ_SILVER_WATER:
+        case RG_GANONS_CASTLE_MQ_SILVER_SHADOW: {
+            s8* field = Randomizer::SilverFieldFromSaveContext(&gSaveContext, item);
+            if (OTRGlobals::Instance->gRandomizer->GetRandoSettingValue(RSK_SHUFFLE_SILVER) ==
+                RO_SHUFFLE_SILVER_WALLET) {
+                *field = 10;
+                // this spoils MQ in theory, but will not update trackers because it's subtle and there's too many edge
+                // cases where this does not apply
+                Rupees_ChangeBy(Randomizer::SilverTotal(item) * 5);
+            } else {
+                *field += 1;
+                Rupees_ChangeBy(5);
+            }
+            break;
+        }
         // Custom Items (Second Inventory Page)
         // IMPORTANT: Use ExtInv_SetItemById() instead of INV_CONTENT() for custom items
         // to avoid buffer overflow on gItemSlots[] array (which only has 54 elements)
@@ -2299,7 +2413,7 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
             ExtInv_GiveItem(SLOT_SHADOW_CRYSTAL, EXT_ITEM_SHADOW_CRYSTAL);
             break;
         case RG_ROD_OF_SEASONS:
-            ExtInv_GiveItem(SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS);
+            Seasons_GrantRod();
             break;
         // Crossover Items. Both registry rows carry NEI_NO_SLOT, so the generic default arm
         // below (ExtInv_SetItemById) silently drops them — the item would be consumed by the
@@ -2470,6 +2584,9 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
         case RG_MM_SOUL_WART:
         case RG_MM_SOUL_WIZROBE:
         case RG_MM_SOUL_WOLFOS:
+            // Their FC receipt is already recorded above. These have no OoT inventory item;
+            // falling through would also grant Moon's Tear (including for MM starting souls).
+            break;
         // MM trade / quest-chain items — grant the REAL NEI inventory item, same APIs the give-all
         // debug menu path uses: adult-trade wheel (pause kaleido slots 4/5, trade_items.c),
         // pictobox (picto_box.c), powder keg (power_keg.c), Bombers' Notebook (mmQuestItems bit).
@@ -2768,7 +2885,8 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
                 break;
             }
             // The check is already marked collected, so a missing arm eats the item in silence.
-            LUSLOG_ERROR("Randomizer_Item_Give didn't have behaviour specified for getItemId=%d", item);
+            SPDLOG_WARN("Randomizer_Item_Give didn't have behaviour specified for getItemId={}",
+                        static_cast<uint32_t>(item));
             assert(false);
             return -1;
         }

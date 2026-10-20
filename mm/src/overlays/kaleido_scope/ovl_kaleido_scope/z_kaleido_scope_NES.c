@@ -5,6 +5,7 @@
  */
 
 #include "z_kaleido_scope.h"
+#include "sword_element_kaleido.h"
 #include "z64map.h"
 #include "z64skybox.h"
 #include "z64view.h"
@@ -25,6 +26,7 @@ void KaleidoScope_UpdateEquipmentCursor(PlayState* play);
 void* KaleidoEquip_GetNameTex(void);
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/Enhancements/Saving/SavingEnhancements.h"
+#include "2s2h/BenGui/CosmeticEditor.h"
 
 #include "2s2h_assets.h"
 
@@ -879,7 +881,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
             gDPSetCombineLERP(POLY_OPA_DISP++, TEXEL0, 0, PRIMITIVE, 0, TEXEL0, 0, SHADE, 0, TEXEL0, 0, PRIMITIVE, 0,
                               TEXEL0, 0, SHADE, 0);
 
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255);
+            gDPSetPrimColorOverride(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255, COSMETIC_ID("Menus.PausePanels"));
 
             Matrix_RotateYF(0.0f, MTXMODE_NEW);
             Matrix_Translate(0.0f, sPauseMenuVerticalOffset / 100.0f, -93.0f, MTXMODE_APPLY);
@@ -901,7 +903,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
             gDPSetCombineLERP(POLY_OPA_DISP++, TEXEL0, 0, PRIMITIVE, 0, TEXEL0, 0, SHADE, 0, TEXEL0, 0, PRIMITIVE, 0,
                               TEXEL0, 0, SHADE, 0);
 
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255);
+            gDPSetPrimColorOverride(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255, COSMETIC_ID("Menus.PausePanels"));
 
             Matrix_RotateYF(-1.57f, MTXMODE_NEW);
             Matrix_Translate(0.0f, sPauseMenuVerticalOffset / 100.0f, -93.0f, MTXMODE_APPLY);
@@ -932,7 +934,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
             gDPSetCombineLERP(POLY_OPA_DISP++, TEXEL0, 0, PRIMITIVE, 0, TEXEL0, 0, SHADE, 0, TEXEL0, 0, PRIMITIVE, 0,
                               TEXEL0, 0, SHADE, 0);
 
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255);
+            gDPSetPrimColorOverride(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255, COSMETIC_ID("Menus.PausePanels"));
 
             Matrix_RotateYF(-3.14f, MTXMODE_NEW);
             Matrix_Translate(0.0f, sPauseMenuVerticalOffset / 100.0f, -93.0f, MTXMODE_APPLY);
@@ -957,7 +959,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
             gDPSetCombineLERP(POLY_OPA_DISP++, TEXEL0, 0, PRIMITIVE, 0, TEXEL0, 0, SHADE, 0, TEXEL0, 0, PRIMITIVE, 0,
                               TEXEL0, 0, SHADE, 0);
 
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255);
+            gDPSetPrimColorOverride(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255, COSMETIC_ID("Menus.PausePanels"));
 
             Matrix_RotateYF(1.57f, MTXMODE_NEW);
             Matrix_Translate(0.0f, sPauseMenuVerticalOffset / 100.0f, -93.0f, MTXMODE_APPLY);
@@ -982,7 +984,8 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
                     gDPSetCombineLERP(POLY_OPA_DISP++, TEXEL0, 0, PRIMITIVE, 0, TEXEL0, 0, SHADE, 0, TEXEL0, 0,
                                       PRIMITIVE, 0, TEXEL0, 0, SHADE, 0);
 
-                    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255);
+                    gDPSetPrimColorOverride(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255,
+                                            COSMETIC_ID("Menus.PausePanels"));
 
                     Matrix_RotateYF(0.0f, MTXMODE_NEW);
                     Matrix_Translate(0.0f, sPauseMenuVerticalOffset / 100.0f, -93.0f, MTXMODE_APPLY);
@@ -1006,7 +1009,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
                 gDPSetCombineLERP(POLY_OPA_DISP++, TEXEL0, 0, PRIMITIVE, 0, TEXEL0, 0, SHADE, 0, TEXEL0, 0, PRIMITIVE,
                                   0, TEXEL0, 0, SHADE, 0);
 
-                gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255);
+                gDPSetPrimColorOverride(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255, COSMETIC_ID("Menus.PausePanels"));
 
                 Matrix_RotateYF(-1.57f, MTXMODE_NEW);
                 Matrix_Translate(0.0f, sPauseMenuVerticalOffset / 100.0f, -93.0f, MTXMODE_APPLY);
@@ -1056,7 +1059,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
                 gDPSetCombineLERP(POLY_OPA_DISP++, TEXEL0, 0, PRIMITIVE, 0, TEXEL0, 0, SHADE, 0, TEXEL0, 0, PRIMITIVE,
                                   0, TEXEL0, 0, SHADE, 0);
 
-                gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255);
+                gDPSetPrimColorOverride(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255, COSMETIC_ID("Menus.PausePanels"));
 
                 gDPSetTextureFilter(POLY_OPA_DISP++, G_TF_BILERP);
 
@@ -1081,7 +1084,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
                 gDPSetCombineLERP(POLY_OPA_DISP++, TEXEL0, 0, PRIMITIVE, 0, TEXEL0, 0, SHADE, 0, TEXEL0, 0, PRIMITIVE,
                                   0, TEXEL0, 0, SHADE, 0);
 
-                gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255);
+                gDPSetPrimColorOverride(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255, COSMETIC_ID("Menus.PausePanels"));
 
                 Matrix_RotateYF(1.57f, MTXMODE_NEW);
                 Matrix_Translate(0.0f, sPauseMenuVerticalOffset / 100.0f, -93.0f, MTXMODE_APPLY);
@@ -1107,7 +1110,7 @@ void KaleidoScope_DrawPages(PlayState* play, GraphicsContext* gfxCtx) {
             gDPPipeSync(POLY_OPA_DISP++);
             gDPSetCombineLERP(POLY_OPA_DISP++, TEXEL0, 0, PRIMITIVE, 0, TEXEL0, 0, SHADE, 0, TEXEL0, 0, PRIMITIVE, 0,
                               TEXEL0, 0, SHADE, 0);
-            gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255);
+            gDPSetPrimColorOverride(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255, COSMETIC_ID("Menus.PausePanels"));
 
             switch (pauseCtx->pageIndex) {
                 case PAUSE_ITEM:
@@ -1666,7 +1669,7 @@ void KaleidoScope_DrawOwlWarpMapPage(PlayState* play) {
     gDPSetCombineLERP(POLY_OPA_DISP++, TEXEL0, 0, PRIMITIVE, 0, TEXEL0, 0, SHADE, 0, TEXEL0, 0, PRIMITIVE, 0, TEXEL0, 0,
                       SHADE, 0);
 
-    gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255);
+    gDPSetPrimColorOverride(POLY_OPA_DISP++, 0, 0, 180, 180, 120, 255, COSMETIC_ID("Menus.PausePanels"));
 
     Matrix_RotateYF(-1.57f, MTXMODE_NEW);
     Matrix_Translate(0.0f, sPauseMenuVerticalOffset / 100.0f, -93.0f, MTXMODE_APPLY);
@@ -3213,6 +3216,7 @@ void KaleidoScope_UpdateCursorSize(PlayState* play) {
 
 void KaleidoScope_DrawCursor(PlayState* play) {
     PauseContext* pauseCtx = &play->pauseCtx;
+    Color_RGBA8 cursorGlow; // 2S2H [Cosmetic]
     s16 i;
 
     // Skijer's NEI: the OoT quest page (L-flip) draws its OWN cursor inside
@@ -3247,8 +3251,12 @@ void KaleidoScope_DrawCursor(PlayState* play) {
         gDPPipeSync(POLY_OPA_DISP++);
         gDPSetCombineLERP(POLY_OPA_DISP++, PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0,
                           PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, TEXEL0, 0, PRIMITIVE, 0);
-        gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, sCursorPrimR, sCursorPrimG, sCursorPrimB, 255);
-        gDPSetEnvColor(POLY_OPA_DISP++, sCursorEnvR, sCursorEnvG, sCursorEnvB, 255);
+        gDPSetPrimColorOverride(POLY_OPA_DISP++, 0, 0, sCursorPrimR, sCursorPrimG, sCursorPrimB, 255,
+                                COSMETIC_ID("Menus.PauseCursor"));
+        cursorGlow = CosmeticEditor_GetPauseCursorGlow(sCursorEnvR, sCursorEnvG, sCursorEnvB,
+                                                       sCursorEnvColorTarget[pauseCtx->cursorColorSet],
+                                                       sCursorEnvColorTarget[pauseCtx->cursorColorSet + 1]);
+        gDPSetEnvColor(POLY_OPA_DISP++, cursorGlow.r, cursorGlow.g, cursorGlow.b, 255);
 
         Matrix_Translate(pauseCtx->cursorX, pauseCtx->cursorY, -50.0f, MTXMODE_NEW);
         Matrix_Scale(1.0f, 1.0f, 1.0f, MTXMODE_APPLY);
@@ -3507,6 +3515,8 @@ void KaleidoScope_Update(PlayState* play) {
     s16 stepB;
     s16 stepA;
     s16 stickAdjX = input->rel.stick_x;
+
+    KaleidoEquip_UpdateSwordElement(play);
 
     if (pauseCtx->state != PAUSE_STATE_MAIN || pauseCtx->pageIndex != PAUSE_ITEM ||
         pauseCtx->mainState != PAUSE_MAIN_STATE_IDLE) {
@@ -4144,6 +4154,10 @@ void KaleidoScope_Update(PlayState* play) {
 
                     if (pauseCtx->promptChoice == PAUSE_PROMPT_YES) {
                         func_80169FDC(play);
+#ifdef COMBO_BUILD
+                        extern void Combo_MM_RequestCrossBossDeathRecovery(void);
+                        Combo_MM_RequestCrossBossDeathRecovery();
+#endif
                         gSaveContext.respawnFlag = -2;
                         gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
                         gSaveContext.save.saveInfo.playerData.health = 0x30;

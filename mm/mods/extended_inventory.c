@@ -632,6 +632,8 @@ void* ExtInv_GetCustomItemNameTex(uint16_t itemId, uint8_t language) {
                 return Slate_RuneNameTex(Slate_GetRune());
             }
             return (void*)"__OTR__textures/item_name_custom/gSheikahSlateNameTex";
+        case EXT_ITEM_MAGIC_MIRROR:
+            return (void*)MAGIC_MIRROR_NAME_TEX;
         case EXT_ITEM_PHANTOM_HOURGLASS:
             return (void*)"__OTR__textures/item_name_custom/gPhantomHourglassNameTex";
         case EXT_ITEM_SHADOW_CRYSTAL:
@@ -929,6 +931,8 @@ void* ExtInv_GetItemIcon(uint16_t itemId) {
                 return Slate_RuneIcon(Slate_GetRune());
             }
             return (void*)"__OTR__textures/icon_item_custom/gItemIconSheikahSlateTex";
+        case EXT_ITEM_MAGIC_MIRROR:
+            return (void*)MAGIC_MIRROR_ICON_TEX;
         case EXT_ITEM_PHANTOM_HOURGLASS:
             return (void*)"__OTR__textures/icon_item_custom/gItemIconPhantomHourglassTex";
         case EXT_ITEM_SHADOW_CRYSTAL:
@@ -1701,6 +1705,55 @@ void* Slate_RuneIcon(uint8_t rune) {
     return (rune < SLATE_RUNE_COUNT) ? sSlateRuneIcon[rune] : sSlateRuneIcon[0];
 }
 
+// Time Gate and Magic Mirror keep independent ownership behind their selected cell.
+// Old saves stored only Time Gate in the cell; backfill it before any sibling grant.
+void TravelTools_Heal(void) {
+    NeiSaveData* nei = Nei_Save();
+    uint16_t current = ExtInv_GetSlotItem(SLOT_MAGIC_MIRROR);
+    if (current == ITEM_TIME_GATE) {
+        nei->timeGateOwned = 1;
+    } else if (current == EXT_ITEM_MAGIC_MIRROR) {
+        nei->magicMirrorOwned = 1;
+    } else if (current == ITEM_NONE) {
+        if (nei->timeGateOwned) {
+            ExtInv_SetSlotItem(SLOT_MAGIC_MIRROR, ITEM_TIME_GATE);
+        } else if (nei->magicMirrorOwned) {
+            ExtInv_SetSlotItem(SLOT_MAGIC_MIRROR, EXT_ITEM_MAGIC_MIRROR);
+        }
+    }
+}
+
+uint8_t TravelTools_IsOwned(uint16_t item) {
+    const NeiSaveData* nei = Nei_Save();
+    if (item == ITEM_TIME_GATE) {
+        return nei->timeGateOwned || ExtInv_GetSlotItem(SLOT_MAGIC_MIRROR) == item;
+    }
+    if (item == EXT_ITEM_MAGIC_MIRROR) {
+        return nei->magicMirrorOwned || ExtInv_GetSlotItem(SLOT_MAGIC_MIRROR) == item;
+    }
+    return 0;
+}
+
+void TravelTools_Grant(uint16_t item) {
+    if (item != ITEM_TIME_GATE && item != EXT_ITEM_MAGIC_MIRROR) {
+        return;
+    }
+    TravelTools_Heal();
+    if (item == ITEM_TIME_GATE) {
+        Nei_Save()->timeGateOwned = 1;
+    } else {
+        Nei_Save()->magicMirrorOwned = 1;
+    }
+    // Retain the player's selected item and buttons when obtaining its sibling.
+    if (ExtInv_GetSlotItem(SLOT_MAGIC_MIRROR) == ITEM_NONE) {
+        ExtInv_SetSlotItem(SLOT_MAGIC_MIRROR, item);
+    }
+}
+
+uint8_t MagicMirror_IsOwned(void) {
+    return TravelTools_IsOwned(EXT_ITEM_MAGIC_MIRROR);
+}
+
 // Independent ownership behind the shared Grace / hourglass cell. Older saves
 // stored only the selected item; retain it and backfill its ownership.
 void GraceHourglass_Heal(void) {
@@ -1828,23 +1881,48 @@ uint8_t Slate_RuneNeighbor(uint8_t rune, int32_t dir) {
 }
 
 // Rod of Seasons: four sibling pickups share one rod; ownership crosses hosts unchanged.
-uint8_t Seasons_SeasonOwned(uint8_t season) {
-    if (season == SEASON_OFF) {
-        return 1; // the blank coin comes with the rod
+uint8_t Seasons_HasRod(void) {
+    NeiSaveData* nei = Nei_Save();
+    // Heal existing saves through their original ownership stores.
+    if ((nei->seasonsOwned & NEI_SEASONS_MASK) || Nei_GetOwnedItem(SLOT_ROD_OF_SEASONS) == EXT_ITEM_ROD_OF_SEASONS) {
+        nei->seasonsRodOwned = 1;
     }
-    if (season >= SEASON_COUNT) {
+    return nei->seasonsRodOwned != 0;
+}
+
+void Seasons_GrantRod(void) {
+    NeiSaveData* nei = Nei_Save();
+    nei->seasonsRodOwned = 1;
+    ExtInv_GiveItem(SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS);
+    if (Seasons_RandoMode() == NEI_SEASONS_ROD) {
+        nei->seasonsOwned = NEI_SEASONS_MASK;
+    } else if (!(nei->seasonsOwned & NEI_SEASONS_MASK)) {
+        nei->season = SEASON_OFF;
+    }
+}
+
+uint8_t Seasons_SeasonOwned(uint8_t season) {
+    if (season > SEASON_OFF || !Seasons_HasRod()) {
         return 0;
     }
-    return (Nei_Save()->seasonsOwned & (1 << season)) != 0;
+    if (season == SEASON_OFF) {
+        return 1; // even a gated/starting rod with no seasons can open the wheel
+    }
+    if (Seasons_RandoMode() == NEI_SEASONS_GATED) {
+        Seasons_UpdateGates();
+        return (Nei_Save()->seasonsGates & (1u << season)) != 0;
+    }
+    return (Nei_Save()->seasonsOwned & (1u << season)) != 0;
 }
 
 void Seasons_GrantSeason(uint8_t season) {
     if (season >= SEASON_COUNT) {
         return;
     }
-    Nei_Save()->seasonsOwned |= (1 << season);
+    Nei_Save()->seasonsOwned |= (1u << season);
     Nei_Save()->season = season;
-    // Obtaining ANY season hands over the rod itself if it isn't there yet.
+    Nei_Save()->seasonsRodOwned = 1;
+    // Every individual season pickup hands over the Rod, without unlocking its siblings.
     ExtInv_GiveItem(SLOT_ROD_OF_SEASONS, EXT_ITEM_ROD_OF_SEASONS);
 }
 
@@ -1868,7 +1946,7 @@ uint8_t Seasons_SeasonAt(uint8_t index) {
             n++;
         }
     }
-    return SEASON_SPRING;
+    return SEASON_OFF;
 }
 
 uint8_t Seasons_GetSeason(void) {

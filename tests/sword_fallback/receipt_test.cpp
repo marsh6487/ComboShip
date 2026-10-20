@@ -1,9 +1,14 @@
 /* RESOURCE_TYPES */
 #include <unordered_map>
 #include <stdexcept>
+#include "combo/menu/ComboElementalArrowGi.h"
+#include "soh/soh/Enhancements/randomizer/NeiElementalGiColors.h"
+namespace NeiGi {struct TextureMaterial;}
 using f32=float;using s16=int16_t;
 constexpr int MTXMODE_APPLY=1;
 using Kind=NeiGi::Kind;
+void NeiGi_ReportBlackMarketBounds(const NeiGi::Point&,const NeiGi::Point&) {}
+void NeiGi_ReportBlackMarketModel(const char*,const char*,const char* = nullptr) {}
 struct PlayState {struct {void* gfxCtx;}state;uint32_t gameplayFrames=42;} play;
 PlayState* gPlayState=&play;
 struct Pose {float scale=1,lift=0,ry=0,rz=0;bool operator==(const Pose&)const=default;} pose;
@@ -112,6 +117,12 @@ void* Combo_ResolveSym(const char*,const char* name){
     return nullptr; // Missing optional exports must not alias an incompatible function.
 }
 void DrawSong(RandoItemId){assert(false);}
+extern "C" int NeiGi_DrawElementalArrowShop(PlayState*,int){
+    assert(false && "sword receipt must not dispatch elemental arrows");return 0;
+}
+extern "C" int NeiGi_DrawElementalSpell(PlayState*,int,int,int){
+    assert(false && "sword receipt must not dispatch elemental spells");return 0;
+}
 void MM_DrawNeiGi(const CwItemDrawInfo&,bool,int){assert(false&&"legacy mod must retain its native callback");}
 NeiGi::Basis NeiGi_CameraBasis(PlayState*){return {};}
 std::vector<Pose> effects;
@@ -125,7 +136,7 @@ using CustomDrawFunc=void(*)(PlayState*,GetItemEntry*);
 struct GetItemEntry {CustomDrawFunc drawFunc;int gid=0;};
 struct Vec3f {float x,y,z;};
 struct Presentation {CustomDrawFunc draw;const char* opaque;const char* translucent;float scale;Kind effect;
-                     Vec3f effectCenter{};bool alwaysShimmer=true;};
+                     Vec3f effectCenter{};bool alwaysShimmer=true;Kind shimmer=Kind::Neutral;};
 Presentation selected{};
 const Presentation* FindPresentation(GetItemEntry*){return &selected;}
 int SongForEntry(GetItemEntry*){return -1;}
@@ -152,7 +163,7 @@ void LegacyRazor(PlayState*,GetItemEntry*){DrawNativeSword();}
 void DrawCustomItemDiamond(PlayState*,Gfx*,float scale){Matrix_Scale(scale,scale,scale,1);DrawNativeSword();}
 void DrawCustomItemDiamondTint(PlayState* p,Gfx* dl,Gfx*,float scale,int,int,int){DrawCustomItemDiamond(p,dl,scale);}
 Gfx* ResourceMgr_LoadGfxByName(const char*){return nullptr;}
-void DrawMmWeaponGi(PlayState*,Gfx*,Gfx*,float){assert(false);}
+void DrawMmWeaponGi(PlayState*,Gfx*,Gfx*,float,bool){assert(false);}
 const char dgNeiFourSwordBladeDL[]="__OTR__objects/object_nei_four_sword/gNeiFourSwordBladeDL";
 const char dgNeiFourSwordHiltDL[]="__OTR__objects/object_nei_four_sword/gNeiFourSwordHiltDL";
 const char gGiKokiriSwordDL[]="objects/object_gi_sword_1/gGiKokiriSwordDL";
@@ -182,21 +193,40 @@ int main(){
     LegacyVertex("test/bodyVertices",1,{{-200,-600,0},{200,4200,0}});
     LegacyVertex("test/detailVertices",2,{{-300,-900,0},{300,8000,0}});
     List("objects/object_gi_sword_2/gGiRazorSwordDL",3,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/bodyVertices")},{2,0},{uintptr_t(G_ENDDL)<<24,0}});
+    const char* tridentRoot="__OTR__objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298";
+    List(tridentRoot+7,40,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/bodyVertices")},{2,0},
+                         {uintptr_t(G_DL)<<24,0x08000001},{uintptr_t(G_ENDDL)<<24,0}});
+    float frameLow[3]{},frameHigh[3]{};
+    assert(ResourceMgr_GetGiModelBoundsForGame("oot",&tridentRoot,1,frameLow,frameHigh)&&
+           frameLow[1]==-600&&frameHigh[1]==4200);
+    List("test/unknownSegment",41,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/bodyVertices")},{2,0},
+                                  {uintptr_t(G_DL)<<24,0x08000001},{uintptr_t(G_ENDDL)<<24,0}});
+    const char* unknownSegment="__OTR__test/unknownSegment";
+    assert(!ResourceMgr_GetGiModelBoundsForGame("oot",&unknownSegment,1,frameLow,frameHigh));
+    const char* spellOrb="__OTR__objects/object_gi_goddess/gGiMagicSpellOrbDL";
+    List(spellOrb+7,42,{{uintptr_t(G_DL)<<24,0x08000001},
+                       {uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/bodyVertices")},{2,0},
+                       {uintptr_t(G_ENDDL)<<24,0}});
+    assert(ResourceMgr_GetGiModelBoundsForGame("mm",&spellOrb,1,frameLow,frameHigh)&&frameHigh[1]==4200);
+    /* REAL_SPELL_BOUNDS */
     List("objects/object_gi_sword_2/gGiRazorSwordEmptyDL",4,{{uintptr_t(G_VTX_OTR_FILEPATH)<<24,uintptr_t("test/detailVertices")},{2,0},{uintptr_t(G_ENDDL)<<24,0}});
     Actor receipt{ACTOR_EN_ITEM00,{{CustomItem::CALLED_ACTION|CustomItem::GIVE_ITEM_CUTSCENE}}};
     for(int playerForm:{PLAYER_FORM_HUMAN,PLAYER_FORM_GORON}){
-        form=playerForm;const float origin=form==PLAYER_FORM_GORON?96.3f:51.3f;
+        form=playerForm;const float origin=form==PLAYER_FORM_GORON?98.3f:53.3f;
         pose={.21f,origin,0,0};const Pose caller=pose;nativeDraws=0;effects.clear();poses.clear();
         CwItemDrawInfo info{};assert(!MM_DescribeNeiGi(RI_SWORD_RAZOR,&info));
         DrawReceipt(RI_SWORD_RAZOR,&receipt);
-        const float bottom=form==PLAYER_FORM_GORON?36.f:-44.f,top=form==PLAYER_FORM_GORON?90.f:16.f;
+        const float bottom=form==PLAYER_FORM_GORON?36.f:-48.5f,top=form==PLAYER_FORM_GORON?90.f:20.5f;
         assert(nativePose.lift+8000*nativePose.scale<=origin+.21f*top+.001f&&"native legacy receipt leaves second selected sword root above the frame");
         assert(nativePose.lift-900*nativePose.scale>=origin+.21f*bottom-.001f);
         assert(nativeDraws==1&&effects.size()==2&&"receipt correction changed legacy callback or sword identity effects");
         const auto frame=NeiGi::FrameFit(*NeiGi::FindSwordFrameBounds(Kind::RazorSword),1.f,false,
                                         form==PLAYER_FORM_GORON?2:1);
-        const Pose expected{caller.scale*frame.scale,caller.lift+caller.scale*frame.lift,0,0};
-        assert(effects[0]==expected&&effects[1]==expected&&effects[0]!=nativePose&&
+        const float center=form==PLAYER_FORM_GORON?63.f:-14.f;
+        const float size=form==PLAYER_FORM_GORON?1.f:1.15f;
+        const Pose expected{caller.scale*size*frame.scale,caller.lift+caller.scale*((1.f-size)*center+size*frame.lift),0,0};
+        assert(std::abs(effects[0].scale-expected.scale)<.000001f&&std::abs(effects[0].lift-expected.lift)<.0001f&&
+               effects[0]==effects[1]&&effects[0]!=nativePose&&
                "legacy binary receipt effects must retain the authored award footprint");
         assert(pose==caller&&poses.empty()&&"legacy callback transforms escaped its receipt scope");
     }
@@ -207,10 +237,10 @@ int main(){
     List("objects/object_gi_sword_4/gGiGreatFairysSwordHiltEmblemDL",9,{{uintptr_t(G_ENDDL)<<24,0}});
     form=PLAYER_FORM_HUMAN;pose={.21f,51.3f,0,0};effects.clear();
     DrawReceipt(RI_GREAT_FAIRY_SWORD,&receipt);
-    assert(nativePose.lift+8000*nativePose.scale<=54.661f&&"legacy Great Fairy receipt fitted the identity instead of the callback's selected Biggoron geometry");
+    assert(nativePose.lift+8000*nativePose.scale<=55.606f&&"legacy Great Fairy receipt fitted the identity instead of the callback's selected Biggoron geometry");
     save.comboObtained[0]=1;pose={.21f,51.3f,0,0};effects.clear();
     DrawReceipt(RI_GREAT_FAIRY_SWORD,&receipt);
-    assert(nativePose.lift+40*nativePose.scale<=54.661f&&nativePose.lift-20*nativePose.scale>=42.059f&&
+    assert(nativePose.lift+40*nativePose.scale<=55.606f&&nativePose.lift-20*nativePose.scale>=41.114f&&
            "native material-only secondary pass must still allow the geometric root's receipt fit");
     // The native callback chooses OoT's local replacement for an imported
     // root before MM's donor, independently for each pass.
@@ -229,14 +259,20 @@ int main(){
     const char* roots[]={"__OTR__@mm:objects/object_gi_sword_4/gGiGreatFairysSwordBladeDL",
                          "__OTR__@mm:objects/object_gi_sword_2/gGiRazorSwordEmptyDL"};
     float correction[2]{};assert(ResourceMgr_GetGiModelsFitForGame("oot",roots,2,1,0,2,correction));
+    assert(ResourceMgr_GetGiModelBoundsForGame("oot",roots,2,frameLow,frameHigh)&&
+           frameLow[0]==-300&&frameLow[1]==-900&&frameHigh[0]==300&&frameHigh[1]==32000&&currentOwner==ootOwner);
     assert(correction[1]+32000*correction[0]<=16.001f&&correction[1]-900*correction[0]>=-44.001f);
     const float altFit=correction[0];
     mmOwner->alt=false;assert(ResourceMgr_GetGiModelsFitForGame("oot",roots,2,1,0,2,correction));
+    assert(ResourceMgr_GetGiModelBoundsForGame("oot",roots,2,frameLow,frameHigh)&&frameHigh[1]==8000);
     assert(correction[0]>altFit&&currentOwner==ootOwner&&"fit retained an Alt graph after selection changed");
     // Unsupported second geometry refuses the whole query. Keeping the
     // original draw cannot be described as a partial successful fit.
     List("test/unsupported",12,{{uintptr_t(G_MTX)<<24,0},{uintptr_t(G_ENDDL)<<24,0}});
     roots[1]="__OTR__@mm:test/unsupported";
+    frameLow[0]=-777;frameHigh[0]=888;
+    assert(!ResourceMgr_GetGiModelBoundsForGame("oot",roots,2,frameLow,frameHigh)&&
+           frameLow[0]==-777&&frameHigh[0]==888&&currentOwner==ootOwner);
     assert(!ResourceMgr_GetGiModelsFitForGame("oot",roots,2,1,0,2,correction)&&currentOwner==ootOwner);
     auto scaleMatrix=std::make_shared<Fast::Matrix>();
     const float matrixValues[16]={3,0,0,0, 0,3,0,0, 0,0,3,0, 0,0,0,1};
@@ -246,6 +282,7 @@ int main(){
     loader.files["test/carryMatrix"]=scaleMatrix;
     List("test/carryPass",13,{{uintptr_t(G_MTX_OTR_FILEPATH)<<24|G_MTX_PUSH,uintptr_t("test/carryMatrix")},{uintptr_t(G_ENDDL)<<24,0}});
     roots[0]="__OTR__@mm:test/carryPass";roots[1]="__OTR__@mm:objects/object_gi_sword_2/gGiRazorSwordEmptyDL";
+    assert(!ResourceMgr_GetGiModelBoundsForGame("oot",roots,2,frameLow,frameHigh));
     assert(!ResourceMgr_GetGiModelsFitForGame("oot",roots,2,1,0,2,correction)&&
            "stateful material pass underfits following geometry when independent root readers reset its MUL");
     // A companion root is independent of MM's same-name base remnant. Its
@@ -264,25 +301,31 @@ int main(){
     donor->files[biggoron]=loader("test/archiveRoot");
     mmOwner->overrides["test/donorChild"]=selectedChild;mmOwner->alt=true;
     const char* companionRoots[]={biggoron};
+    assert(ResourceMgr_GetGiModelBoundsForGame("oot-companion",companionRoots,1,frameLow,frameHigh)&&
+           frameLow[1]==-900&&frameHigh[1]==32000&&currentOwner==ootOwner);
     assert(ResourceMgr_GetGiModelsFitForGame("oot-companion",companionRoots,1,1,0,2,correction)&&
            correction[1]+32000*correction[0]<=16.001f&&correction[1]-900*correction[0]>=-44.001f&&
            "companion fit omitted the winning Alt child or read its descendants from donor instead of MM");
     save.comboObtained[0]=0;pose={.21f,51.3f,0,0};effects.clear();
     DrawReceipt(RI_GREAT_FAIRY_SWORD,&receipt);
-    assert(nativePose.lift+32000*nativePose.scale<=54.661f&&
+    assert(nativePose.lift+32000*nativePose.scale<=55.606f&&
            "native legacy Biggoron callback queried the MM twin instead of its companion's selected Alt child");
     const float modChildFit=correction[0];mmOwner->alt=false;
+    assert(ResourceMgr_GetGiModelBoundsForGame("oot-companion",companionRoots,1,frameLow,frameHigh)&&frameHigh[1]==100);
     assert(ResourceMgr_GetGiModelsFitForGame("oot-companion",companionRoots,1,1,0,2,correction)&&
            correction[0]>modChildFit&&"companion fit used MM's same-name root or stale Alt descendant");
     assert(currentOwner==ootOwner);
     auto unsupportedDonor=std::make_shared<Ship::Archive>();
     unsupportedDonor->files[biggoron]=loader("test/unsupported");sOotArchives={unsupportedDonor};
+    assert(!ResourceMgr_GetGiModelBoundsForGame("oot-companion",companionRoots,1,frameLow,frameHigh)&&currentOwner==ootOwner);
     assert(!ResourceMgr_GetGiModelsFitForGame("oot-companion",companionRoots,1,1,0,2,correction)&&
            "unsupported donor graph incorrectly fitted the native MM fallback");
     sOotArchives={donor};failArchiveParse=true;
+    assert(!ResourceMgr_GetGiModelBoundsForGame("oot-companion",companionRoots,1,frameLow,frameHigh)&&currentOwner==ootOwner);
     assert(!ResourceMgr_GetGiModelsFitForGame("oot-companion",companionRoots,1,1,0,2,correction)&&currentOwner==ootOwner);
     failArchiveParse=false;
     sOotArchives.clear();
+    assert(ResourceMgr_GetGiModelBoundsForGame("oot-companion",companionRoots,1,frameLow,frameHigh)&&frameHigh[1]==8000);
     assert(ResourceMgr_GetGiModelsFitForGame("oot-companion",companionRoots,1,1,0,2,correction)&&
            correction[1]+8000*correction[0]<=16.001f&&currentOwner==ootOwner);
     mmOwner->alt=true;mmOwner->overrides.clear();
@@ -290,10 +333,11 @@ int main(){
     NativeOot::GetItemEntry entry{NativeOot::LegacyRazor};
     pose={};const Pose ootCaller=pose;effects.clear();nativeDraws=0;
     assert(NativeOot::NeiGi_DrawImpl(&play,&entry,false));
-    assert(nativePose.lift+8000*nativePose.scale<=48.001f&&nativePose.lift-900*nativePose.scale>=-56.001f&&
+    assert(nativePose.lift+8000*nativePose.scale<=55.501f&&nativePose.lift-900*nativePose.scale>=-59.501f&&
            "native OoT legacy mod receipt bypassed selected model fitting");
     const auto razorFrame=NeiGi::FrameFit(*NeiGi::FindSwordFrameBounds(Kind::RazorSword),1.f,false);
-    assert(nativeDraws==1&&effects.size()>=2&&effects[0].scale==razorFrame.scale&&effects[0].lift==razorFrame.lift&&
+    assert(nativeDraws==1&&effects.size()>=2&&std::abs(effects[0].scale-1.15f*razorFrame.scale)<.000001f&&
+           std::abs(effects[0].lift-(.3f+1.15f*razorFrame.lift))<.0001f&&
            "native OoT legacy effects inherited selected geometry units");
     assert(pose==ootCaller&&poses.empty());
     Vertex("test/kokiriVertices",13,{{-200,-900,0},{200,8000,0}});
@@ -302,13 +346,13 @@ int main(){
     NativeOot::selected={NativeOot::Randomizer_DrawProgressiveMasterSword,"__OTR__objects/nei_gi_redesign/master_sword/gi_dl",nullptr,.04f,Kind::MasterSword};
     entry.drawFunc=NativeOot::Randomizer_DrawProgressiveMasterSword;pose={};effects.clear();nativeDraws=0;
     assert(NativeOot::NeiGi_DrawImpl(&play,&entry,false));
-    assert(nativePose.lift+8000*nativePose.scale<=48.001f&&nativePose.lift-900*nativePose.scale>=-56.001f&&
+    assert(nativePose.lift+8000*nativePose.scale<=55.501f&&nativePose.lift-900*nativePose.scale>=-59.501f&&
            "native progressive Master callback fitted Temple/authored bounds instead of its selected Kokiri placeholder at .6");
     assert(nativeDraws==1&&effects.size()>=2&&pose==ootCaller&&poses.empty());
     NativeOot::selected={NativeOot::Randomizer_DrawExtFourSword,"__OTR__objects/nei_gi_redesign/four_sword/gi_dl",nullptr,.04f,Kind::FourSword};
     entry.drawFunc=NativeOot::Randomizer_DrawExtFourSword;pose={};effects.clear();nativeDraws=0;
     assert(NativeOot::NeiGi_DrawImpl(&play,&entry,false));
-    assert(nativePose.lift+8000*nativePose.scale<=48.001f&&nativePose.lift-900*nativePose.scale>=-56.001f&&
+    assert(nativePose.lift+8000*nativePose.scale<=55.501f&&nativePose.lift-900*nativePose.scale>=-59.501f&&
            "missing Four Sword primary left the retained .55 selected Kokiri fallback unbounded");
     Vertex("test/kokiriVertices",25,{{-200,-900,0},{200,32000,0}});
     ootMods.erase(razor);mmMods.erase(razor);mmArchiveAvailable=false;pose={};loadedOwners.clear();

@@ -5,6 +5,14 @@
 #include <string>
 #include <unordered_set>
 
+extern "C" int NeiResource_EnsureGiBaseOwner(void) {
+    using Query = int32_t (*)(void);
+    static Query ensure = nullptr;
+    if (!ensure)
+        ensure = reinterpret_cast<Query>(Combo_ResolveSym("soh", "OOT_NeiEnsureGiBaseOwner"));
+    return ensure && ensure();
+}
+
 extern "C" int NeiResource_Available(const char* path) {
     if (!path || std::strncmp(path, "__OTR__", 7) != 0)
         return 0;

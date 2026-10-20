@@ -21,6 +21,7 @@ def main():
         (build / "mm_audio_worker.inc").write_text(source[start:end])
         binary = build / "worker_test"
         subprocess.run([*shlex.split(os.environ.get("CXX", "c++")), "-std=c++20", "-O2", "-g", "-DCOMBO_BUILD",
+                        "-DTEST_AUDIO_WORKER_EMOTES=1",
                         "-pthread", "-Wall", "-Wextra", "-Werror", "-Wno-unused-variable",
                         *shlex.split(os.environ.get("MM_AUDIO_WORKER_CXXFLAGS", "")),
                         "-I" + str(build), str(ROOT / "tests/audio_mixer/mm_worker_test.cpp"),

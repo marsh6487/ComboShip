@@ -4,6 +4,7 @@
 #include "mods/ext_buttons/ext_buttons.h"
 #include "mods/items/helpers/equip_helper.h"
 #include "2s2h/Enhancements/Audio/MMWeather.h"
+#include "mods/items/helpers/season_particles.h"
 
 static u8 sRodDrawn;
 static u8 sRodPendingDraw;
@@ -72,8 +73,12 @@ static u16 Seasons_EquippedButtonMask(void) {
 }
 
 static void Seasons_OnWheelConfirm(s32 index) {
+    const u8 previous = Seasons_GetSeason();
     Seasons_SetSeason((u8)index);
     if (gPlayState != NULL) {
+        if (Seasons_GetSeason() != previous) {
+            MM_BoxMenu_StartSeasonFlash(gPlayState);
+        }
         ExtInv_RefreshButtonIconsForItem(gPlayState, EXT_ITEM_ROD_OF_SEASONS);
     }
 }
@@ -105,7 +110,8 @@ void Seasons_TickInput(PlayState* play, Player* player, Input* input) {
         sRodScene = play->sceneId;
     }
     sRodFrame = play->gameplayFrames;
-    if (!Seasons_SeasonCount() || player->transformation != PLAYER_FORM_HUMAN || MasterCycle_IsRiding()) {
+    Seasons_UpdateGates();
+    if (!Seasons_HasRod() || player->transformation != PLAYER_FORM_HUMAN || MasterCycle_IsRiding()) {
         sRodPendingDraw = 0;
         Seasons_Stow(play, player);
         return;
@@ -157,7 +163,10 @@ void Seasons_TickInput(PlayState* play, Player* player, Input* input) {
                 Seasons_TryFinishDraw(play, player);
             }
         } else {
-            BoxMenu_Open(play, entries, Seasons_BuildWheel(entries), Seasons_GetSeason(), 0, Seasons_OnWheelConfirm);
+            if (BoxMenu_Open(play, entries, Seasons_BuildWheel(entries), Seasons_GetSeason(), 0,
+                             Seasons_OnWheelConfirm)) {
+                MM_BoxMenu_UseSeasonStyle();
+            }
         }
     }
 }
@@ -202,7 +211,7 @@ void Seasons_UpdateWeather(PlayState* play) {
     }
     sSeasonWeatherFrame = play->gameplayFrames;
     const int season = MMWeather_SeasonForPlay(play);
-    if (season != SEASON_WINTER && season != SEASON_AUTUMN) {
+    if (!MMSeasonParticles_IsEnabled(season)) {
         Seasons_RemoveSnowActor(play);
         return;
     }

@@ -155,8 +155,8 @@ inline bool GetGiModelFit(const char* nativeGame, const char* game, const char* 
     fit[1] = correction.lift;
     return true;
 }
-inline bool GetIkanaShieldGiTiltX(const char* nativeGame, const char* game, const char* path, float* tilt) {
-    if (!game || !path || !tilt || (std::strcmp(game, "oot") && std::strcmp(game, "mm")))
+inline bool GetIkanaShieldGiPose(const char* nativeGame, const char* game, const char* path, float* tilt, float* roll) {
+    if (!game || !path || !tilt || !roll || (std::strcmp(game, "oot") && std::strcmp(game, "mm")))
         return false;
     auto owner = Ship::CrossRMRegistry::Get(game);
 #ifndef COMBO_BUILD
@@ -175,7 +175,12 @@ inline bool GetIkanaShieldGiTiltX(const char* nativeGame, const char* game, cons
     if (!reader.Read(path, bounds))
         return false;
     *tilt = reader.ShieldTiltX();
+    *roll = reader.ShieldRollZ();
     return true;
+}
+inline bool GetIkanaShieldGiTiltX(const char* nativeGame, const char* game, const char* path, float* tilt) {
+    float roll = 0.f;
+    return GetIkanaShieldGiPose(nativeGame, game, path, tilt, &roll);
 }
 
 inline int GetDinSwordGiProfile(const char* nativeGame, const char* game, const char* path, bool enabled) {
@@ -224,6 +229,80 @@ struct GiFitResourceLoader {
         return materialSegment8 && address == 0x08000001;
     }
 };
+
+// Observe selected geometry without changing its fit or retaining a frame cache.
+inline bool GetGiModelBounds(const char* nativeGame, const char* game, const char* const* paths, int count,
+                             float minimum[3], float maximum[3]) {
+    if (!game || !paths || count < 1 || count > 16 || !minimum || !maximum)
+        return false;
+    NeiGi::Point low{}, high{};
+    bool geometry = false;
+    for (int i = 0; i < count; ++i) {
+        if (!paths[i])
+            return false;
+        std::string resource = paths[i], ownerGame = game;
+        if (resource.starts_with("__OTR__"))
+            resource.erase(0, 7);
+        if (resource.starts_with('@')) {
+            const auto colon = resource.find(':');
+            if (colon == std::string::npos)
+                return false;
+            ownerGame = resource.substr(1, colon - 1);
+            resource.erase(0, colon + 1);
+        }
+        auto owner = Ship::CrossRMRegistry::Get(ownerGame);
+#ifndef COMBO_BUILD
+        if (!owner && ownerGame == nativeGame)
+            if (const auto context = Ship::Context::GetRawInstance())
+                owner = context->GetResourceManager();
+#else
+        (void)nativeGame;
+#endif
+        if (!owner)
+            return false;
+        Ship::ResourceManagerScope scope(owner);
+        struct Loader : GiFitResourceLoader {
+            bool spinMaterial = false;
+            bool IsMaterialDisplayList(uintptr_t address) const {
+                return GiFitResourceLoader::IsMaterialDisplayList(address) ||
+                       (spinMaterial && (address & ~uintptr_t(1)) == 0x08000000u);
+            }
+        } load;
+        load.owner = owner;
+        load.materialSegment8 = resource == "objects/object_gi_longsword/gGiBiggoronSwordDL" ||
+                                resource == "objects/object_toki_objects/object_toki_objects_DL_001BD0" ||
+                                // Both legacy trident drawers bind this hook to an empty list.
+                                resource == "objects/object_gnd/gPhantomGanonSkelLimbsLimb_00C610DL_009298" ||
+                                // Native spell setup supplies only texture scrolling here.
+                                resource == "objects/object_gi_goddess/gGiMagicSpellOrbDL";
+        load.spinMaterial = resource == "objects/gameplay_keep/gGreatSpinAttackDiskDL" ||
+                            resource == "objects/gameplay_keep/gGreatSpinAttackCylinderDL";
+        NeiGi::ModelBoundsReader<Loader, true> reader(load, 0.f);
+        NeiGi::FrameBounds fitted{};
+        if (!reader.Read(resource.c_str(), fitted, true) || (count > 1 && !reader.RestoresModelView()))
+            return false;
+        NeiGi::Point partLow{}, partHigh{};
+        if (!reader.ExactBounds(partLow, partHigh))
+            continue; // Geometry-free native color/material pass.
+        if (!geometry) {
+            low = partLow;
+            high = partHigh;
+            geometry = true;
+        } else {
+            low = { std::min(low.x, partLow.x), std::min(low.y, partLow.y), std::min(low.z, partLow.z) };
+            high = { std::max(high.x, partHigh.x), std::max(high.y, partHigh.y), std::max(high.z, partHigh.z) };
+        }
+    }
+    if (!geometry)
+        return false;
+    minimum[0] = low.x;
+    minimum[1] = low.y;
+    minimum[2] = low.z;
+    maximum[0] = high.x;
+    maximum[1] = high.y;
+    maximum[2] = high.z;
+    return true;
+}
 
 inline bool GetGiModelsFit(const char* nativeGame, const char* game, const char* const* paths, int count, float scale,
                            float tilt, int presentation, float fit[2], bool dinEnabled) {

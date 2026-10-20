@@ -6,6 +6,8 @@
 #include "2s2h/BenGui/Notification.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
 #include "2s2h/Rando/ItemReceiptText.h"
+#include "ComboDungeonPickup.h"
+#include "sword_element_message.h"
 #include "2s2h/ShipUtils.h"
 #include "Traps.h"
 #ifdef COMBO_BUILD
@@ -48,7 +50,7 @@ void Rando::MiscBehavior::InvalidateComboForeignCache() {
 // RI_COMBO_FOREIGN. Returns nullptr when the check isn't foreign. Keyed by Checks[].name (RC_*).
 const ComboRando::ForeignItem* Rando::MiscBehavior::MM_LookupForeign(RandoCheckId rc) {
     int slot = gSaveContext.fileNum;
-    if (slot == 0xFF)
+    if (!Combo_IsCombinedGame() || slot == 0xFF)
         return nullptr; // no real save loaded (title screen sentinel)
     if (g_mmForeignGen != g_comboRandoGen) {
         g_mmForeignMap = ComboRando::LoadForeignForGame(slot, ComboRando::GAME_MM);
@@ -61,6 +63,8 @@ const ComboRando::ForeignItem* Rando::MiscBehavior::MM_LookupForeign(RandoCheckI
 // ComboShip: deliver a foreign-marked check's real item to its home game, toast, and persist the
 // save (caller sets the obtained flags). Exposed so the shop buy path can reuse it.
 void Rando::MiscBehavior::SendForeignCheck(RandoCheckId rc) {
+    if (!Combo_IsCombinedGame())
+        return;
     int slot = gSaveContext.fileNum;
     if (g_mmForeignGen != g_comboRandoGen) {
         g_mmForeignMap = ComboRando::LoadForeignForGame(slot, ComboRando::GAME_MM);
@@ -110,7 +114,11 @@ bool Rando::MiscBehavior::ShouldShowForeignCutscene(RandoCheckId rc) {
     if (lvl == 0) {
         return true;
     }
-    return advancement ? (lvl < 3) : (lvl < 1);
+    if (advancement)
+        return lvl < 3;
+    if (fi && ComboDungeonPickup::IsMapOrCompass(fi->itemName))
+        return lvl < 2;
+    return lvl < 1;
 }
 #endif
 
@@ -232,20 +240,21 @@ void Rando::MiscBehavior::CheckQueue() {
                         if (randoItemId == RI_TRIFORCE_PIECE) {
 #ifdef COMBO_BUILD
                             // ComboShip (#136): the goal counts BOTH games' pieces.
-                            const int comboPieces =
-                                gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces + 1 +
-                                (gMMComboOtherTriforceCount != NULL ? gMMComboOtherTriforceCount() : 0);
-                            if (gMMComboGoalRequired > 0 && comboPieces >= gMMComboGoalRequired) {
-                                prefix = "You";
-                                message = "completed the Triforce";
-                            }
-#else
-                            if (gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces + 1 >=
-                                RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED]) {
-                                prefix = "You";
-                                message = "completed the Triforce";
-                            }
+                            if (Combo_IsCombinedGame()) {
+                                const int comboPieces =
+                                    gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces + 1 +
+                                    (gMMComboOtherTriforceCount != NULL ? gMMComboOtherTriforceCount() : 0);
+                                if (gMMComboGoalRequired > 0 && comboPieces >= gMMComboGoalRequired) {
+                                    prefix = "You";
+                                    message = "completed the Triforce";
+                                }
+                            } else
 #endif
+                                if (gSaveContext.save.shipSaveInfo.rando.foundTriforcePieces + 1 >=
+                                    RANDO_SAVE_OPTIONS[RO_TRIFORCE_PIECES_REQUIRED]) {
+                                prefix = "You";
+                                message = "completed the Triforce";
+                            }
                             randoItemId = RI_TRIFORCE_PIECE_PREVIOUS;
                         }
 
@@ -266,7 +275,10 @@ void Rando::MiscBehavior::CheckQueue() {
                         };
                         Rando::ApplyItemReceiptText(randoItemId, entry);
                         Rando::AppendReceiptSource(entry, BankRewardSourceSuffix((RandoCheckId)CUSTOM_ITEM_PARAM));
+                        entry.swordElementTutorial =
+                            SwordElement_MessageElementForPickup(Rando::StaticData::Items[randoItemId].itemId);
 
+                        bool overheadReceiptOpened = false;
                         if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
                             CustomMessage::SetActiveCustomMessage(entry.msg, entry);
                         } else if (entry.capeVisibilityChoice ||
@@ -275,6 +287,7 @@ void Rando::MiscBehavior::CheckQueue() {
                                                             ? entry.msg + "\x1C\x02\x10"
                                                             : entry.msg,
                                                         entry);
+                            overheadReceiptOpened = true;
                         } else {
                             if (Rando::StaticData::Items[randoItemId].randoItemType != RITYPE_JUNK) {
                                 Notification::Emit({
@@ -292,6 +305,10 @@ void Rando::MiscBehavior::CheckQueue() {
                         bool wasObtained = randoSaveCheck.obtained;
 #endif
                         Rando::GiveItem(randoItemId, (RandoCheckId)CUSTOM_ITEM_PARAM);
+                        // Overhead receipts opened above precede the grant. Their
+                        // same native buffer can now receive the tutorial page.
+                        if (overheadReceiptOpened)
+                            SwordElement_MessageAppend(play, entry.swordElementTutorial);
                         randoSaveCheck.cycleObtained = true;
                         randoSaveCheck.obtained = true;
                         randoSaveCheck.eligible = false;

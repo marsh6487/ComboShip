@@ -12,6 +12,7 @@
 #endif
 
 #include <any>
+#include <array>
 #include <map>
 #include <set>
 #include <unordered_map>
@@ -676,6 +677,58 @@ static uint32_t GetTileSizeFromCoordinates(float low, float high) {
     return static_cast<uint32_t>(lroundf((high - low + 4.0f) / 4.0f));
 }
 
+// Loaded size is HD-scaled but the tile region is raw N64 texels; normalize before comparing.
+static int32_t GetRepeatPeriodFromTile(const RDP* rdp, uint8_t tile, bool isS, uint32_t tileSize) {
+    const auto& textureTile = rdp->texture_tile[tile];
+    const uint8_t mask = isS ? textureTile.masks : textureTile.maskt;
+    const uint8_t mode = isS ? textureTile.cms : textureTile.cmt;
+    const uint8_t shift = isS ? textureTile.shifts : textureTile.shiftt;
+
+    uint32_t period = tileSize;
+    if (mask != 0) {
+        period = 1u << mask;
+    }
+    if ((mode & G_TX_MIRROR) != 0) {
+        period *= 2;
+    }
+
+    int32_t shiftedPeriod = static_cast<int32_t>(period) << 2;
+    if (shift != 0) {
+        if (shift <= 10) {
+            shiftedPeriod <<= shift;
+        } else {
+            shiftedPeriod >>= (16 - shift);
+            if (shiftedPeriod <= 0) {
+                shiftedPeriod = 1;
+            }
+        }
+    }
+
+    return shiftedPeriod;
+}
+
+static float WrapScrollCoordinate(int64_t value, int32_t period) {
+    if (period <= 0) {
+        return 0.0f;
+    }
+
+    int32_t wrapped = value % period;
+    if (wrapped < 0) {
+        wrapped += period;
+    }
+
+    return static_cast<float>(wrapped);
+}
+
+static bool IsPyramidLike(uint32_t width, uint32_t height, uint32_t tileW, uint32_t tileH, float hByteScale,
+                          float vPixelScale) {
+    const float hs = hByteScale > 0.0f ? hByteScale : 1.0f;
+    const float vs = vPixelScale > 0.0f ? vPixelScale : 1.0f;
+    const uint32_t loadedPixels = static_cast<uint32_t>(width / hs) * static_cast<uint32_t>(height / vs);
+    const uint32_t renderedPixels = tileW * tileH;
+    return renderedPixels > 0 && loadedPixels > renderedPixels && loadedPixels * 8 < renderedPixels * 13; // < 1.625x
+}
+
 void Interpreter::ImportTextureRgba16(int tile, bool importReplacement) {
     const RawTexMetadata* metadata = &mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].raw_tex_metadata;
     const uint8_t* addr =
@@ -703,10 +756,7 @@ void Interpreter::ImportTextureRgba16(int tile, bool importReplacement) {
     // skip both. CLAMP wrap mode always opts in.
     uint32_t tile_w = GetTileSizeFromCoordinates(mRdp->texture_tile[tile].uls, mRdp->texture_tile[tile].lrs);
     uint32_t tile_h = GetTileSizeFromCoordinates(mRdp->texture_tile[tile].ult, mRdp->texture_tile[tile].lrt);
-    uint32_t loadedPixels = width * height;
-    uint32_t renderedPixels = tile_w * tile_h;
-    bool pyramidLike =
-        renderedPixels > 0 && loadedPixels > renderedPixels && loadedPixels * 8 < renderedPixels * 13; // < 1.625x
+    bool pyramidLike = IsPyramidLike(width, height, tile_w, tile_h, metadata->h_byte_scale, metadata->v_pixel_scale);
     bool clampS = (mRdp->texture_tile[tile].cms & G_TX_CLAMP) != 0;
     bool clampT = (mRdp->texture_tile[tile].cmt & G_TX_CLAMP) != 0;
     // A masked axis wraps every 2^mask texels, so trim an over-loaded texture back to that.
@@ -719,12 +769,10 @@ void Interpreter::ImportTextureRgba16(int tile, bool importReplacement) {
     if (maskH != 0 && (1u << maskH) >= tile_h && (1u << maskH) < height) {
         height = 1u << maskH;
     }
-    // HD replacement textures must still clamp to the rendered tile region
-    bool isHd = metadata->h_byte_scale != 1 || metadata->v_pixel_scale != 1;
-    if ((isHd || pyramidLike || clampS) && tile_w > 0 && tile_w < width) {
+    if ((pyramidLike || clampS) && tile_w > 0 && tile_w < width) {
         width = tile_w;
     }
-    if ((isHd || pyramidLike || clampT) && tile_h > 0 && tile_h < height) {
+    if ((pyramidLike || clampT) && tile_h > 0 && tile_h < height) {
         height = tile_h;
     }
 
@@ -783,9 +831,7 @@ void Interpreter::ImportTextureRgba32(int tile, bool importReplacement) {
     // skip both. CLAMP wrap mode always opts in.
     uint32_t tile_w = GetTileSizeFromCoordinates(mRdp->texture_tile[tile].uls, mRdp->texture_tile[tile].lrs);
     uint32_t tile_h = GetTileSizeFromCoordinates(mRdp->texture_tile[tile].ult, mRdp->texture_tile[tile].lrt);
-    uint32_t loadedPixels = width * height;
-    uint32_t renderedPixels = tile_w * tile_h;
-    bool pyramidLike = renderedPixels > 0 && loadedPixels > renderedPixels && loadedPixels * 8 < renderedPixels * 13;
+    bool pyramidLike = IsPyramidLike(width, height, tile_w, tile_h, metadata->h_byte_scale, metadata->v_pixel_scale);
     bool clampS = (mRdp->texture_tile[tile].cms & G_TX_CLAMP) != 0;
     bool clampT = (mRdp->texture_tile[tile].cmt & G_TX_CLAMP) != 0;
     // A masked axis wraps every 2^mask texels, so trim an over-loaded texture back to that.
@@ -798,12 +844,10 @@ void Interpreter::ImportTextureRgba32(int tile, bool importReplacement) {
     if (maskH != 0 && (1u << maskH) >= tile_h && (1u << maskH) < height) {
         height = 1u << maskH;
     }
-    // HD replacement textures must still clamp to the rendered tile region
-    bool isHd = metadata->h_byte_scale != 1 || metadata->v_pixel_scale != 1;
-    if ((isHd || pyramidLike || clampS) && tile_w > 0 && tile_w < width) {
+    if ((pyramidLike || clampS) && tile_w > 0 && tile_w < width) {
         width = tile_w;
     }
-    if ((isHd || pyramidLike || clampT) && tile_h > 0 && tile_h < height) {
+    if ((pyramidLike || clampT) && tile_h > 0 && tile_h < height) {
         height = tile_h;
     }
 
@@ -1103,9 +1147,7 @@ void Interpreter::ImportTextureCi4(int tile, bool importReplacement) {
     // skip both. CLAMP wrap mode always opts in.
     uint32_t tile_w = GetTileSizeFromCoordinates(mRdp->texture_tile[tile].uls, mRdp->texture_tile[tile].lrs);
     uint32_t tile_h = GetTileSizeFromCoordinates(mRdp->texture_tile[tile].ult, mRdp->texture_tile[tile].lrt);
-    uint32_t loadedPixels = width * height;
-    uint32_t renderedPixels = tile_w * tile_h;
-    bool pyramidLike = renderedPixels > 0 && loadedPixels > renderedPixels && loadedPixels * 8 < renderedPixels * 13;
+    bool pyramidLike = IsPyramidLike(width, height, tile_w, tile_h, metadata->h_byte_scale, metadata->v_pixel_scale);
     bool clampS = (mRdp->texture_tile[tile].cms & G_TX_CLAMP) != 0;
     bool clampT = (mRdp->texture_tile[tile].cmt & G_TX_CLAMP) != 0;
     // A masked axis wraps every 2^mask texels, so trim an over-loaded texture back to that.
@@ -1118,12 +1160,10 @@ void Interpreter::ImportTextureCi4(int tile, bool importReplacement) {
     if (maskH != 0 && (1u << maskH) >= tile_h && (1u << maskH) < height) {
         height = 1u << maskH;
     }
-    // HD replacement textures must still clamp to the rendered tile region
-    bool isHd = metadata->h_byte_scale != 1 || metadata->v_pixel_scale != 1;
-    if ((isHd || pyramidLike || clampS) && tile_w > 0 && tile_w < width) {
+    if ((pyramidLike || clampS) && tile_w > 0 && tile_w < width) {
         width = tile_w;
     }
-    if ((isHd || pyramidLike || clampT) && tile_h > 0 && tile_h < height) {
+    if ((pyramidLike || clampT) && tile_h > 0 && tile_h < height) {
         height = tile_h;
     }
 
@@ -1212,9 +1252,7 @@ void Interpreter::ImportTextureCi8(int tile, bool importReplacement) {
     // skip both. CLAMP wrap mode always opts in.
     uint32_t tile_w = GetTileSizeFromCoordinates(mRdp->texture_tile[tile].uls, mRdp->texture_tile[tile].lrs);
     uint32_t tile_h = GetTileSizeFromCoordinates(mRdp->texture_tile[tile].ult, mRdp->texture_tile[tile].lrt);
-    uint32_t loadedPixels = width * height;
-    uint32_t renderedPixels = tile_w * tile_h;
-    bool pyramidLike = renderedPixels > 0 && loadedPixels > renderedPixels && loadedPixels * 8 < renderedPixels * 13;
+    bool pyramidLike = IsPyramidLike(width, height, tile_w, tile_h, metadata->h_byte_scale, metadata->v_pixel_scale);
     bool clampS = (mRdp->texture_tile[tile].cms & G_TX_CLAMP) != 0;
     bool clampT = (mRdp->texture_tile[tile].cmt & G_TX_CLAMP) != 0;
     // A masked axis wraps every 2^mask texels, so trim an over-loaded texture back to that.
@@ -1227,12 +1265,10 @@ void Interpreter::ImportTextureCi8(int tile, bool importReplacement) {
     if (maskH != 0 && (1u << maskH) >= tile_h && (1u << maskH) < height) {
         height = 1u << maskH;
     }
-    // HD replacement textures must still clamp to the rendered tile region
-    bool isHd = metadata->h_byte_scale != 1 || metadata->v_pixel_scale != 1;
-    if ((isHd || pyramidLike || clampS) && tile_w > 0 && tile_w < width) {
+    if ((pyramidLike || clampS) && tile_w > 0 && tile_w < width) {
         width = tile_w;
     }
-    if ((isHd || pyramidLike || clampT) && tile_h > 0 && tile_h < height) {
+    if ((pyramidLike || clampT) && tile_h > 0 && tile_h < height) {
         height = tile_h;
     }
 
@@ -1914,6 +1950,141 @@ void Interpreter::GfxSpModifyVertex(uint16_t vtx_idx, uint8_t where, uint32_t va
     v->v = t;
 }
 
+static uint8_t AutumnForestLayer(std::string_view path) {
+    if (path.starts_with("__OTR__"))
+        path.remove_prefix(7);
+    if (path.starts_with("@mm:"))
+        path.remove_prefix(4);
+    if (path.starts_with("alt/"))
+        path.remove_prefix(4);
+    constexpr std::string_view base = "scenes/nonmq/Z2_00KEIKOKU/";
+    constexpr std::string_view scene = "scenes/nonmq/Z2_00KEIKOKU_scene/";
+    if (path.starts_with(base))
+        path.remove_prefix(base.size());
+    else if (path.starts_with(scene))
+        path.remove_prefix(scene.size());
+    else
+        return 0;
+    return path == "Z2_00KEIKOKUTex_034098" ? 1 : path == "Z2_00KEIKOKUTex_037098" ? 2 : 0;
+}
+
+// Observe the two Termina forest layers after shader selection, rather than
+// assuming that a bound seasonal display-list wrapper reached the actual draw.
+static void TraceAutumnForestDraw(const RawTexMetadata& metadata, const RDP& rdp, bool vertexGray, uint64_t shader0,
+                                  uint64_t shader1, uint32_t tile, GfxRenderingAPI* backend) {
+    if (!metadata.resource)
+        return;
+    const auto init = metadata.resource->GetInitData();
+    if (!init)
+        return;
+    const auto identity = metadata.autumnForestLayer ? metadata.autumnForestLayer : AutumnForestLayer(init->Path);
+    if (identity == 0 || identity > 2)
+        return;
+    const auto layer = identity - 1;
+    struct Sample {
+        std::string path;
+        std::array<uint64_t, 7> state{};
+        unsigned count = 0;
+    };
+    static std::array<Sample, 2> previous;
+    auto& sample = previous[layer];
+    if (sample.count >= 16)
+        return;
+    const auto& color = rdp.grayscale_color;
+    const uint32_t rgba = uint32_t(color.r) << 24 | uint32_t(color.g) << 16 | uint32_t(color.b) << 8 | color.a;
+    const bool shaderGray = (shader1 & SHADER_OPT(GRAYSCALE)) != 0;
+    const auto& texture = *metadata.resource;
+    const unsigned tmem = rdp.texture_tile[tile].tmem_index;
+    const std::array<uint64_t, 7> state = { uint64_t(rdp.grayscale) | uint64_t(vertexGray) << 1,
+                                            // An unused palette can change during unrelated draws while tint is Off.
+                                            rdp.grayscale || vertexGray || shaderGray ? rgba : 0, shader0, shader1,
+                                            uint64_t(tile) | uint64_t(tmem) << 32,
+                                            uint64_t(texture.Type) | uint64_t(texture.Width) << 16 |
+                                                uint64_t(texture.Height) << 32,
+                                            reinterpret_cast<uintptr_t>(metadata.resource.get()) };
+    if (sample.count && sample.path == init->Path && sample.state == state)
+        return;
+    auto owner = init->Parent;
+    if (!owner)
+        owner = ActiveResMgr()->GetArchiveManager()->GetArchiveFromFile(init->Path);
+    static const std::string noArchive = "<unknown>";
+    const auto& archive = owner ? owner->GetPath() : noArchive;
+    sample.path = init->Path;
+    sample.state = state;
+    ++sample.count;
+    SPDLOG_INFO(
+        "[AutumnForestDraw] layer={} texture={} path_owner_archive={} format={} dimensions={}x{} tile={} tmem={} "
+        "rdp_gray={} vertex_gray={} rgba={:08X} shader_gray={} shader0={:016X} shader1={:016X} "
+        "backend={} sample={}/16",
+        layer == 0 ? "wallpaper" : "canopy", init->Path, archive, int(texture.Type), texture.Width, texture.Height,
+        tile, tmem, rdp.grayscale, vertexGray, rgba, shaderGray, shader0, shader1, backend->GetName(), sample.count);
+}
+
+static uint8_t ZoraCosmeticLayer(std::string_view path) {
+    if (path.find("objects/object_link_zora") == std::string_view::npos)
+        return 0;
+    return path.find("Eyes") != std::string_view::npos ? 1 : 2;
+}
+
+// Bounded runtime evidence for the Zora pack's cosmetic targets. Only drawn
+// Zora textures reach this probe; shader IDs/colors and the selected archive
+// distinguish a correct source overlay from a different runtime resource.
+static void TraceZoraCosmeticDraw(const RawTexMetadata& metadata, const RDP& rdp, bool vertexGray,
+                                  uint64_t shader0, uint64_t shader1, uint32_t tile) {
+    if (!metadata.zoraCosmeticLayer || !metadata.resource)
+        return;
+    const auto init = metadata.resource->GetInitData();
+    if (!init)
+        return;
+    struct Sample {
+        std::string path;
+        std::array<uint64_t, 7> state{};
+        unsigned count = 0, zeroAlpha = 0, partialAlpha = 0, pixels = 0;
+    };
+    static std::array<Sample, 2> previous;
+    static std::set<std::pair<std::string, std::array<uint64_t, 7>>> seen;
+    auto& sample = previous[metadata.zoraCosmeticLayer - 1];
+    if (sample.count >= 64)
+        return;
+    const auto rgba = [](const auto& color) {
+        return uint32_t(color.r) << 24 | uint32_t(color.g) << 16 | uint32_t(color.b) << 8 | color.a;
+    };
+    const auto pointer = reinterpret_cast<uintptr_t>(metadata.resource.get());
+    const std::array<uint64_t, 7> state = { shader0, shader1, rgba(rdp.prim_color), rgba(rdp.env_color), pointer,
+                                            uint64_t(tile) | uint64_t(rdp.texture_tile[tile].tmem_index) << 32,
+                                            uint64_t(rdp.grayscale) | uint64_t(vertexGray) << 1 |
+                                                uint64_t(ActiveResMgr()->IsAltAssetsEnabled()) << 2 };
+    if (!seen.emplace(init->Path, state).second)
+        return;
+    const auto& texture = *metadata.resource;
+    if (!sample.count || sample.path != init->Path || sample.state[4] != pointer) {
+        sample.zeroAlpha = sample.partialAlpha = sample.pixels = 0;
+        if (texture.Type == TextureType::RGBA32bpp && texture.ImageData) {
+            sample.pixels = texture.ImageDataSize / 4;
+            for (size_t i = 3; i < texture.ImageDataSize; i += 4) {
+                sample.zeroAlpha += texture.ImageData[i] == 0;
+                sample.partialAlpha += texture.ImageData[i] > 0 && texture.ImageData[i] < 255;
+            }
+        }
+    }
+    auto owner = init->Parent;
+    auto archives = ActiveResMgr()->GetArchiveManager();
+    if (!owner && archives->HasFile(init->Path))
+        owner = archives->GetArchiveFromFile(init->Path);
+    sample.path = init->Path;
+    sample.state = state;
+    ++sample.count;
+    SPDLOG_INFO(
+        "[ZoraCosmeticDraw] layer={} texture={} archive={} pointer={:X} alt={} format={} dimensions={}x{} "
+        "scale={}x{} flags={} alpha_zero={} alpha_partial={} pixels={} prim={:08X} env={:08X} "
+        "gray={} vertex_gray={} shader0={:016X} shader1={:016X} tile={} sample={}/64",
+        metadata.zoraCosmeticLayer == 1 ? "eyes" : "model", init->Path,
+        owner ? owner->GetPath() : "<unknown>", pointer, ActiveResMgr()->IsAltAssetsEnabled(), int(texture.Type),
+        texture.Width, texture.Height, texture.HByteScale, texture.VPixelScale, texture.Flags, sample.zeroAlpha,
+        sample.partialAlpha, sample.pixels, rgba(rdp.prim_color), rgba(rdp.env_color), rdp.grayscale, vertexGray,
+        shader0, shader1, tile, sample.count);
+}
+
 void Interpreter::GfxSpTri1(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3_idx, bool is_rect) {
     if (mTriangleStateReuseAllowed) {
         if (!mTriangleState.valid || mTriangleState.reusePackedVertices) {
@@ -2191,9 +2362,10 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
 
                 // Same pyramid-like ratio gate as ImportTexture: only clamp when loaded pixels
                 // are close to rendered pixels (mipmap), not when much bigger (window scroll).
-                uint32_t loadedPx = tex_width[i] * tex_height[i];
-                uint32_t renderedPx = tex_width2[i] * tex_height2[i];
-                bool pyrLike = renderedPx > 0 && loadedPx > renderedPx && loadedPx * 8 < renderedPx * 13;
+                const RawTexMetadata& triMeta =
+                    mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].raw_tex_metadata;
+                bool pyrLike = IsPyramidLike(tex_width[i], tex_height[i], tex_width2[i], tex_height2[i],
+                                             triMeta.h_byte_scale, triMeta.v_pixel_scale);
                 // Same wrap-period trim as the import paths. The >= tex_width2 guard skips a stale
                 // mask left by an FB blit (the pause background), which would otherwise tile the FB.
                 uint32_t maskW = mRdp->texture_tile[tile].masks;
@@ -2204,13 +2376,10 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
                 if (maskH != 0 && (1u << maskH) >= tex_height2[i] && (1u << maskH) < tex_height[i]) {
                     tex_height[i] = 1u << maskH;
                 }
-                // HD replacements must clamp to the tile region
-                bool isHd = mRdp->loaded_texture[i].raw_tex_metadata.h_byte_scale != 1 ||
-                            mRdp->loaded_texture[i].raw_tex_metadata.v_pixel_scale != 1;
-                if ((isHd || pyrLike || (cms & G_TX_CLAMP)) && tex_width2[i] > 0 && tex_width2[i] < tex_width[i]) {
+                if ((pyrLike || (cms & G_TX_CLAMP)) && tex_width2[i] > 0 && tex_width2[i] < tex_width[i]) {
                     tex_width[i] = tex_width2[i];
                 }
-                if ((isHd || pyrLike || (cmt & G_TX_CLAMP)) && tex_height2[i] > 0 && tex_height2[i] < tex_height[i]) {
+                if ((pyrLike || (cmt & G_TX_CLAMP)) && tex_height2[i] > 0 && tex_height2[i] < tex_height[i]) {
                     tex_height[i] = tex_height2[i];
                 }
 
@@ -2282,6 +2451,15 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
                                reusable && !is_rect && (numInputs > 1 || usedTextures[1]) &&
                                    !(mRdp->other_mode_l & G_TL_LOD) };
         }
+    }
+
+    if (usedTextures[0]) {
+        const auto tile = effective_tile[0];
+        TraceAutumnForestDraw(mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].raw_tex_metadata, *mRdp,
+                              use_grayscale, comb->shader_id0, comb->shader_id1 | tm * SHADER_OPT(TEXEL0_CLAMP_S), tile,
+                              mRapi);
+        TraceZoraCosmeticDraw(mRdp->loaded_texture[mRdp->texture_tile[tile].tmem_index].raw_tex_metadata, *mRdp,
+                              use_grayscale, comb->shader_id0, comb->shader_id1 | tm * SHADER_OPT(TEXEL0_CLAMP_S), tile);
     }
 
     // Within a pure triangle run a loaded vertex's expanded attributes are
@@ -2376,9 +2554,15 @@ void Interpreter::GfxSpTri1Impl(uint8_t vtx1_idx, uint8_t vtx2_idx, uint8_t vtx3
         }
 
         if (use_grayscale) {
-            mBufVbo[mBufVboLen++] = mRdp->grayscale_color.r / 255.0f;
-            mBufVbo[mBufVboLen++] = mRdp->grayscale_color.g / 255.0f;
-            mBufVbo[mBufVboLen++] = mRdp->grayscale_color.b / 255.0f;
+            const auto color = mRdp->grayscale_color;
+            const unsigned sum = unsigned(color.r) + color.g + color.b;
+            // All backends multiply mean texel RGB by these float attributes.
+            // Mode 2 retains that mean; mode 3 lifts it for snow on dark foliage.
+            // Preserve legacy mode's exact arithmetic and texture/fragment alpha.
+            const float scale = sum != 0 ? (mRdp->grayscale_frost ? 5.4f : 3.0f) / sum : 0.0f;
+            mBufVbo[mBufVboLen++] = mRdp->grayscale_normalize ? color.r * scale : color.r / 255.0f;
+            mBufVbo[mBufVboLen++] = mRdp->grayscale_normalize ? color.g * scale : color.g / 255.0f;
+            mBufVbo[mBufVboLen++] = mRdp->grayscale_normalize ? color.b * scale : color.b / 255.0f;
             mBufVbo[mBufVboLen++] = mRdp->grayscale_color.a / 255.0f; // lerp interpolation factor (not alpha)
         }
 
@@ -2673,6 +2857,8 @@ void Interpreter::GfxDpSetTextureImage(uint32_t format, uint32_t size, uint32_t 
     mRdp->texture_to_load.siz = size;
     mRdp->texture_to_load.width = width;
     mRdp->texture_to_load.tex_flags = texFlags;
+    rawTexMetdata.autumnForestLayer = rawTexMetdata.resource && texPath ? AutumnForestLayer(texPath) : 0;
+    rawTexMetdata.zoraCosmeticLayer = rawTexMetdata.resource && texPath ? ZoraCosmeticLayer(texPath) : 0;
     mRdp->texture_to_load.raw_tex_metadata = rawTexMetdata;
 }
 
@@ -3742,7 +3928,9 @@ bool gfx_push_shader(Interpreter* gfx, F3DGfx** cmd0) {
 bool gfx_pop_shader(Interpreter* gfx, F3DGfx** cmd0) {
     F3DGfx* cmd = *cmd0;
 
-    gfx->mShaderStack.pop();
+    if (!gfx->mShaderStack.empty()) {
+        gfx->mShaderStack.pop();
+    }
 
     return false;
 }
@@ -4677,6 +4865,10 @@ bool gfx_set_grayscale_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
     F3DGfx* cmd = *cmd0;
 
     gfx->mRdp->grayscale = cmd->words.w1;
+    // 0 disables, 1 keeps legacy multiplication, 2 preserves mean intensity,
+    // and 3 lifts that mean for winter frost. Every mode change clears old state.
+    gfx->mRdp->grayscale_normalize = cmd->words.w1 == 2 || cmd->words.w1 == 3;
+    gfx->mRdp->grayscale_frost = cmd->words.w1 == 3;
     return false;
 }
 
@@ -4764,6 +4956,44 @@ bool gfx_set_tile_size_lerp_handler_rdp(Interpreter* gfx, F3DGfx** cmd0) {
     gfx->mRdp->texture_tile[tile].ult = coords[1] + t * (coords[5] - coords[1]);
     gfx->mRdp->texture_tile[tile].lrs = coords[2] + t * (coords[6] - coords[2]);
     gfx->mRdp->texture_tile[tile].lrt = coords[3] + t * (coords[7] - coords[3]);
+    gfx->mRdp->textures_changed[0] = true;
+    gfx->mRdp->textures_changed[1] = true;
+
+    return false;
+}
+
+bool gfx_scroll_texture_handler_custom(Interpreter* gfx, F3DGfx** cmd0) {
+    F3DGfx* cmd = *cmd0;
+
+    const uint8_t tile = cmd->words.w0 & 0x7;
+    const int16_t speedX = static_cast<int16_t>(cmd->words.w1 >> 16);
+    const int16_t speedY = static_cast<int16_t>(cmd->words.w1 & 0xFFFF);
+
+    auto& textureTile = gfx->mRdp->texture_tile[tile];
+    const uint32_t tileWidth = GetTileSizeFromCoordinates(textureTile.uls, textureTile.lrs);
+    const uint32_t tileHeight = GetTileSizeFromCoordinates(textureTile.ult, textureTile.lrt);
+    const float tileSpanX = textureTile.lrs - textureTile.uls;
+    const float tileSpanY = textureTile.lrt - textureTile.ult;
+
+    const int32_t periodX = GetRepeatPeriodFromTile(gfx->mRdp, tile, true, tileWidth);
+    const int32_t periodY = GetRepeatPeriodFromTile(gfx->mRdp, tile, false, tileHeight);
+    const int64_t tick = gfx->mGameTick;
+
+    const float uls0 = WrapScrollCoordinate(static_cast<int32_t>(lroundf(textureTile.uls)) + tick * speedX, periodX);
+    const float ult0 = WrapScrollCoordinate(static_cast<int32_t>(lroundf(textureTile.ult)) + tick * speedY, periodY);
+    const float lrs0 = uls0 + tileSpanX;
+    const float lrt0 = ult0 + tileSpanY;
+
+    const float uls1 = uls0 + speedX;
+    const float ult1 = ult0 + speedY;
+    const float lrs1 = lrs0 + speedX;
+    const float lrt1 = lrt0 + speedY;
+
+    const float t = gfx->mInterpolationT;
+    textureTile.uls = uls0 + t * (uls1 - uls0);
+    textureTile.ult = ult0 + t * (ult1 - ult0);
+    textureTile.lrs = lrs0 + t * (lrs1 - lrs0);
+    textureTile.lrt = lrt0 + t * (lrt1 - lrt0);
     gfx->mRdp->textures_changed[0] = true;
     gfx->mRdp->textures_changed[1] = true;
 
@@ -5155,6 +5385,7 @@ static constexpr UcodeHandler otrHandlers = {
     { OTR_G_MOVEMEM_HASH, { "OTR_G_MOVEMEM_HASH", gfx_movemem_handler_otr } },      // OTR_G_MOVEMEM_HASH
     { OTR_G_PUSH_SHADER, { "G_PUSH_SHADER", gfx_push_shader } },
     { OTR_G_POP_SHADER, { "G_POP_SHADER", gfx_pop_shader } },
+    { OTR_G_SCROLL_TEXTURE, { "G_SCROLL_TEXTURE", gfx_scroll_texture_handler_custom } },
     { RDP_G_LOADBLOCK_WIDE, { "G_LOADBLOCK_WIDE", gfx_load_block_wide_handler_rdp } }, // RDP_G_LOADBLOCK_WIDE (-15)
     { RDP_G_VTX_WIDE, { "G_VTX_WIDE", gfx_vtx_handler_f3dex2 } },                      // RDP_G_VTX_WIDE (-16)
     { RDP_G_TRI1_WIDE, { "G_TRI1_WIDE", gfx_tri1_handler_f3dex2 } },                   // RDP_G_TRI1_WIDE (-17)

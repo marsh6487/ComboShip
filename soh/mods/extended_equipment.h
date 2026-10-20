@@ -3,7 +3,8 @@
  *
  * Adds 12 new equipment pieces (3 swords, 3 shields, 3 tunics, 3 boots)
  * accessible via L button on the pause menu equipment page.
- * All extended equipment is "owned" when the cheat CVar is enabled.
+ * The page is always reachable. Only owned items can be equipped; a valid equip
+ * enables gameplay behavior independently of the legacy cheat checkbox.
  *
  * Page switching: Press L on equipment screen to toggle vanilla/extended.
  */
@@ -89,7 +90,7 @@ void ExtEquip_SwitchPage(void);
 /** @return true if page switch cooldown elapsed */
 u8 ExtEquip_CanSwitch(void);
 
-/** @return true if the extra equipment cheat is enabled */
+/** @return true if extended equipment gameplay behavior is enabled */
 u8 ExtEquip_IsEnabled(void);
 
 // ---------------------------------------------------------------------------

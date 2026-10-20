@@ -5,6 +5,7 @@
  */
 
 #include "z64actor.h"
+#include "gameplay/ComboFaroresWind.h"
 #include "crash_actor_context.h"
 #include "z64door.h"
 
@@ -33,6 +34,8 @@
 #include "2s2h/ObjectExtension/ObjectExtension.h"
 #include "2s2h/ObjectExtension/ActorListIndex.h"
 #include <libultraship/bridge/consolevariablebridge.h>
+#include "2s2h/BenGui/CosmeticEditor.h"
+#include "2s2h/Enhancements/Gameplay/ComboForestSkullKid.h"
 
 // Skijer's NEI shared time control (mods/items/helpers/timestop_helper.c).
 // gChampionSlowFactor: 1.0f = normal, 0.0f = fully stopped, in between = slow motion.
@@ -622,13 +625,16 @@ void Attention_Draw(Attention* attention, PlayState* play) {
                         lockOnScaleX = ((reticle->radius - 120.0f) * 0.001f) + 0.15f;
                     }
 
+                    f32 reticleScale = CVarGetFloat(CVAR_COSMETIC("Silly.LockOnReticleScale"), 1.0f);
+                    f32 reticleSpin = CVarGetFloat(CVAR_COSMETIC("Silly.LockOnReticleSpin"), 1.0f);
+
                     Matrix_Translate(reticle->pos.x, reticle->pos.y, 0.0f, MTXMODE_NEW);
-                    Matrix_Scale(lockOnScaleX, 0.15f, 1.0f, MTXMODE_APPLY);
+                    Matrix_Scale(lockOnScaleX * reticleScale, 0.15f * reticleScale, 1.0f, MTXMODE_APPLY);
 
-                    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, reticle->color.r, reticle->color.g, reticle->color.b,
-                                    (u8)alpha);
+                    gDPSetPrimColorOverride(OVERLAY_DISP++, 0, 0, reticle->color.r, reticle->color.g, reticle->color.b,
+                                            (u8)alpha, COSMETIC_ID("HUD.TargetReticle"));
 
-                    Matrix_RotateZS(attention->reticleSpinCounter * 0x200, MTXMODE_APPLY);
+                    Matrix_RotateZS((s16)(attention->reticleSpinCounter * 0x200 * reticleSpin), MTXMODE_APPLY);
 
                     // Draw the 4 triangles that make up the reticle
                     for (triangleIndex = 0; triangleIndex < 4; triangleIndex++) {
@@ -664,8 +670,8 @@ void Attention_Draw(Attention* attention, PlayState* play) {
         Matrix_RotateYS(play->gameplayFrames * 0xBB8, MTXMODE_APPLY);
         Matrix_Scale((iREG(27) + 35) / 1000.0f, (iREG(28) + 60) / 1000.0f, (iREG(29) + 50) / 1000.0f, MTXMODE_APPLY);
         if (GameInteractor_Should(VB_DRAW_LOCK_ON_ARROW, true, actor)) {
-            gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, attentionColor->primary.r, attentionColor->primary.g,
-                            attentionColor->primary.b, 255);
+            gDPSetPrimColorOverride(POLY_XLU_DISP++, 0, 0, attentionColor->primary.r, attentionColor->primary.g,
+                                    attentionColor->primary.b, 255, COSMETIC_ID("HUD.TargetArrow"));
         }
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
         gSPDisplayList(POLY_XLU_DISP++, gLockOnArrowDL);
@@ -2654,6 +2660,7 @@ static u8 sOotFwRoomIndex = 0;
 
 // OoT func_8002FA60 — called from Actor_InitContext on every scene load.
 void OotFw_OnSceneInit(PlayState* play) {
+    ComboFw_SyncPoint();
     NeiSaveData* nei = Nei_Save();
 
     if (nei->fwSet) {
@@ -3473,7 +3480,7 @@ void Actor_DrawLensActors(PlayState* play, s32 numLensActors, Actor** lensActors
 
         gDPSetCombineLERP(gfx++, 1, TEXEL0, PRIMITIVE, 0, 1, TEXEL0, PRIMITIVE, 0, 1, TEXEL0, PRIMITIVE, 0, 1, TEXEL0,
                           PRIMITIVE, 0);
-        gDPSetPrimColor(gfx++, 0, 0, 74, 0, 0, 74);
+        gDPSetPrimColorOverride(gfx++, 0, 0, 74, 0, 0, 74, COSMETIC_ID("HUD.LensOverlay"));
 
         gfxTemp = gfx;
         Actor_DrawLensOverlay(&gfxTemp, play->actorCtx.lensMaskSize);
@@ -4049,7 +4056,11 @@ Actor* Actor_SpawnAsChildAndCutscene(ActorContext* actorCtx, PlayState* play, s1
         return NULL;
     }
 
+#ifdef COMBO_BUILD
+    objectSlot = Object_GetSlot(&play->objectCtx, ComboForestSkullKid_ObjectId(index, params, profile->objectId));
+#else
     objectSlot = Object_GetSlot(&play->objectCtx, profile->objectId);
+#endif
     if ((objectSlot <= OBJECT_SLOT_NONE) ||
         ((profile->type == ACTORCAT_ENEMY) && Flags_GetClear(play, play->roomCtx.curRoom.num) &&
          (profile->id != ACTOR_BOSS_05))) {

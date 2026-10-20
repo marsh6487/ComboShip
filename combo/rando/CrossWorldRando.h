@@ -21,6 +21,7 @@
 #include "gui/ComboGenProgress.h"
 #include "CrossForeign.h" // for ComboRando::GameId
 #include "SharedItems.h"
+#include "CrossDungeonReachability.h"
 
 namespace ComboRando {
 
@@ -69,11 +70,16 @@ struct OracleFns {
     // OOT only (null for MM): is the OOT->MM portal region reachable? Valid only immediately after a
     // GetReachableChecks call, whose owned-set it describes (the DLL piggybacks on that search).
     uint8_t (*GetPortalOpen)(void) = nullptr;
+    void (*SetDungeonAccess)(const char*) = nullptr;
+    const char* (*GetDungeonExits)(void) = nullptr;
+    uint16_t (*GetBossDefeated)(void) = nullptr;
+    int (*CanEnterArrival)(int32_t) = nullptr;
+    CrossDungeon::BossSourceMap CrossBossSources = CrossDungeon::EmptyBossSources();
 };
 
 // ---------- Data types ----------
 
-// Per-game OOT accessibility, mapped from OOT's RSK_LOGIC_RULES + RSK_ALL_LOCATIONS_REACHABLE.
+// Per-game OOT accessibility, mapped from OOT's RSK_NO_LOGIC + RSK_ALL_CHECKS_REACHABLE.
 // MM is always ALL_REACHABLE. See CrossWorldCombinedFill for the per-mode fill/validation behavior.
 //   ALL_REACHABLE  every OOT advancement item lands reachable (default; unchanged behavior)
 //   BEATABLE_ONLY  OOT progression may strand off-path, but the seed stays beatable (ALR-off)
@@ -255,7 +261,9 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
 
     // Portal gate: NO_LOGIC deliberately skips it (an impossible seed is that mode's point). Any other
     // mode without the export would silently fill MM as sphere-0 reachable — the bug this gate fixes.
-    const bool portalGated = ootAccess != OotAccess::NO_LOGIC;
+    const bool crossDungeon = ootOracle.SetDungeonAccess && mmOracle.SetDungeonAccess && ootOracle.GetDungeonExits &&
+                              mmOracle.GetDungeonExits;
+    const bool portalGated = ootAccess != OotAccess::NO_LOGIC && !crossDungeon;
     const bool mmStart = startingGame == GAME_MM;
     if (portalGated && ootOracle.GetPortalOpen == nullptr) {
         result.error = "OOT oracle is missing Combo_SOH_Rando_GetPortalOpen — rebuild soh.dll (the OOT->MM "
@@ -450,9 +458,14 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         return count;
     };
     uint32_t effectiveSharedMask = 0;
-    const bool maskQuestShuffle = nlohmann::json::parse(sohDumpJson)
-                                      .value("accessibility", nlohmann::json::object())
-                                      .value("maskQuestShuffle", false);
+    bool maskQuestShuffle = false;
+    if (sharedMask != 0) {
+        try {
+            maskQuestShuffle = nlohmann::json::parse(sohDumpJson)
+                                   .value("accessibility", nlohmann::json::object())
+                                   .value("maskQuestShuffle", false);
+        } catch (...) {}
+    }
     for (int i = 0; i < SF_COUNT; ++i) {
         const auto& def = SharedFamilyByIndex(i);
         if (!(sharedMask & (1u << i)) || (def.isMask && !maskQuestShuffle))
@@ -766,12 +779,19 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         std::vector<std::string> ootSeen, mmSeen;
         for (;;) {
             SharedOwnedViews(sharedGroups, ootOwned, mmOwned, ootSeen, mmSeen);
-            ootReachable = queryReachable(ootOracle, ootSeen);
-            // Read the portal off THIS OOT query, before any MM check is credited below — that ordering
-            // is what stops the fill proving the portal with an item that lives behind it.
-            if (!portalOpen)
-                portalOpen = ootOracle.GetPortalOpen() != 0;
-            mmReachable = portalOpen ? queryReachable(mmOracle, mmSeen) : std::unordered_set<std::string>{};
+            if (crossDungeon) {
+                auto joint = CrossDungeon::QueryJoint(ootOracle, mmOracle, ootSeen, mmSeen,
+                                                      mmStart || ootAccess == OotAccess::NO_LOGIC, queryReachable);
+                ootReachable = std::move(joint.oot);
+                mmReachable = std::move(joint.mm);
+            } else {
+                ootReachable = queryReachable(ootOracle, ootSeen);
+                // Read the portal off THIS OOT query, before any MM check is credited below — that ordering
+                // is what stops the fill proving the portal with an item that lives behind it.
+                if (!portalOpen)
+                    portalOpen = ootOracle.GetPortalOpen() != 0;
+                mmReachable = portalOpen ? queryReachable(mmOracle, mmSeen) : std::unordered_set<std::string>{};
+            }
             bool changed = false;
             for (size_t i = 0; i < placements.size(); ++i) {
                 if (credited[i])
@@ -818,6 +838,10 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         }
 
     for (int pass = 1; pass <= kMaxPasses && !fillOk; ++pass) {
+        if (GenCancelled(progress)) {
+            result.error = "cancelled";
+            return result;
+        }
         passesUsed = pass;
         auto passStart = std::chrono::steady_clock::now();
         auto passMs = [&] {
@@ -838,6 +862,10 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
         std::vector<CwItem> advRest = advItems;
         bool prereqOk = portalPrereqs.empty();
         for (int t = 1; t <= kMaxPrereqTries && !prereqOk; ++t) {
+            if (GenCancelled(progress)) {
+                result.error = "cancelled";
+                return result;
+            }
             placements = lockedPlacements;
             filledChecks.clear();
             for (const auto& lp : lockedPlacements)
@@ -918,6 +946,10 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
 
         bool deadEnd = false;
         while (!toPlace.empty()) {
+            if (GenCancelled(progress)) {
+                result.error = "cancelled";
+                return result;
+            }
             size_t k = std::min({ batchCap, std::max<size_t>(1, toPlace.size() / 4), toPlace.size() });
 
             std::vector<CwItem> batch;
@@ -1077,6 +1109,10 @@ CrossWorldCombinedFill(const std::string& sohDumpJson, const std::string& mmDump
             }
         }
 
+        if (GenCancelled(progress)) {
+            result.error = "cancelled";
+            return result;
+        }
         // Validation: with nothing assumed, sphere-collecting placed items must reach every
         // ADVANCEMENT check (the assumed-fill guarantee). Junk-holding checks may legitimately be
         // oracle-unreachable (oracles under-model, e.g. MM with zeroed save options) — count and log

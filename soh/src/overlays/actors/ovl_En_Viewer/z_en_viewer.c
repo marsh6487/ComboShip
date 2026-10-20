@@ -1,3 +1,4 @@
+#include "rando/CrossEntranceBoss.h"
 /*
  * File: z_en_viewer.c
  * Overlay: ovl_En_Viewer
@@ -5,6 +6,7 @@
  */
 
 #include "z_en_viewer.h"
+#include "soh/Enhancements/cosmetics/NativeNpcModels.h"
 #include "overlays/actors/ovl_Bg_Toki_Swd/z_bg_toki_swd.h"
 #include "overlays/actors/ovl_En_Ganon_Mant/z_en_ganon_mant.h"
 #include "objects/object_zl4/object_zl4.h"
@@ -36,6 +38,7 @@
 #include "static_story_mm_actor.h"
 #include "static_story_ganon.h"
 #include "mods/transformation_masks/assets/mm_asset_loader.h"
+#include "mods/sound_translator/mm_sfx_ids.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/frame_interpolation.h"
 #include <assert.h>
@@ -169,6 +172,10 @@ void EnViewer_Destroy(Actor* thisx, PlayState* play) {
     EnViewer* this = (EnViewer*)thisx;
 
     if (this->staticState.staticMode) {
+        if (this->staticState.type == STATIC_STORY_ACTOR_MONKEY && this->staticState.monkeySfxActive) {
+            MmSfx_StopAtPos(MM_NA_SE_EV_MONKEY_VO_JOY, &this->actor.projectedPos);
+            this->staticState.monkeySfxActive = false;
+        }
         if (this->staticState.initialized) {
             if (this->staticState.tatlInitialized) {
                 SkelAnime_Free(&this->staticState.tatlSkelAnime, play);
@@ -335,10 +342,15 @@ static void EnViewerStatic_InitSkeleton(EnViewer* this, PlayState* play,
             SkelAnime_InitFlex(play, &this->skin.skelAnime, &gImpaSkel, NULL, NULL, NULL, 0);
             break;
         case STATIC_SKELETON_MALON_CHILD:
-            SkelAnime_InitFlex(play, &this->skin.skelAnime, &gMalonChildSkel, NULL, NULL, NULL, 0);
+            SkelAnime_InitFlex(
+                play, &this->skin.skelAnime,
+                (FlexSkeletonHeader*)NativeNpcModel_SelectSkeleton(&sChildMalonNpcModel, gMalonChildSkel), NULL, NULL,
+                NULL, 0);
             break;
         case STATIC_SKELETON_SARIA:
-            SkelAnime_InitFlex(play, &this->skin.skelAnime, &gSariaSkel, NULL, NULL, NULL, 0);
+            SkelAnime_InitFlex(play, &this->skin.skelAnime,
+                               (FlexSkeletonHeader*)NativeNpcModel_SelectSkeleton(&sSariaNpcModel, gSariaSkel), NULL,
+                               NULL, NULL, 0);
             break;
         case STATIC_SKELETON_SHEIK:
             SkelAnime_InitFlex(play, &this->skin.skelAnime, &gSheikSkel, NULL, NULL, NULL, 0);
@@ -350,7 +362,10 @@ static void EnViewerStatic_InitSkeleton(EnViewer* this, PlayState* play,
             SkelAnime_InitFlex(play, &this->skin.skelAnime, &gRutoChildSkel, NULL, NULL, NULL, 0);
             break;
         case STATIC_SKELETON_MALON_ADULT:
-            SkelAnime_InitFlex(play, &this->skin.skelAnime, &gMalonAdultSkel, NULL, NULL, NULL, 0);
+            SkelAnime_InitFlex(
+                play, &this->skin.skelAnime,
+                (FlexSkeletonHeader*)NativeNpcModel_SelectSkeleton(&sAdultMalonNpcModel, gMalonAdultSkel), NULL, NULL,
+                NULL, 0);
             break;
         case STATIC_SKELETON_ADULT_ZELDA:
             SkelAnime_InitFlex(play, &this->skin.skelAnime, &gZelda2Skel, NULL, NULL, NULL, 0);
@@ -823,6 +838,26 @@ void EnViewerStatic_Update(EnViewer* this, PlayState* play) {
     bool animationEnded = false;
     bool canInteract = true;
 
+    if (this->staticState.type == STATIC_STORY_ACTOR_MONKEY) {
+        bool canCall = this->actor.room == play->roomCtx.curRoom.num && play->pauseCtx.state == 0 &&
+                       play->csCtx.state == CS_STATE_IDLE && play->transitionTrigger == TRANS_TRIGGER_OFF &&
+                       play->transitionMode == TRANS_MODE_OFF;
+        if (!canCall) {
+            if (this->staticState.monkeySfxActive) {
+                MmSfx_StopAtPos(MM_NA_SE_EV_MONKEY_VO_JOY, &this->actor.projectedPos);
+                this->staticState.monkeySfxActive = false;
+            }
+            this->staticState.monkeySfxTimer = 0;
+        } else if (this->staticState.monkeySfxTimer > 0) {
+            --this->staticState.monkeySfxTimer;
+        } else {
+            this->staticState.monkeySfxActive = MmSfx_PlayAtPos(MM_NA_SE_EV_MONKEY_VO_JOY, &this->actor.projectedPos);
+            // Native MM one-shot through Sequence_0, with a 3–5 second gap
+            // at the native 20 Hz update rate. All poses share this hook.
+            this->staticState.monkeySfxTimer = Rand_S16Offset(60, 41);
+        }
+    }
+
     if (poseDescriptor->skeletonFamily != STATIC_SKELETON_NONE &&
         poseDescriptor->animation != STATIC_ANIM_ADULT_ZELDA_NEUTRAL) {
         if (this->staticState.type == STATIC_STORY_ACTOR_CHILD_KAFEI) {
@@ -948,7 +983,8 @@ static StaticStoryProgression EnViewerStatic_ReadProgression(void) {
     StaticStoryProgression progression = {
         .metZelda = Flags_GetEventChkInf(EVENTCHKINF_ZELDA_FLED_HYRULE_CASTLE),
         .forestComplete = CHECK_QUEST_ITEM(QUEST_SONG_SARIA),
-        .waterComplete = Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP),
+        .waterComplete = Combo_SOH_CrossBossLogicalClear(COMBO_BOSS_MORPHA,
+                                                         Flags_GetEventChkInf(EVENTCHKINF_USED_WATER_TEMPLE_BLUE_WARP)),
         .eponaComplete = Flags_GetEventChkInf(EVENTCHKINF_EPONA_OBTAINED),
     };
 
@@ -1104,8 +1140,8 @@ void EnViewer_UpdateImpl(EnViewer* this, PlayState* play) {
                 case 380:
                 case 409:
                 case 438:
-                    Audio_PlaySoundGeneral(NA_SE_SY_DEMO_CUT, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                           &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+                    Audio_PlaySfxGeneral(NA_SE_SY_DEMO_CUT, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                         &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
                     break;
             }
         }
@@ -1122,8 +1158,8 @@ void EnViewer_UpdateImpl(EnViewer* this, PlayState* play) {
             Audio_QueueSeqCmd(SEQ_PLAYER_FANFARE << 24 | NA_BGM_OPENING_GANON);
         }
         if (play->csCtx.frames == 960) {
-            Audio_PlaySoundGeneral(NA_SE_EV_HORSE_GROAN, &this->actor.projectedPos, 4, &gSfxDefaultFreqAndVolScale,
-                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            Audio_PlaySfxGeneral(NA_SE_EV_HORSE_GROAN, &this->actor.projectedPos, 4, &gSfxDefaultFreqAndVolScale,
+                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         }
     } else if (type == ENVIEWER_TYPE_6_HORSE_GANONDORF) {
         if (gSaveContext.sceneLayer == 5 || gSaveContext.sceneLayer == 10) {
@@ -1314,8 +1350,8 @@ void EnViewer_UpdateImpl(EnViewer* this, PlayState* play) {
             case 0:
                 if (play->csCtx.state != CS_STATE_IDLE && play->csCtx.npcActions[1] != NULL &&
                     play->csCtx.npcActions[1]->action == 7) {
-                    Audio_PlaySoundGeneral(NA_SE_EN_GANON_LAUGH, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                           &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+                    Audio_PlaySfxGeneral(NA_SE_EN_GANON_LAUGH, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                         &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
                     Animation_MorphToPlayOnce(&this->skin.skelAnime, &gYoungGanondorfLaughStartAnim, -5.0f);
                     this->state++;
                 }
@@ -1598,20 +1634,25 @@ static s32 EnViewer_StaticChildMalonOverrideLimbDraw(PlayState* play, s32 limbIn
                                                      Vec3s* rot, void* thisx) {
     EnViewer* this = (EnViewer*)thisx;
 
-    if (limbIndex == 2 || limbIndex == 5) {
+    if ((limbIndex == 2 || limbIndex == 5) && !NativeNpcModel_IsActive(&sChildMalonNpcModel)) {
         *dList = NULL;
+    }
+    if (limbIndex == 15) {
+        *dList = NativeNpcModel_SelectHead(&sChildMalonNpcModel, *dList, this->staticState.eyeIndex, 0);
     }
     if (StaticStoryActor_CanTrack(STATIC_STORY_ACTOR_CHILD_MALON, this->staticState.pose)) {
         if (limbIndex == 15) {
-            Matrix_Translate(1400.0f, 0.0f, 0.0f, MTXMODE_APPLY);
+            Vec3f pivot = NativeNpcModel_IsActive(&sChildMalonNpcModel) ? *pos : (Vec3f){ 1400.0f, 0.0f, 0.0f };
+            Matrix_Translate(pivot.x, pivot.y, pivot.z, MTXMODE_APPLY);
             Matrix_RotateX(BINANG_TO_RAD(this->staticState.interactInfo.headRot.y), MTXMODE_APPLY);
             Matrix_RotateZ(BINANG_TO_RAD(this->staticState.interactInfo.headRot.x), MTXMODE_APPLY);
-            Matrix_Translate(-1400.0f, 0.0f, 0.0f, MTXMODE_APPLY);
+            Matrix_Translate(-pivot.x, -pivot.y, -pivot.z, MTXMODE_APPLY);
         } else if (limbIndex == 8) {
             Matrix_RotateX(BINANG_TO_RAD(-this->staticState.interactInfo.torsoRot.y), MTXMODE_APPLY);
             Matrix_RotateZ(BINANG_TO_RAD(-this->staticState.interactInfo.torsoRot.x), MTXMODE_APPLY);
         }
     }
+    *dList = NativeNpcPose_SelectLimb(&this->skin.skelAnime, limbIndex, *dList);
     return false;
 }
 
@@ -1627,11 +1668,16 @@ void EnViewer_DrawStaticChildMalon(EnViewer* this, PlayState* play) {
 static s32 EnViewer_StaticSariaOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
                                                 void* thisx) {
     EnViewer* this = (EnViewer*)thisx;
+    if (limbIndex == 16) {
+        u8 eye = StaticStoryActor_GetInteractionEyeIndex(STATIC_STORY_ACTOR_SARIA, this->staticState.pose,
+                                                         this->staticState.eyeIndex, this->staticState.talking);
+        *dList = NativeNpcModel_SelectHead(&sSariaNpcModel, *dList, eye, 0);
+    }
 
     if (limbIndex == 15 &&
         (StaticStoryActor_ResolvePose((StaticStoryActorType)this->staticState.type, this->staticState.pose)->flags &
          STATIC_POSE_FLAG_OCARINA)) {
-        *dList = gSariaRightHandAndOcarinaDL;
+        *dList = NativeNpcModel_SariaOcarina((Gfx*)gSariaRightHandAndOcarinaDL);
     }
     if (StaticStoryActor_CanTrack(STATIC_STORY_ACTOR_SARIA, this->staticState.pose)) {
         if (limbIndex == 16) {
@@ -1644,14 +1690,17 @@ static s32 EnViewer_StaticSariaOverrideLimbDraw(PlayState* play, s32 limbIndex, 
             Matrix_RotateX(BINANG_TO_RAD(this->staticState.interactInfo.torsoRot.x), MTXMODE_APPLY);
         }
     }
+    *dList = NativeNpcPose_SelectLimb(&this->skin.skelAnime, limbIndex, *dList);
     return false;
 }
 
 void EnViewer_DrawStaticSaria(EnViewer* this, PlayState* play) {
     static void* sEyes[] = { gSariaEyeOpenTex, gSariaEyeHalfTex, gSariaEyeClosedTex };
+    u8 eye = StaticStoryActor_GetInteractionEyeIndex(STATIC_STORY_ACTOR_SARIA, this->staticState.pose,
+                                                     this->staticState.eyeIndex, this->staticState.talking);
     OPEN_DISPS(play->state.gfxCtx);
-    gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sEyes[this->staticState.eyeIndex]));
-    gSPSegment(POLY_OPA_DISP++, 0x09, SEGMENTED_TO_VIRTUAL(sEyes[this->staticState.eyeIndex]));
+    gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sEyes[eye]));
+    gSPSegment(POLY_OPA_DISP++, 0x09, SEGMENTED_TO_VIRTUAL(sEyes[eye]));
     /* Closed2 is Saria's neutral native mouth; Closed reads as a frown. */
     gSPSegment(POLY_OPA_DISP++, 0x0A, SEGMENTED_TO_VIRTUAL(gSariaMouthClosed2Tex));
     SkelAnime_DrawSkeletonOpa(play, &this->skin.skelAnime, EnViewer_StaticSariaOverrideLimbDraw, NULL, this);
@@ -1800,21 +1849,28 @@ void EnViewer_DrawStaticChildRuto(EnViewer* this, PlayState* play) {
 static s32 EnViewer_StaticAdultMalonOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos,
                                                      Vec3s* rot, void* thisx) {
     EnViewer* this = (EnViewer*)thisx;
+    if (limbIndex == 18) {
+        *dList = NativeNpcModel_SelectHead(&sAdultMalonNpcModel, *dList, this->staticState.eyeIndex, 0);
+    }
 
     if (limbIndex == 3 || limbIndex == 6) {
-        *dList = NULL;
+        if (!NativeNpcModel_IsActive(&sAdultMalonNpcModel)) {
+            *dList = NULL;
+        }
     }
     if (StaticStoryActor_CanTrack(STATIC_STORY_ACTOR_ADULT_MALON, this->staticState.pose)) {
         if (limbIndex == 18) {
-            Matrix_Translate(1400.0f, 0.0f, 0.0f, MTXMODE_APPLY);
+            Vec3f pivot = NativeNpcModel_IsActive(&sAdultMalonNpcModel) ? *pos : (Vec3f){ 1400.0f, 0.0f, 0.0f };
+            Matrix_Translate(pivot.x, pivot.y, pivot.z, MTXMODE_APPLY);
             Matrix_RotateX(BINANG_TO_RAD(this->staticState.interactInfo.headRot.y), MTXMODE_APPLY);
             Matrix_RotateZ(BINANG_TO_RAD(this->staticState.interactInfo.headRot.x), MTXMODE_APPLY);
-            Matrix_Translate(-1400.0f, 0.0f, 0.0f, MTXMODE_APPLY);
+            Matrix_Translate(-pivot.x, -pivot.y, -pivot.z, MTXMODE_APPLY);
         } else if (limbIndex == 11) {
             Matrix_RotateY(BINANG_TO_RAD(-this->staticState.interactInfo.torsoRot.y), MTXMODE_APPLY);
             Matrix_RotateX(BINANG_TO_RAD(-this->staticState.interactInfo.torsoRot.x), MTXMODE_APPLY);
         }
     }
+    *dList = NativeNpcPose_SelectLimb(&this->skin.skelAnime, limbIndex, *dList);
     return false;
 }
 
@@ -1826,7 +1882,8 @@ static void EnViewer_StaticAdultMalonPostLimbDraw(PlayState* play, s32 limbIndex
         (StaticStoryActor_ResolvePose((StaticStoryActorType)this->staticState.type, this->staticState.pose)->flags &
          STATIC_POSE_FLAG_BASKET)) {
         OPEN_DISPS(play->state.gfxCtx);
-        gSPDisplayList(POLY_OPA_DISP++, gMalonAdultBasketDL);
+        gSPDisplayList(POLY_OPA_DISP++,
+                       NativeNpcPose_SelectProp(&this->skin.skelAnime, "Basket", (Gfx*)gMalonAdultBasketDL));
         CLOSE_DISPS(play->state.gfxCtx);
     }
 }
@@ -2378,6 +2435,7 @@ void EnViewerStatic_Draw(EnViewer* this, PlayState* play) {
         case STATIC_STORY_ACTOR_CHILD_KAFEI:
         case STATIC_STORY_ACTOR_LULU:
         case STATIC_STORY_ACTOR_ANJU:
+        case STATIC_STORY_ACTOR_MONKEY:
             EnViewer_DrawStaticMmActor(this, play);
             break;
         case STATIC_STORY_ACTOR_SKULL_KID:
@@ -2465,9 +2523,8 @@ void EnViewer_UpdatePosition(EnViewer* this, PlayState* play) {
             if (type == ENVIEWER_TYPE_0_HORSE_ZELDA) {
                 if (!sHorseSfxPlayed) {
                     sHorseSfxPlayed = true;
-                    Audio_PlaySoundGeneral(NA_SE_EV_HORSE_NEIGH, &this->actor.projectedPos, 4,
-                                           &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
-                                           &gSfxDefaultReverb);
+                    Audio_PlaySfxGeneral(NA_SE_EV_HORSE_NEIGH, &this->actor.projectedPos, 4,
+                                         &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
                 }
                 Audio_PlayActorSound2(&this->actor, NA_SE_EV_HORSE_RUN_LEVEL - SFX_FLAG);
             }
@@ -2516,8 +2573,8 @@ void EnViewer_UpdatePosition(EnViewer* this, PlayState* play) {
             }
         }
         if (type == ENVIEWER_TYPE_5_GANONDORF) {
-            Audio_PlaySoundGeneral(NA_SE_EV_BURNING - SFX_FLAG, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            Audio_PlaySfxGeneral(NA_SE_EV_BURNING - SFX_FLAG, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
             EnViewer_DrawFireEffects(this, play);
         }
     }

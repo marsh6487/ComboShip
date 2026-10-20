@@ -1,7 +1,10 @@
 // Execute the real MM native-fallback export and OoT OPS consumer.
 // Catalog, resource query and graphics services are fixture boundaries.
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/menu/ComboElementalArrowGi.h"
 #include "mm/2s2h/Rando/Types.h"
+#include "mm/include/z64item.h"
+#include "soh/soh/Enhancements/randomizer/NeiGiEffectPolicy.h"
 #include "mm/assets/objects/object_gi_shield_3/object_gi_shield_3.h"
 #include <algorithm>
 #include <cassert>
@@ -25,7 +28,7 @@ struct ResourceManagerScope {
 };
 }
 namespace ItemGrantAudit { struct Scope { Scope(const char*,int,int,bool){} }; }
-bool flat=true, readable=true, authored=false;
+bool flat=true, sideways=false, readable=true, authored=false;
 int queryCalls=0;
 int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* owner,const char* path,float* tilt) {
     ++queryCalls;
@@ -33,6 +36,10 @@ int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* owner,const char* path,
     assert(!std::strcmp(owner,"mm")&&!std::strcmp(path,"objects/object_gi_shield_3/gGiMirrorShieldDL"));
     if(!readable)return 0;
     *tilt=flat?1.5707963267948966f:0.f;return 1;
+}
+int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* owner,const char* path,float* tilt,float* roll) {
+    if(!ResourceMgr_GetIkanaShieldGiTiltXForGame(owner,path,tilt))return 0;
+    *roll=sideways?-1.5707963267948966f:0.f;return 1;
 }
 namespace Rando {
 RandoItemId ConvertItem(RandoItemId id){return id;}
@@ -81,14 +88,21 @@ GraphicsContext gfx;PlayState play{{&gfx},{}};
 /* CONSUMER_INFO */
 Gfx commands[128];Gfx* outputOpa=commands;Gfx* outputXlu=commands+64;
 constexpr int MTXMODE_APPLY=1,kMaxMatEntries=8;
-float rotationX=0,scale=1;
-std::vector<std::pair<float,float>> stack;
-std::vector<float> heights;
+float rotationX=0,rotationZ=0,scale=1;
+struct Pose {float x,z,scale;};
+std::vector<Pose> stack;
+std::vector<float> heights,chins;
+std::vector<int> rotations;
 std::vector<int> streams;
 std::vector<std::string> paths;
-void Matrix_Push(){stack.push_back({rotationX,scale});}
-void Matrix_Pop(){assert(!stack.empty());rotationX=stack.back().first;scale=stack.back().second;stack.pop_back();}
-void Matrix_RotateZYX(s16 x,s16 y,s16 z,int){assert(!y&&!z);rotationX+=x*(3.14159265358979323846f/32768.f);}
+void Matrix_Push(){stack.push_back({rotationX,rotationZ,scale});}
+void Matrix_Pop(){assert(!stack.empty());rotationX=stack.back().x;rotationZ=stack.back().z;scale=stack.back().scale;stack.pop_back();}
+void Matrix_RotateZYX(s16 x,s16 y,s16 z,int){
+    assert(!y&&(!x||!z));
+    rotationX+=x*(3.14159265358979323846f/32768.f);
+    rotationZ+=z*(3.14159265358979323846f/32768.f);
+    rotations.push_back(z?CW_OP_ROTATE_Z:CW_OP_ROTATE_X);
+}
 void Matrix_Scale(float x,float y,float z,int){assert(x==y&&y==z);scale*=x;}
 void Matrix_Translate(float,float,float,int){}
 void Matrix_ReplaceRotation(MtxF*){}
@@ -96,8 +110,11 @@ void Gfx_SetupDL_25Opa(GraphicsContext*){}
 void Gfx_SetupDL_25Xlu(GraphicsContext*){}
 void Submit(Gfx* command,const char* path) {
     paths.emplace_back(path);streams.push_back(command>=commands+64);
-    const float y=flat?2.f:100.f,z=flat?100.f:2.f;
-    heights.push_back(scale*(std::abs(std::cos(rotationX))*y+std::abs(std::sin(rotationX))*z));
+    const float x=sideways?99.f:68.f,vertical=sideways?68.f:99.f;
+    const float y=flat?2.f:vertical,z=flat?vertical:2.f;
+    const float tiltedY=std::abs(std::cos(rotationX))*y+std::abs(std::sin(rotationX))*z;
+    heights.push_back(scale*(std::abs(std::sin(rotationZ))*x+std::abs(std::cos(rotationZ))*tiltedY));
+    chins.push_back(sideways?std::sin(rotationZ):std::cos(rotationZ)*(flat?-std::sin(rotationX):-std::cos(rotationX)));
 }
 void ComboForeignTexAnim_Run(PlayState*,const char*,const char*,bool,int*,int*){assert(false);}
 void ComboForeignTexAnim_Restore(PlayState*,int*,int count,bool){assert(count==0);}
@@ -125,23 +142,28 @@ void Render(const CwItemDrawInfo& out) {
     std::vector<std::string> routed;
     for(int i=0;i<out.dlistCount;++i)routed.emplace_back(std::string("__OTR__@mm:")+(out.dlists[i]+7));
     for(int i=0;i<out.dlistCount;++i)info.dls[i]=routed[i].c_str();
-    outputOpa=commands;outputXlu=commands+64;rotationX=0;scale=1;heights.clear();streams.clear();paths.clear();
+    outputOpa=commands;outputXlu=commands+64;rotationX=rotationZ=0;scale=1;heights.clear();chins.clear();rotations.clear();streams.clear();paths.clear();
     if(info.drawKind==CW_DRAW_KIND_OPS)OOT_DrawForeignOps(&play,&info);
     else OOT_DrawForeignSimple(&play,&info);
 }
 int main() {
-    for(bool selectedFlat:{false,true})for(float modelScale:{0.f,.5f}) {
-        flat=selectedFlat;selectedScale=modelScale;
+    for(bool selectedSideways:{false,true})for(bool selectedFlat:{false,true})for(float modelScale:{0.f,.5f}) {
+        sideways=selectedSideways;flat=selectedFlat;selectedScale=modelScale;
         CwItemDrawInfo out{};assert(MM_GetItemDrawInfo("Shield of Ikana",&out)==1);
         assert(out.dlistCount==2&&out.xluStartIndex==1&&out.neiShimmer==17);
         Render(out);
         assert(heights.size()==2&&streams==std::vector<int>({0,1}));
-        for(float height:heights)assert(height>40.f&&"MM shield exported to OoT must stay upright");
+        for(float height:heights)assert(std::abs(height-99.f*(modelScale>0?modelScale:1.f))<.0001f);
+        for(float chin:chins)assert(chin<-.99f&&"MM shield exported to OoT must face upright, chin down");
+        std::vector<int> expectedRotations;
+        if(sideways)expectedRotations.push_back(CW_OP_ROTATE_Z);
+        if(flat)expectedRotations.push_back(CW_OP_ROTATE_X);
+        assert(rotations==expectedRotations&&"roll must precede X tilt without adding caller spin");
         assert(paths[0].starts_with("__OTR__@mm:")&&paths[1].ends_with("gGiMirrorShieldDL"));
-        assert(stack.empty()&&rotationX==0);
+        assert(stack.empty()&&rotationX==0&&rotationZ==0);
         assert(out.stateDependent==2&&"selected shield pose must refresh after an owner Alt toggle");
     }
-    readable=false;flat=true;selectedScale=0;
+    readable=false;flat=true;sideways=false;selectedScale=0;
     CwItemDrawInfo out{};assert(MM_GetItemDrawInfo("Shield of Ikana",&out)==1);
     assert(out.drawKind==CW_DRAW_KIND_SIMPLE&&out.opCount==0);
     Render(out);assert(heights[0]<10&&stack.empty());
@@ -150,5 +172,5 @@ int main() {
     assert(out.drawKind==CW_DRAW_KIND_NEI_GI&&out.opCount==0&&queryCalls==calls);
     authored=false;out={};assert(MM_FillItemDrawInfo(RI_SHIELD_HERO,&out)==1);
     assert(out.drawKind==CW_DRAW_KIND_SIMPLE&&out.opCount==0&&queryCalls==calls);
-    std::cout<<"PASS actual MM shield export and OoT consumer: upright/flat, OPA/XLU, original scale, live pose, authored bypass and unreadable defaults\n";
+    std::cout<<"PASS actual MM shield export and OoT consumer: upright/flat/sideways, chin-down sign, rotation order, OPA/XLU, original scale, live pose, authored bypass and unreadable defaults\n";
 }

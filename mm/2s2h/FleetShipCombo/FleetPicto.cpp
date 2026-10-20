@@ -39,6 +39,7 @@
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
 #include "FleetSync.h"
+#include "../../../combo/ComboGameMode.h"
 
 #include <fstream>
 #include <filesystem>
@@ -63,6 +64,10 @@ void ColorPictograph_SetBuffer(const void* src);
 // A combo session is the only time the picture is shared. Same master toggle the rest of the combo
 // uses; when it is off this file is inert.
 static bool FleetPicto_IsCombo() {
+#ifdef COMBO_BUILD
+    if (!Combo_IsCombinedGame())
+        return false;
+#endif
     return CVarGetInteger("isFleetShipCombo.Enabled", 0) != 0;
 }
 

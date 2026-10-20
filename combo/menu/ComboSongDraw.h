@@ -50,7 +50,9 @@ static inline uint32_t ComboSongColorHex(int song) {
 }
 static inline int ComboSongAlwaysShimmers(int song) {
     return (song >= CW_SONG_OOT_MINUET && song <= CW_SONG_OOT_PRELUDE) || song == CW_SONG_EPONA ||
-           song == CW_SONG_OOT_EPONA || song == CW_SONG_SUN;
+           song == CW_SONG_OOT_EPONA || song == CW_SONG_SUN || song == CW_SONG_HEALING || song == CW_SONG_SONATA ||
+           song == CW_SONG_LULLABY_INTRO || song == CW_SONG_LULLABY || song == CW_SONG_NOVA || song == CW_SONG_ELEGY ||
+           song == CW_SONG_OATH || song == CW_SONG_INVERTED_TIME || song == CW_SONG_DOUBLE_TIME;
 }
 // Portable itemShimmer also gates song-local overlays, including Soaring's
 // authored feathers. Other regular songs keep their plain note.

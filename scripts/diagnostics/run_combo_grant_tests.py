@@ -60,6 +60,10 @@ preamble += r'''
 int depth = 0, echoes = 0, ootTier = 0, mmTier = 0, persisted = 0;
 bool throwGrant = false;
 bool mmSaveLoaded = true;
+bool obtainable = true, mmForeground = true;
+int blueRupees = 0, parkedFlushes = 0;
+bool Combo_MmIsForeground() { return mmForeground; }
+void Combo_MM_FlushAccumulators() { ++parkedFlushes; }
 #define IS_RANDO mmSaveLoaded
 extern "C" void FleetShared_BeginReceive() { ++depth; }
 extern "C" void FleetShared_EndReceive() { --depth; }
@@ -76,7 +80,29 @@ int bombchu = -1, ammo = 0;
 #define INV_CONTENT(x) bombchu
 #define AMMO(x) ammo
 #define CUR_CAPACITY(x) 20
-struct GetItemEntry { RandomizerGet id; };
+struct GetItemEntry { RandomizerGet id; bool blueRupee = false; };
+constexpr int CAN_OBTAIN = 0, CANNOT_OBTAIN = 1, MOD_NONE = 0, GI_RUPEE_BLUE = 7;
+struct RandomizerBoundary {
+    int GetItemObtainabilityFromRandomizerGet(RandomizerGet) const {
+        return obtainable ? CAN_OBTAIN : CANNOT_OBTAIN;
+    }
+};
+struct OTRGlobals {
+    static OTRGlobals* Instance;
+    RandomizerBoundary* gRandomizer;
+};
+RandomizerBoundary randomizerBoundary;
+OTRGlobals ootGlobals{&randomizerBoundary};
+OTRGlobals* OTRGlobals::Instance = &ootGlobals;
+struct ItemTableManager {
+    static ItemTableManager* Instance;
+    GetItemEntry RetrieveItemEntry(int mod, int item) const {
+        if (mod != MOD_NONE || item != GI_RUPEE_BLUE) throw std::logic_error("unexpected fallback item");
+        return {RG_NONE, true};
+    }
+};
+ItemTableManager itemTableBoundary;
+ItemTableManager* ItemTableManager::Instance = &itemTableBoundary;
 namespace Rando { namespace StaticData {
 std::map<std::string, RandomizerGet> itemNameToEnum = {
     {"Progressive Magic Meter", RG_PROGRESSIVE_MAGIC_METER}
@@ -92,6 +118,7 @@ Item RetrieveItem(RandomizerGet id) { return {id}; }
 }}
 void Combo_GrantResolvedOOT(const GetItemEntry& item) {
     if (throwGrant) throw std::runtime_error("injected save failure");
+    if (item.blueRupee) { ++blueRupees; return; }
     ++ootTier;
     if (item.id == RG_MAGIC_SINGLE) { gSaveContext.isMagicAcquired = true; ootRpg.nativeMagicLevel = 1; }
     if (item.id == RG_MAGIC_DOUBLE) { gSaveContext.isDoubleMagicAcquired = true; ootRpg.nativeMagicLevel = 2; }
@@ -122,6 +149,8 @@ void check(bool condition, const char* label) {
 void reset() { depth = echoes = ootTier = mmTier = persisted = 0; throwGrant = false; gPlayState = nullptr;
     ootRpg = {};
     mmSaveLoaded = true;
+    obtainable = mmForeground = true;
+    blueRupees = parkedFlushes = 0;
     gSaveContext.isMagicAcquired = gSaveContext.isDoubleMagicAcquired = false; gComboSuppressAnchorSend = 0; }
 int main() {
     reset(); mmSaveLoaded = false;
@@ -136,7 +165,12 @@ int main() {
     check(mmTier == 1 && echoes == 0 && depth == 0, "dormant MM convergence raises once without NEI echo");
     reset(); gPlayState = &depth;
     MM_RaiseSharedTier(ComboRando::SF_BOW, 1);
-    check(mmTier == 1 && echoes == 0 && persisted == 1, "live MM convergence is persisted without NEI echo");
+    check(mmTier == 1 && echoes == 0 && persisted == 1 && parkedFlushes == 0,
+          "live MM convergence is persisted without NEI echo or parked flush");
+    reset(); gPlayState = &depth; mmForeground = false;
+    MM_RaiseSharedTier(ComboRando::SF_BOW, 1);
+    check(mmTier == 1 && echoes == 0 && persisted == 1 && parkedFlushes == 1 && depth == 0,
+          "parked MM banks pending accumulators and persists without NEI echo");
     reset();
     MM_RaiseSharedTier(ComboRando::SF_GORON_MASK, 1);
     MM_RaiseSharedTier(ComboRando::SF_GORON_MASK, 1);
@@ -146,6 +180,12 @@ int main() {
     check(depth == 1 && gComboSuppressAnchorSend == 7, "nested OoT receive and Anchor suppression restored");
     reset();
     RandomizerGet granted = RG_NONE;
+    obtainable = false;
+    check(GrantOotItemByName("Progressive Magic Meter", &granted) && granted == RG_MAGIC_SINGLE,
+          "unobtainable grant keeps its acquisition identity");
+    check(blueRupees == 1 && ootTier == 0 && !gSaveContext.isMagicAcquired && echoes == 0 && depth == 0,
+          "unobtainable grant becomes a blue rupee under receive suppression");
+    reset();
     check(GrantOotItemByName("Progressive Magic Meter", &granted), "first dormant magic accepted");
     check(gSaveContext.isMagicAcquired && !gSaveContext.isDoubleMagicAcquired, "first dormant magic is single");
     check(GrantOotItemByName("Progressive Magic Meter", &granted), "second dormant magic accepted");

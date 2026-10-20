@@ -392,6 +392,10 @@ void MmSfx_Shutdown(void);
  */
 SoundFont* MmSfx_LoadFont(s32 fontId);
 
+// Resident MM SFX program, archive-scoped and pinned with the soundfonts.
+// Global music registration may replace/remap its same-name Sequence_0.
+SequenceData* MmSfx_LoadSequence(void);
+
 /**
  * Get SoundFont for a specific SFX ID
  * @param sfxId MM SFX ID
@@ -417,6 +421,12 @@ s32 MmSfx_PlayEx(u16 sfxId, Vec3f* pos, u8 token, f32* freqScale, f32* vol, s8* 
  * Stop a MM sound effect
  */
 void MmSfx_Stop(u16 sfxId);
+
+// Release only this emitter's bank entry and queued requests before its position is freed.
+void MmSfx_StopAtPos(u16 sfxId, Vec3f* pos);
+
+// Once per native graph-frame Audio_Update, serialized with the PCM mixer.
+void MmSfx_UpdateGameFrame(void);
 
 /**
  * Play Goron roll sound with MM's synced freq/vol mapping.

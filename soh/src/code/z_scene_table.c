@@ -1,4 +1,8 @@
+#include "rando/CrossEntranceBoss.h"
 #include "global.h"
+#ifdef COMBO_BUILD
+#include "soh/Enhancements/Gameplay/ComboSoloForest.h"
+#endif
 
 #include "scenes/overworld/spot00/spot00_scene.h"
 #include "scenes/overworld/spot00/spot00_room_0.h"
@@ -27,6 +31,7 @@
 #include "soh/OTRGlobals.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include "soh/Enhancements/Graphics/ZorasDomain.h"
 
 // Entrance Table definition
 #define DEFINE_ENTRANCE(_0, sceneId, spawn, continueBgm, displayTitleCard, endTransType, startTransType) \
@@ -1149,7 +1154,8 @@ void func_8009E0B8(PlayState* play) {
     } else if (gSaveContext.sceneLayer == 6) {
         spA0 = play->roomCtx.unk_74[0] + 500;
     } else if (((gSaveContext.sceneLayer < 4) || LINK_IS_ADULT) &&
-               (Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD))) {
+               (Combo_SOH_CrossBossLogicalClear(
+                   COMBO_BOSS_GOHMA, Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_KOKIRI_EMERALD_DEKU_TREE_DEAD)))) {
         spA0 = 2150;
     }
 
@@ -1211,7 +1217,7 @@ void func_8009E730(PlayState* play) {
 
     gameplayFrames = play->gameplayFrames;
     var = 127 - (gameplayFrames * 1) % 128;
-    if (LINK_IS_ADULT) {
+    if (LINK_IS_ADULT && !ZorasDomain_IsAlwaysThawed(play)) {
         var = 0;
     }
     gSPSegment(POLY_OPA_DISP++, 0x0C,
@@ -1729,4 +1735,7 @@ void Scene_Draw(PlayState* play) {
     } else {
         sSceneDrawHandlers[play->sceneConfig](play);
     }
+#ifdef COMBO_BUILD
+    ComboSoloForestOot_DrawMaterials(play);
+#endif
 }

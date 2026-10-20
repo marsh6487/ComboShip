@@ -1,10 +1,16 @@
 #include "../../combo/NeiAssetPriorityResource.h"
 #include "../../combo/NeiWolfAssetResource.h"
+#include <libultraship/bridge/consolevariablebridge.h>
+#include <fast/interpreter.h>
+#include <fast/resource/ResourceType.h>
+#include <fast/resource/type/DisplayList.h>
+#include <libultraship/bridge/resourcebridge.h>
+#include <ship/Context.h>
+#include <ship/resource/ResourceManager.h>
+#include <stb_image.h>
+
 #include "ResourceManagerHelpers.h"
 #include "OTRGlobals.h"
-#include "variables.h"
-#include "z64.h"
-#include "macros.h"
 #include "cvar_prefixes.h"
 #include "Enhancements/enhancementTypes.h"
 #include "Enhancements/Graphics/PreludeNativeMaterialScroll.h"
@@ -15,14 +21,12 @@
 #include "resource/type/Array.h"
 #include "resource/type/Skeleton.h"
 #include "resource/type/PlayerAnimation.h"
-#include <fast/Fast3dWindow.h>
-#include <fast/resource/ResourceType.h>
-#include <fast/resource/type/DisplayList.h>
-#include <libultraship/bridge/resourcebridge.h>
-#include <ship/Context.h>
-#include <ship/resource/ResourceManager.h>
 
-#include <stb_image.h>
+extern "C" {
+#include "variables.h"
+#include "z64.h"
+#include "macros.h"
+}
 
 #ifdef COMBO_BUILD
 #include "ComboExport.h"
@@ -92,8 +96,8 @@ static const char* ResourceMgr_ResolveLinkTunicDListPath(const char* path) {
         return it->second.c_str();
     }
 
-    const std::string candidate =
-        fmt::format("__OTR__objects/{}_{}/{}", objectFolder, tunicSuffix, originalPath + objectPrefix.size());
+    const std::string candidate = spdlog::fmt_lib::format("__OTR__objects/{}_{}/{}", objectFolder, tunicSuffix,
+                                                          originalPath + objectPrefix.size());
 
     if (!ResourceMgr_IsAltAssetsEnabled() || !ResourceMgr_FileAltExists(candidate.c_str()) ||
         !ResourceGetIsCustomByName(candidate.c_str())) {
@@ -223,7 +227,7 @@ u32 IsSceneMasterQuest(s16 sceneNum) {
         }
 
         if (IS_RANDO) {
-            auto dungeon = OTRGlobals::Instance->gRandoContext->GetDungeons()->GetDungeonFromScene(sceneNum);
+            auto dungeon = OTRGlobals::Instance->gRandoContext->GetDungeonFromScene((SceneID)sceneNum);
             if (dungeon != nullptr && dungeon->IsMQ()) {
                 return true;
             }
@@ -1021,6 +1025,11 @@ extern "C" COMBO_EXPORT int32_t OOT_NeiEnsureGiBaseOwner(void) {
 
 #endif
 
+#include "../../combo/NeiRewardGiResource.h"
+extern "C" int ResourceMgr_GetRewardSurfaceForGame(const char* game, const char* path, NeiGi::Mesh* mesh) {
+    return NeiGi::GetRewardSurface("oot", game, path, mesh);
+}
+
 extern "C" int ResourceMgr_GetGiModelFitForGame(const char* game, const char* path, float scale, float tilt, int shop,
                                                 float fit[2]) {
     const int din =
@@ -1038,8 +1047,17 @@ extern "C" int ResourceMgr_GetGiModelsFitForGame(const char* game, const char* c
                                             CVarGetInteger(CVAR_ENHANCEMENT("DinFireSword"), 0));
 }
 
+extern "C" int ResourceMgr_GetGiModelBoundsForGame(const char* game, const char* const* paths, int count,
+                                                   float minimum[3], float maximum[3]) {
+    return NeiAssetPriority::GetGiModelBounds("oot", game, paths, count, minimum, maximum);
+}
+
 extern "C" int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path) {
     return NeiAssetPriority::IsCustomAsset("oot", game, path);
+}
+
+extern "C" int ResourceMgr_GetIkanaShieldGiPoseForGame(const char* game, const char* path, float* tilt, float* roll) {
+    return NeiAssetPriority::GetIkanaShieldGiPose("oot", game, path, tilt, roll);
 }
 
 extern "C" int ResourceMgr_GetIkanaShieldGiTiltXForGame(const char* game, const char* path, float* tilt) {
@@ -1085,4 +1103,14 @@ extern "C"
     int
     OOT_CopyWolfLinkResource(uint8_t* destination, size_t capacity, size_t* size, const char** owner) {
     return NeiWolfAsset::CopyResource("oot", destination, capacity, size, owner);
+}
+
+extern "C"
+#ifdef COMBO_BUILD
+    COMBO_EXPORT
+#endif
+    int
+    OOT_CopyWolfLinkModelResource(int useHD, uint8_t* destination, size_t capacity, size_t* size, const char** owner,
+                                  const char** path) {
+    return NeiWolfAsset::CopyResource("oot", destination, capacity, size, owner, useHD != 0, path);
 }

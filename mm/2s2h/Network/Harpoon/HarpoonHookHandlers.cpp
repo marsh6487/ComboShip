@@ -1,3 +1,6 @@
+#include "../../../../combo/emotes/EmoteBridge.h"
+#include <cstring>
+#include <array>
 // =============================================================================
 // HarpoonHookHandlers — game-side hooks for Harpoon multiplayer.
 //
@@ -97,7 +100,7 @@ void SendLocalPlayerTransform(Player* player) {
                                  { { "x", (int)player->skelAnime.prevTransl.x },
                                    { "y", (int)player->skelAnime.prevTransl.y },
                                    { "z", (int)player->skelAnime.prevTransl.z } } },
-                               { "movementFlags", (int)player->skelAnime.movementFlags },
+                               { "movementFlags", ComboEmotes_IsActive() ? 0 : (int)player->skelAnime.movementFlags },
                                { "quiet", true },
                            } } };
     Harpoon::Instance()->SendJson(p);
@@ -107,13 +110,16 @@ void SendLocalPlayerSkeleton(Player* player) {
     if (player->skelAnime.jointTable == nullptr)
         return;
     int limbs = player->skelAnime.limbCount;
+    Vec3s joints[24]{};
+    std::memcpy(joints, player->skelAnime.jointTable, std::min<size_t>(limbs, 24) * sizeof(Vec3s));
+    const bool emoting = ComboEmotes_CopyPose(joints, sizeof(joints));
     std::vector<int> jointArray;
     jointArray.reserve(24 * 3);
     for (int i = 0; i < 24; ++i) {
-        if (i < limbs) {
-            jointArray.push_back(player->skelAnime.jointTable[i].x);
-            jointArray.push_back(player->skelAnime.jointTable[i].y);
-            jointArray.push_back(player->skelAnime.jointTable[i].z);
+        if (i < limbs || emoting) {
+            jointArray.push_back(joints[i].x);
+            jointArray.push_back(joints[i].y);
+            jointArray.push_back(joints[i].z);
         } else {
             jointArray.push_back(0);
             jointArray.push_back(0);
@@ -125,7 +131,7 @@ void SendLocalPlayerSkeleton(Player* player) {
                            {
                                { "clientId", Harpoon::Instance()->OwnClientId() },
                                { "jointTable", jointArray },
-                               { "movementFlags", (int)player->skelAnime.movementFlags },
+                               { "movementFlags", ComboEmotes_IsActive() ? 0 : (int)player->skelAnime.movementFlags },
                                { "quiet", true },
                            } } };
     Harpoon::Instance()->SendJson(p);

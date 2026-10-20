@@ -83,6 +83,7 @@ static void CheckReflow(const std::string& original, const char* body, size_t si
                         const float* widths, size_t count, int scale = 75) {
     assert(VisibleWords(body, size, mm) == VisibleWords(original.data(), original.size(), mm));
     unsigned lines = 1;
+    unsigned glyphs = 0;
     int width = 0;
     for (size_t i = 0; i < size;) {
         const uint8_t c = body[i];
@@ -93,8 +94,12 @@ static void CheckReflow(const std::string& original, const char* body, size_t si
             width = 0;
         } else if (c == (mm ? 0x10 : 0x04)) {
             lines = 1;
+            glyphs = 0;
             width = 0;
         } else if (command == 1) {
+            if (mm && c >= 0x21) {
+                assert(++glyphs <= 120 && "MM's native character texture bank has only 120 slots per page");
+            }
             // Use the engine's submitted pen advance, independently of the fitter.
             width += mm ? Mm::NativeLineWidth(std::string(1, static_cast<char>(c)))
                         : c == ' ' ? 6 * scale / 75
@@ -106,7 +111,80 @@ static void CheckReflow(const std::string& original, const char* body, size_t si
     }
 }
 
+static void CheckLongMmMapPages() {
+  // Real entrance-source names: normal and inverted Stone Tower can each
+  // point to a different source. A visually fitting map still needs enough
+  // character texture slots in MM, independently of its chosen text scale.
+  const std::string sources[] = {"Woodfall",
+                                 "Snowhead",
+                                 "Zora Cape's turtle",
+                                 "Stone Tower (normal)",
+                                 "Stone Tower (inverted)",
+                                 "Southern Swamp's Spider House",
+                                 "Great Bay's Spider House",
+                                 "Ikana Castle",
+                                 "Ikana Canyon's Secret Shrine",
+                                 "Beneath the Well's front entrance",
+                                 "Beneath the Well's castle entrance",
+                                 "Great Bay's Pirates' Fortress",
+                                 "Deku Tree",
+                                 "Dodongo's Cavern",
+                                 "Jabu-Jabu's Belly",
+                                 "Forest Temple",
+                                 "Fire Temple",
+                                 "Water Temple",
+                                 "Spirit Temple",
+                                 "Shadow Temple",
+                                 "Bottom of the Well",
+                                 "Ice Cavern"};
+  CwItemReceiptPresentation p{};
+  p.singleBox = 1;
+  p.rewardLine = 2;
+  for (const auto &normal : sources) {
+    for (const auto &inverted : sources) {
+      if (normal == inverted)
+        continue;
+      const auto original = ComboItemReceiptText::FromNeiMarkup(
+                                "You found the %gStone Tower Map%w!&It seems "
+                                "the entrance is at %cnormal: " +
+                                normal + "; inverted: " + inverted + "%w.") +
+                            '\xBF';
+      char *body = Mm::play.msgCtx.font.msgBuf.schar + 11;
+      std::memcpy(body, original.data(), original.size());
+      Mm::play.msgCtx.msgLength = original.size() + 11;
+      Mm::play.msgCtx.msgBufPos = 0;
+      Mm::Message_SetItemReceiptPresentation(&p);
+      Mm::Message_ApplyItemReceiptLayout(&Mm::play);
+      const auto &layout = Mm::sItemReceiptLayout;
+      CheckReflow(original, body, layout.bodySize, true, Mm::sNESFontWidths,
+                  160, layout.textScale);
+      assert(body[layout.bodySize - 1] == '\xBF');
+    }
+  }
+  for (const unsigned length : {120u, 121u, 241u}) {
+    std::string original;
+    for (unsigned i = 0; i < length; ++i) {
+      if (i && i % 10 == 0)
+        original += ' ';
+      original += 'i';
+    }
+    original += '\xBF';
+    char *body = Mm::play.msgCtx.font.msgBuf.schar + 11;
+    std::memcpy(body, original.data(), original.size());
+    Mm::play.msgCtx.msgLength = original.size() + 11;
+    Mm::play.msgCtx.msgBufPos = 0;
+    Mm::Message_SetItemReceiptPresentation(&p);
+    Mm::Message_ApplyItemReceiptLayout(&Mm::play);
+    const auto &layout = Mm::sItemReceiptLayout;
+    CheckReflow(original, body, layout.bodySize, true, Mm::sNESFontWidths, 160,
+                layout.textScale);
+    assert(length != 120 || !std::memchr(body, '\x10', layout.bodySize));
+  }
+}
+
+
 int main() {
+    CheckLongMmMapPages();
     (void)&Mm::Message_DrawItemReceiptIcon;
     CwItemReceiptPresentation p{};
     p.singleBox = 1;

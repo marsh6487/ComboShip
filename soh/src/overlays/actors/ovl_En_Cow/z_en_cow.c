@@ -6,9 +6,9 @@
 
 #include "z_en_cow.h"
 #include "objects/object_cow/object_cow.h"
-#include "soh/ResourceManagerHelpers.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "soh/Enhancements/item-tables/ItemTableTypes.h"
+#include "soh/Enhancements/custom-message/CustomMessageTypes.h"
 #include "soh/Enhancements/randomizer/draw.h"
 #include "mods/transformation_masks/mm_mask_wear.h"
 
@@ -26,7 +26,7 @@ static GetItemEntry EnCow_GetChateauEntry(void) {
     entry.itemId = ITEM_CHATEAU_ROMANI;
     entry.field = 0;
     entry.gi = (int16_t)(GID_MILK + 1); // positive = long chest anim
-    entry.textId = 0x9214;
+    entry.textId = TEXT_CHATEAU_ROMANI;
     entry.objectId = OBJECT_GI_MILK;
     entry.modIndex = MOD_NONE;
     entry.tableId = MOD_NONE;
@@ -189,8 +189,6 @@ void EnCow_Destroy(Actor* thisx, PlayState* play) {
         Collider_DestroyCylinder(play, &this->colliders[0]);
         Collider_DestroyCylinder(play, &this->colliders[1]);
     }
-
-    ResourceMgr_UnregisterSkeleton(&this->skelAnime);
 }
 
 void EnCow_UpdateAnimation(EnCow* this, PlayState* play) {

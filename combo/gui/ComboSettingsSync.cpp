@@ -202,6 +202,9 @@ const SyncPair kPairs[] = {
     { "gRando.Options.RO_CROSSOVER_MARIO_MASK", "gRandoSettings.CrossoverMarioMask", SYNC_INT, GROUP_RANDOMIZER, 0, 0 },
     { "gRando.Options.RO_HYLIAS_GRACE", "gRandoSettings.HyliasGrace", SYNC_INT, GROUP_RANDOMIZER, 0, 0 },
     { "gRando.Options.RO_HYLIAS_GRACE_REWARDS", "gRandoSettings.HyliasGraceRewards", SYNC_INT, GROUP_RANDOMIZER, 0, 0 },
+    { "gRando.Options.RO_ROD_OF_SEASONS", "gRandoSettings.RodOfSeasons", SYNC_INT, GROUP_RANDOMIZER, 0, 0 },
+    { "gRando.Options.RO_STARTING_ROD_OF_SEASONS", "gRandoSettings.StartingRodOfSeasons", SYNC_INT, GROUP_RANDOMIZER, 0,
+      0 },
 };
 
 constexpr size_t kPairCount = sizeof(kPairs) / sizeof(kPairs[0]);

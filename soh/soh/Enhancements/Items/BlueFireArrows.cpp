@@ -1,4 +1,6 @@
-#include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include <libultraship/bridge/consolevariablebridge.h>
+
+#include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include "soh/ShipInit.hpp"
 #include "expansions/sw97/sw97_config.h"
@@ -25,11 +27,8 @@ static void UpdateBlueFireCollidersBgIceShelter(void* actorPtr) {
     thisx->cylinder2.info.bumper.dmgFlags |= DMG_ARROW_ICE;
 }
 
-static bool CheckAC(Actor* ac) {
-    if (ac == NULL || ac->id != ACTOR_EN_ARROW)
-        return false;
-    s16 p = (s16)ac->params;
-    return p == ARROW_ICE || p == ARROW_SW97_ICE || p == ARROW_SEED_ICE;
+static bool HitByIceArrow(ColliderCylinder* cylinder) {
+    return cylinder->info.acHitInfo != NULL && (cylinder->info.acHitInfo->toucher.dmgFlags & DMG_ARROW_ICE);
 }
 
 static bool IsSw97IceArrow(Actor* ac) {
@@ -39,11 +38,8 @@ static bool IsSw97IceArrow(Actor* ac) {
     return p == ARROW_SW97_ICE || p == ARROW_SEED_ICE;
 }
 
-// The Gust Jar's BLOW collider is owned by the Player (ac->id == ACTOR_PLAYER),
-// not by an EnArrow — so CheckAC/IsSw97IceArrow alone would reject it even
-// though the dmgFlag is DMG_ARROW_ICE. Treat an Ice-element BLOW as an SW97
-// ice arrow for the red-ice melt check so the Water medallion gustjar also
-// melts BgIceShelter, the same way the SW97 bow / slingshot ice already do.
+// The Gust Jar's BLOW collider is owned by the Player, so it must also be
+// accepted as the Water medallion's ice attack when melting red ice.
 static bool IsGustJarIceBlow(Actor* ac) {
     if (ac == NULL || ac->id != ACTOR_PLAYER)
         return false;
@@ -78,11 +74,9 @@ void RegisterBlueFireArrowsHooks() {
         Actor* ac2 = thisx->cylinder2.base.ac;
 
         if (IsSw97IceArrow(ac1) || IsSw97IceArrow(ac2) || IsGustJarIceBlow(ac1) || IsGustJarIceBlow(ac2)) {
-            // SW97 ice (bow or slingshot) and Water-medallion gustjar BLOW
-            // always melt red ice regardless of cheat state.
+            // SW97 ice and Water-medallion gustjar BLOW melt red ice without the cheat.
             *should = true;
-        } else if (meltCheatOn && (CheckAC(ac1) || CheckAC(ac2))) {
-            // Vanilla ice only melts when the cheat is on
+        } else if (meltCheatOn && (HitByIceArrow(&thisx->cylinder1) || HitByIceArrow(&thisx->cylinder2))) {
             *should = true;
         }
     });

@@ -21,6 +21,7 @@ static int loadedMessages;
 static void (*registeredMessage)(u16*, bool*);
 // The fixture supplies the message renderer; production selects whether to use it.
 struct CustomMessage {
+    bool capeVisibilityChoice = false;
     void LoadIntoFont() {
         ++loadedMessages;
     }

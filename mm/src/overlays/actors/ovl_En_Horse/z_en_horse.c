@@ -14,6 +14,7 @@
 #include "objects/object_horse_link_child/object_horse_link_child.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/Graphics/EponaCosmetics.h"
+#include "z_en_horse_combo.h"
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED)
 
@@ -717,6 +718,10 @@ void func_8087CA04(EnHorse* this, PlayState* play) {
 }
 
 void EnHorse_Init(Actor* thisx, PlayState* play2) {
+#ifdef COMBO_BUILD
+    if (EnHorse_ComboTryInit(thisx, play2))
+        return;
+#endif
     PlayState* play = play2;
     EnHorse* this = (EnHorse*)thisx;
     Skin* skin = &this->skin;

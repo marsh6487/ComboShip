@@ -6,6 +6,7 @@
 #include "src/overlays/actors/ovl_En_Viewer/static_story_actor.h"
 #include "src/overlays/actors/ovl_En_Viewer/static_story_kokiri.h"
 #include "soh/ResourceManagerHelpers.h"
+#include "soh/Enhancements/cosmetics/NativeNpcModels.h"
 #include "objects/object_dy_obj/object_dy_obj.h"
 #include "objects/object_kw1/object_kw1.h"
 #include "objects/object_os_anime/object_os_anime.h"
@@ -13,19 +14,41 @@
 
 static bool donorAvailable = true;
 static unsigned donorLoads;
+static bool modelPackAvailable;
+static bool fadoPackAvailable;
+static bool fadoSeatedAvailable;
+static const SkelAnime* fittedPoseTarget;
+static const char* expectedSkeleton;
+static const char* expectedAnimation;
+static const char fadoSkeleton[] = "__OTR__objects/object_fa/YoungFadoNpcPOC1/Skel";
+static const char fadoHead[] = "__OTR__objects/object_fa/YoungFadoNpcPOC1/Body/Limb14";
+static const char fadoSeated[] = "__OTR__objects/object_fa/YoungFadoNpcPOC1/Animations/Seated5";
 uintptr_t gSegments[16];
+
+uint8_t ResourceMgr_FileExists(const char* path) {
+    return (modelPackAvailable && strcmp(path, sKokiriGirlNpcSkel) == 0) ||
+           (fadoPackAvailable && strcmp(path, fadoSkeleton) == 0) ||
+           (fadoSeatedAvailable && strcmp(path, fadoSeated) == 0);
+}
+uint8_t ResourceMgr_FileAltExists(const char* path) {
+    return (modelPackAvailable && (strcmp(path, sKokiriGirlNpcSkel) == 0 || strcmp(path, sKokiriGirlNpcHead) == 0)) ||
+           (fadoPackAvailable && (strcmp(path, fadoSkeleton) == 0 || strcmp(path, fadoHead) == 0)) ||
+           (fadoSeatedAvailable && strcmp(path, fadoSeated) == 0);
+}
 
 /* Exercise the production init path while retaining caller-owned test tables. */
 s32 __wrap_SkelAnime_InitFlex(PlayState* play, SkelAnime* skel, FlexSkeletonHeader* skeleton,
                               AnimationHeader* animation, Vec3s* joints, Vec3s* morph, s32 count) {
-    REQUIRE(strcmp((const char*)skeleton, gKw1Skel) == 0);
+    REQUIRE(strcmp((const char*)skeleton, expectedSkeleton != NULL ? expectedSkeleton : gKw1Skel) == 0);
     REQUIRE(animation == NULL && joints == NULL && morph == NULL && count == 0);
     REQUIRE(skel->jointTable != NULL);
     skel->limbCount = 16;
     return 0;
 }
 void __wrap_Animation_PlayLoopSetSpeed(SkelAnime* skel, AnimationHeader* animation, f32 speed) {
-    REQUIRE(strcmp((const char*)animation, gKokiriSittingCrossedLegsAnim) == 0);
+    REQUIRE(strcmp((const char*)animation,
+                   expectedAnimation != NULL ? expectedAnimation : gKokiriSittingCrossedLegsAnim) == 0);
+    skel->animation = animation;
     memcpy(skel->jointTable, fixtureSeated, sizeof(fixtureSeated));
 }
 
@@ -33,6 +56,9 @@ AnimationHeaderCommon* ResourceMgr_LoadAnimByName(const char* path) {
     REQUIRE(strcmp(path, gGreatFairySittingAnim) == 0);
     ++donorLoads;
     return donorAvailable ? &fixtureDonor.common : NULL;
+}
+AnimationHeader* NativeNpcPose_ResolveAnimation(const SkelAnime* skel, AnimationHeader* animation) {
+    return skel == fittedPoseTarget ? &fixtureDonor : animation;
 }
 int ResourceMgr_OTRSigCheck(char* value) {
     return 0;
@@ -98,6 +124,38 @@ int main(void) {
     RequireLevelHead(girlJoints);
     RequireLevelHead(fadoJoints);
 
+    /* The private girl rig retains exactly the same native sampler output.
+     * The separate Fado control never selects this model, even with the pack. */
+    modelPackAvailable = true;
+    expectedSkeleton = sKokiriGirlNpcSkel;
+    StaticStoryKokiri_Init(&girl, play);
+    expectedSkeleton = gKw1Skel;
+    StaticStoryKokiri_Init(&fado, play);
+    REQUIRE(memcmp(girlJoints, fadoJoints, sizeof(girlJoints)) == 0);
+    RequireLevelHead(girlJoints);
+    modelPackAvailable = false;
+    expectedSkeleton = NULL;
+
+    /* Real static Fado initialization must register her private rig. Recognizing
+     * her namespace in the resolver alone cannot make seated corrections load. */
+    Pose(&fado, fadoJoints, STATIC_STORY_ACTOR_FADO, 5);
+    fadoPackAvailable = true;
+    expectedSkeleton = fadoSkeleton;
+    expectedAnimation = gKokiriSittingCrossedArmsLegsAnim;
+    StaticStoryKokiri_Init(&fado, play);
+    REQUIRE(strcmp((const char*)fado.skin.skelAnime.animation, gKokiriSittingCrossedArmsLegsAnim) == 0);
+    fadoSeatedAvailable = true;
+    expectedAnimation = fadoSeated;
+    StaticStoryKokiri_Init(&fado, play);
+    REQUIRE(strcmp((const char*)fado.skin.skelAnime.animation, fadoSeated) == 0);
+    fadoPackAvailable = false;
+    expectedSkeleton = gKw1Skel;
+    expectedAnimation = gKokiriSittingCrossedArmsLegsAnim;
+    StaticStoryKokiri_Init(&fado, play);
+    fadoSeatedAvailable = false;
+    expectedSkeleton = expectedAnimation = NULL;
+    Pose(&fado, fadoJoints, STATIC_STORY_ACTOR_FADO, 4);
+
     /* Two complete loops plus fractional updates and the seam. */
     float frame = 0;
     for (int tick = 0; tick < fixtureDonor.common.frameCount * 4 + 3; ++tick) {
@@ -138,14 +196,42 @@ int main(void) {
         REQUIRE(!StaticStoryActor_CanTrack(type, 4));
         REQUIRE(!StaticStoryActor_CanTrack(type, 5));
     }
+    /* An archive-provided complete pose must retain its own head and legs. */
+    Pose(&girl, girlJoints, STATIC_STORY_ACTOR_KOKIRI_GIRL, 4);
+    fittedPoseTarget = &girl.skin.skelAnime;
+    unsigned loadsBeforeFit = donorLoads;
+    Update(&girl, 1);
+    REQUIRE(memcmp(girlJoints, fixtureSeated, sizeof(girlJoints)) == 0);
+    REQUIRE(girl.staticState.kokiriLegFrame == 0 && donorLoads == loadsBeforeFit);
+    fittedPoseTarget = NULL;
     donorAvailable = false;
     Pose(&girl, girlJoints, STATIC_STORY_ACTOR_KOKIRI_GIRL, 4);
     Update(&girl, 1);
     RequireLevelHead(girlJoints);
     REQUIRE(memcmp(girlJoints + 2, fixtureSeated + 2, sizeof(Vec3s) * 6) == 0);
 
+    /* Every cutscene entry selects the paired girl rig, including the three
+     * entries absent from the old preview sheet. Missing packs stay native. */
+    const char* allAnimations[] = { gKokiriIdleAnim,
+                                    gKokiriStandingArmsBehindBackAnim,
+                                    gKokiriStandingHandsOnHipsAnim,
+                                    gKokiriSittingHeadOnHandAnim,
+                                    gKokiriSittingCrossedLegsAnim,
+                                    gKokiriSittingCrossedArmsLegsAnim };
+    EnViewer entry;
+    Vec3s entryJoints[16];
+    for (int available = 0; available < 2; ++available) {
+        modelPackAvailable = available;
+        expectedSkeleton = available ? sKokiriGirlNpcSkel : gKw1Skel;
+        for (int pose = 0; pose < 6; ++pose) {
+            Pose(&entry, entryJoints, STATIC_STORY_ACTOR_KOKIRI_GIRL, pose);
+            expectedAnimation = allAnimations[pose];
+            StaticStoryKokiri_Init(&entry, play);
+            REQUIRE(strcmp((const char*)entry.skin.skelAnime.animation, allAnimations[pose]) == 0);
+        }
+    }
     free(play);
     puts("PASS both characters: level heads from init, donor leg motion, two loops, fractional seam, independent "
-         "restart, unchanged other poses and missing-donor fallback");
+         "restart, unchanged other poses, fitted-clip ownership and missing-donor fallback");
     return 0;
 }

@@ -53,6 +53,10 @@ for first, last, boss in [('RG_FOREST_TEMPLE_SMALL_KEY', 'RG_TREASURE_GAME_SMALL
 donor = (ROOT / 'tests/item_receipts/key_donor_test.cpp').read_text()
 donor = donor.replace('/* KEY_CATALOG */', 'const KeyRow keyRows[] = {\n' + ',\n'.join(key_rows) + '\n};')
 export = receipt_source('soh/soh/Enhancements/randomizer/Messages/ItemMessages.cpp')
+vanilla_builder = re.search(r'^static bool BuildVanillaEquipmentBottleReceipt\([^;]*\) \{', export, re.M)
+if vanilla_builder:
+    donor = donor.replace('/* DONOR_EXPORT */', vanilla_builder[0][:-1] +
+        block(export, vanilla_builder[0]) + '\n/* DONOR_EXPORT */')
 key_builder = re.search(r'^bool BuildDungeonKeyReceiptMessage\([^;]*\) \{', export, re.M)
 if key_builder:
     donor = donor.replace('/* DONOR_EXPORT */', key_builder[0][:-1] +

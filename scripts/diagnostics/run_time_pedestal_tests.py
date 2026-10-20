@@ -163,9 +163,21 @@ def main():
             helpers += render["Player_ApplyTimePedestalSword"] + "\n"
         post_hand = render["Player_PostLimbDrawGameplay"]
         post_sword = block_from(post_hand, post_hand.index("        if ((*dList != NULL)"))
+        # The insertion cue owns its sword in this fixture. Active Four and its
+        # compound allocator are exercised by the dedicated visibility fixture.
+        sword_boundary = '''
+typedef struct GraphicsContext GraphicsContext;
+static u8 FourSword_IsEquipped(void) { return 0; }
+static u8 WeaponUpgrade_ApplyHeldSwordDL(Gfx** dList, void* hand, Player* player, u8 r, u8 g, u8 b) {
+    abort();
+}
+static void* Graph_Alloc(GraphicsContext* gfxCtx, size_t size) {
+    abort();
+}
+'''
         # Supply the final hand type at this boundary, initialized by the root
         # limb and potentially changed by a different weapon owner in gameplay.
-        (build / "render.c").write_text('#include "time_pedestal_fixture.h"\n' + helpers +
+        (build / "render.c").write_text('#include "time_pedestal_fixture.h"\n' + sword_boundary + helpers +
             "static s32 Fixture_RenderTail(PlayState* play, Player* this, s32 limbIndex, Gfx** dList, Vec3s* rot) {\n"
             # Supply the earlier limb-selection result. This fixture's fire
             # renderer boundary has no progressive resources and returns NULL.

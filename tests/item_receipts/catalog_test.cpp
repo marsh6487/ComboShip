@@ -4,13 +4,17 @@
 #include "2s2h/FleetShipCombo/FleetComboItems.h"
 #include "2s2h/FleetShipCombo/FleetComboItemsGlue.h"
 #include "2s2h/Rando/ItemReceiptText.h"
+#include <nlohmann/json.hpp>
+#include "2s2h/Rando/Rando.h"
 #include "2s2h/Rando/StaticData/StaticData.h"
 #include "ComboExport.h"
 #include "ComboItemReceiptText.h"
 #include "ComboSongDrawMM.h"
 #include "ComboItemIconOwnership.h"
 #include "key_receipt_fixtures.h"
+#include "boss_soul_fixtures.h"
 #include "rando/CrossForeign.h"
+#include "rando/CrossDungeonSeed.h"
 extern "C" {
 #include "message_data_static.h"
 #include "mods/extended_inventory.h"
@@ -28,8 +32,17 @@ extern "C" {
 #include <iostream>
 #include <unordered_map>
 
+namespace OotNative {
+enum {
+#define DEFINE_ENTRANCE(entrance, ...) entrance,
+#include "soh/include/tables/entrance_table.h"
+#undef DEFINE_ENTRANCE
+};
+}
+
 extern "C" {
 PlayState *gPlayState = nullptr;
+int gComboGameMode = COMBO_GAME_BOTH;
 
 const NeiItem *Nei_FindByItem(int32_t item) {
   for (const auto &nei : sReceiptNeiItems)
@@ -68,6 +81,7 @@ u8 gItemSlots[77]{};
 u32 gBitFlags[32] = {1, 2, 4};
 u8 Nei_BulletBagLevel() { return std::min<int>(3, neiSave.ootUpgrades & 7); }
 }
+#include "receipt_fairy_grants.inc"
 
 namespace Rando::StaticData {
 
@@ -85,6 +99,13 @@ const std::string& GetCheckDisplayName(RandoCheckId id) {
 namespace CustomMessage {
 static Entry shownSong;
 static bool startedSong;
+static Entry nativeRupeeLoaded;
+static int nativeRupeeLoads = 0;
+Entry LoadVanillaMessageTableEntry(u16) {
+  return {.textboxType=3, .textboxYPos=2, .icon=0xA7, .nextMessageID=0x1234,
+          .firstItemCost=0x5678, .secondItemCost=0x9ABC, .msg="Native rupee receipt"};
+}
+void LoadCustomMessageIntoFont(Entry entry) { nativeRupeeLoaded=std::move(entry);++nativeRupeeLoads; }
 void SetActiveCustomMessage(std::string msg, Entry options) { options.msg=std::move(msg);shownSong=options;startedSong=false; }
 void StartTextbox(std::string msg, Entry options) { options.msg=std::move(msg);shownSong=options;startedSong=true; }
 }
@@ -100,6 +121,33 @@ static bool donorReady = true;
 static int donorReads = 0;
 static uint64_t generation = 0;
 static bool mapCompassInfo = false;
+static int randomRupeeNames = 0;
+static int wandRule = 0;
+static bool neiEnabled = true;
+#ifdef COMPASS_DONOR_INTEGRATION
+extern "C" void FixtureConfigureWandReceipt(int rule, int customItems);
+#endif
+static void SyncWandFixtureSettings() {
+#ifdef COMPASS_DONOR_INTEGRATION
+  // Production ComboSettingsSync mirrors these two options between hosts.
+  FixtureConfigureWandReceipt(wandRule, neiEnabled);
+#endif
+}
+extern "C" uint8_t Wand_RandoMode() { return wandRule; }
+extern "C" int32_t CVarGetInteger(const char* name, int32_t fallback) {
+  if (std::strcmp(name, "gRando.Options.RO_ELEMENTAL_WAND_SHUFFLE") == 0)
+    return wandRule;
+  if (std::strcmp(name, "gRando.Options.RO_SHUFFLE_NEI_ITEMS") == 0)
+    return neiEnabled;
+  if (std::strcmp(name, "gRandoEnhancements.RandomizeRupeeNames") == 0)
+    return randomRupeeNames < 0 ? fallback : randomRupeeNames;
+  return fallback;
+}
+using NativeRupeeHook = void (*)(u16*, bool*);
+static std::map<u16,NativeRupeeHook> nativeRupeeHooks;
+#define COND_ID_HOOK(kind,id,condition,callback) do { if(condition) nativeRupeeHooks[id]=callback; } while(0)
+#include "receipt_rupee_hooks.inc"
+#undef COND_ID_HOOK
 static RandoCheckId foreignRewardCheck = RC_UNKNOWN;
 static ComboRando::ForeignItem foreignReward;
 namespace Rando::MiscBehavior {
@@ -109,6 +157,24 @@ const ComboRando::ForeignItem* MM_LookupForeign(RandoCheckId check) {
 }
 } // namespace Rando::MiscBehavior
 #ifndef COMPASS_DONOR_INTEGRATION
+static bool nativeHintEntranceSwap;
+extern "C" COMBO_EXPORT int32_t OOT_GetDungeonEntranceSourceName(int32_t index,char* buffer,uint32_t capacity) {
+  assert(index == OotNative::ENTR_DEKU_TREE_ENTRANCE);
+  const std::string name = nativeHintEntranceSwap ? "Forest Temple" : "Deku Tree";
+  if (!buffer || name.size() >= capacity) return 0;
+  std::memcpy(buffer,name.c_str(),name.size()+1);return name.size();
+}
+extern "C" COMBO_EXPORT int32_t OOT_GetPhysicalBossRewardName(int32_t boss,char* buffer,uint32_t capacity) {
+  assert(boss == 0);
+  const std::string name = "Deku Leaf";
+  if (!buffer || name.size() >= capacity) return 0;
+  std::memcpy(buffer,name.c_str(),name.size()+1);return name.size();
+}
+extern "C" COMBO_EXPORT int32_t OOT_GetPhysicalBossRewardPresentation(int32_t boss,CwItemReceiptPresentation* out) {
+  assert(boss == 0);*out={};out->singleBox=1;out->rewardLine=1;
+  std::strcpy(out->iconPath,"__OTR__@oot:textures/icon_item_custom/gItemIconDekuLeafTex");
+  out->iconWidth=out->iconHeight=32;return 1;
+}
 extern "C" COMBO_EXPORT int32_t OOT_MapCompassInfoEnabled() { return mapCompassInfo; }
 extern "C" COMBO_EXPORT int32_t OOT_GetSeedItemIconInfo(const char* name, CwItemIconInfo* out) {
   assert(std::string(name) == "Progressive Hookshot");
@@ -169,6 +235,9 @@ static std::string FlattenReceiptLines(const std::string& body) {
 #ifdef COMPASS_DONOR_INTEGRATION
 extern "C" void FixtureConfigureForestCompassReceipt(int information);
 extern "C" void FixtureConfigureGeneratedCompassRoute(const char* fixturePath, const char* route);
+extern "C" void FixtureConfigurePhysicalBossHints(int nativeSwap);
+extern "C" int32_t OOT_GetItemReceiptText(const char*,char*,uint32_t);
+extern "C" int32_t OOT_GetDungeonItemReceiptPresentation(const char*,CwItemReceiptPresentation*);
 
 static void CheckForestCompassReceiveRoutes(const char* fixturePath) {
   gSaveContext.fileNum = 0;
@@ -423,11 +492,584 @@ static void CheckMapCompassInformation() {
   std::cout << "MM map/compass information: four placed rewards, foreign owner names, native entrances, owned pause/Start With, gates and no save writes passed\n";
 }
 
+static void CheckShuffledDungeonInformation() {
+  using namespace ComboRando::CrossDungeon;
+  const auto saved = gSaveContext;
+  const auto seedBefore = ComboRando::g_comboForeignJson;
+  gSaveContext.fileNum = 0;
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+  mapCompassInfo = true;
+#ifdef COMPASS_DONOR_INTEGRATION
+  FixtureConfigurePhysicalBossHints(0);
+#endif
+  std::vector<Dungeon> dungeons = {
+    {"mm:woodfall", {1, ENTRANCE(WOODFALL_TEMPLE,0)}, {1, ENTRANCE(WOODFALL,1)}, {1, ENTRANCE(WOODFALL,1)}},
+    {"mm:snowhead", {1, ENTRANCE(SNOWHEAD_TEMPLE,0)}, {1, ENTRANCE(SNOWHEAD,1)}, {1, ENTRANCE(SNOWHEAD,1)}}
+  };
+  nlohmann::json seed = {{"crossDungeonEntrances", Encode(dungeons,{1,0})}};
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());
+  ++generation;
+  for (int dungeon : {0,1}) {
+    const std::string source = dungeon == 0 ? "Snowhead" : "Woodfall";
+    const auto before = gSaveContext;
+    const auto text = Rando::GetDungeonMapCompassInfo(dungeon,false);
+    assert(text.find("at " + source) != std::string::npos && "MM map must name saved shuffled entrance");
+    assert(!std::memcmp(&before,&gSaveContext,sizeof(before)));
+    gSaveContext.save.saveInfo.inventory.dungeonItems[dungeon] |= 1 << DUNGEON_MAP;
+    const auto owned = gSaveContext;
+    assert(PauseItemDesc_GetMapInfo(dungeon,ITEM_DUNGEON_MAP) == text);
+    CustomMessage::Entry receipt;
+    assert(Rando::ApplyItemReceiptText(dungeon == 0 ? RI_WOODFALL_MAP : RI_SNOWHEAD_MAP,receipt));
+    assert(FlattenReceiptLines(receipt.msg).find(source) != std::string::npos);
+    assert(!std::memcmp(&owned,&gSaveContext,sizeof(owned)));
+    gSaveContext = before;
+  }
+  dungeons.push_back({"oot:" + std::to_string(OotNative::ENTR_DEKU_TREE_ENTRANCE),
+                     {0,OotNative::ENTR_DEKU_TREE_ENTRANCE}, {0,0x209}, {0,0x209}});
+  seed["crossDungeonEntrances"] = Encode(dungeons,{1,2,0});
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  assert(Rando::GetDungeonMapCompassInfo(0,false).find("at Deku Tree") != std::string::npos);
+#ifdef COMPASS_DONOR_INTEGRATION
+  FixtureConfigurePhysicalBossHints(1);
+#else
+  nativeHintEntranceSwap = true;
+#endif
+  assert(Rando::GetDungeonMapCompassInfo(0,false).find("at Forest Temple") != std::string::npos &&
+         "physical source composes native OoT shuffle before the saved cross route");
+#ifdef COMPASS_DONOR_INTEGRATION
+  char importedMap[2048];
+  const int importedMapSize=OOT_GetItemReceiptText("Woodfall Map",importedMap,sizeof(importedMap));
+  assert(importedMapSize>0 && std::string(importedMap,importedMapSize).find("Forest Temple")!=std::string::npos);
+  CustomMessage::Entry foreignMap;
+  assert(Rando::ApplyForeignItemReceiptText("Great Deku Tree Map",foreignMap));
+  assert(FlattenReceiptLines(foreignMap.msg).find("Snowhead")!=std::string::npos &&
+         "OoT map received in MM must invert the recorded cross route even with native shuffle Off");
+#endif
+#ifdef COMPASS_DONOR_INTEGRATION
+  FixtureConfigurePhysicalBossHints(0);
+#else
+  nativeHintEntranceSwap = false;
+#endif
+
+  const int entries[] = {ENTRANCE(WOODFALL_TEMPLE,0),ENTRANCE(SNOWHEAD_TEMPLE,0),
+                         ENTRANCE(GREAT_BAY_TEMPLE,0),ENTRANCE(STONE_TOWER_TEMPLE_INVERTED,0)};
+  const int arenas[] = {ENTRANCE(ODOLWAS_LAIR,0),ENTRANCE(GOHTS_LAIR,0),
+                        ENTRANCE(GYORGS_LAIR,0),ENTRANCE(TWINMOLDS_LAIR,0)};
+  const char* owners[] = {"mm:woodfall","mm:snowhead","mm:greatbay","mm:inverted"};
+  const char* checks[] = {"Woodfall Temple Boss Warp","Snowhead Temple Boss Warp",
+                         "Great Bay Temple Boss Warp","Stone Tower Temple Inverted Boss Warp"};
+  std::vector<Dungeon> bosses;
+  for(int i=0;i<4;++i) {
+    Dungeon b{"mm:boss:"+std::to_string(i+8),{1,arenas[i]},{1,entries[i]},{1,entries[i]}};
+    b.pool=Pool::Boss;b.boss=i+8;b.owner=owners[i];b.hasReverse=false;b.warpReturn=Endpoint{1,entries[i]};
+    bosses.push_back(b);
+    seed["mm"]["placements"][checks[i]]=Rando::StaticData::Items.at(RI_PROGRESSIVE_MAGIC).name;
+  }
+  Dungeon gohma{"oot:boss:0",{0,OotNative::ENTR_DEKU_TREE_BOSS_ENTRANCE},
+                 {0,OotNative::ENTR_DEKU_TREE_BOSS_DOOR},{0,OotNative::ENTR_DEKU_TREE_ENTRANCE}};
+  gohma.pool=Pool::Boss;gohma.boss=0;gohma.owner="oot:"+std::to_string(OotNative::ENTR_DEKU_TREE_ENTRANCE);
+  gohma.warpReturn=Endpoint{0,OotNative::ENTR_KOKIRI_FOREST_DEKU_TREE_BLUE_WARP};bosses.push_back(gohma);
+  seed["crossDungeonEntrances"]=Encode(bosses,{3,4,2,0,1});
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  const auto compass = Rando::GetDungeonMapCompassInfo(0,true);
+  assert(compass.find("Twinmold") != std::string::npos && compass.find("Odolwa") == std::string::npos);
+  assert(compass.find(Rando::StaticData::Items.at(RI_PROGRESSIVE_MAGIC).name) != std::string::npos);
+  gSaveContext.save.saveInfo.inventory.dungeonItems[0] |= 1 << DUNGEON_COMPASS;
+  assert(PauseItemDesc_GetMapInfo(0,ITEM_COMPASS) == compass);
+  const auto other = Rando::GetDungeonMapCompassInfo(1,true);
+  assert(other.find("Queen Gohma") != std::string::npos && other.find("Deku Leaf") != std::string::npos);
+  CustomMessage::Entry receipt;
+  assert(Rando::ApplyItemReceiptText(RI_SNOWHEAD_COMPASS,receipt));
+  assert(FlattenReceiptLines(receipt.msg).find("Queen Gohma") != std::string::npos);
+  assert(std::string(receipt.receiptPresentation.iconPath)=="__OTR__@oot:textures/icon_item_custom/gItemIconDekuLeafTex");
+  assert(receipt.receiptPresentation.rewardLine==1);
+#ifdef COMPASS_DONOR_INTEGRATION
+  char importedCompass[2048];
+  const int importedCompassSize=OOT_GetItemReceiptText("Snowhead Compass",importedCompass,sizeof(importedCompass));
+  assert(importedCompassSize>0 && std::string(importedCompass,importedCompassSize).find("Queen Gohma")!=std::string::npos);
+  CwItemReceiptPresentation importedPresentation{};
+  assert(OOT_GetDungeonItemReceiptPresentation("Snowhead Compass",&importedPresentation)==1);
+  assert(!std::strcmp(importedPresentation.iconPath,receipt.receiptPresentation.iconPath));
+  CustomMessage::Entry foreignCompass;
+  assert(Rando::ApplyForeignItemReceiptText("Great Deku Tree Compass",foreignCompass));
+  assert(FlattenReceiptLines(foreignCompass.msg).find("Goht")!=std::string::npos &&
+         "OoT compass received in MM must name the assigned cross-game physical boss");
+  assert(std::strstr(foreignCompass.receiptPresentation.iconPath,"gQuestIconSmallMagicJarTex"));
+  FixtureConfigurePhysicalBossHints(2);
+  ++generation;
+  assert(Rando::ApplyForeignItemReceiptText("Forest Temple Compass",foreignCompass));
+  assert(FlattenReceiptLines(foreignCompass.msg).find("Goht")!=std::string::npos &&
+         "native boss override must compose before the cross-game boss permutation");
+  gComboGameMode=COMBO_GAME_OOT;
+  const int soloSize=OOT_GetItemReceiptText("Forest Temple Compass",importedCompass,sizeof(importedCompass));
+  assert(soloSize>0 && std::string(importedCompass,soloSize).find("Queen Gohma")!=std::string::npos &&
+         "solo OoT keeps its native boss override while ignoring dormant combined seed data");
+  gComboGameMode=COMBO_GAME_BOTH;
+  auto mixed=dungeons;
+  mixed.insert(mixed.end(),bosses.begin(),bosses.end());
+  seed["crossDungeonEntrances"]=Encode(mixed,{1,2,0,6,7,5,3,4});
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  FixtureConfigurePhysicalBossHints(3);
+  assert(Rando::ApplyForeignItemReceiptText("Forest Temple Compass",foreignCompass));
+  assert(FlattenReceiptLines(foreignCompass.msg).find("Twinmold")!=std::string::npos &&
+         "a native mixed route into a dungeon must cross to its assigned temple before following that boss door");
+  FixtureConfigurePhysicalBossHints(0);
+#endif
+  std::vector<Dungeon> expanded=dungeons;
+  expanded.push_back({"mm:stonetower",{1,ENTRANCE(STONE_TOWER_TEMPLE,0)},
+                       {1,ENTRANCE(STONE_TOWER,2)},{1,ENTRANCE(STONE_TOWER,2)}});
+  expanded.push_back({"mm:inverted",{1,ENTRANCE(STONE_TOWER_TEMPLE_INVERTED,0)},
+                       {1,ENTRANCE(STONE_TOWER_INVERTED,1)},{1,ENTRANCE(STONE_TOWER_INVERTED,1)}});
+  expanded.push_back({"mm:swamp-spider-house",{1,ENTRANCE(SWAMP_SPIDER_HOUSE,0)},
+                       {1,ENTRANCE(SOUTHERN_SWAMP_POISONED,8)},{1,ENTRANCE(SOUTHERN_SWAMP_POISONED,8)}});
+  expanded.back().expanded=true;
+  seed["crossDungeonEntrances"]=Encode(expanded,{5,3,2,0,1,4});
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  const auto tower=Rando::GetDungeonMapCompassInfo(3,false);
+  assert(tower.find("normal: Snowhead; inverted: Southern Swamp's Spider House")!=std::string::npos);
+  CustomMessage::Entry towerReceipt;
+  assert(Rando::ApplyItemReceiptText(RI_STONE_TOWER_MAP,towerReceipt));
+  const auto flatTower=FlattenReceiptLines(towerReceipt.msg);
+  assert(flatTower.find("normal: Snowhead")!=std::string::npos && flatTower.find("inverted: Southern Swamp's Spider House")!=std::string::npos);
+  char exportedSource[512], exportedBoss[64];
+  assert(MM_GetDungeonEntranceName(3,exportedSource,sizeof(exportedSource))>0);
+  assert(tower.find(exportedSource)!=std::string::npos);
+  assert(MM_GetDungeonBossName(3,exportedBoss,sizeof(exportedBoss))==8 && !std::strcmp(exportedBoss,"Twinmold"));
+  char tooShort[2]={'x','x'};
+  assert(MM_GetDungeonEntranceName(3,tooShort,sizeof(tooShort))==0 && !tooShort[0]);
+  assert(MM_GetDungeonBossName(-1,tooShort,sizeof(tooShort))==0 && !tooShort[0]);
+  assert(MM_GetDungeonEntranceName(0,nullptr,0)==0);
+  seed.erase("crossDungeonEntrances");
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  assert(Rando::GetDungeonMapCompassInfo(3,false).find("at Stone Tower")!=std::string::npos);
+  // A new seed resets descriptors even if no scene, slot, or inventory changes.
+  seed["crossDungeonEntrances"]=Encode(dungeons,{0,1,2});
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  assert(Rando::GetDungeonMapCompassInfo(0,false).find("at Woodfall") != std::string::npos);
+  assert(Rando::GetDungeonMapCompassInfo(0,true).find("Odolwa") != std::string::npos);
+  seed["crossDungeonEntrances"]["permutation"]={0,0,0};
+  ComboRando::Combo_SetForeignJson(seed.dump().c_str());++generation;
+  assert(Rando::GetDungeonMapCompassInfo(0,false).empty());
+  assert(Rando::GetDungeonMapCompassInfo(0,true).empty());
+  gComboGameMode=COMBO_GAME_MM;
+  gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_MAPS_COMPASSES_GIVE_INFORMATION]=1;
+  gSaveContext.save.shipSaveInfo.rando.randoSaveChecks[RC_WOODFALL_TEMPLE_BOSS_WARP].randoItemId=RI_PROGRESSIVE_SWORD;
+  assert(Rando::GetDungeonMapCompassInfo(0,false).find("at Woodfall") != std::string::npos);
+  assert(Rando::GetDungeonMapCompassInfo(0,true).find(Rando::StaticData::Items.at(RI_PROGRESSIVE_SWORD).name) != std::string::npos);
+  const RandoItemId nativeMaps[]={RI_WOODFALL_MAP,RI_SNOWHEAD_MAP,RI_GREAT_BAY_MAP,RI_STONE_TOWER_MAP};
+  const RandoItemId nativeCompasses[]={RI_WOODFALL_COMPASS,RI_SNOWHEAD_COMPASS,RI_GREAT_BAY_COMPASS,RI_STONE_TOWER_COMPASS};
+  const RandoCheckId nativeRewards[]={RC_WOODFALL_TEMPLE_BOSS_WARP,RC_SNOWHEAD_TEMPLE_BOSS_WARP,
+      RC_GREAT_BAY_TEMPLE_BOSS_WARP,RC_STONE_TOWER_TEMPLE_INVERTED_BOSS_WARP};
+  for(int enabled:{0,1,0}) {
+    gSaveContext.save.shipSaveInfo.rando.randoSaveOptions[RO_MAPS_COMPASSES_GIVE_INFORMATION]=enabled;
+    for(int d=0;d<4;++d) {
+      gSaveContext.save.shipSaveInfo.rando.randoSaveChecks[nativeRewards[d]].randoItemId=RI_PROGRESSIVE_SWORD;
+      gSaveContext.save.saveInfo.inventory.dungeonItems[d]=(1<<DUNGEON_MAP)|(1<<DUNGEON_COMPASS);
+      const auto before=gSaveContext;
+      const auto map=Rando::GetDungeonMapCompassInfo(d,false);
+      const auto compass=Rando::GetDungeonMapCompassInfo(d,true);
+      assert(map.empty()==!enabled && compass.empty()==!enabled);
+      assert(bool(PauseItemDesc_GetMapInfo(d,ITEM_DUNGEON_MAP))==bool(enabled));
+      assert(bool(PauseItemDesc_GetMapInfo(d,ITEM_COMPASS))==bool(enabled));
+      CustomMessage::Entry mapReceipt,compassReceipt;
+      const bool mapHandled=Rando::ApplyItemReceiptText(nativeMaps[d],mapReceipt);
+      const bool compassHandled=Rando::ApplyItemReceiptText(nativeCompasses[d],compassReceipt);
+      if(enabled) {
+        assert(mapHandled && compassHandled);
+        assert(mapReceipt.msg.find("entrance")!=std::string::npos);
+        assert(compassReceipt.msg.find("It points to")!=std::string::npos);
+        assert(std::strstr(compassReceipt.receiptPresentation.iconPath,"KokiriSword"));
+        assert(compass.find("Progressive Sword")!=std::string::npos);
+      } else {
+        assert(!mapReceipt.receiptPresentation.singleBox && !compassReceipt.receiptPresentation.singleBox);
+        assert(mapReceipt.msg.find("It seems the entrance") == std::string::npos);
+        assert(compassReceipt.msg.find("It points to") == std::string::npos);
+      }
+      assert(!std::memcmp(&before,&gSaveContext,sizeof(before)));
+    }
+  }
+  std::cout<<"PASS solo 2Ship: all four native map/compass collection and owned-pause paths, saved Off/On/Off, physical rewards, stale combined seed ignored and save isolation\n";
+  gComboGameMode=COMBO_GAME_BOTH;
+  ComboRando::Combo_SetForeignJson(seedBefore.c_str());
+  ++generation;
+  gSaveContext = saved;
+  mapCompassInfo = false;
+  std::cout << "PASS MM information: saved map/boss permutations, native composition, physical rewards/icons, collection/C-Up, reload, malformed and solo ownership\n";
+}
+
+static void CheckRandomRupeeReceipts() {
+  const auto saved = gSaveContext;
+  gSaveContext.fileNum = 0;
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+  const struct { RandoItemId id; const char* name; const char* amount; unsigned color; } cases[] = {
+    {RI_RUPEE_GREEN, "Green Rupee", "1", 2}, {RI_RUPEE_BLUE, "Blue Rupee", "5", 3},
+    {RI_RUPEE_RED, "Red Rupee", "20", 1}, {RI_RUPEE_PURPLE, "Purple Rupee", "50", 6},
+    {RI_RUPEE_SILVER, "Silver Rupee", "100", 0}, {RI_RUPEE_HUGE, "Huge Rupee", "200", 4}
+  };
+  for (int enabled : {-1, 1}) {
+    randomRupeeNames = enabled;
+    for (auto [id, name, amount, color] : cases) {
+      for (auto lang : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+        gSaveContext.options.language = lang;
+        for (bool foreign : {false, true}) {
+          const auto before = gSaveContext;
+          CustomMessage::Entry receipt;
+          receipt.icon = 0xF5;
+          const bool applied = foreign ? Rando::ApplyForeignItemReceiptText(name, receipt)
+                                       : Rando::ApplyItemReceiptText(id, receipt);
+          assert(applied && "rupee enhancement must work without the donor/message table");
+          const std::string value = std::string(1, static_cast<char>(color)) + amount;
+          assert(!receipt.autoFormat && receipt.msg.find(value) != std::string::npos);
+          assert(receipt.msg.find(name) == std::string::npos);
+          assert(receipt.msg.find("%") == std::string::npos);
+          assert(receipt.msg.find("[P]") == std::string::npos);
+          assert(receipt.icon == 0xF5 && !receipt.receiptPresentation.singleBox);
+          assert(!std::memcmp(&gSaveContext, &before, sizeof(before)));
+        }
+      }
+    }
+  }
+  // Disabled and non-randomizer modes retain the ordinary native/donor path.
+  donorReady = false;
+  randomRupeeNames = 0;
+  CustomMessage::Entry receipt;
+  assert(!Rando::ApplyItemReceiptText(RI_RUPEE_BLUE, receipt));
+  assert(!Rando::ApplyForeignItemReceiptText("Blue Rupee", receipt));
+  randomRupeeNames = 1;
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_VANILLA;
+  assert(!Rando::ApplyItemReceiptText(RI_RUPEE_BLUE, receipt));
+  assert(!Rando::ApplyForeignItemReceiptText("Blue Rupee", receipt));
+  gSaveContext.save.shipSaveInfo.saveType = SAVETYPE_RANDO;
+  assert(!Rando::ApplyForeignItemReceiptText("Silver Rupee (Forest Temple)", receipt));
+  donorReady = true;
+  randomRupeeNames = 0;
+  gSaveContext = saved;
+  std::cout << "Localized random rupee receipts: native/foreign values, live/default setting, modes and non-currency exclusion passed\n";
+}
+
+static void CheckNativeRupeeHooks() {
+  RegisterNativeRandomRupeeNames();
+  assert(nativeRupeeHooks.size()==7 && "native repeat/minigame rupee boxes need the enhancement too");
+  const struct {u16 text; const char* amount; unsigned color;} cases[] = {
+    {0xC4,"1",2},{0x2,"5",3},{0x3,"10",3},{0x4,"20",1},
+    {0x5,"50",6},{0x6,"100",0},{0x7,"200",4}
+  };
+  const auto saved=gSaveContext;
+  const auto* savedTable=gPlayState->msgCtx.messageTableNES;
+  MessageTableEntry table[]={{0xFFFF}};
+  gPlayState->msgCtx.messageTableNES=table;
+  gSaveContext.fileNum=0;
+  gSaveContext.save.shipSaveInfo.saveType=SAVETYPE_RANDO;
+  gSaveContext.options.language=LANGUAGE_ENG;
+  randomRupeeNames=1;
+  for(auto [id,amount,color]:cases) {
+    assert(nativeRupeeHooks.count(id));
+    auto text=id;bool load=true;
+    const auto before=gSaveContext;
+    nativeRupeeHooks[id](&text,&load);
+    const auto& receipt=CustomMessage::nativeRupeeLoaded;
+    assert(!load && text==id && !receipt.autoFormat);
+    assert(receipt.msg.find(std::string(1,char(color))+amount)!=std::string::npos && receipt.msg.back()==char(0xBF));
+    assert(receipt.textboxType==3 && receipt.textboxYPos==2 && receipt.icon==0xA7 &&
+           receipt.nextMessageID==0x1234 && receipt.firstItemCost==0x5678 && receipt.secondItemCost==0x9ABC);
+    assert(!std::memcmp(&gSaveContext,&before,sizeof(before)));
+  }
+  // Unrelated dialogue never registers, and live guards leave native loading intact.
+  assert(!nativeRupeeHooks.count(0x1C14) && !nativeRupeeHooks.count(CUSTOM_MESSAGE_ID));
+  const int before=CustomMessage::nativeRupeeLoads;
+  for(int guard=0;guard<4;++guard) {
+    auto id=u16(0x4);bool load=guard!=0;
+    randomRupeeNames=guard==1?0:1;
+    gSaveContext.fileNum=guard==2?0xFF:0;
+    gSaveContext.save.shipSaveInfo.saveType=guard==3?SAVETYPE_VANILLA:SAVETYPE_RANDO;
+    nativeRupeeHooks.at(id)(&id,&load);
+    assert(load==(guard!=0) && CustomMessage::nativeRupeeLoads==before);
+  }
+  randomRupeeNames=0;
+  gSaveContext=saved;
+  gPlayState->msgCtx.messageTableNES=const_cast<MessageTableEntry*>(savedTable);
+  std::cout<<"Native MM rupee award hooks: seven IDs including10, live guards, header/icon/END and save isolation passed\n";
+}
+
 int main(int argc, char** argv) {
   (void)argc;
   (void)argv;
   PlayState play{};
   gPlayState = &play;
+  const struct {
+    RandoItemId id;
+    const char *name;
+    int color;
+  } souls[] = {
+#define SOUL_ROW(mm, oot, name, color) {mm, name, color},
+      BOSS_SOUL_RECEIPT_FIXTURES(SOUL_ROW)
+#undef SOUL_ROW
+  };
+  const auto soulSaveBefore = gSaveContext;
+  const auto soulNeiBefore = neiSave;
+  for (int mode : {COMBO_GAME_MM, COMBO_GAME_BOTH}) {
+    gComboGameMode = mode;
+    for (bool ready : {false, true}) {
+      donorReady = ready;
+      for (int language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+        gSaveContext.options.language = language;
+        for (const auto &soul : souls) {
+          const auto before = gSaveContext;
+          const int reads = donorReads;
+          CustomMessage::Entry native, imported;
+          native.icon = imported.icon = 0xF5;
+          assert(Rando::ApplyItemReceiptText(soul.id, native) &&
+                 "boss soul fell through to white queue text");
+          assert(Rando::ApplyForeignItemReceiptText(soul.name, imported));
+          for (const auto *entry : {&native, &imported}) {
+            const auto body = FlattenReceiptLines(entry->msg);
+            const auto color = body.find(static_cast<char>(soul.color));
+            const auto reset = body.find('\0', color);
+            assert(!entry->autoFormat && entry->icon == 0xF5);
+            assert(color != std::string::npos && reset > color + 3 &&
+                   reset != std::string::npos);
+            if (language == LANGUAGE_ENG)
+              assert(body.find(std::string(1, static_cast<char>(soul.color)) +
+                               soul.name + std::string(1, '\0')) !=
+                     std::string::npos);
+            else
+              assert(body.find(language == LANGUAGE_GER
+                                   ? "Du hast "
+                                   : "Vous avez") != std::string::npos);
+          }
+          assert(native.msg == imported.msg && donorReads == reads &&
+                 "boss soul text depends on the donor module");
+          assert(std::memcmp(&before, &gSaveContext, sizeof(before)) == 0);
+        }
+      }
+    }
+  }
+  assert(std::memcmp(&soulNeiBefore, &neiSave, sizeof(neiSave)) == 0);
+  gSaveContext = soulSaveBefore;
+  gComboGameMode = COMBO_GAME_BOTH;
+  donorReady = true;
+  std::cout << "Boss soul native/foreign receipts: 14 identities, three "
+               "locales, cold/warm donor, solo/combined passed\n";
+  // Cosmetic masks retain their OoT descriptions; Gerudo/Keaton teach their forms.
+  // MM-first pickups must not depend on a hydrated OoT module or mutate saves.
+  const struct { RandoItemId id; const char* name; const char* detail; } masks[] = {
+    {RI_OOT_MASK_SKULL, "Skull Mask", "monster"},
+    {RI_OOT_MASK_SPOOKY, "Spooky Mask", "scare"},
+    {RI_MASK_TRUTH, "Mask of Truth", "Show it"},
+    {RI_OOT_MASK_GERUDO, "Gerudo Mask", "Urbosa"},
+    {RI_MASK_KEATON, "Keaton Mask", "reflect"},
+  };
+  for (bool ready : {false, true}) {
+    donorReady = ready;
+    for (int language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+      gSaveContext.options.language = language;
+      for (const auto& mask : masks) {
+        CustomMessage::Entry native, foreign;
+        native.icon = foreign.icon = 0xF5;
+        const auto saveBefore = gSaveContext;
+        const auto neiBefore = neiSave;
+        const int readsBefore = donorReads;
+        assert(Rando::ApplyItemReceiptText(mask.id, native) && "mask still uses generic receipt");
+        assert(Rando::ApplyForeignItemReceiptText(mask.name, foreign));
+        assert(native.msg == foreign.msg && !native.autoFormat && !foreign.autoFormat);
+        assert(native.icon == 0xF5 && foreign.icon == 0xF5);
+        assert(native.msg.find('\xB2') != std::string::npos && "missing MM C glyph");
+        assert(native.msg.find('%') == std::string::npos && native.msg.size() <= 1269);
+        if (language == LANGUAGE_ENG) assert(native.msg.find(mask.detail) != std::string::npos);
+        if (mask.id == RI_MASK_KEATON) {
+          CustomMessage::Entry imported;
+          imported.icon = native.icon; // Compare the same header-icon wrapping width.
+          assert(Rando::ApplyForeignItemReceiptText("Keaton Mask (MM)", imported));
+          assert(imported.msg == native.msg && "Keaton copies have different tutorials");
+          for (char glyph : {'\xB0', '\xB1', '\xB4'})
+            assert(native.msg.find(glyph) != std::string::npos);
+          if (language == LANGUAGE_ENG) {
+            for (const char* move : {"punch", "charge", "jump", "kick", "climb", "magic"})
+              assert(native.msg.find(move) != std::string::npos && "missing Keaton instruction");
+          }
+        }
+        unsigned lines = 1;
+        for (char c : native.msg) {
+          if (c == '\x10') lines = 1;
+          if (c == '\x11') assert(++lines <= 3 && "mask receipt exceeds MM line offsets");
+        }
+        assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+        assert(!std::memcmp(&neiBefore, &neiSave, sizeof(neiBefore)));
+        assert(donorReads == readsBefore && "mask receipt queried dormant OoT");
+      }
+    }
+  }
+  gSaveContext.options.language = LANGUAGE_ENG;
+  std::cout << "PASS mask receipts: native/foreign, locales, cold/warm donor, glyphs and save isolation\n";
+  // Utility tutorials must work in an MM-first seed without querying OoT.
+  const struct { RandoItemId id; const char* name; char color; char extraButton; unsigned pages; } tools[] = {
+    {RI_OOT_NEI_PHANTOM_HOURGLASS, "Phantom Hourglass", '\x04', '\xB4', 4},
+    {RI_OOT_NEI_SHADOW_CRYSTAL, "Shadow Crystal", '\x06', '\xB0', 3},
+  };
+  for (bool ready : {false, true}) {
+    donorReady = ready;
+    for (int language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+      gSaveContext.options.language = language;
+      for (const auto& tool : tools) {
+        CustomMessage::Entry native, foreign;
+        native.icon = foreign.icon = 0xF5;
+        const auto saveBefore = gSaveContext;
+        const auto neiBefore = neiSave;
+        const int readsBefore = donorReads;
+        assert(Rando::ApplyItemReceiptText(tool.id, native) && "utility pickup still uses generic text");
+        assert(Rando::ApplyForeignItemReceiptText(tool.name, foreign));
+        assert(native.msg == foreign.msg && !native.autoFormat && !foreign.autoFormat);
+        assert(native.icon == 0xF5 && foreign.icon == 0xF5);
+        assert(native.msg.find('\xB2') != std::string::npos && "C-button glyph was not encoded for MM");
+        assert(native.msg.find('\xB1') != std::string::npos && native.msg.find(tool.extraButton) != std::string::npos);
+        assert(native.msg.substr(0, native.msg.find('\x10')).find(tool.color) != std::string::npos);
+        assert(native.msg.find('%') == std::string::npos && native.msg.size() <= 1269);
+        unsigned lines = 1, pages = 1;
+        for (char c : native.msg) {
+          if (c == '\x10') { lines = 1; ++pages; }
+          if (c == '\x11') assert(++lines <= 3 && "tutorial exceeds MM's line-offset table");
+        }
+        assert(pages == tool.pages && "tutorial instruction spilled onto an extra page");
+        assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+        assert(!std::memcmp(&neiBefore, &neiSave, sizeof(neiBefore)));
+        assert(donorReads == readsBefore && "shared tool tutorial queried the OoT donor");
+      }
+    }
+  }
+  gSaveContext.options.language = LANGUAGE_ENG;
+  std::cout << "PASS Hourglass/Crystal MM tutorials: native/foreign, all locales, cold/warm donor, glyphs, colors, pages and save isolation\n";
+  const struct {
+    RandoItemId id;
+    const char* name;
+    const char* effect;
+    uint8_t color;
+  } magicItems[] = {
+    {RI_OOT_NEI_ELEMENTAL_WAND, "Elemental Wand", "medallion", 5},
+    {RI_OOT_NEI_WAND_SAND_ROD, "Sand Rod", "platform", 4},
+    {RI_OOT_NEI_WAND_TORNADO_ROD, "Tornado Rod", "jump", 2},
+    {RI_OOT_NEI_WAND_WATER_ROD, "Water Rod", "water", 3},
+    {RI_OOT_NEI_WAND_METEOR_ROD, "Meteor Rod", "explosive", 1},
+    {RI_OOT_NEI_WAND_STORM_ROD, "Storm Rod", "lightning", 5},
+    {RI_OOT_NEI_WAND_SHADOW_SCEPTER, "Shadow Scepter", "stun", 6},
+    {RI_OOT_NEI_SHEIKAH_SLATE, "Sheikah Slate", "rune", 5},
+    {RI_OOT_NEI_SLATE_RUNE_BOMB, "Rune: Remote Bomb", "detonate", 5},
+    {RI_OOT_NEI_SLATE_RUNE_STASIS, "Rune: Stasis", "Freeze", 4},
+    {RI_OOT_NEI_SLATE_RUNE_CRYONIS, "Rune: Cryonis", "pillar", 3},
+    {RI_OOT_NEI_SLATE_RUNE_MASTER_CYCLE, "Rune: Master Cycle", "motorcycle", 2},
+    {RI_OOT_NEI_DESIRE_SENSOR, "Rune: Sheikah Sensor", "Heart Container", 6},
+  };
+  const struct { RandoItemId id; const char* name; const char* power; } medallions[] = {
+    {RI_OOT_MEDALLION_SPIRIT, "Spirit Medallion", "Sand Rod"},
+    {RI_OOT_MEDALLION_FOREST, "Forest Medallion", "Tornado Rod"},
+    {RI_OOT_MEDALLION_WATER, "Water Medallion", "Water Rod"},
+    {RI_OOT_MEDALLION_FIRE, "Fire Medallion", "Meteor Rod"},
+    {RI_OOT_MEDALLION_LIGHT, "Light Medallion", "Storm Rod"},
+    {RI_OOT_MEDALLION_SHADOW, "Shadow Medallion", "Shadow Scepter"},
+  };
+  donorReady = false;
+  SyncWandFixtureSettings();
+  for (const auto& medallion : medallions) {
+    CustomMessage::Entry native, foreign;
+    const auto saveBefore = gSaveContext;
+    const auto neiBefore = neiSave;
+    assert(Rando::ApplyItemReceiptText(medallion.id, native));
+    assert(Rando::ApplyForeignItemReceiptText(medallion.name, foreign) && "medallion unlock needs its rod tutorial without a donor");
+    assert(native.msg == foreign.msg);
+    assert(native.msg.find(medallion.name) != std::string::npos);
+    assert(native.msg.find(medallion.power) != std::string::npos);
+    assert(native.msg.find("awakens") != std::string::npos);
+    assert(native.msg.size() <= 1269 && "magic description exceeds MM's textbox body capacity");
+    assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+    assert(!std::memcmp(&neiBefore, &neiSave, sizeof(neiBefore)));
+  }
+  for (int language : {LANGUAGE_GER, LANGUAGE_FRE}) {
+    gSaveContext.options.language = language;
+    for (const auto& medallion : medallions) {
+      CustomMessage::Entry native, foreign;
+      assert(Rando::ApplyItemReceiptText(medallion.id, native));
+      assert(Rando::ApplyForeignItemReceiptText(medallion.name, foreign));
+      assert(native.msg == foreign.msg);
+      assert(native.msg.find(language == LANGUAGE_GER ? "erweckt" : "pouvoir") != std::string::npos);
+      assert(native.msg.find('\xB2') != std::string::npos && native.msg.size() <= 1269);
+    }
+  }
+  gSaveContext.options.language = LANGUAGE_ENG;
+  for (int rule : {1, 2}) {
+    wandRule = rule;
+    SyncWandFixtureSettings();
+    for (const auto& medallion : medallions) {
+      CustomMessage::Entry receipt;
+      Rando::ApplyItemReceiptText(medallion.id, receipt);
+      assert(receipt.msg.find("awakens") == std::string::npos && "medallions unlock rods only in medallion mode");
+    }
+  }
+  wandRule = 0;
+  neiEnabled = false;
+  SyncWandFixtureSettings();
+  for (const auto& medallion : medallions) {
+    CustomMessage::Entry receipt;
+    Rando::ApplyItemReceiptText(medallion.id, receipt);
+    assert(receipt.msg.find("awakens") == std::string::npos && "disabled wand pool must retain ordinary medallion text");
+  }
+  neiEnabled = true;
+  SyncWandFixtureSettings();
+  for (bool ready : {false, true}) {
+    donorReady = ready;
+    gSaveContext.options.language = LANGUAGE_ENG;
+    for (const auto& item : magicItems) {
+      CustomMessage::Entry native, foreign;
+      native.msg = foreign.msg = "generic grant";
+      const auto saveBefore = gSaveContext;
+      const auto neiBefore = neiSave;
+      assert(Rando::ApplyItemReceiptText(item.id, native) && "native magic item has no description");
+      assert(Rando::ApplyForeignItemReceiptText(item.name, foreign) && "foreign magic item has no description");
+      assert(native.msg == foreign.msg && native.msg.find(item.effect) != std::string::npos);
+      assert(native.msg.find('\xB2') != std::string::npos && "missing equipped C-button glyph");
+      assert(native.msg.find('\xB3') != std::string::npos && native.msg.find('\xB0') != std::string::npos);
+      assert(native.msg.substr(0, native.msg.find('\x10')).find(char(item.color)) != std::string::npos);
+      assert(native.msg.find('%') == std::string::npos && "raw color markup leaked into a receipt");
+      assert(native.msg.size() <= 1269 && "magic description exceeds MM's textbox body capacity");
+      assert(!native.autoFormat && !native.capeVisibilityChoice && native.receiptPresentation.singleBox == 0);
+      assert(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
+      assert(!std::memcmp(&neiBefore, &neiSave, sizeof(neiBefore)));
+    }
+    for (int language : {LANGUAGE_GER, LANGUAGE_FRE}) {
+      gSaveContext.options.language = language;
+      for (const auto& item : magicItems) {
+        CustomMessage::Entry native, foreign;
+        assert(Rando::ApplyItemReceiptText(item.id, native));
+        assert(Rando::ApplyForeignItemReceiptText(item.name, foreign));
+        assert(native.msg == foreign.msg);
+        assert(native.msg.find(language == LANGUAGE_GER ? "ziehen" : "sortir") != std::string::npos);
+        assert(native.msg.find('\xB2') != std::string::npos);
+        assert(native.msg.size() <= 1269);
+      }
+    }
+  }
+  gSaveContext.options.language = LANGUAGE_ENG;
+  for (int rule : {0, 1, 2}) {
+    wandRule = rule;
+    SyncWandFixtureSettings();
+    CustomMessage::Entry receipt;
+    assert(Rando::ApplyItemReceiptText(RI_OOT_NEI_ELEMENTAL_WAND, receipt));
+    assert(receipt.msg.find(rule == 0 ? "medallion" : rule == 1 ? "All six" : "separately") != std::string::npos);
+    if (rule != 2) {
+      for (const char* effect : {"platform", "wind", "water", "explosive", "lightning", "stun"})
+        assert(receipt.msg.find(effect) != std::string::npos && "shared wand pickup must teach every power");
+      if (rule == 0) {
+        for (const char* medallion : {"Spirit:", "Forest:", "Water:", "Fire:", "Light:", "Shadow:"})
+          assert(receipt.msg.find(medallion) != std::string::npos && "missing medallion-to-rod explanation");
+      }
+      const auto footer = receipt.msg.find("Equip to");
+      assert(footer != std::string::npos && receipt.msg.find("Equip to", footer+1) == std::string::npos);
+    }
+  }
+  wandRule = 0;
+  SyncWandFixtureSettings();
+  donorReady = true;
+  std::cout << "PASS 13 magic pickups and six medallion tutorials: effects, colors, glyphs, all locales, cold/warm donor, three wand rules and complete universal guide\n";
+  CheckRandomRupeeReceipts();
+  CheckNativeRupeeHooks();
   // A real cape identity carries the prompt marker through the native and
   // cross-game builders without changing ownership or visibility at preview
   // time.
@@ -447,6 +1089,7 @@ int main(int argc, char** argv) {
   assert(!std::memcmp(&capeNeiBefore, &neiSave, sizeof(capeNeiBefore)));
 #ifdef COMPASS_DONOR_INTEGRATION
   CheckForestCompassReceiveRoutes(argc > 1 ? argv[1] : nullptr);
+  CheckShuffledDungeonInformation();
   return 0;
 #else
   // Header is deliberately a story entry with a different icon and next ID.
@@ -477,6 +1120,7 @@ int main(int argc, char** argv) {
   entry.icon = 0xF5;
   CheckDungeonKeyReceipts();
   CheckMapCompassInformation();
+  CheckShuffledDungeonInformation();
   // Native MM receipt and exported icon both retain MM's own shield artwork.
   stagedIconPath = nullptr;
   assert(Rando::StaticData::GetIconForZMessage(RI_SHIELD_MIRROR) == 0xF5);
@@ -519,6 +1163,216 @@ int main(int argc, char** argv) {
   assert(D_801CFE04[healing] == 255 && D_801CFE1C[healing] == 150 && D_801CFE34[healing] == 230);
   const int time = ITEM_SONG_TIME - ITEM_SONG_SONATA;
   assert(D_801CFE04[time] == 98 && D_801CFE1C[time] == 177 && D_801CFE34[time] == 211);
+  const auto tableBeforeEquipment = play.msgCtx.messageTableNES;
+  const RandoItemId nativeEquipment[] = {RI_SWORD_KOKIRI, RI_SWORD_RAZOR,
+                                         RI_SWORD_GILDED, RI_GREAT_FAIRY_SWORD,
+                                         RI_SHIELD_HERO,  RI_SHIELD_MIRROR,
+                                         RI_BOTTLE_EMPTY, RI_BOTTLE_RED_POTION,
+                                         RI_BOTTLE_MILK, RI_BOTTLE_GOLD_DUST,
+                                         RI_BOTTLE_CHATEAU_ROMANI};
+  std::vector<std::string> equipmentBodies;
+  std::vector<MessageTableEntry> equipmentMessages;
+  equipmentBodies.reserve(std::size(nativeEquipment));
+  for (const auto id : nativeEquipment) {
+    const auto &item = Rando::StaticData::Items.at(id);
+    // Native receipt IDs from MM's real player get-item table. Red's catalog
+    // GI is a model alias; Chateau's full bottle differs from its refill GI.
+    const auto text = id == RI_BOTTLE_RED_POTION ? 0x5B
+                     : id == RI_BOTTLE_CHATEAU_ROMANI ? 0x6F
+                     : Player_GetItemReceiptTextId(item.getItemId, item.itemId);
+    assert(text);
+    equipmentBodies.emplace_back(
+        std::string(MESSAGE_HEADER_SIZE, '\0') + "Native MM tutorial: " +
+        (id == RI_SHIELD_MIRROR ? "Mirror Shield" : item.name) +
+        "!\x10"
+        "Equip and press \xB1 or \xB4.\xBF");
+    const auto &body = equipmentBodies.back();
+    equipmentMessages.push_back(
+        {text, 0, body.data(), static_cast<uint32_t>(body.size())});
+  }
+  equipmentMessages.push_back({0xFFFF, 0, nullptr, 0});
+  play.msgCtx.messageTableNES = equipmentMessages.data();
+  for (const auto id : nativeEquipment) {
+    entry = {};
+    entry.icon = 0xE7;
+    const auto before = gSaveContext;
+    assert(Rando::ApplyItemReceiptText(id, entry));
+    assert(entry.msg.find("Native MM tutorial") != std::string::npos &&
+           "MM equipment must keep its own full native tutorial");
+    auto equipmentBody = entry.msg;
+    std::replace(equipmentBody.begin(), equipmentBody.end(), '\x11', ' ');
+    assert(equipmentBody.find(Rando::StaticData::Items.at(id).name) !=
+           std::string::npos);
+    assert(entry.icon == 0xE7 && entry.msg.find('\xB1') != std::string::npos);
+    assert(!entry.autoFormat &&
+           !std::memcmp(&before, &gSaveContext, sizeof(before)));
+  }
+  play.msgCtx.messageTableNES = tableBeforeEquipment;
+  const RandoItemId importedEquipment[] = {
+      RI_OOT_MASTER_SWORD,  RI_OOT_BIGGORON_SWORD, RI_OOT_DEKU_SHIELD,
+      RI_OOT_MIRROR_SHIELD, RI_OOT_BOTTLE_FISH,    RI_OOT_BOTTLE_BUGS,
+      RI_OOT_BOTTLE_POE,    RI_OOT_BOTTLE_BIG_POE,
+      RI_OOT_BOTTLE_BLUE_FIRE, RI_OOT_BOTTLE_BLUE_POTION, RI_OOT_BOTTLE_GREEN_POTION,
+      RI_OOT_BOTTLE_FAIRY, RI_OOT_BOTTLE_MAGIC_MUSHROOM, RI_OOT_RUTOS_LETTER};
+  const auto donorBeforeEquipment = donorReady;
+  donorReady = false;
+  for (int language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+    gSaveContext.options.language = language;
+    for (const auto id : importedEquipment) {
+      entry = {};
+      entry.icon = 0xE7;
+      const auto before = gSaveContext;
+      assert(Rando::ApplyItemReceiptText(id, entry));
+      assert(entry.msg.find('\x10') != std::string::npos &&
+             entry.msg.size() < 1269);
+      assert(
+          entry.msg.find((id >= RI_OOT_BOTTLE_BIG_POE && id <= RI_OOT_BOTTLE_POE) || id == RI_OOT_RUTOS_LETTER
+                             ? '\xB2'
+                             : '\xB0') != std::string::npos);
+      assert(entry.icon == 0xE7 && !entry.capeVisibilityChoice &&
+             entry.receiptPresentation.singleBox == 0);
+      assert(!std::memcmp(&before, &gSaveContext, sizeof(before)));
+    }
+  }
+  const auto playBeforeBottles = gPlayState;
+  gPlayState = nullptr;
+  const RandoItemId nativeBottlesAndRefills[] = { RI_BOTTLE_EMPTY, RI_BOTTLE_RED_POTION, RI_BOTTLE_MILK,
+      RI_BOTTLE_GOLD_DUST, RI_BOTTLE_CHATEAU_ROMANI, RI_RED_POTION_REFILL, RI_GREEN_POTION_REFILL,
+      RI_BLUE_POTION_REFILL, RI_MILK_REFILL, RI_CHATEAU_ROMANI_REFILL, RI_GOLD_DUST_REFILL,
+      RI_FAIRY_REFILL, RI_MUSHROOM };
+  for (int language : {LANGUAGE_ENG, LANGUAGE_GER, LANGUAGE_FRE}) {
+    gSaveContext.options.language = language;
+    for (auto id : nativeBottlesAndRefills) {
+      entry = {}; entry.icon = 0xE7;
+      const auto before = gSaveContext;
+      assert(Rando::ApplyItemReceiptText(id, entry));
+      assert(entry.msg.find('\xB2') != std::string::npos && entry.msg.find('\x10') != std::string::npos);
+      assert(entry.icon == 0xE7 && entry.msg.size() < 1269);
+      assert(!std::memcmp(&before, &gSaveContext, sizeof(before)));
+    }
+    for (const char* name : {"Bottle with Hot Spring Water", "Deku Princess", "Seahorse", "Spring Water",
+        "Zora Egg", "Hylian Loach", "Obaba's Drink", "Milk (Half)"}) {
+      entry = {}; entry.icon = 0xE7;
+      assert(Rando::ApplyForeignItemReceiptText(name, entry));
+      assert(entry.msg.find('\xB2') != std::string::npos && entry.msg.find('\x10') != std::string::npos);
+      assert(entry.icon == 0xE7);
+    }
+  }
+  // A live donor exports English bytes even when its native banks are absent.
+  // MM must still own the language of its local bottle fallback lessons.
+  donorReady = true;
+  for (int language : {LANGUAGE_GER, LANGUAGE_FRE}) {
+    gSaveContext.options.language = language;
+    const char* opening = language == LANGUAGE_GER ? "Du hast" : "Vous obtenez";
+    for (auto id : nativeBottlesAndRefills) {
+      entry = {}; entry.icon = 0xE7;
+      assert(Rando::ApplyItemReceiptText(id, entry));
+      assert(entry.msg.find(opening) != std::string::npos && "live English donor bypassed localized bottle lesson");
+      assert(entry.icon == 0xE7);
+    }
+    for (const char* name : {"Bottle with Fairy", "Bottle with Blue Fire", "Bottle with Red Potion",
+        "Bottle with Green Potion", "Bottle with Blue Potion", "Bottle with Fish", "Bottle with Bugs",
+        "Bottle with Poe", "Bottle with Big Poe", "Bottle with Ruto's Letter", "Bottle with Hot Spring Water",
+        "Deku Princess", "Seahorse", "Spring Water", "Zora Egg", "Hylian Loach", "Obaba's Drink", "Milk (Half)"}) {
+      entry = {}; entry.icon = 0xE7;
+      assert(Rando::ApplyForeignItemReceiptText(name, entry));
+      assert(entry.msg.find(opening) != std::string::npos && "foreign bottle lesson lost MM locale");
+      assert(entry.icon == 0xE7);
+    }
+  }
+  gPlayState = playBeforeBottles;
+  gSaveContext.options.language = LANGUAGE_ENG;
+  donorReady = donorBeforeEquipment;
+  std::cout
+      << "PASS MM native equipment tutorials and imported sword/shield/bottle "
+         "cold fallback, locales, icons and save isolation\n";
+  // Shuffled fairy receipts use their own dungeon, with the pending grant
+  // included once. The current scene and shared scene index are unrelated.
+  const RandoItemId fairies[] = {
+      RI_WOODFALL_STRAY_FAIRY, RI_SNOWHEAD_STRAY_FAIRY,
+      RI_GREAT_BAY_STRAY_FAIRY, RI_STONE_TOWER_STRAY_FAIRY};
+  const char *fairyTemples[] = {"Woodfall Temple", "Snowhead Temple",
+                                "Great Bay Temple", "Stone Tower Temple"};
+  const char fairyColors[] = {0x06, 0x02, 0x03,
+                              0x04}; // native pink, green, blue, yellow
+  const auto beforeFairyReceipts = gSaveContext;
+  play.sceneId = SCENE_CLOCKTOWER;
+  gSaveContext.dungeonSceneSharedIndex = DUNGEON_SCENE_INDEX_SNOWHEAD_TEMPLE;
+  for (int d = 0; d < 4; ++d) {
+    for (int current : {0, 7, 14}) {
+      for (int other = 0; other < 4; ++other)
+        gSaveContext.save.saveInfo.inventory.strayFairies[other] =
+            other == d ? current : 3;
+      const auto before = gSaveContext;
+      entry = {};
+      entry.icon = Rando::StaticData::GetIconForZMessage(fairies[d]);
+      assert(entry.icon ==
+             0xF1 + d); // Existing per-dungeon fairy icon sentinel.
+      assert(Rando::ApplyItemReceiptText(fairies[d], entry) &&
+             "MM fairy lost its pickup dialogue");
+      std::string flat = entry.msg;
+      std::replace(flat.begin(), flat.end(), '\x11', ' ');
+      assert(flat.find(Rando::StaticData::Items.at(fairies[d]).name) !=
+             std::string::npos);
+      assert(flat.find(fairyTemples[d]) != std::string::npos);
+      assert(flat.find(std::to_string(current + 1)) != std::string::npos);
+      assert(flat.find(current == 0 ? "stray fairy" : "stray fairies") !=
+             std::string::npos);
+      assert(std::count(entry.msg.begin(), entry.msg.end(), fairyColors[d]) ==
+                 3 &&
+             "fairy name, count and temple need their dungeon color code");
+      assert(flat.find(std::string(1, fairyColors[d]) + fairyTemples[d]) !=
+             std::string::npos);
+      assert(entry.icon == 0xF1 + d && !entry.autoFormat &&
+             entry.nextMessageID == 0xFFFF);
+      assert(!std::memcmp(&before, &gSaveContext, sizeof(before)) &&
+             "receipt granted or changed a fairy");
+    }
+  }
+  entry.msg = "Clock Town pickup";
+  assert(!Rando::ApplyItemReceiptText(RI_CLOCK_TOWN_STRAY_FAIRY, entry));
+  assert(entry.msg ==
+         "Clock Town pickup"); // Its single-fairy dialogue stays separate.
+  const auto beforeFairyGrants = neiSave;
+  for (int d = 0; d < 4; ++d) {
+    const int fc = FcCombo_ItemForNative(fairies[d]);
+    for (auto counts : {std::pair{7, 0}, std::pair{7, 3}, std::pair{3, 7},
+                        std::pair{14, 14}}) {
+      neiSave = {};
+      for (int other = 0; other < 4; ++other)
+        gSaveContext.save.saveInfo.inventory.strayFairies[other] =
+            other == d ? counts.first : 3;
+      neiSave.comboObtainedFc[fc] = counts.second + 2;
+      neiSave.comboAppliedFc[fc] = counts.second;
+      ApplyReceiptFcRegistry();
+      assert(
+          gSaveContext.save.saveInfo.inventory.strayFairies[d] ==
+              counts.first + 2 &&
+          "an older native fairy baseline must not become phantom FC grants");
+      assert(neiSave.comboObtainedFc[fc] == counts.second + 2);
+      assert(neiSave.comboAppliedFc[fc] == counts.second + 2);
+      assert(gFcCombo_SuppressRecord == 0);
+      for (int other = 0; other < 4; ++other)
+        if (other != d)
+          assert(gSaveContext.save.saveInfo.inventory.strayFairies[other] == 3);
+      const auto saveAfterGrant = gSaveContext;
+      const auto fcAfterGrant = neiSave;
+      ApplyReceiptFcRegistry();
+      assert(
+          !std::memcmp(&saveAfterGrant, &gSaveContext, sizeof(gSaveContext)));
+      assert(!std::memcmp(&fcAfterGrant, &neiSave, sizeof(neiSave)));
+    }
+  }
+  neiSave = beforeFairyGrants;
+  gSaveContext = beforeFairyReceipts;
+  std::cout
+      << "MM stray fairy receipts: four native colors/icons, first/8th/15th "
+         "counts, shuffled dungeon identity and save isolation passed\n";
+  std::cout
+      << "MM fairy FC materialization: preserved native baseline, exact copy "
+         "deficits, suppression and repeat reconciliation passed\n";
+  entry = {};
+  entry.icon = 0xF5;
   // Receipt is composed before GiveItem. The token's identity, never the
   // current scene, chooses the spider-house counter.
   play.sceneId = SCENE_CLOCKTOWER;

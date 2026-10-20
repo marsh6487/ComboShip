@@ -232,6 +232,7 @@ static void Spacer() {
 static void Separator(bool, bool, float, float) {
 }
 } // namespace UIWidgets
+#define SPDLOG_INFO(...) ((void)0)
 #include "custom_cosmetic_production.inc"
 static void ApplyOrResetCustomGfxPatches() {
 }

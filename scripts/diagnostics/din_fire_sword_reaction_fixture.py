@@ -69,6 +69,63 @@ static void Test_ActorAction(Actor* actor, PlayState* play) {}
 '''
         write(name + "Reaction", prefix)
 
+    # Exercise the actual damage-consumption branch, not only the selected table
+    # nibble: native Lizalfos ice stuns after applying the sword's own damage.
+    text, prefix = actor_source("En_Zf")
+    prefix += re.search(r'typedef enum \{[^{}]*\} EnZfDamageEffect;', text, re.S)[0] + '\n'
+    prefix += '''#define EnZf_UpdateDamage Test_EnZf_UpdateDamage
+static s16 D_80B4A1B4 = -1;
+static int Test_lizStunned;
+static void EnZf_SetupStunned(EnZf* actor) { Test_lizStunned = 1; }
+static void EnZf_SetupDie(EnZf* actor) {}
+static void EnZf_SetupDamaged(EnZf* actor) {}
+#define Item_DropCollectibleRandom(...) ((void)0)
+'''
+    prefix += functions(text)["EnZf_UpdateDamage"] + '''
+DamageTable* Test_LizalfosTable(void);
+void CollisionCheck_ApplyDamage(PlayState*, CollisionCheckContext*, Collider*, ColliderInfo*);
+int Test_LizalfosHealth(PlayState* play, ColliderInfo* toucher, int alreadyStunned, int* stunned) {
+    EnZf actor = { 0 };
+    actor.actor.id = ACTOR_EN_ZF;
+    actor.actor.params = ENZF_TYPE_LIZALFOS_LONE;
+    actor.action = alreadyStunned ? ENZF_ACTION_STUNNED : ENZF_ACTION_DROP_IN;
+    actor.actor.colChkInfo.health = 30;
+    actor.actor.colChkInfo.damageTable = Test_LizalfosTable();
+    actor.bodyCollider.base.actor = &actor.actor;
+    actor.bodyCollider.base.acFlags = AC_HIT;
+    actor.bodyCollider.info.bumperFlags = BUMP_HIT;
+    actor.bodyCollider.info.bumper.dmgFlags = 0xFFCFFFFF;
+    actor.bodyCollider.info.acHitInfo = toucher;
+    CollisionCheck_ApplyDamage(play, &play->colChkCtx, &actor.bodyCollider.base, &actor.bodyCollider.info);
+    Test_lizStunned = 0;
+    EnZf_UpdateDamage(&actor, play);
+    *stunned = Test_lizStunned;
+    return actor.actor.colChkInfo.health;
+}
+'''
+    write("LizalfosDamageReaction", prefix)
+
+    # Native light-arrow stun setup consumes the actor-local code 4; it never
+    # treats that number as a generic cross-actor light/freeze constant.
+    for name, actor, type_, setup, action in [
+        ("Wallmaster", "En_Wallmas", "EnWallmas", "EnWallmas_SetupStun", "EnWallmas_Stun"),
+        ("Floormaster", "En_Floormas", "EnFloormas", "EnFloormas_SetupFreeze", "EnFloormas_Freeze"),
+    ]:
+        text, prefix = actor_source(actor)
+        prefix += f'#define {setup} Test_{setup}\n'
+        prefix += f'static void {action}({type_}* actor, PlayState* play) {{}}\n'
+        prefix += '#define Animation_Change(...) ((void)0)\n'
+        prefix += functions(text)[setup] + '\n'
+        timer = "timer" if name == "Wallmaster" else "actionTimer"
+        prefix += f'''int Test_{name}LightStun(u8 effect) {{
+    {type_} actor = {{ 0 }};
+    actor.actor.colChkInfo.damageEffect = effect;
+    {setup}(&actor);
+    return actor.{timer} == 80 && actor.actionFunc == {action};
+}}
+'''
+        write(name + "LightReaction", prefix)
+
     text, prefix = actor_source("Obj_Comb")
     prefix += '''static void ObjComb_ChooseItemDrop(ObjComb* actor, PlayState* play) {}
 void ObjComb_Break(ObjComb* actor, PlayState* play) {}

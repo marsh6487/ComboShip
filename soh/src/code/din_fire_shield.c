@@ -188,6 +188,37 @@ static void DinFireShield_DrawFlames(PlayState* play, const FireResources* resou
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+// The guard animation lowers and rotates the hand. Measure both meshes after
+// their final transform so the flame rim cannot follow that hand below the
+// floor. Move only this draw's world-Y translation; keep the bracer, native
+// shield collider, flame shape and airborne attachment unchanged.
+static void DinFireShield_ClearGround(Player* player) {
+    if (!(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) || !isfinite(player->actor.floorHeight))
+        return;
+
+    MtxF matrix;
+    Matrix_Get(&matrix);
+    const f32 floorY = player->actor.floorHeight + 1.0f;
+    f32 lowestY = floorY;
+    const char* paths[] = { sSurfaceVertices, sRimVertices };
+    for (size_t i = 0; i < ARRAY_COUNT(paths); ++i) {
+        const Vtx* vertices = ResourceGetDataByName(paths[i]);
+        const size_t size = ResourceGetSizeByName(paths[i]);
+        if (vertices == NULL || size == 0 || size % sizeof(Vtx) != 0)
+            return;
+        for (size_t v = 0; v < size / sizeof(Vtx); ++v) {
+            const f32 y = matrix.yw + matrix.yx * vertices[v].v.ob[0] + matrix.yy * vertices[v].v.ob[1] +
+                          matrix.yz * vertices[v].v.ob[2];
+            if (y < lowestY)
+                lowestY = y;
+        }
+    }
+    if (lowestY < floorY) {
+        matrix.yw += floorY - lowestY;
+        Matrix_Put(&matrix);
+    }
+}
+
 void DinFireShield_Draw(PlayState* play, Player* player) {
     if (play == NULL || player == NULL || player != GET_PLAYER(play))
         return;
@@ -211,6 +242,7 @@ void DinFireShield_Draw(PlayState* play, Player* player) {
     // Native shield quad is centered at (-1500,0), z=-600 in this hand's frame.
     Matrix_Translate(-1500.0f, 0.0f, -850.0f, MTXMODE_APPLY);
     Matrix_Scale(2.4f * bloom, 2.7f * bloom, 1.0f, MTXMODE_APPLY);
+    DinFireShield_ClearGround(player);
     DinFireShield_DrawFlames(play, &resources, sFire.phase, sFire.opacity);
     Matrix_Pop();
 }

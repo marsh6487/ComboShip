@@ -28,7 +28,8 @@
     ]
   },
   "notes": [
-    "Six approved pointed spikes and anchor retained; display coil removed; center at authoritative ball position. Existing held .06 / thrown .1 scales retained."
+    "Six approved pointed spikes and anchor retained; display coil removed; center at authoritative ball position. Existing held .06 / thrown .1 scales retained.",
+    "Metallic POC1: brushed silver plate faces, polished bevels, spikes and shackle/links use camera-relative reflection mapping. Original dark seams, aged trim, geometry, normals, UVs and attachment scales retained."
   ],
   "runtime_tested": false
 }

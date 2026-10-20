@@ -7,6 +7,8 @@
 #ifndef SW97_CONFIG_H
 #define SW97_CONFIG_H
 
+#include "libultraship/bridge/consolevariablebridge.h"
+
 // Single CVar toggle — enables medallion spell/arrow equipping
 #define SW97_MEDALLIONS_CVAR "gEnhancements.SkijerNEI.SW97Medallions"
 #define SW97_MEDALLIONS_ENABLED() CVarGetInteger(SW97_MEDALLIONS_CVAR, 0)

@@ -2,6 +2,7 @@
 // damage consumption. Asset allocation, floor geometry and reaction VFX are boundaries.
 #include "behavior_fixture.inc"
 #include "mods/combo_rpg.h"
+#include "din_fire_sword.h"
 #include "overlays/actors/ovl_En_Slime/z_en_slime.h"
 #include "overlays/actors/ovl_En_Clear_Tag/z_en_clear_tag.h"
 
@@ -9,6 +10,10 @@ u8 gIvanPossessActive;
 u8 Sm64Mario_IsReady() { return 0; }
 u8 TridentChargeBall_GetFierceDamage(Actor*) { return 0; }
 uint8_t DinFireSword_DamageEntry(PlayState*, Actor*, const ColliderElement*, uint32_t, uint8_t entry) { return entry; }
+// Wand projectiles are foreign to the owned enchanted-sword collider context.
+uint32_t DinFireSword_OriginalDamageFlags(PlayState*, const ColliderElement* hit) {
+    return hit ? hit->atDmgInfo.dmgFlags : 0;
+}
 int ComboRpg_IsEnabled(int) { return 0; }
 uint8_t ComboRpg_ApplyPower(uint8_t damage, float) { return damage; }
 f32 Rand_ZeroOne() { return 0; }

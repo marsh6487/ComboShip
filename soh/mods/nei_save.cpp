@@ -7,6 +7,7 @@
 #include <filesystem> // Save directory path
 
 #include "nei_save.h"
+#include "z64item.h"              // Equipment bits used by the const-reference save callback.
 #include "items/custom_bottles.h" // Bottle_WheelResetTracking (wheel session trackers)
 #include "soh/SaveManager.h"
 #include "soh/ShipInit.hpp"
@@ -212,14 +213,21 @@ extern "C" void Picto_SyncClear(void) {
 // tradeAdultOwned bitmask (4 bytes, native) so 2Ship can mirror which trade items the player owns for
 // the Anju exchange. <Save>/file<N>_tradeitems.bin. The Pendant of Memories crossing over also re-grants
 // its Ext Boots 2 combat moveset on the OoT side.
+// ComboShip instead persists each playthrough in its .combosav and bridges ownership through
+// FleetSync. These unversioned files identify only a slot number, so importing one can resurrect
+// an earlier playthrough's Moon's Tear (or other trade items) in a fresh combined save.
+// Keep the legacy bridge only for the standalone builds that still use it.
 static void TradeItems_SyncWrite(void) {
+#ifndef COMBO_BUILD
     std::ofstream f(Nei_SidecarPath("_tradeitems.bin"), std::ios::binary | std::ios::trunc);
     if (f) {
         f.write(reinterpret_cast<const char*>(&gNeiSave.tradeAdultOwned), sizeof(gNeiSave.tradeAdultOwned));
     }
+#endif
 }
 
 static void TradeItems_SyncRead(void) {
+#ifndef COMBO_BUILD
     std::ifstream f(Nei_SidecarPath("_tradeitems.bin"), std::ios::binary);
     if (f) {
         uint32_t v = 0;
@@ -235,6 +243,7 @@ static void TradeItems_SyncRead(void) {
             // truth and needs nothing here. Skijer's NEI
         }
     }
+#endif
 }
 
 namespace {
@@ -244,6 +253,10 @@ constexpr const char* kSaveSectionName = "nei";
 void NeiSave_Init(bool isDebug) {
     ItemGrantAudit::Scope itemGrantAuditScope("OOT custom-init");
     memset(&gNeiSave, 0, sizeof(gNeiSave));
+    // New grants use the current equipment layouts. Version 0 is reserved for
+    // loaded legacy saves, whose old slots must migrate at player initialization.
+    gNeiSave.extTunicLayoutVersion = 1;
+    gNeiSave.extBootsLayoutVersion = 1;
     // Empty custom slots = ITEM_NONE (0xFF), not 0 (=ITEM_STICK). Skijer's NEI
     // ownedItems is u16 now, so memset(0xFF) would write 0xFFFF per entry — and the empty marker
     // is ITEM_NONE (0xFF), not 0xFFFF. Fill it element by element. Skijer's NEI
@@ -257,8 +270,8 @@ void NeiSave_Init(bool isDebug) {
     Bottle_WheelResetTracking();
 }
 
-void NeiSave_Save(SaveContext* saveContext, int sectionID, bool fullSave) {
-    if (saveContext->inventory.equipment & (1U << EQUIP_INV_SWORD_MASTER)) {
+void NeiSave_Save(const SaveContext& saveContext, int sectionID, bool fullSave) {
+    if (saveContext.inventory.equipment & (1U << EQUIP_INV_SWORD_MASTER)) {
         gNeiSave.timePedestalNoMasterSwordRepair = 0;
     }
     SaveManager::Instance->SaveData("timePedestalNoMasterSwordRepair", gNeiSave.timePedestalNoMasterSwordRepair);
@@ -266,6 +279,8 @@ void NeiSave_Save(SaveContext* saveContext, int sectionID, bool fullSave) {
                                      [](size_t i) { SaveManager::Instance->SaveData("", gNeiSave.ownedItems[i]); });
     SaveManager::Instance->SaveData("hyliasGraceOwned", gNeiSave.hyliasGraceOwned);
     SaveManager::Instance->SaveData("phantomHourglassOwned", gNeiSave.phantomHourglassOwned);
+    SaveManager::Instance->SaveData("timeGateOwned", gNeiSave.timeGateOwned);
+    SaveManager::Instance->SaveData("magicMirrorOwned", gNeiSave.magicMirrorOwned);
     SaveManager::Instance->SaveData("shovelOwned", gNeiSave.shovelOwned);
     SaveManager::Instance->SaveData("dominionOwned", gNeiSave.dominionOwned);
     SaveManager::Instance->SaveData("pokeballOwned", gNeiSave.pokeballOwned);
@@ -337,6 +352,8 @@ void NeiSave_Save(SaveContext* saveContext, int sectionID, bool fullSave) {
     SaveManager::Instance->SaveData("trirodFullList", gNeiSave.trirodFullList);
     SaveManager::Instance->SaveData("season", gNeiSave.season);
     SaveManager::Instance->SaveData("seasonsOwned", gNeiSave.seasonsOwned);
+    SaveManager::Instance->SaveData("seasonsRodOwned", gNeiSave.seasonsRodOwned);
+    SaveManager::Instance->SaveData("seasonsGates", gNeiSave.seasonsGates);
     SaveManager::Instance->SaveData("quartzOwned", gNeiSave.quartzOwned);
     SaveManager::Instance->SaveData("quartzCategory", gNeiSave.quartzCategory);
     SaveManager::Instance->SaveData("quartzSubcat", gNeiSave.quartzSubcat);
@@ -352,7 +369,10 @@ void NeiSave_Save(SaveContext* saveContext, int sectionID, bool fullSave) {
     SaveManager::Instance->SaveData("slateMode", gNeiSave.slateMode);
     SaveManager::Instance->SaveData("slateRunesOwned", gNeiSave.slateRunesOwned);
     SaveManager::Instance->SaveData("ritoMaskFlags", gNeiSave.ritoMaskFlags);
-    TradeItems_SyncWrite(); // mirror the MM trade-item flags next to the save for 2Ship
+    SaveManager::Instance->SaveArray("swordElements", 8,
+                                     [](size_t i) { SaveManager::Instance->SaveData("", gNeiSave.swordElements[i]); });
+    SaveManager::Instance->SaveData("swordElementSet", gNeiSave.swordElementSet);
+    TradeItems_SyncWrite(); // standalone legacy bridge; ComboShip uses the combined save + FleetSync
 }
 
 void NeiSave_Load() {
@@ -372,6 +392,8 @@ void NeiSave_Load() {
     });
     SaveManager::Instance->LoadData("hyliasGraceOwned", gNeiSave.hyliasGraceOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("phantomHourglassOwned", gNeiSave.phantomHourglassOwned, (uint8_t)0);
+    SaveManager::Instance->LoadData("timeGateOwned", gNeiSave.timeGateOwned, (uint8_t)0);
+    SaveManager::Instance->LoadData("magicMirrorOwned", gNeiSave.magicMirrorOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("shovelOwned", gNeiSave.shovelOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("dominionOwned", gNeiSave.dominionOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("pokeballOwned", gNeiSave.pokeballOwned, (uint8_t)0);
@@ -456,6 +478,8 @@ void NeiSave_Load() {
     // to anyway (Seasons_GetSeason heals it to an owned one).
     SaveManager::Instance->LoadData("season", gNeiSave.season, (uint8_t)SEASON_SPRING);
     SaveManager::Instance->LoadData("seasonsOwned", gNeiSave.seasonsOwned, (uint8_t)0);
+    SaveManager::Instance->LoadData("seasonsRodOwned", gNeiSave.seasonsRodOwned, (uint8_t)0);
+    SaveManager::Instance->LoadData("seasonsGates", gNeiSave.seasonsGates, (uint8_t)0);
     SaveManager::Instance->LoadData("quartzOwned", gNeiSave.quartzOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("quartzCategory", gNeiSave.quartzCategory, (uint8_t)0);
     SaveManager::Instance->LoadData("quartzSubcat", gNeiSave.quartzSubcat, (uint8_t)0);
@@ -471,9 +495,28 @@ void NeiSave_Load() {
     SaveManager::Instance->LoadData("slateMode", gNeiSave.slateMode, (uint8_t)0);
     SaveManager::Instance->LoadData("slateRunesOwned", gNeiSave.slateRunesOwned, (uint8_t)0);
     SaveManager::Instance->LoadData("ritoMaskFlags", gNeiSave.ritoMaskFlags, (uint8_t)0);
+    // Read as JSON before narrowing: malformed values and out-of-range enums must
+    // not wrap into another valid element. Missing/short old arrays retain zeroes.
+    nlohmann::json swordElements;
+    SaveManager::Instance->LoadData("swordElements", swordElements, nlohmann::json::array());
+    if (swordElements.is_array()) {
+        for (size_t i = 0; i < 8 && i < swordElements.size(); ++i) {
+            const auto& value = swordElements[i];
+            if (value.is_number_integer() && (value.is_number_unsigned() || value.get<int64_t>() >= 0) &&
+                value.get<uint64_t>() < 4) {
+                gNeiSave.swordElements[i] = value.get<uint8_t>();
+            }
+        }
+    }
+    nlohmann::json swordElementSet;
+    SaveManager::Instance->LoadData("swordElementSet", swordElementSet, nlohmann::json(0));
+    if (swordElementSet.is_number_integer() &&
+        (swordElementSet.is_number_unsigned() || swordElementSet.get<int64_t>() >= 0)) {
+        gNeiSave.swordElementSet = (uint8_t)(swordElementSet.get<uint64_t>() & 0xFFu);
+    }
     // Cross-game: a pictograph synced from 2Ship (shared sidecar) wins over the SOH save copy.
     Picto_SyncRead();
-    TradeItems_SyncRead(); // merge MM trade-item ownership from the cross-game sidecar
+    TradeItems_SyncRead(); // standalone legacy bridge; never overrides a ComboShip playthrough
     // Session wheel trackers must not leak across files (per-frame reconcile would ghost-write).
     Bottle_WheelResetTracking();
 }

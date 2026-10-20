@@ -323,6 +323,9 @@ static const NeiItem sNeiItems[] = {
       "Du hast das %cZeittor%w!&Eine tragbare Tür durch die Zeit,&die Macht des Zeitturms in&deinen Händen.^Drücke "
       "%y\xA1%w zum Aktivieren.&Eine Frage erscheint: %g\"Durch&die Zeit reisen?\"%w^Wähle %yJa%w um zwischen&%rKind%w "
       "und %gErwachsenem%w Link&überall zu wechseln!^Kostet %g48 Magie%w pro Nutzung." },
+    // Static forest reward: permanent ownership, no randomizer pool or get-item row.
+    { EXT_ITEM_MAGIC_MIRROR, PLAYER_IA_ELEMENTAL_WAND, PLAYER_MODELGROUP_DEFAULT, SLOT_MAGIC_MIRROR, AGE_REQ_NONE,
+      (void*)MAGIC_MIRROR_ICON_TEX, Nei_SharedIA_UpperAction, Nei_SharedIA_Init, NULL, NEI_NO_RG, NULL, NULL, NULL },
     // Bomb Arrows keeps every column EXCEPT the slot: it is the 7th value of the bow's element flag
     // (SW97_ELEM_BOMB) and owns no inventory cell, so .slot is NEI_NO_SLOT. The IA/upper-action/init
     // are still reached — ExtPlayer_GetItemAction returns PLAYER_IA_BOMB_ARROWS for a bow whose flag
@@ -628,9 +631,9 @@ static const NeiItem sNeiItems[] = {
       "You got %yDon Gero's Mask%w!&The conductor's mask of the&frog choir.^Equip from the mask page.&Approach the "
       "%glog at Zora's River%w&and press %y\xA0%w to %ccollect every&unclaimed Frog Song reward%w at once.^Frog flags "
       "0-4 = purple rupee&each, flags 5-6 = heart piece.",
-      "Vous obtenez le %yMasque de Don Gero%w!&Le masque du chef d'orchestre&du chœur des grenouilles.^Équipez depuis "
+      "Vous obtenez le %yMasque de Don Gero%w!&Le masque du chef d'orchestre&du choeur des grenouilles.^Équipez depuis "
       "la page des masques.&Approchez la %gbûche à la Rivière Zora%w&et appuyez sur %y\xA0%w pour %crécupérer&toutes "
-      "les récompenses non-réclamées%w.^Drapeaux 0-4 = rubis violet chacun,&drapeaux 5-6 = pièce de cœur.",
+      "les récompenses non-réclamées%w.^Drapeaux 0-4 = rubis violet chacun,&drapeaux 5-6 = pièce de coeur.",
       "Du hast %yDon Geros Maske%w!&Die Dirigentenmaske des&Froschchors.^Aufsetzen auf der Maskenseite.&Geh zum "
       "%gBaumstamm an Zoras Fluss%w&und drücke %y\xA0%w um %calle ungeholten&Froschlied-Belohnungen%w zu "
       "sammeln.^Flags 0-4 = je lila Rupie,&Flags 5-6 = Herzteil." },
@@ -682,7 +685,7 @@ static const NeiItem sNeiItems[] = {
       "Vous obtenez le %yMasque du Chef de Cirque%w!&Porté, vous devenez le %cCollecteur&d'Impôts%w de Ganondorf. Les "
       "PNJ&se soumettent à votre vue.^Parler à un PNJ de mini-jeu et le&%cmini-jeu entier est sauté%w -&sa récompense "
       "est donnée directement:^%gStand de Tir%w (sac à billes/carquois),&%gBombchu Bowling%w (sac de bombes -> "
-      "cœur),&%gIngo%w (Épona + transition Plaine d'Hyrule),&%gTalon%w (Bouteille de Lait, Lon Lon enfant),&%gMalon "
+      "coeur),&%gIngo%w (Épona + transition Plaine d'Hyrule),&%gTalon%w (Bouteille de Lait, Lon Lon enfant),&%gMalon "
       "adulte%w (vend vache, %p100 Rubis%w),&%gHBA%w, %gPêche%w, %gJeu de Coffres%w,&%gJeu de Plongée Zora%w (Écaille "
       "d'Argent).^Visites répétées donnent un pourboire.&Conscient du rando: livre les items shufflés.",
       "Du hast die %yZirkusleitermaske%w!&Beim Tragen wirst du zu Ganondorfs&%cSteuereintreiber%w. NPCs zahlen&Tribut "
@@ -706,7 +709,8 @@ static const NeiItem sNeiItems[] = {
       "%g+1 MP every 7 frames%w&(full magic in ~32s).",
       "Vous obtenez le %yMasque des Amoureux%w!&Le masque des retrouvailles de deux&amants à jamais "
       "entrelacés.^Équipez depuis la page des masques.^%cRégénération passive%w pendant le port:&%rJour%w -> %g+1 PV "
-      "toutes les 4 frames%w&(cœurs pleins en ~32s).&%bNuit%w -> %g+1 PM toutes les 7 frames%w&(magie pleine en ~32s).",
+      "toutes les 4 frames%w&(coeurs pleins en ~32s).&%bNuit%w -> %g+1 PM toutes les 7 frames%w&(magie pleine en "
+      "~32s).",
       "Du hast die %yPaarmaske%w!&Die Wiedervereinigungsmaske zweier&für immer verbundener Liebender.^Aufsetzen auf "
       "der Maskenseite.^%cPassive Regeneration%w beim Tragen:&%rTag%w -> %g+1 HP alle 4 Frames%w&(volle Herzen in "
       "~32s).&%bNacht%w -> %g+1 MP alle 7 Frames%w&(volle Magie in ~32s)." },
@@ -715,7 +719,7 @@ static const NeiItem sNeiItems[] = {
       "You got the %yMask of Truth%w (MM)!&The all-seeing eye that hears the&voices of beasts and stones.^Equip from "
       "the mask page.&%rNo gameplay effect yet%w -&currently cosmetic only.&(OOT's vanilla Mask of Truth is&a separate "
       "item.)",
-      "Vous obtenez le %yMasque de Vérité%w (MM)!&L'œil omniscient qui entend les&voix des bêtes et des "
+      "Vous obtenez le %yMasque de Vérité%w (MM)!&L'oeil omniscient qui entend les&voix des bêtes et des "
       "pierres.^Équipez depuis la page des masques.&%rPas d'effet de jeu%w -&actuellement cosmétique seulement.&(Le "
       "Masque de Vérité OOT est&un objet distinct.)",
       "Du hast die %yMaske der Wahrheit%w (MM)!&Das allsehende Auge, das die Stimmen&der Tiere und Steine "
@@ -1366,7 +1370,7 @@ static const NeiItem sNeiItems[] = {
     { NEI_NO_ITEM, PLAYER_IA_NONE, PLAYER_MODELGROUP_DEFAULT, NEI_NO_SLOT, AGE_REQ_NONE, NULL, func_8083485C,
       Player_InitDefaultIA, Randomizer_DrawMmOwlStatue, RG_MM_OWL_CLOCK_TOWN_SOUTH,
       "You reached the %gClock Town Owl Statue%w!&A soaring waypoint in the&heart of Termina.",
-      "Vous atteignez la %gStatue-Chouette de Bourg-Clock%w!&Un point d'envol au cœur&de Termina.",
+      "Vous atteignez la %gStatue-Chouette de Bourg-Clock%w!&Un point d'envol au coeur&de Termina.",
       "Du erreichst die %gEulenstatue (Unruhstadt)%w!&Ein Flugpunkt im Herzen&Terminas." },
     { NEI_NO_ITEM, PLAYER_IA_NONE, PLAYER_MODELGROUP_DEFAULT, NEI_NO_SLOT, AGE_REQ_NONE, NULL, func_8083485C,
       Player_InitDefaultIA, Randomizer_DrawMmOwlStatue, RG_MM_OWL_GREAT_BAY_COAST,
@@ -1576,6 +1580,10 @@ static const NeiItem* ExtPlayer_FindByIA(int32_t itemAction) {
  * Get the PLAYER_IA_xxx value for a given ITEM_xxx value.
  */
 int8_t ExtPlayer_GetItemAction(int32_t item) {
+    // EXT button IDs are wider than the vanilla item range; keep a neutral action.
+    if (item == EXT_ITEM_MAGIC_MIRROR) {
+        return PLAYER_IA_ELEMENTAL_WAND;
+    }
     // Handle special cases first
     if (item >= ITEM_NONE_FE) {
         return PLAYER_IA_NONE;
@@ -1604,6 +1612,10 @@ int8_t ExtPlayer_GetItemAction(int32_t item) {
             return PLAYER_IA_SWORD_MASTER;
         case ITEM_SWORD_BGS:
             return PLAYER_IA_SWORD_BIGGORON;
+        // Byrna keeps its own item identity and ordinary sword melee. Its separate
+        // two-handed hook supplies the stance without borrowing Giant's Knife durability.
+        case ITEM_EXT_SWORD_1:
+            return PLAYER_IA_SWORD_MASTER;
         // Four Sword / Trident sit on B as themselves (ExtEquip_SetSlot) and swing as a one-hand
         // sword; their behaviors supply the model — no Kokiri Sword is ever written to the save.
         case ITEM_EXT_SWORD_2:

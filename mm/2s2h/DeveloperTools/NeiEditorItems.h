@@ -208,7 +208,8 @@ inline bool RestoreOwnedHost(RandoItemId id) {
     if ((id == RI_OOT_NEI_SHEIKAH_SLATE || IsOneOf(id, runeItems)) && nei->slateRunesOwned) {
         slot = SLOT_SHEIKAH_SLATE;
         item = EXT_ITEM_SHEIKAH_SLATE;
-    } else if ((id == RI_OOT_NEI_ROD_OF_SEASONS || IsOneOf(id, seasonItems)) && nei->seasonsOwned) {
+    } else if ((id == RI_OOT_NEI_ROD_OF_SEASONS || IsOneOf(id, seasonItems)) &&
+               (nei->seasonsRodOwned || nei->seasonsOwned)) {
         slot = SLOT_ROD_OF_SEASONS;
         item = EXT_ITEM_ROD_OF_SEASONS;
     } else if (IsOneOf(id, caneItems) && nei->caneSkills) {
@@ -260,7 +261,7 @@ inline bool Grant(RandoItemId id) {
 
 inline void GrantAll() {
     const uint8_t season = Nei_Save()->season;
-    const bool keepSeason = Seasons_SeasonOwned(season);
+    const bool keepSeason = season == SEASON_OFF || Seasons_SeasonOwned(season);
     for (const auto id : Catalog()) {
         Grant(id);
     }

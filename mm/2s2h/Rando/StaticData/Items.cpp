@@ -55,7 +55,7 @@ std::map<RandoItemId, RandoStaticItem> Items = {
     RI(RI_BOMBS_5,                    "",     "5 Bombs",                    RITYPE_JUNK,            ITEM_BOMBS_5,                    GI_BOMBS_5,                  GID_BOMB),
     RI(RI_BOTTLE_CHATEAU_ROMANI,      "a",    "Bottle of Chateau Romani",   RITYPE_MAJOR,           ITEM_CHATEAU,                    GI_CHATEAU,                  GID_CHATEAU),
     RI(RI_BOTTLE_EMPTY,               "an",   "Empty Bottle",               RITYPE_MAJOR,           ITEM_BOTTLE,                     GI_BOTTLE,                   GID_BOTTLE),
-    RI(RI_BOTTLE_GOLD_DUST,           "a",    "Bottle With Gold Dust",      RITYPE_MAJOR,           ITEM_GOLD_DUST,                  GI_GOLD_DUST,                GID_SEAHORSE), // bottle of gold dust
+    RI(RI_BOTTLE_GOLD_DUST,           "a",    "Bottle With Gold Dust",      RITYPE_MAJOR,           ITEM_GOLD_DUST,                  GI_GOLD_DUST,                GID_BOTTLE_GOLD_DUST), // bottle of gold dust
     RI(RI_BOTTLE_MILK,                "a",    "Bottle of Milk",             RITYPE_MAJOR,           ITEM_MILK_BOTTLE,                GI_MILK_BOTTLE,              GID_MILK),
     RI(RI_BOTTLE_RED_POTION,          "a",    "Bottle with Red Potion",     RITYPE_MAJOR,           ITEM_POTION_RED,                 GI_POTION_RED_BOTTLE,        GID_57), // bottle of red potion
     RI(RI_BOW,                        "a",    "Bow",                        RITYPE_MAJOR,           ITEM_BOW,                        GI_QUIVER_30,                GID_BOW),
@@ -129,7 +129,7 @@ std::map<RandoItemId, RandoStaticItem> Items = {
     RI(RI_MASK_ZORA,                  "the",  "Zora Mask",                  RITYPE_MASK,            ITEM_MASK_ZORA,                  GI_MASK_ZORA,                GID_MASK_ZORA),
     RI(RI_MILK_REFILL,                "a",    "Milk Refill",                RITYPE_JUNK,            ITEM_MILK,                       GI_MILK,                     GID_MILK),
     RI(RI_MOONS_TEAR,                 "the",  "Moon's Tear",                RITYPE_MAJOR,           ITEM_MOONS_TEAR,                 GI_MOONS_TEAR,               GID_MOONS_TEAR),
-    RI(RI_MUSHROOM,                   "a",    "Magic Mushroom",             RITYPE_MAJOR,           ITEM_MUSHROOM,                   GI_MUSHROOM,                 GID_MUSHROOM),
+    RI(RI_MUSHROOM,                   "a",    "Magic Mushroom",             RITYPE_MAJOR,           ITEM_MUSHROOM,                   GI_MUSHROOM,                 GID_BOTTLE_MUSHROOM),
     RI(RI_NONE,                       "",     "literally nothing",          RITYPE_JUNK,            ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OCARINA_BUTTON_A,           "the",  "A Button",                   RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OCARINA_BUTTON_C_DOWN,      "the",  "C Down Button",              RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_NONE),
@@ -163,7 +163,7 @@ std::map<RandoItemId, RandoStaticItem> Items = {
     RI(RI_OOT_BOTTLE_FAIRY,           "a",    "Bottle with Fairy",          RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_FAIRY),
     RI(RI_OOT_BOTTLE_FISH,            "a",    "Bottle with Fish",           RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_FISH),
     RI(RI_OOT_BOTTLE_GREEN_POTION,    "a",    "Bottle with Green Potion",   RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_POTION_GREEN),
-    RI(RI_OOT_BOTTLE_MAGIC_MUSHROOM,  "a",    "Bottle with Magic Mushroom", RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_MUSHROOM),
+    RI(RI_OOT_BOTTLE_MAGIC_MUSHROOM,  "a",    "Bottle with Magic Mushroom", RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_BOTTLE_MUSHROOM),
     RI(RI_OOT_BOTTLE_POE,             "a",    "Bottle with Poe",            RITYPE_MAJOR,           ITEM_NONE,                       GI_NONE,                     GID_POE),
     RI(RI_OOT_COMPASS_BOTTOM_OF_THE_WELL, "the", "Bottom of the Well Compass", RITYPE_LESSER,       ITEM_NONE,                       GI_NONE,                     GID_NONE),
     RI(RI_OOT_COMPASS_DEKU_TREE,      "the",  "Great Deku Tree Compass",    RITYPE_LESSER,          ITEM_NONE,                       GI_NONE,                     GID_NONE),

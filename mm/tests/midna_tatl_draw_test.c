@@ -5,6 +5,7 @@
 #include "tests/test_require.h"
 #include "src/overlays/actors/ovl_En_Elf/z_en_elf.h"
 #include "2s2h/Enhancements/Companion/MidnaAudioResources.h"
+#include "2s2h/BenGui/CosmeticEditor.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 
 static Gfx commands[160], resource[1], body[1], markings[1], shimmer[1], allocated[4];
@@ -12,6 +13,7 @@ static Gfx blinkHalf[1], blinkClosed[1];
 static Vtx pose[1];
 static int enabled = 1, giantMask, cueId;
 static unsigned nativeDraws, midnaSetups, resourceChecks, resourceLoads, pushes, pops;
+static unsigned tatlPrimOverrides, tatlEnvOverrides;
 static int packPresent, loadSucceeds;
 static int poc2Present, poseMissing, markingsMissing, lastPoseFrame, inputTimer = 17;
 static int shimmerVerticesMissing, shimmerVerticesFailed, textureFailed;
@@ -24,6 +26,18 @@ static RegEditor registers;
 RegEditor* gRegEditor = &registers;
 
 #define FAIRY_FLAG_BIG (1 << 9)
+/* Cosmetic colors are a renderer boundary in this actor fixture. Preserve the
+ * emitted native command and verify that only Tatl requests the override. */
+void gDPSetPrimColorOverride(Gfx* pkt, u8 m, u8 l, u8 r, u8 g, u8 b, u8 a, const char* id) {
+    REQUIRE(strcmp(id, "World.TatlInner") == 0);
+    ++tatlPrimOverrides;
+    gDPSetPrimColor(pkt, m, l, r, g, b, a);
+}
+void gDPSetEnvColorOverride(Gfx* pkt, u8 r, u8 g, u8 b, u8 a, const char* id) {
+    REQUIRE(strcmp(id, "World.TatlOuter") == 0);
+    ++tatlEnvOverrides;
+    gDPSetEnvColor(pkt, r, g, b, a);
+}
 void func_80A04D90(EnElf* fairy, PlayState* play) {
 }
 bool ResourceMgr_IsAltAssetsEnabled(void) {
@@ -189,6 +203,7 @@ static void checkCase(int fairyType, int present, int loaded, int hiddenState, i
     play.state.gfxCtx = &gfx;
     play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
     player.currentMask = giantMask ? PLAYER_MASK_GIANT : PLAYER_MASK_NONE;
+    player.tatlActor = fairyType == FAIRY_TYPE_0 ? &fairy.actor : NULL;
     CsCmdActorCue cue = { 0 };
     cue.id = hiddenState ? 6 : 5;
     cueId = hiddenState ? 6 : 0;
@@ -213,11 +228,14 @@ static void checkCase(int fairyType, int present, int loaded, int hiddenState, i
     packPresent = present;
     loadSucceeds = loaded;
     nativeDraws = midnaSetups = resourceChecks = resourceLoads = pushes = pops = 0;
+    tatlPrimOverrides = tatlEnvOverrides = 0;
     EnElf before = fairy;
     Player playerBefore = player;
     EnElf_Draw(&fairy.actor, &play);
     REQUIRE(nativeDraws == expectNative);
     REQUIRE(midnaSetups == expectMidna);
+    REQUIRE(tatlPrimOverrides == (expectNative && fairyType == FAIRY_TYPE_0));
+    REQUIRE(tatlEnvOverrides == tatlPrimOverrides);
     int enhanced = poc2Present && !poseMissing && !markingsMissing && !shimmerVerticesMissing &&
                    !shimmerVerticesFailed && !textureFailed && expectMidna;
     REQUIRE(pushes == pops && pushes == expectMidna + (enhanced ? 6 : 0));

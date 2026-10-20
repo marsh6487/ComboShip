@@ -1,4 +1,5 @@
 #include "combo/menu/ComboItemDrawABI.h"
+#include "combo/BlackMarketShelves.h"
 #include "objects/object_gi_bosskey/object_gi_bosskey.h"
 #include "objects/object_gi_key/object_gi_key.h"
 #include "soh/assets/soh_assets.h"
@@ -46,6 +47,10 @@ Color_RGB8 CVarGetColor24(const char *key, Color_RGB8 fallback) {
   return it == colors.end()
              ? fallback
              : Color_RGB8{it->second.r, it->second.g, it->second.b};
+}
+Color_RGBA8 CVarGetColor(const char *key, Color_RGBA8 fallback) {
+  auto it = colors.find(key);
+  return it == colors.end() ? fallback : it->second;
 }
 void CVarSetColor(const char *key, Color_RGBA8 color) { colors[key] = color; }
 /* EDITOR_DECLARATIONS */

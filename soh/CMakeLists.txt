@@ -4,6 +4,7 @@ set(CMAKE_SYSTEM_VERSION 10.0 CACHE STRING "" FORCE)
 
 project(soh LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20 CACHE STRING "The C++ standard to use")
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 23 CACHE STRING "The C standard to use")
 
 include(CTest)
@@ -68,6 +69,7 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}/assets
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${CMAKE_CURRENT_SOURCE_DIR}/../libultraship/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/../combo
         )
         target_compile_definitions(static_story_viewer_talk_test PRIVATE LOG_LEVEL_GAME_PRINTS=0)
         target_compile_options(static_story_viewer_talk_test PRIVATE -ffunction-sections -fdata-sections)
@@ -95,6 +97,18 @@ if(BUILD_TESTING)
         target_link_libraries(static_story_mm_actor_test PRIVATE m)
     endif()
     add_test(NAME static_story_mm_actor_test COMMAND static_story_mm_actor_test)
+
+    add_executable(static_story_monkey_test
+        tests/static_story_monkey_test.c
+        src/overlays/actors/ovl_En_Viewer/static_story_mm_actor.c
+        src/overlays/actors/ovl_En_Viewer/static_story_actor.c
+        src/overlays/actors/ovl_En_Viewer/static_story_dialogue.c
+    )
+    target_include_directories(static_story_monkey_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    if(NOT WIN32)
+        target_link_libraries(static_story_monkey_test PRIVATE m)
+    endif()
+    add_test(NAME static_story_monkey_test COMMAND static_story_monkey_test)
 
     add_executable(mm_display_list_patch_test
         tests/mm_display_list_patch_test.cpp
@@ -219,6 +233,35 @@ if(BUILD_TESTING)
         add_test(NAME rain_engine_runtime COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/scripts/diagnostics/run_rain_runtime_test.py
             ${CMAKE_CURRENT_BINARY_DIR}/rain-runtime ${CMAKE_C_COMPILER} ${CMAKE_CXX_COMPILER})
+        add_test(NAME soh_season_weather_runtime COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/scripts/diagnostics/run_soh_season_weather_tests.py
+            ${CMAKE_CURRENT_BINARY_DIR}/season-weather-runtime
+            --cc ${CMAKE_C_COMPILER} --cxx ${CMAKE_CXX_COMPILER})
+        add_test(NAME soh_season_particles_runtime COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/scripts/diagnostics/run_soh_season_particle_tests.py)
+        set_tests_properties(soh_season_particles_runtime PROPERTIES ENVIRONMENT
+            "CXX=${CMAKE_CXX_COMPILER};SOH_SEASON_PARTICLE_CXXFLAGS=-I\"$<JOIN:$<TARGET_PROPERTY:nlohmann_json::nlohmann_json,INTERFACE_INCLUDE_DIRECTORIES>,\" -I\">\"")
+        add_test(NAME mm_winter_atmosphere_runtime COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/scripts/diagnostics/run_mm_winter_atmosphere_tests.py)
+        set_tests_properties(mm_winter_atmosphere_runtime PROPERTIES ENVIRONMENT
+            "CXX=${CMAKE_CXX_COMPILER};MM_WINTER_TEST_CXXFLAGS=-I\"$<JOIN:$<TARGET_PROPERTY:nlohmann_json::nlohmann_json,INTERFACE_INCLUDE_DIRECTORIES>,\" -I\">\"")
+        find_package(spdlog REQUIRED)
+        foreach(foliage_test season_foliage_test season_foliage_binding_test)
+            add_executable(${foliage_test}
+                tests/${foliage_test}.cpp
+                ${CMAKE_SOURCE_DIR}/libultraship/src/fast/resource/type/Texture.cpp
+                ${CMAKE_SOURCE_DIR}/libultraship/src/ship/resource/Resource.cpp)
+            target_compile_definitions(${foliage_test} PRIVATE SPDLOG_ACTIVE_LEVEL=6)
+            target_include_directories(${foliage_test} PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}
+                ${CMAKE_SOURCE_DIR}/libultraship/include)
+            target_link_libraries(${foliage_test} PRIVATE spdlog::spdlog)
+            if(foliage_test STREQUAL "season_foliage_binding_test")
+                target_include_directories(${foliage_test} BEFORE PRIVATE
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/season_foliage_stubs)
+            endif()
+            add_test(NAME ${foliage_test} COMMAND ${foliage_test})
+        endforeach()
         add_test(NAME midna_navi_draw COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/scripts/diagnostics/run_midna_navi_draw_test.py)
         add_test(NAME midna_audio COMMAND ${Python3_EXECUTABLE}
@@ -287,7 +330,8 @@ if(MSVC)
     set(CMAKE_C_FLAGS "")
     set(CMAKE_C_FLAGS_DEBUG "")
     set(CMAKE_C_FLAGS_RELEASE "")
-    set(CMAKE_CXX_FLAGS "")
+    # Keep /EHsc: the code uses try/catch.
+    set(CMAKE_CXX_FLAGS "/EHsc")
     set(CMAKE_CXX_FLAGS_DEBUG "")
     set(CMAKE_CXX_FLAGS_RELEASE "")
 endif()
@@ -330,11 +374,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # Sub-projects
 ################################################################################
 if (NOT TARGET libultraship)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../libultraship ${CMAKE_BINARY_DIR}/libultraship)
-endif()
-
-if (NOT TARGET ZAPDLib)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ZAPDTR/ZAPD ${CMAKE_BINARY_DIR}/ZAPD)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../libultraship ${CMAKE_BINARY_DIR}/libultraship SYSTEM)
 endif()
 
 set(PROJECT_NAME soh)
@@ -349,7 +389,7 @@ set(Header_Files "resource.h")
 source_group("headers" FILES ${Header_Files})
 
 # include {{{
-file(GLOB Header_Files__include "include/*.h" "include/*.inc")
+file(GLOB Header_Files__include CONFIGURE_DEPENDS "include/*.h" "include/*.inc")
 list(APPEND Header_Files__include ${CMAKE_CURRENT_SOURCE_DIR}/include/libc/stdarg.h)
 list(REMOVE_ITEM Header_Files__include ${CMAKE_CURRENT_SOURCE_DIR}/include/bgm.h)
 list(REMOVE_ITEM Header_Files__include ${CMAKE_CURRENT_SOURCE_DIR}/include/math_n64.h)
@@ -364,7 +404,7 @@ source_group("include" FILES ${Header_Files__include})
 file(GLOB_RECURSE soh__ CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "soh/*.c" "soh/*.cpp" "soh/*.h" "soh/*.hpp")
 
 # mods (only .cpp files - .c files are included via #include pattern)
-file(GLOB_RECURSE mods__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "mods/*.cpp" "mods/*.h" "mods/*.hpp")
+file(GLOB_RECURSE mods__ CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "mods/*.cpp" "mods/*.h" "mods/*.hpp")
 list(APPEND soh__ ${mods__})
 
 # expansions (only .cpp files - .c files are included via #include pattern)
@@ -407,14 +447,14 @@ endif()
 list(FILTER ship__ EXCLUDE REGEX "soh/Extractor/*")
 
 if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
-    file(GLOB_RECURSE soh__Extractor RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+    file(GLOB_RECURSE soh__Extractor CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
         "soh/Extractor/*.c"
         "soh/Extractor/*.cpp"
         "soh/Extractor/*.h"
         "soh/Extractor/*.hpp"
     )
 else()
-    file(GLOB_RECURSE soh__Extractor RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+    file(GLOB_RECURSE soh__Extractor CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
         "soh/Extractor/*.h"
         "soh/Extractor/*.hpp"
     )
@@ -422,7 +462,7 @@ endif()
 # }}}
 
 # src (decomp) {{{
-file(GLOB_RECURSE src__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/*.c" "src/*.h")
+file(GLOB_RECURSE src__ CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/*.c" "src/*.h")
 set_source_files_properties(${src__} PROPERTIES COMPILE_OPTIONS "${WARNING_OVERRIDE}")
 
 list(APPEND src__ ${CMAKE_CURRENT_SOURCE_DIR}/Resource.rc)
@@ -577,20 +617,23 @@ endif()
 # Compile definitions
 ################################################################################
 
-target_include_directories(${PROJECT_NAME} PRIVATE assets
+target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include/
     ${CMAKE_CURRENT_SOURCE_DIR}/src/
     ${CMAKE_CURRENT_SOURCE_DIR}/mods/
     ${CMAKE_CURRENT_SOURCE_DIR}/../libultraship/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../ZAPDTR/ZAPD/resource/type
-    ${SDL2-INCLUDE}
-    ${SDL2-NET-INCLUDE}
     ${CMAKE_CURRENT_SOURCE_DIR}/assets/
-    ${dr_libs_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../combo
     ${CMAKE_SOURCE_DIR}/combo/menu
     ${CMAKE_SOURCE_DIR}/combo/title
     .
+)
+
+target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
+    ${SDL2-INCLUDE}
+    ${SDL2-NET-INCLUDE}
+    ${dr_libs_SOURCE_DIR}
 )
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
@@ -679,6 +722,7 @@ if(MSVC)
                 /Od
             >
             $<$<CONFIG:Release>:
+                /O2;
                 /Oi;
                 /Gy;
             >
@@ -762,6 +806,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
             -Wno-parentheses
             -Wno-narrowing
             -Wno-missing-braces
+            -Wno-unknown-pragmas # #pragma region is an editor folding marker, GCC doesn't know it
             $<$<COMPILE_LANGUAGE:C>:
                 -Werror-implicit-function-declaration
                 -Wno-incompatible-pointer-types
@@ -790,6 +835,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
             -Wno-parentheses
             -Wno-narrowing
             -Wno-missing-braces
+            -Wno-unknown-pragmas # #pragma region is an editor folding marker, GCC doesn't know it
             $<$<COMPILE_LANGUAGE:C>:
                 -Werror-implicit-function-declaration
                 -Wno-incompatible-pointer-types
@@ -814,6 +860,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
             -Wno-return-type
             -Wno-narrowing
             -Wno-switch-outside-range
+            -Wno-unknown-pragmas # #pragma region is an editor folding marker, GCC doesn't know it
             $<$<COMPILE_LANGUAGE:C>:
                 -Werror-implicit-function-declaration
                 -Wno-incompatible-pointer-types
@@ -840,6 +887,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
             -Wno-parentheses
             -Wno-narrowing
             -Wno-missing-braces
+            -Wno-unknown-pragmas # #pragma region is an editor folding marker, GCC doesn't know it
             $<$<COMPILE_LANGUAGE:C>:
                 -Werror-implicit-function-declaration
                 -Wno-implicit-int
@@ -866,32 +914,22 @@ if (CMAKE_GENERATOR MATCHES "Visual Studio")
     add_custom_command(
     TARGET ${PROJECT_NAME}
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/soh/assets/extractor ${CMAKE_BINARY_DIR}/soh/assets
-    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/soh/assets/xml ${CMAKE_BINARY_DIR}/soh/assets/xml
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/soh/assets/yml ${CMAKE_BINARY_DIR}/soh/assets
     )
 endif()
-if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
-    add_custom_command(
-        TARGET ${PROJECT_NAME}
-        POST_BUILD
-        COMMENT "Copying asset xmls..."
-        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/soh/assets/extractor $<TARGET_FILE_DIR:soh>/assets
-        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/soh/assets/xml $<TARGET_FILE_DIR:soh>/assets/xml
-        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:soh>/assets/symbols
-    #    COMMAND ${VS_COPY_ASSETS_CMD}
-    )
-endif()
+add_custom_command(
+    TARGET ${PROJECT_NAME}
+    POST_BUILD
+    COMMENT "Copying asset ymls..."
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/soh/assets/yml $<TARGET_FILE_DIR:soh>/assets
+)
 ################################################################################
 # Dependencies
 ################################################################################
 add_dependencies(${PROJECT_NAME}
     libultraship
+    torch
 )
-if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
-add_dependencies(${PROJECT_NAME}
-    ZAPDLib
-)
-endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     find_package(glfw3 REQUIRED)
@@ -907,7 +945,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     if(SOH_WINDOWS_64BIT)
         set(ADDITIONAL_LIBRARY_DEPENDENCIES
             "libultraship;"
-            "ZAPDLib;"
+            "torch;"
             "glu32;"
             "SDL2::SDL2;"
             "SDL2::SDL2main;"
@@ -927,7 +965,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     elseif("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "Win32")
         set(ADDITIONAL_LIBRARY_DEPENDENCIES
             "libultraship;"
-            "ZAPDLib;"
+            "torch;"
             "glu32;"
             "SDL2::SDL2;"
             "SDL2::SDL2main;"
@@ -956,7 +994,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
 
         "$<$<CONFIG:Debug>:-Wl,--wrap=abort>"
     )
-    target_include_directories(${PROJECT_NAME} PRIVATE
+    target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE
         ${DEVKITPRO}/portlibs/wiiu/include/
     )
 else()
@@ -967,9 +1005,11 @@ else()
     find_package(Vorbis REQUIRED)
     find_package(Opus REQUIRED)
     find_package(OpusFile REQUIRED)
-     set(ADDITIONAL_LIBRARY_DEPENDENCIES
+    # clang doesn't pull libm in transitively the way gcc does, link it explicitly
+    find_library(MATH_LIBRARY m)
+    set(ADDITIONAL_LIBRARY_DEPENDENCIES
     "libultraship;"
-        "ZAPDLib;"
+        "torch;"
         SDL2::SDL2
         "Ogg::ogg"
         "Vorbis::vorbis"
@@ -981,7 +1021,13 @@ else()
         ${CMAKE_DL_LIBS}
         Threads::Threads
     )
+    if(MATH_LIBRARY)
+        list(APPEND ADDITIONAL_LIBRARY_DEPENDENCIES ${MATH_LIBRARY})
+    endif()
 endif()
+
+find_package(libzip REQUIRED)
+list(APPEND ADDITIONAL_LIBRARY_DEPENDENCIES libzip::zip)
 
 if(USE_ASAN)
     target_compile_options(libultraship PRIVATE -fsanitize=address)

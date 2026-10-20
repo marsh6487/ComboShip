@@ -26,6 +26,7 @@
 #include <vector>
 #include <algorithm>
 #include "soh/ResourceManagerHelpers.h"
+#include "soh/Enhancements/Graphics/ZorasDomain.h"
 // Not a .h: mods/*.h is globbed with CONFIGURE_DEPENDS, and a new header there forces a full CMake
 // regeneration on the next build.
 #include "season_water_dls.inc"
@@ -735,10 +736,11 @@ static u8 SeasonScene_WaterLook(void) {
 extern "C" void SeasonScene_UpdateWater(PlayState* play) {
     CollisionHeader* colHeader = play->colCtx.colHeader;
     u8 season = Seasons_GetSeason();
+    const bool alwaysThawed = ZorasDomain_IsAlwaysThawed(play);
 
-    SeasonScene_SetWaterLook(SeasonScene_WaterLook());
+    SeasonScene_SetWaterLook(alwaysThawed ? SEASON_LOOK_VANILLA : SeasonScene_WaterLook());
 
-    if (!SeasonScene_Active() || (colHeader == NULL) || (colHeader->numWaterBoxes == 0)) {
+    if (alwaysThawed || !SeasonScene_Active() || (colHeader == NULL) || (colHeader->numWaterBoxes == 0)) {
         SeasonScene_RestoreWaterBoxes();
         return;
     }

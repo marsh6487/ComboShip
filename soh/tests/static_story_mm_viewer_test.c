@@ -9,6 +9,7 @@
 #include "src/overlays/actors/ovl_En_Viewer/static_story_ganon.h"
 #include "src/overlays/actors/ovl_En_Viewer/static_story_kokiri.h"
 #include "mods/transformation_masks/assets/mm_asset_loader.h"
+#include "mods/sound_translator/mm_sfx_ids.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "objects/object_dy_obj/object_dy_obj.h"
 #include "soh/ResourceManagerHelpers.h"
@@ -27,6 +28,24 @@ void gSPDisplayList(Gfx* pkt, Gfx* dl) {
 }
 
 static unsigned initCalls, freeCalls, releaseCalls, drawCalls, killCalls, objectCalls, colliderFrees, loopCalls;
+static unsigned monkeyCalls, monkeyStops;
+static Vec3f* lastMonkeyPosition;
+static Vec3f* lastMonkeyStop;
+static bool monkeyAudioAvailable = true;
+s32 MmSfx_PlayAtPos(u16 id, Vec3f* pos) {
+    REQUIRE(id == 0x2901); /* Native MM NA_SE_EV_MONKEY_VO_JOY. */
+    REQUIRE(pos != NULL);
+    if (!monkeyAudioAvailable)
+        return 0;
+    ++monkeyCalls;
+    lastMonkeyPosition = pos;
+    return 1;
+}
+void MmSfx_StopAtPos(u16 id, Vec3f* pos) {
+    REQUIRE(id == 0x2901 && pos != NULL);
+    ++monkeyStops;
+    lastMonkeyStop = pos;
+}
 static bool loadSuccess = true, allocationSuccess = true;
 static float rotateX;
 static unsigned char eyes[8][16], mouths[4][16];
@@ -808,6 +827,93 @@ static void testKokiriUpdateTiming(PlayState* play) {
     puts("PASS Kokiri/Fado update bridge: native normal-animation clock, after base sampling");
 }
 
+static void testMonkeyAudio(PlayState* play) {
+    for (uint8_t pose = 0; pose < 3; ++pose) {
+        EnViewer first, second;
+        prepare(&first, STATIC_STORY_ACTOR_MONKEY, pose);
+        prepare(&second, STATIC_STORY_ACTOR_MONKEY, pose);
+        first.actor.room = second.actor.room = play->roomCtx.curRoom.num;
+        EnViewerStatic_WaitForObjects(&first, play);
+        EnViewerStatic_WaitForObjects(&second, play);
+        unsigned calls = monkeyCalls;
+        EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyCalls == calls + 1 && lastMonkeyPosition == &first.actor.projectedPos);
+        for (unsigned i = 0; i < 59; ++i)
+            EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyCalls == calls + 1); /* No per-frame retrigger or overlapping loop. */
+        for (unsigned i = 0; i < 43; ++i)
+            EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyCalls == calls + 2); /* Continues calling while the room stays loaded. */
+        EnViewer_Update(&second.actor, play);
+        REQUIRE(monkeyCalls == calls + 3 && lastMonkeyPosition == &second.actor.projectedPos);
+        REQUIRE(first.actor.world.pos.y == 345 && first.actor.home.pos.y == 345);
+
+        unsigned stops = monkeyStops;
+        play->pauseCtx.state = 1;
+        EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyStops == stops + 1 && lastMonkeyStop == &first.actor.projectedPos);
+        EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyStops == stops + 1);
+        play->pauseCtx.state = 0;
+        EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyCalls == calls + 4);
+
+        ++play->roomCtx.curRoom.num;
+        EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyStops == stops + 2 && lastMonkeyStop == &first.actor.projectedPos);
+        for (unsigned i = 0; i < 120; ++i)
+            EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyCalls == calls + 4);
+        --play->roomCtx.curRoom.num;
+        EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyCalls == calls + 5);
+        play->transitionTrigger = TRANS_TRIGGER_START;
+        EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyStops == stops + 3);
+        play->transitionTrigger = TRANS_TRIGGER_OFF;
+        EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyCalls == calls + 6);
+        play->transitionMode = 1;
+        EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyStops == stops + 4);
+        play->transitionMode = TRANS_MODE_OFF;
+        EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyCalls == calls + 7);
+        play->csCtx.state = 1;
+        EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyStops == stops + 5);
+        play->csCtx.state = CS_STATE_IDLE;
+        EnViewer_Update(&first.actor, play);
+        REQUIRE(monkeyCalls == calls + 8);
+
+        EnViewer_Destroy(&first.actor, play);
+        REQUIRE(monkeyStops == stops + 6 && lastMonkeyStop == &first.actor.projectedPos);
+        EnViewer_Destroy(&first.actor, play);
+        REQUIRE(monkeyStops == stops + 6);
+        EnViewer_Destroy(&second.actor, play);
+        REQUIRE(monkeyStops == stops + 7 && lastMonkeyStop == &second.actor.projectedPos);
+    }
+    EnViewer unavailable;
+    prepare(&unavailable, STATIC_STORY_ACTOR_MONKEY, 2);
+    EnViewerStatic_WaitForObjects(&unavailable, play);
+    unsigned calls = monkeyCalls, stops = monkeyStops;
+    monkeyAudioAvailable = false;
+    for (unsigned i = 0; i < 120; ++i)
+        EnViewer_Update(&unavailable.actor, play);
+    EnViewer_Destroy(&unavailable.actor, play);
+    REQUIRE(monkeyCalls == calls && monkeyStops == stops);
+    monkeyAudioAvailable = true;
+    loadSuccess = false;
+    prepare(&unavailable, STATIC_STORY_ACTOR_MONKEY, 0);
+    EnViewerStatic_WaitForObjects(&unavailable, play);
+    EnViewerStatic_Update(&unavailable, play);
+    EnViewer_Destroy(&unavailable.actor, play);
+    REQUIRE(monkeyCalls == calls && monkeyStops == stops);
+    loadSuccess = true;
+    puts("PASS monkey audio: all three poses, repeat gaps, independent instances, room/pause/transition/cutscene stop, "
+         "idempotent destroy and unavailable-resource cleanup");
+}
+
 int main(void) {
     static PlayState play;
     static GraphicsContext gfx;
@@ -960,5 +1066,6 @@ int main(void) {
          "lifecycle");
     puts("PASS compiled production viewer init/update/draw/free: 10 poses, independent state, root preservation, face "
          "order, typed-load and partial-allocation failure");
+    testMonkeyAudio(&play);
     return 0;
 }

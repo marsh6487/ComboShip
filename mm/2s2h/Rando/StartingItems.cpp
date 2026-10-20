@@ -17,6 +17,10 @@ namespace Rando {
 std::vector<RandoItemId> GetComputedStartingItems(RandoSaveInfo& randoSaveInfo) {
     std::vector<RandoItemId> startingItems;
 
+    if (randoSaveInfo.randoSaveOptions[RO_STARTING_ROD_OF_SEASONS]) {
+        startingItems.push_back(RI_OOT_NEI_ROD_OF_SEASONS);
+    }
+
     if (randoSaveInfo.randoSaveOptions[RO_STARTING_MAPS_AND_COMPASSES]) {
         std::vector<RandoItemId> MapsAndCompasses = {
             RI_GREAT_BAY_COMPASS,       RI_GREAT_BAY_MAP,       RI_SNOWHEAD_COMPASS,       RI_SNOWHEAD_MAP,
@@ -55,6 +59,8 @@ std::vector<RandoItemId> GetComputedStartingItems(RandoSaveInfo& randoSaveInfo) 
         for (RandoItemId itemId : strayFairies) {
             startingItems.insert(startingItems.end(), STRAY_FAIRY_SCATTERED_TOTAL, itemId);
         }
+
+        startingItems.push_back(RI_CLOCK_TOWN_STRAY_FAIRY);
     }
 
     if (randoSaveInfo.randoSaveOptions[RO_SHUFFLE_SWIM] != RO_GENERIC_YES) {

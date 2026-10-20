@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
+#include "../../tests/fixtures/din_shield_vertices.h"
 
 static GraphicsContext gfx;
 static PlayState play;
@@ -21,6 +23,7 @@ static u16 lastSound;
 static Actor* soundActor;
 static int matrixDepth, matrixCount;
 static float drawX, drawY, drawZ;
+static MtxF currentMatrix, savedMatrix, capturedMatrix;
 SaveContext gSaveContext;
 
 #define REQUIRE(c)                                               \
@@ -68,7 +71,15 @@ Gfx* ResourceMgr_LoadGfxByName(const char* path) {
 void* ResourceGetDataByName(const char* path) {
     if (missingDependency && strstr(path, missingDependency))
         return NULL;
+    if (!loadFailure && strstr(path, "/SurfaceVertices"))
+        return shieldSurfaceVertices;
+    if (!loadFailure && strstr(path, "/RimVertices"))
+        return shieldRimVertices;
     return loadFailure ? NULL : texture;
+}
+
+size_t ResourceGetSizeByName(const char* path) {
+    return strstr(path, "/RimVertices") ? sizeof(shieldRimVertices) : sizeof(shieldSurfaceVertices);
 }
 
 u8 TransformMasks_IsTransformedAny(void) {
@@ -98,28 +109,47 @@ void gSPDisplayList(Gfx* packet, Gfx* list) {
     __gSPDisplayList(packet, list);
 }
 void Matrix_Push(void) {
+    REQUIRE(matrixDepth == 0);
+    savedMatrix = currentMatrix;
     ++matrixDepth;
 }
 void Matrix_Pop(void) {
+    currentMatrix = savedMatrix;
     --matrixDepth;
 }
+void Matrix_Get(MtxF* dest) {
+    *dest = currentMatrix;
+}
+void Matrix_Put(MtxF* src) {
+    currentMatrix = *src;
+}
 void Matrix_Translate(f32 x, f32 y, f32 z, u8 mode) {
-    (void)mode;
+    REQUIRE(mode == MTXMODE_APPLY);
+    currentMatrix.xw += currentMatrix.xx * x + currentMatrix.xy * y + currentMatrix.xz * z;
+    currentMatrix.yw += currentMatrix.yx * x + currentMatrix.yy * y + currentMatrix.yz * z;
+    currentMatrix.zw += currentMatrix.zx * x + currentMatrix.zy * y + currentMatrix.zz * z;
     drawX = x;
     drawY = y;
     drawZ = z;
 }
 void Matrix_Scale(f32 x, f32 y, f32 z, u8 mode) {
-    (void)x;
-    (void)y;
-    (void)z;
-    (void)mode;
+    REQUIRE(mode == MTXMODE_APPLY);
+    currentMatrix.xx *= x;
+    currentMatrix.yx *= x;
+    currentMatrix.zx *= x;
+    currentMatrix.xy *= y;
+    currentMatrix.yy *= y;
+    currentMatrix.zy *= y;
+    currentMatrix.xz *= z;
+    currentMatrix.yz *= z;
+    currentMatrix.zz *= z;
 }
 Mtx* Matrix_NewMtx(GraphicsContext* context, char* file, s32 line) {
     (void)context;
     (void)file;
     (void)line;
     ++matrixCount;
+    capturedMatrix = currentMatrix;
     return &matrix;
 }
 
@@ -142,13 +172,19 @@ static void setup(void) {
     fireSound = audioRequests = 0;
     lastSound = 0;
     soundActor = NULL;
+    memset(&currentMatrix, 0, sizeof(currentMatrix));
+    currentMatrix.xx = currentMatrix.yy = currentMatrix.zz = currentMatrix.ww = 1.0f;
     DinFireShield_Reset();
 }
 
 static size_t draw(void) {
     gfx.polyXlu.p = commands;
+    Player before = player;
+    MtxF hand = currentMatrix;
     DinFireShield_Draw(&play, &player);
     REQUIRE(matrixDepth == 0);
+    REQUIRE(!memcmp(&before, &player, sizeof(player)));
+    REQUIRE(!memcmp(&hand, &currentMatrix, sizeof(hand)));
     REQUIRE(gfx.polyXlu.p < commands + 512);
     return (size_t)(gfx.polyXlu.p - commands);
 }
@@ -187,7 +223,66 @@ static void requireNamedTextures(size_t count) {
     REQUIRE(found == ARRAY_COUNT(paths));
 }
 
+static void testGroundClearance(void) {
+    // Native-size hand frames, including a low braced arm and rotated aiming.
+    // All cases retain the existing full-size flame profile.
+    for (int age = 0; age < 2; ++age) {
+        for (int pose = 0; pose < 6; ++pose) {
+            setup();
+            gSaveContext.linkAge = age == 0 ? LINK_AGE_CHILD : LINK_AGE_ADULT;
+            player.currentShield = age == 0 ? PLAYER_SHIELD_DEKU : PLAYER_SHIELD_HYLIAN;
+            player.actor.bgCheckFlags = BGCHECKFLAG_GROUND;
+            player.actor.floorHeight = 125.0f;
+            currentMatrix.xx = currentMatrix.yy = currentMatrix.zz = .01f;
+            currentMatrix.yw = 137.0f;
+            if (pose == 1)
+                currentMatrix.yw = 165.0f; // already clears floor: no lift
+            if (pose == 2 || pose == 3) {
+                currentMatrix.xx = currentMatrix.yy = 0.0f;
+                currentMatrix.xy = pose == 2 ? -.01f : .01f;
+                currentMatrix.yx = -currentMatrix.xy;
+            }
+            if (pose == 4) {
+                currentMatrix.yy = currentMatrix.zz = 0.0f;
+                currentMatrix.yz = .01f;
+                currentMatrix.zy = -.01f; // curved surface is lowest, not rim
+                currentMatrix.yw = 132.0f;
+            }
+            if (pose == 5)
+                player.actor.bgCheckFlags = 0; // airborne: keep hand attachment
+            for (int i = 0; i < 4; ++i)
+                tick();
+            REQUIRE(draw() > 0);
+            REQUIRE(fabsf(capturedMatrix.xx - currentMatrix.xx * 2.4f) < .00001f);
+            REQUIRE(fabsf(capturedMatrix.xy - currentMatrix.xy * 2.7f) < .00001f);
+            REQUIRE(fabsf(capturedMatrix.zz - currentMatrix.zz) < .00001f);
+            REQUIRE(fabsf(capturedMatrix.xw - (currentMatrix.xw - 1500 * currentMatrix.xx - 850 * currentMatrix.xz)) <
+                    .0001f);
+            REQUIRE(fabsf(capturedMatrix.zw - (currentMatrix.zw - 1500 * currentMatrix.zx - 850 * currentMatrix.zz)) <
+                    .0001f);
+            if (pose == 5) {
+                REQUIRE(fabsf(capturedMatrix.yw - 137.0f) < .0001f);
+            } else {
+                Vtx* sets[] = { shieldSurfaceVertices, shieldRimVertices };
+                for (size_t s = 0; s < ARRAY_COUNT(sets); ++s) {
+                    for (int v = 0; v < 4; ++v) {
+                        f32 y = capturedMatrix.yw + capturedMatrix.yx * sets[s][v].v.ob[0] +
+                                capturedMatrix.yy * sets[s][v].v.ob[1] + capturedMatrix.yz * sets[s][v].v.ob[2];
+                        REQUIRE(y >= player.actor.floorHeight + .99f);
+                    }
+                }
+                if (pose == 0)
+                    REQUIRE(fabsf(capturedMatrix.yw - 155.7f) < .0001f);
+                if (pose == 1)
+                    REQUIRE(fabsf(capturedMatrix.yw - 165.0f) < .0001f);
+            }
+        }
+    }
+    puts("PASS OoT Din shield: grounded bracing/aiming clears both meshes, full size and hand/player state preserved");
+}
+
 int main(void) {
+    testGroundClearance();
     setup();
     REQUIRE(DinFireShield_ItemIcon(ITEM_SHIELD_DEKU) != NULL);
     REQUIRE(DinFireShield_ItemIcon(ITEM_SHIELD_HYLIAN) != NULL);

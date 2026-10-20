@@ -3,6 +3,7 @@
   "collisions": [
     "accessibility/texts/filechoose_eng.json",
     "accessibility/texts/kaleidoscope_eng.json",
+    "accessibility/texts/misc_eng.json",
     "accessibility/texts/scenes_eng.json",
     "objects/object_bosskey/gBossKeyCustomDL",
     "objects/object_bosskey/gBossKeyCustomDL_vtx_0",

@@ -6,7 +6,7 @@ stabilization_build=$(mktemp -d /tmp/soh-stabilization.XXXXXX)
 printf 'Test build directory: %s\n' "$stabilization_build"
 cxx=${CXX:-c++}
 cc=${CC:-cc}
-common=(-g -DNDEBUG)
+common=(-g -DNDEBUG -Icombo -Ilibultraship/include)
 audio_inc=(-Isoh/tests/audio_sequence_stubs -Isoh/include -Isoh)
 weather_inc=(-Isoh/tests/weather_audio_stubs -Isoh/src -Isoh)
 json_inc=()

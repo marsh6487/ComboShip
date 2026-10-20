@@ -1,6 +1,8 @@
 #include "z64.h"
 #include "soh/NEI/nei_exports.h" // PakLoader_GetDLOverride (centralized NEI C-linkage export)
 
+#include <bit>
+
 // OTRTODO - this is awful
 
 extern "C" {
@@ -98,12 +100,12 @@ extern "C" void gDPSetTileSizeInterp(Gfx* pkt, int t, float uls, float ult, floa
     pkt->words.w0 = _SHIFTL(G_SETTILESIZE_INTERP, 24, 8);
     pkt++;
 
-    pkt->words.w0 = *(u32*)&uls;
-    pkt->words.w1 = *(u32*)&ult;
+    pkt->words.w0 = std::bit_cast<u32>(uls);
+    pkt->words.w1 = std::bit_cast<u32>(ult);
     pkt++;
 
-    pkt->words.w0 = *(u32*)&lrs;
-    pkt->words.w1 = *(u32*)&lrt;
+    pkt->words.w0 = std::bit_cast<u32>(lrs);
+    pkt->words.w1 = std::bit_cast<u32>(lrt);
     pkt++;
 }
 

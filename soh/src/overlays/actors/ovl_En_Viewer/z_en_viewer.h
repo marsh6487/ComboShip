@@ -76,6 +76,8 @@ typedef struct {
     uint8_t eyeIndex;
     uint8_t talking;
     uint8_t tracking;
+    uint8_t monkeySfxActive;
+    int16_t monkeySfxTimer;
     int16_t blinkTimer;
     uint8_t luluHdBlinkPhase;
     int16_t luluHdBlinkTimer;

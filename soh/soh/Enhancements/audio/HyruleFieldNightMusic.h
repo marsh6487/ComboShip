@@ -27,4 +27,6 @@ uint16_t HyruleFieldNightMusic_ResolveSequence(uint16_t selected, uint16_t repla
 struct PlayState;
 void HyruleFieldNightMusic_Update(PlayState* play);
 void HyruleFieldNightMusic_Reset();
+bool HyruleFieldNightMusic_IsPlaying(uint16_t sequence);
+bool HyruleFieldNightMusic_RequestRefresh();
 #endif

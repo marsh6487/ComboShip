@@ -5,6 +5,8 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <cassert>
+#include <vector>
 #include <imgui.h>
 #include "z64.h"
 #include "ComboExport.h"
@@ -13,7 +15,7 @@
 #include "rando/SharedItems.h"
 #include "rando/ComboPlaythrough.h"
 
-static int disabledDepth = 0;
+static std::vector<bool> disabledStack;
 static int foregroundGame = 0;
 static int generationCalls = 0;
 static int reloadCalls = 0;
@@ -28,15 +30,25 @@ void Separator() {}
 void SeparatorText(const char*) {}
 void SetNextItemWidth(float) {}
 void SameLine(float, float) {}
-void BeginDisabled(bool disabled) { disabledDepth += disabled; }
-void EndDisabled() { --disabledDepth; }
-bool Button(const char* label, const ImVec2&) { return !disabledDepth && std::strcmp(label, pressedButton) == 0; }
+// ImGui pushes an item-flags scope even for BeginDisabled(false); nested false
+// scopes also retain a disabled parent's state. Mirror that observer contract.
+void BeginDisabled(bool disabled) {
+    disabledStack.push_back(disabled || (!disabledStack.empty() && disabledStack.back()));
+}
+void EndDisabled() {
+    assert(!disabledStack.empty());
+    disabledStack.pop_back();
+}
+bool Button(const char* label, const ImVec2&) {
+    return (disabledStack.empty() || !disabledStack.back()) && std::strcmp(label, pressedButton) == 0;
+}
 bool SmallButton(const char*) { return false; }
 bool Checkbox(const char*, bool*) { return false; }
 bool InputInt(const char*, int*, int, int, ImGuiInputTextFlags) { return false; }
 bool InputTextWithHint(const char*, const char*, char*, size_t, ImGuiInputTextFlags,
                        ImGuiInputTextCallback, void*) { return false; }
 bool BeginCombo(const char*, const char*, ImGuiComboFlags) { return false; }
+bool Combo(const char*, int*, const char* const*, int, int) { return false; }
 void EndCombo() {}
 bool Selectable(const char*, bool, ImGuiSelectableFlags, const ImVec2&) { return false; }
 bool BeginTable(const char*, int, ImGuiTableFlags, const ImVec2&, float) { return false; }
@@ -62,6 +74,11 @@ void EndPopup() {}
 }
 namespace ComboUI {
 int GetForegroundGame() { return foregroundGame; }
+}
+// The appearance panel is rendering only; generation/reload gating is the
+// production behavior under test here.
+namespace BlackMarketUI {
+void DrawAppearance() {}
 }
 extern "C" int ComboUI_GetForegroundGame() { return foregroundGame; }
 int CVarGetInteger(const char*, int fallback) { return fallback; }
@@ -121,7 +138,7 @@ static void CheckActions(ComboRando::ComboMenu& menu, bool generate, bool reload
     pressedButton = "Save";
     ComboRando::DrawComboPlandoPanel();
     Check(reloadCalls == beforeReload + reload, scenario);
-    Check(disabledDepth == 0, "each production panel balances its disabled scope");
+    Check(disabledStack.empty(), "each production panel balances its disabled scope");
 }
 
 int main() {

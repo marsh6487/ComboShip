@@ -97,6 +97,22 @@ static inline int32_t ComboReceipt_LineWidth(const char* body, size_t size, int 
     return ComboReceipt_LineWidthScaled(body, size, mm, widths, count, 75);
 }
 
+/* MM loads each literal glyph into a separate slot, even at smaller scales.
+ * Spaces/colors use no slots; a transferred player-name command uses up to 8. */
+static inline size_t ComboReceipt_MmPageGlyphs(const char* body, size_t size) {
+    size_t glyphs = 0;
+    for (size_t i = 0; i < size;) {
+        const uint8_t c = (uint8_t)body[i];
+        const size_t command = ComboReceipt_CommandSize(c, 1);
+        if (command > size - i)
+            break;
+        if (command == 1)
+            glyphs += c == 0x16 ? 8 : c >= 0x21 && c < 0xBF ? 1 : 0;
+        i += command;
+    }
+    return glyphs;
+}
+
 /* Reflow before native decoding. Track generated pages independently of
  * authored page breaks so map fitting never removes a later attribution. */
 static inline CwItemReceiptLayout ComboReceipt_LayoutAtScale(const CwItemReceiptPresentation* p, char* body,
@@ -188,8 +204,11 @@ static inline CwItemReceiptLayout ComboReceipt_LayoutAtScale(const CwItemReceipt
         const int32_t activeScale = mainBody ? scale : 75;
         const int32_t glyph =
             c != end && command == 1 ? ComboReceipt_GlyphWidthScaled(c, widths, count, activeScale) : 0;
-        if (width + glyph > available && width > 0) {
-            const uint8_t br = ++line == 3 ? (line = 0, page) : newline;
+        const size_t glyphSlots = mm ? ComboReceipt_MmPageGlyphs(body + i, command) : 0;
+        const int fontPageFull =
+            glyphSlots && ComboReceipt_MmPageGlyphs(wrapped + pageStart, length - pageStart) + glyphSlots > 120;
+        if ((width + glyph > available && width > 0) || fontPageFull) {
+            const uint8_t br = fontPageFull || ++line == 3 ? (line = 0, page) : newline;
             if (br == page && mainBody)
                 generatedPage = 1;
             size_t split = space != (size_t)-1 ? space : length;

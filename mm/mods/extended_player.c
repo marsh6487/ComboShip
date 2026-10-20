@@ -107,12 +107,25 @@ extern void Player_InitMinishCapIA(PlayState* play, Player* this);
 extern void Player_InitLanternIA(PlayState* play, Player* this);
 extern void Player_InitPokeballIA(PlayState* play, Player* this);
 
-// Elemental Wand — behavior lives in mods/items/logic/item_elemental_wand.c, dispatched by
-// Wand_GetMode(). Unlike SoH (whose action space is full and forces the wand to share
-// PLAYER_IA_UNUSED_5B with the Mario Mask), 2ship's wand owns PLAYER_IA_ELEMENTAL_WAND outright, so
-// the row below points at the real functions directly. Skijer's NEI
+// The wand and travel mirror share a signed-byte action. Dispatch by the held
+// item so the mirror keeps the neutral action while the wand retains its spells.
 extern s32 Player_UpperAction_ElementalWand(Player* player, PlayState* play);
 extern void Player_InitElementalWandIA(PlayState* play, Player* player);
+
+static s32 Nei_SharedIA_UpperAction(Player* this, PlayState* play) {
+    if (this->heldItemId == ITEM_ELEMENTAL_WAND) {
+        return Player_UpperAction_ElementalWand(this, play);
+    }
+    return func_8083485C(this, play);
+}
+
+static void Nei_SharedIA_Init(PlayState* play, Player* this) {
+    if (this->heldItemId == ITEM_ELEMENTAL_WAND) {
+        Player_InitElementalWandIA(play, this);
+        return;
+    }
+    Player_InitDefaultIA(play, this);
+}
 
 // NOTE (NEI slingshot pass): Sw97_PreferBow is kept only for reference-parity with the SoH
 // fork; since the arrows/bullets split (arrows = bow wheel, bullets = slingshot wheel) the
@@ -355,6 +368,9 @@ static const NeiItem sNeiItems[] = {
       "Du hast das %cZeittor%w!&Eine tragbare Tür durch die Zeit,&die Macht des Zeitturms in&deinen Händen.^Drücke "
       "%y\xA1%w zum Aktivieren.&Eine Frage erscheint: %g\"Durch&die Zeit reisen?\"%w^Wähle %yJa%w um zwischen&%rKind%w "
       "und %gErwachsenem%w Link&überall zu wechseln!^Kostet %g48 Magie%w pro Nutzung." },
+    // Static forest reward: permanent ownership, no randomizer pool or get-item row.
+    { EXT_ITEM_MAGIC_MIRROR, PLAYER_IA_ELEMENTAL_WAND, PLAYER_MODELGROUP_DEFAULT, SLOT_MAGIC_MIRROR, AGE_REQ_NONE,
+      (void*)MAGIC_MIRROR_ICON_TEX, Nei_SharedIA_UpperAction, Nei_SharedIA_Init, NULL, NEI_NO_RG, NULL, NULL, NULL },
     // Bomb Arrows keeps every column EXCEPT the slot: it is the 7th value of the bow's element flag
     // (SW97_ELEM_BOMB) and owns no inventory cell, so .slot is NEI_NO_SLOT. The IA/upper-action/init
     // are still reached — ExtPlayer_GetItemAction returns PLAYER_IA_BOMB_ARROWS for a bow whose flag
@@ -375,8 +391,8 @@ static const NeiItem sNeiItems[] = {
     // IA: the active rod is NeiSaveData.wandMode. Per-rod behavior is a separate task, so the update
     // func is the generic aim handler and the init is a stub. Skijer's NEI
     { ITEM_ELEMENTAL_WAND, PLAYER_IA_ELEMENTAL_WAND, PLAYER_MODELGROUP_DEFAULT, SLOT_ELEMENTAL_WAND, AGE_REQ_NONE,
-      (void*)gItemIconElementalWandTex, Player_UpperAction_ElementalWand, Player_InitElementalWandIA,
-      Randomizer_DrawElementalWand, RG_ELEMENTAL_WAND,
+      (void*)gItemIconElementalWandTex, Nei_SharedIA_UpperAction, Nei_SharedIA_Init, Randomizer_DrawElementalWand,
+      RG_ELEMENTAL_WAND,
       "You got the %cElemental Wand%w!&Six rods in one.^%rHold%w %y\xA2%w for the rod wheel;&the stick picks and "
       "letting go&confirms.^%y\xA1%w casts the active rod.",
       "Vous obtenez la %cBaguette&Élémentaire%w!&Six sceptres en un.^%rMaintenez%w %y\xA2%w pour la roue des&sceptres; "
@@ -572,6 +588,10 @@ static const NeiItem* ExtPlayer_FindByIA(int32_t itemAction) {
  * Get the PLAYER_IA_xxx value for a given ITEM_xxx value.
  */
 int8_t ExtPlayer_GetItemAction(int32_t item) {
+    // EXT button IDs are wider than the vanilla item range; keep a neutral action.
+    if (item == EXT_ITEM_MAGIC_MIRROR) {
+        return PLAYER_IA_ELEMENTAL_WAND;
+    }
     // Handle special cases first
     if (item >= ITEM_NONE_FE) {
         return PLAYER_IA_NONE;
@@ -600,8 +620,9 @@ int8_t ExtPlayer_GetItemAction(int32_t item) {
             return PLAYER_IA_SWORD_MASTER;
         case ITEM_SWORD_BGS:
             return PLAYER_IA_SWORD_BIGGORON;
-        // Four Sword / Trident sit on B as themselves (ExtEquip_SetSlot) and swing as a one-hand
+        // Extended swords sit on B as themselves (ExtEquip_SetSlot) and swing as a one-hand
         // sword; their behaviors supply the model — no Kokiri Sword is ever written to the save.
+        case ITEM_EXT_SWORD_1:
         case ITEM_EXT_SWORD_2:
         case ITEM_EXT_SWORD_3:
             return PLAYER_IA_SWORD_KOKIRI;

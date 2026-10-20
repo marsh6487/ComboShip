@@ -10,6 +10,15 @@ from run_mm_weather_tests import production_function
 def body(path,name): return production_function((ROOT/path).read_text(),name)
 def run(name,prefix,parts,checks):
  if len(sys.argv)>1 and sys.argv[1]!=name:return
+ if any('Seasons_SeasonOwned(' in part or 'Seasons_HasRod(' in part for part in parts):
+  parts.insert(0, body('mm/mods/extended_inventory.c', 'Seasons_HasRod'))
+  prefix += '\nu16 Nei_GetOwnedItem(u8 slot){return Nei_Save()->ownedItems[slot-24];}\n'
+  prefix += 'u8 Seasons_RandoMode(){return NEI_SEASONS_INDIVIDUAL;}\nvoid Seasons_UpdateGates(){}\n'
+ if any('MMSeasonParticles_' in part for part in parts):
+  # Extracted native snow/leaf bodies now share the real editor particle policy.
+  prefix = '#include "mods/items/helpers/season_particles.h"\n' + prefix
+  if not re.search(r'\bCVarGetInteger\([^;]*\)\s*\{',prefix):
+   prefix += '\nextern "C" int32_t CVarGetInteger(const char*,int32_t fallback){return fallback;}\n'
  with tempfile.TemporaryDirectory(prefix='seasons-') as td:
   p=Path(td)/'test.cpp'
   p.write_text('#include "mods/extended_inventory.h"\n#include "mods/ext_buttons/ext_buttons.h"\n#include "overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_scope.h"\n#include <cassert>\n#include <cstring>\n#include <iostream>\n'+prefix+'\n'+'\n'.join(parts)+'\nint main(){'+checks+'\nstd::cout<<"PASS '+name+'\\n";}')
@@ -23,7 +32,7 @@ p='mm/src/overlays/kaleido_scope/ovl_kaleido_scope/z_kaleido_item.c'
 # This first assertion reproduces the reported rod->mushroom conversion using the real equip body.
 run('dpad',r'''
 SaveContext gSaveContext{};
-int32_t CVarGetInteger(const char*,int32_t){return 1;}
+extern "C" int32_t CVarGetInteger(const char*,int32_t){return 1;}
 void Interface_LoadItemIcon(PlayState*,u8){}
 void Interface_LoadItemIconImpl(PlayState*,u8){}
 void Interface_Dpad_LoadItemIcon(PlayState*,u8){}
@@ -74,7 +83,8 @@ if len(sys.argv)==1 or sys.argv[1]=='pool':
  text=(ROOT/'mm/2s2h/Rando/Logic/GeneratePools.cpp').read_text()
  pool=re.search(r'sNeiPoolItems\[\]\s*=\s*\{(.*?)\};',text,re.S).group(1)
  assert not re.search(r'\bRI_OOT_NEI_ROD_OF_SEASONS\b',pool),'bare rod must not be a placeable reward'
- for s in ['SPRING','SUMMER','AUTUMN','WINTER']: assert 'RI_OOT_NEI_SEASON_'+s in pool
+ for s in ['SPRING','SUMMER','AUTUMN','WINTER']: assert 'RI_OOT_NEI_SEASON_'+s in text
+ assert 'NEI_SEASONS_INDIVIDUAL' in text and 'RO_STARTING_ROD_OF_SEASONS' in text
  print('PASS pool')
 
 shop='mm/2s2h/Rando/ActorBehavior/EnGirlA.cpp'
@@ -123,13 +133,15 @@ u8 ItemInput_IsBlocked(Player*,PlayState*){return 0;}
 u8 ItemInput_CheckDamage(Player*,s8*){return 0;}
 u8 MasterCycle_IsRiding(){return 0;}
 u8 Pacci_UltrahandModeActive(){return 0;}
-int32_t CVarGetInteger(const char*,int32_t){return 1;}
+extern "C" int32_t CVarGetInteger(const char*,int32_t){return 1;}
 void Interface_LoadItemIconImpl(PlayState*,u8){}
 void Interface_Dpad_LoadItemIconImpl(PlayState*,u8){}
-int menus=0;typedef struct {const char* iconPath;u8 iconSize;u8 enabled;} BoxMenuEntry;
+int menus=0,seasonStyles=0,seasonFlashes=0;typedef struct {const char* iconPath;u8 iconSize;u8 enabled;} BoxMenuEntry;
 typedef void (*BoxMenuConfirmFn)(s32);
 BoxMenuConfirmFn confirmation=nullptr;BoxMenuEntry entries[5];
 u8 BoxMenu_IsOpen(){return 0;}
+void MM_BoxMenu_UseSeasonStyle(){++seasonStyles;}
+void MM_BoxMenu_StartSeasonFlash(PlayState* play){assert(play==gPlayState);++seasonFlashes;}
 u8 BoxMenu_Open(PlayState*,const BoxMenuEntry* values,s32 n,s32,u16 hold,BoxMenuConfirmFn fn){
  assert(n==5&&hold==0);memcpy(entries,values,sizeof(entries));confirmation=fn;++menus;return 1;}
 void ExtInv_RefreshButtonIconsForItem(PlayState*,u16){}
@@ -138,10 +150,11 @@ PlayState play{};Player player{};gPlayState=&play;player.transformation=PLAYER_F
 Seasons_GrantSeason(SEASON_WINTER);ExtButton_SetDpadItem(0,EQUIP_SLOT_D_UP,EXT_ITEM_ROD_OF_SEASONS);
 play.state.input[0].press.button=BTN_DUP;Seasons_TickInput(&play,&player,&play.state.input[0]);
 assert(Seasons_IsDrawn()&&menus==0);
-play.state.input[0].press.button=BTN_DUP;Seasons_TickInput(&play,&player,&play.state.input[0]);assert(menus==1&&confirmation);
+play.state.input[0].press.button=BTN_DUP;Seasons_TickInput(&play,&player,&play.state.input[0]);assert(menus==1&&confirmation&&seasonStyles==1);
 assert(entries[SEASON_WINTER].enabled&&entries[SEASON_OFF].enabled&&!entries[SEASON_SUMMER].enabled);
-confirmation(SEASON_SUMMER);assert(Seasons_GetSeason()==SEASON_WINTER);
-confirmation(SEASON_OFF);assert(Seasons_GetSeason()==SEASON_OFF);
+confirmation(SEASON_SUMMER);assert(Seasons_GetSeason()==SEASON_WINTER&&seasonFlashes==0);
+confirmation(SEASON_OFF);assert(Seasons_GetSeason()==SEASON_OFF&&seasonFlashes==1);
+confirmation(SEASON_OFF);assert(Seasons_GetSeason()==SEASON_OFF&&seasonFlashes==1);
 play.state.input[0].press.button=BTN_B;Seasons_TickInput(&play,&player,&play.state.input[0]);assert(!Seasons_IsDrawn());
 ''')
 
@@ -175,7 +188,7 @@ assert(gSaveContext.save.shipSaveInfo.dpadEquips.extItems[0][EQUIP_SLOT_D_DOWN]=
 run('icon',r'''
 #include "2s2h_assets.h"
 SaveContext gSaveContext{};TexturePtr gItemIcons[131]{};
-int32_t CVarGetInteger(const char*,int32_t){return 0;}
+extern "C" int32_t CVarGetInteger(const char*,int32_t){return 0;}
 int GameInteractor_Should(int,int result,...){return result;}
 #define VB_INTERFACE_LOAD_DPAD_ITEM_ICON 0
 void* ExtInv_GetItemIcon(u16 item){return item==EXT_ITEM_ROD_OF_SEASONS?(void*)0x1000:nullptr;}
@@ -211,7 +224,12 @@ assert(restored.seasonsOwned==0&&restored.season==SEASON_SPRING);
 ''')
 
 run('snow',r'''
+#include "mods/items/helpers/season_particles.h"
 int activeSeason=SEASON_WINTER,spawns=0;
+int snowEnabled=1;
+extern "C" int32_t CVarGetInteger(const char* key,int32_t fallback){
+ return !strcmp(key,"gAudioEditor.MMWeather.Winter.Snow") ? snowEnabled : fallback;
+}
 u8 D_801F4E30;
 int MMWeather_Season(){return activeSeason;}
 int MMWeather_SeasonForPlay(PlayState*){return activeSeason;}
@@ -229,6 +247,12 @@ play.roomCtx.curRoom.num=1;activeSeason=-1;Seasons_UpdateWeather(&play);
 assert(play.envCtx.precipitation[PRECIP_SNOW_MAX]==12);
 activeSeason=SEASON_WINTER;Seasons_UpdateWeather(&play);
 play.envCtx.precipitation[PRECIP_SNOW_MAX]=20;activeSeason=-1;Seasons_UpdateWeather(&play);
+assert(play.envCtx.precipitation[PRECIP_SNOW_MAX]==20);
+// Exercise the production presentation switch without replacing its policy.
+activeSeason=SEASON_WINTER;snowEnabled=0;
+int before=spawns;Seasons_UpdateWeather(&play);
+assert(spawns==before&&play.envCtx.precipitation[PRECIP_SNOW_MAX]==20);
+snowEnabled=1;Seasons_UpdateWeather(&play);
 assert(play.envCtx.precipitation[PRECIP_SNOW_MAX]==20);
 ''')
 
@@ -340,7 +364,8 @@ drawn=true;hand=false;CustomItems_DrawRodOfSeasons(&player,&play);assert(models=
 
 snowpath='mm/src/overlays/actors/ovl_Object_Kankyo/z_object_kankyo.c'
 snowfunctions=['ObjectKankyo_SetupAction','func_808DC454','func_808DCB7C','func_808DCBF8','func_808DBEB0','func_808DBFB0','ObjectKankyo_Init','ObjectKankyo_Update']
-autumnfunctions=['ObjectKankyo_IsAutumnOwner','ObjectKankyo_AutumnBand','ObjectKankyo_InitAutumnParticle',
+autumnfunctions=['ObjectKankyo_IsAutumnOwner','ObjectKankyo_AutumnBand',
+                 'ObjectKankyo_IsCompactAutumnScene','ObjectKankyo_AutumnViewBasis','ObjectKankyo_InitAutumnParticle',
                  'ObjectKankyo_UpdateAutumnParticles','ObjectKankyo_RestoreAutumnParticle']
 if 'ObjectKankyo_UpdateSnowTarget' in (ROOT/snowpath).read_text():
  snowfunctions.insert(2,'ObjectKankyo_UpdateSnowTarget')
@@ -357,7 +382,9 @@ int MMWeather_Season(){return activeSeason;}
 int MMWeather_SeasonForPlay(const PlayState*){return activeSeason;}
 void Actor_Kill(Actor* actor){actor->update=nullptr;actor->draw=nullptr;}
 f32 Rand_ZeroOne(){return .25f;}
-f32 MMWeather_RandomFloat(){assert(activeSeason==SEASON_AUTUMN);return .25f;}
+f32 MMWeather_RandomFloat(){assert(MMSeasonParticles_IsFallingSeason(activeSeason));return .25f;}
+// Window aspect is an external boundary; use the native 4:3 fixture viewport.
+f32 OTRGetAspectRatio(){return 4.0f/3.0f;}
 s16 Camera_GetCamDirPitch(Camera*){return 0;}
 f32 Math_Vec3f_DistXZ(Vec3f* a,Vec3f* b){return sqrtf(SQ(a->x-b->x)+SQ(a->z-b->z));}
 void func_808DBE8C(ObjectKankyo*){}

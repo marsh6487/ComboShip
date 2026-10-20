@@ -8,9 +8,9 @@ import subprocess
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-patch = (ROOT / 'patches/libultraship-custom-tex-scroll-e3cd6591.patch').read_text()
-section = patch.split('diff --git a/src/fast/interpreter.cpp')[1].split('diff --git')[0]
-added = '\n'.join(line[1:] for line in section.splitlines() if line.startswith('+') and not line.startswith('+++'))
+# Test the compiled interpreter implementation, including its current explicit
+# dispatch ABI, rather than a historical patch that may no longer apply.
+added = (ROOT / 'libultraship/src/fast/interpreter.cpp').read_text()
 
 def function(name):
     start = added.index(name)
@@ -39,7 +39,6 @@ static uint32_t GetTileSizeFromCoordinates(float low, float high) {
     return static_cast<uint32_t>(lroundf((high-low+4)/4));
 }
 '''
-source += '\n'.join(line for line in added.splitlines() if line.startswith('extern "C"'))
 for name in ('GetRepeatPeriodFromTile(', 'WrapScrollCoordinate(', 'gfx_scroll_texture_handler_custom('):
     source += '\n' + function(name)
 source += r'''

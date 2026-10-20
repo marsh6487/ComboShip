@@ -9,6 +9,7 @@
 #include "mods/transformation_masks/assets/mm_asset_loader.h"
 #include "mods/transformation_masks/gerudo_form.h"
 #include "mods/transformation_masks/custom_forms.h"
+#include "mods/transformation_masks/mask_progression.h"
 #include "mods/transformation_masks/boss_super_damage.h"
 #include "mods/items/logic/weapon_upgrades.h" // NEI Real Master Sword super-damage
 #include "mods/actors/trident_charge_ball.h"  // Trident charged ball super-damage claim
@@ -422,6 +423,7 @@ void TransformMasks_FilterB(Input* input) {
 }
 
 void TransformMasks_Update(PlayState* play, Player* player) {
+    MaskProgression_Update(play);
     // Scan C-button/D-pad for transformation mask presses.
     // OOT's Player_UseItem pipeline doesn't run in two cases, so we need a fallback:
     //   1. Transformed (any form): the form's own action loop owns gameplay; OOT's

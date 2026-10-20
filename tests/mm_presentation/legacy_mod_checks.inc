@@ -33,12 +33,21 @@
     assert(MM_TryDrawNeiGi(model.item));
     gfx.polyOpa.p=opa;gfx.polyXlu.p=xlu;
     modFiles.insert({"mm",activeAlt?"alt/"+legacy:legacy});
-    const bool vanillaSword = !activeAlt &&
-      (model.item == RI_SWORD_KOKIRI || model.item == RI_OOT_EXT_FOUR_SWORD);
-    if(vanillaSword) {
+    const bool fourSword = model.item == RI_OOT_EXT_FOUR_SWORD;
+    const bool vanillaSword = !activeAlt && model.item == RI_SWORD_KOKIRI;
+    if(vanillaSword || fourSword) {
+      // Four's authored GI belongs to OoT, not the borrowed MM Kokiri pair.
+      // Generic MM Kokiri/Din overrides retain the Four mesh in both modes.
       assert(MM_DescribeNeiGi(model.item,&info));
-      assert(std::strncmp(info.dlists[0],"__OTR__@oot-gi-base:",20)==0);
-      assert(MM_TryDrawNeiGi(model.item));
+      if(fourSword) {
+        const auto routed=std::string(activeAlt?"__OTR__@oot:":"__OTR__@oot-gi-base:")+authored.substr(7);
+        assert(info.dlistCount==1 && info.dlists[0]==routed);
+        assert(MM_TryDrawNeiGi(model.item));
+        assert(Drawn(true)==std::vector<std::string>{routed});
+      } else {
+        assert(std::strncmp(info.dlists[0],"__OTR__@oot-gi-base:",20)==0);
+        assert(MM_TryDrawNeiGi(model.item));
+      }
     } else {
       assert(!MM_DescribeNeiGi(model.item,&info));
       assert(!MM_TryDrawNeiGi(model.item)&&gfx.polyOpa.p==opa&&gfx.polyXlu.p==xlu);
@@ -48,9 +57,34 @@
       assert(OOT_GetNeiGiDrawInfo(model.slug,&info));
     modFiles.clear();assert(MM_DescribeNeiGi(model.item,&info));
   }
+  // Four-specific blade/hilt overrides follow their actual OoT owner. MM-local
+  // names cannot replace that pair, and vanilla remains on shipped geometry.
+  for(const char* path:{"objects/object_nei_four_sword/gNeiFourSwordBladeDL",
+                       "objects/object_nei_four_sword/gNeiFourSwordHiltDL"})
+  for(const char* owner:{"oot","mm"})
+  for(bool activeAlt:{false,true}) for(bool ownerAltEnabled:{false,true}) {
+    Reset();alt=activeAlt;ownerAlt=ownerAltEnabled;
+    const std::string authored="__OTR__objects/nei_gi_redesign/four_sword/gi_dl";
+    const auto legacy=std::string("__OTR__")+path;
+    files.insert(authored);files.insert(legacy);files.insert("alt/"+legacy);
+    const bool selectedAlt=std::strcmp(owner,"oot")==0?ownerAltEnabled:activeAlt;
+    modFiles.insert({owner,selectedAlt?"alt/"+legacy:legacy});
+    CwItemDrawInfo info{};
+    if(activeAlt && std::strcmp(owner,"oot")==0) {
+      assert(!MM_DescribeNeiGi(RI_OOT_EXT_FOUR_SWORD,&info));
+      assert(!MM_TryDrawNeiGi(RI_OOT_EXT_FOUR_SWORD));
+      assert(Drawn().empty() && gfx.polyOpa.p==opa && gfx.polyXlu.p==xlu);
+    } else {
+      const auto routed=std::string(activeAlt?"__OTR__@oot:":"__OTR__@oot-gi-base:")+authored.substr(7);
+      assert(MM_DescribeNeiGi(RI_OOT_EXT_FOUR_SWORD,&info));
+      assert(info.dlistCount==1 && info.dlists[0]==routed);
+      assert(MM_TryDrawNeiGi(RI_OOT_EXT_FOUR_SWORD));
+      assert(Drawn(true)==std::vector<std::string>{routed});
+    }
+  }
   Reset();ownerAlt=false;
   files.insert("__OTR__objects/nei_gi_redesign/shadow_scepter/gi_dl");
   modFiles.insert({"mm","__OTR__objects/object_nei_wand_shadow_scepter/gNeiShadowScepterDL"});
   CwItemDrawInfo info{};assert(MM_DescribeNeiGi(RI_OOT_NEI_WAND_SHADOW_SCEPTER,&info));
-  std::cout<<"PASS MM legacy GI priority: 19 actual MM roots, both split parts, base/Alt, real native describe/draw selectors, held-only wand exclusion\n";
+  std::cout<<"PASS MM legacy GI priority: 19 MM root bindings, native split parts, Four's actual owner pair, independent base/Alt, real describe/draw selectors, held-only wand exclusion\n";
 }

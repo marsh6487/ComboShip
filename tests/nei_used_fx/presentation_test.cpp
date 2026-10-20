@@ -1,6 +1,10 @@
 // Execute the production C ABI wrapper. Only the engine matrix/render boundary
 // is replaced; samplers and dispatch run unchanged.
+#ifdef NEI_USED_FX_MM
+#include "mm/2s2h/Rando/NeiUsedMagicPresentation.cpp"
+#else
 #include "soh/Enhancements/randomizer/NeiUsedMagicPresentation.cpp"
+#endif
 #include <cassert>
 #include <iostream>
 #include <vector>
@@ -18,9 +22,20 @@ bool textures = false;
 size_t texturedVertices = 0;
 uint32_t expectedFallbackColor = 0;
 } // namespace Fixture
+#ifdef NEI_USED_FX_MM
+using FixtureMatrixMode = MatrixMode;
+#else
+using FixtureMatrixMode = uint8_t;
+#endif
 extern "C" {
 CustomItemState gCustomItemState{};
+#ifdef NEI_USED_FX_MM
+// Rod art belongs to the OoT owner even when the native MM manager has no copy.
+uint8_t ResourceMgr_FileExists(const char *) { return 0; }
+int NeiResource_Available(const char *) { return Fixture::textures; }
+#else
 uint8_t ResourceMgr_FileExists(const char *) { return Fixture::textures; }
+#endif
 uint8_t ResourceMgr_FileAltExists(const char *) { return 0; }
 bool ResourceMgr_IsAltAssetsEnabled() { return false; }
 void Matrix_MultVec3f(Vec3f *p, Vec3f *out) {
@@ -34,11 +49,11 @@ void Matrix_Pop() {
   Fixture::pose = Fixture::stack.back();
   Fixture::stack.pop_back();
 }
-void Matrix_Translate(float x, float y, float z, uint8_t mode) {
+void Matrix_Translate(float x, float y, float z, FixtureMatrixMode mode) {
   assert(mode == MTXMODE_NEW);
   Fixture::pose = {{x, y, z}, 1};
 }
-void Matrix_Scale(float x, float y, float z, uint8_t mode) {
+void Matrix_Scale(float x, float y, float z, FixtureMatrixMode mode) {
   assert(mode == MTXMODE_APPLY && x == y && y == z);
   Fixture::pose.scale *= x;
 }
@@ -91,7 +106,7 @@ int main() {
   restored();
   assert(Fixture::draws.size() > before);
   assert(Fixture::draws.back().position.x == 100 && Fixture::draws.back().position.y == 205);
-  assert(std::string(Fixture::materials.back().path) == "__OTR__objects/nei_rod_attack/fire_release_crest");
+  assert(std::string(Fixture::materials.back().path) == "__OTR__objects/nei_rod_cast_poc6/fire_natural");
   gCustomItemState.fireRodCharging = 1;
   gCustomItemState.fireRodChargeLevel = 1;
   NeiUsedMagic_DrawChargeFocus(&play, 0);
@@ -144,13 +159,16 @@ int main() {
     Fixture::materials.clear();
     NeiUsedMagic_DrawSpin(&play, &player, element, 500, true);
     restored();
-    assert(Fixture::materials.size() == 2);
-    for (const auto &material : Fixture::materials) {
-      assert(std::string(material.path) ==
-             (element == 0 ? "__OTR__objects/nei_rod_attack/fire_release_crest"
-                           : "__OTR__objects/nei_rod_attack/ice_release_crest"));
-      assert(material.repeatS && !material.repeatT);
-    }
+    assert(Fixture::materials.size() == (element == 0 ? 2 : 3));
+    const auto crest = Fixture::materials[Fixture::materials.size() - 2];
+    const auto flow = Fixture::materials.back();
+    assert(std::string(crest.path) == (element == 0 ? "__OTR__objects/nei_rod_cast_poc6/fire_natural"
+                                                  : "__OTR__objects/nei_rod_cast_poc6/ice_fracture_release"));
+    assert(std::string(flow.path) == (element == 0 ? "__OTR__objects/nei_rod_cast_poc6/fire_natural"
+                                                 : "__OTR__objects/nei_rod_cast_poc6/ice_fracture_release"));
+    assert(crest.repeatS && !crest.repeatT && flow.repeatS && flow.repeatT);
+    if (element == 1)
+      assert(std::string(Fixture::materials[0].path) == "__OTR__objects/nei_used_magic/ice_fracture");
   }
   Fixture::textures = false;
   const uint32_t fallbackColors[] = {0xFFB657, 0xA5E9FF, 0xFFF3B8};

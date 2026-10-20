@@ -2,6 +2,7 @@
 #define BenJsonConversions_hpp
 
 #include <nlohmann/json.hpp>
+#include "../../combo/ComboGameMode.h"
 #include <spdlog/spdlog.h>
 #include "build.h"
 #include <cstring> // memset for NEI save defaults (Skijer's NEI)
@@ -55,6 +56,8 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "ownedItems", n.ownedItems },
         { "hyliasGraceOwned", n.hyliasGraceOwned },
         { "phantomHourglassOwned", n.phantomHourglassOwned },
+        { "timeGateOwned", n.timeGateOwned },
+        { "magicMirrorOwned", n.magicMirrorOwned },
         { "shovelOwned", n.shovelOwned },
         { "dominionOwned", n.dominionOwned },
         { "pokeballOwned", n.pokeballOwned },
@@ -148,12 +151,17 @@ inline void to_json(json& j, const NeiSaveData& n) {
         { "slateRunesOwned", n.slateRunesOwned },
         { "season", n.season },
         { "seasonsOwned", n.seasonsOwned },
+        { "seasonsRodOwned", n.seasonsRodOwned },
+        { "seasonsGates", n.seasonsGates },
+        { "comboSariaSongClaimed", n.comboSariaSongClaimed },
         { "ootCanGrab", n.ootCanGrab },
         { "activeCustomForm", n.activeCustomForm },
         { "marioMaskOwned", n.marioMaskOwned },
         { "comboSpeedUpgrades", n.comboSpeedUpgrades },
         { "comboSpeedRequired", n.comboSpeedRequired },
         { "comboRpg", ComboRpg::ToJson(n.comboRpg) },
+        { "swordElements", n.swordElements },
+        { "swordElementSet", n.swordElementSet },
     };
 }
 
@@ -172,6 +180,8 @@ inline void from_json(const json& j, NeiSaveData& n) {
     }
     n.hyliasGraceOwned = j.value("hyliasGraceOwned", (uint8_t)0);
     n.phantomHourglassOwned = j.value("phantomHourglassOwned", (uint8_t)0);
+    n.timeGateOwned = j.value("timeGateOwned", (uint8_t)0);
+    n.magicMirrorOwned = j.value("magicMirrorOwned", (uint8_t)0);
     n.shovelOwned = j.value("shovelOwned", (uint8_t)0);
     n.dominionOwned = j.value("dominionOwned", (uint8_t)0);
     n.pokeballOwned = j.value("pokeballOwned", (uint8_t)0);
@@ -282,6 +292,9 @@ inline void from_json(const json& j, NeiSaveData& n) {
     n.slateRunesOwned = j.value("slateRunesOwned", (uint8_t)0);
     n.season = j.value("season", (uint8_t)0);
     n.seasonsOwned = j.value("seasonsOwned", (uint8_t)0);
+    n.seasonsRodOwned = j.value("seasonsRodOwned", (uint8_t)0);
+    n.seasonsGates = j.value("seasonsGates", (uint8_t)0);
+    n.comboSariaSongClaimed = j.value("comboSariaSongClaimed", (uint8_t)0);
     n.ootCanGrab = j.value("ootCanGrab", (uint8_t)0);
     n.activeCustomForm = j.value("activeCustomForm", (uint8_t)0);
     n.marioMaskOwned = j.value("marioMaskOwned", (uint8_t)0);
@@ -290,6 +303,23 @@ inline void from_json(const json& j, NeiSaveData& n) {
     if (j.contains("comboRpg"))
         ComboRpg::MergeJson(n.comboRpg, j["comboRpg"]);
     ComboRpg::MigrateLegacySpeed(n.comboRpg, n.comboSpeedUpgrades, n.comboSpeedRequired);
+    // Keep all eight stable slots, including explicit None. Validate before byte
+    // conversion so malformed/short legacy data cannot select another element.
+    auto swordElements = j.find("swordElements");
+    if (swordElements != j.end() && swordElements->is_array()) {
+        for (size_t i = 0; i < 8 && i < swordElements->size(); ++i) {
+            const auto& value = (*swordElements)[i];
+            if (value.is_number_integer() && (value.is_number_unsigned() || value.get<int64_t>() >= 0) &&
+                value.get<uint64_t>() < 4) {
+                n.swordElements[i] = value.get<uint8_t>();
+            }
+        }
+    }
+    auto swordElementSet = j.find("swordElementSet");
+    if (swordElementSet != j.end() && swordElementSet->is_number_integer() &&
+        (swordElementSet->is_number_unsigned() || swordElementSet->get<int64_t>() >= 0)) {
+        n.swordElementSet = (uint8_t)(swordElementSet->get<uint64_t>() & 0xFFu);
+    }
 }
 
 // Spiritual Stones — per-save state (gSaveContext.save.shipSaveInfo.spiritualStones).
@@ -449,6 +479,7 @@ inline void to_json(json& j, const ShipSaveInfo& shipSaveInfo) {
         { "dpadEquips", shipSaveInfo.dpadEquips },
         { "extButtons", shipSaveInfo.extButtons },
         { "pauseSaveEntrance", shipSaveInfo.pauseSaveEntrance },
+        { "persistentBunnyHood", shipSaveInfo.persistentBunnyHood },
         { "saveType", shipSaveInfo.saveType },
         { "fileCreatedAt", shipSaveInfo.fileCreatedAt },
         { "fileCompletedAt", shipSaveInfo.fileCompletedAt },
@@ -473,6 +504,7 @@ inline void from_json(const json& j, ShipSaveInfo& shipSaveInfo) {
         memset(&shipSaveInfo.extButtons, 0, sizeof(shipSaveInfo.extButtons));
     }
     j.at("pauseSaveEntrance").get_to(shipSaveInfo.pauseSaveEntrance);
+    j.at("persistentBunnyHood").get_to(shipSaveInfo.persistentBunnyHood);
     j.at("saveType").get_to(shipSaveInfo.saveType);
     j.at("fileCreatedAt").get_to(shipSaveInfo.fileCreatedAt);
     j.at("fileCompletedAt").get_to(shipSaveInfo.fileCompletedAt);
@@ -491,13 +523,12 @@ inline void from_json(const json& j, ShipSaveInfo& shipSaveInfo) {
     }
 
     if (shipSaveInfo.saveType == SAVETYPE_RANDO) {
-#ifndef COMBO_BUILD
-        // ComboShip: tolerate cross-build rando saves on the combosave path (mirrors SoH's !comboSrc exemption).
-        if (strcmp(shipSaveInfo.commitHash, gGitCommitHash) != 0) {
+        // Combined containers keep their existing compatibility policy; native
+        // randomizer saves retain MM's version check.
+        if (!Combo_IsCombinedGame() && strcmp(shipSaveInfo.commitHash, gGitCommitHash) != 0) {
             SPDLOG_ERROR("Randomizer saves cannot be loaded from a different version.");
-            throw new std::runtime_error("Randomizer saves cannot be loaded from a different version.");
+            throw std::runtime_error("Randomizer saves cannot be loaded from a different version.");
         }
-#endif
 
         j.at("rando").get_to(shipSaveInfo.rando);
     }

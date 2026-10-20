@@ -517,6 +517,10 @@ void MmForm_DevTransformTo(PlayState* play, Player* player, MmPlayerTransformati
 void TransformMasks_Init(PlayState* play, Player* player);
 void TransformMasks_Update(PlayState* play, Player* player);
 void TransformMasks_Draw(PlayState* play, Player* player);
+void MmForm_DrawNativeTransformationLimb(PlayState* play, Player* player, s32 limbIndex);
+void MmForm_OnPlayDestroy(PlayState* play, Player* player);
+u8 MmForm_IsNativeTransformationPlaying(PlayState* play, Player* player);
+void MmForm_DrawNativeTransformationPostProcess(PlayState* play);
 
 // Strip BTN_B from a Player_Update input copy before Player_UpdateCommon runs.
 // Centralizes the cases where B is reserved by a custom system (currently:

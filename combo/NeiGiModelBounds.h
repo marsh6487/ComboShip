@@ -28,6 +28,7 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
     }
 
     bool Read(const char* path, FrameBounds& out, bool allowEmpty = false) {
+        mComplete = false;
         const auto root = std::dynamic_pointer_cast<Fast::DisplayList>(mLoad(path));
         if (!Walk(root, 0) || !mStack.empty())
             return false;
@@ -36,7 +37,17 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
             return allowEmpty; // Native sword detail/color passes can be geometry-free.
         }
         out = { "selected_sword", { 0, mLow, 0 }, { 0, mHigh, 0 }, 2.f * mRadius, Kind::Neutral, {} };
-        return (mHigh > mLow || (TrackDepth && mDepthHigh > mDepthLow)) && mRadius > 0.f;
+        return mComplete = (mHigh > mLow || (TrackDepth && mDepthHigh > mDepthLow)) && mRadius > 0.f;
+    }
+
+    // Observational XYZ accessor: retain Read's established radial/Y fit output.
+    bool ExactBounds(Point& minimum, Point& maximum) const {
+        static_assert(TrackDepth, "Exact frame queries track all three axes");
+        if (!mComplete || !mVertices)
+            return false;
+        minimum = { mWidthLow, mLow, mDepthLow };
+        maximum = { mWidthHigh, mHigh, mDepthHigh };
+        return true;
     }
 
     float ShieldTiltX() const {
@@ -44,6 +55,23 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
         // Correct an XZ-oriented shield without tilting an already upright
         // replacement. The margin leaves ordinary thick/angled meshes alone.
         return mDepthHigh - mDepthLow > 2.f * (mHigh - mLow) ? 1.5707963267948966f : 0.f;
+    }
+
+    float ShieldRollZ() const {
+        static_assert(TrackDepth);
+        // Fados' worn Ikana mesh has a -X chin inside a nearly round rim.
+        // Match its selected vertex stream, not a shared filename or relaxed
+        // span threshold. Resource transforms and edited meshes stay generic.
+        if (!mHasModelMatrix && mShieldVertexHashValid && mVertices == 2290 &&
+            mShieldVertexHash == 0x015b5334888c6583ull)
+            return 1.5707963267948966f;
+        // After standing an arm-local XZ mesh up, its face can still point
+        // sideways. Use spans, not distance from the off-center grip origin.
+        // Bounds cannot identify a sideways face inside a square rim. Leave
+        // ambiguous frames alone; correct only a clearly longer X axis.
+        const float height = ShieldTiltX() != 0.f ? mDepthHigh - mDepthLow : mHigh - mLow;
+        // The worn MM shield's face is authored with its chin toward -X.
+        return mWidthHigh - mWidthLow > 1.05f * height ? 1.5707963267948966f : 0.f;
     }
 
     bool RestoresModelView() const {
@@ -68,7 +96,7 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
     }
 
     bool Vertices(const std::shared_ptr<Ship::IResource>& resource, size_t offset, size_t count,
-                  bool byteOffset = false) {
+                  bool byteOffset = false, size_t cacheIndex = 0) {
         return WithVertexData(resource, [&](const auto& vertices) {
             if (byteOffset) {
                 const size_t stride = sizeof(vertices[0]);
@@ -99,10 +127,28 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
                 }
                 const float x = transformed[0] * mCos - transformed[1] * mSin;
                 const float y = transformed[0] * mSin + transformed[1] * mCos;
+                if constexpr (requires { mLoad.SurfaceVertex(transformed, cacheIndex); }) {
+                    if (!mLoad.SurfaceVertex(transformed, cacheIndex + i - offset))
+                        return false;
+                }
                 mLow = std::min(mLow, y);
                 mHigh = std::max(mHigh, y);
                 mRadius = std::max(mRadius, std::hypot(x, transformed[2]));
                 if constexpr (TrackDepth) {
+                    if (mShieldVertexHashValid) {
+                        for (int axis = 0; axis < 3; ++axis) {
+                            const float coordinate = p[axis];
+                            if (coordinate < -32768.f || coordinate > 32767.f || std::trunc(coordinate) != coordinate) {
+                                mShieldVertexHashValid = false;
+                                break;
+                            }
+                            const uint16_t word = static_cast<uint16_t>(static_cast<int16_t>(coordinate));
+                            mShieldVertexHash = (mShieldVertexHash ^ (word & 0xffu)) * 0x100000001b3ull;
+                            mShieldVertexHash = (mShieldVertexHash ^ (word >> 8)) * 0x100000001b3ull;
+                        }
+                    }
+                    mWidthLow = std::min(mWidthLow, x);
+                    mWidthHigh = std::max(mWidthHigh, x);
                     mDepthLow = std::min(mDepthLow, transformed[2]);
                     mDepthHigh = std::max(mDepthHigh, transformed[2]);
                 }
@@ -124,6 +170,7 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
         // cannot reliably contain such geometry without changing the asset.
         if (!matrix || (flags & ~(uint32_t)G_MTX_PUSH) || mStack.size() >= 32)
             return false;
+        mHasModelMatrix = true;
         Matrix decoded{};
 #ifdef GBI_FLOATS
         for (int row = 0; row < 4; ++row)
@@ -197,7 +244,7 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
                     return false;
                 const auto& args = commands[i];
                 if (!Vertices(mLoad(reinterpret_cast<const char*>(command.words.w1)), args.words.w1 & 0xffffu,
-                              args.words.w0))
+                              args.words.w0, false, (args.words.w1 >> 16) & 0xffffu))
                     return false;
             } else if (op == G_MTX_OTR_FILEPATH) {
                 if (!ApplyMatrix(MatrixResource(reinterpret_cast<const char*>(command.words.w1)),
@@ -223,7 +270,26 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
                     if (!ApplyMatrix(resource, (command.words.w0 & 0xffu) ^ G_MTX_PUSH))
                         return false;
                 } else {
-                    if (!Vertices(resource, command.words.w1, (command.words.w0 >> 12) & 0xff, true))
+                    const size_t count = (command.words.w0 >> 12) & 0xff;
+                    const size_t end = (command.words.w0 >> 1) & 0x7f;
+                    if (!Vertices(resource, command.words.w1, count, true, end - count))
+                        return false;
+                }
+            } else if (op == G_TRI1_OTR) {
+                if constexpr (requires { mLoad.SurfaceTriangle(size_t{}, size_t{}, size_t{}); }) {
+                    // XML Triangle1 uses direct indices in separate words;
+                    // the native packed TRI1/TRI2 encoding below uses index*2.
+                    if (!mLoad.SurfaceTriangle(command.words.w0 & 0xffffffu, (command.words.w1 >> 16) & 0xffffu,
+                                               command.words.w1 & 0xffffu))
+                        return false;
+                }
+            } else if (op == G_TRI1 || op == G_TRI2 || op == G_QUAD) {
+                if constexpr (requires { mLoad.SurfaceTriangle(size_t{}, size_t{}, size_t{}); }) {
+                    const auto triangle = [&](uintptr_t word) {
+                        const size_t a = (word >> 16) & 0xff, b = (word >> 8) & 0xff, c = word & 0xff;
+                        return !(a & 1 || b & 1 || c & 1) && mLoad.SurfaceTriangle(a / 2, b / 2, c / 2);
+                    };
+                    if (!triangle(command.words.w0) || ((op == G_TRI2 || op == G_QUAD) && !triangle(command.words.w1)))
                         return false;
                 }
             } else if (op == G_DL) {
@@ -247,8 +313,11 @@ template <class Load, bool TrackDepth = false> class ModelBoundsReader {
     Load& mLoad;
     float mSin, mCos, mLow = std::numeric_limits<float>::max(), mHigh = -std::numeric_limits<float>::max();
     float mRadius = 0;
+    float mWidthLow = std::numeric_limits<float>::max(), mWidthHigh = -std::numeric_limits<float>::max();
     float mDepthLow = std::numeric_limits<float>::max(), mDepthHigh = -std::numeric_limits<float>::max();
     size_t mVertices = 0, mCommands = 0;
+    uint64_t mShieldVertexHash = 0xcbf29ce484222325ull;
+    bool mShieldVertexHashValid = true, mHasModelMatrix = false, mComplete = false;
     Matrix mMatrix{ { { { 1, 0, 0, 0 } }, { { 0, 1, 0, 0 } }, { { 0, 0, 1, 0 } }, { { 0, 0, 0, 1 } } } };
     std::vector<Matrix> mStack;
 };

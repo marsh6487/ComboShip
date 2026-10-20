@@ -25,7 +25,7 @@ static struct {
 static std::atomic<bool> gFscAudioMuted{false};
 static std::atomic<int> buffered{0};
 static unsigned synthUpdates, synthFrames, batches, weatherCalls, midnaCalls,
-    midnaResets;
+    midnaResets, emoteCalls;
 static int desired = 4096;
 
 static int AudioPlayer_Buffered() { return buffered; }
@@ -51,11 +51,21 @@ static void MMMidnaAudio_Mix(s16 *buffer, size_t frames) {
   ++midnaCalls;
 }
 static void MMMidnaAudio_Reset() { ++midnaResets; }
+#if TEST_AUDIO_WORKER_EMOTES
+static void ComboEmotes_MixAudio(s16 *buffer, size_t frames) {
+  for (size_t i = 0; i < frames * 2; ++i) {
+    assert(buffer[i] == 1500);
+    buffer[i] += 400;
+  }
+  ++emoteCalls;
+}
+#endif
 static void AudioPlayer_Play(const u8 *buffer, size_t bytes) {
   const auto *pcm = reinterpret_cast<const s16 *>(buffer);
   assert(weatherCalls == batches + 1 && midnaCalls == batches + 1);
+  assert(emoteCalls == (TEST_AUDIO_WORKER_EMOTES ? batches + 1 : 0));
   for (size_t i = 0; i < bytes / sizeof(s16); ++i) {
-    assert(pcm[i] == (gFscAudioMuted ? 0 : 1500));
+    assert(pcm[i] == (gFscAudioMuted ? 0 : (TEST_AUDIO_WORKER_EMOTES ? 1900 : 1500)));
   }
   buffered += bytes / (sizeof(s16) * 2);
   assert(buffered <= desired);
@@ -80,7 +90,7 @@ static void start() {
   audio.processing = false;
   buffered = 0;
   synthUpdates = synthFrames = batches = weatherCalls = midnaCalls =
-      midnaResets = 0;
+      midnaResets = emoteCalls = 0;
   audio.thread = std::thread(OTRAudio_Thread);
 }
 static void stop() {

@@ -3,9 +3,15 @@
 #ifdef COMBO_BUILD
 #include "global.h"
 #include "BenPort.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/Enhancements/Gameplay/BlackMarket.h"
+extern int32_t Combo_MM_ConsumeCrossDungeonArrival(void);
+extern int32_t Combo_MM_ConsumeCrossDungeonRecovery(void);
+extern int32_t Combo_MM_ConsumeCrossBossRecoveryResume(void);
 #endif
 #include "z64save.h"
+#include "gameplay/ComboFaroresWind.h"
 
 void Setup_InitRegs(void) {
     XREG(2) = 0;
@@ -62,7 +68,7 @@ void Setup_InitImpl(SetupState* this) {
 #ifdef COMBO_BUILD
     s32 loadedOwlSave;
 
-    if (gComboStartFileNum >= 0) {
+    if (Combo_IsCombinedGame() && gComboStartFileNum >= 0) {
         // Sram_LoadGlobalOptions above found no global.json in combo, so take OOT's settings.
         Combo_AdoptOOTGlobalOptions();
         // Set flashSaveAvailable so Sram_Alloc allocates saveBuf (normally set by the title screen).
@@ -110,6 +116,27 @@ void Setup_InitImpl(SetupState* this) {
         // and re-runs ShipInit::Init("IS_RANDO"). COND_* macros are unregister-then-register, so it's
         // idempotent. Without it the combo force-spawn loads a rando save whose behaviors never activate.
         GameInteractor_ExecuteOnSaveLoad(gSaveContext.fileNum);
+        MM_ApplyComboPortalArrival();
+        ComboBlackMarket_ApplyResume(gComboEntryIsResume);
+        // These entrances are already composed. Apply after native save/load hooks and never send
+        // them through transition permutation a second time. Preserve the loaded MM day/time.
+        s32 crossDungeonArrival = Combo_MM_ConsumeCrossDungeonArrival();
+        s32 crossBossRecovery = Combo_MM_ConsumeCrossBossRecoveryResume();
+        s32 crossDungeonRecovery = crossDungeonArrival < 0 && crossBossRecovery < 0 && gComboEntryIsResume
+                                       ? Combo_MM_ConsumeCrossDungeonRecovery()
+                                       : -1;
+        if (crossDungeonArrival >= 0 || crossBossRecovery >= 0 || crossDungeonRecovery >= 0) {
+            gSaveContext.save.entrance = crossDungeonArrival >= 0 ? crossDungeonArrival
+                                         : crossBossRecovery >= 0 ? crossBossRecovery
+                                                                  : crossDungeonRecovery;
+            // The consumed arrival owns respawn mode, including a positioned grotto-hole return.
+            // A departure checkpoint may carry a pause-save marker. Player_Init would
+            // turn its grotto jump into a stationary spawn over the hole if retained.
+            gSaveContext.save.shipSaveInfo.pauseSaveEntrance = -1;
+            gSaveContext.save.isOwlSave = false;
+            gSaveContext.save.cutsceneIndex = 0;
+        }
+        ComboFw_ApplyArrival(); // Explicit recall takes precedence over ordinary save recovery.
 
         // ComboShip (#182): consume the owl save like Sram_OpenSave does, so it can't shadow the newer
         // state we just continued into. Vetoed for Persistent Owl Saves and for pause/auto saves.

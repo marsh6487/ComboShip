@@ -526,6 +526,58 @@ static void Page2Relayout_Heal(void) {
         ExtInv_SetSlotItem(SLOT_SHADOW_CRYSTAL, ITEM_NONE);
     }
     GraceHourglass_Heal();
+    TravelTools_Heal();
+}
+
+// Time Gate and Magic Mirror use distinct u16 identities behind one inventory cell.
+#define TRAVEL_TOOLS_KALEIDO_CELL (SLOT_MAGIC_MIRROR - 24)
+
+static void TravelTools_KaleidoCycle(PlayState* play, s32 dir) {
+    uint16_t oldItem = ExtInv_GetSlotItem(SLOT_MAGIC_MIRROR);
+    uint16_t newItem = oldItem == ITEM_TIME_GATE ? EXT_ITEM_MAGIC_MIRROR : ITEM_TIME_GATE;
+    (void)dir;
+    ExtInv_SetSlotItem(SLOT_MAGIC_MIRROR, newItem);
+    play->pauseCtx.cursorItem[PAUSE_ITEM] = newItem;
+    play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    for (s32 btn = EQUIP_SLOT_C_LEFT; btn <= EQUIP_SLOT_C_RIGHT; ++btn) {
+        if (ExtButton_GetItem(0, btn) == oldItem) {
+            if (newItem > 0xFF) {
+                ExtButton_SetItem(0, btn, newItem);
+            } else {
+                ExtButton_ClearItem(0, btn);
+                BUTTON_ITEM_EQUIP(0, btn) = (u8)newItem;
+            }
+            C_SLOT_EQUIP(0, btn) = newItem > 0xFF ? SLOT_NONE : SLOT_MAGIC_MIRROR + 48;
+            Interface_LoadItemIconImpl(play, (u8)btn);
+        }
+    }
+    for (s32 btn = EQUIP_SLOT_D_RIGHT; btn <= EQUIP_SLOT_D_UP; ++btn) {
+        if (ExtButton_GetDpadItem(0, btn) == oldItem) {
+            ExtButton_SetDpadItem(0, btn, newItem);
+            DPAD_SLOT_EQUIP(0, btn) = SLOT_MAGIC_MIRROR + 48;
+            Interface_Dpad_LoadItemIconImpl(play, (u8)btn);
+        }
+    }
+}
+
+static void TravelTools_KaleidoHandle(PlayState* play) {
+    u8 canToggle = TravelTools_IsOwned(ITEM_TIME_GATE) && TravelTools_IsOwned(EXT_ITEM_MAGIC_MIRROR);
+    if (gCurrentItemCyclingSlot == TRAVEL_TOOLS_KALEIDO_CELL &&
+        (!canToggle || play->pauseCtx.cursorSlot[PAUSE_ITEM] != TRAVEL_TOOLS_KALEIDO_CELL)) {
+        KaleidoScope_ResetItemCycling();
+    }
+    KaleidoWheel_Run(play, TRAVEL_TOOLS_KALEIDO_CELL, canToggle, TravelTools_KaleidoCycle);
+}
+
+static void TravelTools_KaleidoDraw(PlayState* play) {
+    uint16_t current = ExtInv_GetSlotItem(SLOT_MAGIC_MIRROR);
+    uint16_t other = current == ITEM_TIME_GATE ? EXT_ITEM_MAGIC_MIRROR : ITEM_TIME_GATE;
+    void* icon = ExtInv_GetItemIcon(other);
+    // Explicit textures retain the mirror's full-width ID in the byte-based renderer.
+    KaleidoScope_DrawItemCycleExtrasTinted(play, TRAVEL_TOOLS_KALEIDO_CELL,
+                                           TravelTools_IsOwned(ITEM_TIME_GATE) &&
+                                               TravelTools_IsOwned(EXT_ITEM_MAGIC_MIRROR),
+                                           ITEM_TIME_GATE, ITEM_TIME_GATE, true, icon, icon, NULL, NULL);
 }
 
 // Grace and the hourglass use distinct u16 identities behind one inventory cell.
@@ -921,10 +973,20 @@ static void Sw97Wheel_Draw(PlayState* play, s32 cell, u8 isSling) {
 // still missing. This is the pattern that keeps the page-2 slot array from growing.
 #define WAND_KALEIDO_CELL (SLOT_ELEMENTAL_WAND - 24)
 
+static void Wand_KaleidoSyncTitle(PlayState* play) {
+    static u8 namedMode = 0xFF;
+    u8 mode = Wand_ModeCount() ? Wand_GetMode() : 0xFF;
+    if (play->pauseCtx.namedItem == ITEM_ELEMENTAL_WAND && namedMode != mode) {
+        play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    }
+    namedMode = mode;
+}
+
 static void Wand_KaleidoHandle(PlayState* play) {
     Input* input = CONTROLLER1(&play->state);
     PauseContext* pauseCtx = &play->pauseCtx;
 
+    Wand_KaleidoSyncTitle(play);
     if (ExtInv_GetSlotItem(SLOT_ELEMENTAL_WAND) == ITEM_NONE) {
         return;
     }
@@ -948,6 +1010,7 @@ static void Wand_KaleidoHandle(PlayState* play) {
         if (dir != 0) {
             Audio_PlaySfx(NA_SE_SY_CURSOR);
             Wand_SetMode(Wand_ModeNeighbor(Wand_GetMode(), dir));
+            pauseCtx->namedItem = PAUSE_ITEM_NONE;
             // The HUD caches the resolved icon per button (iconItemSegment[]); the item id did not
             // change, so ask for the reload — same reasoning as Sw97_RefreshButtonIcons.
             ExtInv_RefreshButtonIconsForItem(play, ITEM_ELEMENTAL_WAND);
@@ -1150,6 +1213,7 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
         Slate_KaleidoHandle(play);   // Sheikah Slate rune selector (Skijer's NEI)
         Lantern_KaleidoHandle(play); // Lantern fire-type selector (ported from SoH)
         GraceHourglass_KaleidoHandle(play);
+        TravelTools_KaleidoHandle(play);
         Shovel_KaleidoHandle(play); // Shovel <-> Dominion Rod (2026-08-06 re-layout)
         return;
     }
@@ -1301,6 +1365,7 @@ void KaleidoScope_DrawItemCycles(PlayState* play) {
         Slate_KaleidoDraw(play);   // Sheikah Slate rune selector (Skijer's NEI)
         Lantern_KaleidoDraw(play); // Lantern fire-type selector (ported from SoH)
         GraceHourglass_KaleidoDraw(play);
+        TravelTools_KaleidoDraw(play);
         Shovel_KaleidoDraw(play); // Shovel <-> Dominion Rod (2026-08-06 re-layout)
         return;
     }
@@ -1893,6 +1958,21 @@ void KaleidoScope_UpdateItemCursor(PlayState* play) {
             return;
         }
 
+        // An empty first page leaves the cursor on an arrow. L must work there too,
+        // otherwise owned customs and masks on the other pages cannot be reached.
+        if ((pauseCtx->debugEditor == DEBUG_EDITOR_NONE) &&
+            CHECK_BTN_ALL(CONTROLLER1(&play->state)->press.button, BTN_L) && ExtInv_CanSwitchPage() &&
+            (ExtInv_GetMaxPages() > 1)) {
+            ExtInv_SwitchPage();
+            pauseCtx->namedItem = PAUSE_ITEM_NONE;
+            cursorItem = ExtInv_GetSlotItem(ExtInv_GetInventorySlot(pauseCtx->cursorPoint[PAUSE_ITEM]));
+            pauseCtx->cursorItem[PAUSE_ITEM] =
+                (pauseCtx->cursorSpecialPos != 0 || cursorItem == ITEM_NONE) ? PAUSE_ITEM_NONE : cursorItem;
+            Audio_PlaySfx(NA_SE_SY_HP_RECOVER);
+            // A simultaneous C/A press must not act on the previous page's item.
+            return;
+        }
+
         // Move cursor left/right
         if (pauseCtx->cursorSpecialPos == 0) {
             // cursor is currently on a slot
@@ -2007,8 +2087,11 @@ void KaleidoScope_UpdateItemCursor(PlayState* play) {
                         continue;
                     }
 
-                    // No item available
-                    KaleidoScope_MoveCursorToSpecialPos(play, PAUSE_CURSOR_PAGE_RIGHT);
+                    // The grid remains navigable before the first item is obtained.
+                    pauseCtx->cursorPoint[PAUSE_ITEM] = 0;
+                    pauseCtx->cursorXIndex[PAUSE_ITEM] = 0;
+                    pauseCtx->cursorYIndex[PAUSE_ITEM] = 0;
+                    moveCursorResult = PAUSE_CURSOR_RESULT_SLOT;
                     break;
                 }
             }
@@ -2045,8 +2128,11 @@ void KaleidoScope_UpdateItemCursor(PlayState* play) {
                         continue;
                     }
 
-                    // No item available
-                    KaleidoScope_MoveCursorToSpecialPos(play, PAUSE_CURSOR_PAGE_LEFT);
+                    // The grid remains navigable before the first item is obtained.
+                    pauseCtx->cursorPoint[PAUSE_ITEM] = 5;
+                    pauseCtx->cursorXIndex[PAUSE_ITEM] = 5;
+                    pauseCtx->cursorYIndex[PAUSE_ITEM] = 0;
+                    moveCursorResult = PAUSE_CURSOR_RESULT_SLOT;
                     break;
                 }
             }
@@ -2117,14 +2203,6 @@ void KaleidoScope_UpdateItemCursor(PlayState* play) {
 
             pauseCtx->cursorItem[PAUSE_ITEM] = cursorItem;
             pauseCtx->cursorSlot[PAUSE_ITEM] = cursorSlot;
-
-            // NEI: L cycles the extended-inventory sub-page (vanilla / custom items / MM masks).
-            // Handled here in the cursor update (like equip / C-Up description) so the press is
-            // reliably detected. Takes effect next frame when cursorItem recomputes on the new page.
-            if (CHECK_BTN_ALL(CONTROLLER1(&play->state)->press.button, BTN_L) && ExtInv_CanSwitchPage()) {
-                ExtInv_SwitchPage();
-                Audio_PlaySfx(NA_SE_SY_HP_RECOVER);
-            }
 
             // NEI: per-slot item cycles (bottle wheels; more selectors later). While a cycle is
             // open it captures the input — skip equip/description handling below.
@@ -2316,11 +2394,8 @@ void KaleidoScope_UpdateItemCursor(PlayState* play) {
                         // So: custom text first, vanilla message only when it really exists.
                         u8 textBoxPos = (pauseCtx->cursorYIndex[PAUSE_ITEM] < 2) ? 3 : 1;
                         u16 vanillaTextId = 0x1700 + pauseCtx->cursorItem[PAUSE_ITEM];
-                        const char* customDesc = PauseItemDesc_Get(pauseCtx->cursorItem[PAUSE_ITEM], PAUSE_ITEM);
-
-                        if (customDesc != NULL) {
+                        if (PauseItemDesc_ShowItem(play, pauseCtx->cursorItem[PAUSE_ITEM], PAUSE_ITEM, textBoxPos)) {
                             pauseCtx->itemDescriptionOn = true;
-                            PauseItemDesc_Show(play, customDesc, textBoxPos);
                         } else if (PauseItemDesc_VanillaTextExists(vanillaTextId)) {
                             pauseCtx->itemDescriptionOn = true;
                             func_801514B0(play, vanillaTextId, textBoxPos);

@@ -1,6 +1,7 @@
 
 #include "CustomMessage.h"
 #include "ComboCapeReceiptChoice.h"
+#include "sword_element_message.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 
 extern "C" {
@@ -212,6 +213,7 @@ void CustomMessage::LoadCustomMessageIntoFont(CustomMessage::Entry entry) {
 
     msgCtx->msgLength = entry.msg.length() + MESSAGE_HEADER_SIZE;
     memcpy(&font->msgBuf, buff, msgCtx->msgLength);
+    SwordElement_MessageAppend(gPlayState, entry.swordElementTutorial);
 }
 
 void CustomMessage::RegisterHooks() {

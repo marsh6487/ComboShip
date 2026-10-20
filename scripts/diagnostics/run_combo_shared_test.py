@@ -28,13 +28,16 @@ with tempfile.TemporaryDirectory(prefix='combo_shared_') as tmp:
         (includes / 'rando/SharedItems.h').write_bytes((ROOT / 'combo/rando/SharedItems.h').read_bytes())
         flags = ['-DCOMBO_SHARED_BASELINE']
     binary = directory / 'combo_shared_test'
-    subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++17', '-Wall', '-Wextra', '-O0', *flags,
+    subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-Wall', '-Wextra', '-O0', *flags,
                     '-I', str(includes), '-I', str(a.json_include),
                     str(ROOT / 'combo/tests/combo_shared_test.cpp'), '-o', str(binary)], check=True)
     result = subprocess.run([str(binary)], cwd=directory)
     if result.returncode or a.baseline:
         raise SystemExit(result.returncode)
     source = (ROOT / 'combo/ComboShip.cpp').read_text()
+    begin = source.index('static bool Combo_BindCrossDungeonRuntime(')
+    end = source.index('\n}', begin) + 2
+    binding = source[begin:end]
     begin = source.index('static void Combo_OnSharedChanged(', source.index('// Shared Items tier reconcile'))
     end = source.index('// Seed utilities', begin)
     runtime = source[begin:end]
@@ -43,9 +46,9 @@ with tempfile.TemporaryDirectory(prefix='combo_shared_') as tmp:
     runtime += source[begin:end]
     begin = source.index('static std::set<std::string> sAppliedCrossChecks;')
     end = source.index('// Network-receive idempotency:', begin)
-    (directory / 'combo_shared_runtime_functions.h').write_text(runtime + source[begin:end])
+    (directory / 'combo_shared_runtime_functions.h').write_text(binding + '\n' + runtime + source[begin:end])
     runtime_binary = directory / 'combo_shared_runtime_test'
-    subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++17', '-Wall', '-Wextra', '-O0',
+    subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-Wall', '-Wextra', '-O0',
                     '-I', str(includes), '-I', str(a.json_include), '-I', str(directory),
                     str(ROOT / 'combo/tests/combo_shared_runtime_test.cpp'), '-o', str(runtime_binary)], check=True)
     result = subprocess.run([str(runtime_binary)], cwd=directory)
@@ -59,7 +62,7 @@ with tempfile.TemporaryDirectory(prefix='combo_shared_') as tmp:
     end = source.index('\n}', begin) + 2
     (directory / 'combo_shared_plando_functions.h').write_text(state + source[begin:end])
     plando_binary = directory / 'combo_shared_plando_test'
-    subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++17', '-Wall', '-Wextra', '-O0',
+    subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++20', '-Wall', '-Wextra', '-O0',
                     '-I', str(includes), '-I', str(a.json_include), '-I', str(directory),
                     str(ROOT / 'combo/tests/combo_shared_plando_test.cpp'), '-o', str(plando_binary)], check=True)
     result = subprocess.run([str(plando_binary)], cwd=directory)

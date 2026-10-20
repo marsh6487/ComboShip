@@ -8,6 +8,7 @@
 #undef WeaponUpgrade_KokiriLevel
 #undef WeaponUpgrade_HasGreatFairy
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
+#include "overlays/actors/ovl_En_Zf/z_en_zf.h"
 
 static u8 kokiriUpgrade, greatFairyUpgrade;
 u8 WeaponUpgrade_KokiriLevel(void) {
@@ -115,12 +116,14 @@ static ColliderInfo* setStrike(u32 flags) {
 }
 
 static Actor hit(s16 actorId, DamageTable* table, u32 mask, ColliderInfo* atInfo) {
-    Actor actor = { 0 };
+    // The resolver may read native Lizalfos action state for repeated ice hits.
+    EnZf storage = { 0 };
+    Actor* actor = &storage.actor;
     Collider collider = { 0 };
     ColliderInfo info = { 0 };
-    actor.id = actorId;
-    actor.colChkInfo.damageTable = table;
-    collider.actor = &actor;
+    actor->id = actorId;
+    actor->colChkInfo.damageTable = table;
+    collider.actor = actor;
     collider.acFlags = AC_HIT;
     info.bumper.dmgFlags = mask;
     info.bumperFlags = BUMP_HIT;
@@ -128,7 +131,7 @@ static Actor hit(s16 actorId, DamageTable* table, u32 mask, ColliderInfo* atInfo
     if (!CollisionCheck_NoSharedFlags(atInfo, &info)) {
         CollisionCheck_ApplyDamage(&play, &play.colChkCtx, &collider, &info);
     }
-    return actor;
+    return *actor;
 }
 
 static void testSwordHits(void) {
@@ -363,6 +366,7 @@ static void testNativeReactions(void) {
     }
 }
 
+#ifndef ELEMENTAL_SWORD_DAMAGE_FIXTURE
 int main(void) {
     testSwordHits();
     testIsolation();
@@ -376,3 +380,4 @@ int main(void) {
          "live age handoff and owner isolation");
     return 0;
 }
+#endif

@@ -19,6 +19,7 @@
 #include "mods/items/logic/item_lantern.h"     // LanternFireType enum (Vacía/Regular/Blue/Poe/Green)
 #include "mods/items/logic/twilight_upgrade.h" // Clawshot / Gale Boomerang mode selectors
 #include "expansions/sw97/sw97_config.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 
 u8 gAmmoItems[] = {
     ITEM_STICK,   ITEM_NUT,  ITEM_BOMB, ITEM_BOW,  ITEM_NONE, ITEM_NONE, ITEM_SLINGSHOT, ITEM_NONE,
@@ -333,16 +334,16 @@ void KaleidoScope_HandleItemCycleExtras(PlayState* play, u8 slot, bool canCycle,
 
     if (canCycle && pauseCtx->cursorSlot[PAUSE_ITEM] == slot && CHECK_BTN_ALL(input->press.button, BTN_A) &&
         (hasLeftItem || hasRightItem)) {
-        Audio_PlaySoundGeneral(NA_SE_SY_DECIDE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+        Audio_PlaySfxGeneral(NA_SE_SY_DECIDE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                             &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         gCurrentItemCyclingSlot = gCurrentItemCyclingSlot == slot ? -1 : slot;
     }
     if (gCurrentItemCyclingSlot == slot) {
         pauseCtx->cursorColorSet = 8;
         if ((pauseCtx->stickRelX > 30 || pauseCtx->stickRelY > 30) ||
             dpad && CHECK_BTN_ANY(input->press.button, BTN_DRIGHT | BTN_DUP)) {
-            Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            Audio_PlaySfxGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
             if (replaceCButtons) {
                 for (int i = 1; i < ARRAY_COUNT(gSaveContext.equips.buttonItems); i++) {
                     if (gSaveContext.equips.buttonItems[i] == ExtInv_GetSlotItem(slot)) { // Skijer's NEI
@@ -359,8 +360,8 @@ void KaleidoScope_HandleItemCycleExtras(PlayState* play, u8 slot, bool canCycle,
             ExtInv_SetSlotItem(slot, rightItem); // Skijer's NEI
         } else if ((pauseCtx->stickRelX < -30 || pauseCtx->stickRelY < -30) ||
                    dpad && CHECK_BTN_ANY(input->press.button, BTN_DLEFT | BTN_DDOWN)) {
-            Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            Audio_PlaySfxGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
             if (replaceCButtons) {
                 for (int i = 1; i < ARRAY_COUNT(gSaveContext.equips.buttonItems); i++) {
                     if (gSaveContext.equips.buttonItems[i] == ExtInv_GetSlotItem(slot)) { // Skijer's NEI
@@ -382,20 +383,14 @@ void KaleidoScope_HandleItemCycleExtras(PlayState* play, u8 slot, bool canCycle,
 
 bool CanMaskSelect() {
     if (IS_RANDO) {
-        return ((CVarGetInteger(CVAR_ENHANCEMENT("MaskSelect"), 0) ||
-                 Randomizer_GetSettingValue(RSK_MASK_QUEST) != RO_MASK_QUEST_VANILLA) &&
-                Flags_GetRandomizerInf(RAND_INF_ZELDAS_LETTER) &&
-                Flags_GetInfTable(INFTABLE_SHOWED_ZELDAS_LETTER_TO_GATE_GUARD)) ||
-               Randomizer_GetSettingValue(RSK_MASK_QUEST) == RO_MASK_QUEST_SHUFFLE;
+        return true;
     }
-
     // only allow mask select when:
     // the shop is open:
     // * zelda's letter check: Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_ZELDAS_LETTER)
     // * kak gate check: Flags_GetInfTable(INFTABLE_SHOWED_ZELDAS_LETTER_TO_GATE_GUARD)
     // and the mask quest is complete: Flags_GetEventChkInf(EVENTCHKINF_PAID_BACK_BUNNY_HOOD_FEE)
-    return (CVarGetInteger(CVAR_ENHANCEMENT("MaskSelect"), 0) ||
-            Randomizer_GetSettingValue(RSK_MASK_QUEST) != RO_MASK_QUEST_VANILLA) &&
+    return CVarGetInteger(CVAR_ENHANCEMENT("MaskSelect"), 0) &&
            Flags_GetEventChkInf(EVENTCHKINF_PAID_BACK_BUNNY_HOOD_FEE) &&
            Flags_GetEventChkInf(EVENTCHKINF_OBTAINED_ZELDAS_LETTER) &&
            Flags_GetInfTable(INFTABLE_SHOWED_ZELDAS_LETTER_TO_GATE_GUARD);
@@ -1078,6 +1073,7 @@ static void Page2Relayout_Heal(void) {
         ExtInv_SetSlotItem(SLOT_SHADOW_CRYSTAL, ITEM_NONE);
     }
     GraceHourglass_Heal();
+    TravelTools_Heal();
 }
 
 static u8 ShovelSel_IsShovelCellItem(s32 item) {
@@ -1090,6 +1086,50 @@ static void Shovel_Cycle(PlayState* play, s32 dir) {
     ExtInv_SetSlotItem(SLOT_SHOVEL, next);
     Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                            &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+}
+
+// Time Gate / Magic Mirror share cell 31; ownership and selected u16 item remain separate.
+static u8 sTravelToolsSelectorActive = 0;
+
+static void TravelTools_KaleidoCycle(PlayState* play, s32 dir) {
+    uint16_t oldItem = ExtInv_GetSlotItem(SLOT_MAGIC_MIRROR);
+    uint16_t newItem = oldItem == ITEM_TIME_GATE ? EXT_ITEM_MAGIC_MIRROR : ITEM_TIME_GATE;
+    (void)dir;
+    ExtInv_SetSlotItem(SLOT_MAGIC_MIRROR, newItem);
+    play->pauseCtx.cursorItem[PAUSE_ITEM] = newItem;
+    play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    for (s32 btn = 1; btn < ARRAY_COUNT(gSaveContext.equips.buttonItems); ++btn) {
+        if (ExtButton_GetItem(btn) == oldItem) {
+            if (newItem > 0xFF) {
+                ExtButton_SetItem(btn, newItem);
+            } else {
+                ExtButton_ClearItem(btn);
+                gSaveContext.equips.buttonItems[btn] = (u8)newItem;
+            }
+            gSaveContext.equips.cButtonSlots[btn - 1] = newItem > 0xFF ? SLOT_NONE : SLOT_MAGIC_MIRROR;
+            Interface_LoadItemIcon1(play, (u16)btn);
+        }
+    }
+}
+
+static void TravelTools_KaleidoHandle(PlayState* play) {
+    uint16_t selected = play->pauseCtx.cursorItem[PAUSE_ITEM];
+    u8 onThisItem = ExtInv_GetCurrentPage() == 1 && (selected == ITEM_TIME_GATE || selected == EXT_ITEM_MAGIC_MIRROR);
+    KaleidoWheel_Run(play, onThisItem,
+                     TravelTools_IsOwned(ITEM_TIME_GATE) && TravelTools_IsOwned(EXT_ITEM_MAGIC_MIRROR),
+                     &sTravelToolsSelectorActive, TravelTools_KaleidoCycle);
+}
+
+static void TravelTools_KaleidoDraw(PlayState* play) {
+    uint16_t selected = play->pauseCtx.cursorItem[PAUSE_ITEM];
+    if (ExtInv_GetCurrentPage() != 1 || (selected != ITEM_TIME_GATE && selected != EXT_ITEM_MAGIC_MIRROR) ||
+        !TravelTools_IsOwned(ITEM_TIME_GATE) || !TravelTools_IsOwned(EXT_ITEM_MAGIC_MIRROR)) {
+        return;
+    }
+    uint16_t other = selected == ITEM_TIME_GATE ? EXT_ITEM_MAGIC_MIRROR : ITEM_TIME_GATE;
+    void* icon = ExtInv_GetItemIcon(other);
+    KaleidoCycle_DrawRocStyle(play, play->pauseCtx.cursorSlot[PAUSE_ITEM], sTravelToolsSelectorActive, 1, 1, icon, icon,
+                              NULL, NULL, 32, 32);
 }
 
 // Grace / hourglass share cell 41; ownership and selected u16 item remain separate.
@@ -1609,8 +1649,18 @@ static void ArrowWheel_Cycle(PlayState* play, s32 dir) {
 // reminder of what you are still missing.
 static u8 sWandSelectorActive = 0;
 
+static void Wand_KaleidoSyncTitle(PlayState* play) {
+    static u8 namedMode = 0xFF;
+    u8 mode = Wand_ModeCount() ? Wand_GetMode() : 0xFF;
+    if (play->pauseCtx.namedItem == ITEM_ELEMENTAL_WAND && namedMode != mode) {
+        play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
+    }
+    namedMode = mode;
+}
+
 static void Wand_KaleidoCycle(PlayState* play, s32 dir) {
     Wand_SetMode(Wand_ModeNeighbor(Wand_GetMode(), dir));
+    play->pauseCtx.namedItem = PAUSE_ITEM_NONE;
     Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
                            &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
 }
@@ -1619,6 +1669,7 @@ static void Wand_HandleKaleidoSelector(PlayState* play) {
     PauseContext* pauseCtx = &play->pauseCtx;
     u8 onThisItem = (pauseCtx->cursorItem[PAUSE_ITEM] == ITEM_ELEMENTAL_WAND);
 
+    Wand_KaleidoSyncTitle(play);
     KaleidoWheel_Run(play, onThisItem, Wand_ModeCount() > 1, &sWandSelectorActive, Wand_KaleidoCycle);
 }
 
@@ -1998,10 +2049,9 @@ static void Bottle_WheelHandle(PlayState* play, u8 wheel, u8 kaleidoSlot) {
 void KaleidoScope_HandleItemCycles(PlayState* play) {
     // handle the mask select — only on the vanilla item page (0); on pages 1/2 the cell holds a
     // custom item / MM mask, so the wheel must not respond there (same as the bottle wheels).
-    // Skijer's NEI. The IS_RANDO term is upstream's: in rando the wheel stays usable even when
-    // CanMaskSelect() says no, and that has to keep working on page 0.
+    // CanMaskSelect() includes randomizer saves, so their wheel stays usable on page 0.
     if (ExtInv_GetCurrentPage() == 0)
-        KaleidoScope_HandleItemCycleExtras(play, SLOT_TRADE_CHILD, IS_RANDO || CanMaskSelect(),
+        KaleidoScope_HandleItemCycleExtras(play, SLOT_TRADE_CHILD, CanMaskSelect(),
                                            IS_RANDO ? Randomizer_GetPrevChildTradeItem()
                                                     : (INV_CONTENT(ITEM_TRADE_CHILD) <= ITEM_MASK_KEATON ||
                                                                INV_CONTENT(ITEM_TRADE_CHILD) > ITEM_MASK_TRUTH
@@ -2013,23 +2063,6 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
                                                            ? ITEM_MASK_KEATON
                                                            : INV_CONTENT(ITEM_TRADE_CHILD) + 1),
                                            true);
-
-    // the slot age requirement for the child trade slot has to be updated
-    // in case it currently holds a mask
-    // to allow adult link to wear it if the setting is enabled
-    gSlotAgeReqs[SLOT_TRADE_CHILD] =
-        (CVarGetInteger(CVAR_ENHANCEMENT("AdultMasks"), 0) || CVarGetInteger(CVAR_CHEAT("TimelessEquipment"), 0)) &&
-                INV_CONTENT(ITEM_TRADE_CHILD) >= ITEM_MASK_KEATON && INV_CONTENT(ITEM_TRADE_CHILD) <= ITEM_MASK_TRUTH
-            ? AGE_REQ_NONE
-            : AGE_REQ_CHILD;
-
-    // also update the age requirements for the masks itself
-    for (int i = ITEM_MASK_KEATON; i <= ITEM_MASK_TRUTH; i += 1) {
-        gItemAgeReqs[i] =
-            CVarGetInteger(CVAR_ENHANCEMENT("AdultMasks"), 0) || CVarGetInteger(CVAR_CHEAT("TimelessEquipment"), 0)
-                ? AGE_REQ_NONE
-                : AGE_REQ_CHILD;
-    }
 
     // handle the adult trade select
     // Adult-trade wheel: the shared linear cycle wheel, fed with EVERY owned trade item — a held
@@ -2092,6 +2125,7 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
 
     // Shovel <-> Dominion Rod (shared cell 46; also folds pre-re-layout saves). Skijer's NEI
     GraceHourglass_KaleidoHandle(play);
+    TravelTools_KaleidoHandle(play);
     Shovel_HandleKaleidoSelector(play);
 
     // Elemental Wand rod selector (A on the cell) — six rods share the page-2 slot the Bomb Arrows
@@ -2126,9 +2160,9 @@ void KaleidoScope_HandleItemCycles(PlayState* play) {
 void KaleidoScope_DrawItemCycles(PlayState* play) {
     // draw the mask select
     // mask-select overlay only on the vanilla item page (0) — pages 1/2 show custom items / masks. Skijer's NEI
-    // IS_RANDO term from upstream, same reasoning as the input handler above.
+    // CanMaskSelect() includes randomizer saves, as in the input handler above.
     if (ExtInv_GetCurrentPage() == 0)
-        KaleidoScope_DrawItemCycleExtras(play, SLOT_TRADE_CHILD, IS_RANDO || CanMaskSelect(),
+        KaleidoScope_DrawItemCycleExtras(play, SLOT_TRADE_CHILD, CanMaskSelect(),
                                          IS_RANDO ? Randomizer_GetPrevChildTradeItem()
                                                   : (INV_CONTENT(ITEM_TRADE_CHILD) <= ITEM_MASK_KEATON ||
                                                              INV_CONTENT(ITEM_TRADE_CHILD) > ITEM_MASK_TRUTH
@@ -2183,6 +2217,7 @@ void KaleidoScope_DrawItemCycles(PlayState* play) {
 
     // Shovel <-> Dominion Rod overlay (shared cell 46). Skijer's NEI
     GraceHourglass_KaleidoDraw(play);
+    TravelTools_KaleidoDraw(play);
     Shovel_DrawKaleidoSelector(play);
 
     // Elemental Wand rod selector overlay. Skijer's NEI
@@ -2215,6 +2250,7 @@ bool IsItemCycling() {
 void KaleidoScope_ResetItemCycling() {
     gCurrentItemCyclingSlot = -1;
     sGraceHourglassSelectorActive = 0;
+    sTravelToolsSelectorActive = 0;
     sSlateSelectorActive = 0;
 }
 
@@ -2407,8 +2443,8 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                 pauseCtx->nameDisplayTimer = 0;
                 pauseCtx->cursorSpecialPos = 0;
 
-                Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                       &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+                Audio_PlaySfxGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                     &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
 
                 cursorPoint = cursorX = cursorY = 0;
                 while (true) {
@@ -2442,8 +2478,8 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                 pauseCtx->nameDisplayTimer = 0;
                 pauseCtx->cursorSpecialPos = 0;
 
-                Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                       &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+                Audio_PlaySfxGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                     &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
 
                 cursorPoint = cursorX = 5;
                 cursorY = 0;
@@ -2571,8 +2607,8 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
                                                             pauseCtx->itemVtx[index].v.ob[1] * 10);
                             }
                         } else {
-                            Audio_PlaySoundGeneral(NA_SE_SY_ERROR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+                            Audio_PlaySfxGeneral(NA_SE_SY_ERROR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
                         }
                     }
                 }
@@ -2588,8 +2624,8 @@ void KaleidoScope_DrawItemSelect(PlayState* play) {
         }
 
         if (oldCursorPoint != pauseCtx->cursorPoint[PAUSE_ITEM]) {
-            Audio_PlaySoundGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            Audio_PlaySfxGeneral(NA_SE_SY_CURSOR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         }
     } else if ((pauseCtx->unk_1E4 == 3) && (pauseCtx->pageIndex == PAUSE_ITEM)) {
         KaleidoScope_SetCursorVtx(pauseCtx, cursorSlot * 4, pauseCtx->itemVtx);
@@ -2790,8 +2826,8 @@ void KaleidoScope_SetupItemEquip(PlayState* play, u16 item, u16 slot, s16 animX,
     if ((pauseCtx->equipTargetItem == ITEM_ARROW_FIRE) || (pauseCtx->equipTargetItem == ITEM_ARROW_ICE) ||
         (pauseCtx->equipTargetItem == ITEM_ARROW_LIGHT)) {
         if (CVarGetInteger(CVAR_ENHANCEMENT("SkipArrowAnimation"), 0)) {
-            Audio_PlaySoundGeneral(NA_SE_SY_DECIDE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            Audio_PlaySfxGeneral(NA_SE_SY_DECIDE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         } else {
             u16 index = 0;
             if (pauseCtx->equipTargetItem == ITEM_ARROW_ICE) {
@@ -2800,16 +2836,16 @@ void KaleidoScope_SetupItemEquip(PlayState* play, u16 item, u16 slot, s16 animX,
             if (pauseCtx->equipTargetItem == ITEM_ARROW_LIGHT) {
                 index = 2;
             }
-            Audio_PlaySoundGeneral(NA_SE_SY_SET_FIRE_ARROW + index, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            Audio_PlaySfxGeneral(NA_SE_SY_SET_FIRE_ARROW + index, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
             pauseCtx->equipTargetItem = 0xBF + index;
             sEquipState = 0;
             pauseCtx->equipAnimAlpha = 0;
             sEquipMoveTimer = 6;
         }
     } else {
-        Audio_PlaySoundGeneral(NA_SE_SY_DECIDE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+        Audio_PlaySfxGeneral(NA_SE_SY_DECIDE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                             &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
     }
 }
 
@@ -3052,8 +3088,8 @@ void KaleidoScope_UpdateItemEquip(PlayState* play) {
             WREG(90) = 320;
             WREG(87) = WREG(91);
             sEquipState++;
-            Audio_PlaySoundGeneral(NA_SE_SY_SYNTH_MAGIC_ARROW, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
-                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            Audio_PlaySfxGeneral(NA_SE_SY_SYNTH_MAGIC_ARROW, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         }
         return;
     }

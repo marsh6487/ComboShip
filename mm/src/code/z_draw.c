@@ -4,6 +4,7 @@
  * @brief Draw get-item models
  */
 #include "global.h"
+void NeiGi_ReportBlackMarketModel(const char* owner, const char* opaque, const char* translucent);
 #include "ComboElementalArrowGi.h"
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "2s2h/Enhancements/ItemVisuals.h"
@@ -11,6 +12,7 @@
 #include <libultraship/bridge/resourcebridge.h>
 #include "ComboFairyBottle.h"
 #include "ComboBottleGi.h"
+#include "ComboBottleContents.h"
 #include "assets/objects/gameplay_keep/gameplay_keep.h"
 #include "assets/objects/object_gi_arrow/object_gi_arrow.h"
 #include "assets/objects/object_gi_arrowcase/object_gi_arrowcase.h"
@@ -129,6 +131,13 @@ typedef struct {
     /* 0x0 */ void (*drawFunc)(PlayState*, s16);
     /* 0x4 */ void* drawResources[8]; // Either display lists (Gfx*) or matrices (Mtx*)
 } DrawItemTableEntry;                 // size = 0x24
+
+static const ALIGN_ASSET(2) char gComboMushroomBottleGi[] = "__OTR__objects/combo_bottle_gi/MushroomBottle";
+static const ALIGN_ASSET(2) char gComboPrincessBottleGi[] = "__OTR__objects/combo_bottle_gi/PrincessBottle";
+static const ALIGN_ASSET(2) char gComboGoldDustBottleGi[] = "__OTR__objects/combo_bottle_gi/GoldDustBottle";
+
+void GetItem_DrawBottleContents(PlayState* play, s16 drawId);
+void GetItem_DrawSeahorseBottle(PlayState* play, s16 drawId);
 
 static DrawItemTableEntry sDrawItemTable[] = {
     // GID_BOTTLE, OBJECT_GI_BOTTLE
@@ -337,7 +346,7 @@ static DrawItemTableEntry sDrawItemTable[] = {
     // GID_GOLD_DUST, OBJECT_GI_GOLD_DUST
     { GetItem_DrawOpa01, { gGiGoldDustPowderDL, gGiGoldDustPowderEmptyDL } },
     // GID_SEAHORSE, OBJECT_GI_BOTTLE_16
-    { GetItem_DrawOpa0Xlu1, { gGiSeahorseBottleEmptyDL, gGiSeahorseBottleGlassAndCorkDL } },
+    { GetItem_DrawSeahorseBottle, { gGiSeahorseBottleEmptyDL, gGiSeahorseBottleGlassAndCorkDL } },
     // GID_60, OBJECT_GI_BOTTLE_22
     { GetItem_DrawOpa0Xlu1, { gGiHylianLoachBottleContentsDL, gGiHylianLoachBottleGlassCorkWaterDL } },
     // GID_HYLIAN_LOACH, OBJECT_GI_LOACH
@@ -382,18 +391,31 @@ static DrawItemTableEntry sDrawItemTable[] = {
     { GetItem_DrawOpa0Xlu1, { gGiPictoBoxFrameDL, gGiPictoBoxBodyAndLensDL } },
     // GID_MASK_FIERCE_DEITY, OBJECT_GI_MASK03
     { GetItem_DrawOpa01, { gGiFierceDeityMaskFaceDL, gGiFierceDeityMaskHairAndHatDL } },
+    { GetItem_DrawBottleContents, { (void*)gComboMushroomBottleGi } },
+    { GetItem_DrawBottleContents, { (void*)gComboPrincessBottleGi } },
+    { GetItem_DrawBottleContents, { (void*)gComboGoldDustBottleGi } },
 };
 
 extern int ResourceMgr_IsModAsset(const char* path);
 extern int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
 extern int ResourceMgr_IsCustomAssetForGame(const char* game, const char* path);
+static ComboFairyBottleShell GetItem_EmptyBottleShell(s16 drawId) {
+    ComboFairyBottleShell shell = { (const char*)sDrawItemTable[drawId].drawResources[0],
+                                    (const char*)sDrawItemTable[drawId].drawResources[1] };
+    if (shell.opaque != gGiEmptyBottleCorkDL || shell.glass != gGiEmptyBottleGlassDL) {
+        return shell; // Other two-pass items retain their native recipe.
+    }
+    // Explicit empty-bottle mods retain their complete casing.
+    return ComboFairyBottle_BundledShell(shell, shell.opaque, shell.glass, ResourceMgr_IsModAsset,
+                                         ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/EmptyOpaque") &&
+                                             ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/EmptyXlu"));
+}
+
 static ComboFairyBottleShell GetItem_FairyBottleShell(s16 drawId) {
-    return ComboFairyBottle_SelectShell(
-        (const char*)sDrawItemTable[drawId].drawResources[0], (const char*)sDrawItemTable[drawId].drawResources[1],
-        gGiEmptyBottleCorkDL, gGiEmptyBottleGlassDL, ResourceMgr_IsModAsset,
-        "__OTR__@oot:objects/object_gi_fire/gGiBlueFireChamberstickDL",
-        (ResourceMgr_IsModAssetForGame("oot", "objects/object_gi_fire/gGiBlueFireChamberstickDL") ||
-         ResourceMgr_IsCustomAssetForGame("oot", "objects/object_gi_fire/gGiBlueFireChamberstickDL")));
+    // Content models such as Blue Fire can bake a flame into their shell.
+    // Reuse the empty bottle's selected casing without inheriting any content.
+    return ComboFairyBottle_ReadableShell(GetItem_EmptyBottleShell(GID_BOTTLE), ResourceMgr_IsModAsset,
+                                          ResourceMgr_FileExists("__OTR__objects/combo_bottle_gi/FairyXlu"));
 }
 
 #define COMBO_FAIRY_HOST_MM
@@ -464,7 +486,8 @@ s32 GetItem_GetDungeonKeyEmblemTint(s32 owner, Color_RGBA8* color) {
     return true;
 }
 
-// Replacement-model selection is a separate, optional path.
+// The repaired key models belong to MM's bundled assets. Canonical paths also
+// allow normal Alt replacements without requiring the retired POC3 archive.
 extern bool ResourceMgr_IsAltAssetsEnabled(void);
 extern u8 ResourceMgr_FileAltExists(const char* path);
 
@@ -481,26 +504,26 @@ s32 GetItem_GetDungeonKeyModel(s16 drawId, s32 owner, const char** metalPath, co
     static const char* emblemIds[4] = { "Items.WoodfallEmblem", "Items.SnowheadEmblem", "Items.GreatBayEmblem",
                                         "Items.StoneTowerEmblem" };
     static const char* paths[4][2][2] = {
-        { { "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallSmallKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallSmallKeyEmblemDL" },
-          { "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallBossKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/WoodfallBossKeyEmblemDL" } },
-        { { "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadSmallKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadSmallKeyEmblemDL" },
-          { "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadBossKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/SnowheadBossKeyEmblemDL" } },
-        { { "__OTR__alt/objects/cor_mm_keys_poc2/GreatBaySmallKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/GreatBaySmallKeyEmblemDL" },
-          { "__OTR__alt/objects/cor_mm_keys_poc2/GreatBayBossKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/GreatBayBossKeyEmblemDL" } },
-        { { "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerSmallKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerSmallKeyEmblemDL" },
-          { "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerBossKeyMetalDL",
-            "__OTR__alt/objects/cor_mm_keys_poc2/StoneTowerBossKeyEmblemDL" } },
+        { { "__OTR__objects/combo_dungeon_keys/WoodfallSmallKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/WoodfallSmallKeyEmblemDL" },
+          { "__OTR__objects/combo_dungeon_keys/WoodfallBossKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/WoodfallBossKeyEmblemDL" } },
+        { { "__OTR__objects/combo_dungeon_keys/SnowheadSmallKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/SnowheadSmallKeyEmblemDL" },
+          { "__OTR__objects/combo_dungeon_keys/SnowheadBossKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/SnowheadBossKeyEmblemDL" } },
+        { { "__OTR__objects/combo_dungeon_keys/GreatBaySmallKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/GreatBaySmallKeyEmblemDL" },
+          { "__OTR__objects/combo_dungeon_keys/GreatBayBossKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/GreatBayBossKeyEmblemDL" } },
+        { { "__OTR__objects/combo_dungeon_keys/StoneTowerSmallKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/StoneTowerSmallKeyEmblemDL" },
+          { "__OTR__objects/combo_dungeon_keys/StoneTowerBossKeyMetalDL",
+            "__OTR__objects/combo_dungeon_keys/StoneTowerBossKeyEmblemDL" } },
     };
     s32 kind;
     if (owner < 0 || owner >= 4 || metalPath == NULL || emblemPath == NULL || metalColor == NULL ||
-        emblemColor == NULL || !ResourceMgr_IsAltAssetsEnabled()) {
+        emblemColor == NULL) {
         return false;
     }
     if (drawId == GID_KEY_SMALL) {
@@ -512,7 +535,9 @@ s32 GetItem_GetDungeonKeyModel(s16 drawId, s32 owner, const char** metalPath, co
     }
     *metalPath = paths[owner][kind][0];
     *emblemPath = paths[owner][kind][1];
-    if (!ResourceMgr_FileAltExists(*metalPath) || !ResourceMgr_FileAltExists(*emblemPath)) {
+    const bool altEnabled = ResourceMgr_IsAltAssetsEnabled();
+    if ((!ResourceMgr_FileExists(*metalPath) && !(altEnabled && ResourceMgr_FileAltExists(*metalPath))) ||
+        (!ResourceMgr_FileExists(*emblemPath) && !(altEnabled && ResourceMgr_FileAltExists(*emblemPath)))) {
         return false;
     }
     *metalColor = metalDefaults[kind];
@@ -599,12 +624,23 @@ s32 GetItem_DrawDungeonItem(PlayState* play, s16 drawId, s32 owner) {
 
 s32 GetItem_GetShimmerColor(s16 drawId, uint8_t color[4]) {
     switch (drawId) {
-        case GID_FAIRY:
-        case GID_FAIRY_2: {
-            const uint8_t pink[4] = { 255, 160, 235, 255 };
-            memcpy(color, pink, sizeof(pink));
+        case GID_CHATEAU:
+            color[0] = 0x4A;
+            color[1] = 0x0C;
+            color[2] = 0x41;
+            color[3] = 255;
             return true;
-        }
+        case GID_BOTTLE_MUSHROOM:
+            return ComboBottleContents_Color(CW_BOTTLE_MUSHROOM, color);
+        case GID_BOTTLE_DEKU_PRINCESS:
+            return ComboBottleContents_Color(CW_BOTTLE_PRINCESS, color);
+        case GID_BOTTLE_GOLD_DUST:
+            return ComboBottleContents_Color(CW_BOTTLE_GOLD_DUST, color);
+        case GID_SEAHORSE:
+            return ComboBottleContents_Color(CW_BOTTLE_SEAHORSE, color);
+        case GID_FAIRY:
+        case GID_FAIRY_2:
+            return ComboBottleShimmer_Color(CW_SHIMMER_FAIRY, color);
         case GID_MASK_POSTMAN:
             return ComboMmMaskShimmerColor(0, color);
         case GID_MASK_ALL_NIGHT:
@@ -798,7 +834,11 @@ void GetItem_Draw(PlayState* play, s16 drawId) {
             GetItem_DrawBottleShimmer(play, drawId);
         }
         if (itemShimmer) {
-            GetItem_DrawShimmer(play, maskColor);
+            if (drawId == GID_CHATEAU) {
+                NeiGi_DrawChateauShimmer(play);
+            } else {
+                GetItem_DrawShimmer(play, maskColor);
+            }
         }
     }
 }
@@ -822,6 +862,7 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         KIND_MM_FAIRY_BOTTLE = 21,
         KIND_MM_FAIRY_CONTAINER = 37,
         KIND_ELEMENTAL_ARROW = 39,
+        KIND_BOTTLE_CONTENTS = 40,
     };
     static const s8 sOrder0[] = { 0 };
     static const s8 sOrder01[] = { 0, 1 };
@@ -833,6 +874,7 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
     static const s8 sBottlePotion[] = { 1, 3, 5 };
     void (*drawFunc)(PlayState*, s16);
     void** res;
+    void* seahorsePolish[] = { (void*)"__OTR__objects/combo_bottle_gi/SeahorseBottle" };
     const s8* order;
     s32 count;
     s32 xluStart;
@@ -852,6 +894,11 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
     }
     drawFunc = sDrawItemTable[drawId].drawFunc;
     res = sDrawItemTable[drawId].drawResources;
+    const s32 isEmptyBottle = drawFunc == GetItem_DrawOpa0Xlu1 && (const char*)res[0] == gGiEmptyBottleCorkDL &&
+                              (const char*)res[1] == gGiEmptyBottleGlassDL;
+    if (isEmptyBottle && maxDlists < 2) {
+        return 0;
+    }
 
     if (drawFunc == GetItem_DrawRemains) {
         // Single OPA DL at 0.02 scale; see the portability note in the header comment.
@@ -880,6 +927,23 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         order = sOrder01;
         count = 2;
         xluStart = 1;
+    } else if (drawFunc == GetItem_DrawSeahorseBottle) {
+        if (ResourceMgr_IsModAsset((const char*)res[0]) || ResourceMgr_IsModAsset((const char*)res[1])) {
+            order = sOrder01;
+            count = 2;
+            xluStart = 1;
+        } else {
+            res = seahorsePolish;
+            order = sOrder0;
+            count = 1;
+            xluStart = 0;
+            kind = KIND_BOTTLE_CONTENTS;
+        }
+    } else if (drawFunc == GetItem_DrawBottleContents) {
+        order = sOrder0;
+        count = 1;
+        xluStart = 0;
+        kind = KIND_BOTTLE_CONTENTS;
     } else if (drawFunc == GetItem_DrawMagicArrow) {
         order = sOrder0;
         count = 1;
@@ -990,6 +1054,10 @@ s32 GetItem_GetDrawTableEntry(s32 drawId, void** outDlists, s32 maxDlists, s32* 
         const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
         outDlists[0] = (void*)shell.opaque;
         outDlists[1] = (void*)shell.glass;
+    } else if (isEmptyBottle) {
+        const ComboFairyBottleShell shell = GetItem_EmptyBottleShell(drawId);
+        outDlists[0] = (void*)shell.opaque;
+        outDlists[1] = (void*)shell.glass;
     }
     *outXluStart = (xluStart > count) ? count : xluStart;
     if (outDrawKind != NULL) {
@@ -1076,7 +1144,7 @@ void GetItem_DrawPoes(PlayState* play, s16 drawId) {
 void GetItem_DrawFairyBottle(PlayState* play, s16 drawId) {
     s32 pad;
     const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
-    const ComboFairyBottleMotion motion = ComboFairyBottle_Sample(play->gameplayFrames);
+    const ComboFairyBottleMotion motion = ComboFairyBottle_SampleForShell(play->gameplayFrames, shell.opaque);
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -1103,7 +1171,7 @@ void GetItem_DrawFairyBottle(PlayState* play, s16 drawId) {
     Matrix_ReplaceRotation(&play->billboardMtxF);
     Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
 
-    if (!ComboFairyBottle_DrawVfx(play)) {
+    if (!ComboFairyBottle_DrawVfx(play, shell.opaque)) {
         MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
         gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[2]);
     }
@@ -1111,6 +1179,8 @@ void GetItem_DrawFairyBottle(PlayState* play, s16 drawId) {
     Matrix_Pop();
 
     CLOSE_DISPS(play->state.gfxCtx);
+    if (ComboFairyBottle_IsBundledShell(shell.opaque))
+        ComboBottleShimmer_DrawMotes(play, CW_SHIMMER_FAIRY);
 }
 
 void GetItem_DrawSkullToken(PlayState* play, s16 drawId) {
@@ -1196,6 +1266,7 @@ void GetItem_DrawGoronSword(PlayState* play, s16 drawId) {
     gSPSegment(POLY_OPA_DISP++, 0x08,
                Gfx_TwoTexScrollEx(play->state.gfxCtx, G_TX_RENDERTILE, play->state.frames * 1, play->state.frames * 0,
                                   32, 32, 1, play->state.frames * 0, play->state.frames * 0, 32, 32, 1, 0, 0, 0));
+    NeiGi_ReportBlackMarketModel("mm", (const char*)sDrawItemTable[drawId].drawResources[0], NULL);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
 
@@ -1293,6 +1364,7 @@ void GetItem_DrawOpa0(PlayState* play, s16 drawId) {
 
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
+    NeiGi_ReportBlackMarketModel("mm", (const char*)sDrawItemTable[drawId].drawResources[0], NULL);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     POLY_OPA_DISP =
         GetItem_DrawDListWithCosmetics(POLY_OPA_DISP, (const char*)sDrawItemTable[drawId].drawResources[0], drawId);
@@ -1305,18 +1377,20 @@ void GetItem_DrawOpa0(PlayState* play, s16 drawId) {
  */
 void GetItem_DrawOpa0Xlu1(PlayState* play, s16 drawId) {
     s32 pad;
+    const ComboFairyBottleShell shell = GetItem_EmptyBottleShell(drawId);
 
     OPEN_DISPS(play->state.gfxCtx);
 
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
+    NeiGi_ReportBlackMarketModel("mm", shell.opaque, shell.glass);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
+    gSPDisplayList(POLY_OPA_DISP++, (Gfx*)shell.opaque);
 
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
 
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[1]);
+    gSPDisplayList(POLY_XLU_DISP++, (Gfx*)shell.glass);
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -1331,6 +1405,8 @@ void GetItem_DrawOpa01(PlayState* play, s16 drawId) {
 
     Gfx_SetupDL25_Opa(play->state.gfxCtx);
 
+    NeiGi_ReportBlackMarketModel("mm", (const char*)sDrawItemTable[drawId].drawResources[0],
+                                 (const char*)sDrawItemTable[drawId].drawResources[1]);
     MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[0]);
     gSPDisplayList(POLY_OPA_DISP++, sDrawItemTable[drawId].drawResources[1]);
@@ -1348,6 +1424,8 @@ void GetItem_DrawXlu01(PlayState* play, s16 drawId) {
 
     Gfx_SetupDL25_Xlu(play->state.gfxCtx);
 
+    NeiGi_ReportBlackMarketModel("mm", (const char*)sDrawItemTable[drawId].drawResources[0],
+                                 (const char*)sDrawItemTable[drawId].drawResources[1]);
     MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
     gSPDisplayList(POLY_XLU_DISP++, sDrawItemTable[drawId].drawResources[0]);
     POLY_XLU_DISP =
@@ -1386,7 +1464,7 @@ void GetItem_DrawFairyContainer(PlayState* play, s16 drawId) {
     s32 pad;
     MtxF mtx;
     const ComboFairyBottleShell shell = GetItem_FairyBottleShell(drawId);
-    const ComboFairyBottleMotion motion = ComboFairyBottle_Sample(play->gameplayFrames);
+    const ComboFairyBottleMotion motion = ComboFairyBottle_SampleForShell(play->gameplayFrames, shell.opaque);
 
     OPEN_DISPS(play->state.gfxCtx);
 
@@ -1407,7 +1485,7 @@ void GetItem_DrawFairyContainer(PlayState* play, s16 drawId) {
     Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
     if (ComboFairyBottle_IsBlueFireShell(shell.opaque)) {
         Matrix_Translate(-8.0f, -2.0f, 0.0f, MTXMODE_APPLY);
-    } else {
+    } else if (!ComboFairyBottle_IsBundledShell(shell.opaque)) {
         // The native billboard matrix sizes a sprite, not an actor skeleton.
         // Keep its anchor for the VFX; apply its full scale only to fallback contents.
         Matrix_Translate(mtx.xw, mtx.yw, mtx.zw, MTXMODE_APPLY);
@@ -1415,7 +1493,7 @@ void GetItem_DrawFairyContainer(PlayState* play, s16 drawId) {
     Matrix_ReplaceRotation(&play->billboardMtxF);
     Matrix_Scale(motion.scaleX, motion.scaleY, motion.scaleZ, MTXMODE_APPLY);
 
-    if (!ComboFairyBottle_DrawVfx(play)) {
+    if (!ComboFairyBottle_DrawVfx(play, shell.opaque)) {
         Matrix_Pop();
         Matrix_Push();
         Matrix_Translate(motion.x, motion.y, motion.z, MTXMODE_APPLY);
@@ -1432,6 +1510,8 @@ void GetItem_DrawFairyContainer(PlayState* play, s16 drawId) {
     Matrix_Pop();
 
     CLOSE_DISPS(play->state.gfxCtx);
+    if (ComboFairyBottle_IsBundledShell(shell.opaque))
+        ComboBottleShimmer_DrawMotes(play, CW_SHIMMER_FAIRY);
 }
 
 void GetItem_DrawMoonsTear(PlayState* play, s16 drawId) {
@@ -1564,4 +1644,24 @@ void GetItem_DrawRemains(PlayState* play, s16 drawId) {
     POLY_OPA_DISP = Play_SetFog(play, POLY_OPA_DISP);
 
     CLOSE_DISPS(play->state.gfxCtx);
+}
+
+// Selected native Seahorse art owns both shell passes; the accepted built-in
+// profile is otherwise shared with foreign consumers through its marker recipe.
+void GetItem_DrawSeahorseBottle(PlayState* play, s16 drawId) {
+#ifdef COMBO_BUILD
+    if (!ResourceMgr_IsModAsset((const char*)sDrawItemTable[drawId].drawResources[0]) &&
+        !ResourceMgr_IsModAsset((const char*)sDrawItemTable[drawId].drawResources[1]) &&
+        ComboBottleContents_Draw(play, CW_BOTTLE_SEAHORSE))
+        return;
+#endif
+    GetItem_DrawOpa0Xlu1(play, drawId);
+}
+
+void GetItem_DrawBottleContents(PlayState* play, s16 drawId) {
+#ifdef COMBO_BUILD
+    if (!ComboBottleContents_Draw(play,
+                                  ComboBottleContents_Profile((const char*)sDrawItemTable[drawId].drawResources[0])))
+#endif
+        GetItem_DrawOpa0Xlu1(play, GID_BOTTLE);
 }

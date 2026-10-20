@@ -3,6 +3,7 @@
 #define NEI_SAVE_H
 
 #include <stdint.h>
+#include "../../combo/NeiSeasonsPolicy.h"
 #include "../../combo/rando/RpgStats.h"
 #include "2s2h/FleetShipCombo/FleetComboIds.h" // FC_COMBO_OBTAINED_FC_SIZE
 
@@ -311,7 +312,7 @@ typedef struct NeiSaveData {
     // Rod of Seasons — Skijer's NEI. Four seasons share the one SLOT_ROD_OF_SEASONS cell; each
     // pickup grants one season (slate idiom, no levels). APPENDED AT THE END.
     uint8_t season;       // SEASON_* — the season the cell shows
-    uint8_t seasonsOwned; // SEASON_* bitmask (four bits) — 0 = rod not owned at all
+    uint8_t seasonsOwned; // earned season pickup mask; the Rod can be owned with no season pickups
     // OoT RPG Speed Upgrades mirrored by FleetSync. Append to preserve older saves.
     uint8_t comboSpeedUpgrades;
     uint8_t comboSpeedRequired; // effective upgrade count from the saved OoT seed; 0 means default 5
@@ -319,6 +320,21 @@ typedef struct NeiSaveData {
     // Independent items sharing inventory cell 41; append for existing saves.
     uint8_t hyliasGraceOwned;
     uint8_t phantomHourglassOwned;
+    // Independent Rod ownership and persistent completion gates (not reward possession).
+    // Appended so existing saves retain their season pickups and inventory cells.
+    uint8_t seasonsRodOwned;
+    uint8_t seasonsGates;
+    // Fixed Termina Field Saria gift, independent of consumable hint/song ownership.
+    // Append for old saves; local MM completion state, never mirrored to OoT.
+    uint8_t comboSariaSongClaimed;
+    // Local per-file sword choices, appended to preserve existing field offsets.
+    // Kokiri, Master, Biggoron, Giant's Knife, Razor, Gilded, True Master, Great Fairy.
+    // The set mask distinguishes an explicit None from untouched legacy fire settings.
+    uint8_t swordElements[8]; // 0 None, 1 Fire, 2 Ice, 3 Light; fixed wire order
+    uint8_t swordElementSet;
+    // Independent travel tools sharing cell 31. Append to preserve existing save offsets.
+    uint8_t timeGateOwned;
+    uint8_t magicMirrorOwned;
 } NeiSaveData;
 
 // Hookshot-cell variant ids (which item currently fires from SLOT_HOOKSHOT). Returned by

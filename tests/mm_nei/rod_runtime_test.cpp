@@ -45,9 +45,14 @@ Gfx *ResourceMgr_LoadGfxByName(const char *) {
   static Gfx dl[1];
   return dl;
 }
-void *OotAssets_LoadGfx(const char *) {
+void *OotAssets_LoadGfx(const char* path) {
+#ifdef NEI_GI_REWARD_FIXTURE
+  extern void* RewardFixture_LoadNativeGfx(const char*);
+  return RewardFixture_LoadNativeGfx(path);
+#else
   static Gfx dl[1];
   return dl;
+#endif
 }
 void Matrix_Get(MtxF *p) { *p = current; }
 void Matrix_Put(MtxF *p) { current = *p; }
@@ -115,6 +120,7 @@ void Gfx_SetupDL25_Xlu(GraphicsContext *) {}
 void Graph_OpenDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
 void Graph_CloseDisps(Gfx **, Gfx *, GraphicsContext *, const char *, s32) {}
 #endif
+void Gfx_SetupDL26_Opa(GraphicsContext *gfx) { Gfx_SetupDL25_Opa(gfx); }
 void gSPDisplayList(Gfx *, Gfx *list) {
   ++nativeDraws;
 #ifdef MM_REAL_RENDERER

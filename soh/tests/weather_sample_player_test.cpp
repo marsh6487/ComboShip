@@ -65,8 +65,46 @@ static void TestLoopAndOneShotsPreserveEngineMix() {
     WeatherSamplePlayer_Reset();
 }
 
+static void TestResourceLoopEndBoundsThunderWithoutReadingPadding() {
+    uint8_t smallAdpcm[5] = { 0, 0x55, 0x55, 0x55, 0x55 };
+    for (const char* path : { "audio/samples/Low Thunder_META", "audio/samples/Lightning_META" }) {
+        SoundFontSample* sample = WeatherAudioFixture(path);
+        const SoundFontSample original = *sample;
+        const int16_t nativeValue = std::strstr(path, "Low Thunder") != nullptr ? 2 : 3;
+        for (uint32_t codec : { 0u, 3u }) {
+            *sample = original;
+            if (codec == 3) {
+                sample->codec = codec;
+                sample->sampleAddr = smallAdpcm;
+                sample->size = sample->fileSize = sizeof(smallAdpcm);
+            }
+            for (uint32_t end : { 16u, 12u }) {
+                for (uint32_t padding : { 1u, 0u, UINT32_MAX }) {
+                    // AudioSampleFactory fills start/end/count/state. Its loop
+                    // offset 0x0C is unused padding, not a sample-length field.
+                    AdpcmLoop loop = { 4, end, 0, padding, {} };
+                    sample->loop = &loop;
+                    WeatherSamplePlayer_Init();
+                    REQUIRE(WeatherSamplePlayer_Play(path, 1.0f));
+                    int16_t mixed[32] = {};
+                    WeatherSamplePlayer_Mix(mixed, 16);
+                    const int16_t value = codec == 3 ? 1 : nativeValue;
+                    for (size_t frame = 0; frame < 16; ++frame) {
+                        const int16_t expected = frame < end ? value : 0;
+                        REQUIRE(mixed[frame * 2] == expected);
+                        REQUIRE(mixed[frame * 2 + 1] == expected);
+                    }
+                }
+            }
+        }
+        *sample = original;
+    }
+    WeatherSamplePlayer_Reset();
+}
+
 int main() {
     TestLoopAndOneShotsPreserveEngineMix();
+    TestResourceLoopEndBoundsThunderWithoutReadingPadding();
     REQUIRE(WeatherSamplePlayer_ClampGain(-1.0f) == 0.0f);
     REQUIRE(WeatherSamplePlayer_ClampGain(0.35f) == 0.35f);
     REQUIRE(WeatherSamplePlayer_ClampGain(2.0f) == 1.0f);

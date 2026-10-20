@@ -792,6 +792,9 @@ void AudioMmSfx_StopByPos(Vec3f* pos) {
 }
 
 void AudioMmSfx_StopByPosAndId(Vec3f* pos, u16 sfxId) {
+    if (!sMmSfxEngineReady || pos == nullptr || SFX_BANK(sfxId) >= ARRAY_COUNT(gMmSfxBanks)) {
+        return;
+    }
     MmSfxBankEntry* entry;
     u8 entryIndex = gMmSfxBanks[SFX_BANK(sfxId)][0].next;
     u8 prevEntryIndex = 0;

@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_set>
 extern "C" {
+void NeiGi_ReportBlackMarketModel(const char*,const char*,const char*) {}
 #ifdef HOST_MM
 #include "global.h"
 #else
@@ -80,7 +81,16 @@ Gfx* Gfx_TwoTexScrollEx(GraphicsContext*, s32, u32 x1, u32, s32 w1, s32 h1,
 
 #ifndef HOST_MM
 static bool donorReady;
-static int donorResult = 1, invalidDonor, fallbackDraws;
+static bool donorOwnerReady = true;
+static int donorResult = 1, invalidDonor, fallbackDraws, donorQueries;
+namespace Ship {
+struct CrossRMRegistry {
+    static bool Get(const char* game) {
+        assert(!strcmp(game, "mm"));
+        return donorOwnerReady;
+    }
+};
+}
 int32_t SpinDonor(const char* name, CwItemDrawInfo* out) {
     assert(!strcmp(name, "Great Spin Attack"));
     if (donorResult != 1) return donorResult;
@@ -93,6 +103,7 @@ int32_t SpinDonor(const char* name, CwItemDrawInfo* out) {
 }
 void* Combo_ResolveSym(const char* game, const char* symbol) {
     assert(!strcmp(game, "2ship") && !strcmp(symbol, "MM_GetItemDrawInfo"));
+    ++donorQueries;
     return donorReady ? (void*)SpinDonor : nullptr;
 }
 const char* ComboInternRoutedPath(const std::string& path) {
@@ -167,6 +178,10 @@ int main() {
     Randomizer_DrawMmGreatSpinAttack(&play, nullptr);
     assert(fallbackDraws == 1 && draws == 2 && queries == 1 && depth == 0 && gfx.polyOpa.p == opa);
     assert(paths[0].starts_with("__OTR__@mm:") && paths[1].starts_with("__OTR__@mm:"));
+    donorOwnerReady = false;
+    const int queriesBefore = donorQueries;
+    Randomizer_DrawMmGreatSpinAttack(&play, nullptr);
+    assert(fallbackDraws == 2 && draws == 2 && donorQueries == queriesBefore);
 #endif
     puts("PASS real-header spin GI: native and @mm resources, live burst hex, animated scroll, opaque alpha, XLU-only and matrix/segment/RM cleanup");
 }

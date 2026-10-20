@@ -62,6 +62,14 @@ static const StaticStoryMmPresentation sLuluPresentations[] = {
     ORDINARY("object_zov", "gLuluSkel", "gLuluSingLoopAnim", 22, 21, 72, STATIC_STORY_MM_TRACKING_NONE, 3, 2, 9, 8),
     ORDINARY("object_zov", "gLuluSkel", "gLuluLookAroundAnim", 22, 21, 87, STATIC_STORY_MM_TRACKING_NONE, 3, 2, 9, 8),
 };
+static const StaticStoryMmPresentation sMonkeyPresentations[] = {
+    ORDINARY("object_mnk", "gMonkeySkel", "object_mnk_Anim_0105DC", 22, 20, 12, STATIC_STORY_MM_TRACKING_NONE, 3, 0, 8,
+             0),
+    ORDINARY("object_mnk", "gMonkeySkel", "object_mnk_Anim_00B864", 22, 20, 71, STATIC_STORY_MM_TRACKING_NONE, 3, 0, 8,
+             0),
+    ORDINARY("object_mnk", "gMonkeySkel", "object_mnk_Anim_008814", 22, 20, 16, STATIC_STORY_MM_TRACKING_NONE, 3, 0, 8,
+             0),
+};
 #undef ORDINARY
 static const StaticStoryMmPresentation sAnjuPresentations[] = {
     { "objects/object_an1/gAnju1Skel", "objects/object_an2/gAnju2UmbrellaCryAnim", NULL, NULL, NULL, NULL, NULL, 20,
@@ -143,10 +151,17 @@ const StaticStoryMmPresentation* StaticStoryMm_GetPresentation(StaticStoryActorT
         return &sKafeiPresentations[pose];
     if (type == STATIC_STORY_ACTOR_ANJU && pose < 2)
         return &sAnjuPresentations[pose];
+    if (type == STATIC_STORY_ACTOR_MONKEY && pose < 3)
+        return &sMonkeyPresentations[pose];
     return NULL;
 }
 
 const char* StaticStoryMm_GetEyeTexturePath(StaticStoryActorType type, uint8_t eyeIndex) {
+    static const char* monkey[] = { "objects/object_mnk/object_mnk_Tex_015020",
+                                    "objects/object_mnk/object_mnk_Tex_015920",
+                                    "objects/object_mnk/object_mnk_Tex_016120" };
+    if (type == STATIC_STORY_ACTOR_MONKEY)
+        return eyeIndex < 3 ? monkey[eyeIndex] : NULL;
     if (type == STATIC_STORY_ACTOR_ANJU)
         return eyeIndex == 0 ? "objects/object_an1/gAnju1EyeSadTex" : NULL;
     static const char* kafei[] = {

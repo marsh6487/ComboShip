@@ -5803,6 +5803,12 @@ void Audio_StartMorningSceneSequence(u16 seqId) {
     }
 }
 
+#ifdef COMBO_BUILD
+void Audio_InvalidateSceneSequence(void) {
+    sRequestedSceneSeqId = NA_BGM_DISABLED;
+}
+#endif
+
 void Audio_PlaySceneSequence(u16 seqId, u8 dayMinusOne) {
     if (GameInteractor_Should(VB_PLAY_SCENE_SEQUENCE, false, &sRequestedSceneSeqId, &sPrevMainBgmSeqId, &seqId)) {
         return;

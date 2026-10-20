@@ -109,6 +109,10 @@ void GameOver_Update(PlayState* play) {
             if (AudioSeq_GetActiveSeqId(SEQ_PLAYER_FANFARE) != NA_BGM_GAME_OVER) {
 #endif
                 func_80169F78(play);
+#ifdef COMBO_BUILD
+                extern void Combo_MM_RequestCrossBossDeathRecovery(void);
+                Combo_MM_RequestCrossBossDeathRecovery();
+#endif
                 if (gSaveContext.respawnFlag != -7) {
                     gSaveContext.respawnFlag = -6;
                 }

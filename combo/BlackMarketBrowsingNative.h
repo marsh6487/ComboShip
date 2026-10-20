@@ -1,0 +1,227 @@
+// Included inside each native controller's private namespace after Purchase().
+// Both engines use the same interaction code and spatial navigation state.
+BlackMarketBrowsing::State sBrowser;
+s16 sBrowseCamera = -1, sBrowseParent = -1;
+s16 sBrowseCameraUid = -1;
+Camera* sBrowseCameraPtr = nullptr;
+bool sBrowsePlayerWasHidden = false;
+void UpdateBrowsingCamera(PlayState* play);
+bool BrowsingMessage(PlayState* play) {
+#ifdef BLACK_MARKET_BROWSING_OOT
+    const auto text = play->msgCtx.textId;
+#else
+    const auto text = play->msgCtx.currentTextId;
+#endif
+    return text == kWelcomeText || text == kBrowseText || text == kConfirmText || text == kResultText;
+}
+
+void EndBrowsing(PlayState* play, bool destroying = false) {
+    if (!destroying && play && sBrowseCamera >= CAM_ID_SUB_FIRST) {
+        if (play->cameraPtrs[sBrowseCamera] == sBrowseCameraPtr && sBrowseCameraPtr->uid == sBrowseCameraUid) {
+#ifdef BLACK_MARKET_BROWSING_OOT
+            // Native one-point cameras can name the shop as their parent.
+            // Splice their live queue links before freeing the owned slot.
+            const auto child = sBrowseCameraPtr->childCamIdx;
+            const auto survivingChild =
+                child >= CAM_ID_SUB_FIRST && child < NUM_CAMS && child != sBrowseCamera && play->cameraPtrs[child]
+                    ? child
+                    : SUBCAM_FREE;
+            for (auto* camera : play->cameraPtrs) {
+                if (!camera || camera == sBrowseCameraPtr)
+                    continue;
+                if (camera->parentCamIdx == sBrowseCamera)
+                    camera->parentCamIdx = sBrowseParent;
+                if (camera->childCamIdx == sBrowseCamera)
+                    camera->childCamIdx = survivingChild;
+            }
+            if (survivingChild >= CAM_ID_SUB_FIRST && play->cameraPtrs[sBrowseParent] &&
+                play->cameraPtrs[sBrowseParent]->childCamIdx == SUBCAM_FREE)
+                play->cameraPtrs[sBrowseParent]->childCamIdx = survivingChild;
+#else
+            const auto cs = CutsceneManager_GetCurrentCsId();
+            if (cs != CS_ID_NONE && Play_GetActiveCamId(play) != sBrowseCamera &&
+                CutsceneManager_GetCurrentSubCamId(cs) == Play_GetActiveCamId(play))
+                CutsceneManager_SetReturnCamera(sBrowseParent);
+#endif
+            if (Play_GetActiveCamId(play) == sBrowseCamera && sBrowseParent >= 0 && play->cameraPtrs[sBrowseParent])
+                Play_ChangeCameraStatus(play, sBrowseParent, 7); // native ACTIVE in both engines
+            Play_ClearCamera(play, sBrowseCamera);
+        }
+        if (auto* player = GET_PLAYER(play); player && !sBrowsePlayerWasHidden)
+            player->stateFlags2 &= ~(1u << 29); // native shop player-hide bit
+    }
+    // MM's destroy hook runs after actor arena cleanup; never touch its player.
+    sBrowseCamera = sBrowseParent = sBrowseCameraUid = -1;
+    sBrowseCameraPtr = nullptr;
+    sBrowser = {};
+    sTalking = false;
+}
+bool BeginBrowsing(PlayState* play) {
+    if (sTalking)
+        return true;
+    sBrowseParent = Play_GetActiveCamId(play);
+    if (sBrowseParent != CAM_ID_MAIN || !GET_PLAYER(play))
+        return false;
+#ifdef BLACK_MARKET_BROWSING_OOT
+    if (play->cameraPtrs[sBrowseParent]->childCamIdx >= CAM_ID_SUB_FIRST)
+        return false;
+#endif
+    sBrowseCamera = Play_CreateSubCamera(play);
+    if (sBrowseCamera < CAM_ID_SUB_FIRST)
+        return false;
+    sBrowseCameraPtr = Play_GetCamera(play, sBrowseCamera);
+    sBrowseCameraUid = sBrowseCameraPtr->uid;
+#ifdef BLACK_MARKET_BROWSING_OOT
+    sBrowseCameraPtr->parentCamIdx = sBrowseParent;
+    sBrowseCameraPtr->childCamIdx = SUBCAM_FREE;
+    // A manual shop view is outside the native one-point cutscene queue.
+    // Linking it as main's child would make later parent=MAIN cutscenes wait.
+    Play_CameraChangeSetting(play, sBrowseCamera, CAM_SET_FREE0);
+#else
+    Play_ChangeCameraSetting(play, sBrowseCamera, CAM_SET_FREE0);
+#endif
+    sBrowser = {};
+    sSelected = -1;
+    auto* player = GET_PLAYER(play);
+    sBrowsePlayerWasHidden = (player->stateFlags2 & (1u << 29)) != 0;
+    player->stateFlags2 |= 1u << 29;
+    Play_ChangeCameraStatus(play, sBrowseParent, 1); // native WAIT
+    sTalking = true;
+    UpdateBrowsingCamera(play);
+    return true;
+}
+void UpdateBrowsingCamera(PlayState* play) {
+    if (!sTalking)
+        return;
+    sBrowser.TickCamera();
+    auto& view = sBrowser.view;
+    Vec3f at{ view.at.x, view.at.y, view.at.z }, eye{ view.eye.x, view.eye.y, view.eye.z };
+#ifdef BLACK_MARKET_BROWSING_OOT
+    Play_CameraSetAtEye(play, sBrowseCamera, &at, &eye);
+    Play_CameraSetFov(play, sBrowseCamera, view.fov);
+#else
+    Play_SetCameraAtEye(play, sBrowseCamera, &at, &eye);
+    Play_SetCameraFov(play, sBrowseCamera, view.fov);
+#endif
+    Play_ChangeCameraStatus(play, sBrowseCamera, 7);
+}
+void MonitorBrowsing() {
+    if (!sTalking)
+        return;
+    auto* play = gPlayState;
+    if (!play) {
+        EndBrowsing(nullptr, true);
+        return;
+    }
+    if (!Active() || Play_GetActiveCamId(play) != sBrowseCamera ||
+        play->cameraPtrs[sBrowseCamera] != sBrowseCameraPtr || sBrowseCameraPtr->uid != sBrowseCameraUid ||
+        !BrowsingMessage(play) || play->transitionTrigger != TRANS_TRIGGER_OFF ||
+        play->transitionMode != TRANS_MODE_OFF || play->gameOverCtx.state != GAMEOVER_INACTIVE) {
+        if (BrowsingMessage(play))
+            Message_CloseTextbox(play);
+        EndBrowsing(play);
+    }
+}
+void BrowseInput(PlayState* play) {
+    using BlackMarketBrowsing::Phase;
+    MonitorBrowsing();
+    if (!sTalking)
+        return;
+    const auto state = Message_GetState(&play->msgCtx);
+    if (state == TEXT_STATE_NONE || state == TEXT_STATE_CLOSING) {
+        EndBrowsing(play);
+        return;
+    }
+    if (play->pauseCtx.state != 0)
+        return;
+    UpdateBrowsingCamera(play);
+    auto& input = play->state.input[0];
+    if (input.press.button & BTN_B) {
+        if (sBrowser.phase != Phase::Browse) {
+            sBrowser.phase = Phase::Browse;
+            Message_ContinueTextbox(play, kBrowseText);
+        } else if (sSelected >= 0) {
+            sBrowser.row = sSelected & 1;
+            sBrowser.slot = sSelected = -1;
+            Message_ContinueTextbox(play, kWelcomeText);
+        } else {
+            Message_CloseTextbox(play);
+            EndBrowsing(play);
+        }
+        sBrowser.ResetInput();
+        return;
+    }
+    if (sBrowser.phase == Phase::Confirm) {
+        if (state == TEXT_STATE_CHOICE && (input.press.button & BTN_A) && Message_ShouldAdvance(play)) {
+            if (play->msgCtx.choiceIndex == 0) {
+                Purchase();
+                sBrowser.phase = Phase::Result;
+                Message_ContinueTextbox(play, kResultText);
+            } else {
+                sBrowser.phase = Phase::Browse;
+                Message_ContinueTextbox(play, kBrowseText);
+            }
+            sBrowser.ResetInput();
+        }
+        return;
+    }
+    if (sBrowser.phase == Phase::Result) {
+        if ((state == TEXT_STATE_EVENT || state == TEXT_STATE_DONE) && (input.press.button & BTN_A) &&
+            Message_ShouldAdvance(play)) {
+            sBrowser.phase = Phase::Browse;
+            sBrowser.ResetInput();
+            Message_ContinueTextbox(play, kBrowseText);
+        }
+        return;
+    }
+    if (state != TEXT_STATE_EVENT && state != TEXT_STATE_DONE)
+        return;
+    int x = sBrowser.horizontal.Step(input.rel.stick_x), y = sBrowser.vertical.Step(input.rel.stick_y);
+    if (input.press.button & BTN_DLEFT)
+        x = -1;
+    else if (input.press.button & BTN_DRIGHT)
+        x = 1;
+    if (input.press.button & BTN_DUP)
+        y = 1;
+    else if (input.press.button & BTN_DDOWN)
+        y = -1;
+    if (sBrowser.Move(x, y)) {
+        sSelected = sBrowser.slot;
+        Message_ContinueTextbox(play, sSelected < 0 ? kWelcomeText : kBrowseText);
+    } else if ((input.press.button & BTN_A) && Message_ShouldAdvance(play)) {
+        if (sSelected < 0) {
+            sBrowser.Move(1, 0);
+            sSelected = sBrowser.slot;
+            Message_ContinueTextbox(play, kBrowseText);
+        } else {
+            sBrowser.phase = Phase::Confirm;
+            Message_ContinueTextbox(play, kConfirmText);
+        }
+        sBrowser.ResetInput();
+    }
+}
+void DrawBrowseCursor() {
+    auto* play = gPlayState;
+    if (!sTalking || !Active() || sSelected < 0 || Play_GetActiveCamId(play) != sBrowseCamera ||
+        sBrowser.phase != BlackMarketBrowsing::Phase::Browse)
+        return;
+    Actor display{};
+    display.world.pos = kShelves[sSelected];
+    s16 x, y;
+    Actor_GetScreenPos(play, &display, &x, &y);
+    if (x < 0 || x > SCREEN_WIDTH || y < 0 || y > SCREEN_HEIGHT)
+        return;
+    alignas(2) static const char texture[] = "__OTR__objects/gameplay_keep/gSelectionCursorTex";
+    OPEN_DISPS(play->state.gfxCtx);
+#ifdef BLACK_MARKET_BROWSING_OOT
+    Gfx_SetupDL_39Overlay(play->state.gfxCtx);
+#else
+    Gfx_SetupDL39_Overlay(play->state.gfxCtx);
+#endif
+    gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 0, 255, 80, 220);
+    gDPLoadTextureBlock_4b(OVERLAY_DISP++, texture, G_IM_FMT_IA, 16, 16, 0, G_TX_MIRROR | G_TX_WRAP,
+                           G_TX_MIRROR | G_TX_WRAP, 4, 4, G_TX_NOLOD, G_TX_NOLOD);
+    gSPTextureRectangle(OVERLAY_DISP++, (x - 20) * 4, (y - 20) * 4, (x + 20) * 4, (y + 20) * 4, G_TX_RENDERTILE, 0, 0,
+                        819, 819);
+    CLOSE_DISPS(play->state.gfxCtx);
+}

@@ -8,11 +8,13 @@
 #include "ComboTrackerBridge.h"
 #include "ComboTrackerCommon.h" // kKinds (HideBackground CVars for the tracker panels)
 #include "ComboTrackerSwap.h"
-#include "ComboAnchorRoomWindow.h"  // combo-native floating Anchor room window
-#include "ComboNotesWindow.h"       // combo-owned cross-game Personal Notes window
-#include "ComboHintTracker.h"       // combo-owned unified Hint Tracker (#164)
-#include "ComboTimersWindow.h"      // combo-owned overlay timers (#173)
-#include "ComboSettingsSync.h"      // combo-owned cross-game settings sync
+#include "ComboAnchorRoomWindow.h" // combo-native floating Anchor room window
+#include "ComboNotesWindow.h"      // combo-owned cross-game Personal Notes window
+#include "ComboHintTracker.h"      // combo-owned unified Hint Tracker (#164)
+#include "ComboEmoteSettings.h"
+#include "ComboTimersWindow.h" // combo-owned overlay timers (#173)
+#include "ComboSettingsSync.h" // combo-owned cross-game settings sync
+#include "BlackMarketAppearance.h"
 #include "rando/ComboPlaythrough.h" // plando: ParseSpoilerPlacements + Suffix/BuildForeignArray + slot paths
 #include <imgui.h>
 #include <libultraship/libultraship.h>         // CVar bridge (CVarGet/Set* incl. color) + color.h (Color_RGBA8)
@@ -266,8 +268,8 @@ void ComboMenu::DrawElement() {
         static const Scope kScopes[] = {
             { "settings", "Settings" },
             { "randomizer", "Randomizer" },
-            { "oot", "Ship of Harkinian" },
-            { "mm", "2 Ship 2 Harkinian" },
+            { "oot", "Ocarina of Time" },
+            { "mm", "Majora's Mask" },
         };
         if (mScope.empty()) {
             mScope = "settings";
@@ -374,8 +376,8 @@ void ComboMenu::DrawSearchResults(const std::string& query) {
         const GameMenu* game;
     };
     const Source sources[] = {
-        { "Ship of Harkinian", &model.Oot() }, // OOT first: its copy wins the dedupe
-        { "2 Ship 2 Harkinian", &model.Mm() },
+        { "Ocarina of Time", &model.Oot() }, // OOT first: its copy wins the dedupe
+        { "Majora's Mask", &model.Mm() },
     };
 
     // 2-3 equal-width columns (by available width) so results read as a grid, not one tall list —
@@ -452,12 +454,14 @@ struct HubEntry {
         ENGINE,
         OOT_RANDO,
         MM_RANDO,
+        SHARED_SEED_INFORMATION,
         COMBO_GEN,
         COMBO_PLANDO,
         COMBO_TRACKER,
         COMBO_CHECK_TRACKER,
         COMBO_HINT_TRACKER,
         COMBO_TIMERS,
+        COMBO_EMOTES,
         COMBO_SYNC,
         COMBO_NETWORK
     } kind;
@@ -508,6 +512,25 @@ void AppendSectionEntries(std::vector<HubEntry>& out, const char* groupLabel, Hu
         }
         break; // first matching section only
     }
+}
+
+constexpr const char* kMapCompassInformation = "gRandoSettings.MapsCompassesGiveInformation";
+
+const CwWidget* FindWidgetByCvar(const ComboRando::GameMenu& game, const char* cvar) {
+    if (!game.loaded || !game.menu)
+        return nullptr;
+    for (int s = 0; s < game.menu->sectionCount; ++s) {
+        const CwSection& section = game.menu->sections[s];
+        for (int sb = 0; sb < section.sidebarCount; ++sb) {
+            const CwSidebar& side = section.sidebars[sb];
+            for (int w = 0; w < side.widgetCount; ++w) {
+                const CwWidget& widget = side.widgets[w];
+                if (widget.cvar && std::strcmp(widget.cvar, cvar) == 0)
+                    return &widget;
+            }
+        }
+    }
+    return nullptr;
 }
 // Render one game's tracker sidebar inline (linear; the tracker sidebars are single-column).
 // Structural skips: the sidebar's main-window toggle (identified by its CVar — the combo master
@@ -1340,6 +1363,11 @@ void ComboMenu::DrawSharedPanel() {
         tmr.group = "Settings";
         tmr.kind = HubEntry::COMBO_TIMERS;
         e.push_back(std::move(tmr));
+        HubEntry emotes;
+        emotes.label = "Emotes";
+        emotes.group = "Settings";
+        emotes.kind = HubEntry::COMBO_EMOTES;
+        e.push_back(std::move(emotes));
         // Combo-owned settings sync: the options both games have under different CVar names.
         HubEntry syn;
         syn.label = "Sync";
@@ -1367,11 +1395,31 @@ void ComboMenu::DrawSharedPanel() {
         }
     } else {
         {
-            std::vector<HubEntry> e;
-            // Trackers live in the Ship of Harkinian tab, not here.
-            AppendSectionEntries(e, "OOT Randomizer", HubEntry::OOT_RANDO, model.Oot(), "Randomizer", {}, true);
-            if (!e.empty())
-                groups.push_back({ "OOT Randomizer", std::move(e) });
+            std::vector<HubEntry> oot, shared;
+            AppendSectionEntries(oot, "OOT Randomizer", HubEntry::OOT_RANDO, model.Oot(), "Randomizer", {}, true);
+            // These saved seed rules affect both games. Reuse the original native
+            // widgets so option callbacks, amounts and generation guards stay intact.
+            for (auto it = oot.begin(); it != oot.end();) {
+                if (it->label == "Stat Upgrades") {
+                    it->group = "Shared Seed Settings";
+                    shared.push_back(std::move(*it));
+                    it = oot.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+            if (FindWidgetByCvar(model.Oot(), kMapCompassInformation)) {
+                HubEntry information;
+                information.label = "Map & Compass Information";
+                information.group = "Shared Seed Settings";
+                information.kind = HubEntry::SHARED_SEED_INFORMATION;
+                information.game = &model.Oot();
+                shared.push_back(std::move(information));
+            }
+            if (!shared.empty())
+                groups.push_back({ "Shared Seed Settings", std::move(shared) });
+            if (!oot.empty())
+                groups.push_back({ "OOT Randomizer", std::move(oot) });
         }
         {
             std::vector<HubEntry> e;
@@ -1480,13 +1528,33 @@ void ComboMenu::DrawSharedPanel() {
         DrawHintTrackerSharedPanel();
     } else if (active->kind == HubEntry::COMBO_TIMERS) {
         DrawTimersSharedPanel();
+    } else if (active->kind == HubEntry::COMBO_EMOTES) {
+        ComboEmotes::DrawSettings();
     } else if (active->kind == HubEntry::COMBO_SYNC) {
         ComboSync::DrawSyncSharedPanel();
     } else if (active->kind == HubEntry::COMBO_NETWORK) {
         DrawNetworkSharedPanel();
+    } else if (active->kind == HubEntry::SHARED_SEED_INFORMATION) {
+        if (const auto* widget = FindWidgetByCvar(*active->game, kMapCompassInformation)) {
+            RenderWidget(*widget, *active->game);
+        }
     } else {
         const CwSidebar& side = active->game->menu->sections[active->sectionIndex].sidebars[active->sidebarIndex];
-        RenderSidebarWidgets(side, *active->game);
+        if (active->kind == HubEntry::OOT_RANDO) {
+            // Hide only the relocated control; never mutate the game's exported model.
+            std::vector<CwWidget> widgets;
+            for (int w = 0; w < side.widgetCount; ++w) {
+                const auto& widget = side.widgets[w];
+                if (!widget.cvar || std::strcmp(widget.cvar, kMapCompassInformation) != 0)
+                    widgets.push_back(widget);
+            }
+            CwSidebar filtered = side;
+            filtered.widgets = widgets.data();
+            filtered.widgetCount = static_cast<int32_t>(widgets.size());
+            RenderSidebarWidgets(filtered, *active->game);
+        } else {
+            RenderSidebarWidgets(side, *active->game);
+        }
     }
     ImGui::EndChild();
 }
@@ -1733,6 +1801,69 @@ void ComboMenu::DrawComboPanel() {
                         "and the Mask Shop key/entrance exclusions, so Ocarina of Time stays enterable from nothing.");
     ImGui::Separator();
 
+    ImGui::SeparatorText("Entrances");
+    bool crossDungeonEntrances = CVarGetInteger("gCombo.Rando.CrossDungeonEntrances", 0) != 0;
+    ComboRando::ComboMenu_PushCheckbox(goalTheme);
+    if (ImGui::Checkbox("Cross-Game Dungeon Entrances", &crossDungeonEntrances))
+        CVarSetInteger("gCombo.Rando.CrossDungeonEntrances", crossDungeonEntrances ? 1 : 0);
+    ComboRando::ComboMenu_PopCheckbox();
+    ImGui::SetItemTooltip("Shuffle eligible Ocarina of Time and Majora's Mask dungeons together. "
+                          "Uses Ocarina of Time's native entrance settings and saves the layout with the seed.");
+    auto crossPoolCheckbox = [&](const char* label, const char* cvar, const char* help) {
+        bool enabled = CVarGetInteger(cvar, 0) != 0;
+        ComboRando::ComboMenu_PushCheckbox(goalTheme);
+        if (ImGui::Checkbox(label, &enabled))
+            CVarSetInteger(cvar, enabled ? 1 : 0);
+        ComboRando::ComboMenu_PopCheckbox();
+        ImGui::SetItemTooltip("%s", help);
+    };
+    ImGui::BeginDisabled(!crossDungeonEntrances);
+    crossPoolCheckbox(
+        "Expanded Dungeon Pool", "gCombo.Rando.ExpandedDungeonPool",
+        "Add Majora's Mask's Spider Houses, Ikana Castle, Secret Shrine, Beneath the Well's two entrances, "
+        "and Pirates' Fortress to the dungeon pool.");
+    ImGui::EndDisabled();
+    crossPoolCheckbox("Cross-Game Boss Entrances", "gCombo.Rando.CrossBossEntrances",
+                      "Shuffle the eight Ocarina of Time and four Majora's Mask bosses together. "
+                      "Rewards belong to the arena; completion and the blue warp follow the shuffled boss door.");
+    crossPoolCheckbox(
+        "Cross-Game Interiors", "gCombo.Rando.CrossInteriorEntrances",
+        "Shuffle eligible houses and other nonretail interiors between games, including open passageways. "
+        "Includes Door Interiors below. Shops use their own checkbox. The original game portal stays available.");
+    const bool broadInteriors = CVarGetInteger("gCombo.Rando.CrossInteriorEntrances", 0) != 0;
+    crossPoolCheckbox("Cross-Game Shops", "gCombo.Rando.CrossShopEntrances",
+                      "Shuffle all retail shop entrances with other shops between games, including open entrances. "
+                      "Only this checkbox includes shops. Applied to newly generated seeds.");
+    ImGui::BeginDisabled(broadInteriors);
+    crossPoolCheckbox(
+        "Cross-Game Door Interiors", "gCombo.Rando.CrossDoorInteriorEntrances",
+        "Shuffle other interiors with doors you open between games. Shops use their separate checkbox. "
+        "Open houses, caves, tunnels and other passageways stay in place. Applied to newly generated seeds.");
+    ImGui::EndDisabled();
+    crossPoolCheckbox("Cross-Game Grottos and Graves", "gCombo.Rando.CrossGrottoEntrances",
+                      "Shuffle grotto and grave entrances between games, including their return and void positions.");
+    ImGui::Separator();
+
+    ImGui::SeparatorText("Skiejer Black Market");
+    static constexpr const char* marketPrices[] = { "Tiered", "Follow SoH Pricing" };
+    int marketPricing = std::clamp(CVarGetInteger("gCombo.Rando.BlackMarketPricing", 0), 0, 1);
+    ComboRando::ComboMenu_PushCombobox(goalTheme);
+    if (ImGui::Combo("Pricing##BlackMarket", &marketPricing, marketPrices, 2))
+        CVarSetInteger("gCombo.Rando.BlackMarketPricing", marketPricing);
+    ComboRando::ComboMenu_PopCombobox();
+    ImGui::SetItemTooltip("Tiered prices stay within 30-200 rupees. Follow SoH Pricing uses the shop-price options, "
+                          "including Set By Wallet. Stock and prices are fixed when the seed is generated.");
+    bool marketUnlocks = CVarGetInteger("gCombo.Rando.BlackMarketDungeonUnlocks", 1) != 0;
+    ComboRando::ComboMenu_PushCheckbox(goalTheme);
+    if (ImGui::Checkbox("Dungeon Purchase Unlocks", &marketUnlocks))
+        CVarSetInteger("gCombo.Rando.BlackMarketDungeonUnlocks", marketUnlocks);
+    ComboRando::ComboMenu_PopCheckbox();
+    ImGui::SetItemTooltip("Tier 1 is available immediately. Tiers 2 and 3 require one and two unique dungeon clears "
+                          "across both games. Disable to make all eight offers available immediately.");
+    ImGui::TextDisabled("Eight bonus offers in MM Lost Woods. Never required by progression logic.");
+    BlackMarketUI::DrawAppearance();
+    ImGui::Separator();
+
     // Shared Items (OoTMM-style): one item counts for both games, applied at generation. Deferred
     // families (Ocarina, Song of Time, Shields, Bottles, Health) are not drawn — see the plan doc.
     ImGui::SeparatorText("Shared Items");
@@ -1758,7 +1889,7 @@ void ComboMenu::DrawComboPanel() {
         }
     }
     ImGui::TextDisabled("One item counts for both games. Applied at generation. Masks need Ocarina of\n"
-                        "Time's Mask Quest set to Shuffle. Shared Wallets turns off Shuffle Child Wallet.");
+                        "Time's Shuffle Masks on. Shared Wallets turns off Shuffle Child Wallet.");
     ImGui::Separator();
 
     // Cosmetics (#169): each game randomizes on its own by default; sync makes MM take OOT's colors.

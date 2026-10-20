@@ -200,6 +200,19 @@ using LimbArg = void *;
 using OverrideLimbDrawOpa = s32 (*)(PlayState *, s32, Gfx **, Vec3f *, Vec3s *,
                                     LimbArg);
 using PostLimbDrawOpa = void (*)(PlayState *, s32, Gfx **, Vec3s *, LimbArg);
+#ifndef HOST_MM
+// Boss-soul fixtures have no native NPC skin plan. Execute the real native
+// helper's null-plan path and reject unexpected palette blending.
+using MtxF = Mtx;
+static const void* NativeNpcPose_GetSkinPlan(void**, s32) { return nullptr; }
+static s32 NativeNpcPose_SkinMatrixCount(const void* plan) {
+  assert(plan == nullptr);
+  return 0;
+}
+static void NativeNpcPose_BlendSkinMatrix(const void*, s32, MtxF*, MtxF*) { assert(false); }
+static void Matrix_MtxToMtxF(Mtx* source, MtxF* target) { *target = *source; }
+static void Matrix_Put(MtxF* source) { current = *source; }
+#endif
 extern "C" {
 #include "native_draw.inc"
 }
