@@ -1,7 +1,7 @@
 name: Build (reusable)
 
 # Reusable Windows build pipeline: full Release build + cpack ZIP. Called by build-artifacts.yml
-# (which runs the `gate` job first) and release.yml (v* tags, no gate — merged code). See
+# (which runs preflight first and aggregates the final gate) and release.yml (v* tags). See
 # docs/UPSTREAM_MERGES.md and CMake/CPackProjectConfig.cmake (the combo/ship/2s2h ZIP components).
 
 on:
@@ -53,13 +53,23 @@ jobs:
       - name: Verify Windows launcher icon and version resources
         run: python -B scripts/diagnostics/run_windows_launcher_resource_tests.py
 
-      # Shared with the compile gate: caches the expensive vcpkg build + CMake tree.
-      - name: Cache build dir (vcpkg + CMake)
+      # Dependencies have a stable input key. Compile outputs rotate per commit,
+      # so an exact cache hit cannot freeze every later build at an old source tree.
+      - name: Cache Windows dependencies
         uses: actions/cache@v5
         with:
-          path: build/x64
-          key: build-x64-${{ hashFiles('CMakeLists.txt', 'CMake/**', 'libultraship/cmake/**', 'torch/CMakeLists.txt') }}
-          restore-keys: build-x64-
+          path: build/x64/vcpkg
+          key: windows-2022-vcpkg-v2-${{ hashFiles('CMakeLists.txt', 'CMake/**', 'libultraship/cmake/**', 'torch/CMakeLists.txt') }}
+
+      - name: Cache Windows build tree
+        uses: actions/cache@v5
+        with:
+          path: |
+            build/x64
+            !build/x64/vcpkg
+            x64/Release
+          key: windows-2022-build-v2-${{ hashFiles('CMakeLists.txt', 'CMake/**', 'libultraship/cmake/**', 'torch/CMakeLists.txt') }}-${{ github.sha }}
+          restore-keys: windows-2022-build-v2-${{ hashFiles('CMakeLists.txt', 'CMake/**', 'libultraship/cmake/**', 'torch/CMakeLists.txt') }}-
 
       - name: Configure
         # See build-windows.yml: vcvars points VCPKG_ROOT at the (non-git) VS-bundled vcpkg, which
