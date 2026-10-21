@@ -1307,6 +1307,12 @@ void func_8009EE44(PlayState* play) {
     gSPSegment(POLY_XLU_DISP++, 0x09,
                Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, 127 - gameplayFrames % 128, gameplayFrames % 128, 32, 32, 1,
                                   gameplayFrames % 128, gameplayFrames % 128, 32, 32, -1, 1, 1, 1));
+#ifdef COMBO_BUILD
+    // Dedicated vertical light sheets call 0x0A000001; native 08/09 keep their own motion.
+    gSPSegment(POLY_XLU_DISP++, 0x0A,
+               Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, 0, gameplayFrames % 64, 32, 16, 1, 0, gameplayFrames % 64, 32,
+                                  16, 0, 1, 0, 1));
+#endif
 
     gDPPipeSync(POLY_XLU_DISP++);
     gDPSetEnvColor(POLY_XLU_DISP++, 128, 128, 128, 128);
