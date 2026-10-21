@@ -21,7 +21,9 @@ permissions:
 jobs:
   pr-artifacts:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.event == 'pull_request' }}
+    # Platform builds run alongside regressions. Only an entirely successful
+    # run may replace the previously verified download links.
+    if: ${{ github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success' }}
     steps:
       - id: 'pr-number'
         uses: actions/github-script@v7
@@ -65,8 +67,7 @@ jobs:
               return acc;
             }, '### Build Artifacts');
       - id: 'add-to-pr'
-        # Zero artifacts means gate failed and both builds were skipped — skip the update so a red
-        # push doesn't wipe the previous good link list.
+        # Documentation-only runs intentionally have no platform artifacts.
         if: ${{ steps.artifacts-text.outputs.result != '### Build Artifacts' }}
         uses: garrettjoecox/pr-section@4.0.0
         with:
