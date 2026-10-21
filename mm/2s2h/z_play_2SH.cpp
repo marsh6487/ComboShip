@@ -55,6 +55,11 @@ extern "C" void OTRPlay_InitScene(PlayState* play, s32 spawn) {
     Scene_ResetTransitionActorList(&play->state, &play->transitionActors);
     Room_Init(play, &play->roomCtx);
     gSaveContext.worldMapArea = 0;
+#ifdef COMBO_BUILD
+    // Private/authored headers can omit 0x1B. Bind the camera manager to this
+    // PlayState before native camera setup; a header's own list overrides it.
+    CutsceneManager_Init(play, nullptr, 0);
+#endif
     OTRScene_ExecuteCommands(play, (SOH::Scene*)play->sceneSegment);
 #ifdef COMBO_BUILD
     ComboBlackMarket_PrepareSpawn(play);
