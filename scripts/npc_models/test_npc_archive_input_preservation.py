@@ -14,9 +14,31 @@ import recolor_saria_iris as iris
 import refine_saria_ocarina as prop
 import repair_npc_face_torso as face
 import repair_twins_shoulders as twins
+import repair_young_fado_shoulders as fado
+import validate_npc_review_bundle as bundle_check
 
 
 class InputPreservationTests(unittest.TestCase):
+    def test_bundle_readback_report_cannot_overwrite_native_archive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); bundle = root/'bundle'; paths = []
+            for i in range(4): paths.append(bundle/'Common'/f'model{i}.o2r')
+            for style in ('Anime','Traditional'):
+                paths.append(bundle/'Choose-One-Saria'/style/'saria.o2r')
+            native, retained = root/'native.o2r', root/'retained.o2r'
+            for i, path in enumerate([*paths,native,retained]):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with zipfile.ZipFile(path,'w') as archive:
+                    archive.writestr(f'private-{i}.json', '{}')
+            before = native.read_bytes()
+            argv = ['audit','--repo',str(Path(__file__).resolve().parents[2]),
+                    '--bundle',str(bundle),'--native',str(native),
+                    '--retained-adult-fado',str(retained),'--report',str(native)]
+            with mock.patch('sys.argv', argv), contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaisesRegex(ValueError,'separate'):
+                    bundle_check.main()
+            self.assertEqual(native.read_bytes(),before)
+
     def test_refinement_refuses_hardlinked_parent_before_writing(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); parent = root/'parent.o2r'; output = root/'output.o2r'
@@ -49,6 +71,8 @@ class InputPreservationTests(unittest.TestCase):
                 ('iris-native', 'native', lambda out: iris.recolor(inputs['native'], inputs['parent'], out, inputs['source'])),
                 ('iris-parent', 'parent', lambda out: iris.recolor(inputs['native'], inputs['parent'], out, inputs['source'])),
                 ('iris-source', 'source', lambda out: iris.recolor(inputs['native'], inputs['parent'], out, inputs['source'])),
+                *[(f'fado-{name}', name, lambda out: fado.build(inputs['native'], inputs['parent'],
+                    inputs['source'], inputs['art'], out)) for name in inputs],
             ]
             for label, name, invoke in calls:
                 with self.subTest(repair=label):
@@ -74,6 +98,25 @@ class InputPreservationTests(unittest.TestCase):
                             with contextlib.redirect_stdout(io.StringIO()):
                                 with self.assertRaisesRegex(ValueError, 'separate'):
                                     face.main()
+                            build.assert_not_called()
+                        self.assertEqual(path.read_bytes(), b'protected bytes')
+
+    def test_fado_report_refuses_input_and_output_aliases_before_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            paths = {name: root/name for name in ('native', 'parent', 'source', 'mesh', 'output')}
+            for path in paths.values(): path.write_bytes(b'protected bytes')
+            for name, path in paths.items():
+                for hardlink in (False, True):
+                    with self.subTest(target=name, hardlink=hardlink):
+                        report = root/('report-'+name) if hardlink else path
+                        if hardlink: os.link(path, report)
+                        argv = ['fado', *[str(paths[name]) for name in ('native','parent','source','mesh','output')],
+                                '--report', str(report)]
+                        with mock.patch('sys.argv', argv), mock.patch.object(fado, 'build', return_value={}) as build:
+                            with contextlib.redirect_stdout(io.StringIO()):
+                                with self.assertRaisesRegex(ValueError, 'separate'):
+                                    fado.main()
                             build.assert_not_called()
                         self.assertEqual(path.read_bytes(), b'protected bytes')
 

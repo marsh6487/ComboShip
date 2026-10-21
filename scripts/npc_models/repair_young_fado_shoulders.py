@@ -19,6 +19,7 @@ from scipy.sparse.linalg import factorized, spsolve
 from scipy.spatial import cKDTree
 
 from native_assets import skeleton
+from native_assets.path_guard import require_separate_destination
 from native_npc_models import SourceModel, animation_frames, asset, read_limb, read_string, unit, wrapper
 from native_npc_skin import Palette, STEPS
 from verify_native_npc_models import Archive
@@ -289,8 +290,7 @@ def emit_records(output, path, parent_material, records, faces, host):
 
 def build(native, parent, source_path, fitted_mesh, output):
     native, parent, source_path, fitted_mesh, output = map(Path, (native, parent, source_path, fitted_mesh, output))
-    if output.resolve() in {path.resolve() for path in (native, parent, source_path, fitted_mesh)}:
-        raise ValueError('The output must be separate from every read-only input')
+    require_separate_destination(output, native, parent, source_path, fitted_mesh)
     for path, expected in ((parent, PARENT_SHA256), (source_path, SOURCE_SHA256), (fitted_mesh, MESH_SHA256)):
         if sha256(path) != expected:
             raise ValueError(f'Input hash mismatch: {path.name}')
@@ -389,9 +389,13 @@ def main():
         parser.add_argument(name, type=Path)
     parser.add_argument('--report', type=Path)
     args = parser.parse_args()
+    if args.report:
+        require_separate_destination(args.report, args.native, args.parent, args.source,
+                                     args.fitted_mesh, args.output)
     report = build(args.native, args.parent, args.source, args.fitted_mesh, args.output)
     text = json.dumps(report, indent=2)+'\n'
     if args.report:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(text)
     print(text)
 
