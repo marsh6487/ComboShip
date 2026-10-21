@@ -33,6 +33,7 @@ int main(void) {
         { STATIC_STORY_TEXT_CHILD_KAFEI, "I've made a promise to Anju." },
         { STATIC_STORY_TEXT_LULU, "Pleased to meet you. I'm Lulu." },
         { STATIC_STORY_TEXT_ANJU, "...Kafei... I promised I'd wait for you." },
+        { STATIC_STORY_TEXT_MONKEY, "Ook! Ook! The Woods of Mystery are just ahead!" },
     };
 
     for (size_t entry = 0; entry < sizeof(expected) / sizeof(expected[0]); ++entry) {

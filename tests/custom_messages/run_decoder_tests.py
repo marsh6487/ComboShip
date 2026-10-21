@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Run native MM message opening/decoding on the real custom Saria payloads.
 
-The C units and engine layouts are production code. Graphics, audio, item-icon
-loading and the hook registry are boundary doubles; no game or save is run.
+The C units, receipt builder and engine layouts are production code. Graphics,
+audio, texture loading, inventory/save services and the hook registry are
+boundary doubles; no game or save is run.
 """
 import os
 from pathlib import Path
@@ -36,6 +37,16 @@ fixture = fixture.replace("/* CUSTOM_MESSAGE_HELPERS */", helpers)
 fixture = fixture.replace("/* SARIA_HOOK */", hook)
 fixture = fixture.replace("/* SARIA_QUEUE */", function(saria, "void QueueSariaSong()"))
 fixture = fixture.replace("/* SARIA_CLOSURE */", closure)
+receipt = (ROOT / "tests/custom_messages/saria_receipt_test.inc").read_text()
+receipt = receipt.replace("/* SARIA_GRANT */", function(saria, "void GiveSariaSong("))
+items = (ROOT / "mm/2s2h/Rando/StaticData/Items.cpp").read_text()
+row = next(line.strip().removesuffix(",") for line in items.splitlines()
+           if line.strip().startswith("RI(RI_SONG_SARIA,"))
+macro = items[items.index("#define RI("):items.index("// clang-format off")]
+receipt = receipt.replace("/* SARIA_CATALOG */", macro +
+    "\nstd::map<RandoItemId, RandoStaticItem> Items = {" + row + "};\n#undef RI\n")
+receipt = receipt.replace("/* SARIA_ICON_SELECTOR */", function(items, "u8 GetIconForZMessage("))
+fixture = fixture.replace("/* SARIA_RECEIPT */", receipt)
 includes = [ROOT, *[ROOT / "mm" / p for p in ("", "include", "include/PR", "src", "assets", "mods", "2s2h")],
             *[ROOT / p for p in ("combo", "combo/menu", "libultraship/include", "libultraship")]]
 flags = ["-g", "-O1", "-w", "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DF3DEX_GBI_2",
@@ -53,8 +64,11 @@ with tempfile.TemporaryDirectory(prefix="mm-custom-message-") as directory:
         units.append(str(obj))
     cpp = folder / "decoder.cpp"
     cpp.write_text(fixture)
+    receipt_obj = folder / "receipt.o"
+    subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", *flags, "-c",
+                    str(ROOT / "mm/2s2h/Rando/ItemReceiptText.cpp"), "-o", str(receipt_obj)], check=True)
     binary = folder / "decoder"
     subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", *flags, str(cpp),
-                    *units, "-Wl,--gc-sections", "-no-pie", "-o", str(binary)], check=True)
+                    *units, str(receipt_obj), "-Wl,--gc-sections", "-ldl", "-no-pie", "-o", str(binary)], check=True)
     subprocess.run([str(binary)], check=True, timeout=10,
                    env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})

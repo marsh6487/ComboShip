@@ -1,0 +1,11 @@
+{
+  "baseline": "525b3160660225a06700470fb39d9d4948834414",
+  "implementation_commit": "4068936e80a322909b6f679e2850804040cb7842",
+  "implementation_tree": "743dd6dd11f804738277933ea6b2f9de9304af46",
+  "independent_restore": "PASS: shallow baseline copy with no alternates; patch reconstructed exact tree and all source hashes; bundle restored exact implementation commit/tree",
+  "runtime": "Untested; source and native regressions only.",
+  "archive": "saria-song-receipt-source-20261021.zip",
+  "archive_sha256": "527218ca9a5bf871900453d9da50ce95e3cdaa6b8a41fc7d3c1f24a0c449daf3",
+  "source_files": 7,
+  "bytes": 66845
+}

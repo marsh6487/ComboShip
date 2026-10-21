@@ -69,6 +69,7 @@ void GiveSariaSong(Actor* actor, PlayState*) {
     entry.textboxType = TEXTBOX_TYPE_2;
     entry.icon = Rando::StaticData::GetIconForZMessage(RI_SONG_SARIA);
     Rando::ApplyItemReceiptText(RI_SONG_SARIA, entry);
+    Rando::AppendReceiptSource(entry, "");
     if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE)
         CustomMessage::SetActiveCustomMessage(entry.msg, entry);
     else

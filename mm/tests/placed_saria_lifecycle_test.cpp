@@ -71,6 +71,7 @@ void DrawItem(RandoItemId id, RandoCheckId, Actor*) {
 bool ApplyItemReceiptText(RandoItemId id, CustomMessage::Entry& entry) {
     CHECK(id == RI_SONG_SARIA);
     entry.msg = "Saria's Song";
+    entry.autoFormat = false;
     return true;
 }
 namespace StaticData {
@@ -85,13 +86,14 @@ void SariasSongHint() {
 }
 } // namespace MiscBehavior
 } // namespace Rando
+/* PRODUCTION_RECEIPT_FINALIZER */
 namespace CustomMessage {
 void SetActiveCustomMessage(std::string msg, Entry) {
-    CHECK(msg == "Saria's Song");
+    CHECK(msg == "Saria's Song\xBF");
     ++receipts;
 }
 void StartTextbox(std::string msg, Entry) {
-    CHECK(msg == "Saria's Song");
+    CHECK(msg == "Saria's Song\xBF");
     ++receipts;
 }
 } // namespace CustomMessage
