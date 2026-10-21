@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "baseline": "525b3160660225a06700470fb39d9d4948834414",
+  "implementation_commit": "10f25d1f04aa25cd07e682c8c0748799167b1492",
+  "implementation_tree": "e121165324bf95c2c7f9638d4ec9a0c1f13350ea",
+  "independent_changed_source_restore": "PASS: empty isolated directory, embedded baseline paths, patch application and all 15 target SHA256 checks; no object alternates or prior checkout",
+  "status": "candidate; focused tests and native objects verified; full platform link and configured gameplay pending",
+  "archive": "magic-mirror-arrival-ritual-source-20261021.zip",
+  "bytes": 120873,
+  "sha256": "2b907b4cac39dfd7211b219e5ba32ed270218052fb8c9f50758aed9ce55e1782"
+}
