@@ -32,25 +32,25 @@
 
 **Files:** Existing `docs/poc/*20261021*`, native forest assets and source manifests; new roundup record.
 
-- [ ] Record the actual current baseline, checkpoint identities and item-by-item provenance.
-- [ ] Run the baseline native solo-forest route tests; retain source and asset hashes.
-- [ ] Audit core bugfixes, native forest/particles/scrolling and additional morning omissions independently.
+- [x] Record the actual current baseline, checkpoint identities and item-by-item provenance.
+- [x] Run the baseline native solo-forest route tests; retain source and asset hashes.
+- [x] Audit core bugfixes, native forest/particles/scrolling and additional morning omissions independently.
 
 ### Task 2: Compose Woodfall and conditional Fairy return
 
 **Files:** `combo/entrances/LostWoodsEntrance.h`; both engines' passage/arrival controllers; `soh/src/code/z_play.c`; `soh/src/overlays/actors/ovl_player_actor/z_player.c`; `tests/lost_woods_entrance/`; CI regression manifest.
 
-- [ ] Merge Woodfall checkpoint `3352869b5cec8560fcaba20ea1c32df53200e89d` and Fairy checkpoint `34d6f1f3266bafdee86a144749ba66faf52abb0e` into the isolated candidate.
-- [ ] Resolve only shared integration points, retaining current parallel CI architecture.
-- [ ] Run both sanitizer fixtures and the complete entrance runner; correct any reproduced integration failure with a failing regression first.
-- [ ] Verify actual original-game/Combo routes, native collision inputs where available and source-only reconstruction.
-- [ ] Commit the bounded verified integration and record every unresolved runtime check.
+- [x] Merge Woodfall checkpoint `3352869b5cec8560fcaba20ea1c32df53200e89d` and Fairy checkpoint `34d6f1f3266bafdee86a144749ba66faf52abb0e` into the isolated candidate.
+- [x] Resolve only shared integration points, retaining current parallel CI architecture.
+- [x] Run both sanitizer fixtures and the complete entrance runner; correct any reproduced integration failure with a failing regression first.
+- [x] Verify actual original-game/Combo routes, native collision inputs where available and source-only reconstruction.
+- [x] Commit the bounded verified integration and record every unresolved runtime check.
 
 ### Task 3: Review, preserve and publish
 
 **Files:** This plan; `docs/poc/morning-roundup-20261021.md`; source recovery receipt; Git branches/PR.
 
-- [ ] Inspect all audit findings, complete targeted verification and obtain a fresh whole-branch review.
-- [ ] Verify an independent Git-archive restore and record exact source/tree/asset identities.
+- [x] Inspect all audit findings, complete targeted verification and obtain a fresh whole-branch review.
+- [x] Verify an independent Git-archive restore and record exact source/tree/asset identities.
 - [ ] Push the recoverable source candidate, publish the cumulative integration and start the normal hosted gate.
 - [ ] Report the exact commit/build link, extra included work and untested gameplay honestly.

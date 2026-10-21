@@ -6253,7 +6253,8 @@ s32 Player_HandleExitsAndVoids(PlayState* play, Player* this, CollisionPoly* pol
                         Scene_SetTransitionForNextEntrance(play);
                     } else {
                         if (GameInteractor_Should(VB_SET_VOIDOUT_FROM_SURFACE,
-                                                  SurfaceType_GetFloorEffect(&play->colCtx, poly, bgId) == FLOOR_EFFECT_2,
+                                                  SurfaceType_GetFloorEffect(&play->colCtx, poly, bgId) ==
+                                                      FLOOR_EFFECT_2,
                                                   play->setupExitList[exitIndex - 1])) {
                             gSaveContext.respawn[RESPAWN_MODE_DOWN].entranceIndex = play->nextEntranceIndex;
                             if (GameInteractor_Should(VB_TRIGGER_VOIDOUT, true, this)) {

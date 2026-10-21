@@ -4554,7 +4554,7 @@ extern "C" void SOH_ApplyComboPortalArrival(int allowPlacement) {
                    : openingForest ? Vec3f{ 800.0f, 0.0f, 160.0f }
                                    : Vec3f{ 0.0f, 0.0f, -280.0f };
     arrival->yaw = woodfall ? -16384 : openingForest ? (s16)0x8000 : 0; // into the clearing, away from the trigger
-    arrival->playerParams = 0x0EFF;                 // native slow walk out, no fixed background camera
+    arrival->playerParams = 0x0EFF; // native slow walk out, no fixed background camera
     arrival->data = 1;
     gSaveContext.respawnFlag = 2;
 }

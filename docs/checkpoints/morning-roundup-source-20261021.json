@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "archive": "morning-roundup-source-20261021.zip",
+  "bytes": 1029101,
+  "sha256": "94ca02d5b9577e5185466564b13cfd62404dbffcd4c58af5274ac036f80994bc",
+  "implementation_commit": "38c9e66648ec3704d4c21633421301052af5f27c",
+  "implementation_tree": "9e748ecac5cc10c255f08ec20066233db2210b3a",
+  "baseline": "66bde021ccd651a3728db2338251961b1a44c9f7",
+  "bundle_sha256": "eb27d87fe8046d64af303661d873a15846f002d69a2b10d583a94c777b3d75b2",
+  "independent_restore": "pass: fresh GitHub baseline clone, bundle verification/restore, exact tree and native resource reconstruction",
+  "entry_count": 66,
+  "candidate_status": "implemented and locally verified; hosted gate and configured gameplay pending"
+}

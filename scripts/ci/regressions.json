@@ -75,6 +75,12 @@
     "run": "python3 -B scripts/diagnostics/run_spin_gi_tests.py\npython3 -B scripts/diagnostics/run_spin_gi_tests.py --sanitize"
   },
   {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Dedicated Lost Woods vertical scrolling and native binding preservation",
+    "run": "python3 -B tests/lost_woods_entrance/run_vertical_scroll_tests.py"
+  },
+  {
     "suite": "entrances",
     "origin": "gate",
     "name": "Native cross-game entrance sequencing and forest arrival",

@@ -65,9 +65,9 @@ void FountainPlayerUpdate() {
         gSaveContext.respawn[RESPAWN_MODE_RETURN] = sFountainPreservedReturn;
         sFountainReturnStaged = false;
     }
-    if (play->sceneNum != SCENE_LOST_WOODS || !play->state.running ||
-        play->transitionTrigger != TRANS_TRIGGER_OFF || play->transitionMode != TRANS_MODE_OFF ||
-        play->pauseCtx.state != 0 || play->gameOverCtx.state != GAMEOVER_INACTIVE || Player_InCsMode(play))
+    if (play->sceneNum != SCENE_LOST_WOODS || !play->state.running || play->transitionTrigger != TRANS_TRIGGER_OFF ||
+        play->transitionMode != TRANS_MODE_OFF || play->pauseCtx.state != 0 ||
+        play->gameOverCtx.state != GAMEOVER_INACTIVE || Player_InCsMode(play))
         return;
     auto* player = GET_PLAYER(play);
     if (!player || !player->actor.floorPoly || !(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) ||
@@ -126,10 +126,12 @@ void BindFountainFile(int slot) {
         const int entrance = value.at("fountain");
         const auto& point = value.at("origin");
         const int yaw = point.at("yaw");
-        const FountainOrigin origin{ point.at("entrance"), { point.at("x"), point.at("y"), point.at("z") },
-                                     static_cast<s16>(yaw), point.at("room") };
-        if (!IsGreatFairyScene(FountainScene(entrance)) || !ValidFountainOrigin(origin) ||
-            yaw < INT16_MIN || yaw > INT16_MAX)
+        const FountainOrigin origin{ point.at("entrance"),
+                                     { point.at("x"), point.at("y"), point.at("z") },
+                                     static_cast<s16>(yaw),
+                                     point.at("room") };
+        if (!IsGreatFairyScene(FountainScene(entrance)) || !ValidFountainOrigin(origin) || yaw < INT16_MIN ||
+            yaw > INT16_MAX)
             return;
         sFountainOrigin = origin;
         sFountainEntrance = entrance;
@@ -141,12 +143,17 @@ void SaveFountainState(const SaveContext& snapshot, int, bool) {
         return;
     const bool inside = sFountainActive && FountainScene(snapshot.entranceIndex) == FountainScene(sFountainEntrance) &&
                         gEntranceTable[snapshot.entranceIndex].spawn == gEntranceTable[sFountainEntrance].spawn;
-    const nlohmann::json value = {
-        { "version", 1 }, { "seed", sFountainSeed }, { "savedInside", inside }, { "fountain", sFountainEntrance },
-        { "origin", { { "entrance", sFountainOrigin.entrance }, { "room", sFountainOrigin.room },
-                      { "x", sFountainOrigin.pos.x }, { "y", sFountainOrigin.pos.y }, { "z", sFountainOrigin.pos.z },
-                      { "yaw", sFountainOrigin.yaw } } }
-    };
+    const nlohmann::json value = { { "version", 1 },
+                                   { "seed", sFountainSeed },
+                                   { "savedInside", inside },
+                                   { "fountain", sFountainEntrance },
+                                   { "origin",
+                                     { { "entrance", sFountainOrigin.entrance },
+                                       { "room", sFountainOrigin.room },
+                                       { "x", sFountainOrigin.pos.x },
+                                       { "y", sFountainOrigin.pos.y },
+                                       { "z", sFountainOrigin.pos.z },
+                                       { "yaw", sFountainOrigin.yaw } } } };
     SaveManager::Instance->SaveData("native", value);
 }
 void RegisterFountainReturn() {
@@ -159,9 +166,8 @@ void RegisterFountainReturn() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnLoadGame>(BindFountainFile);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>(FountainSceneInit);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerUpdate>(FountainPlayerUpdate);
-    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>([] {
-        sFountainGroundCount = sFountainGroundNext = 0;
-    });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(
+        [] { sFountainGroundCount = sFountainGroundNext = 0; });
 }
 RegisterShipInitFunc fountainReturnInit(RegisterFountainReturn);
 } // namespace
@@ -186,8 +192,8 @@ extern "C" int ComboLostWoodsFountain_TryExit(PlayState* play, Player* player, i
         // or global fountain exit-table changes are involved.
         const FountainOrigin* origin = nullptr;
         for (size_t i = 0; i < sFountainGroundCount; ++i) {
-            const auto& point = sFountainGround[(sFountainGroundNext + sFountainGround.size() - i - 1) %
-                                              sFountainGround.size()];
+            const auto& point =
+                sFountainGround[(sFountainGroundNext + sFountainGround.size() - i - 1) % sFountainGround.size()];
             const auto distance = FountainDistance(point.pos, player->actor.world.pos);
             if (point.room != play->roomCtx.curRoom.num || distance > 256 * 256)
                 continue;
@@ -207,10 +213,9 @@ extern "C" int ComboLostWoodsFountain_TryExit(PlayState* play, Player* player, i
         play->nextEntranceIndex = entrance;
         return 1;
     }
-    const bool exit = (play->sceneNum == SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC &&
-                       entrance == ENTR_RETURN_DAIYOUSEI_IZUMI) ||
-                      (play->sceneNum == SCENE_GREAT_FAIRYS_FOUNTAIN_SPELLS &&
-                       entrance == ENTR_RETURN_YOUSEI_IZUMI_YOKO);
+    const bool exit =
+        (play->sceneNum == SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC && entrance == ENTR_RETURN_DAIYOUSEI_IZUMI) ||
+        (play->sceneNum == SCENE_GREAT_FAIRYS_FOUNTAIN_SPELLS && entrance == ENTR_RETURN_YOUSEI_IZUMI_YOKO);
     if (!exit || !FountainVisit(play))
         return 0;
     SaveManager::Instance->ThreadPoolWait();
