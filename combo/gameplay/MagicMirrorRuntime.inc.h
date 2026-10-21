@@ -8,7 +8,7 @@ struct Context {
 };
 static Context sContext;
 static int sSerial = 0, sPickupToken = 0;
-static bool sPrompt = false, sAnchorValid = false;
+static bool sPrompt = false, sPromptAccepted = false, sAnchorValid = false;
 static const CollisionHeader* sCollision = nullptr;
 static MagicMirrorAnchor::Point sAnchor{};
 static PlayState* sPromptPlay = nullptr;
@@ -54,6 +54,7 @@ void ReleasePrompt(bool close) {
         sPromptPlayer->stateFlags1 &= ~sPromptAddedFlags;
     }
     sPrompt = false;
+    sPromptAccepted = false;
     sPromptPlay = nullptr;
     sPromptPlayer = nullptr;
     sPromptAddedFlags = 0;
@@ -199,12 +200,18 @@ bool PromptOwnsPlayer(PlayState* play, const Player* player) {
     if (!(sPrompt && play == sPromptPlay && player == sPromptPlayer) &&
         !(sPromptInputPlay && play == sPromptInputPlay && player == sPromptInputPlayer))
         return false;
+    // Eligibility is checked by Update, which cancels/cleans up the prompt.
+    // Collision and interaction state can change during the native player
+    // update; they must not hand a live choice box's input back to movement.
     if (!play || play != gPlayState || gGameState != &play->state || GET_PLAYER(play) != player || !Matches(play) ||
-        !Safe(play, true) || !MagicMirror_IsOwned())
+        !MagicMirror_IsOwned())
         return false;
     return (play == sPromptInputPlay && player == sPromptInputPlayer) ||
-           (sPrompt && play == sPromptPlay && player == sPromptPlayer && CurrentText(play) == kPromptText &&
-            play->msgCtx.msgMode != MSGMODE_NONE && play->msgCtx.msgMode != MSGMODE_TEXT_CLOSING);
+           (sPrompt && play == sPromptPlay && player == sPromptPlayer &&
+            (CurrentText(play) == kPromptText ||
+             (sPromptAccepted && play->msgCtx.msgMode == MSGMODE_NONE && play->msgCtx.msgLength == 0)) &&
+            (sPromptAccepted ||
+             (play->msgCtx.msgMode != MSGMODE_NONE && play->msgCtx.msgMode != MSGMODE_TEXT_CLOSING)));
 }
 void ConsumePromptInput(PlayState* play) {
     sPromptInputPlay = play;
@@ -410,9 +417,11 @@ void Update() {
             ++sCastTicks > 160 ||
             (!sDeparted && (!MagicMirror_IsOwned() || !Safe(play, true) || play->msgCtx.msgMode != MSGMODE_NONE ||
                             !AllowedScene(play) || !MirrorHost::PackAvailable()))) {
+            MirrorHost::Trace("cast-cancel", play);
             ReleaseCast();
         } else if (!sDeparted && MagicMirrorPlayer_State(sCastPlayer) == MAGIC_MIRROR_CAST_READY) {
             sDeparted = Travel(play, true);
+            MirrorHost::Trace(sDeparted ? "travel-requested" : "travel-rejected", play);
             if (!sDeparted) {
                 ReleaseCast();
                 MirrorHost::Error();
@@ -422,13 +431,38 @@ void Update() {
     }
     if (sPrompt) {
         const auto text = CurrentText(play);
-        if (play != sPromptPlay || GET_PLAYER(play) != sPromptPlayer || text != kPromptText || !Safe(play, true) ||
-            !MagicMirror_IsOwned()) {
+        const bool finished = sPromptAccepted && play->msgCtx.msgMode == MSGMODE_NONE && play->msgCtx.msgLength == 0;
+        if (play != sPromptPlay || GET_PLAYER(play) != sPromptPlayer || (text != kPromptText && !finished) ||
+            !Safe(play, true) || !MagicMirror_IsOwned()) {
+            MirrorHost::Trace("prompt-invalidated", play);
             ReleasePrompt(text == kPromptText);
             return;
         }
         HoldPrompt();
+        if (sPromptAccepted) {
+            if (!finished)
+                return;
+            // Native closing clears text length/ID and restores the HUD. A
+            // forced NONE with live text makes native drawing reopen the box.
+            ConsumePromptInput(play);
+            ReleasePrompt(false);
+            if (Safe(play, false) && AllowedScene(play) && MirrorHost::PackAvailable()) {
+                if (MagicMirrorPlayer_Begin(play, GET_PLAYER(play))) {
+                    sCastPlay = play;
+                    sCastPlayer = GET_PLAYER(play);
+                    sCastTicks = 0;
+                    MirrorHost::Trace("cast-started", play);
+                } else {
+                    MirrorHost::Trace("cast-rejected", play);
+                    MirrorHost::Error();
+                }
+            } else {
+                MirrorHost::Trace("cast-ineligible-after-close", play);
+            }
+            return;
+        }
         if (play->state.input[0].press.button & BTN_B) {
+            MirrorHost::Trace("prompt-cancel", play);
             ConsumePromptInput(play);
             ReleasePrompt(true);
             return;
@@ -436,18 +470,13 @@ void Update() {
         if (Message_GetState(&play->msgCtx) == TEXT_STATE_CHOICE && Message_ShouldAdvance(play)) {
             const bool yes = play->msgCtx.choiceIndex == 0;
             ConsumePromptInput(play);
-            ReleasePrompt(true);
-            // The message has completed, but its final native closing frame
-            // can still report a textbox. Recheck every other safety gate.
             if (yes && Safe(play, true) && AllowedScene(play) && MirrorHost::PackAvailable()) {
-                play->msgCtx.msgMode = MSGMODE_NONE;
-                if (MagicMirrorPlayer_Begin(play, GET_PLAYER(play))) {
-                    sCastPlay = play;
-                    sCastPlayer = GET_PLAYER(play);
-                    sCastTicks = 0;
-                } else {
-                    MirrorHost::Error();
-                }
+                sPromptAccepted = true;
+                Message_CloseTextbox(play);
+                MirrorHost::Trace("yes-closing", play);
+            } else {
+                MirrorHost::Trace(yes ? "yes-ineligible" : "no-closing", play);
+                ReleasePrompt(true);
             }
         } else if (Message_GetState(&play->msgCtx) == TEXT_STATE_NONE) {
             ReleasePrompt(false);
@@ -478,6 +507,7 @@ void Update() {
     HoldPrompt();
     play->state.input[0].press.button &= ~pressed;
     MirrorHost::OpenPrompt();
+    MirrorHost::Trace("prompt-open", play);
 }
 void DrawWorld() {
     auto* play = gPlayState;

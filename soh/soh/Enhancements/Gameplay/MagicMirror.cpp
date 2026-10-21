@@ -21,6 +21,7 @@
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include <algorithm>
 #include <cmath>
+#include <spdlog/spdlog.h>
 
 extern "C" {
 u8 ResourceMgr_FileExists(const char* path);
@@ -68,6 +69,13 @@ void Save() {
 }
 void Error() {
     Sfx_PlaySfxCentered(NA_SE_SY_ERROR);
+}
+void Trace(const char* phase, PlayState* play) {
+    const auto* player = GET_PLAYER(play);
+    SPDLOG_INFO("Magic Mirror OoT: phase={} scene={} text={:04x} mode={} length={} state1={:08x} ground={} cast={}",
+                phase, play->sceneNum, play->msgCtx.textId, play->msgCtx.msgMode, play->msgCtx.msgLength,
+                player ? player->stateFlags1 : 0, player && (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND),
+                MagicMirrorPlayer_State(player));
 }
 bool ButtonClaimed(u16 button) {
     return ItemInput_ButtonIsClaimed(button);
