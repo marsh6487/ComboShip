@@ -1,5 +1,5 @@
-# Geometry-only private exploration headers and building/stump edits are copied
-# identically into each native port archive. The real MM ROM remains the owner
+# Private exploration framing and bounded authored additions are copied from
+# one verified ZIP into ignored host trees. The MM ROM remains the owner
 # of stock textures and untouched geometry. A pending source bundle blocks only
 # archive generation, so ordinary executable builds remain available.
 get_filename_component(COMBO_NATIVE_FOREST_SOURCE_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
@@ -18,7 +18,7 @@ add_custom_target(PrepareNativeForestAssets
         --manifest "${COMBO_NATIVE_FOREST_MANIFEST}"
         --output-root "${CMAKE_SOURCE_DIR}"
         ${_native_forest_extra_args}
-    COMMENT "Preparing stock native forest geometry (no custom texture payloads)..."
+    COMMENT "Preparing verified native forest framing and authored additions..."
     VERBATIM)
 foreach(_native_forest_archive_target GenerateSohOtr Generate2ShipOtr)
     if(TARGET ${_native_forest_archive_target})

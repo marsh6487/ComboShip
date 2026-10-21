@@ -12,6 +12,8 @@
 #include "gameplay/MagicMirrorArrival.h"
 #include "gameplay/MagicMirrorItem.h"
 #include "gameplay/MagicMirrorPlayer.h"
+#include "actors/ForestGiParticles.h"
+#include "../../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "mods/extended_inventory.h"
 #include "mods/ext_buttons/ext_buttons.h"
 #include "mods/items/helpers/equip_helper.h"
@@ -102,6 +104,9 @@ void GivePickup(Actor* actor, PlayState*) {
 void DrawPickup(Actor*, PlayState* play) {
     Matrix_Scale(30, 30, 30, MTXMODE_APPLY);
     ComboMagicMirrorVisual::Draw(play);
+}
+void DrawWorldShimmer(PlayState* play) {
+    NeiGi_DrawWorldParticles(play, ForestGiParticles::Mirror(play->gameplayFrames, NeiGi_CameraBasis(play)));
 }
 bool QueuePickup(int token) {
     GameInteractor::Instance->events.emplace_back(GIEventGiveItem{

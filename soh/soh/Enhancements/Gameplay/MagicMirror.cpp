@@ -11,6 +11,8 @@
 #include "gameplay/MagicMirrorArrival.h"
 #include "gameplay/MagicMirrorItem.h"
 #include "gameplay/MagicMirrorPlayer.h"
+#include "actors/ForestGiParticles.h"
+#include "soh/Enhancements/randomizer/NeiGiRender.h"
 #include "mods/extended_inventory.h"
 #include "mods/ext_buttons/ext_buttons.h"
 #include "mods/items/helpers/equip_helper.h"
@@ -96,6 +98,9 @@ void DrawPickup(PlayState* play, GetItemEntry*) {
     // Native OoT get-item draws at .2; MM's item actor uses .015 * 30 = .45.
     Matrix_Scale(2.25f, 2.25f, 2.25f, MTXMODE_APPLY);
     ComboMagicMirrorVisual::Draw(play);
+}
+void DrawWorldShimmer(PlayState* play) {
+    NeiGi_DrawWorldParticles(play, ForestGiParticles::Mirror(play->gameplayFrames, NeiGi_CameraBasis(play)));
 }
 bool QueuePickup(int token) {
     GetItemEntry entry = GET_ITEM_NONE;

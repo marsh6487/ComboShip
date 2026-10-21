@@ -1,5 +1,5 @@
 {
-  "building_material": "untextured native vertex shading",
+  "building_material": "exact authored textured/scrolled materials; native geometry owner retained",
   "building_materials": {
     "custom/prelude/Z2_LOST_WOODS/recipe215851318676066": "custom/comboship/native_forest/building/recipe215851318676066_material",
     "custom/prelude/Z2_LOST_WOODS/recipe3635031522573470": "custom/comboship/native_forest/building/recipe3635031522573470_material",
@@ -7,9 +7,41 @@
   },
   "building_triangles": 190,
   "bundle": {
-    "bytes": 58372,
+    "bytes": 49704908,
     "name": "resources.zip",
-    "sha256": "7b21d19512a48b2363247b9276426ff6ba7afa4f10130f98513c22a90d0c6730"
+    "parts": [
+      {
+        "bytes": 8388608,
+        "name": "parts/resources.zip.part001",
+        "sha256": "1a48a18f4d047e9c2fc17281181f0fb049622b97788c8cd654d136a9ea799f9c"
+      },
+      {
+        "bytes": 8388608,
+        "name": "parts/resources.zip.part002",
+        "sha256": "b87064120eba1ff8b3a8c5be1f3a3b0a575dca8ac1856ab2861fc8d4886cc67c"
+      },
+      {
+        "bytes": 8388608,
+        "name": "parts/resources.zip.part003",
+        "sha256": "725a26c23edff90cb6405920dc39aff6acfe35859cdeeb0f5b3ea955ccdffeb7"
+      },
+      {
+        "bytes": 8388608,
+        "name": "parts/resources.zip.part004",
+        "sha256": "1071229f096a5e3dda67809656cfe36696ec1791da196734094e964585a315e8"
+      },
+      {
+        "bytes": 8388608,
+        "name": "parts/resources.zip.part005",
+        "sha256": "7839333bb0405ad09cb09271cad39fd54c9f7f277bdaa825a346a1430bb872e2"
+      },
+      {
+        "bytes": 7761868,
+        "name": "parts/resources.zip.part006",
+        "sha256": "a588b617f17c4e71cea68d9843ae0c0b63df94026a638d06224b7302557a7d5d"
+      }
+    ],
+    "sha256": "b0a33016b32d7e5415090038cff4cb8f4328cc8fd8a4b3f09d55918318be9fb5"
   },
   "culling_bounds": [
     {
@@ -45,17 +77,13 @@
       "room": 0
     }
   ],
-  "custom_texture_payloads": 0,
+  "custom_texture_payloads": 12,
   "dependency_paths": {
     "combined": "custom/comboship/native_forest/dependencies_combined_v1",
     "mm": "custom/comboship/native_forest/dependencies_mm_v1",
     "oot": "custom/comboship/native_forest/dependencies_oot_v1"
   },
-  "excluded_final_bench_meshes": [
-    "recipe449915211495247",
-    "recipe7187869513033518",
-    "recipe388081030655925"
-  ],
+  "excluded_final_bench_meshes": [],
   "external_owner": "normal mm.o2r; OoT uses the existing MmAssets base archive loader",
   "external_resources": [
     "scenes/nonmq/Z2_26SARUNOMORI/Z2_26SARUNOMORITex_00BAC0",
@@ -173,6 +201,10 @@
     "scenes/nonmq/Z2_LOST_WOODS/Z2_LOST_WOODS_room_02Tex_001CB8"
   ],
   "inputs": {
+    "authored": {
+      "name": "zzzz_Skiejer_Native_Solo_Forest_FINAL_avatar_POC4.o2r",
+      "sha256": "65901fcc27453a915be9414c7203e8295fce36ce69b7658653bbcdf978af8d0e"
+    },
     "final": {
       "name": "zzzz_MM3D_Lost_Woods_FINAL_avatar_POC19.prelude.o2r",
       "sha256": "9097583c896a11c204e4950bd9a80aa8e69fb2a42307f55f50e75d4195f30e42"
@@ -187,6 +219,46 @@
     }
   },
   "marker": "custom/comboship/native_forest/materials_v1",
+  "mirror_access": {
+    "already_present": false,
+    "bounds": [
+      -225,
+      26,
+      416,
+      137
+    ],
+    "collision_delta": {
+      "polygons": 28,
+      "surfaces": 1,
+      "vertices": 16
+    },
+    "collision_paths": [
+      "scenes/nonmq/comboship_forest/comboship_forest_collision",
+      "scenes/nonmq/skiejer_forest/skiejer_forest_collision",
+      "scenes/shared/skiejer_forest_oot/skiejer_forest_oot_collision"
+    ],
+    "end": [
+      -345,
+      80,
+      416
+    ],
+    "material": "custom/comboship/native_forest/mirror_access_material",
+    "preserved": "all original collision/header/camera/water records; every scene/actor/room resource",
+    "rise": 80,
+    "root": "custom/comboship/native_forest/mirror_access_root",
+    "run": 240,
+    "slope_degrees": 18.43494882292201,
+    "start": [
+      -105,
+      0,
+      416
+    ],
+    "texture": "custom/comboship/native_forest/authored/textures/portal_bark",
+    "vertex_resource": "custom/comboship/native_forest/mirror_access_vtx",
+    "visual_triangles": 28,
+    "visual_vertices": 48,
+    "walk_width": 64
+  },
   "native_private_geometry": [
     "custom/comboship/native_forest/geometry/Z2_LOST_WOODS_room_00DL_002548",
     "custom/comboship/native_forest/geometry/Z2_LOST_WOODS_room_00DL_0029F0",
@@ -200,23 +272,357 @@
       0,
       -313
     ],
-    "material": "custom/comboship/native_forest/portal_material",
-    "quads": 23,
-    "source": "mm/2s2h/Enhancements/Graphics/ComboLostWoodsPassage.cpp::BuildPassage",
-    "stock_texture": "scenes/nonmq/Z2_26SARUNOMORI/Z2_26SARUNOMORITex_00BAC0",
-    "transform": "native Matrix_RotateYS and guMtxF2L; local vertices retain exact native integer conversion",
-    "triangles": 46,
-    "vertices": 92,
+    "center_y": 66,
+    "mouth_rgba": [
+      68,
+      255,
+      116,
+      96
+    ],
+    "mouth_rgba_before": [
+      124,
+      40,
+      184,
+      96
+    ],
+    "radius": 68,
+    "root": "custom/comboship/native_forest/portal_root",
+    "world_space_vertices": true,
     "yaw": 12288
   },
+  "presentation": {
+    "baseline_bundle": {
+      "bytes": 58372,
+      "name": "resources.zip",
+      "sha256": "7b21d19512a48b2363247b9276426ff6ba7afa4f10130f98513c22a90d0c6730"
+    },
+    "control_portal": {
+      "anchor": [
+        -695,
+        0,
+        -313
+      ],
+      "material": "custom/comboship/native_forest/portal_material",
+      "quads": 23,
+      "source": "mm/2s2h/Enhancements/Graphics/ComboLostWoodsPassage.cpp::BuildPassage",
+      "stock_texture": "scenes/nonmq/Z2_26SARUNOMORI/Z2_26SARUNOMORITex_00BAC0",
+      "transform": "native Matrix_RotateYS and guMtxF2L; local vertices retain exact native integer conversion",
+      "triangles": 46,
+      "vertices": 92,
+      "yaw": 12288
+    },
+    "culling": {
+      "combined": {
+        "custom/comboship/native_forest/building_root": [
+          -830,
+          150,
+          253,
+          343
+        ],
+        "custom/comboship/native_forest/portal_root": [
+          -694,
+          86,
+          -308,
+          180
+        ],
+        "custom/comboship/native_forest/stump_shimmer_root": [
+          634,
+          547,
+          23,
+          2845
+        ]
+      },
+      "mm": {
+        "custom/comboship/native_forest/building_root": [
+          -830,
+          150,
+          253,
+          343
+        ],
+        "custom/comboship/native_forest/portal_root": [
+          -694,
+          86,
+          -308,
+          180
+        ],
+        "custom/comboship/native_forest/stump_shimmer_root": [
+          634,
+          547,
+          23,
+          2845
+        ]
+      },
+      "oot": {
+        "custom/comboship/native_forest/building_root": [
+          -830,
+          150,
+          253,
+          343
+        ],
+        "custom/comboship/native_forest/portal_root": [
+          -694,
+          86,
+          -308,
+          180
+        ],
+        "custom/comboship/native_forest/stump_shimmer_root": [
+          634,
+          547,
+          23,
+          2845
+        ]
+      }
+    },
+    "donor": {
+      "name": "zzzz_Skiejer_Native_Solo_Forest_FINAL_avatar_POC4.o2r",
+      "sha256": "65901fcc27453a915be9414c7203e8295fce36ce69b7658653bbcdf978af8d0e"
+    },
+    "marker": "custom/comboship/native_forest/authored_portal_v2",
+    "native_shop_vertex_arrays_reused": 3,
+    "portal": {
+      "anchor": [
+        -695,
+        0,
+        -313
+      ],
+      "center_y": 66,
+      "mouth_rgba": [
+        68,
+        255,
+        116,
+        96
+      ],
+      "mouth_rgba_before": [
+        124,
+        40,
+        184,
+        96
+      ],
+      "radius": 68,
+      "root": "custom/comboship/native_forest/portal_root",
+      "world_space_vertices": true,
+      "yaw": 12288
+    },
+    "preservation": "Native gameplay framing/collision and shop geometry unchanged; authored pixels/vertices/scrolls exact; only mouth RGB changed",
+    "runtime": "unverified; archive/source checks are not configured gameplay acceptance",
+    "sources": [
+      "custom/skiejer_forest/prelude/black_magic_bench_0",
+      "custom/skiejer_forest/prelude/black_magic_bench_1",
+      "custom/skiejer_forest/prelude/black_magic_bench_2",
+      "custom/skiejer_forest/prelude/black_magic_roof",
+      "custom/skiejer_forest/prelude/black_magic_walls",
+      "custom/skiejer_forest/prelude/black_market_roof_magic_mask",
+      "custom/skiejer_forest/prelude/black_market_skeijer_poster",
+      "custom/skiejer_forest/prelude/black_market_soft_magic_mask",
+      "custom/skiejer_forest/prelude/black_market_wall_magic_mask",
+      "custom/skiejer_forest/prelude/mirror_stump_violet_shimmer",
+      "custom/skiejer_forest/prelude/paste2461349930323740",
+      "custom/skiejer_forest/prelude/recipe215851318676066",
+      "custom/skiejer_forest/prelude/recipe215851318676066_tex0",
+      "custom/skiejer_forest/prelude/recipe215851318676066_vtx",
+      "custom/skiejer_forest/prelude/recipe3635031522573470",
+      "custom/skiejer_forest/prelude/recipe3635031522573470_tex0",
+      "custom/skiejer_forest/prelude/recipe3635031522573470_vtx",
+      "custom/skiejer_forest/prelude/recipe388081030655925",
+      "custom/skiejer_forest/prelude/recipe388081030655925_tex0",
+      "custom/skiejer_forest/prelude/recipe388081030655925_vtx",
+      "custom/skiejer_forest/prelude/recipe449915211495247",
+      "custom/skiejer_forest/prelude/recipe449915211495247_tex0",
+      "custom/skiejer_forest/prelude/recipe449915211495247_vtx",
+      "custom/skiejer_forest/prelude/recipe7187869513033518",
+      "custom/skiejer_forest/prelude/recipe7187869513033518_tex0",
+      "custom/skiejer_forest/prelude/recipe7187869513033518_vtx",
+      "custom/skiejer_forest/prelude/recipe7624751371212635",
+      "custom/skiejer_forest/prelude/recipe7624751371212635_tex0",
+      "custom/skiejer_forest/prelude/recipe7624751371212635_vtx",
+      "custom/skiejer_forest/room_0/Geometry4_vtx",
+      "custom/skiejer_forest/room_0/Geometry6_vtx",
+      "custom/skiejer_forest/room_0/Geometry7_vtx",
+      "custom/skiejer_forest/room_0/Geometry8_vtx",
+      "custom/skiejer_forest/room_0/ReturnMushrooms_-1",
+      "custom/skiejer_forest/room_0/ReturnMushrooms_-1_vtx",
+      "custom/skiejer_forest/room_0/ReturnMushrooms_1",
+      "custom/skiejer_forest/room_0/ReturnMushrooms_1_vtx",
+      "custom/skiejer_forest/room_0/ReturnRootTunnel",
+      "custom/skiejer_forest/room_0/ReturnRootTunnel_vtx",
+      "custom/skiejer_forest/room_0/ReturnTunnelMouth",
+      "custom/skiejer_forest/room_0/ReturnTunnelMouth_vtx",
+      "custom/skiejer_forest/room_0/ReturnTunnelPinkLight",
+      "custom/skiejer_forest/room_0/ReturnTunnelPinkLight_vtx",
+      "custom/skiejer_forest/textures/lw_kinoko_01_FC00",
+      "custom/skiejer_forest/textures/portal_bark"
+    ],
+    "terrain_display_lists": 0,
+    "version": 2
+  },
   "resources": {
+    "custom/comboship/native_forest/authored/prelude/black_magic_bench_0": {
+      "bytes": 264,
+      "sha256": "edb707b36342eb74b8aac831ab7d0d84bbcbd615db880fb2e10d9c8c68f9707d"
+    },
+    "custom/comboship/native_forest/authored/prelude/black_magic_bench_1": {
+      "bytes": 304,
+      "sha256": "c8276845675e5fd008180d21d9ba963ac522bfafd7a69bfc07e581d0513b2b7d"
+    },
+    "custom/comboship/native_forest/authored/prelude/black_magic_bench_2": {
+      "bytes": 368,
+      "sha256": "7f0ca37a259927a296d80a5fd1e6104a285808ead32ccc74cb6fb3f6bc3b256d"
+    },
+    "custom/comboship/native_forest/authored/prelude/black_magic_roof": {
+      "bytes": 632,
+      "sha256": "5dea6dd4ab3f11f4d833b1057f5c034a4715ab72247d469ceca40e58be52bb52"
+    },
+    "custom/comboship/native_forest/authored/prelude/black_magic_walls": {
+      "bytes": 736,
+      "sha256": "9b177367e41031b27c3e14b93ab85a520a6bf9bbd471d307992337f303962360"
+    },
+    "custom/comboship/native_forest/authored/prelude/black_market_roof_magic_mask": {
+      "bytes": 1104,
+      "sha256": "ad61ed021715d878c3044046bfb7b598b95342c155fb6c9aa09990ad8dfbe761"
+    },
+    "custom/comboship/native_forest/authored/prelude/black_market_skeijer_poster": {
+      "bytes": 6291548,
+      "sha256": "65f39217437419112c9dbe2d37631c5d004add2ac45a8209604c6395c0a71898"
+    },
+    "custom/comboship/native_forest/authored/prelude/black_market_soft_magic_mask": {
+      "bytes": 4176,
+      "sha256": "e05d07174fbe77bc09f7e1d3a138543dff09c40a6ef14859367462b86fd4e3a4"
+    },
+    "custom/comboship/native_forest/authored/prelude/black_market_wall_magic_mask": {
+      "bytes": 2128,
+      "sha256": "eb62853fb2b8324d95df03a6f77e3eaa3f64d5d9ece9dce4c31af0bf036e295b"
+    },
+    "custom/comboship/native_forest/authored/prelude/mirror_stump_violet_shimmer": {
+      "bytes": 2016,
+      "sha256": "a6052a5f2fcf4be5fab0682be171cdd0d01b4a01892b9901c954555e78b75d95"
+    },
+    "custom/comboship/native_forest/authored/prelude/paste2461349930323740": {
+      "bytes": 440,
+      "sha256": "f046cf25e3eb4525347b024dbdc54265f74bef4b2112bbac2529523d5ac39172"
+    },
+    "custom/comboship/native_forest/authored/prelude/recipe215851318676066_tex0": {
+      "bytes": 4194396,
+      "sha256": "685d0f11e05935b64019ee64993c0c390bbb967b9bd7931e1284a1956d688e8b"
+    },
+    "custom/comboship/native_forest/authored/prelude/recipe3635031522573470_tex0": {
+      "bytes": 2097244,
+      "sha256": "90c2c77e884f64df96fe5e1ab1704ecfee3466dc01bd05ec2984403f1a643387"
+    },
+    "custom/comboship/native_forest/authored/prelude/recipe388081030655925": {
+      "bytes": 456,
+      "sha256": "7cb5c6b5fe1db016f160dc1df83a8464681b6e6f88f4d42952f6b5229451b61c"
+    },
+    "custom/comboship/native_forest/authored/prelude/recipe388081030655925_tex0": {
+      "bytes": 4188,
+      "sha256": "fd68e5fb7f4feb98249c61a61d6b00e692dfc409e92ef012d223a2d4ec534fcb"
+    },
+    "custom/comboship/native_forest/authored/prelude/recipe388081030655925_vtx": {
+      "bytes": 712,
+      "sha256": "6c1f2debf9c74e331152884ebca8e42d716ab758db70e911b155faf52957f5a2"
+    },
+    "custom/comboship/native_forest/authored/prelude/recipe449915211495247": {
+      "bytes": 352,
+      "sha256": "b8f4c321e07eb6485700effdf220354613cd0cf47a610db7481b86d102234405"
+    },
+    "custom/comboship/native_forest/authored/prelude/recipe449915211495247_tex0": {
+      "bytes": 4188,
+      "sha256": "b8287324e968a8a25ff0cf5ef141702189304b881376434271eb29779a225d1e"
+    },
+    "custom/comboship/native_forest/authored/prelude/recipe449915211495247_vtx": {
+      "bytes": 136,
+      "sha256": "0349f4420bf829304b93d60b289e94a5deb2b1eeb4d829854c339491512e5231"
+    },
+    "custom/comboship/native_forest/authored/prelude/recipe7187869513033518": {
+      "bytes": 392,
+      "sha256": "c41e08599b99d04023b8afe6ae60d4fc1e2e628030ca49ef47c8c03341aaed3e"
+    },
+    "custom/comboship/native_forest/authored/prelude/recipe7187869513033518_tex0": {
+      "bytes": 2140,
+      "sha256": "97303e57a53a55872a4301b199a921e13ef6108f795b03ae75e10f3347cb132b"
+    },
+    "custom/comboship/native_forest/authored/prelude/recipe7187869513033518_vtx": {
+      "bytes": 456,
+      "sha256": "02bdc80edb486635c3d5a37b28c8ad282352979887340edd6105388c8a67ef7c"
+    },
+    "custom/comboship/native_forest/authored/prelude/recipe7624751371212635_tex0": {
+      "bytes": 1048668,
+      "sha256": "19ee961ae9a289e19fc4056b2298a923e3d94cd2ebcbd78a047c0532177fe02d"
+    },
+    "custom/comboship/native_forest/authored/room_0/Geometry4_vtx": {
+      "bytes": 1376,
+      "sha256": "968116e7c27c59b2068c64d8eaacbfb51fa8fd6116452eceeed128d9d5492ee4"
+    },
+    "custom/comboship/native_forest/authored/room_0/Geometry6_vtx": {
+      "bytes": 226369,
+      "sha256": "c245021fa63a9ae836bdb130508fa7bafff6f2aa90e4ea22caad2c42463fd952"
+    },
+    "custom/comboship/native_forest/authored/room_0/Geometry7_vtx": {
+      "bytes": 18494,
+      "sha256": "0822b57b8dc424c8a043fbe20edb18706a8847c6212b4fbdf6ce1e78fa1ef165"
+    },
+    "custom/comboship/native_forest/authored/room_0/Geometry8_vtx": {
+      "bytes": 10914,
+      "sha256": "a3e41f95a3f7e840b6d6e150e34b90eb6c5064a8177ccbd24e1ccaf928c9f35b"
+    },
+    "custom/comboship/native_forest/authored/room_0/ReturnMushrooms_-1": {
+      "bytes": 12449,
+      "sha256": "e2e9363fcbe84c83b71f947f151eed8493f647cb590177716e18d9bb2c734e4f"
+    },
+    "custom/comboship/native_forest/authored/room_0/ReturnMushrooms_-1_vtx": {
+      "bytes": 24493,
+      "sha256": "ee388a79de07cdc8f304d09066a0178922b155bedadf4ac3e0799abf1e0539d6"
+    },
+    "custom/comboship/native_forest/authored/room_0/ReturnMushrooms_1": {
+      "bytes": 12439,
+      "sha256": "3a3b7c4afd35f6e7c6591522fd9a17890fa039b729c14abeed0d7481c274c5cc"
+    },
+    "custom/comboship/native_forest/authored/room_0/ReturnMushrooms_1_vtx": {
+      "bytes": 24493,
+      "sha256": "2a3e0d3cabe6ebae914e9a4443fd6cfe32cb75c828dbed2b29afb807c90007a8"
+    },
+    "custom/comboship/native_forest/authored/room_0/ReturnRootTunnel": {
+      "bytes": 10774,
+      "sha256": "7c7c94637518fbe80b19c38efee13f4f72e1912ea598da48a5e72d527d16e653"
+    },
+    "custom/comboship/native_forest/authored/room_0/ReturnRootTunnel_vtx": {
+      "bytes": 16113,
+      "sha256": "a0f64c0352c1ea8d8ebe87802f9fefea10bee3870266cf35e1c1257d0039b14d"
+    },
+    "custom/comboship/native_forest/authored/room_0/ReturnTunnelMouth": {
+      "bytes": 472,
+      "sha256": "7f0a2afcf10e419c1cf6c32ad2639cdc4b19fde5cdcf666f3ebf4082b88914be"
+    },
+    "custom/comboship/native_forest/authored/room_0/ReturnTunnelMouth_vtx": {
+      "bytes": 2190,
+      "sha256": "3b9ceef5fb0862ad20d591b4e87408dc041bba40d5710e3c007134640070c6d1"
+    },
+    "custom/comboship/native_forest/authored/room_0/ReturnTunnelPinkLight": {
+      "bytes": 4110,
+      "sha256": "54cf402de82ea69456c2b6ede4ac0eade44bb317ac96f84d0cbdd6110ab9dcb7"
+    },
+    "custom/comboship/native_forest/authored/room_0/ReturnTunnelPinkLight_vtx": {
+      "bytes": 4718,
+      "sha256": "492f2ff096e7b0607a5bd8228e0875cbe5f519f5461c4ff69992812624ed5256"
+    },
+    "custom/comboship/native_forest/authored/textures/lw_kinoko_01_FC00": {
+      "bytes": 4194396,
+      "sha256": "348f09245bf45728bd15e2cb4f8553e0bf560495697ba605d10f0d9e61ab9bf8"
+    },
+    "custom/comboship/native_forest/authored/textures/portal_bark": {
+      "bytes": 67108956,
+      "sha256": "6418fb498e531c8d9ea18de43d9dbc2a86740999d5fbff78c76acc6038413152"
+    },
+    "custom/comboship/native_forest/authored_portal_v2": {
+      "bytes": 50,
+      "sha256": "ac04a56ab1451477e60c8aa94545a92e267cd92a076974614b0d08ca505f61fb"
+    },
     "custom/comboship/native_forest/building/recipe215851318676066": {
       "bytes": 4589,
       "sha256": "3d46d604c8d2ed5e0efa8d723066317616cabf44a347373f7b5b19c314140ac8"
     },
     "custom/comboship/native_forest/building/recipe215851318676066_material": {
-      "bytes": 565,
-      "sha256": "caf6c8c746ab7bc24ffb1ef8df88b92e838c4578c1e3c2441548592dfd0df2d8"
+      "bytes": 312,
+      "sha256": "66ac783e8299b1acdfbc2239e4de1be2da27925de0cffca60fb458c663a30a6e"
     },
     "custom/comboship/native_forest/building/recipe215851318676066_vtx": {
       "bytes": 2600,
@@ -227,8 +633,8 @@
       "sha256": "c32c818a48b934953e100b93dc55acbb570ba06735c5a6ffd4b43f515b56cff2"
     },
     "custom/comboship/native_forest/building/recipe3635031522573470_material": {
-      "bytes": 565,
-      "sha256": "caf6c8c746ab7bc24ffb1ef8df88b92e838c4578c1e3c2441548592dfd0df2d8"
+      "bytes": 312,
+      "sha256": "4c5a5c63b45532493cb25b165a8609830b839434df026aed9bbb3f0cb7bf260c"
     },
     "custom/comboship/native_forest/building/recipe3635031522573470_vtx": {
       "bytes": 2840,
@@ -239,28 +645,32 @@
       "sha256": "6bcd357373608bf45e4c30aa6ba0fc80c3b599a4d8421c9a91c028d14041ced3"
     },
     "custom/comboship/native_forest/building/recipe7624751371212635_material": {
-      "bytes": 565,
-      "sha256": "caf6c8c746ab7bc24ffb1ef8df88b92e838c4578c1e3c2441548592dfd0df2d8"
+      "bytes": 232,
+      "sha256": "c2fe77145f8e3f37d26d312d17250b543782a89953f53f1cd5d98c5e4ef6bb87"
     },
     "custom/comboship/native_forest/building/recipe7624751371212635_vtx": {
       "bytes": 904,
       "sha256": "3dc09307bfd19d0bcaa44ad1c9ab1a6660026638a7af1895f0e4ca37f8e087a9"
     },
     "custom/comboship/native_forest/building_root": {
-      "bytes": 323,
-      "sha256": "fd384b417e133ca060055e95e7e29373ed05df3ca7748288662420d43f39dea9"
+      "bytes": 708,
+      "sha256": "e3c6d635e64ea54cbdf8a36a0a27144802179c3b4a4db7ff8fdff477559c8b51"
+    },
+    "custom/comboship/native_forest/building_xlu": {
+      "bytes": 522,
+      "sha256": "7db0b2906f00e7293d92b9207497941d6bf5c6e0b2bc6043ba0782f7d7e3a0ab"
     },
     "custom/comboship/native_forest/dependencies_combined_v1": {
-      "bytes": 6825,
-      "sha256": "e6d555653a033a00ae8b11dbd406c9988fee2ff323d0a1b3d301306a78f6d706"
+      "bytes": 9935,
+      "sha256": "270ae36cb4ae9e78f8b377150a26325b6af3a6e2478686f9156fe686fe2b13f3"
     },
     "custom/comboship/native_forest/dependencies_mm_v1": {
-      "bytes": 6805,
-      "sha256": "9433c2f52b53084a6980e288fbb8f05d9ed5fc44c261c8598e1d0312a76309bc"
+      "bytes": 9915,
+      "sha256": "ec51ddf0e8f8cb1fadc96d5bb38bf481c06aec867c32a0c26bbcd079d823ac4a"
     },
     "custom/comboship/native_forest/dependencies_oot_v1": {
-      "bytes": 6850,
-      "sha256": "8497571a0d2b0da0609197b7a42b418fd51615eef7f5c504f4e19e3cb19cd057"
+      "bytes": 9960,
+      "sha256": "246ee17f665d4048e0933e02b250559555a734339fa3e046b6f3fe1277e0e900"
     },
     "custom/comboship/native_forest/geometry/Z2_LOST_WOODS_room_00DL_002548": {
       "bytes": 888,
@@ -282,13 +692,25 @@
       "bytes": 33,
       "sha256": "7c398d523ea627499cf301a3c31e68588433956fa1dc624bbc7ed895ad51e1da"
     },
+    "custom/comboship/native_forest/mirror_access_material": {
+      "bytes": 673,
+      "sha256": "d1a04cc3aeec0f6f1e35e57beb80b8326965da93f04ffa260f4f4ef23c8b76c2"
+    },
+    "custom/comboship/native_forest/mirror_access_root": {
+      "bytes": 2732,
+      "sha256": "a742af4a443a08ef520dc521f2a94e88f9dd28b91ce493199d3e7419522b033d"
+    },
+    "custom/comboship/native_forest/mirror_access_vtx": {
+      "bytes": 840,
+      "sha256": "94c8854123f310c2f82a81a7e91428e05ec935577fb8f9ae2dc9e1432a880fdd"
+    },
     "custom/comboship/native_forest/portal_material": {
       "bytes": 667,
       "sha256": "0e9e1be4db09ebd456ec1acebd06acd6057b722347f20563d50a6bd1f0e92e26"
     },
     "custom/comboship/native_forest/portal_root": {
-      "bytes": 5117,
-      "sha256": "04a46c4f9537a577bf6d98a93c58403d50397c424f3f3a193444d8b8b0db3974"
+      "bytes": 330,
+      "sha256": "4672ef295aa13daa24cbd5a2410c66cb5bb14ce6fa61735df522acff6b3d247e"
     },
     "custom/comboship/native_forest/portal_transform": {
       "bytes": 128,
@@ -298,25 +720,33 @@
       "bytes": 1544,
       "sha256": "3cfd1008d1887a30d90d9748c55730e7a68597e759bacd20d07b593eaf884697"
     },
+    "custom/comboship/native_forest/portal_xlu": {
+      "bytes": 243,
+      "sha256": "4213a14822427fb33f009e1cf322cba82989950e132983cf3d9bccbaba334e24"
+    },
     "custom/comboship/native_forest/stock_materials": {
-      "bytes": 70,
-      "sha256": "177885389b0646fbc0c3e1d31a4ac9e01fc25201a5abe9345ac9ec14035f7554"
+      "bytes": 114,
+      "sha256": "ee74f841dc2a925ddd61f696a72a51b022341983dcad51be8d13de5fe1ae9ef5"
+    },
+    "custom/comboship/native_forest/stump_shimmer_root": {
+      "bytes": 159,
+      "sha256": "6484d7f39fae27cee2c3e093bf3b53dd2fb62e23484462359f380045e2cd5158"
     },
     "custom/comboship/native_forest/texanim": {
-      "bytes": 75,
-      "sha256": "174795a08d3a2139b4ceec99f1fa7ee09a0e91666d8d56383c4dbeca15aa607f"
+      "bytes": 122,
+      "sha256": "1415bbc8a20734923242f30a2dfe2825c04ccdc3cfaa4f2ed4d6b46ccfd2ee72"
     },
     "scenes/nonmq/comboship_forest/comboship_forest": {
       "bytes": 677,
       "sha256": "4c7bb769fc2f86661b8ff7a13773c002fe27901c514e8266e98e8822feb87b32"
     },
     "scenes/nonmq/comboship_forest/comboship_forest_collision": {
-      "bytes": 19976,
-      "sha256": "d98991a03ff914e651f7f0e276fa86faa6060636716500e25e7f7627dbe807ad"
+      "bytes": 20528,
+      "sha256": "c248115688c75ba6b8440870faf5663931886b2c6ff97c0e0fc479a333c24659"
     },
     "scenes/nonmq/comboship_forest/comboship_forest_room_0": {
-      "bytes": 1023,
-      "sha256": "b66a92494da97ed7fc080543c467ea3bedbbba872f3ba85395ea57dc2ea70b65"
+      "bytes": 1239,
+      "sha256": "f85937441b6b1dc2f87d9abd2e57f6cd9a941483cb41c1647fe45ac2f793d3f6"
     },
     "scenes/nonmq/comboship_forest/comboship_forest_room_1": {
       "bytes": 787,
@@ -331,12 +761,12 @@
       "sha256": "151f2223b596105960e09dc6d1e0aa8b0209011781b22475b6bccacc223fdfe8"
     },
     "scenes/nonmq/skiejer_forest/skiejer_forest_collision": {
-      "bytes": 19976,
-      "sha256": "d98991a03ff914e651f7f0e276fa86faa6060636716500e25e7f7627dbe807ad"
+      "bytes": 20528,
+      "sha256": "c248115688c75ba6b8440870faf5663931886b2c6ff97c0e0fc479a333c24659"
     },
     "scenes/nonmq/skiejer_forest/skiejer_forest_room_0": {
-      "bytes": 1023,
-      "sha256": "b66a92494da97ed7fc080543c467ea3bedbbba872f3ba85395ea57dc2ea70b65"
+      "bytes": 1239,
+      "sha256": "f85937441b6b1dc2f87d9abd2e57f6cd9a941483cb41c1647fe45ac2f793d3f6"
     },
     "scenes/nonmq/skiejer_forest/skiejer_forest_room_1": {
       "bytes": 787,
@@ -351,12 +781,12 @@
       "sha256": "8e5e0b109119908a22a6e1927c6618f03ee9f4588e36dd1a9f049f1b55dea8c7"
     },
     "scenes/shared/skiejer_forest_oot/skiejer_forest_oot_collision": {
-      "bytes": 19976,
-      "sha256": "d98991a03ff914e651f7f0e276fa86faa6060636716500e25e7f7627dbe807ad"
+      "bytes": 20528,
+      "sha256": "c248115688c75ba6b8440870faf5663931886b2c6ff97c0e0fc479a333c24659"
     },
     "scenes/shared/skiejer_forest_oot/skiejer_forest_oot_room_0": {
-      "bytes": 1022,
-      "sha256": "5ca529eee7d66e71ba20dc841e0855cde78cca21abf66db5996f3cdc31c0d681"
+      "bytes": 1238,
+      "sha256": "3ab2dd2a8949b26b5fceb537e4b9fad588dc997d778ffb53d8f04011c2db8cb4"
     },
     "scenes/shared/skiejer_forest_oot/skiejer_forest_oot_room_1": {
       "bytes": 770,
@@ -374,6 +804,85 @@
     "oot": "scenes/shared/skiejer_forest_oot/skiejer_forest_oot"
   },
   "schema": 1,
-  "scroll_bindings": [],
+  "scroll_bindings": [
+    {
+      "layers": [
+        {
+          "height": 32,
+          "width": 32,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "height": 64,
+          "width": 32,
+          "x": 0,
+          "y": -1
+        }
+      ],
+      "segment": 8
+    },
+    {
+      "layers": [
+        {
+          "height": 32,
+          "width": 32,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "height": 64,
+          "width": 32,
+          "x": -1,
+          "y": 0
+        }
+      ],
+      "segment": 9
+    },
+    {
+      "layers": [
+        {
+          "height": 64,
+          "width": 64,
+          "x": -1,
+          "y": -1
+        }
+      ],
+      "segment": 10
+    },
+    {
+      "layers": [
+        {
+          "height": 64,
+          "width": 64,
+          "x": 1,
+          "y": 1
+        }
+      ],
+      "segment": 11
+    },
+    {
+      "layers": [
+        {
+          "height": 64,
+          "width": 64,
+          "x": -1,
+          "y": 1
+        }
+      ],
+      "segment": 12
+    },
+    {
+      "layers": [
+        {
+          "height": 64,
+          "width": 64,
+          "x": 0,
+          "y": -1
+        }
+      ],
+      "segment": 13
+    }
+  ],
   "status": "generated"
 }

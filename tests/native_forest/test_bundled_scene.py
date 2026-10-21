@@ -11,7 +11,7 @@ import unittest
 ROOT=Path(__file__).resolve().parents[2]
 
 class BundledSceneTests(unittest.TestCase):
-    def test_real_bundle_prepares_without_a_scene_mod_or_custom_texture_owner(self):
+    def test_real_bundle_prepares_authored_additions_without_a_scene_mod(self):
         spec=importlib.util.spec_from_file_location('prepare_native_forest',ROOT/'scripts/assets/prepare_native_forest.py')
         prepare=importlib.util.module_from_spec(spec);spec.loader.exec_module(prepare)
         manifest=ROOT/'tools/native_forest/manifest.json'
@@ -19,12 +19,15 @@ class BundledSceneTests(unittest.TestCase):
         receipt=json.loads(manifest.read_text())
         self.assertEqual(receipt['status'],'generated')
         self.assertEqual(receipt['native_stock_rooms'],3)
-        self.assertEqual(receipt['scroll_bindings'],[])
-        self.assertEqual(receipt['custom_texture_payloads'],0)
+        self.assertEqual([row['segment'] for row in receipt['scroll_bindings']],list(range(8,14)))
+        self.assertEqual(receipt['custom_texture_payloads'],12)
         self.assertEqual(receipt['inputs']['native_mm']['sha256'],
                          '2f44bafe1a00f44ddaf7eb5e5c99e73a3d23771038529d6d1748819ad575dc80')
-        self.assertEqual(len(resources),39)
-        self.assertFalse(any(data[4:8]==b'XETO' for data in resources.values()))
+        self.assertEqual(receipt['presentation']['version'],2)
+        self.assertEqual(len(receipt['presentation']['sources']),45)
+        self.assertEqual(sum(data[4:8]==b'XETO' for data in resources.values()),12)
+        self.assertEqual((ROOT/'combo/entrances/NativeForestResources.h').read_text(),
+                         prepare.native_forest.native_core_header(resources))
         with tempfile.TemporaryDirectory(prefix='real-native-runtime-') as name:
             folder=Path(name)
             prepare.prepare(folder,manifest)

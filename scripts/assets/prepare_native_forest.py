@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Verify geometry-only forest source, then prepare both normal port trees."""
+"""Verify the one native forest source ZIP, then prepare both port trees."""
 import argparse
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -12,6 +13,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/black_market'))
 import native_forest
+from native_forest_bundle import read_bundle
 
 DEFAULT_MANIFEST = ROOT / 'tools/native_forest/manifest.json'
 
@@ -23,21 +25,14 @@ def verified_resources(manifest_path, bundle_path=None):
         raise ValueError('Native forest source is blocked: the immutable native MM archive is still required; '
                          'run tools/black_market/native_forest.py --native-mm with the real donor first')
     bundle = metadata.get('bundle', {})
-    name = bundle.get('name', '')
-    if not name or Path(name).name != name or not native_forest.safe_resource_path(name):
-        raise ValueError('Invalid native forest bundle filename')
-    bundle_path = Path(bundle_path) if bundle_path else manifest_path.parent / name
-    if not bundle_path.is_file():
-        raise ValueError('Missing verified native forest bundle; generate it from the immutable native MM archive')
-    if bundle_path.stat().st_size != bundle.get('bytes') or native_forest.file_sha(bundle_path) != bundle.get('sha256'):
-        raise ValueError('Native forest bundle hash/size mismatch')
+    payload = read_bundle(manifest_path.parent, bundle, bundle_path)
     expected = metadata.get('resources', {})
     if not expected:
         raise ValueError('Native forest source has no resource inventory')
     resources = {}
     # Validate every member before creating an output directory. A corrupt
     # source must never partially replace a previously prepared candidate.
-    with zipfile.ZipFile(bundle_path) as archive:
+    with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         names = archive.namelist()
         if len(names) != len(set(names)) or set(names) != set(expected):
             raise ValueError('Native forest bundle resource membership mismatch')
@@ -75,8 +70,9 @@ def prepare(output_root, manifest_path=DEFAULT_MANIFEST, bundle_path=None):
             finally:
                 if temporary:
                     temporary.unlink(missing_ok=True)
-    print(f'PASS native forest source: {len(resources)} geometry/framing resources in both port trees, '
-          f'no custom textures ({restored} restored)')
+    textures = sum(data[4:8] == b'XETO' for data in resources.values())
+    print(f'PASS native forest source: {len(resources)} resources in both port trees, '
+          f'{textures} authored textures ({restored} restored)')
 
 
 def main():

@@ -99,6 +99,6 @@ inline bool Find(const std::vector<Triangle>& source, Point& result) {
 }
 inline bool CanClaim(const Point& player, const Point& cap) {
     const float x = player.x - cap.x, z = player.z - cap.z, y = player.y - cap.y;
-    return Finite(player) && Finite(cap) && x * x + z * z <= 130 * 130 && y >= -220 && y <= 90;
+    return Finite(player) && Finite(cap) && x * x + z * z <= 45 * 45 && std::abs(y) <= 5;
 }
 } // namespace MagicMirrorAnchor

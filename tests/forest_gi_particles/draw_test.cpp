@@ -22,6 +22,7 @@ PlayState* gPlayState;
 SaveContext gSaveContext{};
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 static bool visit = true, safe = true, nativePortal = false, titleAsset = true;
+static bool authoredPortal = false;
 static bool nativeMystery = true, soloAvailable = false, sForestTitle;
 static char kForestTitle[] = "__OTR__custom/skiejer_forest/title";
 static NeiGi::Mesh submitted;
@@ -35,6 +36,8 @@ bool ForestVisit(const PlayState* play) { return play && visit; }
 bool ForestSafe(const PlayState* play) { return play && safe; }
 bool NativePortal(const PlayState*) { return nativePortal; }
 extern "C" u8 ResourceMgr_FileExists(const char* path) {
+    if (!std::strcmp(path, NativeForest::kAuthoredPortalMarker))
+        return authoredPortal;
     return titleAsset && !std::strcmp(path, "custom/skiejer_forest/title");
 }
 extern "C" u8 ResourceMgr_FileAltExists(const char*) { return 0; }
@@ -165,8 +168,24 @@ int main() {
     Reset(); DrawPortalFinish(); CheckMesh(true);
     const Vec3f anchor = ComboOpeningForest_ReturnAnchor(&play);
     assert(origin.x == anchor.x && origin.y == anchor.y && origin.z == anchor.z);
+    assert(EqualMesh(submitted, ForestGiParticles::Portal(play.gameplayFrames, false, basis)));
+    RoomShape shape{};
+    RoomShapeCullableEntry portalEntry{};
+    portalEntry.opa = reinterpret_cast<Gfx*>(const_cast<char*>(NativeForest::kPortalRoot));
+    shape.cullable.base.type = ROOM_SHAPE_TYPE_CULLABLE;
+    shape.cullable.numEntries = 1;
+    shape.cullable.entries = &portalEntry;
+    play.roomCtx.curRoom.roomShape = &shape;
+    assert(ComboOpeningForest_ReturnPackVersion(&play) == 9);
+    Reset(); DrawPortalFinish(); CheckMesh(true);
+    assert(EqualMesh(submitted, ForestGiParticles::Portal(play.gameplayFrames, false, basis)));
+    authoredPortal = true;
+    Reset(); DrawPortalFinish(); CheckMesh(true);
+    assert(EqualMesh(submitted, ForestGiParticles::Portal(play.gameplayFrames, true, basis)));
+    play.roomCtx.curRoom.roomShape = nullptr;
     Reset(); DrawWoodsMysteryHexes(); CheckMesh(true);
     assert(origin.x == WoodsMysteryMakeover::kMouthX && origin.z == WoodsMysteryMakeover::kMouthZ);
+    assert(EqualMesh(submitted, ForestGiParticles::Mystery(play.gameplayFrames, basis)));
     play.pauseCtx.state = 1;
     Reset(); DrawPortalFinish(); DrawWoodsMysteryHexes(); assert(!submissions);
     play.pauseCtx.state = 0; play.csCtx.state = CS_STATE_RUN;
@@ -177,7 +196,7 @@ int main() {
     Reset(); DrawWoodsMysteryHexes(); CheckMesh(true);
     gComboGameMode = COMBO_GAME_BOTH; soloAvailable = false; nativeMystery = false;
     Reset(); DrawWoodsMysteryHexes(); assert(!submissions);
-    puts("PASS production bridge GI particles: native doorway anchors, green hex identity, pause/cutscene and solo/combined ownership guards");
+    puts("PASS both production bridges: exact NEI entrance-face meshes, legacy/authored sizes, pause/cutscene and solo/combined ownership guards");
 #else
     Reset(); DrawForestPortal(); CheckMesh(true);
     assert(origin.x == COMBO_SOLO_FOREST_STUMP_X && origin.z == COMBO_SOLO_FOREST_STUMP_Z);
@@ -185,6 +204,8 @@ int main() {
     nativePortal = true; Reset(); DrawForestPortal(); CheckMesh(true);
     for (size_t i = 0; i < submitted.count; ++i)
         assert(std::fabs(submitted.vertices[i].p.x) < 49 && submitted.vertices[i].p.y < 114);
+    authoredPortal = true; Reset(); DrawForestPortal(); CheckMesh(true);
+    assert(EqualMesh(submitted, ForestGiParticles::Portal(play.gameplayFrames, true, basis)));
     for (int blocked = 0; blocked < 4; ++blocked) {
         visit = blocked != 0; safe = blocked != 1;
         play.roomCtx.curRoom.num = blocked == 2 ? 1 : 0;

@@ -44,9 +44,15 @@ int main() {
     for (auto& triangle : invalid) triangle.p[0].x = std::numeric_limits<float>::quiet_NaN();
     assert(!Find(invalid, anchor));
     assert(!Find({}, anchor));
-    assert(CanClaim({200, 0, -300}, {200, 120, -300}));
+    assert(!CanClaim({200, 0, -300}, {200, 120, -300}));
     assert(CanClaim({200, 120, -300}, {200, 120, -300}));
+    assert(CanClaim({245, 125, -300}, {200, 120, -300}));
+    assert(CanClaim({200, 115, -345}, {200, 120, -300}));
+    assert(!CanClaim({245.1f, 120, -300}, {200, 120, -300}));
+    assert(!CanClaim({200, 125.1f, -300}, {200, 120, -300}));
+    assert(!CanClaim({200, 114.9f, -300}, {200, 120, -300}));
     assert(!CanClaim({500, 0, -300}, {200, 120, -300}));
     assert(!CanClaim({200, -500, -300}, {200, 120, -300}));
-    puts("PASS mirror placement follows moved stump, excludes roof/ledge/malformed geometry, and reaches ground below");
+    assert(!CanClaim({200, std::numeric_limits<float>::quiet_NaN(), -300}, {200, 120, -300}));
+    puts("PASS mirror placement follows moved stump and pickup requires contact with its top");
 }

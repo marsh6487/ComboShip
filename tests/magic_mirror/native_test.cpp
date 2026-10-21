@@ -28,7 +28,7 @@ static bool owned, blocked, pack = true;
 static bool pending, stow;
 static bool alternateModel;
 static int animationStarts, idleRestores;
-static int mirrorDraws, matrixDepth;
+static int mirrorDraws, worldShimmerDraws, matrixDepth;
 static Vec3f mirrorOrigin;
 static int handoffs, prompts, pickups, errors, saves;
 static u32 seed = 77;
@@ -64,6 +64,7 @@ bool TransitionPending() { return pending; }
 bool AlternateModel() { return alternateModel; }
 bool TimedActivity() { return false; }
 bool QueuePickup(int) { ++pickups; return true; }
+void DrawWorldShimmer(PlayState*) { ++worldShimmerDraws; }
 void OpenPrompt() {
     ++prompts;
     SetText(0x3FEC);
@@ -257,7 +258,7 @@ void Reset() {
     pending = stow = false;
     alternateModel = false;
     animationStarts = idleRestores = 0;
-    mirrorDraws = matrixDepth = 0;
+    mirrorDraws = worldShimmerDraws = matrixDepth = 0;
     handoffs = prompts = pickups = errors = saves = 0;
     closed = 0; advance = false; textState = TEXT_STATE_NONE;
     nativeMessages = false;
@@ -591,7 +592,7 @@ void TestArrival() {
         assert(std::memcmp(&original, &copy, sizeof(original)) == 0);
         assert(play.linkActorEntry->pos.x == 1500 && play.linkActorEntry->pos.y == 240 &&
                play.linkActorEntry->pos.z == -1420);
-        assert(MagicMirrorAnchor::CanClaim({1500, 240, -1420}, {1500, 320, -1300}));
+        assert(!MagicMirrorAnchor::CanClaim({1500, 240, -1420}, {1500, 320, -1300}));
 #ifdef MIRROR_OOT
         assert(play.linkActorEntry->rot.y == 0);
 #else
@@ -634,6 +635,89 @@ void TestArrival() {
         assert(idleRestores == 0);
     }
     puts("PASS native stump-relative arrival, scene moves, safe fallback, cached-resource/respawn preservation and one-shot context");
+}
+
+void TestStumpTopPickup() {
+    for (bool combined : { false, true }) {
+#ifdef MIRROR_OOT
+        if (combined)
+            continue; // Combined mode's forest and pickup belong to MM.
+#endif
+        for (int reason = 0; reason < 8; ++reason) {
+            Reset();
+            if (combined)
+                gComboGameMode = COMBO_GAME_BOTH;
+            LoadForest(-377, 80, 416);
+            play.transitionTrigger = TRANS_TRIGGER_OFF;
+            owned = false;
+            player.actor.world.pos = { -377, 80, 416 };
+            player.actor.floorHeight = 80;
+            player.actor.floorBgId = BGCHECK_SCENE;
+            player.actor.floorPoly = play.colCtx.colHeader->polyList;
+            switch (reason) {
+                case 0: player.actor.world.pos.y = player.actor.floorHeight = 0; break;
+                case 1: player.actor.world.pos.x += 45.1f; break;
+                case 2: player.actor.world.pos.y += 5.1f; break;
+                case 3: player.actor.floorBgId = 0; break; // A platform above the cap is not the stump.
+                case 4: player.actor.floorPoly = &landingFloor; break;
+                case 5: player.actor.floorHeight = 76; break; // Near the ramp's upper end.
+                case 6: player.actor.bgCheckFlags = 0; break;
+                case 7: player.actor.floorPoly = nullptr; break;
+            }
+            MirrorRuntime::Update();
+            assert(pickups == 0 && !owned && saves == 0);
+        }
+        Reset();
+        if (combined)
+            gComboGameMode = COMBO_GAME_BOTH;
+        LoadForest(-377, 80, 416);
+        play.transitionTrigger = TRANS_TRIGGER_OFF;
+        owned = false;
+        player.actor.world.pos = { -377, 80, 416 };
+        player.actor.floorHeight = 80;
+        player.actor.floorBgId = BGCHECK_SCENE;
+        player.actor.floorPoly = play.colCtx.colHeader->polyList;
+        MirrorRuntime::Update();
+        assert(pickups == 1 && !owned && saves == 0);
+        const int token = MirrorRuntime::sPickupToken;
+        MirrorRuntime::Update();
+        assert(pickups == 1);
+        MirrorRuntime::FinishPickup(token);
+        MirrorRuntime::FinishPickup(token);
+        assert(owned && saves == 1);
+        MirrorRuntime::Update();
+        assert(pickups == 1);
+    }
+    puts("PASS Mirror pickup requires grounded static stump-top contact, rejects base/ramp/platform, and grants once");
+}
+
+void TestWorldRewardShimmer() {
+    Reset();
+    LoadForest(-377, 80, 416);
+    owned = false;
+    MirrorRuntime::DrawWorld();
+    assert(mirrorDraws == 1 && worldShimmerDraws == 1 && matrixDepth == 0);
+    assert(mirrorOrigin.x == -377 && mirrorOrigin.y == 122 && mirrorOrigin.z == 416);
+    owned = true;
+    MirrorRuntime::DrawWorld();
+    owned = false;
+    MirrorRuntime::sPickupToken = 1;
+    MirrorRuntime::DrawWorld();
+    assert(mirrorDraws == 1 && worldShimmerDraws == 1);
+    for (int reason = 0; reason < 3; ++reason) {
+        Reset();
+        LoadForest(-377, 80, 416);
+        owned = false;
+        if (reason == 0)
+            play.roomCtx.curRoom.num = 1;
+        else if (reason == 1)
+            play.colCtx.colHeader = nullptr;
+        else
+            gComboGameMode = gComboGameMode == COMBO_GAME_MM ? COMBO_GAME_OOT : COMBO_GAME_MM;
+        MirrorRuntime::DrawWorld();
+        assert(mirrorDraws == 0 && worldShimmerDraws == 0 && matrixDepth == 0);
+    }
+    puts("PASS uncollected world Mirror alone requests native shimmer; owned/queued/invalid contexts suppress it");
 }
 
 void TestNativeChoiceLifecycle(bool combined) {
@@ -697,6 +781,8 @@ int main() {
     TestChoiceReleaseInput();
     TestPromptOwnershipLifetime();
     TestArrival();
+    TestStumpTopPickup();
+    TestWorldRewardShimmer();
     assert(FcEquip_OotToMm16(EXT_ITEM_MAGIC_MIRROR) == EXT_ITEM_MAGIC_MIRROR);
     assert(FcEquip_MmToOot16(EXT_ITEM_MAGIC_MIRROR) == EXT_ITEM_MAGIC_MIRROR);
     assert(FcEquip_OotToMm16(EXT_ITEM_MAGIC_MIRROR + 1) == 0xFF);
@@ -752,7 +838,7 @@ int main() {
     alternateModel = true;
     player.actor.world.pos = {100, 20, -50};
     MirrorRuntime::DrawWorld();
-    assert(mirrorDraws == 2 && matrixDepth == 0);
+    assert(mirrorDraws == 2 && worldShimmerDraws == 0 && matrixDepth == 0);
     assert(mirrorOrigin.x == 100 && mirrorOrigin.y > 80 &&
            mirrorOrigin.z == -50);
     alternateModel = false;

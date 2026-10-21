@@ -8,6 +8,7 @@
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "2s2h/Enhancements/Gameplay/ComboSoloForest.h"
 #include "actors/ForestGiParticles.h"
+#include "entrances/NativeForest.h"
 #include "../../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "WoodsMysteryMakeover.h"
 #include "WoodsMysteryNativeBridge.h"
@@ -113,7 +114,8 @@ static void DrawPortalFinish() {
     const Vec3f anchor = ComboOpeningForest_ReturnAnchor(play);
     Matrix_Translate(anchor.x, anchor.y, anchor.z, MTXMODE_NEW);
     Matrix_RotateYS(ComboOpeningForest_ReturnYaw(play), MTXMODE_APPLY);
-    const bool packed = version >= 3 && version <= 8;
+    const bool packed =
+        (version >= 3 && version <= 8) || (version == 9 && ResourceMgr_FileExists(NativeForest::kAuthoredPortalMarker));
     const auto mesh = ForestGiParticles::Portal(play->gameplayFrames, packed, NeiGi_CameraBasis(play));
     NeiGi_DrawWorldParticles(play, mesh);
     Matrix_Pop();

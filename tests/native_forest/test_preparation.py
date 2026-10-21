@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -32,6 +33,117 @@ def source_bundle(test, folder):
     metadata = generator.write_bundle(resources, report, bundle)
     manifest.write_text(json.dumps(metadata))
     return resources, manifest, bundle
+
+
+def split_source_bundle(test, folder):
+    resources, manifest, bundle = source_bundle(test, folder)
+    payload = bundle.read_bytes()
+    metadata = json.loads(manifest.read_text())
+    width = (len(payload) + 2) // 3
+    parts = []
+    (folder / 'parts').mkdir()
+    for number, offset in enumerate(range(0, len(payload), width), 1):
+        name = f'parts/resources.zip.part{number:03d}'
+        data = payload[offset:offset + width]
+        (folder / name).write_bytes(data)
+        parts.append({'name': name, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
+    metadata['bundle']['parts'] = parts
+    manifest.write_text(json.dumps(metadata))
+    bundle.unlink()
+    return resources, manifest, metadata, payload
+
+
+class SplitBundleTests(unittest.TestCase):
+    def reader(self):
+        path = ROOT / 'tools/black_market/native_forest_bundle.py'
+        self.assertTrue(path.is_file(), 'Native forest needs the verified split-bundle reader')
+        spec = importlib.util.spec_from_file_location('native_forest_bundle', path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_tracked_parts_reproduce_the_exact_canonical_zip_without_a_cache(self):
+        metadata = json.loads((ROOT / 'tools/native_forest/manifest.json').read_text())
+        self.assertIn('parts', metadata['bundle'], 'The oversized canonical ZIP must be stored as bounded parts')
+        self.assertEqual(metadata['bundle']['bytes'], 49704908)
+        self.assertEqual(metadata['bundle']['sha256'],
+                         'b0a33016b32d7e5415090038cff4cb8f4328cc8fd8a4b3f09d55918318be9fb5')
+        source = ROOT / 'tools/native_forest'
+        with tempfile.TemporaryDirectory(prefix='native-forest-source-only-') as name:
+            directory = Path(name)
+            (directory / 'parts').mkdir()
+            (directory / 'manifest.json').write_text(json.dumps(metadata))
+            for part in metadata['bundle']['parts']:
+                shutil.copyfile(source / part['name'], directory / part['name'])
+            self.assertFalse((directory / 'resources.zip').exists())
+            payload = self.reader().load_bundle(directory)
+        self.assertEqual(hashlib.sha256(payload).hexdigest(), metadata['bundle']['sha256'])
+        self.assertEqual(len(payload), metadata['bundle']['bytes'])
+        for part in metadata['bundle']['parts']:
+            self.assertLessEqual(part['bytes'], 8 * 1024 * 1024)
+
+    def test_split_bundle_prepares_identical_resources_and_supports_the_shared_reader(self):
+        prepare = load_prepare(self)
+        with tempfile.TemporaryDirectory(prefix='native-forest-split-') as name:
+            directory = Path(name)
+            expected, manifest, _, payload = split_source_bundle(self, directory)
+            self.assertEqual(self.reader().load_bundle(directory), payload)
+            prepare.prepare(directory / 'output', manifest)
+            for game in ('soh', 'mm'):
+                root = directory / 'output' / game / 'assets/custom'
+                self.assertEqual({path.relative_to(root).as_posix(): path.read_bytes()
+                                  for path in root.rglob('*') if path.is_file()}, expected)
+
+    def test_invalid_parts_fail_before_any_existing_output_is_changed(self):
+        prepare = load_prepare(self)
+        for damage in ('missing', 'corrupt', 'reordered', 'part-hash', 'part-size', 'aggregate-hash', 'aggregate-size',
+                       'part-too-large', 'unsafe-path'):
+            with self.subTest(damage=damage), tempfile.TemporaryDirectory(prefix='native-forest-bad-parts-') as name:
+                directory = Path(name)
+                _, manifest, metadata, payload = split_source_bundle(self, directory)
+                # Even an exact local cache must not hide a broken tracked part.
+                (directory / 'resources.zip').write_bytes(payload)
+                output = directory / 'output'
+                sentinel = output / 'soh/assets/custom/retained'
+                sentinel.parent.mkdir(parents=True)
+                sentinel.write_bytes(b'previous verified output')
+                part = metadata['bundle']['parts'][0]
+                if damage == 'missing':
+                    (directory / part['name']).unlink()
+                elif damage == 'corrupt':
+                    raw = bytearray((directory / part['name']).read_bytes())
+                    raw[0] ^= 1
+                    (directory / part['name']).write_bytes(raw)
+                elif damage == 'reordered':
+                    metadata['bundle']['parts'].reverse()
+                elif damage == 'part-hash':
+                    part['sha256'] = '0' * 64
+                elif damage == 'part-size':
+                    part['bytes'] += 1
+                    metadata['bundle']['parts'][1]['bytes'] -= 1
+                elif damage == 'aggregate-hash':
+                    metadata['bundle']['sha256'] = '0' * 64
+                elif damage == 'aggregate-size':
+                    metadata['bundle']['bytes'] += 1
+                elif damage == 'part-too-large':
+                    part['bytes'] = 8 * 1024 * 1024 + 1
+                else:
+                    part['name'] = '../protected'
+                manifest.write_text(json.dumps(metadata))
+                with self.assertRaisesRegex(ValueError, '(part|bundle).*(missing|hash|size|order|path|limit)|Missing.*part'):
+                    prepare.prepare(output, manifest)
+                self.assertEqual({path.relative_to(output).as_posix(): path.read_bytes()
+                                  for path in output.rglob('*') if path.is_file()},
+                                 {'soh/assets/custom/retained': b'previous verified output'})
+                self.assertFalse((output / 'mm').exists())
+
+    def test_legacy_single_zip_and_explicit_canonical_override_remain_supported(self):
+        prepare = load_prepare(self)
+        with tempfile.TemporaryDirectory(prefix='native-forest-single-') as name:
+            directory = Path(name)
+            expected, manifest, bundle = source_bundle(self, directory)
+            self.assertEqual(self.reader().load_bundle(directory), bundle.read_bytes())
+            self.assertEqual(prepare.verified_resources(manifest, bundle), expected)
 
 
 class PreparationTests(unittest.TestCase):

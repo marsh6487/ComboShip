@@ -13,6 +13,7 @@ inline constexpr const char* kCombinedScene = NativeForestResources::kCombinedSc
 inline constexpr const char* kMmSoloScene = NativeForestResources::kMmSoloScene;
 inline constexpr const char* kOotSoloScene = NativeForestResources::kOotSoloScene;
 inline constexpr const char* kPortalRoot = "__OTR__custom/comboship/native_forest/portal_root";
+inline constexpr const char* kAuthoredPortalMarker = NativeForestResources::kAuthoredPortalMarker;
 
 template <typename Entry> bool PortalEntries(const Entry* entries, unsigned count) {
     if (!entries)

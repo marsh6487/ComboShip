@@ -220,7 +220,9 @@ void DrawForestPortal() {
     Matrix_Push();
     Matrix_Translate(COMBO_SOLO_FOREST_STUMP_X, 0, COMBO_SOLO_FOREST_STUMP_Z, MTXMODE_NEW);
     Matrix_RotateYS(COMBO_SOLO_FOREST_STUMP_YAW, MTXMODE_APPLY);
-    const auto mesh = ForestGiParticles::Portal(play->gameplayFrames, !NativePortal(play), NeiGi_CameraBasis(play));
+    const bool authored = ResourceMgr_FileExists(NativeForest::kAuthoredPortalMarker);
+    const auto mesh =
+        ForestGiParticles::Portal(play->gameplayFrames, !NativePortal(play) || authored, NeiGi_CameraBasis(play));
     NeiGi_DrawWorldParticles(play, mesh);
     Matrix_Pop();
 }

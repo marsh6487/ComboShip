@@ -289,6 +289,37 @@ bool Locate(PlayState* play) {
     return sAnchorValid;
 }
 
+bool OnStumpCap(PlayState* play, const Player* player) {
+    const auto* header = play->colCtx.colHeader;
+    const auto* floor = player->actor.floorPoly;
+    if (!header || !header->polyList || !header->vtxList || !floor || player->actor.floorBgId != BGCHECK_SCENE ||
+        !std::isfinite(player->actor.floorHeight) || std::abs(player->actor.floorHeight - sAnchor.y) > 1)
+        return false;
+    // Require the actual static fan under Link's feet. A nearby ramp, another
+    // floor at the same height, or a platform above the stump cannot grant it.
+    for (int index = 0; index < header->numPolygons; ++index) {
+        const auto& poly = header->polyList[index];
+        if (&poly != floor)
+            continue;
+        if (poly.normal.y < 30000)
+            return false;
+        bool hub = false;
+        for (int i = 0; i < 3; ++i) {
+            const unsigned vertex = poly.vtxData[i] & 0x1FFF;
+            if (vertex >= header->numVertices)
+                return false;
+            const auto& v = header->vtxList[vertex];
+            const MagicMirrorAnchor::Point point{ static_cast<float>(v.x), static_cast<float>(v.y),
+                                                  static_cast<float>(v.z) };
+            if (std::abs(point.y - sAnchor.y) >= 1)
+                return false;
+            hub |= MagicMirrorAnchor::Near(point, sAnchor);
+        }
+        return hub;
+    }
+    return false;
+}
+
 bool ArrivalDestination(const PlayState* play) {
     if (!play || !Mode() || gSaveContext.gameMode != GAMEMODE_NORMAL ||
         !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) || gSaveContext.respawnFlag != 0 ||
@@ -307,7 +338,7 @@ bool ArrivalDestination(const PlayState* play) {
 }
 
 bool Landing(PlayState* play, Vec3s& position, s16& yaw) {
-    // Inside the ground-pickup radius, outside the stump and even Goron's body.
+    // Beside the stump, clear of its cap and even Goron's body.
     // Prefer the south side; try the other sides if Prelude moved it near a wall.
     constexpr int offsets[][2] = { { 0, -120 }, { 85, -85 }, { 120, 0 },  { 85, 85 },
                                    { 0, 120 },  { -85, 85 }, { -120, 0 }, { -85, -85 } };
@@ -486,7 +517,7 @@ void Update() {
     if (!MagicMirror_IsOwned()) {
         if (!sPickupToken && Safe(play, false) && Forest(play) && play->roomCtx.curRoom.num == 0 && Locate(play)) {
             const auto& p = GET_PLAYER(play)->actor.world.pos;
-            if (MagicMirrorAnchor::CanClaim({ p.x, p.y, p.z }, sAnchor)) {
+            if (MagicMirrorAnchor::CanClaim({ p.x, p.y, p.z }, sAnchor) && OnStumpCap(play, GET_PLAYER(play))) {
                 const int token = BeginPickup();
                 if (token && !MirrorHost::QueuePickup(token))
                     sPickupToken = 0;
@@ -536,6 +567,7 @@ void DrawWorld() {
     Matrix_RotateY(play->gameplayFrames * 0.025f, MTXMODE_APPLY);
 #endif
     ComboMagicMirrorVisual::Draw(play);
+    MirrorHost::DrawWorldShimmer(play);
     Matrix_Pop();
 }
 } // namespace MirrorRuntime
