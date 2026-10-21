@@ -6,6 +6,19 @@
   "independent_changed_source_restore": "PASS: empty isolated directory, embedded baseline paths, patch application and all 15 target SHA256 checks; no object alternates or prior checkout",
   "status": "candidate; focused tests and native objects verified; full platform link and configured gameplay pending",
   "archive": "magic-mirror-arrival-ritual-source-20261021.zip",
-  "bytes": 120873,
-  "sha256": "2b907b4cac39dfd7211b219e5ba32ed270218052fb8c9f50758aed9ce55e1782"
+  "bytes": 139871,
+  "sha256": "8f2f93b05ef672b95631348f8e3d8f36a58d1fbce6d791ac2e54154b63c5674b",
+  "verification": {
+    "schema": 1,
+    "implementation_commit": "10f25d1f04aa25cd07e682c8c0748799167b1492",
+    "world_regression_commands_passed": 29,
+    "native_forest_tests_passed": 46,
+    "native_forest_original_donor_skips": 2,
+    "native_object_compiles_passed": 5,
+    "shared_effect_renderer_tests": "pass for OoT/MM including actual Mirror adapters and all-green geometry/textured/fallback layers",
+    "review": "two independent review passes; no actionable findings",
+    "full_platform_build": "not run",
+    "configured_gameplay": "pending",
+    "publication": "local candidate; GitHub push blocked by automatic approval review"
+  }
 }
