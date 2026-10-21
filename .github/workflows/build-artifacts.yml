@@ -47,7 +47,18 @@ jobs:
       # The renderer preflight consumes the real solo-forest JSON interface.
       # Install its headers before compiling any production objects.
       - name: Install gate dependencies
-        run: sudo apt-get update && sudo apt-get install -y clang-format-14 cmake ninja-build nlohmann-json3-dev libspdlog-dev libimgui-dev libsdl2-dev libsdl2-net-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-pil
+        run: sudo apt-get update && sudo apt-get install -y clang-format-14 cmake ninja-build nlohmann-json3-dev libspdlog-dev libimgui-dev libsdl2-dev libsdl2-net-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-venv
+
+      # The binary Pillow wheel supplies the font rasterizer used for the
+      # committed UI textures. Keep the distro's NumPy available to other tests.
+      - name: Install pinned UI rasterizer
+        run: |
+          python3 -m venv --system-site-packages "$RUNNER_TEMP/combo-gate-python"
+          "$RUNNER_TEMP/combo-gate-python/bin/python3" -m pip install --only-binary=:all: -r scripts/assets/sword-element-ui-requirements.txt
+          echo "$RUNNER_TEMP/combo-gate-python/bin" >> "$GITHUB_PATH"
+
+      - name: Fast generated sword UI asset check
+        run: python3 -B scripts/assets/build_sword_element_ui.py --check
 
       # These compile small production slices and one renderer object before
       # the long regression/build stages.
