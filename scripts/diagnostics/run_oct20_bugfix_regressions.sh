@@ -8,6 +8,7 @@ python3 -B tests/custom_messages/run_decoder_tests.py
 python3 -B scripts/diagnostics/run_forest_gi_particles_tests.py
 python3 -B tests/black_market/run_entry_access_tests.py
 python3 -B tests/black_market/run_scene_spawn_tests.py
+python3 -B tests/black_market/run_collision_pool_tests.py
 python3 -B tests/black_market/run_resource_entry_tests.py --bundled-only
 python3 -B tests/native_market/run_legacy_cache_tests.py
 python3 -B scripts/diagnostics/run_shield_particle_lifetime_tests.py

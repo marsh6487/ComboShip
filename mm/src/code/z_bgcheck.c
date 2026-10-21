@@ -7,6 +7,9 @@
 #include "2s2h/BenPort.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include <libultraship/bridge/consolevariablebridge.h>
+#ifdef COMBO_BUILD
+#include "entrances/BlackMarketEntrance.h"
+#endif
 
 #define DYNA_RAYCAST_FLOORS 1
 #define DYNA_RAYCAST_WALLS 2
@@ -70,6 +73,10 @@ typedef struct {
 
 BgCheckSceneMemEntry sSceneMemList[] = {
     { SCENE_00KEIKOKU, 0xC800 },
+#ifdef COMBO_BUILD
+    // The authored market needs more static lookup nodes than the native budget.
+    { COMBO_BLACK_MARKET_SCENE, 0x30000 },
+#endif
 };
 
 BgCheckSceneSubdivisionEntry sSceneSubdivisionList[] = {
