@@ -6,8 +6,8 @@ name: Build (Linux)
 # without ROMs). Produces a runnable ComboShip-linux artifact (users add their own extracted
 # oot.o2r/mm.o2r) plus a self-contained ComboShip-linux-appimage — the plain tree links against
 # the runner's system libraries, so on other distros it needs a matching ABI (see
-# docs/BUILDING_LINUX.md); the AppImage bundles them. Called by build-artifacts.yml (gate runs
-# there) and release.yml (v* tags, no gate — merged code).
+# docs/BUILDING_LINUX.md); the AppImage bundles them. Called by build-artifacts.yml
+# (preflight first, final gate after all jobs) and release.yml (v* tags).
 
 on:
   workflow_call:
@@ -32,11 +32,12 @@ jobs:
             libzip-dev zipcmp zipmerge ziptool
 
       # ~2600 objects across lus/soh/2ship/combo: ccache is the difference between ~90 min cold
-      # and a few minutes warm. Cache is only saved on branch pushes so PR runs can't pollute it.
+      # and a few minutes warm. In-repository PRs can warm their own scoped cache;
+      # fork PRs remain read-only. Successful develop builds seed future branches.
       - name: Configure ccache
         uses: hendrikmuhs/ccache-action@v1.2.22
         with:
-          save: ${{ github.event_name == 'push' }}
+          save: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           key: ${{ runner.os }}-linux-ccache-${{ github.ref }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-linux-ccache-${{ github.ref }}
