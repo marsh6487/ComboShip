@@ -11,6 +11,7 @@
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorPlayer.h"
 #include "soh/Enhancements/Gameplay/ComboBlackMarketNative.h"
+#include "soh/Enhancements/Gameplay/ComboLostWoodsFountain.h"
 #endif
 #include "gameplay/ComboFaroresWind.h"
 #include "din_fire_shield.h"
@@ -6214,43 +6215,51 @@ s32 Player_HandleExitsAndVoids(PlayState* play, Player* this, CollisionPoly* pol
             } else {
                 play->nextEntranceIndex = play->setupExitList[exitIndex - 1];
 
-                // Main override for entrance rando and entrance skips
-                if (IS_RANDO) {
-                    play->nextEntranceIndex = Entrance_OverrideNextIndex(play->nextEntranceIndex);
-                }
-
-                if (play->nextEntranceIndex == ENTR_RETURN_GROTTO) {
-                    gSaveContext.respawnFlag = 2;
-                    play->nextEntranceIndex = gSaveContext.respawn[RESPAWN_MODE_RETURN].entranceIndex;
-                    play->transitionType = TRANS_TYPE_FADE_WHITE;
-                    gSaveContext.nextTransitionType = TRANS_TYPE_FADE_WHITE;
-                } else if (play->nextEntranceIndex >= ENTR_RETURN_YOUSEI_IZUMI_YOKO) {
-                    // handle dynamic exits
+#ifdef COMBO_BUILD
+                if (!ComboLostWoodsFountain_TryExit(play, this, play->nextEntranceIndex)) {
+#endif
+                    // Main override for entrance rando and entrance skips
                     if (IS_RANDO) {
-                        play->nextEntranceIndex = Entrance_OverrideDynamicExit(
-                            sReturnEntranceGroupIndices[play->nextEntranceIndex - ENTR_RETURN_YOUSEI_IZUMI_YOKO] +
-                            play->curSpawn);
-                    } else {
-                        play->nextEntranceIndex =
-                            sReturnEntranceGroupData[sReturnEntranceGroupIndices[play->nextEntranceIndex -
-                                                                                 ENTR_RETURN_YOUSEI_IZUMI_YOKO] +
-                                                     play->curSpawn];
+                        play->nextEntranceIndex = Entrance_OverrideNextIndex(play->nextEntranceIndex);
                     }
 
-                    Scene_SetTransitionForNextEntrance(play);
-                } else {
-                    if (GameInteractor_Should(VB_SET_VOIDOUT_FROM_SURFACE,
-                                              SurfaceType_GetFloorEffect(&play->colCtx, poly, bgId) == FLOOR_EFFECT_2,
-                                              play->setupExitList[exitIndex - 1])) {
-                        gSaveContext.respawn[RESPAWN_MODE_DOWN].entranceIndex = play->nextEntranceIndex;
-                        if (GameInteractor_Should(VB_TRIGGER_VOIDOUT, true, this)) {
-                            Play_TriggerVoidOut(play);
+                    if (play->nextEntranceIndex == ENTR_RETURN_GROTTO) {
+                        gSaveContext.respawnFlag = 2;
+                        play->nextEntranceIndex = gSaveContext.respawn[RESPAWN_MODE_RETURN].entranceIndex;
+                        play->transitionType = TRANS_TYPE_FADE_WHITE;
+                        gSaveContext.nextTransitionType = TRANS_TYPE_FADE_WHITE;
+                    } else if (play->nextEntranceIndex >= ENTR_RETURN_YOUSEI_IZUMI_YOKO) {
+                        // handle dynamic exits
+                        if (IS_RANDO) {
+                            play->nextEntranceIndex = Entrance_OverrideDynamicExit(
+                                sReturnEntranceGroupIndices[play->nextEntranceIndex - ENTR_RETURN_YOUSEI_IZUMI_YOKO] +
+                                play->curSpawn);
+                        } else {
+                            play->nextEntranceIndex =
+                                sReturnEntranceGroupData[sReturnEntranceGroupIndices[play->nextEntranceIndex -
+                                                                                     ENTR_RETURN_YOUSEI_IZUMI_YOKO] +
+                                                         play->curSpawn];
                         }
-                        gSaveContext.respawnFlag = -2;
+
+                        Scene_SetTransitionForNextEntrance(play);
+                    } else {
+                        if (GameInteractor_Should(VB_SET_VOIDOUT_FROM_SURFACE,
+                                                  SurfaceType_GetFloorEffect(&play->colCtx, poly, bgId) == FLOOR_EFFECT_2,
+                                                  play->setupExitList[exitIndex - 1])) {
+                            gSaveContext.respawn[RESPAWN_MODE_DOWN].entranceIndex = play->nextEntranceIndex;
+                            if (GameInteractor_Should(VB_TRIGGER_VOIDOUT, true, this)) {
+                                Play_TriggerVoidOut(play);
+                            }
+                            gSaveContext.respawnFlag = -2;
+                        }
+                        gSaveContext.retainWeatherMode = 1;
+                        Scene_SetTransitionForNextEntrance(play);
                     }
-                    gSaveContext.retainWeatherMode = 1;
+#ifdef COMBO_BUILD
+                } else {
                     Scene_SetTransitionForNextEntrance(play);
                 }
+#endif
                 play->transitionTrigger = TRANS_TRIGGER_START;
             }
 

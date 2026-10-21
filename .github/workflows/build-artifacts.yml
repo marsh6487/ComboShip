@@ -191,6 +191,7 @@ jobs:
           ASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/oot_cold_blue_warp_behavior_test.py --sanitize
           ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/run_mm_camera_arrival_test.py --sanitize
           ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/opening_forest_test.py --sanitize
+          ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/run_fountain_return_tests.py --sanitize
           ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/portal_save_test.py --sanitize
           ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/mm3d_pack_test.py --sanitize
 
