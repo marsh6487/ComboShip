@@ -378,7 +378,10 @@ extern "C" void ComboSaria_Update(Actor* actor, PlayState* play) {
     const bool gift = IsSongGift(actor, play);
     if (state.talking) {
         const u8 textState = Message_GetState(&play->msgCtx);
-        if (textState == TEXT_STATE_CLOSING || textState == TEXT_STATE_NONE) {
+        if (textState == TEXT_STATE_EVENT && Message_ShouldAdvance(play)) {
+            // Event-ended dialogue is closed by its actor, not the message engine.
+            Message_CloseTextbox(play);
+        } else if (textState == TEXT_STATE_CLOSING || textState == TEXT_STATE_NONE) {
             state.talking = false;
             if (state.teaching && gift)
                 QueueSariaSong();
