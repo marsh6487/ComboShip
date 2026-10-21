@@ -1,0 +1,16 @@
+{
+  "archive": "lost-woods-woodfall-source-20261021.zip",
+  "archive_sha256": "af84ef7b22f3e7a68179e78ac3be64552d7391da194e3489655feab92eecc810",
+  "baseline": "6effafdeaa41d0e851395c19665f11f2b24f3145",
+  "implementation_commit": "86fbff356fb3b2e4cd31d293db79b9a2cff3e8fe",
+  "implementation_tree": "d1cbfb26e5a730f38f107da6ce5893050480396d",
+  "mm_return": "Separate plain opening beside the normal Woodfall starting platform.",
+  "oot_entrance": "Existing native right-hand tunnel in Lost Woods room 7. No added OoT geometry.",
+  "original_local_implementation_commit": "93d09aa330b404df9b421e170dbbee5bbffccd67",
+  "publication": "GitHub source tree d1cbfb26e5a730f38f107da6ce5893050480396d exactly matches the locally tested source tree; commit metadata differs.",
+  "restore": "PASS: independent shallow object database; exact baseline + archived patch; no object alternates; every complete changed-source copy verified",
+  "restored_tree": "d1cbfb26e5a730f38f107da6ce5893050480396d",
+  "runtime": "Untested. No full executable or application build. No master promotion.",
+  "source_files_verified": 18,
+  "verification": "ASAN/UBSAN focused tests with complete native MM mesh; broad forest suite; six native object compiles"
+}
