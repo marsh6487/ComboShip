@@ -2,16 +2,17 @@ name: Regression groups
 
 on:
   workflow_call:
+    inputs:
+      suite:
+        description: Required regression group selected by the fail-fast caller
+        required: true
+        type: string
 
 jobs:
   regression:
-    name: ${{ matrix.suite }}
+    name: ${{ inputs.suite }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: [world, entrances, items, equipment, systems, render]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -46,4 +47,6 @@ jobs:
           echo "COMBO_NEI_FIXTURE_CPATH=$RUNNER_TEMP/combo-nei-imgui:$RUNNER_TEMP/combo-nei-thread-pool/include:$RUNNER_TEMP/combo-nei-stb${CPATH:+:$CPATH}" >> "$GITHUB_ENV"
 
       - name: Run timed regression group
-        run: python3 -B scripts/ci/run_regressions.py --suite "${{ matrix.suite }}"
+        env:
+          REGRESSION_SUITE: ${{ inputs.suite }}
+        run: python3 -B scripts/ci/run_regressions.py --suite "$REGRESSION_SUITE"

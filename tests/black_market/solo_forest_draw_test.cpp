@@ -33,7 +33,7 @@ int main() {
     play.state.gfxCtx = &gfx; play.gameplayFrames = 75;
     DrawForestPortal();
     assert(draws == 1 && pushes == 1 && pops == 1);
-    assert(submitted.count == ForestGiParticles::kPortalMotes * ForestGiParticles::kHexVertices);
+    assert(submitted.count == ForestGiParticles::kPortalMotes * ForestGiParticles::kTwinkleVertices);
     for (int blocked = 0; blocked < 4; ++blocked) {
         draws = pushes = pops = 0;
         visit = blocked != 0; safe = blocked != 1;
