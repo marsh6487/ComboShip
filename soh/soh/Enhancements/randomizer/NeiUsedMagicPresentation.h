@@ -16,6 +16,8 @@ void NeiUsedMagic_DrawChargeFocus(PlayState* play, int element);
 void NeiUsedMagic_DrawSpin(PlayState* play, Player* player, int element, float radius, bool big);
 void NeiUsedMagic_DrawBurst(PlayState* play, int element, const Vec3f* position, float size, float life);
 void NeiUsedMagic_DrawPortal(PlayState* play, Player* player, float scale, float alpha);
+// Same established portal layers, with green colors throughout the mirror ritual.
+void NeiUsedMagic_DrawMirrorCast(PlayState* play, Player* player, float scale, float alpha);
 #ifdef __cplusplus
 }
 #endif

@@ -21,6 +21,7 @@ static PlayState* sCastPlay = nullptr;
 static Player* sCastPlayer = nullptr;
 static bool sDeparted = false;
 static unsigned sCastTicks = 0;
+static unsigned sDepartureTick = 0;
 // Arrival owns no old PlayState/player pointer and survives departure teardown.
 static Context sArrivalContext;
 static bool sArrivalPending = false;
@@ -67,6 +68,7 @@ void ReleaseCast() {
     sCastPlayer = nullptr;
     sDeparted = false;
     sCastTicks = 0;
+    sDepartureTick = 0;
 }
 
 int Scene(const PlayState* play) {
@@ -452,6 +454,8 @@ void Update() {
             ReleaseCast();
         } else if (!sDeparted && MagicMirrorPlayer_State(sCastPlayer) == MAGIC_MIRROR_CAST_READY) {
             sDeparted = Travel(play, true);
+            if (sDeparted)
+                sDepartureTick = sCastTicks;
             MirrorHost::Trace(sDeparted ? "travel-requested" : "travel-rejected", play);
             if (!sDeparted) {
                 ReleaseCast();
@@ -543,18 +547,13 @@ void Update() {
 void DrawWorld() {
     auto* play = gPlayState;
     if (play && Mode() && Matches(play) && play == sCastPlay && GET_PLAYER(play) == sCastPlayer &&
-        MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PLAYING && sCastPlayer->skelAnime.curFrame >= 40) {
-        auto head = sCastPlayer->bodyPartsPos[PLAYER_BODYPART_HEAD];
-        if (MirrorHost::AlternateModel()) {
-            head = sCastPlayer->actor.world.pos;
-            head.y += 60; // Mario hides Link's skeleton; its head joints can be stale.
-        }
-        Matrix_Push();
-        Matrix_Translate(head.x, head.y + 28, head.z, MTXMODE_NEW);
-        Matrix_ReplaceRotation(&play->billboardMtxF);
-        Matrix_Scale(0.65f, 0.65f, 0.65f, MTXMODE_APPLY);
-        ComboMagicMirrorVisual::Draw(play);
-        Matrix_Pop();
+        MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PLAYING) {
+        // Keep Farore's exact motion. The established Time Gate seal/wisps
+        // build around the actor, then dissolve during departure; no GI model.
+        const float rise = std::clamp(sCastPlayer->skelAnime.curFrame / 20.0f, 0.0f, 1.0f);
+        const float fade = sDeparted ? std::clamp(1.0f - (sCastTicks - sDepartureTick) / 12.0f, 0.0f, 1.0f) : 1.0f;
+        if (rise > 0 && fade > 0)
+            MirrorHost::DrawCastAura(play, sCastPlayer, 0.15f + 0.85f * rise, 255.0f * rise * fade);
     }
     if (!play || !Mode() || !Forest(play) || play->roomCtx.curRoom.num != 0 || MagicMirror_IsOwned() || sPickupToken ||
         !Locate(play))

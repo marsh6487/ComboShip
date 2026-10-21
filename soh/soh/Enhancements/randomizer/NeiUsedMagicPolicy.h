@@ -395,26 +395,31 @@ inline Mesh SampleBurst(Kind kind, uint32_t frame, float life, const Basis& came
     Fade(m, .6f + .4f * std::min(1.f, life * 4), std::min(1.f, life * 4));
     return m;
 }
-inline Mesh SamplePortal(uint32_t frame, float scale, float alpha, const Basis& camera = {}) {
+enum class PortalPalette { Temporal, Forest };
+inline Mesh SamplePortal(uint32_t frame, float scale, float alpha, const Basis& camera = {},
+                         PortalPalette palette = PortalPalette::Temporal) {
     Mesh m;
     scale = Clamp(scale, 0, 1.25f);
     alpha = Clamp(alpha, 0, 255);
     if (scale <= 0 || alpha <= 0)
         return m;
     const float t = NeiGi::Time(frame);
+    const uint32_t temporal[] = { 0x6777E9, 0x99EFFF, 0xDBCEFF, 0x7FFFF0, 0xD3FAFF, 0xBEA4FF, 0xA1FFFF };
+    const uint32_t forest[] = { 0x18863C, 0x44FF74, 0x86FFB0, 0x2EEB5D, 0xBCFFD0, 0x70FF9C, 0x44FF74 };
+    const auto& color = palette == PortalPalette::Forest ? forest : temporal;
     const Basis floor{ { 1, 0, 0 }, { 0, 0, 1 }, { 0, 1, 0 } };
-    NeiGi::Glow(m, { 0, 1, 0 }, 65, 0x6777E9, 150, floor);
-    Ring(m, 70, 2, 5, t * .25f, Tau, 0x99EFFF, 240, 24);
-    Ring(m, 55, 3, 2.6f, -t * .6f, Tau * .84f, 0xDBCEFF, 240, 24);
-    Ring(m, 37, 4, 4, t * 1.1f, Tau * .88f, 0x7FFFF0, 215, 20);
+    NeiGi::Glow(m, { 0, 1, 0 }, 65, color[0], 150, floor);
+    Ring(m, 70, 2, 5, t * .25f, Tau, color[1], 240, 24);
+    Ring(m, 55, 3, 2.6f, -t * .6f, Tau * .84f, color[2], 240, 24);
+    Ring(m, 37, 4, 4, t * 1.1f, Tau * .88f, color[3], 215, 20);
     // Twelve hour marks form a recognizable temporal dial, with longer
     // cardinal marks. These rotate independently from the outer energy rim.
     for (int i = 0; i < 12; ++i) {
         const float a = i * Tau / 12 - t * .16f;
         const Point p = Radial(a, 62, 3), side = Radial(a + Tau / 4, 1.3f);
         const Point end = Radial(a, i % 3 ? 65 : 68, 3);
-        m.Tri({ p - side, 0xD3FAFF, 230 }, { end - side, 0xD3FAFF, 230 }, { end + side, 0xD3FAFF, 230 });
-        m.Tri({ p - side, 0xD3FAFF, 230 }, { end + side, 0xD3FAFF, 230 }, { p + side, 0xD3FAFF, 230 });
+        m.Tri({ p - side, color[4], 230 }, { end - side, color[4], 230 }, { end + side, color[4], 230 });
+        m.Tri({ p - side, color[4], 230 }, { end + side, color[4], 230 }, { p + side, color[4], 230 });
     }
     // Wisps open upward around the player rather than placing an opaque disc
     // over them. Their alpha softens to zero at both ends.
@@ -426,8 +431,8 @@ inline Mesh SamplePortal(uint32_t frame, float scale, float alpha, const Basis& 
         for (int j = 0; j < 9; ++j) {
             const float f = j / 9.f, g = (j + 1) / 9.f;
             const Point side = camera.right * (2.8f * (1 - f) + .4f);
-            Ribbon(m, p(j), p(j + 1), side, side * .85f, i % 2 ? 0xBEA4FF : 0xA1FFFF,
-                   Alpha(210 * std::sin(f * Tau * .5f)), Alpha(210 * std::sin(g * Tau * .5f)));
+            Ribbon(m, p(j), p(j + 1), side, side * .85f, color[i % 2 ? 5 : 6], Alpha(210 * std::sin(f * Tau * .5f)),
+                   Alpha(210 * std::sin(g * Tau * .5f)));
         }
     }
     Fade(m, scale, alpha / 255);
@@ -503,12 +508,14 @@ inline Mesh SampleChargeSurface(Kind kind, uint32_t frame, float charge, const B
         return {};
     return CylinderSurface(frame, 17 + 18 * charge, 30 + 47 * charge, 0xFFFFDD, 0xFFE486, 130 + 100 * charge, 2);
 }
-inline Mesh SamplePortalSurface(uint32_t frame, float scale, float alpha) {
+inline Mesh SamplePortalSurface(uint32_t frame, float scale, float alpha,
+                                PortalPalette palette = PortalPalette::Temporal) {
     scale = Clamp(scale, 0, 1.25f);
     alpha = Clamp(alpha, 0, 255);
     if (scale <= 0 || alpha <= 0)
         return {};
-    auto m = CylinderSurface(frame, 55, 96, 0x68EFFF, 0xBC9EFF, 150, 3);
+    const bool forest = palette == PortalPalette::Forest;
+    auto m = CylinderSurface(frame, 55, 96, forest ? 0x32EB69 : 0x68EFFF, forest ? 0xA4FFC0 : 0xBC9EFF, 150, 3);
     Fade(m, scale, alpha / 255);
     return m;
 }

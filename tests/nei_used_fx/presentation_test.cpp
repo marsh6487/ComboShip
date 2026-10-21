@@ -8,6 +8,11 @@
 #include <cassert>
 #include <iostream>
 #include <vector>
+#ifdef NEI_USED_FX_MM
+#include "mirror_cast_adapter_mm.inc.h"
+#else
+#include "mirror_cast_adapter_soh.inc.h"
+#endif
 
 namespace Fixture {
 struct Pose {
@@ -21,6 +26,18 @@ size_t vertices = 0;
 bool textures = false;
 size_t texturedVertices = 0;
 uint32_t expectedFallbackColor = 0;
+bool greenOnly = false;
+size_t greenVertices = 0;
+void CheckGreen(const NeiGi::Mesh &mesh) {
+    if (!greenOnly)
+        return;
+    for (size_t i = 0; i < mesh.count; ++i) {
+        const auto rgb = mesh.vertices[i].rgb;
+        const auto red = (rgb >> 16) & 255, green = (rgb >> 8) & 255, blue = rgb & 255;
+        assert(green > red && green > blue && "every mirror ritual layer must use green hex colors");
+        ++greenVertices;
+    }
+}
 } // namespace Fixture
 #ifdef NEI_USED_FX_MM
 using FixtureMatrixMode = MatrixMode;
@@ -59,28 +76,28 @@ void Matrix_Scale(float x, float y, float z, FixtureMatrixMode mode) {
 }
 NeiGi::Basis NeiGi_CameraBasis(PlayState *) { return {}; }
 void NeiGi_DrawMesh(PlayState *, const NeiGi::Mesh &mesh, NeiGi::Kind kind) {
-  assert(
-      kind ==
-      NeiGi::Kind::Neutral); // No resource lookup or Alt-owned texture pointer.
-  if (!mesh.count)
-    return;
-  if (Fixture::expectedFallbackColor)
-    for (size_t i = 0; i < mesh.count; ++i) {
-      assert(mesh.vertices[i].rgb == Fixture::expectedFallbackColor);
-      assert(mesh.vertices[i].alpha <= 72);
-    }
+    Fixture::CheckGreen(mesh);
+    assert(kind == NeiGi::Kind::Neutral); // No resource lookup or Alt-owned texture pointer.
+    if (!mesh.count)
+        return;
+    if (Fixture::expectedFallbackColor)
+        for (size_t i = 0; i < mesh.count; ++i) {
+            assert(mesh.vertices[i].rgb == Fixture::expectedFallbackColor);
+            assert(mesh.vertices[i].alpha <= 72);
+        }
   assert(mesh.count < mesh.vertices.size());
   Fixture::draws.push_back(Fixture::pose);
   Fixture::vertices += mesh.count;
 }
 bool NeiGi_DrawTexturedMesh(PlayState *, const NeiGi::Mesh &mesh,
                             const NeiGi::TextureMaterial &material) {
-  assert(material.path && mesh.count < mesh.vertices.size());
-  if (mesh.count)
-    Fixture::materials.push_back(material);
-  if (Fixture::textures)
-    Fixture::texturedVertices += mesh.count;
-  return Fixture::textures;
+    Fixture::CheckGreen(mesh);
+    assert(material.path && mesh.count < mesh.vertices.size());
+    if (mesh.count)
+        Fixture::materials.push_back(material);
+    if (Fixture::textures)
+        Fixture::texturedVertices += mesh.count;
+    return Fixture::textures;
 }
 }
 int main() {
@@ -122,6 +139,15 @@ int main() {
   NeiUsedMagic_DrawPortal(&play, &player, 1, 255);
   restored();
   assert(Fixture::draws.back().position.y == 201);
+  Fixture::greenOnly = true;
+  for (bool textures : {false, true}) {
+      Fixture::textures = textures;
+      MirrorCastAura(&play, &player, 1, 255);
+      restored();
+      assert(Fixture::draws.back().position.y == 201);
+  }
+  assert(Fixture::greenVertices > 0);
+  Fixture::greenOnly = Fixture::textures = false;
   const auto valid = Fixture::draws.size();
   NeiUsedMagic_DrawProjectile(nullptr, 2, &trail[0], &velocity, 2, 0);
   NeiUsedMagic_DrawProjectile(&play, -1, &trail[0], &velocity, 2, 0);

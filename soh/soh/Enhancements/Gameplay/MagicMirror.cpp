@@ -13,6 +13,7 @@
 #include "gameplay/MagicMirrorPlayer.h"
 #include "actors/ForestGiParticles.h"
 #include "soh/Enhancements/randomizer/NeiGiRender.h"
+#include "soh/Enhancements/randomizer/NeiUsedMagicPresentation.h"
 #include "mods/extended_inventory.h"
 #include "mods/ext_buttons/ext_buttons.h"
 #include "mods/items/helpers/equip_helper.h"
@@ -101,6 +102,9 @@ void DrawPickup(PlayState* play, GetItemEntry*) {
 }
 void DrawWorldShimmer(PlayState* play) {
     NeiGi_DrawWorldParticles(play, ForestGiParticles::Mirror(play->gameplayFrames, NeiGi_CameraBasis(play)));
+}
+void DrawCastAura(PlayState* play, Player* player, float scale, float alpha) {
+    NeiUsedMagic_DrawMirrorCast(play, player, scale, alpha);
 }
 bool QueuePickup(int token) {
     GetItemEntry entry = GET_ITEM_NONE;
