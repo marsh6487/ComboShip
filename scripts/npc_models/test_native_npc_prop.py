@@ -1,11 +1,28 @@
 """Ocarina HD texture binding preserves every non-texture display-list word."""
 import struct
 import unittest
+from pathlib import Path
+import numpy as np
 from native_assets import o2r as asset
 import native_npc_pose_fit as fit
 from verify_native_npc_models import Archive
 
 class PropTextureTests(unittest.TestCase):
+    def test_hd_ocarina_raw_upload_has_rgba32_pixels_and_native_byte_stride(self):
+        # Native DL: RGBA16 32x16, 64 bytes/row. The raw importer uploads
+        # four-byte pixels, so an 8x pixel remaster needs 16x byte scaling.
+        art = Path(fit.__file__).with_name('prop_art')/'saria-fairy-ocarina.png'
+        raw = fit.ocarina_hd_resource(art)
+        kind, width, height, flags, horizontal, vertical, length = struct.unpack_from('<IIIIffI', raw, 64)
+        self.assertEqual((kind, width, height, flags), (1, 256, 128, 1))
+        self.assertEqual((horizontal, vertical), (16., 8.))
+        self.assertEqual(64*horizontal, width*4)
+        self.assertEqual(16*vertical, height)
+        self.assertEqual(1024*horizontal*vertical, length)
+        self.assertEqual(length, width*height*4)
+        from PIL import Image
+        self.assertEqual(raw[92:], np.asarray(Image.open(art).convert('RGBA'), np.uint8).tobytes())
+
     def test_rebinding_changes_only_matching_texture_reference_hash(self):
         self.assertTrue(callable(getattr(fit,'bind_ocarina_texture',None)),'Private prop texture binding is missing')
         d=asset.DLBuilder();d.marker('prop');d.settimg_hash(0,2,1,'native/ocarina');d.end();raw=d.to_resource()

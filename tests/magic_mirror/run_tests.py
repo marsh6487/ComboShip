@@ -43,6 +43,20 @@ def main():
                     end += 1
                 bodies.append(native[start:end])
             (Path(directory) / "native_animation.inc.h").write_text("\n".join(bodies))
+            message = (ROOT / host / "src/code" /
+                       ("z_message_PAL.c" if host == "soh" else "z_message.c")).read_text()
+            message_bodies = []
+            for name in ("Message_GetState", "Message_ShouldAdvance", "Message_CloseTextbox"):
+                match = re.search(r"(?:u8|bool|void) " + name + r"\(", message)
+                body = block(message, match[0])
+                body = body.replace(name + "(", "Native" + name + "(", 1)
+                # Audio, settings and the MM behavior hook are explicit boundary doubles.
+                body = re.sub(r"Audio_PlaySfx(?:General)?\([^;]*;", "TestMessageSfx();", body)
+                body = re.sub(r'CVarGetInteger\([^;]*?\) != 0', 'false', body)
+                body = body.replace('GameInteractor_Should(VB_MSG_ADVANCE, shouldAdvance)', 'shouldAdvance')
+                body = body.replace('CVarGetInteger("gEnhancements.Dialogue.FastText", 0)', 'false')
+                message_bodies.append(body)
+            (Path(directory) / "native_message.inc.h").write_text("\n".join(message_bodies))
             player = (ROOT / host / "src/overlays/actors/ovl_player_actor/z_player.c").read_text()
             if host == "mm":
                 start = player.index("    if (play->actorCtx.isOverrideInputOn && (this == GET_PLAYER(play)))")
@@ -67,8 +81,14 @@ def main():
                 for name, value in re.findall(r"^#define\s+(PLAYER_STATE1_\w+)\s+(.+)$", compat, re.M):
                     if name in read:
                         aliases += f"#ifndef {name}\n#define {name} {value}\n#endif\n"
+            mario_path = "soh/expansions/sm64/sm64_mario.c" if host == "soh" else "mm/2s2h/expansions/sm64/sm64_mario.c"
+            mario = (ROOT / mario_path).read_text()
+            start = mario.index("#ifdef COMBO_BUILD", mario.index("void Sm64Mario_Update("))
+            end = mario.index("#endif", start) + len("#endif")
+            mario_gate = ("bool NativeMarioReadsPad(PlayState* play, Player* player) {\n" +
+                          mario[start:end].replace("return;", "return false;") + "\nreturn true;\n}")
             (Path(directory) / "native_prompt_input.inc.h").write_text(
-                pad + "\n" + aliases + block(wolf, "struct WolfInput {") + ";\n" + read)
+                pad + "\n" + aliases + block(wolf, "struct WolfInput {") + ";\n" + read + "\n" + mario_gate)
             includes = [ROOT, ROOT / host, ROOT / host / "include", ROOT / host / "include/PR",
                         ROOT / host / "src", ROOT / host / "assets", ROOT / host / "mods",
                         ROOT / host / ("soh" if host == "soh" else "2s2h"), ROOT / "libultraship/include",

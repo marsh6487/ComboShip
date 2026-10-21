@@ -99,6 +99,7 @@ jobs:
       - name: Fast Goron lifetime and Somaria GI regressions
         run: |
           python3 -B tests/goron_audio/run_tests.py
+          python3 -B tests/mm_sfx_render/run_tests.py
           python3 -B scripts/diagnostics/run_oot_native_transformation_tests.py
           python3 -B tests/goron_field_collision/run_tests.py --sanitize
           python3 -B tests/nei_quest_held/mm_cane_gi_test.py

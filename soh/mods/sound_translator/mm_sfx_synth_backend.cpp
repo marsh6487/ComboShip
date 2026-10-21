@@ -39,6 +39,7 @@ void aLoadADPCMImpl(int num_entries_times_16, const int16_t* book_source_addr);
 void aSetBufferImpl(uint8_t flags, uint16_t in, uint16_t out, uint16_t nbytes);
 void aInterleaveImpl(uint16_t dest, uint16_t left, uint16_t right, uint16_t c);
 void aDMEMMoveImpl(uint16_t in_addr, uint16_t out_addr, int nbytes);
+void aInterlImpl(uint16_t in_addr, uint16_t out_addr, uint16_t n_samples);
 void aSetLoopImpl(int16_t* adpcm_loop_state);
 void aADPCMdecImpl(uint8_t flags, int16_t* state);
 void aResampleImpl(uint8_t flags, uint16_t pitch, int16_t* state);
@@ -316,7 +317,8 @@ static void ProcessSample(s32 noteIndex, NoteSampleState* sampleState, NoteSynth
     u32 numSamplesToLoadFixedPoint = (frequencyFixedPoint * numSamplesPerUpdate * 2) + synthState->samplePosFrac;
     s32 numSamplesToLoad = numSamplesToLoadFixedPoint >> 16;
     synthState->samplePosFrac = numSamplesToLoadFixedPoint & 0xFFFF;
-    synthState->numParts = 1; // we do not split into two parts; see summary.
+    const s32 numParts = sampleState->bitField1.hasTwoParts + 1;
+    synthState->numParts = numParts;
 
     s32 skipBytes = 0;
     s16 sampleDmemBeforeResampling = MM_DMEM_UNCOMPRESSED_NOTE;
@@ -333,217 +335,244 @@ static void ProcessSample(s32 noteIndex, NoteSampleState* sampleState, NoteSynth
     }
 
     u8* sampleAddr = sample->sampleAddr;
-    s32 numSamplesToLoadAdj = numSamplesToLoad;
-    s32 numSamplesProcessed = 0;
-    s32 dmemUncompressedAddrOffset1 = 0;
+    s32 numSamplesToLoadFirstPart = 0;
+    for (s32 part = 0; part < numParts; ++part) {
+        // Above 2x, MM halves frequencyFixedPoint and decodes two source spans,
+        // decimating each before the final resample. Ignoring hasTwoParts plays
+        // the flash's FlyingFairy layer an octave low and advances it at half rate.
+        const s32 numSamplesToLoadAdj =
+            numParts == 1 || !(numSamplesToLoad & 1) ? numSamplesToLoad : (numSamplesToLoad & ~1) + part * 2;
+        s32 numSamplesProcessed = 0;
+        s32 dmemUncompressedAddrOffset1 = 0;
 
-    // Upload the ADPCM codebook on change (bookOffset handling omitted: SFX
-    // uses bookOffset 0/2/3 which all resolve to sample->book->codeBook).
-    if ((sample->codec == MM_CODEC_ADPCM) || (sample->codec == MM_CODEC_SMALL_ADPCM)) {
-        if (sLoadedCodeBook != sample->book->codeBook) {
-            sLoadedCodeBook = sample->book->codeBook;
-            u32 numEntries = MM_SAMPLES_PER_FRAME * sample->book->order * sample->book->numPredictors;
-            aLoadADPCMImpl(numEntries, sample->book->codeBook);
-        }
-    }
-
-    while (numSamplesProcessed != numSamplesToLoadAdj) {
-        s32 sampleFinished = false;
-        s32 loopToPoint = false;
-        s32 dmemUncompressedAddrOffset2 = 0;
-
-        s32 numFirstFrameSamplesToIgnore = synthState->samplePosInt & 0xF;
-        s32 numSamplesUntilEnd = sampleEndPos - synthState->samplePosInt;
-        s32 numSamplesToProcess = numSamplesToLoadAdj - numSamplesProcessed;
-
-        if ((numFirstFrameSamplesToIgnore == 0) && !synthState->atLoopPoint) {
-            numFirstFrameSamplesToIgnore = MM_SAMPLES_PER_FRAME;
-        }
-        s32 numSamplesInFirstFrame = MM_SAMPLES_PER_FRAME - numFirstFrameSamplesToIgnore;
-
-        s32 numSamplesToDecode;
-        s32 numTrailingSamplesToIgnore;
-        s32 numFramesToDecode;
-        if (numSamplesToProcess < numSamplesUntilEnd) {
-            numFramesToDecode =
-                (s32)(numSamplesToProcess - numSamplesInFirstFrame + MM_SAMPLES_PER_FRAME - 1) / MM_SAMPLES_PER_FRAME;
-            numSamplesToDecode = numFramesToDecode * MM_SAMPLES_PER_FRAME;
-            numTrailingSamplesToIgnore = numSamplesInFirstFrame + numSamplesToDecode - numSamplesToProcess;
-        } else {
-            numSamplesToDecode = numSamplesUntilEnd - numSamplesInFirstFrame;
-            numTrailingSamplesToIgnore = 0;
-            if (numSamplesToDecode <= 0) {
-                numSamplesToDecode = 0;
-                numSamplesInFirstFrame = numSamplesUntilEnd;
+        // Upload the ADPCM codebook on change (bookOffset handling omitted: SFX
+        // uses bookOffset 0/2/3 which all resolve to sample->book->codeBook).
+        if ((sample->codec == MM_CODEC_ADPCM) || (sample->codec == MM_CODEC_SMALL_ADPCM)) {
+            if (sLoadedCodeBook != sample->book->codeBook) {
+                sLoadedCodeBook = sample->book->codeBook;
+                u32 numEntries = MM_SAMPLES_PER_FRAME * sample->book->order * sample->book->numPredictors;
+                aLoadADPCMImpl(numEntries, sample->book->codeBook);
             }
-            numFramesToDecode = (numSamplesToDecode + MM_SAMPLES_PER_FRAME - 1) / MM_SAMPLES_PER_FRAME;
-            if (loopInfo->count != 0) {
-                if ((loopInfo->count == 2) && synthState->stopLoop) {
-                    sampleFinished = true;
-                } else {
-                    loopToPoint = true;
+        }
+
+        while (numSamplesProcessed != numSamplesToLoadAdj) {
+            s32 sampleFinished = false;
+            s32 loopToPoint = false;
+            s32 dmemUncompressedAddrOffset2 = 0;
+
+            s32 numFirstFrameSamplesToIgnore = synthState->samplePosInt & 0xF;
+            s32 numSamplesUntilEnd = sampleEndPos - synthState->samplePosInt;
+            s32 numSamplesToProcess = numSamplesToLoadAdj - numSamplesProcessed;
+
+            if ((numFirstFrameSamplesToIgnore == 0) && !synthState->atLoopPoint) {
+                numFirstFrameSamplesToIgnore = MM_SAMPLES_PER_FRAME;
+            }
+            s32 numSamplesInFirstFrame = MM_SAMPLES_PER_FRAME - numFirstFrameSamplesToIgnore;
+
+            s32 numSamplesToDecode;
+            s32 numTrailingSamplesToIgnore;
+            s32 numFramesToDecode;
+            if (numSamplesToProcess < numSamplesUntilEnd) {
+                numFramesToDecode = (s32)(numSamplesToProcess - numSamplesInFirstFrame + MM_SAMPLES_PER_FRAME - 1) /
+                                    MM_SAMPLES_PER_FRAME;
+                numSamplesToDecode = numFramesToDecode * MM_SAMPLES_PER_FRAME;
+                numTrailingSamplesToIgnore = numSamplesInFirstFrame + numSamplesToDecode - numSamplesToProcess;
+            } else {
+                numSamplesToDecode = numSamplesUntilEnd - numSamplesInFirstFrame;
+                numTrailingSamplesToIgnore = 0;
+                if (numSamplesToDecode <= 0) {
+                    numSamplesToDecode = 0;
+                    numSamplesInFirstFrame = numSamplesUntilEnd;
                 }
-            } else {
-                sampleFinished = true;
-            }
-        }
-
-        s32 frameSize = 0;
-        s32 skipInitialSamples = MM_SAMPLES_PER_FRAME;
-        s32 zeroOffset = 0;
-        bool isUncompressed = false; // S16 / S16_INMEMORY: raw load, no decode
-
-        switch (sample->codec) {
-            case MM_CODEC_ADPCM:
-                frameSize = 9;
-                break;
-            case MM_CODEC_SMALL_ADPCM:
-                frameSize = 5;
-                break;
-            case MM_CODEC_S8:
-                frameSize = 16;
-                break;
-            case MM_CODEC_S16_INMEMORY:
-            case MM_CODEC_S16:
-                isUncompressed = true;
-                break;
-            default:
-                // Unsupported codec — stop the note.
-                sampleState->bitField0.enabled = 0;
-                return;
-        }
-
-        if (isUncompressed) {
-            // Clear then raw-load the s16 PCM directly into DMEM.
-            aClearBufferImpl((u16)MM_DMEM_UNCOMPRESSED_NOTE,
-                             (numSamplesToLoadAdj + MM_SAMPLES_PER_FRAME) * MM_SAMPLE_SIZE);
-            flags = MM_A_CONTINUE;
-            skipBytes = 0;
-            numSamplesProcessed += numSamplesToLoadAdj;
-            dmemUncompressedAddrOffset1 = numSamplesToLoadAdj;
-
-            size_t bytesToRead;
-            if (((synthState->samplePosInt * 2) + (numSamplesToLoadAdj * MM_SAMPLE_SIZE)) < (s32)sample->size) {
-                bytesToRead = numSamplesToLoadAdj * MM_SAMPLE_SIZE;
-            } else {
-                bytesToRead = sample->size - (synthState->samplePosInt * 2);
-            }
-            aLoadBufferImpl(sampleAddr + (synthState->samplePosInt * 2), (u16)MM_DMEM_UNCOMPRESSED_NOTE,
-                            (u16)bytesToRead);
-            // fall through to the post-decode bookkeeping below (skip label)
-        } else {
-            // Move the compressed raw sample chunk from RAM into DMEM.
-            s32 sampleDataChunkAlignPad = 0;
-            if (numFramesToDecode != 0) {
-                s32 frameIndex = (synthState->samplePosInt + skipInitialSamples - numFirstFrameSamplesToIgnore) /
-                                 MM_SAMPLES_PER_FRAME;
-                s32 sampleAddrOffset = frameIndex * frameSize;
-                u8* samplesToLoadAddr = sampleAddr + (zeroOffset + sampleAddrOffset);
-
-                sampleDataChunkAlignPad = (uintptr_t)samplesToLoadAddr & 0xF;
-                s32 sampleDataChunkSize = MM_ALIGN16((numFramesToDecode * frameSize) + MM_SAMPLES_PER_FRAME);
-                s16 sampleDataDmemAddr = MM_DMEM_COMPRESSED_ADPCM_DATA - sampleDataChunkSize;
-                aLoadBufferImpl(samplesToLoadAddr - sampleDataChunkAlignPad, (u16)sampleDataDmemAddr,
-                                (u16)sampleDataChunkSize);
-            } else {
-                numSamplesToDecode = 0;
-                sampleDataChunkAlignPad = 0;
+                numFramesToDecode = (numSamplesToDecode + MM_SAMPLES_PER_FRAME - 1) / MM_SAMPLES_PER_FRAME;
+                if (loopInfo->count != 0) {
+                    if ((loopInfo->count == 2) && synthState->stopLoop) {
+                        sampleFinished = true;
+                    } else {
+                        loopToPoint = true;
+                    }
+                } else {
+                    sampleFinished = true;
+                }
             }
 
-            if (synthState->atLoopPoint) {
-                aSetLoopImpl(sample->loop->predictorState);
-                flags = MM_A_LOOP;
-                synthState->atLoopPoint = false;
-            }
+            s32 frameSize = 0;
+            s32 skipInitialSamples = MM_SAMPLES_PER_FRAME;
+            s32 zeroOffset = 0;
+            bool isUncompressed = false; // S16 / S16_INMEMORY: raw load, no decode
 
-            s32 numSamplesInThisIteration = numSamplesToDecode + numSamplesInFirstFrame - numTrailingSamplesToIgnore;
-
-            if (numSamplesProcessed == 0) {
-                skipBytes = numFirstFrameSamplesToIgnore * MM_SAMPLE_SIZE;
-            } else {
-                dmemUncompressedAddrOffset2 = MM_ALIGN16(dmemUncompressedAddrOffset1 + 8 * MM_SAMPLE_SIZE);
-            }
-
-            // Decode into DMEM_UNCOMPRESSED_NOTE.
-            s32 sampleDataChunkSize = MM_ALIGN16((numFramesToDecode * frameSize) + MM_SAMPLES_PER_FRAME);
-            s16 sampleDataDmemAddr = MM_DMEM_COMPRESSED_ADPCM_DATA - sampleDataChunkSize;
             switch (sample->codec) {
                 case MM_CODEC_ADPCM:
-                    aSetBufferImpl(0, (u16)(sampleDataDmemAddr + sampleDataChunkAlignPad),
-                                   (u16)(MM_DMEM_UNCOMPRESSED_NOTE + dmemUncompressedAddrOffset2),
-                                   (u16)(numSamplesToDecode * MM_SAMPLE_SIZE));
-                    aADPCMdecImpl(flags, synthState->synthesisBuffers->adpcmState);
+                    frameSize = 9;
                     break;
                 case MM_CODEC_SMALL_ADPCM:
-                    aSetBufferImpl(0, (u16)(sampleDataDmemAddr + sampleDataChunkAlignPad),
-                                   (u16)(MM_DMEM_UNCOMPRESSED_NOTE + dmemUncompressedAddrOffset2),
-                                   (u16)(numSamplesToDecode * MM_SAMPLE_SIZE));
-                    aADPCMdecImpl(flags | MM_A_ADPCM_SHORT, synthState->synthesisBuffers->adpcmState);
+                    frameSize = 5;
                     break;
                 case MM_CODEC_S8:
-                    aSetBufferImpl(0, (u16)(sampleDataDmemAddr + sampleDataChunkAlignPad),
-                                   (u16)(MM_DMEM_UNCOMPRESSED_NOTE + dmemUncompressedAddrOffset2),
-                                   (u16)(numSamplesToDecode * MM_SAMPLE_SIZE));
-                    aS8DecImpl(flags, synthState->synthesisBuffers->adpcmState);
+                    frameSize = 16;
+                    break;
+                case MM_CODEC_S16_INMEMORY:
+                case MM_CODEC_S16:
+                    isUncompressed = true;
                     break;
                 default:
-                    break;
+                    // Unsupported codec — stop the note.
+                    sampleState->bitField0.enabled = 0;
+                    return;
             }
 
-            if (numSamplesProcessed != 0) {
-                aDMEMMoveImpl((u16)(MM_DMEM_UNCOMPRESSED_NOTE + dmemUncompressedAddrOffset2 +
-                                    (numFirstFrameSamplesToIgnore * MM_SAMPLE_SIZE)),
-                              (u16)(MM_DMEM_UNCOMPRESSED_NOTE + dmemUncompressedAddrOffset1),
-                              numSamplesInThisIteration * MM_SAMPLE_SIZE);
-            }
+            if (isUncompressed) {
+                // Clear then raw-load the s16 PCM directly into DMEM.
+                aClearBufferImpl((u16)MM_DMEM_UNCOMPRESSED_NOTE,
+                                 (numSamplesToLoadAdj + MM_SAMPLES_PER_FRAME) * MM_SAMPLE_SIZE);
+                flags = MM_A_CONTINUE;
+                skipBytes = 0;
+                numSamplesProcessed += numSamplesToLoadAdj;
+                dmemUncompressedAddrOffset1 = numSamplesToLoadAdj;
 
-            numSamplesProcessed += numSamplesInThisIteration;
+                size_t bytesToRead;
+                if (((synthState->samplePosInt * 2) + (numSamplesToLoadAdj * MM_SAMPLE_SIZE)) < (s32)sample->size) {
+                    bytesToRead = numSamplesToLoadAdj * MM_SAMPLE_SIZE;
+                } else {
+                    bytesToRead = sample->size - (synthState->samplePosInt * 2);
+                }
+                aLoadBufferImpl(sampleAddr + (synthState->samplePosInt * 2), (u16)MM_DMEM_UNCOMPRESSED_NOTE,
+                                (u16)bytesToRead);
+                // fall through to the post-decode bookkeeping below (skip label)
+            } else {
+                // Move the compressed raw sample chunk from RAM into DMEM.
+                s32 sampleDataChunkAlignPad = 0;
+                if (numFramesToDecode != 0) {
+                    s32 frameIndex = (synthState->samplePosInt + skipInitialSamples - numFirstFrameSamplesToIgnore) /
+                                     MM_SAMPLES_PER_FRAME;
+                    s32 sampleAddrOffset = frameIndex * frameSize;
+                    u8* samplesToLoadAddr = sampleAddr + (zeroOffset + sampleAddrOffset);
 
-            switch (flags) {
-                case MM_A_INIT:
-                    skipBytes = MM_SAMPLES_PER_FRAME * MM_SAMPLE_SIZE;
-                    dmemUncompressedAddrOffset1 = (numSamplesToDecode + MM_SAMPLES_PER_FRAME) * MM_SAMPLE_SIZE;
-                    break;
-                case MM_A_LOOP:
-                    dmemUncompressedAddrOffset1 =
-                        numSamplesInThisIteration * MM_SAMPLE_SIZE + dmemUncompressedAddrOffset1;
-                    break;
-                default:
-                    if (dmemUncompressedAddrOffset1 != 0) {
+                    sampleDataChunkAlignPad = (uintptr_t)samplesToLoadAddr & 0xF;
+                    s32 sampleDataChunkSize = MM_ALIGN16((numFramesToDecode * frameSize) + MM_SAMPLES_PER_FRAME);
+                    s16 sampleDataDmemAddr = MM_DMEM_COMPRESSED_ADPCM_DATA - sampleDataChunkSize;
+                    aLoadBufferImpl(samplesToLoadAddr - sampleDataChunkAlignPad, (u16)sampleDataDmemAddr,
+                                    (u16)sampleDataChunkSize);
+                } else {
+                    numSamplesToDecode = 0;
+                    sampleDataChunkAlignPad = 0;
+                }
+
+                if (synthState->atLoopPoint) {
+                    aSetLoopImpl(sample->loop->predictorState);
+                    flags = MM_A_LOOP;
+                    synthState->atLoopPoint = false;
+                }
+
+                s32 numSamplesInThisIteration =
+                    numSamplesToDecode + numSamplesInFirstFrame - numTrailingSamplesToIgnore;
+
+                if (numSamplesProcessed == 0) {
+                    skipBytes = numFirstFrameSamplesToIgnore * MM_SAMPLE_SIZE;
+                } else {
+                    dmemUncompressedAddrOffset2 = MM_ALIGN16(dmemUncompressedAddrOffset1 + 8 * MM_SAMPLE_SIZE);
+                }
+
+                // Decode into DMEM_UNCOMPRESSED_NOTE.
+                s32 sampleDataChunkSize = MM_ALIGN16((numFramesToDecode * frameSize) + MM_SAMPLES_PER_FRAME);
+                s16 sampleDataDmemAddr = MM_DMEM_COMPRESSED_ADPCM_DATA - sampleDataChunkSize;
+                switch (sample->codec) {
+                    case MM_CODEC_ADPCM:
+                        aSetBufferImpl(0, (u16)(sampleDataDmemAddr + sampleDataChunkAlignPad),
+                                       (u16)(MM_DMEM_UNCOMPRESSED_NOTE + dmemUncompressedAddrOffset2),
+                                       (u16)(numSamplesToDecode * MM_SAMPLE_SIZE));
+                        aADPCMdecImpl(flags, synthState->synthesisBuffers->adpcmState);
+                        break;
+                    case MM_CODEC_SMALL_ADPCM:
+                        aSetBufferImpl(0, (u16)(sampleDataDmemAddr + sampleDataChunkAlignPad),
+                                       (u16)(MM_DMEM_UNCOMPRESSED_NOTE + dmemUncompressedAddrOffset2),
+                                       (u16)(numSamplesToDecode * MM_SAMPLE_SIZE));
+                        aADPCMdecImpl(flags | MM_A_ADPCM_SHORT, synthState->synthesisBuffers->adpcmState);
+                        break;
+                    case MM_CODEC_S8:
+                        aSetBufferImpl(0, (u16)(sampleDataDmemAddr + sampleDataChunkAlignPad),
+                                       (u16)(MM_DMEM_UNCOMPRESSED_NOTE + dmemUncompressedAddrOffset2),
+                                       (u16)(numSamplesToDecode * MM_SAMPLE_SIZE));
+                        aS8DecImpl(flags, synthState->synthesisBuffers->adpcmState);
+                        break;
+                    default:
+                        break;
+                }
+
+                if (numSamplesProcessed != 0) {
+                    aDMEMMoveImpl((u16)(MM_DMEM_UNCOMPRESSED_NOTE + dmemUncompressedAddrOffset2 +
+                                        (numFirstFrameSamplesToIgnore * MM_SAMPLE_SIZE)),
+                                  (u16)(MM_DMEM_UNCOMPRESSED_NOTE + dmemUncompressedAddrOffset1),
+                                  numSamplesInThisIteration * MM_SAMPLE_SIZE);
+                }
+
+                numSamplesProcessed += numSamplesInThisIteration;
+
+                switch (flags) {
+                    case MM_A_INIT:
+                        skipBytes = MM_SAMPLES_PER_FRAME * MM_SAMPLE_SIZE;
+                        dmemUncompressedAddrOffset1 = (numSamplesToDecode + MM_SAMPLES_PER_FRAME) * MM_SAMPLE_SIZE;
+                        break;
+                    case MM_A_LOOP:
                         dmemUncompressedAddrOffset1 =
                             numSamplesInThisIteration * MM_SAMPLE_SIZE + dmemUncompressedAddrOffset1;
-                    } else {
-                        dmemUncompressedAddrOffset1 =
-                            (numFirstFrameSamplesToIgnore + numSamplesInThisIteration) * MM_SAMPLE_SIZE;
-                    }
-                    break;
+                        break;
+                    default:
+                        if (dmemUncompressedAddrOffset1 != 0) {
+                            dmemUncompressedAddrOffset1 =
+                                numSamplesInThisIteration * MM_SAMPLE_SIZE + dmemUncompressedAddrOffset1;
+                        } else {
+                            dmemUncompressedAddrOffset1 =
+                                (numFirstFrameSamplesToIgnore + numSamplesInThisIteration) * MM_SAMPLE_SIZE;
+                        }
+                        break;
+                }
+                flags = MM_A_CONTINUE;
             }
-            flags = MM_A_CONTINUE;
+
+            // skip: post-decode advance
+            if (sampleFinished) {
+                if ((numSamplesToLoadAdj - numSamplesProcessed) != 0) {
+                    aClearBufferImpl((u16)(MM_DMEM_UNCOMPRESSED_NOTE + dmemUncompressedAddrOffset1),
+                                     (numSamplesToLoadAdj - numSamplesProcessed) * MM_SAMPLE_SIZE);
+                }
+                finished = true;
+                note->sampleState.bitField0.finished = true;
+                break;
+            } else if (loopToPoint) {
+                synthState->atLoopPoint = true;
+                synthState->samplePosInt = loopInfo->start;
+            } else {
+                synthState->samplePosInt += numSamplesToProcess;
+            }
+
+            if (isUncompressed) {
+                // raw-load path processed everything in one shot
+                break;
+            }
         }
 
-        // skip: post-decode advance
-        if (sampleFinished) {
-            if ((numSamplesToLoadAdj - numSamplesProcessed) != 0) {
-                aClearBufferImpl((u16)(MM_DMEM_UNCOMPRESSED_NOTE + dmemUncompressedAddrOffset1),
-                                 (numSamplesToLoadAdj - numSamplesProcessed) * MM_SAMPLE_SIZE);
-            }
-            finished = true;
-            note->sampleState.bitField0.finished = true;
-            break;
-        } else if (loopToPoint) {
-            synthState->atLoopPoint = true;
-            synthState->samplePosInt = loopInfo->start;
+        if (numParts == 1) {
+            sampleDmemBeforeResampling = MM_DMEM_UNCOMPRESSED_NOTE + skipBytes;
         } else {
-            synthState->samplePosInt += numSamplesToProcess;
+            // Match AudioSynth_ProcessSample's two-part packing and its padded
+            // final span when the source reaches its end in the first part.
+            const s32 destination = MM_DMEM_TEMP + MM_SAMPLES_PER_FRAME * MM_SAMPLE_SIZE;
+            aInterlImpl((u16)(MM_DMEM_UNCOMPRESSED_NOTE + skipBytes),
+                        (u16)(destination + (part == 0 ? 0 : numSamplesToLoadFirstPart)),
+                        (u16)(((numSamplesToLoadAdj / 2) + 7) & ~7));
+            if (part == 0) {
+                numSamplesToLoadFirstPart = numSamplesToLoadAdj;
+                sampleDmemBeforeResampling = destination;
+                if (finished) {
+                    aClearBufferImpl((u16)(destination + numSamplesToLoadFirstPart),
+                                     numSamplesToLoadAdj + MM_SAMPLES_PER_FRAME);
+                }
+            }
         }
-
-        if (isUncompressed) {
-            // raw-load path processed everything in one shot
+        if (finished)
             break;
-        }
     }
-
-    sampleDmemBeforeResampling = MM_DMEM_UNCOMPRESSED_NOTE + skipBytes;
 
     // Resample flags: A_INIT only on the very first update for this note.
     u8 resampleFlags = MM_A_CONTINUE;
@@ -664,7 +693,10 @@ static void SynthUpdate(s32* acc, s32 n) {
  * Codecs handled: CODEC_ADPCM, CODEC_SMALL_ADPCM, CODEC_S8, CODEC_S16 /
  *   CODEC_S16_INMEMORY (raw load). CODEC_REVERB/OPUS/UNK are stopped.
  *
- * INTENTIONALLY OMITTED (SFX engine does not use these; left as no-ops):
+ * Two-part high-rate sample decoding/decimation (hasTwoParts) follows the
+ * donor, including odd source-span sizes and early one-shot completion.
+ *
+ * INTENTIONALLY OMITTED (left as no-ops):
  *   - Reverb (SynthesisReverb ring buffers, wet save/load, decay, leak,
  *     filter-reverb, MixOtherReverbIndex). The env-mixer still writes the wet
  *     channels into scratch DMEM (cleared each update) but nothing reads them.
@@ -673,8 +705,6 @@ static void SynthUpdate(s32* acc, s32 n) {
  *   - Comb filter (combFilterSize/Gain) and the per-note convolution filter
  *     (sampleState->filter / aFilter).
  *   - Synthetic-wave notes (bitField1.isSyntheticWave) — skipped via continue.
- *   - The two-part split (hasTwoParts): we force numParts = 1. SFX frequencies
- *     stay within the resampler's range, so the split is not required.
  *   - bookOffset 1 (gInvalidAdpcmCodeBook) / bookOffset 3 (UnkCmd19 no-op).
  * =====================================================================
  */

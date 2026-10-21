@@ -133,17 +133,19 @@ def bind_ocarina_texture(raw, original, replacement):
 
 
 def ocarina_hd_resource(image_path):
-    """RGBA16 at 8x native resolution, retaining the original tile commands."""
+    """Raw RGBA32 at 8x pixels with the native RGBA16 tile byte stride.
+
+    TEX_FLAG_LOAD_AS_RAW uploads four bytes per texel. Its horizontal scale
+    counts bytes against the native two-byte tile, hence 16 rather than 8.
+    """
     import struct
     from PIL import Image
     from native_npc_models import asset
-    pixels = np.asarray(Image.open(image_path).convert('RGBA'), dtype=np.uint16)
+    pixels = np.asarray(Image.open(image_path).convert('RGBA'), dtype=np.uint8)
     if pixels.shape != (128, 256, 4):
         raise ValueError('Expected a 256x128 Fairy Ocarina atlas')
-    rgba16 = ((pixels[..., 0] >> 3) << 11 | (pixels[..., 1] >> 3) << 6 |
-              (pixels[..., 2] >> 3) << 1 | (pixels[..., 3] >= 128)).astype('>u2').tobytes()
     return (asset._header(asset.T_OTEX, 1)+
-            struct.pack('<IIIIffI', 2, 256, 128, 1, 8., 8., len(rgba16))+rgba16)
+            struct.pack('<IIIIffI', 1, 256, 128, 1, 16., 8., pixels.nbytes)+pixels.tobytes())
 
 
 def export_ocarina(archive, native, namespace, hands):

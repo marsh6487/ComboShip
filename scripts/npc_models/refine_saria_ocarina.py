@@ -2,16 +2,17 @@
 import argparse,hashlib,json,zipfile
 from pathlib import Path
 from native_npc_pose_fit import bind_ocarina_texture,ocarina_hd_resource
+from native_assets.path_guard import require_separate_destination
 
 def refine(baseline,output):
     baseline,output=map(Path,(baseline,output))
-    if baseline.resolve()==output.resolve():raise ValueError('Keep the parent unchanged')
+    art=Path(__file__).with_name('prop_art')/'saria-fairy-ocarina.png'
+    require_separate_destination(output,baseline,art)
     with zipfile.ZipFile(baseline) as z:records={n:z.read(n) for n in z.namelist()}
     manifests=[n for n in records if n.endswith('_NativeNpcModelInfo.json')]
     if len(manifests)!=1:raise ValueError('Expected one Saria manifest')
     m=json.loads(records[manifests[0]])
     if m['variant'] not in ('saria-anime','saria-render'):raise ValueError('Expected Saria')
-    art=Path(__file__).with_name('prop_art')/'saria-fairy-ocarina.png'
     texture=m['namespace']+'/Props/Textures/FairyOcarinaHD'
     if 'alt/'+texture in records:raise ValueError('Parent already contains the HD prop')
     changed=[]
@@ -21,8 +22,8 @@ def refine(baseline,output):
         changed.append(path)
     records['alt/'+texture]=ocarina_hd_resource(art)
     report=dict(parent_sha256=hashlib.sha256(baseline.read_bytes()).hexdigest(),
-                texture=texture,texture_size=[256,128],native_texture_size=[32,16],scale=[8,8],
-                texture_encoding='RGBA16; original native tile commands and UVs retained',
+                texture=texture,texture_size=[256,128],native_texture_size=[32,16],scale=[16,8],
+                texture_encoding='raw RGBA32; native RGBA16 tile byte stride and UVs retained',
                 art_sha256=hashlib.sha256(art.read_bytes()).hexdigest(),
                 changed_display_lists=changed,all_geometry_rig_skin_poses_faces_and_other_textures_unchanged=True,
                 runtime_tested=False)

@@ -65,13 +65,10 @@ void Seasons_PrecipTint(u8* r, u8* g, u8* b) {
     *r = *g = *b = 200;
 }
 
-static void Seasons_ApplyWeather(PlayState* play, u8 season) {
+static void Seasons_ApplyWeather(PlayState* play) {
     SeasonWeather_Update(play);
-    // This is Rod gameplay, independent of Audio Editor presentation. Keep the
-    // original Autumn bean-growing behavior even when presentation is Native.
-    if (season == SEASON_AUTUMN && !play->envCtx.indoors) {
-        Flags_SetEnv(play, 5);
-    }
+    // Seasonal weather must not assert the native Song of Storms puzzle flag.
+    // Its ocarina actor retains ownership of genuine song activations.
 }
 
 // ============================================================================
@@ -172,7 +169,7 @@ void Seasons_TickInput(PlayState* play, Player* player) {
         return;
     }
 
-    Seasons_ApplyWeather(play, Seasons_GetSeason());
+    Seasons_ApplyWeather(play);
     // Frozen water is saved Rod gameplay rather than sky weather, so the
     // Water Temple and every other indoor pool freeze too.
     SeasonScene_UpdateWater(play);

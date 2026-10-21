@@ -54,6 +54,7 @@ extern "C" s32 Map_CurRoomHasMapI(PlayState*) { return 0; }
 extern "C" s32 Flags_GetAllTreasure(PlayState*) { return 0; }
 extern "C" s16 Inventory_GetSkullTokenCount(s16) { return 0; }
 extern "C" void Audio_PlaySfx(u16) {}
+extern "C" int32_t CVarGetInteger(const char*, int32_t defaultValue) { return defaultValue; }
 
 static GameInteractor interactor;
 GameInteractor* GameInteractor::Instance = &interactor;
@@ -63,6 +64,62 @@ static void DrawSariaSong(Actor*, PlayState*) {}
 struct TalkingState { bool talking, teaching; };
 static void TickTalking(PlayState* play, TalkingState& state, bool gift) {
     /* SARIA_CLOSURE */
+}
+
+static void TestSariaEventAdvance() {
+    customText = true;
+    gSaveContext.fileNum = 1;
+    for (u16 id : { kText, kTeachText, kTaughtText }) {
+        for (u16 button : { u16(BTN_A), u16(BTN_B), u16(BTN_CUP) }) {
+            interactor.events.clear();
+            interactor.currentEvent = GIEventNone{};
+            gSaveContext.save.shipSaveInfo.nei.comboSariaSongClaimed = (id == kTaughtText);
+            play.msgCtx = {};
+            play.state.input[0] = {};
+            Message_OpenText(&play, id);
+            Message_Decode(&play);
+            assert(play.msgCtx.decodedBuffer.schar[play.msgCtx.decodedTextLen] == '\x19');
+            const bool gift = id != kText;
+            TalkingState state{ true, id == kTeachText };
+
+            // A finished render of MM control 0x19 leaves an actor-owned event.
+            // No graphics are run here; use the real state/input/close functions.
+            play.msgCtx.msgMode = MSGMODE_TEXT_DONE;
+            play.msgCtx.textboxEndType = TEXTBOX_ENDTYPE_EVENT;
+            assert(Message_GetState(&play.msgCtx) == TEXT_STATE_EVENT);
+            TickTalking(&play, state, gift);
+            assert(state.talking && interactor.events.empty());
+            assert(play.msgCtx.msgMode == MSGMODE_TEXT_DONE);
+
+            play.state.input[0].press.button = BTN_CLEFT;
+            TickTalking(&play, state, gift);
+            assert(state.talking && interactor.events.empty());
+            assert(play.msgCtx.msgMode == MSGMODE_TEXT_DONE);
+
+            play.state.input[0].press.button = button;
+            TickTalking(&play, state, gift);
+            if (play.msgCtx.msgMode != MSGMODE_TEXT_CLOSING) {
+                std::fprintf(stderr, "FAIL Saria text 0x%04X ignores advance button 0x%04X at its event arrow\n",
+                             id, button);
+                std::exit(1);
+            }
+            assert(state.talking && interactor.events.empty()); // Grant waits for close.
+            play.state.input[0].press.button = 0;
+            play.msgCtx.stateTimer = 1; // Last native closing tick, rather than forcing a close.
+            TickTalking(&play, state, gift);
+            assert(!state.talking && !state.teaching);
+            assert(interactor.events.size() == (id == kTeachText ? 1 : 0));
+            if (id == kTeachText) {
+                const auto& item = std::get<GIEventGiveItem>(interactor.events.back());
+                assert(item.giveItem == GiveSariaSong && item.showGetItemCutscene);
+                assert(item.param == gSaveContext.fileNum);
+                TickTalking(&play, state, gift);
+                assert(interactor.events.size() == 1);
+            }
+            std::printf("PASS Saria text 0x%04X advances on 0x%04X; deferred reward count %zu\n",
+                        id, button, interactor.events.size());
+        }
+    }
 }
 
 static void TestTeachingClosure() {
@@ -195,6 +252,7 @@ int main() {
     }
     TestNativeTableRouting();
     TestFontWriteBounds();
+    TestSariaEventAdvance();
     TestTeachingClosure();
     puts("PASS actual Saria hook/formatter and native message opening/decoding; no game execution");
 }
