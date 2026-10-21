@@ -46,6 +46,7 @@ with tempfile.TemporaryDirectory(prefix='mm-saria-resources-') as temp:
     sources = ['mm/tests/placed_saria_local_resources_test.cpp',
                'mm/2s2h/Enhancements/Gameplay/MmPlacedSariaResources.cpp', skeleton,
                'mm/2s2h/resource/type/SkeletonLimb.cpp', 'mm/2s2h/resource/type/Animation.cpp',
+               'mm/2s2h/resource/type/Array.cpp',
                'libultraship/src/ship/resource/Resource.cpp', 'libultraship/src/fast/resource/type/Texture.cpp',
                'libultraship/src/fast/resource/type/DisplayList.cpp']
     run(os.environ.get('CXX', 'c++'), *flags, *sources, '-o', work/'resources')
@@ -70,7 +71,7 @@ with tempfile.TemporaryDirectory(prefix='mm-saria-resources-') as temp:
         packFixture.write_text(fixture.replace('/* PRODUCTION_MM_BINARY_FACTORIES */', 'namespace SOH {\n' + skeletonFactory + limbFactory + '}\n'))
         factoryBase = work/'factory_base.cpp'
         factoryBase.write_text('#include <ship/resource/ResourceFactoryBinary.h>\nnamespace Ship {\n' + method((ROOT/'libultraship/src/ship/resource/ResourceFactoryBinary.cpp').read_text(), 'ResourceFactoryBinary::FileHasValidFormatAndReader').replace('SPDLOG_ERROR("resource file format does not match factory format.");', '').replace('SPDLOG_ERROR("Failed to load resource: File has Reader ({} - {})", initData->Type, initData->Path);', '') + '}\n')
-        packSources = [packFixture, *sources[1:], factoryBase, *[ROOT/'libultraship/src/ship/utils'/name for name in ['Utils.cpp', 'binarytools/Stream.cpp', 'binarytools/MemoryStream.cpp', 'binarytools/BinaryReader.cpp']]]
+        packSources = [packFixture, *sources[1:], factoryBase, 'mm/2s2h/resource/importer/ArrayFactory.cpp', *[ROOT/'libultraship/src/ship/utils'/name for name in ['Utils.cpp', 'binarytools/Stream.cpp', 'binarytools/MemoryStream.cpp', 'binarytools/BinaryReader.cpp']]]
         run(os.environ.get('CXX', 'c++'), *flags, '-DMM_SARIA_PACK_TEST', *packSources, '-o', work/'pack')
         for number, pack in enumerate(args.saria):
             folder = work/('archives-' + str(number))

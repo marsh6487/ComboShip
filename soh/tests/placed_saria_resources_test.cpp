@@ -1,6 +1,13 @@
+#include <fast/lus_gbi.h>
+#undef GIMMCMD
 #include "soh/Enhancements/cosmetics/PlacedSariaResources.h"
 #include <cstdlib>
 #include <unordered_map>
+#include "soh/resource/type/Array.h"
+#include <limits>
+#include <cmath>
+#include "tests/PlacedSariaABITest.h"
+#include "ComboExport.h"
 #define CHECK(x)                                                      \
     do {                                                              \
         if (!(x)) {                                                   \
@@ -10,6 +17,39 @@
     } while (0)
 using PlacedSaria::Resource;
 using Store = std::unordered_map<std::string, Resource>;
+// Controlled archive/RM boundary; the injected production exports below use
+// the real snapshot builder and retain real resource objects.
+static Store* providerAssets;
+static bool providerAlt;
+namespace Ship {
+class TestPlacedSariaOwner {
+  public:
+    bool IsAltAssetsEnabled() {
+        return providerAlt;
+    }
+    PlacedSaria::Resource LoadResource(const std::string& path, bool exact) {
+        CHECK(exact);
+        auto found = providerAssets->find(path);
+        return found == providerAssets->end() ? nullptr : found->second;
+    }
+};
+class CrossRMRegistry {
+  public:
+    static auto Get(const std::string& name) {
+        CHECK(name == "oot");
+        static auto owner = std::make_shared<TestPlacedSariaOwner>();
+        return owner;
+    }
+};
+class OwnRMScope {
+  public:
+    explicit OwnRMScope(const char* name) {
+        CHECK(std::strcmp(name, "oot") == 0);
+    }
+};
+} // namespace Ship
+
+/* PRODUCTION_PLACED_SARIA_PROVIDER */
 
 static auto Rig(const char* display) {
     auto s = std::make_shared<SOH::Skeleton>();
@@ -61,9 +101,24 @@ static auto List() {
     d->Instructions.resize(1);
     return d;
 }
+static auto DrawScale(float factor) {
+    auto result = std::make_shared<SOH::Array>();
+    result->ArrayType = SOH::ArrayResourceType::Scalar;
+    result->ArrayScalarType = SOH::ScalarType::ZSCALAR_U16;
+    uint32_t bits;
+    std::memcpy(&bits, &factor, sizeof(bits));
+    for (uint16_t word : { uint16_t(0x4e44), uint16_t(1), uint16_t(bits), uint16_t(bits >> 16) }) {
+        SOH::ScalarData data{};
+        data.u16 = word;
+        result->Scalars.push_back(data);
+    }
+    result->ArrayCount = 4;
+    return result;
+}
 
 int main() {
     Store assets;
+    providerAssets = &assets;
     assets["objects/object_sa/gSariaSkel"] = Rig("__OTR__objects/object_sa/nativeBody");
     for (auto path : PlacedSaria::kAnimations)
         if (path)
@@ -75,6 +130,11 @@ int main() {
         return found == assets.end() ? nullptr : found->second;
     };
     auto native = PlacedSaria::Build(load, false, 0);
+    PlacedSariaABITest::LegacyCaller oldCaller;
+    CHECK(OOT_PlacedSariaLoad(0, reinterpret_cast<ComboPlacedSariaResources*>(&oldCaller.output)));
+    OOT_PlacedSariaRelease(oldCaller.output.owner);
+    CHECK(oldCaller.Intact());
+    CHECK(PlacedSariaABITest::CheckV2(OOT_PlacedSariaLoadV2, OOT_PlacedSariaRelease, 1.f));
     CHECK(native && !native->result.custom && !native->result.altEnabled);
     CHECK(std::strstr(reinterpret_cast<const char*>(native->limbs[1].dList), "__OTR__@oot:") != nullptr);
     CHECK(PlacedSaria::Build(load, true, 15));
@@ -115,6 +175,25 @@ int main() {
     assets[clip + "/Limbs/Limb12"] = List();
     auto custom = PlacedSaria::Build(load, true, 0);
     CHECK(custom && custom->result.custom && custom->result.animation == fitted->GetRawPointer());
+    CHECK(custom->drawScale == 1.f);
+    const std::string scalePath = alt + "/DrawScale";
+    assets[scalePath] = DrawScale(1.10f);
+    providerAlt = true;
+    CHECK(PlacedSariaABITest::CheckV2(OOT_PlacedSariaLoadV2, OOT_PlacedSariaRelease, 1.10f));
+    providerAlt = false;
+    for (unsigned pose : { 0u, 1u, 2u, 3u }) {
+        auto scaled = PlacedSaria::Build(load, true, pose);
+        CHECK(scaled && std::abs(scaled->drawScale - 1.10f) < 1e-6f);
+        CHECK(PlacedSaria::Build(load, false, pose)->drawScale == 1.f);
+    }
+    for (float invalid :
+         { 0.f, -1.f, .49f, 2.01f, std::numeric_limits<float>::infinity(), std::numeric_limits<float>::quiet_NaN() }) {
+        assets[scalePath] = DrawScale(invalid);
+        CHECK(PlacedSaria::Build(load, true, 0)->drawScale == 1.f);
+    }
+    assets[scalePath] = List();
+    CHECK(PlacedSaria::Build(load, true, 0)->drawScale == 1.f);
+    assets[scalePath] = DrawScale(1.10f);
     CHECK(custom->result.poseLimbs[13] && custom->result.heads[0] != custom->result.heads[2]);
     for (unsigned pose : { 0u, 1u, 3u }) {
         auto blink = PlacedSaria::Build(load, true, pose);
@@ -130,6 +209,7 @@ int main() {
     CHECK(PlacedSaria::Build(load, true, 0)->result.animation != fitted->GetRawPointer());
     assets[ns + "/Skel"] = Texture();
     CHECK(!PlacedSaria::Build(load, true, 0)->result.custom);
+    CHECK(PlacedSaria::Build(load, true, 0)->drawScale == 1.f);
     assets[ns + "/Skel"] = assets["objects/object_sa/gSariaSkel"];
     auto malformed = Rig("__OTR__objects/object_sa/customBody");
     std::static_pointer_cast<SOH::SkeletonLimb>(malformed->limbResources[0])->limbData.standardLimb.child = 2;
@@ -139,10 +219,16 @@ int main() {
     CHECK(!PlacedSaria::Build(load, true, 0)->result.custom);
     assets.erase("objects/object_sa/gSariaEyeHalfTex");
     CHECK(!PlacedSaria::Build(load, false, 0));
+    ComboPlacedSariaResourcesV2 failed{};
+    failed.drawScale = 123.f;
+    CHECK(!OOT_PlacedSariaLoadV2(0, &failed, sizeof(failed)));
+    CHECK(!failed.resources.owner && failed.drawScale == 1.f);
     auto* animation = static_cast<AnimationHeader*>(native->result.animation);
     assets.clear();
     CHECK(animation->common.frameCount == 24 && animation->frameData[0] == 1);
     CHECK(native->skeleton.sh.segment[1] == &native->limbs[1]);
     puts("PASS Saria resource snapshots: native/Alt, fitted clips/limbs/faces, malformed pack fallback, root "
          "protection, missing donors, retained lifetime");
+    puts("PASS OoT exports: frozen V1 caller canary, V2 short-size/null rejection before writes and bounded successful "
+         "output.");
 }

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "actors/PlacedSariaABI.h"
+#include "actors/NativeNpcDrawScale.h"
+#include "soh/resource/type/Array.h"
 #include "mods/transformation_masks/assets/mm_normal_actor_resource.h"
 #include <fast/resource/type/DisplayList.h>
 #include <array>
@@ -33,6 +35,7 @@ struct Snapshot {
     std::array<void*, 16> pointers;
     FlexSkeletonHeader skeleton;
     ComboPlacedSariaResources result{};
+    float drawScale = 1.f;
 };
 
 inline bool SameRoot(const AnimationHeader& a, const AnimationHeader& b) {
@@ -91,6 +94,9 @@ inline std::unique_ptr<Snapshot> Build(const Load& load, bool alt, unsigned pose
     } else {
         snapshot->retained = std::move(nativeRig);
     }
+    const auto drawScale =
+        custom ? std::dynamic_pointer_cast<SOH::Array>(load(std::string("alt/") + kNamespace + "/DrawScale")) : nullptr;
+    snapshot->drawScale = NativeNpcDrawScale::Read(drawScale.get());
     const std::string poseRoot = std::string("alt/") + kNamespace + "/PoseAnimations/" + kAnimations[pose];
     auto fitted = custom ? load(poseRoot) : nullptr;
     if (MmNormalActor::ValidateAnimation(fitted, 16, kAnimationFrames[pose]) &&

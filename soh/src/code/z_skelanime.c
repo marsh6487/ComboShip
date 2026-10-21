@@ -218,6 +218,7 @@ void SkelAnime_DrawFlexLod(PlayState* play, void** skeleton, Vec3s* jointTable, 
     const void* skin = NativeNpcPose_GetSkinPlan(skeleton, dListCount);
     Mtx* mtx = Graph_Alloc(play->state.gfxCtx, (dListCount + NativeNpcPose_SkinMatrixCount(skin)) * sizeof(Mtx));
     Mtx* matrixBase = mtx;
+    const float drawScale = NativeNpcPose_GetDrawScale(skeleton);
 
     if (CVarGetInteger(CVAR_ENHANCEMENT("DisableLOD"), 0)) {
         lod = 0;
@@ -234,6 +235,8 @@ void SkelAnime_DrawFlexLod(PlayState* play, void** skeleton, Vec3s* jointTable, 
 
     gSPSegment(POLY_OPA_DISP++, 0xD, mtx);
     Matrix_Push();
+    if (drawScale != 1.f)
+        Matrix_Scale(drawScale, drawScale, drawScale, MTXMODE_APPLY);
 
     rootLimb = (LodLimb*)SEGMENTED_TO_VIRTUAL(skeleton[0]);
     pos.x = jointTable[0].x;
@@ -473,6 +476,7 @@ static void SkelAnime_DrawFlexOpaImpl(PlayState* play, void** skeleton, Vec3s* j
     const void* skin = NativeNpcPose_GetSkinPlan(skeleton, dListCount);
     Mtx* mtx = Graph_Alloc(play->state.gfxCtx, (dListCount + NativeNpcPose_SkinMatrixCount(skin)) * sizeof(Mtx));
     Mtx* matrixBase = mtx;
+    const float drawScale = NativeNpcPose_GetDrawScale(skeleton);
 
     if (skeleton == NULL) {
         osSyncPrintf(VT_FGCOL(RED));
@@ -489,6 +493,8 @@ static void SkelAnime_DrawFlexOpaImpl(PlayState* play, void** skeleton, Vec3s* j
     }
 
     Matrix_Push();
+    if (drawScale != 1.f)
+        Matrix_Scale(drawScale, drawScale, drawScale, MTXMODE_APPLY);
 
     rootLimb = SEGMENTED_TO_VIRTUAL(skeleton[0]);
 
@@ -759,6 +765,7 @@ Gfx* SkelAnime_DrawFlex(PlayState* play, void** skeleton, Vec3s* jointTable, s32
     const void* skin = NativeNpcPose_GetSkinPlan(skeleton, dListCount);
     Mtx* mtx = Graph_Alloc(play->state.gfxCtx, (dListCount + NativeNpcPose_SkinMatrixCount(skin)) * sizeof(Mtx));
     Mtx* matrixBase = mtx;
+    const float drawScale = NativeNpcPose_GetDrawScale(skeleton);
 
     if (skeleton == NULL) {
         osSyncPrintf(VT_FGCOL(RED));
@@ -770,6 +777,8 @@ Gfx* SkelAnime_DrawFlex(PlayState* play, void** skeleton, Vec3s* jointTable, s32
 
     gSPSegment(gfx++, 0xD, mtx);
     Matrix_Push();
+    if (drawScale != 1.f)
+        Matrix_Scale(drawScale, drawScale, drawScale, MTXMODE_APPLY);
     rootLimb = (StandardLimb*)SEGMENTED_TO_VIRTUAL(skeleton[0]);
 
     pos.x = jointTable[0].x;

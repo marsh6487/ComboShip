@@ -22,6 +22,10 @@ def run(*args):
     subprocess.run([str(x) for x in args], cwd=ROOT, check=True)
 
 def main():
+    for bits in [32, 64]:
+        run('cc', '-std=c11', f'-m{bits}', '-ffreestanding', '-fsyntax-only', '-Icombo',
+            'combo/tests/placed_saria_abi_layout_test.c')
+        print(f'PASS frozen Saria ABI layout: {bits}-bit V1 and V2 sizes/offsets', flush=True)
     run('python3', '-B', 'tests/monkey_audio/run_tests.py')
     with tempfile.TemporaryDirectory(prefix='forest-actors-') as temp:
         work = Path(temp)
@@ -56,8 +60,16 @@ def main():
         skeleton = (ROOT/'soh/soh/resource/type/Skeleton.cpp').read_text()
         (work/'skeleton.cpp').write_text('#include "soh/resource/type/Skeleton.h"\nnamespace SOH {\n' +
             function(skeleton, 'Skeleton::GetPointer') + function(skeleton, 'Skeleton::GetPointerSize') + '}\n')
-        sources = ['soh/tests/placed_saria_resources_test.cpp', str(work/'skeleton.cpp'),
+        provider = (ROOT/'soh/soh/Enhancements/cosmetics/PlacedSariaResources.cpp').read_text()
+        providerNames = ['OOT_PlacedSariaAltEnabled', 'OOT_PlacedSariaLoad', 'OOT_PlacedSariaRelease']
+        if 'int OOT_PlacedSariaLoadV2(' in provider:
+            providerNames.insert(1, 'OOT_PlacedSariaLoadV2')
+        fixture = (ROOT/'soh/tests/placed_saria_resources_test.cpp').read_text()
+        (work/'saria-provider.cpp').write_text(fixture.replace('/* PRODUCTION_PLACED_SARIA_PROVIDER */',
+            '\n'.join(function(provider, name) for name in providerNames)))
+        sources = [str(work/'saria-provider.cpp'), str(work/'skeleton.cpp'),
                    'soh/soh/resource/type/SkeletonLimb.cpp', 'soh/soh/resource/type/Animation.cpp',
+                   'soh/soh/resource/type/Array.cpp',
                    'libultraship/src/ship/resource/Resource.cpp', 'libultraship/src/fast/resource/type/Texture.cpp',
                    'libultraship/src/fast/resource/type/DisplayList.cpp']
         run('c++', '-std=c++20', '-DF3DEX_GBI_2', '-DNDEBUG', '-DFMT_HEADER_ONLY', '-Ilibultraship/include',

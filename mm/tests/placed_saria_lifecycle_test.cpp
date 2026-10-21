@@ -35,6 +35,8 @@ static bool hasFloor = true;
 static Vec3f lastFloorProbe;
 static Actor spawned;
 static unsigned skeletonDraws;
+static float modelMatrixScale = .01f, lastSkeletonScale;
+static std::vector<float> matrixScaleStack;
 static unsigned lastPose;
 static bool talkAccepted;
 static u8 textState = TEXT_STATE_NONE;
@@ -127,6 +129,15 @@ static int Load(unsigned pose, ComboPlacedSariaResources* output) {
     output->heads[2] = "closed";
     return 1;
 }
+static int LoadV2(unsigned pose, ComboPlacedSariaResourcesV2* output, size_t callerSize) {
+    CHECK(callerSize >= sizeof(*output));
+    *output = {};
+    output->drawScale = 1.f;
+    if (!Load(pose, &output->resources))
+        return 0;
+    output->drawScale = alt ? 1.10f : 1.f;
+    return 1;
+}
 static void Release(void* owner) {
     ++releases;
     delete static_cast<Owner*>(owner);
@@ -137,11 +148,30 @@ static int Alt() {
 int MM_PlacedSariaLoad(unsigned pose, ComboPlacedSariaResources* output) {
     return Load(pose, output);
 }
+int MM_PlacedSariaLoadV2(unsigned pose, ComboPlacedSariaResourcesV2* output, size_t size) {
+    return LoadV2(pose, output, size);
+}
 void MM_PlacedSariaRelease(void* owner) {
     Release(owner);
 }
 int MM_PlacedSariaAlt() {
     return Alt();
+}
+static bool exposeV2 = true, exposeV1 = true;
+static std::vector<std::string> resolvedSymbols;
+static void* TestResolveSym(const char* module, const char* symbol) {
+    CHECK(std::strcmp(module, "soh") == 0);
+    resolvedSymbols.emplace_back(symbol);
+    if (std::strcmp(symbol, "OOT_PlacedSariaLoadV2") == 0)
+        return exposeV2 ? reinterpret_cast<void*>(LoadV2) : nullptr;
+    if (std::strcmp(symbol, "OOT_PlacedSariaLoad") == 0)
+        return exposeV1 ? reinterpret_cast<void*>(Load) : nullptr;
+    if (std::strcmp(symbol, "OOT_PlacedSariaRelease") == 0)
+        return reinterpret_cast<void*>(Release);
+    if (std::strcmp(symbol, "OOT_PlacedSariaAltEnabled") == 0)
+        return reinterpret_cast<void*>(Alt);
+    CHECK(false);
+    return nullptr;
 }
 
 extern "C" {
@@ -247,18 +277,25 @@ void Gfx_SetupDL25_Opa(GraphicsContext*) {
 void Gfx_SetupDL25_Xlu(GraphicsContext*) {
 }
 void Matrix_Push() {
+    matrixScaleStack.push_back(modelMatrixScale);
 }
 void Matrix_Pop() {
+    CHECK(!matrixScaleStack.empty());
+    modelMatrixScale = matrixScaleStack.back();
+    matrixScaleStack.pop_back();
 }
 void Matrix_Translate(f32 x, f32 y, f32 z, MatrixMode mode) {
     CHECK(mode == MTXMODE_NEW);
     shimmerOrigin = { x, y, z };
+    modelMatrixScale = 1.f;
 }
 Mtx* Matrix_Finalize(GraphicsContext*) {
     static Mtx matrix;
     return &matrix;
 }
-void Matrix_Scale(f32, f32, f32, MatrixMode) {
+void Matrix_Scale(f32 x, f32 y, f32 z, MatrixMode mode) {
+    CHECK(x == y && y == z && mode == MTXMODE_APPLY);
+    modelMatrixScale *= x;
 }
 void EffectSsKirakira_SpawnDispersed(PlayState*, Vec3f* pos, Vec3f*, Vec3f*, Color_RGBA8* prim, Color_RGBA8* env,
                                      s16 scale, s32 life) {
@@ -270,10 +307,13 @@ void EffectSsKirakira_SpawnDispersed(PlayState*, Vec3f* pos, Vec3f*, Vec3f*, Col
 }
 void SkelAnime_DrawFlexOpa(PlayState*, void**, Vec3s*, s32, OverrideLimbDrawOpa, PostLimbDrawOpa, Actor*) {
     ++skeletonDraws;
+    lastSkeletonScale = modelMatrixScale;
 }
 }
 
+#define Combo_ResolveSym TestResolveSym
 /* PRODUCTION_SARIA_RUNTIME */
+#undef Combo_ResolveSym
 
 int main() {
     static PlayState play;
@@ -283,6 +323,7 @@ int main() {
     first.world.pos = { 20, 30, 40 };
     first.world.rot = { 100, 200, 300 };
     sBridge.load = Load;
+    sBridge.loadV2 = LoadV2;
     sBridge.release = Release;
     sBridge.alt = Alt;
     CHECK(ComboSaria_IsParam(0x7F03) && ComboSaria_IsParam(0x7F13) && !ComboSaria_IsParam(1));
@@ -320,6 +361,7 @@ int main() {
             env = true;
     }
     CHECK(skeletonDraws == 1 && segmentC && (segmentC->words.w0 >> 24) == G_ENDDL && env);
+    CHECK(std::fabs(lastSkeletonScale - .01f) < 1e-6f && matrixScaleStack.empty());
     state.blinkTimer = 1;
     ComboSaria_Update(&first, &play);
     CHECK(state.eye == 1 && sStates.at(&second)->eye == 0 && oc == 1);
@@ -332,6 +374,10 @@ int main() {
     alt = 1;
     ComboSaria_Update(&first, &play);
     CHECK(releases == 1 && state.resources.altEnabled == 1 && state.animation.curFrame == previousFrame + 1);
+    ComboSaria_Draw(&first, &play);
+    CHECK(std::fabs(lastSkeletonScale - .011f) < 1e-6f);
+    CHECK(std::fabs(modelMatrixScale - .01f) < 1e-6f && matrixScaleStack.empty());
+    CHECK(first.scale.x == .01f && first.scale.y == .01f && first.scale.z == .01f);
     CHECK(first.world.pos.x == 20 && first.world.pos.y == 30 && first.world.pos.z == 40 && first.textId == 0x8F28);
     missing = true;
     alt = 0;
@@ -650,8 +696,8 @@ int main() {
     CHECK(spawns == soloBefore + 1 && spawned.params == 0x7F13);
     CHECK(std::fabs(spawned.world.pos.x - (-763.883f)) < .01f);
     CHECK(std::fabs(spawned.world.pos.z - (-146.702f)) < .01f);
-    CHECK(sBridge.load == MM_PlacedSariaLoad && sBridge.release == MM_PlacedSariaRelease &&
-          sBridge.alt == MM_PlacedSariaAlt);
+    CHECK(sBridge.load == MM_PlacedSariaLoad && sBridge.loadV2 == MM_PlacedSariaLoadV2 &&
+          sBridge.release == MM_PlacedSariaRelease && sBridge.alt == MM_PlacedSariaAlt);
     SpawnForestEpona();
     CHECK(spawns == soloBefore + 2 && spawned.params == COMBO_FOREST_EPONA_PARAMS);
     // The fixed song gift is also a native local-file check in solo MM.
@@ -690,6 +736,47 @@ int main() {
     SpawnForestSaria();
     CHECK(std::fabs(spawned.world.pos.x - 120.0f) < .01f && std::fabs(spawned.world.pos.z - 60.0f) < .01f);
     CHECK(!ComboOpeningForest_AtReturn(&play, &spawned.world.pos));
+    // Actual production resolver/dispatch with independently controlled module
+    // symbols: new/new, new/old and V2-only providers. V1 fallback starts at1.0.
+    gComboGameMode = COMBO_GAME_BOTH;
+    alt = 1;
+    for (auto symbols : { std::pair{ true, true }, std::pair{ false, true }, std::pair{ true, false } }) {
+        exposeV2 = symbols.first;
+        exposeV1 = symbols.second;
+        resolvedSymbols.clear();
+        Bridge bridge;
+        CHECK(bridge.Resolve() && bool(bridge.loadV2) == exposeV2);
+        struct Caller {
+            ComboPlacedSariaResourcesV2 output;
+            unsigned char tail[32];
+        } caller;
+        std::memset(&caller, 0xa5, sizeof(caller));
+        CHECK(bridge.Load(0, &caller.output));
+        CHECK(std::fabs(caller.output.drawScale - (exposeV2 ? 1.10f : 1.f)) < 1e-6f);
+        CHECK(caller.output.resources.custom && caller.output.resources.owner);
+        for (auto byte : caller.tail)
+            CHECK(byte == 0xa5);
+        CHECK(std::find(resolvedSymbols.begin(), resolvedSymbols.end(), "OOT_PlacedSariaLoadV2") !=
+              resolvedSymbols.end());
+        bridge.release(caller.output.resources.owner);
+        sBridge = bridge;
+        Actor mixed{};
+        mixed.params = 0x7F03;
+        ComboSaria_Init(&mixed, &play);
+        CHECK(sStates.contains(&mixed));
+        gfx.polyOpa.p = commands;
+        gfx.polyOpa.d = reinterpret_cast<Gfx*>(hexVertices + 144);
+        gfx.polyXlu.p = hexCommands;
+        ComboSaria_Draw(&mixed, &play);
+        CHECK(std::fabs(lastSkeletonScale - (exposeV2 ? .011f : .01f)) < 1e-6f);
+        CHECK(mixed.scale.x == .01f && matrixScaleStack.empty());
+        ComboSaria_Destroy(&mixed, &play);
+    }
+    exposeV1 = exposeV2 = false;
+    Bridge absentBridge;
+    CHECK(!absentBridge.Resolve());
+    puts("PASS mixed Saria modules: versioned lookup preference, old-provider1.0 fallback, V2-only provider and output "
+         "canaries.");
     puts("PASS solo MM forest and song routing: own exploration copy, local asset bridge, portal horse, fixed gift "
          "once per native file");
     puts("PASS MM Saria lifecycle: missing donor, independent blink, fixed placement/yaw, collider/talk, Alt "

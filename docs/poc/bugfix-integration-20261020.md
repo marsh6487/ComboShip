@@ -15,6 +15,7 @@ acceptance.
 | Black Market structural access, manifest lookup and rejection diagnostics | `1d19e86cd` | Merged without conflicts |
 | Native transformation camera, shield-light teardown and NPC resource/TLUT repairs, PR46/47 source | `a01321fe0` | Merged without conflicts |
 | Completed elemental damage, selector/HUD and finish source revision | `412058d4c` | Merged without conflicts after its verification record arrived |
+| NPC lossless batching and versioned draw-scale support | `75ee1848e2911001fdbec6ef0f0e912de54adb8b`, `ee83e2613ebcd0cb029869fc6dce90f7a09fdd75` | Combined with the existing GI particles and portal placement; both sets of lifecycle tests retained |
 
 The first combined checkpoint is local commit
 `a2b774ec0c0ef528fc35d23022e50376f9d5219c`, tree
@@ -40,7 +41,7 @@ recorded local source tree exactly; local merge history is retained separately.
   The reported built-in Biggoron casing case remains an open configured runtime
   check; the elemental checkpoint does not claim that screenshot is resolved.
 
-## Required evidence before a full build
+## Entry evidence and candidate builds
 
 cor specifically requested entry tests before the build. The environment has
 no runnable Linux game executable, Wine or Xvfb. The available Windows DLLs and
@@ -55,9 +56,44 @@ optional pack independence, genuinely missing destination rejection, empty
 stock, exit/re-entry and retained safety checks. A generated seed or native
 object compilation alone is insufficient.
 
-Full hosted builds remain held for the live entry-proof requirement. Draft
-publication uses a CI-skip commit so creating the reviewable source PR does not
-silently start the long Windows/Linux builds.
+The first source publication used a CI-skip commit. cor subsequently requested
+the combined test executable, paused advancement for the NPC source checkout,
+then explicitly requested integration after that checkout was ready. Full
+hosted builds now run through the existing regression gate. Live game entry
+remains a runtime acceptance check, rather than a prerequisite for producing
+the candidate needed to perform that check.
+
+## NPC checkout integration and CI correction
+
+The published bug-fix parent is `a0dcb15d5ae22b2e7ef4bf209b211bade07518c9`,
+tree `1f25277b21a78e9a44afc183ef758b5b439354bd`. Its source tree is byte-identical
+to the retained local checkpoint `d5b03c758`. The NPC donor is the exact public
+`ee83e2613ebcd0cb029869fc6dce90f7a09fdd75` checkout, including its preceding
+lossless archive-batching commit. Retain both published histories as merge
+parents. No replacement model archive is regenerated or installed here.
+
+Only the MM Saria lifecycle fixture conflicted. Preserve the existing portal
+side-placement and older-portal-anchor assertions alongside the new V2 provider,
+draw-scale, legacy fallback and caller-buffer checks. The production Saria
+merge retains the shared green GI particle renderer and versioned scale support.
+Apply clang-format 14.0.6 to the changed native source files.
+
+The earlier hosted run `39516654774` failed in `renderer_linkage_test.py`:
+solo MM no longer directly emits display-list interpolation macros after its
+portal switched to the shared GI renderer. Its empty interpolation import list
+is therefore expected. Reproduce the failure locally; update the fixture to
+require the native `NeiGi_DrawWorldParticles` import for that translation unit
+and compile the actual MM GI renderer as a sixth object, requiring both native
+C interpolation symbols there. Other rendering objects retain their existing
+requirements. No production rendering change is needed for this CI correction.
+
+Fresh combined checks pass: 142 NPC Python tests (17 optional source-data skips),
+native NPC routing/pose/draw-scale and actor compilation, forest/Saria lifecycle
+and both 32/64-bit ABI layouts, MM provider ASan/UBSan, and all six renderer
+linkage objects. The bug-fix preflight passed its first seven commands; its
+native-forest preparation step initially lacked local CMake. Running that final
+suite with the existing CMake binary passes all 31 tests (two optional skips).
+Hosted full application/package results and configured runtime remain pending.
 
 ## Verification record
 
@@ -81,7 +117,7 @@ checkpoint. Additional verified source milestones are:
 | Inherited camera, shield lifetime, Saria TLUT and reward asset-packaging checks | Pass; the earlier missing-CMake environment issue was resolved for packaging |
 | Native compilation supplied by focused workstreams | Ten GI/actor/portal configurations and 16 dialogue/player/Wolf/adapter configurations pass; the final four Mirror adapters were recompiled after the handoff fix |
 | Formatting, whitespace and custom asset collisions | Pass using the repository's exact clang-format-14 selection |
-| Full hosted application/Windows builds | Held; not run for this integration |
+| Full hosted application/Windows builds | Requested for the combined NPC/bug-fix candidate; completion pending |
 | Configured game entry, mount/load order, rendered particles and user acceptance | Unproven; no runnable candidate in this environment |
 
 `tests/bugfix_integration/evidence/20261020/verification.json` records exact
@@ -94,8 +130,8 @@ source and match. These hashes identify the actually exercised code.
 Independent review found and resolved the Mirror cancel-frame leak, the stale
 missing-donor paragraph and three CI formatting omissions. Runtime limits above
 remain separate from source verification. The new regression preflight is wired
-into `build-artifacts.yml` before full platform builds; draft publication keeps
-the requested current build hold with a CI-skip commit.
+into `build-artifacts.yml` before full platform builds. The combined NPC follow-up
+does not skip CI; source/build checks remain separate from runtime acceptance.
 
 Repaired NPC model packs remain separate installs, identified in
 `docs/poc/npc-bundle-hash-repair-20261020.md`. Source publication does not replace

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify native rendering objects request their host's C interpolation ABI."""
+"""Verify rendering objects use native C interpolation or the shared GI renderer."""
 import os
 from pathlib import Path
 import subprocess
@@ -20,6 +20,7 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-renderer-linkage-") as tempo
         ("mm", "2s2h/Enhancements/Gameplay/BlackMarket.cpp"),
         ("soh", "soh/Enhancements/Gameplay/ComboSoloForest.cpp"),
         ("soh", "soh/Enhancements/Gameplay/ComboBlackMarketNative.cpp"),
+        ("mm", "2s2h/Rando/NeiGiPresentation.cpp"),
     ]
     for index, (host, source) in enumerate(sources):
         obj = Path(temporary) / f"renderer-{index}.o"
@@ -36,10 +37,16 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-renderer-linkage-") as tempo
         ], check=True)
         undefined = subprocess.check_output(["nm", "--undefined-only", str(obj)], text=True)
         symbols = {line.split()[-1] for line in undefined.splitlines() if line.split()}
+        # Solo MM now delegates all particle submission to the shared GI
+        # renderer, compiled above as its own production object. It no longer
+        # emits display-list interpolation macros in this translation unit.
+        delegated = (host, source) == ("mm", "2s2h/Enhancements/Gameplay/ComboSoloForest.cpp")
+        if delegated and "NeiGi_DrawWorldParticles" not in symbols:
+            failures.append(f"{host}/{source} does not request the native shared GI particle renderer")
         for function in ["FrameInterpolation_RecordOpenChild", "FrameInterpolation_RecordCloseChild"]:
             requested = [symbol for symbol in symbols if function in symbol]
-            if requested != [function]:
+            if requested != ([] if delegated else [function]):
                 failures.append(f"{host}/{source} requests a non-native interpolation ABI: {requested}")
         print(f"Compiled native interpolation boundary: {host}/{source}", flush=True)
     assert not failures, "\n".join(failures)
-    print("PASS: all five production rendering objects use both native C interpolation symbols")
+    print("PASS: native C interpolation ownership and solo-MM GI renderer delegation across six production objects")
