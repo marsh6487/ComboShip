@@ -5,6 +5,7 @@
 #include <ship/resource/ResourceManager.h>
 #ifdef COMBO_BUILD
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "entrances/BlackMarketEntrance.h"
 #include "entrances/NativeForest.h"
 #include "entrances/NativeForestResourceData.h"
 #endif
@@ -21,6 +22,22 @@ Ship::IResource* OTRPlay_LoadFile(PlayState* play, const char* fileName) {
 }
 
 s32 OTRScene_ExecuteCommands(PlayState* play, SOH::Scene* scene);
+
+#ifdef COMBO_BUILD
+static void ComboBlackMarket_PrepareSpawn(PlayState* play) {
+    if (play->sceneId != COMBO_BLACK_MARKET_SCENE || !play->linkActorEntry ||
+        play->linkActorEntry->rot.y != COMBO_BLACK_MARKET_SPAWN_YAW)
+        return;
+    // The bundled market and legacy packs store OoT's raw half-turn here.
+    // MM packs degrees in the upper nine bits and a cutscene ID below them;
+    // the raw value incorrectly selects entry zero in the empty scene list.
+    // Copy after scene commands so cached resources and other scenes stay intact.
+    static ActorEntry spawn;
+    spawn = *play->linkActorEntry;
+    spawn.rot.y = (180 << 7) | 0x7F; // Half-turn, CS_ID_NONE.
+    play->linkActorEntry = &spawn;
+}
+#endif
 
 extern "C" void OTRPlay_InitScene(PlayState* play, s32 spawn) {
     play->curSpawn = spawn;
@@ -39,6 +56,9 @@ extern "C" void OTRPlay_InitScene(PlayState* play, s32 spawn) {
     Room_Init(play, &play->roomCtx);
     gSaveContext.worldMapArea = 0;
     OTRScene_ExecuteCommands(play, (SOH::Scene*)play->sceneSegment);
+#ifdef COMBO_BUILD
+    ComboBlackMarket_PrepareSpawn(play);
+#endif
     Play_InitEnvironment(play, play->skyboxId);
 }
 
