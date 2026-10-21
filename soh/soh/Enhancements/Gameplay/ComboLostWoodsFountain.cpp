@@ -11,7 +11,7 @@
 #include <array>
 #include <cmath>
 
-extern s32 gComboReturnFileNum;
+extern "C" s32 gComboReturnFileNum;
 
 namespace {
 struct FountainOrigin {

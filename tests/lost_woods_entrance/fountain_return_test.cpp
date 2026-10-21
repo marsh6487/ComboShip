@@ -13,7 +13,7 @@
 
 SaveContext gSaveContext{};
 PlayState* gPlayState;
-s32 gComboReturnFileNum = -1;
+/* PRODUCTION_RETURN_SLOT */
 EntranceInfo gEntranceTable[ENTR_MAX];
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 bool isRando = false, heldSaveMutex = false, inCutscene = false;

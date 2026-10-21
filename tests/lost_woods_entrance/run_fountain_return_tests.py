@@ -24,6 +24,12 @@ route_path = ROOT / "soh/soh/Enhancements/Gameplay/ComboLostWoodsFountain.cpp"
 route = route_path.read_text() if route_path.exists() else ""
 production = route[route.index("namespace {"):route.rindex("#endif")] if route else ""
 fixture = (ROOT / "tests/lost_woods_entrance/fountain_return_test.cpp").read_text()
+# Keep the consumer declaration and the real provider definition together so
+# even ELF compilers diagnose C/C++ linkage mismatches hidden by a local stub.
+provider = (ROOT / "soh/soh/OTRGlobals.cpp").read_text(encoding="utf-8-sig")
+slot_definition = re.search(r'^extern[^\n]*\bgComboReturnFileNum\s*=[^;]+;', provider, re.M)[0]
+slot_declaration = re.search(r'^extern[^\n]*\bgComboReturnFileNum\s*;', route, re.M)[0] if route else ""
+fixture = fixture.replace("/* PRODUCTION_RETURN_SLOT */", slot_declaration + "\n" + slot_definition)
 fixture = fixture.replace("/* PRODUCTION_ROUTE */", production)
 fixture = fixture.replace("/* NATIVE_RETURN_TABLES */", tables)
 fixture = fixture.replace("/* NATIVE_COLLISION_EXIT */", re.sub(r"\bthis\b", "current", exit_body))

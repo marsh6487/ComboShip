@@ -81,3 +81,25 @@ gameplay/mod order, new Fairy collision export, vertical-sheet opt-in/continuity
 Woodfall round trip, both Saria interactions, Mirror use/pickup/return, all
 authored particles and transformation listening remain runtime checks. Existing
 separately authored assets and accepted masters have not been overwritten.
+
+## Windows link correction
+
+Published source `023488082d93257c7b3d063dd913b8caf389375b` failed Windows
+run `39668376368` while linking `soh.dll`: `ComboLostWoodsFountain.obj`
+requested the C++ symbol `?gComboReturnFileNum@@3HA`, while `OTRGlobals.cpp`
+defines the return slot with C linkage. Linux and all six regression groups
+passed that run. The correction gives the consumer declaration matching C
+linkage; routing, saves, assets and the CI workflows remain unchanged.
+
+The fountain fixture previously omitted the consumer declaration and supplied
+its own C++ variable, hiding the ABI mismatch. It now compiles the actual
+consumer declaration with the actual provider definition. Before the source
+fix, GCC rejected their conflicting language linkage. After the fix, the
+fountain scenarios pass under address/undefined-behavior sanitizers, and the
+complete production unit compiles with real headers in Combo and solo modes
+without compiler diagnostics. The complete `tests/lost_woods_entrance/run_tests.py`
+suite also passes, including Woodfall, conditional/native Fairy returns,
+paired arrivals, Mirror/stump routing, scrolling, camera and particle checks.
+An independent review found no issues and repeated the sanitized fountain run
+successfully. Clang-format 14.0.6 and `git diff --check` pass. Windows hosted
+link results for this follow-up remain pending; runtime acceptance is unchanged.
