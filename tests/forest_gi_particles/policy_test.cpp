@@ -9,12 +9,12 @@ float Distance(NeiGi::Point a, NeiGi::Point b) {
 
 // Only center and uniform size may differ from the actual NEI item twinkle.
 void CheckCanonical(const NeiGi::Mesh& mesh, uint32_t frame, int motes, float scale,
-                    const NeiGi::Basis& camera) {
+                    const NeiGi::Basis& camera, NeiGi::Kind kind = NeiGi::Kind::Leaf) {
     constexpr size_t vertices = 72;
     assert(mesh.count == size_t(motes) * vertices && "must use complete NEI twinkles, without added hexes");
     assert(mesh.count <= mesh.vertices.size());
     for (int i = 0; i < motes; ++i) {
-        const auto reference = NeiGi::SampleShimmer(frame + uint32_t(i / 5) * 29u, true, camera, NeiGi::Kind::Leaf);
+        const auto reference = NeiGi::SampleShimmer(frame + uint32_t(i / 5) * 29u, true, camera, kind);
         assert(reference.count == 5 * vertices);
         const auto origin = mesh.vertices[i * vertices].p;
         const auto oldOrigin = reference.vertices[(i % 5) * vertices].p;
@@ -66,7 +66,7 @@ int main() {
             CheckCanonical(mystery, frame, ForestGiParticles::kMysteryMotes, .8f, camera);
             CheckFaceCoverage(mystery, 60.f, 10.f);
             const auto mirror = ForestGiParticles::Mirror(frame, camera);
-            CheckCanonical(mirror, frame, 5, .5f, camera);
+            CheckCanonical(mirror, frame, 5, .5f, camera, NeiGi::Kind::Neutral);
             for (size_t i = 0; i < mirror.count; ++i) {
                 const auto p = mirror.vertices[i].p;
                 assert(std::fabs(p.x) < 18 && std::fabs(p.y) < 18 && std::fabs(p.z) < 18);

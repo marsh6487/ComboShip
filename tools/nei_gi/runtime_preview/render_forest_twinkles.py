@@ -104,13 +104,13 @@ def label(image, frame):
     font = lambda size: ImageFont.truetype(FONT, size)
     d.rectangle((0, 0, W, 90), fill='#101c22')
     d.text((30, 16), 'NEI twinkle • production-code preview', font=font(30), fill='#edf7f0')
-    d.text((30, 58), 'Exact triangles, pulse, spin, green palette and alpha. Standard blending; no bloom.',
+    d.text((30, 58), 'Exact triangles, pulse, spin, NEI palettes and alpha. Standard blending; no bloom.',
            font=font(18), fill='#b1c9bc')
     for x, y, title, note in [
         (30, 108, 'Original NEI shimmer', 'Reference sampler, unchanged'),
         (745, 108, 'Both portal entrances', 'Twinkles across the face of each black opening'),
         (30, 565, 'Saria emitter', 'Same NEI twinkles around the actor; silhouette is a guide'),
-        (745, 565, 'Uncollected Magic Mirror', 'Production Mirror geometry + the same NEI sampler'),
+        (745, 565, 'Uncollected Magic Mirror', 'Pale blue and white NEI twinkles match its glass and casing'),
     ]:
         d.text((x, y), title, font=font(25), fill='#edf7f0')
         d.text((x, y + 37), note, font=font(16), fill='#a6c0b2')
