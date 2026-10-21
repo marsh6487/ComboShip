@@ -205,6 +205,7 @@ using PostLimbDrawOpa = void (*)(PlayState *, s32, Gfx **, Vec3s *, LimbArg);
 // helper's null-plan path and reject unexpected palette blending.
 using MtxF = Mtx;
 static const void* NativeNpcPose_GetSkinPlan(void**, s32) { return nullptr; }
+static float NativeNpcPose_GetDrawScale(void**) { return 1.f; }
 static s32 NativeNpcPose_SkinMatrixCount(const void* plan) {
   assert(plan == nullptr);
   return 0;

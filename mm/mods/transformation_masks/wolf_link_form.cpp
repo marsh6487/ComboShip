@@ -39,6 +39,9 @@
 #include "macros.h"
 #include "functions.h"
 #include "variables.h"
+#ifdef COMBO_BUILD
+#include "gameplay/MagicMirrorPlayer.h"
+#endif
 extern "C" {
 #include "z64malloc.h"
 }
@@ -810,7 +813,11 @@ static WolfInput ReadInput(Player* player, PlayState* play, const Input* source)
                     PLAYER_STATE1_400 | PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_4 | PLAYER_STATE1_2000 |
                     PLAYER_STATE1_FIRST_PERSON | PLAYER_STATE1_CLIMBING_LADDER | PLAYER_STATE1_400 |
                     PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_8000000 | PLAYER_STATE1_800000;
-    if (player->stateFlags1 & blockMask) {
+    if ((player->stateFlags1 & blockMask)
+#ifdef COMBO_BUILD
+        || MagicMirror_PromptOwnsPlayer(play, player)
+#endif
+    ) {
         in.aPress = in.bPress = 0;
         in.blocked = 1;
     }

@@ -21,6 +21,7 @@ static int sTint, sShimmer, sMissing, sEdited, sDepth, sDraws, sTransforms;
 static int sEmblemEdited, sOverlayDraws;
 static uint8_t sOverlayColor[4];
 static unsigned sOverlayFrame;
+static unsigned sChateauDraws;
 // The shared renderer's geometry is tested by run_mask_shimmer_tests.py.
 // This native dispatch fixture checks the C boundary, palette and frame.
 void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const char* owner) {
@@ -28,6 +29,11 @@ void NeiGi_DrawShimmerOverlay(PlayState* play, const uint8_t color[4], const cha
     ++sOverlayDraws;
     memcpy(sOverlayColor, color, 4);
     sOverlayFrame = play->gameplayFrames;
+}
+// Chateau geometry has its own production-renderer suite; observe the native dispatch.
+void NeiGi_DrawChateauShimmer(PlayState* play) {
+    assert(play == &sPlay);
+    ++sChateauDraws;
 }
 static float sTrace[128];
 static char sLastColorId[64];
@@ -266,10 +272,15 @@ int main(void) {
     Reset();
     GetItem_Draw(&sPlay, GID_POE);
     assert(sGfx.polyXlu.p == sXlu);
+    Reset();
+    GetItem_Draw(&sPlay, GID_CHATEAU);
+    assert(sChateauDraws == 1 && sDraws == 1 && sDepth == 0);
     sMissing = 1;
     Reset();
     GetItem_Draw(&sPlay, GID_POE);
     assert(sDraws == 0);
+    GetItem_Draw(&sPlay, GID_CHATEAU);
+    assert(sChateauDraws == 1); // Missing model must not draw a detached shimmer.
     puts("PASS 16 owner IDs, 32 tint scopes, exclusions, live hex, missing resources, 7 deterministic three-mote "
          "bottles");
     return 0;

@@ -7,47 +7,11 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-header = ROOT / 'mm/2s2h/Enhancements/Graphics/ComboForestPortalEffect.h'
-assert header.exists(), 'purple portal finish geometry is absent'
-source = r'''
-#include "mm/2s2h/Enhancements/Graphics/ComboForestPortalEffect.h"
-#include <cassert>
-#include <cstring>
-#include <cstdio>
-int main() {
-    using namespace ComboForestPortalEffect;
-    for (bool packed : {false, true}) {
-        std::array<Vertex, kVertexCount> first{}, next{};
-        Build(0, packed, first); Build(20, packed, next);
-        assert(std::memcmp(first.data(), next.data(), sizeof(first)) != 0);
-        for (unsigned frame : {0u, 1u, 20u, 1000u, 100000u, 0xffffffffu}) {
-            Build(frame, packed, next);
-            const float radius = packed ? 68.0f : 44.0f;
-            const float roof = packed ? 134.0f : 109.0f;
-            for (const auto& v : next) {
-                assert(std::isfinite(v.x) && std::isfinite(v.y));
-                assert(std::fabs(v.x) <= radius + 5.1f);
-                assert(v.y >= -4.1f && v.y <= roof + 5.1f);
-                assert(v.b > v.r && v.r > v.g); // Existing purple hue family.
-            }
-            for (int q = 0; q < kRimSegments; ++q) {
-                assert(next[q*4].a == 0 && next[q*4+3].a == 0);
-                assert(next[q*4+1].a > 0 && next[q*4+2].a > 0);
-            }
-        }
-    }
-    std::puts("PASS native finish geometry: time-varying purple rim/glints, bounded to native and packed openings, transparent outer edge");
-}
-'''
 with tempfile.TemporaryDirectory(prefix='forest-portal-finish-') as temporary:
     path = Path(temporary)
-    cpp = path / 'finish.cpp'
-    binary = path / 'finish'
-    cpp.write_text(source)
-    subprocess.run([os.environ.get('CXX','c++'), '-std=c++20', '-Wall', '-Wextra', '-Werror',
-                    '-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-no-pie',
-                    '-I'+str(ROOT), str(cpp), '-o', str(binary)], check=True)
-    subprocess.run([str(binary)], check=True, env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0'))
+    cpp, binary = path / 'finish.cpp', path / 'finish'
+    subprocess.run([sys.executable, '-B', str(ROOT / 'scripts/diagnostics/run_forest_gi_particles_tests.py'),
+                    '--policy-only'], check=True)
 
     # Execute the production submission guards; graphics allocation/submission
     # is the boundary. A recognized pack must never draw the temporary arch.
@@ -55,7 +19,7 @@ with tempfile.TemporaryDirectory(prefix='forest-portal-finish-') as temporary:
     from run_time_pedestal_tests import block_from
     renderer = (ROOT/'mm/2s2h/Enhancements/Graphics/ComboLostWoodsPassage.cpp').read_text()
     finish = block_from(renderer, renderer.index('static void DrawPortalFinish('))
-    finish = finish[:finish.index('    using namespace')] + '\n++finishes;\n}\n'
+    finish = finish[:finish.index('    Matrix_Push()')] + '\n++finishes;\n}\n'
     arch = block_from(renderer, renderer.index('static void DrawPassage('))
     arch = arch[:arch.index('    static const bool built')] + '\n++arches;\n}\n'
     cpp.write_text(r'''

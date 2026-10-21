@@ -41,6 +41,7 @@
 #include "mods/sound_translator/mm_sfx_ids.h"
 #include "soh/ResourceManagerHelpers.h"
 #include "soh/frame_interpolation.h"
+#include "soh/Enhancements/Gameplay/ComboForestActors.h"
 #include <assert.h>
 #include <string.h>
 
@@ -1705,6 +1706,10 @@ void EnViewer_DrawStaticSaria(EnViewer* this, PlayState* play) {
     gSPSegment(POLY_OPA_DISP++, 0x0A, SEGMENTED_TO_VIRTUAL(gSariaMouthClosed2Tex));
     SkelAnime_DrawSkeletonOpa(play, &this->skin.skelAnime, EnViewer_StaticSariaOverrideLimbDraw, NULL, this);
     CLOSE_DISPS(play->state.gfxCtx);
+#ifdef COMBO_BUILD
+    if (this->staticState.staticMode)
+        ComboForestActors_DrawSariaParticles(&this->actor, play, this->staticState.pose == 3);
+#endif
 }
 
 static s32 EnViewer_StaticSheikOverrideLimbDraw(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,

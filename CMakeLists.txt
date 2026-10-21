@@ -437,6 +437,8 @@ add_custom_target(
     COMMENT "Checking custom asset trees for new path collisions...")
 include(CMake/ChateauRomaniAssets.cmake)
 add_dependencies(CheckAssetCollisions PrepareChateauRomaniAssets)
+include(CMake/NativeMarketAssets.cmake)
+add_dependencies(CheckAssetCollisions PrepareNativeMarketAssets)
 add_dependencies(combo CheckAssetCollisions)
 include(CMake/NeiRewardGiAssets.cmake)
 
@@ -461,6 +463,8 @@ add_custom_target(
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/mm
     COMMENT "Generating 2ship.o2r..."
     DEPENDS ZAPD CheckAssetCollisions)
+
+include(CMake/NativeForestAssets.cmake)
 
 ################################################################################
 # Installation and Packaging

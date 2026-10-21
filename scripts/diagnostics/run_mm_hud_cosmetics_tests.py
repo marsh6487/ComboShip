@@ -25,9 +25,11 @@ def main():
     declarations += header[header.index("typedef struct {"):header.index("extern std::map<std::string, CosmeticOption>")]
     dynamic = (ROOT / "mm/2s2h/BenGui/DynamicCosmeticEditor.cpp").read_text()
     # Cover every built-in rainbow callback, not only the originally reported Hearts row.
-    options = [line for line in editor.splitlines() if 'COSMETIC_OPTION("' in line]
+    # Preserve multiline option arguments and their production build guards.
+    options_start = editor.index("std::map<std::string, CosmeticOption> cosmeticOptions = {")
+    options_end = editor.index("\n};", options_start) + len("\n};")
     declarations += function(editor, "ColorRGBA8")
-    declarations += "\nstd::map<std::string, CosmeticOption> cosmeticOptions = {\n" + "\n".join(options) + "\n};\n"
+    declarations += "\n" + editor[options_start:options_end] + "\n"
     declarations += editor[editor.index("static CosmeticOption& kHumanTunicOption"):editor.index("static bool CosmeticEditorIsSuppressed")]
 
     cache_types = renderer_header[renderer_header.index("struct TextureCacheKey {"):renderer_header.index("struct RGBA {")]

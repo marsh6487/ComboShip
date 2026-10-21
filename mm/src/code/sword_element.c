@@ -44,15 +44,24 @@ int SwordElement_SlotForItem(uint16_t item) {
 }
 
 uint8_t SwordElement_IsAvailable(uint8_t element) {
-    static const char* options[] = { NULL, "gEnhancements.DinFireSwordDamage", "gEnhancements.IceSwordDamage",
-                                     "gEnhancements.LightSwordDamage" };
     static const uint8_t slots[] = { 0, SLOT_ARROW_FIRE, SLOT_ARROW_ICE, SLOT_ARROW_LIGHT };
     static const uint8_t items[] = { ITEM_NONE, ITEM_ARROW_FIRE, ITEM_ARROW_ICE, ITEM_ARROW_LIGHT };
     if (element == SWORD_ELEMENT_NONE)
         return true;
-    if (element >= SWORD_ELEMENT_COUNT || !CVarGetInteger(options[element], 0))
+    if (element >= SWORD_ELEMENT_COUNT)
         return false;
     return gSaveContext.save.saveInfo.inventory.items[slots[element]] == items[element];
+}
+
+uint8_t SwordElement_Override(void) {
+    // New menu callbacks keep these mutually exclusive. A deterministic choice
+    // also handles old preferences or console writes containing multiple flags.
+    static const char* options[] = { NULL, "gEnhancements.DinFireSwordDamage", "gEnhancements.IceSwordDamage",
+                                     "gEnhancements.LightSwordDamage" };
+    for (uint8_t element = SWORD_ELEMENT_LIGHT; element > SWORD_ELEMENT_NONE; --element)
+        if (CVarGetInteger(options[element], 0))
+            return element;
+    return SWORD_ELEMENT_NONE;
 }
 
 // A progressive sword inherits its predecessor until the player explicitly
@@ -86,6 +95,11 @@ uint8_t SwordElement_Set(uint16_t item, uint8_t element) {
 }
 
 uint8_t SwordElement_ForItem(uint16_t item) {
+    if (SwordElement_SlotForItem(item) < 0)
+        return SWORD_ELEMENT_NONE;
+    uint8_t forced = SwordElement_Override();
+    if (forced != SWORD_ELEMENT_NONE)
+        return forced;
     uint8_t element = SwordElement_Get(item);
     return SwordElement_IsAvailable(element) ? element : SWORD_ELEMENT_NONE;
 }

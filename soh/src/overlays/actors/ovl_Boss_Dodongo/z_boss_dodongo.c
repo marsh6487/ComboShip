@@ -1,3 +1,4 @@
+#include "din_fire_sword.h"
 #include "z_boss_dodongo.h"
 #include "textures/boss_title_cards/object_kingdodongo.h"
 #include "objects/object_kingdodongo/object_kingdodongo.h"
@@ -1560,6 +1561,10 @@ void BossDodongo_UpdateDamage(BossDodongo* this, PlayState* play) {
                     BossDodongo_SetupDamaged(this);
                     this->unk_1C0 = 5;
                     this->health -= swordDamage;
+                    if (this->health <= 0) {
+                        DinFireSword_FinishConfirmedHit(play, &this->collider.base, item1,
+                                                        this->collider.elements[0].info.bumper.dmgFlags);
+                    }
                 }
             }
         }

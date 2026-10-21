@@ -1038,9 +1038,9 @@ s32 Sm64Mario_OotIsScriptingPlayer(PlayState* play, Player* p) {
 
 void Sm64Mario_Update(PlayState* play, Player* player) {
 #ifdef COMBO_BUILD
-    // The Mirror owns the native action until recall or cancellation. Keep the
-    // current Mario mesh parked; raw libsm64 input/writeback must not fight it.
-    if (MagicMirrorPlayer_State(player))
+    // The prompt and its closing input own movement before the cast action
+    // starts. Park this raw-pad reader as well as the native player input.
+    if (MagicMirror_PromptOwnsPlayer(play, player) || MagicMirrorPlayer_State(player))
         return;
 #endif
     Camera* cam;

@@ -3,6 +3,7 @@
 #include <fast/resource/type/DisplayList.h>
 #include <fast/resource/type/Texture.h>
 #include <ship/Context.h>
+#include <ship/resource/File.h>
 #include <ship/resource/ResourceManager.h>
 #include <ship/resource/archive/Archive.h>
 #include <ship/utils/StrHash64.h>
@@ -19,6 +20,7 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include <nlohmann/json.hpp>
 
 extern "C" {
 #include "global.h"
@@ -168,7 +170,105 @@ uint32_t WholeListColor(std::string path, int selectedSeason = SEASON_AUTUMN, in
     return 0;
 }
 
-uint32_t MaterialColor(uint64_t hash, int selectedSeason = SEASON_AUTUMN, int sceneId = -1) {
+using MoonTreeMaterials = std::map<std::string, std::set<uint64_t>>;
+
+bool NumberedPath(const std::string& path, const std::string& prefix) {
+    return path.starts_with(prefix) && path.size() > prefix.size() &&
+           std::all_of(path.begin() + prefix.size(), path.end(), [](char c) { return c >= '0' && c <= '9'; });
+}
+
+MoonTreeMaterials FindMoonTreeMaterials(const std::shared_ptr<Ship::ArchiveManager>& archives,
+                                        std::set<std::string>& paths) {
+    const std::string prefix = "custom/prelude/Z2_00KEIKOKU/recipe";
+    std::map<std::shared_ptr<Ship::Archive>, std::set<std::string>> owners;
+    for (const auto* assetPrefix : { "", "alt/" }) {
+        const auto files = archives->ListFiles(assetPrefix + prefix + "*");
+        if (files == nullptr)
+            continue;
+        for (const auto& path : *files) {
+            if (path.ends_with(".meta"))
+                continue;
+            const auto root = path.starts_with("alt/") ? path.substr(4) : path;
+            if (!NumberedPath(root, prefix))
+                continue;
+            // An alias can resolve into another pack. Its sidecar's owner does
+            // not prove the loaded material's identity. Only direct Prelude
+            // recipe draws without an alias are eligible for this extension.
+            if (archives->HasFile(path + ".meta") && archives->GetArchiveFromFile(path + ".meta") != nullptr)
+                continue;
+            const auto owner = archives->GetArchiveFromFile(path);
+            if (owner != nullptr)
+                owners[owner].insert(path);
+        }
+    }
+    MoonTreeMaterials result;
+    const nlohmann::json::json_pointer editsPath("/edits/Z2_00KEIKOKU");
+    const nlohmann::json::json_pointer shapesPath("/data/shapes");
+    const nlohmann::json::json_pointer texturesPath("/stored/textures");
+    const nlohmann::json::json_pointer texturePathsPath("/stored/texPaths");
+    for (const auto& [owner, roots] : owners) {
+        // Project paths are shared by all Prelude exports. Read the draw's
+        // actual owner, not whichever pack shadows the global project entry.
+        // Only metadata is read: missing bark and large image blobs are irrelevant.
+        const auto file = owner->LoadFile("prelude/project/edits.json");
+        if (file == nullptr || file->Buffer == nullptr || file->BufferOffset >= file->Buffer->size())
+            continue;
+        const auto project =
+            nlohmann::json::parse(file->Buffer->begin() + file->BufferOffset, file->Buffer->end(), nullptr, false);
+        if (!project.is_object() || project.value("codec", nlohmann::json{}) != 2 || !project.contains(editsPath) ||
+            !project.at(editsPath).is_array())
+            continue;
+        for (const auto& edit : project.at(editsPath)) {
+            if (!edit.contains(shapesPath) || !edit.at(shapesPath).is_array())
+                continue;
+            for (const auto& shape : edit.at(shapesPath)) {
+                if (!shape.is_object() || !shape.contains("newDlPath") || !shape["newDlPath"].is_string() ||
+                    !shape.contains(texturesPath) || !shape.at(texturesPath).is_array() ||
+                    !shape.contains(texturePathsPath) || !shape.at(texturePathsPath).is_array())
+                    continue;
+                std::string root = shape["newDlPath"];
+                if (root.starts_with("alt/"))
+                    root.erase(0, 4);
+                if (!NumberedPath(root, prefix))
+                    continue;
+                const auto& textures = shape.at(texturesPath);
+                const auto& texturePaths = shape.at(texturePathsPath);
+                if (textures.size() != texturePaths.size())
+                    continue;
+                std::set<uint64_t> foliage;
+                for (size_t i = 0; i < textures.size(); ++i) {
+                    if (!textures[i].is_object() || !texturePaths[i].is_string())
+                        continue;
+                    const auto label = textures[i].value("label", nlohmann::json{});
+                    if (label != "sou_ha_01" && label != "sou_ha_02" && label != "sou_ha_03" && label != "sou_sida_01")
+                        continue; // Explicit Moon leaves/ferns; bark, grass and buildings stay native.
+                    std::string texture = texturePaths[i];
+                    if (texture.starts_with("alt/"))
+                        texture.erase(0, 4);
+                    if (!NumberedPath(texture, root + "_tex"))
+                        continue;
+                    foliage.insert(CRC64(texture.c_str()));
+                    foliage.insert(CRC64(("alt/" + texture).c_str()));
+                }
+                if (foliage.empty())
+                    continue;
+                for (const auto* assetPrefix : { "", "alt/" }) {
+                    const auto path = assetPrefix + root;
+                    if (roots.contains(path)) {
+                        result[path].insert(foliage.begin(), foliage.end());
+                        paths.insert(root);
+                    }
+                }
+            }
+        }
+    }
+    return result;
+}
+
+uint32_t MaterialColor(uint64_t hash, int selectedSeason = SEASON_AUTUMN, int sceneId = -1,
+                       const std::set<uint64_t>* moonTree = nullptr) {
+    if (sceneId == SCENE_00KEIKOKU && moonTree != nullptr && moonTree->contains(hash))
+        return SeasonPalette(0xF4B783FF, selectedSeason, sceneId);
     static const auto colors = [] {
         std::map<uint64_t, const Material*> result;
         for (const auto& material : kMaterials) {
@@ -266,7 +366,7 @@ bool IsRoadForestPair(uint64_t primary, uint64_t secondary) {
 }
 
 std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason = SEASON_AUTUMN, int sceneId = -1,
-                              bool* onlyRoadForest = nullptr) {
+                              bool* onlyRoadForest = nullptr, const std::set<uint64_t>* moonTree = nullptr) {
     std::vector<Gfx> result;
     uint32_t imageColor = 0;
     uint64_t imageHash = 0;
@@ -288,7 +388,7 @@ std::vector<Gfx> BuildVariant(const std::vector<Gfx>& source, int selectedSeason
         }
         if (opcode == G_SETTIMG_OTR_HASH) {
             imageHash = (uint64_t(source[i + 1].words.w0) << 32) | source[i + 1].words.w1;
-            imageColor = MaterialColor(imageHash, selectedSeason, sceneId);
+            imageColor = MaterialColor(imageHash, selectedSeason, sceneId, moonTree);
         } else if (opcode == G_SETTIMG) {
             imageColor = 0;
             imageHash = 0;
@@ -484,6 +584,7 @@ std::map<std::pair<const Fast::DisplayList*, int>, Variant> sCanopyLayouts;
 std::map<const Fast::DisplayList*, std::weak_ptr<Fast::DisplayList>> sIgnored;
 std::set<const Fast::DisplayList*> sActive;
 std::vector<std::string> sPaths;
+MoonTreeMaterials sMoonTreeMaterials;
 const Ship::ArchiveManager* sArchives = nullptr;
 int sScene = -1;
 int sFoliageSeason = -1;
@@ -941,6 +1042,9 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
         sScene = play->sceneId;
         sArchives = archives.get();
         std::set<std::string> paths;
+        sMoonTreeMaterials.clear();
+        if (play->sceneId == SCENE_00KEIKOKU)
+            sMoonTreeMaterials = FindMoonTreeMaterials(archives, paths);
         for (const auto* suffix : { "", "_scene" }) {
             const std::string prefix = "scenes/nonmq/" + std::string(scene) + suffix + "/";
             for (const auto* assetPrefix : { "", "alt/" }) {
@@ -1042,8 +1146,11 @@ void MMAutumnSceneFoliage_Update(const PlayState* play) {
             }
             const auto& original = other == nullptr || freshCanopyLayout ? resource->Instructions : other->original;
             const auto forestColor = ForestListColor(path, selectedSeason);
-            auto commands =
-                forestColor != 0 ? std::vector<Gfx>{} : BuildVariant(original, selectedSeason, play->sceneId);
+            const auto moonTree = sMoonTreeMaterials.find(resolved);
+            auto commands = forestColor != 0
+                                ? std::vector<Gfx>{}
+                                : BuildVariant(original, selectedSeason, play->sceneId, nullptr,
+                                               moonTree == sMoonTreeMaterials.end() ? nullptr : &moonTree->second);
             const auto wholeColor =
                 forestColor != 0 ? forestColor : WholeListColor(path, selectedSeason, play->sceneId);
             if (commands.empty() && wholeColor == 0) {
@@ -1110,6 +1217,7 @@ void MMAutumnSceneFoliage_Reset() {
     RestoreActive();
     RestoreSurfaceTextures();
     sPaths.clear();
+    sMoonTreeMaterials.clear();
     sIgnored.clear();
     sArchives = nullptr;
     sScene = -1;

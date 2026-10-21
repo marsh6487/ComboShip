@@ -86,6 +86,11 @@ void DrawSong(RandoItemId) {assert(false && "songs have their own production dis
             blue = macros + function(foreign_oot, 'OOT_DrawForeignBlueFire')
         fixture = fixture.replace('/* PRODUCTION_BLUE_FIRE */', blue)
 
+        if '--forest-particles' in sys.argv:
+            fixture = '#include "' + str(ROOT / 'combo/actors/ForestGiParticles.h') + '"\n' + fixture
+            fixture = fixture.replace('int main() {', 'int main() {\n#include "' +
+                                      str(ROOT / 'tests/forest_gi_particles/renderer_checks.inc') + '"\n', 1)
+
         source = build / 'test.cpp'
         source.write_text(fixture)
         includes = [game, game+'/include', game+'/include/PR', game+'/src', game+'/assets', game+'/2s2h',

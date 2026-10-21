@@ -18,23 +18,35 @@ int MM_PlacedSariaAlt() {
     } catch (...) { return 0; }
 }
 
-int MM_PlacedSariaLoad(unsigned pose, ComboPlacedSariaResources* output) {
-    if (!output)
+int MM_PlacedSariaLoadV2(unsigned pose, ComboPlacedSariaResourcesV2* output, size_t callerSize) {
+    if (!output || callerSize < sizeof(*output))
         return 0;
     *output = {};
+    output->drawScale = 1.f;
     try {
         // Use MM's own mounted companion/mod archives and its current Alt policy.
         auto snapshot = MmPlacedSaria::Build(
             [](const std::string& path) { return GetResourceByName(path.c_str(), true); }, MM_PlacedSariaAlt(), pose);
         if (!snapshot)
             return 0;
-        *output = snapshot->result;
-        output->owner = snapshot.release();
+        output->resources = snapshot->result;
+        output->drawScale = snapshot->drawScale;
+        output->resources.owner = snapshot.release();
         return 1;
     } catch (...) {
         *output = {};
+        output->drawScale = 1.f;
         return 0;
     }
+}
+
+int MM_PlacedSariaLoad(unsigned pose, ComboPlacedSariaResources* output) {
+    if (!output)
+        return 0;
+    ComboPlacedSariaResourcesV2 current{};
+    const int loaded = MM_PlacedSariaLoadV2(pose, &current, sizeof(current));
+    *output = current.resources;
+    return loaded;
 }
 
 void MM_PlacedSariaRelease(void* owner) {

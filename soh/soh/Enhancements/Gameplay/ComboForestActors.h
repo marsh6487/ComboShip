@@ -1,6 +1,17 @@
 #pragma once
 #include <stdint.h>
 #define COMBO_SOLO_FOREST_EPONA_PARAMS 0x7E40
+#ifdef COMBO_BUILD
+struct Actor;
+struct PlayState;
+#ifdef __cplusplus
+extern "C" {
+#endif
+void ComboForestActors_DrawSariaParticles(struct Actor* actor, struct PlayState* play, int seated);
+#ifdef __cplusplus
+}
+#endif
+#endif
 #ifdef __cplusplus
 
 namespace ComboForestActors {

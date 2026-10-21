@@ -918,11 +918,7 @@ def build(source_path, native_path, variant, output):
         if output.resolve() in (Path(source_path).resolve(), Path(native_path).resolve()):
             raise ValueError("The candidate must be separate from both input files")
         output.parent.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
-            for path, raw in sorted(archive.files.items()):
-                info = zipfile.ZipInfo(path, (2026, 10, 18, 0, 0, 0))
-                info.compress_type = zipfile.ZIP_DEFLATED
-                z.writestr(info, raw)
+        archive.write(output, compression=zipfile.ZIP_DEFLATED, timestamp=(2026, 10, 18, 0, 0, 0))
         np.savez_compressed(output.with_suffix(".npz"), **model,
                             bind_matrices=np.asarray([l.M for l in rig.limbs]),
                             bind_positions=np.asarray([l.T for l in rig.limbs]))

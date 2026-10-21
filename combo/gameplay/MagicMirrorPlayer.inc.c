@@ -2,7 +2,7 @@
 // Farore's casting motion: no spell actor, sparkle mesh, magic cost or warp point.
 #include "gameplay/MagicMirrorPlayer.h"
 
-static void MagicMirrorPlayer_StopMotion(Player* player) {
+void MagicMirrorPlayer_StopMotion(Player* player) {
 #ifdef COMBO_MAGIC_MIRROR_MM
     player->speedXZ = player->actor.speed = 0.0f;
 #else

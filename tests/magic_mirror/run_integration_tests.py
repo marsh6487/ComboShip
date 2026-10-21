@@ -24,7 +24,7 @@ class Integration(unittest.TestCase):
         source = (ROOT / "combo/gameplay/MagicMirrorRuntime.inc.h").read_text()
         prompt = int(re.search(r"kPromptText = (0x[\dA-Fa-f]+)", source)[1], 16)
         native = (ROOT / "mm/src/code/z_message.c").read_text()
-        credits = int(re.search(r"else if \(textId >= (0x[\dA-Fa-f]+)\)", native)[1], 16)
+        credits = int(re.search(r"textId >= (0x[\dA-Fa-f]+)", native)[1], 16)
         self.assertLess(prompt, credits, "MM treats this prompt as credits even with a custom message loader")
 
     def test_press_is_claimed_before_native_item_change(self):

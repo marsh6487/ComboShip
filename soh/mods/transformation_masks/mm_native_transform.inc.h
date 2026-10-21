@@ -8,7 +8,16 @@ void Player_DestroyHookshot(Player* player);
 void Player_DetachHeldActor(PlayState* play, Player* player);
 void Player_InitItemAction(PlayState* play, Player* player, s8 itemAction);
 void Player_SetUpperActionFunc(Player* player, UpperActionFunc action);
+f32 Camera_LERPCeilF(f32 target, f32 current, f32 stepScale, f32 minDiff);
+s16 Camera_LERPCeilS(s16 target, s16 current, f32 stepScale, s16 minDiff);
+void Camera_LERPCeilVec3f(Vec3f* target, Vec3f* current, f32 yStepScale, f32 xzStepScale, f32 minDiff);
 }
+
+struct MmNativeMaskCamera {
+    VecSph previousOffset;
+    f32 previousFov, swayDirection, fovStep;
+    s16 state, timer, yaw;
+};
 
 struct MmNativeMaskCutscene {
     PlayState* owner;
@@ -20,6 +29,7 @@ struct MmNativeMaskCutscene {
     u32 ownedFlags;
     LinkAnimationHeader *maskOn, *maskLoop, *maskOff, *formOff;
     s16 cameraId, previousCamera;
+    MmNativeMaskCamera camera;
     f32 lighting, maskDepth, maskWidth;
     s16 ambient[3], light[3], fog[3], fogNear;
     LightInfo lightInfo;
@@ -132,25 +142,158 @@ static void MmForm_CancelNativeMaskCutscene(u8 dying) {
 }
 
 static void MmForm_UpdateNativeMaskCamera(Player* player, PlayState* play) {
+    // MM Player_Action_86 faces the live cutscene camera every update. Keep
+    // the captured front direction even if OoT's paused action changes yaw.
+    player->actor.shape.rot.y = player->yaw = sNativeMaskCs.camera.yaw;
     if (sNativeMaskCs.cameraId == SUBCAM_NONE)
         return;
-    const f32 height =
-        gFormState.skeletonLoaded ? sFormProps[gFormState.currentForm].cameraHeight : (LINK_IS_ADULT ? 68.0f : 44.0f);
-    Vec3f at = player->actor.world.pos;
-    at.y += height * 0.75f;
-    Vec3f eye = at;
-    eye.x += Math_SinS(player->actor.shape.rot.y) * (height * 1.4f + 35.0f);
-    eye.z += Math_CosS(player->actor.shape.rot.y) * (height * 1.4f + 35.0f);
-    eye.y += height * 0.12f;
+    Camera* camera = play->cameraPtrs[sNativeMaskCs.cameraId];
+    auto& shot = sNativeMaskCs.camera;
+    Vec3f at = camera->at;
+    VecSph offset;
+    OLib_Vec3fDiffToVecSphGeo(&offset, &at, &camera->eye);
+    Vec3f focus = player->actor.focus.pos;
+    const Vec3f pos = player->actor.world.pos;
+    f32 fov = camera->fov;
+    s16 roll = camera->roll;
+    // The port switches skeletons under the white flash instead of restarting
+    // Player_Init. Enter the donor's reveal camera before the flash fades.
+    if (gFormState.cutscenePhase == 2)
+        shot.state = sNativeMaskCs.removing ? 3 : 4;
+
+    // Adapt MM Camera_Demo4/5 geometry to OoT's manual subcamera ABI. Preserve
+    // their separate schedules, face focus, FOV, roll and original view offset.
+    if (!sNativeMaskCs.removing) {
+        switch (shot.state) {
+            case 0:
+                shot.state = 1;
+                shot.timer = 0;
+                offset.r = MIN(offset.r, 40.0f);
+                fov = 80.0f;
+                shot.swayDirection = Rand_ZeroOne() < 0.5f ? -1.0f : 1.0f;
+                // fallthrough
+            case 1: {
+                const f32 sway = shot.timer >= 12
+                                     ? shot.swayDirection * sinf(DEG_TO_RAD((shot.timer - 12) * (135.0f / 13.0f)))
+                                     : 0.0f;
+                const f32 lateral = shot.timer * (6.0f / 19.0f) * sway;
+                focus.x = pos.x + Math_SinS(shot.yaw + 0x4000) * lateral;
+                focus.z = pos.z + Math_CosS(shot.yaw + 0x4000) * lateral;
+                focus.y -= (focus.y - pos.y) * 0.099999994f;
+                Camera_LERPCeilVec3f(&focus, &at, 0.2f, 0.2f, 0.1f);
+                roll = (s16)(shot.timer * (30.0f / 19.0f) * sway * (65535.0f / 360.0f) + 0.5f);
+                offset.r = Camera_LERPCeilF(30.0f, offset.r, 1.0f / (38 - shot.timer), 0.1f);
+                offset.pitch = 0;
+                if (++shot.timer >= 38) {
+                    shot.timer = 24;
+                    shot.state = 2;
+                    shot.fovStep = (32.0f - fov) / 24.0f;
+                }
+                break;
+            }
+            case 2:
+                focus.x = pos.x - Math_SinS(shot.yaw) * 7.0f;
+                focus.z = pos.z - Math_CosS(shot.yaw) * 7.0f;
+                focus.y -= (focus.y - pos.y) * 0.1f;
+                if (shot.timer == 24)
+                    at = focus;
+                else
+                    Camera_LERPCeilVec3f(&focus, &at, 0.25f, 0.25f, 0.1f);
+                if (shot.timer > 0)
+                    fov += shot.fovStep;
+                offset.r = 35.0f;
+                offset.pitch = 0x2000;
+                roll = Camera_LERPCeilS(0, roll, 0.1f, 5);
+                if (--shot.timer <= 0) {
+                    shot.timer = 0;
+                    shot.state = 3;
+                    shot.fovStep = (60.0f - fov) / 630.0f;
+                }
+                break;
+            case 3:
+                focus.x = pos.x;
+                focus.z = pos.z;
+                focus.y -= (focus.y - pos.y) * 0.1f;
+                Camera_LERPCeilVec3f(&focus, &at, 0.25f, 0.25f, 0.1f);
+                roll = Camera_LERPCeilS(0, roll, 0.1f, 5);
+                fov += shot.fovStep * ++shot.timer;
+                offset.r = 35.0f;
+                offset.pitch = 0x2000;
+                if (shot.timer >= 35)
+                    shot.state = 4;
+                break;
+            case 999:
+                shot.state = 4;
+                break;
+            case 4:
+                focus.y -= (focus.y - pos.y) * 0.1f;
+                Camera_LERPCeilVec3f(&focus, &at, 0.1f, 0.1f, 0.1f);
+                offset = shot.previousOffset;
+                fov = shot.previousFov;
+                roll = 0;
+                break;
+        }
+    } else {
+        switch (shot.state) {
+            case 0:
+                shot.state = 1;
+                shot.timer = 18;
+                offset.r = 30.0f;
+                offset.pitch = 0;
+                fov = 80.0f;
+                shot.swayDirection = Rand_ZeroOne() < 0.5f ? -1.0f : 1.0f;
+                roll = 0;
+                focus.x = pos.x;
+                focus.z = pos.z;
+                at = focus;
+                // fallthrough
+            case 1:
+                if (--shot.timer <= 0) {
+                    shot.timer = 46;
+                    shot.state = 2;
+                }
+                break;
+            case 2: {
+                const f32 sway = shot.swayDirection * sinf(DEG_TO_RAD(shot.timer * (180.0f / 23.0f)));
+                const f32 lateral = (46 - shot.timer) * (5.0f / 46.0f) * sway;
+                focus.x = pos.x + Math_SinS(shot.yaw + 0x4000) * lateral;
+                focus.z = pos.z + Math_CosS(shot.yaw + 0x4000) * lateral;
+                focus.y -= (focus.y - pos.y) * 0.2f;
+                Camera_LERPCeilVec3f(&focus, &at, 0.1f, 0.1f, 0.1f);
+                roll = (s16)(sway * (shot.timer * (10.0f / 23.0f)) * (65535.0f / 360.0f) + 0.5f);
+                offset.r = Camera_LERPCeilF(80.0f, offset.r, 1.0f / shot.timer, 0.1f);
+                offset.pitch = 0;
+                if (--shot.timer <= 0)
+                    shot.state = 3;
+                break;
+            }
+            case 999:
+                shot.state = 3;
+                break;
+            case 3:
+                focus.y -= (focus.y - pos.y) * 0.1f;
+                Camera_LERPCeilVec3f(&focus, &at, 0.1f, 0.1f, 0.1f);
+                offset = shot.previousOffset;
+                fov = shot.previousFov;
+                roll = 0;
+                break;
+        }
+    }
+    Vec3f eye;
+    OLib_VecSphGeoToVec3f(&eye, &offset);
+    eye.x += at.x;
+    eye.y += at.y;
+    eye.z += at.z;
     Play_CameraSetAtEye(play, sNativeMaskCs.cameraId, &at, &eye);
-    Play_CameraSetFov(play, sNativeMaskCs.cameraId, 60.0f);
+    Play_CameraSetFov(play, sNativeMaskCs.cameraId, fov);
+    Play_SetCameraRoll(play, sNativeMaskCs.cameraId, roll);
 }
 
 static void MmForm_UpdateNativeMaskLighting(Player* player, PlayState* play) {
     // Exact fog/ambient keys from MM D_8085D848. Restore the pre-existing OoT
     // adjustment on exit, including weather effects and indoor lighting.
     static const struct {
-        s16 near;
+        s16 fogNear;
         u8 fog[3], ambient[3];
     } keys[] = {
         { 650, { 0, 0, 0 }, { 10, 0, 30 } },
@@ -181,8 +324,8 @@ static void MmForm_UpdateNativeMaskLighting(Player* player, PlayState* play) {
         play->envCtx.adjFogColor[i] = (s16)(fog + (keys[key].fog[i] - fog) * weight) - base.fogColor[i];
         play->envCtx.adjLight1Color[i] = (s16)(light * (1.0f - weight)) - base.light1Color[i];
     }
-    const f32 near = key ? keys[key - 1].near : base.fogNear;
-    play->envCtx.adjFogNear = (s16)(near + (keys[key].near - near) * weight) - base.fogNear;
+    const f32 fogNear = key ? keys[key - 1].fogNear : base.fogNear;
+    play->envCtx.adjFogNear = (s16)(fogNear + (keys[key].fogNear - fogNear) * weight) - base.fogNear;
     const u8 flash = value > 1.0f && value < 2.0f;
     Lights_PointNoGlowSetInfo(&sNativeMaskCs.lightInfo, player->actor.world.pos.x, player->actor.world.pos.y + 20.0f,
                               player->actor.world.pos.z, flash ? 255 : 120, flash ? 255 : 200, 255,
@@ -273,10 +416,17 @@ static u8 MmForm_BeginNativeMaskCutscene(Player* player, PlayState* play, u8 rem
     memcpy(sNativeMaskCs.fog, play->envCtx.adjFogColor, sizeof(sNativeMaskCs.fog));
     sNativeMaskCs.fogNear = play->envCtx.adjFogNear;
     sNativeMaskCs.previousCamera = play->activeCamera;
-    player->actor.shape.rot.y = Camera_GetCamDirYaw(GET_ACTIVE_CAM(play)) + 0x8000;
-    player->yaw = player->actor.shape.rot.y;
+    Camera* previous = GET_ACTIVE_CAM(play);
+    OLib_Vec3fDiffToVecSphGeo(&sNativeMaskCs.camera.previousOffset, &previous->at, &previous->eye);
+    sNativeMaskCs.camera.previousFov = previous->fov;
+    sNativeMaskCs.camera.yaw = sNativeMaskCs.camera.previousOffset.r > 0.0f ? sNativeMaskCs.camera.previousOffset.yaw
+                                                                            : Camera_GetCamDirYaw(previous) + 0x8000;
+    player->actor.shape.rot.y = player->yaw = sNativeMaskCs.camera.yaw;
     sNativeMaskCs.cameraId = Play_CreateSubCamera(play);
     if (sNativeMaskCs.cameraId != SUBCAM_NONE) {
+        Play_CameraSetAtEye(play, sNativeMaskCs.cameraId, &previous->at, &previous->eye);
+        Play_CameraSetFov(play, sNativeMaskCs.cameraId, previous->fov);
+        Play_SetCameraRoll(play, sNativeMaskCs.cameraId, 0);
         Play_ChangeCameraStatus(play, sNativeMaskCs.previousCamera, CAM_STAT_WAIT);
         Play_ChangeCameraStatus(play, sNativeMaskCs.cameraId, CAM_STAT_ACTIVE);
     }
@@ -350,8 +500,10 @@ static u8 MmForm_UpdateNativeMaskCutscene(Player* player, PlayState* play, u8 re
         const bool skip = timer >= 5 && CHECK_BTN_ANY(play->state.input[0].press.button,
                                                       BTN_A | BTN_B | BTN_CUP | BTN_CDOWN | BTN_CLEFT | BTN_CRIGHT);
         if (timer >= (removing ? 57 : 85) || skip) {
-            if (skip)
+            if (skip) {
+                sNativeMaskCs.camera.state = 999;
                 MmForm_StopNativeMaskSfx(false);
+            }
             gFormState.cutscenePhase = 1;
             MmSfx_PlayTransformFlash();
         }

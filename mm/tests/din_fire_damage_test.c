@@ -34,6 +34,8 @@ void CollisionCheck_HitEffects(PlayState* state, Collider* at, ColliderElement* 
     (void)acElem;
     (void)hitPos;
 }
+void AudioSfx_StopByPosAndId(Vec3f* position, u16 sound) {
+}
 u8 TridentChargeBall_GetFierceDamage(Actor* actor) {
     (void)actor;
     return 0;

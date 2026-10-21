@@ -67,7 +67,8 @@ def main(test_source=None):
             binary = temp / Path(source).stem
             subprocess.run([os.environ.get("CC", "cc"), *flags,
                             source, "soh/src/code/din_fire_sword.c",
-                            "soh/src/code/z_collision_check.c", "soh/src/code/z_actor.c", *wrappers,
+                            "soh/src/code/z_collision_check.c", "soh/src/code/z_actor.c",
+                            "soh/src/code/elemental_sword_finish.c", *wrappers,
                             "-Wl,--gc-sections", "-lm", "-o", str(binary)], cwd=ROOT, check=True)
             subprocess.run([str(binary)], check=True)
 

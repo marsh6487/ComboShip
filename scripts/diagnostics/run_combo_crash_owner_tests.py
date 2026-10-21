@@ -117,12 +117,14 @@ int main() {
         actor_source.write_text(r'''
 #include "z64.h"
 #include "crash_actor_context.h"
+#include "din_fire_sword.h"
 #include <assert.h>
 #include <setjmp.h>
 ''' + native[start:end] + r'''
 static PlayState play;
 static Actor outerActor, innerActor;
 static jmp_buf crashEscape;
+static unsigned finishBegins, finishEnds;
 static void CheckSnapshot(Actor* actor, PlayState* state) {
     const MMCrashActorContext* context = MM_GetCrashActorContext();
     assert(context->active && context->sceneId == state->sceneId);
@@ -130,6 +132,14 @@ static void CheckSnapshot(Actor* actor, PlayState* state) {
     assert(context->actorId == actor->id && context->category == actor->category);
     assert(context->params == actor->params && context->actor == (uintptr_t)actor);
     assert(context->callback == (uintptr_t)actor->update);
+}
+void DinFireSword_FinishBeginActor(PlayState* state, Actor* actor) {
+    CheckSnapshot(actor, state);
+    ++finishBegins;
+}
+void DinFireSword_FinishEndActor(PlayState* state, Actor* actor) {
+    CheckSnapshot(actor, state);
+    ++finishEnds;
 }
 static void InnerUpdate(Actor* actor, PlayState* state) { CheckSnapshot(actor, state); }
 static void OuterUpdate(Actor* actor, PlayState* state) {
@@ -157,12 +167,14 @@ int main(void) {
     assert(!MM_GetCrashActorContext()->active);
     Actor_RunUpdateWithCrashContext(&outerActor, &play);
     assert(!MM_GetCrashActorContext()->active);
+    assert(finishBegins == 2 && finishEnds == 2);
     outerActor.update = FailedUpdate;
     if (!setjmp(crashEscape)) Actor_RunUpdateWithCrashContext(&outerActor, &play);
     const MMCrashActorContext* saved = MM_GetCrashActorContext();
     assert(saved->active && saved->sceneId == 109 && saved->room == 3);
     assert(saved->actorId == ACTOR_EN_ITEM00 && saved->params == -7);
     assert(saved->actor == (uintptr_t)&outerActor && saved->callback == (uintptr_t)FailedUpdate);
+    assert(finishBegins == 3 && finishEnds == 2);
     return 0;
 }
 ''')

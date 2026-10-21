@@ -3,23 +3,35 @@
 #include "entrances/SoloForest.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "entrances/SoloForestResources.h"
+#include "entrances/NativeForest.h"
+#include "entrances/NativeForestResourceData.h"
+#include "entrances/NativeForestMaterials.h"
+#include "mods/transformation_masks/assets/mm_asset_loader.h"
 #include "entrances/SoloForestScroll.h"
 #include "global.h"
+#include "soh/frame_interpolation.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/ShipInit.hpp"
 #include "soh/SaveManager.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
-#include "../../../../mm/2s2h/Enhancements/Graphics/ComboForestPortalEffect.h"
+#include "actors/ForestGiParticles.h"
+#include "soh/Enhancements/randomizer/NeiGiRender.h"
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <ship/Context.h>
+#include <ship/resource/ResourceManager.h>
+#include <ship/resource/type/Blob.h>
 
 extern "C" {
 u8 ResourceMgr_FileExists(const char* path);
 }
 
 namespace {
+// Display-list macros redeclare these helpers at block scope in this namespace.
+extern "C" void FrameInterpolation_RecordOpenChild(const void* a, int b);
+extern "C" void FrameInterpolation_RecordCloseChild(void);
 struct ForestOrigin {
     int entrance;
     Vec3f pos;
@@ -41,6 +53,15 @@ u32 ForestSeed() {
     return IS_RANDO ? Rando::Context::GetInstance()->GetSeed() : 0;
 }
 bool ForestPack() {
+    if (NativeForest::CoreAvailable(NativeForest::kOotSoloScene,
+                                    [](const char* path) { return ResourceMgr_FileExists(path); })) {
+        MmAssets_Init();
+        // The MM owner is mounted lazily and is not in SoH's startup name
+        // cache. Query that owner's archive before entering native MM art.
+        if (NativeForest::SceneAvailable(NativeForest::kOotSoloScene, ResourceMgr_FileExists,
+                                         MmAssets_BaseResourceExists, NativeForest::LoadDependencies))
+            return true;
+    }
     return std::all_of(std::begin(kSoloForestResources), std::end(kSoloForestResources),
                        [](const char* path) { return ResourceMgr_FileExists(path); });
 }
@@ -48,6 +69,11 @@ bool ForestVisit(const PlayState* play) {
     return play &&
            ComboSoloForest_IsOotVisit(play->sceneNum, play->roomCtx.curRoom.num, gSaveContext.gameMode,
                                       gSaveContext.fileNum, gSaveContext.sceneLayer, gSaveContext.cutsceneIndex);
+}
+bool NativePortal(const PlayState* play) {
+    const auto* mesh = play ? play->roomCtx.curRoom.meshHeader : nullptr;
+    return mesh && mesh->base.type == 2 &&
+           NativeForest::PortalEntries(static_cast<const PolygonDlist2*>(mesh->polygon2.start), mesh->polygon2.num);
 }
 bool OriginScene(const PlayState* play) {
     return play && play->sceneNum == SCENE_LOST_WOODS && play->roomCtx.curRoom.num == 1;
@@ -102,7 +128,7 @@ void ForestPlayerUpdate() {
         const float dx = pos.x - COMBO_SOLO_FOREST_STUMP_X, dz = pos.z - COMBO_SOLO_FOREST_STUMP_Z;
         if (dx * dx + dz * dz > 14400)
             sForestArmed = true;
-        if (sForestArmed && ComboSoloForest_AtStump(pos.x, pos.y, pos.z)) {
+        if (sForestArmed && ComboSoloForest_AtStumpWidth(pos.x, pos.y, pos.z, NativePortal(play) ? 42 : 58)) {
             sForestArmed = false;
             sLocalReturning = true;
             ForestTransition(play, sForestOrigin.entrance);
@@ -221,7 +247,8 @@ void DrawForestPortal() {
         return;
     if (sForestTitle) {
         auto& title = play->actorCtx.titleCtx;
-        if (!title.durationTimer && !title.delayTimer && !title.alpha) {
+        if (!title.durationTimer && !title.delayTimer && !title.alpha &&
+            ResourceMgr_FileExists("custom/skiejer_forest/title")) {
             title = {};
             title.texture = const_cast<char*>(kForestTitle);
             title.isBossCard = false;
@@ -235,46 +262,14 @@ void DrawForestPortal() {
         }
         sForestTitle = false;
     }
-    using namespace ComboForestPortalEffect;
-    std::array<Vertex, kVertexCount> shape;
-    Build(play->gameplayFrames, true, shape);
-    auto* vertices = static_cast<Vtx*>(Graph_Alloc(play->state.gfxCtx, sizeof(Vtx) * kVertexCount));
-    if (!vertices)
-        return;
-    for (int i = 0; i < kVertexCount; ++i) {
-        vertices[i] = {};
-        vertices[i].v.ob[0] = shape[i].x;
-        vertices[i].v.ob[1] = shape[i].y;
-        vertices[i].v.ob[2] = 10;
-        vertices[i].v.cn[0] = shape[i].r;
-        vertices[i].v.cn[1] = shape[i].g;
-        vertices[i].v.cn[2] = shape[i].b;
-        vertices[i].v.cn[3] = shape[i].a;
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
     Matrix_Push();
     Matrix_Translate(COMBO_SOLO_FOREST_STUMP_X, 0, COMBO_SOLO_FOREST_STUMP_Z, MTXMODE_NEW);
     Matrix_RotateY(COMBO_SOLO_FOREST_STUMP_YAW * (6.28318530718f / 65536.0f), MTXMODE_APPLY);
-    gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(play->state.gfxCtx, __FILE__, __LINE__),
-              G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_FOG | G_CULL_BOTH);
-    gSPTexture(POLY_XLU_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
-    gDPSetRenderMode(POLY_XLU_DISP++, G_RM_PASS, G_RM_AA_ZB_XLU_SURF2);
-    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_SHADE, G_CC_SHADE);
-    for (int i = 0; i < kRimSegments; ++i) {
-        gSPVertex(POLY_XLU_DISP++, reinterpret_cast<uintptr_t>(&vertices[i * 4]), 4, 0);
-        gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
-    }
-    for (int i = 0; i < kGlints; ++i) {
-        gSPVertex(POLY_XLU_DISP++, reinterpret_cast<uintptr_t>(&vertices[kRimSegments * 4 + i * 5]), 5, 0);
-        gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
-        gSP2Triangles(POLY_XLU_DISP++, 0, 3, 4, 0, 0, 4, 1, 0);
-    }
+    const bool authored = ResourceMgr_FileExists(NativeForest::kAuthoredPortalMarker);
+    const auto mesh =
+        ForestGiParticles::Portal(play->gameplayFrames, !NativePortal(play) || authored, NeiGi_CameraBasis(play));
+    NeiGi_DrawWorldParticles(play, mesh);
     Matrix_Pop();
-    gDPPipeSync(POLY_XLU_DISP++);
-    Gfx_SetupDL_25Xlu(play->state.gfxCtx);
-    CLOSE_DISPS(play->state.gfxCtx);
 }
 void ResetForestFile() {
     // InitFile also runs under saveMtx. Never wait for a worker that needs
@@ -317,9 +312,44 @@ RegisterShipInitFunc init(RegisterSoloForest);
 extern "C" void ComboSoloForestOot_NormalizeEntry(void) {
     NormalizeForestEntry();
 }
-extern "C" void ComboSoloForestOot_DrawMaterials(PlayState* play) {
-    if (!ForestVisit(play) || !ResourceMgr_FileExists(SoloForestScroll::kMarker))
+namespace {
+std::vector<NativeForestMaterials::Binding> LoadNativeForestBindings() {
+    const auto manager = Ship::Context::GetRawInstance()->GetResourceManager();
+    const auto blob = std::dynamic_pointer_cast<Ship::Blob>(manager->LoadResource(NativeForestMaterials::kPath));
+    return blob ? NativeForestMaterials::Parse(blob->Data.data(), blob->Data.size())
+                : std::vector<NativeForestMaterials::Binding>{};
+}
+
+void DrawNativeForestMaterials(PlayState* play) {
+    if (!ForestVisit(play) || !ResourceMgr_FileExists(NativeForest::kMarker) ||
+        !ResourceMgr_FileExists(NativeForestMaterials::kPath))
         return;
+    const auto bindings = LoadNativeForestBindings();
+    const u32 frame = play->gameplayFrames;
+    OPEN_DISPS(play->state.gfxCtx);
+    for (const auto& binding : bindings) {
+        const auto& first = binding.layers[0];
+        const auto& second = binding.layers[1];
+        Gfx* scroll = binding.count == 1
+                          ? Gfx_TexScrollEx(play->state.gfxCtx, frame * first.x, frame * first.y, first.width,
+                                            first.height, first.x, first.y)
+                          : Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, frame * first.x, frame * first.y, first.width,
+                                               first.height, 1, frame * second.x, frame * second.y, second.width,
+                                               second.height, first.x, first.y, second.x, second.y);
+        gSPSegment(POLY_OPA_DISP++, binding.segment, reinterpret_cast<uintptr_t>(scroll));
+        gSPSegment(POLY_XLU_DISP++, binding.segment, reinterpret_cast<uintptr_t>(scroll));
+    }
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+} // namespace
+extern "C" void ComboSoloForestOot_DrawMaterials(PlayState* play) {
+    if (!ForestVisit(play))
+        return;
+    const auto* mesh = play->roomCtx.curRoom.meshHeader;
+    if ((mesh && mesh->base.type == 2) || !ResourceMgr_FileExists(SoloForestScroll::kMarker)) {
+        DrawNativeForestMaterials(play);
+        return;
+    }
     const u32 frame = play->gameplayFrames;
     OPEN_DISPS(play->state.gfxCtx);
     for (const auto& binding : SoloForestScroll::kBindings) {

@@ -22,7 +22,23 @@ def main():
     enums = enums[:enums.index("} MmFormStateId;") + len("} MmFormStateId;")]
     source = (ROOT / "tests/native_transformations/sequence_test.cpp").read_text()
     source = source.replace("/* PRODUCTION_STATE_ENUM */", enums)
-    source = source.replace("/* PRODUCTION_NATIVE_SEQUENCE */", native.read_text() if native.exists() else "")
+    host_camera = (ROOT / "soh/src/code/z_camera.c").read_text()
+    source = source.replace("/* PRODUCTION_CAMERA_MATH */", "\n".join(
+        function(host_camera, name) for name in
+        ("Camera_LERPCeilF", "Camera_LERPCeilS", "Camera_LERPCeilVec3f")))
+    donor_header = (ROOT / "mm/include/z64camera.h").read_text()
+    start = donor_header.rfind("typedef struct", 0, donor_header.index("} Demo4ReadOnlyData;"))
+    end = donor_header.index("} Demo5;") + len("} Demo5;")
+    donor = (ROOT / "mm/src/code/z_camera.c").read_text()
+    reference = (ROOT / "tests/native_transformations/camera_reference.inc.h").read_text()
+    reference = reference.replace("/* DONOR_CAMERA_TYPES */", donor_header[start:end])
+    reference = reference.replace("/* DONOR_CAMERA_FUNCTIONS */", "\n".join(
+        function(donor, name) for name in ("Camera_Demo4", "Camera_Demo5")))
+    source = source.replace("/* DONOR_CAMERA_REFERENCE */", reference)
+    # The Windows SDK defines this legacy macro to nothing. Keep that expansion
+    # active while compiling the actual controller on every test host.
+    source = source.replace("/* PRODUCTION_NATIVE_SEQUENCE */",
+                            "#define near\n" + native.read_text() + "\n#undef near\n" if native.exists() else "")
     player = (ROOT / "soh/src/overlays/actors/ovl_player_actor/z_player.c").read_text()
     camera = (ROOT / "soh/mods/items/helpers/camera_helper.c").read_text()
     # These C functions use `this` as an ordinary identifier; compile their
@@ -54,14 +70,16 @@ def main():
             for case in ("mask-on", "mask-off", "audio", "skip", "instant", "failure", "toggle",
                          "missing-animation", "missing-mask", "missing-animation-off", "missing-mask-off",
                          "scene-lifecycle", "scene-address-reuse", "destroy-after-reveal", "camera-lighting",
-                         "effects", "audio-off", "death-after-reveal", "drawn-item", "bubble-aim"):
-                forms = range(4) if case in ("mask-on", "mask-off", "audio", "audio-off") else (3,)
+                         "effects", "audio-off", "death-after-reveal", "drawn-item", "bubble-aim",
+                         "camera-donor-on", "camera-donor-off", "camera-skip", "camera-facing"):
+                forms = range(4) if case in ("mask-on", "mask-off", "audio", "audio-off") or case.startswith("camera-donor") else (3,)
                 for form_id in forms:
-                    ages = (0, 1) if case in ("mask-on", "mask-off") else (1,)
+                    ages = (0, 1) if case in ("mask-on", "mask-off") or case.startswith("camera-donor") else (1,)
                     for age in ages:
                         subprocess.run([str(binary), case], check=True,
                                        env={**environment, "NATIVE_FORM": str(form_id), "NATIVE_AGE": str(age)})
-            print("PASS native transformation sequence: " + ("ComboShip OoT" if combined else "solo SoH"), flush=True)
+            print("PASS native transformation sequence with Windows near macro: " +
+                  ("ComboShip OoT" if combined else "solo SoH"), flush=True)
 
 
 if __name__ == "__main__":

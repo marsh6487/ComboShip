@@ -6,6 +6,7 @@
 #include "soh/Enhancements/audio/SeasonWeather.h"
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
 #include "overlays/actors/ovl_En_Weather_Tag/z_en_weather_tag.h"
+#include "overlays/actors/ovl_Door_Ana/z_door_ana.h"
 #include <cmath>
 #include <cstring>
 #include <map>
@@ -24,7 +25,9 @@ int32_t SeasonWeather_LightOffset(const PlayState*, int32_t, int32_t) __attribut
 void SeasonWeather_Update(PlayState*) __attribute__((weak));
 void SeasonWeather_Reset(void) __attribute__((weak));
 void SeasonWeather_RecordLighting(PlayState*) __attribute__((weak));
-void SeasonWeather_TestRodBridge(PlayState*, u8);
+void SeasonWeather_TestRodBridge(PlayState*);
+void DoorAna_WaitClosed(DoorAna*, PlayState*);
+void DoorAna_WaitOpen(DoorAna*, PlayState*);
 void Seasons_PrecipTint(u8*, u8*, u8*);
 void func_800766C4(PlayState*);
 void func_8006FB94(EnvironmentContext*, u16);
@@ -55,6 +58,28 @@ u16 gTimeSpeed = 0;
 static GameInfo sGameInfo = {};
 GameInfo* gGameInfo = &sGameInfo;
 u32 gBitFlags[32];
+Vec3f gSfxDefaultPos = {};
+f32 gSfxDefaultFreqAndVolScale = 1.0f;
+s8 gSfxDefaultReverb = 0;
+static int sPuzzleChimes;
+// The real unopened-grotto decision runs below; audio output and the unrelated
+// bomb-collider path are boundaries of this headless seasonal fixture.
+void DoorAna_WaitOpen(DoorAna*, PlayState*) {
+}
+void Audio_PlaySfxGeneral(u16 sfxId, Vec3f*, u8, f32*, f32*, s8*) {
+    REQUIRE(sfxId == NA_SE_SY_CORRECT_CHIME);
+    ++sPuzzleChimes;
+}
+s32 Collider_DestroyCylinder(PlayState*, ColliderCylinder*) {
+    return 0;
+}
+void Collider_UpdateCylinder(Actor*, ColliderCylinder*) {
+}
+s32 CollisionCheck_SetAC(PlayState*, CollisionCheckContext*, Collider*) {
+    return 0;
+}
+void Actor_SetClosestSecretDistance(Actor*, PlayState*) {
+}
 // Platform and unrelated sandstorm/debug IO boundaries. The tested rain and
 // cloud actor functions, range checks and event flags are production code.
 f32 Actor_WorldDistXZToActor(Actor* a, Actor* b) {
@@ -790,18 +815,54 @@ static void IntermittentSeasonRainHasPrivatePausedCadence() {
     REQUIRE(f.play.envCtx.unk_EE[0] == 0);
 }
 
+static void SeasonsCannotActivateStormsGrottosOrConsumeTheRealSong() {
+    for (int season = 0; season < SEASON_SLOTS; ++season) {
+        for (int presentation : { -2, -1, SEASON_SPRING, SEASON_SUMMER, SEASON_AUTUMN, SEASON_WINTER }) {
+            for (bool indoors : { false, true }) {
+                Fixture f;
+                f.Select(presentation);
+                sSave.seasonsOwned = 0x0F;
+                sSave.season = season;
+                f.play.envCtx.indoors = indoors;
+                Flags_SetEnv(&f.play, 7); // unrelated environment state survives
+                DoorAna grotto = {};
+                grotto.actor.params = 0x100; // native unopened Storms grotto
+                grotto.actionFunc = DoorAna_WaitClosed;
+                sPuzzleChimes = 0;
+                for (int frame = 0; frame < 3; ++frame) {
+                    SeasonWeather_TestRodBridge(&f.play);
+                    f.Frame();
+                    DoorAna_WaitClosed(&grotto, &f.play);
+                    REQUIRE(grotto.actionFunc == DoorAna_WaitClosed);
+                    REQUIRE(sPuzzleChimes == 0);
+                    REQUIRE(f.play.envFlags[0] == (1 << 7));
+                }
+                // Native En_Okarina_Effect owns flag 5 when the actual song
+                // reaches its activation frame. Seasonal updates must leave it.
+                Flags_SetEnv(&f.play, 5);
+                SeasonWeather_TestRodBridge(&f.play);
+                f.Frame();
+                DoorAna_WaitClosed(&grotto, &f.play);
+                REQUIRE(grotto.actionFunc == DoorAna_WaitOpen);
+                REQUIRE(sPuzzleChimes == 1);
+                REQUIRE(f.play.envFlags[0] == ((1 << 7) | (1 << 5)));
+            }
+        }
+    }
+}
+
 static void SavedRodGameplayAndNativeParticleColorStaySeparate() {
     Fixture f;
     f.Select(-1);
-    SeasonWeather_TestRodBridge(&f.play, SEASON_AUTUMN);
-    REQUIRE(f.play.envFlags[0] & (1 << 5));
+    SeasonWeather_TestRodBridge(&f.play);
+    REQUIRE((f.play.envFlags[0] & (1 << 5)) == 0);
     REQUIRE(f.play.envCtx.unk_EE[0] == 0);
     f.play.envFlags[0] = 0;
     f.Select(SEASON_AUTUMN);
-    SeasonWeather_TestRodBridge(&f.play, SEASON_SPRING);
+    SeasonWeather_TestRodBridge(&f.play);
     REQUIRE((f.play.envFlags[0] & (1 << 5)) == 0);
     f.play.envCtx.indoors = 1;
-    SeasonWeather_TestRodBridge(&f.play, SEASON_AUTUMN);
+    SeasonWeather_TestRodBridge(&f.play);
     REQUIRE((f.play.envFlags[0] & (1 << 5)) == 0);
     f.play.envCtx.indoors = 0;
     f.play.envCtx.unk_EE[2] = 11;
@@ -811,7 +872,7 @@ static void SavedRodGameplayAndNativeParticleColorStaySeparate() {
     u8 r = 0, g = 0, b = 0;
     Seasons_PrecipTint(&r, &g, &b);
     REQUIRE(r == 200 && g == 200 && b == 200);
-    SeasonWeather_TestRodBridge(&f.play, SEASON_WINTER);
+    SeasonWeather_TestRodBridge(&f.play);
     REQUIRE(f.play.envCtx.unk_EE[2] == 11 && f.play.envCtx.unk_EE[3] == 31);
 }
 
@@ -1079,6 +1140,7 @@ int main() {
     IntermittentSeasonRainHasPrivatePausedCadence();
     EligibilityAndLightingRespectSceneState();
     ParticleEligibilityDoesNotTakeOwnershipOfTheSky();
+    SeasonsCannotActivateStormsGrottosOrConsumeTheRealSong();
     SavedRodGameplayAndNativeParticleColorStaySeparate();
     RealEnvironmentRainAndSkyRestoreComposeWithSeason();
     DuplicateUpdatesAndSceneReuseDoNotLeakOwnership();

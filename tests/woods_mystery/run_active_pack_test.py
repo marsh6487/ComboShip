@@ -7,7 +7,7 @@ sys.path.insert(0,str(root/'scripts/diagnostics'))
 from run_time_pedestal_tests import block_from
 renderer=(root/'mm/2s2h/Enhancements/Graphics/ComboLostWoodsPassage.cpp').read_text()
 draw=block_from(renderer,renderer.index('static void DrawWoodsMysteryHexes('))
-draw=draw[:draw.index('    using namespace')]+'\n++draws;\n}\n'
+draw=draw[:draw.index('    Matrix_Push()')]+'\n++draws;\n}\n'
 arch=block_from(renderer,renderer.index('static void DrawPassage('))
 arch=arch[:arch.index('    static const bool built')]+'\n++arches;\n}\n'
 source=r'''
@@ -83,7 +83,7 @@ int main() {
     DrawPassage();assert(arches==1); // Missing assets retain the legacy fallback.
     entries[1].opa=(Gfx*)kBridgeMesh;altEnabled=false;
     DrawPassage();assert(arches==1); // Stale pack headers cannot double the arch.
-    std::puts("PASS: verified baked entrance draws hexes without any archive in combined/solo modes; native/pack ownership suppresses duplicate arches; missing assets retain fallback");
+    std::puts("PASS: verified baked entrance draws GI hex motes without any archive in combined/solo modes; native/pack ownership suppresses duplicate arches; missing assets retain fallback");
 }
 '''
 source=source.replace('/* DRAW_GUARD */',draw).replace('/* ARCH_GUARD */',arch)

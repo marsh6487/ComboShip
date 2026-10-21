@@ -2931,6 +2931,15 @@ void Interpreter::GfxDpLoadTlut(uint8_t tile, uint32_t high_index) {
             memcpy(mRdp->palette_staging[0] + paletteByteOffset, src, copyLen);
             mRdp->palettes[0] = mRdp->palette_staging[0];
             mRdp->palette_dram_addr[0] = src;
+            // Partial CI8 TLUTs can span both banks too (Saria uses 252
+            // eye colors and 232 mouth colors). Keep their upper colors;
+            // the small CI4 uploads above still touch only their own bank.
+            if (byteCount > copyLen) {
+                uint32_t remaining = std::min(byteCount - copyLen, uint32_t(256));
+                memcpy(mRdp->palette_staging[1], src + copyLen, remaining);
+                mRdp->palettes[1] = mRdp->palette_staging[1];
+                mRdp->palette_dram_addr[1] = src + copyLen;
+            }
         } else {
             // Palettes 8-15 range
             uint32_t offset = paletteByteOffset - 256;

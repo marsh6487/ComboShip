@@ -34,10 +34,13 @@ static inline int ComboSoloForest_IsOotVisit(int scene, int room, int gameMode, 
     return 0;
 #endif
 }
-static inline int ComboSoloForest_AtStump(float x, float y, float z) {
+static inline int ComboSoloForest_AtStumpWidth(float x, float y, float z, float halfWidth) {
     const float angle = COMBO_SOLO_FOREST_STUMP_YAW * (6.28318530718f / 65536.0f);
     const float dx = x - COMBO_SOLO_FOREST_STUMP_X, dz = z - COMBO_SOLO_FOREST_STUMP_Z;
     const float lateral = dx * cosf(angle) - dz * sinf(angle);
     const float depth = dx * sinf(angle) + dz * cosf(angle);
-    return lateral > -58 && lateral < 58 && depth > -62 && depth < 12 && y > -40 && y < 130;
+    return lateral > -halfWidth && lateral < halfWidth && depth > -62 && depth < 12 && y > -40 && y < 130;
+}
+static inline int ComboSoloForest_AtStump(float x, float y, float z) {
+    return ComboSoloForest_AtStumpWidth(x, y, z, 58);
 }

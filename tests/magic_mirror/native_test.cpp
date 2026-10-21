@@ -28,7 +28,7 @@ static bool owned, blocked, pack = true;
 static bool pending, stow;
 static bool alternateModel;
 static int animationStarts, idleRestores;
-static int mirrorDraws, matrixDepth;
+static int mirrorDraws, worldShimmerDraws, matrixDepth;
 static Vec3f mirrorOrigin;
 static int handoffs, prompts, pickups, errors, saves;
 static u32 seed = 77;
@@ -36,6 +36,9 @@ static u16 buttonItem;
 static u8 textState;
 static bool advance;
 static int closed;
+static bool nativeMessages;
+static void TestMessageSfx() {}
+#include "native_message.inc.h"
 static bool noFloor, obstructed;
 static float floorY;
 static CollisionPoly landingFloor;
@@ -61,15 +64,27 @@ bool TransitionPending() { return pending; }
 bool AlternateModel() { return alternateModel; }
 bool TimedActivity() { return false; }
 bool QueuePickup(int) { ++pickups; return true; }
+void DrawWorldShimmer(PlayState*) { ++worldShimmerDraws; }
 void OpenPrompt() {
     ++prompts;
     SetText(0x3FEC);
     play.msgCtx.msgMode = MSGMODE_TEXT_DISPLAYING;
     textState = TEXT_STATE_CHOICE;
+    if (nativeMessages) {
+        play.msgCtx.msgLength = 64;
+        play.msgCtx.msgMode = MSGMODE_TEXT_DONE;
+#ifdef MIRROR_OOT
+        play.msgCtx.textboxEndType = TEXTBOX_ENDTYPE_2_CHOICE;
+#else
+        play.msgCtx.textboxEndType = TEXTBOX_ENDTYPE_TWO_CHOICE;
+        play.msgCtx.nextTextId = 0xFFFF;
+#endif
+    }
 }
 bool RequestHandoff() { ++handoffs; return true; }
 void Save() { ++saves; }
 void Error() { ++errors; }
+void Trace(const char*, PlayState*) {}
 bool ButtonClaimed(u16) { return false; }
 u16 ButtonItem(s32) { return buttonItem; }
 }
@@ -92,14 +107,22 @@ extern "C" void Matrix_Scale(f32, f32, f32, TestMatrixMode) {}
 extern "C" void Matrix_ReplaceRotation(MtxF *) {}
 extern "C" uint8_t MagicMirror_IsOwned(void) { return owned; }
 extern "C" void TravelTools_Grant(uint16_t) { owned = true; }
-extern "C" auto Message_GetState(MessageContext*) -> decltype(Message_GetState((MessageContext*)nullptr)) {
+extern "C" auto Message_GetState(MessageContext* context) -> decltype(Message_GetState((MessageContext*)nullptr)) {
+    if (nativeMessages)
+        return NativeMessage_GetState(context);
     return textState;
 }
-extern "C" auto Message_ShouldAdvance(PlayState*) -> decltype(Message_ShouldAdvance((PlayState*)nullptr)) {
+extern "C" auto Message_ShouldAdvance(PlayState* current) -> decltype(Message_ShouldAdvance((PlayState*)nullptr)) {
+    if (nativeMessages)
+        return NativeMessage_ShouldAdvance(current);
     return advance;
 }
 extern "C" void Message_CloseTextbox(PlayState* current) {
     ++closed;
+    if (nativeMessages) {
+        NativeMessage_CloseTextbox(current);
+        return;
+    }
     current->msgCtx.msgMode = MSGMODE_TEXT_CLOSING;
     textState = TEXT_STATE_NONE;
 }
@@ -194,6 +217,22 @@ extern "C" void PlayerAnimation_Change(PlayState *, SkelAnime *skel,
 #include "combo/gameplay/MagicMirrorPlayer.inc.c"
 #include "combo/gameplay/MagicMirrorRuntime.inc.h"
 
+// Compile the actual native local-pad branch and each Wolf input policy. The
+// controller source remains untouched so the message can read Yes/No and B.
+static bool TestCustomItems_BlocksMovement(Player*) { return false; }
+static bool Testfunc_8082DA90(PlayState*) { return false; }
+static bool TestTransformMasks_IsTransformed() { return false; }
+static bool TestMmMaskWear_IsKamaroDancing() { return false; }
+static void TestWolfLinkHost_RestorePlayerInput(Player*, Input*) {}
+static void TestGameInteractor_ExecuteOnPassPlayerInputs(Input*) {}
+static void TestTransformMasks_FilterB(Input*) {}
+static void TestGetStickData(f32* magnitude, s16* yaw, Input* input) {
+    *magnitude = std::hypot(input->cur.stick_x, input->cur.stick_y);
+    *yaw = 0;
+}
+static s16 TestCameraYaw(PlayState*) { return 0; }
+#include "native_prompt_input.inc.h"
+
 void Scene(int scene) {
 #ifdef MIRROR_OOT
     play.sceneNum = scene;
@@ -219,9 +258,10 @@ void Reset() {
     pending = stow = false;
     alternateModel = false;
     animationStarts = idleRestores = 0;
-    mirrorDraws = matrixDepth = 0;
+    mirrorDraws = worldShimmerDraws = matrixDepth = 0;
     handoffs = prompts = pickups = errors = saves = 0;
     closed = 0; advance = false; textState = TEXT_STATE_NONE;
+    nativeMessages = false;
     buttonItem = EXT_ITEM_MAGIC_MIRROR;
     noFloor = obstructed = false;
     floorY = 0;
@@ -246,6 +286,16 @@ void Reset() {
     gSaveContext.respawn[RESPAWN_MODE_RETURN].pos = {-4, 5, -6};
     MirrorRuntime::Reset();
 }
+void CompletePromptClose() {
+  // The synthetic-message cases don't execute native Message_Update.
+  assert(MirrorRuntime::sPromptAccepted);
+  play.msgCtx.msgMode = MSGMODE_NONE;
+  play.msgCtx.msgLength = 0;
+  SetText(0);
+  textState = TEXT_STATE_NONE;
+  advance = false;
+  MirrorRuntime::Update();
+}
 void ConfirmCast() {
   play.state.input[0].press.button = BTN_CLEFT;
   MirrorRuntime::Update();
@@ -253,8 +303,237 @@ void ConfirmCast() {
   play.msgCtx.choiceIndex = 0;
   advance = true;
   MirrorRuntime::Update();
+  CompletePromptClose();
   advance = false;
   play.state.input[0].press.button = 0;
+}
+
+void TestPromptMovement() {
+    Reset();
+    play.state.input[0].press.button = BTN_CLEFT;
+    MirrorRuntime::Update();
+    auto& raw = play.state.input[0];
+    raw = {};
+    raw.cur.stick_x = 60;
+    raw.cur.stick_y = -40;
+    raw.cur.button = BTN_R;
+    raw.press.button = BTN_A;
+    const auto menuInput = raw;
+    NativeSetAction(&player, NativeIdle); // Native action cleanup clears the flag.
+    MirrorRuntime::Update();
+    assert(MirrorRuntime::sPrompt && (player.stateFlags1 & MirrorRuntime::kPromptFreeze));
+    // Clear again after the early prompt update: local-pad ownership must not
+    // depend on that native action flag surviving the rest of the frame.
+    NativeSetAction(&player, NativeIdle);
+#ifdef MIRROR_OOT
+    player.linearVelocity = player.actor.speedXZ = 4;
+#else
+    player.speedXZ = player.actor.speed = 4;
+#endif
+    player.actor.velocity.x = player.actor.velocity.z = 3;
+    const auto local = ReadNativePromptInput(&player, &play);
+    const Input empty{};
+    assert(std::memcmp(&local, &empty, sizeof(local)) == 0);
+    assert(player.actor.velocity.x == 0 && player.actor.velocity.z == 0);
+    // Wolf may read after another action change, including its raw-pad OoT
+    // route. The live prompt independently blocks every movement procedure.
+    NativeSetAction(&player, NativeIdle);
+#ifdef MIRROR_OOT
+    const auto wolf = TestWolfReadInput(&player, &play);
+#else
+    const auto wolf = TestWolfReadInput(&player, &play, &raw);
+#endif
+    assert(wolf.blocked && !wolf.aPress && !wolf.bPress);
+    assert(std::memcmp(&raw, &menuInput, sizeof(raw)) == 0);
+    raw.press.button = BTN_B;
+    MirrorRuntime::Update();
+    assert(!MirrorRuntime::sPrompt && !(player.stateFlags1 & MirrorRuntime::kPromptFreeze));
+    const auto closing = ReadNativePromptInput(&player, &play);
+    assert(std::memcmp(&closing, &empty, sizeof(closing)) == 0);
+#ifdef MIRROR_OOT
+    const auto closingWolf = TestWolfReadInput(&player, &play);
+#else
+    const auto closingWolf = TestWolfReadInput(&player, &play, &raw);
+#endif
+    assert(closingWolf.blocked && !closingWolf.aPress && !closingWolf.bPress);
+    assert(raw.cur.stick_x == menuInput.cur.stick_x && raw.press.button == BTN_B);
+    MirrorRuntime::Update(); // The next input frame restores gameplay control.
+    const auto released = ReadNativePromptInput(&player, &play);
+    assert(released.cur.stick_x == menuInput.cur.stick_x && released.press.button == BTN_B);
+#ifdef MIRROR_OOT
+    const auto releasedWolf = TestWolfReadInput(&player, &play);
+#else
+    const auto releasedWolf = TestWolfReadInput(&player, &play, &raw);
+#endif
+    assert(!releasedWolf.blocked && releasedWolf.bPress);
+    puts("PASS prompt owns human/Wolf movement after native action changes; raw choice pad and cancel restore preserved");
+}
+
+void TestPromptOwnsInputDuringNativeStateChanges() {
+    Reset();
+    play.state.input[0].press.button = BTN_CLEFT;
+    MirrorRuntime::Update();
+    auto& raw = play.state.input[0];
+    raw = {};
+    raw.cur.stick_x = raw.rel.stick_x = 60;
+    raw.cur.stick_y = raw.rel.stick_y = 40;
+    raw.cur.button = raw.press.button = BTN_A | BTN_B;
+    const auto choiceInput = raw;
+    NativeSetAction(&player, NativeIdle);
+    // Collision/interaction state is mutable inside Player_UpdateCommon,
+    // before late form readers. Eligibility changes must cancel at Update,
+    // not return the still-open prompt's input to a movement reader.
+    player.actor.bgCheckFlags &= ~BGCHECKFLAG_GROUND;
+    assert(MirrorRuntime::sPrompt);
+    assert(MagicMirror_PromptOwnsPlayer(&play, &player));
+    const auto local = ReadNativePromptInput(&player, &play);
+    const Input empty{};
+    assert(std::memcmp(&local, &empty, sizeof(local)) == 0);
+#ifdef MIRROR_OOT
+    const auto wolf = TestWolfReadInput(&player, &play);
+#else
+    const auto wolf = TestWolfReadInput(&player, &play, &raw);
+#endif
+    assert(wolf.blocked && !wolf.aPress && !wolf.bPress);
+    assert(std::memcmp(&raw, &choiceInput, sizeof(raw)) == 0);
+    MirrorRuntime::Update();
+    assert(!MirrorRuntime::sPrompt && closed == 1);
+    puts("PASS prompt keeps gameplay input through native eligibility changes until its owner cancels");
+}
+
+void TestMarioPromptInputGate() {
+    Reset();
+    assert(NativeMarioReadsPad(&play, &player));
+    play.state.input[0].press.button = BTN_CLEFT;
+    MirrorRuntime::Update();
+    NativeSetAction(&player, NativeIdle);
+    // MM Mario intentionally ignores its generic cutscene bit, and reads the
+    // untouched raw pad after native filtering. Ownership must park it before
+    // its input read/libsm64 position writeback, including accepted closing.
+    assert(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_NONE);
+    assert(!NativeMarioReadsPad(&play, &player));
+    play.state.input[0].press.button = BTN_A;
+    play.msgCtx.choiceIndex = 0;
+    advance = true;
+    MirrorRuntime::Update();
+    assert(MirrorRuntime::sPromptAccepted);
+    assert(!NativeMarioReadsPad(&play, &player));
+    CompletePromptClose();
+    assert(!NativeMarioReadsPad(&play, &player));
+    MirrorRuntime::Reset();
+    assert(NativeMarioReadsPad(&play, &player));
+    puts("PASS native Mario park gate covers prompt, accepted closing and cast, then releases");
+}
+
+void TestChoiceReleaseInput() {
+    for (bool yes : { false, true }) {
+        Reset();
+        play.state.input[0].press.button = BTN_CLEFT;
+        MirrorRuntime::Update();
+        auto& raw = play.state.input[0];
+        raw = {};
+        raw.press.button = BTN_A;
+        raw.cur.stick_x = 60;
+        raw.cur.stick_y = 20;
+        play.msgCtx.choiceIndex = yes ? 0 : 1;
+        advance = true;
+        const auto choiceInput = raw;
+        MirrorRuntime::Update();
+        assert(MirrorRuntime::sPrompt == yes);
+        const auto local = ReadNativePromptInput(&player, &play);
+        const Input empty{};
+        assert(std::memcmp(&local, &empty, sizeof(local)) == 0);
+#ifdef MIRROR_OOT
+        const auto wolf = TestWolfReadInput(&player, &play);
+#else
+        const auto wolf = TestWolfReadInput(&player, &play, &raw);
+#endif
+        assert(wolf.blocked && !wolf.aPress && !wolf.bPress);
+        assert(std::memcmp(&raw, &choiceInput, sizeof(raw)) == 0);
+        advance = false;
+        if (yes)
+            CompletePromptClose();
+        else
+            MirrorRuntime::Update();
+        if (yes) {
+            assert(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_PLAYING);
+        } else {
+            const auto released = ReadNativePromptInput(&player, &play);
+            assert(released.press.button == BTN_A && released.cur.stick_x == 60);
+        }
+    }
+    puts("PASS No/Yes consume one gameplay input frame without changing raw choice input; No restores and Yes casts");
+}
+
+void TestPromptOwnershipLifetime() {
+    for (int reason = 0; reason < 9; ++reason) {
+        Reset();
+        play.state.input[0].press.button = BTN_CLEFT;
+        MirrorRuntime::Update();
+        assert(MagicMirror_PromptOwnsPlayer(&play, &player));
+        switch (reason) {
+        case 0: SetText(1234); break;
+        case 1: play.msgCtx.msgMode = MSGMODE_TEXT_CLOSING; break;
+        case 2: play.msgCtx.msgMode = MSGMODE_NONE; break;
+        case 3: ++seed; break;
+        case 4: play.pauseCtx.state = 1; break;
+        case 5: owned = false; break;
+        case 6: gGameState = nullptr; break;
+        case 7: gComboGameMode = gComboGameMode == COMBO_GAME_MM ? COMBO_GAME_OOT : COMBO_GAME_MM; break;
+        case 8: gSaveContext.fileNum = 2; break;
+        }
+        if (reason == 4)
+            MirrorRuntime::Update(); // Safety cancellation belongs to the prompt owner.
+        assert(!MagicMirror_PromptOwnsPlayer(&play, &player));
+    }
+    Reset();
+    // Preserve a flag already owned before the prompt, but clear one that the
+    // prompt reacquires after the original native owner releases it.
+    player.stateFlags1 |= MirrorRuntime::kPromptFreeze;
+    play.state.input[0].press.button = BTN_CLEFT;
+    MirrorRuntime::Update();
+    MirrorRuntime::ReleasePrompt(true);
+    assert(player.stateFlags1 & MirrorRuntime::kPromptFreeze);
+    Reset();
+    player.stateFlags1 |= MirrorRuntime::kPromptFreeze;
+    play.state.input[0].press.button = BTN_CLEFT;
+    MirrorRuntime::Update();
+    NativeSetAction(&player, NativeIdle);
+    MirrorRuntime::Update();
+    MirrorRuntime::ReleasePrompt(true);
+    assert(!(player.stateFlags1 & MirrorRuntime::kPromptFreeze));
+    Reset();
+    auto* retired = new Player(player);
+#ifdef MIRROR_OOT
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &retired->actor;
+#else
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &retired->actor;
+#endif
+    play.state.input[0].press.button = BTN_CLEFT;
+    MirrorRuntime::Update();
+    assert(MagicMirror_PromptOwnsPlayer(&play, retired));
+    delete retired;
+#ifdef MIRROR_OOT
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
+#else
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
+#endif
+    assert(!MagicMirror_PromptOwnsPlayer(&play, &player));
+    MirrorRuntime::Update(); // Reject the old identity without touching freed memory.
+    assert(!MirrorRuntime::sPrompt);
+    Reset();
+    retired = new Player(player);
+#ifdef MIRROR_OOT
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &retired->actor;
+#else
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &retired->actor;
+#endif
+    play.state.input[0].press.button = BTN_CLEFT;
+    MirrorRuntime::Update();
+    delete retired;
+    MirrorRuntime::Destroy();
+    assert(!MirrorRuntime::sPrompt);
+    puts("PASS prompt identity/flag cleanup across message, file, mode, safety, player replacement and post-arena teardown");
 }
 
 void LoadForest(float x, float y, float z) {
@@ -313,7 +592,7 @@ void TestArrival() {
         assert(std::memcmp(&original, &copy, sizeof(original)) == 0);
         assert(play.linkActorEntry->pos.x == 1500 && play.linkActorEntry->pos.y == 240 &&
                play.linkActorEntry->pos.z == -1420);
-        assert(MagicMirrorAnchor::CanClaim({1500, 240, -1420}, {1500, 320, -1300}));
+        assert(!MagicMirrorAnchor::CanClaim({1500, 240, -1420}, {1500, 320, -1300}));
 #ifdef MIRROR_OOT
         assert(play.linkActorEntry->rot.y == 0);
 #else
@@ -358,8 +637,152 @@ void TestArrival() {
     puts("PASS native stump-relative arrival, scene moves, safe fallback, cached-resource/respawn preservation and one-shot context");
 }
 
+void TestStumpTopPickup() {
+    for (bool combined : { false, true }) {
+#ifdef MIRROR_OOT
+        if (combined)
+            continue; // Combined mode's forest and pickup belong to MM.
+#endif
+        for (int reason = 0; reason < 8; ++reason) {
+            Reset();
+            if (combined)
+                gComboGameMode = COMBO_GAME_BOTH;
+            LoadForest(-377, 80, 416);
+            play.transitionTrigger = TRANS_TRIGGER_OFF;
+            owned = false;
+            player.actor.world.pos = { -377, 80, 416 };
+            player.actor.floorHeight = 80;
+            player.actor.floorBgId = BGCHECK_SCENE;
+            player.actor.floorPoly = play.colCtx.colHeader->polyList;
+            switch (reason) {
+                case 0: player.actor.world.pos.y = player.actor.floorHeight = 0; break;
+                case 1: player.actor.world.pos.x += 45.1f; break;
+                case 2: player.actor.world.pos.y += 5.1f; break;
+                case 3: player.actor.floorBgId = 0; break; // A platform above the cap is not the stump.
+                case 4: player.actor.floorPoly = &landingFloor; break;
+                case 5: player.actor.floorHeight = 76; break; // Near the ramp's upper end.
+                case 6: player.actor.bgCheckFlags = 0; break;
+                case 7: player.actor.floorPoly = nullptr; break;
+            }
+            MirrorRuntime::Update();
+            assert(pickups == 0 && !owned && saves == 0);
+        }
+        Reset();
+        if (combined)
+            gComboGameMode = COMBO_GAME_BOTH;
+        LoadForest(-377, 80, 416);
+        play.transitionTrigger = TRANS_TRIGGER_OFF;
+        owned = false;
+        player.actor.world.pos = { -377, 80, 416 };
+        player.actor.floorHeight = 80;
+        player.actor.floorBgId = BGCHECK_SCENE;
+        player.actor.floorPoly = play.colCtx.colHeader->polyList;
+        MirrorRuntime::Update();
+        assert(pickups == 1 && !owned && saves == 0);
+        const int token = MirrorRuntime::sPickupToken;
+        MirrorRuntime::Update();
+        assert(pickups == 1);
+        MirrorRuntime::FinishPickup(token);
+        MirrorRuntime::FinishPickup(token);
+        assert(owned && saves == 1);
+        MirrorRuntime::Update();
+        assert(pickups == 1);
+    }
+    puts("PASS Mirror pickup requires grounded static stump-top contact, rejects base/ramp/platform, and grants once");
+}
+
+void TestWorldRewardShimmer() {
+    Reset();
+    LoadForest(-377, 80, 416);
+    owned = false;
+    MirrorRuntime::DrawWorld();
+    assert(mirrorDraws == 1 && worldShimmerDraws == 1 && matrixDepth == 0);
+    assert(mirrorOrigin.x == -377 && mirrorOrigin.y == 122 && mirrorOrigin.z == 416);
+    owned = true;
+    MirrorRuntime::DrawWorld();
+    owned = false;
+    MirrorRuntime::sPickupToken = 1;
+    MirrorRuntime::DrawWorld();
+    assert(mirrorDraws == 1 && worldShimmerDraws == 1);
+    for (int reason = 0; reason < 3; ++reason) {
+        Reset();
+        LoadForest(-377, 80, 416);
+        owned = false;
+        if (reason == 0)
+            play.roomCtx.curRoom.num = 1;
+        else if (reason == 1)
+            play.colCtx.colHeader = nullptr;
+        else
+            gComboGameMode = gComboGameMode == COMBO_GAME_MM ? COMBO_GAME_OOT : COMBO_GAME_MM;
+        MirrorRuntime::DrawWorld();
+        assert(mirrorDraws == 0 && worldShimmerDraws == 0 && matrixDepth == 0);
+    }
+    puts("PASS uncollected world Mirror alone requests native shimmer; owned/queued/invalid contexts suppress it");
+}
+
+void TestNativeChoiceLifecycle(bool combined) {
+    Reset();
+    if (combined)
+        gComboGameMode = COMBO_GAME_BOTH;
+    nativeMessages = true;
+    play.state.input[0].press.button = BTN_CLEFT;
+    MirrorRuntime::Update();
+    assert(Message_GetState(&play.msgCtx) == TEXT_STATE_CHOICE);
+    play.state.input[0].press.button = BTN_A;
+    MirrorRuntime::Update();
+    // A native close retains live text for two ticks. Forcing NONE here sends
+    // native drawing back to DISPLAYING and the next update cancels the cast.
+    assert(play.msgCtx.msgMode == MSGMODE_TEXT_CLOSING && play.msgCtx.msgLength != 0);
+    assert(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_NONE);
+    // Confirmation is committed: extra A/B/C presses during the native close
+    // cannot reopen the prompt, restart its timer or cancel the queued cast.
+    play.state.input[0].press.button = BTN_A | BTN_B | BTN_CLEFT;
+    MirrorRuntime::Update();
+    assert(closed == 1 && animationStarts == 0 && play.msgCtx.stateTimer == 2);
+    play.state.input[0].press.button = 0;
+    for (int frame = 0; frame < 2; ++frame) {
+        assert(MagicMirror_PromptOwnsPlayer(&play, &player));
+        // Native closing-tail boundary; HUD/audio/ocarina cleanup is outside
+        // this player fixture. The real GetState/ShouldAdvance/Close run above.
+        if (--play.msgCtx.stateTimer == 0) {
+            play.msgCtx.msgLength = 0;
+            play.msgCtx.msgMode = MSGMODE_NONE;
+            SetText(0);
+        }
+        MirrorRuntime::Update();
+    }
+    assert(closed == 1 && animationStarts == 1);
+    assert(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_PLAYING);
+    for (int frame = 0; frame < 80 && !MirrorRuntime::sDeparted; ++frame) {
+        player.actionFunc(&player, &play);
+        MirrorRuntime::Update();
+    }
+    assert(MirrorRuntime::sDeparted);
+#ifdef MIRROR_OOT
+    if (combined) {
+        assert(handoffs == 1 && play.transitionTrigger == TRANS_TRIGGER_OFF);
+    } else {
+        assert(play.nextEntranceIndex == COMBO_SOLO_FOREST_OOT_ENTRANCE);
+        assert(play.transitionTrigger == TRANS_TRIGGER_START);
+    }
+#else
+    assert(play.nextEntrance == (combined ? ENTRANCE(LOST_WOODS, 0) : COMBO_SOLO_FOREST_MM_ENTRANCE));
+    assert(play.transitionTrigger == TRANS_TRIGGER_START);
+#endif
+    puts("PASS single native Yes waits for textbox teardown, casts once and reaches Lost Woods travel");
+}
+
 int main() {
+    TestNativeChoiceLifecycle(false);
+    TestNativeChoiceLifecycle(true);
+    TestPromptOwnsInputDuringNativeStateChanges();
+    TestMarioPromptInputGate();
+    TestPromptMovement();
+    TestChoiceReleaseInput();
+    TestPromptOwnershipLifetime();
     TestArrival();
+    TestStumpTopPickup();
+    TestWorldRewardShimmer();
     assert(FcEquip_OotToMm16(EXT_ITEM_MAGIC_MIRROR) == EXT_ITEM_MAGIC_MIRROR);
     assert(FcEquip_MmToOot16(EXT_ITEM_MAGIC_MIRROR) == EXT_ITEM_MAGIC_MIRROR);
     assert(FcEquip_OotToMm16(EXT_ITEM_MAGIC_MIRROR + 1) == 0xFF);
@@ -387,6 +810,7 @@ int main() {
     play.state.input[0].press.button = BTN_A; play.msgCtx.choiceIndex = 0; advance = true; MirrorRuntime::Update();
     // Confirming commits to a visible cast before changing worlds.
     assert(closed == 1 && play.transitionTrigger == TRANS_TRIGGER_OFF);
+    CompletePromptClose();
     assert(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_PLAYING);
     assert(animationStarts == 1 &&
            (player.stateFlags1 & MirrorRuntime::kPromptFreeze));
@@ -414,7 +838,7 @@ int main() {
     alternateModel = true;
     player.actor.world.pos = {100, 20, -50};
     MirrorRuntime::DrawWorld();
-    assert(mirrorDraws == 2 && matrixDepth == 0);
+    assert(mirrorDraws == 2 && worldShimmerDraws == 0 && matrixDepth == 0);
     assert(mirrorOrigin.x == 100 && mirrorOrigin.y > 80 &&
            mirrorOrigin.z == -50);
     alternateModel = false;

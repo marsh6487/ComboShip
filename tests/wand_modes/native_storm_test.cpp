@@ -1,5 +1,6 @@
 // Native weather remains available to songs and the Rod of Seasons, independently of the Storm wand.
 #include "global.h"
+#include "din_fire_sword.h"
 #include "GameInteractor/GameInteractor.h"
 #include "overlays/actors/ovl_En_Okarina_Effect/z_en_okarina_effect.h"
 #include <cassert>
@@ -13,6 +14,14 @@ ActorOverlay gActorOverlayTable[ACTOR_ID_MAX]{};
 uintptr_t gSegments[NUM_SEGMENTS]{};
 LightningStrike gLightningStrike{};
 std::vector<void*> allocations;
+PlayState* gPlayState;
+int finishFatalCalls;
+Actor* finishActor;
+PlayState* finishPlay;
+// Elemental presentation is a boundary; native actor rejection remains real.
+void DinFireSword_FinishFatal(PlayState* play, Actor* actor) {
+    ++finishFatalCalls; finishPlay = play; finishActor = actor;
+}
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_UPDATE_DURING_OCARINA)
 
@@ -48,6 +57,7 @@ s32 FrameAdvance_IsEnabled(PlayState*) { return false; }
 int main() {
     Player player{};
     PlayState play{};
+    gPlayState = &play;
     play.objectCtx.numEntries = 1;
     play.objectCtx.slots[0].id = GAMEPLAY_KEEP;
 
@@ -62,6 +72,7 @@ int main() {
     Actor* rejected = accepted->next;
     assert(rejected != nullptr && rejected->update == nullptr);
     assert(spawned == rejected && "native weather still rejects a second rain owner during Init");
+    assert(finishFatalCalls == 1 && finishPlay == &play && finishActor == rejected);
 
     for (void* allocation : allocations) std::free(allocation);
     std::cout << "PASS native weather spawn success and Init rejection, independent of wand dispatch\n";

@@ -23,6 +23,8 @@ extern "C" {
 #endif
 int SwordElement_SlotForItem(uint16_t item);
 uint8_t SwordElement_IsAvailable(uint8_t element);
+// Menu selection uses the arrow unlock; cheats are an independent temporary override.
+uint8_t SwordElement_Override(void);
 uint8_t SwordElement_Get(uint16_t item);
 uint8_t SwordElement_HasSelection(uint16_t item);
 uint8_t SwordElement_Set(uint16_t item, uint8_t element);

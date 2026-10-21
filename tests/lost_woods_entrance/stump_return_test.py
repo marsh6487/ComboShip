@@ -93,12 +93,38 @@ int main() {
     entry.opa=(Gfx*)native;
     require(!ComboOpeningForest_UsesPackTunnel(&play) && ComboOpeningForest_AtReturn(&play,&stump),
             "native assets must use the temporary arch at the same stump");
+    alignas(Gfx) static const char nativePortal[]="__OTR__custom/comboship/native_forest/portal_root";
+    RoomShapeCullableEntry nativeEntries[3]{};
+    shape.cullable.base.type=ROOM_SHAPE_TYPE_CULLABLE;
+    shape.cullable.numEntries=3; shape.cullable.entries=nativeEntries;
+    nativeEntries[0].opa=(Gfx*)native;
+    require(ComboOpeningForest_ReturnPackVersion(&play)==0,
+            "ordinary stock culling entries must retain the procedural fallback");
+    nativeEntries[2].opa=(Gfx*)nativePortal;
+    require(ComboOpeningForest_ReturnPackVersion(&play)==9 && ComboOpeningForest_UsesPackTunnel(&play),
+            "the native scene portal must suppress the duplicate procedural arch");
+    const Vec3f nativeAnchor=ComboOpeningForest_ReturnAnchor(&play);
+    require(nativeAnchor.x==-695 && nativeAnchor.y==0 && nativeAnchor.z==-313 &&
+            ComboOpeningForest_ReturnYaw(&play)==12288 && ComboOpeningForest_AtReturn(&play,&stump),
+            "the native cullable portal must retain the accepted doorway and trigger pose");
+    const float nativeAngle=12288*(6.28318530718f/65536.0f);
+    Vec3f nativeJamb={-695+52*std::cos(nativeAngle)-20*std::sin(nativeAngle),0,
+                      -313-52*std::sin(nativeAngle)-20*std::cos(nativeAngle)};
+    require(!ComboOpeningForest_AtReturn(&play,&nativeJamb),
+            "the native arch jamb must not teleport outside its 44-unit mouth");
+    nativeEntries[2].opa=nullptr; nativeEntries[1].xlu=(Gfx*)nativePortal;
+    require(ComboOpeningForest_ReturnPackVersion(&play)==0,
+            "a portal name in an unrelated translucent slot must not suppress the fallback");
+    nativeEntries[2].opa=(Gfx*)nativePortal;
+    shape.cullable.entries=nullptr;
+    require(ComboOpeningForest_ReturnPackVersion(&play)==0,"an incomplete cullable mesh must retain its fallback");
+    shape.cullable.entries=nativeEntries;
     play.roomCtx.curRoom.num=1;
     require(!ComboOpeningForest_AtReturn(&play,&stump),"the second room must retain its native onward route");
     play.roomCtx.curRoom.num=0; gSaveContext.sceneLayer=1;
     require(!ComboOpeningForest_AtReturn(&play,&stump),"flashbacks must not receive a return trigger");
     require(std::memcmp(&original,&gSaveContext.save,sizeof(original))==0,"checking the return cannot change save progress");
-    std::puts("PASS right-nudge return: v8 active mesh/yaw, exact rotated bounds, native fallback, v1-v7 compatibility, every day/form, progress preserved");
+    std::puts("PASS right-nudge return: native cullable portal, v8 active mesh/yaw, exact rotated bounds, stock fallback, v1-v7 compatibility, every day/form, progress preserved");
 }
 '''
 with tempfile.TemporaryDirectory(prefix='forest-stump-') as temporary:

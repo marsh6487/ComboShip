@@ -12,6 +12,7 @@
 #include "z64.h"
 #include "functions.h"
 #include "macros.h"
+#include "din_fire_sword.h"
 #include "soh/Enhancements/game-interactor/vanilla-behavior/GIVanillaBehavior.h"
 extern "C" {
 SaveContext gSaveContext = {};
@@ -94,6 +95,8 @@ static bool NEI_PlayerDamageBoostActive() {
 // overlay has its own focused reaction tests.
 extern "C" uint8_t DinFireSword_DamageEntry(PlayState*, Actor*, const ColliderInfo*, uint32_t, uint8_t vanillaEntry) {
     return vanillaEntry;
+}
+extern "C" void DinFireSword_FinishAcceptedHit(PlayState*, const void*, const ColliderInfo*, uint32_t, uint32_t) {
 }
 #include "stat_upgrade_production.inc"
 

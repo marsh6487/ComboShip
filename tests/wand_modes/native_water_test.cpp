@@ -1,6 +1,7 @@
 // Native actor spawn/init/draw/destroy and dynapoly registration stay real.
 // Archive decoding, heap allocation and the graphics interpreter are boundaries.
 #include "global.h"
+#include "din_fire_sword.h"
 #include "GameInteractor/GameInteractor.h"
 #include "overlays/actors/ovl_Obj_Hunsui/z_obj_hunsui.h"
 #include "objects/object_hunsui/object_hunsui.h"
@@ -26,6 +27,17 @@ CollisionHeader spoutCollision{};
 AnimatedMaterial spoutMaterial{}, unusedMaterial{};
 int materialDraws, meshDraws, switchWrites, cutsceneRequests, objectRequests;
 bool heapFails, initAllowed = true;
+PlayState* gPlayState;
+int finishFatalCalls, finishForgetCalls;
+Actor* finishActor;
+PlayState* finishPlay;
+// Elemental presentation is a boundary; native kill/destroy remains real.
+void DinFireSword_FinishFatal(PlayState* play, Actor* actor) {
+    ++finishFatalCalls; finishPlay = play; finishActor = actor;
+}
+void DinFireSword_FinishForget(PlayState* play, Actor* actor) {
+    ++finishForgetCalls; finishPlay = play; finishActor = actor;
+}
 
 #define FLAGS (ACTOR_FLAG_UPDATE_CULLING_DISABLED | ACTOR_FLAG_DRAW_CULLING_DISABLED)
 ActorProfile* Actor_LoadOverlay(ActorContext*, s16 id) {
@@ -114,6 +126,7 @@ f32 Math_SmoothStepToF(f32* value, f32 target, f32 scale, f32 maxStep, f32 minSt
 
 int main() {
     Player player{}; PlayState play{}; GraphicsContext graphics{};
+    gPlayState = &play;
     Gfx opa[64]{}, xlu[64]{}, overlay[64]{};
     graphics.polyOpa.p = opa; graphics.polyXlu.p = xlu; graphics.overlay.p = overlay;
     play.state.gfxCtx = &graphics;
@@ -157,6 +170,7 @@ int main() {
     assert(water->unk_178 >= 10 && water->unk_178 < 11);
     assert(Flags_GetSwitch(&play, 0) && switchWrites == 0 && cutsceneRequests == 0);
     Actor_Kill(actor); Actor_Destroy(actor, &play);
+    assert(finishFatalCalls == 1 && finishForgetCalls == 1 && finishPlay == &play && finishActor == actor);
     assert(sWaterGeyser == nullptr && "native external destruction must clear the retained Water pointer before memory is freed");
     assert(actor->destroy == nullptr && water->dyna.bgId == -1 && DynaPoly_GetActor(&play.colCtx, bgId) == nullptr);
     // Once the background system retires the deleted entry, another actor can reuse the slot.
@@ -166,6 +180,7 @@ int main() {
     successor.dyna.bgId = DynaPoly_SetBgActor(&play, &play.colCtx.dyna, &successor.dyna.actor, &spoutCollision);
     assert(successor.dyna.bgId == bgId);
     Actor_Destroy(actor, &play);
+    assert(finishForgetCalls == 2 && finishPlay == &play && finishActor == actor);
     assert(DynaPoly_GetActor(&play.colCtx, bgId) == &successor.dyna);
     assert(!WandWater_IsAlive());
     WandWater_Forget(); heapFails = true;

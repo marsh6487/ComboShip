@@ -4,11 +4,16 @@
 #include "ComboForestActors.h"
 #include "entrances/SoloForest.h"
 #include "entrances/SoloForestResources.h"
+#include "entrances/NativeForest.h"
+#include "entrances/NativeForestResourceData.h"
+#include <libultraship/bridge/consolevariablebridge.h>
 #include "entrances/LostWoodsEntrance.h"
 #include "gameplay/MagicMirrorAnchor.h"
 #include "gameplay/MagicMirrorArrival.h"
 #include "gameplay/MagicMirrorItem.h"
 #include "gameplay/MagicMirrorPlayer.h"
+#include "actors/ForestGiParticles.h"
+#include "../../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "mods/extended_inventory.h"
 #include "mods/ext_buttons/ext_buttons.h"
 #include "mods/items/helpers/equip_helper.h"
@@ -19,6 +24,7 @@
 #include "2s2h/SaveManager/SaveManager.h"
 #include <algorithm>
 #include <cmath>
+#include <spdlog/spdlog.h>
 
 extern "C" {
 u8 ResourceMgr_FileExists(const char* path);
@@ -37,8 +43,11 @@ u32 Seed() {
     return gSaveContext.save.shipSaveInfo.rando.finalSeed;
 }
 bool PackAvailable() {
-    return Combo_IsCombinedGame() || std::all_of(std::begin(kSoloForestResources), std::end(kSoloForestResources),
-                                                 [](const char* path) { return ResourceMgr_FileExists(path); });
+    return Combo_IsCombinedGame() ||
+           NativeForest::SceneAvailable(NativeForest::kMmSoloScene, ResourceMgr_FileExists, ResourceMgr_FileExists,
+                                        NativeForest::LoadDependencies) ||
+           std::all_of(std::begin(kSoloForestResources), std::end(kSoloForestResources),
+                       [](const char* path) { return ResourceMgr_FileExists(path); });
 }
 bool Busy(PlayState* play) {
     return ItemInput_IsBlocked(GET_PLAYER(play), play) || Combo_MM_CrossDungeonTransitionPending();
@@ -58,6 +67,13 @@ void Save() {
 }
 void Error() {
     Audio_PlaySfx(NA_SE_SY_ERROR);
+}
+void Trace(const char* phase, PlayState* play) {
+    const auto* player = GET_PLAYER(play);
+    SPDLOG_INFO("Magic Mirror MM: phase={} scene={} text={:04x} mode={} length={} state1={:08x} ground={} cast={}",
+                phase, play->sceneId, play->msgCtx.currentTextId, play->msgCtx.msgMode, play->msgCtx.msgLength,
+                player ? player->stateFlags1 : 0, player && (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND),
+                MagicMirrorPlayer_State(player));
 }
 bool ButtonClaimed(u16) {
     return Pacci_UltrahandModeActive();
@@ -88,6 +104,9 @@ void GivePickup(Actor* actor, PlayState*) {
 void DrawPickup(Actor*, PlayState* play) {
     Matrix_Scale(30, 30, 30, MTXMODE_APPLY);
     ComboMagicMirrorVisual::Draw(play);
+}
+void DrawWorldShimmer(PlayState* play) {
+    NeiGi_DrawWorldParticles(play, ForestGiParticles::Mirror(play->gameplayFrames, NeiGi_CameraBasis(play)));
 }
 bool QueuePickup(int token) {
     GameInteractor::Instance->events.emplace_back(GIEventGiveItem{

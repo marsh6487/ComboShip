@@ -8,12 +8,15 @@ struct Context {
 };
 static Context sContext;
 static int sSerial = 0, sPickupToken = 0;
-static bool sPrompt = false, sAnchorValid = false;
+static bool sPrompt = false, sPromptAccepted = false, sAnchorValid = false;
 static const CollisionHeader* sCollision = nullptr;
 static MagicMirrorAnchor::Point sAnchor{};
 static PlayState* sPromptPlay = nullptr;
 static Player* sPromptPlayer = nullptr;
 static u32 sPromptAddedFlags = 0;
+// The menu's closing A/B/stick belongs to the prompt until the next input tick.
+static PlayState* sPromptInputPlay = nullptr;
+static Player* sPromptInputPlayer = nullptr;
 static PlayState* sCastPlay = nullptr;
 static Player* sCastPlayer = nullptr;
 static bool sDeparted = false;
@@ -51,6 +54,7 @@ void ReleasePrompt(bool close) {
         sPromptPlayer->stateFlags1 &= ~sPromptAddedFlags;
     }
     sPrompt = false;
+    sPromptAccepted = false;
     sPromptPlay = nullptr;
     sPromptPlayer = nullptr;
     sPromptAddedFlags = 0;
@@ -82,6 +86,8 @@ void Reset() {
     sContext = {};
     sPickupToken = 0;
     sPrompt = sAnchorValid = false;
+    sPromptInputPlay = nullptr;
+    sPromptInputPlayer = nullptr;
     sCollision = nullptr;
 }
 void Destroy() {
@@ -181,6 +187,36 @@ bool Safe(PlayState* play, bool ownMessage) {
 #endif
     return ownMessage || (play->msgCtx.msgMode == MSGMODE_NONE && !Player_InCsMode(play) && !MirrorHost::Busy(play));
 }
+void HoldPrompt() {
+    // Native action changes clear this bit. Reacquire only the bits this
+    // prompt now adds, so release still preserves a pre-existing owner.
+    sPromptAddedFlags |= kPromptFreeze & ~sPromptPlayer->stateFlags1;
+    sPromptPlayer->stateFlags1 |= kPromptFreeze;
+    MagicMirrorPlayer_StopMotion(sPromptPlayer);
+}
+bool PromptOwnsPlayer(PlayState* play, const Player* player) {
+    // This independent ownership survives a native action clearing its flags.
+    // Never inspect an old actor after scene/file/player replacement.
+    if (!(sPrompt && play == sPromptPlay && player == sPromptPlayer) &&
+        !(sPromptInputPlay && play == sPromptInputPlay && player == sPromptInputPlayer))
+        return false;
+    // Eligibility is checked by Update, which cancels/cleans up the prompt.
+    // Collision and interaction state can change during the native player
+    // update; they must not hand a live choice box's input back to movement.
+    if (!play || play != gPlayState || gGameState != &play->state || GET_PLAYER(play) != player || !Matches(play) ||
+        !MagicMirror_IsOwned())
+        return false;
+    return (play == sPromptInputPlay && player == sPromptInputPlayer) ||
+           (sPrompt && play == sPromptPlay && player == sPromptPlayer &&
+            (CurrentText(play) == kPromptText ||
+             (sPromptAccepted && play->msgCtx.msgMode == MSGMODE_NONE && play->msgCtx.msgLength == 0)) &&
+            (sPromptAccepted ||
+             (play->msgCtx.msgMode != MSGMODE_NONE && play->msgCtx.msgMode != MSGMODE_TEXT_CLOSING)));
+}
+void ConsumePromptInput(PlayState* play) {
+    sPromptInputPlay = play;
+    sPromptInputPlayer = GET_PLAYER(play);
+}
 bool Travel(PlayState* play, bool casting = false) {
     if (casting && (!play || play != sCastPlay || GET_PLAYER(play) != sCastPlayer ||
                     MagicMirrorPlayer_State(sCastPlayer) != MAGIC_MIRROR_CAST_READY))
@@ -253,6 +289,37 @@ bool Locate(PlayState* play) {
     return sAnchorValid;
 }
 
+bool OnStumpCap(PlayState* play, const Player* player) {
+    const auto* header = play->colCtx.colHeader;
+    const auto* floor = player->actor.floorPoly;
+    if (!header || !header->polyList || !header->vtxList || !floor || player->actor.floorBgId != BGCHECK_SCENE ||
+        !std::isfinite(player->actor.floorHeight) || std::abs(player->actor.floorHeight - sAnchor.y) > 1)
+        return false;
+    // Require the actual static fan under Link's feet. A nearby ramp, another
+    // floor at the same height, or a platform above the stump cannot grant it.
+    for (int index = 0; index < header->numPolygons; ++index) {
+        const auto& poly = header->polyList[index];
+        if (&poly != floor)
+            continue;
+        if (poly.normal.y < 30000)
+            return false;
+        bool hub = false;
+        for (int i = 0; i < 3; ++i) {
+            const unsigned vertex = poly.vtxData[i] & 0x1FFF;
+            if (vertex >= header->numVertices)
+                return false;
+            const auto& v = header->vtxList[vertex];
+            const MagicMirrorAnchor::Point point{ static_cast<float>(v.x), static_cast<float>(v.y),
+                                                  static_cast<float>(v.z) };
+            if (std::abs(point.y - sAnchor.y) >= 1)
+                return false;
+            hub |= MagicMirrorAnchor::Near(point, sAnchor);
+        }
+        return hub;
+    }
+    return false;
+}
+
 bool ArrivalDestination(const PlayState* play) {
     if (!play || !Mode() || gSaveContext.gameMode != GAMEMODE_NORMAL ||
         !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) || gSaveContext.respawnFlag != 0 ||
@@ -271,7 +338,7 @@ bool ArrivalDestination(const PlayState* play) {
 }
 
 bool Landing(PlayState* play, Vec3s& position, s16& yaw) {
-    // Inside the ground-pickup radius, outside the stump and even Goron's body.
+    // Beside the stump, clear of its cap and even Goron's body.
     // Prefer the south side; try the other sides if Prelude moved it near a wall.
     constexpr int offsets[][2] = { { 0, -120 }, { 85, -85 }, { 120, 0 },  { 85, 85 },
                                    { 0, 120 },  { -85, 85 }, { -120, 0 }, { -85, -85 } };
@@ -369,6 +436,9 @@ u16 PressedButton(PlayState* play) {
     return 0;
 }
 void Update() {
+    // OnGameStateMainStart runs once before native player/message updates.
+    sPromptInputPlay = nullptr;
+    sPromptInputPlayer = nullptr;
     auto* play = gPlayState;
     Bind(play);
     if (!play || !Mode())
@@ -378,9 +448,11 @@ void Update() {
             ++sCastTicks > 160 ||
             (!sDeparted && (!MagicMirror_IsOwned() || !Safe(play, true) || play->msgCtx.msgMode != MSGMODE_NONE ||
                             !AllowedScene(play) || !MirrorHost::PackAvailable()))) {
+            MirrorHost::Trace("cast-cancel", play);
             ReleaseCast();
         } else if (!sDeparted && MagicMirrorPlayer_State(sCastPlayer) == MAGIC_MIRROR_CAST_READY) {
             sDeparted = Travel(play, true);
+            MirrorHost::Trace(sDeparted ? "travel-requested" : "travel-rejected", play);
             if (!sDeparted) {
                 ReleaseCast();
                 MirrorHost::Error();
@@ -390,28 +462,52 @@ void Update() {
     }
     if (sPrompt) {
         const auto text = CurrentText(play);
-        if (text != kPromptText || !Safe(play, true) || !MagicMirror_IsOwned()) {
+        const bool finished = sPromptAccepted && play->msgCtx.msgMode == MSGMODE_NONE && play->msgCtx.msgLength == 0;
+        if (play != sPromptPlay || GET_PLAYER(play) != sPromptPlayer || (text != kPromptText && !finished) ||
+            !Safe(play, true) || !MagicMirror_IsOwned()) {
+            MirrorHost::Trace("prompt-invalidated", play);
             ReleasePrompt(text == kPromptText);
             return;
         }
+        HoldPrompt();
+        if (sPromptAccepted) {
+            if (!finished)
+                return;
+            // Native closing clears text length/ID and restores the HUD. A
+            // forced NONE with live text makes native drawing reopen the box.
+            ConsumePromptInput(play);
+            ReleasePrompt(false);
+            if (Safe(play, false) && AllowedScene(play) && MirrorHost::PackAvailable()) {
+                if (MagicMirrorPlayer_Begin(play, GET_PLAYER(play))) {
+                    sCastPlay = play;
+                    sCastPlayer = GET_PLAYER(play);
+                    sCastTicks = 0;
+                    MirrorHost::Trace("cast-started", play);
+                } else {
+                    MirrorHost::Trace("cast-rejected", play);
+                    MirrorHost::Error();
+                }
+            } else {
+                MirrorHost::Trace("cast-ineligible-after-close", play);
+            }
+            return;
+        }
         if (play->state.input[0].press.button & BTN_B) {
+            MirrorHost::Trace("prompt-cancel", play);
+            ConsumePromptInput(play);
             ReleasePrompt(true);
             return;
         }
         if (Message_GetState(&play->msgCtx) == TEXT_STATE_CHOICE && Message_ShouldAdvance(play)) {
             const bool yes = play->msgCtx.choiceIndex == 0;
-            ReleasePrompt(true);
-            // The message has completed, but its final native closing frame
-            // can still report a textbox. Recheck every other safety gate.
+            ConsumePromptInput(play);
             if (yes && Safe(play, true) && AllowedScene(play) && MirrorHost::PackAvailable()) {
-                play->msgCtx.msgMode = MSGMODE_NONE;
-                if (MagicMirrorPlayer_Begin(play, GET_PLAYER(play))) {
-                    sCastPlay = play;
-                    sCastPlayer = GET_PLAYER(play);
-                    sCastTicks = 0;
-                } else {
-                    MirrorHost::Error();
-                }
+                sPromptAccepted = true;
+                Message_CloseTextbox(play);
+                MirrorHost::Trace("yes-closing", play);
+            } else {
+                MirrorHost::Trace(yes ? "yes-ineligible" : "no-closing", play);
+                ReleasePrompt(true);
             }
         } else if (Message_GetState(&play->msgCtx) == TEXT_STATE_NONE) {
             ReleasePrompt(false);
@@ -421,7 +517,7 @@ void Update() {
     if (!MagicMirror_IsOwned()) {
         if (!sPickupToken && Safe(play, false) && Forest(play) && play->roomCtx.curRoom.num == 0 && Locate(play)) {
             const auto& p = GET_PLAYER(play)->actor.world.pos;
-            if (MagicMirrorAnchor::CanClaim({ p.x, p.y, p.z }, sAnchor)) {
+            if (MagicMirrorAnchor::CanClaim({ p.x, p.y, p.z }, sAnchor) && OnStumpCap(play, GET_PLAYER(play))) {
                 const int token = BeginPickup();
                 if (token && !MirrorHost::QueuePickup(token))
                     sPickupToken = 0;
@@ -439,10 +535,10 @@ void Update() {
     sPrompt = true;
     sPromptPlay = play;
     sPromptPlayer = GET_PLAYER(play);
-    sPromptAddedFlags = kPromptFreeze & ~sPromptPlayer->stateFlags1;
-    sPromptPlayer->stateFlags1 |= kPromptFreeze;
+    HoldPrompt();
     play->state.input[0].press.button &= ~pressed;
     MirrorHost::OpenPrompt();
+    MirrorHost::Trace("prompt-open", play);
 }
 void DrawWorld() {
     auto* play = gPlayState;
@@ -471,10 +567,14 @@ void DrawWorld() {
     Matrix_RotateY(play->gameplayFrames * 0.025f, MTXMODE_APPLY);
 #endif
     ComboMagicMirrorVisual::Draw(play);
+    MirrorHost::DrawWorldShimmer(play);
     Matrix_Pop();
 }
 } // namespace MirrorRuntime
 
+extern "C" int MagicMirror_PromptOwnsPlayer(PlayState* play, const Player* player) {
+    return MirrorRuntime::PromptOwnsPlayer(play, player);
+}
 extern "C" void MagicMirror_QueueArrival(void) {
     MirrorRuntime::QueueArrival();
 }

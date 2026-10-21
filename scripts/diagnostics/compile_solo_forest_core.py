@@ -13,6 +13,9 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 UNITS = ["mm/2s2h/Enhancements/Gameplay/ComboSoloForest.cpp",
          "soh/soh/Enhancements/Gameplay/ComboSoloForest.cpp",
+         "mm/2s2h/Enhancements/Gameplay/MagicMirror.cpp",
+         "soh/soh/Enhancements/Gameplay/MagicMirror.cpp", "mm/2s2h/z_play_2SH.cpp",
+         "soh/mods/transformation_masks/assets/mm_asset_loader.cpp",
          "mm/2s2h/Enhancements/Graphics/ComboLostWoodsPassage.cpp",
          "mm/2s2h/Enhancements/Gameplay/BlackMarket.cpp",
          "soh/soh/Enhancements/Gameplay/ComboBlackMarketNative.cpp",

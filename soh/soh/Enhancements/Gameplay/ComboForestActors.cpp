@@ -1,11 +1,25 @@
 #ifdef COMBO_BUILD
 #include "ComboForestActors.h"
 #include "entrances/SoloForest.h"
+#include "entrances/ForestActorPlacements.h"
 #include "global.h"
+#include "actors/ForestGiParticles.h"
+#include "soh/Enhancements/randomizer/NeiGiRender.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/custom-message/CustomMessageManager.h"
 #include "soh/ShipInit.hpp"
 #include <cmath>
+
+extern "C" void ComboForestActors_DrawSariaParticles(Actor* actor, PlayState* play, int seated) {
+    if (!actor || !play || !play->state.gfxCtx || (gComboGameMode != COMBO_GAME_OOT && !Combo_IsCombinedGame()) ||
+        play->pauseCtx.state != 0 || actor->xzDistToPlayer > 700.0f || std::fabs(actor->yDistToPlayer) > 300.0f)
+        return;
+    Matrix_Push();
+    Matrix_Translate(actor->world.pos.x, actor->world.pos.y, actor->world.pos.z, MTXMODE_NEW);
+    const auto mesh = ForestGiParticles::Saria(play->gameplayFrames, seated != 0, NeiGi_CameraBasis(play));
+    NeiGi_DrawWorldParticles(play, mesh);
+    Matrix_Pop();
+}
 
 namespace {
 ComboForestActors::Visit sVisit;
@@ -56,28 +70,17 @@ void Update() {
             [&] { return Spawn(play, id, params, x, z, lift, yaw); });
     };
     if (play->roomCtx.curRoom.num == 0) {
-        ensure(1, kViewer, kSaria, COMBO_SOLO_FOREST_STUMP_X + 100, COMBO_SOLO_FOREST_STUMP_Z + 70, 0, 0);
+        const auto side = ForestActorPlacements::SariaOffset(COMBO_SOLO_FOREST_STUMP_YAW);
+        ensure(1, kViewer, kSaria, COMBO_SOLO_FOREST_STUMP_X + side.x, COMBO_SOLO_FOREST_STUMP_Z + side.z, 0, 0);
         const float angle = COMBO_SOLO_FOREST_STUMP_YAW * (6.28318530718f / 65536.0f);
         const float sine = std::sin(angle), cosine = std::cos(angle);
         auto* beacon = Find(play, kViewer, kSaria);
-        const float dx = beacon ? beacon->world.pos.x - COMBO_SOLO_FOREST_STUMP_X : 100.0f;
-        const float dz = beacon ? beacon->world.pos.z - COMBO_SOLO_FOREST_STUMP_Z : 70.0f;
+        const float dx = beacon ? beacon->world.pos.x - COMBO_SOLO_FOREST_STUMP_X : side.x;
+        const float dz = beacon ? beacon->world.pos.z - COMBO_SOLO_FOREST_STUMP_Z : side.z;
         const float lateral = dx * cosine - dz * sine <= 0 ? 145.0f : -145.0f;
         ensure(2, ACTOR_EN_HORSE, kHorse, COMBO_SOLO_FOREST_STUMP_X + lateral * cosine - 90.0f * sine,
                COMBO_SOLO_FOREST_STUMP_Z - lateral * sine - 90.0f * cosine, 0,
                static_cast<s16>(COMBO_SOLO_FOREST_STUMP_YAW + 0x8000));
-        // Shimmer follows matching authored placements without moving them.
-        auto* saria = Find(play, kViewer, kSaria);
-        if (saria && play->gameplayFrames % 6 == 0) {
-            float angle = play->gameplayFrames * 0.12f;
-            Vec3f pos = saria->world.pos;
-            pos.x += std::sin(angle) * 24;
-            pos.z += std::cos(angle) * 24;
-            pos.y += 12 + (play->gameplayFrames % 48);
-            Vec3f velocity = { 0, 0.25f, 0 }, accel = { 0, 0.01f, 0 };
-            Color_RGBA8 prim = { 130, 255, 140, 190 }, env = { 20, 130, 45, 0 };
-            EffectSsKiraKira_SpawnDispersed(play, &pos, &velocity, &accel, &prim, &env, 500, 24);
-        }
     } else {
         ensure(4, kViewer, kSkullKid, 2200, 200, 35, -0x5000);
     }

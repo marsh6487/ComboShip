@@ -36,6 +36,8 @@ def main():
     parser.add_argument("--mm", type=Path, help="Optional native MM archive for both forest-layer controls")
     parser.add_argument("--woodfall-pack", type=Path,
                         help="Optional supplied Woodfall pack for actual HD gradient/detail pixel controls")
+    parser.add_argument("--moon-tree-pack", type=Path,
+                        help="Optional Prelude Termina export for actual Moon tree leaf/bark draw coverage")
     parser.add_argument("--all-scene-materials", action="store_true",
                         help="Check frozen grass/forest and negative material cases from the full --mm archive")
     args = parser.parse_args()
@@ -112,6 +114,34 @@ def main():
             production_function(renderer, "Interpreter::GfxDpLoadBlock") + "\n" +
             production_function(renderer, "Interpreter::ImportTextureRaw"))
         fixtures = "static void CheckActualMaterials() {\n"
+        if args.moon_tree_pack:
+            with zipfile.ZipFile(args.moon_tree_pack) as archive:
+                project = archive.read("prelude/project/edits.json")
+                project_path = build / "moon-tree-project.json"
+                project_path.write_bytes(project)
+                shapes = [shape for edit in json.loads(project)["edits"]["Z2_00KEIKOKU"]
+                          for shape in edit.get("data", {}).get("shapes", [])]
+                if not shapes:
+                    raise ValueError("The Moon tree export has no placed geometry")
+                fixtures += f'CheckActualPreludeMoonTree({json.dumps(str(project_path))}, {{\n'
+                leaf_count = 0
+                for shape in shapes:
+                    path = shape["newDlPath"]
+                    labels = [texture.get("label") for texture in shape["stored"]["textures"]]
+                    foliage = any(label in ("sou_ha_01", "sou_ha_02", "sou_ha_03", "sou_sida_01")
+                                  for label in labels)
+                    leaf_count += foliage
+                    data = archive.read(path)
+                    if len(data) < 72 or data[4:8] != b"TLDO" or (len(data) - 72) % 8:
+                        raise ValueError(f"Invalid Prelude Moon tree display list: {path}")
+                    textures = ','.join(json.dumps(path) for path in shape["stored"]["texPaths"])
+                    fixtures += '{' + json.dumps(path) + ', {'
+                    fixtures += ','.join(f'Command(0x{a:08X}, 0x{b:08X})'
+                                         for a, b in struct.iter_unpack('<II', data[72:]))
+                    fixtures += '}, {' + textures + '}, ' + str(foliage).lower() + '},\n'
+                if not leaf_count:
+                    raise ValueError("The Prelude export contains no Moon leaf/fern material labels")
+                fixtures += '});\n'
         # The actual bundled randomizer models split shrubbery/leaves from the
         # reward flower and brown stem. Keep that material ownership explicit.
         for folder, family in (("gameplay_field_keep", "gFieldBush"), ("gameplay_keep", "gRandoCuttableGrass")):

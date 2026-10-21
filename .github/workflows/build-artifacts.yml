@@ -47,15 +47,32 @@ jobs:
       # The renderer preflight consumes the real solo-forest JSON interface.
       # Install its headers before compiling any production objects.
       - name: Install gate dependencies
-        run: sudo apt-get update && sudo apt-get install -y clang-format-14 cmake ninja-build nlohmann-json3-dev libspdlog-dev libsdl2-dev libsdl2-net-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-pil
+        run: sudo apt-get update && sudo apt-get install -y clang-format-14 cmake ninja-build nlohmann-json3-dev libspdlog-dev libimgui-dev libsdl2-dev libsdl2-net-dev libogg-dev libvorbis-dev pkg-config python3-numpy python3-venv
+
+      # The binary Pillow wheel supplies the font rasterizer used for the
+      # committed UI textures. Keep the distro's NumPy available to other tests.
+      - name: Install pinned UI rasterizer
+        run: |
+          python3 -m venv --system-site-packages "$RUNNER_TEMP/combo-gate-python"
+          "$RUNNER_TEMP/combo-gate-python/bin/python3" -m pip install --only-binary=:all: -r scripts/assets/sword-element-ui-requirements.txt
+          echo "$RUNNER_TEMP/combo-gate-python/bin" >> "$GITHUB_PATH"
+
+      - name: Fast generated sword UI asset check
+        run: python3 -B scripts/assets/build_sword_element_ui.py --check
 
       # These compile small production slices and one renderer object before
       # the long regression/build stages.
       - name: Fast shared Granny UI and engine header regression
         run: python3 -B tests/black_market/run_granny_header_tests.py
 
+      - name: Verify October 20 bug-fix entry, decoder and particle paths
+        run: bash scripts/diagnostics/run_oct20_bugfix_regressions.sh
+
       - name: Fast game-picker Windows header regression
         run: python3 -B tests/solo_games/selection_test.py --windows
+
+      - name: Fast headless module loader diagnostics
+        run: python3 -B tests/solo_games/headless_module_load_test.py
 
       - name: Fast pickup text and receipt regressions
         run: |
@@ -82,6 +99,7 @@ jobs:
       - name: Fast Goron lifetime and Somaria GI regressions
         run: |
           python3 -B tests/goron_audio/run_tests.py
+          python3 -B tests/mm_sfx_render/run_tests.py
           python3 -B scripts/diagnostics/run_oot_native_transformation_tests.py
           python3 -B tests/goron_field_collision/run_tests.py --sanitize
           python3 -B tests/nei_quest_held/mm_cane_gi_test.py

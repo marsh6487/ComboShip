@@ -4,9 +4,11 @@
 #include "ComboForestActors.h"
 #include "MmPlacedSariaResources.h"
 #include "ComboForestEpona.h"
+#include "entrances/ForestActorPlacements.h"
 #include "ComboResolve.h"
 #include "actors/PlacedSariaABI.h"
-#include "actors/SariaHexEffect.h"
+#include "actors/ForestGiParticles.h"
+#include "../../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -22,47 +24,14 @@
 #include <unordered_map>
 
 static void DrawShimmer(Actor* actor, PlayState* play, bool seated) {
-    if (play->pauseCtx.state != PAUSE_STATE_OFF || actor->xzDistToPlayer > 700.0f ||
-        std::fabs(actor->playerHeightRel) > 300.0f)
+    if (!actor || !play || !play->state.gfxCtx || play->pauseCtx.state != PAUSE_STATE_OFF ||
+        actor->xzDistToPlayer > 700.0f || std::fabs(actor->playerHeightRel) > 300.0f)
         return;
-    using namespace SariaHexEffect;
-    std::array<Vertex, kVertexCount> shape;
-    const float facing = std::atan2(play->view.eye.x - actor->world.pos.x, play->view.eye.z - actor->world.pos.z);
-    Build(play->gameplayFrames, seated, facing, shape);
-    auto* vertices = static_cast<Vtx*>(GRAPH_ALLOC(play->state.gfxCtx, sizeof(Vtx) * kVertexCount));
-    if (!vertices)
-        return;
-    for (int i = 0; i < kVertexCount; ++i) {
-        vertices[i] = {};
-        vertices[i].v.ob[0] = static_cast<s16>(std::lround(shape[i].x * 10.0f));
-        vertices[i].v.ob[1] = static_cast<s16>(std::lround(shape[i].y * 10.0f));
-        vertices[i].v.ob[2] = static_cast<s16>(std::lround(shape[i].z * 10.0f));
-        vertices[i].v.cn[0] = shape[i].r;
-        vertices[i].v.cn[1] = shape[i].g;
-        vertices[i].v.cn[2] = shape[i].b;
-        vertices[i].v.cn[3] = shape[i].a;
-    }
-    OPEN_DISPS(play->state.gfxCtx);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
     Matrix_Push();
     Matrix_Translate(actor->world.pos.x, actor->world.pos.y, actor->world.pos.z, MTXMODE_NEW);
-    Matrix_Scale(0.1f, 0.1f, 0.1f, MTXMODE_APPLY);
-    MATRIX_FINALIZE_AND_LOAD(POLY_XLU_DISP++, play->state.gfxCtx);
-    gSPClearGeometryMode(POLY_XLU_DISP++, G_LIGHTING | G_FOG | G_CULL_BOTH);
-    gSPTexture(POLY_XLU_DISP++, 0, 0, 0, G_TX_RENDERTILE, G_OFF);
-    gDPSetRenderMode(POLY_XLU_DISP++, G_RM_PASS, G_RM_AA_ZB_XLU_SURF2);
-    gDPSetCombineMode(POLY_XLU_DISP++, G_CC_SHADE, G_CC_SHADE);
-    for (int h = 0; h < kHexes; ++h) {
-        gSPVertex(POLY_XLU_DISP++, reinterpret_cast<uintptr_t>(&vertices[h * 12]), 12, 0);
-        for (int side = 0; side < 6; ++side) {
-            const int next = (side + 1) % 6;
-            gSP2Triangles(POLY_XLU_DISP++, side, next, next + 6, 0, side, next + 6, side + 6, 0);
-        }
-    }
+    const auto mesh = ForestGiParticles::Saria(play->gameplayFrames, seated, NeiGi_CameraBasis(play));
+    NeiGi_DrawWorldParticles(play, mesh);
     Matrix_Pop();
-    gDPPipeSync(POLY_XLU_DISP++);
-    Gfx_SetupDL25_Xlu(play->state.gfxCtx);
-    CLOSE_DISPS(play->state.gfxCtx);
 }
 
 namespace {
@@ -134,11 +103,13 @@ void QueueSariaSong() {
 }
 struct Bridge {
     ComboPlacedSariaLoadFunc load = nullptr;
+    ComboPlacedSariaLoadV2Func loadV2 = nullptr;
     ComboPlacedSariaReleaseFunc release = nullptr;
     ComboPlacedSariaAltFunc alt = nullptr;
     bool Resolve() {
         if (gComboGameMode == COMBO_GAME_MM) {
             load = MM_PlacedSariaLoad;
+            loadV2 = MM_PlacedSariaLoadV2;
             release = MM_PlacedSariaRelease;
             alt = MM_PlacedSariaAlt;
             return true;
@@ -147,15 +118,23 @@ struct Bridge {
             return false;
         if (!load)
             load = reinterpret_cast<ComboPlacedSariaLoadFunc>(Combo_ResolveSym("soh", "OOT_PlacedSariaLoad"));
+        if (!loadV2)
+            loadV2 = reinterpret_cast<ComboPlacedSariaLoadV2Func>(Combo_ResolveSym("soh", "OOT_PlacedSariaLoadV2"));
         if (!release)
             release = reinterpret_cast<ComboPlacedSariaReleaseFunc>(Combo_ResolveSym("soh", "OOT_PlacedSariaRelease"));
         if (!alt)
             alt = reinterpret_cast<ComboPlacedSariaAltFunc>(Combo_ResolveSym("soh", "OOT_PlacedSariaAltEnabled"));
-        return load && release && alt;
+        return (loadV2 || load) && release && alt;
+    }
+    int Load(unsigned pose, ComboPlacedSariaResourcesV2* output) const {
+        *output = {};
+        output->drawScale = 1.f;
+        return loadV2 ? loadV2(pose, output, sizeof(*output)) : load ? load(pose, &output->resources) : 0;
     }
 } sBridge;
 struct State {
     ComboPlacedSariaResources resources{};
+    float drawScale = 1.f;
     SkelAnime animation{};
     Vec3s joints[17]{}, morph[17]{};
     ColliderCylinder collider{};
@@ -183,16 +162,17 @@ void ResetSariaResources() {
 }
 
 bool Bind(State& state, Actor* actor, PlayState* play) {
-    ComboPlacedSariaResources next{};
-    if (!sBridge.load(((u16)actor->params >> 4) & 15, &next))
+    ComboPlacedSariaResourcesV2 next{};
+    if (!sBridge.Load(((u16)actor->params >> 4) & 15, &next))
         return false;
     const float frame = state.animation.curFrame;
     auto previous = state.resources;
-    state.resources = next;
+    state.resources = next.resources;
+    state.drawScale = next.drawScale;
     // The normal headers share a C layout. MM owns all animation state and
     // fixed joint arrays; no OoT actor, player or animation context is invoked.
-    SkelAnime_InitFlex(play, &state.animation, static_cast<FlexSkeletonHeader*>(next.skeleton),
-                       static_cast<AnimationHeader*>(next.animation), state.joints, state.morph, 17);
+    SkelAnime_InitFlex(play, &state.animation, static_cast<FlexSkeletonHeader*>(next.resources.skeleton),
+                       static_cast<AnimationHeader*>(next.resources.animation), state.joints, state.morph, 17);
     state.animation.curFrame = std::fmod(frame, state.animation.endFrame + 1.0f);
     // This cutscene loop carries an elevated stump position. Ground the small
     // placed NPC, preserving the native breathing motion and authored XYZ.
@@ -237,16 +217,20 @@ void SpawnForestSaria() {
     if (!sBridge.Resolve())
         return;
     const Vec3f anchor = ComboOpeningForest_ReturnAnchor(play);
-    // Just southwest of Clock Town's south gate. Provisional until live review.
+    const auto side = ForestActorPlacements::SariaOffset(ComboOpeningForest_ReturnYaw(play));
+    // cor's authored Termina Field song-giver export; MM's packed yaw is 272 degrees.
     Vec3f pos =
-        field ? Vec3f{ -720.0f, 300.0f, 2000.0f } : Vec3f{ anchor.x + 100.0f, anchor.y + 120.0f, anchor.z + 70.0f };
+        field ? Vec3f{ 975.0f, -99.0f, 2101.0f } : Vec3f{ anchor.x + side.x, anchor.y + 120.0f, anchor.z + side.z };
+    Vec3f floorProbe = pos;
+    if (field)
+        floorProbe.y += 120.0f;
     CollisionPoly* poly = nullptr;
     s32 bgId;
-    const float floor = BgCheck_EntityRaycastFloor5(&play->colCtx, &poly, &bgId, nullptr, &pos);
+    const float floor = BgCheck_EntityRaycastFloor5(&play->colCtx, &poly, &bgId, nullptr, &floorProbe);
     if (!poly || !std::isfinite(floor) || floor <= BGCHECK_Y_MIN)
         return;
-    Actor_Spawn(&play->actorCtx, play, ACTOR_EN_VIEWER, pos.x, floor, pos.z, 0, 0, 0,
-                field ? kSongGiftParams : kWaitingParams);
+    Actor_Spawn(&play->actorCtx, play, ACTOR_EN_VIEWER, pos.x, field ? pos.y : floor, pos.z, 0,
+                field ? DEG_TO_BINANG(272) : 0, 0, field ? kSongGiftParams : kWaitingParams);
 }
 
 void SpawnForestEpona() {
@@ -262,7 +246,7 @@ void SpawnForestEpona() {
     const s16 yaw = ComboOpeningForest_ReturnYaw(play);
     const float angle = yaw * (6.28318530718f / 65536.0f);
     const float sine = std::sin(angle), cosine = std::cos(angle);
-    float sariaLateral = 100.0f * cosine - 70.0f * sine;
+    float sariaLateral = ForestActorPlacements::kSariaLateral;
     bool foundSaria = false;
     for (const auto& list : play->actorCtx.actorLists) {
         for (Actor* actor = list.first; actor; actor = actor->next) {
@@ -394,7 +378,10 @@ extern "C" void ComboSaria_Update(Actor* actor, PlayState* play) {
     const bool gift = IsSongGift(actor, play);
     if (state.talking) {
         const u8 textState = Message_GetState(&play->msgCtx);
-        if (textState == TEXT_STATE_CLOSING || textState == TEXT_STATE_NONE) {
+        if (textState == TEXT_STATE_EVENT && Message_ShouldAdvance(play)) {
+            // Event-ended dialogue is closed by its actor, not the message engine.
+            Message_CloseTextbox(play);
+        } else if (textState == TEXT_STATE_CLOSING || textState == TEXT_STATE_NONE) {
             state.talking = false;
             if (state.teaching && gift)
                 QueueSariaSong();
@@ -430,8 +417,13 @@ extern "C" void ComboSaria_Draw(Actor* actor, PlayState* play) {
     gSPSegment(POLY_OPA_DISP++, 8, reinterpret_cast<uintptr_t>(state.resources.eyes[eye]));
     gSPSegment(POLY_OPA_DISP++, 9, reinterpret_cast<uintptr_t>(state.resources.eyes[eye]));
     gSPSegment(POLY_OPA_DISP++, 10, reinterpret_cast<uintptr_t>(state.resources.mouth));
+    Matrix_Push();
+    const float drawScale = state.drawScale;
+    if (state.resources.custom && std::isfinite(drawScale) && drawScale >= .5f && drawScale <= 2.f && drawScale != 1.f)
+        Matrix_Scale(drawScale, drawScale, drawScale, MTXMODE_APPLY);
     SkelAnime_DrawFlexOpa(play, state.animation.skeleton, state.animation.jointTable, state.animation.dListCount,
                           Override, nullptr, actor);
+    Matrix_Pop();
     CLOSE_DISPS(play->state.gfxCtx);
     DrawShimmer(actor, play, IsSeated(actor));
 }

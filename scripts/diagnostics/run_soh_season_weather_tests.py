@@ -33,8 +33,12 @@ def run(out, cc, cxx):
     bridge = '#include "z64.h"\n#include "functions.h"\n#include "mods/extended_inventory.h"\n'
     bridge += '#include "soh/Enhancements/audio/SeasonWeather.h"\n'
     bridge += extract(rod, ['Seasons_PrecipTint', 'Seasons_ApplyWeather'])
-    bridge += '\nvoid SeasonWeather_TestRodBridge(PlayState* play, u8 season) { Seasons_ApplyWeather(play, season); }\n'
-    bridge += extract(root / 'soh/src/code/code_8006C3A0.c', ['Flags_SetEnv'])
+    bridge += '\nvoid SeasonWeather_TestRodBridge(PlayState* play) { Seasons_ApplyWeather(play); }\n'
+    bridge += extract(root / 'soh/src/code/code_8006C3A0.c', ['Flags_SetEnv', 'Flags_GetEnv'])
+    bridge += '#include "overlays/actors/ovl_Door_Ana/z_door_ana.h"\n'
+    bridge += 'void DoorAna_WaitOpen(DoorAna*, PlayState*);\n'
+    bridge += extract(root / 'soh/src/overlays/actors/ovl_Door_Ana/z_door_ana.c',
+                      ['DoorAna_SetupAction', 'DoorAna_WaitClosed'])
     # The environment functions are unchanged production code, not a second
     # implementation of density interpolation or sky-restoration behavior.
     bridge += '#include "macros.h"\n#include "variables.h"\n#include "vt.h"\n#include "libc/math.h"\n'

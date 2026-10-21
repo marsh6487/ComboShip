@@ -1,3 +1,4 @@
+#include "din_fire_sword.h"
 /*
  * File: z_en_invadepoh.c
  * Overlay: ovl_En_Invadepoh
@@ -2836,6 +2837,9 @@ void EnInvadepoh_Alien_Update(Actor* thisx, PlayState* play2) {
         }
     } else if (this->collider.base.acFlags & AC_HIT) {
         Actor* ac = this->collider.base.ac;
+        // Only the Alien_Update variant reaches this confirmed lethal AC path.
+        DinFireSword_FinishConfirmedHit(play, &this->collider.base, this->collider.elem.acHitElem,
+                                        this->collider.elem.acDmgInfo.dmgFlags);
 
         thisx->speed = ac->speed * 0.5f;
         thisx->speed = CLAMP(thisx->speed, -60.0f, 60.0f);

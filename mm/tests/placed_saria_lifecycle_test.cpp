@@ -3,7 +3,9 @@
 #include "2s2h/Enhancements/Gameplay/ComboForestActors.h"
 #include "2s2h/Enhancements/Gameplay/ComboForestEpona.h"
 #include "actors/PlacedSariaABI.h"
-#include "actors/SariaHexEffect.h"
+#include "actors/ForestGiParticles.h"
+#include "../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
+#include "entrances/ForestActorPlacements.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "ComboResolve.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -30,8 +32,11 @@ static bool missing;
 static int alt;
 static unsigned spawns;
 static bool hasFloor = true;
+static Vec3f lastFloorProbe;
 static Actor spawned;
 static unsigned skeletonDraws;
+static float modelMatrixScale = .01f, lastSkeletonScale;
+static std::vector<float> matrixScaleStack;
 static unsigned lastPose;
 static bool talkAccepted;
 static u8 textState = TEXT_STATE_NONE;
@@ -40,6 +45,15 @@ static unsigned sparkles;
 static Vec3f sparklePos;
 static Color_RGBA8 sparklePrim, sparkleEnv;
 static Vec3f shimmerOrigin;
+static NeiGi::Mesh shimmerMesh;
+static unsigned shimmerDraws;
+extern "C" NeiGi::Basis NeiGi_CameraBasis(PlayState*) {
+    return {};
+}
+extern "C" void NeiGi_DrawWorldParticles(PlayState*, const NeiGi::Mesh& mesh) {
+    shimmerMesh = mesh;
+    ++shimmerDraws;
+}
 static GameInteractor interactor;
 GameInteractor* GameInteractor::Instance = &interactor;
 namespace Rando {
@@ -115,6 +129,15 @@ static int Load(unsigned pose, ComboPlacedSariaResources* output) {
     output->heads[2] = "closed";
     return 1;
 }
+static int LoadV2(unsigned pose, ComboPlacedSariaResourcesV2* output, size_t callerSize) {
+    CHECK(callerSize >= sizeof(*output));
+    *output = {};
+    output->drawScale = 1.f;
+    if (!Load(pose, &output->resources))
+        return 0;
+    output->drawScale = alt ? 1.10f : 1.f;
+    return 1;
+}
 static void Release(void* owner) {
     ++releases;
     delete static_cast<Owner*>(owner);
@@ -125,11 +148,30 @@ static int Alt() {
 int MM_PlacedSariaLoad(unsigned pose, ComboPlacedSariaResources* output) {
     return Load(pose, output);
 }
+int MM_PlacedSariaLoadV2(unsigned pose, ComboPlacedSariaResourcesV2* output, size_t size) {
+    return LoadV2(pose, output, size);
+}
 void MM_PlacedSariaRelease(void* owner) {
     Release(owner);
 }
 int MM_PlacedSariaAlt() {
     return Alt();
+}
+static bool exposeV2 = true, exposeV1 = true;
+static std::vector<std::string> resolvedSymbols;
+static void* TestResolveSym(const char* module, const char* symbol) {
+    CHECK(std::strcmp(module, "soh") == 0);
+    resolvedSymbols.emplace_back(symbol);
+    if (std::strcmp(symbol, "OOT_PlacedSariaLoadV2") == 0)
+        return exposeV2 ? reinterpret_cast<void*>(LoadV2) : nullptr;
+    if (std::strcmp(symbol, "OOT_PlacedSariaLoad") == 0)
+        return exposeV1 ? reinterpret_cast<void*>(Load) : nullptr;
+    if (std::strcmp(symbol, "OOT_PlacedSariaRelease") == 0)
+        return reinterpret_cast<void*>(Release);
+    if (std::strcmp(symbol, "OOT_PlacedSariaAltEnabled") == 0)
+        return reinterpret_cast<void*>(Alt);
+    CHECK(false);
+    return nullptr;
 }
 
 extern "C" {
@@ -146,8 +188,9 @@ int gComboGameMode;
 bool Player_InCsMode(PlayState*) {
     return false;
 }
-f32 BgCheck_EntityRaycastFloor5(CollisionContext*, CollisionPoly** poly, s32*, Actor*, Vec3f*) {
+f32 BgCheck_EntityRaycastFloor5(CollisionContext*, CollisionPoly** poly, s32*, Actor*, Vec3f* probe) {
     static CollisionPoly floor;
+    lastFloorProbe = *probe;
     *poly = hasFloor ? &floor : nullptr;
     return hasFloor ? 42.0f : BGCHECK_Y_MIN;
 }
@@ -234,18 +277,25 @@ void Gfx_SetupDL25_Opa(GraphicsContext*) {
 void Gfx_SetupDL25_Xlu(GraphicsContext*) {
 }
 void Matrix_Push() {
+    matrixScaleStack.push_back(modelMatrixScale);
 }
 void Matrix_Pop() {
+    CHECK(!matrixScaleStack.empty());
+    modelMatrixScale = matrixScaleStack.back();
+    matrixScaleStack.pop_back();
 }
 void Matrix_Translate(f32 x, f32 y, f32 z, MatrixMode mode) {
     CHECK(mode == MTXMODE_NEW);
     shimmerOrigin = { x, y, z };
+    modelMatrixScale = 1.f;
 }
 Mtx* Matrix_Finalize(GraphicsContext*) {
     static Mtx matrix;
     return &matrix;
 }
-void Matrix_Scale(f32, f32, f32, MatrixMode) {
+void Matrix_Scale(f32 x, f32 y, f32 z, MatrixMode mode) {
+    CHECK(x == y && y == z && mode == MTXMODE_APPLY);
+    modelMatrixScale *= x;
 }
 void EffectSsKirakira_SpawnDispersed(PlayState*, Vec3f* pos, Vec3f*, Vec3f*, Color_RGBA8* prim, Color_RGBA8* env,
                                      s16 scale, s32 life) {
@@ -257,10 +307,13 @@ void EffectSsKirakira_SpawnDispersed(PlayState*, Vec3f* pos, Vec3f*, Vec3f*, Col
 }
 void SkelAnime_DrawFlexOpa(PlayState*, void**, Vec3s*, s32, OverrideLimbDrawOpa, PostLimbDrawOpa, Actor*) {
     ++skeletonDraws;
+    lastSkeletonScale = modelMatrixScale;
 }
 }
 
+#define Combo_ResolveSym TestResolveSym
 /* PRODUCTION_SARIA_RUNTIME */
+#undef Combo_ResolveSym
 
 int main() {
     static PlayState play;
@@ -270,6 +323,7 @@ int main() {
     first.world.pos = { 20, 30, 40 };
     first.world.rot = { 100, 200, 300 };
     sBridge.load = Load;
+    sBridge.loadV2 = LoadV2;
     sBridge.release = Release;
     sBridge.alt = Alt;
     CHECK(ComboSaria_IsParam(0x7F03) && ComboSaria_IsParam(0x7F13) && !ComboSaria_IsParam(1));
@@ -307,6 +361,7 @@ int main() {
             env = true;
     }
     CHECK(skeletonDraws == 1 && segmentC && (segmentC->words.w0 >> 24) == G_ENDDL && env);
+    CHECK(std::fabs(lastSkeletonScale - .01f) < 1e-6f && matrixScaleStack.empty());
     state.blinkTimer = 1;
     ComboSaria_Update(&first, &play);
     CHECK(state.eye == 1 && sStates.at(&second)->eye == 0 && oc == 1);
@@ -319,6 +374,10 @@ int main() {
     alt = 1;
     ComboSaria_Update(&first, &play);
     CHECK(releases == 1 && state.resources.altEnabled == 1 && state.animation.curFrame == previousFrame + 1);
+    ComboSaria_Draw(&first, &play);
+    CHECK(std::fabs(lastSkeletonScale - .011f) < 1e-6f);
+    CHECK(std::fabs(modelMatrixScale - .01f) < 1e-6f && matrixScaleStack.empty());
+    CHECK(first.scale.x == .01f && first.scale.y == .01f && first.scale.z == .01f);
     CHECK(first.world.pos.x == 20 && first.world.pos.y == 30 && first.world.pos.z == 40 && first.textId == 0x8F28);
     missing = true;
     alt = 0;
@@ -401,6 +460,18 @@ int main() {
     SpawnForestSaria();
     SpawnForestSaria();
     CHECK(spawns == 1 && spawned.id == ACTOR_EN_VIEWER && spawned.params == 0x7F13 && spawned.world.pos.y == 42);
+    // The fallback belongs beside the portal, clear of its mouth and arrival.
+    // The previous world offset (+100,+70) put her directly in front instead.
+    CHECK(std::fabs(spawned.world.pos.x - (-763.883f)) < .01f);
+    CHECK(std::fabs(spawned.world.pos.z - (-146.702f)) < .01f);
+    CHECK(lastFloorProbe.x == spawned.world.pos.x && lastFloorProbe.z == spawned.world.pos.z &&
+          lastFloorProbe.y == 120.0f);
+    const float sariaAngle = 12288 * (6.28318530718f / 65536.0f);
+    const float sariaDx = spawned.world.pos.x + 695.0f, sariaDz = spawned.world.pos.z + 313.0f;
+    CHECK(sariaDx * std::cos(sariaAngle) - sariaDz * std::sin(sariaAngle) < -150.0f);
+    CHECK(std::fabs(sariaDx * std::sin(sariaAngle) + sariaDz * std::cos(sariaAngle)) < .01f);
+    CHECK(!ComboOpeningForest_AtReturn(&play, &spawned.world.pos));
+    CHECK(std::hypot(spawned.world.pos.x + 486.0f, spawned.world.pos.z + 227.0f) > 250.0f);
     CHECK(std::memcmp(&before, &gSaveContext, sizeof(before)) == 0);
 
     // Seated scenery never grants; only the dedicated Termina Field gift does.
@@ -503,13 +574,17 @@ int main() {
     sSpawnAttempted = false;
     SpawnForestSaria();
     CHECK(spawns == 2 && spawned.params == 0x7E33);
+    // cor's Termina Field export: preserve the seated height and native
+    // MM packed rotation (-30593 decodes to 272 degrees), without floor snap.
+    CHECK(spawned.world.pos.x == 975 && spawned.world.pos.y == -99 && spawned.world.pos.z == 2101);
+    CHECK(spawned.shape.rot.y == static_cast<s16>(0xC16C));
     sSpawnAttempted = false;
     authored.params = 0x7E33;
     play.actorCtx.actorLists[ACTORCAT_NPC].first = &authored;
     SpawnForestSaria();
     CHECK(spawns == 2 && sSpawnAttempted);
-    // Actual translucent draw commands must contain hollow green hexes and
-    // follow every authored pose, without relying on native star particles.
+    // Execute the actual draw body and shared GI particle sampler for every
+    // placed pose. Native renderer allocation/GBI is covered by its own suite.
     const unsigned beforeSparkles = sparkles;
     for (auto params : { 0x7F13, 0x7F23, 0x7F33, 0x7E13, 0x7E23, 0x7E33 }) {
         Actor magical{};
@@ -518,59 +593,39 @@ int main() {
         ComboSaria_Init(&magical, &play);
         auto draw = [&] {
             gfx.polyOpa.p = commands;
-            gfx.polyOpa.d = reinterpret_cast<Gfx*>(hexVertices + 144);
-            gfx.polyXlu.p = hexCommands;
+            shimmerDraws = 0;
             ComboSaria_Draw(&magical, &play);
         };
         draw();
-        unsigned loads = 0, triangles = 0;
-        for (Gfx* command = hexCommands; command != gfx.polyXlu.p; ++command) {
-            loads += (command->words.w0 >> 24) == G_VTX;
-            triangles += (command->words.w0 >> 24) == G_TRI2;
-        }
-        CHECK(loads == 12 && triangles == 72);
+        CHECK(shimmerDraws == 1 &&
+              shimmerMesh.count == ForestGiParticles::kSariaMotes * ForestGiParticles::kHexVertices);
         CHECK(shimmerOrigin.x == 500 && shimmerOrigin.y == 80 && shimmerOrigin.z == -400);
-        for (const auto& vertex : hexVertices) {
-            CHECK(vertex.v.cn[1] > vertex.v.cn[0] && vertex.v.cn[1] > vertex.v.cn[2]);
-            CHECK(std::abs(vertex.v.ob[0]) < 320 && std::abs(vertex.v.ob[2]) < 320);
-            CHECK(vertex.v.ob[1] >= 0 && vertex.v.ob[1] < 530);
-        }
-        for (int h = 0; h < 12; ++h) {
-            float center[3]{};
-            for (int side = 0; side < 6; ++side)
-                for (int axis = 0; axis < 3; ++axis)
-                    center[axis] += hexVertices[h * 12 + side].v.ob[axis] / 6.0f;
-            for (int side = 0; side < 6; ++side) {
-                float outer = 0, inner = 0;
-                for (int axis = 0; axis < 3; ++axis) {
-                    const float a = hexVertices[h * 12 + side].v.ob[axis] - center[axis];
-                    const float b = hexVertices[h * 12 + side + 6].v.ob[axis] - center[axis];
-                    outer += a * a;
-                    inner += b * b;
-                }
-                CHECK(inner > outer * 0.22f && inner < outer * 0.65f);
-            }
+        for (size_t i = 0; i < shimmerMesh.count; ++i) {
+            const auto& vertex = shimmerMesh.vertices[i];
+            CHECK(((vertex.rgb >> 8) & 255) >= (vertex.rgb >> 16));
+            CHECK(((vertex.rgb >> 8) & 255) > (vertex.rgb & 255));
+            CHECK(std::abs(vertex.p.x) < 28 && std::abs(vertex.p.z) < 28);
+            CHECK(vertex.p.y > 1 && vertex.p.y < 52);
         }
         if (((params >> 4) & 15) == 2) {
             Gfx* head = nullptr;
             Override(&play, 16, &head, nullptr, nullptr, &magical);
             CHECK(reinterpret_cast<const char*>(head) == sStates.at(&magical)->resources.heads[2]);
         }
-        Vtx previous[144];
-        std::memcpy(previous, hexVertices, sizeof(previous));
+        const auto previous = shimmerMesh.vertices[0].p;
         ++play.gameplayFrames;
         draw();
-        CHECK(std::memcmp(previous, hexVertices, sizeof(previous)) != 0);
+        CHECK(previous.y != shimmerMesh.vertices[0].p.y);
         magical.world.pos = { -120, 12, 620 };
         draw();
         CHECK(shimmerOrigin.x == -120 && shimmerOrigin.y == 12 && shimmerOrigin.z == 620);
         play.pauseCtx.state = 1;
         draw();
-        CHECK(gfx.polyXlu.p == hexCommands);
+        CHECK(shimmerDraws == 0);
         play.pauseCtx.state = PAUSE_STATE_OFF;
         magical.xzDistToPlayer = 1000;
         draw();
-        CHECK(gfx.polyXlu.p == hexCommands);
+        CHECK(shimmerDraws == 0);
         ComboSaria_Destroy(&magical, &play);
     }
     CHECK(sparkles == beforeSparkles);
@@ -639,8 +694,10 @@ int main() {
     sSpawnAttempted = sHorseSpawnAttempted = false;
     SpawnForestSaria();
     CHECK(spawns == soloBefore + 1 && spawned.params == 0x7F13);
-    CHECK(sBridge.load == MM_PlacedSariaLoad && sBridge.release == MM_PlacedSariaRelease &&
-          sBridge.alt == MM_PlacedSariaAlt);
+    CHECK(std::fabs(spawned.world.pos.x - (-763.883f)) < .01f);
+    CHECK(std::fabs(spawned.world.pos.z - (-146.702f)) < .01f);
+    CHECK(sBridge.load == MM_PlacedSariaLoad && sBridge.loadV2 == MM_PlacedSariaLoadV2 &&
+          sBridge.release == MM_PlacedSariaRelease && sBridge.alt == MM_PlacedSariaAlt);
     SpawnForestEpona();
     CHECK(spawns == soloBefore + 2 && spawned.params == COMBO_FOREST_EPONA_PARAMS);
     // The fixed song gift is also a native local-file check in solo MM.
@@ -663,6 +720,63 @@ int main() {
     CHECK(rewards == 2 && saves == 2 && hintRegistrations == 2 &&
           gSaveContext.save.shipSaveInfo.nei.comboSariaSongClaimed);
     ComboSaria_Destroy(&gift, &play);
+    // An older active portal has a different anchor and facing. The same
+    // fallback remains at its side rather than at a fixed world-space offset.
+    gComboGameMode = COMBO_GAME_BOTH;
+    play.sceneId = SCENE_LOST_WOODS;
+    gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
+    RoomShape portalShape{};
+    RoomShapeDListsEntry portalMesh{};
+    portalShape.base.type = ROOM_SHAPE_TYPE_NORMAL;
+    portalShape.normal.numEntries = 1;
+    portalShape.normal.entries = &portalMesh;
+    portalMesh.opa = reinterpret_cast<Gfx*>(const_cast<char*>(COMBO_OPENING_FOREST_STUMP_PACK_ROOT));
+    play.roomCtx.curRoom.roomShape = &portalShape;
+    sSpawnAttempted = false;
+    SpawnForestSaria();
+    CHECK(std::fabs(spawned.world.pos.x - 120.0f) < .01f && std::fabs(spawned.world.pos.z - 60.0f) < .01f);
+    CHECK(!ComboOpeningForest_AtReturn(&play, &spawned.world.pos));
+    // Actual production resolver/dispatch with independently controlled module
+    // symbols: new/new, new/old and V2-only providers. V1 fallback starts at1.0.
+    gComboGameMode = COMBO_GAME_BOTH;
+    alt = 1;
+    for (auto symbols : { std::pair{ true, true }, std::pair{ false, true }, std::pair{ true, false } }) {
+        exposeV2 = symbols.first;
+        exposeV1 = symbols.second;
+        resolvedSymbols.clear();
+        Bridge bridge;
+        CHECK(bridge.Resolve() && bool(bridge.loadV2) == exposeV2);
+        struct Caller {
+            ComboPlacedSariaResourcesV2 output;
+            unsigned char tail[32];
+        } caller;
+        std::memset(&caller, 0xa5, sizeof(caller));
+        CHECK(bridge.Load(0, &caller.output));
+        CHECK(std::fabs(caller.output.drawScale - (exposeV2 ? 1.10f : 1.f)) < 1e-6f);
+        CHECK(caller.output.resources.custom && caller.output.resources.owner);
+        for (auto byte : caller.tail)
+            CHECK(byte == 0xa5);
+        CHECK(std::find(resolvedSymbols.begin(), resolvedSymbols.end(), "OOT_PlacedSariaLoadV2") !=
+              resolvedSymbols.end());
+        bridge.release(caller.output.resources.owner);
+        sBridge = bridge;
+        Actor mixed{};
+        mixed.params = 0x7F03;
+        ComboSaria_Init(&mixed, &play);
+        CHECK(sStates.contains(&mixed));
+        gfx.polyOpa.p = commands;
+        gfx.polyOpa.d = reinterpret_cast<Gfx*>(hexVertices + 144);
+        gfx.polyXlu.p = hexCommands;
+        ComboSaria_Draw(&mixed, &play);
+        CHECK(std::fabs(lastSkeletonScale - (exposeV2 ? .011f : .01f)) < 1e-6f);
+        CHECK(mixed.scale.x == .01f && matrixScaleStack.empty());
+        ComboSaria_Destroy(&mixed, &play);
+    }
+    exposeV1 = exposeV2 = false;
+    Bridge absentBridge;
+    CHECK(!absentBridge.Resolve());
+    puts("PASS mixed Saria modules: versioned lookup preference, old-provider1.0 fallback, V2-only provider and output "
+         "canaries.");
     puts("PASS solo MM forest and song routing: own exploration copy, local asset bridge, portal horse, fixed gift "
          "once per native file");
     puts("PASS MM Saria lifecycle: missing donor, independent blink, fixed placement/yaw, collider/talk, Alt "
@@ -674,7 +788,7 @@ int main() {
     puts("PASS seated fixed song gift: grounded pose, custom blinking, talk/close, deferred existing-item delivery, "
          "queued/active duplicate suppression, file/mode/scene guards, post-consumption permanent claim, authored "
          "field placement");
-    puts("PASS all Saria poses and song variants: green hollow-hex draw commands, follow authored placements, "
+    puts("PASS all Saria poses and song variants: green GI hex particles, follow authored placements, "
          "pause/distance guards");
     puts("PASS portal Epona placement: opposite Saria in portal coordinates, clear approach, floor probe, authored "
          "override, no duplicate or prologue/solo/other-scene spawn");

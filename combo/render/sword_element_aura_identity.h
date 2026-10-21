@@ -14,6 +14,10 @@ static inline int SwordAura_ResourceModel(const char* path, const Gfx* source, s
         { 0x14F171F6, 0xA52C587B, SWORD_AURA_DIN_CHILD },
         { 0x72E2A885, 0x10DE5020, SWORD_AURA_DIN_BGS },
         { 0x3D9F2549, 0xED5D838C, SWORD_AURA_DIN_BROKEN },
+        // Original adult Din equipment routes both custom and combined native
+        // hands through these blade leaves, in its own authored held basis.
+        { 0x0AC6FFD3, 0xF0AE6266, SWORD_AURA_MODERN_DIN_BGS },
+        { 0x68A55E4B, 0x08BD368C, SWORD_AURA_MODERN_DIN_BROKEN },
     };
     // Only inspect complete commands supplied by the resource owner. An alias
     // can carry a marker first; the 128-bit hash command owns the next slot.

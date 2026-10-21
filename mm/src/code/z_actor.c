@@ -1244,6 +1244,7 @@ void* Actor_FindSharedMemoryEntry(PlayState* play, s16 id) {
 }
 
 void Actor_Kill(Actor* actor) {
+    DinFireSword_FinishFatal(gPlayState, actor);
     GameInteractor_ExecuteOnActorKill(actor);
     actor->draw = NULL;
     actor->update = NULL;
@@ -1317,6 +1318,7 @@ void Actor_Init(Actor* actor, PlayState* play) {
 }
 
 void Actor_Destroy(Actor* actor, PlayState* play) {
+    DinFireSword_FinishForget(play, actor);
     if (actor->init == NULL) {
         if (actor->destroy != NULL) {
             actor->destroy(actor, play);
@@ -2961,7 +2963,9 @@ static void Actor_RunUpdateWithCrashContext(Actor* actor, PlayState* play) {
     sCrashActorContext.actor = (uintptr_t)actor;
     sCrashActorContext.callback = (uintptr_t)actor->update;
     sCrashActorContext.active = 1;
+    DinFireSword_FinishBeginActor(play, actor);
     actor->update(actor, play);
+    DinFireSword_FinishEndActor(play, actor);
     sCrashActorContext = previous;
 }
 
@@ -3756,6 +3760,7 @@ void Actor_DrawAll(PlayState* play, ActorContext* actorCtx) {
     EffectSs_DrawAll(play);
     EffFootmark_Draw(play);
 
+    DinFireSword_FinishDrawAll(play);
     OotFw_DrawPointer(play); // Skijer's NEI: Farore's Wind pillar (OoT func_800315AC call site)
 
     ref2 = POLY_XLU_DISP;
@@ -4433,6 +4438,7 @@ void Attention_FindActor(PlayState* play, ActorContext* actorCtx, Actor** attent
  * While the screen flashes, the game freezes.
  */
 void Enemy_StartFinishingBlow(PlayState* play, Actor* actor) {
+    DinFireSword_FinishFatal(play, actor);
     play->actorCtx.freezeFlashTimer = 5;
     SoundSource_PlaySfxAtFixedWorldPos(play, &actor->world.pos, 20, NA_SE_EN_LAST_DAMAGE);
 }
@@ -5549,11 +5555,14 @@ s32 func_800BE184(PlayState* play, Actor* actor, f32 xzDist, s16 arg3, s16 arg4,
 }
 
 u8 Actor_ApplyDamage(Actor* actor) {
+    u8 swordFinishHealth = actor->colChkInfo.health;
     if (actor->colChkInfo.damage >= actor->colChkInfo.health) {
         actor->colChkInfo.health = 0;
     } else {
         actor->colChkInfo.health -= actor->colChkInfo.damage;
     }
+    if (swordFinishHealth != 0 && actor->colChkInfo.health == 0)
+        DinFireSword_FinishFatal(gPlayState, actor);
     return actor->colChkInfo.health;
 }
 
