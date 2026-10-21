@@ -83,6 +83,12 @@
   {
     "suite": "entrances",
     "origin": "gate",
+    "name": "Conditional Lost Woods Great Fairy return",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/run_fountain_return_tests.py --sanitize"
+  },
+  {
+    "suite": "entrances",
+    "origin": "gate",
     "name": "Retail shops and nonretail interior entrance regressions",
     "run": "g++ -std=c++20 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/cross_dungeon/narrow_pools_test.cpp -o /tmp/narrow-pools\nASAN_OPTIONS=detect_leaks=0 /tmp/narrow-pools\ng++ -std=c++20 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -I. tests/cross_dungeon/shop_pool_test.cpp -o /tmp/shop-pools\nASAN_OPTIONS=detect_leaks=0 /tmp/shop-pools\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/shop_catalogue_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/shop_native_pool_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/shop_return_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/shop_cli_options_behavior_test.py --sanitize\npython3 -B tests/cross_dungeon/interior_settings_behavior_test.py\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/oot_catalogue_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/mm_catalogue_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/oot_pool_runtime_behavior_test.py --sanitize"
   },

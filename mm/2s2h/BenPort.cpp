@@ -8,6 +8,7 @@
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
 #include "ComboResolve.h"
 #include "../../combo/entrances/LostWoodsEntrance.h"
+#include "2s2h/Enhancements/Gameplay/ComboWoodfallPassage.h"
 #include "../../combo/gameplay/MagicMirrorArrival.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "2s2h/Enhancements/Camera/ComboForestArrivalCamera.h"
@@ -222,6 +223,17 @@ extern "C" void MM_ApplyComboPortalArrival(void) {
     // Stage the exploration arrival after save loading; Play_Init consumes it
     // once and the existing title-card hook waits for the native fade to end.
     gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
+    if (sComboPortalRoute == COMBO_PORTAL_WOODFALL) {
+        // Enter at the native start of the exterior, preserving its traversal,
+        // owl activation, temple requirements and the loaded cycle/progress.
+        gSaveContext.save.entrance = ENTRANCE(WOODFALL, 0);
+        gSaveContext.save.cutsceneIndex = 0;
+        gSaveContext.nextCutsceneIndex = 0xFFEF;
+        gSaveContext.cutsceneTrigger = 0;
+        gSaveContext.save.isOwlSave = false;
+        gSaveContext.respawnFlag = 0;
+        return;
+    }
     if (ComboLostWoods_IsOpeningForestRoute(sComboPortalRoute)) {
         gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
         gSaveContext.save.cutsceneIndex = 0;
@@ -270,6 +282,7 @@ extern "C" void Combo_RequestOwlSaveQuit(void) {
 // Drop any unconsumed return request. Called as MM is entered: one left over from the previous session
 // would immediately quit the new one.
 static void Combo_CancelLostWoodsPassage(void) {
+    ComboWoodfallPassage_Reset();
     if (sComboPassageFade && gPlayState && gGameState == &gPlayState->state)
         gPlayState->envCtx.fillScreen = false;
     if (ComboLostWoods_IsForestRoute(sComboReturnPortalRoute))
@@ -1523,14 +1536,17 @@ extern "C" void InitOTR(int argc, char* argv[]) {
                     sComboOpeningReturnArmed = true;
             }
             const bool openingReturn = sComboOpeningReturnArmed && ComboOpeningForest_AtReturn(gPlayState, &pos);
-            if (!openingReturn &&
+            const bool woodfallReturn = ComboWoodfallPassage_AtReturn(gPlayState, &pos);
+            if (!openingReturn && !woodfallReturn &&
                 !ComboLostWoods_InMmPassage(gPlayState->sceneId, gPlayState->roomCtx.curRoom.num, pos.x, pos.y, pos.z))
                 return;
             if (!sComboSetOotReturnRoute)
                 sComboSetOotReturnRoute = (void (*)(int))Combo_ResolveSym("soh", "SOH_SetComboPortalReturnRoute");
             if (!sComboSetOotReturnRoute)
                 return;
-            sComboReturnPortalRoute = openingReturn ? COMBO_PORTAL_OPENING_FOREST : COMBO_PORTAL_LOST_WOODS;
+            sComboReturnPortalRoute = woodfallReturn  ? COMBO_PORTAL_WOODFALL
+                                      : openingReturn ? COMBO_PORTAL_OPENING_FOREST
+                                                      : COMBO_PORTAL_LOST_WOODS;
             sComboPassageFileNum = (int)gSaveContext.fileNum;
             sComboPassageFade = 1;
         });

@@ -32,6 +32,7 @@ static PlayState play{};
 static Player player{};
 static int saves, switches, recordedRoute, savedSlot;
 static int sComboFwSwitchSlot = -1;
+static int sComboWoodfallPassageSlot = -1;
 namespace ComboCrossOotRuntime {
     static bool pending = false;
     static struct { bool Enabled() const { return false; } } state;

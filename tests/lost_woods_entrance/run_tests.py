@@ -12,6 +12,8 @@ MODE_PREAMBLE = '#include "ComboGameMode.h"\nextern "C" { int gComboGameMode = C
 sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
 from run_time_pedestal_tests import block_from
 
+subprocess.run([sys.executable, '-B', str(ROOT / 'tests/lost_woods_entrance/run_woodfall_tests.py')], check=True)
+
 title = (ROOT / "mm/src/code/title_setup.c").read_text()
 port = (ROOT / "mm/2s2h/BenPort.cpp").read_text()
 body = block_from(title, title.index("void Setup_InitImpl("))
@@ -99,6 +101,7 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-arrival-") as directory:
     subprocess.run([str(binary)], check=True)
 
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_arrival_fade_tests.py")], check=True)
+subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_fountain_return_tests.py"), "--sanitize"], check=True)
 subprocess.run([sys.executable, str(ROOT / "tests/lost_woods_entrance/renderer_linkage_test.py")], check=True)
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_mm_camera_arrival_test.py")], check=True)
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/opening_forest_test.py")], check=True)
