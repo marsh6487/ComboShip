@@ -12,9 +12,7 @@ def main():
         code = needs["preflight"]["outputs"]["code"]
         if code not in ("true", "false"):
             raise ValueError("Missing or invalid preflight code output")
-        expected = {"preflight": "success"}
-        expected.update({name: "success" if code == "true" else "skipped"
-                         for name in ("checks",)})
+        expected = {"preflight": "success", "checks": "success" if code == "true" else "skipped"}
         failed = False
         rows = []
         for name, required in expected.items():
@@ -41,8 +39,10 @@ def main():
                         report += f"- [{name}]({url})" + (f": {steps}" if steps else "") + "\n"
                 cancelled = sum(job.get("conclusion") == "cancelled" for job in jobs)
                 if cancelled:
-                    report += f"\n{cancelled} remaining check(s) were cancelled. Open the failed check above for the original error.\n"
-            except (ValueError, TypeError, KeyError):
+                    report += f"\n{cancelled} remaining check(s) were cancelled."
+                    report += (" Open the failed check above for the original error.\n" if earlier
+                               else " No original failed job was reported; the run or its checks were cancelled.\n")
+            except (ValueError, TypeError, KeyError, AttributeError):
                 report += "\nDetailed job metadata was unavailable; the required failure remains recorded above.\n"
         print(report)
         if os.environ.get("GITHUB_STEP_SUMMARY"):

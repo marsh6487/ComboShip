@@ -115,6 +115,34 @@ class FinalVerdictTests(unittest.TestCase):
         jobs["checks"]["result"] = "failure"
         self.assertEqual(self.verdict(jobs).returncode, 1)
 
+    def test_cancelled_siblings_are_distinguished_from_the_original_failure(self):
+        jobs = self.jobs()
+        jobs["checks"]["result"] = "failure"
+        result = self.verdict(jobs, [
+            {"name": "Build Windows", "conclusion": "cancelled"},
+            {"name": "Test forest", "conclusion": "failure", "html_url": "https://example.test/failure"},
+        ])
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("[Test forest](https://example.test/failure)", result.stdout)
+        self.assertNotIn("[Build Windows]", result.stdout)
+        self.assertIn("1 remaining check(s) were cancelled", result.stdout)
+
+    def test_cancellation_without_failed_jobs_does_not_invent_a_cause(self):
+        jobs = self.jobs()
+        jobs["checks"]["result"] = "cancelled"
+        result = self.verdict(jobs, [{"name": "Build Windows", "conclusion": "cancelled"}])
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("No original failed job was reported", result.stdout)
+        self.assertNotIn("Open the failed check above", result.stdout)
+
+    def test_malformed_optional_metadata_keeps_the_required_failure(self):
+        jobs = self.jobs()
+        jobs["checks"]["result"] = "failure"
+        result = self.verdict(jobs, "invalid job list")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("checks: expected success, got failure", result.stdout)
+        self.assertIn("metadata was unavailable", result.stdout)
+
     def test_all_required_results_must_succeed(self):
         self.assertEqual(self.verdict(self.jobs()).returncode, 0)
         for name in ("preflight", "checks"):

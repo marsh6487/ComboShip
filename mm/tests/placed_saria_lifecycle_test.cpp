@@ -40,6 +40,8 @@ static std::vector<float> matrixScaleStack;
 static unsigned lastPose;
 static bool talkAccepted;
 static u8 textState = TEXT_STATE_NONE;
+static bool advanceText;
+static unsigned textboxesClosed;
 static unsigned rewards, saves, receipts, hintRegistrations;
 static unsigned sparkles;
 static Vec3f sparklePos;
@@ -250,6 +252,13 @@ s32 Actor_OfferTalk(Actor*, PlayState*, f32) {
 }
 u8 Message_GetState(MessageContext*) {
     return textState;
+}
+bool Message_ShouldAdvance(PlayState*) {
+    return advanceText;
+}
+void Message_CloseTextbox(PlayState*) {
+    ++textboxesClosed;
+    textState = TEXT_STATE_CLOSING;
 }
 void SkelAnime_InitFlex(PlayState*, SkelAnime* a, FlexSkeletonHeader* s, AnimationHeader* animation, Vec3s* joints,
                         Vec3s* morph, s32 count) {
@@ -496,12 +505,24 @@ int main() {
         CHECK(reinterpret_cast<const char*>(head) == sitting.resources.heads[eye]);
     }
     auto talkAndClose = [&](Actor& actor) {
-        textState = TEXT_STATE_DONE;
+        const size_t queued = interactor.events.size();
+        textState = TEXT_STATE_EVENT;
         talkAccepted = true;
         ComboSaria_Update(&actor, &play);
         CHECK(rewards == 0);
-        textState = TEXT_STATE_NONE;
+        const unsigned closed = textboxesClosed;
+        advanceText = false;
         ComboSaria_Update(&actor, &play);
+        CHECK(textboxesClosed == closed && sStates.at(&actor)->talking);
+        CHECK(interactor.events.size() == queued);
+        advanceText = true;
+        ComboSaria_Update(&actor, &play);
+        CHECK(textboxesClosed == closed + 1 && textState == TEXT_STATE_CLOSING && sStates.at(&actor)->talking);
+        CHECK(interactor.events.size() == queued);
+        advanceText = false;
+        ComboSaria_Update(&actor, &play);
+        CHECK(!sStates.at(&actor)->talking);
+        textState = TEXT_STATE_NONE;
     };
     talkAndClose(seated);
     CHECK(interactor.events.empty());
@@ -598,7 +619,7 @@ int main() {
         };
         draw();
         CHECK(shimmerDraws == 1 &&
-              shimmerMesh.count == ForestGiParticles::kSariaMotes * ForestGiParticles::kHexVertices);
+              shimmerMesh.count == ForestGiParticles::kSariaMotes * ForestGiParticles::kTwinkleVertices);
         CHECK(shimmerOrigin.x == 500 && shimmerOrigin.y == 80 && shimmerOrigin.z == -400);
         for (size_t i = 0; i < shimmerMesh.count; ++i) {
             const auto& vertex = shimmerMesh.vertices[i];
@@ -788,7 +809,7 @@ int main() {
     puts("PASS seated fixed song gift: grounded pose, custom blinking, talk/close, deferred existing-item delivery, "
          "queued/active duplicate suppression, file/mode/scene guards, post-consumption permanent claim, authored "
          "field placement");
-    puts("PASS all Saria poses and song variants: green GI hex particles, follow authored placements, "
+    puts("PASS all Saria poses and song variants: green NEI twinkle particles, follow authored placements, "
          "pause/distance guards");
     puts("PASS portal Epona placement: opposite Saria in portal coordinates, clear approach, floor probe, authored "
          "override, no duplicate or prologue/solo/other-scene spawn");
