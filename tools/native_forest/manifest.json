@@ -455,6 +455,29 @@
     "terrain_display_lists": 0,
     "version": 2
   },
+  "presentation_polish": {
+    "palette": "581880",
+    "preservation": "Original split ZIP, every scene/collision/room/texture byte, ramp geometry, scrolling tracks and avatar poster preserved",
+    "resources": {
+      "custom/comboship/native_forest/authored/room_0/ReturnTunnelMouth": {
+        "bytes": 472,
+        "sha256": "1fc24235bcdece280f92216b5665c95db0574c86de0e36b57ea17ced6c5b6e0c"
+      },
+      "custom/comboship/native_forest/building/recipe7624751371212635_vtx": {
+        "bytes": 904,
+        "sha256": "7b2cf3adf5eb218d86ef1dd81260060ac7fcf9ac1a707eb1004df09c1d7b345a"
+      },
+      "custom/comboship/native_forest/mirror_access_material": {
+        "bytes": 1322,
+        "sha256": "f5de90b99ba04ff73fa42dd9c39c21d013376dbf5ddacd7d80b5b563d0eb2fd7"
+      },
+      "custom/comboship/native_forest/portal_xlu": {
+        "bytes": 148,
+        "sha256": "6f5df01d84046449a1212fd8d9ef625089687903bbe73802d57ade7c8526b650"
+      }
+    },
+    "version": 1
+  },
   "resources": {
     "custom/comboship/native_forest/authored/prelude/black_magic_bench_0": {
       "bytes": 264,

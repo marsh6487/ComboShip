@@ -257,10 +257,11 @@ class PresentationTests(unittest.TestCase):
             self.assertEqual(module.file_sha(one), module.file_sha(two))
             metadata = directory / 'manifest.json'
             metadata.write_text(json.dumps(manifest))
+            effective = prepare.prepared_resources(metadata)
             prepare.prepare(directory / 'output', metadata)
             for engine in ('soh', 'mm'):
                 root = directory / 'output' / engine / 'assets/custom'
-                for path, data in resources.items():
+                for path, data in effective.items():
                     self.assertEqual((root / path).read_bytes(), data)
 
 

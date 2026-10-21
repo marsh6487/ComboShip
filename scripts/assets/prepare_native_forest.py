@@ -50,8 +50,31 @@ def verified_resources(manifest_path, bundle_path=None):
     return resources
 
 
-def prepare(output_root, manifest_path=DEFAULT_MANIFEST, bundle_path=None):
+def prepared_resources(manifest_path, bundle_path=None):
+    # Authoring rebakes consume the original verified source; normal archive
+    # preparation consumes the derived presentation. Keep those contracts apart.
     resources = verified_resources(manifest_path, bundle_path)
+    metadata = json.loads(Path(manifest_path).read_text())
+    polish = metadata.get('presentation_polish')
+    if polish is not None:
+        if polish.get('version') != 1 or not isinstance(polish.get('resources'), dict):
+            raise ValueError('Unsupported native forest presentation polish')
+        from forest_presentation import apply
+        polished = apply(resources)
+        changed = {name for name in resources if resources[name] != polished[name]}
+        if changed != set(polish['resources']):
+            raise ValueError('Native forest presentation polish membership mismatch')
+        for name in changed:
+            entry, data = polish['resources'][name], polished[name]
+            if len(data) != entry['bytes'] or native_forest.sha(data) != entry['sha256']:
+                raise ValueError(f'Native forest presentation polish hash/size mismatch: {name}')
+        native_forest.validate_resources(polished)
+        resources = polished
+    return resources
+
+
+def prepare(output_root, manifest_path=DEFAULT_MANIFEST, bundle_path=None):
+    resources = prepared_resources(manifest_path, bundle_path)
     restored = 0
     for game in ('soh', 'mm'):
         root = Path(output_root) / game / 'assets/custom'

@@ -2,6 +2,7 @@
 #include "ComboForestSkullKid.h"
 #include "ComboOpeningForest.h"
 #include "ComboForestActors.h"
+#include "entrances/ForestActorPlacements.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/ShipInit.hpp"
 #include <cmath>
@@ -25,15 +26,16 @@ void SpawnForestSkullKid() {
                 return;
             }
     sSpawnAttempted = true;
-    // Raised outer edge of the second clearing, facing back into the area.
-    // Native collision has Y=89.279 here; live/custom-scene fit is provisional.
-    Vec3f pos = { 2200.0f, 500.0f, 200.0f };
+    // Use the marked raised ledge, facing the clearing. Sample its real floor
+    // so optional appearance packs do not leave him at a stale ground height.
+    using namespace ForestActorPlacements;
+    Vec3f pos = { kSkullKidX, kSkullKidProbeY, kSkullKidZ };
     CollisionPoly* poly = nullptr;
     s32 bgId = BGCHECK_SCENE;
     const float floor = BgCheck_EntityRaycastFloor5(&play->colCtx, &poly, &bgId, nullptr, &pos);
     if (!poly || !std::isfinite(floor) || floor <= BGCHECK_Y_MIN)
         return;
-    Actor_Spawn(&play->actorCtx, play, ACTOR_DM_STK, pos.x, floor + 35.0f, pos.z, 0, -0x5000, 0,
+    Actor_Spawn(&play->actorCtx, play, ACTOR_DM_STK, pos.x, floor + kSkullKidLift, pos.z, 0, kSkullKidYaw, 0,
                 COMBO_FOREST_SKULL_KID_PARAMS);
 }
 

@@ -45,19 +45,30 @@ inline NeiGi::Mesh Saria(uint32_t frame, bool seated, const NeiGi::Basis& camera
     });
 }
 
-inline NeiGi::Mesh Entrance(uint32_t frame, float radius, float centerY, float front, const NeiGi::Basis& camera) {
-    return Emit(frame, kPortalMotes, .8f, camera, [&](int i, NeiGi::Point) {
-        // A staggered five-by-four field covers the full black opening.
-        // The arched ceiling clips emitter centers rather than outlining it.
-        const float x = (((i * 3) % 5 + .5f) / 5.f * 2.f - 1.f) * (radius - 5.f);
-        const float height = centerY + std::sqrt(radius * radius - x * x);
-        const float row = (i / 5 + .5f) / 4.f;
-        return NeiGi::Point{ x, 6.f + row * (height - 12.f), front };
-    });
+inline NeiGi::Mesh Entrance(uint32_t frame, float radius, float centerY, float front, const NeiGi::Basis& camera,
+                            NeiGi::Kind kind = NeiGi::Kind::Leaf) {
+    return Emit(
+        frame, kPortalMotes, .8f, camera,
+        [&](int i, NeiGi::Point) {
+            // A staggered five-by-four field covers the full black opening.
+            // The arched ceiling clips emitter centers rather than outlining it.
+            const float x = (((i * 3) % 5 + .5f) / 5.f * 2.f - 1.f) * (radius - 5.f);
+            const float height = centerY + std::sqrt(radius * radius - x * x);
+            const float row = (i / 5 + .5f) / 4.f;
+            return NeiGi::Point{ x, 6.f + row * (height - 12.f), front };
+        },
+        kind);
 }
 
 inline NeiGi::Mesh Portal(uint32_t frame, bool packed, const NeiGi::Basis& camera = {}) {
-    return Entrance(frame, packed ? 68.f : 44.f, packed ? 66.f : 65.f, packed ? 14.f : 8.f, camera);
+    auto mesh =
+        Entrance(frame, packed ? 68.f : 44.f, packed ? 66.f : 65.f, packed ? 14.f : 8.f, camera, NeiGi::Kind::Shadow);
+    // Match the authored building's 0x581880 palette. Preserve the exact NEI
+    // white star cores, alpha, geometry, motion and full black-face coverage.
+    for (size_t i = 0; i < mesh.count; ++i)
+        if (mesh.vertices[i].rgb == NeiGi::ColorHex(NeiGi::Kind::Shadow))
+            mesh.vertices[i].rgb = 0x581880;
+    return mesh;
 }
 
 inline NeiGi::Mesh Mystery(uint32_t frame, const NeiGi::Basis& camera = {}) {

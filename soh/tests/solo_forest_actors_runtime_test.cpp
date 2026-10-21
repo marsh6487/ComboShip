@@ -114,12 +114,12 @@ int main() {
     assert(spawned.size() == 2);
     assert(spawned[0].params == 0x7F13 && spawned[0].world.pos.y == 12);
     // Hand-checked stock-forest side position, outside the portal and arrival.
-    assert(std::fabs(spawned[0].world.pos.x - (-763.883f)) < .01f);
-    assert(std::fabs(spawned[0].world.pos.z - (-146.702f)) < .01f);
+    assert(std::fabs(spawned[0].world.pos.x - (-672.152f)) < .01f);
+    assert(std::fabs(spawned[0].world.pos.z - (-54.586f)) < .01f);
     const float angle = 12288 * (6.28318530718f / 65536.0f);
     const float dx = spawned[0].world.pos.x + 695.0f, dz = spawned[0].world.pos.z + 313.0f;
     assert(dx * std::cos(angle) - dz * std::sin(angle) < -150.0f);
-    assert(std::fabs(dx * std::sin(angle) + dz * std::cos(angle)) < .01f);
+    assert(std::fabs(dx * std::sin(angle) + dz * std::cos(angle) - 120.0f) < .01f);
     assert(!ComboSoloForest_AtStump(spawned[0].world.pos.x, spawned[0].world.pos.y, spawned[0].world.pos.z));
     assert(std::hypot(spawned[0].world.pos.x + 486.0f, spawned[0].world.pos.z + 227.0f) > 250.0f);
     assert(spawned[1].params == 0x7E40 && spawned[1].world.pos.y == 12);
@@ -130,7 +130,7 @@ int main() {
     play.roomCtx.curRoom.num = 1;
     Update();
     assert(spawned.size() == 3);
-    assert(spawned[2].params == 0x7E08 && spawned[2].world.pos.x == 2200 && spawned[2].world.pos.z == 200 &&
+    assert(spawned[2].params == 0x7E08 && spawned[2].world.pos.x == 2302 && spawned[2].world.pos.z == -185 &&
            spawned[2].world.pos.y == 47);
     sVisit.Reset();
     play.roomCtx.curRoom.num = 0;

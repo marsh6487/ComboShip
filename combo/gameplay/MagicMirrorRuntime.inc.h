@@ -338,17 +338,19 @@ bool ArrivalDestination(const PlayState* play) {
 }
 
 bool Landing(PlayState* play, Vec3s& position, s16& yaw) {
-    // Beside the stump, clear of its cap and even Goron's body.
-    // Prefer the south side; try the other sides if Prelude moved it near a wall.
-    constexpr int offsets[][2] = { { 0, -120 }, { 85, -85 }, { 120, 0 },  { 85, 85 },
-                                   { 0, 120 },  { -85, 85 }, { -120, 0 }, { -85, -85 } };
+    // Prefer the center of the actual placed cap, facing the ramp. Retain the
+    // checked ground fallbacks if a scene edit obstructs or removes its top.
+    constexpr int offsets[][2] = { { 0, 0 },   { 0, -120 }, { 85, -85 }, { 120, 0 },  { 85, 85 },
+                                   { 0, 120 }, { -85, 85 }, { -120, 0 }, { -85, -85 } };
     for (const auto& offset : offsets) {
+        const bool cap = offset[0] == 0 && offset[1] == 0;
         Vec3f point{ std::round(sAnchor.x) + offset[0], sAnchor.y + 1, std::round(sAnchor.z) + offset[1] };
         CollisionPoly* floor = nullptr;
         s32 bgId = BGCHECK_SCENE;
         const float height = BgCheck_EntityRaycastFloor3(&play->colCtx, &floor, &bgId, &point);
         if (!std::isfinite(height) || !floor || bgId != BGCHECK_SCENE || floor->normal.y < 30000 ||
-            height > sAnchor.y - 1 || height < sAnchor.y - 220 || height <= BGCHECK_Y_MIN)
+            (cap ? std::abs(height - sAnchor.y) > 1 : height > sAnchor.y - 1) || height < sAnchor.y - 220 ||
+            height <= BGCHECK_Y_MIN)
             continue;
         point.y = std::ceil(height);
         if (std::abs(point.x) > 32700 || std::abs(point.y) > 32700 || std::abs(point.z) > 32700)
@@ -379,7 +381,7 @@ bool Landing(PlayState* play, Vec3s& position, s16& yaw) {
         if (!clear)
             continue;
         position = { static_cast<s16>(point.x), static_cast<s16>(point.y), static_cast<s16>(point.z) };
-        const float angle = std::atan2(sAnchor.x - point.x, sAnchor.z - point.z);
+        const float angle = cap ? 3.14159265359f / 2 : std::atan2(sAnchor.x - point.x, sAnchor.z - point.z);
 #ifdef COMBO_MAGIC_MIRROR_MM
         const int degrees = (static_cast<int>(std::round(angle * (180.0f / 3.14159265359f))) + 360) % 360;
         yaw = static_cast<s16>((degrees << 7) | 127); // native packed yaw + no actor cutscene

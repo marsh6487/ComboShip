@@ -1,6 +1,7 @@
 #include "overlays/actors/ovl_Dm_Stk/z_dm_stk.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "entrances/SoloForest.h"
+#include "entrances/ForestActorPlacements.h"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -240,7 +241,7 @@ int main() {
     attempt();
     CHECK(spawns == 1);
     CHECK(spawned.id == ACTOR_DM_STK && spawned.params == COMBO_FOREST_SKULL_KID_PARAMS);
-    CHECK(spawned.world.pos.x > 2100 && spawned.world.pos.z > 150 && spawned.world.pos.y > 123);
+    CHECK(spawned.world.pos.x == 2302 && spawned.world.pos.z == -185 && spawned.world.pos.y == 158);
     SpawnForestSkullKid();
     CHECK(spawns == 1);
     CHECK(!std::memcmp(&saveBefore, &gSaveContext, sizeof(saveBefore)));
