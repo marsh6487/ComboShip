@@ -11,13 +11,14 @@ static_assert(kPortalMotes * kTwinkleVertices <= NeiGi::Mesh{}.vertices.size());
 static_assert(kMysteryMotes * kTwinkleVertices <= NeiGi::Mesh{}.vertices.size());
 
 // Sample the actual optional NEI GI shimmer. Move each complete twinkle as a
-// rigid unit, preserving its shape, pulse, spin, green palette and alpha.
+// rigid unit, preserving its shape, pulse, spin, selected palette and alpha.
 // Five source twinkles are sampled together; no new particle primitive exists.
 template <class Placement>
-inline NeiGi::Mesh Emit(uint32_t frame, int motes, float scale, const NeiGi::Basis& camera, Placement place) {
+inline NeiGi::Mesh Emit(uint32_t frame, int motes, float scale, const NeiGi::Basis& camera, Placement place,
+                        NeiGi::Kind kind = NeiGi::Kind::Leaf) {
     NeiGi::Mesh mesh;
     for (int group = 0; group * 5 < motes; ++group) {
-        const auto sample = NeiGi::SampleShimmer(frame + uint32_t(group) * 29u, true, camera, NeiGi::Kind::Leaf);
+        const auto sample = NeiGi::SampleShimmer(frame + uint32_t(group) * 29u, true, camera, kind);
         for (int slot = 0; slot < 5 && group * 5 + slot < motes; ++slot) {
             const size_t first = slot * kTwinkleVertices;
             const auto origin = sample.vertices[first].p;
@@ -64,6 +65,7 @@ inline NeiGi::Mesh Mystery(uint32_t frame, const NeiGi::Basis& camera = {}) {
 }
 
 inline NeiGi::Mesh Mirror(uint32_t frame, const NeiGi::Basis& camera = {}) {
-    return Emit(frame, 5, .5f, camera, [](int, NeiGi::Point original) { return original * .55f; });
+    return Emit(
+        frame, 5, .5f, camera, [](int, NeiGi::Point original) { return original * .55f; }, NeiGi::Kind::Neutral);
 }
 } // namespace ForestGiParticles

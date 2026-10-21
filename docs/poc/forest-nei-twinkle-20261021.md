@@ -61,3 +61,15 @@ The decisive configured check remains both bridge directions with the actual
 installed mod stack, Saria in each placed pose, and an unowned Mirror before
 and after walking the new log onto its stump. Particle preview is not proof
 of scene load order, live camera placement or native gameplay acceptance.
+
+Mirror palette follow-up: cor accepted the preview except the Mirror's green
+color and delegated a suitable replacement. Starting from merged source
+`09d26152330c946f4e8e2934ee97a06c75308b7e`, the Mirror alone now samples
+NEI's existing Neutral palette: pale-blue halo `#A8E9FF`, icy glints `#E6F8FF`
+and white core `#FFFFFF`. Saria and both entrances retain Leaf green. Shape,
+pulse, motion, alpha, size and pickup behavior are unchanged. The existing
+canonical test first failed on the old green RGB and then passed the full
+native particle/renderer suite. Comparing all 180 exported frames confirms
+that only Mirror RGB differs; all other streams and Mirror geometry, positions
+and alpha are byte-identical. This is verified source/offline rendering;
+the new palette has not been captured in configured gameplay.
