@@ -33,6 +33,10 @@ static ObjBombiwa boulder;
 static DoorAna grotto;
 static LinkAnimationHeader idle;
 static s32 textState, boulderBreaks;
+static s32 finishAcceptedCalls;
+static const void* finishReceiver;
+static const ColliderInfo* finishHit;
+static uint32_t finishFlags, finishDamage;
 
 #define MM_FORM_LIMB_COUNT 22
 #define MMFORM_GRAVITY_NORMAL 0
@@ -58,6 +62,16 @@ static u8 NEI_PlayerDamageBoostActive(void) {
 uint8_t DinFireSword_DamageEntry(PlayState* state, Actor* target, const ColliderInfo* hit, uint32_t flags,
                                  uint8_t entry) {
     return entry;
+}
+/* Elemental presentation is an observer boundary, not collision policy. */
+void DinFireSword_FinishAcceptedHit(PlayState* state, const void* receiver, const ColliderInfo* hit,
+                                   uint32_t flags, uint32_t damage) {
+    assert(state == &play);
+    ++finishAcceptedCalls;
+    finishReceiver = receiver;
+    finishHit = hit;
+    finishFlags = flags;
+    finishDamage = damage;
 }
 static f32 MmForm_GetGravity(s32 mode) {
     return -1.2f;
@@ -208,6 +222,7 @@ static void reset(MmPlayerTransformation form) {
     idle.common.frameCount = 25;
     gFormState.savedShadowScale = 90;
     textState = boulderBreaks = sRollOwnsPause = 0;
+    finishAcceptedCalls = 0;
     player.actor.update = actor_update;
     player.actor.colChkInfo.mass = 50; /* Player_UpdateCommon's live mass */
     player.cylinder.base.actor = &player.actor;
@@ -301,6 +316,9 @@ int main(int argc, char** argv) {
         production_pound_0(&player);
         collide_attack(&player.cylinder.base, &boulder.collider.base);
         CollisionCheck_ApplyDamage(&play, &play.colChkCtx, &boulder.collider.base, &boulder.collider.info);
+        assert(finishAcceptedCalls == 1 && finishReceiver == &boulder.collider.base &&
+               finishHit == &player.cylinder.info && finishFlags == boulder.collider.info.bumper.dmgFlags &&
+               finishDamage == 4);
         assert(boulder.actor.colChkInfo.damage == 4 && boulder.actor.colChkInfo.damageEffect == 2 &&
                "Adding grotto compatibility must preserve the pound's existing "
                "jump-hammer damage table row");

@@ -2,6 +2,7 @@
 #include "functions.h"
 #include "variables.h"
 #include "macros.h"
+#include "din_fire_sword.h"
 #include "mods/transformation_masks/transformation_masks.h"
 #include "mods/sound_translator/mm_audio_sfx.h"
 #include "mods/sound_translator/mm_sfx_ids.h"
@@ -36,6 +37,13 @@ u16 gEquipMasks[4];
 u8 gEquipShifts[4];
 static PlayState play;
 static Player player;
+static int finishForgetCalls;
+// The elemental finish observer is a boundary; its implementation has its own
+// native tests. Keep the actual Actor_Destroy body and verify its handoff here.
+extern "C" void DinFireSword_FinishForget(PlayState* state, Actor* actor) {
+    assert(state == &play && actor == &player.actor);
+    ++finishForgetCalls;
+}
 static struct {
     int state, currentForm, targetForm, initialized, skeletonLoaded, goronAction;
     int cutsceneTimer, cutscenePhase, flashAlpha, zoraSwimEnabled, groundPoundCrackTimer;
@@ -210,6 +218,7 @@ static void reset() {
     gPlayState = nullptr;
     player.actor.id = ACTOR_PLAYER;
     actionExits = false;
+    finishForgetCalls = 0;
     dispatchedSfx = 0;
     available = true;
     sPendingSoftReload = sPendingReactivate = sForceInstantTransform = 0;
@@ -280,6 +289,7 @@ int main(int argc, char** argv) {
         else if (!strcmp(scenario, "destroy")) {
             player.actor.destroy = destroy;
             Actor_Destroy(&player.actor, &play);
+            assert(finishForgetCalls == 1 && "actor destruction must notify the elemental finish observer");
         } else if (!strcmp(scenario, "unavailable")) {
             available = false;
             MmForm_StopGoronRollSfx();

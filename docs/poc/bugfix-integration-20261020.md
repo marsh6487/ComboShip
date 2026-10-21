@@ -145,3 +145,43 @@ Restore from the published candidate source commit/tree or the original
 checkpoint refs in the table. Original input archives remain unchanged. Discard
 only a bounded new change when a regression is found; retain the independently
 verified inputs. No accepted runtime master is promoted by this integration.
+
+## Combined gate follow-up
+
+The published cumulative head `4a91c33ba88d78dbe17a29bfbbdaf2f430818094`
+contains NPC source checkpoint `ee83e261` and the completed bug-fix history.
+Its exact tree is `164adb4ef53e166580c13645c7f126630b3cb1ac`, also held by
+local merge `b76e7475`. Windows compile preflight `39521052893` passed.
+Build Artifacts `39521052872` stopped before platform builds because the older
+Goron audio fixture did not declare the new elemental finish cleanup observer
+called by the actual `Actor_Destroy` body.
+
+Reproduce that failure, then retain the production actor/collision bodies and
+their normal observer calls. Add production-header-compatible observer
+boundaries to the Goron audio/collision, native MM water/weather, MM wand damage
+and OoT stat fixtures. The Goron and native MM lifecycle fixtures assert the
+observer handoff alongside their existing gameplay checks. The actual elemental
+finish implementation remains covered by its independent native sanitizer suite.
+No production renderer, model recipe, actor, scene or elemental implementation
+changes are part of this follow-up.
+
+The subsequent archive-authoring checkpoint `9633262f` explicitly freezes the
+game rebuild source at `ee83e261`; its texture/normal/iris/ocarina recipes do
+not require further executable changes. Those separate archive candidates do
+not replace installed model packs through this source push.
+
+Fresh checks pass: the 28 Goron audio scenario/backend runs, nine native Goron
+collision cases, the complete sanitized wand suite (including 2,224 Sand parity
+observations), native water/weather lifecycle, native transformation and Somaria
+GI checks, and stat/Anchor snapshot checks. The full eight-command October 20
+preflight passes, including 31 forest tests with two optional-data skips. The
+NPC suite passes 142 tests with 17 optional-data skips; native NPC routing,
+pose, draw-scale and actor compilation also pass. Asset collisions, whitespace
+and changed-source clang-format 14.0.6 checks pass. Optional detailed local
+test logs are excluded from this publication.
+
+Independent review of all six changed fixtures found no blocking issues.
+Recover the preceding cumulative candidate by checking out
+`4a91c33b`; recover its unmodified parent source from its two retained public
+histories. Configured runtime acceptance and full platform builds remain
+separate from this test-fixture correction.

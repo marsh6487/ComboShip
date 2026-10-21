@@ -10,6 +10,9 @@ u8 gIvanPossessActive;
 u8 Sm64Mario_IsReady() { return 0; }
 u8 TridentChargeBall_GetFierceDamage(Actor*) { return 0; }
 uint8_t DinFireSword_DamageEntry(PlayState*, Actor*, const ColliderElement*, uint32_t, uint8_t entry) { return entry; }
+// Elemental finish VFX are external to these native wand damage checks.
+void DinFireSword_FinishAcceptedHit(PlayState*, const void*, const ColliderElement*, uint32_t, uint32_t) {}
+void DinFireSword_FinishFatal(PlayState*, Actor*) {}
 // Wand projectiles are foreign to the owned enchanted-sword collider context.
 uint32_t DinFireSword_OriginalDamageFlags(PlayState*, const ColliderElement* hit) {
     return hit ? hit->atDmgInfo.dmgFlags : 0;
