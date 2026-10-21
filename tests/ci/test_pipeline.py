@@ -48,13 +48,15 @@ class CommandRunnerTests(unittest.TestCase):
         self.assertNotIn("SHOULD_NOT_RUN", result.stdout)
         self.assertIn("failure", summary)
         self.assertIn("17", summary)
+        self.assertIn("::error title=Regression failed::[items] failure failed (exit 17)", result.stdout)
+        self.assertIn("Run: exit 17", result.stdout)
 
     def test_pipeline_and_multiline_errors_cannot_be_hidden(self):
         for command in ("false | cat", "false\necho SHOULD_NOT_RUN"):
             with self.subTest(command=command):
                 result, _ = self.run_suite([{"suite": "items", "name": "strict shell", "run": command}])
                 self.assertEqual(result.returncode, 1, result.stderr)
-                self.assertNotIn("SHOULD_NOT_RUN", result.stdout)
+                self.assertNotIn("SHOULD_NOT_RUN", result.stdout.splitlines())
 
     def test_unknown_group_is_an_error(self):
         result, _ = self.run_suite([{"suite": "world", "name": "other", "run": "true"}])
@@ -84,19 +86,38 @@ class FinalVerdictTests(unittest.TestCase):
     def jobs(code="true"):
         return {
             "preflight": {"result": "success", "outputs": {"code": code}},
-            **{name: {"result": "success" if code == "true" else "skipped"}
-               for name in ("regressions", "windows", "linux")},
+            "checks": {"result": "success" if code == "true" else "skipped"},
         }
 
-    def verdict(self, jobs):
+    def verdict(self, jobs, workflow_jobs=None):
         return subprocess.run(
             [sys.executable, str(VERDICT)],
-            env=dict(os.environ, NEEDS_JSON=json.dumps(jobs)), text=True, capture_output=True,
+            env=dict(os.environ, NEEDS_JSON=json.dumps(jobs),
+                     WORKFLOW_JOBS_JSON=json.dumps(workflow_jobs or [])), text=True, capture_output=True,
         )
+
+    def test_failed_regression_links_the_original_job_and_step(self):
+        jobs = self.jobs()
+        jobs["checks"]["result"] = "failure"
+        result = self.verdict(jobs, [{
+            "name": "regressions / world", "conclusion": "failure",
+            "html_url": "https://github.com/marsh6487/ComboShip/actions/runs/1/job/2",
+            "steps": [{"name": "Run timed regression group", "conclusion": "failure"}],
+        }])
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("regressions / world", result.stdout)
+        self.assertIn("Run timed regression group", result.stdout)
+        self.assertIn("/job/2", result.stdout)
+        self.assertIn("Earlier failed checks", result.stdout)
+
+    def test_missing_diagnostic_metadata_cannot_hide_failure(self):
+        jobs = self.jobs()
+        jobs["checks"]["result"] = "failure"
+        self.assertEqual(self.verdict(jobs).returncode, 1)
 
     def test_all_required_results_must_succeed(self):
         self.assertEqual(self.verdict(self.jobs()).returncode, 0)
-        for name in ("preflight", "regressions", "windows", "linux"):
+        for name in ("preflight", "checks"):
             for status in ("failure", "cancelled", "skipped", "", "pending"):
                 with self.subTest(name=name, status=status):
                     jobs = self.jobs()
@@ -106,11 +127,11 @@ class FinalVerdictTests(unittest.TestCase):
     def test_docs_only_allows_intentional_skips(self):
         self.assertEqual(self.verdict(self.jobs("false")).returncode, 0)
         jobs = self.jobs("false")
-        jobs["linux"]["result"] = "failure"
+        jobs["checks"]["result"] = "failure"
         self.assertNotEqual(self.verdict(jobs).returncode, 0)
 
     def test_missing_routing_output_or_job_is_a_failure(self):
-        for missing in ("preflight", "regressions", "windows", "linux"):
+        for missing in ("preflight", "checks"):
             jobs = self.jobs()
             del jobs[missing]
             self.assertNotEqual(self.verdict(jobs).returncode, 0)

@@ -1,7 +1,7 @@
 name: Build Artifacts
 
 # Preserve this filename/name: validate-seed.yml consumes successful develop runs.
-# Preflight releases platform builds and independent regression groups together.
+# Preflight releases builds and regression groups in one fail-fast matrix.
 # The stable `gate` job verifies every required result before the run is green.
 
 on:
@@ -22,6 +22,7 @@ concurrency:
 
 jobs:
   preflight:
+    name: Fast source checks
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
@@ -88,11 +89,11 @@ jobs:
       - name: Check custom asset trees for new path collisions
         run: python3 scripts/check-asset-collisions.py
 
+      - name: Install preflight dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang-format-14 python3-venv python3-yaml
+
       - name: Verify CI failure handling
         run: python3 -B -m unittest discover -s tests/ci -v
-
-      - name: Install preflight dependencies
-        run: sudo apt-get update && sudo apt-get install -y clang-format-14 python3-venv
 
       - name: Install pinned UI rasterizer
         run: |
@@ -108,31 +109,74 @@ jobs:
           ./run-clang-format.sh
           git diff --exit-code
 
-  regressions:
+  checks:
+    name: ${{ matrix.label }}
     needs: preflight
     if: needs.preflight.outputs.code == 'true'
-    uses: ./.github/workflows/regressions.yml
-
-  windows:
-    needs: preflight
-    if: needs.preflight.outputs.code == 'true'
-    uses: ./.github/workflows/build.yml
+    strategy:
+      # One required failure stops both platform builds and all other test groups.
+      fail-fast: true
+      matrix:
+        include:
+          - check: windows
+            label: Build Windows
+          - check: linux
+            label: Build Linux
+          - check: world
+            label: Test forest, shops and Mirror
+          - check: entrances
+            label: Test entrances and returns
+          - check: items
+            label: Test items and rewards
+          - check: equipment
+            label: Test equipment and actors
+          - check: systems
+            label: Test audio, saves and weather
+          - check: render
+            label: Test rendering and assets
+    uses: ./.github/workflows/ci-check.yml
     with:
+      check: ${{ matrix.check }}
       validator: ${{ github.ref == 'refs/heads/develop' }}
 
-  linux:
-    needs: preflight
-    if: needs.preflight.outputs.code == 'true'
-    uses: ./.github/workflows/build-linux.yml
-
   gate:
+    name: Final required-check status
     if: ${{ always() }}
-    needs: [preflight, regressions, windows, linux]
+    needs: [preflight, checks]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v5
+        with:
+          sparse-checkout: scripts/ci/check_required_jobs.py
+          sparse-checkout-cone-mode: false
+      - name: Locate earlier failures
+        id: failures
+        if: needs.preflight.result != 'success' || needs.checks.result == 'failure' || needs.checks.result == 'cancelled'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+              filter: 'latest',
+              per_page: 100,
+            });
+            const failed = jobs.filter(job => ['failure', 'cancelled'].includes(job.conclusion));
+            core.setOutput('jobs', JSON.stringify(failed.map(job => ({
+              name: job.name, conclusion: job.conclusion, html_url: job.html_url,
+              completed_at: job.completed_at,
+              steps: (job.steps || []).filter(step => step.conclusion === 'failure').map(step => ({
+                name: step.name, conclusion: step.conclusion,
+              })),
+            }))));
       - name: Require every expected check
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
+          WORKFLOW_JOBS_JSON: ${{ steps.failures.outputs.jobs }}
         run: python3 -B scripts/ci/check_required_jobs.py

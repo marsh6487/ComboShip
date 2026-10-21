@@ -57,6 +57,11 @@ def main():
             with open(summary_path, "a") as summary:
                 summary.write(f"| {name} | {status} | {elapsed:.2f} |\n")
         if code:
+            # Surface the actual check in the workflow annotations immediately;
+            # the final aggregate job may run much later than this failure.
+            message = f"[{args.suite}] {task['name']} failed (exit {code}). Run: {task['run']}"
+            message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+            print(f"::error title=Regression failed::{message}", flush=True)
             return code
     return 0
 
