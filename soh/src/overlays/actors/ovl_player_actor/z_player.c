@@ -8,6 +8,7 @@
 
 #include <libultraship/libultra.h>
 #include "global.h"
+#include "soh/Enhancements/Gameplay/ComboWoodfallPassage.h"
 #ifdef COMBO_BUILD
 #include "gameplay/MagicMirrorPlayer.h"
 #include "soh/Enhancements/Gameplay/ComboBlackMarketNative.h"
@@ -6189,6 +6190,14 @@ s32 Player_HandleExitsAndVoids(PlayState* play, Player* this, CollisionPoly* pol
     s32 sp34;
     f32 speedXZ;
     s32 yaw;
+
+#ifdef COMBO_BUILD
+    // The fixed passage owns this departure until its covered-frame handoff.
+    // Do not let continued walking fire the native Kokiri/shuffled exit underneath it.
+    if (SOH_WoodfallPassageActive(play)) {
+        return 0;
+    }
+#endif
 
     if (this->actor.category == ACTORCAT_PLAYER) {
         exitIndex = 0;

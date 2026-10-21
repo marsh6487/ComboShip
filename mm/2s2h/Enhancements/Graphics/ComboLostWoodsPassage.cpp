@@ -7,6 +7,7 @@
 #include "../../../../combo/entrances/LostWoodsEntrance.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "2s2h/Enhancements/Gameplay/ComboSoloForest.h"
+#include "2s2h/Enhancements/Gameplay/ComboWoodfallPassage.h"
 #include "actors/ForestGiParticles.h"
 #include "entrances/NativeForest.h"
 #include "../../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
@@ -102,6 +103,44 @@ static void DrawPassage() {
     CLOSE_DISPS(gPlayState->state.gfxCtx);
 }
 
+static void DrawWoodfallPassage() {
+    PlayState* play = gPlayState;
+    Vec3f anchor;
+    s16 yaw;
+    if (!ComboWoodfallPassage_Get(play, &anchor, &yaw))
+        return;
+    static const auto vertices = [] {
+        BuildPassage();
+        auto result = sVertices;
+        // The entrance platform's angled wall is narrower than a forest trunk.
+        for (auto& vertex : result)
+            vertex.v.ob[0] = (s16)(vertex.v.ob[0] * COMBO_WOODFALL_PASSAGE_HALF_WIDTH / 68.0f);
+        // One unit behind the frame, still in front of the intact native wall.
+        for (int i = (kQuadCount - 1) * 4; i < kQuadCount * 4; ++i)
+            result[i].v.ob[2] = -1;
+        return result;
+    }();
+    OPEN_DISPS(play->state.gfxCtx);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    Matrix_Push();
+    Matrix_Translate(anchor.x, anchor.y, anchor.z, MTXMODE_NEW);
+    Matrix_RotateYS(yaw, MTXMODE_APPLY);
+    MATRIX_FINALIZE_AND_LOAD(POLY_OPA_DISP++, play->state.gfxCtx);
+    gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BOTH);
+    gSPTexture(POLY_OPA_DISP++, 0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON);
+    gDPSetCombineMode(POLY_OPA_DISP++, G_CC_MODULATEI, G_CC_MODULATEI);
+    gDPLoadTextureBlock(POLY_OPA_DISP++, "__OTR__scenes/nonmq/Z2_26SARUNOMORI/Z2_26SARUNOMORITex_00BAC0", G_IM_FMT_RGBA,
+                        G_IM_SIZ_16b, 32, 32, 0, G_TX_WRAP, G_TX_WRAP, 5, 5, G_TX_NOLOD, G_TX_NOLOD);
+    for (int i = 0; i < kQuadCount; ++i) {
+        gSPVertex(POLY_OPA_DISP++, (uintptr_t)&vertices[i * 4], 4, 0);
+        gSP2Triangles(POLY_OPA_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
+    }
+    Matrix_Pop();
+    gDPPipeSync(POLY_OPA_DISP++);
+    Gfx_SetupDL25_Opa(play->state.gfxCtx);
+    CLOSE_DISPS(play->state.gfxCtx);
+}
+
 static void DrawPortalFinish() {
     PlayState* play = gPlayState;
     if (!ComboOpeningForest_IsExploration(play) || play->roomCtx.curRoom.num != 0 || !play->linkActorEntry ||
@@ -153,6 +192,7 @@ void RegisterPassage() {
         [] { WoodsMysteryNativeBridge::Reset(); });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawWorldEnd>([] {
         DrawPassage();
+        DrawWoodfallPassage();
         DrawPortalFinish();
         DrawWoodsMysteryHexes();
     });

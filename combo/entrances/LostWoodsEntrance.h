@@ -7,6 +7,7 @@ enum {
     COMBO_PORTAL_LOST_WOODS = 1,
     COMBO_PORTAL_OPENING_FOREST = 2,
     COMBO_PORTAL_MAGIC_MIRROR = 3,
+    COMBO_PORTAL_WOODFALL = 4,
 };
 
 static inline int ComboLostWoods_IsOpeningForestRoute(int route) {
@@ -14,7 +15,8 @@ static inline int ComboLostWoods_IsOpeningForestRoute(int route) {
 }
 
 static inline int ComboLostWoods_IsForestRoute(int route) {
-    return route == COMBO_PORTAL_LOST_WOODS || ComboLostWoods_IsOpeningForestRoute(route);
+    return route == COMBO_PORTAL_LOST_WOODS || route == COMBO_PORTAL_WOODFALL ||
+           ComboLostWoods_IsOpeningForestRoute(route);
 }
 
 static inline int ComboLostWoods_IsPlayableSlot(int fileNum) {
@@ -30,6 +32,13 @@ static inline int ComboLostWoods_InOotFairyTunnel(int scene, int room, float x, 
     // Authored pink tunnel. Arm before its slot-11 Fairy exit floor at Z=360..400.
     return scene == 0x5B && room == 1 && x > 750.0f && x < 850.0f && y > -20.0f && y < 120.0f && z > 320.0f &&
            z < 400.0f;
+}
+
+static inline int ComboLostWoods_InOotWoodfallTunnel(int scene, int room, float x, float y, float z) {
+    // Room 7's east dead end. Claim before its native Kokiri exit floor at X=2000.
+    // The north tunnel and west room-8 connection remain separate.
+    return scene == 0x5B && room == 7 && x > 1840.0f && x < 2160.0f && y > -30.0f && y < 120.0f && z > -2460.0f &&
+           z < -2340.0f;
 }
 
 static inline int ComboLostWoods_InMmPassage(int scene, int room, float x, float y, float z) {
