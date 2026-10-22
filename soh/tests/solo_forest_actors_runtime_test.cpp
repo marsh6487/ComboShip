@@ -113,18 +113,21 @@ int main() {
     Update();
     assert(spawned.size() == 2);
     assert(spawned[0].params == 0x7F13 && spawned[0].world.pos.y == 12);
-    // Hand-checked stock-forest side position, outside the portal and arrival.
-    assert(std::fabs(spawned[0].world.pos.x - (-672.152f)) < .01f);
-    assert(std::fabs(spawned[0].world.pos.z - (-54.586f)) < .01f);
+    // October 22's authored-rim follow-up moves both flanks from 230 to 120.
+    // Keep independent world/local expectations for the shared native placement.
+    assert(std::fabs(spawned[0].world.pos.x - (-630.056f)) < .01f);
+    assert(std::fabs(spawned[0].world.pos.z - (-156.212f)) < .01f);
     const float angle = 12288 * (6.28318530718f / 65536.0f);
     const float dx = spawned[0].world.pos.x + 695.0f, dz = spawned[0].world.pos.z + 313.0f;
-    assert(dx * std::cos(angle) - dz * std::sin(angle) < -150.0f);
+    assert(std::fabs(dx * std::cos(angle) - dz * std::sin(angle) - (-120.0f)) < .01f);
     assert(std::fabs(dx * std::sin(angle) + dz * std::cos(angle) - 120.0f) < .01f);
     assert(!ComboSoloForest_AtStump(spawned[0].world.pos.x, spawned[0].world.pos.y, spawned[0].world.pos.z));
-    assert(std::hypot(spawned[0].world.pos.x + 486.0f, spawned[0].world.pos.z + 227.0f) > 250.0f);
+    assert(std::hypot(dx, dz) > 68.0f + 35.0f); // Authored rim plus horse-footprint clearance.
     assert(spawned[1].params == 0x7E40 && spawned[1].world.pos.y == 12);
-    assert((spawned[1].world.pos.x + 695.0f) * std::cos(angle) - (spawned[1].world.pos.z + 313.0f) * std::sin(angle) >
-           140.0f);
+    assert(std::fabs((spawned[1].world.pos.x + 695.0f) * std::cos(angle) -
+                     (spawned[1].world.pos.z + 313.0f) * std::sin(angle) - 120.0f) < .01f);
+    assert(!ComboSoloForest_AtStump(spawned[1].world.pos.x, spawned[1].world.pos.y, spawned[1].world.pos.z));
+    assert(std::hypot(spawned[1].world.pos.x + 695.0f, spawned[1].world.pos.z + 313.0f) > 68.0f + 35.0f);
     Update();
     assert(spawned.size() == 2);
     play.roomCtx.curRoom.num = 1;
