@@ -132,6 +132,7 @@ base = r'''
 #include <cstring>
 #include "global.h"
 #include "regs.h"
+#include "gameplay/CrossGameTitleCard.h"
 #if __has_include("2s2h/Enhancements/Gameplay/ComboOpeningForest.h")
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "entrances/SoloForest.h"
@@ -226,7 +227,10 @@ if args.case in (None, 'cutscene'):
     # The camera/script allocator is the boundary. Run the actual preceding
     # start/rejection logic and count whether it reaches that boundary.
     start = start[:start.index('    ActorCutscene* csEntry;')] + '\n++starts; return csId;\n}\n'
-    source = base + r'''
+    title = (ROOT / 'mm/src/code/title_setup.c').read_text()
+    request = re.search(r'static s32 sComboCrossGameTitleCardPending[^;]*;', title)[0] + '\n'
+    request += function(title, 'int Combo_MM_ConsumeCrossGameTitleCard(') + '\n'
+    source = base + request + r'''
 static int starts, spawnQueries;
 extern "C" s16 CutsceneManager_FindEntranceCsId() { ++spawnQueries; return 0; }
 extern "C" s16 CutsceneManager_GetCutsceneScriptIndex(s16 id) { return id == CS_ID_GLOBAL_TALK ? CS_SCRIPT_ID_NONE : 0; }
@@ -243,11 +247,14 @@ int main() {
     play.csCtx.scriptList = scripts;
     gSaveContext.gameMode = GAMEMODE_NORMAL; gSaveContext.fileNum = 0;
     gSaveContext.save.entrance = ENTRANCE(LOST_WOODS,0);
+    sComboCrossGameTitleCardPending = true;
     const auto progress = gSaveContext.save;
     Cutscene_HandleEntranceTriggers(&play);
     require(starts == 0 && spawnQueries == 0 &&
             std::memcmp(&progress,&gSaveContext.save,sizeof(progress)) == 0,
             "forest arrival must not query/start Skull Kid's scene cutscene or set its story flags");
+    require(!Combo_MM_ConsumeCrossGameTitleCard(),
+            "opening forest must consume the crossing request before its prologue bypass");
     require(CutsceneManager_Start(0,nullptr) == CS_ID_NONE && starts == 0,
             "walking deeper must not start a scripted prologue cutscene");
     require(CutsceneManager_Start(CS_ID_GLOBAL_TALK,nullptr) == CS_ID_GLOBAL_TALK && starts == 1,

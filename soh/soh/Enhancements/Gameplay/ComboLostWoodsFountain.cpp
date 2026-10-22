@@ -3,6 +3,7 @@
 #include "ComboGameMode.h"
 #include "global.h"
 #include "entrances/LostWoodsEntrance.h"
+#include "gameplay/CrossGameTitleCard.h"
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/randomizer/randomizer.h"
 #include "soh/Enhancements/randomizer/SeedContext.h"
@@ -223,6 +224,7 @@ extern "C" int ComboLostWoodsFountain_TryExit(PlayState* play, Player* player, i
         sFountainEntrance = entrance;
         sFountainActive = true;
         play->nextEntranceIndex = entrance;
+        Combo_SOH_RequestCrossGameTitleCard();
         return 1;
     }
     const bool exit =
@@ -245,6 +247,7 @@ extern "C" int ComboLostWoodsFountain_TryExit(PlayState* play, Player* player, i
     gSaveContext.respawnFlag = 2;
     gSaveContext.entranceSpeed = 0;
     play->nextEntranceIndex = sFountainOrigin.entrance;
+    Combo_SOH_RequestCrossGameTitleCard();
     return 1;
 }
 #endif

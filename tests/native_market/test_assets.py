@@ -116,12 +116,15 @@ class NativeMarketAssets(unittest.TestCase):
             self.assertNotIn(other, contract)
             self.assertNotIn(other + "_room_0", contract)
             self.assertIn(MARKER, contract)
-            self.assertIn(STOCK_TEXTURE, contract)
+            self.assertNotIn(STOCK_TEXTURE, contract)
+            for name in ('baseline_timber', 'baseline_slate', 'baseline_plaster', 'arcane_stone'):
+                self.assertIn('custom/skiejer_market/texture/' + name, contract)
+            self.assertIn('custom/skiejer_market/title', contract)
             for name in ("gTreasureChestShopGalSkel", "object_bg_Anim_009890",
                          "gTreasureChestShopGalEyeOpenUpTex", "gTreasureChestShopGalEyeHalfUpTex",
                          "gTreasureChestShopGalEyeClosedTex", "gTreasureChestShopGalTLUT"):
                 self.assertIn("objects/object_bg/" + name, contract)
-            self.assertFalse(any("/keeper/" in name or name.endswith("/title") or
+            self.assertFalse(any("/keeper/" in name or
                                  name == "CosmeticEntries" for name in contract))
         header = module.core_contract_header(resources)
         for host in ("Mm", "Oot"):
@@ -153,12 +156,13 @@ class NativeMarketAssets(unittest.TestCase):
             self.assertEqual({p.name: p.read_bytes() for p in first.iterdir()},
                              {p.name: p.read_bytes() for p in second.iterdir()})
             output = root / "output"
+            prepared = prepare.prepared_resources(first)
             prepare.prepare(output, first)
             targets = [output / game / "assets/custom" / name
-                       for game in ("soh", "mm") for name in resources]
+                       for game in ("soh", "mm") for name in prepared]
             for path in targets:
                 name = path.relative_to(output / path.relative_to(output).parts[0] / "assets/custom").as_posix()
-                self.assertEqual(path.read_bytes(), resources[name])
+                self.assertEqual(path.read_bytes(), prepared[name])
             times = {path: path.stat().st_mtime_ns for path in targets}
             prepare.prepare(output, first)
             self.assertEqual(times, {path: path.stat().st_mtime_ns for path in targets})

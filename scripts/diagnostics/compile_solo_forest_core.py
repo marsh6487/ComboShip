@@ -19,6 +19,8 @@ UNITS = ["mm/2s2h/Enhancements/Gameplay/ComboSoloForest.cpp",
          "mm/2s2h/Enhancements/Graphics/ComboLostWoodsPassage.cpp",
          "mm/2s2h/Enhancements/Gameplay/BlackMarket.cpp",
          "soh/soh/Enhancements/Gameplay/ComboBlackMarketNative.cpp",
+         "soh/src/code/title_setup.c",
+         "soh/soh/Enhancements/TimeSavers/timesaver_hook_handlers.cpp",
          "mm/2s2h/SaveManager/SaveManager.cpp", "mm/src/code/z_play.c", "soh/src/code/z_play.c",
          "soh/src/code/z_scene_table.c",
          "soh/soh/Enhancements/gameplaystats.cpp", "soh/soh/util.cpp"]

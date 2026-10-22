@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare geometry-only market resources for both ordinary port archives."""
+"""Prepare the retained market and original default surfaces for both ports."""
 import argparse
 import hashlib
 import os
@@ -10,12 +10,19 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/black_market"))
 import native_market
+import market_interior
+import market_title
+import exit_door
 
 SOURCE = ROOT / "tools/native_market/bundled"
 
 
+def prepared_resources(bundle_directory=SOURCE):
+    return exit_door.apply(market_title.apply(market_interior.apply(native_market.read_bundle(bundle_directory))))
+
+
 def prepare(output_root=ROOT, bundle_directory=SOURCE):
-    resources = native_market.read_bundle(bundle_directory)
+    resources = prepared_resources(bundle_directory)
     written = 0
     for game in ("soh", "mm"):
         for name, data in sorted(resources.items()):

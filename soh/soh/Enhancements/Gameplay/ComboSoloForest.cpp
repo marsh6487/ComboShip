@@ -1,4 +1,5 @@
 #ifdef COMBO_BUILD
+#include "gameplay/CrossGameTitleCard.h"
 #include "ComboSoloForest.h"
 #include "entrances/SoloForest.h"
 #include "entrances/LostWoodsEntrance.h"
@@ -86,6 +87,7 @@ bool ForestSafe(const PlayState* play) {
            play->csCtx.state == CS_STATE_IDLE && !gSaveContext.cutsceneTrigger;
 }
 void ForestTransition(PlayState* play, int entrance) {
+    Combo_SOH_RequestCrossGameTitleCard();
     play->nextEntranceIndex = entrance;
     play->transitionType = gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
     play->transitionTrigger = TRANS_TRIGGER_START;

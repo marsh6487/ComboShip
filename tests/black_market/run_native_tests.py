@@ -2,11 +2,15 @@
 """Execute native production transaction and recovery bodies with real MM types."""
 from pathlib import Path
 import os
+import argparse
 import re
 import subprocess
 import sys
 import tempfile
 ROOT = Path(__file__).resolve().parents[2]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--case", choices=("all", "door-exit"), default="all")
+args = parser.parse_args()
 sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
 from run_time_pedestal_tests import block_from
 source = (ROOT / "mm/2s2h/Enhancements/Gameplay/BlackMarket.cpp").read_text()
@@ -54,8 +58,8 @@ with tempfile.TemporaryDirectory(prefix="market-native-") as temp:
     path.write_text(fixture)
     binary = Path(temp) / "test"
     includes = ("tests/black_market", "mm", "mm/2s2h", "mm/include", "mm/include/PR", "mm/src", "mm/assets",
-                "libultraship/include", "combo")
+                "libultraship/include", "combo", "combo/menu")
     subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-w", "-DF3DEX_GBI_2", "-DCOMBO_BUILD",
                     "-DFMT_HEADER_ONLY", "-g", "-fsanitize=address,undefined", "-fno-sanitize-recover=all", "-no-pie",
                     *["-I" + str(ROOT / p) for p in includes], str(path), "-o", str(binary)], check=True)
-    subprocess.run([str(binary)], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
+    subprocess.run([str(binary), args.case], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})

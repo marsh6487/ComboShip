@@ -2,6 +2,7 @@
 #include "ComboGameMode.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "entrances/BlackMarketEntrance.h"
+#include "BlackMarketExitDoor.h"
 #include "entrances/SoloForest.h"
 #include "rando/BlackMarket.h"
 #include "BlackMarketKeeper.h"
@@ -15,10 +16,15 @@
 #include <cstdio>
 #include <memory>
 #include "entry_diagnostics_fixture.h"
+#include "soh/Enhancements/game-interactor/vanilla-behavior/GIVanillaBehavior.h"
 bool sNativeKeeperReady = false;
 extern "C" u8 MmAssets_BaseResourceExists(const char*) { return destination; }
 extern "C" { int gComboGameMode = COMBO_GAME_OOT; }
 SaveContext gSaveContext{};
+// Native title policy is exercised by lost_woods_entrance/run_oot_title_card_tests.py.
+extern "C" void Combo_SOH_RequestCrossGameTitleCard(void) {}
+extern "C" int Combo_SOH_SwapCustomTitleCardPresentation(int) { return 0; }
+extern "C" bool GameInteractor_Should(GIVanillaBehavior, uint32_t result, ...) { return result; }
 PlayState* gPlayState;
 using namespace ComboRando::BlackMarket;
 Session sSession;
@@ -327,7 +333,10 @@ static void TestDoorOpen() {
     }
     std::puts("PASS OoT native Open hook, actual idle/action animation cleanup and ordinary-door fallback");
 }
+#define OOT_INTERIOR_EXIT_TEST
+#include "interior_exit_cases.inc"
 int main(int argc, char** argv) {
+    if (argc > 1 && std::string(argv[1]) == "door-exit") { TestInteriorExitDoor(); return 0; }
     const std::string only = argc > 1 ? argv[1] : "all";
     if (only != "all") {
         if (only == "door-marker") TestDoorMarker();
@@ -395,6 +404,7 @@ int main(int argc, char** argv) {
     assert(lastProfile.instanceSize == sizeof(Actor) && lastProfile.destroy == nullptr);
     assert(lastProfile.init == KeeperInit && lastProfile.update == KeeperUpdate && lastProfile.draw == KeeperDraw);
     lastProfile.init(&player.actor, &play); assert(customInits == 1 && nativeInits == 0);
+    sTitlePending = true;
     PresentTitle();
     const auto& title = play.actorCtx.titleCtx;
     assert(title.texture == kCard && title.width == 192 && title.height == 24);

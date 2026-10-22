@@ -29,7 +29,10 @@ def ramp_material():
     ET.SubElement(root, 'ClearGeometryMode', G_LIGHTING='1', G_CULL_BOTH='1',
                   G_TEXTURE_GEN='1', G_TEXTURE_GEN_LINEAR='1', G_FOG='1')
     ET.SubElement(root, 'SetGeometryMode', G_ZBUFFER='1', G_SHADE='1', G_SHADING_SMOOTH='1')
-    ET.SubElement(root, 'Texture', S='65535', T='65535', Level='0', Tile='0', On='1')
+    # Reuse the wall/bench track's scrolling second layer. Tile zero in that
+    # track is stationary and 32x32; the authored mask is 32x64 on tile one.
+    ET.SubElement(root, 'Texture', S='65535', T='65535', Level='0', Tile='1', On='1')
+    ET.SubElement(root, 'SetTextureLUT', Mode='G_TT_NONE')
     ET.SubElement(root, 'SetPrimColor', M='0', L='0', R='184', G='112', B='248', A='255')
     ET.SubElement(root, 'SetEnvColor', R='88', G='24', B='128', A='255')
     combine = {}
@@ -43,6 +46,10 @@ def ramp_material():
     ET.SubElement(root, 'LoadTextureBlock', Path=ART + 'prelude/black_market_wall_magic_mask',
                   Format='4', Size='1', Width='32', Height='64', MaskS='5', MaskT='6',
                   ShiftS='0', ShiftT='0', CMS_TXWrap='1', CMT_TXWrap='1')
+    ET.SubElement(root, 'SetTile', Size='G_IM_SIZ_8b', Line='4', Tile='1', Format='G_IM_FMT_I',
+                  TMem='0', Palette='0', Cms0='G_TX_WRAP', Cms1='G_TX_NOMIRROR',
+                  Cmt0='G_TX_WRAP', Cmt1='G_TX_NOMIRROR', MaskS='5', MaskT='6', ShiftS='0', ShiftT='0')
+    ET.SubElement(root, 'CallDisplayList', Path='>0x08000000')
     ET.SubElement(root, 'EndDisplayList')
     return native._xml(root)
 
@@ -86,4 +93,25 @@ def apply(resources):
         struct.pack_into('<h', vertices, offset + 8, s)
     result[signs] = bytes(vertices)
     result[CORE + 'mirror_access_material'] = ramp_material()
+    ramp = ET.fromstring(resources[CORE + 'mirror_access_root'])
+    if ramp[-1].tag != 'EndDisplayList':
+        raise ValueError('Unexpected Mirror ramp draw terminator')
+    ramp.remove(ramp[-1])
+    # Native cullable entries are depth-sorted, so the ramp can precede a tree,
+    # stump or connecting tunnel. Their stock two-texture combiners only set
+    # TLUT/tiles, inheriting the room's two-cycle setup. Restore that setup after
+    # the last ramp triangle, not inside its material before geometry is drawn.
+    ET.SubElement(ramp, 'PipeSync')
+    ET.SubElement(ramp, 'SetOtherMode', Cmd='G_SETOTHERMODE_H', Sft='4', Length='20',
+                  G_AD_PATTERN='1', G_CD_MAGICSQ='1', G_CK_NONE='1', G_TC_FILT='1',
+                  G_TF_BILERP='1', G_TL_TILE='1', G_TD_CLAMP='1', G_TP_PERSP='1',
+                  G_CYC_2CYCLE='1', G_PM_NPRIMITIVE='1')
+    ET.SubElement(ramp, 'SetOtherMode', Cmd='G_SETOTHERMODE_L', Sft='0', Length='32',
+                  G_AC_NONE='1', G_ZS_PIXEL='1', G_RM_FOG_SHADE_A='1', G_RM_AA_ZB_OPA_SURF2='1')
+    ET.SubElement(ramp, 'SetTextureLUT', Mode='G_TT_NONE')
+    ET.SubElement(ramp, 'Texture', S='65535', T='65535', Level='0', Tile='0', On='1')
+    ET.SubElement(ramp, 'SetGeometryMode', G_ZBUFFER='1', G_SHADE='1', G_CULL_BACK='1',
+                  G_FOG='1', G_LIGHTING='1', G_SHADING_SMOOTH='1')
+    ET.SubElement(ramp, 'EndDisplayList')
+    result[CORE + 'mirror_access_root'] = native._xml(ramp)
     return result

@@ -1,0 +1,105 @@
+{
+  "generated_on_utc": "2026-10-22",
+  "mode": "built-in imagegen",
+  "reference_images": [],
+  "reference_for_roles": "user screenshot image(20261022-040928).png, inspected for material semantics only; no source image given to generation",
+  "assets": [
+    {
+      "name": "ceramic",
+      "prompt": "Use case: stylized-concept\nAsset type: production opaque seamless albedo texture for a retained fantasy-game prop mesh. Square image, strict flat orthographic surface scan, edge-to-edge material filling the entire image, no perspective, no separate objects, no borders, no labels, no text, no watermark. Original art, no reference-image copying. Restrained painterly realism for a polished late-1990s fantasy adventure remake. Even neutral albedo illumination, no directional shadows, no cast shadows, no painted specular hotspots; small natural surface variation. Every pixel fully opaque.\nPrimary request: Rich glazed jade and deep desaturated teal ceramic. Fine irregular glaze crazing, very subtle cloudy kiln variation, sparse warm bronze-gold flecks and faint shallow ornamental curls. This is the flat outer ceramic surface material of potion cauldrons and small jars, NOT a drawing of any pot, jar or bowl. Middle-dark jade base, readable muted teal detail, restrained glaze sheen as color variation only. Seamless matching edges. No handle, no rim, no vessel silhouette, no whole object.",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "opaque": true,
+      "sha256": "ddd8ff5f0820253dfda4e74b7a8bb21419c01f7c8c4e53d2317a9288e1aff492",
+      "bytes": 3458896
+    },
+    {
+      "name": "bronze",
+      "prompt": "Use case: stylized-concept\nAsset type: production opaque seamless albedo texture for a retained fantasy-game prop mesh. Square image, strict flat orthographic surface scan, edge-to-edge material filling the entire image, no perspective, no separate objects, no borders, no labels, no text, no watermark. Original art, no reference-image copying. Restrained painterly realism for a polished late-1990s fantasy adventure remake. Even neutral albedo illumination, no directional shadows, no cast shadows, no painted specular hotspots; small natural surface variation. Every pixel fully opaque.\nPrimary request: Aged muted bronze metal surface for decorative brazier stands, fittings and hanging supports. Smoky bronze-brown base with fine brushed wear, restrained dark grooves and tiny desaturated verdigris patches, quiet warm edge wear. Completely flat repeatable surface, seamless matching edges. No objects, no rivets, no symbols, no relief design, no whole torch or lamp.",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "opaque": true,
+      "sha256": "88b328e79785411d4774186427db01c84a520aa5e670b511bd093ee38d493d0a",
+      "bytes": 3602737
+    },
+    {
+      "name": "wicker",
+      "prompt": "Use case: stylized-concept\nAsset type: production opaque seamless albedo texture for a retained fantasy-game prop mesh. Square image, strict flat orthographic surface scan, edge-to-edge material filling the entire image, no perspective, no separate objects, no borders, no labels, no text, no watermark. Original art, no reference-image copying. Restrained painterly realism for a polished late-1990s fantasy adventure remake. Even neutral albedo illumination, no directional shadows, no cast shadows, no painted specular hotspots; small natural surface variation. Every pixel fully opaque.\nPrimary request: Dark honey-brown tightly woven willow wicker, visible vertical slender ribs crossed by fine horizontal woven strands, natural warm brown/copper fibers with dark charcoal recessed gaps. For hanging herb baskets and lattice screens. All gaps are painted dark opaque color, never transparent. Dense regular weave, restrained contrast, fine handworked detail, seamless matching edges. No basket silhouette, no whole basket, no cage outline, no stems, no room.",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "opaque": true,
+      "sha256": "1d011ff044338bc4e8aa8d1b0dc9cf06a638201afad5df422fa20b3827f59a5e",
+      "bytes": 2805165
+    },
+    {
+      "name": "celestial",
+      "prompt": "Use case: stylized-concept\nAsset type: production opaque seamless albedo texture for a retained fantasy-game prop mesh. Square image, strict flat orthographic surface scan, edge-to-edge material filling the entire image, no perspective, no separate objects, no borders, no labels, no text, no watermark. Original art, no reference-image copying. Restrained painterly realism for a polished late-1990s fantasy adventure remake. Even neutral albedo illumination, no directional shadows, no cast shadows, no painted specular hotspots; small natural surface variation. Every pixel fully opaque.\nPrimary request: Deep midnight-blue and muted indigo enamel with a delicate original celestial pattern: tiny scattered pale icy blue stars and very fine silvery speckling over a subtly mottled blue enamel surface. For already-modeled faceted star ornaments. A seamless square SURFACE, NOT a large central star icon. Small stars evenly scattered at varied sizes, no large constellation focal point. No text, no borders, no pendant silhouette, no object, no transparency.",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "opaque": true,
+      "sha256": "3d7180a9d4be05b4e32c04ae714a9c4d1faedbec04e250cc8226e0aa295ec235",
+      "bytes": 3425334
+    },
+    {
+      "name": "herbs",
+      "prompt": "Use case: stylized-concept\nAsset type: production opaque square albedo texture for existing fantasy-game prop geometry. Strict flat orthographic surface scan, square edge-to-edge, no perspective, no whole object, no border, no watermark, no text. Original art. Restrained hand-painted realism for a polished late-1990s fantasy adventure remake. Every pixel opaque, no alpha holes. Even neutral albedo lighting without cast shadows, directional light or specular hotspots.\nPrimary request: A dense fibrous surface of dry sage and olive-green medicinal leaves with very fine leaf veins, soft dusty ochre fiber and small pale papery root details, to wrap existing modeled hanging herb bundles. Muted smoky olive and sage with subtle tan fibers, calm readable texture, matching seamless edges. Fine scale material detail only. No bundle silhouette, no individual large plant in a scene, no ties, no pot, no basket. Do not depict a photograph or arrangement of cut herbs.",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "opaque": true,
+      "sha256": "c369e794d2baa820ae6ec728a0647c3a9c0b8f4cf671e9607fc04b48e2d5046d",
+      "bytes": 4585484
+    },
+    {
+      "name": "curios",
+      "prompt": "Use case: stylized-concept\nAsset type: production opaque square albedo texture for existing fantasy-game prop geometry. Strict flat orthographic surface scan, square edge-to-edge, no perspective, no whole object, no border, no watermark, no text. Original art. Restrained hand-painted realism for a polished late-1990s fantasy adventure remake. Every pixel opaque, no alpha holes. Even neutral albedo lighting without cast shadows, directional light or specular hotspots.\nPrimary request: A precise four-cell square MATERIAL ATLAS for existing book, mask and bottle UV islands. Split the square exactly at horizontal and vertical midpoint into FOUR equal square quadrants, no gaps or divider borders. Upper-left quadrant: warm aged ivory parchment, fine paper fibers with very faint irregular non-readable brown ink strokes. Upper-right quadrant: dark oxblood/burgundy bookbinding leather, very fine leather grain and restrained shallow gold tooling, no book silhouette. Lower-left quadrant: aged ivory bone, soft cream mineral streaks and fine small pores, no skull illustration. Lower-right quadrant: muted opaque jade/celadon bottle-glass surface, subtle cloudy cyan-green variation, no bottle illustration. Each quadrant is a flat uninterrupted material patch filling its exact quadrant. The atlas contains materials only: no objects, icons, labels, lettering, words, frames or gutters. Quadrant edges must be exactly straight at 50%.",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "opaque": true,
+      "sha256": "a41a95e9e25ce409578eb0f021ebac14459c767b0aaa4b2b570d26245836716a",
+      "bytes": 3314422
+    },
+    {
+      "name": "liquid",
+      "prompt": "Use case: stylized-concept\nAsset type: production opaque square albedo texture for existing fantasy-game prop geometry. Strict flat orthographic surface scan, square edge-to-edge, no perspective, no whole object, no border, no watermark, no text. Original art. Restrained hand-painted realism for a polished late-1990s fantasy adventure remake. Every pixel opaque, no alpha holes. Even neutral albedo lighting without cast shadows, directional light or specular hotspots.\nPrimary request: A muted pale turquoise and jade magical potion LIQUID SURFACE with soft small curling eddies, very subtle fine rings and tiny scattered pale bubbles. The flat fluid surface should glow gently through color contrast, with low-contrast teal around milky pale aqua movement. Match seamless edges. Surface material fills the entire square. No bowl, no vessel, no cauldron, no rim, no smoke, no steam column, no object, no central circular vignette. Original subtle fantasy potion liquid albedo, not water photograph.",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "opaque": true,
+      "sha256": "ff268814d6c3661ad4ee7b61caa822ab65df47977746a351480a5d3e4de269f7",
+      "bytes": 2401054
+    },
+    {
+      "name": "cloth",
+      "prompt": "Use case: stylized-concept\nAsset type: production opaque square albedo texture for existing fantasy-game prop geometry. Strict flat orthographic surface scan, square edge-to-edge, no perspective, no whole object, no border, no watermark, no text. Original art. Restrained hand-painted realism for a polished late-1990s fantasy adventure remake. Every pixel opaque, no alpha holes. Even neutral albedo lighting without cast shadows, directional light or specular hotspots.\nPrimary request: Deep desaturated plum and smoky burgundy woven cloth with fine visible fibers and very small restrained muted bronze-gold diamond brocade motifs. For draped curtains, runners and existing rug meshes. Dense fine weave with soft irregular wear, elegant quiet original pattern, evenly repeated tiny diamonds with lots of dark plum fabric between them. Seamless matching edges. No whole curtain, no rug outline, no border band, no folds, no draped fabric silhouette, no objects, no lettering.",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "opaque": true,
+      "sha256": "e1131499422a20291753a6a127c26dbec2bdb83184a2a07f6d78e183d14451da",
+      "bytes": 3543529
+    }
+  ],
+  "processing": "Original PNGs retained byte-for-byte. Optional authoring packs flat material patches into existing UV rectangles and encodes512px uploads; no procedural art, no geometry/UV changes, no transparency."
+}

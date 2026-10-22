@@ -160,8 +160,10 @@ int main() {
 with tempfile.TemporaryDirectory(prefix="market-entry-policy-") as temporary:
     for host, name, main in (("mm", "native", MM_MAIN), ("oot", "oot_native", OOT_MAIN)):
         fixture = (ROOT / "tests/black_market" / (name + "_test.cpp")).read_text()
-        marker = "int main() {" if host == "mm" else "int main(int argc, char** argv) {"
-        fixture = fixture[:fixture.index(marker)] + main
+        marker = re.search(r'^int main\([^\n]*\)\s*\{', fixture, re.M)
+        if marker is None:
+            raise ValueError('native entry fixture main is missing: ' + host)
+        fixture = fixture[:marker.start()] + main
         fixture_path = Path(temporary) / (host + "-fixture.cpp")
         fixture_path.write_text(fixture)
         driver = (ROOT / "tests/black_market" / ("run_" + name + "_tests.py")).read_text()

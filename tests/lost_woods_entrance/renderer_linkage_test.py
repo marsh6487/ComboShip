@@ -2,6 +2,7 @@
 """Verify rendering objects use native C interpolation or the shared GI renderer."""
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 
@@ -27,9 +28,14 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-renderer-linkage-") as tempo
         paths = (host, host + ("/2s2h" if host == "mm" else "/soh"),
                  host + "/include", host + "/include/PR", host + "/src", host + "/assets",
                  "libultraship/include", "combo", "combo/menu")
+        # Shared render/browsing helpers consume the native CMake CVar prefixes.
+        prefixes = re.findall(r'set\((CVAR_PREFIX_\w+) "([^"]+)"\)',
+                              (ROOT / "CMake" / ("soh-cvars.cmake" if host == "soh" else
+                                               "2ship-cvars.cmake")).read_text())
         subprocess.run([
             os.environ.get("CXX", "c++"), "-std=c++20", "-w", "-fmax-errors=5", "-fPIC",
             "-DF3DEX_GBI_2", "-DCOMBO_BUILD", "-DFMT_HEADER_ONLY",
+            *[f'-D{key}="{value}"' for key, value in prefixes],
             "-I" + temporary, "-I/usr/include/imgui", *["-I" + str(ROOT / path) for path in paths],
             # Ubuntu's ImGui keeps the UI-only ImGuiInputFlags type in its internal header.
             "-include", "imgui_internal.h",

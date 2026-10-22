@@ -5,6 +5,13 @@ s16 sBrowseCamera = -1, sBrowseParent = -1;
 s16 sBrowseCameraUid = -1;
 Camera* sBrowseCameraPtr = nullptr;
 bool sBrowsePlayerWasHidden = false;
+void PlayBrowseCursorSound() {
+#ifdef BLACK_MARKET_BROWSING_OOT
+    Sfx_PlaySfxCentered(NA_SE_SY_CURSOR);
+#else
+    Audio_PlaySfx(NA_SE_SY_CURSOR);
+#endif
+}
 void UpdateBrowsingCamera(PlayState* play);
 bool BrowsingMessage(PlayState* play) {
 #ifdef BLACK_MARKET_BROWSING_OOT
@@ -143,11 +150,19 @@ void BrowseInput(PlayState* play) {
         } else if (sSelected >= 0) {
             sBrowser.row = sSelected & 1;
             sBrowser.slot = sSelected = -1;
+            PlayBrowseCursorSound();
             Message_ContinueTextbox(play, kWelcomeText);
         } else {
             Message_CloseTextbox(play);
             EndBrowsing(play);
         }
+        sBrowser.ResetInput();
+        return;
+    }
+    // Native EnOssan has separate look-to-shelf/look-to-keeper states. Do not
+    // consume navigation or A/Buy while the camera is still turning; B remains
+    // available above so an interrupted browse can always be cancelled.
+    if (!sBrowser.CameraSettled()) {
         sBrowser.ResetInput();
         return;
     }
@@ -185,12 +200,18 @@ void BrowseInput(PlayState* play) {
         y = 1;
     else if (input.press.button & BTN_DDOWN)
         y = -1;
+#ifdef BLACK_MARKET_BROWSING_OOT
+    if (CVarGetInteger(CVAR_ENHANCEMENT("MirroredWorld"), 0))
+        x = -x;
+#endif
     if (sBrowser.Move(x, y)) {
         sSelected = sBrowser.slot;
+        PlayBrowseCursorSound();
         Message_ContinueTextbox(play, sSelected < 0 ? kWelcomeText : kBrowseText);
     } else if ((input.press.button & BTN_A) && Message_ShouldAdvance(play)) {
         if (sSelected < 0) {
-            sBrowser.Move(1, 0);
+            if (sBrowser.Move(1, 0))
+                PlayBrowseCursorSound();
             sSelected = sBrowser.slot;
             Message_ContinueTextbox(play, kBrowseText);
         } else {
@@ -203,13 +224,22 @@ void BrowseInput(PlayState* play) {
 void DrawBrowseCursor() {
     auto* play = gPlayState;
     if (!sTalking || !Active() || sSelected < 0 || Play_GetActiveCamId(play) != sBrowseCamera ||
-        sBrowser.phase != BlackMarketBrowsing::Phase::Browse)
+        sBrowser.phase != BlackMarketBrowsing::Phase::Browse || !sBrowser.CameraSettled())
         return;
     Actor display{};
-    display.world.pos = kShelves[sSelected];
+    // Both native Actor_GetScreenPos implementations project focus.pos, as
+    // EnOssan does for EnGirlA. A display-only actor has no focus update.
+    display.focus.pos = kShelves[sSelected];
     s16 x, y;
     Actor_GetScreenPos(play, &display, &x, &y);
-    if (x < 0 || x > SCREEN_WIDTH || y < 0 || y > SCREEN_HEIGHT)
+#ifdef BLACK_MARKET_BROWSING_OOT
+    if (CVarGetInteger(CVAR_ENHANCEMENT("MirroredWorld"), 0))
+#else
+    if (CVarGetInteger("gModes.MirroredWorld.State", 0))
+#endif
+        x = SCREEN_WIDTH - x;
+    if (x < 0 || x > SCREEN_WIDTH || y < 0 || y > SCREEN_HEIGHT ||
+        !BlackMarketGraphicsArena::HasRoom(play->state.gfxCtx, 0, 8, 8, 32))
         return;
     alignas(2) static const char texture[] = "__OTR__objects/gameplay_keep/gSelectionCursorTex";
     OPEN_DISPS(play->state.gfxCtx);

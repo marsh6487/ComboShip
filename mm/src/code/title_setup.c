@@ -6,9 +6,22 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
+#include "gameplay/CrossGameTitleCard.h"
 extern int32_t Combo_MM_ConsumeCrossDungeonArrival(void);
 extern int32_t Combo_MM_ConsumeCrossDungeonRecovery(void);
 extern int32_t Combo_MM_ConsumeCrossBossRecoveryResume(void);
+static s32 sComboCrossGameTitleCardPending = false;
+
+int Combo_MM_ConsumeCrossGameTitleCard(void) {
+    const s32 pending = sComboCrossGameTitleCardPending;
+    sComboCrossGameTitleCardPending = false;
+    return pending;
+}
+
+void Combo_MM_RequestCrossGameTitleCard(void) {
+    gSaveContext.showTitleCard = true;
+    sComboCrossGameTitleCardPending = true;
+}
 #endif
 #include "z64save.h"
 #include "gameplay/ComboFaroresWind.h"
@@ -67,6 +80,7 @@ void Setup_InitImpl(SetupState* this) {
 
 #ifdef COMBO_BUILD
     s32 loadedOwlSave;
+    sComboCrossGameTitleCardPending = false;
 
     if (Combo_IsCombinedGame() && gComboStartFileNum >= 0) {
         // Sram_LoadGlobalOptions above found no global.json in combo, so take OOT's settings.
@@ -136,7 +150,14 @@ void Setup_InitImpl(SetupState* this) {
             gSaveContext.save.isOwlSave = false;
             gSaveContext.save.cutsceneIndex = 0;
         }
-        ComboFw_ApplyArrival(); // Explicit recall takes precedence over ordinary save recovery.
+        s32 crossFwArrival = ComboFw_ApplyArrival(); // Explicit recall wins over ordinary save recovery.
+        // File select normally initializes showTitleCard. A crossing bypasses
+        // it, and may land at a positioned/shuffled entrance without a card bit.
+        // Ordinary save resumes keep the native rules, including saved recovery.
+        sComboCrossGameTitleCardPending = !gComboEntryIsResume || crossDungeonArrival >= 0 || crossBossRecovery >= 0 ||
+                                         crossFwArrival;
+        if (sComboCrossGameTitleCardPending)
+            gSaveContext.showTitleCard = true;
 
         // ComboShip (#182): consume the owl save like Sram_OpenSave does, so it can't shadow the newer
         // state we just continued into. Vetoed for Persistent Owl Saves and for pause/auto saves.

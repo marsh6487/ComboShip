@@ -471,18 +471,19 @@ int main() {
     SpawnForestSaria();
     SpawnForestSaria();
     CHECK(spawns == 1 && spawned.id == ACTOR_EN_VIEWER && spawned.params == 0x7F13 && spawned.world.pos.y == 42);
-    // The fallback belongs beside the portal, clear of its mouth and arrival.
-    // The previous world offset (+100,+70) put her directly in front instead.
-    CHECK(std::fabs(spawned.world.pos.x - (-672.152f)) < .01f);
-    CHECK(std::fabs(spawned.world.pos.z - (-54.586f)) < .01f);
+    // Flank the authored radius-68 rim, with a clear center walking lane.
+    CHECK(std::fabs(spawned.world.pos.x - (-630.056f)) < .01f);
+    CHECK(std::fabs(spawned.world.pos.z - (-156.212f)) < .01f);
+    CHECK(spawned.shape.rot.y == 12288);
     CHECK(lastFloorProbe.x == spawned.world.pos.x && lastFloorProbe.z == spawned.world.pos.z &&
           lastFloorProbe.y == 120.0f);
     const float sariaAngle = 12288 * (6.28318530718f / 65536.0f);
     const float sariaDx = spawned.world.pos.x + 695.0f, sariaDz = spawned.world.pos.z + 313.0f;
-    CHECK(sariaDx * std::cos(sariaAngle) - sariaDz * std::sin(sariaAngle) < -150.0f);
+    CHECK(std::fabs(sariaDx * std::cos(sariaAngle) - sariaDz * std::sin(sariaAngle) + 120) < .01f);
     CHECK(std::fabs(sariaDx * std::sin(sariaAngle) + sariaDz * std::cos(sariaAngle) - 120) < .01f);
     CHECK(!ComboOpeningForest_AtReturn(&play, &spawned.world.pos));
-    CHECK(std::hypot(spawned.world.pos.x + 486.0f, spawned.world.pos.z + 227.0f) > 250.0f);
+    // Keep the 226-unit portal arrival clear even with the closer flank marks.
+    CHECK(std::hypot(spawned.world.pos.x + 486.0f, spawned.world.pos.z + 227.0f) > 120.0f);
     CHECK(std::memcmp(&before, &gSaveContext, sizeof(before)) == 0);
 
     // Seated scenery never grants; only the dedicated Termina Field gift does.
@@ -698,16 +699,19 @@ int main() {
     SpawnForestEpona();
     CHECK(spawns == beforeHorse + 1 && spawned.id == ACTOR_EN_HORSE && spawned.params == COMBO_FOREST_EPONA_PARAMS);
     const float dx = spawned.world.pos.x - portal.x, dz = spawned.world.pos.z - portal.z;
-    CHECK(std::fabs(dx * std::cos(portalAngle) - dz * std::sin(portalAngle) - 230) < .01);
+    CHECK(std::fabs(dx * std::cos(portalAngle) - dz * std::sin(portalAngle) - 120) < .01);
     CHECK(std::fabs(dx * std::sin(portalAngle) + dz * std::cos(portalAngle) - 120) < .01);
     CHECK(spawned.world.pos.y == 42);
+    CHECK(spawned.shape.rot.y == ComboOpeningForest_ReturnYaw(&play));
     // Moving Saria to the opposite flank flips the horse's automatic side.
     authored.world.pos = { portal.x + 130 * std::cos(portalAngle), portal.y, portal.z - 130 * std::sin(portalAngle) };
     sHorseSpawnAttempted = false;
     SpawnForestEpona();
     const float flipped = (spawned.world.pos.x - portal.x) * std::cos(portalAngle) -
                           (spawned.world.pos.z - portal.z) * std::sin(portalAngle);
-    CHECK(flipped < -229 && std::memcmp(&beforeHorseSave, &gSaveContext, sizeof(beforeHorseSave)) == 0);
+    CHECK(std::fabs(flipped + 120) < .01 &&
+          spawned.shape.rot.y == ComboOpeningForest_ReturnYaw(&play) &&
+          std::memcmp(&beforeHorseSave, &gSaveContext, sizeof(beforeHorseSave)) == 0);
     // Solo MM has its own forest copy and owns Saria's asset snapshot locally.
     play.actorCtx.actorLists[ACTORCAT_NPC].first = nullptr;
     gComboGameMode = COMBO_GAME_MM;
@@ -717,8 +721,9 @@ int main() {
     sSpawnAttempted = sHorseSpawnAttempted = false;
     SpawnForestSaria();
     CHECK(spawns == soloBefore + 1 && spawned.params == 0x7F13);
-    CHECK(std::fabs(spawned.world.pos.x - (-672.152f)) < .01f);
-    CHECK(std::fabs(spawned.world.pos.z - (-54.586f)) < .01f);
+    CHECK(std::fabs(spawned.world.pos.x - (-630.056f)) < .01f);
+    CHECK(std::fabs(spawned.world.pos.z - (-156.212f)) < .01f);
+    CHECK(spawned.shape.rot.y == COMBO_SOLO_FOREST_STUMP_YAW);
     CHECK(sBridge.load == MM_PlacedSariaLoad && sBridge.loadV2 == MM_PlacedSariaLoadV2 &&
           sBridge.release == MM_PlacedSariaRelease && sBridge.alt == MM_PlacedSariaAlt);
     SpawnForestEpona();
@@ -757,7 +762,8 @@ int main() {
     play.roomCtx.curRoom.roomShape = &portalShape;
     sSpawnAttempted = false;
     SpawnForestSaria();
-    CHECK(std::fabs(spawned.world.pos.x) < .01f && std::fabs(spawned.world.pos.z - 10.0f) < .01f);
+    CHECK(std::fabs(spawned.world.pos.x) < .01f && std::fabs(spawned.world.pos.z - 120.0f) < .01f);
+    CHECK(spawned.shape.rot.y == ComboOpeningForest_ReturnYaw(&play));
     CHECK(!ComboOpeningForest_AtReturn(&play, &spawned.world.pos));
     // Actual production resolver/dispatch with independently controlled module
     // symbols: new/new, new/old and V2-only providers. V1 fallback starts at1.0.

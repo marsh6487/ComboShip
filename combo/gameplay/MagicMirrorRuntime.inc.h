@@ -340,7 +340,7 @@ bool ArrivalDestination(const PlayState* play) {
 }
 
 bool Landing(PlayState* play, Vec3s& position, s16& yaw) {
-    // Prefer the center of the actual placed cap, facing the ramp. Retain the
+    // Prefer the center of the actual placed cap, facing the market/portal. Retain the
     // checked ground fallbacks if a scene edit obstructs or removes its top.
     constexpr int offsets[][2] = { { 0, 0 },   { 0, -120 }, { 85, -85 }, { 120, 0 },  { 85, 85 },
                                    { 0, 120 }, { -85, 85 }, { -120, 0 }, { -85, -85 } };
@@ -383,7 +383,13 @@ bool Landing(PlayState* play, Vec3s& position, s16& yaw) {
         if (!clear)
             continue;
         position = { static_cast<s16>(point.x), static_cast<s16>(point.y), static_cast<s16>(point.z) };
-        const float angle = cap ? 3.14159265359f / 2 : std::atan2(sAnchor.x - point.x, sAnchor.z - point.z);
+#ifdef COMBO_MAGIC_MIRROR_MM
+        const Vec3f viewTarget = ComboOpeningForest_ReturnAnchor(play);
+#else
+        const Vec3f viewTarget{ COMBO_SOLO_FOREST_STUMP_X, 0, COMBO_SOLO_FOREST_STUMP_Z };
+#endif
+        const float angle = cap ? std::atan2(viewTarget.x - point.x, viewTarget.z - point.z)
+                                : std::atan2(sAnchor.x - point.x, sAnchor.z - point.z);
 #ifdef COMBO_MAGIC_MIRROR_MM
         const int degrees = (static_cast<int>(std::round(angle * (180.0f / 3.14159265359f))) + 360) % 360;
         yaw = static_cast<s16>((degrees << 7) | 127); // native packed yaw + no actor cutscene

@@ -4,8 +4,12 @@
 #include "2s2h/Enhancements/Gameplay/BlackMarket.h"
 #include "2s2h/Enhancements/Gameplay/BlackMarketDoorNative.h"
 #include "entrances/BlackMarketEntrance.h"
+#include "BlackMarketExitDoor.h"
 #include "entrances/SoloForest.h"
 #include "rando/BlackMarket.h"
+#include "BlackMarketText.h"
+#include "2s2h/CustomMessage/CustomMessage.h"
+#include "2s2h/Rando/StaticData/StaticData.h"
 #include "overlays/actors/ovl_En_Door/z_en_door.h"
 #include <algorithm>
 #include <cassert>
@@ -17,6 +21,8 @@
 extern "C" u8 ResourceMgr_FileExists(const char*) { return destination; }
 extern "C" { int gComboGameMode = COMBO_GAME_BOTH; }
 SaveContext gSaveContext{};
+// Native title policy is exercised by lost_woods_entrance/run_mm_title_card_tests.py.
+extern "C" void Combo_MM_RequestCrossGameTitleCard(void) {}
 PlayState* gPlayState;
 GameState* gGameState;
 using namespace ComboRando::BlackMarket;
@@ -66,6 +72,7 @@ extern "C" f32 BgCheck_EntityRaycastFloor5_3(PlayState*, CollisionContext*, Coll
 }
 extern "C" void Camera_InitFocalActorSettings(Camera*, Actor*) {}
 namespace ComboBlackMarketItems {
+RandoItemId Id(const Item&) { return RI_UNKNOWN; }
 bool Owned(const Item&) { return owned; }
 bool Available(const Item&) { return usable; }
 bool Grant(const Item&) { if (!grantWorks) return false; owned = true; ++grants; return true; }
@@ -77,10 +84,11 @@ void SaveManager_SaveCurrentForCombo(bool) {
 }
 constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12, kConfirmText = 0x8F13;
 namespace CustomMessage {
-struct Entry { std::string msg; int firstItemCost; };
 Entry last;
-void LoadCustomMessageIntoFont(const Entry& entry) { last = entry; }
+void LoadCustomMessageIntoFont(Entry entry) { last = std::move(entry); }
 }
+namespace Rando::StaticData { std::map<RandoItemId, RandoStaticItem> Items; }
+float sNESFontWidths[160]{}; // Actual native widths/decoder are exercised by run_text_codec_tests.py.
 // Room rendering is exercised separately by run_granny_native_tests.py.
 void GrannySceneBegin() {}
 void ApplyGrannyInterior() {}
@@ -228,14 +236,16 @@ void TestPlacedDoor() {
     }
     puts("PASS authored native Open action, moved door/return, blocked-shop cleanup, ordinary-door and respawn preservation");
 }
-int main() {
+#include "interior_exit_cases.inc"
+int main(int argc, char** argv) {
+    if (argc > 1 && std::string(argv[1]) == "door-exit") { TestInteriorExitDoor(); return 0; }
     TestPlacedDoor();
     Reset();
     u16 textId = kBrowseText; bool fromTable = true;
     MarketText(&textId, &fromTable);
-    assert(!fromTable && CustomMessage::last.msg.find("A: Select   B: Back") != std::string::npos);
+    assert(!fromTable && CustomMessage::last.msg.find("\xB0 Select   \xB1 Back") != std::string::npos);
     textId = kConfirmText; fromTable = true; MarketText(&textId,&fromTable);
-    assert(!fromTable && CustomMessage::last.msg.find(std::string("\xC2") + "Buy\nCancel") != std::string::npos);
+    assert(!fromTable && CustomMessage::last.msg.find("\xC2I'll buy it\x11No thanks") != std::string::npos);
     textId = kWelcomeText; fromTable = true; MarketText(&textId,&fromTable);
     assert(!fromTable && CustomMessage::last.msg.find("Left / Right: browse items") != std::string::npos);
     const int price = sSession.market["stock"][0]["price"];

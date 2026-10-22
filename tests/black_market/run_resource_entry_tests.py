@@ -23,6 +23,7 @@ sys.path[:0] = [str(ROOT / "scripts/diagnostics"), str(ROOT / "scripts/assets"),
 from run_time_pedestal_tests import block_from
 import final_forest
 import native_forest
+import exit_door
 import native_market
 import prepare_native_forest
 import prepare_native_market
@@ -113,11 +114,14 @@ def build_input(args, work):
     authored = read_archive(args.authored_forest, native_forest.FINAL_SHA) if full else {}
     art = read_archive(args.market_pack, native_market.SOURCE_SHA) if full else {}
     forest = prepare_native_forest.verified_resources(ROOT / "tools/native_forest/manifest.json")
-    market = native_market.read_bundle(ROOT / "tools/native_market/bundled")
-    if full:
-        for path in (native_market.COLLISION, *(scene + suffix for scene in native_market.SCENES.values()
-                                              for suffix in ("", "_room_0"))):
-            assert market[path] == art[path], ("authored/native destination framing differs", path)
+    market = prepare_native_market.prepared_resources(ROOT / "tools/native_market/bundled")
+    # The explicitly requested native exit door is the only scene-header
+    # adaptation; collision, room and player-start payloads stay protected.
+    framing_source = art if full else native_market.read_bundle(ROOT / "tools/native_market/bundled")
+    expected_destinations = exit_door.apply(framing_source)
+    for path in (native_market.COLLISION, *(scene + suffix for scene in native_market.SCENES.values()
+                                          for suffix in ("", "_room_0"))):
+        assert market[path] == expected_destinations[path], ("authored/native destination framing differs", path)
     # Exercise the ordinary preparation stage and consume its files, rather
     # than generate a list of expected names and call that mounted content.
     prepared = work / "prepared"
@@ -172,6 +176,7 @@ def build_input(args, work):
                "external_resource_status": "actual supplied base owner" if full else "absent; no declared inventory or placeholder resources",
                "native_forest_bundle_sha256": manifest["bundle"]["sha256"],
                "native_market_decoded_sha256": json.loads((ROOT / "tools/native_market/bundled/manifest.json").read_text())["decoded_sha256"],
+               "native_market_surfaces": json.loads((ROOT / "tools/black_market/assets/interior/encoded.json").read_text()),
                "native_resources": len(forest) + len(market), "base_resources_consumed": len(base_index),
                "optional_visual_resources": len(visual_index), "destinations": data["destinations"],
                "forests": {key: {k: v for k, v in value.items() if k not in ("vertices", "polygons")}
@@ -206,8 +211,10 @@ def build_and_run(host, work, input_path, includes=()):
     if host == "mm":
         assert re.search(r"gSaveContext.respawnFlag = 0;[\s\S]*?GameInteractor_ExecuteOnSceneInit", play_source)
     fixture = (ROOT / "tests/black_market" / (name + "_test.cpp")).read_text()
-    marker = "int main() {" if host == "mm" else "int main(int argc, char** argv) {"
-    fixture = fixture[:fixture.index(marker)]
+    marker = re.search(r'^int main\([^\n]*\)\s*\{', fixture, re.M)
+    if marker is None:
+        raise ValueError('native resource-entry fixture main is missing: ' + host)
+    fixture = fixture[:marker.start()]
     # Remove the original fixture's policy doubles. The new executable always
     # calls the actual production readiness bodies and membership adapters.
     fixture = re.sub(r'extern "C" u8 ResourceMgr_FileExists\(const char\*\) \{ return destination; \}\n', "", fixture)
@@ -261,9 +268,7 @@ def build_and_run(host, work, input_path, includes=()):
     patch = ROOT / "soh/mods/transformation_masks/assets/mm_display_list_patch.cpp"
     if host != "mm":
         driver = replace_once(driver, 'str(path), "-o", str(binary)', f'str(path), {str(patch)!r}, "-o", str(binary)')
-        driver = replace_once(driver, '[str(binary), args.case]', f'[str(binary), {str(input_path)!r}]')
-    else:
-        driver = replace_once(driver, '[str(binary)]', f'[str(binary), {str(input_path)!r}]')
+    driver = replace_once(driver, '[str(binary), args.case]', f'[str(binary), {str(input_path)!r}]')
     runner = work / (host + "-runner.py"); runner.write_text(driver)
     result = subprocess.run([sys.executable, str(runner)], cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     (work / (host + "-entry.log")).write_text(result.stdout)

@@ -1,6 +1,7 @@
 """Active preparation must apply the bounded presentation without scene edits."""
 import hashlib
 import io
+import itertools
 import json
 from pathlib import Path
 import struct
@@ -29,7 +30,7 @@ class PolishTests(unittest.TestCase):
         cls.after = prepared_resources(cls.manifest)
 
     def test_preparation_applies_a_pinned_revision_without_touching_scene_or_texture_bytes(self):
-        self.assertEqual(self.metadata.get('presentation_polish', {}).get('version'), 1)
+        self.assertEqual(self.metadata.get('presentation_polish', {}).get('version'), 2)
         self.assertEqual(set(self.before), set(self.after))
         changed = {name for name in self.before if self.before[name] != self.after[name]}
         self.assertEqual(changed, set(self.metadata['presentation_polish']['resources']))
@@ -74,6 +75,65 @@ class PolishTests(unittest.TestCase):
         self.assertEqual(material.find('SetEnvColor').get('R'), '88')
         self.assertEqual(self.before[CORE + 'mirror_access_vtx'], self.after[CORE + 'mirror_access_vtx'])
 
+    def test_ramp_uses_the_authored_second_layer_scroll_in_both_hosts(self):
+        from native_forest import scroll_bindings
+        material = ET.fromstring(self.after[CORE + 'mirror_access_material'])
+        image = material.find('LoadTextureBlock')
+        track = next(row for row in scroll_bindings(self.after[CORE + 'texanim']) if row['segment'] == 8)
+        layer = track['layers'][1]
+        self.assertEqual((layer['x'], layer['y'], layer['width'], layer['height']), (0, -1, 32, 64))
+        self.assertEqual((int(image.get('Width')), int(image.get('Height'))),
+                         (layer['width'], layer['height']))
+        self.assertEqual(material.find('Texture').get('Tile'), '1')
+        tile = material.find("SetTile[@Tile='1']")
+        self.assertIsNotNone(tile, 'The ramp mask must own render tile one before the authored scroll call')
+        self.assertEqual((tile.get('Format'), tile.get('Size'), tile.get('Line'), tile.get('TMem')),
+                         ('G_IM_FMT_I', 'G_IM_SIZ_8b', '4', '0'))
+        calls = material.findall('CallDisplayList')
+        self.assertEqual([node.get('Path') for node in calls], ['>0x08000000'])
+        nodes = list(material)
+        self.assertLess(nodes.index(tile), nodes.index(calls[0]), 'Scroll must follow texture/tile setup')
+        self.assertEqual(self.before[CORE + 'texanim'], self.after[CORE + 'texanim'])
+        self.assertEqual(self.before[CORE + 'stock_materials'], self.after[CORE + 'stock_materials'])
+
+    def test_native_stump_keeps_two_cycle_material_after_each_culled_ramp_order(self):
+        from native_forest import display_commands
+        stump = CORE + 'geometry/Z2_LOST_WOODS_room_00DL_002548'
+        # This is the real native I8/I4 bark combiner, not a replacement fixture.
+        self.assertIn((0xFC272C04, 0x1F0C93FF),
+                      [(a, b) for _, a, b, op in display_commands(self.after[stump], stump) if op == 0xFC])
+        resources = self.after
+
+        def draw(path, state, observations):
+            data = resources[path]
+            if data.startswith(b'<DisplayList'):
+                for node in ET.fromstring(data):
+                    if node.tag == 'CallDisplayList':
+                        target = node.get('Path')
+                        if not target.startswith('>'):
+                            draw(target, state, observations)
+                    elif node.tag == 'SetOtherMode' and node.get('Cmd') == 'G_SETOTHERMODE_H':
+                        if node.get('G_CYC_1CYCLE'):
+                            state['cycle'] = 1
+                        elif node.get('G_CYC_2CYCLE'):
+                            state['cycle'] = 2
+                    elif node.tag == 'SetGeometryMode' and node.get('G_FOG'):
+                        state['fog'] = True
+                    elif node.tag == 'ClearGeometryMode' and node.get('G_FOG'):
+                        state['fog'] = False
+            elif data[4:8] == b'TLDO':
+                for _, _, _, opcode in display_commands(data, path):
+                    if path == stump and opcode in (5, 6):
+                        observations.append(dict(state))
+
+        # Culling sorts by camera depth; test both orders and repetition/re-entry.
+        for order in itertools.permutations((CORE + 'mirror_access_root', stump)):
+            state, observations = {'cycle': 2, 'fog': True}, []
+            for path in order * 2:
+                draw(path, state, observations)
+            self.assertTrue(observations)
+            self.assertTrue(all(value == {'cycle': 2, 'fog': True} for value in observations), order)
+
     def test_authoring_rebakes_still_receive_the_immutable_source_bytes(self):
         from prepare_native_forest import verified_resources
         self.assertEqual(verified_resources(self.manifest), self.before)
@@ -86,7 +146,7 @@ class PolishTests(unittest.TestCase):
                 metadata = json.loads(self.manifest.read_text())
                 polish = metadata['presentation_polish']
                 if damage == 'version':
-                    polish['version'] = 2
+                    polish['version'] = 3
                 elif damage == 'hash':
                     polish['resources'][CORE + 'mirror_access_material']['sha256'] = '0' * 64
                 else:

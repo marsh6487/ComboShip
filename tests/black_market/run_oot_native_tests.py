@@ -7,7 +7,7 @@ sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
 from run_time_pedestal_tests import block_from
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--include", type=Path, action="append", default=[])
-parser.add_argument("--case", choices=("all", "door-marker", "door-entry", "door-return", "door-open"), default="all")
+parser.add_argument("--case", choices=("all", "door-marker", "door-entry", "door-return", "door-open", "door-exit"), default="all")
 args = parser.parse_args()
 source = (ROOT / "soh/soh/Enhancements/Gameplay/ComboBlackMarketNative.cpp").read_text()
 signatures = ["bool Interior(", "bool Exterior(", "bool Active(", "bool Safe(",

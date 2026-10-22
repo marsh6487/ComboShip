@@ -1,0 +1,17 @@
+{
+  "authoring_pillow_version": "12.3.0",
+  "encoding": "base64+zlib; timber, slate, plaster; each 512x512 RGBA8",
+  "packed_sha256": "61ad652c37a9d455316f3fa128e4107dcd94ab02418f9b2da6301dc28efe7064",
+  "pixels_sha256": {
+    "plaster": "f8a41211a86a45e2da83e470e3f7195807246eca8db9308e58bd2305ce85c8ce",
+    "slate": "3038a86c9b31bcfb0abf9971a996fc4656e129a7188c5011f54f1e328979ac30",
+    "timber": "26a5fd3ab1f9746de810145d843854fe0aef44d790a98d79fb8d5e698199e17f"
+  },
+  "processing": "Pillow LANCZOS encoding of unchanged imagegen originals; original PNGs retained",
+  "source_sha256": {
+    "plaster": "473f242489a01fd820cd2db294e59222a6cc78b4cc81d258c8ca196d362e28d2",
+    "slate": "c27db9c549aa645290c2b16234e102544d6dbf7b7116f00b81957e5949556499",
+    "timber": "01bd1e0497cff4a69c9c6f14d1369598bd7abf2174adeacb1b210ef17c1d6599"
+  },
+  "version": 1
+}

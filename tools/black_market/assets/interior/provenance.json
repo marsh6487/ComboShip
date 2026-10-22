@@ -1,0 +1,68 @@
+{
+  "generated_on_utc": "2026-10-22",
+  "mode": "built-in imagegen",
+  "reference_images": [],
+  "assets": [
+    {
+      "name": "timber",
+      "prompt": "Use case: stylized-concept\nAsset type: production seamless square opaque albedo texture for a fantasy game interior, one material image.\nPrimary request: Original aged dark walnut / ebonized timber material for a clandestine forest-market interior. Fine vertical wood grain with a few subtle shallow grain channels and restrained worn bronze-brown wear. Readable organic timber detail with quiet variation, nearly black brown base with muted warm brown grain, no separate objects.\nStyle/medium: slightly painterly realistic late-1990s fantasy-game remake material texture, restrained hand-painted realism.\nComposition/framing: strict overhead orthographic flat material scan, square edge-to-edge texture filling the entire image; grain runs vertically. Seamless repeat with opposing image edges matching, no border and no vignette.\nLighting/mood: even neutral albedo illumination across every pixel; no directional light, no baked shadows, no highlights.\nConstraints: single square opaque material only. Original design. No room, no perspective, no objects, no ornaments, no metal fittings, no signage, no words, no symbols, no watermark, no montage, no labels. Do not resemble tree bark: timber has fine smooth dense grain, not coarse cracked bark. Do not depict a framed wooden panel. No white margins.",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "opaque": true,
+      "sha256": "01bd1e0497cff4a69c9c6f14d1369598bd7abf2174adeacb1b210ef17c1d6599",
+      "bytes": 2600504,
+      "readOnlyValidation": {
+        "square": true,
+        "xWrapMeanAbsoluteRGBDifference": 10.08,
+        "xInteriorMeanAdjacentRGBDifference": 7.367,
+        "yWrapMeanAbsoluteRGBDifference": 6.327,
+        "yInteriorMeanAdjacentRGBDifference": 2.988,
+        "note": "Prompt requests seamless repeat. Read-only edge statistics recorded; output pixels are original built-in imagegen output with no procedural synthesis or post-editing."
+      }
+    },
+    {
+      "name": "slate",
+      "prompt": "Use case: stylized-concept\nAsset type: production seamless square opaque albedo texture for a fantasy game interior floor, one material image.\nPrimary request: Original charcoal blue-green slate flagstone material for a clandestine forest-market interior. Tightly fitted irregular medium rectangular slabs, desaturated dark blue gray and muted green gray, narrow dark joints, subtle natural slate grain and small soft scratches. Readable planar stone and varied slab shapes without strong contrast.\nStyle/medium: slightly painterly realistic late-1990s fantasy-game remake material texture, restrained hand-painted realism.\nComposition/framing: strict overhead orthographic flat material scan, square edge-to-edge texture filling the entire image, medium-sized rectangular flagstones on a mostly horizontal and vertical irregular grid. Seamless repeat with opposing image edges matching; stones continue through edges.\nLighting/mood: even neutral albedo illumination across every pixel, no directional light, no baked shadows, no specular highlights, no vignette.\nConstraints: single square opaque material only. Original design. No objects, no moss, no vegetation, no ornaments, no border, no room, no perspective, no labels, no words, no symbols, no watermark, no montage, no white margins. Not brickwork. No tiny pebbles. No highly luminous or saturated color.",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "opaque": true,
+      "sha256": "c27db9c549aa645290c2b16234e102544d6dbf7b7116f00b81957e5949556499",
+      "bytes": 3308642,
+      "readOnlyValidation": {
+        "square": true,
+        "xWrapMeanAbsoluteRGBDifference": 8.265,
+        "xInteriorMeanAdjacentRGBDifference": 6.834,
+        "yWrapMeanAbsoluteRGBDifference": 11.552,
+        "yInteriorMeanAdjacentRGBDifference": 7.674,
+        "note": "Prompt requests seamless repeat. Read-only edge statistics recorded; output pixels are original built-in imagegen output with no procedural synthesis or post-editing."
+      }
+    },
+    {
+      "name": "plaster",
+      "prompt": "Use case: stylized-concept\nAsset type: production seamless square opaque albedo texture for fantasy game interior walls, one material image.\nPrimary request: Original muted smoky sage and charcoal lime plaster material for a clandestine forest-market interior. Subtle fine mineral grain, restrained cloudy trowelled tonal variation, very small worn flecks, mostly smooth matte plaster with readable fine surface texture. Dark muted sage gray with subdued charcoal mottling.\nStyle/medium: slightly painterly realistic late-1990s fantasy-game remake material texture, restrained hand-painted realism.\nComposition/framing: strict overhead orthographic flat material scan, square edge-to-edge texture filling the entire image. Seamless repeat with opposing image edges matching. Uniform-scale plaster texture across whole image.\nLighting/mood: even neutral albedo illumination across every pixel; no directional light, no baked shadows or highlights, no vignette.\nConstraints: single square opaque material only. Original design. No objects, no room, no perspective, no bricks, no stone blocks, no trim, no borders, no cracks forming masonry, no decorations, no symbols, no words, no labels, no watermark, no montage, no white margins. No large focal marks or large holes. No green vegetation.",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "mode": "RGB",
+      "opaque": true,
+      "sha256": "473f242489a01fd820cd2db294e59222a6cc78b4cc81d258c8ca196d362e28d2",
+      "bytes": 3605051,
+      "readOnlyValidation": {
+        "square": true,
+        "xWrapMeanAbsoluteRGBDifference": 9.515,
+        "xInteriorMeanAdjacentRGBDifference": 7.575,
+        "yWrapMeanAbsoluteRGBDifference": 8.296,
+        "yInteriorMeanAdjacentRGBDifference": 9.77,
+        "note": "Prompt requests seamless repeat. Read-only edge statistics recorded; output pixels are original built-in imagegen output with no procedural synthesis or post-editing."
+      }
+    }
+  ],
+  "build_encoding": "Original PNGs retained; optional authoring rebake encodes 512x512 RGBA8. Standard-library archive preparation consumes the verified texture bundle."
+}
