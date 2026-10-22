@@ -1,0 +1,16 @@
+{
+  "status": "Reconstruction in progress; draft only.",
+  "original_recovery_commit": "2a2a82233f7b1aeafbdcc8bcc27c605e07a97d89",
+  "textures_expected": 11,
+  "completed": [
+    {
+      "path": "tools/black_market/assets/interior/bronze.png",
+      "sha": "56ba6d036110f7a86823bafddc0ccd471f57ec85",
+      "bytes": 482566
+    }
+  ],
+  "source_format": "512x512 RGB PNGs; lossless PNG compression after the existing LANCZOS runtime-size conversion. Original built-in imagegen outputs are preserved separately.",
+  "publication": "Sequential per-file uploads. Verify every returned Git blob SHA before advancing. Runtime bundles will use small individually verified compressed parts.",
+  "preservation": "Geometry, UV layout, actor behavior, render routing and native title/door code remain unchanged.",
+  "remaining": "10 material textures, rebuilt packed data and matching identity metadata, asset preparation tests and visual review."
+}
