@@ -126,10 +126,10 @@ void Scene(int scene, int entrance, int room = 0, int spawn = 0) {
     // Play_Init consumes the staged respawn before the first player update.
     gSaveContext.respawnFlag = 0;
 }
-void Ground(float x, float z, int room = 4) {
+void Ground(float x, float z, int room = 4, s16 yaw = 0) {
     play.roomCtx.curRoom.num = room;
     player.actor.world.pos = {x, 0, z};
-    player.actor.floorHeight = 0; player.actor.shape.rot.y = 0;
+    player.actor.floorHeight = 0; player.actor.shape.rot.y = yaw;
     floorPoly.type = 0;
     Tick();
 }
@@ -160,6 +160,74 @@ int main() {
     gEntranceTable[name].scene = sceneValue; gEntranceTable[name].spawn = spawnValue;
 #include "tables/entrance_table.h"
 #undef DEFINE_ENTRANCE
+
+    // The unmodified room-7 north floor uses exit-list slot 0 (Kokiri),
+    // not the authored archive's additional Fairy exit. Exercise that input.
+    for (const auto mode : {COMBO_GAME_BOTH, COMBO_GAME_OOT}) {
+        for (const bool randomized : {false, true}) {
+            for (const int age : {LINK_AGE_CHILD, LINK_AGE_ADULT}) {
+                Reset(randomized); gComboGameMode = mode; gSaveContext.linkAge = age;
+                Scene(SCENE_LOST_WOODS, ENTR_LOST_WOODS_SOUTH_EXIT, 7);
+                Ground(1600, -2700, 7, static_cast<s16>(0x8000));
+                Ground(1600, -2740, 7, static_cast<s16>(0x8000));
+                Ground(1600, -2780, 7, static_cast<s16>(0x8000));
+                player.actor.world.pos = {1600, 0, -2820}; floorPoly.type = 1;
+                Resolve(ENTR_KOKIRI_FOREST_UPPER_EXIT);
+                Require(play.nextEntranceIndex == ENTR_GREAT_FAIRYS_FOUNTAIN_MAGIC_DMT && shuffled == 0,
+                        "unmodified room-7 straight tunnel must reach the Fairy without any scene archive");
+                Scene(SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC, play.nextEntranceIndex);
+                Resolve(ENTR_RETURN_DAIYOUSEI_IZUMI);
+                const auto& local = gSaveContext.respawn[RESPAWN_MODE_RETURN];
+                Require(play.nextEntranceIndex == ENTR_LOST_WOODS_SOUTH_EXIT && local.roomIndex == 7 &&
+                            local.pos.x == 1600 && local.pos.z > -2800 && local.pos.z <= -2600 && local.yaw == 0,
+                        "native tunnel must return to a safe approach outside its own exit floor");
+                Require(shuffled == 0 && dynamicShuffled == 0,
+                        "native Fairy round trip must stay fixed with entrance shuffle enabled");
+            }
+        }
+    }
+    // Debug warps or a first update directly on the exit floor have no sampled
+    // approach. The native mesh still provides a known safe room-7 return.
+    Reset(true); Scene(SCENE_LOST_WOODS, ENTR_LOST_WOODS_SOUTH_EXIT, 7);
+    player.actor.world.pos = {1600, 0, -3100}; floorPoly.type = 1;
+    Resolve(ENTR_KOKIRI_FOREST_UPPER_EXIT);
+    Require(play.nextEntranceIndex == ENTR_GREAT_FAIRYS_FOUNTAIN_MAGIC_DMT,
+            "native Fairy entry must not depend on prior sampled frames");
+    Scene(SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC, play.nextEntranceIndex);
+    manager.save(gSaveContext, 0, false);
+    LoadFile(nlohmann::json::parse(manager.written.dump()));
+    gSaveContext.entranceIndex = ENTR_LINKS_HOUSE_CHILD_SPAWN; Normalize();
+    Require(gSaveContext.entranceIndex == ENTR_GREAT_FAIRYS_FOUNTAIN_MAGIC_DMT,
+            "saving inside the native tunnel's fountain must resume the same visit");
+    Scene(SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC, gSaveContext.entranceIndex);
+    Resolve(ENTR_RETURN_DAIYOUSEI_IZUMI);
+    const auto& nativeReturn = gSaveContext.respawn[RESPAWN_MODE_RETURN];
+    Require(nativeReturn.roomIndex == 7 && nativeReturn.pos.x == 1600 && nativeReturn.pos.y == 0 &&
+                nativeReturn.pos.z == -2760 && nativeReturn.yaw == 0,
+            "unsampled native entry must return on the known dry floor facing south into room 7");
+
+    for (const auto& position : std::array<Vec3f, 4>{Vec3f{2020, 0, -2400}, Vec3f{1180, 0, -2400},
+                                                    Vec3f{1600, 0, -1980}, Vec3f{1600, 200, -2820}}) {
+        Reset(); Scene(SCENE_LOST_WOODS, ENTR_LOST_WOODS_SOUTH_EXIT, 7);
+        player.actor.world.pos = position; Resolve(ENTR_KOKIRI_FOREST_UPPER_EXIT);
+        Require(play.nextEntranceIndex == ENTR_KOKIRI_FOREST_UPPER_EXIT,
+                "the Woodfall, left, south and upper paths must not become Fairy entrances");
+    }
+    for (const int room : {0, 1, 6, 8}) {
+        Reset(); Scene(SCENE_LOST_WOODS, ENTR_LOST_WOODS_SOUTH_EXIT, room);
+        player.actor.world.pos = {1600, 0, -2820}; Resolve(ENTR_KOKIRI_FOREST_UPPER_EXIT);
+        Require(play.nextEntranceIndex == ENTR_KOKIRI_FOREST_UPPER_EXIT,
+                "only room 7 may claim the native Fairy exit");
+    }
+    Reset(); Scene(SCENE_LOST_WOODS, ENTR_LOST_WOODS_SOUTH_EXIT, 7);
+    player.actor.world.pos = {1600, 0, -2820}; Resolve(ENTR_HYRULE_FIELD_CENTER_EXIT);
+    Require(play.nextEntranceIndex == ENTR_HYRULE_FIELD_CENTER_EXIT,
+            "an archive's explicit non-Kokiri exit must keep its authored destination");
+    Reset(true); gComboGameMode = COMBO_GAME_MM;
+    Scene(SCENE_LOST_WOODS, ENTR_LOST_WOODS_SOUTH_EXIT, 7);
+    player.actor.world.pos = {1600, 0, -2820}; Resolve(ENTR_KOKIRI_FOREST_UPPER_EXIT);
+    Require(play.nextEntranceIndex == ENTR_HAPPY_MASK_SHOP_0 && shuffled == 1,
+            "the OoT native tunnel controller must be inactive in MM-only mode");
 
     Reset(true); Enter();
     const auto returnBefore = gSaveContext.respawn[RESPAWN_MODE_RETURN];
@@ -249,5 +317,6 @@ int main() {
     Scene(SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC, ENTR_GREAT_FAIRYS_FOUNTAIN_MAGIC_DMT);
     Resolve(ENTR_RETURN_DAIYOUSEI_IZUMI);
     Require(play.nextEntranceIndex == ENTR_MARKET_DAY_4, "a different seed must not reuse the return marker");
-    std::puts("PASS conditional fountain return: relocated rooms, six fountains, solo/combo, native/rando exits, reload and stale-state cleanup");
+    std::puts("PASS native room-7 Fairy round trip: no archive, both ages/modes, shuffle, unsampled entry and reload");
+    std::puts("PASS conditional fountain return: relocated rooms, six fountains, native/rando exits and stale-state cleanup");
 }

@@ -7,6 +7,7 @@
 #include "soh/Enhancements/randomizer/SeedContext.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance.h"
 #include "soh/ShipInit.hpp"
+#include "gameplay/CrossGameTitleCard.h"
 
 extern "C" {
 #include "src/overlays/actors/ovl_En_Wonder_Talk2/z_en_wonder_talk2.h"
@@ -457,7 +458,10 @@ void TimeSaverOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_li
             }
             break;
         case VB_SHOW_TITLE_CARD:
-            if (CVarGetInteger(CVAR_ENHANCEMENT("TimeSavers.DisableTitleCard"), IS_RANDO)) {
+            // Cross-game returns request their destination card even in shuffled
+            // seeds. An explicitly configured hide-card setting still wins.
+            if (CVarGetInteger(CVAR_ENHANCEMENT("TimeSavers.DisableTitleCard"),
+                               IS_RANDO && !Combo_SOH_HasCrossGameTitleCard())) {
                 *should = false;
             }
             break;

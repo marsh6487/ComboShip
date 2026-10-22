@@ -187,9 +187,16 @@ extern "C" void ComboLostWoodsFountain_NormalizeEntry(void) {
 extern "C" int ComboLostWoodsFountain_TryExit(PlayState* play, Player* player, int entrance) {
     if (!FountainBound() || !play || !player)
         return 0;
+    const auto& pos = player->actor.world.pos;
+    // The unmodified room-7 north tunnel shares Kokiri's exit-list slot with
+    // other dead ends. Claim only its own native exit floor, before shuffle.
+    const bool nativeTunnel = play->sceneNum == SCENE_LOST_WOODS && play->roomCtx.curRoom.num == 7 &&
+                              entrance == ENTR_KOKIRI_FOREST_UPPER_EXIT && pos.x >= 1540 && pos.x <= 1660 &&
+                              pos.y > -30 && pos.y < 120 && pos.z <= -2800 && pos.z >= -3200;
+    if (nativeTunnel)
+        entrance = ENTR_GREAT_FAIRYS_FOUNTAIN_MAGIC_DMT;
     if (play->sceneNum == SCENE_LOST_WOODS && IsGreatFairyScene(FountainScene(entrance))) {
-        // Read the actual authored collision exit. No old tunnel coordinates
-        // or global fountain exit-table changes are involved.
+        // Authored Fairy exits retain their chosen destination and approach.
         const FountainOrigin* origin = nullptr;
         for (size_t i = 0; i < sFountainGroundCount; ++i) {
             const auto& point =
@@ -204,6 +211,11 @@ extern "C" int ComboLostWoodsFountain_TryExit(PlayState* play, Player* player, i
                 break;
             }
         }
+        // Debug warps can arrive directly on the native exit floor. Its known
+        // dry approach is outside that floor and faces south into room 7.
+        const FountainOrigin nativeOrigin{ ENTR_LOST_WOODS_SOUTH_EXIT, { 1600, 0, -2760 }, 0, 7 };
+        if (!origin && nativeTunnel)
+            origin = &nativeOrigin;
         if (!origin)
             return 0;
         SaveManager::Instance->ThreadPoolWait();

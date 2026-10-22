@@ -30,6 +30,9 @@ static bool alternateModel;
 static int animationStarts, idleRestores;
 static int mirrorDraws, worldShimmerDraws, matrixDepth;
 static Vec3f mirrorOrigin;
+static int auraDraws;
+static float auraScale, auraAlpha;
+static Vec3f auraOrigin;
 static int handoffs, prompts, pickups, errors, saves;
 static u32 seed = 77;
 static u16 buttonItem;
@@ -86,6 +89,12 @@ bool AlternateModel() { return alternateModel; }
 bool TimedActivity() { return false; }
 bool QueuePickup(int) { ++pickups; return true; }
 void DrawWorldShimmer(PlayState*) { ++worldShimmerDraws; }
+void DrawCastAura(PlayState *, Player *current, float scale, float alpha) {
+    ++auraDraws;
+    auraOrigin = current->actor.world.pos;
+    auraScale = scale;
+    auraAlpha = alpha;
+}
 void OpenPrompt() {
     ++prompts;
     SetText(0x3FEC);
@@ -280,6 +289,8 @@ void Reset() {
     alternateModel = false;
     animationStarts = idleRestores = 0;
     mirrorDraws = worldShimmerDraws = matrixDepth = 0;
+    auraDraws = 0;
+    auraScale = auraAlpha = 0;
     handoffs = prompts = pickups = errors = saves = 0;
     closed = 0; advance = false; textState = TEXT_STATE_NONE;
     nativeMessages = false;
@@ -842,8 +853,7 @@ int main() {
            (player.stateFlags1 & MirrorRuntime::kPromptFreeze));
     player.bodyPartsPos[PLAYER_BODYPART_HEAD] = {10, 60, 30};
     MirrorRuntime::DrawWorld();
-    assert(mirrorDraws ==
-           0); // The item appears when the hands rise, not during the windup.
+    assert(mirrorDraws == 0 && auraDraws == 0); // Cast starts without an overhead item or an instant full aura.
     const auto castSave = gSaveContext;
     // New presses cannot reopen the prompt or restart/skip the committed
     // motion.
@@ -852,6 +862,8 @@ int main() {
          ++tick) {
       player.actionFunc(&player, &play);
       MirrorRuntime::Update();
+      MirrorRuntime::DrawWorld();
+      assert(mirrorDraws == 0); // Even the raised-hands finish is ritual energy only.
       if (MagicMirrorPlayer_State(&player) != MAGIC_MIRROR_CAST_READY)
         assert(play.transitionTrigger == TRANS_TRIGGER_OFF);
     }
@@ -859,15 +871,23 @@ int main() {
            animationStarts == 1);
     assert(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_READY);
     MirrorRuntime::DrawWorld();
-    assert(mirrorDraws == 1 && matrixDepth == 0);
-    assert(mirrorOrigin.x == 10 && mirrorOrigin.y > 60 && mirrorOrigin.z == 30);
+    assert(mirrorDraws == 0 && auraDraws > 0 && matrixDepth == 0);
+    assert(auraScale > 0.9f && auraAlpha > 200 && auraOrigin.x == player.actor.world.pos.x);
     alternateModel = true;
     player.actor.world.pos = {100, 20, -50};
     MirrorRuntime::DrawWorld();
-    assert(mirrorDraws == 2 && worldShimmerDraws == 0 && matrixDepth == 0);
-    assert(mirrorOrigin.x == 100 && mirrorOrigin.y > 80 &&
-           mirrorOrigin.z == -50);
+    assert(mirrorDraws == 0 && worldShimmerDraws == 0 && matrixDepth == 0);
+    assert(auraOrigin.x == 100 && auraOrigin.y == 20 && auraOrigin.z == -50);
     alternateModel = false;
+    const float fullAlpha = auraAlpha;
+    MirrorRuntime::Update();
+    MirrorRuntime::DrawWorld();
+    assert(auraAlpha > 0 && auraAlpha < fullAlpha);
+    for (int tick = 0; tick < 12; ++tick)
+        MirrorRuntime::Update();
+    const int fadedDraws = auraDraws;
+    MirrorRuntime::DrawWorld();
+    assert(auraDraws == fadedDraws && mirrorDraws == 0);
     assert(std::memcmp(&castSave.respawn, &gSaveContext.respawn,
                        sizeof(castSave.respawn)) == 0);
 #ifdef MIRROR_OOT
@@ -882,6 +902,8 @@ int main() {
     MirrorRuntime::Reset();
     assert(idleRestores == 1 &&
            !(player.stateFlags1 & MirrorRuntime::kPromptFreeze));
+    MirrorRuntime::DrawWorld();
+    assert(auraDraws == fadedDraws); // No sampled cast energy survives cancellation or teardown.
     Reset();
     gComboGameMode = COMBO_GAME_BOTH;
     ConfirmCast();
@@ -1024,7 +1046,7 @@ int main() {
     Reset(); owned = false; MirrorRuntime::Bind(&play); token = MirrorRuntime::BeginPickup();
     MirrorRuntime::FinishPickup(token); assert(owned && saves == 1);
     MirrorRuntime::FinishPickup(token); assert(saves == 1);
-    puts("PASS native mirror: committed Farore cast, overhead item, fade hold, "
+    puts("PASS native mirror: unchanged Farore cast, sampled ritual aura without overhead item, fade hold, "
          "safe cancellation/teardown, preserved magic/respawns, travel and "
          "pickup");
 }

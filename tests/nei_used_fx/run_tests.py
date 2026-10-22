@@ -37,6 +37,11 @@ if __name__ == "__main__":
             'void Player_DrawGetItemImpl(PlayState*, Player*, Vec3f*, s32);\n'
             'void EnGirlA_Draw(Actor*, PlayState*);\n')
         (Path(tmp)/'nei_gi_bounds.inc').write_text('')
+        for host, adapter in (("soh", "soh/soh/Enhancements/Gameplay/MagicMirror.cpp"),
+                              ("mm", "mm/2s2h/Enhancements/Gameplay/MagicMirror.cpp")):
+            body = functions((ROOT / adapter).read_text())["DrawCastAura"]
+            (Path(tmp) / ("mirror_cast_adapter_" + host + ".inc.h")).write_text(
+                body.replace("DrawCastAura(", "MirrorCastAura(", 1))
         for name in (("budget",) if "--budget-only" in sys.argv else ("policy", "feedback_policy", "presentation", "budget")):
             binary = str(Path(tmp) / name)
             subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-O2", *flags(), '-I'+tmp,
@@ -48,7 +53,7 @@ if __name__ == "__main__":
             from run_mm_nei_tests import flags as mm_flags
             binary = str(Path(tmp) / "mm-presentation")
             subprocess.run([os.environ.get("CXX", "c++"), "-std=c++20", "-O2", *mm_flags(),
-                            "-I" + str(ROOT), "-DNEI_USED_FX_MM",
+                            "-I" + str(ROOT), "-I" + tmp, "-DNEI_USED_FX_MM",
                             str(ROOT / "tests/nei_used_fx/presentation_test.cpp"), "-o", binary], check=True)
             subprocess.run([binary], check=True)
         # Compile the public interface as C, just as the unity item sources use it.

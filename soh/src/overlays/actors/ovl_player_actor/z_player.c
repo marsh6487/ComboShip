@@ -15,6 +15,7 @@
 #include "soh/Enhancements/Gameplay/ComboLostWoodsFountain.h"
 #endif
 #include "gameplay/ComboFaroresWind.h"
+#include "gameplay/CrossGameTitleCard.h"
 #include "din_fire_shield.h"
 #include "din_fire_sword.h"
 #include "sword_element_message.h"
@@ -12536,12 +12537,14 @@ void Player_Init(Actor* thisx, PlayState* play2) {
         }
     }
 
-    if ((respawnFlag == 0) || (respawnFlag < -1)) {
+    const s32 crossGameTitleCard = Combo_SOH_HasCrossGameTitleCard();
+    if (crossGameTitleCard || (respawnFlag == 0) || (respawnFlag < -1)) {
         titleFileSize = scene->titleFile.vromEnd - scene->titleFile.vromStart;
         if (GameInteractor_Should(VB_SHOW_TITLE_CARD, gSaveContext.showTitleCard)) {
             if ((gSaveContext.sceneLayer < 4) &&
-                (gEntranceTable[((void)0, gSaveContext.entranceIndex) + ((void)0, gSaveContext.sceneLayer)].field &
-                 ENTRANCE_INFO_DISPLAY_TITLE_CARD_FLAG) &&
+                (crossGameTitleCard ||
+                 (gEntranceTable[((void)0, gSaveContext.entranceIndex) + ((void)0, gSaveContext.sceneLayer)].field &
+                  ENTRANCE_INFO_DISPLAY_TITLE_CARD_FLAG)) &&
                 ((play->sceneNum != SCENE_DODONGOS_CAVERN) ||
                  (Flags_GetEventChkInf(EVENTCHKINF_ENTERED_DODONGOS_CAVERN))) &&
                 ((play->sceneNum != SCENE_BOMBCHU_SHOP) ||
@@ -12552,6 +12555,7 @@ void Player_Init(Actor* thisx, PlayState* play2) {
         }
         gSaveContext.showTitleCard = true;
     }
+    Combo_SOH_ConsumeCrossGameTitleCard(); // Hidden/untitled arrivals must not leak into a later respawn.
 
     if (func_80845C68(play, (respawnFlag == 2) ? 1 : 0) == 0) {
         gSaveContext.respawn[RESPAWN_MODE_DOWN].playerParams = (thisx->params & 0xFF) | 0xD00;

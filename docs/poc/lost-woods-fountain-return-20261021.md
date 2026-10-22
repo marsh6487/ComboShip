@@ -1,5 +1,10 @@
 # Conditional Lost Woods Great Fairy return
 
+Update: the source-native room-7 north tunnel is now covered without a scene
+archive. See `native-lost-woods-fairy-20261021.md` for the bounded follow-up,
+exact baseline, regression evidence and recovery checkpoint. The authored-exit
+contract below remains supported for additional or relocated custom entrances.
+
 Status: composed into the October 21 morning source candidate; configured
 gameplay acceptance pending. cor's later morning-roundup instruction authorizes
 the cumulative source publication and build, superseding the earlier hold while
@@ -31,9 +36,11 @@ Return uses that point with an idle start facing outward. Entry/return for
 this authored connection bypass entrance shuffle; normal entrances keep their
 existing native or shuffled behavior.
 
-This does not add a proximity entrance or restore the collision cor removed.
-The existing coordinate-based forest portal is preserved. An actual authored
-collision exit and a grounded approach are needed for the new route.
+This uses actual collision exits, not a proximity entrance. The source-native
+room-7 north floor is intercepted before entrance shuffle and has a known safe
+approach for debug warps. Other custom connections use their authored Fairy
+collision exit and sampled grounded approach. The existing coordinate-based
+private-forest portal is preserved.
 
 ## Visit and save lifecycle
 
@@ -69,17 +76,18 @@ and DOWN are untouched. Save-worker synchronization occurs outside saveMtx.
   `z_player.c`; the compiler reports 1, 0 and 334 warnings respectively.
 - Independent review has no remaining actionable findings.
 
-No full application build or in-game traversal is claimed. Once cor's entrance
-is exported and the new source is built, enter through that tunnel, exit back
-to it, then enter the same fountain through its original entrance and verify
-the original return. Repeat after saving/reloading inside the local visit.
+No full application build or in-game traversal is claimed. With the new source
+built, enter through room 7's north tunnel with no scene mods and exit back to
+it. Then enter the same fountain through its original entrance and verify the
+original return. Repeat after saving/reloading inside the local visit. A custom
+entrance export is optional and should retain its own authored destination.
 
 ## Recovery
 
 Apply the saved source checkpoint's `CHANGES.patch` to the exact baseline above
 to restore its recorded source and tests, or fetch the named candidate branch
 in `marsh6487/ComboShip` for the published source and current handoff notes.
-The baseline remains unchanged. The candidate adds no asset dependency; cor's
-separately authored Lost Woods entrance export is the pending runtime input.
+The baseline remains unchanged. The source-native candidate adds no asset
+dependency; a separately authored Lost Woods entrance export is optional.
 Do not promote this candidate to an accepted scene/runtime master based on
 static checks alone.
