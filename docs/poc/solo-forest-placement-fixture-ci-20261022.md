@@ -32,6 +32,9 @@ Validation:
   end: all 25 checks passed. This covers the remaining forest, Mirror, native
   shop/door/shelf/browsing, hex and scene-music checks. The first four unchanged
   world commands passed in the inspected hosted run, giving evidence for all 29.
+  The 25 local manifest tasks completed in 104.82 seconds in total, as recorded
+  by the existing timed runner; their command bodies and environment scopes were
+  unchanged. Local replay used a manifest containing world entries 4 through 28.
 - clang-format 14.0.6 dry-run and `git diff --check` passed.
 
 Full hosted CI remains pending. Native fixtures do not establish configured
