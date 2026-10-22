@@ -45,9 +45,9 @@ static void CheckPavingSeams(Ship::Context& context) {
                 source->Flags = packed ? 0 : TEX_FLAG_LOAD_AS_RAW;
                 // Grass, slightly green stone, and warm stone. Sharing this
                 // allocation with ordinary grass also checks copy-cache isolation.
-                const std::vector<uint8_t> pixels = packed
-                    ? std::vector<uint8_t>{ 0x2B, 0x87, 0x7C, 0x1C, 0x5A, 0x91 }
-                    : std::vector<uint8_t>{ 40, 110, 25, 83, 120, 130, 118, 255, 95, 85, 70, 0 };
+                const std::vector<uint8_t> pixels =
+                    packed ? std::vector<uint8_t>{ 0x2B, 0x87, 0x7C, 0x1C, 0x5A, 0x91 }
+                           : std::vector<uint8_t>{ 40, 110, 25, 83, 120, 130, 118, 255, 95, 85, 70, 0 };
                 source->mImageBuffer = std::make_shared<std::vector<char>>(pixels.begin(), pixels.end());
                 source->ImageData = reinterpret_cast<uint8_t*>(source->mImageBuffer->data());
                 source->ImageDataSize = pixels.size();
@@ -61,8 +61,8 @@ static void CheckPavingSeams(Ship::Context& context) {
                     Update(nullptr);
                     const bool tinted = (!*prefix || alt) && (selected == 0 || selected == 2 || selected == 3);
                     for (const char* road : roads) {
-                        const auto shown = std::dynamic_pointer_cast<Fast::Texture>(
-                            context.rm->cache.at(std::string(prefix) + road));
+                        const auto shown =
+                            std::dynamic_pointer_cast<Fast::Texture>(context.rm->cache.at(std::string(prefix) + road));
                         REQUIRE((shown != source) == tinted && "paving seam grass missed the seasonal binding");
                         REQUIRE((std::memcmp(shown->ImageData, source->ImageData, stride) != 0) == tinted);
                         REQUIRE(std::memcmp(shown->ImageData + stride, source->ImageData + stride, stride * 2) == 0 &&
