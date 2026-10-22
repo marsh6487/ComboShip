@@ -187,6 +187,10 @@ bool GameInteractor_Should(GIVanillaBehavior behavior, uint32_t result, ...) { (
     c_path.write_text(decoder)
     includes = [ROOT, *[ROOT / "soh" / p for p in ("include", "include/PR", "", "soh", "src", "assets", "mods")],
                 *[ROOT / p for p in ("combo", "combo/menu", "libultraship/include", "libultraship")]]
+    # Native item metadata reaches ImGui and ResourceManager headers. This gate
+    # runs outside the legacy NEI runner's CPATH scope, but uses the same pins.
+    includes += [Path(path) for path in os.environ.get(
+        "COMBO_NEI_FIXTURE_CPATH", "/usr/include/imgui").split(os.pathsep) if path]
     flags = common_flags(includes) + ['-DCVAR_PREFIX_ENHANCEMENT="gEnhancements"']
     units = []
     for path in (c_path, ROOT / "soh/src/code/z_kanfont.c",
