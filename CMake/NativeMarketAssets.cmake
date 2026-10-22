@@ -1,6 +1,9 @@
 # Retained geometry and original surfaces stay verified in git. Both ordinary
 # port-archive packers consume them; no supplemental market archive is needed.
 get_filename_component(COMBO_NATIVE_MARKET_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+file(GLOB COMBO_NATIVE_MARKET_TEXTURE_PARTS CONFIGURE_DEPENDS
+    "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/assets/interior/props.zlib.*.b64"
+    "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/assets/interior/textures.zlib.*.b64")
 add_custom_target(
     PrepareNativeMarketAssets
     COMMAND ${Python3_EXECUTABLE} -B "${COMBO_NATIVE_MARKET_ROOT}/scripts/assets/prepare_native_market.py"
@@ -28,11 +31,10 @@ add_custom_target(
             "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/assets/interior/cloth.png"
             "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/assets/interior/props-provenance.json"
             "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/assets/interior/props-encoded.json"
-            "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/assets/interior/props.zlib.001.b64"
-            "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/assets/interior/props.zlib.002.b64"
+            ${COMBO_NATIVE_MARKET_TEXTURE_PARTS}
             "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/assets/interior/encoded.json"
-            "${COMBO_NATIVE_MARKET_ROOT}/tools/black_market/assets/interior/textures.zlib.b64"
             "${COMBO_NATIVE_MARKET_ROOT}/tools/native_market/bundled/resources.zlib.b64"
             "${COMBO_NATIVE_MARKET_ROOT}/tools/native_market/bundled/manifest.json"
     COMMENT "Preparing native Black Market geometry and original interior surfaces..."
     VERBATIM)
+

@@ -1,5 +1,5 @@
 {
-  "status": "All 11 reconstructed source textures checkpointed; compressed part publication pending.",
+  "status": "Asset publication complete; source/build-preparation verified candidate. Configured gameplay acceptance pending.",
   "original_recovery_commit": "2a2a82233f7b1aeafbdcc8bcc27c605e07a97d89",
   "textures_expected": 11,
   "completed": [
@@ -62,7 +62,10 @@
   "source_format": "512x512 RGB PNGs; lossless PNG compression after the existing LANCZOS runtime-size conversion. Original built-in imagegen outputs are preserved separately.",
   "publication": "Sequential per-file uploads. Verify every returned Git blob SHA before advancing. Runtime bundles will use small individually verified compressed parts.",
   "preservation": "Geometry, UV layout, actor behavior, render routing and native title/door code remain unchanged.",
-  "remaining": "Publish 91 compressed parts sequentially and verify the final remote inventory.",
+  "remaining": [
+    "Configured native/Alt gameplay and appearance smoke tests",
+    "Full executable linking not run"
+  ],
   "bundle_parts_expected": [
     {
       "path": "tools/black_market/assets/interior/props.zlib.001.b64",
@@ -520,13 +523,23 @@
       "sha": "c861548b8b8216f2db32fe3e22c60040c98267ae"
     }
   ],
-  "bundle_parts_uploaded": 0,
+  "bundle_parts_uploaded": 91,
   "validation": {
-    "asset_tests": 27,
+    "asset_tests": 28,
     "result": "pass",
     "command": "python3 -B -m unittest discover -s tests/native_market -p 'test_*.py'",
+    "real_cmake_asset_target": "pass",
     "prepared_resources_per_host": 141,
+    "stdlib_only_preparation": "pass",
+    "deterministic_rebake": "all 91 parts and both manifests unchanged",
+    "protected_market_functions_and_constants": "unchanged",
     "configured_gameplay": "untested",
     "full_executable": "not built"
+  },
+  "asset_sizes": {
+    "original_pending_bytes": 48556154,
+    "reconstructed_png_bytes": 5331362,
+    "packed_source_bytes": 11711084,
+    "max_packed_file_bytes": 131072
   }
 }

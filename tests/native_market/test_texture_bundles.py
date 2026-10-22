@@ -17,7 +17,10 @@ import market_interior as interior
 class TextureBundles(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        from PIL import Image
+        try:
+            from PIL import Image
+        except ImportError as error:
+            raise unittest.SkipTest('Pillow is required for optional texture authoring fixtures') from error
         cls.sources, cls.pixels = {}, {}
         for name in (*interior.BASE_NAMES, *interior.PROP_NAMES):
             rgb = hashlib.shake_256(name.encode()).digest(512 * 512 * 3)
@@ -35,8 +38,10 @@ class TextureBundles(unittest.TestCase):
         for name, data in self.sources.items():
             (self.assets / (name + '.png')).write_bytes(data)
             hashes[name] = hashlib.sha256(data).hexdigest()
-        self.enterContext(patch.object(interior, 'ASSETS', self.assets))
-        self.enterContext(patch.object(interior, 'SOURCE_HASHES', hashes))
+        for name, value in (('ASSETS', self.assets), ('SOURCE_HASHES', hashes)):
+            patcher = patch.object(interior, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
         interior.encoded_pixels.cache_clear()
         self.addCleanup(interior.encoded_pixels.cache_clear)
 

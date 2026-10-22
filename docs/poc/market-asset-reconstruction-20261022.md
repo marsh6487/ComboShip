@@ -12,6 +12,6 @@ From the repository root, rebake with Pillow installed:
 python3 -c "import sys; sys.path.insert(0, 'tools/black_market'); import market_interior; market_interior.rebake()"
 ```
 
-Validation: all 27 native-market asset tests pass, including source-archive conversion, both ports' 141-resource preparation, stdlib-only preparation, retained scene/material contracts, texture round trips and damaged/oversized/path-invalid part rejection. Repeating the authoring bake reproduces all 91 parts and both manifests exactly. Protected market functions and constants compare unchanged against the recovered source.
+Validation: all 28 native-market asset tests pass, including the real CMake preparation target, source-archive conversion, both ports' 141-resource preparation, stdlib-only preparation, retained scene/material contracts, texture round trips and damaged/oversized/path-invalid part rejection. Repeating the authoring bake reproduces all 91 parts and both manifests exactly. Protected market functions and constants compare unchanged against the recovered source. CMake tracks both sets of numbered part files and no longer requires the superseded single architecture file.
 
 Configured native/Alt gameplay, GPU appearance and full executable linking remain untested. Publication does not promote a runtime master. See the adjacent JSON record for exact upload identities and progress; the earlier publication-recovery record retains the historical pre-stall manifest.
