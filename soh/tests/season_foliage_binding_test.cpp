@@ -32,10 +32,68 @@ static std::shared_ptr<Fast::Texture> Make(const std::string& path) {
     return source;
 }
 
+static void CheckPavingSeams(Ship::Context& context) {
+    const char* roads[] = { "scenes/shared/spot00_scene/s00_road_01_41180",
+                            "scenes/shared/spot00_scene/s00_road_02_46580" };
+    const char* ground = "scenes/shared/spot00_scene/s00_yuka_01_78B00___Copie";
+    for (bool packed : { false, true }) {
+        for (bool alt : { false, true }) {
+            context.rm->alt = alt;
+            for (const char* prefix : { "", "alt/" }) {
+                const auto source = Make("fixture/shared-paving");
+                source->Width = 3;
+                source->Flags = packed ? 0 : TEX_FLAG_LOAD_AS_RAW;
+                // Grass, slightly green stone, and warm stone. Sharing this
+                // allocation with ordinary grass also checks copy-cache isolation.
+                const std::vector<uint8_t> pixels = packed
+                    ? std::vector<uint8_t>{ 0x2B, 0x87, 0x7C, 0x1C, 0x5A, 0x91 }
+                    : std::vector<uint8_t>{ 40, 110, 25, 83, 120, 130, 118, 255, 95, 85, 70, 0 };
+                source->mImageBuffer = std::make_shared<std::vector<char>>(pixels.begin(), pixels.end());
+                source->ImageData = reinterpret_cast<uint8_t*>(source->mImageBuffer->data());
+                source->ImageDataSize = pixels.size();
+                const auto original = *source->mImageBuffer;
+                const size_t stride = packed ? 2 : 4;
+                for (const char* road : roads)
+                    context.rm->cache[std::string(prefix) + road] = source;
+                context.rm->cache[std::string(prefix) + ground] = source;
+                for (int selected : { 0, 2, 3, 1, 2, -1 }) {
+                    season = selected;
+                    Update(nullptr);
+                    const bool tinted = (!*prefix || alt) && (selected == 0 || selected == 2 || selected == 3);
+                    for (const char* road : roads) {
+                        const auto shown = std::dynamic_pointer_cast<Fast::Texture>(
+                            context.rm->cache.at(std::string(prefix) + road));
+                        REQUIRE((shown != source) == tinted && "paving seam grass missed the seasonal binding");
+                        REQUIRE((std::memcmp(shown->ImageData, source->ImageData, stride) != 0) == tinted);
+                        REQUIRE(std::memcmp(shown->ImageData + stride, source->ImageData + stride, stride * 2) == 0 &&
+                                "paving stones must retain their exact source pixels");
+                        REQUIRE(shown->Type == source->Type && shown->Flags == source->Flags &&
+                                shown->Width == source->Width && shown->Height == source->Height &&
+                                shown->HByteScale == source->HByteScale && shown->VPixelScale == source->VPixelScale);
+                        for (size_t i = 0; i < pixels.size(); i += stride)
+                            REQUIRE(packed ? (shown->ImageData[i + 1] & 1) == (source->ImageData[i + 1] & 1)
+                                           : shown->ImageData[i + 3] == source->ImageData[i + 3]);
+                    }
+                    if (tinted) {
+                        const auto ordinary = std::dynamic_pointer_cast<Fast::Texture>(
+                            context.rm->cache.at(std::string(prefix) + ground));
+                        REQUIRE(std::memcmp(ordinary->ImageData + stride, source->ImageData + stride, stride) != 0 &&
+                                "grass trim must not narrow ordinary terrain's existing selection");
+                    }
+                    REQUIRE(*source->mImageBuffer == original);
+                }
+                Retire();
+                context.rm->cache.clear();
+            }
+        }
+    }
+}
+
 int main() {
     Ship::Context context;
     context.rm = std::make_shared<Ship::ResourceManager>();
     Ship::Context::current = &context;
+    CheckPavingSeams(context);
     // The private forest is shared scenery: its eight greenery identities must
     // keep MM's darker autumn palette and blush spring grass.
     const char* forestLeaves[] = { "lw_enkei_01_0", "lw_kusa_01_12600", "lw_wood_02_2CA00", "lw_wood_03_31E00",
@@ -222,6 +280,9 @@ int main() {
             context.rm->cache[marker] = reward;
             const std::string pavers = "alt/scenes/shared/spot00_scene/s00_road_01_41180";
             const auto stone = Make(pavers);
+            stone->ImageData[0] = 120;
+            stone->ImageData[1] = 130;
+            stone->ImageData[2] = 118;
             context.rm->cache[pavers] = stone;
             for (int selected : { 0, 2, 3 }) {
                 season = selected;

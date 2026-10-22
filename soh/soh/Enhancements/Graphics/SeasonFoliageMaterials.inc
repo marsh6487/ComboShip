@@ -14,6 +14,10 @@
 { "scenes/shared/spot00_scene/s00_yuka_01_78B00___Copie", Surface::Ground },
 // Exact additional identities in cor's Hyrule Field FINAL archive.
 { "custom/prelude/spot00_scene/s00_yuka_04_85D00", Surface::Ground },
+// Grass between the paving tiles. The stricter mask protects the green-gray
+// stone in these two mixed images; all other terrain keeps its existing mask.
+{ "scenes/shared/spot00_scene/s00_road_01_41180", Surface::Ground, {}, 0, PixelMask::GrassTrim },
+{ "scenes/shared/spot00_scene/s00_road_02_46580", Surface::Ground, {}, 0, PixelMask::GrassTrim },
 { "scenes/shared/spot00_scene/s00_kabe_01_11300", Surface::Ground },
 { "scenes/shared/spot00_scene/s00_kabe_05_1C700", Surface::Ground },
 { "scenes/shared/spot00_scene/s00_yama_01_76B00", Surface::Ground, { 0, 8, 16, 16 } },

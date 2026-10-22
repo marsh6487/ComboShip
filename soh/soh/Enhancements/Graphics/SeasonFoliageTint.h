@@ -8,6 +8,7 @@
 
 namespace SeasonFoliage {
 enum class Surface { Ground, Canopy, Understory };
+enum class PixelMask { Green, GrassTrim };
 struct Tint {
     uint32_t color = 0;
     unsigned lightScale = 256;
@@ -34,7 +35,7 @@ inline Tint Palette(int season, Surface surface, uint32_t autumnColor = 0) {
 // Tint copies are made from the original texture, never the preceding season.
 // Djipi's RGBA16 resources with LOAD_AS_RAW carry four RGBA bytes per pixel.
 inline std::shared_ptr<Fast::Texture> BuildTexture(const std::shared_ptr<Fast::Texture>& source, Tint tint,
-                                                   Region region = {}) {
+                                                   Region region = {}, PixelMask pixelMask = PixelMask::Green) {
     if (!source || !tint.color || !source->ImageData || !source->Width || !source->Height)
         return nullptr;
     if (region.left >= region.right || region.top >= region.bottom || region.right > 16 || region.bottom > 16)
@@ -82,6 +83,12 @@ inline std::shared_ptr<Fast::Texture> BuildTexture(const std::shared_ptr<Fast::T
         const unsigned b = packed ? (native >> 1) & 31 : pixel[2];
         if (g <= r || g <= b)
             continue; // Rocks, bark, flowers and alpha retain their exact source pixels.
+        // The Field paving's gray stone is slightly green too. Select its
+        // saturated seam grass without recoloring those stone faces. Match the
+        // same separation in native 5-bit and raw/HD 8-bit channels.
+        if (pixelMask == PixelMask::GrassTrim &&
+            (g * 100 <= r * 120 || g * 100 <= b * 120 || g - r < (packed ? 2u : 10u)))
+            continue;
         const auto channel = [&](unsigned original, unsigned target) {
             const unsigned normalized =
                 std::min(packed ? 31u : 255u, (r + g + b) * target * tint.lightScale / (targetSum * 256));
