@@ -22,10 +22,15 @@
       "path": "tools/black_market/assets/interior/plaster.png",
       "sha": "6c2b7e8cc521b4a0396f1bec728dbfa4927cf7d2",
       "bytes": 413592
+    },
+    {
+      "path": "tools/black_market/assets/interior/ceramic.png",
+      "sha": "15597c72dc851e2e3db1ab1963c345e5e57f0e1c",
+      "bytes": 516208
     }
   ],
   "source_format": "512x512 RGB PNGs; lossless PNG compression after the existing LANCZOS runtime-size conversion. Original built-in imagegen outputs are preserved separately.",
   "publication": "Sequential per-file uploads. Verify every returned Git blob SHA before advancing. Runtime bundles will use small individually verified compressed parts.",
   "preservation": "Geometry, UV layout, actor behavior, render routing and native title/door code remain unchanged.",
-  "remaining": "7 material textures, packed data, identity metadata and verification."
+  "remaining": "6 material textures, packed data, identity metadata and verification."
 }
