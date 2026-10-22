@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 import zlib
 
 ASSETS = Path(__file__).parent / 'assets/interior'
+PART_BYTES = 96 * 1024  # Each base64 source file is at most 128 KiB.
 PREFIX = 'custom/skiejer_market/texture/'
 BASE_NAMES = ('timber', 'slate', 'plaster')
 PROP_NAMES = ('ceramic', 'bronze', 'wicker', 'celestial', 'herbs', 'curios', 'liquid', 'cloth')
@@ -23,17 +24,17 @@ DERIVED_NAMES = ('counter_atlas', 'fittings_atlas', 'walltrim_atlas')
 TEXTURES = {name: PREFIX + 'baseline_' + name for name in (*BASE_NAMES, *PROP_NAMES, *DERIVED_NAMES)}
 SHELF = PREFIX + 'arcane_stone'
 SOURCE_HASHES = {
-    'timber': '01bd1e0497cff4a69c9c6f14d1369598bd7abf2174adeacb1b210ef17c1d6599',
-    'slate': 'c27db9c549aa645290c2b16234e102544d6dbf7b7116f00b81957e5949556499',
-    'plaster': '473f242489a01fd820cd2db294e59222a6cc78b4cc81d258c8ca196d362e28d2',
-    'ceramic': 'ddd8ff5f0820253dfda4e74b7a8bb21419c01f7c8c4e53d2317a9288e1aff492',
-    'bronze': '88b328e79785411d4774186427db01c84a520aa5e670b511bd093ee38d493d0a',
-    'wicker': '1d011ff044338bc4e8aa8d1b0dc9cf06a638201afad5df422fa20b3827f59a5e',
-    'celestial': '3d7180a9d4be05b4e32c04ae714a9c4d1faedbec04e250cc8226e0aa295ec235',
-    'herbs': 'c369e794d2baa820ae6ec728a0647c3a9c0b8f4cf671e9607fc04b48e2d5046d',
-    'curios': 'a41a95e9e25ce409578eb0f021ebac14459c767b0aaa4b2b570d26245836716a',
-    'liquid': 'ff268814d6c3661ad4ee7b61caa822ab65df47977746a351480a5d3e4de269f7',
-    'cloth': 'e1131499422a20291753a6a127c26dbec2bdb83184a2a07f6d78e183d14451da',
+    'bronze': 'c5d17c93cb7c79a2d5fdda77cd5791220bef417fae24b85881d9427e2176ec62',
+    'timber': '62dc29aef9b2e4b0194a5c2ce25e1bff79139deb2ab3e9a74642555d9207ec7c',
+    'slate': 'e91d3c7ef5d1e78dabaadf138d76db2cd6b74c3ca7e3dca0890fd2b4d4e408db',
+    'plaster': 'aef51704902f9144fb88d3492667fc143ee77c976a192bae2a7cdb0d76688b84',
+    'ceramic': 'a01ed02e1ea1c108c3a74790bbf6e8481c590e7c26be106a811b60ad0f1ef6be',
+    'wicker': '52cd841c267cfcfc41598c1122b4de32c854aa68f90e8cdf5135e53665079ea8',
+    'celestial': 'da370b831378ac8cdea60c3e7890324e80e6c72a6a1f4143e17c05db0aa1356f',
+    'herbs': '8d5e3c2f546745b171cf8f48a3a9d82f90613fa01106ba8ff6f1b5ca2f1e66f7',
+    'curios': '2ffe56c06fa7f81cd94ad3e0dd302c6e8cc5b56f3fbd5cafb1c46f10f8be3c90',
+    'liquid': '22ab45941f50f8963e24cf1fd34fb2f4b9bd3d36336a4998a0f304e76b59df32',
+    'cloth': '93ecac406f9238a7756a0a901619f3b9f5173b2f4217bc7fac0a5172a87d73bf',
 }
 # Material IDs differ from the retained tri/vtx suffixes. Follow the actual
 # room draw graph, not numeric suffixes or broad spatial bounds alone.
@@ -175,12 +176,33 @@ def resource_paths():
     return set(TEXTURES.values()) | {SHELF}
 
 
+def _packed_parts(manifest, stem):
+    parts = []
+    for index, part in enumerate(manifest['parts'], 1):
+        if part['name'] != f'{stem}.zlib.{index:03}.b64':
+            raise ValueError('Original market part order/path changed')
+        text = (ASSETS / part['name']).read_bytes()
+        if len(text) > 128 * 1024:
+            raise ValueError('Original market source part exceeds publication limit')
+        data = base64.b64decode(text, validate=True)
+        if len(data) != part['bytes'] or hashlib.sha256(data).hexdigest() != part['sha256']:
+            raise ValueError('Original market part hash/size changed')
+        parts.append(data)
+    packed = b''.join(parts)
+    if hashlib.sha256(packed).hexdigest() != manifest['packed_sha256']:
+        raise ValueError('Original market part aggregate hash changed')
+    return packed
+
+
 @lru_cache(maxsize=1)
 def encoded_pixels():
     manifest = json.loads((ASSETS / 'encoded.json').read_text())
-    packed = base64.b64decode((ASSETS / 'textures.zlib.b64').read_bytes(), validate=True)
     if manifest.get('version') != 1 or manifest.get('source_sha256') != {name:SOURCE_HASHES[name] for name in BASE_NAMES}:
         raise ValueError('Original market encoded surface identity changed')
+    if 'parts' in manifest:
+        packed = _packed_parts(manifest, 'textures')
+    else:
+        packed = base64.b64decode((ASSETS / 'textures.zlib.b64').read_bytes(), validate=True)
     if hashlib.sha256(packed).hexdigest() != manifest['packed_sha256']:
         raise ValueError('Original market encoded surface hash mismatch')
     decoder = zlib.decompressobj()
@@ -199,20 +221,7 @@ def encoded_pixels():
     if (manifest.get('version') != 1 or manifest.get('names') != list(names) or
             manifest.get('source_sha256') != SOURCE_HASHES):
         raise ValueError('Original market prop source/encoding identity changed')
-    parts = []
-    for index, part in enumerate(manifest['parts'], 1):
-        if part['name'] != f'props.zlib.{index:03}.b64':
-            raise ValueError('Original market prop part order/path changed')
-        text = (ASSETS / part['name']).read_bytes()
-        if len(text) > 8 * 1024 * 1024:
-            raise ValueError('Original market prop source part exceeds publication limit')
-        data = base64.b64decode(text, validate=True)
-        if len(data) != part['bytes'] or hashlib.sha256(data).hexdigest() != part['sha256']:
-            raise ValueError('Original market prop part hash/size changed')
-        parts.append(data)
-    packed = b''.join(parts)
-    if hashlib.sha256(packed).hexdigest() != manifest['packed_sha256']:
-        raise ValueError('Original market prop aggregate hash changed')
+    packed = _packed_parts(manifest, 'props')
     decoder = zlib.decompressobj()
     size = 512 * 512 * 4
     decoded = decoder.decompress(packed, len(names) * size + 1)
@@ -236,7 +245,6 @@ def rebake():
             raise ValueError('Original market surface identity changed: ' + name)
         with Image.open(source) as image:
             images[name] = image.convert('RGBA').resize((512, 512), Image.Resampling.LANCZOS)
-    # The existing three encoded architectural originals stay byte-identical.
     curios = images['curios']
     patches = {'paper':curios.crop((0,0,256,256)), 'leather':curios.crop((256,0,512,256)),
                'bone':curios.crop((0,256,256,512)), 'glass':curios.crop((256,256,512,512)), **images}
@@ -249,22 +257,27 @@ def rebake():
                 patch = patches[source].resize((right-left, bottom-top), Image.Resampling.LANCZOS)
                 atlas.paste(patch, (left, top))
         images[name] = atlas
-    names = (*PROP_NAMES, *DERIVED_NAMES)
-    pixels = {name:images[name].tobytes() for name in names}
-    packed = zlib.compress(b''.join(pixels.values()), 9)
-    parts = []
-    for index, start in enumerate(range(0, len(packed), 5 * 1024 * 1024), 1):
-        data = packed[start:start + 5 * 1024 * 1024]
-        name = f'props.zlib.{index:03}.b64'
-        (ASSETS / name).write_bytes(base64.b64encode(data))
-        parts.append({'name':name, 'bytes':len(data), 'sha256':hashlib.sha256(data).hexdigest()})
-    manifest = {'version':1, 'source_sha256':SOURCE_HASHES, 'names':list(names), 'parts':parts,
-                'packed_sha256':hashlib.sha256(packed).hexdigest(),
-                'pixels_sha256':{name:hashlib.sha256(data).hexdigest() for name,data in pixels.items()},
-                'authoring_pillow_version':__version__, 'atlas_rects':ATLAS_RECTS,
-                'encoding':'base64 parts of one zlib stream; ordered 512x512 RGBA8 uploads',
-                'processing':'LANCZOS encoding/UV atlas packing of unchanged imagegen originals; no synthesized artwork'}
-    (ASSETS / 'props-encoded.json').write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n')
+    for stem, names, filename in (('textures', BASE_NAMES, 'encoded.json'),
+                                   ('props', (*PROP_NAMES, *DERIVED_NAMES), 'props-encoded.json')):
+        pixels = {name:images[name].tobytes() for name in names}
+        packed = zlib.compress(b''.join(pixels.values()), 9)
+        parts = []
+        for index, start in enumerate(range(0, len(packed), PART_BYTES), 1):
+            data = packed[start:start + PART_BYTES]
+            name = f'{stem}.zlib.{index:03}.b64'
+            (ASSETS / name).write_bytes(base64.b64encode(data))
+            parts.append({'name':name, 'bytes':len(data), 'sha256':hashlib.sha256(data).hexdigest()})
+        manifest = {'version':1, 'source_sha256':({name:SOURCE_HASHES[name] for name in BASE_NAMES}
+                                                  if stem == 'textures' else SOURCE_HASHES),
+                    'names':list(names), 'parts':parts,
+                    'packed_sha256':hashlib.sha256(packed).hexdigest(),
+                    'pixels_sha256':{name:hashlib.sha256(data).hexdigest() for name,data in pixels.items()},
+                    'authoring_pillow_version':__version__,
+                    'encoding':'base64 parts of one zlib stream; ordered 512x512 RGBA8 uploads',
+                    'processing':'Lossless RGBA encoding and existing UV atlas packing of the recorded source PNGs'}
+        if stem == 'props':
+            manifest['atlas_rects'] = ATLAS_RECTS
+        (ASSETS / filename).write_text(json.dumps(manifest, indent=2, sort_keys=True) + '\n')
     encoded_pixels.cache_clear()
 
 
@@ -391,3 +404,4 @@ if __name__ == '__main__':
         import native_market
         resources = native_market.read_bundle(Path(__file__).parents[1] / 'native_market/bundled')
         args.audit_output.write_text(json.dumps(audit_manifest(resources),indent=2,sort_keys=True) + '\n')
+

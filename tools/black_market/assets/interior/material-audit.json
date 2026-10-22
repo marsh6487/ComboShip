@@ -1013,17 +1013,17 @@
   "retained_resources": 125,
   "routing": "All original render/combine/alpha/cull commands preserved; every uploaded pixel opaque. Native TEX_EDGE materials remain TEX_EDGE, with no added XLU routing.",
   "source_png_sha256": {
-    "bronze": "88b328e79785411d4774186427db01c84a520aa5e670b511bd093ee38d493d0a",
-    "celestial": "3d7180a9d4be05b4e32c04ae714a9c4d1faedbec04e250cc8226e0aa295ec235",
-    "ceramic": "ddd8ff5f0820253dfda4e74b7a8bb21419c01f7c8c4e53d2317a9288e1aff492",
-    "cloth": "e1131499422a20291753a6a127c26dbec2bdb83184a2a07f6d78e183d14451da",
-    "curios": "a41a95e9e25ce409578eb0f021ebac14459c767b0aaa4b2b570d26245836716a",
-    "herbs": "c369e794d2baa820ae6ec728a0647c3a9c0b8f4cf671e9607fc04b48e2d5046d",
-    "liquid": "ff268814d6c3661ad4ee7b61caa822ab65df47977746a351480a5d3e4de269f7",
-    "plaster": "473f242489a01fd820cd2db294e59222a6cc78b4cc81d258c8ca196d362e28d2",
-    "slate": "c27db9c549aa645290c2b16234e102544d6dbf7b7116f00b81957e5949556499",
-    "timber": "01bd1e0497cff4a69c9c6f14d1369598bd7abf2174adeacb1b210ef17c1d6599",
-    "wicker": "1d011ff044338bc4e8aa8d1b0dc9cf06a638201afad5df422fa20b3827f59a5e"
+    "bronze": "c5d17c93cb7c79a2d5fdda77cd5791220bef417fae24b85881d9427e2176ec62",
+    "celestial": "da370b831378ac8cdea60c3e7890324e80e6c72a6a1f4143e17c05db0aa1356f",
+    "ceramic": "a01ed02e1ea1c108c3a74790bbf6e8481c590e7c26be106a811b60ad0f1ef6be",
+    "cloth": "93ecac406f9238a7756a0a901619f3b9f5173b2f4217bc7fac0a5172a87d73bf",
+    "curios": "2ffe56c06fa7f81cd94ad3e0dd302c6e8cc5b56f3fbd5cafb1c46f10f8be3c90",
+    "herbs": "8d5e3c2f546745b171cf8f48a3a9d82f90613fa01106ba8ff6f1b5ca2f1e66f7",
+    "liquid": "22ab45941f50f8963e24cf1fd34fb2f4b9bd3d36336a4998a0f304e76b59df32",
+    "plaster": "aef51704902f9144fb88d3492667fc143ee77c976a192bae2a7cdb0d76688b84",
+    "slate": "e91d3c7ef5d1e78dabaadf138d76db2cd6b74c3ca7e3dca0890fd2b4d4e408db",
+    "timber": "62dc29aef9b2e4b0194a5c2ce25e1bff79139deb2ab3e9a74642555d9207ec7c",
+    "wicker": "52cd841c267cfcfc41598c1122b4de32c854aa68f90e8cdf5135e53665079ea8"
   },
   "source_poc14_sha256": "3ac1432d0e8f75e51f08892739a13e16762bb4d820a2bbc7a35469af1db872e2",
   "texture_resources": [
