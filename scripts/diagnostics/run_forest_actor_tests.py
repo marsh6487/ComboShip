@@ -81,6 +81,9 @@ def main():
         bodies = '\n'.join(function(public, name) for name in
                            ['ComboSaria_IsParam', 'ComboSaria_Init', 'ComboSaria_Destroy', 'ComboSaria_Update', 'ComboSaria_Draw'])
         fixture = (ROOT/'mm/tests/placed_saria_lifecycle_test.cpp').read_text()
+        receipt = (ROOT/'mm/2s2h/Rando/ItemReceiptText.cpp').read_text()
+        fixture = fixture.replace('/* PRODUCTION_RECEIPT_FINALIZER */',
+                                  function(receipt, 'Rando::AppendReceiptSource'))
         (work/'lifecycle.cpp').write_text(fixture.replace('/* PRODUCTION_SARIA_RUNTIME */',
             function(runtime, 'DrawShimmer') + 'namespace {\n' + core + function(runtime, 'SpawnForestSaria') + function(runtime, 'SpawnForestEpona') + '}\n' + bodies))
         run('c++', '-std=c++20', *flags[1:], work/'lifecycle.cpp', '-ldl', '-lm', '-o', work/'lifecycle')

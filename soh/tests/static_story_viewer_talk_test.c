@@ -7,8 +7,16 @@
 void EnViewerStatic_OfferTalk(EnViewer* viewer, PlayState* play);
 SaveContext gSaveContext;
 u32 gBitFlags[32];
+#ifdef COMBO_BUILD
+/* The cross-boss service is outside the dialogue test; keep native progression. */
+int Combo_SOH_CrossBossLogicalClear(int id, int nativeValue) {
+    (void)id;
+    return nativeValue;
+}
+#endif
 static unsigned processCalls, offerCalls, stateCalls, advanceCalls, closeCalls, flagCalls;
 static bool acceptTalk;
+static bool advanceTalk;
 static u8 messageState = TEXT_STATE_NONE;
 static f32 offeredDistance;
 u32 Actor_ProcessTalkRequest(Actor* actor, PlayState* play) {
@@ -32,7 +40,7 @@ u8 Message_GetState(MessageContext* msgCtx) {
 u8 Message_ShouldAdvance(PlayState* play) {
     (void)play;
     advanceCalls++;
-    return 0;
+    return advanceTalk;
 }
 void Message_CloseTextbox(PlayState* play) {
     (void)play;
@@ -79,5 +87,44 @@ int main(void) {
     REQUIRE(viewer.skin.skelAnime.animation == &seatedAnimation && viewer.staticState.pose == 0);
     REQUIRE(viewer.actor.world.pos.x == 10 && viewer.actor.world.pos.y == 123 && viewer.actor.world.pos.z == 30);
     REQUIRE(viewer.actor.shape.rot.y == 12000);
+
+    /* Every talkable cutscene-actor entry must acknowledge EVENT and preserve
+     * its authored pose. Ordinary dialogue must not enter an item grant path. */
+    unsigned checked = 0;
+    for (int type = 0; type < STATIC_STORY_ACTOR_MAX; ++type) {
+        if (!StaticStoryActor_CanTalk(type)) {
+            continue;
+        }
+        memset(&viewer, 0, sizeof(viewer));
+        viewer.staticState.type = type;
+        viewer.staticState.pose = 1;
+        viewer.skin.skelAnime.animation = &seatedAnimation;
+        viewer.actor.world.pos = (Vec3f){ 10, 123, 30 };
+        viewer.actor.shape.rot.y = 12000;
+        acceptTalk = false;
+        advanceTalk = false;
+        messageState = TEXT_STATE_NONE;
+        const unsigned offered = offerCalls;
+        EnViewerStatic_OfferTalk(&viewer, &play);
+        REQUIRE(viewer.actor.textId != 0 && offerCalls == offered + 1);
+        REQUIRE(!viewer.staticState.talking);
+        acceptTalk = true;
+        EnViewerStatic_OfferTalk(&viewer, &play);
+        REQUIRE(viewer.staticState.talking);
+        messageState = TEXT_STATE_EVENT;
+        const unsigned closed = closeCalls;
+        EnViewerStatic_OfferTalk(&viewer, &play);
+        REQUIRE(viewer.staticState.talking && closeCalls == closed);
+        advanceTalk = true;
+        EnViewerStatic_OfferTalk(&viewer, &play);
+        REQUIRE(closeCalls == closed + 1 && !viewer.staticState.talking && !viewer.staticState.tracking);
+        REQUIRE(viewer.staticState.interactInfo.talkState == NPC_TALK_STATE_IDLE);
+        REQUIRE(viewer.skin.skelAnime.animation == &seatedAnimation && viewer.staticState.pose == 1);
+        REQUIRE(viewer.actor.world.pos.x == 10 && viewer.actor.world.pos.y == 123 && viewer.actor.world.pos.z == 30);
+        REQUIRE(viewer.actor.shape.rot.y == 12000);
+        ++checked;
+    }
+    REQUIRE(checked > 0);
+    printf("PASS cutscene-actor talk: %u catalog entries offer, wait, acknowledge EVENT and preserve pose\n", checked);
     return 0;
 }

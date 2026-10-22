@@ -1,5 +1,6 @@
 #include "global.h"
 #include "gameplay/ComboFaroresWind.h"
+#include "gameplay/CrossGameTitleCard.h"
 
 #ifdef COMBO_BUILD
 #include "soh/Enhancements/game-interactor/GameInteractor_Hooks.h"
@@ -11,12 +12,24 @@ extern s32 gComboReturnFileNum;
 extern int32_t Combo_SOH_ConsumeCrossDungeonArrival(void);
 extern int32_t Combo_SOH_ConsumeCrossBossRecoveryResume(void);
 void SOH_ApplyComboPortalArrival(int allowPlacement);
+static s32 sComboCrossGameTitleCardPending = false;
+
+int Combo_SOH_HasCrossGameTitleCard(void) {
+    return sComboCrossGameTitleCardPending;
+}
+
+int Combo_SOH_ConsumeCrossGameTitleCard(void) {
+    const s32 pending = sComboCrossGameTitleCardPending;
+    sComboCrossGameTitleCardPending = false;
+    return pending;
+}
 #endif
 
 void TitleSetup_InitImpl(GameState* gameState) {
     osSyncPrintf("ゼルダ共通データ初期化\n"); // "Zelda common data initalization"
     SaveContext_Init();
 #ifdef COMBO_BUILD
+    sComboCrossGameTitleCardPending = false;
     if (gComboReturnFileNum >= 0) {
         // Combo MM->OOT return: mirror FileChoose_LoadGame (z_file_choose.c) to load the OOT save and
         // jump directly to Play, then override the entrance so Link spawns in the Market outside the
@@ -49,6 +62,10 @@ void TitleSetup_InitImpl(GameState* gameState) {
         // pending intro (0xFFF1), which would shift Play_Init's entrance lookup onto a garbage layer.
         gSaveContext.cutsceneIndex = 0;
         ComboFw_ApplyArrival(); // Queued Farore recall overrides the fixed portal arrival.
+        // Cross-game arrivals bypass file select and may use positioned/grotto
+        // respawns. Request the final destination's native place card once.
+        gSaveContext.showTitleCard = true;
+        sComboCrossGameTitleCardPending = true;
         gComboReturnFileNum = -1;
         gameState->running = false;
         SET_NEXT_GAMESTATE(gameState, Play_Init, PlayState);

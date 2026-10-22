@@ -17,6 +17,7 @@ static bool sComboPortalArrivalPending = false;
 static bool sComboReturnPending, sComboFwReturnPending, sComboResetReturnPending, sComboOwlSaveQuitPending;
 static int sComboReturnPortalRoute, sComboPassageFade, sComboPassageFileNum;
 static bool sComboOpeningReturnArmed;
+extern "C" void ComboWoodfallPassage_Reset(void) {} // separately covered by Woodfall geometry tests
 PlayState* gPlayState;
 GameState* gGameState;
 static bool sRememberLocation;

@@ -1,6 +1,11 @@
 #include "global.h"
 #include "message_data_static.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
+#include "2s2h/CustomItem/CustomItem.h"
+#include "2s2h/Enhancements/Gameplay/ComboForestActors.h"
+#include <nlohmann/json.hpp>
+#include "2s2h/Rando/Rando.h"
+#include "2s2h/Rando/ItemReceiptText.h"
 #include "ComboCapeReceiptChoice.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include <cassert>
@@ -20,6 +25,8 @@ static Player player;
 static bool customText;
 static u16 customId;
 static std::string customBody;
+static bool sariaReceipt;
+static CustomMessage::Entry shownReceipt;
 constexpr u16 kText = 0x8F28, kTeachText = 0x8F29, kTaughtText = 0x8F2A;
 extern "C" f32 sNESFontWidths[160];
 extern "C" const char* fontTbl[156];
@@ -35,6 +42,12 @@ static auto sariaHook = /* SARIA_HOOK */;
 extern "C" void GameInteractor_ExecuteOnOpenText(u16* textId, bool* fromTable) {
     if (!customText)
         return;
+    if (sariaReceipt) {
+        assert(*textId == CUSTOM_MESSAGE_ID);
+        CustomMessage::LoadCustomMessageIntoFont(shownReceipt);
+        *fromTable = false;
+        return;
+    }
     if (*textId >= kText && *textId <= kTaughtText) {
         sariaHook(textId, fromTable);
     } else {
@@ -58,7 +71,7 @@ extern "C" int32_t CVarGetInteger(const char*, int32_t defaultValue) { return de
 
 static GameInteractor interactor;
 GameInteractor* GameInteractor::Instance = &interactor;
-static void GiveSariaSong(Actor*, PlayState*) {}
+static void GiveSariaSong(Actor*, PlayState*);
 static void DrawSariaSong(Actor*, PlayState*) {}
 /* SARIA_QUEUE */
 struct TalkingState { bool talking, teaching; };
@@ -228,6 +241,8 @@ static void TestFontWriteBounds() {
     puts("PASS native font writer: both valid edge slots, negative/oversize slots and invalid banks");
 }
 
+/* SARIA_RECEIPT */
+
 int main() {
     play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
     gPlayState = &play;
@@ -254,5 +269,6 @@ int main() {
     TestFontWriteBounds();
     TestSariaEventAdvance();
     TestTeachingClosure();
+    TestSariaRewardReceipt();
     puts("PASS actual Saria hook/formatter and native message opening/decoding; no game execution");
 }

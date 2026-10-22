@@ -155,6 +155,10 @@ def read_scene(data, oot=False):
         start = reader.offset
         if kind in (0, 1, 14, 27):
             reader.skip(reader.take('I') * 16)
+        elif kind == 2:
+            for _ in range(reader.take('I')):
+                reader.take('H')
+                reader.skip(reader.take('H') * 6)
         elif kind in (3, 26):
             reader.text()
         elif kind == 4:
@@ -188,6 +192,8 @@ def read_scene(data, oot=False):
             count = reader.take('I')
             reader.take('H')
             reader.skip(count * 10)
+        elif kind == 30:
+            reader.skip(reader.take('I') * 10)
         elif kind == 31:
             for _ in range(reader.take('B')):
                 reader.text()

@@ -102,6 +102,8 @@ void CheckMesh(bool green) {
         if (green) {
             const unsigned r = (vertex.rgb >> 16) & 255, g = (vertex.rgb >> 8) & 255, b = vertex.rgb & 255;
             assert(g >= r && g > b);
+        } else {
+            assert(vertex.rgb == 0x581880 || vertex.rgb == 0xFFFFFF);
         }
     }
 }
@@ -165,7 +167,7 @@ int main() {
     ActorEntry spawn{}; play.linkActorEntry = &spawn;
     gSaveContext.gameMode = GAMEMODE_NORMAL; gSaveContext.fileNum = 0;
     gSaveContext.save.entrance = ENTRANCE(LOST_WOODS, 0);
-    Reset(); DrawPortalFinish(); CheckMesh(true);
+    Reset(); DrawPortalFinish(); CheckMesh(false);
     const Vec3f anchor = ComboOpeningForest_ReturnAnchor(&play);
     assert(origin.x == anchor.x && origin.y == anchor.y && origin.z == anchor.z);
     assert(EqualMesh(submitted, ForestGiParticles::Portal(play.gameplayFrames, false, basis)));
@@ -177,10 +179,10 @@ int main() {
     shape.cullable.entries = &portalEntry;
     play.roomCtx.curRoom.roomShape = &shape;
     assert(ComboOpeningForest_ReturnPackVersion(&play) == 9);
-    Reset(); DrawPortalFinish(); CheckMesh(true);
+    Reset(); DrawPortalFinish(); CheckMesh(false);
     assert(EqualMesh(submitted, ForestGiParticles::Portal(play.gameplayFrames, false, basis)));
     authoredPortal = true;
-    Reset(); DrawPortalFinish(); CheckMesh(true);
+    Reset(); DrawPortalFinish(); CheckMesh(false);
     assert(EqualMesh(submitted, ForestGiParticles::Portal(play.gameplayFrames, true, basis)));
     play.roomCtx.curRoom.roomShape = nullptr;
     Reset(); DrawWoodsMysteryHexes(); CheckMesh(true);
@@ -198,13 +200,13 @@ int main() {
     Reset(); DrawWoodsMysteryHexes(); assert(!submissions);
     puts("PASS both production bridges: exact NEI entrance-face meshes, legacy/authored sizes, pause/cutscene and solo/combined ownership guards");
 #else
-    Reset(); DrawForestPortal(); CheckMesh(true);
+    Reset(); DrawForestPortal(); CheckMesh(false);
     assert(origin.x == COMBO_SOLO_FOREST_STUMP_X && origin.z == COMBO_SOLO_FOREST_STUMP_Z);
     assert(std::fabs(yaw - COMBO_SOLO_FOREST_STUMP_YAW * (6.28318530718f / 65536)) < .001f);
-    nativePortal = true; Reset(); DrawForestPortal(); CheckMesh(true);
+    nativePortal = true; Reset(); DrawForestPortal(); CheckMesh(false);
     for (size_t i = 0; i < submitted.count; ++i)
         assert(std::fabs(submitted.vertices[i].p.x) < 49 && submitted.vertices[i].p.y < 114);
-    authoredPortal = true; Reset(); DrawForestPortal(); CheckMesh(true);
+    authoredPortal = true; Reset(); DrawForestPortal(); CheckMesh(false);
     assert(EqualMesh(submitted, ForestGiParticles::Portal(play.gameplayFrames, true, basis)));
     for (int blocked = 0; blocked < 4; ++blocked) {
         visit = blocked != 0; safe = blocked != 1;

@@ -11,6 +11,7 @@ struct Scene {
     ActorEntry* spawn;
     ActorCutscene* cutscenes;
     s16 count;
+    bool hasCutsceneCommand = true;
 };
 } // namespace SOH
 
@@ -27,7 +28,8 @@ extern "C" void Play_InitEnvironment(PlayState*, s16) {
 }
 s32 OTRScene_ExecuteCommands(PlayState* play, SOH::Scene* scene) {
     play->linkActorEntry = scene->spawn;
-    CutsceneManager_Init(play, scene->cutscenes, scene->count);
+    if (scene->hasCutsceneCommand)
+        CutsceneManager_Init(play, scene->cutscenes, scene->count);
     return 0;
 }
 extern "C" Actor* Actor_SpawnAsChildAndCutscene(ActorContext*, PlayState*, s16 id, f32 x, f32 y, f32 z, s16 rx, s16 ry,
@@ -50,6 +52,39 @@ int main() {
     SOH::Scene scene{ &resourceSpawn, nullptr, 0 };
     play.sceneSegment = &scene;
 #ifdef COMBO_BUILD
+    // Replay the shipped private forest header, including its missing 0x1B.
+    // A cold OoT handoff starts with no MM scene; a later recall can leave a
+    // different scene's camera manager behind. Both must bind this scene.
+    ActorEntry forestSpawn = /* FOREST_SPAWN */;
+    SOH::Scene forest{&forestSpawn, nullptr, 0, /* FOREST_HAS_CUTSCENES */};
+    PlayState previous{};
+    ActorCutscene previousList[1]{};
+    for (int entry = 0; entry < 2; ++entry) {
+        if (entry == 0)
+            sCutsceneMgr.play = nullptr;
+        else
+            CutsceneManager_Init(&previous, previousList, 1);
+        sWaitingCutsceneList[0] = sNextCutsceneList[0] = 255;
+        play.sceneSegment = &forest;
+        play.sceneId = SCENE_LOST_WOODS;
+        OTRPlay_InitScene(&play, 0);
+        assert(sCutsceneMgr.play == &play &&
+               "private forest must initialize its camera manager before native camera setup");
+        assert(sSceneCutsceneCount == 0 && sWaitingCutsceneList[0] == 0 && sNextCutsceneList[0] == 0);
+        play.mainCamera.camId = CAM_ID_MAIN;
+        play.mainCamera.eye = {10, 20, 30};
+        CutsceneManager_StoreCamera(&play.mainCamera);
+        assert(sCutsceneMgr.isCameraStored && play.subCameras[2].eye.y == 20 &&
+               play.subCameras[2].status == CAM_STATUS_INACTIVE);
+    }
+    // A normal scene's own cutscene command must replace the empty default.
+    SOH::Scene nativeScene{&resourceSpawn, previousList, 1};
+    play.sceneSegment = &nativeScene;
+    OTRPlay_InitScene(&play, 0);
+    assert(sSceneCutsceneList == previousList && sSceneCutsceneCount == 1 && !sCutsceneMgr.isCameraStored);
+    play.sceneSegment = &scene;
+    puts("PASS private forest cold OoT arrival and recalled scene: real camera storage, fresh cutscene queues and "
+         "native-header override");
     // Entry and repeated entry use the exact bundled/legacy archive row for
     // every native MM form. This used to read address 0x4 during assignment.
     for (int cycle = 0; cycle < 3; ++cycle) {

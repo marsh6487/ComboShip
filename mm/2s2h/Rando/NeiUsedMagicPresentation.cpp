@@ -186,3 +186,15 @@ extern "C" void NeiUsedMagic_DrawPortal(PlayState* play, Player* player, float s
     NeiGi_DrawMesh(play, NeiUsedMagic::SamplePortal(play->gameplayFrames, scale, alpha, NeiGi_CameraBasis(play)));
     NeiGi_DrawTexturedMesh(play, NeiUsedMagic::SamplePortalSurface(play->gameplayFrames, scale, alpha), kFireMaterial);
 }
+extern "C" void NeiUsedMagic_DrawMirrorCast(PlayState* play, Player* player, float scale, float alpha) {
+    if (!play || !player || !Position(&player->actor.world.pos) || scale <= 0 || alpha <= 0)
+        return;
+    Vec3f origin = player->actor.world.pos;
+    origin.y += 1;
+    const MatrixScope matrix(origin);
+    constexpr auto palette = NeiUsedMagic::PortalPalette::Forest;
+    NeiGi_DrawMesh(play,
+                   NeiUsedMagic::SamplePortal(play->gameplayFrames, scale, alpha, NeiGi_CameraBasis(play), palette));
+    NeiGi_DrawTexturedMesh(play, NeiUsedMagic::SamplePortalSurface(play->gameplayFrames, scale, alpha, palette),
+                           kFireMaterial);
+}

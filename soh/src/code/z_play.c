@@ -35,6 +35,7 @@
 #include "soh/Enhancements/audio/AudioEditor.h"
 #include "soh/Enhancements/Gameplay/ComboBlackMarketNative.h"
 #include "soh/Enhancements/Gameplay/ComboSoloForest.h"
+#include "soh/Enhancements/Gameplay/ComboLostWoodsFountain.h"
 extern int Combo_SOH_CompleteCrossDungeonTransition(void);
 extern void Combo_SOH_CancelCrossDungeonTransition(void);
 #endif
@@ -413,6 +414,7 @@ void Play_Init(GameState* thisx) {
 #ifdef COMBO_BUILD
     ComboBlackMarketOot_NormalizeEntry();
     ComboSoloForestOot_NormalizeEntry();
+    ComboLostWoodsFountain_NormalizeEntry();
 #endif
     enableBetaQuest();
 

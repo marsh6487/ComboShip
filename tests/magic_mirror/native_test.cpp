@@ -30,6 +30,9 @@ static bool alternateModel;
 static int animationStarts, idleRestores;
 static int mirrorDraws, worldShimmerDraws, matrixDepth;
 static Vec3f mirrorOrigin;
+static int auraDraws;
+static float auraScale, auraAlpha;
+static Vec3f auraOrigin;
 static int handoffs, prompts, pickups, errors, saves;
 static u32 seed = 77;
 static u16 buttonItem;
@@ -39,10 +42,31 @@ static int closed;
 static bool nativeMessages;
 static void TestMessageSfx() {}
 #include "native_message.inc.h"
-static bool noFloor, obstructed;
+static bool noFloor, obstructed, capUnavailable;
 static float floorY;
 static CollisionPoly landingFloor;
-extern "C" f32 BgCheck_EntityRaycastFloor3(CollisionContext*, CollisionPoly** poly, s32* bg, Vec3f*) {
+extern "C" f32 BgCheck_EntityRaycastFloor3(CollisionContext* context, CollisionPoly** poly, s32* bg, Vec3f* point) {
+    // Resolve the fixture's real cap triangles instead of treating the entire
+    // world as one flat floor. This exercises footprint support at a moved cap.
+    const auto* header = context->colHeader;
+    if (!noFloor && !capUnavailable && header) {
+        for (int i = 0; i < header->numPolygons; ++i) {
+            auto& candidate = header->polyList[i];
+            const auto a = header->vtxList[candidate.vtxData[0] & 0x1FFF];
+            const auto b = header->vtxList[candidate.vtxData[1] & 0x1FFF];
+            const auto c = header->vtxList[candidate.vtxData[2] & 0x1FFF];
+            const float d = float(b.x - a.x) * (c.z - a.z) - float(b.z - a.z) * (c.x - a.x);
+            if (std::fabs(d) < .001f || a.y > point->y)
+                continue;
+            const float u = ((point->x - a.x) * (c.z - a.z) - (point->z - a.z) * (c.x - a.x)) / d;
+            const float v = ((b.x - a.x) * (point->z - a.z) - (b.z - a.z) * (point->x - a.x)) / d;
+            if (u >= -.0001f && v >= -.0001f && u + v <= 1.0001f) {
+                *poly = &candidate;
+                *bg = BGCHECK_SCENE;
+                return a.y;
+            }
+        }
+    }
     *poly = noFloor ? nullptr : &landingFloor;
     *bg = BGCHECK_SCENE;
     return noFloor ? BGCHECK_Y_MIN : floorY;
@@ -65,6 +89,12 @@ bool AlternateModel() { return alternateModel; }
 bool TimedActivity() { return false; }
 bool QueuePickup(int) { ++pickups; return true; }
 void DrawWorldShimmer(PlayState*) { ++worldShimmerDraws; }
+void DrawCastAura(PlayState *, Player *current, float scale, float alpha) {
+    ++auraDraws;
+    auraOrigin = current->actor.world.pos;
+    auraScale = scale;
+    auraAlpha = alpha;
+}
 void OpenPrompt() {
     ++prompts;
     SetText(0x3FEC);
@@ -259,11 +289,13 @@ void Reset() {
     alternateModel = false;
     animationStarts = idleRestores = 0;
     mirrorDraws = worldShimmerDraws = matrixDepth = 0;
+    auraDraws = 0;
+    auraScale = auraAlpha = 0;
     handoffs = prompts = pickups = errors = saves = 0;
     closed = 0; advance = false; textState = TEXT_STATE_NONE;
     nativeMessages = false;
     buttonItem = EXT_ITEM_MAGIC_MIRROR;
-    noFloor = obstructed = false;
+    noFloor = obstructed = capUnavailable = false;
     floorY = 0;
     landingFloor = {};
     landingFloor.normal.y = 32767;
@@ -590,13 +622,12 @@ void TestArrival() {
         MagicMirror_PrepareArrival(&play);
         assert(play.linkActorEntry != &original);
         assert(std::memcmp(&original, &copy, sizeof(original)) == 0);
-        assert(play.linkActorEntry->pos.x == 1500 && play.linkActorEntry->pos.y == 240 &&
-               play.linkActorEntry->pos.z == -1420);
-        assert(!MagicMirrorAnchor::CanClaim({1500, 240, -1420}, {1500, 320, -1300}));
+        assert(play.linkActorEntry->pos.x == 1500 && play.linkActorEntry->pos.y == 320 &&
+               play.linkActorEntry->pos.z == -1300);
 #ifdef MIRROR_OOT
-        assert(play.linkActorEntry->rot.y == 0);
+        assert(play.linkActorEntry->rot.y == 0x4000);
 #else
-        assert(((play.linkActorEntry->rot.y >> 7) & 0x1FF) == 0 && (play.linkActorEntry->rot.y & 127) == 127);
+        assert(((play.linkActorEntry->rot.y >> 7) & 0x1FF) == 90 && (play.linkActorEntry->rot.y & 127) == 127);
 #endif
         assert(std::memcmp(&gSaveContext.respawn, &respawns.respawn, sizeof(respawns.respawn)) == 0);
         MagicMirror_FinishArrival(&play);
@@ -614,7 +645,13 @@ void TestArrival() {
     ActorEntry original{}; play.linkActorEntry = &original;
     MagicMirror_PrepareArrival(&play);
     assert(play.linkActorEntry != &original && play.linkActorEntry->pos.x == -1500 &&
-           play.linkActorEntry->pos.z == 1380);
+           play.linkActorEntry->pos.y == 400 && play.linkActorEntry->pos.z == 1500);
+    // A blocked/missing cap retains the existing checked ground fallback.
+    Reset(); MagicMirror_QueueArrival(); LoadForest(-377, 80, 416);
+    capUnavailable = true; play.linkActorEntry = &original;
+    MagicMirror_PrepareArrival(&play);
+    assert(play.linkActorEntry != &original && play.linkActorEntry->pos.x == -377 &&
+           play.linkActorEntry->pos.y == 0 && play.linkActorEntry->pos.z == 296);
     // Slot/seed/mode/scene mismatches, cutscenes, absent floor and walls fail closed.
     for (int reason = 0; reason < 8; ++reason) {
         Reset(); MagicMirror_QueueArrival(); LoadForest(-377, 80, 416);
@@ -816,8 +853,7 @@ int main() {
            (player.stateFlags1 & MirrorRuntime::kPromptFreeze));
     player.bodyPartsPos[PLAYER_BODYPART_HEAD] = {10, 60, 30};
     MirrorRuntime::DrawWorld();
-    assert(mirrorDraws ==
-           0); // The item appears when the hands rise, not during the windup.
+    assert(mirrorDraws == 0 && auraDraws == 0); // Cast starts without an overhead item or an instant full aura.
     const auto castSave = gSaveContext;
     // New presses cannot reopen the prompt or restart/skip the committed
     // motion.
@@ -826,6 +862,8 @@ int main() {
          ++tick) {
       player.actionFunc(&player, &play);
       MirrorRuntime::Update();
+      MirrorRuntime::DrawWorld();
+      assert(mirrorDraws == 0); // Even the raised-hands finish is ritual energy only.
       if (MagicMirrorPlayer_State(&player) != MAGIC_MIRROR_CAST_READY)
         assert(play.transitionTrigger == TRANS_TRIGGER_OFF);
     }
@@ -833,15 +871,23 @@ int main() {
            animationStarts == 1);
     assert(MagicMirrorPlayer_State(&player) == MAGIC_MIRROR_CAST_READY);
     MirrorRuntime::DrawWorld();
-    assert(mirrorDraws == 1 && matrixDepth == 0);
-    assert(mirrorOrigin.x == 10 && mirrorOrigin.y > 60 && mirrorOrigin.z == 30);
+    assert(mirrorDraws == 0 && auraDraws > 0 && matrixDepth == 0);
+    assert(auraScale > 0.9f && auraAlpha > 200 && auraOrigin.x == player.actor.world.pos.x);
     alternateModel = true;
     player.actor.world.pos = {100, 20, -50};
     MirrorRuntime::DrawWorld();
-    assert(mirrorDraws == 2 && worldShimmerDraws == 0 && matrixDepth == 0);
-    assert(mirrorOrigin.x == 100 && mirrorOrigin.y > 80 &&
-           mirrorOrigin.z == -50);
+    assert(mirrorDraws == 0 && worldShimmerDraws == 0 && matrixDepth == 0);
+    assert(auraOrigin.x == 100 && auraOrigin.y == 20 && auraOrigin.z == -50);
     alternateModel = false;
+    const float fullAlpha = auraAlpha;
+    MirrorRuntime::Update();
+    MirrorRuntime::DrawWorld();
+    assert(auraAlpha > 0 && auraAlpha < fullAlpha);
+    for (int tick = 0; tick < 12; ++tick)
+        MirrorRuntime::Update();
+    const int fadedDraws = auraDraws;
+    MirrorRuntime::DrawWorld();
+    assert(auraDraws == fadedDraws && mirrorDraws == 0);
     assert(std::memcmp(&castSave.respawn, &gSaveContext.respawn,
                        sizeof(castSave.respawn)) == 0);
 #ifdef MIRROR_OOT
@@ -856,6 +902,8 @@ int main() {
     MirrorRuntime::Reset();
     assert(idleRestores == 1 &&
            !(player.stateFlags1 & MirrorRuntime::kPromptFreeze));
+    MirrorRuntime::DrawWorld();
+    assert(auraDraws == fadedDraws); // No sampled cast energy survives cancellation or teardown.
     Reset();
     gComboGameMode = COMBO_GAME_BOTH;
     ConfirmCast();
@@ -998,7 +1046,7 @@ int main() {
     Reset(); owned = false; MirrorRuntime::Bind(&play); token = MirrorRuntime::BeginPickup();
     MirrorRuntime::FinishPickup(token); assert(owned && saves == 1);
     MirrorRuntime::FinishPickup(token); assert(saves == 1);
-    puts("PASS native mirror: committed Farore cast, overhead item, fade hold, "
+    puts("PASS native mirror: unchanged Farore cast, sampled ritual aura without overhead item, fade hold, "
          "safe cancellation/teardown, preserved magic/respawns, travel and "
          "pickup");
 }

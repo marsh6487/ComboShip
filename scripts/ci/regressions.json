@@ -75,10 +75,22 @@
     "run": "python3 -B scripts/diagnostics/run_spin_gi_tests.py\npython3 -B scripts/diagnostics/run_spin_gi_tests.py --sanitize"
   },
   {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Dedicated Lost Woods vertical scrolling and native binding preservation",
+    "run": "python3 -B tests/lost_woods_entrance/run_vertical_scroll_tests.py"
+  },
+  {
     "suite": "entrances",
     "origin": "gate",
     "name": "Native cross-game entrance sequencing and forest arrival",
     "run": "C_INCLUDE_PATH=/usr/include/SDL2 python3 -B scripts/diagnostics/run_receipt_syntax_tests.py mm/src/code/z_play.c soh/src/code/z_play.c\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/transition_fade_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/cross_dungeon/oot_cold_blue_warp_behavior_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/run_mm_camera_arrival_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/opening_forest_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/portal_save_test.py --sanitize\nASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/mm3d_pack_test.py --sanitize"
+  },
+  {
+    "suite": "entrances",
+    "origin": "gate",
+    "name": "Conditional Lost Woods Great Fairy return",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/run_fountain_return_tests.py --sanitize"
   },
   {
     "suite": "entrances",

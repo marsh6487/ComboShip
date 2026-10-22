@@ -69,6 +69,7 @@ void GiveSariaSong(Actor* actor, PlayState*) {
     entry.textboxType = TEXTBOX_TYPE_2;
     entry.icon = Rando::StaticData::GetIconForZMessage(RI_SONG_SARIA);
     Rando::ApplyItemReceiptText(RI_SONG_SARIA, entry);
+    Rando::AppendReceiptSource(entry, "");
     if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE)
         CustomMessage::SetActiveCustomMessage(entry.msg, entry);
     else
@@ -263,8 +264,9 @@ void SpawnForestEpona() {
     sHorseSpawnAttempted = true;
     // Use portal coordinates so angled/older portal packs keep the horse on
     // the opposite flank. Leave the doorway and its forward approach clear.
-    const float lateral = sariaLateral <= 0.0f ? 145.0f : -145.0f;
-    constexpr float depth = -90.0f;
+    const float lateral =
+        sariaLateral <= 0.0f ? ForestActorPlacements::kHorseLateral : -ForestActorPlacements::kHorseLateral;
+    constexpr float depth = ForestActorPlacements::kFlankDepth;
     Vec3f pos = { anchor.x + lateral * cosine + depth * sine, anchor.y + 120.0f,
                   anchor.z - lateral * sine + depth * cosine };
     CollisionPoly* poly = nullptr;

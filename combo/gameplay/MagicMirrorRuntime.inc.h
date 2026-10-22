@@ -21,6 +21,7 @@ static PlayState* sCastPlay = nullptr;
 static Player* sCastPlayer = nullptr;
 static bool sDeparted = false;
 static unsigned sCastTicks = 0;
+static unsigned sDepartureTick = 0;
 // Arrival owns no old PlayState/player pointer and survives departure teardown.
 static Context sArrivalContext;
 static bool sArrivalPending = false;
@@ -67,6 +68,7 @@ void ReleaseCast() {
     sCastPlayer = nullptr;
     sDeparted = false;
     sCastTicks = 0;
+    sDepartureTick = 0;
 }
 
 int Scene(const PlayState* play) {
@@ -338,17 +340,19 @@ bool ArrivalDestination(const PlayState* play) {
 }
 
 bool Landing(PlayState* play, Vec3s& position, s16& yaw) {
-    // Beside the stump, clear of its cap and even Goron's body.
-    // Prefer the south side; try the other sides if Prelude moved it near a wall.
-    constexpr int offsets[][2] = { { 0, -120 }, { 85, -85 }, { 120, 0 },  { 85, 85 },
-                                   { 0, 120 },  { -85, 85 }, { -120, 0 }, { -85, -85 } };
+    // Prefer the center of the actual placed cap, facing the ramp. Retain the
+    // checked ground fallbacks if a scene edit obstructs or removes its top.
+    constexpr int offsets[][2] = { { 0, 0 },   { 0, -120 }, { 85, -85 }, { 120, 0 },  { 85, 85 },
+                                   { 0, 120 }, { -85, 85 }, { -120, 0 }, { -85, -85 } };
     for (const auto& offset : offsets) {
+        const bool cap = offset[0] == 0 && offset[1] == 0;
         Vec3f point{ std::round(sAnchor.x) + offset[0], sAnchor.y + 1, std::round(sAnchor.z) + offset[1] };
         CollisionPoly* floor = nullptr;
         s32 bgId = BGCHECK_SCENE;
         const float height = BgCheck_EntityRaycastFloor3(&play->colCtx, &floor, &bgId, &point);
         if (!std::isfinite(height) || !floor || bgId != BGCHECK_SCENE || floor->normal.y < 30000 ||
-            height > sAnchor.y - 1 || height < sAnchor.y - 220 || height <= BGCHECK_Y_MIN)
+            (cap ? std::abs(height - sAnchor.y) > 1 : height > sAnchor.y - 1) || height < sAnchor.y - 220 ||
+            height <= BGCHECK_Y_MIN)
             continue;
         point.y = std::ceil(height);
         if (std::abs(point.x) > 32700 || std::abs(point.y) > 32700 || std::abs(point.z) > 32700)
@@ -379,7 +383,7 @@ bool Landing(PlayState* play, Vec3s& position, s16& yaw) {
         if (!clear)
             continue;
         position = { static_cast<s16>(point.x), static_cast<s16>(point.y), static_cast<s16>(point.z) };
-        const float angle = std::atan2(sAnchor.x - point.x, sAnchor.z - point.z);
+        const float angle = cap ? 3.14159265359f / 2 : std::atan2(sAnchor.x - point.x, sAnchor.z - point.z);
 #ifdef COMBO_MAGIC_MIRROR_MM
         const int degrees = (static_cast<int>(std::round(angle * (180.0f / 3.14159265359f))) + 360) % 360;
         yaw = static_cast<s16>((degrees << 7) | 127); // native packed yaw + no actor cutscene
@@ -452,6 +456,8 @@ void Update() {
             ReleaseCast();
         } else if (!sDeparted && MagicMirrorPlayer_State(sCastPlayer) == MAGIC_MIRROR_CAST_READY) {
             sDeparted = Travel(play, true);
+            if (sDeparted)
+                sDepartureTick = sCastTicks;
             MirrorHost::Trace(sDeparted ? "travel-requested" : "travel-rejected", play);
             if (!sDeparted) {
                 ReleaseCast();
@@ -543,18 +549,13 @@ void Update() {
 void DrawWorld() {
     auto* play = gPlayState;
     if (play && Mode() && Matches(play) && play == sCastPlay && GET_PLAYER(play) == sCastPlayer &&
-        MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PLAYING && sCastPlayer->skelAnime.curFrame >= 40) {
-        auto head = sCastPlayer->bodyPartsPos[PLAYER_BODYPART_HEAD];
-        if (MirrorHost::AlternateModel()) {
-            head = sCastPlayer->actor.world.pos;
-            head.y += 60; // Mario hides Link's skeleton; its head joints can be stale.
-        }
-        Matrix_Push();
-        Matrix_Translate(head.x, head.y + 28, head.z, MTXMODE_NEW);
-        Matrix_ReplaceRotation(&play->billboardMtxF);
-        Matrix_Scale(0.65f, 0.65f, 0.65f, MTXMODE_APPLY);
-        ComboMagicMirrorVisual::Draw(play);
-        Matrix_Pop();
+        MagicMirrorPlayer_State(sCastPlayer) >= MAGIC_MIRROR_CAST_PLAYING) {
+        // Keep Farore's exact motion. The established Time Gate seal/wisps
+        // build around the actor, then dissolve during departure; no GI model.
+        const float rise = std::clamp(sCastPlayer->skelAnime.curFrame / 20.0f, 0.0f, 1.0f);
+        const float fade = sDeparted ? std::clamp(1.0f - (sCastTicks - sDepartureTick) / 12.0f, 0.0f, 1.0f) : 1.0f;
+        if (rise > 0 && fade > 0)
+            MirrorHost::DrawCastAura(play, sCastPlayer, 0.15f + 0.85f * rise, 255.0f * rise * fade);
     }
     if (!play || !Mode() || !Forest(play) || play->roomCtx.curRoom.num != 0 || MagicMirror_IsOwned() || sPickupToken ||
         !Locate(play))

@@ -9,7 +9,7 @@ float Distance(NeiGi::Point a, NeiGi::Point b) {
 
 // Only center and uniform size may differ from the actual NEI item twinkle.
 void CheckCanonical(const NeiGi::Mesh& mesh, uint32_t frame, int motes, float scale,
-                    const NeiGi::Basis& camera, NeiGi::Kind kind = NeiGi::Kind::Leaf) {
+                    const NeiGi::Basis& camera, NeiGi::Kind kind = NeiGi::Kind::Leaf, uint32_t tint = 0) {
     constexpr size_t vertices = 72;
     assert(mesh.count == size_t(motes) * vertices && "must use complete NEI twinkles, without added hexes");
     assert(mesh.count <= mesh.vertices.size());
@@ -22,7 +22,8 @@ void CheckCanonical(const NeiGi::Mesh& mesh, uint32_t frame, int motes, float sc
             const auto& actual = mesh.vertices[i * vertices + j];
             const auto& expected = reference.vertices[(i % 5) * vertices + j];
             assert(Distance((actual.p - origin) * (1.f / scale), expected.p - oldOrigin) < .0001f);
-            assert(actual.rgb == expected.rgb && actual.alpha == expected.alpha);
+            const auto rgb = tint && expected.rgb == NeiGi::ColorHex(kind) ? tint : expected.rgb;
+            assert(actual.rgb == rgb && actual.alpha == expected.alpha);
             assert(std::isfinite(actual.p.x) && std::isfinite(actual.p.y) && std::isfinite(actual.p.z));
         }
     }
@@ -59,7 +60,8 @@ int main() {
             }
             for (bool packed : { false, true }) {
                 const auto mesh = ForestGiParticles::Portal(frame, packed, camera);
-                CheckCanonical(mesh, frame, ForestGiParticles::kPortalMotes, .8f, camera);
+                CheckCanonical(mesh, frame, ForestGiParticles::kPortalMotes, .8f, camera,
+                               NeiGi::Kind::Shadow, 0x581880);
                 CheckFaceCoverage(mesh, packed ? 68.f : 44.f, packed ? 14.f : 8.f);
             }
             const auto mystery = ForestGiParticles::Mystery(frame, camera);

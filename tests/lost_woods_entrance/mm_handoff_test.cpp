@@ -35,6 +35,12 @@ GameState* gGameState;
 extern "C" void ComboForestArrivalCamera_Queue(int) {}
 static PlayState play{};
 static Player player{};
+static bool woodfallPassage;
+extern "C" void ComboWoodfallPassage_Reset(void) {}
+extern "C" int ComboWoodfallPassage_AtReturn(PlayState* current, const Vec3f*) {
+    return woodfallPassage && current && current->sceneId == SCENE_21MITURINMAE &&
+           current->roomCtx.curRoom.num == 0;
+} // floor/wall services are exercised with the production endpoint in woodfall_geometry_test.cpp
 static int saves, switches, recordedRoute, kind, fwCaptures;
 static void require(bool condition, const char* message) {
     if (!condition) { std::fprintf(stderr, "FAIL: %s\n", message); std::exit(1); }

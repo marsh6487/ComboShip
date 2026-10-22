@@ -15,7 +15,7 @@ class BundledSceneTests(unittest.TestCase):
         spec=importlib.util.spec_from_file_location('prepare_native_forest',ROOT/'scripts/assets/prepare_native_forest.py')
         prepare=importlib.util.module_from_spec(spec);spec.loader.exec_module(prepare)
         manifest=ROOT/'tools/native_forest/manifest.json'
-        resources=prepare.verified_resources(manifest)
+        resources=prepare.prepared_resources(manifest)
         receipt=json.loads(manifest.read_text())
         self.assertEqual(receipt['status'],'generated')
         self.assertEqual(receipt['native_stock_rooms'],3)

@@ -8,6 +8,7 @@
 SaveContext gSaveContext;
 static int gComboReturnFileNum = 1;
 static int sComboReturnPortalRoute = COMBO_PORTAL_LOST_WOODS;
+static s32 sComboCrossGameTitleCardPending;
 static int loadHooks, exitHooks;
 static int crossArrival = -1, bossRecovery = -1, fwArrival = -1;
 static int fallbackLookups;

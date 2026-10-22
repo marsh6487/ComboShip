@@ -1954,6 +1954,12 @@ bool VerifyArchiveVersion(OTRVersion version) {
 extern "C" void (*gComboSceneSwitchCallback)(int fileNum);
 static int sComboFwSwitchSlot = -1;
 static int sComboMirrorSwitchSlot = -1;
+static int sComboWoodfallPassageSlot = -1;
+
+extern "C" int SOH_WoodfallPassageActive(PlayState* play) {
+    return Combo_IsCombinedGame() && play && play->sceneNum == SCENE_LOST_WOODS && play->roomCtx.curRoom.num == 7 &&
+           sComboWoodfallPassageSlot >= 0 && sComboWoodfallPassageSlot == gSaveContext.fileNum;
+}
 extern "C" void SOH_QueueFwHandoff(int slot) {
     sComboFwSwitchSlot = slot;
 }
@@ -2265,6 +2271,7 @@ static void Combo_FinishInit() {
             sComboSwitchFileNum = -1;
             sComboSwitchPortalRoute = COMBO_PORTAL_MARKET;
             sComboMirrorSwitchSlot = -1;
+            sComboWoodfallPassageSlot = -1;
         };
         GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>(cancelComboPassage);
         GameInteractor::Instance->RegisterGameHook<GameInteractor::OnExitGame>([](int32_t) {
@@ -2292,7 +2299,9 @@ static void Combo_FinishInit() {
             const Vec3f& pos = player->actor.world.pos;
             const bool openingForest = ComboLostWoods_InOotFairyTunnel(
                 gPlayState->sceneNum, gPlayState->roomCtx.curRoom.num, pos.x, pos.y, pos.z);
-            if (!openingForest &&
+            const bool woodfall = ComboLostWoods_InOotWoodfallTunnel(
+                gPlayState->sceneNum, gPlayState->roomCtx.curRoom.num, pos.x, pos.y, pos.z);
+            if (!openingForest && !woodfall &&
                 !ComboLostWoods_InOotTunnel(gPlayState->sceneNum, gPlayState->roomCtx.curRoom.num, pos.x, pos.y, pos.z))
                 return;
             if (!sComboSetMmPortalRoute)
@@ -2300,7 +2309,10 @@ static void Combo_FinishInit() {
             if (!sComboSetMmPortalRoute)
                 return;
             sComboSwitchFileNum = (int)gSaveContext.fileNum;
-            sComboSwitchPortalRoute = openingForest ? COMBO_PORTAL_OPENING_FOREST : COMBO_PORTAL_LOST_WOODS;
+            sComboSwitchPortalRoute = woodfall        ? COMBO_PORTAL_WOODFALL
+                                      : openingForest ? COMBO_PORTAL_OPENING_FOREST
+                                                      : COMBO_PORTAL_LOST_WOODS;
+            sComboWoodfallPassageSlot = woodfall ? sComboSwitchFileNum : -1;
             sComboPassageFade = 1;
         });
 
@@ -2366,7 +2378,9 @@ static void Combo_FinishInit() {
                 Combo_SOH_CapturePendingChecks();
             }
             Combo_FlushDormantAccumulators(); // Bank pending fills before saving either switch path.
-            if ((isFwReturn || ComboLostWoods_IsOpeningForestRoute(sComboSwitchPortalRoute)) && gPlayState)
+            if ((isFwReturn || sComboSwitchPortalRoute == COMBO_PORTAL_WOODFALL ||
+                 ComboLostWoods_IsOpeningForestRoute(sComboSwitchPortalRoute)) &&
+                gPlayState)
                 Play_PerformSave(gPlayState); // Capture live scene flags and native save/equipment bookkeeping.
             else
                 SaveManager::Instance->SaveFile(sComboSwitchFileNum);
@@ -2378,6 +2392,7 @@ static void Combo_FinishInit() {
             if (sComboSetMmPortalRoute)
                 sComboSetMmPortalRoute(sComboSwitchPortalRoute);
             sComboSwitchPortalRoute = COMBO_PORTAL_MARKET;
+            sComboWoodfallPassageSlot = -1;
             if (gGameState) {
                 gGameState->running = false;
             }
@@ -4522,6 +4537,7 @@ extern "C" void SOH_ApplyComboPortalArrival(int allowPlacement) {
     if (!ComboLostWoods_IsForestRoute(sComboReturnPortalRoute))
         return;
     const bool openingForest = sComboReturnPortalRoute == COMBO_PORTAL_OPENING_FOREST;
+    const bool woodfall = sComboReturnPortalRoute == COMBO_PORTAL_WOODFALL;
     sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
     if (!allowPlacement)
         return; // Consume a stale forest route without replacing a composed arrival's respawn.
@@ -4533,10 +4549,12 @@ extern "C" void SOH_ApplyComboPortalArrival(int allowPlacement) {
     RespawnData* arrival = &gSaveContext.respawn[RESPAWN_MODE_RETURN];
     *arrival = {};
     arrival->entranceIndex = gSaveContext.entranceIndex;
-    arrival->roomIndex = openingForest ? 1 : 0;
-    arrival->pos = openingForest ? Vec3f{ 800.0f, 0.0f, 160.0f } : Vec3f{ 0.0f, 0.0f, -280.0f };
-    arrival->yaw = openingForest ? (s16)0x8000 : 0; // into the clearing, away from the relevant trigger
-    arrival->playerParams = 0x0EFF;                 // native slow walk out, no fixed background camera
+    arrival->roomIndex = woodfall ? 7 : openingForest ? 1 : 0;
+    arrival->pos = woodfall        ? Vec3f{ 1780.0f, 0.0f, -2400.0f }
+                   : openingForest ? Vec3f{ 800.0f, 0.0f, 160.0f }
+                                   : Vec3f{ 0.0f, 0.0f, -280.0f };
+    arrival->yaw = woodfall ? -16384 : openingForest ? (s16)0x8000 : 0; // into the clearing, away from the trigger
+    arrival->playerParams = 0x0EFF; // native slow walk out, no fixed background camera
     arrival->data = 1;
     gSaveContext.respawnFlag = 2;
 }

@@ -77,12 +77,15 @@ void Update() {
         auto* beacon = Find(play, kViewer, kSaria);
         const float dx = beacon ? beacon->world.pos.x - COMBO_SOLO_FOREST_STUMP_X : side.x;
         const float dz = beacon ? beacon->world.pos.z - COMBO_SOLO_FOREST_STUMP_Z : side.z;
-        const float lateral = dx * cosine - dz * sine <= 0 ? 145.0f : -145.0f;
-        ensure(2, ACTOR_EN_HORSE, kHorse, COMBO_SOLO_FOREST_STUMP_X + lateral * cosine - 90.0f * sine,
-               COMBO_SOLO_FOREST_STUMP_Z - lateral * sine - 90.0f * cosine, 0,
+        const float lateral =
+            dx * cosine - dz * sine <= 0 ? ForestActorPlacements::kHorseLateral : -ForestActorPlacements::kHorseLateral;
+        ensure(2, ACTOR_EN_HORSE, kHorse,
+               COMBO_SOLO_FOREST_STUMP_X + lateral * cosine + ForestActorPlacements::kFlankDepth * sine,
+               COMBO_SOLO_FOREST_STUMP_Z - lateral * sine + ForestActorPlacements::kFlankDepth * cosine, 0,
                static_cast<s16>(COMBO_SOLO_FOREST_STUMP_YAW + 0x8000));
     } else {
-        ensure(4, kViewer, kSkullKid, 2200, 200, 35, -0x5000);
+        ensure(4, kViewer, kSkullKid, ForestActorPlacements::kSkullKidX, ForestActorPlacements::kSkullKidZ,
+               ForestActorPlacements::kSkullKidLift, ForestActorPlacements::kSkullKidYaw);
     }
 }
 void OpenText(uint16_t*, bool* loadFromTable) {

@@ -13,10 +13,12 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path[:0] = [str(ROOT / "scripts/diagnostics"), str(ROOT / "tools/black_market")]
+sys.path[:0] = [str(ROOT / "scripts/diagnostics"), str(ROOT / "tools/black_market"),
+               str(ROOT / "scripts/assets")]
 from run_time_pedestal_tests import block_from, functions
 import native_forest
 import native_market
+import prepare_native_forest
 
 
 def main():
@@ -28,11 +30,16 @@ def main():
     eventmgr = (ROOT / "mm/src/code/z_eventmgr.c").read_text()
     play = (ROOT / "mm/src/code/z_play.c").read_text()
     actors = (ROOT / "mm/src/code/z_actor.c").read_text()
+    camera = (ROOT / "mm/src/code/z_camera.c").read_text()
+    forest = prepare_native_forest.verified_resources(prepare_native_forest.DEFAULT_MANIFEST)
+    forest_commands = native_forest.read_scene(forest[native_forest.COMBINED])
+    forest_spawn = native_forest.read_actor_list(forest_commands[0])[0]
     declarations = eventmgr[eventmgr.index("typedef enum {"):eventmgr.index("s16 CutsceneManager_SetHudVisibility(")]
     body = declarations + "\n"
     body += block_from(eventmgr, eventmgr.index("ActorCutscene sGlobalCutsceneList[]")) + ";\n"
-    for name in ("CutsceneManager_Init", "CutsceneManager_GetCutsceneEntryImpl", "CutsceneManager_GetCutsceneEntry"):
+    for name in ("CutsceneManager_Init", "CutsceneManager_StoreCamera", "CutsceneManager_GetCutsceneEntryImpl", "CutsceneManager_GetCutsceneEntry"):
         body += functions(eventmgr, {name})[name] + "\n"
+    body += functions(camera, {"Camera_ChangeStatus"})["Camera_ChangeStatus"] + "\n"
     body += block_from(play, play.index("s16 sPlayerCsIdToCsCamId[]")) + ";\n"
     # Compile any local startup helper with its real COMBO_BUILD guard. The
     # unmodified baseline has no helper and reproduces the supplied null read.
@@ -51,6 +58,10 @@ def main():
     fixture = fixture.replace("/* RESOURCE_SPAWN */", "{" + ",".join(map(str, spawn[:1])) + ",{" +
                               ",".join(map(str, spawn[1:4])) + "},{" + ",".join(map(str, spawn[4:7])) +
                               "}," + str(spawn[7]) + "}")
+    fixture = fixture.replace("/* FOREST_SPAWN */", "{" + str(forest_spawn[0]) + ",{" +
+                              ",".join(map(str, forest_spawn[1:4])) + "},{" +
+                              ",".join(map(str, forest_spawn[4:7])) + "}," + str(forest_spawn[7]) + "}")
+    fixture = fixture.replace("/* FOREST_HAS_CUTSCENES */", str(0x1b in forest_commands).lower())
     includes = ("mm", "mm/2s2h", "mm/include", "mm/include/PR", "mm/src", "mm/assets",
                 "libultraship/include", "combo")
     with tempfile.TemporaryDirectory(prefix="market-scene-spawn-") as temporary:
