@@ -55,8 +55,8 @@ inline std::string Mm(Page page, const Offer& offer, const std::string& result, 
         // Keep the two native choice lines together on MM's three-line pages.
         const auto pageBreak = text.find_last_of('\x10');
         const auto lineBreak = text.find_last_of('\x11');
-        const bool titleWrapped = lineBreak != std::string::npos &&
-                                  (pageBreak == std::string::npos || lineBreak > pageBreak);
+        const bool titleWrapped =
+            lineBreak != std::string::npos && (pageBreak == std::string::npos || lineBreak > pageBreak);
         text += titleWrapped ? "\x10\x11" : "\x11"; // Native arrows target rows two and three.
         text += '\x02'; // Native green; append raw choices after UTF-8 conversion/page break.
         text += "\xC2I'll buy it\x11No thanks\xBF";
@@ -70,8 +70,8 @@ inline std::string Mm(Page page, const Offer& offer, const std::string& result, 
             text = "Welcome to the Black Market.&Left / Right: browse items&\x9F Browse   \xA0 Leave";
             break;
         case Page::Browse:
-            text = "%r" + offer.name + ": " + std::to_string(offer.price) + " Rupees%w&" + Status(offer) +
-                   "&(" + std::to_string(offer.slot + 1) + "/8) \x9F Select   \xA0 Back";
+            text = "%r" + offer.name + ": " + std::to_string(offer.price) + " Rupees%w&" + Status(offer) + "&(" +
+                   std::to_string(offer.slot + 1) + "/8) \x9F Select   \xA0 Back";
             break;
         case Page::Result:
             text = Result(offer, result);
@@ -91,8 +91,8 @@ inline std::string Mm(Page page, const Offer& offer, const std::string& result, 
 // places the choices on lines three/four and wraps localized item metadata.
 inline std::string Oot(Page page, const Offer& offer, const std::string& result, int language) {
     const char* currency = language == 1 ? "Rubine" : language == 2 ? "Rubis" : "Rupees";
-    const std::string title = "\x08" + offer.color + offer.name + "%w  %y" + std::to_string(offer.price) + "_" +
-                              currency + "%w";
+    const std::string title =
+        "\x08" + offer.color + offer.name + "%w  %y" + std::to_string(offer.price) + "_" + currency + "%w";
     switch (page) {
         case Page::Unavailable:
             return "My wares aren't ready yet.&Come back soon!";
@@ -100,7 +100,9 @@ inline std::string Oot(Page page, const Offer& offer, const std::string& result,
             return "Welcome to the Black Market.&Left / Right: browse items&\x9F Browse   \xA0 Leave\x0B";
         case Page::Confirm:
             return title + "\x09\x1B%g" +
-                   (language == 1 ? "Kaufen&Nicht kaufen" : language == 2 ? "Acheter&Ne pas acheter" : "Buy&Don't buy") +
+                   (language == 1   ? "Kaufen&Nicht kaufen"
+                    : language == 2 ? "Acheter&Ne pas acheter"
+                                    : "Buy&Don't buy") +
                    "%w\x09";
         case Page::Result:
             return Result(offer, result) + "\x0B";

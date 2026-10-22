@@ -15,9 +15,9 @@ inline constexpr int16_t kYaw = 0;
 inline constexpr int16_t kMmPackedYaw = 127; // zero degrees, CS_ID_NONE
 inline constexpr int16_t kMmActorId = 5;
 inline constexpr int16_t kOotActorId = 9;
-inline constexpr int16_t kMmParams = 7; // WHOLE_DAY, all half-days
+inline constexpr int16_t kMmParams = 7;    // WHOLE_DAY, all half-days
 inline constexpr int16_t kOotParams = 384; // DOOR_SCENEEXIT
-inline constexpr int16_t kFarExitZ = 440; // behind the leaf; floor ends at 458
+inline constexpr int16_t kFarExitZ = 440;  // behind the leaf; floor ends at 458
 
 template <bool Oot, class Play> const TransitionActorEntry* Entry(const Play* play) {
     if (!play || play->roomCtx.curRoom.num != 0)
@@ -34,9 +34,8 @@ template <bool Oot, class Play> const TransitionActorEntry* Entry(const Play* pl
     if (!entries || count != 1)
         return nullptr;
     const auto& entry = entries[0];
-    if ((entry.id != ACTOR_EN_DOOR && entry.id != -ACTOR_EN_DOOR) ||
-        entry.sides[0].room != 0 || entry.sides[1].room != -1 ||
-        entry.pos.x != kX || entry.pos.y != kY || entry.pos.z != kZ ||
+    if ((entry.id != ACTOR_EN_DOOR && entry.id != -ACTOR_EN_DOOR) || entry.sides[0].room != 0 ||
+        entry.sides[1].room != -1 || entry.pos.x != kX || entry.pos.y != kY || entry.pos.z != kZ ||
         entry.rotY != (Oot ? kYaw : kMmPackedYaw) || entry.params != (Oot ? kOotParams : kMmParams))
         return nullptr;
     return &entry;
@@ -69,7 +68,6 @@ template <bool Oot, class Play> const Actor* Live(const Play* play) {
 template <bool Oot, class Play> bool WalkExit(const Play* play, const Vec3f& position) {
     // A normal native door leaf has no solid collision. Do not fire the old
     // trigger in front of its Open prompt, or strand a walk-through behind it.
-    return ComboBlackMarket_AtExit(position.x, position.y, position.z) &&
-           (!Live<Oot>(play) || position.z >= kFarExitZ);
+    return ComboBlackMarket_AtExit(position.x, position.y, position.z) && (!Live<Oot>(play) || position.z >= kFarExitZ);
 }
 } // namespace BlackMarketExitDoor

@@ -709,8 +709,7 @@ int main() {
     SpawnForestEpona();
     const float flipped = (spawned.world.pos.x - portal.x) * std::cos(portalAngle) -
                           (spawned.world.pos.z - portal.z) * std::sin(portalAngle);
-    CHECK(std::fabs(flipped + 120) < .01 &&
-          spawned.shape.rot.y == ComboOpeningForest_ReturnYaw(&play) &&
+    CHECK(std::fabs(flipped + 120) < .01 && spawned.shape.rot.y == ComboOpeningForest_ReturnYaw(&play) &&
           std::memcmp(&beforeHorseSave, &gSaveContext, sizeof(beforeHorseSave)) == 0);
     // Solo MM has its own forest copy and owns Saria's asset snapshot locally.
     play.actorCtx.actorLists[ACTORCAT_NPC].first = nullptr;

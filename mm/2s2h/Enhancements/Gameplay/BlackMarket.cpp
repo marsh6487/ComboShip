@@ -374,8 +374,10 @@ void MarketText(u16* textId, bool* fromTable) {
     if (!Active() ||
         (*textId != kBrowseText && *textId != kResultText && *textId != kWelcomeText && *textId != kConfirmText))
         return;
-    const Page page = *textId == kWelcomeText ? Page::Welcome : *textId == kConfirmText ? Page::Confirm :
-                      *textId == kResultText ? Page::Result : Page::Browse;
+    const Page page = *textId == kWelcomeText   ? Page::Welcome
+                      : *textId == kConfirmText ? Page::Confirm
+                      : *textId == kResultText  ? Page::Result
+                                                : Page::Browse;
     BlackMarketText::Offer offer;
     if (page != Page::Welcome) {
         offer.item = Offer(sSelected);
@@ -409,8 +411,8 @@ void MarketText(u16* textId, bool* fromTable) {
 void DrawSeal(PlayState* play, const BlackMarketVisual::Frame& frame, bool selected) {
     using namespace BlackMarketVisual;
     const auto mesh = BuildLock(frame, play->gameplayFrames, selected);
-    if (!mesh.valid || !BlackMarketGraphicsArena::HasRoom(play->state.gfxCtx,
-                                                        kLockVertices * sizeof(Vtx) + sizeof(Mtx), 8, 64))
+    if (!mesh.valid ||
+        !BlackMarketGraphicsArena::HasRoom(play->state.gfxCtx, kLockVertices * sizeof(Vtx) + sizeof(Mtx), 8, 64))
         return;
     auto* vertices = (Vtx*)GRAPH_ALLOC(play->state.gfxCtx, kLockVertices * sizeof(Vtx));
     if (!vertices)

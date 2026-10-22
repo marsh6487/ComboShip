@@ -275,8 +275,7 @@ void SpawnForestEpona() {
     const float floor = BgCheck_EntityRaycastFloor5(&play->colCtx, &poly, &bgId, nullptr, &pos);
     if (!poly || !std::isfinite(floor) || floor <= BGCHECK_Y_MIN)
         return;
-    Actor_Spawn(&play->actorCtx, play, ACTOR_EN_HORSE, pos.x, floor, pos.z, 0, yaw, 0,
-                COMBO_FOREST_EPONA_PARAMS);
+    Actor_Spawn(&play->actorCtx, play, ACTOR_EN_HORSE, pos.x, floor, pos.z, 0, yaw, 0, COMBO_FOREST_EPONA_PARAMS);
 }
 
 void RegisterSaria() {

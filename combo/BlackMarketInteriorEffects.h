@@ -8,8 +8,9 @@
 
 namespace BlackMarketInteriorEffects {
 // Audited retained liquid circles: tri0, tri18 (two mouths), and tri16.
-inline constexpr std::array<Vec3f, 4> kPotMouths{ { { 73, 37, 48 }, { -91, 51, 24 },
-                                                  { 118, 45, 243 }, { 118, 40, 333 } } };
+inline constexpr std::array<Vec3f, 4> kPotMouths{
+    { { 73, 37, 48 }, { -91, 51, 24 }, { 118, 45, 243 }, { 118, 40, 333 } }
+};
 // Prepared stand-only vertex translations preserve each bowl/shaft/foot shape:
 // right +(-55,0,213), left +(29,0,213). The original bundle stays unchanged.
 // Asymmetric gaps clear the retained cabinets, pots and hanging baskets, plus
@@ -24,7 +25,8 @@ alignas(2) inline constexpr char kMmSmoke[] = "__OTR__objects/gameplay_keep/gEff
 alignas(2) inline constexpr char kOotSmoke[] = "__OTR__objects/gameplay_keep/gDust1Tex";
 inline constexpr int kPuffsPerPot = 12, kPuffCount = kPuffsPerPot * kPotMouths.size();
 inline constexpr size_t kFrameTailBytes = ((sizeof(Vtx) * kPuffCount * 4 + 15) & ~size_t(15)) +
-    ((sizeof(Mtx) * 3 + 15) & ~size_t(15)) + 2 * ((sizeof(Gfx) * 12 + 15) & ~size_t(15));
+                                          ((sizeof(Mtx) * 3 + 15) & ~size_t(15)) +
+                                          2 * ((sizeof(Gfx) * 12 + 15) & ~size_t(15));
 inline constexpr size_t kXluCommands = 256;
 struct Puff {
     Vec3f center;
@@ -39,10 +41,11 @@ inline Puff Vapor(int pot, int puff, uint32_t frame) {
     const float age = (frame % 120 + puff * 10 + pot * 17) % 120;
     const auto mouth = kPotMouths[pot];
     const float fade = std::max(0.f, std::min({ 1.f, age / 12, (120 - age) / 30 }));
-    return { { mouth.x + std::sin(age * .07f + pot) * 1.3f,
-               mouth.y + 1 + age * .95f,
+    return { { mouth.x + std::sin(age * .07f + pot) * 1.3f, mouth.y + 1 + age * .95f,
                mouth.z + std::sin(age * .055f + pot * 2) * .9f },
-             6 + age * .035f, 18 + age * .08f, uint8_t(72 * fade) };
+             6 + age * .035f,
+             18 + age * .08f,
+             uint8_t(72 * fade) };
 }
 
 inline void Draw(PlayState* play, bool defaultInterior, bool oot) {
@@ -67,9 +70,9 @@ inline void Draw(PlayState* play, bool defaultInterior, bool oot) {
         return;
     std::array<Gfx*, 2> scrolling;
     for (int torch = 0; torch < 2; ++torch) {
-        scrolling[torch] = Gfx_TwoTexScrollEx(gfx, 0, 0, 0, 32, 64, 1, 0,
-                                             (uint32_t(0) - (play->gameplayFrames + torch * 17) * 20) & 511,
-                                             32, 128, 0, 0, 0, -20);
+        scrolling[torch] =
+            Gfx_TwoTexScrollEx(gfx, 0, 0, 0, 32, 64, 1, 0,
+                               (uint32_t(0) - (play->gameplayFrames + torch * 17) * 20) & 511, 32, 128, 0, 0, 0, -20);
         if (!scrolling[torch])
             return;
     }
@@ -130,8 +133,8 @@ inline void Draw(PlayState* play, bool defaultInterior, bool oot) {
     gSPClearGeometryMode(head++, G_LIGHTING | G_FOG | G_CULL_BOTH | G_TEXTURE_GEN | G_TEXTURE_GEN_LINEAR);
     gSPSetGeometryMode(head++, G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH);
     gSPTexture(head++, 0xffff, 0xffff, 0, G_TX_RENDERTILE, G_ON);
-    gDPLoadTextureBlock(head++, oot ? kOotSmoke : kMmSmoke, G_IM_FMT_I, G_IM_SIZ_8b, 32, 32, 0,
-                        G_TX_CLAMP, G_TX_CLAMP, 5, 5, G_TX_NOLOD, G_TX_NOLOD);
+    gDPLoadTextureBlock(head++, oot ? kOotSmoke : kMmSmoke, G_IM_FMT_I, G_IM_SIZ_8b, 32, 32, 0, G_TX_CLAMP, G_TX_CLAMP,
+                        5, 5, G_TX_NOLOD, G_TX_NOLOD);
     gSPMatrix(head++, transforms + 2, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
     for (int puff = 0; puff < kPuffCount; ++puff) {
         const auto& p = puffs[puff];

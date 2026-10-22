@@ -154,8 +154,8 @@ void Setup_InitImpl(SetupState* this) {
         // File select normally initializes showTitleCard. A crossing bypasses
         // it, and may land at a positioned/shuffled entrance without a card bit.
         // Ordinary save resumes keep the native rules, including saved recovery.
-        sComboCrossGameTitleCardPending = !gComboEntryIsResume || crossDungeonArrival >= 0 || crossBossRecovery >= 0 ||
-                                         crossFwArrival;
+        sComboCrossGameTitleCardPending =
+            !gComboEntryIsResume || crossDungeonArrival >= 0 || crossBossRecovery >= 0 || crossFwArrival;
         if (sComboCrossGameTitleCardPending)
             gSaveContext.showTitleCard = true;
 

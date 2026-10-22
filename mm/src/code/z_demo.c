@@ -1555,7 +1555,7 @@ void Cutscene_HandleEntranceTriggers(PlayState* play) {
     // Consume before the opening-forest bypass and native cutscene handling:
     // neither a hidden nor untitled arrival may leak into a later room/respawn.
     s32 crossGameTitleCard = Combo_MM_ConsumeCrossGameTitleCard() && gSaveContext.sceneLayer == 0 &&
-                            gSaveContext.gameMode == GAMEMODE_NORMAL && gSaveContext.save.cutsceneIndex < 0xFFF0;
+                             gSaveContext.gameMode == GAMEMODE_NORMAL && gSaveContext.save.cutsceneIndex < 0xFFF0;
 
 #ifdef COMBO_BUILD
     if (ComboOpeningForest_IsExploration(play))
@@ -1596,10 +1596,9 @@ void Cutscene_HandleEntranceTriggers(PlayState* play) {
     if (crossGameTitleCard || (gSaveContext.respawnFlag == 0) || (gSaveContext.respawnFlag == -2)) {
         scene = play->loadedScene;
         if ((scene->titleTextId != 0) && GameInteractor_Should(VB_SHOW_TITLE_CARD, gSaveContext.showTitleCard)) {
-            if (crossGameTitleCard ||
-                (Entrance_GetTransitionFlags(((void)0, gSaveContext.save.entrance) +
-                                            ((void)0, gSaveContext.sceneLayer)) &
-                 0x4000) != 0) {
+            if (crossGameTitleCard || (Entrance_GetTransitionFlags(((void)0, gSaveContext.save.entrance) +
+                                                                   ((void)0, gSaveContext.sceneLayer)) &
+                                       0x4000) != 0) {
                 Message_DisplaySceneTitleCard(play, scene->titleTextId);
             }
         }
