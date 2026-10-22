@@ -47,10 +47,15 @@
       "path": "tools/black_market/assets/interior/curios.png",
       "sha": "bcf1219a13fb6ce693237f48e391fa25c2f524d7",
       "bytes": 513861
+    },
+    {
+      "path": "tools/black_market/assets/interior/liquid.png",
+      "sha": "1ea1ababffcb1a11b089d0e10549ec6c570717e2",
+      "bytes": 457982
     }
   ],
   "source_format": "512x512 RGB PNGs; lossless PNG compression after the existing LANCZOS runtime-size conversion. Original built-in imagegen outputs are preserved separately.",
   "publication": "Sequential per-file uploads. Verify every returned Git blob SHA before advancing. Runtime bundles will use small individually verified compressed parts.",
   "preservation": "Geometry, UV layout, actor behavior, render routing and native title/door code remain unchanged.",
-  "remaining": "2 material textures, packed data publication, identity metadata and final verification."
+  "remaining": "1 material textures, packed data publication, identity metadata and final verification."
 }
