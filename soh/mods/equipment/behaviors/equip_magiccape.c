@@ -410,7 +410,7 @@ static void MagicCape_UpdateVertices(void) {
 // Draw cape (adapted from EnGanonMant_DrawCloak + EnGanonMant_Draw)
 // ---------------------------------------------------------------------------
 static void MagicCape_Draw(Player* player, PlayState* play) {
-    if (!sCapeInitialized)
+    if (!sCapeInitialized || (player->stateFlags2 & PLAYER_STATE2_DISABLE_DRAW))
         return;
     // Skip cape rendering while riding Epona (and other special states): the player skeleton
     // is in horse pose, shoulder limbs land in unexpected positions, and the cape produces
@@ -583,9 +583,11 @@ static void MagicCape_Behavior(Player* player, PlayState* play) {
         return;
     }
 
-    // Skip during cutscenes
-    if (player->stateFlags1 &
-        (PLAYER_STATE1_DEAD | PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_LOADING | PLAYER_STATE1_IN_ITEM_CS)) {
+    // Hidden player draws do not refresh the shoulders; snap cloth to the current
+    // anchors on reveal, just as after a cutscene.
+    if ((player->stateFlags2 & PLAYER_STATE2_DISABLE_DRAW) ||
+        (player->stateFlags1 &
+         (PLAYER_STATE1_DEAD | PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_LOADING | PLAYER_STATE1_IN_ITEM_CS))) {
         if (sCapeInitialized) {
             MagicCape_Reset();
         }
