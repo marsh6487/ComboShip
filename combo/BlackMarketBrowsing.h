@@ -16,14 +16,13 @@ struct View {
 inline View Target(int slot) {
     if (slot < 0)
         return { { 0, 76, 196 }, { 0, 61, 86 }, 46 };
-    // EnOssan turns 30 degrees to each shelf. These taller, compact flat
-    // banks need the farther eye to keep both rows above the Y142 textbox;
-    // translate it sideways so that the native turn still faces the actual
-    // bank center rather than looking past it. Geometry/slot order stay fixed.
-    constexpr float bankX = 52.5f, eyeZ = 300, shelfZ = 110;
-    constexpr float eyeX = bankX - (eyeZ - shelfZ) * .57735026919f; // tan(30 degrees)
+    // Turn from the accepted close customer eye, like native EnOssan's
+    // authored fixed-eye shop camera. Pitch follows the selected row rather
+    // than backing the camera behind Link to fit both rows simultaneously.
+    // The focused row and its cursor/seal clear the native bottom textbox.
+    constexpr float shelfZ = 110, bankX = (196 - shelfZ) * .57735026919f; // tan(30 degrees)
     const float side = slot < 4 ? 1.0f : -1.0f;
-    return { { side * eyeX, 80, eyeZ }, { side * bankX, 52, shelfZ }, 64 };
+    return { { 0, 76, 196 }, { side * bankX, slot & 1 ? 98.f : 38.f, shelfZ }, 64 };
 }
 inline float Approach(float current, float target) {
     return std::abs(target - current) < .05f ? target : current + (target - current) * .4f;

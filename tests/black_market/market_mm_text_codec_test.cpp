@@ -70,6 +70,9 @@ static std::string Body() {
 static std::string Open(u16 id) {
     play.msgCtx = {};
     Message_OpenText(&play, id);
+    if (id == kBrowseText || id == kConfirmText || id == kResultText)
+      assert(play.msgCtx.textBoxPos == 3 &&
+             "focused merchandise view reserves the native bottom textbox");
     play.msgCtx.textboxY = play.msgCtx.textboxYTarget; // Fully opened native textbox geometry.
     assert(!play.msgCtx.textIsCredits);
     assert(u8(play.msgCtx.font.msgBuf.schar[2]) == 0xFE); // Native merchandise has no receipt icon.
@@ -130,15 +133,21 @@ static void TestReleaseContract() {
     play.msgCtx.textboxSegment = textboxSegments; // Native Message_Init-owned segment array.
     for (int conversation = 0; conversation < 3; ++conversation) {
         Message_StartTextbox(&play, kWelcomeText, &player.actor);
-        play.msgCtx.textboxY = play.msgCtx.textboxYTarget;
+        play.msgCtx.textboxY = play.msgCtx.textboxYTarget =
+            38; // Already-open native top welcome box.
+        for (int row = 0; row < 3; ++row)
+          play.msgCtx.unk11FFE[row] = 58 + row * 12;
         Decode(0x19);
         for (u16 id : { kBrowseText, kConfirmText, kBrowseText, kConfirmText, kResultText,
                         kBrowseText, kWelcomeText }) {
             play.msgCtx.choiceIndex = 1; // Decline must not leave a stale selection on re-confirm.
             sStatus = conversation == 1 ? "You need more rupees." : "Yours: Somaria: Statues.";
-            Message_ContinueTextbox(&play, id);
+            ContinueBrowsingText(&play, id);
             assert(play.msgCtx.msgMode == MSGMODE_TEXT_CONTINUING);
-            play.msgCtx.textboxY = play.msgCtx.textboxYTarget;
+            assert(play.msgCtx.textboxY == (id == kWelcomeText ? 38 : 142) &&
+                   play.msgCtx.textboxYTarget == play.msgCtx.textboxY &&
+                   "merchandise continuation must move an existing top box "
+                   "below the focused row, then restore welcome");
             Decode(id == kConfirmText ? 0xBF : 0x19, id == kConfirmText);
             if (id == kConfirmText)
                 assert(play.msgCtx.choiceIndex == 0);

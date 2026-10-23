@@ -53,6 +53,8 @@ static s16 sBrowseCamera = -1, sBrowseParent = -1;
 static s16 sBrowseCameraUid;
 static Camera* sBrowseCameraPtr;
 static bool sBrowsePlayerWasHidden;
+static bool sBrowseTextboxSaved;
+static std::array<s16, 6> sBrowseTextboxLayout{};
 static int currentCs = -1, currentSub = -1, returnCamera;
 struct KeeperState { SkelAnime skel; int timer = 90, eye; } sKeeper;
 bool Active() { return active; }
@@ -75,10 +77,13 @@ void Continue(PlayState*, u16 text) {
     state = text == 0x8F13 ? TEXT_STATE_CHOICE : TEXT_STATE_EVENT;
 }
 void Close(PlayState*) { state = TEXT_STATE_CLOSING; ++closes; }
+void NativeCameraInit(Camera *, View *, CollisionContext *, PlayState *);
+void InitNativeCameraTable();
 int CreateCamera(PlayState*) {
     ++allocations;
     if (allocationId < 0) return allocationId;
-    shopCamera.uid = allocations;
+    InitNativeCameraTable();
+    NativeCameraInit(&shopCamera, &play.view, &play.colCtx, &play);
     play.cameraPtrs[1] = &shopCamera; return 1;
 }
 int ActiveCamera(PlayState*) {
@@ -99,7 +104,13 @@ void CameraStatus(PlayState*, int id, int status) {
 }
 #define GameInteractor_Should(...) true
 #define GameInteractor_InvertControl(...) 1
+#define Play_GetCamera(play, id) ((play)->cameraPtrs[id])
 /* NATIVE CAMERA */
+static int nativeCameraFrames, nativeSettingRequests;
+int SetCameraSetting(PlayState *state, s16 id, s16 setting) {
+  ++nativeSettingRequests;
+  return NativeSetting(state, id, setting);
+}
 void SetView(PlayState*, int id, Vec3f* at, Vec3f* eye) {
     assert(id == 1); assert(NativeAtEye(&play, id, at, eye)); ++cameraWrites;
 }
@@ -118,8 +129,8 @@ void SetFov(PlayState*, int id, float fov) { assert(id == 1); assert(NativeFov(&
 #define Play_ChangeCameraStatus CameraStatus
 #define Play_GetCamera(play,id) ((play)->cameraPtrs[id])
 #define Play_ClearCamera(play,id) ((play)->cameraPtrs[id] = nullptr)
-#define Play_ChangeCameraSetting(...) ((void)0)
-#define Play_CameraChangeSetting(...) ((void)0)
+#define Play_ChangeCameraSetting SetCameraSetting
+#define Play_CameraChangeSetting SetCameraSetting
 #define Play_SetCameraAtEye SetView
 #define Play_CameraSetAtEye SetView
 #define Play_SetCameraFov SetFov
@@ -150,6 +161,37 @@ void SetupCursorOverlay(GraphicsContext* ctx) {
 #define Gfx_SetupDL_39Overlay SetupCursorOverlay
 void UpdateBrowsingCamera(PlayState*);
 /* PRODUCTION */
+
+void NativeCameraFrame() {
+  if (!sTalking)
+    return;
+  assert(ActiveCamera(&play) == 1 && play.cameraPtrs[1] == &shopCamera);
+  assert(shopCamera.setting == CAM_SET_FREE0 &&
+         shopCamera.mode == CAM_MODE_NORMAL);
+#ifdef OOT_BROWSING_TEST
+  assert(sCameraSettings[shopCamera.setting]
+             .cameraModes[shopCamera.mode]
+             .funcIdx == CAM_FUNC_UNIQ6);
+#else
+  assert(
+      sCameraSettings[shopCamera.setting].cameraModes[shopCamera.mode].funcId ==
+      CAM_FUNC_UNIQUE6);
+#endif
+  assert(Camera_Unique6(&shopCamera));
+  ++nativeCameraFrames;
+  assert(
+      shopCamera.animState == 1 &&
+      "actual Unique6 must initialize, then retain the supplied manual camera");
+  assert(shopCamera.eye.x == 0 && shopCamera.eye.y == 76 &&
+         shopCamera.eye.z == 196 && shopCamera.eyeNext.x == 0 &&
+         shopCamera.eyeNext.y == 76 && shopCamera.eyeNext.z == 196 &&
+         "actual native camera frames must retain the close fixed eye "
+         "throughout the shop turn");
+  assert(shopCamera.at.x == sBrowser.view.at.x &&
+         shopCamera.at.y == sBrowser.view.at.y &&
+         shopCamera.at.z == sBrowser.view.at.z &&
+         shopCamera.fov == sBrowser.view.fov);
+}
 
 void ResetCursorArena(size_t opa = 64, size_t xlu = 64, size_t overlay = 128) {
     graphics = {}; commands = {}; opaqueCommands = {}; translucentCommands = {}; cursorSetups = 0;
@@ -296,9 +338,11 @@ void CheckReleaseLifecycle(Actor* keeper) {
                sBrowser.phase == BlackMarketBrowsing::Phase::Browse && ActiveCamera(&play) == 1);
     };
     const auto released = [&] {
-        assert(!sTalking && sBrowseCamera == -1 && sBrowseParent == -1 && sBrowseCameraUid == -1 &&
-               sBrowseCameraPtr == nullptr && sBrowser.phase == BlackMarketBrowsing::Phase::Browse &&
-               sBrowser.slot == -1 && purchases == purchaseBefore);
+      assert(!sTalking && sBrowseCamera == -1 && sBrowseParent == -1 &&
+             sBrowseCameraUid == -1 && sBrowseCameraPtr == nullptr &&
+             !sBrowseTextboxSaved &&
+             sBrowser.phase == BlackMarketBrowsing::Phase::Browse &&
+             sBrowser.slot == -1 && purchases == purchaseBefore);
     };
     for (auto phase : { BlackMarketBrowsing::Phase::Browse, BlackMarketBrowsing::Phase::Confirm,
                         BlackMarketBrowsing::Phase::Result }) {
@@ -398,6 +442,21 @@ void CheckReceiptHandoff(Actor* keeper) {
     assert(player.stateFlags2 == 0x100);
 }
 
+void CheckFixedCustomerEye() {
+  BlackMarketBrowsing::State camera;
+  for (int slot : {-1, 0, 1, 3, 2, -1, 4, 5, 7, 6, -1}) {
+    camera.slot = slot;
+    for (int frame = 0; frame < 24; ++frame) {
+      camera.TickCamera();
+      assert(camera.view.eye.x == 0 && camera.view.eye.y == 76 &&
+             camera.view.eye.z == 196 &&
+             "keeper, either bank and both rows must turn from one close "
+             "customer eye without pulling behind Link");
+    }
+    assert(camera.CameraSettled());
+  }
+}
+
 void CheckShelfFraming() {
     const float radius = .32f * 38, halfHeight = .32f * 42;
     const auto extension = [](float half, float floor, float extra) {
@@ -414,8 +473,10 @@ void CheckShelfFraming() {
         const auto anchor = kShelves[slot];
         const int bank = slot < 4 ? 0 : 6;
         const int first = slot < 4 ? 0 : 4;
-        assert(view.at.x == (kShelves[first].x + kShelves[first + 2].x) / 2 && view.at.z == anchor.z &&
-               "shelf cameras must face the actual offer bank rather than a separate camera-only layout");
+        assert(std::abs(view.at.x) > 35 && std::abs(view.at.x) < 70 &&
+               view.at.z == anchor.z &&
+               "shelf cameras must face the actual offer bank rather than a "
+               "separate camera-only layout");
         const auto& bottom = BlackMarketShelves::kBoxes[bank + (slot & 1 ? 4 : 3)];
         const auto& top = BlackMarketShelves::kBoxes[bank + (slot & 1 ? 5 : 4)];
         assert(anchor.x > bottom.low.x && anchor.x < bottom.high.x &&
@@ -443,15 +504,20 @@ void CheckShelfFraming() {
             const auto point = project({ anchor.x + (corner & 1 ? high.x : low.x),
                                          anchor.y + (corner & 2 ? high.y : low.y),
                                          anchor.z + (corner & 4 ? high.z : low.z) });
-            assert(point[0] > 8 && point[0] < 312 && point[1] > 8 && point[1] < 138 &&
-                   "both shelf rows, selected items and seals must clear the native bottom textbox at 4:3");
+            assert(point[0] > 8 && point[0] < 312 && point[1] > 8 &&
+                   point[1] < 138 &&
+                   "the selected row's item and seal must clear the native "
+                   "bottom textbox at 4:3");
         }
     }
 }
 
 int main() {
-    CheckShelfFraming();
-    gPlayState = &play;
+  CheckFixedCustomerEye();
+  CheckShelfFraming();
+  InitNativeCameraTable();
+  NativeCameraInit(&mainCamera, &play.view, &play.colCtx, &play);
+  gPlayState = &play;
 #ifdef OOT_BROWSING_TEST
     play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
 #else
@@ -464,6 +530,7 @@ int main() {
     EnTakaraya gal{}; Actor& keeper = gal.actor;
 #endif
     KeeperUpdate(&keeper, &play);
+    NativeCameraFrame();
     assert(allocations == 1 && ActiveCamera(&play) == 1 && cameraWrites > 0 &&
            "accepting shop talk must start a native controlled browsing camera");
     assert(sTalking && sSelected == -1 && (player.stateFlags2 & (1u << 29)));
@@ -480,6 +547,7 @@ int main() {
     auto input = [&](u16 button, bool shouldAdvance = false) {
         play.state.input[0].press.button = button; advance = shouldAdvance;
         KeeperUpdate(&keeper,&play);
+        NativeCameraFrame();
         play.state.input[0].press.button = 0; advance = false;
     };
     auto finishPan = [&] { for (int i = 0; i < 24; ++i) input(0); };
@@ -494,13 +562,16 @@ int main() {
     assert(graphics.overlay.p == commands.data() && "hide the item cursor until the shelf pan finishes");
     finishPan();
     input(BTN_DUP); assert(sSelected == 1);
+    finishPan();
     input(BTN_DRIGHT); assert(sSelected == 3);
     input(BTN_DDOWN); assert(sSelected == 2);
+    finishPan();
     input(BTN_DLEFT); assert(sSelected == 0);
     input(BTN_DDOWN); assert(sSelected == 0 && cursorSounds == 5 &&
                             "only actual row/column changes play one native cursor cue");
     for (int i=0;i<24;++i) input(0);
-    assert(shopCamera.at.x>50 && shopCamera.eye.z>shopCamera.at.z && shopCamera.fov>0);
+    assert(shopCamera.at.x > 35 && shopCamera.at.x < 70 &&
+           shopCamera.eye.z > shopCamera.at.z && shopCamera.fov > 0);
     const float rightYaw = std::atan2(shopCamera.at.x - shopCamera.eye.x,
                                      shopCamera.eye.z - shopCamera.at.z) * 180.f / 3.14159265f;
     assert(std::abs(rightYaw - 30) < .02f && "use native OoT's 30-degree right shelf direction");
@@ -511,10 +582,11 @@ int main() {
     input(BTN_DLEFT); assert(sSelected == 4);
     finishPan();
     input(BTN_DUP); assert(sSelected == 5);
+    finishPan();
     input(BTN_DLEFT); assert(sSelected == 7);
     input(BTN_DDOWN); assert(sSelected == 6 && cursorSounds == 10);
     for (int i=0;i<24;++i) input(0);
-    assert(std::abs(shopCamera.at.x+52.5f)<.05f);
+    assert(std::abs(shopCamera.at.x + 86.f * .57735026919f) < .05f);
     const float leftYaw = std::atan2(shopCamera.at.x - shopCamera.eye.x,
                                     shopCamera.eye.z - shopCamera.at.z) * 180.f / 3.14159265f;
     assert(std::abs(leftYaw + 30) < .02f && "use native OoT's 30-degree left shelf direction");
@@ -600,9 +672,15 @@ int main() {
            "empty stock offers a normal explanation without browsing or purchasing");
     CheckReleaseLifecycle(&keeper);
     CheckReceiptHandoff(&keeper);
+    assert(nativeSettingRequests > 0 && nativeCameraFrames > 100);
     BlackMarketBrowsing::Axis axis;
     assert(axis.Step(30)==0 && axis.Step(60)==1);
     for (int i=0;i<9;++i) assert(axis.Step(60)==0);
     assert(axis.Step(60)==1 && axis.Step(-60)==-1 && axis.Step(0)==0 && axis.Step(-60)==-1);
-    std::puts("PASS native shop: eight normal/mirrored native cursor projections/GBI, cursor arena exhaustion, host-native mirrored stick/D-pad and cursor audio; physical shelf rows/full item-seal framing; close keeper/30-degree shelf cameras; pan gating; Buy/Cancel, B/back/leave, pause, held B, native return links, UID reuse, foreign dialogue, NONE/active/transition/death/null-play cleanup, poisoned post-cleanup destruction, immediate re-talk, hide-flag restoration and empty-stock talk");
+    std::puts(
+        "PASS shop adapter: actual native Camera_Init/setting/Unique6 frames "
+        "retain fixed close eye/eyeNext, at/FOV and active subcamera through "
+        "keeper/both banks/rows/return; eight normal/mirrored cursor "
+        "projections/GBI; selected-row item/seal framing; navigation, "
+        "purchase/receipt and ownership cleanup regressions");
 }

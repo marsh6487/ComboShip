@@ -25,6 +25,13 @@ def function(source, signature):
     return source[start:end]
 
 
+def browsing_text_adapter():
+    source = (ROOT / 'combo/BlackMarketBrowsingNative.h').read_text()
+    return ('\n#include <array>\nstatic bool sBrowseTextboxSaved;\n'
+            'static std::array<s16, 6> sBrowseTextboxLayout{};\n' +
+            function(source, 'void ContinueBrowsingText('))
+
+
 def render_controls(folder, host, source, flags):
     def case(label, following):
         begin = source.index("case " + label + ":")
@@ -114,7 +121,7 @@ def run_mm(folder):
     fixture = (ROOT / "tests/black_market/market_mm_text_codec_test.cpp").read_text()
     fixture = fixture.replace("/* CUSTOM_MESSAGE_HELPERS */", helpers).replace("/* NATIVE_METADATA */", metadata)
     fixture = fixture.replace("/* MARKET_TEXT */", function(source, "const Item* Offer(") + "\n" +
-                              function(source, "void MarketText("))
+                              function(source, "void MarketText(") + browsing_text_adapter())
     includes = [ROOT, *[ROOT / "mm" / p for p in ("", "include", "include/PR", "src", "assets", "mods", "2s2h")],
                 *[ROOT / p for p in ("combo", "combo/menu", "libultraship/include", "libultraship")]]
     flags = common_flags(includes) + ["-DMM_BUILD_DLL"]
@@ -160,7 +167,7 @@ def run_oot(folder):
     fixture = fixture.replace("/* NATIVE_METADATA */", metadata)
     fixture = fixture.replace("/* NATIVE_COPY */", function(util, "size_t SohUtils::CopyStringToCharBuffer("))
     fixture = fixture.replace("/* MARKET_TEXT */", function(source, "const Item* Offer(") + "\n" +
-                              function(source, "void MarketText("))
+                              function(source, "void MarketText(") + browsing_text_adapter())
     # Retain the production decoder exactly. The item-icon/layout and Japanese
     # services are unused boundaries for this icon-less NES merchandise path.
     decoder = r'''
@@ -195,7 +202,7 @@ bool GameInteractor_Should(GIVanillaBehavior behavior, uint32_t result, ...) { (
     # runs outside the legacy NEI runner's CPATH scope, but uses the same pins.
     includes += [Path(path) for path in os.environ.get(
         "COMBO_NEI_FIXTURE_CPATH", "/usr/include/imgui").split(os.pathsep) if path]
-    flags = common_flags(includes) + ['-DCVAR_PREFIX_ENHANCEMENT="gEnhancements"']
+    flags = common_flags(includes) + ['-DCVAR_PREFIX_ENHANCEMENT="gEnhancements"', '-DBLACK_MARKET_BROWSING_OOT']
     units = []
     for path in (c_path, ROOT / "soh/src/code/z_kanfont.c",
                  ROOT / "soh/soh/Enhancements/custom-message/CustomMessageManager.cpp",

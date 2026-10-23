@@ -563,6 +563,8 @@ void MarketText(u16* textId, bool* fromTable) {
     }
     CustomMessage::Entry entry;
     entry.autoFormat = false; // The native MM codec/wrapper runs before raw choice controls are appended.
+    if (page != Page::Welcome)
+        entry.textboxYPos = 0x30; // Native header high nibble3: bottom, below the focused merchandise row.
     if (page == Page::Browse || page == Page::Confirm)
         entry.firstItemCost = offer.price;
     entry.msg = BlackMarketText::Mm(page, offer, sStatus, sNESFontWidths);

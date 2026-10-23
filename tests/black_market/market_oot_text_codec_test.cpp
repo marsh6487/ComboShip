@@ -53,6 +53,9 @@ static std::string Open(u16 id) {
     bool fromTable = true;
     MarketText(&id, &fromTable);
     assert(!fromTable);
+    if (id == kBrowseText || id == kConfirmText || id == kResultText)
+      assert((play.msgCtx.font.charTexBuf[0] & 0xF) == TEXTBOX_POS_BOTTOM &&
+             "focused merchandise view reserves the native bottom textbox");
     return { play.msgCtx.font.msgBuf, play.msgCtx.font.msgLength };
 }
 static void Decode(u8 expectedEnd, bool choices = false, bool accent = false, bool buttons = false) {
@@ -112,13 +115,26 @@ static void TestReleaseContract() {
     play.msgCtx = {};
     for (int conversation = 0; conversation < 3; ++conversation) {
         Message_StartTextbox(&play, kWelcomeText, nullptr);
+        R_TEXTBOX_Y = R_TEXTBOX_Y_TARGET =
+            38; // Already-open native top welcome box.
+        R_TEXTBOX_END_YPOS = 97;
+        for (int row = 0; row < 3; ++row)
+          R_TEXT_CHOICE_YPOS(row) = 58 + row * 12;
         Decode(0x0B);
         for (u16 id : { kBrowseText, kConfirmText, kBrowseText, kConfirmText, kResultText,
                         kBrowseText, kWelcomeText }) {
             play.msgCtx.choiceIndex = 1;
             sStatus = conversation == 1 ? "You need more rupees." : "Yours: Somaria: Statues.";
-            Message_ContinueTextbox(&play, id);
+            ContinueBrowsingText(&play, id);
             assert(play.msgCtx.msgMode == MSGMODE_TEXT_CONTINUING);
+            assert(R_TEXTBOX_Y == (id == kWelcomeText ? 38 : 142) &&
+                   R_TEXTBOX_Y_TARGET == R_TEXTBOX_Y &&
+                   "merchandise continuation must move an existing top box "
+                   "below the focused row, then restore welcome");
+            assert(R_TEXTBOX_END_YPOS == (id == kWelcomeText ? 97 : 201));
+            for (int row = 0; row < 3; ++row)
+              assert(R_TEXT_CHOICE_YPOS(row) ==
+                     (id == kWelcomeText ? 58 : 162) + row * 12);
             Decode(id == kConfirmText ? 0x02 : 0x0B, id == kConfirmText);
             if (id == kConfirmText)
                 assert(play.msgCtx.choiceIndex == 0);

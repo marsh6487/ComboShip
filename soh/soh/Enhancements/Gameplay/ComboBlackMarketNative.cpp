@@ -531,6 +531,8 @@ void MarketText(u16* textId, bool* fromTable) {
     CustomMessage entry(BlackMarketText::Oot(page, offer, sStatus, gSaveContext.language));
     entry.AutoFormat();
     entry = CustomMessage(BlackMarketText::OotPages(entry.GetForCurrentLanguage(MF_RAW)));
+    if (page != Page::Welcome)
+        entry.SetTextBoxPosition(TEXTBOX_POS_BOTTOM);
     entry.LoadIntoFont();
     *fromTable = false;
 }

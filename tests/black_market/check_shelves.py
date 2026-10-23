@@ -41,15 +41,6 @@ def main():
         boards=[box for box in boxes if box[1,1]<reserved[slot,0,1] and box[0,0]<position[0]<box[1,0] and box[0,2]<position[2]<box[1,2]]
         assert boards,(slot,'item has no shelf beneath it')
         assert reserved[slot,0,1]-max(box[1,1] for box in boards)<5,(slot,'shelf too far below the complete offer envelope')
-    from check_browsing_frame import camera_views,project
-    cameras=camera_views()
-    for bank,name in [(0,'right'),(1,'left')]:
-        for box in boxes[bank*6:bank*6+6]:
-            if box[1,1]<140:continue
-            for x in box[:,0]:
-                for z in box[:,2]:
-                    point=project([x,box[1,1],z],cameras[name])
-                    assert 8<point[0]<312 and point[1]>8,(bank,'shelf crown clips browsing view',point)
     a.output.write_text(json.dumps(dict(boxes=fixture['boxes'],shelves=shelves.tolist(),
         reserved_slot_envelopes=reserved.tolist(),keeper_frames=keeper.frame_count,
         physical_shelves_clear_items_and_keeper=True,native_runtime_proven=False),indent=2)+'\n')

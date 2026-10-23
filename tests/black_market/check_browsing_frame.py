@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Project reserved item/seal bounds through the production shop camera poses."""
+"""Project each selected row through the fixed-eye production camera poses."""
 from pathlib import Path
 import argparse,hashlib,itertools,json,os,subprocess,tempfile
 import numpy as np
@@ -28,17 +28,19 @@ def main():
     for name,slots in [('right',range(4)),('left',range(4,8))]:
         bounds=[]
         for slot in slots:
-            points=np.array([project(point,views[name]) for point in itertools.product(*zip(*layout['reserved_slot_envelopes'][slot]))])
+            view=views['slots'][slot]
+            assert view['eye']==[0,76,196],(name,slot,'shop eye moved behind customer')
+            points=np.array([project(point,view) for point in itertools.product(*zip(*layout['reserved_slot_envelopes'][slot]))])
             low,high=points.min(0),points.max(0)
             assert low[0]>8 and high[0]<312 and low[1]>8 and high[1]<138,(name,slot,'item/seal clips screen or native Y142 textbox',low,high)
-            anchor=np.array(project(layout['shelves'][slot],views[name]))
+            anchor=np.array(project(layout['shelves'][slot],view))
             assert anchor[1]+20<142 and anchor[1]-20>4,(name,slot,'native cursor clips textbox or top')
             bounds.append({'slot':slot,'screen_min':low.tolist(),'screen_max':high.tolist()})
         proof[name]=bounds
     a.output.write_text(json.dumps(dict(views=views,bounds=proof,layout_sha256=hashlib.sha256(a.layout.read_bytes()).hexdigest(),
         source_sha256=hashlib.sha256((ROOT/'combo/BlackMarketBrowsing.h').read_bytes()).hexdigest(),
         native_textbox_y=142,aspect='4:3',runtime_proven=False,
-        scope='Conditional full authored FrameFit item/seal envelope including selected scale and bob; arbitrary native/Alt models not covered.'),indent=2)+'\n')
-    print('PASS browsing framing: eight full item/seal envelopes and native cursor clear 4:3 screen and Y142 textbox')
+        scope='Each selected row uses its own fixed-eye view; conditional authored FrameFit item/seal envelope including selected scale and bob. Nonselected row cropping is intentional; arbitrary native/Alt models not covered.'),indent=2)+'\n')
+    print('PASS browsing framing: close fixed eye; all eight selected item/seal envelopes and cursors clear 4:3 screen and explicit bottom textbox')
 
 if __name__=='__main__':main()

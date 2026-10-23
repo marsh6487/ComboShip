@@ -1,10 +1,13 @@
 // Included inside each native controller's private namespace after Purchase().
-// Both engines use the same interaction code and spatial navigation state.
+// Both engines use this bounded manual FREE0/Unique6 adapter and spatial
+// navigation state; native shop actors/cutscene tables do not own the market.
 BlackMarketBrowsing::State sBrowser;
 s16 sBrowseCamera = -1, sBrowseParent = -1;
 s16 sBrowseCameraUid = -1;
 Camera* sBrowseCameraPtr = nullptr;
 bool sBrowsePlayerWasHidden = false;
+bool sBrowseTextboxSaved = false;
+std::array<s16, 6> sBrowseTextboxLayout{};
 void PlayBrowseCursorSound() {
 #ifdef BLACK_MARKET_BROWSING_OOT
     Sfx_PlaySfxCentered(NA_SE_SY_CURSOR);
@@ -20,6 +23,44 @@ bool BrowsingMessage(PlayState* play) {
     const auto text = play->msgCtx.currentTextId;
 #endif
     return text == kWelcomeText || text == kBrowseText || text == kConfirmText || text == kResultText;
+}
+
+void ContinueBrowsingText(PlayState* play, u16 text) {
+    // Native ContinueTextbox skips the START positioning step. Keep the
+    // welcome box's accepted placement, and move merchandise below the row
+    // without reopening the box or changing native choice/message behavior.
+    auto& message = play->msgCtx;
+#ifdef BLACK_MARKET_BROWSING_OOT
+    const std::array<s16, 6> current{ R_TEXTBOX_Y,           R_TEXTBOX_Y_TARGET,    R_TEXTBOX_END_YPOS,
+                                      R_TEXT_CHOICE_YPOS(0), R_TEXT_CHOICE_YPOS(1), R_TEXT_CHOICE_YPOS(2) };
+#else
+    const std::array<s16, 6> current{ message.textboxY,    message.textboxYTarget, message.unk11FFE[0],
+                                      message.unk11FFE[1], message.unk11FFE[2],    0 };
+#endif
+    if (text != kWelcomeText && !sBrowseTextboxSaved) {
+        sBrowseTextboxLayout = current;
+        sBrowseTextboxSaved = true;
+    }
+    Message_ContinueTextbox(play, text);
+    if (text == kWelcomeText && !sBrowseTextboxSaved)
+        return;
+#ifdef BLACK_MARKET_BROWSING_OOT
+    const auto layout =
+        text == kWelcomeText ? sBrowseTextboxLayout : std::array<s16, 6>{ 142, 142, 201, 162, 174, 186 };
+    R_TEXTBOX_Y = layout[0];
+    R_TEXTBOX_Y_TARGET = layout[1];
+    R_TEXTBOX_END_YPOS = layout[2];
+    for (int row = 0; row < 3; ++row)
+        R_TEXT_CHOICE_YPOS(row) = layout[3 + row];
+#else
+    const auto layout = text == kWelcomeText ? sBrowseTextboxLayout : std::array<s16, 6>{ 142, 142, 162, 174, 186, 0 };
+    message.textboxY = layout[0];
+    message.textboxYTarget = layout[1];
+    for (int row = 0; row < 3; ++row)
+        message.unk11FFE[row] = layout[2 + row];
+#endif
+    if (text == kWelcomeText)
+        sBrowseTextboxSaved = false;
 }
 
 void EndBrowsing(PlayState* play, bool destroying = false) {
@@ -60,6 +101,7 @@ void EndBrowsing(PlayState* play, bool destroying = false) {
     // MM's destroy hook runs after actor arena cleanup; never touch its player.
     sBrowseCamera = sBrowseParent = sBrowseCameraUid = -1;
     sBrowseCameraPtr = nullptr;
+    sBrowseTextboxSaved = false;
     sBrowser = {};
     sTalking = false;
 }
@@ -146,12 +188,12 @@ void BrowseInput(PlayState* play) {
     if (input.press.button & BTN_B) {
         if (sBrowser.phase != Phase::Browse) {
             sBrowser.phase = Phase::Browse;
-            Message_ContinueTextbox(play, kBrowseText);
+            ContinueBrowsingText(play, kBrowseText);
         } else if (sSelected >= 0) {
             sBrowser.row = sSelected & 1;
             sBrowser.slot = sSelected = -1;
             PlayBrowseCursorSound();
-            Message_ContinueTextbox(play, kWelcomeText);
+            ContinueBrowsingText(play, kWelcomeText);
         } else {
             Message_CloseTextbox(play);
             EndBrowsing(play);
@@ -177,10 +219,10 @@ void BrowseInput(PlayState* play) {
                     return;
                 }
                 sBrowser.phase = Phase::Result;
-                Message_ContinueTextbox(play, kResultText);
+                ContinueBrowsingText(play, kResultText);
             } else {
                 sBrowser.phase = Phase::Browse;
-                Message_ContinueTextbox(play, kBrowseText);
+                ContinueBrowsingText(play, kBrowseText);
             }
             sBrowser.ResetInput();
         }
@@ -191,7 +233,7 @@ void BrowseInput(PlayState* play) {
             Message_ShouldAdvance(play)) {
             sBrowser.phase = Phase::Browse;
             sBrowser.ResetInput();
-            Message_ContinueTextbox(play, kBrowseText);
+            ContinueBrowsingText(play, kBrowseText);
         }
         return;
     }
@@ -213,16 +255,16 @@ void BrowseInput(PlayState* play) {
     if (sBrowser.Move(x, y)) {
         sSelected = sBrowser.slot;
         PlayBrowseCursorSound();
-        Message_ContinueTextbox(play, sSelected < 0 ? kWelcomeText : kBrowseText);
+        ContinueBrowsingText(play, sSelected < 0 ? kWelcomeText : kBrowseText);
     } else if ((input.press.button & BTN_A) && Message_ShouldAdvance(play)) {
         if (sSelected < 0) {
             if (sBrowser.Move(1, 0))
                 PlayBrowseCursorSound();
             sSelected = sBrowser.slot;
-            Message_ContinueTextbox(play, kBrowseText);
+            ContinueBrowsingText(play, kBrowseText);
         } else {
             sBrowser.phase = Phase::Confirm;
-            Message_ContinueTextbox(play, kConfirmText);
+            ContinueBrowsingText(play, kConfirmText);
         }
         sBrowser.ResetInput();
     }
