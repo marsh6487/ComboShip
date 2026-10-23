@@ -47,7 +47,15 @@ u8 TridentChargeBall_GetFierceDamage(Actor *actor) { return 0; }
 int ComboRpg_IsEnabled(int stat) { return 0; }
 uint8_t ComboRpg_ApplyPower(uint8_t damage, float roll) { return damage; }
 f32 Rand_ZeroOne(void) { return 0.5f; }
+static u16 finishLoopSounds[SWORD_FINISH_EFFECT_CAPACITY];
 void Audio_PlaySfx_AtPos(Vec3f *pos, u16 sound) {
+  REQUIRE(pos >= sFinishSoundPos &&
+          pos < sFinishSoundPos + SWORD_FINISH_EFFECT_CAPACITY);
+  REQUIRE(sound == NA_SE_EV_ICE_FREEZE - SFX_FLAG ||
+          sound == NA_SE_EN_COMMON_DEADLIGHT - SFX_FLAG);
+  unsigned slot = (unsigned)(pos - sFinishSoundPos);
+  REQUIRE(finishLoopSounds[slot] == 0 || finishLoopSounds[slot] == sound);
+  finishLoopSounds[slot] = sound;
   ++finishSoundCount;
   finishSound = sound;
   finishSoundPos = pos;
@@ -55,8 +63,10 @@ void Audio_PlaySfx_AtPos(Vec3f *pos, u16 sound) {
 void AudioSfx_StopByPosAndId(Vec3f *pos, u16 sound) {
   ++finishStopCount;
   REQUIRE(pos >= sFinishSoundPos &&
-          pos < sFinishSoundPos + SWORD_FINISH_EFFECT_CAPACITY &&
-          sound == 0x31F7);
+          pos < sFinishSoundPos + SWORD_FINISH_EFFECT_CAPACITY);
+  unsigned slot = (unsigned)(pos - sFinishSoundPos);
+  REQUIRE(finishLoopSounds[slot] != 0 && finishLoopSounds[slot] == sound);
+  finishLoopSounds[slot] = 0;
 }
 #else
 u8 TransformMasks_IsFDSkinMode(void) { return 0; }
@@ -174,11 +184,22 @@ static void FatalBindings(void) {
     REQUIRE(sFinish.effects[0].shape.origin.x == 10);
     DinFireSword_FinishPlaySound(&play, &sFinish.effects[0]);
     REQUIRE(finishSoundCount == 1);
-    if (element == 3)
-      REQUIRE(finishSound == 0x31F7); // Native 0x39F7 - SFX_FLAG held burn.
+#ifdef SWORD_FINISH_TEST_MM
+    const int heldLoop =
+        element == SWORD_ELEMENT_ICE || element == SWORD_ELEMENT_LIGHT;
+    if (heldLoop)
+      REQUIRE(finishSound ==
+              (element == SWORD_ELEMENT_ICE ? NA_SE_EV_ICE_FREEZE
+                                            : NA_SE_EN_COMMON_DEADLIGHT) -
+                  SFX_FLAG);
+#else
+    const int heldLoop = element == SWORD_ELEMENT_LIGHT;
+    if (heldLoop)
+      REQUIRE(finishSound == 0x31F7); // Native MM 0x39F7 - SFX_FLAG bridge.
+#endif
     DinFireSword_FinishPlaySound(&play, &sFinish.effects[0]);
     REQUIRE(finishSoundCount == 1);
-    if (element == 3) {
+    if (heldLoop) {
       REQUIRE(finishSoundPos == &sFinishSoundPos[0]);
       ++play.gameplayFrames;
       DinFireSword_FinishContext(&play);

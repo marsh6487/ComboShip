@@ -17,6 +17,16 @@ Mtx *Matrix_ToMtx(Mtx *dest, char *file, s32 line) {
 }
 void Matrix_Translate(f32 x, f32 y, f32 z, u8 mode) {}
 void Matrix_Scale(f32 x, f32 y, f32 z, u8 mode) {}
+static int finishIcePitchCount, finishIcePitchVaries;
+static f32 finishIcePitchFirst;
+void Matrix_RotateX(f32 angle, u8 mode) {
+  REQUIRE(mode == MTXMODE_APPLY);
+  REQUIRE(isfinite(angle) && angle >= -3.14159265f && angle <= 3.14159265f);
+  if (!finishIcePitchCount++)
+    finishIcePitchFirst = angle;
+  else if (angle != finishIcePitchFirst)
+    finishIcePitchVaries = 1;
+}
 void Matrix_RotateY(f32 angle, u8 mode) {}
 void Matrix_RotateZ(f32 angle, u8 mode) {}
 Hilite *func_8002EB44(Vec3f *object, Vec3f *eye, Vec3f *light,
@@ -55,8 +65,21 @@ int main(void) {
     gfx.polyOpa.d = opa + ARRAY_COUNT(opa);
     gfx.polyXlu.d = xlu + ARRAY_COUNT(xlu);
     finishDrawMatrices = 0;
+#ifndef SWORD_FINISH_TEST_MM
+    finishIcePitchCount = finishIcePitchVaries = 0;
+#endif
     DinFireSword_FinishDrawAll(&play);
     REQUIRE(finishDrawMatrices == SWORD_FINISH_DRAW_POINT_LIMIT);
+#ifndef SWORD_FINISH_TEST_MM
+    if (element == SWORD_ELEMENT_ICE)
+      REQUIRE(finishIcePitchCount == SWORD_FINISH_DRAW_POINT_LIMIT &&
+              finishIcePitchVaries); // Native ice clumps must not share a flat pitch.
+    else if (element <= SWORD_ELEMENT_LIGHT)
+      REQUIRE(finishIcePitchCount == 0); // Fire/light remain billboard effects.
+    else
+      REQUIRE(finishIcePitchCount > 0 &&
+              finishIcePitchCount < SWORD_FINISH_DRAW_POINT_LIMIT);
+#endif
     REQUIRE(finishSoundCount == 32);
     for (int slot = 0; slot < MASS_FINISH_COUNT; ++slot)
       heard[slot] |= sFinish.effects[slot].sounded;
@@ -92,14 +115,21 @@ int main(void) {
     gfx.polyXlu.d = gfx.polyXlu.p;
     Gfx *before = gfx.polyXlu.p;
     finishDrawMatrices = 0;
+#ifndef SWORD_FINISH_TEST_MM
+    finishIcePitchCount = 0;
+#endif
     DinFireSword_FinishDrawAll(&play);
     REQUIRE(gfx.polyXlu.p == before && finishDrawMatrices == 0);
+#ifndef SWORD_FINISH_TEST_MM
+    REQUIRE(finishIcePitchCount == 0);
+#endif
 #ifndef SWORD_FINISH_TEST_MM
     gfx.polyOpa.d = opa + ARRAY_COUNT(opa);
     gfx.polyXlu.d = xlu + ARRAY_COUNT(xlu);
     graphFailure = 1;
     DinFireSword_FinishDrawAll(&play);
     REQUIRE(gfx.polyXlu.p == before && finishDrawMatrices == 0);
+    REQUIRE(finishIcePitchCount == 0);
     graphFailure = 0;
 #endif
     // Release all stable source positions before constructing another world.
