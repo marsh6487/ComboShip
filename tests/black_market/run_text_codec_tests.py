@@ -119,10 +119,14 @@ def run_mm(folder):
                 *[ROOT / p for p in ("combo", "combo/menu", "libultraship/include", "libultraship")]]
     flags = common_flags(includes) + ["-DMM_BUILD_DLL"]
     units = []
-    for name in ("z_message", "z_message_nes", "z_message_staff", "z_kanfont"):
-        obj = folder / (name + ".o")
+    c_sources = [ROOT / "mm/src/code" / (name + ".c")
+                 for name in ("z_message", "z_message_nes", "z_message_staff", "z_kanfont")]
+    # Message_OpenText resets the real optional-title context; link its C owner.
+    c_sources.append(ROOT / "mm/2s2h/Enhancements/Graphics/OotLocationTitleCard.c")
+    for c_source in c_sources:
+        obj = folder / (c_source.stem + ".o")
         subprocess.run([os.environ.get("CC", "cc"), "-std=gnu17", *flags, "-c",
-                        str(ROOT / "mm/src/code" / (name + ".c")), "-o", str(obj)], check=True)
+                        str(c_source), "-o", str(obj)], check=True)
         units.append(str(obj))
     units.append(render_controls(folder, "mm", (ROOT / "mm/src/code/z_message_nes.c").read_text(), flags))
     compile_and_run(folder, "mm", fixture, flags, units)

@@ -57,10 +57,14 @@ flags = ["-g", "-O1", "-w", "-DCOMBO_BUILD", "-DMM_BUILD_DLL", "-DF3DEX_GBI_2",
 with tempfile.TemporaryDirectory(prefix="mm-custom-message-") as directory:
     folder = Path(directory)
     units = []
-    for name in ("z_message", "z_message_nes", "z_message_staff", "z_kanfont"):
-        obj = folder / (name + ".o")
+    c_sources = [ROOT / "mm/src/code" / (name + ".c")
+                 for name in ("z_message", "z_message_nes", "z_message_staff", "z_kanfont")]
+    # Message_OpenText owns a reset of the actual optional-title context.
+    c_sources.append(ROOT / "mm/2s2h/Enhancements/Graphics/OotLocationTitleCard.c")
+    for source in c_sources:
+        obj = folder / (source.stem + ".o")
         subprocess.run([os.environ.get("CC", "cc"), "-std=gnu17", *flags, "-c",
-                        str(ROOT / "mm/src/code" / (name + ".c")), "-o", str(obj)], check=True)
+                        str(source), "-o", str(obj)], check=True)
         units.append(str(obj))
     cpp = folder / "decoder.cpp"
     cpp.write_text(fixture)
