@@ -37,7 +37,7 @@ u16 sClears;
 bool sEntering, sReturnPending, sReturnStaged, sResumeFromMarket;
 bool sDoorArmed, sTalking, sTitlePending, sKeeperSpawned;
 int sKeeperActorId = 1000;
-alignas(2) constexpr char kCard[] = "__OTR__custom/skiejer_market/title";
+/* CARD_RESOURCE */
 int sTravelSlot = -1, sSelected;
 float sDoorFloor;
 u32 sTravelSeed;
@@ -560,7 +560,8 @@ int main(int argc, char** argv) {
     sTitlePending = true;
     PresentTitle();
     const auto& title = play.actorCtx.titleCtx;
-    assert(title.texture == kCard && title.width == 192 && title.height == 24);
+    assert(title.texture == kCard && title.width == 240 && title.height == 24);
+    assert(std::string_view(static_cast<const char*>(title.texture)) == "__OTR__custom/oot_location_titles/v1/market");
     assert(!title.isBossCard && !title.hasTranslation && title.durationTimer == 80 && title.delayTimer == 20);
     player.actor.world.pos = { -11, 0, 410 }; PlayerUpdate();
     assert(sReturnPending && play.nextEntranceIndex == ENTR_SKIEJER_FOREST);

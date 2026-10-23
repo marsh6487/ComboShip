@@ -23,6 +23,7 @@ body = "\n".join(block_from(source, source.index(s)) for s in signatures)
 body += "\n" + "\n".join(block_from(source, source.index(s)) for s in
                           ("void LogDoorAttempt(", "void LogEntryRecovery("))
 fixture = (ROOT / "tests/black_market/oot_native_test.cpp").read_text().replace("/* PRODUCTION */", body)
+fixture = fixture.replace("/* CARD_RESOURCE */", re.search(r'alignas\(2\) constexpr char kCard\[\][^;]*;', source)[0])
 player_source = (ROOT / "soh/src/overlays/actors/ovl_player_actor/z_player.c").read_text()
 cleanup_signatures = ["BAD_RETURN(s32) Player_ZeroSpeedXZ(Player* this) {", "void Player_ApplyYawFromAnim(",
                       "void Player_ResetAnimMovement(", "void Player_FinishAnimMovement(",
