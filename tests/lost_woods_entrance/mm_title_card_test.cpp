@@ -4,6 +4,7 @@
 #include "overlays/gamestates/ovl_title/z_title.h"
 #include "2s2h/GameInteractor/GameInteractor_VanillaBehavior.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
+#include "2s2h/Enhancements/Graphics/OotLocationTitleCard.h"
 #include "ComboGameMode.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "gameplay/CrossGameTitleCard.h"
@@ -21,6 +22,9 @@ RegEditor* gRegEditor = &editor;
 static bool hideCards;
 static int presentations, entranceFlags = -1, entranceCs = CS_ID_NONE, scriptIndex = CS_SCRIPT_ID_NONE, cutscenes;
 static u16 lastTitle, hud;
+static int nativeTitleBegins;
+static PlayState* decodedTitlePlay;
+static void Require(bool condition, const char* message);
 extern "C" bool GameInteractor_Should(GIVanillaBehavior behavior, uint32_t value, ...) {
     return value && (behavior != VB_SHOW_TITLE_CARD || !hideCards);
 }
@@ -29,11 +33,25 @@ extern "C" s16 CutsceneManager_GetCutsceneScriptIndex(s16) { return scriptIndex;
 extern "C" s16 CutsceneManager_Start(s16 csId, Actor*) { ++cutscenes; return csId; }
 extern "C" s16 CutsceneManager_StartWithPlayerCs(s16 csId, Actor*) { ++cutscenes; return csId; }
 extern "C" void Message_OpenText(PlayState* play, u16 textId) {
+    decodedTitlePlay = nullptr;
     ++presentations; lastTitle = textId; play->msgCtx.currentTextId = textId;
 }
 extern "C" void func_80150A84(PlayState*) {}
-extern "C" void Message_DecodeNES(PlayState*) {}
+extern "C" void Message_DecodeNES(PlayState* play) { decodedTitlePlay = play; }
 extern "C" void Interface_SetHudVisibility(u16 visibility) { hud = visibility; }
+
+// Rendering is exercised by tests/location_titles. This fixture observes the
+// handoff after native decoding and scene-title setup, in both MM build modes.
+void OotLocationTitle_Begin(PlayState* play) {
+    Require(play && decodedTitlePlay == play && play->msgCtx.currentTextId == lastTitle &&
+            play->msgCtx.msgMode == MSGMODE_SCENE_TITLE_CARD_FADE_IN_BACKGROUND &&
+            play->msgCtx.stateTimer == 30 && play->msgCtx.textDelayTimer == 0 &&
+            play->msgCtx.textColorAlpha == 0 && play->msgCtx.textboxColorAlphaCurrent == 0 &&
+            play->msgCtx.textboxColorAlphaTarget == 0,
+            "optional presenter must receive the fully decoded native title and fade setup");
+    decodedTitlePlay = nullptr;
+    ++nativeTitleBegins;
+}
 
 /* SCENE_TABLE */
 /* ENTRANCE_TABLE */
@@ -257,5 +275,7 @@ int main() {
     gSaveContext.respawnFlag = 0; entranceFlags = 0;
     Cutscene_HandleEntranceTriggers(&native);
     Require(presentations == beforeNative + 1, "ordinary room entrances with no card bit must retain native suppression");
+    Require(nativeTitleBegins == presentations,
+            "every native title must notify the optional presenter exactly once");
     std::puts("PASS MM native destination titles: composed boot, message layout, cutscene/hide guards, consumption and solo parity");
 }
