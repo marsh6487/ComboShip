@@ -17,7 +17,7 @@ parser.add_argument("--msvc", action="store_true")
 parser.add_argument("--include", type=Path, action="append", default=[])
 args = parser.parse_args()
 
-production = (ROOT / "soh/soh/OTRGlobals.cpp").read_text()
+production = (ROOT / "soh/soh/OTRGlobals.cpp").read_text(encoding="utf-8")
 preamble = production[:production.index("#include")]
 query = block_from(production, production.index('extern "C" COMBO_EXPORT uint8_t SOH_IsOnFileSelect('))
 sdl = r'''
@@ -78,10 +78,10 @@ with tempfile.TemporaryDirectory(prefix="file-select-sdl-main-") as directory:
             source += '#include "z64.h"\n'
         source += '#include "ComboExport.h"\n' + body
         cpp = build / (name + ".cpp")
-        cpp.write_text(source)
+        cpp.write_text(source, encoding="utf-8")
         binary = build / (name + (".exe" if args.msvc else ""))
         if args.msvc:
-            command = [args.compiler, "/nologo", "/std:c++20", "/EHsc", "/DF3DEX_GBI_2", "/DCOMBO_BUILD",
+            command = [args.compiler, "/nologo", "/std:c++20", "/EHsc", "/utf-8", "/DF3DEX_GBI_2", "/DCOMBO_BUILD",
                        *["/I" + str(p) for p in includes], str(cpp), "/Fo" + str(build / (name + ".obj")),
                        "/Fe" + str(binary)]
         else:
