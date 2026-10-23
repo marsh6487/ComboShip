@@ -5,6 +5,7 @@
 #include "gameplay/CrossGameTitleCard.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance.h"
 #include "entrances/LostWoodsEntrance.h"
+#include "entrances/RegionalPassages.h"
 
 SaveContext gSaveContext;
 static int gComboReturnFileNum = 1;
@@ -53,6 +54,9 @@ extern "C" void Play_Init(GameState*) {}
 extern "C" void Title_Init(GameState*) {}
 #undef osSyncPrintf
 #define osSyncPrintf(...) ((void)0)
+
+static int regionalArrival;
+extern "C" int ComboRegionalPassagesOot_ApplyArrival(int route) { regionalArrival=route; return 1; }
 
 /* ARRIVAL_BODY */
 /* BOOT_BODY */

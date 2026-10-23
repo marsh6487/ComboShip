@@ -6,6 +6,7 @@
 #include "overlays/gamestates/ovl_title/z_title.h"
 #include "2s2h/BenPort.h"
 #include "entrances/LostWoodsEntrance.h"
+#include "entrances/RegionalPassages.h"
 #include "gameplay/CrossGameTitleCard.h"
 
 SaveContext gSaveContext;
@@ -72,6 +73,10 @@ extern "C" s32 CVarGetInteger(const char*, s32) { return sRememberLocation; }
 extern "C" void Play_Init(GameState*) {}
 void ConsoleLogo_Init(GameState*) {}
 #define GameInteractor_Should(...) false
+
+static int regionalArrival;
+extern "C" int ComboRegionalPassagesMm_ApplyArrival(int route) { regionalArrival=route; return 1; }
+extern "C" void ComboRegionalPassagesMm_Reset(void) {}
 
 /* ARRIVAL_BODY */
 /* ROUTE_BODY */

@@ -8,6 +8,7 @@
 #include "soh/Enhancements/game-interactor/vanilla-behavior/GIVanillaBehavior.h"
 #include "rando/CrossEntranceBoss.h"
 #include "entrances/LostWoodsEntrance.h"
+#include "entrances/RegionalPassages.h"
 #include "ComboGameMode.h"
 #if __has_include("gameplay/CrossGameTitleCard.h")
 #include "gameplay/CrossGameTitleCard.h"
@@ -34,6 +35,7 @@ extern "C" void ComboFw_ApplyArrival(void) {
     if (fwArrival >= 0) { gSaveContext.entranceIndex = fwArrival; gSaveContext.respawnFlag = 2; }
     fwArrival = -1;
 }
+extern "C" int ComboRegionalPassagesOot_ApplyArrival(int) { std::abort(); }
 extern "C" void SaveContext_Init(void) { gSaveContext = {}; }
 extern "C" void Sram_OpenSave(void) {
     gSaveContext.language = LANGUAGE_ENG;

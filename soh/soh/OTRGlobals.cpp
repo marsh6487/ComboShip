@@ -10,6 +10,8 @@
 #include "ComboExtract.h"
 #include "ComboResolve.h"
 #include "../../combo/entrances/LostWoodsEntrance.h"
+#include "../../combo/entrances/RegionalPassages.h"
+#include "soh/Enhancements/Gameplay/ComboRegionalPassages.h"
 #include "../../combo/NeiGracePolicy.h"
 #include "../../combo/NeiSeasonsPolicy.h"
 #include <algorithm>
@@ -2266,6 +2268,7 @@ static void Combo_FinishInit() {
         static const auto cancelComboPassage = []() {
             if (sComboPassageFade && gPlayState && gGameState == &gPlayState->state)
                 gPlayState->envCtx.fillScreen = false;
+            ComboRegionalPassagesOot_CancelDeparture();
             sComboPassageFade = 0;
             sComboSwitchPending = false;
             sComboSwitchFileNum = -1;
@@ -2293,15 +2296,17 @@ static void Combo_FinishInit() {
             if (sComboPassageFade || sComboSwitchPending || !gPlayState || !gComboSceneSwitchCallback ||
                 gSaveContext.gameMode != GAMEMODE_NORMAL || !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) ||
                 gPlayState->pauseCtx.state != 0 || gPlayState->transitionMode != TRANS_MODE_OFF ||
-                gPlayState->transitionTrigger != TRANS_TRIGGER_OFF || Player_InCsMode(gPlayState))
+                gPlayState->transitionTrigger != TRANS_TRIGGER_OFF ||
+                (Player_InCsMode(gPlayState) && !ComboRegionalPassagesOot_OwnsGraveFall(gPlayState)))
                 return;
             Player* player = GET_PLAYER(gPlayState);
             const Vec3f& pos = player->actor.world.pos;
+            const int regional = ComboRegionalPassagesOot_AtDeparture(gPlayState, &pos);
             const bool openingForest = ComboLostWoods_InOotFairyTunnel(
                 gPlayState->sceneNum, gPlayState->roomCtx.curRoom.num, pos.x, pos.y, pos.z);
             const bool woodfall = ComboLostWoods_InOotWoodfallTunnel(
                 gPlayState->sceneNum, gPlayState->roomCtx.curRoom.num, pos.x, pos.y, pos.z);
-            if (!openingForest && !woodfall &&
+            if (!regional && !openingForest && !woodfall &&
                 !ComboLostWoods_InOotTunnel(gPlayState->sceneNum, gPlayState->roomCtx.curRoom.num, pos.x, pos.y, pos.z))
                 return;
             if (!sComboSetMmPortalRoute)
@@ -2309,7 +2314,8 @@ static void Combo_FinishInit() {
             if (!sComboSetMmPortalRoute)
                 return;
             sComboSwitchFileNum = (int)gSaveContext.fileNum;
-            sComboSwitchPortalRoute = woodfall        ? COMBO_PORTAL_WOODFALL
+            sComboSwitchPortalRoute = regional        ? regional
+                                      : woodfall      ? COMBO_PORTAL_WOODFALL
                                       : openingForest ? COMBO_PORTAL_OPENING_FOREST
                                                       : COMBO_PORTAL_LOST_WOODS;
             sComboWoodfallPassageSlot = woodfall ? sComboSwitchFileNum : -1;
@@ -2350,7 +2356,9 @@ static void Combo_FinishInit() {
             if ((sComboPassageFade || sComboSwitchPending) &&
                 (!gPlayState || gGameState != &gPlayState->state || !gGameState->running ||
                  gSaveContext.gameMode != GAMEMODE_NORMAL || !ComboLostWoods_IsPlayableSlot(gSaveContext.fileNum) ||
-                 sComboSwitchFileNum != (int)gSaveContext.fileNum)) {
+                 sComboSwitchFileNum != (int)gSaveContext.fileNum ||
+                 (ComboRegionalPassages_IsRoute(sComboSwitchPortalRoute) &&
+                  !ComboRegionalPassagesOot_Get(gPlayState, nullptr, nullptr, nullptr)))) {
                 cancelComboPassage();
                 return;
             }
@@ -2378,7 +2386,8 @@ static void Combo_FinishInit() {
                 Combo_SOH_CapturePendingChecks();
             }
             Combo_FlushDormantAccumulators(); // Bank pending fills before saving either switch path.
-            if ((isFwReturn || sComboSwitchPortalRoute == COMBO_PORTAL_WOODFALL ||
+            if ((isFwReturn || ComboRegionalPassages_IsRoute(sComboSwitchPortalRoute) ||
+                 sComboSwitchPortalRoute == COMBO_PORTAL_WOODFALL ||
                  ComboLostWoods_IsOpeningForestRoute(sComboSwitchPortalRoute)) &&
                 gPlayState)
                 Play_PerformSave(gPlayState); // Capture live scene flags and native save/equipment bookkeeping.
@@ -4530,12 +4539,19 @@ extern "C" s32 gComboReturnFileNum = -1;
 static int sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
 
 extern "C" COMBO_EXPORT void SOH_SetComboPortalReturnRoute(int route) {
-    sComboReturnPortalRoute = ComboLostWoods_IsForestRoute(route) ? route : COMBO_PORTAL_MARKET;
+    sComboReturnPortalRoute = ComboPassages_IsRoute(route) ? route : COMBO_PORTAL_MARKET;
 }
 
 extern "C" void SOH_ApplyComboPortalArrival(int allowPlacement) {
-    if (!ComboLostWoods_IsForestRoute(sComboReturnPortalRoute))
+    if (!ComboPassages_IsRoute(sComboReturnPortalRoute))
         return;
+    if (ComboRegionalPassages_IsRoute(sComboReturnPortalRoute)) {
+        const int route = sComboReturnPortalRoute;
+        sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
+        if (allowPlacement)
+            ComboRegionalPassagesOot_ApplyArrival(route);
+        return;
+    }
     const bool openingForest = sComboReturnPortalRoute == COMBO_PORTAL_OPENING_FOREST;
     const bool woodfall = sComboReturnPortalRoute == COMBO_PORTAL_WOODFALL;
     sComboReturnPortalRoute = COMBO_PORTAL_MARKET;

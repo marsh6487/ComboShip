@@ -1,4 +1,5 @@
 #include <memory>
+#include "soh/Enhancements/Gameplay/ComboRegionalPassages.h"
 #include <cassert>
 
 #include <ship/resource/type/Blob.h>
@@ -47,6 +48,9 @@ bool Scene_CommandSpawnList(PlayState* play, SOH::ISceneCommand* cmd) {
     ActorEntry* entries = (ActorEntry*)cmdStartPos->GetRawPointer();
 
     play->linkActorEntry = &entries[play->setupEntranceList[play->curSpawn].spawn];
+#ifdef COMBO_BUILD
+    ComboRegionalPassagesOot_ReadSpawns(play, entries, cmdStartPos->numStartPositions);
+#endif
     play->linkAgeOnLoad = gSaveContext.linkAge;
     s16 linkObjectId = gLinkObjectIds[gSaveContext.linkAge];
 
@@ -94,6 +98,9 @@ bool Scene_CommandEntranceList(PlayState* play, SOH::ISceneCommand* cmd) {
     // SOH::SetEntranceList* otrEntrance = std::static_pointer_cast<SOH::SetEntranceList>(cmd);
     SOH::SetEntranceList* otrEntrance = (SOH::SetEntranceList*)cmd;
     play->setupEntranceList = (EntranceEntry*)otrEntrance->GetRawPointer();
+#ifdef COMBO_BUILD
+    ComboRegionalPassagesOot_ReadEntrances(play, otrEntrance->numEntrances);
+#endif
 
     return false;
 }

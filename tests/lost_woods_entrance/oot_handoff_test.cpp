@@ -4,6 +4,7 @@
 #include <vector>
 #include "global.h"
 #include "entrances/LostWoodsEntrance.h"
+#include "entrances/RegionalPassages.h"
 
 // Only event dispatch, DLL resolution and disk IO are boundaries. The registered
 // production trigger/fade/save/handoff bodies and all engine state types stay real.
@@ -62,6 +63,15 @@ static void* Combo_ResolveSym(const char*, const char*) {
     return mirrorDestinationAvailable ? (void*)SetMmRoute : nullptr;
 }
 extern "C" s32 Player_InCsMode(PlayState*) { return 0; }
+
+// Regional collision/actor policy is exercised separately with its production
+// endpoint module; this fixture keeps DLL/endpoint dispatch as boundaries.
+static int regionalDeparture;
+static bool regionalReady=true, regionalFall;
+extern "C" int ComboRegionalPassagesOot_AtDeparture(PlayState*,const Vec3f*) { return regionalDeparture; }
+extern "C" int ComboRegionalPassagesOot_Get(PlayState*,int*,Vec3f*,s16*) { return regionalReady; }
+extern "C" int ComboRegionalPassagesOot_OwnsGraveFall(PlayState*) { return regionalFall; }
+extern "C" void ComboRegionalPassagesOot_CancelDeparture(void) { regionalDeparture=0; regionalFall=false; }
 
 /* MIRROR_QUEUE */
 

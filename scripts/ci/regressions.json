@@ -94,6 +94,24 @@
   },
   {
     "suite": "render",
+    "origin": "nei",
+    "name": "Native elemental sword ice material and frost rendering",
+    "run": "python3 -B scripts/assets/build_sword_finish_ice.py --check\npython3 -B tests/elemental_swords/run_ice_material_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "render",
+    "origin": "nei",
+    "name": "Native regional passage presentation and graphics translation units",
+    "run": "python3 -B tests/regional_passages/run_presentation_tests.py --syntax",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "render",
     "origin": "gate",
     "name": "Dedicated Lost Woods vertical scrolling and native binding preservation",
     "run": "python3 -B tests/lost_woods_entrance/run_vertical_scroll_tests.py"
@@ -109,6 +127,15 @@
     "origin": "gate",
     "name": "Conditional Lost Woods Great Fairy return",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/run_fountain_return_tests.py --sanitize"
+  },
+  {
+    "suite": "entrances",
+    "origin": "nei",
+    "name": "Native regional passage geometry, actor entry and cross-game handoff",
+    "run": "python3 -B tests/regional_passages/run_tests.py --sanitize",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
   },
   {
     "suite": "entrances",
@@ -663,10 +690,13 @@
     "run": "python3 -B scripts/diagnostics/run_mm_season_selector_tests.py"
   },
   {
-    "suite": "systems",
+    "suite": "equipment",
     "origin": "nei",
-    "name": "tests/seasons/run_rod_lifecycle_tests.py",
-    "run": "python3 -B tests/seasons/run_rod_lifecycle_tests.py"
+    "name": "Native OoT and MM Rod put-away, chooser and lifecycle in solo and Combo",
+    "run": "python3 -B tests/seasons/run_oot_rod_stow_tests.py --sanitize\npython3 -B tests/seasons/run_oot_rod_stow_tests.py --combo --sanitize\npython3 -B tests/seasons/run_rod_lifecycle_tests.py --sanitize\npython3 -B tests/seasons/run_rod_lifecycle_tests.py --combo --sanitize",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
   },
   {
     "suite": "systems",

@@ -172,6 +172,7 @@ struct SetTimeSettings : ISceneCommand {
 }
 // The separately tested native-solo lifecycle controller is a boundary here.
 extern "C" void ComboWoodfallPassage_ReadSpawns(PlayState*, const ActorEntry*, unsigned) {}
+extern "C" void ComboRegionalPassagesMm_ReadSpawns(PlayState*, const ActorEntry*, unsigned) {}
 // This fixture exercises the unchanged combined opening/prologue entry path.
 extern "C" void ComboSoloForestMm_NormalizeEntry() {
     require(Combo_IsCombinedGame(), "combined scene fixture must keep the solo controller inactive");

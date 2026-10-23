@@ -31,7 +31,8 @@
     "combo/render/sword_finish_ice_assets/frost-source.png": "83fbb0d35b80a1cc3870dac71119a52a204a8b76bd7073b06ec7e312394b98dd",
     "combo/render/sword_finish_ice_assets/frost.i8.png": "cbe168afeaa037f4b5249c812c2e1226138775a2342bd9776dcd13a2f02c459b",
     "combo/render/sword_finish_ice_assets/opacity.i8.png": "c0fc49fcff730c754e90e475288e95e760443388ec264763c21cbac7dfeb9b4f",
-    "combo/render/SwordFinishIceData.h": "29249d2cb8cfa8bfe6c55bb15e515d8fdc7d5c066ebbce7c310109676ebf1a8c"
+    "combo/render/SwordFinishIceData.h": "a049b307b4808804dd241e5edb3418d656edd788452c44d657fd9b1b2c125f7d"
   },
-  "sourceRecovery": "13 code paths recovered from retained exact tool text/hunks. Three tiny ABI/header/host wrappers reconstructed equivalently. All original native geometry/UV/normal commands retained; unsupported roots use native fallback. Actual configured runtime appearance requires user verification."
+  "sourceRecovery": "13 code paths recovered from retained exact tool text/hunks. Three tiny ABI/header/host wrappers reconstructed equivalently. All original native geometry/UV/normal commands retained; unsupported roots use native fallback. Actual configured runtime appearance requires user verification.",
+  "packingCheckCommand": "python3 -B scripts/assets/build_sword_finish_ice.py --check"
 }

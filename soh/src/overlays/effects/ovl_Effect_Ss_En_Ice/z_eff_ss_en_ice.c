@@ -134,10 +134,9 @@ void EffectSsEnIce_Draw(PlayState* play, u32 index, EffectSs* this) {
                Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, 0, gameplayFrames & 0xFF, 0x20, 0x10, 1, 0,
                                   (gameplayFrames * 2) & 0xFF, 0x40, 0x20, 0, 1, 0, 2));
     gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, iceMaterial ? 95 : this->rPrimColorR,
-                    iceMaterial ? 165 : this->rPrimColorG, iceMaterial ? 215 : this->rPrimColorB,
-                    this->rPrimColorA);
-    gDPSetEnvColor(POLY_XLU_DISP++, iceMaterial ? 230 : this->rEnvColorR,
-                   iceMaterial ? 250 : this->rEnvColorG, iceMaterial ? 255 : this->rEnvColorB, (u32)alpha);
+                    iceMaterial ? 165 : this->rPrimColorG, iceMaterial ? 215 : this->rPrimColorB, this->rPrimColorA);
+    gDPSetEnvColor(POLY_XLU_DISP++, iceMaterial ? 230 : this->rEnvColorR, iceMaterial ? 250 : this->rEnvColorG,
+                   iceMaterial ? 255 : this->rEnvColorB, (u32)alpha);
     gSPDisplayList(POLY_XLU_DISP++, iceMaterial ? iceMaterial : gEffIceFragment2DL);
 
     CLOSE_DISPS(gfxCtx);

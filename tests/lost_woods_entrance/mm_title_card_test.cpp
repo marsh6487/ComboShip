@@ -7,6 +7,7 @@
 #include "2s2h/Enhancements/Graphics/OotLocationTitleCard.h"
 #include "ComboGameMode.h"
 #include "entrances/LostWoodsEntrance.h"
+#include "entrances/RegionalPassages.h"
 #include "gameplay/CrossGameTitleCard.h"
 #include <cstdio>
 #include <cstdlib>
@@ -66,6 +67,7 @@ extern "C" s32 Entrance_GetTransitionFlags(u16 entrance) {
 /* NATIVE_MESSAGE_TITLE */
 
 #ifdef COMBO_BUILD
+extern "C" int ComboRegionalPassagesMm_ApplyArrival(int) { std::abort(); }
 int gComboStartFileNum = -1, gComboEntryIsResume, gComboOwlBlobSlot = -1;
 static int sComboPortalRoute;
 static bool sComboPortalArrivalPending;

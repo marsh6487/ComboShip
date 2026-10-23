@@ -370,8 +370,8 @@ static int DinFireSword_FinishPlaySound(PlayState* play, SwordFinishEffect* effe
         if (effect->element == SWORD_ELEMENT_LIGHT)
             MmSfx_PlayAtPos(0x39F7 - 0x800, &sFinishSoundPos[slot]);
         else
-            Audio_PlaySfxGeneral(NA_SE_EV_ICE_FREEZE - SFX_FLAG, &sFinishSoundPos[slot], 4,
-                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
+            Audio_PlaySfxGeneral(NA_SE_EV_ICE_FREEZE - SFX_FLAG, &sFinishSoundPos[slot], 4, &gSfxDefaultFreqAndVolScale,
+                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
 #else
         Audio_PlaySfx_AtPos(&sFinishSoundPos[slot],
                             (effect->element == SWORD_ELEMENT_LIGHT ? NA_SE_EN_COMMON_DEADLIGHT : NA_SE_EV_ICE_FREEZE) -
@@ -463,12 +463,12 @@ void DinFireSword_FinishDrawAll(PlayState* play) {
 #ifdef SWORD_FINISH_OOT
                 // Retain each host's original palette for unsupported native
                 // or Alt roots; scoped frost uses a blue/white envelope.
-                gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, iceDisplayList ? 95 : 150,
-                                iceDisplayList ? 165 : 150, iceDisplayList ? 215 : 150, 250);
+                gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, iceDisplayList ? 95 : 150, iceDisplayList ? 165 : 150,
+                                iceDisplayList ? 215 : 150, 250);
                 gDPSetEnvColor(POLY_XLU_DISP++, iceDisplayList ? 230 : 235, iceDisplayList ? 250 : 245, 255, alpha);
 #else
-                gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, iceDisplayList ? 95 : 170,
-                                iceDisplayList ? 165 : 255, iceDisplayList ? 215 : 255, 255);
+                gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, iceDisplayList ? 95 : 170, iceDisplayList ? 165 : 255,
+                                iceDisplayList ? 215 : 255, 255);
                 gDPSetEnvColor(POLY_XLU_DISP++, iceDisplayList ? 230 : 200, iceDisplayList ? 250 : 200, 255, alpha);
 #endif
                 gSPMatrix(POLY_XLU_DISP++, FINISH_MATRIX_TO(allocatedMatrix),
