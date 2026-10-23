@@ -86,6 +86,9 @@ jobs:
             exit 1
           fi
 
+      - name: Prepare exact shipped spin resources
+        run: python3 -B scripts/assets/prepare_spin_styles.py
+
       - name: Check custom asset trees for new path collisions
         run: python3 scripts/check-asset-collisions.py
 
@@ -103,6 +106,17 @@ jobs:
 
       - name: Fast generated sword UI asset check
         run: python3 -B scripts/assets/build_sword_element_ui.py --check
+
+      - name: Verify shipped spin styles
+        run: |
+          python3 -B tests/spin_style/test_bundled_assets.py
+          python3 -B scripts/assets/build_spin_style_resources.py --check
+          python3 -B scripts/diagnostics/run_spin_style_tests.py --policy --resources
+
+      - name: Verify native location titles
+        run: |
+          python3 -B tests/location_titles/test_native_assets.py
+          python3 -B tests/location_titles/run_tests.py
 
       - name: clang-format (clang-format-14)
         run: |

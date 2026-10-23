@@ -29,6 +29,7 @@ uint8_t SwordElement_Get(uint16_t item);
 uint8_t SwordElement_HasSelection(uint16_t item);
 uint8_t SwordElement_Set(uint16_t item, uint8_t element);
 uint8_t SwordElement_ForItem(uint16_t item);
+uint8_t SwordElement_IsRegularSword(struct PlayState* play, struct Player* player);
 uint8_t SwordElement_Active(struct PlayState* play, struct Player* player);
 #ifdef __cplusplus
 }

@@ -42,7 +42,7 @@ int sForestSlot = -1;
 u32 sForestSeed;
 bool sForestResume = false, sForestArmed = false, sOriginStaged = false, sLocalReturning = false, sForestTitle = false;
 RespawnData sForestPreservedReturn;
-alignas(2) constexpr char kForestTitle[] = "__OTR__custom/skiejer_forest/title";
+alignas(2) constexpr char kForestTitle[] = "__OTR__custom/oot_location_titles/v1/lost_woods";
 u32 ForestSeed() {
     return gSaveContext.save.shipSaveInfo.rando.finalSeed;
 }
@@ -216,7 +216,7 @@ void DrawForestPortal() {
     auto* play = gPlayState;
     if (!ForestVisit(play) || play->roomCtx.curRoom.num != 0 || !ForestSafe(play))
         return;
-    if (sForestTitle && (!ResourceMgr_FileExists("custom/skiejer_forest/title") ||
+    if (sForestTitle && (!ResourceMgr_FileExists("custom/oot_location_titles/v1/lost_woods") ||
                          ComboPlaceTitleCard_Show(play, const_cast<char*>(kForestTitle), 144, 24) != 0))
         sForestTitle = false;
     Matrix_Push();

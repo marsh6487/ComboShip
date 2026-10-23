@@ -77,7 +77,7 @@ constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12,
 int sKeeperActorId = -1;
 constexpr int kLimbCount = 24, kHeadLimb = 5;
 alignas(2) constexpr char kKeeper[] = "__OTR__custom/skiejer_market/keeper/gTreasureChestShopGalSkel";
-alignas(2) constexpr char kCard[] = "__OTR__custom/skiejer_market/title";
+alignas(2) constexpr char kCard[] = "__OTR__custom/oot_location_titles/v1/market";
 alignas(2) constexpr char kExterior[] = "__OTR__custom/skiejer_market/entrance";
 struct KeeperState {
     SkelAnime skel;
@@ -613,7 +613,7 @@ void PresentTitle() {
     card.hasTranslation = false;
     card.x = 160;
     card.y = 120;
-    card.width = 192;
+    card.width = 240;
     card.height = 24;
     card.durationTimer = 80;
     card.delayTimer = 20;

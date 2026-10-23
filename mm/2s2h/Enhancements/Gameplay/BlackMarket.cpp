@@ -74,7 +74,7 @@ constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12,
 constexpr char kScene[] = "scenes/nonmq/skiejer_market/skiejer_market";
 constexpr char kRoom[] = "scenes/nonmq/skiejer_market/skiejer_market_room_0";
 constexpr char kKeeper[] = "__OTR__custom/skiejer_market/keeper/gTreasureChestShopGalSkel";
-alignas(2) constexpr char kCard[] = "__OTR__custom/skiejer_market/title";
+alignas(2) constexpr char kCard[] = "__OTR__custom/oot_location_titles/v1/market";
 alignas(2) constexpr char kExterior[] = "__OTR__custom/skiejer_market/entrance";
 constexpr Vec3f kShelves[8] = {
     // Two framed shelf banks; keep all offers on one frontal plane.
@@ -520,7 +520,7 @@ void PresentTitle() {
         sTitlePending = false;
         return;
     }
-    if (ComboPlaceTitleCard_Show(gPlayState, (TexturePtr)kCard, 192, 24) != 0)
+    if (ComboPlaceTitleCard_Show(gPlayState, (TexturePtr)kCard, 240, 24) != 0)
         sTitlePending = false;
 }
 void MarketText(u16* textId, bool* fromTable) {

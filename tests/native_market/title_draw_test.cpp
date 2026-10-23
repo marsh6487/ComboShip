@@ -84,23 +84,23 @@ static void InspectDraw(const TitleCardContext& card) {
             assert(((first >> 21) & 7) == G_IM_FMT_IA && ((first >> 19) & 3) == G_IM_SIZ_8b);
         } else if (opcode == G_SETTILESIZE) {
             ++tileSizes;
-            assert(((second >> 12) & 0xFFF) == 764 && (second & 0xFFF) == 92);
+            assert(((second >> 12) & 0xFFF) == 956 && (second & 0xFFF) == 92);
         } else if (opcode == G_SETPRIMCOLOR) {
             ++colors;
             assert(second == expectedColor && "native draw must submit the current frame's fade color/alpha");
         } else if (opcode == G_TEXRECT) {
             ++rectangles;
             // Native MM coordinates are quarter-pixels, including its native -1 bottom edge.
-            assert(((second >> 12) & 0xFFF) == 256 && (second & 0xFFF) == 432);
-            assert(((first >> 12) & 0xFFF) == 1020 && (first & 0xFFF) == 527);
+            assert(((second >> 12) & 0xFFF) == 160 && (second & 0xFFF) == 432);
+            assert(((first >> 12) & 0xFFF) == 1116 && (first & 0xFFF) == 527);
             assert(command + 2 < graphics.overlay.p);
             assert(command[1].words.w1 == 0 && command[2].words.w1 == 0x04000400);
         } else if (opcode == G_TEXRECT_WIDE) {
             ++rectangles;
             // Native OoT uses the wide command with its full native bottom edge.
-            assert((first & 0xFFFFFF) == 1020 && (second & 0xFFFFFF) == 528);
+            assert((first & 0xFFFFFF) == 1116 && (second & 0xFFFFFF) == 528);
             assert(command + 2 < graphics.overlay.p);
-            assert((command[1].words.w0 & 0xFFFFFF) == 256 && (command[1].words.w1 & 0xFFFFFF) == 432);
+            assert((command[1].words.w0 & 0xFFFFFF) == 160 && (command[1].words.w1 & 0xFFFFFF) == 432);
             assert(command[2].words.w0 == 0 && command[2].words.w1 == 0x04000400);
             command += 2;
         }
@@ -132,7 +132,7 @@ static void NativeFadeCheck(int frame, const TitleCardContext& card) {
 
 int main() {
     assert(__alignof__(kCard) >= 2 && "raw native texture pointers reserve the low bit for segmented addresses");
-    assert(!std::strcmp(kCard, "__OTR__custom/skiejer_market/title"));
+    assert(!std::strcmp(kCard, "__OTR__custom/oot_location_titles/v1/market"));
     for (int language = 0; language < 3; ++language) {
         PlayState play{};
         gSaveContext = {};
@@ -149,7 +149,7 @@ int main() {
         sTitlePending = true;
         PresentTitle();
         auto& card = play.actorCtx.titleCtx;
-        assert(card.texture == kCard && card.x == 160 && card.y == 120 && card.width == 192 && card.height == 24);
+        assert(card.texture == kCard && card.x == 160 && card.y == 120 && card.width == 240 && card.height == 24);
         assert(card.delayTimer == 20 && card.durationTimer == 80 && !sTitlePending);
         for (int frame = 0; frame < 120; ++frame) {
 #ifdef OOT_TITLE_DRAW_TEST
@@ -170,5 +170,5 @@ int main() {
         }
         assert(card.alpha == 0 && card.durationTimer == 0 && card.delayTimer == 0);
     }
-    std::puts("PASS native market TitleCard_Draw: actual IA8 resource, centered192x24 rectangle, native fade commands and language parity");
+    std::puts("PASS native market TitleCard_Draw: actual IA8 resource, centered240x24 rectangle, native fade commands and language parity");
 }

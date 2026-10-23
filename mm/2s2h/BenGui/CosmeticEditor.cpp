@@ -1162,6 +1162,14 @@ void CosmeticEditorWindow::DrawElement() {
             UIWidgets::Separator(true, true, 2.0f, 2.0f);
             CosmeticEditorDrawGroup(COSMETICS_GROUP_PLAYER, "Link");
             UIWidgets::CVarCheckbox(
+                "Use Vanilla Held Swords", "gEnhancements.SkijerNEI.UseVanillaHeldSwords",
+                UIWidgets::CheckboxOptions()
+                    .DefaultValue(false)
+                    .Color(THEME_COLOR)
+                    .Tooltip("Use the original held sword models in both games (the legacy model for Four Sword). "
+                             "Turn off to keep the authored models. Selected custom models retain priority. "
+                             "Changes apply immediately and do not affect pickup or shop models."));
+            UIWidgets::CVarCheckbox(
                 "Dungeon item colours", "gEnhancements.DungeonItemColors",
                 UIWidgets::CheckboxOptions()
                     .Color(THEME_COLOR)

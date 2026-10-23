@@ -11,6 +11,7 @@ bool equipped=true;
 Gfx nativeDL[1]{};
 extern "C" {
 SaveContext gSaveContext{};
+s32 CVarGetInteger(const char*, s32 fallback){return fallback;}
 uint8_t ResourceMgr_FileExists(const char* p){return resources.contains(p);}
 uint8_t ResourceMgr_FileAltExists(const char* p){return alternate.contains(p);}
 bool ResourceMgr_IsAltAssetsEnabled(){return altEnabled;}

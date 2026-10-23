@@ -3,6 +3,7 @@
 
 #include <libultraship/libultra.h>
 #include "global.h"
+#include "../../../../../combo/gameplay/SpinAttackState.h"
 
 struct EnMThunder;
 
@@ -33,7 +34,8 @@ typedef struct EnMThunder {
     u8 coneArmed; // 0 = still waiting for the release swing to reach its 2/3 mark
     u8 coneWait;  // frames spent waiting, so a cancelled swing can never strand it
     s16 coneYaw;  // her facing at release — the cone does not turn with her afterwards
-} EnMThunder;                         // size = 0x01D0
+    CwSpinAttackState spinStyle;
+} EnMThunder; // size = 0x01D0
 
 // Vanilla inlined the charge glow because Link holds one sword. Gerudo's second blade and the Four
 // Sword clones each supply their own hand matrix.

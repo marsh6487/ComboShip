@@ -1,5 +1,5 @@
-// OoT-like presentation using the actual decoded MM location-name glyphs.
-// Native decoded text stays authoritative, with optional title-only artwork.
+// Built-in native OoT location artwork with native timing and exact decoded
+// MM title eligibility. Optional HD packs replace these same native resources.
 #include "OotLocationTitleCard.h"
 #include "message_data_fmt_nes.h"
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -14,8 +14,8 @@ static u16 sTextId;
 static TitleCardContext sCard;
 static s16 sWidths[3];
 static u8 sLines;
-static int sUseTexture;
-static int sUseFont; // 0: native MM, 1: optional 16px font, 2: native OoT profile
+static int sUseTexture; // 1: legacy 192px override, 2: built-in 240px native card
+static int sUseFont;    // 0: native MM, 1: optional 16px font, 2: native OoT profile
 // Native OoT place-card crops retain their source proportions and 24px baseline.
 // This versioned profile must not use the native MM dialogue advance table.
 static const u8 sOotNativeAdvances[160] = {
@@ -226,6 +226,14 @@ void OotLocationTitle_Begin(PlayState* play) {
     snprintf(sTexturePath, sizeof(sTexturePath), "__OTR__custom/mm_location_titles/%u/%04x",
              (unsigned)gSaveContext.options.language, (unsigned)sTextId);
     sUseTexture = OotLocationTitle_HasTexture(sTexturePath);
+    if (!sUseTexture) {
+        // Native lettering ships in the ordinary port archive. It must not
+        // depend on mounting the optional higher-resolution replacement pack.
+        snprintf(sTexturePath, sizeof(sTexturePath), "__OTR__custom/oot_location_titles/v1/%u/%04x",
+                 (unsigned)gSaveContext.options.language, (unsigned)sTextId);
+        if (OotLocationTitle_HasTexture(sTexturePath))
+            sUseTexture = 2;
+    }
     // A hand-authored whole-card override wins. Missing any optional font
     // character keeps the entire native glyph presentation, without a mix.
     sUseFont = sUseTexture ? 0 : PrepareFont(msg);
@@ -267,10 +275,13 @@ int OotLocationTitle_Draw(PlayState* play, Gfx** gfxP) {
     gDPSetCombineMode(gfx++, G_CC_MODULATEIA_PRIM, G_CC_MODULATEIA_PRIM);
     gDPSetEnvColor(gfx++, 0, 0, 0, 255);
     if (sUseTexture) {
+        const s16 width = sUseTexture == 2 ? 240 : 192;
+        const s16 left = 160 - width / 2;
         gDPSetPrimColor(gfx++, 0, 0, sCard.intensity, sCard.intensity, sCard.intensity, sCard.alpha);
-        gDPLoadTextureBlock(gfx++, sTexturePath, G_IM_FMT_IA, G_IM_SIZ_8b, 192, 24, 0, G_TX_NOMIRROR | G_TX_WRAP,
+        gDPLoadTextureBlock(gfx++, sTexturePath, G_IM_FMT_IA, G_IM_SIZ_8b, width, 24, 0, G_TX_NOMIRROR | G_TX_WRAP,
                             G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
-        gSPTextureRectangle(gfx++, 64 * 4, 108 * 4, 256 * 4 - 4, 132 * 4 - 1, G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
+        gSPTextureRectangle(gfx++, left * 4, 108 * 4, (left + width) * 4 - 4, 132 * 4 - 1, G_TX_RENDERTILE, 0, 0,
+                            1 << 10, 1 << 10);
     } else {
         unsigned glyph = 0, line = 0;
         s16 x = 160 - sWidths[0] / 2;

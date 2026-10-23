@@ -3,6 +3,8 @@
 #include "mods/transformation_masks/transformation_masks.h"
 #include "mods/extended_equipment.h"
 #include "overlays/effects/ovl_Effect_Ss_Blast/z_eff_ss_blast.h"
+#include "sword_element.h"
+#include "../../../../../combo/render/SpinAttackDraw.h"
 
 #define FLAGS 0
 
@@ -85,6 +87,37 @@ void EnMThunder_SetupAction(EnMThunder* this, EnMThunderActionFunc actionFunc) {
     this->actionFunc = actionFunc;
 }
 
+static void EnMThunder_InitStyle(EnMThunder* this, PlayState* play) {
+    Player* player = GET_PLAYER(play);
+    int eligible = SwordElement_IsRegularSword(play, player) && gSaveContext.isMagicAcquired &&
+                   !(this->actor.params & EN_M_THUNDER_SWORD_BEAM_FLAG) && !GerudoMhr_UsesConeBurst(player) &&
+                   (this->actor.parent == NULL || this->actor.parent == &player->actor);
+    CwSpinAttack_Init(&this->spinStyle, CVarGetInteger(CW_SPIN_STYLE_CVAR, 0),
+                      CVarGetInteger(CW_SPIN_ELEMENT_EFFECTS_CVAR, 1), eligible, (uintptr_t)player, (uintptr_t)play,
+                      play->sceneNum);
+    CwSpinAttack_Preview(&this->spinStyle, SwordElement_Active(play, player), eligible, 0);
+}
+
+static void EnMThunder_PreviewStyle(EnMThunder* this, PlayState* play) {
+    Player* player = GET_PLAYER(play);
+    int eligible = this->spinStyle.owner == (uintptr_t)player && this->spinStyle.context == (uintptr_t)play &&
+                   this->spinStyle.scene == play->sceneNum && SwordElement_IsRegularSword(play, player) &&
+                   (this->actor.parent == NULL || this->actor.parent == &player->actor);
+    CwSpinAttack_Preview(&this->spinStyle, SwordElement_Active(play, player), eligible,
+                         play->pauseCtx.state != 0 || play->pauseCtx.debugState != 0);
+}
+
+static void EnMThunder_ReleaseStyle(EnMThunder* this, PlayState* play) {
+    Player* player = GET_PLAYER(play);
+    int eligible = this->spinStyle.owner == (uintptr_t)player && this->spinStyle.context == (uintptr_t)play &&
+                   this->spinStyle.scene == play->sceneNum && SwordElement_IsRegularSword(play, player) &&
+                   !this->isGerudoCone && !GerudoMhr_UsesConeBurst(player) &&
+                   (this->actor.parent == NULL || this->actor.parent == &player->actor);
+    this->collider.info.toucher.dmgFlags =
+        CwSpinAttack_Release(&this->spinStyle, SwordElement_Active(play, player), eligible,
+                             this->collider.info.toucher.dmgFlags, DMG_ARROW_FIRE, DMG_ARROW_ICE, DMG_ARROW_LIGHT);
+}
+
 void EnMThunder_Init(Actor* thisx, PlayState* play2) {
     PlayState* play = play2;
     EnMThunder* this = (EnMThunder*)thisx;
@@ -92,6 +125,7 @@ void EnMThunder_Init(Actor* thisx, PlayState* play2) {
 
     Collider_InitCylinder(play, &this->collider);
     Collider_SetCylinder(play, &this->collider, &this->actor, &sCylinderInit);
+    EnMThunder_InitStyle(this, play);
 
     // Sword beam mode: spawned by FD Z-target + B attack.
     // From MM z_en_m_thunder.c EnMThunder_Init lines 169-184.
@@ -176,6 +210,7 @@ void EnMThunder_Init(Actor* thisx, PlayState* play2) {
         Audio_PlaySfxGeneral(NA_SE_IT_ROLLING_CUT_LV1, &player->actor.projectedPos, 4, &gSfxDefaultFreqAndVolScale,
                              &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         this->spinAttackTimer = 1.0f;
+        EnMThunder_ReleaseStyle(this, play);
     } else {
         EnMThunder_SetupAction(this, EnMThunder_ChargingSpinAttack);
     }
@@ -189,6 +224,9 @@ void EnMThunder_Destroy(Actor* thisx, PlayState* play) {
         Magic_Reset(play);
     }
 
+    this->collider.info.toucher.dmgFlags =
+        CwSpinAttack_Original(&this->spinStyle, this->collider.info.toucher.dmgFlags);
+    CwSpinAttack_Reset(&this->spinStyle);
     Collider_DestroyCylinder(play, &this->collider);
     EnMThunder_AdjustEnvLights(play, 0.0f);
     LightContext_RemoveLight(play, &play->lightCtx, this->lightNode);
@@ -221,6 +259,7 @@ void EnMThunder_EmptySpinAttack(EnMThunder* this, PlayState* play) {
 void EnMThunder_ChargingSpinAttack(EnMThunder* this, PlayState* play) {
     Player* player = GET_PLAYER(play);
     Actor* child = this->actor.child;
+    EnMThunder_PreviewStyle(this, play);
 
     this->spinChargePercent = player->unk_858;
     this->actor.world.pos = player->bodyPartsPos[0];
@@ -289,6 +328,7 @@ void EnMThunder_ChargingSpinAttack(EnMThunder* this, PlayState* play) {
             Audio_PlaySfxGeneral(sSfxIds[this->attackStrength], &player->actor.projectedPos, 4,
                                  &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
             this->spinAttackTimer = 1.0f;
+            EnMThunder_ReleaseStyle(this, play);
             return;
         }
     }
@@ -646,6 +686,22 @@ static void EnMThunder_DrawGerudoWedge(EnMThunder* this, PlayState* play, u8 alp
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+static CwSpinVisualSelection EnMThunder_VisualStyle(EnMThunder* thunder, PlayState* play) {
+    int eligible = thunder->spinStyle.eligible && thunder->spinStyle.owner == (uintptr_t)GET_PLAYER(play) &&
+                   thunder->spinStyle.context == (uintptr_t)play && thunder->spinStyle.scene == play->sceneNum &&
+                   !thunder->isGerudoCone && thunder->attackStrength != 2;
+    return CwSpinStyle_Resolve(thunder->spinStyle.style, thunder->spinStyle.effectsEnabled, thunder->spinStyle.element,
+                               eligible);
+}
+
+static int EnMThunder_DrawChargeStyle(EnMThunder* thunder, PlayState* play) {
+    CwSpinVisualSelection visual = EnMThunder_VisualStyle(thunder, play);
+    if (thunder->spinStyle.released)
+        visual.accentElement = 0; // Released bursts own the entire 12/24 particle budget.
+    return CwSpinDraw_Charge(play, visual, thunder->spinChargePercent >= 0.85f, thunder->chargeAlpha / 255.0f,
+                             gSpinAttackChargingDL);
+}
+
 void EnMThunder_DrawChargeGlow(EnMThunder* thunder, PlayState* play, MtxF* handMtx) {
     static f32 sSpinChargeScale[] = { 0.1f, 0.15f, 0.2f, 0.25f, 0.3f, 0.25f, 0.2f, 0.15f };
     f32 pulse;
@@ -721,7 +777,9 @@ void EnMThunder_DrawChargeGlow(EnMThunder* thunder, PlayState* play, MtxF* handM
                                   (play->gameplayFrames * 20) & 0xFF, (play->gameplayFrames * scrollRate) & 0xFF, 8, 8,
                                   5, 0, 20, scrollRate));
 
-    gSPDisplayList(POLY_XLU_DISP++, gSpinAttackChargingDL);
+    if (!EnMThunder_DrawChargeStyle(thunder, play)) {
+        gSPDisplayList(POLY_XLU_DISP++, gSpinAttackChargingDL);
+    }
 
     CLOSE_DISPS(play->state.gfxCtx);
 }
@@ -799,8 +857,11 @@ void EnMThunder_Draw(Actor* thisx, PlayState* play2) {
             } else {
                 gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, 255, 255, 170, (u8)(this->spinAttackAlpha * 255));
             }
-            gSPDisplayList(POLY_XLU_DISP++, gSpinAttack3DL);
-            gSPDisplayList(POLY_XLU_DISP++, gSpinAttack4DL);
+            if (!CwSpinDraw_Burst(play, EnMThunder_VisualStyle(this, play), 1, this->spinAttackAlpha, gSpinAttack3DL,
+                                  gSpinAttack4DL)) {
+                gSPDisplayList(POLY_XLU_DISP++, gSpinAttack3DL);
+                gSPDisplayList(POLY_XLU_DISP++, gSpinAttack4DL);
+            }
             break;
         case 1:
             if (CVarGetInteger(CVAR_COSMETIC("SpinAttack.Level1Primary.Changed"), 0)) {
@@ -810,13 +871,20 @@ void EnMThunder_Draw(Actor* thisx, PlayState* play2) {
             } else {
                 gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, 170, 255, 255, (u8)(this->spinAttackAlpha * 255));
             }
-            gSPDisplayList(POLY_XLU_DISP++, gSpinAttack1DL);
-            gSPDisplayList(POLY_XLU_DISP++, gSpinAttack2DL);
+            if (!CwSpinDraw_Burst(play, EnMThunder_VisualStyle(this, play), 0, this->spinAttackAlpha, gSpinAttack1DL,
+                                  gSpinAttack2DL)) {
+                gSPDisplayList(POLY_XLU_DISP++, gSpinAttack1DL);
+                gSPDisplayList(POLY_XLU_DISP++, gSpinAttack2DL);
+            }
             break;
     }
 
     CLOSE_DISPS(play->state.gfxCtx);
 
+    if (this->spinStyle.released) {
+        CwSpinDraw_Accents(play, EnMThunder_VisualStyle(this, play), this->attackStrength == 0,
+                           this->spinTrailTexScroll, this->spinAttackAlpha);
+    }
     EnMThunder_DrawChargeGlow(this, play, &player->mf_9E0);
 
     // Gerudo Dual Blades: she charges with a blade in each hand, so the glow goes up twice. Her

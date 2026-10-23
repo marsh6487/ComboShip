@@ -83,6 +83,12 @@
   {
     "suite": "render",
     "origin": "gate",
+    "name": "Complete spin style native rendering and combat, normal and sanitized",
+    "run": "python3 -B scripts/diagnostics/run_spin_style_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_spin_style_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
     "name": "Native OoT and MM cape visibility during shop camera ownership",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/mm_cape/run_visibility_tests.py"
   },
@@ -979,6 +985,12 @@
     "origin": "nei",
     "name": "tests/nei_held/run_equipment_tests.py",
     "run": "python3 -B tests/nei_held/run_equipment_tests.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "nei",
+    "name": "tests/nei_held/run_vanilla_sword_menu_tests.py",
+    "run": "python3 -B tests/nei_held/run_vanilla_sword_menu_tests.py"
   },
   {
     "suite": "items",

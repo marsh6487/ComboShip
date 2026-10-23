@@ -1,4 +1,9 @@
 #include "global.h"
+#include "spin_attack_style.h"
+#include "overlays/actors/ovl_En_M_Thunder/z_en_m_thunder.h"
+#define CW_SPIN_OWNERSHIP_MM
+#include "../../../combo/gameplay/SpinAttackOwnership.h"
+#undef CW_SPIN_OWNERSHIP_MM
 #include "align_asset_macro.h"
 #include "din_fire_sword.h"
 #include "sword_element.h"
@@ -343,6 +348,9 @@ uint32_t DinFireSword_OriginalDamageFlags(PlayState* play, const ColliderElement
     if (hitInfo == NULL)
         return 0;
     u32 flags = hitInfo->atDmgInfo.dmgFlags;
+    u32 spinOriginal = SpinAttack_OriginalDamageFlags(play, hitInfo);
+    if (spinOriginal != flags)
+        return spinOriginal;
     if (play == NULL || sDamage.play != play || sDamage.player == NULL || sDamage.player != GET_PLAYER(play) ||
         sDamage.scene != play->sceneId || sDamage.age != (AdultLink_IsActive() ? 0 : 1))
         return flags;

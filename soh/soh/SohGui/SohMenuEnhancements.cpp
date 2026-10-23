@@ -1,4 +1,5 @@
 #include "../../../combo/gameplay/SwordElementOverride.h"
+#include "../../../combo/render/SpinAttackStyle.h"
 #ifdef COMBO_BUILD
 #include "../../../combo/gui/BlackMarketAppearance.h"
 #endif
@@ -36,6 +37,16 @@ extern PlayState* gPlayState;
     ShipInit::Init(cvar);
 
 static std::string comboboxTooltip = "";
+static const std::map<int32_t, const char*> spinStyleOptions = {
+    { CW_SPIN_STYLE_NATIVE, "Native" },
+    { CW_SPIN_STYLE_FIRE, "Fire" },
+    { CW_SPIN_STYLE_ICE, "Ice" },
+    { CW_SPIN_STYLE_LIGHT, "Light" },
+    { CW_SPIN_STYLE_LIGHTNING, "Lightning" },
+    { CW_SPIN_STYLE_ARCANE, "Arcane" },
+    { CW_SPIN_STYLE_ASTRAL, "Astral" },
+    { CW_SPIN_STYLE_DARK_ENERGY, "Dark Energy" },
+};
 bool isBetaQuestEnabled = false;
 
 extern "C" {
@@ -846,6 +857,19 @@ void SohMenu::AddMenuEnhancements() {
         .CVar(CVAR_ENHANCEMENT("EquipmentAlwaysVisible"))
         .RaceDisable(false)
         .Options(CheckboxOptions().Tooltip("Makes all equipment visible, regardless of age."));
+    AddWidget(path, "Spin Style", WIDGET_CVAR_COMBOBOX)
+        .CVar(CW_SPIN_STYLE_CVAR)
+        .Options(ComboboxOptions()
+                     .ComboMap(spinStyleOptions)
+                     .DefaultIndex(CW_SPIN_STYLE_NATIVE)
+                     .Tooltip("Choose the appearance of powered sword spins. Applies to the next spin. "
+                              "Styles are available independently of sword imbues and do not grant elemental damage."));
+    AddWidget(path, "Elemental Spin Effects", WIDGET_CVAR_CHECKBOX)
+        .CVar(CW_SPIN_ELEMENT_EFFECTS_CVAR)
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+            "Add the sword's Fire, Ice or Light glow and particles to powered spins. Native style also uses "
+            "elemental spin materials; custom styles keep their own look. Applies to the next spin. "
+            "Turning this off changes appearance only. Native magic costs are unchanged."));
     AddWidget(path, "Din Fire Shield (POC)", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_ENHANCEMENT("DinFireShield"))
         .RaceDisable(false)

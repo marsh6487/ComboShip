@@ -61,7 +61,7 @@ PlayState* gPlayState;
 GameState* gGameState;
 static bool titleAvailable, altAvailable, altEnabled, stockActive, playerCs, veto, randomized;
 static int hide = -1, presentations;
-alignas(2) constexpr char kCard[]="__OTR__custom/skiejer_market/title";
+/* CARD_RESOURCE */
 bool Active(){return stockActive;}
 bool Interior(){return true;}
 bool Safe(PlayState* p){return p && p->state.running && p->transitionTrigger==0 && p->transitionMode==0 && p->pauseCtx.state==0 && p->gameOverCtx.state==0 && p->csCtx.state==0;}
@@ -111,7 +111,7 @@ int main(){
  PresentTitle();
  assert(play.actorCtx.titleCtx.texture==kCard && "entry title must not require active stock");
  assert(play.actorCtx.titleCtx.x==160 && play.actorCtx.titleCtx.y==120);
- assert(play.actorCtx.titleCtx.width==192 && play.actorCtx.titleCtx.height==24);
+ assert(play.actorCtx.titleCtx.width==240 && play.actorCtx.titleCtx.height==24);
  assert(play.actorCtx.titleCtx.delayTimer==20 && play.actorCtx.titleCtx.durationTimer==80);
  assert(!sTitlePending && !std::memcmp(&saved,&gSaveContext,sizeof(saved)));
  for(int frame=0;frame<120;++frame){TitleCard_Update(
@@ -177,6 +177,7 @@ int main(){
         fixture = fixture.replace('/* REQUEST */',request).replace('/* GUARD */',guard)
         fixture = fixture.replace('/* NATIVE */',native).replace('/* HELPER */',helper)
         fixture = fixture.replace('/* PRESENT */',function(source,'void PresentTitle('))
+        fixture = fixture.replace('/* CARD_RESOURCE */', re.search(r'alignas\(2\) constexpr char kCard\[\][^;]*;', source)[0])
         target=Path(temporary)/(host+'.cpp');target.write_text(fixture)
         binary=Path(temporary)/host
         paths=[host,host+'/include',host+'/include/PR',host+'/src',host+'/assets',host+('/2s2h' if host=='mm' else '/soh'),'libultraship/include','combo']

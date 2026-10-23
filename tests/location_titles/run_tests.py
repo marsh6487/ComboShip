@@ -5,7 +5,9 @@ No game/ROM/pack is required. The native TitleCard_Update body is extracted
 from z_actor.c; platform graphics/resource APIs are explicit fixture boundaries.
 """
 from pathlib import Path
+import json
 import os
+import re
 import subprocess
 import tempfile
 
@@ -90,9 +92,10 @@ HARNESS = r"""
 #include <stdio.h>
 Save gSaveContext;
 f32 sNESFontWidths[160];
-static int option, nativeAsset, altAsset, altEnabled, fontAsset, missingGlyph, fontProbes, nativeFontAsset;
+static int option, nativeAsset, altAsset, altEnabled, fontAsset, missingGlyph, fontProbes, nativeFontAsset, builtinAsset;
 int CVarGetInteger(const char* key, int def) { (void)key; (void)def; return option; }
 int OotLocationTitle_HasTexture(const char* p) {
+    if (strstr(p,"custom/oot_location_titles/v1/")) return builtinAsset;
     assert(strstr(p,"custom/mm_location_titles/"));
     if (strstr(p,"/oot_native_v1/")) {
         if (strstr(p,"/profile")) return nativeFontAsset;
@@ -119,7 +122,7 @@ static void init(const char* text) {
     // excluding it from the reported glyph/control-stream length.
     p.msgCtx.decodedTextLen=strlen(text);
     p.msgCtx.decodedBuffer.schar[p.msgCtx.decodedTextLen]=MESSAGE_END;
-    option=1; nativeAsset=altAsset=altEnabled=fontAsset=fontProbes=nativeFontAsset=0; missingGlyph=-1;
+    option=1; nativeAsset=altAsset=altEnabled=fontAsset=fontProbes=nativeFontAsset=builtinAsset=0; missingGlyph=-1;
     memset(&p.actorCtx.titleCtx, 0x42, sizeof(p.actorCtx.titleCtx));
     OotLocationTitle_Reset();
 }
@@ -407,6 +410,7 @@ int main(void) {
     assert(sWidths[0]==135);
     init("Milk Road"); nativeFontAsset=1; OotLocationTitle_Begin(&p); assert(sUseFont==2);
     assert(sWidths[0]==79);
+    /* BUILTIN_NATIVE_CASES */
     puts("location cards: native fade, glyph commands, eligibility, assets and interruption PASS");
 }
 """
@@ -425,7 +429,39 @@ def main():
         (tmp / "tables/scene_table.h").write_text((ROOT / "mm/include/tables/scene_table.h").read_text())
         (tmp / "message_data_fmt_nes.h").write_text((ROOT / "mm/include/message_data_fmt_nes.h").read_text())
         (tmp / "libultraship/bridge/consolevariablebridge.h").write_text("int CVarGetInteger(const char*, int);\n")
-        (tmp / "test.c").write_text(source + "\n" + function(actor, "TitleCard_Update") + "\n" + HARNESS)
+        scenes = (ROOT / 'mm/include/tables/scene_table.h').read_text()
+        scene_titles = {}
+        for scene, text in re.findall(r'DEFINE_SCENE\([^,]+,\s*(SCENE_\w+),\s*(0x[0-9A-Fa-f]+|0)\s*,', scenes):
+            if int(text, 0):
+                scene_titles.setdefault(f'{int(text, 0):04x}', scene)
+        titles = json.loads((ROOT / 'tools/location_titles/assets/native-v3/manifest.json').read_text())['titles']
+        assert set(scene_titles) == {row['id'] for row in titles}, 'all actual titled scene IDs must have built-in art'
+        cases = []
+        for row in titles:
+            cases.append(f'''
+    init({json.dumps(row['text'])}); builtinAsset=fontAsset=nativeFontAsset=1;
+    p.sceneId={scene_titles[row['id']]}; p.msgCtx.currentTextId=0x{row['id']};
+    OotLocationTitle_Begin(&p);
+    assert(sUseTexture==2 && !sUseFont && !fontProbes);
+    assert(!strcmp(sTexturePath,"__OTR__custom/oot_location_titles/v1/1/{row['id']}"));
+    for(int i=0;i<21;++i) OotLocationTitle_Update(&p);
+    n=draw(); cards=rectangles=0;
+    for(int i=0;i<n;++i) {{
+        cards+=commands[i].kind==2;
+        if(commands[i].kind==4) {{
+            ++rectangles;
+            assert(commands[i].a==40*4 && commands[i].b==108*4);
+            assert(commands[i].c==280*4-4 && commands[i].d==132*4-1);
+        }}
+    }}
+    assert(cards==1 && rectangles==1); // halo is baked, never drawn five times
+''')
+        cases.append('''
+    init("AB"); builtinAsset=nativeAsset=1; OotLocationTitle_Begin(&p);
+    assert(sUseTexture==1 && !strcmp(sTexturePath,"__OTR__custom/mm_location_titles/1/0116"));
+''')
+        harness = HARNESS.replace('/* BUILTIN_NATIVE_CASES */', '\n'.join(cases))
+        (tmp / "test.c").write_text(source + "\n" + function(actor, "TitleCard_Update") + "\n" + harness)
         binary = tmp / "test"
         subprocess.run(["cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
                         "-Wno-unused-parameter", "-fsanitize=address,undefined", "-I", str(tmp),
