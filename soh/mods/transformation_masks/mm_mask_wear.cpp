@@ -19,6 +19,7 @@
 #include "soh/cvar_prefixes.h"
 
 #include "mods/transformation_masks/mm_mask_wear.h"
+#include "mods/transformation_masks/transformation_masks.h"
 #include "mods/transformation_masks/custom_forms.h"
 #include "mods/transformation_masks/assets/mm_asset_loader.h"
 #include "mods/sound_translator/mm_sfx_ids.h"
@@ -194,6 +195,7 @@ static Gfx sBlastMaskXluSeg9[] = {
 
 static s32 sCurrentMmMask = ITEM_NONE;
 static s32 sBlastMaskCooldown = 0;
+static bool sBlastARequested = false;
 
 // Don Gero state
 static s32 sDonGeroState = 0; // 0=idle, 1=giving reward
@@ -1135,6 +1137,71 @@ extern "C" void MmMaskWear_Draw(PlayState* play, Player* player) {
 // Per-Mask Effect Update (empty stubs for now)
 // =============================================================================
 
+extern "C" s32 MmMaskWear_CanUseBlastA(PlayState* play, Player* player) {
+    // The worn-mask updater ticks the cooldown before accepting the request.
+    if (play == nullptr || player == nullptr || sCurrentMmMask != ITEM_MM_MASK_BLAST ||
+        (sBlastMaskCooldown != 0 && sBlastMaskCooldown != 1)) {
+        return false;
+    }
+    const u32 blockedState1 = PLAYER_STATE1_INPUT_DISABLED | PLAYER_STATE1_TALKING | PLAYER_STATE1_DEAD |
+                              PLAYER_STATE1_GETTING_ITEM | PLAYER_STATE1_IN_ITEM_CS | PLAYER_STATE1_IN_CUTSCENE |
+                              PLAYER_STATE1_FIRST_PERSON | PLAYER_STATE1_ON_HORSE | PLAYER_STATE1_CARRYING_ACTOR |
+                              PLAYER_STATE1_IN_WATER | PLAYER_STATE1_CLIMBING_LEDGE | PLAYER_STATE1_HANGING_OFF_LEDGE |
+                              PLAYER_STATE1_CLIMBING_LADDER | PLAYER_STATE1_READY_TO_FIRE |
+                              PLAYER_STATE1_START_CHANGING_HELD_ITEM;
+    const u32 blockedState2 = PLAYER_STATE2_CRAWLING | PLAYER_STATE2_DIVING | PLAYER_STATE2_UNDERWATER |
+                              PLAYER_STATE2_FROZEN | PLAYER_STATE2_GRABBED_BY_ENEMY | PLAYER_STATE2_GRABBING_DYNAPOLY |
+                              PLAYER_STATE2_OCARINA_PLAYING | PLAYER_STATE2_FORCED_VOID_OUT;
+    return player->actor.category == ACTORCAT_PLAYER && !(player->stateFlags1 & blockedState1) &&
+           !(player->stateFlags2 & blockedState2) && player->textboxBtnCooldownTimer == 0 &&
+           player->heldItemAction != PLAYER_IA_FISHING_POLE && player->rideActor == nullptr &&
+           player->itemAction != PLAYER_IA_OCARINA_FAIRY && player->itemAction != PLAYER_IA_OCARINA_OF_TIME &&
+           play->msgCtx.msgMode == MSGMODE_NONE && play->pauseCtx.state == 0 && play->pauseCtx.debugState == 0 &&
+           play->gameOverCtx.state == GAMEOVER_INACTIVE && play->csCtx.state == CS_STATE_IDLE &&
+           play->transitionMode == TRANS_MODE_OFF && !Player_InBlockingCsMode(play, player) &&
+           !TransformMasks_AButtonIsOffered(player);
+}
+
+extern "C" void MmMaskWear_FilterBlastA(PlayState* play, Player* player, Input* input) {
+    sBlastARequested = false;
+    if (input != nullptr && MmMaskWear_CanUseBlastA(play, player)) {
+        // Snapshot ownership before UpdateCommon clears the interaction flags.
+        // The later worn-mask update owns bomb creation and the cooldown tick.
+        sBlastARequested = CHECK_BTN_ALL(input->press.button, BTN_A);
+        input->cur.button &= ~BTN_A;
+        input->press.button &= ~BTN_A;
+    }
+}
+
+static void MmMaskWear_UpdateBlast(PlayState* play, Player* player) {
+    const bool requestedA = sBlastARequested;
+    sBlastARequested = false;
+    if (sBlastMaskCooldown > 0) {
+        sBlastMaskCooldown--;
+    }
+
+    // B keeps its existing path. A has already yielded to native interactions.
+    if (sBlastMaskCooldown == 0 && (requestedA || CHECK_BTN_ALL(play->state.input[0].press.button, BTN_B))) {
+        Vec3f bombPos = player->actor.world.pos;
+
+        EnBom* bomb = (EnBom*)Actor_Spawn(&play->actorCtx, play, ACTOR_EN_BOM, bombPos.x, bombPos.y, bombPos.z, 0, 0, 0,
+                                          BOMB_BODY);
+
+        if (bomb != NULL) {
+            // Timer=1: decrements to 0 on first update, triggering the explosion.
+            bomb->timer = 1;
+            Actor_SetScale(&bomb->actor, 0.01f);
+
+            // Update runs before Draw can position the explosion collider.
+            bomb->explosionCollider.elements[0].dim.worldSphere.center.x = (s16)bombPos.x;
+            bomb->explosionCollider.elements[0].dim.worldSphere.center.y = (s16)bombPos.y;
+            bomb->explosionCollider.elements[0].dim.worldSphere.center.z = (s16)bombPos.z;
+
+            sBlastMaskCooldown = CVarGetInteger("gMods.BlastMask.Instant", 0) ? 1 : BLAST_MASK_COOLDOWN;
+        }
+    }
+}
+
 extern "C" void MmMaskWear_Update(PlayState* play, Player* player) {
     if (sCurrentMmMask == ITEM_NONE) {
         return;
@@ -1158,39 +1225,8 @@ extern "C" void MmMaskWear_Update(PlayState* play, Player* player) {
                 break;
             }
             case 2: // Blast Mask
-            {
-                // Decrement cooldown every frame
-                if (sBlastMaskCooldown > 0) {
-                    sBlastMaskCooldown--;
-                }
-
-                // B button press + no cooldown = spawn bomb (like BombArrows_SpawnInstantBomb)
-                if (sBlastMaskCooldown == 0 && CHECK_BTN_ALL(play->state.input[0].press.button, BTN_B)) {
-                    Vec3f bombPos = player->actor.world.pos;
-
-                    EnBom* bomb = (EnBom*)Actor_Spawn(&play->actorCtx, play, ACTOR_EN_BOM, bombPos.x, bombPos.y,
-                                                      bombPos.z, 0, 0, 0, BOMB_BODY);
-
-                    if (bomb != NULL) {
-                        // Timer=1: decrements to 0 on first update → triggers explosion
-                        bomb->timer = 1;
-
-                        // Scale must be set (init chain sets to 0, normally set at timer=67)
-                        Actor_SetScale(&bomb->actor, 0.01f);
-
-                        // CRITICAL: Set explosion collider position manually.
-                        // With timer=1, Update runs before Draw can call Collider_UpdateSpheres,
-                        // so the collider position would be at (0,0,0) without this.
-                        bomb->explosionCollider.elements[0].dim.worldSphere.center.x = (s16)bombPos.x;
-                        bomb->explosionCollider.elements[0].dim.worldSphere.center.y = (s16)bombPos.y;
-                        bomb->explosionCollider.elements[0].dim.worldSphere.center.z = (s16)bombPos.z;
-
-                        // Start cooldown (MM: this->blastMaskTimer = 310)
-                        sBlastMaskCooldown = CVarGetInteger("gMods.BlastMask.Instant", 0) ? 1 : BLAST_MASK_COOLDOWN;
-                    }
-                }
+                MmMaskWear_UpdateBlast(play, player);
                 break;
-            }
             case 3: // Stone Mask - effect handled in z_actor.c via MmMaskWear_IsStoneMaskActive()
                 break;
             case 4: // Great Fairy Mask — hair physics + A to claim reward in fountain + B for teleport
@@ -1931,6 +1967,7 @@ extern "C" void MmMaskWear_SetCurrent(s32 maskItem) {
 extern "C" void MmMaskWear_Clear(void) {
     sCurrentMmMask = ITEM_NONE;
     sBlastMaskCooldown = 0;
+    sBlastARequested = false;
     sDonGeroState = 0;
     sDonGeroReward = GI_NONE;
     sAllNightGsSpawned = 0;

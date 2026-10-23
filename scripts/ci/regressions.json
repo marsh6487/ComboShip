@@ -50,6 +50,12 @@
   {
     "suite": "equipment",
     "origin": "gate",
+    "name": "Native OoT Blast Mask tutorial and A-action arbitration",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/blast_mask/run_tests.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
     "name": "Fast Goron lifetime and Somaria GI regressions",
     "run": "python3 -B tests/goron_audio/run_tests.py\npython3 -B tests/mm_sfx_render/run_tests.py\npython3 -B scripts/diagnostics/run_oot_native_transformation_tests.py\npython3 -B tests/goron_field_collision/run_tests.py --sanitize\npython3 -B tests/nei_quest_held/mm_cane_gi_test.py"
   },
@@ -73,6 +79,12 @@
     "origin": "gate",
     "name": "Native MM weather and winter bridge preflight",
     "run": "python3 -B scripts/diagnostics/run_mm_weather_tests.py\npython3 -B scripts/diagnostics/run_mm_winter_atmosphere_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Native OoT and MM cape visibility during shop camera ownership",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/mm_cape/run_visibility_tests.py"
   },
   {
     "suite": "render",
