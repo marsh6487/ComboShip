@@ -185,6 +185,7 @@ void func_800BCC68(Vec3f* p,PlayState* play){}
 const char* gEffIceFragment2DL="native-oot-ice-clump";
 const char* gEffIceFragment2MaterialDL="native-mm-ice-material";
 const char* gEffIceFragment2ModelDL="native-mm-ice-model";
+Gfx* SwordFinishIce_GetDisplayList(uint32_t frame){(void)frame;return NULL;}
 Gfx* Gfx_TwoTexScrollEx(GraphicsContext* g,int a,int b,int c,int d,int e,int f,int h,int j,int k,int l,int m,int n,int o,int p){
  CHECK(a==0 && b==0 && d==32 && e==16 && f==1 && h==0 && k==64 && l==32 && m==0 && n==1 && o==0 && p==2);
  ++scrollChecks;return commands;

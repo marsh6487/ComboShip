@@ -447,6 +447,8 @@ void DinFireSword_FinishDrawAll(PlayState* play) {
             Matrix_Translate(point->x, point->y, point->z, MTXMODE_NEW);
             float scale = DinFireSword_FinishClamp(point->radius / 12.0f, 0.3f, 10);
             if (effect->element == SWORD_ELEMENT_ICE) {
+                extern Gfx* SwordFinishIce_GetDisplayList(uint32_t frame);
+                Gfx* iceDisplayList = SwordFinishIce_GetDisplayList(play->gameplayFrames);
                 Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);
                 FINISH_ROTATE_Y((i & 1) ? 3.14159265f : 0, MTXMODE_APPLY);
 #ifdef SWORD_FINISH_OOT
@@ -459,24 +461,32 @@ void DinFireSword_FinishDrawAll(PlayState* play) {
                            Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, 0, play->gameplayFrames & 255, 32, 16, 1, 0,
                                               (play->gameplayFrames * 2) & 255, 64, 32, 0, 1, 0, 2));
 #ifdef SWORD_FINISH_OOT
-                // OoT's EnCrow/EnZf clumps use this palette with their native
-                // material. MM's frozen-damage palette belongs to its own DL.
-                gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, 150, 150, 150, 250);
-                gDPSetEnvColor(POLY_XLU_DISP++, 235, 245, 255, alpha);
+                // Retain each host's original palette for unsupported native
+                // or Alt roots; scoped frost uses a blue/white envelope.
+                gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, iceDisplayList ? 95 : 150,
+                                iceDisplayList ? 165 : 150, iceDisplayList ? 215 : 150, 250);
+                gDPSetEnvColor(POLY_XLU_DISP++, iceDisplayList ? 230 : 235, iceDisplayList ? 250 : 245, 255, alpha);
 #else
-                gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, 170, 255, 255, 255);
-                gDPSetEnvColor(POLY_XLU_DISP++, 200, 200, 255, alpha);
+                gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, iceDisplayList ? 95 : 170,
+                                iceDisplayList ? 165 : 255, iceDisplayList ? 215 : 255, 255);
+                gDPSetEnvColor(POLY_XLU_DISP++, iceDisplayList ? 230 : 200, iceDisplayList ? 250 : 200, 255, alpha);
 #endif
                 gSPMatrix(POLY_XLU_DISP++, FINISH_MATRIX_TO(allocatedMatrix),
                           G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
 #ifdef SWORD_FINISH_OOT
                 Vec3f pos = { point->x, point->y, point->z }, lightDir = { 89.8f, 0, 89.8f };
                 func_8002EB44(&pos, &play->view.eye, &lightDir, play->state.gfxCtx);
-                gSPDisplayList(POLY_XLU_DISP++, gEffIceFragment2DL);
+                if (iceDisplayList)
+                    gSPDisplayList(POLY_XLU_DISP++, iceDisplayList);
+                else
+                    gSPDisplayList(POLY_XLU_DISP++, gEffIceFragment2DL);
 #else
                 Vec3f pos = { point->x, point->y, point->z };
                 func_800BCC68(&pos, play);
-                gSPDisplayList(POLY_XLU_DISP++, gEffIceFragment2MaterialDL);
+                if (iceDisplayList)
+                    gSPDisplayList(POLY_XLU_DISP++, iceDisplayList);
+                else
+                    gSPDisplayList(POLY_XLU_DISP++, gEffIceFragment2MaterialDL);
                 gSPDisplayList(POLY_XLU_DISP++, gEffIceFragment2ModelDL);
 #endif
             } else if (effect->element == SWORD_ELEMENT_FIRE) {

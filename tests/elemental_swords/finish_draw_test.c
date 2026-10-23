@@ -2,6 +2,10 @@
 #include "finish_host_test.c"
 
 static int finishDrawMatrices;
+Gfx* SwordFinishIce_GetDisplayList(uint32_t frame) {
+  (void)frame;
+  return NULL; // Native/Alt fallback; scoped material graph has its own fixture.
+}
 #ifdef SWORD_FINISH_TEST_MM
 Mtx *Matrix_ToMtx(Mtx *dest) {
   ++finishDrawMatrices;
