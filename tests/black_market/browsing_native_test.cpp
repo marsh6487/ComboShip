@@ -13,6 +13,8 @@
 #include "combo/BlackMarketEntry.h"
 #include "combo/BlackMarketShelves.h"
 #include "combo/BlackMarketGraphicsArena.h"
+#include "combo/BlackMarketReceipt.h"
+BlackMarketReceipt::State sReceipt;
 #if __has_include("combo/BlackMarketBrowsing.h")
 #include "combo/BlackMarketBrowsing.h"
 BlackMarketBrowsing::State sBrowser;
@@ -39,6 +41,7 @@ extern "C" int32_t CVarGetInteger(const char* name, int32_t fallback) {
 static bool active = true, accepted = true, advance;
 static int state = TEXT_STATE_EVENT, purchases, allocations, cameraWrites, lastText, allocationId = 1, closes;
 static int cursorSounds;
+static bool purchaseAccepted;
 #ifdef OOT_BROWSING_TEST
 void Sfx_PlaySfxCentered(u16 id) { assert(id == NA_SE_SY_CURSOR); ++cursorSounds; }
 #else
@@ -54,7 +57,11 @@ static int currentCs = -1, currentSub = -1, returnCamera;
 struct KeeperState { SkelAnime skel; int timer = 90, eye; } sKeeper;
 bool Active() { return active; }
 bool Interior() { return active; }
-void Purchase() { ++purchases; }
+// Observe the queued-GI boundary; native transaction fixtures own item/rupee delivery.
+bool Purchase() {
+    ++purchases;
+    return purchaseAccepted && sReceipt.Begin(sSelected, 0, 0, 0);
+}
 int GetState(MessageContext*) { return state; }
 bool ShouldAdvance(PlayState*) { return advance; }
 bool Accept(Actor*, PlayState*) { bool result = accepted; accepted = false; return result; }
@@ -343,6 +350,54 @@ void CheckReleaseLifecycle(Actor* keeper) {
     freshTalk(); press(BTN_B); released();
 }
 
+
+void CheckReceiptHandoff(Actor* keeper) {
+    const int before = purchases;
+    sReceipt.Cancel(); purchaseAccepted = true;
+    gPlayState = &play; active = true; accepted = true; allocationId = 1;
+    play.transitionTrigger = TRANS_TRIGGER_OFF; play.transitionMode = TRANS_MODE_OFF;
+    play.gameOverCtx.state = GAMEOVER_INACTIVE; play.pauseCtx.state = 0;
+    play.csCtx.state = CS_STATE_IDLE; player.stateFlags2 = 0x100;
+    play.cameraPtrs[0] = &mainCamera; play.cameraPtrs[1] = play.cameraPtrs[2] = nullptr;
+#ifdef OOT_BROWSING_TEST
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].head = &player.actor;
+    mainCamera.childCamIdx = SUBCAM_FREE;
+#else
+    play.actorCtx.actorLists[ACTORCAT_PLAYER].first = &player.actor;
+#endif
+    CameraStatus(&play, 0, 7); Continue(&play, kWelcomeText);
+    KeeperUpdate(keeper, &play);
+    assert(sTalking && ActiveCamera(&play) == 1 && (player.stateFlags2 & (1u << 29)));
+    sSelected = sBrowser.slot = 0; sBrowser.view = BlackMarketBrowsing::Target(0);
+    sBrowser.phase = BlackMarketBrowsing::Phase::Confirm;
+    Continue(&play, kConfirmText); play.msgCtx.choiceIndex = 0;
+    play.state.input[0] = {}; play.state.input[0].press.button = BTN_A; advance = true;
+    BrowseInput(&play);
+    play.state.input[0] = {}; advance = false;
+    assert(purchases == before + 1 && sReceipt.pending && !sReceipt.delivered && sReceipt.slot == 0);
+    assert(!sTalking && sBrowseCamera == -1 && sBrowseParent == -1 && !play.cameraPtrs[1] &&
+           ActiveCamera(&play) == 0 && state == TEXT_STATE_CLOSING && player.stateFlags2 == 0x100 &&
+           "accepted GI purchase must release the manual camera and shop-only hide bit before native presentation");
+    const int camerasBefore = allocations, writesBefore = cameraWrites, textBefore = lastText;
+    accepted = true; state = TEXT_STATE_EVENT;
+    KeeperUpdate(keeper, &play);
+    assert(accepted && !sTalking && allocations == camerasBefore && cameraWrites == writesBefore &&
+           lastText == textBefore && purchases == before + 1 &&
+           "pending GI receipt must not consume a keeper talk offer or restart browsing");
+    Camera itemCamera{}; play.cameraPtrs[2] = &itemCamera; CameraStatus(&play, 2, 7);
+    MonitorBrowsing(); KeeperUpdate(keeper, &play);
+    assert(ActiveCamera(&play) == 2 && play.cameraPtrs[2] == &itemCamera && !play.cameraPtrs[1] &&
+           allocations == camerasBefore && cameraWrites == writesBefore &&
+           "pending receipt must leave the native get-item camera in control");
+    sReceipt.Cancel(); purchaseAccepted = false;
+    play.cameraPtrs[2] = nullptr; CameraStatus(&play, 0, 7);
+    KeeperUpdate(keeper, &play);
+    assert(sTalking && allocations == camerasBefore + 1 && ActiveCamera(&play) == 1 &&
+           "keeper browsing must be available again after the receipt is retired");
+    EndBrowsing(&play);
+    assert(player.stateFlags2 == 0x100);
+}
+
 void CheckShelfFraming() {
     const float radius = .32f * 38, halfHeight = .32f * 42;
     const auto extension = [](float half, float floor, float extra) {
@@ -412,7 +467,8 @@ int main() {
     assert(allocations == 1 && ActiveCamera(&play) == 1 && cameraWrites > 0 &&
            "accepting shop talk must start a native controlled browsing camera");
     assert(sTalking && sSelected == -1 && (player.stateFlags2 & (1u << 29)));
-    assert(shopCamera.eye.x == 0 && shopCamera.eye.z == 240 &&
+    assert(shopCamera.eye.x == 0 && shopCamera.eye.y == 76 && shopCamera.eye.z == 196 &&
+           shopCamera.at.y == 61 && shopCamera.at.z == 86 && shopCamera.fov == 46 &&
            "the welcome view must face the keeper from the customer side at conversational distance");
     CheckCursorArenas();
     CheckCursorAnchors();
@@ -468,7 +524,9 @@ int main() {
     input(BTN_A,true); assert(lastText == kBrowseText && purchases == 0);
     input(BTN_A,true); assert(lastText == kConfirmText);
     play.msgCtx.choiceIndex = 0;
-    input(BTN_A,true); assert(lastText == kResultText && purchases == 1);
+    input(BTN_A,true); assert(lastText == kResultText && purchases == 1 && !sReceipt.pending &&
+                             sTalking && ActiveCamera(&play) == 1 &&
+                             "rejected purchase must retain browsing and show its result");
     input(0); assert(purchases == 1);
     input(BTN_A,true); assert(lastText == kBrowseText && purchases == 1);
     assert(cursorSounds == 10 && "confirmation, cancellation and results do not replay selection audio");
@@ -541,6 +599,7 @@ int main() {
            allocations==allocationsBeforeEmptyStock &&
            "empty stock offers a normal explanation without browsing or purchasing");
     CheckReleaseLifecycle(&keeper);
+    CheckReceiptHandoff(&keeper);
     BlackMarketBrowsing::Axis axis;
     assert(axis.Step(30)==0 && axis.Step(60)==1);
     for (int i=0;i<9;++i) assert(axis.Step(60)==0);

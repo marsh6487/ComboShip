@@ -16,8 +16,11 @@ from run_time_pedestal_tests import block_from
 source = (ROOT / "mm/2s2h/Enhancements/Gameplay/BlackMarket.cpp").read_text()
 signatures = ["bool SoloExterior(", "bool Exterior(", "Vec3f Door(", "u16 ReturnEntrance(",
               "void StageSoloReturn(", "bool Interior(",
-              "bool Safe(", "void Transition(", "void PlayerUpdate(", "void SceneInit(",
-              "const Item* Offer(", "PurchaseResult Status(", "void Purchase(", "void MarketText(",
+              "bool Safe(", "void Transition(", "void PlayerUpdate(",
+              "const Item* Offer(", "PurchaseResult Status(",
+              "bool ReceiptContext(", "void AbortMarketReceipt(", "void GiveMarketReceipt(",
+              "void ReleaseReceiptEvent(", "void MarketReceiptDestroyed(", "void CancelReceipt(",
+              "void OfferMarketReceipt(", "bool Purchase(", "void SceneInit(", "void MarketText(",
               "void ComboBlackMarket_SaveState(", "void ComboBlackMarket_LoadState(",
               'extern "C" void ComboBlackMarket_ApplyResume(',
               'extern "C" void ComboBlackMarket_NormalizeEntry(', "void LoadSolo("]
@@ -28,7 +31,8 @@ if "void RememberTravel(" in source:
     signatures.insert(0, "void RememberTravel(")
 if 'extern "C" int ComboBlackMarket_IsAuthoredDoor(' in source:
     signatures.append('extern "C" int ComboBlackMarket_IsAuthoredDoor(')
-body = "\n".join(block_from(source, source.index(s)) for s in signatures)
+receipt_state = source[source.index("BlackMarketReceipt::State sReceipt;"):source.index("bool ReceiptContext(")]
+body = receipt_state + "\n" + "\n".join(block_from(source, source.index(s)) for s in signatures)
 body += "\n" + "\n".join(block_from(source, source.index(s)) for s in
                           ("void LogDoorAttempt(", "void LogEntryRecovery("))
 fixture = (ROOT / "tests/black_market/native_test.cpp").read_text().replace("/* PRODUCTION */", body)
