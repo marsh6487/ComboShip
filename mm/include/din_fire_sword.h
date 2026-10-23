@@ -39,6 +39,8 @@ void DinFireSword_FinishFatal(struct PlayState* play, struct Actor* actor);
 void DinFireSword_FinishForget(struct PlayState* play, struct Actor* actor);
 void DinFireSword_FinishTeardown(struct PlayState* play);
 void DinFireSword_FinishDrawAll(struct PlayState* play);
+// Native delayed ice spawns inherit only an accepted custom sword-ice hit.
+int DinFireSword_UseIceMaterial(struct PlayState* play, const struct Actor* actor);
 void DinFireSword_Reset(void);
 void DinFireSword_Update(struct PlayState* play, struct Player* player);
 void DinFireSword_BeginPlayerDraw(struct PlayState* play, struct Player* player);

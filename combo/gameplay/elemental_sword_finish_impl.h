@@ -36,18 +36,33 @@ static SwordFinishCore sFinish;
 // entire module lifetime; expiration/scene resets release each bank reference.
 static Vec3f sFinishSoundPos[SWORD_FINISH_EFFECT_CAPACITY];
 
+#define SWORD_FINISH_SOUND_REQUEST_LIMIT 32
+static uint32_t sFinishSoundFrame;
+static unsigned sFinishSoundRequests;
+static unsigned sFinishSoundCursor;
+
+static int DinFireSword_FinishReserveSound(PlayState* play) {
+    if (sFinishSoundFrame != play->gameplayFrames) {
+        sFinishSoundFrame = play->gameplayFrames;
+        sFinishSoundRequests = 0;
+    }
+    // Leave space in the shared 256-entry ring for ordinary native sounds.
+    if (sFinishSoundRequests >= SWORD_FINISH_SOUND_REQUEST_LIMIT)
+        return 0;
+    ++sFinishSoundRequests;
+    return 1;
+}
+
 static int DinFireSword_FinishLoopSound(uint8_t element) {
-#ifdef SWORD_FINISH_OOT
-    return element == SWORD_ELEMENT_LIGHT;
-#else
     return element == SWORD_ELEMENT_LIGHT || element == SWORD_ELEMENT_ICE;
-#endif
 }
 
 static void DinFireSword_FinishStopSound(unsigned slot, uint8_t element) {
 #ifdef SWORD_FINISH_OOT
-    (void)element;
-    MmSfx_StopAtPos(0x31F7, &sFinishSoundPos[slot]);
+    if (element == SWORD_ELEMENT_LIGHT)
+        MmSfx_StopAtPos(0x31F7, &sFinishSoundPos[slot]);
+    else
+        Audio_StopSfxByPosAndId(&sFinishSoundPos[slot], NA_SE_EV_ICE_FREEZE - SFX_FLAG);
 #else
     AudioSfx_StopByPosAndId(&sFinishSoundPos[slot],
                             (element == SWORD_ELEMENT_LIGHT ? NA_SE_EN_COMMON_DEADLIGHT : NA_SE_EV_ICE_FREEZE) -
@@ -88,6 +103,14 @@ static int DinFireSword_FinishContext(PlayState* play) {
 
 static SwordFinishPoint DinFireSword_FinishOrigin(const Actor* actor) {
     return (SwordFinishPoint){ actor->world.pos.x, actor->world.pos.y, actor->world.pos.z, 0 };
+}
+
+int DinFireSword_UseIceMaterial(PlayState* play, const Actor* actor) {
+    if (!play || !actor)
+        return 0;
+    DinFireSword_FinishContext(play);
+    // Keys only: a late native spawn need not read a victim that was killed.
+    return SwordFinishCore_UseIceMaterial(&sFinish, (uintptr_t)actor);
 }
 
 static int DinFireSword_FinishEnemy(const Actor* actor) {
@@ -221,15 +244,35 @@ static SwordFinishShape DinFireSword_FinishBounds(const Collider* collider) {
     return shape;
 }
 
+static void DinFireSword_FinishIceImpact(PlayState* play, uintptr_t key, uint8_t element,
+                                         const SwordFinishShape* shape) {
+    if (element != SWORD_ELEMENT_ICE)
+        return;
+    SwordFinishHit* hit = SwordFinishCore_Find(&sFinish, key);
+    if (!hit || hit->iceImpacted || !DinFireSword_FinishReserveSound(play))
+        return;
+    Vec3f pos = { shape->origin.x, shape->origin.y, shape->origin.z };
+    // The native fixed-world emitter copies this value; it never retains the
+    // collider, the dying actor or this stack address.
+    SoundSource_PlaySfxAtFixedWorldPos(play, &pos, 24, NA_SE_IT_EXPLOSION_ICE);
+    hit->iceImpacted = 1;
+}
+
 void DinFireSword_FinishAcceptedHit(PlayState* play, const void* receiverCollider, const FINISH_INFO* info,
                                     uint32_t receiverFlags, uint32_t damage) {
     const Collider* receiver = receiverCollider;
-    if (!DinFireSword_FinishContext(play) || !receiver || !DinFireSword_FinishEnemy(receiver->actor) || !damage)
+    if (!DinFireSword_FinishContext(play) || !receiver || !DinFireSword_FinishEnemy(receiver->actor))
         return;
     uint8_t element = DinFireSword_FinishElement(play, info);
+    // Material provenance follows accepted collisions, independently of the
+    // audio request quota and the shorter-lived fatal-attribution record.
+    SwordFinishCore_SetIceMaterial(&sFinish, (uintptr_t)receiver->actor, element == SWORD_ELEMENT_ICE);
+    if (!damage)
+        return;
     SwordFinishShape shape = DinFireSword_FinishBounds(receiver);
     SwordFinishCore_Hit(&sFinish, (uintptr_t)receiver->actor, element,
                         DinFireSword_FinishNative(receiver->actor, element, receiverFlags), damage, &shape);
+    DinFireSword_FinishIceImpact(play, (uintptr_t)receiver->actor, element, &shape);
 }
 
 void DinFireSword_FinishConfirmedHit(PlayState* play, const void* receiverCollider, const FINISH_INFO* info,
@@ -239,11 +282,13 @@ void DinFireSword_FinishConfirmedHit(PlayState* play, const void* receiverCollid
         !(FINISH_FLAGS(info) & receiverFlags))
         return;
     uint8_t element = DinFireSword_FinishElement(play, info);
+    SwordFinishCore_SetIceMaterial(&sFinish, (uintptr_t)receiver->actor, element == SWORD_ELEMENT_ICE);
     if (!element)
         return;
     SwordFinishShape shape = DinFireSword_FinishBounds(receiver);
     SwordFinishCore_ConfirmPart(&sFinish, (uintptr_t)receiver->actor, 0, element,
                                 DinFireSword_FinishNative(receiver->actor, element, receiverFlags), &shape);
+    DinFireSword_FinishIceImpact(play, (uintptr_t)receiver->actor, element, &shape);
 }
 
 void DinFireSword_FinishConfirmedPart(PlayState* play, Actor* actor, const FINISH_INFO* info, unsigned part, float x,
@@ -251,12 +296,14 @@ void DinFireSword_FinishConfirmedPart(PlayState* play, Actor* actor, const FINIS
     if (!DinFireSword_FinishContext(play) || !actor)
         return;
     uint8_t element = DinFireSword_FinishElement(play, info);
+    SwordFinishCore_SetIceMaterial(&sFinish, (uintptr_t)actor, element == SWORD_ELEMENT_ICE);
     if (!element)
         return;
     SwordFinishShape shape = { 0 };
     shape.count = 1;
     shape.origin = shape.points[0] = (SwordFinishPoint){ x, y, z, DinFireSword_FinishClamp(radius, 4, 150) };
     SwordFinishCore_ConfirmPart(&sFinish, (uintptr_t)actor, part, element, 0, &shape);
+    DinFireSword_FinishIceImpact(play, (uintptr_t)actor, element, &shape);
 }
 
 static uint8_t DinFireSword_FinishHealth(const Actor* actor) {
@@ -287,8 +334,11 @@ void DinFireSword_FinishFatal(PlayState* play, Actor* actor) {
 }
 void DinFireSword_FinishForget(PlayState* play, Actor* actor) {
     // Do not read actor memory: Actor_Destroy may also run during scene teardown.
-    if (DinFireSword_FinishContext(play))
+    DinFireSword_FinishContext(play);
+    if (play && sFinish.context == (uintptr_t)play) {
         SwordFinishCore_Forget(&sFinish, (uintptr_t)actor);
+        SwordFinishCore_SetIceMaterial(&sFinish, (uintptr_t)actor, 0);
+    }
 }
 void DinFireSword_FinishTeardown(PlayState* play) {
     // DestroyContext runs before PlayState storage is released. An unrelated
@@ -297,26 +347,14 @@ void DinFireSword_FinishTeardown(PlayState* play) {
         DinFireSword_FinishContext(NULL);
 }
 
-#define SWORD_FINISH_SOUND_REQUEST_LIMIT 32
-static uint32_t sFinishSoundFrame;
-static unsigned sFinishSoundRequests;
-static unsigned sFinishSoundCursor;
-
 static int DinFireSword_FinishPlaySound(PlayState* play, SwordFinishEffect* effect) {
     if (sFinish.paused || !effect->life)
         return 0;
     if (effect->sounded &&
         (!DinFireSword_FinishLoopSound(effect->element) || effect->soundFrame == play->gameplayFrames))
         return 0;
-    if (sFinishSoundFrame != play->gameplayFrames) {
-        sFinishSoundFrame = play->gameplayFrames;
-        sFinishSoundRequests = 0;
-    }
-    // Both native MM and the OoT bridge have a 256-entry request ring. Keep
-    // room for native sounds, including across repeated draws/pause toggles.
-    if (sFinishSoundRequests >= SWORD_FINISH_SOUND_REQUEST_LIMIT)
+    if (!DinFireSword_FinishReserveSound(play))
         return 0;
-    ++sFinishSoundRequests;
     Vec3f pos = { effect->shape.origin.x, effect->shape.origin.y, effect->shape.origin.z };
     if (DinFireSword_FinishLoopSound(effect->element)) {
         unsigned slot = (unsigned)(effect - sFinish.effects);
@@ -325,11 +363,15 @@ static int DinFireSword_FinishPlaySound(PlayState* play, SwordFinishEffect* effe
         SkinMatrix_Vec3fMtxFMultXYZ(&play->viewProjectionMtxF, &pos, &sFinishSoundPos[slot]);
         effect->sounded = 1;
         effect->soundFrame = play->gameplayFrames;
-        // Native MM frozen damage effects refresh ICE_FREEZE - SFX_FLAG
-        // each frame. Use copied positions: the killed actor may be gone.
+        // Native frozen damage refreshes ICE_FREEZE - SFX_FLAG each frame.
+        // Use copied positions: even dismembered actors may already be gone.
         // Only light needs the imported MM bank in OoT.
 #ifdef SWORD_FINISH_OOT
-        MmSfx_PlayAtPos(0x39F7 - 0x800, &sFinishSoundPos[slot]);
+        if (effect->element == SWORD_ELEMENT_LIGHT)
+            MmSfx_PlayAtPos(0x39F7 - 0x800, &sFinishSoundPos[slot]);
+        else
+            Audio_PlaySfxGeneral(NA_SE_EV_ICE_FREEZE - SFX_FLAG, &sFinishSoundPos[slot], 4,
+                                 &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
 #else
         Audio_PlaySfx_AtPos(&sFinishSoundPos[slot],
                             (effect->element == SWORD_ELEMENT_LIGHT ? NA_SE_EN_COMMON_DEADLIGHT : NA_SE_EV_ICE_FREEZE) -
@@ -337,15 +379,7 @@ static int DinFireSword_FinishPlaySound(PlayState* play, SwordFinishEffect* effe
 #endif
     } else {
         effect->sounded = 1;
-        // OoT's native ice stun (EnZf) uses the enemy freeze cue, not
-        // MM's sustained environmental ICE_FREEZE sound.
-#ifdef SWORD_FINISH_OOT
-        SoundSource_PlaySfxAtFixedWorldPos(
-            play, &pos, 24, effect->element == SWORD_ELEMENT_FIRE ? NA_SE_EV_BURN_OUT : NA_SE_EN_GOMA_JR_FREEZE);
-#else
-        SoundSource_PlaySfxAtFixedWorldPos(
-            play, &pos, 24, effect->element == SWORD_ELEMENT_FIRE ? NA_SE_EV_BURN_OUT : NA_SE_EV_ICE_FREEZE);
-#endif
+        SoundSource_PlaySfxAtFixedWorldPos(play, &pos, 24, NA_SE_EV_BURN_OUT);
     }
     return 1;
 }

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Narrow native-contract fixture; no renderer, audio mixer or game runtime.
-Runs real extracted production sound/context functions and the ice draw branch.
+Runs real extracted sound/context functions, Lizalfos stun and the ice draw branch.
 The tiny fake engine records calls; symbolic SFX constants intentionally differ.
 Usage after applying: python3 tests/elemental_sword_finish_native_test.py
---fixture-stdin accepts {"impl": "...", "core": "..."} for no-checkout review.
+--fixture-stdin accepts {"impl": "...", "core": "...", "stun": "..."} for no-checkout review.
 """
 import json
 from pathlib import Path
@@ -20,6 +20,7 @@ SOUND_PREFIX = r"""#include <stdint.h>
 #define SWORD_ELEMENT_LIGHT 3
 #define SFX_FLAG 0x800
 #define NA_SE_EV_ICE_FREEZE 0x280E
+#define NA_SE_IT_EXPLOSION_ICE 0x183B
 #define NA_SE_EN_GOMA_JR_FREEZE 0x30A4
 #define NA_SE_EV_BURN_OUT 0x2891
 #define NA_SE_EN_COMMON_DEADLIGHT 0x39F7
@@ -46,17 +47,6 @@ void SkinMatrix_Vec3fMtxFMultXYZ(MtxF* m,Vec3f* in,Vec3f* out){*out=*in;out->z+=
 SOUND_MAIN = r"""int main(void) {
  PlayState play={0}; play.gameplayFrames=1; play.sceneNum=1;
  CHECK(DinFireSword_FinishContext(&play));
-#ifdef SWORD_FINISH_OOT
- SwordFinishEffect* ice=&sFinish.effects[0];
- ice->element=SWORD_ELEMENT_ICE; ice->life=24; ice->shape.origin=(SwordFinishPoint){1,2,3,0};
- DinFireSword_FinishPlayAllSounds(&play);
- CHECK(oneShots==1 && lastId==NA_SE_EN_GOMA_JR_FREEZE && requests==0);
- DinFireSword_FinishPlayAllSounds(&play); CHECK(oneShots==1);
- ++play.gameplayFrames; CHECK(DinFireSword_FinishContext(&play));
- DinFireSword_FinishPlayAllSounds(&play); CHECK(oneShots==1);
- DinFireSword_FinishContext(NULL); CHECK(stops==0);
- oneShots=0;
-#else
  SwordFinishEffect* ice=&sFinish.effects[0];
  ice->element=SWORD_ELEMENT_ICE; ice->life=24; ice->shape.origin=(SwordFinishPoint){1,2,3,0};
  DinFireSword_FinishPlayAllSounds(&play);
@@ -77,7 +67,6 @@ SOUND_MAIN = r"""int main(void) {
  DinFireSword_FinishPlayAllSounds(&play);
  ++play.sceneNum;CHECK(DinFireSword_FinishContext(&play));
  CHECK(stops==4 && lastId==NA_SE_EV_ICE_FREEZE-SFX_FLAG && !sFinish.effects[0].life);
-#endif
  CHECK(DinFireSword_FinishContext(&play));
  SwordFinishEffect* fire=&sFinish.effects[1]; fire->element=SWORD_ELEMENT_FIRE;fire->life=24;
  DinFireSword_FinishPlayAllSounds(&play); CHECK(oneShots==1 && lastId==NA_SE_EV_BURN_OUT);
@@ -87,11 +76,7 @@ SOUND_MAIN = r"""int main(void) {
  unsigned before=requests; DinFireSword_FinishPlayAllSounds(&play);CHECK(before==requests);
  ++play.gameplayFrames;CHECK(DinFireSword_FinishContext(&play));DinFireSword_FinishPlayAllSounds(&play);CHECK(requests==before+1);
  DinFireSword_FinishTeardown(&play); CHECK(stops==
-#ifdef SWORD_FINISH_OOT
- 1
-#else
  5
-#endif
  );
  CHECK(DinFireSword_FinishContext(&play));
  for(unsigned i=0;i<40;++i){
@@ -109,6 +94,59 @@ SOUND_MAIN = r"""int main(void) {
  CHECK(sFinish.effects[39].sounded);
  puts("PASS host-native ice SFX routing, cadence/cleanup, fire/light preservation, request budget and fairness");
  return 0;
+}"""
+IMPACT_MAIN = r"""int main(void){
+ PlayState play={0};play.sceneNum=1;
+ const uint8_t orders[][2]={{0,2},{1,2},{3,2},{2,0},{2,1},{2,3},{2,2}};
+ SwordFinishShape shape={0};shape.count=1;shape.origin=(SwordFinishPoint){1,2,3,0};
+ for(unsigned order=0;order<sizeof(orders)/sizeof(orders[0]);++order){
+  ++play.gameplayFrames;CHECK(DinFireSword_FinishContext(&play));oneShots=0;
+  for(unsigned hit=0;hit<2;++hit){
+   unsigned element=orders[order][hit];
+   SwordFinishCore_Hit(&sFinish,7,element,0,1,&shape);
+   DinFireSword_FinishIceImpact(&play,7,element,&shape);
+  }
+  CHECK(oneShots==1 && lastId==NA_SE_IT_EXPLOSION_ICE);
+  DinFireSword_FinishIceImpact(&play,7,SWORD_ELEMENT_ICE,&shape);CHECK(oneShots==1);
+  SwordFinishCore_Begin(&sFinish,7,2);SwordFinishCore_End(&sFinish,7,0,&shape.origin);
+  CHECK(sFinish.effects[0].life==(order==6 ? 24 : 0));
+  DinFireSword_FinishContext(NULL);
+ }
+ puts("PASS mixed-hit ice impact dedup independent of fatal attribution and hit order");return 0;
+}"""
+STUN_PREFIX = r"""#include <stdint.h>
+#include <stdio.h>
+#include <stddef.h>
+#define BGCHECKFLAG_GROUND 1
+#define ENZF_DMGEFF_ICE 15
+#define ENZF_DMGEFF_STUN 1
+#define ENZF_ACTION_STUNNED 16
+#define DMG_ARROW_ICE 0x1000
+#define NA_SE_EN_GOMA_JR_FREEZE 0x389E
+typedef struct {struct {uint32_t dmgFlags;} toucher;} ColliderInfo;
+typedef struct {struct {unsigned bgCheckFlags;struct {float y;} velocity;float speedXZ;} actor;
+ int hopAnimIndex,damageEffect,iceTimer,action,skelAnime;
+ struct {struct {ColliderInfo* acHitInfo;} info;} bodyCollider;} EnZf;
+static unsigned sounds;static uint32_t original;
+void* gPlayState;int gZfKnockedBackAnim;
+uint32_t DinFireSword_OriginalDamageFlags(void* p,const ColliderInfo* hit){return original;}
+void Audio_PlayActorSound2(void* actor,unsigned id){++sounds;}
+void Animation_PlayOnceSetSpeed(void* anim,void* resource,float speed){}
+void EnZf_Stunned(EnZf* actor,void* play){}
+void EnZf_SetupAction(EnZf* actor,void(*action)(EnZf*,void*)){}
+#define CHECK(c) do{if(!(c)){fprintf(stderr,"FAIL line %d: %s\n",__LINE__,#c);return 1;}}while(0)
+"""
+STUN_MAIN = r"""int main(void){
+ EnZf actor={0};ColliderInfo hit={0};actor.bodyCollider.info.acHitInfo=&hit;
+ actor.damageEffect=ENZF_DMGEFF_ICE;hit.toucher.dmgFlags=0x200|DMG_ARROW_ICE;original=0x200;
+ EnZf_SetupStunned(&actor);CHECK(sounds==0 && actor.iceTimer==36 && actor.action==ENZF_ACTION_STUNNED);
+ hit.toucher.dmgFlags=original=DMG_ARROW_ICE;
+ EnZf_SetupStunned(&actor);CHECK(sounds==1); // Native ice arrows retain their own cue.
+ actor.damageEffect=ENZF_DMGEFF_STUN;hit.toucher.dmgFlags=original=1;
+ EnZf_SetupStunned(&actor);CHECK(sounds==2); // Real Deku nuts retain their own cue.
+ actor.damageEffect=ENZF_DMGEFF_ICE;actor.bodyCollider.info.acHitInfo=NULL;
+ EnZf_SetupStunned(&actor);CHECK(sounds==3);
+ puts("PASS OoT Lizalfos sword-ice impact replaces shared nut cue; native arrows/nuts remain intact");return 0;
 }"""
 RENDER_PREFIX = r"""#include <stdint.h>
 #include <stdio.h>
@@ -192,15 +230,31 @@ def ice_body(source):
     begin = source.index("if (effect->element == SWORD_ELEMENT_ICE) {")
     return source[begin:source.index(" else if (effect->element == SWORD_ELEMENT_FIRE)", begin)]
 
-def run(impl, core):
+def function(source, name):
+    begin = source.index("void " + name + "(")
+    opening = source.index("{", begin)
+    depth = 1
+    end = opening + 1
+    while depth:
+        depth += (source[end] == "{") - (source[end] == "}")
+        end += 1
+    return source[begin:end]
+
+
+def run(impl, core, stun=None):
     sources = {
         "sound": SOUND_PREFIX + core + sound_body(impl) + SOUND_MAIN,
+        "impact": SOUND_PREFIX + core + sound_body(impl) + function(impl, "DinFireSword_FinishIceImpact") + IMPACT_MAIN,
         "render": RENDER_PREFIX + core + RENDER_MAIN.replace("BODY", ice_body(impl)),
     }
+    if stun:
+        sources["stun"] = STUN_PREFIX + function(stun, "EnZf_SetupStunned") + STUN_MAIN
     failed = False
     with tempfile.TemporaryDirectory(prefix="sword-finish-native-") as temp:
         for name, source in sources.items():
             for host in ("MM", "OOT"):
+                if name == "stun" and host != "OOT":
+                    continue
                 executable = str(Path(temp) / (name + "-" + host))
                 command = ["cc", "-std=c99", "-x", "c", "-", "-o", executable]
                 if host == "OOT":
@@ -218,8 +272,9 @@ def run(impl, core):
 if __name__ == "__main__":
     if "--fixture-stdin" in sys.argv:
         fixture = json.load(sys.stdin)
-        raise SystemExit(run(fixture["impl"], fixture["core"]))
+        raise SystemExit(run(fixture["impl"], fixture["core"], fixture.get("stun")))
     root = Path(__file__).resolve().parents[1]
     raise SystemExit(run(
         (root / "combo/gameplay/elemental_sword_finish_impl.h").read_text(),
-        (root / "combo/gameplay/elemental_sword_finish_core.h").read_text()))
+        (root / "combo/gameplay/elemental_sword_finish_core.h").read_text(),
+        (root / "soh/src/overlays/actors/ovl_En_Zf/z_en_zf.c").read_text()))

@@ -146,6 +146,51 @@ static void Lifecycle(void) {
   REQUIRE(Effects() ==
           1); // Capacity pressure never steals another actor's identity.
 }
+static void NativeIceKeepsDeathAudioWithoutDuplicateMesh(void) {
+  Setup();
+  Hit(7, 2, 1);
+  SwordFinishCore_Begin(&core, 7, 3);
+  SwordFinishPoint moved = {15, 25, 35, 0};
+  SwordFinishCore_End(&core, 7, 0, &moved);
+  REQUIRE(Effects() == 1 && core.effects[0].element == 2);
+  REQUIRE(core.effects[0].shape.count == 0);
+  REQUIRE(core.effects[0].shape.origin.x == 15 &&
+          core.effects[0].shape.origin.y == 25 &&
+          core.effects[0].shape.origin.z == 35);
+  memset(&shape, 0xDE, sizeof(shape));
+  REQUIRE(core.effects[0].shape.origin.x == 15);
+}
+static void NativeIceMaterialOutlivesHitWithoutOwningActorMemory(void) {
+#ifdef SWORD_FINISH_HAS_ICE_MATERIAL
+  Setup();
+  REQUIRE(!SwordFinishCore_UseIceMaterial(&core, 7));
+  SwordFinishCore_SetIceMaterial(&core, 7, 1);
+  Hit(7, 2, 0);
+  SwordFinishCore_Begin(&core, 7, 3);
+  SwordFinishCore_End(&core, 7, 1, NULL);
+  REQUIRE(!SwordFinishCore_Find(&core, 7));
+  for (int frame = 101; frame <= 137; ++frame)
+    SwordFinishCore_Context(&core, 1, 2, 3, frame, 0, 1);
+  REQUIRE(SwordFinishCore_UseIceMaterial(&core, 7)); // Delayed native 36-frame ice spawns.
+  for (int frame = 138; frame <= 197; ++frame)
+    SwordFinishCore_Context(&core, 1, 2, 3, frame, 1, 1);
+  REQUIRE(SwordFinishCore_UseIceMaterial(&core, 7)); // Pause does not age provenance.
+  for (int frame = 198; frame <= 326; ++frame)
+    SwordFinishCore_Context(&core, 1, 2, 3, frame, 0, 1);
+  REQUIRE(!SwordFinishCore_UseIceMaterial(&core, 7)); // Provenance remains bounded.
+  SwordFinishCore_SetIceMaterial(&core, 7, 1);
+  REQUIRE(SwordFinishCore_UseIceMaterial(&core, 7));
+  SwordFinishCore_SetIceMaterial(&core, 8, 1);
+  SwordFinishCore_SetIceMaterial(&core, 7, 0);
+  REQUIRE(!SwordFinishCore_UseIceMaterial(&core, 7));
+  REQUIRE(SwordFinishCore_UseIceMaterial(&core, 8));
+  SwordFinishCore_SetIceMaterial(&core, 7, 1);
+  SwordFinishCore_Context(&core, 1, 2, 4, 327, 0, 1);
+  REQUIRE(!SwordFinishCore_UseIceMaterial(&core, 7));
+#else
+  REQUIRE(!"accepted ice material provenance is missing");
+#endif
+}
 static void SeparateParts(void) {
 #ifdef SWORD_FINISH_HAS_PARTS
   Setup();
@@ -173,6 +218,8 @@ static void SeparateParts(void) {
 int main(void) {
   Attribution();
   Lifecycle();
+  NativeIceKeepsDeathAudioWithoutDuplicateMesh();
+  NativeIceMaterialOutlivesHitWithoutOwningActorMemory();
   SeparateParts();
   puts("PASS production finish core: owned fatal attribution, native dedup, "
        "copied anchors and lifecycle");

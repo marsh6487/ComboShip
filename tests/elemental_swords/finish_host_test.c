@@ -31,6 +31,8 @@ static int finishSoundCount;
 static u16 finishSound;
 static int finishStopCount;
 static Vec3f *finishSoundPos;
+static int finishImpactCount;
+static Vec3f finishImpactWorldPos;
 static void LiveUpdate(Actor *actor, PlayState *state) {}
 bool GameInteractor_Should(GIVanillaBehavior behavior, uint32_t result, ...) {
   return result;
@@ -70,6 +72,23 @@ void AudioSfx_StopByPosAndId(Vec3f *pos, u16 sound) {
 }
 #else
 u8 TransformMasks_IsFDSkinMode(void) { return 0; }
+f32 gSfxDefaultFreqAndVolScale = 1.0f;
+s8 gSfxDefaultReverb;
+void Audio_PlaySfxGeneral(u16 sound, Vec3f *pos, u8 token, f32 *freq,
+                          f32 *volume, s8 *reverb) {
+  REQUIRE(pos >= sFinishSoundPos &&
+          pos < sFinishSoundPos + SWORD_FINISH_EFFECT_CAPACITY);
+  REQUIRE(sound == NA_SE_EV_ICE_FREEZE - SFX_FLAG);
+  ++finishSoundCount;
+  finishSound = sound;
+  finishSoundPos = pos;
+}
+void Audio_StopSfxByPosAndId(Vec3f *pos, u16 sound) {
+  REQUIRE(pos >= sFinishSoundPos &&
+          pos < sFinishSoundPos + SWORD_FINISH_EFFECT_CAPACITY);
+  REQUIRE(sound == NA_SE_EV_ICE_FREEZE - SFX_FLAG);
+  ++finishStopCount;
+}
 static GameInfo gameInfo;
 GameInfo *gGameInfo = &gameInfo;
 s32 MmSfx_PlayAtPos(u16 sound, Vec3f *pos) {
@@ -100,6 +119,11 @@ void SoundSource_PlaySfxAtFixedWorldPos(PlayState *state, Vec3f *pos,
 #endif
   ++finishSoundCount;
   finishSound = sound;
+  if (sound == NA_SE_IT_EXPLOSION_ICE) {
+    ++finishImpactCount;
+    finishImpactWorldPos = *pos;
+    REQUIRE(duration == 24);
+  }
 }
 #include "finish_native.inc"
 #include "finish_tables.inc"
@@ -122,8 +146,10 @@ static void World(void) {
   gfx.polyXlu.p = xlu;
   finishSoundCount = finishSound = finishStopCount = 0;
   finishSoundPos = NULL;
+  finishImpactCount = 0;
   elementalSelection = elementalActive = 3;
-  ++play.gameplayFrames;
+  static uint32_t worldFrame;
+  play.gameplayFrames = ++worldFrame;
 }
 static void Accept(ColliderCylinder *cylinder, int element) {
   elementalSelection = elementalActive = element;
@@ -168,6 +194,8 @@ static void FatalBindings(void) {
     cylinder.dim = (Cylinder16){20, 60, 0, {10, 20, 30}};
     Actor before = actor;
     Accept(&cylinder, element);
+    REQUIRE(finishImpactCount == (element == SWORD_ELEMENT_ICE));
+    REQUIRE(finishSoundCount == (element == SWORD_ELEMENT_ICE));
     REQUIRE(actor.colChkInfo.damage == 4);
     DinFireSword_FinishBeginActor(&play, &actor);
     REQUIRE(Actor_ApplyDamage(&actor) == 0);
@@ -182,6 +210,7 @@ static void FatalBindings(void) {
     DinFireSword_FinishForget(&play, &actor);
     memset(&actor, 0xDE, sizeof(actor));
     REQUIRE(sFinish.effects[0].shape.origin.x == 10);
+    finishSoundCount = 0;
     DinFireSword_FinishPlaySound(&play, &sFinish.effects[0]);
     REQUIRE(finishSoundCount == 1);
 #ifdef SWORD_FINISH_TEST_MM
@@ -193,9 +222,11 @@ static void FatalBindings(void) {
                                             : NA_SE_EN_COMMON_DEADLIGHT) -
                   SFX_FLAG);
 #else
-    const int heldLoop = element == SWORD_ELEMENT_LIGHT;
+    const int heldLoop = element == SWORD_ELEMENT_ICE || element == SWORD_ELEMENT_LIGHT;
     if (heldLoop)
-      REQUIRE(finishSound == 0x31F7); // Native MM 0x39F7 - SFX_FLAG bridge.
+      REQUIRE(finishSound == (element == SWORD_ELEMENT_LIGHT
+                                  ? 0x31F7
+                                  : NA_SE_EV_ICE_FREEZE - SFX_FLAG));
 #endif
     DinFireSword_FinishPlaySound(&play, &sFinish.effects[0]);
     REQUIRE(finishSoundCount == 1);
@@ -224,6 +255,151 @@ static void FatalBindings(void) {
       REQUIRE(Effects() == 0 && finishStopCount == 2);
     }
   }
+}
+static void IceImpactEachAcceptedHitAndDismemberedDeath(void) {
+  World();
+  Actor actor = {0};
+  actor.id = ACTOR_EN_DEKUBABA;
+  actor.category = ACTORCAT_ENEMY;
+  actor.update = LiveUpdate;
+  actor.colChkInfo.health = 12;
+  actor.world.pos = (Vec3f){10, 20, 30};
+  ColliderCylinder cylinder = {0};
+  cylinder.base.actor = &actor;
+  cylinder.base.acFlags = AC_HIT;
+  cylinder.base.shape = COLSHAPE_CYLINDER;
+  cylinder.dim = (Cylinder16){20, 60, 0, {10, 20, 30}};
+  Accept(&cylinder, SWORD_ELEMENT_ICE);
+  REQUIRE(finishImpactCount == 1 && finishSound == NA_SE_IT_EXPLOSION_ICE);
+  REQUIRE(finishImpactWorldPos.x == 10 && finishImpactWorldPos.y == 20 &&
+          finishImpactWorldPos.z == 30);
+  Accept(&cylinder, SWORD_ELEMENT_ICE);
+  REQUIRE(finishImpactCount == 1); // Overlapping melee colliders share one hit.
+  DinFireSword_FinishBeginActor(&play, &actor);
+  Actor_ApplyDamage(&actor);
+  DinFireSword_FinishEndActor(&play, &actor);
+#ifdef SWORD_FINISH_TEST_MM
+  const int remainingHealth = 8; // Native MM keeps the larger overlapping hit.
+#else
+  const int remainingHealth = 4; // Native OoT accumulates the two collider hits.
+#endif
+  REQUIRE(actor.colChkInfo.health == remainingHealth && Effects() == 0);
+  ++play.gameplayFrames;
+  Accept(&cylinder, SWORD_ELEMENT_ICE);
+  REQUIRE(finishImpactCount == 2);
+  DinFireSword_FinishBeginActor(&play, &actor);
+  Actor_Kill(&actor); // Dismembering paths may kill before writing health zero.
+  DinFireSword_FinishEndActor(&play, &actor);
+  REQUIRE(Effects() == 1 && actor.colChkInfo.health == remainingHealth);
+  memset(&actor, 0xDE, sizeof(actor));
+  DinFireSword_FinishPlayAllSounds(&play);
+  REQUIRE(finishImpactCount == 2 && finishSound == NA_SE_EV_ICE_FREEZE - SFX_FLAG);
+  REQUIRE(finishSoundPos == &sFinishSoundPos[0] && finishSoundPos->x == 10);
+  DinFireSword_FinishContext(NULL);
+}
+static void MixedIceImpactPreservesAmbiguousDeathAttribution(void) {
+  const int orders[][2] = {{0, 2}, {1, 2}, {3, 2}, {2, 0}, {2, 1}, {2, 3}};
+  for (unsigned order = 0; order < ARRAY_COUNT(orders); ++order) {
+    World();
+    Actor actor = {0};
+    actor.id = ACTOR_EN_DEKUBABA;
+    actor.category = ACTORCAT_ENEMY;
+    actor.update = LiveUpdate;
+    actor.colChkInfo.health = 12;
+    ColliderCylinder cylinder = {0};
+    cylinder.base.actor = &actor;
+    cylinder.base.acFlags = AC_HIT;
+    cylinder.base.shape = COLSHAPE_CYLINDER;
+    cylinder.dim = (Cylinder16){20, 60, 0, {0, 0, 0}};
+    Accept(&cylinder, orders[order][0]);
+    Accept(&cylinder, orders[order][1]);
+    REQUIRE(finishImpactCount == 1 && finishSound == NA_SE_IT_EXPLOSION_ICE);
+    Accept(&cylinder, SWORD_ELEMENT_ICE);
+    REQUIRE(finishImpactCount == 1);
+    DinFireSword_FinishBeginActor(&play, &actor);
+    Actor_Kill(&actor);
+    DinFireSword_FinishEndActor(&play, &actor);
+    REQUIRE(Effects() == 0); // Mixed accepted damage cannot claim a sole killer.
+    DinFireSword_FinishContext(NULL);
+  }
+}
+static void AcceptedIceMaterialProvenance(void) {
+  World();
+  Actor actor = {0};
+  actor.id = ACTOR_EN_DEKUBABA;
+  actor.category = ACTORCAT_ENEMY;
+  actor.update = LiveUpdate;
+  actor.colChkInfo.health = 12;
+  ColliderCylinder cylinder = {0};
+  cylinder.base.actor = &actor;
+  cylinder.base.acFlags = AC_HIT;
+  cylinder.base.shape = COLSHAPE_CYLINDER;
+  cylinder.dim = (Cylinder16){20, 60, 0, {0, 0, 0}};
+  REQUIRE(!DinFireSword_UseIceMaterial(&play, &actor));
+  Accept(&cylinder, SWORD_ELEMENT_ICE);
+  REQUIRE(DinFireSword_UseIceMaterial(&play, &actor));
+  DinFireSword_FinishBeginActor(&play, &actor);
+  Actor_ApplyDamage(&actor);
+  DinFireSword_FinishEndActor(&play, &actor);
+  elementalSelection = elementalActive = SWORD_ELEMENT_FIRE;
+  for (int frame = 0; frame < 37; ++frame) {
+    ++play.gameplayFrames;
+    REQUIRE(DinFireSword_UseIceMaterial(&play, &actor));
+  }
+  play.pauseCtx.state = 1;
+  ++play.gameplayFrames;
+  REQUIRE(DinFireSword_UseIceMaterial(&play, &actor));
+  play.pauseCtx.state = 0;
+  ++play.gameplayFrames;
+  Accept(&cylinder, 0);
+  REQUIRE(!DinFireSword_UseIceMaterial(&play, &actor));
+  Accept(&cylinder, SWORD_ELEMENT_ICE);
+  REQUIRE(DinFireSword_UseIceMaterial(&play, &actor));
+#ifdef SWORD_FINISH_TEST_MM
+  ColliderElement ordinary = {0};
+  ordinary.atDmgInfo.dmgFlags = DMG_ICE_ARROW;
+#else
+  ColliderInfo ordinary = {0};
+  ordinary.toucher.dmgFlags = DMG_ARROW_ICE;
+#endif
+  DinFireSword_FinishAcceptedHit(&play, &cylinder, &ordinary, 0xFFFFFFFF, 0);
+  REQUIRE(!DinFireSword_UseIceMaterial(&play, &actor)); // Foreign zero-damage freeze clears the tag.
+  Accept(&cylinder, SWORD_ELEMENT_ICE);
+  REQUIRE(DinFireSword_UseIceMaterial(&play, &actor));
+  play.pauseCtx.state = 1;
+  DinFireSword_FinishForget(&play, &actor);
+  memset(&actor, 0xDE, sizeof(actor));
+  REQUIRE(!DinFireSword_UseIceMaterial(&play, &actor)); // Destruction/address reuse cannot inherit it.
+  play.pauseCtx.state = 0;
+  DinFireSword_FinishContext(&play);
+  Actor *unreadable = (Actor *)(uintptr_t)1;
+  SwordFinishCore_SetIceMaterial(&sFinish, (uintptr_t)unreadable, 1);
+  REQUIRE(DinFireSword_UseIceMaterial(&play, unreadable));
+  DinFireSword_FinishForget(&play, unreadable);
+  REQUIRE(!DinFireSword_UseIceMaterial(&play, unreadable));
+  DinFireSword_FinishContext(NULL);
+}
+static void IceMaterialDoesNotDependOnSoundQuota(void) {
+  World();
+  DinFireSword_FinishContext(&play);
+  for (unsigned slot = 0; slot < 32; ++slot) {
+    sFinish.effects[slot].life = 24;
+    sFinish.effects[slot].element = SWORD_ELEMENT_LIGHT;
+  }
+  DinFireSword_FinishPlayAllSounds(&play);
+  REQUIRE(finishSoundCount == 32);
+  Actor actor = {0};
+  actor.id = ACTOR_EN_DEKUBABA;
+  actor.category = ACTORCAT_ENEMY;
+  actor.update = LiveUpdate;
+  ColliderCylinder cylinder = {0};
+  cylinder.base.actor = &actor;
+  cylinder.base.acFlags = AC_HIT;
+  cylinder.base.shape = COLSHAPE_CYLINDER;
+  cylinder.dim = (Cylinder16){20, 60, 0, {0, 0, 0}};
+  Accept(&cylinder, SWORD_ELEMENT_ICE);
+  REQUIRE(finishImpactCount == 0 && DinFireSword_UseIceMaterial(&play, &actor));
+  DinFireSword_FinishContext(NULL);
 }
 static void DrawBudget(void) {
 #ifdef SWORD_FINISH_DRAW_POINT_LIMIT
@@ -333,6 +509,10 @@ static void ImmuneElementKeepsFatalSwordDamage(void) {
 }
 #ifndef SWORD_FINISH_ADAPTER_TEST
 int main(void) {
+  IceImpactEachAcceptedHitAndDismemberedDeath();
+  MixedIceImpactPreservesAmbiguousDeathAttribution();
+  AcceptedIceMaterialProvenance();
+  IceMaterialDoesNotDependOnSoundQuota();
   FatalBindings();
   IdleObservers();
   LightLoopContextCleanup();
