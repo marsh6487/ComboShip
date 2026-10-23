@@ -91,6 +91,9 @@ jobs:
             Start-Sleep -Seconds $configureDelaySeconds
           }
 
+      - name: Verify native file-select query with SDL and MSVC
+        run: python -B tests/item_receipts/run_file_select_sdl_main_tests.py --msvc --compiler cl --include "$PWD/build/x64/vcpkg/installed/x64-windows-static-md/include"
+
       # Only libultraship is needed by comboui. Compile/link the UI and generate
       # both archives before spending time compiling either game engine.
       - name: Build libultraship

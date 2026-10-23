@@ -1,3 +1,8 @@
+// This module accesses GameState::main and owns no SDL entry point.
+#ifndef SDL_MAIN_HANDLED
+#define SDL_MAIN_HANDLED
+#endif
+
 #include "../../combo/ComboGameMode.h"
 #include "../../combo/emotes/EmoteBridge.h"
 #include "../../combo/menu/ItemGrantAuditBridge.h"

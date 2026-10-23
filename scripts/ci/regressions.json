@@ -542,6 +542,12 @@
   {
     "suite": "items",
     "origin": "nei",
+    "name": "tests/item_receipts/run_file_select_sdl_main_tests.py",
+    "run": "python3 -B tests/item_receipts/run_file_select_sdl_main_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "nei",
     "name": "scripts/diagnostics/run_receipt_syntax_tests.py",
     "run": "python3 -B scripts/diagnostics/run_receipt_syntax_tests.py"
   },
