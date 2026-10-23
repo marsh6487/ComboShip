@@ -154,7 +154,7 @@ u8 FourSword_HeldSwordDLForFrame(void** blade, void** handle, int frame) {
             return 1;
         }
     }
-    if (FourSword_IsEquipped() && NeiEquipment_HasFourSword()) {
+    if (FourSword_IsEquipped() && !NeiHeldSword_UseVanilla() && NeiEquipment_HasFourSword()) {
         Gfx* authoredBlade = NeiEquipment_ModelDL(NEI_EQUIPMENT_FOUR_BLADE, FOURSWORD_BLADE_DL);
         Gfx* authoredHilt = NeiEquipment_ModelDL(NEI_EQUIPMENT_FOUR_HILT, FOURSWORD_HILT_DL);
         if (authoredBlade != NULL && authoredHilt != NULL) {

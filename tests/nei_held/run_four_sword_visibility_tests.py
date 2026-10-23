@@ -62,7 +62,8 @@ def held(directory, host):
                     str(ROOT / "tests/nei_held/four_sword_visibility_test.cpp"), *bridge,
                     "-o", str(binary)], check=True)
     cases = ([sys.argv[2:]] if len(sys.argv) > 2
-             else [[], ["body"], ["graph"], ["limb" if host == "mm" else "late"]])
+             else [[], ["body"], ["graph"], ["limb" if host == "mm" else "late"],
+                   ["vanilla"], ["vanilla-missing"]])
     for case in cases:
         subprocess.run([str(binary), *case], check=True)
 

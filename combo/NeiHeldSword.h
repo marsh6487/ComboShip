@@ -13,6 +13,7 @@ extern u8 ResourceMgr_FileAltExists(const char* path);
 extern bool ResourceMgr_IsAltAssetsEnabled(void);
 extern int ResourceMgr_IsModAsset(const char* path);
 extern int ResourceMgr_IsModAssetForGame(const char* game, const char* path);
+extern s32 CVarGetInteger(const char* name, s32 defaultValue);
 #ifdef COMBO_BUILD
 extern int32_t OOT_NeiEnsureGiBaseOwner(void);
 extern int32_t OOT_NeiResourceExists(const char* path);
@@ -41,6 +42,10 @@ enum {
 };
 #include "NeiHeldSwordResources.inc"
 
+static inline bool NeiHeldSword_UseVanilla(void) {
+    return CVarGetInteger("gEnhancements.SkijerNEI.UseVanillaHeldSwords", 0) != 0;
+}
+
 static inline bool NeiHeldSword_Available(const char* path) {
 #ifdef NEI_EQUIPMENT_MM
     // Both the wrapper and every authored mesh/material dependency belong to
@@ -59,6 +64,10 @@ static inline bool NeiHeldSword_Available(const char* path) {
 static inline Gfx* NeiHeldSword_ModelDL(int sword, int frame) {
     static Gfx wrappers[2][NEI_HELD_SWORD_COUNT][NEI_HELD_SWORD_FRAME_COUNT][2];
     if (sword < 0 || sword >= NEI_HELD_SWORD_COUNT || frame < 0 || frame >= NEI_HELD_SWORD_FRAME_COUNT)
+        return NULL;
+    // Read on every draw so the cosmetic option switches live. The callers
+    // retain their native/legacy fallback and selected custom equipment rules.
+    if (NeiHeldSword_UseVanilla())
         return NULL;
     bool base = false;
 #if defined(COMBO_BUILD) || defined(NEI_EQUIPMENT_MM)

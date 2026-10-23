@@ -14,7 +14,9 @@
 
 static std::set<std::string> local, donor, shipped, selected;
 static bool altOn, equipped = true, customBody, adult;
+static bool vanillaHeldSwords;
 static Gfx hand[1]{}, original[1]{}, native[1]{};
+static Gfx legacyBlade[1]{}, legacyHilt[1]{};
 extern "C" {
 void DinFireSword_SetHandModel(Player*, void*, int) {}
 void DinFireSword_CopyHandModel(Player*, void*, void*) {}
@@ -39,13 +41,19 @@ u8 Player_IsCustomLinkModel(Player*) { return customBody; }
 u8 Player_IsCustomLinkModel() { return customBody; }
 #endif
 u8 FourSword_IsEquipped() { return equipped; }
-s32 CVarGetInteger(const char*, s32 fallback) { return fallback; }
+s32 CVarGetInteger(const char* name, s32 fallback) {
+    return !std::strcmp(name, "gEnhancements.SkijerNEI.UseVanillaHeldSwords") ? vanillaHeldSwords : fallback;
+}
 u8 WeaponUpgrade_KokiriLevel() { return 0; }
 u8 WeaponUpgrade_HasGilded() { return 0; }
 u8 WeaponUpgrade_HasTrueMaster() { return 0; }
 u8 WeaponUpgrade_HasGreatFairy() { return 0; }
 void* MmAssets_LoadResource(const char*) { return nullptr; }
-Gfx* ResourceMgr_LoadGfxByName(const char* path) { return std::strstr(path, "Closed") ? hand : native; }
+Gfx* ResourceMgr_LoadGfxByName(const char* path) {
+    if (std::strstr(path, "gNeiFourSwordBladeDL")) return legacyBlade;
+    if (std::strstr(path, "gNeiFourSwordHiltDL")) return legacyHilt;
+    return std::strstr(path, "Closed") ? hand : native;
+}
 void gSPDisplayList(Gfx* command, Gfx* display) { __gSPDisplayList(command, display); }
 
 #define FOURSWORD_BLADE_DL "__OTR__objects/object_nei_four_sword/gNeiFourSwordBladeDL"
@@ -95,6 +103,7 @@ static void resources() {
     }
     donor = shipped = local;
     customBody = false;
+    vanillaHeldSwords = false;
     gSaveContext = {};
 }
 
@@ -148,6 +157,8 @@ int main(int argc, char** argv) {
     const bool limbCase = argc > 1 && !std::strcmp(argv[1], "limb");
     const bool lateCase = argc > 1 && !std::strcmp(argv[1], "late");
     const bool graphCase = argc > 1 && !std::strcmp(argv[1], "graph");
+    const bool vanillaCase = argc > 1 && !std::strcmp(argv[1], "vanilla");
+    const bool vanillaMissingCase = argc > 1 && !std::strcmp(argv[1], "vanilla-missing");
     for (bool alt : {false, true}) for (bool adultFrame : {false, true}) {
         resources(); altOn = alt; adult = adultFrame;
 #ifndef NEI_EQUIPMENT_MM
@@ -164,6 +175,65 @@ int main(int argc, char** argv) {
         player.leftHandType = PLAYER_MODELTYPE_LH_SWORD;
 #endif
         expectFour(player);
+        if (vanillaCase || vanillaMissingCase) {
+            // Both authored alternatives are complete. Disabling only the
+            // primary GI-derived sword must not select the second redesign.
+            for (int model : {NEI_EQUIPMENT_FOUR_BLADE, NEI_EQUIPMENT_FOUR_HILT})
+                for (const char* const* p = sNeiEquipmentResources[model]; *p; ++p)
+                    local.insert(*p);
+            if (vanillaCase) {
+                local.insert(FOURSWORD_BLADE_DL);
+                local.insert(FOURSWORD_HILT_DL);
+            }
+            donor = shipped = local;
+            for (bool useVanilla : {true, false, true, false}) {
+                vanillaHeldSwords = useVanilla;
+                if (!useVanilla) {
+                    expectFour(player);
+                    continue;
+                }
+                void *blade = nullptr, *hilt = nullptr;
+                if (vanillaMissingCase) {
+                    assert(!getFour(&blade, &hilt) && !blade && !hilt &&
+                           "Missing legacy resources must retain the native hand, not another authored Four Sword");
+                    Gfx* draw = original;
+                    assert(!WeaponUpgrade_ApplyHeldSwordDL(&draw, hand, &player, 30, 105, 27) && draw == original);
+                    continue;
+                }
+                assert(getFour(&blade, &hilt) && blade == legacyBlade && hilt == legacyHilt &&
+                       "The vanilla preference still selected an authored Four Sword fallback");
+                for (bool body : {false, true}) {
+                    customBody = body;
+                    const Player before = player;
+                    Gfx* draw = original;
+                    assert(WeaponUpgrade_ApplyHeldSwordDL(&draw, hand, &player, 30, 105, 27));
+                    assert(draw[0].words.w1 == reinterpret_cast<uintptr_t>(legacyBlade));
+                    assert(draw[1].words.w1 == reinterpret_cast<uintptr_t>(legacyHilt));
+                    assert(draw[2].words.w1 == reinterpret_cast<uintptr_t>(hand));
+                    assert(!std::memcmp(&player, &before, sizeof(player)));
+                }
+                customBody = false;
+            }
+            if (vanillaCase) {
+                // An override of either legacy half still owns the whole pair
+                // in both settings, regardless of the complete authored graphs.
+                for (bool useVanilla : {false, true}) {
+                    vanillaHeldSwords = useVanilla;
+                    for (const char* selectedHalf : {FOURSWORD_BLADE_DL, FOURSWORD_HILT_DL}) {
+                        selected = {selectedHalf};
+                        void *blade = nullptr, *hilt = nullptr;
+                        assert(getFour(&blade, &hilt));
+                        for (auto [draw, path] : {std::pair(blade, FOURSWORD_BLADE_DL),
+                                                 std::pair(hilt, FOURSWORD_HILT_DL)}) {
+                            const Gfx* list = static_cast<const Gfx*>(draw);
+                            assert((list[0].words.w0 >> 24) == G_DL_OTR_FILEPATH);
+                            assert(!std::strcmp(reinterpret_cast<const char*>(list[0].words.w1), path));
+                        }
+                    }
+                }
+            }
+            continue;
+        }
 #ifndef NEI_EQUIPMENT_MM
         if (lateCase) {
             customBody = true;
@@ -278,6 +348,6 @@ int main(int argc, char** argv) {
               << "OoT"
 #endif
               << " Four Sword held: real getter, child/adult and both Alt states, selected "
-              << (graphCase ? "complete donor graph/own pair" : lateCase ? "late custom/PAK limb" : limbCase ? "native/adult limb" : bodyCase ? "body" : "native/Din equipment")
+              << (vanillaCase ? "live vanilla/legacy pair" : vanillaMissingCase ? "missing vanilla resources" : graphCase ? "complete donor graph/own pair" : lateCase ? "late custom/PAK limb" : limbCase ? "native/adult limb" : bodyCase ? "body" : "native/Din equipment")
               << " preserves Four identity and ordinary mod priority\n";
 }
