@@ -1,4 +1,4 @@
-"""Active preparation must apply the bounded presentation without scene edits."""
+"""Active preparation must apply the bounded presentation with bounded room draw ownership edits."""
 import hashlib
 import io
 import itertools
@@ -18,6 +18,11 @@ from prepare_native_forest import prepared_resources
 from native_forest_bundle import load_bundle
 
 CORE = 'custom/comboship/native_forest/'
+ROOMS = {
+    'scenes/nonmq/comboship_forest/comboship_forest_room_0': False,
+    'scenes/nonmq/skiejer_forest/skiejer_forest_room_0': False,
+    'scenes/shared/skiejer_forest_oot/skiejer_forest_oot_room_0': True,
+}
 
 
 class PolishTests(unittest.TestCase):
@@ -29,17 +34,38 @@ class PolishTests(unittest.TestCase):
             cls.before = {name: archive.read(name) for name in archive.namelist()}
         cls.after = prepared_resources(cls.manifest)
 
-    def test_preparation_applies_a_pinned_revision_without_touching_scene_or_texture_bytes(self):
+    def test_preparation_applies_only_the_pinned_presentation_and_room_draw_changes(self):
         self.assertEqual(self.metadata.get('presentation_polish', {}).get('version'), 2)
         self.assertEqual(set(self.before), set(self.after))
         changed = {name for name in self.before if self.before[name] != self.after[name]}
         self.assertEqual(changed, set(self.metadata['presentation_polish']['resources']))
+        self.assertEqual(changed, set(ROOMS) | {CORE + name for name in (
+            'authored/room_0/ReturnTunnelMouth',
+            'building/recipe7624751371212635_vtx',
+            'mirror_access_material', 'mirror_access_root', 'portal_xlu',
+        )})
         for name in changed:
-            self.assertTrue(name.startswith(CORE))
             self.assertNotEqual(self.before[name][4:8], b'XETO', name)
             self.assertEqual(hashlib.sha256(self.after[name]).hexdigest(),
                              self.metadata['presentation_polish']['resources'][name]['sha256'])
         self.assertTrue(changed)
+
+    def test_room_changes_only_move_the_ramp_from_opaque_to_translucent(self):
+        from native_forest import read_mesh, read_scene, write_mesh, write_scene
+        ramp = CORE + 'mirror_access_root'
+        for name, oot in ROOMS.items():
+            with self.subTest(room=name):
+                commands = read_scene(self.before[name], oot=oot)
+                mesh = read_mesh(commands[10])
+                self.assertEqual(mesh['type'], 2)
+                entries = [entry for entry in mesh['entries']
+                           if ramp in (entry['opaque'], entry['translucent'])]
+                self.assertEqual(len(entries), 1)
+                self.assertEqual((entries[0]['opaque'], entries[0]['translucent']), (ramp, ''))
+                entries[0]['opaque'], entries[0]['translucent'] = '', ramp
+                commands[10] = write_mesh(mesh)
+                # All other scene commands, mesh entries, bounds and headers stay byte-exact.
+                self.assertEqual(self.after[name], write_scene(commands))
 
     def test_portal_uses_building_purple_and_has_no_legacy_frame_glow(self):
         from native_forest import display_commands
@@ -71,7 +97,19 @@ class PolishTests(unittest.TestCase):
         self.assertEqual((texture.get('Width'), texture.get('Height')), ('32', '64'))
         self.assertEqual(texture.get('Format'), '4', 'The authored mask is native I8, not IA8')
         self.assertEqual(struct.unpack_from('<I', self.before[texture.get('Path')], 64)[0], 6)
-        self.assertEqual(material.find('SetPrimColor').get('A'), '255')
+        self.assertEqual(material.find('SetPrimColor').get('A'), '112')
+        low = material.find("SetOtherMode[@Cmd='G_SETOTHERMODE_L']")
+        self.assertIsNotNone(low)
+        self.assertEqual(low.attrib, {
+            'Cmd': 'G_SETOTHERMODE_L', 'Sft': '0', 'Length': '32',
+            'G_AC_NONE': '1', 'G_ZS_PIXEL': '1',
+            'G_RM_AA_ZB_XLU_SURF': '1', 'G_RM_AA_ZB_XLU_SURF2': '1',
+        })
+        combine = material.find('SetCombineLERP')
+        self.assertIsNotNone(combine)
+        for cycle in ('0', '1'):
+            self.assertEqual([combine.get(key + cycle) for key in ('Aa', 'Ab', 'Ac', 'Ad')],
+                             ['G_ACMUX_0', 'G_ACMUX_0', 'G_ACMUX_0', 'G_ACMUX_PRIMITIVE'])
         self.assertEqual(material.find('SetEnvColor').get('R'), '88')
         self.assertEqual(self.before[CORE + 'mirror_access_vtx'], self.after[CORE + 'mirror_access_vtx'])
 
