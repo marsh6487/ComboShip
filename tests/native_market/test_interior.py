@@ -41,11 +41,12 @@ class DefaultInterior(unittest.TestCase):
         door_scenes = exit_door.apply(base)
         material_paths = set()
         vertex_changes = {f'{market_interior.GEOMETRY}_vtx_{suffix}' for suffix in (2,5,8,12,14,24)}
+        geometry_changes = vertex_changes | {f'{market_interior.GEOMETRY}_tri_23'}
         for name, data in base.items():
             if '/mat_' not in name:
                 if name in exit_door.SCENES.values():
                     self.assertEqual(resources[name], door_scenes[name], name)
-                elif name not in vertex_changes:
+                elif name not in geometry_changes:
                     self.assertEqual(resources[name], data, name)
                 continue
             material = ET.fromstring(resources[name])

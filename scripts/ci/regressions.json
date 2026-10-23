@@ -36,6 +36,12 @@
     "run": "python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\nMM_AUDIO_WORKER_CXXFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py --sanitize"
   },
   {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Native OoT seasonal rain PCM and Song of Storms ownership",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_soh_rain_audio_tests.py --sanitize"
+  },
+  {
     "suite": "entrances",
     "origin": "gate",
     "name": "Fast entrance compile and linkage preflight",

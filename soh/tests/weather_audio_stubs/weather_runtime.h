@@ -23,6 +23,7 @@ struct PlayState {
         uint8_t unk_DE;
         uint8_t lightningMode;
         uint8_t unk_EE[4];
+        uint8_t unk_F2[4];
     } envCtx;
 };
 #define SKYBOX_NORMAL_SKY 1

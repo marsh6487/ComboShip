@@ -23,6 +23,7 @@ python3 -B tests/black_market/run_collision_pool_tests.py
 python3 -B tests/black_market/run_resource_entry_tests.py --bundled-only
 python3 -B tests/native_market/run_runtime_readiness_tests.py
 python3 -B -m unittest discover -s tests/native_market -p 'test_interior.py'
+python3 -B -m unittest discover -s tests/native_market -p 'test_platform_overlay.py'
 python3 -B tests/native_market/run_legacy_cache_tests.py
 python3 -B scripts/diagnostics/run_shield_particle_lifetime_tests.py
 python3 -B scripts/diagnostics/run_saria_palette_tests.py

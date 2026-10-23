@@ -34,6 +34,21 @@ def main():
         "/* PRODUCTION_EMITTER_STOP */", lock + "\n" + function(assets, "MmSfx_StopAtPos"))
     with tempfile.TemporaryDirectory(prefix="monkey-audio-") as temp:
         directory = Path(temp)
+        native = (ROOT / "mm/src/overlays/actors/ovl_En_Mnk/z_en_mnk.c").read_text()
+        guide = (ROOT / "tests/monkey_audio/native_guide_test.c").read_text().replace(
+            "/* NATIVE_GUIDE */", "\n".join(function(native, name) for name in (
+                "EnMnk_PlayWalkSfx", "EnMnk_Monkey_GuideThroughWoods")))
+        guide_source = directory / "guide.c"
+        guide_source.write_text(guide)
+        guide_binary = directory / "guide"
+        subprocess.run([os.environ.get("CC", "cc"), "-std=gnu17", "-DF3DEX_GBI_2",
+                        "-DLOG_LEVEL_GAME_PRINTS=0", "-DCONTROLLERBUTTONS_T=uint32_t", "-w",
+                        *["-I" + str(ROOT / path) for path in (
+                            "mm", "mm/include", "mm/include/PR", "mm/src", "mm/assets", "mm/2s2h",
+                            "combo", "combo/menu", "libultraship/include")],
+                        "-O1", "-g", "-fno-pie", "-no-pie", "-fsanitize=address,undefined",
+                        "-fno-sanitize-recover=all", str(guide_source), "-o", str(guide_binary)], cwd=ROOT, check=True)
+        subprocess.run([str(guide_binary)], check=True, env=env, timeout=10)
         test = directory / "bank.cpp"
         test.write_text(fixture)
         engine = directory / "engine.cpp"

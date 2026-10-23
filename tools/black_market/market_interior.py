@@ -174,6 +174,44 @@ def prepare_prop_vertices(resources):
     return changed
 
 
+def prepare_platform_overlay(resources):
+    """Use native opaque decal depth for the two coplanar right-pot panels."""
+    path = f'{GEOMETRY}_tri_23'
+    panels = vertex_components(resources, path)[1:]
+    expected = (
+        ([[98,8,198],[160,8,275]], list(range(63,69))),
+        ([[98,8,295],[160,8,372]], list(range(69,75))),
+    )
+    if len(panels) != 2 or any(part['bounds'] != bounds or part['indices'] != indices or
+                              part['triangles'] != 4 for part,(bounds,indices) in zip(panels,expected)):
+        raise ValueError('Retained potion floor panel identity changed')
+    root = ET.fromstring(resources[path])
+    commands = list(root)
+    load = next((index for index,node in enumerate(commands) if node.tag == 'LoadVertices' and
+                 node.attrib == {'Path':f'{GEOMETRY}_vtx_23', 'VertexBufferIndex':'0',
+                                 'VertexOffset':'63', 'Count':'12'}), None)
+    if load is None or [node.tag for node in commands[load:]] != [
+            'LoadVertices', 'Triangles2', 'Triangles2', 'Triangles2', 'Triangles2', 'EndDisplayList']:
+        raise ValueError('Retained potion floor panel draw range changed')
+    material = ET.fromstring(resources[f'custom/skiejer_market/geometry/mat_mahouya_room_0DL_006548_GranmaShop01'])
+    mode = material.find("SetOtherMode[@Cmd='G_SETOTHERMODE_L']")
+    if mode is None or mode.get('G_RM_AA_ZB_OPA_SURF2') != '1':
+        raise ValueError('Retained potion floor panel depth mode changed')
+    decal = dict(mode.attrib)
+    decal.pop('G_RM_AA_ZB_OPA_SURF2')
+    decal['G_RM_AA_ZB_OPA_DECAL2'] = '1'
+    # Both panels and the timber below are exactly Y=8. Raising the panels
+    # would intersect the pots' Y=8 bases. Native decal bias preserves every
+    # position, UV, color, texture and collision face, then restores opaque
+    # depth state before the room continues drawing.
+    root.insert(load, ET.Element('PipeSync'))
+    root.insert(load + 1, ET.Element('SetOtherMode', decal))
+    root.insert(len(root) - 1, ET.Element('PipeSync'))
+    root.insert(len(root) - 1, ET.Element('SetOtherMode', dict(mode.attrib)))
+    ET.indent(root, space='  ')
+    return {path:ET.tostring(root, encoding='utf-8') + b'\n'}
+
+
 def resource_paths():
     return set(TEXTURES.values()) | {SHELF}
 
@@ -381,6 +419,7 @@ def apply(resources):
     native_market.validate_resources(resources)
     result = dict(resources)
     result.update(prepare_prop_vertices(resources))
+    result.update(prepare_platform_overlay(resources))
     for name, path in TEXTURES.items():
         result[path] = texture(name, 32 if name in BASE_NAMES else 64)
     # Flow/Veil owns this animated shelf/backdrop path, not the slate floor.

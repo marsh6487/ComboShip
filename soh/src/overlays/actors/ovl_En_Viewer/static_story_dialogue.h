@@ -2,6 +2,7 @@
 #define STATIC_STORY_DIALOGUE_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 typedef enum {
@@ -18,6 +19,8 @@ typedef enum {
 typedef bool (*StaticStoryDialogueLoadFunc)(const char* text, uint8_t language, void* context);
 
 const char* StaticStoryDialogue_GetText(uint16_t textId, uint8_t language);
+/* Returns zero after the final catalog entry. */
+uint16_t StaticStoryDialogue_GetTextIdAt(size_t index);
 bool StaticStoryDialogue_HandleOpenText(uint16_t textId, uint8_t language, bool* loadFromMessageTable,
                                         StaticStoryDialogueLoadFunc load, void* context);
 

@@ -174,7 +174,7 @@ void EnViewer_Destroy(Actor* thisx, PlayState* play) {
 
     if (this->staticState.staticMode) {
         if (this->staticState.type == STATIC_STORY_ACTOR_MONKEY && this->staticState.monkeySfxActive) {
-            MmSfx_StopAtPos(MM_NA_SE_EV_MONKEY_VO_JOY, &this->actor.projectedPos);
+            MmSfx_StopAtPos(MM_NA_SE_EV_MONKEY_VO_WALK, &this->actor.projectedPos);
             this->staticState.monkeySfxActive = false;
         }
         if (this->staticState.initialized) {
@@ -845,14 +845,14 @@ void EnViewerStatic_Update(EnViewer* this, PlayState* play) {
                        play->transitionMode == TRANS_MODE_OFF;
         if (!canCall) {
             if (this->staticState.monkeySfxActive) {
-                MmSfx_StopAtPos(MM_NA_SE_EV_MONKEY_VO_JOY, &this->actor.projectedPos);
+                MmSfx_StopAtPos(MM_NA_SE_EV_MONKEY_VO_WALK, &this->actor.projectedPos);
                 this->staticState.monkeySfxActive = false;
             }
             this->staticState.monkeySfxTimer = 0;
         } else if (this->staticState.monkeySfxTimer > 0) {
             --this->staticState.monkeySfxTimer;
         } else {
-            this->staticState.monkeySfxActive = MmSfx_PlayAtPos(MM_NA_SE_EV_MONKEY_VO_JOY, &this->actor.projectedPos);
+            this->staticState.monkeySfxActive = MmSfx_PlayAtPos(MM_NA_SE_EV_MONKEY_VO_WALK, &this->actor.projectedPos);
             // Native MM one-shot through Sequence_0, with a 3–5 second gap
             // at the native 20 Hz update rate. All poses share this hook.
             this->staticState.monkeySfxTimer = Rand_S16Offset(60, 41);
