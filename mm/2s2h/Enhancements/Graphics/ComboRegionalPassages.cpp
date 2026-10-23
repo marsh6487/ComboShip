@@ -1,5 +1,6 @@
 #ifdef COMBO_BUILD
 #include "global.h"
+#include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "actors/RegionalPassagePresentation.h"
 #include "2s2h/Enhancements/Gameplay/ComboRegionalPassages.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
@@ -7,6 +8,9 @@
 #include "../../../../soh/soh/Enhancements/randomizer/NeiGiRender.h"
 
 namespace {
+// Display-list macros redeclare these helpers at block scope in this namespace.
+extern "C" void FrameInterpolation_RecordOpenChild(const void* a, int b);
+extern "C" void FrameInterpolation_RecordCloseChild(void);
 namespace RP = RegionalPassagePresentation;
 
 bool RegionalPresentationSafe(PlayState* play) {

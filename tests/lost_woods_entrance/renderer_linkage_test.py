@@ -16,6 +16,8 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-renderer-linkage-") as tempo
     )
     failures = []
     sources = [
+        ("soh", "soh/Enhancements/Graphics/ComboRegionalPassages.cpp"),
+        ("mm", "2s2h/Enhancements/Graphics/ComboRegionalPassages.cpp"),
         ("mm", "2s2h/Enhancements/Graphics/ComboLostWoodsPassage.cpp"),
         ("mm", "2s2h/Enhancements/Gameplay/ComboSoloForest.cpp"),
         ("mm", "2s2h/Enhancements/Gameplay/BlackMarket.cpp"),
@@ -55,4 +57,4 @@ with tempfile.TemporaryDirectory(prefix="lost-woods-renderer-linkage-") as tempo
                 failures.append(f"{host}/{source} requests a non-native interpolation ABI: {requested}")
         print(f"Compiled native interpolation boundary: {host}/{source}", flush=True)
     assert not failures, "\n".join(failures)
-    print("PASS: native C interpolation ownership and solo-MM GI renderer delegation across six production objects")
+    print(f"PASS: native C interpolation ownership and solo-MM GI renderer delegation across {len(sources)} production objects")
