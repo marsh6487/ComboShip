@@ -1,4 +1,5 @@
 #include "../../../combo/gameplay/SwordElementOverride.h"
+#include "../../../combo/render/SpinAttackStyle.h"
 #include "../../../combo/gui/WhatsNew.h"
 #ifdef COMBO_BUILD
 #include "../../../combo/gui/BlackMarketAppearance.h"
@@ -48,6 +49,13 @@
 #include "ResolutionEditor.h"
 #include "2s2h/Rando/Rando.h"
 #include "build.h"
+
+static const std::unordered_map<int32_t, const char*> spinStyleOptions = {
+    { CW_SPIN_STYLE_NATIVE, "Native" },       { CW_SPIN_STYLE_FIRE, "Fire" },
+    { CW_SPIN_STYLE_ICE, "Ice" },             { CW_SPIN_STYLE_LIGHT, "Light" },
+    { CW_SPIN_STYLE_LIGHTNING, "Lightning" }, { CW_SPIN_STYLE_ARCANE, "Arcane" },
+    { CW_SPIN_STYLE_ASTRAL, "Astral" },       { CW_SPIN_STYLE_DARK_ENERGY, "Dark Energy" },
+};
 
 // ComboShip: MM dev-tool / viewer windows share names with OOT's in the single shared Gui registry,
 // which keys by display name and rejects duplicates. BenGui.cpp registers the MM windows with this
@@ -1594,6 +1602,19 @@ void BenMenu::AddEnhancements() {
         .Options(CheckboxOptions().Tooltip(
             "Toggle between standard assets and alternate assets. Usually mods will indicate if "
             "this setting has to be used or not."));
+    AddWidget(path, "Spin Style", WIDGET_CVAR_COMBOBOX)
+        .CVar(CW_SPIN_STYLE_CVAR)
+        .Options(ComboboxOptions()
+                     .ComboMap(&spinStyleOptions)
+                     .DefaultIndex(CW_SPIN_STYLE_NATIVE)
+                     .Tooltip("Choose the appearance of powered sword spins. Applies to the next spin. "
+                              "Styles are available independently of sword imbues and do not grant elemental damage."));
+    AddWidget(path, "Elemental Spin Effects", WIDGET_CVAR_CHECKBOX)
+        .CVar(CW_SPIN_ELEMENT_EFFECTS_CVAR)
+        .Options(CheckboxOptions().DefaultValue(true).Tooltip(
+            "Add the sword's Fire, Ice or Light glow and particles to powered spins. Native style also uses "
+            "elemental spin materials; custom styles keep their own look. Applies to the next spin. "
+            "Turning this off changes appearance only. Native magic costs are unchanged."));
     AddWidget(path, "Din Fire Shield (POC)", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.DinFireShield")
         .Options(CheckboxOptions().DefaultValue(false).Tooltip(
