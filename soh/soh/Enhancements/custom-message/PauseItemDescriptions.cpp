@@ -87,7 +87,8 @@ static const ItemDescEntry sCustomItemDescs[] = {
     { EXT_ITEM_SHADOW_CRYSTAL, TEXT_DESC_SHADOW_CRYSTAL,
       "Turn into Wolf Link.&B attacks; moving + A dashes.&Use crystal again to turn back." },
     { EXT_ITEM_ROD_OF_SEASONS, TEXT_DESC_ROD_OF_SEASONS,
-      "C draws the rod, then opens the season&prompt. A confirms, B cancels, and a&new season reloads the scene." },
+      "C draws the rod, then opens the season&prompt. A puts the rod away.&In the prompt: A confirms, B cancels.&"
+      "A new season reloads the scene." },
     // Bottle row
     { ITEM_NET, TEXT_DESC_NET, "Swing it like a sword to scoop bugs,&fish and fairies into a bottle." },
     { ITEM_BOTTOMLESS_BOTTLE, TEXT_DESC_BOTTOMLESS_BOTTLE, "Refills itself for a set number of&uses per fill." },

@@ -13579,6 +13579,7 @@ void Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
 
     BgTokiSwd_UpdateTimePedestalFill(play, this);
     sControlInput = input;
+    Seasons_FilterPlayerInput(play, this, input);
 
     if (this->unk_A86 < 0) {
         this->unk_A86++;

@@ -9226,7 +9226,8 @@ s32 Player_ActionHandler_6(Player* this, PlayState* play) {
                 return true;
             }
 
-            if ((this->putAwayCooldownTimer == 0) && (this->heldItemAction >= PLAYER_IA_SWORD_KOKIRI) &&
+            if ((this->putAwayCooldownTimer == 0) &&
+                ((this->heldItemAction >= PLAYER_IA_SWORD_KOKIRI) || CustomItems_HasStowableHeldItem(this)) &&
                 GameInteractor_Should(VB_SHOULD_PUTAWAY, (this->transformation != PLAYER_FORM_FIERCE_DEITY))) {
                 Player_UseItem(play, this, ITEM_NONE);
             } else {

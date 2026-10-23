@@ -156,6 +156,28 @@ static void Seasons_Stow(PlayState* play, Player* player) {
     ItemEquip_PlayUnequipSFX(play, player);
 }
 
+// Runs on the effective native input before item dispatch. The late Rod tick
+// keeps the raw C edge, so a second press opens its chooser instead of sending
+// ITEM_EXT_BUTTON through native ITEM_NONE and putting the Rod away first.
+static void Seasons_FilterPlayerInput(PlayState* play, Player* player, Input* input) {
+    if (!sRodDrawn || Seasons_EquippedButtonMask() == 0 || BoxMenu_IsOpen() || ItemInput_IsBlocked(player, play) ||
+        play->pauseCtx.state != 0 || play->csCtx.state != CS_STATE_IDLE || play->msgCtx.msgMode != MSGMODE_NONE ||
+        player->csAction != 0 || play->transitionTrigger == TRANS_TRIGGER_START) {
+        return;
+    }
+    input->press.button &= ~Seasons_EquippedButtonMask();
+
+    // A is the put-away action. Do not turn an idle B press into a same-frame
+    // Rod stow plus sword draw; native items and interaction states keep B.
+    if (player->heldItemAction == PLAYER_IA_NONE && player->itemAction == PLAYER_IA_NONE &&
+        !(player->stateFlags1 & (PLAYER_STATE1_FIRST_PERSON | PLAYER_STATE1_CARRYING_ACTOR)) &&
+        player->doorType == PLAYER_DOORTYPE_NONE && player->interactRangeActor == NULL &&
+        !(player->stateFlags2 & PLAYER_STATE2_CAN_ACCEPT_TALK_OFFER)) {
+        input->cur.button &= ~BTN_B;
+        input->press.button &= ~BTN_B;
+    }
+}
+
 /**
  * Per-frame rod input, called from Player_UpdateCommon. The weather runs off ownership alone: once a
  * season is owned the world is in it, whether or not the rod sits on a button.

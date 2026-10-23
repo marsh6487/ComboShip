@@ -155,7 +155,7 @@ assert(entries[SEASON_WINTER].enabled&&entries[SEASON_OFF].enabled&&!entries[SEA
 confirmation(SEASON_SUMMER);assert(Seasons_GetSeason()==SEASON_WINTER&&seasonFlashes==0);
 confirmation(SEASON_OFF);assert(Seasons_GetSeason()==SEASON_OFF&&seasonFlashes==1);
 confirmation(SEASON_OFF);assert(Seasons_GetSeason()==SEASON_OFF&&seasonFlashes==1);
-play.state.input[0].press.button=BTN_B;Seasons_TickInput(&play,&player,&play.state.input[0]);assert(!Seasons_IsDrawn());
+play.state.input[0].press.button=BTN_B;Seasons_TickInput(&play,&player,&play.state.input[0]);assert(Seasons_IsDrawn());
 ''')
 
 codec=(ROOT/'mm/2s2h/BenJsonConversions.hpp').read_text()
