@@ -33,6 +33,7 @@
 #include "soh/Enhancements/randomizer/RCToRandInf.h"
 #include "dungeon.h"
 #ifdef COMBO_BUILD
+extern "C" bool ComboBlackMarketOot_TryFixedReceiptGrant(PlayState*, GetItemEntry);
 #include "hook_handlers.h" // ComboShip: OOT_DeliverForeign for RG_COMBO_FOREIGN grant divert
 extern "C" void (*gComboTriforceProgress)(int game, int fileNum);
 #endif
@@ -1788,6 +1789,11 @@ extern "C" u16 Randomizer_Item_Give(PlayState* play, GetItemEntry giEntry) {
     RandomizerGet item = (RandomizerGet)giEntry.getItemId;
 
 #ifdef COMBO_BUILD
+    // A live fixed Black Market receipt may own an exact cane/bundle grant.
+    // Keep the native receive hook, text, fanfare and item camera intact.
+    if (ComboBlackMarketOot_TryFixedReceiptGrant(play, giEntry))
+        return Return_Item_Entry(giEntry, RG_NONE);
+
     // ComboShip: a foreign check's item belongs to the OTHER game. After the normal get-item
     // presentation (real model + name + held-up animation) reaches here, divert the real item
     // cross-game instead of granting anything locally.

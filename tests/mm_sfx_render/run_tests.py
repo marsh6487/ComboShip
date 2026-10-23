@@ -12,6 +12,8 @@ from run_tests import function
 
 
 def main():
+    subprocess.run([sys.executable, "-B", ROOT / "tests/mm_sfx_render/clock_test.py"], check=True)
+    subprocess.run([sys.executable, "-B", ROOT / "tests/native_transformations/audio_lifecycle_test.py"], check=True)
     source = (ROOT / "soh/soh/mixer.c").read_text()
     names = ("clamp16", "aClearBufferImpl", "aLoadBufferImpl", "aSaveBufferImpl",
              "aLoadADPCMImpl", "aSetBufferImpl", "aInterleaveImpl", "aDMEMMoveImpl",

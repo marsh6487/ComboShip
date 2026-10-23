@@ -8,7 +8,20 @@
 
 namespace SeasonFoliage {
 enum class Surface { Ground, Canopy, Understory };
-enum class PixelMask { Green, GrassTrim };
+enum class PixelMask {
+    Green,
+    GrassTrim,
+    KakarikoCliffGrass,
+    MeadowWallGrass,
+    MeadowNativeCliffGrass,
+    MeadowRuinsGrass,
+    CliffGrass,
+    RiverAltCliffGrass,
+    RanchMasonryGrass,
+    RanchAtlasGrass,
+    RiverGroundAtlasGrass,
+    RiverFrameGrass
+};
 struct Tint {
     uint32_t color = 0;
     unsigned lightScale = 256;
@@ -31,6 +44,39 @@ inline Tint Palette(int season, Surface surface, uint32_t autumnColor = 0) {
             return {};
     }
 }
+
+// Fixed normalized 64-cell masks from inspected River grass/stone atlases.
+// Keep their tree, cliff and Triforce-frame interiors in the original artwork.
+inline constexpr uint64_t kRiverGroundAtlasGrass[64] = {
+    0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL,
+    0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL,
+    0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL,
+    0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL,
+    0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL,
+    0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00ffffffffffffULL, 0xfc00c01ff8006067ULL,
+    0xfc00e017f410e03fULL, 0xfc00c001e400000fULL, 0x000000006000001fULL, 0x000000004000001cULL, 0x0000000000000000ULL,
+    0x0000000000000000ULL, 0x0000000000000000ULL, 0x0000000000000000ULL, 0x0000000000000000ULL, 0x0000000000000000ULL,
+    0x0000000000000000ULL, 0x0000000000000000ULL, 0x0000000000000000ULL, 0x0000000000000000ULL, 0x0000000000000000ULL,
+    0x0000000000000000ULL, 0x0000000000000000ULL, 0x0000000000000000ULL, 0x00000000ffffffffULL, 0x000000007ffffffeULL,
+    0x000000003ffffffcULL, 0x000000001ffffffcULL, 0x0000000007ffffb0ULL, 0x0000000007ffefa0ULL, 0x0000000000ffe484ULL,
+    0x0000000004ffd800ULL, 0x000000000478b800ULL, 0x0000000001206010ULL, 0x000000001f00051eULL, 0x000000001e00079eULL,
+    0x000000003fc81f9eULL, 0x000000002ffa7f5eULL, 0x000000007ffe7ffeULL, 0x00000000ffffffffULL
+};
+inline constexpr uint64_t kRiverFrameGrass[64] = {
+    0xffffffffffffffffULL, 0xffffffffffffffffULL, 0xffffffffffffffffULL, 0xffffffffffffffffULL, 0xffffffffffffffffULL,
+    0xffffffffffffffffULL, 0xffffffffffffffffULL, 0xffffffffffffffffULL, 0xffffffffffffffffULL, 0xffffffffffffffffULL,
+    0xffffffffffffffffULL, 0xffffffffffffffffULL, 0xffffff8fffffffffULL, 0xffffe60001ffffffULL, 0xffff00000000ffffULL,
+    0xffff000000001fffULL, 0xfffc000000001fffULL, 0xfff8000000001fffULL, 0xfff0000000001fffULL, 0xfff0000000000fffULL,
+    0xfff0000000000fffULL, 0xfff0000000000fffULL, 0xfff0000000000fffULL, 0xffe0000000001fffULL, 0xffe0000000000fffULL,
+    0xffe0000000000fffULL, 0xffe0000000000fffULL, 0xffe0000000000fffULL, 0xffe0000000000fffULL, 0xfff0000000000fffULL,
+    0xfff0000000000fffULL, 0xfff0000000000fffULL, 0xfff0000000000fffULL, 0xfff0000000000fffULL, 0xfff0000000000fffULL,
+    0xffe0000000000fffULL, 0xfff0000000000fffULL, 0xfff0000000000fffULL, 0xfff0000000000fffULL, 0xfff0000000000fffULL,
+    0xfff0000000000fffULL, 0xfff8000000001fffULL, 0xfff0000000001fffULL, 0xfff0000000001fffULL, 0xfff0000000000fffULL,
+    0xfff0000000000fffULL, 0xfff0000000000fffULL, 0xffe0000000001fffULL, 0xffe0000000001fffULL, 0xfff0000000001fffULL,
+    0xfff0000000001fffULL, 0xfff8000000007fffULL, 0xfffe00000000ffffULL, 0xffffe0000001ffffULL, 0xfffffffe081fffffULL,
+    0xffffffffffffffffULL, 0xffffffffffffffffULL, 0xffffffffffffffffULL, 0xffffffffffffffffULL, 0xffffffffffffffffULL,
+    0xffffffffffffffffULL, 0xffffffffffffffffULL, 0xffffffffffffffffULL, 0xffffffffffffffffULL
+};
 
 // Tint copies are made from the original texture, never the preceding season.
 // Djipi's RGBA16 resources with LOAD_AS_RAW carry four RGBA bytes per pixel.
@@ -69,6 +115,44 @@ inline std::shared_ptr<Fast::Texture> BuildTexture(const std::shared_ptr<Fast::T
     bool changed = false;
     const bool wholeTexture = region.left == 0 && region.top == 0 && region.right == 16 && region.bottom == 16;
     for (size_t i = 0; i < copy->ImageDataSize; i += stride) {
+        // Kakariko's cliff atlas has grass at both edges. Retain its rock face
+        // between the top eighth and bottom sixteenth, including greenish moss.
+        if (pixelMask == PixelMask::KakarikoCliffGrass) {
+            const size_t y = (i / stride) / source->Width;
+            if (y * 16 >= source->Height * 2u && y * 16 < source->Height * 15u)
+                continue;
+        }
+        // Actual exported mixed atlases have bounded foliage. Pixel origins
+        // use normalized regions so replacement dimensions do not widen them.
+        const auto inside = [&](Region r) {
+            const size_t x = (i / stride) % source->Width, y = (i / stride) / source->Width;
+            return x * 16 >= source->Width * r.left && x * 16 < source->Width * r.right &&
+                   y * 16 >= source->Height * r.top && y * 16 < source->Height * r.bottom;
+        };
+        if (pixelMask == PixelMask::MeadowWallGrass && !(inside({ 0, 0, 16, 4 }) || inside({ 0, 14, 16, 16 })))
+            continue;
+        if (pixelMask == PixelMask::MeadowNativeCliffGrass && !(inside({ 0, 0, 16, 4 }) || inside({ 0, 13, 16, 16 })))
+            continue;
+        if (pixelMask == PixelMask::MeadowRuinsGrass && !(inside({ 0, 0, 8, 4 }) || inside({ 0, 15, 8, 16 })))
+            continue;
+        if (pixelMask == PixelMask::CliffGrass && !(inside({ 0, 0, 16, 3 }) || inside({ 0, 14, 16, 16 })))
+            continue;
+        if (pixelMask == PixelMask::RiverAltCliffGrass && !(inside({ 0, 0, 16, 3 }) || inside({ 0, 15, 16, 16 })))
+            continue;
+        if (pixelMask == PixelMask::RanchMasonryGrass && !(inside({ 0, 0, 8, 1 }) || inside({ 7, 15, 16, 16 })))
+            continue;
+        if (pixelMask == PixelMask::RanchAtlasGrass &&
+            !(inside({ 0, 7, 2, 8 }) || inside({ 4, 7, 6, 8 }) || inside({ 0, 15, 2, 16 }) ||
+              inside({ 8, 15, 11, 16 }) || inside({ 12, 0, 14, 16 }) || inside({ 14, 15, 16, 16 })))
+            continue;
+        const uint64_t* contour = pixelMask == PixelMask::RiverGroundAtlasGrass ? kRiverGroundAtlasGrass
+                                  : pixelMask == PixelMask::RiverFrameGrass     ? kRiverFrameGrass
+                                                                                : nullptr;
+        if (contour) {
+            const size_t x = (i / stride) % source->Width, y = (i / stride) / source->Width;
+            if (!(contour[y * 64 / source->Height] & (uint64_t{ 1 } << (x * 64 / source->Width))))
+                continue;
+        }
         if (!wholeTexture) {
             const size_t pixelIndex = i / stride;
             const unsigned x = pixelIndex % source->Width, y = pixelIndex / source->Width;

@@ -15,7 +15,7 @@ struct View {
 // inner bottom offers; odd slots are the upper row. -1 faces the keeper.
 inline View Target(int slot) {
     if (slot < 0)
-        return { { 0, 80, 240 }, { 0, 66, 86 }, 55 };
+        return { { 0, 76, 196 }, { 0, 61, 86 }, 46 };
     // EnOssan turns 30 degrees to each shelf. These taller, compact flat
     // banks need the farther eye to keep both rows above the Y142 textbox;
     // translate it sideways so that the native turn still faces the actual

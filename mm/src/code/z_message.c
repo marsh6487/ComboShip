@@ -11,6 +11,7 @@
 #include "BenPort.h"
 #include "ComboItemReceiptRender.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
+#include "2s2h/Enhancements/Graphics/OotLocationTitleCard.h"
 #include "2s2h/BenGui/CosmeticEditor.h"
 #include "assets/archives/schedule_dma_static/schedule_dma_static_yar.h"
 #include "assets/archives/icon_item_static/icon_item_static_yar.h"
@@ -3539,6 +3540,7 @@ void func_80150A84(PlayState* play) {
 }
 
 void Message_OpenText(PlayState* play, u16 textId) {
+    OotLocationTitle_Reset();
     MessageContext* msgCtx = &play->msgCtx;
     Font* font = &msgCtx->font;
     Player* player = GET_PLAYER(play);
@@ -3851,6 +3853,7 @@ void Message_DisplaySceneTitleCard(PlayState* play, u16 textId) {
         msgCtx->unk11F1A[0] = msgCtx->unk11F1A[1] = msgCtx->unk11F1A[2] = 0;
         Interface_SetHudVisibility(HUD_VISIBILITY_NONE);
     }
+    OotLocationTitle_Begin(play);
 }
 
 void Message_BombersNotebookQueueEvent(PlayState* play, u8 event) {
@@ -4632,6 +4635,8 @@ void Message_DrawText(PlayState* play, Gfx** gfxP) {
 }
 
 void Message_DrawSceneTitleCard(PlayState* play, Gfx** gfxP) {
+    if (OotLocationTitle_Draw(play, gfxP))
+        return;
     MessageContext* msgCtx = &play->msgCtx;
     Gfx* gfx;
 
@@ -6561,6 +6566,8 @@ void Message_Update(PlayState* play) {
             break;
 
         case MSGMODE_SCENE_TITLE_CARD_FADE_IN_BACKGROUND:
+            if (OotLocationTitle_Update(play))
+                break;
             msgCtx->textboxColorAlphaCurrent += XREG(73);
             if (msgCtx->textboxColorAlphaCurrent >= 255) {
                 msgCtx->textboxColorAlphaCurrent = 255;
@@ -6569,6 +6576,8 @@ void Message_Update(PlayState* play) {
             break;
 
         case MSGMODE_SCENE_TITLE_CARD_FADE_IN_TEXT:
+            if (OotLocationTitle_Update(play))
+                break;
             msgCtx->textColorAlpha += XREG(73);
             if (msgCtx->textColorAlpha >= 255) {
                 msgCtx->textColorAlpha = 255;
@@ -6577,6 +6586,8 @@ void Message_Update(PlayState* play) {
             break;
 
         case MSGMODE_SCENE_TITLE_CARD_DISPLAYING:
+            if (OotLocationTitle_Update(play))
+                break;
             msgCtx->stateTimer--;
             if (msgCtx->stateTimer == 0) {
                 msgCtx->msgMode = MSGMODE_SCENE_TITLE_CARD_FADE_OUT_TEXT;
@@ -6584,6 +6595,8 @@ void Message_Update(PlayState* play) {
             break;
 
         case MSGMODE_SCENE_TITLE_CARD_FADE_OUT_TEXT:
+            if (OotLocationTitle_Update(play))
+                break;
             msgCtx->textColorAlpha -= XREG(70);
             if (msgCtx->textColorAlpha <= 0) {
                 msgCtx->textColorAlpha = 0;
@@ -6592,6 +6605,8 @@ void Message_Update(PlayState* play) {
             break;
 
         case MSGMODE_SCENE_TITLE_CARD_FADE_OUT_BACKGROUND:
+            if (OotLocationTitle_Update(play))
+                break;
             msgCtx->textboxColorAlphaCurrent -= XREG(70);
             if (msgCtx->textboxColorAlphaCurrent <= 0) {
                 if ((msgCtx->currentTextId >= 0x1BB2) && (msgCtx->currentTextId <= 0x1BB6) &&
@@ -6703,6 +6718,7 @@ void Message_SetTables(PlayState* play) {
 }
 
 void Message_Init(PlayState* play) {
+    OotLocationTitle_Reset();
     Font* font;
     MessageContext* msgCtx = &play->msgCtx;
 

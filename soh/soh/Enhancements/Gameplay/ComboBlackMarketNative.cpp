@@ -13,6 +13,7 @@
 #include "BlackMarketExitDoor.h"
 #include "BlackMarketGrannyResources.h"
 #include "BlackMarketBrowsing.h"
+#include "BlackMarketReceipt.h"
 #include "BlackMarketText.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "soh/SaveManager.h"
@@ -237,7 +238,77 @@ PurchaseResult Status(int slot) {
                        gSaveContext.rupees + std::min<int>(0, gSaveContext.rupeeAccumulator), ClearCount(sClears),
                        ComboBlackMarketOotItems::Owned(*item), ComboBlackMarketOotItems::Available(*item));
 }
-void Purchase() {
+BlackMarketReceipt::State sReceipt;
+nlohmann::json sReceiptMarket;
+GetItemEntry sReceiptEntry{};
+bool ReceiptContext() {
+    return Active() && gPlayState && gPlayState->state.running &&
+           sReceipt.Matches(gSaveContext.fileNum, Seed(), sReceipt.ticket) && sReceiptMarket == sSession.market &&
+           gPlayState->transitionTrigger == TRANS_TRIGGER_OFF && gPlayState->transitionMode == TRANS_MODE_OFF &&
+           gPlayState->gameOverCtx.state == GAMEOVER_INACTIVE;
+}
+void CancelReceipt(bool destroying = false) {
+    // Withdraw only the entry issued by this transaction. Native item actions
+    // already test GI_NONE/OBJECT_INVALID and finish through normal cleanup.
+    if (!destroying && gPlayState && !sReceipt.delivered) {
+        auto* player = GET_PLAYER(gPlayState);
+        if (player && sReceipt.pending && player->getItemEntry.comboMarketReceipt == sReceipt.ticket) {
+            player->getItemEntry = GET_ITEM_NONE;
+            player->getItemId = GI_NONE;
+            if (player->interactRangeActor == &player->actor)
+                player->interactRangeActor = nullptr;
+        }
+    }
+    sReceipt.Cancel();
+    sReceiptMarket = {};
+    sReceiptEntry = {};
+}
+bool PendingReceiptEntry(PlayState* play, const GetItemEntry& entry) {
+    const auto* player = play == gPlayState && play ? GET_PLAYER(play) : nullptr;
+    return ReceiptContext() && sReceipt.offered && !sReceipt.delivered && player &&
+           (player->stateFlags1 & PLAYER_STATE1_GETTING_ITEM) && entry.comboMarketReceipt == sReceipt.ticket &&
+           player->getItemEntry.comboMarketReceipt == sReceipt.ticket && entry.modIndex == sReceiptEntry.modIndex &&
+           entry.getItemId == sReceiptEntry.getItemId && player->getItemEntry.modIndex == entry.modIndex &&
+           player->getItemEntry.getItemId == entry.getItemId;
+}
+bool FixedMarketGrant(PlayState* play, const GetItemEntry& entry) {
+    if (!entry.comboMarketReceipt)
+        return false; // Every ordinary native entry remains untouched.
+    if (!PendingReceiptEntry(play, entry))
+        return true; // A cancelled/stale market offer must never fall through.
+    const auto* item = Offer(sReceipt.slot);
+    if (!item)
+        return true;
+    SaveManager::Instance->ThreadPoolWait();
+    // Preserve physically owned tools before any native shared-slot write.
+    ComboBlackMarketOotItems::LatchToolOwnership();
+    const auto key = std::string_view(item->key);
+    // Native acquisition still owns the presentation and OnItemReceive. These
+    // few catalogue rows need their exact shop grant instead of native
+    // progressive cane/feather or incomplete bundle behavior.
+    if ((key.starts_with("nei.cane.") && key != "nei.cane.byrna") || key.starts_with("nei.bundle.") ||
+        key == "nei.rocs_feather") {
+        ComboBlackMarketOotItems::Grant(*item);
+        return true;
+    }
+    return false;
+}
+void ReceiveMarketItem(GetItemEntry entry) {
+    if (!PendingReceiptEntry(gPlayState, entry))
+        return;
+    // Latch a newly granted tool before ownership checks and the atomic save.
+    ComboBlackMarketOotItems::LatchToolOwnership();
+    const auto* item = Offer(sReceipt.slot);
+    if (!item || !ComboBlackMarketOotItems::Owned(*item))
+        return;
+    SaveManager::Instance->ThreadPoolWait();
+    if (!sReceipt.Acknowledge(gSaveContext.fileNum, Seed(), sReceipt.ticket))
+        return;
+    gSaveContext.rupees -= sReceipt.price;
+    CommitPurchase(sSession.state, sReceipt.slot);
+    SaveManager::Instance->SaveSection(gSaveContext.fileNum, SECTION_ID_BASE, false);
+}
+bool Purchase() {
     if (Status(sSelected) != PurchaseResult::Ready) {
         switch (Status(sSelected)) {
             case PurchaseResult::SoldOut:
@@ -256,24 +327,55 @@ void Purchase() {
                 sStatus = "You need its prerequisite first.";
                 break;
         }
-        return;
+        return false;
     }
-    SaveManager::Instance->ThreadPoolWait();
     const auto* item = Offer(sSelected);
-    if (!item || !ComboBlackMarketOotItems::Grant(*item)) {
+    const auto entry =
+        item ? Rando::StaticData::RetrieveItem(ComboBlackMarketOotItems::Id(*item)).GetGIEntryUnresolved() : nullptr;
+    if (!entry || entry->modIndex != MOD_RANDOMIZER ||
+        !sReceipt.Begin(sSelected, gSaveContext.fileNum, Seed(),
+                        sSession.market["stock"][sSelected]["price"].get<int>())) {
         sStatus = "That offer cannot be delivered yet.";
-        return;
+        return false;
     }
-    gSaveContext.rupees -= sSession.market["stock"][sSelected]["price"].get<int>();
-    CommitPurchase(sSession.state, sSelected);
-    // NEI, rupees and market bits share the same synchronous atomic native save.
-    SaveManager::Instance->SaveSection(gSaveContext.fileNum, SECTION_ID_BASE, false);
-    sStatus = std::string("Yours: ") + item->label + ".";
+    sReceiptMarket = sSession.market;
+    sReceiptEntry = *entry; // exact GI row, never GetGIEntry()/GetFinalGIEntry()
+    sReceiptEntry.comboMarketReceipt = sReceipt.ticket;
+    return true;
 }
 
 #define BLACK_MARKET_BROWSING_OOT
 #include "BlackMarketBrowsingNative.h"
 #undef BLACK_MARKET_BROWSING_OOT
+void MonitorReceipt() {
+    if (!sReceipt.pending)
+        return;
+    if (!ReceiptContext()) {
+        CancelReceipt();
+        return;
+    }
+    auto* play = gPlayState;
+    auto* player = GET_PLAYER(play);
+    if (!player || play->msgCtx.msgMode != 0 || Player_InBlockingCsMode(play, player) ||
+        (player->stateFlags1 & (PLAYER_STATE1_GETTING_ITEM | PLAYER_STATE1_IN_ITEM_CS)) || !Safe(play))
+        return;
+    if (!sReceipt.delivered) {
+        if (Status(sReceipt.slot) != PurchaseResult::Ready) {
+            CancelReceipt();
+            return;
+        }
+        sReceipt.offered = GiveItemEntryWithoutActor(play, sReceiptEntry) != 0;
+        return;
+    }
+    if (Play_GetActiveCamId(play) != CAM_ID_MAIN)
+        return;
+    const int shelf = sReceipt.slot;
+    CancelReceipt();
+    if (BeginBrowsing(play)) {
+        sSelected = sBrowser.slot = shelf;
+        Message_StartTextbox(play, kBrowseText, nullptr);
+    }
+}
 
 bool CustomKeeperAvailable() {
     return BlackMarketKeeperAssets::CustomAvailable(kBlackMarketResources, [](const char* path) {
@@ -308,6 +410,8 @@ void KeeperUpdate(Actor* actor, PlayState* play) {
             Actor_OfferTalk(actor, play, 150);
         return;
     }
+    if (sReceipt.pending)
+        return;
     if (Actor_ProcessTalkRequest(actor, play)) {
         if (!BeginBrowsing(play)) {
             Message_CloseTextbox(play);
@@ -669,6 +773,7 @@ void PlayerUpdate() {
     }
 }
 void BindSolo(int slot) {
+    CancelReceipt();
     if (gComboGameMode != COMBO_GAME_OOT || !ComboLostWoods_IsPlayableSlot(slot))
         return;
     if (!sFileLoadPending && sSession.Active(slot) && sSession.market["seed"] == Seed())
@@ -753,6 +858,7 @@ void RegisterNativeMarket() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](s16 scene) {
         sShelfFixture.Reset();
         EndBrowsing(gPlayState, true);
+        CancelReceipt(true);
         GrannySceneBegin();
         sEntering = sDoorArmed = sTalking = false;
         sKeeperSpawned = false;
@@ -765,8 +871,10 @@ void RegisterNativeMarket() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerUpdate>(ApplyGrannyInterior);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerUpdate>(PlayerUpdate);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnOpenText>(MarketText);
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnItemReceive>(ReceiveMarketItem);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameFrameUpdate>([] {
         MonitorBrowsing();
+        MonitorReceipt();
         PresentTitle();
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDrawEnd>([] {
@@ -777,11 +885,16 @@ void RegisterNativeMarket() {
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>([] {
         sShelfFixture.Reset();
         EndBrowsing(gPlayState, true);
+        CancelReceipt();
         sTitlePending = sTalking = sDoorArmed = sGrannyActive = sGrannyPending = false;
     });
 }
 RegisterShipInitFunc init(RegisterNativeMarket);
 } // namespace
+
+extern "C" bool ComboBlackMarketOot_TryFixedReceiptGrant(PlayState* play, GetItemEntry entry) {
+    return FixedMarketGrant(play, entry);
+}
 
 namespace {
 void LogDoorAttempt(PlayState* play, Actor* door, int result, const char* reason) {

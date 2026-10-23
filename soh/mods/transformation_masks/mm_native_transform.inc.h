@@ -67,10 +67,13 @@ static void MmForm_RestoreNativeMaskLighting(PlayState* play) {
     play->envCtx.adjFogNear = sNativeMaskCs.fogNear;
 }
 
-static void MmForm_EndNativeMaskCutscene(Player* player, PlayState* play) {
+static void MmForm_EndNativeMaskCutscene(Player* player, PlayState* play, bool stopSfx = true) {
     if (!sNativeMaskCs.active)
         return;
-    MmForm_StopNativeMaskSfx();
+    // Successful recovery leaves the native one-shot tails playing. Interrupts
+    // still drain the bank before a retained player-position pointer can expire.
+    if (stopSfx)
+        MmForm_StopNativeMaskSfx();
     // Player_Init receives the new PlayState after the old scene's camera and
     // light contexts were destroyed. Never release their handles through it.
     if (sNativeMaskCs.owner != play) {
@@ -97,8 +100,11 @@ static void MmForm_EndNativeMaskCutscene(Player* player, PlayState* play) {
 
 static void MmForm_InterruptNativeMaskForScene(Player* player, PlayState* play, u8 abandon) {
     sNativeMaskInstantFallback = 0;
-    if (!sNativeMaskCs.active)
+    if (!sNativeMaskCs.active) {
+        // Recovery can release camera ownership before the last SFX finishes.
+        MmForm_StopNativeMaskSfx();
         return;
+    }
     // Preserve the body that actually reached the screen. Before the flash it
     // is still human; after it, a new scene can seamlessly reload the form.
     if (gFormState.skeletonLoaded && MmForm_IsNativeMaskForm(gFormState.currentForm)) {
@@ -127,8 +133,11 @@ extern "C" void MmForm_OnPlayDestroy(PlayState* play, Player* player) {
 
 static void MmForm_CancelNativeMaskCutscene(u8 dying) {
     sNativeMaskInstantFallback = 0;
-    if (!sNativeMaskCs.active)
+    if (!sNativeMaskCs.active) {
+        // Recovery can release camera ownership before the last SFX finishes.
+        MmForm_StopNativeMaskSfx();
         return;
+    }
     // The existing death equipment/tunic rollback checks ACTIVE. A revealed
     // form has already applied those properties even during its recovery pose.
     if (dying && gFormState.skeletonLoaded && MmForm_IsNativeMaskForm(gFormState.currentForm))
@@ -547,7 +556,7 @@ static u8 MmForm_UpdateNativeMaskCutscene(Player* player, PlayState* play, u8 re
         const bool moving = sNativeMaskCs.recoveryTimer > 10 &&
                             (ABS(play->state.input[0].cur.stick_x) > 20 || ABS(play->state.input[0].cur.stick_y) > 20);
         if (gFormState.flashAlpha == 0 && (done || moving) && (removing || sNativeMaskCs.recovering)) {
-            MmForm_EndNativeMaskCutscene(player, play);
+            MmForm_EndNativeMaskCutscene(player, play, false);
             sForceInstantTransform = 0;
             if (removing) {
                 gFormState.state = MMFORM_STATE_INACTIVE;

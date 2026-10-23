@@ -8,17 +8,24 @@
 #include <string>
 #include <tuple>
 
+extern "C" {
+#include "z64.h"
+}
+
 extern "C" PlayState* gPlayState;
 extern "C" void gfx_texture_cache_clear();
 
 namespace {
 using namespace SeasonFoliage;
+enum class Assets { Both, Native, Alt };
 struct Material {
     const char* path;
     Surface surface;
     Region region{};
     uint32_t autumnColor = 0;
     PixelMask pixelMask = PixelMask::Green;
+    int16_t scene = -1;
+    Assets assets = Assets::Both;
 };
 constexpr Material kMaterials[] = {
 #include "SeasonFoliageMaterials.inc"
@@ -67,10 +74,16 @@ void Update(const PlayState* play) {
     }
     std::vector<Binding> active;
     for (const auto& material : kMaterials) {
+        if (material.scene >= 0 && (!play || play->sceneNum != material.scene))
+            continue;
         const auto tint = Palette(season, material.surface, material.autumnColor);
         if (!tint.color)
             continue;
         for (const char* prefix : { "", "alt/" }) {
+            // Selection follows the requested cache binding, including native
+            // fallback and .meta redirects; target metadata is preserved.
+            if ((material.assets == Assets::Native && *prefix) || (material.assets == Assets::Alt && !*prefix))
+                continue;
             if (*prefix && !rm->IsAltAssetsEnabled())
                 continue;
             const std::string path = std::string(prefix) + material.path;

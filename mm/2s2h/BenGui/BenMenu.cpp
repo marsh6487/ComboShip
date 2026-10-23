@@ -1555,6 +1555,13 @@ void BenMenu::AddEnhancements() {
     AddWidget(path, "24 Hours Clock", WIDGET_CVAR_CHECKBOX)
         .CVar("gEnhancements.Graphics.24HoursClock")
         .Options(CheckboxOptions().Tooltip("Changes from a 12 Hour to a 24 Hour Clock."));
+    AddWidget(path, "OoT-style Location Cards", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.Graphics.OotLocationTitleCards")
+        .Options(CheckboxOptions().DefaultValue(false).Tooltip(
+            "Center MM location names with white outlined native lettering and OoT-style fades. "
+            "Installed location-card textures use normal native/HD and Alternate Assets routing. "
+            "Day announcements, boss names and custom cards keep their existing presentation. "
+            "Changes apply to the next location card."));
     AddWidget(path, "Mods", WIDGET_SEPARATOR_TEXT);
 #ifdef COMBO_BUILD
     AddWidget(path, "Black Market Appearance", WIDGET_CUSTOM).CustomFunction([](WidgetInfo&) {

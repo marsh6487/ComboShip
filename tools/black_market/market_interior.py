@@ -14,6 +14,7 @@ import re
 import struct
 import xml.etree.ElementTree as ET
 import zlib
+import prop_appearance
 
 ASSETS = Path(__file__).parent / 'assets/interior'
 PART_BYTES = 96 * 1024  # Each base64 source file is at most 128 KiB.
@@ -169,6 +170,7 @@ def prepare_prop_vertices(resources):
                 vertices[index].set(key, str(int(vertices[index].get(key)) + spec['delta'][axis]))
     ET.indent(root, space='  ')
     changed[f'{GEOMETRY}_vtx_2'] = ET.tostring(root, encoding='utf-8') + b'\n'
+    changed.update(prop_appearance.prepare_vertices(resources, changed, vertex_components))
     return changed
 
 
@@ -339,8 +341,31 @@ def audit_manifest(resources):
             'ownership_note':'Material17 has no default draw owner. Active celestial material15 owns tri26; tri27 is a retained unused duplicate mesh, not material27. Material27 owns liquid tri16.'}
 
 
+@lru_cache(maxsize=1)
+def shelf_pixels():
+    """Exact original ethereal shelf art; independent of the floor/prop streams."""
+    manifest = json.loads((ASSETS / 'shelf-encoded.json').read_text())
+    size = 512 * 512 * 4
+    if (manifest.get('version') != 1 or manifest.get('name') != 'arcane_stone' or
+            manifest.get('source_sha256') != '19c491b0ed659ed4a8735a4e433755839010fa5367524b7cfd7bc8c581c7ca5f' or
+            manifest.get('decoded_bytes') != size or not 1 <= len(manifest.get('parts', [])) <= 11 or
+            any(not 0 < part['bytes'] <= PART_BYTES for part in manifest['parts'])):
+        raise ValueError('Original shelf source/encoding identity changed')
+    packed = _packed_parts(manifest, 'shelf')
+    if len(packed) != manifest['packed_bytes']:
+        raise ValueError('Original shelf packed size changed')
+    decoder = zlib.decompressobj()
+    pixels = decoder.decompress(packed, size + 1)
+    if (len(pixels) != size or not decoder.eof or decoder.unused_data or decoder.unconsumed_tail or
+            hashlib.sha256(pixels).hexdigest() != manifest['pixels_sha256'] or
+            any(alpha != 255 for alpha in pixels[3::4])):
+        raise ValueError('Original shelf decoded pixels changed')
+    return pixels
+
+
 def texture(name, logical_size):
-    pixels = encoded_pixels()[name]
+    pixels = shelf_pixels() if name == 'arcane_stone' else encoded_pixels()[name]
+    pixels = prop_appearance.texture_pixels(name, pixels)
     header = bytearray(64)
     header[1] = 1
     struct.pack_into('<IIQ', header, 4, 0x4F544558, 1, 0xDEADBEEFDEADBEEF)
@@ -358,9 +383,9 @@ def apply(resources):
     result.update(prepare_prop_vertices(resources))
     for name, path in TEXTURES.items():
         result[path] = texture(name, 32 if name in BASE_NAMES else 64)
-    # The shared shelf fixture always loads this public path. Supplying a valid
-    # original slate surface prevents a failed load reusing the preceding tile.
-    result[SHELF] = texture('slate', 64)
+    # Flow/Veil owns this animated shelf/backdrop path, not the slate floor.
+    # Retain valid raw framing while restoring its exact original ethereal art.
+    result[SHELF] = texture('arcane_stone', 64)
     count = 0
     for path, data in resources.items():
         if '/mat_' not in path:

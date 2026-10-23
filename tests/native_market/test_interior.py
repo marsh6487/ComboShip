@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Verify the shipped market material graph, using the retained real geometry."""
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import struct
@@ -39,7 +40,7 @@ class DefaultInterior(unittest.TestCase):
         resources = module.prepared_resources(module.SOURCE)
         door_scenes = exit_door.apply(base)
         material_paths = set()
-        vertex_changes = {f'{market_interior.GEOMETRY}_vtx_{suffix}' for suffix in (2,5,8,12)}
+        vertex_changes = {f'{market_interior.GEOMETRY}_vtx_{suffix}' for suffix in (2,5,8,12,14,24)}
         for name, data in base.items():
             if '/mat_' not in name:
                 if name in exit_door.SCENES.values():
@@ -59,6 +60,9 @@ class DefaultInterior(unittest.TestCase):
         self.assertGreaterEqual(len(material_paths), 10, 'Retained props need independently mapped material surfaces')
         shelf = 'custom/skiejer_market/texture/arcane_stone'
         self.assertIn(shelf, resources, 'Native shelves must never load an absent texture')
+        self.assertEqual(hashlib.sha256(resources[shelf][92:]).hexdigest(),
+                         '3e2bac601d1a9c3e0317d159aa6b9f5354abaac982a24848edfec5e97dbb3231',
+                         'Animated shelves/backdrop must retain original arcane art, never floor slate')
         added = set(resources) - set(base)
         self.assertEqual(added, material_paths | {shelf, market_title.RESOURCE})
         market_title.validate_texture(resources[market_title.RESOURCE])
@@ -147,7 +151,11 @@ class DefaultInterior(unittest.TestCase):
         path = f'{market_interior.GEOMETRY}_vtx_2'
         old, new = list(ET.fromstring(base[path])), list(ET.fromstring(after[path]))
         moved = [0,0]
-        for before, prepared in zip(old,new):
+        from prop_appearance import POTS
+        pot_bounds = {tuple(tuple(edge) for edge in spec[1]) for spec in POTS}
+        pot_uv_indices = {index for part in market_interior.vertex_components(base, f'{market_interior.GEOMETRY}_tri_2')
+                          if tuple(tuple(edge) for edge in part['bounds']) in pot_bounds for index in part['indices']}
+        for vertex_index,(before, prepared) in enumerate(zip(old,new)):
             xyz = [int(before.get(key)) for key in ('X','Y','Z')]
             expected = xyz[:]
             for index,spec in enumerate(market_interior.TORCH_STANDS):
@@ -156,8 +164,9 @@ class DefaultInterior(unittest.TestCase):
                     expected = [a+b for a,b in zip(xyz,spec['delta'])]
                     moved[index] += 1
             self.assertEqual([int(prepared.get(key)) for key in ('X','Y','Z')],expected)
-            self.assertEqual([prepared.get(key) for key in ('S','T','R','G','B','A')],
-                             [before.get(key) for key in ('S','T','R','G','B','A')])
+            protected = ('R','G','B','A') if vertex_index in pot_uv_indices else ('S','T','R','G','B','A')
+            self.assertEqual([prepared.get(key) for key in protected],
+                             [before.get(key) for key in protected])
         self.assertEqual(moved, [78,73])
         self.assertEqual([[[a+b for a,b in zip(edge,spec['delta'])] for edge in spec['bounds']]
                           for spec in market_interior.TORCH_STANDS],

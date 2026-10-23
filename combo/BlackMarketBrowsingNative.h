@@ -169,7 +169,13 @@ void BrowseInput(PlayState* play) {
     if (sBrowser.phase == Phase::Confirm) {
         if (state == TEXT_STATE_CHOICE && (input.press.button & BTN_A) && Message_ShouldAdvance(play)) {
             if (play->msgCtx.choiceIndex == 0) {
-                Purchase();
+                if (Purchase()) {
+                    // Release the manual camera and native shop-hide bit before
+                    // the engine starts its own get-item camera and receipt.
+                    Message_CloseTextbox(play);
+                    EndBrowsing(play);
+                    return;
+                }
                 sBrowser.phase = Phase::Result;
                 Message_ContinueTextbox(play, kResultText);
             } else {
