@@ -81,7 +81,9 @@ with tempfile.TemporaryDirectory(prefix="file-select-sdl-main-") as directory:
         cpp.write_text(source, encoding="utf-8")
         binary = build / (name + (".exe" if args.msvc else ""))
         if args.msvc:
-            command = [args.compiler, "/nologo", "/std:c++20", "/EHsc", "/utf-8", "/DF3DEX_GBI_2", "/DCOMBO_BUILD",
+            # Match the engine's UTF-8 and C++20 X-macro preprocessor settings.
+            command = [args.compiler, "/nologo", "/std:c++20", "/EHsc", "/utf-8", "/Zc:preprocessor",
+                       "/DF3DEX_GBI_2", "/DCOMBO_BUILD",
                        *["/I" + str(p) for p in includes], str(cpp), "/Fo" + str(build / (name + ".obj")),
                        "/Fe" + str(binary)]
         else:
