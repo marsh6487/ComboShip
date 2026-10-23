@@ -38,9 +38,78 @@ new=functions((ROOT/'soh/mods/items/logic/item_rod_common.c').read_text())['RodC
 old=old.replace('FX_SpawnRodSwingParticles','RodCommon_PreserveChargeSparkCadence').replace('&env, 100, 10','&env, 0, 0')
 assert tokens(old)==tokens(new)
 for path in ('soh/src/overlays/effects/ovl_Effect_Ss_G_Spk/z_eff_ss_g_spk.c',
-             'soh/src/overlays/effects/ovl_Effect_Ss_En_Ice/z_eff_ss_en_ice.c',
              'soh/src/overlays/effects/ovl_Effect_Ss_KiraKira/z_eff_ss_kirakira.c'):
  assert (ROOT/path).read_text()==baseline(path),path
+# Sword-origin flying ice now captures a material flag at init and selects a
+# private material in Draw. Normalize only those exact, anchored additions;
+# the entire remaining native file still matches the fixed historical source.
+def native_ice_gameplay(source):
+ normalized=tokens(source)
+ changes=(
+  ('''#include "z_eff_ss_en_ice.h"
+      #include "din_fire_sword.h"
+      #include "objects/gameplay_keep/gameplay_keep.h"
+      #include "render/SwordFinishIceMaterial.h"''',
+   '''#include "z_eff_ss_en_ice.h"
+      #include "objects/gameplay_keep/gameplay_keep.h"'''),
+  ('''#define rRotSpeed regs[3]
+      #define rSwordIceMaterial regs[3]''','#define rRotSpeed regs[3]'),
+  ('''EffectSsEnIceInitParams* initParams = (EffectSsEnIceInitParams*)initParamsx;
+      this->rRotSpeed = 0;
+      if (initParams->type == 0) {''',
+   '''EffectSsEnIceInitParams* initParams = (EffectSsEnIceInitParams*)initParamsx;
+      if (initParams->type == 0) {'''),
+  ('''this->rPitch = Rand_CenteredFloat(65536.0f);
+      this->rSwordIceMaterial = DinFireSword_UseIceMaterial(play, initParams->actor);''',
+   'this->rPitch = Rand_CenteredFloat(65536.0f);'),
+  ('''f32 alpha;
+      Gfx* iceMaterial = (this->update == EffectSsEnIce_UpdateFlying && this->rSwordIceMaterial)
+                            ? SwordFinishIce_GetDisplayList(play->gameplayFrames) : NULL;''',
+   'f32 alpha;'),
+  ('''gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, iceMaterial ? 95 : this->rPrimColorR,
+                     iceMaterial ? 165 : this->rPrimColorG, iceMaterial ? 215 : this->rPrimColorB, this->rPrimColorA);
+      gDPSetEnvColor(POLY_XLU_DISP++, iceMaterial ? 230 : this->rEnvColorR, iceMaterial ? 250 : this->rEnvColorG,
+                    iceMaterial ? 255 : this->rEnvColorB, (u32)alpha);
+      gSPDisplayList(POLY_XLU_DISP++, iceMaterial ? iceMaterial : gEffIceFragment2DL);''',
+   '''gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, this->rPrimColorR, this->rPrimColorG, this->rPrimColorB,
+                     this->rPrimColorA);
+      gDPSetEnvColor(POLY_XLU_DISP++, this->rEnvColorR, this->rEnvColorG, this->rEnvColorB, (u32)alpha);
+      gSPDisplayList(POLY_XLU_DISP++, gEffIceFragment2DL);'''),
+ )
+ for current,native in changes:
+  current=tokens(current)
+  assert normalized.count(current)==1,('expected exact sword ice material hook',current)
+  normalized=normalized.replace(current,tokens(native),1)
+ return normalized
+path='soh/src/overlays/effects/ovl_Effect_Ss_En_Ice/z_eff_ss_en_ice.c'
+current=(ROOT/path).read_text()
+expected_ice=tokens(baseline(path))
+assert native_ice_gameplay(current)==expected_ice,(path,'native ice gameplay or geometry changed')
+# Witness that accepting the hook cannot hide native behavior changes, weaken
+# its flying-only guard, or move provenance capture to ordinary debris init.
+def reject_native_ice_mutation(mutated):
+ try:
+  assert native_ice_gameplay(mutated)==expected_ice
+ except AssertionError:
+  return
+ raise AssertionError('native ice contract accepted an unrelated mutation')
+for before,after in (
+ ('this->life = 10;','this->life = 11;'),
+ ('this->life++;','this->life += 2;'),
+ ('alpha = this->life * 12;','alpha = this->life * 13;'),
+ ('Rand_CenteredFloat(65535.0f)','Rand_CenteredFloat(65534.0f)'),
+ ('this->rPitch += this->rRotSpeed;','this->rPitch += this->rRotSpeed + 1;'),
+ ('Matrix_Scale(scale, scale, scale, MTXMODE_APPLY);','Matrix_Scale(scale * 2, scale, scale, MTXMODE_APPLY);'),
+ ('iceMaterial ? iceMaterial : gEffIceFragment2DL','iceMaterial ? iceMaterial : gEffIceFragment1DL'),
+ ('this->update == EffectSsEnIce_UpdateFlying && this->rSwordIceMaterial','this->rSwordIceMaterial'),
+):
+ assert current.count(before)==1,('expected native ice mutation site',before)
+ reject_native_ice_mutation(current.replace(before,after,1))
+capture='        this->rSwordIceMaterial = DinFireSword_UseIceMaterial(play, initParams->actor);\n'
+assert current.count(capture)==1
+reject_native_ice_mutation(current.replace(capture,'',1).replace('        this->rAlphaMode = 0;\n',
+                                                               capture+'        this->rAlphaMode = 0;\n',1))
+print('PASS native ice contract permits only sword material hooks; native lifetime, updates, geometry and fallback mutations rejected')
 # The native-bank regression in tests/oot_timegate covers this audio-only
 # lifetime fix. Permit only its two source-owned stops and one cleanup call in
 # each exit handler; the rest of Time Gate must still match the accepted source
