@@ -230,8 +230,7 @@ void Draw(Actor*, PlayState* play) {
     OPEN_DISPS(play->state.gfxCtx);
     Gfx_SetupDL_25Opa(play->state.gfxCtx);
     Matrix_Translate(0, 0, 0, MTXMODE_NEW);
-    gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(play->state.gfxCtx, __FILE__, __LINE__),
-              G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
+    gSPMatrix(POLY_OPA_DISP++, MATRIX_NEWMTX(play->state.gfxCtx), G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH);
     gSPClearGeometryMode(POLY_OPA_DISP++, G_LIGHTING | G_CULL_BACK);
     gSPTexture(POLY_OPA_DISP++, 0xffff, 0xffff, 0, G_TX_RENDERTILE, G_ON);
     gDPSetTextureLUT(POLY_OPA_DISP++, G_TT_NONE);

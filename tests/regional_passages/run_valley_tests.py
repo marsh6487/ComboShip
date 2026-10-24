@@ -36,7 +36,9 @@ with tempfile.TemporaryDirectory(prefix='combo-valley-') as td:
     paths=['soh','soh/soh','soh/include','soh/include/PR','soh/src','soh/assets','libultraship/include','combo','soh/soh/Enhancements/Gameplay']
     flags=['-std=c++20','-w','-DCOMBO_BUILD','-DF3DEX_GBI_2','-DFMT_HEADER_ONLY',*['-I'+str(ROOT/p)for p in paths]]
     host_object=Path(td)/'valley-production.o'
-    subprocess.run([os.environ.get('CXX','c++'),*flags,'-c',str(host),'-o',str(host_object)],env=env,check=True)
+    # Match MSVC's rejection of const filenames passed to legacy char* APIs.
+    strict_flags=[flag for flag in flags if flag!='-w']+['-Werror=write-strings']
+    subprocess.run([os.environ.get('CXX','c++'),*strict_flags,'-c',str(host),'-o',str(host_object)],env=env,check=True)
     subprocess.run([os.environ.get('PYTHON','python3'),str(ROOT/'tests/regional_passages/valley_linkage_test.py'),str(host_object)],env=env,check=True)
     sources=['libultraship/src/fast/resource/type/DisplayList.cpp','libultraship/src/fast/resource/type/Vertex.cpp','libultraship/src/ship/resource/Resource.cpp']
     binary=Path(td)/'native'
