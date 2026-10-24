@@ -1,10 +1,20 @@
 // Included inside each native controller's private namespace after Purchase().
-// Both engines use the same interaction code and spatial navigation state.
+// Both engines use this bounded manual FREE0/Unique6 adapter and spatial
+// navigation state; native shop actors/cutscene tables do not own the market.
 BlackMarketBrowsing::State sBrowser;
 s16 sBrowseCamera = -1, sBrowseParent = -1;
 s16 sBrowseCameraUid = -1;
 Camera* sBrowseCameraPtr = nullptr;
 bool sBrowsePlayerWasHidden = false;
+bool sBrowseTextboxSaved = false;
+std::array<s16, 6> sBrowseTextboxLayout{};
+void PlayBrowseCursorSound() {
+#ifdef BLACK_MARKET_BROWSING_OOT
+    Sfx_PlaySfxCentered(NA_SE_SY_CURSOR);
+#else
+    Audio_PlaySfx(NA_SE_SY_CURSOR);
+#endif
+}
 void UpdateBrowsingCamera(PlayState* play);
 bool BrowsingMessage(PlayState* play) {
 #ifdef BLACK_MARKET_BROWSING_OOT
@@ -13,6 +23,44 @@ bool BrowsingMessage(PlayState* play) {
     const auto text = play->msgCtx.currentTextId;
 #endif
     return text == kWelcomeText || text == kBrowseText || text == kConfirmText || text == kResultText;
+}
+
+void ContinueBrowsingText(PlayState* play, u16 text) {
+    // Native ContinueTextbox skips the START positioning step. Keep the
+    // welcome box's accepted placement, and move merchandise below the row
+    // without reopening the box or changing native choice/message behavior.
+    auto& message = play->msgCtx;
+#ifdef BLACK_MARKET_BROWSING_OOT
+    const std::array<s16, 6> current{ R_TEXTBOX_Y,           R_TEXTBOX_Y_TARGET,    R_TEXTBOX_END_YPOS,
+                                      R_TEXT_CHOICE_YPOS(0), R_TEXT_CHOICE_YPOS(1), R_TEXT_CHOICE_YPOS(2) };
+#else
+    const std::array<s16, 6> current{ message.textboxY,    message.textboxYTarget, message.unk11FFE[0],
+                                      message.unk11FFE[1], message.unk11FFE[2],    0 };
+#endif
+    if (text != kWelcomeText && !sBrowseTextboxSaved) {
+        sBrowseTextboxLayout = current;
+        sBrowseTextboxSaved = true;
+    }
+    Message_ContinueTextbox(play, text);
+    if (text == kWelcomeText && !sBrowseTextboxSaved)
+        return;
+#ifdef BLACK_MARKET_BROWSING_OOT
+    const auto layout =
+        text == kWelcomeText ? sBrowseTextboxLayout : std::array<s16, 6>{ 142, 142, 201, 162, 174, 186 };
+    R_TEXTBOX_Y = layout[0];
+    R_TEXTBOX_Y_TARGET = layout[1];
+    R_TEXTBOX_END_YPOS = layout[2];
+    for (int row = 0; row < 3; ++row)
+        R_TEXT_CHOICE_YPOS(row) = layout[3 + row];
+#else
+    const auto layout = text == kWelcomeText ? sBrowseTextboxLayout : std::array<s16, 6>{ 142, 142, 162, 174, 186, 0 };
+    message.textboxY = layout[0];
+    message.textboxYTarget = layout[1];
+    for (int row = 0; row < 3; ++row)
+        message.unk11FFE[row] = layout[2 + row];
+#endif
+    if (text == kWelcomeText)
+        sBrowseTextboxSaved = false;
 }
 
 void EndBrowsing(PlayState* play, bool destroying = false) {
@@ -53,6 +101,7 @@ void EndBrowsing(PlayState* play, bool destroying = false) {
     // MM's destroy hook runs after actor arena cleanup; never touch its player.
     sBrowseCamera = sBrowseParent = sBrowseCameraUid = -1;
     sBrowseCameraPtr = nullptr;
+    sBrowseTextboxSaved = false;
     sBrowser = {};
     sTalking = false;
 }
@@ -139,11 +188,12 @@ void BrowseInput(PlayState* play) {
     if (input.press.button & BTN_B) {
         if (sBrowser.phase != Phase::Browse) {
             sBrowser.phase = Phase::Browse;
-            Message_ContinueTextbox(play, kBrowseText);
+            ContinueBrowsingText(play, kBrowseText);
         } else if (sSelected >= 0) {
             sBrowser.row = sSelected & 1;
             sBrowser.slot = sSelected = -1;
-            Message_ContinueTextbox(play, kWelcomeText);
+            PlayBrowseCursorSound();
+            ContinueBrowsingText(play, kWelcomeText);
         } else {
             Message_CloseTextbox(play);
             EndBrowsing(play);
@@ -151,15 +201,28 @@ void BrowseInput(PlayState* play) {
         sBrowser.ResetInput();
         return;
     }
+    // Native EnOssan has separate look-to-shelf/look-to-keeper states. Do not
+    // consume navigation or A/Buy while the camera is still turning; B remains
+    // available above so an interrupted browse can always be cancelled.
+    if (!sBrowser.CameraSettled()) {
+        sBrowser.ResetInput();
+        return;
+    }
     if (sBrowser.phase == Phase::Confirm) {
         if (state == TEXT_STATE_CHOICE && (input.press.button & BTN_A) && Message_ShouldAdvance(play)) {
             if (play->msgCtx.choiceIndex == 0) {
-                Purchase();
+                if (Purchase()) {
+                    // Release the manual camera and native shop-hide bit before
+                    // the engine starts its own get-item camera and receipt.
+                    Message_CloseTextbox(play);
+                    EndBrowsing(play);
+                    return;
+                }
                 sBrowser.phase = Phase::Result;
-                Message_ContinueTextbox(play, kResultText);
+                ContinueBrowsingText(play, kResultText);
             } else {
                 sBrowser.phase = Phase::Browse;
-                Message_ContinueTextbox(play, kBrowseText);
+                ContinueBrowsingText(play, kBrowseText);
             }
             sBrowser.ResetInput();
         }
@@ -170,7 +233,7 @@ void BrowseInput(PlayState* play) {
             Message_ShouldAdvance(play)) {
             sBrowser.phase = Phase::Browse;
             sBrowser.ResetInput();
-            Message_ContinueTextbox(play, kBrowseText);
+            ContinueBrowsingText(play, kBrowseText);
         }
         return;
     }
@@ -185,17 +248,23 @@ void BrowseInput(PlayState* play) {
         y = 1;
     else if (input.press.button & BTN_DDOWN)
         y = -1;
+#ifdef BLACK_MARKET_BROWSING_OOT
+    if (CVarGetInteger(CVAR_ENHANCEMENT("MirroredWorld"), 0))
+        x = -x;
+#endif
     if (sBrowser.Move(x, y)) {
         sSelected = sBrowser.slot;
-        Message_ContinueTextbox(play, sSelected < 0 ? kWelcomeText : kBrowseText);
+        PlayBrowseCursorSound();
+        ContinueBrowsingText(play, sSelected < 0 ? kWelcomeText : kBrowseText);
     } else if ((input.press.button & BTN_A) && Message_ShouldAdvance(play)) {
         if (sSelected < 0) {
-            sBrowser.Move(1, 0);
+            if (sBrowser.Move(1, 0))
+                PlayBrowseCursorSound();
             sSelected = sBrowser.slot;
-            Message_ContinueTextbox(play, kBrowseText);
+            ContinueBrowsingText(play, kBrowseText);
         } else {
             sBrowser.phase = Phase::Confirm;
-            Message_ContinueTextbox(play, kConfirmText);
+            ContinueBrowsingText(play, kConfirmText);
         }
         sBrowser.ResetInput();
     }
@@ -203,13 +272,22 @@ void BrowseInput(PlayState* play) {
 void DrawBrowseCursor() {
     auto* play = gPlayState;
     if (!sTalking || !Active() || sSelected < 0 || Play_GetActiveCamId(play) != sBrowseCamera ||
-        sBrowser.phase != BlackMarketBrowsing::Phase::Browse)
+        sBrowser.phase != BlackMarketBrowsing::Phase::Browse || !sBrowser.CameraSettled())
         return;
     Actor display{};
-    display.world.pos = kShelves[sSelected];
+    // Both native Actor_GetScreenPos implementations project focus.pos, as
+    // EnOssan does for EnGirlA. A display-only actor has no focus update.
+    display.focus.pos = kShelves[sSelected];
     s16 x, y;
     Actor_GetScreenPos(play, &display, &x, &y);
-    if (x < 0 || x > SCREEN_WIDTH || y < 0 || y > SCREEN_HEIGHT)
+#ifdef BLACK_MARKET_BROWSING_OOT
+    if (CVarGetInteger(CVAR_ENHANCEMENT("MirroredWorld"), 0))
+#else
+    if (CVarGetInteger("gModes.MirroredWorld.State", 0))
+#endif
+        x = SCREEN_WIDTH - x;
+    if (x < 0 || x > SCREEN_WIDTH || y < 0 || y > SCREEN_HEIGHT ||
+        !BlackMarketGraphicsArena::HasRoom(play->state.gfxCtx, 0, 8, 8, 32))
         return;
     alignas(2) static const char texture[] = "__OTR__objects/gameplay_keep/gSelectionCursorTex";
     OPEN_DISPS(play->state.gfxCtx);

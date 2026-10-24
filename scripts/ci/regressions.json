@@ -36,10 +36,22 @@
     "run": "python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\nMM_AUDIO_WORKER_CXXFLAGS=\"-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-pie -no-pie\" python3 -B scripts/diagnostics/run_mm_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py\npython3 -B scripts/diagnostics/run_soh_audio_worker_tests.py --sanitize"
   },
   {
+    "suite": "systems",
+    "origin": "gate",
+    "name": "Native OoT seasonal rain PCM and Song of Storms ownership",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_soh_rain_audio_tests.py --sanitize"
+  },
+  {
     "suite": "entrances",
     "origin": "gate",
     "name": "Fast entrance compile and linkage preflight",
     "run": "python3 -B tests/cross_dungeon/oot_blue_warp_hook_test.py\npython3 -B tests/cross_dungeon/oot_entrance_metadata_test.py\npython3 -B tests/cross_dungeon/generation_reset_behavior_test.py\npython3 -B tests/lost_woods_entrance/renderer_linkage_test.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "gate",
+    "name": "Native OoT Blast Mask tutorial and A-action arbitration",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/blast_mask/run_tests.py"
   },
   {
     "suite": "equipment",
@@ -71,8 +83,38 @@
   {
     "suite": "render",
     "origin": "gate",
+    "name": "Complete spin style native rendering and combat, normal and sanitized",
+    "run": "python3 -B scripts/diagnostics/run_spin_style_tests.py\nASAN_OPTIONS=detect_leaks=0 python3 -B scripts/diagnostics/run_spin_style_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
+    "name": "Native OoT and MM cape visibility during shop camera ownership",
+    "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/mm_cape/run_visibility_tests.py"
+  },
+  {
+    "suite": "render",
+    "origin": "gate",
     "name": "Foreign Great Spin GI preflight",
     "run": "python3 -B scripts/diagnostics/run_spin_gi_tests.py\npython3 -B scripts/diagnostics/run_spin_gi_tests.py --sanitize"
+  },
+  {
+    "suite": "render",
+    "origin": "nei",
+    "name": "Native elemental sword ice material and frost rendering",
+    "run": "python3 -B scripts/assets/build_sword_finish_ice.py --check\npython3 -B tests/elemental_swords/run_ice_material_tests.py",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
+  },
+  {
+    "suite": "render",
+    "origin": "nei",
+    "name": "Native regional passage presentation and graphics translation units",
+    "run": "python3 -B tests/regional_passages/run_presentation_tests.py --syntax",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
   },
   {
     "suite": "render",
@@ -91,6 +133,15 @@
     "origin": "gate",
     "name": "Conditional Lost Woods Great Fairy return",
     "run": "ASAN_OPTIONS=detect_leaks=0 python3 -B tests/lost_woods_entrance/run_fountain_return_tests.py --sanitize"
+  },
+  {
+    "suite": "entrances",
+    "origin": "nei",
+    "name": "Native regional passage geometry, actor entry and cross-game handoff",
+    "run": "python3 -B tests/regional_passages/run_tests.py --sanitize",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
   },
   {
     "suite": "entrances",
@@ -491,6 +542,12 @@
   {
     "suite": "items",
     "origin": "nei",
+    "name": "tests/item_receipts/run_file_select_sdl_main_tests.py",
+    "run": "python3 -B tests/item_receipts/run_file_select_sdl_main_tests.py"
+  },
+  {
+    "suite": "items",
+    "origin": "nei",
     "name": "scripts/diagnostics/run_receipt_syntax_tests.py",
     "run": "python3 -B scripts/diagnostics/run_receipt_syntax_tests.py"
   },
@@ -645,10 +702,13 @@
     "run": "python3 -B scripts/diagnostics/run_mm_season_selector_tests.py"
   },
   {
-    "suite": "systems",
+    "suite": "equipment",
     "origin": "nei",
-    "name": "tests/seasons/run_rod_lifecycle_tests.py",
-    "run": "python3 -B tests/seasons/run_rod_lifecycle_tests.py"
+    "name": "Native OoT and MM Rod put-away, chooser and lifecycle in solo and Combo",
+    "run": "python3 -B tests/seasons/run_oot_rod_stow_tests.py --sanitize\npython3 -B tests/seasons/run_oot_rod_stow_tests.py --combo --sanitize\npython3 -B tests/seasons/run_rod_lifecycle_tests.py --sanitize\npython3 -B tests/seasons/run_rod_lifecycle_tests.py --combo --sanitize",
+    "env": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    }
   },
   {
     "suite": "systems",
@@ -931,6 +991,12 @@
     "origin": "nei",
     "name": "tests/nei_held/run_equipment_tests.py",
     "run": "python3 -B tests/nei_held/run_equipment_tests.py"
+  },
+  {
+    "suite": "equipment",
+    "origin": "nei",
+    "name": "tests/nei_held/run_vanilla_sword_menu_tests.py",
+    "run": "python3 -B tests/nei_held/run_vanilla_sword_menu_tests.py"
   },
   {
     "suite": "items",

@@ -35,7 +35,7 @@ extern "C" void MmSfxSynth_WriteChannelIO(int channel, int port,
     channelIO[channel][1] =
         0; // Sequence_0 owns this channel until its note finishes.
   if (port == 4) {
-    assert(value == 1); // Native Sequence_0 low byte for MM's 0x2901 call.
+    assert(value == 0); // Native Sequence_0 low byte for MM's 0x2900 call.
     ++triggers;
   }
   if (port == 5)
@@ -64,7 +64,7 @@ static bool contains(Vec3f *position, u16 id) {
       return true;
   return false;
 }
-static void queue(Vec3f *position, u16 id = MM_NA_SE_EV_MONKEY_VO_JOY) {
+static void queue(Vec3f *position, u16 id = MM_NA_SE_EV_MONKEY_VO_WALK) {
   AudioMmSfx_PlaySfx(id, position, 4, &gMmSfxDefaultFreqAndVolScale,
                      &gMmSfxDefaultFreqAndVolScale, &gMmSfxDefaultReverb);
 }
@@ -75,8 +75,8 @@ static void tick() {
 int main() {
   Vec3f second = {30.0f, 0.0f, 100.0f};
   // Cold cleanup must not traverse zero-filled bank links or initialize audio.
-  MmSfx_StopAtPos(0x2901, &second);
-  MmSfx_StopAtPos(0x2901, nullptr);
+  MmSfx_StopAtPos(0x2900, &second);
+  MmSfx_StopAtPos(0x2900, nullptr);
   MmSfx_StopAtPos(0xFFFF, &second);
   assert(lockDepth == 0 && triggers == 0);
   AudioMmSfx_Reset();
@@ -85,33 +85,33 @@ int main() {
   queue(first);
   queue(&second);
   tick();
-  assert(contains(first, 0x2901) && contains(&second, 0x2901));
+  assert(contains(first, 0x2900) && contains(&second, 0x2900));
   assert(triggers == 2);
   unsigned before = lockCalls;
-  MmSfx_StopAtPos(0x2901, first);
+  MmSfx_StopAtPos(0x2900, first);
   assert(lockCalls == before + 1 && lockDepth == 0);
-  assert(!contains(first, 0x2901) && contains(&second, 0x2901));
+  assert(!contains(first, 0x2900) && contains(&second, 0x2900));
   delete first;
   tick(); // ASan catches any actor-position reference surviving destruction.
-  assert(contains(&second, 0x2901));
+  assert(contains(&second, 0x2900));
 
   auto *queued = new Vec3f{};
   queue(queued);
   queue(&second, 0x28EF); // Native monkey footstep is unrelated to the call.
-  MmSfx_StopAtPos(0x2901, queued);
+  MmSfx_StopAtPos(0x2900, queued);
   delete queued;
   AudioMmSfx_ProcessRequests(); // Pending requests must also be safe after
                                 // free.
-  assert(contains(&second, 0x2901) && contains(&second, 0x28EF));
-  MmSfx_StopAtPos(0x2901, &second);
-  assert(!contains(&second, 0x2901) && contains(&second, 0x28EF));
+  assert(contains(&second, 0x2900) && contains(&second, 0x28EF));
+  MmSfx_StopAtPos(0x2900, &second);
+  assert(!contains(&second, 0x2900) && contains(&second, 0x28EF));
   AudioMmSfx_StopById(0x28EF);
   AudioMmSfx_ProcessRequests();
   // Re-entering the room can reuse the same position and native call.
   queue(&second);
   tick();
-  assert(contains(&second, 0x2901) && triggers == 3);
-  MmSfx_StopAtPos(0x2901, &second);
+  assert(contains(&second, 0x2900) && triggers == 3);
+  MmSfx_StopAtPos(0x2900, &second);
   assert(lockDepth == 0);
   puts("PASS native MM monkey Sequence_0 dispatch, per-emitter/queued cleanup, "
        "cold stop and re-entry (ASan/UBSan)");

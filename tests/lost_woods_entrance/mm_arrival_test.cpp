@@ -6,6 +6,8 @@
 #include "overlays/gamestates/ovl_title/z_title.h"
 #include "2s2h/BenPort.h"
 #include "entrances/LostWoodsEntrance.h"
+#include "entrances/RegionalPassages.h"
+#include "gameplay/CrossGameTitleCard.h"
 
 SaveContext gSaveContext;
 int gComboStartFileNum = 0;
@@ -14,6 +16,7 @@ int gComboOwlBlobSlot = -1;
 extern "C" void ComboBlackMarket_ApplyResume(int) {} // separately tested market resume boundary
 static int sComboPortalRoute = COMBO_PORTAL_MARKET;
 static bool sComboPortalArrivalPending = false;
+static s32 sComboCrossGameTitleCardPending;
 static bool sComboReturnPending, sComboFwReturnPending, sComboResetReturnPending, sComboOwlSaveQuitPending;
 static int sComboReturnPortalRoute, sComboPassageFade, sComboPassageFileNum;
 static bool sComboOpeningReturnArmed;
@@ -38,9 +41,11 @@ extern "C" int32_t Combo_MM_ConsumeCrossBossRecoveryResume(void) {
 extern "C" int32_t Combo_MM_ConsumeCrossDungeonRecovery(void) {
     int value = savedRecovery; savedRecovery = -1; return value;
 }
-extern "C" void ComboFw_ApplyArrival(void) {
+extern "C" int ComboFw_ApplyArrival(void) {
+    const bool applied = fwArrival >= 0;
     if (fwArrival >= 0) { gSaveContext.save.entrance = fwArrival; gSaveContext.respawnFlag = 0; }
     fwArrival = -1;
+    return applied;
 }
 static void require(bool condition, const char* message) {
     if (!condition) { std::fprintf(stderr, "FAIL: %s\n", message); std::exit(1); }
@@ -68,6 +73,10 @@ extern "C" s32 CVarGetInteger(const char*, s32) { return sRememberLocation; }
 extern "C" void Play_Init(GameState*) {}
 void ConsoleLogo_Init(GameState*) {}
 #define GameInteractor_Should(...) false
+
+static int regionalArrival;
+extern "C" int ComboRegionalPassagesMm_ApplyArrival(int route) { regionalArrival=route; return 1; }
+extern "C" void ComboRegionalPassagesMm_Reset(void) {}
 
 /* ARRIVAL_BODY */
 /* ROUTE_BODY */

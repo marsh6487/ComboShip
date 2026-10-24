@@ -458,10 +458,11 @@ void TimeSaverOnVanillaBehaviorHandler(GIVanillaBehavior id, bool* should, va_li
             }
             break;
         case VB_SHOW_TITLE_CARD:
-            // Cross-game returns request their destination card even in shuffled
+            // Explicit custom/cross-game arrivals request their card even in shuffled
             // seeds. An explicitly configured hide-card setting still wins.
             if (CVarGetInteger(CVAR_ENHANCEMENT("TimeSavers.DisableTitleCard"),
-                               IS_RANDO && !Combo_SOH_HasCrossGameTitleCard())) {
+                               IS_RANDO && !Combo_SOH_HasCrossGameTitleCard() &&
+                                   !Combo_SOH_IsPresentingCustomTitleCard())) {
                 *should = false;
             }
             break;

@@ -14,14 +14,15 @@ struct View {
 // The room's eight offers have two flat 2x2 banks. Slots 0/4 are the
 // inner bottom offers; odd slots are the upper row. -1 faces the keeper.
 inline View Target(int slot) {
-    // Leave the native bottom textbox (Y142 at 4:3) below every selected
-    // item/seal, while retaining both rows and the keeper's counter pose.
-    return { { 0, 80, 300 },
-             { slot < 0   ? 0.0f
-               : slot < 4 ? 52.5f
-                          : -52.5f,
-               slot < 0 ? 66.0f : 52.0f, 110 },
-             slot < 0 ? 55.0f : 64.0f };
+    if (slot < 0)
+        return { { 0, 76, 196 }, { 0, 61, 86 }, 46 };
+    // Turn from the accepted close customer eye, like native EnOssan's
+    // authored fixed-eye shop camera. Pitch follows the selected row rather
+    // than backing the camera behind Link to fit both rows simultaneously.
+    // The focused row and its cursor/seal clear the native bottom textbox.
+    constexpr float shelfZ = 110, bankX = (196 - shelfZ) * .57735026919f; // tan(30 degrees)
+    const float side = slot < 4 ? 1.0f : -1.0f;
+    return { { 0, 76, 196 }, { side * bankX, slot & 1 ? 98.f : 38.f, shelfZ }, 64 };
 }
 inline float Approach(float current, float target) {
     return std::abs(target - current) < .05f ? target : current + (target - current) * .4f;
@@ -78,9 +79,19 @@ struct State {
     }
     void TickCamera() {
         const View target = Target(slot);
+        view.eye.x = Approach(view.eye.x, target.eye.x);
+        view.eye.y = Approach(view.eye.y, target.eye.y);
+        view.eye.z = Approach(view.eye.z, target.eye.z);
         view.at.x = Approach(view.at.x, target.at.x);
         view.at.y = Approach(view.at.y, target.at.y);
+        view.at.z = Approach(view.at.z, target.at.z);
         view.fov = Approach(view.fov, target.fov);
+    }
+    bool CameraSettled() const {
+        const View target = Target(slot);
+        return view.eye.x == target.eye.x && view.eye.y == target.eye.y && view.eye.z == target.eye.z &&
+               view.at.x == target.at.x && view.at.y == target.at.y && view.at.z == target.at.z &&
+               view.fov == target.fov;
     }
 };
 } // namespace BlackMarketBrowsing

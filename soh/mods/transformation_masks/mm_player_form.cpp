@@ -751,6 +751,24 @@ static const char sZoraMouthClosed[] = "__OTR__objects/object_link_zora/gLinkZor
 // FD head DL has mouth baked in, segment 0x09 is unread. OTR path doesn't exist → crash.
 // static const char sFierceMouthClosed[] = "__OTR__objects/object_link_boy/gLinkFierceDeityMouthClosedTex";
 
+// Gerudo's head material reads segment 0x08, including on the MmForm draw
+// path that bypasses CustomForms_ResolveVanillaTexture. Keep OTR paths here:
+// raw pixels lose the HD resource's RGBA32 flags and scale metadata.
+// Segmented texture resolution reserves the low pointer bit, so each path
+// starts at an even address.
+alignas(2) static const char sGerudoEyeTextures[2][3][128] = {
+    {
+        "__OTR__objects/forms/gerudo/object_link_child/gLinkChildEyesOpenTex",
+        "__OTR__objects/forms/gerudo/object_link_child/gLinkChildEyesHalfTex",
+        "__OTR__objects/forms/gerudo/object_link_child/gLinkChildEyesClosedfTex",
+    },
+    {
+        "__OTR__objects/forms/gerudo/object_link_boy/gLinkAdultEyesOpenTex",
+        "__OTR__objects/forms/gerudo/object_link_boy/gLinkAdultEyesHalfTex",
+        "__OTR__objects/forms/gerudo/object_link_boy/gLinkAdultEyesClosedfTex",
+    },
+};
+
 // Per-form eye texture arrays indexed by eye state (0=open, 1=half, 2=closed, 3=special)
 // From 2Ship sPlayerEyesTextures[playerForm][eyeIndex]
 static const char* sFormEyeTextures[MM_PLAYER_FORM_MAX][4] = {
@@ -18399,7 +18417,10 @@ void MmForm_Draw(PlayState* play, Player* player) {
             if (eyeIdx > 3)
                 eyeIdx = 0;
 
-            if (form >= 0 && form < MM_PLAYER_FORM_MAX && sFormEyeTextures[form][eyeIdx] != NULL) {
+            if (form == MM_PLAYER_FORM_GERUDO) {
+                const char* eyePath = sGerudoEyeTextures[LINK_IS_ADULT ? 1 : 0][eyeIdx < 3 ? eyeIdx : 0];
+                gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)eyePath);
+            } else if (form >= 0 && form < MM_PLAYER_FORM_MAX && sFormEyeTextures[form][eyeIdx] != NULL) {
                 gSPSegment(POLY_OPA_DISP++, 0x08, (uintptr_t)sFormEyeTextures[form][eyeIdx]);
             }
 

@@ -87,7 +87,8 @@ static const ItemDescEntry sCustomItemDescs[] = {
     { EXT_ITEM_SHADOW_CRYSTAL, TEXT_DESC_SHADOW_CRYSTAL,
       "Turn into Wolf Link.&B attacks; moving + A dashes.&Use crystal again to turn back." },
     { EXT_ITEM_ROD_OF_SEASONS, TEXT_DESC_ROD_OF_SEASONS,
-      "C draws the rod, then opens the season&prompt. A confirms, B cancels, and a&new season reloads the scene." },
+      "C draws the rod, then opens the season&prompt. A puts the rod away.&In the prompt: A confirms, B cancels.&"
+      "A new season reloads the scene." },
     // Bottle row
     { ITEM_NET, TEXT_DESC_NET, "Swing it like a sword to scoop bugs,&fish and fairies into a bottle." },
     { ITEM_BOTTOMLESS_BOTTLE, TEXT_DESC_BOTTOMLESS_BOTTLE, "Refills itself for a set number of&uses per fill." },
@@ -102,7 +103,8 @@ static const ItemDescEntry sCustomItemDescs[] = {
 
 static const ItemDescEntry sMaskDescs[] = {
     { ITEM_MM_MASK_ALL_NIGHT, TEXT_DESC_MASK_ALL_NIGHT, "Spawns night-only Gold Skulltulas&during daytime." },
-    { ITEM_MM_MASK_BLAST, TEXT_DESC_MASK_BLAST, "Press B for instant explosion at&your feet. Has cooldown." },
+    { ITEM_MM_MASK_BLAST, TEXT_DESC_MASK_BLAST,
+      "Press A when free, or B, for an&explosion at your feet. Has cooldown." },
     { ITEM_MM_MASK_STONE, TEXT_DESC_MASK_STONE, "Enemies ignore you completely." },
     { ITEM_MM_MASK_GREAT_FAIRY, TEXT_DESC_MASK_GREAT_FAIRY,
       "In fountain: A=claim reward.&B=teleport menu between fountains." },

@@ -86,23 +86,37 @@ jobs:
             exit 1
           fi
 
+      - name: Prepare exact shipped spin resources
+        run: python3 -B scripts/assets/prepare_spin_styles.py
+
       - name: Check custom asset trees for new path collisions
         run: python3 scripts/check-asset-collisions.py
 
-      - name: Install preflight dependencies
-        run: sudo apt-get update && sudo apt-get install -y clang-format-14 python3-venv python3-yaml
+      - name: Install pinned preflight tools
+        timeout-minutes: 3
+        run: |
+          python3 -m venv "$RUNNER_TEMP/combo-gate-python"
+          "$RUNNER_TEMP/combo-gate-python/bin/python3" -m pip install --only-binary=:all: --timeout 20 --retries 2 -r scripts/ci/preflight-requirements.txt
+          ln -s clang-format "$RUNNER_TEMP/combo-gate-python/bin/clang-format-14"
+          "$RUNNER_TEMP/combo-gate-python/bin/clang-format-14" --version
+          echo "$RUNNER_TEMP/combo-gate-python/bin" >> "$GITHUB_PATH"
 
       - name: Verify CI failure handling
         run: python3 -B -m unittest discover -s tests/ci -v
 
-      - name: Install pinned UI rasterizer
-        run: |
-          python3 -m venv --system-site-packages "$RUNNER_TEMP/combo-gate-python"
-          "$RUNNER_TEMP/combo-gate-python/bin/python3" -m pip install --only-binary=:all: -r scripts/assets/sword-element-ui-requirements.txt
-          echo "$RUNNER_TEMP/combo-gate-python/bin" >> "$GITHUB_PATH"
-
       - name: Fast generated sword UI asset check
         run: python3 -B scripts/assets/build_sword_element_ui.py --check
+
+      - name: Verify shipped spin styles
+        run: |
+          python3 -B tests/spin_style/test_bundled_assets.py
+          python3 -B scripts/assets/build_spin_style_resources.py --check
+          python3 -B scripts/diagnostics/run_spin_style_tests.py --policy --resources
+
+      - name: Verify native location titles
+        run: |
+          python3 -B tests/location_titles/test_native_assets.py
+          python3 -B tests/location_titles/run_tests.py
 
       - name: clang-format (clang-format-14)
         run: |

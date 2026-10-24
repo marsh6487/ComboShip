@@ -8,6 +8,7 @@ registration retaining unrelated renderer/actor tables. No game is executed.
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,3 +42,5 @@ with tempfile.TemporaryDirectory(prefix="cutscene-dialogue-") as directory:
             "-Wl,--gc-sections", "-lm", "-o", binary)
         run(binary)
         print("PASS native viewer talk in " + ("Combo" if combo else "solo SoH"), flush=True)
+
+run(sys.executable, "-B", "tests/custom_messages/run_story_open_tests.py")

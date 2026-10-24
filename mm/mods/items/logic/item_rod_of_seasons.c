@@ -72,6 +72,25 @@ static u16 Seasons_EquippedButtonMask(void) {
     return mask;
 }
 
+static void Seasons_FilterPlayerInput(PlayState* play, Player* player, Input* input) {
+    if (!sRodDrawn || Seasons_EquippedButtonMask() == 0 || ItemInput_IsBlocked(player, play) ||
+        play->pauseCtx.state != PAUSE_STATE_OFF || play->csCtx.state != CS_STATE_IDLE ||
+        play->msgCtx.msgMode != MSGMODE_NONE || player->csAction != 0 ||
+        play->transitionTrigger == TRANS_TRIGGER_START || player->heldItemAction != PLAYER_IA_NONE ||
+        player->itemAction != PLAYER_IA_NONE ||
+        (player->stateFlags1 & (PLAYER_STATE1_FIRST_PERSON | PLAYER_STATE1_CARRYING_ACTOR)) ||
+        player->doorType != PLAYER_DOORTYPE_NONE || player->interactRangeActor != NULL ||
+        (player->stateFlags2 & PLAYER_STATE2_CAN_ACCEPT_TALK_OFFER) || play->bButtonAmmoPlusOne != 0 ||
+        player->currentMask == PLAYER_MASK_BLAST || player->currentMask == PLAYER_MASK_BREMEN ||
+        player->currentMask == PLAYER_MASK_KAMARO) {
+        return;
+    }
+    // Native mask/minigame/combat B actions retain their existing delegation.
+    // Empty hands holding only the Rod use A to put it away.
+    input->cur.button &= ~BTN_B;
+    input->press.button &= ~BTN_B;
+}
+
 static void Seasons_OnWheelConfirm(s32 index) {
     const u8 previous = Seasons_GetSeason();
     Seasons_SetSeason((u8)index);
@@ -132,6 +151,7 @@ void Seasons_TickInput(PlayState* play, Player* player, Input* input) {
     // the remaining input blockers while allowing that one transition to finish.
     u8 blocked = sRodPendingDraw ? (player->stateFlags1 & (ITEM_BLOCK_STATE1 | PLAYER_STATE1_SHIELDING)) != 0
                                  : ItemInput_IsBlocked(player, play);
+    Seasons_FilterPlayerInput(play, player, input);
     if (!buttons || blocked || (player->stateFlags1 & PLAYER_STATE1_8000000) || player->meleeWeaponState != 0 ||
         ItemInput_CheckDamage(player, &sRodPrevInvinc) || play->pauseCtx.state != PAUSE_STATE_OFF ||
         play->csCtx.state != CS_STATE_IDLE || play->msgCtx.msgMode != MSGMODE_NONE ||

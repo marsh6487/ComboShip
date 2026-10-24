@@ -551,14 +551,15 @@ static const NeiItem sNeiItems[] = {
     { ITEM_MM_MASK_BLAST, PLAYER_IA_MM_MASK_BLAST, PLAYER_MODELGROUP_DEFAULT, NEI_NO_SLOT, AGE_REQ_NONE, NULL,
       func_8083485C, Player_InitDefaultIA, Randomizer_DrawMmMask, RG_MM_MASK_BLAST,
       "You got the %yBlast Mask%w!&A mask of explosive power born&of pure detonation.^Equip from the mask "
-      "page.^%y\xA0%w detonates an %rinstant explosion%w&at Link's position - no bombs needed.&Cooldown: %g~310 "
-      "frames%w (~16 s).&With %cgMods.BlastMask.Instant%w on,&cooldown drops to 1 frame.",
+      "page.^Press %y\x9F%w to %rExplode%w when free.&%y\xA0%w also detonates the mask.&No bombs are needed.^"
+      "Cooldown: about %g16 seconds%w.&Enable %cInstant Blast Mask%w and&the cooldown drops to 1 frame.",
       "Vous obtenez le %yMasque d'Explosion%w!&Un masque de pure détonation&aux pouvoirs explosifs.^Équipez depuis la "
-      "page des masques.^%y\xA0%w déclenche une %rexplosion instantanée%w&à la position de Link - aucune "
-      "bombe.&Recharge: %g~310 frames%w (~16 s).&Avec %cgMods.BlastMask.Instant%w activé,&la recharge tombe à 1 frame.",
+      "page des masques.^%y\x9F%w déclenche l'%rexplosion%w si libre.&%y\xA0%w fait aussi exploser le masque.&Aucune "
+      "bombe nécessaire.^Recharge: environ %g16 secondes%w.&Activez %cInstant Blast Mask%w pour&une recharge de 1 "
+      "frame.",
       "Du hast die %yExplosionsmaske%w!&Eine Maske explosiver Kraft,&geboren aus reiner Detonation.^Aufsetzen auf der "
-      "Maskenseite.^%y\xA0%w zündet eine %rsofortige Explosion%w&an Links Position - keine Bomben nötig.&Abklingzeit: "
-      "%g~310 Frames%w (~16 s).&Mit %cgMods.BlastMask.Instant%w an,&fällt die Abklingzeit auf 1 Frame." },
+      "Maskenseite.^%y\x9F%w löst eine %rExplosion%w aus,&wenn frei. %y\xA0%w zündet sie auch.&Keine Bomben nötig.^"
+      "Abklingzeit: etwa %g16 Sekunden%w.&Aktiviere %cInstant Blast Mask%w für&eine Abklingzeit von 1 Frame." },
     { ITEM_MM_MASK_STONE, PLAYER_IA_MM_MASK_STONE, PLAYER_MODELGROUP_DEFAULT, NEI_NO_SLOT, AGE_REQ_NONE, NULL,
       func_8083485C, Player_InitDefaultIA, Randomizer_DrawMmMask, RG_MM_MASK_STONE,
       "You got the %yStone Mask%w!&A featureless gray mask said to&render its wearer beneath notice.^Equip from the "

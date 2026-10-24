@@ -26,8 +26,34 @@ prefix=prefix.replace('void CustomItems_PutAwayHeldItems(Player* p,PlayState* pl
 prefix=prefix.replace('void Player_InitItemActionWithAnim(PlayState* play,Player* p,PlayerItemAction action){++initializations;p->heldItemAction=p->itemAction=action;p->modelGroup=p->nextModelGroup;}','void Player_InitItemAction(PlayState*,Player*,PlayerItemAction);\nvoid Player_InitItemActionWithAnim(PlayState* play,Player* p,PlayerItemAction action){++initializations;Player_InitItemAction(play,p,action);}')
 prefix=prefix.replace('void Player_StartChangingHeldItem(Player* p,PlayState* play){++transitions;animationDestination=p->nextModelGroup;p->stateFlags3&=~PLAYER_STATE3_START_CHANGING_HELD_ITEM;}','s32 Player_UpperAction_ChangeHeldItem(Player*,PlayState*);\nvoid Player_StartChangingHeldItem(Player* p,PlayState* play){++transitions;animationDestination=p->nextModelGroup;p->stateFlags3&=~PLAYER_STATE3_START_CHANGING_HELD_ITEM;p->upperActionFunc=Player_UpperAction_ChangeHeldItem;}')
 prefix+=r'''
+#include "overlays/actors/ovl_En_Horse/z_en_horse.h"
 PlayState* gPlayState;
 int rodEquips,rodStows,menus,menuOpen,sceneNumber;
+static s32 sUpperBodyIsBusy;
+s32 Player_UpdateHostileLockOn(Player* p){return 0;}
+void func_8083A04C(Player* p){}
+s32 func_80839F98(PlayState* play,Player* p){return 0;}
+s32 func_80839A84(PlayState* play,Player* p){return 0;}
+s32 func_80839800(Player* p,PlayState* play){return 0;}
+u8 Seasons_IsDrawn(void);
+s32 CustomItems_HasStowableHeldItem(Player* p){return Seasons_IsDrawn();}
+static s32 sPlayerFloorType;
+bool func_801242B4(Player* p){return false;}
+bool Player_InBlockingCsMode(PlayState* play,Player* p){return p->csAction!=0;}
+bool Player_CheckHostileLockOn(Player* p){return false;}
+bool Player_FriendlyLockOnOrParallel(Player* p){return false;}
+bool Player_IsZTargeting(Player* p){return false;}
+bool func_800B7128(Player* p){return false;}
+s32 func_800C9DDC(CollisionContext* ctx,CollisionPoly* poly,s32 id){return 0;}
+s32 Player_CanThrowCarriedActor(Player* p,Actor* a){return 0;}
+bool Play_InCsMode(PlayState* play){return false;}
+void Player_Action_28(Player* p,PlayState* play){}
+void Player_Action_53(Player* p,PlayState* play){}
+void Player_Action_80(Player* p,PlayState* play){}
+void Interface_SetAButtonDoAction(PlayState* play,u16 action){play->interfaceCtx.aButtonDoAction=action;}
+void Interface_SetBButtonPlayerDoAction(PlayState* play,s16 action){play->interfaceCtx.bButtonPlayerDoAction=action;}
+void Interface_SetTatlCall(PlayState* play,u16 call){}
+void CutsceneManager_Queue(s16 id){}
 u16 hookSuppressed;u8 movementBlocked;
 s32 CustomItems_BlocksMovement(Player* p){return movementBlocked;}
 void GameInteractor_ExecuteOnPassPlayerInputs(Input* input){
@@ -72,6 +98,8 @@ parts+=[body(player,n) for n in ['func_8082FDC4','func_Dpad_8082FDC4','Player_It
 parts+=[body('mm/mods/items/helpers/equip_helper.c',n) for n in ['ItemInput_IsBlockedEx','ItemInput_IsBlocked']]
 parts+=[body('mm/mods/extended_inventory.c',n) for n in ['Seasons_HasRod','Seasons_GrantRod','Seasons_SeasonOwned','Seasons_GrantSeason','Seasons_SeasonCount','Seasons_SeasonAt','Seasons_GetSeason','Seasons_SetSeason']]
 parts+=[(ROOT/'mm/mods/items/logic/item_rod_of_seasons.c').read_text().split('// Seasonal particles')[0]]
+parts+=[body(player,'Player_ActionHandler_6')]
+parts+=[body(player,'Player_UpdateInterface')]
 # Keep MM's real choice of overridden/suppressed physical input and the final
 # OnPassPlayerInputs policy hook. Animation/world scheduling remains a boundary.
 input_start=ps.index('    if (play->actorCtx.isOverrideInputOn && (this == GET_PLAYER(play)))')
@@ -124,6 +152,49 @@ void FinishNative(Player* p,PlayState* play){
 }
 int main(void){
  Player p;PlayState play;
+ EquipRod(&p,&play,BTN_CLEFT);CompleteRodFrame(&p,&play,BTN_CLEFT);
+ p.putAwayCooldownTimer=0;
+ p.controlStickDirections[0]=PLAYER_STICK_DIR_NONE;
+ Player_UpdateInterface(&play,&p);assert(play.interfaceCtx.aButtonDoAction==DO_ACTION_PUTAWAY);
+ p.doorType=PLAYER_DOORTYPE_HANDLE;Player_UpdateInterface(&play,&p);
+ assert(play.interfaceCtx.aButtonDoAction==DO_ACTION_OPEN&&Seasons_IsDrawn());
+ p.doorType=PLAYER_DOORTYPE_NONE;p.putAwayCooldownTimer=0;
+ BUTTON_ITEM_EQUIP(0,EQUIP_SLOT_B)=ITEM_SWORD_KOKIRI;
+ Input putAwayInput={0};putAwayInput.cur.button=putAwayInput.press.button=BTN_A|BTN_B;
+ Seasons_TickInput(&play,&p,&putAwayInput);
+ sPlayerControlInput=&putAwayInput;
+ Player_ActionHandler_6(&p,&play);
+ Player_ProcessItemButtons(&p,&play);
+ assert(!Seasons_IsDrawn()&&rodStows==1&&p.heldItemAction==PLAYER_IA_NONE&&p.heldItemId==ITEM_NONE);
+ assert(!(putAwayInput.press.button&BTN_B));
+ BUTTON_ITEM_EQUIP(0,EQUIP_SLOT_B)=ITEM_SWORD_KOKIRI;
+ CompleteRodFrame(&p,&play,BTN_B);assert(p.heldItemId==ITEM_SWORD_KOKIRI);
+ EquipRod(&p,&play,BTN_CLEFT);CompleteRodFrame(&p,&play,BTN_CLEFT);
+ CompleteRodFrame(&p,&play,BTN_B);
+ assert(Seasons_IsDrawn()&&rodStows==0&&p.heldItemAction==PLAYER_IA_NONE);
+ EquipRod(&p,&play,BTN_CLEFT);CompleteRodFrame(&p,&play,BTN_CLEFT);
+ BUTTON_ITEM_EQUIP(0,EQUIP_SLOT_C_LEFT)=ITEM_NONE;
+ Input removedInput={0};removedInput.cur.button=removedInput.press.button=BTN_B;
+ Seasons_TickInput(&play,&p,&removedInput);
+ assert(!Seasons_IsDrawn()&&(removedInput.press.button&BTN_B));
+ const u8 masks[]={PLAYER_MASK_BLAST,PLAYER_MASK_BREMEN,PLAYER_MASK_KAMARO};
+ const u16 actions[]={DO_ACTION_EXPLODE,DO_ACTION_MARCH,DO_ACTION_DANCE};
+ for(int mask=0;mask<3;++mask){
+  EquipRod(&p,&play,BTN_CLEFT);CompleteRodFrame(&p,&play,BTN_CLEFT);
+  p.currentMask=masks[mask];Player_UpdateInterface(&play,&p);
+  assert(play.interfaceCtx.bButtonPlayerDoAction==actions[mask]);
+  Input maskInput={0};maskInput.cur.button=maskInput.press.button=BTN_B;
+  Seasons_TickInput(&play,&p,&maskInput);assert(maskInput.press.button&BTN_B);
+ }
+ for(int context=0;context<4;++context){
+  EquipRod(&p,&play,BTN_CLEFT);CompleteRodFrame(&p,&play,BTN_CLEFT);
+  if(context==0)play.msgCtx.msgMode=MSGMODE_TEXT_DISPLAYING;
+  if(context==1)play.csCtx.state=1;
+  if(context==2)p.doorType=PLAYER_DOORTYPE_HANDLE;
+  if(context==3)p.stateFlags1=PLAYER_STATE1_FIRST_PERSON;
+  Input contextInput={0};contextInput.cur.button=contextInput.press.button=BTN_B;
+  Seasons_TickInput(&play,&p,&contextInput);assert(contextInput.press.button&BTN_B);
+ }
  for(int dpad=0;dpad<2;dpad++){
   u16 button=dpad?BTN_DUP:BTN_CLEFT;
   EquipRod(&p,&play,button);
@@ -171,8 +242,8 @@ int main(void){
   assert(Seasons_IsDrawn()&&rodEquips==1&&p.rightHandType==PLAYER_MODELTYPE_RH_CLOSED);
   TickRod(&p,&play,0);assert(Seasons_IsDrawn()&&rodEquips==1);
   TickRod(&p,&play,BTN_DUP);assert(menus==1&&Seasons_IsDrawn());
-  TickRod(&p,&play,BTN_B);assert(!Seasons_IsDrawn()&&p.rightHandType==PLAYER_MODELTYPE_RH_OPEN);
-  assert(play.state.input[0].press.button&BTN_B);
+  TickRod(&p,&play,BTN_B);assert(Seasons_IsDrawn()&&p.rightHandType==PLAYER_MODELTYPE_RH_CLOSED);
+  assert(!(play.state.input[0].press.button&BTN_B));
  }
  // The copied native dispatcher also preserves an accepted delayed unequip.
  for(int dpad=0;dpad<2;dpad++){
@@ -227,6 +298,7 @@ with tempfile.TemporaryDirectory(prefix='rod-lifecycle-') as td:
  # The real grant always uses the fixed Rod cell; Release-style inlining keeps
  # the unrelated Grace shared-slot implementation outside this rod fixture.
  sanitizer=['-fsanitize=address,undefined,bounds','-fno-sanitize-recover=all'] if '--sanitize' in sys.argv else []
- subprocess.run(['cc','-std=gnu17','-O2','-w','-Werror=implicit-function-declaration',*sanitizer,*flags(),'-ffunction-sections','-fdata-sections',str(path),'-Wl,--gc-sections','-lm','-o',str(binary)],check=True)
+ combined=['-DCOMBO_BUILD'] if '--combo' in sys.argv else []
+ subprocess.run(['cc','-std=gnu17','-O2','-w','-Werror=implicit-function-declaration',*sanitizer,*combined,*flags(),'-ffunction-sections','-fdata-sections',str(path),'-Wl,--gc-sections','-lm','-o',str(binary)],check=True)
  environment={**os.environ,'ASAN_OPTIONS':os.environ.get('ASAN_OPTIONS','')+':detect_leaks=0'}
  subprocess.run([str(binary)],check=True,env=environment)

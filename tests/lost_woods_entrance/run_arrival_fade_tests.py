@@ -125,6 +125,9 @@ with tempfile.TemporaryDirectory(prefix="forest-native-arrival-") as temporary:
         title = (ROOT / game / "src/code/title_setup.c").read_text()
         boot = function(title, "void Setup_InitImpl(" if mm else "void TitleSetup_InitImpl(")
         source = source.replace("/* BOOT_BODY */", re.sub(r"\bthis\b", "self", boot))
+        title_owner = "MM" if mm else "SOH"
+        for operation, result in (("Request", "void"), ("Consume", "int")):
+            source += "\n" + function(title, result + " Combo_" + title_owner + "_" + operation + "CrossGameTitleCard(") + "\n"
         source = source.replace("/* ROUTE_BODY */", "\n".join(function(host, signature) for signature in (
             "static void Combo_CancelLostWoodsPassage(", "static void Combo_ClearReturnRequests(",
             'extern "C" COMBO_EXPORT void MM_SetComboEntryIsResume(',
@@ -166,7 +169,10 @@ STALE_EFFECT
 GUARDS
     for (bool shop : {false, true}) {
         PlayState departure{};
+        CONSUME_TITLE(); // discard the earlier boot request before testing a local transition
         if (shop) Transition(&departure, 0); else ForestTransition(&departure, 0);
+        require(CONSUME_TITLE() && !CONSUME_TITLE(),
+                "explicit local shop/forest routes must request exactly one destination title");
         require(departure.transitionTrigger == TRANS_TRIGGER_START &&
                 departure.transitionType == TRANS_TYPE_FADE_BLACK,
                 "local shop/forest routes must still fade out natively");
@@ -174,7 +180,8 @@ GUARDS
     }
     std::puts("PASS: native portal/save-load and shop/solo-forest arrivals start black, reveal gradually, consume once and preserve other arrivals");
 }
-'''.replace("MIRROR_ROUTE", "COMBO_PORTAL_MAGIC_MIRROR" if mm else "COMBO_PORTAL_OPENING_FOREST").replace("BOOT", r'''
+'''.replace("CONSUME_TITLE", "Combo_" + title_owner + "_ConsumeCrossGameTitleCard").replace(
+    "MIRROR_ROUTE", "COMBO_PORTAL_MAGIC_MIRROR" if mm else "COMBO_PORTAL_OPENING_FOREST").replace("BOOT", r'''
             SetupState state{};
             gComboStartFileNum = slot;
             MM_SetComboEntryIsResume(0);

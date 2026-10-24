@@ -18,6 +18,10 @@ static const StaticStoryDialogueEntry sDialogue[] = {
     { STATIC_STORY_TEXT_MONKEY, "Ook! Ook! The Woods of Mystery are just ahead!" },
 };
 
+uint16_t StaticStoryDialogue_GetTextIdAt(size_t index) {
+    return index < sizeof(sDialogue) / sizeof(sDialogue[0]) ? sDialogue[index].textId : 0;
+}
+
 const char* StaticStoryDialogue_GetText(uint16_t textId, uint8_t language) {
     /* All approved translations currently fall back to English. */
     (void)language;

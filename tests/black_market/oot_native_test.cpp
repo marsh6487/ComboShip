@@ -2,9 +2,12 @@
 #include "ComboGameMode.h"
 #include "entrances/LostWoodsEntrance.h"
 #include "entrances/BlackMarketEntrance.h"
+#include "BlackMarketExitDoor.h"
 #include "entrances/SoloForest.h"
 #include "rando/BlackMarket.h"
 #include "BlackMarketKeeper.h"
+#include "BlackMarketReceipt.h"
+#include "BlackMarketBrowsing.h"
 #include "soh/ActorDB.h"
 #include "Enhancements/Gameplay/ComboBlackMarketNative.h"
 #include "Enhancements/Gameplay/OotBlackMarketDoorNative.h"
@@ -14,11 +17,17 @@
 #include <cstring>
 #include <cstdio>
 #include <memory>
+#include <string_view>
 #include "entry_diagnostics_fixture.h"
+#include "soh/Enhancements/game-interactor/vanilla-behavior/GIVanillaBehavior.h"
 bool sNativeKeeperReady = false;
 extern "C" u8 MmAssets_BaseResourceExists(const char*) { return destination; }
 extern "C" { int gComboGameMode = COMBO_GAME_OOT; }
 SaveContext gSaveContext{};
+// Native title policy is exercised by lost_woods_entrance/run_oot_title_card_tests.py.
+extern "C" void Combo_SOH_RequestCrossGameTitleCard(void) {}
+extern "C" int Combo_SOH_SwapCustomTitleCardPresentation(int) { return 0; }
+extern "C" bool GameInteractor_Should(GIVanillaBehavior, uint32_t result, ...) { return result; }
 PlayState* gPlayState;
 using namespace ComboRando::BlackMarket;
 Session sSession;
@@ -28,7 +37,7 @@ u16 sClears;
 bool sEntering, sReturnPending, sReturnStaged, sResumeFromMarket;
 bool sDoorArmed, sTalking, sTitlePending, sKeeperSpawned;
 int sKeeperActorId = 1000;
-alignas(2) constexpr char kCard[] = "__OTR__custom/skiejer_market/title";
+/* CARD_RESOURCE */
 int sTravelSlot = -1, sSelected;
 float sDoorFloor;
 u32 sTravelSeed;
@@ -40,6 +49,17 @@ s16 sGroundedReturnYaw = 0;
 u16 sGroundedReturnEntrance = ENTR_SKIEJER_FOREST;
 RespawnData sPreservedReturn;
 std::string sStatus;
+BlackMarketReceipt::State sReceipt;
+nlohmann::json sReceiptMarket;
+GetItemEntry sReceiptEntry{};
+BlackMarketBrowsing::State sBrowser;
+constexpr u16 kBrowseText = 0x8F10;
+int receiptOffers = 0, browseStarts = 0, browseMessages = 0;
+bool offerWorks = true, rowAvailable = true;
+u16 rowMod = MOD_RANDOMIZER;
+s16 activeCamera = CAM_ID_MAIN;
+u32 nativeSeed = 77;
+GetItemEntry lastOfferedEntry{};
 bool pack = true, owned = false, usable = true, grantWorks = true;
 int grants = 0, writes = 0;
 u16 clearsAtWait;
@@ -89,6 +109,27 @@ ActorDB::Entry& ActorDB::AddEntry(const ActorDBInit& profile) {
 }
 bool inCs = false;
 extern "C" s32 Player_InCsMode(PlayState*) { return inCs; }
+extern "C" s32 Player_InBlockingCsMode(PlayState*, Player*) { return inCs; }
+extern "C" s16 Play_GetActiveCamId(PlayState*) { return activeCamera; }
+extern "C" s32 GiveItemEntryWithoutActor(PlayState* current, GetItemEntry entry) {
+    assert(current == gPlayState);
+    ++receiptOffers;
+    lastOfferedEntry = entry;
+    if (!offerWorks) return false;
+    player.getItemEntry = entry;
+    player.getItemId = entry.getItemId;
+    player.interactRangeActor = &player.actor;
+    return true;
+}
+bool BeginBrowsing(PlayState* current) {
+    assert(current == gPlayState && !sReceipt.pending);
+    ++browseStarts; sBrowser = {}; sSelected = -1; sTalking = true;
+    return true;
+}
+extern "C" void Message_StartTextbox(PlayState* current, u16 text, Actor* actor) {
+    assert(current == gPlayState && text == kBrowseText && !actor);
+    ++browseMessages;
+}
 extern "C" Actor* Actor_Spawn(ActorContext*, PlayState*, s16 actor, f32 x, f32 y, f32 z, s16, s16 yaw, s16, s16 marker) {
     assert(actor > ACTOR_ID_MAX); // dedicated profile, independent of vanilla actor controllers
     assert(actor == sKeeperActorId && marker == 0); ++keeperSpawns;
@@ -106,12 +147,13 @@ void KeeperUpdate(Actor*, PlayState*) {}
 void KeeperDraw(Actor*, PlayState*) {}
 void VanillaInit(Actor*, PlayState*) { ++nativeInits; }
 const char* SOH_ReadBlackMarketOptions() { return "{}"; }
-u32 Seed() { return 77; }
+u32 Seed() { return nativeSeed; }
 bool PackAvailable() { return pack; }
 extern "C" u8 ResourceMgr_FileExists(const char*) { return destination; }
 extern "C" bool ResourceMgr_IsAltAssetsEnabled() { return false; }
 extern "C" u8 ResourceMgr_FileAltExists(const char*) { return false; }
 namespace ComboBlackMarketOotItems {
+void LatchToolOwnership() {}
 RandomizerGet Id(const Item&) { return RG_LANTERN; }
 bool Owned(const Item&) { return owned; }
 bool Available(const Item&) { return usable; }
@@ -123,7 +165,11 @@ struct NativeRow {
     std::shared_ptr<GetItemEntry> GetGIEntryUnresolved() const { return entry; }
 };
 NativeRow RetrieveItem(RandomizerGet id) {
-    auto entry = std::make_shared<GetItemEntry>(); entry->getItemId = id; return { entry };
+    if (!rowAvailable) return {};
+    auto entry = std::make_shared<GetItemEntry>();
+    entry->getItemId = id; entry->modIndex = rowMod;
+    entry->textId = 0x1357; entry->objectId = OBJECT_GAMEPLAY_KEEP; entry->gi = 17;
+    return { entry };
 }
 }
 int shopDraws, fallbackDraws;
@@ -161,6 +207,10 @@ static int NativeOpen(Player* current, PlayState* play, EnDoor* door) {
 }
 
 void Reset() {
+    sReceipt = {}; sReceiptMarket = {}; sReceiptEntry = {}; sBrowser = {};
+    receiptOffers = browseStarts = browseMessages = 0;
+    offerWorks = rowAvailable = true; rowMod = MOD_RANDOMIZER; nativeSeed = 77;
+    activeCamera = CAM_ID_MAIN; lastOfferedEntry = {};
     destination = true;
     diagnostics.clear();
     gComboGameMode = COMBO_GAME_OOT;
@@ -327,9 +377,130 @@ static void TestDoorOpen() {
     }
     std::puts("PASS OoT native Open hook, actual idle/action animation cleanup and ordinary-door fallback");
 }
+static void PrepareReceipt() {
+    Reset();
+    play.sceneNum = SCENE_SKIEJER_MARKET;
+    assert(Status(0) == PurchaseResult::Ready);
+}
+static void NativeAcquire(const GetItemEntry& entry) {
+    // Observe the native GI boundary: the engine owns acquisition, grants the
+    // unresolved row, then reports OnItemReceive. Offering alone does neither.
+    player.stateFlags1 |= PLAYER_STATE1_GETTING_ITEM;
+    if (!FixedMarketGrant(&play, entry)) {
+        const auto* item = Offer(sReceipt.slot);
+        if (item) ComboBlackMarketOotItems::Grant(*item);
+    }
+    ReceiveMarketItem(entry);
+}
+static void TestReceipt() {
+    PrepareReceipt();
+    const int price = sSession.market["stock"][0]["price"];
+    assert(Purchase() && sReceipt.pending && !sReceipt.delivered);
+    assert(grants == 0 && writes == 0 && gSaveContext.rupees == 500 && !sSession.state.purchased);
+    assert(!Purchase()); // An outstanding offer cannot create a second receipt.
+    play.msgCtx.msgMode = 1;
+    MonitorReceipt(); assert(receiptOffers == 0);
+    play.msgCtx.msgMode = 0; inCs = true;
+    MonitorReceipt(); assert(receiptOffers == 0);
+    inCs = false; offerWorks = false;
+    MonitorReceipt(); assert(receiptOffers == 1 && !sReceipt.offered);
+    offerWorks = true;
+    MonitorReceipt();
+    const auto entry = lastOfferedEntry;
+    assert(receiptOffers == 2 && sReceipt.offered && entry.comboMarketReceipt == sReceipt.ticket);
+    assert(entry.modIndex == MOD_RANDOMIZER && entry.getItemId == RG_LANTERN &&
+           entry.textId == 0x1357 && entry.objectId == OBJECT_GAMEPLAY_KEEP && entry.gi == 17);
+    assert(grants == 0 && writes == 0 && gSaveContext.rupees == 500);
+    ReceiveMarketItem(entry); // The native acquisition flag is also required.
+    assert(grants == 0 && writes == 0);
+    NativeAcquire(entry);
+    assert(grants == 1 && writes == 1 && sReceipt.delivered && gSaveContext.rupees == 500 - price);
+    assert(persisted["rupees"] == 500 - price && persisted["market"]["state"]["purchased"] == 1);
+    NativeAcquire(entry);
+    assert(grants == 1 && writes == 1 && gSaveContext.rupees == 500 - price);
+    assert(!Purchase());
+    MonitorReceipt(); assert(browseStarts == 0);
+    player.stateFlags1 = 0; play.msgCtx.msgMode = 1;
+    MonitorReceipt(); assert(browseStarts == 0);
+    play.msgCtx.msgMode = 0; inCs = true;
+    MonitorReceipt(); assert(browseStarts == 0);
+    inCs = false; activeCamera = CAM_ID_MAIN + 1;
+    MonitorReceipt(); assert(browseStarts == 0 && sReceipt.pending);
+    activeCamera = CAM_ID_MAIN; sSelected = -1;
+    MonitorReceipt();
+    assert(!sReceipt.pending && browseStarts == 1 && browseMessages == 1 && sSelected == 0 && sBrowser.slot == 0);
+    MonitorReceipt(); assert(browseStarts == 1 && browseMessages == 1);
+
+    PrepareReceipt(); grantWorks = false;
+    assert(Purchase()); MonitorReceipt(); NativeAcquire(lastOfferedEntry);
+    assert(!sReceipt.delivered && grants == 0 && writes == 0 &&
+           gSaveContext.rupees == 500 && !sSession.state.purchased);
+    CancelReceipt();
+    for (int invalid = 0; invalid < 2; ++invalid) {
+        PrepareReceipt();
+        if (invalid == 0) rowAvailable = false;
+        else rowMod = MOD_RANDOMIZER + 1;
+        assert(!Purchase() && !sReceipt.pending && grants == 0 && writes == 0);
+    }
+    PrepareReceipt(); gSaveContext.rupeeAccumulator = -450;
+    if (price > 50) assert(!Purchase() && grants == 0 && writes == 0);
+
+    // A market marker never authorizes an unrelated GI row or player entry.
+    for (int mismatch = 0; mismatch < 4; ++mismatch) {
+        PrepareReceipt(); assert(Purchase()); MonitorReceipt();
+        auto wrong = lastOfferedEntry;
+        if (mismatch == 0) ++wrong.comboMarketReceipt;
+        if (mismatch == 1) ++wrong.modIndex;
+        if (mismatch == 2) ++wrong.getItemId;
+        if (mismatch == 3) ++player.getItemEntry.comboMarketReceipt;
+        NativeAcquire(wrong);
+        assert(grants == 0 && writes == 0 && !sReceipt.delivered && gSaveContext.rupees == 500);
+    }
+    GetItemEntry ordinary{};
+    assert(!FixedMarketGrant(&play, ordinary)); // Ordinary native grants pass through.
+
+    PrepareReceipt(); assert(Purchase()); MonitorReceipt();
+    const auto cancelled = lastOfferedEntry;
+    CancelReceipt();
+    assert(!sReceipt.pending && player.getItemEntry.comboMarketReceipt == 0 &&
+           player.getItemId == GI_NONE && !player.interactRangeActor);
+    assert(Purchase() && sReceipt.ticket != cancelled.comboMarketReceipt);
+    MonitorReceipt();
+    NativeAcquire(cancelled);
+    assert(grants == 0 && writes == 0 && !sReceipt.delivered);
+    NativeAcquire(lastOfferedEntry);
+    assert(grants == 1 && writes == 1);
+    PrepareReceipt(); assert(Purchase()); MonitorReceipt();
+    ++player.getItemEntry.comboMarketReceipt;
+    const int unrelated = player.getItemEntry.comboMarketReceipt;
+    CancelReceipt();
+    assert(player.getItemEntry.comboMarketReceipt == unrelated); // Do not withdraw another native action.
+
+    for (int stale = 0; stale < 7; ++stale) {
+        PrepareReceipt(); assert(Purchase()); MonitorReceipt();
+        const auto old = lastOfferedEntry;
+        if (stale == 0) gSaveContext.fileNum = 1;
+        if (stale == 1) ++nativeSeed;
+        if (stale == 2) sSession.market["stock"][0]["price"] = price + 1;
+        if (stale == 3) play.sceneNum = SCENE_SKIEJER_FOREST;
+        if (stale == 4) gComboGameMode = COMBO_GAME_BOTH;
+        if (stale == 5) play.transitionTrigger = TRANS_TRIGGER_START;
+        if (stale == 6) play.gameOverCtx.state = GAMEOVER_DEATH_START;
+        NativeAcquire(old);
+        assert(grants == 0 && writes == 0 && !sReceipt.delivered && gSaveContext.rupees == 500);
+        MonitorReceipt();
+        assert(!sReceipt.pending && browseStarts == 0);
+    }
+    std::puts("PASS OoT unresolved native GI offer, acknowledgment-only purchase/save, cancellation and browse recovery");
+}
+
+#define OOT_INTERIOR_EXIT_TEST
+#include "interior_exit_cases.inc"
 int main(int argc, char** argv) {
+    if (argc > 1 && std::string(argv[1]) == "door-exit") { TestInteriorExitDoor(); return 0; }
     const std::string only = argc > 1 ? argv[1] : "all";
     if (only != "all") {
+        if (only == "receipt") TestReceipt();
         if (only == "door-marker") TestDoorMarker();
         if (only == "door-entry") TestDoorEntry();
         if (only == "door-return") TestDoorReturn();
@@ -363,16 +534,7 @@ int main(int argc, char** argv) {
     assert(gSaveContext.entranceIndex == ENTR_SKIEJER_MARKET && !sReturnPending);
     Reset(); play.sceneNum = SCENE_LOST_WOODS;
     assert(!Exterior(&play)); // native LW now approaches the forest, never the shop directly
-    Reset();
-    const int price = sSession.market["stock"][0]["price"];
-    Purchase();
-    assert(grants == 1 && writes == 1 && persisted["rupees"] == 500 - price);
-    assert(persisted["market"]["state"]["purchased"] == 1);
-    Purchase(); assert(grants == 1 && writes == 1);
-    Reset(); grantWorks = false; Purchase();
-    assert(grants == 0 && writes == 0 && gSaveContext.rupees == 500 && !sSession.state.purchased);
-    Reset(); gSaveContext.rupeeAccumulator = -450; Purchase();
-    if (price > 50) assert(grants == 0 && writes == 0);
+    TestReceipt();
     Reset(); play.sceneNum = SCENE_SKIEJER_FOREST;
     player.actor.world.pos = { 184, 500, -300 }; PlayerUpdate();
     assert(sReturnPos.y == 0 && sReturnPos.x == 184);
@@ -395,9 +557,11 @@ int main(int argc, char** argv) {
     assert(lastProfile.instanceSize == sizeof(Actor) && lastProfile.destroy == nullptr);
     assert(lastProfile.init == KeeperInit && lastProfile.update == KeeperUpdate && lastProfile.draw == KeeperDraw);
     lastProfile.init(&player.actor, &play); assert(customInits == 1 && nativeInits == 0);
+    sTitlePending = true;
     PresentTitle();
     const auto& title = play.actorCtx.titleCtx;
-    assert(title.texture == kCard && title.width == 192 && title.height == 24);
+    assert(title.texture == kCard && title.width == 240 && title.height == 24);
+    assert(std::string_view(static_cast<const char*>(title.texture)) == "__OTR__custom/oot_location_titles/v1/market");
     assert(!title.isBossCard && !title.hasTranslation && title.durationTimer == 80 && title.delayTimer == 20);
     player.actor.world.pos = { -11, 0, 410 }; PlayerUpdate();
     assert(sReturnPending && play.nextEntranceIndex == ENTR_SKIEJER_FOREST);

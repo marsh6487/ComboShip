@@ -8,6 +8,9 @@ enum {
     COMBO_PORTAL_OPENING_FOREST = 2,
     COMBO_PORTAL_MAGIC_MIRROR = 3,
     COMBO_PORTAL_WOODFALL = 4,
+    COMBO_PORTAL_IKANA = 5,
+    COMBO_PORTAL_GREAT_BAY = 6,
+    COMBO_PORTAL_SNOWHEAD = 7,
 };
 
 static inline int ComboLostWoods_IsOpeningForestRoute(int route) {

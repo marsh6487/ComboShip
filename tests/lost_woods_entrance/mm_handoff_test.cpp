@@ -1,5 +1,6 @@
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
 #include "entrances/LostWoodsEntrance.h"
+#include "entrances/RegionalPassages.h"
 #include "gameplay/MagicMirrorArrival.h"
 #include "global.h"
 #include <algorithm>
@@ -68,6 +69,13 @@ extern "C" s32 CVarGetInteger(const char*, s32) { return 0; }
 extern "C" void MM_CaptureFwDeparture(void) { ++fwCaptures; }
 void Combo_MM_FlushAccumulators() {}
 void SaveManager_SaveCurrentForCombo(bool = false) { ++saves; }
+
+static int regionalReturn;
+extern "C" int ComboRegionalPassagesMm_ApplyArrival(int) { return 1; }
+static bool regionalReady=true;
+extern "C" void ComboRegionalPassagesMm_Reset(void) { regionalReturn=0; }
+extern "C" int ComboRegionalPassagesMm_AtReturn(PlayState*,const Vec3f*) { return regionalReturn; }
+extern "C" int ComboRegionalPassagesMm_Get(PlayState*,int*,Vec3f*,s16*) { return regionalReady; }
 
 /* RETURN_STATE */
 void RegisterCandidate() {

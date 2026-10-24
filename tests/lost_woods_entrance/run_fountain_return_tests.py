@@ -30,6 +30,14 @@ provider = (ROOT / "soh/soh/OTRGlobals.cpp").read_text(encoding="utf-8-sig")
 slot_definition = re.search(r'^extern[^\n]*\bgComboReturnFileNum\s*=[^;]+;', provider, re.M)[0]
 slot_declaration = re.search(r'^extern[^\n]*\bgComboReturnFileNum\s*;', route, re.M)[0] if route else ""
 fixture = fixture.replace("/* PRODUCTION_RETURN_SLOT */", slot_declaration + "\n" + slot_definition)
+boot = (ROOT / "soh/src/code/title_setup.c").read_text()
+request = re.search(r"static s32 sComboCrossGameTitleCardPending[^;]*;", boot)[0]
+for name in ("Combo_SOH_HasCrossGameTitleCard", "Combo_SOH_ConsumeCrossGameTitleCard",
+             "Combo_SOH_RequestCrossGameTitleCard"):
+    match = re.search(r"(?:int|void) " + name + r"\(", boot)
+    if match:
+        request += "\n" + block_from(boot, match.start())
+fixture = fixture.replace("/* PRODUCTION_REQUEST_STATE */", request)
 fixture = fixture.replace("/* PRODUCTION_ROUTE */", production)
 fixture = fixture.replace("/* NATIVE_RETURN_TABLES */", tables)
 fixture = fixture.replace("/* NATIVE_COLLISION_EXIT */", re.sub(r"\bthis\b", "current", exit_body))

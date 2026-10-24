@@ -47,6 +47,11 @@ s32 MmMaskWear_IsStoneMaskActive(void);
 // Returns true if Blast Mask is on cooldown (used for draw blackout).
 s32 MmMaskWear_IsBlastCooldown(void);
 
+// The Blast Mask owns A only when no native interaction or blocking state needs it.
+// Filter the player's input copy before UpdateCommon; the raw pad remains untouched.
+s32 MmMaskWear_CanUseBlastA(PlayState* play, Player* player);
+void MmMaskWear_FilterBlastA(PlayState* play, Player* player, Input* input);
+
 // Returns true if All-Night Mask is currently worn (used by En_Sw and En_Wood02).
 s32 MmMaskWear_IsAllNightMaskActive(void);
 

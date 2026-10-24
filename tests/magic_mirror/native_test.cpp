@@ -625,10 +625,16 @@ void TestArrival() {
         assert(play.linkActorEntry->pos.x == 1500 && play.linkActorEntry->pos.y == 320 &&
                play.linkActorEntry->pos.z == -1300);
 #ifdef MIRROR_OOT
-        assert(play.linkActorEntry->rot.y == 0x4000);
+        const float arrivalAngle = play.linkActorEntry->rot.y * (6.28318530718f / 65536.0f);
 #else
-        assert(((play.linkActorEntry->rot.y >> 7) & 0x1FF) == 90 && (play.linkActorEntry->rot.y & 127) == 127);
+        const float arrivalAngle = ((play.linkActorEntry->rot.y >> 7) & 0x1FF) * (3.14159265359f / 180.0f);
+        assert((play.linkActorEntry->rot.y & 127) == 127);
 #endif
+        const float targetX = COMBO_SOLO_FOREST_STUMP_X - play.linkActorEntry->pos.x;
+        const float targetZ = COMBO_SOLO_FOREST_STUMP_Z - play.linkActorEntry->pos.z;
+        const float targetLength = std::sqrt(targetX * targetX + targetZ * targetZ);
+        assert((std::sin(arrivalAngle) * targetX + std::cos(arrivalAngle) * targetZ) / targetLength > .9999f &&
+               "Mirror arrival must face the visible market/portal, including at a moved cap");
         assert(std::memcmp(&gSaveContext.respawn, &respawns.respawn, sizeof(respawns.respawn)) == 0);
         MagicMirror_FinishArrival(&play);
         assert(player.actionFunc == NativeIdle && idleRestores == 1);
@@ -639,6 +645,17 @@ void TestArrival() {
         MagicMirror_PrepareArrival(&play);
         assert(play.linkActorEntry == &original); // Consumed exactly once.
     }
+    // The native cap's first view matches the final market/portal-facing shot.
+    Reset(); MagicMirror_QueueArrival(); LoadForest(-377, 80, 416);
+    ActorEntry nativeEntry{}; play.linkActorEntry = &nativeEntry;
+    MagicMirror_PrepareArrival(&play);
+    assert(play.linkActorEntry != &nativeEntry);
+#ifdef MIRROR_OOT
+    assert(play.linkActorEntry->rot.y == -28478);
+#else
+    assert(((play.linkActorEntry->rot.y >> 7) & 0x1FF) == 204);
+#endif
+    MagicMirror_FinishArrival(&play);
     // Moved geometry replaces the previous scene's cached anchor at the same address.
     Reset(); LoadForest(-377, 80, 416); assert(MirrorRuntime::Locate(&play));
     MagicMirror_QueueArrival(); LoadForest(-1500, 400, 1500);

@@ -110,6 +110,7 @@ subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/port
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/mm3d_pack_test.py")], check=True)
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_title_card_tests.py")], check=True)
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_oot_title_card_tests.py"), "--sanitize"], check=True)
+subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_mm_title_card_tests.py"), "--sanitize"], check=True)
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/stump_return_test.py"), "--sanitize"], check=True)
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/stump_tool_safety_test.py")], check=True)
 subprocess.run([sys.executable, "-B", str(ROOT / "tests/lost_woods_entrance/run_portal_camera_tests.py")], check=True)

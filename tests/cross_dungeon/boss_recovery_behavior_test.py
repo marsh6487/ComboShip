@@ -41,7 +41,14 @@ void* Combo_ResolveSym(const char*,const char* name) {
 ''')
 oot_title = (ROOT / 'soh/src/code/title_setup.c').read_text()
 oot_host = (ROOT / 'soh/soh/OTRGlobals.cpp').read_text(encoding='utf-8-sig')
-oot += '\n#include "combo/entrances/LostWoodsEntrance.h"\nstatic int sComboReturnPortalRoute = COMBO_PORTAL_MARKET;\n'
+oot += r'''
+#include "combo/entrances/RegionalPassages.h"
+#include "soh/Enhancements/Gameplay/ComboRegionalPassages.h"
+#include <cstdlib>
+// A composed boss recovery must consume a stale passage without placing it.
+extern "C" int ComboRegionalPassagesOot_ApplyArrival(int) { std::abort(); }
+static int sComboReturnPortalRoute = COMBO_PORTAL_MARKET;
+'''
 oot += block_from(oot_host, oot_host.index('extern "C" void SOH_ApplyComboPortalArrival(')) + '\n'
 oot_title = oot_title[oot_title.index('        s32 crossDungeonArrival ='):oot_title.index('        // A portal return')]
 oot += '\nint16_t Entrance_OverrideNextIndex(int16_t index) { return index; }\nvoid NativeTitleArrival() {\n' + oot_title + '\n}\n'
@@ -95,15 +102,18 @@ int main() {
     // Loading the frozen source state must still use death ownership for the actual spawn.
     seed=Encode({nativeMixed,mm},{1,0});
     assert(SOH_SetCrossDungeonRuntimeSeed(seed.dump().c_str()));
-    assert(SOH_QueueCrossBossRecovery(1,mm.entrance.index));
-    Combo_SOH_LoadCrossDungeonCheckpoint(nativeMixed.returnTo.index);
-    sComboReturnPortalRoute=COMBO_PORTAL_LOST_WOODS;
-    gSaveContext.respawnFlag=0;
-    NativeTitleArrival();
-    assert(sComboReturnPortalRoute==COMBO_PORTAL_MARKET && gSaveContext.respawnFlag==0 &&
-           "real forest placement must not override source-owned boss recovery");
-    assert(gSaveContext.entranceIndex==ENTR_FIRE_TEMPLE_ENTRANCE &&
-           "foreign death must physically resume at the incoming Fire source, not the Water reverse");
+    for (int route : {COMBO_PORTAL_LOST_WOODS, COMBO_PORTAL_OPENING_FOREST, COMBO_PORTAL_WOODFALL,
+                      COMBO_PORTAL_IKANA, COMBO_PORTAL_GREAT_BAY, COMBO_PORTAL_SNOWHEAD}) {
+        assert(SOH_QueueCrossBossRecovery(1,mm.entrance.index));
+        Combo_SOH_LoadCrossDungeonCheckpoint(nativeMixed.returnTo.index);
+        sComboReturnPortalRoute=route;
+        gSaveContext.respawnFlag=0;
+        NativeTitleArrival();
+        assert(sComboReturnPortalRoute==COMBO_PORTAL_MARKET && gSaveContext.respawnFlag==0 &&
+               "passage placement must not override source-owned boss recovery");
+        assert(gSaveContext.entranceIndex==ENTR_FIRE_TEMPLE_ENTRANCE &&
+               "foreign death must physically resume at the incoming Fire source, not the Water reverse");
+    }
     assert(Combo_SOH_SaveCrossDungeonCheckpoint()==ENTR_FIRE_TEMPLE_ENTRANCE);
     Combo_SOH_LoadCrossDungeonCheckpoint(Combo_SOH_SaveCrossDungeonCheckpoint());
     assert(Combo_SOH_ConsumeCrossDungeonRecovery()==ENTR_FIRE_TEMPLE_ENTRANCE && !PrepareSwitch());

@@ -8,6 +8,7 @@
 #include "soh/Enhancements/game-interactor/vanilla-behavior/GIVanillaBehavior.h"
 #include "rando/CrossEntranceBoss.h"
 #include "entrances/LostWoodsEntrance.h"
+#include "entrances/RegionalPassages.h"
 #include "ComboGameMode.h"
 #if __has_include("gameplay/CrossGameTitleCard.h")
 #include "gameplay/CrossGameTitleCard.h"
@@ -34,6 +35,7 @@ extern "C" void ComboFw_ApplyArrival(void) {
     if (fwArrival >= 0) { gSaveContext.entranceIndex = fwArrival; gSaveContext.respawnFlag = 2; }
     fwArrival = -1;
 }
+extern "C" int ComboRegionalPassagesOot_ApplyArrival(int) { std::abort(); }
 extern "C" void SaveContext_Init(void) { gSaveContext = {}; }
 extern "C" void Sram_OpenSave(void) {
     gSaveContext.language = LANGUAGE_ENG;
@@ -79,6 +81,7 @@ extern "C" void GameInteractor_ExecuteOnPresentTitleCard(void) { ++presentations
 /* BOOT_BODY */
 /* ENTRANCE_TABLE */
 /* NATIVE_TITLE_CARD */
+/* CUSTOM_TRANSITIONS */
 
 static void SelectPlayerTitle(PlayState* play) {
     SceneTableEntry* scene = play->loadedScene;
@@ -157,6 +160,39 @@ int main() {
         require(Active(play) == (setting == 0), "crossing must respect an explicit title-card setting in rando");
     }
     titleCardSetting = -1;
+    // Same-game custom returns, including the fountain, use the same request
+    // without booting TitleSetup or modifying their positioned respawn.
+    for (bool rando : {false, true}) {
+        isRando = rando;
+        gSaveContext.respawnFlag = 2;
+        gSaveContext.showTitleCard = false;
+        gSaveContext.entranceIndex = ENTR_LOST_WOODS_SOUTH_EXIT;
+        Combo_SOH_RequestCrossGameTitleCard();
+        const SaveContext before = gSaveContext;
+        auto localReturn = Destination(SCENE_LOST_WOODS);
+        SelectPlayerTitle(&localReturn);
+        require(Active(localReturn) && !std::strcmp(static_cast<const char*>(localReturn.actorCtx.titleCtx.texture),
+                                                  gLostWoodsTitleCardENGTex),
+                "a custom positioned return must select the native destination card, including shuffled seeds");
+        require(!std::memcmp(&before, &gSaveContext, sizeof(before)),
+                "a custom title request must not alter its positioned return or player progress");
+        localReturn = Destination(SCENE_LOST_WOODS);
+        SelectPlayerTitle(&localReturn);
+        require(!Active(localReturn), "a custom title request must be consumed after one destination");
+    }
+    isRando = true;
+    for (bool market : {false, true}) {
+        gSaveContext.respawnFlag = 2;
+        gSaveContext.showTitleCard = false;
+        auto localReturn = Destination(SCENE_LOST_WOODS);
+        if (market) Transition(&localReturn, ENTR_LOST_WOODS_SOUTH_EXIT);
+        else ForestTransition(&localReturn, ENTR_LOST_WOODS_SOUTH_EXIT);
+        SelectPlayerTitle(&localReturn);
+        require(Active(localReturn), "explicit same-game shop and forest returns must request the native destination card");
+        localReturn = Destination(SCENE_LOST_WOODS);
+        SelectPlayerTitle(&localReturn);
+        require(!Active(localReturn), "same-game shop and forest return requests must be consumed once");
+    }
     gSaveContext.respawnFlag = 0;
     auto shuffledLocal = Destination(SCENE_LOST_WOODS);
     SelectPlayerTitle(&shuffledLocal);

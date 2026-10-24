@@ -10,6 +10,13 @@ int main() {
     std::printf("{\"center\":"); Print(Target(-1));
     std::printf(",\"right\":"); Print(Target(0));
     std::printf(",\"left\":"); Print(Target(4));
+    std::printf(",\"slots\":[");
+    for (int slot = 0; slot < 8; ++slot) {
+      if (slot)
+        std::printf(",");
+      Print(Target(slot));
+    }
+    std::printf("]");
     std::printf(",\"frames\":[");
     State state;
     for (int i=0;i<60;++i) {

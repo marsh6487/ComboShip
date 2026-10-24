@@ -4,18 +4,26 @@
 #include "BlackMarketResources.h"
 #include "BlackMarketNativeResources.h"
 #include "BlackMarketEntry.h"
+#include "BlackMarketExitDoor.h"
 #include "ComboExport.h"
 #include "ComboOpeningForest.h"
 #include "BlackMarketDoorNative.h"
 #include "entrances/BlackMarketEntrance.h"
 #include "entrances/SoloForest.h"
 #include "BlackMarketLock.h"
+#include "BlackMarketGraphicsArena.h"
 #include "BlackMarketKeeper.h"
 #include "BlackMarketGrannyResources.h"
 #include "BlackMarketBrowsing.h"
+#include "BlackMarketReceipt.h"
+#include "2s2h/CustomItem/CustomItem.h"
+#include "2s2h/Rando/ItemReceiptText.h"
+#include "sword_element_message.h"
+#include "BlackMarketText.h"
 #include "2s2h/BenPort.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
 #include "2s2h/Enhancements/Graphics/ComboPlaceTitleCard.h"
+#include "gameplay/CrossGameTitleCard.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "2s2h/GameInteractor/GameInteractor.h"
 #include "2s2h/Rando/Rando.h"
@@ -32,6 +40,7 @@ int SaveManager_ReadSaveFile(const std::filesystem::path&, nlohmann::json&);
 extern "C" {
 #include "overlays/actors/ovl_En_Takaraya/z_en_takaraya.h"
 extern SceneEntranceTableEntry sSceneEntranceTable[ENTR_SCENE_MAX];
+extern f32 sNESFontWidths[160];
 u8 ResourceMgr_FileExists(const char* path);
 u8 ResourceMgr_FileAltExists(const char* path);
 bool ResourceMgr_IsAltAssetsEnabled(void);
@@ -39,7 +48,10 @@ void Player_Action_35(Player* player, PlayState* play);
 void Player_Action_36(Player* player, PlayState* play);
 }
 #include "BlackMarketShelvesNative.h"
+#include "BlackMarketInteriorEffects.h"
 #include "BlackMarketKeeperAssets.h"
+
+void CustomItem00_Destroy(Actor* actor, PlayState* play);
 
 namespace {
 // Display-list macros redeclare these helpers at block scope in this namespace.
@@ -62,7 +74,7 @@ constexpr u16 kBrowseText = 0x8F10, kResultText = 0x8F11, kWelcomeText = 0x8F12,
 constexpr char kScene[] = "scenes/nonmq/skiejer_market/skiejer_market";
 constexpr char kRoom[] = "scenes/nonmq/skiejer_market/skiejer_market_room_0";
 constexpr char kKeeper[] = "__OTR__custom/skiejer_market/keeper/gTreasureChestShopGalSkel";
-alignas(2) constexpr char kCard[] = "__OTR__custom/skiejer_market/title";
+alignas(2) constexpr char kCard[] = "__OTR__custom/oot_location_titles/v1/market";
 alignas(2) constexpr char kExterior[] = "__OTR__custom/skiejer_market/entrance";
 constexpr Vec3f kShelves[8] = {
     // Two framed shelf banks; keep all offers on one frontal plane.
@@ -202,6 +214,7 @@ bool Safe(const PlayState* play) {
            !gSaveContext.cutsceneTrigger && !play->soaringCsOrSoTCsPlaying;
 }
 void Transition(PlayState* play, u16 entrance) {
+    Combo_MM_RequestCrossGameTitleCard();
     play->nextEntrance = entrance;
     play->transitionType = TRANS_TYPE_FADE_BLACK;
     gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK;
@@ -221,22 +234,145 @@ PurchaseResult Status(int slot) {
                        ClearCount(sClears), ComboBlackMarketItems::Owned(*item),
                        ComboBlackMarketItems::Available(*item));
 }
-void Purchase() {
+BlackMarketReceipt::State sReceipt;
+nlohmann::json sReceiptMarket;
+Actor* sReceiptActor = nullptr;
+int sReceiptActorTicket = 0;
+bool ReceiptContext() {
+    return Active() && gPlayState && gGameState == &gPlayState->state && gPlayState->state.running &&
+           sReceipt.Matches(gSaveContext.fileNum, gSaveContext.save.shipSaveInfo.rando.finalSeed, sReceipt.ticket) &&
+           sReceiptMarket == sSession.market && gPlayState->transitionTrigger == TRANS_TRIGGER_OFF &&
+           gPlayState->transitionMode == TRANS_MODE_OFF && gPlayState->gameOverCtx.state == GAMEOVER_INACTIVE;
+}
+void AbortMarketReceipt(Actor* actor) {
+    CustomMessage::Entry entry;
+    entry.textboxType = 2;
+    entry.msg = "That offer is no longer available.";
+    if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE)
+        CustomMessage::SetActiveCustomMessage(entry.msg, entry);
+    else
+        CustomMessage::StartTextbox(entry.msg, entry);
+    // The queue's callback still owns currentEvent until this call returns.
+    sReceipt.Cancel();
+    sReceiptMarket = {};
+}
+void GiveMarketReceipt(Actor* actor, PlayState* play) {
+    if (actor != sReceiptActor || !ReceiptContext() ||
+        !sReceipt.Matches(gSaveContext.fileNum, gSaveContext.save.shipSaveInfo.rando.finalSeed, CUSTOM_ITEM_PARAM) ||
+        sReceipt.delivered)
+        return;
+    const auto* item = Offer(sReceipt.slot);
+    if (!item || Status(sReceipt.slot) != PurchaseResult::Ready) {
+        AbortMarketReceipt(actor);
+        return;
+    }
+    const auto id = ComboBlackMarketItems::Id(*item);
+    CustomMessage::Entry entry;
+    entry.textboxType = 2;
+    entry.icon = Rando::StaticData::GetIconForZMessage(id);
+    entry.msg = "You got " + std::string(item->label) + "!";
+    // Capture the actual receipt and its native follow-ups before granting.
+    Rando::ApplyItemReceiptText(id, entry);
+    Rando::AppendReceiptSource(entry, "");
+    entry.swordElementTutorial = SwordElement_MessageElementForPickup(Rando::StaticData::Items.at(id).itemId);
+    if (!ComboBlackMarketItems::Grant(*item)) {
+        AbortMarketReceipt(actor);
+        return;
+    }
+    if (!sReceipt.Acknowledge(gSaveContext.fileNum, gSaveContext.save.shipSaveInfo.rando.finalSeed, CUSTOM_ITEM_PARAM))
+        return;
+    // Reward, balance and sold bit enter one synchronous native snapshot.
+    gSaveContext.save.saveInfo.playerData.rupees -= sReceipt.price;
+    CommitPurchase(sSession.state, sReceipt.slot);
+    SaveManager_SaveCurrentForCombo(true);
+    if (CUSTOM_ITEM_FLAGS & CustomItem::GIVE_ITEM_CUTSCENE) {
+        CustomMessage::SetActiveCustomMessage(entry.msg, entry);
+    } else {
+        CustomMessage::StartTextbox(entry.msg, entry);
+        SwordElement_MessageAppend(play, entry.swordElementTutorial);
+    }
+}
+void DrawMarketReceipt(Actor* actor, PlayState* play) {
+    if (!ReceiptContext())
+        return;
+    const auto* item = Offer(sReceipt.slot);
+    if (!item)
+        return;
+    Matrix_Scale(30.0f, 30.0f, 30.0f, MTXMODE_APPLY);
+    Rando::DrawResolvedItem(ComboBlackMarketItems::Id(*item), RC_UNKNOWN, actor);
+}
+void ReleaseReceiptEvent(int ticket) {
+    auto& current = GameInteractor::Instance->currentEvent;
+    const auto* give = std::get_if<GIEventGiveItem>(&current);
+    if (ticket && give && give->giveItem == GiveMarketReceipt && give->param == ticket)
+        current = GIEventNone{};
+}
+void MarketReceiptDestroyed(Actor* actor, PlayState* play) {
+    if (actor == sReceiptActor) {
+        sReceiptActor = nullptr;
+        sReceiptActorTicket = 0;
+    }
+    ReleaseReceiptEvent(CUSTOM_ITEM_PARAM);
+    // Retain native item00 collider destruction; there is no scheduler closure.
+    CustomItem00_Destroy(actor, play);
+}
+void CancelReceipt(bool destroying = false) {
+    auto* actor = sReceiptActor;
+    ReleaseReceiptEvent(sReceiptActorTicket);
+    sReceiptActorTicket = 0;
+    sReceiptActor = nullptr; // retire ownership before deferred actor destruction
+    sReceipt.Cancel();
+    sReceiptMarket = {};
+    if (!destroying && actor)
+        Actor_Kill(actor);
+}
+void OfferMarketReceipt(PlayState* play, Player* player) {
+    // Yield to the ordinary event queue without ever changing its ownership.
+    if (sReceiptActor || !GameInteractor::Instance->events.empty() ||
+        !std::holds_alternative<GIEventNone>(GameInteractor::Instance->currentEvent))
+        return;
+    s16 flags = CustomItem::HIDE_TILL_OVERHEAD | CustomItem::KEEP_ON_PLAYER;
+    if ((player->stateFlags1 &
+         (PLAYER_STATE1_CHARGING_SPIN_ATTACK | PLAYER_STATE1_2000 | PLAYER_STATE1_4000 | PLAYER_STATE1_40000 |
+          PLAYER_STATE1_80000 | PLAYER_STATE1_100000 | PLAYER_STATE1_200000 | PLAYER_STATE1_8000000)) ||
+        Player_GetExplosiveHeld(player) > PLAYER_EXPLOSIVE_NONE)
+        flags |= CustomItem::GIVE_OVERHEAD;
+    else
+        flags |= CustomItem::GIVE_ITEM_CUTSCENE;
+    // Same native custom-item path as GIEventGiveItem, with an actor-owned
+    // action/destructor instead of closures that read mutable currentEvent.
+    auto* actor =
+        Actor_Spawn(&play->actorCtx, play, ACTOR_EN_ITEM00, player->actor.world.pos.x, player->actor.world.pos.y,
+                    player->actor.world.pos.z, flags, 0, static_cast<s16>(sReceipt.ticket), ITEM00_NOTHING);
+    if (!actor)
+        return;
+    auto* item = reinterpret_cast<EnItem00*>(actor);
+    item->actionFunc = reinterpret_cast<EnItem00ActionFunc>(GiveMarketReceipt);
+    actor->draw = DrawMarketReceipt;
+    actor->destroy = MarketReceiptDestroyed;
+    sReceiptActor = actor;
+    sReceiptActorTicket = sReceipt.ticket;
+    // Reserve scheduler ownership while this independent native actor is live.
+    // No action or destructor dispatches through this mutable marker.
+    GameInteractor::Instance->currentEvent = GIEventGiveItem{
+        .showGetItemCutscene = true,
+        .param = static_cast<s16>(sReceipt.ticket),
+        .giveItem = GiveMarketReceipt,
+        .drawItem = DrawMarketReceipt,
+    };
+}
+bool Purchase() {
     switch (Status(sSelected)) {
         case PurchaseResult::Ready: {
             const Item* item = Offer(sSelected);
             const int price = sSession.market["stock"][sSelected]["price"];
-            if (!item || !ComboBlackMarketItems::Grant(*item)) {
+            if (!item || !sReceipt.Begin(sSelected, gSaveContext.fileNum,
+                                         gSaveContext.save.shipSaveInfo.rando.finalSeed, price)) {
                 sStatus = "That offer cannot be delivered yet.";
                 break;
             }
-            // Rupees_ChangeBy only queues HUD animation. Set the actual saved
-            // balance so this snapshot cannot persist the reward with unpaid rupees.
-            gSaveContext.save.saveInfo.playerData.rupees -= price;
-            CommitPurchase(sSession.state, sSelected);
-            SaveManager_SaveCurrentForCombo(true); // item, balance and shelf bit in one MM snapshot
-            sStatus = std::string("Yours: ") + item->label + ".";
-            break;
+            sReceiptMarket = sSession.market;
+            return true;
         }
         case PurchaseResult::SoldOut:
             sStatus = "That one has already been sold.";
@@ -257,9 +393,40 @@ void Purchase() {
                                                                       : "You need its prerequisite first.";
             break;
     }
+    return false;
 }
 
 #include "BlackMarketBrowsingNative.h"
+void MonitorReceipt() {
+    if (!sReceipt.pending)
+        return;
+    if (!ReceiptContext()) {
+        // Once the play arena is gone only drop ownership; its destroy hooks
+        // already retired actors. Never dereference the old player/actor.
+        CancelReceipt(!gPlayState || gGameState != &gPlayState->state);
+        return;
+    }
+    auto* play = gPlayState;
+    auto* player = GET_PLAYER(play);
+    if (!player || play->msgCtx.msgMode != 0 || (player->stateFlags1 & PLAYER_STATE1_400) ||
+        Player_InBlockingCsMode(play, player) || !Safe(play) || Play_GetActiveCamId(play) != CAM_ID_MAIN)
+        return;
+    if (!sReceipt.delivered) {
+        if (Status(sReceipt.slot) != PurchaseResult::Ready) {
+            CancelReceipt();
+            return;
+        }
+        OfferMarketReceipt(play, player);
+        return;
+    }
+    // The cape choice and every native tutorial own their whole message chain.
+    const int shelf = sReceipt.slot;
+    CancelReceipt();
+    if (BeginBrowsing(play)) {
+        sSelected = sBrowser.slot = shelf;
+        Message_StartTextbox(play, kBrowseText, nullptr);
+    }
+}
 
 bool CustomKeeperAvailable() {
     return BlackMarketKeeperAssets::CustomAvailable(kBlackMarketResources, [](const char* path) {
@@ -286,6 +453,8 @@ void KeeperUpdate(Actor* actor, PlayState* play) {
             Actor_OfferTalk(actor, play, 150.0f);
         return;
     }
+    if (sReceipt.pending)
+        return;
     if (Actor_TalkOfferAccepted(actor, &play->state)) {
         if (!BeginBrowsing(play)) {
             Message_CloseTextbox(play);
@@ -345,19 +514,21 @@ void InitKeeper(Actor* actor) {
     sTalking = false;
 }
 void PresentTitle() {
-    if (!sTitlePending || !Active())
+    if (!sTitlePending || !Interior())
         return;
     if (!ResourceMgr_FileExists(kCard) && !(ResourceMgr_IsAltAssetsEnabled() && ResourceMgr_FileAltExists(kCard))) {
         sTitlePending = false;
         return;
     }
-    if (ComboPlaceTitleCard_Show(gPlayState, (TexturePtr)kCard, 192, 24) != 0)
+    if (ComboPlaceTitleCard_Show(gPlayState, (TexturePtr)kCard, 240, 24) != 0)
         sTitlePending = false;
 }
 void MarketText(u16* textId, bool* fromTable) {
+    using BlackMarketText::Page;
     if (Interior() && *textId == BlackMarketEntry::kUnavailableText) {
         CustomMessage::Entry entry;
-        entry.msg = "My wares aren't ready yet.\nCome back soon!\xBF";
+        entry.autoFormat = false;
+        entry.msg = BlackMarketText::Mm(Page::Unavailable, {}, {}, sNESFontWidths);
         CustomMessage::LoadCustomMessageIntoFont(entry);
         *fromTable = false;
         return;
@@ -365,46 +536,38 @@ void MarketText(u16* textId, bool* fromTable) {
     if (!Active() ||
         (*textId != kBrowseText && *textId != kResultText && *textId != kWelcomeText && *textId != kConfirmText))
         return;
-    CustomMessage::Entry entry;
-    if (*textId == kWelcomeText) {
-        entry.msg = "Welcome to the Black Market.\nLeft / Right: browse items\nA: Browse   B: Leave\x19";
-    } else if (*textId == kConfirmText) {
-        const auto* item = Offer(sSelected);
-        if (!item)
+    const Page page = *textId == kWelcomeText   ? Page::Welcome
+                      : *textId == kConfirmText ? Page::Confirm
+                      : *textId == kResultText  ? Page::Result
+                                                : Page::Browse;
+    BlackMarketText::Offer offer;
+    if (page != Page::Welcome) {
+        offer.item = Offer(sSelected);
+        if (!offer.item && page != Page::Result)
             return;
-        entry.firstItemCost = sSession.market["stock"][sSelected]["price"];
-        entry.msg = std::string(item->label) + " - " + std::to_string(entry.firstItemCost) +
-                    " rupees\n%g\xC2"
-                    "Buy\nCancel\xBF";
-    } else if (*textId == kResultText) {
-        entry.msg = sStatus + "\x19";
-    } else {
-        const Item* item = Offer(sSelected);
-        if (!item)
-            return;
-        const auto& stock = sSession.market["stock"][sSelected];
-        std::string label;
-        switch (Status(sSelected)) {
-            case PurchaseResult::SoldOut:
-                label = "Sold out";
-                break;
-            case PurchaseResult::Owned:
-                label = "Already owned";
-                break;
-            case PurchaseResult::Locked:
-                label = "Sealed: " + std::to_string(stock["clears"].get<int>()) + " dungeon clears";
-                break;
-            case PurchaseResult::Unavailable:
-                label = item->renewable ? "Empty bottle required" : "Prerequisite required";
-                break;
-            default:
-                label = "Tier " + std::to_string(item->tier);
-                break;
+        if (offer.item) {
+            offer.name = offer.item->label;
+            // Resolve the fixed item we deliver, without progressive/check conversion.
+            const auto id = ComboBlackMarketItems::Id(*offer.item);
+            const auto metadata = Rando::StaticData::Items.find(id);
+            if (id != RI_UNKNOWN && metadata != Rando::StaticData::Items.end() && metadata->second.name &&
+                metadata->second.name[0])
+                offer.name = metadata->second.name;
+            const auto& stock = sSession.market["stock"][sSelected];
+            offer.price = stock["price"].get<int>();
+            offer.clears = stock["clears"].get<int>();
+            offer.slot = sSelected;
+            if (page == Page::Browse)
+                offer.status = Status(sSelected);
         }
-        entry.firstItemCost = stock["price"];
-        entry.msg = std::string(item->label) + " - " + std::to_string(stock["price"].get<int>()) + " rupees\n" + label +
-                    " (" + std::to_string(sSelected + 1) + "/8)\nA: Select   B: Back\x19";
     }
+    CustomMessage::Entry entry;
+    entry.autoFormat = false; // The native MM codec/wrapper runs before raw choice controls are appended.
+    if (page != Page::Welcome)
+        entry.textboxYPos = 0x30; // Native header high nibble3: bottom, below the focused merchandise row.
+    if (page == Page::Browse || page == Page::Confirm)
+        entry.firstItemCost = offer.price;
+    entry.msg = BlackMarketText::Mm(page, offer, sStatus, sNESFontWidths);
     CustomMessage::LoadCustomMessageIntoFont(entry);
     *fromTable = false;
 }
@@ -412,7 +575,8 @@ void MarketText(u16* textId, bool* fromTable) {
 void DrawSeal(PlayState* play, const BlackMarketVisual::Frame& frame, bool selected) {
     using namespace BlackMarketVisual;
     const auto mesh = BuildLock(frame, play->gameplayFrames, selected);
-    if (!mesh.valid)
+    if (!mesh.valid ||
+        !BlackMarketGraphicsArena::HasRoom(play->state.gfxCtx, kLockVertices * sizeof(Vtx) + sizeof(Mtx), 8, 64))
         return;
     auto* vertices = (Vtx*)GRAPH_ALLOC(play->state.gfxCtx, kLockVertices * sizeof(Vtx));
     if (!vertices)
@@ -479,13 +643,17 @@ void DrawMarket() {
     if (!Interior() || !play->state.running)
         return;
     DrawShelves(play);
+    BlackMarketInteriorEffects::Draw(play, !sGrannyActive, false);
     if (!Active())
         return;
     for (int slot = 0; slot < 8; ++slot) {
         const Item* item = Offer(slot);
         if (!item)
             continue;
-        const bool locked = Status(slot) == PurchaseResult::Locked;
+        const auto status = Status(slot);
+        if (status == PurchaseResult::SoldOut && !item->renewable)
+            continue;
+        const bool locked = status == PurchaseResult::Locked;
         BlackMarketVisual::Capture capture(locked);
         Actor& display = sDisplays[slot];
         display.id = ACTOR_EN_GIRLA;
@@ -510,7 +678,7 @@ void PlayerUpdate(Actor* actor) {
     if (!Safe(play) || Player_InCsMode(play))
         return;
     if (Interior()) {
-        if (ComboBlackMarket_AtExit(actor->world.pos.x, actor->world.pos.y, actor->world.pos.z)) {
+        if (BlackMarketExitDoor::WalkExit<false>(play, actor->world.pos)) {
             RememberTravel();
             sReturnPending = true;
             Transition(play, ReturnEntrance());
@@ -549,6 +717,7 @@ void PlayerUpdate(Actor* actor) {
     }
 }
 void SceneInit(s8 scene, s8 spawn) {
+    CancelReceipt(true);
     sShelfFixture.Reset();
     EndBrowsing(gPlayState, true);
     GrannySceneBegin();
@@ -564,7 +733,7 @@ void SceneInit(s8 scene, s8 spawn) {
     if (scene == COMBO_BLACK_MARKET_SCENE) {
         sSelected = 0;
         sDisplays = {};
-        sTitlePending = Active() && PackAvailable();
+        sTitlePending = PackAvailable();
     } else if (sReturnPending && MatchesTravel() && Exterior(gPlayState)) {
         sReturnPending = false;
         Player* player = GET_PLAYER(gPlayState);
@@ -688,11 +857,13 @@ void RegisterMarket() {
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateUpdate>([] {
         MonitorBrowsing();
+        MonitorReceipt();
         PresentTitle();
     });
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayDestroy>([] {
         sShelfFixture.Reset();
         EndBrowsing(gPlayState, true);
+        CancelReceipt(true);
         sGrannyActive = sGrannyPending = false;
         sTitlePending = sTalking = sDoorArmed = false;
     });
@@ -760,6 +931,7 @@ void ComboBlackMarket_SaveState(nlohmann::json& save, int slot) {
     }
 }
 void ComboBlackMarket_LoadState(const nlohmann::json& save, int slot) {
+    CancelReceipt();
     const auto value = save.is_object() ? save.value("blackMarket", nlohmann::json()) : nlohmann::json();
     if (gComboGameMode == COMBO_GAME_MM) {
         sEntering = sReturnPending = sReturnStaged = sResumeFromMarket = false;
@@ -910,6 +1082,17 @@ void LogEntryRecovery() {
 }
 } // namespace
 extern "C" int ComboBlackMarket_TryDoorEntrance(PlayState* play, Actor* door) {
+    if (play == gPlayState && Interior() && BlackMarketExitDoor::Matches<false>(play, door)) {
+        const auto* player = GET_PLAYER(play);
+        if (!Safe(play) || sTalking || !player || player->doorActor != door ||
+            player->doorType != PLAYER_DOORTYPE_HANDLE || player->actionFunc != Player_Action_36 ||
+            gSaveContext.save.saveInfo.playerData.health <= 0)
+            return COMBO_BLACK_MARKET_DOOR_BLOCKED;
+        RememberTravel();
+        sReturnPending = true;
+        Transition(play, ReturnEntrance());
+        return COMBO_BLACK_MARKET_DOOR_ENTERED;
+    }
     BlackMarketDoorNative::Pose placed;
     if (play != gPlayState || !Exterior(play) || !BlackMarketDoorNative::Find(play, placed) ||
         !BlackMarketDoorNative::Matches(door, placed)) {

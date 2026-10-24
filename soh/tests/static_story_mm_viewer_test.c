@@ -33,7 +33,7 @@ static Vec3f* lastMonkeyPosition;
 static Vec3f* lastMonkeyStop;
 static bool monkeyAudioAvailable = true;
 s32 MmSfx_PlayAtPos(u16 id, Vec3f* pos) {
-    REQUIRE(id == 0x2901); /* Native MM NA_SE_EV_MONKEY_VO_JOY. */
+    REQUIRE(id == 0x2900); /* Native Woods of Mystery NA_SE_EV_MONKEY_VO_WALK. */
     REQUIRE(pos != NULL);
     if (!monkeyAudioAvailable)
         return 0;
@@ -42,7 +42,7 @@ s32 MmSfx_PlayAtPos(u16 id, Vec3f* pos) {
     return 1;
 }
 void MmSfx_StopAtPos(u16 id, Vec3f* pos) {
-    REQUIRE(id == 0x2901 && pos != NULL);
+    REQUIRE(id == 0x2900 && pos != NULL);
     ++monkeyStops;
     lastMonkeyStop = pos;
 }

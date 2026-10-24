@@ -1,8 +1,32 @@
 # Skiejer Black Market asset candidate
 
+## Current default source preparation
+
+The source candidate `poc/market-forest-followup-20261022` prepares its default
+market through `scripts/assets/prepare_native_market.py` and the normal
+`PrepareNativeMarketAssets` CMake dependency. Both port archives receive the
+retained room, original architecture/prop/shelf materials, original IA8 title
+with a black lettering edge, and a native interior handle door. Native pot
+vapor and pale violet torch effects are supplied by the controllers. This path
+does not require a supplemental market pack or any Djipi texture. An authored
+keeper remains optional; the existing native keeper is the fallback.
+
+The prepared graph has 141 resources; its immutable 125-resource geometry input
+is preserved separately. Old private scene/room/material/vertex/title overrides
+can replace the new defaults and should be excluded during default review.
+The optional Granny appearance is separate. Current scope, exact preservation
+and source/native-versus-runtime evidence are recorded in
+`docs/poc/market-forest-followup-20261022.md`.
+
+## Legacy optional pack authoring
+
+The following instructions describe the older standalone builder and its
+reproducible donor packs. They are not dependencies of current default source
+preparation.
+
 This builder creates private native MM and OoT resources for the isolated market source branch. It does not modify input donors or the accepted POC9 Lost Woods archive. The editable output directory sits beside the output O2R; it contains native resource/XML sources, not a Prelude project file.
 
-The current presentation candidate is **Black Market POC12 KeeperLean**, paired
+The earlier standalone presentation candidate was **Black Market POC12 KeeperLean**, paired
 with the cumulative shop/forest source. It selects the retained native Sway
 crossed-arm lean and positions her at `(0,1,130)` behind the counter using
 `combo/BlackMarketKeeper.h`. `keeper_lean.py` reproduces this bounded update from

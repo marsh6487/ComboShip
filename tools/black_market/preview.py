@@ -125,9 +125,10 @@ def render(rows,textures,tick,title,*,keeper=None,placement=None,stock=(),shelve
     image=Image.fromarray(pixels[::-1].copy(),"RGBA")
     if title:
         data=title[80:]
-        alpha=Image.frombytes("L",(192,24),bytes((p&15)*17 for p in data)).resize((576,72))
-        white=Image.new("RGBA",alpha.size,(245,241,255,255));white.putalpha(alpha)
-        image.alpha_composite(white,((gpu.W-576)//2,(gpu.H-72)//2))
+        rgba=bytes(channel for p in data for channel in ((p>>4)*17,(p>>4)*17,(p>>4)*17,(p&15)*17))
+        size=(192*gpu.W//320,24*gpu.H//240)
+        card=Image.frombytes("RGBA",(192,24),rgba).resize(size,Image.Resampling.LANCZOS)
+        image.alpha_composite(card,((gpu.W-size[0])//2,(gpu.H-size[1])//2))
     image=image.convert('RGB')
     image.info['stock_markers']=[(slot+1,project(np.array(pos)+[0,5,0],view,fov)) for slot,pos in enumerate(shelves)] if show_stock else []
     image.info['clears']=clears

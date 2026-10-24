@@ -35,8 +35,13 @@ def main():
     request = ""
     if consume + "(" in boot:
         request = re.search(r"static s32 sComboCrossGameTitleCardPending[^;]*;", boot)[0]
+        request += "\n" + re.search(r"static s32 sComboCustomTitleCardPresentation[^;]*;", boot)[0]
+        request += "\n" + block_from(boot, boot.index("int Combo_SOH_SwapCustomTitleCardPresentation("))
+        request += "\n" + block_from(boot, boot.index("int Combo_SOH_IsPresentingCustomTitleCard("))
         request += "\n" + block_from(boot, boot.index("int " + consume + "("))
         request += "\n" + block_from(boot, boot.index("int Combo_SOH_HasCrossGameTitleCard("))
+        if "void Combo_SOH_RequestCrossGameTitleCard(" in boot:
+            request += "\n" + block_from(boot, boot.index("void Combo_SOH_RequestCrossGameTitleCard("))
         request = "#ifdef COMBO_BUILD\n" + request + "\n#endif\n"
     texture_headers = "\n".join(re.findall(r'^#include "textures/place_title_cards/[^\n]+', actor, re.M))
     native = functions(actor, ("TitleCard_InitPlaceName", "TitleCard_Update"))
@@ -52,6 +57,10 @@ def main():
     fixture = fixture.replace("/* ARRIVAL_BODY */", block_from(portal, portal.index('extern "C" void SOH_ApplyComboPortalArrival(')))
     fixture = fixture.replace("/* NATIVE_TITLE_CARD */", "\n".join([library["Math_StepToS"], *native.values()]))
     fixture = fixture.replace("/* PLAYER_SELECTION */", selection)
+    fixture = fixture.replace("/* CUSTOM_TRANSITIONS */", "\n".join(block_from((ROOT / path).read_text(),
+        (ROOT / path).read_text().index(signature)) for path, signature in (
+            ("soh/soh/Enhancements/Gameplay/ComboBlackMarketNative.cpp", "void Transition("),
+            ("soh/soh/Enhancements/Gameplay/ComboSoloForest.cpp", "void ForestTransition("))))
     fixture = fixture.replace("/* ENTRANCE_TABLE */", table + "\n#undef DEFINE_ENTRANCE\n")
     includes = ("soh", "soh/soh", "soh/include", "soh/src", "soh/assets", "libultraship/include", "combo")
     flags = ["-std=c++20", "-fpermissive", "-w", "-fmax-errors=5", "-DF3DEX_GBI_2", "-DFMT_HEADER_ONLY",

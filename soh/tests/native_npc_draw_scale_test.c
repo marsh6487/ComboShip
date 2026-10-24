@@ -110,8 +110,9 @@ int main(void) {
     void* lodSkeleton[] = { &lodRoot, &lodChild };
     memcpy(saved, joints, sizeof(saved));
     play.state.gfxCtx = &context;
-    for (int factor = 0; factor < 2; ++factor) {
-        requestedScale = factor ? 1.f : 1.10f;
+    const float factors[] = { 1.10f, 1.f, 1.25f };
+    for (int factor = 0; factor < 3; ++factor) {
+        requestedScale = factors[factor];
         for (int route = 0; route < 4; ++route) {
             memset(&current, 0, sizeof(current));
             current.xx = current.yy = current.zz = .01f;

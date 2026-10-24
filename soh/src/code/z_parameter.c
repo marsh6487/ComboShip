@@ -2930,14 +2930,17 @@ void func_80086D5C(s32* buf, u16 size) {
 
 void Interface_LoadActionLabel(InterfaceContext* interfaceCtx, u16 action, s16 loadOffset) {
     static void* sDoActionTextures[] = { gAttackDoActionENGTex, gCheckDoActionENGTex };
-    if (action >= DO_ACTION_MAX) {
+    if ((action >= DO_ACTION_MAX) && (action != DO_ACTION_EXPLODE)) {
         action = DO_ACTION_NONE;
     }
 
-    char* doAction = actionsTbl[action];
+    // The MM pack already supplies the same 48x16 IA4 action texture used by OoT.
+    // It has only an English asset, so do not synthesize missing locale paths.
+    char* doAction =
+        action == DO_ACTION_EXPLODE ? "__OTR__do_action_static/gDoActionExplodeENGTex" : actionsTbl[action];
 
     static char newName[4][512];
-    if (gSaveContext.language != LANGUAGE_ENG) {
+    if ((action != DO_ACTION_EXPLODE) && (gSaveContext.language != LANGUAGE_ENG)) {
         size_t length = strlen(doAction);
         strcpy(newName[loadOffset], doAction);
         if (gSaveContext.language == LANGUAGE_FRA) {

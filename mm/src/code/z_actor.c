@@ -23,6 +23,7 @@
 #include "overlays/actors/ovl_En_Part/z_en_part.h"
 #include "overlays/actors/ovl_En_Box/z_en_box.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
+#include "render/SwordFinishIceMaterial.h"
 #include "objects/gameplay_dangeon_keep/gameplay_dangeon_keep.h"
 #include "objects/object_bdoor/object_bdoor.h"
 
@@ -5710,6 +5711,7 @@ void Actor_DrawDamageEffects(PlayState* play, Actor* actor, Vec3f bodyPartsPos[]
         Vec3f* bodyPartsPosStart = bodyPartsPos;
         u32 gameplayFrames = play->gameplayFrames;
         f32 effectAlphaScaled;
+        Gfx* iceMaterial;
 
         currentMatrix = Matrix_GetCurrent();
 
@@ -5733,6 +5735,9 @@ void Actor_DrawDamageEffects(PlayState* play, Actor* actor, Vec3f bodyPartsPos[]
         switch (type) {
             case ACTOR_DRAW_DMGEFF_FROZEN_NO_SFX:
             case ACTOR_DRAW_DMGEFF_FROZEN_SFX:
+                iceMaterial = (actor != NULL && DinFireSword_UseIceMaterial(play, actor))
+                                  ? SwordFinishIce_GetDisplayList(gameplayFrames)
+                                  : NULL;
                 frozenScale = ((KREG(19) * 0.01f) + 2.3f) * effectScale;
                 steamScale = ((KREG(28) * 0.0001f) + 0.035f) * frozenSteamScale;
                 func_800BCC68(bodyPartsPos, play);
@@ -5742,8 +5747,9 @@ void Actor_DrawDamageEffects(PlayState* play, Actor* actor, Vec3f bodyPartsPos[]
                 gSPSegment(POLY_XLU_DISP++, 0x08,
                            Gfx_TwoTexScrollEx(play->state.gfxCtx, 0, 0, gameplayFrames & 0xFF, 32, 16, 1, 0,
                                               (gameplayFrames * 2) & 0xFF, 64, 32, 0, 1, 0, 2));
-                gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, 170, 255, 255, 255);
-                gSPDisplayList(POLY_XLU_DISP++, gEffIceFragment2MaterialDL);
+                gDPSetPrimColor(POLY_XLU_DISP++, 0, 0x80, iceMaterial ? 95 : 170, iceMaterial ? 165 : 255,
+                                iceMaterial ? 215 : 255, 255);
+                gSPDisplayList(POLY_XLU_DISP++, iceMaterial ? iceMaterial : gEffIceFragment2MaterialDL);
 
                 effectAlphaScaled = effectAlpha * 255.0f;
 
@@ -5759,7 +5765,8 @@ void Actor_DrawDamageEffects(PlayState* play, Actor* actor, Vec3f bodyPartsPos[]
                         alpha = 255.0f;
                     }
 
-                    gDPSetEnvColor(POLY_XLU_DISP++, KREG(20) + 200, KREG(21) + 200, KREG(22) + 255, (u8)alpha);
+                    gDPSetEnvColor(POLY_XLU_DISP++, iceMaterial ? 230 : KREG(20) + 200,
+                                   iceMaterial ? 250 : KREG(21) + 200, iceMaterial ? 255 : KREG(22) + 255, (u8)alpha);
 
                     Matrix_Translate(bodyPartsPos->x, bodyPartsPos->y, bodyPartsPos->z, MTXMODE_NEW);
                     Matrix_Scale(frozenScale, frozenScale, frozenScale, MTXMODE_APPLY);

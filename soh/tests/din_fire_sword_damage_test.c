@@ -34,6 +34,21 @@ void GameInteractor_ExecuteOnActorKill(void* actor) {
 }
 void MmSfx_StopAtPos(u16 sound, Vec3f* pos) {
 }
+void Audio_StopSfxByPosAndId(Vec3f* pos, u16 sound) {
+    REQUIRE(pos != NULL);
+    REQUIRE(sound == NA_SE_EV_ICE_FREEZE - SFX_FLAG);
+}
+static unsigned fixedSoundRequests;
+static Vec3f fixedSoundPosition;
+static u16 fixedSound;
+void SoundSource_PlaySfxAtFixedWorldPos(PlayState* state, Vec3f* pos, s32 duration, u16 sound) {
+    REQUIRE(state == &play && pos != NULL);
+    REQUIRE(duration == 24);
+    REQUIRE(sound == NA_SE_IT_EXPLOSION_ICE || sound == NA_SE_EV_BURN_OUT);
+    ++fixedSoundRequests;
+    fixedSoundPosition = *pos; // The native sound source copies the world position.
+    fixedSound = sound;
+}
 void TimeCtl_NoteAcCollider(Collider* collider) {
 }
 uint8_t GameInteractor_SecondCollisionUpdate(void) {
@@ -132,6 +147,39 @@ static Actor hit(s16 actorId, DamageTable* table, u32 mask, ColliderInfo* atInfo
         CollisionCheck_ApplyDamage(&play, &play.colChkCtx, &collider, &info);
     }
     return *actor;
+}
+
+static void testAcceptedIceAudio(void) {
+    setupSword(1);
+    elementalSelection = elementalActive = 2;
+    ColliderInfo* attack = setStrike(DMG_SLASH_MASTER);
+    Actor target = { 0 };
+    target.id = ACTOR_EN_WF;
+    target.category = ACTORCAT_ENEMY;
+    target.world.pos = (Vec3f){ 10, 20, 30 };
+    target.colChkInfo.health = 8;
+    target.colChkInfo.damageTable = Test_WolfosTable();
+    ColliderCylinder receiver = { 0 };
+    receiver.base.actor = &target;
+    receiver.base.acFlags = AC_HIT;
+    receiver.base.shape = COLSHAPE_CYLINDER;
+    receiver.dim = (Cylinder16){ 20, 60, 0, { 10, 20, 30 } };
+    receiver.info.bumperFlags = BUMP_HIT;
+    receiver.info.bumper.dmgFlags = 0xFFCFFFFF;
+    receiver.info.acHitInfo = attack;
+    REQUIRE(!CollisionCheck_NoSharedFlags(attack, &receiver.info));
+    fixedSoundRequests = 0;
+    CollisionCheck_ApplyDamage(&play, &play.colChkCtx, &receiver.base, &receiver.info);
+    CHECK("accepted ice collision preserves native damage and reaction",
+          target.colChkInfo.damage == 2 && target.colChkInfo.damageEffect == 0 && target.colChkInfo.health == 8);
+    CHECK("accepted ice collision emits one native impact",
+          fixedSoundRequests == 1 && fixedSound == NA_SE_IT_EXPLOSION_ICE);
+    CHECK("impact emitter copies the victim's world position",
+          fixedSoundPosition.x == 10 && fixedSoundPosition.y == 20 && fixedSoundPosition.z == 30);
+    CollisionCheck_ApplyDamage(&play, &play.colChkCtx, &receiver.base, &receiver.info);
+    CHECK("overlapping ice collisions preserve damage accumulation and share one impact",
+          target.colChkInfo.damage == 4 && fixedSoundRequests == 1);
+    DinFireSword_FinishTeardown(&play);
 }
 
 static void testSwordHits(void) {
@@ -368,6 +416,7 @@ static void testNativeReactions(void) {
 
 #ifndef ELEMENTAL_SWORD_DAMAGE_FIXTURE
 int main(void) {
+    testAcceptedIceAudio();
     testSwordHits();
     testIsolation();
     testLiveAgeChanges();

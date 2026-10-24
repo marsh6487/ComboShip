@@ -2513,6 +2513,14 @@ void CosmeticsEditorWindow::DrawElement() {
             DrawCosmeticGroup(COSMETICS_GROUP_GLOVES);
             DrawCosmeticGroup(COSMETICS_GROUP_MIRRORSHIELD);
             DrawCosmeticGroup(COSMETICS_GROUP_EQUIPMENT);
+            UIWidgets::CVarCheckbox(
+                "Use Vanilla Held Swords", "gEnhancements.SkijerNEI.UseVanillaHeldSwords",
+                UIWidgets::CheckboxOptions()
+                    .DefaultValue(false)
+                    .Color(THEME_COLOR)
+                    .Tooltip("Use the original held sword models in both games (the legacy model for Four Sword). "
+                             "Turn off to keep the authored models. Selected custom models retain priority. "
+                             "Changes apply immediately and do not affect pickup or shop models."));
             DrawCosmeticGroup(COSMETICS_GROUP_SWORDS);
             DrawCosmeticGroup(COSMETICS_GROUP_CONSUMABLE);
             ImGui::EndTabItem();

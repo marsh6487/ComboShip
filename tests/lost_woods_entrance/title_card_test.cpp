@@ -75,7 +75,7 @@ extern "C" Gfx* Gfx_SetupDL52_NoCD(Gfx* gfx) { return gfx; }
 static PlayState play;
 static GraphicsContext graphics;
 static Gfx overlay[128], opaque[128], translucent[128];
-static const char* kTexture = "textures/g_pn_36/gLostWoodsTitleCardENGTex";
+static const char* kTexture = "custom/oot_location_titles/v1/lost_woods";
 
 static void Reset() {
     for (const auto& fn : GameInteractor::OnPlayDestroy::callbacks) fn();
@@ -98,7 +98,7 @@ static void Reset() {
     playerInCutscene = hideTitleCards = false;
     auto owner = std::make_shared<Ship::ResourceManager>();
     owner->archive->files.insert(kTexture);
-    Ship::CrossRMRegistry::managers = {{"oot", owner}};
+    Ship::CrossRMRegistry::managers = {{"mm", owner}};
 }
 
 static void Arrive() {
@@ -154,7 +154,7 @@ int main() {
     Require(card.durationTimer == 80 && card.delayTimer == 20 && card.alpha == 0 && card.intensity == 0,
             "the place card must retain native OoT delay and MM fade timing");
     Require(!std::strcmp((const char*)card.texture,
-                        "__OTR__@oot:textures/g_pn_36/gLostWoodsTitleCardENGTex"),
+                        "__OTR__@mm:custom/oot_location_titles/v1/lost_woods"),
             "the title must use the exact OoT Lost Woods texture through its owning resource manager");
     /* ROUTED_ALIGNMENT */
     for (int i = 0; i < 45; ++i) Tick();
@@ -182,27 +182,27 @@ int main() {
     Require(!std::memcmp(&directLoad, &gSaveContext, sizeof(directLoad)),
             "a direct-load title must not rewrite native cutscene/title state");
 
-    // The OoT owner retains its own Alt choice. Both modes submit the logical
+    // The MM owner retains its own Alt choice. Both modes submit the logical
     // card path, allowing the real ResourceManager's native Alt fallback.
     for (bool alt : {false, true}) {
         Reset();
-        Ship::CrossRMRegistry::managers["oot"]->alt = alt;
+        Ship::CrossRMRegistry::managers["mm"]->alt = alt;
         Arrive(); Tick();
-        Require(CardActive(), "native and Djipi-enabled OoT owners must both supply the card");
+        Require(CardActive(), "native and Djipi-enabled MM owners must both supply the card");
         Require(!std::strcmp((const char*)play.actorCtx.titleCtx.texture,
-                            "__OTR__@oot:textures/g_pn_36/gLostWoodsTitleCardENGTex"),
+                            "__OTR__@mm:custom/oot_location_titles/v1/lost_woods"),
                 "the card path must allow the owning resource manager to select native or Djipi");
     }
     Reset();
-    auto owner = Ship::CrossRMRegistry::managers["oot"];
+    auto owner = Ship::CrossRMRegistry::managers["mm"];
     owner->alt = true;
     owner->archive->files.clear();
     owner->archive->files.insert(std::string("alt/") + kTexture);
     Arrive(); Tick();
-    Require(CardActive(), "an installed Alt-only Lost Woods card is valid when OoT Alt is enabled");
+    Require(CardActive(), "an installed Alt-only Lost Woods card is valid when MM Alt is enabled");
     for (bool alt : {false, true}) {
         Reset();
-        owner = Ship::CrossRMRegistry::managers["oot"];
+        owner = Ship::CrossRMRegistry::managers["mm"];
         owner->alt = alt;
         owner->archive->files.clear();
         owner->archive->files.insert((alt ? std::string("alt/") : std::string()) + kTexture + ".meta");
@@ -210,21 +210,21 @@ int main() {
         Require(CardActive(), "native and Alt texture metadata aliases must be recognized as available cards");
     }
     Reset();
-    Ship::CrossRMRegistry::managers.erase("oot");
-    // An identically named host asset must never stand in for the donor.
-    Ship::CrossRMRegistry::managers["mm"] = owner;
+    Ship::CrossRMRegistry::managers.erase("mm");
+    // An identically named foreign asset must never stand in for the MM owner.
+    Ship::CrossRMRegistry::managers["oot"] = owner;
     Arrive(); Tick();
-    Require(!CardActive(), "missing OoT owner must safely skip rather than borrow host textures");
+    Require(!CardActive(), "missing MM owner must safely skip rather than borrow foreign textures");
     Reset();
-    Ship::CrossRMRegistry::managers["oot"]->archive->files.clear();
+    Ship::CrossRMRegistry::managers["mm"]->archive->files.clear();
     Arrive(); Tick();
     Require(!CardActive(), "a missing native and Alt card must safely skip drawing");
     Reset();
-    owner = Ship::CrossRMRegistry::managers["oot"];
+    owner = Ship::CrossRMRegistry::managers["mm"];
     owner->archive->files.clear();
     owner->archive->files.insert(std::string("alt/") + kTexture);
     Arrive(); Tick();
-    Require(!CardActive(), "an Alt-only card must not be submitted while OoT Alt is disabled");
+    Require(!CardActive(), "an Alt-only card must not be submitted while MM Alt is disabled");
 
     for (int variant = 0; variant < 10; ++variant) {
         Reset();

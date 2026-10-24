@@ -66,6 +66,9 @@ static void RequireMixFrame(int16_t expected) {
     int16_t buffer[2] = { 100, -100 };
     WeatherSamplePlayer_Mix(buffer, 1);
     REQUIRE(buffer[0] - 100 == buffer[1] + 100);
+    if (buffer[0] != expected)
+        fprintf(stderr, "weather mix: expected %d, got %d (native rain tracked=%d)\n", expected, buffer[0],
+                Audio_IsNatureRainEnabled());
     REQUIRE(buffer[0] == expected);
     WeatherSfxEngine_Refresh();
 }
@@ -150,6 +153,94 @@ static void TestPlacedWeatherRainUsesPrivateLoop() {
     GlobalOutdoorRain_SetNativeRequest(&play, &play, 0, 0);
     GlobalOutdoorRain_Resolve(&play);
     SetNatureRain(false);
+}
+
+static void TestSeasonalRainUsesPrivateLoopWithNativeAmbience() {
+    // Spring and Autumn share this request boundary. A tracked native rain
+    // channel must not make their authored, slider-controlled loop disappear.
+    for (bool nativeRain : { false, true }) {
+        WeatherSamplePlayer_Init();
+        GlobalOutdoorRain_Reset();
+        WeatherSfxEngine_Reset();
+        WeatherSfxEngine_StartDenseFlameHub();
+        SetNatureRain(nativeRain);
+        sEnabled = 0;
+        sRainVolume = 100;
+        PlayState play = {};
+
+        GlobalOutdoorRain_SetSeasonRequest(&play, 30, 1.0f, false);
+        REQUIRE(play.envCtx.unk_EE[0] == 30);
+        RequireMixFrame(101);
+        REQUIRE(!Audio_IsNatureRainEnabled());
+
+        REQUIRE(WeatherSamplePlayer_Play("audio/samples/Low Thunder_META", 1.0f));
+        REQUIRE(WeatherSamplePlayer_Play("audio/samples/Lightning_META", 1.0f));
+        RequireMixFrame(107);
+
+        sRainVolume = 0;
+        GlobalOutdoorRain_SetSeasonRequest(&play, 30, 1.0f, false);
+        REQUIRE(play.envCtx.unk_EE[0] == 30);
+        RequireMixFrame(105);
+        sRainVolume = 100;
+        GlobalOutdoorRain_SetSeasonRequest(&play, 30, 1.0f, false);
+        RequireMixFrame(106);
+
+        GlobalOutdoorRain_SetSeasonRequest(&play, 0, 0.0f, false);
+        REQUIRE(play.envCtx.unk_EE[0] == 0);
+        RequireMixFrame(105);
+    }
+    GlobalOutdoorRain_Reset();
+    SetNatureRain(false);
+    sEnabled = 1;
+}
+
+static void TestSeasonalRainYieldsToLiveSongOfStorms() {
+    WeatherSamplePlayer_Init();
+    GlobalOutdoorRain_Reset();
+    WeatherSfxEngine_Reset();
+    WeatherSfxEngine_StartDenseFlameHub();
+    sEnabled = 0;
+    sRainVolume = 100;
+    PlayState play = {};
+
+    // Song of Storms owns a separate native target; it does not register a
+    // placed-weather request. Seasonal wet/dry changes must leave it audible.
+    play.envCtx.unk_F2[0] = 20;
+    play.envCtx.lightningMode = LIGHTNING_MODE_ON;
+    SetNatureRain(true);
+    Audio_SetNatureAmbienceChannelIO(0x0F, 1, 1);
+    GlobalOutdoorRain_SetSeasonRequest(&play, 30, 1.0f, false);
+    RequireMixFrame(100); // native rain owns the channel, no duplicate loop
+    REQUIRE(Audio_IsNatureRainEnabled());
+    REQUIRE(sNatureWeather.natureLightningEnabled);
+    GlobalOutdoorRain_SetSeasonRequest(&play, 0, 0.0f, false);
+    RequireMixFrame(100);
+    REQUIRE(Audio_IsNatureRainEnabled());
+    REQUIRE(play.envCtx.unk_F2[0] == 20);
+    REQUIRE(play.envCtx.lightningMode == LIGHTNING_MODE_ON);
+
+    // Native teardown releases the channel; seasonal rain can then acquire
+    // its private loop. A new storm arriving afterward must take it back.
+    play.envCtx.unk_F2[0] = 0;
+    SetNatureRain(false);
+    Audio_SetNatureAmbienceChannelIO(0x0F, 1, 0);
+    GlobalOutdoorRain_SetSeasonRequest(&play, 30, 1.0f, false);
+    RequireMixFrame(101);
+    REQUIRE(play.envCtx.unk_EE[1] == 0);
+    play.envCtx.unk_F2[0] = 20;
+    SetNatureRain(true);
+    Audio_SetNatureAmbienceChannelIO(0x0F, 1, 1);
+    GlobalOutdoorRain_Resolve(&play);
+    RequireMixFrame(100);
+    REQUIRE(Audio_IsNatureRainEnabled());
+    GlobalOutdoorRain_SetSeasonRequest(&play, 0, 0.0f, false);
+    RequireMixFrame(100);
+    REQUIRE(Audio_IsNatureRainEnabled());
+    REQUIRE(sNatureWeather.natureLightningEnabled);
+    GlobalOutdoorRain_Reset();
+    SetNatureRain(false);
+    Audio_SetNatureAmbienceChannelIO(0x0F, 1, 0);
+    sEnabled = 1;
 }
 
 static void TestRemainingNativeOwnerKeepsRain() {
@@ -300,6 +391,8 @@ int main() {
     TestDenseFlameHubDoesNotStealNaviOrThunder();
     TestNaviEmergenceSurvivesEnvironmentBankSaturation();
     TestPlacedWeatherRainUsesPrivateLoop();
+    TestSeasonalRainUsesPrivateLoopWithNativeAmbience();
+    TestSeasonalRainYieldsToLiveSongOfStorms();
 
     // Overcast follows the enhanced rain lifecycle, stays off fixed skies,
     // and is reclaimed by the incoming PlayState without restarting audio.

@@ -36,6 +36,17 @@ void CollisionCheck_HitEffects(PlayState* state, Collider* at, ColliderElement* 
 }
 void AudioSfx_StopByPosAndId(Vec3f* position, u16 sound) {
 }
+static unsigned fixedSoundRequests;
+static Vec3f fixedSoundPosition;
+static u16 fixedSound;
+void SoundSource_PlaySfxAtFixedWorldPos(PlayState* state, Vec3f* position, u32 duration, u16 sound) {
+    REQUIRE(state == &play && position != NULL);
+    REQUIRE(duration == 24);
+    REQUIRE(sound == NA_SE_IT_EXPLOSION_ICE || sound == NA_SE_EV_BURN_OUT);
+    ++fixedSoundRequests;
+    fixedSoundPosition = *position; // The native sound source copies the world position.
+    fixedSound = sound;
+}
 u8 TridentChargeBall_GetFierceDamage(Actor* actor) {
     (void)actor;
     return 0;
@@ -160,6 +171,37 @@ static void Strike(int weapon, int strong) {
             break;
     }
     func_8083375C(&player, strong ? PLAYER_MWA_JUMPSLASH_START : PLAYER_MWA_FORWARD_SLASH_1H);
+}
+
+static void AcceptedIceAudio(void) {
+    SetupDamage();
+    elementalSelection = elementalActive = 2;
+    Strike(0, 0);
+    ColliderElement* attack = &player.meleeWeaponQuads[0].elem;
+    Actor target = { 0 };
+    target.id = ACTOR_EN_WF;
+    target.category = ACTORCAT_ENEMY;
+    target.world.pos = (Vec3f){ 10, 20, 30 };
+    target.colChkInfo.health = 8;
+    target.colChkInfo.damageTable = Test_WolfosTable();
+    ColliderCylinder receiver = { 0 };
+    receiver.base.actor = &target;
+    receiver.base.acFlags = AC_HIT;
+    receiver.base.shape = COLSHAPE_CYLINDER;
+    receiver.dim = (Cylinder16){ 20, 60, 0, { 10, 20, 30 } };
+    receiver.elem.acElemFlags = ACELEM_HIT;
+    receiver.elem.acDmgInfo.dmgFlags = 0xFFFFFFFF;
+    receiver.elem.acHit = &player.meleeWeaponQuads[0].base;
+    receiver.elem.acHitElem = attack;
+    REQUIRE(!CollisionCheck_NoSharedFlags(attack, &receiver.elem));
+    fixedSoundRequests = 0;
+    CollisionCheck_ApplyDamage(&play, &play.colChkCtx, &receiver.base, &receiver.elem);
+    REQUIRE(target.colChkInfo.damage == 1 && target.colChkInfo.damageEffect == 3 && target.colChkInfo.health == 8);
+    REQUIRE(fixedSoundRequests == 1 && fixedSound == NA_SE_IT_EXPLOSION_ICE);
+    REQUIRE(fixedSoundPosition.x == 10 && fixedSoundPosition.y == 20 && fixedSoundPosition.z == 30);
+    CollisionCheck_ApplyDamage(&play, &play.colChkCtx, &receiver.base, &receiver.elem);
+    REQUIRE(target.colChkInfo.damage == 1 && fixedSoundRequests == 1);
+    DinFireSword_FinishTeardown(&play);
 }
 
 static Actor RequireHit(s16 actorId, DamageTable* table, ColliderElement* attack, u32 receiverFlags, int damage,
@@ -526,6 +568,7 @@ static void NativeSoulAdmission(void) {
 
 #ifndef ELEMENTAL_SWORD_DAMAGE_FIXTURE
 int main(void) {
+    AcceptedIceAudio();
     NativeSoulAdmission();
     puts("PASS MM Din: native soul hook gates Chuchu/Deku Baba, permits Kusa/Grass, both fire checkboxes off/on");
     NativeDamageAndReactions();

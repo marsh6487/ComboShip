@@ -17,6 +17,7 @@ extern uint8_t SwordElement_HasSelection(uint16_t item) __attribute__((weak));
 extern uint8_t SwordElement_Set(uint16_t item, uint8_t element) __attribute__((weak));
 extern uint8_t SwordElement_ForItem(uint16_t item) __attribute__((weak));
 extern uint8_t SwordElement_Active(PlayState* play, Player* player) __attribute__((weak));
+extern uint8_t SwordElement_IsRegularSword(PlayState* play, Player* player) __attribute__((weak));
 
 #define REQUIRE(c) do { if (!(c)) { fprintf(stderr, "FAIL line %d: %s\n", __LINE__, #c); exit(1); } } while (0)
 SaveContext gSaveContext;
@@ -77,6 +78,7 @@ uint8_t GameInteractor_InvisibleLinkActive(void) { return 0; }
 #endif
 
 int main(void) {
+    REQUIRE(SwordElement_IsRegularSword != NULL);
     REQUIRE(SwordElement_Set != NULL); // Fails against the unmodified baseline.
     memset(&nei, 0, sizeof(nei));
     memset(&gSaveContext, 0, sizeof(gSaveContext));
@@ -147,6 +149,13 @@ int main(void) {
     player.actor.scale.y = 1.0f;
     player.heldItemId = ITEM_SWORD_KOKIRI;
     player.heldItemAction = PLAYER_IA_SWORD_KOKIRI;
+    REQUIRE(SwordElement_IsRegularSword(&play, &player));
+    player.heldItemId = ITEM_SWORD_MASTER;
+    player.heldItemAction = PLAYER_IA_SWORD_MASTER;
+    REQUIRE(SwordElement_Active(&play, &player) == 0);
+    REQUIRE(SwordElement_IsRegularSword(&play, &player));
+    player.heldItemId = ITEM_SWORD_KOKIRI;
+    player.heldItemAction = PLAYER_IA_SWORD_KOKIRI;
     REQUIRE(SwordElement_Active(&play, &player) == 1);
     // An override works before its arrow is acquired and cannot rewrite the
     // saved per-sword choice. Disabling it restores that choice immediately.
@@ -164,8 +173,10 @@ int main(void) {
         REQUIRE(SwordElement_Active(&play, &player) == 1);
     }
     Player remote = player;
+    REQUIRE(!SwordElement_IsRegularSword(&play, &remote));
     REQUIRE(SwordElement_Active(&play, &remote) == 0);
     transformed = 1;
+    REQUIRE(!SwordElement_IsRegularSword(&play, &player));
     REQUIRE(SwordElement_Active(&play, &player) == 0);
     transformed = NO_CUSTOM_FORM;
     otherOwner = 1;
@@ -175,6 +186,7 @@ int main(void) {
     REQUIRE(SwordElement_Active(&play, &player) == 0);
     bossOwner = 0;
     player.heldItemId = ITEM_BOW;
+    REQUIRE(!SwordElement_IsRegularSword(&play, &player));
     REQUIRE(SwordElement_Active(&play, &player) == 0);
     REQUIRE(MAGIC == 37);
 #ifdef SWORD_ELEMENT_TEST_COMBAT

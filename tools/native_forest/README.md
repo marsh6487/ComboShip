@@ -102,6 +102,19 @@ source TexAnim bytes are unchanged. OoT's Blob velocities already negate MM's
 serialized Y velocity and bind both opaque and translucent draw contexts.
 The runtime Blob factory's sixteen padding bytes are not serialized.
 
+Build preparation's separately pinned `presentation_polish` version 2 retains
+the immutable ZIP and applies the existing portal/sign polish plus the ramp
+material repair. The ramp now calls segment 8 after loading its I8 mask onto
+render tile 1, reusing the exact authored second layer (32×64, Y velocity -1)
+in both ports. The original six tracks, every texture and the ramp's vertices,
+UVs, triangles and collision stay unchanged. After the last ramp triangle,
+`mirror_access_root` restores the room's two-cycle/fog/tile-zero pipeline.
+Native bark display lists already set `G_TT_NONE` and retain their exact native
+texture hashes; they depend on that room pipeline. Leaving the ramp's one-cycle
+state active made tree/stump/tunnel bark change with the cullable draw order.
+The derived material and root bytes are checked against the version-2 receipt
+before either port is written. Source rebakes still consume the original ZIP.
+
 Per-host `dependencies_{combined,mm,oot}_v1` Blobs contain every generated
 shared resource plus that host's scene/collision/three rooms, and separately
 all external stock dependencies. A missing addition or native stock owner
@@ -129,6 +142,7 @@ must be a new path, and every donor identity is checked before output writing.
 
 ```sh
 python3 -B -m unittest discover -s tests/native_forest -p 'test_*.py' -v
+python3 -B tests/native_forest/run_material_loader_tests.py
 python3 -B tests/black_market/run_solo_forest_tests.py --native
 python3 -B scripts/assets/prepare_native_forest.py --output-root /temporary/source
 ```
@@ -142,6 +156,12 @@ and the real CMake archive dependency. Access integration independently removes
 the appended 16/28/1 records and verifies exact native collision hashes,
 checks one visible/colliding log per room and idempotent rebaking. Native
 control tests remain separate.
+The material-loader fixture compiles the actual XML and binary factories and
+checks ramp/native-stump draw orders under ASan/UBSan. Its optional
+`--tinyxml2-root` points at a materialized tinyxml2 source checkout when the
+normal `ZAPDTR/lib/tinyxml2` submodule is unavailable. The placement fixture runs
+the real MM Saria/Epona spawn bodies, including duplicate guards, and checks
+their portal-local ±120/depth-120 footprints against retained native collision.
 These are source/resource/native-fixture checks. Configured gameplay rendering,
 pause/re-entry, shop access, solo return routes and user acceptance remain
 unverified; no master is promoted.

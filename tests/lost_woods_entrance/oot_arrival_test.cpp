@@ -2,13 +2,16 @@
 #include <cstdlib>
 #include <cstring>
 #include "global.h"
+#include "gameplay/CrossGameTitleCard.h"
 #include "soh/Enhancements/randomizer/randomizer_entrance.h"
 #include "entrances/LostWoodsEntrance.h"
+#include "entrances/RegionalPassages.h"
 
 SaveContext gSaveContext;
 static int gComboReturnFileNum = 1;
 static int sComboReturnPortalRoute = COMBO_PORTAL_LOST_WOODS;
 static s32 sComboCrossGameTitleCardPending;
+static s32 sComboCustomTitleCardPresentation;
 static int loadHooks, exitHooks;
 static int crossArrival = -1, bossRecovery = -1, fwArrival = -1;
 static int fallbackLookups;
@@ -52,12 +55,18 @@ extern "C" void Title_Init(GameState*) {}
 #undef osSyncPrintf
 #define osSyncPrintf(...) ((void)0)
 
+static int regionalArrival;
+extern "C" int ComboRegionalPassagesOot_ApplyArrival(int route) { regionalArrival=route; return 1; }
+
 /* ARRIVAL_BODY */
 /* BOOT_BODY */
 
 int main() {
     GameState state{};
+    sComboCustomTitleCardPresentation = true;
     TitleSetup_InitImpl(&state);
+    require(!sComboCustomTitleCardPresentation,
+            "native boot must clear a previous transient custom-title presentation scope");
     require(gSaveContext.entranceIndex == ENTR_LOST_WOODS_SOUTH_EXIT,
             "the return crossing must reach OoT Lost Woods, not the Market or Link's House");
     require(gSaveContext.respawnFlag == 2 && gSaveContext.respawn[RESPAWN_MODE_RETURN].roomIndex == 0 &&

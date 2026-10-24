@@ -57,7 +57,7 @@ def prepared_resources(manifest_path, bundle_path=None):
     metadata = json.loads(Path(manifest_path).read_text())
     polish = metadata.get('presentation_polish')
     if polish is not None:
-        if polish.get('version') != 1 or not isinstance(polish.get('resources'), dict):
+        if polish.get('version') != 2 or not isinstance(polish.get('resources'), dict):
             raise ValueError('Unsupported native forest presentation polish')
         from forest_presentation import apply
         polished = apply(resources)

@@ -1,5 +1,5 @@
-// Reuse OoT's Lost Woods place card for ordinary ComboShip visits to MM's
-// opening forest. The donor ResourceManager selects Djipi/Alt or native art.
+// Reuse the built-in native Lost Woods place card for ordinary ComboShip
+// visits to MM's opening forest. MM selects optional HD/Alt or native art.
 #ifdef COMBO_BUILD
 #include "global.h"
 #include "2s2h/Enhancements/Gameplay/ComboOpeningForest.h"
@@ -27,14 +27,14 @@ extern "C" int ComboPlaceTitleCard_Show(PlayState* play, TexturePtr texture, u8 
 }
 
 namespace {
-constexpr char kLostWoodsCard[] = "textures/g_pn_36/gLostWoodsTitleCardENGTex";
+constexpr char kLostWoodsCard[] = "custom/oot_location_titles/v1/lost_woods";
 // Raw texture commands reserve odd addresses for segmented-pointer tags.
-alignas(2) constexpr char kRoutedLostWoodsCard[] = "__OTR__@oot:textures/g_pn_36/gLostWoodsTitleCardENGTex";
+alignas(2) constexpr char kRoutedLostWoodsCard[] = "__OTR__@mm:custom/oot_location_titles/v1/lost_woods";
 bool sPendingOpeningTitle = false;
 
 bool HasLostWoodsCard() {
-    // A missing donor must never resolve through MM's active resource manager.
-    const auto owner = Ship::CrossRMRegistry::Get("oot");
+    // Check the same owner that resolves the routed draw path.
+    const auto owner = Ship::CrossRMRegistry::Get("mm");
     const auto archives = owner ? owner->GetArchiveManager() : nullptr;
     if (!archives)
         return false;

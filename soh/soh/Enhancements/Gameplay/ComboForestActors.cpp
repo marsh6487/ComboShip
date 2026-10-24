@@ -71,7 +71,8 @@ void Update() {
     };
     if (play->roomCtx.curRoom.num == 0) {
         const auto side = ForestActorPlacements::SariaOffset(COMBO_SOLO_FOREST_STUMP_YAW);
-        ensure(1, kViewer, kSaria, COMBO_SOLO_FOREST_STUMP_X + side.x, COMBO_SOLO_FOREST_STUMP_Z + side.z, 0, 0);
+        ensure(1, kViewer, kSaria, COMBO_SOLO_FOREST_STUMP_X + side.x, COMBO_SOLO_FOREST_STUMP_Z + side.z, 0,
+               COMBO_SOLO_FOREST_STUMP_YAW);
         const float angle = COMBO_SOLO_FOREST_STUMP_YAW * (6.28318530718f / 65536.0f);
         const float sine = std::sin(angle), cosine = std::cos(angle);
         auto* beacon = Find(play, kViewer, kSaria);
@@ -82,7 +83,7 @@ void Update() {
         ensure(2, ACTOR_EN_HORSE, kHorse,
                COMBO_SOLO_FOREST_STUMP_X + lateral * cosine + ForestActorPlacements::kFlankDepth * sine,
                COMBO_SOLO_FOREST_STUMP_Z - lateral * sine + ForestActorPlacements::kFlankDepth * cosine, 0,
-               static_cast<s16>(COMBO_SOLO_FOREST_STUMP_YAW + 0x8000));
+               COMBO_SOLO_FOREST_STUMP_YAW);
     } else {
         ensure(4, kViewer, kSkullKid, ForestActorPlacements::kSkullKidX, ForestActorPlacements::kSkullKidZ,
                ForestActorPlacements::kSkullKidLift, ForestActorPlacements::kSkullKidYaw);

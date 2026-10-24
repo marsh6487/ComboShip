@@ -7,6 +7,8 @@
 
 # Unignore our custom assets and header file
 !custom/**/*
+# Restored from the bounded lossless source pool before packaging.
+custom/objects/combo_spin/
 !2s2h_assets.h
 
 # Restored from the verified native forest/market source bundles.

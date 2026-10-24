@@ -61,6 +61,10 @@ static void Whip_Stop(Player *p, PlayState *s) {
   ++cleanups[7];
   whipActive = 0;
 }
+#ifndef REAL_SEASONS_STOW
+u8 Seasons_IsDrawn(void) { return 0; }
+static void Seasons_Stow(PlayState* play, Player* player) {}
+#endif
 #include "mods/items/custom_items_stow.c"
 
 s8 Player_ItemToItemAction(s32 item);

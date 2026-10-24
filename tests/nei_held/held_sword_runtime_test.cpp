@@ -14,6 +14,7 @@
 static std::set<std::string> local, donor, shipped, alternate, localMods, foreignMods;
 static bool altOn = false, bodySelected = false, fourEquipped = false, adult = false;
 static bool adultMode = false, shippedOwnerReady = true;
+static int vanillaHeldSwords = -1; // -1 leaves the CVar absent, exercising the production default.
 static u8 kokiriLevel = 0, trueMaster = 0, greatFairy = 0;
 static bool gildedLook = true, fairyLook = true;
 static Gfx hand[1]{}, nativeBlade[1]{}, nativeHilt[1]{}, original[1]{};
@@ -54,6 +55,8 @@ u8 Player_IsCustomLinkModel() { return bodySelected; }
 #endif
 void gSPDisplayList(Gfx* command, Gfx* display) { __gSPDisplayList(command, display); }
 s32 CVarGetInteger(const char* name, s32 fallback) {
+    if (!std::strcmp(name, "gEnhancements.SkijerNEI.UseVanillaHeldSwords"))
+        return vanillaHeldSwords < 0 ? fallback : vanillaHeldSwords;
     if (std::strstr(name, "GildedUsesGildedLook")) return gildedLook;
     if (std::strstr(name, "BgsUsesGfsLook")) return fairyLook;
     return fallback;
@@ -117,6 +120,7 @@ static void allResources() {
     shipped = donor = local;
     altOn = bodySelected = fourEquipped = adult = false;
     adultMode = false;
+    vanillaHeldSwords = -1;
     shippedOwnerReady = true;
     kokiriLevel = trueMaster = greatFairy = 0;
     gildedLook = fairyLook = true;
@@ -129,8 +133,9 @@ static void swordHand(Player& player, int action, int item) {
     player.heldItemId = item;
 #ifdef NEI_EQUIPMENT_MM
     player.transformation = PLAYER_FORM_HUMAN;
-    player.leftHandType = action == PLAYER_IA_SWORD_BIGGORON ? PLAYER_MODELTYPE_LH_TWO_HAND_SWORD
-                                                          : PLAYER_MODELTYPE_LH_ONE_HAND_SWORD;
+    player.leftHandType = action == PLAYER_IA_SWORD_BIGGORON || action == PLAYER_IA_SWORD_TWO_HANDED
+                             ? PLAYER_MODELTYPE_LH_TWO_HAND_SWORD
+                             : PLAYER_MODELTYPE_LH_ONE_HAND_SWORD;
 #else
     player.leftHandType = action == PLAYER_IA_SWORD_BIGGORON ? PLAYER_MODELTYPE_LH_BGS : PLAYER_MODELTYPE_LH_SWORD;
     gSaveContext.swordHealth = 8.f;
@@ -172,11 +177,15 @@ static void expectUntouched(Player& player) {
 }
 
 static void expectCombinedHandPriority(Player& player, int sword, const char* path) {
-    for (bool alt : {false, true}) {
-        altOn = alt;
-        localMods.insert(path); expectUntouched(player); localMods.clear();
-        foreignMods.insert(path); expectUntouched(player); foreignMods.clear();
+    for (int appearance : {0, 1}) {
+        vanillaHeldSwords = appearance;
+        for (bool alt : {false, true}) {
+            altOn = alt;
+            localMods.insert(path); expectUntouched(player); localMods.clear();
+            foreignMods.insert(path); expectUntouched(player); foreignMods.clear();
+        }
     }
+    vanillaHeldSwords = -1;
     // An inactive Alt hand does not own the draw; a live toggle immediately does.
     alternate.insert(path); altOn = false; expectAuthored(player, sword);
     altOn = true; expectUntouched(player); alternate.clear(); altOn = false;
@@ -192,6 +201,122 @@ static void expectFourSeparateFromGenericSwordMods(Player& player, const char* p
     altOn = false; expectAuthored(player, NEI_HELD_SWORD_FOUR);
     altOn = true; expectAuthored(player, NEI_HELD_SWORD_FOUR);
     alternate.clear(); altOn = false;
+}
+
+static void expectAppearanceToggle(Player& player, int sword, int nativeAura = -1, bool separateHilt = false) {
+    const SaveContext saveBefore = gSaveContext;
+    for (int appearance : {0, 1, 0, 1, 0}) {
+        vanillaHeldSwords = appearance;
+        if (!appearance) {
+            expectAuthored(player, sword);
+        } else if (nativeAura < 0) {
+            expectUntouched(player);
+        } else {
+            const Player before = player;
+            Gfx* selected = original;
+            assert(WeaponUpgrade_ApplyHeldSwordDL(&selected, hand, &player, 12, 34, 56));
+            assert(std::memcmp(&player, &before, sizeof(player)) == 0);
+            assert(selected[0].words.w1 == reinterpret_cast<uintptr_t>(nativeBlade));
+            const int handIndex = separateHilt ? 2 : 1;
+            if (separateHilt) assert(selected[1].words.w1 == reinterpret_cast<uintptr_t>(nativeHilt));
+            assert(selected[handIndex].words.w1 == reinterpret_cast<uintptr_t>(hand));
+            assert((selected[handIndex + 1].words.w0 >> 24) == G_RDPPIPESYNC);
+            assert((selected[handIndex + 2].words.w0 >> 24) == G_SETENVCOLOR &&
+                   selected[handIndex + 2].words.w1 == 0x0c223800);
+            assert((selected[handIndex + 4].words.w0 >> 24) == G_ENDDL);
+            assert(registeredHand == selected && registeredAura == nativeAura &&
+                   "Native progressive blades must retain their own elemental aura profile");
+        }
+        assert(std::memcmp(&gSaveContext, &saveBefore, sizeof(gSaveContext)) == 0);
+    }
+}
+
+static void testVanillaHeldSetting() {
+    for (bool alt : {false, true}) {
+        allResources();
+        altOn = alt;
+        // An unset setting and explicit false both preserve every authored
+        // sword/frame. Already-populated wrappers must not latch that decision.
+        for (int sword = 0; sword < NEI_HELD_SWORD_COUNT; ++sword) {
+            for (int rig = 0; rig < NEI_HELD_SWORD_FRAME_COUNT; ++rig) {
+                vanillaHeldSwords = -1;
+                assert(NeiHeldSword_ModelDL(sword, rig));
+                for (int appearance : {1, 0, 1, 0}) {
+                    vanillaHeldSwords = appearance;
+                    assert(bool(NeiHeldSword_ModelDL(sword, rig)) == !appearance &&
+                           "The live vanilla preference did not bypass the authored held sword");
+                }
+            }
+        }
+        for (const char* path : {
+                 "__OTR__objects/gameplay_keep/gRazorSwordBladeDL",
+                 "__OTR__objects/gameplay_keep/gRazorSwordHandleDL",
+                 "__OTR__objects/object_link_child/gLinkHumanGildedSwordBladeDL",
+                 "__OTR__objects/object_link_child/gLinkHumanGildedSwordHandleDL",
+                 "__OTR__objects/object_link_child/gLinkHumanGreatFairysSwordDL"})
+            local.insert(path);
+        for (bool adultFrame : {false, true}) {
+            adult = adultFrame;
+#ifndef NEI_EQUIPMENT_MM
+            gSaveContext.linkAge = adult ? LINK_AGE_ADULT : LINK_AGE_CHILD;
+#endif
+            Player player{};
+            swordHand(player, PLAYER_IA_SWORD_KOKIRI, ITEM_SWORD_KOKIRI);
+#ifdef NEI_EQUIPMENT_MM
+            const int kokiri = NEI_HELD_SWORD_MM_KOKIRI;
+#else
+            const int kokiri = NEI_HELD_SWORD_KOKIRI;
+#endif
+            expectAppearanceToggle(player, kokiri);
+            kokiriLevel = 1;
+            expectAppearanceToggle(player, NEI_HELD_SWORD_RAZOR, SWORD_AURA_NATIVE_MM_RAZOR, true);
+            kokiriLevel = 2;
+            expectAppearanceToggle(player, NEI_HELD_SWORD_GILDED, SWORD_AURA_NATIVE_MM_GILDED, true);
+            gildedLook = false;
+            expectAppearanceToggle(player, NEI_HELD_SWORD_RAZOR, SWORD_AURA_NATIVE_MM_RAZOR, true);
+            gildedLook = true;
+            kokiriLevel = 0;
+            swordHand(player, PLAYER_IA_SWORD_MASTER, ITEM_SWORD_MASTER);
+            expectAppearanceToggle(player, NEI_HELD_SWORD_MASTER);
+            trueMaster = 1;
+            expectAppearanceToggle(player, NEI_HELD_SWORD_TRUE_MASTER);
+            trueMaster = 0;
+            swordHand(player, PLAYER_IA_SWORD_BIGGORON, ITEM_SWORD_BGS);
+            expectAppearanceToggle(player, NEI_HELD_SWORD_BIGGORON);
+            greatFairy = 1;
+            expectAppearanceToggle(player, NEI_HELD_SWORD_GREAT_FAIRY, SWORD_AURA_NATIVE_MM_FAIRY);
+            fairyLook = false;
+            expectAppearanceToggle(player, NEI_HELD_SWORD_BIGGORON);
+            fairyLook = true;
+            greatFairy = 0;
+#ifdef NEI_EQUIPMENT_MM
+            swordHand(player, PLAYER_IA_SWORD_RAZOR, ITEM_SWORD_RAZOR);
+            expectAppearanceToggle(player, NEI_HELD_SWORD_RAZOR);
+            swordHand(player, PLAYER_IA_SWORD_GILDED, ITEM_SWORD_GILDED);
+            expectAppearanceToggle(player, NEI_HELD_SWORD_GILDED);
+            swordHand(player, PLAYER_IA_SWORD_TWO_HANDED, ITEM_SWORD_GREAT_FAIRY);
+            expectAppearanceToggle(player, NEI_HELD_SWORD_GREAT_FAIRY);
+#else
+            swordHand(player, PLAYER_IA_SWORD_BIGGORON, ITEM_SWORD_KNIFE);
+            gSaveContext.swordHealth = 0;
+            for (int appearance : {0, 1}) {
+                vanillaHeldSwords = appearance;
+                expectUntouched(player);
+            }
+#endif
+            swordHand(player, PLAYER_IA_SWORD_KOKIRI, ITEM_SWORD_KOKIRI);
+            for (int appearance : {0, 1}) {
+                vanillaHeldSwords = appearance;
+                bodySelected = true;
+                expectUntouched(player);
+                bodySelected = false;
+                localMods.insert("__OTR__objects/object_custom_equip/gCustomKokiriSwordDL");
+                expectUntouched(player);
+                localMods.clear();
+            }
+        }
+    }
+    allResources();
 }
 
 int main() {
@@ -373,5 +498,6 @@ int main() {
     swordHand(player, PLAYER_IA_SWORD_KOKIRI, ITEM_SWORD_KOKIRI); gSaveContext.linkAge = LINK_AGE_CHILD;
     expectAuthored(player, NEI_HELD_SWORD_KOKIRI);
 #endif
-    std::cout << "PASS held sword selection: progressive tiers, native frames, complete donor graphs, live Alt/mod priority and untouched player state\n";
+    testVanillaHeldSetting();
+    std::cout << "PASS held sword selection: authored default, live vanilla toggle, native progressive auras, complete donor graphs, Alt/mod priority and untouched player/save state\n";
 }

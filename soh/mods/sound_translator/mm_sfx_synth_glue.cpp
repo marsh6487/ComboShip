@@ -200,8 +200,12 @@ void MmSfxSynth_InitEngine(void) {
     abp->updatesPerFrameScaled = (f32)MMSFX_UPDATES_PER_FRAME / 4.0f;
 
     gMmSfx.numNotes = MMSFX_NUM_NOTES;
-    gMmSfx.maxTempo = 3000; // updatesPerFrame*2880000/48/60
-    gMmSfx.unk_2870 = 60.0f * (f32)MMSFX_UPDATES_PER_FRAME / 32000.0f / 3000.0f;
+    // MM AudioHeap_Init divides by the NTSC frame period in milliseconds,
+    // not its refresh rate. The old threshold clamped Sequence_0's 120 BPM
+    // tempo and advanced its notes before their authored durations elapsed.
+    const f32 ntscFramePeriodMs = 16.713f;
+    gMmSfx.maxTempo = (u32)(abp->updatesPerFrame * 2880000.0f / TATUMS_PER_BEAT / ntscFramePeriodMs);
+    gMmSfx.unk_2870 = 60.0f * abp->updatesPerFrame / abp->aiSamplingFreq / gMmSfx.maxTempo;
     gMmSfx.soundMode = SOUNDMODE_STEREO;
     gMmSfx.audioErrorFlags = 0;
 

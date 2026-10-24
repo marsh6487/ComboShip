@@ -8,16 +8,24 @@
 #include <string>
 #include <tuple>
 
+extern "C" {
+#include "z64.h"
+}
+
 extern "C" PlayState* gPlayState;
 extern "C" void gfx_texture_cache_clear();
 
 namespace {
 using namespace SeasonFoliage;
+enum class Assets { Both, Native, Alt };
 struct Material {
     const char* path;
     Surface surface;
     Region region{};
     uint32_t autumnColor = 0;
+    PixelMask pixelMask = PixelMask::Green;
+    int16_t scene = -1;
+    Assets assets = Assets::Both;
 };
 constexpr Material kMaterials[] = {
 #include "SeasonFoliageMaterials.inc"
@@ -32,7 +40,9 @@ struct Binding {
 std::vector<Binding> sBindings;
 // Retain original/copy allocations for queued renderer pointers and GPU cache
 // keys, including when a different scene or season stops using a texture.
-std::map<std::tuple<const Fast::Texture*, uint32_t, unsigned, unsigned, unsigned, unsigned, unsigned>, Binding> sCopies;
+std::map<std::tuple<const Fast::Texture*, uint32_t, unsigned, unsigned, unsigned, unsigned, unsigned, PixelMask>,
+         Binding>
+    sCopies;
 
 void Restore(const Binding& binding) {
     if (auto rm = binding.owner.lock(); rm && rm->GetCachedResource(binding.path, true) == binding.copy)
@@ -64,10 +74,16 @@ void Update(const PlayState* play) {
     }
     std::vector<Binding> active;
     for (const auto& material : kMaterials) {
+        if (material.scene >= 0 && (!play || play->sceneNum != material.scene))
+            continue;
         const auto tint = Palette(season, material.surface, material.autumnColor);
         if (!tint.color)
             continue;
         for (const char* prefix : { "", "alt/" }) {
+            // Selection follows the requested cache binding, including native
+            // fallback and .meta redirects; target metadata is preserved.
+            if ((material.assets == Assets::Native && *prefix) || (material.assets == Assets::Alt && !*prefix))
+                continue;
             if (*prefix && !rm->IsAltAssetsEnabled())
                 continue;
             const std::string path = std::string(prefix) + material.path;
@@ -79,12 +95,12 @@ void Update(const PlayState* play) {
             });
             if (current != sBindings.end())
                 source = current->source;
-            const auto key = std::tuple{ source.get(),          tint.color,          tint.lightScale,
-                                         material.region.left,  material.region.top, material.region.right,
-                                         material.region.bottom };
+            const auto key = std::tuple{ source.get(),           tint.color,          tint.lightScale,
+                                         material.region.left,   material.region.top, material.region.right,
+                                         material.region.bottom, material.pixelMask };
             auto found = sCopies.find(key);
             if (found == sCopies.end()) {
-                auto copy = BuildTexture(source, tint, material.region);
+                auto copy = BuildTexture(source, tint, material.region, material.pixelMask);
                 if (!copy)
                     continue;
                 found = sCopies.emplace(key, Binding{ rm, path, source, std::move(copy) }).first;

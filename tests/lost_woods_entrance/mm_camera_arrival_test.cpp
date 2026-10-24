@@ -6,6 +6,7 @@
 #include "global.h"
 #include "2s2h/Enhancements/FrameInterpolation/FrameInterpolation.h"
 #include "entrances/LostWoodsEntrance.h"
+#include "entrances/RegionalPassages.h"
 #include <array>
 #include <cassert>
 #include <cmath>
@@ -19,6 +20,10 @@ MtxF* sCurrentMatrix = &sMatrix;
 static s16 sCameraInterfaceFlags;
 extern "C" void ComboForestArrivalCamera_Queue(int) {}
 extern "C" void MagicMirror_QueueArrival(void) {}
+extern "C" int ComboRegionalPassagesMm_ApplyArrival(int) {
+    assert(false && "forest arrival must retain its native route");
+    return 0;
+}
 
 void FrameInterpolation_RecordMatrixTranslate(f32, f32, f32, MatrixMode) {
 }

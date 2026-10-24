@@ -13,6 +13,17 @@ extern int32_t Combo_SOH_ConsumeCrossDungeonArrival(void);
 extern int32_t Combo_SOH_ConsumeCrossBossRecoveryResume(void);
 void SOH_ApplyComboPortalArrival(int allowPlacement);
 static s32 sComboCrossGameTitleCardPending = false;
+static s32 sComboCustomTitleCardPresentation = false;
+
+int Combo_SOH_SwapCustomTitleCardPresentation(int active) {
+    const s32 previous = sComboCustomTitleCardPresentation;
+    sComboCustomTitleCardPresentation = active != 0;
+    return previous;
+}
+
+int Combo_SOH_IsPresentingCustomTitleCard(void) {
+    return sComboCustomTitleCardPresentation;
+}
 
 int Combo_SOH_HasCrossGameTitleCard(void) {
     return sComboCrossGameTitleCardPending;
@@ -23,6 +34,11 @@ int Combo_SOH_ConsumeCrossGameTitleCard(void) {
     sComboCrossGameTitleCardPending = false;
     return pending;
 }
+
+void Combo_SOH_RequestCrossGameTitleCard(void) {
+    gSaveContext.showTitleCard = true;
+    sComboCrossGameTitleCardPending = true;
+}
 #endif
 
 void TitleSetup_InitImpl(GameState* gameState) {
@@ -30,6 +46,7 @@ void TitleSetup_InitImpl(GameState* gameState) {
     SaveContext_Init();
 #ifdef COMBO_BUILD
     sComboCrossGameTitleCardPending = false;
+    sComboCustomTitleCardPresentation = false;
     if (gComboReturnFileNum >= 0) {
         // Combo MM->OOT return: mirror FileChoose_LoadGame (z_file_choose.c) to load the OOT save and
         // jump directly to Play, then override the entrance so Link spawns in the Market outside the

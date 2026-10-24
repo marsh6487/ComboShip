@@ -109,7 +109,10 @@ for marker in ['extern "C" int Combo_MM_CrossDungeonEntranceFromRegion', 'extern
     program+='\n'+block(oracle,marker)+'\n'
 program+='\n'+block(boss,'extern "C" int Combo_MM_CrossBossLogicalClear')+'\n'
 title=(ROOT/'mm/src/code/title_setup.c').read_text()
-title_block=title[title.index('        s32 crossDungeonArrival ='):title.index('        ComboFw_ApplyArrival();')]
+# Keep this fixture scoped to entrance recovery, before the independently tested
+# Farore/title-card composition. The recall call now stores its return value.
+title_end=title.rfind('\n',0,title.index('ComboFw_ApplyArrival()'))
+title_block=title[title.index('        s32 crossDungeonArrival ='):title_end]
 program+='\nstatic bool gComboEntryIsResume=false;\nvoid NativeTitleArrival() {\n'+title_block+'\n}\n'
 # Execute the actual late native player-start override after title materialization.
 # Routing/respawn assertions alone cannot detect a saved-location marker replacing

@@ -369,7 +369,7 @@ static void MagicCape_UpdateVertices(void) {
 static void MagicCape_Draw(Player* player, PlayState* play) {
     // (Availability gate = the ResourceMgr_FileExists texture guard below — OotAssets_Available()'s
     // global mount flag was another possible silent blocker and is redundant with the real check.)
-    if (!sCapeInitialized)
+    if (!sCapeInitialized || (player->stateFlags2 & PLAYER_STATE2_20000000))
         return;
     // Skip cape rendering while riding Epona (and other special states): the player skeleton
     // is in horse pose, shoulder limbs land in unexpected positions, and the cape produces
@@ -554,9 +554,11 @@ static void MagicCape_Behavior(Player* player, PlayState* play) {
         return;
     }
 
-    // Skip during cutscenes
-    if (player->stateFlags1 &
-        (PLAYER_STATE1_DEAD | PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_LOADING | PLAYER_STATE1_IN_ITEM_CS)) {
+    // Hidden player draws do not refresh the shoulders; snap cloth to the current
+    // anchors on reveal, just as after a cutscene.
+    if ((player->stateFlags2 & PLAYER_STATE2_20000000) ||
+        (player->stateFlags1 &
+         (PLAYER_STATE1_DEAD | PLAYER_STATE1_IN_CUTSCENE | PLAYER_STATE1_LOADING | PLAYER_STATE1_IN_ITEM_CS))) {
         if (sCapeInitialized) {
             MagicCape_Reset();
         }

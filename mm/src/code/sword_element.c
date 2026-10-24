@@ -104,7 +104,7 @@ uint8_t SwordElement_ForItem(uint16_t item) {
     return SwordElement_IsAvailable(element) ? element : SWORD_ELEMENT_NONE;
 }
 
-uint8_t SwordElement_Active(PlayState* play, Player* player) {
+uint8_t SwordElement_IsRegularSword(PlayState* play, Player* player) {
     if (play == NULL || player == NULL || player != GET_PLAYER(play) ||
         (player->transformation != PLAYER_FORM_HUMAN || CustomForms_ActiveForm() != CUSTOM_FORM_NONE) ||
         BossRemains_IsOdolwaWorn() || BossRemains_IsGohtWorn() || ExtEquip_ShouldHideSwordDL() ||
@@ -116,5 +116,9 @@ uint8_t SwordElement_Active(PlayState* play, Player* player) {
         player->heldItemAction != PLAYER_IA_SWORD_RAZOR && player->heldItemAction != PLAYER_IA_SWORD_GILDED &&
         player->heldItemAction != PLAYER_IA_SWORD_TWO_HANDED)
         return SWORD_ELEMENT_NONE;
-    return SwordElement_ForItem(player->heldItemId);
+    return SwordElement_SlotForItem(player->heldItemId) >= 0;
+}
+
+uint8_t SwordElement_Active(PlayState* play, Player* player) {
+    return SwordElement_IsRegularSword(play, player) ? SwordElement_ForItem(player->heldItemId) : SWORD_ELEMENT_NONE;
 }

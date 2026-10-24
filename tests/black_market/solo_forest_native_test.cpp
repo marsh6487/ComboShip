@@ -12,6 +12,9 @@
 #include <type_traits>
 extern "C" { int gComboGameMode; }
 SaveContext gSaveContext{};
+// Native title policy is exercised by the two lost_woods_entrance title suites.
+extern "C" void Combo_MM_RequestCrossGameTitleCard(void) {}
+extern "C" void Combo_SOH_RequestCrossGameTitleCard(void) {}
 PlayState* gPlayState;
 #ifndef OOT_FOREST_TEST
 GameState* gGameState;

@@ -408,6 +408,10 @@ extern "C" void GlobalOutdoorRain_Resolve(PlayState* play) {
         sRainSource = GlobalOutdoorRainSource::SeasonalPresentation;
         play->envCtx.unk_EE[0] = sSeasonRequest.density;
         sOwnsDensity = true;
+        // Seasonal rain uses the placed-rain loop, while a live Song of
+        // Storms keeps its independent native target and ambience channel.
+        if (Audio_IsNatureRainEnabled() && play->envCtx.unk_F2[0] == 0)
+            Audio_SetNatureAmbienceChannelIO(NATURE_CHANNEL_RAIN, CHANNEL_IO_PORT_1, 0);
         PlayRainLoop(sSeasonRequest.intensity);
         UpdateLightning(play, false, false);
     } else if (sOwnsDensity && sRainSource != GlobalOutdoorRainSource::EnhancedOutdoor) {

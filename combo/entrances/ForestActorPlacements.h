@@ -2,10 +2,11 @@
 #include <cmath>
 
 namespace ForestActorPlacements {
-// Clear of the stock tree at the portal's side, mouth and forward arrival.
-inline constexpr float kSariaLateral = -230.0f;
+// Flank the authored radius-68 rim and keep its forward walking lane clear.
+// These local offsets are checked against the retained native floor/walls.
+inline constexpr float kSariaLateral = -120.0f;
 inline constexpr float kFlankDepth = 120.0f;
-inline constexpr float kHorseLateral = 230.0f;
+inline constexpr float kHorseLateral = 120.0f;
 // Raised mushroom/tree ledge on the left of the second clearing, as marked
 // in cor's placement screenshot. Retain the reclining float above its floor.
 inline constexpr float kSkullKidX = 2302.0f, kSkullKidZ = -185.0f;

@@ -87,8 +87,12 @@ int main() {
  importFailure=ImportFailure::None;
  assert(PackAvailable() && "native model failure must remain retryable");
 #endif
- assert(!files.count("custom/skiejer_market/texture/arcane_stone"));
- assert(!files.count("custom/skiejer_market/title"));
+ assert(files.count("custom/skiejer_market/texture/arcane_stone"));
+ files.erase("custom/skiejer_market/texture/arcane_stone");
+ assert(!PackAvailable() && "the shipped shelf surface is a required default dependency");
+ files.insert("custom/skiejer_market/texture/arcane_stone");
+ assert(PackAvailable());
+ assert(files.count("custom/skiejer_market/title") && "default location card is a shipped core resource");
  assert(!files.count("CosmeticEntries"));
  assert(!files.count("/* OTHER */"));
  files.erase("objects/object_bg/gTreasureChestShopGalSkel");

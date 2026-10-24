@@ -7,12 +7,14 @@ sys.path.insert(0, str(ROOT / "scripts/diagnostics"))
 from run_time_pedestal_tests import block_from
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--include", type=Path, action="append", default=[])
-parser.add_argument("--case", choices=("all", "door-marker", "door-entry", "door-return", "door-open"), default="all")
+parser.add_argument("--case", choices=("all", "door-marker", "door-entry", "door-return", "door-open", "door-exit", "receipt"), default="all")
 args = parser.parse_args()
 source = (ROOT / "soh/soh/Enhancements/Gameplay/ComboBlackMarketNative.cpp").read_text()
 signatures = ["bool Interior(", "bool Exterior(", "bool Active(", "bool Safe(",
               "void RememberTravel(", "bool MatchesTravel(", "void StageReturn(", "void Transition(",
-              "const Item* Offer(", "PurchaseResult Status(", "void Purchase(",
+              "const Item* Offer(", "PurchaseResult Status(",
+              "bool ReceiptContext(", "void CancelReceipt(", "bool PendingReceiptEntry(",
+              "bool FixedMarketGrant(", "void ReceiveMarketItem(", "bool Purchase(", "void MonitorReceipt(",
               "void PlayerUpdate(", "void BindSolo(", "void SaveMarket(", "void RegisterKeeperActor(", "void PresentTitle(", "void DrawOffer(",
               'extern "C" void ComboBlackMarketOot_NormalizeEntry(',
               'extern "C" void ComboBlackMarketOot_ReportClear(',
@@ -21,6 +23,7 @@ body = "\n".join(block_from(source, source.index(s)) for s in signatures)
 body += "\n" + "\n".join(block_from(source, source.index(s)) for s in
                           ("void LogDoorAttempt(", "void LogEntryRecovery("))
 fixture = (ROOT / "tests/black_market/oot_native_test.cpp").read_text().replace("/* PRODUCTION */", body)
+fixture = fixture.replace("/* CARD_RESOURCE */", re.search(r'alignas\(2\) constexpr char kCard\[\][^;]*;', source)[0])
 player_source = (ROOT / "soh/src/overlays/actors/ovl_player_actor/z_player.c").read_text()
 cleanup_signatures = ["BAD_RETURN(s32) Player_ZeroSpeedXZ(Player* this) {", "void Player_ApplyYawFromAnim(",
                       "void Player_ResetAnimMovement(", "void Player_FinishAnimMovement(",

@@ -86,6 +86,14 @@ static void PrepareResourceEntry(const char* scenario, const char* forest, bool 
     assert(RealForestAvailable(forest) == inputResources.at("full_real_inputs").get<bool>());
 }
 
+static int ResourceRupees() {
+#ifdef OOT_RESOURCE_ENTRY_TEST
+    return gSaveContext.rupees;
+#else
+    return gSaveContext.save.saveInfo.playerData.rupees;
+#endif
+}
+
 static void TestResourceEntryCycle(const char* scenario, const char* forest, bool stock) {
     PrepareResourceEntry(scenario, forest, stock);
     const bool full = inputResources.at("full_real_inputs");
@@ -130,14 +138,45 @@ static void TestResourceEntryCycle(const char* scenario, const char* forest, boo
         assert(play.transitionTrigger == TRANS_TRIGGER_OFF && Interior());
         assert(sSession.Active(gSaveContext.fileNum) == stock);
         if (!stock) {
-            Purchase(); assert(grants == 0 && writes == 0);
+            assert(!Purchase() && !sReceipt.pending && grants == 0 && writes == 0);
 #ifndef OOT_RESOURCE_ENTRY_TEST
             u16 text = BlackMarketEntry::kUnavailableText; bool fromTable = true;
             MarketText(&text, &fromTable);
             assert(!fromTable && text < 0x4E20 && CustomMessage::last.msg.find("wares aren't ready") != std::string::npos);
 #endif
         } else if (cycle == 0) {
-            Purchase(); assert(grants == 1 && writes == 1 && sSession.state.purchased == 1);
+            const int rupees = ResourceRupees();
+            const int price = sSession.market["stock"][0]["price"];
+            assert(Purchase() && sReceipt.pending && !sReceipt.delivered);
+            assert(grants == 0 && writes == 0 && sSession.state.purchased == 0 && ResourceRupees() == rupees);
+#ifdef OOT_RESOURCE_ENTRY_TEST
+            MonitorReceipt();
+            assert(sReceipt.offered && grants == 0 && writes == 0 && ResourceRupees() == rupees);
+            const auto receipt = lastOfferedEntry;
+            NativeAcquire(receipt);
+#else
+            Actor* receipt = OfferFixtureReceipt();
+            assert(grants == 0 && writes == 0 && ResourceRupees() == rupees);
+            GiveMarketReceipt(receipt, &play);
+#endif
+            assert(sReceipt.delivered && grants == 1 && writes == 1 && sSession.state.purchased == 1);
+            assert(ResourceRupees() == rupees - price);
+#ifdef OOT_RESOURCE_ENTRY_TEST
+            NativeAcquire(receipt); // A repeated native notification cannot charge or grant again.
+            player.stateFlags1 &= ~(PLAYER_STATE1_GETTING_ITEM | PLAYER_STATE1_IN_ITEM_CS);
+            play.msgCtx.msgMode = 0; inCs = false; activeCamera = CAM_ID_MAIN;
+            MonitorReceipt(); // Native GI/dialogue completion releases the delivered receipt.
+            assert(browseStarts == 1 && browseMessages == 1 && sSelected == 0 && sBrowser.slot == 0 && sTalking);
+#else
+            GiveMarketReceipt(receipt, &play);
+            MarketReceiptDestroyed(receipt, &play);
+            CancelReceipt(true);
+            assert(!sReceiptActor && std::holds_alternative<GIEventNone>(receiptInteractor.currentEvent));
+#endif
+            assert(!sReceipt.pending && grants == 1 && writes == 1 && sSession.state.purchased == 1);
+            assert(ResourceRupees() == rupees - price);
+            EndBrowsing(&play, false);
+            assert(!sTalking);
         } else {
             assert(grants == 1 && writes == 1 && sSession.state.purchased == 1);
         }

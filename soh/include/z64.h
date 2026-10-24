@@ -739,7 +739,8 @@ typedef enum {
     /* 0x07 */ DO_ACTION_DIVE,
     /* 0x08 */ DO_ACTION_FASTER,
     /* 0x09 */ DO_ACTION_THROW,
-    /* 0x0A */ DO_ACTION_NONE, // in do_action_static, the texture at this position is NAVI, however this value is in practice the "No Action" value
+    /* 0x0A */ DO_ACTION_NONE, // in do_action_static, the texture at this position is NAVI, however this value is in
+                               // practice the "No Action" value
     /* 0x0B */ DO_ACTION_CLIMB,
     /* 0x0C */ DO_ACTION_DROP,
     /* 0x0D */ DO_ACTION_DOWN,
@@ -758,7 +759,9 @@ typedef enum {
     /* 0x1A */ DO_ACTION_6,
     /* 0x1B */ DO_ACTION_7,
     /* 0x1C */ DO_ACTION_8,
-    /* 0x1D */ DO_ACTION_MAX
+    /* 0x1D */ DO_ACTION_MAX,
+    // Keep the native 0x1D/0x1E no-action sentinels; custom labels start after them.
+    /* 0x1F */ DO_ACTION_EXPLODE = 0x1F
 } DoAction;
 
 typedef struct {

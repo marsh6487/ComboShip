@@ -1,6 +1,7 @@
 #include "global.h"
 #include "ComboGameMode.h"
 #include "entrances/LostWoodsEntrance.h"
+#include "gameplay/CrossGameTitleCard.h"
 #include "soh/Enhancements/game-interactor/vanilla-behavior/GIVanillaBehavior.h"
 #include <nlohmann/json.hpp>
 #include <array>
@@ -76,6 +77,7 @@ GameInteractor interactor;
 GameInteractor* GameInteractor::Instance = &interactor;
 struct RegisterShipInitFunc { explicit RegisterShipInitFunc(void (*callback)()) { callback(); } };
 
+/* PRODUCTION_REQUEST_STATE */
 /* PRODUCTION_ROUTE */
 /* NATIVE_RETURN_TABLES */
 
@@ -175,6 +177,8 @@ int main() {
                 Resolve(ENTR_KOKIRI_FOREST_UPPER_EXIT);
                 Require(play.nextEntranceIndex == ENTR_GREAT_FAIRYS_FOUNTAIN_MAGIC_DMT && shuffled == 0,
                         "unmodified room-7 straight tunnel must reach the Fairy without any scene archive");
+                Require(Combo_SOH_ConsumeCrossGameTitleCard(),
+                        "a claimed custom fountain entrance must request its native destination card");
                 Scene(SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC, play.nextEntranceIndex);
                 Resolve(ENTR_RETURN_DAIYOUSEI_IZUMI);
                 const auto& local = gSaveContext.respawn[RESPAWN_MODE_RETURN];
@@ -183,6 +187,8 @@ int main() {
                         "native tunnel must return to a safe approach outside its own exit floor");
                 Require(shuffled == 0 && dynamicShuffled == 0,
                         "native Fairy round trip must stay fixed with entrance shuffle enabled");
+                Require(Combo_SOH_ConsumeCrossGameTitleCard() && !Combo_SOH_ConsumeCrossGameTitleCard(),
+                        "the positioned fountain return must request one Lost Woods destination card");
             }
         }
     }
